@@ -15,6 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Ελεύθερος χώρος στον δίσκο
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
@@ -56,7 +62,11 @@ jobs:
             BIN="$SDK/cmdline-tools/latest/bin"
             IMG="system-images;android-34;google_apis;x86_64"
             yes | "$BIN/sdkmanager" --licenses > /dev/null || true
-            "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1 || tail -20 sdk.log
+            df -h /
+            if ! "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1; then
+              echo "sdkmanager απέτυχε:"; tr '\r' '\n' < sdk.log | grep -v "^ *\[\|%" | tail -15
+            fi
+            df -h /
             echo no | "$BIN/avdmanager" create avd -n perf -k "$IMG" -d pixel_6 --force || \
               echo no | "$BIN/avdmanager" create avd -n perf -k "$IMG" --force
             export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
