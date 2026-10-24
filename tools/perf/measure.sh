@@ -74,3 +74,8 @@ jobs=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -c "$PKG" || true)
 alarms=$(adb shell dumpsys alarm | tr -d '\r' | grep -c "$PKG" || true)
 wl=$(adb shell dumpsys power | tr -d '\r' | grep -i "wake" | grep -c "$PKG" || true)
 say "- Services: $svc · Jobs: $jobs · Alarms: $alarms · Wakelocks: $wl"
+
+say ""
+say "### Λεπτομέρειες παρασκηνίου"
+adb shell dumpsys activity services "$PKG" | tr -d '\r' | grep -E "ServiceRecord|intent=" | head -6 | sed 's/^ */- /' | tee -a "$OUT"
+adb shell dumpsys jobscheduler | tr -d '\r' | grep "$PKG" | grep -E "JOB #|Job #|#u0" | head -6 | sed 's/^ */- /' | tee -a "$OUT"
