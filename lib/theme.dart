@@ -222,7 +222,12 @@ class FoodTheme extends StatelessWidget {
     final c = Aigaio.of(context);
     return Theme(
       data: t.copyWith(
-        colorScheme: t.colorScheme.copyWith(primary: Aigaio.foodSolid, onPrimary: Colors.white),
+        colorScheme: t.colorScheme.copyWith(
+          primary: Aigaio.foodSolid,
+          onPrimary: Colors.white,
+          secondary: Aigaio.foodSolid,
+          onSecondary: Colors.white,
+        ),
         textButtonTheme: TextButtonThemeData(
           style: (t.textButtonTheme.style ?? const ButtonStyle()).copyWith(
             foregroundColor: WidgetStatePropertyAll(c.food),

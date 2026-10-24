@@ -45,17 +45,36 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm || echo "Χωρίς KVM"
 
-      - name: Μέτρηση στον emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash tools/perf/measure.sh perf.apk perf.md > perf.log 2>&1 || true
+      - name: Emulator και μέτρηση
+        run: |
+          # Όλα σε ένα βήμα, με το log σε αρχείο (τα logs του Actions δεν διαβάζονται από έξω).
+          {
+            set -x
+            SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+            BIN="$SDK/cmdline-tools/latest/bin"
+            IMG="system-images;android-34;google_apis;x86_64"
+            yes | "$BIN/sdkmanager" --licenses > /dev/null || true
+            "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1 || tail -20 sdk.log
+            echo no | "$BIN/avdmanager" create avd -n perf -k "$IMG" -d pixel_6 --force || \
+              echo no | "$BIN/avdmanager" create avd -n perf -k "$IMG" --force
+            export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
+            nohup emulator -avd perf -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
+              -no-snapshot -camera-back none -camera-front none -memory 4096 > emu.log 2>&1 &
+            timeout 600 adb wait-for-device || { echo "Ο emulator δεν εμφανίστηκε"; tail -60 emu.log; }
+            for i in $(seq 1 120); do
+              [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break
+              sleep 5
+            done
+            adb shell getprop sys.boot_completed
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+            sleep 20
+            bash tools/perf/measure.sh perf.apk perf.md
+            tail -30 emu.log
+          } > perf.log 2>&1 || true
 
       - name: Αποτελέσματα
         if: always()
