@@ -627,17 +627,20 @@ class Hypnogram extends StatelessWidget {
                 s.name,
               ),
           ],
-          onDark ? Colors.white.withValues(alpha: 0.08) : Aigaio.of(context).background,
+          onDark ? Colors.white.withValues(alpha: 0.10) : Aigaio.of(context).hairline,
+          onDark ? Colors.white.withValues(alpha: 0.35) : Aigaio.of(context).textTertiary.withValues(alpha: 0.5),
         ),
       ),
     );
   }
 }
 
+/// Υπνόγραμμα: κάθε φάση στη γραμμή της, ενωμένες με λεπτές κάθετες, όπως στα εργαστήρια ύπνου.
 class _HypnoPainter extends CustomPainter {
-  _HypnoPainter(this.parts, this.track);
+  _HypnoPainter(this.parts, this.guide, this.connector);
   final List<(double, double, String)> parts;
-  final Color track;
+  final Color guide;
+  final Color connector;
 
   // Από πάνω προς τα κάτω: ξύπνιος, REM, ελαφρύς, βαθύς.
   static const _rows = ['AWAKE', 'REM', 'LIGHT', 'DEEP'];
@@ -645,24 +648,37 @@ class _HypnoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rowH = size.height / _rows.length;
-    final barH = rowH * 0.74;
+    final barH = math.min(rowH * 0.8, 12.0);
+    double centerY(int row) => rowH * row + rowH / 2;
+
+    final guidePaint = Paint()
+      ..color = guide
+      ..strokeWidth = 1;
     for (var i = 0; i < _rows.length; i++) {
-      final y = rowH * i + (rowH - barH) / 2;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(0, y, size.width, barH), Radius.circular(barH / 2)),
-        Paint()..color = track,
-      );
+      final y = centerY(i);
+      for (double x = 0; x < size.width; x += 6) {
+        canvas.drawLine(Offset(x, y), Offset(math.min(x + 2, size.width), y), guidePaint);
+      }
     }
+
+    final link = Paint()
+      ..color = connector
+      ..strokeWidth = 1.2;
+    (double, int)? previous;
     for (final (a, b, name) in parts) {
       final row = _rows.indexOf(name);
       if (row < 0) continue;
       final left = a.clamp(0.0, 1.0) * size.width;
       final right = math.max(b.clamp(0.0, 1.0) * size.width, left + 2);
-      final y = rowH * row + (rowH - barH) / 2;
+      if (previous != null && (left - previous.$1).abs() < 2 && previous.$2 != row) {
+        canvas.drawLine(Offset(left, centerY(previous.$2)), Offset(left, centerY(row)), link);
+      }
+      final y = centerY(row) - barH / 2;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTRB(left, y, right, y + barH), const Radius.circular(3)),
+        RRect.fromRectAndRadius(Rect.fromLTRB(left, y, right, y + barH), Radius.circular(barH / 2.5)),
         Paint()..color = stageColorOf(name),
       );
+      previous = (right, row);
     }
   }
 

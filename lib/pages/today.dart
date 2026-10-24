@@ -297,16 +297,6 @@ class _SleepHero extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [c.nightTop, c.nightBottom],
         ),
-        boxShadow: c.dark
-            ? null
-            : [
-                BoxShadow(
-                  color: c.nightBottom.withValues(alpha: 0.22),
-                  blurRadius: 30,
-                  spreadRadius: -8,
-                  offset: const Offset(0, 14),
-                ),
-              ],
       ),
       child: Material(
         type: MaterialType.transparency,
