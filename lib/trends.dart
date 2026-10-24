@@ -60,13 +60,19 @@ class MetricDef {
   String format(double v) => switch (kind) {
         ValueKind.duration => hoursMinutes(v.round()),
         ValueKind.clock => clockFromSix(v),
-        ValueKind.number => '${dec(v, digits)}${unit.isEmpty ? '' : ' $unit'}',
+        ValueKind.number => _num(v),
       };
+
+  String _num(double v) {
+    final n = digits == 0 && v.abs() >= 1000 ? thousands(v.round()) : dec(v, digits);
+    if (unit.isEmpty) return n;
+    return unit == '%' ? '$n%' : '$n $unit';
+  }
 
   String formatDiff(double d) => switch (kind) {
         ValueKind.duration => hoursMinutes(d.abs().round()),
         ValueKind.clock => hoursMinutes(d.abs().round()),
-        ValueKind.number => '${dec(d.abs(), digits)}${unit.isEmpty ? '' : ' $unit'}',
+        ValueKind.number => _num(d.abs()),
       };
 }
 
@@ -111,6 +117,7 @@ class TrendResult {
     required this.points,
     required this.currentFrom,
     required this.previousFrom,
+    required this.previousEnd,
     required this.end,
   });
 
@@ -129,6 +136,7 @@ class TrendResult {
   final List<(DateTime, double)> points;
   final DateTime currentFrom;
   final DateTime previousFrom;
+  final DateTime previousEnd;
   final DateTime end;
 
   bool get changed => status == TrendStatus.up || status == TrendStatus.down;
@@ -179,36 +187,54 @@ TrendResult computeTrend(
   DateTime today,
   TrendPeriod period,
 ) {
-  DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
-  final end = def.includeToday ? dayOf(today) : add(dayOf(today), -1);
+  final end = def.includeToday ? dayOf(today) : _add(dayOf(today), -1);
   final len = period == TrendPeriod.month ? 30 : 90;
-  final currentFrom = add(end, -(len - 1));
-  final previousEnd = period == TrendPeriod.year ? add(end, -(364 - len + 1)) : add(currentFrom, -1);
-  final previousFrom = add(previousEnd, -(len - 1));
+  final currentFrom = _add(end, -(len - 1));
+  final previousEnd = period == TrendPeriod.year ? _add(end, -(364 - len + 1)) : _add(currentFrom, -1);
+  final previousFrom = _add(previousEnd, -(len - 1));
+  return compareWindows(
+    def,
+    history,
+    currentFrom: currentFrom,
+    end: end,
+    previousFrom: previousFrom,
+    previousEnd: previousEnd,
+    needed: def.sparse ? 3 : (len * 2 / 3).ceil(),
+  );
+}
 
+DateTime _add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
+
+/// Σύγκριση δύο διαστημάτων (με τις άκρες), με τους κανόνες των Τάσεων.
+/// [needed]: πόσες τιμές χρειάζεται κάθε διάστημα.
+TrendResult compareWindows(
+  MetricDef def,
+  Map<String, Map<String, double>> history, {
+  required DateTime currentFrom,
+  required DateTime end,
+  required DateTime previousFrom,
+  required DateTime previousEnd,
+  required int needed,
+  int? neededPrevious,
+}) {
   List<(DateTime, double)> collect(DateTime from, DateTime to) {
     final out = <(DateTime, double)>[];
-    for (var d = from; !d.isAfter(to); d = add(d, 1)) {
+    for (var d = from; !d.isAfter(to); d = _add(d, 1)) {
       final v = history[dateKey(d)]?[def.key];
       if (v != null) out.add((d, v));
     }
     return out;
   }
 
-  final cur = collect(currentFrom, end);
-  final prev = collect(previousFrom, previousEnd);
-  final needed = def.sparse ? 3 : (len * 2 / 3).ceil();
-  final chartFrom = period == TrendPeriod.year ? previousFrom : previousFrom;
-  final points = collect(chartFrom, end);
-
-  final c = cur.map((e) => e.$2).toList();
-  final p = prev.map((e) => e.$2).toList();
+  final c = collect(currentFrom, end).map((e) => e.$2).toList();
+  final p = collect(previousFrom, previousEnd).map((e) => e.$2).toList();
+  final points = collect(previousFrom.isBefore(currentFrom) ? previousFrom : currentFrom, end);
   final mc = median(c);
   final mp = median(p);
 
   TrendStatus status;
   var z = 0.0;
-  if (c.length < needed || p.length < needed || mc == null || mp == null) {
+  if (c.length < needed || p.length < (neededPrevious ?? needed) || mc == null || mp == null) {
     status = TrendStatus.insufficient;
   } else {
     final se = math.sqrt(_variance(c) / c.length + _variance(p) / p.length);
@@ -234,6 +260,7 @@ TrendResult computeTrend(
     points: points,
     currentFrom: currentFrom,
     previousFrom: previousFrom,
+    previousEnd: previousEnd,
     end: end,
   );
 }

@@ -373,6 +373,7 @@ class TodayCard {
 
 const todayCards = <TodayCard>[
   TodayCard('sleep', 'Ύπνος της νύχτας', true),
+  TodayCard('week', 'Απολογισμός εβδομάδας (Κυριακή βράδυ και Δευτέρα)', true),
   TodayCard('energy', 'Energy Score', true),
   TodayCard('rhr', 'Παλμοί στον ύπνο', true),
   TodayCard('steps', 'Βήματα', true),

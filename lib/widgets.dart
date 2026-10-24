@@ -1052,7 +1052,11 @@ class LineChart extends StatelessWidget {
     this.color,
     this.dateLabel,
     this.minRange = 1,
+    this.levels = const [],
   });
+
+  /// Οριζόντιες διακεκομμένες γραμμές ανά διάστημα (π.χ. η μεσαία τιμή κάθε περιόδου στις Τάσεις).
+  final List<(DateTime, DateTime, double, Color)> levels;
 
   /// Ελάχιστο εύρος του κάθετου άξονα, ώστε μικρές διαφορές να μη φαίνονται τεράστιες.
   final double minRange;
@@ -1079,6 +1083,7 @@ class LineChart extends StatelessWidget {
           format: format ?? (v) => v.toStringAsFixed(1),
           dateLabel: dateLabel ?? (d) => '${d.day}/${d.month}',
           minRange: minRange,
+          levels: levels,
         ),
       ),
     );
@@ -1087,6 +1092,7 @@ class LineChart extends StatelessWidget {
 
 class _LinePainter extends CustomPainter {
   _LinePainter({
+    required this.levels,
     required this.points,
     required this.color,
     required this.text,
@@ -1099,6 +1105,7 @@ class _LinePainter extends CustomPainter {
   });
 
   final double minRange;
+  final List<(DateTime, DateTime, double, Color)> levels;
   final List<(DateTime, double)> points;
   final Color color;
   final Color text;
@@ -1118,8 +1125,8 @@ class _LinePainter extends CustomPainter {
     final w = size.width - left - right;
     final h = size.height - bottom - top;
 
-    var minV = points.map((p) => p.$2).reduce(math.min);
-    var maxV = points.map((p) => p.$2).reduce(math.max);
+    var minV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3)].reduce(math.min);
+    var maxV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3)].reduce(math.max);
     if (maxV - minV < minRange) {
       final mid = (maxV + minV) / 2;
       minV = mid - minRange / 2;
@@ -1176,9 +1183,9 @@ class _LinePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = color
+        ..color = levels.isEmpty ? color : color.withValues(alpha: 0.75)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
+        ..strokeWidth = points.length > 60 ? 1.5 : (levels.isEmpty ? 2.5 : 2)
         ..strokeJoin = StrokeJoin.round
         ..strokeCap = StrokeCap.round,
     );
@@ -1186,6 +1193,19 @@ class _LinePainter extends CustomPainter {
       final dot = Paint()..color = color;
       for (final p in points) {
         canvas.drawCircle(at(p), 2.5, dot);
+      }
+    }
+    for (final l in levels) {
+      final a = at((l.$1, l.$3));
+      final b = at((l.$2, l.$3));
+      final x0 = a.dx.clamp(left, left + w).toDouble();
+      final x1 = b.dx.clamp(left, left + w).toDouble();
+      final dash = Paint()
+        ..color = l.$4
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round;
+      for (var x = x0; x < x1; x += 9) {
+        canvas.drawLine(Offset(x, a.dy), Offset(math.min(x + 5, x1), a.dy), dash);
       }
     }
     final last = at(points.last);

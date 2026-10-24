@@ -40,14 +40,16 @@ Future<void> _shot(
   required Brightness brightness,
   required int tab,
   bool backfilling = false,
+  DateTime? at,
   Future<void> Function(WidgetTester)? act,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
 
-  final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
-  store.history = sampleHistory(now, store.data!);
+  final when = at ?? now;
+  final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(when));
+  store.history = sampleHistory(when, store.data!);
   if (backfilling) {
     store.backfilling = true;
     store.backfillProgress = 0.42;
@@ -61,7 +63,7 @@ Future<void> _shot(
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-        home: Shell(store: store, initialIndex: tab, now: now),
+        home: Shell(store: store, initialIndex: tab, now: when),
       ),
     ),
   );
@@ -84,6 +86,14 @@ void main() {
   testWidgets('Σήμερα · κινητό · ανοιχτό', (t) => _shot(t, name: '01_today_phone_light', size: phone, brightness: Brightness.light, tab: 0));
   testWidgets('Σήμερα · κινητό · σκοτεινό', (t) => _shot(t, name: '02_today_phone_dark', size: phone, brightness: Brightness.dark, tab: 0));
   testWidgets('Σήμερα · Fold ανοιχτό', (t) => _shot(t, name: '03_today_open_light', size: open, brightness: Brightness.light, tab: 0));
+  testWidgets('Σήμερα · Κυριακή βράδυ · απολογισμός', (t) => _shot(
+        t,
+        name: '11_week_phone_light',
+        size: tall,
+        brightness: Brightness.light,
+        tab: 0,
+        at: DateTime(2026, 10, 25, 19, 10),
+      ));
   testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: 1));
   testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(
         t,

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/trends.dart';
+import 'package:ygeia_forma/weekly.dart';
 
 /// Συνθετικό ιστορικό με γνωστές αλλαγές, για να ελέγχουμε ότι οι κανόνες των τάσεων κάνουν ό,τι λένε.
 void main() {
@@ -68,5 +69,25 @@ void main() {
     expect(minutesFromSix(DateTime(2026, 1, 1, 0, 30)), 390);
     expect(clockFromSix(390), '00:30');
     expect(clockFromSix(300), '23:00');
+  });
+
+  test('Απολογισμός: πότε φαίνεται', () {
+    expect(reviewWeekSunday(DateTime(2026, 10, 25, 17, 59)), isNull);
+    expect(reviewWeekSunday(DateTime(2026, 10, 25, 18, 0)), DateTime(2026, 10, 25));
+    expect(reviewWeekSunday(DateTime(2026, 10, 26, 9)), DateTime(2026, 10, 25));
+    expect(reviewWeekSunday(DateTime(2026, 10, 27, 9)), isNull);
+  });
+
+  test('Απολογισμός: εβδομάδα Δευτέρα–Κυριακή, η Κυριακή δεν μετρά στα βήματα', () {
+    final sunday = DateTime(2026, 10, 18);
+    final r = buildWeekReview(history, sunday, DateTime(2026, 10, 18, 19));
+    expect(r.monday, DateTime(2026, 10, 12));
+    final steps = r.items.firstWhere((t) => t.def.key == K.steps);
+    expect(steps.end, DateTime(2026, 10, 17));
+    expect(steps.nCurrent, 6);
+    final hr = r.items.firstWhere((t) => t.def.key == K.sleepHr);
+    expect(hr.end, sunday);
+    expect(hr.nCurrent, 7);
+    expect(hr.nPrevious, 28);
   });
 }

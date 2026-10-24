@@ -97,9 +97,17 @@ class _PeriodSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
     return SegmentedButton<TrendPeriod>(
       showSelectedIcon: false,
       style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.primary : c.card,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.onPrimary : c.text,
+        ),
+        side: WidgetStatePropertyAll(BorderSide(color: c.hairline)),
         textStyle: const WidgetStatePropertyAll(
           TextStyle(fontFamily: fontFamily, fontSize: 14.5, fontWeight: FontWeight.w600),
         ),
@@ -199,7 +207,7 @@ class _ChangeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final color = _sectionColor(c, r.def.section);
+    final color = trendSectionColor(c, r.def.section);
     final up = r.status == TrendStatus.up;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -221,7 +229,7 @@ class _ChangeRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _StatusPill(r: r),
+          TrendStatusPill(r: r),
         ],
       ),
     );
@@ -239,7 +247,7 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final color = _sectionColor(c, section);
+    final color = trendSectionColor(c, section);
     return AppCard(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
       child: Column(
@@ -303,7 +311,7 @@ class _MetricRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _StatusPill(r: r),
+                TrendStatusPill(r: r),
                 const SizedBox(width: 4),
                 Icon(
                   expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
@@ -348,6 +356,10 @@ class _MetricDetail extends StatelessWidget {
               format: _axisFormat(def),
               minRange: _minRange(def),
               dateLabel: dayMonth,
+              levels: [
+                if (r.previous != null) (r.previousFrom, r.previousEnd, r.previous!, c.textSecondary),
+                if (r.current != null) (r.currentFrom, r.end, r.current!, c.text),
+              ],
             ),
             const SizedBox(height: 10),
           ],
@@ -358,18 +370,20 @@ class _MetricDetail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 InfoRow(
-                  '${dayMonth(r.currentFrom)} – ${dayMonth(r.end)}',
+                  'Τώρα · ${dayMonth(r.currentFrom)} – ${dayMonth(r.end)}',
                   r.current == null ? '—' : def.format(r.current!),
-                  dot: color,
+                  dot: c.text,
                 ),
                 InfoRow(
-                  '${dayMonth(r.previousFrom)} – ${dayMonth(_previousEnd(r))}',
+                  'Πριν · ${dayMonth(r.previousFrom)} – ${dayMonth(r.previousEnd)}',
                   r.previous == null ? '—' : def.format(r.previous!),
-                  dot: c.textTertiary,
+                  dot: c.textSecondary,
                 ),
                 InfoRow('Με δεδομένα (τώρα)', count(r.nCurrent)),
                 InfoRow('Με δεδομένα (πριν)', count(r.nPrevious)),
                 const Hairline(vertical: 8),
+                Text('Οι διακεκομμένες γραμμές στο γράφημα είναι η μεσαία τιμή κάθε περιόδου.', style: style),
+                const SizedBox(height: 6),
                 Text(_explain(r), style: style),
               ],
             ),
@@ -381,8 +395,8 @@ class _MetricDetail extends StatelessWidget {
 }
 
 /// Το «χάπι» δεξιά: ↓ 3 bpm / Σταθερό / Λίγα δεδομένα.
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.r});
+class TrendStatusPill extends StatelessWidget {
+  const TrendStatusPill({required this.r});
   final TrendResult r;
 
   @override
@@ -403,11 +417,6 @@ class _StatusPill extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-
-DateTime _previousEnd(TrendResult r) {
-  final len = r.end.difference(r.currentFrom).inDays + 1;
-  return DateTime(r.previousFrom.year, r.previousFrom.month, r.previousFrom.day + len - 1);
-}
 
 String _explain(TrendResult r) {
   final def = r.def;
@@ -449,7 +458,7 @@ double _minRange(MetricDef def) => switch (def.key) {
       _ => def.minDiff * 4,
     };
 
-Color _sectionColor(Aigaio c, TrendSection s) => switch (s) {
+Color trendSectionColor(Aigaio c, TrendSection s) => switch (s) {
       TrendSection.heart => c.heart,
       TrendSection.sleep => c.sleep,
       TrendSection.body => c.body,
