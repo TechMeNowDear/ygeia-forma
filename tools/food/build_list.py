@@ -67,6 +67,18 @@ for line in open(listfile, encoding="utf-8"):
         if key not in n: problems.append(f"ΛΕΙΠΕΙ {key} {entry['id']} {name}")
     foods.append(entry)
 
+# Ζευγάρια ωμό → μαγειρεμένο
+pairs_file = listfile.replace("greek_list.tsv", "raw_cooked.tsv")
+byid = {f["id"]: f for f in foods}
+for line in open(pairs_file, encoding="utf-8"):
+    if not line.strip() or line.startswith("#"): continue
+    raw, cooked, label = line.rstrip("\n").split("\t")[:3]
+    if raw not in byid or cooked not in byid:
+        problems.append(f"ΖΕΥΓΑΡΙ ΧΩΡΙΣ ΤΡΟΦΙΜΟ {raw} → {cooked}"); continue
+    byid[raw].setdefault("cooked", []).append({"id": cooked, "label": label})
+    byid[cooked]["rawId"] = raw
+    byid[cooked]["cookedLabel"] = label
+
 json.dump({"version": 1, "sources": {
     "CIQUAL 2025": "ANSES, Table de composition nutritionnelle des aliments Ciqual 2025, doi:10.57745/RDMHWY — Licence Ouverte (etalab-2.0)",
     "USDA SR Legacy": "U.S. Department of Agriculture, FoodData Central, SR Legacy (2018) — public domain (CC0)",

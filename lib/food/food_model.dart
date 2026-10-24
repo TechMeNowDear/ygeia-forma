@@ -75,6 +75,9 @@ class Food {
     this.energyCalc = false,
     this.servingGrams,
     this.servingLabel,
+    this.rawId,
+    this.cookedLabel,
+    this.cooked = const [],
   });
 
   final String id;
@@ -96,6 +99,15 @@ class Food {
 
   final Nutrients n;
 
+  /// Αν αυτό είναι μαγειρεμένη μορφή: το id της ωμής και ο τρόπος («Βρασμένο», «Ψητό»…).
+  final String? rawId;
+  final String? cookedLabel;
+
+  /// Αν αυτό είναι ωμό: οι μαγειρεμένες μορφές του (id, τρόπος).
+  final List<(String, String)> cooked;
+
+  bool get isRawWithCooked => cooked.isNotEmpty;
+
   bool get isMine => source == 'Open Food Facts' || source == 'Ετικέτα';
 
   factory Food.fromJson(Map<String, dynamic> j) => Food(
@@ -111,6 +123,12 @@ class Food {
         energyCalc: j['energyCalc'] == true,
         servingGrams: (j['servingGrams'] as num?)?.toDouble(),
         servingLabel: j['servingLabel'] as String?,
+        rawId: j['rawId'] as String?,
+        cookedLabel: j['cookedLabel'] as String?,
+        cooked: [
+          for (final c in (j['cooked'] as List?) ?? const [])
+            if (c is Map) ((c['id'] as String), (c['label'] as String)),
+        ],
         n: Nutrients.fromJson(Map<String, dynamic>.from(j['n'] as Map)),
       );
 
@@ -127,6 +145,9 @@ class Food {
         if (energyCalc) 'energyCalc': true,
         if (servingGrams != null) 'servingGrams': servingGrams,
         if (servingLabel != null) 'servingLabel': servingLabel,
+        if (rawId != null) 'rawId': rawId,
+        if (cookedLabel != null) 'cookedLabel': cookedLabel,
+        if (cooked.isNotEmpty) 'cooked': [for (final c in cooked) {'id': c.$1, 'label': c.$2}],
         'n': n.toJson(),
       };
 }
@@ -172,8 +193,8 @@ class LogEntry {
 
   double total(String k) => food.n.amount(k) * grams / 100;
 
-  LogEntry copyWith({Meal? meal, double? grams}) =>
-      LogEntry(id: id, day: day, meal: meal ?? this.meal, food: food, grams: grams ?? this.grams, time: time);
+  LogEntry copyWith({Meal? meal, double? grams, Food? food}) => LogEntry(
+      id: id, day: day, meal: meal ?? this.meal, food: food ?? this.food, grams: grams ?? this.grams, time: time);
 
   factory LogEntry.fromJson(Map<String, dynamic> j) => LogEntry(
         id: j['id'] as String,

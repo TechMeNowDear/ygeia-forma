@@ -118,6 +118,7 @@ class FoodIndex {
       final f = foods[i];
       score += (boost[f.id] ?? 0);
       if (f.isMine) score += 1.5; // τα δικά μου πρώτα (έγγραφο › Βάση τροφίμων)
+      if (f.isRawWithCooked) score += 1.2; // ζυγίζω ωμά: η ωμή μορφή πριν από τη μαγειρεμένη
       score -= f.name.length / 60; // τα πιο σύντομα ονόματα λίγο πιο πάνω
       scored.add((score, i));
     }

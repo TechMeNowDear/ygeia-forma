@@ -22,7 +22,7 @@ void main() {
     List<String> names(String q) => [for (final f in index.search(q).take(5)) f.name];
 
     test('«fakes» βρίσκει φακές πρώτα', () {
-      expect(names('fakes').first, startsWith('Φακές'));
+      expect(names('fakes').take(2).every((n) => n.startsWith('Φακές')), isTrue);
     });
     test('«γιαουρτι 2» βρίσκει το στραγγιστό 2%', () {
       expect(names('γιαουρτι 2').first, contains('2%'));
@@ -33,6 +33,13 @@ void main() {
     test('«φιλετο κοτοπουλο» βρίσκει στήθος κοτόπουλου από τα άλλα ονόματα', () {
       expect(names('φιλετο κοτοπουλο').first, startsWith('Κοτόπουλο στήθος'));
     });
+    test('Η ωμή μορφή βγαίνει πριν από τη μαγειρεμένη', () {
+      expect(names('μακαρονια').first, 'Μακαρόνια (ξηρά, ωμά)');
+      expect(names('ρυζι λευκο').first, 'Ρύζι λευκό (ωμό)');
+      expect(names('fakes').first, 'Φακές (ξερές)');
+      expect(names('κοτοπουλο στηθος').first, 'Κοτόπουλο στήθος χωρίς πέτσα (ωμό)');
+    });
+
     test('Τίποτα για ανύπαρκτη λέξη', () {
       expect(index.search('ξυλοκαρβουνο'), isEmpty);
     });
@@ -118,6 +125,30 @@ void main() {
     test('Θερμίδες που δεν ταιριάζουν με τα μακρο (π.χ. ανά μερίδα)', () {
       expect(energyMismatch({Nk.kcal: 72, Nk.protein: 10, Nk.carbs: 3, Nk.fat: 2}), isNull);
       expect(energyMismatch({Nk.kcal: 250, Nk.protein: 10, Nk.carbs: 3, Nk.fat: 2}), isNotNull);
+    });
+  });
+
+  group('Ωμό και μαγειρεμένο', () {
+    final s = FoodStore.preloaded(foods: basicFoods());
+    test('Από το ωμό και από το βρασμένο βγαίνουν οι ίδιες καταστάσεις', () {
+      final raw = foodNamed('Μακαρόνια (ξηρά, ωμά)');
+      final cooked = foodNamed('Μακαρόνια (βρασμένα, χωρίς αλάτι)');
+      final a = [for (final x in s.statesOf(raw)) x.$2];
+      final b = [for (final x in s.statesOf(cooked)) x.$2];
+      expect(a, ['Ωμό', 'Βρασμένα']);
+      expect(b, a);
+    });
+    test('Πατάτα: ωμή, βραστή, φούρνου', () {
+      final p = foodNamed('Πατάτα (ωμή, ξεφλουδισμένη)');
+      expect([for (final x in s.statesOf(p)) x.$2], ['Ωμό', 'Βραστή', 'Φούρνου']);
+    });
+    test('Τρόφιμο χωρίς άλλες μορφές', () {
+      expect(s.statesOf(foodNamed('Μέλι')), isEmpty);
+    });
+    test('180 g ωμά μακαρόνια ≠ 180 g βρασμένα', () {
+      final raw = foodNamed('Μακαρόνια (ξηρά, ωμά)');
+      final cooked = foodNamed('Μακαρόνια (βρασμένα, χωρίς αλάτι)');
+      expect(raw.n.amount(Nk.kcal) * 1.8, greaterThan(cooked.n.amount(Nk.kcal) * 1.8 * 2));
     });
   });
 

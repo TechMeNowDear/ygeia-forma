@@ -50,7 +50,7 @@ FoodStore sampleFoodStore(DateTime now) {
     add(ago, Meal.snack, 'Μπανάνα', 120, 16);
     if (ago > 0) {
       add(ago, Meal.dinner, 'Μπρόκολο (στον ατμό)', 200, 20);
-      add(ago, Meal.dinner, 'Μοσχαρίσιο φιλέτο (ωμό)', 150, 20);
+      add(ago, Meal.dinner, 'Μοσχαρίσιο φιλέτο, άπαχο (ωμό)', 150, 20);
     }
   }
   return FoodStore.preloaded(foods: basicFoods(), entries: entries, mine: sampleMine(), now: now);

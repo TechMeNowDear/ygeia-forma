@@ -161,6 +161,28 @@ class FoodStore extends ChangeNotifier {
     return _index.search(q, boost: {for (final e in counts.entries) e.key: math.min(6, e.value * 1.5)});
   }
 
+  Food? byId(String id) {
+    for (final x in _mine) {
+      if (x.id == id) return x;
+    }
+    for (final x in _basic) {
+      if (x.id == id) return x;
+    }
+    return null;
+  }
+
+  /// Ωμό + μαγειρεμένες μορφές του ίδιου τροφίμου, με την ετικέτα κάθε κατάστασης.
+  /// Κενή λίστα αν το τρόφιμο δεν έχει άλλες μορφές.
+  List<(Food, String)> statesOf(Food f) {
+    final raw = f.rawId != null ? byId(f.rawId!) : (f.isRawWithCooked ? f : null);
+    if (raw == null) return const [];
+    return [
+      (raw, 'Ωμό'),
+      for (final c in raw.cooked)
+        if (byId(c.$1) case final cf?) (cf, c.$2),
+    ];
+  }
+
   Food? byBarcode(String code) {
     for (final f in _mine) {
       if (f.barcode == code) return f;

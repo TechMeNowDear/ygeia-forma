@@ -39,7 +39,7 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.restore(e)),
     ));
   } else {
-    await food.update(e.copyWith(grams: r.grams, meal: r.meal));
+    await food.update(e.copyWith(grams: r.grams, meal: r.meal, food: r.food.id == e.food.id ? null : r.food));
   }
 }
 
@@ -135,10 +135,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       ),
     );
     if (r == null || !mounted) return;
-    final e = await widget.food.add(f, r.grams, r.meal, on: widget.day);
+    final e = await widget.food.add(r.food, r.grams, r.meal, on: widget.day);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Προστέθηκε: ${f.name}, ${gramsText(r.grams)} g'),
+      content: Text('Προστέθηκε: ${r.food.name}, ${gramsText(r.grams)} g'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),
     ));
     setState(() => _meal = r.meal);
@@ -364,9 +364,12 @@ class MineBadge extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SheetResult {
-  _SheetResult(this.grams, this.meal, {this.delete = false});
+  _SheetResult(this.grams, this.meal, this.food, {this.delete = false});
   final double grams;
   final Meal meal;
+
+  /// Η μορφή που διάλεξε (ωμό/βρασμένο/ψητό…): μπορεί να διαφέρει από αυτή που άνοιξε.
+  final Food food;
   final bool delete;
 }
 
@@ -392,6 +395,8 @@ class QuantitySheet extends StatefulWidget {
 class _QuantitySheetState extends State<QuantitySheet> {
   late final _grams = TextEditingController(text: gramsText(widget.initialGrams));
   late Meal _meal = widget.meal;
+  late Food _item = widget.item;
+  late final List<(Food, String)> _states = widget.food.statesOf(widget.item);
 
   @override
   void dispose() {
@@ -409,7 +414,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final f = widget.item;
+    final f = _item;
     final g = _value;
     double tot(String k) => g == null ? 0 : f.n.amount(k) * g / 100;
 
@@ -460,6 +465,30 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     ),
                   ),
                 ),
+                if (_states.length > 1) ...[
+                  const SizedBox(height: 12),
+                  Text('Ζύγισα:', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final st in _states)
+                        ChoiceChip(
+                          label: Text(st.$2),
+                          selected: st.$1.id == f.id,
+                          onSelected: (_) => setState(() => _item = st.$1),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    f.rawId == null
+                        ? 'Βάρος πριν το μαγείρεμα (το πιο ακριβές).'
+                        : 'Βάρος μετά το μαγείρεμα· οι τιμές είναι για ${(f.cookedLabel ?? 'μαγειρεμένο').toLowerCase()}.',
+                    style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -516,14 +545,14 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 const SizedBox(height: 18),
                 FilledButton(
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                  onPressed: g == null ? null : () => Navigator.pop(context, _SheetResult(g, _meal)),
+                  onPressed: g == null ? null : () => Navigator.pop(context, _SheetResult(g, _meal, _item)),
                   child: Text(widget.editing ? 'Αποθήκευση' : 'Προσθήκη στο ${mealLabel(_meal)}'),
                 ),
                 if (widget.editing) ...[
                   const SizedBox(height: 8),
                   TextButton.icon(
                     style: TextButton.styleFrom(foregroundColor: c.bad),
-                    onPressed: () => Navigator.pop(context, _SheetResult(g ?? 0, _meal, delete: true)),
+                    onPressed: () => Navigator.pop(context, _SheetResult(g ?? 0, _meal, _item, delete: true)),
                     icon: const Icon(Icons.delete_outline_rounded),
                     label: const Text('Διαγραφή'),
                   ),
