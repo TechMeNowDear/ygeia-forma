@@ -11,6 +11,7 @@ import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/pages/trends.dart';
+import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/unusual.dart';
@@ -194,6 +195,23 @@ void main() {
           await t.enterText(find.byType(TextField), 'giaourti');
         },
       ));
+  testWidgets('Η κουζίνα μου', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(400, 2400) * 2.0;
+    addTearDown(tester.view.reset);
+    final store = HealthStore();
+    final key = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(
+      key: key,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.light),
+        home: KitchenScreen(store: store),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/21_kitchen.png'));
+  });
   testWidgets('Διατροφή · ποσότητα', (t) => _shot(
         t,
         name: '18_quantity_sheet',

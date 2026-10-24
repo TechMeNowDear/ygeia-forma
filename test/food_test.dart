@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/food_search.dart';
 import 'package:ygeia_forma/food/food_store.dart';
+import 'package:ygeia_forma/food/kitchen.dart';
 import 'package:ygeia_forma/food/off.dart';
 
 import 'sample_food.dart';
@@ -174,6 +175,20 @@ void main() {
       final back = LogEntry.fromJson(e.toJson().map((k, v) => MapEntry(k, v)));
       expect(back.total(Nk.kcal), closeTo(e.total(Nk.kcal), 1e-9));
       expect(back.food.source, f.source);
+    });
+  });
+
+  group('Η κουζίνα μου', () {
+    test('Αρχική κατάσταση από το αρχείο του χρήστη και αποθήκευση', () {
+      final k = Kitchen.fromJson(null);
+      expect(k.has('steamer'), isTrue);
+      expect(k.steamerTiers, 2);
+      expect(k.has('airFryer'), isFalse);
+      expect(k.cookware.where((c) => c.kind == 'panNonstick').length, 3);
+      k.cookware.first.tareGrams = 640;
+      final back = Kitchen.fromJson(k.toJson());
+      expect(back.cookware.first.tareGrams, 640);
+      expect(back.devices, k.devices);
     });
   });
 }

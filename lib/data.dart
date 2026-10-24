@@ -385,7 +385,7 @@ const todayCards = <TodayCard>[
 ];
 
 class Prefs {
-  Prefs(this.cards, {this.backfillFrom});
+  Prefs(this.cards, {this.backfillFrom, this.kitchen});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -394,8 +394,12 @@ class Prefs {
         for (final c in todayCards) c.key: saved[c.key] is bool ? saved[c.key] as bool : c.defaultOn,
       },
       backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
+      kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
     );
   }
+
+  /// «Η κουζίνα μου» (δες food/kitchen.dart), όπως αποθηκεύεται.
+  Map<String, dynamic>? kitchen;
 
   final Map<String, bool> cards;
 
@@ -404,7 +408,7 @@ class Prefs {
 
   bool show(String key) => cards[key] ?? true;
 
-  String toJson() => jsonEncode({'cards': cards, 'backfillFrom': backfillFrom});
+  String toJson() => jsonEncode({'cards': cards, 'backfillFrom': backfillFrom, 'kitchen': kitchen});
 }
 
 // ---------------------------------------------------------------------------
@@ -568,6 +572,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (last == null || DateTime.now().difference(last).inMinutes >= 5) {
       refresh();
     }
+  }
+
+  void setKitchen(Map<String, dynamic> k) {
+    prefs.kitchen = k;
+    notifyListeners();
+    SamsungHealth.savePrefs(prefs.toJson());
   }
 
   void setCard(String key, bool on) {

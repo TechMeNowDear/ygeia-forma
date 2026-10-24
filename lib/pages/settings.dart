@@ -5,6 +5,7 @@ import '../format.dart';
 import '../theme.dart';
 import '../ti_ftanei.dart';
 import '../widgets.dart';
+import 'kitchen.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store});
@@ -51,6 +52,20 @@ class SettingsPage extends StatelessWidget {
                                 onChanged: (on) => store.setCard(card.key, on),
                               ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AppCard(
+                        padding: EdgeInsets.zero,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => KitchenScreen(store: store)),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.fromLTRB(18, 8, 12, 8),
+                          leading: IconBadge(Icons.soup_kitchen_outlined, c.body, size: 38),
+                          title: const Text('Η κουζίνα μου'),
+                          subtitle: const Text('Συσκευές και σκεύη για τις συνταγές, απόβαρα'),
+                          trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
                         ),
                       ),
                       const SizedBox(height: 12),
