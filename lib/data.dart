@@ -107,6 +107,10 @@ class Dashboard {
     required this.floors,
     required this.body,
     required this.activity,
+    required this.sleepRecords,
+    required this.stepsByMinute,
+    required this.stepsMinuteFrom,
+    required this.exercise,
   });
 
   final DateTime readAt;
@@ -121,6 +125,18 @@ class Dashboard {
   final List<DayValue> floors;
   final List<BodyMeasurement> body; // παλιότερη πρώτη
   final Map<String, dynamic> activity;
+
+  /// Όλα τα κομμάτια ύπνου (και οι υπνάκοι), για να εξαιρούνται από τους παλμούς ημέρας.
+  final List<SleepRecord> sleepRecords;
+
+  /// Βήματα ανά λεπτό: κλειδί = λεπτά από την εποχή Unix.
+  final Map<int, int> stepsByMinute;
+
+  /// Από πότε υπάρχουν βήματα ανά λεπτό (null = καθόλου).
+  final DateTime? stepsMinuteFrom;
+
+  /// Ασκήσεις (αρχή, τέλος).
+  final List<(DateTime, DateTime)> exercise;
 
   bool get hasAnyPermission => granted > 0;
 
@@ -208,6 +224,18 @@ class Dashboard {
       ]..sort((a, b) => a.day.compareTo(b.day)),
       body: body,
       activity: j['activity'] is Map<String, dynamic> ? j['activity'] as Map<String, dynamic> : const {},
+      sleepRecords: records,
+      stepsByMinute: {
+        for (final e in list('stepsMin'))
+          if (e is List && e.length >= 2) (e[0] as num).toInt() ~/ 60000: (e[1] as num).toInt(),
+      },
+      stepsMinuteFrom: j['stepsMin'] is List
+          ? dayOf((j['readAt'] is num ? t(j['readAt']) : DateTime.now()).subtract(const Duration(days: 7)))
+          : null,
+      exercise: [
+        for (final e in list('exercise'))
+          if (e is List && e.length >= 2) (t(e[0]), t(e[1])),
+      ],
     );
   }
 
@@ -335,7 +363,7 @@ class TodayCard {
 const todayCards = <TodayCard>[
   TodayCard('sleep', 'Ύπνος της νύχτας', true),
   TodayCard('energy', 'Energy Score', true),
-  TodayCard('rhr', 'Παλμοί ηρεμίας', true),
+  TodayCard('rhr', 'Παλμοί στον ύπνο', true),
   TodayCard('steps', 'Βήματα', true),
   TodayCard('calories', 'Θερμίδες που έκαψα', true),
   TodayCard('weight', 'Βάρος και λίπος', true),

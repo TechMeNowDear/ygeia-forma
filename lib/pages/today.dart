@@ -158,7 +158,7 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.favorite_rounded,
       color: c.heart,
-      title: 'Παλμοί ηρεμίας',
+      title: 'Παλμοί στον ύπνο',
       value: hr?.round().toString(),
       unit: 'bpm',
       trend: trend,

@@ -42,7 +42,43 @@ class DashboardReader(private val s: HealthDataStore) {
         if (has(DataTypes.STEPS)) o.put("steps", safe { steps(today) })
         if (has(DataTypes.FLOORS_CLIMBED)) o.put("floors", safe { floors(from, now) })
         if (has(DataTypes.ACTIVITY_SUMMARY)) o.put("activity", safe { activity(today) })
+        if (has(DataTypes.STEPS)) o.put("stepsMin", safe { stepsByMinute(today) })
+        if (has(DataTypes.EXERCISE)) o.put("exercise", safe { exercise(from, now) })
         return o
+    }
+
+    // ---------- Βήματα ανά λεπτό, 7 ημέρες: [αρχή λεπτού, βήματα] (μόνο λεπτά με βήματα) ----------
+
+    private suspend fun stepsByMinute(today: LocalDate): JSONArray {
+        val out = JSONArray()
+        val filter = LocalTimeFilter.of(today.minusDays(STEP_DAYS.toLong()).atStartOfDay(), LocalDateTime.now())
+        var token: String? = null
+        var pages = 0
+        do {
+            val b = DataType.StepsType.TOTAL.requestBuilder
+                .setLocalTimeFilterWithGroup(filter, LocalTimeGroup.of(LocalTimeGroupUnit.MINUTELY, 1))
+                .setOrdering(Ordering.ASC)
+                .setPageSize(PAGE_SIZE)
+            if (!token.isNullOrEmpty()) b.setPageToken(token)
+            val r = s.aggregateData(b.build())
+            for (d in r.dataList) {
+                val v: Long? = d.value
+                if (v != null && v > 0) out.put(JSONArray().put(ms(d.startTime) ?: 0L).put(v))
+            }
+            token = r.pageToken
+            pages++
+        } while (!token.isNullOrEmpty() && pages < 40)
+        return out
+    }
+
+    // ---------- Ασκήσεις: [αρχή, τέλος] ----------
+
+    private suspend fun exercise(from: LocalDateTime, to: LocalDateTime): JSONArray {
+        val out = JSONArray()
+        for (p in readAll(DataTypes.EXERCISE.readDataRequestBuilder, from, to)) {
+            out.put(JSONArray().put(ms(p.startTime) ?: 0L).put(ms(p.endTime) ?: ms(p.startTime) ?: 0L))
+        }
+        return out
     }
 
     // ---------- Ύπνος ----------
@@ -305,6 +341,7 @@ class DashboardReader(private val s: HealthDataStore) {
 
     private companion object {
         const val DAYS = 30
+        const val STEP_DAYS = 7
         const val PAGE_SIZE = 1000
         const val MAX_PAGES = 10
     }

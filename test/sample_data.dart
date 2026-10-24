@@ -11,6 +11,7 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
   final heart = <List<num>>[];
   final spo2 = <List<num>>[];
   final skin = <List<num>>[];
+  final stepsMin = <List<num>>[];
 
   List<List<Object>> stagesFor(DateTime start, DateTime end) {
     final out = <List<Object>>[];
@@ -63,12 +64,33 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
       spo2.add([ms(s), ms(e), ox, split ? 77 : ox - 4 - rnd.nextInt(3), 98]);
       skin.add([ms(s), ms(e), 34.8 + rnd.nextDouble() * 0.8]);
     }
-    // παλμοί μέσα στη μέρα
-    for (var h = 9; h <= 22; h++) {
-      final t = wake.add(Duration(hours: h));
-      if (t.isAfter(now)) break;
-      final hr = 70 + rnd.nextInt(18);
-      heart.add([ms(t), ms(t.add(const Duration(hours: 1))), hr, hr - 8, hr + 15]);
+    // παλμοί μέσα στη μέρα: ανά 4 λεπτά τις τελευταίες 7 μέρες, με βήματα ανά λεπτό
+    if (d <= 7) {
+      int cadenceAt(DateTime t) {
+        final m = t.hour * 60 + t.minute;
+        if (m >= 8 * 60 + 30 && m < 8 * 60 + 55) return 90;
+        if (m >= 13 * 60 && m < 13 * 60 + 25) return 115;
+        if (m >= 18 * 60 && m < 18 * 60 + 40) return 85;
+        if (m >= 10 * 60 && m < 17 * 60 && m % 60 < 3) return 30;
+        return 0;
+      }
+      for (var t = wake.add(const Duration(hours: 9)); t.isBefore(wake.add(const Duration(hours: 23))); t = t.add(const Duration(minutes: 4))) {
+        if (t.isAfter(now)) break;
+        final cad = cadenceAt(t);
+        final hr = cad >= 100 ? 108 + rnd.nextInt(8) : cad >= 60 ? 92 + rnd.nextInt(8) : cad > 0 ? 78 + rnd.nextInt(6) : 64 + rnd.nextInt(7);
+        heart.add([ms(t), ms(t.add(const Duration(minutes: 4))), hr, hr - 4, hr + 5]);
+        if (cad > 0) {
+          for (var k = 0; k < 4; k++) {
+            stepsMin.add([ms(t.add(Duration(minutes: k))), cad]);
+          }
+        }
+      }
+    } else {
+      for (var h = 9; h <= 22; h++) {
+        final t = wake.add(Duration(hours: h));
+        final hr = 70 + rnd.nextInt(18);
+        heart.add([ms(t), ms(t.add(const Duration(hours: 1))), hr, hr - 8, hr + 15]);
+      }
     }
   }
 
@@ -115,6 +137,8 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
     'steps': steps,
     'floors': floors,
     'body': body,
+    'stepsMin': stepsMin,
+    'exercise': <List<num>>[],
     'activity': {'calories': 1237.6, 'activeCalories': 69.8, 'activeMinutes': 21, 'distance': 1489.7},
   };
 }

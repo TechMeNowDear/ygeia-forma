@@ -4,6 +4,7 @@ import '../data.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'day_heart_card.dart';
 
 class HeartPage extends StatelessWidget {
   const HeartPage({super.key, required this.store});
@@ -59,31 +60,34 @@ class HeartPage extends StatelessWidget {
           subtitle: 'Παλμοί, οξυγόνο και HRV',
           onRefresh: () => store.refresh(),
           left: [
+            DayHeartCard(data: d),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.favorite_rounded, title: 'Παλμοί ηρεμίας', color: c.heart),
+                  CardHeader(icon: Icons.bedtime_rounded, title: 'Παλμοί στον ύπνο', color: c.sleep),
                   const SizedBox(height: 14),
                   if (lastRhr != null) BigValue('${lastRhr.round()}', unit: 'bpm', size: 34),
                   if (trend != null) ...[const SizedBox(height: 8), trend],
                   const SizedBox(height: 8),
                   Text(
-                    'Ο μέσος όρος των παλμών σου στον ύπνο. Όσο πιο χαμηλά, τόσο πιο ξεκούραστη η καρδιά.',
+                    'Ο μέσος όρος των παλμών σου όσο κοιμάσαι, κάθε νύχτα. Είναι συνήθως λίγο πιο χαμηλά από την ηρεμία όταν είσαι ξύπνιος.',
                     style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
                   if (rhrPoints.length >= 2) ...[
                     const SizedBox(height: 14),
-                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.heart),
+                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.sleep),
                   ],
                 ],
               ),
             ),
+          ],
+          right: [
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.monitor_heart_rounded, title: 'Παλμοί σήμερα', color: c.heart),
+                  CardHeader(icon: Icons.monitor_heart_rounded, title: 'Τελευταίες μετρήσεις σήμερα', color: c.heart),
                   const SizedBox(height: 8),
                   if (latest != null)
                     InfoRow('Τελευταία μέτρηση, ${hm(latest.start)}', '${latest.avg.round()} bpm'),
@@ -96,8 +100,6 @@ class HeartPage extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-          right: [
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
