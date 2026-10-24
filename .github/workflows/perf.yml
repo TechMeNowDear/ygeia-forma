@@ -60,9 +60,14 @@ jobs:
             echo no | "$BIN/avdmanager" create avd -n perf -k "$IMG" -d pixel_6 --force || \
               echo no | "$BIN/avdmanager" create avd -n perf -k "$IMG" --force
             export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
+            ls -l /dev/kvm || true
+            emulator -accel-check || true
+            "$BIN/avdmanager" list avd || true
             nohup emulator -avd perf -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
               -no-snapshot -camera-back none -camera-front none -memory 4096 > emu.log 2>&1 &
-            timeout 600 adb wait-for-device || { echo "Ο emulator δεν εμφανίστηκε"; tail -60 emu.log; }
+            if ! timeout 600 adb wait-for-device; then
+              echo "Ο emulator δεν εμφανίστηκε"; tail -40 emu.log; exit 0
+            fi
             for i in $(seq 1 120); do
               [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break
               sleep 5
@@ -75,6 +80,8 @@ jobs:
             bash tools/perf/measure.sh perf.apk perf.md
             tail -30 emu.log
           } > perf.log 2>&1 || true
+          # Σε αποτυχία: η αρχή του log (έλεγχοι KVM/AVD) για διάγνωση.
+          [ -f perf.md ] || { head -40 perf.log > perf-head.log; tail -40 perf.log >> perf-head.log; mv perf-head.log perf.log; }
 
       - name: Αποτελέσματα
         if: always()
