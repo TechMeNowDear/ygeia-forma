@@ -109,7 +109,12 @@ class _RoundButton extends StatelessWidget {
     return IconButton.filledTonal(
       tooltip: tooltip,
       onPressed: onPressed,
-      style: IconButton.styleFrom(backgroundColor: c.card),
+      style: IconButton.styleFrom(
+        backgroundColor: c.card,
+        foregroundColor: c.text,
+        disabledBackgroundColor: c.card.withValues(alpha: 0.5),
+        disabledForegroundColor: c.textTertiary,
+      ),
       icon: Icon(icon),
     );
   }
@@ -136,10 +141,11 @@ class _SummaryCard extends StatelessWidget {
                   Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 6),
                   Flexible(
-                    child: Text(label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: c.textSecondary)),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(label, maxLines: 1, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+                    ),
                   ),
                 ],
               ),

@@ -49,6 +49,53 @@ double? parseNumber(String s) {
   return double.tryParse(t);
 }
 
+/// Επιλογή γεύματος: 4 ίσα κουμπιά που χωράνε πάντα σε μία γραμμή.
+class MealPicker extends StatelessWidget {
+  const MealPicker({super.key, required this.value, required this.onChanged});
+  final Meal value;
+  final ValueChanged<Meal> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.hairline)),
+      child: Row(
+        children: [
+          for (final m in Meal.values)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(m),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: m == value ? c.body : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      mealLabel(m),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: m == value ? Colors.white : c.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Αναζήτηση και προσθήκη
 // ---------------------------------------------------------------------------
@@ -201,23 +248,12 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           const SizedBox(width: 4),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: SizedBox(
-            height: 52,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              children: [
-                for (final m in Meal.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(mealLabel(m)),
-                      selected: _meal == m,
-                      onSelected: (_) => setState(() => _meal = m),
-                    ),
-                  ),
-              ],
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: MealPicker(value: _meal, onChanged: (m) => setState(() => _meal = m)),
             ),
           ),
         ),
@@ -483,17 +519,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                SegmentedButton<Meal>(
-                  showSelectedIcon: false,
-                  style: const ButtonStyle(
-                    textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: fontFamily, fontSize: 13)),
-                  ),
-                  segments: [
-                    for (final m in Meal.values) ButtonSegment(value: m, label: Text(mealLabel(m))),
-                  ],
-                  selected: {_meal},
-                  onSelectionChanged: (s) => setState(() => _meal = s.first),
-                ),
+                MealPicker(value: _meal, onChanged: (m) => setState(() => _meal = m)),
                 const SizedBox(height: 18),
                 FilledButton(
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
