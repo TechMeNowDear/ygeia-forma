@@ -327,14 +327,14 @@ class _PageOne extends StatelessWidget {
     String pct(double v) => '${v.round()}%';
     String dur(double v) {
       final m = v.round();
-      return '${m ~/ 60} ώρ. ${two(m % 60)} λ.';
+      return '${m ~/ 60}:${two(m % 60)}';
     }
 
     final rows = <(String, String, String Function(double), MetricDef?)>[
       ('Παλμοί στον ύπνο (bpm)', K.sleepHr, num0, _def(K.sleepHr)),
       ('Οξυγόνο στον ύπνο, μέσο', K.spo2Avg, pct, _def(K.spo2Avg)),
       ('Οξυγόνο στον ύπνο, ελάχιστο της νύχτας', K.spo2Min, pct, null),
-      ('Διάρκεια ύπνου', K.sleepMin, dur, _def(K.sleepMin)),
+      ('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, dur, _def(K.sleepMin)),
       ('Ώρα που κοιμήθηκε', K.bedtime, clockFromSix, _def(K.bedtime)),
       ('Ώρα που ξύπνησε', K.wake, clockFromSix, null),
       ('Βήματα ανά μέρα', K.steps, (v) => thousands(v), _def(K.steps)),
