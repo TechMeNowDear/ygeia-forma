@@ -62,7 +62,7 @@ class CategoryPage extends StatelessWidget {
         );
         return PageHeaderScope(
           header: header,
-          child: IndexedStack(index: i, children: pages),
+          child: LazyIndexedStack(index: i, children: pages),
         );
       },
     );

@@ -11,6 +11,33 @@ import 'theme.dart';
 // ποτέ τεντωμένη (μέγιστο πλάτος).
 // ---------------------------------------------------------------------------
 
+/// Σαν το IndexedStack, αλλά κάθε σελίδα χτίζεται μόνο την πρώτη φορά που την ανοίγεις
+/// (και μετά κρατά την κατάστασή της). Λιγότερη μνήμη και δουλειά στο άνοιγμα της εφαρμογής.
+class LazyIndexedStack extends StatefulWidget {
+  const LazyIndexedStack({super.key, required this.index, required this.children});
+  final int index;
+  final List<Widget> children;
+
+  @override
+  State<LazyIndexedStack> createState() => _LazyIndexedStackState();
+}
+
+class _LazyIndexedStackState extends State<LazyIndexedStack> {
+  final _built = <int>{};
+
+  @override
+  Widget build(BuildContext context) {
+    _built.add(widget.index);
+    return IndexedStack(
+      index: widget.index,
+      children: [
+        for (var i = 0; i < widget.children.length; i++)
+          _built.contains(i) ? widget.children[i] : const SizedBox.shrink(),
+      ],
+    );
+  }
+}
+
 /// Όταν μια σελίδα ζει μέσα σε κατηγορία (Υγεία, Διατροφή, Άσκηση), η κατηγορία δίνει
 /// την κεφαλίδα (τίτλο και καρτέλες) και η σελίδα κρατά μόνο τη δική της γραμμή κάτω από αυτήν.
 class PageHeaderScope extends InheritedWidget {
@@ -47,7 +74,7 @@ class PageTitle extends StatelessWidget {
           ),
         Text(
           title,
-          style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w700, letterSpacing: -1.1, color: c.text),
+          style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -1.1, color: c.text),
         ),
       ],
     );
@@ -394,7 +421,7 @@ class BigValue extends StatelessWidget {
             text: value,
             style: TextStyle(
               fontSize: size,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               letterSpacing: -size * 0.035,
               color: color ?? c.text,
               fontFeatures: tabular,
@@ -437,7 +464,7 @@ class DurationValue extends StatelessWidget {
               text: (i > 0 ? '  ' : '') + parts[i].$1,
               style: TextStyle(
                 fontSize: size,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
                 letterSpacing: -size * 0.035,
                 color: color ?? c.text,
                 fontFeatures: tabular,

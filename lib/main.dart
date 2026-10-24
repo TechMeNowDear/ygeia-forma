@@ -15,6 +15,7 @@ import 'pages/sleep.dart';
 import 'pages/today.dart';
 import 'pages/trends.dart';
 import 'theme.dart';
+import 'widgets.dart';
 
 export 'nav.dart';
 
@@ -175,7 +176,7 @@ class _ShellState extends State<Shell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 600;
-        final content = IndexedStack(index: _index, children: pages);
+        final content = LazyIndexedStack(index: _index, children: pages);
 
         if (wide) {
           return Scaffold(

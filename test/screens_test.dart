@@ -24,7 +24,7 @@ final now = DateTime(2026, 10, 24, 16, 30);
 
 Future<void> _loadFonts() async {
   final inter = FontLoader('Inter');
-  for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+  for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
     inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
   }
   await inter.load();
