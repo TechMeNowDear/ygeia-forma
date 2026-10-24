@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../food/food_model.dart';
 import '../food/food_search.dart';
@@ -50,6 +51,30 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
       },
     );
     if (f != null && mounted) _saved(f, fromScan: true);
+  }
+
+  /// Όλα τα προϊόντα σε απλό κείμενο, για έλεγχο (π.χ. επικόλληση στη συζήτηση με τον Claude).
+  Future<void> _copyForCheck() async {
+    final all = widget.food.mine;
+    String v(Food f, String k) => f.n.has(k) ? nValueText(f.n[k], digits: 2) : '—';
+    final b = StringBuffer('Τα προϊόντα μου (${all.length}), τιμές ανά 100 g\n');
+    for (final f in all) {
+      b
+        ..writeln()
+        ..writeln(f.name)
+        ..writeln('Μάρκα: ${f.brand ?? '—'} · Barcode: ${f.barcode ?? '—'} · Πηγή: ${f.source}')
+        ..writeln('Ενέργεια ${v(f, Nk.kcal)} kcal · Λιπαρά ${v(f, Nk.fat)} g (κορεσμένα ${v(f, Nk.satFat)}) · '
+            'Υδατάνθρακες ${v(f, Nk.carbs)} g (σάκχαρα ${v(f, Nk.sugars)}) · Ίνες ${v(f, Nk.fiber)} g · '
+            'Πρωτεΐνη ${v(f, Nk.protein)} g · Αλάτι ${v(f, Nk.salt)} g')
+        ..writeln('Μερίδα: ${f.servingGrams == null ? '—' : '${gramsText(f.servingGrams!)} g'}');
+    }
+    await Clipboard.setData(ClipboardData(text: b.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(all.length == 1
+          ? 'Αντιγράφηκε 1 προϊόν. Επικόλλησέ το στη συζήτηση με τον Claude.'
+          : 'Αντιγράφηκαν ${all.length} προϊόντα. Επικόλλησέ τα στη συζήτηση με τον Claude.'),
+    ));
   }
 
   Future<void> _manual() async {
@@ -131,6 +156,15 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
             backgroundColor: c.background,
             surfaceTintColor: Colors.transparent,
             title: const Text('Τα προϊόντα μου'),
+            actions: [
+              if (all.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _copyForCheck,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Αντιγραφή για έλεγχο'),
+                ),
+              const SizedBox(width: 6),
+            ],
             bottom: _busy
                 ? const PreferredSize(preferredSize: Size.fromHeight(3), child: LinearProgressIndicator(minHeight: 3))
                 : null,
