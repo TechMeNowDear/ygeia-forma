@@ -55,17 +55,29 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash tools/perf/measure.sh perf.apk perf.md
+          script: bash tools/perf/measure.sh perf.apk perf.md > perf.log 2>&1 || true
 
       - name: Αποτελέσματα
         if: always()
         run: |
-          [ -f perf.md ] && cat perf.md >> "$GITHUB_STEP_SUMMARY"
-          [ -f perf.md ] && sed 's/^/PERF: /' perf.md
+          # Τα logs του Actions δεν διαβάζονται από έξω· τα αποτελέσματα γίνονται «σημειώσεις».
+          if [ -f perf.md ]; then
+            cat perf.md >> "$GITHUB_STEP_SUMMARY"
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' perf.md)
+            echo "::notice title=Μέτρηση απόδοσης::$msg"
+          fi
+          if [ -f perf.log ]; then
+            msg=$(tail -60 perf.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::warning title=Log μέτρησης::$msg"
+          else
+            echo "::error title=Μέτρηση::Δεν έτρεξε το script (ο emulator δεν ξεκίνησε;)"
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: perf-${{ github.run_number }}
-          path: perf.md
+          path: |
+            perf.md
+            perf.log
           retention-days: 90
