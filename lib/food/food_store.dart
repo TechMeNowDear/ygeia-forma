@@ -176,8 +176,10 @@ class FoodStore extends ChangeNotifier {
   List<(Food, String)> statesOf(Food f) {
     final raw = f.rawId != null ? byId(f.rawId!) : (f.isRawWithCooked ? f : null);
     if (raw == null) return const [];
+    // Όσπρια: «Ξερό» είναι πιο κατανοητό από «Ωμό».
+    final rawLabel = raw.name.contains('ξερ') ? 'Ξερό (πριν το βράσιμο)' : 'Ωμό';
     return [
-      (raw, 'Ωμό'),
+      (raw, rawLabel),
       for (final c in raw.cooked)
         if (byId(c.$1) case final cf?) (cf, c.$2),
     ];
