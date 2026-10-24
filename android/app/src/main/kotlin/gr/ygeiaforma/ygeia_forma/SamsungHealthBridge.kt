@@ -248,7 +248,7 @@ class SamsungHealthBridge(
         o.put("state", "ok")
             .put("count", count)
             .put("capped", !token.isNullOrEmpty())
-            .put("latest", last.startLocalDateTime?.withNano(0)?.toString() ?: "")
+            .put("latest", localText(last.startTime))
             .put("fields", fieldArray)
             .put("sources", sourceArray)
     }
@@ -298,14 +298,14 @@ class SamsungHealthBridge(
         for (d in s.aggregateData(request).dataList) {
             array.put(
                 JSONObject()
-                    .put("date", d.startLocalDateTime?.toLocalDate()?.toString() ?: "")
+                    .put("date", localDate(d.startTime))
                     .put("value", d.value ?: JSONObject.NULL)
             )
         }
         return array
     }
 
-    private suspend fun <T> putToday(
+    private suspend fun <T : Any> putToday(
         s: HealthDataStore,
         target: JSONObject,
         key: String,
@@ -330,8 +330,8 @@ class SamsungHealthBridge(
         if (id.isEmpty()) return ""
         deviceNames[id]?.let { return it }
         val name = try {
-            val d = s.deviceManager.getDevice(id)
-            listOfNotNull(d?.name, d?.model).firstOrNull { it.isNotBlank() } ?: ""
+            val d = s.getDeviceManager().getDevice(id)
+            listOfNotNull<String>(d?.name, d?.model).firstOrNull { it.isNotBlank() } ?: ""
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -340,6 +340,12 @@ class SamsungHealthBridge(
         deviceNames[id] = name
         return name
     }
+
+    private fun localText(i: Instant?): String =
+        if (i == null) "" else LocalDateTime.ofInstant(i, ZoneId.systemDefault()).withNano(0).toString()
+
+    private fun localDate(i: Instant?): String =
+        if (i == null) "" else LocalDateTime.ofInstant(i, ZoneId.systemDefault()).toLocalDate().toString()
 
     @Suppress("UNCHECKED_CAST")
     private fun valueOf(p: HealthDataPoint, f: Field<*>): Any? =
