@@ -191,6 +191,8 @@ void main() {
       expect(back.devices, k.devices);
       expect(back.cookware.where((c) => c.kind == 'pot').map((c) => c.size), ['Μικρό', 'Μεσαίο', 'Μεγάλο']);
       expect(back.hob, 'Κεραμικά');
+      expect(back.cookware.firstWhere((c) => c.kind == 'pot').label, 'Κατσαρόλα · μικρή');
+      expect(back.cookware.first.label, 'Τηγάνι αντικολλητικό · μικρό · Tefal');
     });
 
     test('Αναβάθμιση από την πρώτη έκδοση: προσθέτει, δεν σβήνει', () {

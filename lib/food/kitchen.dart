@@ -32,6 +32,13 @@ const cookwareKinds = <(String, String)>[
 
 const cookwareSizes = ['Μικρό', 'Μεσαίο', 'Μεγάλο'];
 
+/// Το μέγεθος συμφωνεί με το σκεύος: «κατσαρόλα μικρή», «τηγάνι μικρό».
+/// Αποθηκεύεται πάντα στο ουδέτερο ([cookwareSizes]).
+String cookwareSizeLabel(String kind, String size) {
+  if (kind != 'pot') return size;
+  return switch (size) { 'Μικρό' => 'Μικρή', 'Μεσαίο' => 'Μεσαία', 'Μεγάλο' => 'Μεγάλη', _ => size };
+}
+
 String cookwareKindLabel(String k) => cookwareKinds.firstWhere((e) => e.$1 == k, orElse: () => (k, k)).$2;
 
 class Cookware {
@@ -47,7 +54,7 @@ class Cookware {
 
   String get label => [
         cookwareKindLabel(kind),
-        if (size != null) size!.toLowerCase(),
+        if (size != null) cookwareSizeLabel(kind, size!).toLowerCase(),
         if (brand != null && brand!.isNotEmpty) brand!,
         if (note != null && note!.isNotEmpty) note!,
       ].join(' · ');

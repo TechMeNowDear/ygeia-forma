@@ -288,7 +288,7 @@ class _CookwareSheetState extends State<_CookwareSheet> {
               children: [
                 for (final s in cookwareSizes)
                   ChoiceChip(
-                    label: Text(s),
+                    label: Text(cookwareSizeLabel(_kind, s)),
                     selected: _size == s,
                     onSelected: (on) => setState(() => _size = on ? s : null),
                   ),
