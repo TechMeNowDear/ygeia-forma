@@ -9,7 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/main.dart';
+import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/unusual.dart';
 
 import 'sample_data.dart';
 
@@ -41,6 +43,7 @@ Future<void> _shot(
   required int tab,
   bool backfilling = false,
   DateTime? at,
+  void Function(HealthStore)? prepare,
   Future<void> Function(WidgetTester)? act,
 }) async {
   tester.view.devicePixelRatio = 2.0;
@@ -50,6 +53,7 @@ Future<void> _shot(
   final when = at ?? now;
   final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(when));
   store.history = sampleHistory(when, store.data!);
+  prepare?.call(store);
   if (backfilling) {
     store.backfilling = true;
     store.backfillProgress = 0.42;
@@ -93,6 +97,22 @@ void main() {
         brightness: Brightness.light,
         tab: 0,
         at: DateTime(2026, 10, 25, 19, 10),
+      ));
+  testWidgets('Σήμερα · εκτός συνηθισμένου', (t) => _shot(
+        t,
+        name: '12_unusual_phone_dark',
+        size: phone,
+        brightness: Brightness.dark,
+        tab: 0,
+        prepare: (store) {
+          final today = DateTime(now.year, now.month, now.day);
+          final usual = {for (final s in checkUnusual(store.history, today).signals) s.rule.key: s.usual};
+          store.history[dateKey(today)] = {
+            ...?store.history[dateKey(today)],
+            K.sleepHr: (usual[K.sleepHr] ?? 60) + 7,
+            K.skinTemp: (usual[K.skinTemp] ?? 34) + 0.6,
+          };
+        },
       ));
   testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: 1));
   testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(

@@ -5,6 +5,8 @@ import '../format.dart';
 import '../labels.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../unusual.dart';
+import 'unusual_card.dart';
 import 'week_card.dart';
 
 class TodayPage extends StatelessWidget {
@@ -58,6 +60,8 @@ class TodayPage extends StatelessWidget {
         final hero = prefs.show('sleep') ? _SleepHero(data: d, onTap: () => openTab(2)) : null;
         final review = prefs.show('week') ? currentWeekReview(store.history, now) : null;
         final week = review == null ? null : WeekCard(review: review);
+        final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now)) : null;
+        final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
 
         final heartCards = <Widget>[
           if (prefs.show('energy')) _energyCard(context, d),
@@ -102,6 +106,7 @@ class TodayPage extends StatelessWidget {
           onRefresh: () => store.refresh(),
           single: [
             if (error != null) error,
+            if (unusual != null) unusual,
             if (hero != null) hero,
             if (week != null) week,
             ...heartSection,
@@ -112,6 +117,7 @@ class TodayPage extends StatelessWidget {
           ],
           left: [
             if (error != null) error,
+            if (unusual != null) unusual,
             if (hero != null) hero,
             if (week != null) week,
             ...bodySection,
