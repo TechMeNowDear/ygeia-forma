@@ -1,5 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/history.dart';
+
 /// Δείγμα δεδομένων στη μορφή που επιστρέφει η γέφυρα Kotlin (DashboardReader),
 /// κοντά στα πραγματικά (ύπνος σε κομμάτια, InBody κάθε μερικές εβδομάδες).
 Map<String, dynamic> sampleDashboardJson(DateTime now) {
@@ -141,4 +144,45 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
     'exercise': <List<num>>[],
     'activity': {'calories': 1237.6, 'activeCalories': 69.8, 'activeMinutes': 21, 'distance': 1489.7},
   };
+}
+
+/// Ιστορικό 12 μηνών για τα στιγμιότυπα των Τάσεων: οι τελευταίες 30 μέρες από το δείγμα
+/// (ίδιοι υπολογισμοί με την εφαρμογή), οι παλιότερες συνθετικές με γνωστές αλλαγές.
+Map<String, Map<String, double>> sampleHistory(DateTime now, Dashboard d) {
+  final rnd = math.Random(11);
+  final today = DateTime(now.year, now.month, now.day);
+  double noise(double a) => (rnd.nextDouble() * 2 - 1) * a;
+  final out = <String, Map<String, double>>{};
+  for (var ago = 364; ago > 30; ago--) {
+    final day = DateTime(today.year, today.month, today.day - ago);
+    final old = ago > 60; // πριν από 2 μήνες: λίγο χειρότερη φόρμα
+    out[dateKey(day)] = {
+      K.sleepMin: (old ? 405 : 415) + noise(45),
+      K.sleepScore: (old ? 74 : 77) + noise(8),
+      K.deepPct: 15 + noise(4),
+      K.remPct: 21 + noise(4),
+      K.awakeMin: 22 + noise(10),
+      K.bedtime: 330 + noise(40),
+      K.sleepHr: (old ? 63 : 61) + noise(2.5),
+      K.spo2Avg: 95 + noise(1),
+      K.skinTemp: 33.6 + noise(0.3),
+      K.restHr: (old ? 70 : 68) + noise(3),
+      K.walkHr: (old ? 101 : 98) + noise(5),
+      K.dayHr: (old ? 77 : 75) + noise(3),
+      K.steps: 7200 + noise(3000),
+      K.activeMin: 55 + noise(25),
+      K.energy: (old ? 68 : 71) + noise(10),
+    };
+  }
+  final recent = summarizeRange(d, DateTime(today.year, today.month, today.day - 30), today);
+  for (final b in d.body) {
+    recent[dateKey(b.time)] = {
+      ...?recent[dateKey(b.time)],
+      if (b.weight != null) K.weight: b.weight!,
+      if (b.fatPct != null) K.fatPct: b.fatPct!,
+      if (b.smm != null) K.smm: b.smm!,
+    };
+  }
+  out.addAll(recent);
+  return out;
 }

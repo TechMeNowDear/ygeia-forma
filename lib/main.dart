@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'data.dart';
 import 'pages/body.dart';
 import 'pages/heart.dart';
-import 'pages/move.dart';
 import 'pages/settings.dart';
 import 'pages/sleep.dart';
 import 'pages/today.dart';
+import 'pages/trends.dart';
 import 'theme.dart';
 
 void main() {
@@ -43,10 +43,10 @@ class _Dest {
 
 const _destinations = [
   _Dest(Icons.wb_sunny_outlined, Icons.wb_sunny, 'Σήμερα'),
+  _Dest(Icons.insights_outlined, Icons.insights, 'Τάσεις'),
   _Dest(Icons.bedtime_outlined, Icons.bedtime, 'Ύπνος'),
   _Dest(Icons.favorite_outline, Icons.favorite, 'Καρδιά'),
-  _Dest(Icons.monitor_weight_outlined, Icons.monitor_weight, 'Σώμα'),
-  _Dest(Icons.directions_walk_outlined, Icons.directions_walk, 'Κίνηση'),
+  _Dest(Icons.accessibility_new_outlined, Icons.accessibility_new, 'Σώμα'),
 ];
 
 /// Κέλυφος: κάτω μπάρα στο κινητό (κλειστό Fold), πλευρική σε ανοιχτό Fold και tablet.
@@ -79,10 +79,10 @@ class _ShellState extends State<Shell> {
     final store = widget.store;
     final pages = <Widget>[
       TodayPage(store: store, openTab: _go, openSettings: _openSettings, now: widget.now),
+      TrendsPage(store: store, now: widget.now),
       SleepPage(store: store),
       HeartPage(store: store),
       BodyPage(store: store),
-      MovePage(store: store),
     ];
 
     return LayoutBuilder(

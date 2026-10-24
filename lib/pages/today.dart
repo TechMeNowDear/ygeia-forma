@@ -54,21 +54,21 @@ class TodayPage extends StatelessWidget {
         }
 
         final error = store.error != null ? _ErrorCard(store: store) : null;
-        final hero = prefs.show('sleep') ? _SleepHero(data: d, onTap: () => openTab(1)) : null;
+        final hero = prefs.show('sleep') ? _SleepHero(data: d, onTap: () => openTab(2)) : null;
 
         final heartCards = <Widget>[
           if (prefs.show('energy')) _energyCard(context, d),
-          if (prefs.show('rhr')) _restingCard(context, d, () => openTab(2)),
+          if (prefs.show('rhr')) _restingCard(context, d, () => openTab(3)),
         ];
         final moveCards = <Widget>[
           if (prefs.show('steps')) _stepsCard(context, d, () => openTab(4)),
           if (prefs.show('calories')) _caloriesCard(context, d, () => openTab(4)),
         ];
         final nightCards = <Widget>[
-          if (prefs.show('spo2')) _spo2Card(context, d, () => openTab(2)),
-          if (prefs.show('skin')) _skinCard(context, d, () => openTab(3)),
+          if (prefs.show('spo2')) _spo2Card(context, d, () => openTab(3)),
+          if (prefs.show('skin')) _skinCard(context, d, () => openTab(4)),
         ];
-        final weight = prefs.show('weight') ? _WeightCard(data: d, onTap: () => openTab(3)) : null;
+        final weight = prefs.show('weight') ? _WeightCard(data: d, onTap: () => openTab(4)) : null;
 
         final footer = Padding(
           padding: const EdgeInsets.only(top: 6),

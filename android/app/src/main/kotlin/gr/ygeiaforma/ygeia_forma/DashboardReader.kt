@@ -37,21 +37,58 @@ class DashboardReader(private val s: HealthDataStore) {
         if (has(DataTypes.HEART_RATE)) o.put("heart", safe { heart(from, now) })
         if (has(DataTypes.BLOOD_OXYGEN)) o.put("spo2", safe { spo2(from, now) })
         if (has(DataTypes.SKIN_TEMPERATURE)) o.put("skinTemp", safe { skinTemp(from, now) })
-        if (has(DataTypes.ENERGY_SCORE)) o.put("energy", safe { energy(today) })
+        if (has(DataTypes.ENERGY_SCORE)) o.put("energy", safe { energy(today.minusDays(DAYS.toLong()), today.plusDays(1)) })
         if (has(DataTypes.BODY_COMPOSITION)) o.put("body", safe { body(now) })
-        if (has(DataTypes.STEPS)) o.put("steps", safe { steps(today) })
+        if (has(DataTypes.STEPS)) o.put("steps", safe { steps(from, today.plusDays(1).atStartOfDay()) })
         if (has(DataTypes.FLOORS_CLIMBED)) o.put("floors", safe { floors(from, now) })
-        if (has(DataTypes.ACTIVITY_SUMMARY)) o.put("activity", safe { activity(today) })
-        if (has(DataTypes.STEPS)) o.put("stepsMin", safe { stepsByMinute(today) })
+        if (has(DataTypes.ACTIVITY_SUMMARY)) {
+            o.put("activity", safe { activity(today) })
+            o.put("activityDaily", safe { activityDaily(from, today.plusDays(1).atStartOfDay()) })
+        }
+        if (has(DataTypes.STEPS)) {
+            val stepsFrom = today.minusDays(STEP_DAYS.toLong()).atStartOfDay()
+            o.put("stepsMin", safe { stepsByMinute(stepsFrom, now) })
+            o.put("stepsFrom", epochMs(stepsFrom))
+        }
         if (has(DataTypes.EXERCISE)) o.put("exercise", safe { exercise(from, now) })
         return o
     }
 
-    // ---------- Βήματα ανά λεπτό, 7 ημέρες: [αρχή λεπτού, βήματα] (μόνο λεπτά με βήματα) ----------
+    /**
+     * Τα ίδια δεδομένα για ένα παλιότερο διάστημα [fromDate, toDate) — για το ιστορικό (Τάσεις).
+     * Ο ύπνος διαβάζεται και την προηγούμενη μέρα, ώστε να πιάνεται η πρώτη νύχτα.
+     */
+    suspend fun readRange(grantedNames: Set<String>, fromDate: LocalDate, toDate: LocalDate): JSONObject {
+        val from = fromDate.atStartOfDay()
+        val to = toDate.atStartOfDay()
+        val o = JSONObject()
 
-    private suspend fun stepsByMinute(today: LocalDate): JSONArray {
+        fun has(t: DataType) = t.name in grantedNames
+
+        if (has(DataTypes.SLEEP)) o.put("sleep", safe { sleep(from.minusDays(1), to) })
+        if (has(DataTypes.HEART_RATE)) o.put("heart", safe { heart(from.minusDays(1), to) })
+        if (has(DataTypes.BLOOD_OXYGEN)) o.put("spo2", safe { spo2(from.minusDays(1), to) })
+        if (has(DataTypes.SKIN_TEMPERATURE)) o.put("skinTemp", safe { skinTemp(from.minusDays(1), to) })
+        if (has(DataTypes.ENERGY_SCORE)) o.put("energy", safe { energy(fromDate, toDate) })
+        if (has(DataTypes.STEPS)) {
+            o.put("steps", safe { steps(from, to) })
+            o.put("stepsMin", safe { stepsByMinute(from.minusMinutes(30), to) })
+            o.put("stepsFrom", epochMs(from))
+        }
+        if (has(DataTypes.FLOORS_CLIMBED)) o.put("floors", safe { floors(from, to) })
+        if (has(DataTypes.ACTIVITY_SUMMARY)) o.put("activityDaily", safe { activityDaily(from, to) })
+        if (has(DataTypes.EXERCISE)) o.put("exercise", safe { exercise(from.minusDays(1), to) })
+        o.put("readAt", epochMs(to.minusSeconds(1)))
+        return o
+    }
+
+    private fun epochMs(t: LocalDateTime): Long = t.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    // ---------- Βήματα ανά λεπτό: [αρχή λεπτού, βήματα] (μόνο λεπτά με βήματα) ----------
+
+    private suspend fun stepsByMinute(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        val filter = LocalTimeFilter.of(today.minusDays(STEP_DAYS.toLong()).atStartOfDay(), LocalDateTime.now())
+        val filter = LocalTimeFilter.of(from, to)
         var token: String? = null
         var pages = 0
         do {
@@ -67,7 +104,54 @@ class DashboardReader(private val s: HealthDataStore) {
             }
             token = r.pageToken
             pages++
-        } while (!token.isNullOrEmpty() && pages < 40)
+        } while (!token.isNullOrEmpty() && pages < 80)
+        return out
+    }
+
+    // ---------- Δραστηριότητα ανά μέρα: [ημέρα, ενεργά λεπτά, θερμίδες] ----------
+
+    private suspend fun activityDaily(from: LocalDateTime, to: LocalDateTime): JSONArray {
+        val group = LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1)
+        val filter = LocalTimeFilter.of(from, to)
+        val minutes = HashMap<Long, Long>()
+        val calories = HashMap<Long, Double>()
+        try {
+            val r = s.aggregateData(
+                DataType.ActivitySummaryType.TOTAL_ACTIVE_TIME.requestBuilder
+                    .setLocalTimeFilterWithGroup(filter, group).setPageSize(400).build()
+            )
+            for (d in r.dataList) {
+                val k = ms(d.startTime) ?: continue
+                val v: Duration? = d.value
+                if (v != null) minutes[k] = v.toMinutes()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+        }
+        try {
+            val r = s.aggregateData(
+                DataType.ActivitySummaryType.TOTAL_CALORIES_BURNED.requestBuilder
+                    .setLocalTimeFilterWithGroup(filter, group).setPageSize(400).build()
+            )
+            for (d in r.dataList) {
+                val k = ms(d.startTime) ?: continue
+                val v: Float? = d.value
+                if (v != null && !v.isNaN()) calories[k] = v.toDouble()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+        }
+        val out = JSONArray()
+        for (k in (minutes.keys + calories.keys).toSortedSet()) {
+            out.put(
+                JSONArray()
+                    .put(k)
+                    .put(minutes[k] ?: JSONObject.NULL)
+                    .put(calories[k] ?: JSONObject.NULL)
+            )
+        }
         return out
     }
 
@@ -187,13 +271,13 @@ class DashboardReader(private val s: HealthDataStore) {
 
     // ---------- Energy Score: [ημέρα σε millis, βαθμός] ----------
 
-    private suspend fun energy(today: LocalDate): JSONArray {
+    private suspend fun energy(fromDate: LocalDate, toDate: LocalDate): JSONArray {
         val out = JSONArray()
         var token: String? = null
         var pages = 0
         do {
             val b = DataTypes.ENERGY_SCORE.readDataRequestBuilder
-                .setLocalDateFilter(LocalDateFilter.of(today.minusDays(DAYS.toLong()), today.plusDays(1)))
+                .setLocalDateFilter(LocalDateFilter.of(fromDate, toDate))
                 .setOrdering(Ordering.ASC)
                 .setPageSize(PAGE_SIZE)
             if (!token.isNullOrEmpty()) b.setPageToken(token)
@@ -233,13 +317,11 @@ class DashboardReader(private val s: HealthDataStore) {
 
     // ---------- Βήματα ανά μέρα: [ημέρα σε millis, βήματα] ----------
 
-    private suspend fun steps(today: LocalDate): JSONArray {
+    private suspend fun steps(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val request = DataType.StepsType.TOTAL.requestBuilder
-            .setLocalTimeFilterWithGroup(
-                LocalTimeFilter.of(today.minusDays(DAYS.toLong()).atStartOfDay(), today.plusDays(1).atStartOfDay()),
-                LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1),
-            )
+            .setLocalTimeFilterWithGroup(LocalTimeFilter.of(from, to), LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1))
             .setOrdering(Ordering.ASC)
+            .setPageSize(400)
             .build()
         val out = JSONArray()
         for (d in s.aggregateData(request).dataList) {
@@ -343,6 +425,6 @@ class DashboardReader(private val s: HealthDataStore) {
         const val DAYS = 30
         const val STEP_DAYS = 7
         const val PAGE_SIZE = 1000
-        const val MAX_PAGES = 10
+        const val MAX_PAGES = 20
     }
 }

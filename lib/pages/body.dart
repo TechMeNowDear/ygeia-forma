@@ -4,6 +4,7 @@ import '../data.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'move.dart';
 
 class BodyPage extends StatelessWidget {
   const BodyPage({super.key, required this.store});
@@ -23,6 +24,7 @@ class BodyPage extends StatelessWidget {
         final skinBase = d?.skinTempBaseline;
 
         final left = <Widget>[
+          const SectionHeader('Σώμα'),
           if (last == null)
             EmptyCard(
               icon: Icons.monitor_weight_rounded,
@@ -48,7 +50,7 @@ class BodyPage extends StatelessWidget {
             ),
         ];
 
-        final right = <Widget>[
+        final bodyMore = <Widget>[
           if (body.where((b) => b.smm != null).length >= 2)
             _chartCard(
               context,
@@ -108,12 +110,26 @@ class BodyPage extends StatelessWidget {
           ),
         ];
 
+        // Κίνηση: δεξιά στήλη σε μεγάλη οθόνη, κάτω από το σώμα στο κινητό.
+        final move = <Widget>[
+          const SectionHeader('Κίνηση'),
+          if (d == null)
+            EmptyCard(
+              icon: Icons.directions_walk_rounded,
+              color: c.move,
+              title: 'Δεν υπάρχουν ακόμα δεδομένα',
+              text: 'Τράβηξε προς τα κάτω για ανανέωση από το Samsung Health.',
+            )
+          else
+            ...moveCards(context, d),
+        ];
+
         return PageFrame(
-          title: 'Σώμα',
+          title: 'Σώμα και κίνηση',
           subtitle: body.isEmpty ? null : '${body.length} ζυγίσεις στην InBody',
           onRefresh: () => store.refresh(),
-          left: left,
-          right: right,
+          left: [...left, ...bodyMore],
+          right: move,
         );
       },
     );

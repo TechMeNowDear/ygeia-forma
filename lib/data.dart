@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
 import 'format.dart';
+import 'history.dart';
 import 'samsung.dart';
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,7 @@ class Dashboard {
     required this.stepsByMinute,
     required this.stepsMinuteFrom,
     required this.exercise,
+    required this.activityDaily,
   });
 
   final DateTime readAt;
@@ -137,6 +139,9 @@ class Dashboard {
 
   /// Ασκήσεις (αρχή, τέλος).
   final List<(DateTime, DateTime)> exercise;
+
+  /// Ανά μέρα: (μέρα, ενεργά λεπτά, θερμίδες).
+  final List<(DateTime, int?, double?)> activityDaily;
 
   bool get hasAnyPermission => granted > 0;
 
@@ -230,8 +235,14 @@ class Dashboard {
           if (e is List && e.length >= 2) (e[0] as num).toInt() ~/ 60000: (e[1] as num).toInt(),
       },
       stepsMinuteFrom: j['stepsMin'] is List
-          ? dayOf((j['readAt'] is num ? t(j['readAt']) : DateTime.now()).subtract(const Duration(days: 7)))
+          ? (j['stepsFrom'] is num
+              ? t(j['stepsFrom'])
+              : dayOf((j['readAt'] is num ? t(j['readAt']) : DateTime.now()).subtract(const Duration(days: 7))))
           : null,
+      activityDaily: [
+        for (final e in list('activityDaily'))
+          if (e is List && e.length >= 3) (dayOf(t(e[0])), (e[1] as num?)?.toInt(), (e[2] as num?)?.toDouble()),
+      ],
       exercise: [
         for (final e in list('exercise'))
           if (e is List && e.length >= 2) (t(e[0]), t(e[1])),
@@ -372,20 +383,26 @@ const todayCards = <TodayCard>[
 ];
 
 class Prefs {
-  Prefs(this.cards);
+  Prefs(this.cards, {this.backfillFrom});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
-    return Prefs({
-      for (final c in todayCards) c.key: saved[c.key] is bool ? saved[c.key] as bool : c.defaultOn,
-    });
+    return Prefs(
+      {
+        for (final c in todayCards) c.key: saved[c.key] is bool ? saved[c.key] as bool : c.defaultOn,
+      },
+      backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
+    );
   }
 
   final Map<String, bool> cards;
 
+  /// Ως πού έχει φτάσει το ιστορικό προς τα πίσω («2025-11-01»).
+  String? backfillFrom;
+
   bool show(String key) => cards[key] ?? true;
 
-  String toJson() => jsonEncode({'cards': cards});
+  String toJson() => jsonEncode({'cards': cards, 'backfillFrom': backfillFrom});
 }
 
 // ---------------------------------------------------------------------------
@@ -400,9 +417,20 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   Prefs prefs = Prefs.fromJson(const {});
   DateTime? _lastRefresh;
 
+  /// Ημερήσιες συνόψεις: «2026-10-24» → τιμές (δες history.dart).
+  Map<String, Map<String, double>> history = {};
+
+  /// Φέρνω ιστορικό 12 μηνών (μία φορά, ανά μήνα).
+  bool backfilling = false;
+  double backfillProgress = 0;
+
+  static const historyDays = 365;
+  static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
+
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
     prefs = Prefs.fromJson(await SamsungHealth.loadPrefs());
+    await _loadHistory();
     final cached = await SamsungHealth.cachedDashboard();
     if (cached['ok'] == true) {
       try {
@@ -443,6 +471,91 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       error = r;
     }
     loading = false;
+    notifyListeners();
+
+    final d = data;
+    if (r['ok'] == true && d != null && d.hasAnyPermission) {
+      await _updateRecentHistory(d);
+      _backfill();
+    }
+  }
+
+  // ---------- Ιστορικό ----------
+
+  static DateTime addDays(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
+
+  Future<void> _loadHistory() async {
+    final r = await SamsungHealth.loadDays();
+    if (r['ok'] != true || r['days'] is! List) return;
+    final h = <String, Map<String, double>>{};
+    for (final row in r['days'] as List) {
+      if (row is! Map || row['date'] is! String || row['data'] is! Map) continue;
+      h[row['date'] as String] = {
+        for (final e in (row['data'] as Map).entries)
+          if (e.value is num) e.key.toString(): (e.value as num).toDouble(),
+      };
+    }
+    history = h;
+  }
+
+  Future<void> _mergeAndSave(Map<String, Map<String, double>> rows) async {
+    if (rows.isEmpty) return;
+    for (final e in rows.entries) {
+      history[e.key] = {...?history[e.key], ...e.value};
+    }
+    await SamsungHealth.saveDays(jsonEncode([
+      for (final k in rows.keys) {'date': k, 'data': history[k]},
+    ]));
+  }
+
+  /// Οι τελευταίες 30 μέρες από την κανονική ανάγνωση + όλες οι ζυγίσεις.
+  Future<void> _updateRecentHistory(Dashboard d) async {
+    final today = dayOf(d.readAt);
+    final rows = summarizeRange(d, addDays(today, -30), today);
+    for (final b in d.body) {
+      final k = dateKey(b.time);
+      rows[k] = {
+        ...?rows[k],
+        if (b.weight != null) K.weight: b.weight!,
+        if (b.fatPct != null) K.fatPct: b.fatPct!,
+        if (b.smm != null) K.smm: b.smm!,
+      };
+    }
+    await _mergeAndSave(rows);
+    notifyListeners();
+  }
+
+  /// Φέρνει το ιστορικό ανά 30 μέρες προς τα πίσω, μέχρι 12 μήνες. Μόνο όσο η εφαρμογή είναι ανοιχτή·
+  /// αν κλείσει, συνεχίζει από εκεί που σταμάτησε την επόμενη φορά.
+  Future<void> _backfill() async {
+    if (backfilling) return;
+    final today = dayOf(DateTime.now());
+    final start = addDays(today, -_recentDays);
+    final oldest = addDays(today, -historyDays);
+    var cursor = prefs.backfillFrom != null ? parseDateKey(prefs.backfillFrom!) : start;
+    if (!cursor.isAfter(oldest)) return;
+
+    backfilling = true;
+    notifyListeners();
+    try {
+      while (cursor.isAfter(oldest)) {
+        var from = addDays(cursor, -30);
+        if (from.isBefore(oldest)) from = oldest;
+        final r = await SamsungHealth.readRange(dateKey(from), dateKey(cursor));
+        if (r['ok'] != true) break;
+        final dash = Dashboard.fromJson(r);
+        await _mergeAndSave(summarizeRange(dash, from, addDays(cursor, -1)));
+        cursor = from;
+        prefs.backfillFrom = dateKey(cursor);
+        await SamsungHealth.savePrefs(prefs.toJson());
+        final total = start.difference(oldest).inDays;
+        backfillProgress = total <= 0 ? 1 : start.difference(cursor).inDays / total;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Θα ξαναπροσπαθήσει την επόμενη φορά που ανοίγει η εφαρμογή.
+    }
+    backfilling = false;
     notifyListeners();
   }
 

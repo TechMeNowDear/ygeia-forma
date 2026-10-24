@@ -5,50 +5,25 @@ import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-class MovePage extends StatelessWidget {
-  const MovePage({super.key, required this.store});
-  final HealthStore store;
+/// Η ενότητα «Κίνηση» (μέσα στην οθόνη Σώμα).
+List<Widget> moveCards(BuildContext context, Dashboard d) {
+  final c = Aigaio.of(context);
+  final a = d.activity;
+  final steps = d.todaySteps;
+  final distance = (a['distance'] as num?)?.toDouble();
+  final activeMinutes = (a['activeMinutes'] as num?)?.toInt();
+  final calories = (a['calories'] as num?)?.toDouble();
+  final activeCalories = (a['activeCalories'] as num?)?.toDouble();
+  final floorsToday = d.valueFor(d.floors, d.readAt)?.value;
 
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: store,
-      builder: (context, _) {
-        final c = Aigaio.of(context);
-        final d = store.data;
-        if (d == null) {
-          return PageFrame(
-            title: 'Κίνηση',
-            onRefresh: () => store.refresh(),
-            left: [
-              EmptyCard(
-                icon: Icons.directions_walk_rounded,
-                color: c.move,
-                title: 'Δεν υπάρχουν δεδομένα ακόμα',
-                text: 'Σύνδεσε το Samsung Health από το «Σήμερα».',
-              ),
-            ],
-          );
-        }
+  final last14 = d.steps.length <= 14 ? d.steps : d.steps.sublist(d.steps.length - 14);
+  final floors14 = [
+    for (var i = 13; i >= 0; i--) d.readAt.subtract(Duration(days: i)),
+  ];
 
-        final a = d.activity;
-        final steps = d.todaySteps;
-        final distance = (a['distance'] as num?)?.toDouble();
-        final activeMinutes = (a['activeMinutes'] as num?)?.toInt();
-        final calories = (a['calories'] as num?)?.toDouble();
-        final activeCalories = (a['activeCalories'] as num?)?.toDouble();
-        final floorsToday = d.valueFor(d.floors, d.readAt)?.value;
 
-        final last14 = d.steps.length <= 14 ? d.steps : d.steps.sublist(d.steps.length - 14);
-        final floors14 = [
-          for (var i = 13; i >= 0; i--) d.readAt.subtract(Duration(days: i)),
-        ];
+  return [
 
-        return PageFrame(
-          title: 'Κίνηση',
-          subtitle: 'Βήματα, δραστηριότητα και θερμίδες',
-          onRefresh: () => store.refresh(),
-          left: [
             ...pairUp([
               StatCard(
                 icon: Icons.directions_walk_rounded,
@@ -95,8 +70,8 @@ class MovePage extends StatelessWidget {
                 unit: 'kcal',
               ),
             ]),
-          ],
-          right: [
+          
+
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -136,9 +111,6 @@ class MovePage extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        );
-      },
-    );
-  }
+          
+  ];
 }

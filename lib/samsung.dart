@@ -46,4 +46,12 @@ class SamsungHealth {
   static Future<Map<String, dynamic>> savePrefs(String json) => _call('savePrefs', {'json': json});
 
   static Future<Map<String, dynamic>> resolve() => _call('resolve');
+
+  /// Δεδομένα για το διάστημα [from, to) — ημερομηνίες «2026-10-01».
+  static Future<Map<String, dynamic>> readRange(String from, String to) =>
+      _call('readRange', {'from': from, 'to': to});
+
+  static Future<Map<String, dynamic>> saveDays(String json) => _call('saveDays', {'json': json});
+
+  static Future<Map<String, dynamic>> loadDays() => _call('loadDays');
 }

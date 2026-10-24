@@ -26,6 +26,8 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Duration
@@ -85,6 +87,22 @@ class SamsungHealthBridge(
             "requestPermissions" -> respond(result) { requestPermissions() }
             "readAll" -> respond(result) { readAll(call.argument<Int>("days") ?: 30) }
             "dashboard" -> respond(result) { dashboard() }
+            "readRange" -> respond(result) {
+                readRange(call.argument<String>("from") ?: "", call.argument<String>("to") ?: "")
+            }
+            "saveDays" -> respond(result) {
+                val json = call.argument<String>("json") ?: "[]"
+                withContext(Dispatchers.IO) { dayStore.save(JSONArray(json)) }
+                JSONObject().put("ok", true)
+            }
+            "loadDays" -> respond(result) {
+                val rows = withContext(Dispatchers.IO) { dayStore.loadAll() }
+                JSONObject().put("ok", true).put("days", rows)
+            }
+            "clearDays" -> respond(result) {
+                withContext(Dispatchers.IO) { dayStore.clear() }
+                JSONObject().put("ok", true)
+            }
             "cachedDashboard" -> result.success(readFile(DASHBOARD_FILE) ?: "{}")
             "loadPrefs" -> result.success(readFile(PREFS_FILE) ?: "{}")
             "savePrefs" -> {
@@ -135,6 +153,18 @@ class SamsungHealthBridge(
     }
 
     // ---------- Δεδομένα για τις οθόνες ----------
+
+    private val dayStore by lazy { DayStore(activity.applicationContext) }
+
+    private suspend fun readRange(from: String, to: String): JSONObject {
+        val s = store()
+        val names = s.getGrantedPermissions(permissions).map { it.dataType.name }.toSet()
+        return DashboardReader(s)
+            .readRange(names, java.time.LocalDate.parse(from), java.time.LocalDate.parse(to))
+            .put("ok", true)
+            .put("granted", names.size)
+            .put("total", permissions.size)
+    }
 
     private suspend fun dashboard(): JSONObject {
         val s = store()

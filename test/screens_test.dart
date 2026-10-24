@@ -39,12 +39,19 @@ Future<void> _shot(
   required Size size,
   required Brightness brightness,
   required int tab,
+  bool backfilling = false,
+  Future<void> Function(WidgetTester)? act,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
 
   final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
+  store.history = sampleHistory(now, store.data!);
+  if (backfilling) {
+    store.backfilling = true;
+    store.backfillProgress = 0.42;
+  }
   final key = GlobalKey();
   await tester.pumpWidget(
     RepaintBoundary(
@@ -59,6 +66,10 @@ Future<void> _shot(
     ),
   );
   await tester.pumpAndSettle();
+  if (act != null) {
+    await act(tester);
+    await tester.pumpAndSettle();
+  }
   await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
 }
 
@@ -68,13 +79,38 @@ void main() {
   const phone = Size(400, 1900);
   const open = Size(860, 1500);
 
+  const tall = Size(400, 3200);
+
   testWidgets('Σήμερα · κινητό · ανοιχτό', (t) => _shot(t, name: '01_today_phone_light', size: phone, brightness: Brightness.light, tab: 0));
   testWidgets('Σήμερα · κινητό · σκοτεινό', (t) => _shot(t, name: '02_today_phone_dark', size: phone, brightness: Brightness.dark, tab: 0));
   testWidgets('Σήμερα · Fold ανοιχτό', (t) => _shot(t, name: '03_today_open_light', size: open, brightness: Brightness.light, tab: 0));
-  testWidgets('Σήμερα · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '04_today_open_dark', size: open, brightness: Brightness.dark, tab: 0));
-  testWidgets('Ύπνος · κινητό', (t) => _shot(t, name: '05_sleep_phone_light', size: phone, brightness: Brightness.light, tab: 1));
-  testWidgets('Καρδιά · κινητό', (t) => _shot(t, name: '06_heart_phone_light', size: phone, brightness: Brightness.light, tab: 2));
-  testWidgets('Σώμα · κινητό', (t) => _shot(t, name: '07_body_phone_light', size: phone, brightness: Brightness.light, tab: 3));
-  testWidgets('Κίνηση · κινητό', (t) => _shot(t, name: '08_move_phone_light', size: phone, brightness: Brightness.light, tab: 4));
-  testWidgets('Ύπνος · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '09_sleep_open_dark', size: open, brightness: Brightness.dark, tab: 1));
+  testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: 1));
+  testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(
+        t,
+        name: '05_trends_phone_dark_open_row',
+        size: phone,
+        brightness: Brightness.dark,
+        tab: 1,
+        backfilling: true,
+        act: (t) async {
+          final row = find.byKey(const ValueKey('trend-sleepHr'));
+          await t.ensureVisible(row);
+          await t.pumpAndSettle();
+          await t.tap(row);
+        },
+      ));
+  testWidgets('Τάσεις · Fold ανοιχτό · χρόνος', (t) => _shot(
+        t,
+        name: '06_trends_open_light_year',
+        size: open,
+        brightness: Brightness.light,
+        tab: 1,
+        act: (t) async {
+          await t.tap(find.byKey(const ValueKey('period-year')));
+        },
+      ));
+  testWidgets('Ύπνος · κινητό', (t) => _shot(t, name: '07_sleep_phone_light', size: phone, brightness: Brightness.light, tab: 2));
+  testWidgets('Καρδιά · κινητό', (t) => _shot(t, name: '08_heart_phone_light', size: phone, brightness: Brightness.light, tab: 3));
+  testWidgets('Σώμα και κίνηση · κινητό', (t) => _shot(t, name: '09_body_phone_light', size: tall, brightness: Brightness.light, tab: 4));
+  testWidgets('Σώμα και κίνηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '10_body_open_dark', size: open, brightness: Brightness.dark, tab: 4));
 }
