@@ -218,4 +218,30 @@ void main() {
       expect(again.cookware.length, k.cookware.length);
     });
   });
+
+  group('Ίδιο με χθες', () {
+    test('Αντιγράφει το γεύμα με τις ίδιες ποσότητες και σειρά, σε άλλη μέρα', () async {
+      final now = DateTime(2026, 10, 24, 20);
+      final store = sampleFoodStore(now);
+      final today = DateTime(2026, 10, 24);
+      final yesterday = DateTime(2026, 10, 23);
+      expect(store.entriesFor(today, Meal.dinner), isEmpty);
+      final source = store.entriesFor(yesterday, Meal.dinner);
+      expect(source, isNotEmpty);
+
+      final added = await store.copyMeal(yesterday, Meal.dinner, today);
+      final copied = store.entriesFor(today, Meal.dinner);
+      expect(copied.length, source.length);
+      expect([for (final e in copied) e.food.id], [for (final e in source) e.food.id]);
+      expect([for (final e in copied) e.grams], [for (final e in source) e.grams]);
+      expect(Totals(copied).kcal, closeTo(Totals(source).kcal, 0.001));
+      // Τα χθεσινά μένουν όπως ήταν.
+      expect(store.entriesFor(yesterday, Meal.dinner).length, source.length);
+
+      for (final e in added) {
+        await store.remove(e);
+      }
+      expect(store.entriesFor(today, Meal.dinner), isEmpty);
+    });
+  });
 }

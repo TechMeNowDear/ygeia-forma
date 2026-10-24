@@ -311,10 +311,33 @@ class _MealCard extends StatelessWidget {
   final List<LogEntry> entries;
   final DateTime day;
 
+  DateTime get prevDay => DateTime(day.year, day.month, day.day - 1);
+
+  Future<void> _copyFromPrevious(BuildContext context, DateTime from) async {
+    final added = await food.copyMeal(from, meal, day);
+    if (!context.mounted || added.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text(
+        '${mealLabel(meal)}: ${added.length == 1 ? '1 τρόφιμο' : '${added.length} τρόφιμα'} όπως χθες',
+      ),
+      action: SnackBarAction(
+        label: 'Αναίρεση',
+        onPressed: () async {
+          for (final e in added) {
+            await food.remove(e);
+          }
+        },
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final t = Totals(entries);
+    final previous = entries.isEmpty ? food.entriesFor(prevDay, meal) : const <LogEntry>[];
     return AppCard(
       padding: const EdgeInsets.fromLTRB(18, 16, 10, 6),
       child: Column(
@@ -336,13 +359,28 @@ class _MealCard extends StatelessWidget {
           ),
           if (entries.isNotEmpty) const SizedBox(height: 4),
           for (final e in entries) _EntryRow(food: food, entry: e),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => openAddFood(context, food, meal: meal, day: day),
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: Text(entries.isEmpty ? 'Προσθήκη' : 'Κι άλλο'),
-            ),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => openAddFood(context, food, meal: meal, day: day),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: Text(entries.isEmpty ? 'Προσθήκη' : 'Κι άλλο'),
+              ),
+              const Spacer(),
+              if (entries.isEmpty && previous.isNotEmpty)
+                Flexible(
+                  child: TextButton.icon(
+                    key: ValueKey('copy-${meal.name}'),
+                    onPressed: () => _copyFromPrevious(context, prevDay),
+                    icon: const Icon(Icons.content_copy_rounded, size: 18),
+                    label: Text(
+                      'Ίδιο με χθες · ${kcalText(Totals(previous).kcal)} kcal',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

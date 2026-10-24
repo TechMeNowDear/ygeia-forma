@@ -207,6 +207,31 @@ class FoodStore extends ChangeNotifier {
     return e;
   }
 
+  /// «Ίδιο με χθες»: ξαναγράφει τα τρόφιμα ενός γεύματος από άλλη μέρα, με τις ίδιες ποσότητες.
+  /// Οι τιμές παίρνονται από τη βάση όπως είναι τώρα (σαν να τα κατέγραφα ξανά).
+  Future<List<LogEntry>> copyMeal(DateTime from, Meal meal, DateTime to, {Meal? into}) async {
+    final source = entriesFor(from, meal);
+    final d = dayOf(to);
+    final now = DateTime.now();
+    final base = DateTime(d.year, d.month, d.day, now.hour, now.minute, now.second);
+    final out = <LogEntry>[
+      for (var i = 0; i < source.length; i++)
+        LogEntry(
+          id: _newId(),
+          day: dateKey(d),
+          meal: into ?? meal,
+          food: _current(source[i].food),
+          grams: source[i].grams,
+          // Ίδια σειρά με το αρχικό γεύμα.
+          time: base.add(Duration(milliseconds: i)),
+        ),
+    ];
+    for (final e in out) {
+      await _put(e);
+    }
+    return out;
+  }
+
   Future<void> update(LogEntry e) => _put(e);
 
   Future<void> _put(LogEntry e) async {
