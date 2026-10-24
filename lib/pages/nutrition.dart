@@ -169,7 +169,9 @@ class MacroBreakdown extends StatelessWidget {
     final sum = pk + ck + fk;
 
     Widget macro(String label, double g, double kcalPart, Color color) => Expanded(
-          child: Column(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -203,6 +205,7 @@ class MacroBreakdown extends StatelessWidget {
                 ),
             ],
           ),
+          ),
         );
 
     return Column(
@@ -215,6 +218,7 @@ class MacroBreakdown extends StatelessWidget {
                   decoration: BoxDecoration(color: c.hairline, borderRadius: BorderRadius.circular(6)),
                 )
               : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final (i, part, color) in [(0, pk, proteinColor(c)), (1, ck, carbsColor(c)), (2, fk, fatColor(c))]) ...[
                       if (i > 0) const SizedBox(width: 3),

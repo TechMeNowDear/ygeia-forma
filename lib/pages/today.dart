@@ -153,7 +153,6 @@ class TodayPage extends StatelessWidget {
       final diff = last!.weight! - prev!.weight!;
       trend = TrendPill(
         '${signedDec(diff)} kg από ${dayMonth(prev.time)}',
-        up: diff.abs() < 0.05 ? null : diff > 0,
         kind: diff < -0.05 ? TrendKind.good : (diff > 0.05 ? TrendKind.bad : TrendKind.neutral),
       );
     }
@@ -367,6 +366,7 @@ class _SleepCard extends StatelessWidget {
                     child: SizedBox(
                       height: 10,
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           for (final (i, k) in stages.indexed) ...[
                             if (i > 0) const SizedBox(width: 2),

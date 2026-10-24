@@ -58,7 +58,7 @@ class _Dest {
 
 const _destinations = [
   _Dest(Icons.wb_sunny_outlined, Icons.wb_sunny_rounded, 'Σήμερα', null),
-  _Dest(Icons.monitor_heart_outlined, Icons.monitor_heart_rounded, 'Υγεία', Aigaio.healthSolid),
+  _Dest(Icons.favorite_outline_rounded, Icons.favorite_rounded, 'Υγεία', Aigaio.healthSolid),
   _Dest(Icons.restaurant_outlined, Icons.restaurant_rounded, 'Διατροφή', Aigaio.foodSolid),
   _Dest(Icons.fitness_center_outlined, Icons.fitness_center_rounded, 'Άσκηση', Aigaio.exerciseSolid),
 ];
