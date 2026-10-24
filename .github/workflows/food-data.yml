@@ -1,0 +1,24 @@
+name: Δεδομένα τροφίμων
+on:
+  push:
+    branches: [main]
+    paths: ['tools/food/**']
+  workflow_dispatch:
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Κατέβασμα πηγών
+        run: bash tools/food/fetch.sh
+      - name: Ανέβασμα στο branch food-raw
+        run: |
+          cd food-raw
+          git init -q -b food-raw
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -qm "Ακατέργαστα δεδομένα τροφίμων $(date -u +%F)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" food-raw
