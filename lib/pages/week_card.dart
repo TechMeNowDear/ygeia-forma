@@ -168,22 +168,15 @@ class _WeekRow extends StatelessWidget {
               children: [
                 Text(t.def.label, style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 const SizedBox(height: 1),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: t.def.format(t.current!),
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text),
-                      ),
-                      if (t.previous != null)
-                        TextSpan(
-                          text: '   συνήθως ${t.def.format(t.previous!)}',
-                          style: TextStyle(fontSize: 13, color: c.textTertiary),
-                        ),
-                    ],
-                  ),
-                  style: const TextStyle(fontFeatures: tabular),
+                Text(
+                  t.def.format(t.current!),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                 ),
+                if (t.previous != null)
+                  Text(
+                    'συνήθως ${t.def.format(t.previous!)}',
+                    style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
+                  ),
               ],
             ),
           ),
