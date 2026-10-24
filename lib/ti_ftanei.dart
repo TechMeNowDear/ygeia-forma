@@ -198,7 +198,7 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
 
     for (final t in _types()) {
       final key = t['key'] as String;
-      b.writeln('## ${typeLabels[key] ?? key} [$key] — ${t['state']}');
+      b.writeln('## ${typeLabels[key] ?? key} [$key] — ${t['state']} (${t['days'] ?? ''} μέρες)');
       if (t['state'] == 'ok') {
         b.writeln(
           'Εγγραφές: ${t['count']}${t['capped'] == true ? '+' : ''} · τελευταία: ${t['latest']}',
@@ -405,7 +405,7 @@ class _TypeCard extends StatelessWidget {
         final capped = type['capped'] == true ? '+' : '';
         line = '${type['count']}$capped εγγραφές · τελευταία ${_formatDateTime(type['latest'] as String?)}';
       case 'empty':
-        line = 'Καμία εγγραφή τις τελευταίες 30 μέρες.';
+        line = 'Καμία εγγραφή τις τελευταίες ${type['days'] ?? 30} μέρες.';
       case 'no_permission':
         line = 'Δεν δόθηκε άδεια ανάγνωσης.';
       case 'unsupported':

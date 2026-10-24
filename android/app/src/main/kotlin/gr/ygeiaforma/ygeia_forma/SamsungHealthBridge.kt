@@ -143,7 +143,10 @@ class SamsungHealthBridge(
                 continue
             }
             try {
-                readOne(s, type, from, to, o)
+                // Η ζυγαριά δεν χρησιμοποιείται κάθε μέρα: για τη σύσταση σώματος κοιτάμε έναν χρόνο πίσω.
+                val typeFrom = if (key == "body_composition") to.minusDays(365) else from
+                o.put("days", java.time.temporal.ChronoUnit.DAYS.between(typeFrom, to))
+                readOne(s, type, typeFrom, to, o)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
