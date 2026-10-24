@@ -5,6 +5,8 @@
 - Αν λείπουν οι θερμίδες, υπολογίζονται από τα μακροθρεπτικά με τους συντελεστές του Κανονισμού ΕΕ 1169/2011
   (πρωτεΐνη 4, υδατάνθρακες 4, λίπος 9, φυτικές ίνες 2, αλκοόλ 7, πολυόλες 2,4) και το τρόφιμο σημειώνεται "energyCalc".
 - Έλεγχος λογικής: θερμίδες πηγής vs υπολογισμένες από τα μακρο. Απόκλιση >15% (και >20 kcal) → λίστα για έλεγχο.
+- Αλάτι = νάτριο × 2,5 / 1000 όταν υπάρχει νάτριο (ορισμός ΕΕ), ώστε όλες οι πηγές να συμφωνούν.
+- Το id είναι σταθερό: πηγή+κωδικός, ή η 6η στήλη όταν ο ίδιος κωδικός ξαναχρησιμοποιείται.
 """
 import json, sys
 
@@ -23,7 +25,8 @@ def calc_kcal(n):
     fib = val(n.get("fiber")) or 0.0
     alc = val(n.get("alcohol")) or 0.0
     pol = val(n.get("polyols")) or 0.0
-    return 4*p + 4*c + 9*f + 2*fib + 7*alc + 2.4*pol
+    # Στη CIQUAL οι υδατάνθρακες περιέχουν ήδη τις πολυόλες.
+    return 4*p + 4*max(0.0, c - pol) + 9*f + 2*fib + 7*alc + 2.4*pol
 
 foods, problems, seen = [], [], set()
 for line in open(listfile, encoding="utf-8"):
@@ -36,13 +39,21 @@ for line in open(listfile, encoding="utf-8"):
         problems.append(f"ΔΕΝ ΥΠΑΡΧΕΙ {src}{code} {name}"); continue
     s = db[code]
     n = dict(s["n"])
+    fid = parts[5].strip() if len(parts) > 5 and parts[5].strip() else f"{src}{code}"
+    if fid in seen:
+        problems.append(f"ΔΙΠΛΟ ID {fid} {name}: βάλε σταθερό id στην 6η στήλη"); continue
+    seen.add(fid)
+    if s.get("carbsInclFiber"):
+        problems.append(f"ΧΩΡΙΣ ΦΥΤΙΚΕΣ ΙΝΕΣ (υδατάνθρακες USDA με ίνες) {fid} {name}")
+    sod = n.get("sodium")
+    if isinstance(sod, (int, float)):
+        n["salt"] = round(sod * 2.5 / 1000, 3)
     entry = {
-        "id": f"{src}{code}" + ("" if f"{src}{code}" not in seen else f"-{len([x for x in seen if x.startswith(f'{src}{code}')])}"),
+        "id": fid,
         "name": name, "cat": cat, "aliases": aliases,
         "source": "CIQUAL 2025" if src == "C" else ("USDA Foundation" if s.get("dataset") == "foundation" else "USDA SR Legacy"),
         "sourceCode": code, "sourceName": s["en"], "n": n,
     }
-    seen.add(entry["id"])
     ck = calc_kcal(n)
     if "kcal" not in n or n["kcal"] is None or isinstance(n["kcal"], dict):
         if ck is None:

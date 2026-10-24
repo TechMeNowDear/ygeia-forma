@@ -1,5 +1,9 @@
 """USDA FoodData Central (CC0): SR Legacy + Foundation Foods → usda.json (ίδιο σχήμα με ciqual.json).
-Τιμές ανά 100 g. Αλάτι = νάτριο × 2,5 / 1000 (κανόνας ΕΕ 1169/2011)."""
+Τιμές ανά 100 g. Αλάτι = νάτριο × 2,5 / 1000 (κανόνας ΕΕ 1169/2011).
+
+ΥΔΑΤΑΝΘΡΑΚΕΣ: η USDA (1005, «by difference») μετράει μέσα και τις φυτικές ίνες· η CIQUAL, οι ετικέτες της ΕΕ
+και το Open Food Facts όχι. Για να έχουν όλα την ίδια σημασία: carbs = max(0, 1005 − φυτικές ίνες).
+Αν λείπουν οι φυτικές ίνες, το τρόφιμο σημειώνεται "carbsInclFiber" και δεν πρέπει να μπει στη λίστα χωρίς έλεγχο."""
 import csv, json, sys, os
 
 base = sys.argv[1]
@@ -14,6 +18,8 @@ NUT = {
     1167: "vitB3", 1170: "vitB5", 1175: "vitB6", 1178: "vitB12", 1177: "folate",
 }
 ATWATER = (2047, 2048)  # Foundation: ενέργεια Atwater (γενική / ειδική) όταν λείπει το 1008
+# Foundation: εναλλακτικοί κωδικοί όταν λείπουν οι βασικοί.
+FALLBACK = {1063: "sugars", 2033: "fiber", 1085: "fat"}
 
 foods = {}
 for ds in sorted(os.listdir(base)):
@@ -41,11 +47,20 @@ for ds in sorted(os.listdir(base)):
             amt = float(r["amount"])
             if nid in NUT:
                 foods[fid]["n"][NUT[nid]] = amt
+            elif nid in FALLBACK:
+                foods[fid].setdefault("_fb", {})[FALLBACK[nid]] = amt
             elif nid in ATWATER:
                 foods[fid]["_atw"][nid] = amt
 
 for f in foods.values():
     n = f["n"]
+    for k, v in f.pop("_fb", {}).items():
+        n.setdefault(k, v)
+    if "carbs" in n:
+        if "fiber" in n:
+            n["carbs"] = round(max(0.0, n["carbs"] - n["fiber"]), 3)
+        else:
+            f["carbsInclFiber"] = True
     if "kcal" not in n:
         for k in (2048, 2047):
             if k in f["_atw"]:

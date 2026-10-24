@@ -63,6 +63,22 @@ void main() {
       }
     });
 
+    test('Λογικά νούμερα: μακρο + ίνες + νερό δεν ξεπερνούν τα 100 g', () {
+      for (final f in basicFoods()) {
+        final sum = [Nk.protein, Nk.carbs, Nk.fat, Nk.fiber, 'water'].fold<double>(0, (s, k) => s + f.n.amount(k));
+        expect(sum, lessThanOrEqualTo(102), reason: '${f.name}: ${sum.toStringAsFixed(1)} g');
+      }
+    });
+
+    test('USDA: οι υδατάνθρακες χωρίς τις φυτικές ίνες, όπως στις ετικέτες της ΕΕ', () {
+      final lima = basicFoods().firstWhere((f) => f.id == 'U174252');
+      expect(lima.n.amount(Nk.carbs), closeTo(63.38 - 19.0, 0.01));
+    });
+
+    test('Σταθερά id: το κριθαράκι κρατά το id του', () {
+      expect(basicFoods().where((f) => f.id == 'C9810-1').single.name, startsWith('Κριθαράκι'));
+    });
+
     test('Γεύμα από την ώρα', () {
       expect(mealForTime(DateTime(2026, 1, 1, 8)), Meal.breakfast);
       expect(mealForTime(DateTime(2026, 1, 1, 14)), Meal.lunch);
