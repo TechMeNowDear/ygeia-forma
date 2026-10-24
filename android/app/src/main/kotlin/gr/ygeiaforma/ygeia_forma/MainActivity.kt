@@ -16,6 +16,8 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/samsung")
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")
+            .setMethodCallHandler(FoodBridge(this, scope))
     }
 
     override fun onDestroy() {

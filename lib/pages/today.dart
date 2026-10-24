@@ -15,12 +15,14 @@ class TodayPage extends StatelessWidget {
     required this.store,
     required this.openTab,
     required this.openSettings,
+    required this.openTrends,
     this.now,
   });
 
   final HealthStore store;
   final void Function(int) openTab;
   final VoidCallback openSettings;
+  final VoidCallback openTrends;
 
   /// Για τα στιγμιότυπα δοκιμών· στην εφαρμογή είναι πάντα «τώρα».
   final DateTime? now;
@@ -35,15 +37,28 @@ class TodayPage extends StatelessWidget {
         final now = this.now ?? DateTime.now();
         final prefs = store.prefs;
 
-        final settingsButton = TextButton.icon(
-          onPressed: openSettings,
-          style: TextButton.styleFrom(
-            backgroundColor: c.card,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: const StadiumBorder(),
-          ),
-          icon: const Icon(Icons.tune_rounded, size: 18),
-          label: const Text('Ρυθμίσεις'),
+        ButtonStyle pill() => TextButton.styleFrom(
+              backgroundColor: c.card,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: const StadiumBorder(),
+            );
+        final settingsButton = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(
+              onPressed: openTrends,
+              style: pill(),
+              icon: const Icon(Icons.insights_rounded, size: 18),
+              label: const Text('Τάσεις'),
+            ),
+            const SizedBox(width: 6),
+            IconButton.filledTonal(
+              tooltip: 'Ρυθμίσεις',
+              onPressed: openSettings,
+              style: IconButton.styleFrom(backgroundColor: c.card, foregroundColor: c.primary),
+              icon: const Icon(Icons.tune_rounded, size: 20),
+            ),
+          ],
         );
 
         if (d == null || !d.hasAnyPermission) {

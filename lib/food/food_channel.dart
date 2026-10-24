@@ -1,0 +1,32 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
+
+/// Κανάλι «ygeia/food» προς το Kotlin (FoodBridge).
+class FoodChannel {
+  static const _channel = MethodChannel('ygeia/food');
+
+  static Future<Map<String, dynamic>> _call(String method, [Map<String, dynamic>? args]) async {
+    try {
+      final raw = await _channel.invokeMethod<String>(method, args);
+      if (raw == null) return {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'};
+      final d = jsonDecode(raw);
+      return d is Map<String, dynamic> ? d : <String, dynamic>{};
+    } on PlatformException catch (e) {
+      return {'ok': false, 'kind': 'other', 'message': e.message ?? e.code};
+    } on MissingPluginException {
+      return {'ok': false, 'kind': 'not_android', 'message': 'Διαθέσιμο μόνο στο κινητό'};
+    } on FormatException catch (e) {
+      return {'ok': false, 'kind': 'other', 'message': e.message};
+    }
+  }
+
+  static Future<Map<String, dynamic>> logRange(String from, String to) => _call('logRange', {'from': from, 'to': to});
+  static Future<Map<String, dynamic>> logPut(String json) => _call('logPut', {'json': json});
+  static Future<Map<String, dynamic>> logDelete(String id) => _call('logDelete', {'id': id});
+  static Future<Map<String, dynamic>> myFoods() => _call('myFoods');
+  static Future<Map<String, dynamic>> myFoodPut(String json) => _call('myFoodPut', {'json': json});
+  static Future<Map<String, dynamic>> myFoodDelete(String id) => _call('myFoodDelete', {'id': id});
+  static Future<Map<String, dynamic>> scanBarcode() => _call('scanBarcode');
+  static Future<Map<String, dynamic>> offLookup(String code) => _call('offLookup', {'code': code});
+}

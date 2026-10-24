@@ -170,7 +170,7 @@ class SamsungHealthBridge(
 
     // ---------- Δεδομένα για τις οθόνες ----------
 
-    private val dayStore by lazy { DayStore(activity.applicationContext) }
+    private val dayStore by lazy { DayStore.get(activity.applicationContext) }
 
     private suspend fun readRange(from: String, to: String): JSONObject {
         val s = store()

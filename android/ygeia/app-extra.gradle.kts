@@ -41,4 +41,6 @@ dependencies {
     implementation(files("libs/samsung-health-data-api-1.1.0.aar"))
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Σκανάρισμα barcode από το Google Play services (χωρίς άδεια κάμερας, χωρίς δική μας κάμερα).
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }

@@ -10,11 +10,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
+import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/unusual.dart';
 
 import 'sample_data.dart';
+import 'sample_food.dart';
 
 final now = DateTime(2026, 10, 24, 16, 30);
 
@@ -46,6 +48,7 @@ Future<void> _shot(
   DateTime? at,
   void Function(HealthStore)? prepare,
   Future<void> Function(WidgetTester)? act,
+  bool trends = false,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
@@ -68,7 +71,9 @@ Future<void> _shot(
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-        home: Shell(store: store, initialIndex: tab, now: when),
+        home: trends
+            ? Scaffold(body: TrendsPage(store: store, now: when))
+            : Shell(store: store, food: sampleFoodStore(when), initialIndex: tab, now: when),
       ),
     ),
   );
@@ -142,13 +147,52 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(find.byKey(key), matchesGoldenFile('shots/13_report.png'));
   });
-  testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: 1));
+  testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: 0, trends: true));
+  testWidgets('Διατροφή · κινητό', (t) => _shot(t, name: '14_nutrition_phone_light', size: tall, brightness: Brightness.light, tab: 1));
+  testWidgets('Διατροφή · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '15_nutrition_open_dark', size: open, brightness: Brightness.dark, tab: 1));
+  testWidgets('Διατροφή · προσθήκη · αναζήτηση', (t) => _shot(
+        t,
+        name: '16_add_food_search',
+        size: phone,
+        brightness: Brightness.light,
+        tab: 1,
+        act: (t) async {
+          await t.tap(find.text('Φαγητό'));
+          await t.pumpAndSettle();
+          await t.enterText(find.byType(TextField), 'kotopoulo');
+        },
+      ));
+  testWidgets('Διατροφή · προσθήκη · πρόσφατα', (t) => _shot(
+        t,
+        name: '17_add_food_recent',
+        size: phone,
+        brightness: Brightness.dark,
+        tab: 1,
+        act: (t) async {
+          await t.tap(find.text('Φαγητό'));
+        },
+      ));
+  testWidgets('Διατροφή · ποσότητα', (t) => _shot(
+        t,
+        name: '18_quantity_sheet',
+        size: phone,
+        brightness: Brightness.light,
+        tab: 1,
+        act: (t) async {
+          await t.tap(find.text('Φαγητό'));
+          await t.pumpAndSettle();
+          await t.enterText(find.byType(TextField), 'fakes');
+          await t.pumpAndSettle();
+          await t.tap(find.text('Φακές (βρασμένες)').first);
+        },
+      ));
   testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(
         t,
         name: '05_trends_phone_dark_open_row',
         size: phone,
         brightness: Brightness.dark,
-        tab: 1,
+        tab: 0,
+        trends: true,
         backfilling: true,
         act: (t) async {
           final row = find.byKey(const ValueKey('trend-sleepHr'));
@@ -162,7 +206,8 @@ void main() {
         name: '06_trends_open_light_year',
         size: open,
         brightness: Brightness.light,
-        tab: 1,
+        tab: 0,
+        trends: true,
         act: (t) async {
           await t.tap(find.byKey(const ValueKey('period-year')));
         },
