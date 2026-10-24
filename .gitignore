@@ -32,3 +32,6 @@ android/key.properties
 .vscode/
 *.iml
 .DS_Store
+
+# Στιγμιότυπα (ανεβαίνουν στο branch screenshots)
+test/shots/

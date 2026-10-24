@@ -24,7 +24,9 @@ class BodyPage extends StatelessWidget {
 
         final left = <Widget>[
           if (last == null)
-            const EmptyCard(
+            EmptyCard(
+              icon: Icons.monitor_weight_rounded,
+              color: c.body,
               title: 'Δεν υπάρχει ζύγιση',
               text: 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ μέσω Samsung Health σε λίγα λεπτά.',
             )
@@ -35,14 +37,14 @@ class BodyPage extends StatelessWidget {
               context,
               'Βάρος (kg)',
               [for (final b in body) if (b.weight != null) (b.time, b.weight!)],
-              c.primary,
+              c.body,
             ),
           if (body.where((b) => b.fatPct != null).length >= 2)
             _chartCard(
               context,
               'Λίπος (%)',
               [for (final b in body) if (b.fatPct != null) (b.time, b.fatPct!)],
-              c.terracotta,
+              c.heart,
             ),
         ];
 
@@ -52,15 +54,15 @@ class BodyPage extends StatelessWidget {
               context,
               'Σκελετικοί μύες (kg)',
               [for (final b in body) if (b.smm != null) (b.time, b.smm!)],
-              c.olive,
+              c.energy,
             ),
           if (body.isNotEmpty)
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Ζυγίσεις'),
-                  const SizedBox(height: 6),
+                  CardHeader(icon: Icons.list_alt_rounded, title: 'Ζυγίσεις', color: c.body),
+                  const SizedBox(height: 8),
                   for (final b in body.reversed.take(12))
                     InfoRow(
                       dayMonthYear(b.time),
@@ -78,8 +80,8 @@ class BodyPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Θερμοκρασία δέρματος στον ύπνο'),
-                  const SizedBox(height: 4),
+                  CardHeader(icon: Icons.thermostat_rounded, title: 'Θερμοκρασία δέρματος στον ύπνο', color: c.move),
+                  const SizedBox(height: 10),
                   Text(
                     skinBase == null
                         ? 'Χρειάζονται λίγες ακόμα νύχτες για τον μέσο όρο σου.'
@@ -93,12 +95,14 @@ class BodyPage extends StatelessWidget {
                         (n.date, n.skinTemp!),
                     ],
                     format: (v) => dec(v),
-                    color: c.wheat,
+                    color: c.move,
                   ),
                 ],
               ),
             ),
-          const EmptyCard(
+          EmptyCard(
+            icon: Icons.add_chart_rounded,
+            color: c.body,
             title: 'Περισσότερα από την InBody',
             text: 'Σπλαχνικό λίπος, νερό σώματος και μετρήσεις ανά χέρι και πόδι έρχονται με τη σύνδεση με την InBody (Βήμα 5).',
           ),
@@ -120,7 +124,7 @@ class BodyPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SectionLabel(title),
+          CardHeader(icon: Icons.show_chart_rounded, title: title, color: color),
           const SizedBox(height: 12),
           LineChart(points: points, color: color, format: (v) => dec(v), dateLabel: dayMonth),
         ],
@@ -153,28 +157,21 @@ class _LatestCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Τελευταία ζύγιση · ${relativeDay(last.time, now)} ${hm(last.time)}',
-            style: TextStyle(color: c.textSecondary, fontWeight: FontWeight.w600),
+          CardHeader(
+            icon: Icons.monitor_weight_rounded,
+            title: 'Τελευταία ζύγιση · ${relativeDay(last.time, now)} ${hm(last.time)}',
+            color: c.body,
           ),
-          const SizedBox(height: 4),
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: last.weight == null ? '—' : dec(last.weight!),
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: c.text),
-                ),
-                TextSpan(text: ' kg', style: TextStyle(color: c.textSecondary, fontSize: 16)),
-              ],
-            ),
-          ),
-          if (p != null)
+          const SizedBox(height: 14),
+          BigValue(last.weight == null ? '—' : dec(last.weight!), unit: 'kg', size: 34),
+          if (p != null) ...[
+            const SizedBox(height: 4),
             Text(
-              'Σύγκριση με ${dayMonth(p.time)}',
+              'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}',
               style: TextStyle(color: c.textSecondary, fontSize: 13),
             ),
-          const SizedBox(height: 8),
+          ],
+          const Hairline(vertical: 12),
           InfoRow('Βάρος', withDiff(last.weight, p?.weight, 'kg')),
           InfoRow('Λίπος', withDiff(last.fatPct, p?.fatPct, '%')),
           InfoRow('Μάζα λίπους', withDiff(last.fatKg, p?.fatKg, 'kg')),

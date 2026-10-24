@@ -42,13 +42,26 @@ String two(int n) => n.toString().padLeft(2, '0');
 /// «08:40»
 String hm(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
 
-/// 372 → «6 ώ 12 λ»
+String _hours(int h) => h == 1 ? '1 ώρα' : '$h ώρες';
+String _minutes(int m) => m == 1 ? '1 λεπτό' : '$m λεπτά';
+
+/// 372 → «6 ώρες 12 λεπτά», 60 → «1 ώρα», 1 → «1 λεπτό».
 String hoursMinutes(int minutes) {
   final h = minutes ~/ 60;
   final m = minutes % 60;
-  if (h == 0) return '$m λ';
-  if (m == 0) return '$h ώ';
-  return '$h ώ $m λ';
+  if (h == 0) return _minutes(m);
+  if (m == 0) return _hours(h);
+  return '${_hours(h)} ${_minutes(m)}';
+}
+
+/// Χωριστά ο αριθμός και η λέξη, για μεγάλα νούμερα: [('6', 'ώρες'), ('12', 'λεπτά')].
+List<(String, String)> hoursMinutesParts(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  return [
+    if (h > 0) ('$h', h == 1 ? 'ώρα' : 'ώρες'),
+    if (m > 0 || h == 0) ('$m', m == 1 ? 'λεπτό' : 'λεπτά'),
+  ];
 }
 
 /// 82.2 → «82,2»
@@ -72,8 +85,17 @@ String signedDec(num v, [int digits = 1]) {
   return r > 0 ? '+${dec(r, digits)}' : '−${dec(-r, digits)}';
 }
 
-/// Διαφορά λεπτών: «+25 λ», «−1 ώ 5 λ».
+/// Διαφορά λεπτών: «25 λεπτά περισσότερα», «1 ώρα 5 λεπτά λιγότερα».
+String moreLessMinutes(int v) {
+  if (v == 0) return 'ίδια διάρκεια';
+  return v > 0 ? '${hoursMinutes(v)} περισσότερο' : '${hoursMinutes(-v)} λιγότερο';
+}
+
+/// Διαφορά λεπτών με πρόσημο: «+25 λεπτά».
 String signedMinutes(int v) {
-  if (v == 0) return '0 λ';
+  if (v == 0) return '0 λεπτά';
   return v > 0 ? '+${hoursMinutes(v)}' : '−${hoursMinutes(-v)}';
 }
+
+/// «Καλημέρα» / «Καλησπέρα» ανάλογα με την ώρα.
+String greeting(DateTime now) => (now.hour >= 4 && now.hour < 13) ? 'Καλημέρα' : 'Καλησπέρα';

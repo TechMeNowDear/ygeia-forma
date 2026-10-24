@@ -20,8 +20,10 @@ class HeartPage extends StatelessWidget {
           return PageFrame(
             title: 'Καρδιά',
             onRefresh: () => store.refresh(),
-            left: const [
+            left: [
               EmptyCard(
+                icon: Icons.favorite_rounded,
+                color: c.heart,
                 title: 'Δεν υπάρχουν παλμοί ακόμα',
                 text: 'Φόρεσε το ρολόι. Οι παλμοί εμφανίζονται εδώ μόλις συγχρονιστεί το Samsung Health.',
               ),
@@ -40,6 +42,18 @@ class HeartPage extends StatelessWidget {
         final latest = d.latestHeart;
         final oxNights = d.nights.where((n) => n.spo2Avg != null).toList().reversed.take(10).toList();
 
+        Widget? trend;
+        if (lastRhr != null && base != null) {
+          final diff = (lastRhr - base).round();
+          trend = diff == 0
+              ? const TrendPill('Όπως ο μέσος όρος σου')
+              : TrendPill(
+                  '${diff.abs()} ${diff > 0 ? 'πάνω' : 'κάτω'} από τον μέσο όρο (${base.round()})',
+                  up: diff > 0,
+                  kind: diff >= 3 ? TrendKind.bad : (diff < 0 ? TrendKind.good : TrendKind.neutral),
+                );
+        }
+
         return PageFrame(
           title: 'Καρδιά',
           subtitle: 'Παλμοί, οξυγόνο και HRV',
@@ -49,37 +63,19 @@ class HeartPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Παλμοί ηρεμίας'),
-                  const SizedBox(height: 4),
+                  CardHeader(icon: Icons.favorite_rounded, title: 'Παλμοί ηρεμίας', color: c.heart),
+                  const SizedBox(height: 14),
+                  if (lastRhr != null) BigValue('${lastRhr.round()}', unit: 'bpm', size: 34),
+                  if (trend != null) ...[const SizedBox(height: 8), trend],
+                  const SizedBox(height: 8),
                   Text(
                     'Ο μέσος όρος των παλμών σου στον ύπνο. Όσο πιο χαμηλά, τόσο πιο ξεκούραστη η καρδιά.',
-                    style: TextStyle(color: c.textSecondary, fontSize: 13),
+                    style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
-                  const SizedBox(height: 12),
-                  if (lastRhr != null)
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '${lastRhr.round()}',
-                            style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: c.text),
-                          ),
-                          TextSpan(text: ' bpm', style: TextStyle(color: c.textSecondary)),
-                          if (base != null)
-                            TextSpan(
-                              text: '   μέσος όρος ${base.round()}',
-                              style: TextStyle(color: c.textSecondary),
-                            ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  if (rhrPoints.length >= 2)
-                    LineChart(
-                      points: rhrPoints,
-                      format: (v) => v.round().toString(),
-                      color: c.terracotta,
-                    ),
+                  if (rhrPoints.length >= 2) ...[
+                    const SizedBox(height: 14),
+                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.heart),
+                  ],
                 ],
               ),
             ),
@@ -87,10 +83,10 @@ class HeartPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Σήμερα'),
-                  const SizedBox(height: 6),
+                  CardHeader(icon: Icons.monitor_heart_rounded, title: 'Παλμοί σήμερα', color: c.heart),
+                  const SizedBox(height: 8),
                   if (latest != null)
-                    InfoRow('Τελευταία μέτρηση (${hm(latest.start)})', '${latest.avg.round()} bpm'),
+                    InfoRow('Τελευταία μέτρηση, ${hm(latest.start)}', '${latest.avg.round()} bpm'),
                   if (today != null) ...[
                     InfoRow('Χαμηλότεροι', '${today.$1.round()} bpm'),
                     InfoRow('Υψηλότεροι', '${today.$2.round()} bpm'),
@@ -106,26 +102,28 @@ class HeartPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Οξυγόνο στον ύπνο'),
-                  const SizedBox(height: 4),
+                  CardHeader(icon: Icons.air_rounded, title: 'Οξυγόνο στον ύπνο', color: c.sleep),
+                  const SizedBox(height: 8),
                   Text(
                     'Μέσο και χαμηλότερο ανά νύχτα. Μεμονωμένες χαμηλές τιμές είναι συχνά λάθος μέτρησης '
                     '(κίνηση, χαλαρό λουρί). Αν επαναλαμβάνονται, συζήτησέ το με γιατρό.',
-                    style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+                    style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
-                  const SizedBox(height: 8),
+                  const Hairline(vertical: 12),
                   if (oxNights.isEmpty)
                     Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
                   for (final n in oxNights)
                     InfoRow(
                       shortDayDate(n.date),
-                      '${n.spo2Avg!.round()}% / ${n.spo2Min?.round() ?? '—'}%',
-                      valueColor: (n.spo2Min ?? 100) < 88 ? c.terracotta : null,
+                      '${n.spo2Avg!.round()}% · χαμηλότερο ${n.spo2Min?.round() ?? '—'}%',
+                      valueColor: (n.spo2Min ?? 100) < 88 ? c.bad : null,
                     ),
                 ],
               ),
             ),
-            const EmptyCard(
+            EmptyCard(
+              icon: Icons.timeline_rounded,
+              color: c.sleep,
               title: 'HRV (μεταβλητότητα παλμών)',
               text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές. Θα το μετρά η δική μας εφαρμογή στο ρολόι (Βήμα 6).',
             ),

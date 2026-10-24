@@ -51,15 +51,19 @@ const _destinations = [
 
 /// Κέλυφος: κάτω μπάρα στο κινητό (κλειστό Fold), πλευρική σε ανοιχτό Fold και tablet.
 class Shell extends StatefulWidget {
-  const Shell({super.key, required this.store});
+  const Shell({super.key, required this.store, this.initialIndex = 0, this.now});
   final HealthStore store;
+  final int initialIndex;
+
+  /// Μόνο για τα στιγμιότυπα δοκιμών.
+  final DateTime? now;
 
   @override
   State<Shell> createState() => _ShellState();
 }
 
 class _ShellState extends State<Shell> {
-  int _index = 0;
+  late int _index = widget.initialIndex;
 
   void _go(int i) => setState(() => _index = i);
 
@@ -74,7 +78,7 @@ class _ShellState extends State<Shell> {
     final c = Aigaio.of(context);
     final store = widget.store;
     final pages = <Widget>[
-      TodayPage(store: store, openTab: _go, openSettings: _openSettings),
+      TodayPage(store: store, openTab: _go, openSettings: _openSettings, now: widget.now),
       SleepPage(store: store),
       HeartPage(store: store),
       BodyPage(store: store),

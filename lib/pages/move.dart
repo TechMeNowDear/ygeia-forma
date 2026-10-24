@@ -20,8 +20,10 @@ class MovePage extends StatelessWidget {
           return PageFrame(
             title: 'Κίνηση',
             onRefresh: () => store.refresh(),
-            left: const [
+            left: [
               EmptyCard(
+                icon: Icons.directions_walk_rounded,
+                color: c.move,
                 title: 'Δεν υπάρχουν δεδομένα ακόμα',
                 text: 'Σύνδεσε το Samsung Health από το «Σήμερα».',
               ),
@@ -48,27 +50,43 @@ class MovePage extends StatelessWidget {
           onRefresh: () => store.refresh(),
           left: [
             ...pairUp([
-              StatCard(title: 'Βήματα σήμερα', value: steps == null ? null : thousands(steps)),
               StatCard(
+                icon: Icons.directions_walk_rounded,
+                color: c.move,
+                title: 'Βήματα σήμερα',
+                value: steps == null ? null : thousands(steps),
+                note: d.stepsBaseline == null ? null : 'Μέσος όρος ${thousands(d.stepsBaseline!)}',
+              ),
+              StatCard(
+                icon: Icons.timer_rounded,
+                color: c.move,
                 title: 'Ενεργός χρόνος',
                 value: activeMinutes == null ? null : hoursMinutes(activeMinutes),
               ),
               StatCard(
+                icon: Icons.straighten_rounded,
+                color: c.energy,
                 title: 'Απόσταση',
                 value: distance == null ? null : dec(distance / 1000),
                 unit: 'km',
               ),
               StatCard(
+                icon: Icons.stairs_rounded,
+                color: c.energy,
                 title: 'Όροφοι',
                 value: floorsToday == null ? '0' : floorsToday.round().toString(),
               ),
               StatCard(
+                icon: Icons.local_fire_department_rounded,
+                color: c.heart,
                 title: 'Θερμίδες που έκαψες',
                 value: calories == null ? null : thousands(calories),
                 unit: 'kcal',
                 note: 'Μαζί με τον βασικό μεταβολισμό',
               ),
               StatCard(
+                icon: Icons.bolt_rounded,
+                color: c.heart,
                 title: 'Από κίνηση',
                 value: activeCalories == null ? null : thousands(activeCalories),
                 unit: 'kcal',
@@ -80,8 +98,8 @@ class MovePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Βήματα 14 ημερών'),
-                  const SizedBox(height: 4),
+                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Βήματα, 14 ημέρες', color: c.move),
+                  const SizedBox(height: 8),
                   Text(
                     d.stepsBaseline == null
                         ? ''
@@ -94,6 +112,7 @@ class MovePage extends StatelessWidget {
                     labels: [for (final s in last14) weekdayShort(s.day)],
                     average: d.stepsBaseline,
                     valueLabel: (v) => thousands(v),
+                    color: c.move,
                   ),
                 ],
               ),
@@ -102,13 +121,14 @@ class MovePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Όροφοι 14 ημερών'),
+                  CardHeader(icon: Icons.stairs_rounded, title: 'Όροφοι, 14 ημέρες', color: c.energy),
                   const SizedBox(height: 12),
                   BarChart(
                     height: 110,
                     values: [for (final day in floors14) d.valueFor(d.floors, day)?.value ?? 0],
                     labels: [for (final day in floors14) weekdayShort(day)],
                     valueLabel: (v) => v.round().toString(),
+                    color: c.energy,
                   ),
                 ],
               ),

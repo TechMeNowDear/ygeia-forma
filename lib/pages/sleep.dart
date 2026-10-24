@@ -14,29 +14,32 @@ class SleepPage extends StatelessWidget {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
+        final c = Aigaio.of(context);
         final d = store.data;
         final nights = d?.nights ?? const <Night>[];
         if (d == null || nights.isEmpty) {
           return PageFrame(
             title: 'Ύπνος',
             onRefresh: () => store.refresh(),
-            left: const [
+            left: [
               EmptyCard(
+                icon: Icons.bedtime_rounded,
+                color: c.sleep,
                 title: 'Δεν υπάρχει ύπνος ακόμα',
-                text: 'Φόρεσε το ρολόι στον ύπνο. Το πρωί θα δεις εδώ διάρκεια, βαθμολογία και φάσεις.',
+                text: 'Φόρεσε το ρολόι στον ύπνο. Το πρωί θα δεις εδώ πότε κοιμήθηκες, πόσο και πόσο καλά.',
               ),
             ],
           );
         }
 
         final last14 = nights.length <= 14 ? nights : nights.sublist(nights.length - 14);
-        final avg7 = Dashboard.mean(
-          (nights.length <= 7 ? nights : nights.sublist(nights.length - 7)).map((n) => n.minutes.toDouble()),
-        );
+        final week = nights.length <= 7 ? nights : nights.sublist(nights.length - 7);
+        final avg7 = Dashboard.mean(week.map((n) => n.minutes.toDouble()));
+        final scoreAvg = Dashboard.mean(week.map((n) => n.score?.toDouble()));
 
         return PageFrame(
           title: 'Ύπνος',
-          subtitle: '${nights.length} νύχτες τις τελευταίες 30 μέρες',
+          subtitle: 'Οι τελευταίες ${nights.length} νύχτες',
           onRefresh: () => store.refresh(),
           left: [
             _LastNightCard(night: nights.last, data: d),
@@ -44,30 +47,67 @@ class SleepPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionLabel('Διάρκεια ανά νύχτα'),
-                  const SizedBox(height: 4),
-                  Text(
-                    avg7 == null ? '' : 'Μέσος όρος εβδομάδας ${hoursMinutes(avg7.round())} (διακεκομμένη γραμμή)',
-                    style: TextStyle(color: Aigaio.of(context).textSecondary, fontSize: 13),
+                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Διάρκεια, 14 νύχτες', color: c.sleep),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Summary(
+                          label: 'Μέσος όρος εβδομάδας',
+                          value: avg7 == null ? '—' : hoursMinutes(avg7.round()),
+                        ),
+                      ),
+                      Expanded(
+                        child: _Summary(
+                          label: 'Μέση βαθμολογία',
+                          value: scoreAvg == null ? '—' : '${scoreAvg.round()} από 100',
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   BarChart(
                     values: [for (final n in last14) n.minutes / 60],
                     labels: [for (final n in last14) weekdayShort(n.date)],
                     average: avg7 == null ? null : avg7 / 60,
-                    valueLabel: (v) => '${dec(v)} ώ',
+                    valueLabel: (v) => hoursMinutes((v * 60).round()),
+                    color: c.sleep,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Η διακεκομμένη γραμμή είναι ο μέσος όρος της εβδομάδας.',
+                    style: TextStyle(color: c.textTertiary, fontSize: 12.5),
                   ),
                 ],
               ),
             ),
-            _ConsistencyCard(nights: nights.length <= 14 ? nights : nights.sublist(nights.length - 14)),
+            _ConsistencyCard(nights: last14),
           ],
           right: [
-            const SectionLabel('Νύχτες'),
+            const SectionHeader('Νύχτα προς νύχτα'),
             for (final n in nights.reversed.take(14)) _NightRow(night: n, now: d.readAt),
           ],
         );
       },
+    );
+  }
+}
+
+class _Summary extends StatelessWidget {
+  const _Summary({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: c.textSecondary, fontSize: 12.5)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w700, fontFeatures: tabular)),
+      ],
     );
   }
 }
@@ -81,46 +121,87 @@ class _LastNightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final n = night;
+
+    Widget clock(String label, DateTime t) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: c.textSecondary, fontSize: 13)),
+              Text(
+                hm(t),
+                style: TextStyle(color: c.text, fontSize: 22, fontWeight: FontWeight.w700, fontFeatures: tabular),
+              ),
+            ],
+          ),
+        );
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          CardHeader(
+            icon: Icons.bedtime_rounded,
+            title: 'Τελευταία νύχτα · ${shortDayDate(n.date)}',
+            color: c.sleep,
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Τελευταία νύχτα · ${relativeDay(n.date, data.readAt)}',
-                      style: TextStyle(color: c.textSecondary, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      hoursMinutes(n.minutes),
-                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: c.text),
-                    ),
-                    Text('${hm(n.start)} – ${hm(n.end)}', style: TextStyle(color: c.textSecondary)),
-                  ],
-                ),
+              Expanded(child: DurationValue(n.minutes, size: 30)),
+              ScoreRing(
+                value: n.score?.toDouble(),
+                size: 64,
+                stroke: 6,
+                color: c.sleep,
+                track: c.tint(c.sleep),
+                textColor: c.text,
+                caption: 'βαθμολογία',
               ),
-              ScoreRing(value: n.score?.toDouble(), size: 64, stroke: 7, color: c.primary, track: c.background),
             ],
           ),
           const SizedBox(height: 14),
-          StageTimeline(night: n),
-          const SizedBox(height: 10),
+          Row(
+            children: [
+              clock('Κοιμήθηκες', n.start),
+              clock('Ξύπνησες', n.end),
+              if (n.awakeMinutes > 0)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Ξύπνιος', style: TextStyle(color: c.textSecondary, fontSize: 13)),
+                      Text(
+                        hoursMinutes(n.awakeMinutes),
+                        style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Hypnogram(night: n, height: 64),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(hm(n.start), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+              const Spacer(),
+              Text(hm(n.end), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+            ],
+          ),
+          const SizedBox(height: 14),
           StageLegend(night: n),
-          const SizedBox(height: 8),
-          if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm'),
+          const Hairline(vertical: 14),
+          if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
           if (n.spo2Avg != null)
             InfoRow(
-              'Οξυγόνο (μέσο / χαμηλότερο)',
-              '${n.spo2Avg!.round()}% / ${n.spo2Min?.round() ?? '—'}%',
-              valueColor: (n.spo2Min ?? 100) < 88 ? c.terracotta : null,
+              'Οξυγόνο, μέσο και χαμηλότερο',
+              '${n.spo2Avg!.round()}% · ${n.spo2Min?.round() ?? '—'}%',
+              dot: c.sleep,
+              valueColor: (n.spo2Min ?? 100) < 88 ? c.bad : null,
             ),
-          if (n.parts.length > 1) InfoRow('Κομμάτια ύπνου', '${n.parts.length}'),
-          if (n.napMinutes > 0) InfoRow('Υπνάκος', hoursMinutes(n.napMinutes)),
+          if (n.parts.length > 1) InfoRow('Κομμάτια ύπνου', '${n.parts.length}', dot: c.textTertiary),
+          if (n.napMinutes > 0) InfoRow('Υπνάκος', hoursMinutes(n.napMinutes), dot: c.textTertiary),
         ],
       ),
     );
@@ -141,6 +222,7 @@ class _ConsistencyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
     if (nights.length < 3) return const SizedBox.shrink();
     final bed = nights.map((n) => _fromSix(n.start).toDouble()).toList();
     final wake = nights.map((n) => _fromSix(n.end).toDouble()).toList();
@@ -151,11 +233,11 @@ class _ConsistencyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionLabel('Ωράριο'),
-          const SizedBox(height: 6),
-          InfoRow('Συνήθως πέφτεις', _clock(bedAvg)),
+          CardHeader(icon: Icons.schedule_rounded, title: 'Ωράριο, 14 νύχτες', color: c.sleep),
+          const SizedBox(height: 8),
+          InfoRow('Συνήθως κοιμάσαι', _clock(bedAvg)),
           InfoRow('Συνήθως ξυπνάς', _clock(wakeAvg)),
-          InfoRow('Απόκλιση ώρας ύπνου', '± ${hoursMinutes(spread.round())}'),
+          InfoRow('Η ώρα ύπνου αλλάζει κατά', hoursMinutes(spread.round())),
         ],
       ),
     );
@@ -176,25 +258,41 @@ class _NightRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  '${relativeDay(night.date, now)} · ${shortDayDate(night.date)}',
-                  style: TextStyle(color: c.text, fontWeight: FontWeight.w600),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      relativeDay(night.date, now) == 'Σήμερα' ? 'Χθες βράδυ' : shortDayDate(night.date),
+                      style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${hm(night.start)} – ${hm(night.end)}',
+                      style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontFeatures: tabular),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                hoursMinutes(night.minutes),
-                style: TextStyle(color: c.text, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                night.score == null ? '' : '${night.score}',
-                style: TextStyle(color: c.primary, fontWeight: FontWeight.w700),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    hoursMinutes(night.minutes),
+                    style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 15, fontFeatures: tabular),
+                  ),
+                  if (night.score != null)
+                    Text(
+                      'βαθμολογία ${night.score}',
+                      style: TextStyle(color: c.sleep, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           StageTimeline(night: night, height: 8),
         ],
       ),

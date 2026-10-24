@@ -78,7 +78,7 @@ jobs:
           echo "YGEIA_KEYSTORE_PASSWORD=$pw" >> "$GITHUB_ENV"
 
       - name: Έλεγχοι
-        run: flutter test
+        run: flutter test test/widget_test.dart
 
       - name: Χτίσιμο APK
         run: |
@@ -110,3 +110,39 @@ jobs:
             --target "${{ github.sha }}" \
             --title "Τελευταία έκδοση · #${{ github.run_number }}" \
             --notes "Χτίστηκε από το commit ${{ github.sha }}. Κατέβασε το .apk στο Fold και πάτα «Εγκατάσταση»."
+
+  # Στιγμιότυπα οθονών με δείγμα δεδομένων, για έλεγχο της εμφάνισης.
+  # Ανεβαίνουν στο branch «screenshots» (όχι στο main).
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Ζωγράφισμα οθονών
+        run: |
+          set -o pipefail
+          if ! flutter test test/screens_test.dart --update-goldens 2>&1 | tee shots.log; then
+            grep -E -A4 "Error:|error:|EXCEPTION|was thrown|overflowed|Expected|Test failed" shots.log | head -150 > errors.txt || true
+            [ -s errors.txt ] || tail -120 shots.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα στιγμιοτύπων::$msg"
+          fi
+          ls -la test/shots || true
+
+      - name: Ανέβασμα στο branch screenshots
+        if: always()
+        run: |
+          [ -d test/shots ] || exit 0
+          cp shots.log test/shots/ 2>/dev/null || true
+          cd test/shots
+          git init -q
+          git checkout -q -b screenshots
+          git add .
+          git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Στιγμιότυπα #${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" screenshots
