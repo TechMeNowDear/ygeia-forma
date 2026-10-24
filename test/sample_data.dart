@@ -68,7 +68,7 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
     if (d <= 7) {
       int cadenceAt(DateTime t) {
         final m = t.hour * 60 + t.minute;
-        if (m >= 8 * 60 + 30 && m < 8 * 60 + 55) return 90;
+        if (m >= 9 * 60 + 30 && m < 10 * 60 + 10) return 90;
         if (m >= 13 * 60 && m < 13 * 60 + 25) return 115;
         if (m >= 18 * 60 && m < 18 * 60 + 40) return 85;
         if (m >= 10 * 60 && m < 17 * 60 && m % 60 < 3) return 30;

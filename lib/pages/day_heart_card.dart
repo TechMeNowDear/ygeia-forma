@@ -44,7 +44,7 @@ class _DayHeartCardState extends State<DayHeartCard> {
         selectedBackgroundColor: c.tint(c.heart),
         selectedForegroundColor: c.heart,
         side: BorderSide(color: c.hairline),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: fontFamily, fontSize: 15, fontWeight: FontWeight.w600),
       ),
       onSelectionChanged: (s) => setState(() => _dayOffset = s.first),
     );
@@ -118,6 +118,7 @@ class _DayHeartCardState extends State<DayHeartCard> {
                 ],
               ),
             ),
+            const SizedBox(width: 12),
             Text(
               valueOf(f),
               style: TextStyle(
