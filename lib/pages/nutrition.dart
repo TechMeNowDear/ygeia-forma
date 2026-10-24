@@ -360,13 +360,13 @@ class _MealCard extends StatelessWidget {
           if (entries.isNotEmpty) const SizedBox(height: 4),
           for (final e in entries) _EntryRow(food: food, entry: e),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TextButton.icon(
                 onPressed: () => openAddFood(context, food, meal: meal, day: day),
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: Text(entries.isEmpty ? 'Προσθήκη' : 'Κι άλλο'),
               ),
-              const Spacer(),
               if (entries.isEmpty && previous.isNotEmpty)
                 Flexible(
                   child: TextButton.icon(
