@@ -1,0 +1,34 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.metadata
+
+# Android: τα αρχεία που φτιάχνει το «flutter create» στο GitHub Actions
+android/.gradle/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/build.gradle.kts
+android/settings.gradle.kts
+android/gradle.properties
+android/app/build.gradle.kts
+android/app/src/debug/
+android/app/src/profile/
+android/app/src/main/AndroidManifest.xml
+android/app/src/main/res/
+android/**/*.iml
+android/key.properties
+*.jks
+*.keystore
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store

@@ -1,0 +1,7 @@
+analyzer:
+  language:
+    strict-casts: false
+linter:
+  rules:
+    - prefer_const_constructors
+    - avoid_print

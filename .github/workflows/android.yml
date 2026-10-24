@@ -1,0 +1,104 @@
+# Χτίζει την εφαρμογή Android σε κάθε αλλαγή στο main και βάζει το APK
+# στη σελίδα Releases του repository (έκδοση «latest»).
+name: Χτίσιμο Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Συμπλήρωση αρχείων Android
+        run: |
+          flutter --version
+          # Φτιάχνει μόνο όσα αρχεία λείπουν· τα δικά μας μένουν όπως είναι.
+          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
+          test -f android/app/build.gradle.kts || { echo "Λείπει το android/app/build.gradle.kts"; exit 1; }
+          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
+          sed -i 's/android:label="ygeia_forma"/android:label="Υγεία \&amp; Φόρμα"/' android/app/src/main/AndroidManifest.xml
+          grep -n 'android:label' android/app/src/main/AndroidManifest.xml
+
+      - name: Προσωρινή μνήμη για το κλειδί υπογραφής
+        uses: actions/cache@v4
+        with:
+          path: ~/.ygeia-signing
+          key: ygeia-signing-v1
+
+      - name: Κλειδί υπογραφής
+        env:
+          KEYSTORE_B64: ${{ secrets.YGEIA_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.YGEIA_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            mkdir -p "$HOME/.ygeia-secret"
+            echo "$KEYSTORE_B64" | base64 -d > "$HOME/.ygeia-secret/release.jks"
+            store="$HOME/.ygeia-secret/release.jks"
+            pw="$KEYSTORE_PASSWORD"
+            echo "Κλειδί από τα Secrets του repository."
+          else
+            mkdir -p "$HOME/.ygeia-signing"
+            if [ ! -f "$HOME/.ygeia-signing/release.jks" ]; then
+              openssl rand -hex 24 > "$HOME/.ygeia-signing/password"
+              p="$(cat "$HOME/.ygeia-signing/password")"
+              keytool -genkeypair -keystore "$HOME/.ygeia-signing/release.jks" -alias ygeia \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$p" -keypass "$p" -dname "CN=Ygeia Forma"
+              echo "Φτιάχτηκε νέο κλειδί στην προσωρινή μνήμη."
+            else
+              echo "Κλειδί από την προσωρινή μνήμη."
+            fi
+            store="$HOME/.ygeia-signing/release.jks"
+            pw="$(cat "$HOME/.ygeia-signing/password")"
+          fi
+          echo "::add-mask::$pw"
+          echo "YGEIA_KEYSTORE=$store" >> "$GITHUB_ENV"
+          echo "YGEIA_KEYSTORE_PASSWORD=$pw" >> "$GITHUB_ENV"
+
+      - name: Έλεγχοι
+        run: flutter test
+
+      - name: Χτίσιμο APK
+        run: |
+          flutter build apk --release --target-platform android-arm64 \
+            --build-name=0.1.${{ github.run_number }} --build-number=${{ github.run_number }}
+          cp build/app/outputs/flutter-apk/app-release.apk ygeia-forma-${{ github.run_number }}.apk
+          ls -lh ygeia-forma-*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ygeia-forma-${{ github.run_number }}
+          path: ygeia-forma-*.apk
+          retention-days: 14
+
+      - name: Δημοσίευση στο Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest ygeia-forma-${{ github.run_number }}.apk \
+            --target "${{ github.sha }}" \
+            --title "Τελευταία έκδοση · #${{ github.run_number }}" \
+            --notes "Χτίστηκε από το commit ${{ github.sha }}. Κατέβασε το .apk στο Fold και πάτα «Εγκατάσταση»."

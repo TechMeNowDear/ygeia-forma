@@ -1,0 +1,19 @@
+name: ygeia_forma
+description: "Υγεία & Φόρμα: προσωπική εφαρμογή υγείας, διατροφής και άσκησης."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+
+# Λίγες βιβλιοθήκες: μόνο ό,τι δίνει η ίδια η Flutter.
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
