@@ -84,6 +84,13 @@ class SamsungHealthBridge(
             "status" -> respond(result) { status() }
             "requestPermissions" -> respond(result) { requestPermissions() }
             "readAll" -> respond(result) { readAll(call.argument<Int>("days") ?: 30) }
+            "dashboard" -> respond(result) { dashboard() }
+            "cachedDashboard" -> result.success(readFile(DASHBOARD_FILE) ?: "{}")
+            "loadPrefs" -> result.success(readFile(PREFS_FILE) ?: "{}")
+            "savePrefs" -> {
+                writeFile(PREFS_FILE, call.argument<String>("json") ?: "{}")
+                result.success("{\"ok\":true}")
+            }
             "resolve" -> {
                 val r = pendingResolution
                 if (r != null) {
@@ -125,6 +132,40 @@ class SamsungHealthBridge(
             .put("ok", true)
             .put("granted", granted.size)
             .put("total", permissions.size)
+    }
+
+    // ---------- Δεδομένα για τις οθόνες ----------
+
+    private suspend fun dashboard(): JSONObject {
+        val s = store()
+        val granted = s.getGrantedPermissions(permissions)
+        val names = granted.map { it.dataType.name }.toSet()
+        val o = DashboardReader(s).read(names)
+            .put("ok", true)
+            .put("readAt", System.currentTimeMillis())
+            .put("granted", granted.size)
+            .put("total", permissions.size)
+        if (granted.isNotEmpty()) writeFile(DASHBOARD_FILE, o.toString())
+        return o
+    }
+
+    private fun readFile(name: String): String? =
+        try {
+            val f = java.io.File(activity.filesDir, name)
+            if (f.exists()) f.readText() else null
+        } catch (e: Throwable) {
+            null
+        }
+
+    private fun writeFile(name: String, text: String) {
+        try {
+            val f = java.io.File(activity.filesDir, name)
+            val tmp = java.io.File(activity.filesDir, "$name.tmp")
+            tmp.writeText(text)
+            tmp.renameTo(f)
+        } catch (e: Throwable) {
+            // Η προσωρινή αποθήκευση είναι βοηθητική· αν αποτύχει, απλώς διαβάζουμε ξανά.
+        }
     }
 
     // ---------- Ανάγνωση ----------
@@ -423,6 +464,8 @@ class SamsungHealthBridge(
     }
 
     private companion object {
+        const val DASHBOARD_FILE = "dashboard.json"
+        const val PREFS_FILE = "prefs.json"
         const val PAGE_SIZE = 1000
         const val MAX_PAGES = 20
     }

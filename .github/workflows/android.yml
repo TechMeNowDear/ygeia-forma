@@ -86,7 +86,7 @@ jobs:
           if ! flutter build apk --release --target-platform android-arm64 \
             --build-name=0.1.${{ github.run_number }} --build-number=${{ github.run_number }} 2>&1 | tee build.log; then
             # Τα σφάλματα γίνονται «σημειώσεις» (annotations), ώστε να διαβάζονται και χωρίς το πλήρες log.
-            grep -E -A3 "^e: |error:|What went wrong|ERROR|Missing class|Unresolved reference|Execution failed" build.log | head -120 > errors.txt || true
+            grep -E -A3 "^e: |error:|Error:|What went wrong|ERROR|Missing class|Unresolved reference|Execution failed" build.log | head -150 > errors.txt || true
             [ -s errors.txt ] || tail -120 build.log > errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
             echo "::error title=Σφάλμα χτισίματος::$msg"

@@ -16,7 +16,8 @@ class SamsungHealth {
       if (raw == null) {
         return {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'};
       }
-      return jsonDecode(raw) as Map<String, dynamic>;
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     } on PlatformException catch (e) {
       return {'ok': false, 'kind': 'other', 'message': e.message ?? e.code};
     } on MissingPluginException {
@@ -25,16 +26,24 @@ class SamsungHealth {
         'kind': 'not_android',
         'message': 'Διαθέσιμο μόνο στο κινητό',
       };
+    } on FormatException catch (e) {
+      return {'ok': false, 'kind': 'other', 'message': e.message};
     }
   }
 
   static Future<Map<String, dynamic>> status() => _call('status');
 
-  static Future<Map<String, dynamic>> requestPermissions() =>
-      _call('requestPermissions');
+  static Future<Map<String, dynamic>> requestPermissions() => _call('requestPermissions');
 
-  static Future<Map<String, dynamic>> readAll({int days = 30}) =>
-      _call('readAll', {'days': days});
+  static Future<Map<String, dynamic>> readAll({int days = 30}) => _call('readAll', {'days': days});
+
+  static Future<Map<String, dynamic>> dashboard() => _call('dashboard');
+
+  static Future<Map<String, dynamic>> cachedDashboard() => _call('cachedDashboard');
+
+  static Future<Map<String, dynamic>> loadPrefs() => _call('loadPrefs');
+
+  static Future<Map<String, dynamic>> savePrefs(String json) => _call('savePrefs', {'json': json});
 
   static Future<Map<String, dynamic>> resolve() => _call('resolve');
 }
