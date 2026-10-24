@@ -2,7 +2,7 @@ name: Δεδομένα τροφίμων
 on:
   push:
     branches: [main]
-    paths: ['tools/food/**']
+    paths: ['tools/food/fetch.sh']
   workflow_dispatch:
 jobs:
   fetch:
