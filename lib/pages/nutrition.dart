@@ -359,8 +359,8 @@ class _MealCard extends StatelessWidget {
           ),
           if (entries.isNotEmpty) const SizedBox(height: 4),
           for (final e in entries) _EntryRow(food: food, entry: e),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Αν δεν χωράνε δίπλα δίπλα, το «Όπως χθες» πάει στην από κάτω γραμμή.
+          Wrap(
             children: [
               TextButton.icon(
                 onPressed: () => openAddFood(context, food, meal: meal, day: day),
@@ -368,17 +368,11 @@ class _MealCard extends StatelessWidget {
                 label: Text(entries.isEmpty ? 'Προσθήκη' : 'Κι άλλο'),
               ),
               if (entries.isEmpty && previous.isNotEmpty)
-                Flexible(
-                  child: TextButton.icon(
-                    key: ValueKey('copy-${meal.name}'),
-                    onPressed: () => _copyFromPrevious(context, prevDay),
-                    icon: const Icon(Icons.content_copy_rounded, size: 18),
-                    label: Text(
-                      'Όπως χθες · ${kcalText(Totals(previous).kcal)} kcal',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                TextButton.icon(
+                  key: ValueKey('copy-${meal.name}'),
+                  onPressed: () => _copyFromPrevious(context, prevDay),
+                  icon: const Icon(Icons.content_copy_rounded, size: 18),
+                  label: Text('Όπως χθες · ${kcalText(Totals(previous).kcal)} kcal'),
                 ),
             ],
           ),
