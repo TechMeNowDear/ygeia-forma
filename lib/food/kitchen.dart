@@ -26,6 +26,7 @@ const cookwareKinds = <(String, String)>[
   ('panSteel', 'Τηγάνι ανοξείδωτο'),
   ('pot', 'Κατσαρόλα'),
   ('tray', 'Ταψί'),
+  ('glass', 'Γυάλινο πυρίμαχο'),
   ('other', 'Άλλο σκεύος'),
 ];
 
@@ -94,9 +95,13 @@ class Kitchen {
 
   bool has(String d) => devices.contains(d);
 
+  /// Έκδοση των προσωπικών προεπιλογών. Όταν ο χρήστης μου λέει κάτι νέο για την κουζίνα του,
+  /// ανεβαίνει και το [_upgrade] το προσθέτει χωρίς να σβήσει ό,τι έχει ήδη γράψει.
+  static const seedVersion = 2;
+
   factory Kitchen.fromJson(Map<String, dynamic>? j) {
     if (j == null) return Kitchen.initial();
-    return Kitchen(
+    final k = Kitchen(
       devices: {for (final d in (j['devices'] as List?) ?? const []) d.toString()},
       hob: j['hob'] as String?,
       ovenFan: j['ovenFan'] as bool?,
@@ -108,9 +113,36 @@ class Kitchen {
           if (c is Map) Cookware.fromJson(Map<String, dynamic>.from(c)),
       ],
     );
+    final seed = (j['seed'] as num?)?.toInt() ?? 1;
+    if (seed < 2) k._upgradeTo2();
+    return k;
+  }
+
+  /// 24/10 βράδυ: μάτια κεραμικά, φούρνος με αέρα, 3 κατσαρόλες, Pyrex, τοστιέρα, μπλέντερ.
+  /// Συμπληρώνει μόνο ό,τι λείπει· δεν αλλάζει όσα έγραψε ήδη ο χρήστης.
+  void _upgradeTo2() {
+    devices.addAll(const {'toaster', 'blender'});
+    hob ??= 'Κεραμικά';
+    ovenFan ??= true;
+    final pots = cookware.where((c) => c.kind == 'pot').toList();
+    // Η αρχική «Κατσαρόλα» χωρίς μέγεθος και απόβαρο γίνεται τρεις.
+    if (pots.length == 1 && pots.first.size == null && pots.first.tareGrams == null) {
+      final i = cookware.indexOf(pots.first);
+      cookware
+        ..removeAt(i)
+        ..insertAll(i, [
+          Cookware(id: 'c6', kind: 'pot', size: 'Μικρό'),
+          Cookware(id: 'c8', kind: 'pot', size: 'Μεσαίο'),
+          Cookware(id: 'c9', kind: 'pot', size: 'Μεγάλο'),
+        ]);
+    }
+    if (!cookware.any((c) => c.kind == 'glass')) {
+      cookware.add(Cookware(id: 'c10', kind: 'glass', brand: 'Pyrex'));
+    }
   }
 
   Map<String, dynamic> toJson() => {
+        'seed': seedVersion,
         'devices': devices.toList()..sort(),
         if (hob != null) 'hob': hob,
         if (ovenFan != null) 'ovenFan': ovenFan,
@@ -123,7 +155,11 @@ class Kitchen {
   /// Αρχική κατάσταση: ό,τι έχει πει ο χρήστης στο αρχείο «Συσκευές Μαγειρέματος» (24/10).
   /// ΣΗΜΕΙΩΣΗ: προσωπικές προεπιλογές· πριν από δημόσια έκδοση η κουζίνα ξεκινά άδεια.
   factory Kitchen.initial() => Kitchen(
-        devices: {'oven', 'hob', 'steamer', 'gasGrill', 'deepFryer', 'kettle', 'briki', 'scale'},
+        devices: {
+          'oven', 'hob', 'steamer', 'gasGrill', 'deepFryer', 'kettle', 'briki', 'scale', 'toaster', 'blender',
+        },
+        hob: 'Κεραμικά',
+        ovenFan: true,
         steamerTiers: 2,
         cookware: [
           Cookware(id: 'c1', kind: 'panNonstick', size: 'Μικρό', brand: 'Tefal'),
@@ -131,8 +167,11 @@ class Kitchen {
           Cookware(id: 'c3', kind: 'panNonstick', size: 'Μεγάλο', brand: 'Tefal'),
           Cookware(id: 'c4', kind: 'panCastIron'),
           Cookware(id: 'c5', kind: 'panCastIron'),
-          Cookware(id: 'c6', kind: 'pot'),
+          Cookware(id: 'c6', kind: 'pot', size: 'Μικρό'),
+          Cookware(id: 'c8', kind: 'pot', size: 'Μεσαίο'),
+          Cookware(id: 'c9', kind: 'pot', size: 'Μεγάλο'),
           Cookware(id: 'c7', kind: 'tray'),
+          Cookware(id: 'c10', kind: 'glass', brand: 'Pyrex'),
         ],
       );
 }

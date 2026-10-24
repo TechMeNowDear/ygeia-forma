@@ -189,6 +189,31 @@ void main() {
       final back = Kitchen.fromJson(k.toJson());
       expect(back.cookware.first.tareGrams, 640);
       expect(back.devices, k.devices);
+      expect(back.cookware.where((c) => c.kind == 'pot').map((c) => c.size), ['Μικρό', 'Μεσαίο', 'Μεγάλο']);
+      expect(back.hob, 'Κεραμικά');
+    });
+
+    test('Αναβάθμιση από την πρώτη έκδοση: προσθέτει, δεν σβήνει', () {
+      // Όπως αποθηκεύτηκε στο #32, με αλλαγές του χρήστη.
+      final old = {
+        'devices': ['oven', 'hob', 'steamer', 'scale'],
+        'ovenFan': false,
+        'cookware': [
+          {'id': 'c1', 'kind': 'panNonstick', 'size': 'Μικρό', 'brand': 'Tefal', 'tare': 410},
+          {'id': 'c6', 'kind': 'pot'},
+          {'id': 'c7', 'kind': 'tray'},
+        ],
+      };
+      final k = Kitchen.fromJson(old);
+      expect(k.has('toaster') && k.has('blender') && k.has('steamer'), isTrue);
+      expect(k.ovenFan, isFalse, reason: 'ό,τι έγραψε ο χρήστης μένει');
+      expect(k.hob, 'Κεραμικά');
+      expect(k.cookware.first.tareGrams, 410);
+      expect(k.cookware.where((c) => c.kind == 'pot').length, 3);
+      expect(k.cookware.where((c) => c.kind == 'glass').single.brand, 'Pyrex');
+      // Δεύτερο άνοιγμα: τίποτα δεν διπλασιάζεται.
+      final again = Kitchen.fromJson(k.toJson());
+      expect(again.cookware.length, k.cookware.length);
     });
   });
 }
