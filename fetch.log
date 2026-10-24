@@ -1,0 +1,28 @@
+ciqual meta ok
+ciqual file ok alim_2025_11_03.xml
+ciqual file ok alim_grp_2025_11_03.xml
+ciqual file ok compo_2025_11_03.xml
+ciqual file ok const_2025_11_03.xml
+ciqual file ok sources_2025_11_03.xml
+ciqual file ok Table_Ciqual_2025_doc_FR_2025_11_19.pdf
+ciqual file ok Table_Ciqual_2025_FR_2025_11_03.xls
+ciqual file ok Table_Ciqual_2025_FR_2025_11_03.xlsx
+usda foundation_food_csv https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2026-04-30.zip
+usda ok foundation_food_csv
+usda sr_legacy_food_csv https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+usda ok sr_legacy_food_csv
+total 89864
+drwxr-xr-x  2 runner runner     4096 Oct 24 16:54 .
+drwxr-xr-x 10 runner runner     4096 Oct 24 16:53 ..
+-rw-r--r--  1 runner runner    17726 Oct 24 16:53 ciqual-meta.json
+-rw-r--r--  1 runner runner  4489728 Oct 24 16:54 ciqual_Table_Ciqual_2025_FR_2025_11_03.xls
+-rw-r--r--  1 runner runner  1541998 Oct 24 16:54 ciqual_Table_Ciqual_2025_FR_2025_11_03.xlsx
+-rw-r--r--  1 runner runner  4236848 Oct 24 16:54 ciqual_Table_Ciqual_2025_doc_FR_2025_11_19.pdf
+-rw-r--r--  1 runner runner  1581031 Oct 24 16:53 ciqual_alim_2025_11_03.xml
+-rw-r--r--  1 runner runner    80421 Oct 24 16:53 ciqual_alim_grp_2025_11_03.xml
+-rw-r--r--  1 runner runner 69243149 Oct 24 16:54 ciqual_compo_2025_11_03.xml
+-rw-r--r--  1 runner runner    17955 Oct 24 16:54 ciqual_const_2025_11_03.xml
+-rw-r--r--  1 runner runner   871783 Oct 24 16:54 ciqual_sources_2025_11_03.xml
+-rw-r--r--  1 runner runner      637 Oct 24 16:54 fetch.log
+-rw-r--r--  1 runner runner  3825741 Oct 24 16:54 usda_foundation_food_csv.zip
+-rw-r--r--  1 runner runner  6074592 Oct 24 16:54 usda_sr_legacy_food_csv.zip
