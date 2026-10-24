@@ -1000,7 +1000,7 @@ class _BarPainter extends CustomPainter {
         );
         if (strong && valueLabel != null) {
           final tp = _painter(valueLabel!(v), strongText, 12, bold: true);
-          final x = (cx - tp.width / 2).clamp(0.0, math.max(0.0, size.width - tp.width));
+          final x = (cx - tp.width / 2).clamp(0.0, math.max(0.0, size.width - tp.width)).toDouble();
           tp.paint(canvas, Offset(x, topPad + chartHeight - h - 18));
         }
       }
