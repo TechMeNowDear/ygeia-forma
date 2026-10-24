@@ -11,6 +11,50 @@ import 'theme.dart';
 // ποτέ τεντωμένη (μέγιστο πλάτος).
 // ---------------------------------------------------------------------------
 
+/// Όταν μια σελίδα ζει μέσα σε κατηγορία (Υγεία, Διατροφή, Άσκηση), η κατηγορία δίνει
+/// την κεφαλίδα (τίτλο και καρτέλες) και η σελίδα κρατά μόνο τη δική της γραμμή κάτω από αυτήν.
+class PageHeaderScope extends InheritedWidget {
+  const PageHeaderScope({super.key, required this.header, required super.child});
+  final Widget header;
+
+  static PageHeaderScope? of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<PageHeaderScope>();
+
+  @override
+  bool updateShouldNotify(PageHeaderScope oldWidget) => oldWidget.header != header;
+}
+
+/// Ο μεγάλος τίτλος σελίδας, ίδιος παντού.
+class PageTitle extends StatelessWidget {
+  const PageTitle(this.title, {super.key, this.eyebrow, this.eyebrowColor});
+  final String title;
+  final String? eyebrow;
+  final Color? eyebrowColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (eyebrow != null)
+          Text(
+            eyebrow!,
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: eyebrowColor == null ? FontWeight.w500 : FontWeight.w600,
+              color: eyebrowColor ?? c.textSecondary,
+            ),
+          ),
+        Text(
+          title,
+          style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w700, letterSpacing: -1.1, color: c.text),
+        ),
+      ],
+    );
+  }
+}
+
+/// Σκελετός κάθε σελίδας: τίτλος, ανανέωση με τράβηγμα, μία στήλη στο κινητό, δύο σε μεγάλη οθόνη.
 class PageFrame extends StatelessWidget {
   const PageFrame({
     super.key,
@@ -22,6 +66,7 @@ class PageFrame extends StatelessWidget {
     required this.left,
     this.right = const [],
     this.single,
+    this.top = const [],
   });
 
   final String title;
@@ -34,16 +79,20 @@ class PageFrame extends StatelessWidget {
   final List<Widget> left;
   final List<Widget> right;
 
+  /// Σε δύο στήλες: πάνω από τις στήλες, σε όλο το πλάτος (π.χ. ειδοποίηση).
+  final List<Widget> top;
+
   static const gap = 14.0;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    final scope = PageHeaderScope.of(context);
     return SafeArea(
       bottom: false,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final side = constraints.maxWidth >= 600 ? 28.0 : 18.0;
+          final side = constraints.maxWidth >= 600 ? 28.0 : 16.0;
           final width = math.min(constraints.maxWidth - side * 2, 1080.0);
           final twoColumns = width >= 680 && right.isNotEmpty;
 
@@ -57,60 +106,78 @@ class PageFrame extends StatelessWidget {
                 ],
               );
 
-          final header = Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          final Widget header;
+          if (scope != null) {
+            // Μέσα σε κατηγορία: η κεφαλίδα της κατηγορίας, και από κάτω η γραμμή της σελίδας.
+            final line = subtitle == null && action == null
+                ? null
+                : Row(
                     children: [
-                      if (eyebrow != null)
-                        Text(
-                          eyebrow!,
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: c.textSecondary),
-                        ),
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 32,
-                          height: 1.15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.8,
-                          color: c.text,
-                        ),
-                      ),
                       if (subtitle != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(subtitle!, style: TextStyle(fontSize: 15, color: c.textSecondary)),
+                        Expanded(
+                          child: Text(subtitle!, style: TextStyle(fontSize: 14.5, color: c.textSecondary)),
                         ),
+                      if (action != null) subtitle == null ? Expanded(child: action!) : action!,
                     ],
+                  );
+            header = Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  scope.header,
+                  if (line != null) ...[const SizedBox(height: 14), line],
+                ],
+              ),
+            );
+          } else {
+            header = Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        PageTitle(title, eyebrow: eyebrow),
+                        if (subtitle != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(subtitle!, style: TextStyle(fontSize: 15, color: c.textSecondary)),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                if (action != null) action!,
-              ],
-            ),
-          );
+                  if (action != null) action!,
+                ],
+              ),
+            );
+          }
 
           final body = twoColumns
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: column(left)),
-                    const SizedBox(width: gap + 4),
-                    Expanded(child: column(right)),
+                    if (top.isNotEmpty) ...[column(top), const SizedBox(height: gap)],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: column(left)),
+                        const SizedBox(width: gap + 2),
+                        Expanded(child: column(right)),
+                      ],
+                    ),
                   ],
                 )
-              : column(single ?? [...left, ...right]);
+              : column(single ?? [...top, ...left, ...right]);
 
           return RefreshIndicator(
             onRefresh: onRefresh,
             color: c.primary,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(side, 18, side, 120),
+              padding: EdgeInsets.fromLTRB(side, 14, side, 120),
               children: [
                 Center(
                   child: SizedBox(
@@ -192,19 +259,17 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     return DecoratedBox(
+      // Καθαρό περίγραμμα αντί για θολή σκιά: πιο «καθαρή» εικόνα.
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        border: c.dark ? Border.all(color: c.hairline) : null,
-        boxShadow: c.dark
-            ? null
-            : const [
-                BoxShadow(color: Color(0x0A0F172A), blurRadius: 2, offset: Offset(0, 1)),
-                BoxShadow(color: Color(0x0D0F172A), blurRadius: 24, offset: Offset(0, 8)),
-              ],
+        boxShadow: c.dark ? null : const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 2, offset: Offset(0, 1))],
       ),
       child: Material(
         color: c.card,
-        borderRadius: BorderRadius.circular(radius),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide(color: c.hairline),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -330,7 +395,7 @@ class BigValue extends StatelessWidget {
             style: TextStyle(
               fontSize: size,
               fontWeight: FontWeight.w700,
-              letterSpacing: -0.6,
+              letterSpacing: -size * 0.035,
               color: color ?? c.text,
               fontFeatures: tabular,
             ),
@@ -373,7 +438,7 @@ class DurationValue extends StatelessWidget {
               style: TextStyle(
                 fontSize: size,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.8,
+                letterSpacing: -size * 0.035,
                 color: color ?? c.text,
                 fontFeatures: tabular,
               ),

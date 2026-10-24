@@ -6,7 +6,6 @@ import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'food_add.dart';
-import 'my_foods.dart';
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
 Color proteinColor(Aigaio c) => c.sleep;
@@ -44,22 +43,19 @@ class NutritionPage extends StatelessWidget {
                 : shortDayDate(day);
 
         final switcher = Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            _RoundButton(
-              icon: Icons.inventory_2_outlined,
-              tooltip: 'Τα προϊόντα μου',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => MyFoodsScreen(food: food)),
-              ),
-            ),
-            const SizedBox(width: 6),
             _RoundButton(
               icon: Icons.chevron_left_rounded,
               tooltip: 'Προηγούμενη μέρα',
               onPressed: () => food.setDay(DateTime(day.year, day.month, day.day - 1)),
             ),
-            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                dayLabel,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text),
+              ),
+            ),
             _RoundButton(
               icon: Icons.chevron_right_rounded,
               tooltip: 'Επόμενη μέρα',
@@ -78,7 +74,6 @@ class NutritionPage extends StatelessWidget {
         }
 
         final summary = _SummaryCard(totals: totals);
-        final products = _ProductsCard(food: food);
         final meals = [
           for (final m in Meal.values)
             _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day),
@@ -93,13 +88,11 @@ class NutritionPage extends StatelessWidget {
             if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
             summary,
             ...meals,
-            products,
             _SourcesNote(color: c.textTertiary),
           ],
           left: [
             if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
             summary,
-            products,
             _SourcesNote(color: c.textTertiary),
           ],
           right: meals,
@@ -140,6 +133,37 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final t = totals;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CardHeader(icon: Icons.restaurant_rounded, title: 'Σύνολο ημέρας', color: c.food),
+          const SizedBox(height: 10),
+          BigValue(kcalText(t.kcal), unit: 'kcal', size: 44),
+          const SizedBox(height: 14),
+          MacroBreakdown(totals: t),
+          const Hairline(vertical: 14),
+          InfoRow('Φυτικές ίνες', '${gramsText(t.fiber)} g'),
+          InfoRow('Σάκχαρα', '${gramsText(t.sugars)} g'),
+          InfoRow('Αλάτι', '${dec(t.salt, 1)} g'),
+        ],
+      ),
+    );
+  }
+}
+
+/// Μπάρα ενέργειας ανά μακροθρεπτικό και τα γραμμάρια από κάτω.
+class MacroBreakdown extends StatelessWidget {
+  const MacroBreakdown({super.key, required this.totals, this.percent = true});
+  final Totals totals;
+
+  /// Και «24% θερμίδων» κάτω από κάθε τιμή.
+  final bool percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final t = totals;
     // Ποσοστό ενέργειας από κάθε μακροθρεπτικό (4/4/9 kcal ανά g).
     final pk = t.protein * 4, ck = t.carbs * 4, fk = t.fat * 9;
     final sum = pk + ck + fk;
@@ -166,60 +190,112 @@ class _SummaryCard extends StatelessWidget {
                 TextSpan(children: [
                   TextSpan(
                     text: gramsText(g),
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.text),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.6, color: c.text),
                   ),
                   TextSpan(text: ' g', style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 ]),
                 style: const TextStyle(fontFeatures: tabular),
               ),
-              Text(
-                sum > 0 ? '${(100 * kcalPart / sum).round()}% θερμίδων' : '—',
-                style: TextStyle(fontSize: 12, color: c.textTertiary, fontFeatures: tabular),
-              ),
+              if (percent)
+                Text(
+                  sum > 0 ? '${(100 * kcalPart / sum).round()}% θερμίδων' : '—',
+                  style: TextStyle(fontSize: 12, color: c.textTertiary, fontFeatures: tabular),
+                ),
             ],
           ),
         );
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CardHeader(icon: Icons.restaurant_rounded, title: 'Σύνολο ημέρας', color: c.body),
-          const SizedBox(height: 10),
-          BigValue(kcalText(t.kcal), unit: 'kcal', size: 40),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              height: 10,
-              child: sum <= 0
-                  ? Container(color: c.hairline)
-                  : Row(
-                      children: [
-                        Expanded(flex: (pk * 100).round().clamp(1, 1 << 30), child: Container(color: proteinColor(c))),
-                        const SizedBox(width: 2),
-                        Expanded(flex: (ck * 100).round().clamp(1, 1 << 30), child: Container(color: carbsColor(c))),
-                        const SizedBox(width: 2),
-                        Expanded(flex: (fk * 100).round().clamp(1, 1 << 30), child: Container(color: fatColor(c))),
-                      ],
-                    ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 10,
+          child: sum <= 0
+              ? DecoratedBox(
+                  decoration: BoxDecoration(color: c.hairline, borderRadius: BorderRadius.circular(6)),
+                )
+              : Row(
+                  children: [
+                    for (final (i, part, color) in [(0, pk, proteinColor(c)), (1, ck, carbsColor(c)), (2, fk, fatColor(c))]) ...[
+                      if (i > 0) const SizedBox(width: 3),
+                      Expanded(
+                        flex: (part * 100).round().clamp(1, 1 << 30),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            macro('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
+            macro('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
+            macro('Λίπος', t.fat, fk, fatColor(c)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Η κάρτα της Διατροφής στο «Σήμερα»: τι έφαγα σήμερα και «+ Φαγητό».
+class FoodTodayCard extends StatelessWidget {
+  const FoodTodayCard({super.key, required this.food, required this.onOpen, this.now});
+  final FoodStore food;
+  final VoidCallback onOpen;
+  final DateTime? now;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: food,
+      builder: (context, _) {
+        final c = Aigaio.of(context);
+        final today = dayOf(now ?? DateTime.now());
+        final entries = food.entriesFor(today);
+        final t = Totals(entries);
+        return AppCard(
+          onTap: onOpen,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              macro('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
-              macro('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
-              macro('Λίπος', t.fat, fk, fatColor(c)),
+              CardHeader(
+                icon: Icons.restaurant_rounded,
+                title: 'Διατροφή · σήμερα',
+                color: c.food,
+                trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+              ),
+              const SizedBox(height: 12),
+              if (entries.isEmpty)
+                Text(
+                  'Δεν έχεις γράψει τίποτα ακόμα σήμερα.',
+                  style: TextStyle(fontSize: 15, color: c.textSecondary),
+                )
+              else ...[
+                BigValue(kcalText(t.kcal), unit: 'kcal', size: 40),
+                const SizedBox(height: 14),
+                MacroBreakdown(totals: t, percent: false),
+              ],
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Aigaio.foodSolid,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => openAddFood(context, food, day: today),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Φαγητό'),
+              ),
             ],
           ),
-          const Hairline(vertical: 14),
-          InfoRow('Φυτικές ίνες', '${gramsText(t.fiber)} g'),
-          InfoRow('Σάκχαρα', '${gramsText(t.sugars)} g'),
-          InfoRow('Αλάτι', '${dec(t.salt, 1)} g'),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -245,7 +321,7 @@ class _MealCard extends StatelessWidget {
             child: CardHeader(
               icon: mealIcon(meal),
               title: mealLabel(meal),
-              color: c.body,
+              color: c.food,
               trailing: entries.isEmpty
                   ? null
                   : Text(
@@ -298,8 +374,7 @@ class _EntryRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${gramsText(e.grams)} g · Π ${gramsText(e.total(Nk.protein))} · '
-                    'Υ ${gramsText(e.total(Nk.carbs))} · Λ ${gramsText(e.total(Nk.fat))}',
+                    '${gramsText(e.grams)} g · πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -317,44 +392,6 @@ class _EntryRow extends StatelessWidget {
   }
 }
 
-/// Είσοδος στα «Τα προϊόντα μου» (καταχώριση χωρίς φαγητό).
-class _ProductsCard extends StatelessWidget {
-  const _ProductsCard({required this.food});
-  final FoodStore food;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = Aigaio.of(context);
-    final n = food.mine.length;
-    return AppCard(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MyFoodsScreen(food: food))),
-      child: Row(
-        children: [
-          IconBadge(Icons.inventory_2_outlined, c.primary, size: 38),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Τα προϊόντα μου',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-                const SizedBox(height: 2),
-                Text(
-                  n == 0
-                      ? 'Πέρασε ό,τι αγόρασες με barcode ή χειροκίνητα, χωρίς να το φας.'
-                      : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · πρόσθεσε κι άλλα με barcode ή χειροκίνητα',
-                  style: TextStyle(fontSize: 13.5, height: 1.35, color: c.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-        ],
-      ),
-    );
-  }
-}
-
 class _SourcesNote extends StatelessWidget {
   const _SourcesNote({required this.color});
   final Color color;
@@ -364,8 +401,7 @@ class _SourcesNote extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Text(
-        'Τιμές από CIQUAL 2025 (ANSES), USDA FoodData Central, Open Food Facts και ό,τι πέρασες από ετικέτες. '
-        'Π: πρωτεΐνη, Υ: υδατάνθρακες, Λ: λίπος, σε γραμμάρια.',
+        'Τιμές από CIQUAL 2025 (ANSES), USDA FoodData Central, Open Food Facts και ό,τι πέρασες από ετικέτες.',
         style: TextStyle(fontSize: 12, height: 1.4, color: color),
       ),
     );

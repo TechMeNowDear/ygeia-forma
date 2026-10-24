@@ -1,28 +1,35 @@
 import 'package:flutter/material.dart';
 
 import '../data.dart';
+import '../food/food_store.dart';
 import '../format.dart';
 import '../labels.dart';
+import '../nav.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../unusual.dart';
+import 'nutrition.dart';
 import 'unusual_card.dart';
 import 'week_card.dart';
 
+/// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
+/// Πώς κοιμήθηκα; Τι έφαγα; Κουνήθηκα; Πού πάει το βάρος μου; Οι ειδοποιήσεις μόνο όταν υπάρχουν.
 class TodayPage extends StatelessWidget {
   const TodayPage({
     super.key,
     required this.store,
-    required this.openTab,
+    required this.food,
+    required this.open,
     required this.openSettings,
-    required this.openTrends,
     this.now,
   });
 
   final HealthStore store;
-  final void Function(int) openTab;
+  final FoodStore food;
+
+  /// Άνοιγμα κατηγορίας ([Cat]) και καρτέλας μέσα της.
+  final void Function(int category, [int? tab]) open;
   final VoidCallback openSettings;
-  final VoidCallback openTrends;
 
   /// Για τα στιγμιότυπα δοκιμών· στην εφαρμογή είναι πάντα «τώρα».
   final DateTime? now;
@@ -37,60 +44,53 @@ class TodayPage extends StatelessWidget {
         final now = this.now ?? DateTime.now();
         final prefs = store.prefs;
 
-        ButtonStyle pill() => TextButton.styleFrom(
-              backgroundColor: c.card,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: const StadiumBorder(),
-            );
-        final settingsButton = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton.icon(
-              onPressed: openTrends,
-              style: pill(),
-              icon: const Icon(Icons.insights_rounded, size: 18),
-              label: const Text('Τάσεις'),
-            ),
-            const SizedBox(width: 6),
-            IconButton.filledTonal(
-              tooltip: 'Ρυθμίσεις',
-              onPressed: openSettings,
-              style: IconButton.styleFrom(backgroundColor: c.card, foregroundColor: c.primary),
-              icon: const Icon(Icons.tune_rounded, size: 20),
-            ),
-          ],
+        final settingsButton = IconButton(
+          tooltip: 'Ρυθμίσεις',
+          onPressed: openSettings,
+          style: IconButton.styleFrom(
+            backgroundColor: c.card,
+            foregroundColor: c.text,
+            fixedSize: const Size(46, 46),
+            side: BorderSide(color: c.hairline),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          ),
+          icon: const Icon(Icons.tune_rounded, size: 20),
         );
+        // Στη μεγάλη οθόνη οι Ρυθμίσεις είναι κάτω στην πλευρική μπάρα.
+        final action = MediaQuery.sizeOf(context).width >= 600 ? null : settingsButton;
 
         if (d == null || !d.hasAnyPermission) {
           return PageFrame(
             eyebrow: longDate(now),
             title: greeting(now),
-            action: settingsButton,
+            action: action,
             onRefresh: () => store.refresh(),
             left: [_ConnectCard(store: store)],
           );
         }
 
         final error = store.error != null ? _ErrorCard(store: store) : null;
-        final hero = prefs.show('sleep') ? _SleepHero(data: d, onTap: () => openTab(2)) : null;
+        final sleep = prefs.show('sleep') ? _SleepCard(data: d, onTap: () => open(Cat.health, HealthTab.sleep)) : null;
         final review = prefs.show('week') ? currentWeekReview(store.history, now) : null;
         final week = review == null ? null : WeekCard(review: review);
         final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now)) : null;
         final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
+        final foodCard = prefs.show('food')
+            ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))
+            : null;
 
-        final heartCards = <Widget>[
-          if (prefs.show('energy')) _energyCard(context, d),
-          if (prefs.show('rhr')) _restingCard(context, d, () => openTab(3)),
+        final pair = <Widget>[
+          if (prefs.show('steps')) _stepsCard(context, d, () => open(Cat.exercise)),
+          if (prefs.show('weight')) _weightCard(context, d, () => open(Cat.health, HealthTab.body)),
         ];
-        final moveCards = <Widget>[
-          if (prefs.show('steps')) _stepsCard(context, d, () => openTab(4)),
-          if (prefs.show('calories')) _caloriesCard(context, d, () => openTab(4)),
+
+        final extras = <Widget>[
+          if (prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (prefs.show('rhr')) _restingCard(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (prefs.show('calories')) _caloriesCard(context, d, () => open(Cat.exercise)),
+          if (prefs.show('spo2')) _spo2Card(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (prefs.show('skin')) _skinCard(context, d, () => open(Cat.health, HealthTab.body)),
         ];
-        final nightCards = <Widget>[
-          if (prefs.show('spo2')) _spo2Card(context, d, () => openTab(3)),
-          if (prefs.show('skin')) _skinCard(context, d, () => openTab(4)),
-        ];
-        final weight = prefs.show('weight') ? _WeightCard(data: d, onTap: () => openTab(4)) : null;
 
         final footer = Padding(
           padding: const EdgeInsets.only(top: 6),
@@ -101,54 +101,78 @@ class TodayPage extends StatelessWidget {
           ),
         );
 
-        final heartSection = [
-          if (heartCards.isNotEmpty) ...[const SectionHeader('Καρδιά και ενέργεια'), ...pairUp(heartCards)],
-        ];
-        final moveSection = [
-          if (moveCards.isNotEmpty) ...[const SectionHeader('Κίνηση σήμερα'), ...pairUp(moveCards)],
-        ];
-        final nightSection = [
-          if (nightCards.isNotEmpty) ...[const SectionHeader('Στον ύπνο'), ...pairUp(nightCards)],
-        ];
-        final bodySection = [
-          if (weight != null) ...[const SectionHeader('Σώμα'), weight],
+        final alerts = [if (error != null) error, if (unusual != null) unusual];
+        final more = [
+          ...pairUp(pair),
+          if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
         ];
 
         return PageFrame(
           eyebrow: longDate(now),
           title: greeting(now),
-          action: settingsButton,
+          action: action,
           onRefresh: () => store.refresh(),
           single: [
-            if (error != null) error,
-            if (unusual != null) unusual,
-            if (hero != null) hero,
+            ...alerts,
+            if (sleep != null) sleep,
             if (week != null) week,
-            ...heartSection,
-            ...moveSection,
-            ...bodySection,
-            ...nightSection,
+            if (foodCard != null) foodCard,
+            ...more,
             footer,
           ],
-          left: [
-            if (error != null) error,
-            if (unusual != null) unusual,
-            if (hero != null) hero,
-            if (week != null) week,
-            ...bodySection,
-          ],
-          right: [
-            ...heartSection,
-            ...moveSection,
-            ...nightSection,
-            footer,
-          ],
+          top: alerts,
+          left: [if (sleep != null) sleep, if (week != null) week],
+          right: [if (foodCard != null) foodCard, ...more, footer],
         );
       },
     );
   }
 
-  Widget _energyCard(BuildContext context, Dashboard d) {
+  Widget _stepsCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+    final c = Aigaio.of(context);
+    final steps = d.todaySteps;
+    final base = d.stepsBaseline;
+    final last7 = d.steps.length <= 7 ? d.steps : d.steps.sublist(d.steps.length - 7);
+    return StatCard(
+      icon: Icons.directions_walk_rounded,
+      color: c.exercise,
+      title: 'Βήματα',
+      value: steps == null ? null : thousands(steps),
+      note: base == null ? null : 'Συνήθως ${thousands(base)}',
+      chart: last7.length >= 2 ? MiniBars(values: [for (final s in last7) s.value], color: c.exercise) : null,
+      onTap: onTap,
+    );
+  }
+
+  Widget _weightCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+    final c = Aigaio.of(context);
+    final last = d.latestBody;
+    final prev = d.previousBody;
+    Widget? trend;
+    if (last?.weight != null && prev?.weight != null) {
+      final diff = last!.weight! - prev!.weight!;
+      trend = TrendPill(
+        '${signedDec(diff)} kg από ${dayMonth(prev.time)}',
+        up: diff.abs() < 0.05 ? null : diff > 0,
+        kind: diff < -0.05 ? TrendKind.good : (diff > 0.05 ? TrendKind.bad : TrendKind.neutral),
+      );
+    }
+    final weights = [for (final b in d.body) if (b.weight != null) b.weight!];
+    final recent = weights.length <= 10 ? weights : weights.sublist(weights.length - 10);
+    return StatCard(
+      icon: Icons.monitor_weight_rounded,
+      color: c.body,
+      title: 'Βάρος',
+      value: last?.weight == null ? null : dec(last!.weight!),
+      unit: 'kg',
+      trend: trend,
+      chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body) : null,
+      empty: 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ σε λίγα λεπτά.',
+      onTap: onTap,
+    );
+  }
+
+  Widget _energyCard(BuildContext context, Dashboard d, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final e = d.latestEnergy;
     final recent = d.energy.length <= 7 ? d.energy : d.energy.sublist(d.energy.length - 7);
@@ -161,6 +185,7 @@ class TodayPage extends StatelessWidget {
       note: e == null ? null : relativeDay(e.day, d.readAt),
       chart: recent.length >= 2 ? Sparkline(values: [for (final v in recent) v.value], color: c.energy) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
+      onTap: onTap,
     );
   }
 
@@ -190,22 +215,6 @@ class TodayPage extends StatelessWidget {
       trend: trend,
       chart: last7.length >= 2 ? Sparkline(values: [for (final n in last7) n.sleepingHr!], color: c.heart) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
-      onTap: onTap,
-    );
-  }
-
-  Widget _stepsCard(BuildContext context, Dashboard d, VoidCallback onTap) {
-    final c = Aigaio.of(context);
-    final steps = d.todaySteps;
-    final base = d.stepsBaseline;
-    final last7 = d.steps.length <= 7 ? d.steps : d.steps.sublist(d.steps.length - 7);
-    return StatCard(
-      icon: Icons.directions_walk_rounded,
-      color: c.move,
-      title: 'Βήματα',
-      value: steps == null ? null : thousands(steps),
-      note: base == null ? null : 'Μέσος όρος ${thousands(base)}',
-      chart: last7.length >= 2 ? MiniBars(values: [for (final s in last7) s.value], color: c.move) : null,
       onTap: onTap,
     );
   }
@@ -263,11 +272,11 @@ class TodayPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Η νυχτερινή κάρτα ύπνου
+// Ο ύπνος της νύχτας, σε σύντομη μορφή (η πλήρης είναι στην Υγεία › Ύπνος)
 // ---------------------------------------------------------------------------
 
-class _SleepHero extends StatelessWidget {
-  const _SleepHero({required this.data, required this.onTap});
+class _SleepCard extends StatelessWidget {
+  const _SleepCard({required this.data, required this.onTap});
 
   final Dashboard data;
   final VoidCallback onTap;
@@ -287,37 +296,16 @@ class _SleepHero extends StatelessWidget {
     }
 
     const white = Colors.white;
-    final soft = Colors.white.withValues(alpha: 0.72);
+    final soft = Colors.white.withValues(alpha: 0.75);
     final base = data.sleepBaseline;
     final diff = base == null ? null : n.minutes - base.round();
-
-    Widget time(String label, DateTime t, IconData icon) => Expanded(
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: soft),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500)),
-                  Text(
-                    hm(t),
-                    style: const TextStyle(
-                      color: white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: tabular,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
+    final total = stageOrder.fold<int>(0, (s, k) => s + (n.stageMinutes[k] ?? 0));
+    int pct(String k) => total == 0 ? 0 : ((n.stageMinutes[k] ?? 0) * 100 / total).round();
+    final stages = [for (final k in stageOrder) if ((n.stageMinutes[k] ?? 0) > 0) k];
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(AppCard.radius),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -328,47 +316,41 @@ class _SleepHero extends StatelessWidget {
         type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(AppCard.radius),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Icon(Icons.bedtime_rounded, size: 18, color: soft),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.bedtime_rounded, size: 18, color: soft),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Ύπνος · ${_nightLabel(n.date, data.readAt)}',
-                                style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          DurationValue(n.minutes, size: 34, color: white, unitColor: soft),
-                        ],
+                      child: Text(
+                        'Ύπνος · ${_nightLabel(n.date, data.readAt)}',
+                        style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
+                    Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.6)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: DurationValue(n.minutes, size: 42, color: white, unitColor: soft)),
                     const SizedBox(width: 12),
                     ScoreRing(
                       value: n.score?.toDouble(),
-                      size: 70,
-                      stroke: 7,
+                      size: 64,
+                      stroke: 6,
                       color: white,
                       track: Colors.white.withValues(alpha: 0.16),
-                      caption: 'Βαθμολογία',
                     ),
                   ],
                 ),
                 if (diff != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TrendPill(
@@ -378,44 +360,36 @@ class _SleepHero extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 18),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(18),
+                if (total > 0) ...[
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: SizedBox(
+                      height: 10,
+                      child: Row(
+                        children: [
+                          for (final (i, k) in stages.indexed) ...[
+                            if (i > 0) const SizedBox(width: 2),
+                            Expanded(flex: n.stageMinutes[k]!, child: ColoredBox(color: stageColorOf(k))),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Row(
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
-                      time('Κοιμήθηκες', n.start, Icons.nights_stay_rounded),
-                      Container(width: 1, height: 34, color: Colors.white.withValues(alpha: 0.15)),
-                      const SizedBox(width: 14),
-                      time('Ξύπνησες', n.end, Icons.wb_twilight_rounded),
+                      Text(hm(n.start), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
+                      Expanded(
+                        child: Text(
+                          '${stageLabel('DEEP')} ${pct('DEEP')}% · REM ${pct('REM')}%',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Text(hm(n.end), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
                     ],
                   ),
-                ),
-                if (n.parts.length > 1) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Σε ${n.parts.length} κομμάτια, με διακοπές ενδιάμεσα',
-                    style: TextStyle(color: soft, fontSize: 12.5),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                Hypnogram(night: n, height: 64, onDark: true),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(hm(n.start), style: TextStyle(color: soft, fontSize: 11.5, fontFeatures: tabular)),
-                    const Spacer(),
-                    Text(hm(n.end), style: TextStyle(color: soft, fontSize: 11.5, fontFeatures: tabular)),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                StageLegend(night: n, onBlue: true),
-                if (n.napMinutes > 0) ...[
-                  const SizedBox(height: 12),
-                  Text('Και υπνάκος ${hoursMinutes(n.napMinutes)}', style: TextStyle(color: soft, fontSize: 13)),
                 ],
               ],
             ),
@@ -428,96 +402,6 @@ class _SleepHero extends StatelessWidget {
   String _nightLabel(DateTime wakeDay, DateTime now) {
     if (sameDay(wakeDay, now)) return 'χθες βράδυ';
     return 'ξύπνημα ${relativeDay(wakeDay, now).toLowerCase()}';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Βάρος
-// ---------------------------------------------------------------------------
-
-class _WeightCard extends StatelessWidget {
-  const _WeightCard({required this.data, required this.onTap});
-  final Dashboard data;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = Aigaio.of(context);
-    final last = data.latestBody;
-    if (last == null || last.weight == null) {
-      return EmptyCard(
-        icon: Icons.monitor_weight_rounded,
-        color: c.body,
-        title: 'Βάρος',
-        text: 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ μέσα σε λίγα λεπτά.',
-      );
-    }
-    final prev = data.previousBody;
-    final prevWeight = prev?.weight;
-    Widget? trend;
-    if (prev != null && prevWeight != null) {
-      final diff = last.weight! - prevWeight;
-      trend = TrendPill(
-        '${signedDec(diff)} kg από ${dayMonth(prev.time)}',
-        up: diff.abs() < 0.05 ? null : diff > 0,
-        kind: diff < -0.05 ? TrendKind.good : (diff > 0.05 ? TrendKind.bad : TrendKind.neutral),
-      );
-    }
-    final weights = [for (final b in data.body) if (b.weight != null) b.weight!];
-    final recent = weights.length <= 10 ? weights : weights.sublist(weights.length - 10);
-
-    Widget mini(String label, String value) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(color: c.textSecondary, fontSize: 12.5)),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w700, fontFeatures: tabular),
-              ),
-            ],
-          ),
-        );
-
-    return AppCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CardHeader(
-            icon: Icons.monitor_weight_rounded,
-            title: 'Βάρος · ${relativeDay(last.time, data.readAt)}',
-            color: c.body,
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    BigValue(dec(last.weight!), unit: 'kg', size: 34),
-                    if (trend != null) ...[const SizedBox(height: 8), trend],
-                  ],
-                ),
-              ),
-              if (recent.length >= 2)
-                SizedBox(width: 120, child: Sparkline(values: recent, color: c.body, height: 48)),
-            ],
-          ),
-          const Hairline(vertical: 14),
-          Row(
-            children: [
-              mini('Λίπος', last.fatPct == null ? '—' : '${dec(last.fatPct!)}%'),
-              mini('Σκελετικοί μύες', last.smm == null ? '—' : '${dec(last.smm!)} kg'),
-              mini('Μάζα λίπους', last.fatKg == null ? '—' : '${dec(last.fatKg!)} kg'),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 }
 

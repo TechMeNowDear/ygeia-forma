@@ -24,6 +24,9 @@ class Aigaio {
     required this.nav,
     required this.nightTop,
     required this.nightBottom,
+    required this.health,
+    required this.food,
+    required this.exercise,
   });
 
   final bool dark;
@@ -51,6 +54,16 @@ class Aigaio {
   final Color nightTop;
   final Color nightBottom;
 
+  /// Οι τρεις μεγάλες κατηγορίες: χρώμα για κείμενο και λεπτομέρειες.
+  final Color health;
+  final Color food;
+  final Color exercise;
+
+  /// Γεμάτα χρώματα κατηγοριών (κουμπιά, μπάρα), ίδια σε ανοιχτό και σκοτεινό· λευκό κείμενο πάνω τους.
+  static const healthSolid = Color(0xFF1D5BD8);
+  static const foodSolid = Color(0xFF15803D);
+  static const exerciseSolid = Color(0xFFC2410C);
+
   // Παλιά ονόματα, για να μη σπάσει ο υπόλοιπος κώδικας.
   Color get terracotta => heart;
   Color get wheat => move;
@@ -76,6 +89,9 @@ class Aigaio {
     nav: Color(0xFF111827),
     nightTop: Color(0xFF141C45),
     nightBottom: Color(0xFF2A3C96),
+    health: Color(0xFF1D5BD8),
+    food: Color(0xFF15803D),
+    exercise: Color(0xFFC2410C),
   );
 
   static const darkTheme = Aigaio._(
@@ -98,6 +114,9 @@ class Aigaio {
     nav: Color(0xFF1A2236),
     nightTop: Color(0xFF111735),
     nightBottom: Color(0xFF1F2C6E),
+    health: Color(0xFF6FA2FF),
+    food: Color(0xFF5CC98A),
+    exercise: Color(0xFFF0915A),
   );
 
   static Aigaio of(BuildContext context) =>

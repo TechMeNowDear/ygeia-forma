@@ -375,23 +375,34 @@ const todayCards = <TodayCard>[
   TodayCard('sleep', 'Ύπνος της νύχτας', true),
   TodayCard('unusual', 'Εκτός συνηθισμένου (όταν ξεφεύγουν 2 δείκτες)', true),
   TodayCard('week', 'Απολογισμός εβδομάδας (Κυριακή βράδυ και Δευτέρα)', true),
-  TodayCard('energy', 'Energy Score', true),
-  TodayCard('rhr', 'Παλμοί στον ύπνο', true),
+  TodayCard('food', 'Διατροφή της ημέρας', true),
   TodayCard('steps', 'Βήματα', true),
-  TodayCard('calories', 'Θερμίδες που έκαψα', true),
-  TodayCard('weight', 'Βάρος και λίπος', true),
+  TodayCard('weight', 'Βάρος', true),
+  TodayCard('energy', 'Energy Score', false),
+  TodayCard('rhr', 'Παλμοί στον ύπνο', false),
+  TodayCard('calories', 'Θερμίδες που έκαψα', false),
   TodayCard('spo2', 'Οξυγόνο στον ύπνο', false),
   TodayCard('skin', 'Θερμοκρασία δέρματος', false),
 ];
+
+/// Έκδοση της διάταξης του «Σήμερα». Στη 2 (νέα δομή, 24/10) το Energy Score, οι παλμοί
+/// και οι θερμίδες φεύγουν από την αρχική (υπάρχουν στην Υγεία και στην Άσκηση)· μπαίνουν ξανά από τις Ρυθμίσεις.
+const todayLayout = 2;
 
 class Prefs {
   Prefs(this.cards, {this.backfillFrom, this.kitchen});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
+    final layout = (j['layout'] as num?)?.toInt() ?? 1;
+    // Κάρτες που η νέα διάταξη βγάζει από την αρχική: μία φορά στην προεπιλογή τους.
+    const movedOut = {'energy', 'rhr', 'calories'};
     return Prefs(
       {
-        for (final c in todayCards) c.key: saved[c.key] is bool ? saved[c.key] as bool : c.defaultOn,
+        for (final c in todayCards)
+          c.key: (layout < todayLayout && movedOut.contains(c.key)) || saved[c.key] is! bool
+              ? c.defaultOn
+              : saved[c.key] as bool,
       },
       backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
       kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
@@ -408,7 +419,8 @@ class Prefs {
 
   bool show(String key) => cards[key] ?? true;
 
-  String toJson() => jsonEncode({'cards': cards, 'backfillFrom': backfillFrom, 'kitchen': kitchen});
+  String toJson() =>
+      jsonEncode({'layout': todayLayout, 'cards': cards, 'backfillFrom': backfillFrom, 'kitchen': kitchen});
 }
 
 // ---------------------------------------------------------------------------
