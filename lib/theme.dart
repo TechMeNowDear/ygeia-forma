@@ -210,3 +210,31 @@ ThemeData buildTheme(Brightness brightness) {
     ),
   );
 }
+
+/// Οθόνες της Διατροφής: τα κουμπιά και οι επιλογές στο πράσινο της κατηγορίας.
+class FoodTheme extends StatelessWidget {
+  const FoodTheme({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final c = Aigaio.of(context);
+    return Theme(
+      data: t.copyWith(
+        colorScheme: t.colorScheme.copyWith(primary: Aigaio.foodSolid, onPrimary: Colors.white),
+        textButtonTheme: TextButtonThemeData(
+          style: (t.textButtonTheme.style ?? const ButtonStyle()).copyWith(
+            foregroundColor: WidgetStatePropertyAll(c.food),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: (t.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
+            foregroundColor: WidgetStatePropertyAll(c.food),
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}

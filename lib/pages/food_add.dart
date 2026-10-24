@@ -72,7 +72,7 @@ class MealPicker extends StatelessWidget {
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
                   decoration: BoxDecoration(
-                    color: m == value ? c.body : Colors.transparent,
+                    color: m == value ? Aigaio.foodSolid : Colors.transparent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: FittedBox(
@@ -155,7 +155,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final q = _query.text;
     final results = q.trim().isEmpty ? const <Food>[] : widget.food.search(q);
@@ -314,14 +316,14 @@ class _FoodTile extends StatelessWidget {
                     ),
                   const SizedBox(height: 2),
                   Text(
-                    '${kcalText(n.amount(Nk.kcal))} kcal · Π ${nValueText(n[Nk.protein])} g ανά 100 g'
+                    '${kcalText(n.amount(Nk.kcal))} kcal · πρωτεΐνη ${nValueText(n[Nk.protein])} g ανά 100 g'
                     '${times > 0 ? ' · ${times == 1 ? '1 φορά' : '$times φορές'}' : ''}',
                     style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.add_circle_outline_rounded, color: c.body),
+            Icon(Icons.add_circle_outline_rounded, color: c.food),
           ],
         ),
       ),
@@ -412,7 +414,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
   void _set(double g) => setState(() => _grams.text = gramsText(g));
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final f = _item;
     final g = _value;
@@ -599,7 +603,9 @@ class FoodDetailScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final f = food;
     return Scaffold(
@@ -615,7 +621,7 @@ class FoodDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CardHeader(icon: Icons.science_outlined, title: 'Ανά 100 g', color: c.body),
+                    CardHeader(icon: Icons.science_outlined, title: 'Ανά 100 g', color: c.food),
                     const SizedBox(height: 6),
                     for (final r in _rows)
                       if (f.n.has(r.$1)) InfoRow(r.$2, '${nValueText(f.n[r.$1], digits: r.$4)} ${r.$3}'),
@@ -737,7 +743,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final values = _values;
     final mismatch = energyMismatch(values);

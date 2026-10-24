@@ -62,7 +62,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
 
     Widget detail(Widget child) => Padding(padding: const EdgeInsets.fromLTRB(16, 0, 8, 12), child: child);
@@ -256,7 +258,9 @@ class _CookwareSheetState extends State<_CookwareSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     InputDecoration deco(String l, {String? suffix}) => InputDecoration(
           labelText: l,

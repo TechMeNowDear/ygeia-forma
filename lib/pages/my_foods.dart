@@ -141,7 +141,9 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     return ListenableBuilder(
       listenable: widget.food,
