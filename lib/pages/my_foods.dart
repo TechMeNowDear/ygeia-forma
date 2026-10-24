@@ -156,15 +156,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
             backgroundColor: c.background,
             surfaceTintColor: Colors.transparent,
             title: const Text('Τα προϊόντα μου'),
-            actions: [
-              if (all.isNotEmpty)
-                TextButton.icon(
-                  onPressed: _copyForCheck,
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: const Text('Αντιγραφή για έλεγχο'),
-                ),
-              const SizedBox(width: 6),
-            ],
+
             bottom: _busy
                 ? const PreferredSize(preferredSize: Size.fromHeight(3), child: LinearProgressIndicator(minHeight: 3))
                 : null,
@@ -226,10 +218,21 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                     )
                   else ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
-                      child: Text(
-                        all.length == 1 ? '1 προϊόν' : '${all.length} προϊόντα',
-                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: c.textSecondary),
+                      padding: const EdgeInsets.fromLTRB(4, 4, 0, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              all.length == 1 ? '1 προϊόν' : '${all.length} προϊόντα',
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: c.textSecondary),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _copyForCheck,
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('Αντιγραφή για έλεγχο'),
+                          ),
+                        ],
                       ),
                     ),
                     for (final f in shown)
