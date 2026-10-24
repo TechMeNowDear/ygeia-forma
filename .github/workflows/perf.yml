@@ -61,6 +61,9 @@ jobs:
             SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
             BIN="$SDK/cmdline-tools/latest/bin"
             IMG="system-images;android-34;google_apis;x86_64"
+            # Ίδιος φάκελος AVD για avdmanager και emulator (αλλιώς ο emulator δεν το βρίσκει).
+            export ANDROID_AVD_HOME="$HOME/.android/avd"
+            mkdir -p "$ANDROID_AVD_HOME"
             yes | "$BIN/sdkmanager" --licenses > /dev/null || true
             df -h /
             if ! "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1; then
