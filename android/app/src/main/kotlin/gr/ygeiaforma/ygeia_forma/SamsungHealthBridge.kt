@@ -103,6 +103,22 @@ class SamsungHealthBridge(
                 withContext(Dispatchers.IO) { dayStore.clear() }
                 JSONObject().put("ok", true)
             }
+            "savePdf" -> respond(result) {
+                val pages = call.argument<List<ByteArray>>("pages") ?: emptyList()
+                val name = call.argument<String>("name") ?: "ygeia-anafora.pdf"
+                val uri = withContext(Dispatchers.IO) { PdfExporter.save(activity, pages, name) }
+                JSONObject().put("ok", true).put("uri", uri.toString())
+            }
+            "sharePdf", "openPdf" -> {
+                val json = try {
+                    val uri = android.net.Uri.parse(call.argument<String>("uri") ?: "")
+                    if (call.method == "sharePdf") PdfExporter.share(activity, uri) else PdfExporter.open(activity, uri)
+                    JSONObject().put("ok", true)
+                } catch (e: Throwable) {
+                    errorJson(e)
+                }
+                result.success(json.toString())
+            }
             "cachedDashboard" -> result.success(readFile(DASHBOARD_FILE) ?: "{}")
             "loadPrefs" -> result.success(readFile(PREFS_FILE) ?: "{}")
             "savePrefs" -> {

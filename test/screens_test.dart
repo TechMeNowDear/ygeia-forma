@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/main.dart';
+import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/unusual.dart';
@@ -106,14 +107,41 @@ void main() {
         tab: 0,
         prepare: (store) {
           final today = DateTime(now.year, now.month, now.day);
-          final usual = {for (final s in checkUnusual(store.history, today).signals) s.rule.key: s.usual};
+          // Παλμοί και δέρμα ξεκάθαρα πάνω από το όριο του καθενός (όριο × 1,3).
+          final yesterday = store.history[dateKey(today.subtract(const Duration(days: 1)))] ?? {};
           store.history[dateKey(today)] = {
+            K.sleepHr: yesterday[K.sleepHr] ?? 60,
+            K.skinTemp: yesterday[K.skinTemp] ?? 34,
             ...?store.history[dateKey(today)],
-            K.sleepHr: (usual[K.sleepHr] ?? 60) + 7,
-            K.skinTemp: (usual[K.skinTemp] ?? 34) + 0.6,
           };
+          final row = {...store.history[dateKey(today)]!};
+          for (final sig in checkUnusual(store.history, today).signals) {
+            if (sig.rule.key == K.energy) continue;
+            row[sig.rule.key] = sig.usual + sig.threshold * 1.3;
+          }
+          store.history[dateKey(today)] = row;
         },
       ));
+  testWidgets('Αναφορά για γιατρό', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(680, 2200) * 2.0;
+    addTearDown(tester.view.reset);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
+    store.history = sampleHistory(now, store.data!);
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light),
+          home: ReportPage(store: store, now: now),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13_report.png'));
+  });
   testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: 1));
   testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(
         t,

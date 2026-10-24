@@ -6,6 +6,7 @@ import '../history.dart';
 import '../theme.dart';
 import '../trends.dart';
 import '../widgets.dart';
+import 'report_page.dart';
 
 /// Τάσεις: τι άλλαξε τον τελευταίο μήνα, τους 3 μήνες ή μέσα στον χρόνο.
 /// Λέμε «άλλαξε» μόνο όταν η αλλαγή είναι πραγματική (κανόνες στο trends.dart).
@@ -76,7 +77,21 @@ class _TrendsPageState extends State<TrendsPage> {
           section(TrendSection.other),
         ];
 
+        final reportButton = TextButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => ReportPage(store: store, now: widget.now)),
+          ),
+          style: TextButton.styleFrom(
+            backgroundColor: c.card,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: const StadiumBorder(),
+          ),
+          icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+          label: const Text('Για γιατρό'),
+        );
+
         return PageFrame(
+          action: store.history.isEmpty ? null : reportButton,
           title: 'Τάσεις',
           subtitle: 'Συγκρίνω ${periodExplanation(_period)}',
           onRefresh: () => store.refresh(),

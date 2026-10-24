@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 
@@ -54,4 +55,12 @@ class SamsungHealth {
   static Future<Map<String, dynamic>> saveDays(String json) => _call('saveDays', {'json': json});
 
   static Future<Map<String, dynamic>> loadDays() => _call('loadDays');
+
+  /// Σελίδες PNG (A4) → PDF στις Λήψεις. Επιστρέφει `uri`.
+  static Future<Map<String, dynamic>> savePdf(List<Uint8List> pages, String name) =>
+      _call('savePdf', {'pages': pages, 'name': name});
+
+  static Future<Map<String, dynamic>> sharePdf(String uri) => _call('sharePdf', {'uri': uri});
+
+  static Future<Map<String, dynamic>> openPdf(String uri) => _call('openPdf', {'uri': uri});
 }
