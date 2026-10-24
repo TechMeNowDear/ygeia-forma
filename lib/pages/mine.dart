@@ -22,7 +22,6 @@ class MinePage extends StatelessWidget {
         final c = Aigaio.of(context);
         final n = food.mine.length;
         final k = Kitchen.fromJson(store.prefs.kitchen);
-        final weighed = k.cookware.where((x) => x.tareGrams != null).length;
 
         final products = _EntryCard(
           key: const ValueKey('mine-products'),
@@ -39,8 +38,7 @@ class MinePage extends StatelessWidget {
           icon: Icons.soup_kitchen_outlined,
           color: c.food,
           title: 'Η κουζίνα μου',
-          text: '${k.devices.length} συσκευές · ${k.cookware.length} σκεύη'
-              '${k.cookware.isEmpty ? '' : ' · απόβαρο σε $weighed από ${k.cookware.length}'}',
+          text: '${k.devices.length} συσκευές · ${k.cookware.length} σκεύη',
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => KitchenScreen(store: store))),
         );
 

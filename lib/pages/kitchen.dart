@@ -190,8 +190,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
                       child: Text(
-                        'Ζύγισε μία φορά κάθε σκεύος άδειο και γράψε το «απόβαρο». Έτσι θα μπορείς να ζυγίζεις '
-                        'το μαγειρεμένο φαγητό μέσα στην κατσαρόλα ή στο ταψί.',
+                        'Τα σκεύη που έχεις. Οι συνταγές θα προτείνουν μόνο αυτά.',
                         style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary),
                       ),
                     ),
@@ -200,10 +199,6 @@ class _KitchenScreenState extends State<KitchenScreen> {
                         onTap: () => _editCookware(w),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                         title: Text(w.label),
-                        subtitle: Text(
-                          w.tareGrams == null ? 'Απόβαρο: δεν το έχεις ζυγίσει' : 'Απόβαρο ${gramsTextPlain(w.tareGrams!)} g',
-                          style: TextStyle(color: w.tareGrams == null ? c.textTertiary : c.textSecondary),
-                        ),
                         trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
                       ),
                     Align(
@@ -246,14 +241,11 @@ class _CookwareSheetState extends State<_CookwareSheet> {
   late String? _size = widget.existing?.size;
   late final _brand = TextEditingController(text: widget.existing?.brand ?? '');
   late final _note = TextEditingController(text: widget.existing?.note ?? '');
-  late final _tare = TextEditingController(
-      text: widget.existing?.tareGrams == null ? '' : gramsTextPlain(widget.existing!.tareGrams!));
 
   @override
   void dispose() {
     _brand.dispose();
     _note.dispose();
-    _tare.dispose();
     super.dispose();
   }
 
@@ -302,13 +294,6 @@ class _CookwareSheetState extends State<_CookwareSheet> {
             TextField(controller: _brand, decoration: deco('Μάρκα (προαιρετικό)')),
             const SizedBox(height: 10),
             TextField(controller: _note, decoration: deco('Σημείωση (π.χ. «28 cm», «με καπάκι»)')),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _tare,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-              decoration: deco('Απόβαρο (άδειο, χωρίς καπάκι)', suffix: 'g'),
-            ),
             const SizedBox(height: 18),
             FilledButton(
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
@@ -321,7 +306,6 @@ class _CookwareSheetState extends State<_CookwareSheet> {
                     size: _size,
                     brand: _brand.text.trim().isEmpty ? null : _brand.text.trim(),
                     note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-                    tareGrams: parseNumber(_tare.text),
                   ),
                 ),
               ),

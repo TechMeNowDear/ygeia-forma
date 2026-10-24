@@ -1,5 +1,5 @@
 /// «Η κουζίνα μου»: συσκευές και σκεύη, για συνταγές που γίνονται μόνο με ό,τι υπάρχει
-/// και για ζύγισμα μαγειρεμένου φαγητού μέσα στο σκεύος (απόβαρο).
+/// (μάρκα, μέγεθος). Το απόβαρο το κάνει η ζυγαριά του χρήστη, όχι η εφαρμογή (απόφαση 25/10).
 library;
 
 /// Συσκευές που αλλάζουν το πώς γίνεται μια συνταγή.
@@ -42,14 +42,12 @@ String cookwareSizeLabel(String kind, String size) {
 String cookwareKindLabel(String k) => cookwareKinds.firstWhere((e) => e.$1 == k, orElse: () => (k, k)).$2;
 
 class Cookware {
-  Cookware({required this.id, required this.kind, this.size, this.brand, this.tareGrams, this.note});
+  Cookware({required this.id, required this.kind, this.size, this.brand, this.note});
   final String id;
   String kind;
   String? size;
   String? brand;
 
-  /// Βάρος άδειου σκεύους (για «τελικό βάρος = ζυγαριά − απόβαρο»).
-  double? tareGrams;
   String? note;
 
   String get label => [
@@ -64,7 +62,6 @@ class Cookware {
         kind: j['kind'] as String,
         size: j['size'] as String?,
         brand: j['brand'] as String?,
-        tareGrams: (j['tare'] as num?)?.toDouble(),
         note: j['note'] as String?,
       );
 
@@ -73,7 +70,6 @@ class Cookware {
         'kind': kind,
         if (size != null) 'size': size,
         if (brand != null) 'brand': brand,
-        if (tareGrams != null) 'tare': tareGrams,
         if (note != null) 'note': note,
       };
 }
@@ -132,8 +128,8 @@ class Kitchen {
     hob ??= 'Κεραμικά';
     ovenFan ??= true;
     final pots = cookware.where((c) => c.kind == 'pot').toList();
-    // Η αρχική «Κατσαρόλα» χωρίς μέγεθος και απόβαρο γίνεται τρεις.
-    if (pots.length == 1 && pots.first.size == null && pots.first.tareGrams == null) {
+    // Η αρχική «Κατσαρόλα» χωρίς μέγεθος γίνεται τρεις.
+    if (pots.length == 1 && pots.first.size == null) {
       final i = cookware.indexOf(pots.first);
       cookware
         ..removeAt(i)

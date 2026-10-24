@@ -185,9 +185,8 @@ void main() {
       expect(k.steamerTiers, 2);
       expect(k.has('airFryer'), isFalse);
       expect(k.cookware.where((c) => c.kind == 'panNonstick').length, 3);
-      k.cookware.first.tareGrams = 640;
       final back = Kitchen.fromJson(k.toJson());
-      expect(back.cookware.first.tareGrams, 640);
+      expect(back.cookware.first.label, k.cookware.first.label);
       expect(back.devices, k.devices);
       expect(back.cookware.where((c) => c.kind == 'pot').map((c) => c.size), ['Μικρό', 'Μεσαίο', 'Μεγάλο']);
       expect(back.hob, 'Κεραμικά');
@@ -210,7 +209,8 @@ void main() {
       expect(k.has('toaster') && k.has('blender') && k.has('steamer'), isTrue);
       expect(k.ovenFan, isFalse, reason: 'ό,τι έγραψε ο χρήστης μένει');
       expect(k.hob, 'Κεραμικά');
-      expect(k.cookware.first.tareGrams, 410);
+      expect(k.cookware.first.brand, 'Tefal');
+      expect(k.cookware.first.toJson().containsKey('tare'), isFalse);
       expect(k.cookware.where((c) => c.kind == 'pot').length, 3);
       expect(k.cookware.where((c) => c.kind == 'glass').single.brand, 'Pyrex');
       // Δεύτερο άνοιγμα: τίποτα δεν διπλασιάζεται.
