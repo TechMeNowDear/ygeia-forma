@@ -1051,8 +1051,11 @@ class LineChart extends StatelessWidget {
     this.format,
     this.color,
     this.dateLabel,
+    this.minRange = 1,
   });
 
+  /// Ελάχιστο εύρος του κάθετου άξονα, ώστε μικρές διαφορές να μη φαίνονται τεράστιες.
+  final double minRange;
   final List<(DateTime, double)> points;
   final double height;
   final String Function(double)? format;
@@ -1075,6 +1078,7 @@ class LineChart extends StatelessWidget {
           card: c.card,
           format: format ?? (v) => v.toStringAsFixed(1),
           dateLabel: dateLabel ?? (d) => '${d.day}/${d.month}',
+          minRange: minRange,
         ),
       ),
     );
@@ -1091,8 +1095,10 @@ class _LinePainter extends CustomPainter {
     required this.card,
     required this.format,
     required this.dateLabel,
+    required this.minRange,
   });
 
+  final double minRange;
   final List<(DateTime, double)> points;
   final Color color;
   final Color text;
@@ -1114,9 +1120,10 @@ class _LinePainter extends CustomPainter {
 
     var minV = points.map((p) => p.$2).reduce(math.min);
     var maxV = points.map((p) => p.$2).reduce(math.max);
-    if (maxV - minV < 1e-6) {
-      minV -= 1;
-      maxV += 1;
+    if (maxV - minV < minRange) {
+      final mid = (maxV + minV) / 2;
+      minV = mid - minRange / 2;
+      maxV = mid + minRange / 2;
     }
     final pad = (maxV - minV) * 0.2;
     minV -= pad;

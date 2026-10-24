@@ -161,6 +161,7 @@ class _DayHeartCardState extends State<DayHeartCard> {
               points: [for (final x in recent) (x.day, x.resting.value!)],
               format: (v) => v.round().toString(),
               color: c.heart,
+              minRange: 8,
               dateLabel: (dt) => weekdayShort(dt),
             ),
           ],

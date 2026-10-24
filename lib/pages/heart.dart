@@ -76,7 +76,7 @@ class HeartPage extends StatelessWidget {
                   ),
                   if (rhrPoints.length >= 2) ...[
                     const SizedBox(height: 14),
-                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.sleep),
+                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.sleep, minRange: 8),
                   ],
                 ],
               ),
