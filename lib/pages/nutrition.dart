@@ -374,7 +374,7 @@ class _MealCard extends StatelessWidget {
                     onPressed: () => _copyFromPrevious(context, prevDay),
                     icon: const Icon(Icons.content_copy_rounded, size: 18),
                     label: Text(
-                      'Ίδιο με χθες · ${kcalText(Totals(previous).kcal)} kcal',
+                      'Όπως χθες · ${kcalText(Totals(previous).kcal)} kcal',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
