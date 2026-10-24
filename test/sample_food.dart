@@ -53,5 +53,27 @@ FoodStore sampleFoodStore(DateTime now) {
       add(ago, Meal.dinner, 'Μοσχαρίσιο φιλέτο (ωμό)', 150, 20);
     }
   }
-  return FoodStore.preloaded(foods: basicFoods(), entries: entries, now: now);
+  return FoodStore.preloaded(foods: basicFoods(), entries: entries, mine: sampleMine(), now: now);
 }
+
+/// Δύο προϊόντα με μάρκα, όπως θα τα περνούσε ο χρήστης από barcode (φανταστικές μάρκες για τη δοκιμή).
+List<Food> sampleMine() => [
+      Food(
+        id: 'Mdemo1',
+        name: 'Γιαούρτι στραγγιστό 2%',
+        cat: 'Τα προϊόντα μου',
+        brand: 'Μάρκα Α',
+        barcode: '5200000000017',
+        source: 'Open Food Facts',
+        servingGrams: 170,
+        n: Nutrients({Nk.kcal: const NValue(73), Nk.protein: const NValue(9.6), Nk.carbs: const NValue(3.4), Nk.fat: const NValue(2)}),
+      ),
+      Food(
+        id: 'Mdemo2',
+        name: 'Ανθότυρο',
+        cat: 'Τα προϊόντα μου',
+        source: 'Ετικέτα',
+        n: Nutrients({Nk.kcal: const NValue(180), Nk.protein: const NValue(11), Nk.carbs: const NValue(3), Nk.fat: const NValue(14)}),
+      ),
+    ];
+

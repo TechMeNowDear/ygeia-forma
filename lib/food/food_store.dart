@@ -16,10 +16,15 @@ class FoodStore extends ChangeNotifier {
   FoodStore() : _offline = false;
 
   /// Για δοκιμές και στιγμιότυπα: χωρίς κανάλι προς το Android.
-  FoodStore.preloaded({required List<Food> foods, List<LogEntry> entries = const [], DateTime? now})
-      : _offline = true {
+  FoodStore.preloaded({
+    required List<Food> foods,
+    List<LogEntry> entries = const [],
+    List<Food> mine = const [],
+    DateTime? now,
+  }) : _offline = true {
     _basic = foods;
-    _index = FoodIndex(foods);
+    _mine = mine;
+    _index = FoodIndex([...mine, ...foods]);
     for (final e in entries) {
       _entries[e.id] = e;
     }
@@ -194,6 +199,16 @@ class FoodStore extends ChangeNotifier {
 
   /// Αναίρεση διαγραφής: ξαναμπαίνει ακριβώς όπως ήταν.
   Future<void> restore(LogEntry e) => _put(e);
+
+  /// Τα προϊόντα μου, το πιο πρόσφατο πρώτο.
+  List<Food> get mine => _mine;
+
+  Future<void> deleteMyFood(Food f) async {
+    _mine = _mine.where((x) => x.id != f.id).toList();
+    _rebuildIndex();
+    notifyListeners();
+    if (!_offline) await FoodChannel.myFoodDelete(f.id);
+  }
 
   Future<void> saveMyFood(Food f) async {
     _mine = [f, ..._mine.where((x) => x.id != f.id)];

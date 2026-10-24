@@ -6,6 +6,7 @@ import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'food_add.dart';
+import 'my_foods.dart';
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
 Color proteinColor(Aigaio c) => c.sleep;
@@ -46,6 +47,14 @@ class NutritionPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _RoundButton(
+              icon: Icons.inventory_2_outlined,
+              tooltip: 'Τα προϊόντα μου',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => MyFoodsScreen(food: food)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            _RoundButton(
               icon: Icons.chevron_left_rounded,
               tooltip: 'Προηγούμενη μέρα',
               onPressed: () => food.setDay(DateTime(day.year, day.month, day.day - 1)),
@@ -69,6 +78,7 @@ class NutritionPage extends StatelessWidget {
         }
 
         final summary = _SummaryCard(totals: totals);
+        final products = _ProductsCard(food: food);
         final meals = [
           for (final m in Meal.values)
             _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day),
@@ -83,11 +93,13 @@ class NutritionPage extends StatelessWidget {
             if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
             summary,
             ...meals,
+            products,
             _SourcesNote(color: c.textTertiary),
           ],
           left: [
             if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
             summary,
+            products,
             _SourcesNote(color: c.textTertiary),
           ],
           right: meals,
@@ -300,6 +312,44 @@ class _EntryRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Είσοδος στα «Τα προϊόντα μου» (καταχώριση χωρίς φαγητό).
+class _ProductsCard extends StatelessWidget {
+  const _ProductsCard({required this.food});
+  final FoodStore food;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final n = food.mine.length;
+    return AppCard(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MyFoodsScreen(food: food))),
+      child: Row(
+        children: [
+          IconBadge(Icons.inventory_2_outlined, c.primary, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Τα προϊόντα μου',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+                const SizedBox(height: 2),
+                Text(
+                  n == 0
+                      ? 'Πέρασε ό,τι αγόρασες με barcode ή χειροκίνητα, χωρίς να το φας.'
+                      : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · πρόσθεσε κι άλλα με barcode ή χειροκίνητα',
+                  style: TextStyle(fontSize: 13.5, height: 1.35, color: c.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+        ],
       ),
     );
   }

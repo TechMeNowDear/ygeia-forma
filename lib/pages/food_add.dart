@@ -144,73 +144,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     setState(() => _meal = r.meal);
   }
 
-  Future<void> _newFood({FoodDraft? draft, String? note}) async {
-    final f = await Navigator.of(context).push<Food>(
-      MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draft ?? FoodDraft(), note: note)),
-    );
-    if (f == null || !mounted) return;
-    await widget.food.saveMyFood(f);
-    if (mounted) await _pick(f);
+  Future<void> _newFood({FoodDraft? draft}) async {
+    final f = await createFood(context, widget.food, draft: draft);
+    if (f != null && mounted) await _pick(f);
   }
 
   Future<void> _scan() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final s = await FoodChannel.scanBarcode();
-    if (!mounted) return;
-    if (s['ok'] != true) {
-      final kind = s['kind'];
-      if (kind == 'cancelled') return;
-      final detail = (s['detail'] as String?) ?? '';
-      messenger.showSnackBar(SnackBar(
-        duration: const Duration(seconds: 8),
-        content: Text(kind == 'unavailable'
-            ? 'Ο σαρωτής κατεβαίνει από το Google Play. Δοκίμασε ξανά σε λίγο, με σύνδεση στο ίντερνετ.'
-            : 'Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν «Από ετικέτα».'),
-        action: detail.isEmpty
-            ? null
-            : SnackBarAction(
-                label: 'Λεπτομέρειες',
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Για τον Claude'),
-                    content: SingleChildScrollView(
-                      child: SelectableText('${s['message'] ?? ''}\n\n$detail', style: const TextStyle(fontSize: 12)),
-                    ),
-                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Κλείσιμο'))],
-                  ),
-                ),
-              ),
-      ));
-      return;
-    }
-    final code = (s['code'] as String?) ?? '';
-    final mine = widget.food.byBarcode(code);
-    if (mine != null) return _pick(mine);
-
-    setState(() => _busy = true);
-    final r = await FoodChannel.offLookup(code);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (r['ok'] != true) {
-      return _newFood(
-        draft: FoodDraft(barcode: code),
-        note: 'Δεν έγινε σύνδεση με το Open Food Facts. Πέρασε τα στοιχεία από την ετικέτα.',
-      );
-    }
-    if (r['found'] != true) {
-      return _newFood(
-        draft: FoodDraft(barcode: code),
-        note: 'Το προϊόν δεν υπάρχει στο Open Food Facts. Πέρασε τα στοιχεία από την ετικέτα (ανά 100 g).',
-      );
-    }
-    final d = draftFromOff(code, Map<String, dynamic>.from(r['product'] as Map));
-    return _newFood(
-      draft: d,
-      note: d.missing.isEmpty
-          ? 'Βρέθηκε στο Open Food Facts. Έλεγξε ότι τα νούμερα ταιριάζουν με την ετικέτα και πάτα Αποθήκευση.'
-          : 'Βρέθηκε στο Open Food Facts, αλλά λείπουν τιμές. Συμπλήρωσέ τες από την ετικέτα.',
-    );
+    final f = await scanToFood(context, widget.food, onBusy: (b) => setState(() => _busy = b));
+    if (f != null && mounted) await _pick(f);
   }
 
   @override
@@ -361,11 +302,16 @@ class _FoodTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    food.brand == null ? food.name : '${food.name} · ${food.brand}',
+                    food.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text),
                   ),
+                  if (food.isMine)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3, bottom: 1),
+                      child: MineBadge(text: food.brand ?? 'δικό μου'),
+                    ),
                   const SizedBox(height: 2),
                   Text(
                     '${kcalText(n.amount(Nk.kcal))} kcal · Π ${nValueText(n[Nk.protein])} g ανά 100 g'
@@ -378,6 +324,36 @@ class _FoodTile extends StatelessWidget {
             Icon(Icons.add_circle_outline_rounded, color: c.body),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Μικρή ετικέτα για τα προϊόντα μου (μάρκα), ώστε να ξεχωρίζουν από τα γενικά.
+class MineBadge extends StatelessWidget {
+  const MineBadge({super.key, required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(color: c.tint(c.primary), borderRadius: BorderRadius.circular(6)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sell_outlined, size: 12, color: c.primary),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: c.primary),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -665,9 +641,12 @@ class FoodDetailScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class FoodFormScreen extends StatefulWidget {
-  const FoodFormScreen({super.key, required this.draft, this.note});
+  const FoodFormScreen({super.key, required this.draft, this.note, this.existingId});
   final FoodDraft draft;
   final String? note;
+
+  /// Αν δίνεται, διορθώνουμε υπάρχον προϊόν (κρατά το ίδιο id).
+  final String? existingId;
 
   @override
   State<FoodFormScreen> createState() => _FoodFormScreenState();
@@ -725,7 +704,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       values: values,
       fromOff: widget.draft.fromOff,
     );
-    Navigator.pop(context, foodFromDraft(d, FoodStore.newFoodId()));
+    Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }
 
   @override
@@ -746,7 +725,11 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       appBar: AppBar(
         backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
-        title: Text(widget.draft.fromOff ? 'Έλεγχος προϊόντος' : 'Νέο τρόφιμο'),
+        title: Text(widget.existingId != null
+            ? 'Διόρθωση προϊόντος'
+            : widget.draft.fromOff
+                ? 'Έλεγχος προϊόντος'
+                : 'Νέο προϊόν'),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -818,4 +801,82 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Κοινά: νέο προϊόν χειροκίνητα ή από barcode (χωρίς καταγραφή φαγητού)
+// ---------------------------------------------------------------------------
+
+/// Φόρμα νέου τροφίμου· το αποθηκεύει στα προϊόντα μου και το επιστρέφει.
+Future<Food?> createFood(BuildContext context, FoodStore food, {FoodDraft? draft, String? note}) async {
+  final f = await Navigator.of(context).push<Food>(
+    MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draft ?? FoodDraft(), note: note)),
+  );
+  if (f == null) return null;
+  await food.saveMyFood(f);
+  return f;
+}
+
+/// Σκανάρισμα → αν υπάρχει ήδη στα προϊόντα μου, αυτό· αλλιώς Open Food Facts → έλεγχος με την ετικέτα → αποθήκευση.
+/// [existing]: τι να γίνει όταν το προϊόν υπάρχει ήδη (στην προσθήκη φαγητού απλώς επιστρέφεται).
+Future<Food?> scanToFood(
+  BuildContext context,
+  FoodStore food, {
+  required void Function(bool busy) onBusy,
+  Future<Food?> Function(Food existing)? existing,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final s = await FoodChannel.scanBarcode();
+  if (!context.mounted) return null;
+  if (s['ok'] != true) {
+    final kind = s['kind'];
+    if (kind == 'cancelled') return null;
+    final detail = (s['detail'] as String?) ?? '';
+    messenger.showSnackBar(SnackBar(
+      duration: const Duration(seconds: 8),
+      content: Text(kind == 'unavailable'
+          ? 'Ο σαρωτής κατεβαίνει από το Google Play. Δοκίμασε ξανά σε λίγο, με σύνδεση στο ίντερνετ.'
+          : 'Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν χειροκίνητα.'),
+      action: detail.isEmpty
+          ? null
+          : SnackBarAction(
+              label: 'Λεπτομέρειες',
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Για τον Claude'),
+                  content: SingleChildScrollView(
+                    child: SelectableText('${s['message'] ?? ''}\n\n$detail', style: const TextStyle(fontSize: 12)),
+                  ),
+                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Κλείσιμο'))],
+                ),
+              ),
+            ),
+    ));
+    return null;
+  }
+  final code = (s['code'] as String?) ?? '';
+  final mine = food.byBarcode(code);
+  if (mine != null) return existing == null ? mine : existing(mine);
+
+  onBusy(true);
+  final r = await FoodChannel.offLookup(code);
+  onBusy(false);
+  if (!context.mounted) return null;
+  if (r['ok'] != true) {
+    return createFood(context, food,
+        draft: FoodDraft(barcode: code),
+        note: 'Δεν έγινε σύνδεση με το Open Food Facts. Πέρασε τα στοιχεία από την ετικέτα.');
+  }
+  if (r['found'] != true) {
+    return createFood(context, food,
+        draft: FoodDraft(barcode: code),
+        note: 'Το προϊόν δεν υπάρχει στο Open Food Facts. Πέρασε τα στοιχεία από την ετικέτα (ανά 100 g).');
+  }
+  final d = draftFromOff(code, Map<String, dynamic>.from(r['product'] as Map));
+  return createFood(context, food,
+      draft: d,
+      note: d.missing.isEmpty
+          ? 'Βρέθηκε στο Open Food Facts. Έλεγξε ότι τα νούμερα ταιριάζουν με την ετικέτα και πάτα Αποθήκευση.'
+          : 'Βρέθηκε στο Open Food Facts, αλλά λείπουν τιμές. Συμπλήρωσέ τες από την ετικέτα.');
 }

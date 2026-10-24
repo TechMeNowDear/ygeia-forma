@@ -172,6 +172,28 @@ void main() {
           await t.tap(find.text('Φαγητό'));
         },
       ));
+  testWidgets('Διατροφή · τα προϊόντα μου', (t) => _shot(
+        t,
+        name: '19_my_foods',
+        size: phone,
+        brightness: Brightness.light,
+        tab: 1,
+        act: (t) async {
+          await t.tap(find.byTooltip('Τα προϊόντα μου'));
+        },
+      ));
+  testWidgets('Διατροφή · αναζήτηση με μάρκα', (t) => _shot(
+        t,
+        name: '20_search_branded',
+        size: phone,
+        brightness: Brightness.dark,
+        tab: 1,
+        act: (t) async {
+          await t.tap(find.text('Φαγητό'));
+          await t.pumpAndSettle();
+          await t.enterText(find.byType(TextField), 'giaourti');
+        },
+      ));
   testWidgets('Διατροφή · ποσότητα', (t) => _shot(
         t,
         name: '18_quantity_sheet',

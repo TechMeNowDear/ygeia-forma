@@ -88,10 +88,23 @@ double? energyMismatch(Map<String, double> v) {
   return (diff > 20 && diff / (k > 1 ? k : 1) > 0.15) ? calc : null;
 }
 
+/// Για διόρθωση προϊόντος που υπάρχει ήδη.
+FoodDraft draftFromFood(Food f) => FoodDraft(
+      name: f.name,
+      brand: f.brand,
+      barcode: f.barcode,
+      servingGrams: f.servingGrams,
+      servingLabel: f.servingLabel,
+      values: {for (final e in f.n.values.entries) e.key: e.value.value},
+      fromOff: f.source == 'Open Food Facts',
+    );
+
+const myFoodsCategory = 'Τα προϊόντα μου';
+
 Food foodFromDraft(FoodDraft d, String id) => Food(
       id: id,
       name: d.name.trim(),
-      cat: 'Δικά μου',
+      cat: myFoodsCategory,
       brand: (d.brand?.trim().isEmpty ?? true) ? null : d.brand!.trim(),
       barcode: d.barcode,
       source: d.fromOff ? 'Open Food Facts' : 'Ετικέτα',
