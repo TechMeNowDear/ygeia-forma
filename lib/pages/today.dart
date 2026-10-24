@@ -148,7 +148,7 @@ class TodayPage extends StatelessWidget {
       trend = diff == 0
           ? const TrendPill('Όπως συνήθως')
           : TrendPill(
-              '${diff.abs()} ${diff > 0 ? 'πάνω' : 'κάτω'} από τον μ.ό.',
+              '${diff > 0 ? '+' : '−'}${diff.abs()} από τον μ.ό.',
               up: diff > 0,
               kind: diff >= 3 ? TrendKind.bad : (diff < 0 ? TrendKind.good : TrendKind.neutral),
             );
@@ -299,7 +299,14 @@ class _SleepHero extends StatelessWidget {
         ),
         boxShadow: c.dark
             ? null
-            : [BoxShadow(color: c.nightBottom.withValues(alpha: 0.28), blurRadius: 28, offset: const Offset(0, 12))],
+            : [
+                BoxShadow(
+                  color: c.nightBottom.withValues(alpha: 0.22),
+                  blurRadius: 30,
+                  spreadRadius: -8,
+                  offset: const Offset(0, 14),
+                ),
+              ],
       ),
       child: Material(
         type: MaterialType.transparency,
@@ -330,28 +337,31 @@ class _SleepHero extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           DurationValue(n.minutes, size: 34, color: white, unitColor: soft),
-                          if (diff != null) ...[
-                            const SizedBox(height: 10),
-                            TrendPill(
-                              diff.abs() < 10 ? 'Όσο ο μέσος όρος της εβδομάδας' : '${moreLessMinutes(diff)} από τον μ.ό.',
-                              up: diff.abs() < 10 ? null : diff > 0,
-                              onDark: true,
-                            ),
-                          ],
                         ],
                       ),
                     ),
                     const SizedBox(width: 12),
                     ScoreRing(
                       value: n.score?.toDouble(),
-                      size: 76,
+                      size: 70,
                       stroke: 7,
                       color: white,
                       track: Colors.white.withValues(alpha: 0.16),
-                      caption: 'βαθμολογία',
+                      caption: 'Βαθμολογία',
                     ),
                   ],
                 ),
+                if (diff != null) ...[
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TrendPill(
+                      diff.abs() < 10 ? 'Όσο κοιμάσαι συνήθως' : '${moreLessMinutes(diff)} από ό,τι συνήθως',
+                      up: diff.abs() < 10 ? null : diff > 0,
+                      onDark: true,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

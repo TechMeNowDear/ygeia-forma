@@ -61,7 +61,10 @@ class MovePage extends StatelessWidget {
                 icon: Icons.timer_rounded,
                 color: c.move,
                 title: 'Ενεργός χρόνος',
-                value: activeMinutes == null ? null : hoursMinutes(activeMinutes),
+                value: activeMinutes == null
+                    ? null
+                    : (activeMinutes < 60 ? '$activeMinutes' : hoursMinutes(activeMinutes)),
+                unit: (activeMinutes != null && activeMinutes < 60) ? (activeMinutes == 1 ? 'λεπτό' : 'λεπτά') : null,
               ),
               StatCard(
                 icon: Icons.straighten_rounded,

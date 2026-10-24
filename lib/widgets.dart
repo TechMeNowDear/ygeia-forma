@@ -252,9 +252,9 @@ class CardHeader extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.textSecondary),
+            style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
           ),
         ),
         if (trailing != null) trailing!,
@@ -521,34 +521,37 @@ class ScoreRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final ring = SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _RingPainter((value ?? 0) / 100, stroke, color, track),
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                value == null ? '—' : value!.round().toString(),
-                style: TextStyle(
-                  fontSize: size * 0.3,
-                  height: 1.0,
-                  fontWeight: FontWeight.w700,
-                  color: textColor ?? color,
-                  fontFeatures: tabular,
-                ),
-              ),
-              if (caption != null)
-                Text(
-                  caption!,
-                  style: TextStyle(fontSize: size * 0.12, color: (textColor ?? color).withValues(alpha: 0.75)),
-                ),
-            ],
+          child: Text(
+            value == null ? '—' : value!.round().toString(),
+            style: TextStyle(
+              fontSize: size * 0.34,
+              height: 1.0,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+              color: textColor ?? color,
+              fontFeatures: tabular,
+            ),
           ),
         ),
       ),
+    );
+    if (caption == null) return ring;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ring,
+        const SizedBox(height: 6),
+        Text(
+          caption!,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: (textColor ?? color).withValues(alpha: 0.72)),
+        ),
+      ],
     );
   }
 }
@@ -642,7 +645,7 @@ class _HypnoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rowH = size.height / _rows.length;
-    final barH = rowH * 0.62;
+    final barH = rowH * 0.74;
     for (var i = 0; i < _rows.length; i++) {
       final y = rowH * i + (rowH - barH) / 2;
       canvas.drawRRect(
@@ -794,7 +797,7 @@ class MiniBars extends StatelessWidget {
     return SizedBox(
       height: height,
       width: double.infinity,
-      child: CustomPaint(painter: _MiniBarsPainter(values, color, c.tint(color))),
+      child: CustomPaint(painter: _MiniBarsPainter(values, color, color.withValues(alpha: c.dark ? 0.32 : 0.26))),
     );
   }
 }
@@ -996,7 +999,9 @@ class _BarPainter extends CustomPainter {
           Paint()..color = strong ? barStrong : bar,
         );
         if (strong && valueLabel != null) {
-          _text(canvas, valueLabel!(v), Offset(cx, topPad + chartHeight - h - 18), strongText, 12, bold: true);
+          final tp = _painter(valueLabel!(v), strongText, 12, bold: true);
+          final x = (cx - tp.width / 2).clamp(0.0, math.max(0.0, size.width - tp.width));
+          tp.paint(canvas, Offset(x, topPad + chartHeight - h - 18));
         }
       }
       final fromEnd = values.length - 1 - i;

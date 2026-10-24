@@ -195,8 +195,8 @@ class _LastNightCard extends StatelessWidget {
           if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
           if (n.spo2Avg != null)
             InfoRow(
-              'Οξυγόνο, μέσο και χαμηλότερο',
-              '${n.spo2Avg!.round()}% · ${n.spo2Min?.round() ?? '—'}%',
+              'Οξυγόνο',
+              '${n.spo2Avg!.round()}% · χαμηλότερο ${n.spo2Min?.round() ?? '—'}%',
               dot: c.sleep,
               valueColor: (n.spo2Min ?? 100) < 88 ? c.bad : null,
             ),
