@@ -84,6 +84,7 @@ class FoodBridge(
                 throw e
             } catch (e: Throwable) {
                 JSONObject().put("ok", false).put("kind", "other").put("message", e.message ?: e.javaClass.simpleName)
+                    .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))
             }
             result.success(json.toString())
         }
@@ -92,13 +93,28 @@ class FoodBridge(
     // ---------- Barcode ----------
 
     private suspend fun scan(): JSONObject = suspendCancellableCoroutine { cont ->
+        // Το ML Kit αρχικοποιείται συνήθως μόνο του· το κάνουμε ρητά για σιγουριά.
+        try {
+            com.google.mlkit.common.sdkinternal.MlKitContext.initializeIfNeeded(activity.applicationContext)
+        } catch (e: Throwable) {
+            // αν έχει ήδη γίνει, απλώς συνεχίζουμε
+        }
         val options = GmsBarcodeScannerOptions.Builder()
             .setBarcodeFormats(
                 Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E,
             )
             .enableAutoZoom()
             .build()
-        GmsBarcodeScanning.getClient(activity, options).startScan()
+        val scanner = try {
+            GmsBarcodeScanning.getClient(activity, options)
+        } catch (e: Throwable) {
+            cont.resume(
+                JSONObject().put("ok", false).put("kind", "other").put("message", e.message ?: e.javaClass.simpleName)
+                    .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))
+            )
+            return@suspendCancellableCoroutine
+        }
+        scanner.startScan()
             .addOnSuccessListener { b ->
                 if (cont.isActive) cont.resume(JSONObject().put("ok", true).put("code", b.rawValue ?: ""))
             }
@@ -109,6 +125,7 @@ class FoodBridge(
                 val kind = if (e is MlKitException && e.errorCode == MlKitException.UNAVAILABLE) "unavailable" else "other"
                 if (cont.isActive) cont.resume(
                     JSONObject().put("ok", false).put("kind", kind).put("message", e.message ?: "")
+                        .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))
                 )
             }
     }

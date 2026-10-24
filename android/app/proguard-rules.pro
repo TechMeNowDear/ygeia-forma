@@ -12,3 +12,13 @@
 
 # Η γέφυρά μας προς τη Flutter.
 -keep class gr.ygeiaforma.** { *; }
+
+# Google code scanner (ML Kit μέσω Google Play services): βρίσκει τα κομμάτια του με reflection.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_code_scanner.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
+-keep class com.google.android.gms.internal.mlkit_common.** { *; }
+-keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
+-keep class com.google.firebase.components.** { *; }
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.android.gms.**

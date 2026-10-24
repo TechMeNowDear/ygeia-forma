@@ -160,10 +160,27 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     if (s['ok'] != true) {
       final kind = s['kind'];
       if (kind == 'cancelled') return;
+      final detail = (s['detail'] as String?) ?? '';
       messenger.showSnackBar(SnackBar(
+        duration: const Duration(seconds: 8),
         content: Text(kind == 'unavailable'
             ? 'Ο σαρωτής κατεβαίνει από το Google Play. Δοκίμασε ξανά σε λίγο, με σύνδεση στο ίντερνετ.'
-            : 'Δεν έγινε σκανάρισμα: ${s['message'] ?? ''}'),
+            : 'Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν «Από ετικέτα».'),
+        action: detail.isEmpty
+            ? null
+            : SnackBarAction(
+                label: 'Λεπτομέρειες',
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Για τον Claude'),
+                    content: SingleChildScrollView(
+                      child: SelectableText('${s['message'] ?? ''}\n\n$detail', style: const TextStyle(fontSize: 12)),
+                    ),
+                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Κλείσιμο'))],
+                  ),
+                ),
+              ),
       ));
       return;
     }

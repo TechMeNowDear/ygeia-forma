@@ -1,6 +1,6 @@
 package gr.ygeiaforma.ygeia_forma
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
@@ -8,7 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 
-class MainActivity : FlutterActivity() {
+// FragmentActivity: το χρειάζονται υπηρεσίες της Google (π.χ. σαρωτής barcode) για να ανοίγουν τις δικές τους οθόνες.
+class MainActivity : FlutterFragmentActivity() {
     // Ζει όσο ζει η οθόνη· τίποτα δεν τρέχει στο παρασκήνιο.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
