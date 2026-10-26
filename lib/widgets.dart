@@ -721,6 +721,11 @@ class Hypnogram extends StatelessWidget {
           ],
           onDark ? Colors.white.withValues(alpha: 0.10) : Aigaio.of(context).hairline,
           onDark ? Colors.white.withValues(alpha: 0.35) : Aigaio.of(context).textTertiary.withValues(alpha: 0.5),
+          gaps: [
+            for (final g in night.estimatedGaps)
+              (g.$1.difference(night.start).inSeconds / total, g.$2.difference(night.start).inSeconds / total),
+          ],
+          gapColor: onDark ? Colors.white.withValues(alpha: 0.12) : Aigaio.of(context).sleep.withValues(alpha: 0.12),
         ),
       ),
     );
@@ -729,10 +734,14 @@ class Hypnogram extends StatelessWidget {
 
 /// Υπνόγραμμα: κάθε φάση στη γραμμή της, ενωμένες με λεπτές κάθετες, όπως στα εργαστήρια ύπνου.
 class _HypnoPainter extends CustomPainter {
-  _HypnoPainter(this.parts, this.guide, this.connector);
+  _HypnoPainter(this.parts, this.guide, this.connector, {this.gaps = const [], this.gapColor = const Color(0x00000000)});
   final List<(double, double, String)> parts;
   final Color guide;
   final Color connector;
+
+  /// Κενά της Samsung που μετρήθηκαν ως ύπνος (εκτίμηση, χωρίς φάσεις): απαλή ζώνη σε όλο το ύψος.
+  final List<(double, double)> gaps;
+  final Color gapColor;
 
   // Από πάνω προς τα κάτω: ξύπνιος, REM, ελαφρύς, βαθύς.
   static const _rows = ['AWAKE', 'REM', 'LIGHT', 'DEEP'];
@@ -742,6 +751,16 @@ class _HypnoPainter extends CustomPainter {
     final rowH = size.height / _rows.length;
     final barH = math.min(rowH * 0.8, 12.0);
     double centerY(int row) => rowH * row + rowH / 2;
+
+    for (final (a, b) in gaps) {
+      final left = a.clamp(0.0, 1.0) * size.width;
+      final right = b.clamp(0.0, 1.0) * size.width;
+      if (right - left < 1) continue;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTRB(left, 0, right, size.height), const Radius.circular(6)),
+        Paint()..color = gapColor,
+      );
+    }
 
     final guidePaint = Paint()
       ..color = guide

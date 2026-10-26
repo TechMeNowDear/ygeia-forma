@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'format.dart';
 import 'history.dart';
 import 'samsung.dart';
+import 'sleep_gaps.dart';
 
 // ---------------------------------------------------------------------------
 // Μοντέλα
@@ -44,6 +45,11 @@ class Night {
   double? spo2Min;
   double? skinTemp;
   int napMinutes = 0;
+
+  /// Κενά της Samsung ανάμεσα στα κομμάτια που κρίθηκαν ύπνος (δες sleep_gaps.dart).
+  /// Μετρούν στα [minutes], χωρίς φάσεις ύπνου.
+  final List<(DateTime, DateTime)> estimatedGaps = [];
+  int get estimatedMinutes => estimatedGaps.fold(0, (s, g) => s + g.$2.difference(g.$1).inMinutes);
 
   int get awakeMinutes => stageMinutes['AWAKE'] ?? 0;
 }
@@ -205,7 +211,17 @@ class Dashboard {
           ),
     ]..sort((a, b) => a.time.compareTo(b.time));
 
-    final nights = _groupNights(records)
+    final stepsByMinute = <int, int>{
+      for (final e in list('stepsMin'))
+        if (e is List && e.length >= 2) (e[0] as num).toInt() ~/ 60000: (e[1] as num).toInt(),
+    };
+    final stepsFrom = j['stepsMin'] is List
+        ? (j['stepsFrom'] is num
+            ? t(j['stepsFrom'])
+            : dayOf((j['readAt'] is num ? t(j['readAt']) : DateTime.now()).subtract(const Duration(days: 7))))
+        : null;
+
+    final nights = _groupNights(records, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom)
       ..forEach((n) => _fillNightMetrics(n, heart, spo2, skin));
 
     return Dashboard._(
@@ -230,15 +246,8 @@ class Dashboard {
       body: body,
       activity: j['activity'] is Map<String, dynamic> ? j['activity'] as Map<String, dynamic> : const {},
       sleepRecords: records,
-      stepsByMinute: {
-        for (final e in list('stepsMin'))
-          if (e is List && e.length >= 2) (e[0] as num).toInt() ~/ 60000: (e[1] as num).toInt(),
-      },
-      stepsMinuteFrom: j['stepsMin'] is List
-          ? (j['stepsFrom'] is num
-              ? t(j['stepsFrom'])
-              : dayOf((j['readAt'] is num ? t(j['readAt']) : DateTime.now()).subtract(const Duration(days: 7))))
-          : null,
+      stepsByMinute: stepsByMinute,
+      stepsMinuteFrom: stepsFrom,
       activityDaily: [
         for (final e in list('activityDaily'))
           if (e is List && e.length >= 3) (dayOf(t(e[0])), (e[1] as num?)?.toInt(), (e[2] as num?)?.toDouble()),
@@ -250,28 +259,52 @@ class Dashboard {
     );
   }
 
-  /// Ο ύπνος ομαδοποιείται σε νύχτες. Κομμάτι που αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες
-  /// είναι υπνάκος και μετρά χωριστά.
-  static List<Night> _groupNights(List<SleepRecord> records) {
+  /// Ο ύπνος ομαδοποιείται σε νύχτες. Κομμάτι που ακολουθεί άλλο με κενό που κρίθηκε ύπνος
+  /// (sleep_gaps.dart) ανήκει στην ίδια νύχτα, και το κενό μετρά ως «εκτίμηση».
+  /// Αλλιώς: κομμάτι που αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες είναι υπνάκος.
+  static List<Night> _groupNights(
+    List<SleepRecord> records, {
+    List<Sample> heart = const [],
+    Map<int, int> stepsByMinute = const {},
+    DateTime? stepsFrom,
+  }) {
     final byDate = <DateTime, Night>{};
     final naps = <DateTime, int>{};
+    SleepRecord? previous;
+    Night? previousNight;
     for (final r in records) {
+      final linked = previous != null &&
+          previousNight != null &&
+          judgeGap(previous, r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) ==
+              GapVerdict.asleep;
+      if (linked) {
+        final night = previousNight!;
+        final gapStart = previous!.end;
+        night.parts.add(r);
+        if (r.start.isAfter(gapStart)) night.estimatedGaps.add((gapStart, r.start));
+        previous = r;
+        continue;
+      }
       final isNap = r.start.hour >= 10 && r.start.hour < 18 && r.minutes < 180;
       if (isNap) {
         final day = dayOf(r.start);
         naps[day] = (naps[day] ?? 0) + r.minutes;
+        previous = null;
+        previousNight = null;
         continue;
       }
       final date = r.end.hour >= 18 ? dayOf(r.end).add(const Duration(days: 1)) : dayOf(r.end);
       final night = byDate.putIfAbsent(date, () => Night(date));
       night.parts.add(r);
+      previous = r;
+      previousNight = night;
     }
     final nights = byDate.values.toList()..sort((a, b) => a.date.compareTo(b.date));
     for (final n in nights) {
       n.parts.sort((a, b) => a.start.compareTo(b.start));
       n.start = n.parts.first.start;
       n.end = n.parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
-      n.minutes = n.parts.fold(0, (sum, p) => sum + p.minutes);
+      n.minutes = n.parts.fold(0, (sum, p) => sum + p.minutes) + n.estimatedMinutes;
       final longest = n.parts.reduce((a, b) => a.minutes >= b.minutes ? a : b);
       n.score = longest.score ?? n.parts.map((p) => p.score).whereType<int>().fold<int?>(null, (a, b) => a == null ? b : math.max(a, b));
       for (final p in n.parts) {

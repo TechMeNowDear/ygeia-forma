@@ -84,7 +84,7 @@ jobs:
       - name: Έλεγχοι
         run: |
           set -o pipefail
-          if ! flutter test test/widget_test.dart test/heart_day_test.dart test/trends_test.dart test/unusual_test.dart test/food_test.dart 2>&1 | tee tests.log; then
+          if ! flutter test test/widget_test.dart test/heart_day_test.dart test/trends_test.dart test/unusual_test.dart test/food_test.dart test/sleep_gaps_test.dart 2>&1 | tee tests.log; then
             grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -120 > errors.txt || true
             [ -s errors.txt ] || tail -80 tests.log > errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
