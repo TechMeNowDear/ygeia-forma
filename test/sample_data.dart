@@ -67,6 +67,13 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
       spo2.add([ms(s), ms(e), ox, split ? 77 : ox - 4 - rnd.nextInt(3), 98]);
       skin.add([ms(s), ms(e), 34.8 + rnd.nextDouble() * 0.8]);
     }
+    // Στο κενό ανάμεσα στα κομμάτια το ρολόι συνεχίζει να μετρά: παλμοί ύπνου, κανένα βήμα.
+    if (split) {
+      for (var t = parts[0].$2; t.isBefore(parts[1].$1); t = t.add(const Duration(minutes: 30))) {
+        final hr = 58 + rnd.nextInt(4);
+        heart.add([ms(t), ms(t.add(const Duration(minutes: 30))), hr, hr - 4, hr + 5]);
+      }
+    }
     // παλμοί μέσα στη μέρα: ανά 4 λεπτά τις τελευταίες 7 μέρες, με βήματα ανά λεπτό
     if (d <= 7) {
       int cadenceAt(DateTime t) {
@@ -141,6 +148,7 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
     'floors': floors,
     'body': body,
     'stepsMin': stepsMin,
+    'stepsFrom': ms(today.subtract(const Duration(days: 6))),
     'exercise': <List<num>>[],
     'activity': {'calories': 1237.6, 'activeCalories': 69.8, 'activeMinutes': 21, 'distance': 1489.7},
   };
