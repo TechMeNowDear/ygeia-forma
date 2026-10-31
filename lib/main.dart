@@ -172,8 +172,9 @@ class _ShellState extends State<Shell> {
         now: widget.now,
         tabs: const ['Ημερολόγιο', 'Τα δικά μου'],
         pages: [
-          NutritionPage(food: _food, now: widget.now),
-          MinePage(food: _food, store: store),
+          // Οθόνες φαγητού: κουμπιά στο χρώμα της Διατροφής, σε κάθε θέμα.
+          FoodTheme(child: NutritionPage(food: _food, now: widget.now)),
+          FoodTheme(child: MinePage(food: _food, store: store)),
         ],
       ),
       CategoryPage(

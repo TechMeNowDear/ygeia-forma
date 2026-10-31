@@ -246,7 +246,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     nav: Color(0xFFFFFFFF),
     navBorder: Color(0xFFF3E2D8),
     navIdle: Color(0xFF7A6058),
-    navLabel: Color(0xFF9A3412),
+    navLabel: Color(0xFF2B1B17),
     navShadow: Color(0x24C2410C),
     todayPill: Color(0xFFC2410C),
     todayPillInk: Color(0xFFFFFFFF),
