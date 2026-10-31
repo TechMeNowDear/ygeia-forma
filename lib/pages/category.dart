@@ -98,7 +98,7 @@ class TabChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected ? Colors.white : c.text,
+                color: selected ? c.onSolid : c.text,
               ),
             ),
           ),

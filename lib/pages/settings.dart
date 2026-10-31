@@ -5,6 +5,7 @@ import '../format.dart';
 import '../theme.dart';
 import '../ti_ftanei.dart';
 import '../widgets.dart';
+import 'appearance.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store});
@@ -32,6 +33,37 @@ class SettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      AppCard(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => AppearancePage(store: store)),
+                        ),
+                        child: Row(
+                          children: [
+                            IconBadge(Icons.palette_outlined, c.primary, size: 40),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Εμφάνιση', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    switch (store.prefs.themeMode) {
+                                      'light' => 'Πάντα ανοιχτό · ${Aigaio.day(store.prefs.dayTheme).name}',
+                                      'dark' => 'Πάντα σκοτεινό · ${Aigaio.night(store.prefs.nightTheme).name}',
+                                      _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} · '
+                                          'νύχτα ${Aigaio.night(store.prefs.nightTheme).name}',
+                                    },
+                                    style: TextStyle(color: c.textSecondary, fontSize: 13.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       AppCard(
                         padding: const EdgeInsets.fromLTRB(18, 16, 8, 8),
                         child: Column(

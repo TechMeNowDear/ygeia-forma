@@ -72,7 +72,7 @@ class MealPicker extends StatelessWidget {
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
                   decoration: BoxDecoration(
-                    color: m == value ? Aigaio.foodSolid : Colors.transparent,
+                    color: m == value ? c.foodSolid : Colors.transparent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: FittedBox(
@@ -83,7 +83,7 @@ class MealPicker extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: m == value ? Colors.white : c.textSecondary,
+                        color: m == value ? c.onSolid : c.textSecondary,
                       ),
                     ),
                   ),

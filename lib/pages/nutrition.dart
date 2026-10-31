@@ -287,8 +287,8 @@ class FoodTodayCard extends StatelessWidget {
               const SizedBox(height: 16),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: Aigaio.foodSolid,
-                  foregroundColor: Colors.white,
+                  backgroundColor: c.foodSolid,
+                  foregroundColor: c.onSolid,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),

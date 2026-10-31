@@ -423,7 +423,7 @@ const todayCards = <TodayCard>[
 const todayLayout = 2;
 
 class Prefs {
-  Prefs(this.cards, {this.backfillFrom, this.kitchen});
+  Prefs(this.cards, {this.backfillFrom, this.kitchen, this.themeMode = 'auto', this.dayTheme = 'aigaio', this.nightTheme = 'aigaio'});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -439,8 +439,16 @@ class Prefs {
       },
       backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
       kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
+      themeMode: const ['auto', 'light', 'dark'].contains(j['themeMode']) ? j['themeMode'] as String : 'auto',
+      dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
+      nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
     );
   }
+
+  /// Εμφάνιση: «auto» (όπως το κινητό), «light» ή «dark»· και ποιο θέμα τη μέρα και τη νύχτα.
+  String themeMode;
+  String dayTheme;
+  String nightTheme;
 
   /// «Η κουζίνα μου» (δες food/kitchen.dart), όπως αποθηκεύεται.
   Map<String, dynamic>? kitchen;
@@ -453,7 +461,15 @@ class Prefs {
   bool show(String key) => cards[key] ?? true;
 
   String toJson() =>
-      jsonEncode({'layout': todayLayout, 'cards': cards, 'backfillFrom': backfillFrom, 'kitchen': kitchen});
+      jsonEncode({
+        'layout': todayLayout,
+        'cards': cards,
+        'backfillFrom': backfillFrom,
+        'kitchen': kitchen,
+        'themeMode': themeMode,
+        'dayTheme': dayTheme,
+        'nightTheme': nightTheme,
+      });
 }
 
 // ---------------------------------------------------------------------------
@@ -478,9 +494,21 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   static const historyDays = 365;
   static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
 
+  bool _prefsLoaded = false;
+
+  /// Οι ρυθμίσεις πριν από την πρώτη οθόνη, ώστε να ανοίγει κατευθείαν με το σωστό θέμα.
+  /// Αν αργήσουν, η εφαρμογή ανοίγει κανονικά και το θέμα αλλάζει μόλις έρθουν.
+  Future<void> loadPrefs() async {
+    try {
+      prefs = Prefs.fromJson(await SamsungHealth.loadPrefs().timeout(const Duration(milliseconds: 800)));
+      _prefsLoaded = true;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
-    prefs = Prefs.fromJson(await SamsungHealth.loadPrefs());
+    if (!_prefsLoaded) await loadPrefs();
     await _loadHistory();
     final cached = await SamsungHealth.cachedDashboard();
     if (cached['ok'] == true) {
@@ -621,6 +649,15 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
   void setKitchen(Map<String, dynamic> k) {
     prefs.kitchen = k;
+    notifyListeners();
+    SamsungHealth.savePrefs(prefs.toJson());
+  }
+
+  /// Εμφάνιση: αλλάζει αμέσως και αποθηκεύεται.
+  void setAppearance({String? mode, String? day, String? night}) {
+    if (mode != null) prefs.themeMode = mode;
+    if (day != null) prefs.dayTheme = day;
+    if (night != null) prefs.nightTheme = night;
     notifyListeners();
     SamsungHealth.savePrefs(prefs.toJson());
   }

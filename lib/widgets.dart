@@ -686,13 +686,8 @@ String stageLabel(String name) => switch (name) {
       _ => 'Άλλο',
     };
 
-Color stageColorOf(String name) => switch (name) {
-      'DEEP' => StageColors.deep,
-      'LIGHT' => StageColors.light,
-      'REM' => StageColors.rem,
-      'AWAKE' => StageColors.awake,
-      _ => const Color(0xFF94A0B4),
-    };
+/// Χρώμα φάσης ύπνου στο τρέχον θέμα.
+Color stageColorOf(BuildContext context, String name) => Aigaio.of(context).stage(name);
 
 /// Η νύχτα σαν «υπνόγραμμα»: κάθε φάση σε δική της γραμμή ύψους, στη σειρά που έγινε.
 class Hypnogram extends StatelessWidget {
@@ -726,6 +721,7 @@ class Hypnogram extends StatelessWidget {
               (g.$1.difference(night.start).inSeconds / total, g.$2.difference(night.start).inSeconds / total),
           ],
           gapColor: onDark ? Colors.white.withValues(alpha: 0.12) : Aigaio.of(context).sleep.withValues(alpha: 0.12),
+          stageColor: Aigaio.of(context).stage,
         ),
       ),
     );
@@ -734,7 +730,9 @@ class Hypnogram extends StatelessWidget {
 
 /// Υπνόγραμμα: κάθε φάση στη γραμμή της, ενωμένες με λεπτές κάθετες, όπως στα εργαστήρια ύπνου.
 class _HypnoPainter extends CustomPainter {
-  _HypnoPainter(this.parts, this.guide, this.connector, {this.gaps = const [], this.gapColor = const Color(0x00000000)});
+  _HypnoPainter(this.parts, this.guide, this.connector,
+      {required this.stageColor, this.gaps = const [], this.gapColor = const Color(0x00000000)});
+  final Color Function(String) stageColor;
   final List<(double, double, String)> parts;
   final Color guide;
   final Color connector;
@@ -787,7 +785,7 @@ class _HypnoPainter extends CustomPainter {
       final y = centerY(row) - barH / 2;
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTRB(left, y, right, y + barH), Radius.circular(barH / 2.5)),
-        Paint()..color = stageColorOf(name),
+        Paint()..color = stageColor(name),
       );
       previous = (right, row);
     }
@@ -821,7 +819,7 @@ class StageTimeline extends StatelessWidget {
                 (
                   s.start.difference(night.start).inSeconds / total,
                   s.end.difference(night.start).inSeconds / total,
-                  stageColorOf(s.name),
+                  stageColorOf(context, s.name),
                 ),
             ],
             onBlue ? Colors.white.withValues(alpha: 0.12) : Aigaio.of(context).background,
@@ -875,7 +873,7 @@ class StageLegend extends StatelessWidget {
             margin: const EdgeInsets.only(top: 4),
             width: 10,
             height: 10,
-            decoration: BoxDecoration(color: stageColorOf(name), borderRadius: BorderRadius.circular(3)),
+            decoration: BoxDecoration(color: stageColorOf(context, name), borderRadius: BorderRadius.circular(3)),
           ),
           const SizedBox(width: 8),
           Expanded(

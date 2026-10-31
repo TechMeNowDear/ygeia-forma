@@ -343,7 +343,7 @@ class _SleepCard extends StatelessWidget {
                       value: n.score?.toDouble(),
                       size: 64,
                       stroke: 6,
-                      color: white,
+                      color: c.ring,
                       track: Colors.white.withValues(alpha: 0.16),
                     ),
                   ],
@@ -377,7 +377,7 @@ class _SleepCard extends StatelessWidget {
                         children: [
                           for (final (i, k) in stages.indexed) ...[
                             if (i > 0) const SizedBox(width: 2),
-                            Expanded(flex: n.stageMinutes[k]!, child: ColoredBox(color: stageColorOf(k))),
+                            Expanded(flex: n.stageMinutes[k]!, child: ColoredBox(color: c.stage(k))),
                           ],
                         ],
                       ),

@@ -13,6 +13,7 @@ import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
+import 'package:ygeia_forma/pages/appearance.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/unusual.dart';
@@ -52,6 +53,7 @@ Future<void> _shot(
   void Function(HealthStore)? prepare,
   Future<void> Function(WidgetTester)? act,
   bool trends = false,
+  Aigaio? palette,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
@@ -71,8 +73,8 @@ Future<void> _shot(
       key: key,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: buildTheme(Brightness.light),
-        darkTheme: buildTheme(Brightness.dark),
+        theme: buildTheme(Brightness.light, palette != null && !palette.dark ? palette : null),
+        darkTheme: buildTheme(Brightness.dark, palette != null && palette.dark ? palette : null),
         themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
         home: trends
             ? Scaffold(body: TrendsPage(store: store, now: when))
@@ -262,4 +264,36 @@ void main() {
   testWidgets('Διατροφή · τα δικά μου', (t) => _shot(t, name: '22_mine_phone_light', size: phone, brightness: Brightness.light, tab: Cat.food, sub: FoodTab.mine));
   testWidgets('Άσκηση · κινητό', (t) => _shot(t, name: '23_exercise_phone_light', size: tall, brightness: Brightness.light, tab: Cat.exercise));
   testWidgets('Άσκηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '24_exercise_open_dark', size: open, brightness: Brightness.dark, tab: Cat.exercise));
+
+  // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».
+  for (final (n, p) in [(30, Aigaio.elia), (32, Aigaio.avgi), (34, Aigaio.stivos), (36, Aigaio.anasa)]) {
+    final b = p.dark ? Brightness.dark : Brightness.light;
+    testWidgets('Θέμα ${p.name} · Σήμερα', (t) => _shot(t, name: '${n}_theme_${p.id}_today', size: phone, brightness: b, tab: 0, palette: p));
+    testWidgets('Θέμα ${p.name} · Διατροφή', (t) => _shot(t, name: '${n + 1}_theme_${p.id}_food', size: phone, brightness: b, tab: Cat.food, palette: p));
+  }
+  testWidgets('Θέμα Ελιά · Fold ανοιχτό', (t) => _shot(t, name: '38_theme_elia_open', size: open, brightness: Brightness.light, tab: Cat.health, palette: Aigaio.elia));
+  for (final p in [Aigaio.light, Aigaio.stivos]) {
+    testWidgets('Εμφάνιση · ${p.name}', (tester) async {
+      tester.view.devicePixelRatio = 2.0;
+      tester.view.physicalSize = const Size(400, 1700) * 2.0;
+      addTearDown(tester.view.reset);
+      final store = HealthStore()
+        ..prefs.dayTheme = 'aigaio'
+        ..prefs.nightTheme = p.dark ? p.id : 'anasa'
+        ..prefs.themeMode = p.dark ? 'dark' : 'auto';
+      final key = GlobalKey();
+      await tester.pumpWidget(RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light, p.dark ? null : p),
+          darkTheme: buildTheme(Brightness.dark, p.dark ? p : null),
+          themeMode: p.dark ? ThemeMode.dark : ThemeMode.light,
+          home: AppearancePage(store: store),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await expectLater(find.byKey(key), matchesGoldenFile('shots/${p.dark ? 40 : 39}_appearance_${p.dark ? 'dark' : 'light'}.png'));
+    });
+  }
 }

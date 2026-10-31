@@ -19,49 +19,78 @@ import 'widgets.dart';
 
 export 'nav.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = HealthStore();
   final food = FoodStore();
+  // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
+  await store.loadPrefs();
   runApp(YgeiaFormaApp(store: store, food: food));
   store.start();
   food.start();
 }
 
-class YgeiaFormaApp extends StatelessWidget {
+class YgeiaFormaApp extends StatefulWidget {
   const YgeiaFormaApp({super.key, required this.store, required this.food});
   final HealthStore store;
   final FoodStore food;
 
   @override
+  State<YgeiaFormaApp> createState() => _YgeiaFormaAppState();
+}
+
+class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
+  // Ίδιο αντικείμενο σε κάθε αλλαγή θέματος: αλλάζουν μόνο τα χρώματα, όχι η κατάσταση.
+  late final Widget _home = Shell(store: widget.store, food: widget.food);
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Υγεία & Φόρμα',
-      debugShowCheckedModeBanner: false,
-      // Ανοιχτό ή σκοτεινό, όπως είναι ρυθμισμένο το κινητό.
-      themeMode: ThemeMode.system,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
-      home: Shell(store: store, food: food),
+    return ListenableBuilder(
+      listenable: widget.store,
+      builder: (context, _) {
+        final p = widget.store.prefs;
+        return MaterialApp(
+          title: 'Υγεία & Φόρμα',
+          debugShowCheckedModeBanner: false,
+          // «Αυτόματο»: ανοιχτό ή σκοτεινό όπως το κινητό, με το θέμα που διάλεξα για τη μέρα και τη νύχτα.
+          themeMode: switch (p.themeMode) {
+            'light' => ThemeMode.light,
+            'dark' => ThemeMode.dark,
+            _ => ThemeMode.system,
+          },
+          theme: buildTheme(Brightness.light, Aigaio.day(p.dayTheme)),
+          darkTheme: buildTheme(Brightness.dark, Aigaio.night(p.nightTheme)),
+          themeAnimationDuration: const Duration(milliseconds: 220),
+          home: _home,
+        );
+      },
     );
   }
 }
 
 class _Dest {
-  const _Dest(this.icon, this.selectedIcon, this.label, this.solid);
+  const _Dest(this.icon, this.selectedIcon, this.label, this.cat);
   final IconData icon;
   final IconData selectedIcon;
   final String label;
 
-  /// Χρώμα του «χαπιού» όταν είναι επιλεγμένο (null = λευκό, για το «Σήμερα»).
-  final Color? solid;
+  /// Η κατηγορία ([Cat]): δίνει το χρώμα του «χαπιού» όταν είναι επιλεγμένο.
+  final int cat;
+
+  /// Χρώμα και εικονίδιο του «χαπιού» στο θέμα [c].
+  (Color, Color) pill(Aigaio c) => switch (cat) {
+        Cat.health => (c.healthSolid, c.onSolid),
+        Cat.food => (c.foodSolid, c.onSolid),
+        Cat.exercise => (c.exerciseSolid, c.onSolid),
+        _ => (c.todayPill, c.todayPillInk),
+      };
 }
 
 const _destinations = [
-  _Dest(Icons.wb_sunny_outlined, Icons.wb_sunny_rounded, 'Σήμερα', null),
-  _Dest(Icons.favorite_outline_rounded, Icons.favorite_rounded, 'Υγεία', Aigaio.healthSolid),
-  _Dest(Icons.restaurant_outlined, Icons.restaurant_rounded, 'Διατροφή', Aigaio.foodSolid),
-  _Dest(Icons.fitness_center_outlined, Icons.fitness_center_rounded, 'Άσκηση', Aigaio.exerciseSolid),
+  _Dest(Icons.wb_sunny_outlined, Icons.wb_sunny_rounded, 'Σήμερα', Cat.today),
+  _Dest(Icons.favorite_outline_rounded, Icons.favorite_rounded, 'Υγεία', Cat.health),
+  _Dest(Icons.restaurant_outlined, Icons.restaurant_rounded, 'Διατροφή', Cat.food),
+  _Dest(Icons.fitness_center_outlined, Icons.fitness_center_rounded, 'Άσκηση', Cat.exercise),
 ];
 
 /// Κέλυφος: σταθερή κάτω μπάρα στο κινητό (κλειστό Fold), κάθετη μπάρα σε ανοιχτό Fold, tablet, PC.
@@ -124,7 +153,7 @@ class _ShellState extends State<Shell> {
       CategoryPage(
         title: 'Υγεία',
         color: c.health,
-        solid: Aigaio.healthSolid,
+        solid: c.healthSolid,
         tab: _healthTab,
         now: widget.now,
         tabs: const ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'],
@@ -138,7 +167,7 @@ class _ShellState extends State<Shell> {
       CategoryPage(
         title: 'Διατροφή',
         color: c.food,
-        solid: Aigaio.foodSolid,
+        solid: c.foodSolid,
         tab: _foodTab,
         now: widget.now,
         tabs: const ['Ημερολόγιο', 'Τα δικά μου'],
@@ -150,7 +179,7 @@ class _ShellState extends State<Shell> {
       CategoryPage(
         title: 'Άσκηση',
         color: c.exercise,
-        solid: Aigaio.exerciseSolid,
+        solid: c.exerciseSolid,
         tab: _exerciseTab,
         now: widget.now,
         tabs: const ['Κίνηση'],
@@ -166,8 +195,8 @@ class _ShellState extends State<Shell> {
               onPressed: () => openAddFood(context, _food),
               icon: const Icon(Icons.add_rounded, size: 22),
               label: const Text('Φαγητό', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              backgroundColor: Aigaio.foodSolid,
-              foregroundColor: Colors.white,
+              backgroundColor: c.foodSolid,
+              foregroundColor: c.onSolid,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             )
           : const SizedBox.shrink(),
@@ -212,12 +241,11 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
   final double pillHeight;
 
-  static const _idle = Color(0xFFA3AEC2);
-
   @override
   Widget build(BuildContext context) {
-    final pill = dest.solid ?? Colors.white;
-    final iconColor = selected ? (dest.solid == null ? const Color(0xFF0F172A) : Colors.white) : _idle;
+    final c = Aigaio.of(context);
+    final (pill, ink) = dest.pill(c);
+    final iconColor = selected ? ink : c.navIdle;
     return Semantics(
       selected: selected,
       button: true,
@@ -250,7 +278,7 @@ class _NavItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: selected ? Colors.white : _idle,
+                  color: selected ? c.navLabel : c.navIdle,
                 ),
               ),
             ],
@@ -276,9 +304,10 @@ class _BottomBar extends StatelessWidget {
         height: 68,
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: c.dark ? c.nav : const Color(0xFF0F172A),
+          color: c.nav,
           borderRadius: BorderRadius.circular(22),
-          boxShadow: const [BoxShadow(color: Color(0x400F172A), blurRadius: 30, offset: Offset(0, 10))],
+          border: Border.all(color: c.navBorder),
+          boxShadow: [BoxShadow(color: c.navShadow, blurRadius: 30, offset: const Offset(0, 10))],
         ),
         child: Row(
           children: [
@@ -313,8 +342,9 @@ class _SideBar extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(14, 14, 0, 14),
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: c.dark ? c.nav : const Color(0xFF0F172A),
+        color: c.nav,
         borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: c.navBorder),
       ),
       child: Column(
         children: [
@@ -333,8 +363,8 @@ class _SideBar extends StatelessWidget {
             tooltip: 'Ρυθμίσεις',
             onPressed: onSettings,
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.08),
-              foregroundColor: const Color(0xFFCBD5E1),
+              backgroundColor: c.navIdle.withValues(alpha: 0.14),
+              foregroundColor: c.navLabel,
               fixedSize: const Size(48, 48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
