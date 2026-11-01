@@ -84,7 +84,25 @@ Set<String> mergeHistory(
     final base = overwriteSleep
         ? {for (final v in old.entries) if (!sleepKeys.contains(v.key)) v.key: v.value}
         : old;
-    history[e.key] = {...base, ...incoming};
+    final next = {...base, ...incoming};
+    // Μόνο ό,τι άλλαξε γράφεται ξανά στο κινητό.
+    if (!_sameValues(history[e.key], next)) changed.add(e.key);
+    history[e.key] = next;
+  }
+  return changed;
+}
+
+/// Τιμές που έρχονται από τις ζυγίσεις.
+const bodyKeys = {K.weight, K.fatPct, K.smm};
+
+/// Σβήνει τις τιμές ζύγισης από μέρες (από [from] και μετά) που δεν έχουν πια ζύγιση στη Samsung
+/// (π.χ. σβήστηκε μια λάθος ζύγιση). [bodyDays]: οι μέρες με ζύγιση τώρα. Επιστρέφει τις μέρες που άλλαξαν.
+Set<String> removeMissingBody(Map<String, Map<String, double>> history, Set<String> bodyDays, {required DateTime from}) {
+  final changed = <String>{};
+  for (final e in history.entries.toList()) {
+    if (bodyDays.contains(e.key) || !e.value.keys.any(bodyKeys.contains)) continue;
+    if (parseDateKey(e.key).isBefore(dayOf(from))) continue;
+    history[e.key] = {for (final v in e.value.entries) if (!bodyKeys.contains(v.key)) v.key: v.value};
     changed.add(e.key);
   }
   return changed;
@@ -185,4 +203,12 @@ Map<String, Map<String, double>> summarizeRange(Dashboard d, DateTime from, Date
     if (s.isNotEmpty) out[dateKey(day)] = s;
   }
   return out;
+}
+
+bool _sameValues(Map<String, double>? a, Map<String, double> b) {
+  if (a == null || a.length != b.length) return false;
+  for (final e in b.entries) {
+    if (a[e.key] != e.value) return false;
+  }
+  return true;
 }

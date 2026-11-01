@@ -66,6 +66,6 @@ void main() {
   });
 
   test('Όνομα αρχείου', () {
-    expect(backupFileName(DateTime(2026, 3, 5)), 'ygeia-antigrafo-2026-03-05.json');
+    expect(backupFileName(DateTime(2026, 3, 5)), 'ygeia-antigrafo-2026-03-05.json.gz');
   });
 }

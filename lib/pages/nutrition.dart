@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../food/food_model.dart';
@@ -192,9 +194,10 @@ class MacroBreakdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final t = totals;
-    // Ποσοστό ενέργειας από κάθε μακροθρεπτικό (4/4/9 kcal ανά g).
+    // Ποσοστό των θερμίδων από κάθε μακροθρεπτικό (4/4/9 kcal ανά g). Παρονομαστής οι θερμίδες της πηγής
+    // (μετρούν και ίνες, αλκοόλ), ποτέ λιγότερο από το άθροισμα των τριών, ώστε να μην ξεπερνά το 100%.
     final pk = t.protein * 4, ck = t.carbs * 4, fk = t.fat * 9;
-    final sum = pk + ck + fk;
+    final sum = math.max(t.kcal, pk + ck + fk);
 
     Widget macro(String label, double g, double kcalPart, Color color) => Expanded(
           child: Padding(
@@ -400,7 +403,9 @@ class _MealCard extends StatelessWidget {
                   key: ValueKey('copy-${meal.name}'),
                   onPressed: () => _copyFromPrevious(context, prevDay),
                   icon: const Icon(Icons.content_copy_rounded, size: 18),
-                  label: Text('Όπως χθες · ${kcalText(Totals(previous).kcal)} kcal'),
+                  // Με τις τωρινές τιμές, όπως θα γραφτούν (όχι με τα παλιά αντίγραφα).
+                  label: Text(
+                      'Όπως χθες · ${kcalText(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).kcal)} kcal'),
                 ),
             ],
           ),

@@ -165,10 +165,19 @@ class Dashboard {
     required this.exercise,
     required this.activityDaily,
     required this.sleepOk,
+    this.bodyOk = false,
+    this.failed = const {},
   });
 
   /// Ο ύπνος διαβάστηκε κανονικά (όχι σφάλμα ανάγνωσης). Χωρίς αυτό δεν σβήνουμε τιμές ύπνου από το ιστορικό.
   final bool sleepOk;
+
+  /// Οι ζυγίσεις (2 χρόνια) διαβάστηκαν όλες: μόνο τότε σβήνεται από το ιστορικό ζύγιση που δεν υπάρχει πια.
+  final bool bodyOk;
+
+  /// Είδη δεδομένων που η Samsung δεν έδωσε τώρα (σφάλμα), π.χ. {'heart'}: οι οθόνες λένε «δεν διαβάστηκε»,
+  /// όχι «δεν υπάρχει».
+  final Set<String> failed;
 
   final DateTime readAt;
   final int granted;
@@ -279,6 +288,11 @@ class Dashboard {
     return Dashboard._(
       readAt: j['readAt'] is num ? t(j['readAt']) : DateTime.now(),
       sleepOk: j['sleep'] is List,
+      bodyOk: j['body'] is List,
+      failed: {
+        for (final e in j.entries)
+          if (e.value is Map && (e.value as Map).containsKey('error')) e.key,
+      },
       granted: (j['granted'] as num?)?.toInt() ?? 0,
       total: (j['total'] as num?)?.toInt() ?? 0,
       nights: nights,
@@ -521,7 +535,8 @@ class Prefs {
       this.themeMode = 'auto',
       this.dayTheme = 'aigaio',
       this.nightTheme = 'aigaio',
-      this.historyVersion = 1});
+      this.historyVersion = 1,
+      this.recentTo});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -541,8 +556,13 @@ class Prefs {
       dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
       historyVersion: (j['historyVersion'] as num?)?.toInt() ?? 1,
+      recentTo: j['recentTo'] is String ? j['recentTo'] as String : null,
     );
   }
+
+  /// Η τελευταία μέρα που γράφτηκε από την κανονική ανάγνωση («2026-11-01»). Αν η εφαρμογή μείνει
+  /// κλειστή πάνω από 29 μέρες, το ιστορικό ξαναδιαβάζεται, ώστε να μη μείνουν κενές μέρες.
+  String? recentTo;
 
   /// Με ποιους κανόνες υπολογίστηκε το αποθηκευμένο ιστορικό (δες historyRulesVersion).
   int historyVersion;
@@ -572,6 +592,7 @@ class Prefs {
         'dayTheme': dayTheme,
         'nightTheme': nightTheme,
         'historyVersion': historyVersion,
+        'recentTo': recentTo,
       });
 }
 
@@ -656,9 +677,17 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     _savePrefs();
   }
 
-  Future<void> _savePrefs() async {
-    if (!_prefsLoaded) return;
-    await SamsungHealth.savePrefs(prefs.toJson());
+  /// Οι αποθηκεύσεις γίνονται με τη σειρά (η μία μετά την άλλη), ώστε μια παλιότερη να μη γράψει
+  /// πάνω σε νεότερη. `true` αν γράφτηκε.
+  Future<bool> _prefsSaves = Future.value(true);
+
+  Future<bool> _savePrefs() {
+    if (!_prefsLoaded) return Future.value(false);
+    final json = prefs.toJson();
+    return _prefsSaves = _prefsSaves.then((_) async {
+      final r = await SamsungHealth.savePrefs(json);
+      return r['ok'] == true;
+    });
   }
 
   bool _historyLoaded = false;
@@ -696,7 +725,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    final r = await SamsungHealth.dashboard();
+    // Χωρίς απάντηση σε 90″ (π.χ. κόλλησε η Samsung) δεν μένει «φορτώνει» για πάντα.
+    final r = await SamsungHealth.dashboard().timeout(const Duration(seconds: 90),
+        onTimeout: () => {'ok': false, 'kind': 'other', 'message': 'Η Samsung δεν απάντησε. Δοκίμασε ξανά.'});
     if (r['ok'] == true) {
       try {
         data = Dashboard.fromJson(r);
@@ -719,7 +750,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       // Χωρίς το αποθηκευμένο ιστορικό δεν γράφουμε τίποτα: θα έσβηνε τιμές που δεν ξαναδιαβάζονται.
       if (_historyLoaded) {
         await _upgradeHistory();
-        await _updateRecentHistory(d);
+        await _updateRecentHistory(d, sleepFailed: sleepReadFailed(r));
         _backfill();
       }
     }
@@ -744,12 +775,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     history = h;
   }
 
-  Future<void> _saveDays(Set<String> keys) async {
-    if (keys.isEmpty) return;
-    await SamsungHealth.saveDays(jsonEncode([
+  /// `true` αν γράφτηκαν (ή δεν υπήρχε κάτι να γραφτεί).
+  Future<bool> _saveDays(Set<String> keys) async {
+    if (keys.isEmpty) return true;
+    final r = await SamsungHealth.saveDays(jsonEncode([
       for (final k in keys)
         if (history[k] != null) {'date': k, 'data': history[k]},
     ]));
+    return r['ok'] == true;
   }
 
   /// Νέοι κανόνες ύπνου (historyRulesVersion): το ιστορικό ξαναδιαβάζεται από την αρχή και κάθε
@@ -765,7 +798,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Οι τελευταίες 30 μέρες από την κανονική ανάγνωση + όλες οι ζυγίσεις.
   /// Ο ύπνος ξαναγράφεται μόνο για τις μέρες με βήματα ανά λεπτό (δες mergeHistory).
-  Future<void> _updateRecentHistory(Dashboard d) async {
+  /// [sleepFailed]: κάποιο είδος από το οποίο βγαίνει ο ύπνος δεν διαβάστηκε (δες sleepReadFailed)·
+  /// τότε οι τιμές ύπνου που υπάρχουν ήδη δεν αντικαθίστανται.
+  Future<void> _updateRecentHistory(Dashboard d, {bool sleepFailed = false}) async {
     final today = dayOf(d.readAt);
     // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης.
     final rows = summarizeRange(d, addDays(today, -29), today);
@@ -779,8 +814,24 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       };
     }
     final stepsFrom = d.stepsMinuteFrom;
-    final sleepFrom = d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
-    await _saveDays(mergeHistory(history, rows, sleepFrom: sleepFrom));
+    final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
+    final changed = mergeHistory(history, rows, sleepFrom: sleepFrom);
+    // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
+    if (d.bodyOk) {
+      changed.addAll(removeMissingBody(history, {for (final b in d.body) dateKey(b.time)},
+          from: DateTime(today.year - 2, today.month, today.day + 1)));
+    }
+    final saved = await _saveDays(changed);
+    // Η εφαρμογή έμεινε κλειστή πάνω από 29 μέρες: οι μέρες στη μέση (και η τελευταία, που είχε
+    // γραφτεί μισή) ξαναδιαβάζονται από το ιστορικό.
+    final last = prefs.recentTo != null ? parseDateKey(prefs.recentTo!) : null;
+    if (saved && _prefsLoaded) {
+      if (last != null && last.isBefore(addDays(today, -29))) prefs.backfillFrom = null;
+      if (prefs.recentTo != dateKey(today)) {
+        prefs.recentTo = dateKey(today);
+        await _savePrefs();
+      }
+    }
     notifyListeners();
   }
 
@@ -824,7 +875,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         }
         final dash = Dashboard.fromJson(r);
         final to = addDays(cursor, -1);
-        await _saveDays(mergeHistory(
+        final saved = await _saveDays(mergeHistory(
           history,
           summarizeRange(dash, from, to),
           // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς οι παλιές τιμές μένουν.
@@ -832,6 +883,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
           rangeFrom: from,
           rangeTo: to,
         ));
+        // Δεν γράφτηκε στο κινητό: δεν προχωράμε, ώστε ο μήνας να ξαναδιαβαστεί.
+        if (!saved) {
+          _backfillFails++;
+          break;
+        }
         cursor = from;
         prefs.backfillFrom = dateKey(cursor);
         await _savePrefs();

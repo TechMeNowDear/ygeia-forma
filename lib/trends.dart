@@ -99,7 +99,8 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.sleepHr, label: 'Παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1),
   MetricDef(key: K.restHr, label: 'Ξύπνιος, χωρίς βήματα', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
   MetricDef(key: K.walkHr, label: 'Παλμοί στο περπάτημα', section: TrendSection.heart, minDiff: 3, unit: 'bpm', better: -1, includeToday: false),
-  MetricDef(key: K.dayHr, label: 'Μέσος όρος ημέρας', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
+  // Ουδέτερο: μεγαλύτερος μέσος όρος ημέρας συνήθως σημαίνει περισσότερη κίνηση, όχι χειρότερη υγεία.
+  MetricDef(key: K.dayHr, label: 'Μέσος όρος ημέρας', section: TrendSection.heart, minDiff: 2, unit: 'bpm', includeToday: false),
   // Ύπνος
   MetricDef(key: K.sleepMin, label: 'Διάρκεια ύπνου', section: TrendSection.sleep, minDiff: 15, better: 1, kind: ValueKind.duration),
   MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1, partial: true),

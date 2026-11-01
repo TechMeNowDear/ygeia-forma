@@ -86,7 +86,7 @@ class SamsungHealthBridge(
             "status" -> respond(result) { status() }
             "requestPermissions" -> respond(result) { requestPermissions() }
             "readAll" -> respond(result) { readAll(call.argument<Int>("days") ?: 30) }
-            "dashboard" -> respond(result) { dashboard() }
+            "dashboard" -> respondText(result) { dashboard() }
             "readRange" -> respond(result) {
                 readRange(call.argument<String>("from") ?: "", call.argument<String>("to") ?: "")
             }
@@ -121,9 +121,10 @@ class SamsungHealthBridge(
             }
             "cachedDashboard" -> result.success(readFile(DASHBOARD_FILE) ?: "{}")
             "loadPrefs" -> result.success(loadPrefsText())
-            "savePrefs" -> {
-                writeFile(PREFS_FILE, call.argument<String>("json") ?: "{}")
-                result.success("{\"ok\":true}")
+            "savePrefs" -> respond(result) {
+                val json = call.argument<String>("json") ?: "{}"
+                val ok = withContext(Dispatchers.IO) { writeFile(PREFS_FILE, json) }
+                if (ok) JSONObject().put("ok", true) else JSONObject().put("ok", false).put("kind", "write")
             }
             "resolve" -> {
                 val r = pendingResolution
@@ -134,6 +135,20 @@ class SamsungHealthBridge(
                 result.success(JSONObject().put("ok", r != null).toString())
             }
             else -> result.notImplemented()
+        }
+    }
+
+    /** Όπως [respond], για απαντήσεις που είναι ήδη κείμενο JSON (μία σειριοποίηση, εκτός main thread). */
+    private fun respondText(result: MethodChannel.Result, block: suspend () -> String) {
+        scope.launch {
+            val text = try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                errorJson(e).toString()
+            }
+            result.success(text)
         }
     }
 
@@ -182,7 +197,7 @@ class SamsungHealthBridge(
             .put("total", permissions.size)
     }
 
-    private suspend fun dashboard(): JSONObject {
+    private suspend fun dashboard(): String {
         val s = store()
         val granted = s.getGrantedPermissions(permissions)
         val names = granted.map { it.dataType.name }.toSet()
@@ -191,8 +206,10 @@ class SamsungHealthBridge(
             .put("readAt", System.currentTimeMillis())
             .put("granted", granted.size)
             .put("total", permissions.size)
-        if (granted.isNotEmpty()) writeFile(DASHBOARD_FILE, o.toString())
-        return o
+        // Το JSON (μερικά MB) φτιάχνεται μία φορά και όχι στο main thread· η εγγραφή στο IO.
+        val text = withContext(Dispatchers.Default) { o.toString() }
+        if (granted.isNotEmpty()) withContext(Dispatchers.IO) { writeFile(DASHBOARD_FILE, text) }
+        return text
     }
 
     // «Δεν υπάρχει αρχείο» = {} (προεπιλογές). Αρχείο που υπάρχει αλλά δεν διαβάστηκε = σφάλμα,
@@ -213,16 +230,24 @@ class SamsungHealthBridge(
             null
         }
 
-    private fun writeFile(name: String, text: String) {
+    /**
+     * Γράφει πρώτα σε προσωρινό αρχείο, το «σφραγίζει» στον δίσκο (sync) και μετά το μετονομάζει:
+     * μια διακοπή ρεύματος αφήνει είτε το παλιό είτε το νέο αρχείο, ποτέ μισό. `false` αν απέτυχε.
+     */
+    @Synchronized
+    private fun writeFile(name: String, text: String): Boolean =
         try {
             val f = java.io.File(activity.filesDir, name)
             val tmp = java.io.File(activity.filesDir, "$name.tmp")
-            tmp.writeText(text)
+            java.io.FileOutputStream(tmp).use { out ->
+                out.write(text.toByteArray(Charsets.UTF_8))
+                out.flush()
+                out.fd.sync()
+            }
             tmp.renameTo(f)
         } catch (e: Throwable) {
-            // Η προσωρινή αποθήκευση είναι βοηθητική· αν αποτύχει, απλώς διαβάζουμε ξανά.
+            false
         }
-    }
 
     // ---------- Ανάγνωση ----------
 

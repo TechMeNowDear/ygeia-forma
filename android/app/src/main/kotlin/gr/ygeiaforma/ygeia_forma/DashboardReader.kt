@@ -201,22 +201,26 @@ class DashboardReader(private val s: HealthDataStore) {
 
     private suspend fun heart(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to)) {
+        // Το ρολόι μετρά συνεχώς: περισσότερες σελίδες από τα άλλα είδη (όριο 60.000 εγγραφές).
+        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES)) {
             val series: List<HeartRate>? = p.getValue(DataType.HeartRateType.SERIES_DATA)
             if (!series.isNullOrEmpty()) {
                 for (h in series) {
+                    // Μία άκυρη τιμή (NaN) δεν πρέπει να χαλάει όλη την ανάγνωση: παραλείπεται μόνο αυτή.
+                    val avg = h.heartRate
+                    if (!avg.isFinite()) continue
                     out.put(
                         JSONArray()
                             .put((ms(h.startTime) ?: 0L))
                             .put((ms(h.endTime) ?: 0L))
-                            .put(h.heartRate.toDouble())
-                            .put(h.min.toDouble())
-                            .put(h.max.toDouble())
+                            .put(avg.toDouble())
+                            .put(finiteOr(h.min, avg))
+                            .put(finiteOr(h.max, avg))
                     )
                 }
             } else {
                 val avg: Float? = p.getValue(DataType.HeartRateType.HEART_RATE)
-                if (avg == null || avg.isNaN()) continue
+                if (avg == null || !avg.isFinite()) continue
                 val min: Float? = p.getValue(DataType.HeartRateType.MIN_HEART_RATE)
                 val max: Float? = p.getValue(DataType.HeartRateType.MAX_HEART_RATE)
                 out.put(
@@ -224,8 +228,8 @@ class DashboardReader(private val s: HealthDataStore) {
                         .put((ms(p.startTime) ?: 0L))
                         .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
                         .put(avg.toDouble())
-                        .put((min ?: avg).toDouble())
-                        .put((max ?: avg).toDouble())
+                        .put(finiteOr(min, avg))
+                        .put(finiteOr(max, avg))
                 )
             }
         }
@@ -238,7 +242,7 @@ class DashboardReader(private val s: HealthDataStore) {
         val out = JSONArray()
         for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to)) {
             val avg: Float? = p.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION)
-            if (avg == null || avg.isNaN()) continue
+            if (avg == null || !avg.isFinite()) continue
             val min: Float? = p.getValue(DataType.BloodOxygenType.MIN_OXYGEN_SATURATION)
             val max: Float? = p.getValue(DataType.BloodOxygenType.MAX_OXYGEN_SATURATION)
             out.put(
@@ -246,8 +250,8 @@ class DashboardReader(private val s: HealthDataStore) {
                     .put((ms(p.startTime) ?: 0L))
                     .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
                     .put(avg.toDouble())
-                    .put((min ?: avg).toDouble())
-                    .put((max ?: avg).toDouble())
+                    .put(finiteOr(min, avg))
+                    .put(finiteOr(max, avg))
             )
         }
         return out
@@ -326,20 +330,27 @@ class DashboardReader(private val s: HealthDataStore) {
             .build()
         val out = JSONArray()
         for (d in s.aggregateData(request).dataList) {
-            val v: Long? = d.value
-            out.put(JSONArray().put((ms(d.startTime) ?: 0L)).put(v ?: 0L))
+            // Μέρα χωρίς τιμή = δεν μετρήθηκε (όχι «0 βήματα»).
+            val v: Long = d.value ?: continue
+            out.put(JSONArray().put((ms(d.startTime) ?: 0L)).put(v))
         }
         return out
     }
 
-    // ---------- Όροφοι: [αρχή, όροφοι] ----------
+    // ---------- Όροφοι ανά μέρα: [ημέρα σε millis, όροφοι] ----------
+    // Το σύνολο της Samsung (όπως στα βήματα), ώστε κινητό και ρολόι να μη μετρώνται δύο φορές.
 
     private suspend fun floors(from: LocalDateTime, to: LocalDateTime): JSONArray {
+        val request = DataType.FloorsClimbedType.TOTAL.requestBuilder
+            .setLocalTimeFilterWithGroup(LocalTimeFilter.of(from, to), LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1))
+            .setOrdering(Ordering.ASC)
+            .setPageSize(400)
+            .build()
         val out = JSONArray()
-        for (p in readAll(DataTypes.FLOORS_CLIMBED.readDataRequestBuilder, from, to)) {
-            val f: Float? = p.getValue(DataType.FloorsClimbedType.FLOOR)
-            if (f == null || f.isNaN()) continue
-            out.put(JSONArray().put((ms(p.startTime) ?: 0L)).put(f.toDouble()))
+        for (d in s.aggregateData(request).dataList) {
+            val f: Float = d.value ?: continue
+            if (!f.isFinite()) continue
+            out.put(JSONArray().put((ms(d.startTime) ?: 0L)).put(f.toDouble()))
         }
         return out
     }
@@ -378,6 +389,7 @@ class DashboardReader(private val s: HealthDataStore) {
         builder: ReadDataRequest.DualTimeBuilder<HealthDataPoint>,
         from: LocalDateTime,
         to: LocalDateTime,
+        maxPages: Int = MAX_PAGES,
     ): List<HealthDataPoint> {
         val all = ArrayList<HealthDataPoint>()
         var token: String? = null
@@ -392,9 +404,15 @@ class DashboardReader(private val s: HealthDataStore) {
             all.addAll(r.dataList)
             token = r.pageToken
             pages++
-        } while (!token.isNullOrEmpty() && pages < MAX_PAGES)
+        } while (!token.isNullOrEmpty() && pages < maxPages)
+        // Έμειναν κι άλλες σελίδες: η ανάγνωση είναι μισή. Καλύτερα σφάλμα (η εφαρμογή κρατά τις παλιές
+        // τιμές) παρά μισά δεδομένα που θα έμοιαζαν πλήρη.
+        if (!token.isNullOrEmpty()) throw IllegalStateException("Πάρα πολλές εγγραφές (όριο ${maxPages * PAGE_SIZE})")
         return all
     }
+
+    private fun finiteOr(v: Float?, fallback: Float): Double =
+        (if (v != null && v.isFinite()) v else fallback).toDouble()
 
     private fun ms(i: java.time.Instant?): Long? = i?.toEpochMilli()
 
@@ -427,5 +445,6 @@ class DashboardReader(private val s: HealthDataStore) {
         const val STEP_DAYS = 7
         const val PAGE_SIZE = 1000
         const val MAX_PAGES = 20
+        const val HEART_MAX_PAGES = 60
     }
 }

@@ -22,12 +22,20 @@ class HeartPage extends StatelessWidget {
             title: 'Καρδιά',
             onRefresh: () => store.refresh(),
             left: [
-              EmptyCard(
-                icon: Icons.favorite_rounded,
-                color: c.heart,
-                title: 'Δεν υπάρχουν παλμοί ακόμα',
-                text: 'Φόρεσε το ρολόι. Οι παλμοί εμφανίζονται εδώ μόλις συγχρονιστεί το Samsung Health.',
-              ),
+              if (d != null && d.failed.contains('heart'))
+                EmptyCard(
+                  icon: Icons.favorite_rounded,
+                  color: c.heart,
+                  title: 'Οι παλμοί δεν διαβάστηκαν τώρα',
+                  text: 'Η Samsung δεν τους έδωσε αυτή τη φορά. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.',
+                )
+              else
+                EmptyCard(
+                  icon: Icons.favorite_rounded,
+                  color: c.heart,
+                  title: 'Δεν υπάρχουν παλμοί ακόμα',
+                  text: 'Φόρεσε το ρολόι. Οι παλμοί εμφανίζονται εδώ μόλις συγχρονιστεί το Samsung Health.',
+                ),
             ],
           );
         }
@@ -90,7 +98,10 @@ class HeartPage extends StatelessWidget {
                   CardHeader(icon: Icons.monitor_heart_rounded, title: 'Τελευταίες μετρήσεις σήμερα', color: c.heart),
                   const SizedBox(height: 8),
                   if (latest != null)
-                    InfoRow('Τελευταία μέτρηση, ${hm(latest.start)}', '${latest.avg.round()} bpm'),
+                    InfoRow(
+                      'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now())} '}${hm(latest.start)}',
+                      '${latest.avg.round()} bpm',
+                    ),
                   if (today != null) ...[
                     InfoRow('Χαμηλότεροι', '${today.$1.round()} bpm'),
                     InfoRow('Υψηλότεροι', '${today.$2.round()} bpm'),

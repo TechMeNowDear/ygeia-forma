@@ -268,7 +268,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                       child: Text(
-                        'Δεν βρέθηκε «$q». Αν είναι συσκευασμένο, σκάναρε το barcode· αλλιώς πρόσθεσέ το από την ετικέτα.',
+                        'Δεν βρέθηκε «$q» στη βάση. Αν είναι συσκευασμένο, σκάναρε το barcode ή γράψε τις τιμές της ετικέτας. '
+                        'Αν δεν έχει ετικέτα (π.χ. σπιτικό φαγητό), γράψε ένα-ένα τα υλικά του.',
                         style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                       ),
                     )
@@ -507,7 +508,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
                         ChoiceChip(
                           label: Text(st.$2),
                           selected: st.$1.id == f.id,
-                          onSelected: (_) => setState(() => _item = st.$1),
+                          onSelected: (_) {
+                            if (st.$1.id != f.id) setState(() => _item = st.$1);
+                          },
                         ),
                     ],
                   ),
@@ -733,10 +736,11 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   late final _name = TextEditingController(text: widget.draft.name);
   late final _brand = TextEditingController(text: widget.draft.brand ?? '');
   late final _serving = TextEditingController(
-      text: widget.draft.servingGrams == null ? '' : gramsText(widget.draft.servingGrams!));
+      text: widget.draft.servingGrams == null ? '' : gramsField(widget.draft.servingGrams!));
   late final Map<String, TextEditingController> _v = {
     for (final k in _fields.map((e) => e.$1))
-      k: TextEditingController(text: widget.draft.values[k] == null ? '' : dec(widget.draft.values[k]!, 2).replaceAll(RegExp(r',?0+$'), '')),
+      // Μέχρι 4 δεκαδικά, ώστε μια διόρθωση μόνο του ονόματος να μη στρογγυλεύει τις τιμές (αλάτι 0,0125).
+      k: TextEditingController(text: widget.draft.values[k] == null ? '' : dec(widget.draft.values[k]!, 4).replaceAll(RegExp(r',?0+$'), '')),
   };
   bool _tried = false;
 
@@ -872,7 +876,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
                   child: Text(
                     'Οι θερμίδες δεν ταιριάζουν με τα υπόλοιπα: από πρωτεΐνη, υδατάνθρακες και λίπος βγαίνουν '
-                    'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα;).',
+                    'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα ή σε kJ;).',
                     style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text),
                   ),
                 ),

@@ -9,6 +9,7 @@ import '../history.dart' show dateKey;
 import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
+import 'replaced_foods.dart';
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
 /// Όλα τοπικά στο κινητό. Δίκτυο μόνο για το barcode (Open Food Facts).
@@ -24,7 +25,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   }) : _offline = true {
     _basic = foods;
     _mine = mine;
-    _index = FoodIndex([...mine, ...foods]);
+    _rebuildIndex();
     for (final e in entries) {
       _entries[e.id] = e;
     }
@@ -76,6 +77,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _loadMine() async {
     if (_offline) return;
     final r = await FoodChannel.myFoods();
+    if (r['ok'] != true) {
+      // Να φαίνεται: αλλιώς θα έμοιαζε ότι δεν έχω προϊόντα και θα τα ξανάγραφα (διπλά).
+      error = 'Δεν διαβάστηκαν «Τα προϊόντα μου». Κλείσε και άνοιξε ξανά την εφαρμογή.';
+    }
     if (r['ok'] == true && r['foods'] is List) {
       // Μία χαλασμένη εγγραφή δεν πρέπει να «κολλάει» όλη τη Διατροφή.
       final out = <Food>[];
@@ -94,6 +99,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final to = dayOf(DateTime.now());
     final from = DateTime(to.year, to.month, to.day - historyDays);
     final r = await FoodChannel.logRange(dateKey(from), dateKey(DateTime(to.year, to.month, to.day + 1)));
+    _loadedFrom = from;
+    if (r['ok'] != true) {
+      error = 'Δεν διαβάστηκε το ημερολόγιο φαγητού. Κλείσε και άνοιξε ξανά την εφαρμογή πριν γράψεις κάτι.';
+    }
     if (r['ok'] == true && r['entries'] is List) {
       for (final e in r['entries'] as List) {
         if (e is! Map) continue;
@@ -105,7 +114,22 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _rebuildIndex() => _index = FoodIndex([..._mine, ..._basic]);
+  void _rebuildIndex() {
+    _index = FoodIndex([..._mine, ..._basic]);
+    _byId = {for (final f in _basic) f.id: f, for (final f in _mine) f.id: f};
+  }
+
+  Map<String, Food> _byId = const {};
+
+  /// Κάθε αλλαγή (ημερολόγιο, προϊόντα) περνά από εδώ: τα έτοιμα μετρημένα ξαναμετριούνται.
+  @override
+  void notifyListeners() {
+    _countsCache = null;
+    super.notifyListeners();
+  }
+
+  /// Από ποια μέρα υπάρχουν στη μνήμη καταχωρίσεις (οι παλιότερες φορτώνονται όταν τις ανοίξω).
+  DateTime? _loadedFrom;
 
   // ---------- Ανάγνωση ----------
 
@@ -119,14 +143,26 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Ημέρες με καταχωρίσεις (για «αντιγραφή από χθες» κ.λπ. αργότερα).
   bool hasEntries(DateTime d) => _entries.values.any((e) => e.day == dateKey(d));
 
-  /// Πόσες φορές έχω φάει κάθε τρόφιμο τις τελευταίες 90 μέρες.
+  /// Πόσες φορές έχω φάει κάθε τρόφιμο τις τελευταίες 90 μέρες (με το τωρινό id του τροφίμου).
+  /// Κρατιέται έτοιμο και ξαναμετριέται μόνο όταν αλλάξει το ημερολόγιο.
+  Map<String, int>? _countsCache;
   Map<String, int> get _counts {
+    final cached = _countsCache;
+    if (cached != null) return cached;
     final c = <String, int>{};
     for (final e in _entries.values) {
-      c[e.food.id] = (c[e.food.id] ?? 0) + 1;
+      final id = _idNow(e.food.id);
+      c[id] = (c[id] ?? 0) + 1;
     }
-    return c;
+    return _countsCache = c;
   }
+
+  /// Το τωρινό id ενός τροφίμου (αν άλλαξε σε νεότερη λίστα).
+  static String _idNow(String id) => replacedFoods[id] ?? id;
+
+  /// Τρόφιμο της βάσης που δεν υπάρχει πια (ούτε με νέο id): δεν προτείνεται ξανά.
+  /// (Αν η βάση δεν φορτώθηκε, δεν κρύβεται τίποτα.)
+  bool _gone(Food f) => !f.isMine && _basic.isNotEmpty && byId(_idNow(f.id)) == null;
 
   /// Πρόσφατα: τα τελευταία διαφορετικά τρόφιμα.
   List<Food> recent({int limit = 15}) {
@@ -134,7 +170,8 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final seen = <String>{};
     final out = <Food>[];
     for (final e in sorted) {
-      if (seen.add(e.food.id)) out.add(_current(e.food));
+      if (_gone(e.food)) continue;
+      if (seen.add(_idNow(e.food.id))) out.add(_current(e.food));
       if (out.length >= limit) break;
     }
     return out;
@@ -145,48 +182,50 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final counts = _counts.entries.where((e) => e.value >= 2).toList()..sort((a, b) => b.value.compareTo(a.value));
     final latest = <String, LogEntry>{};
     for (final e in _entries.values) {
-      final p = latest[e.food.id];
-      if (p == null || e.time.isAfter(p.time)) latest[e.food.id] = e;
+      final id = _idNow(e.food.id);
+      final p = latest[id];
+      if (p == null || e.time.isAfter(p.time)) latest[id] = e;
     }
-    return [for (final c in counts.take(limit)) _current(latest[c.key]!.food)];
+    return [
+      for (final c in counts)
+        if (!_gone(latest[c.key]!.food)) _current(latest[c.key]!.food),
+    ].take(limit).toList();
   }
 
-  int timesEaten(String foodId) => _counts[foodId] ?? 0;
+  int timesEaten(String foodId) => _counts[_idNow(foodId)] ?? 0;
 
   /// Η ποσότητα της τελευταίας φοράς (έγγραφο › «ποσότητα από την τελευταία φορά»).
   double? lastGrams(String foodId) {
+    final id = _idNow(foodId);
     LogEntry? last;
     for (final e in _entries.values) {
-      if (e.food.id == foodId && (last == null || e.time.isAfter(last.time))) last = e;
+      if (_idNow(e.food.id) == id && (last == null || e.time.isAfter(last.time))) last = e;
     }
     return last?.grams;
   }
 
-  /// Αν το τρόφιμο υπάρχει ακόμα στη βάση, η τρέχουσα μορφή του· αλλιώς το αντίγραφο.
-  Food _current(Food f) {
-    for (final x in _mine) {
-      if (x.id == f.id) return x;
-    }
-    for (final x in _basic) {
-      if (x.id == f.id) return x;
-    }
-    return f;
-  }
+  /// Η τωρινή μορφή του τροφίμου (από τη βάση ή «Τα προϊόντα μου», και με το νέο id αν άλλαξε)·
+  /// αν δεν υπάρχει πια, το αντίγραφο της καταχώρισης.
+  Food _current(Food f) => byId(_idNow(f.id)) ?? f;
 
+  /// Για την οθόνη: η μορφή που θα γραφτεί αν το ξαναδιαλέξω (π.χ. το «Όπως χθες»).
+  Food currentOf(Food f) => _current(f);
+
+  /// Το πιο συνηθισμένο είδος, όταν όλα ταιριάζουν το ίδιο στην αναζήτηση (π.χ. «γάλα» → 1,5%).
+  static const _preferred = {'C19033': 0.5};
+
+  /// Η συχνότητα βοηθά μόνο ανάμεσα σε όσα ταιριάζουν περίπου το ίδιο: το πολύ +1,5, λιγότερο από
+  /// τη διαφορά «ακριβώς η λέξη» / «ξεκινά με τη λέξη». Αλλιώς, μετά από 2 μελιτζάνες, το «μέλι»
+  /// έβγαζε πρώτη τη μελιτζάνα.
   List<Food> search(String q) {
     final counts = _counts;
-    return _index.search(q, boost: {for (final e in counts.entries) e.key: math.min(6, e.value * 1.5)});
+    return _index.search(q, boost: {
+      ..._preferred,
+      for (final e in counts.entries) e.key: math.min(1.5, e.value * 0.5) + (_preferred[e.key] ?? 0),
+    });
   }
 
-  Food? byId(String id) {
-    for (final x in _mine) {
-      if (x.id == id) return x;
-    }
-    for (final x in _basic) {
-      if (x.id == id) return x;
-    }
-    return null;
-  }
+  Food? byId(String id) => _byId[id];
 
   /// Ωμό + μαγειρεμένες μορφές του ίδιου τροφίμου, με την ετικέτα κάθε κατάστασης.
   /// Κενή λίστα αν το τρόφιμο δεν έχει άλλες μορφές.
@@ -335,14 +374,42 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   void setDay(DateTime d) {
     day = dayOf(d);
     _followToday = sameDay(day, DateTime.now());
+    _shownOn = dayOf(DateTime.now());
+    notifyListeners();
+    _loadDayIfOld(day);
+  }
+
+  /// Ποια μέρα (του ημερολογίου) διάλεξα να βλέπω μια παλιότερη μέρα.
+  DateTime? _shownOn;
+
+  /// Μέρα πριν από τις 90 που φορτώνονται στο άνοιγμα: φορτώνεται τώρα, ώστε να μη φαίνεται άδεια.
+  Future<void> _loadDayIfOld(DateTime d) async {
+    final from = _loadedFrom;
+    if (_offline || from == null || !d.isBefore(from)) return;
+    final r = await FoodChannel.logRange(dateKey(d), dateKey(DateTime(d.year, d.month, d.day + 1)));
+    if (r['ok'] != true || r['entries'] is! List) return;
+    for (final e in r['entries'] as List) {
+      if (e is! Map) continue;
+      try {
+        final le = LogEntry.fromJson(Map<String, dynamic>.from(e));
+        _entries.putIfAbsent(le.id, () => le);
+      } catch (_) {}
+    }
     notifyListeners();
   }
 
   /// Μετά τα μεσάνυχτα: αν έβλεπα τη «σήμερα», το ημερολόγιο περνά στη νέα σημερινή μέρα.
+  /// Και αν είχα αφήσει ανοιχτή μια παλιότερη μέρα από χθες ή πιο πριν, την επόμενη μέρα ξεκινά
+  /// πάλι από τη σήμερα (να μη γραφτεί το πρωινό σε λάθος μέρα).
   /// Καλείται όταν επιστρέφω στην εφαρμογή και πριν από κάθε «+ Φαγητό».
   void syncToday() {
-    if (_offline || !_followToday) return;
+    if (_offline) return;
     final t = dayOf(DateTime.now());
+    if (!_followToday) {
+      final shown = _shownOn;
+      if (shown == null || sameDay(shown, t)) return;
+      _followToday = true;
+    }
     if (!sameDay(day, t)) {
       day = t;
       notifyListeners();
@@ -376,13 +443,25 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  /// Επαναφορά: προσθέτει ό,τι λείπει και ενημερώνει ό,τι έχει το ίδιο id. Δεν σβήνει τίποτα.
-  /// Επιστρέφει (καταχωρίσεις, προϊόντα, αποτυχίες).
-  Future<(int, int, int)> importBackup(List<LogEntry> entries, List<Food> foods) async {
-    var e = 0, f = 0, failed = 0;
+  /// Επαναφορά: προσθέτει **μόνο ό,τι λείπει**. Ό,τι υπάρχει ήδη στο κινητό (ίδιο id) μένει όπως
+  /// είναι, ώστε ένα παλιό αντίγραφο να μη γυρίσει πίσω διορθώσεις που έγιναν μετά. Δεν σβήνει τίποτα.
+  /// Επιστρέφει (καταχωρίσεις, προϊόντα, αποτυχίες, όσα υπήρχαν ήδη) ή null αν δεν διαβάστηκε
+  /// τι υπάρχει ήδη (τότε δεν γράφεται τίποτα).
+  Future<(int, int, int, int)?> importBackup(List<LogEntry> entries, List<Food> foods) async {
+    var e = 0, f = 0, failed = 0, existing = 0;
+    final have = await FoodChannel.logRange('0000-01-01', '9999-12-31');
+    if (have['ok'] != true || have['entries'] is! List) return null;
+    final haveIds = {
+      for (final x in have['entries'] as List)
+        if (x is Map && x['id'] is String) x['id'] as String,
+    };
     final today = dayOf(DateTime.now());
     final from = DateTime(today.year, today.month, today.day - historyDays);
     for (final le in entries) {
+      if (haveIds.contains(le.id)) {
+        existing++;
+        continue;
+      }
       final r = await FoodChannel.logPut(jsonEncode(le.toJson()));
       if (r['ok'] == true) {
         e++;
@@ -393,7 +472,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     final mine = [..._mine];
+    final mineIds = {for (final x in _mine) x.id};
     for (final food in foods) {
+      if (mineIds.contains(food.id)) {
+        existing++;
+        continue;
+      }
       final r = await FoodChannel.myFoodPut(jsonEncode(food.toJson()));
       if (r['ok'] == true) {
         f++;
@@ -406,6 +490,31 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _mine = mine;
     _rebuildIndex();
     notifyListeners();
-    return (e, f, failed);
+    return (e, f, failed, existing);
+  }
+
+  /// Καταχωρίσεις (των τελευταίων 90 ημερών) με αυτό το προϊόν, που έχουν άλλες τιμές από το [f].
+  List<LogEntry> entriesWithOldValues(Food f) => [
+        for (final e in _entries.values)
+          if (e.food.id == f.id && !_sameNutrients(e.food.n, f.n)) e,
+      ];
+
+  static bool _sameNutrients(Nutrients a, Nutrients b) {
+    final ka = a.values.keys.toSet(), kb = b.values.keys.toSet();
+    if (ka.length != kb.length || !ka.containsAll(kb)) return false;
+    for (final k in ka) {
+      if (jsonEncode(a.values[k]!.toJson()) != jsonEncode(b.values[k]!.toJson())) return false;
+    }
+    return true;
+  }
+
+  /// Διόρθωση προϊόντος: οι καταχωρίσεις του παίρνουν τις νέες τιμές (ίδια γραμμάρια).
+  /// Επιστρέφει πόσες γράφτηκαν.
+  Future<int> applyFoodToEntries(Food f, List<LogEntry> entries) async {
+    var n = 0;
+    for (final e in entries) {
+      if (await _put(e.copyWith(food: f))) n++;
+    }
+    return n;
   }
 }

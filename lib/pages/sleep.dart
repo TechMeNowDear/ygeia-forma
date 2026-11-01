@@ -22,12 +22,20 @@ class SleepPage extends StatelessWidget {
             title: 'Ύπνος',
             onRefresh: () => store.refresh(),
             left: [
-              EmptyCard(
-                icon: Icons.bedtime_rounded,
-                color: c.sleep,
-                title: 'Δεν υπάρχει ύπνος ακόμα',
-                text: 'Φόρεσε το ρολόι στον ύπνο. Το πρωί θα δεις εδώ πότε κοιμήθηκες, πόσο και πόσο καλά.',
-              ),
+              if (d != null && d.failed.contains('sleep'))
+                EmptyCard(
+                  icon: Icons.bedtime_rounded,
+                  color: c.sleep,
+                  title: 'Ο ύπνος δεν διαβάστηκε τώρα',
+                  text: 'Η Samsung δεν τον έδωσε αυτή τη φορά. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.',
+                )
+              else
+                EmptyCard(
+                  icon: Icons.bedtime_rounded,
+                  color: c.sleep,
+                  title: 'Δεν υπάρχει ύπνος ακόμα',
+                  text: 'Φόρεσε το ρολόι στον ύπνο. Το πρωί θα δεις εδώ πότε κοιμήθηκες, πόσο και πόσο καλά.',
+                ),
             ],
           );
         }
@@ -36,6 +44,8 @@ class SleepPage extends StatelessWidget {
         final week = nights.length <= 7 ? nights : nights.sublist(nights.length - 7);
         final avg7 = Dashboard.mean(week.map((n) => n.minutes.toDouble()));
         final scoreAvg = Dashboard.mean(week.map((n) => n.score?.toDouble()));
+        // Οι χωρισμένες νύχτες δεν έχουν βαθμολογία: λέμε από πόσες βγαίνει ο μέσος όρος.
+        final scored = week.where((n) => n.score != null).length;
 
         return PageFrame(
           title: 'Ύπνος',
@@ -59,7 +69,7 @@ class SleepPage extends StatelessWidget {
                       ),
                       Expanded(
                         child: _Summary(
-                          label: 'Μέση βαθμολογία',
+                          label: scored == week.length ? 'Μέση βαθμολογία' : 'Μέση βαθμολογία ($scored νύχτες)',
                           value: scoreAvg == null ? '—' : '${scoreAvg.round()} από 100',
                         ),
                       ),

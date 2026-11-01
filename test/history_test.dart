@@ -86,4 +86,23 @@ void main() {
     expect(h['2026-10-10']![K.sleepMin], isNotNull);
     expect(h['2026-10-10']![K.steps], 7000);
   });
+
+  test('Ίδιες τιμές: η μέρα δεν ξαναγράφεται', () {
+    final h = sample();
+    final changed = mergeHistory(h, {'2026-10-31': {K.steps: 7100}});
+    expect(changed, isEmpty);
+  });
+
+  test('Ζύγιση που σβήστηκε στη Samsung φεύγει από το ιστορικό, οι άλλες τιμές μένουν', () {
+    final h = <String, Map<String, double>>{
+      '2026-10-01': {K.weight: 31.4, K.steps: 4000},
+      '2026-10-08': {K.weight: 82.2, K.fatPct: 25.4},
+      '2024-01-01': {K.weight: 85},
+    };
+    final changed = removeMissingBody(h, {'2026-10-08'}, from: DateTime(2024, 11, 2));
+    expect(changed, {'2026-10-01'});
+    expect(h['2026-10-01'], {K.steps: 4000});
+    expect(h['2026-10-08']![K.weight], 82.2);
+    expect(h['2024-01-01']![K.weight], 85, reason: 'έξω από τα 2 χρόνια της ανάγνωσης: δεν αγγίζεται');
+  });
 }

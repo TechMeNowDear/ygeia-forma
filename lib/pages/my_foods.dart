@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../backup.dart' show countText;
 import '../food/food_model.dart';
 import '../food/food_search.dart';
 import '../food/food_store.dart';
@@ -87,7 +88,32 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
       MaterialPageRoute(settings: const RouteSettings(name: 'Διόρθωση προϊόντος'), builder: (_) => FoodFormScreen(draft: draftFromFood(f), existingId: f.id, note: note)),
     );
     if (edited == null) return null;
-    await widget.food.saveMyFood(edited);
+    if (!await widget.food.saveMyFood(edited)) return edited;
+    // Διόρθωση τιμών: προσφέρεται να διορθωθούν και οι μέρες που το έχω ήδη γράψει.
+    final old = widget.food.entriesWithOldValues(edited);
+    if (old.isNotEmpty && mounted) {
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Και στις μέρες που το έγραψες;'),
+          content: Text(
+            'Το «${edited.name}» υπάρχει σε ${countText(old.length, 'καταχώριση', 'καταχωρίσεις')} των τελευταίων '
+            '${FoodStore.historyDays} ημερών με τις παλιές τιμές. Να πάρουν τις νέες; Τα γραμμάρια μένουν ίδια.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Όχι, μόνο από εδώ και πέρα')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ναι, διόρθωσέ τες')),
+          ],
+        ),
+      );
+      if (yes == true) {
+        final n = await widget.food.applyFoodToEntries(edited, old);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Διορθώθηκαν ${countText(n, 'καταχώριση', 'καταχωρίσεις')}.')));
+        }
+      }
+    }
     return edited;
   }
 

@@ -137,7 +137,8 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.directions_walk_rounded,
       color: c.exercise,
-      title: 'Βήματα',
+      // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
+      title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα' : 'Βήματα · ${relativeDay(d.readAt, DateTime.now())}',
       value: steps == null ? null : thousands(steps),
       note: base == null ? null : 'Συνήθως ${thousands(base)}',
       chart: last7.length >= 2 ? MiniBars(values: [for (final s in last7) s.value], color: c.exercise) : null,
@@ -154,8 +155,8 @@ class TodayPage extends StatelessWidget {
       final diff = last!.weight! - prev!.weight!;
       trend = TrendPill(
         '${signedDec(diff)} kg από ${dayMonth(prev.time)}',
-        // Κάτω από 1 kg είναι θόρυβος της ζυγαριάς (νερό, φαγητό): ουδέτερο χρώμα.
-        kind: diff <= -1 ? TrendKind.good : (diff >= 1 ? TrendKind.bad : TrendKind.neutral),
+        // Ουδέτερο χρώμα: χωρίς στόχο (μετά τον γιατρό) ούτε η πτώση ούτε η άνοδος είναι «καλή» ή «κακή».
+        kind: TrendKind.neutral,
       );
     }
     final weights = [for (final b in d.body) if (b.weight != null) b.weight!];

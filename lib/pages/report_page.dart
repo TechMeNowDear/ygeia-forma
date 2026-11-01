@@ -458,7 +458,7 @@ class _PageOne extends StatelessWidget {
             ],
           ),
         ],
-        _Title('Ζυγίσεις (InBody)'),
+        _Title('Ζυγίσεις'),
         if (d.weighIns.isEmpty)
           Text('Δεν υπάρχουν ζυγίσεις.', style: cell)
         else

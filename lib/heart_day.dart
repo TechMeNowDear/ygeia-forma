@@ -149,7 +149,8 @@ extension HeartByDay on Dashboard {
         exerciseMinutes += dur;
         continue;
       }
-      final steps = _stepsBetween(s.start, s.end);
+      // Στιγμιαία μέτρηση (αρχή = τέλος): το λεπτό της, όπως και στη διάρκεια (dur = 1).
+      final steps = _stepsBetween(s.start, s.end.isAfter(s.start) ? s.end : s.start.add(const Duration(minutes: 1)));
       final cadence = steps / dur;
       final band = steps == 0
           ? HeartBand.still

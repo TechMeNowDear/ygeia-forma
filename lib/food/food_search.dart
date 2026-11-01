@@ -33,7 +33,7 @@ const _grLetters = {
 
 // Greeklish → ίδια «φωνητικά» λατινικά.
 const _latDigraphs = {
-  'ou': 'u', 'ei': 'i', 'oi': 'i', 'ai': 'e', 'mp': 'b', 'nt': 'd', 'gk': 'g', 'gg': 'g', 'ng': 'g',
+  'ou': 'u', 'oy': 'u', 'ei': 'i', 'oi': 'i', 'ai': 'e', 'mp': 'b', 'nt': 'd', 'gk': 'g', 'gg': 'g', 'ng': 'g',
   'ch': 'h', 'kh': 'h', 'ph': 'f', 'th': 'th', 'ps': 'ps', 'ks': 'ks', 'tz': 'dz',
   'au': 'av', 'eu': 'ev',
 };

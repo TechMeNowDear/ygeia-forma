@@ -150,6 +150,14 @@ class Food {
         if (cooked.isNotEmpty) 'cooked': [for (final c in cooked) {'id': c.$1, 'label': c.$2}],
         'n': n.toJson(),
       };
+
+  /// Το αντίγραφο που κρατά κάθε καταχώριση: ό,τι χρειάζεται για να δείχνει και να μετρά
+  /// (όνομα, πηγή, τιμές), χωρίς τα στοιχεία αναζήτησης (άλλα ονόματα, περιγραφή πηγής, μορφές),
+  /// που υπάρχουν ήδη στη βάση. Μικρότερο ημερολόγιο και αντίγραφο ασφαλείας.
+  Map<String, Object?> toSnapshotJson() => {
+        for (final e in toJson().entries)
+          if (e.key != 'aliases' && e.key != 'sourceName' && e.key != 'cooked') e.key: e.value,
+      };
 }
 
 enum Meal { breakfast, lunch, dinner, snack }
@@ -209,7 +217,7 @@ class LogEntry {
         'id': id,
         'day': day,
         'meal': meal.name,
-        'food': food.toJson(),
+        'food': food.toSnapshotJson(),
         'grams': grams,
         'time': time.millisecondsSinceEpoch,
       };

@@ -26,7 +26,7 @@ class MainActivity : FlutterFragmentActivity() {
     fun pickDocument(callback: (Uri?) -> Unit) {
         pickCallback?.invoke(null) // προηγούμενη επιλογή που δεν ολοκληρώθηκε
         pickCallback = callback
-        documentPicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+        documentPicker.launch(arrayOf("application/json", "application/gzip", "application/x-gzip", "text/plain", "application/octet-stream"))
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

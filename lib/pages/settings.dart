@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 
 import '../backup.dart';
@@ -171,7 +172,13 @@ class _BackupCardState extends State<_BackupCard> {
       }
       final now = DateTime.now();
       final name = backupFileName(now);
-      final json = buildBackup(foodLog: raw.$1, myFoods: raw.$2, prefs: widget.store.prefsJson(), now: now);
+      // Οι ρυθμίσεις μπαίνουν μόνο αν έχουν διαβαστεί (αλλιώς θα έμπαιναν οι αρχικές).
+      final json = buildBackup(
+        foodLog: raw.$1,
+        myFoods: raw.$2,
+        prefs: widget.store.prefsLoaded ? widget.store.prefsJson() : const {},
+        now: now,
+      );
       final r = await FoodChannel.saveBackup(json, name);
       if (r['ok'] != true || r['uri'] is! String) {
         _say('Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}');
@@ -198,7 +205,8 @@ class _BackupCardState extends State<_BackupCard> {
       }
       BackupContents? parsed;
       try {
-        parsed = parseBackup(r['json'] as String? ?? '');
+        // Σε ξεχωριστό νήμα: ένα αντίγραφο χρόνων είναι αρκετά MB και δεν πρέπει να «παγώσει» η οθόνη.
+        parsed = await compute(parseBackup, r['json'] as String? ?? '');
       } on BackupError catch (e) {
         _say(e.message);
       }
@@ -212,7 +220,8 @@ class _BackupCardState extends State<_BackupCard> {
           title: const Text('Επαναφορά αντιγράφου'),
           content: Text(
             'Αντίγραφο$when: ${entriesText(b.entries.length)} φαγητού, ${productsText(b.myFoods.length)}.\n\n'
-            'Όσα υπάρχουν ήδη μένουν· όσα έχουν την ίδια ταυτότητα ενημερώνονται. Τίποτα δεν σβήνεται.'
+            'Μπαίνουν μόνο όσα λείπουν από το κινητό. Όσα υπάρχουν ήδη μένουν όπως είναι (και με τις διορθώσεις τους). '
+            'Τίποτα δεν σβήνεται· καταχωρίσεις που έσβησες μετά το αντίγραφο ξαναμπαίνουν.'
             '${b.prefs.isEmpty ? '' : '\n\nΘα αντικατασταθούν οι ρυθμίσεις: «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση.'}'
             '${b.skipped == 0 ? '' : '\n\n${countText(b.skipped, 'χαλασμένη εγγραφή θα παραλειφθεί', 'χαλασμένες εγγραφές θα παραλειφθούν')}.'}',
           ),
@@ -223,10 +232,16 @@ class _BackupCardState extends State<_BackupCard> {
         ),
       );
       if (ok != true) return;
-      final (e, f, failed) = await widget.food.importBackup(b.entries, b.myFoods);
+      final res = await widget.food.importBackup(b.entries, b.myFoods);
+      if (res == null) {
+        _say('Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.');
+        return;
+      }
+      final (e, f, failed, existing) = res;
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       _say([
         'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
+        if (existing > 0) '${countText(existing, 'υπήρχε ήδη', 'υπήρχαν ήδη')} και έμειναν όπως είναι.',
         if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
       ].join(' '));

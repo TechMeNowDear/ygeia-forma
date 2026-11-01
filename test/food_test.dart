@@ -4,6 +4,7 @@ import 'package:ygeia_forma/food/food_search.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/food/kitchen.dart';
 import 'package:ygeia_forma/food/off.dart';
+import 'package:ygeia_forma/food/replaced_foods.dart';
 import 'package:ygeia_forma/pages/food_add.dart' show parseNumber, gramsField;
 
 import 'sample_food.dart';
@@ -18,6 +19,7 @@ void main() {
       expect(phonetic('ρεβίθια'), phonetic('revithia'));
       expect(phonetic('ΦΑΚΈΣ'), phonetic('fakes'));
       expect(phonetic('μπέικον'), phonetic('mpeikon'));
+      expect(phonetic('κοτόπουλο'), phonetic('kotopoylo'));
     });
 
     final index = FoodIndex(basicFoods());
@@ -237,12 +239,90 @@ void main() {
       expect(s.entriesFor(now, Meal.dinner).single.grams, 30);
     });
 
+    test('Η συχνότητα δεν βγάζει πρώτο άλλο τρόφιμο από αυτό που γράφω', () async {
+      final now = DateTime(2026, 10, 24, 13);
+      final s = FoodStore.preloaded(foods: basicFoods(), now: now);
+      final eggplant = foodNamed('Μελιτζάνα (ωμή)');
+      final pepper = foodNamed('Πιπεριά κόκκινη (ωμή)');
+      final jam = foodNamed('Μαρμελάδα φράουλα');
+      for (var i = 0; i < 10; i++) {
+        await s.add(eggplant, 200, Meal.lunch);
+        await s.add(pepper, 100, Meal.lunch);
+        await s.add(jam, 20, Meal.breakfast);
+      }
+      expect(s.search('μέλι').first.name, 'Μέλι');
+      expect(s.search('πιπέρι').first.name, 'Πιπέρι μαύρο');
+      expect(s.search('φράουλες').first.name, 'Φράουλες');
+      // Ανάμεσα σε ίδια ταιριάσματα, το συχνό πρώτο.
+      expect(s.search('μαρμελάδα').first.name, 'Μαρμελάδα φράουλα');
+    });
+
+    test('«γάλα» χωρίς ιστορικό: πρώτο το αγελαδινό 1,5%', () {
+      final s = FoodStore.preloaded(foods: basicFoods(), now: DateTime(2026, 10, 24));
+      expect(s.search('γάλα').first.name, 'Γάλα ημιαποβουτυρωμένο 1,5%');
+      expect(s.search('λεμόνι').first.name, 'Λεμόνι');
+    });
+
+    test('Τρόφιμο που άλλαξε σε νεότερη λίστα: προτείνεται η σωστή, τωρινή μορφή', () async {
+      final foods = basicFoods();
+      final ids = {for (final f in foods) f.id};
+      for (final e in replacedFoods.entries) {
+        expect(ids.contains(e.key), isFalse, reason: '${e.key} υπάρχει ακόμα');
+        expect(ids.contains(e.value), isTrue, reason: '${e.value} λείπει');
+      }
+      for (final r in removedFoods) {
+        expect(ids.contains(r), isFalse);
+      }
+      final now = DateTime(2026, 10, 24, 13);
+      final oldRice = Food.fromJson({
+        'id': 'C9103', 'name': 'Ρύζι καστανό/ολικής (βρασμένο)', 'cat': 'Δημητριακά', 'source': 'CIQUAL 2025',
+        'n': {'kcal': 187, 'protein': 4, 'carbs': 38, 'fat': 1.5},
+      });
+      final oldCream = Food.fromJson({
+        'id': 'C19402', 'name': 'Κρέμα γάλακτος (μέσος όρος)', 'cat': 'Γαλακτοκομικά', 'source': 'CIQUAL 2025',
+        'n': {'kcal': 248, 'protein': 2, 'carbs': 3, 'fat': 25},
+      });
+      final s = FoodStore.preloaded(foods: foods, now: now, entries: [
+        LogEntry(id: 'r1', day: '2026-10-23', meal: Meal.lunch, food: oldRice, grams: 200, time: DateTime(2026, 10, 23, 13)),
+        LogEntry(id: 'r2', day: '2026-10-22', meal: Meal.lunch, food: oldRice, grams: 200, time: DateTime(2026, 10, 22, 13)),
+        LogEntry(id: 'c1', day: '2026-10-23', meal: Meal.dinner, food: oldCream, grams: 50, time: DateTime(2026, 10, 23, 20)),
+      ]);
+      expect(s.recent().map((f) => f.id), ['U169704'], reason: 'νέο id· η κρέμα που βγήκε δεν προτείνεται');
+      expect(s.frequent().single.id, 'U169704');
+      expect(s.timesEaten('U169704'), 2);
+      // Οι παλιές μέρες κρατούν τις τιμές τους.
+      expect(s.entriesFor(DateTime(2026, 10, 23), Meal.lunch).single.food.n.amount(Nk.kcal), 187);
+      final copied = await s.copyMeal(DateTime(2026, 10, 23), Meal.lunch, DateTime(2026, 10, 24));
+      expect(copied.single.food.id, 'U169704');
+    });
+
+    test('Διόρθωση προϊόντος: βρίσκει τις καταχωρίσεις με τις παλιές τιμές και τις διορθώνει', () async {
+      final now = DateTime(2026, 10, 24, 13);
+      final yog = Food.fromJson({
+        'id': 'M1', 'name': 'Γιαούρτι Χ', 'cat': 'Τα προϊόντα μου', 'source': 'Ετικέτα',
+        'n': {'kcal': 60, 'protein': 3.5, 'carbs': 4, 'fat': 2},
+      });
+      final s = FoodStore.preloaded(foods: basicFoods(), mine: [yog], now: now);
+      await s.add(yog, 170, Meal.breakfast);
+      final fixed = Food.fromJson({...yog.toJson(), 'n': {'kcal': 60, 'protein': 10, 'carbs': 4, 'fat': 2}});
+      expect(s.entriesWithOldValues(yog), isEmpty);
+      final old = s.entriesWithOldValues(fixed);
+      expect(old.length, 1);
+      expect(await s.applyFoodToEntries(fixed, old), 1);
+      expect(s.entriesFor(now).single.total(Nk.protein), closeTo(17, 1e-9));
+    });
+
     test('Αντίγραφο τιμών στην καταχώριση (JSON πάει και έρχεται)', () {
       final f = foodNamed('Μέλι');
       final e = LogEntry(id: 'a', day: '2026-10-24', meal: Meal.breakfast, food: f, grams: 15, time: DateTime(2026, 10, 24, 9));
-      final back = LogEntry.fromJson(e.toJson().map((k, v) => MapEntry(k, v)));
+      final json = e.toJson();
+      final back = LogEntry.fromJson(json.map((k, v) => MapEntry(k, v)));
       expect(back.total(Nk.kcal), closeTo(e.total(Nk.kcal), 1e-9));
       expect(back.food.source, f.source);
+      expect(back.food.name, f.name);
+      // Το αντίγραφο δεν κουβαλά τα στοιχεία αναζήτησης (υπάρχουν στη βάση).
+      expect((json['food'] as Map).containsKey('aliases'), isFalse);
+      expect((json['food'] as Map).containsKey('sourceName'), isFalse);
     });
   });
 

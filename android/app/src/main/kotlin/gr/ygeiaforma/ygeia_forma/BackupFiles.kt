@@ -14,17 +14,21 @@ import android.provider.MediaStore
 object BackupFiles {
     fun save(context: Context, json: String, fileName: String): Uri {
         val resolver = context.contentResolver
+        // «.gz»: συμπιεσμένο (περίπου 10 φορές μικρότερο), ώστε ακόμα κι ένα αντίγραφο χρόνων να μένει μικρό.
+        val gz = fileName.endsWith(".gz")
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
+            put(MediaStore.MediaColumns.MIME_TYPE, if (gz) "application/gzip" else "application/json")
             put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             ?: throw IllegalStateException("Δεν δημιουργήθηκε αρχείο στις Λήψεις")
         try {
-            resolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
-                ?: throw IllegalStateException("Δεν άνοιξε το αρχείο για γράψιμο")
+            resolver.openOutputStream(uri)?.use { out ->
+                if (gz) java.util.zip.GZIPOutputStream(out).use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                else out.write(json.toByteArray(Charsets.UTF_8))
+            } ?: throw IllegalStateException("Δεν άνοιξε το αρχείο για γράψιμο")
             values.clear()
             values.put(MediaStore.MediaColumns.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
@@ -47,8 +51,17 @@ object BackupFiles {
     fun read(context: Context, uri: Uri): String {
         // Όριο ασφαλείας: ένα αντίγραφο χρόνων είναι λίγα MB· κάτι πολύ μεγαλύτερο δεν είναι δικό μας.
         // Διαβάζεται κομμάτι-κομμάτι, ώστε ένα τεράστιο αρχείο να σταματά πριν γεμίσει τη μνήμη.
-        val limit = 30 * 1024 * 1024
-        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+        // Όριο μετά την αποσυμπίεση (ένα αντίγραφο πολλών ετών είναι λίγες δεκάδες MB το πολύ).
+        val limit = 100 * 1024 * 1024
+        val bytes = context.contentResolver.openInputStream(uri)?.use { raw ->
+            // Συμπιεσμένο (gzip, ξεκινά με 1f 8b) ή απλό JSON (τα αντίγραφα πριν από την έκδοση 61).
+            val buffered = java.io.BufferedInputStream(raw)
+            buffered.mark(2)
+            val b1 = buffered.read()
+            val b2 = buffered.read()
+            buffered.reset()
+            val input: java.io.InputStream =
+                if (b1 == 0x1f && b2 == 0x8b) java.util.zip.GZIPInputStream(buffered) else buffered
             val out = java.io.ByteArrayOutputStream()
             val buf = ByteArray(64 * 1024)
             var total = 0

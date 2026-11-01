@@ -23,7 +23,14 @@ class BodyPage extends StatelessWidget {
         final skinBase = d?.skinTempBaseline;
 
         final left = <Widget>[
-          if (last == null)
+          if (last == null && d != null && d.failed.contains('body'))
+            EmptyCard(
+              icon: Icons.monitor_weight_rounded,
+              color: c.body,
+              title: 'Οι ζυγίσεις δεν διαβάστηκαν τώρα',
+              text: 'Η Samsung δεν τις έδωσε αυτή τη φορά. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.',
+            )
+          else if (last == null)
             EmptyCard(
               icon: Icons.monitor_weight_rounded,
               color: c.body,
@@ -105,7 +112,7 @@ class BodyPage extends StatelessWidget {
 
         return PageFrame(
           title: 'Σώμα',
-          subtitle: body.isEmpty ? null : '${body.length} ζυγίσεις στην InBody',
+          subtitle: body.isEmpty ? null : '${body.length} ζυγίσεις',
           onRefresh: () => store.refresh(),
           left: left,
           right: bodyMore,

@@ -20,7 +20,8 @@ String buildBackup({
   required Map<String, dynamic> prefs,
   required DateTime now,
 }) {
-  return const JsonEncoder.withIndent(' ').convert({
+  // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
+  return jsonEncode({
     'app': backupApp,
     'version': backupVersion,
     'created': now.toIso8601String(),
@@ -108,6 +109,6 @@ String countText(int n, String one, String many) => n == 1 ? '1 $one' : '$n $man
 String entriesText(int n) => countText(n, 'καταχώριση', 'καταχωρίσεις');
 String productsText(int n) => countText(n, 'προϊόν', 'προϊόντα');
 
-/// «ygeia-antigrafo-2026-11-01.json»
+/// «ygeia-antigrafo-2026-11-01.json.gz» (συμπιεσμένο· η επαναφορά δέχεται και τα παλιά .json).
 String backupFileName(DateTime now) =>
-    'ygeia-antigrafo-${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.json';
+    'ygeia-antigrafo-${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.json.gz';
