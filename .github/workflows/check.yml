@@ -1,0 +1,101 @@
+# Έλεγχοι σε κάθε κλάδο εκτός από το main: τρέχουν όλοι οι έλεγχοι (με ώρα Αθήνας),
+# χτίζεται APK debug (για να πιάνονται λάθη Kotlin) και βγαίνουν στιγμιότυπα στο branch
+# «screenshots-dev». Τίποτα δεν δημοσιεύεται στο Releases: αυτό γίνεται μόνο από το main.
+name: Έλεγχος κλάδου
+
+on:
+  push:
+    branches-ignore: [main, screenshots, screenshots-dev, food-raw]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Europe/Athens
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Συμπλήρωση αρχείων Android
+        run: |
+          echo "::notice title=Flutter::$(flutter --version | head -1)"
+          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
+          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
+            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+
+      - name: Έλεγχοι (ώρα Αθήνας)
+        run: |
+          set -o pipefail
+          date
+          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test)
+          if ! flutter test $files 2>&1 | tee tests.log; then
+            grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -150 > errors.txt || true
+            [ -s errors.txt ] || tail -80 tests.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα ελέγχων::$msg"
+            exit 1
+          fi
+          echo "::notice title=Έλεγχοι::$(grep -Eo '\+[0-9]+' tests.log | tail -1) έλεγχοι πέρασαν"
+
+      - name: Χτίσιμο APK (debug, μόνο για έλεγχο)
+        run: |
+          set -o pipefail
+          if ! flutter build apk --debug --target-platform android-arm64 2>&1 | tee build.log; then
+            grep -E -A3 "^e: |error:|Error:|What went wrong|ERROR|Unresolved reference|Execution failed" build.log | head -150 > errors.txt || true
+            [ -s errors.txt ] || tail -120 build.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα χτισίματος::$msg"
+            exit 1
+          fi
+
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Ζωγράφισμα οθονών
+        run: |
+          set -o pipefail
+          if ! flutter test test/screens_test.dart --update-goldens 2>&1 | tee shots.log; then
+            grep -E -A4 "Error:|error:|EXCEPTION|was thrown|overflowed|Expected|Test failed" shots.log | head -150 > errors.txt || true
+            [ -s errors.txt ] || tail -120 shots.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα στιγμιοτύπων::$msg"
+            exit 1
+          fi
+
+      - name: Ανέβασμα στο branch screenshots-dev
+        if: always()
+        run: |
+          [ -d test/shots ] || exit 0
+          cp shots.log test/shots/ 2>/dev/null || true
+          cd test/shots
+          git init -q
+          git checkout -q -b screenshots-dev
+          git add .
+          git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Στιγμιότυπα κλάδου ${{ github.ref_name }} · ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" screenshots-dev
