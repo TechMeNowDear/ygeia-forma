@@ -507,9 +507,10 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       for (final st in _states)
                         ChoiceChip(
                           label: Text(st.$2),
-                          selected: st.$1.id == f.id,
+                          // Και για καταχώριση με παλιό id (τρόφιμο που άλλαξε σε νεότερη λίστα).
+                          selected: st.$1.id == widget.food.currentOf(f).id,
                           onSelected: (_) {
-                            if (st.$1.id != f.id) setState(() => _item = st.$1);
+                            if (st.$1.id != widget.food.currentOf(f).id) setState(() => _item = st.$1);
                           },
                         ),
                     ],

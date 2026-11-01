@@ -483,7 +483,14 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         failed++;
       }
     }
-    final mine = [..._mine];
+    // Η λίστα από το κινητό (αν δεν είχε φορτωθεί στο άνοιγμα, να φαίνονται όλα, όχι μόνο τα νέα).
+    final mine = <Food>[];
+    for (final x in haveMine['foods'] as List) {
+      if (x is! Map) continue;
+      try {
+        mine.add(Food.fromJson(Map<String, dynamic>.from(x)));
+      } catch (_) {}
+    }
     for (final food in foods) {
       if (mineIds.contains(food.id)) {
         existing++;

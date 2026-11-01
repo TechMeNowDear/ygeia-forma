@@ -105,4 +105,10 @@ void main() {
     expect(h['2026-10-08']![K.weight], 82.2);
     expect(h['2024-01-01']![K.weight], 85, reason: 'έξω από τα 2 χρόνια της ανάγνωσης: δεν αγγίζεται');
   });
+
+  test('Πόσες μέρες έχουν ήδη ύπνο σε ένα διάστημα', () {
+    final h = sample();
+    expect(sleepDaysIn(h, DateTime(2026, 10, 1), DateTime(2026, 10, 31)), 3);
+    expect(sleepDaysIn(h, DateTime(2026, 10, 21), DateTime(2026, 10, 29)), 0);
+  });
 }

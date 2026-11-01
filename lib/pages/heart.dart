@@ -99,7 +99,7 @@ class HeartPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   if (latest != null)
                     InfoRow(
-                      'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now()).toLowerCase()} '}${hm(latest.start)}',
+                      'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now()).replaceFirst('Χθες', 'χθες')} '}${hm(latest.start)}',
                       '${latest.avg.round()} bpm',
                     ),
                   if (today != null) ...[

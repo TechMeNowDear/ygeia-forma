@@ -789,7 +789,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     ]));
     final ok = r['ok'] == true;
     if (ok) {
-      _unsavedDays.clear();
+      _unsavedDays.removeAll(all);
     } else {
       _unsavedDays.addAll(all);
     }
@@ -885,21 +885,26 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         _backfillFails = 0;
         // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ο μήνας ξαναδιαβάζεται στην επόμενη
         // ανανέωση. Μετά από 3 φορές προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
-        final failed = sleepReadFailed(r);
+        final dash = Dashboard.fromJson(r);
+        final to = addDays(cursor, -1);
+        final rows = summarizeRange(dash, from, to);
+        // Η Samsung έδωσε πολύ λιγότερες νύχτες από όσες έχει ήδη το ιστορικό για αυτόν τον μήνα
+        // (π.χ. νέο κινητό που δεν έχει συγχρονίσει ακόμα): σαν αποτυχία ανάγνωσης, ώστε να μη σβηστούν.
+        final had = sleepDaysIn(history, from, to);
+        final got = rows.values.where((v) => v.containsKey(K.sleepMin)).length;
+        final tooFew = had >= 4 && got < had / 2;
+        final failed = sleepReadFailed(r) || tooFew;
         if (failed) {
           final k = dateKey(cursor);
           final n = _backfillMonthFails[k] = (_backfillMonthFails[k] ?? 0) + 1;
           if (n < 3) break;
         }
-        final dash = Dashboard.fromJson(r);
-        final to = addDays(cursor, -1);
         final saved = await _saveDays(mergeHistory(
           history,
-          summarizeRange(dash, from, to),
-          // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς οι παλιές τιμές μένουν. Και μόνο αν
-          // η Samsung έδωσε ύπνο για εκείνον τον μήνα: σε νέο κινητό που δεν έχει συγχρονίσει ακόμα,
-          // ένας άδειος μήνας δεν σβήνει τον ύπνο που υπάρχει ήδη στο ιστορικό.
-          replaceSleep: !failed && dash.sleepOk && dash.sleepRecords.isNotEmpty,
+          rows,
+          // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς (και μετά από 3 προσπάθειες) οι
+          // τιμές ύπνου που υπάρχουν ήδη μένουν όπως είναι.
+          replaceSleep: !failed && dash.sleepOk,
           rangeFrom: from,
           rangeTo: to,
         ));

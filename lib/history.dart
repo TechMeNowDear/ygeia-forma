@@ -92,6 +92,15 @@ Set<String> mergeHistory(
   return changed;
 }
 
+/// Πόσες μέρες στο [from, to] έχουν ήδη ύπνο στο ιστορικό.
+int sleepDaysIn(Map<String, Map<String, double>> history, DateTime from, DateTime to) {
+  var n = 0;
+  for (var d = dayOf(from); !d.isAfter(dayOf(to)); d = DateTime(d.year, d.month, d.day + 1)) {
+    if (history[dateKey(d)]?.containsKey(K.sleepMin) ?? false) n++;
+  }
+  return n;
+}
+
 /// Τιμές που έρχονται από τις ζυγίσεις.
 const bodyKeys = {K.weight, K.fatPct, K.smm};
 

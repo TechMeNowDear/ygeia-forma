@@ -409,7 +409,11 @@ class DashboardReader(private val s: HealthDataStore) {
         // τιμές) παρά μισά δεδομένα που θα έμοιαζαν πλήρη.
         if (!token.isNullOrEmpty()) {
             val e = IllegalStateException("Πάρα πολλές εγγραφές (όριο ${maxPages * PAGE_SIZE})")
-            ErrorQueue.report(e, "samsung") // να το μάθουμε (Sentry): κάθε επόμενη ανάγνωση θα κοπεί ξανά
+            // Να το μάθουμε (Sentry), μία φορά ανά άνοιγμα της εφαρμογής: κάθε επόμενη ανάγνωση θα κοπεί ξανά.
+            if (!cappedReported) {
+                cappedReported = true
+                ErrorQueue.report(e, "samsung")
+            }
             throw e
         }
         return all
@@ -450,5 +454,8 @@ class DashboardReader(private val s: HealthDataStore) {
         const val PAGE_SIZE = 1000
         const val MAX_PAGES = 20
         const val HEART_MAX_PAGES = 60
+
+        @Volatile
+        var cappedReported = false
     }
 }
