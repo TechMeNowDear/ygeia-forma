@@ -41,5 +41,7 @@ void main() {
     expect(statuses, [200], reason: 'το Sentry πρέπει να απαντήσει 200');
     expect(await r.pending(), 0);
     dir.deleteSync(recursive: true);
+    // Σημάδι για το χτίσιμο ότι ο έλεγχος έτρεξε πραγματικά (δεν παραλείφθηκε).
+    File('sentry_live_ok').writeAsStringSync('ok');
   }, skip: !_live);
 }
