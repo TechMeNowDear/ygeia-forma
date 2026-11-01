@@ -37,6 +37,7 @@ class MetricDef {
     this.better = 0,
     this.kind = ValueKind.number,
     this.sparse = false,
+    this.partial = false,
     this.includeToday = true,
   });
 
@@ -55,6 +56,13 @@ class MetricDef {
 
   /// Αραιές μετρήσεις (ζυγίσεις): αρκούν 3 τιμές ανά περίοδο.
   final bool sparse;
+
+  /// Τιμή μόνο κάποιες μέρες (βαθμολογία ύπνου: μόνο νύχτες που η Samsung δεν χώρισε σε κομμάτια):
+  /// αρκεί το 1/3 των ημερών κάθε περιόδου.
+  final bool partial;
+
+  /// Πόσες τιμές χρειάζεται ένα διάστημα [len] ημερών.
+  int neededFor(int len) => sparse ? 3 : partial ? (len / 3).ceil() : (len * 2 / 3).ceil();
 
   /// Αν η σημερινή τιμή είναι ήδη τελική (ο ύπνος του πρωινού ναι, τα βήματα της μέρας όχι).
   final bool includeToday;
@@ -94,7 +102,7 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.dayHr, label: 'Μέσος όρος ημέρας', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
   // Ύπνος
   MetricDef(key: K.sleepMin, label: 'Διάρκεια ύπνου', section: TrendSection.sleep, minDiff: 15, better: 1, kind: ValueKind.duration),
-  MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1),
+  MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1, partial: true),
   MetricDef(key: K.deepPct, label: 'Βαθύς ύπνος', section: TrendSection.sleep, minDiff: 2, unit: '%', better: 1),
   // REM: ουδέτερο χρώμα· επηρεάζεται από φάρμακα (π.χ. αντικαταθλιπτικά), όχι μόνο από την ποιότητα του ύπνου.
   MetricDef(key: K.remPct, label: 'REM', section: TrendSection.sleep, minDiff: 2, unit: '%'),
@@ -191,7 +199,8 @@ double? median(List<double> v) {
 double _mean(List<double> v) => v.reduce((a, b) => a + b) / v.length;
 
 /// Αυτοσυσχέτιση διαδοχικών ημερών (lag 1), από τα ζευγάρια συνεχόμενων ημερών των δύο περιόδων.
-/// Στο [0, 0,8]· με λιγότερα από 6 ζευγάρια, 0,3 (συντηρητική τιμή για καθημερινές μετρήσεις).
+/// Στο [0, 0,8]. Με λιγότερα από 6 ζευγάρια οι τιμές δεν είναι καθημερινές (π.χ. ζυγίσεις μία φορά
+/// την εβδομάδα): μέρες που απέχουν δεν «κολλάνε» η μία στην άλλη, άρα 0.
 double lagOneCorrelation(List<List<(DateTime, double)>> windows) {
   var num = 0.0, den = 0.0, pairs = 0;
   for (final w in windows) {
@@ -208,7 +217,7 @@ double lagOneCorrelation(List<List<(DateTime, double)>> windows) {
       }
     }
   }
-  if (pairs < 6 || den <= 0) return 0.3;
+  if (pairs < 6 || den <= 0) return 0;
   return (num / den).clamp(0.0, 0.8);
 }
 
@@ -253,7 +262,7 @@ TrendResult computeTrend(
     end: end,
     previousFrom: previousFrom,
     previousEnd: previousEnd,
-    needed: def.sparse ? 3 : (len * 2 / 3).ceil(),
+    needed: def.neededFor(len),
   );
 }
 

@@ -128,7 +128,7 @@ class HeartPage extends StatelessWidget {
               icon: Icons.timeline_rounded,
               color: c.sleep,
               title: 'HRV (μεταβλητότητα παλμών)',
-              text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές. Θα έρθει από το Oura.',
+              text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές, γι\' αυτό δεν φαίνεται εδώ.',
             ),
           ],
         );

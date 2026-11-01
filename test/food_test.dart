@@ -66,6 +66,14 @@ void main() {
       expect(names('hliosporoi').first, startsWith('Ηλιόσποροι'));
       expect(names('angouri').first, startsWith('Αγγούρι'));
       expect(names('xoirino').first, startsWith('Χοιρ'), reason: 'το x ως χ δουλεύει όπως πριν');
+      expect(names('mango').first, 'Μάνγκο');
+      expect(names('μάνγκο').first, 'Μάνγκο');
+    });
+
+    test('Μικρές λέξεις (των, σε) και ρίζες στα άλλα ονόματα δεν φέρνουν άσχετα', () {
+      expect(names('τόνος').every((n) => n.startsWith('Τόνος')), isTrue, reason: 'όχι «…όλων των ειδών»');
+      expect(names('φέτα').take(2), ['Φέτα (ΠΟΠ, πρόβειο και κατσικίσιο)', 'Τυρί τύπου φέτας από αγελαδινό γάλα']);
+      expect(index.search('των'), isEmpty);
     });
   });
 
@@ -153,9 +161,14 @@ void main() {
     test('Αδύνατες τιμές ετικέτας δεν περνούν (kJ αντί για kcal, σάκχαρα > υδατάνθρακες)', () {
       expect(impossibleValues({Nk.kcal: 72, Nk.protein: 10, Nk.carbs: 3, Nk.sugars: 3, Nk.fat: 2}), isEmpty);
       expect(impossibleValues({Nk.kcal: 1500}).keys, [Nk.kcal]);
-      expect(impossibleValues({Nk.carbs: 10, Nk.sugars: 20}).keys, [Nk.sugars]);
-      expect(impossibleValues({Nk.fat: 5, Nk.satFat: 9}).keys, [Nk.satFat]);
-      expect(impossibleValues({Nk.protein: 50, Nk.carbs: 40, Nk.fat: 30}).keys, [Nk.protein]);
+      expect(impossibleValues({Nk.salt: 100, Nk.fat: 100, Nk.kcal: 900}), isEmpty);
+      // Μάλλον λάθος, αλλά αποθηκεύεται (προειδοποίηση).
+      expect(impossibleValues({Nk.carbs: 10, Nk.sugars: 20}), isEmpty);
+      expect(doubtfulValues({Nk.carbs: 10, Nk.sugars: 20}).keys, [Nk.sugars]);
+      expect(doubtfulValues({Nk.fat: 5, Nk.satFat: 9}).keys, [Nk.satFat]);
+      expect(doubtfulValues({Nk.protein: 50, Nk.carbs: 40, Nk.fat: 30}).keys, ['total']);
+      // Σπόροι chia με αμερικάνικη ετικέτα (ίνες μέσα στους υδατάνθρακες): καμία προειδοποίηση.
+      expect(doubtfulValues({Nk.protein: 17, Nk.carbs: 42, Nk.fat: 31, Nk.fiber: 34}), isEmpty);
     });
     test('Αριθμοί όπως στα ελληνικά', () {
       expect(parseNumber('12,5'), 12.5);

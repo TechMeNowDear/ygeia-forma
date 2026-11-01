@@ -201,12 +201,8 @@ class _LastNightCard extends StatelessWidget {
           StageLegend(night: n),
           const Hairline(vertical: 14),
           if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
-          if (n.spo2Avg != null)
-            InfoRow(
-              'Οξυγόνο',
-              '${n.spo2Avg!.round()}% · χαμηλότερη μέτρηση ${n.spo2Min?.round() ?? '—'}%',
-              dot: c.sleep,
-            ),
+          if (n.spo2Avg != null) InfoRow('Οξυγόνο, μέσος όρος', '${n.spo2Avg!.round()}%', dot: c.sleep),
+          if (n.spo2Min != null) InfoRow('Οξυγόνο, χαμηλότερη μέτρηση', '${n.spo2Min!.round()}%', dot: c.sleep),
           if (n.parts.length > 1) InfoRow('Η Samsung τη χώρισε σε', '${n.parts.length} κομμάτια', dot: c.textTertiary),
           if (n.parts.length > 1 && n.parts.any((p) => p.score != null))
             InfoRow(
@@ -252,7 +248,7 @@ class _ConsistencyCard extends StatelessWidget {
           const SizedBox(height: 8),
           InfoRow('Συνήθως κοιμάσαι', _clock(bedAvg)),
           InfoRow('Συνήθως ξυπνάς', _clock(wakeAvg)),
-          InfoRow('Η ώρα ύπνου διαφέρει συνήθως ±', hoursMinutes(spread.round())),
+          InfoRow('Η ώρα ύπνου αλλάζει συνήθως', '± ${hoursMinutes(spread.round())}'),
         ],
       ),
     );

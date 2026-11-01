@@ -88,8 +88,7 @@ double? energyMismatch(Map<String, double> v) {
   return (diff > 20 && diff / (k > 1 ? k : 1) > 0.15) ? calc : null;
 }
 
-/// Τιμές ανά 100 g που δεν γίνεται να είναι σωστές (λάθος πληκτρολόγηση ή τιμές ανά μερίδα/kJ).
-/// Κλειδί → μήνυμα. Κενό αν όλα στέκουν.
+/// Τιμές που **δεν γίνεται** να είναι σωστές (ανά 100 g): το προϊόν δεν αποθηκεύεται μέχρι να διορθωθούν.
 Map<String, String> impossibleValues(Map<String, double> v) {
   final out = <String, String>{};
   final k = v[Nk.kcal];
@@ -98,11 +97,21 @@ Map<String, String> impossibleValues(Map<String, double> v) {
     final x = v[key];
     if (x != null && x > 100) out[key] = 'Πάνω από 100 g σε 100 g δεν γίνεται';
   }
+  return out;
+}
+
+/// Τιμές που **μάλλον** είναι λάθος: προειδοποίηση, αλλά το προϊόν αποθηκεύεται (κάποιες ετικέτες,
+/// π.χ. αμερικάνικες, γράφουν αλλιώς). Το κλειδί `total` είναι για το σύνολο, όχι για ένα πεδίο.
+Map<String, String> doubtfulValues(Map<String, double> v) {
+  final out = <String, String>{};
   final c = v[Nk.carbs], s = v[Nk.sugars], f = v[Nk.fat], sf = v[Nk.satFat];
-  if (c != null && s != null && s > c + 0.5) out[Nk.sugars] ??= 'Τα σάκχαρα είναι μέρος των υδατανθράκων: όχι περισσότερα';
-  if (f != null && sf != null && sf > f + 0.5) out[Nk.satFat] ??= 'Τα κορεσμένα είναι μέρος των λιπαρών: όχι περισσότερα';
-  final total = (v[Nk.protein] ?? 0) + (c ?? 0) + (f ?? 0) + (v[Nk.fiber] ?? 0) + (v[Nk.salt] ?? 0);
-  if (total > 105) out[Nk.protein] ??= 'Μαζί όλα ξεπερνούν τα 100 g: έλεγξε τις τιμές';
+  if (c != null && s != null && s > c + 0.5) out[Nk.sugars] = 'Τα σάκχαρα είναι μέρος των υδατανθράκων: έλεγξέ τα';
+  if (f != null && sf != null && sf > f + 0.5) out[Nk.satFat] = 'Τα κορεσμένα είναι μέρος των λιπαρών: έλεγξέ τα';
+  // Χωρίς τις φυτικές ίνες: σε αμερικάνικες ετικέτες είναι ήδη μέσα στους υδατάνθρακες.
+  final total = (v[Nk.protein] ?? 0) + (c ?? 0) + (f ?? 0) + (v[Nk.salt] ?? 0);
+  if (total > 105) {
+    out['total'] = 'Πρωτεΐνη, υδατάνθρακες, λιπαρά και αλάτι μαζί ξεπερνούν τα 100 g. Έλεγξε ξανά την ετικέτα.';
+  }
   return out;
 }
 

@@ -58,6 +58,13 @@ void main() {
     expect(() => parseBackup(jsonEncode({'app': backupApp, 'version': 99})), throwsA(isA<BackupError>()));
   });
 
+  test('Ενικός και πληθυντικός', () {
+    expect(entriesText(1), '1 καταχώριση');
+    expect(entriesText(3), '3 καταχωρίσεις');
+    expect(productsText(1), '1 προϊόν');
+    expect(productsText(0), '0 προϊόντα');
+  });
+
   test('Όνομα αρχείου', () {
     expect(backupFileName(DateTime(2026, 3, 5)), 'ygeia-antigrafo-2026-03-05.json');
   });

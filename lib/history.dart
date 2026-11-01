@@ -90,17 +90,15 @@ Set<String> mergeHistory(
   return changed;
 }
 
-/// Ξεκίνημα από την αρχή για τους κανόνες ύπνου: σβήνει τις τιμές ύπνου από όλες τις μέρες.
-Set<String> clearSleepValues(Map<String, Map<String, double>> history) {
-  final changed = <String>{};
-  for (final e in history.entries.toList()) {
-    if (e.value.keys.any(sleepKeys.contains)) {
-      history[e.key] = {for (final v in e.value.entries) if (!sleepKeys.contains(v.key)) v.key: v.value};
-      changed.add(e.key);
-    }
-  }
-  return changed;
-}
+/// Τα είδη δεδομένων από τα οποία βγαίνουν οι τιμές ύπνου ([sleepKeys]), με τα ονόματα της γέφυρας.
+const sleepReadKeys = ['sleep', 'heart', 'stepsMin', 'spo2', 'skinTemp'];
+
+/// Αν σε μια ανάγνωση της γέφυρας κάποιο από τα [sleepReadKeys] γύρισε σφάλμα ({"error": …}).
+/// Τότε οι τιμές ύπνου εκείνων των ημερών **δεν** αντικαθίστανται (θα έμεναν κενά).
+bool sleepReadFailed(Map<String, dynamic> r) => sleepReadKeys.any((k) {
+      final v = r[k];
+      return v is Map && v.containsKey('error');
+    });
 
 /// «2026-10-24»
 String dateKey(DateTime d) => '${d.year}-${two(d.month)}-${two(d.day)}';

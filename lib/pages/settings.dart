@@ -178,8 +178,9 @@ class _BackupCardState extends State<_BackupCard> {
         return;
       }
       final uri = r['uri'] as String;
+      final saved = r['name'] is String ? r['name'] as String : name;
       _say(
-        'Αποθηκεύτηκε στις Λήψεις: $name · ${raw.$1.length} καταχωρίσεις, ${raw.$2.length} προϊόντα',
+        'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}',
         action: SnackBarAction(label: 'Αποστολή', onPressed: () => FoodChannel.shareBackup(uri)),
       );
     } finally {
@@ -210,10 +211,10 @@ class _BackupCardState extends State<_BackupCard> {
         builder: (context) => AlertDialog(
           title: const Text('Επαναφορά αντιγράφου'),
           content: Text(
-            'Αντίγραφο$when: ${b.entries.length} καταχωρίσεις φαγητού, ${b.myFoods.length} προϊόντα.\n\n'
+            'Αντίγραφο$when: ${entriesText(b.entries.length)} φαγητού, ${productsText(b.myFoods.length)}.\n\n'
             'Όσα υπάρχουν ήδη μένουν· όσα έχουν την ίδια ταυτότητα ενημερώνονται. Τίποτα δεν σβήνεται.'
             '${b.prefs.isEmpty ? '' : '\n\nΘα αντικατασταθούν οι ρυθμίσεις: «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση.'}'
-            '${b.skipped == 0 ? '' : '\n\n${b.skipped} χαλασμένες εγγραφές θα παραλειφθούν.'}',
+            '${b.skipped == 0 ? '' : '\n\n${countText(b.skipped, 'χαλασμένη εγγραφή θα παραλειφθεί', 'χαλασμένες εγγραφές θα παραλειφθούν')}.'}',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
@@ -225,8 +226,8 @@ class _BackupCardState extends State<_BackupCard> {
       final (e, f, failed) = await widget.food.importBackup(b.entries, b.myFoods);
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       _say([
-        'Επαναφέρθηκαν $e καταχωρίσεις και $f προϊόντα.',
-        if (failed > 0) '$failed δεν γράφτηκαν· δοκίμασε ξανά.',
+        'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
+        if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
       ].join(' '));
     } finally {

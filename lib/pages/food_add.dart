@@ -16,11 +16,14 @@ import 'nutrition.dart';
 // ---------------------------------------------------------------------------
 
 Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day}) {
+  final shown = food.day;
   food.syncToday();
+  // Κάρτα της μέρας που φαινόταν (π.χ. οθόνη ανοιχτή από χθες βράδυ): πάει στη νέα σημερινή μέρα.
+  final target = day == null || sameDay(day, shown) ? food.day : day;
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'Προσθήκη φαγητού'),
-      builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: day ?? food.day),
+      builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: target),
     ),
   );
 }
@@ -37,7 +40,7 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   );
   if (r == null) return;
   if (r.delete) {
-    await food.remove(e);
+    if (!await food.remove(e)) return;
     messenger.showSnackBar(SnackBar(
       content: Text('Διαγράφηκε: ${e.food.name}'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.restore(e)),
@@ -151,7 +154,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     );
     if (r == null || !mounted) return;
     final e = await widget.food.add(r.food, r.grams, r.meal, on: widget.day);
-    if (!mounted) return;
+    if (!mounted || !widget.food.isSaved(e)) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Προστέθηκε: ${r.food.name}, ${gramsText(r.grams)} g'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),
@@ -783,11 +786,15 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final values = _values;
     final mismatch = energyMismatch(values);
     final impossible = impossibleValues(values);
+    final doubtful = doubtfulValues(values);
 
-    InputDecoration deco(String label, {String? suffix, String? error}) => InputDecoration(
+    InputDecoration deco(String label, {String? suffix, String? error, String? warning}) => InputDecoration(
           labelText: label,
           suffixText: suffix,
           errorText: error,
+          helperText: warning,
+          helperMaxLines: 2,
+          helperStyle: TextStyle(fontSize: 12.5, color: c.bad),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         );
 
@@ -840,7 +847,16 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                     f.$4 ? f.$2 : '${f.$2} (προαιρετικό)',
                     suffix: f.$3,
                     error: impossible[f.$1] ?? (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
+                    warning: doubtful[f.$1],
                   ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (doubtful['total'] != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
+                  child: Text(doubtful['total']!, style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text)),
                 ),
                 const SizedBox(height: 10),
               ],

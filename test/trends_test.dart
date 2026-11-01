@@ -58,6 +58,38 @@ void main() {
     expect(t.status, TrendStatus.insufficient);
   });
 
+  test('Λίγες ζυγίσεις με πραγματική αλλαγή 2 kg → φαίνεται', () {
+    final h = <String, Map<String, double>>{};
+    const now = [80.1, 79.8, 80.2, 79.9], before = [82.2, 81.9, 82.0, 82.3];
+    for (var i = 0; i < 4; i++) {
+      h[dateKey(day(1 + 7 * i))] = {K.weight: now[i]};
+      h[dateKey(day(32 + 7 * i))] = {K.weight: before[i]};
+    }
+    final t = computeTrend(def(K.weight), h, today, TrendPeriod.month);
+    expect(t.status, TrendStatus.down);
+    // και χωρίς αλλαγή, ίδιος θόρυβος → σταθερό
+    for (var i = 0; i < 4; i++) {
+      h[dateKey(day(32 + 7 * i))] = {K.weight: now[3 - i]};
+    }
+    expect(computeTrend(def(K.weight), h, today, TrendPeriod.month).status, TrendStatus.stable);
+  });
+
+  test('Βαθμολογία ύπνου: αρκεί το 1/3 των νυχτών (οι χωρισμένες δεν έχουν βαθμολογία)', () {
+    final h = <String, Map<String, double>>{};
+    for (var ago = 0; ago < 60; ago++) {
+      if (ago % 2 == 0) h[dateKey(day(ago))] = {K.sleepScore: 80.0 + (ago % 6)};
+    }
+    final t = computeTrend(def(K.sleepScore), h, today, TrendPeriod.month);
+    expect(t.needed, 10);
+    expect(t.status, isNot(TrendStatus.insufficient));
+  });
+
+  test('Αραιές μετρήσεις: καμία αυτοσυσχέτιση', () {
+    expect(lagOneCorrelation([
+      [(day(1), 80.0), (day(8), 81.0), (day(15), 80.0)],
+    ]), 0);
+  });
+
   test('Χρόνος: τελευταίοι 3 μήνες με τους ίδιους μήνες πέρσι', () {
     final t = computeTrend(def(K.sleepHr), history, today, TrendPeriod.year);
     expect(t.end, today);

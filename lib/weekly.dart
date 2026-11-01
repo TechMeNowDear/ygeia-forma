@@ -67,8 +67,8 @@ WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime su
       end: end,
       previousFrom: add(monday, -28),
       previousEnd: add(monday, -1),
-      needed: (len * 2 / 3).ceil(),
-      neededPrevious: 19,
+      needed: def.neededFor(len),
+      neededPrevious: def.neededFor(28), // 19 από τις 28 (10 για τη βαθμολογία ύπνου)
     ));
   }
 

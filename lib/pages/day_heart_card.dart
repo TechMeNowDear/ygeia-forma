@@ -155,7 +155,7 @@ class _DayHeartCardState extends State<DayHeartCard> {
           for (final b in HeartBand.values) bandRow(b),
           if (recent.length >= 2) ...[
             const Hairline(vertical: 14),
-            Text('Ηρεμία ξύπνιος, τελευταίες μέρες', style: TextStyle(color: c.textSecondary, fontSize: 13)),
+            Text('Ξύπνιος, χωρίς βήματα: τελευταίες μέρες', style: TextStyle(color: c.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
             LineChart(
               height: 130,

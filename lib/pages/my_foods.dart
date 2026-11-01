@@ -92,8 +92,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
   }
 
   Future<void> _delete(Food f) async {
-    await widget.food.deleteMyFood(f);
-    if (!mounted) return;
+    if (!await widget.food.deleteMyFood(f) || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Διαγράφηκε: ${f.name}'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.saveMyFood(f)),

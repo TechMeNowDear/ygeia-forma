@@ -71,13 +71,19 @@ void main() {
     expect(h['2026-10-30']![K.sleepMin], 300, reason: 'έξω από το διάστημα: δεν αγγίζεται');
   });
 
-  test('Νέοι κανόνες: σβήνονται μόνο οι τιμές ύπνου', () {
-    final h = sample();
-    final changed = clearSleepValues(h);
-    expect(changed, {'2026-10-10', '2026-10-20', '2026-10-30'});
-    for (final row in h.values) {
-      expect(row.keys.any(sleepKeys.contains), isFalse);
+  test('Σφάλμα σε είδος ύπνου: δεν αντικαθίστανται οι τιμές ύπνου', () {
+    expect(sleepReadFailed({'ok': true, 'sleep': [], 'heart': []}), isFalse);
+    expect(sleepReadFailed({'ok': true, 'sleep': [], 'energy': {'error': 'x'}}), isFalse,
+        reason: 'η Energy Score δεν αγγίζει τον ύπνο');
+    for (final k in sleepReadKeys) {
+      expect(sleepReadFailed({'ok': true, 'sleep': [], k: {'error': 'x'}}), isTrue, reason: k);
     }
-    expect(h['2026-10-10']![K.steps], 5000);
+  });
+
+  test('Χωρίς αντικατάσταση ο ύπνος μένει όπως ήταν', () {
+    final h = sample();
+    mergeHistory(h, {'2026-10-10': {K.steps: 7000}});
+    expect(h['2026-10-10']![K.sleepMin], isNotNull);
+    expect(h['2026-10-10']![K.steps], 7000);
   });
 }

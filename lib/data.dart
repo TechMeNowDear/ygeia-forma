@@ -610,15 +610,33 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     try {
       final r = await SamsungHealth.loadPrefs().timeout(timeout);
       if (r['ok'] == false) {
-        // Σφάλμα ανάγνωσης (όχι «δεν υπάρχει αρχείο», που δίνει {}). Μετά από δύο, το αρχείο
-        // θεωρείται χαλασμένο και ξεκινάμε από τις προεπιλογές.
-        if (++_prefsErrors < 2) return;
+        // Το αρχείο υπάρχει αλλά δεν διαβάστηκε τώρα (kind «read»): ξανά αργότερα, ποτέ προεπιλογές
+        // από πάνω του. Άλλο σφάλμα (π.χ. χαλασμένο αρχείο) δύο φορές: ξεκινάμε από τις προεπιλογές.
+        if (r['kind'] == 'read' || ++_prefsErrors < 2) return;
       } else {
         prefs = Prefs.fromJson(r);
       }
+      // Ό,τι άλλαξε ο χρήστης όσο περιμέναμε (π.χ. θέμα) μπαίνει πάνω στις ρυθμίσεις που ήρθαν.
+      final pending = [..._pendingPrefChanges];
+      _pendingPrefChanges.clear();
+      for (final f in pending) {
+        f(prefs);
+      }
       _prefsLoaded = true;
       notifyListeners();
+      if (pending.isNotEmpty) await _savePrefs();
     } catch (_) {}
+  }
+
+  /// Αλλαγές ρυθμίσεων πριν διαβαστεί το αρχείο: εφαρμόζονται αμέσως στην οθόνη και ξανά πάνω
+  /// στις ρυθμίσεις που θα διαβαστούν, ώστε να μη χαθούν.
+  final List<void Function(Prefs)> _pendingPrefChanges = [];
+
+  void _changePrefs(void Function(Prefs) f) {
+    f(prefs);
+    if (!_prefsLoaded) _pendingPrefChanges.add(f);
+    notifyListeners();
+    _savePrefs();
   }
 
   Future<void> _savePrefs() async {
@@ -630,8 +648,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
-    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
-    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
+    // Αν δεν ήρθαν ακόμα, μία ακόμα προσπάθεια εδώ· μετά ξαναδοκιμάζει κάθε ανανέωση.
+    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
     await _loadHistory();
     await _upgradeHistory();
     final cached = await SamsungHealth.cachedDashboard();
@@ -676,11 +694,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     loading = false;
     notifyListeners();
 
+    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
+
     final d = data;
     if (r['ok'] == true && d != null && d.hasAnyPermission) {
       if (!_historyLoaded) await _loadHistory();
       // Χωρίς το αποθηκευμένο ιστορικό δεν γράφουμε τίποτα: θα έσβηνε τιμές που δεν ξαναδιαβάζονται.
       if (_historyLoaded) {
+        await _upgradeHistory();
         await _updateRecentHistory(d);
         _backfill();
       }
@@ -714,11 +735,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     ]));
   }
 
-  /// Νέοι κανόνες ύπνου (historyRulesVersion): οι παλιές τιμές ύπνου σβήνονται και το ιστορικό
-  /// ξαναδιαβάζεται από την αρχή με τους νέους κανόνες, ώστε όλες οι μέρες να έχουν τον ίδιο ορισμό.
+  /// Νέοι κανόνες ύπνου (historyRulesVersion): το ιστορικό ξαναδιαβάζεται από την αρχή και κάθε
+  /// μήνας αντικαθιστά τις τιμές ύπνου του με τους νέους κανόνες, ώστε όλες οι μέρες να έχουν τον
+  /// ίδιο ορισμό. Οι παλιές τιμές **δεν σβήνονται από πριν**: μένουν ώσπου να έρθουν οι νέες,
+  /// ώστε μια ανάγνωση που αποτυγχάνει να μην αφήνει κενά.
   Future<void> _upgradeHistory() async {
     if (!_prefsLoaded || !_historyLoaded || prefs.historyVersion >= historyRulesVersion) return;
-    await _saveDays(clearSleepValues(history));
     prefs.backfillFrom = null;
     prefs.historyVersion = historyRulesVersion;
     await _savePrefs();
@@ -745,9 +767,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  /// Σφάλμα ανάγνωσης σε κάποιο είδος δεδομένων (η γέφυρα βάζει {"error": …} στη θέση του).
-  static bool _hasReadErrors(Map<String, dynamic> r) =>
-      r.values.any((v) => v is Map && v.containsKey('error'));
+  /// Αποτυχίες της συμπλήρωσης σε αυτή τη χρήση της εφαρμογής: ανά μήνα (σφάλμα σε είδος ύπνου)
+  /// και συνολικά (η ανάγνωση δεν έγινε καθόλου). Μετά από 3, δεν ξαναδιαβάζουμε τα ίδια
+  /// σε κάθε ανανέωση (μπαταρία).
+  final Map<String, int> _backfillMonthFails = {};
+  int _backfillFails = 0;
 
   /// Φέρνει το ιστορικό ανά 30 μέρες προς τα πίσω, μέχρι 12 μήνες. Μόνο όσο η εφαρμογή είναι ανοιχτή·
   /// αν κλείσει, συνεχίζει από εκεί που σταμάτησε την επόμενη φορά.
@@ -758,7 +782,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     final start = addDays(today, -(_recentDays - 1));
     final oldest = addDays(today, -historyDays);
     var cursor = prefs.backfillFrom != null ? parseDateKey(prefs.backfillFrom!) : start;
-    if (!cursor.isAfter(oldest)) return;
+    if (!cursor.isAfter(oldest) || _backfillFails >= 3) return;
 
     backfilling = true;
     notifyListeners();
@@ -767,14 +791,27 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         var from = addDays(cursor, -30);
         if (from.isBefore(oldest)) from = oldest;
         final r = await SamsungHealth.readRange(dateKey(from), dateKey(cursor));
-        // Αν απέτυχε έστω ένα είδος δεδομένων, ο μήνας ξαναδιαβάζεται την επόμενη φορά.
-        if (r['ok'] != true || _hasReadErrors(r)) break;
+        if (r['ok'] != true) {
+          // Δεν διαβάστηκε τίποτα: ξανά στην επόμενη ανανέωση (ως 3 φορές), χωρίς να προχωρήσουμε.
+          _backfillFails++;
+          break;
+        }
+        _backfillFails = 0;
+        // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ο μήνας ξαναδιαβάζεται στην επόμενη
+        // ανανέωση. Μετά από 3 φορές προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
+        final failed = sleepReadFailed(r);
+        if (failed) {
+          final k = dateKey(cursor);
+          final n = _backfillMonthFails[k] = (_backfillMonthFails[k] ?? 0) + 1;
+          if (n < 3) break;
+        }
         final dash = Dashboard.fromJson(r);
         final to = addDays(cursor, -1);
         await _saveDays(mergeHistory(
           history,
           summarizeRange(dash, from, to),
-          replaceSleep: true,
+          // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς οι παλιές τιμές μένουν.
+          replaceSleep: !failed && dash.sleepOk,
           rangeFrom: from,
           rangeTo: to,
         ));
@@ -817,26 +854,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     return true;
   }
 
-  void setKitchen(Map<String, dynamic> k) {
-    prefs.kitchen = k;
-    notifyListeners();
-    _savePrefs();
-  }
+  void setKitchen(Map<String, dynamic> k) => _changePrefs((p) => p.kitchen = k);
 
   /// Εμφάνιση: αλλάζει αμέσως και αποθηκεύεται.
-  void setAppearance({String? mode, String? day, String? night}) {
-    if (mode != null) prefs.themeMode = mode;
-    if (day != null) prefs.dayTheme = day;
-    if (night != null) prefs.nightTheme = night;
-    notifyListeners();
-    _savePrefs();
-  }
+  void setAppearance({String? mode, String? day, String? night}) => _changePrefs((p) {
+        if (mode != null) p.themeMode = mode;
+        if (day != null) p.dayTheme = day;
+        if (night != null) p.nightTheme = night;
+      });
 
-  void setCard(String key, bool on) {
-    prefs.cards[key] = on;
-    notifyListeners();
-    _savePrefs();
-  }
+  void setCard(String key, bool on) => _changePrefs((p) => p.cards[key] = on);
 
   @override
   void dispose() {

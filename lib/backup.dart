@@ -102,6 +102,12 @@ BackupContents parseBackup(String text) {
   );
 }
 
+/// «1 καταχώριση» / «3 καταχωρίσεις».
+String countText(int n, String one, String many) => n == 1 ? '1 $one' : '$n $many';
+
+String entriesText(int n) => countText(n, 'καταχώριση', 'καταχωρίσεις');
+String productsText(int n) => countText(n, 'προϊόν', 'προϊόντα');
+
 /// «ygeia-antigrafo-2026-11-01.json»
 String backupFileName(DateTime now) =>
     'ygeia-antigrafo-${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.json';

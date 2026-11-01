@@ -120,7 +120,7 @@ class SamsungHealthBridge(
                 result.success(json.toString())
             }
             "cachedDashboard" -> result.success(readFile(DASHBOARD_FILE) ?: "{}")
-            "loadPrefs" -> result.success(readFile(PREFS_FILE) ?: "{}")
+            "loadPrefs" -> result.success(loadPrefsText())
             "savePrefs" -> {
                 writeFile(PREFS_FILE, call.argument<String>("json") ?: "{}")
                 result.success("{\"ok\":true}")
@@ -194,6 +194,16 @@ class SamsungHealthBridge(
         if (granted.isNotEmpty()) writeFile(DASHBOARD_FILE, o.toString())
         return o
     }
+
+    // «Δεν υπάρχει αρχείο» = {} (προεπιλογές). Αρχείο που υπάρχει αλλά δεν διαβάστηκε = σφάλμα,
+    // ώστε η εφαρμογή να μη γράψει προεπιλογές πάνω στις ρυθμίσεις.
+    private fun loadPrefsText(): String =
+        try {
+            val f = java.io.File(activity.filesDir, PREFS_FILE)
+            if (f.exists()) f.readText() else "{}"
+        } catch (e: Throwable) {
+            """{"ok":false,"kind":"read"}"""
+        }
 
     private fun readFile(name: String): String? =
         try {

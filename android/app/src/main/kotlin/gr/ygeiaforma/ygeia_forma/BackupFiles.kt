@@ -35,11 +35,32 @@ object BackupFiles {
         return uri
     }
 
+    /** Το όνομα που πήρε τελικά το αρχείο (αν υπήρχε ήδη, το σύστημα βάζει «(1)»). */
+    fun displayName(context: Context, uri: Uri): String? =
+        try {
+            context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        } catch (e: Throwable) {
+            null
+        }
+
     fun read(context: Context, uri: Uri): String {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: throw IllegalStateException("Δεν άνοιξε το αρχείο")
         // Όριο ασφαλείας: ένα αντίγραφο χρόνων είναι λίγα MB· κάτι πολύ μεγαλύτερο δεν είναι δικό μας.
-        if (bytes.size > 50 * 1024 * 1024) throw IllegalStateException("Πολύ μεγάλο αρχείο")
+        // Διαβάζεται κομμάτι-κομμάτι, ώστε ένα τεράστιο αρχείο να σταματά πριν γεμίσει τη μνήμη.
+        val limit = 30 * 1024 * 1024
+        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(64 * 1024)
+            var total = 0
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                total += n
+                if (total > limit) throw IllegalStateException("Πολύ μεγάλο αρχείο")
+                out.write(buf, 0, n)
+            }
+            out.toByteArray()
+        } ?: throw IllegalStateException("Δεν άνοιξε το αρχείο")
         return String(bytes, Charsets.UTF_8)
     }
 

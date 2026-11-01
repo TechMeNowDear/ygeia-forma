@@ -73,7 +73,8 @@ class FoodBridge(
                 val name = call.argument<String>("name") ?: "ygeia-antigrafo.json"
                 require(json.isNotEmpty()) { "Κενό αντίγραφο" }
                 val uri = withContext(Dispatchers.IO) { BackupFiles.save(activity, json, name) }
-                JSONObject().put("ok", true).put("uri", uri.toString())
+                val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
+                JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
             }
             "shareBackup" -> respond(result) {
                 BackupFiles.share(activity, android.net.Uri.parse(call.argument<String>("uri") ?: ""))

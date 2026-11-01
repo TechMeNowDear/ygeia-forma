@@ -1,5 +1,5 @@
 # Έλεγχοι σε κάθε κλάδο εκτός από το main: τρέχουν όλοι οι έλεγχοι (με ώρα Αθήνας),
-# χτίζεται APK debug (για να πιάνονται λάθη Kotlin) και βγαίνουν στιγμιότυπα στο branch
+# χτίζεται APK release όπως στο main, αλλά χωρίς το κλειδί (για να πιάνονται λάθη Kotlin και R8) και βγαίνουν στιγμιότυπα στο branch
 # «screenshots-dev». Τίποτα δεν δημοσιεύεται στο Releases: αυτό γίνεται μόνο από το main.
 name: Έλεγχος κλάδου
 
@@ -56,11 +56,11 @@ jobs:
           fi
           echo "::notice title=Έλεγχοι::$(grep -a 'All tests passed' tests.log | tail -1 | tr -cd '[:print:]' | tail -c 120)"
 
-      - name: Χτίσιμο APK (debug, μόνο για έλεγχο)
+      - name: Χτίσιμο APK (release χωρίς κλειδί, μόνο για έλεγχο)
         run: |
           set -o pipefail
-          if ! flutter build apk --debug --target-platform android-arm64 2>&1 | tee build.log; then
-            grep -E -A3 "^e: |error:|Error:|What went wrong|ERROR|Unresolved reference|Execution failed" build.log | head -150 > errors.txt || true
+          if ! flutter build apk --release --target-platform android-arm64 2>&1 | tee build.log; then
+            grep -E -A3 "^e: |error:|Error:|What went wrong|ERROR|Missing class|Unresolved reference|Execution failed" build.log | head -150 > errors.txt || true
             [ -s errors.txt ] || tail -120 build.log > errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
             echo "::error title=Σφάλμα χτισίματος::$msg"

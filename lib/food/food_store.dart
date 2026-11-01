@@ -245,42 +245,50 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
           time: base.add(Duration(milliseconds: i)),
         ),
     ];
+    final saved = <LogEntry>[];
     for (final e in out) {
-      await _put(e);
+      if (await _put(e)) saved.add(e);
     }
-    return out;
+    return saved;
   }
 
   Future<void> update(LogEntry e) => _put(e);
 
-  Future<void> _put(LogEntry e) async {
+  /// Αν η καταχώριση είναι αποθηκευμένη όπως είναι (όχι αν απέτυχε η αποθήκευσή της).
+  bool isSaved(LogEntry e) => identical(_entries[e.id], e);
+
+  Future<bool> _put(LogEntry e) async {
     final before = _entries[e.id];
     _entries[e.id] = e;
     notifyListeners();
-    if (_offline) return;
+    if (_offline) return true;
     final r = await FoodChannel.logPut(jsonEncode(e.toJson()));
-    if (r['ok'] != true) {
-      // Δεν γράφτηκε: η οθόνη να δείχνει ό,τι υπάρχει πραγματικά, και να το λέει.
+    if (r['ok'] == true) return true;
+    // Δεν γράφτηκε: η οθόνη να δείχνει ό,τι υπάρχει πραγματικά, και να το λέει. Αν στο μεταξύ
+    // ήρθε νεότερη αλλαγή στο ίδιο, δεν την πατάμε.
+    if (identical(_entries[e.id], e)) {
       if (before == null) {
         _entries.remove(e.id);
       } else {
         _entries[e.id] = before;
       }
-      saveError = 'Δεν αποθηκεύτηκε: ${e.food.name}. Δοκίμασε ξανά.';
-      notifyListeners();
     }
+    saveError = 'Δεν αποθηκεύτηκε: ${e.food.name}. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
   }
 
-  Future<void> remove(LogEntry e) async {
+  /// `false` αν δεν διαγράφηκε (τότε ξαναφαίνεται και βγαίνει μήνυμα).
+  Future<bool> remove(LogEntry e) async {
     _entries.remove(e.id);
     notifyListeners();
-    if (_offline) return;
+    if (_offline) return true;
     final r = await FoodChannel.logDelete(e.id);
-    if (r['ok'] != true) {
-      _entries[e.id] = e;
-      saveError = 'Δεν διαγράφηκε: ${e.food.name}. Δοκίμασε ξανά.';
-      notifyListeners();
-    }
+    if (r['ok'] == true) return true;
+    _entries.putIfAbsent(e.id, () => e);
+    saveError = 'Δεν διαγράφηκε: ${e.food.name}. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
   }
 
   /// Αναίρεση διαγραφής: ξαναμπαίνει ακριβώς όπως ήταν.
@@ -289,34 +297,39 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Τα προϊόντα μου, το πιο πρόσφατο πρώτο.
   List<Food> get mine => _mine;
 
-  Future<void> deleteMyFood(Food f) async {
+  /// `false` αν δεν διαγράφηκε.
+  Future<bool> deleteMyFood(Food f) async {
     final before = _mine;
-    _mine = _mine.where((x) => x.id != f.id).toList();
+    final after = _mine = _mine.where((x) => x.id != f.id).toList();
     _rebuildIndex();
     notifyListeners();
-    if (_offline) return;
+    if (_offline) return true;
     final r = await FoodChannel.myFoodDelete(f.id);
-    if (r['ok'] != true) {
+    if (r['ok'] == true) return true;
+    if (identical(_mine, after)) {
       _mine = before;
       _rebuildIndex();
-      saveError = 'Δεν διαγράφηκε: ${f.name}. Δοκίμασε ξανά.';
-      notifyListeners();
     }
+    saveError = 'Δεν διαγράφηκε: ${f.name}. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
   }
 
-  Future<void> saveMyFood(Food f) async {
+  Future<bool> saveMyFood(Food f) async {
     final before = _mine;
-    _mine = [f, ..._mine.where((x) => x.id != f.id)];
+    final after = _mine = [f, ..._mine.where((x) => x.id != f.id)];
     _rebuildIndex();
     notifyListeners();
-    if (_offline) return;
+    if (_offline) return true;
     final r = await FoodChannel.myFoodPut(jsonEncode(f.toJson()));
-    if (r['ok'] != true) {
+    if (r['ok'] == true) return true;
+    if (identical(_mine, after)) {
       _mine = before;
       _rebuildIndex();
-      saveError = 'Δεν αποθηκεύτηκε: ${f.name}. Δοκίμασε ξανά.';
-      notifyListeners();
     }
+    saveError = 'Δεν αποθηκεύτηκε: ${f.name}. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
   }
 
   void setDay(DateTime d) {

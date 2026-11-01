@@ -50,7 +50,8 @@ GapVerdict judgeGap(
   // Μέτρηση μέσα στο διάστημα [start, end): με διάρκεια που το τέμνει, ή στιγμιαία μέσα του.
   bool overlaps(Sample s, DateTime start, DateTime end) =>
       s.start.isBefore(end) && (s.end.isAfter(start) || (s.end == s.start && !s.start.isBefore(start)));
-  final inGap = [for (final s in heart) if (overlaps(s, gapStart, gapEnd)) s.avg];
+  final gapSamples = [for (final s in heart) if (overlaps(s, gapStart, gapEnd)) s];
+  final inGap = [for (final s in gapSamples) s.avg];
   final inSleep = [
     for (final s in heart)
       if (overlaps(s, a.start, a.end) || overlaps(s, b.start, b.end)) s.avg,
@@ -59,7 +60,7 @@ GapVerdict judgeGap(
   // συνολικά, που μπορεί να είναι όλες στην αρχή, π.χ. πριν μπει το ρολόι στον φορτιστή).
   for (var slot = gapStart; slot.isBefore(gapEnd); slot = slot.add(const Duration(minutes: 30))) {
     final slotEnd = slot.add(const Duration(minutes: 30)).isBefore(gapEnd) ? slot.add(const Duration(minutes: 30)) : gapEnd;
-    if (!heart.any((s) => overlaps(s, slot, slotEnd))) return GapVerdict.noHeartData;
+    if (!gapSamples.any((s) => overlaps(s, slot, slotEnd))) return GapVerdict.noHeartData;
   }
   if (inGap.isEmpty || inSleep.length < 3) return GapVerdict.noHeartData;
   double mean(List<double> v) => v.reduce((x, y) => x + y) / v.length;

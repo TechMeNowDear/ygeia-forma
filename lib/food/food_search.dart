@@ -51,6 +51,12 @@ String phonetic(String s) {
     final ch = p[i];
     final isGreek = ch.codeUnitAt(0) >= 0x0370 && ch.codeUnitAt(0) <= 0x03FF;
     if (isGreek) {
+      // «νγκ» (μάνγκο) = «ng» στο greeklish (mango), που γίνεται g όπως το «γγ».
+      if (i + 2 < p.length && p.substring(i, i + 3) == 'νγκ') {
+        out.write('g');
+        i += 3;
+        continue;
+      }
       if (_grDigraphs.containsKey(two)) {
         out.write(_grDigraphs[two]);
         i += 2;
@@ -73,7 +79,15 @@ String phonetic(String s) {
   return out.toString().replaceAllMapped(RegExp(r'([a-z])\1+'), (m) => m[1]!);
 }
 
-List<String> _words(String s) => s.split(RegExp(r'[^a-z0-9α-ω%]+')).where((w) => w.isNotEmpty).toList();
+/// Μικρές λέξεις που δεν λένε τι είναι το τρόφιμο (σε φωνητική μορφή): των, με, σε, και, από…
+/// Δεν μετρούν ούτε στο όνομα ούτε στην αναζήτηση («τόνος» δεν βρίσκει «…όλων **των** ειδών»).
+const _stopWords = {
+  'ton', 'tin', 'tis', 'tu', 'to', 'ta', 'ti', 'me', 'se', 'ke', 'i', 'o', 'apo', 'gia',
+  'sto', 'sti', 'stin', 'ston', 'stis', 'stus', 'sta', 'ena', 'enas', 'mia',
+};
+
+List<String> _words(String s) =>
+    s.split(RegExp(r'[^a-z0-9α-ω%]+')).where((w) => w.isNotEmpty && !_stopWords.contains(w)).toList();
 
 /// Ρίζα λέξης (σε φωνητική μορφή), για να βρίσκονται πληθυντικοί και πτώσεις:
 /// «ντομάτες» = «ντομάτα», «πιπεριές» = «πιπεριά», «φακή» = «φακές», «αμύγδαλο» = «αμύγδαλα».
@@ -148,12 +162,13 @@ class FoodIndex {
         for (var k = 0; k < _alias[i].length; k++) {
           final aw = _alias[i][k];
           // Τα «άλλα ονόματα» είναι επιλεγμένα με το χέρι: ακριβές ταίριασμα μετρά σχεδόν όσο το όνομα.
+          // Ίδια ρίζα μόνο λίγο («φέτα» ≠ «τυρί σε φέτες»).
           final s = aw == w
               ? 9.0
-              : (ws.length >= 3 && _aliasStem[i][k] == ws)
-                  ? 6.0
-                  : aw.startsWith(w)
-                      ? 4.0
+              : aw.startsWith(w)
+                  ? 4.0
+                  : (ws.length >= 3 && _aliasStem[i][k] == ws)
+                      ? 3.0
                       : 0.0;
           if (s > best) best = s;
         }
