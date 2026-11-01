@@ -103,3 +103,6 @@ String signedMinutes(int v) {
 
 /// «Καλημέρα» / «Καλησπέρα» ανάλογα με την ώρα.
 String greeting(DateTime now) => (now.hour >= 4 && now.hour < 13) ? 'Καλημέρα' : 'Καλησπέρα';
+
+/// «1 καταχώριση» / «3 καταχωρίσεις».
+String countText(int n, String one, String many) => n == 1 ? '1 $one' : '$n $many';

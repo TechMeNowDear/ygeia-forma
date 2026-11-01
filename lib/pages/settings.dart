@@ -220,7 +220,7 @@ class _BackupCardState extends State<_BackupCard> {
           title: const Text('Επαναφορά αντιγράφου'),
           content: Text(
             'Αντίγραφο$when: ${entriesText(b.entries.length)} φαγητού, ${productsText(b.myFoods.length)}.\n\n'
-            'Μπαίνουν μόνο όσα λείπουν από το κινητό. Όσα υπάρχουν ήδη μένουν όπως είναι (και με τις διορθώσεις τους). '
+            'Μπαίνουν μόνο όσα λείπουν από το κινητό. Όσα υπάρχουν ήδη μένουν όπως είναι, με όσες αλλαγές τους έκανες. '
             'Τίποτα δεν σβήνεται· καταχωρίσεις που έσβησες μετά το αντίγραφο ξαναμπαίνουν.'
             '${b.prefs.isEmpty ? '' : '\n\nΘα αντικατασταθούν οι ρυθμίσεις: «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση.'}'
             '${b.skipped == 0 ? '' : '\n\n${countText(b.skipped, 'χαλασμένη εγγραφή θα παραλειφθεί', 'χαλασμένες εγγραφές θα παραλειφθούν')}.'}',
@@ -241,7 +241,8 @@ class _BackupCardState extends State<_BackupCard> {
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       _say([
         'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
-        if (existing > 0) '${countText(existing, 'υπήρχε ήδη', 'υπήρχαν ήδη')} και έμειναν όπως είναι.',
+        if (existing > 0)
+          existing == 1 ? '1 εγγραφή υπήρχε ήδη και έμεινε όπως ήταν.' : '$existing εγγραφές υπήρχαν ήδη και έμειναν όπως ήταν.',
         if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
       ].join(' '));

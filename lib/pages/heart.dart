@@ -95,16 +95,16 @@ class HeartPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.monitor_heart_rounded, title: 'Τελευταίες μετρήσεις σήμερα', color: c.heart),
+                  CardHeader(icon: Icons.monitor_heart_rounded, title: 'Τελευταίες μετρήσεις', color: c.heart),
                   const SizedBox(height: 8),
                   if (latest != null)
                     InfoRow(
-                      'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now())} '}${hm(latest.start)}',
+                      'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now()).toLowerCase()} '}${hm(latest.start)}',
                       '${latest.avg.round()} bpm',
                     ),
                   if (today != null) ...[
-                    InfoRow('Χαμηλότεροι', '${today.$1.round()} bpm'),
-                    InfoRow('Υψηλότεροι', '${today.$2.round()} bpm'),
+                    InfoRow('Χαμηλότεροι σήμερα', '${today.$1.round()} bpm'),
+                    InfoRow('Υψηλότεροι σήμερα', '${today.$2.round()} bpm'),
                   ],
                   if (latest == null && today == null)
                     Text('Δεν υπάρχουν μετρήσεις σήμερα.', style: TextStyle(color: c.textSecondary)),

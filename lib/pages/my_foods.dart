@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../backup.dart' show countText;
+import '../format.dart' show countText;
 import '../food/food_model.dart';
 import '../food/food_search.dart';
 import '../food/food_store.dart';

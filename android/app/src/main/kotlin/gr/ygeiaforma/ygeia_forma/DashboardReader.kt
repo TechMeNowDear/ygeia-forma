@@ -407,7 +407,11 @@ class DashboardReader(private val s: HealthDataStore) {
         } while (!token.isNullOrEmpty() && pages < maxPages)
         // Έμειναν κι άλλες σελίδες: η ανάγνωση είναι μισή. Καλύτερα σφάλμα (η εφαρμογή κρατά τις παλιές
         // τιμές) παρά μισά δεδομένα που θα έμοιαζαν πλήρη.
-        if (!token.isNullOrEmpty()) throw IllegalStateException("Πάρα πολλές εγγραφές (όριο ${maxPages * PAGE_SIZE})")
+        if (!token.isNullOrEmpty()) {
+            val e = IllegalStateException("Πάρα πολλές εγγραφές (όριο ${maxPages * PAGE_SIZE})")
+            ErrorQueue.report(e, "samsung") // να το μάθουμε (Sentry): κάθε επόμενη ανάγνωση θα κοπεί ξανά
+            throw e
+        }
         return all
     }
 

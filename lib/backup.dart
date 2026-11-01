@@ -1,12 +1,13 @@
 /// Αντίγραφο ασφαλείας: ημερολόγιο φαγητού, «Τα προϊόντα μου» και ρυθμίσεις σε ένα αρχείο JSON.
 ///
 /// Αυτά υπάρχουν μόνο στο κινητό (τα δεδομένα της Samsung ξαναδιαβάζονται, γι' αυτό δεν μπαίνουν).
-/// Η επαναφορά **δεν σβήνει τίποτα**: προσθέτει ό,τι λείπει και ενημερώνει ό,τι έχει το ίδιο id.
+/// Η επαναφορά **δεν σβήνει τίποτα** και **δεν αλλάζει ό,τι υπάρχει ήδη**: προσθέτει μόνο ό,τι λείπει.
 library;
 
 import 'dart:convert';
 
 import 'food/food_model.dart';
+import 'format.dart';
 
 const backupApp = 'ygeia-forma';
 const backupVersion = 1;
@@ -103,8 +104,6 @@ BackupContents parseBackup(String text) {
   );
 }
 
-/// «1 καταχώριση» / «3 καταχωρίσεις».
-String countText(int n, String one, String many) => n == 1 ? '1 $one' : '$n $many';
 
 String entriesText(int n) => countText(n, 'καταχώριση', 'καταχωρίσεις');
 String productsText(int n) => countText(n, 'προϊόν', 'προϊόντα');

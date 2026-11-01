@@ -69,7 +69,7 @@ class SleepPage extends StatelessWidget {
                       ),
                       Expanded(
                         child: _Summary(
-                          label: scored == week.length ? 'Μέση βαθμολογία' : 'Μέση βαθμολογία ($scored νύχτες)',
+                          label: scored == week.length ? 'Μέση βαθμολογία' : 'Μέση βαθμολογία (${countText(scored, 'νύχτα', 'νύχτες')})',
                           value: scoreAvg == null ? '—' : '${scoreAvg.round()} από 100',
                         ),
                       ),

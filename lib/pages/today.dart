@@ -80,7 +80,7 @@ class TodayPage extends StatelessWidget {
             : null;
 
         final pair = <Widget>[
-          if (prefs.show('steps')) _stepsCard(context, d, () => open(Cat.exercise)),
+          if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise)),
           if (prefs.show('weight')) _weightCard(context, d, () => open(Cat.health, HealthTab.body)),
         ];
 
@@ -129,7 +129,7 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _stepsCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _stepsCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final steps = d.todaySteps;
     final base = d.stepsBaseline;
@@ -138,7 +138,7 @@ class TodayPage extends StatelessWidget {
       icon: Icons.directions_walk_rounded,
       color: c.exercise,
       // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
-      title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα' : 'Βήματα · ${relativeDay(d.readAt, DateTime.now())}',
+      title: sameDay(d.readAt, now) ? 'Βήματα' : 'Βήματα · ${relativeDay(d.readAt, now)}',
       value: steps == null ? null : thousands(steps),
       note: base == null ? null : 'Συνήθως ${thousands(base)}',
       chart: last7.length >= 2 ? MiniBars(values: [for (final s in last7) s.value], color: c.exercise) : null,

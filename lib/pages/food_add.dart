@@ -269,7 +269,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                       child: Text(
                         'Δεν βρέθηκε «$q» στη βάση. Αν είναι συσκευασμένο, σκάναρε το barcode ή γράψε τις τιμές της ετικέτας. '
-                        'Αν δεν έχει ετικέτα (π.χ. σπιτικό φαγητό), γράψε ένα-ένα τα υλικά του.',
+                        'Αν δεν έχει ετικέτα (π.χ. σπιτικό φαγητό), πρόσθεσε ένα-ένα τα υλικά του.',
                         style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                       ),
                     )
@@ -487,7 +487,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 Text(f.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
                 const SizedBox(height: 4),
                 InkWell(
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τρόφιμο'), builder: (_) => FoodDetailScreen(food: f))),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τρόφιμο'), builder: (_) => FoodDetailScreen(food: f, sourceName: widget.food.byId(f.id)?.sourceName))),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
@@ -620,8 +620,11 @@ class _QuantitySheetState extends State<QuantitySheet> {
 // ---------------------------------------------------------------------------
 
 class FoodDetailScreen extends StatelessWidget {
-  const FoodDetailScreen({super.key, required this.food});
+  const FoodDetailScreen({super.key, required this.food, this.sourceName});
   final Food food;
+
+  /// Η περιγραφή της πηγής, όταν το [food] είναι αντίγραφο καταχώρισης (που δεν την κρατά).
+  final String? sourceName;
 
   static const _rows = <(String, String, String, int)>[
     ('kcal', 'Ενέργεια', 'kcal', 0),
@@ -689,10 +692,10 @@ class FoodDetailScreen extends StatelessWidget {
                     InfoRow('Βάση', f.source),
                     if (f.sourceCode != null) InfoRow('Κωδικός', '${f.sourceCode}'),
                     if (f.barcode != null) InfoRow('Barcode', f.barcode!),
-                    if (f.sourceName != null)
+                    if ((f.sourceName ?? sourceName) != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
-                        child: Text('Όνομα στην πηγή: ${f.sourceName}',
+                        child: Text('Όνομα στην πηγή: ${f.sourceName ?? sourceName}',
                             style: TextStyle(fontSize: 13, color: c.textSecondary)),
                       ),
                     const SizedBox(height: 8),

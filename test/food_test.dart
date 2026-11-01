@@ -213,6 +213,14 @@ void main() {
       expect(s.statesOf(foodNamed('Χυλοπίτες/ζυμαρικά με αυγό (ξηρά, ωμά)')).length, 2);
       expect(s.statesOf(foodNamed('Ρύζι parboiled (ωμό)')).length, 2);
     });
+    test('Καταχώριση που ξαναδιαβάστηκε από το κινητό: οι μορφές βγαίνουν από τη βάση', () {
+      final raw = foodNamed('Ρύζι λευκό (ωμό)');
+      final e = LogEntry(id: 'x', day: '2026-10-24', meal: Meal.lunch, food: raw, grams: 80, time: DateTime(2026, 10, 24, 13));
+      final back = LogEntry.fromJson(e.toJson());
+      final states = s.statesOf(back.food);
+      expect(states.length, 2);
+      expect(identical(states.first.$1, back.food), isTrue, reason: 'η ίδια μορφή μένει το αντίγραφο της καταχώρισης');
+    });
     test('Τρόφιμο χωρίς άλλες μορφές', () {
       expect(s.statesOf(foodNamed('Μέλι')), isEmpty);
     });
@@ -245,11 +253,14 @@ void main() {
       final eggplant = foodNamed('Μελιτζάνα (ωμή)');
       final pepper = foodNamed('Πιπεριά κόκκινη (ωμή)');
       final jam = foodNamed('Μαρμελάδα φράουλα');
+      final noodles = foodNamed('Χυλοπίτες/ζυμαρικά με αυγό (ξηρά, ωμά)');
       for (var i = 0; i < 10; i++) {
         await s.add(eggplant, 200, Meal.lunch);
         await s.add(pepper, 100, Meal.lunch);
         await s.add(jam, 20, Meal.breakfast);
+        await s.add(noodles, 80, Meal.dinner);
       }
+      expect(s.search('αυγό').first.name, 'Αυγό (ωμό)');
       expect(s.search('μέλι').first.name, 'Μέλι');
       expect(s.search('πιπέρι').first.name, 'Πιπέρι μαύρο');
       expect(s.search('φράουλες').first.name, 'Φράουλες');

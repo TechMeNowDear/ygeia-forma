@@ -79,7 +79,7 @@ object BackupFiles {
 
     fun share(context: Context, uri: Uri) {
         val send = Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
+            type = context.contentResolver.getType(uri) ?: "application/gzip"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }

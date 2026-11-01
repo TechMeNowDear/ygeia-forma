@@ -208,7 +208,8 @@ class SamsungHealthBridge(
             .put("total", permissions.size)
         // Το JSON (μερικά MB) φτιάχνεται μία φορά και όχι στο main thread· η εγγραφή στο IO.
         val text = withContext(Dispatchers.Default) { o.toString() }
-        if (granted.isNotEmpty()) withContext(Dispatchers.IO) { writeFile(DASHBOARD_FILE, text) }
+        // Βοηθητικό αντίγραφο (ξαναδιαβάζεται): χωρίς «σφράγισμα» στον δίσκο σε κάθε ανανέωση.
+        if (granted.isNotEmpty()) withContext(Dispatchers.IO) { writeFile(DASHBOARD_FILE, text, sync = false) }
         return text
     }
 
@@ -235,14 +236,14 @@ class SamsungHealthBridge(
      * μια διακοπή ρεύματος αφήνει είτε το παλιό είτε το νέο αρχείο, ποτέ μισό. `false` αν απέτυχε.
      */
     @Synchronized
-    private fun writeFile(name: String, text: String): Boolean =
+    private fun writeFile(name: String, text: String, sync: Boolean = true): Boolean =
         try {
             val f = java.io.File(activity.filesDir, name)
             val tmp = java.io.File(activity.filesDir, "$name.tmp")
             java.io.FileOutputStream(tmp).use { out ->
                 out.write(text.toByteArray(Charsets.UTF_8))
                 out.flush()
-                out.fd.sync()
+                if (sync) out.fd.sync()
             }
             tmp.renameTo(f)
         } catch (e: Throwable) {

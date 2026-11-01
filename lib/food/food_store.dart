@@ -229,17 +229,22 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Ωμό + μαγειρεμένες μορφές του ίδιου τροφίμου, με την ετικέτα κάθε κατάστασης.
   /// Κενή λίστα αν το τρόφιμο δεν έχει άλλες μορφές.
+  ///
+  /// Οι μορφές βγαίνουν από τη βάση (το αντίγραφο μιας καταχώρισης δεν κρατά τη λίστα τους)· η μορφή
+  /// που είναι ήδη η καταχώριση μένει το δικό της αντίγραφο, με τις τιμές της.
   List<(Food, String)> statesOf(Food f) {
-    final raw = f.rawId != null ? byId(f.rawId!) : (f.isRawWithCooked ? f : null);
+    final cur = byId(_idNow(f.id)) ?? f;
+    final raw = cur.rawId != null ? byId(cur.rawId!) : (cur.isRawWithCooked ? cur : null);
     if (raw == null) return const [];
+    Food same(Food x) => x.id == f.id ? f : x;
     // Όσπρια: «Ξερές/Ξερά» είναι πιο κατανοητό από «Ωμό». Μόνο όταν η κατάσταση στην παρένθεση λέει «ξερ…»
     // (όχι το «Κρεμμύδι ξερό», που είναι είδος κρεμμυδιού), και στο γένος του ονόματος: «Φακές (ξερές)» → «Ξερές».
     final dry = RegExp(r'\((ξερ[^\s,)]*)').firstMatch(raw.name)?.group(1);
     final rawLabel = dry != null ? '${dry[0].toUpperCase()}${dry.substring(1)} (πριν το βράσιμο)' : 'Ωμό';
     return [
-      (raw, rawLabel),
+      (same(raw), rawLabel),
       for (final c in raw.cooked)
-        if (byId(c.$1) case final cf?) (cf, c.$2),
+        if (byId(c.$1) case final cf?) (same(cf), c.$2),
     ];
   }
 
@@ -451,6 +456,13 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     var e = 0, f = 0, failed = 0, existing = 0;
     final have = await FoodChannel.logRange('0000-01-01', '9999-12-31');
     if (have['ok'] != true || have['entries'] is! List) return null;
+    // Τα προϊόντα από το κινητό (όχι από τη μνήμη, που μπορεί να μη φορτώθηκαν).
+    final haveMine = await FoodChannel.myFoods();
+    if (haveMine['ok'] != true || haveMine['foods'] is! List) return null;
+    final mineIds = {
+      for (final x in haveMine['foods'] as List)
+        if (x is Map && x['id'] is String) x['id'] as String,
+    };
     final haveIds = {
       for (final x in have['entries'] as List)
         if (x is Map && x['id'] is String) x['id'] as String,
@@ -472,7 +484,6 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     final mine = [..._mine];
-    final mineIds = {for (final x in _mine) x.id};
     for (final food in foods) {
       if (mineIds.contains(food.id)) {
         existing++;

@@ -112,7 +112,7 @@ class BodyPage extends StatelessWidget {
 
         return PageFrame(
           title: 'Σώμα',
-          subtitle: body.isEmpty ? null : '${body.length} ζυγίσεις',
+          subtitle: body.isEmpty ? null : countText(body.length, 'ζύγιση', 'ζυγίσεις'),
           onRefresh: () => store.refresh(),
           left: left,
           right: bodyMore,

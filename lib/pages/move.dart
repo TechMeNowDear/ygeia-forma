@@ -48,7 +48,12 @@ class ExercisePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CardHeader(icon: Icons.directions_walk_rounded, title: 'Βήματα σήμερα', color: c.exercise),
+              // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
+              CardHeader(
+                icon: Icons.directions_walk_rounded,
+                title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα σήμερα' : 'Βήματα · ${relativeDay(d.readAt, DateTime.now())}',
+                color: c.exercise,
+              ),
               const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,

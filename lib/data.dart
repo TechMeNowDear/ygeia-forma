@@ -684,7 +684,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<bool> _savePrefs() {
     if (!_prefsLoaded) return Future.value(false);
     final json = prefs.toJson();
-    return _prefsSaves = _prefsSaves.then((_) async {
+    return _prefsSaves = _prefsSaves.catchError((_) => false).then((_) async {
       final r = await SamsungHealth.savePrefs(json);
       return r['ok'] == true;
     });
@@ -775,14 +775,25 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     history = h;
   }
 
+  /// Μέρες που άλλαξαν στη μνήμη αλλά δεν γράφτηκαν ακόμα στο κινητό (απέτυχε η αποθήκευση):
+  /// μπαίνουν σε κάθε επόμενη αποθήκευση μέχρι να γραφτούν, ώστε να μη μείνουν κενά.
+  final Set<String> _unsavedDays = {};
+
   /// `true` αν γράφτηκαν (ή δεν υπήρχε κάτι να γραφτεί).
   Future<bool> _saveDays(Set<String> keys) async {
-    if (keys.isEmpty) return true;
+    final all = {...keys, ..._unsavedDays};
+    if (all.isEmpty) return true;
     final r = await SamsungHealth.saveDays(jsonEncode([
-      for (final k in keys)
+      for (final k in all)
         if (history[k] != null) {'date': k, 'data': history[k]},
     ]));
-    return r['ok'] == true;
+    final ok = r['ok'] == true;
+    if (ok) {
+      _unsavedDays.clear();
+    } else {
+      _unsavedDays.addAll(all);
+    }
+    return ok;
   }
 
   /// Νέοι κανόνες ύπνου (historyRulesVersion): το ιστορικό ξαναδιαβάζεται από την αρχή και κάθε
@@ -817,9 +828,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
     final changed = mergeHistory(history, rows, sleepFrom: sleepFrom);
     // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
-    if (d.bodyOk) {
-      changed.addAll(removeMissingBody(history, {for (final b in d.body) dateKey(b.time)},
-          from: DateTime(today.year - 2, today.month, today.day + 1)));
+    // Με προφύλαξη: αν η Samsung δεν δίνει καμία ζύγιση (π.χ. μόλις επανεγκαταστάθηκε) ή θα έφευγαν
+    // πολλές μαζί, δεν σβήνεται τίποτα· μια λάθος ζύγιση που σβήνεις είναι μία-δύο μέρες.
+    if (d.bodyOk && d.body.isNotEmpty) {
+      final copy = {for (final e in history.entries) e.key: e.value};
+      final gone = removeMissingBody(copy, {for (final b in d.body) dateKey(b.time)},
+          from: DateTime(today.year - 2, today.month, today.day + 1));
+      if (gone.isNotEmpty && gone.length <= 3) {
+        changed.addAll(removeMissingBody(history, {for (final b in d.body) dateKey(b.time)},
+            from: DateTime(today.year - 2, today.month, today.day + 1)));
+      }
     }
     final saved = await _saveDays(changed);
     // Η εφαρμογή έμεινε κλειστή πάνω από 29 μέρες: οι μέρες στη μέση (και η τελευταία, που είχε
@@ -878,8 +896,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         final saved = await _saveDays(mergeHistory(
           history,
           summarizeRange(dash, from, to),
-          // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς οι παλιές τιμές μένουν.
-          replaceSleep: !failed && dash.sleepOk,
+          // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς οι παλιές τιμές μένουν. Και μόνο αν
+          // η Samsung έδωσε ύπνο για εκείνον τον μήνα: σε νέο κινητό που δεν έχει συγχρονίσει ακόμα,
+          // ένας άδειος μήνας δεν σβήνει τον ύπνο που υπάρχει ήδη στο ιστορικό.
+          replaceSleep: !failed && dash.sleepOk && dash.sleepRecords.isNotEmpty,
           rangeFrom: from,
           rangeTo: to,
         ));
@@ -924,8 +944,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       ..historyVersion = prefs.historyVersion;
     prefs = restored;
     notifyListeners();
-    await _savePrefs();
-    return true;
+    return _savePrefs();
   }
 
   /// `false` αν οι ρυθμίσεις δεν έχουν διαβαστεί ακόμα: τότε η κουζίνα που φαίνεται μπορεί να μην
