@@ -154,7 +154,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     );
     if (r == null || !mounted) return;
     final e = await widget.food.add(r.food, r.grams, r.meal, on: widget.day);
-    if (!mounted || !widget.food.isSaved(e)) return;
+    if (!mounted) return;
+    if (!widget.food.isSaved(e)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Δεν αποθηκεύτηκε: ${r.food.name}. Δοκίμασε ξανά.'),
+      ));
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Προστέθηκε: ${r.food.name}, ${gramsText(r.grams)} g'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),

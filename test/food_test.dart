@@ -73,7 +73,10 @@ void main() {
     test('Μικρές λέξεις (των, σε) και ρίζες στα άλλα ονόματα δεν φέρνουν άσχετα', () {
       expect(names('τόνος').every((n) => n.startsWith('Τόνος')), isTrue, reason: 'όχι «…όλων των ειδών»');
       expect(names('φέτα').take(2), ['Φέτα (ΠΟΠ, πρόβειο και κατσικίσιο)', 'Τυρί τύπου φέτας από αγελαδινό γάλα']);
-      expect(index.search('των'), isEmpty);
+      // Όσο πληκτρολογώ: «τυ» (→ τυρί), «με» (→ μέλι) δεν δίνουν «Δεν βρέθηκε».
+      expect(names('τυ'), isNotEmpty);
+      expect(names('με'), isNotEmpty);
+      expect(names('ψωμί με').first, startsWith('Ψωμί'));
     });
   });
 

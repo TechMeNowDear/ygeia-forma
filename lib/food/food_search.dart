@@ -86,8 +86,9 @@ const _stopWords = {
   'sto', 'sti', 'stin', 'ston', 'stis', 'stus', 'sta', 'ena', 'enas', 'mia',
 };
 
-List<String> _words(String s) =>
-    s.split(RegExp(r'[^a-z0-9α-ω%]+')).where((w) => w.isNotEmpty && !_stopWords.contains(w)).toList();
+List<String> _allWords(String s) => s.split(RegExp(r'[^a-z0-9α-ω%]+')).where((w) => w.isNotEmpty).toList();
+
+List<String> _words(String s) => _allWords(s).where((w) => !_stopWords.contains(w)).toList();
 
 /// Ρίζα λέξης (σε φωνητική μορφή), για να βρίσκονται πληθυντικοί και πτώσεις:
 /// «ντομάτες» = «ντομάτα», «πιπεριές» = «πιπεριά», «φακή» = «φακές», «αμύγδαλο» = «αμύγδαλα».
@@ -134,7 +135,11 @@ class FoodIndex {
 
   /// [boost]: πόσο προτιμάται κάθε τρόφιμο (π.χ. πόσες φορές το έχω φάει).
   List<Food> _search(String query, {Map<String, double> boost = const {}, int limit = 60}) {
-    final q = _words(phonetic(query));
+    final p = phonetic(query);
+    // Μόνο μικρές λέξεις (π.χ. «τυ» στη μέση του «τυρί»): ψάχνουμε με αυτές, για να μη βγαίνει
+    // «Δεν βρέθηκε» όσο πληκτρολογώ.
+    var q = _words(p);
+    if (q.isEmpty) q = _allWords(p);
     if (q.isEmpty) return const [];
     final scored = <(double, int)>[];
     for (var i = 0; i < foods.length; i++) {

@@ -21,7 +21,12 @@ class _KitchenScreenState extends State<KitchenScreen> {
   late final Kitchen _k = Kitchen.fromJson(widget.store.prefs.kitchen);
 
   void _save() {
-    widget.store.setKitchen(_k.toJson());
+    if (!widget.store.setKitchen(_k.toJson())) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Οι ρυθμίσεις δεν έχουν φορτώσει ακόμα. Βγες και ξαναμπές σε λίγο.'),
+      ));
+      return;
+    }
     setState(() {});
   }
 

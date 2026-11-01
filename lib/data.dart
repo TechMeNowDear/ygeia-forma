@@ -600,6 +600,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
   bool _prefsLoaded = false;
   int _prefsErrors = 0;
+  Future<void>? _prefsLoad;
+
+  /// Αν διαβάστηκαν οι ρυθμίσεις (ως τότε δεν αλλάζει η «Η κουζίνα μου»).
+  bool get prefsLoaded => _prefsLoaded;
 
   /// Οι ρυθμίσεις πριν από την πρώτη οθόνη, ώστε να ανοίγει κατευθείαν με το σωστό θέμα.
   /// Αν αργήσουν, η εφαρμογή ανοίγει κανονικά και το θέμα αλλάζει μόλις έρθουν.
@@ -607,25 +611,38 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Μέχρι να διαβαστούν, **τίποτα δεν αποθηκεύεται** στις ρυθμίσεις: αλλιώς οι προεπιλογές θα
   /// έγραφαν πάνω σε «Η κουζίνα μου», τις κάρτες και το θέμα.
   Future<void> loadPrefs({Duration timeout = const Duration(milliseconds: 800)}) async {
+    if (_prefsLoaded) return;
+    // Μία ανάγνωση τη φορά: αν τρέχει ήδη (π.χ. από το άνοιγμα), περιμένουμε την ίδια, ώστε μια
+    // παλιότερη απάντηση να μη γράψει πάνω σε νεότερη και ένα σφάλμα να μετρά μία φορά.
+    final load = _prefsLoad ??= _loadPrefsOnce().whenComplete(() => _prefsLoad = null);
     try {
-      final r = await SamsungHealth.loadPrefs().timeout(timeout);
-      if (r['ok'] == false) {
-        // Το αρχείο υπάρχει αλλά δεν διαβάστηκε τώρα (kind «read»): ξανά αργότερα, ποτέ προεπιλογές
-        // από πάνω του. Άλλο σφάλμα (π.χ. χαλασμένο αρχείο) δύο φορές: ξεκινάμε από τις προεπιλογές.
-        if (r['kind'] == 'read' || ++_prefsErrors < 2) return;
-      } else {
-        prefs = Prefs.fromJson(r);
-      }
-      // Ό,τι άλλαξε ο χρήστης όσο περιμέναμε (π.χ. θέμα) μπαίνει πάνω στις ρυθμίσεις που ήρθαν.
-      final pending = [..._pendingPrefChanges];
-      _pendingPrefChanges.clear();
-      for (final f in pending) {
-        f(prefs);
-      }
-      _prefsLoaded = true;
-      notifyListeners();
-      if (pending.isNotEmpty) await _savePrefs();
+      await load.timeout(timeout);
     } catch (_) {}
+  }
+
+  Future<void> _loadPrefsOnce() async {
+    final r = await SamsungHealth.loadPrefs();
+    if (_prefsLoaded) return;
+    if (r['ok'] == false) {
+      // Το αρχείο υπάρχει αλλά δεν διαβάστηκε τώρα (kind «read»): ξανά αργότερα, ποτέ προεπιλογές
+      // από πάνω του. Άλλο σφάλμα (π.χ. χαλασμένο αρχείο) δύο φορές: ξεκινάμε από τις προεπιλογές.
+      if (r['kind'] == 'read' || ++_prefsErrors < 2) return;
+    } else {
+      try {
+        prefs = Prefs.fromJson(r);
+      } catch (_) {
+        if (++_prefsErrors < 2) return;
+      }
+    }
+    // Ό,τι άλλαξε ο χρήστης όσο περιμέναμε (π.χ. θέμα) μπαίνει πάνω στις ρυθμίσεις που ήρθαν.
+    final pending = [..._pendingPrefChanges];
+    _pendingPrefChanges.clear();
+    for (final f in pending) {
+      f(prefs);
+    }
+    _prefsLoaded = true;
+    notifyListeners();
+    if (pending.isNotEmpty) await _savePrefs();
   }
 
   /// Αλλαγές ρυθμίσεων πριν διαβαστεί το αρχείο: εφαρμόζονται αμέσως στην οθόνη και ξανά πάνω
@@ -823,7 +840,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         notifyListeners();
       }
     } catch (_) {
-      // Θα ξαναπροσπαθήσει την επόμενη φορά που ανοίγει η εφαρμογή.
+      // Ξανά στην επόμενη ανανέωση (ως 3 φορές σε αυτή τη χρήση της εφαρμογής).
+      _backfillFails++;
     }
     backfilling = false;
     notifyListeners();
@@ -854,7 +872,13 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     return true;
   }
 
-  void setKitchen(Map<String, dynamic> k) => _changePrefs((p) => p.kitchen = k);
+  /// `false` αν οι ρυθμίσεις δεν έχουν διαβαστεί ακόμα: τότε η κουζίνα που φαίνεται μπορεί να μην
+  /// είναι η αποθηκευμένη, και δεν τη γράφουμε πάνω της.
+  bool setKitchen(Map<String, dynamic> k) {
+    if (!_prefsLoaded) return false;
+    _changePrefs((p) => p.kitchen = k);
+    return true;
+  }
 
   /// Εμφάνιση: αλλάζει αμέσως και αποθηκεύεται.
   void setAppearance({String? mode, String? day, String? night}) => _changePrefs((p) {
