@@ -22,7 +22,13 @@ class WeekCard extends StatelessWidget {
 
     final highlights = <(IconData, Color, String, String)>[
       if (r.bestNight != null)
-        (Icons.bedtime_rounded, c.sleep, 'Καλύτερη νύχτα', '${_weekday(r.bestNight!)} · ${r.bestNightScore!.round()}'),
+        (
+          Icons.bedtime_rounded,
+          c.sleep,
+          'Καλύτερη βαθμολογία ύπνου',
+          // Η νύχτα έχει την ημερομηνία του πρωινού: «Τρί→Τετ» = η νύχτα από Τρίτη προς Τετάρτη.
+          '${_weekday(DateTime(r.bestNight!.year, r.bestNight!.month, r.bestNight!.day - 1))}→${_weekday(r.bestNight!)} · ${r.bestNightScore!.round()}',
+        ),
       if (r.mostSteps != null)
         (Icons.directions_walk_rounded, c.move, 'Περισσότερα βήματα', '${_weekday(r.mostSteps!)} · ${thousands(r.mostStepsValue!)}'),
       if (r.activeTotal != null)

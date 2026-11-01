@@ -351,8 +351,8 @@ class _PageOne extends StatelessWidget {
       if (def == null || t == null || t.status == TrendStatus.insufficient) return '—';
       if (t.status == TrendStatus.stable) return 'Σταθερό';
       final up = t.status == TrendStatus.up;
-      if (def.kind == ValueKind.clock) return '${def.formatDiff(t.diff!)} ${up ? 'αργότερα' : 'νωρίτερα'}';
-      return '${up ? '↑' : '↓'} ${def.formatDiff(t.diff!)}';
+      if (def.kind == ValueKind.clock) return '${def.formatDiff(t.displayDiff!)} ${up ? 'αργότερα' : 'νωρίτερα'}';
+      return '${up ? '↑' : '↓'} ${def.formatDiff(t.displayDiff!)}';
     }
 
     return Column(

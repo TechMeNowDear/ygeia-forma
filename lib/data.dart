@@ -594,7 +594,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   bool backfilling = false;
   double backfillProgress = 0;
 
-  static const historyDays = 365;
+  /// 455 μέρες: ο «Χρόνος» στις Τάσεις συγκρίνει τους τελευταίους 3 μήνες με τους ίδιους μήνες πέρσι.
+  static const historyDays = 455;
   static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
 
   bool _prefsLoaded = false;

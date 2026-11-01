@@ -93,7 +93,7 @@ class _TrendsPageState extends State<TrendsPage> {
         return PageFrame(
           action: store.history.isEmpty ? null : reportButton,
           title: 'Τάσεις',
-          subtitle: 'Συγκρίνω ${periodExplanation(_period)}',
+          subtitle: 'Συγκρίνω ${periodExplanation(_period)}. Κάθε τιμή είναι η μεσαία της περιόδου.',
           onRefresh: () => store.refresh(),
           left: left,
           right: right,
@@ -425,9 +425,9 @@ class TrendStatusPill extends StatelessWidget {
       _ => TrendKind.neutral,
     };
     if (r.def.kind == ValueKind.clock) {
-      return TrendPill('${r.def.formatDiff(r.diff!)} ${up ? 'αργότερα' : 'νωρίτερα'}', kind: kind);
+      return TrendPill('${r.def.formatDiff(r.displayDiff!)} ${up ? 'αργότερα' : 'νωρίτερα'}', kind: kind);
     }
-    return TrendPill(r.def.formatDiff(r.diff!), kind: kind, up: up);
+    return TrendPill(r.def.formatDiff(r.displayDiff!), kind: kind, up: up);
   }
 }
 

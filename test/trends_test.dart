@@ -58,11 +58,52 @@ void main() {
     expect(t.status, TrendStatus.insufficient);
   });
 
-  test('Χρόνος: τελευταίοι 3 μήνες με τους πρώτους 3', () {
+  test('Χρόνος: τελευταίοι 3 μήνες με τους ίδιους μήνες πέρσι', () {
     final t = computeTrend(def(K.sleepHr), history, today, TrendPeriod.year);
     expect(t.end, today);
     expect(t.currentFrom, DateTime(2026, 7, 27));
-    expect(t.previousFrom, DateTime(2025, 10, 25));
+    expect(t.previousEnd, DateTime(2025, 10, 25));
+    expect(t.previousFrom, DateTime(2025, 7, 28));
+  });
+
+  test('Διαδοχικές μέρες που μοιάζουν (αυτοσυσχέτιση) δεν βγάζουν ψεύτικο «άλλαξε»', () {
+    // Τυχαίος περίπατος γύρω από σταθερό επίπεδο (AR(1), φ = 0,7), χωρίς καμία αλλαγή.
+    var falseChanges = 0;
+    for (var seed = 0; seed < 200; seed++) {
+      final r = math.Random(seed);
+      final h = <String, Map<String, double>>{};
+      var x = 0.0;
+      for (var ago = 70; ago >= 0; ago--) {
+        // κανονικός θόρυβος (Box–Muller)
+        final n = math.sqrt(-2 * math.log(1 - r.nextDouble())) * math.cos(2 * math.pi * r.nextDouble());
+        x = 0.7 * x + n * 4;
+        h[dateKey(day(ago))] = {K.sleepHr: 62 + x};
+      }
+      if (computeTrend(def(K.sleepHr), h, today, TrendPeriod.month).changed) falseChanges++;
+    }
+    expect(falseChanges, lessThanOrEqualTo(14), reason: 'το πολύ ~7% ψεύτικα «άλλαξε» (πριν: 12–25%)');
+  });
+
+  test('Απολογισμός: εβδομάδα χωρίς αλλαγή σπάνια δείχνει «άλλαξε»', () {
+    var cardsWithFalseChange = 0;
+    for (var seed = 0; seed < 200; seed++) {
+      final r = math.Random(1000 + seed);
+      final h = <String, Map<String, double>>{};
+      final xs = <String, double>{for (final k in weekKeys) k: 0};
+      for (var ago = 40; ago >= 0; ago--) {
+        final row = <String, double>{};
+        for (final k in weekKeys) {
+          final n = math.sqrt(-2 * math.log(1 - r.nextDouble())) * math.cos(2 * math.pi * r.nextDouble());
+          xs[k] = 0.4 * xs[k]! + n;
+          row[k] = 100 + xs[k]! * 30;
+        }
+        h[dateKey(day(ago))] = row;
+      }
+      final sunday = DateTime(2026, 10, 18);
+      final w = buildWeekReview(h, sunday, DateTime(2026, 10, 19, 9));
+      if (w.items.any((t) => t.changed)) cardsWithFalseChange++;
+    }
+    expect(cardsWithFalseChange, lessThanOrEqualTo(36), reason: 'πριν: ~42–76% των καρτών· τώρα το πολύ ~18%');
   });
 
   test('Ώρα ύπνου μετά τα μεσάνυχτα', () {

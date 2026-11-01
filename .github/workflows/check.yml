@@ -31,6 +31,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
           cache: true
 
       - name: Συμπλήρωση αρχείων Android
@@ -53,7 +54,7 @@ jobs:
             echo "::error title=Σφάλμα ελέγχων::$msg"
             exit 1
           fi
-          echo "::notice title=Έλεγχοι::$(grep -Eo '\+[0-9]+' tests.log | tail -1) έλεγχοι πέρασαν"
+          echo "::notice title=Έλεγχοι::$(grep -a 'All tests passed' tests.log | tail -1 | tr -cd '[:print:]' | tail -c 120)"
 
       - name: Χτίσιμο APK (debug, μόνο για έλεγχο)
         run: |
@@ -75,6 +76,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
           cache: true
 
       - name: Ζωγράφισμα οθονών
