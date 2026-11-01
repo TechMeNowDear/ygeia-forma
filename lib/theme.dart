@@ -143,7 +143,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     hairline: Color(0xFFE6EAF1),
     text: Color(0xFF0F172A),
     textSecondary: Color(0xFF5B6576),
-    textTertiary: Color(0xFF94A0B4),
+    textTertiary: Color(0xFF69717F), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFF1D5BD8),
     onPrimary: Color(0xFFFFFFFF),
     sleep: Color(0xFF4F63D9),
@@ -188,7 +188,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     hairline: Color(0xFFE3E1D6),
     text: Color(0xFF1E2318),
     textSecondary: Color(0xFF5E6354),
-    textTertiary: Color(0xFF8F9384),
+    textTertiary: Color(0xFF6C6F64), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFF4E6526),
     onPrimary: Color(0xFFFFFFFF),
     sleep: Color(0xFF3D6A9E),
@@ -233,7 +233,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     hairline: Color(0xFFF3E2D8),
     text: Color(0xFF2B1B17),
     textSecondary: Color(0xFF6E5A53),
-    textTertiary: Color(0xFFA89089),
+    textTertiary: Color(0xFF816E69), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFFC2410C),
     onPrimary: Color(0xFFFFFFFF),
     sleep: Color(0xFF5B3FC4),
@@ -279,7 +279,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     hairline: Color(0xFF232C42),
     text: Color(0xFFE8ECF5),
     textSecondary: Color(0xFF9AA4B8),
-    textTertiary: Color(0xFF6B7690),
+    textTertiary: Color(0xFF79839B), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFF4C8DFF),
     onPrimary: Color(0xFF04122E),
     sleep: Color(0xFF8C9CFF),
@@ -324,7 +324,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     hairline: Color(0xFF24272D),
     text: Color(0xFFF2F4F0),
     textSecondary: Color(0xFF9BA19A),
-    textTertiary: Color(0xFF6B706A),
+    textTertiary: Color(0xFF7E827D), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFFC8F04A),
     onPrimary: Color(0xFF0B0C0E),
     sleep: Color(0xFF8AB4FF),
@@ -369,7 +369,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     hairline: Color(0xFF183337),
     text: Color(0xFFE6F2F1),
     textSecondary: Color(0xFF93ADAA),
-    textTertiary: Color(0xFF5F7A77),
+    textTertiary: Color(0xFF738B88), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFF5EEAD4),
     onPrimary: Color(0xFF04201C),
     sleep: Color(0xFF7DD3FC),

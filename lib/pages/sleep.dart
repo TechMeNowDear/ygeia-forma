@@ -207,7 +207,7 @@ class _LastNightCard extends StatelessWidget {
               '${n.spo2Avg!.round()}% · χαμηλότερη μέτρηση ${n.spo2Min?.round() ?? '—'}%',
               dot: c.sleep,
             ),
-          if (n.parts.length > 1) InfoRow('Κομμάτια ύπνου (Samsung)', '${n.parts.length}', dot: c.textTertiary),
+          if (n.parts.length > 1) InfoRow('Η Samsung τη χώρισε σε', '${n.parts.length} κομμάτια', dot: c.textTertiary),
           if (n.parts.length > 1 && n.parts.any((p) => p.score != null))
             InfoRow(
               'Βαθμολογία Samsung ανά κομμάτι',
@@ -252,7 +252,7 @@ class _ConsistencyCard extends StatelessWidget {
           const SizedBox(height: 8),
           InfoRow('Συνήθως κοιμάσαι', _clock(bedAvg)),
           InfoRow('Συνήθως ξυπνάς', _clock(wakeAvg)),
-          InfoRow('Η ώρα ύπνου αλλάζει κατά', hoursMinutes(spread.round())),
+          InfoRow('Η ώρα ύπνου διαφέρει συνήθως ±', hoursMinutes(spread.round())),
         ],
       ),
     );

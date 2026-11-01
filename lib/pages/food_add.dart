@@ -5,6 +5,7 @@ import '../food/food_channel.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
 import '../food/off.dart';
+import '../food/weigh_hints.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -46,11 +47,21 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   }
 }
 
+/// Αριθμός όπως τον γράφουμε στα ελληνικά: «12,5» ή «12.5»· η τελεία ως διαχωριστικό χιλιάδων
+/// («1.000», «1.250») διαβάζεται ως χιλιάδες, όχι ως «1».
 double? parseNumber(String s) {
-  final t = s.trim().replaceAll(',', '.');
+  var t = s.trim().replaceAll(' ', '');
   if (t.isEmpty) return null;
+  if (t.contains(',')) {
+    t = t.replaceAll('.', '').replaceAll(',', '.');
+  } else if (RegExp(r'^[1-9]\d{0,2}(\.\d{3})+$').hasMatch(t)) {
+    t = t.replaceAll('.', '');
+  }
   return double.tryParse(t);
 }
+
+/// Γραμμάρια στο πεδίο: χωρίς άσκοπα δεκαδικά, αλλά χωρίς να χάνεται το «,5».
+String gramsField(double v) => v == v.roundToDouble() ? '${v.round()}' : dec(v, 1);
 
 /// Επιλογή γεύματος: 4 ίσα κουμπιά που χωράνε πάντα σε μία γραμμή.
 class MealPicker extends StatelessWidget {
@@ -165,8 +176,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     final c = Aigaio.of(context);
     final q = _query.text;
     final results = q.trim().isEmpty ? const <Food>[] : widget.food.search(q);
-    final recent = widget.food.recent();
-    final frequent = widget.food.frequent();
+    final recent = widget.food.recent(limit: 10);
+    // «Συχνά»: όσα τρως συχνά αλλά δεν είναι ήδη στα «Πρόσφατα» (αλλιώς οι δύο λίστες βγαίνουν ίδιες).
+    final recentIds = {for (final f in recent) f.id};
+    final frequent = [for (final f in widget.food.frequent(limit: 25)) if (!recentIds.contains(f.id)) f].take(10).toList();
 
     Widget section(String title, List<Food> foods) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -399,7 +412,7 @@ class QuantitySheet extends StatefulWidget {
 }
 
 class _QuantitySheetState extends State<QuantitySheet> {
-  late final _grams = TextEditingController(text: gramsText(widget.initialGrams));
+  late final _grams = TextEditingController(text: gramsField(widget.initialGrams));
   late Meal _meal = widget.meal;
   late Food _item = widget.item;
   late final List<(Food, String)> _states = widget.food.statesOf(widget.item);
@@ -415,7 +428,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
     return (v == null || v <= 0 || v > 5000) ? null : v;
   }
 
-  void _set(double g) => setState(() => _grams.text = gramsText(g));
+  void _set(double g) => setState(() => _grams.text = gramsField(g));
 
   @override
   Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
@@ -497,6 +510,22 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary),
                   ),
                 ],
+                if (weighHints[f.id] case final hint?) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.scale_rounded, size: 18, color: c.textSecondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Ζύγισε $hint: οι τιμές είναι για ό,τι τρώγεται.',
+                          style: TextStyle(fontSize: 13.5, height: 1.35, color: c.text, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -543,7 +572,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     children: [
                       stat('kcal', kcalText(tot(Nk.kcal)), c.primary),
                       stat('Πρωτεΐνη', '${gramsText(tot(Nk.protein))} g', proteinColor(c)),
-                      stat('Υδατ.', '${gramsText(tot(Nk.carbs))} g', carbsColor(c)),
+                      stat('Υδατάνθρ.', '${gramsText(tot(Nk.carbs))} g', carbsColor(c)),
                       stat('Λίπος', '${gramsText(tot(Nk.fat))} g', fatColor(c)),
                     ],
                   ),
@@ -733,7 +762,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     setState(() => _tried = true);
     final values = _values;
     final missing = [for (final f in _fields) if (f.$4 && values[f.$1] == null) f.$1];
-    if (_name.text.trim().isEmpty || missing.isNotEmpty) return;
+    if (_name.text.trim().isEmpty || missing.isNotEmpty || impossibleValues(values).isNotEmpty) return;
     final d = FoodDraft(
       name: _name.text.trim(),
       brand: _brand.text.trim(),
@@ -753,6 +782,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final c = Aigaio.of(context);
     final values = _values;
     final mismatch = energyMismatch(values);
+    final impossible = impossibleValues(values);
 
     InputDecoration deco(String label, {String? suffix, String? error}) => InputDecoration(
           labelText: label,
@@ -809,7 +839,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   decoration: deco(
                     f.$4 ? f.$2 : '${f.$2} (προαιρετικό)',
                     suffix: f.$3,
-                    error: _tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null,
+                    error: impossible[f.$1] ?? (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
                   ),
                 ),
                 const SizedBox(height: 10),

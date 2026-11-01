@@ -226,11 +226,18 @@ class Totals {
       fiber += e.total(Nk.fiber);
       sugars += e.total(Nk.sugars);
       salt += e.total(Nk.salt);
+      satFat += e.total(Nk.satFat);
+      for (final k in const [Nk.fiber, Nk.sugars, Nk.salt, Nk.satFat]) {
+        if (!e.food.n.has(k)) missing[k] = (missing[k] ?? 0) + 1;
+      }
       count++;
     }
   }
-  double kcal = 0, protein = 0, carbs = 0, fat = 0, fiber = 0, sugars = 0, salt = 0;
+  double kcal = 0, protein = 0, carbs = 0, fat = 0, fiber = 0, sugars = 0, salt = 0, satFat = 0;
   int count = 0;
+
+  /// Πόσα τρόφιμα δεν έχουν τιμή για κάθε θρεπτικό (τότε το σύνολο είναι «τουλάχιστον»).
+  final Map<String, int> missing = {};
 }
 
 /// «1.250» για θερμίδες, «12,5» για γραμμάρια.

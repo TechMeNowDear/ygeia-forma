@@ -120,8 +120,10 @@ class PageFrame extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final side = constraints.maxWidth >= 600 ? 28.0 : 16.0;
-          final width = math.min(constraints.maxWidth - side * 2, 1080.0);
-          final twoColumns = width >= 680 && right.isNotEmpty;
+          final available = constraints.maxWidth - side * 2;
+          final twoColumns = available >= 680 && right.isNotEmpty;
+          // Μία στήλη σε φαρδιά οθόνη: όχι τεντωμένη, έως 640 στο κέντρο.
+          final width = math.min(available, twoColumns ? 1080.0 : 640.0);
 
           Widget column(List<Widget> items) => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -456,7 +458,11 @@ class DurationValue extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final parts = hoursMinutesParts(minutes);
-    return Text.rich(
+    // Σε στενή οθόνη ή με μεγάλα γράμματα: μικραίνει αντί να κόβεται.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text.rich(
       TextSpan(
         children: [
           for (var i = 0; i < parts.length; i++) ...[
@@ -478,6 +484,7 @@ class DurationValue extends StatelessWidget {
         ],
       ),
       maxLines: 1,
+      ),
     );
   }
 }
@@ -526,7 +533,12 @@ class StatCard extends StatelessWidget {
               style: TextStyle(color: c.textSecondary, fontSize: 14, height: 1.35),
             ),
           ] else ...[
-            BigValue(value!, unit: unit, size: 28),
+            // Μεγάλη τιμή που δεν χωράει (π.χ. «2 ώρες 15 λεπτά» σε στενή κάρτα): μικραίνει, δεν κόβεται.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: BigValue(value!, unit: unit, size: 28),
+            ),
             if (trend != null) ...[const SizedBox(height: 8), trend!],
             if (note != null) ...[
               const SizedBox(height: 6),

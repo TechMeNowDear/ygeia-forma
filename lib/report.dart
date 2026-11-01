@@ -48,7 +48,7 @@ class ReportData {
     required this.weighIns,
   });
 
-  /// Οι τελευταίες ζυγίσεις (έως 8, όποτε κι αν έγιναν), η νεότερη πρώτη: (μέρα, βάρος, λίπος %, μύες).
+  /// Οι τελευταίες ζυγίσεις (έως 6, όποτε κι αν έγιναν), η νεότερη πρώτη: (μέρα, βάρος, λίπος %, μύες).
   final List<(DateTime, double?, double?, double?)> weighIns;
 
   final DateTime from;
@@ -105,7 +105,7 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now) {
 
   final weighDays = history.keys.where((k) => history[k]![K.weight] != null).toList()..sort();
   final weighIns = [
-    for (final k in weighDays.reversed.take(8))
+    for (final k in weighDays.reversed.take(6))
       (parseDateKey(k), history[k]![K.weight], history[k]![K.fatPct], history[k]![K.smm]),
   ];
 

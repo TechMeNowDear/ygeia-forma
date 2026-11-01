@@ -15,9 +15,12 @@ import '../widgets.dart';
 
 /// Αναφορά για γιατρό: προεπισκόπηση των δύο σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
-  const ReportPage({super.key, required this.store, this.now});
+  const ReportPage({super.key, required this.store, this.now, this.note = ''});
   final HealthStore store;
   final DateTime? now;
+
+  /// Αρχική σημείωση (για δοκιμές· στην εφαρμογή γράφεται στην οθόνη).
+  final String note;
 
   @override
   State<ReportPage> createState() => _ReportPageState();
@@ -30,7 +33,7 @@ class _ReportPageState extends State<ReportPage> {
   String? _error;
 
   /// Σημείωση για τον γιατρό (φάρμακα, κάπνισμα…). Δεν αποθηκεύεται: γράφεται μόνο στο PDF.
-  String _note = '';
+  late String _note = widget.note;
 
   late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now());
 
@@ -442,7 +445,7 @@ class _PageOne extends StatelessWidget {
             spacing: 14,
             runSpacing: 2,
             children: [
-              for (final n in d.lowOxygenNights.take(12))
+              for (final n in d.lowOxygenNights.take(8))
                 Text('${dayMonthYear(n.$1)}: ${n.$2.round()}%', style: bold),
             ],
           ),
@@ -485,18 +488,16 @@ class _PageOne extends StatelessWidget {
           ),
         _Title('Πώς διαβάζεται'),
         Text(
-          'Μεσαία τιμή: οι μισές μέρες είναι πάνω και οι μισές κάτω από αυτή. «Συνήθως»: το εύρος όπου βρίσκονται '
-          '8 στις 10 μέρες. «Διαφορά από τους 3 προηγούμενους μήνες»: γράφεται μόνο όταν περνά στατιστικό έλεγχο '
-          '(επίπεδο 1%, με διόρθωση για τη συσχέτιση διαδοχικών ημερών)· αλλιώς «Σταθερό», και «—» όταν δεν υπάρχουν '
-          'αρκετές μετρήσεις. Οι νύχτες χρονολογούνται με την ημερομηνία του πρωινού.',
+          'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
+          'μόνο όταν περνά στατιστικό έλεγχο (1%, με διόρθωση για τη συσχέτιση των ημερών)· αλλιώς «Σταθερό», '
+          'ή «—» όταν οι μετρήσεις είναι λίγες. Οι νύχτες έχουν την ημερομηνία του πρωινού.',
           style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 6),
         Text(
-          'Πώς μετρήθηκαν: ρολόι Samsung Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40 (ρεύμα στο σώμα), '
-          'μέσω Samsung Health. Παλμοί στον ύπνο: μέσος όρος των μετρήσεων του ρολογιού στον ύπνο. Οξυγόνο: αισθητήρας '
-          'καρπού· το «ελάχιστο» είναι μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η Samsung, '
-          'χωρίς εκτιμήσεις της εφαρμογής. Δεν περιλαμβάνονται HRV και παλμοί ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
+          'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
+          'αισθητήρας καρπού· «ελάχιστο» = μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
+          'Samsung. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
           style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
         ),
         const Spacer(),

@@ -193,8 +193,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   List<(Food, String)> statesOf(Food f) {
     final raw = f.rawId != null ? byId(f.rawId!) : (f.isRawWithCooked ? f : null);
     if (raw == null) return const [];
-    // Όσπρια: «Ξερό» είναι πιο κατανοητό από «Ωμό».
-    final rawLabel = raw.name.contains('ξερ') ? 'Ξερό (πριν το βράσιμο)' : 'Ωμό';
+    // Όσπρια: «Ξερές/Ξερά» είναι πιο κατανοητό από «Ωμό». Μόνο όταν η κατάσταση στην παρένθεση λέει «ξερ…»
+    // (όχι το «Κρεμμύδι ξερό», που είναι είδος κρεμμυδιού), και στο γένος του ονόματος: «Φακές (ξερές)» → «Ξερές».
+    final dry = RegExp(r'\((ξερ[^\s,)]*)').firstMatch(raw.name)?.group(1);
+    final rawLabel = dry != null ? '${dry[0].toUpperCase()}${dry.substring(1)} (πριν το βράσιμο)' : 'Ωμό';
     return [
       (raw, rawLabel),
       for (final c in raw.cooked)

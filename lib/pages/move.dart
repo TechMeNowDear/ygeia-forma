@@ -75,7 +75,7 @@ class ExercisePage extends StatelessWidget {
               if (d.stepsBaseline != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  '14 ημέρες · η διακεκομμένη γραμμή είναι ο μέσος όρος σου',
+                  '14 ημέρες · η διακεκομμένη γραμμή είναι ο μέσος όρος των 7 προηγούμενων',
                   style: TextStyle(color: c.textSecondary, fontSize: 12.5),
                 ),
               ],
@@ -110,7 +110,8 @@ class ExercisePage extends StatelessWidget {
             icon: Icons.stairs_rounded,
             color: c.energy,
             title: 'Όροφοι',
-            value: floorsToday == null ? '0' : floorsToday.round().toString(),
+            // Χωρίς καθόλου δεδομένα ορόφων: «—»· αλλιώς μέρα χωρίς ορόφους = 0.
+            value: d.floors.isEmpty ? null : (floorsToday ?? 0).round().toString(),
           ),
         ]);
 

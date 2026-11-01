@@ -141,6 +141,9 @@ class _RoundButton extends StatelessWidget {
   }
 }
 
+/// «τουλάχιστον 12 g» όταν κάποιο τρόφιμο δεν έχει τιμή γι' αυτό το θρεπτικό.
+String _atLeast(Totals t, String key, String text) => (t.missing[key] ?? 0) > 0 ? 'τουλάχιστον $text' : text;
+
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.totals});
   final Totals totals;
@@ -159,9 +162,18 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 14),
           MacroBreakdown(totals: t),
           const Hairline(vertical: 14),
-          InfoRow('Φυτικές ίνες', '${gramsText(t.fiber)} g'),
-          InfoRow('Σάκχαρα', '${gramsText(t.sugars)} g'),
-          InfoRow('Αλάτι', '${dec(t.salt, 1)} g'),
+          InfoRow('Φυτικές ίνες', _atLeast(t, Nk.fiber, '${gramsText(t.fiber)} g')),
+          InfoRow('Σάκχαρα', _atLeast(t, Nk.sugars, '${gramsText(t.sugars)} g')),
+          InfoRow('Κορεσμένα λιπαρά', _atLeast(t, Nk.satFat, '${gramsText(t.satFat)} g')),
+          InfoRow('Αλάτι', _atLeast(t, Nk.salt, '${dec(t.salt, 1)} g')),
+          if (t.missing.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '«τουλάχιστον»: κάποια τρόφιμα δεν έχουν τιμή στην πηγή τους.',
+                style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+              ),
+            ),
         ],
       ),
     );

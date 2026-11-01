@@ -233,7 +233,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                           TextButton.icon(
                             onPressed: _copyForCheck,
                             icon: const Icon(Icons.copy_rounded, size: 18),
-                            label: const Text('Αντιγραφή για έλεγχο'),
+                            label: const Text('Αντιγραφή λίστας'),
                           ),
                         ],
                       ),

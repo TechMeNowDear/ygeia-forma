@@ -88,6 +88,24 @@ double? energyMismatch(Map<String, double> v) {
   return (diff > 20 && diff / (k > 1 ? k : 1) > 0.15) ? calc : null;
 }
 
+/// Τιμές ανά 100 g που δεν γίνεται να είναι σωστές (λάθος πληκτρολόγηση ή τιμές ανά μερίδα/kJ).
+/// Κλειδί → μήνυμα. Κενό αν όλα στέκουν.
+Map<String, String> impossibleValues(Map<String, double> v) {
+  final out = <String, String>{};
+  final k = v[Nk.kcal];
+  if (k != null && k > 900) out[Nk.kcal] = 'Πάνω από 900 kcal ανά 100 g δεν γίνεται (μήπως είναι kJ;)';
+  for (final key in const [Nk.protein, Nk.carbs, Nk.sugars, Nk.fat, Nk.satFat, Nk.fiber, Nk.salt]) {
+    final x = v[key];
+    if (x != null && x > 100) out[key] = 'Πάνω από 100 g σε 100 g δεν γίνεται';
+  }
+  final c = v[Nk.carbs], s = v[Nk.sugars], f = v[Nk.fat], sf = v[Nk.satFat];
+  if (c != null && s != null && s > c + 0.5) out[Nk.sugars] ??= 'Τα σάκχαρα είναι μέρος των υδατανθράκων: όχι περισσότερα';
+  if (f != null && sf != null && sf > f + 0.5) out[Nk.satFat] ??= 'Τα κορεσμένα είναι μέρος των λιπαρών: όχι περισσότερα';
+  final total = (v[Nk.protein] ?? 0) + (c ?? 0) + (f ?? 0) + (v[Nk.fiber] ?? 0) + (v[Nk.salt] ?? 0);
+  if (total > 105) out[Nk.protein] ??= 'Μαζί όλα ξεπερνούν τα 100 g: έλεγξε τις τιμές';
+  return out;
+}
+
 /// Για διόρθωση προϊόντος που υπάρχει ήδη.
 FoodDraft draftFromFood(Food f) => FoodDraft(
       name: f.name,

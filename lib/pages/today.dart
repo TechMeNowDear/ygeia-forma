@@ -95,7 +95,8 @@ class TodayPage extends StatelessWidget {
         final footer = Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(
-            'Ενημέρωση ${hm(d.readAt)} · τράβηξε προς τα κάτω για ανανέωση',
+            'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now)} '}${hm(d.readAt)} · '
+            'τράβηξε προς τα κάτω για ανανέωση',
             textAlign: TextAlign.center,
             style: TextStyle(color: c.textTertiary, fontSize: 12.5),
           ),

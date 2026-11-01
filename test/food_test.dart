@@ -4,6 +4,7 @@ import 'package:ygeia_forma/food/food_search.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/food/kitchen.dart';
 import 'package:ygeia_forma/food/off.dart';
+import 'package:ygeia_forma/pages/food_add.dart' show parseNumber, gramsField;
 
 import 'sample_food.dart';
 
@@ -43,6 +44,28 @@ void main() {
 
     test('Τίποτα για ανύπαρκτη λέξη', () {
       expect(index.search('ξυλοκαρβουνο'), isEmpty);
+    });
+
+    test('Πληθυντικοί και πτώσεις βρίσκουν το τρόφιμο', () {
+      expect(names('ντομάτες').first, startsWith('Ντομάτα'));
+      expect(names('ntomates').first, startsWith('Ντομάτα'));
+      expect(names('πιπεριές').first, startsWith('Πιπεριά'));
+      expect(names('κρεμμύδια').first, startsWith('Κρεμμύδι'));
+      expect(names('φακή').first, startsWith('Φακές'));
+      expect(names('αμύγδαλο').first, startsWith('Αμύγδαλα'));
+      expect(names('ελιά').first, startsWith('Ελιές'));
+    });
+
+    test('«λάδι» βρίσκει πρώτα το ελαιόλαδο, όχι κάτι «χωρίς λάδι»', () {
+      expect(names('λάδι').first, startsWith('Ελαιόλαδο'));
+      expect(names('λάδι').take(3).any((n) => n.contains('χωρίς λάδι')), isFalse);
+    });
+
+    test('Greeklish με x για ξ, h για η, ng για γγ', () {
+      expect(names('xeres fakes').first, 'Φακές (ξερές)');
+      expect(names('hliosporoi').first, startsWith('Ηλιόσποροι'));
+      expect(names('angouri').first, startsWith('Αγγούρι'));
+      expect(names('xoirino').first, startsWith('Χοιρ'), reason: 'το x ως χ δουλεύει όπως πριν');
     });
   });
 
@@ -127,6 +150,23 @@ void main() {
       expect(energyMismatch({Nk.kcal: 72, Nk.protein: 10, Nk.carbs: 3, Nk.fat: 2}), isNull);
       expect(energyMismatch({Nk.kcal: 250, Nk.protein: 10, Nk.carbs: 3, Nk.fat: 2}), isNotNull);
     });
+    test('Αδύνατες τιμές ετικέτας δεν περνούν (kJ αντί για kcal, σάκχαρα > υδατάνθρακες)', () {
+      expect(impossibleValues({Nk.kcal: 72, Nk.protein: 10, Nk.carbs: 3, Nk.sugars: 3, Nk.fat: 2}), isEmpty);
+      expect(impossibleValues({Nk.kcal: 1500}).keys, [Nk.kcal]);
+      expect(impossibleValues({Nk.carbs: 10, Nk.sugars: 20}).keys, [Nk.sugars]);
+      expect(impossibleValues({Nk.fat: 5, Nk.satFat: 9}).keys, [Nk.satFat]);
+      expect(impossibleValues({Nk.protein: 50, Nk.carbs: 40, Nk.fat: 30}).keys, [Nk.protein]);
+    });
+    test('Αριθμοί όπως στα ελληνικά', () {
+      expect(parseNumber('12,5'), 12.5);
+      expect(parseNumber('12.5'), 12.5);
+      expect(parseNumber('1.000'), 1000);
+      expect(parseNumber('1.250,5'), 1250.5);
+      expect(parseNumber('0.500'), 0.5);
+      expect(parseNumber(''), isNull);
+      expect(gramsField(112.5), '112,5');
+      expect(gramsField(120), '120');
+    });
   });
 
   group('Ωμό και μαγειρεμένο', () {
@@ -142,6 +182,18 @@ void main() {
     test('Πατάτα: ωμή, βραστή, φούρνου', () {
       final p = foodNamed('Πατάτα (ωμή, ξεφλουδισμένη)');
       expect([for (final x in s.statesOf(p)) x.$2], ['Ωμό', 'Βραστή', 'Φούρνου']);
+    });
+    test('Όσπρια: «Ξερές» στο γένος του ονόματος· το «Κρεμμύδι ξερό» είναι ωμό', () {
+      expect(s.statesOf(foodNamed('Φακές (ξερές)')).first.$2, 'Ξερές (πριν το βράσιμο)');
+      final onion = basicFoods().where((f) => f.name.startsWith('Κρεμμύδι ξερό') && f.isRawWithCooked);
+      for (final o in onion) {
+        expect(s.statesOf(o).first.$2, 'Ωμό');
+      }
+    });
+    test('Νέες βρασμένες μορφές: κριθαράκι, χυλοπίτες, parboiled', () {
+      expect([for (final x in s.statesOf(foodNamed('Κριθαράκι (ξηρό, ωμό)'))) x.$2], ['Ωμό', 'Βρασμένο']);
+      expect(s.statesOf(foodNamed('Χυλοπίτες/ζυμαρικά με αυγό (ξηρά, ωμά)')).length, 2);
+      expect(s.statesOf(foodNamed('Ρύζι parboiled (ωμό)')).length, 2);
     });
     test('Τρόφιμο χωρίς άλλες μορφές', () {
       expect(s.statesOf(foodNamed('Μέλι')), isEmpty);
