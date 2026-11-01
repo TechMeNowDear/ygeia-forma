@@ -28,5 +28,9 @@ class FoodChannel {
   static Future<Map<String, dynamic>> myFoodPut(String json) => _call('myFoodPut', {'json': json});
   static Future<Map<String, dynamic>> myFoodDelete(String id) => _call('myFoodDelete', {'id': id});
   static Future<Map<String, dynamic>> scanBarcode() => _call('scanBarcode');
+  static Future<Map<String, dynamic>> saveBackup(String json, String name) =>
+      _call('saveBackup', {'json': json, 'name': name});
+  static Future<Map<String, dynamic>> shareBackup(String uri) => _call('shareBackup', {'uri': uri});
+  static Future<Map<String, dynamic>> pickBackup() => _call('pickBackup');
   static Future<Map<String, dynamic>> offLookup(String code) => _call('offLookup', {'code': code});
 }

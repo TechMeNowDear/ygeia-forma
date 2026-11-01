@@ -68,6 +68,29 @@ class FoodBridge(
                 withContext(Dispatchers.IO) { store.myFoodDelete(call.argument<String>("id") ?: "") }
                 JSONObject().put("ok", true)
             }
+            "saveBackup" -> respond(result) {
+                val json = call.argument<String>("json") ?: ""
+                val name = call.argument<String>("name") ?: "ygeia-antigrafo.json"
+                require(json.isNotEmpty()) { "Κενό αντίγραφο" }
+                val uri = withContext(Dispatchers.IO) { BackupFiles.save(activity, json, name) }
+                JSONObject().put("ok", true).put("uri", uri.toString())
+            }
+            "shareBackup" -> respond(result) {
+                BackupFiles.share(activity, android.net.Uri.parse(call.argument<String>("uri") ?: ""))
+                JSONObject().put("ok", true)
+            }
+            "pickBackup" -> respond(result) {
+                val main = activity as? MainActivity ?: throw IllegalStateException("Δεν ανοίγει επιλογέας")
+                val uri = suspendCancellableCoroutine<android.net.Uri?> { cont ->
+                    main.pickDocument { u -> if (cont.isActive) cont.resume(u) }
+                }
+                if (uri == null) {
+                    JSONObject().put("ok", false).put("kind", "cancelled").put("message", "Ακυρώθηκε")
+                } else {
+                    val text = withContext(Dispatchers.IO) { BackupFiles.read(activity, uri) }
+                    JSONObject().put("ok", true).put("json", text)
+                }
+            }
             "scanBarcode" -> respond(result) { scan() }
             "offLookup" -> respond(result) {
                 withContext(Dispatchers.IO) { offLookup(call.argument<String>("code") ?: "") }

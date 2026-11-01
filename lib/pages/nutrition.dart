@@ -86,12 +86,28 @@ class NutritionPage extends StatelessWidget {
           onRefresh: () async {},
           single: [
             if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
+            if (food.saveError != null)
+              EmptyCard(
+                title: 'Δεν αποθηκεύτηκε',
+                text: food.saveError!,
+                icon: Icons.error_outline_rounded,
+                buttonText: 'Εντάξει',
+                onPressed: food.clearSaveError,
+              ),
             summary,
             ...meals,
             _SourcesNote(color: c.textTertiary),
           ],
           left: [
             if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
+            if (food.saveError != null)
+              EmptyCard(
+                title: 'Δεν αποθηκεύτηκε',
+                text: food.saveError!,
+                icon: Icons.error_outline_rounded,
+                buttonText: 'Εντάξει',
+                onPressed: food.clearSaveError,
+              ),
             summary,
             _SourcesNote(color: c.textTertiary),
           ],

@@ -15,6 +15,7 @@ import 'nutrition.dart';
 // ---------------------------------------------------------------------------
 
 Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day}) {
+  food.syncToday();
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'Προσθήκη φαγητού'),

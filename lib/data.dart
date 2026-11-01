@@ -801,6 +801,22 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Οι ρυθμίσεις όπως αποθηκεύονται (για το αντίγραφο ασφαλείας).
+  Map<String, dynamic> prefsJson() => jsonDecode(prefs.toJson()) as Map<String, dynamic>;
+
+  /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
+  Future<bool> restorePrefs(Map<String, dynamic> p) async {
+    if (!_prefsLoaded) return false;
+    final merged = {...prefsJson(), ...p, 'layout': todayLayout};
+    final restored = Prefs.fromJson(merged)
+      ..backfillFrom = prefs.backfillFrom
+      ..historyVersion = prefs.historyVersion;
+    prefs = restored;
+    notifyListeners();
+    await _savePrefs();
+    return true;
+  }
+
   void setKitchen(Map<String, dynamic> k) {
     prefs.kitchen = k;
     notifyListeners();

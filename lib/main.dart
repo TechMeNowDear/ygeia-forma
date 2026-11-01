@@ -171,7 +171,7 @@ class _ShellState extends State<Shell> {
 
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(settings: const RouteSettings(name: 'Ρυθμίσεις'), builder: (_) => SettingsPage(store: widget.store)),
+      MaterialPageRoute<void>(settings: const RouteSettings(name: 'Ρυθμίσεις'), builder: (_) => SettingsPage(store: widget.store, food: _food)),
     );
   }
 
