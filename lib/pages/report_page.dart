@@ -34,6 +34,13 @@ class _ReportPageState extends State<ReportPage> {
 
   /// Σημείωση για τον γιατρό (φάρμακα, κάπνισμα…). Δεν αποθηκεύεται: γράφεται μόνο στο PDF.
   late String _note = widget.note;
+  late final _noteField = TextEditingController(text: widget.note);
+
+  @override
+  void dispose() {
+    _noteField.dispose();
+    super.dispose();
+  }
 
   late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now());
 
@@ -107,6 +114,7 @@ class _ReportPageState extends State<ReportPage> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: _noteField,
                       maxLength: 160,
                       maxLines: 2,
                       minLines: 1,
