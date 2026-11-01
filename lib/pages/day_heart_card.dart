@@ -147,7 +147,7 @@ class _DayHeartCardState extends State<DayHeartCard> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              bigFigure('Ηρεμία, ξύπνιος', h.resting),
+              bigFigure('Ξύπνιος, χωρίς βήματα', h.resting),
               bigFigure('Μέσος όρος ημέρας', h.awake),
             ],
           ),
@@ -216,7 +216,8 @@ class _Method extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Για έλεγχο: σύγκρινε την «Ηρεμία, ξύπνιος» με τους παλμούς ηρεμίας του Samsung Health και πες στο Claude τη διαφορά.',
+            'Δεν είναι οι «παλμοί ηρεμίας» των γιατρών: μετρά κάθε ξύπνια ώρα χωρίς βήματα (και οδήγηση, και μετά από τσιγάρο ή καφέ). '
+            'Για έλεγχο: σύγκρινέ το με τους παλμούς ηρεμίας του Samsung Health και πες στο Claude τη διαφορά.',
             style: style.copyWith(fontWeight: FontWeight.w600),
           ),
         ],

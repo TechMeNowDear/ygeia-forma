@@ -80,12 +80,13 @@ class BodyPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.thermostat_rounded, title: 'Θερμοκρασία δέρματος στον ύπνο', color: c.move),
+                  CardHeader(icon: Icons.thermostat_rounded, title: 'Θερμοκρασία καρπού στον ύπνο', color: c.move),
                   const SizedBox(height: 10),
                   Text(
                     skinBase == null
                         ? 'Χρειάζονται λίγες ακόμα νύχτες για τον μέσο όρο σου.'
-                        : 'Μέσος όρος σου ${dec(skinBase)} °C. Μια απότομη άνοδος συχνά προηγείται κρυώματος ή κούρασης.',
+                        : 'Μέσος όρος σου ${dec(skinBase)} °C. Αλλάζει πολύ με τη θερμοκρασία του δωματίου, τα σκεπάσματα '
+                            'και το λουράκι. Δείχνει μόνο τι άλλαξε σε σχέση με εσένα· δεν είναι θερμοκρασία σώματος ούτε πυρετός.',
                     style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
                   ),
                   const SizedBox(height: 12),
@@ -161,7 +162,8 @@ class _LatestCard extends StatelessWidget {
           if (p != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}',
+              'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}. Η ζυγαριά (ρεύμα στο σώμα) αλλάζει από μέρα σε μέρα '
+              'με το νερό και το φαγητό: αλλαγή κάτω από 1 kg ή 1% δεν σημαίνει κάτι.',
               style: TextStyle(color: c.textSecondary, fontSize: 13),
             ),
           ],
@@ -171,7 +173,7 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Μάζα λίπους', withDiff(last.fatKg, p?.fatKg, 'kg')),
           InfoRow('Σκελετικοί μύες', withDiff(last.smm, p?.smm, 'kg')),
           InfoRow('Άλιπη μάζα', withDiff(last.leanMass, p?.leanMass, 'kg')),
-          if (last.bmr != null) InfoRow('Βασικός μεταβολισμός', '${thousands(last.bmr!)} kcal'),
+          if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση)', '${thousands(last.bmr!)} kcal'),
           if (last.bmi != null) InfoRow('Δείκτης μάζας σώματος', dec(last.bmi!)),
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
         ],

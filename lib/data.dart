@@ -507,7 +507,7 @@ const todayCards = <TodayCard>[
   TodayCard('rhr', 'Παλμοί στον ύπνο', false),
   TodayCard('calories', 'Θερμίδες που έκαψα', false),
   TodayCard('spo2', 'Οξυγόνο στον ύπνο', false),
-  TodayCard('skin', 'Θερμοκρασία δέρματος', false),
+  TodayCard('skin', 'Θερμοκρασία καρπού στον ύπνο', false),
 ];
 
 /// Έκδοση της διάταξης του «Σήμερα». Στη 2 (νέα δομή, 24/10) το Energy Score, οι παλμοί

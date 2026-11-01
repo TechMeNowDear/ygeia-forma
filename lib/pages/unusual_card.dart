@@ -59,8 +59,10 @@ class _UnusualCardState extends State<UnusualCard> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: c.tint(accent), borderRadius: BorderRadius.circular(16)),
             child: Text(
-              'Συμβαίνει συχνά μετά από κούραση, λίγο ύπνο, αλκοόλ, βαρύ ή αργό φαγητό, έντονη άσκηση '
-              'ή στην αρχή ενός κρυώματος. Δεν είναι διάγνωση. Αν νιώθεις άρρωστος ή κρατήσει μέρες, ρώτα γιατρό.',
+              'Συμβαίνει συχνά μετά από λίγο ύπνο, αλκοόλ, βαρύ ή αργό φαγητό, έντονη άσκηση, ζεστό δωμάτιο, '
+              'αλλαγή στο κάπνισμα ή στα φάρμακα, ή στην αρχή μιας ίωσης. Δεν είναι διάγνωση. '
+              'Αν νιώθεις άρρωστος ή κρατήσει μέρες, ρώτα γιατρό. '
+              'Αν έχεις πόνο στο στήθος, δύσπνοια, λιποθυμία ή έντονο φτερούγισμα, μην περιμένεις: 166 ή 112.',
               style: TextStyle(fontSize: 13.5, height: 1.45, color: c.text),
             ),
           ),
@@ -131,7 +133,7 @@ class _SignalRow extends StatelessWidget {
             ),
           ),
           TrendPill(
-            s.off ? '$diffText${def.unit.isEmpty ? '' : def.unit == '%' ? '%' : ' ${def.unit}'}' : 'Κανονικό',
+            s.off ? '$diffText${def.unit.isEmpty ? '' : def.unit == '%' ? '%' : ' ${def.unit}'}' : 'Όπως συνήθως',
             kind: TrendKind.neutral,
           ),
         ],

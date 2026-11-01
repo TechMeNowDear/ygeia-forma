@@ -89,21 +89,22 @@ class MetricDef {
 const trendMetrics = <MetricDef>[
   // Καρδιά
   MetricDef(key: K.sleepHr, label: 'Παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1),
-  MetricDef(key: K.restHr, label: 'Ηρεμία, ξύπνιος', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
+  MetricDef(key: K.restHr, label: 'Ξύπνιος, χωρίς βήματα', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
   MetricDef(key: K.walkHr, label: 'Παλμοί στο περπάτημα', section: TrendSection.heart, minDiff: 3, unit: 'bpm', better: -1, includeToday: false),
   MetricDef(key: K.dayHr, label: 'Μέσος όρος ημέρας', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
   // Ύπνος
   MetricDef(key: K.sleepMin, label: 'Διάρκεια ύπνου', section: TrendSection.sleep, minDiff: 15, better: 1, kind: ValueKind.duration),
   MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1),
   MetricDef(key: K.deepPct, label: 'Βαθύς ύπνος', section: TrendSection.sleep, minDiff: 2, unit: '%', better: 1),
-  MetricDef(key: K.remPct, label: 'REM', section: TrendSection.sleep, minDiff: 2, unit: '%', better: 1),
+  // REM: ουδέτερο χρώμα· επηρεάζεται από φάρμακα (π.χ. αντικαταθλιπτικά), όχι μόνο από την ποιότητα του ύπνου.
+  MetricDef(key: K.remPct, label: 'REM', section: TrendSection.sleep, minDiff: 2, unit: '%'),
   MetricDef(key: K.awakeMin, label: 'Ξύπνιος μέσα στη νύχτα', section: TrendSection.sleep, minDiff: 5, better: -1, kind: ValueKind.duration),
   MetricDef(key: K.bedtime, label: 'Ώρα ύπνου', section: TrendSection.sleep, minDiff: 15, kind: ValueKind.clock),
   // Σώμα
   MetricDef(key: K.weight, label: 'Βάρος', section: TrendSection.body, minDiff: 0.5, unit: 'kg', digits: 1, sparse: true),
   MetricDef(key: K.fatPct, label: 'Λίπος', section: TrendSection.body, minDiff: 0.5, unit: '%', digits: 1, better: -1, sparse: true),
   MetricDef(key: K.smm, label: 'Σκελετικοί μύες', section: TrendSection.body, minDiff: 0.3, unit: 'kg', digits: 1, better: 1, sparse: true),
-  MetricDef(key: K.skinTemp, label: 'Θερμοκρασία δέρματος', section: TrendSection.body, minDiff: 0.2, unit: '°C', digits: 1),
+  MetricDef(key: K.skinTemp, label: 'Θερμοκρασία καρπού στον ύπνο', section: TrendSection.sleep, minDiff: 0.2, unit: '°C', digits: 1),
   // Κίνηση
   MetricDef(key: K.steps, label: 'Βήματα', section: TrendSection.move, minDiff: 500, better: 1, includeToday: false),
   MetricDef(key: K.activeMin, label: 'Ενεργός χρόνος', section: TrendSection.move, minDiff: 5, better: 1, kind: ValueKind.duration, includeToday: false),

@@ -57,7 +57,7 @@ class HeartPage extends StatelessWidget {
 
         return PageFrame(
           title: 'Καρδιά',
-          subtitle: 'Παλμοί, οξυγόνο και HRV',
+          subtitle: 'Παλμοί και οξυγόνο',
           onRefresh: () => store.refresh(),
           left: [
             DayHeartCard(data: d),
@@ -107,8 +107,10 @@ class HeartPage extends StatelessWidget {
                   CardHeader(icon: Icons.air_rounded, title: 'Οξυγόνο στον ύπνο', color: c.sleep),
                   const SizedBox(height: 8),
                   Text(
-                    'Μέσο και χαμηλότερο ανά νύχτα. Μεμονωμένες χαμηλές τιμές είναι συχνά λάθος μέτρησης '
-                    '(κίνηση, χαλαρό λουρί). Αν επαναλαμβάνονται, συζήτησέ το με γιατρό.',
+                    'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού. Μεμονωμένες χαμηλές τιμές '
+                    'είναι συχνά λάθος μέτρησης (κίνηση, χαλαρό λουρί)· το κάπνισμα κάνει τις μετρήσεις να δείχνουν ψηλότερα. '
+                    'Αν ροχαλίζεις ή είσαι κουρασμένος τη μέρα, το σωστό εργαλείο είναι το τεστ άπνοιας του Samsung Health Monitor '
+                    'και ο γιατρός, όχι αυτή η λίστα.',
                     style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
                   const Hairline(vertical: 12),
@@ -117,8 +119,7 @@ class HeartPage extends StatelessWidget {
                   for (final n in oxNights)
                     InfoRow(
                       shortDayDate(n.date),
-                      '${n.spo2Avg!.round()}% · χαμηλότερο ${n.spo2Min?.round() ?? '—'}%',
-                      valueColor: (n.spo2Min ?? 100) < 88 ? c.bad : null,
+                      '${n.spo2Avg!.round()}% · χαμηλότερη μέτρηση ${n.spo2Min?.round() ?? '—'}%',
                     ),
                 ],
               ),
@@ -127,7 +128,7 @@ class HeartPage extends StatelessWidget {
               icon: Icons.timeline_rounded,
               color: c.sleep,
               title: 'HRV (μεταβλητότητα παλμών)',
-              text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές. Θα το μετρά η δική μας εφαρμογή στο ρολόι (Βήμα 6).',
+              text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές. Θα έρθει από το Oura.',
             ),
           ],
         );

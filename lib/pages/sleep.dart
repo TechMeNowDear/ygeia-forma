@@ -204,9 +204,8 @@ class _LastNightCard extends StatelessWidget {
           if (n.spo2Avg != null)
             InfoRow(
               'Οξυγόνο',
-              '${n.spo2Avg!.round()}% · χαμηλότερο ${n.spo2Min?.round() ?? '—'}%',
+              '${n.spo2Avg!.round()}% · χαμηλότερη μέτρηση ${n.spo2Min?.round() ?? '—'}%',
               dot: c.sleep,
-              valueColor: (n.spo2Min ?? 100) < 88 ? c.bad : null,
             ),
           if (n.parts.length > 1) InfoRow('Κομμάτια ύπνου (Samsung)', '${n.parts.length}', dot: c.textTertiary),
           if (n.parts.length > 1 && n.parts.any((p) => p.score != null))

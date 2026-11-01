@@ -29,6 +29,9 @@ class _ReportPageState extends State<ReportPage> {
   String? _uri;
   String? _error;
 
+  /// Σημείωση για τον γιατρό (φάρμακα, κάπνισμα…). Δεν αποθηκεύεται: γράφεται μόνο στο PDF.
+  String _note = '';
+
   late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now());
 
   String get _fileName {
@@ -74,7 +77,7 @@ class _ReportPageState extends State<ReportPage> {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final pages = [_PageOne(data: _data), _PageTwo(data: _data)];
+    final pages = [_PageOne(data: _data, note: _note.trim()), _PageTwo(data: _data)];
 
     return Scaffold(
       backgroundColor: c.background,
@@ -96,10 +99,25 @@ class _ReportPageState extends State<ReportPage> {
                   children: [
                     Text(
                       'Οι τελευταίοι 3 μήνες σε δύο σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
-                      'Μόνο μετρήσεις, χωρίς ερμηνείες.',
+                      'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση.',
                       style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    TextField(
+                      maxLength: 160,
+                      maxLines: 2,
+                      minLines: 1,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Σημείωση για τον γιατρό (προαιρετικά)',
+                        hintText: 'π.χ. φάρμακα και δόση, κάπνισμα, συμπτώματα',
+                      ),
+                      onChanged: (v) => setState(() {
+                        _note = v;
+                        _uri = null; // το αποθηκευμένο PDF δεν έχει πια την ίδια σημείωση
+                      }),
+                    ),
+                    const SizedBox(height: 12),
                     for (var i = 0; i < pages.length; i++) ...[
                       if (i > 0) const SizedBox(height: 16),
                       DecoratedBox(
@@ -315,8 +333,9 @@ class _Title extends StatelessWidget {
 // --- Σελίδα 1: πίνακας ---
 
 class _PageOne extends StatelessWidget {
-  const _PageOne({required this.data});
+  const _PageOne({required this.data, this.note = ''});
   final ReportData data;
+  final String note;
 
   @override
   Widget build(BuildContext context) {
@@ -359,6 +378,16 @@ class _PageOne extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(data: d, page: 1),
+        if (note.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Σημείωση: $note',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 9.5, color: c.text, height: 1.35),
+            ),
+          ),
         _Title('Σύνοψη'),
         Table(
           columnWidths: const {
@@ -379,8 +408,8 @@ class _PageOne extends StatelessWidget {
                 pad(Text('Μεσαία τιμή', style: header)),
                 pad(Text('Συνήθως\n(8 στις 10 μέρες)', style: header)),
                 pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
-                pad(Text('Μέρες', style: header)),
-                pad(Text('Σε σχέση με τους\n3 προηγ. μήνες', style: header)),
+                pad(Text('Μέρες με\nμέτρηση', style: header)),
+                pad(Text('Διαφορά από τους\n3 προηγ. μήνες', style: header)),
               ],
             ),
             for (final r in rows)
@@ -400,7 +429,7 @@ class _PageOne extends StatelessWidget {
               }(),
           ],
         ),
-        _Title('Νύχτες με ελάχιστο οξυγόνο κάτω από 90%'),
+        _Title('Νύχτες με μία τουλάχιστον μέτρηση οξυγόνου κάτω από 90%'),
         if (d.lowOxygenNights.isEmpty)
           Text('Καμία στο διάστημα (${d.stat(K.spo2Min).n} νύχτες με μέτρηση).', style: cell)
         else ...[
@@ -457,15 +486,17 @@ class _PageOne extends StatelessWidget {
         _Title('Πώς διαβάζεται'),
         Text(
           'Μεσαία τιμή: οι μισές μέρες είναι πάνω και οι μισές κάτω από αυτή. «Συνήθως»: το εύρος όπου βρίσκονται '
-          '8 στις 10 μέρες. «Σε σχέση με τους 3 προηγούμενους μήνες»: γράφεται αλλαγή μόνο όταν η διαφορά είναι '
-          'μεγαλύτερη από τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις· αλλιώς «Σταθερό», και «—» όταν δεν υπάρχουν '
+          '8 στις 10 μέρες. «Διαφορά από τους 3 προηγούμενους μήνες»: γράφεται μόνο όταν περνά στατιστικό έλεγχο '
+          '(επίπεδο 1%, με διόρθωση για τη συσχέτιση διαδοχικών ημερών)· αλλιώς «Σταθερό», και «—» όταν δεν υπάρχουν '
           'αρκετές μετρήσεις. Οι νύχτες χρονολογούνται με την ημερομηνία του πρωινού.',
           style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 6),
         Text(
-          'Δεν περιλαμβάνονται: μεταβλητότητα καρδιακού ρυθμού (HRV) και παλμοί ηρεμίας της Samsung, γιατί η Samsung '
-          'δεν τα δίνει σε άλλες εφαρμογές.',
+          'Πώς μετρήθηκαν: ρολόι Samsung Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40 (ρεύμα στο σώμα), '
+          'μέσω Samsung Health. Παλμοί στον ύπνο: μέσος όρος των μετρήσεων του ρολογιού στον ύπνο. Οξυγόνο: αισθητήρας '
+          'καρπού· το «ελάχιστο» είναι μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η Samsung, '
+          'χωρίς εκτιμήσεις της εφαρμογής. Δεν περιλαμβάνονται HRV και παλμοί ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
           style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
         ),
         const Spacer(),

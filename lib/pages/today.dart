@@ -153,7 +153,8 @@ class TodayPage extends StatelessWidget {
       final diff = last!.weight! - prev!.weight!;
       trend = TrendPill(
         '${signedDec(diff)} kg από ${dayMonth(prev.time)}',
-        kind: diff < -0.05 ? TrendKind.good : (diff > 0.05 ? TrendKind.bad : TrendKind.neutral),
+        // Κάτω από 1 kg είναι θόρυβος της ζυγαριάς (νερό, φαγητό): ουδέτερο χρώμα.
+        kind: diff <= -1 ? TrendKind.good : (diff >= 1 ? TrendKind.bad : TrendKind.neutral),
       );
     }
     final weights = [for (final b in d.body) if (b.weight != null) b.weight!];
@@ -161,7 +162,8 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.monitor_weight_rounded,
       color: c.body,
-      title: 'Βάρος',
+      // Αν η τελευταία ζύγιση δεν είναι σημερινή, λέει πότε έγινε.
+      title: last == null || sameDay(last.time, d.readAt) ? 'Βάρος' : 'Βάρος · ${relativeDay(last.time, d.readAt)}',
       value: last?.weight == null ? null : dec(last!.weight!),
       unit: 'kg',
       trend: trend,
@@ -247,7 +249,7 @@ class TodayPage extends StatelessWidget {
       unit: '%',
       trend: min == null
           ? null
-          : TrendPill('Χαμηλότερο ${min.round()}%', kind: min < 88 ? TrendKind.bad : TrendKind.neutral),
+          : TrendPill('Χαμηλότερη μέτρηση ${min.round()}%'),
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
@@ -260,7 +262,7 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.thermostat_rounded,
       color: c.move,
-      title: 'Θερμοκρασία δέρματος',
+      title: 'Θερμοκρασία καρπού',
       value: t == null ? null : (base == null ? dec(t) : signedDec(t - base)),
       unit: '°C',
       note: (t != null && base != null) ? 'Απόκλιση από τον μέσο όρο σου' : null,
