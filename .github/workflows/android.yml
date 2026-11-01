@@ -39,6 +39,7 @@ jobs:
       - name: Συμπλήρωση αρχείων Android
         run: |
           flutter --version
+          echo "::notice title=Flutter::$(flutter --version | head -1)"
           # Φτιάχνει μόνο όσα αρχεία λείπουν· τα δικά μας μένουν όπως είναι.
           flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
           test -f android/app/build.gradle.kts || { echo "Λείπει το android/app/build.gradle.kts"; exit 1; }
@@ -67,24 +68,45 @@ jobs:
             store="$HOME/.ygeia-secret/release.jks"
             pw="$KEYSTORE_PASSWORD"
             echo "Κλειδί από τα Secrets του repository."
-          else
-            mkdir -p "$HOME/.ygeia-signing"
-            if [ ! -f "$HOME/.ygeia-signing/release.jks" ]; then
-              openssl rand -hex 24 > "$HOME/.ygeia-signing/password"
-              p="$(cat "$HOME/.ygeia-signing/password")"
-              keytool -genkeypair -keystore "$HOME/.ygeia-signing/release.jks" -alias ygeia \
-                -keyalg RSA -keysize 2048 -validity 10000 \
-                -storepass "$p" -keypass "$p" -dname "CN=Ygeia Forma"
-              echo "Φτιάχτηκε νέο κλειδί στην προσωρινή μνήμη."
-            else
-              echo "Κλειδί από την προσωρινή μνήμη."
-            fi
+          elif [ -f "$HOME/.ygeia-signing/release.jks" ] && [ -f "$HOME/.ygeia-signing/password" ]; then
             store="$HOME/.ygeia-signing/release.jks"
             pw="$(cat "$HOME/.ygeia-signing/password")"
+            echo "::warning title=Κλειδί υπογραφής::Το κλειδί βρίσκεται μόνο στην προσωρινή μνήμη του GitHub, που σβήνεται μετά από 7 μέρες χωρίς χτίσιμο. Πρέπει να μπει στα Secrets (YGEIA_KEYSTORE_B64, YGEIA_KEYSTORE_PASSWORD)."
+          else
+            # Ποτέ νέο κλειδί: ένα νέο κλειδί σημαίνει ότι η έκδοση δεν μπαίνει πάνω στην παλιά
+            # και η απεγκατάσταση σβήνει τα δεδομένα του κινητού. Καλύτερα να σταματήσει το χτίσιμο.
+            echo "::error title=Κλειδί υπογραφής::Δεν βρέθηκε το κλειδί υπογραφής (ούτε στα Secrets ούτε στην προσωρινή μνήμη). Το χτίσιμο σταματά για να μη φτιαχτεί έκδοση με άλλο κλειδί."
+            exit 1
           fi
           echo "::add-mask::$pw"
+          fp="$(keytool -list -v -keystore "$store" -storepass "$pw" -alias ygeia | grep -m1 'SHA256:' | sed 's/.*SHA256: *//')"
+          [ -n "$fp" ] || { echo "::error title=Κλειδί υπογραφής::Δεν διαβάστηκε το κλειδί (λάθος κωδικός ή αρχείο)."; exit 1; }
+          echo "::notice title=Αποτύπωμα κλειδιού::SHA-256 $fp"
           echo "YGEIA_KEYSTORE=$store" >> "$GITHUB_ENV"
           echo "YGEIA_KEYSTORE_PASSWORD=$pw" >> "$GITHUB_ENV"
+
+      # Μόνο όταν το ζητήσουμε ([export-key] στο μήνυμα του commit): αντίγραφο του κλειδιού για 1 μέρα,
+      # ώστε να μπει στα Secrets του repository και σε διαχειριστή κωδικών.
+      - name: Αντίγραφο κλειδιού υπογραφής
+        if: contains(github.event.head_commit.message, '[export-key]')
+        run: |
+          mkdir -p key-export
+          cp "$YGEIA_KEYSTORE" key-export/release.jks
+          base64 -w0 "$YGEIA_KEYSTORE" > key-export/YGEIA_KEYSTORE_B64.txt
+          printf '%s' "$YGEIA_KEYSTORE_PASSWORD" > key-export/YGEIA_KEYSTORE_PASSWORD.txt
+          printf '%s\n' \
+            "Κλειδί υπογραφής της εφαρμογής «Υγεία & Φόρμα»." \
+            "1. Το περιεχόμενο του YGEIA_KEYSTORE_B64.txt μπαίνει στο Secret YGEIA_KEYSTORE_B64." \
+            "2. Το περιεχόμενο του YGEIA_KEYSTORE_PASSWORD.txt μπαίνει στο Secret YGEIA_KEYSTORE_PASSWORD." \
+            "3. Όλος ο φάκελος φυλάγεται σε διαχειριστή κωδικών. Αν χαθεί, οι νέες εκδόσεις δεν θα μπαίνουν πάνω στην παλιά." \
+            > key-export/ODIGIES.txt
+
+      - uses: actions/upload-artifact@v4
+        if: contains(github.event.head_commit.message, '[export-key]')
+        with:
+          name: kleidi-ypografis
+          path: key-export/
+          retention-days: 1
 
       - name: Έλεγχοι
         run: |
