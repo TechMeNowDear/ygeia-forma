@@ -43,7 +43,7 @@ class _TrendsPageState extends State<TrendsPage> {
           onChanged: (p) => setState(() => _period = p),
         );
 
-        final progress = store.backfilling
+        final progress = store.backfillVisible
             ? _BackfillCard(reached: store.backfillReached)
             : null;
 
@@ -162,8 +162,9 @@ class _BackfillCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             '${r == null ? '' : 'Έφτασα στις ${dayMonth(r)} ${r.year}. '}'
-            'Μία φορά, για όλο το ιστορικό (ως 10 χρόνια). Προχωρά μόνο όσο είναι ανοιχτή η εφαρμογή· '
-            'αν την κλείσεις, συνεχίζει από εκεί που έμεινε. Μέχρι τότε, οι συγκρίσεις 3 μηνών και χρόνου μπορεί να λένε «λίγα δεδομένα».',
+            'Πρώτα οι μήνες που χρειάζονται οι Τάσεις· τα παλιότερα χρόνια (ως 10) έρχονται μετά, χωρίς αυτή την κάρτα. '
+            'Προχωρά μόνο όσο είναι ανοιχτή η εφαρμογή· αν την κλείσεις, συνεχίζει από εκεί που έμεινε. '
+            'Μέχρι τότε, οι συγκρίσεις 3 μηνών και χρόνου μπορεί να λένε «λίγα δεδομένα».',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
           ),
         ],

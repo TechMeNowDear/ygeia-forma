@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import 'error_report.dart';
 import 'format.dart';
 import 'history.dart';
 import 'samsung.dart';
@@ -627,9 +628,18 @@ typedef ParsedDashboard = ({Map<String, dynamic> status, Dashboard? data, bool s
 Future<ParsedDashboard> parseDashboard(String raw) async {
   try {
     return await Isolate.run(() => parseDashboardSync(raw));
-  } catch (_) {
+  } catch (e, st) {
+    _isolateFailed(e, st);
     return parseDashboardSync(raw);
   }
+}
+
+/// Αν το νήμα δεν ξεκινά, η εφαρμογή δουλεύει (πιο αργά)· το λέμε στο Sentry μία φορά, για να το δούμε.
+bool _isolateReported = false;
+void _isolateFailed(Object e, StackTrace st) {
+  if (_isolateReported) return;
+  _isolateReported = true;
+  errors.report(e, st, extra: {'where': 'isolate'});
 }
 
 /// Ένα κομμάτι ιστορικού από τη Samsung, διαβασμένο: συνόψεις ανά μέρα και αν διαβάστηκαν όλα.
@@ -638,7 +648,8 @@ typedef ParsedRange = ({bool ok, Map<String, Map<String, double>> rows, bool sle
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to) async {
   try {
     return await Isolate.run(() => parseRangeSync(raw, from, to));
-  } catch (_) {
+  } catch (e, st) {
+    _isolateFailed(e, st);
     return parseRangeSync(raw, from, to);
   }
 }
@@ -889,6 +900,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _upgradeHistory() async {
     if (!_prefsLoaded || !_historyLoaded || prefs.historyVersion >= historyRulesVersion) return;
     prefs.backfillFrom = null;
+    prefs.emptyFrom = null;
+    prefs.emptyChecked = null;
     prefs.historyVersion = historyRulesVersion;
     await _savePrefs();
   }
@@ -926,13 +939,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     final saved = await _saveDays(changed);
-    // Η εφαρμογή έμεινε κλειστή πάνω από 29 μέρες: οι μέρες στη μέση (και η τελευταία, που είχε
-    // γραφτεί μισή) ξαναδιαβάζονται από το ιστορικό.
+    // Η εφαρμογή έμεινε κλειστή πάνω από 6 μέρες: οι μέρες στη μέση (και η τελευταία, που είχε
+    // γραφτεί μισή) ξαναδιαβάζονται, με βήματα ανά λεπτό, ώστε ο ύπνος τους να έχει τον ίδιο ορισμό
+    // με τις υπόλοιπες (η κανονική ανάγνωση έχει βήματα ανά λεπτό μόνο για 7 μέρες).
     final last = prefs.recentTo != null ? parseDateKey(prefs.recentTo!) : null;
     if (saved && _prefsLoaded) {
       // Διαβάζεται μόνο το κενό (όχι όλο το ιστορικό): από την τελευταία μέρα που είχε γραφτεί (μισή) ως
-      // τη μέρα −30. Αν υπήρχε ήδη ανολοκλήρωτο κενό, κρατάμε την παλιότερη αρχή και ξεκινάμε από πάνω.
-      if (last != null && last.isBefore(addDays(today, -29))) {
+      // τη μέρα −7. Αν υπήρχε ήδη ανολοκλήρωτο κενό, κρατάμε την παλιότερη αρχή και ξεκινάμε από πάνω.
+      if (last != null && last.isBefore(addDays(today, -(_recentDays - 1)))) {
         final prev = prefs.gapFrom != null ? parseDateKey(prefs.gapFrom!) : null;
         prefs.gapFrom = dateKey(prev != null && prev.isBefore(last) ? prev : last);
         prefs.gapTo = null;
@@ -955,7 +969,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Επιστρέφει null αν σταματάμε για τώρα (θα ξαναδοκιμαστεί), αλλιώς αν ήταν εντελώς άδειο.
   Future<bool?> _readChunk(DateTime from, DateTime cursor) async {
     final to = addDays(cursor, -1);
-    final p = await parseRange(await SamsungHealth.readRangeRaw(dateKey(from), dateKey(cursor)), from, to);
+    final raw = await SamsungHealth.readRangeRaw(dateKey(from), dateKey(cursor))
+        .timeout(const Duration(seconds: 120), onTimeout: () => '{"ok":false,"kind":"timeout"}');
+    final p = await parseRange(raw, from, to);
     if (!p.ok) {
       // Δεν διαβάστηκε τίποτα: ξανά στην επόμενη ανανέωση (ως 3 φορές), χωρίς να προχωρήσουμε.
       _backfillFails++;
@@ -993,9 +1009,18 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Ως πού έχει φτάσει η συμπλήρωση (για την κάρτα στις Τάσεις).
   DateTime? backfillReached;
+  bool _fillingGap = false;
+
+  /// Η κάρτα στις Τάσεις φαίνεται μόνο όσο έρχονται μέρες που αλλάζουν τις Τάσεις (κενό ή τελευταίοι
+  /// 15 μήνες). Τα παλιότερα χρόνια και ο μηνιαίος έλεγχος γίνονται αθόρυβα.
+  bool get backfillVisible {
+    if (!backfilling) return false;
+    final r = backfillReached;
+    return _fillingGap || r == null || r.isAfter(addDays(dayOf(DateTime.now()), -455));
+  }
 
   /// Συμπληρώνει το ιστορικό, μόνο όσο η εφαρμογή είναι ανοιχτή· αν κλείσει, συνεχίζει την επόμενη φορά.
-  /// 1. Πρώτα το κενό από όσο έμεινε κλειστή η εφαρμογή (πάνω από 29 μέρες).
+  /// 1. Πρώτα το κενό από όσο έμεινε κλειστή η εφαρμογή (πάνω από 6 μέρες).
   /// 2. Μετά προς τα πίσω ανά 30 μέρες, ως 10 χρόνια ή ως εκεί που αρχίζουν τα δεδομένα σου.
   Future<void> _backfill() async {
     if (backfilling || !_prefsLoaded || !_historyLoaded || _backfillFails >= 3) return;
@@ -1005,8 +1030,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     final oldest = addDays(today, -historyDays);
     // Μία φορά τον μήνα ξανακοιτάμε πιο πίσω από εκεί που «άρχιζαν» τα δεδομένα: π.χ. σε νέο κινητό
     // που τότε δεν είχε συγχρονίσει ακόμα όλο το ιστορικό της Samsung.
+    // Μόνο όταν η συμπλήρωση έχει τελειώσει: αλλιώς ο δείκτης θα πηδούσε μήνες που δεν έχουν διαβαστεί.
     final checked = prefs.emptyChecked != null ? parseDateKey(prefs.emptyChecked!) : null;
-    if (prefs.emptyFrom != null && checked != null && checked.isBefore(addDays(today, -30))) {
+    final done = prefs.backfillFrom != null && !parseDateKey(prefs.backfillFrom!).isAfter(oldest);
+    if (done && prefs.emptyFrom != null && checked != null && checked.isBefore(addDays(today, -30))) {
       prefs.backfillFrom = prefs.emptyFrom;
       prefs.emptyFrom = null;
       prefs.emptyChecked = null;
@@ -1016,10 +1043,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (gapFrom == null && !cursor.isAfter(oldest)) return;
 
     backfilling = true;
+    _fillingGap = gapFrom != null;
+    backfillReached = gapFrom != null ? (prefs.gapTo != null ? parseDateKey(prefs.gapTo!) : start) : cursor;
     notifyListeners();
     try {
       if (gapFrom != null) {
-        var g = prefs.gapTo != null ? parseDateKey(prefs.gapTo!) : addDays(today, -29);
+        var g = prefs.gapTo != null ? parseDateKey(prefs.gapTo!) : start;
         while (g.isAfter(gapFrom)) {
           var from = addDays(g, -30);
           if (from.isBefore(gapFrom)) from = gapFrom;
@@ -1033,6 +1062,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         prefs.gapFrom = null;
         prefs.gapTo = null;
         await _savePrefs();
+        _fillingGap = false;
+        backfillReached = cursor;
+        notifyListeners();
       }
 
       final tooOldForTrends = addDays(today, -455);
@@ -1090,7 +1122,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     final merged = {...prefsJson(), ...p, 'layout': todayLayout};
     final restored = Prefs.fromJson(merged)
       ..backfillFrom = prefs.backfillFrom
-      ..historyVersion = prefs.historyVersion;
+      ..historyVersion = prefs.historyVersion
+      ..recentTo = prefs.recentTo
+      ..gapFrom = prefs.gapFrom
+      ..gapTo = prefs.gapTo
+      ..emptyFrom = prefs.emptyFrom
+      ..emptyChecked = prefs.emptyChecked;
     prefs = restored;
     notifyListeners();
     return _savePrefs();

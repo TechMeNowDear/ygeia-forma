@@ -32,6 +32,9 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         // Πρόσφατη ανάγνωση (π.χ. η εφαρμογή ήταν ανοιχτή): δεν χρειάζεται άλλη.
         val cache = java.io.File(applicationContext.filesDir, SamsungHealthBridge.DASHBOARD_FILE)
         if (cache.exists() && System.currentTimeMillis() - cache.lastModified() < FRESH_MS) return Result.success()
+        // Η Samsung αρνήθηκε 3 φορές στη σειρά σε αυτή την έκδοση: δεν ξαναδοκιμάζουμε (μπαταρία)·
+        // τα δεδομένα έρχονται κανονικά όταν ανοίγει η εφαρμογή.
+        if (failures() >= MAX_FAILURES) return Result.success()
         val started = System.currentTimeMillis()
         return try {
             val store = HealthDataService.getStore(applicationContext)
@@ -48,34 +51,49 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             // μισά δεδομένα πάνω στα καλά· το λέμε στο Sentry, μία φορά ανά έκδοση.
             val failed = o.keys().asSequence().filter { k -> (o.opt(k) as? org.json.JSONObject)?.has("error") == true }.toList()
             if (failed.isNotEmpty()) {
-                reportOnce(IllegalStateException("Ανάγνωση στο παρασκήνιο: σφάλμα σε ${failed.joinToString()}"))
+                fail(IllegalStateException("Ανάγνωση στο παρασκήνιο: σφάλμα σε ${failed.joinToString()}"))
                 return Result.success()
             }
             val text = withContext(Dispatchers.Default) { o.toString() }
             withContext(Dispatchers.IO) {
                 // Η εφαρμογή έγραψε στο μεταξύ νεότερα δεδομένα: δεν τα πατάμε.
                 if (!(cache.exists() && cache.lastModified() > started)) writeAtomically(SamsungHealthBridge.DASHBOARD_FILE, text)
+                failFile().delete()
             }
             Result.success()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             // Στο Sentry μία φορά ανά έκδοση, για να ξέρουμε αν η Samsung επιτρέπει την ανάγνωση στο παρασκήνιο.
-            reportOnce(e)
+            fail(e)
             Result.success()
         }
     }
 
-    private fun reportOnce(e: Throwable) {
-        val version = try {
-            applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0).versionName ?: "dev"
+    private fun version(): String = try {
+        applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0).versionName ?: "dev"
+    } catch (_: Throwable) {
+        "dev"
+    }
+
+    // «έκδοση:αποτυχίες στη σειρά». Νέα έκδοση = ξανά από το μηδέν.
+    private fun failFile() = java.io.File(applicationContext.filesDir, "bg-failures")
+
+    private fun failures(): Int = try {
+        val parts = failFile().readText().split(':')
+        if (parts.size == 2 && parts[0] == version()) parts[1].toInt() else 0
+    } catch (_: Throwable) {
+        0
+    }
+
+    /** Μετρά την αποτυχία· στο Sentry μόνο η πρώτη της έκδοσης. */
+    private fun fail(e: Throwable) {
+        val n = failures() + 1
+        try {
+            failFile().writeText("${version()}:$n")
         } catch (_: Throwable) {
-            "dev"
         }
-        val mark = java.io.File(applicationContext.filesDir, "bg-reported")
-        if (mark.exists() && mark.readText() == version) return
-        mark.writeText(version)
-        ErrorQueue.report(e, "background")
+        if (n == 1) ErrorQueue.report(e, "background")
     }
 
     // Δικό του προσωρινό αρχείο, ώστε να μη συγκρούεται με την εφαρμογή· η μετονομασία είναι ατομική.
@@ -89,6 +107,7 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     companion object {
         private const val NAME = "ygeia-refresh"
         private const val FRESH_MS = 150 * 60 * 1000L // 2,5 ώρες
+        private const val MAX_FAILURES = 3
 
         /**
          * Καλείται όταν ανοίγει η εφαρμογή. UPDATE: κρατά το πρόγραμμα, αλλά παίρνει τις νέες ρυθμίσεις
