@@ -84,7 +84,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
 
   Future<Food?> _edit(Food f, {String? note}) async {
     final edited = await Navigator.of(context).push<Food>(
-      MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draftFromFood(f), existingId: f.id, note: note)),
+      MaterialPageRoute(settings: const RouteSettings(name: 'Διόρθωση προϊόντος'), builder: (_) => FoodFormScreen(draft: draftFromFood(f), existingId: f.id, note: note)),
     );
     if (edited == null) return null;
     await widget.food.saveMyFood(edited);
@@ -104,6 +104,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
     final c = Aigaio.of(context);
     final choice = await showModalBottomSheet<String>(
       context: context,
+      routeSettings: const RouteSettings(name: 'Επιλογές προϊόντος'),
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(
@@ -134,7 +135,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
       final e = await _edit(f);
       if (e != null && mounted) _saved(e);
     } else if (choice == 'detail') {
-      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FoodDetailScreen(food: f)));
+      await Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τρόφιμο'), builder: (_) => FoodDetailScreen(food: f)));
     } else if (choice == 'delete') {
       await _delete(f);
     }

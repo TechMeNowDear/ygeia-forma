@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'data.dart';
+import 'error_report.dart';
 import 'food/food_store.dart';
 import 'nav.dart';
 import 'pages/body.dart';
@@ -21,6 +22,7 @@ export 'nav.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installErrorReporting();
   final store = HealthStore();
   final food = FoodStore();
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
@@ -61,6 +63,7 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
           theme: buildTheme(Brightness.light, Aigaio.day(p.dayTheme)),
           darkTheme: buildTheme(Brightness.dark, Aigaio.night(p.nightTheme)),
           themeAnimationDuration: const Duration(milliseconds: 220),
+          navigatorObservers: [errors.observer],
           home: _home,
         );
       },
@@ -119,6 +122,31 @@ class _ShellState extends State<Shell> {
   late final _foodTab = ValueNotifier(widget.initialIndex == Cat.food ? widget.initialTab : 0);
   final _exerciseTab = ValueNotifier(0);
 
+  // Για την αναφορά σφαλμάτων: σε ποια κατηγορία και καρτέλα είμαι.
+  static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
+  static const _healthTabs = ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'];
+  static const _foodTabs = ['Ημερολόγιο', 'Τα δικά μου'];
+  static const _exerciseTabs = ['Κίνηση'];
+
+  void _track() {
+    final (tabs, t) = switch (_index) {
+      Cat.health => (_healthTabs, _healthTab.value),
+      Cat.food => (_foodTabs, _foodTab.value),
+      Cat.exercise => (_exerciseTabs, _exerciseTab.value),
+      _ => (const <String>[], 0),
+    };
+    errors.setBase([_catNames[_index], if (t < tabs.length) tabs[t]].join(' › '));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _track();
+    _healthTab.addListener(_track);
+    _foodTab.addListener(_track);
+    _exerciseTab.addListener(_track);
+  }
+
   @override
   void dispose() {
     _healthTab.dispose();
@@ -127,7 +155,10 @@ class _ShellState extends State<Shell> {
     super.dispose();
   }
 
-  void _go(int i) => setState(() => _index = i);
+  void _go(int i) {
+    setState(() => _index = i);
+    _track();
+  }
 
   /// Από μια κάρτα του «Σήμερα» κατευθείαν στη σωστή κατηγορία και καρτέλα.
   void _open(int category, [int? tab]) {
@@ -140,7 +171,7 @@ class _ShellState extends State<Shell> {
 
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => SettingsPage(store: widget.store)),
+      MaterialPageRoute<void>(settings: const RouteSettings(name: 'Ρυθμίσεις'), builder: (_) => SettingsPage(store: widget.store)),
     );
   }
 

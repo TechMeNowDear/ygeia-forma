@@ -15,6 +15,10 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Σφάλματα για το Sentry: μόνο γράφει σε αρχείο όταν κάτι χαλάσει· τα στέλνει η Flutter.
+        ErrorQueue.install(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/errors")
+            .setMethodCallHandler(ErrorQueue)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/samsung")
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")

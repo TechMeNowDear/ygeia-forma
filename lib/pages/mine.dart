@@ -31,7 +31,7 @@ class MinePage extends StatelessWidget {
           text: n == 0
               ? 'Πέρασε ό,τι αγοράζεις, με barcode ή χειροκίνητα, χωρίς να το φας.'
               : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · πρόσθεσε κι άλλα με barcode ή χειροκίνητα',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MyFoodsScreen(food: food))),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: food))),
         );
         final kitchen = _EntryCard(
           key: const ValueKey('mine-kitchen'),
@@ -39,7 +39,7 @@ class MinePage extends StatelessWidget {
           color: c.food,
           title: 'Η κουζίνα μου',
           text: '${k.devices.length} συσκευές · ${k.cookware.length} σκεύη',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => KitchenScreen(store: store))),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Η κουζίνα μου'), builder: (_) => KitchenScreen(store: store))),
         );
 
         return PageFrame(

@@ -28,6 +28,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
   Future<void> _editCookware([Cookware? existing]) async {
     final r = await showModalBottomSheet<_CookwareResult>(
       context: context,
+      routeSettings: const RouteSettings(name: 'Σκεύος'),
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,

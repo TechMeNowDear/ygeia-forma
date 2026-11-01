@@ -79,7 +79,7 @@ class _TrendsPageState extends State<TrendsPage> {
 
         final reportButton = TextButton.icon(
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => ReportPage(store: store, now: widget.now)),
+            MaterialPageRoute<void>(settings: const RouteSettings(name: 'Για γιατρό'), builder: (_) => ReportPage(store: store, now: widget.now)),
           ),
           style: TextButton.styleFrom(
             backgroundColor: c.card,

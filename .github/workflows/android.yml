@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      sentry_test:
+        description: "Στείλε και ένα δοκιμαστικό σφάλμα στο Sentry"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -40,7 +45,7 @@ jobs:
           cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
           sed -i 's/android:label="ygeia_forma"/android:label="Υγεία \&amp; Φόρμα"/' android/app/src/main/AndroidManifest.xml
           grep -n 'android:label' android/app/src/main/AndroidManifest.xml
-          # Διαδίκτυο: μόνο για το Open Food Facts (barcode). Το Samsung Health δεν το χρειάζεται.
+          # Διαδίκτυο: για το Open Food Facts (barcode) και την αναφορά σφαλμάτων (Sentry). Το Samsung Health δεν το χρειάζεται.
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           grep -n 'INTERNET' android/app/src/main/AndroidManifest.xml
@@ -84,7 +89,7 @@ jobs:
       - name: Έλεγχοι
         run: |
           set -o pipefail
-          if ! flutter test test/widget_test.dart test/heart_day_test.dart test/trends_test.dart test/unusual_test.dart test/food_test.dart test/sleep_gaps_test.dart 2>&1 | tee tests.log; then
+          if ! flutter test test/widget_test.dart test/heart_day_test.dart test/trends_test.dart test/unusual_test.dart test/food_test.dart test/sleep_gaps_test.dart test/error_report_test.dart 2>&1 | tee tests.log; then
             grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -120 > errors.txt || true
             [ -s errors.txt ] || tail -80 tests.log > errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
@@ -106,6 +111,19 @@ jobs:
           fi
           cp build/app/outputs/flutter-apk/app-release.apk ygeia-forma-${{ github.run_number }}.apk
           ls -lh ygeia-forma-*.apk
+
+      # Μόνο όταν το ζητήσουμε: πραγματικό σφάλμα στο Sentry με τον κώδικα της εφαρμογής και την ίδια έκδοση.
+      - name: Δοκιμαστικό σφάλμα στο Sentry
+        if: contains(github.event.head_commit.message, '[sentry-test]') || inputs.sentry_test
+        run: |
+          set -o pipefail
+          if ! flutter test test/sentry_live_test.dart --dart-define=SENTRY_LIVE=1 \
+            --dart-define=APP_VERSION=0.1.${{ github.run_number }} 2>&1 | tee live.log; then
+            msg=$(tail -60 live.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Δοκιμή Sentry::$msg"
+            exit 1
+          fi
+          echo "::notice title=Δοκιμή Sentry::Στάλθηκε δοκιμαστικό σφάλμα για ygeia-forma@0.1.${{ github.run_number }}"
 
       - uses: actions/upload-artifact@v4
         with:

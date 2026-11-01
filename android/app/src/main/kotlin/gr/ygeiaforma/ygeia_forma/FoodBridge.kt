@@ -83,6 +83,7 @@ class FoodBridge(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                ErrorQueue.report(e, "food")
                 JSONObject().put("ok", false).put("kind", "other").put("message", e.message ?: e.javaClass.simpleName)
                     .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))
             }
@@ -123,6 +124,7 @@ class FoodBridge(
             }
             .addOnFailureListener { e ->
                 val kind = if (e is MlKitException && e.errorCode == MlKitException.UNAVAILABLE) "unavailable" else "other"
+                if (kind == "other") ErrorQueue.report(e, "barcode")
                 if (cont.isActive) cont.resume(
                     JSONObject().put("ok", false).put("kind", kind).put("message", e.message ?: "")
                         .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))

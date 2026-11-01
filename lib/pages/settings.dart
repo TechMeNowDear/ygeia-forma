@@ -35,7 +35,7 @@ class SettingsPage extends StatelessWidget {
                     children: [
                       AppCard(
                         onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(builder: (_) => AppearancePage(store: store)),
+                          MaterialPageRoute<void>(settings: const RouteSettings(name: 'Εμφάνιση'), builder: (_) => AppearancePage(store: store)),
                         ),
                         child: Row(
                           children: [
@@ -103,6 +103,7 @@ class SettingsPage extends StatelessWidget {
                             OutlinedButton(
                               onPressed: () => Navigator.of(context).push(
                                 MaterialPageRoute<void>(
+                                  settings: const RouteSettings(name: 'Έλεγχος δεδομένων'),
                                   builder: (_) => Scaffold(
                                     appBar: AppBar(title: const Text('Έλεγχος δεδομένων')),
                                     body: const TiFtaneiScreen(),

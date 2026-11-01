@@ -487,6 +487,8 @@ class SamsungHealthBridge(
                 o.put("resolvable", true)
             }
         } else {
+            // Τα σφάλματα του Samsung Health (άδειες, σύνδεση) είναι αναμενόμενα· αναφέρονται μόνο τα δικά μας.
+            ErrorQueue.report(e, "samsung")
             o.put("code", -1)
                 .put("message", e.toString())
                 .put("kind", "other")

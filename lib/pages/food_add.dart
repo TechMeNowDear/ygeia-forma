@@ -17,6 +17,7 @@ import 'nutrition.dart';
 Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day}) {
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'Προσθήκη φαγητού'),
       builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: day ?? food.day),
     ),
   );
@@ -26,6 +27,7 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   final messenger = ScaffoldMessenger.of(context);
   final r = await showModalBottomSheet<_SheetResult>(
     context: context,
+    routeSettings: const RouteSettings(name: 'Ποσότητα'),
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
@@ -124,6 +126,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   Future<void> _pick(Food f) async {
     final r = await showModalBottomSheet<_SheetResult>(
       context: context,
+      routeSettings: const RouteSettings(name: 'Ποσότητα'),
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
@@ -460,7 +463,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 Text(f.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
                 const SizedBox(height: 4),
                 InkWell(
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FoodDetailScreen(food: f))),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τρόφιμο'), builder: (_) => FoodDetailScreen(food: f))),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
@@ -847,7 +850,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
 /// Φόρμα νέου τροφίμου· το αποθηκεύει στα προϊόντα μου και το επιστρέφει.
 Future<Food?> createFood(BuildContext context, FoodStore food, {FoodDraft? draft, String? note}) async {
   final f = await Navigator.of(context).push<Food>(
-    MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draft ?? FoodDraft(), note: note)),
+    MaterialPageRoute(settings: const RouteSettings(name: 'Νέο τρόφιμο'), builder: (_) => FoodFormScreen(draft: draft ?? FoodDraft(), note: note)),
   );
   if (f == null) return null;
   await food.saveMyFood(f);
@@ -880,6 +883,7 @@ Future<Food?> scanToFood(
               label: 'Λεπτομέρειες',
               onPressed: () => showDialog<void>(
                 context: context,
+                routeSettings: const RouteSettings(name: 'Λεπτομέρειες σφάλματος'),
                 builder: (ctx) => AlertDialog(
                   title: const Text('Για τον Claude'),
                   content: SingleChildScrollView(
