@@ -119,11 +119,16 @@ extension HeartByDay on Dashboard {
   DayHeart? heartForDay(DateTime day) {
     if (!hasStepCoverage(day)) return null;
     final start = dayOf(day);
-    final end = start.add(const Duration(days: 1));
+    final end = DateTime(start.year, start.month, start.day + 1); // ημερολογιακή μέρα (23/25 ώρες στην αλλαγή ώρας)
     final daySamples = heart.where((h) => !h.start.isBefore(start) && h.start.isBefore(end)).toList();
     if (daySamples.isEmpty) return null;
 
-    final sleepRanges = [for (final r in sleepRecords) (r.start, r.end)];
+    // Έξω από τον «ξύπνιο» χρόνο: ο ύπνος της Samsung και τα κενά με παλμούς ύπνου ανάμεσα στα
+    // κομμάτια (δεν ξέρουμε αν κοιμόσουν, άρα δεν μετρούν ούτε ως ύπνος ούτε ως ηρεμία).
+    final sleepRanges = [
+      for (final r in sleepRecords) (r.start, r.end),
+      for (final n in nights) ...n.estimatedGaps,
+    ];
 
     var sleepMinutes = 0.0;
     var exerciseMinutes = 0.0;
@@ -185,7 +190,8 @@ extension HeartByDay on Dashboard {
   List<DayHeart> recentHeartDays([int days = 7]) {
     final out = <DayHeart>[];
     for (var i = days - 1; i >= 0; i--) {
-      final d = heartForDay(dayOf(readAt).subtract(Duration(days: i)));
+      final today = dayOf(readAt);
+      final d = heartForDay(DateTime(today.year, today.month, today.day - i));
       if (d != null) out.add(d);
     }
     return out;

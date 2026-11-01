@@ -354,7 +354,7 @@ class _MetricDetail extends StatelessWidget {
     final def = r.def;
     final style = TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.45);
     final unitWord = def.sparse ? 'ζυγίσεις' : 'μέρες';
-    final len = r.end.difference(r.currentFrom).inDays + 1;
+    final len = daysBetween(r.currentFrom, r.end) + 1;
 
     String count(int n) => def.sparse ? '$n $unitWord' : '$n από $len $unitWord';
 
@@ -435,7 +435,7 @@ class TrendStatusPill extends StatelessWidget {
 
 String _explain(TrendResult r) {
   final def = r.def;
-  final len = r.end.difference(r.currentFrom).inDays + 1;
+  final len = daysBetween(r.currentFrom, r.end) + 1;
   final minDiff = switch (def.kind) {
     ValueKind.number => '${dec(def.minDiff, def.digits)}${def.unit.isEmpty ? '' : ' ${def.unit}'}',
     _ => hoursMinutes(def.minDiff.round()),

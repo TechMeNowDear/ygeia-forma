@@ -23,7 +23,8 @@ class _DayHeartCardState extends State<DayHeartCard> {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final d = widget.data;
-    final day = dayOf(d.readAt).subtract(Duration(days: _dayOffset));
+    final today = dayOf(d.readAt);
+    final day = DateTime(today.year, today.month, today.day - _dayOffset);
     final h = d.heartForDay(day);
 
     final header = Row(

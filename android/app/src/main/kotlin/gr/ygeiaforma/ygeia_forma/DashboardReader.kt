@@ -72,8 +72,9 @@ class DashboardReader(private val s: HealthDataStore) {
         if (has(DataTypes.ENERGY_SCORE)) o.put("energy", safe { energy(fromDate, toDate) })
         if (has(DataTypes.STEPS)) {
             o.put("steps", safe { steps(from, to) })
-            o.put("stepsMin", safe { stepsByMinute(from.minusMinutes(30), to) })
-            o.put("stepsFrom", epochMs(from))
+            // Από την προηγούμενη μέρα, όπως ο ύπνος: για τα κενά της πρώτης νύχτας του διαστήματος.
+            o.put("stepsMin", safe { stepsByMinute(from.minusDays(1), to) })
+            o.put("stepsFrom", epochMs(from.minusDays(1)))
         }
         if (has(DataTypes.FLOORS_CLIMBED)) o.put("floors", safe { floors(from, to) })
         if (has(DataTypes.ACTIVITY_SUMMARY)) o.put("activityDaily", safe { activityDaily(from, to) })

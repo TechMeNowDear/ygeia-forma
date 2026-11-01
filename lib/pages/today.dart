@@ -362,7 +362,7 @@ class _SleepCard extends StatelessWidget {
                 if (n.estimatedMinutes > 0) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Μαζί με ${hoursMinutes(n.estimatedMinutes)} εκτίμηση στα κενά της Samsung',
+                    'Και ${hoursMinutes(n.estimatedMinutes)} πιθανός ύπνος στα κενά της Samsung (δεν μετρά)',
                     style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
                   ),
                 ],

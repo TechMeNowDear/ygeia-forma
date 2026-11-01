@@ -3,9 +3,10 @@
 /// Η Samsung συχνά σπάει μία νύχτα σε 2–3 κομμάτια (έλεγχος 26/10 στα δεδομένα του χρήστη:
 /// 9 από 16 νύχτες). Το ρολόι όμως συνεχίζει να μετρά παλμούς και βήματα μέσα στο κενό.
 /// Αν στο κενό **δεν υπάρχουν βήματα** και **οι παλμοί μένουν στο επίπεδο του ύπνου**,
-/// το κενό μετρά ως ύπνος, με την ένδειξη «εκτίμηση». Αλλιώς μένει όπως το έδωσε η Samsung.
+/// τα δύο κομμάτια ανήκουν στην ίδια νύχτα και το κενό φαίνεται ως «πιθανός ύπνος».
+/// Από 1/11 το κενό **δεν** προστίθεται στη διάρκεια: δεν ξεχωρίζει ύπνο από ξάπλωμα ξύπνιος.
 ///
-/// Δικός μας κανόνας, όχι ελεγμένος σε εργαστήριο ύπνου (απόφαση χρήστη 26/10).
+/// Δικός μας κανόνας, όχι ελεγμένος σε εργαστήριο ύπνου (απόφαση χρήστη 26/10, αλλαγή 1/11).
 library;
 
 import 'data.dart' show Sample, SleepRecord;
@@ -54,8 +55,13 @@ GapVerdict judgeGap(
     for (final s in heart)
       if (overlaps(s, a.start, a.end) || overlaps(s, b.start, b.end)) s.avg,
   ];
-  final needed = (gap.inMinutes / 30).ceil().clamp(1, 1 << 20);
-  if (inGap.length < needed || inSleep.length < 3) return GapVerdict.noHeartData;
+  // Κάλυψη: τουλάχιστον μία μέτρηση σε **κάθε** μισάωρο του κενού (όχι απλώς αρκετές μετρήσεις
+  // συνολικά, που μπορεί να είναι όλες στην αρχή, π.χ. πριν μπει το ρολόι στον φορτιστή).
+  for (var slot = gapStart; slot.isBefore(gapEnd); slot = slot.add(const Duration(minutes: 30))) {
+    final slotEnd = slot.add(const Duration(minutes: 30)).isBefore(gapEnd) ? slot.add(const Duration(minutes: 30)) : gapEnd;
+    if (!heart.any((s) => overlaps(s, slot, slotEnd))) return GapVerdict.noHeartData;
+  }
+  if (inGap.isEmpty || inSleep.length < 3) return GapVerdict.noHeartData;
   double mean(List<double> v) => v.reduce((x, y) => x + y) / v.length;
   if (mean(inGap) > mean(inSleep) + maxHrRise) return GapVerdict.heartHigh;
 

@@ -11,6 +11,10 @@ const _monthsShort = ['Ιαν', 'Φεβ', 'Μαρ', 'Απρ', 'Μαΐ', 'Ιου�
 
 DateTime dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
 
+/// Ημερολογιακές μέρες από το [a] ως το [b] (σωστά και στην αλλαγή ώρας, όπου μια μέρα κρατά 23 ή 25 ώρες).
+int daysBetween(DateTime a, DateTime b) =>
+    DateTime.utc(b.year, b.month, b.day).difference(DateTime.utc(a.year, a.month, a.day)).inDays;
+
 bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// «Σάββατο 24 Οκτωβρίου»
@@ -30,7 +34,7 @@ String dayMonthYear(DateTime d) => '${d.day} ${_monthsShort[d.month - 1]} ${d.ye
 
 /// «Σήμερα», «Χθες» ή «Πέμπτη».
 String relativeDay(DateTime d, DateTime now) {
-  final diff = dayOf(now).difference(dayOf(d)).inDays;
+  final diff = daysBetween(d, now);
   if (diff == 0) return 'Σήμερα';
   if (diff == 1) return 'Χθες';
   if (diff < 7 && diff > 0) return _weekdays[d.weekday - 1];

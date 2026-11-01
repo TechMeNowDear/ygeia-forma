@@ -59,7 +59,7 @@ WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime su
     final def = trendMetrics.firstWhere((m) => m.key == key);
     // Μέρα που δεν έχει τελειώσει (Κυριακή βράδυ) δεν μετρά για βήματα, ενεργό χρόνο, παλμούς ημέρας.
     final end = (!def.includeToday && !sunday.isBefore(today)) ? add(sunday, -1) : sunday;
-    final len = end.difference(monday).inDays + 1;
+    final len = daysBetween(monday, end) + 1;
     items.add(compareWindows(
       def,
       history,

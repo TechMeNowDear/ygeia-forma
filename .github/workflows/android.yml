@@ -109,9 +109,14 @@ jobs:
           retention-days: 1
 
       - name: Έλεγχοι
+        env:
+          TZ: Europe/Athens
         run: |
           set -o pipefail
-          if ! flutter test test/widget_test.dart test/heart_day_test.dart test/trends_test.dart test/unusual_test.dart test/food_test.dart test/sleep_gaps_test.dart test/error_report_test.dart 2>&1 | tee tests.log; then
+          # Όλοι οι έλεγχοι εκτός από τα στιγμιότυπα και τη ζωντανή δοκιμή Sentry, με ώρα Αθήνας
+          # (ώστε να πιάνονται λάθη στην αλλαγή ώρας).
+          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test)
+          if ! flutter test $files 2>&1 | tee tests.log; then
             grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -120 > errors.txt || true
             [ -s errors.txt ] || tail -80 tests.log > errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)

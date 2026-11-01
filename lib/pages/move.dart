@@ -42,7 +42,7 @@ class ExercisePage extends StatelessWidget {
         final floorsToday = d.valueFor(d.floors, d.readAt)?.value;
 
         final last14 = d.steps.length <= 14 ? d.steps : d.steps.sublist(d.steps.length - 14);
-        final floors14 = [for (var i = 13; i >= 0; i--) d.readAt.subtract(Duration(days: i))];
+        final floors14 = [for (var i = 13; i >= 0; i--) DateTime(d.readAt.year, d.readAt.month, d.readAt.day - i)];
 
         final stepsCard = AppCard(
           child: Column(

@@ -36,6 +36,9 @@ class Night {
   final List<SleepRecord> parts = [];
   final List<Stage> stages = [];
   final Map<String, int> stageMinutes = {};
+
+  /// Δευτερόλεπτα ανά φάση (τα λεπτά στρογγυλεύονται μία φορά, στο τέλος).
+  final Map<String, int> stageSeconds = {};
   late DateTime start;
   late DateTime end;
   int minutes = 0;
@@ -46,12 +49,54 @@ class Night {
   double? skinTemp;
   int napMinutes = 0;
 
-  /// Κενά της Samsung ανάμεσα στα κομμάτια που κρίθηκαν ύπνος (δες sleep_gaps.dart).
-  /// Μετρούν στα [minutes], χωρίς φάσεις ύπνου.
+  /// Κενά της Samsung ανάμεσα στα κομμάτια, με παλμούς σαν του ύπνου (δες sleep_gaps.dart).
+  /// «Πιθανός ύπνος»: φαίνονται χωριστά και **δεν** μετρούν στα [minutes].
   final List<(DateTime, DateTime)> estimatedGaps = [];
   int get estimatedMinutes => estimatedGaps.fold(0, (s, g) => s + g.$2.difference(g.$1).inMinutes);
 
   int get awakeMinutes => stageMinutes['AWAKE'] ?? 0;
+}
+
+/// Κομμάτια ύπνου που ανήκουν μαζί (πριν μοιραστούν σε νύχτες και υπνάκους).
+class _SleepGroup {
+  _SleepGroup(SleepRecord first, {required this.isNight}) : parts = [first];
+  final List<SleepRecord> parts;
+  final bool isNight;
+  final List<(DateTime, DateTime)> gaps = [];
+  int get minutes => parts.fold(0, (s, p) => s + p.minutes);
+  DateTime get end => parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
+}
+
+/// Διπλές ή επικαλυπτόμενες εγγραφές ύπνου δεν αθροίζονται (π.χ. η ίδια νύχτα από δύο πηγές).
+/// - Αν η επικάλυψη είναι τουλάχιστον το μισό της μικρότερης εγγραφής: η ίδια νύχτα δύο φορές,
+///   κρατάμε τη μεγαλύτερη.
+/// - Αν είναι μικρότερη: η δεύτερη ξεκινά εκεί που τελειώνει η πρώτη και χάνει τα κοινά λεπτά.
+List<SleepRecord> dedupeSleep(List<SleepRecord> records) {
+  final sorted = [...records]..sort((a, b) => a.start.compareTo(b.start));
+  final out = <SleepRecord>[];
+  for (final r in sorted) {
+    if (out.isEmpty || !r.start.isBefore(out.last.end)) {
+      out.add(r);
+      continue;
+    }
+    final k = out.last;
+    final overlap = (r.end.isBefore(k.end) ? r.end : k.end).difference(r.start);
+    final rLen = r.end.difference(r.start);
+    final kLen = k.end.difference(k.start);
+    final shorter = rLen < kLen ? rLen : kLen;
+    if (shorter.inSeconds <= 0 || overlap.inSeconds * 2 >= shorter.inSeconds) {
+      if (rLen > kLen) out[out.length - 1] = r;
+      continue;
+    }
+    out.add(SleepRecord(
+      k.end,
+      r.end,
+      math.max(0, r.minutes - overlap.inMinutes),
+      r.score,
+      [for (final s in r.stages) if (!s.start.isBefore(k.end)) s],
+    ));
+  }
+  return out;
 }
 
 class Sample {
@@ -119,7 +164,11 @@ class Dashboard {
     required this.stepsMinuteFrom,
     required this.exercise,
     required this.activityDaily,
+    required this.sleepOk,
   });
+
+  /// Ο ύπνος διαβάστηκε κανονικά (όχι σφάλμα ανάγνωσης). Χωρίς αυτό δεν σβήνουμε τιμές ύπνου από το ιστορικό.
+  final bool sleepOk;
 
   final DateTime readAt;
   final int granted;
@@ -218,7 +267,10 @@ class Dashboard {
     final stepsFrom = j['stepsMin'] is List
         ? (j['stepsFrom'] is num
             ? t(j['stepsFrom'])
-            : dayOf((j['readAt'] is num ? t(j['readAt']) : DateTime.now()).subtract(const Duration(days: 7))))
+            : () {
+                final r = j['readAt'] is num ? t(j['readAt']) : DateTime.now();
+                return DateTime(r.year, r.month, r.day - 7);
+              }())
         : null;
 
     final nights = _groupNights(records, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom)
@@ -226,6 +278,7 @@ class Dashboard {
 
     return Dashboard._(
       readAt: j['readAt'] is num ? t(j['readAt']) : DateTime.now(),
+      sleepOk: j['sleep'] is List,
       granted: (j['granted'] as num?)?.toInt() ?? 0,
       total: (j['total'] as num?)?.toInt() ?? 0,
       nights: nights,
@@ -259,64 +312,103 @@ class Dashboard {
     );
   }
 
-  /// Ο ύπνος ομαδοποιείται σε νύχτες. Κομμάτι που ακολουθεί άλλο με κενό που κρίθηκε ύπνος
-  /// (sleep_gaps.dart) ανήκει στην ίδια νύχτα, και το κενό μετρά ως «εκτίμηση».
-  /// Αλλιώς: κομμάτι που αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες είναι υπνάκος.
+  /// Ο ύπνος ομαδοποιείται σε νύχτες (απόφαση 1/11, μετά τον έλεγχο):
+  /// - Η διάρκεια είναι **μόνο** ό,τι μέτρησε η Samsung (άθροισμα των κομματιών).
+  /// - Κομμάτι που ακολουθεί άλλο με κενό που μοιάζει με ύπνο (sleep_gaps.dart) ανήκει στην ίδια
+  ///   νύχτα. Το κενό φαίνεται χωριστά ως «πιθανός ύπνος» και **δεν** μετρά στη διάρκεια, γιατί
+  ///   δεν ξεχωρίζει ύπνο από ξάπλωμα ξύπνιος.
+  /// - Αλλιώς: κομμάτι που αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες είναι υπνάκος.
+  /// - Δύο ομάδες κομματιών με την ίδια ημερομηνία και κενό πάνω από 4 ώρες (π.χ. λαγοκοίμισμα στον
+  ///   καναπέ το βράδυ): η μεγαλύτερη είναι η νύχτα· η άλλη, αν κρατά λιγότερο από 3 ώρες, υπνάκος.
   static List<Night> _groupNights(
     List<SleepRecord> records, {
     List<Sample> heart = const [],
     Map<int, int> stepsByMinute = const {},
     DateTime? stepsFrom,
   }) {
-    final byDate = <DateTime, Night>{};
-    final naps = <DateTime, int>{};
-    SleepRecord? previous;
-    Night? previousNight;
-    for (final r in records) {
-      final linked = previous != null &&
-          previousNight != null &&
-          judgeGap(previous, r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) ==
-              GapVerdict.asleep;
+    final recs = dedupeSleep(records);
+    // Ομάδες: κομμάτια ενωμένα με κενό που κρίθηκε ύπνος.
+    final groups = <_SleepGroup>[];
+    _SleepGroup? previous;
+    for (final r in recs) {
+      final last = previous?.parts.last;
+      final linked = last != null &&
+          previous!.isNight &&
+          judgeGap(last, r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) == GapVerdict.asleep;
       if (linked) {
-        final night = previousNight!;
-        final gapStart = previous!.end;
-        night.parts.add(r);
-        if (r.start.isAfter(gapStart)) night.estimatedGaps.add((gapStart, r.start));
-        previous = r;
+        if (r.start.isAfter(last.end)) previous.gaps.add((last.end, r.start));
+        previous.parts.add(r);
         continue;
       }
       final isNap = r.start.hour >= 10 && r.start.hour < 18 && r.minutes < 180;
-      if (isNap) {
-        final day = dayOf(r.start);
-        naps[day] = (naps[day] ?? 0) + r.minutes;
-        previous = null;
-        previousNight = null;
+      final g = _SleepGroup(r, isNight: !isNap);
+      groups.add(g);
+      previous = g;
+    }
+
+    final naps = <DateTime, int>{};
+    void addNap(_SleepGroup g) {
+      final day = dayOf(g.parts.first.start);
+      naps[day] = (naps[day] ?? 0) + g.minutes;
+    }
+
+    final byDate = <DateTime, List<_SleepGroup>>{};
+    for (final g in groups) {
+      if (!g.isNight) {
+        addNap(g);
         continue;
       }
-      final date = r.end.hour >= 18 ? dayOf(r.end).add(const Duration(days: 1)) : dayOf(r.end);
-      final night = byDate.putIfAbsent(date, () => Night(date));
-      night.parts.add(r);
-      previous = r;
-      previousNight = night;
+      final end = g.end;
+      final date = end.hour >= 18 ? DateTime(end.year, end.month, end.day + 1) : dayOf(end);
+      byDate.putIfAbsent(date, () => []).add(g);
     }
-    final nights = byDate.values.toList()..sort((a, b) => a.date.compareTo(b.date));
+
+    final nights = <Night>[];
+    for (final entry in byDate.entries) {
+      final list = entry.value..sort((a, b) => a.parts.first.start.compareTo(b.parts.first.start));
+      final main = list.reduce((a, b) => a.minutes >= b.minutes ? a : b);
+      final n = Night(entry.key);
+      for (final g in list) {
+        final separate = !identical(g, main) && _gapBetween(g, main) > maxGap;
+        if (separate && g.minutes < 180) {
+          addNap(g);
+          continue;
+        }
+        n.parts.addAll(g.parts);
+        n.estimatedGaps.addAll(g.gaps);
+      }
+      nights.add(n);
+    }
+    nights.sort((a, b) => a.date.compareTo(b.date));
+
     for (final n in nights) {
       n.parts.sort((a, b) => a.start.compareTo(b.start));
+      n.estimatedGaps.sort((a, b) => a.$1.compareTo(b.$1));
       n.start = n.parts.first.start;
       n.end = n.parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
-      n.minutes = n.parts.fold(0, (sum, p) => sum + p.minutes) + n.estimatedMinutes;
-      final longest = n.parts.reduce((a, b) => a.minutes >= b.minutes ? a : b);
-      n.score = longest.score ?? n.parts.map((p) => p.score).whereType<int>().fold<int?>(null, (a, b) => a == null ? b : math.max(a, b));
+      n.minutes = n.parts.fold(0, (sum, p) => sum + p.minutes);
+      // Βαθμολογία: της Samsung μόνο όταν η νύχτα είναι ένα κομμάτι. Σε σπασμένη νύχτα η Samsung
+      // βαθμολογεί κάθε κομμάτι χωριστά· κανένα από αυτά δεν είναι η βαθμολογία της νύχτας.
+      n.score = n.parts.length == 1 ? n.parts.single.score : null;
       for (final p in n.parts) {
         n.stages.addAll(p.stages);
       }
       n.stages.sort((a, b) => a.start.compareTo(b.start));
       for (final s in n.stages) {
-        n.stageMinutes[s.name] = (n.stageMinutes[s.name] ?? 0) + s.minutes;
+        n.stageSeconds[s.name] = (n.stageSeconds[s.name] ?? 0) + s.end.difference(s.start).inSeconds;
+      }
+      for (final e in n.stageSeconds.entries) {
+        n.stageMinutes[e.key] = (e.value / 60).round();
       }
       n.napMinutes = naps[n.date] ?? 0;
     }
     return nights;
+  }
+
+  static Duration _gapBetween(_SleepGroup a, _SleepGroup b) {
+    final first = a.parts.first.start.isBefore(b.parts.first.start) ? a : b;
+    final second = identical(first, a) ? b : a;
+    return second.parts.first.start.difference(first.end);
   }
 
   static void _fillNightMetrics(Night n, List<Sample> heart, List<Sample> spo2, List<Sample> skin) {
@@ -423,7 +515,13 @@ const todayCards = <TodayCard>[
 const todayLayout = 2;
 
 class Prefs {
-  Prefs(this.cards, {this.backfillFrom, this.kitchen, this.themeMode = 'auto', this.dayTheme = 'aigaio', this.nightTheme = 'aigaio'});
+  Prefs(this.cards,
+      {this.backfillFrom,
+      this.kitchen,
+      this.themeMode = 'auto',
+      this.dayTheme = 'aigaio',
+      this.nightTheme = 'aigaio',
+      this.historyVersion = 1});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -442,8 +540,12 @@ class Prefs {
       themeMode: const ['auto', 'light', 'dark'].contains(j['themeMode']) ? j['themeMode'] as String : 'auto',
       dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
+      historyVersion: (j['historyVersion'] as num?)?.toInt() ?? 1,
     );
   }
+
+  /// Με ποιους κανόνες υπολογίστηκε το αποθηκευμένο ιστορικό (δες historyRulesVersion).
+  int historyVersion;
 
   /// Εμφάνιση: «auto» (όπως το κινητό), «light» ή «dark»· και ποιο θέμα τη μέρα και τη νύχτα.
   String themeMode;
@@ -469,6 +571,7 @@ class Prefs {
         'themeMode': themeMode,
         'dayTheme': dayTheme,
         'nightTheme': nightTheme,
+        'historyVersion': historyVersion,
       });
 }
 
@@ -495,21 +598,41 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
 
   bool _prefsLoaded = false;
+  int _prefsErrors = 0;
 
   /// Οι ρυθμίσεις πριν από την πρώτη οθόνη, ώστε να ανοίγει κατευθείαν με το σωστό θέμα.
   /// Αν αργήσουν, η εφαρμογή ανοίγει κανονικά και το θέμα αλλάζει μόλις έρθουν.
-  Future<void> loadPrefs() async {
+  ///
+  /// Μέχρι να διαβαστούν, **τίποτα δεν αποθηκεύεται** στις ρυθμίσεις: αλλιώς οι προεπιλογές θα
+  /// έγραφαν πάνω σε «Η κουζίνα μου», τις κάρτες και το θέμα.
+  Future<void> loadPrefs({Duration timeout = const Duration(milliseconds: 800)}) async {
     try {
-      prefs = Prefs.fromJson(await SamsungHealth.loadPrefs().timeout(const Duration(milliseconds: 800)));
+      final r = await SamsungHealth.loadPrefs().timeout(timeout);
+      if (r['ok'] == false) {
+        // Σφάλμα ανάγνωσης (όχι «δεν υπάρχει αρχείο», που δίνει {}). Μετά από δύο, το αρχείο
+        // θεωρείται χαλασμένο και ξεκινάμε από τις προεπιλογές.
+        if (++_prefsErrors < 2) return;
+      } else {
+        prefs = Prefs.fromJson(r);
+      }
       _prefsLoaded = true;
       notifyListeners();
     } catch (_) {}
   }
 
+  Future<void> _savePrefs() async {
+    if (!_prefsLoaded) return;
+    await SamsungHealth.savePrefs(prefs.toJson());
+  }
+
+  bool _historyLoaded = false;
+
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
-    if (!_prefsLoaded) await loadPrefs();
+    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
+    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
     await _loadHistory();
+    await _upgradeHistory();
     final cached = await SamsungHealth.cachedDashboard();
     if (cached['ok'] == true) {
       try {
@@ -554,8 +677,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
     final d = data;
     if (r['ok'] == true && d != null && d.hasAnyPermission) {
-      await _updateRecentHistory(d);
-      _backfill();
+      if (!_historyLoaded) await _loadHistory();
+      // Χωρίς το αποθηκευμένο ιστορικό δεν γράφουμε τίποτα: θα έσβηνε τιμές που δεν ξαναδιαβάζονται.
+      if (_historyLoaded) {
+        await _updateRecentHistory(d);
+        _backfill();
+      }
     }
   }
 
@@ -566,6 +693,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _loadHistory() async {
     final r = await SamsungHealth.loadDays();
     if (r['ok'] != true || r['days'] is! List) return;
+    _historyLoaded = true;
     final h = <String, Map<String, double>>{};
     for (final row in r['days'] as List) {
       if (row is! Map || row['date'] is! String || row['data'] is! Map) continue;
@@ -577,20 +705,30 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     history = h;
   }
 
-  Future<void> _mergeAndSave(Map<String, Map<String, double>> rows) async {
-    if (rows.isEmpty) return;
-    for (final e in rows.entries) {
-      history[e.key] = {...?history[e.key], ...e.value};
-    }
+  Future<void> _saveDays(Set<String> keys) async {
+    if (keys.isEmpty) return;
     await SamsungHealth.saveDays(jsonEncode([
-      for (final k in rows.keys) {'date': k, 'data': history[k]},
+      for (final k in keys)
+        if (history[k] != null) {'date': k, 'data': history[k]},
     ]));
   }
 
+  /// Νέοι κανόνες ύπνου (historyRulesVersion): οι παλιές τιμές ύπνου σβήνονται και το ιστορικό
+  /// ξαναδιαβάζεται από την αρχή με τους νέους κανόνες, ώστε όλες οι μέρες να έχουν τον ίδιο ορισμό.
+  Future<void> _upgradeHistory() async {
+    if (!_prefsLoaded || !_historyLoaded || prefs.historyVersion >= historyRulesVersion) return;
+    await _saveDays(clearSleepValues(history));
+    prefs.backfillFrom = null;
+    prefs.historyVersion = historyRulesVersion;
+    await _savePrefs();
+  }
+
   /// Οι τελευταίες 30 μέρες από την κανονική ανάγνωση + όλες οι ζυγίσεις.
+  /// Ο ύπνος ξαναγράφεται μόνο για τις μέρες με βήματα ανά λεπτό (δες mergeHistory).
   Future<void> _updateRecentHistory(Dashboard d) async {
     final today = dayOf(d.readAt);
-    final rows = summarizeRange(d, addDays(today, -30), today);
+    // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης.
+    final rows = summarizeRange(d, addDays(today, -29), today);
     for (final b in d.body) {
       final k = dateKey(b.time);
       rows[k] = {
@@ -600,16 +738,23 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         if (b.smm != null) K.smm: b.smm!,
       };
     }
-    await _mergeAndSave(rows);
+    final stepsFrom = d.stepsMinuteFrom;
+    final sleepFrom = d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
+    await _saveDays(mergeHistory(history, rows, sleepFrom: sleepFrom));
     notifyListeners();
   }
+
+  /// Σφάλμα ανάγνωσης σε κάποιο είδος δεδομένων (η γέφυρα βάζει {"error": …} στη θέση του).
+  static bool _hasReadErrors(Map<String, dynamic> r) =>
+      r.values.any((v) => v is Map && v.containsKey('error'));
 
   /// Φέρνει το ιστορικό ανά 30 μέρες προς τα πίσω, μέχρι 12 μήνες. Μόνο όσο η εφαρμογή είναι ανοιχτή·
   /// αν κλείσει, συνεχίζει από εκεί που σταμάτησε την επόμενη φορά.
   Future<void> _backfill() async {
-    if (backfilling) return;
+    if (backfilling || !_prefsLoaded || !_historyLoaded) return;
     final today = dayOf(DateTime.now());
-    final start = addDays(today, -_recentDays);
+    // Το πρώτο κομμάτι φτάνει ως τη μέρα −7 (η −6 και μετά ξαναγράφονται σε κάθε ανανέωση).
+    final start = addDays(today, -(_recentDays - 1));
     final oldest = addDays(today, -historyDays);
     var cursor = prefs.backfillFrom != null ? parseDateKey(prefs.backfillFrom!) : start;
     if (!cursor.isAfter(oldest)) return;
@@ -621,12 +766,20 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
         var from = addDays(cursor, -30);
         if (from.isBefore(oldest)) from = oldest;
         final r = await SamsungHealth.readRange(dateKey(from), dateKey(cursor));
-        if (r['ok'] != true) break;
+        // Αν απέτυχε έστω ένα είδος δεδομένων, ο μήνας ξαναδιαβάζεται την επόμενη φορά.
+        if (r['ok'] != true || _hasReadErrors(r)) break;
         final dash = Dashboard.fromJson(r);
-        await _mergeAndSave(summarizeRange(dash, from, addDays(cursor, -1)));
+        final to = addDays(cursor, -1);
+        await _saveDays(mergeHistory(
+          history,
+          summarizeRange(dash, from, to),
+          replaceSleep: true,
+          rangeFrom: from,
+          rangeTo: to,
+        ));
         cursor = from;
         prefs.backfillFrom = dateKey(cursor);
-        await SamsungHealth.savePrefs(prefs.toJson());
+        await _savePrefs();
         final total = start.difference(oldest).inDays;
         backfillProgress = total <= 0 ? 1 : start.difference(cursor).inDays / total;
         notifyListeners();
@@ -650,7 +803,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   void setKitchen(Map<String, dynamic> k) {
     prefs.kitchen = k;
     notifyListeners();
-    SamsungHealth.savePrefs(prefs.toJson());
+    _savePrefs();
   }
 
   /// Εμφάνιση: αλλάζει αμέσως και αποθηκεύεται.
@@ -659,13 +812,13 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (day != null) prefs.dayTheme = day;
     if (night != null) prefs.nightTheme = night;
     notifyListeners();
-    SamsungHealth.savePrefs(prefs.toJson());
+    _savePrefs();
   }
 
   void setCard(String key, bool on) {
     prefs.cards[key] = on;
     notifyListeners();
-    SamsungHealth.savePrefs(prefs.toJson());
+    _savePrefs();
   }
 
   @override

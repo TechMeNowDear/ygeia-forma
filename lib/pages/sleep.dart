@@ -162,7 +162,8 @@ class _LastNightCard extends StatelessWidget {
           if (n.estimatedMinutes > 0) ...[
             const SizedBox(height: 6),
             Text(
-              'Μαζί με ${hoursMinutes(n.estimatedMinutes)} εκτίμηση: κενό της Samsung χωρίς βήματα, με παλμούς ύπνου.',
+              'Επιπλέον ${hoursMinutes(n.estimatedMinutes)} κενό της Samsung χωρίς βήματα, με παλμούς σαν του ύπνου: '
+              'ίσως κοιμόσουν, ίσως ήσουν ξαπλωμένος ξύπνιος. Δεν μετρά στη διάρκεια.',
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
@@ -208,8 +209,14 @@ class _LastNightCard extends StatelessWidget {
               valueColor: (n.spo2Min ?? 100) < 88 ? c.bad : null,
             ),
           if (n.parts.length > 1) InfoRow('Κομμάτια ύπνου (Samsung)', '${n.parts.length}', dot: c.textTertiary),
+          if (n.parts.length > 1 && n.parts.any((p) => p.score != null))
+            InfoRow(
+              'Βαθμολογία Samsung ανά κομμάτι',
+              [for (final p in n.parts) p.score?.toString() ?? '—'].join(' · '),
+              dot: c.textTertiary,
+            ),
           if (n.estimatedMinutes > 0)
-            InfoRow('Εκτίμηση ύπνου στα κενά', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
+            InfoRow('Πιθανός ύπνος στα κενά (δεν μετρά)', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
           if (n.napMinutes > 0) InfoRow('Υπνάκος', hoursMinutes(n.napMinutes), dot: c.textTertiary),
         ],
       ),

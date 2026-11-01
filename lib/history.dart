@@ -34,6 +34,74 @@ abstract final class K {
   static const floors = 'floors';
 }
 
+/// Τιμές που βγαίνουν από τον ύπνο μιας νύχτας.
+const sleepKeys = {
+  K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake,
+  K.sleepHr, K.spo2Avg, K.spo2Min, K.skinTemp,
+};
+
+/// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
+/// 2 (1/11): η «εκτίμηση» στα κενά δεν μετρά στη διάρκεια· σπασμένη νύχτα χωρίς βαθμολογία·
+/// διπλές εγγραφές δεν αθροίζονται.
+const historyRulesVersion = 2;
+
+/// Βάζει νέες συνόψεις στο [history] και επιστρέφει τις μέρες που άλλαξαν (για αποθήκευση).
+///
+/// Ο ύπνος κρίνεται με βήματα ανά λεπτό (κενά ανάμεσα στα κομμάτια). Για να έχει **ένα** ορισμό
+/// όλο το ιστορικό, οι τιμές ύπνου μιας μέρας γράφονται μόνο όταν υπολογίστηκαν με βήματα:
+/// - [sleepFrom]: από αυτή τη μέρα και μετά οι τιμές ύπνου αντικαθίστανται.
+/// - πριν από αυτήν (ή αν είναι null): γράφονται μόνο αν η μέρα δεν έχει καθόλου τιμές ύπνου.
+/// - [replaceSleep] true: όλες οι τιμές ύπνου των ημερών στο [rangeFrom, rangeTo] αντικαθίστανται
+///   (ξαναϋπολογισμός ιστορικού με βήματα), και όσες δεν υπάρχουν πια σβήνονται.
+Set<String> mergeHistory(
+  Map<String, Map<String, double>> history,
+  Map<String, Map<String, double>> rows, {
+  DateTime? sleepFrom,
+  bool replaceSleep = false,
+  DateTime? rangeFrom,
+  DateTime? rangeTo,
+}) {
+  final changed = <String>{};
+  if (replaceSleep && rangeFrom != null && rangeTo != null) {
+    for (var day = dayOf(rangeFrom); !day.isAfter(dayOf(rangeTo)); day = DateTime(day.year, day.month, day.day + 1)) {
+      final k = dateKey(day);
+      final old = history[k];
+      if (old == null) continue;
+      if (old.keys.any(sleepKeys.contains)) {
+        history[k] = {for (final e in old.entries) if (!sleepKeys.contains(e.key)) e.key: e.value};
+        changed.add(k);
+      }
+    }
+  }
+  for (final e in rows.entries) {
+    final day = parseDateKey(e.key);
+    final old = history[e.key] ?? const <String, double>{};
+    final overwriteSleep = replaceSleep || (sleepFrom != null && !day.isBefore(dayOf(sleepFrom)));
+    final keepOldSleep = !overwriteSleep && old.keys.any(sleepKeys.contains);
+    final incoming = keepOldSleep
+        ? {for (final v in e.value.entries) if (!sleepKeys.contains(v.key)) v.key: v.value}
+        : e.value;
+    final base = overwriteSleep
+        ? {for (final v in old.entries) if (!sleepKeys.contains(v.key)) v.key: v.value}
+        : old;
+    history[e.key] = {...base, ...incoming};
+    changed.add(e.key);
+  }
+  return changed;
+}
+
+/// Ξεκίνημα από την αρχή για τους κανόνες ύπνου: σβήνει τις τιμές ύπνου από όλες τις μέρες.
+Set<String> clearSleepValues(Map<String, Map<String, double>> history) {
+  final changed = <String>{};
+  for (final e in history.entries.toList()) {
+    if (e.value.keys.any(sleepKeys.contains)) {
+      history[e.key] = {for (final v in e.value.entries) if (!sleepKeys.contains(v.key)) v.key: v.value};
+      changed.add(e.key);
+    }
+  }
+  return changed;
+}
+
 /// «2026-10-24»
 String dateKey(DateTime d) => '${d.year}-${two(d.month)}-${two(d.day)}';
 
