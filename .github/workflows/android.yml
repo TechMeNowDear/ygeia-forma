@@ -123,6 +123,8 @@ jobs:
             echo "::error title=Δοκιμή Sentry::$msg"
             exit 1
           fi
+          # Να έτρεξε πραγματικά (όχι «skipped»).
+          grep -q "+1: All tests passed" live.log || { echo "::error title=Δοκιμή Sentry::Ο έλεγχος δεν έτρεξε"; exit 1; }
           echo "::notice title=Δοκιμή Sentry::Στάλθηκε δοκιμαστικό σφάλμα για ygeia-forma@0.1.${{ github.run_number }}"
 
       - uses: actions/upload-artifact@v4

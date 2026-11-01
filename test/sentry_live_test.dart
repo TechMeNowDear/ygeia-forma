@@ -7,7 +7,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/error_report.dart';
 
-const _live = bool.fromEnvironment('SENTRY_LIVE');
+// Προσοχή: το bool.fromEnvironment δέχεται μόνο «true»· εδώ ελέγχουμε το κείμενο, για να μην παραλειφθεί σιωπηλά.
+const _live = String.fromEnvironment('SENTRY_LIVE') == '1';
 const _version = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
 
 void main() {
