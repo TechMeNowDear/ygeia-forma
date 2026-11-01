@@ -32,6 +32,21 @@ class SamsungHealth {
     }
   }
 
+  /// Η απάντηση όπως είναι (κείμενο JSON), για να διαβαστεί σε άλλο νήμα (δες parseDashboard).
+  static Future<String> _callRaw(String method) async {
+    try {
+      final raw = await _channel.invokeMethod<String>(method);
+      return raw ?? jsonEncode({'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'});
+    } on PlatformException catch (e) {
+      return jsonEncode({'ok': false, 'kind': 'other', 'message': e.message ?? e.code});
+    } on MissingPluginException {
+      return jsonEncode({'ok': false, 'kind': 'not_android', 'message': 'Διαθέσιμο μόνο στο κινητό'});
+    }
+  }
+
+  static Future<String> dashboardRaw() => _callRaw('dashboard');
+  static Future<String> cachedDashboardRaw() => _callRaw('cachedDashboard');
+
   static Future<Map<String, dynamic>> status() => _call('status');
 
   static Future<Map<String, dynamic>> requestPermissions() => _call('requestPermissions');

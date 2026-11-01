@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -172,7 +173,7 @@ class Dashboard {
   /// Ο ύπνος διαβάστηκε κανονικά (όχι σφάλμα ανάγνωσης). Χωρίς αυτό δεν σβήνουμε τιμές ύπνου από το ιστορικό.
   final bool sleepOk;
 
-  /// Οι ζυγίσεις (2 χρόνια) διαβάστηκαν όλες: μόνο τότε σβήνεται από το ιστορικό ζύγιση που δεν υπάρχει πια.
+  /// Οι ζυγίσεις (10 χρόνια) διαβάστηκαν όλες: μόνο τότε σβήνεται από το ιστορικό ζύγιση που δεν υπάρχει πια.
   final bool bodyOk;
 
   /// Είδη δεδομένων που η Samsung δεν έδωσε τώρα (σφάλμα), π.χ. {'heart'}: οι οθόνες λένε «δεν διαβάστηκε»,
@@ -596,6 +597,37 @@ class Prefs {
       });
 }
 
+/// Μια απάντηση της Samsung, διαβασμένη: [status] (ok ή το σφάλμα), [data] αν ήταν εντάξει,
+/// [sleepFailed] αν κάποιο είδος του ύπνου δεν διαβάστηκε (δες sleepReadFailed).
+typedef ParsedDashboard = ({Map<String, dynamic> status, Dashboard? data, bool sleepFailed});
+
+/// Σε ξεχωριστό νήμα (isolate), ώστε το άνοιγμα να μην «παγώνει».
+Future<ParsedDashboard> parseDashboard(String raw) => Isolate.run(() => parseDashboardSync(raw));
+
+ParsedDashboard parseDashboardSync(String raw) {
+  Object? j;
+  try {
+    j = jsonDecode(raw);
+  } catch (e) {
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false);
+  }
+  if (j is! Map<String, dynamic>) {
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false);
+  }
+  if (j['ok'] != true) {
+    return (
+      status: {for (final k in const ['ok', 'kind', 'message', 'code', 'resolvable']) if (j.containsKey(k)) k: j[k]},
+      data: null,
+      sleepFailed: false,
+    );
+  }
+  try {
+    return (status: const {'ok': true}, data: Dashboard.fromJson(j), sleepFailed: sleepReadFailed(j));
+  } catch (e) {
+    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Η κατάσταση της εφαρμογής: διαβάζει όταν ανοίγει και όταν επιστρέφω σε αυτήν.
 // Τίποτα στο παρασκήνιο.
@@ -615,8 +647,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   bool backfilling = false;
   double backfillProgress = 0;
 
-  /// 455 μέρες: ο «Χρόνος» στις Τάσεις συγκρίνει τους τελευταίους 3 μήνες με τους ίδιους μήνες πέρσι.
-  static const historyDays = 455;
+  /// Ως 10 χρόνια πίσω: όλο το ιστορικό που έχει η Samsung (απόφαση 2/11). Διαβάζεται μία φορά·
+  /// ο «Χρόνος» στις Τάσεις χρειάζεται 455 μέρες, τα υπόλοιπα μένουν για τον γιατρό και για αργότερα.
+  static const historyDays = 3653;
+
+  /// Τόσοι συνεχόμενοι μήνες χωρίς κανένα δεδομένο = εκεί αρχίζει το ιστορικό σου· η συμπλήρωση σταματά.
+  static const _emptyMonthsToStop = 12;
   static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
 
   bool _prefsLoaded = false;
@@ -698,14 +734,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
     await _loadHistory();
     await _upgradeHistory();
-    final cached = await SamsungHealth.cachedDashboard();
-    if (cached['ok'] == true) {
-      try {
-        data = Dashboard.fromJson(cached);
-      } catch (_) {
-        data = null;
-      }
-    }
+    final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw());
+    if (cached.data != null) data = cached.data;
     notifyListeners();
     await refresh();
   }
@@ -726,18 +756,17 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     // Χωρίς απάντηση σε 90″ (π.χ. κόλλησε η Samsung) δεν μένει «φορτώνει» για πάντα.
-    final r = await SamsungHealth.dashboard().timeout(const Duration(seconds: 90),
-        onTimeout: () => {'ok': false, 'kind': 'other', 'message': 'Η Samsung δεν απάντησε. Δοκίμασε ξανά.'});
-    if (r['ok'] == true) {
-      try {
-        data = Dashboard.fromJson(r);
-        error = null;
-      } catch (e) {
-        error = {'ok': false, 'kind': 'other', 'message': e.toString()};
-      }
+    final raw = await SamsungHealth.dashboardRaw().timeout(const Duration(seconds: 90),
+        onTimeout: () => jsonEncode({'ok': false, 'kind': 'other', 'message': 'Η Samsung δεν απάντησε. Δοκίμασε ξανά.'}));
+    // Οι υπολογισμοί (νύχτες, παλμοί, μερικά MB δεδομένων) σε άλλο νήμα: η οθόνη δεν «κολλάει».
+    final p = await parseDashboard(raw);
+    final ok = p.data != null;
+    if (ok) {
+      data = p.data;
+      error = null;
       _lastRefresh = DateTime.now();
     } else {
-      error = r;
+      error = p.status;
     }
     loading = false;
     notifyListeners();
@@ -745,12 +774,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
 
     final d = data;
-    if (r['ok'] == true && d != null && d.hasAnyPermission) {
+    if (ok && d != null && d.hasAnyPermission) {
       if (!_historyLoaded) await _loadHistory();
       // Χωρίς το αποθηκευμένο ιστορικό δεν γράφουμε τίποτα: θα έσβηνε τιμές που δεν ξαναδιαβάζονται.
       if (_historyLoaded) {
         await _upgradeHistory();
-        await _updateRecentHistory(d, sleepFailed: sleepReadFailed(r));
+        await _updateRecentHistory(d, sleepFailed: p.sleepFailed);
         _backfill();
       }
     }
@@ -833,10 +862,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (d.bodyOk && d.body.isNotEmpty) {
       final copy = {for (final e in history.entries) e.key: e.value};
       final gone = removeMissingBody(copy, {for (final b in d.body) dateKey(b.time)},
-          from: DateTime(today.year - 2, today.month, today.day + 1));
+          from: DateTime(today.year - 10, today.month, today.day + 1));
       if (gone.isNotEmpty && gone.length <= 3) {
         changed.addAll(removeMissingBody(history, {for (final b in d.body) dateKey(b.time)},
-            from: DateTime(today.year - 2, today.month, today.day + 1)));
+            from: DateTime(today.year - 10, today.month, today.day + 1)));
       }
     }
     final saved = await _saveDays(changed);
@@ -859,8 +888,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, int> _backfillMonthFails = {};
   int _backfillFails = 0;
 
-  /// Φέρνει το ιστορικό ανά 30 μέρες προς τα πίσω, μέχρι 12 μήνες. Μόνο όσο η εφαρμογή είναι ανοιχτή·
-  /// αν κλείσει, συνεχίζει από εκεί που σταμάτησε την επόμενη φορά.
+  /// Φέρνει το ιστορικό ανά 30 μέρες προς τα πίσω, ως 10 χρόνια (ή ως εκεί που αρχίζουν τα δεδομένα σου).
+  /// Μόνο όσο η εφαρμογή είναι ανοιχτή· αν κλείσει, συνεχίζει από εκεί που σταμάτησε την επόμενη φορά.
   Future<void> _backfill() async {
     if (backfilling || !_prefsLoaded || !_historyLoaded) return;
     final today = dayOf(DateTime.now());
@@ -872,6 +901,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
 
     backfilling = true;
     notifyListeners();
+    var emptyMonths = 0;
     try {
       while (cursor.isAfter(oldest)) {
         var from = addDays(cursor, -30);
@@ -914,6 +944,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
           break;
         }
         cursor = from;
+        // Χρόνος ολόκληρος χωρίς τίποτα πριν από αυτό: εδώ αρχίζουν τα δεδομένα, δεν ψάχνουμε πιο πίσω.
+        emptyMonths = rows.isEmpty ? emptyMonths + 1 : 0;
+        if (emptyMonths >= _emptyMonthsToStop) cursor = oldest;
         prefs.backfillFrom = dateKey(cursor);
         await _savePrefs();
         final total = start.difference(oldest).inDays;

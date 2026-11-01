@@ -39,7 +39,7 @@ class WeekReview {
   final (DateTime, double)? weightLast;
 }
 
-const weekKeys = [K.sleepMin, K.bedtime, K.sleepScore, K.sleepHr, K.restHr, K.steps, K.activeMin, K.energy];
+const weekKeys = [K.sleepMin, K.bedtime, K.sleepScore, K.sleepHr, K.steps, K.activeMin, K.energy];
 
 /// Πότε φαίνεται: Κυριακή από τις 18:00 και όλη τη Δευτέρα.
 DateTime? reviewWeekSunday(DateTime now) {

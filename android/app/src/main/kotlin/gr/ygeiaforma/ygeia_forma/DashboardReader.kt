@@ -298,11 +298,11 @@ class DashboardReader(private val s: HealthDataStore) {
         return out
     }
 
-    // ---------- Σύσταση σώματος (InBody), 2 χρόνια ----------
+    // ---------- Σύσταση σώματος (ζυγίσεις), 10 χρόνια (όπως το ιστορικό) ----------
 
     private suspend fun body(now: LocalDateTime): JSONArray {
         val out = JSONArray()
-        val from = now.minusYears(2)
+        val from = now.minusYears(10)
         for (p in readAll(DataTypes.BODY_COMPOSITION.readDataRequestBuilder, from, now)) {
             val o = JSONObject().put("time", (ms(p.startTime) ?: 0L))
             putFloat(o, "weight", p.getValue(DataType.BodyCompositionType.WEIGHT))

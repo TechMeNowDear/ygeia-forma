@@ -4,7 +4,6 @@ import '../data.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'day_heart_card.dart';
 
 class HeartPage extends StatelessWidget {
   const HeartPage({super.key, required this.store});
@@ -68,7 +67,6 @@ class HeartPage extends StatelessWidget {
           subtitle: 'Παλμοί και οξυγόνο',
           onRefresh: () => store.refresh(),
           left: [
-            DayHeartCard(data: d),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

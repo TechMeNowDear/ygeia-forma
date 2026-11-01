@@ -41,6 +41,8 @@ dependencies {
     implementation(files("libs/samsung-health-data-api-1.1.0.aar"))
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Ανανέωση στο παρασκήνιο κάθε 3 ώρες (RefreshWorker), με τους κανόνες μπαταρίας του Android.
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
     // Σκανάρισμα barcode από το Google Play services (χωρίς άδεια κάμερας, χωρίς δική μας κάμερα).
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }

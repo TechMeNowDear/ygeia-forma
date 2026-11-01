@@ -97,8 +97,8 @@ class MetricDef {
 const trendMetrics = <MetricDef>[
   // Καρδιά
   MetricDef(key: K.sleepHr, label: 'Παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1),
-  MetricDef(key: K.restHr, label: 'Ξύπνιος, χωρίς βήματα', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1, includeToday: false),
-  MetricDef(key: K.walkHr, label: 'Παλμοί στο περπάτημα', section: TrendSection.heart, minDiff: 3, unit: 'bpm', better: -1, includeToday: false),
+  // «Ξύπνιος, χωρίς βήματα» και «Παλμοί στο περπάτημα» βγήκαν (2/11): δικοί μας ορισμοί, χωρίς επαλήθευση.
+  // Η ηρεμία θα έρθει από το Oura (παλμοί ύπνου του δαχτυλιδιού).
   // Ουδέτερο: μεγαλύτερος μέσος όρος ημέρας συνήθως σημαίνει περισσότερη κίνηση, όχι χειρότερη υγεία.
   MetricDef(key: K.dayHr, label: 'Μέσος όρος ημέρας', section: TrendSection.heart, minDiff: 2, unit: 'bpm', includeToday: false),
   // Ύπνος

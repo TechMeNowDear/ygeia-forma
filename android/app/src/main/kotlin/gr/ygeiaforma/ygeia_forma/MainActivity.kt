@@ -12,7 +12,7 @@ import kotlinx.coroutines.cancel
 
 // FragmentActivity: το χρειάζονται υπηρεσίες της Google (π.χ. σαρωτής barcode) για να ανοίγουν τις δικές τους οθόνες.
 class MainActivity : FlutterFragmentActivity() {
-    // Ζει όσο ζει η οθόνη· τίποτα δεν τρέχει στο παρασκήνιο.
+    // Ζει όσο ζει η οθόνη. Στο παρασκήνιο τρέχει μόνο η ανανέωση ανά 3 ώρες (RefreshWorker).
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // Επιλογέας αρχείου του συστήματος (για την επαναφορά αντιγράφου). Δηλώνεται πριν ανοίξει η οθόνη.
@@ -39,6 +39,12 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")
             .setMethodCallHandler(FoodBridge(this, scope))
+        // Ανανέωση κάθε 3 ώρες στο παρασκήνιο (δες RefreshWorker). Δεν αποτρέπει το άνοιγμα αν αποτύχει.
+        try {
+            RefreshWorker.schedule(this)
+        } catch (e: Throwable) {
+            ErrorQueue.report(e, "background")
+        }
     }
 
     override fun onDestroy() {

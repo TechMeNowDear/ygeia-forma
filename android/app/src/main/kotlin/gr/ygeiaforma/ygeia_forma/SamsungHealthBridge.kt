@@ -39,7 +39,7 @@ import java.time.ZoneId
 /**
  * Γέφυρα προς το Samsung Health Data SDK (μόνο ανάγνωση).
  * Η Flutter πλευρά καλεί μεθόδους στο κανάλι «ygeia/samsung» και παίρνει πίσω JSON κείμενο.
- * Τίποτα δεν τρέχει στο παρασκήνιο: κάθε ανάγνωση γίνεται μόνο όταν το ζητήσει η οθόνη.
+ * Κάθε ανάγνωση εδώ γίνεται όταν το ζητήσει η οθόνη· στο παρασκήνιο διαβάζει μόνο ο RefreshWorker.
  */
 class SamsungHealthBridge(
     private val activity: Activity,
@@ -52,34 +52,6 @@ class SamsungHealthBridge(
 
     private fun store(): HealthDataStore =
         cachedStore ?: HealthDataService.getStore(activity.applicationContext).also { cachedStore = it }
-
-    /** Τύποι που διαβάζονται εγγραφή-εγγραφή. */
-    private val readTypes: List<Pair<String, DataType>> = listOf(
-        "sleep" to DataTypes.SLEEP,
-        "heart_rate" to DataTypes.HEART_RATE,
-        "body_composition" to DataTypes.BODY_COMPOSITION,
-        "exercise" to DataTypes.EXERCISE,
-        "energy_score" to DataTypes.ENERGY_SCORE,
-        "blood_oxygen" to DataTypes.BLOOD_OXYGEN,
-        "skin_temperature" to DataTypes.SKIN_TEMPERATURE,
-        "blood_pressure" to DataTypes.BLOOD_PRESSURE,
-        "body_temperature" to DataTypes.BODY_TEMPERATURE,
-        "blood_glucose" to DataTypes.BLOOD_GLUCOSE,
-        "water_intake" to DataTypes.WATER_INTAKE,
-        "nutrition" to DataTypes.NUTRITION,
-        "floors_climbed" to DataTypes.FLOORS_CLIMBED,
-        "sleep_apnea" to DataTypes.SLEEP_APNEA,
-        "irregular_heart_rhythm" to DataTypes.IRREGULAR_HEART_RHYTHM_NOTIFICATION,
-    )
-
-    /** Τύποι που δίνουν μόνο σύνολα (π.χ. βήματα ανά μέρα). */
-    private val aggregateTypes: List<Pair<String, DataType>> = listOf(
-        "steps" to DataTypes.STEPS,
-        "activity_summary" to DataTypes.ACTIVITY_SUMMARY,
-    )
-
-    private val permissions: Set<Permission> =
-        (readTypes + aggregateTypes).map { Permission.of(it.second, AccessType.READ) }.toSet()
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -547,7 +519,35 @@ class SamsungHealthBridge(
         else -> "other"
     }
 
-    private companion object {
+    companion object {
+        /** Τύποι που διαβάζονται εγγραφή-εγγραφή. */
+        val readTypes: List<Pair<String, DataType>> = listOf(
+            "sleep" to DataTypes.SLEEP,
+            "heart_rate" to DataTypes.HEART_RATE,
+            "body_composition" to DataTypes.BODY_COMPOSITION,
+            "exercise" to DataTypes.EXERCISE,
+            "energy_score" to DataTypes.ENERGY_SCORE,
+            "blood_oxygen" to DataTypes.BLOOD_OXYGEN,
+            "skin_temperature" to DataTypes.SKIN_TEMPERATURE,
+            "blood_pressure" to DataTypes.BLOOD_PRESSURE,
+            "body_temperature" to DataTypes.BODY_TEMPERATURE,
+            "blood_glucose" to DataTypes.BLOOD_GLUCOSE,
+            "water_intake" to DataTypes.WATER_INTAKE,
+            "nutrition" to DataTypes.NUTRITION,
+            "floors_climbed" to DataTypes.FLOORS_CLIMBED,
+            "sleep_apnea" to DataTypes.SLEEP_APNEA,
+            "irregular_heart_rhythm" to DataTypes.IRREGULAR_HEART_RHYTHM_NOTIFICATION,
+        )
+
+        /** Τύποι που δίνουν μόνο σύνολα (π.χ. βήματα ανά μέρα). */
+        val aggregateTypes: List<Pair<String, DataType>> = listOf(
+            "steps" to DataTypes.STEPS,
+            "activity_summary" to DataTypes.ACTIVITY_SUMMARY,
+        )
+
+        val permissions: Set<Permission> =
+            (readTypes + aggregateTypes).map { Permission.of(it.second, AccessType.READ) }.toSet()
+
         const val DASHBOARD_FILE = "dashboard.json"
         const val PREFS_FILE = "prefs.json"
         const val PAGE_SIZE = 1000
