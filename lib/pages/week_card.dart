@@ -102,7 +102,7 @@ class WeekCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Μεσαία τιμή της εβδομάδας. «Σταθερό» σημαίνει ότι η διαφορά χωράει στις συνηθισμένες διακυμάνσεις σου.'
-            '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα, στον ενεργό χρόνο και στους παλμούς «Ξύπνιος, χωρίς βήματα», γιατί δεν έχει τελειώσει.' : ''}',
+            '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα και στον ενεργό χρόνο, γιατί δεν έχει τελειώσει.' : ''}',
             style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textTertiary),
           ),
         ],

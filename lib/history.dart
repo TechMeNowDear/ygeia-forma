@@ -176,6 +176,7 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day) {
   // Παλμοί μέσα στη μέρα (μόνο όταν υπάρχουν βήματα ανά λεπτό).
   final h = d.heartForDay(day);
   if (h != null) {
+    // Υπολογίζονται και κρατιούνται (για αργότερα), αλλά δεν φαίνονται πια: δικοί μας ορισμοί χωρίς επαλήθευση.
     put(K.restHr, h.resting.value);
     put(K.dayHr, h.awake.value);
     put(K.walkHr, h.bands[HeartBand.walk]?.value);

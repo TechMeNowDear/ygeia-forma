@@ -29,6 +29,10 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val hour = LocalTime.now().hour
         if (hour < 6) return Result.success()
         ErrorQueue.install(applicationContext) // χωρίς ανοιχτή εφαρμογή δεν έχει γίνει ακόμα
+        // Πρόσφατη ανάγνωση (π.χ. η εφαρμογή ήταν ανοιχτή): δεν χρειάζεται άλλη.
+        val cache = java.io.File(applicationContext.filesDir, SamsungHealthBridge.DASHBOARD_FILE)
+        if (cache.exists() && System.currentTimeMillis() - cache.lastModified() < FRESH_MS) return Result.success()
+        val started = System.currentTimeMillis()
         return try {
             val store = HealthDataService.getStore(applicationContext)
             val granted = store.getGrantedPermissions(SamsungHealthBridge.permissions)
@@ -40,16 +44,38 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 .put("granted", granted.size)
                 .put("total", SamsungHealthBridge.permissions.size)
                 .put("background", true)
+            // Αν η Samsung αρνήθηκε κάποιο είδος (π.χ. δεν επιτρέπει ανάγνωση στο παρασκήνιο), δεν γράφουμε
+            // μισά δεδομένα πάνω στα καλά· το λέμε στο Sentry, μία φορά ανά έκδοση.
+            val failed = o.keys().asSequence().filter { k -> (o.opt(k) as? org.json.JSONObject)?.has("error") == true }.toList()
+            if (failed.isNotEmpty()) {
+                reportOnce(IllegalStateException("Ανάγνωση στο παρασκήνιο: σφάλμα σε ${failed.joinToString()}"))
+                return Result.success()
+            }
             val text = withContext(Dispatchers.Default) { o.toString() }
-            withContext(Dispatchers.IO) { writeAtomically(SamsungHealthBridge.DASHBOARD_FILE, text) }
+            withContext(Dispatchers.IO) {
+                // Η εφαρμογή έγραψε στο μεταξύ νεότερα δεδομένα: δεν τα πατάμε.
+                if (!(cache.exists() && cache.lastModified() > started)) writeAtomically(SamsungHealthBridge.DASHBOARD_FILE, text)
+            }
             Result.success()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // Μία φορά ανά εκτέλεση στο Sentry, για να ξέρουμε αν η Samsung επιτρέπει την ανάγνωση στο παρασκήνιο.
-            ErrorQueue.report(e, "background")
+            // Στο Sentry μία φορά ανά έκδοση, για να ξέρουμε αν η Samsung επιτρέπει την ανάγνωση στο παρασκήνιο.
+            reportOnce(e)
             Result.success()
         }
+    }
+
+    private fun reportOnce(e: Throwable) {
+        val version = try {
+            applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0).versionName ?: "dev"
+        } catch (_: Throwable) {
+            "dev"
+        }
+        val mark = java.io.File(applicationContext.filesDir, "bg-reported")
+        if (mark.exists() && mark.readText() == version) return
+        mark.writeText(version)
+        ErrorQueue.report(e, "background")
     }
 
     // Δικό του προσωρινό αρχείο, ώστε να μη συγκρούεται με την εφαρμογή· η μετονομασία είναι ατομική.
@@ -62,14 +88,19 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
     companion object {
         private const val NAME = "ygeia-refresh"
+        private const val FRESH_MS = 150 * 60 * 1000L // 2,5 ώρες
 
-        /** Καλείται όταν ανοίγει η εφαρμογή. KEEP: δεν ξαναπρογραμματίζεται αν υπάρχει ήδη. */
+        /**
+         * Καλείται όταν ανοίγει η εφαρμογή. UPDATE: κρατά το πρόγραμμα, αλλά παίρνει τις νέες ρυθμίσεις
+         * αν αλλάξουν σε νεότερη έκδοση. Η πρώτη εκτέλεση μία ώρα μετά (όχι πάνω στο άνοιγμα).
+         */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<RefreshWorker>(3, TimeUnit.HOURS)
                 .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
+                .setInitialDelay(1, TimeUnit.HOURS)
                 .build()
             WorkManager.getInstance(context.applicationContext)
-                .enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+                .enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
     }
 }

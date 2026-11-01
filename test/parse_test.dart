@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/history.dart';
 
 import 'sample_data.dart';
 
@@ -37,5 +38,28 @@ void main() {
     expect(p.data, isNotNull);
     expect(p.sleepFailed, isTrue);
     expect(p.data!.failed, contains('heart'));
+  });
+
+  test('Ανάγνωση εύρους: ίδιες γραμμές με το summarizeRange, σφάλματα χωρίς κρασάρισμα', () async {
+    final when = DateTime(2026, 10, 24, 20);
+    final j = sampleDashboardJson(when);
+    final from = DateTime(2026, 10, 1), to = DateTime(2026, 10, 25);
+    final p = await parseRange(jsonEncode(j), from, to);
+    expect(p.ok, isTrue);
+    expect(p.anyError, isFalse);
+    expect(p.sleepFailed, isFalse);
+    final direct = summarizeRange(Dashboard.fromJson(j), from, to);
+    expect(p.rows.keys.toSet(), direct.keys.toSet());
+    for (final k in direct.keys) {
+      expect(p.rows[k], direct[k]);
+    }
+    final bad = parseRangeSync('όχι json', from, to);
+    expect(bad.ok, isFalse);
+    expect(bad.rows, isEmpty);
+    expect(parseRangeSync(jsonEncode({'ok': false, 'kind': 'x'}), from, to).ok, isFalse);
+    final heartErr = parseRangeSync(jsonEncode(sampleDashboardJson(when)..['heart'] = {'error': 'x'}), from, to);
+    expect(heartErr.ok, isTrue);
+    expect(heartErr.anyError, isTrue);
+    expect(heartErr.sleepFailed, isTrue);
   });
 }

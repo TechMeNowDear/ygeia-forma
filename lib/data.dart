@@ -537,7 +537,11 @@ class Prefs {
       this.dayTheme = 'aigaio',
       this.nightTheme = 'aigaio',
       this.historyVersion = 1,
-      this.recentTo});
+      this.recentTo,
+      this.gapFrom,
+      this.gapTo,
+      this.emptyFrom,
+      this.emptyChecked});
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -558,8 +562,21 @@ class Prefs {
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
       historyVersion: (j['historyVersion'] as num?)?.toInt() ?? 1,
       recentTo: j['recentTo'] is String ? j['recentTo'] as String : null,
+      gapFrom: j['gapFrom'] is String ? j['gapFrom'] as String : null,
+      gapTo: j['gapTo'] is String ? j['gapTo'] as String : null,
+      emptyFrom: j['emptyFrom'] is String ? j['emptyFrom'] as String : null,
+      emptyChecked: j['emptyChecked'] is String ? j['emptyChecked'] as String : null,
     );
   }
+
+  /// Κενό στο ιστορικό από όσο έμεινε κλειστή η εφαρμογή: από [gapFrom] ως τη μέρα −30.
+  /// [gapTo]: ως πού (από πάνω) έχει ήδη διαβαστεί.
+  String? gapFrom;
+  String? gapTo;
+
+  /// Από πού και πίσω δεν βρέθηκε τίποτα (2 χρόνια άδεια), και πότε κοιτάχτηκε (ξανά σε έναν μήνα).
+  String? emptyFrom;
+  String? emptyChecked;
 
   /// Η τελευταία μέρα που γράφτηκε από την κανονική ανάγνωση («2026-11-01»). Αν η εφαρμογή μείνει
   /// κλειστή πάνω από 29 μέρες, το ιστορικό ξαναδιαβάζεται, ώστε να μη μείνουν κενές μέρες.
@@ -594,6 +611,10 @@ class Prefs {
         'nightTheme': nightTheme,
         'historyVersion': historyVersion,
         'recentTo': recentTo,
+        'gapFrom': gapFrom,
+        'gapTo': gapTo,
+        'emptyFrom': emptyFrom,
+        'emptyChecked': emptyChecked,
       });
 }
 
@@ -601,8 +622,44 @@ class Prefs {
 /// [sleepFailed] αν κάποιο είδος του ύπνου δεν διαβάστηκε (δες sleepReadFailed).
 typedef ParsedDashboard = ({Map<String, dynamic> status, Dashboard? data, bool sleepFailed});
 
-/// Σε ξεχωριστό νήμα (isolate), ώστε το άνοιγμα να μην «παγώνει».
-Future<ParsedDashboard> parseDashboard(String raw) => Isolate.run(() => parseDashboardSync(raw));
+/// Σε ξεχωριστό νήμα (isolate), ώστε το άνοιγμα να μην «παγώνει». Αν το νήμα δεν ξεκινήσει,
+/// γίνεται εδώ (πιο αργά, αλλά ποτέ «κολλημένο»).
+Future<ParsedDashboard> parseDashboard(String raw) async {
+  try {
+    return await Isolate.run(() => parseDashboardSync(raw));
+  } catch (_) {
+    return parseDashboardSync(raw);
+  }
+}
+
+/// Ένα κομμάτι ιστορικού από τη Samsung, διαβασμένο: συνόψεις ανά μέρα και αν διαβάστηκαν όλα.
+typedef ParsedRange = ({bool ok, Map<String, Map<String, double>> rows, bool sleepOk, bool sleepFailed, bool anyError});
+
+Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to) async {
+  try {
+    return await Isolate.run(() => parseRangeSync(raw, from, to));
+  } catch (_) {
+    return parseRangeSync(raw, from, to);
+  }
+}
+
+ParsedRange parseRangeSync(String raw, DateTime from, DateTime to) {
+  const fail = (ok: false, rows: <String, Map<String, double>>{}, sleepOk: false, sleepFailed: false, anyError: true);
+  try {
+    final j = jsonDecode(raw);
+    if (j is! Map<String, dynamic> || j['ok'] != true) return fail;
+    final d = Dashboard.fromJson(j);
+    return (
+      ok: true,
+      rows: summarizeRange(d, from, to),
+      sleepOk: d.sleepOk,
+      sleepFailed: sleepReadFailed(j),
+      anyError: d.failed.isNotEmpty,
+    );
+  } catch (_) {
+    return fail;
+  }
+}
 
 ParsedDashboard parseDashboardSync(String raw) {
   Object? j;
@@ -629,8 +686,8 @@ ParsedDashboard parseDashboardSync(String raw) {
 }
 
 // ---------------------------------------------------------------------------
-// Η κατάσταση της εφαρμογής: διαβάζει όταν ανοίγει και όταν επιστρέφω σε αυτήν.
-// Τίποτα στο παρασκήνιο.
+// Η κατάσταση της εφαρμογής: διαβάζει όταν ανοίγει και όταν επιστρέφω σε αυτήν. Στο παρασκήνιο μόνο
+// ο RefreshWorker (Android) ανανεώνει κάθε 3 ώρες το βοηθητικό αρχείο· το ιστορικό γράφεται εδώ.
 // ---------------------------------------------------------------------------
 
 class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
@@ -643,16 +700,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Ημερήσιες συνόψεις: «2026-10-24» → τιμές (δες history.dart).
   Map<String, Map<String, double>> history = {};
 
-  /// Φέρνω ιστορικό 12 μηνών (μία φορά, ανά μήνα).
+  /// Φέρνω το ιστορικό (μία φορά, ανά μήνα).
   bool backfilling = false;
-  double backfillProgress = 0;
 
   /// Ως 10 χρόνια πίσω: όλο το ιστορικό που έχει η Samsung (απόφαση 2/11). Διαβάζεται μία φορά·
   /// ο «Χρόνος» στις Τάσεις χρειάζεται 455 μέρες, τα υπόλοιπα μένουν για τον γιατρό και για αργότερα.
   static const historyDays = 3653;
 
-  /// Τόσοι συνεχόμενοι μήνες χωρίς κανένα δεδομένο = εκεί αρχίζει το ιστορικό σου· η συμπλήρωση σταματά.
-  static const _emptyMonthsToStop = 12;
+  /// Τόσοι συνεχόμενοι μήνες χωρίς κανένα δεδομένο (πιο πίσω από τους 15 μήνες των Τάσεων) = εκεί
+  /// αρχίζει το ιστορικό σου· η συμπλήρωση σταματά και ξανακοιτά σε έναν μήνα.
+  static const _emptyMonthsToStop = 24;
   static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
 
   bool _prefsLoaded = false;
@@ -873,7 +930,13 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     // γραφτεί μισή) ξαναδιαβάζονται από το ιστορικό.
     final last = prefs.recentTo != null ? parseDateKey(prefs.recentTo!) : null;
     if (saved && _prefsLoaded) {
-      if (last != null && last.isBefore(addDays(today, -29))) prefs.backfillFrom = null;
+      // Διαβάζεται μόνο το κενό (όχι όλο το ιστορικό): από την τελευταία μέρα που είχε γραφτεί (μισή) ως
+      // τη μέρα −30. Αν υπήρχε ήδη ανολοκλήρωτο κενό, κρατάμε την παλιότερη αρχή και ξεκινάμε από πάνω.
+      if (last != null && last.isBefore(addDays(today, -29))) {
+        final prev = prefs.gapFrom != null ? parseDateKey(prefs.gapFrom!) : null;
+        prefs.gapFrom = dateKey(prev != null && prev.isBefore(last) ? prev : last);
+        prefs.gapTo = null;
+      }
       if (prefs.recentTo != dateKey(today)) {
         prefs.recentTo = dateKey(today);
         await _savePrefs();
@@ -888,77 +951,125 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, int> _backfillMonthFails = {};
   int _backfillFails = 0;
 
-  /// Φέρνει το ιστορικό ανά 30 μέρες προς τα πίσω, ως 10 χρόνια (ή ως εκεί που αρχίζουν τα δεδομένα σου).
-  /// Μόνο όσο η εφαρμογή είναι ανοιχτή· αν κλείσει, συνεχίζει από εκεί που σταμάτησε την επόμενη φορά.
+  /// Ένα κομμάτι [from, cursor) από τη Samsung: διαβάζεται σε άλλο νήμα και γράφεται στο ιστορικό.
+  /// Επιστρέφει null αν σταματάμε για τώρα (θα ξαναδοκιμαστεί), αλλιώς αν ήταν εντελώς άδειο.
+  Future<bool?> _readChunk(DateTime from, DateTime cursor) async {
+    final to = addDays(cursor, -1);
+    final p = await parseRange(await SamsungHealth.readRangeRaw(dateKey(from), dateKey(cursor)), from, to);
+    if (!p.ok) {
+      // Δεν διαβάστηκε τίποτα: ξανά στην επόμενη ανανέωση (ως 3 φορές), χωρίς να προχωρήσουμε.
+      _backfillFails++;
+      return null;
+    }
+    _backfillFails = 0;
+    // Η Samsung έδωσε πολύ λιγότερες νύχτες από όσες έχει ήδη το ιστορικό για αυτόν τον μήνα
+    // (π.χ. νέο κινητό που δεν έχει συγχρονίσει ακόμα): σαν αποτυχία ανάγνωσης, ώστε να μη σβηστούν.
+    final had = sleepDaysIn(history, from, to);
+    final got = p.rows.values.where((v) => v.containsKey(K.sleepMin)).length;
+    final tooFew = had >= 4 && got < had / 2;
+    // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ξανά στην επόμενη ανανέωση. Μετά από 3 φορές
+    // προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
+    final failed = p.sleepFailed || tooFew;
+    if (failed) {
+      final k = dateKey(cursor);
+      final n = _backfillMonthFails[k] = (_backfillMonthFails[k] ?? 0) + 1;
+      if (n < 3) return null;
+    }
+    final saved = await _saveDays(mergeHistory(
+      history,
+      p.rows,
+      replaceSleep: !failed && p.sleepOk,
+      rangeFrom: from,
+      rangeTo: to,
+    ));
+    // Δεν γράφτηκε στο κινητό: δεν προχωράμε, ώστε ο μήνας να ξαναδιαβαστεί.
+    if (!saved) {
+      _backfillFails++;
+      return null;
+    }
+    // «Άδειο» μόνο αν δεν υπήρχε τίποτα και δεν απέτυχε κανένα είδος δεδομένων.
+    return p.rows.isEmpty && !p.anyError;
+  }
+
+  /// Ως πού έχει φτάσει η συμπλήρωση (για την κάρτα στις Τάσεις).
+  DateTime? backfillReached;
+
+  /// Συμπληρώνει το ιστορικό, μόνο όσο η εφαρμογή είναι ανοιχτή· αν κλείσει, συνεχίζει την επόμενη φορά.
+  /// 1. Πρώτα το κενό από όσο έμεινε κλειστή η εφαρμογή (πάνω από 29 μέρες).
+  /// 2. Μετά προς τα πίσω ανά 30 μέρες, ως 10 χρόνια ή ως εκεί που αρχίζουν τα δεδομένα σου.
   Future<void> _backfill() async {
-    if (backfilling || !_prefsLoaded || !_historyLoaded) return;
+    if (backfilling || !_prefsLoaded || !_historyLoaded || _backfillFails >= 3) return;
     final today = dayOf(DateTime.now());
     // Το πρώτο κομμάτι φτάνει ως τη μέρα −7 (η −6 και μετά ξαναγράφονται σε κάθε ανανέωση).
     final start = addDays(today, -(_recentDays - 1));
     final oldest = addDays(today, -historyDays);
+    // Μία φορά τον μήνα ξανακοιτάμε πιο πίσω από εκεί που «άρχιζαν» τα δεδομένα: π.χ. σε νέο κινητό
+    // που τότε δεν είχε συγχρονίσει ακόμα όλο το ιστορικό της Samsung.
+    final checked = prefs.emptyChecked != null ? parseDateKey(prefs.emptyChecked!) : null;
+    if (prefs.emptyFrom != null && checked != null && checked.isBefore(addDays(today, -30))) {
+      prefs.backfillFrom = prefs.emptyFrom;
+      prefs.emptyFrom = null;
+      prefs.emptyChecked = null;
+    }
+    final gapFrom = prefs.gapFrom != null ? parseDateKey(prefs.gapFrom!) : null;
     var cursor = prefs.backfillFrom != null ? parseDateKey(prefs.backfillFrom!) : start;
-    if (!cursor.isAfter(oldest) || _backfillFails >= 3) return;
+    if (gapFrom == null && !cursor.isAfter(oldest)) return;
 
     backfilling = true;
     notifyListeners();
-    var emptyMonths = 0;
     try {
+      if (gapFrom != null) {
+        var g = prefs.gapTo != null ? parseDateKey(prefs.gapTo!) : addDays(today, -29);
+        while (g.isAfter(gapFrom)) {
+          var from = addDays(g, -30);
+          if (from.isBefore(gapFrom)) from = gapFrom;
+          if (await _readChunk(from, g) == null) return;
+          g = from;
+          prefs.gapTo = dateKey(g);
+          await _savePrefs();
+          backfillReached = g;
+          notifyListeners();
+        }
+        prefs.gapFrom = null;
+        prefs.gapTo = null;
+        await _savePrefs();
+      }
+
+      final tooOldForTrends = addDays(today, -455);
+      var emptyMonths = 0;
+      DateTime? emptyStart;
       while (cursor.isAfter(oldest)) {
         var from = addDays(cursor, -30);
         if (from.isBefore(oldest)) from = oldest;
-        final r = await SamsungHealth.readRange(dateKey(from), dateKey(cursor));
-        if (r['ok'] != true) {
-          // Δεν διαβάστηκε τίποτα: ξανά στην επόμενη ανανέωση (ως 3 φορές), χωρίς να προχωρήσουμε.
-          _backfillFails++;
-          break;
-        }
-        _backfillFails = 0;
-        // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ο μήνας ξαναδιαβάζεται στην επόμενη
-        // ανανέωση. Μετά από 3 φορές προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
-        final dash = Dashboard.fromJson(r);
-        final to = addDays(cursor, -1);
-        final rows = summarizeRange(dash, from, to);
-        // Η Samsung έδωσε πολύ λιγότερες νύχτες από όσες έχει ήδη το ιστορικό για αυτόν τον μήνα
-        // (π.χ. νέο κινητό που δεν έχει συγχρονίσει ακόμα): σαν αποτυχία ανάγνωσης, ώστε να μη σβηστούν.
-        final had = sleepDaysIn(history, from, to);
-        final got = rows.values.where((v) => v.containsKey(K.sleepMin)).length;
-        final tooFew = had >= 4 && got < had / 2;
-        final failed = sleepReadFailed(r) || tooFew;
-        if (failed) {
-          final k = dateKey(cursor);
-          final n = _backfillMonthFails[k] = (_backfillMonthFails[k] ?? 0) + 1;
-          if (n < 3) break;
-        }
-        final saved = await _saveDays(mergeHistory(
-          history,
-          rows,
-          // Μόνο αν διαβάστηκαν όλα όσα χρειάζεται ο ύπνος· αλλιώς (και μετά από 3 προσπάθειες) οι
-          // τιμές ύπνου που υπάρχουν ήδη μένουν όπως είναι.
-          replaceSleep: !failed && dash.sleepOk,
-          rangeFrom: from,
-          rangeTo: to,
-        ));
-        // Δεν γράφτηκε στο κινητό: δεν προχωράμε, ώστε ο μήνας να ξαναδιαβαστεί.
-        if (!saved) {
-          _backfillFails++;
-          break;
+        final empty = await _readChunk(from, cursor);
+        if (empty == null) break;
+        if (empty) {
+          emptyStart ??= cursor;
+          emptyMonths++;
+        } else {
+          emptyMonths = 0;
+          emptyStart = null;
         }
         cursor = from;
-        // Χρόνος ολόκληρος χωρίς τίποτα πριν από αυτό: εδώ αρχίζουν τα δεδομένα, δεν ψάχνουμε πιο πίσω.
-        emptyMonths = rows.isEmpty ? emptyMonths + 1 : 0;
-        if (emptyMonths >= _emptyMonthsToStop) cursor = oldest;
+        // 2 χρόνια χωρίς κανένα δεδομένο, πιο πίσω από τους 15 μήνες των Τάσεων: εκεί αρχίζουν τα
+        // δεδομένα σου. Σταματάμε (και ξανακοιτάμε σε έναν μήνα, δες πάνω).
+        if (emptyMonths >= _emptyMonthsToStop && !from.isAfter(tooOldForTrends)) {
+          prefs.emptyFrom = dateKey(emptyStart!);
+          prefs.emptyChecked = dateKey(today);
+          cursor = oldest;
+        }
         prefs.backfillFrom = dateKey(cursor);
         await _savePrefs();
-        final total = start.difference(oldest).inDays;
-        backfillProgress = total <= 0 ? 1 : start.difference(cursor).inDays / total;
+        backfillReached = cursor;
         notifyListeners();
       }
     } catch (_) {
       // Ξανά στην επόμενη ανανέωση (ως 3 φορές σε αυτή τη χρήση της εφαρμογής).
       _backfillFails++;
+    } finally {
+      backfilling = false;
+      notifyListeners();
     }
-    backfilling = false;
-    notifyListeners();
   }
 
   @override

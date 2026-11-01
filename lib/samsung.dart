@@ -33,9 +33,9 @@ class SamsungHealth {
   }
 
   /// Η απάντηση όπως είναι (κείμενο JSON), για να διαβαστεί σε άλλο νήμα (δες parseDashboard).
-  static Future<String> _callRaw(String method) async {
+  static Future<String> _callRaw(String method, [Map<String, dynamic>? args]) async {
     try {
-      final raw = await _channel.invokeMethod<String>(method);
+      final raw = await _channel.invokeMethod<String>(method, args);
       return raw ?? jsonEncode({'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'});
     } on PlatformException catch (e) {
       return jsonEncode({'ok': false, 'kind': 'other', 'message': e.message ?? e.code});
@@ -46,6 +46,7 @@ class SamsungHealth {
 
   static Future<String> dashboardRaw() => _callRaw('dashboard');
   static Future<String> cachedDashboardRaw() => _callRaw('cachedDashboard');
+  static Future<String> readRangeRaw(String from, String to) => _callRaw('readRange', {'from': from, 'to': to});
 
   static Future<Map<String, dynamic>> status() => _call('status');
 
@@ -53,9 +54,7 @@ class SamsungHealth {
 
   static Future<Map<String, dynamic>> readAll({int days = 30}) => _call('readAll', {'days': days});
 
-  static Future<Map<String, dynamic>> dashboard() => _call('dashboard');
 
-  static Future<Map<String, dynamic>> cachedDashboard() => _call('cachedDashboard');
 
   static Future<Map<String, dynamic>> loadPrefs() => _call('loadPrefs');
 
@@ -63,9 +62,6 @@ class SamsungHealth {
 
   static Future<Map<String, dynamic>> resolve() => _call('resolve');
 
-  /// Δεδομένα για το διάστημα [from, to) — ημερομηνίες «2026-10-01».
-  static Future<Map<String, dynamic>> readRange(String from, String to) =>
-      _call('readRange', {'from': from, 'to': to});
 
   static Future<Map<String, dynamic>> saveDays(String json) => _call('saveDays', {'json': json});
 

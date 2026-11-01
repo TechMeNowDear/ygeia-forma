@@ -44,7 +44,7 @@ class _TrendsPageState extends State<TrendsPage> {
         );
 
         final progress = store.backfilling
-            ? _BackfillCard(progress: store.backfillProgress)
+            ? _BackfillCard(reached: store.backfillReached)
             : null;
 
         final Widget summary = store.history.isEmpty
@@ -139,39 +139,30 @@ class _PeriodSelector extends StatelessWidget {
 }
 
 class _BackfillCard extends StatelessWidget {
-  const _BackfillCard({required this.progress});
-  final double progress;
+  const _BackfillCard({required this.reached});
+
+  /// Ως πού έχει φτάσει (null = μόλις ξεκίνησε).
+  final DateTime? reached;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final pct = (progress.clamp(0, 1) * 100).round();
+    final r = reached;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(
-            icon: Icons.history_rounded,
-            title: 'Φέρνω το ιστορικό σου από το Samsung Health',
-            color: c.primary,
-            trailing: Text(
-              '$pct%',
-              style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
-            ),
-          ),
+          CardHeader(icon: Icons.history_rounded, title: 'Φέρνω το ιστορικό σου από το Samsung Health', color: c.primary),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0, 1).toDouble(),
-              minHeight: 8,
-              color: c.primary,
-              backgroundColor: c.tint(c.primary),
-            ),
+            // Χωρίς ποσοστό: δεν ξέρουμε από πριν πόσα χρόνια έχει η Samsung.
+            child: LinearProgressIndicator(minHeight: 8, color: c.primary, backgroundColor: c.tint(c.primary)),
           ),
           const SizedBox(height: 10),
           Text(
-            'Μία φορά, για τους τελευταίους 12 μήνες. Προχωρά μόνο όσο είναι ανοιχτή η εφαρμογή· '
+            '${r == null ? '' : 'Έφτασα στις ${dayMonth(r)} ${r.year}. '}'
+            'Μία φορά, για όλο το ιστορικό (ως 10 χρόνια). Προχωρά μόνο όσο είναι ανοιχτή η εφαρμογή· '
             'αν την κλείσεις, συνεχίζει από εκεί που έμεινε. Μέχρι τότε, οι συγκρίσεις 3 μηνών και χρόνου μπορεί να λένε «λίγα δεδομένα».',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
           ),
