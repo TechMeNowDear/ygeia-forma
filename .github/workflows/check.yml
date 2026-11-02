@@ -41,12 +41,14 @@ jobs:
           cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          # Σύνδεση Oura: singleTask, επιστροφή ygeiaforma://oura-callback, <queries> για browser.
+          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 
       - name: Έλεγχοι (ώρα Αθήνας)
         run: |
           set -o pipefail
           date
-          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test)
+          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test -e oura_sandbox_live_test)
           if ! flutter test $files 2>&1 | tee tests.log; then
             grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -150 > errors.txt || true
             [ -s errors.txt ] || tail -80 tests.log > errors.txt
@@ -66,6 +68,32 @@ jobs:
             echo "::error title=Σφάλμα χτισίματος::$msg"
             exit 1
           fi
+
+  # Oura: ο πραγματικός κώδικας ανάγνωσης πάνω στα συνθετικά δεδομένα του sandbox της Oura (χωρίς δαχτυλίδι).
+  # Δεν μπλοκάρει αν η Oura δεν απαντά· αποτυγχάνει αν η απάντηση δεν διαβάζεται σωστά.
+  oura-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Europe/Athens
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Ανάγνωση sandbox Oura
+        run: |
+          set -o pipefail
+          if ! flutter test test/oura_sandbox_live_test.dart --dart-define=OURA_LIVE=1 2>&1 | tee sandbox.log; then
+            msg=$(grep -E -B2 -A10 "Expected|Error|Exception|FAILED" sandbox.log | head -80 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Sandbox Oura::$msg"
+            exit 1
+          fi
+          echo "::notice title=Sandbox Oura::$(cat oura_sandbox_result.txt 2>/dev/null || echo 'χωρίς αποτέλεσμα')"
 
   shots:
     runs-on: ubuntu-latest
@@ -130,6 +158,8 @@ jobs:
           cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          # Σύνδεση Oura: singleTask, επιστροφή ygeiaforma://oura-callback, <queries> για browser.
+          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 
       - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)
         run: flutter build apk --release --target-platform android-x64

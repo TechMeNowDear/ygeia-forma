@@ -194,3 +194,46 @@ Map<String, Map<String, double>> sampleHistory(DateTime now, Dashboard d) {
   out.addAll(recent);
   return out;
 }
+
+/// Δείγμα Oura για τα στιγμιότυπα: σύνδεση στις [ouraFrom], νύχτες ως το πρωί του [now] (εκτός από [missing]),
+/// με τις ίδιες μετατροπές που κάνει η εφαρμογή (ouraRows → ιστορικό με κλειδιά «o.*»).
+List<Map<String, dynamic>> sampleOuraSleep(DateTime ouraFrom, DateTime now, {Set<DateTime> missing = const {}}) {
+  final rnd = math.Random(5);
+  final out = <Map<String, dynamic>>[];
+  String iso(DateTime t) => t.toUtc().toIso8601String();
+  const phases = '4422211112223332222111222333322224222111222333222111223332222244';
+  for (var d = DateTime(ouraFrom.year, ouraFrom.month, ouraFrom.day); !d.isAfter(now); d = DateTime(d.year, d.month, d.day + 1)) {
+    if (missing.any((m) => m.year == d.year && m.month == d.month && m.day == d.day)) continue;
+    final bed = DateTime(d.year, d.month, d.day - 1, 23, 40).add(Duration(minutes: rnd.nextInt(80)));
+    final wake = DateTime(d.year, d.month, d.day, 7, 0).add(Duration(minutes: rnd.nextInt(90)));
+    final inBed = wake.difference(bed).inSeconds;
+    final latency = 600 + rnd.nextInt(900);
+    final awake = 1200 + rnd.nextInt(1500);
+    final total = inBed - latency - awake;
+    final deep = (total * (0.14 + rnd.nextDouble() * 0.05)).round();
+    final rem = (total * (0.2 + rnd.nextDouble() * 0.05)).round();
+    out.add({
+      'id': 'sample-${d.month}-${d.day}',
+      'day': '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+      'type': 'long_sleep',
+      'bedtime_start': iso(bed),
+      'bedtime_end': iso(wake),
+      'time_in_bed': inBed,
+      'total_sleep_duration': total,
+      'deep_sleep_duration': deep,
+      'rem_sleep_duration': rem,
+      'light_sleep_duration': total - deep - rem,
+      'awake_time': awake,
+      'latency': latency,
+      'efficiency': 85 + rnd.nextInt(8),
+      'lowest_heart_rate': 51 + rnd.nextInt(5),
+      'average_heart_rate': 57 + rnd.nextDouble() * 5,
+      'average_hrv': 32 + rnd.nextInt(14),
+      'average_breath': 13.6 + rnd.nextDouble(),
+      'sleep_phase_5_min': phases.substring(0, (inBed / 300).floor().clamp(1, phases.length)),
+      'period': 0,
+      'low_battery_alert': false,
+    });
+  }
+  return out;
+}

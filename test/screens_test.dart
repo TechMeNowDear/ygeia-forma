@@ -17,6 +17,12 @@ import 'package:ygeia_forma/pages/appearance.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/unusual.dart';
+import 'package:ygeia_forma/oura/oura_api.dart';
+import 'package:ygeia_forma/oura/oura_model.dart';
+import 'package:ygeia_forma/pages/compare_page.dart';
+import 'package:ygeia_forma/pages/oura_pages.dart';
+import 'package:ygeia_forma/pages/sources_page.dart';
+import 'package:ygeia_forma/sources.dart';
 
 import 'sample_data.dart';
 import 'sample_food.dart';
@@ -54,6 +60,8 @@ Future<void> _shot(
   Future<void> Function(WidgetTester)? act,
   bool trends = false,
   Aigaio? palette,
+  bool oura = false,
+  bool ouraMissingToday = false,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
@@ -62,6 +70,7 @@ Future<void> _shot(
   final when = at ?? now;
   final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(when));
   store.history = sampleHistory(when, store.data!);
+  if (oura) prepareOura(store, missingToday: ouraMissingToday, now: when);
   prepare?.call(store);
   if (backfilling) {
     store.backfilling = true;
@@ -98,6 +107,71 @@ Future<void> _shot(
     await act(tester);
     await settle();
   }
+  await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
+}
+
+/// Μέρα στα στιγμιότυπα του Oura: Σάββατο 14/11, η σύνδεση στις 6/11 (8 μέρες πριν, η σύγκριση ανοιχτή).
+final ouraNow = DateTime(2026, 11, 14, 10, 20);
+final ouraStart = DateTime(2026, 11, 6);
+
+/// Κατάσταση «Oura συνδεδεμένο» με δείγμα νυχτών (ίδιες μετατροπές με την εφαρμογή). [missingToday]: η χθεσινή
+/// νύχτα δεν έχει έρθει (για την κάρτα «Περιμένει το Oura»).
+void prepareOura(HealthStore store, {bool missingToday = false, DateTime? now}) {
+  final at = now ?? ouraNow;
+  final today = DateTime(at.year, at.month, at.day);
+  store.prefs.plan = SourcePlan.samsungOnly.withEra(Source.oura, ouraStart);
+  store.data = store.data; // ξαναχωρίζει τις νύχτες κατά το σχέδιο
+  final batch = parseOura(
+    sleep: sampleOuraSleep(ouraStart, at, missing: {if (missingToday) today}),
+    dailySleep: [
+      for (var d = ouraStart; !d.isAfter(today); d = DateTime(d.year, d.month, d.day + 1))
+        if (!(missingToday && d == today)) {'id': 'ds$d', 'day': dateKey(d), 'score': 70 + d.day % 15, 'timestamp': d.toIso8601String()},
+    ],
+    readiness: [
+      for (var d = ouraStart; !d.isAfter(today); d = DateTime(d.year, d.month, d.day + 1))
+        if (!(missingToday && d == today))
+          {'id': 'dr$d', 'day': dateKey(d), 'score': 64 + d.day % 12, 'temperature_deviation': (d.day % 5 - 2) / 10, 'timestamp': d.toIso8601String()},
+    ],
+  );
+  store.ouraNights = batch.nights;
+  // Πριν από τη σύνδεση: λίγες «παλιές» νύχτες Oura δεν υπάρχουν· το ιστορικό του Oura γράφεται μόνο από τη σύνδεση.
+  mergeOura(store.history, ouraRows(batch.nights), from: ouraStart, to: today, plan: store.plan);
+  stripForeignWatchNight(store.history, store.plan, from: ouraStart);
+  store.ouraHasTokens = true;
+  store.ouraLink = OuraLink(vault: MemoryVault(), clientId: 'SCREENSHOT');
+  store.ouraClock = () => at;
+  store.ouraSyncedMs = at.subtract(const Duration(minutes: 12)).millisecondsSinceEpoch;
+  store.ouraSyncedTo = dateKey(today);
+}
+
+Future<void> _page(
+  WidgetTester tester, {
+  required String name,
+  required Size size,
+  required Brightness brightness,
+  required Widget Function(HealthStore) page,
+  bool oura = true,
+  void Function(HealthStore)? prepare,
+}) async {
+  tester.view.devicePixelRatio = 2.0;
+  tester.view.physicalSize = size * 2.0;
+  addTearDown(tester.view.reset);
+  final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(ouraNow));
+  store.history = sampleHistory(ouraNow, store.data!);
+  if (oura) prepareOura(store);
+  prepare?.call(store);
+  final key = GlobalKey();
+  await tester.pumpWidget(RepaintBoundary(
+    key: key,
+    child: MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+      home: page(store),
+    ),
+  ));
+  await tester.pumpAndSettle();
   await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
 }
 
@@ -333,4 +407,131 @@ void main() {
       await expectLater(find.byKey(key), matchesGoldenFile('shots/${p.dark ? 40 : 39}_appearance_${p.dark ? 'dark' : 'light'}.png'));
     });
   }
+
+  // Oura (2/11): ύπνος μόνο από το δαχτυλίδι. Κλειστό Fold (400) και ανοιχτό (860), φωτεινό και σκοτεινό Αιγαίο.
+  const fold = Size(400, 2200);
+  const foldOpen = Size(860, 1700);
+  for (final (n, size, b, tag) in [
+    (50, fold, Brightness.light, 'closed_light'),
+    (51, fold, Brightness.dark, 'closed_dark'),
+    (52, foldOpen, Brightness.light, 'open_light'),
+    (53, foldOpen, Brightness.dark, 'open_dark'),
+  ]) {
+    testWidgets('Oura · Σήμερα · $tag', (t) => _shot(t, name: '${n}_oura_today_$tag', size: size, brightness: b, tab: 0, at: ouraNow, oura: true));
+    testWidgets('Oura · Ύπνος · $tag', (t) => _shot(
+          t,
+          name: '${n + 4}_oura_sleep_$tag',
+          size: size == fold ? const Size(400, 3000) : foldOpen,
+          brightness: b,
+          tab: Cat.health,
+          sub: HealthTab.sleep,
+          at: ouraNow,
+          oura: true,
+        ));
+    testWidgets('Πηγές · $tag', (t) => _page(t, name: '${n + 8}_sources_$tag', size: size, brightness: b, page: (s) => SourcesPage(store: s, now: ouraNow)));
+    testWidgets('Σύγκριση πηγών · $tag',
+        (t) => _page(t, name: '${n + 12}_compare_$tag', size: size, brightness: b, page: (s) => ComparePage(store: s, now: ouraNow)));
+    testWidgets('Oura · διαχείριση · $tag',
+        (t) => _page(t, name: '${n + 16}_oura_manage_$tag', size: size, brightness: b, page: (s) => OuraManagePage(store: s, now: ouraNow)));
+    testWidgets('Σύνδεση Oura · $tag', (t) => _page(
+          t,
+          name: '${n + 20}_oura_connect_$tag',
+          size: size,
+          brightness: b,
+          oura: false,
+          page: (s) => OuraConnectPage(store: s, now: ouraNow),
+        ));
+  }
+  testWidgets('Oura · Σήμερα · περιμένει τη νύχτα', (t) => _shot(
+        t,
+        name: '74_oura_today_waiting',
+        size: fold,
+        brightness: Brightness.light,
+        tab: 0,
+        at: DateTime(2026, 11, 14, 8, 5),
+        oura: true,
+        ouraMissingToday: true,
+      ));
+  testWidgets('Oura · Σήμερα · χρειάζεται νέα σύνδεση', (t) => _shot(
+        t,
+        name: '75_oura_today_reconnect',
+        size: fold,
+        brightness: Brightness.dark,
+        tab: 0,
+        at: ouraNow,
+        oura: true,
+        prepare: (s) {
+          s.ouraHasTokens = false;
+          s.ouraError = OuraErrorKind.reconnect;
+        },
+      ));
+  testWidgets('Oura · Σήμερα · συνδρομή', (t) => _shot(
+        t,
+        name: '76_oura_today_subscription',
+        size: fold,
+        brightness: Brightness.light,
+        tab: 0,
+        at: ouraNow,
+        oura: true,
+        prepare: (s) => s.ouraError = OuraErrorKind.subscription,
+      ));
+  testWidgets('Oura · Καρδιά', (t) => _shot(
+        t,
+        name: '77_oura_heart',
+        size: const Size(400, 2400),
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.heart,
+        at: ouraNow,
+        oura: true,
+      ));
+  testWidgets('Oura · Τάσεις · αλλαγή πηγής', (t) => _shot(
+        t,
+        name: '78_oura_trends',
+        size: const Size(400, 3600),
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.trends,
+        at: ouraNow,
+        oura: true,
+        act: (t) async {
+          final row = find.byKey(const ValueKey('trend-sleepMin'));
+          await t.ensureVisible(row);
+          await t.pumpAndSettle();
+          await t.tap(row);
+        },
+      ));
+  testWidgets('Πηγές · πριν από το Oura', (t) => _page(
+        t,
+        name: '79_sources_before',
+        size: fold,
+        brightness: Brightness.light,
+        oura: false,
+        page: (s) => SourcesPage(store: s, now: ouraNow),
+      ));
+  testWidgets('Oura · Ύπνος · αποσυνδέθηκε', (t) => _shot(
+        t,
+        name: '80_oura_sleep_disconnected',
+        size: fold,
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.sleep,
+        at: ouraNow,
+        oura: true,
+        prepare: (s) {
+          s.prefs.plan = s.plan.withEra(Source.none, DateTime(2026, 11, 13));
+          s.ouraHasTokens = false;
+        },
+      ));
+  testWidgets('Oura · διαχείριση · αποσυνδέθηκε', (t) => _page(
+        t,
+        name: '81_oura_manage_disconnected',
+        size: fold,
+        brightness: Brightness.light,
+        page: (s) => OuraManagePage(store: s, now: ouraNow),
+        prepare: (s) {
+          s.prefs.plan = s.plan.withEra(Source.none, DateTime(2026, 11, 13));
+          s.ouraHasTokens = false;
+        },
+      ));
 }
