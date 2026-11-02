@@ -83,14 +83,20 @@ Future<void> _shot(
     ),
   );
   // Η γραμμή συμπλήρωσης κινείται συνέχεια (χωρίς ποσοστό): ένα σταθερό καρέ αντί για «ησυχία».
-  if (backfilling) {
-    await tester.pump(const Duration(milliseconds: 600));
-  } else {
-    await tester.pumpAndSettle();
+  Future<void> settle() async {
+    if (backfilling) {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    } else {
+      await tester.pumpAndSettle();
+    }
   }
+
+  await settle();
   if (act != null) {
     await act(tester);
-    await tester.pumpAndSettle();
+    await settle();
   }
   await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
 }
@@ -271,7 +277,9 @@ void main() {
         act: (t) async {
           final row = find.byKey(const ValueKey('trend-sleepHr'));
           await t.ensureVisible(row);
-          await t.pumpAndSettle();
+          for (var i = 0; i < 6; i++) {
+            await t.pump(const Duration(milliseconds: 100)); // η γραμμή συμπλήρωσης κινείται συνέχεια
+          }
           await t.tap(row);
         },
       ));
