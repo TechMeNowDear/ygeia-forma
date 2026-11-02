@@ -269,6 +269,7 @@ class SourcesPage extends StatelessWidget {
   static String _when(DateTime t, DateTime today) => sameDay(t, today) ? hm(t) : '${relativeDay(t, today)} ${hm(t)}';
 
   static String _ouraStatus(HealthStore s, DateTime today) {
+    if (s.planState == PlanState.unknown) return s.ouraHasTokens ? 'Συνδεδεμένο · διάλεξε πηγή ύπνου πάνω' : 'Διάλεξε πηγή ύπνου πάνω';
     if (!s.ouraConfigured && !s.ouraHasTokens) return 'Η σύνδεση ενεργοποιείται τη μέρα που θα έρθει';
     return switch (s.ouraStatus) {
       OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
