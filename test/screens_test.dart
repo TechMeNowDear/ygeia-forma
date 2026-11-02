@@ -82,7 +82,12 @@ Future<void> _shot(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  // Η γραμμή συμπλήρωσης κινείται συνέχεια (χωρίς ποσοστό): ένα σταθερό καρέ αντί για «ησυχία».
+  if (backfilling) {
+    await tester.pump(const Duration(milliseconds: 600));
+  } else {
+    await tester.pumpAndSettle();
+  }
   if (act != null) {
     await act(tester);
     await tester.pumpAndSettle();
