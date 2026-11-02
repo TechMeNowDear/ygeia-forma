@@ -65,7 +65,7 @@ Future<void> _shot(
   prepare?.call(store);
   if (backfilling) {
     store.backfilling = true;
-    store.backfillProgress = 0.42;
+    store.backfillReached = DateTime(when.year, when.month - 2, when.day);
   }
   final key = GlobalKey();
   await tester.pumpWidget(
