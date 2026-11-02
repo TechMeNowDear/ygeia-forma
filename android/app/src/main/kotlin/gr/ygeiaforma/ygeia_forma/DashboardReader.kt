@@ -3,6 +3,7 @@ package gr.ygeiaforma.ygeia_forma
 import com.samsung.android.sdk.health.data.HealthDataStore
 import com.samsung.android.sdk.health.data.data.HealthDataPoint
 import com.samsung.android.sdk.health.data.data.entries.HeartRate
+import com.samsung.android.sdk.health.data.data.entries.OxygenSaturation
 import com.samsung.android.sdk.health.data.data.entries.SleepSession
 import com.samsung.android.sdk.health.data.request.DataType
 import com.samsung.android.sdk.health.data.request.DataTypes
@@ -23,7 +24,27 @@ import java.time.LocalDateTime
  * Διαβάζει ό,τι χρειάζονται οι οθόνες, σε απλή μορφή (χρόνοι σε millis).
  * Οι υπολογισμοί (νύχτες, μέσοι όροι) γίνονται στη Flutter πλευρά.
  */
-class DashboardReader(private val s: HealthDataStore) {
+class DashboardReader(
+    private val s: HealthDataStore,
+    /**
+     * Ως ποια νύχτα (μαζί) διαβάζεται ο ύπνος του ρολογιού (απόφαση 2/11): μετά τη σύνδεση του Oura ο ύπνος
+     * έρχεται μόνο από το δαχτυλίδι, και του ρολογιού διαβάζεται μόνο για τη «Σύγκριση πηγών» τις πρώτες 14 μέρες.
+     * null = χωρίς όριο (όπως πριν από το Oura). Δες [SleepPolicy].
+     */
+    private val sleepUntil: LocalDate? = null,
+) {
+
+    /** Το τέλος της ανάγνωσης ύπνου: 18:00 της τελευταίας επιτρεπτής νύχτας (μετά αρχίζει η επόμενη νύχτα). */
+    private fun sleepEnd(to: LocalDateTime): LocalDateTime {
+        val cut = sleepUntil?.atTime(18, 0) ?: return to
+        return if (cut.isBefore(to)) cut else to
+    }
+
+    /** Ύπνος στο [from, to), κομμένος στο όριο· κενή λίστα αν το όριο είναι πριν από την αρχή. */
+    private suspend fun sleepLimited(from: LocalDateTime, to: LocalDateTime): JSONArray {
+        val end = sleepEnd(to)
+        return if (!end.isAfter(from)) JSONArray() else sleep(from, end)
+    }
 
     suspend fun read(grantedNames: Set<String>): JSONObject {
         val now = LocalDateTime.now()
@@ -33,7 +54,7 @@ class DashboardReader(private val s: HealthDataStore) {
 
         fun has(t: DataType) = t.name in grantedNames
 
-        if (has(DataTypes.SLEEP)) o.put("sleep", safe { sleep(from, now) })
+        if (has(DataTypes.SLEEP)) o.put("sleep", safe { sleepLimited(from, now) })
         if (has(DataTypes.HEART_RATE)) o.put("heart", safe { heart(from, now) })
         if (has(DataTypes.BLOOD_OXYGEN)) o.put("spo2", safe { spo2(from, now) })
         if (has(DataTypes.SKIN_TEMPERATURE)) o.put("skinTemp", safe { skinTemp(from, now) })
@@ -65,7 +86,7 @@ class DashboardReader(private val s: HealthDataStore) {
 
         fun has(t: DataType) = t.name in grantedNames
 
-        if (has(DataTypes.SLEEP)) o.put("sleep", safe { sleep(from.minusDays(1), to) })
+        if (has(DataTypes.SLEEP)) o.put("sleep", safe { sleepLimited(from.minusDays(1), to) })
         if (has(DataTypes.HEART_RATE)) o.put("heart", safe { heart(from.minusDays(1), to) })
         if (has(DataTypes.BLOOD_OXYGEN)) o.put("spo2", safe { spo2(from.minusDays(1), to) })
         if (has(DataTypes.SKIN_TEMPERATURE)) o.put("skinTemp", safe { skinTemp(from.minusDays(1), to) })
@@ -236,7 +257,7 @@ class DashboardReader(private val s: HealthDataStore) {
         return out
     }
 
-    // ---------- Οξυγόνο: [αρχή, τέλος, μέσο, ελάχιστο, μέγιστο] ----------
+    // ---------- Οξυγόνο: [αρχή, τέλος, μέσο, ελάχιστο, μέγιστο, (δευτερόλεπτα κάτω από 90%)] ----------
 
     private suspend fun spo2(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
@@ -245,16 +266,44 @@ class DashboardReader(private val s: HealthDataStore) {
             if (avg == null || !avg.isFinite()) continue
             val min: Float? = p.getValue(DataType.BloodOxygenType.MIN_OXYGEN_SATURATION)
             val max: Float? = p.getValue(DataType.BloodOxygenType.MAX_OXYGEN_SATURATION)
-            out.put(
-                JSONArray()
-                    .put((ms(p.startTime) ?: 0L))
-                    .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
-                    .put(avg.toDouble())
-                    .put(finiteOr(min, avg))
-                    .put(finiteOr(max, avg))
-            )
+            val row = JSONArray()
+                .put((ms(p.startTime) ?: 0L))
+                .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
+                .put(avg.toDouble())
+                .put(finiteOr(min, avg))
+                .put(finiteOr(max, avg))
+            below90(p)?.let { row.put(it) }
+            out.put(row)
         }
         return out
+    }
+
+    /**
+     * Δευτερόλεπτα με οξυγόνο κάτω από 90%, από τις αναλυτικές μετρήσεις — μόνο όταν βγαίνει με σιγουριά:
+     * κάθε μέτρηση πρέπει να έχει διάρκεια (τέλος μετά την αρχή). Αλλιώς null (δεν το δείχνουμε).
+     */
+    private fun below90(p: HealthDataPoint): Long? = try {
+        val series: List<OxygenSaturation>? = p.getValue(DataType.BloodOxygenType.SERIES_DATA)
+        if (series.isNullOrEmpty()) {
+            null
+        } else {
+            var total = 0L
+            var ok = true
+            for (x in series) {
+                val a = x.startTime
+                val b = x.endTime
+                if (a == null || b == null || !b.isAfter(a)) {
+                    ok = false
+                    break
+                }
+                if (x.oxygenSaturation.isFinite() && x.oxygenSaturation < 90f) total += Duration.between(a, b).seconds
+            }
+            if (ok) total else null
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        null
     }
 
     // ---------- Θερμοκρασία δέρματος: [αρχή, τέλος, μέση] ----------

@@ -41,7 +41,7 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val granted = store.getGrantedPermissions(SamsungHealthBridge.permissions)
             if (granted.isEmpty()) return Result.success()
             val names = granted.map { it.dataType.name }.toSet()
-            val o = DashboardReader(store).read(names)
+            val o = DashboardReader(store, SleepPolicy.until(applicationContext)).read(names)
                 .put("ok", true)
                 .put("readAt", System.currentTimeMillis())
                 .put("granted", granted.size)

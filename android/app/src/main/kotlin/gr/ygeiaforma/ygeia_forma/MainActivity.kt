@@ -1,6 +1,8 @@
 package gr.ygeiaforma.ygeia_forma
 
+import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -23,6 +25,29 @@ class MainActivity : FlutterFragmentActivity() {
         cb?.invoke(uri)
     }
 
+    // Σύνδεση Oura: η επιστροφή ygeiaforma://oura-callback φτάνει εδώ (singleTask: στην ίδια οθόνη).
+    private var oura: OuraBridge? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        takeOuraCallback(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        takeOuraCallback(intent)
+    }
+
+    private fun takeOuraCallback(i: Intent?) {
+        if (!OuraBridge.isCallback(i)) return
+        val uri = i?.dataString ?: return
+        // Μία φορά: να μην ξαναδιαβαστεί αν η οθόνη ξαναφτιαχτεί (π.χ. περιστροφή).
+        i.data = null
+        val b = oura
+        if (b != null) b.deliver(uri) else OuraBridge.pendingCallback = uri
+    }
+
     fun pickDocument(callback: (Uri?) -> Unit) {
         pickCallback?.invoke(null) // προηγούμενη επιλογή που δεν ολοκληρώθηκε
         pickCallback = callback
@@ -39,6 +64,8 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")
             .setMethodCallHandler(FoodBridge(this, scope))
+        val ouraChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/oura")
+        oura = OuraBridge(this, scope, ouraChannel).also { ouraChannel.setMethodCallHandler(it) }
         // Ανανέωση κάθε 3 ώρες στο παρασκήνιο (δες RefreshWorker). Δεν αποτρέπει το άνοιγμα αν αποτύχει.
         try {
             RefreshWorker.schedule(this)
@@ -48,6 +75,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        oura = null
         scope.cancel()
         super.onDestroy()
     }

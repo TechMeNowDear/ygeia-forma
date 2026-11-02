@@ -50,6 +50,8 @@ jobs:
           # Διαδίκτυο: για το Open Food Facts (barcode) και την αναφορά σφαλμάτων (Sentry). Το Samsung Health δεν το χρειάζεται.
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          # Σύνδεση Oura: singleTask, επιστροφή ygeiaforma://oura-callback, <queries> για browser.
+          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
           grep -n 'INTERNET' android/app/src/main/AndroidManifest.xml
 
       - name: Προσωρινή μνήμη για το κλειδί υπογραφής
@@ -116,7 +118,7 @@ jobs:
           set -o pipefail
           # Όλοι οι έλεγχοι εκτός από τα στιγμιότυπα και τη ζωντανή δοκιμή Sentry, με ώρα Αθήνας
           # (ώστε να πιάνονται λάθη στην αλλαγή ώρας).
-          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test)
+          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test -e oura_sandbox_live_test)
           if ! flutter test $files 2>&1 | tee tests.log; then
             grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -120 > errors.txt || true
             [ -s errors.txt ] || tail -80 tests.log > errors.txt
