@@ -1,6 +1,6 @@
 # Έλεγχοι σε κάθε κλάδο εκτός από το main: τρέχουν όλοι οι έλεγχοι (με ώρα Αθήνας),
 # χτίζεται APK release όπως στο main, αλλά χωρίς το κλειδί (για να πιάνονται λάθη Kotlin και R8) και βγαίνουν στιγμιότυπα στο branch
-# «screenshots-dev». Τίποτα δεν δημοσιεύεται στο Releases: αυτό γίνεται μόνο από το main.
+# «screenshots-dev». Επίσης ανοίγει την εφαρμογή σε emulator (smoke). Τίποτα δεν δημοσιεύεται στο Releases: αυτό γίνεται μόνο από το main.
 name: Έλεγχος κλάδου
 
 on:
@@ -101,3 +101,71 @@ jobs:
           git add .
           git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Στιγμιότυπα κλάδου ${{ github.ref_name }} · ${{ github.sha }}"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" screenshots-dev
+
+  # Ανοίγει την εφαρμογή σε emulator Android 14. Αν κλείνει στο άνοιγμα, ο κλάδος δεν συγχωνεύεται.
+  # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Ελεύθερος χώρος στον δίσκο
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Συμπλήρωση αρχείων Android
+        run: |
+          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
+          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
+            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+
+      - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)
+        run: flutter build apk --release --target-platform android-x64
+
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Άνοιγμα σε emulator
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BIN="$SDK/cmdline-tools/latest/bin"
+          IMG="system-images;android-34;google_apis;x86_64"
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          yes | "$BIN/sdkmanager" --licenses > /dev/null || true
+          "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1 || true
+          echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force > /dev/null 2>&1 || \
+            echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" --force > /dev/null
+          export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
+          nohup emulator -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
+            -no-snapshot -camera-back none -camera-front none -memory 4096 > emu.log 2>&1 &
+          if ! timeout 600 adb wait-for-device; then
+            echo "::warning title=Άνοιγμα::Ο emulator δεν ξεκίνησε· ο έλεγχος ανοίγματος δεν έγινε"; exit 1
+          fi
+          for i in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          sleep 15
+          if bash tools/perf/smoke.sh build/app/outputs/flutter-apk/app-release.apk > smoke.log 2>&1; then
+            echo "::notice title=Άνοιγμα::$(tail -1 smoke.log)"
+          else
+            msg=$(head -60 smoke.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Η εφαρμογή κλείνει στο άνοιγμα::$msg"
+            exit 1
+          fi
