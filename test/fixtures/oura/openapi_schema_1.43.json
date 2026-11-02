@@ -1,0 +1,102 @@
+{
+ "openapi_version": "3.1.0",
+ "spec": "openapi-1.43.json",
+ "fetched": "2026-11-02",
+ "PublicModifiedSleepModel": {
+  "required": [
+   "id",
+   "bedtime_end",
+   "bedtime_start",
+   "day",
+   "low_battery_alert",
+   "period",
+   "time_in_bed"
+  ],
+  "properties": [
+   "app_sleep_phase_5_min",
+   "average_breath",
+   "average_heart_rate",
+   "average_hrv",
+   "awake_time",
+   "bedtime_end",
+   "bedtime_start",
+   "day",
+   "deep_sleep_duration",
+   "efficiency",
+   "heart_rate",
+   "hrv",
+   "id",
+   "latency",
+   "light_sleep_duration",
+   "low_battery_alert",
+   "lowest_heart_rate",
+   "movement_30_sec",
+   "period",
+   "readiness",
+   "readiness_score_delta",
+   "rem_sleep_duration",
+   "restless_periods",
+   "ring_id",
+   "sleep_algorithm_version",
+   "sleep_analysis_reason",
+   "sleep_phase_30_sec",
+   "sleep_phase_5_min",
+   "sleep_score_delta",
+   "time_in_bed",
+   "total_sleep_duration",
+   "type"
+  ]
+ },
+ "PublicDailySleep": {
+  "required": [
+   "id",
+   "contributors",
+   "day",
+   "timestamp"
+  ],
+  "properties": [
+   "contributors",
+   "day",
+   "id",
+   "score",
+   "timestamp"
+  ]
+ },
+ "PublicDailyReadiness": {
+  "required": [
+   "id",
+   "contributors",
+   "day",
+   "timestamp"
+  ],
+  "properties": [
+   "contributors",
+   "day",
+   "id",
+   "score",
+   "temperature_deviation",
+   "temperature_trend_deviation",
+   "timestamp"
+  ]
+ },
+ "PublicSleepType": [
+  "deleted",
+  "sleep",
+  "long_sleep",
+  "late_nap",
+  "rest"
+ ],
+ "scopes": [
+  "daily",
+  "email",
+  "heart_health",
+  "heartrate",
+  "personal",
+  "session",
+  "spo2",
+  "tag",
+  "workout"
+ ],
+ "authorizationUrl": "https://cloud.ouraring.com/oauth/authorize",
+ "tokenUrl": "https://api.ouraring.com/oauth/token"
+}

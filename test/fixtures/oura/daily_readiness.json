@@ -1,0 +1,35 @@
+{
+ "data": [
+  {
+   "id": "dr-1023",
+   "day": "2026-10-23",
+   "score": 78,
+   "temperature_deviation": 0.12,
+   "temperature_trend_deviation": 0.05,
+   "timestamp": "2026-10-23T00:00:00.000+03:00",
+   "contributors": {
+    "activity_balance": 80,
+    "body_temperature": 95
+   }
+  },
+  {
+   "id": "dr-1024",
+   "day": "2026-10-24",
+   "score": 70,
+   "temperature_deviation": -0.21,
+   "temperature_trend_deviation": null,
+   "timestamp": "2026-10-24T00:00:00.000+03:00",
+   "contributors": {}
+  },
+  {
+   "id": "dr-1025",
+   "day": "2026-10-25",
+   "score": 81,
+   "temperature_deviation": null,
+   "temperature_trend_deviation": null,
+   "timestamp": "2026-10-25T00:00:00.000+03:00",
+   "contributors": {}
+  }
+ ],
+ "next_token": null
+}

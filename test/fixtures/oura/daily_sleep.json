@@ -1,0 +1,41 @@
+{
+ "data": [
+  {
+   "id": "ds-1023",
+   "day": "2026-10-23",
+   "score": 82,
+   "timestamp": "2026-10-23T00:00:00.000+03:00",
+   "contributors": {
+    "deep_sleep": 80,
+    "efficiency": 90,
+    "latency": 85,
+    "rem_sleep": 88,
+    "restfulness": 70,
+    "timing": 75,
+    "total_sleep": 85
+   }
+  },
+  {
+   "id": "ds-1024",
+   "day": "2026-10-24",
+   "score": 74,
+   "timestamp": "2026-10-24T00:00:00.000+03:00",
+   "contributors": {}
+  },
+  {
+   "id": "ds-1025",
+   "day": "2026-10-25",
+   "score": 85,
+   "timestamp": "2026-10-25T00:00:00.000+03:00",
+   "contributors": {}
+  },
+  {
+   "id": "ds-1026",
+   "day": "2026-10-26",
+   "score": null,
+   "timestamp": "2026-10-26T00:00:00.000+02:00",
+   "contributors": {}
+  }
+ ],
+ "next_token": null
+}

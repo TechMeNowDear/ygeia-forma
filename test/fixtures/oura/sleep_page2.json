@@ -1,0 +1,69 @@
+{
+ "data": [
+  {
+   "id": "s-1025",
+   "day": "2026-10-25",
+   "type": "long_sleep",
+   "bedtime_start": "2026-10-25T00:40:00.000+03:00",
+   "bedtime_end": "2026-10-25T08:10:00.000+02:00",
+   "time_in_bed": 30600,
+   "total_sleep_duration": 27000,
+   "deep_sleep_duration": 5400,
+   "light_sleep_duration": 14400,
+   "rem_sleep_duration": 7200,
+   "awake_time": 3600,
+   "latency": 1200,
+   "efficiency": 88,
+   "lowest_heart_rate": 51,
+   "average_heart_rate": 56.0,
+   "average_hrv": 44,
+   "average_breath": 13.75,
+   "sleep_phase_5_min": "4421112223332211122233322224",
+   "period": 0,
+   "low_battery_alert": false
+  },
+  {
+   "id": "s-1026",
+   "day": "2026-10-26",
+   "type": "long_sleep",
+   "bedtime_start": "2026-10-26T00:05:00.000+02:00",
+   "bedtime_end": "2026-10-26T06:50:00.000+02:00",
+   "time_in_bed": 24300,
+   "total_sleep_duration": 21600,
+   "deep_sleep_duration": null,
+   "light_sleep_duration": null,
+   "rem_sleep_duration": null,
+   "awake_time": null,
+   "latency": null,
+   "efficiency": null,
+   "lowest_heart_rate": null,
+   "average_heart_rate": null,
+   "average_hrv": null,
+   "average_breath": null,
+   "sleep_phase_5_min": null,
+   "period": 0,
+   "low_battery_alert": true
+  },
+  {
+   "id": "s-1027-late",
+   "day": "2026-10-27",
+   "type": "late_nap",
+   "bedtime_start": "2026-10-26T19:20:00.000+02:00",
+   "bedtime_end": "2026-10-26T19:55:00.000+02:00",
+   "time_in_bed": 2100,
+   "total_sleep_duration": 1500,
+   "period": 0,
+   "low_battery_alert": false
+  },
+  {
+   "id": "s-bad",
+   "day": "2026-10-27",
+   "type": "long_sleep",
+   "bedtime_start": "2026-10-27T00:00:00.000+02:00",
+   "time_in_bed": 100,
+   "period": 0,
+   "low_battery_alert": false
+  }
+ ],
+ "next_token": null
+}
