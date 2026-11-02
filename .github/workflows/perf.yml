@@ -92,6 +92,9 @@ jobs:
             adb shell settings put global animator_duration_scale 0
             sleep 20
             bash tools/perf/measure.sh perf.apk perf.md
+            # Κρασαρίσματα (Java/Kotlin και native) και ό,τι είπε το WorkManager.
+            adb logcat -b crash -d > crash.log 2>&1 || true
+            adb logcat -d | grep -E "AndroidRuntime|FATAL|WM-|ygeia|DEBUG  :" | tail -400 > app.log || true
             tail -30 emu.log
           } > perf.log 2>&1 || true
           # Σε αποτυχία: η αρχή του log (έλεγχοι KVM/AVD) για διάγνωση.
@@ -120,4 +123,6 @@ jobs:
           path: |
             perf.md
             perf.log
+            crash.log
+            app.log
           retention-days: 90
