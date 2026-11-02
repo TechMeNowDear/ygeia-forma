@@ -18,8 +18,9 @@ for i in 1 2 3; do
   if [ -z "$pid" ]; then echo "Φορά $i: η εφαρμογή δεν τρέχει μετά από 25 s"; ok=0; else echo "Φορά $i: τρέχει (pid $pid)"; fi
 done
 adb logcat -b crash -d > crash.log 2>&1 || true
-if grep -q "FATAL EXCEPTION\|Fatal signal" crash.log; then
-  echo "Βρέθηκε κρασάρισμα:"; grep -v "^---" crash.log | head -40; ok=0
+# Μόνο κρασαρίσματα της δικής μας εφαρμογής (ο emulator έχει και δικά του, π.χ. Gmail).
+if grep -q "Process: $PKG\|>>> $PKG <<<" crash.log; then
+  echo "Βρέθηκε κρασάρισμα:"; grep -A30 "Process: $PKG\|>>> $PKG <<<" crash.log | head -40; ok=0
 fi
 [ "$ok" = 1 ] && echo "Άνοιγμα: εντάξει" && exit 0
 exit 1
