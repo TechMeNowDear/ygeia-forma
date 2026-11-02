@@ -226,8 +226,8 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Από τη μέρα της σύνδεσης ο ύπνος έρχεται μόνο από το δαχτυλίδι. Οι παλιές νύχτες μένουν όπως είναι, '
-                'από το ρολόι.',
+                'Από την πρώτη νύχτα μετά τη σύνδεση ο ύπνος έρχεται μόνο από το δαχτυλίδι. Η χθεσινή και οι παλιές '
+                'νύχτες μένουν όπως είναι, από το ρολόι.',
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
             ],
@@ -296,7 +296,7 @@ class OuraManagePage extends StatelessWidget {
         title: const Text('Αποσύνδεση από το Oura;'),
         content: const Text(
           'Σταματά η ανάγνωση από το Oura και η άδεια ανακαλείται. Ό,τι έχει ήδη έρθει μένει στο κινητό.\n\n'
-          'Από σήμερα οι νύχτες μένουν κενές: ο ύπνος δεν περνά μόνος του στο ρολόι. Αν το θέλεις, το διαλέγεις '
+          'Από απόψε οι νύχτες μένουν κενές: ο ύπνος δεν περνά μόνος του στο ρολόι. Αν το θέλεις, το διαλέγεις '
           'μετά ρητά, σε αυτή τη σελίδα.',
         ),
         actions: [
@@ -324,7 +324,7 @@ class OuraManagePage extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Ο ύπνος ξανά από το ρολόι;'),
         content: const Text(
-          'Από σήμερα ο ύπνος θα έρχεται από το Galaxy Watch. Οι νύχτες του Oura μένουν όπως είναι. '
+          'Από απόψε ο ύπνος θα έρχεται από το Galaxy Watch. Οι νύχτες του Oura μένουν όπως είναι. '
           'Οι Τάσεις δεν θα συγκρίνουν νύχτες των δύο συσκευών μεταξύ τους.',
         ),
         actions: [
@@ -361,6 +361,11 @@ class OuraManagePage extends StatelessWidget {
           OuraStatus.off => connected
               ? ('Συνδεδεμένο', 'Ο ύπνος έρχεται τώρα από το ρολόι, όπως διάλεξες.', c.good)
               : ('Δεν είναι συνδεδεμένο', 'Ο ύπνος έρχεται από το ρολόι.', c.textSecondary),
+          OuraStatus.starting => (
+              'Συνδεδεμένο',
+              'Από απόψε ο ύπνος έρχεται μόνο από το Oura. Η χθεσινή νύχτα μένει όπως τη μέτρησε το ρολόι.',
+              c.good,
+            ),
           OuraStatus.retry => (
               'Συνδεδεμένο',
               ouraErrorText(store.ouraError ?? OuraErrorKind.network),
@@ -368,7 +373,7 @@ class OuraManagePage extends StatelessWidget {
             ),
           _ => (
               'Συνδεδεμένο',
-              '${ouraFrom == null ? '' : 'Από ${shortDayDate(ouraFrom)} · '}δεν χρειάζεται να κάνεις τίποτα',
+              '${ouraFrom == null ? '' : 'Από τη νύχτα προς ${shortDayDate(ouraFrom)} · '}δεν χρειάζεται να κάνεις τίποτα',
               c.good,
             ),
         };
@@ -420,7 +425,7 @@ class OuraManagePage extends StatelessWidget {
           else if (connected && store.ouraActive)
             FilledButton.icon(
               key: const ValueKey('oura-sync-now'),
-              onPressed: store.ouraSyncing ? null : store.syncOuraNow,
+              onPressed: store.ouraSyncing || !store.ouraCanSyncNow ? null : store.syncOuraNow,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Ενημέρωση τώρα'),
             ),
@@ -464,7 +469,7 @@ class OuraManagePage extends StatelessWidget {
               const SectionLabel('Τι παίρνουμε από το Oura'),
               const SizedBox(height: 4),
               for (final r in sourceRows.where((r) => r.group == SourceGroup.night))
-                InfoRow(r.title, plan.nightSource(today) == Source.oura ? 'Ναι' : 'Όχι τώρα'),
+                InfoRow(r.title, store.ouraActive ? 'Ναι' : (store.ouraStartsTonight ? 'Από απόψε' : 'Όχι τώρα')),
               const InfoRow('Βήματα δαχτυλιδιού', 'Όχι · από το ρολόι'),
               const InfoRow('Οξυγόνο δαχτυλιδιού', 'Όχι · από το ρολόι'),
             ],
@@ -497,7 +502,7 @@ class OuraManagePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Μόνο αν το διαλέξεις: από σήμερα ο ύπνος έρχεται από το Galaxy Watch.',
+                  'Μόνο αν το διαλέξεις: από απόψε ο ύπνος έρχεται από το Galaxy Watch.',
                   style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
                 ),
               ],

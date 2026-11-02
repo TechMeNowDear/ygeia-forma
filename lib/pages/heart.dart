@@ -67,7 +67,20 @@ class HeartPage extends StatelessWidget {
           lastRhr = rhrNights.isEmpty ? null : rhrNights.last.sleepingHr;
           base = d.restingHrBaseline;
         }
-        final today = d.heartRange(d.readAt);
+        // Χαμηλότεροι/υψηλότεροι της μέρας από το ρολόι. Όσο ο ύπνος δεν είναι του ρολογιού, ο ύπνος της νύχτας
+        // εξαιρείται με τις ώρες του Oura (ίδιος κανόνας με τους παλμούς της μέρας)· χωρίς νύχτα του Oura δεν
+        // ξεχωρίζει η μέρα από τον ύπνο, οπότε δεν δείχνουμε τίποτα (ποτέ «χαμηλότεροι» που είναι παλμοί του ύπνου).
+        final readDay = dayOf(d.readAt);
+        final dayOnly = store.plan.nightSource(readDay) != Source.watch;
+        final windows = store.ouraWindows;
+        final (double, double)? today;
+        if (!dayOnly) {
+          today = d.heartRange(d.readAt);
+        } else if (store.plan.nightSource(readDay) == Source.oura && windows.mains.containsKey(dateKey(readDay))) {
+          today = d.heartRange(d.readAt, exclude: windows.ranges);
+        } else {
+          today = null;
+        }
         final latest = d.latestHeart;
         // Οξυγόνο: πάντα του ρολογιού. Μετά τη σύνδεση του Oura ανά νύχτα χωρίς τον ύπνο του ρολογιού.
         final oxNights = ouraHr
@@ -103,7 +116,7 @@ class HeartPage extends StatelessWidget {
                     icon: Icons.bedtime_rounded,
                     title: 'Παλμοί στον ύπνο',
                     color: c.sleep,
-                    trailing: ouraHr ? const SourceTag(Source.oura) : null,
+                    trailing: store.plan.nightSource(day) == Source.oura ? const SourceTag(Source.oura) : null,
                   ),
                   const SizedBox(height: 14),
                   if (lastRhr != null) BigValue('${lastRhr.round()}', unit: 'bpm', size: 34),
@@ -136,11 +149,21 @@ class HeartPage extends StatelessWidget {
                       'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now()).replaceFirst('Χθες', 'χθες')} '}${hm(latest.start)}',
                       '${latest.avg.round()} bpm',
                     ),
-                  if (today != null) ...[
+                  if (today != null && !dayOnly) ...[
                     InfoRow('Χαμηλότεροι σήμερα', '${today.$1.round()} bpm'),
                     InfoRow('Υψηλότεροι σήμερα', '${today.$2.round()} bpm'),
                   ],
-                  if (latest == null && today == null)
+                  if (today != null && dayOnly) ...[
+                    InfoRow('Χαμηλότεροι μέρας · ρολόι', '${today.$1.round()} bpm'),
+                    InfoRow('Υψηλότεροι μέρας · ρολόι', '${today.$2.round()} bpm'),
+                  ],
+                  if (today == null && dayOnly)
+                    Text(
+                      'Οι χαμηλότεροι και υψηλότεροι της μέρας φαίνονται όταν έρθει η νύχτα από το δαχτυλίδι, για να μη '
+                      'μετρήσουν παλμοί του ύπνου.',
+                      style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
+                    ),
+                  if (latest == null && today == null && !dayOnly)
                     Text('Δεν υπάρχουν μετρήσεις σήμερα.', style: TextStyle(color: c.textSecondary)),
                 ],
               ),
@@ -169,7 +192,7 @@ class HeartPage extends StatelessWidget {
                   for (final n in oxNights)
                     InfoRow(
                       shortDayDate(n.$1),
-                      '${n.$2.round()}% · χαμηλότερη μέτρηση ${n.$3?.round() ?? '—'}%',
+                      '${n.$2.round()}% · χαμηλότερη ${n.$3?.round() ?? '—'}% (ενδεικτικό)',
                     ),
                 ],
               ),

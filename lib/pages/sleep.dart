@@ -221,7 +221,7 @@ class _LastNightCard extends StatelessWidget {
           const Hairline(vertical: 14),
           if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
           if (n.spo2Avg != null) InfoRow('Οξυγόνο, μέσος όρος', '${n.spo2Avg!.round()}%', dot: c.sleep),
-          if (n.spo2Min != null) InfoRow('Οξυγόνο, χαμηλότερη μέτρηση', '${n.spo2Min!.round()}%', dot: c.sleep),
+          if (n.spo2Min != null) InfoRow('Οξυγόνο, χαμηλότερη μέτρηση', '${n.spo2Min!.round()}% · ενδεικτικό', dot: c.sleep),
           if (n.parts.length > 1) InfoRow('Η Samsung τη χώρισε σε', '${n.parts.length} κομμάτια', dot: c.textTertiary),
           if (n.parts.length > 1 && n.parts.any((p) => p.score != null))
             InfoRow(

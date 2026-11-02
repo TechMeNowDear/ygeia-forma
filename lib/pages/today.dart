@@ -11,6 +11,7 @@ import '../widgets.dart';
 import '../unusual.dart';
 import 'nutrition.dart';
 import 'oura_today.dart';
+import 'sources_page.dart';
 import 'unusual_card.dart';
 import 'week_card.dart';
 
@@ -84,7 +85,11 @@ class TodayPage extends StatelessWidget {
         final rest = ouraNight && store.plan.nightSource(now) == Source.oura && OuraRestCard.hasData(store, now)
             ? OuraRestCard(store: store, now: now, onTap: openSleep)
             : null;
-        final ouraState = ouraNight && OuraStatusCard.shows(store) ? OuraStatusCard(store: store, now: now) : null;
+        final ouraState = PlanUnknownCard.shows(store)
+            ? PlanUnknownCard(onOpen: () => Navigator.of(context).push(SourcesPage.route(store, now: this.now)))
+            : OuraStatusCard.shows(store)
+                ? OuraStatusCard(store: store, now: now)
+                : null;
         final review = prefs.show('week') ? currentWeekReview(store.history, now, plan: store.plan) : null;
         final week = review == null ? null : WeekCard(review: review);
         final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.plan) : null;
@@ -250,7 +255,7 @@ class TodayPage extends StatelessWidget {
       title: 'Οξυγόνο · ρολόι',
       value: ox?.avg.round().toString(),
       unit: '%',
-      trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${ox.min.round()}%'),
+      trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${ox.min.round()}% · ενδεικτικό'),
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
@@ -285,7 +290,7 @@ class TodayPage extends StatelessWidget {
       unit: '%',
       trend: min == null
           ? null
-          : TrendPill('Χαμηλότερη μέτρηση ${min.round()}%'),
+          : TrendPill('Χαμηλότερη μέτρηση ${min.round()}% · ενδεικτικό'),
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );

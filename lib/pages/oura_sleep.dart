@@ -378,7 +378,7 @@ class _BreathCard extends StatelessWidget {
             ox == null ? 'Οξυγόνο —' : 'Οξυγόνο ${ox.avg.round()}%',
             ox == null
                 ? 'Δεν υπάρχουν μετρήσεις του ρολογιού για αυτή τη νύχτα'
-                : 'Χαμηλότερο ${ox.min.round()}%'
+                : 'Χαμηλότερο ${ox.min.round()}% · ενδεικτικό'
                     '${ox.below90 == null ? '' : ' · κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ενδεικτικό)'}',
             Source.watch,
           ),

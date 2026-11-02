@@ -6,6 +6,7 @@ import '../history.dart';
 import '../oura/oura_api.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
+import '../plan_file.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -21,7 +22,7 @@ class OuraStatusCard extends StatelessWidget {
   /// Αν πρέπει να φανεί κάρτα.
   static bool shows(HealthStore s) => switch (s.ouraStatus) {
         OuraStatus.waiting || OuraStatus.missing || OuraStatus.reconnect || OuraStatus.subscription => true,
-        OuraStatus.disconnected => true,
+        OuraStatus.disconnected || OuraStatus.starting => true,
         _ => false,
       };
 
@@ -49,8 +50,15 @@ class OuraStatusCard extends StatelessWidget {
         ),
       OuraStatus.missing => (
           'Χθες βράδυ χωρίς ύπνο από το δαχτυλίδι',
-          'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις. Οξυγόνο και παλμοί μέρας από το ρολόι φαίνονται κανονικά.',
+          'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις. Το οξυγόνο από το ρολόι φαίνεται κανονικά.',
           c.textSecondary,
+          null,
+        ),
+      OuraStatus.starting => (
+          'Από απόψε ο ύπνος από το Oura',
+          'Το Oura συνδέθηκε. Η χθεσινή νύχτα μένει όπως τη μέτρησε το ρολόι· από την επόμενη νύχτα ο ύπνος έρχεται '
+              'μόνο από το δαχτυλίδι. Φόρεσέ το απόψε.',
+          c.sleep,
           null,
         ),
       OuraStatus.reconnect => (
@@ -83,6 +91,30 @@ class OuraStatusCard extends StatelessWidget {
                     ? OuraConnectPage.route(store, now: now)
                     : OuraManagePage.route(store, now: now),
               ),
+    );
+  }
+}
+
+/// Το σχέδιο πηγών δεν διαβάστηκε με σιγουριά (π.χ. χαλασμένο αρχείο): οι νύχτες μένουν κενές, τίποτα δεν
+/// γράφεται, και ο χρήστης διαλέγει στις Πηγές. Ποτέ σιωπηλά πίσω στο ρολόι.
+class PlanUnknownCard extends StatelessWidget {
+  const PlanUnknownCard({super.key, required this.onOpen});
+  final VoidCallback onOpen;
+
+  static bool shows(HealthStore s) => s.planState == PlanState.unknown;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return EmptyCard(
+      key: const ValueKey('plan-unknown'),
+      icon: Icons.device_unknown_rounded,
+      color: c.bad,
+      title: 'Δεν διαβάστηκε από πού έρχεται ο ύπνος',
+      text: 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Για να μη μπερδευτούν συσκευές, οι νύχτες μένουν κενές και δεν '
+          'αποθηκεύεται τίποτα ώσπου να διαλέξεις.',
+      buttonText: 'Διάλεξε πηγή',
+      onPressed: onOpen,
     );
   }
 }

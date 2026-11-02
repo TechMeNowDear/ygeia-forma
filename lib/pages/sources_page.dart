@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../oura/oura_store.dart';
+import '../plan_file.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -121,7 +122,9 @@ class SourcesPage extends StatelessWidget {
                 )
               : null;
 
-          final history = plan.eras.isEmpty
+          // Οι νύχτες έχουν την ημερομηνία του πρωινού: «νύχτα προς 7/11» = από το βράδυ της 6/11.
+          String nightTo(DateTime d) => 'τη νύχτα προς ${shortDayDate(d)}';
+          final history = plan.eras.isEmpty || store.planState != PlanState.ok
               ? null
               : AppCard(
                   child: Column(
@@ -130,16 +133,57 @@ class SourcesPage extends StatelessWidget {
                       const SectionLabel('Αλλαγές πηγής ύπνου'),
                       const SizedBox(height: 6),
                       Text(
-                        'Οι παλιές νύχτες μένουν με την πηγή τους. Οι Τάσεις δεν συγκρίνουν ποτέ νύχτες από δύο συσκευές.',
+                        'Κάθε αλλαγή ισχύει από το βράδυ της μέρας που την έκανες· η νύχτα πριν μένει όπως τη μέτρησε η '
+                        'προηγούμενη πηγή. Οι παλιές νύχτες μένουν με την πηγή τους και οι Τάσεις δεν συγκρίνουν ποτέ '
+                        'νύχτες από δύο συσκευές.',
                         style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                       const SizedBox(height: 4),
-                      InfoRow('Ως ${dayMonthYear(DateTime(plan.eras.first.from.year, plan.eras.first.from.month, plan.eras.first.from.day - 1))}',
-                          sourceName(Source.watch)),
-                      for (final e in plan.eras) InfoRow('Από ${dayMonthYear(e.from)}', sourceName(e.source)),
+                      InfoRow(
+                        'Ως ${nightTo(DateTime(plan.eras.first.from.year, plan.eras.first.from.month, plan.eras.first.from.day - 1))}',
+                        sourceName(Source.watch),
+                      ),
+                      for (final e in plan.eras) InfoRow('Από ${nightTo(e.from)}', sourceName(e.source)),
                     ],
                   ),
                 );
+
+          // Το σχέδιο πηγών δεν διαβάστηκε: ρητή επιλογή, τίποτα αυτόματο.
+          final first = earliestOuraDay(store.history);
+          final unknown = store.planState == PlanState.unknown
+              ? AppCard(
+                  key: const ValueKey('plan-recover'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SectionLabel('Δεν διαβάστηκε από πού έρχεται ο ύπνος'),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Οι ρυθμίσεις πηγών χάλασαν ή χάθηκαν. Ώσπου να διαλέξεις, οι νύχτες μένουν κενές και δεν '
+                        'αποθηκεύεται τίποτα, για να μη μπερδευτούν συσκευές.',
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
+                      ),
+                      const SizedBox(height: 12),
+                      if (first != null) ...[
+                        FilledButton(
+                          onPressed: () => store.recoverPlan(SourcePlan([SourceEra(Source.oura, first)])),
+                          child: Text('Ύπνος από το Oura, από ${nightTo(first)}'),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      OutlinedButton(
+                        onPressed: () => store.recoverPlan(first == null
+                            ? SourcePlan.samsungOnly
+                            : SourcePlan([
+                                SourceEra(Source.none, first),
+                                SourceEra(Source.watch, DateTime(today.year, today.month, today.day + 1)),
+                              ])),
+                        child: Text(first == null ? 'Ύπνος από το ρολόι, όπως πριν' : 'Ύπνος από το ρολόι, από απόψε'),
+                      ),
+                    ],
+                  ),
+                )
+              : null;
 
           final compare = plan.compareActive(today)
               ? AppCard(
@@ -181,7 +225,13 @@ class SourcesPage extends StatelessWidget {
           return LayoutBuilder(
             builder: (context, box) {
               final wide = box.maxWidth >= 760;
-              final left = <Widget>[if (noSource != null) noSource, devices, if (compare != null) compare, if (history != null) history];
+              final left = <Widget>[
+                if (unknown != null) unknown,
+                if (noSource != null && unknown == null) noSource,
+                devices,
+                if (compare != null) compare,
+                if (history != null) history,
+              ];
               final right = <Widget>[table, if (notUsed != null) notUsed];
               Widget col(List<Widget> items) => Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -222,6 +272,7 @@ class SourcesPage extends StatelessWidget {
     if (!s.ouraConfigured && !s.ouraHasTokens) return 'Η σύνδεση ενεργοποιείται τη μέρα που θα έρθει';
     return switch (s.ouraStatus) {
       OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
+      OuraStatus.starting => 'Συνδεδεμένο · ο ύπνος από το Oura από απόψε',
       OuraStatus.disconnected => 'Αποσυνδέθηκε',
       OuraStatus.reconnect => 'Χρειάζεται νέα σύνδεση',
       OuraStatus.subscription => 'Η συνδρομή δεν είναι ενεργή',
