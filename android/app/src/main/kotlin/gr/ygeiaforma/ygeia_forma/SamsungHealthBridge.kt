@@ -162,7 +162,7 @@ class SamsungHealthBridge(
     private suspend fun readRange(from: String, to: String): JSONObject {
         val s = store()
         val names = s.getGrantedPermissions(permissions).map { it.dataType.name }.toSet()
-        return DashboardReader(s, SleepPolicy.until(activity))
+        return DashboardReader(s, SleepPolicy.until(activity), SleepPolicy.spo2Series(activity))
             .readRange(names, java.time.LocalDate.parse(from), java.time.LocalDate.parse(to))
             .put("ok", true)
             .put("granted", names.size)
@@ -173,7 +173,7 @@ class SamsungHealthBridge(
         val s = store()
         val granted = s.getGrantedPermissions(permissions)
         val names = granted.map { it.dataType.name }.toSet()
-        val o = DashboardReader(s, SleepPolicy.until(activity)).read(names)
+        val o = DashboardReader(s, SleepPolicy.until(activity), SleepPolicy.spo2Series(activity)).read(names)
             .put("ok", true)
             .put("readAt", System.currentTimeMillis())
             .put("granted", granted.size)

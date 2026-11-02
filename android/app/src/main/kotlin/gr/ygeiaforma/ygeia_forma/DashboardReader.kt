@@ -32,6 +32,8 @@ class DashboardReader(
      * null = χωρίς όριο (όπως πριν από το Oura). Δες [SleepPolicy].
      */
     private val sleepUntil: LocalDate? = null,
+    /** Λεπτά κάτω από 90% από τις αναλυτικές μετρήσεις οξυγόνου: μόνο μετά από σύνδεση Oura (όπως πριν, αλλιώς). */
+    private val spo2Series: Boolean = false,
 ) {
 
     /** Το τέλος της ανάγνωσης ύπνου: 18:00 της τελευταίας επιτρεπτής νύχτας (μετά αρχίζει η επόμενη νύχτα). */
@@ -272,7 +274,7 @@ class DashboardReader(
                 .put(avg.toDouble())
                 .put(finiteOr(min, avg))
                 .put(finiteOr(max, avg))
-            below90(p)?.let { row.put(it) }
+            if (spo2Series) below90(p)?.let { row.put(it) }
             out.put(row)
         }
         return out

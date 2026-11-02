@@ -16,6 +16,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.security.KeyStore
+import java.security.UnrecoverableKeyException
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -40,7 +43,16 @@ class OuraBridge(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "vaultLoad" -> io(result) { Vault.load(activity, call.argument<String>("name") ?: "") }
+            // {"v": κείμενο ή null} ή {"error": "transient"} (προσωρινό σφάλμα: τα αρχεία μένουν).
+            "vaultLoad" -> scope.launch {
+                val out = try {
+                    val v = withContext(Dispatchers.IO) { Vault.load(activity, call.argument<String>("name") ?: "") }
+                    org.json.JSONObject().put("v", v ?: org.json.JSONObject.NULL)
+                } catch (e: Throwable) {
+                    org.json.JSONObject().put("error", "transient")
+                }
+                result.success(out.toString())
+            }
             "vaultSave" -> io(result) {
                 Vault.save(activity, call.argument<String>("name") ?: "", call.argument<String>("value") ?: "")
             }
@@ -58,6 +70,20 @@ class OuraBridge(
                 result.success(uri)
             }
             "readNights" -> io(result) { readText(NIGHTS_FILE) }
+            // Το σχέδιο πηγών (δικό του αρχείο, ανεξάρτητο από τις ρυθμίσεις): {"state": missing|ok|error, "json"}.
+            "readPlan" -> scope.launch {
+                val out = withContext(Dispatchers.IO) {
+                    val f = File(activity.filesDir, PLAN_FILE)
+                    try {
+                        if (!f.exists()) org.json.JSONObject().put("state", "missing")
+                        else org.json.JSONObject().put("state", "ok").put("json", f.readText())
+                    } catch (e: Throwable) {
+                        org.json.JSONObject().put("state", "error")
+                    }
+                }
+                result.success(out.toString())
+            }
+            "writePlan" -> io(result) { writeText(PLAN_FILE, call.argument<String>("json") ?: "") }
             "writeNights" -> io(result) { writeText(NIGHTS_FILE, call.argument<String>("json") ?: "") }
             else -> result.notImplemented()
         }
@@ -78,7 +104,7 @@ class OuraBridge(
     /** Μόνο https στην Oura: τίποτα άλλο δεν ανοίγει από εδώ. */
     private fun openBrowser(url: String): Boolean {
         val uri = Uri.parse(url)
-        if (uri.scheme != "https" || !(uri.host ?: "").endsWith("ouraring.com")) return false
+        if (uri.scheme != "https" || uri.host !in ALLOWED_HOSTS) return false
         return try {
             val i = Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
             activity.startActivity(i)
@@ -106,11 +132,25 @@ class OuraBridge(
 
     companion object {
         const val NIGHTS_FILE = "oura_nights.json"
+        const val PLAN_FILE = "sources.json"
         const val SCHEME = "ygeiaforma"
         const val HOST = "oura-callback"
 
+        /** Μόνο οι σελίδες σύνδεσης της Oura ανοίγουν από εδώ (ακριβές όνομα, όχι «τελειώνει σε»). */
+        val ALLOWED_HOSTS = setOf("cloud.ouraring.com", "api.ouraring.com")
+
         @Volatile
         var pendingCallback: String? = null
+
+        /** Η γέφυρα της οθόνης που ζει τώρα (αν η εφαρμογή είναι ανοιχτή). */
+        @Volatile
+        var live: OuraBridge? = null
+
+        /** Από την OuraCallbackActivity: κρατιέται και δίνεται στη Flutter αν είναι ανοιχτή. */
+        fun receive(uri: String) {
+            pendingCallback = uri
+            live?.deliver(uri)
+        }
 
         fun isCallback(intent: Intent?): Boolean {
             val d = intent?.data ?: return false
@@ -175,18 +215,30 @@ object Vault {
         return OuraBridge.atomicWrite(file(context, name), out)
     }
 
+    /**
+     * null = δεν υπάρχει, ή δεν αποκρυπτογραφείται ΠΟΤΕ πια (άλλο ή χαμένο κλειδί, χαλασμένη μορφή): τότε
+     * σβήνεται, ώστε να ζητηθεί νέα σύνδεση. Κάθε άλλο (προσωρινό) σφάλμα πετιέται και το αρχείο ΜΕΝΕΙ.
+     */
     @Synchronized
     fun load(context: Context, name: String): String? {
         val f = file(context, name)
         if (!f.exists()) return null
+        val b = f.readBytes()
+        if (b.size < 1 + 12 + 16 || b[0] != VERSION) {
+            f.delete()
+            return null
+        }
         return try {
-            val b = f.readBytes()
-            if (b.size < 1 + 12 + 16 || b[0] != VERSION) throw IllegalStateException("Άγνωστη μορφή")
             val c = Cipher.getInstance("AES/GCM/NoPadding")
             c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, b, 1, 12))
             String(c.doFinal(b, 13, b.size - 13), Charsets.UTF_8)
-        } catch (e: Throwable) {
-            // Δεν αποκρυπτογραφείται (άλλο κλειδί): χωρίς αξία πια. Σβήνεται, ώστε να ζητηθεί νέα σύνδεση.
+        } catch (e: AEADBadTagException) {
+            f.delete()
+            null
+        } catch (e: KeyPermanentlyInvalidatedException) {
+            f.delete()
+            null
+        } catch (e: UnrecoverableKeyException) {
             f.delete()
             null
         }
@@ -205,15 +257,27 @@ object Vault {
  * Χωρίς ρύθμιση: χωρίς όριο (όπως πριν από το Oura).
  */
 object SleepPolicy {
-    fun until(context: Context): java.time.LocalDate? = try {
-        val f = File(context.filesDir, SamsungHealthBridge.PREFS_FILE)
-        if (!f.exists()) {
-            null
-        } else {
+    /**
+     * Από το αρχείο του σχεδίου πηγών («sources.json», το γράφει η Flutter πριν από κάθε ανάγνωση):
+     * - δεν υπάρχει → χωρίς όριο (όπως πριν από το Oura),
+     * - υπάρχει αλλά δεν διαβάζεται → καθόλου ύπνος ρολογιού (ποτέ σιωπηλά ύπνος ρολογιού για νύχτες του Oura).
+     */
+    fun until(context: Context): java.time.LocalDate? {
+        val f = File(context.filesDir, OuraBridge.PLAN_FILE)
+        if (!f.exists()) return null
+        return try {
             val v = org.json.JSONObject(f.readText()).optString("sleepUntil", "")
             if (v.length == 10) java.time.LocalDate.parse(v) else null
+        } catch (e: Throwable) {
+            java.time.LocalDate.of(2000, 1, 1)
         }
+    }
+
+    /** Αναλυτικές μετρήσεις οξυγόνου (λεπτά κάτω από 90%) μόνο μετά από σύνδεση Oura. */
+    fun spo2Series(context: Context): Boolean = try {
+        val f = File(context.filesDir, OuraBridge.PLAN_FILE)
+        f.exists() && org.json.JSONObject(f.readText()).optBoolean("spo2Series", false)
     } catch (e: Throwable) {
-        null
+        false
     }
 }

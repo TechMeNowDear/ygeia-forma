@@ -50,7 +50,7 @@ jobs:
           # Διαδίκτυο: για το Open Food Facts (barcode) και την αναφορά σφαλμάτων (Sentry). Το Samsung Health δεν το χρειάζεται.
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          # Σύνδεση Oura: singleTask, επιστροφή ygeiaforma://oura-callback, <queries> για browser.
+          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
           grep -n 'INTERNET' android/app/src/main/AndroidManifest.xml
 

@@ -41,7 +41,7 @@ jobs:
           cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          # Σύνδεση Oura: singleTask, επιστροφή ygeiaforma://oura-callback, <queries> για browser.
+          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 
       - name: Έλεγχοι (ώρα Αθήνας)
@@ -158,7 +158,7 @@ jobs:
           cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          # Σύνδεση Oura: singleTask, επιστροφή ygeiaforma://oura-callback, <queries> για browser.
+          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 
       - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)

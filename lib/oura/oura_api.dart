@@ -58,8 +58,16 @@ Future<OuraResponse> ouraHttp(String method, Uri url, {Map<String, String> heade
 // Αποθήκευση (κρυπτογραφημένη στο Android Keystore, δες OuraBridge.kt)
 // ---------------------------------------------------------------------------
 
+/// Η αποθήκευση δεν απάντησε τώρα (π.χ. προσωρινό σφάλμα του Keystore): τα αρχεία μένουν, ξανά αργότερα.
+class VaultUnavailable implements Exception {
+  const VaultUnavailable();
+  @override
+  String toString() => 'VaultUnavailable';
+}
+
 abstract class OuraVault {
   /// null = δεν υπάρχει (ή δεν αποκρυπτογραφείται πια, π.χ. μετά από επαναφορά σε άλλο κινητό).
+  /// Πετάει [VaultUnavailable] σε προσωρινό σφάλμα.
   Future<String?> load(String name);
 
   /// `true` αν γράφτηκε.
@@ -70,9 +78,13 @@ abstract class OuraVault {
 class MemoryVault implements OuraVault {
   final Map<String, String> data = {};
   bool failSaves = false;
+  bool failLoads = false;
 
   @override
-  Future<String?> load(String name) async => data[name];
+  Future<String?> load(String name) async {
+    if (failLoads) throw const VaultUnavailable();
+    return data[name];
+  }
 
   @override
   Future<bool> save(String name, String value) async {
@@ -154,6 +166,12 @@ enum OuraErrorKind {
   /// Δεν δόθηκε άδεια στη σελίδα της Oura.
   denied,
 
+  /// Η σύνδεση ακυρώθηκε (αποσύνδεση στο μεταξύ) ή οι πηγές δεν μπορούν να αλλάξουν τώρα.
+  cancelled,
+
+  /// Το νήμα ανάγνωσης δεν ξεκίνησε (έγινε στο κύριο νήμα· μόνο για αναφορά).
+  isolate,
+
   /// Η σύνδεση άργησε ή δεν ταιριάζει (state).
   stale,
 
@@ -186,6 +204,8 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.noRefresh => 'Η Oura δεν έδωσε μόνιμη σύνδεση. Δεν συνδέθηκε, για να μη χρειάζεται νέα σύνδεση κάθε μήνα.',
       OuraErrorKind.tokenRejected => 'Η Oura δεν δέχτηκε τη σύνδεση. Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
       OuraErrorKind.denied => 'Δεν δόθηκε άδεια στη σελίδα της Oura. Δεν άλλαξε τίποτα.',
+      OuraErrorKind.cancelled => 'Η σύνδεση δεν ολοκληρώθηκε. Δεν άλλαξε τίποτα· δοκίμασε ξανά σε λίγο.',
+      OuraErrorKind.isolate => 'Η ανάγνωση έγινε πιο αργά από το συνηθισμένο.',
       OuraErrorKind.stale => 'Η σύνδεση άργησε. Πάτα ξανά «Σύνδεση με Oura».',
       OuraErrorKind.notConfigured => 'Η εγγραφή στην Oura γίνεται τη μέρα που θα έρθει το δαχτυλίδι.',
       OuraErrorKind.noBrowser => 'Δεν άνοιξε ο browser του κινητού.',
@@ -292,6 +312,11 @@ class OuraLink {
   OuraTokens? _tokens;
   bool _loaded = false;
 
+  /// «Γενιά» της σύνδεσης: αυξάνει σε κάθε αποσύνδεση. Ό,τι ξεκίνησε σε παλιότερη γενιά (ανανέωση, σύνδεση,
+  /// ανάγνωση) πετά το αποτέλεσμά του και δεν αποθηκεύει ποτέ tokens. Η αποσύνδεση κερδίζει πάντα.
+  int _gen = 0;
+  int get generation => _gen;
+
   /// Νέα tokens που δεν γράφτηκαν ακόμα (απέτυχε η αποθήκευση): ξαναδοκιμάζεται σε κάθε επόμενη χρήση.
   bool _unsaved = false;
 
@@ -299,9 +324,18 @@ class OuraLink {
 
   bool get configured => clientId.isNotEmpty;
 
+  /// Πετάει [OuraError] (network) αν η αποθήκευση δεν απαντά τώρα: τα tokens δεν θεωρούνται χαμένα.
   Future<OuraTokens?> tokens() async {
     if (!_loaded) {
-      _tokens = OuraTokens.fromJson(await vault.load(vaultTokens));
+      final gen = _gen;
+      final String? raw;
+      try {
+        raw = await vault.load(vaultTokens);
+      } on VaultUnavailable {
+        throw const OuraError(OuraErrorKind.network);
+      }
+      if (gen != _gen) return null; // αποσυνδέθηκε στο μεταξύ
+      _tokens = OuraTokens.fromJson(raw);
       _loaded = true;
     }
     if (_unsaved && _tokens != null) {
@@ -324,7 +358,13 @@ class OuraLink {
   Future<bool> complete(String uri) async {
     final cb = parseCallback(uri);
     if (cb == null) return false;
-    final pending = OuraPending.fromJson(await vault.load(vaultPending));
+    final gen = _gen;
+    final OuraPending? pending;
+    try {
+      pending = OuraPending.fromJson(await vault.load(vaultPending));
+    } on VaultUnavailable {
+      throw const OuraError(OuraErrorKind.cancelled);
+    }
     // Επιστροφή χωρίς δική μας εκκρεμή σύνδεση, ή με άλλο state: δεν είναι δική μας (CSRF) — αγνοείται.
     if (pending == null || cb.state == null || cb.state != pending.state) return false;
     await vault.delete(vaultPending); // ο κωδικός και το state είναι μιας χρήσης
@@ -342,14 +382,23 @@ class OuraLink {
     if (res.status == 400 || res.status == 401) throw OuraError(OuraErrorKind.tokenRejected, status: res.status);
     if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
     final t = OuraTokens.parseResponse(res.body, _clock());
-    await _store(t);
+    if (!await _store(t, gen)) throw const OuraError(OuraErrorKind.cancelled);
     return true;
   }
 
-  Future<void> _store(OuraTokens t) async {
+  /// Αποθηκεύει τα νέα tokens μόνο αν δεν έγινε αποσύνδεση από τότε που ξεκίνησε το αίτημα ([gen]).
+  Future<bool> _store(OuraTokens t, int gen) async {
+    if (gen != _gen) return false;
+    final ok = await vault.save(vaultTokens, t.toJson());
+    // Αποσύνδεση όσο γραφόταν: σβήνουμε ό,τι γράφτηκε.
+    if (gen != _gen) {
+      await vault.delete(vaultTokens);
+      return false;
+    }
     _tokens = t;
     _loaded = true;
-    _unsaved = !await vault.save(vaultTokens, t.toJson());
+    _unsaved = !ok;
+    return true;
   }
 
   Future<OuraResponse> _post(String url, Map<String, String> form) async {
@@ -366,6 +415,7 @@ class OuraLink {
   Future<OuraTokens?> refresh() => _refreshing ??= _refreshOnce().whenComplete(() => _refreshing = null);
 
   Future<OuraTokens?> _refreshOnce() async {
+    final gen = _gen;
     final old = await tokens();
     if (old == null) throw const OuraError(OuraErrorKind.reconnect);
     final res = await _post(tokenEndpoint, {
@@ -379,23 +429,35 @@ class OuraLink {
     }
     if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
     final t = OuraTokens.parseResponse(res.body, _clock());
-    // ΠΡΩΤΑ αποθήκευση του νέου refresh token, ΜΕΤΑ χρήση της νέας πρόσβασης.
-    await _store(t);
+    // ΠΡΩΤΑ αποθήκευση του νέου refresh token, ΜΕΤΑ χρήση της νέας πρόσβασης. Μετά από αποσύνδεση δεν
+    // αποθηκεύεται τίποτα (τα tokens επιστρέφονται μόνο για να ανακληθούν).
+    await _store(t, gen);
     return t;
   }
 
   /// GET στο API με ανανέωση όταν χρειάζεται. 401 → μία ανανέωση και ξανά.
   Future<String> _get(Uri url) async {
+    final gen = _gen;
     var t = await tokens();
     if (t == null) throw const OuraError(OuraErrorKind.reconnect);
-    if (t.expiringSoon(_clock())) t = await refresh() ?? t;
-    var res = await _getWith(url, t.access);
+    if (t.expiringSoon(_clock())) {
+      try {
+        t = await refresh() ?? t;
+      } on OuraError catch (e) {
+        // Χωρίς δίκτυο για την πρόωρη ανανέωση: η τωρινή πρόσβαση ισχύει ακόμα (λήγει σε λίγα λεπτά).
+        final stillValid = _clock().millisecondsSinceEpoch < t!.expiresAt;
+        if (e.kind != OuraErrorKind.network || !stillValid) rethrow;
+      }
+    }
+    if (gen != _gen) throw const OuraError(OuraErrorKind.reconnect);
+    var res = await _getWith(url, t!.access);
     if (res.status == 401) {
       t = await refresh();
-      if (t == null) throw const OuraError(OuraErrorKind.reconnect);
+      if (t == null || gen != _gen) throw const OuraError(OuraErrorKind.reconnect);
       res = await _getWith(url, t.access);
       if (res.status == 401) throw const OuraError(OuraErrorKind.reconnect, status: 401);
     }
+    if (gen != _gen) throw const OuraError(OuraErrorKind.reconnect);
     if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
     return res.body;
   }
@@ -453,8 +515,23 @@ class OuraLink {
   }
 
   /// Αποσύνδεση: ανάκληση στην Oura (αν γίνεται) και σβήσιμο των tokens από το κινητό. Δεν πετάει ποτέ.
+  /// Κερδίζει κάθε αίτημα που τρέχει: νέα γενιά αμέσως, και ό,τι ανανέωση έτρεχε δεν αποθηκεύεται.
   Future<void> disconnect() async {
-    final t = await tokens().catchError((_) => null);
+    OuraTokens? t;
+    try {
+      t = _loaded ? _tokens : OuraTokens.fromJson(await vault.load(vaultTokens));
+    } catch (_) {}
+    final running = _refreshing;
+    _gen++;
+    _tokens = null;
+    _loaded = true;
+    _unsaved = false;
+    if (running != null) {
+      try {
+        // Η ανανέωση που έτρεχε: δεν αποθηκεύει (άλλη γενιά)· αν πέτυχε, ανακαλούμε τα νέα tokens.
+        t = await running.timeout(const Duration(seconds: 30)) ?? t;
+      } catch (_) {}
+    }
     if (t != null) {
       try {
         final u = Uri.parse(endpoints.revoke);
@@ -473,5 +550,10 @@ class OuraLink {
     _unsaved = false;
     await vault.delete(vaultTokens);
     await vault.delete(vaultPending);
+  }
+
+  /// Μετά από νέα σύνδεση: τα tokens ξαναδιαβάζονται από την αποθήκευση.
+  void reload() {
+    if (_refreshing == null) _loaded = false;
   }
 }

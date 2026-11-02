@@ -31,8 +31,9 @@ class OuraOAuthEndpoints {
   final String token;
   final String revoke;
 
-  /// Μόνο ό,τι χρειάζεται: «daily» (ύπνος, βαθμολογία ύπνου, ετοιμότητα) και «heartrate».
-  /// Όχι email, personal, spo2, workout, tag, session.
+  /// Μόνο ό,τι χρειάζεται: «daily» («Daily summaries of sleep, activity and readiness», OpenAPI 1.43).
+  /// Καλύπτει τα /sleep (με τους παλμούς, το HRV και τις αναπνοές της νύχτας), /daily_sleep, /daily_readiness.
+  /// Όχι heartrate (δεν διαβάζουμε τη χρονοσειρά παλμών), email, personal, spo2, workout, tag, session.
   final String scopes;
 
   /// Πώς στέλνεται το token στην ανάκληση.
@@ -42,7 +43,7 @@ class OuraOAuthEndpoints {
     'https://cloud.ouraring.com/oauth/authorize',
     'https://api.ouraring.com/oauth/token',
     'https://api.ouraring.com/oauth/revoke',
-    'daily heartrate',
+    'daily',
     'access_token',
   );
 
@@ -50,7 +51,7 @@ class OuraOAuthEndpoints {
     'https://api.ouraring.com/v2/oauth/authorize',
     'https://api.ouraring.com/v2/oauth/token',
     'https://api.ouraring.com/v2/oauth/token/revoke',
-    'extapi:daily extapi:heartrate',
+    'extapi:daily',
     'token',
   );
 }
