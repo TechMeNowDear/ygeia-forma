@@ -18,8 +18,8 @@ const minNightsForBaseline = 7;
 const baselineNights = 14;
 
 /// Η τιμή μιας νύχτας μπροστά στο συνηθισμένο σου (μέση τιμή των προηγούμενων 14 νυχτών Oura).
-class Baseline {
-  const Baseline(this.value, this.usual, this.count);
+class NightBaseline {
+  const NightBaseline(this.value, this.usual, this.count);
   final double value;
   final double? usual;
 
@@ -30,7 +30,7 @@ class Baseline {
 
 /// Η τιμή της μέτρησης [metric] τη νύχτα [day] (μόνο Oura) και το συνηθισμένο από τις 14 προηγούμενες νύχτες
 /// με πηγή Oura (μετά την τελευταία αλλαγή πηγής). Χωρίς αρκετές νύχτες: χωρίς «συνηθισμένο».
-Baseline? ouraBaseline(Map<String, Map<String, double>> history, SourcePlan plan, String metric, DateTime day) {
+NightBaseline? ouraBaseline(Map<String, Map<String, double>> history, SourcePlan plan, String metric, DateTime day) {
   if (plan.sourceFor(metric, day) != Source.oura) return null;
   final v = plan.value(history, metric, day);
   if (v == null) return null;
@@ -42,8 +42,8 @@ Baseline? ouraBaseline(Map<String, Map<String, double>> history, SourcePlan plan
     final x = plan.value(history, metric, d);
     if (x != null) prev.add(x);
   }
-  if (prev.length < minNightsForBaseline) return Baseline(v, null, prev.length);
-  return Baseline(v, prev.reduce((a, b) => a + b) / prev.length, prev.length);
+  if (prev.length < minNightsForBaseline) return NightBaseline(v, null, prev.length);
+  return NightBaseline(v, prev.reduce((a, b) => a + b) / prev.length, prev.length);
 }
 
 /// Μέσοι όροι φάσεων (λεπτά) των τελευταίων 7 νυχτών Oura ως τη νύχτα [day].

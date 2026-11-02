@@ -304,7 +304,14 @@ DayHeart? _heartWithPlan(Dashboard d, DateTime day, SourcePlan p, SleepWindows w
         if (!d.sleepOk) return null;
         if (!watchAdded) {
           watchAdded = true;
-          ranges.addAll([for (final r in d.sleepRecords) (r.start, r.end), for (final x in d.nights) ...x.estimatedGaps]);
+          // Μόνο ύπνος του ρολογιού από νύχτες που η πηγή τους είναι το ρολόι (ποτέ από νύχτες του Oura).
+          DateTime nightOf(DateTime end) => end.hour >= 18 ? DateTime(end.year, end.month, end.day + 1) : dayOf(end);
+          ranges.addAll([
+            for (final r in d.sleepRecords)
+              if (p.nightSource(nightOf(r.end)) == Source.watch) (r.start, r.end),
+            for (final x in d.nights)
+              if (p.nightSource(x.date) == Source.watch) ...x.estimatedGaps,
+          ]);
         }
       case Source.oura:
         if (!windows.mains.containsKey(dateKey(n))) return null;

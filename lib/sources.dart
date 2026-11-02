@@ -353,9 +353,16 @@ class SourcePlan {
   bool watchSleepAllowed(DateTime day) {
     final d = dayOf(day);
     if (nightSource(d) == Source.watch) return true;
-    for (final e in eras) {
+    for (var i = 0; i < eras.length; i++) {
+      final e = eras[i];
       if (e.source != Source.oura) continue;
-      final end = DateTime(e.from.year, e.from.month, e.from.day + compareDays);
+      var end = DateTime(e.from.year, e.from.month, e.from.day + compareDays);
+      // Η σύγκριση τελειώνει και όταν αρχίζει νέα εποχή (π.χ. αποσύνδεση την 3η μέρα).
+      if (i + 1 < eras.length) {
+        final next = eras[i + 1].from;
+        final lastOfEra = DateTime(next.year, next.month, next.day - 1);
+        if (lastOfEra.isBefore(end)) end = lastOfEra;
+      }
       if (!d.isBefore(e.from) && !d.isAfter(end)) return true;
     }
     return false;

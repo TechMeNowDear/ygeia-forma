@@ -255,7 +255,7 @@ class OuraRestCard extends StatelessWidget {
     final temp = plan.value(store.history, K.skinTemp, day);
     final readiness = plan.value(store.history, K.energy, day);
 
-    String note(Baseline? b, {required double same, String up = 'πάνω', String down = 'κάτω'}) {
+    String note(NightBaseline? b, {required double same, String up = 'πάνω', String down = 'κάτω'}) {
       if (b == null) return '—';
       if (b.usual == null) return 'μαθαίνει';
       final d = b.diff!;
