@@ -1,5 +1,6 @@
 // Oura: ανάγνωση των απαντήσεων (με τα αρχεία δοκιμής από το OpenAPI 1.43 και το sandbox), φάσεις,
 // κύρια νύχτα και υπνάκοι, αλλαγή ώρας, σελίδες, πεδία που λείπουν, σφάλματα HTTP, ανανέωση tokens, PKCE.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -68,7 +69,7 @@ void main() {
       expect(RegExp(r'^[A-Za-z0-9\-._~]+$').hasMatch(v), isTrue);
     });
 
-    test('Σελίδα σύνδεσης: code, PKCE S256, state, μόνο daily + heartrate', () {
+    test('Σελίδα σύνδεσης: code, PKCE S256, state, μόνο daily', () {
       final p = OuraPending(state: 'st', verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', created: DateTime(2026, 11, 6));
       final u = ouraAuthorizeUrl(clientId: 'CID', p: p);
       expect(u.toString(), startsWith('https://cloud.ouraring.com/oauth/authorize?'));
@@ -78,7 +79,7 @@ void main() {
       expect(u.queryParameters['state'], 'st');
       expect(u.queryParameters['code_challenge_method'], 'S256');
       expect(u.queryParameters['code_challenge'], 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
-      expect(u.queryParameters['scope']!.split(' ').toSet(), {'daily', 'heartrate'});
+      expect(u.queryParameters['scope'], 'daily');
       expect(u.queryParameters.containsKey('client_secret'), isFalse);
     });
 
@@ -356,13 +357,66 @@ void main() {
       );
     });
 
-    test('Refresh token που δεν ισχύει (400) → νέα σύνδεση, τα παλιά δεν σβήνονται σιωπηλά', () async {
-      final v = MemoryVault()..data[vaultTokens] = tokens(life: Duration.zero).toJson();
+    test('Refresh token που δεν ισχύει (400) → νέα σύνδεση· τα παλιά tokens ΚΡΑΤΙΟΥΝΤΑΙ (σβήνονται μόνο με αποσύνδεση ή νέα σύνδεση)', () async {
+      final old = tokens(life: Duration.zero).toJson();
+      final v = MemoryVault()..data[vaultTokens] = old;
       final http = FakeHttp((m, u, h, f) => const OuraResponse(400, '{"error":"invalid_grant"}'));
-      expect(
-        () => link(http, v).fetchAll('sleep', DateTime(2026, 11, 1), DateTime(2026, 11, 7)),
+      await expectLater(
+        link(http, v).fetchAll('sleep', DateTime(2026, 11, 1), DateTime(2026, 11, 7)),
         throwsA(isA<OuraError>().having((e) => e.kind, 'kind', OuraErrorKind.reconnect)),
       );
+      expect(v.data[vaultTokens], old);
+    });
+
+    test('Ανανέωση σε εξέλιξη την ώρα της αποσύνδεσης: τα νέα tokens ΔΕΝ αποθηκεύονται, ανακαλούνται', () async {
+      final v = MemoryVault()..data[vaultTokens] = tokens().toJson();
+      final gate = Completer<OuraResponse>();
+      final revoked = <String>[];
+      final http = FakeHttp((m, u, h, f) {
+        if (u.path.endsWith('/revoke')) {
+          revoked.add(u.queryParameters['access_token'] ?? '');
+          return const OuraResponse(200, '{}');
+        }
+        throw StateError('μη αναμενόμενο');
+      });
+      final l = OuraLink(
+        vault: v,
+        send: (m, u, {headers = const {}, form}) => m == 'POST' && !u.path.endsWith('/revoke') ? gate.future : http.send(m, u, headers: headers, form: form),
+        clock: () => now,
+        clientId: 'CID',
+        tokenEndpoint: 'https://api.ouraring.com/oauth/token',
+      );
+      final refresh = l.refresh();
+      await Future<void>.delayed(Duration.zero);
+      final disc = l.disconnect();
+      gate.complete(OuraResponse(200, jsonEncode({'access_token': 'A1', 'refresh_token': 'R1', 'expires_in': 86400})));
+      await disc;
+      await refresh.catchError((_) => null);
+      expect(v.data, isEmpty, reason: 'κανένα token μετά την αποσύνδεση');
+      expect(await l.hasTokens, isFalse);
+      expect(revoked, ['A1'], reason: 'ανακαλείται η νέα πρόσβαση');
+    });
+
+    test('Η αποθήκευση δεν απαντά (προσωρινά): σφάλμα δικτύου, τα tokens ΔΕΝ θεωρούνται χαμένα', () async {
+      final v = MemoryVault()
+        ..data[vaultTokens] = tokens().toJson()
+        ..failLoads = true;
+      final http = FakeHttp((m, u, h, f) => OuraResponse(200, jsonEncode({'data': [], 'next_token': null})));
+      final l = link(http, v);
+      await expectLater(l.hasTokens, throwsA(isA<OuraError>().having((e) => e.kind, 'kind', OuraErrorKind.network)));
+      v.failLoads = false;
+      expect(await l.hasTokens, isTrue);
+      expect(v.data.containsKey(vaultTokens), isTrue);
+    });
+
+    test('Πρόωρη ανανέωση χωρίς δίκτυο: χρησιμοποιείται η πρόσβαση που ισχύει ακόμα', () async {
+      final v = MemoryVault()..data[vaultTokens] = tokens(life: const Duration(minutes: 5)).toJson();
+      final http = FakeHttp((m, u, h, f) {
+        if (m == 'POST') throw const SocketException('χωρίς δίκτυο');
+        return OuraResponse(200, jsonEncode({'data': [], 'next_token': null}));
+      });
+      await link(http, v).fetchAll('sleep', DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(http.calls.last.$3['Authorization'], 'Bearer A0');
     });
 
     test('Ανανεώσεις μία-μία: δύο ταυτόχρονες χρησιμοποιούν το refresh token μία φορά', () async {

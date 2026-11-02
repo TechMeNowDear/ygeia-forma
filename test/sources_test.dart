@@ -100,8 +100,12 @@ void main() {
       final watch = off.withEra(Source.watch, d(2026, 12, 10));
       expect(watch.nightSource(d(2026, 12, 9)), Source.none);
       expect(watch.nightSource(d(2026, 12, 10)), Source.watch);
-      expect(watch.changeDates(K.sleepMin), [ouraFrom, d(2026, 12, 1), d(2026, 12, 10)]);
+      // Αλλαγή πηγής = όπου αρχίζει άλλη συσκευή που ΔΙΝΕΙ τη μέτρηση· το κενό («καμία») δεν είναι αλλαγή.
+      expect(watch.changeDates(K.sleepMin), [ouraFrom, d(2026, 12, 10)]);
       expect(watch.changeDates(K.steps), isEmpty);
+      // HRV/αναπνοές/χαμηλότεροι παλμοί: μόνο Oura → ποτέ «αλλαγή πηγής».
+      expect(watch.changeDates(K.hrv), isEmpty);
+      expect(plan.changeDates(K.breath), isEmpty);
     });
 
     test('Αποθήκευση και ανάγνωση του σχεδίου', () {
@@ -111,27 +115,47 @@ void main() {
       expect(SourcePlan.fromJson([{'src': 'x', 'from': '2026-01-01'}]), SourcePlan.samsungOnly);
     });
 
-    test('Ύπνος ρολογιού: μόνο ως τη σύνδεση + 14 μέρες, μετά ποτέ', () {
-      expect(plan.watchSleepAllowed(add(ouraFrom, -1)), isTrue);
-      expect(plan.watchSleepAllowed(ouraFrom), isTrue);
-      expect(plan.watchSleepAllowed(add(ouraFrom, compareDays)), isTrue);
-      expect(plan.watchSleepAllowed(add(ouraFrom, compareDays + 1)), isFalse);
-      expect(plan.watchSleepCutoff, add(ouraFrom, compareDays));
-      expect(SourcePlan.samsungOnly.watchSleepCutoff, isNull);
-      // Αποσύνδεση την 3η μέρα: η σύγκριση κόβεται εκεί, και ο ύπνος του ρολογιού δεν διαβάζεται μετά.
+    test('Ύπνος ρολογιού: μόνο για τις 14 νύχτες της σύγκρισης και μόνο όσο είναι ανοιχτή', () {
+      final last = add(ouraFrom, compareDays - 1);
+      expect(plan.compareUntil, last);
+      expect(plan.watchSleepAllowed(add(ouraFrom, -1), add(ouraFrom, 30)), isTrue, reason: 'νύχτα του ρολογιού');
+      expect(plan.watchSleepAllowed(ouraFrom, ouraFrom), isTrue);
+      expect(plan.watchSleepAllowed(last, last), isTrue);
+      expect(plan.watchSleepAllowed(add(last, 1), add(last, 1)), isFalse);
+      expect(plan.watchSleepAllowed(ouraFrom, add(last, 1)), isFalse, reason: 'η σύγκριση έκλεισε');
+      // Το όριο της Samsung: όσο η σύγκριση είναι ανοιχτή, η τελευταία της νύχτα· μετά, η τελευταία του ρολογιού
+      // (ώστε η ανάγνωση των 30 ημερών να μη φέρνει ξανά ύπνο ρολογιού για νύχτες του Oura).
+      expect(plan.watchSleepCutoff(add(ouraFrom, 3)), last);
+      expect(plan.watchSleepCutoff(add(last, 1)), add(ouraFrom, -1));
+      expect(SourcePlan.samsungOnly.watchSleepCutoff(ouraFrom), isNull);
+      // Αποσύνδεση την 3η μέρα: η σύγκριση κλείνει αμέσως και ο ύπνος του ρολογιού δεν διαβάζεται για το Oura.
       final off = plan.withEra(Source.none, add(ouraFrom, 3));
-      expect(off.watchSleepCutoff, add(ouraFrom, 2));
-      expect(off.watchSleepAllowed(add(ouraFrom, 5)), isFalse);
+      expect(off.compareActive(add(ouraFrom, 3)), isFalse);
+      expect(off.watchSleepCutoff(add(ouraFrom, 3)), add(ouraFrom, -1));
+      expect(off.watchSleepAllowed(add(ouraFrom, 1), add(ouraFrom, 3)), isFalse);
       // Ρητά ξανά στο ρολόι: χωρίς όριο.
-      expect(off.withEra(Source.watch, add(ouraFrom, 5)).watchSleepCutoff, isNull);
+      expect(off.withEra(Source.watch, add(ouraFrom, 5)).watchSleepCutoff(add(ouraFrom, 6)), isNull);
     });
 
-    test('«Σύγκριση πηγών»: φαίνεται από τη σύνδεση ως +14 μέρες, μετά εξαφανίζεται', () {
+    test('«Σύγκριση πηγών»: ακριβώς 14 νύχτες· εξαφανίζεται μετά, και μετά από αποσύνδεση ή «ξανά ρολόι»', () {
       expect(plan.compareActive(add(ouraFrom, -1)), isFalse);
       expect(plan.compareActive(ouraFrom), isTrue);
-      expect(plan.compareActive(add(ouraFrom, 14)), isTrue);
-      expect(plan.compareActive(add(ouraFrom, 15)), isFalse);
+      expect(plan.compareActive(add(ouraFrom, 13)), isTrue);
+      expect(plan.compareActive(add(ouraFrom, 14)), isFalse);
       expect(SourcePlan.samsungOnly.compareActive(ouraFrom), isFalse);
+      final off = plan.withEra(Source.none, add(ouraFrom, 4));
+      expect(off.compareActive(add(ouraFrom, 5)), isFalse);
+      expect(off.withEra(Source.watch, add(ouraFrom, 6)).compareActive(add(ouraFrom, 7)), isFalse);
+    });
+
+    test('Τάσεις για μετρήσεις μόνο του Oura: «Λίγα δεδομένα», ποτέ «Αλλαγή πηγής»', () {
+      final h = dualHistory(d(2026, 6, 1), add(ouraFrom, 20));
+      for (final key in [K.hrv, K.lowHr, K.breath]) {
+        final def = ouraTrendMetrics.firstWhere((m) => m.key == key);
+        final r = computeTrend(def, h, add(ouraFrom, 10), TrendPeriod.month, plan: plan);
+        expect(r.status, TrendStatus.insufficient, reason: key);
+        expect(r.points.every((p) => !p.$1.isBefore(ouraFrom)), isTrue);
+      }
     });
 
     test('Η οθόνη «Πηγές» βγαίνει από τον ίδιο πίνακα: τίτλοι και πηγές', () {
@@ -224,6 +248,7 @@ void main() {
         final r = checkUnusual(history, x, plan: plan);
         for (final s in r.signals) {
           final oura = !x.isBefore(ouraFrom) && metricGroups[s.rule.key] == SourceGroup.night;
+          expect(s.source, oura ? Source.oura : Source.watch, reason: 'η κάρτα λέει την πηγή');
           expect(oura ? isOura(s.value) : isWatch(s.value), isTrue, reason: '${s.rule.key} ${dateKey(x)}');
           expect(oura ? isOura(s.usual) : isWatch(s.usual), isTrue, reason: '${s.rule.key} ${dateKey(x)} συνηθισμένο');
         }
@@ -248,7 +273,9 @@ void main() {
           if (expected == Source.oura) {
             expect(vals.every(isOura), isTrue, reason: e.key);
             final from = add(dayOf(now), -(reportDays - 1));
-            expect(e.value.since, from.isBefore(ouraFrom) ? ouraFrom : null, reason: e.key);
+            // Μετρήσεις μόνο του Oura δεν είχαν άλλη πηγή πριν: χωρίς «από …».
+            final expectSince = from.isBefore(ouraFrom) && !ouraOnlyMetrics.contains(e.key) ? ouraFrom : null;
+            expect(e.value.since, expectSince, reason: e.key);
           }
         }
         for (final w in r.weighIns) {
@@ -348,26 +375,36 @@ void main() {
       expect(summarizeDay(dash, d(2026, 11, 7), plan: p).containsKey(K.dayHr), isFalse);
     });
 
-    test('Χωρίς Oura: οι συνόψεις ίδιες με πριν (καμία αλλαγή στην εφαρμογή ως τη σύνδεση)', () {
-      final now = DateTime(2026, 10, 24, 16, 30);
+    test('Παλμοί μέρας με το σχέδιο της ΙΔΙΑΣ μέρας: σύνδεση και αποσύνδεση την ίδια μέρα δεν μετρά τον ύπνο ως μέρα', () {
+      final now = DateTime(2026, 11, 8, 16, 30);
       final dash = Dashboard.fromJson(sampleDashboardJson(now));
-      final a = summarizeRange(dash, d(2026, 9, 26), d(2026, 10, 24));
-      final b = summarizeRange(dash, d(2026, 9, 26), d(2026, 10, 24), plan: SourcePlan.samsungOnly);
-      expect(b, a);
-      expect(a.values.any((r) => r.containsKey(K.sleepMin)), isTrue);
+      final day = d(2026, 11, 6);
+      expect(summarizeDay(dash, day).containsKey(K.dayHr), isTrue, reason: 'με το ρολόι: όπως πάντα');
+      // [καμία από 6/11] (χωρίς εποχή Oura): ο ύπνος του ρολογιού δεν διαβάζεται από τη Samsung → δεν ξέρουμε τον ύπνο.
+      final none = SourcePlan([SourceEra(Source.none, day)]);
+      expect(none.hasOura, isFalse);
+      expect(summarizeDay(dash, day, plan: none).containsKey(K.dayHr), isFalse);
+      expect(summarizeDay(dash, add(day, -1), plan: none).containsKey(K.dayHr), isFalse, reason: 'η νύχτα του βραδιού είναι χωρίς πηγή');
+      expect(summarizeDay(dash, add(day, -2), plan: none).containsKey(K.dayHr), isTrue, reason: 'και οι δύο νύχτες του ρολογιού');
     });
 
-    test('Dashboard.restrict: νύχτες ρολογιού μετά τη σύνδεση μόνο στη σύγκριση, ως +14 μέρες', () {
+    test('Dashboard.restrict: για τις οθόνες, μόνο νύχτες της τρέχουσας εποχής ρολογιού· σύγκριση μόνο όσο είναι ανοιχτή', () {
       final now = DateTime(2026, 11, 8, 16, 30);
       final dash = Dashboard.fromJson(sampleDashboardJson(now));
       final p = SourcePlan.samsungOnly.withEra(Source.oura, d(2026, 11, 6));
       final r = dash.restrict(p);
-      expect(r.nights.every((n) => n.date.isBefore(d(2026, 11, 6))), isTrue);
+      expect(r.nights, isEmpty, reason: 'ο ύπνος είναι του Oura: καμία νύχτα ρολογιού στις οθόνες');
+      expect(r.energy, isEmpty, reason: 'το Energy Score δεν φαίνεται μετά τη σύνδεση');
       expect(r.compareNights.map((n) => dateKey(n.date)), containsAll(['2026-11-06', '2026-11-07', '2026-11-08']));
-      expect(r.nights.length + r.compareNights.length, dash.nights.length);
-      // Πριν από τη σύνδεση: όλα όπως ήταν.
-      expect(dash.restrict(SourcePlan.samsungOnly).nights.length, dash.nights.length);
-      expect(dash.restrict(SourcePlan.samsungOnly).compareNights, isEmpty);
+      // Ξανά ρολόι από 5/11 μετά από Oura (20/10–4/11): φαίνονται μόνο νύχτες από 5/11, όχι από πριν το Oura.
+      final again = SourcePlan([SourceEra(Source.oura, d(2026, 10, 20)), SourceEra(Source.watch, d(2026, 11, 5))]);
+      final a = dash.restrict(again);
+      expect(a.nights, isNotEmpty);
+      expect(a.nights.every((n) => !n.date.isBefore(d(2026, 11, 5))), isTrue);
+      expect(a.energy.every((e) => !e.day.isBefore(d(2026, 11, 5))), isTrue);
+      expect(a.compareNights, isEmpty);
+      // Χωρίς σχέδιο: ακριβώς τα ίδια δεδομένα.
+      expect(identical(dash.restrict(SourcePlan.samsungOnly), dash), isTrue);
     });
   });
 

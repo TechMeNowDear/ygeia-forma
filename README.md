@@ -49,8 +49,11 @@ Secrets του GitHub (ή από την προσωρινή μνήμη του Git
   οι παλμοί/HRV/αναπνοές ύπνου, η θερμοκρασία και η ετοιμότητα έρχονται μόνο από το Oura· οξυγόνο, βήματα, παλμοί μέρας
   από το ρολόι· βάρος από την InBody. Οι τιμές του Oura αποθηκεύονται με πρόθεμα `o.` στο ιστορικό.
 - Σύνδεση: OAuth2 με PKCE, χωρίς Client Secret (`lib/oura/`). Ρυθμίσεις σε ένα σημείο: `lib/oura/config.dart`
-  (`ouraClientId`, `ouraTokenProxy`, `ouraOAuth`). Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
+  (`ouraClientId`, `ouraTokenProxy`, `ouraOAuth`). Scope μόνο `daily`. Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
 - Τη μέρα του δαχτυλιδιού: εγγραφή εφαρμογής στο https://cloud.ouraring.com/oauth/applications με Redirect URI
   `ygeiaforma://oura-callback`, και το Client ID στο `ouraClientId`.
-- Το manifest (από το `flutter create`) συμπληρώνεται από το `tools/android/patch_manifest.py` (singleTask, επιστροφή, `<queries>`).
+- Το manifest (από το `flutter create`) συμπληρώνεται από το `tools/android/patch_manifest.py`: μικρή οθόνη
+  `OuraCallbackActivity` για την επιστροφή και `<queries>` για browser. Η MainActivity δεν αλλάζει.
+- Το σχέδιο πηγών έχει δικό του αρχείο (`sources.json`, `lib/plan_file.dart`), ανεξάρτητο από τις ρυθμίσεις.
+  Κάθε αλλαγή πηγής ισχύει από το βράδυ της μέρας που γίνεται.
 - Έλεγχος με το sandbox της Oura: job «oura-sandbox» στο `check.yml` (`test/oura_sandbox_live_test.dart`).

@@ -1,0 +1,2556 @@
+{
+ "summary@2026-10-24T16:30:00.000": {
+  "2026-09-24": {
+   "steps": 3984.0
+  },
+  "2026-09-25": {
+   "sleepMin": 402.0,
+   "sleepScore": 68.0,
+   "deepPct": 14.148681055155876,
+   "remPct": 14.628297362110311,
+   "awakeMin": 8.0,
+   "bedtime": 400.0,
+   "wake": 817.0,
+   "sleepHr": 59.357142857142854,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.2612076533224,
+   "steps": 4443.0
+  },
+  "2026-09-26": {
+   "sleepMin": 433.0,
+   "sleepScore": 71.0,
+   "deepPct": 20.982142857142858,
+   "remPct": 15.625,
+   "awakeMin": 13.0,
+   "bedtime": 379.0,
+   "wake": 827.0,
+   "sleepHr": 60.06666666666667,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 34.86519870262913,
+   "steps": 5169.0
+  },
+  "2026-09-27": {
+   "sleepMin": 444.0,
+   "sleepScore": 69.0,
+   "deepPct": 17.647058823529413,
+   "remPct": 12.418300653594772,
+   "awakeMin": 18.0,
+   "bedtime": 346.0,
+   "wake": 805.0,
+   "sleepHr": 59.0625,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.32889287913076,
+   "steps": 3679.0
+  },
+  "2026-09-28": {
+   "sleepMin": 488.0,
+   "sleepScore": 67.0,
+   "deepPct": 19.4831013916501,
+   "remPct": 15.308151093439363,
+   "awakeMin": 13.0,
+   "bedtime": 334.0,
+   "wake": 837.0,
+   "sleepHr": 59.76470588235294,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.353476569367814,
+   "steps": 7365.0
+  },
+  "2026-09-29": {
+   "sleepMin": 510.0,
+   "sleepScore": 78.0,
+   "deepPct": 19.238095238095237,
+   "remPct": 12.0,
+   "awakeMin": 14.0,
+   "bedtime": 336.0,
+   "wake": 861.0,
+   "sleepHr": 59.05555555555556,
+   "spo2Avg": 96.0,
+   "spo2Min": 92.0,
+   "skinTemp": 35.5218236633103,
+   "steps": 3905.0
+  },
+  "2026-09-30": {
+   "sleepMin": 458.0,
+   "sleepScore": 72.0,
+   "deepPct": 24.52431289640592,
+   "remPct": 9.090909090909092,
+   "awakeMin": 15.0,
+   "bedtime": 373.0,
+   "wake": 846.0,
+   "sleepHr": 58.5,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.596153300662934,
+   "steps": 7117.0
+  },
+  "2026-10-01": {
+   "sleepMin": 542.0,
+   "sleepScore": 80.0,
+   "deepPct": 16.337522441651707,
+   "remPct": 20.28725314183124,
+   "awakeMin": 12.0,
+   "bedtime": 317.0,
+   "wake": 874.0,
+   "sleepHr": 59.94736842105263,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 34.97053437648991,
+   "steps": 2795.0
+  },
+  "2026-10-02": {
+   "sleepMin": 498.0,
+   "sleepScore": 87.0,
+   "deepPct": 16.179337231968812,
+   "remPct": 14.42495126705653,
+   "awakeMin": 9.0,
+   "bedtime": 316.0,
+   "wake": 829.0,
+   "sleepHr": 59.22222222222222,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.32783083829048,
+   "steps": 2905.0
+  },
+  "2026-10-03": {
+   "sleepMin": 460.0,
+   "sleepScore": 84.0,
+   "deepPct": 21.473684210526315,
+   "remPct": 11.789473684210526,
+   "awakeMin": 14.0,
+   "bedtime": 318.0,
+   "wake": 793.0,
+   "sleepHr": 59.5625,
+   "spo2Avg": 95.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.13379539107043,
+   "steps": 3240.0
+  },
+  "2026-10-04": {
+   "sleepMin": 465.0,
+   "sleepScore": 74.0,
+   "deepPct": 15.0,
+   "remPct": 13.333333333333334,
+   "awakeMin": 13.0,
+   "bedtime": 386.0,
+   "wake": 866.0,
+   "sleepHr": 60.3125,
+   "spo2Avg": 96.0,
+   "spo2Min": 92.0,
+   "skinTemp": 35.41352219839718,
+   "steps": 3128.0
+  },
+  "2026-10-05": {
+   "sleepMin": 430.0,
+   "sleepScore": 80.0,
+   "deepPct": 15.280898876404494,
+   "remPct": 14.606741573033707,
+   "awakeMin": 10.0,
+   "bedtime": 368.0,
+   "wake": 813.0,
+   "sleepHr": 59.0,
+   "spo2Avg": 96.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.12517009246984,
+   "steps": 7698.0
+  },
+  "2026-10-06": {
+   "sleepMin": 516.0,
+   "sleepScore": 89.0,
+   "deepPct": 14.689265536723164,
+   "remPct": 16.0075329566855,
+   "awakeMin": 17.0,
+   "bedtime": 323.0,
+   "wake": 854.0,
+   "sleepHr": 58.833333333333336,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 34.84571508850157,
+   "steps": 4601.0
+  },
+  "2026-10-07": {
+   "sleepMin": 510.0,
+   "sleepScore": 82.0,
+   "deepPct": 20.19047619047619,
+   "remPct": 10.666666666666666,
+   "awakeMin": 18.0,
+   "bedtime": 339.0,
+   "wake": 864.0,
+   "sleepHr": 59.27777777777778,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 34.98150001493046,
+   "steps": 2253.0
+  },
+  "2026-10-08": {
+   "sleepMin": 487.0,
+   "sleepScore": 84.0,
+   "deepPct": 24.10358565737052,
+   "remPct": 15.737051792828685,
+   "awakeMin": 14.0,
+   "bedtime": 369.0,
+   "wake": 871.0,
+   "sleepHr": 59.23529411764706,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.00654489717937,
+   "steps": 3065.0
+  },
+  "2026-10-09": {
+   "sleepMin": 438.0,
+   "sleepScore": 76.0,
+   "deepPct": 14.79028697571744,
+   "remPct": 13.907284768211921,
+   "awakeMin": 9.0,
+   "bedtime": 340.0,
+   "wake": 793.0,
+   "sleepHr": 59.6875,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.04674586807865,
+   "steps": 6237.0
+  },
+  "2026-10-10": {
+   "sleepMin": 430.0,
+   "sleepScore": 81.0,
+   "deepPct": 16.179775280898877,
+   "remPct": 15.0561797752809,
+   "awakeMin": 12.0,
+   "bedtime": 405.0,
+   "wake": 850.0,
+   "sleepHr": 59.2,
+   "spo2Avg": 95.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.59518613049995,
+   "steps": 3684.0,
+   "floors": 2.0,
+   "energy": 66.0
+  },
+  "2026-10-11": {
+   "sleepMin": 459.0,
+   "sleepScore": 86.0,
+   "deepPct": 16.244725738396625,
+   "remPct": 15.189873417721518,
+   "awakeMin": 13.0,
+   "bedtime": 315.0,
+   "wake": 789.0,
+   "sleepHr": 59.125,
+   "spo2Avg": 93.0,
+   "spo2Min": 87.0,
+   "skinTemp": 35.21185644718193,
+   "steps": 3260.0,
+   "floors": 2.0,
+   "energy": 81.0
+  },
+  "2026-10-12": {
+   "sleepMin": 442.0,
+   "sleepScore": 65.0,
+   "deepPct": 15.973741794310722,
+   "remPct": 14.660831509846828,
+   "awakeMin": 11.0,
+   "bedtime": 384.0,
+   "wake": 841.0,
+   "sleepHr": 59.3125,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.057947323911414,
+   "steps": 3119.0,
+   "floors": 1.0,
+   "energy": 87.0
+  },
+  "2026-10-13": {
+   "sleepMin": 489.0,
+   "sleepScore": 76.0,
+   "deepPct": 16.46825396825397,
+   "remPct": 16.46825396825397,
+   "awakeMin": 9.0,
+   "bedtime": 329.0,
+   "wake": 833.0,
+   "sleepHr": 59.1764705882353,
+   "spo2Avg": 93.0,
+   "spo2Min": 89.0,
+   "skinTemp": 34.838228521975395,
+   "steps": 5323.0,
+   "floors": 2.0,
+   "energy": 74.0
+  },
+  "2026-10-14": {
+   "sleepMin": 431.0,
+   "sleepScore": 84.0,
+   "deepPct": 15.246636771300448,
+   "remPct": 12.10762331838565,
+   "awakeMin": 18.0,
+   "bedtime": 386.0,
+   "wake": 832.0,
+   "sleepHr": 60.333333333333336,
+   "spo2Avg": 94.0,
+   "spo2Min": 89.0,
+   "skinTemp": 34.89226058137294,
+   "steps": 6292.0,
+   "floors": 1.0,
+   "energy": 63.0
+  },
+  "2026-10-15": {
+   "sleepMin": 475.0,
+   "sleepScore": 82.0,
+   "deepPct": 16.53061224489796,
+   "remPct": 13.46938775510204,
+   "awakeMin": 16.0,
+   "bedtime": 346.0,
+   "wake": 836.0,
+   "sleepHr": 60.35294117647059,
+   "spo2Avg": 94.0,
+   "spo2Min": 88.0,
+   "skinTemp": 34.945604569841535,
+   "steps": 7072.0,
+   "floors": 1.0,
+   "energy": 86.0
+  },
+  "2026-10-16": {
+   "sleepMin": 437.0,
+   "sleepScore": 62.0,
+   "deepPct": 16.5929203539823,
+   "remPct": 15.044247787610619,
+   "awakeMin": 9.0,
+   "bedtime": 400.0,
+   "wake": 852.0,
+   "sleepHr": 58.6875,
+   "spo2Avg": 94.0,
+   "spo2Min": 90.0,
+   "skinTemp": 34.81432363732551,
+   "steps": 7042.0,
+   "energy": 89.0
+  },
+  "2026-10-17": {
+   "sleepMin": 474.0,
+   "sleepScore": 66.0,
+   "deepPct": 21.063394683026583,
+   "remPct": 8.997955010224949,
+   "awakeMin": 11.0,
+   "bedtime": 312.0,
+   "wake": 801.0,
+   "sleepHr": 58.8235294117647,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.50500058451921,
+   "steps": 7000.0,
+   "energy": 63.0
+  },
+  "2026-10-18": {
+   "sleepMin": 463.0,
+   "sleepScore": 85.0,
+   "deepPct": 20.292887029288703,
+   "remPct": 8.99581589958159,
+   "awakeMin": 11.0,
+   "bedtime": 381.0,
+   "wake": 859.0,
+   "sleepHr": 59.25,
+   "spo2Avg": 95.0,
+   "spo2Min": 89.0,
+   "skinTemp": 35.189695644467605,
+   "restHr": 67.0,
+   "dayHr": 71.67619047619047,
+   "walkHr": 96.0,
+   "steps": 7583.0,
+   "energy": 86.0
+  },
+  "2026-10-19": {
+   "sleepMin": 449.0,
+   "sleepScore": 75.0,
+   "deepPct": 17.67241379310345,
+   "remPct": 13.577586206896552,
+   "awakeMin": 18.0,
+   "bedtime": 362.0,
+   "wake": 826.0,
+   "sleepHr": 58.875,
+   "spo2Avg": 94.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.29626472962406,
+   "restHr": 67.0,
+   "dayHr": 71.39047619047619,
+   "walkHr": 95.0,
+   "steps": 2039.0,
+   "floors": 1.0,
+   "energy": 67.0
+  },
+  "2026-10-20": {
+   "sleepMin": 407.0,
+   "sleepScore": 86.0,
+   "deepPct": 18.72037914691943,
+   "remPct": 14.928909952606634,
+   "awakeMin": 10.0,
+   "bedtime": 410.0,
+   "wake": 832.0,
+   "sleepHr": 59.13333333333333,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.49355842959014,
+   "restHr": 67.0,
+   "dayHr": 71.41428571428571,
+   "walkHr": 94.0,
+   "steps": 6300.0,
+   "floors": 1.0,
+   "energy": 81.0
+  },
+  "2026-10-21": {
+   "sleepMin": 429.0,
+   "sleepScore": 68.0,
+   "deepPct": 19.144144144144143,
+   "remPct": 11.936936936936936,
+   "awakeMin": 11.0,
+   "bedtime": 386.0,
+   "wake": 830.0,
+   "sleepHr": 62.53333333333333,
+   "spo2Avg": 93.0,
+   "spo2Min": 87.0,
+   "skinTemp": 35.394034041402556,
+   "restHr": 67.0,
+   "dayHr": 71.42857142857143,
+   "walkHr": 94.0,
+   "steps": 7549.0,
+   "floors": 1.0,
+   "energy": 65.0
+  },
+  "2026-10-22": {
+   "sleepMin": 415.0,
+   "sleepScore": 65.0,
+   "deepPct": 19.069767441860463,
+   "remPct": 14.651162790697674,
+   "awakeMin": 12.0,
+   "bedtime": 352.0,
+   "wake": 782.0,
+   "sleepHr": 62.666666666666664,
+   "spo2Avg": 93.0,
+   "spo2Min": 89.0,
+   "skinTemp": 34.94856979575803,
+   "restHr": 67.0,
+   "dayHr": 71.44285714285714,
+   "walkHr": 95.0,
+   "steps": 6382.0,
+   "floors": 2.0,
+   "energy": 74.0
+  },
+  "2026-10-23": {
+   "sleepMin": 434.0,
+   "sleepScore": 62.0,
+   "deepPct": 22.71714922048998,
+   "remPct": 15.367483296213809,
+   "awakeMin": 12.0,
+   "bedtime": 385.0,
+   "wake": 834.0,
+   "sleepHr": 61.86666666666667,
+   "spo2Avg": 94.0,
+   "spo2Min": 89.0,
+   "skinTemp": 35.216446675495895,
+   "restHr": 67.0,
+   "dayHr": 71.51428571428572,
+   "walkHr": 95.0,
+   "steps": 3937.0,
+   "floors": 3.0,
+   "energy": 64.0
+  },
+  "2026-10-24": {
+   "sleepMin": 327.0,
+   "deepPct": 16.231884057971016,
+   "remPct": 9.27536231884058,
+   "awakeMin": 3.0,
+   "bedtime": 440.0,
+   "wake": 880.0,
+   "sleepHr": 60.76923076923077,
+   "spo2Avg": 95.0,
+   "spo2Min": 77.0,
+   "skinTemp": 35.09264734186112,
+   "restHr": 67.0,
+   "dayHr": 72.83185840707965,
+   "walkHr": 94.0,
+   "steps": 1965.0,
+   "floors": 2.0,
+   "weight": 82.2,
+   "fatPct": 25.4,
+   "smm": 34.3
+  }
+ },
+ "trends@2026-10-24T16:30:00.000@month": [
+  {
+   "key": "sleepHr",
+   "status": "stable",
+   "current": 59.263888888888886,
+   "previous": 59.712525532066586,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "dayHr",
+   "status": "insufficient",
+   "current": 71.43571428571428,
+   "previous": 75.74318693654007,
+   "nCurrent": 6,
+   "nPrevious": 30,
+   "points": 36
+  },
+  {
+   "key": "sleepMin",
+   "status": "up",
+   "current": 453.5,
+   "previous": 411.32676022679874,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "sleepScore",
+   "status": "stable",
+   "current": 76.0,
+   "previous": 79.19274443391163,
+   "nCurrent": 29,
+   "nPrevious": 29,
+   "points": 58
+  },
+  {
+   "key": "deepPct",
+   "status": "stable",
+   "current": 17.119989588755857,
+   "previous": 15.7192224287576,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "remPct",
+   "status": "down",
+   "current": 14.515846420045118,
+   "previous": 21.395985998593666,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "awakeMin",
+   "status": "down",
+   "current": 12.0,
+   "previous": 22.54107177228644,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "bedtime",
+   "status": "up",
+   "current": 365.0,
+   "previous": 330.5957546558577,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "weight",
+   "status": "insufficient",
+   "current": 82.2,
+   "previous": null,
+   "nCurrent": 1,
+   "nPrevious": 0,
+   "points": 1
+  },
+  {
+   "key": "fatPct",
+   "status": "insufficient",
+   "current": 25.4,
+   "previous": null,
+   "nCurrent": 1,
+   "nPrevious": 0,
+   "points": 1
+  },
+  {
+   "key": "smm",
+   "status": "insufficient",
+   "current": 34.3,
+   "previous": null,
+   "nCurrent": 1,
+   "nPrevious": 0,
+   "points": 1
+  },
+  {
+   "key": "skinTemp",
+   "status": "up",
+   "current": 35.16174551776902,
+   "previous": 33.57557089743017,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "steps",
+   "status": "down",
+   "current": 4522.0,
+   "previous": 6971.056433995891,
+   "nCurrent": 30,
+   "nPrevious": 30,
+   "points": 60
+  },
+  {
+   "key": "activeMin",
+   "status": "insufficient",
+   "current": null,
+   "previous": 61.212443511683944,
+   "nCurrent": 0,
+   "nPrevious": 30,
+   "points": 30
+  },
+  {
+   "key": "energy",
+   "status": "insufficient",
+   "current": 74.0,
+   "previous": 70.62965852132433,
+   "nCurrent": 14,
+   "nPrevious": 29,
+   "points": 43
+  },
+  {
+   "key": "spo2Avg",
+   "status": "stable",
+   "current": 95.0,
+   "previous": 94.99571052859903,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  }
+ ],
+ "trends@2026-10-24T16:30:00.000@quarter": [
+  {
+   "key": "sleepHr",
+   "status": "down",
+   "current": 60.481374221687375,
+   "previous": 62.96010972626446,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "dayHr",
+   "status": "stable",
+   "current": 76.26750063601422,
+   "previous": 76.49084142579581,
+   "nCurrent": 65,
+   "nPrevious": 88,
+   "points": 153
+  },
+  {
+   "key": "sleepMin",
+   "status": "stable",
+   "current": 422.7853403143655,
+   "previous": 410.6142155859112,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "sleepScore",
+   "status": "stable",
+   "current": 76.0,
+   "previous": 74.95234292354641,
+   "nCurrent": 87,
+   "nPrevious": 88,
+   "points": 175
+  },
+  {
+   "key": "deepPct",
+   "status": "stable",
+   "current": 16.23830489818382,
+   "previous": 15.014281061809324,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "remPct",
+   "status": "down",
+   "current": 18.600873929556357,
+   "previous": 21.57622678734016,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "awakeMin",
+   "status": "down",
+   "current": 17.502932727146266,
+   "previous": 23.019367022983484,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "bedtime",
+   "status": "stable",
+   "current": 334.38577294441814,
+   "previous": 329.38031414323325,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "weight",
+   "status": "insufficient",
+   "current": 82.75,
+   "previous": 83.9,
+   "nCurrent": 2,
+   "nPrevious": 2,
+   "points": 4
+  },
+  {
+   "key": "fatPct",
+   "status": "insufficient",
+   "current": 25.85,
+   "previous": 26.8,
+   "nCurrent": 2,
+   "nPrevious": 2,
+   "points": 4
+  },
+  {
+   "key": "smm",
+   "status": "insufficient",
+   "current": 34.45,
+   "previous": 34.45,
+   "nCurrent": 2,
+   "nPrevious": 2,
+   "points": 4
+  },
+  {
+   "key": "skinTemp",
+   "status": "stable",
+   "current": 33.784314342660785,
+   "previous": 33.57844219112228,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "steps",
+   "status": "stable",
+   "current": 6405.72317690439,
+   "previous": 7003.295596231113,
+   "nCurrent": 89,
+   "nPrevious": 88,
+   "points": 177
+  },
+  {
+   "key": "activeMin",
+   "status": "insufficient",
+   "current": 58.84057734011045,
+   "previous": 58.211656765519415,
+   "nCurrent": 59,
+   "nPrevious": 88,
+   "points": 147
+  },
+  {
+   "key": "energy",
+   "status": "stable",
+   "current": 69.45395043739578,
+   "previous": 68.3362211990173,
+   "nCurrent": 72,
+   "nPrevious": 88,
+   "points": 160
+  },
+  {
+   "key": "spo2Avg",
+   "status": "stable",
+   "current": 94.89443529413458,
+   "previous": 95.07447911956581,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  }
+ ],
+ "trends@2026-10-24T16:30:00.000@year": [
+  {
+   "key": "sleepHr",
+   "status": "insufficient",
+   "current": 60.481374221687375,
+   "previous": 64.7835158423489,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "dayHr",
+   "status": "insufficient",
+   "current": 76.26750063601422,
+   "previous": null,
+   "nCurrent": 65,
+   "nPrevious": 0,
+   "points": 333
+  },
+  {
+   "key": "sleepMin",
+   "status": "insufficient",
+   "current": 422.7853403143655,
+   "previous": 408.4396039422269,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "sleepScore",
+   "status": "insufficient",
+   "current": 76.0,
+   "previous": 72.1461928555433,
+   "nCurrent": 87,
+   "nPrevious": 1,
+   "points": 356
+  },
+  {
+   "key": "deepPct",
+   "status": "insufficient",
+   "current": 16.23830489818382,
+   "previous": 15.696820805811821,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "remPct",
+   "status": "insufficient",
+   "current": 18.600873929556357,
+   "previous": 18.697938267408517,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "awakeMin",
+   "status": "insufficient",
+   "current": 17.502932727146266,
+   "previous": 14.850069495443678,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "bedtime",
+   "status": "insufficient",
+   "current": 334.38577294441814,
+   "previous": 304.26116034426116,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "weight",
+   "status": "insufficient",
+   "current": 82.75,
+   "previous": null,
+   "nCurrent": 2,
+   "nPrevious": 0,
+   "points": 8
+  },
+  {
+   "key": "fatPct",
+   "status": "insufficient",
+   "current": 25.85,
+   "previous": null,
+   "nCurrent": 2,
+   "nPrevious": 0,
+   "points": 8
+  },
+  {
+   "key": "smm",
+   "status": "insufficient",
+   "current": 34.45,
+   "previous": null,
+   "nCurrent": 2,
+   "nPrevious": 0,
+   "points": 8
+  },
+  {
+   "key": "skinTemp",
+   "status": "insufficient",
+   "current": 33.784314342660785,
+   "previous": 33.763056925929504,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "steps",
+   "status": "insufficient",
+   "current": 6405.72317690439,
+   "previous": null,
+   "nCurrent": 89,
+   "nPrevious": 0,
+   "points": 357
+  },
+  {
+   "key": "activeMin",
+   "status": "insufficient",
+   "current": 58.84057734011045,
+   "previous": null,
+   "nCurrent": 59,
+   "nPrevious": 0,
+   "points": 327
+  },
+  {
+   "key": "energy",
+   "status": "insufficient",
+   "current": 69.45395043739578,
+   "previous": 68.1632902567836,
+   "nCurrent": 72,
+   "nPrevious": 1,
+   "points": 341
+  },
+  {
+   "key": "spo2Avg",
+   "status": "insufficient",
+   "current": 94.89443529413458,
+   "previous": 95.10894380097953,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  }
+ ],
+ "report@2026-10-24T16:30:00.000": {
+  "sleepHr": {
+   "n": 88,
+   "median": 60.481374221687375,
+   "p10": 58.9625,
+   "p90": 63.47816365473152,
+   "low": 58.5,
+   "high": 65.44288141487864,
+   "trend": "down"
+  },
+  "spo2Avg": {
+   "n": 88,
+   "median": 94.89443529413458,
+   "p10": 93.7,
+   "p90": 95.89833588097241,
+   "low": 93.0,
+   "high": 96.0,
+   "trend": "stable"
+  },
+  "spo2Min": {
+   "n": 30,
+   "median": 89.5,
+   "p10": 87.9,
+   "p90": 91.0,
+   "low": 77.0,
+   "high": 92.0,
+   "trend": null
+  },
+  "sleepMin": {
+   "n": 88,
+   "median": 422.7853403143655,
+   "p10": 377.06052120643585,
+   "p90": 474.3,
+   "low": 327.0,
+   "high": 542.0,
+   "trend": "stable"
+  },
+  "bedtime": {
+   "n": 88,
+   "median": 334.38577294441814,
+   "p10": 305.8598850273534,
+   "p90": 384.3,
+   "low": 290.1555189344304,
+   "high": 440.0,
+   "trend": "stable"
+  },
+  "wake": {
+   "n": 30,
+   "median": 833.5,
+   "p10": 793.0,
+   "p90": 866.5,
+   "low": 782.0,
+   "high": 880.0,
+   "trend": null
+  },
+  "steps": {
+   "n": 88,
+   "median": 6393.861588452195,
+   "p10": 3553.3000000000006,
+   "p90": 8946.058425733356,
+   "low": 2039.0,
+   "high": 10013.319937539496,
+   "trend": "stable"
+  },
+  "weight": {
+   "n": 2,
+   "median": 82.75,
+   "p10": null,
+   "p90": null,
+   "low": 82.2,
+   "high": 83.3,
+   "trend": "insufficient"
+  },
+  "fatPct": {
+   "n": 2,
+   "median": 25.85,
+   "p10": null,
+   "p90": null,
+   "low": 25.4,
+   "high": 26.3,
+   "trend": "insufficient"
+  },
+  "smm": {
+   "n": 2,
+   "median": 34.45,
+   "p10": null,
+   "p90": null,
+   "low": 34.3,
+   "high": 34.6,
+   "trend": "insufficient"
+  },
+  "lowOxygen": 15,
+  "weighIns": 6
+ },
+ "week@2026-10-24T16:30:00.000": {
+  "items": [
+   {
+    "key": "sleepMin",
+    "status": "stable",
+    "current": 422.0,
+    "previous": 459.0,
+    "nCurrent": 6,
+    "nPrevious": 27,
+    "points": 33
+   },
+   {
+    "key": "bedtime",
+    "status": "stable",
+    "current": 385.5,
+    "previous": 346.0,
+    "nCurrent": 6,
+    "nPrevious": 27,
+    "points": 33
+   },
+   {
+    "key": "sleepScore",
+    "status": "stable",
+    "current": 68.0,
+    "previous": 80.0,
+    "nCurrent": 5,
+    "nPrevious": 27,
+    "points": 32
+   },
+   {
+    "key": "sleepHr",
+    "status": "stable",
+    "current": 61.31794871794872,
+    "previous": 59.25,
+    "nCurrent": 6,
+    "nPrevious": 27,
+    "points": 33
+   },
+   {
+    "key": "steps",
+    "status": "stable",
+    "current": 5118.5,
+    "previous": 4885.0,
+    "nCurrent": 6,
+    "nPrevious": 28,
+    "points": 34
+   },
+   {
+    "key": "activeMin",
+    "status": "insufficient",
+    "current": null,
+    "previous": 43.290577023486605,
+    "nCurrent": 0,
+    "nPrevious": 3,
+    "points": 3
+   },
+   {
+    "key": "energy",
+    "status": "insufficient",
+    "current": 67.0,
+    "previous": 73.35954644684702,
+    "nCurrent": 5,
+    "nPrevious": 12,
+    "points": 17
+   }
+  ],
+  "bestNight": "2026-10-20T00:00:00.000",
+  "bestNightScore": 86.0,
+  "mostSteps": "2026-10-21T00:00:00.000",
+  "mostStepsValue": 7549.0,
+  "activeTotal": null,
+  "activeDays": 0
+ },
+ "unusual@2026-10-24T16:30:00.000@0": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 60.76923076923077,
+    "usual": 59.24264705882353,
+    "threshold": 3.0,
+    "n": 28
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.09264734186112,
+    "usual": 35.16174551776902,
+    "threshold": 0.6003147825538614,
+    "n": 28
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@1": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 61.86666666666667,
+    "usual": 59.24264705882353,
+    "threshold": 3.0,
+    "n": 28
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.216446675495895,
+    "usual": 35.16174551776902,
+    "threshold": 0.6003147825538614,
+    "n": 28
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@2": {
+  "off": 1,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 62.666666666666664,
+    "usual": 59.23529411764706,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 34.94856979575803,
+    "usual": 35.189695644467605,
+    "threshold": 0.6173416807035397,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@3": {
+  "off": 1,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 62.53333333333333,
+    "usual": 59.23529411764706,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.394034041402556,
+    "usual": 35.13379539107043,
+    "threshold": 0.5785030715965024,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@4": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 59.13333333333333,
+    "usual": 59.25,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.49355842959014,
+    "usual": 35.12517009246984,
+    "threshold": 0.6040788070069768,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@5": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 58.875,
+    "usual": 59.25,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.29626472962406,
+    "usual": 35.057947323911414,
+    "threshold": 0.6293110244372662,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@6": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 59.25,
+    "usual": 59.27777777777778,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.189695644467605,
+    "usual": 35.04674586807865,
+    "threshold": 0.6359220856047649,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@7": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 58.8235294117647,
+    "usual": 59.27777777777778,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.50500058451921,
+    "usual": 35.00654489717937,
+    "threshold": 0.6087898080675986,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@8": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 58.6875,
+    "usual": 59.3125,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 34.81432363732551,
+    "usual": 35.00654489717937,
+    "threshold": 0.7551260045153247,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-24T16:30:00.000@9": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 60.35294117647059,
+    "usual": 59.3125,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 34.945604569841535,
+    "usual": 35.00654489717937,
+    "threshold": 0.9526770725826751,
+    "n": 27
+   }
+  ]
+ },
+ "summary@2026-10-25T19:10:00.000": {
+  "2026-09-25": {
+   "steps": 6589.0
+  },
+  "2026-09-26": {
+   "sleepMin": 402.0,
+   "sleepScore": 68.0,
+   "deepPct": 14.148681055155876,
+   "remPct": 14.628297362110311,
+   "awakeMin": 8.0,
+   "bedtime": 400.0,
+   "wake": 817.0,
+   "sleepHr": 59.357142857142854,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.2612076533224,
+   "steps": 7195.0
+  },
+  "2026-09-27": {
+   "sleepMin": 433.0,
+   "sleepScore": 71.0,
+   "deepPct": 20.982142857142858,
+   "remPct": 15.625,
+   "awakeMin": 13.0,
+   "bedtime": 379.0,
+   "wake": 827.0,
+   "sleepHr": 60.06666666666667,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 34.86519870262913,
+   "steps": 4003.0
+  },
+  "2026-09-28": {
+   "sleepMin": 444.0,
+   "sleepScore": 69.0,
+   "deepPct": 17.647058823529413,
+   "remPct": 12.418300653594772,
+   "awakeMin": 18.0,
+   "bedtime": 346.0,
+   "wake": 805.0,
+   "sleepHr": 59.0625,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.32889287913076,
+   "steps": 6605.0
+  },
+  "2026-09-29": {
+   "sleepMin": 488.0,
+   "sleepScore": 67.0,
+   "deepPct": 19.4831013916501,
+   "remPct": 15.308151093439363,
+   "awakeMin": 13.0,
+   "bedtime": 334.0,
+   "wake": 837.0,
+   "sleepHr": 59.76470588235294,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.353476569367814,
+   "steps": 6229.0
+  },
+  "2026-09-30": {
+   "sleepMin": 510.0,
+   "sleepScore": 78.0,
+   "deepPct": 19.238095238095237,
+   "remPct": 12.0,
+   "awakeMin": 14.0,
+   "bedtime": 336.0,
+   "wake": 861.0,
+   "sleepHr": 59.05555555555556,
+   "spo2Avg": 96.0,
+   "spo2Min": 92.0,
+   "skinTemp": 35.5218236633103,
+   "steps": 5351.0
+  },
+  "2026-10-01": {
+   "sleepMin": 458.0,
+   "sleepScore": 72.0,
+   "deepPct": 24.52431289640592,
+   "remPct": 9.090909090909092,
+   "awakeMin": 15.0,
+   "bedtime": 373.0,
+   "wake": 846.0,
+   "sleepHr": 58.5,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.596153300662934,
+   "steps": 7989.0
+  },
+  "2026-10-02": {
+   "sleepMin": 542.0,
+   "sleepScore": 80.0,
+   "deepPct": 16.337522441651707,
+   "remPct": 20.28725314183124,
+   "awakeMin": 12.0,
+   "bedtime": 317.0,
+   "wake": 874.0,
+   "sleepHr": 59.94736842105263,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 34.97053437648991,
+   "steps": 5796.0
+  },
+  "2026-10-03": {
+   "sleepMin": 498.0,
+   "sleepScore": 87.0,
+   "deepPct": 16.179337231968812,
+   "remPct": 14.42495126705653,
+   "awakeMin": 9.0,
+   "bedtime": 316.0,
+   "wake": 829.0,
+   "sleepHr": 59.22222222222222,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.32783083829048,
+   "steps": 1826.0
+  },
+  "2026-10-04": {
+   "sleepMin": 460.0,
+   "sleepScore": 84.0,
+   "deepPct": 21.473684210526315,
+   "remPct": 11.789473684210526,
+   "awakeMin": 14.0,
+   "bedtime": 318.0,
+   "wake": 793.0,
+   "sleepHr": 59.5625,
+   "spo2Avg": 95.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.13379539107043,
+   "steps": 2379.0
+  },
+  "2026-10-05": {
+   "sleepMin": 465.0,
+   "sleepScore": 74.0,
+   "deepPct": 15.0,
+   "remPct": 13.333333333333334,
+   "awakeMin": 13.0,
+   "bedtime": 386.0,
+   "wake": 866.0,
+   "sleepHr": 60.3125,
+   "spo2Avg": 96.0,
+   "spo2Min": 92.0,
+   "skinTemp": 35.41352219839718,
+   "steps": 5796.0
+  },
+  "2026-10-06": {
+   "sleepMin": 430.0,
+   "sleepScore": 80.0,
+   "deepPct": 15.280898876404494,
+   "remPct": 14.606741573033707,
+   "awakeMin": 10.0,
+   "bedtime": 368.0,
+   "wake": 813.0,
+   "sleepHr": 59.0,
+   "spo2Avg": 96.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.12517009246984,
+   "steps": 3042.0
+  },
+  "2026-10-07": {
+   "sleepMin": 516.0,
+   "sleepScore": 89.0,
+   "deepPct": 14.689265536723164,
+   "remPct": 16.0075329566855,
+   "awakeMin": 17.0,
+   "bedtime": 323.0,
+   "wake": 854.0,
+   "sleepHr": 58.833333333333336,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 34.84571508850157,
+   "steps": 3749.0
+  },
+  "2026-10-08": {
+   "sleepMin": 510.0,
+   "sleepScore": 82.0,
+   "deepPct": 20.19047619047619,
+   "remPct": 10.666666666666666,
+   "awakeMin": 18.0,
+   "bedtime": 339.0,
+   "wake": 864.0,
+   "sleepHr": 59.27777777777778,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 34.98150001493046,
+   "steps": 2826.0
+  },
+  "2026-10-09": {
+   "sleepMin": 487.0,
+   "sleepScore": 84.0,
+   "deepPct": 24.10358565737052,
+   "remPct": 15.737051792828685,
+   "awakeMin": 14.0,
+   "bedtime": 369.0,
+   "wake": 871.0,
+   "sleepHr": 59.23529411764706,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.00654489717937,
+   "steps": 3668.0
+  },
+  "2026-10-10": {
+   "sleepMin": 438.0,
+   "sleepScore": 76.0,
+   "deepPct": 14.79028697571744,
+   "remPct": 13.907284768211921,
+   "awakeMin": 9.0,
+   "bedtime": 340.0,
+   "wake": 793.0,
+   "sleepHr": 59.6875,
+   "spo2Avg": 93.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.04674586807865,
+   "steps": 6447.0
+  },
+  "2026-10-11": {
+   "sleepMin": 430.0,
+   "sleepScore": 81.0,
+   "deepPct": 16.179775280898877,
+   "remPct": 15.0561797752809,
+   "awakeMin": 12.0,
+   "bedtime": 405.0,
+   "wake": 850.0,
+   "sleepHr": 59.2,
+   "spo2Avg": 95.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.59518613049995,
+   "steps": 3985.0,
+   "energy": 72.0
+  },
+  "2026-10-12": {
+   "sleepMin": 459.0,
+   "sleepScore": 86.0,
+   "deepPct": 16.244725738396625,
+   "remPct": 15.189873417721518,
+   "awakeMin": 13.0,
+   "bedtime": 315.0,
+   "wake": 789.0,
+   "sleepHr": 59.125,
+   "spo2Avg": 93.0,
+   "spo2Min": 87.0,
+   "skinTemp": 35.21185644718193,
+   "steps": 2787.0,
+   "energy": 60.0
+  },
+  "2026-10-13": {
+   "sleepMin": 442.0,
+   "sleepScore": 65.0,
+   "deepPct": 15.973741794310722,
+   "remPct": 14.660831509846828,
+   "awakeMin": 11.0,
+   "bedtime": 384.0,
+   "wake": 841.0,
+   "sleepHr": 59.3125,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.057947323911414,
+   "steps": 6646.0,
+   "energy": 76.0
+  },
+  "2026-10-14": {
+   "sleepMin": 489.0,
+   "sleepScore": 76.0,
+   "deepPct": 16.46825396825397,
+   "remPct": 16.46825396825397,
+   "awakeMin": 9.0,
+   "bedtime": 329.0,
+   "wake": 833.0,
+   "sleepHr": 59.1764705882353,
+   "spo2Avg": 93.0,
+   "spo2Min": 89.0,
+   "skinTemp": 34.838228521975395,
+   "steps": 2657.0,
+   "energy": 65.0
+  },
+  "2026-10-15": {
+   "sleepMin": 431.0,
+   "sleepScore": 84.0,
+   "deepPct": 15.246636771300448,
+   "remPct": 12.10762331838565,
+   "awakeMin": 18.0,
+   "bedtime": 386.0,
+   "wake": 832.0,
+   "sleepHr": 60.333333333333336,
+   "spo2Avg": 94.0,
+   "spo2Min": 89.0,
+   "skinTemp": 34.89226058137294,
+   "steps": 7217.0,
+   "floors": 1.0,
+   "energy": 57.0
+  },
+  "2026-10-16": {
+   "sleepMin": 475.0,
+   "sleepScore": 82.0,
+   "deepPct": 16.53061224489796,
+   "remPct": 13.46938775510204,
+   "awakeMin": 16.0,
+   "bedtime": 346.0,
+   "wake": 836.0,
+   "sleepHr": 60.35294117647059,
+   "spo2Avg": 94.0,
+   "spo2Min": 88.0,
+   "skinTemp": 34.945604569841535,
+   "steps": 5979.0,
+   "floors": 1.0,
+   "energy": 80.0
+  },
+  "2026-10-17": {
+   "sleepMin": 437.0,
+   "sleepScore": 62.0,
+   "deepPct": 16.5929203539823,
+   "remPct": 15.044247787610619,
+   "awakeMin": 9.0,
+   "bedtime": 400.0,
+   "wake": 852.0,
+   "sleepHr": 58.6875,
+   "spo2Avg": 94.0,
+   "spo2Min": 90.0,
+   "skinTemp": 34.81432363732551,
+   "steps": 4981.0,
+   "floors": 2.0,
+   "energy": 79.0
+  },
+  "2026-10-18": {
+   "sleepMin": 474.0,
+   "sleepScore": 66.0,
+   "deepPct": 21.063394683026583,
+   "remPct": 8.997955010224949,
+   "awakeMin": 11.0,
+   "bedtime": 312.0,
+   "wake": 801.0,
+   "sleepHr": 58.8235294117647,
+   "spo2Avg": 95.0,
+   "spo2Min": 90.0,
+   "skinTemp": 35.50500058451921,
+   "steps": 3473.0,
+   "floors": 1.0,
+   "energy": 73.0
+  },
+  "2026-10-19": {
+   "sleepMin": 463.0,
+   "sleepScore": 85.0,
+   "deepPct": 20.292887029288703,
+   "remPct": 8.99581589958159,
+   "awakeMin": 11.0,
+   "bedtime": 381.0,
+   "wake": 859.0,
+   "sleepHr": 59.25,
+   "spo2Avg": 95.0,
+   "spo2Min": 89.0,
+   "skinTemp": 35.189695644467605,
+   "restHr": 67.0,
+   "dayHr": 71.67619047619047,
+   "walkHr": 96.0,
+   "steps": 2123.0,
+   "floors": 2.0,
+   "energy": 71.0
+  },
+  "2026-10-20": {
+   "sleepMin": 449.0,
+   "sleepScore": 75.0,
+   "deepPct": 17.67241379310345,
+   "remPct": 13.577586206896552,
+   "awakeMin": 18.0,
+   "bedtime": 362.0,
+   "wake": 826.0,
+   "sleepHr": 58.875,
+   "spo2Avg": 94.0,
+   "spo2Min": 88.0,
+   "skinTemp": 35.29626472962406,
+   "restHr": 67.0,
+   "dayHr": 71.39047619047619,
+   "walkHr": 95.0,
+   "steps": 2723.0,
+   "floors": 1.0,
+   "energy": 62.0
+  },
+  "2026-10-21": {
+   "sleepMin": 407.0,
+   "sleepScore": 86.0,
+   "deepPct": 18.72037914691943,
+   "remPct": 14.928909952606634,
+   "awakeMin": 10.0,
+   "bedtime": 410.0,
+   "wake": 832.0,
+   "sleepHr": 59.13333333333333,
+   "spo2Avg": 96.0,
+   "spo2Min": 91.0,
+   "skinTemp": 35.49355842959014,
+   "restHr": 67.0,
+   "dayHr": 71.41428571428571,
+   "walkHr": 94.0,
+   "steps": 6026.0,
+   "energy": 82.0
+  },
+  "2026-10-22": {
+   "sleepMin": 429.0,
+   "sleepScore": 68.0,
+   "deepPct": 19.144144144144143,
+   "remPct": 11.936936936936936,
+   "awakeMin": 11.0,
+   "bedtime": 386.0,
+   "wake": 830.0,
+   "sleepHr": 62.53333333333333,
+   "spo2Avg": 93.0,
+   "spo2Min": 87.0,
+   "skinTemp": 35.394034041402556,
+   "restHr": 67.0,
+   "dayHr": 71.42857142857143,
+   "walkHr": 94.0,
+   "steps": 6648.0,
+   "energy": 62.0
+  },
+  "2026-10-23": {
+   "sleepMin": 415.0,
+   "sleepScore": 65.0,
+   "deepPct": 19.069767441860463,
+   "remPct": 14.651162790697674,
+   "awakeMin": 12.0,
+   "bedtime": 352.0,
+   "wake": 782.0,
+   "sleepHr": 62.666666666666664,
+   "spo2Avg": 93.0,
+   "spo2Min": 89.0,
+   "skinTemp": 34.94856979575803,
+   "restHr": 67.0,
+   "dayHr": 71.44285714285714,
+   "walkHr": 95.0,
+   "steps": 6635.0,
+   "floors": 2.0,
+   "energy": 59.0
+  },
+  "2026-10-24": {
+   "sleepMin": 434.0,
+   "sleepScore": 62.0,
+   "deepPct": 22.71714922048998,
+   "remPct": 15.367483296213809,
+   "awakeMin": 12.0,
+   "bedtime": 385.0,
+   "wake": 834.0,
+   "sleepHr": 61.86666666666667,
+   "spo2Avg": 94.0,
+   "spo2Min": 89.0,
+   "skinTemp": 35.216446675495895,
+   "restHr": 67.0,
+   "dayHr": 71.51428571428572,
+   "walkHr": 95.0,
+   "steps": 3871.0,
+   "floors": 1.0,
+   "energy": 71.0
+  },
+  "2026-10-25": {
+   "sleepMin": 387.0,
+   "deepPct": 16.049382716049383,
+   "remPct": 8.395061728395062,
+   "awakeMin": 12.0,
+   "bedtime": 440.0,
+   "wake": 880.0,
+   "sleepHr": 64.4,
+   "spo2Avg": 94.5,
+   "spo2Min": 77.0,
+   "skinTemp": 35.217374684802465,
+   "restHr": 67.0,
+   "dayHr": 72.94303797468355,
+   "walkHr": 95.0,
+   "steps": 1965.0,
+   "weight": 82.2,
+   "fatPct": 25.4,
+   "smm": 34.3
+  }
+ },
+ "trends@2026-10-25T19:10:00.000@month": [
+  {
+   "key": "sleepHr",
+   "status": "stable",
+   "current": 59.263888888888886,
+   "previous": 59.712525532066586,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "dayHr",
+   "status": "insufficient",
+   "current": 71.43571428571428,
+   "previous": 75.74318693654007,
+   "nCurrent": 6,
+   "nPrevious": 30,
+   "points": 36
+  },
+  {
+   "key": "sleepMin",
+   "status": "up",
+   "current": 453.5,
+   "previous": 411.32676022679874,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "sleepScore",
+   "status": "stable",
+   "current": 76.0,
+   "previous": 79.19274443391163,
+   "nCurrent": 29,
+   "nPrevious": 29,
+   "points": 58
+  },
+  {
+   "key": "deepPct",
+   "status": "stable",
+   "current": 17.119989588755857,
+   "previous": 15.7192224287576,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "remPct",
+   "status": "down",
+   "current": 14.515846420045118,
+   "previous": 21.395985998593666,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "awakeMin",
+   "status": "down",
+   "current": 12.0,
+   "previous": 22.54107177228644,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "bedtime",
+   "status": "up",
+   "current": 365.0,
+   "previous": 330.5957546558577,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "weight",
+   "status": "insufficient",
+   "current": 82.2,
+   "previous": null,
+   "nCurrent": 1,
+   "nPrevious": 0,
+   "points": 1
+  },
+  {
+   "key": "fatPct",
+   "status": "insufficient",
+   "current": 25.4,
+   "previous": null,
+   "nCurrent": 1,
+   "nPrevious": 0,
+   "points": 1
+  },
+  {
+   "key": "smm",
+   "status": "insufficient",
+   "current": 34.3,
+   "previous": null,
+   "nCurrent": 1,
+   "nPrevious": 0,
+   "points": 1
+  },
+  {
+   "key": "skinTemp",
+   "status": "up",
+   "current": 35.20077604582477,
+   "previous": 33.57557089743017,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  },
+  {
+   "key": "steps",
+   "status": "down",
+   "current": 5166.0,
+   "previous": 6971.056433995891,
+   "nCurrent": 30,
+   "nPrevious": 30,
+   "points": 60
+  },
+  {
+   "key": "activeMin",
+   "status": "insufficient",
+   "current": null,
+   "previous": 61.212443511683944,
+   "nCurrent": 0,
+   "nPrevious": 30,
+   "points": 30
+  },
+  {
+   "key": "energy",
+   "status": "insufficient",
+   "current": 71.0,
+   "previous": 70.62965852132433,
+   "nCurrent": 14,
+   "nPrevious": 29,
+   "points": 43
+  },
+  {
+   "key": "spo2Avg",
+   "status": "stable",
+   "current": 94.75,
+   "previous": 94.99571052859903,
+   "nCurrent": 30,
+   "nPrevious": 29,
+   "points": 59
+  }
+ ],
+ "trends@2026-10-25T19:10:00.000@quarter": [
+  {
+   "key": "sleepHr",
+   "status": "down",
+   "current": 60.481374221687375,
+   "previous": 62.96010972626446,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "dayHr",
+   "status": "stable",
+   "current": 76.26750063601422,
+   "previous": 76.49084142579581,
+   "nCurrent": 65,
+   "nPrevious": 88,
+   "points": 153
+  },
+  {
+   "key": "sleepMin",
+   "status": "stable",
+   "current": 422.7853403143655,
+   "previous": 410.6142155859112,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "sleepScore",
+   "status": "stable",
+   "current": 76.0,
+   "previous": 74.95234292354641,
+   "nCurrent": 87,
+   "nPrevious": 88,
+   "points": 175
+  },
+  {
+   "key": "deepPct",
+   "status": "stable",
+   "current": 16.212250509647752,
+   "previous": 15.014281061809324,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "remPct",
+   "status": "down",
+   "current": 18.600873929556357,
+   "previous": 21.57622678734016,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "awakeMin",
+   "status": "down",
+   "current": 17.502932727146266,
+   "previous": 23.019367022983484,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "bedtime",
+   "status": "stable",
+   "current": 334.38577294441814,
+   "previous": 329.38031414323325,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "weight",
+   "status": "insufficient",
+   "current": 82.75,
+   "previous": 83.9,
+   "nCurrent": 2,
+   "nPrevious": 2,
+   "points": 4
+  },
+  {
+   "key": "fatPct",
+   "status": "insufficient",
+   "current": 25.85,
+   "previous": 26.8,
+   "nCurrent": 2,
+   "nPrevious": 2,
+   "points": 4
+  },
+  {
+   "key": "smm",
+   "status": "insufficient",
+   "current": 34.45,
+   "previous": 34.45,
+   "nCurrent": 2,
+   "nPrevious": 2,
+   "points": 4
+  },
+  {
+   "key": "skinTemp",
+   "status": "stable",
+   "current": 33.784314342660785,
+   "previous": 33.57844219112228,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  },
+  {
+   "key": "steps",
+   "status": "stable",
+   "current": 6447.0,
+   "previous": 7003.295596231113,
+   "nCurrent": 89,
+   "nPrevious": 88,
+   "points": 177
+  },
+  {
+   "key": "activeMin",
+   "status": "insufficient",
+   "current": 58.84057734011045,
+   "previous": 58.211656765519415,
+   "nCurrent": 59,
+   "nPrevious": 88,
+   "points": 147
+  },
+  {
+   "key": "energy",
+   "status": "stable",
+   "current": 69.45395043739578,
+   "previous": 68.3362211990173,
+   "nCurrent": 72,
+   "nPrevious": 88,
+   "points": 160
+  },
+  {
+   "key": "spo2Avg",
+   "status": "stable",
+   "current": 94.84800559193147,
+   "previous": 95.07447911956581,
+   "nCurrent": 88,
+   "nPrevious": 88,
+   "points": 176
+  }
+ ],
+ "trends@2026-10-25T19:10:00.000@year": [
+  {
+   "key": "sleepHr",
+   "status": "insufficient",
+   "current": 60.481374221687375,
+   "previous": 64.7835158423489,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "dayHr",
+   "status": "insufficient",
+   "current": 76.26750063601422,
+   "previous": null,
+   "nCurrent": 65,
+   "nPrevious": 0,
+   "points": 333
+  },
+  {
+   "key": "sleepMin",
+   "status": "insufficient",
+   "current": 422.7853403143655,
+   "previous": 408.4396039422269,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "sleepScore",
+   "status": "insufficient",
+   "current": 76.0,
+   "previous": 72.1461928555433,
+   "nCurrent": 87,
+   "nPrevious": 1,
+   "points": 356
+  },
+  {
+   "key": "deepPct",
+   "status": "insufficient",
+   "current": 16.212250509647752,
+   "previous": 15.696820805811821,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "remPct",
+   "status": "insufficient",
+   "current": 18.600873929556357,
+   "previous": 18.697938267408517,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "awakeMin",
+   "status": "insufficient",
+   "current": 17.502932727146266,
+   "previous": 14.850069495443678,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "bedtime",
+   "status": "insufficient",
+   "current": 334.38577294441814,
+   "previous": 304.26116034426116,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "weight",
+   "status": "insufficient",
+   "current": 82.75,
+   "previous": null,
+   "nCurrent": 2,
+   "nPrevious": 0,
+   "points": 8
+  },
+  {
+   "key": "fatPct",
+   "status": "insufficient",
+   "current": 25.85,
+   "previous": null,
+   "nCurrent": 2,
+   "nPrevious": 0,
+   "points": 8
+  },
+  {
+   "key": "smm",
+   "status": "insufficient",
+   "current": 34.45,
+   "previous": null,
+   "nCurrent": 2,
+   "nPrevious": 0,
+   "points": 8
+  },
+  {
+   "key": "skinTemp",
+   "status": "insufficient",
+   "current": 33.784314342660785,
+   "previous": 33.763056925929504,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  },
+  {
+   "key": "steps",
+   "status": "insufficient",
+   "current": 6447.0,
+   "previous": null,
+   "nCurrent": 89,
+   "nPrevious": 0,
+   "points": 357
+  },
+  {
+   "key": "activeMin",
+   "status": "insufficient",
+   "current": 58.84057734011045,
+   "previous": null,
+   "nCurrent": 59,
+   "nPrevious": 0,
+   "points": 327
+  },
+  {
+   "key": "energy",
+   "status": "insufficient",
+   "current": 69.45395043739578,
+   "previous": 68.1632902567836,
+   "nCurrent": 72,
+   "nPrevious": 1,
+   "points": 341
+  },
+  {
+   "key": "spo2Avg",
+   "status": "insufficient",
+   "current": 94.84800559193147,
+   "previous": 95.10894380097953,
+   "nCurrent": 88,
+   "nPrevious": 1,
+   "points": 357
+  }
+ ],
+ "report@2026-10-25T19:10:00.000": {
+  "sleepHr": {
+   "n": 88,
+   "median": 60.481374221687375,
+   "p10": 58.9625,
+   "p90": 63.65149342628792,
+   "low": 58.5,
+   "high": 65.44288141487864,
+   "trend": "down"
+  },
+  "spo2Avg": {
+   "n": 88,
+   "median": 94.84800559193147,
+   "p10": 93.7,
+   "p90": 95.89833588097241,
+   "low": 93.0,
+   "high": 96.0,
+   "trend": "stable"
+  },
+  "spo2Min": {
+   "n": 30,
+   "median": 89.5,
+   "p10": 87.9,
+   "p90": 91.0,
+   "low": 77.0,
+   "high": 92.0,
+   "trend": null
+  },
+  "sleepMin": {
+   "n": 88,
+   "median": 422.7853403143655,
+   "p10": 378.9081332368679,
+   "p90": 474.3,
+   "low": 361.3774516606767,
+   "high": 542.0,
+   "trend": "stable"
+  },
+  "bedtime": {
+   "n": 88,
+   "median": 334.38577294441814,
+   "p10": 305.8598850273534,
+   "p90": 384.3,
+   "low": 290.1555189344304,
+   "high": 440.0,
+   "trend": "stable"
+  },
+  "wake": {
+   "n": 30,
+   "median": 833.5,
+   "p10": 793.0,
+   "p90": 866.5,
+   "low": 782.0,
+   "high": 880.0,
+   "trend": null
+  },
+  "steps": {
+   "n": 88,
+   "median": 6426.361588452195,
+   "p10": 3609.5,
+   "p90": 8946.058425733356,
+   "low": 1826.0,
+   "high": 10013.319937539496,
+   "trend": "stable"
+  },
+  "weight": {
+   "n": 2,
+   "median": 82.75,
+   "p10": null,
+   "p90": null,
+   "low": 82.2,
+   "high": 83.3,
+   "trend": "insufficient"
+  },
+  "fatPct": {
+   "n": 2,
+   "median": 25.85,
+   "p10": null,
+   "p90": null,
+   "low": 25.4,
+   "high": 26.3,
+   "trend": "insufficient"
+  },
+  "smm": {
+   "n": 2,
+   "median": 34.45,
+   "p10": null,
+   "p90": null,
+   "low": 34.3,
+   "high": 34.6,
+   "trend": "insufficient"
+  },
+  "lowOxygen": 15,
+  "weighIns": 6
+ },
+ "week@2026-10-25T19:10:00.000": {
+  "items": [
+   {
+    "key": "sleepMin",
+    "status": "stable",
+    "current": 429.0,
+    "previous": 458.0,
+    "nCurrent": 7,
+    "nPrevious": 27,
+    "points": 34
+   },
+   {
+    "key": "bedtime",
+    "status": "stable",
+    "current": 385.0,
+    "previous": 340.0,
+    "nCurrent": 7,
+    "nPrevious": 27,
+    "points": 34
+   },
+   {
+    "key": "sleepScore",
+    "status": "stable",
+    "current": 71.5,
+    "previous": 79.19274443391163,
+    "nCurrent": 6,
+    "nPrevious": 27,
+    "points": 33
+   },
+   {
+    "key": "sleepHr",
+    "status": "stable",
+    "current": 61.86666666666667,
+    "previous": 59.27777777777778,
+    "nCurrent": 7,
+    "nPrevious": 27,
+    "points": 34
+   },
+   {
+    "key": "steps",
+    "status": "stable",
+    "current": 4948.5,
+    "previous": 5713.2247507432785,
+    "nCurrent": 6,
+    "nPrevious": 28,
+    "points": 34
+   },
+   {
+    "key": "activeMin",
+    "status": "insufficient",
+    "current": null,
+    "previous": 38.082765059130296,
+    "nCurrent": 0,
+    "nPrevious": 4,
+    "points": 4
+   },
+   {
+    "key": "energy",
+    "status": "insufficient",
+    "current": 66.5,
+    "previous": 71.28589604117897,
+    "nCurrent": 6,
+    "nPrevious": 12,
+    "points": 18
+   }
+  ],
+  "bestNight": "2026-10-21T00:00:00.000",
+  "bestNightScore": 86.0,
+  "mostSteps": "2026-10-22T00:00:00.000",
+  "mostStepsValue": 6648.0,
+  "activeTotal": null,
+  "activeDays": 0
+ },
+ "unusual@2026-10-25T19:10:00.000@0": {
+  "off": 1,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 64.4,
+    "usual": 59.24264705882353,
+    "threshold": 3.0,
+    "n": 28
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.217374684802465,
+    "usual": 35.16174551776902,
+    "threshold": 0.6003147825538614,
+    "n": 28
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@1": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 61.86666666666667,
+    "usual": 59.24264705882353,
+    "threshold": 3.0,
+    "n": 28
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.216446675495895,
+    "usual": 35.16174551776902,
+    "threshold": 0.6003147825538614,
+    "n": 28
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@2": {
+  "off": 1,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 62.666666666666664,
+    "usual": 59.23529411764706,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 34.94856979575803,
+    "usual": 35.189695644467605,
+    "threshold": 0.6173416807035397,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@3": {
+  "off": 1,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 62.53333333333333,
+    "usual": 59.23529411764706,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.394034041402556,
+    "usual": 35.13379539107043,
+    "threshold": 0.5785030715965024,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@4": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 59.13333333333333,
+    "usual": 59.25,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.49355842959014,
+    "usual": 35.12517009246984,
+    "threshold": 0.6040788070069768,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@5": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 58.875,
+    "usual": 59.25,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.29626472962406,
+    "usual": 35.057947323911414,
+    "threshold": 0.6293110244372662,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@6": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 59.25,
+    "usual": 59.27777777777778,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.189695644467605,
+    "usual": 35.04674586807865,
+    "threshold": 0.6359220856047649,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@7": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 58.8235294117647,
+    "usual": 59.27777777777778,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 35.50500058451921,
+    "usual": 35.00654489717937,
+    "threshold": 0.6087898080675986,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@8": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 58.6875,
+    "usual": 59.3125,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 34.81432363732551,
+    "usual": 35.00654489717937,
+    "threshold": 0.7551260045153247,
+    "n": 27
+   }
+  ]
+ },
+ "unusual@2026-10-25T19:10:00.000@9": {
+  "off": 0,
+  "prev": false,
+  "signals": [
+   {
+    "key": "sleepHr",
+    "value": 60.35294117647059,
+    "usual": 59.3125,
+    "threshold": 3.0,
+    "n": 27
+   },
+   {
+    "key": "skinTemp",
+    "value": 34.945604569841535,
+    "usual": 35.00654489717937,
+    "threshold": 0.9526770725826751,
+    "n": 27
+   }
+  ]
+ }
+}

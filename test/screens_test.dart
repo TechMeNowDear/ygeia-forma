@@ -23,6 +23,7 @@ import 'package:ygeia_forma/pages/compare_page.dart';
 import 'package:ygeia_forma/pages/oura_pages.dart';
 import 'package:ygeia_forma/pages/sources_page.dart';
 import 'package:ygeia_forma/sources.dart';
+import 'package:ygeia_forma/plan_file.dart';
 
 import 'sample_data.dart';
 import 'sample_food.dart';
@@ -119,8 +120,7 @@ final ouraStart = DateTime(2026, 11, 6);
 void prepareOura(HealthStore store, {bool missingToday = false, DateTime? now}) {
   final at = now ?? ouraNow;
   final today = DateTime(at.year, at.month, at.day);
-  store.prefs.plan = SourcePlan.samsungOnly.withEra(Source.oura, ouraStart);
-  store.data = store.data; // ξαναχωρίζει τις νύχτες κατά το σχέδιο
+  store.debugSetPlan(SourcePlan.samsungOnly.withEra(Source.oura, ouraStart));
   final batch = parseOura(
     sleep: sampleOuraSleep(ouraStart, at, missing: {if (missingToday) today}),
     dailySleep: [
@@ -519,7 +519,7 @@ void main() {
         at: ouraNow,
         oura: true,
         prepare: (s) {
-          s.prefs.plan = s.plan.withEra(Source.none, DateTime(2026, 11, 13));
+          s.debugSetPlan(s.plan.withEra(Source.none, DateTime(2026, 11, 13)));
           s.ouraHasTokens = false;
         },
       ));
@@ -530,8 +530,39 @@ void main() {
         brightness: Brightness.light,
         page: (s) => OuraManagePage(store: s, now: ouraNow),
         prepare: (s) {
-          s.prefs.plan = s.plan.withEra(Source.none, DateTime(2026, 11, 13));
+          s.debugSetPlan(s.plan.withEra(Source.none, DateTime(2026, 11, 13)));
           s.ouraHasTokens = false;
         },
+      ));
+  testWidgets('Oura · Σήμερα · συνδέθηκε σήμερα (από απόψε)', (t) => _shot(
+        t,
+        name: '82_oura_today_starting',
+        size: fold,
+        brightness: Brightness.light,
+        tab: 0,
+        at: ouraNow,
+        prepare: (s) {
+          s.debugSetPlan(SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 15)));
+          s.ouraHasTokens = true;
+          s.ouraClock = () => ouraNow;
+        },
+      ));
+  testWidgets('Πηγές · άγνωστο σχέδιο (χαλασμένο αρχείο)', (t) => _page(
+        t,
+        name: '83_sources_plan_unknown',
+        size: fold,
+        brightness: Brightness.light,
+        page: (s) => SourcesPage(store: s, now: ouraNow),
+        prepare: (s) => s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown),
+      ));
+  testWidgets('Σήμερα · άγνωστο σχέδιο', (t) => _shot(
+        t,
+        name: '84_today_plan_unknown',
+        size: fold,
+        brightness: Brightness.dark,
+        tab: 0,
+        at: ouraNow,
+        oura: true,
+        prepare: (s) => s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown),
       ));
 }
