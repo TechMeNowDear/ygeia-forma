@@ -5,10 +5,12 @@ import '../food/food_store.dart';
 import '../format.dart';
 import '../labels.dart';
 import '../nav.dart';
+import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../unusual.dart';
 import 'nutrition.dart';
+import 'oura_today.dart';
 import 'unusual_card.dart';
 import 'week_card.dart';
 
@@ -70,10 +72,21 @@ class TodayPage extends StatelessWidget {
         }
 
         final error = store.error != null ? _ErrorCard(store: store) : null;
-        final sleep = prefs.show('sleep') ? _SleepCard(data: d, onTap: () => open(Cat.health, HealthTab.sleep)) : null;
-        final review = prefs.show('week') ? currentWeekReview(store.history, now) : null;
+        // Από τη σύνδεση του Oura η «νύχτα» (ύπνος, παλμοί και θερμοκρασία ύπνου, ετοιμότητα) έρχεται μόνο από αυτό.
+        final ouraNight = store.plan.nightSource(now) != Source.watch;
+        final openSleep = () => open(Cat.health, HealthTab.sleep);
+        final sleep = !prefs.show('sleep')
+            ? null
+            : ouraNight
+                ? OuraSleepTodayCard(store: store, now: now, onTap: openSleep)
+                : _SleepCard(data: d, onTap: openSleep);
+        final rest = ouraNight && store.plan.nightSource(now) == Source.oura
+            ? OuraRestCard(store: store, now: now, onTap: openSleep)
+            : null;
+        final ouraState = ouraNight && OuraStatusCard.shows(store) ? OuraStatusCard(store: store, now: now) : null;
+        final review = prefs.show('week') ? currentWeekReview(store.history, now, plan: store.plan) : null;
         final week = review == null ? null : WeekCard(review: review);
-        final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now)) : null;
+        final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.plan) : null;
         final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
         final foodCard = prefs.show('food')
             ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))
@@ -84,12 +97,15 @@ class TodayPage extends StatelessWidget {
           if (prefs.show('weight')) _weightCard(context, d, () => open(Cat.health, HealthTab.body)),
         ];
 
+        // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
+        // «Ξεκούραση στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
         final extras = <Widget>[
-          if (prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
-          if (prefs.show('rhr')) _restingCard(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (!ouraNight && prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, () => open(Cat.health, HealthTab.heart)),
           if (prefs.show('calories')) _caloriesCard(context, d, () => open(Cat.exercise)),
-          if (prefs.show('spo2')) _spo2Card(context, d, () => open(Cat.health, HealthTab.heart)),
-          if (prefs.show('skin')) _skinCard(context, d, () => open(Cat.health, HealthTab.body)),
+          if (prefs.show('spo2'))
+            ouraNight ? _watchSpo2Card(context, d, now, () => open(Cat.health, HealthTab.heart)) : _spo2Card(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (!ouraNight && prefs.show('skin')) _skinCard(context, d, () => open(Cat.health, HealthTab.body)),
         ];
 
         final footer = Padding(
@@ -102,7 +118,7 @@ class TodayPage extends StatelessWidget {
           ),
         );
 
-        final alerts = [if (error != null) error, if (unusual != null) unusual];
+        final alerts = [if (ouraState != null) ouraState, if (error != null) error, if (unusual != null) unusual];
         final more = [
           ...pairUp(pair),
           if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
@@ -116,13 +132,14 @@ class TodayPage extends StatelessWidget {
           single: [
             ...alerts,
             if (sleep != null) sleep,
+            if (rest != null) rest,
             if (week != null) week,
             if (foodCard != null) foodCard,
             ...more,
             footer,
           ],
           top: alerts,
-          left: [if (sleep != null) sleep, if (week != null) week],
+          left: [if (sleep != null) sleep, if (rest != null) rest, if (week != null) week],
           right: [if (foodCard != null) foodCard, ...more, footer],
         );
       },
@@ -217,6 +234,22 @@ class TodayPage extends StatelessWidget {
       unit: 'bpm',
       trend: trend,
       chart: last7.length >= 2 ? Sparkline(values: [for (final n in last7) n.sleepingHr!], color: c.heart) : null,
+      empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
+      onTap: onTap,
+    );
+  }
+
+  /// Οξυγόνο της νύχτας από το ρολόι όταν ο ύπνος είναι του Oura (χωρίς τον ύπνο του ρολογιού).
+  Widget _watchSpo2Card(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
+    final c = Aigaio.of(context);
+    final ox = d.watchSpo2(now);
+    return StatCard(
+      icon: Icons.air_rounded,
+      color: c.sleep,
+      title: 'Οξυγόνο · ρολόι',
+      value: ox?.avg.round().toString(),
+      unit: '%',
+      trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${ox.min.round()}%'),
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );

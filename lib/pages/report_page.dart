@@ -9,6 +9,7 @@ import '../format.dart';
 import '../history.dart';
 import '../report.dart';
 import '../samsung.dart';
+import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
 import '../widgets.dart';
@@ -42,7 +43,7 @@ class _ReportPageState extends State<ReportPage> {
     super.dispose();
   }
 
-  late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now());
+  late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now(), plan: widget.store.plan);
 
   String get _fileName {
     final t = _data.created;
@@ -314,7 +315,9 @@ class _Footer extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Μετρήσεις από ρολόι και ζυγαριά μέσω Samsung Health· δεν είναι ιατρικές μετρήσεις.',
+            data.plan?.hasOura == true
+                ? 'Μετρήσεις από ρολόι, δαχτυλίδι και ζυγαριά· δεν είναι ιατρικές μετρήσεις.'
+                : 'Μετρήσεις από ρολόι και ζυγαριά μέσω Samsung Health· δεν είναι ιατρικές μετρήσεις.',
             style: TextStyle(fontSize: 8, color: c.textTertiary),
           ),
         ),
@@ -360,8 +363,13 @@ class _PageOne extends StatelessWidget {
       return '${m ~/ 60}:${two(m % 60)}';
     }
 
+    final plan = d.plan ?? SourcePlan.samsungOnly;
+    final withOura = plan.hasOura;
     final rows = <(String, String, String Function(double), MetricDef?)>[
       ('Παλμοί στον ύπνο (bpm)', K.sleepHr, num0, _def(K.sleepHr)),
+      if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο (bpm)', K.lowHr, num0, _def(K.lowHr)),
+      if (withOura) ('HRV νύχτας, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
+      if (withOura) ('Αναπνοές στον ύπνο (το λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
       ('Οξυγόνο στον ύπνο, μέσο', K.spo2Avg, pct, _def(K.spo2Avg)),
       ('Οξυγόνο στον ύπνο, ελάχιστο της νύχτας', K.spo2Min, pct, null),
       ('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, dur, _def(K.sleepMin)),
@@ -369,6 +377,13 @@ class _PageOne extends StatelessWidget {
       ('Ώρα που ξύπνησε', K.wake, clockFromSix, null),
       ('Βήματα ανά μέρα', K.steps, (v) => thousands(v), _def(K.steps)),
     ];
+    // Η πηγή κάθε δείκτη, γραμμένη στη γραμμή του (απόφαση 2/11). Μετά από αλλαγή πηγής: «από τις …».
+    String label((String, String, String Function(double), MetricDef?) r) {
+      if (!withOura) return r.$1;
+      final s = d.stat(r.$2);
+      final since = s.since == null ? '' : ', από ${s.since!.day}/${s.since!.month}';
+      return '${r.$1} · ${sourceName(s.source)}$since';
+    }
 
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
     final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
@@ -380,6 +395,7 @@ class _PageOne extends StatelessWidget {
       final t = s.trend;
       if (def == null || t == null || t.status == TrendStatus.insufficient) return '—';
       if (t.status == TrendStatus.stable) return 'Σταθερό';
+      if (t.status == TrendStatus.sourceChange) return 'Αλλαγή συσκευής';
       final up = t.status == TrendStatus.up;
       if (def.kind == ValueKind.clock) return '${def.formatDiff(t.displayDiff!)} ${up ? 'αργότερα' : 'νωρίτερα'}';
       return '${up ? '↑' : '↓'} ${def.formatDiff(t.displayDiff!)}';
@@ -429,7 +445,7 @@ class _PageOne extends StatelessWidget {
                 final f = r.$3;
                 return TableRow(
                   children: [
-                    pad(Text(r.$1, style: cell)),
+                    pad(Text(label(r), style: cell)),
                     pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
                     pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
                     pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
@@ -503,9 +519,14 @@ class _PageOne extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
-          'αισθητήρας καρπού· «ελάχιστο» = μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
-          'Samsung. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
+          withOura
+              ? 'Πώς μετρήθηκαν: κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
+                  'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
+                  'Galaxy Watch Ultra 2. Οξυγόνο και βήματα: Galaxy Watch Ultra 2 (καρπός)· «ελάχιστο» = μία μεμονωμένη '
+                  'μέτρηση, όχι οξυμετρία. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής μετρούν μόνο οι μέρες της νέας.'
+              : 'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
+                  'αισθητήρας καρπού· «ελάχιστο» = μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
+                  'Samsung. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
           style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
         ),
         const Spacer(),
@@ -515,12 +536,7 @@ class _PageOne extends StatelessWidget {
   }
 }
 
-MetricDef? _def(String key) {
-  for (final m in trendMetrics) {
-    if (m.key == key) return m;
-  }
-  return null;
-}
+MetricDef? _def(String key) => metricDef(key);
 
 // --- Σελίδα 2: γραφήματα ---
 

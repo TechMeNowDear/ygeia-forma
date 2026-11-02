@@ -7,9 +7,11 @@ import '../food/food_channel.dart';
 import '../food/food_store.dart';
 import '../format.dart';
 import '../theme.dart';
+import '../sources.dart';
 import '../ti_ftanei.dart';
 import '../widgets.dart';
 import 'appearance.dart';
+import 'sources_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
@@ -61,6 +63,32 @@ class SettingsPage extends StatelessWidget {
                                       _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} · '
                                           'νύχτα ${Aigaio.night(store.prefs.nightTheme).name}',
                                     },
+                                    style: TextStyle(color: c.textSecondary, fontSize: 13.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AppCard(
+                        key: const ValueKey('settings-sources'),
+                        onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
+                        child: Row(
+                          children: [
+                            IconBadge(Icons.device_hub_rounded, c.sleep, size: 40),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Πηγές', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
+                                    'βήματα: ρολόι · βάρος: InBody',
                                     style: TextStyle(color: c.textSecondary, fontSize: 13.5),
                                   ),
                                 ],

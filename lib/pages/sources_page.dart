@@ -1,0 +1,309 @@
+import 'package:flutter/material.dart';
+
+import '../data.dart';
+import '../format.dart';
+import '../oura/oura_store.dart';
+import '../sources.dart';
+import '../theme.dart';
+import '../widgets.dart';
+import 'compare_page.dart';
+import 'oura_pages.dart';
+import 'source_widgets.dart';
+
+/// Ρυθμίσεις › Πηγές: οι συσκευές, και ο πίνακας «Από πού παίρνουμε τι» — φτιαγμένος ΑΠΟ τον πίνακα
+/// του κώδικα (sources.dart), ώστε η οθόνη να μη διαφωνεί ποτέ με ό,τι πραγματικά υπολογίζεται.
+class SourcesPage extends StatelessWidget {
+  const SourcesPage({super.key, required this.store, this.now});
+  final HealthStore store;
+
+  /// Για τα στιγμιότυπα δοκιμών.
+  final DateTime? now;
+
+  static const routeName = 'Πηγές';
+
+  static Route<void> route(HealthStore store, {DateTime? now}) => MaterialPageRoute<void>(
+        settings: const RouteSettings(name: routeName),
+        builder: (_) => SourcesPage(store: store, now: now),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Πηγές'), backgroundColor: c.background, surfaceTintColor: Colors.transparent),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          final today = dayOf(now ?? DateTime.now());
+          final plan = store.plan;
+          final d = store.data;
+          final nightSrc = plan.nightSource(today);
+
+          final devices = AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SectionLabel('Συσκευές'),
+                const SizedBox(height: 6),
+                _DeviceRow(
+                  icon: Icons.radio_button_unchecked_rounded,
+                  name: sourceDevice(Source.oura),
+                  status: _ouraStatus(store, today),
+                  action: store.ouraActive || store.ouraHasTokens ? 'Διαχείριση' : 'Σύνδεση',
+                  onTap: () => Navigator.of(context).push(
+                    store.ouraActive || store.ouraHasTokens
+                        ? OuraManagePage.route(store, now: now)
+                        : OuraConnectPage.route(store, now: now),
+                  ),
+                ),
+                const Hairline(vertical: 4),
+                _DeviceRow(
+                  icon: Icons.watch_rounded,
+                  name: sourceDevice(Source.watch),
+                  status: d == null ? 'Μέσω Samsung Health' : 'Μέσω Samsung Health · ${_when(d.readAt, today)}',
+                ),
+                const Hairline(vertical: 4),
+                _DeviceRow(
+                  icon: Icons.monitor_weight_outlined,
+                  name: sourceDevice(Source.scale),
+                  status: d?.latestBody == null
+                      ? 'Μέσω Samsung Health'
+                      : 'Μέσω Samsung Health · ${shortDayDate(d!.latestBody!.time)}',
+                ),
+              ],
+            ),
+          );
+
+          final table = AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SectionLabel('Από πού παίρνουμε τι'),
+                const SizedBox(height: 6),
+                Text(
+                  'Μία συσκευή για κάθε μέτρηση, ποτέ ανάμειξη, ούτε όταν λείπει.'
+                  '${plan.hasOura ? ' Ο ύπνος του ρολογιού φαίνεται μόνο στη Σύγκριση πηγών.' : ''}',
+                  style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                for (final (i, r) in sourceRows.indexed) ...[
+                  if (i > 0) const Hairline(vertical: 2),
+                  _TableRow(row: r, source: plan.sourceFor(r.metrics.first, today)),
+                ],
+              ],
+            ),
+          );
+
+          final notUsed = plan.hasOura
+              ? AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SectionLabel('Τι δεν χρησιμοποιούμε'),
+                      const SizedBox(height: 8),
+                      for (final t in notUsedWithOura)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Icon(Icons.block_rounded, size: 16, color: c.textTertiary),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(t, style: TextStyle(color: c.textSecondary, fontSize: 14, height: 1.35))),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              : null;
+
+          final history = plan.eras.isEmpty
+              ? null
+              : AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SectionLabel('Αλλαγές πηγής ύπνου'),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Οι παλιές νύχτες μένουν με την πηγή τους. Οι Τάσεις δεν συγκρίνουν ποτέ νύχτες από δύο συσκευές.',
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
+                      ),
+                      const SizedBox(height: 4),
+                      InfoRow('Ως ${dayMonthYear(DateTime(plan.eras.first.from.year, plan.eras.first.from.month, plan.eras.first.from.day - 1))}',
+                          sourceName(Source.watch)),
+                      for (final e in plan.eras) InfoRow('Από ${dayMonthYear(e.from)}', sourceName(e.source)),
+                    ],
+                  ),
+                );
+
+          final compare = plan.compareActive(today)
+              ? AppCard(
+                  key: const ValueKey('sources-compare'),
+                  onTap: () => Navigator.of(context).push(ComparePage.route(store, now: now)),
+                  child: Row(
+                    children: [
+                      IconBadge(Icons.compare_arrows_rounded, c.sleep, size: 40),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Σύγκριση πηγών', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Oura δίπλα στο ρολόι, μόνο για έλεγχο · ως ${shortDayDate(plan.compareUntil!)}',
+                              style: TextStyle(color: c.textSecondary, fontSize: 13.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+                    ],
+                  ),
+                )
+              : null;
+
+          final noSource = nightSrc == Source.none
+              ? EmptyCard(
+                  icon: Icons.bedtime_off_rounded,
+                  color: c.sleep,
+                  title: 'Ο ύπνος δεν έχει πηγή',
+                  text: 'Το Oura αποσυνδέθηκε. Οι νύχτες μένουν κενές ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι '
+                      'στη σελίδα «Oura».',
+                )
+              : null;
+
+          return LayoutBuilder(
+            builder: (context, box) {
+              final wide = box.maxWidth >= 760;
+              final left = <Widget>[if (noSource != null) noSource, devices, if (compare != null) compare, if (history != null) history];
+              final right = <Widget>[table, if (notUsed != null) notUsed];
+              Widget col(List<Widget> items) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final (i, w) in items.indexed) ...[if (i > 0) const SizedBox(height: 12), w],
+                    ],
+                  );
+              return ListView(
+                padding: EdgeInsets.fromLTRB(wide ? 28 : 16, 8, wide ? 28 : 16, 32),
+                children: [
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: wide ? 1080 : 680),
+                      child: wide
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: col(left)),
+                                const SizedBox(width: 16),
+                                Expanded(child: col(right)),
+                              ],
+                            )
+                          : col([...left, ...right]),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  static String _when(DateTime t, DateTime today) => sameDay(t, today) ? hm(t) : '${relativeDay(t, today)} ${hm(t)}';
+
+  static String _ouraStatus(HealthStore s, DateTime today) {
+    if (!s.ouraConfigured && !s.ouraHasTokens) return 'Η σύνδεση ενεργοποιείται τη μέρα που θα έρθει';
+    return switch (s.ouraStatus) {
+      OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
+      OuraStatus.disconnected => 'Αποσυνδέθηκε',
+      OuraStatus.reconnect => 'Χρειάζεται νέα σύνδεση',
+      OuraStatus.subscription => 'Η συνδρομή δεν είναι ενεργή',
+      _ => s.ouraLastSync == null
+          ? 'Συνδεδεμένο'
+          : 'Συνδεδεμένο · τελευταίος συγχρονισμός ${_when(s.ouraLastSync!, today)}',
+    };
+  }
+}
+
+class _DeviceRow extends StatelessWidget {
+  const _DeviceRow({required this.icon, required this.name, required this.status, this.action, this.onTap});
+  final IconData icon;
+  final String name;
+  final String status;
+  final String? action;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          IconBadge(icon, c.primary, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+                const SizedBox(height: 2),
+                Text(status, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+              ],
+            ),
+          ),
+          if (action != null) ...[
+            const SizedBox(width: 8),
+            Text(action!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.primary)),
+            Icon(Icons.chevron_right_rounded, color: c.primary, size: 20),
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return InkWell(
+      key: ValueKey('device-$name'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48), child: row),
+    );
+  }
+}
+
+class _TableRow extends StatelessWidget {
+  const _TableRow({required this.row, required this.source});
+  final SourceRow row;
+  final Source source;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(row.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
+                const SizedBox(height: 2),
+                Text(row.noteFor(source), style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.3)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          SourceTag(source),
+        ],
+      ),
+    );
+  }
+}

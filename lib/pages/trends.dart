@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
+import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
 import '../widgets.dart';
@@ -35,7 +36,7 @@ class _TrendsPageState extends State<TrendsPage> {
       builder: (context, _) {
         final c = Aigaio.of(context);
         final today = dayOf(widget.now ?? store.data?.readAt ?? DateTime.now());
-        final results = computeAllTrends(store.history, today, _period);
+        final results = computeAllTrends(store.history, today, _period, plan: store.plan);
         final changed = results.where((r) => r.changed).toList()..sort((a, b) => b.z.compareTo(a.z));
 
         final selector = _PeriodSelector(
@@ -226,7 +227,7 @@ class _ChangeRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(r.def.label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
+                Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                 const SizedBox(height: 2),
                 Text(
                   'από ${r.def.format(r.previous!)} σε ${r.def.format(r.current!)}',
@@ -303,7 +304,7 @@ class _MetricRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(r.def.label, style: TextStyle(fontSize: 15, color: c.textSecondary)),
+                      Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, color: c.textSecondary)),
                       const SizedBox(height: 2),
                       Text(
                         value,
@@ -365,8 +366,21 @@ class _MetricDetail extends StatelessWidget {
               dateLabel: dayMonth,
               levels: [
                 if (r.previous != null) (r.previousFrom, r.previousEnd, r.previous!, c.textSecondary),
-                if (r.current != null) (r.currentFrom, r.end, r.current!, c.text),
+                if (r.current != null && r.status != TrendStatus.sourceChange) (r.currentFrom, r.end, r.current!, c.text),
               ],
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (r.status == TrendStatus.sourceChange) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: c.tint(c.sleep), borderRadius: BorderRadius.circular(16)),
+              child: Text(
+                'Αλλαγή πηγής ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα η μέτρηση έρχεται από ${sourceDevice(r.source)}. '
+                'Δύο συσκευές δεν μετρούν το ίδιο, οπότε δεν συγκρίνω τιμές από πριν και μετά. Το γράφημα δείχνει μόνο '
+                'τις μέρες από την αλλαγή· η σύγκριση ξαναρχίζει όταν μαζευτούν αρκετές μέρες από τη νέα πηγή.',
+                style: style.copyWith(color: c.text),
+              ),
             ),
             const SizedBox(height: 10),
           ],
@@ -388,6 +402,7 @@ class _MetricDetail extends StatelessWidget {
                 ),
                 InfoRow('Με δεδομένα (τώρα)', count(r.nCurrent)),
                 InfoRow('Με δεδομένα (πριν)', count(r.nPrevious)),
+                if (r.source != Source.watch) InfoRow('Πηγή', sourceDevice(r.source)),
                 const Hairline(vertical: 8),
                 Text('Οι διακεκομμένες γραμμές στο γράφημα είναι η μεσαία τιμή κάθε περιόδου.', style: style),
                 const SizedBox(height: 6),
@@ -409,6 +424,7 @@ class TrendStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (r.status == TrendStatus.insufficient) return const TrendPill('Λίγα δεδομένα');
+    if (r.status == TrendStatus.sourceChange) return const TrendPill('Αλλαγή πηγής');
     if (r.status == TrendStatus.stable) return const TrendPill('Σταθερό');
     final up = r.status == TrendStatus.up;
     final kind = switch (r.goodness) {
@@ -440,7 +456,7 @@ String _explain(TrendResult r) {
   } else {
     b.write('Χρειάζονται δεδομένα τουλάχιστον ${r.needed} από τις $len μέρες κάθε περιόδου.');
   }
-  if (def.partial) {
+  if (def.partial && r.source == Source.watch) {
     b.write(' Μετρούν μόνο οι νύχτες που η Samsung δεν χώρισε σε κομμάτια, γιατί μόνο αυτές έχουν μία βαθμολογία.');
   }
   if (!def.includeToday) b.write(' Η σημερινή μέρα δεν μετράει, γιατί δεν έχει τελειώσει.');

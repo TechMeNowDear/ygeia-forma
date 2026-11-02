@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../format.dart';
+import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
 import '../weekly.dart';
@@ -172,7 +173,7 @@ class _WeekRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.def.label, style: TextStyle(fontSize: 14, color: c.textSecondary)),
+                Text(metricLabel(t.def, t.source), style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 const SizedBox(height: 1),
                 Text(
                   t.def.format(t.current!),
@@ -197,10 +198,10 @@ class _WeekRow extends StatelessWidget {
 String _weekday(DateTime d) => weekdayShort(d);
 
 /// Για να ξέρει η Σήμερα αν πρέπει να δείξει την κάρτα.
-WeekReview? currentWeekReview(Map<String, Map<String, double>> history, DateTime now) {
+WeekReview? currentWeekReview(Map<String, Map<String, double>> history, DateTime now, {SourcePlan? plan}) {
   final sunday = reviewWeekSunday(now);
   if (sunday == null || history.isEmpty) return null;
-  final r = buildWeekReview(history, sunday, now);
+  final r = buildWeekReview(history, sunday, now, plan: plan);
   final any = r.items.any((t) => t.current != null);
   return any ? r : null;
 }

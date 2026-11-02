@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
+import '../history.dart';
+import '../oura/oura_view.dart';
+import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'source_widgets.dart';
 
 class HeartPage extends StatelessWidget {
-  const HeartPage({super.key, required this.store});
+  const HeartPage({super.key, required this.store, this.now});
   final HealthStore store;
+
+  /// Για τα στιγμιότυπα δοκιμών.
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
@@ -39,16 +46,37 @@ class HeartPage extends StatelessWidget {
           );
         }
 
-        final rhrNights = d.nights.where((n) => n.sleepingHr != null).toList();
-        final rhrPoints = [
-          for (final n in rhrNights.length <= 30 ? rhrNights : rhrNights.sublist(rhrNights.length - 30))
-            (n.date, n.sleepingHr!),
-        ];
-        final lastRhr = rhrNights.isEmpty ? null : rhrNights.last.sleepingHr;
-        final base = d.restingHrBaseline;
+        // Παλμοί ύπνου: ΜΙΑ πηγή. Μετά τη σύνδεση του Oura μόνο οι νύχτες του Oura (από το ιστορικό, με τα
+        // κλειδιά του), με σύγκριση μόνο με νύχτες του Oura· πριν, όπως πάντα από το ρολόι.
+        final day = dayOf(now ?? d.readAt);
+        final ouraHr = store.plan.nightSource(day) != Source.watch;
+        final List<(DateTime, double)> rhrPoints;
+        final double? lastRhr;
+        final double? base;
+        if (ouraHr) {
+          rhrPoints = planSeries(store.history, store.plan, K.sleepHr, DateTime(day.year, day.month, day.day - 29), day).points;
+          final b = rhrPoints.isEmpty ? null : ouraBaseline(store.history, store.plan, K.sleepHr, rhrPoints.last.$1);
+          lastRhr = rhrPoints.isEmpty ? null : rhrPoints.last.$2;
+          base = b?.usual;
+        } else {
+          final rhrNights = d.nights.where((n) => n.sleepingHr != null).toList();
+          rhrPoints = [
+            for (final n in rhrNights.length <= 30 ? rhrNights : rhrNights.sublist(rhrNights.length - 30))
+              (n.date, n.sleepingHr!),
+          ];
+          lastRhr = rhrNights.isEmpty ? null : rhrNights.last.sleepingHr;
+          base = d.restingHrBaseline;
+        }
         final today = d.heartRange(d.readAt);
         final latest = d.latestHeart;
-        final oxNights = d.nights.where((n) => n.spo2Avg != null).toList().reversed.take(10).toList();
+        // Οξυγόνο: πάντα του ρολογιού. Μετά τη σύνδεση του Oura ανά νύχτα χωρίς τον ύπνο του ρολογιού.
+        final oxNights = ouraHr
+            ? [
+                for (var i = 0; i < 14; i++)
+                  if (d.watchSpo2(DateTime(day.year, day.month, day.day - i)) case final o?)
+                    (DateTime(day.year, day.month, day.day - i), o.avg, o.min),
+              ].take(10).toList()
+            : [for (final n in d.nights.where((n) => n.spo2Avg != null).toList().reversed.take(10)) (n.date, n.spo2Avg!, n.spo2Min)];
 
         Widget? trend;
         if (lastRhr != null && base != null) {
@@ -71,13 +99,21 @@ class HeartPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.bedtime_rounded, title: 'Παλμοί στον ύπνο', color: c.sleep),
+                  CardHeader(
+                    icon: Icons.bedtime_rounded,
+                    title: 'Παλμοί στον ύπνο',
+                    color: c.sleep,
+                    trailing: ouraHr ? const SourceTag(Source.oura) : null,
+                  ),
                   const SizedBox(height: 14),
                   if (lastRhr != null) BigValue('${lastRhr.round()}', unit: 'bpm', size: 34),
                   if (trend != null) ...[const SizedBox(height: 8), trend],
                   const SizedBox(height: 8),
                   Text(
-                    'Ο μέσος όρος των παλμών σου όσο κοιμάσαι, κάθε νύχτα. Είναι συνήθως λίγο πιο χαμηλά από την ηρεμία όταν είσαι ξύπνιος.',
+                    ouraHr
+                        ? 'Ο μέσος όρος των παλμών σου όσο κοιμάσαι, κάθε νύχτα, από το δαχτυλίδι. Συγκρίνεται μόνο με '
+                            'τις νύχτες σου από το Oura.'
+                        : 'Ο μέσος όρος των παλμών σου όσο κοιμάσαι, κάθε νύχτα. Είναι συνήθως λίγο πιο χαμηλά από την ηρεμία όταν είσαι ξύπνιος.',
                     style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
                   if (rhrPoints.length >= 2) ...[
@@ -113,7 +149,12 @@ class HeartPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.air_rounded, title: 'Οξυγόνο στον ύπνο', color: c.sleep),
+                  CardHeader(
+                    icon: Icons.air_rounded,
+                    title: 'Οξυγόνο στον ύπνο',
+                    color: c.sleep,
+                    trailing: ouraHr ? const SourceTag(Source.watch) : null,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού. Μεμονωμένες χαμηλές τιμές '
@@ -127,18 +168,26 @@ class HeartPage extends StatelessWidget {
                     Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
                   for (final n in oxNights)
                     InfoRow(
-                      shortDayDate(n.date),
-                      '${n.spo2Avg!.round()}% · χαμηλότερη μέτρηση ${n.spo2Min?.round() ?? '—'}%',
+                      shortDayDate(n.$1),
+                      '${n.$2.round()}% · χαμηλότερη μέτρηση ${n.$3?.round() ?? '—'}%',
                     ),
                 ],
               ),
             ),
-            EmptyCard(
-              icon: Icons.timeline_rounded,
-              color: c.sleep,
-              title: 'HRV (μεταβλητότητα παλμών)',
-              text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές, γι\' αυτό δεν φαίνεται εδώ.',
-            ),
+            if (!ouraHr)
+              EmptyCard(
+                icon: Icons.timeline_rounded,
+                color: c.sleep,
+                title: 'HRV (μεταβλητότητα παλμών)',
+                text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές, γι\' αυτό δεν φαίνεται εδώ.',
+              )
+            else
+              EmptyCard(
+                icon: Icons.timeline_rounded,
+                color: c.sleep,
+                title: 'HRV (μεταβλητότητα παλμών)',
+                text: 'Έρχεται από το Oura: Υγεία › Ύπνος › «Καρδιά στον ύπνο».',
+              ),
           ],
         );
       },

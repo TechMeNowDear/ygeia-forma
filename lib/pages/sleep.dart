@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
+import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'oura_sleep.dart';
 
 class SleepPage extends StatelessWidget {
-  const SleepPage({super.key, required this.store});
+  const SleepPage({super.key, required this.store, this.now});
   final HealthStore store;
+
+  /// Για τα στιγμιότυπα δοκιμών.
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +20,10 @@ class SleepPage extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final c = Aigaio.of(context);
+        // Μετά τη σύνδεση του Oura (ή την αποσύνδεσή του χωρίς άλλη πηγή): μόνο ύπνος από το Oura.
+        if (store.plan.nightSource(now ?? DateTime.now()) != Source.watch) {
+          return OuraSleepPage(store: store, now: now);
+        }
         final d = store.data;
         final nights = d?.nights ?? const <Night>[];
         if (d == null || nights.isEmpty) {
