@@ -245,6 +245,10 @@ class OuraRestCard extends StatelessWidget {
   final DateTime now;
   final VoidCallback onTap;
 
+  /// Αν η νύχτα έχει έστω μία από τις τιμές της κάρτας.
+  static bool hasData(HealthStore s, DateTime now) =>
+      [K.hrv, K.sleepHr, K.skinTemp, K.energy].any((k) => s.plan.value(s.history, k, dayOf(now)) != null);
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);

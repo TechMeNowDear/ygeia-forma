@@ -80,7 +80,8 @@ class TodayPage extends StatelessWidget {
             : ouraNight
                 ? OuraSleepTodayCard(store: store, now: now, onTap: openSleep)
                 : _SleepCard(data: d, onTap: openSleep);
-        final rest = ouraNight && store.plan.nightSource(now) == Source.oura
+        // Μόνο όταν η χθεσινή νύχτα έχει τιμές από το Oura (αλλιώς η κάρτα ύπνου λέει ήδη γιατί λείπει).
+        final rest = ouraNight && store.plan.nightSource(now) == Source.oura && OuraRestCard.hasData(store, now)
             ? OuraRestCard(store: store, now: now, onTap: openSleep)
             : null;
         final ouraState = ouraNight && OuraStatusCard.shows(store) ? OuraStatusCard(store: store, now: now) : null;

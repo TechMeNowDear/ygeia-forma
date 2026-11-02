@@ -193,11 +193,11 @@ class _CompareCard extends StatelessWidget {
 
     TableRow line(String label, String oura, String watch) => TableRow(children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
+            padding: const EdgeInsets.fromLTRB(0, 7, 8, 7),
             child: Text(label, style: TextStyle(fontSize: 14, color: c.textSecondary)),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
+            padding: const EdgeInsets.fromLTRB(0, 7, 10, 7),
             child: Text(oura, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular)),
           ),
           Padding(

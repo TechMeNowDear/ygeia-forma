@@ -42,3 +42,15 @@ Secrets του GitHub (ή από την προσωρινή μνήμη του Git
 - Δοκιμή: commit με `[sentry-test]` στο μήνυμα (ή χειροκίνητο χτίσιμο με «Στείλε και ένα δοκιμαστικό σφάλμα»)
   στέλνει πραγματικό σφάλμα με τον ίδιο κώδικα (`test/sentry_live_test.dart`).
 - Το DSN μέσα στον κώδικα **δεν** είναι μυστικό: επιτρέπει μόνο αποστολή σφαλμάτων, όχι ανάγνωση.
+
+## Oura Ring 5
+
+- Πηγές: ένας πίνακας στο `lib/sources.dart` (μία πηγή ανά μέτρηση, ποτέ ανάμειξη). Από τη μέρα της σύνδεσης ο ύπνος,
+  οι παλμοί/HRV/αναπνοές ύπνου, η θερμοκρασία και η ετοιμότητα έρχονται μόνο από το Oura· οξυγόνο, βήματα, παλμοί μέρας
+  από το ρολόι· βάρος από την InBody. Οι τιμές του Oura αποθηκεύονται με πρόθεμα `o.` στο ιστορικό.
+- Σύνδεση: OAuth2 με PKCE, χωρίς Client Secret (`lib/oura/`). Ρυθμίσεις σε ένα σημείο: `lib/oura/config.dart`
+  (`ouraClientId`, `ouraTokenProxy`, `ouraOAuth`). Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
+- Τη μέρα του δαχτυλιδιού: εγγραφή εφαρμογής στο https://cloud.ouraring.com/oauth/applications με Redirect URI
+  `ygeiaforma://oura-callback`, και το Client ID στο `ouraClientId`.
+- Το manifest (από το `flutter create`) συμπληρώνεται από το `tools/android/patch_manifest.py` (singleTask, επιστροφή, `<queries>`).
+- Έλεγχος με το sandbox της Oura: job «oura-sandbox» στο `check.yml` (`test/oura_sandbox_live_test.dart`).
