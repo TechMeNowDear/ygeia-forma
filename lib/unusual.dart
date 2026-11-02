@@ -42,7 +42,11 @@ class UnusualSignal {
     required this.spread,
     required this.threshold,
     required this.baselineCount,
+    this.source = Source.watch,
   });
+
+  /// Από ποια συσκευή είναι η τιμή και το «συνηθισμένο» (πάντα η ίδια).
+  final Source source;
 
   final UnusualRule rule;
   final double value;
@@ -104,6 +108,7 @@ UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime da
       spread: spread,
       threshold: threshold,
       baselineCount: base.length,
+      source: p.sourceFor(rule.key, day),
     ));
   }
   final prev = checkPrevious ? checkUnusual(history, add(day, -1), checkPrevious: false, plan: p).show : false;

@@ -149,9 +149,12 @@ Set<String> mergeOura(
 /// π.χ. τη μέρα της σύνδεσης του Oura, που μπορεί να είχε ήδη γραφτεί το πρωί από το ρολόι.
 Set<String> stripForeignWatchNight(Map<String, Map<String, double>> history, SourcePlan plan, {required DateTime from}) {
   final changed = <String>{};
+  final fromKey = dateKey(from);
   for (final e in history.entries.toList()) {
+    // Τα κλειδιά «2026-11-06» ταξινομούνται σαν ημερομηνίες: οι παλιές μέρες προσπερνιούνται χωρίς ανάλυση.
+    if (e.key.compareTo(fromKey) < 0) continue;
     final day = parseDateKey(e.key);
-    if (day.isBefore(dayOf(from)) || plan.nightSource(day) == Source.watch) continue;
+    if (plan.nightSource(day) == Source.watch) continue;
     if (!e.value.keys.any(watchNightKeys.contains)) continue;
     history[e.key] = {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value};
     changed.add(e.key);
@@ -257,7 +260,11 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
   }
 
   // Παλμοί μέσα στη μέρα (μόνο όταν υπάρχουν βήματα ανά λεπτό).
-  final h = p.hasOura ? _heartWithPlan(d, day, p, windows) : d.heartForDay(day);
+  // Ο ύπνος που εξαιρείται έρχεται από την πηγή ΚΑΘΕ νύχτας (της νύχτας που τελειώνει το πρωί και αυτής που
+  // αρχίζει το βράδυ), όχι από το «αν συνδέθηκε ποτέ το Oura». Με το ρολόι και στις δύο: όπως πάντα.
+  final next = DateTime(day.year, day.month, day.day + 1);
+  final planned = p.nightSource(day) != Source.watch || p.nightSource(next) != Source.watch;
+  final h = planned ? _heartWithPlan(d, day, p, windows) : d.heartForDay(day);
   if (h != null) {
     // Υπολογίζονται και κρατιούνται (για αργότερα), αλλά δεν φαίνονται πια: δικοί μας ορισμοί χωρίς επαλήθευση.
     put(K.restHr, h.resting.value);

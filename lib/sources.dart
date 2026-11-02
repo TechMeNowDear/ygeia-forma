@@ -299,15 +299,18 @@ class SourcePlan {
   }
 
   /// Οι μέρες που η μέτρηση [metric] αλλάζει πηγή (η πρώτη μέρα της νέας πηγής), παλιότερη πρώτη.
+  /// Μετρούν μόνο οι πηγές που ΔΙΝΟΥΝ τη μέτρηση: μια εποχή χωρίς τιμή (π.χ. «καμία», ή το ρολόι για το HRV)
+  /// δεν είναι αλλαγή η ίδια, αλλά ρολόι → [κενό] → Oura είναι αλλαγή στην αρχή του Oura. Έτσι:
+  /// - HRV/αναπνοές/χαμηλότεροι παλμοί (μόνο Oura) δεν έχουν ποτέ «αλλαγή πηγής»· απλώς λίγα δεδομένα στην αρχή.
+  /// - Ύπνος: ρολόι → Oura → καμία → ρολόι έχει αλλαγές στην αρχή του Oura και στην αρχή του ρολογιού.
   List<DateTime> changeDates(String metric) {
     if (metricGroups[metric] != SourceGroup.night) return const [];
     final out = <DateTime>[];
-    var prev = Source.watch;
+    Source? prev = storageKey(metric, Source.watch) != null ? Source.watch : null;
     for (final e in eras) {
-      if (e.source != prev) {
-        out.add(e.from);
-        prev = e.source;
-      }
+      if (storageKey(metric, e.source) == null) continue;
+      if (prev != null && e.source != prev) out.add(e.from);
+      prev = e.source;
     }
     return out;
   }
@@ -333,68 +336,50 @@ class SourcePlan {
     return null;
   }
 
-  /// Ως ποια μέρα φαίνεται η «Σύγκριση πηγών» (μαζί).
+  /// Η τελευταία νύχτα της «Σύγκρισης πηγών»: ακριβώς [compareDays] νύχτες από την αρχή του (τελευταίου) Oura.
   DateTime? get compareUntil {
     final f = ouraFrom;
-    return f == null ? null : DateTime(f.year, f.month, f.day + compareDays);
+    return f == null ? null : DateTime(f.year, f.month, f.day + compareDays - 1);
   }
 
-  /// Αν φαίνεται σήμερα η «Σύγκριση πηγών».
+  /// Αν φαίνεται σήμερα η «Σύγκριση πηγών»: μόνο όσο ο ύπνος είναι του Oura (όχι μετά από αποσύνδεση
+  /// ή «ξανά από το ρολόι»), και μόνο τις [compareDays] πρώτες νύχτες.
   bool compareActive(DateTime today) {
     final f = ouraFrom;
     final u = compareUntil;
     if (f == null || u == null) return false;
     final d = dayOf(today);
-    return !d.isBefore(f) && !d.isAfter(u);
+    return nightSource(d) == Source.oura && !d.isBefore(f) && !d.isAfter(u);
   }
 
-  /// Αν επιτρέπεται να διαβαστεί ο ύπνος του ρολογιού για τη νύχτα [day]: όταν το ρολόι είναι η πηγή,
-  /// ή για τη «Σύγκριση πηγών» τις πρώτες [compareDays] μέρες κάθε σύνδεσης του Oura.
-  bool watchSleepAllowed(DateTime day) {
+  /// Αν επιτρέπεται σήμερα ([today]) να διαβαστεί ο ύπνος του ρολογιού για τη νύχτα [day]: όταν το ρολόι
+  /// είναι η πηγή της, ή για τη «Σύγκριση πηγών» όσο αυτή είναι ανοιχτή.
+  bool watchSleepAllowed(DateTime day, DateTime today) {
     final d = dayOf(day);
     if (nightSource(d) == Source.watch) return true;
-    for (var i = 0; i < eras.length; i++) {
-      final e = eras[i];
-      if (e.source != Source.oura) continue;
-      var end = DateTime(e.from.year, e.from.month, e.from.day + compareDays);
-      // Η σύγκριση τελειώνει και όταν αρχίζει νέα εποχή (π.χ. αποσύνδεση την 3η μέρα).
-      if (i + 1 < eras.length) {
-        final next = eras[i + 1].from;
-        final lastOfEra = DateTime(next.year, next.month, next.day - 1);
-        if (lastOfEra.isBefore(end)) end = lastOfEra;
-      }
-      if (!d.isBefore(e.from) && !d.isAfter(end)) return true;
-    }
-    return false;
+    if (!compareActive(today)) return false;
+    final f = ouraFrom!;
+    return !d.isBefore(f) && !d.isAfter(compareUntil!) && nightSource(d) == Source.oura;
   }
 
-  /// Ως ποια νύχτα (μαζί) διαβάζεται ο ύπνος του ρολογιού από τη Samsung. null = χωρίς όριο.
+  /// Ως ποια νύχτα (μαζί) διαβάζεται σήμερα ([today]) ο ύπνος του ρολογιού από τη Samsung. null = χωρίς όριο.
   /// - Τελευταία εποχή ρολόι: χωρίς όριο.
-  /// - Αλλιώς: η τελευταία νύχτα που επιτρέπεται ([watchSleepAllowed]): το τέλος της τελευταίας εποχής
-  ///   ρολογιού ή της «Σύγκρισης πηγών» (σύνδεση + [compareDays]). Μετά ο ύπνος του ρολογιού δεν διαβάζεται.
-  DateTime? get watchSleepCutoff {
+  /// - Αλλιώς η τελευταία νύχτα του ρολογιού, ή όσο η σύγκριση είναι ανοιχτή η τελευταία νύχτα της.
+  ///   Μόλις κλείσει η σύγκριση, το όριο πέφτει πάλι στην τελευταία νύχτα του ρολογιού: δεν ξαναδιαβάζεται
+  ///   ύπνος ρολογιού για νύχτες του Oura (ούτε στην ανάγνωση των 30 ημερών).
+  DateTime? watchSleepCutoff(DateTime today) {
     if (eras.isEmpty || eras.last.source == Source.watch) return null;
     DateTime? best;
-    for (var i = -1; i < eras.length; i++) {
-      // i = −1: η αρχική εποχή του ρολογιού, πριν από την πρώτη αλλαγή.
+    for (var i = -1; i < eras.length - 1; i++) {
       final source = i < 0 ? Source.watch : eras[i].source;
-      final nextFrom = i + 1 < eras.length ? eras[i + 1].from : null;
-      if (nextFrom == null) continue; // η τελευταία εποχή δεν είναι ρολόι (έλεγχος πάνω)
-      final lastOfEra = DateTime(nextFrom.year, nextFrom.month, nextFrom.day - 1);
-      DateTime? end;
-      if (source == Source.watch) {
-        end = lastOfEra;
-      } else if (source == Source.oura) {
-        final f = eras[i].from;
-        final c = DateTime(f.year, f.month, f.day + compareDays);
-        end = c.isBefore(lastOfEra) ? c : lastOfEra;
-      }
-      if (end != null && (best == null || end.isAfter(best))) best = end;
+      if (source != Source.watch) continue;
+      final next = eras[i + 1].from;
+      final lastOfEra = DateTime(next.year, next.month, next.day - 1);
+      if (best == null || lastOfEra.isAfter(best)) best = lastOfEra;
     }
-    final last = eras.last;
-    if (last.source == Source.oura) {
-      final c = DateTime(last.from.year, last.from.month, last.from.day + compareDays);
-      if (best == null || c.isAfter(best)) best = c;
+    if (compareActive(today)) {
+      final u = compareUntil!;
+      if (best == null || u.isAfter(best)) best = u;
     }
     return best;
   }

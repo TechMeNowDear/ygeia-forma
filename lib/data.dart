@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/widgets.dart';
 
 import 'error_report.dart';
 import 'format.dart';
 import 'history.dart';
 import 'oura/oura_store.dart';
+import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
 import 'sources.dart';
@@ -191,23 +193,32 @@ class Dashboard {
   /// «Σύγκριση πηγών» τις πρώτες 14 μέρες. Καμία άλλη οθόνη ή υπολογισμός δεν τις διαβάζει.
   final List<Night> compareNights;
 
-  /// Ίδια δεδομένα, με τις νύχτες χωρισμένες κατά το σχέδιο πηγών: στις [nights] μένουν ΜΟΝΟ οι νύχτες που
-  /// η πηγή τους είναι το ρολόι. Έτσι καμία οθόνη δεν μπορεί να δείξει ύπνο του ρολογιού για νύχτα του Oura.
+  /// Για τις ΟΘΟΝΕΣ (όχι για το ιστορικό, που υπολογίζεται από τα πλήρη δεδομένα με το σχέδιο πηγών):
+  /// - στις [nights] μένουν μόνο νύχτες του ρολογιού της τρέχουσας εποχής ρολογιού (μετά από «ξανά από το
+  ///   ρολόι» δεν φαίνονται νύχτες από πριν από το Oura· όσο ο ύπνος είναι του Oura ή χωρίς πηγή, καμία),
+  /// - στις [compareNights] οι νύχτες του ρολογιού για τη «Σύγκριση πηγών», μόνο όσο είναι ανοιχτή,
+  /// - το Energy Score της Samsung μόνο όσο η «νύχτα» είναι του ρολογιού, από την τρέχουσα εποχή.
+  /// Έτσι καμία οθόνη δεν δείχνει ύπνο του ρολογιού για νύχτα του Oura, ούτε συγκρίνει πάνω από αλλαγή πηγής.
   Dashboard restrict(SourcePlan plan) {
+    if (plan.eras.isEmpty) return this;
+    final today = dayOf(readAt);
     final all = [...nights, ...compareNights]..sort((a, b) => a.date.compareTo(b.date));
+    final watchNow = plan.nightSource(today) == Source.watch;
+    final seg = plan.segmentStart(K.sleepMin, today);
+    bool current(DateTime d) => watchNow && plan.nightSource(d) == Source.watch && (seg == null || !d.isBefore(seg));
     return Dashboard._(
       readAt: readAt,
       granted: granted,
       total: total,
-      nights: [for (final n in all) if (plan.nightSource(n.date) == Source.watch) n],
+      nights: [for (final n in all) if (current(n.date)) n],
       compareNights: [
         for (final n in all)
-          if (plan.nightSource(n.date) != Source.watch && plan.watchSleepAllowed(n.date)) n,
+          if (plan.nightSource(n.date) != Source.watch && plan.watchSleepAllowed(n.date, today)) n,
       ],
       heart: heart,
       spo2: spo2,
       skin: skin,
-      energy: energy,
+      energy: [for (final e in energy) if (current(e.day)) e],
       steps: steps,
       floors: floors,
       body: body,
@@ -557,9 +568,12 @@ class Dashboard {
     return mean(last7.map((s) => s.value));
   }
 
-  /// Ελάχιστοι και μέγιστοι παλμοί μιας ημέρας.
-  (double, double)? heartRange(DateTime day) {
-    final s = heart.where((h) => sameDay(h.start, day)).toList();
+  /// Ελάχιστοι και μέγιστοι παλμοί μιας ημέρας. [exclude]: χρονικά διαστήματα (π.χ. ο ύπνος από το Oura)
+  /// που δεν μετρούν, ώστε το «χαμηλότερο της μέρας» να μην είναι παλμός του ύπνου.
+  (double, double)? heartRange(DateTime day, {List<(DateTime, DateTime)> exclude = const []}) {
+    final s = heart
+        .where((h) => sameDay(h.start, day) && !exclude.any((r) => h.start.isBefore(r.$2) && h.end.isAfter(r.$1)))
+        .toList();
     if (s.isEmpty) return null;
     return (s.map((h) => h.min).reduce(math.min), s.map((h) => h.max).reduce(math.max));
   }
@@ -615,7 +629,9 @@ class Prefs {
       this.emptyChecked,
       SourcePlan? plan,
       this.ouraSynced,
-      this.ouraSyncedTo})
+      this.ouraSyncedTo,
+      this.ouraTried,
+      this.ouraBackoff})
       : plan = plan ?? SourcePlan.samsungOnly;
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
@@ -644,11 +660,18 @@ class Prefs {
       plan: SourcePlan.fromJson(j['sources']),
       ouraSynced: (j['ouraSynced'] as num?)?.toInt(),
       ouraSyncedTo: j['ouraSyncedTo'] is String ? j['ouraSyncedTo'] as String : null,
+      ouraTried: (j['ouraTried'] as num?)?.toInt(),
+      ouraBackoff: (j['ouraBackoff'] as num?)?.toInt(),
     );
   }
 
-  /// Από πού έρχεται κάθε μέτρηση και από πότε (δες sources.dart).
+  /// ΑΝΤΙΓΡΑΦΟ του σχεδίου πηγών. Το κύριο είναι στο δικό του αρχείο (plan_file.dart)· αυτό χρησιμεύει μόνο
+  /// αν εκείνο χαθεί και οι ρυθμίσεις διαβάστηκαν κανονικά.
   SourcePlan plan;
+
+  /// Πότε δοκιμάστηκε τελευταία φορά ανάγνωση του Oura (ms, με ή χωρίς επιτυχία) και ως πότε περιμένουμε (ms).
+  int? ouraTried;
+  int? ouraBackoff;
 
   /// Πότε διαβάστηκε τελευταία φορά το Oura με επιτυχία (ms) και ως ποια μέρα («2026-11-07»).
   int? ouraSynced;
@@ -701,10 +724,10 @@ class Prefs {
         'emptyFrom': emptyFrom,
         'emptyChecked': emptyChecked,
         if (plan.eras.isNotEmpty) 'sources': plan.toJson(),
-        // Για την πλευρά Android (SleepPolicy.kt): ως ποια νύχτα διαβάζεται ο ύπνος του ρολογιού.
-        if (plan.watchSleepCutoff != null) 'sleepUntil': dateKey(plan.watchSleepCutoff!),
         if (ouraSynced != null) 'ouraSynced': ouraSynced,
         if (ouraSyncedTo != null) 'ouraSyncedTo': ouraSyncedTo,
+        if (ouraTried != null) 'ouraTried': ouraTried,
+        if (ouraBackoff != null) 'ouraBackoff': ouraBackoff,
       });
 }
 
@@ -793,10 +816,16 @@ ParsedDashboard parseDashboardSync(String raw) {
 // ---------------------------------------------------------------------------
 
 class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore {
-  /// Τα δεδομένα της Samsung, χωρισμένα πάντα κατά το σχέδιο πηγών ([Dashboard.restrict]).
+  /// Τα δεδομένα της Samsung για τις οθόνες, χωρισμένα πάντα κατά το σχέδιο πηγών ([Dashboard.restrict]).
+  /// Το ιστορικό υπολογίζεται από τα πλήρη ([_raw]) με το σχέδιο πηγών.
   Dashboard? get data => _data;
-  set data(Dashboard? d) => _data = d?.restrict(prefs.plan);
+  set data(Dashboard? d) {
+    _raw = d;
+    _data = d?.restrict(_plan);
+  }
+
   Dashboard? _data;
+  Dashboard? _raw;
   bool loading = false;
   Map<String, dynamic>? error;
   Prefs prefs = Prefs.fromJson(const {});
@@ -806,9 +835,87 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   Map<String, Map<String, double>> history = {};
 
-  /// Το σχέδιο πηγών (από τις ρυθμίσεις).
+  /// Το σχέδιο πηγών: από το δικό του αρχείο (plan_file.dart). Ως να διαβαστεί, τίποτα δεν γράφεται.
   @override
-  SourcePlan get plan => prefs.plan;
+  SourcePlan get plan => _plan;
+  SourcePlan _plan = SourcePlan.samsungOnly;
+  PlanState planState = PlanState.loading;
+
+  /// Πού κρατιέται το σχέδιο (αντικαθίσταται στις δοκιμές).
+  PlanFile planFile = const ChannelPlanFile();
+  String? _planFileWritten;
+
+  @override
+  bool get planReady => planState == PlanState.ok;
+
+  /// Ιστορικό γράφεται μόνο με διαβασμένες ρυθμίσεις, διαβασμένο ιστορικό και γνωστό σχέδιο πηγών.
+  bool get _canWrite => _historyLoaded && _prefsLoaded && planState == PlanState.ok;
+
+  @override
+  int? get ouraTriedMs => prefs.ouraTried;
+  @override
+  set ouraTriedMs(int? v) => prefs.ouraTried = v;
+  @override
+  int? get ouraBackoffMs => prefs.ouraBackoff;
+  @override
+  set ouraBackoffMs(int? v) => prefs.ouraBackoff = v;
+
+  /// Για τους ελέγχους και τα στιγμιότυπα: ορίζει το σχέδιο χωρίς αρχείο.
+  @visibleForTesting
+  void debugSetPlan(SourcePlan p, {PlanState state = PlanState.ok}) {
+    _plan = p;
+    prefs.plan = p;
+    planState = state;
+    _data = _raw?.restrict(p);
+  }
+
+  /// Διαβάζει (ή ξανακρίνει) το σχέδιο πηγών. Δες [resolvePlan].
+  Future<void> _loadPlan() async {
+    if (planState == PlanState.ok) return;
+    final r = resolvePlan(
+      file: await planFile.read(),
+      trustedPrefsPlan: _prefsLoaded && !_prefsDefaulted ? prefs.plan : null,
+      history: _historyLoaded ? history : null,
+      today: DateTime.now(),
+    );
+    if (r.rewrite && !await planFile.write(encodePlanFile(r.plan, DateTime.now()))) {
+      // Δεν γράφτηκε το αρχείο: ξανά στην επόμενη ανανέωση, χωρίς να γράψουμε τίποτα ως τότε.
+      planState = PlanState.loading;
+      return;
+    }
+    _plan = r.plan;
+    planState = r.state;
+    _data = _raw?.restrict(_plan);
+    if (planState == PlanState.ok) {
+      prefs.plan = _plan;
+      // Οι ρυθμίσεις ξεκίνησαν από προεπιλογές (χαλασμένο αρχείο): τώρα που το σχέδιο είναι γνωστό, γράφονται
+      // μαζί με το αντίγραφό του.
+      if (_prefsDefaulted && _prefsLoaded) await _savePrefs();
+    }
+    notifyListeners();
+  }
+
+  /// Το όριο του ύπνου του ρολογιού αλλάζει με τις μέρες (π.χ. όταν κλείνει η «Σύγκριση πηγών»): το αρχείο
+  /// ξαναγράφεται πριν από κάθε ανάγνωση της Samsung, μόνο αν άλλαξε.
+  Future<void> _syncPlanFile() async {
+    if (planState != PlanState.ok || _plan.eras.isEmpty) return;
+    final json = encodePlanFile(_plan, DateTime.now());
+    if (json == _planFileWritten) return;
+    if (await planFile.write(json)) _planFileWritten = json;
+  }
+
+  /// Μετά από «άγνωστο» σχέδιο: ο χρήστης διαλέγει ρητά (Ρυθμίσεις › Πηγές).
+  Future<bool> recoverPlan(SourcePlan p) async {
+    if (planState != PlanState.unknown || !_prefsLoaded) return false;
+    if (!await planFile.write(encodePlanFile(p, DateTime.now()))) return false;
+    _plan = p;
+    prefs.plan = p;
+    planState = PlanState.ok;
+    _data = _raw?.restrict(p);
+    notifyListeners();
+    await _savePrefs();
+    return true;
+  }
 
   @override
   int? get ouraSyncedMs => prefs.ouraSynced;
@@ -832,6 +939,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   static const _recentDays = 7; // όσες μέρες έχουν βήματα ανά λεπτό στην κανονική ανάγνωση
 
   bool _prefsLoaded = false;
+
+  /// Οι ρυθμίσεις ΔΕΝ διαβάστηκαν (χαλασμένο αρχείο) και ξεκινήσαμε από τις προεπιλογές: δεν γράφονται πάνω
+  /// στο αρχείο ως να είναι γνωστό το σχέδιο πηγών (ώστε το αντίγραφό του να μη χαθεί).
+  bool _prefsDefaulted = false;
   int _prefsErrors = 0;
   Future<void>? _prefsLoad;
 
@@ -860,14 +971,17 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       // Το αρχείο υπάρχει αλλά δεν διαβάστηκε τώρα (kind «read»): ξανά αργότερα, ποτέ προεπιλογές
       // από πάνω του. Άλλο σφάλμα (π.χ. χαλασμένο αρχείο) δύο φορές: ξεκινάμε από τις προεπιλογές.
       if (r['kind'] == 'read' || ++_prefsErrors < 2) return;
+      _prefsDefaulted = true;
     } else {
       try {
         prefs = Prefs.fromJson(r);
-        _data = _data?.restrict(prefs.plan);
       } catch (_) {
         if (++_prefsErrors < 2) return;
+        _prefsDefaulted = true;
       }
     }
+    // Το σχέδιο πηγών δεν έρχεται από τις ρυθμίσεις (έχει δικό του αρχείο)· κρατάμε όποιο ξέρουμε ήδη.
+    if (planState == PlanState.ok) prefs.plan = _plan;
     // Ό,τι άλλαξε ο χρήστης όσο περιμέναμε (π.χ. θέμα) μπαίνει πάνω στις ρυθμίσεις που ήρθαν.
     final pending = [..._pendingPrefChanges];
     _pendingPrefChanges.clear();
@@ -896,6 +1010,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   Future<bool> _savePrefs() {
     if (!_prefsLoaded) return Future.value(false);
+    if (_prefsDefaulted && planState != PlanState.ok) return Future.value(false);
     final json = prefs.toJson();
     return _prefsSaves = _prefsSaves.catchError((_) => false).then((_) async {
       final r = await SamsungHealth.savePrefs(json);
@@ -910,6 +1025,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // Αν δεν ήρθαν ακόμα, μία ακόμα προσπάθεια εδώ· μετά ξαναδοκιμάζει κάθε ανανέωση.
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
     await _loadHistory();
+    await _loadPlan();
     await _upgradeHistory();
     await startOura();
     final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw());
@@ -933,6 +1049,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       }
     }
 
+    // Το σχέδιο πηγών πριν από την ανάγνωση: η Samsung διαβάζει ύπνο του ρολογιού μόνο ως το όριό του.
+    if (planState != PlanState.ok) await _loadPlan();
+    await _syncPlanFile();
+
     // Χωρίς απάντηση σε 90″ (π.χ. κόλλησε η Samsung) δεν μένει «φορτώνει» για πάντα.
     final raw = await SamsungHealth.dashboardRaw().timeout(const Duration(seconds: 90),
         onTimeout: () => jsonEncode({'ok': false, 'kind': 'other', 'message': 'Η Samsung δεν απάντησε. Δοκίμασε ξανά.'}));
@@ -951,18 +1071,20 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
 
-    final d = data;
+    final d = _raw;
     if (ok && d != null && d.hasAnyPermission) {
       if (!_historyLoaded) await _loadHistory();
-      // Χωρίς το αποθηκευμένο ιστορικό δεν γράφουμε τίποτα: θα έσβηνε τιμές που δεν ξαναδιαβάζονται.
-      if (_historyLoaded) {
+      if (planState != PlanState.ok) await _loadPlan();
+      // Χωρίς το αποθηκευμένο ιστορικό, τις ρυθμίσεις ή το σχέδιο πηγών δεν γράφουμε τίποτα: θα έσβηνε τιμές
+      // που δεν ξαναδιαβάζονται, ή θα έγραφε ύπνο του ρολογιού για νύχτες του Oura.
+      if (_canWrite) {
         await _upgradeHistory();
         // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας.
         await syncOura();
         await _updateRecentHistory(d, sleepFailed: p.sleepFailed);
         _backfill();
       }
-    } else if (_historyLoaded && _prefsLoaded) {
+    } else if (_canWrite) {
       // Η Samsung δεν απάντησε: το Oura διαβάζεται κανονικά (ανεξάρτητη πηγή).
       await syncOura();
     }
@@ -1052,6 +1174,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     }
     final stepsFrom = d.stepsMinuteFrom;
     final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
+    if (!_canWrite) return;
     final changed = mergeHistory(history, rows, sleepFrom: sleepFrom, plan: plan);
     // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
     final f = plan.eras.isEmpty ? null : plan.eras.first.from;
@@ -1154,7 +1277,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// 1. Πρώτα το κενό από όσο έμεινε κλειστή η εφαρμογή (πάνω από 6 μέρες).
   /// 2. Μετά προς τα πίσω ανά 30 μέρες, ως 10 χρόνια ή ως εκεί που αρχίζουν τα δεδομένα σου.
   Future<void> _backfill() async {
-    if (backfilling || !_prefsLoaded || !_historyLoaded || _backfillFails >= 3) return;
+    if (backfilling || !_canWrite || _backfillFails >= 3) return;
     final today = dayOf(DateTime.now());
     // Το πρώτο κομμάτι φτάνει ως τη μέρα −7 (η −6 και μετά ξαναγράφονται σε κάθε ανανέωση).
     final start = addDays(today, -(_recentDays - 1));
@@ -1249,15 +1372,25 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Οι ρυθμίσεις όπως αποθηκεύονται (για το αντίγραφο ασφαλείας).
   Map<String, dynamic> prefsJson() => jsonDecode(prefs.toJson()) as Map<String, dynamic>;
 
-  /// Αλλαγή του σχεδίου πηγών (σύνδεση/αποσύνδεση Oura): αποθηκεύεται αμέσως.
+  /// Αλλαγή του σχεδίου πηγών (σύνδεση/αποσύνδεση Oura): ΠΡΩΤΑ στο δικό του αρχείο (ατομικά), μετά στη μνήμη
+  /// και στο αντίγραφο των ρυθμίσεων. Μόνο με διαβασμένες ρυθμίσεις και γνωστό σχέδιο.
   @override
   Future<bool> setPlan(SourcePlan p) async {
-    if (!_prefsLoaded) return false;
+    if (!_prefsLoaded || planState != PlanState.ok) return false;
+    final json = encodePlanFile(p, DateTime.now());
+    if (!await planFile.write(json)) return false;
+    _planFileWritten = json;
+    _plan = p;
     prefs.plan = p;
-    _data = _data?.restrict(p);
+    _data = _raw?.restrict(p);
     notifyListeners();
-    return _savePrefs();
+    await _savePrefs();
+    return true;
   }
+
+  /// Αν επιτρέπεται τώρα αλλαγή πηγών (για τη σύνδεση: να μη συνδεθεί χωρίς να μπορεί να αλλάξει η πηγή).
+  @override
+  bool get canChangePlan => _prefsLoaded && planState == PlanState.ok;
 
   /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
   Future<bool> restorePrefs(Map<String, dynamic> p) async {
@@ -1272,9 +1405,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..emptyFrom = prefs.emptyFrom
       ..emptyChecked = prefs.emptyChecked
       // Οι πηγές και η σύνδεση Oura ανήκουν σε αυτό το κινητό, όχι στο αντίγραφο.
-      ..plan = prefs.plan
+      ..plan = _plan
       ..ouraSynced = prefs.ouraSynced
-      ..ouraSyncedTo = prefs.ouraSyncedTo;
+      ..ouraSyncedTo = prefs.ouraSyncedTo
+      ..ouraTried = prefs.ouraTried
+      ..ouraBackoff = prefs.ouraBackoff;
     prefs = restored;
     notifyListeners();
     return _savePrefs();
