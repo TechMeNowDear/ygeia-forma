@@ -4,6 +4,7 @@ library;
 
 import 'format.dart';
 import 'history.dart';
+import 'sources.dart';
 import 'trends.dart';
 
 class WeekReview {
@@ -49,7 +50,8 @@ DateTime? reviewWeekSunday(DateTime now) {
   return null;
 }
 
-WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime sunday, DateTime now) {
+WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime sunday, DateTime now, {SourcePlan? plan}) {
+  final p = plan ?? SourcePlan.samsungOnly;
   DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
   final monday = add(sunday, -6);
   final today = dayOf(now);
@@ -69,6 +71,7 @@ WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime su
       previousEnd: add(monday, -1),
       needed: def.neededFor(len),
       neededPrevious: def.neededFor(28), // 19 από τις 28 (10 για τη βαθμολογία ύπνου)
+      plan: p,
     ));
   }
 
@@ -81,26 +84,28 @@ WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime su
   (DateTime, double)? wFirst;
   (DateTime, double)? wLast;
 
+  // «Καλύτερη βαθμολογία»: μόνο αν όλη η εβδομάδα έχει την ίδια πηγή βαθμολογίας (ποτέ Samsung δίπλα σε Oura).
+  final scoreMixed = p.changeWithin(K.sleepScore, monday, sunday) != null;
   for (var d = monday; !d.isAfter(sunday); d = add(d, 1)) {
     final row = history[dateKey(d)];
     if (row == null) continue;
     final complete = d.isBefore(today);
-    final s = row[K.sleepScore];
+    final s = scoreMixed ? null : p.value(history, K.sleepScore, d);
     if (s != null && (bestScore == null || s > bestScore)) {
       bestScore = s;
       bestNight = d;
     }
-    final st = row[K.steps];
+    final st = p.value(history, K.steps, d);
     if (complete && st != null && (mostStepsValue == null || st > mostStepsValue)) {
       mostStepsValue = st;
       mostSteps = d;
     }
-    final a = row[K.activeMin];
+    final a = p.value(history, K.activeMin, d);
     if (complete && a != null) {
       active = (active ?? 0) + a;
       activeDays++;
     }
-    final w = row[K.weight];
+    final w = p.value(history, K.weight, d);
     if (w != null) {
       wFirst ??= (d, w);
       wLast = (d, w);

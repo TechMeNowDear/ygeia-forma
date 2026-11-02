@@ -6,13 +6,20 @@ import 'dart:math' as math;
 
 import 'format.dart';
 import 'history.dart';
+import 'sources.dart';
 import 'trends.dart';
 
 const reportDays = 90;
 
 /// Στατιστικά ενός δείκτη στο διάστημα της αναφοράς.
 class ReportStat {
-  ReportStat({required this.values, this.trend});
+  ReportStat({required this.values, this.trend, this.source = Source.watch, this.since});
+
+  /// Από ποια συσκευή είναι όλες οι τιμές (μία, πάντα).
+  final Source source;
+
+  /// Αν η πηγή άλλαξε μέσα στο διάστημα της αναφοράς: από πότε μετρούν οι τιμές (μόνο της νέας πηγής).
+  final DateTime? since;
 
   /// (μέρα, τιμή), παλιότερη πρώτη.
   final List<(DateTime, double)> values;
@@ -46,7 +53,11 @@ class ReportData {
     required this.stats,
     required this.lowOxygenNights,
     required this.weighIns,
+    this.plan,
   });
+
+  /// Οι πηγές (για τη σημείωση «Πώς μετρήθηκαν»).
+  final SourcePlan? plan;
 
   /// Οι τελευταίες ζυγίσεις (έως 6, όποτε κι αν έγιναν), η νεότερη πρώτη: (μέρα, βάρος, λίπος %, μύες).
   final List<(DateTime, double?, double?, double?)> weighIns;
@@ -77,25 +88,24 @@ const reportKeys = [
   K.smm,
 ];
 
-ReportData buildReport(Map<String, Map<String, double>> history, DateTime now) {
+/// Μετά τη σύνδεση του Oura η αναφορά δείχνει και ό,τι δίνει μόνο αυτό.
+List<String> reportKeysFor(SourcePlan plan) => plan.hasOura ? [...reportKeys, K.lowHr, K.hrv, K.breath] : reportKeys;
+
+ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {SourcePlan? plan}) {
+  final p = plan ?? SourcePlan.samsungOnly;
   DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
   final to = dayOf(now);
   final from = add(to, -(reportDays - 1));
   final stats = <String, ReportStat>{};
 
-  for (final key in reportKeys) {
+  for (final key in reportKeysFor(p)) {
     // Βήματα: η σημερινή μέρα δεν έχει τελειώσει.
     final end = key == K.steps ? add(to, -1) : to;
-    final values = <(DateTime, double)>[
-      for (var d = from; !d.isAfter(end); d = add(d, 1))
-        if (history[dateKey(d)]?[key] case final v?) (d, v),
-    ];
-    MetricDef? def;
-    for (final m in trendMetrics) {
-      if (m.key == key) def = m;
-    }
-    final trend = def == null ? null : computeTrend(def, history, now, TrendPeriod.quarter);
-    stats[key] = ReportStat(values: values, trend: trend);
+    // Μόνο μία πηγή ανά δείκτη: αν άλλαξε μέσα στους 3 μήνες, μετρούν μόνο οι μέρες της νέας.
+    final series = planSeries(history, p, key, from, end);
+    final def = metricDef(key);
+    final trend = def == null ? null : computeTrend(def, history, now, TrendPeriod.quarter, plan: p);
+    stats[key] = ReportStat(values: series.points, trend: trend, source: series.source, since: series.cut);
   }
 
   final low = [
@@ -103,10 +113,15 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now) {
       if (v.$2 < 90) v,
   ]..sort((a, b) => a.$2.compareTo(b.$2));
 
-  final weighDays = history.keys.where((k) => history[k]![K.weight] != null).toList()..sort();
+  final weighDays = history.keys.where((k) => p.value(history, K.weight, parseDateKey(k)) != null).toList()..sort();
   final weighIns = [
     for (final k in weighDays.reversed.take(6))
-      (parseDateKey(k), history[k]![K.weight], history[k]![K.fatPct], history[k]![K.smm]),
+      (
+        parseDateKey(k),
+        p.value(history, K.weight, parseDateKey(k)),
+        p.value(history, K.fatPct, parseDateKey(k)),
+        p.value(history, K.smm, parseDateKey(k)),
+      ),
   ];
 
   return ReportData(
@@ -116,5 +131,6 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now) {
     stats: stats,
     lowOxygenNights: low,
     weighIns: weighIns,
+    plan: p,
   );
 }

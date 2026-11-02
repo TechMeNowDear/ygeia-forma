@@ -13,6 +13,7 @@ import 'dart:math' as math;
 
 import 'format.dart';
 import 'history.dart';
+import 'sources.dart';
 
 enum TrendSection { heart, sleep, body, move, other }
 
@@ -122,7 +123,37 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο', section: TrendSection.other, minDiff: 1, unit: '%', better: 1),
 ];
 
-enum TrendStatus { up, down, stable, insufficient }
+/// Μετρήσεις που υπάρχουν μόνο με το Oura.
+const ouraTrendMetrics = <MetricDef>[
+  MetricDef(key: K.hrv, label: 'HRV νύχτας', section: TrendSection.heart, minDiff: 3, unit: 'ms', better: 1),
+  MetricDef(key: K.lowHr, label: 'Χαμηλότεροι παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1),
+  MetricDef(key: K.breath, label: 'Αναπνοές στον ύπνο', section: TrendSection.other, minDiff: 0.5, unit: 'το λεπτό', digits: 1),
+];
+
+/// Ο ορισμός μιας μέτρησης (και όσων υπάρχουν μόνο με το Oura).
+MetricDef? metricDef(String key) {
+  for (final m in [...trendMetrics, ...ouraTrendMetrics]) {
+    if (m.key == key) return m;
+  }
+  return null;
+}
+
+/// Το όνομα μιας μέτρησης όπως το λέει η πηγή της (π.χ. «Energy Score» → «Ετοιμότητα (εκτίμηση του Oura)»).
+String metricLabel(MetricDef def, Source s) {
+  if (s != Source.oura) return def.label;
+  return switch (def.key) {
+    K.energy => 'Ετοιμότητα (εκτίμηση του Oura)',
+    K.sleepScore => 'Βαθμολογία ύπνου (εκτίμηση του Oura)',
+    K.skinTemp => 'Θερμοκρασία δέρματος, απόκλιση',
+    K.deepPct => 'Βαθύς ύπνος (εκτίμηση του Oura)',
+    K.remPct => 'REM (εκτίμηση του Oura)',
+    K.awakeMin => 'Ξύπνιος μέσα στη νύχτα (τουλάχιστον)',
+    _ => def.label,
+  };
+}
+
+/// [sourceChange]: η πηγή της μέτρησης άλλαξε μέσα στα διαστήματα της σύγκρισης· δεν συγκρίνεται.
+enum TrendStatus { up, down, stable, insufficient, sourceChange }
 
 class TrendResult {
   TrendResult({
@@ -139,7 +170,15 @@ class TrendResult {
     required this.previousFrom,
     required this.previousEnd,
     required this.end,
+    this.source = Source.watch,
+    this.changedOn,
   });
+
+  /// Από πού είναι οι τιμές (η πηγή του τρέχοντος διαστήματος).
+  final Source source;
+
+  /// Η μέρα που άλλαξε πηγή μέσα στη σύγκριση (μόνο με [TrendStatus.sourceChange]).
+  final DateTime? changedOn;
 
   final MetricDef def;
   final TrendStatus status;
@@ -248,8 +287,9 @@ TrendResult computeTrend(
   MetricDef def,
   Map<String, Map<String, double>> history,
   DateTime today,
-  TrendPeriod period,
-) {
+  TrendPeriod period, {
+  SourcePlan? plan,
+}) {
   final end = def.includeToday ? dayOf(today) : _add(dayOf(today), -1);
   final len = period == TrendPeriod.month ? 30 : 90;
   final currentFrom = _add(end, -(len - 1));
@@ -264,6 +304,7 @@ TrendResult computeTrend(
     previousFrom: previousFrom,
     previousEnd: previousEnd,
     needed: def.neededFor(len),
+    plan: plan,
   );
 }
 
@@ -280,14 +321,43 @@ TrendResult compareWindows(
   required DateTime previousEnd,
   required int needed,
   int? neededPrevious,
+  SourcePlan? plan,
 }) {
+  final sp = plan ?? SourcePlan.samsungOnly;
+  // Κάθε τιμή ΜΟΝΟ από την πηγή της εκείνη τη μέρα (ένα κλειδί ανά μέρα, δες sources.dart).
   List<(DateTime, double)> collect(DateTime from, DateTime to) {
     final out = <(DateTime, double)>[];
     for (var d = from; !d.isAfter(to); d = _add(d, 1)) {
-      final v = history[dateKey(d)]?[def.key];
+      final v = sp.value(history, def.key, d);
       if (v != null) out.add((d, v));
     }
     return out;
+  }
+
+  // Η σύγκριση δεν περνά ποτέ πάνω από αλλαγή πηγής: αν η πηγή άλλαξε από την αρχή του παλιότερου
+  // διαστήματος ως το τέλος του νεότερου, δεν συγκρίνεται. Το γράφημα δείχνει μόνο τη νέα πηγή.
+  final earliest = previousFrom.isBefore(currentFrom) ? previousFrom : currentFrom;
+  final change = sp.changeWithin(def.key, earliest, end);
+  if (change != null) {
+    final pts = collect(change, end);
+    final c = [for (final e in pts) if (!e.$1.isBefore(currentFrom)) e.$2];
+    return TrendResult(
+      def: def,
+      status: TrendStatus.sourceChange,
+      current: median(c),
+      previous: null,
+      nCurrent: c.length,
+      nPrevious: 0,
+      needed: needed,
+      z: 0,
+      points: pts,
+      currentFrom: currentFrom,
+      previousFrom: previousFrom,
+      previousEnd: previousEnd,
+      end: end,
+      source: sp.sourceFor(def.key, end),
+      changedOn: change,
+    );
   }
 
   final cw = collect(currentFrom, end);
@@ -335,8 +405,15 @@ TrendResult compareWindows(
     previousFrom: previousFrom,
     previousEnd: previousEnd,
     end: end,
+    source: sp.sourceFor(def.key, end),
   );
 }
 
-List<TrendResult> computeAllTrends(Map<String, Map<String, double>> history, DateTime today, TrendPeriod period) =>
-    [for (final m in trendMetrics) computeTrend(m, history, today, period)];
+/// Οι μετρήσεις των Τάσεων για το σχέδιο πηγών: όσο το Oura δεν έχει συνδεθεί, όπως πάντα· μετά, και
+/// οι μετρήσεις που δίνει μόνο το Oura (HRV, αναπνοές, χαμηλότεροι παλμοί).
+List<MetricDef> trendMetricsFor(SourcePlan plan) =>
+    plan.hasOura ? [...trendMetrics, ...ouraTrendMetrics] : trendMetrics;
+
+List<TrendResult> computeAllTrends(Map<String, Map<String, double>> history, DateTime today, TrendPeriod period,
+        {SourcePlan? plan}) =>
+    [for (final m in trendMetricsFor(plan ?? SourcePlan.samsungOnly)) computeTrend(m, history, today, period, plan: plan)];

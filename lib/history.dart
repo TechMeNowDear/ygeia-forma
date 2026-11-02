@@ -7,6 +7,7 @@ library;
 import 'data.dart';
 import 'format.dart';
 import 'heart_day.dart';
+import 'sources.dart';
 
 /// Κλειδιά συνόψεων (σταθερά: αποθηκεύονται στη βάση).
 abstract final class K {
@@ -20,6 +21,8 @@ abstract final class K {
   static const sleepHr = 'sleepHr';
   static const spo2Avg = 'spo2Avg';
   static const spo2Min = 'spo2Min';
+  /// Λεπτά με οξυγόνο κάτω από 90% (ενδεικτικό· μόνο όταν βγαίνει από τις αναλυτικές μετρήσεις).
+  static const spo2Low = 'spo2Low';
   static const skinTemp = 'skinTemp';
   static const restHr = 'restHr';
   static const dayHr = 'dayHr';
@@ -32,12 +35,17 @@ abstract final class K {
   static const fatPct = 'fatPct';
   static const smm = 'smm';
   static const floors = 'floors';
+  // Μόνο από το Oura (αποθηκεύονται με πρόθεμα «o.», δες sources.dart).
+  static const napMin = 'napMin';
+  static const lowHr = 'lowHr';
+  static const hrv = 'hrv';
+  static const breath = 'breath';
 }
 
 /// Τιμές που βγαίνουν από τον ύπνο μιας νύχτας.
 const sleepKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake,
-  K.sleepHr, K.spo2Avg, K.spo2Min, K.skinTemp,
+  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.skinTemp,
 };
 
 /// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
@@ -53,6 +61,10 @@ const historyRulesVersion = 2;
 /// - πριν από αυτήν (ή αν είναι null): γράφονται μόνο αν η μέρα δεν έχει καθόλου τιμές ύπνου.
 /// - [replaceSleep] true: όλες οι τιμές ύπνου των ημερών στο [rangeFrom, rangeTo] αντικαθίστανται
 ///   (ξαναϋπολογισμός ιστορικού με βήματα), και όσες δεν υπάρχουν πια σβήνονται.
+///
+/// [plan]: τις μέρες που η «νύχτα» ΔΕΝ έρχεται από το ρολόι (Oura ή καμία πηγή), οι τιμές νύχτας του
+/// ρολογιού δεν γράφονται ποτέ (και όσες υπήρχαν φεύγουν)· μένει μόνο το οξυγόνο, που είναι πάντα του ρολογιού.
+/// Οι τιμές του Oura («o.*») δεν αγγίζονται εδώ (δες [mergeOura]).
 Set<String> mergeHistory(
   Map<String, Map<String, double>> history,
   Map<String, Map<String, double>> rows, {
@@ -60,8 +72,10 @@ Set<String> mergeHistory(
   bool replaceSleep = false,
   DateTime? rangeFrom,
   DateTime? rangeTo,
+  SourcePlan? plan,
 }) {
   final changed = <String>{};
+  final p = plan ?? SourcePlan.samsungOnly;
   if (replaceSleep && rangeFrom != null && rangeTo != null) {
     for (var day = dayOf(rangeFrom); !day.isAfter(dayOf(rangeTo)); day = DateTime(day.year, day.month, day.day + 1)) {
       final k = dateKey(day);
@@ -76,18 +90,71 @@ Set<String> mergeHistory(
   for (final e in rows.entries) {
     final day = parseDateKey(e.key);
     final old = history[e.key] ?? const <String, double>{};
-    final overwriteSleep = replaceSleep || (sleepFrom != null && !day.isBefore(dayOf(sleepFrom)));
+    // Μέρα που η νύχτα δεν είναι του ρολογιού: οι τιμές νύχτας του ρολογιού δεν μπαίνουν ποτέ, και το
+    // οξυγόνο (το μόνο του ρολογιού εδώ, χωρίς ομαδοποίηση ύπνου) ανανεώνεται πάντα.
+    final foreignNight = p.nightSource(day) != Source.watch;
+    final row = foreignNight
+        ? {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value}
+        : e.value;
+    // Το οξυγόνο τέτοιων ημερών δεν θέλει βήματα ανά λεπτό: ανανεώνεται σε κάθε αξιόπιστη ανάγνωση
+    // (όχι όταν απέτυχε κάποιο είδος του ύπνου, που τότε το [sleepFrom] είναι null).
+    final trusted = replaceSleep || sleepFrom != null;
+    final overwriteSleep = replaceSleep || (sleepFrom != null && !day.isBefore(dayOf(sleepFrom))) || (foreignNight && trusted);
     final keepOldSleep = !overwriteSleep && old.keys.any(sleepKeys.contains);
     final incoming = keepOldSleep
-        ? {for (final v in e.value.entries) if (!sleepKeys.contains(v.key)) v.key: v.value}
-        : e.value;
+        ? {for (final v in row.entries) if (!sleepKeys.contains(v.key)) v.key: v.value}
+        : row;
     final base = overwriteSleep
-        ? {for (final v in old.entries) if (!sleepKeys.contains(v.key)) v.key: v.value}
+        ? {
+            for (final v in old.entries)
+              if (!sleepKeys.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))) v.key: v.value,
+          }
         : old;
     final next = {...base, ...incoming};
     // Μόνο ό,τι άλλαξε γράφεται ξανά στο κινητό.
     if (!_sameValues(history[e.key], next)) changed.add(e.key);
     history[e.key] = next;
+  }
+  return changed;
+}
+
+/// Βάζει τις τιμές του Oura ([rows], κλειδιά «o.*») για τις μέρες [from, to] και επιστρέφει όσες άλλαξαν.
+/// Η ανάγνωση του διαστήματος ήταν πλήρης: ό,τι δεν ήρθε για μια μέρα (π.χ. σβήστηκε στην Oura) φεύγει.
+/// Γράφονται μόνο οι μέρες που η «νύχτα» έρχεται από το Oura· οι άλλες αγνοούνται.
+Set<String> mergeOura(
+  Map<String, Map<String, double>> history,
+  Map<String, Map<String, double>> rows, {
+  required DateTime from,
+  required DateTime to,
+  required SourcePlan plan,
+}) {
+  final changed = <String>{};
+  for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
+    if (plan.nightSource(day) != Source.oura) continue;
+    final k = dateKey(day);
+    final old = history[k] ?? const <String, double>{};
+    final next = {
+      for (final v in old.entries) if (!ouraKeySet.contains(v.key)) v.key: v.value,
+      for (final v in (rows[k] ?? const <String, double>{}).entries)
+        if (ouraKeySet.contains(v.key) && v.value.isFinite) v.key: v.value,
+    };
+    if (next.isEmpty && history[k] == null) continue;
+    if (!_sameValues(history[k], next)) changed.add(k);
+    history[k] = next;
+  }
+  return changed;
+}
+
+/// Σβήνει τις τιμές νύχτας του ρολογιού από τις μέρες (από [from] και μετά) που η νύχτα έχει άλλη πηγή:
+/// π.χ. τη μέρα της σύνδεσης του Oura, που μπορεί να είχε ήδη γραφτεί το πρωί από το ρολόι.
+Set<String> stripForeignWatchNight(Map<String, Map<String, double>> history, SourcePlan plan, {required DateTime from}) {
+  final changed = <String>{};
+  for (final e in history.entries.toList()) {
+    final day = parseDateKey(e.key);
+    if (day.isBefore(dayOf(from)) || plan.nightSource(day) == Source.watch) continue;
+    if (!e.value.keys.any(watchNightKeys.contains)) continue;
+    history[e.key] = {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value};
+    changed.add(e.key);
   }
   return changed;
 }
@@ -144,19 +211,34 @@ String clockFromSix(double minutesFromSix) {
   return '${two(m ~/ 60)}:${two(m % 60)}';
 }
 
-/// Η σύνοψη μιας μέρας. Ό,τι λείπει, απλώς δεν υπάρχει στον χάρτη.
-Map<String, double> summarizeDay(Dashboard d, DateTime day) {
+/// Η σύνοψη μιας μέρας από τα δεδομένα της Samsung (ρολόι, ζυγαριά). Ό,τι λείπει, απλώς δεν υπάρχει στον χάρτη.
+///
+/// [plan]: τις μέρες που η «νύχτα» δεν είναι του ρολογιού, δεν βγαίνει καμία τιμή νύχτας από το ρολόι (ύπνος,
+/// παλμοί ύπνου, θερμοκρασία, βαθμολογία, Energy Score)· μόνο το οξυγόνο της νύχτας, με ορισμό που δεν χρειάζεται
+/// τον ύπνο του ρολογιού ([Dashboard.watchSpo2]).
+/// [windows]: οι ώρες ύπνου του Oura, μόνο για να εξαιρούνται από τους παλμούς της μέρας.
+Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
+  final p = plan ?? SourcePlan.samsungOnly;
   final out = <String, double>{};
   void put(String k, num? v) {
     if (v != null && v.isFinite) out[k] = v.toDouble();
   }
+
+  final watchNight = p.nightSource(day) == Source.watch;
 
   // Ύπνος: η νύχτα με ημερομηνία το πρωί αυτής της μέρας.
   Night? night;
   for (final n in d.nights) {
     if (sameDay(n.date, day)) night = n;
   }
-  if (night != null) {
+  if (!watchNight) {
+    final ox = d.watchSpo2(day);
+    if (ox != null) {
+      put(K.spo2Avg, ox.avg);
+      put(K.spo2Min, ox.min);
+      put(K.spo2Low, ox.below90);
+    }
+  } else if (night != null) {
     put(K.sleepMin, night.minutes);
     put(K.sleepScore, night.score);
     final staged = ['DEEP', 'LIGHT', 'REM', 'AWAKE'].fold<int>(0, (s, k) => s + (night!.stageMinutes[k] ?? 0));
@@ -170,11 +252,12 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day) {
     put(K.sleepHr, night.sleepingHr);
     put(K.spo2Avg, night.spo2Avg);
     put(K.spo2Min, night.spo2Min);
+    put(K.spo2Low, night.spo2Below90);
     put(K.skinTemp, night.skinTemp);
   }
 
   // Παλμοί μέσα στη μέρα (μόνο όταν υπάρχουν βήματα ανά λεπτό).
-  final h = d.heartForDay(day);
+  final h = p.hasOura ? _heartWithPlan(d, day, p, windows) : d.heartForDay(day);
   if (h != null) {
     // Υπολογίζονται και κρατιούνται (για αργότερα), αλλά δεν φαίνονται πια: δικοί μας ορισμοί χωρίς επαλήθευση.
     put(K.restHr, h.resting.value);
@@ -184,7 +267,8 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day) {
 
   put(K.steps, d.valueFor(d.steps, day)?.value);
   put(K.floors, d.valueFor(d.floors, day)?.value);
-  put(K.energy, d.valueFor(d.energy, day)?.value);
+  // Energy Score: της ίδιας ομάδας με τη νύχτα (μετά τη σύνδεση τη θέση του παίρνει η ετοιμότητα του Oura).
+  if (watchNight) put(K.energy, d.valueFor(d.energy, day)?.value);
   for (final a in d.activityDaily) {
     if (sameDay(a.$1, day)) {
       put(K.activeMin, a.$2);
@@ -205,11 +289,43 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day) {
   return out;
 }
 
+/// Παλμοί μέρας όταν υπάρχει Oura στο σχέδιο: ο ύπνος που εξαιρείται έρχεται από την πηγή κάθε νύχτας
+/// (της νύχτας που τελειώνει το πρωί και αυτής που αρχίζει το βράδυ). Αν μία από τις δύο δεν είναι γνωστή,
+/// δεν βγαίνει τιμή: αλλιώς ο ύπνος θα μετρούσε ως «μέρα». Οι τιμές είναι πάντα μόνο του ρολογιού.
+DayHeart? _heartWithPlan(Dashboard d, DateTime day, SourcePlan p, SleepWindows windows) {
+  final today = dayOf(d.readAt);
+  final ranges = <(DateTime, DateTime)>[];
+  var watchAdded = false;
+  var ouraAdded = false;
+  for (final n in [dayOf(day), DateTime(day.year, day.month, day.day + 1)]) {
+    if (n.isAfter(today)) continue; // η νύχτα του απόψε δεν έχει γίνει ακόμα
+    switch (p.nightSource(n)) {
+      case Source.watch:
+        if (!d.sleepOk) return null;
+        if (!watchAdded) {
+          watchAdded = true;
+          ranges.addAll([for (final r in d.sleepRecords) (r.start, r.end), for (final x in d.nights) ...x.estimatedGaps]);
+        }
+      case Source.oura:
+        if (!windows.mains.containsKey(dateKey(n))) return null;
+        if (!ouraAdded) {
+          ouraAdded = true;
+          ranges.addAll(windows.ranges);
+        }
+      case Source.none:
+      case Source.scale:
+        return null;
+    }
+  }
+  return d.heartForDay(day, sleepRanges: ranges);
+}
+
 /// Συνόψεις για κάθε μέρα στο [from, to] (συμπεριλαμβανομένων), μόνο όσες έχουν κάτι.
-Map<String, Map<String, double>> summarizeRange(Dashboard d, DateTime from, DateTime to) {
+Map<String, Map<String, double>> summarizeRange(Dashboard d, DateTime from, DateTime to,
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
   final out = <String, Map<String, double>>{};
   for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
-    final s = summarizeDay(d, day);
+    final s = summarizeDay(d, day, plan: plan, windows: windows);
     if (s.isNotEmpty) out[dateKey(day)] = s;
   }
   return out;

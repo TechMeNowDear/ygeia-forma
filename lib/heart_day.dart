@@ -116,7 +116,9 @@ extension HeartByDay on Dashboard {
   bool _overlaps(Sample s, List<(DateTime, DateTime)> ranges) =>
       ranges.any((r) => s.start.isBefore(r.$2) && s.end.isAfter(r.$1));
 
-  DayHeart? heartForDay(DateTime day) {
+  /// [sleepRanges]: ποιες ώρες εξαιρούνται ως ύπνος. Χωρίς αυτό: ο ύπνος της Samsung (πριν από το Oura).
+  /// Μετά τη σύνδεση του Oura τις δίνει ο υπολογισμός του ιστορικού από την πηγή κάθε νύχτας.
+  DayHeart? heartForDay(DateTime day, {List<(DateTime, DateTime)>? sleepRanges}) {
     if (!hasStepCoverage(day)) return null;
     final start = dayOf(day);
     final end = DateTime(start.year, start.month, start.day + 1); // ημερολογιακή μέρα (23/25 ώρες στην αλλαγή ώρας)
@@ -125,10 +127,11 @@ extension HeartByDay on Dashboard {
 
     // Έξω από τον «ξύπνιο» χρόνο: ο ύπνος της Samsung και τα κενά με παλμούς ύπνου ανάμεσα στα
     // κομμάτια (δεν ξέρουμε αν κοιμόσουν, άρα δεν μετρούν ούτε ως ύπνος ούτε ως ηρεμία).
-    final sleepRanges = [
-      for (final r in sleepRecords) (r.start, r.end),
-      for (final n in nights) ...n.estimatedGaps,
-    ];
+    final ranges = sleepRanges ??
+        [
+          for (final r in sleepRecords) (r.start, r.end),
+          for (final n in nights) ...n.estimatedGaps,
+        ];
 
     var sleepMinutes = 0.0;
     var exerciseMinutes = 0.0;
@@ -141,7 +144,7 @@ extension HeartByDay on Dashboard {
       final minutes = s.end.difference(s.start).inSeconds / 60;
       final dur = minutes > 0 ? minutes : 1.0;
       intervals.add(dur);
-      if (_overlaps(s, sleepRanges)) {
+      if (_overlaps(s, ranges)) {
         sleepMinutes += dur;
         continue;
       }

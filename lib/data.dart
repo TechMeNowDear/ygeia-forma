@@ -7,8 +7,10 @@ import 'package:flutter/widgets.dart';
 import 'error_report.dart';
 import 'format.dart';
 import 'history.dart';
+import 'oura/oura_store.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
+import 'sources.dart';
 
 // ---------------------------------------------------------------------------
 // Μοντέλα
@@ -48,6 +50,7 @@ class Night {
   double? sleepingHr;
   double? spo2Avg;
   double? spo2Min;
+  double? spo2Below90;
   double? skinTemp;
   int napMinutes = 0;
 
@@ -102,12 +105,24 @@ List<SleepRecord> dedupeSleep(List<SleepRecord> records) {
 }
 
 class Sample {
-  Sample(this.start, this.end, this.avg, this.min, this.max);
+  Sample(this.start, this.end, this.avg, this.min, this.max, [this.belowSec]);
   final DateTime start;
   final DateTime end;
   final double avg;
   final double min;
   final double max;
+
+  /// Οξυγόνο: δευτερόλεπτα κάτω από 90%, μόνο όταν βγαίνει με σιγουριά από τις αναλυτικές μετρήσεις.
+  final double? belowSec;
+}
+
+/// Οξυγόνο μιας νύχτας από το ρολόι: μέσο, χαμηλότερη μέτρηση, λεπτά κάτω από 90% (αν βγαίνουν).
+typedef NightOxygen = ({double avg, double min, double? below90});
+
+/// Λεπτά κάτω από 90%: μόνο αν ΚΑΘΕ μέτρηση της νύχτας το δίνει (αλλιώς δεν ξέρουμε, άρα κενό).
+double? _below90Minutes(List<Sample> ox) {
+  if (ox.isEmpty || ox.any((s) => s.belowSec == null)) return null;
+  return ox.fold<double>(0, (t, s) => t + s.belowSec!) / 60;
 }
 
 class DayValue {
@@ -169,7 +184,44 @@ class Dashboard {
     required this.sleepOk,
     this.bodyOk = false,
     this.failed = const {},
+    this.compareNights = const [],
   });
+
+  /// Νύχτες του ρολογιού που ΔΕΝ είναι η πηγή του ύπνου (μετά τη σύνδεση του Oura), μόνο για τη
+  /// «Σύγκριση πηγών» τις πρώτες 14 μέρες. Καμία άλλη οθόνη ή υπολογισμός δεν τις διαβάζει.
+  final List<Night> compareNights;
+
+  /// Ίδια δεδομένα, με τις νύχτες χωρισμένες κατά το σχέδιο πηγών: στις [nights] μένουν ΜΟΝΟ οι νύχτες που
+  /// η πηγή τους είναι το ρολόι. Έτσι καμία οθόνη δεν μπορεί να δείξει ύπνο του ρολογιού για νύχτα του Oura.
+  Dashboard restrict(SourcePlan plan) {
+    final all = [...nights, ...compareNights]..sort((a, b) => a.date.compareTo(b.date));
+    return Dashboard._(
+      readAt: readAt,
+      granted: granted,
+      total: total,
+      nights: [for (final n in all) if (plan.nightSource(n.date) == Source.watch) n],
+      compareNights: [
+        for (final n in all)
+          if (plan.nightSource(n.date) != Source.watch && plan.watchSleepAllowed(n.date)) n,
+      ],
+      heart: heart,
+      spo2: spo2,
+      skin: skin,
+      energy: energy,
+      steps: steps,
+      floors: floors,
+      body: body,
+      activity: activity,
+      sleepRecords: sleepRecords,
+      stepsByMinute: stepsByMinute,
+      stepsMinuteFrom: stepsMinuteFrom,
+      exercise: exercise,
+      activityDaily: activityDaily,
+      sleepOk: sleepOk,
+      bodyOk: bodyOk,
+      failed: failed,
+    );
+  }
 
   /// Ο ύπνος διαβάστηκε κανονικά (όχι σφάλμα ανάγνωσης). Χωρίς αυτό δεν σβήνουμε τιμές ύπνου από το ιστορικό.
   final bool sleepOk;
@@ -225,6 +277,7 @@ class Dashboard {
                 (e[2] as num).toDouble(),
                 e.length > 3 ? (e[3] as num).toDouble() : (e[2] as num).toDouble(),
                 e.length > 4 ? (e[4] as num).toDouble() : (e[2] as num).toDouble(),
+                e.length > 5 && e[5] is num ? (e[5] as num).toDouble() : null,
               ),
         ];
 
@@ -437,10 +490,27 @@ class Dashboard {
     if (ox.isNotEmpty) {
       n.spo2Avg = ox.map((s) => s.avg).reduce((a, b) => a + b) / ox.length;
       n.spo2Min = ox.map((s) => s.min).reduce(math.min);
+      n.spo2Below90 = _below90Minutes(ox);
     }
 
     final st = skin.where(inside).map((s) => s.avg).toList();
     n.skinTemp = st.isEmpty ? null : st.reduce((a, b) => a + b) / st.length;
+  }
+
+  /// Οξυγόνο της νύχτας με ημερομηνία (πρωινό) [day], ΧΩΡΙΣ τον ύπνο του ρολογιού: όσο ο ύπνος έρχεται από
+  /// άλλη πηγή (Oura), το οξυγόνο μένει του ρολογιού. Οι μετρήσεις οξυγόνου του ρολογιού γίνονται μόνο στον ύπνο,
+  /// άρα «νύχτα» = οι μετρήσεις από τις 18:00 της προηγούμενης μέρας ως τις 12:00 του πρωινού.
+  NightOxygen? watchSpo2(DateTime day) {
+    final d = dayOf(day);
+    final from = DateTime(d.year, d.month, d.day - 1, 18);
+    final to = DateTime(d.year, d.month, d.day, 12);
+    final ox = spo2.where((s) => s.start.isBefore(to) && s.end.isAfter(from) && !s.start.isBefore(from)).toList();
+    if (ox.isEmpty) return null;
+    return (
+      avg: ox.map((s) => s.avg).reduce((a, b) => a + b) / ox.length,
+      min: ox.map((s) => s.min).reduce(math.min),
+      below90: _below90Minutes(ox),
+    );
   }
 
   // ---------- Υπολογισμοί για τις οθόνες ----------
@@ -542,7 +612,11 @@ class Prefs {
       this.gapFrom,
       this.gapTo,
       this.emptyFrom,
-      this.emptyChecked});
+      this.emptyChecked,
+      SourcePlan? plan,
+      this.ouraSynced,
+      this.ouraSyncedTo})
+      : plan = plan ?? SourcePlan.samsungOnly;
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -567,8 +641,18 @@ class Prefs {
       gapTo: j['gapTo'] is String ? j['gapTo'] as String : null,
       emptyFrom: j['emptyFrom'] is String ? j['emptyFrom'] as String : null,
       emptyChecked: j['emptyChecked'] is String ? j['emptyChecked'] as String : null,
+      plan: SourcePlan.fromJson(j['sources']),
+      ouraSynced: (j['ouraSynced'] as num?)?.toInt(),
+      ouraSyncedTo: j['ouraSyncedTo'] is String ? j['ouraSyncedTo'] as String : null,
     );
   }
+
+  /// Από πού έρχεται κάθε μέτρηση και από πότε (δες sources.dart).
+  SourcePlan plan;
+
+  /// Πότε διαβάστηκε τελευταία φορά το Oura με επιτυχία (ms) και ως ποια μέρα («2026-11-07»).
+  int? ouraSynced;
+  String? ouraSyncedTo;
 
   /// Κενό στο ιστορικό από όσο έμεινε κλειστή η εφαρμογή: από [gapFrom] ως τη μέρα −30.
   /// [gapTo]: ως πού (από πάνω) έχει ήδη διαβαστεί.
@@ -616,6 +700,11 @@ class Prefs {
         'gapTo': gapTo,
         'emptyFrom': emptyFrom,
         'emptyChecked': emptyChecked,
+        if (plan.eras.isNotEmpty) 'sources': plan.toJson(),
+        // Για την πλευρά Android (SleepPolicy.kt): ως ποια νύχτα διαβάζεται ο ύπνος του ρολογιού.
+        if (plan.watchSleepCutoff != null) 'sleepUntil': dateKey(plan.watchSleepCutoff!),
+        if (ouraSynced != null) 'ouraSynced': ouraSynced,
+        if (ouraSyncedTo != null) 'ouraSyncedTo': ouraSyncedTo,
       });
 }
 
@@ -645,16 +734,18 @@ void _isolateFailed(Object e, StackTrace st) {
 /// Ένα κομμάτι ιστορικού από τη Samsung, διαβασμένο: συνόψεις ανά μέρα και αν διαβάστηκαν όλα.
 typedef ParsedRange = ({bool ok, Map<String, Map<String, double>> rows, bool sleepOk, bool sleepFailed, bool anyError});
 
-Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to) async {
+Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) async {
   try {
-    return await Isolate.run(() => parseRangeSync(raw, from, to));
+    return await Isolate.run(() => parseRangeSync(raw, from, to, plan: plan, windows: windows));
   } catch (e, st) {
     _isolateFailed(e, st);
-    return parseRangeSync(raw, from, to);
+    return parseRangeSync(raw, from, to, plan: plan, windows: windows);
   }
 }
 
-ParsedRange parseRangeSync(String raw, DateTime from, DateTime to) {
+ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
   const fail = (ok: false, rows: <String, Map<String, double>>{}, sleepOk: false, sleepFailed: false, anyError: true);
   try {
     final j = jsonDecode(raw);
@@ -662,7 +753,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to) {
     final d = Dashboard.fromJson(j);
     return (
       ok: true,
-      rows: summarizeRange(d, from, to),
+      rows: summarizeRange(d, from, to, plan: plan, windows: windows),
       sleepOk: d.sleepOk,
       sleepFailed: sleepReadFailed(j),
       anyError: d.failed.isNotEmpty,
@@ -701,15 +792,32 @@ ParsedDashboard parseDashboardSync(String raw) {
 // ο RefreshWorker (Android) ανανεώνει κάθε 3 ώρες το βοηθητικό αρχείο· το ιστορικό γράφεται εδώ.
 // ---------------------------------------------------------------------------
 
-class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
-  Dashboard? data;
+class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore {
+  /// Τα δεδομένα της Samsung, χωρισμένα πάντα κατά το σχέδιο πηγών ([Dashboard.restrict]).
+  Dashboard? get data => _data;
+  set data(Dashboard? d) => _data = d?.restrict(prefs.plan);
+  Dashboard? _data;
   bool loading = false;
   Map<String, dynamic>? error;
   Prefs prefs = Prefs.fromJson(const {});
   DateTime? _lastRefresh;
 
   /// Ημερήσιες συνόψεις: «2026-10-24» → τιμές (δες history.dart).
+  @override
   Map<String, Map<String, double>> history = {};
+
+  /// Το σχέδιο πηγών (από τις ρυθμίσεις).
+  @override
+  SourcePlan get plan => prefs.plan;
+
+  @override
+  int? get ouraSyncedMs => prefs.ouraSynced;
+  @override
+  set ouraSyncedMs(int? v) => prefs.ouraSynced = v;
+  @override
+  String? get ouraSyncedTo => prefs.ouraSyncedTo;
+  @override
+  set ouraSyncedTo(String? v) => prefs.ouraSyncedTo = v;
 
   /// Φέρνω το ιστορικό (μία φορά, ανά μήνα).
   bool backfilling = false;
@@ -755,6 +863,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     } else {
       try {
         prefs = Prefs.fromJson(r);
+        _data = _data?.restrict(prefs.plan);
       } catch (_) {
         if (++_prefsErrors < 2) return;
       }
@@ -802,6 +911,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
     await _loadHistory();
     await _upgradeHistory();
+    await startOura();
     final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw());
     if (cached.data != null) data = cached.data;
     notifyListeners();
@@ -847,9 +957,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       // Χωρίς το αποθηκευμένο ιστορικό δεν γράφουμε τίποτα: θα έσβηνε τιμές που δεν ξαναδιαβάζονται.
       if (_historyLoaded) {
         await _upgradeHistory();
+        // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας.
+        await syncOura();
         await _updateRecentHistory(d, sleepFailed: p.sleepFailed);
         _backfill();
       }
+    } else if (_historyLoaded && _prefsLoaded) {
+      // Η Samsung δεν απάντησε: το Oura διαβάζεται κανονικά (ανεξάρτητη πηγή).
+      await syncOura();
     }
   }
 
@@ -875,6 +990,18 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Μέρες που άλλαξαν στη μνήμη αλλά δεν γράφτηκαν ακόμα στο κινητό (απέτυχε η αποθήκευση):
   /// μπαίνουν σε κάθε επόμενη αποθήκευση μέχρι να γραφτούν, ώστε να μη μείνουν κενά.
   final Set<String> _unsavedDays = {};
+
+  @override
+  bool get historyReady => _historyLoaded;
+
+  @override
+  bool get prefsReady => _prefsLoaded;
+
+  @override
+  Future<bool> saveDaysNow(Set<String> keys) => _saveDays(keys);
+
+  @override
+  Future<bool> savePrefsNow() => _savePrefs();
 
   /// `true` αν γράφτηκαν (ή δεν υπήρχε κάτι να γραφτεί).
   Future<bool> _saveDays(Set<String> keys) async {
@@ -913,7 +1040,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _updateRecentHistory(Dashboard d, {bool sleepFailed = false}) async {
     final today = dayOf(d.readAt);
     // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης.
-    final rows = summarizeRange(d, addDays(today, -29), today);
+    final rows = summarizeRange(d, addDays(today, -29), today, plan: plan, windows: ouraWindows);
     for (final b in d.body) {
       final k = dateKey(b.time);
       rows[k] = {
@@ -925,7 +1052,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     }
     final stepsFrom = d.stepsMinuteFrom;
     final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
-    final changed = mergeHistory(history, rows, sleepFrom: sleepFrom);
+    final changed = mergeHistory(history, rows, sleepFrom: sleepFrom, plan: plan);
+    // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
+    final f = plan.eras.isEmpty ? null : plan.eras.first.from;
+    if (f != null) changed.addAll(stripForeignWatchNight(history, plan, from: f));
     // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
     // Με προφύλαξη: αν η Samsung δεν δίνει καμία ζύγιση (π.χ. μόλις επανεγκαταστάθηκε) ή θα έφευγαν
     // πολλές μαζί, δεν σβήνεται τίποτα· μια λάθος ζύγιση που σβήνεις είναι μία-δύο μέρες.
@@ -971,7 +1101,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     final to = addDays(cursor, -1);
     final raw = await SamsungHealth.readRangeRaw(dateKey(from), dateKey(cursor))
         .timeout(const Duration(seconds: 120), onTimeout: () => '{"ok":false,"kind":"timeout"}');
-    final p = await parseRange(raw, from, to);
+    final p = await parseRange(raw, from, to, plan: plan, windows: ouraWindows);
     if (!p.ok) {
       // Δεν διαβάστηκε τίποτα: ξανά στην επόμενη ανανέωση (ως 3 φορές), χωρίς να προχωρήσουμε.
       _backfillFails++;
@@ -997,6 +1127,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       replaceSleep: !failed && p.sleepOk,
       rangeFrom: from,
       rangeTo: to,
+      plan: plan,
     ));
     // Δεν γράφτηκε στο κινητό: δεν προχωράμε, ώστε ο μήνας να ξαναδιαβαστεί.
     if (!saved) {
@@ -1110,11 +1241,23 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
     final last = _lastRefresh;
     if (last == null || DateTime.now().difference(last).inMinutes >= 5) {
       refresh();
+    } else if (_historyLoaded && _prefsLoaded) {
+      syncOura(); // έχει δικό της όριο (το πολύ κάθε 30 λεπτά)
     }
   }
 
   /// Οι ρυθμίσεις όπως αποθηκεύονται (για το αντίγραφο ασφαλείας).
   Map<String, dynamic> prefsJson() => jsonDecode(prefs.toJson()) as Map<String, dynamic>;
+
+  /// Αλλαγή του σχεδίου πηγών (σύνδεση/αποσύνδεση Oura): αποθηκεύεται αμέσως.
+  @override
+  Future<bool> setPlan(SourcePlan p) async {
+    if (!_prefsLoaded) return false;
+    prefs.plan = p;
+    _data = _data?.restrict(p);
+    notifyListeners();
+    return _savePrefs();
+  }
 
   /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
   Future<bool> restorePrefs(Map<String, dynamic> p) async {
@@ -1127,7 +1270,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
       ..gapFrom = prefs.gapFrom
       ..gapTo = prefs.gapTo
       ..emptyFrom = prefs.emptyFrom
-      ..emptyChecked = prefs.emptyChecked;
+      ..emptyChecked = prefs.emptyChecked
+      // Οι πηγές και η σύνδεση Oura ανήκουν σε αυτό το κινητό, όχι στο αντίγραφο.
+      ..plan = prefs.plan
+      ..ouraSynced = prefs.ouraSynced
+      ..ouraSyncedTo = prefs.ouraSyncedTo;
     prefs = restored;
     notifyListeners();
     return _savePrefs();
@@ -1153,6 +1300,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    disposeOura();
     super.dispose();
   }
 }

@@ -11,6 +11,7 @@
 library;
 
 import 'history.dart';
+import 'sources.dart';
 import 'trends.dart';
 
 class UnusualRule {
@@ -75,15 +76,21 @@ class UnusualResult {
 
 double? _median(List<double> v) => median(v);
 
-UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime day, {bool checkPrevious = true}) {
+/// [plan]: κάθε δείκτης μόνο από την πηγή του. Το «συνηθισμένο» μετρά μόνο μέρες με την ίδια πηγή με σήμερα:
+/// μετά από αλλαγή πηγής ξαναμαθαίνεται από την αρχή (θέλει πάλι τουλάχιστον [unusualMinBaseline] μέρες).
+UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime day,
+    {bool checkPrevious = true, SourcePlan? plan}) {
+  final p = plan ?? SourcePlan.samsungOnly;
   DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
   final signals = <UnusualSignal>[];
   for (final rule in unusualRules) {
-    final x = history[dateKey(day)]?[rule.key];
+    final x = p.value(history, rule.key, day);
     if (x == null) continue;
+    final seg = p.segmentStart(rule.key, day);
     final base = <double>[
       for (var i = 1; i <= unusualBaselineDays; i++)
-        if (history[dateKey(add(day, -i))]?[rule.key] case final v?) v,
+        if (seg == null || !add(day, -i).isBefore(seg))
+          if (p.value(history, rule.key, add(day, -i)) case final v?) v,
     ];
     if (base.length < unusualMinBaseline) continue;
     final med = _median(base)!;
@@ -99,6 +106,6 @@ UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime da
       baselineCount: base.length,
     ));
   }
-  final prev = checkPrevious ? checkUnusual(history, add(day, -1), checkPrevious: false).show : false;
+  final prev = checkPrevious ? checkUnusual(history, add(day, -1), checkPrevious: false, plan: p).show : false;
   return UnusualResult(day: day, signals: signals, previousDayOff: prev);
 }
