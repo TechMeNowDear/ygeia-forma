@@ -14,6 +14,7 @@ class FoodDraft {
     this.servingLabel,
     Map<String, double>? values,
     this.fromOff = false,
+    this.perMl = false,
   }) : values = values ?? {};
 
   String name;
@@ -25,6 +26,10 @@ class FoodDraft {
   /// Ανά 100 g, κλειδιά Nk.*
   final Map<String, double> values;
   final bool fromOff;
+
+  /// Υγρό στο Open Food Facts: τα πεδία «_100g» είναι τότε ανά 100 ml (έλεγχος διατροφής M4, 4/11).
+  /// Η εφαρμογή μετρά σε γραμμάρια· το λέμε στη φόρμα, χωρίς να μαντεύουμε πυκνότητα.
+  final bool perMl;
 
   static const required = [Nk.kcal, Nk.protein, Nk.carbs, Nk.fat];
 
@@ -67,6 +72,8 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   put(Nk.salt, 'salt');
 
   final brand = pick(['brands'])?.split(',').first.trim();
+  final perMl = isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size'])) ||
+      (p['nutrition_data_per'] is String && (p['nutrition_data_per'] as String).toLowerCase().contains('ml'));
   return FoodDraft(
     name: pick(['product_name_el', 'generic_name_el', 'product_name']) ?? '',
     brand: brand,
@@ -75,8 +82,13 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
     servingLabel: pick(['serving_size']),
     values: values,
     fromOff: true,
+    perMl: perMl,
   );
 }
+
+/// «330 ml», «1 L», «75cl», «1,5 l» → υγρό.
+bool isLiquidQuantity(String? q) =>
+    q != null && RegExp(r'\d\s*(ml|cl|dl|l|lt)\b', caseSensitive: false).hasMatch(q);
 
 /// Έλεγχος λογικής: θερμίδες ετικέτας vs υπολογισμένες από τα μακροθρεπτικά (συντελεστές ΕΕ).
 /// Επιστρέφει τις υπολογισμένες αν η απόκλιση είναι >15% και >20 kcal.

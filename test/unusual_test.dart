@@ -72,4 +72,12 @@ void main() {
     expect(r.offCount, 3);
     expect(r.previousDayOff, isTrue);
   });
+
+  test('Παλμοί και Energy Score μόνο (χωρίς θερμοκρασία) → καμία κάρτα (κλινικός έλεγχος M1)', () {
+    // Το Energy Score βγαίνει εν μέρει από τους ίδιους παλμούς: δεν είναι δεύτερος ανεξάρτητος δείκτης.
+    final h = base()..[dateKey(today)] = {K.sleepHr: 66, K.skinTemp: 34.0, K.energy: 55};
+    final r = checkUnusual(h, today);
+    expect(r.offCount, 2);
+    expect(r.show, isFalse);
+  });
 }

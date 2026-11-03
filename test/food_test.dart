@@ -72,6 +72,46 @@ void main() {
       expect(names('μάνγκο').first, 'Μάνγκο');
     });
 
+    test('Έλεγχος διατροφής 4/11: φραπέ, βραστά, giaurti, augo, xeres, κόλα, πίτα', () {
+      // Ο φραπές δεν ανοίγει τη σκόνη (291 kcal/100 g) αλλά τον έτοιμο καφέ.
+      expect(names('φραπέ'), ['Στιγμιαίος καφές έτοιμος (χωρίς ζάχαρη)']);
+      expect(names('nescafe').contains('Στιγμιαίος καφές (σκόνη)'), isFalse);
+      expect(names('μακαρόνια βραστά').first, startsWith('Μακαρόνια (βρασμένα'));
+      expect(names('giaurti').first, startsWith('Γιαούρτι'));
+      expect(names('augo').first, startsWith('Αυγό'));
+      expect(names('xeres').first, 'Φακές (ξερές)', reason: 'όχι «Ντοματίνια» από ρίζα άλλου ονόματος');
+      expect(names('κόλα').any((n) => n.startsWith('Σοκολάτα')), isFalse);
+      expect(names('πίτα').any((n) => n.contains('χτυπητά')), isFalse);
+    });
+
+    test('Ονόματα φαγητών δεν ανοίγουν σκέτο υλικό (καλύτερα κανένα αποτέλεσμα)', () {
+      for (final q in ['φασολάδα', 'γαλέτα', 'φλωρίνης']) {
+        expect(names(q), isEmpty, reason: q);
+      }
+      expect(names('σαλάτα').any((n) => n.startsWith('Μαρούλι') || n.startsWith('Ρόκα') || n.startsWith('Μάτσε')), isFalse);
+    });
+
+    test('Αλάτι «<x»: από το νάτριο «<x», όχι «<2 g» (γκρέιπφρουτ, κρασί)', () {
+      for (final id in ['C13040', 'C5214']) {
+        final f = basicFoods().firstWhere((f) => f.id == id);
+        expect(f.n['salt']!.lessThan, isTrue);
+        expect(f.n['salt']!.value, lessThan(0.01), reason: f.name);
+      }
+      // Το όριο στρογγυλεύεται προς τα πάνω: <0,0125 → «<0,02», ποτέ «<0,01».
+      expect(nValueText(const NValue(0.0125, lessThan: true), digits: 2), '<0,02');
+      expect(nValueText(const NValue(0.13, lessThan: true), digits: 2), '<0,13');
+    });
+
+    test('Open Food Facts: υγρό → «ανά 100 ml»', () {
+      expect(isLiquidQuantity('330 ml'), isTrue);
+      expect(isLiquidQuantity('1,5 L'), isTrue);
+      expect(isLiquidQuantity('75cl'), isTrue);
+      expect(isLiquidQuantity('500 g'), isFalse);
+      expect(isLiquidQuantity('2 lb'), isFalse);
+      expect(draftFromOff('1', {'quantity': '1 l', 'nutriments': {'energy-kcal_100g': 42}}).perMl, isTrue);
+      expect(draftFromOff('1', {'quantity': '400 g', 'nutriments': {'energy-kcal_100g': 42}}).perMl, isFalse);
+    });
+
     test('Μικρές λέξεις (των, σε) και ρίζες στα άλλα ονόματα δεν φέρνουν άσχετα', () {
       expect(names('τόνος').every((n) => n.startsWith('Τόνος')), isTrue, reason: 'όχι «…όλων των ειδών»');
       expect(names('φέτα').take(2), ['Φέτα (ΠΟΠ, πρόβειο και κατσικίσιο)', 'Τυρί τύπου φέτας από αγελαδινό γάλα']);

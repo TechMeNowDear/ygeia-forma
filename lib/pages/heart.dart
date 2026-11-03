@@ -4,9 +4,11 @@ import '../data.dart';
 import '../format.dart';
 import '../history.dart';
 import '../oura/oura_view.dart';
+import '../oxygen_note.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
 class HeartPage extends StatelessWidget {
@@ -65,7 +67,8 @@ class HeartPage extends StatelessWidget {
               (n.date, n.sleepingHr!),
           ];
           lastRhr = rhrNights.isEmpty ? null : rhrNights.last.sleepingHr;
-          base = d.restingHrBaseline;
+          // Το «συνηθισμένο» από τις νύχτες ΠΡΙΝ από αυτή που δείχνουμε (έλεγχος υπολογισμών F8).
+          base = rhrNights.isEmpty ? null : d.restingHrBaselineFor(rhrNights.last.date);
         }
         // Χαμηλότεροι/υψηλότεροι της μέρας από το ρολόι. Όσο ο ύπνος δεν είναι του ρολογιού, ο ύπνος της νύχτας
         // εξαιρείται με τις ώρες του Oura (ίδιος κανόνας με τους παλμούς της μέρας)· χωρίς νύχτα του Oura δεν
@@ -90,6 +93,10 @@ class HeartPage extends StatelessWidget {
                     (DateTime(day.year, day.month, day.day - i), o.avg, o.min),
               ].take(10).toList()
             : [for (final n in d.nights.where((n) => n.spo2Avg != null).toList().reversed.take(10)) (n.date, n.spo2Avg!, n.spo2Min)];
+        final oxGuidance = oxygenGuidance(
+          {for (final n in oxNights) if (n.$3 != null) n.$1: n.$3!},
+          ouraHr ? day : (d.lastNight?.date ?? day),
+        );
 
         Widget? trend;
         if (lastRhr != null && base != null) {
@@ -99,7 +106,8 @@ class HeartPage extends StatelessWidget {
               : TrendPill(
                   '${diff.abs()} ${diff > 0 ? 'πάνω' : 'κάτω'} από τον μέσο όρο (${base.round()})',
                   up: diff > 0,
-                  kind: diff >= 3 ? TrendKind.bad : (diff < 0 ? TrendKind.good : TrendKind.neutral),
+                  // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4): μπορεί να είναι φάρμακο ή κρύο δωμάτιο.
+                  kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
                 );
         }
 
@@ -180,10 +188,7 @@ class HeartPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού. Μεμονωμένες χαμηλές τιμές '
-                    'είναι συχνά λάθος μέτρησης (κίνηση, χαλαρό λουρί)· το κάπνισμα κάνει τις μετρήσεις να δείχνουν ψηλότερα. '
-                    'Αν ροχαλίζεις ή είσαι κουρασμένος τη μέρα, το σωστό εργαλείο είναι το τεστ άπνοιας του Samsung Health Monitor '
-                    'και ο γιατρός, όχι αυτή η λίστα.',
+                    'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού. $oxygenAboutText',
                     style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
                   const Hairline(vertical: 12),
@@ -192,8 +197,10 @@ class HeartPage extends StatelessWidget {
                   for (final n in oxNights)
                     InfoRow(
                       shortDayDate(n.$1),
-                      '${n.$2.round()}% · χαμηλότερη ${n.$3?.round() ?? '—'}% (ενδεικτικό)',
+                      '${n.$2.round()}% · χαμηλότερη ${n.$3 == null ? '—' : lowestText(n.$3!)}% (ενδεικτικό)',
                     ),
+                  const SizedBox(height: 10),
+                  OxygenNotes(guidance: oxGuidance),
                 ],
               ),
             ),
@@ -211,6 +218,12 @@ class HeartPage extends StatelessWidget {
                 title: 'HRV (μεταβλητότητα παλμών)',
                 text: 'Έρχεται από το Oura: Υγεία › Ύπνος › «Καρδιά στον ύπνο».',
               ),
+            // Κλινικός έλεγχος M6 (4/11): όποιος έχει συμπτώματα ανοίγει πρώτα την Καρδιά.
+            Padding(
+              key: const ValueKey('heart-red-flags'),
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+              child: Text(heartRhythmNote, style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4)),
+            ),
           ],
         );
       },

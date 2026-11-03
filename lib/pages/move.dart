@@ -99,10 +99,12 @@ class ExercisePage extends StatelessWidget {
           StatCard(
             icon: Icons.local_fire_department_rounded,
             color: c.heart,
-            title: 'Θερμίδες που έκαψες',
+            // Κλινικός έλεγχος M9 (4/11): μεγάλο λάθος σε όλα τα ρολόγια, ειδικά στα βάρη.
+            title: 'Θερμίδες (εκτίμηση ρολογιού)',
             value: calories == null ? null : thousands(calories),
             unit: 'kcal',
-            note: activeCalories == null ? 'Μαζί με τον βασικό μεταβολισμό' : 'Από κίνηση ${thousands(activeCalories)} kcal',
+            note: '${activeCalories == null ? 'Μαζί με τον βασικό μεταβολισμό' : 'Από κίνηση ${thousands(activeCalories)} kcal'}. '
+                'Τα ρολόγια κάνουν μεγάλα λάθη στις θερμίδες, ειδικά στα βάρη. Δες τις μόνο ως τάση, όχι για να ισοφαρίσεις φαγητό.',
           ),
           StatCard(
             icon: Icons.straighten_rounded,

@@ -14,6 +14,7 @@ import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
 import 'sources.dart';
+import 'trends.dart' show usualMean;
 
 // ---------------------------------------------------------------------------
 // Μοντέλα
@@ -543,14 +544,20 @@ class Dashboard {
     return v.reduce((a, b) => a + b) / v.length;
   }
 
-  double? get sleepBaseline => mean(previousNights().map((n) => n.minutes.toDouble()));
+  /// Οι νύχτες πριν από τη νύχτα [date] (ποτέ η ίδια μέσα στο «συνηθισμένο» της).
+  Iterable<Night> nightsBefore(DateTime date) => nights.where((n) => n.date.isBefore(dayOf(date)));
 
-  double? get restingHrBaseline => mean(previousNights(14).map((n) => n.sleepingHr));
+  /// «Συνήθως» για τη διάρκεια της τελευταίας νύχτας ([usualMean]: τουλάχιστον 7 προηγούμενες νύχτες).
+  double? get sleepBaseline =>
+      lastNight == null ? null : usualMean(nightsBefore(lastNight!.date).map((n) => n.minutes.toDouble()));
 
-  double? get skinTempBaseline {
-    final prev = previousNights(14).map((n) => n.skinTemp).whereType<double>().toList();
-    return prev.length >= 3 ? mean(prev) : null;
-  }
+  double? get restingHrBaseline => lastNight == null ? null : restingHrBaselineFor(lastNight!.date);
+
+  /// Ο μέσος όρος παλμών ύπνου πριν από τη νύχτα [date] (η νύχτα που δείχνουμε, όχι απαραίτητα η τελευταία).
+  double? restingHrBaselineFor(DateTime date) => usualMean(nightsBefore(date).map((n) => n.sleepingHr));
+
+  double? get skinTempBaseline =>
+      lastNight == null ? null : usualMean(nightsBefore(lastNight!.date).map((n) => n.skinTemp));
 
   DayValue? valueFor(List<DayValue> list, DateTime day) {
     for (final v in list.reversed) {
@@ -563,11 +570,7 @@ class Dashboard {
 
   double? get todaySteps => valueFor(steps, readAt)?.value;
 
-  double? get stepsBaseline {
-    final prev = steps.where((s) => !sameDay(s.day, readAt)).toList();
-    final last7 = prev.length <= 7 ? prev : prev.sublist(prev.length - 7);
-    return mean(last7.map((s) => s.value));
-  }
+  double? get stepsBaseline => usualMean(steps.where((s) => s.day.isBefore(dayOf(readAt))).map((s) => s.value));
 
   /// Ελάχιστοι και μέγιστοι παλμοί μιας ημέρας. [exclude]: χρονικά διαστήματα (π.χ. ο ύπνος από το Oura)
   /// που δεν μετρούν, ώστε το «χαμηλότερο της μέρας» να μην είναι παλμός του ύπνου.

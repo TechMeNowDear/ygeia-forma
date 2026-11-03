@@ -6,10 +6,12 @@ import '../history.dart';
 import '../oura/oura_model.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
+import '../oxygen_note.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'compare_page.dart';
+import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
 /// Ο λόγος που η χθεσινή νύχτα είναι κενή (null = υπάρχει).
@@ -290,7 +292,7 @@ class _OuraHeartCard extends StatelessWidget {
           Row(children: [
             value('Χαμηλότεροι παλμοί', low == null ? '—' : '${low.round()}', 'bpm'),
             value('Μέσοι παλμοί', avg == null ? '—' : '${avg.round()}', 'bpm'),
-            value('HRV νύχτας', hrv == null ? '—' : '${hrv.value.round()}', 'ms'),
+            value('HRV (RMSSD)', hrv == null ? '—' : '${hrv.value.round()}', 'ms'),
           ]),
           if (hrv?.usual != null) ...[
             const SizedBox(height: 8),
@@ -320,8 +322,11 @@ class _OuraHeartCard extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           Text(
-            'Το HRV (μεταβλητότητα καρδιακού ρυθμού) ανεβαίνει όσο ξεκουράζεσαι. Κάθε σημείο είναι ο μέσος όρος μιας '
-            'ολόκληρης νύχτας, γιατί αυτός μετριέται με ακρίβεια. Το συγκρίνουμε μόνο με τις δικές σου νύχτες.',
+            // Κλινικός έλεγχος H5 (4/11): χωρίς «ανεβαίνει όσο ξεκουράζεσαι» και «με ακρίβεια».
+            'HRV (RMSSD): πόσο αλλάζει το διάστημα από χτύπο σε χτύπο. Χαμηλώνει με την ηλικία, το αλκοόλ, την ασθένεια '
+            'και την κούραση, και αλλάζει με φάρμακα. Κάθε σημείο είναι ο μέσος όρος μιας νύχτας, που είναι πιο αξιόπιστος '
+            'από μεμονωμένες μετρήσεις. Έχει νόημα μόνο σε σύγκριση με τις δικές σου νύχτες. Ακανόνιστος ρυθμός ή έκτακτες '
+            'συστολές μπορεί να ανεβάσουν ψεύτικα την τιμή.',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
           ),
         ],
@@ -342,6 +347,11 @@ class _BreathCard extends StatelessWidget {
     final plan = store.plan;
     final b = ouraBaseline(store.history, plan, K.breath, day);
     final ox = store.data?.watchSpo2(day);
+    final g = oxygenGuidance({
+      for (var i = 0; i < oxygenWindowNights; i++)
+        if (store.data?.watchSpo2(DateTime(day.year, day.month, day.day - i)) case final o?)
+          DateTime(day.year, day.month, day.day - i): o.min,
+    }, day);
 
     Widget row(String title, String sub, Source s) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -384,16 +394,15 @@ class _BreathCard extends StatelessWidget {
             ox == null ? 'Οξυγόνο —' : 'Οξυγόνο ${ox.avg.round()}%',
             ox == null
                 ? 'Δεν υπάρχουν μετρήσεις του ρολογιού για αυτή τη νύχτα'
-                : 'Χαμηλότερο ${ox.min.round()}% · ενδεικτικό'
+                : 'Χαμηλότερο ${lowestText(ox.min)}% · ενδεικτικό'
                     '${ox.below90 == null ? '' : ' · κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ενδεικτικό)'}',
             Source.watch,
           ),
           const SizedBox(height: 6),
-          Text(
-            'Δεν είναι διάγνωση. Αν ροχαλίζεις ή είσαι κουρασμένος τη μέρα, το σωστό εργαλείο είναι το τεστ άπνοιας '
-            'του Samsung Health Monitor και ο γιατρός σου.',
-            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
-          ),
+          // Κλινικός έλεγχος C1 (4/11): το τεστ άπνοιας του ρολογιού είναι διαλογή, όχι «το σωστό εργαλείο».
+          Text(oxygenAboutText, style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4)),
+          const SizedBox(height: 10),
+          OxygenNotes(guidance: g),
         ],
       ),
     );

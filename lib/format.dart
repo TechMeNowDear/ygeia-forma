@@ -49,8 +49,9 @@ String hm(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
 String _hours(int h) => h == 1 ? '1 ώρα' : '$h ώρες';
 String _minutes(int m) => m == 1 ? '1 λεπτό' : '$m λεπτά';
 
-/// 372 → «6 ώρες 12 λεπτά», 60 → «1 ώρα», 1 → «1 λεπτό».
+/// 372 → «6 ώρες 12 λεπτά», 60 → «1 ώρα», 1 → «1 λεπτό», −5 → «−5 λεπτά».
 String hoursMinutes(int minutes) {
+  if (minutes < 0) return '−${hoursMinutes(-minutes)}';
   final h = minutes ~/ 60;
   final m = minutes % 60;
   if (h == 0) return _minutes(m);
@@ -68,8 +69,12 @@ List<(String, String)> hoursMinutesParts(int minutes) {
   ];
 }
 
-/// 82.2 → «82,2»
-String dec(num v, [int digits = 1]) => v.toStringAsFixed(digits).replaceAll('.', ',');
+/// 82.2 → «82,2». Ποτέ «-0,0»: μια τιμή που στρογγυλεύεται στο μηδέν γράφεται χωρίς πρόσημο.
+String dec(num v, [int digits = 1]) {
+  final s = v.toStringAsFixed(digits);
+  final zero = double.parse(s) == 0;
+  return (zero && s.startsWith('-') ? s.substring(1) : s).replaceAll('.', ',');
+}
 
 /// 12345 → «12.345»
 String thousands(num v) {

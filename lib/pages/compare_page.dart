@@ -39,12 +39,14 @@ List<CompareRow> buildCompareRows({
       ouraStart: o?.onset ?? o?.start,
       ouraEnd: o?.end,
       ouraHr: o?.avgHr,
+      ouraAwake: o?.awake == null ? null : (o!.awake! / 60).round(),
       watchMinutes: w?.minutes,
       watchEstimated: w?.estimatedMinutes ?? 0,
       watchStart: w?.start,
       watchEnd: w?.end,
       watchParts: w?.parts.length ?? 0,
       watchHr: w?.sleepingHr,
+      watchAwake: w == null || w.stageMinutes.isEmpty ? null : w.awakeMinutes,
     ));
   }
   return rows;
@@ -117,8 +119,8 @@ class ComparePage extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     mean.abs() < 5
-                        ? 'Το ρολόι μετρά κατά μέσο όρο σχεδόν τον ίδιο ύπνο'
-                        : 'Το ρολόι μετρά κατά μέσο όρο ${hoursMinutes(mean.abs())} ${mean < 0 ? 'λιγότερο' : 'περισσότερο'} ύπνο',
+                        ? 'Η διάρκεια του ρολογιού είναι κατά μέσο όρο σχεδόν ίδια με τον ύπνο του Oura'
+                        : 'Η διάρκεια του ρολογιού είναι κατά μέσο όρο ${hoursMinutes(mean.abs())} ${mean < 0 ? 'μικρότερη' : 'μεγαλύτερη'} από τον ύπνο του Oura',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text, height: 1.25),
                   ),
                   const SizedBox(height: 6),
@@ -128,6 +130,13 @@ class ComparePage extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 10),
+                // Έλεγχος υπολογισμών F7 (4/11): δύο διαφορετικοί ορισμοί, γραμμένοι ρητά.
+                Text(
+                  'Τι συγκρίνεται: Oura = μόνο ύπνος, χωρίς τα ξυπνήματα. Ρολόι = η διάρκεια όπως τη δίνει η Samsung, που '
+                  'μπορεί να περιέχει και τα ξυπνήματα που μέτρησε. Γι\' αυτό φαίνεται και ο χρόνος ξύπνιος της κάθε συσκευής.',
+                  style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   'Καμία συσκευή δεν είναι «η σωστή». Εδώ βλέπεις πόσο διαφέρουν· οι φάσεις ύπνου διαφέρουν πολύ ακόμα '
                   'και ανάμεσα σε καλές συσκευές, γι\' αυτό δεν τις συγκρίνουμε.',
@@ -216,7 +225,7 @@ class _CompareCard extends StatelessWidget {
                 child: Text(longDate(r.day), style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
               ),
               if (r.diff != null)
-                TrendPill(r.diff!.abs() < 5 ? 'ίδια διάρκεια' : 'διαφορά ${hoursMinutes(r.diff!.abs())}'),
+                TrendPill(r.diff!.abs() < 5 ? 'σχεδόν ίδια' : 'διαφορά ${hoursMinutes(r.diff!.abs())}'),
             ],
           ),
           const SizedBox(height: 8),
@@ -228,7 +237,8 @@ class _CompareCard extends StatelessWidget {
                 const Align(alignment: Alignment.centerLeft, child: SourceTag(Source.oura)),
                 const Align(alignment: Alignment.centerLeft, child: SourceTag(Source.watch)),
               ]),
-              line('Ύπνος', dur(r.ouraMinutes), dur(r.watchMinutes)),
+              line('Διάρκεια', dur(r.ouraMinutes), dur(r.watchMinutes)),
+              line('Ξύπνιος μέσα', dur(r.ouraAwake), dur(r.watchAwake)),
               line('Κοιμήθηκες', t(r.ouraStart), t(r.watchStart)),
               line('Ξύπνησες', t(r.ouraEnd), t(r.watchEnd)),
               line('Κομμάτια', r.ouraMinutes == null ? '—' : '1', r.watchParts == 0 ? '—' : '${r.watchParts}'),

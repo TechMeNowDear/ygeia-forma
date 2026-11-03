@@ -312,7 +312,7 @@ class OuraSleepTodayCard extends StatelessWidget {
   }
 }
 
-/// «Ξεκούραση στον ύπνο»: HRV, παλμοί, θερμοκρασία (μέσοι όροι όλης της νύχτας), και ετοιμότητα.
+/// «Καρδιά και θερμοκρασία στον ύπνο»: HRV, παλμοί, θερμοκρασία (μέσοι όροι όλης της νύχτας), και ετοιμότητα.
 /// Όλα από το Oura, σε σύγκριση με τις 14 τελευταίες νύχτες σου από το Oura.
 class OuraRestCard extends StatelessWidget {
   const OuraRestCard({super.key, required this.store, required this.now, required this.onTap});
@@ -364,12 +364,13 @@ class OuraRestCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            Expanded(child: Text('Ξεκούραση στον ύπνο', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+            // Κλινικός έλεγχος M8 (4/11): όχι «ξεκούραση»· HRV και θερμοκρασία δεν είναι επικυρωμένοι δείκτες ανάρρωσης.
+            Expanded(child: Text('Καρδιά και θερμοκρασία στον ύπνο', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
             const SourceTag(Source.oura),
           ]),
           const SizedBox(height: 12),
           Row(children: [
-            cell('HRV', hrv == null ? '—' : '${hrv.value.round()}', 'ms', note(hrv, same: 3)),
+            cell('HRV (RMSSD)', hrv == null ? '—' : '${hrv.value.round()}', 'ms', note(hrv, same: 3)),
             cell('Παλμοί στον ύπνο', hr == null ? '—' : '${hr.value.round()}', 'bpm', note(hr, same: 2)),
             cell(
               'Θερμοκρασία',

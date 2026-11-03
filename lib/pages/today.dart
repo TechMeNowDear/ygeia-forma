@@ -5,6 +5,7 @@ import '../food/food_store.dart';
 import '../format.dart';
 import '../labels.dart';
 import '../nav.dart';
+import '../oxygen_note.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -104,7 +105,7 @@ class TodayPage extends StatelessWidget {
         ];
 
         // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
-        // «Ξεκούραση στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
+        // «Καρδιά και θερμοκρασία στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
         final extras = <Widget>[
           if (!ouraNight && prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
           if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, () => open(Cat.health, HealthTab.heart)),
@@ -208,7 +209,7 @@ class TodayPage extends StatelessWidget {
       title: 'Energy Score',
       value: e?.value.round().toString(),
       unit: 'από 100',
-      note: e == null ? null : relativeDay(e.day, d.readAt),
+      note: e == null ? null : '${relativeDay(e.day, d.readAt)} · εκτίμηση της Samsung',
       chart: recent.length >= 2 ? Sparkline(values: [for (final v in recent) v.value], color: c.energy) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
@@ -227,7 +228,8 @@ class TodayPage extends StatelessWidget {
           : TrendPill(
               '${diff > 0 ? '+' : '−'}${diff.abs()} από τον μ.ό.',
               up: diff > 0,
-              kind: diff >= 3 ? TrendKind.bad : (diff < 0 ? TrendKind.good : TrendKind.neutral),
+              // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4).
+              kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
             );
     }
     final recent = d.nights.where((n) => n.sleepingHr != null).toList();
@@ -249,13 +251,18 @@ class TodayPage extends StatelessWidget {
   Widget _watchSpo2Card(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final ox = d.watchSpo2(now);
+    final g = oxygenGuidance({
+      for (var i = 0; i < oxygenWindowNights; i++)
+        if (d.watchSpo2(DateTime(now.year, now.month, now.day - i)) case final o?) DateTime(now.year, now.month, now.day - i): o.min,
+    }, now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
       title: 'Οξυγόνο · ρολόι',
       value: ox?.avg.round().toString(),
       unit: '%',
-      trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${ox.min.round()}% · ενδεικτικό'),
+      trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${lowestText(ox.min)}% · ενδεικτικό'),
+      note: ox == null ? null : g.short,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
@@ -269,7 +276,8 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.local_fire_department_rounded,
       color: c.heart,
-      title: 'Θερμίδες που έκαψες',
+      // Κλινικός έλεγχος M9: τα ρολόγια κάνουν μεγάλα λάθη στις θερμίδες (συχνά 20–30%).
+      title: 'Θερμίδες (εκτίμηση ρολογιού)',
       value: total == null ? null : thousands(total),
       unit: 'kcal',
       note: active == null ? null : 'Από κίνηση ${thousands(active)} kcal',
@@ -282,6 +290,7 @@ class TodayPage extends StatelessWidget {
     final c = Aigaio.of(context);
     final n = d.lastNight;
     final min = n?.spo2Min;
+    final g = n == null ? null : oxygenGuidance({for (final x in d.nights) if (x.spo2Min != null) x.date: x.spo2Min!}, n.date);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
@@ -290,7 +299,8 @@ class TodayPage extends StatelessWidget {
       unit: '%',
       trend: min == null
           ? null
-          : TrendPill('Χαμηλότερη μέτρηση ${min.round()}% · ενδεικτικό'),
+          : TrendPill('Χαμηλότερη μέτρηση ${lowestText(min)}% · ενδεικτικό'),
+      note: g?.short,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
@@ -304,10 +314,11 @@ class TodayPage extends StatelessWidget {
       icon: Icons.thermostat_rounded,
       color: c.move,
       title: 'Θερμοκρασία καρπού',
-      value: t == null ? null : (base == null ? dec(t) : signedDec(t - base)),
+      // Χωρίς μέσο όρο δεν δείχνουμε απόλυτη τιμή καρπού (π.χ. 33,6 °C διαβάζεται ως υποθερμία· κλινικός έλεγχος L5).
+      value: t == null || base == null ? null : signedDec(t - base),
       unit: '°C',
       note: (t != null && base != null) ? 'Απόκλιση από τον μέσο όρο σου' : null,
-      empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
+      empty: t == null ? 'Έρχεται μετά από έναν ύπνο με το ρολόι.' : 'Μαθαίνει το συνηθισμένο σου (7 νύχτες).',
       onTap: onTap,
     );
   }
@@ -342,7 +353,6 @@ class _SleepCard extends StatelessWidget {
     final base = data.sleepBaseline;
     final diff = base == null ? null : n.minutes - base.round();
     final total = stageOrder.fold<int>(0, (s, k) => s + (n.stageMinutes[k] ?? 0));
-    int pct(String k) => total == 0 ? 0 : ((n.stageMinutes[k] ?? 0) * 100 / total).round();
     final stages = [for (final k in stageOrder) if ((n.stageMinutes[k] ?? 0) > 0) k];
 
     return DecoratedBox(
@@ -431,8 +441,9 @@ class _SleepCard extends StatelessWidget {
                     children: [
                       Text(hm(n.start), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
                       Expanded(
+                        // Χωρίς ποσοστά μίας νύχτας (κλινικός έλεγχος H1): μόνο η μπάρα, ως εκτίμηση.
                         child: Text(
-                          '${stageLabel('DEEP')} ${pct('DEEP')}% · REM ${pct('REM')}%',
+                          'Φάσεις · εκτίμηση της Samsung',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
                         ),

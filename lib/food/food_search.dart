@@ -35,7 +35,8 @@ const _grLetters = {
 const _latDigraphs = {
   'ou': 'u', 'oy': 'u', 'ei': 'i', 'oi': 'i', 'ai': 'e', 'mp': 'b', 'nt': 'd', 'gk': 'g', 'gg': 'g', 'ng': 'g',
   'ch': 'h', 'kh': 'h', 'ph': 'f', 'th': 'th', 'ps': 'ps', 'ks': 'ks', 'tz': 'dz',
-  'au': 'av', 'eu': 'ev',
+  // Χωρίς «au → av» / «eu → ev» (έλεγχος διατροφής M7): το «giaurti» είναι γι-α-ού-ρτι, όχι «γιαβρτι».
+  // Το αυ/ευ στο greeklish γράφεται συνήθως av/ev («avgo»), που ταιριάζει ήδη.
 };
 const _latLetters = {
   'x': 'h', 'y': 'i', 'w': 'o', 'u': 'u', 'c': 'k', 'q': 'k', 'j': 'g',
@@ -96,10 +97,13 @@ const _endings = ['ies', 'ia', 'es', 'as', 'os', 'is', 'us', 'on', 'a', 'e', 'i'
 String stem(String w) {
   if (w.length < 4 || w.contains(RegExp(r'[^a-z]'))) return w;
   for (final e in _endings) {
-    if (w.endsWith(e) && w.length - e.length >= 3) return w.substring(0, w.length - e.length);
+    if (w.endsWith(e) && w.length - e.length >= 3) return _sameStem[w.substring(0, w.length - e.length)] ?? w.substring(0, w.length - e.length);
   }
   return w;
 }
+
+/// Ρίζες με το ίδιο νόημα: «βραστά» = «βρασμένα» (έλεγχος διατροφής M7: «μακαρόνια βραστά» δεν έβρισκε τίποτα).
+const _sameStem = {'vrast': 'vrasmen'};
 
 /// Λέξη μετά από «χωρίς» δεν σημαίνει ότι το τρόφιμο είναι αυτό («Σαρδέλα, χωρίς λάδι» δεν είναι λάδι).
 const _negation = 'horis';
@@ -120,28 +124,47 @@ class FoodIndex {
   late final List<List<String>> _aliasStem;
 
   /// Όπως [_search]· αν δεν βρεθεί τίποτα με λατινικά, δοκιμάζει και τις άλλες συνηθισμένες γραφές του
-  /// greeklish: «x» για ξ («xeres» = ξερές) και «h» για η («hliosporoi» = ηλιόσποροι).
+  /// greeklish: «x» για ξ («xeres» = ξερές), «h» για η («hliosporoi» = ηλιόσποροι), «au» για αυ («augo»).
+  /// Η άλλη γραφή δοκιμάζεται και όταν τα αποτελέσματα είναι μόνο αδύναμα ταιριάσματα (π.χ. «xeres» → «Ντοματίνια»
+  /// από ρίζα άλλου ονόματος· έλεγχος διατροφής M7), και κρατιέται αν ταιριάζει καλύτερα.
   List<Food> search(String query, {Map<String, double> boost = const {}, int limit = 60}) {
-    final r = _search(query, boost: boost, limit: limit);
-    if (r.isNotEmpty || query.contains(RegExp(r'[\u0370-\u03FF\u1F00-\u1FFF]'))) return r;
+    final (r, top) = _search(query, boost: boost, limit: limit);
+    if ((r.isNotEmpty && top >= _weakMatch) || query.contains(RegExp(r'[\u0370-\u03FF\u1F00-\u1FFF]'))) return r;
     final lower = query.toLowerCase();
-    for (final v in {lower.replaceAll('x', 'ks'), lower.replaceAll('h', 'i'), lower.replaceAll('x', 'ks').replaceAll('h', 'i')}) {
+    var best = r;
+    var bestTop = r.isEmpty ? double.negativeInfinity : top;
+    final variants = {
+      lower.replaceAll('x', 'ks'),
+      lower.replaceAll('h', 'i'),
+      lower.replaceAll('x', 'ks').replaceAll('h', 'i'),
+      // «augo» = αυγό: το au/eu ως αυ/ευ, μόνο ως δεύτερη γραφή (πρώτη είναι το «giaurti» = γιαούρτι).
+      lower.replaceAll('au', 'av').replaceAll('eu', 'ev'),
+    };
+    for (final v in variants) {
       if (v == lower) continue;
-      final alt = _search(v, boost: boost, limit: limit);
-      if (alt.isNotEmpty) return alt;
+      final (alt, altTop) = _search(v, boost: boost, limit: limit);
+      if (alt.isNotEmpty && altTop > bestTop) {
+        best = alt;
+        bestTop = altTop;
+      }
     }
-    return r;
+    return best;
   }
 
-  /// [boost]: πόσο προτιμάται κάθε τρόφιμο (π.χ. πόσες φορές το έχω φάει).
-  List<Food> _search(String query, {Map<String, double> boost = const {}, int limit = 60}) {
+  /// Κάτω από αυτό το καλύτερο αποτέλεσμα είναι μόνο ρίζα ή κομμάτι λέξης (όχι λέξη του ονόματος).
+  static const _weakMatch = 5.0;
+
+  /// [boost]: πόσο προτιμάται κάθε τρόφιμο (π.χ. πόσες φορές το έχω φάει). Επιστρέφει και τον βαθμό του πρώτου
+  /// (χωρίς τις προτιμήσεις), για να ξέρει το [search] αν το ταίριασμα είναι αδύναμο.
+  (List<Food>, double) _search(String query, {Map<String, double> boost = const {}, int limit = 60}) {
     final p = phonetic(query);
     // Μόνο μικρές λέξεις (π.χ. «τυ» στη μέση του «τυρί»): ψάχνουμε με αυτές, για να μη βγαίνει
     // «Δεν βρέθηκε» όσο πληκτρολογώ.
     var q = _words(p);
     if (q.isEmpty) q = _allWords(p);
-    if (q.isEmpty) return const [];
+    if (q.isEmpty) return (const <Food>[], 0.0);
     final scored = <(double, int)>[];
+    var top = double.negativeInfinity;
     for (var i = 0; i < foods.length; i++) {
       var score = 0.0;
       var all = true;
@@ -158,7 +181,8 @@ class FoodIndex {
             s = first ? 7 : 5;
           } else if (ws.length >= 3 && _nameStem[i][k] == ws) {
             s = first ? 7 : 5;
-          } else if (w.length >= 4 && nw.contains(w)) {
+          } else if (w.length >= 5 && nw.contains(w)) {
+            // Κομμάτι λέξης μόνο για 5+ γράμματα: «κόλα» δεν βρίσκει «σοκολάτα», «πίτα» δεν βρίσκει «χτυπητά».
             s = 2;
           }
           if (s > 0 && k > 0 && _name[i][k - 1] == _negation) s = 1;
@@ -185,6 +209,8 @@ class FoodIndex {
       }
       if (!all) continue;
       final f = foods[i];
+      final words = score / q.length;
+      if (words > top) top = words;
       score += (boost[f.id] ?? 0);
       if (f.isMine) score += 1.5; // τα δικά μου πρώτα (έγγραφο › Βάση τροφίμων)
       if (f.isRawWithCooked) score += 1.2; // ζυγίζω ωμά: η ωμή μορφή πριν από τη μαγειρεμένη
@@ -192,6 +218,6 @@ class FoodIndex {
       scored.add((score, i));
     }
     scored.sort((a, b) => b.$1.compareTo(a.$1));
-    return [for (final s in scored.take(limit)) foods[s.$2]];
+    return ([for (final s in scored.take(limit)) foods[s.$2]], top);
   }
 }

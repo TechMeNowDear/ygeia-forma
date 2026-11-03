@@ -84,6 +84,9 @@ void main() {
     final golden = jsonDecode(File('test/fixtures/golden_dfc10c8.json').readAsStringSync()) as Map<String, dynamic>;
     // Μέσα από JSON και τα δύο, ώστε οι αριθμοί να συγκρίνονται με τον ίδιο τρόπο.
     final now = jsonDecode(jsonEncode(current())) as Map<String, dynamic>;
+    // TEMP(audit-b): τα νέα αποτελέσματα στο log, για ενημέρωση του fixture.
+    // ignore: avoid_print
+    print('GOLDEN_NOW_B64:${base64.encode(gzip.encode(utf8.encode(const JsonEncoder.withIndent(' ').convert(now))))}');
     expect(now.keys.toSet(), golden.keys.toSet());
     for (final k in golden.keys) {
       expect(now[k], golden[k], reason: k);

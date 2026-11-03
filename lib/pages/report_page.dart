@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
+import '../oxygen_note.dart' show lowestText;
 import '../report.dart';
 import '../samsung.dart';
 import '../sources.dart';
@@ -14,7 +15,7 @@ import '../theme.dart';
 import '../trends.dart';
 import '../widgets.dart';
 
-/// Αναφορά για γιατρό: προεπισκόπηση των δύο σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
+/// Αναφορά για γιατρό: προεπισκόπηση των σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key, required this.store, this.now, this.note = ''});
   final HealthStore store;
@@ -28,7 +29,7 @@ class ReportPage extends StatefulWidget {
 }
 
 class _ReportPageState extends State<ReportPage> {
-  final _keys = [GlobalKey(), GlobalKey()];
+  final _keys = [for (var i = 0; i < _pageCount; i++) GlobalKey()];
   bool _saving = false;
   String? _uri;
   String? _error;
@@ -88,7 +89,7 @@ class _ReportPageState extends State<ReportPage> {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final pages = [_PageOne(data: _data, note: _note.trim()), _PageTwo(data: _data)];
+    final pages = [_PageOne(data: _data, note: _note.trim()), _PageTwo(data: _data), _PageThree(data: _data)];
 
     return Scaffold(
       backgroundColor: c.background,
@@ -109,8 +110,10 @@ class _ReportPageState extends State<ReportPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Οι τελευταίοι 3 μήνες σε δύο σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
-                      'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση.',
+                      'Οι τελευταίοι 3 μήνες σε τρεις σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
+                      'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση. '
+                      // Κλινικός έλεγχος H2 (4/11).
+                      'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού ή τεστ άπνοιας· αυτά τα δείχνεις από το Samsung Health Monitor.',
                       style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
                     ),
                     const SizedBox(height: 12),
@@ -234,6 +237,9 @@ class _ReportPageState extends State<ReportPage> {
 
 const _a4 = Size(595, 842);
 
+/// Σελίδες: 1 σύνοψη και ορισμοί, 2 γραφήματα, 3 οξυγόνο και ζυγίσεις (από 4/11, για να χωρούν οι εξηγήσεις).
+const _pageCount = 3;
+
 class _Paper extends StatelessWidget {
   const _Paper({required this.child});
   final Widget child;
@@ -278,7 +284,11 @@ class _Header extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    page == 1 ? 'Αναφορά υγείας' : 'Αναφορά υγείας · γραφήματα',
+                    switch (page) {
+                      1 => 'Αναφορά υγείας',
+                      2 => 'Αναφορά υγείας · γραφήματα',
+                      _ => 'Αναφορά υγείας · οξυγόνο και ζυγίσεις',
+                    },
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.3),
                   ),
                   const SizedBox(height: 2),
@@ -322,7 +332,7 @@ class _Footer extends StatelessWidget {
           ),
         ),
         Text(
-          'Δημιουργήθηκε ${t.day}/${t.month}/${t.year} · σελίδα $page από 2',
+          'Δημιουργήθηκε ${t.day}/${t.month}/${t.year} · σελίδα $page από $_pageCount',
           style: TextStyle(fontSize: 8, color: c.textTertiary),
         ),
       ],
@@ -365,31 +375,34 @@ class _PageOne extends StatelessWidget {
 
     final plan = d.plan ?? SourcePlan.samsungOnly;
     final withOura = plan.hasOura;
+    // Ορισμοί και μονάδες σε κάθε γραμμή (κλινικός έλεγχος H3/H4, 4/11).
     final rows = <(String, String, String Function(double), MetricDef?)>[
-      ('Παλμοί στον ύπνο (bpm)', K.sleepHr, num0, _def(K.sleepHr)),
+      ('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, num0, _def(K.sleepHr)),
       if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο (bpm)', K.lowHr, num0, _def(K.lowHr)),
-      if (withOura) ('HRV νύχτας, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
-      if (withOura) ('Αναπνοές στον ύπνο (το λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
-      ('Οξυγόνο στον ύπνο, μέσο', K.spo2Avg, pct, _def(K.spo2Avg)),
-      ('Οξυγόνο στον ύπνο, ελάχιστο της νύχτας', K.spo2Min, pct, null),
+      if (withOura) ('HRV νύχτας, RMSSD, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
+      if (withOura) ('Αναπνοές στον ύπνο (ανά λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
+      ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)', K.spo2Avg, pct, _def(K.spo2Avg)),
+      ('Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση νύχτας (%)', K.spo2Min, pct, null),
       ('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, dur, _def(K.sleepMin)),
-      ('Ώρα που κοιμήθηκε', K.bedtime, clockFromSix, _def(K.bedtime)),
-      ('Ώρα που ξύπνησε', K.wake, clockFromSix, null),
+      ('Ώρα που κοιμήθηκε (ώρα:λεπτά)', K.bedtime, clockFromSix, _def(K.bedtime)),
+      ('Ώρα που ξύπνησε (ώρα:λεπτά)', K.wake, clockFromSix, null),
       ('Βήματα ανά μέρα', K.steps, (v) => thousands(v), _def(K.steps)),
     ];
-    // Η πηγή κάθε δείκτη, γραμμένη στη γραμμή του (απόφαση 2/11). Μετά από αλλαγή πηγής: «από τις …».
+    // Η πηγή κάθε δείκτη, γραμμένη στη γραμμή του (απόφαση 2/11· από 4/11 και χωρίς Oura). Μετά από αλλαγή πηγής:
+    // «από τις …». Τα βήματα είναι το σύνολο της Samsung Health (ρολόι και κινητό, χωρίς διπλομέτρηση).
     String label((String, String, String Function(double), MetricDef?) r) {
-      if (!withOura) return r.$1;
       final s = d.stat(r.$2);
       final since = s.since == null ? '' : ', από ${s.since!.day}/${s.since!.month}';
-      return '${r.$1} · ${sourceName(s.source)}$since';
+      final src = r.$2 == K.steps ? 'Samsung Health' : sourceName(s.source);
+      return '${r.$1} · $src$since';
     }
 
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
     final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
     final bold = cell.copyWith(fontWeight: FontWeight.w700);
+    final small = TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4);
 
-    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4), child: w);
+    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 4.5, horizontal: 4), child: w);
 
     String trendText(ReportStat s, MetricDef? def) {
       final t = s.trend;
@@ -415,15 +428,33 @@ class _PageOne extends StatelessWidget {
               style: TextStyle(fontSize: 9.5, color: c.text, height: 1.35),
             ),
           ),
+        // Κλινικός έλεγχος H2 (4/11): η απουσία ρυθμού/άπνοιας εδώ δεν σημαίνει ότι ήταν φυσιολογικά.
+        Container(
+          key: const ValueKey('report-not-included'),
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(4)),
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
+              const TextSpan(
+                text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor. Η εφαρμογή δεν '
+                    'έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν φυσιολογικά. Αν υπάρχουν, δείτε '
+                    'τα PDF του Samsung Health Monitor.',
+              ),
+            ]),
+            style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
+          ),
+        ),
         _Title('Σύνοψη'),
         Table(
           columnWidths: const {
-            0: FlexColumnWidth(2.5),
-            1: FlexColumnWidth(1.2),
-            2: FlexColumnWidth(1.7),
-            3: FlexColumnWidth(1.7),
+            0: FlexColumnWidth(3.0),
+            1: FlexColumnWidth(1.1),
+            2: FlexColumnWidth(1.6),
+            3: FlexColumnWidth(1.6),
             4: FlexColumnWidth(0.8),
-            5: FlexColumnWidth(1.5),
+            5: FlexColumnWidth(1.4),
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
@@ -431,7 +462,7 @@ class _PageOne extends StatelessWidget {
             TableRow(
               decoration: BoxDecoration(color: c.background),
               children: [
-                pad(Text('Δείκτης', style: header)),
+                pad(Text('Δείκτης · πηγή', style: header)),
                 pad(Text('Μεσαία τιμή', style: header)),
                 pad(Text('Συνήθως\n(8 στις 10 μέρες)', style: header)),
                 pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
@@ -456,12 +487,81 @@ class _PageOne extends StatelessWidget {
               }(),
           ],
         ),
-        _Title('Νύχτες με μία τουλάχιστον μέτρηση οξυγόνου κάτω από 90%'),
+        _Title('Πώς διαβάζεται'),
+        Text(
+          // Έλεγχος υπολογισμών F9 (4/11): χωρίς ισχυρισμό «1%»· είναι ένδειξη ανά δείκτη.
+          'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
+          'ένδειξη αλλαγής ανά δείκτη, μόνο όταν η διαφορά των μεσαίων τιμών ξεπερνά ένα ελάχιστο και τις συνηθισμένες '
+          'μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών ημερών)· αλλιώς '
+          '«Σταθερό», ή «—» όταν οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια '
+          'ένδειξη μπορεί να είναι τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού.',
+          style: small,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          withOura
+              ? 'Πώς μετρήθηκαν: κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
+                  'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
+                  'Galaxy Watch Ultra 2. Οξυγόνο: Galaxy Watch Ultra 2 (αισθητήρας καρπού)· «χαμηλότερη μεμονωμένη '
+                  'μέτρηση», όχι οξυμετρία. Βήματα: Samsung Health. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής '
+                  'μετρούν μόνο οι μέρες της νέας.'
+              : 'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
+                  'αισθητήρας καρπού· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
+                  'Samsung. Βήματα: σύνολο της Samsung Health. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει '
+                  'σε άλλες εφαρμογές.',
+          style: small,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          // Κλινικός έλεγχος H4 (4/11).
+          'Παλμοί στον ύπνο = μέσος όρος όλου του ύπνου, όχι παλμοί ηρεμίας σε εγρήγορση.'
+          '${withOura ? ' HRV = RMSSD, μέσος όρος της νύχτας από το Oura· δεν συγκρίνεται με τιμές Holter 24ώρου.' : ''}'
+          ' Λίπος και μύες (σελίδα 3): εκτίμηση βιοηλεκτρικής αντίστασης της ζυγαριάς InBody H40, όχι DXA.',
+          style: small,
+        ),
+        const Spacer(),
+        _Footer(data: d, page: 1),
+      ],
+    );
+  }
+}
+
+// --- Σελίδα 3: οξυγόνο και ζυγίσεις ---
+
+class _PageThree extends StatelessWidget {
+  const _PageThree({required this.data});
+  final ReportData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.light;
+    final d = data;
+    final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
+    final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
+    final bold = cell.copyWith(fontWeight: FontWeight.w700);
+    final small = TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4);
+    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4), child: w);
+    final minN = d.stat(K.spo2Min).n;
+    final avgN = d.stat(K.spo2Avg).n;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Header(data: d, page: 3),
+        // Κλινικός έλεγχος H3 (4/11): μία μεμονωμένη τιμή του καρπού, όχι αποκορεσμοί ή T90.
+        _Title('Νύχτες με χαμηλότερη μεμονωμένη μέτρηση οξυγόνου κάτω από 90% (ρολόι, καρπός)'),
+        Text(
+          'Μία μεμονωμένη μέτρηση του ρολογιού ανά νύχτα, όχι ιατρική οξυμετρία, όχι δείκτης αποκορεσμών (ODI) ούτε '
+          'χρόνος κάτω από 90% (T90). Αναφορά: σε υγιείς ενήλικες το ελάχιστο της νύχτας είναι κατά μέσο όρο περίπου '
+          '90% (Gries & Brooks, Chest 1996).',
+          style: TextStyle(fontSize: 9.5, color: c.text, height: 1.4),
+        ),
+        const SizedBox(height: 6),
         if (d.lowOxygenNights.isEmpty)
-          Text('Καμία στο διάστημα (${d.stat(K.spo2Min).n} νύχτες με μέτρηση).', style: cell)
+          Text('Καμία στο διάστημα ($minN νύχτες με μέτρηση).', style: cell)
         else ...[
           Text(
-            '${d.lowOxygenNights.length} από ${d.stat(K.spo2Min).n} νύχτες με μέτρηση. Οι χαμηλότερες:',
+            '${d.lowOxygenNights.length} από $minN νύχτες με μέτρηση. Οι χαμηλότερες:',
             style: cell,
           ),
           const SizedBox(height: 4),
@@ -469,12 +569,20 @@ class _PageOne extends StatelessWidget {
             spacing: 14,
             runSpacing: 2,
             children: [
-              for (final n in d.lowOxygenNights.take(8))
-                Text('${dayMonthYear(n.$1)}: ${n.$2.round()}%', style: bold),
+              // Ποτέ «90%» σε λίστα «κάτω από 90%» (έλεγχος υπολογισμών F16): χωρίς στρογγυλοποίηση προς τα πάνω.
+              for (final n in d.lowOxygenNights.take(16)) Text('${dayMonthYear(n.$1)}: ${lowestText(n.$2)}%', style: bold),
             ],
           ),
         ],
-        _Title('Ζυγίσεις'),
+        if (minN != avgN) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Μέσο οξυγόνο: $avgN νύχτες· χαμηλότερη μέτρηση: $minN. Η χαμηλότερη λείπει όταν η Samsung δεν δίνει '
+            'αναλυτικές τιμές για τη νύχτα.',
+            style: small,
+          ),
+        ],
+        _Title('Ζυγίσεις (InBody H40)'),
         if (d.weighIns.isEmpty)
           Text('Δεν υπάρχουν ζυγίσεις.', style: cell)
         else
@@ -482,9 +590,9 @@ class _PageOne extends StatelessWidget {
             columnWidths: const {
               0: FlexColumnWidth(1.6),
               1: FlexColumnWidth(1.2),
-              2: FlexColumnWidth(1.2),
-              3: FlexColumnWidth(1.6),
-              4: FlexColumnWidth(2.4),
+              2: FlexColumnWidth(1.6),
+              3: FlexColumnWidth(2.0),
+              4: FlexColumnWidth(1.6),
             },
             border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
             children: [
@@ -492,9 +600,10 @@ class _PageOne extends StatelessWidget {
                 decoration: BoxDecoration(color: c.background),
                 children: [
                   pad(Text('Ημερομηνία', style: header)),
-                  pad(Text('Βάρος', style: header)),
-                  pad(Text('Λίπος', style: header)),
-                  pad(Text('Σκελετικοί μύες', style: header)),
+                  pad(Text('Βάρος (kg)', style: header)),
+                  // Κλινικός έλεγχος M5 (4/11).
+                  pad(Text('Λίπος (BIA, εκτίμηση)', style: header)),
+                  pad(Text('Σκελετικοί μύες (BIA, εκτίμηση)', style: header)),
                   const SizedBox(),
                 ],
               ),
@@ -510,27 +619,14 @@ class _PageOne extends StatelessWidget {
                 ),
             ],
           ),
-        _Title('Πώς διαβάζεται'),
-        Text(
-          'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
-          'μόνο όταν περνά στατιστικό έλεγχο (1%, με διόρθωση για τη συσχέτιση των ημερών)· αλλιώς «Σταθερό», '
-          'ή «—» όταν οι μετρήσεις είναι λίγες. Οι νύχτες έχουν την ημερομηνία του πρωινού.',
-          style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
-        ),
         const SizedBox(height: 6),
         Text(
-          withOura
-              ? 'Πώς μετρήθηκαν: κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
-                  'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
-                  'Galaxy Watch Ultra 2. Οξυγόνο και βήματα: Galaxy Watch Ultra 2 (καρπός)· «ελάχιστο» = μία μεμονωμένη '
-                  'μέτρηση, όχι οξυμετρία. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής μετρούν μόνο οι μέρες της νέας.'
-              : 'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
-                  'αισθητήρας καρπού· «ελάχιστο» = μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
-                  'Samsung. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
-          style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
+          'Λίπος και μύες: εκτίμηση βιοηλεκτρικής αντίστασης (BIA) της ζυγαριάς InBody H40, όχι DXA. Επηρεάζονται από '
+          'το νερό, το φαγητό και την άσκηση.',
+          style: small,
         ),
         const Spacer(),
-        _Footer(data: d, page: 1),
+        _Footer(data: d, page: 3),
       ],
     );
   }
@@ -574,7 +670,7 @@ class _PageTwo extends StatelessWidget {
               dateLabel: dayMonth,
               levels: [
                 if (med != null) (s.values.first.$1, s.values.last.$1, med, c.textSecondary),
-                if (reference != null) (s.values.first.$1, s.values.last.$1, reference, c.bad),
+                if (reference != null) (s.values.first.$1, s.values.last.$1, reference, c.textTertiary),
               ],
             ),
           if (note != null)
@@ -597,16 +693,17 @@ class _PageTwo extends StatelessWidget {
             style: TextStyle(fontSize: 8.8, color: c.textSecondary),
           ),
         ),
-        chart('Παλμοί στον ύπνο (bpm)', K.sleepHr, c.heart, (v) => v.round().toString(), 8),
+        chart('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, c.heart, (v) => v.round().toString(), 8),
         chart('Οξυγόνο στον ύπνο, μέσο ανά νύχτα (%)', K.spo2Avg, c.energy, (v) => v.round().toString(), 4),
         chart(
-          'Οξυγόνο στον ύπνο, ελάχιστο ανά νύχτα (%)',
+          'Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση ανά νύχτα (%, καρπός)',
           K.spo2Min,
           c.energy,
           (v) => v.round().toString(),
           8,
           reference: 90,
-          note: 'Κόκκινη διακεκομμένη: 90%.',
+          // Κλινικός έλεγχος H6: γκρι γραμμή αναφοράς, όχι κόκκινο «όριο».
+          note: 'Γραμμή αναφοράς 90% (όχι διαγνωστικό όριο).',
         ),
         chart('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, c.sleep, (v) {
           final m = v.round();

@@ -101,8 +101,11 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
   for (final key in reportKeysFor(p)) {
     // Βήματα: η σημερινή μέρα δεν έχει τελειώσει.
     final end = key == K.steps ? add(to, -1) : to;
+    // Πάντα 90 μέρες ως το [end], ίδιο διάστημα με τη «Διαφορά» της ίδιας γραμμής (έλεγχος υπολογισμών F11:
+    // πριν, τα βήματα είχαν 89 μέρες στον πίνακα και 90 στη σύγκριση).
+    final start = add(end, -(reportDays - 1));
     // Μόνο μία πηγή ανά δείκτη: αν άλλαξε μέσα στους 3 μήνες, μετρούν μόνο οι μέρες της νέας.
-    final series = planSeries(history, p, key, from, end);
+    final series = planSeries(history, p, key, start, end);
     final def = metricDef(key);
     final trend = def == null ? null : computeTrend(def, history, now, TrendPeriod.quarter, plan: p);
     stats[key] = ReportStat(values: series.points, trend: trend, source: series.source, since: series.cut);

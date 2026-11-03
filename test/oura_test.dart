@@ -224,7 +224,9 @@ void main() {
 
     test('Ποσοστά φάσεων μόνο όταν υπάρχουν και οι τέσσερις', () {
       final row = ouraRow(night(fixtureBatch(), '2026-10-23'));
-      expect(row[ouraKeys[K.deepPct]], closeTo(100 * 4200 / (4200 + 14400 + 6600 + 2610), 1e-9));
+      // Ποσοστό του ύπνου, όπως η εφαρμογή Oura (χωρίς τον χρόνο ξύπνιος· έλεγχος υπολογισμών F6).
+      expect(row[ouraKeys[K.deepPct]], closeTo(100 * 4200 / (4200 + 14400 + 6600), 1e-9));
+      expect(row[ouraKeys[K.remPct]], closeTo(100 * 6600 / (4200 + 14400 + 6600), 1e-9));
       expect(row[ouraKeys[K.awakeMin]], 43.5);
     });
 

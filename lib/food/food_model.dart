@@ -6,6 +6,8 @@
 /// - Κάθε καταχώριση κρατά αντίγραφο των τιμών ανά 100 g τη στιγμή που μπήκε.
 library;
 
+import 'dart:math' as math;
+
 import '../format.dart';
 
 /// Κλειδιά θρεπτικών (ίδια με τα αρχεία της βάσης).
@@ -256,6 +258,10 @@ String gramsText(double v) => v >= 100 ? v.round().toString() : dec(v, v < 10 ? 
 String nValueText(NValue? v, {int digits = 1}) {
   if (v == null) return '—';
   if (v.traces) return 'ίχνη';
-  if (v.lessThan) return '<${dec(v.value, digits)}';
+  // Το όριο «<x» στρογγυλεύεται προς τα πάνω: «<0,0125 g» γράφεται «<0,02», ποτέ «<0,01» (που θα ήταν λιγότερο από το όριο).
+  if (v.lessThan) {
+    final f = math.pow(10, digits);
+    return '<${dec(((v.value * f) - 1e-9).ceil() / f, digits)}';
+  }
   return dec(v.value, digits);
 }

@@ -7,6 +7,10 @@
 ///   Στατιστικός έλεγχος (από 1/11, μετά τον έλεγχο): t-test Welch με επίπεδο 1% (όχι 5%, γιατί
 ///   ελέγχονται πολλοί δείκτες μαζί), και με «πραγματικό» πλήθος ημερών: οι διαδοχικές μέρες
 ///   μοιάζουν μεταξύ τους (αυτοσυσχέτιση), άρα 30 μέρες δεν είναι 30 ανεξάρτητες μετρήσεις.
+///   Από 4/11 (έλεγχος υπολογισμών F2–F4): αυτοσυσχέτιση σωστή και με κενά ή αραιές μετρήσεις, διόρθωση της
+///   διακύμανσης, και «άλλαξε» μόνο όταν μέσος όρος και μεσαία τιμή δείχνουν προς την ίδια κατεύθυνση.
+///   Προσομοίωση (test/trends_test.dart): ψεύτικο «άλλαξε» ≤ ~1,5% ανά δείκτη, χωρίς καμία αλλαγή.
+///   Είναι ένδειξη ανά δείκτη, όχι ιατρικός έλεγχος· με 16–19 δείκτες μαζί, κάποιος μπορεί να βγει τυχαία.
 library;
 
 import 'dart:math' as math;
@@ -36,6 +40,7 @@ class MetricDef {
     this.unit = '',
     this.digits = 0,
     this.better = 0,
+    this.flagRiseOnly = false,
     this.kind = ValueKind.number,
     this.sparse = false,
     this.partial = false,
@@ -53,6 +58,10 @@ class MetricDef {
 
   /// 1 = καλύτερα όσο ανεβαίνει, −1 = καλύτερα όσο πέφτει, 0 = ουδέτερο.
   final int better;
+
+  /// Μόνο η άνοδος έχει χρώμα «προσοχή»· η πτώση είναι ουδέτερη (παλμοί ύπνου: η πτώση δεν είναι πάντα
+  /// καλό σημάδι, π.χ. φάρμακα ή διαταραχή αγωγής· κλινικός έλεγχος M4, 4/11).
+  final bool flagRiseOnly;
   final ValueKind kind;
 
   /// Αραιές μετρήσεις (ζυγίσεις): αρκούν 3 τιμές ανά περίοδο.
@@ -73,6 +82,10 @@ class MetricDef {
         ValueKind.clock => clockFromSix(v),
         ValueKind.number => _num(v),
       };
+
+  /// Η τιμή όπως τη λέει η πηγή της: η θερμοκρασία του Oura είναι απόκλιση, με πρόσημο («+0,3 °C»).
+  String formatAs(double v, Source s) =>
+      s == Source.oura && key == K.skinTemp ? '${signedDec(v, digits)} $unit' : format(v);
 
   String _num(double v) {
     final n = digits == 0 && v.abs() >= 1000 ? thousands(v.round()) : dec(v, digits);
@@ -97,7 +110,7 @@ class MetricDef {
 
 const trendMetrics = <MetricDef>[
   // Καρδιά
-  MetricDef(key: K.sleepHr, label: 'Παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1),
+  MetricDef(key: K.sleepHr, label: 'Παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', flagRiseOnly: true),
   // «Ξύπνιος, χωρίς βήματα» και «Παλμοί στο περπάτημα» βγήκαν (2/11): δικοί μας ορισμοί, χωρίς επαλήθευση.
   // Η ηρεμία θα έρθει από το Oura (παλμοί ύπνου του δαχτυλιδιού).
   // Ουδέτερο: μεγαλύτερος μέσος όρος ημέρας συνήθως σημαίνει περισσότερη κίνηση, όχι χειρότερη υγεία.
@@ -105,10 +118,12 @@ const trendMetrics = <MetricDef>[
   // Ύπνος
   MetricDef(key: K.sleepMin, label: 'Διάρκεια ύπνου', section: TrendSection.sleep, minDiff: 15, better: 1, kind: ValueKind.duration),
   MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1, partial: true),
-  MetricDef(key: K.deepPct, label: 'Βαθύς ύπνος', section: TrendSection.sleep, minDiff: 2, unit: '%', better: 1),
+  // Βαθύς ύπνος και ξύπνιος: ουδέτερο χρώμα (κλινικός έλεγχος M3, 4/11). Οι συσκευές χάνουν τα μισά ξυπνήματα και
+  // υπερεκτιμούν τον βαθύ ύπνο· μια ενημέρωση λογισμικού θα έβγαζε ψεύτικη «βελτίωση».
+  MetricDef(key: K.deepPct, label: 'Βαθύς ύπνος', section: TrendSection.sleep, minDiff: 2, unit: '%'),
   // REM: ουδέτερο χρώμα· επηρεάζεται από φάρμακα (π.χ. αντικαταθλιπτικά), όχι μόνο από την ποιότητα του ύπνου.
   MetricDef(key: K.remPct, label: 'REM', section: TrendSection.sleep, minDiff: 2, unit: '%'),
-  MetricDef(key: K.awakeMin, label: 'Ξύπνιος μέσα στη νύχτα', section: TrendSection.sleep, minDiff: 5, better: -1, kind: ValueKind.duration),
+  MetricDef(key: K.awakeMin, label: 'Ξύπνιος μέσα στη νύχτα', section: TrendSection.sleep, minDiff: 5, kind: ValueKind.duration),
   MetricDef(key: K.bedtime, label: 'Ώρα ύπνου', section: TrendSection.sleep, minDiff: 15, kind: ValueKind.clock),
   // Σώμα
   MetricDef(key: K.weight, label: 'Βάρος', section: TrendSection.body, minDiff: 0.5, unit: 'kg', digits: 1, sparse: true),
@@ -125,8 +140,9 @@ const trendMetrics = <MetricDef>[
 
 /// Μετρήσεις που υπάρχουν μόνο με το Oura.
 const ouraTrendMetrics = <MetricDef>[
-  MetricDef(key: K.hrv, label: 'HRV νύχτας', section: TrendSection.heart, minDiff: 3, unit: 'ms', better: 1),
-  MetricDef(key: K.lowHr, label: 'Χαμηλότεροι παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm', better: -1),
+  // HRV: ουδέτερο χρώμα· ανεβαίνει και με φάρμακα ή ακανόνιστο ρυθμό, όχι μόνο με την ξεκούραση (κλινικός έλεγχος H5).
+  MetricDef(key: K.hrv, label: 'HRV νύχτας (RMSSD)', section: TrendSection.heart, minDiff: 3, unit: 'ms'),
+  MetricDef(key: K.lowHr, label: 'Χαμηλότεροι παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm'),
   MetricDef(key: K.breath, label: 'Αναπνοές στον ύπνο', section: TrendSection.other, minDiff: 0.5, unit: 'το λεπτό', digits: 1),
 ];
 
@@ -140,7 +156,17 @@ MetricDef? metricDef(String key) {
 
 /// Το όνομα μιας μέτρησης όπως το λέει η πηγή της (π.χ. «Energy Score» → «Ετοιμότητα (εκτίμηση του Oura)»).
 String metricLabel(MetricDef def, Source s) {
-  if (s != Source.oura) return def.label;
+  // Ρολόι: οι βαθμολογίες και τα στάδια είναι εκτιμήσεις της Samsung, όπως και του Oura (κλινικός έλεγχος M2, 4/11).
+  if (s != Source.oura) {
+    return switch (def.key) {
+      K.sleepScore => 'Βαθμολογία ύπνου (εκτίμηση της Samsung)',
+      K.energy => 'Energy Score (εκτίμηση της Samsung)',
+      K.deepPct => 'Βαθύς ύπνος (εκτίμηση)',
+      K.remPct => 'REM (εκτίμηση)',
+      K.awakeMin => 'Ξύπνιος μέσα στη νύχτα (τουλάχιστον)',
+      _ => def.label,
+    };
+  }
   return switch (def.key) {
     K.energy => 'Ετοιμότητα (εκτίμηση του Oura)',
     K.sleepScore => 'Βαθμολογία ύπνου (εκτίμηση του Oura)',
@@ -207,8 +233,10 @@ class TrendResult {
 
   /// Καλό (1), κακό (−1) ή ουδέτερο (0).
   int get goodness {
-    if (!changed || def.better == 0) return 0;
+    if (!changed) return 0;
     final up = status == TrendStatus.up;
+    if (def.flagRiseOnly) return up ? -1 : 0;
+    if (def.better == 0) return 0;
     return (up ? 1 : -1) * def.better;
   }
 }
@@ -238,27 +266,94 @@ double? median(List<double> v) {
 
 double _mean(List<double> v) => v.reduce((a, b) => a + b) / v.length;
 
-/// Αυτοσυσχέτιση διαδοχικών ημερών (lag 1), από τα ζευγάρια συνεχόμενων ημερών των δύο περιόδων.
-/// Στο [0, 0,8]. Με λιγότερα από 6 ζευγάρια οι τιμές δεν είναι καθημερινές (π.χ. ζυγίσεις μία φορά
-/// την εβδομάδα): μέρες που απέχουν δεν «κολλάνε» η μία στην άλλη, άρα 0.
-double lagOneCorrelation(List<List<(DateTime, double)>> windows) {
-  var num = 0.0, den = 0.0, pairs = 0;
-  for (final w in windows) {
+/// Πόσες μέρες το πολύ απέχουν δύο γειτονικές τιμές για να μετρήσουν στην αυτοσυσχέτιση.
+const _maxCorrelationGap = 7;
+
+/// Το πολύ τόση αυτοσυσχέτιση (πάνω από αυτήν, τα 30 «πραγματικά» δεδομένα γίνονται < 1).
+const _maxCorrelation = 0.95;
+
+/// Όταν δεν βγαίνει εκτίμηση (π.χ. ζυγίσεις κάθε 10 μέρες): συντηρητικά, σαν οι μέρες να μοιάζουν πολύ.
+const _fallbackCorrelation = 0.9;
+
+/// Αυτοσυσχέτιση από μέρα σε μέρα (φ, μοντέλο AR(1): δύο τιμές που απέχουν g μέρες έχουν συσχέτιση φ^g).
+///
+/// Διόρθωση μετά τον έλεγχο 4/11 (έλεγχος υπολογισμών F2, F4):
+/// - Ο μέσος όρος των γινομένων είναι ανά ζευγάρι και η διακύμανση ανά τιμή (πριν, οι μέρες που έλειπαν
+///   «μίκραιναν» το φ, και το «άλλαξε» έβγαινε στο 4–10% χωρίς καμία αλλαγή αντί για 1%).
+/// - Μετρούν και γειτονικές τιμές που απέχουν ως 7 μέρες (αραιές ζυγίσεις: πριν, φ = 0, σαν να ήταν ανεξάρτητες).
+///   Το φ βγαίνει με ελάχιστα τετράγωνα πάνω στο φ^g (βήμα 0,01).
+/// - Διόρθωση της γνωστής υποεκτίμησης σε μικρά δείγματα (Kendall/Marriott–Pope): φ + (1 + 4φ)/n.
+/// - Στο [0, 0,95]. null = λιγότερα από 6 ζευγάρια (δεν βγαίνει εκτίμηση).
+/// [blocks]: κομμάτια με τον δικό τους μέσο όρο (π.χ. 30 ημερών), ώστε μια πραγματική αλλαγή επιπέδου να μη
+/// μοιάζει με συσχέτιση· παλιότερη τιμή πρώτη μέσα σε κάθε κομμάτι.
+double? dailyCorrelation(List<List<(DateTime, double)>> blocks) {
+  final products = <double>[];
+  final gaps = <int>[];
+  var den = 0.0;
+  var points = 0;
+  var used = 0;
+  for (final w in blocks) {
     if (w.length < 2) continue;
     final m = _mean([for (final e in w) e.$2]);
     for (final e in w) {
       den += (e.$2 - m) * (e.$2 - m);
     }
+    points += w.length;
+    used++;
     for (var i = 1; i < w.length; i++) {
-      final a = w[i - 1], b = w[i];
-      if (daysBetween(a.$1, b.$1) == 1) {
-        num += (a.$2 - m) * (b.$2 - m);
-        pairs++;
+      final g = daysBetween(w[i - 1].$1, w[i].$1);
+      if (g >= 1 && g <= _maxCorrelationGap) {
+        products.add((w[i - 1].$2 - m) * (w[i].$2 - m));
+        gaps.add(g);
       }
     }
   }
-  if (pairs < 6 || den <= 0) return 0;
-  return (num / den).clamp(0.0, 0.8);
+  if (products.length < 6 || den <= 0) return null;
+  final variance = den / points;
+  final c = [for (final x in products) x / variance];
+  var best = 0.0;
+  var bestErr = double.infinity;
+  for (var k = 0; k <= (_maxCorrelation * 100).round(); k++) {
+    final f = k / 100;
+    final pow = [1.0];
+    for (var g = 1; g <= _maxCorrelationGap; g++) {
+      pow.add(pow.last * f);
+    }
+    var err = 0.0;
+    for (var i = 0; i < c.length; i++) {
+      final d = c[i] - pow[gaps[i]];
+      err += d * d;
+    }
+    if (err < bestErr) {
+      bestErr = err;
+      best = f;
+    }
+  }
+  final n = points / used;
+  return (best + (1 + 4 * best) / n).clamp(0.0, _maxCorrelation);
+}
+
+/// «Πραγματικό» πλήθος ανεξάρτητων τιμών για τις μέρες [days] με αυτοσυσχέτιση [phi] (AR(1)):
+/// n² / Σᵢ Σⱼ φ^|tᵢ − tⱼ|. Λαμβάνει υπόψη τα κενά: δύο τιμές που απέχουν 2 μέρες μοιάζουν λιγότερο από δύο
+/// διαδοχικές. Με φ = 0 δίνει n.
+double effectiveN(List<DateTime> days, double phi) {
+  final n = days.length;
+  if (n == 0) return 0;
+  if (phi <= 0) return n.toDouble();
+  final t = [for (final d in days) daysBetween(days.first, d)];
+  final span = t.reduce(math.max) - t.reduce(math.min);
+  final pow = List<double>.filled(span + 1, 0);
+  pow[0] = 1;
+  for (var g = 1; g < pow.length; g++) {
+    pow[g] = pow[g - 1] * phi;
+  }
+  var s = 0.0;
+  for (var i = 0; i < n; i++) {
+    for (var j = 0; j < n; j++) {
+      s += pow[(t[i] - t[j]).abs()];
+    }
+  }
+  return n * n / s;
 }
 
 /// Κρίσιμη τιμή t για έλεγχο δύο πλευρών στο 1%. Για βαθμούς ελευθερίας ανάμεσα στις τιμές του
@@ -360,11 +455,20 @@ TrendResult compareWindows(
     );
   }
 
-  final cw = collect(currentFrom, end);
-  final pw = collect(previousFrom, previousEnd);
+  var cw = collect(currentFrom, end);
+  var pw = collect(previousFrom, previousEnd);
+  var points = collect(previousFrom.isBefore(currentFrom) ? previousFrom : currentFrom, end);
+  // Ώρες (π.χ. ώρα ύπνου): γύρω από τον «κυκλικό» μέσο όρο, ώστε τιμές εκατέρωθεν των 18:00 να μη
+  // δίνουν μέσο όρο 12 ώρες μακριά (έλεγχος υπολογισμών F13). Στις συνηθισμένες ώρες δεν αλλάζει τίποτα.
+  if (def.kind == ValueKind.clock && points.isNotEmpty) {
+    final center = circularMeanMinutes([for (final e in points) e.$2]);
+    List<(DateTime, double)> unwrap(List<(DateTime, double)> v) => [for (final e in v) (e.$1, unwrapMinutes(e.$2, center))];
+    cw = unwrap(cw);
+    pw = unwrap(pw);
+    points = unwrap(points);
+  }
   final c = cw.map((e) => e.$2).toList();
   final p = pw.map((e) => e.$2).toList();
-  final points = collect(previousFrom.isBefore(currentFrom) ? previousFrom : currentFrom, end);
   final mc = median(c);
   final mp = median(p);
 
@@ -373,18 +477,29 @@ TrendResult compareWindows(
   if (c.length < needed || p.length < (neededPrevious ?? needed) || mc == null || mp == null) {
     status = TrendStatus.insufficient;
   } else {
-    // Πραγματικό πλήθος ανεξάρτητων τιμών: n × (1 − r) / (1 + r).
-    final r = lagOneCorrelation([cw, pw]);
-    double eff(int n) => math.max(2, n * (1 - r) / (1 + r));
-    final nc = eff(c.length), np = eff(p.length);
-    final vc = _variance(c) / nc, vp = _variance(p) / np;
+    // Πραγματικό πλήθος ανεξάρτητων τιμών, με την αυτοσυσχέτιση από έως 180 μέρες της ίδιας πηγής
+    // (έλεγχος υπολογισμών F2/F4, 4/11): το φ από δύο μόνο διαστήματα ήταν πολύ θορυβώδες.
+    final r = _correlationFor(def, sp, collect, end: end, previousFrom: previousFrom, previousEnd: previousEnd);
+    final nc = math.max(2.0, effectiveN([for (final e in cw) e.$1], r));
+    final np = math.max(2.0, effectiveN([for (final e in pw) e.$1], r));
+    // Με αυτοσυσχέτιση η διακύμανση του δείγματος βγαίνει μικρότερη από την πραγματική:
+    // E[s²] = σ² (n − n/n_eff) / (n − 1). Διορθώνεται, αλλιώς ο έλεγχος είναι πιο χαλαρός απ' όσο λέει.
+    double corrected(List<double> v, double ne) {
+      final k = v.length - v.length / ne;
+      return k > 0 ? _variance(v) * (v.length - 1) / k : _variance(v);
+    }
+
+    final vc = corrected(c, nc) / nc, vp = corrected(p, np) / np;
     final se = math.sqrt(vc + vp);
-    final meanDiff = (_mean(c) - _mean(p)).abs();
-    z = se == 0 ? (meanDiff > 0 ? double.infinity : 0) : meanDiff / se;
+    final meanDiff = _mean(c) - _mean(p);
+    z = se == 0 ? (meanDiff != 0 ? double.infinity : 0) : meanDiff.abs() / se;
     // Βαθμοί ελευθερίας Welch–Satterthwaite.
     final df = (vc + vp) == 0 ? 1000.0 : math.pow(vc + vp, 2) / (vc * vc / (nc - 1) + vp * vp / (np - 1));
     final d = mc - mp;
-    if (d.abs() >= def.minDiff && z >= tCritical01(df.toDouble())) {
+    // Ο έλεγχος είναι στους μέσους όρους, η τιμή που φαίνεται είναι η μεσαία: «άλλαξε» μόνο όταν δείχνουν
+    // προς την ίδια κατεύθυνση (έλεγχος υπολογισμών F3).
+    final agree = d.sign == meanDiff.sign;
+    if (d.abs() >= def.minDiff && agree && z >= tCritical01(df.toDouble())) {
       status = d > 0 ? TrendStatus.up : TrendStatus.down;
     } else {
       status = TrendStatus.stable;
@@ -407,6 +522,75 @@ TrendResult compareWindows(
     end: end,
     source: sp.sourceFor(def.key, end),
   );
+}
+
+/// Η αυτοσυσχέτιση μιας μέτρησης: από κομμάτια 30 ημερών (το καθένα με τον δικό του μέσο όρο) στις 180 μέρες
+/// ως το [end], και στο προηγούμενο διάστημα αν είναι πιο πίσω (σύγκριση με πέρσι). Μόνο από την ίδια πηγή
+/// (μετά την τελευταία αλλαγή πηγής). Χωρίς αρκετά ζευγάρια: συντηρητική τιμή.
+double _correlationFor(
+  MetricDef def,
+  SourcePlan sp,
+  List<(DateTime, double)> Function(DateTime, DateTime) collect, {
+  required DateTime end,
+  required DateTime previousFrom,
+  required DateTime previousEnd,
+}) {
+  final seg = sp.segmentStart(def.key, end);
+  final blocks = <List<(DateTime, double)>>[];
+  void add(DateTime last, int count) {
+    for (var b = 0; b < count; b++) {
+      final to = _add(last, -30 * b);
+      if (seg != null && to.isBefore(seg)) break;
+      final from = _add(to, -29);
+      blocks.add(collect(seg != null && from.isBefore(seg) ? seg : from, to));
+    }
+  }
+
+  add(end, 6);
+  if (previousEnd.isBefore(_add(end, -179))) {
+    add(previousEnd, math.max(1, (daysBetween(previousFrom, previousEnd) + 1) ~/ 30));
+  }
+  return dailyCorrelation(blocks) ?? _fallbackCorrelation;
+}
+
+/// Κυκλικός μέσος όρος λεπτών μέσα στο 24ωρο (0–1439), π.χ. 23:50 και 00:10 → 00:00.
+double circularMeanMinutes(List<double> minutes) {
+  var x = 0.0, y = 0.0;
+  for (final m in minutes) {
+    final a = 2 * math.pi * m / 1440;
+    x += math.cos(a);
+    y += math.sin(a);
+  }
+  if (x == 0 && y == 0) return minutes.isEmpty ? 0 : minutes.first;
+  final a = math.atan2(y, x);
+  return ((a < 0 ? a + 2 * math.pi : a) * 1440 / (2 * math.pi)) % 1440;
+}
+
+/// Η τιμή [m] (λεπτά στο 24ωρο) μετακινημένη κατά ±1440 ώστε να απέχει το πολύ 12 ώρες από το [center].
+/// (Μόνο ολόκληρες μέρες προστίθενται ή αφαιρούνται: η τιμή μένει ακριβώς ίδια όταν δεν χρειάζεται μετακίνηση.)
+double unwrapMinutes(double m, double center) {
+  var v = m;
+  while (v - center >= 720) {
+    v -= 1440;
+  }
+  while (v - center < -720) {
+    v += 1440;
+  }
+  return v;
+}
+
+/// Το «συνηθισμένο» μιας νύχτας ή μέρας, ίδιο σε όλη την εφαρμογή (έλεγχος υπολογισμών F8, κλινικός M10, 4/11):
+/// ο μέσος όρος των έως [usualNights] προηγούμενων τιμών, και μόνο με τουλάχιστον [usualMinNights]. Πριν,
+/// μία νύχτα αρκούσε για κόκκινο «+3 από τον μ.ό.».
+const usualNights = 14;
+const usualMinNights = 7;
+
+/// [previous]: οι τιμές πριν από τη νύχτα/μέρα που δείχνουμε, παλιότερη πρώτη (τα κενά αγνοούνται).
+double? usualMean(Iterable<double?> previous) {
+  final all = previous.whereType<double>().toList();
+  final v = all.length <= usualNights ? all : all.sublist(all.length - usualNights);
+  if (v.length < usualMinNights) return null;
+  return v.reduce((a, b) => a + b) / v.length;
 }
 
 /// Οι μετρήσεις των Τάσεων για το σχέδιο πηγών: όσο το Oura δεν έχει συνδεθεί, όπως πάντα· μετά, και

@@ -648,7 +648,9 @@ class FoodDetailScreen extends StatelessWidget {
     ('vitC', 'Βιταμίνη C', 'mg', 1),
     ('vitD', 'Βιταμίνη D', 'µg', 1),
     ('vitB12', 'Βιταμίνη B12', 'µg', 1),
-    ('folate', 'Φυλλικό οξύ', 'µg', 0),
+    // Ολικό φυλλικό της πηγής, όχι μόνο «φυλλικό οξύ» (το συνθετικό)· έλεγχος διατροφής L4, 4/11.
+    // (Η βιταμίνη A δεν φαίνεται: CIQUAL = ισοδύναμα ρετινόλης RE, USDA = RAE· διαφέρουν ~2× στα φυτικά.)
+    ('folate', 'Φυλλικό (φολικό)', 'µg', 0),
   ];
 
   @override
@@ -848,8 +850,18 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 Text('Barcode ${widget.draft.barcode}', style: TextStyle(color: c.textTertiary, fontSize: 13)),
               ],
               const SizedBox(height: 18),
-              Text('Διατροφική ετικέτα, ανά 100 g',
+              Text(widget.draft.perMl ? 'Διατροφική ετικέτα, ανά 100 ml' : 'Διατροφική ετικέτα, ανά 100 g',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
+              if (widget.draft.perMl) ...[
+                const SizedBox(height: 6),
+                // Έλεγχος διατροφής M4 (4/11): στο Open Food Facts τα υγρά είναι ανά 100 ml, ενώ εδώ ζυγίζεις γραμμάρια.
+                Text(
+                  'Το Open Food Facts δίνει αυτό το υγρό ανά 100 ml, ενώ η εφαρμογή μετρά γραμμάρια. Για νερό, γάλα, χυμούς '
+                  'και αναψυκτικά η διαφορά είναι μικρή (100 ml ≈ 100 g). Για λάδι 100 ml ζυγίζουν περίπου 92 g: αν η '
+                  'ετικέτα γράφει ανά 100 g, πέρασε εκείνες τις τιμές.',
+                  style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
+                ),
+              ],
               const SizedBox(height: 10),
               for (final f in _fields) ...[
                 TextField(

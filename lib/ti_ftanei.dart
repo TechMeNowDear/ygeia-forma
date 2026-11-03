@@ -544,7 +544,7 @@ class _HrvCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Η Samsung δεν το δίνει σε άλλες εφαρμογές. Θα το μετρά η δική μας εφαρμογή στο ρολόι (Βήμα 6).',
+              'Η Samsung δεν το δίνει σε άλλες εφαρμογές. Έρχεται από το Oura, όταν συνδεθεί.',
               style: TextStyle(color: c.textSecondary),
             ),
           ],
