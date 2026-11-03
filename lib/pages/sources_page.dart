@@ -149,41 +149,7 @@ class SourcesPage extends StatelessWidget {
                 );
 
           // Το σχέδιο πηγών δεν διαβάστηκε: ρητή επιλογή, τίποτα αυτόματο.
-          final first = earliestOuraDay(store.history);
-          final unknown = store.planState == PlanState.unknown
-              ? AppCard(
-                  key: const ValueKey('plan-recover'),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SectionLabel('Δεν διαβάστηκε από πού έρχεται ο ύπνος'),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Οι ρυθμίσεις πηγών χάλασαν ή χάθηκαν. Ώσπου να διαλέξεις, οι νύχτες μένουν κενές και δεν '
-                        'αποθηκεύεται τίποτα, για να μη μπερδευτούν συσκευές.',
-                        style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
-                      ),
-                      const SizedBox(height: 12),
-                      if (first != null) ...[
-                        FilledButton(
-                          onPressed: () => store.recoverPlan(SourcePlan([SourceEra(Source.oura, first)])),
-                          child: Text('Ύπνος από το Oura, από ${nightTo(first)}'),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      OutlinedButton(
-                        onPressed: () => store.recoverPlan(first == null
-                            ? SourcePlan.samsungOnly
-                            : SourcePlan([
-                                SourceEra(Source.none, first),
-                                SourceEra(Source.watch, DateTime(today.year, today.month, today.day + 1)),
-                              ])),
-                        child: Text(first == null ? 'Ύπνος από το ρολόι, όπως πριν' : 'Ύπνος από το ρολόι, από απόψε'),
-                      ),
-                    ],
-                  ),
-                )
-              : null;
+          final unknown = store.planState == PlanState.unknown ? PlanRecoveryCard(store: store) : null;
 
           final compare = plan.compareActive(today)
               ? AppCard(
@@ -274,6 +240,7 @@ class SourcesPage extends StatelessWidget {
     return switch (s.ouraStatus) {
       OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
       OuraStatus.starting => 'Συνδεδεμένο · ο ύπνος από το Oura από απόψε',
+      OuraStatus.startingNow => 'Συνδεδεμένο · η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι',
       OuraStatus.disconnected => 'Αποσυνδέθηκε',
       OuraStatus.reconnect => 'Χρειάζεται νέα σύνδεση',
       OuraStatus.subscription => 'Η συνδρομή δεν είναι ενεργή',
@@ -354,6 +321,103 @@ class _TableRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           SourceTag(source),
+        ],
+      ),
+    );
+  }
+}
+
+/// «Δεν διαβάστηκε από πού έρχεται ο ύπνος»: επιλογές ΜΟΝΟ όταν έχει διαβαστεί το ιστορικό (αλλιώς «Δοκίμασε
+/// ξανά»). Κάθε επιλογή δείχνει πρώτα όλη τη χρονογραμμή που θα μπει, για επιβεβαίωση.
+class PlanRecoveryCard extends StatefulWidget {
+  const PlanRecoveryCard({super.key, required this.store});
+  final HealthStore store;
+
+  @override
+  State<PlanRecoveryCard> createState() => _PlanRecoveryCardState();
+}
+
+class _PlanRecoveryCardState extends State<PlanRecoveryCard> {
+  bool _busy = false;
+
+  Future<void> _retry() async {
+    setState(() => _busy = true);
+    await widget.store.retryPlan();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _choose(RecoveryOption o) async {
+    final c = Aigaio.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      routeSettings: const RouteSettings(name: 'Επιβεβαίωση πηγών'),
+      builder: (context) => AlertDialog(
+        title: Text(o.label),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Έτσι θα μετρούν οι νύχτες:', style: TextStyle(color: c.textSecondary, fontSize: 14)),
+            const SizedBox(height: 8),
+            for (final line in describePlan(o.plan))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Text('• $line', style: TextStyle(color: c.text, fontSize: 14.5, height: 1.35)),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ναι, αυτό')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final done = await widget.store.recoverPlan(o.plan);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!done) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Δεν αποθηκεύτηκε. Τίποτα δεν άλλαξε· δοκίμασε ξανά σε λίγο.'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final options = widget.store.planRecovery;
+    return AppCard(
+      key: const ValueKey('plan-recover'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SectionLabel('Δεν διαβάστηκε από πού έρχεται ο ύπνος'),
+          const SizedBox(height: 6),
+          Text(
+            options == null
+                ? 'Τα αποθηκευμένα δεδομένα δεν έχουν διαβαστεί ακόμα. Ώσπου να διαβαστούν, οι νύχτες μένουν κενές και '
+                    'δεν αποθηκεύεται τίποτα, για να μη μπερδευτούν συσκευές.'
+                : 'Οι ρυθμίσεις πηγών χάλασαν ή χάθηκαν. Ώσπου να διαλέξεις, οι νύχτες μένουν κενές και δεν '
+                    'αποθηκεύεται τίποτα, για να μη μπερδευτούν συσκευές.',
+            style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          if (options == null)
+            FilledButton(
+              key: const ValueKey('plan-retry'),
+              onPressed: _busy ? null : _retry,
+              child: const Text('Δοκίμασε ξανά'),
+            )
+          else
+            for (final (i, o) in options.indexed) ...[
+              if (i > 0) const SizedBox(height: 8),
+              o.primary
+                  ? FilledButton(onPressed: _busy ? null : () => _choose(o), child: Text(o.label))
+                  : OutlinedButton(onPressed: _busy ? null : () => _choose(o), child: Text(o.label)),
+            ],
         ],
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data.dart';
@@ -307,13 +309,15 @@ class OuraManagePage extends StatelessWidget {
     );
     if (ok != true || !context.mounted) return;
     final before = store.plan;
+    // Αναίρεση έχει νόημα μόνο αν είχε ήδη αρχίσει εποχή Oura (αλλιώς δεν άλλαξε τίποτα που να επιστρέφει).
+    final undo = store.ouraEraStarted;
     final messenger = ScaffoldMessenger.of(context);
     await store.disconnectOura();
     messenger.showSnackBar(SnackBar(
       duration: const Duration(seconds: 8),
       content: const Text('Αποσυνδέθηκε. Τα δεδομένα που είχαν έρθει μένουν.'),
       // Αναίρεση: η πηγή του ύπνου ξαναγίνεται Oura· για να ξαναδιαβάζει χρειάζεται «Σύνδεση με Oura».
-      action: SnackBarAction(label: 'Αναίρεση', onPressed: () => store.restorePlan(before)),
+      action: undo ? SnackBarAction(label: 'Αναίρεση', onPressed: () => store.restorePlan(before)) : null,
     ));
   }
 
@@ -364,6 +368,11 @@ class OuraManagePage extends StatelessWidget {
           OuraStatus.starting => (
               'Συνδεδεμένο',
               'Από απόψε ο ύπνος έρχεται μόνο από το Oura. Η χθεσινή νύχτα μένει όπως τη μέτρησε το ρολόι.',
+              c.good,
+            ),
+          OuraStatus.startingNow => (
+              'Συνδεδεμένο',
+              'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι. Θα φανεί όταν συγχρονίσει η εφαρμογή Oura.',
               c.good,
             ),
           OuraStatus.retry => (
@@ -423,12 +432,7 @@ class OuraManagePage extends StatelessWidget {
               child: const Text('Σύνδεση ξανά'),
             )
           else if (connected && store.ouraActive)
-            FilledButton.icon(
-              key: const ValueKey('oura-sync-now'),
-              onPressed: store.ouraSyncing || !store.ouraCanSyncNow ? null : store.syncOuraNow,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Ενημέρωση τώρα'),
-            ),
+            _SyncNowButton(store: store),
           if (store.ouraActive)
             Text(
               'Η ενημέρωση γίνεται μόνη της όταν ανοίγεις την εφαρμογή. Αν λείπει η χθεσινή νύχτα, άνοιξε πρώτα '
@@ -516,6 +520,58 @@ class OuraManagePage extends StatelessWidget {
           right: [what, danger],
         );
       },
+    );
+  }
+}
+
+/// «Ενημέρωση τώρα»: το πολύ μία φορά το λεπτό. Ξαναενεργοποιείται μόνο του με ΕΝΑ χρονόμετρο μίας χρήσης όσο
+/// φαίνεται η σελίδα (κανένα επαναλαμβανόμενο).
+class _SyncNowButton extends StatefulWidget {
+  const _SyncNowButton({required this.store});
+  final HealthStore store;
+
+  @override
+  State<_SyncNowButton> createState() => _SyncNowButtonState();
+}
+
+class _SyncNowButtonState extends State<_SyncNowButton> {
+  Timer? _timer;
+
+  void _arm() {
+    _timer?.cancel();
+    _timer = null;
+    final left = widget.store.ouraSyncNowIn;
+    if (left == Duration.zero) return;
+    _timer = Timer(left + const Duration(milliseconds: 200), () {
+      _timer = null;
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    final can = !store.ouraSyncing && store.ouraCanSyncNow;
+    if (!can && !store.ouraSyncing) {
+      if (_timer == null) _arm();
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+    return FilledButton.icon(
+      key: const ValueKey('oura-sync-now'),
+      onPressed: can ? () async {
+        await store.syncOuraNow();
+        if (mounted) setState(_arm);
+      } : null,
+      icon: const Icon(Icons.refresh_rounded),
+      label: const Text('Ενημέρωση τώρα'),
     );
   }
 }

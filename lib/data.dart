@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math' as math;
@@ -8,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import 'error_report.dart';
 import 'format.dart';
 import 'history.dart';
+import 'oura/oura_model.dart';
 import 'oura/oura_store.dart';
 import 'plan_file.dart';
 import 'samsung.dart';
@@ -631,7 +633,10 @@ class Prefs {
       this.ouraSynced,
       this.ouraSyncedTo,
       this.ouraTried,
-      this.ouraBackoff})
+      this.ouraBackoff,
+      this.planAt,
+      this.ouraErr,
+      this.ouraConnected})
       : plan = plan ?? SourcePlan.samsungOnly;
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
@@ -662,12 +667,25 @@ class Prefs {
       ouraSyncedTo: j['ouraSyncedTo'] is String ? j['ouraSyncedTo'] as String : null,
       ouraTried: (j['ouraTried'] as num?)?.toInt(),
       ouraBackoff: (j['ouraBackoff'] as num?)?.toInt(),
+      planAt: (j['sourcesAt'] as num?)?.toInt(),
+      ouraErr: j['ouraErr'] is String ? j['ouraErr'] as String : null,
+      ouraConnected: (j['ouraConnected'] as num?)?.toInt(),
     );
   }
 
   /// ΑΝΤΙΓΡΑΦΟ του σχεδίου πηγών. Το κύριο είναι στο δικό του αρχείο (plan_file.dart)· αυτό χρησιμεύει μόνο
   /// αν εκείνο χαθεί και οι ρυθμίσεις διαβάστηκαν κανονικά.
   SourcePlan plan;
+
+  /// Πότε ορίστηκε το [plan] (ms): για να διαλέγεται το νεότερο αντίγραφο αν χαθεί το αρχείο.
+  int? planAt;
+
+  /// Το είδος του τελευταίου σφάλματος του Oura (π.χ. «auth», «rate»), δίπλα στην αναμονή: μετά από
+  /// επανεκκίνηση η κάρτα λέει το ίδιο. Ποτέ κείμενο ή τιμές.
+  String? ouraErr;
+
+  /// Πότε ολοκληρώθηκε η σύνδεση του Oura (ms): για το «η νύχτα που κοιμάσαι τώρα».
+  int? ouraConnected;
 
   /// Πότε δοκιμάστηκε τελευταία φορά ανάγνωση του Oura (ms, με ή χωρίς επιτυχία) και ως πότε περιμένουμε (ms).
   int? ouraTried;
@@ -723,7 +741,10 @@ class Prefs {
         'gapTo': gapTo,
         'emptyFrom': emptyFrom,
         'emptyChecked': emptyChecked,
-        if (plan.eras.isNotEmpty) 'sources': plan.toJson(),
+        if (plan.eras.isNotEmpty || planAt != null) 'sources': plan.toJson(),
+        if (planAt != null) 'sourcesAt': planAt,
+        if (ouraErr != null) 'ouraErr': ouraErr,
+        if (ouraConnected != null) 'ouraConnected': ouraConnected,
         if (ouraSynced != null) 'ouraSynced': ouraSynced,
         if (ouraSyncedTo != null) 'ouraSyncedTo': ouraSyncedTo,
         if (ouraTried != null) 'ouraTried': ouraTried,
@@ -860,6 +881,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   set ouraBackoffMs(int? v) => prefs.ouraBackoff = v;
 
+  /// Για τα στιγμιότυπα της «άγνωστης» κατάστασης: αν διαβάστηκε το ιστορικό, ημερολόγιο, ένδειξη Oura.
+  @visibleForTesting
+  void debugSetRecovery({bool historyLoaded = true, DatedPlan? logged, bool evidence = false}) {
+    _historyLoaded = historyLoaded;
+    _logged = logged;
+    ouraEvidence = evidence;
+  }
+
   /// Για τους ελέγχους και τα στιγμιότυπα: ορίζει το σχέδιο χωρίς αρχείο.
   @visibleForTesting
   void debugSetPlan(SourcePlan p, {PlanState state = PlanState.ok}) {
@@ -869,52 +898,186 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     _data = _raw?.restrict(p);
   }
 
+  @override
+  bool get planUnknown => planState == PlanState.unknown;
+
+  /// Ένδειξη ότι το Oura συνδέθηκε κάποτε (tokens, αρχείο νυχτών, «ouraSyncedTo»): ένα χαμένο σχέδιο τότε δεν
+  /// θεωρείται ποτέ «δεν συνδέθηκε» (που θα έφερνε πίσω σιωπηλά τον ύπνο του ρολογιού).
+  bool ouraEvidence = false;
+  DatedPlan? _logged;
+
+  /// Πότε ορίστηκε το τρέχον σχέδιο (ms), όπως γράφτηκε στο αρχείο.
+  int? _planAt;
+
+  /// Οι επιλογές στην «άγνωστη» κατάσταση (null = δεν είναι άγνωστη, ή το ιστορικό δεν διαβάστηκε ακόμα).
+  List<RecoveryOption>? get planRecovery => planState != PlanState.unknown
+      ? null
+      : recoveryOptions(
+          history: _historyLoaded ? history : null,
+          logged: _logged,
+          evidence: ouraEvidence,
+          today: dayOf(ouraClock()),
+        );
+
+  Future<bool> _findOuraEvidence() async {
+    if (_prefsLoaded && !_prefsDefaulted && prefs.ouraSyncedTo != null) return true;
+    try {
+      if (await ouraLink.hasTokens) return true;
+    } catch (_) {
+      // Η αποθήκευση δεν απάντησε: σημαίνει ότι υπάρχει αρχείο tokens.
+      return true;
+    }
+    try {
+      if (decodeOuraNights(await ouraNightsFile.read()).isNotEmpty) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  static int? _atOf(String? raw) {
+    try {
+      final j = raw == null ? null : jsonDecode(raw);
+      return j is Map && j['at'] is num ? (j['at'] as num).toInt() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Οι εγγραφές του σχεδίου πηγών (αρχείο, ημερολόγιο) μία-μία: μια παλιότερη δεν γράφει πάνω σε νεότερη.
+  Future<void> _planWrites = Future.value();
+  Future<T> _planQueue<T>(Future<T> Function() f) {
+    final run = _planWrites.catchError((_) {}).then((_) => f());
+    _planWrites = run.then((_) {}, onError: (_) {});
+    return run;
+  }
+
+  /// Νέα καταχώριση στο ημερολόγιο αλλαγών. Αν το ημερολόγιο δεν διαβάζεται, δεν γράφεται από πάνω του.
+  Future<void> _appendLog(SourcePlan p, int at) async {
+    final log = await planFile.readLog();
+    if (log.state == 'error') return;
+    final raw = appendPlanLog(log.json, p, at);
+    if (!await planFile.writeLog(raw)) await planFile.writeLog(raw);
+    _logged = (plan: p, at: at);
+  }
+
   /// Διαβάζει (ή ξανακρίνει) το σχέδιο πηγών. Δες [resolvePlan].
   Future<void> _loadPlan() async {
     if (planState == PlanState.ok) return;
-    final r = resolvePlan(
-      file: await planFile.read(),
-      trustedPrefsPlan: _prefsLoaded && !_prefsDefaulted ? prefs.plan : null,
-      history: _historyLoaded ? history : null,
-      today: DateTime.now(),
-    );
-    if (r.rewrite && !await planFile.write(encodePlanFile(r.plan, DateTime.now()))) {
-      // Δεν γράφτηκε το αρχείο: ξανά στην επόμενη ανανέωση, χωρίς να γράψουμε τίποτα ως τότε.
-      planState = PlanState.loading;
-      return;
+    var file = await planFile.read();
+    // Προσωρινό σφάλμα ανάγνωσης: μία ακόμα προσπάθεια πριν το θεωρήσουμε χαλασμένο.
+    if (file.state == 'error') file = await planFile.read();
+    final fileOk = file.state == 'ok' && decodePlanFile(file.json) != null;
+    if (!fileOk) {
+      final log = await planFile.readLog();
+      _logged = lastLoggedPlan(log.json);
+      ouraEvidence = await _findOuraEvidence();
     }
+    final now = ouraClock();
+    // Το αντίγραφο στις ρυθμίσεις (παλιό αντίγραφο χωρίς ώρα = το παλιότερο δυνατό).
+    final prefsCopy = _prefsLoaded && !_prefsDefaulted && (prefs.planAt != null || prefs.plan.eras.isNotEmpty)
+        ? (plan: prefs.plan, at: prefs.planAt ?? 0)
+        : null;
+    final r = resolvePlan(
+      file: file,
+      logged: _logged,
+      prefsCopy: prefsCopy,
+      history: _historyLoaded ? history : null,
+      evidence: ouraEvidence,
+      today: now,
+    );
+    // Το σχέδιο που βρέθηκε ισχύει αμέσως για τις οθόνες, ακόμα κι αν το αρχείο δεν ξαναγραφτεί τώρα: ποτέ
+    // οι νύχτες του ρολογιού στη θέση νυχτών του Oura. Αποθήκευση στο ιστορικό μόνο όταν γραφτεί το αρχείο.
     _plan = r.plan;
-    planState = r.state;
     _data = _raw?.restrict(_plan);
+    if (r.rewrite) {
+      final copy = _logged != null && (prefsCopy == null || _logged!.at >= prefsCopy.at) ? _logged! : prefsCopy!;
+      final json = encodePlanFile(r.plan, now, at: copy.at);
+      if (!await _planQueue(() => planFile.write(json))) {
+        planState = PlanState.loading;
+        notifyListeners();
+        return;
+      }
+      _planFileWritten = json;
+      _planAt = copy.at;
+    } else if (fileOk) {
+      _planAt = _atOf(file.json);
+    }
+    planState = r.state;
     if (planState == PlanState.ok) {
+      // Το αντίγραφο στις ρυθμίσεις ακολουθεί το αρχείο (π.χ. αν μια παλιότερη αποθήκευσή του απέτυχε).
+      final stale = prefs.plan != _plan || prefs.planAt != _planAt;
       prefs.plan = _plan;
-      // Οι ρυθμίσεις ξεκίνησαν από προεπιλογές (χαλασμένο αρχείο): τώρα που το σχέδιο είναι γνωστό, γράφονται
-      // μαζί με το αντίγραφό του.
-      if (_prefsDefaulted && _prefsLoaded) await _savePrefs();
+      prefs.planAt = _plan.eras.isEmpty && _planAt == null ? null : _planAt ?? 0;
+      if (_prefsLoaded && (_prefsDefaulted || stale)) await _savePrefs();
     }
     notifyListeners();
   }
 
   /// Το όριο του ύπνου του ρολογιού αλλάζει με τις μέρες (π.χ. όταν κλείνει η «Σύγκριση πηγών»): το αρχείο
   /// ξαναγράφεται πριν από κάθε ανάγνωση της Samsung, μόνο αν άλλαξε.
-  Future<void> _syncPlanFile() async {
-    if (planState != PlanState.ok || _plan.eras.isEmpty) return;
-    final json = encodePlanFile(_plan, DateTime.now());
-    if (json == _planFileWritten) return;
-    if (await planFile.write(json)) _planFileWritten = json;
-  }
+  Future<void> _syncPlanFile() => _planQueue(() async {
+        if (planState != PlanState.ok || _plan.eras.isEmpty) return;
+        final json = encodePlanFile(_plan, ouraClock(), at: _planAt);
+        if (json == _planFileWritten) return;
+        if (await planFile.write(json)) _planFileWritten = json;
+      });
 
-  /// Μετά από «άγνωστο» σχέδιο: ο χρήστης διαλέγει ρητά (Ρυθμίσεις › Πηγές).
+  /// Μετά από «άγνωστο» σχέδιο: ο χρήστης διαλέγει ρητά (Ρυθμίσεις › Πηγές). `false` αν δεν γράφτηκε.
   Future<bool> recoverPlan(SourcePlan p) async {
-    if (planState != PlanState.unknown || !_prefsLoaded) return false;
-    if (!await planFile.write(encodePlanFile(p, DateTime.now()))) return false;
+    if (planState != PlanState.unknown || !_prefsLoaded || !_historyLoaded) return false;
+    final now = ouraClock();
+    final at = now.millisecondsSinceEpoch;
+    final ok = await _planQueue(() async {
+      final json = encodePlanFile(p, now, at: at);
+      if (!await planFile.write(json)) return false;
+      _planFileWritten = json;
+      await _appendLog(p, at);
+      return true;
+    });
+    if (!ok) return false;
     _plan = p;
+    _planAt = at;
     prefs.plan = p;
+    prefs.planAt = at;
     planState = PlanState.ok;
     _data = _raw?.restrict(p);
     notifyListeners();
-    await _savePrefs();
+    if (!await _savePrefs()) await _savePrefs();
     return true;
+  }
+
+  /// «Δοκίμασε ξανά» στην άγνωστη κατάσταση: ξαναδιαβάζει ρυθμίσεις, ιστορικό και σχέδιο.
+  Future<void> retryPlan() async {
+    if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
+    if (!_historyLoaded) await _loadHistory();
+    await _loadPlan();
+    notifyListeners();
+  }
+
+  @override
+  String? get ouraErrorStored => prefs.ouraErr;
+  @override
+  set ouraErrorStored(String? v) => prefs.ouraErr = v;
+  @override
+  int? get ouraConnectedMs => prefs.ouraConnected;
+  @override
+  set ouraConnectedMs(int? v) => prefs.ouraConnected = v;
+
+  /// Για τη σύνδεση πριν από τις 12:00: φρέσκια ανάγνωση της Samsung (ή αυτή που τρέχει ήδη), και οι νύχτες του
+  /// ρολογιού (ημερομηνία, τέλος). null αν η Samsung δεν διαβάστηκε (τότε η πρώτη νύχτα του Oura είναι η αυριανή).
+  @override
+  Future<List<(DateTime, DateTime)>?> freshWatchNights() async {
+    try {
+      final running = _reading;
+      if (running == null || running.isCompleted) unawaited(refresh());
+      await _reading!.future.timeout(const Duration(seconds: 100));
+    } catch (_) {
+      return null;
+    }
+    final d = _raw;
+    if (d == null || error != null) return null;
+    if (!d.hasAnyPermission) return const [];
+    if (!d.sleepOk) return null;
+    return [for (final n in [...d.nights, ...d.compareNights]) (n.date, n.end)];
   }
 
   @override
@@ -981,7 +1144,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       }
     }
     // Το σχέδιο πηγών δεν έρχεται από τις ρυθμίσεις (έχει δικό του αρχείο)· κρατάμε όποιο ξέρουμε ήδη.
-    if (planState == PlanState.ok) prefs.plan = _plan;
+    if (planState == PlanState.ok) {
+      prefs.plan = _plan;
+      prefs.planAt = _plan.eras.isEmpty && _planAt == null ? null : _planAt ?? 0;
+    }
     // Ό,τι άλλαξε ο χρήστης όσο περιμέναμε (π.χ. θέμα) μπαίνει πάνω στις ρυθμίσεις που ήρθαν.
     final pending = [..._pendingPrefChanges];
     _pendingPrefChanges.clear();
@@ -1034,16 +1200,29 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     await refresh();
   }
 
+  /// Η ανάγνωση της Samsung που τρέχει (ολοκληρώνεται μόλις έρθουν τα δεδομένα, πριν από το ιστορικό).
+  Completer<void>? _reading;
+
   Future<void> refresh({bool askPermissions = false}) async {
     if (loading) return;
     loading = true;
+    final reading = _reading = Completer<void>();
     notifyListeners();
+    try {
+      await _refresh(askPermissions, reading);
+    } finally {
+      if (!reading.isCompleted) reading.complete();
+    }
+  }
+
+  Future<void> _refresh(bool askPermissions, Completer<void> reading) async {
 
     if (askPermissions) {
       final r = await SamsungHealth.requestPermissions();
       if (r['ok'] != true) {
         error = r;
         loading = false;
+        reading.complete();
         notifyListeners();
         return;
       }
@@ -1067,6 +1246,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       error = p.status;
     }
     loading = false;
+    reading.complete();
     notifyListeners();
 
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
@@ -1377,14 +1557,25 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   Future<bool> setPlan(SourcePlan p) async {
     if (!_prefsLoaded || planState != PlanState.ok) return false;
-    final json = encodePlanFile(p, DateTime.now());
-    if (!await planFile.write(json)) return false;
-    _planFileWritten = json;
+    final now = ouraClock();
+    final at = now.millisecondsSinceEpoch;
+    // Σειρά: αρχείο (ατομικά) → ημερολόγιο αλλαγών → αντίγραφο στις ρυθμίσεις (με μία επανάληψη). Αν το αρχείο
+    // δεν γραφτεί, τίποτα άλλο δεν αλλάζει (ούτε το ημερολόγιο).
+    final ok = await _planQueue(() async {
+      final json = encodePlanFile(p, now, at: at);
+      if (!await planFile.write(json)) return false;
+      _planFileWritten = json;
+      await _appendLog(p, at);
+      return true;
+    });
+    if (!ok) return false;
     _plan = p;
+    _planAt = at;
     prefs.plan = p;
+    prefs.planAt = at;
     _data = _raw?.restrict(p);
     notifyListeners();
-    await _savePrefs();
+    if (!await _savePrefs()) await _savePrefs();
     return true;
   }
 
@@ -1409,7 +1600,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..ouraSynced = prefs.ouraSynced
       ..ouraSyncedTo = prefs.ouraSyncedTo
       ..ouraTried = prefs.ouraTried
-      ..ouraBackoff = prefs.ouraBackoff;
+      ..ouraBackoff = prefs.ouraBackoff
+      ..planAt = prefs.planAt
+      ..ouraErr = prefs.ouraErr
+      ..ouraConnected = prefs.ouraConnected;
     prefs = restored;
     notifyListeners();
     return _savePrefs();

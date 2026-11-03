@@ -20,6 +20,7 @@ import '../sources.dart';
 import 'config.dart';
 import 'oura_api.dart';
 import 'oura_model.dart';
+import 'oura_view.dart';
 
 /// Η αποθήκευση στο κινητό (Android Keystore) μέσω της γέφυρας «ygeia/oura».
 class ChannelVault implements OuraVault {
@@ -73,6 +74,10 @@ enum OuraStatus {
   /// Συνδέθηκε σήμερα· ο ύπνος έρχεται από το Oura από απόψε (η χθεσινή νύχτα μένει του ρολογιού).
   starting,
 
+  /// Συνδέθηκε μέσα στη νύχτα (πριν από τις 12:00, χωρίς τελειωμένη νύχτα του ρολογιού): η νύχτα που κοιμάσαι
+  /// τώρα μετρά από το δαχτυλίδι· δεν έχει έρθει ακόμα.
+  startingNow,
+
   /// Συνδεδεμένο, όλα εντάξει.
   ok,
 
@@ -101,11 +106,33 @@ Duration ouraBackoffFor(OuraErrorKind? k, {Duration? retryAfter}) => switch (k) 
       null => ouraMinInterval,
       OuraErrorKind.reconnect || OuraErrorKind.noRefresh => const Duration(hours: 6),
       OuraErrorKind.subscription || OuraErrorKind.format => const Duration(hours: 1),
-      OuraErrorKind.rateLimited => retryAfter == null || retryAfter < const Duration(minutes: 1)
+      // Όσο ζητά η Oura (Retry-After), τουλάχιστον 1 λεπτό και το πολύ 6 ώρες· χωρίς Retry-After 15 λεπτά.
+      OuraErrorKind.rateLimited => retryAfter == null
           ? const Duration(minutes: 15)
-          : retryAfter,
+          : retryAfter < const Duration(minutes: 1)
+              ? const Duration(minutes: 1)
+              : retryAfter > ouraMaxBackoff
+                  ? ouraMaxBackoff
+                  : retryAfter,
       _ => ouraMinInterval,
     };
+
+/// Ποτέ δεν περιμένουμε περισσότερο από αυτό (και ένα παλιό «περίμενε ως» πιο μακριά θεωρείται λάθος ρολογιού).
+const ouraMaxBackoff = Duration(hours: 6);
+
+/// Η πρώτη νύχτα του Oura (απόφαση 3/11): η πρώτη νύχτα που ΤΕΛΕΙΩΝΕΙ μετά τη στιγμή της σύνδεσης.
+/// - Σύνδεση πριν από τις 12:00 χωρίς τελειωμένη νύχτα του ρολογιού με ημερομηνία σήμερα πριν από τη σύνδεση
+///   (π.χ. 00:40, πριν κοιμηθείς): η νύχτα που έρχεται/τρέχει είναι του Oura → σήμερα.
+/// - Αλλιώς (ξύπνησες ήδη, ή απόγευμα): από απόψε → αύριο.
+/// [watchNights]: (ημερομηνία, τέλος) των νυχτών του ρολογιού· null = δεν ξέρουμε (η Samsung δεν διαβάστηκε): τότε
+/// αύριο, ώστε μια νύχτα του ρολογιού που τελείωσε πριν από τη σύνδεση να μη χαθεί ποτέ.
+DateTime firstOuraNight({required DateTime connectedAt, required List<(DateTime, DateTime)>? watchNights}) {
+  final today = dayOf(connectedAt);
+  final tomorrow = DateTime(today.year, today.month, today.day + 1);
+  if (connectedAt.hour >= 12 || watchNights == null) return tomorrow;
+  final ended = watchNights.any((n) => sameDay(n.$1, today) && !n.$2.isAfter(connectedAt));
+  return ended ? tomorrow : today;
+}
 
 /// Οι γραμμές του ιστορικού σε άλλο νήμα όταν είναι πολλές (πρώτη ανάγνωση). Αν το νήμα δεν ξεκινήσει,
 /// γίνεται εδώ και αναφέρεται μία φορά: η ανάγνωση δεν σταματά ποτέ γι' αυτό.
@@ -129,7 +156,11 @@ mixin OuraStore on ChangeNotifier {
   bool get prefsReady;
   bool get planReady;
   bool get canChangePlan;
+  bool get planUnknown;
   Future<bool> saveDaysNow(Set<String> keys);
+
+  /// Οι νύχτες του ρολογιού (ημερομηνία, τέλος) από φρέσκια ανάγνωση της Samsung· null αν δεν διαβάστηκε.
+  Future<List<(DateTime, DateTime)>?> freshWatchNights();
   Future<bool> savePrefsNow();
   Future<bool> setPlan(SourcePlan p);
 
@@ -142,6 +173,14 @@ mixin OuraStore on ChangeNotifier {
   set ouraTriedMs(int? v);
   int? get ouraBackoffMs;
   set ouraBackoffMs(int? v);
+
+  /// Το τελευταίο σφάλμα, όπως αποθηκεύεται (όνομα), ώστε μετά από επανεκκίνηση να λέμε τον σωστό λόγο.
+  String? get ouraErrorStored;
+  set ouraErrorStored(String? v);
+
+  /// Πότε ολοκληρώθηκε η σύνδεση (ms), για την κάρτα «η νύχτα που κοιμάσαι τώρα».
+  int? get ouraConnectedMs;
+  set ouraConnectedMs(int? v);
 
   /// Η σύνδεση (αντικαθίσταται στους ελέγχους).
   OuraLink ouraLink = OuraLink(vault: const ChannelVault());
@@ -163,8 +202,18 @@ mixin OuraStore on ChangeNotifier {
   bool ouraSyncing = false;
   bool ouraConnecting = false;
 
-  /// Το τελευταίο σφάλμα (για την κατάσταση· ποτέ με προσωπικά στοιχεία).
-  OuraErrorKind? ouraError;
+  /// Το τελευταίο σφάλμα (για την κατάσταση· ποτέ με προσωπικά στοιχεία). Αποθηκεύεται στις ρυθμίσεις.
+  OuraErrorKind? get ouraError {
+    final n = ouraErrorStored;
+    if (n == null) return null;
+    for (final k in OuraErrorKind.values) {
+      if (k.name == n) return k;
+    }
+    return null;
+  }
+
+  set ouraError(OuraErrorKind? k) => ouraErrorStored = k?.name;
+
   bool _ouraStarted = false;
 
   /// Αυξάνει σε κάθε αποσύνδεση: ό,τι ανάγνωση ξεκίνησε πριν πετά τα αποτελέσματά της.
@@ -228,8 +277,26 @@ mixin OuraStore on ChangeNotifier {
     if (ouraError == OuraErrorKind.subscription) return OuraStatus.subscription;
     if (ouraError != null) return OuraStatus.retry;
     if (ouraNightFor(today)?.main != null) return OuraStatus.ok;
-    return ouraClock().hour < 12 ? OuraStatus.waiting : OuraStatus.missing;
+    final morning = ouraClock().hour < 12;
+    final c = ouraConnectedMs;
+    if (morning && sameDay(plan.ouraFrom ?? DateTime(2000), today) && c != null &&
+        sameDay(DateTime.fromMillisecondsSinceEpoch(c), today)) {
+      return OuraStatus.startingNow;
+    }
+    return morning ? OuraStatus.waiting : OuraStatus.missing;
   }
+
+  /// Γιατί η νύχτα [day] είναι κενή (null = δεν είναι κενή ή δεν είναι νύχτα του Oura).
+  EmptyNight? ouraNightReason(DateTime day, DateTime now) => emptyNightReason(
+        plan: plan,
+        day: day,
+        now: now,
+        night: ouraNightFor(day),
+        hasTokens: ouraHasTokens,
+        error: ouraError?.name,
+        synced: ouraLastSync,
+        planUnknown: planUnknown,
+      );
 
   /// Η νύχτα του Oura για τη μέρα [day] — ΜΟΝΟ αν η πηγή εκείνης της νύχτας είναι το Oura.
   OuraNight? ouraNightFor(DateTime day) {
@@ -283,8 +350,8 @@ mixin OuraStore on ChangeNotifier {
   OuraErrorKind? ouraLoginError;
   bool ouraJustConnected = false;
 
-  /// Η επιστροφή από την Oura. Μόνο αν πετύχει αλλάζει η πηγή του ύπνου — από ΑΠΟΨΕ (απόφαση μετά τον έλεγχο):
-  /// η πρώτη νύχτα του Oura είναι η πρώτη που τελειώνει μετά τη σύνδεση· η χθεσινή μένει όπως τη μέτρησε το ρολόι.
+  /// Η επιστροφή από την Oura. Μόνο αν πετύχει αλλάζει η πηγή του ύπνου. Η πρώτη νύχτα του Oura είναι η πρώτη
+  /// που τελειώνει μετά τη σύνδεση ([firstOuraNight]): μια νύχτα του ρολογιού που τελείωσε πριν μένει όπως ήταν.
   Future<void> completeOuraLogin(String uri) async {
     if (parseCallback(uri) == null) return;
     // Χωρίς γνωστό σχέδιο πηγών δεν συνδέεται (δεν θα μπορούσε να αλλάξει η πηγή): ο κωδικός δεν χρησιμοποιείται.
@@ -304,8 +371,14 @@ mixin OuraStore on ChangeNotifier {
         await ouraLink.disconnect();
         return;
       }
-      final today = dayOf(ouraClock());
-      final from = DateTime(today.year, today.month, today.day + 1);
+      final connectedAt = ouraClock();
+      // Πριν από τις 12:00 χρειάζεται φρέσκια ανάγνωση της Samsung: τελείωσε ήδη νύχτα του ρολογιού σήμερα;
+      final watch = connectedAt.hour < 12 ? await freshWatchNights() : const <(DateTime, DateTime)>[];
+      if (epoch != _ouraEpoch) {
+        await ouraLink.disconnect();
+        return;
+      }
+      final from = firstOuraNight(connectedAt: connectedAt, watchNights: watch);
       if (plan.nightSource(from) != Source.oura && !await setPlan(plan.withEra(Source.oura, from))) {
         // Η πηγή δεν άλλαξε: δεν μένει μισή σύνδεση.
         await ouraLink.disconnect();
@@ -317,8 +390,11 @@ mixin OuraStore on ChangeNotifier {
       ouraError = null;
       ouraTriedMs = null;
       ouraBackoffMs = null;
+      ouraConnectedMs = connectedAt.millisecondsSinceEpoch;
       ouraJustConnected = true;
       await savePrefsNow();
+      // Αν η πρώτη νύχτα είναι η σημερινή, διαβάζεται αμέσως (μπορεί να έχει ήδη έρθει).
+      if (!from.isAfter(dayOf(connectedAt))) unawaited(syncOura(force: true));
     } on OuraError catch (e) {
       ouraLoginError = e.kind;
       errors.report(e, StackTrace.current, extra: {'where': 'oura-login'});
@@ -331,10 +407,17 @@ mixin OuraStore on ChangeNotifier {
     }
   }
 
+  /// Αν μια εποχή Oura έχει ήδη αρχίσει (για το «Αναίρεση» της αποσύνδεσης: χωρίς αυτήν δεν υπάρχει τι να αναιρεθεί).
+  bool get ouraEraStarted {
+    final today = dayOf(ouraClock());
+    return plan.eras.any((e) => e.source == Source.oura && !e.from.isAfter(today));
+  }
+
   /// Αποσύνδεση: ανάκληση, σβήσιμο tokens, τα δεδομένα μένουν. Κερδίζει κάθε ανάγνωση που τρέχει.
-  /// - Αν ο ύπνος του Oura δεν είχε αρχίσει ακόμα (σύνδεση σήμερα): όλα όπως πριν τη σύνδεση.
-  /// - Αλλιώς από απόψε ο ύπνος δεν έχει πηγή (κενές νύχτες), ώσπου να συνδεθεί ξανά ή να διαλέξει ρητά το
-  ///   ρολόι ([sleepFromWatchAgain]). Η χθεσινή νύχτα του Oura μένει.
+  /// - Φεύγουν ΜΟΝΟ οι μελλοντικές εποχές Oura (π.χ. σύνδεση σήμερα με αρχή απόψε)· μια ρητή επιλογή
+  ///   «ξανά από το ρολόι» μένει.
+  /// - Αν και αύριο η πηγή θα ήταν το Oura: από απόψε χωρίς πηγή (κενές νύχτες), ώσπου να συνδεθεί ξανά ή να
+  ///   διαλέξει ρητά το ρολόι ([sleepFromWatchAgain]). Η χθεσινή νύχτα του Oura μένει.
   Future<void> disconnectOura() async {
     _ouraEpoch++;
     final today = dayOf(ouraClock());
@@ -344,11 +427,12 @@ mixin OuraStore on ChangeNotifier {
     ouraError = null;
     ouraTriedMs = null;
     ouraBackoffMs = null;
-    if (plan.eras.any((e) => e.from.isAfter(today))) {
-      // Προγραμματισμένες αλλαγές από απόψε (π.χ. η σύνδεση σήμερα) φεύγουν.
-      await setPlan(SourcePlan([for (final e in plan.eras) if (!e.from.isAfter(today)) e]));
+    ouraConnectedMs = null;
+    if (plan.eras.any((e) => e.source == Source.oura && e.from.isAfter(today))) {
+      await setPlan(SourcePlan([for (final e in plan.eras) if (!(e.source == Source.oura && e.from.isAfter(today))) e]));
     }
     if (plan.nightSource(from) == Source.oura) await setPlan(plan.withEra(Source.none, from));
+    await savePrefsNow();
     notifyListeners();
   }
 
@@ -373,11 +457,17 @@ mixin OuraStore on ChangeNotifier {
   /// Μία ανάγνωση τη φορά.
   Future<void> syncOura({bool force = false}) => _sync ??= _syncOnce(force).whenComplete(() => _sync = null);
 
-  /// Αν μπορεί να γίνει τώρα «Ενημέρωση τώρα» (μία φορά το λεπτό).
-  bool get ouraCanSyncNow {
+  /// Πόσο μένει ώσπου να επιτρέπεται πάλι «Ενημέρωση τώρα» (μία φορά το λεπτό). Μηδέν = τώρα.
+  /// Μια δοκιμή «στο μέλλον» (το ρολόι πήγε πίσω) δεν μπλοκάρει.
+  Duration get ouraSyncNowIn {
     final t = ouraTriedMs;
-    return t == null || ouraClock().millisecondsSinceEpoch - t >= const Duration(minutes: 1).inMilliseconds;
+    final ms = ouraClock().millisecondsSinceEpoch;
+    if (t == null || t > ms) return Duration.zero;
+    final left = const Duration(minutes: 1).inMilliseconds - (ms - t);
+    return left <= 0 ? Duration.zero : Duration(milliseconds: left);
   }
+
+  bool get ouraCanSyncNow => ouraSyncNowIn == Duration.zero;
 
   Future<void> _syncOnce(bool force) async {
     if (!historyReady || !prefsReady || !planReady) return;
@@ -386,13 +476,27 @@ mixin OuraStore on ChangeNotifier {
     // Μόνο όταν το Oura είναι πηγή κάποιας νύχτας ως σήμερα: χωρίς σύνδεση δεν γίνεται καμία κλήση.
     final f = plan.ouraFrom;
     if (f == null || !ouraHasTokens || f.isAfter(today)) return;
+    // Το Oura δεν είναι πηγή σήμερα (π.χ. «ξανά από το ρολόι») και έχει διαβαστεί ως το τέλος του: τίποτα να
+    // διαβαστεί πια, ούτε με tokens.
+    if (plan.nightSource(today) != Source.oura) {
+      DateTime? w;
+      for (final e in plan.eras) {
+        if (!e.from.isAfter(today)) w = e.from;
+      }
+      final synced = ouraSyncedTo == null ? null : parseDateKey(ouraSyncedTo!);
+      if (w != null && synced != null && !synced.isBefore(DateTime(w.year, w.month, w.day - 1))) return;
+    }
     final ms = now.millisecondsSinceEpoch;
-    final tried = ouraTriedMs;
+    var tried = ouraTriedMs;
+    var backoff = ouraBackoffMs;
+    // Χρόνοι από ρολόι που είχε πάει μπροστά: ληγμένοι (αλλιώς η ανάγνωση θα έμενε μπλοκαρισμένη).
+    if (tried != null && tried > ms) tried = null;
+    if (backoff != null && backoff > ms + ouraMaxBackoff.inMilliseconds) backoff = null;
     if (force) {
       if (!ouraCanSyncNow) return;
     } else {
-      if (ouraBackoffMs != null && ms < ouraBackoffMs!) return;
-      if (tried != null && ms - tried < ouraMinInterval.inMilliseconds && ms >= tried) return;
+      if (backoff != null && ms < backoff) return;
+      if (tried != null && ms - tried < ouraMinInterval.inMilliseconds) return;
     }
 
     // Ποιες μέρες: τις τελευταίες [ouraRecentDays]· αν δεν έχει διαβαστεί για καιρό, από εκεί που είχε μείνει
@@ -419,7 +523,7 @@ mixin OuraStore on ChangeNotifier {
       final saved = await saveDaysNow(changed);
       if (epoch != _ouraEpoch) return;
       ouraNights = mergeOuraNights(ouraNights, batch.nights, from: from, to: today, today: today, keepDays: ouraDetailDays);
-      await ouraNightsFile.write(encodeOuraNights(ouraNights));
+      await _writeNights(encodeOuraNights(ouraNights));
       ouraError = null;
       if (saved) {
         ouraSyncedMs = ms;
@@ -456,6 +560,11 @@ mixin OuraStore on ChangeNotifier {
 
   /// «Ενημέρωση τώρα» από τη σελίδα Oura (το πολύ μία φορά το λεπτό).
   Future<void> syncOuraNow() => syncOura(force: true);
+
+  /// Οι εγγραφές του αρχείου νυχτών μία-μία (μια παλιότερη δεν γράφει πάνω σε νεότερη).
+  Future<void> _nightsWrites = Future.value();
+  Future<void> _writeNights(String json) =>
+      _nightsWrites = _nightsWrites.catchError((_) {}).then((_) => ouraNightsFile.write(json));
 
   @visibleForTesting
   void resetOuraForTest() {

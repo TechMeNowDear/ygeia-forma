@@ -152,6 +152,7 @@ Future<void> _page(
   required Widget Function(HealthStore) page,
   bool oura = true,
   void Function(HealthStore)? prepare,
+  Future<void> Function(WidgetTester)? act,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
@@ -172,6 +173,10 @@ Future<void> _page(
     ),
   ));
   await tester.pumpAndSettle();
+  if (act != null) {
+    await act(tester);
+    await tester.pumpAndSettle();
+  }
   await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
 }
 
@@ -553,7 +558,80 @@ void main() {
         size: fold,
         brightness: Brightness.light,
         page: (s) => SourcesPage(store: s, now: ouraNow),
-        prepare: (s) => s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown),
+        prepare: (s) {
+          s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown);
+          s.debugSetRecovery(evidence: true);
+        },
+      ));
+  testWidgets('Πηγές · άγνωστο σχέδιο · επιβεβαίωση χρονογραμμής', (t) => _page(
+        t,
+        name: '85_sources_plan_confirm',
+        size: fold,
+        brightness: Brightness.light,
+        page: (s) => SourcesPage(store: s, now: ouraNow),
+        prepare: (s) {
+          s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown);
+          s.debugSetRecovery(evidence: true);
+        },
+        act: (t) async {
+          await t.tap(find.text('Όπως φαίνεται από τα αποθηκευμένα δεδομένα'));
+        },
+      ));
+  testWidgets('Πηγές · άγνωστο σχέδιο · ιστορικό όχι ακόμα', (t) => _page(
+        t,
+        name: '86_sources_plan_retry',
+        size: phone,
+        brightness: Brightness.dark,
+        page: (s) => SourcesPage(store: s, now: ouraNow),
+        prepare: (s) {
+          s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown);
+          s.debugSetRecovery(historyLoaded: false, evidence: true);
+        },
+      ));
+  testWidgets('Oura · Σήμερα · η νύχτα που κοιμάσαι τώρα', (t) => _shot(
+        t,
+        name: '87_oura_today_starting_now',
+        size: phone,
+        brightness: Brightness.light,
+        tab: 0,
+        at: ouraNow,
+        prepare: (s) {
+          s.debugSetPlan(SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 14)));
+          s.ouraHasTokens = true;
+          s.ouraClock = () => ouraNow;
+          s.ouraConnectedMs = DateTime(2026, 11, 14, 0, 40).millisecondsSinceEpoch;
+        },
+      ));
+  testWidgets('Oura · Ύπνος · σύντομη νύχτα σε δύο κομμάτια', (t) => _shot(
+        t,
+        name: '88_oura_sleep_short',
+        size: fold,
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.sleep,
+        at: ouraNow,
+        oura: true,
+        prepare: (s) {
+          String iso(DateTime t) => t.toUtc().toIso8601String();
+          Map<String, dynamic> rec(String id, DateTime a, DateTime b) => {
+                'id': id,
+                'day': '2026-11-14',
+                'type': 'sleep',
+                'bedtime_start': iso(a),
+                'bedtime_end': iso(b),
+                'time_in_bed': b.difference(a).inSeconds,
+                'total_sleep_duration': b.difference(a).inSeconds - 600,
+                'latency': 420,
+                'sleep_phase_5_min': '42221112223332221112',
+              };
+          final short = parseOura(sleep: [
+            rec('a', DateTime(2026, 11, 13, 23, 0), DateTime(2026, 11, 14, 1, 30)),
+            rec('b', DateTime(2026, 11, 14, 3, 0), DateTime(2026, 11, 14, 5, 45)),
+          ], dailySleep: const [], readiness: const [])
+              .nights
+              .single;
+          s.ouraNights = [for (final n in s.ouraNights) if (dateKey(n.day) != '2026-11-14') n, short];
+        },
       ));
   testWidgets('Σήμερα · άγνωστο σχέδιο', (t) => _shot(
         t,
