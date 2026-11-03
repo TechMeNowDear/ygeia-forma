@@ -100,6 +100,10 @@ class MemoryVault implements OuraVault {
 const vaultTokens = 'oura_tokens';
 const vaultPending = 'oura_pending';
 
+/// Σημάδι «συνδέεται» (κρυπτογραφημένο, ατομικό): γράφεται ΠΡΙΝ από το σχέδιο πηγών και σβήνεται όταν κρατηθούν τα
+/// tokens. Αν βρεθεί στην εκκίνηση χωρίς tokens, η σύνδεση έμεινε μισή.
+const vaultConnecting = 'oura_connecting';
+
 // ---------------------------------------------------------------------------
 // Tokens και σφάλματα
 // ---------------------------------------------------------------------------
@@ -428,6 +432,10 @@ class OuraLink {
     if (gen != _gen) return false;
     if (!await vault.save(vaultTokens, t.toJson()) || gen != _gen) {
       await vault.delete(vaultTokens);
+      // Ούτε στη μνήμη μένουν παλιά tokens (π.χ. νέα σύνδεση μετά από παλιότερη).
+      _tokens = null;
+      _loaded = true;
+      _unsaved = false;
       return false;
     }
     _tokens = t;
@@ -435,6 +443,11 @@ class OuraLink {
     _unsaved = false;
     return true;
   }
+
+  /// Το σημάδι «συνδέεται» ([vaultConnecting]). Πετάει [VaultUnavailable] αν η αποθήκευση δεν απαντά.
+  Future<bool> markConnecting(String json) => vault.save(vaultConnecting, json);
+  Future<String?> connectingMarker() => vault.load(vaultConnecting);
+  Future<void> clearConnecting() => vault.delete(vaultConnecting);
 
   /// Tokens που δεν κρατήθηκαν (π.χ. δεν γράφτηκε το σχέδιο πηγών): ανάκληση στην Oura, τίποτα στο κινητό.
   Future<void> discard(OuraTokens t) => _revoke(t);
@@ -605,5 +618,6 @@ class OuraLink {
     _unsaved = false;
     await vault.delete(vaultTokens);
     await vault.delete(vaultPending);
+    await vault.delete(vaultConnecting);
   }
 }

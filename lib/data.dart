@@ -1024,6 +1024,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       final json = encodePlanFile(p, now, at: at);
       if (!await planFile.write(json)) return false;
       _planFileWritten = json;
+      // Αμέσως μετά την εγγραφή (μέσα στην ουρά): μια ανανέωση που περιμένει πίσω της βλέπει ήδη το νέο σχέδιο
+      // και δεν ξαναγράφει ποτέ το παλιό.
+      _plan = p;
+      _planAt = at;
       await _appendLog(p, at);
       return true;
     });
@@ -1527,6 +1531,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       final json = encodePlanFile(p, now, at: at);
       if (!await planFile.write(json)) return false;
       _planFileWritten = json;
+      // Αμέσως μετά την εγγραφή (μέσα στην ουρά): μια ανανέωση που περιμένει πίσω της βλέπει ήδη το νέο σχέδιο
+      // και δεν ξαναγράφει ποτέ το παλιό.
+      _plan = p;
+      _planAt = at;
       await _appendLog(p, at);
       return true;
     });

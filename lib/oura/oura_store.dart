@@ -295,6 +295,10 @@ mixin OuraStore on ChangeNotifier {
     final src = plan.nightSource(today);
     if (src == Source.none) return OuraStatus.disconnected;
     if (src != Source.oura) return ouraStartsTonight && ouraHasTokens ? OuraStatus.starting : OuraStatus.off;
+    // Αποσυνδέθηκε σήμερα (η σημερινή νύχτα μένει του Oura, από απόψε χωρίς πηγή): όχι «νέα σύνδεση».
+    if (!ouraHasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) == Source.none) {
+      return OuraStatus.disconnected;
+    }
     if (!ouraHasTokens || ouraError == OuraErrorKind.reconnect || ouraError == OuraErrorKind.noRefresh) {
       return OuraStatus.reconnect;
     }
@@ -406,9 +410,17 @@ mixin OuraStore on ChangeNotifier {
       final before = plan;
       final next = plan.withEra(Source.oura, from);
       final changed = next != plan;
+      // Σημάδι «συνδέεται» ΠΡΙΝ από το σχέδιο: αν κλείσει η εφαρμογή στη μέση, η εκκίνηση ξέρει τι να αναιρέσει.
+      final marker = jsonEncode({'from': dateKey(from), 'at': now.millisecondsSinceEpoch, 'before': before.toJson()});
+      if (!await ouraLink.markConnecting(marker)) {
+        await ouraLink.discard(ex.tokens);
+        ouraLoginError = OuraErrorKind.cancelled;
+        return;
+      }
       if (changed && !await setPlan(next)) {
         // Η πηγή δεν άλλαξε: τα tokens δεν κρατιούνται.
         await ouraLink.discard(ex.tokens);
+        await ouraLink.clearConnecting();
         ouraLoginError = OuraErrorKind.cancelled;
         return;
       }
@@ -416,6 +428,7 @@ mixin OuraStore on ChangeNotifier {
         // Τα tokens δεν γράφτηκαν (ή αποσυνδέθηκε στο μεταξύ): το σχέδιο επιστρέφει, τίποτα μισό.
         if (changed && epoch == _ouraEpoch) await setPlan(before);
         await ouraLink.discard(ex.tokens);
+        await ouraLink.clearConnecting();
         ouraLoginError = OuraErrorKind.cancelled;
         return;
       }
@@ -427,6 +440,7 @@ mixin OuraStore on ChangeNotifier {
       ouraConnectedMs = now.millisecondsSinceEpoch;
       ouraJustConnected = true;
       await savePrefsNow();
+      await ouraLink.clearConnecting();
       // Αν η πρώτη νύχτα είναι η σημερινή, διαβάζεται αμέσως (μπορεί να έχει ήδη έρθει).
       if (!from.isAfter(today)) unawaited(syncOura(force: true));
     } on OuraError catch (e) {
@@ -444,31 +458,68 @@ mixin OuraStore on ChangeNotifier {
   /// Μια σύνδεση έμεινε μισή και καθαρίστηκε στην εκκίνηση ([_cleanHalfConnection]).
   bool ouraIncomplete = false;
 
-  /// Μισή σύνδεση στην εκκίνηση (π.χ. έκλεισε η εφαρμογή ανάμεσα στο σχέδιο και στα tokens), χωρίς καμία ένδειξη
-  /// Oura (νύχτες, ανάγνωση, τιμές «o.*»):
-  /// - tokens χωρίς εποχή Oura → σβήνονται·
-  /// - εποχή Oura από σήμερα ή αύριο χωρίς tokens → φεύγει.
-  /// Και στις δύο: «Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά». Ποτέ «άγνωστο σχέδιο» γι' αυτό.
+  /// Μισή σύνδεση στην εκκίνηση. Ποτέ «άγνωστο σχέδιο» γι' αυτό.
+  /// - Σημάδι «συνδέεται» ([vaultConnecting]) χωρίς tokens: το σχέδιο επιστρέφει ακριβώς όπως ήταν πριν από αυτή
+  ///   τη σύνδεση (και για όποιον είχε συνδεθεί παλιότερα), ανεξάρτητα από ημερομηνία ή άλλες ενδείξεις.
+  ///   «Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά».
+  /// - Σημάδι με tokens: η σύνδεση ολοκληρώθηκε (έκλεισε πριν σβηστεί το σημάδι)· σβήνεται.
+  /// - Tokens χωρίς καμία εποχή Oura και χωρίς τίποτα από το Oura (νύχτες, ανάγνωση, «o.*»): σβήνονται.
+  /// Tokens που χάθηκαν (π.χ. επαναφορά κινητού) ΔΕΝ είναι μισή σύνδεση: «Χρειάζεται νέα σύνδεση με το Oura».
   Future<void> _cleanHalfConnection() async {
     if (!historyReady || !canChangePlan) return;
+    final String? raw;
+    try {
+      raw = await ouraLink.connectingMarker();
+    } catch (_) {
+      return; // η αποθήκευση δεν απαντά: τίποτα δεν πειράζεται
+    }
+    if (raw != null) {
+      await _finishMarker(raw);
+      return;
+    }
+    // Χωρίς tokens και χωρίς σημάδι δεν υπάρχει τίποτα να καθαριστεί (κανένα ψάξιμο στο ιστορικό).
+    if (!ouraHasTokens || plan.hasOura) return;
     if (ouraNights.isNotEmpty || ouraSyncedTo != null) return;
     if (history.values.any((r) => r.keys.any(ouraKeySet.contains))) return;
-    final today = dayOf(ouraClock());
-    final last = plan.eras.isEmpty ? null : plan.eras.last;
-    if (ouraHasTokens && !plan.eras.any((e) => e.source == Source.oura)) {
-      _ouraEpoch++;
-      await ouraLink.disconnect();
-      ouraHasTokens = false;
-      ouraIncomplete = true;
-      ouraLoginError = OuraErrorKind.incomplete;
-    } else if (!ouraHasTokens && last != null && last.source == Source.oura && !last.from.isBefore(today)) {
-      if (await setPlan(SourcePlan(plan.eras.sublist(0, plan.eras.length - 1)))) {
-        ouraIncomplete = true;
-        ouraLoginError = OuraErrorKind.incomplete;
-        ouraConnectedMs = null;
+    _ouraEpoch++;
+    await ouraLink.disconnect();
+    ouraHasTokens = false;
+    ouraIncomplete = true;
+    ouraLoginError = OuraErrorKind.incomplete;
+  }
+
+  Future<void> _finishMarker(String raw) async {
+    Map? j;
+    try {
+      final d = jsonDecode(raw);
+      if (d is Map) j = d;
+    } catch (_) {}
+    if (ouraHasTokens) {
+      // Ολοκληρώθηκε· αν έκλεισε πριν αποθηκευτεί η ώρα σύνδεσης, παίρνεται από το σημάδι.
+      if (ouraConnectedMs == null && j?['at'] is num) {
+        ouraConnectedMs = (j!['at'] as num).toInt();
         await savePrefsNow();
       }
+      await ouraLink.clearConnecting();
+      return;
     }
+    final before = j?['before'] is List ? SourcePlan.fromJson(j!['before']) : null;
+    DateTime? from;
+    try {
+      from = j?['from'] is String ? parseDateKey(j!['from'] as String) : null;
+    } catch (_) {}
+    var ok = true;
+    if (before != null && from != null && plan == before.withEra(Source.oura, from)) {
+      ok = await setPlan(before);
+    } else if (from != null && plan.eras.isNotEmpty && plan.eras.last.source == Source.oura && sameDay(plan.eras.last.from, from)) {
+      ok = await setPlan(SourcePlan(plan.eras.sublist(0, plan.eras.length - 1)));
+    }
+    if (!ok) return; // ξανά στην επόμενη εκκίνηση
+    await ouraLink.clearConnecting();
+    ouraIncomplete = true;
+    ouraLoginError = OuraErrorKind.incomplete;
+    ouraConnectedMs = null;
+    await savePrefsNow();
   }
 
   /// Πριν από τις 04:00: «η νύχτα που κοιμάσαι τώρα»· μετά: «η νύχτα που μόλις τελείωσε» (ακόμα κι αν η σύνδεση
@@ -477,6 +528,10 @@ mixin OuraStore on ChangeNotifier {
     final asleep = ouraClock().hour < 4;
     return asleep ? 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι' : 'Η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι';
   }
+
+  /// Το κουμπί της αναίρεσης: πριν από τις 04:00 η νύχτα δεν έχει τελειώσει ακόμα.
+  String get watchLastNightLabel =>
+      ouraClock().hour < 4 ? 'Η νύχτα που κοιμάσαι τώρα από το ρολόι' : 'Η τελευταία νύχτα από το ρολόι';
 
   /// Τη μέρα της σύνδεσης, αν η πρώτη νύχτα του Oura είναι η σημερινή: «Η τελευταία νύχτα από το ρολόι».
   bool get canWatchLastNight {
