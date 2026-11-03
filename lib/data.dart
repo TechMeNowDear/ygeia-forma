@@ -78,6 +78,9 @@ class Night {
 
   /// Από τον ύπνο ως το ξύπνημα, ΜΕ τα ξυπνήματα («Χρόνος ύπνου» της Samsung): άθροισμα αρχή→τέλος των κομματιών.
   int spanMinutes = 0;
+
+  /// Κενά ανάμεσα στα κομμάτια της νύχτας (εκτός από τον «πιθανό ύπνο»): δεν μετρούν ποτέ ως ύπνος.
+  int betweenMinutes = 0;
   int? score;
   double? sleepingHr;
   double? spo2Avg;
@@ -573,6 +576,13 @@ class Dashboard {
       n.minutes = (asleep / 60).round() + other;
       n.staged = n.parts.every((p) => p.asleepSeconds != null);
       n.spanMinutes = n.parts.fold(0, (sum, p) => sum + p.end.difference(p.start).inMinutes);
+      var between = 0;
+      var reach = n.parts.first.end;
+      for (final p in n.parts.skip(1)) {
+        if (p.start.isAfter(reach)) between += p.start.difference(reach).inMinutes;
+        if (p.end.isAfter(reach)) reach = p.end;
+      }
+      n.betweenMinutes = math.max(0, between - n.estimatedMinutes);
       // Βαθμολογία: της Samsung μόνο όταν η νύχτα είναι ένα κομμάτι. Σε σπασμένη νύχτα η Samsung
       // βαθμολογεί κάθε κομμάτι χωριστά· κανένα από αυτά δεν είναι η βαθμολογία της νύχτας.
       n.score = n.parts.length == 1 ? n.parts.single.score : null;
@@ -654,7 +664,8 @@ class Dashboard {
     return v.reduce((a, b) => a + b) / v.length;
   }
 
-  double? get sleepBaseline => mean(previousNights().map((n) => n.minutes.toDouble()));
+  /// Μόνο νύχτες με φάσεις (πραγματικός ύπνος): μια νύχτα χωρίς φάσεις έχει διάρκεια με τα ξυπνήματα.
+  double? get sleepBaseline => mean(previousNights().where((n) => n.staged).map((n) => n.minutes.toDouble()));
 
   double? get restingHrBaseline => mean(previousNights(14).map((n) => n.sleepingHr));
 
@@ -746,7 +757,8 @@ class Prefs {
       this.ouraBackoff,
       this.planAt,
       this.ouraErr,
-      this.ouraConnected})
+      this.ouraConnected,
+      this.dbReset})
       : plan = plan ?? SourcePlan.samsungOnly;
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
@@ -780,8 +792,12 @@ class Prefs {
       planAt: (j['sourcesAt'] as num?)?.toInt(),
       ouraErr: j['ouraErr'] is String ? j['ouraErr'] as String : null,
       ouraConnected: (j['ouraConnected'] as num?)?.toInt(),
+      dbReset: (j['dbReset'] as num?)?.toInt(),
     );
   }
+
+  /// Για ποια χαλασμένη βάση (ώρα, ms) ξεκίνησε ήδη η ξαναδιάβαση του ιστορικού (A7): μία φορά για κάθε βλάβη.
+  int? dbReset;
 
   /// ΑΝΤΙΓΡΑΦΟ του σχεδίου πηγών. Το κύριο είναι στο δικό του αρχείο (plan_file.dart)· αυτό χρησιμεύει μόνο
   /// αν εκείνο χαθεί και οι ρυθμίσεις διαβάστηκαν κανονικά.
@@ -859,22 +875,32 @@ class Prefs {
         if (ouraSyncedTo != null) 'ouraSyncedTo': ouraSyncedTo,
         if (ouraTried != null) 'ouraTried': ouraTried,
         if (ouraBackoff != null) 'ouraBackoff': ouraBackoff,
+        if (dbReset != null) 'dbReset': dbReset,
       });
 }
 
 /// Μια απάντηση της Samsung, διαβασμένη: [status] (ok ή το σφάλμα), [data] αν ήταν εντάξει,
 /// [sleepFailed] αν κάποιο είδος του ύπνου δεν διαβάστηκε (δες sleepReadFailed), [heartFailed] αν οι παλμοί
 /// δεν διαβάστηκαν (δες heartReadFailed).
-typedef ParsedDashboard = ({Map<String, dynamic> status, Dashboard? data, bool sleepFailed, bool heartFailed});
+/// [rows]: οι συνόψεις των 30 ημερών, υπολογισμένες στο ίδιο νήμα με το διάβασμα (A9), αν ζητήθηκαν.
+typedef ParsedDashboard = ({
+  Map<String, dynamic> status,
+  Dashboard? data,
+  bool sleepFailed,
+  bool heartFailed,
+  Map<String, Map<String, double>>? rows,
+});
 
 /// Σε ξεχωριστό νήμα (isolate), ώστε το άνοιγμα να μην «παγώνει». Αν το νήμα δεν ξεκινήσει,
 /// γίνεται εδώ (πιο αργά, αλλά ποτέ «κολλημένο»).
-Future<ParsedDashboard> parseDashboard(String raw) async {
+/// Με [plan] υπολογίζονται εκεί και οι συνόψεις των 30 ημερών (A9: όχι στο νήμα της οθόνης). Το αποτέλεσμα
+/// επιστρέφει χωρίς αντιγραφή (Isolate.run).
+Future<ParsedDashboard> parseDashboard(String raw, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) async {
   try {
-    return await Isolate.run(() => parseDashboardSync(raw));
+    return await Isolate.run(() => parseDashboardSync(raw, plan: plan, windows: windows));
   } catch (e, st) {
     _isolateFailed(e, st);
-    return parseDashboardSync(raw);
+    return parseDashboardSync(raw, plan: plan, windows: windows);
   }
 }
 
@@ -933,15 +959,19 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
   }
 }
 
-ParsedDashboard parseDashboardSync(String raw) {
+/// Πόσες μέρες (ως σήμερα) ξαναγράφονται από την κανονική ανάγνωση.
+const recentSummaryDays = 30;
+
+/// [plan]/[windows]: αν δοθούν, υπολογίζονται και οι συνόψεις των 30 ημερών ([ParsedDashboard.rows]).
+ParsedDashboard parseDashboardSync(String raw, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
   Object? j;
   try {
     j = jsonDecode(raw);
   } catch (e) {
-    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false, heartFailed: false);
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false, heartFailed: false, rows: null);
   }
   if (j is! Map<String, dynamic>) {
-    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false, heartFailed: false);
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false, heartFailed: false, rows: null);
   }
   if (j['ok'] != true) {
     return (
@@ -949,17 +979,24 @@ ParsedDashboard parseDashboardSync(String raw) {
       data: null,
       sleepFailed: false,
       heartFailed: false,
+      rows: null,
     );
   }
   try {
+    final d = Dashboard.fromJson(j);
+    final today = dayOf(d.readAt);
     return (
       status: const {'ok': true},
-      data: Dashboard.fromJson(j),
+      data: d,
       sleepFailed: sleepReadFailed(j),
       heartFailed: heartReadFailed(j),
+      rows: plan == null
+          ? null
+          : summarizeRange(d, DateTime(today.year, today.month, today.day - recentSummaryDays + 1), today,
+              plan: plan, windows: windows),
     );
   } catch (e) {
-    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false, heartFailed: false);
+    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false, heartFailed: false, rows: null);
   }
 }
 
@@ -976,10 +1013,13 @@ Set<String> applyRecentRead(
   SleepWindows windows = SleepWindows.empty,
   bool sleepFailed = false,
   bool heartFailed = false,
+  Map<String, Map<String, double>>? rows,
 }) {
   final today = dayOf(d.readAt);
-  // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης.
-  final rows = summarizeRange(d, DateTime(today.year, today.month, today.day - 29), today, plan: plan, windows: windows);
+  // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης. [rows]: ήδη
+  // υπολογισμένες σε άλλο νήμα με το ΙΔΙΟ σχέδιο και τις ίδιες ώρες ύπνου (A9).
+  rows ??= summarizeRange(d, DateTime(today.year, today.month, today.day - recentSummaryDays + 1), today,
+      plan: plan, windows: windows);
   for (final r in rows.values) {
     r.removeWhere((k, _) => bodyKeys.contains(k));
   }
@@ -1352,6 +1392,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // Αν δεν ήρθαν ακόμα, μία ακόμα προσπάθεια εδώ· μετά ξαναδοκιμάζει κάθε ανανέωση.
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
     await _loadHistory();
+    await _checkDatabase();
     await _loadPlan();
     await _upgradeHistory();
     await startOura();
@@ -1380,11 +1421,17 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     if (planState != PlanState.ok) await _loadPlan();
     await _syncPlanFile();
 
-    // Χωρίς απάντηση σε 90″ (π.χ. κόλλησε η Samsung) δεν μένει «φορτώνει» για πάντα.
-    final raw = await SamsungHealth.dashboardRaw().timeout(const Duration(seconds: 90),
+    // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας και το
+    // οξυγόνο, που υπολογίζονται μαζί με το διάβασμα της Samsung (A9).
+    // Χωρίς απάντηση σε 90″ (π.χ. κόλλησε η Samsung) δεν μένει «φορτώνει» για πάντα. Η Samsung και το Oura μαζί.
+    final rawRead = SamsungHealth.dashboardRaw().timeout(const Duration(seconds: 90),
         onTimeout: () => jsonEncode({'ok': false, 'kind': 'other', 'message': 'Η Samsung δεν απάντησε. Δοκίμασε ξανά.'}));
-    // Οι υπολογισμοί (νύχτες, παλμοί, μερικά MB δεδομένων) σε άλλο νήμα: η οθόνη δεν «κολλάει».
-    final p = await parseDashboard(raw);
+    if (_canWrite) await syncOura();
+    final raw = await rawRead;
+    // Οι υπολογισμοί (νύχτες, παλμοί, συνόψεις 30 ημερών, μερικά MB δεδομένων) σε άλλο νήμα: η οθόνη δεν «κολλάει».
+    final parsePlan = _canWrite ? plan : null;
+    final parseNights = ouraNights;
+    final p = await parseDashboard(raw, plan: parsePlan, windows: parsePlan == null ? SleepWindows.empty : ouraWindows);
     final ok = p.data != null;
     if (ok) {
       data = p.data;
@@ -1408,13 +1455,43 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         await _upgradeHistory();
         // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας.
         await syncOura();
-        await _updateRecentHistory(d, sleepFailed: p.sleepFailed, heartFailed: p.heartFailed);
+        // Οι συνόψεις από το άλλο νήμα μόνο αν το σχέδιο και οι νύχτες του Oura δεν άλλαξαν στο μεταξύ.
+        final same = parsePlan != null && parsePlan == plan && identical(parseNights, ouraNights);
+        await _updateRecentHistory(d, sleepFailed: p.sleepFailed, heartFailed: p.heartFailed, rows: same ? p.rows : null);
         _backfill();
       }
     } else if (_canWrite) {
       // Η Samsung δεν απάντησε: το Oura διαβάζεται κανονικά (ανεξάρτητη πηγή).
       await syncOura();
     }
+  }
+
+  /// Η βάση βρέθηκε χαλασμένη (ώρα, ms) και κρατήθηκε αντίγραφο (A7): κάρτα στη Σήμερα ώσπου να την κλείσει ο χρήστης.
+  int? dbCorruptAt;
+
+  /// Χαλασμένη βάση: ξεκίνησε καινούργια (το παλιό αρχείο κρατήθηκε). Το ιστορικό ξαναδιαβάζεται από τη Samsung από
+  /// την αρχή (μία φορά για κάθε βλάβη)· το ημερολόγιο φαγητού επανέρχεται από το αντίγραφο ασφαλείας.
+  Future<void> _checkDatabase() async {
+    final r = await SamsungHealth.dbStatus();
+    final at = r['ok'] == true && r['corrupt'] is num ? (r['corrupt'] as num).toInt() : null;
+    dbCorruptAt = at;
+    if (at == null || !_prefsLoaded || prefs.dbReset == at) return;
+    prefs
+      ..backfillFrom = null
+      ..emptyFrom = null
+      ..emptyChecked = null
+      ..gapFrom = null
+      ..gapTo = null
+      ..recentTo = null
+      ..dbReset = at;
+    await _savePrefs();
+  }
+
+  /// «Εντάξει» στην κάρτα της χαλασμένης βάσης.
+  Future<void> dismissDatabaseNotice() async {
+    dbCorruptAt = null;
+    notifyListeners();
+    await SamsungHealth.dbStatusSeen();
   }
 
   // ---------- Ιστορικό ----------
@@ -1496,7 +1573,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// [sleepFailed]: κάποιο είδος από το οποίο βγαίνει ο ύπνος δεν διαβάστηκε (δες sleepReadFailed)·
   /// τότε οι τιμές ύπνου που υπάρχουν ήδη δεν αντικαθίστανται.
   /// [heartFailed]: οι παλμοί δεν διαβάστηκαν· οι τιμές από τους παλμούς μένουν ως είχαν (A12).
-  Future<void> _updateRecentHistory(Dashboard d, {bool sleepFailed = false, bool heartFailed = false}) async {
+  Future<void> _updateRecentHistory(Dashboard d,
+      {bool sleepFailed = false, bool heartFailed = false, Map<String, Map<String, double>>? rows}) async {
     if (!_canWrite) return;
     final changed = applyRecentRead(
       history,
@@ -1505,6 +1583,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       windows: ouraWindows,
       sleepFailed: sleepFailed,
       heartFailed: heartFailed,
+      rows: rows,
     );
     // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
     final today = dayOf(d.readAt);
@@ -1725,6 +1804,47 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Αν επιτρέπεται τώρα αλλαγή πηγών (για τη σύνδεση: να μη συνδεθεί χωρίς να μπορεί να αλλάξει η πηγή).
   @override
   bool get canChangePlan => _prefsLoaded && planState == PlanState.ok;
+
+  /// Το σχέδιο πηγών και το ημερολόγιό του για το αντίγραφο ασφαλείας (A10), μόνο αν το αρχείο διαβάζεται.
+  Future<({String plan, String? log})?> sourcesForBackup() async {
+    if (planState != PlanState.ok) return null;
+    final f = await planFile.read();
+    if (f.state != 'ok' || decodePlanFile(f.json) == null) return null;
+    final log = await planFile.readLog();
+    return (plan: f.json!, log: log.state == 'ok' ? log.json : null);
+  }
+
+  /// Επαναφορά του σχεδίου πηγών από αντίγραφο (A10). Μπαίνει ΜΟΝΟ αν το κινητό δεν έχει νεότερο: σε κινητό που δεν
+  /// είχε ποτέ σχέδιο (π.χ. νέο κινητό), ή αν το σχέδιο του αντιγράφου ορίστηκε αργότερα. Δεν σβήνει τίποτα από το
+  /// ιστορικό ή τα δεδομένα· αλλάζει μόνο το ποια πηγή μετρά κάθε νύχτα. `true` αν μπήκε.
+  Future<bool> restoreSources(({String plan, String? log}) s) async {
+    if (!_prefsLoaded || planState != PlanState.ok) return false;
+    final p = decodePlanFile(s.plan);
+    if (p == null) return false;
+    final at = _atOf(s.plan) ?? 0;
+    final neverSet = _plan.eras.isEmpty && _planAt == null;
+    if (!neverSet && (at <= (_planAt ?? 0) || p == _plan)) return false;
+    final now = ouraClock();
+    final ok = await _planQueue(() async {
+      final json = encodePlanFile(p, now, at: at);
+      if (!await planFile.write(json)) return false;
+      _planFileWritten = json;
+      _plan = p;
+      _planAt = at;
+      // Το ημερολόγιο του αντιγράφου, αν το κινητό δεν έχει δικό του· και η καταχώριση της επαναφοράς.
+      final log = await planFile.readLog();
+      if (log.state == 'missing' && s.log != null && lastLoggedPlan(s.log) != null) await planFile.writeLog(s.log!);
+      await _appendLog(p, at);
+      return true;
+    });
+    if (!ok) return false;
+    prefs.plan = p;
+    prefs.planAt = at;
+    _data = _raw?.restrict(p);
+    notifyListeners();
+    if (!await _savePrefs()) await _savePrefs();
+    return true;
+  }
 
   /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
   Future<bool> restorePrefs(Map<String, dynamic> p) async {

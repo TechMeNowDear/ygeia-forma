@@ -88,7 +88,7 @@ class SettingsPage extends StatelessWidget {
                                   const SizedBox(height: 2),
                                   Text(
                                     'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
-                                    'βήματα: ρολόι · βάρος: InBody',
+                                    'βήματα: Samsung Health · βάρος: InBody',
                                     style: TextStyle(color: c.textSecondary, fontSize: 13.5),
                                   ),
                                 ],
@@ -206,6 +206,7 @@ class _BackupCardState extends State<_BackupCard> {
         myFoods: raw.$2,
         prefs: widget.store.prefsLoaded ? widget.store.prefsJson() : const {},
         now: now,
+        sources: await widget.store.sourcesForBackup(),
       );
       final r = await FoodChannel.saveBackup(json, name);
       if (r['ok'] != true || r['uri'] is! String) {
@@ -251,6 +252,7 @@ class _BackupCardState extends State<_BackupCard> {
             'Μπαίνουν μόνο όσα λείπουν από το κινητό. Όσα υπάρχουν ήδη μένουν όπως είναι, με όσες αλλαγές τους έκανες. '
             'Τίποτα δεν σβήνεται· καταχωρίσεις που έσβησες μετά το αντίγραφο ξαναμπαίνουν.'
             '${b.prefs.isEmpty ? '' : '\n\nΘα αντικατασταθούν οι ρυθμίσεις: «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση.'}'
+            '${b.sources == null ? '' : '\n\nΠηγές ύπνου (π.χ. από πότε μετρά το Oura): από το αντίγραφο, μόνο αν το κινητό δεν έχει νεότερες.'}'
             '${b.skipped == 0 ? '' : '\n\n${countText(b.skipped, 'χαλασμένη εγγραφή θα παραλειφθεί', 'χαλασμένες εγγραφές θα παραλειφθούν')}.'}',
           ),
           actions: [
@@ -267,12 +269,15 @@ class _BackupCardState extends State<_BackupCard> {
       }
       final (e, f, failed, existing) = res;
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
+      final sourcesIn = b.sources != null && await widget.store.restoreSources(b.sources!);
       _say([
         'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
         if (existing > 0)
           existing == 1 ? '1 εγγραφή υπήρχε ήδη και έμεινε όπως ήταν.' : '$existing εγγραφές υπήρχαν ήδη και έμειναν όπως ήταν.',
         if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
+        if (sourcesIn) 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
+        if (b.sources != null && !sourcesIn) 'Οι πηγές ύπνου του κινητού είναι νεότερες και έμειναν.',
       ].join(' '));
     } finally {
       if (mounted) setState(() => _busy = false);

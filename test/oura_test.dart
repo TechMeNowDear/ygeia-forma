@@ -437,7 +437,8 @@ void main() {
       expect(all.length, 9);
       expect(http.calls.length, 2);
       expect(http.calls.first.$2.path, '/v2/usercollection/sleep');
-      expect(http.calls.first.$2.queryParameters['start_date'], '2026-10-23');
+      // Μία μέρα πριν από την αρχή (A3): το /sleep δεν δίνει πάντα τη νύχτα με day = start_date.
+      expect(http.calls.first.$2.queryParameters['start_date'], '2026-10-22');
       // Το end_date της Oura δεν περιλαμβάνει τη μέρα του: ζητάμε ως την επόμενη.
       expect(http.calls.first.$2.queryParameters['end_date'], '2026-10-28');
       expect(http.calls.last.$2.queryParameters['next_token'], 'page-2');

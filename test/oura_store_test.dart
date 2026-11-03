@@ -121,7 +121,8 @@ class FakeOura {
     return OuraResponse(200, jsonEncode({'data': data, 'next_token': null}));
   }
 
-  int get gets => calls.where((c) => c.$1 == 'GET').length;
+  /// Αναγνώσεις δεδομένων (όχι η ανάκληση, που είναι κι αυτή GET).
+  int get gets => calls.where((c) => c.$1 == 'GET' && !c.$2.path.endsWith('/revoke')).length;
 }
 
 DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
@@ -568,7 +569,7 @@ void main() {
       expect(decodePlanFile(a.planFile.content)!.ouraFrom, add(today, 1), reason: 'πρώτα στο αρχείο');
       // Μία κλήση μόνο: ο έλεγχος πρόσβασης ΠΡΙΝ από το σχέδιο πηγών (A13). Ανάγνωση σήμερα: τίποτα να διαβαστεί
       // ακόμα (η πρώτη νύχτα είναι αύριο).
-      expect(a.oura.calls.where((c) => c.$1 == 'GET').single.$2.pathSegments.last, 'daily_sleep');
+      expect(a.oura.calls.where((c) => c.$1 == 'GET' && !c.$2.path.endsWith('/revoke')).single.$2.pathSegments.last, 'daily_sleep');
       await a.store.syncOura(force: true);
       expect(a.oura.gets, 1);
       // Αποσύνδεση την ίδια μέρα: τίποτα δεν είχε έρθει από το Oura → όλα όπως πριν.
@@ -715,7 +716,8 @@ void main() {
       final p = SourcePlan([SourceEra(Source.oura, ouraStart), SourceEra(Source.none, today)]);
       final a = app(plan: p, withTokens: true);
       await boot(a.store);
-      expect(a.store.ouraNights.any((n) => sameDay(n.day, today)), isTrue, reason: 'η Oura την έδωσε');
+      // Νύχτα «χωρίς πηγή»: δεν ζητείται καν από την Oura (A3: μόνο νύχτες με πηγή το Oura).
+      expect(a.store.ouraNights.any((n) => sameDay(n.day, today)), isFalse);
       expect(a.store.ouraNightFor(today), isNull);
       expect(a.store.ouraNightFor(add(today, -1)), isNotNull);
       expect(a.store.ouraNightReason(today, now), EmptyNight.disconnected);
@@ -1108,5 +1110,25 @@ void main() {
       await a.store.completeOuraLogin('$ouraRedirectHttps?code=C&state=ξανά');
       expect(a.store.ouraLoginError, isNull);
     });
-  });
+  
+    test('A10: επαναφορά πηγών από αντίγραφο: σε κινητό χωρίς σχέδιο μπαίνει· νεότερο σχέδιο του κινητού ΜΕΝΕΙ', () async {
+      final backupPlan = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -20));
+      final file = encodePlanFile(backupPlan, add(today, -19), at: 1000);
+      // Νέο κινητό: κανένα σχέδιο.
+      final a = app(plan: null);
+      a.android.days[dateKey(add(today, -10))] = {K.steps: 4000, K.sleepMin: 400};
+      await boot(a.store);
+      expect(await a.store.restoreSources((plan: file, log: appendPlanLog(null, backupPlan, 1000))), isTrue);
+      expect(a.store.plan, backupPlan);
+      expect(decodePlanFile(a.planFile.content), backupPlan);
+      expect(lastLoggedPlan(a.planFile.log)!.plan, backupPlan);
+      expect(a.android.days[dateKey(add(today, -10))]![K.steps], 4000, reason: 'τίποτα δεν σβήνεται από την επαναφορά');
+      // Κινητό με νεότερο σχέδιο (ορίστηκε μετά το αντίγραφο): δεν αλλάζει.
+      final newer = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -5));
+      final b = app(plan: null, planFile: MemoryPlanFile(encodePlanFile(newer, today, at: 5000)));
+      await boot(b.store);
+      expect(await b.store.restoreSources((plan: file, log: null)), isFalse);
+      expect(b.store.plan, newer);
+    });
+});
 }

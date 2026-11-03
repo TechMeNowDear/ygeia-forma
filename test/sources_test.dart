@@ -421,19 +421,26 @@ void main() {
       expect(h['2026-11-07'], {K.spo2Avg: 96, K.steps: 3});
     });
 
-    test('summarizeDay με Oura: καμία τιμή νύχτας από το ρολόι, οξυγόνο ναι (χωρίς τον ύπνο του ρολογιού)', () {
+    test('summarizeDay με Oura: καμία τιμή νύχτας από το ρολόι, οξυγόνο ναι (μέσα στις ώρες ύπνου του Oura)', () {
       final now = DateTime(2026, 11, 8, 16, 30);
       final dash = Dashboard.fromJson(sampleDashboardJson(now));
       final p = SourcePlan.samsungOnly.withEra(Source.oura, d(2026, 11, 6));
+      // Οι ώρες ύπνου του Oura (μόνο ώρες) για τις τρεις νύχτες.
+      final windows = SleepWindows(const [], {
+        for (final day in [d(2026, 11, 6), d(2026, 11, 7), d(2026, 11, 8)])
+          dateKey(day): (DateTime(day.year, day.month, day.day - 1, 22), DateTime(day.year, day.month, day.day, 10)),
+      });
       final before = summarizeDay(dash, d(2026, 11, 5), plan: p);
       expect(before.containsKey(K.sleepMin), isTrue);
       expect(before.containsKey(K.energy), isTrue);
       for (final day in [d(2026, 11, 6), d(2026, 11, 7), d(2026, 11, 8)]) {
-        final row = summarizeDay(dash, day, plan: p);
+        final row = summarizeDay(dash, day, plan: p, windows: windows);
         for (final k in watchNightKeys) {
           expect(row.containsKey(k), isFalse, reason: '$k ${dateKey(day)}');
         }
         expect(row.containsKey(K.spo2Avg), isTrue, reason: 'οξυγόνο ρολογιού ${dateKey(day)}');
+        // A4: χωρίς τις ώρες του Oura δεν ξέρουμε πότε κοιμήθηκε: χωρίς οξυγόνο νύχτας.
+        expect(summarizeDay(dash, day, plan: p).containsKey(K.spo2Avg), isFalse);
         expect(row.keys.any((k) => k.startsWith('o.')), isFalse);
       }
       // Παλμοί μέρας: χωρίς τις ώρες ύπνου του Oura δεν βγαίνουν (αλλιώς ο ύπνος θα μετρούσε ως μέρα).

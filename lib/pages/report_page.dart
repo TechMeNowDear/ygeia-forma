@@ -382,7 +382,7 @@ class _PageOne extends StatelessWidget {
       if (!withOura) return r.$1;
       final s = d.stat(r.$2);
       final since = s.since == null ? '' : ', από ${s.since!.day}/${s.since!.month}';
-      return '${r.$1} · ${sourceName(s.source)}$since';
+      return '${r.$1} · ${metricSourceName(r.$2, s.source)}$since';
     }
 
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
@@ -522,11 +522,13 @@ class _PageOne extends StatelessWidget {
           withOura
               ? 'Πώς μετρήθηκαν: κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
                   'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
-                  'Galaxy Watch Ultra 2. Οξυγόνο και βήματα: Galaxy Watch Ultra 2 (καρπός)· «ελάχιστο» = μία μεμονωμένη '
-                  'μέτρηση, όχι οξυμετρία. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής μετρούν μόνο οι μέρες της νέας.'
+                  'Galaxy Watch Ultra 2. Οξυγόνο: Galaxy Watch Ultra 2 (καρπός)· «ελάχιστο» = μία μεμονωμένη '
+                  'μέτρηση, όχι οξυμετρία. Βήματα: $samsungTotalLabel. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής '
+                  'μετρούν μόνο οι μέρες της νέας.'
               : 'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
-                  'αισθητήρας καρπού· «ελάχιστο» = μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
-                  'Samsung. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
+                  'αισθητήρας καρπού· «ελάχιστο» = μία μεμονωμένη μέτρηση, όχι οξυμετρία. Διάρκεια ύπνου: πραγματικός ύπνος '
+                  'από τις φάσεις της Samsung, χωρίς τα ξυπνήματα. Βήματα: $samsungTotalLabel. Χωρίς HRV και παλμούς '
+                  'ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
           style: TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4),
         ),
         const Spacer(),

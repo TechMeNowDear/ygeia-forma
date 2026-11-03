@@ -37,7 +37,7 @@ class FoodBridge(
             "logRange" -> respond(result) {
                 val from = call.argument<String>("from") ?: ""
                 val to = call.argument<String>("to") ?: ""
-                val rows = withContext(Dispatchers.IO) { store.logRange(from, to) }
+                val rows = withContext(DbQueue.dispatcher) { store.logRange(from, to) }
                 JSONObject().put("ok", true).put("entries", rows)
             }
             "logPut" -> respond(result) {
@@ -45,27 +45,27 @@ class FoodBridge(
                 val id = json.optString("id")
                 val day = json.optString("day")
                 require(id.isNotEmpty() && day.isNotEmpty()) { "Λείπει id ή day" }
-                withContext(Dispatchers.IO) { store.logPut(id, day, json.toString()) }
+                withContext(DbQueue.dispatcher) { store.logPut(id, day, json.toString()) }
                 JSONObject().put("ok", true)
             }
             "logDelete" -> respond(result) {
                 val id = call.argument<String>("id") ?: ""
-                withContext(Dispatchers.IO) { store.logDelete(id) }
+                withContext(DbQueue.dispatcher) { store.logDelete(id) }
                 JSONObject().put("ok", true)
             }
             "myFoods" -> respond(result) {
-                val rows = withContext(Dispatchers.IO) { store.myFoods() }
+                val rows = withContext(DbQueue.dispatcher) { store.myFoods() }
                 JSONObject().put("ok", true).put("foods", rows)
             }
             "myFoodPut" -> respond(result) {
                 val json = JSONObject(call.argument<String>("json") ?: "{}")
                 val id = json.optString("id")
                 require(id.isNotEmpty()) { "Λείπει id" }
-                withContext(Dispatchers.IO) { store.myFoodPut(id, json.toString()) }
+                withContext(DbQueue.dispatcher) { store.myFoodPut(id, json.toString()) }
                 JSONObject().put("ok", true)
             }
             "myFoodDelete" -> respond(result) {
-                withContext(Dispatchers.IO) { store.myFoodDelete(call.argument<String>("id") ?: "") }
+                withContext(DbQueue.dispatcher) { store.myFoodDelete(call.argument<String>("id") ?: "") }
                 JSONObject().put("ok", true)
             }
             "saveBackup" -> respond(result) {
@@ -76,11 +76,11 @@ class FoodBridge(
                 val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
                 JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
             }
-            "shareBackup" -> respond(result) {
+            "shareBackup" -> respondMain(result) {
                 BackupFiles.share(activity, android.net.Uri.parse(call.argument<String>("uri") ?: ""))
                 JSONObject().put("ok", true)
             }
-            "pickBackup" -> respond(result) {
+            "pickBackup" -> respondMain(result) {
                 val main = activity as? MainActivity ?: throw IllegalStateException("Δεν ανοίγει επιλογέας")
                 val uri = suspendCancellableCoroutine<android.net.Uri?> { cont ->
                     main.pickDocument { u -> if (cont.isActive) cont.resume(u) }
@@ -92,7 +92,7 @@ class FoodBridge(
                     JSONObject().put("ok", true).put("json", text)
                 }
             }
-            "scanBarcode" -> respond(result) { scan() }
+            "scanBarcode" -> respondMain(result) { scan() }
             "offLookup" -> respond(result) {
                 withContext(Dispatchers.IO) { offLookup(call.argument<String>("code") ?: "") }
             }
@@ -100,20 +100,32 @@ class FoodBridge(
         }
     }
 
+    /**
+     * Η δουλειά και η σειριοποίηση (π.χ. όλο το ημερολόγιο για το αντίγραφο) εκτός main thread (A9)· μόνο η απάντηση
+     * στη Flutter στο main thread. Οι εργασίες στη βάση μία-μία ([DbQueue], A8).
+     */
     private fun respond(result: MethodChannel.Result, block: suspend () -> JSONObject) {
         scope.launch {
-            val json = try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                ErrorQueue.report(e, "food")
-                JSONObject().put("ok", false).put("kind", "other").put("message", e.message ?: e.javaClass.simpleName)
-                    .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))
-            }
-            result.success(json.toString())
+            val text = withContext(Dispatchers.Default) { guarded(block).toString() }
+            result.success(text)
         }
     }
+
+    /** Για ό,τι ανοίγει οθόνη (επιλογέας αρχείων, κοινοποίηση, σαρωτής): στο main thread. */
+    private fun respondMain(result: MethodChannel.Result, block: suspend () -> JSONObject) {
+        scope.launch { result.success(guarded(block).toString()) }
+    }
+
+    private suspend fun guarded(block: suspend () -> JSONObject): JSONObject =
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            ErrorQueue.report(e, "food")
+            JSONObject().put("ok", false).put("kind", "other").put("message", e.message ?: e.javaClass.simpleName)
+                .put("detail", e.stackTraceToString().lines().take(12).joinToString("\n"))
+        }
 
     // ---------- Barcode ----------
 

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/food/food_model.dart';
+import 'package:ygeia_forma/plan_file.dart';
+import 'package:ygeia_forma/sources.dart';
 
 void main() {
   final food = {
@@ -67,5 +69,20 @@ void main() {
 
   test('Όνομα αρχείου', () {
     expect(backupFileName(DateTime(2026, 3, 5)), 'ygeia-antigrafo-2026-03-05.json.gz');
+  });
+
+  test('A10: το σχέδιο πηγών και το ημερολόγιό του μπαίνουν στο αντίγραφο και διαβάζονται πίσω', () {
+    final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 6));
+    final file = encodePlanFile(plan, DateTime(2026, 11, 7), at: 1234);
+    final log = appendPlanLog(null, plan, 1234);
+    final b = parseBackup(buildBackup(foodLog: [entry], myFoods: const [], prefs: const {}, now: DateTime(2026, 11, 7),
+        sources: (plan: file, log: log)));
+    expect(b.sources!.plan, file);
+    expect(decodePlanFile(b.sources!.plan), plan);
+    expect(b.sources!.log, log);
+    // Παλιό αντίγραφο χωρίς πηγές, ή χαλασμένο σχέδιο: χωρίς πηγές (τίποτα δεν αλλάζει στο κινητό).
+    expect(parseBackup(buildBackup(foodLog: const [], myFoods: const [], prefs: const {}, now: DateTime(2026, 11, 7))).sources, isNull);
+    final broken = jsonEncode({'app': backupApp, 'version': 1, 'sources': {'plan': '{"v":1,"sources":"x"}'}});
+    expect(parseBackup(broken).sources, isNull);
   });
 }

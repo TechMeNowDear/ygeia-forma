@@ -44,6 +44,17 @@ jobs:
           # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 
+      - name: Ανάλυση κώδικα (σταματά μόνο σε σφάλματα)
+        run: |
+          set -o pipefail
+          # Έλεγχος 4/11 (A14): σφάλματα του analyzer σταματούν το χτίσιμο· προειδοποιήσεις και υποδείξεις όχι (φαίνονται).
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log; then
+            msg=$(grep -E " error " analyze.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Ανάλυση κώδικα::$msg"
+            exit 1
+          fi
+          echo "::notice title=Ανάλυση κώδικα::$(tail -1 analyze.log | tr -cd '[:print:]' | tail -c 120)"
+
       - name: Έλεγχοι (ώρα Αθήνας)
         run: |
           set -o pipefail

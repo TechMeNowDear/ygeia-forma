@@ -321,7 +321,7 @@ class _TableRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          SourceTag(source),
+          SourceTag(source, label: samsungTotalMetrics.contains(row.metrics.first) ? 'Samsung Health' : null),
         ],
       ),
     );

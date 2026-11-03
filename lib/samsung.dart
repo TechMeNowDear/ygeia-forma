@@ -67,6 +67,10 @@ class SamsungHealth {
 
   static Future<Map<String, dynamic>> loadDays() => _call('loadDays');
 
+  /// Αν η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ms ή null}.
+  static Future<Map<String, dynamic>> dbStatus() => _call('dbStatus');
+  static Future<Map<String, dynamic>> dbStatusSeen() => _call('dbStatusSeen');
+
   /// Σελίδες PNG (A4) → PDF στις Λήψεις. Επιστρέφει `uri`.
   static Future<Map<String, dynamic>> savePdf(List<Uint8List> pages, String name) =>
       _call('savePdf', {'pages': pages, 'name': name});

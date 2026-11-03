@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/history.dart';
 
 import 'sample_data.dart';
@@ -31,12 +32,13 @@ void main() {
     expect(parseDashboardSync('[]').data, isNull);
   });
 
-  test('Σφάλμα σε παλμούς: τα υπόλοιπα διαβάζονται, ο ύπνος σημειώνεται ότι δεν είναι πλήρης', () {
+  test('Σφάλμα σε παλμούς (A12): τα υπόλοιπα διαβάζονται, ο ύπνος ενημερώνεται, οι παλμοί σημειώνονται', () {
     final when = DateTime(2026, 10, 24, 20);
     final j = sampleDashboardJson(when)..['heart'] = {'error': 'x'};
     final p = parseDashboardSync(jsonEncode(j));
     expect(p.data, isNotNull);
-    expect(p.sleepFailed, isTrue);
+    expect(p.sleepFailed, isFalse);
+    expect(p.heartFailed, isTrue);
     expect(p.data!.failed, contains('heart'));
   });
 
@@ -60,6 +62,18 @@ void main() {
     final heartErr = parseRangeSync(jsonEncode(sampleDashboardJson(when)..['heart'] = {'error': 'x'}), from, to);
     expect(heartErr.ok, isTrue);
     expect(heartErr.anyError, isTrue);
-    expect(heartErr.sleepFailed, isTrue);
+    expect(heartErr.sleepFailed, isFalse, reason: 'A12: οι παλμοί δεν μπλοκάρουν τον ύπνο');
+    expect(heartErr.heartFailed, isTrue);
+  });
+
+  test('A9: οι συνόψεις των 30 ημερών βγαίνουν στο ίδιο νήμα με το διάβασμα, ίδιες με το summarizeRange', () async {
+    final when = DateTime(2026, 10, 24, 20);
+    final j = sampleDashboardJson(when);
+    final plan = SourcePlan.samsungOnly;
+    final p = await parseDashboard(jsonEncode(j), plan: plan);
+    final today = DateTime(2026, 10, 24);
+    final direct = summarizeRange(Dashboard.fromJson(j), DateTime(2026, 9, 25), today, plan: plan);
+    expect(p.rows, direct);
+    expect((await parseDashboard(jsonEncode(j))).rows, isNull, reason: 'χωρίς σχέδιο δεν υπολογίζονται');
   });
 }

@@ -51,7 +51,8 @@ class SleepPage extends StatelessWidget {
 
         final last14 = nights.length <= 14 ? nights : nights.sublist(nights.length - 14);
         final week = nights.length <= 7 ? nights : nights.sublist(nights.length - 7);
-        final avg7 = Dashboard.mean(week.map((n) => n.minutes.toDouble()));
+        // Μέσος όρος μόνο από νύχτες με φάσεις (πραγματικός ύπνος, χωρίς τα ξυπνήματα).
+        final avg7 = Dashboard.mean(week.where((n) => n.staged).map((n) => n.minutes.toDouble()));
         final scoreAvg = Dashboard.mean(week.map((n) => n.score?.toDouble()));
         // Οι χωρισμένες νύχτες δεν έχουν βαθμολογία: λέμε από πόσες βγαίνει ο μέσος όρος.
         final scored = week.where((n) => n.score != null).length;
@@ -178,6 +179,13 @@ class _LastNightCard extends StatelessWidget {
               ),
             ],
           ),
+          if (!n.staged) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Χωρίς φάσεις από τη Samsung· διάρκεια με τα ξυπνήματα. Δεν μετρά στους μέσους όρους.',
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
           if (n.estimatedMinutes > 0) ...[
             const SizedBox(height: 6),
             Text(
@@ -233,8 +241,8 @@ class _LastNightCard extends StatelessWidget {
             InfoRow('Πιθανός ύπνος στα κενά (δεν μετρά)', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
           if (n.spanMinutes > n.minutes)
             InfoRow('Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)', hoursMinutes(n.spanMinutes), dot: c.textTertiary),
-          if (!n.staged)
-            InfoRow('Χωρίς φάσεις από τη Samsung', 'διάρκεια όπως τη δίνει η Samsung', dot: c.textTertiary),
+          if (n.betweenMinutes > 0)
+            InfoRow('Κενό ανάμεσα στα κομμάτια (δεν μετρά)', hoursMinutes(n.betweenMinutes), dot: c.textTertiary),
           if (n.napMinutes > 0) InfoRow('Υπνάκος ή χωριστός ύπνος (δεν μετρά)', hoursMinutes(n.napMinutes), dot: c.textTertiary),
         ],
       ),

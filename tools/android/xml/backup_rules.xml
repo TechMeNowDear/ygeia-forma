@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Το ίδιο με το data_extraction_rules.xml, για Android 10–11 (A10). -->
+<full-backup-content>
+    <include domain="database" path="ygeia.db" />
+    <include domain="database" path="ygeia.db-wal" />
+    <include domain="file" path="prefs.json" />
+    <include domain="file" path="sources.json" />
+    <include domain="file" path="sources_log.json" />
+    <include domain="file" path="oura_nights.json" />
+</full-backup-content>

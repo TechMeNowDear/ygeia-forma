@@ -118,6 +118,17 @@ jobs:
           path: key-export/
           retention-days: 1
 
+      - name: Ανάλυση κώδικα (σταματά μόνο σε σφάλματα)
+        run: |
+          set -o pipefail
+          # Έλεγχος 4/11 (A14): σφάλματα του analyzer σταματούν το χτίσιμο· προειδοποιήσεις και υποδείξεις όχι (φαίνονται).
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log; then
+            msg=$(grep -E " error " analyze.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Ανάλυση κώδικα::$msg"
+            exit 1
+          fi
+          echo "::notice title=Ανάλυση κώδικα::$(tail -1 analyze.log | tr -cd '[:print:]' | tail -c 120)"
+
       - name: Έλεγχοι
         env:
           TZ: Europe/Athens
@@ -148,6 +159,23 @@ jobs:
           fi
           cp build/app/outputs/flutter-apk/app-release.apk ygeia-forma-${{ github.run_number }}.apk
           ls -lh ygeia-forma-*.apk
+
+      # Και στο main (A14): οι έλεγχοι Kotlin σε απλό JVM, πριν δημοσιευτεί η έκδοση.
+      - name: Έλεγχοι Kotlin (JVM, χωρίς συσκευή)
+        run: |
+          set -o pipefail
+          cd android
+          if ! ./gradlew :app:testDebugUnitTest --console=plain 2>&1 | tee ../kotlin-tests.log; then
+            grep -E -A6 "FAILED|AssertionError|^e: |What went wrong" ../kotlin-tests.log | head -80 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -80 ../kotlin-tests.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Έλεγχοι Kotlin::$msg"
+            exit 1
+          fi
+          # Η Flutter βάζει το build του app στο ../build/app.
+          n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
+            | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
+          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
 
       # Μόνο όταν το ζητήσουμε: πραγματικό σφάλμα στο Sentry με τον κώδικα της εφαρμογής και την ίδια έκδοση.
       - name: Δοκιμαστικό σφάλμα στο Sentry
@@ -202,6 +230,8 @@ jobs:
             [ -s errors.txt ] || tail -120 shots.log > errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
             echo "::error title=Σφάλμα στιγμιοτύπων::$msg"
+            ls -la test/shots || true
+            exit 1
           fi
           ls -la test/shots || true
 
@@ -216,3 +246,74 @@ jobs:
           git add .
           git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Στιγμιότυπα #${{ github.run_number }}"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" screenshots
+
+  # Και στο main (A14): ανοίγει την εφαρμογή σε emulator Android 14. Αν κλείνει στο άνοιγμα, το λέει (η έκδοση έχει
+  # ήδη χτιστεί· ο έλεγχος δεν τη σταματά, αλλά φαίνεται κόκκινος).
+  # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Ελεύθερος χώρος στον δίσκο
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Συμπλήρωση αρχείων Android
+        run: |
+          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
+          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
+            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
+          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
+
+      - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)
+        run: flutter build apk --release --target-platform android-x64
+
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Άνοιγμα σε emulator
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BIN="$SDK/cmdline-tools/latest/bin"
+          IMG="system-images;android-34;google_apis;x86_64"
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          yes | "$BIN/sdkmanager" --licenses > /dev/null || true
+          "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1 || true
+          echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force > /dev/null 2>&1 || \
+            echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" --force > /dev/null
+          export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
+          nohup emulator -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
+            -no-snapshot -camera-back none -camera-front none -memory 4096 > emu.log 2>&1 &
+          if ! timeout 600 adb wait-for-device; then
+            echo "::warning title=Άνοιγμα::Ο emulator δεν ξεκίνησε· ο έλεγχος ανοίγματος δεν έγινε"; exit 1
+          fi
+          for i in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          sleep 15
+          if bash tools/perf/smoke.sh build/app/outputs/flutter-apk/app-release.apk > smoke.log 2>&1; then
+            echo "::notice title=Άνοιγμα::$(tail -1 smoke.log)"
+          else
+            msg=$(head -60 smoke.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Η εφαρμογή κλείνει στο άνοιγμα::$msg"
+            exit 1
+          fi

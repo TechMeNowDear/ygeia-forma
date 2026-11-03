@@ -334,4 +334,68 @@ void main() {
       expect(r2.diff, isNull);
     });
   });
+
+  // Η ΙΔΙΑ νύχτα όπως την έδειχνε η εφαρμογή (#65): 6ω15 (= «Χρόνος ύπνου» της Samsung, με τα ξυπνήματα), φάσεις
+  // βαθύς 8′, ελαφρύς 4ω31, REM 51′, ξύπνιος 47′, 2 κομμάτια με βαθμολογίες 18 · 31. Πραγματικός ύπνος = 330′.
+  test('Παλινδρόμηση: νύχτα 3/11 με τα νούμερα της εφαρμογής → 5ω30 πραγματικός ύπνος, όχι 6ω15', () {
+    DateTime t(int day, int h, int m) => DateTime(2026, 11, day, h, m);
+    List<Object> st(String name, DateTime a, int minutes) => [name, ms(a), ms(a.add(Duration(minutes: minutes)))];
+    List<List<Object>> seq(DateTime start, List<(String, int)> parts) {
+      final out = <List<Object>>[];
+      var x = start;
+      for (final (name, m) in parts) {
+        out.add(st(name, x, m));
+        x = x.add(Duration(minutes: m));
+      }
+      return out;
+    }
+
+    final j = {
+      'readAt': ms(t(3, 12, 0)),
+      'sleep': [
+        {
+          'start': ms(t(2, 23, 43)),
+          'end': ms(t(3, 2, 40)),
+          'minutes': 177,
+          'score': 18,
+          'stages': seq(t(2, 23, 43), [('LIGHT', 60), ('DEEP', 8), ('LIGHT', 60), ('REM', 25), ('AWAKE', 25)]),
+        },
+        {
+          'start': ms(t(3, 3, 50)),
+          'end': ms(t(3, 7, 8)),
+          'minutes': 198,
+          'score': 31,
+          'stages': seq(t(3, 3, 50), [('LIGHT', 80), ('AWAKE', 22), ('LIGHT', 71), ('REM', 26)]),
+        },
+      ],
+      'stepsMin': <List<num>>[],
+      'stepsFrom': ms(DateTime(2026, 10, 28)),
+    };
+    final d = Dashboard.fromJson(j);
+    final n = d.nights.single;
+    expect(n.stageMinutes, {'LIGHT': 271, 'DEEP': 8, 'REM': 51, 'AWAKE': 47});
+    expect(n.spanMinutes, 375, reason: 'αυτό έδειχνε πριν η εφαρμογή ως «ύπνο» (6ω15)');
+    expect(n.minutes, 330, reason: '8 + 271 + 51: «Πραγματικός ύπνος» της Samsung (5ω29)');
+    expect(n.staged, isTrue);
+    expect(n.betweenMinutes, 70, reason: '02:40–03:50: φαίνεται χωριστά, δεν μετρά ως ύπνος');
+    expect(n.estimatedMinutes, 0);
+    expect(n.start, t(2, 23, 43));
+    expect(n.end, t(3, 7, 8));
+    expect(n.parts.map((p) => p.score), [18, 31]);
+    expect(n.score, isNull);
+    final row = summarizeDay(d, DateTime(2026, 11, 3));
+    expect(row[K.sleepMin], 330);
+    expect(row[K.awakeMin], 47);
+    // Νύχτα χωρίς φάσεις: όχι στα στατιστικά διάρκειας (μόνο ώρες).
+    final unstaged = Dashboard.fromJson({
+      ...j,
+      'sleep': [
+        for (final r in j['sleep'] as List) {...(r as Map<String, dynamic>), 'stages': <Object>[]},
+      ],
+    });
+    expect(unstaged.nights.single.staged, isFalse);
+    final r2 = summarizeDay(unstaged, DateTime(2026, 11, 3));
+    expect(r2.containsKey(K.sleepMin), isFalse);
+    expect(r2[K.bedtime], isNotNull);
+  });
 }

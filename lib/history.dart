@@ -324,7 +324,9 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
       put(K.spo2Low, ox.below90);
     }
   } else if (night != null) {
-    put(K.sleepMin, night.minutes);
+    // Διάρκεια μόνο από φάσεις (πραγματικός ύπνος). Νύχτα χωρίς φάσεις: η διάρκεια της Samsung έχει τα ξυπνήματα,
+    // οπότε δεν μπαίνει στις Τάσεις, στην εβδομάδα και στην αναφορά (οι ώρες ύπνου/ξυπνήματος μπαίνουν κανονικά).
+    if (night.staged) put(K.sleepMin, night.minutes);
     put(K.sleepScore, night.score);
     final staged = ['DEEP', 'LIGHT', 'REM', 'AWAKE'].fold<int>(0, (s, k) => s + (night!.stageMinutes[k] ?? 0));
     if (staged > 0) {

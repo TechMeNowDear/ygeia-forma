@@ -145,7 +145,8 @@ class OuraBridge(
         const val HOST = OuraRules.HOST
 
         /** Μόνο οι σελίδες σύνδεσης της Oura ανοίγουν από εδώ (ακριβές όνομα, όχι «τελειώνει σε»). */
-        val ALLOWED_HOSTS = setOf("cloud.ouraring.com", "api.ouraring.com")
+        /** Μόνο οι σελίδες της Oura (DataRules.ALLOWED_HOSTS): νέα σελίδα σύνδεσης, κλασική, v2. */
+        val ALLOWED_HOSTS = DataRules.ALLOWED_HOSTS
 
         @Volatile
         var pendingCallback: String? = null
@@ -297,17 +298,23 @@ object SleepPolicy {
     /**
      * Από το αρχείο του σχεδίου πηγών («sources.json», το γράφει η Flutter πριν από κάθε ανάγνωση):
      * - δεν υπάρχει → χωρίς όριο (όπως πριν από το Oura),
-     * - υπάρχει αλλά δεν διαβάζεται → καθόλου ύπνος ρολογιού (ποτέ σιωπηλά ύπνος ρολογιού για νύχτες του Oura).
+     * - υπάρχει αλλά δεν διαβάζεται → καθόλου ύπνος ρολογιού (ποτέ σιωπηλά ύπνος ρολογιού για νύχτες του Oura), και
+     *   ο ύπνος γυρίζει ως σφάλμα, όχι ως «καθόλου ύπνος» (A15).
      */
-    fun until(context: Context): java.time.LocalDate? {
+    fun limit(context: Context): DataRules.SleepLimit {
         val f = File(context.filesDir, OuraBridge.PLAN_FILE)
-        if (!f.exists()) return null
-        return try {
-            val v = org.json.JSONObject(f.readText()).optString("sleepUntil", "")
-            if (v.length == 10) java.time.LocalDate.parse(v) else null
-        } catch (e: Throwable) {
-            java.time.LocalDate.of(2000, 1, 1)
-        }
+        return DataRules.sleepLimit(f.exists(), { f.readText() }) { org.json.JSONObject(it).optString("sleepUntil", "") }
+    }
+
+    /** Η ανάγνωση της Samsung με το όριο ύπνου του σχεδίου πηγών (και «σφάλμα» αν το αρχείο δεν διαβάζεται). */
+    fun reader(
+        context: Context,
+        store: com.samsung.android.sdk.health.data.HealthDataStore,
+        heartDays: Int = DashboardReader.DAYS,
+        bodyDays: Long = 3653,
+    ): DashboardReader {
+        val l = limit(context)
+        return DashboardReader(store, l.until, spo2Series(context), l.error, heartDays, bodyDays)
     }
 
     /** Αναλυτικές μετρήσεις οξυγόνου (λεπτά κάτω από 90%) μόνο μετά από σύνδεση Oura. */

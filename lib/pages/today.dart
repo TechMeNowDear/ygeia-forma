@@ -127,7 +127,13 @@ class TodayPage extends StatelessWidget {
           ),
         );
 
-        final alerts = [if (ouraState != null) ouraState, if (error != null) error, if (unusual != null) unusual];
+        final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
+        final alerts = [
+          if (dbNotice != null) dbNotice,
+          if (ouraState != null) ouraState,
+          if (error != null) error,
+          if (unusual != null) unusual,
+        ];
         final more = [
           ...pairUp(pair),
           if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
@@ -348,7 +354,8 @@ class _SleepCard extends StatelessWidget {
     const white = Colors.white;
     final soft = Colors.white.withValues(alpha: 0.75);
     final base = data.sleepBaseline;
-    final diff = base == null ? null : n.minutes - base.round();
+    // Σύγκριση μόνο για νύχτα με φάσεις (πραγματικός ύπνος): χωρίς φάσεις η διάρκεια έχει τα ξυπνήματα.
+    final diff = base == null || !n.staged ? null : n.minutes - base.round();
     final total = stageOrder.fold<int>(0, (s, k) => s + (n.stageMinutes[k] ?? 0));
     int pct(String k) => total == 0 ? 0 : ((n.stageMinutes[k] ?? 0) * 100 / total).round();
     final stages = [for (final k in stageOrder) if ((n.stageMinutes[k] ?? 0) > 0) k];
@@ -408,6 +415,13 @@ class _SleepCard extends StatelessWidget {
                       up: diff.abs() < 10 ? null : diff > 0,
                       onDark: true,
                     ),
+                  ),
+                ],
+                if (!n.staged) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Χωρίς φάσεις από τη Samsung· διάρκεια με τα ξυπνήματα',
+                    style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
                   ),
                 ],
                 if (n.estimatedMinutes > 0) ...[
@@ -528,6 +542,26 @@ class _ErrorCard extends StatelessWidget {
       text: '${errorText(kind)} Βλέπεις τα τελευταία δεδομένα που διάβασα.',
       buttonText: 'Δοκίμασε ξανά',
       onPressed: () => store.refresh(),
+    );
+  }
+}
+
+/// Η βάση του κινητού βρέθηκε χαλασμένη (A7): τίποτα δεν σβήστηκε, το παλιό αρχείο κρατήθηκε.
+class _DatabaseCard extends StatelessWidget {
+  const _DatabaseCard({required this.store});
+  final HealthStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return EmptyCard(
+      icon: Icons.storage_rounded,
+      color: c.bad,
+      title: 'Η βάση χάλασε· κράτησα αντίγραφο',
+      text: 'Ξεκίνησε καινούργια βάση και το παλιό αρχείο κρατήθηκε στο κινητό. Το ιστορικό ξαναδιαβάζεται από τη '
+          'Samsung Health. Το ημερολόγιο φαγητού επανέρχεται από το αντίγραφό σου (Ρυθμίσεις › Αντίγραφο ασφαλείας).',
+      buttonText: 'Εντάξει',
+      onPressed: () => store.dismissDatabaseNotice(),
     );
   }
 }

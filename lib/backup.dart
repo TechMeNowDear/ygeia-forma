@@ -1,13 +1,17 @@
 /// Αντίγραφο ασφαλείας: ημερολόγιο φαγητού, «Τα προϊόντα μου» και ρυθμίσεις σε ένα αρχείο JSON.
 ///
-/// Αυτά υπάρχουν μόνο στο κινητό (τα δεδομένα της Samsung ξαναδιαβάζονται, γι' αυτό δεν μπαίνουν).
-/// Η επαναφορά **δεν σβήνει τίποτα** και **δεν αλλάζει ό,τι υπάρχει ήδη**: προσθέτει μόνο ό,τι λείπει.
+/// Αυτά υπάρχουν μόνο στο κινητό (τα δεδομένα της Samsung ξαναδιαβάζονται, γι' αυτό δεν μπαίνουν). Και το σχέδιο
+/// πηγών με το ημερολόγιό του (έλεγχος 4/11, A10): σε νέο κινητό, χωρίς αυτό, οι νύχτες του Oura θα γίνονταν σιωπηλά
+/// νύχτες του ρολογιού.
+/// Η επαναφορά **δεν σβήνει τίποτα** και **δεν αλλάζει ό,τι υπάρχει ήδη**: προσθέτει μόνο ό,τι λείπει· το σχέδιο πηγών
+/// μπαίνει μόνο αν το κινητό δεν έχει νεότερο ([HealthStore.restoreSources]).
 library;
 
 import 'dart:convert';
 
 import 'food/food_model.dart';
 import 'format.dart';
+import 'plan_file.dart';
 
 const backupApp = 'ygeia-forma';
 const backupVersion = 1;
@@ -20,6 +24,7 @@ String buildBackup({
   required List<Map<String, dynamic>> myFoods,
   required Map<String, dynamic> prefs,
   required DateTime now,
+  ({String plan, String? log})? sources,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
   return jsonEncode({
@@ -32,12 +37,17 @@ String buildBackup({
       for (final k in backupPrefKeys)
         if (prefs[k] != null) k: prefs[k],
     },
+    // Τα αρχεία του σχεδίου πηγών όπως είναι (με την ώρα τους, «at»).
+    if (sources != null) 'sources': {'plan': sources.plan, if (sources.log != null) 'log': sources.log},
   });
 }
 
 /// Ό,τι βρέθηκε σε ένα αρχείο αντιγράφου, ελεγμένο.
 class BackupContents {
-  BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped);
+  BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped, {this.sources});
+
+  /// Το σχέδιο πηγών και το ημερολόγιό του (κείμενο των αρχείων), αν υπήρχαν και διαβάζονται.
+  final ({String plan, String? log})? sources;
   final List<LogEntry> entries;
   final List<Food> myFoods;
   final Map<String, dynamic> prefs;
@@ -95,12 +105,15 @@ BackupContents parseBackup(String text) {
             if (backupPrefKeys.contains(e.key)) e.key.toString(): e.value,
         }
       : <String, dynamic>{};
+  final src = j['sources'];
+  final plan = src is Map && src['plan'] is String && decodePlanFile(src['plan'] as String) != null ? src['plan'] as String : null;
   return BackupContents(
     entries,
     foods,
     prefs,
     j['created'] is String ? DateTime.tryParse(j['created'] as String) : null,
     skipped,
+    sources: plan == null ? null : (plan: plan, log: (src as Map)['log'] is String ? src['log'] as String : null),
   );
 }
 

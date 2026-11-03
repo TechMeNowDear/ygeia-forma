@@ -203,9 +203,11 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
         b.writeln(
           'Εγγραφές: ${t['count']}${t['capped'] == true ? '+' : ''} · τελευταία: ${t['latest']}',
         );
+        if (t['counted'] is num) b.writeln('Μετρούν στην εφαρμογή: ${t['counted']} · αγνοούνται (άλλη πηγή): ${t['ignored']}');
         for (final s in (t['sources'] as List<dynamic>? ?? [])) {
           final m = s as Map<String, dynamic>;
-          b.writeln('Πηγή: ${m['app']} · συσκευή: ${m['device']} · ${m['count']}');
+          final counts = m['counts'] is bool ? (m['counts'] == true ? ' · μετρά' : ' · ΔΕΝ μετρά') : '';
+          b.writeln('Πηγή: ${m['app']} · συσκευή: ${m['device']} · ${m['count']}$counts');
         }
         for (final f in (t['fields'] as List<dynamic>? ?? [])) {
           final m = f as Map<String, dynamic>;
@@ -447,13 +449,24 @@ class _TypeCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(line, style: TextStyle(color: c.textSecondary)),
+            // A2: ύπνος/παλμοί/οξυγόνο/θερμοκρασία μόνο από ρολόι, ζυγίσεις μόνο InBody· οι άλλες πηγές φαίνονται εδώ.
+            if (type['counted'] is num && (type['ignored'] as num? ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Μετρούν ${type['counted']} · αγνοούνται ${type['ignored']} από άλλη πηγή '
+                  '(${key == 'body_composition' ? 'μόνο InBody' : 'μόνο ρολόι'})',
+                  style: TextStyle(color: c.text, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
             for (final s in sources)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Από: ${appLabel(s['app'] as String? ?? '')}'
                   '${(s['device'] as String? ?? '').isNotEmpty ? ' · ${s['device']}' : ''}'
-                  ' · ${s['count']}',
+                  ' · ${s['count']}'
+                  '${s['counts'] == false ? ' · δεν μετρά' : ''}',
                   style: TextStyle(color: c.textSecondary, fontSize: 13),
                 ),
               ),

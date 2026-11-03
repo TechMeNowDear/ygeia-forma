@@ -13,6 +13,8 @@ import com.samsung.android.sdk.health.data.request.LocalTimeGroup
 import com.samsung.android.sdk.health.data.request.LocalTimeGroupUnit
 import com.samsung.android.sdk.health.data.request.Ordering
 import com.samsung.android.sdk.health.data.request.ReadDataRequest
+import com.samsung.android.sdk.health.data.request.ReadSourceFilter
+import com.samsung.android.sdk.health.data.device.DeviceGroup
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
@@ -34,6 +36,15 @@ class DashboardReader(
     private val sleepUntil: LocalDate? = null,
     /** Λεπτά κάτω από 90% από τις αναλυτικές μετρήσεις οξυγόνου: μόνο μετά από σύνδεση Oura (όπως πριν, αλλιώς). */
     private val spo2Series: Boolean = false,
+    /**
+     * Το αρχείο του σχεδίου πηγών υπάρχει αλλά δεν διαβάστηκε (A15): ο ύπνος γυρίζει ως σφάλμα («δεν διαβάστηκε»),
+     * ποτέ ως άδεια λίστα που θα έμοιαζε με «δεν κοιμήθηκες» και θα έσβηνε τιμές ύπνου.
+     */
+    private val sleepPolicyError: Boolean = false,
+    /** Πόσες μέρες παλμών στην κανονική ανάγνωση (ο RefreshWorker διαβάζει λιγότερες, A12). */
+    private val heartDays: Int = DAYS,
+    /** Πόσες μέρες ζυγίσεων (η εφαρμογή: 10 χρόνια· ο RefreshWorker: 30 μέρες, A12). */
+    private val bodyDays: Long = 3653,
 ) {
 
     /** Το τέλος της ανάγνωσης ύπνου: 18:00 της τελευταίας επιτρεπτής νύχτας (μετά αρχίζει η επόμενη νύχτα). */
@@ -44,6 +55,7 @@ class DashboardReader(
 
     /** Ύπνος στο [from, to), κομμένος στο όριο· κενή λίστα αν το όριο είναι πριν από την αρχή. */
     private suspend fun sleepLimited(from: LocalDateTime, to: LocalDateTime): JSONArray {
+        if (sleepPolicyError) throw IllegalStateException("Δεν διαβάστηκε το σχέδιο πηγών")
         val end = sleepEnd(to)
         return if (!end.isAfter(from)) JSONArray() else sleep(from, end)
     }
@@ -57,7 +69,7 @@ class DashboardReader(
         fun has(t: DataType) = t.name in grantedNames
 
         if (has(DataTypes.SLEEP)) o.put("sleep", safe { sleepLimited(from, now) })
-        if (has(DataTypes.HEART_RATE)) o.put("heart", safe { heart(from, now) })
+        if (has(DataTypes.HEART_RATE)) o.put("heart", safe { heart(today.minusDays(heartDays.toLong()).atStartOfDay(), now) })
         if (has(DataTypes.BLOOD_OXYGEN)) o.put("spo2", safe { spo2(from, now) })
         if (has(DataTypes.SKIN_TEMPERATURE)) o.put("skinTemp", safe { skinTemp(from, now) })
         if (has(DataTypes.ENERGY_SCORE)) o.put("energy", safe { energy(today.minusDays(DAYS.toLong()), today.plusDays(1)) })
@@ -110,6 +122,7 @@ class DashboardReader(
 
     // ---------- Βήματα ανά λεπτό: [αρχή λεπτού, βήματα] (μόνο λεπτά με βήματα) ----------
 
+    /** Βήματα ανά λεπτό. Αν έμειναν σελίδες μετά το όριο, ΣΦΑΛΜΑ (A15): λεπτά που κόπηκαν θα έμοιαζαν «χωρίς βήματα». */
     private suspend fun stepsByMinute(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
         val filter = LocalTimeFilter.of(from, to)
@@ -124,11 +137,13 @@ class DashboardReader(
             val r = s.aggregateData(b.build())
             for (d in r.dataList) {
                 val v: Long? = d.value
-                if (v != null && v > 0) out.put(JSONArray().put(ms(d.startTime) ?: 0L).put(v))
+                val t = ms(d.startTime) ?: continue
+                if (v != null && v > 0) out.put(JSONArray().put(t).put(v))
             }
             token = r.pageToken
             pages++
         } while (!token.isNullOrEmpty() && pages < 80)
+        if (!token.isNullOrEmpty()) throw IllegalStateException("Πάρα πολλά λεπτά βημάτων (όριο ${80 * PAGE_SIZE})")
         return out
     }
 
@@ -184,7 +199,8 @@ class DashboardReader(
     private suspend fun exercise(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
         for (p in readAll(DataTypes.EXERCISE.readDataRequestBuilder, from, to)) {
-            out.put(JSONArray().put(ms(p.startTime) ?: 0L).put(ms(p.endTime) ?: ms(p.startTime) ?: 0L))
+            val a = ms(p.startTime) ?: continue
+            out.put(JSONArray().put(a).put(ms(p.endTime) ?: a))
         }
         return out
     }
@@ -193,25 +209,23 @@ class DashboardReader(
 
     private suspend fun sleep(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.SLEEP.readDataRequestBuilder, from, to)) {
+        for (p in readAll(DataTypes.SLEEP.readDataRequestBuilder, from, to, source = WATCH)) {
+            val start = ms(p.startTime) ?: continue
             val duration: Duration? = p.getValue(DataType.SleepType.DURATION)
             val score: Int? = p.getValue(DataType.SleepType.SLEEP_SCORE)
             val sessions: List<SleepSession>? = p.getValue(DataType.SleepType.SESSIONS)
             val stages = JSONArray()
             for (session in sessions ?: emptyList()) {
                 for (stage in session.stages ?: emptyList()) {
-                    stages.put(
-                        JSONArray()
-                            .put(stage.stage?.toString() ?: "UNDEFINED")
-                            .put((ms(stage.startTime) ?: 0L))
-                            .put((ms(stage.endTime) ?: 0L))
-                    )
+                    val a = ms(stage.startTime) ?: continue
+                    val b = ms(stage.endTime) ?: continue
+                    stages.put(JSONArray().put(stage.stage?.toString() ?: "UNDEFINED").put(a).put(b))
                 }
             }
             out.put(
                 JSONObject()
-                    .put("start", (ms(p.startTime) ?: 0L))
-                    .put("end", ms(p.endTime) ?: ms(p.startTime) ?: 0L)
+                    .put("start", start)
+                    .put("end", ms(p.endTime) ?: start)
                     .put("minutes", duration?.toMinutes() ?: JSONObject.NULL)
                     .put("score", score ?: JSONObject.NULL)
                     .put("stages", stages)
@@ -225,17 +239,18 @@ class DashboardReader(
     private suspend fun heart(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
         // Το ρολόι μετρά συνεχώς: περισσότερες σελίδες από τα άλλα είδη (όριο 60.000 εγγραφές).
-        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES)) {
+        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES, source = WATCH)) {
             val series: List<HeartRate>? = p.getValue(DataType.HeartRateType.SERIES_DATA)
             if (!series.isNullOrEmpty()) {
                 for (h in series) {
                     // Μία άκυρη τιμή (NaN) δεν πρέπει να χαλάει όλη την ανάγνωση: παραλείπεται μόνο αυτή.
                     val avg = h.heartRate
                     if (!avg.isFinite()) continue
+                    val a = ms(h.startTime) ?: continue
                     out.put(
                         JSONArray()
-                            .put((ms(h.startTime) ?: 0L))
-                            .put((ms(h.endTime) ?: 0L))
+                            .put(a)
+                            .put(ms(h.endTime) ?: a)
                             .put(avg.toDouble())
                             .put(finiteOr(h.min, avg))
                             .put(finiteOr(h.max, avg))
@@ -244,12 +259,13 @@ class DashboardReader(
             } else {
                 val avg: Float? = p.getValue(DataType.HeartRateType.HEART_RATE)
                 if (avg == null || !avg.isFinite()) continue
+                val a = ms(p.startTime) ?: continue
                 val min: Float? = p.getValue(DataType.HeartRateType.MIN_HEART_RATE)
                 val max: Float? = p.getValue(DataType.HeartRateType.MAX_HEART_RATE)
                 out.put(
                     JSONArray()
-                        .put((ms(p.startTime) ?: 0L))
-                        .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
+                        .put(a)
+                        .put(ms(p.endTime) ?: a)
                         .put(avg.toDouble())
                         .put(finiteOr(min, avg))
                         .put(finiteOr(max, avg))
@@ -263,14 +279,15 @@ class DashboardReader(
 
     private suspend fun spo2(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to)) {
+        for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to, source = WATCH)) {
             val avg: Float? = p.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION)
             if (avg == null || !avg.isFinite()) continue
+            val a = ms(p.startTime) ?: continue
             val min: Float? = p.getValue(DataType.BloodOxygenType.MIN_OXYGEN_SATURATION)
             val max: Float? = p.getValue(DataType.BloodOxygenType.MAX_OXYGEN_SATURATION)
             val row = JSONArray()
-                .put((ms(p.startTime) ?: 0L))
-                .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
+                .put(a)
+                .put(ms(p.endTime) ?: a)
                 .put(avg.toDouble())
                 .put(finiteOr(min, avg))
                 .put(finiteOr(max, avg))
@@ -312,13 +329,14 @@ class DashboardReader(
 
     private suspend fun skinTemp(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, from, to)) {
+        for (p in readAll(DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, from, to, source = WATCH)) {
             val avg: Float? = p.getValue(DataType.SkinTemperatureType.SKIN_TEMPERATURE)
             if (avg == null || avg.isNaN()) continue
+            val a = ms(p.startTime) ?: continue
             out.put(
                 JSONArray()
-                    .put((ms(p.startTime) ?: 0L))
-                    .put(ms(p.endTime) ?: ms(p.startTime) ?: 0L)
+                    .put(a)
+                    .put(ms(p.endTime) ?: a)
                     .put(avg.toDouble())
             )
         }
@@ -341,7 +359,8 @@ class DashboardReader(
             for (p in r.dataList) {
                 val score: Float? = p.getValue(DataType.EnergyScoreType.ENERGY_SCORE)
                 if (score == null || score.isNaN()) continue
-                out.put(JSONArray().put((ms(p.startTime) ?: 0L)).put(score.toDouble()))
+                val a = ms(p.startTime) ?: continue
+                out.put(JSONArray().put(a).put(score.toDouble()))
             }
             token = r.pageToken
             pages++
@@ -350,12 +369,15 @@ class DashboardReader(
     }
 
     // ---------- Σύσταση σώματος (ζυγίσεις), 10 χρόνια (όπως το ιστορικό) ----------
+    // Διαβάζονται όλες με την εφαρμογή που τις έγραψε («app»): η Flutter κρατά ΜΟΝΟ της InBody (A2) και μετρά τις
+    // άλλες, ώστε να φαίνεται ότι αγνοήθηκαν.
 
     private suspend fun body(now: LocalDateTime): JSONArray {
         val out = JSONArray()
-        val from = now.minusYears(10)
+        val from = now.minusDays(bodyDays)
         for (p in readAll(DataTypes.BODY_COMPOSITION.readDataRequestBuilder, from, now)) {
-            val o = JSONObject().put("time", (ms(p.startTime) ?: 0L))
+            val t = ms(p.startTime) ?: continue
+            val o = JSONObject().put("time", t)
             putFloat(o, "weight", p.getValue(DataType.BodyCompositionType.WEIGHT))
             putFloat(o, "fatPct", p.getValue(DataType.BodyCompositionType.BODY_FAT))
             putFloat(o, "fatKg", p.getValue(DataType.BodyCompositionType.BODY_FAT_MASS))
@@ -383,7 +405,8 @@ class DashboardReader(
         for (d in s.aggregateData(request).dataList) {
             // Μέρα χωρίς τιμή = δεν μετρήθηκε (όχι «0 βήματα»).
             val v: Long = d.value ?: continue
-            out.put(JSONArray().put((ms(d.startTime) ?: 0L)).put(v))
+            val a = ms(d.startTime) ?: continue
+            out.put(JSONArray().put(a).put(v))
         }
         return out
     }
@@ -401,7 +424,8 @@ class DashboardReader(
         for (d in s.aggregateData(request).dataList) {
             val f: Float = d.value ?: continue
             if (!f.isFinite()) continue
-            out.put(JSONArray().put((ms(d.startTime) ?: 0L)).put(f.toDouble()))
+            val a = ms(d.startTime) ?: continue
+            out.put(JSONArray().put(a).put(f.toDouble()))
         }
         return out
     }
@@ -441,6 +465,7 @@ class DashboardReader(
         from: LocalDateTime,
         to: LocalDateTime,
         maxPages: Int = MAX_PAGES,
+        source: ReadSourceFilter? = null,
     ): List<HealthDataPoint> {
         val all = ArrayList<HealthDataPoint>()
         var token: String? = null
@@ -450,6 +475,7 @@ class DashboardReader(
                 .setLocalTimeFilter(LocalTimeFilter.of(from, to))
                 .setOrdering(Ordering.ASC)
                 .setPageSize(PAGE_SIZE)
+            if (source != null) b.setSourceFilter(source)
             if (!token.isNullOrEmpty()) b.setPageToken(token)
             val r = s.readData(b.build())
             all.addAll(r.dataList)
@@ -499,7 +525,13 @@ class DashboardReader(
             JSONObject().put("error", e.toString())
         }
 
-    private companion object {
+    companion object {
+        /**
+         * Μόνο ό,τι μέτρησε ρολόι (A2, οδηγός «Read data» της Samsung: ReadSourceFilter.fromDeviceType(DeviceGroup.WATCH)).
+         * Για ύπνο, παλμούς, οξυγόνο, θερμοκρασία (DataRules.WATCH_ONLY): όχι Oura μέσω Health Connect, όχι κινητό.
+         */
+        val WATCH: ReadSourceFilter get() = ReadSourceFilter.fromDeviceType(DeviceGroup.WATCH)
+
         const val DAYS = 30
         const val STEP_DAYS = 7
         const val PAGE_SIZE = 1000
@@ -507,6 +539,6 @@ class DashboardReader(
         const val HEART_MAX_PAGES = 60
 
         @Volatile
-        var cappedReported = false
+        private var cappedReported = false
     }
 }

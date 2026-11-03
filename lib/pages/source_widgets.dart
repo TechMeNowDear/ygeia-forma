@@ -5,9 +5,12 @@ import '../theme.dart';
 
 /// Η μικρή ετικέτα πηγής σε κάθε κάρτα: «Oura», «Ρολόι», «InBody». Κάθε κάρτα έχει μία μόνο πηγή.
 class SourceTag extends StatelessWidget {
-  const SourceTag(this.source, {super.key, this.onDark = false});
+  const SourceTag(this.source, {super.key, this.onDark = false, this.label});
   final Source source;
   final bool onDark;
+
+  /// Άλλο όνομα από το [sourceName] (π.χ. «Samsung Health» για τα βήματα, που ενώνουν ρολόι και κινητό).
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +18,7 @@ class SourceTag extends StatelessWidget {
     final fg = onDark ? Colors.white.withValues(alpha: 0.92) : c.textSecondary;
     final bg = onDark ? Colors.white.withValues(alpha: 0.14) : c.background;
     return Semantics(
-      label: 'Πηγή: ${sourceDevice(source)}',
+      label: 'Πηγή: ${label ?? sourceDevice(source)}',
       excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -29,7 +32,7 @@ class SourceTag extends StatelessWidget {
           children: [
             Icon(_icon(source), size: 12, color: fg),
             const SizedBox(width: 4),
-            Text(sourceName(source), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg)),
+            Text(label ?? sourceName(source), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg)),
           ],
         ),
       ),

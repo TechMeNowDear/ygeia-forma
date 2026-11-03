@@ -2,6 +2,7 @@ package gr.ygeiaforma.ygeia_forma
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import org.json.JSONArray
@@ -12,7 +13,8 @@ import org.json.JSONObject
  * Μικρό μέγεθος (λίγα KB τον χρόνο), καμία εξωτερική βιβλιοθήκη.
  * Οι συνόψεις υπολογίζονται στη Flutter πλευρά· εδώ μόνο αποθηκεύονται.
  */
-class DayStore private constructor(context: Context) : SQLiteOpenHelper(context, "ygeia.db", null, 2) {
+class DayStore private constructor(context: Context) :
+    SQLiteOpenHelper(context, "ygeia.db", null, 2, KeepCorruptDb(context.applicationContext)) {
 
     companion object {
         @Volatile private var instance: DayStore? = null
@@ -22,7 +24,26 @@ class DayStore private constructor(context: Context) : SQLiteOpenHelper(context,
             instance ?: synchronized(this) {
                 instance ?: DayStore(context.applicationContext).also { instance = it }
             }
+
+        /** Σημάδι «η βάση χάλασε, κρατήθηκε αντίγραφο» (ώρα σε ms), ώσπου να το δει ο χρήστης. Όχι στο αντίγραφο Google. */
+        internal fun marker(context: Context) = java.io.File(context.noBackupFilesDir, "db_corrupt")
+
+        fun corruptAt(context: Context): Long? = try {
+            marker(context).takeIf { it.exists() }?.readText()?.trim()?.toLongOrNull()
+        } catch (e: Throwable) {
+            null
+        }
+
+        fun clearCorrupt(context: Context) {
+            try {
+                marker(context).delete()
+            } catch (_: Throwable) {
+            }
+        }
     }
+
+    // Ένας πίνακας μόνο προστίθεται σε κάθε έκδοση· μια παλιότερη έκδοση της εφαρμογής ανοίγει τη βάση χωρίς σφάλμα.
+    override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
 
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -153,5 +174,29 @@ class DayStore private constructor(context: Context) : SQLiteOpenHelper(context,
 
     fun clear() {
         writableDatabase.delete("days", null, null)
+    }
+}
+
+/**
+ * Χαλασμένη βάση (A7): ΠΟΤΕ διαγραφή (ο προεπιλεγμένος χειριστής του Android σβήνει το αρχείο, μαζί το ημερολόγιο
+ * φαγητού και «Τα προϊόντα μου» που δεν ξαναδιαβάζονται από πουθενά). Το αρχείο μετακινείται με την ώρα στο όνομα
+ * (noBackupFilesDir/corrupt), ανοίγει καινούργια βάση, η εφαρμογή δείχνει κάρτα και το Sentry μαθαίνει μόνο το είδος.
+ */
+private class KeepCorruptDb(private val context: Context) : DatabaseErrorHandler {
+    override fun onCorruption(dbObj: SQLiteDatabase) {
+        val path = dbObj.path
+        try {
+            dbObj.close()
+        } catch (_: Throwable) {
+        }
+        val now = System.currentTimeMillis()
+        try {
+            if (path != null && path != ":memory:") {
+                DataRules.keepCorrupt(java.io.File(path), java.io.File(context.noBackupFilesDir, "corrupt"), now)
+            }
+            DayStore.marker(context).writeText(now.toString())
+        } catch (_: Throwable) {
+        }
+        ErrorQueue.report(IllegalStateException("Η βάση χάλασε· κρατήθηκε αντίγραφο"), "database")
     }
 }

@@ -41,7 +41,9 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val granted = store.getGrantedPermissions(SamsungHealthBridge.permissions)
             if (granted.isEmpty()) return Result.success()
             val names = granted.map { it.dataType.name }.toSet()
-            val o = DashboardReader(store, SleepPolicy.until(applicationContext), SleepPolicy.spo2Series(applicationContext)).read(names)
+            // Μόνο ό,τι χρειάζεται η πρώτη οθόνη (A12, μπαταρία): παλμοί 7 ημερών, ζυγίσεις 30 ημερών. Το ιστορικό
+            // γράφεται μόνο από την πλήρη ανάγνωση της εφαρμογής, ποτέ από αυτό το αρχείο.
+            val o = SleepPolicy.reader(applicationContext, store, heartDays = 7, bodyDays = 30).read(names)
                 .put("ok", true)
                 .put("readAt", System.currentTimeMillis())
                 .put("granted", granted.size)

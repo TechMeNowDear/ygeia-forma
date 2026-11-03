@@ -7,11 +7,15 @@
    - ygeiaforma://oura-callback (custom scheme, εφεδρική).
    Η MainActivity ΔΕΝ αλλάζει (μένει όπως τη φτιάχνει η Flutter: launchMode, επιλογέας αρχείων, άδειες Samsung).
 2. <queries> για browser (https), όπως θέλει το Android 11+ για να βλέπει ποιος ανοίγει συνδέσμους.
+3. Κανόνες αντιγράφου Google (έλεγχος 4/11, A10): μόνο βάση, ρυθμίσεις, σχέδιο πηγών, νύχτες Oura
+   (tools/android/xml → res/xml: data_extraction_rules.xml, backup_rules.xml)· όχι το βοηθητικό αρχείο, όχι tokens.
 
 Τρέχει όσες φορές θέλουμε (δεν προσθέτει δεύτερη φορά). Σταματά με σφάλμα αν δεν βρει ό,τι περιμένει.
 Χρήση: python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 """
+import os
 import re
+import shutil
 import sys
 
 path = sys.argv[1]
@@ -65,6 +69,25 @@ if "<!-- Σύνδεση Oura: άνοιγμα" not in s:
     else:
         s = s.replace("</manifest>", "    <queries>" + BROWSER + "\n    </queries>\n</manifest>", 1)
 
+# Τα αρχεία των κανόνων (το res/ το φτιάχνει το «flutter create» και δεν το κρατάμε στο repository).
+xml_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xml")
+xml_dst = os.path.join(os.path.dirname(os.path.abspath(path)), "res", "xml")
+os.makedirs(xml_dst, exist_ok=True)
+for name in ("data_extraction_rules.xml", "backup_rules.xml"):
+    shutil.copyfile(os.path.join(xml_src, name), os.path.join(xml_dst, name))
+
+BACKUP = ('android:allowBackup="true"', 'android:fullBackupContent="@xml/backup_rules"',
+          'android:dataExtractionRules="@xml/data_extraction_rules"')
+app_tag = re.search(r"<application\b[^>]*>", s, re.S)
+if not app_tag:
+    sys.exit("Δεν βρέθηκε το application")
+tag = app_tag.group(0)
+if "android:fullBackupContent" in tag or "android:dataExtractionRules" in tag or "android:allowBackup" in tag:
+    if not all(a in tag for a in BACKUP):
+        sys.exit("Το application έχει ήδη άλλους κανόνες αντιγράφου")
+else:
+    s = s.replace(tag, tag.replace("<application", "<application\n        " + "\n        ".join(BACKUP), 1), 1)
+
 with open(path, "w", encoding="utf-8") as f:
     f.write(s)
 
@@ -74,11 +97,12 @@ if after_main != before_main:
     sys.exit("Η MainActivity άλλαξε· δεν έπρεπε")
 for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiaforma"', 'android:host="oura-callback"',
                'android:host="ygeia-forma.netlify.app"', 'android:path="/oura/callback"', 'android:autoVerify="true"',
-               "<!-- Σύνδεση Oura: άνοιγμα"):
+               "<!-- Σύνδεση Oura: άνοιγμα") + BACKUP:
     if needle not in s:
         sys.exit("Λείπει μετά την αλλαγή: " + needle)
 if s.count('android:scheme="ygeiaforma"') != 1:
     sys.exit("Η επιστροφή ygeiaforma:// δηλώθηκε δύο φορές")
 if s.count('android:host="ygeia-forma.netlify.app"') != 1:
     sys.exit("Το App Link δηλώθηκε δύο φορές")
-print("Manifest: OuraCallbackActivity (https App Link + ygeiaforma://oura-callback), queries https· MainActivity χωρίς αλλαγή")
+print("Manifest: OuraCallbackActivity (https App Link + ygeiaforma://oura-callback), queries https, κανόνες αντιγράφου· "
+      "MainActivity χωρίς αλλαγή")

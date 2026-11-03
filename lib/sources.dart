@@ -141,7 +141,8 @@ const sourceRows = <SourceRow>[
     title: 'Βήματα, όροφοι, θερμίδες',
     group: SourceGroup.watch,
     metrics: [K.steps, K.floors, K.calories, K.activeMin],
-    watchNote: 'Μόνο ρολόι· τα βήματα του δαχτυλιδιού δεν διαβάζονται',
+    // Το σύνολο της Samsung, όπως στον κώδικα (DashboardReader: StepsType.TOTAL κ.λπ.): ρολόι ΚΑΙ κινητό (A2).
+    watchNote: '$samsungTotalLabel· τα βήματα του δαχτυλιδιού δεν διαβάζονται',
   ),
   SourceRow(
     title: 'Παλμοί μέρας',
@@ -156,6 +157,14 @@ const sourceRows = <SourceRow>[
     watchNote: 'Μόνο InBody, μέσω Samsung Health',
   ),
 ];
+
+/// Βήματα, όροφοι, θερμίδες, ενεργός χρόνος: το σύνολο της Samsung Health, που ενώνει ρολόι και κινητό χωρίς να μετρά
+/// δύο φορές (έλεγχος 4/11, A2). ΔΕΝ είναι «μόνο ρολόι»: η ετικέτα το λέει παντού (Πηγές, κάρτες, αναφορά).
+const samsungTotalMetrics = {K.steps, K.floors, K.calories, K.activeMin};
+const samsungTotalLabel = 'Samsung Health (ρολόι και κινητό, χωρίς διπλομέτρηση)';
+
+/// Το σύντομο όνομα της πηγής μιας μέτρησης για ετικέτες: «Samsung Health» για τα σύνολα της Samsung.
+String metricSourceName(String metric, Source s) => samsungTotalMetrics.contains(metric) ? 'Samsung Health' : sourceName(s);
 
 /// Τι ΔΕΝ διαβάζεται ή δεν φαίνεται, ώστε να μην ανακατευτεί ποτέ (δείχνεται στην οθόνη «Πηγές» μετά τη σύνδεση).
 const notUsedWithOura = <String>[

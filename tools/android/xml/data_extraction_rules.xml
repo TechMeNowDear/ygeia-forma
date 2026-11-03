@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Αντίγραφο Google και μεταφορά σε νέο κινητό (Android 12+), έλεγχος 4/11 (A10): ΜΟΝΟ ό,τι δεν ξαναδιαβάζεται.
+  - Βάση (ιστορικό, ημερολόγιο φαγητού, «Τα προϊόντα μου»), ρυθμίσεις, σχέδιο πηγών + ημερολόγιό του, νύχτες Oura:
+    μαζί, ώστε σχέδιο, ιστορικό και νύχτες να συμφωνούν.
+  - ΟΧΙ: το βοηθητικό αρχείο της Samsung (dashboard.json, ξαναδιαβάζεται), η ουρά σφαλμάτων, προσωρινά αρχεία, και ποτέ
+    τα tokens του Oura (είναι στο noBackupFilesDir, κρυπτογραφημένα με κλειδί που δεν φεύγει από το κινητό).
+  Μόλις υπάρχουν κανόνες «include», μπαίνουν μόνο αυτά τα αρχεία.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="ygeia.db" />
+        <include domain="database" path="ygeia.db-wal" />
+        <include domain="file" path="prefs.json" />
+        <include domain="file" path="sources.json" />
+        <include domain="file" path="sources_log.json" />
+        <include domain="file" path="oura_nights.json" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="ygeia.db" />
+        <include domain="database" path="ygeia.db-wal" />
+        <include domain="file" path="prefs.json" />
+        <include domain="file" path="sources.json" />
+        <include domain="file" path="sources_log.json" />
+        <include domain="file" path="oura_nights.json" />
+    </device-transfer>
+</data-extraction-rules>

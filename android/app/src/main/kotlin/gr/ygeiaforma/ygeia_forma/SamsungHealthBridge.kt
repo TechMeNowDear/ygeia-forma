@@ -47,8 +47,9 @@ class SamsungHealthBridge(
 ) : MethodChannel.MethodCallHandler {
 
     private var cachedStore: HealthDataStore? = null
-    private var pendingResolution: ResolvablePlatformException? = null
-    private val deviceNames = HashMap<String, String>()
+    @Volatile private var pendingResolution: ResolvablePlatformException? = null
+    private val deviceNames = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val deviceWatch = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
     private fun store(): HealthDataStore =
         cachedStore ?: HealthDataService.getStore(activity.applicationContext).also { cachedStore = it }
@@ -56,23 +57,34 @@ class SamsungHealthBridge(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "status" -> respond(result) { status() }
-            "requestPermissions" -> respond(result) { requestPermissions() }
+            // Ανοίγει οθόνη της Samsung: στο main thread.
+            "requestPermissions" -> respondMain(result) { requestPermissions() }
             "readAll" -> respond(result) { readAll(call.argument<Int>("days") ?: 30) }
             "dashboard" -> respondText(result) { dashboard() }
             "readRange" -> respond(result) {
                 readRange(call.argument<String>("from") ?: "", call.argument<String>("to") ?: "")
             }
+            // Βάση: όλες οι εγγραφές και αναγνώσεις μία-μία, με τη σειρά που ζητήθηκαν (A8, DbQueue).
             "saveDays" -> respond(result) {
                 val json = call.argument<String>("json") ?: "[]"
-                withContext(Dispatchers.IO) { dayStore.save(JSONArray(json)) }
+                withContext(DbQueue.dispatcher) { dayStore.save(JSONArray(json)) }
                 JSONObject().put("ok", true)
             }
             "loadDays" -> respond(result) {
-                val rows = withContext(Dispatchers.IO) { dayStore.loadAll() }
+                val rows = withContext(DbQueue.dispatcher) { dayStore.loadAll() }
                 JSONObject().put("ok", true).put("days", rows)
             }
             "clearDays" -> respond(result) {
-                withContext(Dispatchers.IO) { dayStore.clear() }
+                withContext(DbQueue.dispatcher) { dayStore.clear() }
+                JSONObject().put("ok", true)
+            }
+            // Η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ώρα σε ms ή null}.
+            "dbStatus" -> respond(result) {
+                val at = withContext(DbQueue.dispatcher) { DayStore.corruptAt(activity.applicationContext) }
+                JSONObject().put("ok", true).put("corrupt", at ?: JSONObject.NULL)
+            }
+            "dbStatusSeen" -> respond(result) {
+                withContext(DbQueue.dispatcher) { DayStore.clearCorrupt(activity.applicationContext) }
                 JSONObject().put("ok", true)
             }
             "savePdf" -> respond(result) {
@@ -91,7 +103,8 @@ class SamsungHealthBridge(
                 }
                 result.success(json.toString())
             }
-            "cachedDashboard" -> result.success(readFile(DASHBOARD_FILE) ?: "{}")
+            // Μερικά MB: ανάγνωση εκτός main thread (A9).
+            "cachedDashboard" -> respondText(result) { withContext(Dispatchers.IO) { readFile(DASHBOARD_FILE) ?: "{}" } }
             "loadPrefs" -> result.success(loadPrefsText())
             "savePrefs" -> respond(result) {
                 val json = call.argument<String>("json") ?: "{}"
@@ -110,21 +123,31 @@ class SamsungHealthBridge(
         }
     }
 
-    /** Όπως [respond], για απαντήσεις που είναι ήδη κείμενο JSON (μία σειριοποίηση, εκτός main thread). */
+    /**
+     * Όπως [respond], για απαντήσεις που είναι ήδη κείμενο JSON. Όλη η δουλειά (ανάγνωση, χτίσιμο, σειριοποίηση μερικών
+     * MB) εκτός main thread (A9)· μόνο η απάντηση στη Flutter γίνεται στο main thread, όπως πρέπει.
+     */
     private fun respondText(result: MethodChannel.Result, block: suspend () -> String) {
         scope.launch {
-            val text = try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                errorJson(e).toString()
+            val text = withContext(Dispatchers.Default) {
+                try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    errorJson(e).toString()
+                }
             }
             result.success(text)
         }
     }
 
-    private fun respond(result: MethodChannel.Result, block: suspend () -> JSONObject) {
+    /** Η δουλειά και η σειριοποίηση εκτός main thread (A9). */
+    private fun respond(result: MethodChannel.Result, block: suspend () -> JSONObject) =
+        respondText(result) { block().toString() }
+
+    /** Για ό,τι ανοίγει οθόνη (άδειες Samsung): στο main thread. */
+    private fun respondMain(result: MethodChannel.Result, block: suspend () -> JSONObject) {
         scope.launch {
             val json = try {
                 block()
@@ -162,7 +185,7 @@ class SamsungHealthBridge(
     private suspend fun readRange(from: String, to: String): JSONObject {
         val s = store()
         val names = s.getGrantedPermissions(permissions).map { it.dataType.name }.toSet()
-        return DashboardReader(s, SleepPolicy.until(activity), SleepPolicy.spo2Series(activity))
+        return SleepPolicy.reader(activity, s)
             .readRange(names, java.time.LocalDate.parse(from), java.time.LocalDate.parse(to))
             .put("ok", true)
             .put("granted", names.size)
@@ -173,13 +196,13 @@ class SamsungHealthBridge(
         val s = store()
         val granted = s.getGrantedPermissions(permissions)
         val names = granted.map { it.dataType.name }.toSet()
-        val o = DashboardReader(s, SleepPolicy.until(activity), SleepPolicy.spo2Series(activity)).read(names)
+        val o = SleepPolicy.reader(activity, s).read(names)
             .put("ok", true)
             .put("readAt", System.currentTimeMillis())
             .put("granted", granted.size)
             .put("total", permissions.size)
-        // Το JSON (μερικά MB) φτιάχνεται μία φορά και όχι στο main thread· η εγγραφή στο IO.
-        val text = withContext(Dispatchers.Default) { o.toString() }
+        // Το JSON (μερικά MB) φτιάχνεται μία φορά, εκτός main thread (όλο το dashboard() τρέχει εκτός, A9).
+        val text = o.toString()
         // Βοηθητικό αντίγραφο (ξαναδιαβάζεται): χωρίς «σφράγισμα» στον δίσκο σε κάθε ανανέωση.
         if (granted.isNotEmpty()) withContext(Dispatchers.IO) { writeFile(DASHBOARD_FILE, text, sync = false) }
         return text
@@ -242,6 +265,22 @@ class SamsungHealthBridge(
                 val typeFrom = if (key == "body_composition") to.minusDays(365) else from
                 o.put("days", java.time.temporal.ChronoUnit.DAYS.between(typeFrom, to))
                 readOne(s, type, typeFrom, to, o)
+                // Πόσες μετρούν στην εφαρμογή (A2): ύπνος/παλμοί/οξυγόνο/θερμοκρασία μόνο από ρολόι (το ίδιο φίλτρο της
+                // Samsung με την κανονική ανάγνωση), ζυγίσεις μόνο από την InBody. Οι υπόλοιπες αγνοούνται.
+                if (o.optString("state") == "ok") {
+                    val counted = when {
+                        key in DataRules.WATCH_ONLY -> countWith(s, type, typeFrom, to, DashboardReader.WATCH)
+                        key == "body_composition" -> {
+                            val src = o.optJSONArray("sources") ?: JSONArray()
+                            (0 until src.length()).sumOf { i ->
+                                val x = src.getJSONObject(i)
+                                if (DataRules.isScaleApp(x.optString("app"))) x.optInt("count") else 0
+                            }
+                        }
+                        else -> null
+                    }
+                    if (counted != null) o.put("counted", counted).put("ignored", (o.optInt("count") - counted).coerceAtLeast(0))
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -335,12 +374,15 @@ class SamsungHealthBridge(
         for ((key, n) in sources) {
             val app = key.substringBefore("|")
             val deviceId = key.substringAfter("|")
-            sourceArray.put(
-                JSONObject()
-                    .put("app", app)
-                    .put("device", deviceName(s, deviceId))
-                    .put("count", n)
-            )
+            val src = JSONObject()
+                .put("app", app)
+                .put("device", deviceName(s, deviceId))
+                .put("count", n)
+            // Αν η πηγή μετρά στην εφαρμογή (A2): ρολόι για τα είδη του ρολογιού, InBody για τις ζυγίσεις.
+            val key = readTypes.firstOrNull { it.second == type }?.first
+            if (key != null && key in DataRules.WATCH_ONLY) src.put("counts", deviceWatch[deviceId] == true)
+            if (key == "body_composition") src.put("counts", DataRules.isScaleApp(app))
+            sourceArray.put(src)
         }
 
         o.put("state", "ok")
@@ -351,12 +393,34 @@ class SamsungHealthBridge(
             .put("sources", sourceArray)
     }
 
+    /** Πόσες εγγραφές δίνει η Samsung με το φίλτρο πηγής [source] (για το «Τι φτάνει»). */
+    private suspend fun countWith(
+        s: HealthDataStore,
+        type: DataType,
+        from: LocalDateTime,
+        to: LocalDateTime,
+        source: com.samsung.android.sdk.health.data.request.ReadSourceFilter,
+    ): Int {
+        var n = 0
+        var token: String? = null
+        var pages = 0
+        do {
+            val request = buildRequest(type, from, to, token, source) ?: return 0
+            val response = s.readData(request)
+            n += response.dataList.size
+            token = response.pageToken
+            pages++
+        } while (!token.isNullOrEmpty() && pages < MAX_PAGES)
+        return n
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun buildRequest(
         type: DataType,
         from: LocalDateTime,
         to: LocalDateTime,
         token: String?,
+        source: com.samsung.android.sdk.health.data.request.ReadSourceFilter? = null,
     ): ReadDataRequest<HealthDataPoint>? {
         val readable = type as? DataType.Readable<*, *> ?: return null
         return when (val builder = readable.readDataRequestBuilder) {
@@ -365,6 +429,7 @@ class SamsungHealthBridge(
                     .setLocalTimeFilter(LocalTimeFilter.of(from, to))
                     .setOrdering(Ordering.DESC)
                     .setPageSize(PAGE_SIZE)
+                if (source != null) b.setSourceFilter(source)
                 if (!token.isNullOrEmpty()) b.setPageToken(token)
                 b.build()
             }
@@ -429,6 +494,7 @@ class SamsungHealthBridge(
         deviceNames[id]?.let { return it }
         val name = try {
             val d = s.getDeviceManager().getDevice(id)
+            deviceWatch[id] = d?.deviceType == com.samsung.android.sdk.health.data.device.DeviceGroup.WATCH
             listOfNotNull<String>(d?.name, d?.model).firstOrNull { it.isNotBlank() } ?: ""
         } catch (e: CancellationException) {
             throw e
