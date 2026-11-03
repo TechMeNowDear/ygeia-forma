@@ -70,6 +70,8 @@ class OuraBridge(
                 result.success(uri)
             }
             "readNights" -> io(result) { readText(NIGHTS_FILE) }
+            // Στην εκκίνηση: προσωρινά αρχεία που έμειναν από εγγραφή που διακόπηκε (μόνο τα δικά μας).
+            "cleanTmp" -> io(result) { cleanTmp(activity) }
             // Το σχέδιο πηγών (δικό του αρχείο, ανεξάρτητο από τις ρυθμίσεις): {"state": missing|ok|error, "json"}.
             "readPlan" -> scope.launch {
                 val out = withContext(Dispatchers.IO) {
@@ -171,6 +173,29 @@ class OuraBridge(
                 SCHEME -> d.host == HOST && (d.path.isNullOrEmpty() || d.path == "/")
                 else -> false
             }
+        }
+
+        /** Τα ονόματα των δικών μας αρχείων (το προσωρινό είναι «όνομα.<αριθμός>.tmp»). */
+        private val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, "oura_tokens.bin", "oura_pending.bin")
+
+        /**
+         * Σβήνει μόνο προσωρινά αρχεία των δικών μας εγγραφών (filesDir και noBackupFilesDir/oura), παλιότερα από
+         * ένα λεπτό. Ίδιο κλείδωμα με την [atomicWrite]: ποτέ το προσωρινό μιας εγγραφής που τρέχει.
+         */
+        @Synchronized
+        fun cleanTmp(context: Context): Int {
+            val cutoff = System.currentTimeMillis() - 60_000
+            var n = 0
+            for (dir in listOf(context.filesDir, File(context.noBackupFilesDir, "oura"))) {
+                val files = dir.listFiles() ?: continue
+                for (f in files) {
+                    val name = f.name
+                    if (!f.isFile || !name.endsWith(".tmp") || f.lastModified() > cutoff) continue
+                    if (OWN_FILES.none { name.startsWith("$it.") }) continue
+                    if (f.delete()) n++
+                }
+            }
+            return n
         }
 
         /** Μία εγγραφή τη φορά (κλείδωμα) και μοναδικό προσωρινό αρχείο: δύο εγγραφές δεν μπλέκονται ποτέ. */
