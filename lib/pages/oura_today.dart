@@ -48,6 +48,13 @@ class OuraStatusCard extends StatelessWidget {
           c.move,
           null,
         ),
+      OuraStatus.missing when store.ouraNightFor(dayOf(now))?.onlyNap ?? false => (
+          'Χθες βράδυ μόνο υπνάκος από το δαχτυλίδι',
+          'Υπνάκος ${napTimes(store.ouraNightFor(dayOf(now)))}. Δεν μετρά ως νύχτα: η νύχτα μένει κενή στον Ύπνο και '
+              'στις Τάσεις. Το οξυγόνο από το ρολόι φαίνεται κανονικά.',
+          c.textSecondary,
+          null,
+        ),
       OuraStatus.missing => (
           'Χθες βράδυ χωρίς ύπνο από το δαχτυλίδι',
           'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις. Το οξυγόνο από το ρολόι φαίνεται κανονικά.',
