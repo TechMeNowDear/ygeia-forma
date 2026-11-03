@@ -73,14 +73,14 @@ jobs:
         run: |
           set -o pipefail
           cd android
-          if ! ./gradlew :app:testReleaseUnitTest --console=plain 2>&1 | tee ../kotlin-tests.log; then
+          if ! ./gradlew :app:testDebugUnitTest --console=plain 2>&1 | tee ../kotlin-tests.log; then
             grep -E -A6 "FAILED|AssertionError|^e: |What went wrong" ../kotlin-tests.log | head -80 > ../errors.txt || true
             [ -s ../errors.txt ] || tail -80 ../kotlin-tests.log > ../errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
             echo "::error title=Έλεγχοι Kotlin::$msg"
             exit 1
           fi
-          n=$(grep -ho 'tests="[0-9]*"' app/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+          n=$(grep -ho 'tests="[0-9]*"' app/build/test-results/*/*.xml 2>/dev/null | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
           echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
 
   # Oura: ο πραγματικός κώδικας ανάγνωσης πάνω στα συνθετικά δεδομένα του sandbox της Oura (χωρίς δαχτυλίδι).
