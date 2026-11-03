@@ -185,7 +185,7 @@ class _OuraNightCard extends StatelessWidget {
           if (reason != null) ...[
             Text(
               '${emptyNightText(reason!)} για χθες βράδυ'
-              '${reason == EmptyNight.onlyNap && napTimes(todayNight).isNotEmpty ? ' (${napTimes(todayNight)})' : ''}. '
+              '${reason == EmptyNight.onlyNap && napTimes(todayNight, nightOnly: true).isNotEmpty ? ' (${napTimes(todayNight, nightOnly: true)})' : ''}. '
               'Βλέπεις την τελευταία νύχτα που ήρθε.',
               style: TextStyle(color: c.bad, fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.35),
             ),

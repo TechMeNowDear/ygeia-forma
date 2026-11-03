@@ -48,9 +48,9 @@ class OuraStatusCard extends StatelessWidget {
           c.move,
           null,
         ),
-      OuraStatus.missing when store.ouraNightFor(dayOf(now))?.onlyNap ?? false => (
+      OuraStatus.missing when napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true).isNotEmpty => (
           'Χθες βράδυ μόνο υπνάκος από το δαχτυλίδι',
-          'Υπνάκος ${napTimes(store.ouraNightFor(dayOf(now)))}. Δεν μετρά ως νύχτα: η νύχτα μένει κενή στον Ύπνο και '
+          'Υπνάκος ${napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true)}. Δεν μετρά ως νύχτα: η νύχτα μένει κενή στον Ύπνο και '
               'στις Τάσεις. Το οξυγόνο από το ρολόι φαίνεται κανονικά.',
           c.textSecondary,
           null,
@@ -169,14 +169,14 @@ class OuraSleepTodayCard extends StatelessWidget {
         ),
       );
       // «Μόνο υπνάκος»: οι ώρες του φαίνονται (π.χ. σύντομη νύχτα που τελείωσε πριν από τα μεσάνυχτα).
-      if (reason == EmptyNight.onlyNap && napTimes(night).isNotEmpty) {
+      if (reason == EmptyNight.onlyNap && napTimes(night, nightOnly: true).isNotEmpty) {
         body = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             body,
             const SizedBox(height: 6),
             Text(
-              'Υπνάκος ${napTimes(night)} (δεν μετρά ως νύχτα)',
+              'Υπνάκος ${napTimes(night, nightOnly: true)} (δεν μετρά ως νύχτα)',
               key: const ValueKey('oura-only-nap-times'),
               style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600),
             ),

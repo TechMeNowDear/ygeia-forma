@@ -444,8 +444,10 @@ class OuraLink {
     return true;
   }
 
-  /// Το σημάδι «συνδέεται» ([vaultConnecting]). Πετάει [VaultUnavailable] αν η αποθήκευση δεν απαντά.
+  /// Το σημάδι «συνδέεται» ([vaultConnecting]). `false` αν δεν γράφτηκε.
   Future<bool> markConnecting(String json) => vault.save(vaultConnecting, json);
+
+  /// Πετάει [VaultUnavailable] αν η αποθήκευση δεν απαντά.
   Future<String?> connectingMarker() => vault.load(vaultConnecting);
   Future<void> clearConnecting() => vault.delete(vaultConnecting);
 
@@ -597,6 +599,9 @@ class OuraLink {
   /// Αποσύνδεση: ανάκληση στην Oura (αν γίνεται) και σβήσιμο των tokens από το κινητό. Δεν πετάει ποτέ.
   /// Κερδίζει κάθε αίτημα που τρέχει: νέα γενιά αμέσως, και ό,τι ανανέωση έτρεχε δεν αποθηκεύεται.
   Future<void> disconnect() async {
+    // ΠΡΩΤΑ το σημάδι «συνδέεται»: ένα σημάδι που θα έμενε χωρίς tokens θα αναιρούσε στην εκκίνηση μια σύνδεση που
+    // είχε χρησιμοποιηθεί.
+    await vault.delete(vaultConnecting);
     OuraTokens? t;
     try {
       t = _loaded ? _tokens : OuraTokens.fromJson(await vault.load(vaultTokens));
@@ -618,6 +623,5 @@ class OuraLink {
     _unsaved = false;
     await vault.delete(vaultTokens);
     await vault.delete(vaultPending);
-    await vault.delete(vaultConnecting);
   }
 }

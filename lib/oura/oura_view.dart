@@ -84,11 +84,19 @@ StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan
 
 /// «Μόνο υπνάκος»: οι ώρες του (π.χ. «21:30–23:50 · 2 ώρες 15 λεπτά»), ώστε μια σύντομη νύχτα που τελείωσε πριν από
 /// τα μεσάνυχτα να φαίνεται (δεν μετρά ως νύχτα: κανόνας επικάλυψης 00:00–06:00).
-String napTimes(OuraNight? n) => n == null
-    ? ''
-    : [
-        for (final x in n.naps) '${hm(x.start)}–${hm(x.end)}${x.totalMinutes == null ? '' : ' · ${hoursMinutes(x.totalMinutes!)}'}',
-      ].join(', ');
+/// [nightOnly]: μόνο υπνάκοι της νύχτας (επικάλυψη με 18:00 της προηγούμενης ως 12:00 της μέρας), για τα κείμενα
+/// «χθες βράδυ»· ποτέ ένας απογευματινός υπνάκος της ίδιας μέρας.
+String napTimes(OuraNight? n, {bool nightOnly = false}) {
+  if (n == null) return '';
+  final d = n.day;
+  final from = DateTime(d.year, d.month, d.day - 1, 18);
+  final to = DateTime(d.year, d.month, d.day, 12);
+  return [
+    for (final x in n.naps)
+      if (!nightOnly || (x.start.isBefore(to) && x.end.isAfter(from)))
+        '${hm(x.start)}–${hm(x.end)}${x.totalMinutes == null ? '' : ' · ${hoursMinutes(x.totalMinutes!)}'}',
+  ].join(', ');
+}
 
 /// Η νύχτα είναι μόνο ένα σύντομο κομμάτι ύπνου (το Oura το λέει «sleep», όχι «long_sleep»).
 const shortNightLabel = 'Σύντομη νύχτα · κάτω από 3 ώρες';

@@ -260,8 +260,10 @@ mixin OuraStore on ChangeNotifier {
     _ouraStarted = true;
     // Προσωρινά αρχεία από εγγραφή που διακόπηκε (μόνο τα δικά μας, στο Android). Δεν περιμένουμε.
     unawaited(ChannelVault.channel.invokeMethod<int>('cleanTmp').then((_) {}, onError: (_) {}));
+    _tokensKnown = false;
     try {
       ouraHasTokens = await ouraLink.hasTokens;
+      _tokensKnown = true;
     } on OuraError {
       // Η αποθήκευση δεν απάντησε τώρα: τα tokens δεν θεωρούνται χαμένα (ξανά στην επόμενη ανάγνωση).
       ouraHasTokens = plan.ouraFrom != null;
@@ -395,6 +397,8 @@ mixin OuraStore on ChangeNotifier {
     ouraLoginError = null;
     notifyListeners();
     final epoch = _ouraEpoch;
+    final done = Completer<void>();
+    _connectDone = done.future;
     try {
       final ex = await ouraLink.exchange(uri);
       if (ex == null) return;
@@ -417,6 +421,13 @@ mixin OuraStore on ChangeNotifier {
         ouraLoginError = OuraErrorKind.cancelled;
         return;
       }
+      if (epoch != _ouraEpoch) {
+        // «Αποσύνδεση» στο μεταξύ: τίποτα δεν αλλάζει.
+        await ouraLink.discard(ex.tokens);
+        await ouraLink.clearConnecting();
+        ouraLoginError = OuraErrorKind.cancelled;
+        return;
+      }
       if (changed && !await setPlan(next)) {
         // Η πηγή δεν άλλαξε: τα tokens δεν κρατιούνται.
         await ouraLink.discard(ex.tokens);
@@ -425,8 +436,9 @@ mixin OuraStore on ChangeNotifier {
         return;
       }
       if (epoch != _ouraEpoch || !await ouraLink.adopt(ex.tokens, ex.gen)) {
-        // Τα tokens δεν γράφτηκαν (ή αποσυνδέθηκε στο μεταξύ): το σχέδιο επιστρέφει, τίποτα μισό.
-        if (changed && epoch == _ouraEpoch) await setPlan(before);
+        // Τα tokens δεν γράφτηκαν (ή αποσυνδέθηκε στο μεταξύ): το σχέδιο επιστρέφει, τίποτα μισό. Η αποσύνδεση
+        // περιμένει να τελειώσει αυτό ([_connectDone]) πριν αλλάξει το σχέδιο, άρα το σχέδιο είναι ακόμα το [next].
+        if (changed && plan == next) await setPlan(before);
         await ouraLink.discard(ex.tokens);
         await ouraLink.clearConnecting();
         ouraLoginError = OuraErrorKind.cancelled;
@@ -451,9 +463,16 @@ mixin OuraStore on ChangeNotifier {
       errors.report(e, st, extra: {'where': 'oura-login'});
     } finally {
       ouraConnecting = false;
+      done.complete();
       notifyListeners();
     }
   }
+
+  /// Η σύνδεση που τρέχει (για να την περιμένει η αποσύνδεση).
+  Future<void> _connectDone = Future.value();
+
+  /// Αν τα tokens διαβάστηκαν στην εκκίνηση (false = η αποθήκευση δεν απάντησε· το [ouraHasTokens] είναι εκτίμηση).
+  bool _tokensKnown = false;
 
   /// Μια σύνδεση έμεινε μισή και καθαρίστηκε στην εκκίνηση ([_cleanHalfConnection]).
   bool ouraIncomplete = false;
@@ -494,6 +513,8 @@ mixin OuraStore on ChangeNotifier {
       final d = jsonDecode(raw);
       if (d is Map) j = d;
     } catch (_) {}
+    // Τα tokens δεν διαβάστηκαν: τίποτα δεν κρίνεται τώρα (ούτε «ολοκληρώθηκε» ούτε «μισή»), ξανά σε επόμενη εκκίνηση.
+    if (!_tokensKnown) return;
     if (ouraHasTokens) {
       // Ολοκληρώθηκε· αν έκλεισε πριν αποθηκευτεί η ώρα σύνδεσης, παίρνεται από το σημάδι.
       if (ouraConnectedMs == null && j?['at'] is num) {
@@ -508,6 +529,18 @@ mixin OuraStore on ChangeNotifier {
     try {
       from = j?['from'] is String ? parseDateKey(j!['from'] as String) : null;
     } catch (_) {}
+    // Παλιό σημάδι από σύνδεση που χρησιμοποιήθηκε (ανάγνωση ή τιμές Oura μετά από αυτό): μόνο σβήνεται. Μια
+    // πραγματικά μισή σύνδεση δεν έχει ποτέ τέτοια (η ανάγνωση θέλει tokens).
+    final at = j?['at'] is num ? (j!['at'] as num).toInt() : null;
+    final f = from;
+    final used = (at != null && (ouraSyncedMs ?? 0) >= at) ||
+        (f != null && ouraNights.any((n) => !n.day.isBefore(f))) ||
+        (f != null &&
+            history.entries.any((e) => e.key.compareTo(dateKey(f)) >= 0 && e.value.keys.any(ouraKeySet.contains)));
+    if (used) {
+      await ouraLink.clearConnecting();
+      return;
+    }
     var ok = true;
     if (before != null && from != null && plan == before.withEra(Source.oura, from)) {
       ok = await setPlan(before);
@@ -578,6 +611,10 @@ mixin OuraStore on ChangeNotifier {
   ///   διαλέξει ρητά το ρολόι ([sleepFromWatchAgain]). Η χθεσινή νύχτα του Oura μένει.
   Future<void> disconnectOura() async {
     _ouraEpoch++;
+    // Σύνδεση στη μέση: σταματά (νέα γενιά) και επαναφέρει μόνη της το σχέδιο· μετά αλλάζει το σχέδιο η αποσύνδεση.
+    try {
+      await _connectDone;
+    } catch (_) {}
     final today = dayOf(ouraClock());
     final from = DateTime(today.year, today.month, today.day + 1);
     await ouraLink.disconnect();
