@@ -225,7 +225,7 @@ SourcePlan rebuildTimeline(Map<String, Map<String, double>> history) {
 /// 1. Το αρχείο του, αν διαβάζεται.
 /// 2. Το ΝΕΟΤΕΡΟ από τα αντίγραφα: το ημερολόγιο ([logged]) και οι ρυθμίσεις ([prefsCopy], μόνο αν διαβάστηκαν
 ///    κανονικά). Τότε το αρχείο ξαναγράφεται.
-/// 3. Χωρίς αρχείο, χωρίς αντίγραφο, χωρίς ένδειξη Oura ([evidence]: tokens, αρχείο νυχτών, «ouraSyncedTo») και
+/// 3. Χωρίς αρχείο, χωρίς αντίγραφο, χωρίς ένδειξη Oura ([evidence]: αρχείο νυχτών, «ouraSyncedTo») και
 ///    χωρίς τιμές Oura στο ιστορικό: δεν συνδέθηκε ποτέ → όπως πάντα.
 /// 4. Αλλιώς «άγνωστο»: οι νύχτες από την πρώτη μέρα με τιμές Oura (ή από σήμερα) δεν έχουν πηγή — ποτέ
 ///    σιωπηλά πίσω στο ρολόι.
@@ -269,24 +269,21 @@ class RecoveryOption {
 /// ώστε να μην προταθεί «ρολόι» επειδή απλώς δεν φαίνονται ακόμα οι τιμές του Oura.
 List<RecoveryOption>? recoveryOptions({
   required Map<String, Map<String, double>>? history,
-  DatedPlan? logged,
   required bool evidence,
   required DateTime today,
 }) {
   if (history == null) return null;
   final tomorrow = DateTime(today.year, today.month, today.day + 1);
+  // Το ημερολόγιο αλλαγών δεν χρειάζεται επιλογή: αν διαβάζεται, το σχέδιο επανέρχεται μόνο του ([resolvePlan]).
   final rebuilt = rebuildTimeline(history);
   final out = <RecoveryOption>[];
   var base = SourcePlan.samsungOnly;
-  if (logged != null) {
-    base = logged.plan;
-    out.add(RecoveryOption('Όπως ήταν (από το ημερολόγιο αλλαγών)', logged.plan, primary: true));
-  } else if (rebuilt.eras.isNotEmpty) {
+  if (rebuilt.eras.isNotEmpty) {
     base = rebuilt;
     out.add(RecoveryOption('Όπως φαίνεται από τα αποθηκευμένα δεδομένα', rebuilt, primary: true));
   }
-  // Με ένδειξη Oura (tokens, αρχείο νυχτών, τιμές) υπάρχει ΠΑΝΤΑ η επιλογή «από το Oura».
-  final anyOura = evidence || logged != null || rebuilt.eras.isNotEmpty;
+  // Με ένδειξη Oura (αρχείο νυχτών, ανάγνωση, τιμές) υπάρχει ΠΑΝΤΑ η επιλογή «από το Oura».
+  final anyOura = evidence || rebuilt.eras.isNotEmpty;
   if (anyOura && base.nightSource(tomorrow) != Source.oura) {
     out.add(RecoveryOption('Ύπνος από το Oura, από απόψε', base.withEra(Source.oura, tomorrow), primary: out.isEmpty));
   }

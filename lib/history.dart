@@ -81,8 +81,11 @@ Set<String> mergeHistory(
       final k = dateKey(day);
       final old = history[k];
       if (old == null) continue;
-      if (old.keys.any(sleepKeys.contains)) {
-        history[k] = {for (final e in old.entries) if (!sleepKeys.contains(e.key)) e.key: e.value};
+      // Η νύχτα του ρολογιού την πρώτη μέρα μιας εποχής Oura δεν σβήνεται ποτέ ([SourcePlan.keepsWatchNight]).
+      final keep = p.keepsWatchNight(day);
+      bool drop(String key) => sleepKeys.contains(key) && !(keep && watchNightKeys.contains(key));
+      if (old.keys.any(drop)) {
+        history[k] = {for (final e in old.entries) if (!drop(e.key)) e.key: e.value};
         changed.add(k);
       }
     }
@@ -93,6 +96,7 @@ Set<String> mergeHistory(
     // Μέρα που η νύχτα δεν είναι του ρολογιού: οι τιμές νύχτας του ρολογιού δεν μπαίνουν ποτέ, και το
     // οξυγόνο (το μόνο του ρολογιού εδώ, χωρίς ομαδοποίηση ύπνου) ανανεώνεται πάντα.
     final foreignNight = p.nightSource(day) != Source.watch;
+    final keep = p.keepsWatchNight(day);
     final row = foreignNight
         ? {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value}
         : e.value;
@@ -107,7 +111,9 @@ Set<String> mergeHistory(
     final base = overwriteSleep
         ? {
             for (final v in old.entries)
-              if (!sleepKeys.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))) v.key: v.value,
+              if ((keep && watchNightKeys.contains(v.key)) ||
+                  (!sleepKeys.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))))
+                v.key: v.value,
           }
         : old;
     final next = {...base, ...incoming};
@@ -145,8 +151,9 @@ Set<String> mergeOura(
   return changed;
 }
 
-/// Σβήνει τις τιμές νύχτας του ρολογιού από τις μέρες (από [from] και μετά) που η νύχτα έχει άλλη πηγή:
-/// π.χ. τη μέρα της σύνδεσης του Oura, που μπορεί να είχε ήδη γραφτεί το πρωί από το ρολόι.
+/// Σβήνει τις τιμές νύχτας του ρολογιού από τις μέρες (από [from] και μετά) που η νύχτα έχει άλλη πηγή.
+/// Εξαίρεση: η πρώτη νύχτα μιας εποχής Oura ([SourcePlan.keepsWatchNight]) — αν το ρολόι την είχε ήδη γράψει,
+/// μένει (κρυφή).
 Set<String> stripForeignWatchNight(Map<String, Map<String, double>> history, SourcePlan plan, {required DateTime from}) {
   final changed = <String>{};
   final fromKey = dateKey(from);
@@ -154,7 +161,7 @@ Set<String> stripForeignWatchNight(Map<String, Map<String, double>> history, Sou
     // Τα κλειδιά «2026-11-06» ταξινομούνται σαν ημερομηνίες: οι παλιές μέρες προσπερνιούνται χωρίς ανάλυση.
     if (e.key.compareTo(fromKey) < 0) continue;
     final day = parseDateKey(e.key);
-    if (plan.nightSource(day) == Source.watch) continue;
+    if (plan.nightSource(day) == Source.watch || plan.keepsWatchNight(day)) continue;
     if (!e.value.keys.any(watchNightKeys.contains)) continue;
     history[e.key] = {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value};
     changed.add(e.key);

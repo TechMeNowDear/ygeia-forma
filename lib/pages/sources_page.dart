@@ -240,7 +240,8 @@ class SourcesPage extends StatelessWidget {
     return switch (s.ouraStatus) {
       OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
       OuraStatus.starting => 'Συνδεδεμένο · ο ύπνος από το Oura από απόψε',
-      OuraStatus.startingNow => 'Συνδεδεμένο · η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι',
+      OuraStatus.startingNow => 'Συνδεδεμένο · ${s.ouraFirstNightText.toLowerCase()}',
+      OuraStatus.incomplete => 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά',
       OuraStatus.disconnected => 'Αποσυνδέθηκε',
       OuraStatus.reconnect => 'Χρειάζεται νέα σύνδεση',
       OuraStatus.subscription => 'Η συνδρομή δεν είναι ενεργή',

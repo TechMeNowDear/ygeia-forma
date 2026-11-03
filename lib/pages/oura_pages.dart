@@ -111,12 +111,61 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
   OuraErrorKind? _error;
   bool _opening = false;
 
+  /// 04:00–11:59: «Φορούσες το δαχτυλίδι την τελευταία νύχτα;». null = έκλεισε χωρίς απάντηση (τίποτα δεν ανοίγει).
+  Future<bool?> _askLastNight() => showModalBottomSheet<bool>(
+        context: context,
+        showDragHandle: true,
+        routeSettings: const RouteSettings(name: 'Η τελευταία νύχτα'),
+        builder: (context) {
+          final c = Aigaio.of(context);
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Φορούσες το δαχτυλίδι την τελευταία νύχτα;',
+                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Αν ναι, η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι. Αν όχι, μένει όπως τη μέτρησε το ρολόι και '
+                    'το δαχτυλίδι μετρά από απόψε.',
+                    style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    key: const ValueKey('oura-first-night-no'),
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Όχι, από απόψε'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    key: const ValueKey('oura-first-night-yes'),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Ναι, μετρά από το δαχτυλίδι'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
   Future<void> _connect() async {
+    // Η πρώτη νύχτα αποφασίζεται εδώ, πριν ανοίξει ο browser, από την ώρα που πατήθηκε το κουμπί.
+    final now = widget.store.ouraClock();
+    var wore = false;
+    if (firstNightChoice(now) == FirstNightChoice.ask) {
+      final a = await _askLastNight();
+      if (a == null || !mounted) return;
+      wore = a;
+    }
     setState(() {
       _opening = true;
       _error = null;
     });
-    final e = await widget.store.beginOuraLogin();
+    final e = await widget.store.beginOuraLogin(from: firstOuraNight(now, woreRing: wore));
     if (!mounted) return;
     setState(() {
       _opening = false;
@@ -228,8 +277,8 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Από την πρώτη νύχτα μετά τη σύνδεση ο ύπνος έρχεται μόνο από το δαχτυλίδι. Η χθεσινή και οι παλιές '
-                'νύχτες μένουν όπως είναι, από το ρολόι.',
+                'Από την πρώτη νύχτα του δαχτυλιδιού ο ύπνος έρχεται μόνο από αυτό. Οι νύχτες πριν μένουν όπως είναι, '
+                'από το ρολόι. Αν συνδέσεις το πρωί, θα σε ρωτήσουμε για τη νύχτα που μόλις τελείωσε.',
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
             ],
@@ -321,6 +370,30 @@ class OuraManagePage extends StatelessWidget {
     ));
   }
 
+  /// Μόνο τη μέρα της σύνδεσης: η νύχτα που μόλις τελείωσε από το ρολόι, το δαχτυλίδι από απόψε.
+  Future<void> _watchLastNight(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      routeSettings: const RouteSettings(name: 'Η τελευταία νύχτα από το ρολόι'),
+      builder: (context) => AlertDialog(
+        title: const Text('Η τελευταία νύχτα από το ρολόι;'),
+        content: const Text(
+          'Η νύχτα που μόλις τελείωσε θα φαίνεται όπως τη μέτρησε το Galaxy Watch. Το δαχτυλίδι μετρά από απόψε.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ναι, από το ρολόι')),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final done = await store.watchLastNight();
+    messenger.showSnackBar(SnackBar(
+      content: Text(done ? 'Η τελευταία νύχτα από το ρολόι. Το δαχτυλίδι από απόψε.' : 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.'),
+    ));
+  }
+
   Future<void> _watchAgain(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -372,9 +445,10 @@ class OuraManagePage extends StatelessWidget {
             ),
           OuraStatus.startingNow => (
               'Συνδεδεμένο',
-              'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι. Θα φανεί όταν συγχρονίσει η εφαρμογή Oura.',
+              '${store.ouraFirstNightText}. Θα φανεί όταν συγχρονίσει η εφαρμογή Oura.',
               c.good,
             ),
+          OuraStatus.incomplete => ('Δεν συνδέθηκε', ouraErrorText(OuraErrorKind.incomplete), c.bad),
           OuraStatus.retry => (
               'Συνδεδεμένο',
               ouraErrorText(store.ouraError ?? OuraErrorKind.network),
@@ -426,6 +500,12 @@ class OuraManagePage extends StatelessWidget {
         );
 
         final actions = <Widget>[
+          if (store.canWatchLastNight)
+            OutlinedButton(
+              key: const ValueKey('oura-watch-last-night'),
+              onPressed: () => _watchLastNight(context),
+              child: const Text('Η τελευταία νύχτα από το ρολόι'),
+            ),
           if (status == OuraStatus.reconnect || status == OuraStatus.disconnected || (!connected && status != OuraStatus.off))
             FilledButton(
               onPressed: store.ouraConfigured ? () => Navigator.of(context).push(OuraConnectPage.route(store, now: now)) : null,

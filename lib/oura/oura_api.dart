@@ -175,6 +175,9 @@ enum OuraErrorKind {
   /// Η σύνδεση άργησε ή δεν ταιριάζει (state).
   stale,
 
+  /// Μια σύνδεση έμεινε μισή (έκλεισε η εφαρμογή στη μέση) και καθαρίστηκε στην εκκίνηση.
+  incomplete,
+
   /// Δεν έχει μπει Client ID.
   notConfigured,
 
@@ -207,6 +210,7 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.cancelled => 'Η σύνδεση δεν ολοκληρώθηκε. Δεν άλλαξε τίποτα· δοκίμασε ξανά σε λίγο.',
       OuraErrorKind.isolate => 'Η ανάγνωση έγινε πιο αργά από το συνηθισμένο.',
       OuraErrorKind.stale => 'Η σύνδεση άργησε. Πάτα ξανά «Σύνδεση με Oura».',
+      OuraErrorKind.incomplete => 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά.',
       OuraErrorKind.notConfigured => 'Η εγγραφή στην Oura γίνεται τη μέρα που θα έρθει το δαχτυλίδι.',
       OuraErrorKind.noBrowser => 'Δεν άνοιξε ο browser του κινητού.',
     };
@@ -233,26 +237,36 @@ String randomVerifier([int length = 64, Random? rng]) {
 }
 
 class OuraPending {
-  const OuraPending({required this.state, required this.verifier, required this.created});
+  const OuraPending({required this.state, required this.verifier, required this.created, this.from});
   final String state;
   final String verifier;
   final DateTime created;
+
+  /// Η πρώτη νύχτα του Oura, όπως αποφασίστηκε πριν ανοίξει ο browser (κρυπτογραφημένα μαζί με το state).
+  final DateTime? from;
 
   /// Πόση ώρα δίνεται για να ολοκληρωθεί η σύνδεση στη σελίδα της Oura.
   static const lifetime = Duration(minutes: 20);
   bool expired(DateTime now) => now.difference(created) > lifetime || now.isBefore(created.subtract(const Duration(minutes: 1)));
 
-  String toJson() => jsonEncode({'s': state, 'v': verifier, 'c': created.millisecondsSinceEpoch});
+  String toJson() => jsonEncode({
+        's': state,
+        'v': verifier,
+        'c': created.millisecondsSinceEpoch,
+        if (from != null) 'f': '${from!.year}-${from!.month.toString().padLeft(2, '0')}-${from!.day.toString().padLeft(2, '0')}',
+      });
 
   static OuraPending? fromJson(String? raw) {
     if (raw == null) return null;
     try {
       final j = jsonDecode(raw);
       if (j is! Map || j['s'] is! String || j['v'] is! String || j['c'] is! num) return null;
+      final f = j['f'] is String ? DateTime.tryParse(j['f'] as String) : null;
       return OuraPending(
         state: j['s'] as String,
         verifier: j['v'] as String,
         created: DateTime.fromMillisecondsSinceEpoch((j['c'] as num).toInt()),
+        from: f == null ? null : DateTime(f.year, f.month, f.day),
       );
     } catch (_) {
       return null;
@@ -360,17 +374,28 @@ class OuraLink {
   Future<bool> get hasTokens async => (await tokens()) != null;
 
   /// Ξεκινά τη σύνδεση: φτιάχνει και κρατά (κρυπτογραφημένα) state και verifier, και δίνει τη διεύθυνση.
-  Future<Uri> begin() async {
+  /// [from]: η πρώτη νύχτα του Oura, κρατιέται με το state ως την επιστροφή.
+  Future<Uri> begin({DateTime? from}) async {
     if (!configured) throw const OuraError(OuraErrorKind.notConfigured);
-    final p = OuraPending(state: randomVerifier(32), verifier: randomVerifier(64), created: _clock());
+    final p = OuraPending(state: randomVerifier(32), verifier: randomVerifier(64), created: _clock(), from: from);
     if (!await vault.save(vaultPending, p.toJson())) throw const OuraError(OuraErrorKind.stale);
     return ouraAuthorizeUrl(clientId: clientId, p: p, endpoints: endpoints);
   }
 
-  /// Η επιστροφή από την Oura. Επιστρέφει true αν συνδέθηκε. Ό,τι δεν ταιριάζει αγνοείται (false).
+  /// Η επιστροφή από την Oura, μαζί: ανταλλαγή και αποθήκευση. Επιστρέφει true αν συνδέθηκε. Ό,τι δεν ταιριάζει
+  /// αγνοείται (false). Η εφαρμογή χρησιμοποιεί [exchange] και [adopt] χωριστά (πρώτα το σχέδιο πηγών).
   Future<bool> complete(String uri) async {
+    final ex = await exchange(uri);
+    if (ex == null) return false;
+    if (!await adopt(ex.tokens, ex.gen)) throw const OuraError(OuraErrorKind.cancelled);
+    return true;
+  }
+
+  /// Η επιστροφή από την Oura: έλεγχος state και ανταλλαγή του κωδικού. Τα tokens ΔΕΝ αποθηκεύονται εδώ
+  /// ([adopt]). null = δεν είναι δική μας επιστροφή (αγνοείται).
+  Future<({OuraTokens tokens, DateTime? from, int gen})?> exchange(String uri) async {
     final cb = parseCallback(uri);
-    if (cb == null) return false;
+    if (cb == null) return null;
     final gen = _gen;
     final OuraPending? pending;
     try {
@@ -379,7 +404,7 @@ class OuraLink {
       throw const OuraError(OuraErrorKind.cancelled);
     }
     // Επιστροφή χωρίς δική μας εκκρεμή σύνδεση, ή με άλλο state: δεν είναι δική μας (CSRF) — αγνοείται.
-    if (pending == null || cb.state == null || cb.state != pending.state) return false;
+    if (pending == null || cb.state == null || cb.state != pending.state) return null;
     await vault.delete(vaultPending); // ο κωδικός και το state είναι μιας χρήσης
     if (pending.expired(_clock())) throw const OuraError(OuraErrorKind.stale);
     if (cb.error != null) throw const OuraError(OuraErrorKind.denied);
@@ -395,8 +420,37 @@ class OuraLink {
     if (res.status == 400 || res.status == 401) throw OuraError(OuraErrorKind.tokenRejected, status: res.status);
     if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
     final t = OuraTokens.parseResponse(res.body, _clock());
-    if (!await _store(t, gen)) throw const OuraError(OuraErrorKind.cancelled);
+    return (tokens: t, from: pending.from, gen: gen);
+  }
+
+  /// Κρατά τα tokens μιας νέας σύνδεσης: μόνο αν γράφτηκαν στην αποθήκευση και δεν έγινε αποσύνδεση στο μεταξύ.
+  Future<bool> adopt(OuraTokens t, int gen) async {
+    if (gen != _gen) return false;
+    if (!await vault.save(vaultTokens, t.toJson()) || gen != _gen) {
+      await vault.delete(vaultTokens);
+      return false;
+    }
+    _tokens = t;
+    _loaded = true;
+    _unsaved = false;
     return true;
+  }
+
+  /// Tokens που δεν κρατήθηκαν (π.χ. δεν γράφτηκε το σχέδιο πηγών): ανάκληση στην Oura, τίποτα στο κινητό.
+  Future<void> discard(OuraTokens t) => _revoke(t);
+
+  Future<void> _revoke(OuraTokens t) async {
+    try {
+      final u = Uri.parse(endpoints.revoke);
+      if (endpoints.revokeParam == 'access_token') {
+        // Όπως στην τεκμηρίωση της Oura: POST /oauth/revoke?access_token=…
+        await _send('POST', u.replace(queryParameters: {'access_token': t.access})).timeout(const Duration(seconds: 15));
+      } else {
+        await _send('POST', u, form: _form({'token': t.refresh, 'client_id': clientId})).timeout(const Duration(seconds: 15));
+      }
+    } catch (_) {
+      // Χωρίς ίντερνετ: τα tokens σβήνονται έτσι κι αλλιώς από το κινητό.
+    }
   }
 
   /// Αποθηκεύει τα νέα tokens μόνο αν δεν έγινε αποσύνδεση από τότε που ξεκίνησε το αίτημα ([gen]).
@@ -545,19 +599,7 @@ class OuraLink {
         t = await running.timeout(const Duration(seconds: 30)) ?? t;
       } catch (_) {}
     }
-    if (t != null) {
-      try {
-        final u = Uri.parse(endpoints.revoke);
-        if (endpoints.revokeParam == 'access_token') {
-          // Όπως στην τεκμηρίωση της Oura: POST /oauth/revoke?access_token=…
-          await _send('POST', u.replace(queryParameters: {'access_token': t.access})).timeout(const Duration(seconds: 15));
-        } else {
-          await _send('POST', u, form: _form({'token': t.refresh, 'client_id': clientId})).timeout(const Duration(seconds: 15));
-        }
-      } catch (_) {
-        // Χωρίς ίντερνετ: τα tokens σβήνονται έτσι κι αλλιώς από το κινητό.
-      }
-    }
+    if (t != null) await _revoke(t);
     _tokens = null;
     _loaded = true;
     _unsaved = false;

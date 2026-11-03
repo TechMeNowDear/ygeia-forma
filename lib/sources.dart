@@ -337,6 +337,12 @@ class SourcePlan {
   }
 
   /// Η τελευταία νύχτα της «Σύγκρισης πηγών»: ακριβώς [compareDays] νύχτες από την αρχή του (τελευταίου) Oura.
+  /// Η πρώτη νύχτα μιας εποχής Oura: αν το ρολόι είχε ήδη γράψει νύχτα εκείνη τη μέρα (σύνδεση το πρωί με
+  /// «μετρά από το δαχτυλίδι»), οι τιμές του μένουν στο ιστορικό — κρυφές, μόνο για τη «Σύγκριση πηγών» και
+  /// για την αναίρεση «Η τελευταία νύχτα από το ρολόι». Ποτέ δεν σβήνονται.
+  bool keepsWatchNight(DateTime day) =>
+      eras.any((e) => e.source == Source.oura && e.from.year == day.year && e.from.month == day.month && e.from.day == day.day);
+
   DateTime? get compareUntil {
     final f = ouraFrom;
     return f == null ? null : DateTime(f.year, f.month, f.day + compareDays - 1);

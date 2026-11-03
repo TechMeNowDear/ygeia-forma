@@ -22,7 +22,7 @@ class OuraStatusCard extends StatelessWidget {
   /// Αν πρέπει να φανεί κάρτα.
   static bool shows(HealthStore s) => switch (s.ouraStatus) {
         OuraStatus.waiting || OuraStatus.missing || OuraStatus.reconnect || OuraStatus.subscription => true,
-        OuraStatus.disconnected || OuraStatus.starting || OuraStatus.startingNow => true,
+        OuraStatus.disconnected || OuraStatus.starting || OuraStatus.startingNow || OuraStatus.incomplete => true,
         _ => false,
       };
 
@@ -62,11 +62,17 @@ class OuraStatusCard extends StatelessWidget {
           null,
         ),
       OuraStatus.startingNow => (
-          'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι',
-          'Το Oura συνδέθηκε. Όταν ξυπνήσεις, άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ. '
-              'Ο ύπνος έρχεται μόνο από το δαχτυλίδι.',
+          store.ouraFirstNightText,
+          'Το Oura συνδέθηκε. ${now.hour < 4 ? 'Όταν ξυπνήσεις, άνοιξε' : 'Άνοιξε'} την εφαρμογή Oura για να συγχρονίσει, '
+              'και μετά γύρνα εδώ. Ο ύπνος έρχεται μόνο από το δαχτυλίδι.',
           c.sleep,
-          null,
+          store.canWatchLastNight && now.hour >= 4 ? 'Oura' : null,
+        ),
+      OuraStatus.incomplete => (
+          'Η σύνδεση δεν ολοκληρώθηκε',
+          'Η σύνδεση με το Oura έμεινε μισή και δεν άλλαξε τίποτα. Δοκίμασε ξανά.',
+          c.textSecondary,
+          'Σύνδεση με Oura',
         ),
       OuraStatus.reconnect => (
           'Χρειάζεται νέα σύνδεση με το Oura',
@@ -94,7 +100,7 @@ class OuraStatusCard extends StatelessWidget {
       onPressed: button == null
           ? null
           : () => Navigator.of(context).push(
-                s == OuraStatus.reconnect && store.ouraConfigured
+                (s == OuraStatus.reconnect || s == OuraStatus.incomplete) && store.ouraConfigured
                     ? OuraConnectPage.route(store, now: now)
                     : OuraManagePage.route(store, now: now),
               ),
@@ -225,7 +231,7 @@ class OuraSleepTodayCard extends StatelessWidget {
             Text(
               [
                 if (night.shortNight) shortNightLabel,
-                if (night.pieces.isNotEmpty) 'και δεύτερο κομμάτι ${hm(night.pieces.first.start)}–${hm(night.pieces.first.end)} (χωριστά)',
+                if (night.pieces.isNotEmpty) 'και άλλο κομμάτι ${hm(night.pieces.first.start)}–${hm(night.pieces.first.end)} (χωριστά)',
               ].join(' · '),
               style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
             ),

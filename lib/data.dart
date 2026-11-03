@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math' as math;
@@ -883,9 +882,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   /// Για τα στιγμιότυπα της «άγνωστης» κατάστασης: αν διαβάστηκε το ιστορικό, ημερολόγιο, ένδειξη Oura.
   @visibleForTesting
-  void debugSetRecovery({bool historyLoaded = true, DatedPlan? logged, bool evidence = false}) {
+  void debugSetRecovery({bool historyLoaded = true, bool evidence = false}) {
     _historyLoaded = historyLoaded;
-    _logged = logged;
     ouraEvidence = evidence;
   }
 
@@ -901,8 +899,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   bool get planUnknown => planState == PlanState.unknown;
 
-  /// Ένδειξη ότι το Oura συνδέθηκε κάποτε (tokens, αρχείο νυχτών, «ouraSyncedTo»): ένα χαμένο σχέδιο τότε δεν
-  /// θεωρείται ποτέ «δεν συνδέθηκε» (που θα έφερνε πίσω σιωπηλά τον ύπνο του ρολογιού).
+  /// Ένδειξη ότι το Oura διαβάστηκε κάποτε (αρχείο νυχτών, «ouraSyncedTo»· και οι τιμές «o.*» στο ιστορικό): ένα
+  /// χαμένο σχέδιο τότε δεν θεωρείται ποτέ «δεν συνδέθηκε». Tokens μόνα τους (χωρίς τίποτα από το Oura) = μισή
+  /// σύνδεση, που καθαρίζεται στην εκκίνηση (OuraStore) — ποτέ «άγνωστο σχέδιο» γι' αυτό.
   bool ouraEvidence = false;
   DatedPlan? _logged;
 
@@ -914,19 +913,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ? null
       : recoveryOptions(
           history: _historyLoaded ? history : null,
-          logged: _logged,
           evidence: ouraEvidence,
           today: dayOf(ouraClock()),
         );
 
   Future<bool> _findOuraEvidence() async {
     if (_prefsLoaded && !_prefsDefaulted && prefs.ouraSyncedTo != null) return true;
-    try {
-      if (await ouraLink.hasTokens) return true;
-    } catch (_) {
-      // Η αποθήκευση δεν απάντησε: σημαίνει ότι υπάρχει αρχείο tokens.
-      return true;
-    }
     try {
       if (decodeOuraNights(await ouraNightsFile.read()).isNotEmpty) return true;
     } catch (_) {}
@@ -1064,24 +1056,6 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   set ouraConnectedMs(int? v) => prefs.ouraConnected = v;
 
-  /// Για τη σύνδεση πριν από τις 12:00: φρέσκια ανάγνωση της Samsung (ή αυτή που τρέχει ήδη), και οι νύχτες του
-  /// ρολογιού (ημερομηνία, τέλος). null αν η Samsung δεν διαβάστηκε (τότε η πρώτη νύχτα του Oura είναι η αυριανή).
-  @override
-  Future<List<(DateTime, DateTime)>?> freshWatchNights() async {
-    try {
-      final running = _reading;
-      if (running == null || running.isCompleted) unawaited(refresh());
-      await _reading!.future.timeout(const Duration(seconds: 100));
-    } catch (_) {
-      return null;
-    }
-    final d = _raw;
-    if (d == null || error != null) return null;
-    if (!d.hasAnyPermission) return const [];
-    if (!d.sleepOk) return null;
-    return [for (final n in [...d.nights, ...d.compareNights]) (n.date, n.end)];
-  }
-
   @override
   int? get ouraSyncedMs => prefs.ouraSynced;
   @override
@@ -1202,29 +1176,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     await refresh();
   }
 
-  /// Η ανάγνωση της Samsung που τρέχει (ολοκληρώνεται μόλις έρθουν τα δεδομένα, πριν από το ιστορικό).
-  Completer<void>? _reading;
-
   Future<void> refresh({bool askPermissions = false}) async {
     if (loading) return;
     loading = true;
-    final reading = _reading = Completer<void>();
     notifyListeners();
-    try {
-      await _refresh(askPermissions, reading);
-    } finally {
-      if (!reading.isCompleted) reading.complete();
-    }
-  }
-
-  Future<void> _refresh(bool askPermissions, Completer<void> reading) async {
 
     if (askPermissions) {
       final r = await SamsungHealth.requestPermissions();
       if (r['ok'] != true) {
         error = r;
         loading = false;
-        reading.complete();
         notifyListeners();
         return;
       }
@@ -1248,7 +1209,6 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       error = p.status;
     }
     loading = false;
-    reading.complete();
     notifyListeners();
 
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
