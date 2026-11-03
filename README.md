@@ -51,7 +51,8 @@ Secrets του GitHub (ή από την προσωρινή μνήμη του Git
 - Σύνδεση: OAuth2 με PKCE, χωρίς Client Secret (`lib/oura/`). Ρυθμίσεις σε ένα σημείο: `lib/oura/config.dart`
   (`ouraClientId`, `ouraTokenProxy`, `ouraOAuth`). Scope μόνο `daily`. Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
 - Τη μέρα του δαχτυλιδιού: εγγραφή εφαρμογής στο https://cloud.ouraring.com/oauth/applications με Redirect URI
-  `ygeiaforma://oura-callback`, και το Client ID στο `ouraClientId`.
+  `https://ygeia-forma.netlify.app/oura/callback` (App Link· εναλλακτική `ygeiaforma://oura-callback`, αλλαγή μίας
+  γραμμής στο `ouraRedirectUri`), scope μόνο `daily`, και το Client ID στο `ouraClientId`.
 - Το manifest (από το `flutter create`) συμπληρώνεται από το `tools/android/patch_manifest.py`: μικρή οθόνη
   `OuraCallbackActivity` για την επιστροφή και `<queries>` για browser. Η MainActivity δεν αλλάζει.
 - Το σχέδιο πηγών έχει δικό του αρχείο (`sources.json`, `lib/plan_file.dart`), ανεξάρτητο από τις ρυθμίσεις.

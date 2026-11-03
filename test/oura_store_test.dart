@@ -149,7 +149,7 @@ void main() {
     final store = HealthStore()
       ..planFile = pf
       ..ouraNightsFile = nf
-      ..ouraClock = clock ?? () => t
+      ..ouraClock = (clock ?? () => t)
       ..ouraLink = OuraLink(vault: v, send: o.send, clientId: 'CID', tokenEndpoint: 'https://api.ouraring.com/oauth/token');
     return (store: store, android: and, oura: o, vault: v, planFile: pf, nights: nf);
   }
