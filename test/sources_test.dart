@@ -309,20 +309,41 @@ void main() {
   group('Αποθήκευση: οι τιμές νύχτας του ρολογιού δεν γράφονται ποτέ για νύχτες του Oura', () {
     test('mergeHistory: μέρα Oura → μόνο οξυγόνο/βήματα του ρολογιού, οι παλιές τιμές νύχτας φεύγουν', () {
       final h = <String, Map<String, double>>{
-        '2026-11-06': {K.sleepMin: 350, K.sleepHr: 60, K.energy: 70, 'o.sleepMin': 420, K.steps: 1000},
+        '2026-11-07': {K.sleepMin: 350, K.sleepHr: 60, K.energy: 70, 'o.sleepMin': 420, K.steps: 1000},
       };
       final changed = mergeHistory(
         h,
         {
           '2026-11-05': {K.sleepMin: 380, K.spo2Avg: 95, K.steps: 7000},
-          '2026-11-06': {K.sleepMin: 355, K.sleepHr: 61, K.energy: 71, K.skinTemp: 34, K.spo2Avg: 94, K.spo2Min: 88, K.steps: 8000},
+          '2026-11-07': {K.sleepMin: 355, K.sleepHr: 61, K.energy: 71, K.skinTemp: 34, K.spo2Avg: 94, K.spo2Min: 88, K.steps: 8000},
         },
         sleepFrom: d(2026, 11, 1),
         plan: plan,
       );
-      expect(changed, containsAll(['2026-11-05', '2026-11-06']));
+      expect(changed, containsAll(['2026-11-05', '2026-11-07']));
       expect(h['2026-11-05']![K.sleepMin], 380, reason: 'πριν από τη σύνδεση: όπως πάντα');
-      expect(h['2026-11-06'], {'o.sleepMin': 420, K.steps: 8000, K.spo2Avg: 94, K.spo2Min: 88});
+      expect(h['2026-11-07'], {'o.sleepMin': 420, K.steps: 8000, K.spo2Avg: 94, K.spo2Min: 88});
+    });
+
+    test('mergeHistory: η πρώτη νύχτα του Oura κρατά τη νύχτα του ρολογιού που υπήρχε (κρυφή), χωρίς νέες τιμές', () {
+      final h = <String, Map<String, double>>{
+        '2026-11-06': {K.sleepMin: 350, K.sleepHr: 60, K.energy: 70, 'o.sleepMin': 420, K.steps: 1000},
+      };
+      mergeHistory(
+        h,
+        {
+          '2026-11-06': {K.sleepMin: 355, K.sleepHr: 61, K.energy: 71, K.skinTemp: 34, K.spo2Avg: 94, K.steps: 8000},
+        },
+        sleepFrom: d(2026, 11, 1),
+        plan: plan,
+      );
+      expect(h['2026-11-06'], {K.sleepMin: 350, K.sleepHr: 60, K.energy: 70, 'o.sleepMin': 420, K.steps: 8000, K.spo2Avg: 94});
+      // Οι οθόνες διαβάζουν μόνο το Oura εκείνη τη μέρα.
+      expect(plan.value(h, K.sleepMin, d(2026, 11, 6)), 420);
+      // Ούτε ο ξαναϋπολογισμός τη σβήνει.
+      mergeHistory(h, {'2026-11-06': {K.spo2Avg: 95}},
+          replaceSleep: true, rangeFrom: d(2026, 11, 1), rangeTo: d(2026, 11, 10), plan: plan);
+      expect(h['2026-11-06']![K.sleepMin], 350);
     });
 
     test('Ξαναϋπολογισμός ιστορικού (replaceSleep) πάνω από τη σύνδεση: το Oura μένει, το ρολόι δεν μπαίνει', () {
@@ -345,15 +366,17 @@ void main() {
       expect(h['2026-11-07'], {'o.sleepMin': 430, 'o.hrv': 40, K.spo2Avg: 95});
     });
 
-    test('stripForeignWatchNight: η μέρα της σύνδεσης χάνει τις τιμές νύχτας του ρολογιού', () {
+    test('stripForeignWatchNight: οι μέρες του Oura χάνουν τις τιμές του ρολογιού· η πρώτη νύχτα της εποχής μένει', () {
       final h = <String, Map<String, double>>{
         '2026-11-05': {K.sleepMin: 300, K.steps: 1},
         '2026-11-06': {K.sleepMin: 300, K.energy: 50, K.spo2Avg: 95, K.steps: 2},
+        '2026-11-07': {K.sleepMin: 310, K.energy: 51, K.spo2Avg: 96, K.steps: 3},
       };
       final c = stripForeignWatchNight(h, plan, from: ouraFrom);
-      expect(c, {'2026-11-06'});
+      expect(c, {'2026-11-07'});
       expect(h['2026-11-05']![K.sleepMin], 300);
-      expect(h['2026-11-06'], {K.spo2Avg: 95, K.steps: 2});
+      expect(h['2026-11-06']![K.sleepMin], 300, reason: 'ποτέ δεν σβήνεται');
+      expect(h['2026-11-07'], {K.spo2Avg: 96, K.steps: 3});
     });
 
     test('summarizeDay με Oura: καμία τιμή νύχτας από το ρολόι, οξυγόνο ναι (χωρίς τον ύπνο του ρολογιού)', () {

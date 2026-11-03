@@ -159,6 +159,14 @@ void main() {
     await s.start();
   }
 
+  /// «Σύνδεση με Oura» στην ώρα του ρολογιού του store (με την απάντηση [wore] αν ρωτηθεί), και επιστροφή.
+  Future<void> connect(HealthStore s, MemoryVault vault, {bool wore = false}) async {
+    expect(await s.beginOuraLogin(from: firstOuraNight(s.ouraClock(), woreRing: wore)), isNull);
+    final state = OuraPending.fromJson(vault.data[vaultPending])!.state;
+    await s.completeOuraLogin('$ouraRedirectHttps?code=C&state=$state');
+    await s.syncOura();
+  }
+
   // ---------------------------------------------------------------------------
   group('B1: χωρίς ρυθμίσεις ή σχέδιο πηγών δεν γράφεται τίποτα', () {
     test('Ιστορικό διαβασμένο, ρυθμίσεις ΟΧΙ: καμία εγγραφή, καμία κλήση στην Oura', () async {
@@ -259,22 +267,46 @@ void main() {
       expect(a.oura.gets, 0);
     });
 
-    test('S-E: χωρίς αρχείο και αντίγραφο αλλά με tokens (χωρίς τιμές «o.*»): «άγνωστο», ποτέ σιωπηλά ρολόι', () async {
-      final a = app(plan: null, withTokens: true);
+    test('S-E: χωρίς ένδειξη Oura, με επιλογές: αποτυχία εγγραφής δεν αλλάζει τίποτα, μετά γράφεται', () async {
+      final a = app(plan: null);
+      a.nights.content = encodeOuraNights(
+          parseOura(sleep: sampleOuraSleep(ouraStart, now), dailySleep: const [], readiness: const []).nights);
       await boot(a.store);
       expect(a.store.planState, PlanState.unknown);
       expect(a.store.plan.nightSource(today), Source.none);
       expect(a.android.saveDaysCalls, 0);
       final options = a.store.planRecovery!;
       expect(options.any((o) => o.plan.nightSource(add(today, 1)) == Source.oura), isTrue, reason: 'επιλογή Oura');
-      // Αποτυχία εγγραφής: τίποτα δεν αλλάζει (η οθόνη δείχνει μήνυμα).
       a.planFile.failWrites = true;
       expect(await a.store.recoverPlan(options.first.plan), isFalse);
       expect(a.store.planState, PlanState.unknown);
+      expect(a.planFile.log, isNull, reason: 'ούτε στο ημερολόγιο');
       a.planFile.failWrites = false;
       expect(await a.store.recoverPlan(options.first.plan), isTrue);
       expect(a.store.planState, PlanState.ok);
       expect(lastLoggedPlan(a.planFile.log)!.plan, options.first.plan, reason: 'και στο ημερολόγιο');
+    });
+
+    test('N-2: tokens χωρίς εποχή Oura και χωρίς τίποτα από το Oura = μισή σύνδεση: σβήνονται, ποτέ «άγνωστο»', () async {
+      final a = app(plan: null, withTokens: true);
+      await boot(a.store);
+      expect(a.store.planState, PlanState.ok);
+      expect(a.store.plan.eras, isEmpty);
+      expect(a.vault.data.containsKey(vaultTokens), isFalse);
+      expect(a.store.ouraHasTokens, isFalse);
+      expect(a.store.ouraStatus, OuraStatus.incomplete);
+      expect(ouraErrorText(a.store.ouraLoginError!), 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά.');
+      expect(a.android.saveDaysCalls, greaterThan(0), reason: 'η εφαρμογή συνεχίζει κανονικά');
+      expect(a.oura.gets, 0);
+    });
+
+    test('N-2: εποχή Oura από σήμερα χωρίς tokens και χωρίς τίποτα από το Oura: η εποχή φεύγει', () async {
+      final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, today));
+      await boot(a.store);
+      expect(a.store.planState, PlanState.ok);
+      expect(a.store.plan.eras, isEmpty);
+      expect(decodePlanFile(a.planFile.content)!.eras, isEmpty);
+      expect(a.store.ouraStatus, OuraStatus.incomplete);
     });
 
     test('S-E: αρχείο νυχτών Oura χωρίς tokens = ένδειξη· χωρίς ιστορικό ακόμα: καμία επιλογή («Δοκίμασε ξανά»)', () async {
@@ -299,17 +331,19 @@ void main() {
 
   // ---------------------------------------------------------------------------
   group('Σύνδεση, αποσύνδεση, αναίρεση, «ξανά από το ρολόι»', () {
-    test('S3: η πρώτη νύχτα του Oura είναι η επόμενη· η χθεσινή μένει του ρολογιού και δεν σβήνεται', () async {
+    test('15:00: από απόψε, χωρίς ερώτηση· η χθεσινή μένει του ρολογιού και δεν σβήνεται', () async {
       final a = app(plan: null);
       await boot(a.store);
       final watchSleep = a.android.days[dateKey(today)]?[K.sleepMin];
       expect(watchSleep, isNotNull, reason: 'η χθεσινή νύχτα του ρολογιού');
-      final url = await a.store.ouraLink.begin();
-      await a.store.completeOuraLogin('$ouraRedirectHttps?code=C&state=${url.queryParameters['state']}');
+      expect(firstNightChoice(now), FirstNightChoice.tomorrow);
+      await connect(a.store, a.vault);
       expect(a.store.ouraLoginError, isNull);
       expect(a.store.plan.ouraFrom, add(today, 1), reason: '15:00: από απόψε');
       expect(a.store.plan.nightSource(today), Source.watch);
       expect(a.store.ouraStatus, OuraStatus.starting);
+      expect(a.store.ouraEraStarted, isFalse, reason: 'M-12: χωρίς «Αναίρεση»');
+      expect(a.store.canWatchLastNight, isFalse);
       expect(a.android.days[dateKey(today)]?[K.sleepMin], watchSleep, reason: 'δεν σβήστηκε');
       expect(decodePlanFile(a.planFile.content)!.ouraFrom, add(today, 1), reason: 'πρώτα στο αρχείο');
       // Ανάγνωση σήμερα: τίποτα να διαβαστεί ακόμα (η πρώτη νύχτα είναι αύριο).
@@ -319,6 +353,86 @@ void main() {
       await a.store.disconnectOura();
       expect(a.store.plan.eras, isEmpty);
       expect(a.vault.data, isEmpty);
+    });
+
+    test('02:00: η νύχτα που κοιμάσαι τώρα από το δαχτυλίδι, χωρίς ερώτηση', () async {
+      final at = DateTime(today.year, today.month, today.day, 2);
+      final a = app(plan: null, at: at);
+      a.oura.noData = true;
+      await boot(a.store);
+      expect(firstNightChoice(at), FirstNightChoice.today);
+      await connect(a.store, a.vault);
+      expect(a.store.plan.ouraFrom, today);
+      expect(a.store.ouraStatus, OuraStatus.startingNow);
+      expect(a.store.ouraFirstNightText, 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι');
+      expect(a.store.ouraNightReason(today, at), EmptyNight.waiting);
+      expect(a.store.ouraEraStarted, isTrue, reason: 'M-12: «Αναίρεση» μετά από αποσύνδεση');
+    });
+
+    test('09:00, «Όχι, από απόψε» (προεπιλογή): αύριο', () async {
+      final at = DateTime(today.year, today.month, today.day, 9);
+      final a = app(plan: null, at: at);
+      await boot(a.store);
+      expect(firstNightChoice(at), FirstNightChoice.ask);
+      await connect(a.store, a.vault, wore: false);
+      expect(a.store.plan.ouraFrom, add(today, 1));
+      expect(a.store.plan.nightSource(today), Source.watch);
+      expect(a.store.ouraStatus, OuraStatus.starting);
+    });
+
+    test('09:00, «Ναι»: σήμερα· η νύχτα του ρολογιού μένει στο ιστορικό (κρυφή)· «Η τελευταία νύχτα από το ρολόι»', () async {
+      final at = DateTime(today.year, today.month, today.day, 9);
+      final a = app(plan: null, at: at);
+      await boot(a.store);
+      final watchSleep = a.android.days[dateKey(today)]?[K.sleepMin];
+      expect(watchSleep, isNotNull);
+      await connect(a.store, a.vault, wore: true);
+      expect(a.store.plan.ouraFrom, today);
+      expect(a.store.plan.nightSource(today), Source.oura);
+      expect(a.store.ouraFirstNightText, 'Η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι');
+      await a.store.refresh();
+      final row = a.android.days[dateKey(today)]!;
+      expect(row[ouraKeys[K.sleepMin]], isNotNull, reason: 'η νύχτα από το Oura');
+      expect(row[K.sleepMin], watchSleep, reason: 'η νύχτα του ρολογιού δεν σβήνεται ποτέ');
+      expect(a.store.plan.value(a.store.history, K.sleepMin, today), row[ouraKeys[K.sleepMin]], reason: 'οι οθόνες: Oura');
+      expect(a.store.data!.nights.any((n) => sameDay(n.date, today)), isFalse, reason: 'μόνο στη Σύγκριση');
+      // Αναίρεση της μέρας της σύνδεσης.
+      expect(a.store.canWatchLastNight, isTrue);
+      expect(await a.store.watchLastNight(), isTrue);
+      expect(a.store.plan.nightSource(today), Source.watch);
+      expect(a.store.plan.ouraFrom, add(today, 1));
+      expect(decodePlanFile(a.planFile.content)!.ouraFrom, add(today, 1));
+      final after = a.android.days[dateKey(today)]!;
+      expect(after[K.sleepMin], watchSleep);
+      expect(after.keys.any(ouraKeySet.contains), isFalse);
+      expect(a.store.data!.nights.any((n) => sameDay(n.date, today)), isTrue, reason: 'ξαναφαίνεται');
+      expect(a.store.canWatchLastNight, isFalse);
+      expect(a.store.ouraHasTokens, isTrue, reason: 'η σύνδεση μένει');
+    });
+
+    test('Δεν γράφτηκε το σχέδιο πηγών: τα tokens δεν κρατιούνται (ανάκληση), τίποτα δεν αλλάζει', () async {
+      final a = app(plan: null);
+      await boot(a.store);
+      a.planFile.failWrites = true;
+      await connect(a.store, a.vault);
+      expect(a.store.ouraLoginError, OuraErrorKind.cancelled);
+      expect(a.vault.data.containsKey(vaultTokens), isFalse);
+      expect(a.store.ouraHasTokens, isFalse);
+      expect(a.oura.revoked, isNotEmpty);
+      expect(a.store.plan.eras, isEmpty);
+    });
+
+    test('Δεν γράφτηκαν τα tokens: το σχέδιο πηγών επιστρέφει όπως ήταν', () async {
+      final a = app(plan: null);
+      await boot(a.store);
+      expect(await a.store.beginOuraLogin(from: add(today, 1)), isNull);
+      final state = OuraPending.fromJson(a.vault.data[vaultPending])!.state;
+      a.vault.failSaves = true;
+      await a.store.completeOuraLogin('$ouraRedirectHttps?code=C&state=$state');
+      expect(a.store.ouraLoginError, OuraErrorKind.cancelled);
+      expect(a.store.plan.eras, isEmpty);
+      expect(decodePlanFile(a.planFile.content)?.eras ?? const [], isEmpty);
+      expect(a.store.ouraHasTokens, isFalse);
     });
 
     test('Χωρίς γνωστό σχέδιο δεν συνδέεται (ο κωδικός δεν χρησιμοποιείται)', () async {
@@ -349,21 +463,6 @@ void main() {
       await a.store.sleepFromWatchAgain();
       expect(a.store.plan.nightSource(add(today, 1)), Source.watch);
       expect(a.store.plan.changeDates(K.sleepMin), [ouraStart, add(today, 1)]);
-    });
-
-    test('S-D: σύνδεση στις 00:40 χωρίς τελειωμένη νύχτα ρολογιού: η νύχτα που έρχεται μετρά από το δαχτυλίδι', () async {
-      final at = DateTime(today.year, today.month, today.day, 0, 40);
-      final a = app(plan: null, at: at);
-      a.oura.noData = true;
-      await boot(a.store);
-      final url = await a.store.ouraLink.begin();
-      await a.store.completeOuraLogin('$ouraRedirectHttps?code=C&state=${url.queryParameters['state']}');
-      for (var i = 0; i < 50 && (a.store.loading || a.store.ouraSyncing); i++) {
-        await Future<void>.delayed(Duration.zero);
-      }
-      expect(a.store.plan.ouraFrom, today);
-      expect(a.store.ouraStatus, OuraStatus.startingNow);
-      expect(a.store.ouraNightReason(today, at), EmptyNight.waiting);
     });
 
     test('S-B: αποσύνδεση μετά από «ρολόι από απόψε»: η επιλογή μένει, καμία «χωρίς πηγή»', () async {
@@ -397,28 +496,54 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  group('S-D: η πρώτη νύχτα του Oura (καθαρή συνάρτηση)', () {
+  group('Η πρώτη νύχτα του Oura από την ώρα του «Σύνδεση με Oura» (καθαρή συνάρτηση)', () {
     final d = DateTime(2026, 11, 3);
-    test('00:40 χωρίς νύχτα ρολογιού: σήμερα', () {
-      expect(firstOuraNight(connectedAt: DateTime(2026, 11, 3, 0, 40), watchNights: const []), d);
+    final next = DateTime(2026, 11, 4);
+    DateTime t(int h, [int m = 0]) => DateTime(2026, 11, 3, h, m);
+    test('00:00–03:59: σήμερα, χωρίς ερώτηση', () {
+      for (final x in [t(0), t(2), t(3, 59)]) {
+        expect(firstNightChoice(x), FirstNightChoice.today);
+        expect(firstOuraNight(x), d);
+      }
     });
-    test('07:30 αφού τελείωσε νύχτα ρολογιού στις 07:10: αύριο (η νύχτα του ρολογιού μένει)', () {
-      expect(
-        firstOuraNight(connectedAt: DateTime(2026, 11, 3, 7, 30), watchNights: [(d, DateTime(2026, 11, 3, 7, 10))]),
-        DateTime(2026, 11, 4),
-      );
+    test('04:00–11:59: ερώτηση· «Ναι» σήμερα, «Όχι» (προεπιλογή) αύριο', () {
+      for (final x in [t(4), t(9), t(11, 59)]) {
+        expect(firstNightChoice(x), FirstNightChoice.ask);
+        expect(firstOuraNight(x, woreRing: true), d);
+        expect(firstOuraNight(x), next);
+      }
     });
-    test('07:30 με νύχτα ρολογιού που δεν έχει τελειώσει ακόμα: σήμερα', () {
-      expect(
-        firstOuraNight(connectedAt: DateTime(2026, 11, 3, 7, 30), watchNights: [(d, DateTime(2026, 11, 3, 8, 10))]),
-        d,
-      );
+    test('12:00–23:59: αύριο, χωρίς ερώτηση', () {
+      for (final x in [t(12), t(15), t(23, 59)]) {
+        expect(firstNightChoice(x), FirstNightChoice.tomorrow);
+        expect(firstOuraNight(x, woreRing: true), next);
+      }
     });
-    test('15:00: αύριο', () {
-      expect(firstOuraNight(connectedAt: DateTime(2026, 11, 3, 15), watchNights: const []), DateTime(2026, 11, 4));
+    test('Η απόφαση ταξιδεύει κρυπτογραφημένη με το state (και ξαναδιαβάζεται)', () {
+      final p = OuraPending(state: 's', verifier: 'v', created: t(9), from: d);
+      expect(OuraPending.fromJson(p.toJson())!.from, d);
+      expect(OuraPending.fromJson(OuraPending(state: 's', verifier: 'v', created: t(9)).toJson())!.from, isNull);
     });
-    test('Πριν από τις 12:00 χωρίς ανάγνωση της Samsung: αύριο (ποτέ δεν χάνεται νύχτα ρολογιού)', () {
-      expect(firstOuraNight(connectedAt: DateTime(2026, 11, 3, 6), watchNights: null), DateTime(2026, 11, 4));
+  });
+
+  // ---------------------------------------------------------------------------
+  group('Μικρά: όρια αναμονής (M-8), λόγοι κενής νύχτας (M-5, noRefresh)', () {
+    test('M-8: 429 → max(Retry-After, 1 λεπτό), το πολύ 6 ώρες· χωρίς Retry-After 15 λεπτά', () {
+      expect(ouraBackoffFor(OuraErrorKind.rateLimited, retryAfter: const Duration(seconds: 30)), const Duration(minutes: 1));
+      expect(ouraBackoffFor(OuraErrorKind.rateLimited, retryAfter: const Duration(hours: 2)), const Duration(hours: 2));
+      expect(ouraBackoffFor(OuraErrorKind.rateLimited, retryAfter: const Duration(hours: 10)), const Duration(hours: 6));
+      expect(ouraBackoffFor(OuraErrorKind.rateLimited), const Duration(minutes: 15));
+      expect(ouraBackoffFor(OuraErrorKind.network), ouraMinInterval);
+    });
+    test('M-5: άγνωστο σχέδιο → «Δεν διαβάστηκε από πού έρχεται ο ύπνος»· noRefresh → νέα σύνδεση', () {
+      final none = SourcePlan([SourceEra(Source.none, add(today, -5))]);
+      final r = emptyNightReason(plan: none, day: today, now: now, night: null, hasTokens: true, planUnknown: true);
+      expect(r, EmptyNight.unknownPlan);
+      expect(emptyNightText(r!), 'Δεν διαβάστηκε από πού έρχεται ο ύπνος');
+      expect(emptyNightReason(plan: none, day: today, now: now, night: null, hasTokens: true), EmptyNight.disconnected);
+      final oura = SourcePlan([SourceEra(Source.oura, add(today, -5))]);
+      expect(emptyNightReason(plan: oura, day: today, now: now, night: null, hasTokens: true, error: 'noRefresh'),
+          EmptyNight.reconnect);
     });
   });
 
@@ -496,14 +621,14 @@ void main() {
       expect(describePlan(o.first.plan).length, 3);
     });
 
-    test('Το ημερολόγιο αλλαγών προτιμάται και δείχνεται ολόκληρο', () {
+    test('Ημερολόγιο αλλαγών: η τελευταία έγκυρη καταχώριση· με ένδειξη Oura υπάρχει επιλογή Oura', () {
       final p = SourcePlan([SourceEra(Source.oura, add(today, -10))]);
       final log = appendPlanLog(appendPlanLog(null, SourcePlan.samsungOnly, 1), p, 2);
       expect(lastLoggedPlan(log), (plan: p, at: 2));
-      final o = recoveryOptions(history: const {}, logged: lastLoggedPlan(log), evidence: true, today: today)!;
-      expect(o.first.plan, p);
-      expect(o.where((x) => x.plan.nightSource(add(today, 1)) == Source.oura).length, 1);
       expect(lastLoggedPlan('χαλασμένο'), isNull);
+      final o = recoveryOptions(history: const {}, evidence: true, today: today)!;
+      expect(o.first.primary, isTrue);
+      expect(o.first.plan.nightSource(add(today, 1)), Source.oura);
     });
 
     test('Χωρίς καμία ένδειξη Oura: μόνο «ρολόι, όπως πριν»', () {

@@ -633,6 +633,46 @@ void main() {
           s.ouraNights = [for (final n in s.ouraNights) if (dateKey(n.day) != '2026-11-14') n, short];
         },
       ));
+  testWidgets('Σύνδεση Oura · 04:00–11:59 · ερώτηση για την τελευταία νύχτα', (t) => _page(
+        t,
+        name: '89_oura_connect_question',
+        size: fold,
+        brightness: Brightness.light,
+        oura: false,
+        page: (s) => OuraConnectPage(store: s, now: ouraNow),
+        prepare: (s) {
+          s.ouraLink = OuraLink(vault: MemoryVault(), clientId: 'SCREENSHOT');
+          s.ouraClock = () => ouraNow;
+        },
+        act: (t) async {
+          await t.tap(find.byKey(const ValueKey('oura-connect')));
+        },
+      ));
+  testWidgets('Oura · διαχείριση · μέρα σύνδεσης (η τελευταία νύχτα από το ρολόι)', (t) => _page(
+        t,
+        name: '90_oura_manage_first_day',
+        size: fold,
+        brightness: Brightness.light,
+        page: (s) => OuraManagePage(store: s, now: ouraNow),
+        prepare: (s) {
+          s.debugSetPlan(SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 14)));
+          s.ouraNights = [for (final n in s.ouraNights) if (dateKey(n.day) != '2026-11-14') n];
+          s.ouraConnectedMs = DateTime(2026, 11, 14, 9, 5).millisecondsSinceEpoch;
+        },
+      ));
+  testWidgets('Oura · Σήμερα · η σύνδεση έμεινε μισή', (t) => _shot(
+        t,
+        name: '91_oura_today_incomplete',
+        size: phone,
+        brightness: Brightness.dark,
+        tab: 0,
+        at: ouraNow,
+        prepare: (s) {
+          s.ouraLink = OuraLink(vault: MemoryVault(), clientId: 'SCREENSHOT');
+          s.ouraClock = () => ouraNow;
+          s.ouraIncomplete = true;
+        },
+      ));
   testWidgets('Σήμερα · άγνωστο σχέδιο', (t) => _shot(
         t,
         name: '84_today_plan_unknown',

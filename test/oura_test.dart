@@ -311,7 +311,7 @@ void main() {
       expect(emptyNightText(r!), 'Μόνο υπνάκος από το δαχτυλίδι');
     });
 
-    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η άλλη «δεύτερο κομμάτι», ποτέ άθροισμα', () {
+    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η άλλη «άλλο κομμάτι», ποτέ άθροισμα', () {
       final n = only([
         rec('sleep', at(2, 23, 0), at(3, 1, 30)),
         rec('sleep', at(3, 3, 0), at(3, 5, 45)),
@@ -327,6 +327,24 @@ void main() {
       final back = decodeOuraNights(encodeOuraNights([n])).single;
       expect(back.pieces.length, 1);
       expect(ouraRow(back), row);
+    });
+
+    test('Βραδινό «sleep» 19:00–21:00 (χωρίς νύχτα): μένει υπνάκος, ποτέ νύχτα', () {
+      final n = only([rec('sleep', at(2, 19, 0), at(2, 21, 0))]);
+      expect(n.main, isNull);
+      expect(n.naps.single.type, 'sleep');
+      expect(n.onlyNap, isTrue);
+      expect(ouraRow(n).containsKey(ouraKeys[K.sleepMin]), isFalse);
+      expect(ouraRow(n)[ouraKeys[K.napMin]], 115);
+    });
+
+    test('Παράθυρο: μόνο ό,τι επικαλύπτει 00:00–06:00 της μέρας', () {
+      OuraSleep s(DateTime a, DateTime b) => OuraSleep.fromJson(rec('sleep', a, b))!;
+      expect(inNightWindow(s(at(2, 22, 0), at(3, 0, 30)), d), isTrue);
+      expect(inNightWindow(s(at(3, 5, 30), at(3, 8, 0)), d), isTrue);
+      expect(inNightWindow(s(at(3, 6, 0), at(3, 8, 0)), d), isFalse);
+      expect(inNightWindow(s(at(2, 20, 0), at(2, 23, 59)), d), isFalse);
+      expect(inNightWindow(s(at(3, 14, 0), at(3, 15, 0)), d), isFalse);
     });
 
     test('late_nap στις 19:00: ποτέ νύχτα', () {
@@ -596,6 +614,28 @@ void main() {
       expect(form.containsKey('client_secret'), isFalse);
       expect(OuraTokens.fromJson(v.data[vaultTokens])!.refresh, 'REFRESH-1');
       expect(v.data.containsKey(vaultPending), isFalse, reason: 'state και verifier μιας χρήσης');
+    });
+
+    test('exchange: η πρώτη νύχτα ταξιδεύει με το state· τα tokens ΔΕΝ γράφονται πριν από το adopt', () async {
+      final v = MemoryVault();
+      final http = FakeHttp((m, u, h, f) => OuraResponse(200, jsonEncode(fixture('token.json'))));
+      final l = OuraLink(vault: v, send: http.send, clock: () => now, clientId: 'CID');
+      final st = (await l.begin(from: DateTime(2026, 11, 6))).queryParameters['state'];
+      final ex = await l.exchange('$ouraRedirectHttps?code=C&state=$st');
+      expect(ex!.from, DateTime(2026, 11, 6));
+      expect(v.data.containsKey(vaultTokens), isFalse);
+      expect(await l.hasTokens, isFalse);
+      // Αποθήκευση που αποτυγχάνει: τίποτα δεν κρατιέται ούτε στη μνήμη.
+      v.failSaves = true;
+      expect(await l.adopt(ex.tokens, ex.gen), isFalse);
+      expect(await l.hasTokens, isFalse);
+      v.failSaves = false;
+      expect(await l.adopt(ex.tokens, ex.gen), isTrue);
+      expect(OuraTokens.fromJson(v.data[vaultTokens])!.refresh, 'REFRESH-1');
+      // Αποσύνδεση στο μεταξύ (άλλη γενιά): δεν κρατιέται.
+      await l.disconnect();
+      expect(await l.adopt(ex.tokens, ex.gen), isFalse);
+      expect(v.data.containsKey(vaultTokens), isFalse);
     });
 
     test('Άλλο state (CSRF) ή χωρίς εκκρεμή σύνδεση: αγνοείται, καμία κλήση', () async {
