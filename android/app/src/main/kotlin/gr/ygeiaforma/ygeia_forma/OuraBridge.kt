@@ -141,8 +141,8 @@ class OuraBridge(
 
         /** Μόνο τα δύο αρχεία του σχεδίου πηγών. */
         fun planName(n: String?): String = if (n == PLAN_LOG_FILE) PLAN_LOG_FILE else PLAN_FILE
-        const val SCHEME = "ygeiaforma"
-        const val HOST = "oura-callback"
+        const val SCHEME = OuraRules.SCHEME
+        const val HOST = OuraRules.HOST
 
         /** Μόνο οι σελίδες σύνδεσης της Oura ανοίγουν από εδώ (ακριβές όνομα, όχι «τελειώνει σε»). */
         val ALLOWED_HOSTS = setOf("cloud.ouraring.com", "api.ouraring.com")
@@ -161,22 +161,15 @@ class OuraBridge(
         }
 
         /** App Link (https) της επιστροφής: μόνο αυτός ο ακριβής host και η διαδρομή. */
-        const val HTTPS_HOST = "ygeia-forma.netlify.app"
-        const val HTTPS_PATH = "/oura/callback"
+        const val HTTPS_HOST = OuraRules.HTTPS_HOST
+        const val HTTPS_PATH = OuraRules.HTTPS_PATH
 
         /** Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback. */
         fun isCallback(intent: Intent?): Boolean {
             val d = intent?.data ?: return false
-            if (intent.action != Intent.ACTION_VIEW || d.userInfo != null || d.port != -1) return false
-            return when (d.scheme) {
-                "https" -> d.host == HTTPS_HOST && d.path == HTTPS_PATH
-                SCHEME -> d.host == HOST && (d.path.isNullOrEmpty() || d.path == "/")
-                else -> false
-            }
+            if (intent.action != Intent.ACTION_VIEW) return false
+            return OuraRules.isCallback(d.scheme, d.host, d.port, d.path, d.userInfo)
         }
-
-        /** Τα ονόματα των δικών μας αρχείων (το προσωρινό είναι «όνομα.<αριθμός>.tmp»). */
-        private val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, "oura_tokens.bin", "oura_pending.bin")
 
         /**
          * Σβήνει μόνο προσωρινά αρχεία των δικών μας εγγραφών (filesDir και noBackupFilesDir/oura), παλιότερα από
@@ -190,8 +183,7 @@ class OuraBridge(
                 val files = dir.listFiles() ?: continue
                 for (f in files) {
                     val name = f.name
-                    if (!f.isFile || !name.endsWith(".tmp") || f.lastModified() > cutoff) continue
-                    if (OWN_FILES.none { name.startsWith("$it.") }) continue
+                    if (!f.isFile || !OuraRules.isOwnTmp(name) || f.lastModified() > cutoff) continue
                     if (f.delete()) n++
                 }
             }
@@ -225,7 +217,7 @@ class OuraBridge(
 object Vault {
     private const val ALIAS = "ygeia_oura_v1"
     private const val VERSION: Byte = 1
-    private val allowed = setOf("oura_tokens", "oura_pending")
+    private val allowed = setOf("oura_tokens", "oura_pending", "oura_connecting")
 
     private fun file(context: Context, name: String): File {
         require(name in allowed) { "Άγνωστο όνομα" }
