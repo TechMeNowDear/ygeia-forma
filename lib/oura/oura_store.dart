@@ -471,10 +471,10 @@ mixin OuraStore on ChangeNotifier {
     }
   }
 
-  /// Η σύνδεση έγινε μέσα στη νύχτα (00:00–03:59): «η νύχτα που κοιμάσαι τώρα»· αλλιώς «η νύχτα που μόλις τελείωσε».
+  /// Πριν από τις 04:00: «η νύχτα που κοιμάσαι τώρα»· μετά: «η νύχτα που μόλις τελείωσε» (ακόμα κι αν η σύνδεση
+  /// έγινε μέσα στη νύχτα: το πρωί έχει ήδη τελειώσει).
   String get ouraFirstNightText {
-    final c = ouraConnectedMs;
-    final asleep = c != null && DateTime.fromMillisecondsSinceEpoch(c).hour < 4;
+    final asleep = ouraClock().hour < 4;
     return asleep ? 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι' : 'Η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι';
   }
 
