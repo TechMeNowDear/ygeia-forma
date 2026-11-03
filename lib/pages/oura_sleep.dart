@@ -230,7 +230,7 @@ class _OuraNightCard extends StatelessWidget {
             const Hairline(vertical: 12),
             // Άλλα κομμάτια ύπνου της ίδιας νύχτας: φαίνονται χωριστά, ποτέ δεν προστίθενται στη νύχτα.
             for (final x in night.pieces)
-              InfoRow('Δεύτερο κομμάτι ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+              InfoRow('Άλλο κομμάτι ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
             for (final x in night.naps)
               InfoRow('Υπνάκος ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
             for (final x in night.others)

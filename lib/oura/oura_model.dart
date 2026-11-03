@@ -5,7 +5,7 @@
 /// - Ό,τι λείπει (null) μένει κενό· ποτέ 0.
 /// - Η νύχτα μιας μέρας είναι η περίοδος «long_sleep» με τον περισσότερο ύπνο. Αν δεν υπάρχει (νύχτα κάτω από
 ///   3 ώρες: η Oura τη λέει «sleep»), νύχτα είναι η μεγαλύτερη «sleep» μέσα στο νυχτερινό παράθυρο ([inNightWindow])
-///   — «Σύντομη νύχτα». Άλλα κομμάτια στο ίδιο παράθυρο φαίνονται ως «δεύτερο κομμάτι» και ΔΕΝ προστίθενται.
+///   — «Σύντομη νύχτα». Άλλα κομμάτια στο ίδιο παράθυρο φαίνονται ως «άλλο κομμάτι» και ΔΕΝ προστίθενται.
 ///   Οι υπνάκοι («sleep» εκτός παραθύρου, «late_nap») φαίνονται χωριστά και δεν προστίθενται. Οι «rest» (λάθος
 ///   ανίχνευση που απέρριψε ο χρήστης) και «deleted» αγνοούνται.
 /// - Η μέρα κάθε περιόδου είναι το «day» της Oura (το πρωί που ξύπνησες)· δεν την ξαναϋπολογίζουμε.
@@ -220,7 +220,7 @@ class OuraNight {
   /// Άλλες μεγάλες περίοδοι της ίδιας μέρας (σπάνιο): φαίνονται, δεν προστίθενται.
   final List<OuraSleep> others;
 
-  /// Σύντομη νύχτα σε κομμάτια: τα άλλα κομμάτια του νυχτερινού παραθύρου («δεύτερο κομμάτι»). Φαίνονται κάτω
+  /// Σύντομη νύχτα σε κομμάτια: τα άλλα κομμάτια του νυχτερινού παραθύρου («άλλο κομμάτι»). Φαίνονται κάτω
   /// από τη νύχτα, ΔΕΝ προστίθενται ούτε στη νύχτα ούτε στους υπνάκους.
   final List<OuraSleep> pieces;
 
@@ -305,16 +305,12 @@ OuraSleep? selectMainSleep(Iterable<OuraSleep> periods) {
   return best;
 }
 
-/// Το νυχτερινό παράθυρο της μέρας [day] (πρωινό): αρχή ύπνου 18:00 της προηγούμενης ως 06:00, ή τέλος 00:00 ως
-/// 12:00 της ίδιας μέρας (ώρα κινητού).
+/// Το νυχτερινό παράθυρο της μέρας [day] (πρωινό): η περίοδος επικαλύπτει 00:00–06:00 της ίδιας μέρας (ώρα κινητού).
 bool inNightWindow(OuraSleep s, DateTime day) {
-  final d = DateTime(day.year, day.month, day.day);
-  final startFrom = DateTime(d.year, d.month, d.day - 1, 18);
-  final startTo = DateTime(d.year, d.month, d.day, 6);
-  final endTo = DateTime(d.year, d.month, d.day, 12);
-  final startsIn = !s.start.isBefore(startFrom) && !s.start.isAfter(startTo);
-  final endsIn = !s.end.isBefore(d) && !s.end.isAfter(endTo);
-  return startsIn || endsIn;
+  // Επικάλυψη με 00:00–06:00 (ώρα κινητού) της μέρας D: όχι απογευματινοί/βραδινοί υπνάκοι (π.χ. 19:00–21:00).
+  final from = DateTime(day.year, day.month, day.day);
+  final to = DateTime(day.year, day.month, day.day, 6);
+  return s.start.isBefore(to) && s.end.isAfter(from);
 }
 
 /// Χωρίς «long_sleep»: η σύντομη νύχτα = η «sleep» με τον περισσότερο ύπνο μέσα στο νυχτερινό παράθυρο
@@ -343,7 +339,7 @@ List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies
         final day = parseDateKey(k);
         final long = selectMainSleep(list);
         final main = long ?? selectShortNight(list, day);
-        // Τα άλλα κομμάτια μιας σύντομης νύχτας (ίδιο παράθυρο): «δεύτερο κομμάτι», όχι υπνάκοι.
+        // Τα άλλα κομμάτια μιας σύντομης νύχτας (ίδιο παράθυρο): «άλλο κομμάτι», όχι υπνάκοι.
         final pieces = long != null || main == null
             ? const <OuraSleep>[]
             : [for (final p in list) if (!identical(p, main) && p.isShortNight && inNightWindow(p, day)) p];

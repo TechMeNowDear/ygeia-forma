@@ -147,7 +147,8 @@ EmptyNight? emptyNightReason({
   if (night != null && night.onlyNap) return EmptyNight.onlyNap;
   final today = dayOf(now);
   final isToday = sameDay(day, today);
-  if (!hasTokens || error == 'reconnect') return EmptyNight.reconnect;
+  // Και «noRefresh» θέλει νέα σύνδεση.
+  if (!hasTokens || error == 'reconnect' || error == 'noRefresh') return EmptyNight.reconnect;
   if (error == 'subscription') return EmptyNight.subscription;
   // Δεν διαβάστηκε μετά το πρωί αυτής της νύχτας: δεν ξέρουμε ακόμα.
   final readAfter = synced != null && !synced.isBefore(DateTime(day.year, day.month, day.day, 4));
