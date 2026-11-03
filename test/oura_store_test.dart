@@ -114,6 +114,21 @@ class FakeOura {
 
 DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
 
+/// Αρχείο σχεδίου που μπορεί να καθυστερήσει τις εγγραφές ([gate]) και να καταγράψει κάτι τη στιγμή της εγγραφής.
+class GatedPlanFile extends MemoryPlanFile {
+  GatedPlanFile(super.content);
+  Completer<void>? gate;
+  bool Function()? onWrite;
+  final markerSeen = <bool>[];
+
+  @override
+  Future<bool> write(String json) async {
+    if (onWrite != null) markerSeen.add(onWrite!());
+    if (gate != null) await gate!.future;
+    return super.write(json);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -300,13 +315,103 @@ void main() {
       expect(a.oura.gets, 0);
     });
 
-    test('N-2: εποχή Oura από σήμερα χωρίς tokens και χωρίς τίποτα από το Oura: η εποχή φεύγει', () async {
-      final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, today));
+    test('Tokens που χάθηκαν (π.χ. επαναφορά κινητού), χωρίς σημάδι: η εποχή μένει, «Χρειάζεται νέα σύνδεση»', () async {
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, today);
+      final a = app(plan: p);
       await boot(a.store);
-      expect(a.store.planState, PlanState.ok);
+      expect(a.store.plan, p);
+      expect(a.store.ouraStatus, OuraStatus.reconnect);
+      expect(a.store.ouraIncomplete, isFalse);
+    });
+
+    test('Σημάδι «συνδέεται» χωρίς tokens (έκλεισε μετά το σχέδιο, πριν από τα tokens): το σχέδιο επιστρέφει', () async {
+      final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, today));
+      a.vault.data[vaultConnecting] = jsonEncode({'from': dateKey(today), 'at': 1, 'before': <Object>[]});
+      await boot(a.store);
       expect(a.store.plan.eras, isEmpty);
       expect(decodePlanFile(a.planFile.content)!.eras, isEmpty);
       expect(a.store.ouraStatus, OuraStatus.incomplete);
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse);
+    });
+
+    test('Σημάδι χωρίς tokens για όποιον είχε συνδεθεί παλιότερα (με δεδομένα Oura): επιστρέφει ακριβώς το προηγούμενο', () async {
+      final before = SourcePlan([
+        SourceEra(Source.oura, add(today, -20)),
+        SourceEra(Source.none, add(today, -12)),
+        SourceEra(Source.watch, add(today, -10)),
+      ]);
+      final after = before.withEra(Source.oura, add(today, 1));
+      final a = app(plan: after);
+      a.android.days[dateKey(add(today, -15))] = {'o.sleepMin': 420, K.steps: 3000};
+      a.android.prefs = {'sources': after.toJson(), 'sourcesAt': 5, 'ouraSyncedTo': dateKey(add(today, -12))};
+      a.vault.data[vaultConnecting] = jsonEncode({'from': dateKey(add(today, 1)), 'at': 1, 'before': before.toJson()});
+      await boot(a.store);
+      expect(a.store.plan, before);
+      expect(a.store.ouraStatus, OuraStatus.incomplete);
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse);
+    });
+
+    test('Σημάδι ΜΕ tokens (έκλεισε μετά την ολοκλήρωση): μένει η σύνδεση, σβήνεται το σημάδι, η ώρα σύνδεσης επανέρχεται', () async {
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, today);
+      final a = app(plan: p, withTokens: true);
+      a.oura.noData = true;
+      final at = DateTime(today.year, today.month, today.day, 9).millisecondsSinceEpoch;
+      a.vault.data[vaultConnecting] = jsonEncode({'from': dateKey(today), 'at': at, 'before': <Object>[]});
+      await boot(a.store);
+      expect(a.store.plan, p);
+      expect(a.store.ouraHasTokens, isTrue);
+      expect(a.store.ouraConnectedMs, at);
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse);
+      expect(a.store.ouraIncomplete, isFalse);
+    });
+
+    test('T-1(α): Oura από σήμερα, tokens, χωρίς ανάγνωση ακόμα: ο καθαρισμός δεν πειράζει τίποτα', () async {
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, today);
+      final a = app(plan: p, withTokens: true);
+      a.oura.noData = true;
+      await boot(a.store);
+      expect(a.store.plan, p);
+      expect(a.vault.data.containsKey(vaultTokens), isTrue);
+      expect(a.store.ouraHasTokens, isTrue);
+      expect(a.store.ouraStatus, isNot(OuraStatus.incomplete));
+    });
+
+    test('T-1(β): το ίδιο με αποθήκευση που δεν απαντά: τίποτα δεν σβήνεται', () async {
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, today);
+      final a = app(plan: p, withTokens: true);
+      a.vault.failLoads = true;
+      await boot(a.store);
+      expect(a.store.plan, p);
+      expect(a.vault.data.containsKey(vaultTokens), isTrue);
+      expect(a.store.ouraIncomplete, isFalse);
+    });
+
+    test('T-1(γ): αποσύνδεση την πρώτη μέρα: τίποτα δεν πειράζεται, «Αποσυνδέθηκε»', () async {
+      final p = SourcePlan([SourceEra(Source.oura, today), SourceEra(Source.none, add(today, 1))]);
+      final a = app(plan: p);
+      await boot(a.store);
+      expect(a.store.plan, p);
+      expect(a.store.ouraStatus, OuraStatus.disconnected);
+      expect(a.store.ouraNightReason(today, now), EmptyNight.disconnected);
+      expect(a.store.ouraIncomplete, isFalse);
+    });
+
+    test('M-2: αλλαγή σχεδίου με ανανέωση στη μέση: το αρχείο μένει με το ΝΕΟ σχέδιο', () async {
+      final pf = GatedPlanFile(encodePlanFile(SourcePlan.samsungOnly.withEra(Source.oura, ouraStart), now, at: 1));
+      final a = app(withTokens: true, planFile: pf);
+      await boot(a.store);
+      final next = a.store.plan.withEra(Source.watch, add(today, 1));
+      pf.gate = Completer<void>();
+      final f1 = a.store.setPlan(next);
+      final f2 = a.store.refresh();
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      pf.gate!.complete();
+      expect(await f1, isTrue);
+      await f2;
+      expect(a.store.plan, next);
+      expect(decodePlanFile(pf.content), next);
     });
 
     test('S-E: αρχείο νυχτών Oura χωρίς tokens = ένδειξη· χωρίς ιστορικό ακόμα: καμία επιλογή («Δοκίμασε ξανά»)', () async {
@@ -357,11 +462,17 @@ void main() {
 
     test('02:00: η νύχτα που κοιμάσαι τώρα από το δαχτυλίδι, χωρίς ερώτηση', () async {
       final at = DateTime(today.year, today.month, today.day, 2);
-      final a = app(plan: null, at: at);
+      final pf = GatedPlanFile(null);
+      final a = app(plan: null, at: at, planFile: pf);
+      pf.onWrite = () => a.vault.data.containsKey(vaultConnecting);
       a.oura.noData = true;
       await boot(a.store);
       expect(firstNightChoice(at), FirstNightChoice.today);
       await connect(a.store, a.vault);
+      expect(pf.markerSeen, [true], reason: 'το σημάδι γράφεται ΠΡΙΝ από το σχέδιο');
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse, reason: 'και σβήνεται μετά τα tokens');
+      expect(a.store.canWatchLastNight, isTrue);
+      expect(a.store.watchLastNightLabel, 'Η νύχτα που κοιμάσαι τώρα από το ρολόι');
       expect(a.store.plan.ouraFrom, today);
       expect(a.store.ouraStatus, OuraStatus.startingNow);
       expect(a.store.ouraFirstNightText, 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι');

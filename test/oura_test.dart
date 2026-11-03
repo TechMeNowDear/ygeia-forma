@@ -338,6 +338,14 @@ void main() {
       expect(ouraRow(n)[ouraKeys[K.napMin]], 115);
     });
 
+    test('Σύντομη νύχτα που τελείωσε πριν από τα μεσάνυχτα (21:30–23:50): «Μόνο υπνάκος», με τις ώρες του', () {
+      final n = only([rec('sleep', at(2, 21, 30), at(2, 23, 50))]);
+      expect(n.main, isNull);
+      expect(n.onlyNap, isTrue);
+      expect(napTimes(n), '21:30–23:50 · 2 ώρες 15 λεπτά');
+      expect(napTimes(null), '');
+    });
+
     test('Παράθυρο: μόνο ό,τι επικαλύπτει 00:00–06:00 της μέρας', () {
       OuraSleep s(DateTime a, DateTime b) => OuraSleep.fromJson(rec('sleep', a, b))!;
       expect(inNightWindow(s(at(2, 22, 0), at(3, 0, 30)), d), isTrue);

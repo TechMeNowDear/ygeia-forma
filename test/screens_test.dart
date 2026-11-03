@@ -673,6 +673,34 @@ void main() {
           s.ouraIncomplete = true;
         },
       ));
+  testWidgets('Oura · Σήμερα · μόνο υπνάκος (σύντομη νύχτα πριν από τα μεσάνυχτα)', (t) => _shot(
+        t,
+        name: '92_oura_today_only_nap',
+        size: phone,
+        brightness: Brightness.light,
+        tab: 0,
+        at: DateTime(2026, 11, 14, 14),
+        oura: true,
+        prepare: (s) {
+          final a = DateTime(2026, 11, 13, 21, 30);
+          final b = DateTime(2026, 11, 13, 23, 50);
+          final nap = parseOura(sleep: [
+            {
+              'id': 'nap',
+              'day': '2026-11-14',
+              'type': 'sleep',
+              'bedtime_start': a.toUtc().toIso8601String(),
+              'bedtime_end': b.toUtc().toIso8601String(),
+              'time_in_bed': b.difference(a).inSeconds,
+              'total_sleep_duration': b.difference(a).inSeconds - 300,
+            },
+          ], dailySleep: const [], readiness: const [])
+              .nights
+              .single;
+          s.ouraNights = [for (final n in s.ouraNights) if (dateKey(n.day) != '2026-11-14') n, nap];
+          s.history[dateKey(DateTime(2026, 11, 14))]?.removeWhere((k, _) => k.startsWith('o.'));
+        },
+      ));
   testWidgets('Σήμερα · άγνωστο σχέδιο', (t) => _shot(
         t,
         name: '84_today_plan_unknown',
