@@ -170,6 +170,9 @@ enum OuraErrorKind {
   /// Δεν δόθηκε άδεια στη σελίδα της Oura.
   denied,
 
+  /// 401 από /sleep ή /daily_sleep ενώ η ανανέωση πέτυχε: λείπει δικαίωμα (scope), όχι ληγμένη σύνδεση.
+  scopeMissing,
+
   /// Η σύνδεση ακυρώθηκε (αποσύνδεση στο μεταξύ) ή οι πηγές δεν μπορούν να αλλάξουν τώρα.
   cancelled,
 
@@ -211,6 +214,7 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.noRefresh => 'Η Oura δεν έδωσε μόνιμη σύνδεση. Δεν συνδέθηκε, για να μη χρειάζεται νέα σύνδεση κάθε μήνα.',
       OuraErrorKind.tokenRejected => 'Η Oura δεν δέχτηκε τη σύνδεση. Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
       OuraErrorKind.denied => 'Δεν δόθηκε άδεια στη σελίδα της Oura. Δεν άλλαξε τίποτα.',
+      OuraErrorKind.scopeMissing => 'Λείπει άδεια στην Oura· ξανασύνδεση.',
       OuraErrorKind.cancelled => 'Η σύνδεση δεν ολοκληρώθηκε. Δεν άλλαξε τίποτα· δοκίμασε ξανά σε λίγο.',
       OuraErrorKind.isolate => 'Η ανάγνωση έγινε πιο αργά από το συνηθισμένο.',
       OuraErrorKind.stale => 'Η σύνδεση άργησε. Πάτα ξανά «Σύνδεση με Oura».',
@@ -279,12 +283,14 @@ class OuraPending {
 }
 
 /// Η διεύθυνση της σελίδας σύνδεσης της Oura.
-Uri ouraAuthorizeUrl({required String clientId, required OuraPending p, OuraOAuthEndpoints endpoints = ouraOAuth}) =>
+/// [scopes]: κενό = η προεπιλογή του [endpoints] (δες [ouraScopes]).
+Uri ouraAuthorizeUrl(
+        {required String clientId, required OuraPending p, OuraOAuthEndpoints endpoints = ouraOAuth, String scopes = ouraScopes}) =>
     Uri.parse(endpoints.authorize).replace(queryParameters: {
       'response_type': 'code',
       'client_id': clientId,
       'redirect_uri': ouraRedirectUri,
-      'scope': endpoints.scopes,
+      'scope': scopes.trim().isEmpty ? endpoints.scopes : scopes.trim(),
       'state': p.state,
       'code_challenge': pkceChallenge(p.verifier),
       'code_challenge_method': 'S256',
@@ -537,7 +543,12 @@ class OuraLink {
       t = await refresh();
       if (t == null || gen != _gen) throw const OuraError(OuraErrorKind.reconnect);
       res = await _getWith(url, t.access);
-      if (res.status == 401) throw const OuraError(OuraErrorKind.reconnect, status: 401);
+      if (res.status == 401) {
+        // Η ανανέωση πέτυχε και πάλι 401 στον ύπνο: λείπει δικαίωμα (scope), όχι ληγμένα tokens.
+        final seg = url.pathSegments.isEmpty ? '' : url.pathSegments.last;
+        final scope = seg == 'sleep' || seg == 'daily_sleep';
+        throw OuraError(scope ? OuraErrorKind.scopeMissing : OuraErrorKind.reconnect, status: 401);
+      }
     }
     if (gen != _gen) throw const OuraError(OuraErrorKind.reconnect);
     if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);

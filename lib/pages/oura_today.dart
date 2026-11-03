@@ -81,6 +81,12 @@ class OuraStatusCard extends StatelessWidget {
           c.textSecondary,
           'Σύνδεση με Oura',
         ),
+      OuraStatus.reconnect when store.ouraError == OuraErrorKind.scopeMissing => (
+          'Λείπει άδεια στην Oura',
+          'Η Oura δεν δίνει τον ύπνο με την άδεια που δόθηκε. Σύνδεσε ξανά και τσέκαρε την άδεια για τον ύπνο.',
+          c.bad,
+          'Σύνδεση ξανά',
+        ),
       OuraStatus.reconnect => (
           'Χρειάζεται νέα σύνδεση με το Oura',
           'Γίνεται μετά από αλλαγή κινητού ή αν αφαιρέσεις την άδεια στην Oura. Δεν χάνεται τίποτα· οι νύχτες που '

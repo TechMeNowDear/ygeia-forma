@@ -1,12 +1,18 @@
 /// Ρυθμίσεις της σύνδεσης με το Oura, σε ΕΝΑ σημείο.
 ///
-/// Τη μέρα που θα έρθει το δαχτυλίδι: εγγραφή εφαρμογής στο https://cloud.ouraring.com/oauth/applications
-/// με Redirect URI ακριβώς [ouraRedirectUri], και το Client ID μπαίνει στο [ouraClientId].
+/// Τη μέρα που θα έρθει το δαχτυλίδι: εγγραφή εφαρμογής στο developer portal της Oura (developer.ouraring.com· το
+/// παλιό cloud.ouraring.com/oauth/applications παραπέμπει εκεί) με Redirect URI ακριβώς [ouraRedirectUri], και το
+/// Client ID μπαίνει στο [ouraClientId].
 /// Το Client ID ΔΕΝ είναι μυστικό (φαίνεται σε κάθε σελίδα σύνδεσης). Το Client Secret δεν μπαίνει ΠΟΤΕ εδώ.
 library;
 
 /// Το Client ID της εφαρμογής μας στην Oura. Κενό = η σύνδεση δεν έχει ενεργοποιηθεί ακόμα.
 const ouraClientId = 'af0dbf14-b534-4187-8d6b-6cc0cc6f41a1';
+
+/// Τα δικαιώματα (scope) που ζητάμε, σε ΜΙΑ γραμμή. Κενό = η προεπιλογή του [ouraOAuth] («daily» στο classic,
+/// «extapi:daily» στο v2). Αν το νέο portal δείχνει άλλα κουτάκια, π.χ. `'daily sleep'` ή `'extapi:daily'`.
+/// Την απόφαση για το αν φτάνουν την παίρνουν ΜΟΝΟ τα 401/403 των δεδομένων (το «scope» της απάντησης δεν ελέγχεται).
+const ouraScopes = '';
 
 /// Αν η Oura δεν δέχεται ανταλλαγή κωδικού χωρίς Client Secret (PKCE μόνο), εδώ μπαίνει η διεύθυνση ενός
 /// μικρού διακομιστή που προσθέτει το secret και προωθεί το ίδιο αίτημα στην Oura. Κενό = απευθείας στην Oura.
@@ -42,7 +48,7 @@ class OuraOAuthEndpoints {
   final String token;
   final String revoke;
 
-  /// Μόνο ό,τι χρειάζεται: «daily» («Daily summaries of sleep, activity and readiness», OpenAPI 1.43).
+  /// Προεπιλογή όταν το [ouraScopes] είναι κενό. Μόνο ό,τι χρειάζεται: «daily» («Daily summaries of sleep, activity and readiness», OpenAPI 1.43).
   /// Καλύπτει τα /sleep (με τους παλμούς, το HRV και τις αναπνοές της νύχτας), /daily_sleep, /daily_readiness.
   /// Όχι heartrate (δεν διαβάζουμε τη χρονοσειρά παλμών), email, personal, spo2, workout, tag, session.
   final String scopes;

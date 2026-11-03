@@ -49,10 +49,13 @@ Secrets του GitHub (ή από την προσωρινή μνήμη του Git
   οι παλμοί/HRV/αναπνοές ύπνου, η θερμοκρασία και η ετοιμότητα έρχονται μόνο από το Oura· οξυγόνο, βήματα, παλμοί μέρας
   από το ρολόι· βάρος από την InBody. Οι τιμές του Oura αποθηκεύονται με πρόθεμα `o.` στο ιστορικό.
 - Σύνδεση: OAuth2 με PKCE, χωρίς Client Secret (`lib/oura/`). Ρυθμίσεις σε ένα σημείο: `lib/oura/config.dart`
-  (`ouraClientId`, `ouraTokenProxy`, `ouraOAuth`). Scope μόνο `daily`. Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
-- Τη μέρα του δαχτυλιδιού: εγγραφή εφαρμογής στο https://cloud.ouraring.com/oauth/applications με Redirect URI
-  `https://ygeia-forma.netlify.app/oura/callback` (App Link· εναλλακτική `ygeiaforma://oura-callback`, αλλαγή μίας
-  γραμμής στο `ouraRedirectUri`), scope μόνο `daily`, και το Client ID στο `ouraClientId`.
+  (`ouraClientId`, `ouraScopes`, `ouraTokenProxy`, `ouraOAuth`). Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
+- Τη μέρα του δαχτυλιδιού: εγγραφή εφαρμογής στο developer portal της Oura (developer.ouraring.com· το παλιό
+  cloud.ouraring.com/oauth/applications παραπέμπει εκεί) με Redirect URI `https://ygeia-forma.netlify.app/oura/callback`
+  (App Link· εναλλακτική `ygeiaforma://oura-callback`, αλλαγή μίας γραμμής στο `ouraRedirectUri`) και το Client ID στο
+  `ouraClientId`. Scope: μία γραμμή, `ouraScopes` (κενό = «daily» στο classic, «extapi:daily» στο v2)· διακομιστής
+  σύνδεσης: μία γραμμή, `ouraOAuth` (classic ή v2). Το «scope» της απάντησης δεν ελέγχεται· 401 στον ύπνο μετά από
+  ανανέωση = «Λείπει άδεια στην Oura».
 - Το manifest (από το `flutter create`) συμπληρώνεται από το `tools/android/patch_manifest.py`: μικρή οθόνη
   `OuraCallbackActivity` για την επιστροφή και `<queries>` για browser. Η MainActivity δεν αλλάζει.
 - Το σχέδιο πηγών έχει δικό του αρχείο (`sources.json`, `lib/plan_file.dart`), ανεξάρτητο από τις ρυθμίσεις.

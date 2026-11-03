@@ -168,7 +168,7 @@ EmptyNight? emptyNightReason({
     return EmptyNight.disconnected;
   }
   // Και «noRefresh» θέλει νέα σύνδεση.
-  if (!hasTokens || error == 'reconnect' || error == 'noRefresh') return EmptyNight.reconnect;
+  if (!hasTokens || error == 'reconnect' || error == 'noRefresh' || error == 'scopeMissing') return EmptyNight.reconnect;
   if (error == 'subscription') return EmptyNight.subscription;
   // Δεν διαβάστηκε μετά το πρωί αυτής της νύχτας: δεν ξέρουμε ακόμα.
   final readAfter = synced != null && !synced.isBefore(DateTime(day.year, day.month, day.day, 4));

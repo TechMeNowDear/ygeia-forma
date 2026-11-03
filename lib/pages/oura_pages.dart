@@ -433,7 +433,11 @@ class OuraManagePage extends StatelessWidget {
         final ouraFrom = plan.ouraFrom;
 
         final (title, subtitle, color) = switch (status) {
-          OuraStatus.reconnect => ('Χρειάζεται νέα σύνδεση', ouraErrorText(OuraErrorKind.reconnect), c.bad),
+          OuraStatus.reconnect => (
+              store.ouraError == OuraErrorKind.scopeMissing ? 'Λείπει άδεια στην Oura' : 'Χρειάζεται νέα σύνδεση',
+              ouraErrorText(store.ouraError == OuraErrorKind.scopeMissing ? OuraErrorKind.scopeMissing : OuraErrorKind.reconnect),
+              c.bad,
+            ),
           OuraStatus.subscription => ('Η Oura δεν δίνει δεδομένα', ouraErrorText(OuraErrorKind.subscription), c.bad),
           OuraStatus.disconnected => (
               'Αποσυνδέθηκε',

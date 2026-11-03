@@ -10,6 +10,7 @@ import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oura/config.dart';
 import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
+import 'package:ygeia_forma/oura/oura_store.dart';
 import 'package:ygeia_forma/oura/oura_view.dart';
 import 'package:ygeia_forma/oura/sha256.dart';
 import 'package:ygeia_forma/sources.dart';
@@ -489,15 +490,76 @@ void main() {
       expect(OuraTokens.fromJson(v.data[vaultTokens])!.refresh, 'R1');
     });
 
-    test('401 και μετά την ανανέωση → «Χρειάζεται νέα σύνδεση»', () async {
-      final v = MemoryVault()..data[vaultTokens] = tokens().toJson();
-      final http = FakeHttp((m, u, h, f) => m == 'POST'
-          ? OuraResponse(200, jsonEncode({'access_token': 'A1', 'refresh_token': 'R1', 'expires_in': 86400}))
-          : const OuraResponse(401, '{}'));
-      expect(
-        () => link(http, v).fetchAll('sleep', DateTime(2026, 11, 1), DateTime(2026, 11, 7)),
-        throwsA(isA<OuraError>().having((e) => e.kind, 'kind', OuraErrorKind.reconnect)),
-      );
+    test('401 και μετά την ανανέωση: στον ύπνο → «Λείπει άδεια», αλλού → «Χρειάζεται νέα σύνδεση»', () async {
+      for (final (ep, kind) in [
+        ('sleep', OuraErrorKind.scopeMissing),
+        ('daily_sleep', OuraErrorKind.scopeMissing),
+        ('daily_readiness', OuraErrorKind.reconnect),
+      ]) {
+        final v = MemoryVault()..data[vaultTokens] = tokens().toJson();
+        final http = FakeHttp((m, u, h, f) => m == 'POST'
+            ? OuraResponse(200, jsonEncode({'access_token': 'A1', 'refresh_token': 'R1', 'expires_in': 86400}))
+            : const OuraResponse(401, '{}'));
+        await expectLater(
+          link(http, v).fetchAll(ep, DateTime(2026, 11, 1), DateTime(2026, 11, 7)),
+          throwsA(isA<OuraError>().having((e) => e.kind, 'kind', kind)),
+          reason: ep,
+        );
+      }
+      expect(ouraErrorText(OuraErrorKind.scopeMissing), 'Λείπει άδεια στην Oura· ξανασύνδεση.');
+      expect(ouraBackoffFor(OuraErrorKind.scopeMissing), const Duration(hours: 6));
+    });
+
+    test('Απάντηση token με scope «extapi:daily», «daily», άγνωστο ή χωρίς scope: δεκτή (κρίνουν μόνο τα δεδομένα)', () {
+      for (final scope in ['extapi:daily', 'daily', 'extapi:daily extapi:sleep', 'κάτι άλλο', 42, null]) {
+        final t = OuraTokens.parseResponse(
+            jsonEncode({'access_token': 'A', 'refresh_token': 'R', 'expires_in': 60, if (scope != null) 'scope': scope}),
+            DateTime(2026, 11, 6));
+        expect(t.access, 'A', reason: '$scope');
+      }
+    });
+
+    test('Σελίδα σύνδεσης classic και v2: σωστές διευθύνσεις, ίδιο redirect, scope από μία σταθερά', () {
+      final p = OuraPending(state: 'st', verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', created: DateTime(2026, 11, 6));
+      final c = ouraAuthorizeUrl(clientId: 'CID', p: p, endpoints: OuraOAuthEndpoints.classic);
+      expect('${c.scheme}://${c.host}${c.path}', 'https://cloud.ouraring.com/oauth/authorize');
+      expect(c.queryParameters['scope'], 'daily');
+      final v2 = ouraAuthorizeUrl(clientId: 'CID', p: p, endpoints: OuraOAuthEndpoints.v2);
+      expect('${v2.scheme}://${v2.host}${v2.path}', 'https://api.ouraring.com/v2/oauth/authorize');
+      expect(v2.queryParameters['scope'], 'extapi:daily');
+      for (final u in [c, v2]) {
+        expect(u.queryParameters['redirect_uri'], 'https://ygeia-forma.netlify.app/oura/callback');
+        expect(u.queryParameters['code_challenge_method'], 'S256');
+      }
+      expect(ouraScopes, '', reason: 'κενό = προεπιλογή του ouraOAuth');
+      expect(ouraAuthorizeUrl(clientId: 'CID', p: p, scopes: ' daily sleep ').queryParameters['scope'], 'daily sleep');
+      expect(OuraOAuthEndpoints.classic.token, 'https://api.ouraring.com/oauth/token');
+      expect(OuraOAuthEndpoints.v2.token, 'https://api.ouraring.com/v2/oauth/token');
+      expect(OuraOAuthEndpoints.v2.revoke, 'https://api.ouraring.com/v2/oauth/token/revoke');
+      expect(ouraClientId, '', reason: 'το Client ID μπαίνει μόνο με ξεχωριστό commit');
+    });
+
+    test('v2: ανταλλαγή στο /v2/oauth/token με το ίδιο redirect_uri· ανάκληση με token στο σώμα', () async {
+      final v = MemoryVault();
+      final calls = <(String, Uri, String?)>[];
+      final http = FakeHttp((m, u, h, f) {
+        calls.add((m, u, f));
+        return OuraResponse(200, jsonEncode({'access_token': 'A', 'refresh_token': 'R', 'expires_in': 60, 'scope': 'extapi:daily'}));
+      });
+      final l = OuraLink(
+          vault: v,
+          send: http.send,
+          clock: () => DateTime(2026, 11, 6, 10),
+          clientId: 'CID',
+          endpoints: OuraOAuthEndpoints.v2,
+          tokenEndpoint: OuraOAuthEndpoints.v2.token);
+      final url = await l.begin();
+      expect(await l.complete('$ouraRedirectHttps?code=C&state=${url.queryParameters['state']}'), isTrue);
+      expect(calls.first.$2.toString(), 'https://api.ouraring.com/v2/oauth/token');
+      expect(Uri.splitQueryString(calls.first.$3!)['redirect_uri'], url.queryParameters['redirect_uri']);
+      await l.disconnect();
+      expect(calls.last.$2.toString(), 'https://api.ouraring.com/v2/oauth/token/revoke');
+      expect(Uri.splitQueryString(calls.last.$3!)['token'], 'R');
     });
 
     test('Refresh token που δεν ισχύει (400) → νέα σύνδεση· τα παλιά tokens ΚΡΑΤΙΟΥΝΤΑΙ (σβήνονται μόνο με αποσύνδεση ή νέα σύνδεση)', () async {
