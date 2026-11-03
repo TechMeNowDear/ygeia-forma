@@ -294,7 +294,12 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               text: ouraErrorText(OuraErrorKind.notConfigured),
             )
           else if (error != null)
-            EmptyCard(icon: Icons.error_outline_rounded, color: c.bad, title: 'Δεν συνδέθηκε', text: ouraErrorText(error)),
+            EmptyCard(
+              icon: Icons.error_outline_rounded,
+              color: c.bad,
+              title: 'Δεν συνδέθηκε',
+              text: ouraLoginErrorText(error, code: _error == null ? store.ouraLoginCode : null),
+            ),
         ];
 
         return _OuraScaffold(

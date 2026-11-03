@@ -1116,13 +1116,13 @@ void main() {
       final file = encodePlanFile(backupPlan, add(today, -19), at: 1000);
       // Νέο κινητό: κανένα σχέδιο.
       final a = app(plan: null);
-      a.android.days[dateKey(add(today, -10))] = {K.steps: 4000, K.sleepMin: 400};
+      a.android.days[dateKey(add(today, -40))] = {K.steps: 4000, K.sleepMin: 400}; // έξω από τις 30 μέρες
       await boot(a.store);
       expect(await a.store.restoreSources((plan: file, log: appendPlanLog(null, backupPlan, 1000))), isTrue);
       expect(a.store.plan, backupPlan);
       expect(decodePlanFile(a.planFile.content), backupPlan);
       expect(lastLoggedPlan(a.planFile.log)!.plan, backupPlan);
-      expect(a.android.days[dateKey(add(today, -10))]![K.steps], 4000, reason: 'τίποτα δεν σβήνεται από την επαναφορά');
+      expect(a.android.days[dateKey(add(today, -40))], {K.steps: 4000, K.sleepMin: 400}, reason: 'τίποτα δεν σβήνεται από την επαναφορά');
       // Κινητό με νεότερο σχέδιο (ορίστηκε μετά το αντίγραφο): δεν αλλάζει.
       final newer = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -5));
       final b = app(plan: null, planFile: MemoryPlanFile(encodePlanFile(newer, today, at: 5000)));

@@ -22,11 +22,20 @@ class FoodChannel {
   }
 
   static Future<Map<String, dynamic>> logRange(String from, String to) => _call('logRange', {'from': from, 'to': to});
-  static Future<Map<String, dynamic>> logPut(String json) => _call('logPut', {'json': json});
-  static Future<Map<String, dynamic>> logDelete(String id) => _call('logDelete', {'id': id});
+  /// Οι εγγραφές στη βάση μία-μία, με τη σειρά που ζητήθηκαν (έλεγχος 4/11, A8): π.χ. «διαγραφή» και αμέσως
+  /// «Αναίρεση» δεν φτάνουν ποτέ ανάποδα (μετά η καταχώριση θα έμενε σβησμένη).
+  static Future<Map<String, dynamic>> _writes = Future.value(const {});
+  static Future<Map<String, dynamic>> _write(String method, Map<String, dynamic> args) {
+    final run = _writes.catchError((_) => const <String, dynamic>{}).then((_) => _call(method, args));
+    _writes = run.catchError((_) => const <String, dynamic>{});
+    return run;
+  }
+
+  static Future<Map<String, dynamic>> logPut(String json) => _write('logPut', {'json': json});
+  static Future<Map<String, dynamic>> logDelete(String id) => _write('logDelete', {'id': id});
   static Future<Map<String, dynamic>> myFoods() => _call('myFoods');
-  static Future<Map<String, dynamic>> myFoodPut(String json) => _call('myFoodPut', {'json': json});
-  static Future<Map<String, dynamic>> myFoodDelete(String id) => _call('myFoodDelete', {'id': id});
+  static Future<Map<String, dynamic>> myFoodPut(String json) => _write('myFoodPut', {'json': json});
+  static Future<Map<String, dynamic>> myFoodDelete(String id) => _write('myFoodDelete', {'id': id});
   static Future<Map<String, dynamic>> scanBarcode() => _call('scanBarcode');
   static Future<Map<String, dynamic>> saveBackup(String json, String name) =>
       _call('saveBackup', {'json': json, 'name': name});
