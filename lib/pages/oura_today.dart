@@ -151,7 +151,7 @@ class OuraSleepTodayCard extends StatelessWidget {
     const white = Colors.white;
     final soft = Colors.white.withValues(alpha: 0.8);
 
-    final Widget body;
+    Widget body;
     if (m == null) {
       final reason = store.ouraNightReason(today, now);
       body = Padding(
@@ -161,6 +161,21 @@ class OuraSleepTodayCard extends StatelessWidget {
           style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w700),
         ),
       );
+      // «Μόνο υπνάκος»: οι ώρες του φαίνονται (π.χ. σύντομη νύχτα που τελείωσε πριν από τα μεσάνυχτα).
+      if (reason == EmptyNight.onlyNap && napTimes(night).isNotEmpty) {
+        body = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            body,
+            const SizedBox(height: 6),
+            Text(
+              'Υπνάκος ${napTimes(night)} (δεν μετρά ως νύχτα)',
+              key: const ValueKey('oura-only-nap-times'),
+              style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      }
     } else {
       // Συνηθισμένη διάρκεια: μόνο από νύχτες του Oura (το ίδιο κομμάτι πηγής), τουλάχιστον 4.
       final usual = <double>[];

@@ -35,8 +35,9 @@ class OuraSleepPage extends StatelessWidget {
     final stages = ouraStageAverages(nights, today, plan);
 
     final lastCard = last == null
-        ? _EmptyNightCard(reason: reason ?? EmptyNight.noRing, day: today)
-        : _OuraNightCard(night: last, now: now, reason: sameDay(last.day, today) ? null : reason);
+        ? _EmptyNightCard(reason: reason ?? EmptyNight.noRing, day: today, night: store.ouraNightFor(today))
+        : _OuraNightCard(
+            night: last, now: now, reason: sameDay(last.day, today) ? null : reason, todayNight: store.ouraNightFor(today));
 
     final stagesCard = AppCard(
       child: Column(
@@ -122,9 +123,12 @@ class OuraSleepPage extends StatelessWidget {
 }
 
 class _EmptyNightCard extends StatelessWidget {
-  const _EmptyNightCard({required this.reason, required this.day});
+  const _EmptyNightCard({required this.reason, required this.day, this.night});
   final EmptyNight reason;
   final DateTime day;
+
+  /// Για «Μόνο υπνάκος»: οι ώρες του υπνάκου.
+  final OuraNight? night;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +140,8 @@ class _EmptyNightCard extends StatelessWidget {
       EmptyNight.subscription => 'Χωρίς ενεργή συνδρομή Oura η εφαρμογή δεν μπορεί να διαβάσει τον ύπνο.',
       EmptyNight.notRead => 'Δεν έγινε ακόμα ανάγνωση από την Oura. Τράβηξε προς τα κάτω για να ξαναδοκιμάσεις.',
       EmptyNight.disconnected => 'Οι νύχτες μένουν κενές ώσπου να συνδέσεις ξανά το Oura ή να διαλέξεις το ρολόι (Ρυθμίσεις › Πηγές).',
-      EmptyNight.onlyNap => 'Το δαχτυλίδι κατέγραψε μόνο υπνάκο, όχι νύχτα. Ο υπνάκος φαίνεται χωριστά και δεν μετρά ως νύχτα.',
+      EmptyNight.onlyNap => 'Το δαχτυλίδι κατέγραψε μόνο υπνάκο, όχι νύχτα'
+          '${napTimes(night).isEmpty ? '' : ': ${napTimes(night)}'}. Ο υπνάκος δεν μετρά ως νύχτα.',
       EmptyNight.unknownPlan => 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Για να μη μπερδευτούν συσκευές, οι νύχτες μένουν κενές '
           'ώσπου να διαλέξεις στις Ρυθμίσεις › Πηγές.',
       EmptyNight.notOura => '',
@@ -146,8 +151,11 @@ class _EmptyNightCard extends StatelessWidget {
 }
 
 class _OuraNightCard extends StatelessWidget {
-  const _OuraNightCard({required this.night, required this.now, this.reason});
+  const _OuraNightCard({required this.night, required this.now, this.reason, this.todayNight});
   final OuraNight night;
+
+  /// Η χθεσινή (π.χ. μόνο υπνάκος), για να φαίνονται οι ώρες της.
+  final OuraNight? todayNight;
   final DateTime now;
 
   /// Αν αυτή δεν είναι η χθεσινή νύχτα: γιατί λείπει η χθεσινή.
@@ -176,7 +184,9 @@ class _OuraNightCard extends StatelessWidget {
         children: [
           if (reason != null) ...[
             Text(
-              '${emptyNightText(reason!)} για χθες βράδυ. Βλέπεις την τελευταία νύχτα που ήρθε.',
+              '${emptyNightText(reason!)} για χθες βράδυ'
+              '${reason == EmptyNight.onlyNap && napTimes(todayNight).isNotEmpty ? ' (${napTimes(todayNight)})' : ''}. '
+              'Βλέπεις την τελευταία νύχτα που ήρθε.',
               style: TextStyle(color: c.bad, fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.35),
             ),
             const SizedBox(height: 10),

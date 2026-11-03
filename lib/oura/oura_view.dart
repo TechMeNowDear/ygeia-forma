@@ -82,6 +82,14 @@ StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan
   );
 }
 
+/// «Μόνο υπνάκος»: οι ώρες του (π.χ. «21:30–23:50 · 2 ώρες 15 λεπτά»), ώστε μια σύντομη νύχτα που τελείωσε πριν από
+/// τα μεσάνυχτα να φαίνεται (δεν μετρά ως νύχτα: κανόνας επικάλυψης 00:00–06:00).
+String napTimes(OuraNight? n) => n == null
+    ? ''
+    : [
+        for (final x in n.naps) '${hm(x.start)}–${hm(x.end)}${x.totalMinutes == null ? '' : ' · ${hoursMinutes(x.totalMinutes!)}'}',
+      ].join(', ');
+
 /// Η νύχτα είναι μόνο ένα σύντομο κομμάτι ύπνου (το Oura το λέει «sleep», όχι «long_sleep»).
 const shortNightLabel = 'Σύντομη νύχτα · κάτω από 3 ώρες';
 
@@ -147,6 +155,10 @@ EmptyNight? emptyNightReason({
   if (night != null && night.onlyNap) return EmptyNight.onlyNap;
   final today = dayOf(now);
   final isToday = sameDay(day, today);
+  // Αποσυνδέθηκε (από απόψε χωρίς πηγή): όχι «νέα σύνδεση».
+  if (!hasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) == Source.none) {
+    return EmptyNight.disconnected;
+  }
   // Και «noRefresh» θέλει νέα σύνδεση.
   if (!hasTokens || error == 'reconnect' || error == 'noRefresh') return EmptyNight.reconnect;
   if (error == 'subscription') return EmptyNight.subscription;

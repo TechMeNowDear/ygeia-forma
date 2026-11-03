@@ -372,13 +372,16 @@ class OuraManagePage extends StatelessWidget {
 
   /// Μόνο τη μέρα της σύνδεσης: η νύχτα που μόλις τελείωσε από το ρολόι, το δαχτυλίδι από απόψε.
   Future<void> _watchLastNight(BuildContext context) async {
+    final asleep = store.ouraClock().hour < 4;
     final ok = await showDialog<bool>(
       context: context,
       routeSettings: const RouteSettings(name: 'Η τελευταία νύχτα από το ρολόι'),
       builder: (context) => AlertDialog(
-        title: const Text('Η τελευταία νύχτα από το ρολόι;'),
-        content: const Text(
-          'Η νύχτα που μόλις τελείωσε θα φαίνεται όπως τη μέτρησε το Galaxy Watch. Το δαχτυλίδι μετρά από απόψε.',
+        title: Text('${store.watchLastNightLabel};'),
+        content: Text(
+          asleep
+              ? 'Η νύχτα που κοιμάσαι τώρα θα μετρά από το Galaxy Watch. Το δαχτυλίδι μετρά από το επόμενο βράδυ.'
+              : 'Η νύχτα που μόλις τελείωσε θα φαίνεται όπως τη μέτρησε το Galaxy Watch. Το δαχτυλίδι μετρά από απόψε.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
@@ -390,7 +393,9 @@ class OuraManagePage extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     final done = await store.watchLastNight();
     messenger.showSnackBar(SnackBar(
-      content: Text(done ? 'Η τελευταία νύχτα από το ρολόι. Το δαχτυλίδι από απόψε.' : 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.'),
+      content: Text(done
+          ? (asleep ? 'Η νύχτα από το ρολόι. Το δαχτυλίδι από το επόμενο βράδυ.' : 'Η τελευταία νύχτα από το ρολόι. Το δαχτυλίδι από απόψε.')
+          : 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.'),
     ));
   }
 
@@ -504,7 +509,7 @@ class OuraManagePage extends StatelessWidget {
             OutlinedButton(
               key: const ValueKey('oura-watch-last-night'),
               onPressed: () => _watchLastNight(context),
-              child: const Text('Η τελευταία νύχτα από το ρολόι'),
+              child: Text(store.watchLastNightLabel),
             ),
           if (status == OuraStatus.reconnect || status == OuraStatus.disconnected || (!connected && status != OuraStatus.off))
             FilledButton(
