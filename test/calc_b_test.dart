@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
+import 'package:ygeia_forma/pages/compare_page.dart';
+import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/report.dart';
 import 'package:ygeia_forma/trends.dart';
 
@@ -87,5 +89,21 @@ void main() {
     expect(n.stagePct('REM')!, closeTo(15.5, 0.05));
     expect(n.stagePct('AWAKE'), isNull, reason: 'ο χρόνος ξύπνιος φαίνεται σε λεπτά, όχι ως μέρος του ύπνου');
     expect(n.awakeMinutes, 47);
+  });
+
+  test('Σύγκριση πηγών: και το ρολόι ως πραγματικός ύπνος, χωρίς τα ξυπνήματα (έλεγχος F7)', () {
+    final n = Night(DateTime(2026, 11, 3))
+      ..minutes = 377 // διάρκεια της Samsung, μαζί με τα ξυπνήματα
+      ..start = DateTime(2026, 11, 3, 1, 20)
+      ..end = DateTime(2026, 11, 3, 7, 37)
+      ..stageMinutes.addAll({'DEEP': 8, 'LIGHT': 271, 'REM': 51, 'AWAKE': 47});
+    final rows = buildCompareRows(
+      plan: SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 1)),
+      oura: const [],
+      watch: [n],
+      today: DateTime(2026, 11, 4),
+    );
+    expect(rows.single.watchMinutes, 330);
+    expect(rows.single.watchAwake, 47);
   });
 }

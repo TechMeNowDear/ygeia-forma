@@ -277,10 +277,10 @@ class TodayPage extends StatelessWidget {
       icon: Icons.local_fire_department_rounded,
       color: c.heart,
       // Κλινικός έλεγχος M9: τα ρολόγια κάνουν μεγάλα λάθη στις θερμίδες (συχνά 20–30%).
-      title: 'Θερμίδες (εκτίμηση ρολογιού)',
+      title: 'Θερμίδες',
       value: total == null ? null : thousands(total),
       unit: 'kcal',
-      note: active == null ? null : 'Από κίνηση ${thousands(active)} kcal',
+      note: active == null ? 'Εκτίμηση ρολογιού' : 'Εκτίμηση ρολογιού · από κίνηση ${thousands(active)} kcal',
       trend: (minutes != null && minutes > 0) ? TrendPill('Ενεργός ${hoursMinutes(minutes)}') : null,
       onTap: onTap,
     );

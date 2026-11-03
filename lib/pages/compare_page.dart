@@ -40,7 +40,9 @@ List<CompareRow> buildCompareRows({
       ouraEnd: o?.end,
       ouraHr: o?.avgHr,
       ouraAwake: o?.awake == null ? null : (o!.awake! / 60).round(),
-      watchMinutes: w?.minutes,
+      // Ίδιος ορισμός και στις δύο: πραγματικός ύπνος (χωρίς τα ξυπνήματα). Ρολόι: από τα στάδια της Samsung
+      // (Night.asleepStageMinutes)· μόνο χωρίς στάδια η διάρκεια της Samsung.
+      watchMinutes: w == null ? null : (w.asleepStageMinutes > 0 ? w.asleepStageMinutes : w.minutes),
       watchEstimated: w?.estimatedMinutes ?? 0,
       watchStart: w?.start,
       watchEnd: w?.end,
@@ -119,8 +121,8 @@ class ComparePage extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     mean.abs() < 5
-                        ? 'Η διάρκεια του ρολογιού είναι κατά μέσο όρο σχεδόν ίδια με τον ύπνο του Oura'
-                        : 'Η διάρκεια του ρολογιού είναι κατά μέσο όρο ${hoursMinutes(mean.abs())} ${mean < 0 ? 'μικρότερη' : 'μεγαλύτερη'} από τον ύπνο του Oura',
+                        ? 'Το ρολόι μετρά κατά μέσο όρο σχεδόν τον ίδιο ύπνο'
+                        : 'Το ρολόι μετρά κατά μέσο όρο ${hoursMinutes(mean.abs())} ${mean < 0 ? 'λιγότερο' : 'περισσότερο'} ύπνο',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text, height: 1.25),
                   ),
                   const SizedBox(height: 6),
@@ -132,8 +134,8 @@ class ComparePage extends StatelessWidget {
                 const SizedBox(height: 10),
                 // Έλεγχος υπολογισμών F7 (4/11): δύο διαφορετικοί ορισμοί, γραμμένοι ρητά.
                 Text(
-                  'Τι συγκρίνεται: Oura = μόνο ύπνος, χωρίς τα ξυπνήματα. Ρολόι = η διάρκεια όπως τη δίνει η Samsung, που '
-                  'μπορεί να περιέχει και τα ξυπνήματα που μέτρησε. Γι\' αυτό φαίνεται και ο χρόνος ξύπνιος της κάθε συσκευής.',
+                  'Τι συγκρίνεται: πραγματικός ύπνος και στις δύο, χωρίς τα ξυπνήματα (ρολόι: βαθύς + ελαφρύς + REM της '
+                  'Samsung). Ο χρόνος ξύπνιος φαίνεται χωριστά· και οι δύο συσκευές μετρούν λιγότερα ξυπνήματα απ\' όσα είναι.',
                   style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
                 ),
                 const SizedBox(height: 8),
@@ -237,7 +239,7 @@ class _CompareCard extends StatelessWidget {
                 const Align(alignment: Alignment.centerLeft, child: SourceTag(Source.oura)),
                 const Align(alignment: Alignment.centerLeft, child: SourceTag(Source.watch)),
               ]),
-              line('Διάρκεια', dur(r.ouraMinutes), dur(r.watchMinutes)),
+              line('Ύπνος', dur(r.ouraMinutes), dur(r.watchMinutes)),
               line('Ξύπνιος μέσα', dur(r.ouraAwake), dur(r.watchAwake)),
               line('Κοιμήθηκες', t(r.ouraStart), t(r.watchStart)),
               line('Ξύπνησες', t(r.ouraEnd), t(r.watchEnd)),
