@@ -73,7 +73,7 @@ class OuraBridge(
             // Το σχέδιο πηγών (δικό του αρχείο, ανεξάρτητο από τις ρυθμίσεις): {"state": missing|ok|error, "json"}.
             "readPlan" -> scope.launch {
                 val out = withContext(Dispatchers.IO) {
-                    val f = File(activity.filesDir, PLAN_FILE)
+                    val f = File(activity.filesDir, planName(call.argument<String>("name")))
                     try {
                         if (!f.exists()) org.json.JSONObject().put("state", "missing")
                         else org.json.JSONObject().put("state", "ok").put("json", f.readText())
@@ -83,7 +83,7 @@ class OuraBridge(
                 }
                 result.success(out.toString())
             }
-            "writePlan" -> io(result) { writeText(PLAN_FILE, call.argument<String>("json") ?: "") }
+            "writePlan" -> io(result) { writeText(planName(call.argument<String>("name")), call.argument<String>("json") ?: "") }
             "writeNights" -> io(result) { writeText(NIGHTS_FILE, call.argument<String>("json") ?: "") }
             else -> result.notImplemented()
         }
@@ -133,6 +133,12 @@ class OuraBridge(
     companion object {
         const val NIGHTS_FILE = "oura_nights.json"
         const val PLAN_FILE = "sources.json"
+
+        /** Ημερολόγιο αλλαγών πηγής (για επαναφορά αν χαλάσει το sources.json). */
+        const val PLAN_LOG_FILE = "sources_log.json"
+
+        /** Μόνο τα δύο αρχεία του σχεδίου πηγών. */
+        fun planName(n: String?): String = if (n == PLAN_LOG_FILE) PLAN_LOG_FILE else PLAN_FILE
         const val SCHEME = "ygeiaforma"
         const val HOST = "oura-callback"
 
@@ -152,20 +158,34 @@ class OuraBridge(
             live?.deliver(uri)
         }
 
+        /** App Link (https) της επιστροφής: μόνο αυτός ο ακριβής host και η διαδρομή. */
+        const val HTTPS_HOST = "ygeia-forma.netlify.app"
+        const val HTTPS_PATH = "/oura/callback"
+
+        /** Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback. */
         fun isCallback(intent: Intent?): Boolean {
             val d = intent?.data ?: return false
-            return intent.action == Intent.ACTION_VIEW && d.scheme == SCHEME && d.host == HOST
+            if (intent.action != Intent.ACTION_VIEW || d.userInfo != null || d.port != -1) return false
+            return when (d.scheme) {
+                "https" -> d.host == HTTPS_HOST && d.path == HTTPS_PATH
+                SCHEME -> d.host == HOST && (d.path.isNullOrEmpty() || d.path == "/")
+                else -> false
+            }
         }
 
+        /** Μία εγγραφή τη φορά (κλείδωμα) και μοναδικό προσωρινό αρχείο: δύο εγγραφές δεν μπλέκονται ποτέ. */
+        @Synchronized
         fun atomicWrite(f: File, bytes: ByteArray): Boolean = try {
             f.parentFile?.mkdirs()
-            val tmp = File(f.parentFile, "${f.name}.tmp")
+            val tmp = File(f.parentFile, "${f.name}.${System.nanoTime()}.tmp")
             FileOutputStream(tmp).use { out ->
                 out.write(bytes)
                 out.flush()
                 out.fd.sync()
             }
-            tmp.renameTo(f)
+            val ok = tmp.renameTo(f)
+            if (!ok) tmp.delete()
+            ok
         } catch (e: Throwable) {
             false
         }

@@ -12,10 +12,21 @@ const ouraClientId = '';
 /// μικρού διακομιστή που προσθέτει το secret και προωθεί το ίδιο αίτημα στην Oura. Κενό = απευθείας στην Oura.
 const ouraTokenProxy = '';
 
-/// Η διεύθυνση επιστροφής μετά τη σύνδεση· την πιάνει η MainActivity (intent-filter στο manifest).
+/// Οι δύο διευθύνσεις επιστροφής μετά τη σύνδεση. Τις πιάνει η OuraCallbackActivity (manifest):
+/// - https (Android App Link, επαληθευμένο με /.well-known/assetlinks.json στο ygeia-forma.netlify.app). Αν ο browser
+///   δεν ανοίξει την εφαρμογή, η σελίδα /oura/callback προωθεί το ίδιο query στο ygeiaforma://oura-callback.
+/// - ygeiaforma://oura-callback (custom scheme), εφεδρική.
+/// Γίνονται δεκτές ΜΟΝΟ αυτές οι δύο ακριβείς μορφές (δες parseCallback).
+const ouraRedirectHttpsHost = 'ygeia-forma.netlify.app';
+const ouraRedirectHttpsPath = '/oura/callback';
+const ouraRedirectHttps = 'https://$ouraRedirectHttpsHost$ouraRedirectHttpsPath';
 const ouraRedirectScheme = 'ygeiaforma';
 const ouraRedirectHost = 'oura-callback';
-const ouraRedirectUri = '$ouraRedirectScheme://$ouraRedirectHost';
+const ouraRedirectCustom = '$ouraRedirectScheme://$ouraRedirectHost';
+
+/// Η διεύθυνση που δηλώνεται στην Oura και στέλνεται ΙΔΙΑ στη σελίδα σύνδεσης και στην ανταλλαγή κωδικού.
+/// Για custom scheme: `const ouraRedirectUri = ouraRedirectCustom;`
+const ouraRedirectUri = ouraRedirectHttps;
 
 /// Ποιος διακομιστής σύνδεσης της Oura χρησιμοποιείται.
 /// - classic: ό,τι περιγράφει η τεκμηρίωση (cloud.ouraring.com/docs/authentication) και το OpenAPI 1.43.

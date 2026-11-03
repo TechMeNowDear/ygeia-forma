@@ -2,7 +2,9 @@
 """Προσθήκες στο AndroidManifest.xml που φτιάχνει το «flutter create» (δεν το κρατάμε στο repository).
 
 Για τη σύνδεση με το Oura (απόφαση 2/11, διόρθωση μετά τον έλεγχο):
-1. Μικρή οθόνη OuraCallbackActivity για τη διεύθυνση επιστροφής ygeiaforma://oura-callback (OAuth redirect).
+1. Μικρή οθόνη OuraCallbackActivity για τη διεύθυνση επιστροφής (OAuth redirect), με δύο ακριβείς μορφές:
+   - App Link https://ygeia-forma.netlify.app/oura/callback (autoVerify, assetlinks.json στο Netlify),
+   - ygeiaforma://oura-callback (custom scheme, εφεδρική).
    Η MainActivity ΔΕΝ αλλάζει (μένει όπως τη φτιάχνει η Flutter: launchMode, επιλογέας αρχείων, άδειες Samsung).
 2. <queries> για browser (https), όπως θέλει το Android 11+ για να βλέπει ποιος ανοίγει συνδέσμους.
 
@@ -25,6 +27,12 @@ CALLBACK = (
     '            android:excludeFromRecents="true"\n'
     '            android:taskAffinity=""\n'
     '            android:theme="@android:style/Theme.Translucent.NoTitleBar">\n'
+    '            <intent-filter android:autoVerify="true">\n'
+    '                <action android:name="android.intent.action.VIEW"/>\n'
+    '                <category android:name="android.intent.category.DEFAULT"/>\n'
+    '                <category android:name="android.intent.category.BROWSABLE"/>\n'
+    '                <data android:scheme="https" android:host="ygeia-forma.netlify.app" android:path="/oura/callback"/>\n'
+    "            </intent-filter>\n"
     "            <intent-filter>\n"
     '                <action android:name="android.intent.action.VIEW"/>\n'
     '                <category android:name="android.intent.category.DEFAULT"/>\n'
@@ -51,7 +59,7 @@ if ".OuraCallbackActivity" not in s:
         sys.exit("Δεν βρέθηκε το τέλος του application")
     s = s.replace("</application>", CALLBACK.lstrip("\n") + "\n    </application>", 1)
 
-if 'android:scheme="https"' not in s:
+if "<!-- Σύνδεση Oura: άνοιγμα" not in s:
     if "<queries>" in s:
         s = s.replace("<queries>", "<queries>" + BROWSER, 1)
     else:
@@ -64,9 +72,13 @@ with open(path, "w", encoding="utf-8") as f:
 after_main = re.search(r'<activity\b[^>]*android:name="\.MainActivity"[^>]*>', s, re.S).group(0)
 if after_main != before_main:
     sys.exit("Η MainActivity άλλαξε· δεν έπρεπε")
-for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiaforma"', 'android:host="oura-callback"', 'android:scheme="https"'):
+for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiaforma"', 'android:host="oura-callback"',
+               'android:host="ygeia-forma.netlify.app"', 'android:path="/oura/callback"', 'android:autoVerify="true"',
+               "<!-- Σύνδεση Oura: άνοιγμα"):
     if needle not in s:
         sys.exit("Λείπει μετά την αλλαγή: " + needle)
 if s.count('android:scheme="ygeiaforma"') != 1:
     sys.exit("Η επιστροφή ygeiaforma:// δηλώθηκε δύο φορές")
-print("Manifest: OuraCallbackActivity (ygeiaforma://oura-callback), queries https· MainActivity χωρίς αλλαγή")
+if s.count('android:host="ygeia-forma.netlify.app"') != 1:
+    sys.exit("Το App Link δηλώθηκε δύο φορές")
+print("Manifest: OuraCallbackActivity (https App Link + ygeiaforma://oura-callback), queries https· MainActivity χωρίς αλλαγή")

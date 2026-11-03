@@ -272,10 +272,23 @@ Uri ouraAuthorizeUrl({required String clientId, required OuraPending p, OuraOAut
       'code_challenge_method': 'S256',
     });
 
+/// Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback.
+/// Καμία άλλη διεύθυνση, θύρα, χρήστης ή διαδρομή.
+bool isOuraRedirect(Uri u) {
+  if (u.userInfo.isNotEmpty) return false;
+  if (u.scheme == 'https') {
+    return u.host == ouraRedirectHttpsHost && !u.hasPort && u.path == ouraRedirectHttpsPath;
+  }
+  if (u.scheme == ouraRedirectScheme) {
+    return u.host == ouraRedirectHost && !u.hasPort && (u.path.isEmpty || u.path == '/');
+  }
+  return false;
+}
+
 /// Η επιστροφή από την Oura: κωδικός ή σφάλμα, και το state.
 ({String? code, String? error, String? state})? parseCallback(String uri) {
   final u = Uri.tryParse(uri);
-  if (u == null || u.scheme != ouraRedirectScheme || u.host != ouraRedirectHost) return null;
+  if (u == null || !isOuraRedirect(u)) return null;
   // Οι παράμετροι έρχονται στο query· για σιγουριά διαβάζουμε και το fragment.
   final q = {...Uri.splitQueryString(u.fragment), ...u.queryParameters};
   return (code: q['code'], error: q['error'], state: q['state']);
@@ -550,10 +563,5 @@ class OuraLink {
     _unsaved = false;
     await vault.delete(vaultTokens);
     await vault.delete(vaultPending);
-  }
-
-  /// Μετά από νέα σύνδεση: τα tokens ξαναδιαβάζονται από την αποθήκευση.
-  void reload() {
-    if (_refreshing == null) _loaded = false;
   }
 }
