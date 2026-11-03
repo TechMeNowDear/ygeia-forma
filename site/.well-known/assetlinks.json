@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "gr.ygeiaforma.ygeia_forma",
+      "sha256_cert_fingerprints": [
+        "A4:43:3A:B1:22:14:F1:C8:8F:50:0F:38:60:43:23:73:0D:0F:0D:6F:3D:DA:83:05:73:0D:79:B5:96:21:37:52"
+      ]
+    }
+  }
+]
