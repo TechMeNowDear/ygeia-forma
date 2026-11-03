@@ -35,11 +35,15 @@ const ouraRedirectCustom = '$ouraRedirectScheme://$ouraRedirectHost';
 const ouraRedirectUri = ouraRedirectHttps;
 
 /// Ποιος διακομιστής σύνδεσης της Oura χρησιμοποιείται.
-/// - classic: ό,τι περιγράφει η τεκμηρίωση (cloud.ouraring.com/docs/authentication) και το OpenAPI 1.43.
+/// - portal (προεπιλογή, έλεγχος 4/11): όπως το classic, αλλά η σελίδα σύνδεσης είναι η
+///   https://developer.ouraring.com/authorize, που η τεκμηρίωση της Oura (cloud.ouraring.com/docs/authentication,
+///   4/11/2026) δίνει «for new OAuth clients» — η δική μας εφαρμογή γράφτηκε στο developer.ouraring.com. Ίδια
+///   ανταλλαγή κωδικού, ίδια ανάκληση· μπορεί να ανοίξει την έγκριση μέσα στην εφαρμογή της Oura.
+/// - classic: ό,τι περιγράφει η τεκμηρίωση για τις παλιές εφαρμογές (cloud.ouraring.com/oauth/authorize).
 /// - v2: ο νεότερος (api.ouraring.com/v2/oauth, RFC 8414 metadata στο /.well-known/oauth-authorization-server),
 ///   που δηλώνει ρητά «token_endpoint_auth_methods_supported: none» (εφαρμογές χωρίς secret, με PKCE).
-/// Αν η classic απορρίψει την ανταλλαγή χωρίς secret, αλλάζει μόνο αυτή η γραμμή.
-const ouraOAuth = OuraOAuthEndpoints.classic;
+/// Η αλλαγή είναι μόνο αυτή η γραμμή (και οι διευθύνσεις είναι ήδη στη λίστα του Android, OuraBridge.ALLOWED_HOSTS).
+const ouraOAuth = OuraOAuthEndpoints.portal;
 
 class OuraOAuthEndpoints {
   const OuraOAuthEndpoints._(this.authorize, this.token, this.revoke, this.scopes, this.revokeParam);
@@ -58,6 +62,15 @@ class OuraOAuthEndpoints {
 
   static const classic = OuraOAuthEndpoints._(
     'https://cloud.ouraring.com/oauth/authorize',
+    'https://api.ouraring.com/oauth/token',
+    'https://api.ouraring.com/oauth/revoke',
+    'daily',
+    'access_token',
+  );
+
+  /// Η σελίδα σύνδεσης για νέες εφαρμογές (developer.ouraring.com)· τα υπόλοιπα όπως το [classic].
+  static const portal = OuraOAuthEndpoints._(
+    'https://developer.ouraring.com/authorize',
     'https://api.ouraring.com/oauth/token',
     'https://api.ouraring.com/oauth/revoke',
     'daily',
@@ -90,6 +103,13 @@ const ouraMinInterval = Duration(minutes: 30);
 
 /// Πόσες μέρες πίσω ξαναδιαβάζονται κάθε φορά (η Oura μπορεί να διορθώσει την προηγούμενη νύχτα).
 const ouraRecentDays = 3;
+
+/// Νύχτες του Oura που λείπουν ακόμα ξαναζητούνται για τόσες μέρες πίσω (έλεγχος 4/11, A3: το δαχτυλίδι μπορεί να
+/// συγχρονίσει αργά, π.χ. σε ταξίδι), με το ίδιο όριο συχνότητας ([ouraMinInterval]).
+const ouraMissingDays = 30;
+
+/// Αν η εφαρμογή έμεινε κλειστή πολύ καιρό, το Oura διαβάζεται ως τόσες μέρες πίσω (από την αρχή της εποχής).
+const ouraMaxBackDays = 90;
 
 /// Πόσες νύχτες κρατιούνται με όλες τις λεπτομέρειες (φάσεις, ώρες) για τις οθόνες.
 const ouraDetailDays = 45;

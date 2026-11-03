@@ -51,7 +51,17 @@ const sleepKeys = {
 /// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
 /// 2 (1/11): η «εκτίμηση» στα κενά δεν μετρά στη διάρκεια· σπασμένη νύχτα χωρίς βαθμολογία·
 /// διπλές εγγραφές δεν αθροίζονται.
-const historyRulesVersion = 2;
+/// 3 (4/11, έλεγχος): οξυγόνο που είχε σβηστεί από ζυγίσεις σε μέρες του Oura (A1) ξαναδιαβάζεται· μόνο ρολόι
+/// για ύπνο/παλμούς/οξυγόνο/θερμοκρασία (A2)· οξυγόνο με στάθμιση διάρκειας (A4)· λαγοκοίμισμα με βήματα
+/// χωριστά από τη νύχτα (A6)· διάρκεια ύπνου του ρολογιού = πραγματικός ύπνος από τις φάσεις, χωρίς τα ξυπνήματα
+/// (στοιχεία της Samsung για τη νύχτα 2→3/11: «Πραγματικός ύπνος» ≠ «Χρόνος ύπνου»).
+const historyRulesVersion = 3;
+
+/// Τιμές από τους παλμούς (ύπνου και μέρας): αν η ανάγνωση των παλμών απέτυχε ή κόπηκε, οι παλιές μένουν (A12).
+const heartKeys = {K.sleepHr, K.restHr, K.dayHr, K.walkHr};
+
+/// Οξυγόνο της νύχτας (πάντα του ρολογιού).
+const spo2Keys = {K.spo2Avg, K.spo2Min, K.spo2Low};
 
 /// Βάζει νέες συνόψεις στο [history] και επιστρέφει τις μέρες που άλλαξαν (για αποθήκευση).
 ///
@@ -65,6 +75,11 @@ const historyRulesVersion = 2;
 /// [plan]: τις μέρες που η «νύχτα» ΔΕΝ έρχεται από το ρολόι (Oura ή καμία πηγή), οι τιμές νύχτας του
 /// ρολογιού δεν γράφονται ποτέ (και όσες υπήρχαν φεύγουν)· μένει μόνο το οξυγόνο, που είναι πάντα του ρολογιού.
 /// Οι τιμές του Oura («o.*») δεν αγγίζονται εδώ (δες [mergeOura]).
+/// [keepKeys]: τιμές που ΔΕΝ αλλάζουν σε αυτή την ανάγνωση (π.χ. [heartKeys] όταν οι παλμοί δεν διαβάστηκαν):
+/// οι παλιές μένουν, οι νέες δεν γράφονται.
+/// [ouraNights]: οι μέρες που ξέρουμε τις ώρες της νύχτας του Oura. Το οξυγόνο μιας νύχτας του Oura βγαίνει μόνο
+/// μέσα σε αυτές· για μέρα χωρίς γνωστές ώρες (π.χ. το αρχείο νυχτών δεν διαβάστηκε) το αποθηκευμένο οξυγόνο
+/// ΜΕΝΕΙ (δεν σβήνεται επειδή λείπουν οι ώρες). null = όλες γνωστές.
 Set<String> mergeHistory(
   Map<String, Map<String, double>> history,
   Map<String, Map<String, double>> rows, {
@@ -73,9 +88,18 @@ Set<String> mergeHistory(
   DateTime? rangeFrom,
   DateTime? rangeTo,
   SourcePlan? plan,
+  Set<String> keepKeys = const {},
+  Set<String>? ouraNights,
 }) {
   final changed = <String>{};
   final p = plan ?? SourcePlan.samsungOnly;
+  // Τιμές που μένουν όπως είναι τη μέρα [day].
+  Set<String> kept(DateTime day) {
+    final foreign = p.nightSource(day) != Source.watch;
+    final noWindow = foreign && ouraNights != null && !ouraNights.contains(dateKey(day));
+    return noWindow ? {...keepKeys, ...spo2Keys} : keepKeys;
+  }
+
   if (replaceSleep && rangeFrom != null && rangeTo != null) {
     for (var day = dayOf(rangeFrom); !day.isAfter(dayOf(rangeTo)); day = DateTime(day.year, day.month, day.day + 1)) {
       final k = dateKey(day);
@@ -83,7 +107,8 @@ Set<String> mergeHistory(
       if (old == null) continue;
       // Η νύχτα του ρολογιού την πρώτη μέρα μιας εποχής Oura δεν σβήνεται ποτέ ([SourcePlan.keepsWatchNight]).
       final keep = p.keepsWatchNight(day);
-      bool drop(String key) => sleepKeys.contains(key) && !(keep && watchNightKeys.contains(key));
+      final stay = kept(day);
+      bool drop(String key) => sleepKeys.contains(key) && !stay.contains(key) && !(keep && watchNightKeys.contains(key));
       if (old.keys.any(drop)) {
         history[k] = {for (final e in old.entries) if (!drop(e.key)) e.key: e.value};
         changed.add(k);
@@ -97,9 +122,11 @@ Set<String> mergeHistory(
     // οξυγόνο (το μόνο του ρολογιού εδώ, χωρίς ομαδοποίηση ύπνου) ανανεώνεται πάντα.
     final foreignNight = p.nightSource(day) != Source.watch;
     final keep = p.keepsWatchNight(day);
-    final row = foreignNight
-        ? {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value}
-        : e.value;
+    final stay = kept(day);
+    final row = {
+      for (final v in e.value.entries)
+        if (!(foreignNight && watchNightKeys.contains(v.key)) && !stay.contains(v.key)) v.key: v.value,
+    };
     // Το οξυγόνο τέτοιων ημερών δεν θέλει βήματα ανά λεπτό: ανανεώνεται σε κάθε αξιόπιστη ανάγνωση
     // (όχι όταν απέτυχε κάποιο είδος του ύπνου, που τότε το [sleepFrom] είναι null).
     final trusted = replaceSleep || sleepFrom != null;
@@ -112,6 +139,7 @@ Set<String> mergeHistory(
         ? {
             for (final v in old.entries)
               if ((keep && watchNightKeys.contains(v.key)) ||
+                  (stay.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))) ||
                   (!sleepKeys.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))))
                 v.key: v.value,
           }
@@ -125,7 +153,9 @@ Set<String> mergeHistory(
 }
 
 /// Βάζει τις τιμές του Oura ([rows], κλειδιά «o.*») για τις μέρες [from, to] και επιστρέφει όσες άλλαξαν.
-/// Η ανάγνωση του διαστήματος ήταν πλήρης: ό,τι δεν ήρθε για μια μέρα (π.χ. σβήστηκε στην Oura) φεύγει.
+/// Μια μέρα που ήρθε στην απάντηση αντικαθίσταται όλη (οι τιμές «o.*» της). Μια μέρα που ΔΕΝ ήρθε δεν σβήνεται
+/// ποτέ (έλεγχος 4/11, A3): η Oura μπορεί να μη στείλει μια νύχτα (καθυστέρηση συγχρονισμού, όριο ημερομηνιών)
+/// και μια μετρημένη νύχτα δεν χάνεται γι' αυτό.
 /// Γράφονται μόνο οι μέρες που η «νύχτα» έρχεται από το Oura· οι άλλες αγνοούνται.
 Set<String> mergeOura(
   Map<String, Map<String, double>> history,
@@ -138,6 +168,7 @@ Set<String> mergeOura(
   for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
     if (plan.nightSource(day) != Source.oura) continue;
     final k = dateKey(day);
+    if (!rows.containsKey(k)) continue;
     final old = history[k] ?? const <String, double>{};
     final next = {
       for (final v in old.entries) if (!ouraKeySet.contains(v.key)) v.key: v.value,
@@ -181,6 +212,43 @@ int sleepDaysIn(Map<String, Map<String, double>> history, DateTime from, DateTim
 /// Τιμές που έρχονται από τις ζυγίσεις.
 const bodyKeys = {K.weight, K.fatPct, K.smm};
 
+/// Μία ολόκληρη ζύγιση ανά μέρα: η τελευταία της μέρας από την InBody (ποτέ πεδία από δύο διαφορετικές
+/// ζυγίσεις μαζί). Κλειδί = μέρα («2026-11-10»).
+Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
+  final last = <String, BodyMeasurement>{};
+  for (final b in body) {
+    final k = dateKey(b.time);
+    final o = last[k];
+    if (o == null || !b.time.isBefore(o.time)) last[k] = b;
+  }
+  return {
+    for (final e in last.entries)
+      e.key: {
+        if (e.value.weight != null && e.value.weight!.isFinite) K.weight: e.value.weight!,
+        if (e.value.fatPct != null && e.value.fatPct!.isFinite) K.fatPct: e.value.fatPct!,
+        if (e.value.smm != null && e.value.smm!.isFinite) K.smm: e.value.smm!,
+      },
+  };
+}
+
+/// Βάζει τις ζυγίσεις ([bodyRows]) στο ιστορικό ΧΩΡΙΣ να αγγίζει τίποτα άλλο της μέρας (έλεγχος 4/11, A1: μια
+/// ζύγιση σε παλιά μέρα δεν περνά από το [mergeHistory], που θα έσβηνε π.χ. το οξυγόνο μιας νύχτας του Oura).
+/// Οι τιμές ζύγισης της μέρας αντικαθίστανται όλες μαζί από τη μία ζύγιση. Επιστρέφει τις μέρες που άλλαξαν.
+Set<String> mergeBody(Map<String, Map<String, double>> history, Map<String, Map<String, double>> rows) {
+  final changed = <String>{};
+  for (final e in rows.entries) {
+    if (e.value.isEmpty) continue;
+    final old = history[e.key] ?? const <String, double>{};
+    final next = {
+      for (final v in old.entries) if (!bodyKeys.contains(v.key)) v.key: v.value,
+      ...e.value,
+    };
+    if (!_sameValues(history[e.key], next)) changed.add(e.key);
+    history[e.key] = next;
+  }
+  return changed;
+}
+
 /// Σβήνει τις τιμές ζύγισης από μέρες (από [from] και μετά) που δεν έχουν πια ζύγιση στη Samsung
 /// (π.χ. σβήστηκε μια λάθος ζύγιση). [bodyDays]: οι μέρες με ζύγιση τώρα. Επιστρέφει τις μέρες που άλλαξαν.
 Set<String> removeMissingBody(Map<String, Map<String, double>> history, Set<String> bodyDays, {required DateTime from}) {
@@ -195,14 +263,21 @@ Set<String> removeMissingBody(Map<String, Map<String, double>> history, Set<Stri
 }
 
 /// Τα είδη δεδομένων από τα οποία βγαίνουν οι τιμές ύπνου ([sleepKeys]), με τα ονόματα της γέφυρας.
-const sleepReadKeys = ['sleep', 'heart', 'stepsMin', 'spo2', 'skinTemp'];
+/// Οι παλμοί ΔΕΝ είναι εδώ (έλεγχος 4/11, A12): αν δεν διαβαστούν (π.χ. πάρα πολλές εγγραφές), ο ύπνος
+/// ενημερώνεται κανονικά και μόνο οι τιμές από τους παλμούς ([heartKeys]) μένουν ως είχαν ([heartReadFailed]).
+const sleepReadKeys = ['sleep', 'stepsMin', 'spo2', 'skinTemp'];
+
+bool _failed(Map<String, dynamic> r, String k) {
+  final v = r[k];
+  return v is Map && v.containsKey('error');
+}
 
 /// Αν σε μια ανάγνωση της γέφυρας κάποιο από τα [sleepReadKeys] γύρισε σφάλμα ({"error": …}).
 /// Τότε οι τιμές ύπνου εκείνων των ημερών **δεν** αντικαθίστανται (θα έμεναν κενά).
-bool sleepReadFailed(Map<String, dynamic> r) => sleepReadKeys.any((k) {
-      final v = r[k];
-      return v is Map && v.containsKey('error');
-    });
+bool sleepReadFailed(Map<String, dynamic> r) => sleepReadKeys.any((k) => _failed(r, k));
+
+/// Οι παλμοί δεν διαβάστηκαν (ή κόπηκαν): οι τιμές από τους παλμούς δεν αλλάζουν σε αυτή την ανάγνωση.
+bool heartReadFailed(Map<String, dynamic> r) => _failed(r, 'heart');
 
 /// «2026-10-24»
 String dateKey(DateTime d) => '${d.year}-${two(d.month)}-${two(d.day)}';
@@ -224,9 +299,9 @@ String clockFromSix(double minutesFromSix) {
 /// Η σύνοψη μιας μέρας από τα δεδομένα της Samsung (ρολόι, ζυγαριά). Ό,τι λείπει, απλώς δεν υπάρχει στον χάρτη.
 ///
 /// [plan]: τις μέρες που η «νύχτα» δεν είναι του ρολογιού, δεν βγαίνει καμία τιμή νύχτας από το ρολόι (ύπνος,
-/// παλμοί ύπνου, θερμοκρασία, βαθμολογία, Energy Score)· μόνο το οξυγόνο της νύχτας, με ορισμό που δεν χρειάζεται
-/// τον ύπνο του ρολογιού ([Dashboard.watchSpo2]).
-/// [windows]: οι ώρες ύπνου του Oura, μόνο για να εξαιρούνται από τους παλμούς της μέρας.
+/// παλμοί ύπνου, θερμοκρασία, βαθμολογία, Energy Score)· μόνο το οξυγόνο της νύχτας του ρολογιού, μέσα στις
+/// ώρες της νύχτας του Oura ([Dashboard.watchSpo2]).
+/// [windows]: οι ώρες ύπνου του Oura, μόνο ως χρονικά παράθυρα (παλμοί της μέρας, οξυγόνο της νύχτας).
 Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
   final p = plan ?? SourcePlan.samsungOnly;
   final out = <String, double>{};
@@ -242,7 +317,7 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
     if (sameDay(n.date, day)) night = n;
   }
   if (!watchNight) {
-    final ox = d.watchSpo2(day);
+    final ox = d.watchSpo2(day, windows);
     if (ox != null) {
       put(K.spo2Avg, ox.avg);
       put(K.spo2Min, ox.min);

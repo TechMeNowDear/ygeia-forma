@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../food/food_store.dart';
 import '../format.dart';
+import '../history.dart';
 import '../labels.dart';
 import '../nav.dart';
 import '../sources.dart';
@@ -107,11 +108,13 @@ class TodayPage extends StatelessWidget {
         // «Ξεκούραση στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
         final extras = <Widget>[
           if (!ouraNight && prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
-          if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, () => open(Cat.health, HealthTab.heart)),
-          if (prefs.show('calories')) _caloriesCard(context, d, () => open(Cat.exercise)),
+          if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
+          if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise)),
           if (prefs.show('spo2'))
-            ouraNight ? _watchSpo2Card(context, d, now, () => open(Cat.health, HealthTab.heart)) : _spo2Card(context, d, () => open(Cat.health, HealthTab.heart)),
-          if (!ouraNight && prefs.show('skin')) _skinCard(context, d, () => open(Cat.health, HealthTab.body)),
+            ouraNight
+                ? _watchSpo2Card(context, d, now, store.ouraWindows, () => open(Cat.health, HealthTab.heart))
+                : _spo2Card(context, d, now, () => open(Cat.health, HealthTab.heart)),
+          if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
         final footer = Padding(
@@ -215,7 +218,7 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _restingCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _restingCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final hr = d.lastNight?.sleepingHr;
     final base = d.restingHrBaseline;
@@ -235,7 +238,7 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.favorite_rounded,
       color: c.heart,
-      title: 'Παλμοί στον ύπνο',
+      title: datedTitle('Παλμοί στον ύπνο', hr == null ? null : d.lastNight!.date, now),
       value: hr?.round().toString(),
       unit: 'bpm',
       trend: trend,
@@ -245,23 +248,27 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  /// Οξυγόνο της νύχτας από το ρολόι όταν ο ύπνος είναι του Oura (χωρίς τον ύπνο του ρολογιού).
-  Widget _watchSpo2Card(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
+  /// Οξυγόνο της νύχτας από το ρολόι όταν ο ύπνος είναι του Oura: μετρήσεις του ρολογιού μέσα στις ώρες της
+  /// νύχτας του Oura. Χωρίς νύχτα του Oura δεν ξέρουμε πότε κοιμήθηκες: κενό, με τον λόγο.
+  Widget _watchSpo2Card(BuildContext context, Dashboard d, DateTime now, SleepWindows windows, VoidCallback onTap) {
     final c = Aigaio.of(context);
-    final ox = d.watchSpo2(now);
+    final ox = d.watchSpo2(now, windows);
+    final noWindow = !windows.mains.containsKey(dateKey(dayOf(now)));
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
       title: 'Οξυγόνο · ρολόι',
-      value: ox?.avg.round().toString(),
+      value: ox?.avg?.round().toString(),
       unit: '%',
       trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${ox.min.round()}% · ενδεικτικό'),
-      empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
+      empty: noWindow
+          ? 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο της νύχτας μένει κενό.'
+          : 'Δεν υπάρχουν μετρήσεις οξυγόνου του ρολογιού μέσα στον ύπνο.',
       onTap: onTap,
     );
   }
 
-  Widget _caloriesCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _caloriesCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final total = (d.activity['calories'] as num?)?.toDouble();
     final active = (d.activity['activeCalories'] as num?)?.toDouble();
@@ -269,7 +276,8 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.local_fire_department_rounded,
       color: c.heart,
-      title: 'Θερμίδες που έκαψες',
+      // Οι θερμίδες είναι της μέρας της ανάγνωσης: από αποθηκευμένη ανάγνωση άλλης μέρας, με την ημερομηνία.
+      title: datedTitle('Θερμίδες που έκαψες', total == null ? null : d.readAt, now),
       value: total == null ? null : thousands(total),
       unit: 'kcal',
       note: active == null ? null : 'Από κίνηση ${thousands(active)} kcal',
@@ -278,14 +286,14 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _spo2Card(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _spo2Card(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final n = d.lastNight;
     final min = n?.spo2Min;
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
-      title: 'Οξυγόνο',
+      title: datedTitle('Οξυγόνο', n?.spo2Avg == null && min == null ? null : n!.date, now),
       value: n?.spo2Avg?.round().toString(),
       unit: '%',
       trend: min == null
@@ -296,14 +304,14 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _skinCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _skinCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final t = d.lastNight?.skinTemp;
     final base = d.skinTempBaseline;
     return StatCard(
       icon: Icons.thermostat_rounded,
       color: c.move,
-      title: 'Θερμοκρασία καρπού',
+      title: datedTitle('Θερμοκρασία καρπού', t == null ? null : d.lastNight!.date, now),
       value: t == null ? null : (base == null ? dec(t) : signedDec(t - base)),
       unit: '°C',
       note: (t != null && base != null) ? 'Απόκλιση από τον μέσο όρο σου' : null,

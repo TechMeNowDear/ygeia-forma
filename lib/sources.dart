@@ -196,6 +196,12 @@ final Set<String> ouraKeySet = ouraKeys.values.toSet();
 /// Μετρήσεις που δίνει μόνο το Oura: με το ρολόι ως πηγή δεν έχουν τιμή (όχι «0», απλώς κενό).
 const ouraOnlyMetrics = {K.lowHr, K.hrv, K.breath, K.napMin};
 
+/// Μετρήσεις του ρολογιού που αλλάζουν ΟΡΙΣΜΟ όταν η νύχτα έρχεται από το Oura (έλεγχος 4/11, A4):
+/// - οξυγόνο: πριν, οι μετρήσεις μέσα στον ύπνο του ρολογιού· μετά, μέσα στις ώρες ύπνου του Oura,
+/// - παλμοί μέρας: εξαιρείται ο ύπνος του ρολογιού ή οι ώρες ύπνου του Oura.
+/// Η τιμή μένει πάντα του ρολογιού, αλλά δεν συγκρίνεται πάνω από την αλλαγή ([SourcePlan.changeDates]).
+const definitionMetrics = {K.spo2Avg, K.spo2Min, K.spo2Low, K.dayHr, K.restHr, K.walkHr};
+
 /// Τιμές της «νύχτας» από το ρολόι, όπως αποθηκεύονται (χωρίς το οξυγόνο, που είναι πάντα του ρολογιού).
 const watchNightKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake, K.sleepHr, K.skinTemp, K.energy,
@@ -298,18 +304,33 @@ class SourcePlan {
     return k == null ? null : history[dateKey(day)]?[k];
   }
 
-  /// Οι μέρες που η μέτρηση [metric] αλλάζει πηγή (η πρώτη μέρα της νέας πηγής), παλιότερη πρώτη.
-  /// Μετρούν μόνο οι πηγές που ΔΙΝΟΥΝ τη μέτρηση: μια εποχή χωρίς τιμή (π.χ. «καμία», ή το ρολόι για το HRV)
-  /// δεν είναι αλλαγή η ίδια, αλλά ρολόι → [κενό] → Oura είναι αλλαγή στην αρχή του Oura. Έτσι:
-  /// - HRV/αναπνοές/χαμηλότεροι παλμοί (μόνο Oura) δεν έχουν ποτέ «αλλαγή πηγής»· απλώς λίγα δεδομένα στην αρχή.
-  /// - Ύπνος: ρολόι → Oura → καμία → ρολόι έχει αλλαγές στην αρχή του Oura και στην αρχή του ρολογιού.
+  /// Οι μέρες που η μέτρηση [metric] αλλάζει πηγή ή ορισμό (η πρώτη μέρα της νέας εποχής), παλιότερη πρώτη.
+  /// Καμία σύγκριση, γράφημα ή «συνηθισμένο» δεν περνά πάνω από αυτές (έλεγχος 4/11, A5).
+  /// - Κάθε εποχή που ΔΙΝΕΙ τιμή, μετά από οποιαδήποτε προηγούμενη περίοδο με τιμές, είναι αλλαγή: και
+  ///   Oura → καμία → Oura (ίσως άλλο δαχτυλίδι ή λογαριασμός, νέα «βάση»). Μια εποχή χωρίς τιμή (π.χ. «καμία»,
+  ///   ή το ρολόι για το HRV) δεν είναι αλλαγή η ίδια.
+  /// - HRV/αναπνοές/χαμηλότεροι παλμοί (μόνο Oura): η πρώτη σύνδεση δεν είναι αλλαγή (απλώς αρχίζουν τιμές)·
+  ///   κάθε επόμενη εποχή Oura είναι.
+  /// - Οξυγόνο νύχτας και παλμοί μέρας ([definitionMetrics]): μένουν του ρολογιού, αλλά ο ορισμός τους αλλάζει
+  ///   όταν η νύχτα περνά από το ρολόι στο Oura και πίσω (A4)· «καμία» δεν δίνει τιμή.
   List<DateTime> changeDates(String metric) {
-    if (metricGroups[metric] != SourceGroup.night) return const [];
+    final night = metricGroups[metric] == SourceGroup.night;
+    final definition = definitionMetrics.contains(metric);
+    if (!night && !definition) return const [];
+    bool gives(Source s) => night ? storageKey(metric, s) != null : (s == Source.watch || s == Source.oura);
     final out = <DateTime>[];
-    Source? prev = storageKey(metric, Source.watch) != null ? Source.watch : null;
+    // Πριν από την πρώτη εποχή η νύχτα είναι του ρολογιού.
+    var hadValues = gives(Source.watch);
+    Source prev = Source.watch;
     for (final e in eras) {
-      if (storageKey(metric, e.source) == null) continue;
-      if (prev != null && e.source != prev) out.add(e.from);
+      if (!gives(e.source)) {
+        prev = e.source;
+        continue;
+      }
+      // Ορισμός: αλλάζει μόνο όταν αλλάζει το «ρολόι ή Oura» της νύχτας (ή μετά από κενό «καμία»).
+      final same = definition && e.source == prev;
+      if (hadValues && !same) out.add(e.from);
+      hadValues = true;
       prev = e.source;
     }
     return out;

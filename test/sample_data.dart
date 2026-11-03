@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/history.dart';
 
+/// Η εφαρμογή της InBody στη Samsung Health (Google Play: com.inbody2014.inbody).
+const inbodyApp = 'com.inbody2014.inbody';
+
 /// Δείγμα δεδομένων στη μορφή που επιστρέφει η γέφυρα Kotlin (DashboardReader),
 /// κοντά στα πραγματικά (ύπνος σε κομμάτια, InBody κάθε μερικές εβδομάδες).
 Map<String, dynamic> sampleDashboardJson(DateTime now) {
@@ -131,6 +134,7 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
         'smm': smm[i],
         'bmi': weights[i] / (1.745 * 1.745),
         'bmr': 1650 + i * 6,
+        'app': inbodyApp,
       },
   ];
 

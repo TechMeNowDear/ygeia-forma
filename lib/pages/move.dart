@@ -40,6 +40,9 @@ class ExercisePage extends StatelessWidget {
         final calories = (a['calories'] as num?)?.toDouble();
         final activeCalories = (a['activeCalories'] as num?)?.toDouble();
         final floorsToday = d.valueFor(d.floors, d.readAt)?.value;
+        // Οι τιμές της μέρας είναι της μέρας της ανάγνωσης: από αποθηκευμένη ανάγνωση άλλης μέρας, με ημερομηνία (A11).
+        final today = DateTime.now();
+        String title(String t, Object? value) => datedTitle(t, value == null ? null : d.readAt, today);
 
         final last14 = d.steps.length <= 14 ? d.steps : d.steps.sublist(d.steps.length - 14);
         final floors14 = [for (var i = 13; i >= 0; i--) DateTime(d.readAt.year, d.readAt.month, d.readAt.day - i)];
@@ -92,14 +95,14 @@ class ExercisePage extends StatelessWidget {
           StatCard(
             icon: Icons.timer_rounded,
             color: c.exercise,
-            title: 'Ενεργός χρόνος',
+            title: title('Ενεργός χρόνος', activeMinutes),
             value: activeMinutes == null ? null : (activeMinutes < 60 ? '$activeMinutes' : hoursMinutes(activeMinutes)),
             unit: (activeMinutes != null && activeMinutes < 60) ? (activeMinutes == 1 ? 'λεπτό' : 'λεπτά') : null,
           ),
           StatCard(
             icon: Icons.local_fire_department_rounded,
             color: c.heart,
-            title: 'Θερμίδες που έκαψες',
+            title: title('Θερμίδες που έκαψες', calories),
             value: calories == null ? null : thousands(calories),
             unit: 'kcal',
             note: activeCalories == null ? 'Μαζί με τον βασικό μεταβολισμό' : 'Από κίνηση ${thousands(activeCalories)} kcal',
@@ -107,14 +110,14 @@ class ExercisePage extends StatelessWidget {
           StatCard(
             icon: Icons.straighten_rounded,
             color: c.energy,
-            title: 'Απόσταση',
+            title: title('Απόσταση', distance),
             value: distance == null ? null : dec(distance / 1000),
             unit: 'km',
           ),
           StatCard(
             icon: Icons.stairs_rounded,
             color: c.energy,
-            title: 'Όροφοι',
+            title: title('Όροφοι', d.floors.isEmpty ? null : 0),
             // Χωρίς καθόλου δεδομένα ορόφων: «—»· αλλιώς μέρα χωρίς ορόφους = 0.
             value: d.floors.isEmpty ? null : (floorsToday ?? 0).round().toString(),
           ),

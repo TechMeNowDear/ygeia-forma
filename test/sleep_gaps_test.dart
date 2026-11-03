@@ -53,10 +53,82 @@ void main() {
     expect(n.score, isNull, reason: 'σπασμένη νύχτα: η Samsung βαθμολογεί κάθε κομμάτι χωριστά');
   });
 
-  test('Βήματα στο κενό: χωρίς πιθανό ύπνο', () {
+  test('Βήματα στο κενό (A6): χωρίς πιθανό ύπνο, και το μικρό κομμάτι πριν είναι χωριστό (υπνάκος)', () {
     final n = Dashboard.fromJson(night(gapSteps: 200)).nights.single;
     expect(n.estimatedMinutes, 0);
-    expect(n.minutes, 63 + 141);
+    expect(n.minutes, 141, reason: 'σηκώθηκε και περπάτησε (200 βήματα): το κομμάτι των 63 λεπτών δεν είναι η ίδια νύχτα');
+    expect(n.napMinutes, 63);
+    expect(n.start, DateTime(2026, 10, 26, 5, 34));
+  });
+
+  group('A6: κομμάτια της ίδιας ημερομηνίας ενώνονται μόνο με ήσυχο κενό', () {
+    int ms(DateTime t) => t.millisecondsSinceEpoch;
+    Map<String, dynamic> rec(DateTime a, DateTime b) =>
+        {'start': ms(a), 'end': ms(b), 'minutes': b.difference(a).inMinutes, 'stages': []};
+    Map<String, dynamic> json(List<Map<String, dynamic>> sleep, {List<List<num>> steps = const [], bool known = true}) => {
+          'readAt': ms(DateTime(2026, 11, 2, 13)),
+          'sleep': sleep,
+          'stepsMin': steps,
+          'stepsFrom': known ? ms(DateTime(2026, 10, 26)) : ms(DateTime(2026, 11, 2, 12)),
+        };
+
+    test('Λαγοκοίμισμα στον καναπέ 21:00–22:00, μετά περπάτημα, ύπνος 23:30: υπνάκος, όχι αρχή της νύχτας', () {
+      final d = Dashboard.fromJson(json([
+        rec(DateTime(2026, 11, 1, 21), DateTime(2026, 11, 1, 22)),
+        rec(DateTime(2026, 11, 1, 23, 30), DateTime(2026, 11, 2, 7)),
+      ], steps: [
+        [ms(DateTime(2026, 11, 1, 22, 30)), 120],
+      ]));
+      final n = d.nights.single;
+      expect(n.minutes, 450);
+      expect(n.start, DateTime(2026, 11, 1, 23, 30));
+      expect(n.score, isNull, reason: 'χωρίς βαθμολογία στο δείγμα');
+      expect(n.parts.length, 1, reason: 'το λαγοκοίμισμα δεν είναι κομμάτι της νύχτας');
+    });
+
+    test('Λαγοκοίμισμα το πρωί 08:30–09:30 μετά από βήματα: υπνάκος, η ώρα ξυπνήματος μένει 07:00', () {
+      final d = Dashboard.fromJson(json([
+        rec(DateTime(2026, 11, 1, 23, 30), DateTime(2026, 11, 2, 7)),
+        rec(DateTime(2026, 11, 2, 8, 30), DateTime(2026, 11, 2, 9, 30)),
+      ], steps: [
+        [ms(DateTime(2026, 11, 2, 7, 40)), 80],
+      ]));
+      final n = d.nights.single;
+      expect(n.minutes, 450);
+      expect(n.end, DateTime(2026, 11, 2, 7));
+      expect(n.napMinutes, 60);
+    });
+
+    test('Κενό χωρίς βήματα (ως 30): μία νύχτα, όπως πριν', () {
+      final d = Dashboard.fromJson(json([
+        rec(DateTime(2026, 11, 1, 23, 30), DateTime(2026, 11, 2, 3)),
+        rec(DateTime(2026, 11, 2, 4, 30), DateTime(2026, 11, 2, 7)),
+      ], steps: [
+        [ms(DateTime(2026, 11, 2, 3, 40)), 12],
+      ]));
+      expect(d.nights.single.minutes, 210 + 150);
+      expect(d.nights.single.napMinutes, 0);
+    });
+
+    test('Χωρίς στοιχεία βημάτων για το κενό: χωριστά (δεν μαντεύουμε)', () {
+      final d = Dashboard.fromJson(json([
+        rec(DateTime(2026, 11, 1, 23, 30), DateTime(2026, 11, 2, 5)),
+        rec(DateTime(2026, 11, 2, 6), DateTime(2026, 11, 2, 7)),
+      ], known: false));
+      expect(d.nights.single.minutes, 330);
+      expect(d.nights.single.napMinutes, 60);
+    });
+
+    test('Δεύτερο κομμάτι 3 ωρών και πάνω με βήματα στο κενό: μένει μέρος της νύχτας (δεν είναι λαγοκοίμισμα)', () {
+      final d = Dashboard.fromJson(json([
+        rec(DateTime(2026, 11, 1, 22), DateTime(2026, 11, 2, 2)),
+        rec(DateTime(2026, 11, 2, 3, 30), DateTime(2026, 11, 2, 7)),
+      ], steps: [
+        [ms(DateTime(2026, 11, 2, 2, 30)), 200],
+      ]));
+      expect(d.nights.single.minutes, 240 + 210);
+      expect(d.nights.single.napMinutes, 0);
+    });
   });
 
   test('Παλμοί ξύπνιου στο κενό: χωρίς πιθανό ύπνο', () {

@@ -79,11 +79,32 @@ Map<String, Object?> current() {
   return out;
 }
 
+/// Κάθε τιμή που διαφέρει, ως «διαδρομή: παλιό → νέο» (για να γράφεται ρητά τι άλλαξε και γιατί).
+void diffJson(Object? a, Object? b, String path, List<String> out) {
+  if (a is Map && b is Map) {
+    for (final k in {...a.keys, ...b.keys}) {
+      diffJson(a[k], b[k], '$path/$k', out);
+    }
+  } else if (a is List && b is List && a.length == b.length) {
+    for (var i = 0; i < a.length; i++) {
+      diffJson(a[i], b[i], '$path[$i]', out);
+    }
+  } else if (jsonEncode(a) != jsonEncode(b)) {
+    out.add('$path: ${jsonEncode(a)} → ${jsonEncode(b)}');
+  }
+}
+
 void main() {
   test('Χωρίς Oura: ίδια αποτελέσματα με τον κώδικα πριν από το Oura (dfc10c8)', () {
     final golden = jsonDecode(File('test/fixtures/golden_dfc10c8.json').readAsStringSync()) as Map<String, dynamic>;
     // Μέσα από JSON και τα δύο, ώστε οι αριθμοί να συγκρίνονται με τον ίδιο τρόπο.
     final now = jsonDecode(jsonEncode(current())) as Map<String, dynamic>;
+    final diffs = <String>[];
+    diffJson(golden, now, '', diffs);
+    if (diffs.isNotEmpty) {
+      // ignore: avoid_print
+      print('GOLDEN-DIFF ${diffs.length}\n${diffs.join('\n')}\nGOLDEN-END');
+    }
     expect(now.keys.toSet(), golden.keys.toSet());
     for (final k in golden.keys) {
       expect(now[k], golden[k], reason: k);

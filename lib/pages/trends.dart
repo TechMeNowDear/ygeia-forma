@@ -376,9 +376,14 @@ class _MetricDetail extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: c.tint(c.sleep), borderRadius: BorderRadius.circular(16)),
               child: Text(
-                'Αλλαγή πηγής ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα η μέτρηση έρχεται από ${sourceDevice(r.source)}. '
-                'Δύο συσκευές δεν μετρούν το ίδιο, οπότε δεν συγκρίνω τιμές από πριν και μετά. Το γράφημα δείχνει μόνο '
-                'τις μέρες από την αλλαγή· η σύγκριση ξαναρχίζει όταν μαζευτούν αρκετές μέρες από τη νέα πηγή.',
+                definitionMetrics.contains(def.key)
+                    // Ίδια συσκευή (ρολόι), άλλος ορισμός: μετά τη σύνδεση του Oura μετρά μέσα στις ώρες ύπνου του.
+                    ? 'Αλλαγή ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα ο ύπνος έρχεται από άλλη πηγή, οπότε η τιμή '
+                        'του ρολογιού υπολογίζεται μέσα σε άλλες ώρες ύπνου. Δεν συγκρίνω τιμές από πριν και μετά. Το '
+                        'γράφημα δείχνει μόνο τις μέρες από την αλλαγή.'
+                    : 'Αλλαγή πηγής ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα η μέτρηση έρχεται από ${sourceDevice(r.source)}. '
+                        'Δύο συσκευές δεν μετρούν το ίδιο, οπότε δεν συγκρίνω τιμές από πριν και μετά. Το γράφημα δείχνει μόνο '
+                        'τις μέρες από την αλλαγή· η σύγκριση ξαναρχίζει όταν μαζευτούν αρκετές μέρες από τη νέα πηγή.',
                 style: style.copyWith(color: c.text),
               ),
             ),
@@ -424,7 +429,9 @@ class TrendStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (r.status == TrendStatus.insufficient) return const TrendPill('Λίγα δεδομένα');
-    if (r.status == TrendStatus.sourceChange) return const TrendPill('Αλλαγή πηγής');
+    if (r.status == TrendStatus.sourceChange) {
+      return TrendPill(definitionMetrics.contains(r.def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή πηγής');
+    }
     if (r.status == TrendStatus.stable) return const TrendPill('Σταθερό');
     final up = r.status == TrendStatus.up;
     final kind = switch (r.goodness) {

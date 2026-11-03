@@ -404,7 +404,8 @@ Map<String, double> ouraRow(OuraNight n) {
   }
   final napped = [for (final x in n.naps) if (x.total != null) x.total!];
   if (napped.isNotEmpty) put(K.napMin, napped.fold<int>(0, (a, b) => a + b) / 60);
-  put(K.sleepScore, n.sleepScore);
+  // Βαθμολογία ύπνου μόνο για μέρα με κύρια νύχτα (όχι για μέρα με μόνο υπνάκο: η κάρτα λέει «Μόνο υπνάκος»).
+  if (m != null) put(K.sleepScore, n.sleepScore);
   put(K.energy, n.readiness);
   put(K.skinTemp, n.tempDeviation);
   return out;
@@ -487,8 +488,9 @@ List<OuraNight> decodeOuraNights(String? raw) {
   }
 }
 
-/// Νέες νύχτες πάνω στις παλιές: οι μέρες στο [from, to] αντικαθίστανται όλες (η ανάγνωση ήταν πλήρης),
-/// οι άλλες μένουν. Κρατιούνται οι τελευταίες [keepDays] μέρες ως το [today].
+/// Νέες νύχτες πάνω στις παλιές: οι μέρες στο [from, to] που ήρθαν αντικαθίστανται· όσες ΔΕΝ ήρθαν μένουν
+/// (έλεγχος 4/11, A3: μια νύχτα που η Oura δεν έστειλε αυτή τη φορά δεν σβήνεται). Κρατιούνται οι τελευταίες
+/// [keepDays] μέρες ως το [today].
 List<OuraNight> mergeOuraNights(
   List<OuraNight> old,
   List<OuraNight> fresh, {
@@ -498,10 +500,7 @@ List<OuraNight> mergeOuraNights(
   int keepDays = 45,
 }) {
   final oldest = DateTime(today.year, today.month, today.day - keepDays);
-  final byDay = <String, OuraNight>{
-    for (final n in old)
-      if (n.day.isBefore(dayOf(from)) || n.day.isAfter(dayOf(to))) dateKey(n.day): n,
-  };
+  final byDay = <String, OuraNight>{for (final n in old) dateKey(n.day): n};
   for (final n in fresh) {
     if (n.day.isBefore(dayOf(from)) || n.day.isAfter(dayOf(to))) continue;
     byDay[dateKey(n.day)] = n;

@@ -36,14 +36,8 @@ GapVerdict judgeGap(
   if (gap <= Duration.zero) return GapVerdict.asleep; // συνεχόμενα ή επικαλυπτόμενα κομμάτια
   if (gap > maxGap) return GapVerdict.tooLong;
 
-  // Βήματα: πρέπει να ξέρουμε ότι μετρήθηκαν (λεπτά χωρίς βήματα δεν υπάρχουν στον πίνακα).
-  if (stepsFrom == null || gapStart.isBefore(stepsFrom)) return GapVerdict.noStepData;
-  var steps = 0;
-  final from = gapStart.millisecondsSinceEpoch ~/ 60000;
-  final to = gapEnd.millisecondsSinceEpoch ~/ 60000;
-  for (var m = from; m < to; m++) {
-    steps += stepsByMinute[m] ?? 0;
-  }
+  final steps = gapSteps(gapStart, gapEnd, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
+  if (steps == null) return GapVerdict.noStepData;
   if (steps > maxGapSteps) return GapVerdict.steps;
 
   // Παλμοί: στο κενό αρκετές μετρήσεις (μία ανά 30 λεπτά τουλάχιστον) και κοντά σε αυτούς του ύπνου.
@@ -67,4 +61,17 @@ GapVerdict judgeGap(
   if (mean(inGap) > mean(inSleep) + maxHrRise) return GapVerdict.heartHigh;
 
   return GapVerdict.asleep;
+}
+
+/// Βήματα στο διάστημα [start, end), ή null αν δεν ξέρουμε ότι μετρήθηκαν (λεπτά χωρίς βήματα δεν υπάρχουν
+/// στον πίνακα, οπότε χωρίς [stepsFrom] πριν από την αρχή δεν ξεχωρίζει το «0 βήματα» από το «δεν μετρήθηκε»).
+int? gapSteps(DateTime start, DateTime end, {required Map<int, int> stepsByMinute, required DateTime? stepsFrom}) {
+  if (stepsFrom == null || start.isBefore(stepsFrom)) return null;
+  var steps = 0;
+  final from = start.millisecondsSinceEpoch ~/ 60000;
+  final to = end.millisecondsSinceEpoch ~/ 60000;
+  for (var m = from; m < to; m++) {
+    steps += stepsByMinute[m] ?? 0;
+  }
+  return steps;
 }

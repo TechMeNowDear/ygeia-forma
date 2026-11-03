@@ -31,9 +31,28 @@ class SleepRecord {
   SleepRecord(this.start, this.end, this.minutes, this.score, this.stages);
   final DateTime start;
   final DateTime end;
+
+  /// Η διάρκεια όπως τη δίνει η Samsung (DURATION). Δεν ξέρουμε με σιγουριά αν περιέχει τα ξυπνήματα: η Samsung
+  /// δείχνει «Χρόνος ύπνου» (από τον ύπνο ως το ξύπνημα, ΜΕ τα ξυπνήματα) και «Πραγματικός ύπνος» (έλεγχος 4/11).
   final int minutes;
   final int? score;
   final List<Stage> stages;
+
+  static const _asleep = {'LIGHT', 'DEEP', 'REM'};
+  static const _known = {'LIGHT', 'DEEP', 'REM', 'AWAKE'};
+
+  /// Πραγματικός ύπνος σε δευτερόλεπτα: ελαφρύς + βαθύς + REM, χωρίς τα ξυπνήματα. Μόνο αν το κομμάτι έχει φάσεις
+  /// και όλες είναι γνωστές (αλλιώς null: δεν ξέρουμε).
+  int? get asleepSeconds {
+    if (stages.isEmpty || stages.any((s) => !_known.contains(s.name))) return null;
+    return stages.where((s) => _asleep.contains(s.name)).fold<int>(0, (t, s) => t + s.end.difference(s.start).inSeconds);
+  }
+
+  /// Ύπνος του κομματιού σε λεπτά: ο πραγματικός (από τις φάσεις) όταν υπάρχει, αλλιώς η διάρκεια της Samsung.
+  int get sleepMinutes {
+    final a = asleepSeconds;
+    return a == null ? minutes : (a / 60).round();
+  }
 }
 
 /// Μία νύχτα ύπνου (μπορεί να έχει πολλά κομμάτια), με ημερομηνία το πρωί που ξύπνησα.
@@ -48,7 +67,17 @@ class Night {
   final Map<String, int> stageSeconds = {};
   late DateTime start;
   late DateTime end;
+
+  /// Πραγματικός ύπνος (έλεγχος 4/11): ελαφρύς + βαθύς + REM από τις φάσεις, ΧΩΡΙΣ τα ξυπνήματα και χωρίς τα κενά
+  /// ανάμεσα στα κομμάτια· ίδιος ορισμός με το «Πραγματικός ύπνος» της Samsung και το total_sleep_duration του Oura.
+  /// Κομμάτι χωρίς φάσεις: η διάρκεια της Samsung ([staged] = false).
   int minutes = 0;
+
+  /// Αν ΟΛΑ τα κομμάτια είχαν φάσεις (άρα τα [minutes] είναι σίγουρα χωρίς τα ξυπνήματα).
+  bool staged = false;
+
+  /// Από τον ύπνο ως το ξύπνημα, ΜΕ τα ξυπνήματα («Χρόνος ύπνου» της Samsung): άθροισμα αρχή→τέλος των κομματιών.
+  int spanMinutes = 0;
   int? score;
   double? sleepingHr;
   double? spo2Avg;
@@ -71,7 +100,7 @@ class _SleepGroup {
   final List<SleepRecord> parts;
   final bool isNight;
   final List<(DateTime, DateTime)> gaps = [];
-  int get minutes => parts.fold(0, (s, p) => s + p.minutes);
+  int get minutes => parts.fold(0, (s, p) => s + p.sleepMinutes);
   DateTime get end => parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
 }
 
@@ -119,8 +148,9 @@ class Sample {
   final double? belowSec;
 }
 
-/// Οξυγόνο μιας νύχτας από το ρολόι: μέσο, χαμηλότερη μέτρηση, λεπτά κάτω από 90% (αν βγαίνουν).
-typedef NightOxygen = ({double avg, double min, double? below90});
+/// Οξυγόνο μιας νύχτας από το ρολόι: μέσο (null αν υπάρχουν μόνο σύντομες μετρήσεις), χαμηλότερη μέτρηση
+/// (ενδεικτική), λεπτά κάτω από 90% (αν βγαίνουν).
+typedef NightOxygen = ({double? avg, double min, double? below90});
 
 /// Λεπτά κάτω από 90%: μόνο αν ΚΑΘΕ μέτρηση της νύχτας το δίνει (αλλιώς δεν ξέρουμε, άρα κενό).
 double? _below90Minutes(List<Sample> ox) {
@@ -145,9 +175,13 @@ class BodyMeasurement {
     this.bmi,
     this.water,
     this.bmr,
+    this.app = '',
   });
 
   final DateTime time;
+
+  /// Η εφαρμογή που έγραψε τη μέτρηση στη Samsung Health (π.χ. της InBody).
+  final String app;
   final double? weight;
   final double? fatPct;
   final double? fatKg;
@@ -159,6 +193,43 @@ class BodyMeasurement {
 
   /// Άλιπη μάζα: από την InBody, αλλιώς βάρος μείον λίπος.
   double? get leanMass => ffm ?? ((weight != null && fatKg != null) ? weight! - fatKg! : null);
+}
+
+/// Ζυγίσεις μόνο από την εφαρμογή της InBody (έλεγχος 4/11, A2): η Samsung Health κρατά και χειροκίνητα βάρη,
+/// μετρήσεις σύστασης του ρολογιού (BIA) ή ό,τι έρχεται από το Health Connect. Αυτά δεν μπαίνουν ποτέ στη σειρά
+/// της ζυγαριάς. Ο ίδιος κανόνας με την ετικέτα «InBody» στο «Τι φτάνει» (labels.dart) και στο Kotlin (SourceRules).
+bool isScaleApp(String appId) => appId.toLowerCase().contains('inbody');
+
+/// Όρια λογικών τιμών: έξω από αυτά η τιμή είναι σφάλμα αισθητήρα (π.χ. ρολόι εκτός καρπού), όχι μέτρηση.
+const hrRange = (25.0, 250.0);
+const spo2Range = (50.0, 100.0);
+const skinRange = (20.0, 42.0);
+
+/// Χρόνος που δεν μπορεί να είναι μέτρηση (πριν από το 2000, π.χ. «0» = 1970): η εγγραφή αγνοείται.
+const _oldestMs = 946684800000;
+
+/// Οξυγόνο: εγγραφές μικρότερες από αυτό (π.χ. μια χειροκίνητη μέτρηση στο ρολόι) δεν μετρούν στον μέσο όρο
+/// της νύχτας. Μετρούν μόνο στη «χαμηλότερη μέτρηση», που είναι ενδεικτική.
+const spo2MinRecord = Duration(seconds: 60);
+
+/// Οξυγόνο από εγγραφές (A4): μέσος όρος σταθμισμένος με τη διάρκεια κάθε εγγραφής, μόνο από εγγραφές τουλάχιστον
+/// [spo2MinRecord]· χαμηλότερη μέτρηση από όλες (ενδεικτική)· λεπτά κάτω από 90% μόνο από τις μεγάλες εγγραφές.
+/// null αν δεν υπάρχει καμία εγγραφή.
+NightOxygen? oxygenOf(List<Sample> ox) {
+  if (ox.isEmpty) return null;
+  final long = [for (final s in ox) if (s.end.difference(s.start) >= spo2MinRecord) s];
+  double? avg;
+  if (long.isNotEmpty) {
+    var sum = 0.0;
+    var secs = 0.0;
+    for (final s in long) {
+      final w = s.end.difference(s.start).inMilliseconds / 1000;
+      sum += s.avg * w;
+      secs += w;
+    }
+    avg = sum / secs;
+  }
+  return (avg: avg, min: ox.map((s) => s.min).reduce(math.min), below90: _below90Minutes(long));
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +259,11 @@ class Dashboard {
     this.bodyOk = false,
     this.failed = const {},
     this.compareNights = const [],
+    this.bodyOther = 0,
   });
+
+  /// Ζυγίσεις από άλλες εφαρμογές (όχι InBody) που δεν μπήκαν ([isScaleApp]).
+  final int bodyOther;
 
   /// Νύχτες του ρολογιού που ΔΕΝ είναι η πηγή του ύπνου (μετά τη σύνδεση του Oura), μόνο για τη
   /// «Σύγκριση πηγών» τις πρώτες 14 μέρες. Καμία άλλη οθόνη ή υπολογισμός δεν τις διαβάζει.
@@ -232,6 +307,7 @@ class Dashboard {
       sleepOk: sleepOk,
       bodyOk: bodyOk,
       failed: failed,
+      bodyOther: bodyOther,
     );
   }
 
@@ -277,52 +353,59 @@ class Dashboard {
 
   factory Dashboard.fromJson(Map<String, dynamic> j) {
     DateTime t(dynamic ms) => DateTime.fromMillisecondsSinceEpoch((ms as num).toInt());
+    // Χρόνος «0» ή πριν από το 2000: η εγγραφή αγνοείται (αλλιώς μια νύχτα του 1970 θα «κατάπινε» όλες τις άλλες).
+    bool okTime(dynamic ms) => ms is num && ms >= _oldestMs;
     List<dynamic> list(String key) => j[key] is List ? j[key] as List<dynamic> : const [];
     double? d(dynamic v) => v is num ? v.toDouble() : null;
 
-    List<Sample> samples(String key) => [
-          for (final e in list(key))
-            if (e is List && e.length >= 3)
-              Sample(
-                t(e[0]),
-                t(e[1]),
-                (e[2] as num).toDouble(),
-                e.length > 3 ? (e[3] as num).toDouble() : (e[2] as num).toDouble(),
-                e.length > 4 ? (e[4] as num).toDouble() : (e[2] as num).toDouble(),
-                e.length > 5 && e[5] is num ? (e[5] as num).toDouble() : null,
-              ),
-        ];
+    // Τιμή έξω από τα λογικά όρια = σφάλμα αισθητήρα: η εγγραφή αγνοείται· ελάχιστο/μέγιστο έξω από τα όρια
+    // παίρνουν τη μέση τιμή της εγγραφής (π.χ. «ελάχιστο 0%» δεν είναι μέτρηση).
+    List<Sample> samples(String key, (double, double) range) {
+      bool inRange(num v) => v >= range.$1 && v <= range.$2;
+      return [
+        for (final e in list(key))
+          if (e is List && e.length >= 3 && okTime(e[0]) && e[2] is num && inRange(e[2] as num))
+            Sample(
+              t(e[0]),
+              e[1] is num && (e[1] as num) >= (e[0] as num) ? t(e[1]) : t(e[0]),
+              (e[2] as num).toDouble(),
+              e.length > 3 && e[3] is num && inRange(e[3] as num) ? (e[3] as num).toDouble() : (e[2] as num).toDouble(),
+              e.length > 4 && e[4] is num && inRange(e[4] as num) ? (e[4] as num).toDouble() : (e[2] as num).toDouble(),
+              e.length > 5 && e[5] is num ? (e[5] as num).toDouble() : null,
+            ),
+      ];
+    }
 
     final records = <SleepRecord>[
       for (final e in list('sleep'))
-        if (e is Map<String, dynamic>)
+        if (e is Map<String, dynamic> && okTime(e['start']) && okTime(e['end']) && (e['end'] as num) > (e['start'] as num))
           () {
             final start = t(e['start']);
             final end = t(e['end']);
             final stages = <Stage>[
               for (final s in (e['stages'] as List<dynamic>? ?? const []))
-                if (s is List && s.length >= 3) Stage(s[0].toString(), t(s[1]), t(s[2])),
+                if (s is List && s.length >= 3 && okTime(s[1]) && okTime(s[2])) Stage(s[0].toString(), t(s[1]), t(s[2])),
             ]..sort((a, b) => a.start.compareTo(b.start));
             final minutes = (e['minutes'] as num?)?.toInt() ?? end.difference(start).inMinutes;
             return SleepRecord(start, end, minutes, (e['score'] as num?)?.toInt(), stages);
           }(),
     ]..sort((a, b) => a.start.compareTo(b.start));
 
-    final heart = samples('heart')..sort((a, b) => a.start.compareTo(b.start));
-    final spo2 = samples('spo2');
-    final skin = samples('skinTemp');
+    final heart = samples('heart', hrRange)..sort((a, b) => a.start.compareTo(b.start));
+    final spo2 = samples('spo2', spo2Range);
+    final skin = samples('skinTemp', skinRange);
 
     final floorsByDay = <DateTime, double>{};
     for (final e in list('floors')) {
-      if (e is List && e.length >= 2) {
+      if (e is List && e.length >= 2 && okTime(e[0])) {
         final day = dayOf(t(e[0]));
         floorsByDay[day] = (floorsByDay[day] ?? 0) + (e[1] as num).toDouble();
       }
     }
 
-    final body = <BodyMeasurement>[
+    final allBody = <BodyMeasurement>[
       for (final e in list('body'))
-        if (e is Map<String, dynamic>)
+        if (e is Map<String, dynamic> && okTime(e['time']))
           BodyMeasurement(
             time: t(e['time']),
             weight: d(e['weight']),
@@ -333,12 +416,15 @@ class Dashboard {
             bmi: d(e['bmi']),
             water: d(e['water']),
             bmr: (e['bmr'] as num?)?.toInt(),
+            app: e['app'] is String ? e['app'] as String : '',
           ),
     ]..sort((a, b) => a.time.compareTo(b.time));
+    // Μόνο InBody ([isScaleApp]): ποτέ βάρος από άλλη εφαρμογή ή συσκευή στη σειρά της ζυγαριάς.
+    final body = [for (final b in allBody) if (isScaleApp(b.app)) b];
 
     final stepsByMinute = <int, int>{
       for (final e in list('stepsMin'))
-        if (e is List && e.length >= 2) (e[0] as num).toInt() ~/ 60000: (e[1] as num).toInt(),
+        if (e is List && e.length >= 2 && okTime(e[0])) (e[0] as num).toInt() ~/ 60000: (e[1] as num).toInt(),
     };
     final stepsFrom = j['stepsMin'] is List
         ? (j['stepsFrom'] is num
@@ -368,27 +454,28 @@ class Dashboard {
       skin: skin,
       energy: [
         for (final e in list('energy'))
-          if (e is List && e.length >= 2) DayValue(dayOf(t(e[0])), (e[1] as num).toDouble()),
+          if (e is List && e.length >= 2 && okTime(e[0])) DayValue(dayOf(t(e[0])), (e[1] as num).toDouble()),
       ],
       steps: [
         for (final e in list('steps'))
-          if (e is List && e.length >= 2) DayValue(dayOf(t(e[0])), (e[1] as num).toDouble()),
+          if (e is List && e.length >= 2 && okTime(e[0])) DayValue(dayOf(t(e[0])), (e[1] as num).toDouble()),
       ],
       floors: [
         for (final entry in floorsByDay.entries) DayValue(entry.key, entry.value),
       ]..sort((a, b) => a.day.compareTo(b.day)),
       body: body,
+      bodyOther: allBody.length - body.length,
       activity: j['activity'] is Map<String, dynamic> ? j['activity'] as Map<String, dynamic> : const {},
       sleepRecords: records,
       stepsByMinute: stepsByMinute,
       stepsMinuteFrom: stepsFrom,
       activityDaily: [
         for (final e in list('activityDaily'))
-          if (e is List && e.length >= 3) (dayOf(t(e[0])), (e[1] as num?)?.toInt(), (e[2] as num?)?.toDouble()),
+          if (e is List && e.length >= 3 && okTime(e[0])) (dayOf(t(e[0])), (e[1] as num?)?.toInt(), (e[2] as num?)?.toDouble()),
       ],
       exercise: [
         for (final e in list('exercise'))
-          if (e is List && e.length >= 2) (t(e[0]), t(e[1])),
+          if (e is List && e.length >= 2 && okTime(e[0]) && okTime(e[1])) (t(e[0]), t(e[1])),
       ],
     );
   }
@@ -399,8 +486,11 @@ class Dashboard {
   ///   νύχτα. Το κενό φαίνεται χωριστά ως «πιθανός ύπνος» και **δεν** μετρά στη διάρκεια, γιατί
   ///   δεν ξεχωρίζει ύπνο από ξάπλωμα ξύπνιος.
   /// - Αλλιώς: κομμάτι που αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες είναι υπνάκος.
-  /// - Δύο ομάδες κομματιών με την ίδια ημερομηνία και κενό πάνω από 4 ώρες (π.χ. λαγοκοίμισμα στον
-  ///   καναπέ το βράδυ): η μεγαλύτερη είναι η νύχτα· η άλλη, αν κρατά λιγότερο από 3 ώρες, υπνάκος.
+  /// - Δύο ομάδες κομματιών με την ίδια ημερομηνία: η μεγαλύτερη είναι η νύχτα. Η άλλη ενώνεται μαζί της
+  ///   ΜΟΝΟ αν το κενό ανάμεσα κρατά ως 4 ώρες, έχει μετρημένα βήματα ανά λεπτό και ως [maxGapSteps] βήματα
+  ///   (ο ίδιος κανόνας με τα κενά, sleep_gaps.dart· έλεγχος 4/11, A6). Αλλιώς (π.χ. λαγοκοίμισμα στον καναπέ και
+  ///   μετά περπάτημα, ή κενό χωρίς στοιχεία βημάτων) είναι χωριστή: αν κρατά λιγότερο από 3 ώρες, υπνάκος.
+  ///   Ομάδα 3 ωρών και πάνω την ίδια νύχτα δεν είναι «λαγοκοίμισμα»: μένει μέρος της νύχτας.
   static List<Night> _groupNights(
     List<SleepRecord> records, {
     List<Sample> heart = const [],
@@ -421,7 +511,7 @@ class Dashboard {
         previous.parts.add(r);
         continue;
       }
-      final isNap = r.start.hour >= 10 && r.start.hour < 18 && r.minutes < 180;
+      final isNap = r.start.hour >= 10 && r.start.hour < 18 && r.sleepMinutes < 180;
       final g = _SleepGroup(r, isNight: !isNap);
       groups.add(g);
       previous = g;
@@ -450,9 +540,10 @@ class Dashboard {
       final main = list.reduce((a, b) => a.minutes >= b.minutes ? a : b);
       final n = Night(entry.key);
       for (final g in list) {
-        final separate = !identical(g, main) && _gapBetween(g, main) > maxGap;
+        final separate = !identical(g, main) && !_quietGap(g, main, stepsByMinute, stepsFrom);
         if (separate && g.minutes < 180) {
-          addNap(g);
+          // Χωριστός ύπνος της ίδιας νύχτας (π.χ. 23:43–02:40, μετά σηκώθηκε): μετρά στους υπνάκους ΑΥΤΗΣ της νύχτας.
+          naps[entry.key] = (naps[entry.key] ?? 0) + g.minutes;
           continue;
         }
         n.parts.addAll(g.parts);
@@ -467,7 +558,21 @@ class Dashboard {
       n.estimatedGaps.sort((a, b) => a.$1.compareTo(b.$1));
       n.start = n.parts.first.start;
       n.end = n.parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
-      n.minutes = n.parts.fold(0, (sum, p) => sum + p.minutes);
+      // Πραγματικός ύπνος: δευτερόλεπτα από τις φάσεις (στρογγυλεύονται μία φορά)· κομμάτια χωρίς φάσεις με τη
+      // διάρκεια της Samsung. Τα κενά ανάμεσα στα κομμάτια δεν μετρούν ποτέ.
+      var asleep = 0;
+      var other = 0;
+      for (final p in n.parts) {
+        final a = p.asleepSeconds;
+        if (a == null) {
+          other += p.minutes;
+        } else {
+          asleep += a;
+        }
+      }
+      n.minutes = (asleep / 60).round() + other;
+      n.staged = n.parts.every((p) => p.asleepSeconds != null);
+      n.spanMinutes = n.parts.fold(0, (sum, p) => sum + p.end.difference(p.start).inMinutes);
       // Βαθμολογία: της Samsung μόνο όταν η νύχτα είναι ένα κομμάτι. Σε σπασμένη νύχτα η Samsung
       // βαθμολογεί κάθε κομμάτι χωριστά· κανένα από αυτά δεν είναι η βαθμολογία της νύχτας.
       n.score = n.parts.length == 1 ? n.parts.single.score : null;
@@ -486,10 +591,17 @@ class Dashboard {
     return nights;
   }
 
-  static Duration _gapBetween(_SleepGroup a, _SleepGroup b) {
+  /// Αν το κενό ανάμεσα σε δύο ομάδες της ίδιας νύχτας είναι «ήσυχο»: ως 4 ώρες, με μετρημένα βήματα ανά λεπτό
+  /// και ως [maxGapSteps] βήματα. Επικαλυπτόμενες ομάδες: ήσυχο.
+  static bool _quietGap(_SleepGroup a, _SleepGroup b, Map<int, int> stepsByMinute, DateTime? stepsFrom) {
     final first = a.parts.first.start.isBefore(b.parts.first.start) ? a : b;
     final second = identical(first, a) ? b : a;
-    return second.parts.first.start.difference(first.end);
+    final start = first.end;
+    final end = second.parts.first.start;
+    if (!end.isAfter(start)) return true;
+    if (end.difference(start) > maxGap) return false;
+    final steps = gapSteps(start, end, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
+    return steps != null && steps <= maxGapSteps;
   }
 
   static void _fillNightMetrics(Night n, List<Sample> heart, List<Sample> spo2, List<Sample> skin) {
@@ -498,31 +610,30 @@ class Dashboard {
     final hr = heart.where(inside).map((s) => s.avg).toList();
     n.sleepingHr = hr.isEmpty ? null : hr.reduce((a, b) => a + b) / hr.length;
 
-    final ox = spo2.where(inside).toList();
-    if (ox.isNotEmpty) {
-      n.spo2Avg = ox.map((s) => s.avg).reduce((a, b) => a + b) / ox.length;
-      n.spo2Min = ox.map((s) => s.min).reduce(math.min);
-      n.spo2Below90 = _below90Minutes(ox);
+    final ox = oxygenOf(spo2.where(inside).toList());
+    if (ox != null) {
+      n.spo2Avg = ox.avg;
+      n.spo2Min = ox.min;
+      n.spo2Below90 = ox.below90;
     }
 
     final st = skin.where(inside).map((s) => s.avg).toList();
     n.skinTemp = st.isEmpty ? null : st.reduce((a, b) => a + b) / st.length;
   }
 
-  /// Οξυγόνο της νύχτας με ημερομηνία (πρωινό) [day], ΧΩΡΙΣ τον ύπνο του ρολογιού: όσο ο ύπνος έρχεται από
-  /// άλλη πηγή (Oura), το οξυγόνο μένει του ρολογιού. Οι μετρήσεις οξυγόνου του ρολογιού γίνονται μόνο στον ύπνο,
-  /// άρα «νύχτα» = οι μετρήσεις από τις 18:00 της προηγούμενης μέρας ως τις 12:00 του πρωινού.
-  NightOxygen? watchSpo2(DateTime day) {
-    final d = dayOf(day);
-    final from = DateTime(d.year, d.month, d.day - 1, 18);
-    final to = DateTime(d.year, d.month, d.day, 12);
-    final ox = spo2.where((s) => s.start.isBefore(to) && s.end.isAfter(from) && !s.start.isBefore(from)).toList();
-    if (ox.isEmpty) return null;
-    return (
-      avg: ox.map((s) => s.avg).reduce((a, b) => a + b) / ox.length,
-      min: ox.map((s) => s.min).reduce(math.min),
-      below90: _below90Minutes(ox),
-    );
+  /// Οξυγόνο της νύχτας με ημερομηνία (πρωινό) [day] όσο ο ύπνος έρχεται από άλλη πηγή (Oura): οι τιμές μένουν
+  /// ΜΟΝΟ του ρολογιού, αλλά «νύχτα» = οι μετρήσεις του ρολογιού μέσα στις ώρες της κύριας νύχτας του Oura
+  /// ([windows], μόνο ώρες· ποτέ τιμές του Oura). Χωρίς νύχτα του Oura δεν ξέρουμε πότε κοιμήθηκες: κενό
+  /// (όχι «18:00–12:00», που θα έπιανε και μετρήσεις της μέρας). Δες [oxygenOf] για μέσο όρο και ελάχιστο.
+  NightOxygen? watchSpo2(DateTime day, SleepWindows windows) {
+    final w = windows.mains[dateKey(day)];
+    if (w == null) return null;
+    final (from, to) = w;
+    // Μέσα στο παράθυρο: με διάρκεια που το τέμνει, ή στιγμιαία μέσα του.
+    return oxygenOf([
+      for (final s in spo2)
+        if (s.start.isBefore(to) && (s.end.isAfter(from) || (s.end == s.start && !s.start.isBefore(from)))) s,
+    ]);
   }
 
   // ---------- Υπολογισμοί για τις οθόνες ----------
@@ -752,8 +863,9 @@ class Prefs {
 }
 
 /// Μια απάντηση της Samsung, διαβασμένη: [status] (ok ή το σφάλμα), [data] αν ήταν εντάξει,
-/// [sleepFailed] αν κάποιο είδος του ύπνου δεν διαβάστηκε (δες sleepReadFailed).
-typedef ParsedDashboard = ({Map<String, dynamic> status, Dashboard? data, bool sleepFailed});
+/// [sleepFailed] αν κάποιο είδος του ύπνου δεν διαβάστηκε (δες sleepReadFailed), [heartFailed] αν οι παλμοί
+/// δεν διαβάστηκαν (δες heartReadFailed).
+typedef ParsedDashboard = ({Map<String, dynamic> status, Dashboard? data, bool sleepFailed, bool heartFailed});
 
 /// Σε ξεχωριστό νήμα (isolate), ώστε το άνοιγμα να μην «παγώνει». Αν το νήμα δεν ξεκινήσει,
 /// γίνεται εδώ (πιο αργά, αλλά ποτέ «κολλημένο»).
@@ -775,7 +887,14 @@ void _isolateFailed(Object e, StackTrace st) {
 }
 
 /// Ένα κομμάτι ιστορικού από τη Samsung, διαβασμένο: συνόψεις ανά μέρα και αν διαβάστηκαν όλα.
-typedef ParsedRange = ({bool ok, Map<String, Map<String, double>> rows, bool sleepOk, bool sleepFailed, bool anyError});
+typedef ParsedRange = ({
+  bool ok,
+  Map<String, Map<String, double>> rows,
+  bool sleepOk,
+  bool sleepFailed,
+  bool heartFailed,
+  bool anyError,
+});
 
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
     {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) async {
@@ -789,7 +908,14 @@ Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
 
 ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
     {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
-  const fail = (ok: false, rows: <String, Map<String, double>>{}, sleepOk: false, sleepFailed: false, anyError: true);
+  const fail = (
+    ok: false,
+    rows: <String, Map<String, double>>{},
+    sleepOk: false,
+    sleepFailed: false,
+    heartFailed: false,
+    anyError: true,
+  );
   try {
     final j = jsonDecode(raw);
     if (j is! Map<String, dynamic> || j['ok'] != true) return fail;
@@ -799,6 +925,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
       rows: summarizeRange(d, from, to, plan: plan, windows: windows),
       sleepOk: d.sleepOk,
       sleepFailed: sleepReadFailed(j),
+      heartFailed: heartReadFailed(j),
       anyError: d.failed.isNotEmpty,
     );
   } catch (_) {
@@ -811,23 +938,77 @@ ParsedDashboard parseDashboardSync(String raw) {
   try {
     j = jsonDecode(raw);
   } catch (e) {
-    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false);
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false, heartFailed: false);
   }
   if (j is! Map<String, dynamic>) {
-    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false);
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false, heartFailed: false);
   }
   if (j['ok'] != true) {
     return (
       status: {for (final k in const ['ok', 'kind', 'message', 'code', 'resolvable']) if (j.containsKey(k)) k: j[k]},
       data: null,
       sleepFailed: false,
+      heartFailed: false,
     );
   }
   try {
-    return (status: const {'ok': true}, data: Dashboard.fromJson(j), sleepFailed: sleepReadFailed(j));
+    return (
+      status: const {'ok': true},
+      data: Dashboard.fromJson(j),
+      sleepFailed: sleepReadFailed(j),
+      heartFailed: heartReadFailed(j),
+    );
   } catch (e) {
-    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false);
+    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false, heartFailed: false);
   }
+}
+
+/// Μια κανονική ανάγνωση (30 μέρες + όλες οι ζυγίσεις) στο ιστορικό. Επιστρέφει τις μέρες που άλλαξαν.
+/// - Οι 30 μέρες περνούν από το [mergeHistory] (ύπνος μόνο με βήματα ανά λεπτό, πηγή κάθε νύχτας).
+/// - Οι ζυγίσεις μπαίνουν ΧΩΡΙΣΤΑ ([mergeBody]): μία ολόκληρη ζύγιση InBody ανά μέρα, χωρίς να αγγίζεται τίποτα
+///   άλλο της μέρας (A1: πριν, μια ζύγιση σε παλιά μέρα του Oura έσβηνε το οξυγόνο της νύχτας).
+/// - Νύχτες με άλλη πηγή που είχαν ακόμα τιμές του ρολογιού: φεύγουν· ζύγιση που σβήστηκε στη Samsung: φεύγει
+///   (με προφύλαξη, ως 3 μέρες μαζί).
+Set<String> applyRecentRead(
+  Map<String, Map<String, double>> history,
+  Dashboard d, {
+  required SourcePlan plan,
+  SleepWindows windows = SleepWindows.empty,
+  bool sleepFailed = false,
+  bool heartFailed = false,
+}) {
+  final today = dayOf(d.readAt);
+  // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης.
+  final rows = summarizeRange(d, DateTime(today.year, today.month, today.day - 29), today, plan: plan, windows: windows);
+  for (final r in rows.values) {
+    r.removeWhere((k, _) => bodyKeys.contains(k));
+  }
+  final stepsFrom = d.stepsMinuteFrom;
+  final sf = dayOf(stepsFrom ?? today);
+  final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? DateTime(sf.year, sf.month, sf.day + 1) : null;
+  final changed = mergeHistory(
+    history,
+    rows,
+    sleepFrom: sleepFrom,
+    plan: plan,
+    keepKeys: heartFailed ? heartKeys : const {},
+    ouraNights: windows.mains.keys.toSet(),
+  );
+  changed.addAll(mergeBody(history, bodyRows(d.body)));
+  // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
+  final f = plan.eras.isEmpty ? null : plan.eras.first.from;
+  if (f != null) changed.addAll(stripForeignWatchNight(history, plan, from: f));
+  // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
+  // Με προφύλαξη: αν η Samsung δεν δίνει καμία ζύγιση (π.χ. μόλις επανεγκαταστάθηκε) ή θα έφευγαν
+  // πολλές μαζί, δεν σβήνεται τίποτα· μια λάθος ζύγιση που σβήνεις είναι μία-δύο μέρες.
+  if (d.bodyOk && d.body.isNotEmpty) {
+    final days = {for (final b in d.body) dateKey(b.time)};
+    final from = DateTime(today.year - 10, today.month, today.day + 1);
+    final copy = {for (final e in history.entries) e.key: e.value};
+    final gone = removeMissingBody(copy, days, from: from);
+    if (gone.isNotEmpty && gone.length <= 3) changed.addAll(removeMissingBody(history, days, from: from));
+  }
+  return changed;
 }
 
 // ---------------------------------------------------------------------------
@@ -1227,7 +1408,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         await _upgradeHistory();
         // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας.
         await syncOura();
-        await _updateRecentHistory(d, sleepFailed: p.sleepFailed);
+        await _updateRecentHistory(d, sleepFailed: p.sleepFailed, heartFailed: p.heartFailed);
         _backfill();
       }
     } else if (_canWrite) {
@@ -1271,21 +1452,30 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   Future<bool> savePrefsNow() => _savePrefs();
 
+  /// Οι εγγραφές του ιστορικού γίνονται μία-μία, με τη σειρά που ζητήθηκαν (έλεγχος 4/11, A8): η ανάγνωση των
+  /// 30 ημερών, η συμπλήρωση και το Oura γράφουν τις ίδιες μέρες, και μια παλιότερη εικόνα μιας μέρας δεν πρέπει
+  /// να φτάσει στη βάση μετά από νεότερη. Κάθε εγγραφή παίρνει τις τιμές της μέρας τη στιγμή που ΓΡΑΦΕΤΑΙ.
+  Future<bool> _daysWrites = Future.value(true);
+
   /// `true` αν γράφτηκαν (ή δεν υπήρχε κάτι να γραφτεί).
-  Future<bool> _saveDays(Set<String> keys) async {
-    final all = {...keys, ..._unsavedDays};
-    if (all.isEmpty) return true;
-    final r = await SamsungHealth.saveDays(jsonEncode([
-      for (final k in all)
-        if (history[k] != null) {'date': k, 'data': history[k]},
-    ]));
-    final ok = r['ok'] == true;
-    if (ok) {
-      _unsavedDays.removeAll(all);
-    } else {
-      _unsavedDays.addAll(all);
-    }
-    return ok;
+  Future<bool> _saveDays(Set<String> keys) {
+    final run = _daysWrites.catchError((_) => false).then((_) async {
+      final all = {...keys, ..._unsavedDays};
+      if (all.isEmpty) return true;
+      final r = await SamsungHealth.saveDays(jsonEncode([
+        for (final k in all)
+          if (history[k] != null) {'date': k, 'data': history[k]},
+      ]));
+      final ok = r['ok'] == true;
+      if (ok) {
+        _unsavedDays.removeAll(all);
+      } else {
+        _unsavedDays.addAll(all);
+      }
+      return ok;
+    });
+    _daysWrites = run.catchError((_) => false);
+    return run;
   }
 
   /// Νέοι κανόνες ύπνου (historyRulesVersion): το ιστορικό ξαναδιαβάζεται από την αρχή και κάθε
@@ -1305,38 +1495,19 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Ο ύπνος ξαναγράφεται μόνο για τις μέρες με βήματα ανά λεπτό (δες mergeHistory).
   /// [sleepFailed]: κάποιο είδος από το οποίο βγαίνει ο ύπνος δεν διαβάστηκε (δες sleepReadFailed)·
   /// τότε οι τιμές ύπνου που υπάρχουν ήδη δεν αντικαθίστανται.
-  Future<void> _updateRecentHistory(Dashboard d, {bool sleepFailed = false}) async {
-    final today = dayOf(d.readAt);
-    // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης.
-    final rows = summarizeRange(d, addDays(today, -29), today, plan: plan, windows: ouraWindows);
-    for (final b in d.body) {
-      final k = dateKey(b.time);
-      rows[k] = {
-        ...?rows[k],
-        if (b.weight != null) K.weight: b.weight!,
-        if (b.fatPct != null) K.fatPct: b.fatPct!,
-        if (b.smm != null) K.smm: b.smm!,
-      };
-    }
-    final stepsFrom = d.stepsMinuteFrom;
-    final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? addDays(dayOf(stepsFrom), 1) : null;
+  /// [heartFailed]: οι παλμοί δεν διαβάστηκαν· οι τιμές από τους παλμούς μένουν ως είχαν (A12).
+  Future<void> _updateRecentHistory(Dashboard d, {bool sleepFailed = false, bool heartFailed = false}) async {
     if (!_canWrite) return;
-    final changed = mergeHistory(history, rows, sleepFrom: sleepFrom, plan: plan);
+    final changed = applyRecentRead(
+      history,
+      d,
+      plan: plan,
+      windows: ouraWindows,
+      sleepFailed: sleepFailed,
+      heartFailed: heartFailed,
+    );
     // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
-    final f = plan.eras.isEmpty ? null : plan.eras.first.from;
-    if (f != null) changed.addAll(stripForeignWatchNight(history, plan, from: f));
-    // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
-    // Με προφύλαξη: αν η Samsung δεν δίνει καμία ζύγιση (π.χ. μόλις επανεγκαταστάθηκε) ή θα έφευγαν
-    // πολλές μαζί, δεν σβήνεται τίποτα· μια λάθος ζύγιση που σβήνεις είναι μία-δύο μέρες.
-    if (d.bodyOk && d.body.isNotEmpty) {
-      final copy = {for (final e in history.entries) e.key: e.value};
-      final gone = removeMissingBody(copy, {for (final b in d.body) dateKey(b.time)},
-          from: DateTime(today.year - 10, today.month, today.day + 1));
-      if (gone.isNotEmpty && gone.length <= 3) {
-        changed.addAll(removeMissingBody(history, {for (final b in d.body) dateKey(b.time)},
-            from: DateTime(today.year - 10, today.month, today.day + 1)));
-      }
-    }
+    final today = dayOf(d.readAt);
     final saved = await _saveDays(changed);
     // Η εφαρμογή έμεινε κλειστή πάνω από 6 μέρες: οι μέρες στη μέση (και η τελευταία, που είχε
     // γραφτεί μισή) ξαναδιαβάζονται, με βήματα ανά λεπτό, ώστε ο ύπνος τους να έχει τον ίδιο ορισμό
@@ -1397,6 +1568,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       rangeFrom: from,
       rangeTo: to,
       plan: plan,
+      keepKeys: p.heartFailed ? heartKeys : const {},
+      ouraNights: ouraWindows.mains.keys.toSet(),
     ));
     // Δεν γράφτηκε στο κινητό: δεν προχωράμε, ώστε ο μήνας να ξαναδιαβαστεί.
     if (!saved) {

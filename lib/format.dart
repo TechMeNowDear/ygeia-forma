@@ -41,6 +41,12 @@ String relativeDay(DateTime d, DateTime now) {
   return dayMonth(d);
 }
 
+/// Τίτλος κάρτας με ημερομηνία όταν η τιμή ΔΕΝ είναι της μέρας που περιμένει ο χρήστης (έλεγχος 4/11, A11):
+/// «Θερμίδες που έκαψες · Τρ 3/11». [day]: η μέρα της τιμής (για τιμές νύχτας: το πρωί που τελείωσε)·
+/// [expected]: η μέρα που θα ήταν «φρέσκια» (σήμερα, ή για τη νύχτα το σημερινό πρωί). Χωρίς τιμή: σκέτος τίτλος.
+String datedTitle(String title, DateTime? day, DateTime expected) =>
+    day == null || sameDay(day, expected) ? title : '$title · ${shortDayDate(day)}';
+
 String two(int n) => n.toString().padLeft(2, '0');
 
 /// «08:40»

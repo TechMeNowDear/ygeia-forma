@@ -341,7 +341,8 @@ class _BreathCard extends StatelessWidget {
     final c = Aigaio.of(context);
     final plan = store.plan;
     final b = ouraBaseline(store.history, plan, K.breath, day);
-    final ox = store.data?.watchSpo2(day);
+    final windows = store.ouraWindows;
+    final ox = store.data?.watchSpo2(day, windows);
 
     Widget row(String title, String sub, Source s) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -381,9 +382,11 @@ class _BreathCard extends StatelessWidget {
           row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
           const Hairline(vertical: 2),
           row(
-            ox == null ? 'Οξυγόνο —' : 'Οξυγόνο ${ox.avg.round()}%',
+            ox?.avg == null ? 'Οξυγόνο —' : 'Οξυγόνο ${ox!.avg!.round()}%',
             ox == null
-                ? 'Δεν υπάρχουν μετρήσεις του ρολογιού για αυτή τη νύχτα'
+                ? (windows.mains.containsKey(dateKey(day))
+                    ? 'Δεν υπάρχουν μετρήσεις του ρολογιού μέσα στις ώρες ύπνου'
+                    : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο μένει κενό')
                 : 'Χαμηλότερο ${ox.min.round()}% · ενδεικτικό'
                     '${ox.below90 == null ? '' : ' · κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ενδεικτικό)'}',
             Source.watch,

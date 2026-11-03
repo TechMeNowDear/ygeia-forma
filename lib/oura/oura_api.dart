@@ -167,8 +167,11 @@ enum OuraErrorKind {
   /// Η Oura απέρριψε την ανταλλαγή του κωδικού (π.χ. θέλει Client Secret).
   tokenRejected,
 
-  /// Δεν δόθηκε άδεια στη σελίδα της Oura.
+  /// Δεν δόθηκε άδεια στη σελίδα της Oura (error=access_denied).
   denied,
+
+  /// Η σελίδα της Oura γύρισε άλλο σφάλμα (π.χ. invalid_scope, server_error)· ο κωδικός στο [OuraError.code].
+  authError,
 
   /// 401 από /sleep ή /daily_sleep ενώ η ανανέωση πέτυχε: λείπει δικαίωμα (scope), όχι ληγμένη σύνδεση.
   scopeMissing,
@@ -193,14 +196,30 @@ enum OuraErrorKind {
 }
 
 class OuraError implements Exception {
-  const OuraError(this.kind, {this.retryAfter, this.status});
+  const OuraError(this.kind, {this.retryAfter, this.status, this.code});
   final OuraErrorKind kind;
   final Duration? retryAfter;
   final int? status;
 
-  /// Χωρίς καμία προσωπική πληροφορία: μόνο το είδος και ο κωδικός HTTP.
+  /// Ο κωδικός σφάλματος του OAuth (π.χ. «invalid_client», «access_denied»): σύντομη λέξη από λίστα, ποτέ token.
+  final String? code;
+
+  /// Χωρίς καμία προσωπική πληροφορία: μόνο το είδος, ο κωδικός HTTP και ο κωδικός OAuth.
   @override
-  String toString() => 'OuraError(${kind.name}${status == null ? '' : ', HTTP $status'})';
+  String toString() => 'OuraError(${kind.name}${status == null ? '' : ', HTTP $status'}${code == null ? '' : ', $code'})';
+}
+
+/// Ο κωδικός σφάλματος του OAuth, μόνο αν είναι σύντομη λέξη (a–z, _): ό,τι άλλο δεν κρατιέται.
+String? oauthCode(Object? v) => v is String && RegExp(r'^[a-z_]{1,40}$').hasMatch(v) ? v : null;
+
+/// Ο κωδικός «error» από το σώμα μιας απάντησης του /oauth/token (αν υπάρχει).
+String? oauthCodeOfBody(String body) {
+  try {
+    final j = jsonDecode(body);
+    return j is Map ? oauthCode(j['error']) : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Ελληνικό κείμενο για τον χρήστη.
@@ -214,6 +233,7 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.noRefresh => 'Η Oura δεν έδωσε μόνιμη σύνδεση. Δεν συνδέθηκε, για να μη χρειάζεται νέα σύνδεση κάθε μήνα.',
       OuraErrorKind.tokenRejected => 'Η Oura δεν δέχτηκε τη σύνδεση. Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
       OuraErrorKind.denied => 'Δεν δόθηκε άδεια στη σελίδα της Oura. Δεν άλλαξε τίποτα.',
+      OuraErrorKind.authError => 'Η σελίδα της Oura γύρισε σφάλμα. Δεν άλλαξε τίποτα· πάτα ξανά «Σύνδεση με Oura».',
       OuraErrorKind.scopeMissing => 'Λείπει άδεια στην Oura· ξανασύνδεση.',
       OuraErrorKind.cancelled => 'Η σύνδεση δεν ολοκληρώθηκε. Δεν άλλαξε τίποτα· δοκίμασε ξανά σε λίγο.',
       OuraErrorKind.isolate => 'Η ανάγνωση έγινε πιο αργά από το συνηθισμένο.',
@@ -222,6 +242,23 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.notConfigured => 'Η εγγραφή στην Oura γίνεται τη μέρα που θα έρθει το δαχτυλίδι.',
       OuraErrorKind.noBrowser => 'Δεν άνοιξε ο browser του κινητού.',
     };
+
+/// Κείμενο για το αποτέλεσμα μιας ΣΥΝΔΕΣΗΣ (έλεγχος 4/11, A13): ο κωδικός μιας σύνδεσης είναι μιας χρήσης, άρα τίποτα
+/// δεν ξαναδοκιμάζεται μόνο του· κάθε κείμενο λέει τι έγινε και ότι το σχέδιο πηγών δεν άλλαξε. [code]: ο κωδικός
+/// OAuth (π.χ. «invalid_client»), σε μικρά γράμματα στο τέλος, για να ξέρουμε τι να διορθώσουμε.
+String ouraLoginErrorText(OuraErrorKind k, {String? code}) {
+  final text = switch (k) {
+    OuraErrorKind.network => 'Δεν υπήρχε σύνδεση με την Oura. Δεν άλλαξε τίποτα· πάτα ξανά «Σύνδεση με Oura».',
+    OuraErrorKind.rateLimited => 'Η Oura ζήτησε να περιμένουμε. Δεν άλλαξε τίποτα· πάτα ξανά «Σύνδεση με Oura» σε λίγο.',
+    OuraErrorKind.scopeMissing =>
+      'Η Oura δεν έδωσε πρόσβαση στον ύπνο (λείπει η άδεια «Daily»). Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
+    OuraErrorKind.subscription =>
+      'Η Oura δεν δίνει δεδομένα: χρειάζεται ενεργή συνδρομή Oura. Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
+    OuraErrorKind.reconnect => 'Η Oura δεν δέχτηκε τη σύνδεση. Δεν άλλαξε τίποτα· πάτα ξανά «Σύνδεση με Oura».',
+    _ => ouraErrorText(k),
+  };
+  return code == null ? text : '$text (κωδικός: $code)';
+}
 
 /// Το είδος σφάλματος από έναν κωδικό HTTP (εκτός 2xx).
 OuraErrorKind kindForStatus(int status) => switch (status) {
@@ -417,7 +454,11 @@ class OuraLink {
     if (pending == null || cb.state == null || cb.state != pending.state) return null;
     await vault.delete(vaultPending); // ο κωδικός και το state είναι μιας χρήσης
     if (pending.expired(_clock())) throw const OuraError(OuraErrorKind.stale);
-    if (cb.error != null) throw const OuraError(OuraErrorKind.denied);
+    // Μόνο το «access_denied» είναι «δεν δόθηκε άδεια»· κάθε άλλο σφάλμα κρατά τον κωδικό του.
+    if (cb.error != null) {
+      final c = oauthCode(cb.error);
+      throw OuraError(c == 'access_denied' ? OuraErrorKind.denied : OuraErrorKind.authError, code: c);
+    }
     final code = cb.code;
     if (code == null || code.isEmpty) throw const OuraError(OuraErrorKind.format);
     final res = await _post(tokenEndpoint, {
@@ -427,10 +468,38 @@ class OuraLink {
       'client_id': clientId,
       'code_verifier': pending.verifier,
     });
-    if (res.status == 400 || res.status == 401) throw OuraError(OuraErrorKind.tokenRejected, status: res.status);
+    if (res.status == 400 || res.status == 401) {
+      // π.χ. «invalid_client» (θέλει Client Secret) ή «invalid_grant» (κωδικός/verifier): κρατιέται για το Sentry.
+      throw OuraError(OuraErrorKind.tokenRejected, status: res.status, code: oauthCodeOfBody(res.body));
+    }
     if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
     final t = OuraTokens.parseResponse(res.body, _clock());
     return (tokens: t, from: pending.from, gen: gen);
+  }
+
+  /// Αν υπάρχει εκκρεμής σύνδεση (για το μήνυμα «η σύνδεση έληξε» σε επιστροφή που άργησε). Αν η αποθήκευση δεν
+  /// απαντά: «ναι» (καλύτερα σιωπή παρά λάθος μήνυμα).
+  Future<bool> hasPending() async {
+    try {
+      return await vault.load(vaultPending) != null;
+    } on VaultUnavailable {
+      return true;
+    }
+  }
+
+  /// Έλεγχος πρόσβασης ΠΡΙΝ αλλάξει το σχέδιο πηγών (έλεγχος 4/11, A13): μία κλήση στο daily_sleep με τα νέα tokens
+  /// (κενά δεδομένα είναι εντάξει· θέλουμε 200). 401 = λείπει άδεια ή άχρηστο token, 403 = συνδρομή, αλλιώς δίκτυο.
+  Future<void> verifyAccess(OuraTokens t) async {
+    final now = _clock();
+    String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
+    final url = Uri.parse('${apiBase}daily_sleep').replace(queryParameters: {
+      'start_date': d(DateTime(now.year, now.month, now.day - 7)),
+      'end_date': d(DateTime(now.year, now.month, now.day + 1)),
+    });
+    final res = await _getWith(url, t.access);
+    if (res.status == 200) return;
+    if (res.status == 401) throw const OuraError(OuraErrorKind.scopeMissing, status: 401);
+    throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
   }
 
   /// Κρατά τα tokens μιας νέας σύνδεσης: μόνο αν γράφτηκαν στην αποθήκευση και δεν έγινε αποσύνδεση στο μεταξύ.
@@ -464,8 +533,9 @@ class OuraLink {
     try {
       final u = Uri.parse(endpoints.revoke);
       if (endpoints.revokeParam == 'access_token') {
-        // Όπως στην τεκμηρίωση της Oura: POST /oauth/revoke?access_token=…
-        await _send('POST', u.replace(queryParameters: {'access_token': t.access})).timeout(const Duration(seconds: 15));
+        // Όπως στην τεκμηρίωση της Oura (4/11/2026): /oauth/revoke?access_token=… — η μορφή διεύθυνσης χωρίς σώμα
+        // είναι GET (το POST είχε δώσει 405 σε δοκιμή, έλεγχος 3, F7).
+        await _send('GET', u.replace(queryParameters: {'access_token': t.access})).timeout(const Duration(seconds: 15));
       } else {
         await _send('POST', u, form: _form({'token': t.refresh, 'client_id': clientId})).timeout(const Duration(seconds: 15));
       }
@@ -566,9 +636,13 @@ class OuraLink {
   /// Όλες οι σελίδες ενός endpoint για τις μέρες [from, to] (με τις άκρες).
   Future<List<Map<String, dynamic>>> fetchAll(String endpoint, DateTime from, DateTime to, {int maxPages = 40}) async {
     String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
-    // Το end_date της Oura δεν περιλαμβάνει τη μέρα του (έλεγχος στο sandbox, 2/11): ζητάμε ως την επόμενη
-    // και κρατάμε μόνο τις μέρες που θέλουμε.
-    final params = {'start_date': d(from), 'end_date': d(DateTime(to.year, to.month, to.day + 1))};
+    // Το end_date της Oura δεν περιλαμβάνει τη μέρα του (έλεγχος στο sandbox, 2/11): ζητάμε ως την επόμενη.
+    // Και μία μέρα πριν από την αρχή (έλεγχος 4/11, A3): το /sleep δεν δίνει πάντα τη νύχτα με day = start_date.
+    // Κρατάμε μόνο τις μέρες που θέλουμε (fetchNights).
+    final params = {
+      'start_date': d(DateTime(from.year, from.month, from.day - 1)),
+      'end_date': d(DateTime(to.year, to.month, to.day + 1)),
+    };
     final out = <Map<String, dynamic>>[];
     String? next;
     final seen = <String>{};

@@ -108,6 +108,48 @@ void main() {
       expect(plan.changeDates(K.breath), isEmpty);
     });
 
+    test('A5: κάθε νέα εποχή Oura είναι αλλαγή (Oura → καμία → Oura), και για τις μετρήσεις μόνο του Oura', () {
+      final again = plan.withEra(Source.none, d(2026, 12, 1)).withEra(Source.oura, d(2027, 1, 5));
+      expect(again.changeDates(K.sleepMin), [ouraFrom, d(2027, 1, 5)]);
+      for (final k in [K.hrv, K.lowHr, K.breath, K.napMin]) {
+        // Η πρώτη σύνδεση δεν είναι αλλαγή (απλώς αρχίζουν τιμές)· η δεύτερη εποχή είναι.
+        expect(again.changeDates(k), [d(2027, 1, 5)], reason: k);
+      }
+      // Oura → ρολόι → Oura: και για το HRV (το ρολόι δεν δίνει τιμή, αλλά η νέα εποχή Oura είναι νέα αρχή).
+      final viaWatch = plan.withEra(Source.watch, d(2026, 12, 1)).withEra(Source.oura, d(2027, 1, 5));
+      expect(viaWatch.changeDates(K.hrv), [d(2027, 1, 5)]);
+      expect(viaWatch.changeDates(K.sleepMin), [ouraFrom, d(2026, 12, 1), d(2027, 1, 5)]);
+      // Συνηθισμένο του HRV στη 2η εποχή: μόνο νύχτες της 2ης εποχής.
+      final h = dualHistory(d(2026, 6, 1), d(2027, 2, 10));
+      final b = ouraBaseline(h, again, K.hrv, d(2027, 1, 20))!;
+      expect(b.count, lessThanOrEqualTo(daysBetween(d(2027, 1, 5), d(2027, 1, 20))));
+      final def = ouraTrendMetrics.firstWhere((m) => m.key == K.hrv);
+      final r = computeTrend(def, h, d(2027, 1, 20), TrendPeriod.month, plan: again);
+      expect(r.status, TrendStatus.sourceChange);
+      expect(r.points.every((p) => !p.$1.isBefore(d(2027, 1, 5))), isTrue);
+    });
+
+    test('A4: οξυγόνο νύχτας και παλμοί μέρας κόβονται στη σύνδεση (ίδιο ρολόι, άλλος ορισμός)', () {
+      for (final k in definitionMetrics) {
+        expect(plan.changeDates(k), [ouraFrom], reason: k);
+        expect(plan.sourceFor(k, add(ouraFrom, 3)), Source.watch, reason: 'η τιμή μένει του ρολογιού');
+      }
+      final back = plan.withEra(Source.none, d(2026, 12, 1)).withEra(Source.watch, d(2026, 12, 10));
+      expect(back.changeDates(K.spo2Avg), [ouraFrom, d(2026, 12, 10)]);
+      expect(SourcePlan.samsungOnly.changeDates(K.spo2Avg), isEmpty);
+      expect(plan.changeDates(K.steps), isEmpty, reason: 'τα βήματα δεν αλλάζουν ορισμό');
+      // Τάση οξυγόνου που περνά πάνω από τη σύνδεση: δεν συγκρίνεται.
+      final h = dualHistory(d(2026, 6, 1), add(ouraFrom, 20));
+      final def = trendMetrics.firstWhere((m) => m.key == K.spo2Avg);
+      final r = computeTrend(def, h, add(ouraFrom, 10), TrendPeriod.month, plan: plan);
+      expect(r.status, TrendStatus.sourceChange);
+      expect(r.changedOn, ouraFrom);
+      // Αναφορά: μόνο οι μέρες από τη σύνδεση.
+      final rep = buildReport(h, add(ouraFrom, 20), plan: plan);
+      expect(rep.stats[K.spo2Avg]!.since, ouraFrom);
+      expect(rep.stats[K.spo2Avg]!.values.every((v) => !v.$1.isBefore(ouraFrom)), isTrue);
+    });
+
     test('Αποθήκευση και ανάγνωση του σχεδίου', () {
       final p = plan.withEra(Source.none, d(2026, 12, 1)).withEra(Source.watch, d(2026, 12, 10));
       expect(SourcePlan.fromJson(p.toJson()), p);

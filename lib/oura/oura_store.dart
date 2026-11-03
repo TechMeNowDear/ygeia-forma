@@ -1,7 +1,8 @@
 /// Το Oura μέσα στην κατάσταση της εφαρμογής (HealthStore): σύνδεση, ανάγνωση, αποσύνδεση, κατάσταση.
 ///
-/// - Διαβάζει ΜΟΝΟ όταν ανοίγει η εφαρμογή ή επιστρέφω σε αυτήν (μαζί με τη Samsung), το πολύ κάθε 30 λεπτά,
-///   τις τελευταίες 3 μέρες. Καμία δουλειά στο παρασκήνιο, καμία συνεχής ανανέωση.
+/// - Διαβάζει ΜΟΝΟ όταν ανοίγει η εφαρμογή ή επιστρέφω σε αυτήν (μαζί με τη Samsung), το πολύ κάθε 30 λεπτά:
+///   τις τελευταίες 3 μέρες, ό,τι δεν είχε διαβαστεί, και τις νύχτες του Oura των 30 ημερών που λείπουν ακόμα.
+///   Καμία δουλειά στο παρασκήνιο, καμία συνεχής ανανέωση.
 /// - Γράφει στο ιστορικό ΜΟΝΟ τις μέρες που η «νύχτα» έρχεται από το Oura (δες sources.dart), με τα κλειδιά του.
 /// - Κρατά τις λεπτομέρειες των τελευταίων νυχτών (ώρες, φάσεις, υπνάκοι) για τις οθόνες.
 library;
@@ -209,6 +210,9 @@ mixin OuraStore on ChangeNotifier {
   /// Για τους ελέγχους: «τώρα».
   DateTime Function() ouraClock = DateTime.now;
 
+  /// Πόσο περιμένει η αποσύνδεση την τελευταία ανάγνωση (A3). Αλλάζει μόνο στους ελέγχους.
+  Duration ouraFinalSyncTimeout = const Duration(seconds: 20);
+
   /// Οι τελευταίες νύχτες του Oura με τις λεπτομέρειές τους, παλιότερη πρώτη.
   List<OuraNight> ouraNights = const [];
 
@@ -381,15 +385,17 @@ mixin OuraStore on ChangeNotifier {
     }
   }
 
-  /// Το αποτέλεσμα της τελευταίας σύνδεσης, για να το δείξει η οθόνη (μία φορά).
+  /// Το αποτέλεσμα της τελευταίας σύνδεσης, για να το δείξει η οθόνη (μία φορά), και ο κωδικός OAuth του.
   OuraErrorKind? ouraLoginError;
+  String? ouraLoginCode;
   bool ouraJustConnected = false;
 
   /// Η επιστροφή από την Oura. Σειρά: ανταλλαγή του κωδικού → ΠΡΩΤΑ το σχέδιο πηγών (αρχείο) → ΜΕΤΑ τα tokens.
   /// Αν δεν γραφτεί το σχέδιο, τα tokens δεν κρατιούνται (ανακαλούνται)· αν δεν γραφτούν τα tokens, το σχέδιο
   /// επιστρέφει όπως ήταν. Η πρώτη νύχτα ήρθε μαζί με το state ([beginOuraLogin]).
   Future<void> completeOuraLogin(String uri) async {
-    if (parseCallback(uri) == null) return;
+    final cb = parseCallback(uri);
+    if (cb == null) return;
     // Χωρίς γνωστό σχέδιο πηγών δεν συνδέεται (δεν θα μπορούσε να αλλάξει η πηγή): ο κωδικός δεν χρησιμοποιείται.
     if (!canChangePlan) {
       ouraLoginError = OuraErrorKind.cancelled;
@@ -398,13 +404,35 @@ mixin OuraStore on ChangeNotifier {
     }
     ouraConnecting = true;
     ouraLoginError = null;
+    ouraLoginCode = null;
     notifyListeners();
     final epoch = _ouraEpoch;
     final done = Completer<void>();
     _connectDone = done.future;
     try {
       final ex = await ouraLink.exchange(uri);
-      if (ex == null) return;
+      if (ex == null) {
+        // Επιστροφή χωρίς εκκρεμή σύνδεση (παλιά καρτέλα, δεύτερο πάτημα στη σελίδα επιστροφής): ασφαλές, αλλά το
+        // λέμε (A13). Όχι αμέσως μετά από επιτυχημένη σύνδεση (η ίδια επιστροφή φτάνει μερικές φορές δύο φορές).
+        final c = ouraConnectedMs;
+        final justConnected = ouraHasTokens && c != null && ouraClock().millisecondsSinceEpoch - c < 5 * 60 * 1000;
+        if ((cb.code != null || cb.error != null) && !justConnected && !await ouraLink.hasPending()) {
+          ouraLoginError = OuraErrorKind.stale;
+        }
+        return;
+      }
+      if (epoch != _ouraEpoch) {
+        await ouraLink.discard(ex.tokens);
+        return;
+      }
+      // Έλεγχος πρόσβασης ΠΡΙΝ από οποιαδήποτε αλλαγή (A13): αν η Oura δεν δίνει δεδομένα ύπνου με αυτή τη σύνδεση
+      // (άδεια, συνδρομή, άχρηστο token), τα tokens ανακαλούνται και το σχέδιο πηγών μένει όπως ήταν.
+      try {
+        await ouraLink.verifyAccess(ex.tokens);
+      } on OuraError {
+        await ouraLink.discard(ex.tokens);
+        rethrow;
+      }
       if (epoch != _ouraEpoch) {
         await ouraLink.discard(ex.tokens);
         return;
@@ -460,7 +488,9 @@ mixin OuraStore on ChangeNotifier {
       if (!from.isAfter(today)) unawaited(syncOura(force: true));
     } on OuraError catch (e) {
       ouraLoginError = e.kind;
-      errors.report(e, StackTrace.current, extra: {'where': 'oura-login'});
+      ouraLoginCode = e.code;
+      // Στο Sentry μόνο το είδος, ο κωδικός HTTP και ο κωδικός OAuth (π.χ. invalid_client): ποτέ tokens.
+      errors.report(e, StackTrace.current, extra: {'where': 'oura-login', if (e.code != null) 'oauth': e.code!});
     } catch (e, st) {
       ouraLoginError = OuraErrorKind.format;
       errors.report(e, st, extra: {'where': 'oura-login'});
@@ -613,6 +643,15 @@ mixin OuraStore on ChangeNotifier {
   /// - Αν και αύριο η πηγή θα ήταν το Oura: από απόψε χωρίς πηγή (κενές νύχτες), ώσπου να συνδεθεί ξανά ή να
   ///   διαλέξει ρητά το ρολόι ([sleepFromWatchAgain]). Η χθεσινή νύχτα του Oura μένει.
   Future<void> disconnectOura() async {
+    // Μία τελευταία ανάγνωση πριν από την ανάκληση (έλεγχος 4/11, A3): νύχτες που δεν είχαν διαβαστεί ακόμα (π.χ. η
+    // χθεσινή, πριν από το όριο των 30 λεπτών) δεν χάνονται. Με μικρό χρονικό όριο· αν δεν προλάβει, η αποσύνδεση
+    // κερδίζει (ό,τι έρθει μετά πετιέται).
+    if (ouraHasTokens) {
+      try {
+        await (_sync ?? (_sync = _syncOnce(false, last: true).whenComplete(() => _sync = null)))
+            .timeout(ouraFinalSyncTimeout);
+      } catch (_) {}
+    }
     _ouraEpoch++;
     // Σύνδεση στη μέση: σταματά (νέα γενιά) και επαναφέρει μόνη της το σχέδιο· μετά αλλάζει το σχέδιο η αποσύνδεση.
     try {
@@ -668,60 +707,85 @@ mixin OuraStore on ChangeNotifier {
 
   bool get ouraCanSyncNow => ouraSyncNowIn == Duration.zero;
 
-  Future<void> _syncOnce(bool force) async {
+  /// Οι μέρες που πρέπει να διαβαστούν από το Oura σήμερα (έλεγχος 4/11, A3), σε ΟΛΕΣ τις εποχές του Oura (όχι μόνο
+  /// την τελευταία), μόνο νύχτες με πηγή το Oura, ως [ouraMaxBackDays] πίσω:
+  /// - οι τελευταίες [ouraRecentDays], όσο το Oura είναι η πηγή σήμερα (η Oura μπορεί να διορθώσει την προηγούμενη),
+  /// - ό,τι δεν είχε διαβαστεί (η εφαρμογή έμεινε κλειστή πάνω από 2 μέρες· ή ποτέ: από την αρχή),
+  /// - κάθε νύχτα του Oura των τελευταίων [ouraMissingDays] ημερών που λείπει ακόμα από το ιστορικό.
+  /// null = τίποτα να διαβαστεί.
+  ({DateTime from, DateTime to})? ouraSyncRange(DateTime today) {
+    final floor = DateTime(today.year, today.month, today.day - ouraMaxBackDays);
+    bool oura(DateTime d) => !d.isBefore(floor) && !d.isAfter(today) && plan.nightSource(d) == Source.oura;
+    DateTime? lo;
+    DateTime? hi;
+    void need(DateTime d) {
+      if (!oura(d)) return;
+      if (lo == null || d.isBefore(lo!)) lo = d;
+      if (hi == null || d.isAfter(hi!)) hi = d;
+    }
+
+    void needRange(DateTime a, DateTime b) {
+      for (var d = a; !d.isAfter(b); d = DateTime(d.year, d.month, d.day + 1)) {
+        need(d);
+      }
+    }
+
+    final recent = DateTime(today.year, today.month, today.day - (ouraRecentDays - 1));
+    if (plan.nightSource(today) == Source.oura) needRange(recent, today);
+    final syncedTo = ouraSyncedTo == null ? null : parseDateKey(ouraSyncedTo!);
+    if (syncedTo == null) {
+      needRange(floor, today);
+    } else if (syncedTo.isBefore(recent)) {
+      needRange(DateTime(syncedTo.year, syncedTo.month, syncedTo.day - 1), today);
+    }
+    for (var i = 0; i < ouraMissingDays; i++) {
+      final d = DateTime(today.year, today.month, today.day - i);
+      if (oura(d) && !(history[dateKey(d)]?.containsKey(ouraKeys[K.sleepMin]) ?? false)) need(d);
+    }
+    final a = lo;
+    final b = hi;
+    return a == null || b == null ? null : (from: a, to: b);
+  }
+
+  Future<void> _syncOnce(bool force, {bool last = false}) async {
     if (!historyReady || !prefsReady || !planReady) return;
     final now = ouraClock();
     final today = dayOf(now);
     // Μόνο όταν το Oura είναι πηγή κάποιας νύχτας ως σήμερα: χωρίς σύνδεση δεν γίνεται καμία κλήση.
-    final f = plan.ouraFrom;
-    if (f == null || !ouraHasTokens || f.isAfter(today)) return;
-    // Το Oura δεν είναι πηγή σήμερα (π.χ. «ξανά από το ρολόι») και έχει διαβαστεί ως το τέλος του: τίποτα να
-    // διαβαστεί πια, ούτε με tokens.
-    if (plan.nightSource(today) != Source.oura) {
-      DateTime? w;
-      for (final e in plan.eras) {
-        if (!e.from.isAfter(today)) w = e.from;
-      }
-      final synced = ouraSyncedTo == null ? null : parseDateKey(ouraSyncedTo!);
-      if (w != null && synced != null && !synced.isBefore(DateTime(w.year, w.month, w.day - 1))) return;
-    }
+    if (!ouraHasTokens) return;
+    final range = ouraSyncRange(today);
+    if (range == null) return;
     final ms = now.millisecondsSinceEpoch;
     var tried = ouraTriedMs;
     var backoff = ouraBackoffMs;
     // Χρόνοι από ρολόι που είχε πάει μπροστά: ληγμένοι (αλλιώς η ανάγνωση θα έμενε μπλοκαρισμένη).
     if (tried != null && tried > ms) tried = null;
     if (backoff != null && backoff > ms + ouraMaxBackoff.inMilliseconds) backoff = null;
-    if (force) {
+    if (last) {
+      // Η τελευταία ανάγνωση πριν από την αποσύνδεση: χωρίς το όριο των 30 λεπτών, αλλά όχι αν η Oura ζήτησε αναμονή.
+      if (ouraError == OuraErrorKind.rateLimited && backoff != null && ms < backoff) return;
+    } else if (force) {
       if (!ouraCanSyncNow) return;
     } else {
       if (backoff != null && ms < backoff) return;
       if (tried != null && ms - tried < ouraMinInterval.inMilliseconds) return;
     }
-
-    // Ποιες μέρες: τις τελευταίες [ouraRecentDays]· αν δεν έχει διαβαστεί για καιρό, από εκεί που είχε μείνει
-    // (το πολύ 60 μέρες πίσω). Ποτέ πριν από τη σύνδεση.
-    final syncedTo = ouraSyncedTo == null ? null : parseDateKey(ouraSyncedTo!);
-    var from = DateTime(today.year, today.month, today.day - (ouraRecentDays - 1));
-    if (syncedTo == null || syncedTo.isBefore(from)) {
-      from = syncedTo == null ? f : DateTime(syncedTo.year, syncedTo.month, syncedTo.day - 1);
-    }
-    final floor = DateTime(today.year, today.month, today.day - 60);
-    if (from.isBefore(floor)) from = floor;
-    if (from.isBefore(f)) from = f;
+    final from = range.from;
+    final to = range.to;
 
     final epoch = _ouraEpoch;
     ouraTriedMs = ms;
     ouraSyncing = true;
     notifyListeners();
     try {
-      final batch = await ouraLink.fetchNights(from, today);
+      final batch = await ouraLink.fetchNights(from, to);
       if (epoch != _ouraEpoch) return; // αποσυνδέθηκε στο μεταξύ: τίποτα δεν κρατιέται
       final rows = await ouraRowsOffMain(batch.nights);
       if (epoch != _ouraEpoch) return;
-      final changed = mergeOura(history, rows, from: from, to: today, plan: plan);
+      final changed = mergeOura(history, rows, from: from, to: to, plan: plan);
       final saved = await saveDaysNow(changed);
       if (epoch != _ouraEpoch) return;
-      ouraNights = mergeOuraNights(ouraNights, batch.nights, from: from, to: today, today: today, keepDays: ouraDetailDays);
+      ouraNights = mergeOuraNights(ouraNights, batch.nights, from: from, to: to, today: today, keepDays: ouraDetailDays);
       await _writeNights(encodeOuraNights(ouraNights));
       ouraError = null;
       if (saved) {

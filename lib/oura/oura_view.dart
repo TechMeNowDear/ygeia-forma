@@ -192,13 +192,23 @@ class CompareRow {
     this.watchEnd,
     this.watchParts = 0,
     this.watchHr,
+    this.ouraSpan,
+    this.watchSpan,
   });
+
+  /// Από τον ύπνο ως το ξύπνημα, ΜΕ τα ξυπνήματα (Oura: από την ώρα που κοιμήθηκες ως το τέλος· ρολόι: αρχή→τέλος των
+  /// κομματιών). Συγκρίνεται μόνο με το ίδιο του άλλου.
+  final int? ouraSpan;
+  final int? watchSpan;
 
   final DateTime day;
   final int? ouraMinutes;
   final DateTime? ouraStart;
   final DateTime? ouraEnd;
   final double? ouraHr;
+
+  /// Πραγματικός ύπνος του ρολογιού (από τις φάσεις, χωρίς τα ξυπνήματα): μόνο όταν όλα τα κομμάτια είχαν φάσεις,
+  /// αλλιώς null — ποτέ «χρόνος με τα ξυπνήματα» δίπλα στον πραγματικό ύπνο του Oura.
   final int? watchMinutes;
 
   /// «Πιθανός ύπνος» στα κενά της Samsung (δεν μετρά στη διάρκεια).

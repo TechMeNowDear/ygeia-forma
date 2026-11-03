@@ -231,7 +231,11 @@ class _LastNightCard extends StatelessWidget {
             ),
           if (n.estimatedMinutes > 0)
             InfoRow('Πιθανός ύπνος στα κενά (δεν μετρά)', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
-          if (n.napMinutes > 0) InfoRow('Υπνάκος', hoursMinutes(n.napMinutes), dot: c.textTertiary),
+          if (n.spanMinutes > n.minutes)
+            InfoRow('Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)', hoursMinutes(n.spanMinutes), dot: c.textTertiary),
+          if (!n.staged)
+            InfoRow('Χωρίς φάσεις από τη Samsung', 'διάρκεια όπως τη δίνει η Samsung', dot: c.textTertiary),
+          if (n.napMinutes > 0) InfoRow('Υπνάκος ή χωριστός ύπνος (δεν μετρά)', hoursMinutes(n.napMinutes), dot: c.textTertiary),
         ],
       ),
     );

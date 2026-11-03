@@ -74,7 +74,8 @@ void main() {
     test('Σελίδα σύνδεσης: code, PKCE S256, state, μόνο daily', () {
       final p = OuraPending(state: 'st', verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', created: DateTime(2026, 11, 6));
       final u = ouraAuthorizeUrl(clientId: 'CID', p: p);
-      expect(u.toString(), startsWith('https://cloud.ouraring.com/oauth/authorize?'));
+      // Νέες εφαρμογές (developer.ouraring.com): η σελίδα σύνδεσης που δίνει η τεκμηρίωση της Oura γι' αυτές (A13).
+      expect(u.toString(), startsWith('https://developer.ouraring.com/authorize?'));
       expect(u.queryParameters['response_type'], 'code');
       expect(u.queryParameters['client_id'], 'CID');
       expect(u.queryParameters['redirect_uri'], 'https://ygeia-forma.netlify.app/oura/callback');
@@ -247,11 +248,14 @@ void main() {
       expect(decodeOuraNights('χαλασμένο'), isEmpty);
     });
 
-    test('Συγχώνευση νυχτών: το διάστημα αντικαθίσταται όλο, οι παλιές μέρες έξω μένουν', () {
+    test('Συγχώνευση νυχτών (A3): οι μέρες που ήρθαν αντικαθίστανται, όσες δεν ήρθαν ΜΕΝΟΥΝ', () {
       final b = fixtureBatch();
-      final merged = mergeOuraNights(b.nights, [night(b, '2026-10-25')],
+      final fresh = night(b, '2026-10-25');
+      final merged = mergeOuraNights(b.nights, [fresh],
           from: DateTime(2026, 10, 24), to: DateTime(2026, 10, 25), today: DateTime(2026, 10, 27));
-      expect(merged.map((n) => dateKey(n.day)), ['2026-10-23', '2026-10-25', '2026-10-26', '2026-10-27']);
+      expect(merged.map((n) => dateKey(n.day)), ['2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27'],
+          reason: 'η 24/10 δεν ήρθε αυτή τη φορά: δεν σβήνεται');
+      expect(identical(merged.firstWhere((n) => dateKey(n.day) == '2026-10-25'), fresh), isTrue);
     });
   });
 
@@ -763,7 +767,25 @@ void main() {
       expect(v.data, isEmpty);
       expect(http.calls.single.$2.path, '/oauth/revoke');
       expect(http.calls.single.$2.queryParameters['access_token'], 'A');
+      expect(http.calls.single.$1, 'GET', reason: 'η μορφή της τεκμηρίωσης (διεύθυνση χωρίς σώμα)· το POST έδινε 405');
       expect(await l.hasTokens, isFalse);
+    });
+
+    test('A13: απόρριψη της ανταλλαγής κρατά τον κωδικό OAuth (π.χ. invalid_client), ποτέ το σώμα', () async {
+      final v = MemoryVault();
+      final http = FakeHttp((m, u, h, f) => const OuraResponse(401, '{"error":"invalid_client","error_description":"x y"}'));
+      final l = OuraLink(vault: v, send: http.send, clock: () => now, clientId: 'CID');
+      final url = await l.begin();
+      await expectLater(
+        l.exchange('$ouraRedirectHttps?code=C&state=${url.queryParameters['state']}'),
+        throwsA(isA<OuraError>()
+            .having((e) => e.kind, 'kind', OuraErrorKind.tokenRejected)
+            .having((e) => e.code, 'code', 'invalid_client')
+            .having((e) => e.toString(), 'text', 'OuraError(tokenRejected, HTTP 401, invalid_client)')),
+      );
+      expect(oauthCode('Bearer abc.def'), isNull, reason: 'μόνο σύντομες λέξεις a–z');
+      expect(OuraOAuthEndpoints.portal.token, OuraOAuthEndpoints.classic.token);
+      expect(OuraOAuthEndpoints.portal.authorize, 'https://developer.ouraring.com/authorize');
     });
   });
 
@@ -787,6 +809,21 @@ void main() {
           expect(ouraKeySet.contains(k) || !k.startsWith('o.'), isTrue);
         }
       }
+    });
+
+    test('mergeOura (A3): μέρα που δεν ήρθε στην απάντηση δεν σβήνεται ποτέ', () {
+      final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 10, 20));
+      final h = <String, Map<String, double>>{
+        '2026-10-21': {'o.sleepMin': 431, 'o.hrv': 41, K.spo2Avg: 95},
+      };
+      final rows = ouraRows(fixtureBatch().nights); // 23/10–27/10, όχι η 21/10
+      final changed = mergeOura(h, rows, from: DateTime(2026, 10, 20), to: DateTime(2026, 10, 27), plan: plan);
+      expect(h['2026-10-21'], {'o.sleepMin': 431, 'o.hrv': 41, K.spo2Avg: 95});
+      expect(changed.contains('2026-10-21'), isFalse);
+      // Κενή απάντηση: τίποτα δεν αλλάζει.
+      final before = {for (final e in h.entries) e.key: {...e.value}};
+      expect(mergeOura(h, const {}, from: DateTime(2026, 10, 20), to: DateTime(2026, 10, 27), plan: plan), isEmpty);
+      expect(h, before);
     });
 
     test('Παράθυρα ύπνου: μόνο ώρες, για τους παλμούς της μέρας', () {

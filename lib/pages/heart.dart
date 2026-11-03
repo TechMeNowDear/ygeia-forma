@@ -82,14 +82,20 @@ class HeartPage extends StatelessWidget {
           today = null;
         }
         final latest = d.latestHeart;
-        // Οξυγόνο: πάντα του ρολογιού. Μετά τη σύνδεση του Oura ανά νύχτα χωρίς τον ύπνο του ρολογιού.
+        // Οξυγόνο: πάντα του ρολογιού. Μετά τη σύνδεση του Oura ανά νύχτα μέσα στις ώρες ύπνου του Oura, και ΜΟΝΟ
+        // νύχτες της ίδιας εποχής (ποτέ νύχτες πριν από την αλλαγή με άλλον ορισμό στην ίδια λίστα, A4).
+        final oxSeg = store.plan.segmentStart(K.spo2Avg, day);
         final oxNights = ouraHr
             ? [
                 for (var i = 0; i < 14; i++)
-                  if (d.watchSpo2(DateTime(day.year, day.month, day.day - i)) case final o?)
-                    (DateTime(day.year, day.month, day.day - i), o.avg, o.min),
+                  if (oxSeg == null || !DateTime(day.year, day.month, day.day - i).isBefore(oxSeg))
+                    if (d.watchSpo2(DateTime(day.year, day.month, day.day - i), windows) case final o? when o.avg != null)
+                      (DateTime(day.year, day.month, day.day - i), o.avg!, o.min),
               ].take(10).toList()
-            : [for (final n in d.nights.where((n) => n.spo2Avg != null).toList().reversed.take(10)) (n.date, n.spo2Avg!, n.spo2Min)];
+            : [
+                for (final n in d.nights.where((n) => n.spo2Avg != null && (oxSeg == null || !n.date.isBefore(oxSeg))).toList().reversed.take(10))
+                  (n.date, n.spo2Avg!, n.spo2Min),
+              ];
 
         Widget? trend;
         if (lastRhr != null && base != null) {
