@@ -1,5 +1,6 @@
 // Έλεγχοι για τις διορθώσεις του ελέγχου 4/11 (υπολογισμοί, κλινικά κείμενα, αναφορά γιατρού).
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
 import 'package:ygeia_forma/report.dart';
@@ -74,5 +75,17 @@ void main() {
     expect(steps.values.first.$1, day(90));
     expect(steps.values.last.$1, day(1));
     expect(steps.trend!.currentFrom, day(90));
+  });
+
+  test('Στάδια ρολογιού: ποσοστά επί του πραγματικού ύπνου, όχι μαζί με τα ξυπνήματα (Τρ 3/11, B4)', () {
+    // Πραγματική νύχτα: βαθύς 8, ελαφρύς 271, REM 51, ξύπνιος 47 λεπτά. Πριν: % επί 6:17 (2%, 72%, 14%, 12%).
+    final n = Night(DateTime(2026, 11, 3))
+      ..stageMinutes.addAll({'DEEP': 8, 'LIGHT': 271, 'REM': 51, 'AWAKE': 47});
+    expect(n.asleepStageMinutes, 330);
+    expect(n.stagePct('DEEP')!, closeTo(2.4, 0.05));
+    expect(n.stagePct('LIGHT')!, closeTo(82.1, 0.05));
+    expect(n.stagePct('REM')!, closeTo(15.5, 0.05));
+    expect(n.stagePct('AWAKE'), isNull, reason: 'ο χρόνος ξύπνιος φαίνεται σε λεπτά, όχι ως μέρος του ύπνου');
+    expect(n.awakeMinutes, 47);
   });
 }

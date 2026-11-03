@@ -51,7 +51,8 @@ const sleepKeys = {
 /// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
 /// 2 (1/11): η «εκτίμηση» στα κενά δεν μετρά στη διάρκεια· σπασμένη νύχτα χωρίς βαθμολογία·
 /// διπλές εγγραφές δεν αθροίζονται.
-const historyRulesVersion = 2;
+/// 3 (4/11, έλεγχος): ποσοστά σταδίων επί του πραγματικού ύπνου (χωρίς τα ξυπνήματα).
+const historyRulesVersion = 3;
 
 /// Βάζει νέες συνόψεις στο [history] και επιστρέφει τις μέρες που άλλαξαν (για αποθήκευση).
 ///
@@ -251,10 +252,12 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
   } else if (night != null) {
     put(K.sleepMin, night.minutes);
     put(K.sleepScore, night.score);
+    // Ποσοστά επί του πραγματικού ύπνου (βαθύς + ελαφρύς + REM), όπως στο Oura· ο χρόνος ξύπνιος χωριστά σε λεπτά
+    // (έλεγχος 4/11, B4: πριν, ποσοστά επί του χρόνου μαζί με τα ξυπνήματα).
     final staged = ['DEEP', 'LIGHT', 'REM', 'AWAKE'].fold<int>(0, (s, k) => s + (night!.stageMinutes[k] ?? 0));
     if (staged > 0) {
-      put(K.deepPct, 100 * (night.stageMinutes['DEEP'] ?? 0) / staged);
-      put(K.remPct, 100 * (night.stageMinutes['REM'] ?? 0) / staged);
+      put(K.deepPct, night.stagePct('DEEP'));
+      put(K.remPct, night.stagePct('REM'));
       put(K.awakeMin, night.stageMinutes['AWAKE'] ?? 0);
     }
     put(K.bedtime, minutesFromSix(night.start));

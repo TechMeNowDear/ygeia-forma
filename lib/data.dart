@@ -64,6 +64,17 @@ class Night {
   int get estimatedMinutes => estimatedGaps.fold(0, (s, g) => s + g.$2.difference(g.$1).inMinutes);
 
   int get awakeMinutes => stageMinutes['AWAKE'] ?? 0;
+
+  /// Πραγματικός ύπνος από τα στάδια: βαθύς + ελαφρύς + REM, χωρίς τον χρόνο ξύπνιος.
+  int get asleepStageMinutes => ['DEEP', 'LIGHT', 'REM'].fold(0, (s, k) => s + (stageMinutes[k] ?? 0));
+
+  /// Ποσοστό ενός σταδίου ύπνου επί του πραγματικού ύπνου (όχι επί του χρόνου με τα ξυπνήματα), ίδιος ορισμός
+  /// για ρολόι και Oura (έλεγχος 4/11, F6/B4). Το «ξύπνιος» δεν είναι ποσοστό του ύπνου: null (φαίνεται σε λεπτά).
+  double? stagePct(String stage) {
+    final asleep = asleepStageMinutes;
+    if (asleep <= 0 || stage == 'AWAKE') return null;
+    return 100 * (stageMinutes[stage] ?? 0) / asleep;
+  }
 }
 
 /// Κομμάτια ύπνου που ανήκουν μαζί (πριν μοιραστούν σε νύχτες και υπνάκους).
