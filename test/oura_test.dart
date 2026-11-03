@@ -536,7 +536,6 @@ void main() {
       expect(OuraOAuthEndpoints.classic.token, 'https://api.ouraring.com/oauth/token');
       expect(OuraOAuthEndpoints.v2.token, 'https://api.ouraring.com/v2/oauth/token');
       expect(OuraOAuthEndpoints.v2.revoke, 'https://api.ouraring.com/v2/oauth/token/revoke');
-      expect(ouraClientId, '', reason: 'το Client ID μπαίνει μόνο με ξεχωριστό commit');
     });
 
     test('v2: ανταλλαγή στο /v2/oauth/token με το ίδιο redirect_uri· ανάκληση με token στο σώμα', () async {
