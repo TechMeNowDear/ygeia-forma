@@ -14,9 +14,10 @@ const ouraClientId = 'af0dbf14-b534-4187-8d6b-6cc0cc6f41a1';
 /// Την απόφαση για το αν φτάνουν την παίρνουν ΜΟΝΟ τα 401/403 των δεδομένων (το «scope» της απάντησης δεν ελέγχεται).
 const ouraScopes = '';
 
-/// Αν η Oura δεν δέχεται ανταλλαγή κωδικού χωρίς Client Secret (PKCE μόνο), εδώ μπαίνει η διεύθυνση ενός
-/// μικρού διακομιστή που προσθέτει το secret και προωθεί το ίδιο αίτημα στην Oura. Κενό = απευθείας στην Oura.
-const ouraTokenProxy = '';
+/// Ο μεσάζων για την ανταλλαγή κωδικού και την ανανέωση: Netlify Function στο site/netlify/functions/oura-token.mjs.
+/// Η Oura ζητά Client Secret, και το secret δεν μπαίνει ΠΟΤΕ στην εφαρμογή: ζει μόνο στο Netlify (OURA_CLIENT_SECRET).
+/// Ο μεσάζων δέχεται μόνο το δικό μας Client ID, απαιτεί PKCE και δεν αποθηκεύει τίποτα. Κενό = απευθείας στην Oura.
+const ouraTokenProxy = 'https://ygeia-forma.netlify.app/api/oura/token';
 
 /// Οι δύο διευθύνσεις επιστροφής μετά τη σύνδεση. Τις πιάνει η OuraCallbackActivity (manifest):
 /// - https (Android App Link, επαληθευμένο με /.well-known/assetlinks.json στο ygeia-forma.netlify.app). Αν ο browser

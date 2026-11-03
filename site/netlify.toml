@@ -1,0 +1,4 @@
+# Netlify (συνδεδεμένο με το GitHub repo, base directory: site). Ανεβαίνει μόνο του σε κάθε push στο main.
+[build]
+  publish = "public"
+  functions = "netlify/functions"
