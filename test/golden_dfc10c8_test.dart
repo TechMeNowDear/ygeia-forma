@@ -2,6 +2,14 @@
 // δείγμα πρέπει να είναι ΙΔΙΑ με όσα έβγαζε ο κώδικας του dfc10c8 (πριν από το Oura) πάνω στο ίδιο δείγμα.
 // Το test/fixtures/golden_dfc10c8.json φτιάχτηκε τρέχοντας τον ίδιο υπολογισμό στο dfc10c8 στο GitHub Actions
 // (ώρα Αθήνας), 2/11/2026. Συνόψεις ημερών, Τάσεις (3 περίοδοι), αναφορά γιατρού, εβδομάδα, «Εκτός συνηθισμένου».
+// Ενημερώθηκε σκόπιμα 4/11/2026 (έλεγχος, Track B), μόνο με αυτές τις αλλαγές:
+// - deepPct/remPct στις συνόψεις: ποσοστό του πραγματικού ύπνου (βαθύς+ελαφρύς+REM), όχι μαζί με τα ξυπνήματα.
+//   Γι' αυτό και οι μεσαίες τιμές deepPct/remPct των Τάσεων, και «Βαθύς ύπνος · Μήνας» σταθερό → ↑ (οι 30 μέρες
+//   του δείγματος με τον νέο ορισμό δίπλα στις συνθετικές παλιές τιμές του δείγματος).
+// - Αναφορά, βήματα: 90 μέρες ως χθες (πριν 89), ίδιες με τη «Διαφορά» τους (n 88 → 89, μεσαία/p10/p90).
+// - Τάσεις, «Θερμοκρασία καρπού · 3 μήνες»: σταθερό → ↑. Νέα εκτίμηση αυτοσυσχέτισης (κομμάτια 30 ημερών): το
+//   δείγμα έχει πραγματικό άλμα επιπέδου (33,6 → ~35,2 °C) στις τελευταίες 30 μέρες, που πριν «κρυβόταν» ως
+//   αυτοσυσχέτιση 0,8.
 import 'dart:convert';
 import 'dart:io';
 
@@ -84,9 +92,6 @@ void main() {
     final golden = jsonDecode(File('test/fixtures/golden_dfc10c8.json').readAsStringSync()) as Map<String, dynamic>;
     // Μέσα από JSON και τα δύο, ώστε οι αριθμοί να συγκρίνονται με τον ίδιο τρόπο.
     final now = jsonDecode(jsonEncode(current())) as Map<String, dynamic>;
-    // TEMP(audit-b): τα νέα αποτελέσματα στο log, για ενημέρωση του fixture.
-    // ignore: avoid_print
-    print('GOLDEN_NOW_B64:${base64.encode(gzip.encode(utf8.encode(const JsonEncoder.withIndent(' ').convert(now))))}');
     expect(now.keys.toSet(), golden.keys.toSet());
     for (final k in golden.keys) {
       expect(now[k], golden[k], reason: k);

@@ -498,27 +498,7 @@ class _PageOne extends StatelessWidget {
           style: small,
         ),
         const SizedBox(height: 6),
-        Text(
-          withOura
-              ? 'Πώς μετρήθηκαν: κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
-                  'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
-                  'Galaxy Watch Ultra 2. Οξυγόνο: Galaxy Watch Ultra 2 (αισθητήρας καρπού)· «χαμηλότερη μεμονωμένη '
-                  'μέτρηση», όχι οξυμετρία. Βήματα: Samsung Health. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής '
-                  'μετρούν μόνο οι μέρες της νέας.'
-              : 'Πώς μετρήθηκαν: Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
-                  'αισθητήρας καρπού· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
-                  'Samsung. Βήματα: σύνολο της Samsung Health. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει '
-                  'σε άλλες εφαρμογές.',
-          style: small,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          // Κλινικός έλεγχος H4 (4/11).
-          'Παλμοί στον ύπνο = μέσος όρος όλου του ύπνου, όχι παλμοί ηρεμίας σε εγρήγορση.'
-          '${withOura ? ' HRV = RMSSD, μέσος όρος της νύχτας από το Oura· δεν συγκρίνεται με τιμές Holter 24ώρου.' : ''}'
-          ' Λίπος και μύες (σελίδα 3): εκτίμηση βιοηλεκτρικής αντίστασης της ζυγαριάς InBody H40, όχι DXA.',
-          style: small,
-        ),
+        Text('Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.', style: small.copyWith(fontWeight: FontWeight.w600)),
         const Spacer(),
         _Footer(data: d, page: 1),
       ],
@@ -543,6 +523,8 @@ class _PageThree extends StatelessWidget {
     Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4), child: w);
     final minN = d.stat(K.spo2Min).n;
     final avgN = d.stat(K.spo2Avg).n;
+    final plan = d.plan ?? SourcePlan.samsungOnly;
+    final withOura = plan.hasOura;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -623,6 +605,27 @@ class _PageThree extends StatelessWidget {
         Text(
           'Λίπος και μύες: εκτίμηση βιοηλεκτρικής αντίστασης (BIA) της ζυγαριάς InBody H40, όχι DXA. Επηρεάζονται από '
           'το νερό, το φαγητό και την άσκηση.',
+          style: small,
+        ),
+        _Title('Πώς μετρήθηκαν'),
+        Text(
+          withOura
+              ? 'Κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
+                  'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
+                  'Galaxy Watch Ultra 2. Οξυγόνο: Galaxy Watch Ultra 2 (αισθητήρας καρπού)· «χαμηλότερη μεμονωμένη '
+                  'μέτρηση», όχι οξυμετρία. Βήματα: Samsung Health. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής '
+                  'μετρούν μόνο οι μέρες της νέας.'
+              : 'Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
+                  'αισθητήρας καρπού· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. Διάρκεια ύπνου: όπως τη μέτρησε η '
+                  'Samsung. Βήματα: σύνολο της Samsung Health. Χωρίς HRV και παλμούς ηρεμίας: η Samsung δεν τα δίνει '
+                  'σε άλλες εφαρμογές.',
+          style: small,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          // Κλινικός έλεγχος H4 (4/11).
+          'Παλμοί στον ύπνο = μέσος όρος όλου του ύπνου, όχι παλμοί ηρεμίας σε εγρήγορση.'
+          '${withOura ? ' HRV = RMSSD, μέσος όρος της νύχτας από το Oura· δεν συγκρίνεται με τιμές Holter 24ώρου.' : ''}',
           style: small,
         ),
         const Spacer(),
