@@ -3,8 +3,10 @@
 /// Πεδία επαληθευμένα στο επίσημο OpenAPI 1.43 (PublicModifiedSleepModel, PublicDailySleep,
 /// PublicDailyReadiness) και στο sandbox της Oura. Κανόνες:
 /// - Ό,τι λείπει (null) μένει κενό· ποτέ 0.
-/// - Η νύχτα μιας μέρας είναι ΜΟΝΟ η περίοδος «long_sleep» (η μεγαλύτερη, αν είναι πολλές).
-///   Οι υπνάκοι («sleep», «late_nap») φαίνονται χωριστά και δεν προστίθενται. Οι «rest» (λάθος
+/// - Η νύχτα μιας μέρας είναι η περίοδος «long_sleep» με τον περισσότερο ύπνο. Αν δεν υπάρχει (νύχτα κάτω από
+///   3 ώρες: η Oura τη λέει «sleep»), νύχτα είναι η μεγαλύτερη «sleep» μέσα στο νυχτερινό παράθυρο ([inNightWindow])
+///   — «Σύντομη νύχτα». Άλλα κομμάτια στο ίδιο παράθυρο φαίνονται ως «δεύτερο κομμάτι» και ΔΕΝ προστίθενται.
+///   Οι υπνάκοι («sleep» εκτός παραθύρου, «late_nap») φαίνονται χωριστά και δεν προστίθενται. Οι «rest» (λάθος
 ///   ανίχνευση που απέρριψε ο χρήστης) και «deleted» αγνοούνται.
 /// - Η μέρα κάθε περιόδου είναι το «day» της Oura (το πρωί που ξύπνησες)· δεν την ξαναϋπολογίζουμε.
 /// - Οι ώρες έρχονται με τη ζώνη ώρας τους (π.χ. +02:00) και δείχνονται στην ώρα του κινητού.
@@ -99,6 +101,9 @@ class OuraSleep {
 
   bool get isMain => type == 'long_sleep';
   bool get isNap => type == 'sleep' || type == 'late_nap';
+
+  /// Νύχτα κάτω από 3 ώρες (η Oura την καταγράφει ως «sleep» αντί για «long_sleep»).
+  bool get isShortNight => type == 'sleep';
 
   /// Πότε αποκοιμήθηκες (ξάπλωμα + χρόνος ως τον ύπνο). Χωρίς «latency» δεν το ξέρουμε.
   DateTime? get onset => latency == null ? null : start.add(Duration(seconds: latency!));
@@ -202,7 +207,7 @@ class OuraDaily {
 
 /// Μία μέρα του Oura: η νύχτα, οι υπνάκοι και οι ημερήσιες τιμές.
 class OuraNight {
-  OuraNight({required this.day, this.main, this.naps = const [], this.others = const [], this.daily});
+  OuraNight({required this.day, this.main, this.naps = const [], this.others = const [], this.pieces = const [], this.daily});
 
   final DateTime day;
 
@@ -214,6 +219,16 @@ class OuraNight {
 
   /// Άλλες μεγάλες περίοδοι της ίδιας μέρας (σπάνιο): φαίνονται, δεν προστίθενται.
   final List<OuraSleep> others;
+
+  /// Σύντομη νύχτα σε κομμάτια: τα άλλα κομμάτια του νυχτερινού παραθύρου («δεύτερο κομμάτι»). Φαίνονται κάτω
+  /// από τη νύχτα, ΔΕΝ προστίθενται ούτε στη νύχτα ούτε στους υπνάκους.
+  final List<OuraSleep> pieces;
+
+  /// Η νύχτα είναι κάτω από 3 ώρες («Σύντομη νύχτα»).
+  bool get shortNight => main?.isShortNight ?? false;
+
+  /// Υπάρχει μόνο υπνάκος από το δαχτυλίδι, καμία νύχτα.
+  bool get onlyNap => main == null && naps.isNotEmpty;
   final OuraDaily? daily;
 
   int? get sleepScore => daily?.sleepScore;
@@ -223,7 +238,7 @@ class OuraNight {
   double? get tempDeviation => daily?.tempDeviation ?? main?.readinessTemp;
 
   int get napMinutes => naps.fold(0, (s, n) => s + (n.totalMinutes ?? 0));
-  bool get hasAny => main != null || naps.isNotEmpty || others.isNotEmpty || daily != null;
+  bool get hasAny => main != null || naps.isNotEmpty || others.isNotEmpty || pieces.isNotEmpty || daily != null;
 
   /// Η νύχτα στη μορφή της εφαρμογής, για το υπνόγραμμα (μόνο φάσεις και ώρες).
   Night? toNight() {
@@ -242,6 +257,7 @@ class OuraNight {
         if (main != null) 'main': main!.toJson(),
         if (naps.isNotEmpty) 'naps': [for (final x in naps) x.toJson()],
         if (others.isNotEmpty) 'others': [for (final x in others) x.toJson()],
+        if (pieces.isNotEmpty) 'pieces': [for (final x in pieces) x.toJson()],
         if (daily?.sleepScore != null) 'score': daily!.sleepScore,
         if (daily?.readiness != null) 'readiness': daily!.readiness,
         if (daily?.tempDeviation != null) 'temp': daily!.tempDeviation,
@@ -263,6 +279,7 @@ class OuraNight {
       main: main,
       naps: list(j['naps']),
       others: list(j['others']),
+      pieces: list(j['pieces']),
       daily: hasDaily
           ? (OuraDaily(day)
             ..sleepScore = _int(j['score'])
@@ -288,6 +305,29 @@ OuraSleep? selectMainSleep(Iterable<OuraSleep> periods) {
   return best;
 }
 
+/// Το νυχτερινό παράθυρο της μέρας [day] (πρωινό): αρχή ύπνου 18:00 της προηγούμενης ως 06:00, ή τέλος 00:00 ως
+/// 12:00 της ίδιας μέρας (ώρα κινητού).
+bool inNightWindow(OuraSleep s, DateTime day) {
+  final d = DateTime(day.year, day.month, day.day);
+  final startFrom = DateTime(d.year, d.month, d.day - 1, 18);
+  final startTo = DateTime(d.year, d.month, d.day, 6);
+  final endTo = DateTime(d.year, d.month, d.day, 12);
+  final startsIn = !s.start.isBefore(startFrom) && !s.start.isAfter(startTo);
+  final endsIn = !s.end.isBefore(d) && !s.end.isAfter(endTo);
+  return startsIn || endsIn;
+}
+
+/// Χωρίς «long_sleep»: η σύντομη νύχτα = η «sleep» με τον περισσότερο ύπνο μέσα στο νυχτερινό παράθυρο
+/// (ποτέ «late_nap», «rest», «deleted»).
+OuraSleep? selectShortNight(Iterable<OuraSleep> periods, DateTime day) {
+  OuraSleep? best;
+  for (final p in periods) {
+    if (!p.isShortNight || !inNightWindow(p, day)) continue;
+    if (best == null || (p.total ?? -1) > (best.total ?? -1)) best = p;
+  }
+  return best;
+}
+
 /// Ομαδοποίηση ανά μέρα, παλιότερη πρώτη.
 List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies) {
   final byDay = <String, List<OuraSleep>>{};
@@ -300,12 +340,19 @@ List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies
     for (final k in days)
       () {
         final list = (byDay[k] ?? const <OuraSleep>[]).toList()..sort((a, b) => a.start.compareTo(b.start));
-        final main = selectMainSleep(list);
+        final day = parseDateKey(k);
+        final long = selectMainSleep(list);
+        final main = long ?? selectShortNight(list, day);
+        // Τα άλλα κομμάτια μιας σύντομης νύχτας (ίδιο παράθυρο): «δεύτερο κομμάτι», όχι υπνάκοι.
+        final pieces = long != null || main == null
+            ? const <OuraSleep>[]
+            : [for (final p in list) if (!identical(p, main) && p.isShortNight && inNightWindow(p, day)) p];
         return OuraNight(
-          day: parseDateKey(k),
+          day: day,
           main: main,
-          naps: [for (final p in list) if (p.isNap) p],
+          naps: [for (final p in list) if (p.isNap && !identical(p, main) && !pieces.any((x) => identical(x, p))) p],
           others: [for (final p in list) if (p.isMain && !identical(p, main)) p],
+          pieces: pieces,
           daily: dailies[k],
         );
       }(),
@@ -378,7 +425,7 @@ SleepWindows ouraSleepWindows(List<OuraNight> nights) => SleepWindows(
       [
         for (final n in nights) ...[
           if (n.main != null) (n.main!.start, n.main!.end),
-          for (final x in [...n.naps, ...n.others]) (x.start, x.end),
+          for (final x in [...n.naps, ...n.others, ...n.pieces]) (x.start, x.end),
         ],
       ],
       {for (final n in nights) if (n.main != null) dateKey(n.day): (n.main!.start, n.main!.end)},

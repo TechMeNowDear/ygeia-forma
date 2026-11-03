@@ -10,6 +10,7 @@ import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oura/config.dart';
 import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
+import 'package:ygeia_forma/oura/oura_view.dart';
 import 'package:ygeia_forma/oura/sha256.dart';
 import 'package:ygeia_forma/sources.dart';
 
@@ -75,7 +76,8 @@ void main() {
       expect(u.toString(), startsWith('https://cloud.ouraring.com/oauth/authorize?'));
       expect(u.queryParameters['response_type'], 'code');
       expect(u.queryParameters['client_id'], 'CID');
-      expect(u.queryParameters['redirect_uri'], 'ygeiaforma://oura-callback');
+      expect(u.queryParameters['redirect_uri'], 'https://ygeia-forma.netlify.app/oura/callback');
+      expect(ouraRedirectUri, ouraRedirectHttps);
       expect(u.queryParameters['state'], 'st');
       expect(u.queryParameters['code_challenge_method'], 'S256');
       expect(u.queryParameters['code_challenge'], 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
@@ -90,6 +92,29 @@ void main() {
       expect(parseCallback('ygeiaforma://oura-callback?error=access_denied&state=S1')!.error, 'access_denied');
       expect(parseCallback('https://example.com/?code=x'), isNull);
       expect(parseCallback('ygeiaforma://other?code=x'), isNull);
+    });
+
+    test('Επιστροφή: δεκτές ΜΟΝΟ οι δύο ακριβείς μορφές (App Link https και custom scheme)', () {
+      final https = parseCallback('https://ygeia-forma.netlify.app/oura/callback?code=C2&state=S2');
+      expect(https!.code, 'C2');
+      expect(https.state, 'S2');
+      expect(parseCallback('https://ygeia-forma.netlify.app/oura/callback?error=access_denied&state=S2')!.error, 'access_denied');
+      expect(parseCallback('ygeiaforma://oura-callback/?code=C3&state=S3')!.code, 'C3');
+      for (final bad in [
+        'https://ygeia-forma.netlify.app/oura/callback2?code=x&state=s',
+        'https://ygeia-forma.netlify.app/oura?code=x&state=s',
+        'https://ygeia-forma.netlify.app/oura/callback/x?code=x&state=s',
+        'https://evil-ygeia-forma.netlify.app/oura/callback?code=x&state=s',
+        'https://ygeia-forma.netlify.app.evil.com/oura/callback?code=x&state=s',
+        'https://ygeia-forma.netlify.app:8443/oura/callback?code=x&state=s',
+        'https://user@ygeia-forma.netlify.app/oura/callback?code=x&state=s',
+        'http://ygeia-forma.netlify.app/oura/callback?code=x&state=s',
+        'ygeiaforma://oura-callback/extra?code=x&state=s',
+        'ygeiaforma://oura-callback:1/?code=x&state=s',
+        'intent://oura-callback?code=x',
+      ]) {
+        expect(parseCallback(bad), isNull, reason: bad);
+      }
     });
 
     test('Καμία μυστική τιμή στον κώδικα', () {
@@ -226,6 +251,89 @@ void main() {
       final merged = mergeOuraNights(b.nights, [night(b, '2026-10-25')],
           from: DateTime(2026, 10, 24), to: DateTime(2026, 10, 25), today: DateTime(2026, 10, 27));
       expect(merged.map((n) => dateKey(n.day)), ['2026-10-23', '2026-10-25', '2026-10-26', '2026-10-27']);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // S-C: χωρίς long_sleep, η νύχτα = η μεγαλύτερη «sleep» στο νυχτερινό παράθυρο· ποτέ άθροισμα.
+  group('Σύντομη νύχτα (μόνο «sleep»)', () {
+    final d = DateTime(2026, 11, 3);
+    var seq = 0;
+    Map<String, dynamic> rec(String type, DateTime start, DateTime end, {DateTime? day}) {
+      final secs = end.difference(start).inSeconds;
+      final k = day ?? d;
+      return {
+        'id': 'p${seq++}',
+        'day': dateKey(k),
+        'type': type,
+        'bedtime_start': start.toUtc().toIso8601String(),
+        'bedtime_end': end.toUtc().toIso8601String(),
+        'time_in_bed': secs,
+        'total_sleep_duration': secs - 300,
+      };
+    }
+
+    OuraNight only(List<Map<String, dynamic>> sleep) =>
+        parseOura(sleep: sleep, dailySleep: const [], readiness: const []).nights.single;
+    DateTime at(int day, int h, int m) => DateTime(2026, 11, day, h, m);
+
+    test('Μόνο «sleep» 01:10–03:40: είναι η νύχτα (σύντομη), όχι υπνάκος', () {
+      final n = only([rec('sleep', at(3, 1, 10), at(3, 3, 40))]);
+      expect(n.main, isNotNull);
+      expect(n.shortNight, isTrue);
+      expect(n.naps, isEmpty);
+      final row = ouraRow(n);
+      expect(row[ouraKeys[K.sleepMin]], 145);
+      expect(row.containsKey(ouraKeys[K.napMin]), isFalse, reason: 'δεν μετριέται και ως υπνάκος');
+      expect(shortNightLabel, 'Σύντομη νύχτα · κάτω από 3 ώρες');
+    });
+
+    test('long_sleep + απογευματινό «sleep»: κύρια η long_sleep, το «sleep» υπνάκος', () {
+      final n = only([
+        rec('long_sleep', at(2, 23, 30), at(3, 7, 0)),
+        rec('sleep', at(3, 15, 0), at(3, 15, 40)),
+      ]);
+      expect(n.main!.type, 'long_sleep');
+      expect(n.shortNight, isFalse);
+      expect(n.pieces, isEmpty);
+      expect(n.naps.single.type, 'sleep');
+      expect(ouraRow(n)[ouraKeys[K.napMin]], 35);
+    });
+
+    test('Μόνο απογευματινό «sleep»: καμία νύχτα, λόγος «Μόνο υπνάκος από το δαχτυλίδι»', () {
+      final n = only([rec('sleep', at(3, 15, 0), at(3, 16, 0))]);
+      expect(n.main, isNull);
+      expect(n.onlyNap, isTrue);
+      expect(ouraRow(n).containsKey(ouraKeys[K.sleepMin]), isFalse);
+      final plan = SourcePlan([SourceEra(Source.oura, at(1, 0, 0))]);
+      final r = emptyNightReason(plan: plan, day: d, now: at(3, 18, 0), night: n, hasTokens: true, synced: at(3, 17, 0));
+      expect(r, EmptyNight.onlyNap);
+      expect(emptyNightText(r!), 'Μόνο υπνάκος από το δαχτυλίδι');
+    });
+
+    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η άλλη «δεύτερο κομμάτι», ποτέ άθροισμα', () {
+      final n = only([
+        rec('sleep', at(2, 23, 0), at(3, 1, 30)),
+        rec('sleep', at(3, 3, 0), at(3, 5, 45)),
+      ]);
+      expect(hm(n.main!.start), '03:00');
+      expect(n.pieces.length, 1);
+      expect(hm(n.pieces.single.start), '23:00');
+      expect(n.naps, isEmpty);
+      final row = ouraRow(n);
+      expect(row[ouraKeys[K.sleepMin]], 160, reason: 'μόνο η κύρια (165′ − 5′)');
+      expect(row.containsKey(ouraKeys[K.napMin]), isFalse);
+      // Αποθήκευση και ανάγνωση: το κομμάτι μένει χωριστά.
+      final back = decodeOuraNights(encodeOuraNights([n])).single;
+      expect(back.pieces.length, 1);
+      expect(ouraRow(back), row);
+    });
+
+    test('late_nap στις 19:00: ποτέ νύχτα', () {
+      final n = only([rec('late_nap', at(2, 19, 0), at(2, 19, 50))]);
+      expect(n.main, isNull);
+      expect(n.naps.single.type, 'late_nap');
+      expect(ouraRow(n).containsKey(ouraKeys[K.sleepMin]), isFalse);
     });
   });
 
@@ -477,11 +585,12 @@ void main() {
       final state = url.queryParameters['state']!;
       final pending = OuraPending.fromJson(v.data[vaultPending])!;
       expect(pkceChallenge(pending.verifier), url.queryParameters['code_challenge']);
-      expect(await l.complete('ygeiaforma://oura-callback?code=THECODE&state=$state'), isTrue);
+      expect(await l.complete('https://ygeia-forma.netlify.app/oura/callback?code=THECODE&state=$state'), isTrue);
       final form = Uri.splitQueryString(sentForm!);
       expect(form['grant_type'], 'authorization_code');
       expect(form['code'], 'THECODE');
-      expect(form['redirect_uri'], 'ygeiaforma://oura-callback');
+      expect(form['redirect_uri'], 'https://ygeia-forma.netlify.app/oura/callback', reason: 'ίδια με τη σελίδα σύνδεσης');
+      expect(form['redirect_uri'], url.queryParameters['redirect_uri']);
       expect(form['client_id'], 'CID');
       expect(form['code_verifier'], pending.verifier);
       expect(form.containsKey('client_secret'), isFalse);

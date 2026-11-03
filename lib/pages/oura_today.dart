@@ -22,7 +22,7 @@ class OuraStatusCard extends StatelessWidget {
   /// Αν πρέπει να φανεί κάρτα.
   static bool shows(HealthStore s) => switch (s.ouraStatus) {
         OuraStatus.waiting || OuraStatus.missing || OuraStatus.reconnect || OuraStatus.subscription => true,
-        OuraStatus.disconnected || OuraStatus.starting => true,
+        OuraStatus.disconnected || OuraStatus.starting || OuraStatus.startingNow => true,
         _ => false,
       };
 
@@ -58,6 +58,13 @@ class OuraStatusCard extends StatelessWidget {
           'Από απόψε ο ύπνος από το Oura',
           'Το Oura συνδέθηκε. Η χθεσινή νύχτα μένει όπως τη μέτρησε το ρολόι· από την επόμενη νύχτα ο ύπνος έρχεται '
               'μόνο από το δαχτυλίδι. Φόρεσέ το απόψε.',
+          c.sleep,
+          null,
+        ),
+      OuraStatus.startingNow => (
+          'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι',
+          'Το Oura συνδέθηκε. Όταν ξυπνήσεις, άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ. '
+              'Ο ύπνος έρχεται μόνο από το δαχτυλίδι.',
           c.sleep,
           null,
         ),
@@ -140,15 +147,7 @@ class OuraSleepTodayCard extends StatelessWidget {
 
     final Widget body;
     if (m == null) {
-      final reason = emptyNightReason(
-        plan: store.plan,
-        day: today,
-        now: now,
-        night: night,
-        hasTokens: store.ouraHasTokens,
-        error: store.ouraError?.name,
-        synced: store.ouraLastSync,
-      );
+      final reason = store.ouraNightReason(today, now);
       body = Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Text(
@@ -221,6 +220,16 @@ class OuraSleepTodayCard extends StatelessWidget {
               ),
             ],
           ),
+          if (night.shortNight || night.pieces.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              [
+                if (night.shortNight) shortNightLabel,
+                if (night.pieces.isNotEmpty) 'και δεύτερο κομμάτι ${hm(night.pieces.first.start)}–${hm(night.pieces.first.end)} (χωριστά)',
+              ].join(' · '),
+              style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
+            ),
+          ],
           if (night.naps.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(

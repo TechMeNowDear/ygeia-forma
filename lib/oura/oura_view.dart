@@ -82,6 +82,9 @@ StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan
   );
 }
 
+/// Η νύχτα είναι μόνο ένα σύντομο κομμάτι ύπνου (το Oura το λέει «sleep», όχι «long_sleep»).
+const shortNightLabel = 'Σύντομη νύχτα · κάτω από 3 ώρες';
+
 /// Γιατί μια νύχτα δεν έχει ύπνο.
 enum EmptyNight {
   /// Η νύχτα είναι του ρολογιού (πριν από τη σύνδεση): δεν αφορά το Oura.
@@ -104,6 +107,12 @@ enum EmptyNight {
 
   /// Το Oura αποσυνδέθηκε και δεν διάλεξες άλλη πηγή.
   disconnected,
+
+  /// Το δαχτυλίδι κατέγραψε μόνο υπνάκο (καμία περίοδος στο νυχτερινό παράθυρο).
+  onlyNap,
+
+  /// Δεν διαβάστηκε από πού έρχεται ο ύπνος (χαλασμένες ρυθμίσεις πηγών): κενό ώσπου να διαλέξεις.
+  unknownPlan,
 }
 
 String emptyNightText(EmptyNight r) => switch (r) {
@@ -114,6 +123,8 @@ String emptyNightText(EmptyNight r) => switch (r) {
       EmptyNight.subscription => 'Η συνδρομή Oura δεν είναι ενεργή',
       EmptyNight.notRead => 'Δεν διαβάστηκε ακόμα από την Oura',
       EmptyNight.disconnected => 'Το Oura δεν είναι συνδεδεμένο',
+      EmptyNight.onlyNap => 'Μόνο υπνάκος από το δαχτυλίδι',
+      EmptyNight.unknownPlan => 'Δεν διαβάστηκε από πού έρχεται ο ύπνος',
     };
 
 /// Ο λόγος που η νύχτα [day] είναι κενή (null = δεν είναι κενή).
@@ -126,11 +137,14 @@ EmptyNight? emptyNightReason({
   required bool hasTokens,
   String? error,
   DateTime? synced,
+  bool planUnknown = false,
 }) {
   final src = plan.nightSource(day);
-  if (src == Source.none) return EmptyNight.disconnected;
+  if (src == Source.none) return planUnknown ? EmptyNight.unknownPlan : EmptyNight.disconnected;
   if (src != Source.oura) return null;
   if (night?.main != null) return null;
+  // Η Oura έδωσε μόνο υπνάκο για αυτή τη μέρα: το λέμε (όχι «δεν υπάρχουν δεδομένα»).
+  if (night != null && night.onlyNap) return EmptyNight.onlyNap;
   final today = dayOf(now);
   final isToday = sameDay(day, today);
   if (!hasTokens || error == 'reconnect') return EmptyNight.reconnect;
