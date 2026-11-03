@@ -114,6 +114,24 @@ class FakeOura {
 
 DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
 
+/// Αποθήκευση που δεν απαντά μόνο για ορισμένα ονόματα, και καταγράφει τη σειρά των διαγραφών.
+class PickyVault extends MemoryVault {
+  final failNames = <String>{};
+  final deletes = <String>[];
+
+  @override
+  Future<String?> load(String name) async {
+    if (failNames.contains(name)) throw const VaultUnavailable();
+    return super.load(name);
+  }
+
+  @override
+  Future<void> delete(String name) async {
+    deletes.add(name);
+    await super.delete(name);
+  }
+}
+
 /// Αρχείο σχεδίου που μπορεί να καθυστερήσει τις εγγραφές ([gate]) και να καταγράψει κάτι τη στιγμή της εγγραφής.
 class GatedPlanFile extends MemoryPlanFile {
   GatedPlanFile(super.content);
@@ -363,6 +381,91 @@ void main() {
       expect(a.store.ouraConnectedMs, at);
       expect(a.vault.data.containsKey(vaultConnecting), isFalse);
       expect(a.store.ouraIncomplete, isFalse);
+    });
+
+    test('S-1: παλιό σημάδι χωρίς tokens, αλλά με ανάγνωση του Oura μετά από αυτό: η εποχή μένει, το σημάδι σβήνεται', () async {
+      final before = SourcePlan.samsungOnly;
+      final p = before.withEra(Source.oura, add(today, -3));
+      final a = app(plan: p);
+      a.android.prefs = {
+        'sources': p.toJson(),
+        'sourcesAt': 5,
+        'ouraSynced': now.subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+        'ouraSyncedTo': dateKey(add(today, -1)),
+      };
+      a.vault.data[vaultConnecting] = jsonEncode({
+        'from': dateKey(add(today, -3)),
+        'at': now.subtract(const Duration(days: 3)).millisecondsSinceEpoch,
+        'before': before.toJson(),
+      });
+      await boot(a.store);
+      expect(a.store.plan, p, reason: 'μια σύνδεση που χρησιμοποιήθηκε δεν αναιρείται ποτέ');
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse);
+      expect(a.store.ouraIncomplete, isFalse);
+    });
+
+    test('S-1: παλιό σημάδι χωρίς tokens, με τιμές «o.*» από την πρώτη νύχτα και μετά: η εποχή μένει', () async {
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -3));
+      final a = app(plan: p);
+      a.android.days[dateKey(add(today, -2))] = {'o.sleepMin': 400, K.steps: 3000};
+      a.vault.data[vaultConnecting] = jsonEncode({'from': dateKey(add(today, -3)), 'at': 1, 'before': <Object>[]});
+      await boot(a.store);
+      expect(a.store.plan, p);
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse);
+    });
+
+    test('S-1: η αποσύνδεση σβήνει ΠΡΩΤΑ το σημάδι', () async {
+      final v = PickyVault()..data[vaultTokens] = tokens().toJson();
+      v.data[vaultConnecting] = '{}';
+      final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, ouraStart), vault: v);
+      await boot(a.store);
+      v.deletes.clear();
+      await a.store.disconnectOura();
+      expect(v.deletes.first, vaultConnecting);
+      expect(v.data, isEmpty);
+    });
+
+    test('M-1: σημάδι, αλλά τα tokens δεν διαβάζονται τώρα: τίποτα δεν κρίνεται, το σημάδι μένει για την επόμενη φορά', () async {
+      final v = PickyVault()..failNames.add(vaultTokens);
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, today);
+      final a = app(plan: p, vault: v);
+      v.data[vaultConnecting] = jsonEncode({'from': dateKey(today), 'at': 1, 'before': <Object>[]});
+      await boot(a.store);
+      expect(a.store.plan, p);
+      expect(v.data.containsKey(vaultConnecting), isTrue);
+      expect(a.store.ouraIncomplete, isFalse);
+      // Επόμενη εκκίνηση, η αποθήκευση απαντά και tokens δεν υπάρχουν: μισή σύνδεση, το σχέδιο επιστρέφει.
+      v.failNames.clear();
+      final b = app(android: a.android, oura: a.oura, vault: v, planFile: a.planFile, nights: a.nights);
+      await boot(b.store);
+      expect(b.store.plan.eras, isEmpty);
+      expect(b.store.ouraStatus, OuraStatus.incomplete);
+      expect(v.data.containsKey(vaultConnecting), isFalse);
+    });
+
+    test('M-2: «Αποσύνδεση» την ώρα της σύνδεσης: καμία εποχή Oura χωρίς tokens, κανένα σημάδι', () async {
+      final pf = GatedPlanFile(null);
+      final a = app(plan: null, planFile: pf);
+      await boot(a.store);
+      expect(await a.store.beginOuraLogin(from: add(today, 1)), isNull);
+      final state = OuraPending.fromJson(a.vault.data[vaultPending])!.state;
+      pf.gate = Completer<void>();
+      pf.onWrite = () => true;
+      final connecting = a.store.completeOuraLogin('$ouraRedirectHttps?code=C&state=$state');
+      for (var i = 0; i < 50 && pf.markerSeen.isEmpty; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(pf.markerSeen, isNotEmpty, reason: 'το σχέδιο γράφεται τώρα');
+      final disconnecting = a.store.disconnectOura();
+      await Future<void>.delayed(Duration.zero);
+      pf.gate!.complete();
+      await connecting;
+      await disconnecting;
+      expect(a.store.plan.hasOura, isFalse);
+      expect(decodePlanFile(pf.content)?.hasOura ?? false, isFalse);
+      expect(a.vault.data.containsKey(vaultTokens), isFalse);
+      expect(a.vault.data.containsKey(vaultConnecting), isFalse);
+      expect(a.store.ouraHasTokens, isFalse);
     });
 
     test('T-1(α): Oura από σήμερα, tokens, χωρίς ανάγνωση ακόμα: ο καθαρισμός δεν πειράζει τίποτα', () async {

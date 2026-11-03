@@ -346,6 +346,15 @@ void main() {
       expect(napTimes(null), '');
     });
 
+    test('M-3: «χθες βράδυ» δεν δείχνει ποτέ απογευματινό υπνάκο της ίδιας μέρας', () {
+      final n = only([rec('sleep', at(2, 22, 0), at(2, 23, 40)), rec('sleep', at(3, 14, 0), at(3, 14, 40))]);
+      expect(n.onlyNap, isTrue);
+      expect(napTimes(n, nightOnly: true), '22:00–23:40 · 1 ώρα 35 λεπτά');
+      expect(napTimes(n), contains('14:00–14:40'));
+      final afternoon = only([rec('sleep', at(3, 13, 0), at(3, 13, 40))]);
+      expect(napTimes(afternoon, nightOnly: true), '');
+    });
+
     test('Παράθυρο: μόνο ό,τι επικαλύπτει 00:00–06:00 της μέρας', () {
       OuraSleep s(DateTime a, DateTime b) => OuraSleep.fromJson(rec('sleep', a, b))!;
       expect(inNightWindow(s(at(2, 22, 0), at(3, 0, 30)), d), isTrue);

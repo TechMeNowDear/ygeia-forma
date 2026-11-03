@@ -10,11 +10,16 @@ object OuraRules {
     const val HTTPS_HOST = "ygeia-forma.netlify.app"
     const val HTTPS_PATH = "/oura/callback"
 
+    /** Η μοναδική πηγή για τα ονόματα των αρχείων μας (το OuraBridge και το Vault τα παίρνουν από εδώ). */
+    const val NIGHTS_FILE = "oura_nights.json"
+    const val PLAN_FILE = "sources.json"
+    const val PLAN_LOG_FILE = "sources_log.json"
+
+    /** Τα κρυπτογραφημένα (Vault): αρχείο «όνομα.bin» στο noBackupFilesDir/oura. */
+    val VAULT_NAMES = setOf("oura_tokens", "oura_pending", "oura_connecting")
+
     /** Τα αρχεία μας (στο filesDir ή στο noBackupFilesDir/oura). Το προσωρινό είναι «όνομα.<αριθμός>.tmp». */
-    val OWN_FILES = listOf(
-        "oura_nights.json", "sources.json", "sources_log.json",
-        "oura_tokens.bin", "oura_pending.bin", "oura_connecting.bin",
-    )
+    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE) + VAULT_NAMES.map { "$it.bin" }
 
     /** Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback. */
     fun isCallback(scheme: String?, host: String?, port: Int, path: String?, userInfo: String?): Boolean {

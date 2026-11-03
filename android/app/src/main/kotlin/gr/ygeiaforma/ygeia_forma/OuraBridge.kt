@@ -133,11 +133,11 @@ class OuraBridge(
     private fun writeText(name: String, text: String): Boolean = atomicWrite(File(activity.filesDir, name), text.toByteArray(Charsets.UTF_8))
 
     companion object {
-        const val NIGHTS_FILE = "oura_nights.json"
-        const val PLAN_FILE = "sources.json"
+        const val NIGHTS_FILE = OuraRules.NIGHTS_FILE
+        const val PLAN_FILE = OuraRules.PLAN_FILE
 
         /** Ημερολόγιο αλλαγών πηγής (για επαναφορά αν χαλάσει το sources.json). */
-        const val PLAN_LOG_FILE = "sources_log.json"
+        const val PLAN_LOG_FILE = OuraRules.PLAN_LOG_FILE
 
         /** Μόνο τα δύο αρχεία του σχεδίου πηγών. */
         fun planName(n: String?): String = if (n == PLAN_LOG_FILE) PLAN_LOG_FILE else PLAN_FILE
@@ -217,7 +217,7 @@ class OuraBridge(
 object Vault {
     private const val ALIAS = "ygeia_oura_v1"
     private const val VERSION: Byte = 1
-    private val allowed = setOf("oura_tokens", "oura_pending", "oura_connecting")
+    private val allowed = OuraRules.VAULT_NAMES
 
     private fun file(context: Context, name: String): File {
         require(name in allowed) { "Άγνωστο όνομα" }

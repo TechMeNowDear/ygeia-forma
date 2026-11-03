@@ -1,5 +1,6 @@
 package gr.ygeiaforma.ygeia_forma
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,5 +39,21 @@ class OuraRulesTest {
             "sources.json", "sources.json.tmp", "prefs.json.tmp", "dashboard.json.tmp", "days.json.123.tmp",
             "x.bg.tmp", "sources.json.123", "oura_tokens.bin", "mysources.json.1.tmp", "sources.jsonx.1.tmp",
         )) assertFalse(n, OuraRules.isOwnTmp(n))
+    }
+
+    @Test
+    fun fileNamesHaveOneSource() {
+        assertEquals(OuraRules.NIGHTS_FILE, OuraBridge.NIGHTS_FILE)
+        assertEquals(OuraRules.PLAN_FILE, OuraBridge.PLAN_FILE)
+        assertEquals(OuraRules.PLAN_LOG_FILE, OuraBridge.PLAN_LOG_FILE)
+        assertEquals(
+            listOf(
+                "oura_nights.json", "sources.json", "sources_log.json",
+                "oura_tokens.bin", "oura_pending.bin", "oura_connecting.bin",
+            ),
+            OuraRules.OWN_FILES,
+        )
+        // Κάθε όνομα του Vault έχει το δικό του προσωρινό που καθαρίζεται.
+        for (n in OuraRules.VAULT_NAMES) assertTrue(OuraRules.isOwnTmp("$n.bin.1.tmp"))
     }
 }
