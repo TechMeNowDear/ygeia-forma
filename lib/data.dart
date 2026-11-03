@@ -1000,6 +1000,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       _planAt = copy.at;
     } else if (fileOk) {
       _planAt = _atOf(file.json);
+      // Ό,τι διαβάστηκε είναι ήδη γραμμένο: δεν ξαναγράφεται αν δεν άλλαξε.
+      _planFileWritten = file.json;
     }
     planState = r.state;
     if (planState == PlanState.ok) {
