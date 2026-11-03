@@ -80,7 +80,9 @@ jobs:
             echo "::error title=Έλεγχοι Kotlin::$msg"
             exit 1
           fi
-          n=$(grep -ho 'tests="[0-9]*"' app/build/test-results/*/*.xml 2>/dev/null | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+          # Η Flutter βάζει το build του app στο ../build/app.
+          n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
+            | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
           echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
 
   # Oura: ο πραγματικός κώδικας ανάγνωσης πάνω στα συνθετικά δεδομένα του sandbox της Oura (χωρίς δαχτυλίδι).
