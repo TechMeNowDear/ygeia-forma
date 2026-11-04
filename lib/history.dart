@@ -135,6 +135,11 @@ Set<String> mergeHistory(
       p.nightSource(day) == Source.watch &&
       !(rows[dateKey(day)]?.containsKey(K.sleepMin) ?? false);
 
+  // Review M3: η απόφαση «πρωινός υπνάκος» μιας νύχτας του ρολογιού αλλάζει μόνο όταν η νύχτα ξανακριθεί (έγκυρη νέα
+  // διάρκεια)· μια ανάγνωση χωρίς νύχτα δεν τη σβήνει.
+  bool keepLock(DateTime day, String key) =>
+      key == K.napLock && p.nightSource(day) == Source.watch && !(rows[dateKey(day)]?.containsKey(K.sleepMin) ?? false);
+
   if (replaceSleep && rangeFrom != null && rangeTo != null) {
     for (var day = dayOf(rangeFrom); !day.isAfter(dayOf(rangeTo)); day = DateTime(day.year, day.month, day.day + 1)) {
       final k = dateKey(day);
@@ -147,7 +152,8 @@ Set<String> mergeHistory(
           sleepKeys.contains(key) &&
           !stay.contains(key) &&
           !(keep && watchNightKeys.contains(key)) &&
-          !keepDuration(day, key);
+          !keepDuration(day, key) &&
+          !keepLock(day, key);
       if (old.keys.any(drop)) {
         history[k] = {for (final e in old.entries) if (!drop(e.key)) e.key: e.value};
         changed.add(k);
@@ -179,12 +185,15 @@ Set<String> mergeHistory(
             for (final v in old.entries)
               if ((keep && watchNightKeys.contains(v.key)) ||
                   keepDuration(day, v.key) ||
+                  keepLock(day, v.key) ||
                   (stay.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))) ||
                   (!sleepKeys.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))))
                 v.key: v.value,
           }
         : old;
     final next = {...base, ...incoming};
+    // Review L1: ήρθε έγκυρη νύχτα του ρολογιού για μέρα σημειωμένη «από άλλη συσκευή»: το σημάδι φεύγει.
+    if (incoming.containsKey(K.sleepMin)) next.remove(otherDeviceKey);
     // Μόνο ό,τι άλλαξε γράφεται ξανά στο κινητό.
     if (!_sameValues(history[e.key], next)) changed.add(e.key);
     history[e.key] = next;
@@ -295,10 +304,13 @@ Set<String> archiveSleep(
     final old = history[k];
     if (old == null || old[K.sleepMin] == null || plan.nightSource(day) != Source.watch) continue;
     if (rows[k]?.containsKey(K.sleepMin) ?? false) continue;
+    // Review M3: η απόφαση «πρωινός υπνάκος» ([K.napLock]) δεν είναι μέτρηση· μένει ορατή, ώστε η νύχτα, αν ξανάρθει,
+    // να ομαδοποιηθεί όπως πριν.
+    bool archived(String key) => sleepKeys.contains(key) && key != K.napLock;
     history[k] = {
-      for (final e in old.entries) if (!sleepKeys.contains(e.key)) e.key: e.value,
+      for (final e in old.entries) if (!archived(e.key)) e.key: e.value,
       for (final e in old.entries)
-        if (sleepKeys.contains(e.key) && !old.containsKey('$archivePrefix${e.key}')) '$archivePrefix${e.key}': e.value,
+        if (archived(e.key) && !old.containsKey('$archivePrefix${e.key}')) '$archivePrefix${e.key}': e.value,
       if (otherDevice) otherDeviceKey: 1,
     };
     changed.add(k);

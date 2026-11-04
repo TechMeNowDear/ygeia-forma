@@ -331,14 +331,37 @@ void main() {
       );
       expect(parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'readAt': 1}), add(today, -60), add(today, -31)).otherDeviceOk,
           isFalse);
-      expect(
-        parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'firstWatchSleep': null, 'readAt': 1}),
-                add(today, -60), add(today, -31))
-            .otherDeviceOk,
-        isTrue,
-        reason: 'κανένας ύπνος ρολογιού ποτέ: το κομμάτι είναι πριν από αυτόν',
-      );
+      final none = parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'firstWatchSleep': null, 'readAt': 1}),
+          add(today, -60), add(today, -31));
+      expect(none.otherDeviceOk, isFalse, reason: 'review M2: το null μόνο του δεν αρκεί');
+      expect(none.noWatchSleep, isTrue);
       s.dispose();
+    });
+
+    // Review M2: η Kotlin λέει «καμία εγγραφή ρολογιού ποτέ» (null), αλλά το κομμάτι έχει αποθηκευμένες νύχτες
+    // ρολογιού: το ίδιο φίλτρο μπορεί να έχει χαλάσει (χαμένο μητρώο συσκευών, ρολόι που πουλήθηκε). Σφάλμα ανάγνωσης.
+    test('Review M2: firstWatchSleep = null με αποθηκευμένες νύχτες ρολογιού → σφάλμα, οι τιμές μένουν ορατές', () async {
+      final old = add(today, -33);
+      final a = Android(now)
+        ..prefs = {'historyVersion': 2}
+        ..dashboard = jsonEncode(sampleDashboardJson(now)..['sleep'] = [])
+        ..range = jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'firstWatchSleep': null, 'readAt': now.millisecondsSinceEpoch});
+      final row = {K.sleepMin: 410.0, K.bedtime: 330.0, K.sleepHr: 58.0, K.steps: 4000.0};
+      a.days[dateKey(old)] = {...row};
+      final s = await boot(a);
+      expect((a.prefs['monthFails'] as Map).values.single, 1, reason: 'σφάλμα ανάγνωσης, όχι «άλλη συσκευή»');
+      expect(a.days[dateKey(old)], row, reason: 'τίποτα δεν κρύφτηκε σε «nw.*»');
+      expect(otherDeviceNights(s.history), 0);
+      s.dispose();
+      // Χωρίς αποθηκευμένες νύχτες ρολογιού στο κομμάτι: δεκτό (δεν υπάρχει τίποτα να κρυφτεί).
+      final b = Android(now)
+        ..prefs = {'historyVersion': 2}
+        ..dashboard = jsonEncode(sampleDashboardJson(now)..['sleep'] = [])
+        ..range = jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'firstWatchSleep': null, 'readAt': now.millisecondsSinceEpoch});
+      b.days[dateKey(old)] = {K.steps: 4000.0};
+      final s2 = await boot(b);
+      expect(b.prefs['monthFails'] ?? const {}, isEmpty);
+      s2.dispose();
     });
 
     test('Επανανάγνωση: νύχτα του ρολογιού χωρίς έγκυρη νέα διάρκεια → όλες οι τιμές ύπνου κρυφές, όχι ως ύπνος (πριν: η διάρκεια v2 έμενε)', () async {

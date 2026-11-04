@@ -1058,8 +1058,12 @@ typedef ParsedRange = ({
   Set<String> nonWatch,
 
   /// Έλεγχος 4 (red team M1): ο ύπνος «από άλλη συσκευή» γίνεται δεκτός μόνο αν το κομμάτι τελειώνει πριν από την
-  /// πρώτη εγγραφή ύπνου ρολογιού όλου του ιστορικού («firstWatchSleep» της Kotlin· null εκεί = καμία).
+  /// πρώτη εγγραφή ύπνου ρολογιού όλου του ιστορικού («firstWatchSleep» της Kotlin, αριθμός).
   bool otherDeviceOk,
+
+  /// Η Kotlin απάντησε ρητά null («καμία εγγραφή ρολογιού»). Review M2: δεν εμπιστευόμαστε μόνο αυτό (το ίδιο φίλτρο
+  /// που μπορεί να έχει χαλάσει)· δεκτό μόνο αν το κομμάτι δεν έχει αποθηκευμένες νύχτες ρολογιού.
+  bool noWatchSleep,
 });
 
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
@@ -1083,6 +1087,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
     anyError: true,
     nonWatch: <String>{},
     otherDeviceOk: false,
+    noWatchSleep: false,
   );
   try {
     final j = jsonDecode(raw);
@@ -1098,10 +1103,9 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
       // E3: είδη με δεδομένα μόνο από άλλη συσκευή σε αυτό το κομμάτι (δεκτό: «χωρίς δεδομένα ρολογιού εδώ»).
       nonWatch: {for (final x in (j['nonWatch'] is List ? j['nonWatch'] as List : const [])) if (x is String) x},
       // Μόνο με γνωστή απάντηση: αριθμός (η πρώτη εγγραφή ρολογιού) ή ρητό null (καμία). Σφάλμα ή απουσία = άγνωστο.
-      otherDeviceOk: j.containsKey('firstWatchSleep') &&
-          (j['firstWatchSleep'] == null ||
-              (j['firstWatchSleep'] is num &&
-                  dayOf(to).isBefore(dayOf(DateTime.fromMillisecondsSinceEpoch((j['firstWatchSleep'] as num).toInt()))))),
+      otherDeviceOk: j['firstWatchSleep'] is num &&
+          dayOf(to).isBefore(dayOf(DateTime.fromMillisecondsSinceEpoch((j['firstWatchSleep'] as num).toInt()))),
+      noWatchSleep: j.containsKey('firstWatchSleep') && j['firstWatchSleep'] == null,
     );
   } catch (_) {
     return fail;
@@ -1179,7 +1183,18 @@ Set<String> applyRecentRead(
   // Όλες οι μέρες της ανάγνωσης ξαναγράφονται (όχι μόνο οι 7 με βήματα ανά λεπτό), όταν ο ύπνος διαβάστηκε κανονικά.
   // Τα βήματα κρίνουν μόνο το πρωινό κενό· η απόφαση που πάρθηκε με βήματα είναι κλειδωμένη στο ιστορικό ([K.napLock],
   // έλεγχος 3, E1.6), άρα η μέρα 8–29 χωρίς βήματα βγαίνει ίδια με τη μέρα 0–7.
-  final sleepFrom = !sleepFailed && d.sleepOk ? DateTime(today.year, today.month, today.day - recentSummaryDays + 1) : null;
+  final windowFrom = DateTime(today.year, today.month, today.day - recentSummaryDays + 1);
+  // Review M4: ίδιος κανόνας «πολύ λίγες νύχτες» με την επανανάγνωση. Αν το ιστορικό έχει ≥ 4 νύχτες ρολογιού στις 30
+  // μέρες και η ανάγνωση δίνει έγκυρες λιγότερες από τις μισές (π.χ. Samsung Health μόλις επανεγκαταστάθηκε, νέο
+  // κινητό που συγχρονίζει ακόμα), σαν σφάλμα ανάγνωσης του ύπνου: τίποτα δεν κρύβεται, οι τιμές μένουν.
+  var hadNights = 0, gotNights = 0;
+  for (var day = windowFrom; !day.isAfter(today); day = DateTime(day.year, day.month, day.day + 1)) {
+    if (plan.nightSource(day) != Source.watch) continue;
+    if (history[dateKey(day)]?.containsKey(K.sleepMin) ?? false) hadNights++;
+    if (rows[dateKey(day)]?.containsKey(K.sleepMin) ?? false) gotNights++;
+  }
+  final tooFewNights = hadNights >= 4 && gotNights < hadNights / 2;
+  final sleepFrom = !sleepFailed && d.sleepOk && !tooFewNights ? windowFrom : null;
   // Έλεγχος 4 (1_data M2): νύχτα του ρολογιού που τώρα ήρθε χωρίς έγκυρη διάρκεια (χωρίς φάσεις, άγνωστες φάσεις, ή
   // καθόλου): οι αποθηκευμένες τιμές ύπνου της μέρας κρατιούνται κρυφές («nw.*»), όπως στην επανανάγνωση· πριν
   // σβηνόταν η διάρκεια εδώ, ενώ η επανανάγνωση την κρατούσε ως ύπνο.
@@ -1952,8 +1967,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // κομμάτι που τελειώνει πριν από τον πρώτο ύπνο ρολογιού όλου του ιστορικού (π.χ. πριν από το ρολόι). Μετά από αυτόν
     // (ρολόι που δεν αναγνωρίστηκε, μήνας χωρίς ρολόι με ύπνο από κινητό): σφάλμα ανάγνωσης, οι τιμές μένουν.
     final nonWatch = p.sleepOk && p.nonWatch.contains('sleep');
-    final otherDevice = nonWatch && p.otherDeviceOk;
-    final nonWatchError = nonWatch && !p.otherDeviceOk;
+    // Review M2: «καμία εγγραφή ρολογιού ποτέ» μόνο για κομμάτι χωρίς αποθηκευμένες νύχτες ρολογιού· αλλιώς σφάλμα.
+    final otherDevice = nonWatch && (p.otherDeviceOk || (p.noWatchSleep && had == 0));
+    final nonWatchError = nonWatch && !otherDevice;
     final tooFew = !p.nonWatch.contains('sleep') && had >= 4 && got < had / 2;
     // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ξανά στην επόμενη ανανέωση. Μετά από 3 φορές
     // προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.

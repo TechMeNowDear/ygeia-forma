@@ -823,6 +823,14 @@ class _PageThree extends StatelessWidget {
 
 MetricDef? _def(String key) => metricDef(key);
 
+/// Η ετικέτα της κάθετης γραμμής στην αρχή της περιόδου [p] στα γραφήματα: η συσκευή («Oura», «ρολόι») ή, για το
+/// οξυγόνο (ίδιος αισθητήρας), ο νέος ορισμός της νύχτας.
+String reportBreakLabel(String key, ReportPeriod p) {
+  if (reportDeviceKeys.contains(key)) return reportPeriodDevice(p);
+  if (p.oldRules) return 'παλιός κανόνας';
+  return p.night == Source.oura ? 'νύχτα Oura' : 'νύχτα ρολογιού';
+}
+
 /// Η συσκευή μιας περιόδου στις γραμμές ύπνου και παλμών ύπνου ([reportDeviceKeys]).
 String reportPeriodDevice(ReportPeriod p) {
   final device = switch (p.night) {
@@ -883,6 +891,8 @@ class _PageTwo extends StatelessWidget {
               // Ίδιες 90 μέρες σε κάθε γράφημα (τρίτος κλινικός έλεγχος C8/F6): πριν, κάθε γράφημα είχε το δικό του διάστημα.
               from: d.from,
               to: d.to,
+              // Έλεγχος 4 (review M1): κομμένη γραμμή και κάθετη ένδειξη σε κάθε αλλαγή συσκευής ή ορισμού.
+              breaks: [for (final p in s.periods.skip(1)) (p.from, reportBreakLabel(key, p))],
               levels: [
                 if (parts.isEmpty && med != null) (s.values.first.$1, s.values.last.$1, med, c.textSecondary),
                 for (final p in parts) (p.stat.values.first.$1, p.stat.values.last.$1, p.stat.median!, c.textSecondary),

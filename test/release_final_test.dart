@@ -281,4 +281,94 @@ void main() {
       expect(find.byKey(const ValueKey('ti-ftanei-other-device')), findsNothing);
     });
   });
+
+  // -------------------------------------------------------------------------
+  group('Ανεξάρτητος έλεγχος (review M1, M3, M4, L1)', () {
+    final now = DateTime(2026, 10, 24, 16, 30);
+    final today = dayOf(now);
+
+    test('M1: η γραμμή κόβεται σε κάθε αλλαγή (νέο κομμάτι από την πρώτη τιμή την ή μετά την αλλαγή)', () {
+      final pts = [for (var i = 1; i <= 6; i++) (DateTime(2026, 11, i), 60.0 + i)];
+      final segs = lineSegments(pts, [DateTime(2026, 11, 4)]);
+      expect([for (final s in segs) s.length], [3, 3]);
+      expect(segs.last.first.$1, DateTime(2026, 11, 4));
+      expect(lineSegments(pts, const []).length, 1);
+      // Αλλαγή σε μέρα χωρίς τιμή: το κομμάτι αρχίζει στην επόμενη τιμή.
+      expect([for (final s in lineSegments([pts[0], pts[1], pts[4]], [DateTime(2026, 11, 3)])) s.length], [2, 1]);
+    });
+
+    test('M3: η απόφαση «πρωινός υπνάκος» μένει ορατή όταν η νύχτα κρύβεται, και μετρά όταν η νύχτα ξανάρθει', () {
+      final d = Dashboard.fromJson(sampleDashboardJson(now));
+      final x = dateKey(_add(today, -12));
+      final h = <String, Map<String, double>>{
+        x: {K.sleepMin: 400, K.bedtime: 330, K.napLock: 29000000, K.steps: 5000},
+      };
+      applyRecentRead(h, d, plan: SourcePlan.samsungOnly, rows: {x: {K.steps: 5100.0}});
+      expect(h[x]![K.napLock], 29000000, reason: 'όχι σε «nw.*»');
+      expect(h[x]!.containsKey('${archivePrefix}napLock'), isFalse);
+      expect(h[x]![nonWatchSleepKey], 400);
+      expect(napLocksOf(h)[x], 29000000, reason: 'η επόμενη ανάγνωση ομαδοποιεί όπως πριν');
+      // Η νύχτα ξανάρθε και ξανακρίθηκε (με βήματα, χωρίς υπνάκο): τότε μόνο αλλάζει η απόφαση.
+      mergeHistory(h, {x: {K.sleepMin: 400.0, K.bedtime: 330.0}}, sleepFrom: _add(today, -29));
+      expect(h[x]!.containsKey(K.napLock), isFalse);
+    });
+
+    test('M4: η κανονική ανάγνωση με απότομα λιγότερες νύχτες = σφάλμα ανάγνωσης· τίποτα δεν κρύβεται', () {
+      final d = Dashboard.fromJson(sampleDashboardJson(now));
+      final h = <String, Map<String, double>>{
+        for (var i = 3; i < 9; i++) dateKey(_add(today, -i)): {K.sleepMin: 400.0 + i, K.bedtime: 330, K.steps: 5000},
+      };
+      final before = {for (final e in h.entries) e.key: {...e.value}};
+      // 6 νύχτες στο ιστορικό, 1 έγκυρη στην ανάγνωση (< μισές): π.χ. Samsung Health μόλις επανεγκαταστάθηκε.
+      applyRecentRead(h, d, plan: SourcePlan.samsungOnly, rows: {
+        dateKey(_add(today, -3)): {K.sleepMin: 403.0, K.bedtime: 330.0, K.steps: 5000.0},
+      });
+      for (final e in before.entries) {
+        expect(h[e.key], e.value, reason: '${e.key}: καμία τιμή σε «nw.*», καμία δεν άλλαξε');
+      }
+      // Με τις μισές ή περισσότερες: κανονικά (η νύχτα που λείπει κρύβεται, δεν σβήνεται).
+      applyRecentRead(h, d, plan: SourcePlan.samsungOnly, rows: {
+        for (var i = 3; i < 8; i++) dateKey(_add(today, -i)): {K.sleepMin: 400.0 + i, K.bedtime: 330.0, K.steps: 5000.0},
+      });
+      expect(h[dateKey(_add(today, -8))]![nonWatchSleepKey], 408);
+    });
+
+    test('L1: έγκυρη νύχτα ρολογιού για μέρα «από άλλη συσκευή»: το σημάδι φεύγει, τα «nw.*» μένουν', () {
+      final x = dateKey(_add(today, -40));
+      final h = <String, Map<String, double>>{
+        x: {nonWatchSleepKey: 380, otherDeviceKey: 1, K.steps: 1},
+      };
+      expect(otherDeviceNights(h), 1);
+      mergeHistory(h, {x: {K.sleepMin: 395.0}}, replaceSleep: true, rangeFrom: _add(today, -40), rangeTo: _add(today, -40));
+      expect(h[x], {nonWatchSleepKey: 380, K.steps: 1, K.sleepMin: 395});
+      expect(otherDeviceNights(h), 0);
+    });
+
+    testWidgets('M1: τα γραφήματα της αναφοράς παίρνουν την αλλαγή συσκευής/ορισμού («Oura» στις 6/11)', (t) async {
+      final rnow = DateTime(2026, 11, 14, 10, 20);
+      final ouraFrom = DateTime(2026, 11, 6);
+      final s = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(rnow));
+      s.history = {
+        for (var i = 0; i < 200; i++)
+          dateKey(_add(dayOf(rnow), -i)): {
+            K.sleepHr: 60.0 + i % 3, ouraKeys[K.sleepHr]!: 55.0 + i % 3, K.sleepMin: 400.0, ouraKeys[K.sleepMin]!: 420.0,
+            K.spo2Avg: 95.0, K.spo2Min: 90.0, K.steps: 5000,
+          },
+      };
+      s.debugSetPlan(SourcePlan.samsungOnly.withEra(Source.oura, ouraFrom));
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(680, 3600);
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: ReportPage(store: s, now: rnow)));
+      await t.pumpAndSettle();
+      final charts = t.widgetList<LineChart>(find.byType(LineChart)).toList();
+      expect(charts.length, 5);
+      // Παλμοί, μέσο οξυγόνο, χαμηλότερο οξυγόνο, διάρκεια: κομμένα στις 6/11· βήματα: όχι.
+      expect([for (final c in charts) c.breaks.map((b) => b.$1).toList()], [
+        [ouraFrom], [ouraFrom], [ouraFrom], [ouraFrom], <DateTime>[],
+      ]);
+      expect(charts.first.breaks.single.$2, 'Oura');
+      expect(charts[1].breaks.single.$2, 'νύχτα Oura');
+    });
+  });
 }

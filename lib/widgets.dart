@@ -1204,7 +1204,13 @@ class LineChart extends StatelessWidget {
     this.reference,
     this.from,
     this.to,
+    this.breaks = const [],
   });
+
+  /// Αλλαγές πηγής ή ορισμού (μέρα, σύντομη ετικέτα, π.χ. «Oura»): η γραμμή και το γέμισμα κόβονται εκεί, και μια
+  /// λεπτή κάθετη γραμμή με την ετικέτα δείχνει την αλλαγή (έλεγχος 4, review M1: ποτέ μία γραμμή πάνω από δύο
+  /// συσκευές).
+  final List<(DateTime, String)> breaks;
 
   /// Το διάστημα του οριζόντιου άξονα (π.χ. οι 90 μέρες της αναφοράς), ίδιο για όλα τα γραφήματα μιας σελίδας, ώστε
   /// να συγκρίνονται τα σχήματα (τρίτος κλινικός έλεγχος C8/F6). Χωρίς αυτά: από την πρώτη ως την τελευταία τιμή.
@@ -1247,10 +1253,27 @@ class LineChart extends StatelessWidget {
           reference: reference,
           from: from,
           to: to,
+          breaks: breaks,
         ),
       ),
     );
   }
+}
+
+/// Τα κομμάτια της γραμμής: νέο κομμάτι από την πρώτη τιμή την ή μετά από κάθε [breaks] (τιμές παλιότερη πρώτη).
+List<List<(DateTime, double)>> lineSegments(List<(DateTime, double)> points, List<DateTime> breaks) {
+  final cuts = [...breaks]..sort();
+  final out = <List<(DateTime, double)>>[];
+  var seg = -1;
+  for (final p in points) {
+    final k = cuts.where((c) => !p.$1.isBefore(c)).length;
+    if (out.isEmpty || k != seg) {
+      out.add([]);
+      seg = k;
+    }
+    out.last.add(p);
+  }
+  return out;
 }
 
 class _LinePainter extends CustomPainter {
@@ -1268,8 +1291,10 @@ class _LinePainter extends CustomPainter {
     this.reference,
     this.from,
     this.to,
+    this.breaks = const [],
   });
 
+  final List<(DateTime, String)> breaks;
   final DateTime? from;
   final DateTime? to;
   final double minRange;
@@ -1327,29 +1352,45 @@ class _LinePainter extends CustomPainter {
       _textLeft(canvas, format(v), Offset(left + w + 8, y - 7), text, 11);
     }
 
+    // Ένα κομμάτι για κάθε πηγή/ορισμό ([breaks]): ποτέ γραμμή ή γέμισμα πάνω από την αλλαγή.
     final path = Path();
-    for (var i = 0; i < points.length; i++) {
-      final o = at(points[i]);
-      if (i == 0) {
-        path.moveTo(o.dx, o.dy);
-      } else {
-        path.lineTo(o.dx, o.dy);
+    for (final seg in lineSegments(points, [for (final b in breaks) b.$1])) {
+      final segPath = Path();
+      for (var i = 0; i < seg.length; i++) {
+        final o = at(seg[i]);
+        if (i == 0) {
+          segPath.moveTo(o.dx, o.dy);
+        } else {
+          segPath.lineTo(o.dx, o.dy);
+        }
+      }
+      path.addPath(segPath, Offset.zero);
+      if (seg.length > 1) {
+        final fill = Path.from(segPath)
+          ..lineTo(at(seg.last).dx, top + h)
+          ..lineTo(at(seg.first).dx, top + h)
+          ..close();
+        canvas.drawPath(
+          fill,
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [color.withValues(alpha: 0.20), color.withValues(alpha: 0.0)],
+            ).createShader(Rect.fromLTWH(0, top, size.width, h)),
+        );
       }
     }
-    if (points.length > 1) {
-      final fill = Path.from(path)
-        ..lineTo(at(points.last).dx, top + h)
-        ..lineTo(at(points.first).dx, top + h)
-        ..close();
-      canvas.drawPath(
-        fill,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [color.withValues(alpha: 0.20), color.withValues(alpha: 0.0)],
-          ).createShader(Rect.fromLTWH(0, top, size.width, h)),
-      );
+    for (final (day, label) in breaks) {
+      final x = at((day, minV)).dx;
+      if (x < left || x > left + w) continue;
+      final rule = Paint()
+        ..color = text
+        ..strokeWidth = 1;
+      for (var y = top - 4; y < top + h; y += 6) {
+        canvas.drawLine(Offset(x, y), Offset(x, math.min(y + 3, top + h)), rule);
+      }
+      _textLeft(canvas, label, Offset(x + 3, top - 18), text, 10);
     }
     canvas.drawPath(
       path,
