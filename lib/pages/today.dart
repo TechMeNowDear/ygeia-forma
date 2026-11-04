@@ -7,6 +7,7 @@ import '../history.dart';
 import '../labels.dart';
 import '../nav.dart';
 import '../oxygen_note.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -107,14 +108,29 @@ class TodayPage extends StatelessWidget {
 
         // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
         // «Καρδιά και θερμοκρασία στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
+        // Οξυγόνο: η σημείωση υπολογίζεται εδώ, γιατί η κάρτα εμφανίζεται ΜΟΝΗ της (και κλειστή στις Ρυθμίσεις) όταν το
+        // χαμηλό επαναλαμβάνεται (τρίτος κλινικός έλεγχος C3/F5): αλλιώς η σύσταση «πες το στον γιατρό σου» ήταν δύο
+        // πατήματα μακριά. Όχι για μία μόνο νύχτα.
+        // Έλεγχος 3, E5: όλες οι 30 νύχτες από το ιστορικό (ίδιος αισθητήρας), πέρα από τη σύνδεση του Oura και το
+        // όριο της επανάγνωσης· χωρίς «since».
+        final oxGuidance = ouraNight
+            ? oxygenGuidance(
+                d.spo2MinByNight(now, ouraNights: true, windows: store.ouraWindows, history: store.history), now,
+                today: now)
+            : (d.lastNight == null
+                ? null
+                : oxygenGuidance(
+                    d.spo2MinByNight(d.lastNight!.date, history: store.history), d.lastNight!.date, today: now));
+        final oxAuto = !prefs.show('spo2') && oxGuidance != null && (oxGuidance.veryLowRepeated || oxGuidance.repeated);
+        Widget oxCard() => ouraNight
+            ? _watchSpo2Card(context, d, now, store.ouraWindows, oxGuidance!, () => open(Cat.health, HealthTab.heart),
+                auto: oxAuto)
+            : _spo2Card(context, d, now, oxGuidance, () => open(Cat.health, HealthTab.heart), auto: oxAuto);
         final extras = <Widget>[
           if (!ouraNight && prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
           if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
           if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise)),
-          if (prefs.show('spo2'))
-            ouraNight
-                ? _watchSpo2Card(context, d, now, store.ouraWindows, store.history, () => open(Cat.health, HealthTab.heart))
-                : _spo2Card(context, d, now, store.history, () => open(Cat.health, HealthTab.heart)),
+          if (prefs.show('spo2')) oxCard(),
           if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
@@ -134,6 +150,7 @@ class TodayPage extends StatelessWidget {
           if (ouraState != null) ouraState,
           if (error != null) error,
           if (unusual != null) unusual,
+          if (oxAuto) KeyedSubtree(key: const ValueKey('today-oxygen-auto'), child: oxCard()),
         ];
         final more = [
           ...pairUp(pair),
@@ -171,7 +188,8 @@ class TodayPage extends StatelessWidget {
       icon: Icons.directions_walk_rounded,
       color: c.exercise,
       // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
-      title: sameDay(d.readAt, now) ? 'Βήματα' : 'Βήματα · ${relativeDay(d.readAt, now)}',
+      // UX U8: ίδια μορφή ημερομηνίας με τις άλλες κάρτες («Σάβ 24/10»).
+      title: datedTitle('Βήματα', d.readAt, now),
       value: steps == null ? null : thousands(steps),
       note: base == null ? null : 'Συνήθως ${thousands(base)}',
       chart: last7.length >= 2 ? MiniBars(values: [for (final s in last7) s.value], color: c.exercise) : null,
@@ -185,7 +203,8 @@ class TodayPage extends StatelessWidget {
     final prev = d.previousBody;
     Widget? trend;
     if (last?.weight != null && prev?.weight != null) {
-      final diff = last!.weight! - prev!.weight!;
+      // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2», όχι «−1,1».
+      final diff = shownDiff(last!.weight!, prev!.weight!, 1);
       trend = TrendPill(
         // Σύντομη ημερομηνία και έως 2 γραμμές: στα 360 dp το «από 13 Αυγ» κοβόταν (έλεγχος UX U2).
         '${signedDec(diff)} kg από ${prev.time.day}/${prev.time.month}',
@@ -234,11 +253,12 @@ class TodayPage extends StatelessWidget {
     Widget? trend;
     if (hr != null && base != null) {
       // Η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6) και η ίδια λέξη «συνήθως» παντού (C7/U7).
-      final diff = hr.round() - base.round();
+      // Ένας κανόνας σε όλες τις οθόνες (τρίτος έλεγχος F1).
+      final diff = shownDiff(hr, base);
       trend = diff == 0
-          ? const TrendPill('Όπως συνήθως')
+          ? const TrendPill(asUsualText)
           : TrendPill(
-              '${diff > 0 ? '+' : '−'}${diff.abs()} · συνήθως ${base.round()}',
+              '${signedShown(diff)} · συνήθως ${base.round()}',
               up: diff > 0,
               // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4).
               kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
@@ -261,25 +281,26 @@ class TodayPage extends StatelessWidget {
 
   /// Οξυγόνο της νύχτας από το ρολόι όταν ο ύπνος είναι του Oura: μετρήσεις του ρολογιού μέσα στις ώρες της
   /// νύχτας του Oura. Χωρίς νύχτα του Oura δεν ξέρουμε πότε κοιμήθηκες: κενό, με τον λόγο.
-  Widget _watchSpo2Card(
-      BuildContext context, Dashboard d, DateTime now, SleepWindows windows, Map<String, Map<String, double>> history,
-      VoidCallback onTap) {
+  /// [g]: η σημείωση χαμηλού οξυγόνου (B7) με τις τιμές του ορισμού A4. [auto]: η κάρτα φαίνεται μόνη της, επειδή το
+  /// χαμηλό επαναλαμβάνεται· τότε η σημείωση φαίνεται και χωρίς τιμή για την τελευταία νύχτα.
+  Widget _watchSpo2Card(BuildContext context, Dashboard d, DateTime now, SleepWindows windows, OxygenGuidance g,
+      VoidCallback onTap, {bool auto = false}) {
     final c = Aigaio.of(context);
     final ox = d.watchSpo2(now, windows);
     final noWindow = !windows.mains.containsKey(dateKey(dayOf(now)));
-    // Σημείωση χαμηλού οξυγόνου (B7) με τις τιμές του ορισμού A4· όλες οι 30 νύχτες (E5: ίδιος αισθητήρας).
-    final g = oxygenGuidance(d.spo2MinByNight(now, ouraNights: true, windows: windows, history: history), now, today: now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
       title: 'Οξυγόνο · ρολόι',
-      value: ox?.avg?.round().toString(),
+      value: ox?.avg == null ? null : spo2AvgText(ox!.avg!),
       unit: '%',
       trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${lowestText(ox.min)}% · ενδεικτικό'),
       note: ox == null ? null : g.short,
-      empty: noWindow
-          ? 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο της νύχτας μένει κενό.'
-          : 'Δεν υπάρχουν μετρήσεις οξυγόνου του ρολογιού μέσα στον ύπνο.',
+      empty: auto && g.short != null
+          ? g.short
+          : noWindow
+              ? 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο της νύχτας μένει κενό.'
+              : 'Δεν υπάρχουν μετρήσεις οξυγόνου του ρολογιού μέσα στον ύπνο.',
       onTap: onTap,
     );
   }
@@ -303,23 +324,22 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _spo2Card(
-      BuildContext context, Dashboard d, DateTime now, Map<String, Map<String, double>> history, VoidCallback onTap) {
+  Widget _spo2Card(BuildContext context, Dashboard d, DateTime now, OxygenGuidance? g, VoidCallback onTap,
+      {bool auto = false}) {
     final c = Aigaio.of(context);
     final n = d.lastNight;
     final min = n?.spo2Min;
-    final g = n == null ? null : oxygenGuidance(d.spo2MinByNight(n.date, history: history), n.date, today: now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
       title: datedTitle('Οξυγόνο', n?.spo2Avg == null && min == null ? null : n!.date, now),
-      value: n?.spo2Avg?.round().toString(),
+      value: n?.spo2Avg == null ? null : spo2AvgText(n!.spo2Avg!),
       unit: '%',
       trend: min == null
           ? null
           : TrendPill('Χαμηλότερη μέτρηση ${lowestText(min)}% · ενδεικτικό'),
       note: g?.short,
-      empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
+      empty: auto && g?.short != null ? g!.short : 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
   }
@@ -333,7 +353,8 @@ class TodayPage extends StatelessWidget {
       color: c.move,
       title: datedTitle('Θερμοκρασία καρπού', t == null ? null : d.lastNight!.date, now),
       // Χωρίς μέσο όρο δεν δείχνουμε απόλυτη τιμή καρπού (π.χ. 33,6 °C διαβάζεται ως υποθερμία· κλινικός έλεγχος L5).
-      value: t == null || base == null ? null : signedDec(t - base),
+      // Διαφορά των νούμερων όπως φαίνονται, ίδια με το «Εκτός συνηθισμένου» (τρίτος έλεγχος F3).
+      value: t == null || base == null ? null : signedDec(shownDiff(t, base, 1)),
       unit: '°C',
       note: (t != null && base != null) ? 'Απόκλιση από τα συνηθισμένα σου' : null,
       empty: t == null ? 'Έρχεται μετά από έναν ύπνο με το ρολόι.' : 'Μαθαίνει το συνηθισμένο σου (7 νύχτες).',
@@ -371,6 +392,7 @@ class _SleepCard extends StatelessWidget {
     final base = data.sleepBaseline;
     // Σύγκριση μόνο για νύχτα με φάσεις (πραγματικός ύπνος): χωρίς φάσεις η διάρκεια έχει τα ξυπνήματα.
     final diff = base == null || !n.staged ? null : n.minutes - base.round();
+    // Ένας κανόνας για το «συνήθως» (τρίτος έλεγχος F1): «Όσο κοιμάσαι συνήθως» μόνο για 0 λεπτά διαφορά.
     final total = stageOrder.fold<int>(0, (s, k) => s + (n.stageMinutes[k] ?? 0));
     final stages = [for (final k in stageOrder) if ((n.stageMinutes[k] ?? 0) > 0) k];
 
@@ -429,8 +451,8 @@ class _SleepCard extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TrendPill(
-                      diff.abs() < 10 ? 'Όσο κοιμάσαι συνήθως' : '${moreLessMinutes(diff)} από ό,τι συνήθως',
-                      up: diff.abs() < 10 ? null : diff > 0,
+                      sleepVsUsualText(diff),
+                      up: diff == 0 ? null : diff > 0,
                       onDark: true,
                       maxLines: 2,
                     ),
@@ -446,7 +468,8 @@ class _SleepCard extends StatelessWidget {
                 if (n.estimatedMinutes > 0) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Και ${hoursMinutes(n.estimatedMinutes)} πιθανός ύπνος στα κενά της Samsung (δεν μετρά)',
+                    // Μία φράση παντού για το κενό που ίσως ήταν ύπνος (UX U3).
+                    '+${hoursMinutes(n.estimatedMinutes)} $possibleSleepPhrase',
                     style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
                   ),
                 ],

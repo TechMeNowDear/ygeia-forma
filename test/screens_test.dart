@@ -285,6 +285,13 @@ void main() {
             row[sig.rule.key] = sig.usual + sig.threshold * 1.3;
           }
           store.history[dateKey(today)] = row;
+          // Τρίτος έλεγχος (συνέπεια, εύρημα 0): ίδια τιμή και στη νύχτα του Dashboard, όπως στην εφαρμογή (η γραμμή της
+          // μέρας = summarizeDay(dashboard)). Πριν, το στιγμιότυπο έδειχνε 63 εδώ και 61 στην Καρδιά.
+          final n = store.data!.lastNight;
+          if (n != null && dateKey(n.date) == dateKey(today)) {
+            n.sleepingHr = row[K.sleepHr];
+            n.skinTemp = row[K.skinTemp];
+          }
         },
       ));
   testWidgets('Αναφορά για γιατρό', (tester) async {

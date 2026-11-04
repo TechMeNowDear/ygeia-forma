@@ -10,6 +10,7 @@ import '../history.dart';
 import '../oxygen_note.dart' show lowestText;
 import '../report.dart';
 import '../samsung.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
@@ -112,7 +113,7 @@ class _ReportPageState extends State<ReportPage> {
     final pages = [
       _PageOne(data: _data, note: _note.trim(), name: name),
       _PageTwo(data: _data, name: name),
-      _PageThree(data: _data, name: name),
+      _PageThree(data: _data, name: name, stale: widget.store.prefs.staleMonths),
     ];
 
     return Scaffold(
@@ -167,7 +168,10 @@ class _ReportPageState extends State<ReportPage> {
                       decoration: const InputDecoration(
                         labelText: 'Σημείωση για τον γιατρό (προαιρετικά)',
                         // Δεύτερος κλινικός έλεγχος M6: φάρμακα, ροχαλητό και τεστ άπνοιας χωράνε και φαίνονται.
-                        hintText: 'π.χ. φάρμακα και δόση, κάπνισμα, ροχαλητό, τεστ άπνοιας (ημερομηνία, αποτέλεσμα)',
+                        // Τρίτος κλινικός έλεγχος C11: και οι χαμηλές τιμές που είδες στο Samsung Health.
+                        hintText: 'π.χ. φάρμακα και δόση, κάπνισμα, ροχαλητό, τεστ άπνοιας (ημερομηνία, αποτέλεσμα), '
+                            'χαμηλό οξυγόνο που είδες στο Samsung Health (ημερομηνία, τιμή)',
+                        hintMaxLines: 3,
                       ),
                       onChanged: (v) => setState(() {
                         _note = v;
@@ -420,7 +424,8 @@ class _PageOne extends StatelessWidget {
     final d = data;
 
     String num0(double v) => v.round().toString();
-    String pct(double v) => '${v.round()}%';
+    // Ποτέ στρογγυλοποίηση προς τα πάνω στο 90% (τρίτος έλεγχος F4): 89,5 → «89,5%».
+    String pct(double v) => '${spo2AvgText(v)}%';
     String dur(double v) {
       final m = v.round();
       return '${m ~/ 60}:${two(m % 60)}';
@@ -555,7 +560,7 @@ class _PageOne extends StatelessWidget {
                       pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
                       pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
                       pad(Text('${s.n}', style: cell)),
-                      pad(Text(last ? trendText(whole, r.$4) : '', style: cell)),
+                      pad(Text(last ? (r.$2 == K.spo2Min ? lowestDiffText(whole) : trendText(whole, r.$4)) : '', style: cell)),
                     ],
                   );
                 }(),
@@ -583,9 +588,12 @@ class _PageOne extends StatelessWidget {
 // --- Σελίδα 3: οξυγόνο και ζυγίσεις ---
 
 class _PageThree extends StatelessWidget {
-  const _PageThree({required this.data, this.name = ''});
+  const _PageThree({required this.data, this.name = '', this.stale = const []});
   final ReportData data;
   final String name;
+
+  /// Κομμάτια του ιστορικού που κράτησαν τον παλιό ορισμό του ύπνου (τρίτος έλεγχος F4: σημείωση και στο PDF).
+  final List<String> stale;
 
   @override
   Widget build(BuildContext context) {
@@ -601,6 +609,12 @@ class _PageThree extends StatelessWidget {
     final plan = d.plan ?? SourcePlan.samsungOnly;
     final withOura = plan.hasOura;
     final below85 = d.oxygenBelow(85);
+    final below80 = d.oxygenBelow(80);
+    // Ως 30 στη λίστα του 85%, αλλά οι κάτω από 80% μπαίνουν πάντα (χρονολογικά).
+    final listed85 = [
+      ...below80,
+      ...below85.where((n) => n.$2 >= 80).take(below80.length >= 30 ? 0 : 30 - below80.length),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
     final periods = d.stat(K.spo2Min).periods;
     String dmy(DateTime t) => '${t.day}/${t.month}/${t.year}';
     // Έλεγχος 2, C4: πριν από το όριο της επανανάγνωσης, ο παλιός κανόνας της νύχτας («Ενημερώνεται το ιστορικό»).
@@ -616,8 +630,11 @@ class _PageThree extends StatelessWidget {
         _Title('Χαμηλότερη μεμονωμένη μέτρηση οξυγόνου ανά νύχτα (ρολόι, καρπός)'),
         Text(
           'Μία τιμή ανά νύχτα από τον αισθητήρα του καρπού: όχι ιατρική οξυμετρία, όχι δείκτης αποκορεσμών (ODI), όχι '
-          'χρόνος κάτω από 90% (T90). Αναφορά: σε 350 υγιή άτομα (1 μηνός–85 ετών, οξύμετρο δαχτύλου, χωρίς τα σφάλματα '
-          'κίνησης) το ελάχιστο της νύχτας ήταν 90,4% ± 3,1% (Gries & Brooks, Chest 1996).',
+          // Τρίτος κλινικός έλεγχος C6: όπως το λέει η περίληψη της πηγής (όχι «οξύμετρο δαχτύλου»), με την ηλικία.
+          'χρόνος κάτω από 90% (T90). Αναφορά: σε 350 υγιή άτομα (1 μηνός–85 ετών, ιατρικό οξύμετρο σε εργαστήριο ύπνου, '
+          'χωρίς τα σφάλματα κίνησης) το ελάχιστο της νύχτας ήταν 90,4% ± 3,1% (Gries & Brooks, Chest 1996)· στους άνω '
+          'των 60 οι τιμές ήταν χαμηλότερες. Δεν συγκρίνεται με τους προηγούμενους μήνες (μία ακραία τιμή ανά νύχτα)· '
+          'μετρούν οι νύχτες κάτω από 90, 85 και 80%.',
           style: TextStyle(fontSize: 9.5, color: c.text, height: 1.4),
         ),
         const SizedBox(height: 6),
@@ -628,6 +645,16 @@ class _PageThree extends StatelessWidget {
           style: cell,
         ),
         const SizedBox(height: 4),
+        // Τρίτος κλινικός έλεγχος (F6): ΟΛΕΣ οι νύχτες κάτω από 80% των 90 ημερών, με ημερομηνία, πάντα (ποτέ κρυμμένες
+        // στο «και N ακόμα»).
+        if (below80.isNotEmpty) ...[
+          Text(
+            'Νύχτες κάτω από 80% (όλες): ${[for (final n in below80) '${dmy(n.$1)}: ${lowestText(n.$2)}%'].join(' · ')}',
+            key: const ValueKey('report-oxygen-below80'),
+            style: bold,
+          ),
+          const SizedBox(height: 4),
+        ],
         if (below85.isEmpty)
           Text('Καμία νύχτα κάτω από 85%.', style: cell)
         else ...[
@@ -639,8 +666,9 @@ class _PageThree extends StatelessWidget {
             runSpacing: 2,
             children: [
               // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών F16): 84,6 → «84,6%».
-              for (final n in below85.take(30)) Text('${dmy(n.$1)}: ${lowestText(n.$2)}%', style: bold),
-              if (below85.length > 30) Text('και ${below85.length - 30} ακόμα (γράφημα, σελίδα 2)', style: cell),
+              for (final n in listed85) Text('${dmy(n.$1)}: ${lowestText(n.$2)}%', style: bold),
+              if (below85.length > listed85.length)
+                Text('και ${below85.length - listed85.length} ακόμα (γράφημα, σελίδα 2)', style: cell),
             ],
           ),
         ],
@@ -727,6 +755,11 @@ class _PageThree extends StatelessWidget {
                   'ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
           style: small,
         ),
+        if (stale.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          // Τρίτος έλεγχος F4: μήνες με τον παλιό ορισμό του ύπνου (όπως στις Τάσεις)· ο γιατρός το βλέπει κι εδώ.
+          Text(staleMonthsNote(stale), key: const ValueKey('report-stale-months'), style: small),
+        ],
         if (d.nightsWithoutStages > 0) ...[
           const SizedBox(height: 6),
           // Δεύτερος έλεγχος υπολογισμών C10: η διάρκεια μετρά μόνο νύχτες με φάσεις· το λέμε, με πόσες λείπουν.
@@ -773,7 +806,8 @@ class _PageTwo extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Title(title),
+          // Κομμένη σειρά (αλλαγή συσκευής): το λέει ο τίτλος, γιατί ο άξονας είναι πια οι ίδιες 90 μέρες για όλα (F6).
+          _Title(s.since == null ? title : '$title · μόνο ${metricSourceName(key, s.source)}, από ${s.since!.day}/${s.since!.month}'),
           if (s.n < 2)
             SizedBox(
               height: 96,
@@ -789,6 +823,9 @@ class _PageTwo extends StatelessWidget {
               format: fmt,
               minRange: minRange,
               dateLabel: dayMonth,
+              // Ίδιες 90 μέρες σε κάθε γράφημα (τρίτος κλινικός έλεγχος C8/F6): πριν, κάθε γράφημα είχε το δικό του διάστημα.
+              from: d.from,
+              to: d.to,
               levels: [
                 if (parts.isEmpty && med != null) (s.values.first.$1, s.values.last.$1, med, c.textSecondary),
                 for (final p in parts) (p.stat.values.first.$1, p.stat.values.last.$1, p.stat.median!, c.textSecondary),
@@ -817,7 +854,7 @@ class _PageTwo extends StatelessWidget {
           ),
         ),
         chart('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, c.heart, (v) => v.round().toString(), 8),
-        chart('Οξυγόνο στον ύπνο, μέσο ανά νύχτα (%)', K.spo2Avg, c.energy, (v) => v.round().toString(), 4),
+        chart('Οξυγόνο στον ύπνο, μέσο ανά νύχτα (%)', K.spo2Avg, c.energy, spo2AvgText, 4),
         chart(
           'Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση ανά νύχτα (%, καρπός)',
           K.spo2Min,
@@ -839,4 +876,14 @@ class _PageTwo extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Η «Διαφορά» της γραμμής «χαμηλότερη μέτρηση» (τρίτος κλινικός έλεγχος C9/F6): ποτέ σκέτη «—». Με αλλαγή ορισμού
+/// της νύχτας, ίδια λέξη με τη γραμμή του μέσου οξυγόνου· αλλιώς «Δεν συγκρίνεται», με την εξήγηση στη σελίδα 3 (μία
+/// ακραία τιμή ανά νύχτα δεν συγκρίνεται ως μεσαία τιμή· μετρούν οι νύχτες κάτω από 90/85/80%).
+String lowestDiffText(ReportStat s) {
+  if (s.periods.length > 1) {
+    return s.periods.any((p) => p.oldRules) ? 'Ενημερώνεται το ιστορικό' : 'Αλλαγή ορισμού';
+  }
+  return 'Δεν συγκρίνεται (σελ. 3)';
 }

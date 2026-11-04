@@ -171,10 +171,11 @@ class Food {
 
 enum Meal { breakfast, lunch, dinner, snack }
 
+/// Σύντομα ονόματα, ίδιου μεγέθους στο κουμπί επιλογής (UX U7: το «Μεσημεριανό» μίκραινε για να χωρέσει στα 400 dp).
 String mealLabel(Meal m) => switch (m) {
       Meal.breakfast => 'Πρωινό',
-      Meal.lunch => 'Μεσημεριανό',
-      Meal.dinner => 'Βραδινό',
+      Meal.lunch => 'Μεσημέρι',
+      Meal.dinner => 'Βράδυ',
       Meal.snack => 'Σνακ',
     };
 

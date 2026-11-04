@@ -4,6 +4,7 @@ import '../data.dart';
 import '../format.dart';
 import '../oura/oura_view.dart' show atLeast, minNightsForAverage;
 import '../oxygen_note.dart';
+import '../shown.dart';
 import '../trends.dart' show circularMeanMinutes, unwrapMinutes;
 import '../sources.dart';
 import '../theme.dart';
@@ -223,8 +224,9 @@ class _LastNightCard extends StatelessWidget {
           if (n.estimatedMinutes > 0) ...[
             const SizedBox(height: 6),
             Text(
-              'Επιπλέον ${hoursMinutes(n.estimatedMinutes)} κενό της Samsung χωρίς βήματα, με παλμούς σαν του ύπνου: '
-              'ίσως κοιμόσουν, ίσως ήσουν ξαπλωμένος ξύπνιος. Δεν μετρά στη διάρκεια.',
+              // UX U3: ίδια φράση με τη Σήμερα και τη γραμμή πιο κάτω, και μετά η εξήγηση.
+              '+${hoursMinutes(n.estimatedMinutes)} $possibleSleepPhrase: κενό της Samsung χωρίς βήματα, με παλμούς '
+              'σαν του ύπνου. Ίσως κοιμόσουν, ίσως ήσουν ξαπλωμένος ξύπνιος.',
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
@@ -265,10 +267,12 @@ class _LastNightCard extends StatelessWidget {
           // Στάδια μίας νύχτας σε λεπτά και %: όχι (κλινικός έλεγχος H1)· ο μέσος όρος 7 νυχτών είναι στην επόμενη κάρτα.
           const Hairline(vertical: 14),
           if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
-          if (n.spo2Avg != null) InfoRow('Οξυγόνο, μέσος όρος', '${n.spo2Avg!.round()}%', dot: c.sleep),
+          if (n.spo2Avg != null) InfoRow('Οξυγόνο, μέσος όρος', '${spo2AvgText(n.spo2Avg!)}%', dot: c.sleep),
           if (n.spo2Min != null) InfoRow('Οξυγόνο, χαμηλότερη μέτρηση', '${lowestText(n.spo2Min!)}% · ενδεικτικό', dot: c.sleep),
           if (n.spo2Avg != null || n.spo2Min != null) ...[
             const SizedBox(height: 6),
+            // Τρίτος κλινικός έλεγχος C2/F5: και εδώ το κείμενο για το τεστ άπνοιας (μία γραμμή κλειστό, όπως στην Καρδιά).
+            const OxygenAbout(),
             OxygenNotes(
               guidance: oxygenGuidance(data.spo2MinByNight(n.date, history: oxHistory), n.date, today: today),
             ),
@@ -282,7 +286,7 @@ class _LastNightCard extends StatelessWidget {
               dot: c.textTertiary,
             ),
           if (n.estimatedMinutes > 0)
-            InfoRow('Πιθανός ύπνος στα κενά (δεν μετρά)', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
+            InfoRow('Ίσως ύπνος χωρίς καταγραφή (δεν μετρά)', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
           if (n.spanMinutes > n.minutes)
             InfoRow('Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)', hoursMinutes(n.spanMinutes), dot: c.textTertiary),
           if (n.betweenMinutes > 0)

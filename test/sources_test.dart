@@ -297,7 +297,12 @@ void main() {
           final oura = !x.isBefore(ouraFrom) && metricGroups[s.rule.key] == SourceGroup.night;
           expect(s.source, oura ? Source.oura : Source.watch, reason: 'η κάρτα λέει την πηγή');
           expect(oura ? isOura(s.value) : isWatch(s.value), isTrue, reason: '${s.rule.key} ${dateKey(x)}');
-          expect(oura ? isOura(s.usual) : isWatch(s.usual), isTrue, reason: '${s.rule.key} ${dateKey(x)} συνηθισμένο');
+          // Τρίτος έλεγχος F2 (σκόπιμη αλλαγή): η θερμοκρασία του Oura είναι ήδη απόκλιση· το «συνήθως» της είναι 0.
+          if (oura && s.rule.key == K.skinTemp) {
+            expect(s.usual, 0, reason: '${dateKey(x)} συνηθισμένο θερμοκρασίας Oura');
+          } else {
+            expect(oura ? isOura(s.usual) : isWatch(s.usual), isTrue, reason: '${s.rule.key} ${dateKey(x)} συνηθισμένο');
+          }
         }
         // Τις πρώτες 13 μέρες μετά τη σύνδεση: λιγότερες από 14 νύχτες Oura → κανένας δείκτης νύχτας.
         if (!x.isBefore(ouraFrom) && x.isBefore(add(ouraFrom, unusualMinBaseline))) {

@@ -42,7 +42,8 @@ class ExercisePage extends StatelessWidget {
         final floorsToday = d.valueFor(d.floors, d.readAt)?.value;
         // Οι τιμές της μέρας είναι της μέρας της ανάγνωσης: από αποθηκευμένη ανάγνωση άλλης μέρας, με ημερομηνία (A11).
         final today = DateTime.now();
-        String title(String t, Object? value) => datedTitle(t, value == null ? null : d.readAt, today);
+        // UX U1/U8: η ημερομηνία σε δική της γραμμή («Σάβ 24/10»), ίδια μορφή παντού· ο τίτλος δεν κόβεται.
+        String? dated(Object? value) => value == null || sameDay(d.readAt, today) ? null : shortDayDate(d.readAt);
 
         final last14 = d.steps.length <= 14 ? d.steps : d.steps.sublist(d.steps.length - 14);
         final floors14 = [for (var i = 13; i >= 0; i--) DateTime(d.readAt.year, d.readAt.month, d.readAt.day - i)];
@@ -54,7 +55,7 @@ class ExercisePage extends StatelessWidget {
               // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
               CardHeader(
                 icon: Icons.directions_walk_rounded,
-                title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα σήμερα' : 'Βήματα · ${relativeDay(d.readAt, DateTime.now())}',
+                title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα σήμερα' : 'Βήματα · ${shortDayDate(d.readAt)}',
                 color: c.exercise,
               ),
               const SizedBox(height: 12),
@@ -83,7 +84,8 @@ class ExercisePage extends StatelessWidget {
               if (d.stepsBaseline != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  '14 ημέρες · η διακεκομμένη γραμμή είναι ο μέσος όρος των προηγούμενων ημερών (έως 14)',
+                  // UX U8: η γραμμή είναι το «συνήθως» (μεσαία τιμή), όχι μέσος όρος.
+                  '14 ημέρες · η διακεκομμένη γραμμή είναι το «συνήθως» σου (η μεσαία τιμή των 14 προηγούμενων ημερών)',
                   style: TextStyle(color: c.textSecondary, fontSize: 12.5),
                 ),
               ],
@@ -95,7 +97,8 @@ class ExercisePage extends StatelessWidget {
           StatCard(
             icon: Icons.timer_rounded,
             color: c.exercise,
-            title: title('Ενεργός χρόνος', activeMinutes),
+            title: 'Ενεργός χρόνος',
+            subtitle: dated(activeMinutes),
             value: activeMinutes == null ? null : (activeMinutes < 60 ? '$activeMinutes' : hoursMinutes(activeMinutes)),
             unit: (activeMinutes != null && activeMinutes < 60) ? (activeMinutes == 1 ? 'λεπτό' : 'λεπτά') : null,
           ),
@@ -104,7 +107,8 @@ class ExercisePage extends StatelessWidget {
             color: c.heart,
             // Κλινικός έλεγχος M9 (4/11): μεγάλο λάθος σε όλα τα ρολόγια, ειδικά στα βάρη (σημείωση κάτω από τις κάρτες).
             // Σύντομος τίτλος για τη μισή κάρτα· με ημερομηνία όταν η τιμή δεν είναι σημερινή (A11).
-            title: title('Θερμίδες', calories),
+            title: 'Θερμίδες',
+            subtitle: dated(calories),
             value: calories == null ? null : thousands(calories),
             unit: 'kcal',
             note: 'Εκτίμηση ρολογιού · ${activeCalories == null ? 'μαζί με τον βασικό μεταβολισμό' : 'από κίνηση ${thousands(activeCalories)} kcal'}',
@@ -112,14 +116,16 @@ class ExercisePage extends StatelessWidget {
           StatCard(
             icon: Icons.straighten_rounded,
             color: c.energy,
-            title: title('Απόσταση', distance),
+            title: 'Απόσταση',
+            subtitle: dated(distance),
             value: distance == null ? null : dec(distance / 1000),
             unit: 'km',
           ),
           StatCard(
             icon: Icons.stairs_rounded,
             color: c.energy,
-            title: title('Όροφοι', d.floors.isEmpty ? null : 0),
+            title: 'Όροφοι',
+            subtitle: dated(d.floors.isEmpty ? null : 0),
             // Χωρίς καθόλου δεδομένα ορόφων: «—»· αλλιώς μέρα χωρίς ορόφους = 0.
             value: d.floors.isEmpty ? null : (floorsToday ?? 0).round().toString(),
           ),

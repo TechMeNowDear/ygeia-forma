@@ -110,10 +110,14 @@ class NutritionPage extends StatelessWidget {
                 buttonText: 'Εντάξει',
                 onPressed: food.clearSaveError,
               ),
+            // UX U11: στο tablet/PC τα γεύματα αριστερά και η σύνοψη δεξιά. Το «+ Φαγητό» είναι κάτω δεξιά· η δεξιά στήλη
+            // είναι κοντή, οπότε δεν κάθεται πάνω στις θερμίδες ενός φαγητού (πριν κάλυπτε το «375» του μεσημεριανού).
+            ...meals,
+          ],
+          right: [
             summary,
             _SourcesNote(color: c.textTertiary),
           ],
-          right: meals,
         );
       },
     );
@@ -268,7 +272,8 @@ class MacroBreakdown extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             macro('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
-            macro('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
+            // UX U7: σύντομα, ίδιο μέγεθος με «Πρωτεΐνη»/«Λίπος» (όπως στο φύλλο ποσότητας).
+            macro('Υδατάνθρ.', t.carbs, ck, carbsColor(c)),
             macro('Λίπος', t.fat, fk, fatColor(c)),
           ],
         ),

@@ -4,6 +4,7 @@ import '../data.dart';
 import '../format.dart';
 import '../oura/oura_model.dart';
 import '../oura/oura_view.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -279,7 +280,8 @@ class _CompareCard extends StatelessWidget {
           ),
           if (r.watchEstimated > 0)
             Text(
-              'Το ρολόι έχει και ${hoursMinutes(r.watchEstimated)} «πιθανό ύπνο» στα κενά του (δεν μετρά).',
+              // UX U3: ίδια φράση σε όλες τις οθόνες.
+              'Ρολόι: +${hoursMinutes(r.watchEstimated)} $possibleSleepPhrase.',
               style: TextStyle(fontSize: 12.5, color: c.textSecondary),
             ),
         ],

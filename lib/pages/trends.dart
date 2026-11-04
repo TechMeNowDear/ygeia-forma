@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
@@ -60,7 +61,12 @@ class _TrendsPageState extends State<TrendsPage> {
                 text: 'Άνοιξε τη Σήμερα και τράβηξε προς τα κάτω για ανανέωση. '
                     'Οι μέρες αποθηκεύονται στο κινητό σου και οι τάσεις γεμίζουν μόνες τους.',
               )
-            : _ChangedCard(changed: changed, period: _period);
+            : _ChangedCard(
+                changed: changed,
+                period: _period,
+                // UX U2: όταν καμία γραμμή δεν έχει αρκετά δεδομένα, δεν λέμε «καμία διαφορά», λέμε ότι δεν συγκρίθηκε.
+                nothingCompared: results.every((r) => r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange),
+              );
 
         Widget section(TrendSection s) => _SectionCard(
               section: s,
@@ -201,9 +207,12 @@ class _BackfillCard extends StatelessWidget {
 
 /// Η περίληψη: μόνο ό,τι άλλαξε πραγματικά, το πιο ξεκάθαρο πρώτο.
 class _ChangedCard extends StatelessWidget {
-  const _ChangedCard({required this.changed, required this.period});
+  const _ChangedCard({required this.changed, required this.period, this.nothingCompared = false});
   final List<TrendResult> changed;
   final TrendPeriod period;
+
+  /// Καμία μέτρηση δεν είχε αρκετές μέρες για σύγκριση (όλες «Λίγα δεδομένα» ή αλλαγή πηγής).
+  final bool nothingCompared;
 
   @override
   Widget build(BuildContext context) {
@@ -218,9 +227,11 @@ class _ChangedCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                // Κλινικός έλεγχος M7 (4/11): όχι «ουσιαστικά», που διαβάζεται ως «κλινικά».
-                'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
-                'διακυμάνσεις σου. Αυτό δεν είναι ιατρικός έλεγχος.',
+                nothingCompared
+                    ? noComparisonText(period)
+                    // Κλινικός έλεγχος M7 (4/11): όχι «ουσιαστικά», που διαβάζεται ως «κλινικά».
+                    : 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
+                        'διακυμάνσεις σου. Αυτό δεν είναι ιατρικός έλεγχος.',
                 style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
               ),
             )
@@ -257,7 +268,9 @@ class _ChangeRow extends StatelessWidget {
                 Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                 const SizedBox(height: 2),
                 Text(
-                  'από ${r.def.formatAs(r.previous!, r.source)} σε ${r.def.formatAs(r.current!, r.source)}',
+                  relativeTemp(r)
+                      ? '${relativeTempText(r)} σε σχέση με πριν · όχι θερμοκρασία σώματος'
+                      : 'από ${r.def.formatAs(r.previous!, r.source)} σε ${r.def.formatAs(r.current!, r.source)}',
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular),
                 ),
               ],
@@ -318,7 +331,12 @@ class _MetricRow extends StatelessWidget {
     // Με λίγες μέρες (π.χ. μία νύχτα μετά από αλλαγή πηγής) η «μεσαία της περιόδου» δεν λέει κάτι: «—»
     // (έλεγχος υπολογισμών F10). Η τιμή και το πλήθος φαίνονται στις λεπτομέρειες.
     final few = r.nCurrent < r.needed && (r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange);
-    final value = r.current == null || few ? '—' : r.def.formatAs(r.current!, r.source);
+    final relative = relativeTemp(r);
+    final value = r.current == null || few
+        ? '—'
+        : relative
+            ? relativeTempText(r)
+            : r.def.formatAs(r.current!, r.source);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -341,10 +359,15 @@ class _MetricRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: r.current == null || few ? c.textTertiary : c.text,
+                          color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
                           fontFeatures: tabular,
                         ),
                       ),
+                      if (relative)
+                        Text(
+                          'σε σχέση με πριν · όχι θερμοκρασία σώματος',
+                          style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                        ),
                     ],
                   ),
                 ),
@@ -380,6 +403,11 @@ class _MetricDetail extends StatelessWidget {
     final len = daysBetween(r.currentFrom, r.end) + 1;
 
     String count(int n) => def.sparse ? '$n $unitWord' : '$n από $len $unitWord';
+    // Θερμοκρασία καρπού (ρολόι): ΜΟΝΟ διαφορές, ποτέ απόλυτη τιμή (τρίτος έλεγχος F2/C5). Το γράφημα δείχνει κάθε
+    // νύχτα σε σχέση με τη μεσαία τιμή του «πριν» (ή του «τώρα», αν δεν υπάρχει «πριν»).
+    final relative = relativeTemp(r);
+    final ref = relative ? (r.previous ?? r.current) : null;
+    double rel(double v) => ref == null ? v : v - ref;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -389,14 +417,14 @@ class _MetricDetail extends StatelessWidget {
           if (r.points.length >= 2) ...[
             LineChart(
               height: 150,
-              points: r.points,
+              points: [for (final p in r.points) (p.$1, rel(p.$2))],
               color: color,
-              format: _axisFormat(def),
+              format: relative ? (v) => signedDec(v, def.digits) : _axisFormat(def),
               minRange: _minRange(def),
               dateLabel: dayMonth,
               levels: [
-                if (r.previous != null) (r.previousFrom, r.previousEnd, r.previous!, c.textSecondary),
-                if (r.current != null && r.status != TrendStatus.sourceChange) (r.currentFrom, r.end, r.current!, c.text),
+                if (r.previous != null) (r.previousFrom, r.previousEnd, rel(r.previous!), c.textSecondary),
+                if (r.current != null && r.status != TrendStatus.sourceChange) (r.currentFrom, r.end, rel(r.current!), c.text),
               ],
             ),
             const SizedBox(height: 10),
@@ -429,12 +457,12 @@ class _MetricDetail extends StatelessWidget {
               children: [
                 InfoRow(
                   'Τώρα · ${dayMonth(r.currentFrom)} – ${dayMonth(r.end)}',
-                  r.current == null ? '—' : def.formatAs(r.current!, r.source),
+                  r.current == null ? '—' : (relative ? relativeTempText(r) : def.formatAs(r.current!, r.source)),
                   dot: c.text,
                 ),
                 InfoRow(
                   'Πριν · ${dayMonth(r.previousFrom)} – ${dayMonth(r.previousEnd)}',
-                  r.previous == null ? '—' : def.formatAs(r.previous!, r.source),
+                  r.previous == null ? '—' : (relative ? 'σημείο σύγκρισης' : def.formatAs(r.previous!, r.source)),
                   dot: c.textSecondary,
                 ),
                 InfoRow('Με δεδομένα (τώρα)', count(r.nCurrent)),
@@ -442,6 +470,14 @@ class _MetricDetail extends StatelessWidget {
                 if (r.source != Source.watch) InfoRow('Πηγή', sourceDevice(r.source)),
                 const Hairline(vertical: 8),
                 Text('Οι διακεκομμένες γραμμές στο γράφημα είναι η μεσαία τιμή κάθε περιόδου.', style: style),
+                if (relative) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Θερμοκρασία του δέρματος στον καρπό, όχι του σώματος: αλλάζει με το δωμάτιο, τα σκεπάσματα και το '
+                    'λουράκι. Γι\' αυτό φαίνεται μόνο η αλλαγή σε σχέση με πριν, ποτέ οι βαθμοί.',
+                    style: style,
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(_explain(r), style: style),
               ],
@@ -539,4 +575,24 @@ IconData _sectionIcon(TrendSection s) => switch (s) {
       TrendSection.body => Icons.monitor_weight_rounded,
       TrendSection.move => Icons.directions_walk_rounded,
       TrendSection.other => Icons.bolt_rounded,
+    };
+
+/// Τρίτος έλεγχος F2/C5: η θερμοκρασία καρπού του ρολογιού φαίνεται στις Τάσεις μόνο ως διαφορά (η απόλυτη τιμή,
+/// π.χ. 33,6 °C, διαβαζόταν ως υποθερμία). Η θερμοκρασία του Oura είναι ήδη απόκλιση και φαίνεται όπως είναι.
+bool relativeTemp(TrendResult r) => r.def.key == K.skinTemp && r.source != Source.oura;
+
+/// «+1,6 °C»: η αλλαγή «τώρα» − «πριν» από τα νούμερα όπως θα φαίνονταν· «—» όταν δεν συγκρίνεται (χωρίς «πριν»,
+/// λίγα δεδομένα ή αλλαγή πηγής: τότε ένα «0 °C» δίπλα στο «Λίγα δεδομένα» θα έμοιαζε με αποτέλεσμα).
+String relativeTempText(TrendResult r) => r.current == null ||
+        r.previous == null ||
+        r.status == TrendStatus.insufficient ||
+        r.status == TrendStatus.sourceChange
+    ? '—'
+    : '${signedDec(shownDiff(r.current!, r.previous!, r.def.digits), r.def.digits)} ${r.def.unit}';
+
+/// UX U2: κανένας δείκτης δεν είχε αρκετές μετρήσεις και στις δύο περιόδους.
+String noComparisonText(TrendPeriod p) => switch (p) {
+      TrendPeriod.month => 'Δεν υπάρχουν αρκετές μετρήσεις από τις προηγούμενες 30 μέρες για σύγκριση.',
+      TrendPeriod.quarter => 'Δεν υπάρχουν αρκετές μετρήσεις από τους προηγούμενους 3 μήνες για σύγκριση.',
+      TrendPeriod.year => 'Δεν υπάρχουν αρκετές μετρήσεις από πέρσι για σύγκριση.',
     };

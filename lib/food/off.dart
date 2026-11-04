@@ -17,7 +17,12 @@ class FoodDraft {
     this.perMl = false,
     this.alcohol,
     this.polyols,
+    this.saltFromSodium = false,
   }) : values = values ?? {};
+
+  /// Το Open Food Facts έδωσε μόνο νάτριο: το αλάτι υπολογίστηκε × 2,5 (Κανονισμός ΕΕ 1169/2011· τρίτος έλεγχος
+  /// διατροφής N7). Η φόρμα το λέει, για να το συγκρίνει ο χρήστης με την ετικέτα.
+  final bool saltFromSodium;
 
   String name;
   String? brand;
@@ -67,9 +72,11 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   }
 
   put(Nk.kcal, 'energy-kcal');
-  if (values[Nk.kcal] == null) {
-    final kj = _num(n['energy_100g']) ?? _num(n['energy-kj_100g']);
-    if (kj != null) values[Nk.kcal] = double.parse((kj / 4.184).toStringAsFixed(1));
+  final kj = _num(n['energy_100g']) ?? _num(n['energy-kj_100g']);
+  // kcal 0 μαζί με kJ > 0 είναι λάθος δεδομένων του Open Food Facts (N7): μετρά ως «λείπει».
+  if (values[Nk.kcal] == null || (values[Nk.kcal] == 0 && kj != null && kj > 0)) {
+    values.remove(Nk.kcal);
+    if (kj != null && kj >= 0) values[Nk.kcal] = double.parse((kj / 4.184).toStringAsFixed(1));
   }
   put(Nk.protein, 'proteins');
   put(Nk.carbs, 'carbohydrates');
@@ -78,10 +85,23 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   put(Nk.satFat, 'saturated-fat');
   put(Nk.fiber, 'fiber');
   put(Nk.salt, 'salt');
+  // Μόνο νάτριο (συχνό σε εισαγόμενα): αλάτι = νάτριο × 2,5 (το νάτριο του Open Food Facts είναι σε g).
+  var saltFromSodium = false;
+  if (values[Nk.salt] == null) {
+    final na = _num(n['sodium_100g']);
+    if (na != null && na >= 0) {
+      values[Nk.salt] = double.parse((na * 2.5).toStringAsFixed(3));
+      saltFromSodium = true;
+    }
+  }
 
   final brand = pick(['brands'])?.split(',').first.trim();
-  final perMl = isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size'])) ||
-      (p['nutrition_data_per'] is String && (p['nutrition_data_per'] as String).toLowerCase().contains('ml'));
+  // «Ανά 100 ml» από τη βάση των τιμών (nutrition_data_per), όχι από τη συσκευασία: ελαιόλαδο «1 l» με τιμές ανά
+  // 100 g δεν είναι «ανά 100 ml» (τρίτος έλεγχος διατροφής N7). Μόνο όταν η βάση λείπει, η συσκευασία υγρού.
+  final per = (p['nutrition_data_per'] is String ? p['nutrition_data_per'] as String : '').trim().toLowerCase();
+  final perMl = per.isNotEmpty
+      ? per.contains('ml')
+      : isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size']));
   // Στο Open Food Facts το «alcohol» είναι % vol: g ανά 100 ml = % vol × 0,789 (πυκνότητα αιθανόλης).
   final alcoholVol = _num(n['alcohol_100g']) ?? _num(n['alcohol']);
   final polyols = _num(n['polyols_100g']);
@@ -96,6 +116,7 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
     perMl: perMl,
     alcohol: alcoholVol == null || alcoholVol <= 0 ? null : alcoholVol * 0.789,
     polyols: polyols == null || polyols <= 0 ? null : polyols,
+    saltFromSodium: saltFromSodium,
   );
 }
 
