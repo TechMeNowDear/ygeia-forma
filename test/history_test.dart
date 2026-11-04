@@ -64,7 +64,9 @@ void main() {
       rangeTo: DateTime(2026, 10, 25),
     );
     expect(changed, containsAll(['2026-10-10', '2026-10-20']));
-    expect(h['2026-10-10']!.containsKey(K.sleepMin), isFalse);
+    // Έλεγχος 2, C3: η αποθηκευμένη διάρκεια μένει όταν δεν ήρθε έγκυρη νέα (ποτέ δεν χάνεται μετρημένος ύπνος)·
+    // οι υπόλοιπες τιμές ύπνου της μέρας αντικαθίστανται κανονικά.
+    expect(h['2026-10-10']![K.sleepMin], sample()['2026-10-10']![K.sleepMin]);
     expect(h['2026-10-10']!.containsKey(K.sleepScore), isFalse);
     expect(h['2026-10-10']![K.restHr], 60);
     expect(h['2026-10-20']![K.sleepMin], 395);

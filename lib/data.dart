@@ -43,11 +43,29 @@ class SleepRecord {
   static const _asleep = {'LIGHT', 'DEEP', 'REM'};
   static const _known = {'LIGHT', 'DEEP', 'REM', 'AWAKE'};
 
+  /// Πόσο από το κομμάτι μπορεί να είναι φάση «άγνωστη» (UNDEFINED) χωρίς να χαθεί ο πραγματικός ύπνος (C3).
+  static const undefinedShare = 0.05;
+
   /// Πραγματικός ύπνος σε δευτερόλεπτα: ελαφρύς + βαθύς + REM, χωρίς τα ξυπνήματα. Μόνο αν το κομμάτι έχει φάσεις
-  /// και όλες είναι γνωστές (αλλιώς null: δεν ξέρουμε).
+  /// (αλλιώς null: δεν ξέρουμε). Άγνωστες φάσεις ως το [undefinedShare] του κομματιού δεν μετρούν ούτε ως ύπνος ούτε
+  /// ως ξύπνιος (C3: μία άγνωστη φάση δεν «σβήνει» όλη τη νύχτα)· περισσότερες: null.
   int? get asleepSeconds {
-    if (stages.isEmpty || stages.any((s) => !_known.contains(s.name))) return null;
-    return stages.where((s) => _asleep.contains(s.name)).fold<int>(0, (t, s) => t + s.end.difference(s.start).inSeconds);
+    if (stages.isEmpty) return null;
+    var unknown = 0;
+    var asleep = 0;
+    var total = 0;
+    for (final s in stages) {
+      final secs = s.end.difference(s.start).inSeconds;
+      total += secs;
+      if (_asleep.contains(s.name)) {
+        asleep += secs;
+      } else if (!_known.contains(s.name)) {
+        unknown += secs;
+      }
+    }
+    final span = math.max(total, end.difference(start).inSeconds);
+    if (unknown > 0 && (unknown == total || unknown > undefinedShare * span)) return null;
+    return asleep;
   }
 
   /// Ύπνος του κομματιού σε λεπτά: ο πραγματικός (από τις φάσεις) όταν υπάρχει, αλλιώς η διάρκεια της Samsung.
@@ -75,8 +93,12 @@ class Night {
   /// Κομμάτι χωρίς φάσεις: η διάρκεια της Samsung ([staged] = false).
   int minutes = 0;
 
-  /// Αν ΟΛΑ τα κομμάτια είχαν φάσεις (άρα τα [minutes] είναι σίγουρα χωρίς τα ξυπνήματα).
+  /// Αν η νύχτα έχει φάσεις (τουλάχιστον ένα κομμάτι): τότε τα [minutes] είναι πραγματικός ύπνος, χωρίς τα ξυπνήματα.
   bool staged = false;
+
+  /// Κάποιο κομμάτι της νύχτας ήρθε χωρίς φάσεις (C2/C3): τα [minutes] μετρούν μόνο τα κομμάτια με φάσεις («μερικώς
+  /// χωρίς φάσεις»), ποτέ με τα ξυπνήματα του άλλου κομματιού.
+  bool partial = false;
 
   /// Από τον ύπνο ως το ξύπνημα, ΜΕ τα ξυπνήματα («Χρόνος ύπνου» της Samsung): άθροισμα αρχή→τέλος των κομματιών.
   int spanMinutes = 0;
@@ -117,6 +139,7 @@ class _SleepGroup {
   final bool isNight;
   final List<(DateTime, DateTime)> gaps = [];
   int get minutes => parts.fold(0, (s, p) => s + p.sleepMinutes);
+  DateTime get start => parts.first.start;
   DateTime get end => parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
 }
 
@@ -276,7 +299,12 @@ class Dashboard {
     this.failed = const {},
     this.compareNights = const [],
     this.bodyOther = 0,
+    this.naps = const {},
   });
+
+  /// Υπνάκοι του ρολογιού (λεπτά) ανά ημερομηνία νύχτας (C1): αποθηκεύονται στο ιστορικό (napMin), ακόμα και μέρα
+  /// χωρίς νύχτα, ώστε μετρημένος ύπνος να μη χάνεται.
+  final Map<DateTime, int> naps;
 
   /// Ζυγίσεις από άλλες εφαρμογές (όχι InBody) που δεν μπήκαν ([isScaleApp]).
   final int bodyOther;
@@ -324,6 +352,7 @@ class Dashboard {
       bodyOk: bodyOk,
       failed: failed,
       bodyOther: bodyOther,
+      naps: naps,
     );
   }
 
@@ -451,8 +480,8 @@ class Dashboard {
               }())
         : null;
 
-    final nights = _groupNights(records, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom)
-      ..forEach((n) => _fillNightMetrics(n, heart, spo2, skin));
+    final grouped = _groupNights(records, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
+    final nights = grouped.nights..forEach((n) => _fillNightMetrics(n, heart, spo2, skin));
 
     return Dashboard._(
       readAt: j['readAt'] is num ? t(j['readAt']) : DateTime.now(),
@@ -465,6 +494,7 @@ class Dashboard {
       granted: (j['granted'] as num?)?.toInt() ?? 0,
       total: (j['total'] as num?)?.toInt() ?? 0,
       nights: nights,
+      naps: grouped.naps,
       heart: heart,
       spo2: spo2,
       skin: skin,
@@ -496,70 +526,71 @@ class Dashboard {
     );
   }
 
-  /// Ο ύπνος ομαδοποιείται σε νύχτες (απόφαση 1/11, μετά τον έλεγχο):
-  /// - Η διάρκεια είναι **μόνο** ό,τι μέτρησε η Samsung (άθροισμα των κομματιών).
-  /// - Κομμάτι που ακολουθεί άλλο με κενό που μοιάζει με ύπνο (sleep_gaps.dart) ανήκει στην ίδια
-  ///   νύχτα. Το κενό φαίνεται χωριστά ως «πιθανός ύπνος» και **δεν** μετρά στη διάρκεια, γιατί
-  ///   δεν ξεχωρίζει ύπνο από ξάπλωμα ξύπνιος.
-  /// - Αλλιώς: κομμάτι που αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες είναι υπνάκος.
-  /// - Δύο ομάδες κομματιών με την ίδια ημερομηνία: η μεγαλύτερη είναι η νύχτα. Η άλλη ενώνεται μαζί της
-  ///   ΜΟΝΟ αν το κενό ανάμεσα κρατά ως 4 ώρες, έχει μετρημένα βήματα ανά λεπτό και ως [maxGapSteps] βήματα
-  ///   (ο ίδιος κανόνας με τα κενά, sleep_gaps.dart· έλεγχος 4/11, A6). Αλλιώς (π.χ. λαγοκοίμισμα στον καναπέ και
-  ///   μετά περπάτημα, ή κενό χωρίς στοιχεία βημάτων) είναι χωριστή: αν κρατά λιγότερο από 3 ώρες, υπνάκος.
-  ///   Ομάδα 3 ωρών και πάνω την ίδια νύχτα δεν είναι «λαγοκοίμισμα»: μένει μέρος της νύχτας.
-  static List<Night> _groupNights(
+  /// Ο ύπνος ομαδοποιείται σε νύχτες (έλεγχος 2, C1· στοιχεία της νύχτας 2→3/11 του χρήστη):
+  /// - Η διάρκεια είναι **μόνο** ό,τι μέτρησε η Samsung (πραγματικός ύπνος από τις φάσεις). Τα κενά ανάμεσα στα
+  ///   κομμάτια **δεν** μετρούν ποτέ ως ύπνος.
+  /// - Κομμάτι ανήκει στη νύχτα αν το κενό από το προηγούμενο κομμάτι της είναι ως 4 ώρες ([maxGap]), ΑΝΕΞΑΡΤΗΤΑ
+  ///   από βήματα ή παλμούς (μια βόλτα ως την τουαλέτα δεν «κόβει» τη νύχτα· και ο κανόνας δεν αλλάζει όταν η νύχτα
+  ///   παλιώσει και δεν υπάρχουν πια βήματα ανά λεπτό). Τα βήματα/παλμοί χρησιμεύουν μόνο για την ετικέτα του κενού
+  ///   («πιθανός ύπνος» ή «κενό»), που δεν μετρά.
+  /// - Υπνάκοι είναι ΜΟΝΟ: (α) βραδινό λαγοκοίμισμα που τελειώνει ως τις 22:00 ([_eveningDoze]), (β) πρωινός υπνάκος
+  ///   που αρχίζει μετά τις 06:00 και πάνω από 60 λεπτά μετά το τέλος της νύχτας ([_morningNap]), (γ) απογευματινός:
+  ///   αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες (όπως πριν). Οι υπνάκοι μετρούν στα [Night.napMinutes] της
+  ///   νύχτας με την ίδια ημερομηνία και αποθηκεύονται (napMin), ώστε να μη χάνονται.
+  /// - Δύο ομάδες με την ίδια ημερομηνία (κενό πάνω από 4 ώρες): η μεγαλύτερη που δεν είναι λαγοκοίμισμα είναι η
+  ///   νύχτα· η άλλη είναι υπνάκος μόνο κατά τα (α)/(β), αλλιώς μέρος της νύχτας (με το κενό να μη μετρά).
+  static ({List<Night> nights, Map<DateTime, int> naps}) _groupNights(
     List<SleepRecord> records, {
     List<Sample> heart = const [],
     Map<int, int> stepsByMinute = const {},
     DateTime? stepsFrom,
   }) {
     final recs = dedupeSleep(records);
-    // Ομάδες: κομμάτια ενωμένα με κενό που κρίθηκε ύπνος.
+    // Ομάδες: κομμάτια με κενό ως 4 ώρες (χωρίς βήματα/παλμούς στην απόφαση).
     final groups = <_SleepGroup>[];
     _SleepGroup? previous;
     for (final r in recs) {
-      final last = previous?.parts.last;
-      final linked = last != null &&
-          previous!.isNight &&
-          judgeGap(last, r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) == GapVerdict.asleep;
-      if (linked) {
-        if (r.start.isAfter(last.end)) previous.gaps.add((last.end, r.start));
-        previous.parts.add(r);
+      final g = previous;
+      if (g != null && g.isNight && _joins(g, r)) {
+        final last = g.parts.last;
+        // Μόνο η ετικέτα του κενού κρίνεται με βήματα και παλμούς («πιθανός ύπνος»)· δεν μετρά ποτέ στη διάρκεια.
+        if (r.start.isAfter(g.end) &&
+            judgeGap(last, r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) == GapVerdict.asleep) {
+          g.gaps.add((g.end, r.start));
+        }
+        g.parts.add(r);
         continue;
       }
       final isNap = r.start.hour >= 10 && r.start.hour < 18 && r.sleepMinutes < 180;
-      final g = _SleepGroup(r, isNight: !isNap);
-      groups.add(g);
-      previous = g;
+      final ng = _SleepGroup(r, isNight: !isNap);
+      groups.add(ng);
+      previous = ng;
     }
 
     final naps = <DateTime, int>{};
-    void addNap(_SleepGroup g) {
-      final day = dayOf(g.parts.first.start);
-      naps[day] = (naps[day] ?? 0) + g.minutes;
-    }
+    void addNap(DateTime day, int minutes) => naps[day] = (naps[day] ?? 0) + minutes;
 
     final byDate = <DateTime, List<_SleepGroup>>{};
     for (final g in groups) {
-      if (!g.isNight) {
-        addNap(g);
-        continue;
-      }
       final end = g.end;
       final date = end.hour >= 18 ? DateTime(end.year, end.month, end.day + 1) : dayOf(end);
+      if (!g.isNight) {
+        // Απογευματινός υπνάκος: της νύχτας με την ίδια ημερομηνία (το πρωί της ίδιας μέρας).
+        addNap(dayOf(g.parts.first.start), g.minutes);
+        continue;
+      }
       byDate.putIfAbsent(date, () => []).add(g);
     }
 
     final nights = <Night>[];
     for (final entry in byDate.entries) {
-      final list = entry.value..sort((a, b) => a.parts.first.start.compareTo(b.parts.first.start));
-      final main = list.reduce((a, b) => a.minutes >= b.minutes ? a : b);
+      final list = entry.value..sort((a, b) => a.start.compareTo(b.start));
+      final candidates = [for (final g in list) if (!_eveningDoze(g)) g];
+      final main = (candidates.isEmpty ? list : candidates).reduce((a, b) => a.minutes >= b.minutes ? a : b);
       final n = Night(entry.key);
       for (final g in list) {
-        final separate = !identical(g, main) && !_quietGap(g, main, stepsByMinute, stepsFrom);
-        if (separate && g.minutes < 180) {
-          // Χωριστός ύπνος της ίδιας νύχτας (π.χ. 23:43–02:40, μετά σηκώθηκε): μετρά στους υπνάκους ΑΥΤΗΣ της νύχτας.
-          naps[entry.key] = (naps[entry.key] ?? 0) + g.minutes;
+        if (!identical(g, main) && (_eveningDoze(g) || _morningNap(g, main))) {
+          addNap(entry.key, g.minutes);
           continue;
         }
         n.parts.addAll(g.parts);
@@ -574,20 +605,25 @@ class Dashboard {
       n.estimatedGaps.sort((a, b) => a.$1.compareTo(b.$1));
       n.start = n.parts.first.start;
       n.end = n.parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
-      // Πραγματικός ύπνος: δευτερόλεπτα από τις φάσεις (στρογγυλεύονται μία φορά)· κομμάτια χωρίς φάσεις με τη
-      // διάρκεια της Samsung. Τα κενά ανάμεσα στα κομμάτια δεν μετρούν ποτέ.
+      // Πραγματικός ύπνος: δευτερόλεπτα από τις φάσεις (στρογγυλεύονται μία φορά). Κομμάτι χωρίς φάσεις μέσα σε νύχτα
+      // με φάσεις (C2/C3): δεν μηδενίζει τη νύχτα· μετρά ό,τι έχει φάσεις και η νύχτα σημειώνεται «μερικώς χωρίς
+      // φάσεις» ([Night.partial]). Νύχτα χωρίς καθόλου φάσεις: η διάρκεια της Samsung (με τα ξυπνήματα, [Night.staged]
+      // false). Τα κενά ανάμεσα στα κομμάτια δεν μετρούν ποτέ.
       var asleep = 0;
       var other = 0;
+      var unstagedParts = 0;
       for (final p in n.parts) {
         final a = p.asleepSeconds;
         if (a == null) {
           other += p.minutes;
+          unstagedParts++;
         } else {
           asleep += a;
         }
       }
-      n.minutes = (asleep / 60).round() + other;
-      n.staged = n.parts.every((p) => p.asleepSeconds != null);
+      n.staged = unstagedParts < n.parts.length;
+      n.partial = n.staged && unstagedParts > 0;
+      n.minutes = n.staged ? (asleep / 60).round() : other;
       n.spanMinutes = n.parts.fold(0, (sum, p) => sum + p.end.difference(p.start).inMinutes);
       var between = 0;
       var reach = n.parts.first.end;
@@ -611,21 +647,31 @@ class Dashboard {
       }
       n.napMinutes = naps[n.date] ?? 0;
     }
-    return nights;
+    return (nights: nights, naps: naps);
   }
 
-  /// Αν το κενό ανάμεσα σε δύο ομάδες της ίδιας νύχτας είναι «ήσυχο»: ως 4 ώρες, με μετρημένα βήματα ανά λεπτό
-  /// και ως [maxGapSteps] βήματα. Επικαλυπτόμενες ομάδες: ήσυχο.
-  static bool _quietGap(_SleepGroup a, _SleepGroup b, Map<int, int> stepsByMinute, DateTime? stepsFrom) {
-    final first = a.parts.first.start.isBefore(b.parts.first.start) ? a : b;
-    final second = identical(first, a) ? b : a;
-    final start = first.end;
-    final end = second.parts.first.start;
-    if (!end.isAfter(start)) return true;
-    if (end.difference(start) > maxGap) return false;
-    final steps = gapSteps(start, end, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
-    return steps != null && steps <= maxGapSteps;
+  /// Αν το κομμάτι [r] συνεχίζει την ομάδα [g] (ίδια νύχτα): κενό ως 4 ώρες, εκτός αν η ομάδα είναι βραδινό
+  /// λαγοκοίμισμα ή το [r] πρωινός υπνάκος. Συνεχόμενα ή επικαλυπτόμενα κομμάτια: πάντα μαζί.
+  static bool _joins(_SleepGroup g, SleepRecord r) {
+    final gap = r.start.difference(g.end);
+    if (gap <= Duration.zero) return true;
+    if (gap > maxGap) return false;
+    if (_eveningDoze(g)) return false;
+    return !_startsMorningNap(r.start, g.end);
   }
+
+  /// Βραδινό λαγοκοίμισμα: αρχίζει μετά το μεσημέρι και τελειώνει την ίδια μέρα ως τις 22:00.
+  static bool _eveningDoze(_SleepGroup g) {
+    final s = g.start;
+    final e = g.end;
+    return s.hour >= 12 && sameDay(s, e) && !e.isAfter(DateTime(e.year, e.month, e.day, 22));
+  }
+
+  /// Πρωινός υπνάκος: η ομάδα [g] αρχίζει μετά τις 06:00 και πάνω από 60 λεπτά μετά το τέλος της νύχτας [main].
+  static bool _morningNap(_SleepGroup g, _SleepGroup main) => _startsMorningNap(g.start, main.end);
+
+  static bool _startsMorningNap(DateTime start, DateTime nightEnd) =>
+      start.hour >= 6 && start.hour < 20 && start.difference(nightEnd) > const Duration(minutes: 60);
 
   static void _fillNightMetrics(Night n, List<Sample> heart, List<Sample> spo2, List<Sample> skin) {
     bool inside(Sample s) => n.parts.any((p) => s.start.isBefore(p.end) && s.end.isAfter(p.start));
@@ -1046,7 +1092,7 @@ ParsedDashboard parseDashboardSync(String raw, {SourcePlan? plan, SleepWindows w
 }
 
 /// Μια κανονική ανάγνωση (30 μέρες + όλες οι ζυγίσεις) στο ιστορικό. Επιστρέφει τις μέρες που άλλαξαν.
-/// - Οι 30 μέρες περνούν από το [mergeHistory] (ύπνος μόνο με βήματα ανά λεπτό, πηγή κάθε νύχτας).
+/// - Οι 30 μέρες περνούν από το [mergeHistory] (ύπνος χωρίς εξάρτηση από βήματα, C1· πηγή κάθε νύχτας).
 /// - Οι ζυγίσεις μπαίνουν ΧΩΡΙΣΤΑ ([mergeBody]): μία ολόκληρη ζύγιση InBody ανά μέρα, χωρίς να αγγίζεται τίποτα
 ///   άλλο της μέρας (A1: πριν, μια ζύγιση σε παλιά μέρα του Oura έσβηνε το οξυγόνο της νύχτας).
 /// - Νύχτες με άλλη πηγή που είχαν ακόμα τιμές του ρολογιού: φεύγουν· ζύγιση που σβήστηκε στη Samsung: φεύγει
@@ -1068,9 +1114,9 @@ Set<String> applyRecentRead(
   for (final r in rows.values) {
     r.removeWhere((k, _) => bodyKeys.contains(k));
   }
-  final stepsFrom = d.stepsMinuteFrom;
-  final sf = dayOf(stepsFrom ?? today);
-  final sleepFrom = !sleepFailed && d.sleepOk && stepsFrom != null ? DateTime(sf.year, sf.month, sf.day + 1) : null;
+  // Η ομαδοποίηση του ύπνου δεν εξαρτάται πια από βήματα ανά λεπτό (C1): όλες οι μέρες της ανάγνωσης έχουν τον ίδιο
+  // ορισμό και ξαναγράφονται (όχι μόνο οι 7 με βήματα), όταν ο ύπνος διαβάστηκε κανονικά.
+  final sleepFrom = !sleepFailed && d.sleepOk ? DateTime(today.year, today.month, today.day - recentSummaryDays + 1) : null;
   final changed = mergeHistory(
     history,
     rows,

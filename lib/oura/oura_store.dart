@@ -109,7 +109,11 @@ enum OuraStatus {
 Duration ouraBackoffFor(OuraErrorKind? k, {Duration? retryAfter}) => switch (k) {
       null => ouraMinInterval,
       OuraErrorKind.reconnect || OuraErrorKind.noRefresh || OuraErrorKind.scopeMissing => const Duration(hours: 6),
-      OuraErrorKind.subscription || OuraErrorKind.format => const Duration(hours: 1),
+      OuraErrorKind.subscription ||
+      OuraErrorKind.format ||
+      OuraErrorKind.proxyNotConfigured ||
+      OuraErrorKind.proxyRejected =>
+        const Duration(hours: 1),
       // Όσο ζητά η Oura (Retry-After), τουλάχιστον 1 λεπτό και το πολύ 6 ώρες· χωρίς Retry-After 15 λεπτά.
       OuraErrorKind.rateLimited => retryAfter == null
           ? const Duration(minutes: 15)
@@ -806,7 +810,11 @@ mixin OuraStore on ChangeNotifier {
       ouraError = e.kind;
       ouraBackoffMs = ms + ouraBackoffFor(e.kind, retryAfter: e.retryAfter).inMilliseconds;
       // Στο Sentry μόνο ό,τι δεν είναι φυσιολογικό (όχι δίκτυο, όχι 429)· μόνο το είδος.
-      if (e.kind == OuraErrorKind.format || e.kind == OuraErrorKind.noRefresh || e.kind == OuraErrorKind.scopeMissing) {
+      if (e.kind == OuraErrorKind.format ||
+          e.kind == OuraErrorKind.noRefresh ||
+          e.kind == OuraErrorKind.scopeMissing ||
+          e.kind == OuraErrorKind.proxyNotConfigured ||
+          e.kind == OuraErrorKind.proxyRejected) {
         errors.report(e, StackTrace.current, extra: {'where': 'oura-sync'});
       }
     } catch (e, st) {

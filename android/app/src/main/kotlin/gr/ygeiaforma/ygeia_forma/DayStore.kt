@@ -185,10 +185,9 @@ class DayStore private constructor(context: Context) :
 private class KeepCorruptDb(private val context: Context) : DatabaseErrorHandler {
     override fun onCorruption(dbObj: SQLiteDatabase) {
         val path = dbObj.path
-        try {
-            dbObj.close()
-        } catch (_: Throwable) {
-        }
+        // Έλεγχος 2, C8: το Android ξαναδοκιμάζει το άνοιγμα στο ΙΔΙΟ αντικείμενο μετά από εδώ· αν δεν είναι ανοιχτό
+        // ακόμα, ένα close() το «κλείνει» οριστικά και το πρώτο άνοιγμα αποτυγχάνει (όπως ο DefaultDatabaseErrorHandler).
+        DataRules.closeIfOpen(dbObj.isOpen) { dbObj.close() }
         val now = System.currentTimeMillis()
         try {
             if (path != null && path != ":memory:") {

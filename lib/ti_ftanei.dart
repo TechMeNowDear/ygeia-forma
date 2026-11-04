@@ -204,6 +204,7 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
           'Εγγραφές: ${t['count']}${t['capped'] == true ? '+' : ''} · τελευταία: ${t['latest']}',
         );
         if (t['counted'] is num) b.writeln('Μετρούν στην εφαρμογή: ${t['counted']} · αγνοούνται (άλλη πηγή): ${t['ignored']}');
+        if (filterWarning(t) case final w?) b.writeln(w);
         for (final s in (t['sources'] as List<dynamic>? ?? [])) {
           final m = s as Map<String, dynamic>;
           final counts = m['counts'] is bool ? (m['counts'] == true ? ' · μετρά' : ' · ΔΕΝ μετρά') : '';
@@ -449,6 +450,12 @@ class _TypeCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(line, style: TextStyle(color: c.textSecondary)),
+            // C6: το φίλτρο δεν βρήκε τίποτα ενώ υπάρχουν εγγραφές: το ιστορικό κρατιέται, εδώ φαίνεται ο λόγος.
+            if (filterWarning(type) case final w?)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(w, style: TextStyle(color: c.text, fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
             // A2: ύπνος/παλμοί/οξυγόνο/θερμοκρασία μόνο από ρολόι, ζυγίσεις μόνο InBody· οι άλλες πηγές φαίνονται εδώ.
             if (type['counted'] is num && (type['ignored'] as num? ?? 0) > 0)
               Padding(
@@ -590,4 +597,15 @@ String _round(Object value) {
   final n = num.tryParse(value.toString());
   if (n == null) return value.toString();
   return n.round().toString();
+}
+
+/// Έλεγχος 2, C6: το φίλτρο πηγής δεν άφησε καμία εγγραφή, ενώ η Samsung έχει εγγραφές αυτού του είδους. Η εφαρμογή
+/// τότε ΔΕΝ γράφει τίποτα και κρατά το ιστορικό (η ανάγνωση θεωρείται σφάλμα)· εδώ λέμε τον λόγο. null = εντάξει.
+String? filterWarning(Map<String, dynamic> type) {
+  if (type['state'] != 'ok' || type['counted'] is! num) return null;
+  final count = (type['count'] as num?) ?? 0;
+  if ((type['counted'] as num) > 0 || count <= 0) return null;
+  return type['key'] == 'body_composition'
+      ? 'Καμία ζύγιση από την InBody: οι $count ζυγίσεις είναι από άλλες εφαρμογές. Το ιστορικό ζυγίσεων μένει όπως ήταν.'
+      : 'Το φίλτρο ρολογιού δεν βρήκε τίποτα: οι $count εγγραφές είναι από άλλη συσκευή. Το ιστορικό μένει όπως ήταν.';
 }

@@ -198,16 +198,6 @@ jobs:
           path: ygeia-forma-*.apk
           retention-days: 14
 
-      - name: Δημοσίευση στο Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest ygeia-forma-${{ github.run_number }}.apk \
-            --target "${{ github.sha }}" \
-            --title "Τελευταία έκδοση · #${{ github.run_number }}" \
-            --notes "Χτίστηκε από το commit ${{ github.sha }}. Κατέβασε το .apk στο Fold και πάτα «Εγκατάσταση»."
-
   # Στιγμιότυπα οθονών με δείγμα δεδομένων, για έλεγχο της εμφάνισης.
   # Ανεβαίνουν στο branch «screenshots» (όχι στο main).
   shots:
@@ -247,8 +237,8 @@ jobs:
           git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Στιγμιότυπα #${{ github.run_number }}"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" screenshots
 
-  # Και στο main (A14): ανοίγει την εφαρμογή σε emulator Android 14. Αν κλείνει στο άνοιγμα, το λέει (η έκδοση έχει
-  # ήδη χτιστεί· ο έλεγχος δεν τη σταματά, αλλά φαίνεται κόκκινος).
+  # Και στο main (A14): ανοίγει την εφαρμογή σε emulator Android 14. Αν κλείνει στο άνοιγμα, η έκδοση ΔΕΝ δημοσιεύεται
+  # (έλεγχος 2, C7: το publish περιμένει και αυτόν τον έλεγχο).
   # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
   smoke:
     runs-on: ubuntu-latest
@@ -317,3 +307,37 @@ jobs:
             echo "::error title=Η εφαρμογή κλείνει στο άνοιγμα::$msg"
             exit 1
           fi
+
+  # Έλεγχος 2, C7: η έκδοση μπαίνει στο Releases ΜΟΝΟ αν πέρασαν και το χτίσιμο (έλεγχοι Dart/Kotlin, κλειδί, αποτύπωμα)
+  # ΚΑΙ το άνοιγμα στον emulator. Μια έκδοση που κλείνει στο άνοιγμα δεν φτάνει ποτέ στο κινητό (η επιστροφή σε
+  # παλιότερη θα ήθελε απεγκατάσταση, που σβήνει το ημερολόγιο φαγητού).
+  publish:
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: android-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ygeia-forma-${{ github.run_number }}
+
+      - name: Δημοσίευση στο Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -e
+          apk=ygeia-forma-${{ github.run_number }}.apk
+          test -f "$apk"
+          # Πρώτα ένα αντίγραφο με δικό του όνομα: αν η δημοσίευση διακοπεί ανάμεσα στο σβήσιμο και στη δημιουργία της
+          # «latest», η έκδοση υπάρχει ακόμα στο Releases.
+          gh release create "build-${{ github.run_number }}" "$apk" --target "${{ github.sha }}" \
+            --title "Έκδοση #${{ github.run_number }}" --notes "Χτίστηκε από το commit ${{ github.sha }}." --prerelease
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest "$apk" \
+            --target "${{ github.sha }}" \
+            --title "Τελευταία έκδοση · #${{ github.run_number }}" \
+            --notes "Χτίστηκε από το commit ${{ github.sha }}. Κατέβασε το .apk στο Fold και πάτα «Εγκατάσταση»."
+          gh release delete "build-${{ github.run_number }}" --yes --cleanup-tag || true

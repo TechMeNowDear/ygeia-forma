@@ -291,13 +291,15 @@ void main() {
       expect(summarizeDay(Dashboard.fromJson(json()), DateTime(2026, 11, 3))[K.sleepMin], 329);
     });
 
-    test('Σηκώθηκε στο κενό (βήματα): η νύχτα είναι η κύρια 2ω57, το πρώτο κομμάτι χωριστός ύπνος της ίδιας νύχτας', () {
+    // Έλεγχος 2, C1: πριν (A6) 120 βήματα στο κενό έκοβαν τη νύχτα στα 2ω57. Τώρα: ίδια νύχτα, όπως η Samsung (5ω29).
+    test('Σηκώθηκε στο κενό (βήματα): ίδια νύχτα 5ω29, το κενό δεν μετρά (C1)', () {
       final n = Dashboard.fromJson(json(gapSteps: 120)).nights.single;
-      expect(n.minutes, 177);
-      expect(n.spanMinutes, 198);
-      expect(n.start, t(3, 3, 50));
-      expect(n.napMinutes, 152, reason: 'μετρά στους υπνάκους της ίδιας νύχτας, όχι της προηγούμενης μέρας');
-      expect(n.stageMinutes['DEEP'] ?? 0, 0);
+      expect(n.minutes, 152 + 177);
+      expect(n.spanMinutes, 177 + 198);
+      expect(n.start, t(2, 23, 43));
+      expect(n.napMinutes, 0);
+      expect(n.betweenMinutes, 70);
+      expect(n.stageMinutes['DEEP'], 35);
     });
 
     test('Σύγκριση πηγών: πραγματικός ύπνος με πραγματικό, «με τα ξυπνήματα» με «με τα ξυπνήματα»', () {

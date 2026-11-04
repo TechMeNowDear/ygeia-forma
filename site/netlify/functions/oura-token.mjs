@@ -11,9 +11,11 @@
 // - δεν αποθηκεύει και δεν καταγράφει τίποτα (ούτε κωδικούς ούτε tokens)· δεν βλέπει ποτέ δεδομένα υγείας.
 
 const CLIENT_ID = 'af0dbf14-b534-4187-8d6b-6cc0cc6f41a1';
+// Μόνο η επαληθευμένη διεύθυνση https (App Link): η εφαρμογή στέλνει πάντα αυτήν (config.dart, ouraRedirectUri). Το
+// ygeiaforma:// ΔΕΝ γίνεται δεκτό (έλεγχος 2, C10): μια άλλη εφαρμογή που «πιάνει» το scheme δεν μπορεί να ανταλλάξει
+// κωδικό μέσω του μεσάζοντα με δικό της PKCE.
 const REDIRECTS = new Set([
   'https://ygeia-forma.netlify.app/oura/callback',
-  'ygeiaforma://oura-callback',
 ]);
 // Πού προωθείται. Αλλάζει χωρίς νέα έκδοση της εφαρμογής, με τη μεταβλητή OURA_TOKEN_URL στο Netlify.
 const ALLOWED_TARGETS = new Set([
@@ -22,7 +24,9 @@ const ALLOWED_TARGETS = new Set([
 ]);
 const DEFAULT_TARGET = 'https://api.ouraring.com/oauth/token';
 const MAX_BODY = 4096;
-const UPSTREAM_TIMEOUT_MS = 20000;
+// Κάτω από το όριο χρόνου των συγχρονικών functions του Netlify (C10): αν η Oura αργήσει, απαντάμε εμείς με 502 που
+// η εφαρμογή ξέρει (δίκτυο, ξανά αργότερα), αντί να κόψει το Netlify τη function στη μέση.
+const UPSTREAM_TIMEOUT_MS = 8000;
 
 function reply(status, obj) {
   return new Response(JSON.stringify(obj), {
@@ -110,4 +114,11 @@ export default async (req) => {
 export const config = {
   path: '/api/oura/token',
   method: ['POST'],
+  // Όριο αιτημάτων ανά IP (C10, Netlify «code-based rate limiting», διαθέσιμο σε όλα τα πλάνα): μια σύνδεση ή ανανέωση
+  // είναι 1–2 αιτήματα· πάνω από 20 το λεπτό από την ίδια IP απαντά 429 χωρίς να φτάσει στην Oura.
+  rateLimit: {
+    windowLimit: 20,
+    windowSize: 60,
+    aggregateBy: ['ip', 'domain'],
+  },
 };

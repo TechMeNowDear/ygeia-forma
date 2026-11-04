@@ -35,8 +35,10 @@ abstract final class K {
   static const fatPct = 'fatPct';
   static const smm = 'smm';
   static const floors = 'floors';
-  // Μόνο από το Oura (αποθηκεύονται με πρόθεμα «o.», δες sources.dart).
+  /// Υπνάκοι: του ρολογιού ως «napMin» (C1: βραδινό λαγοκοίμισμα, πρωινός και απογευματινός υπνάκος), του Oura ως
+  /// «o.napMin». Δεν μετρούν ποτέ στη διάρκεια της νύχτας.
   static const napMin = 'napMin';
+  // Μόνο από το Oura (αποθηκεύονται με πρόθεμα «o.», δες sources.dart).
   static const lowHr = 'lowHr';
   static const hrv = 'hrv';
   static const breath = 'breath';
@@ -45,7 +47,7 @@ abstract final class K {
 /// Τιμές που βγαίνουν από τον ύπνο μιας νύχτας.
 const sleepKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake,
-  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.skinTemp,
+  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.skinTemp, K.napMin,
 };
 
 /// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
@@ -102,6 +104,14 @@ Set<String> mergeHistory(
     return noWindow ? {...keepKeys, ...spo2Keys} : keepKeys;
   }
 
+  // Επανανάγνωση (C3): μια αποθηκευμένη διάρκεια ύπνου νύχτας του ρολογιού δεν σβήνεται ποτέ αν δεν έρθει έγκυρη νέα
+  // στη θέση της (π.χ. η νύχτα ήρθε τώρα χωρίς φάσεις ή με άγνωστες φάσεις): ένας μετρημένος ύπνος δεν χάνεται.
+  bool keepDuration(DateTime day, String key) =>
+      replaceSleep &&
+      key == K.sleepMin &&
+      p.nightSource(day) == Source.watch &&
+      !(rows[dateKey(day)]?.containsKey(K.sleepMin) ?? false);
+
   if (replaceSleep && rangeFrom != null && rangeTo != null) {
     for (var day = dayOf(rangeFrom); !day.isAfter(dayOf(rangeTo)); day = DateTime(day.year, day.month, day.day + 1)) {
       final k = dateKey(day);
@@ -110,7 +120,11 @@ Set<String> mergeHistory(
       // Η νύχτα του ρολογιού την πρώτη μέρα μιας εποχής Oura δεν σβήνεται ποτέ ([SourcePlan.keepsWatchNight]).
       final keep = p.keepsWatchNight(day);
       final stay = kept(day);
-      bool drop(String key) => sleepKeys.contains(key) && !stay.contains(key) && !(keep && watchNightKeys.contains(key));
+      bool drop(String key) =>
+          sleepKeys.contains(key) &&
+          !stay.contains(key) &&
+          !(keep && watchNightKeys.contains(key)) &&
+          !keepDuration(day, key);
       if (old.keys.any(drop)) {
         history[k] = {for (final e in old.entries) if (!drop(e.key)) e.key: e.value};
         changed.add(k);
@@ -141,6 +155,7 @@ Set<String> mergeHistory(
         ? {
             for (final v in old.entries)
               if ((keep && watchNightKeys.contains(v.key)) ||
+                  keepDuration(day, v.key) ||
                   (stay.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))) ||
                   (!sleepKeys.contains(v.key) && !(foreignNight && watchNightKeys.contains(v.key))))
                 v.key: v.value,
@@ -325,7 +340,13 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
       put(K.spo2Min, ox.min);
       put(K.spo2Low, ox.below90);
     }
-  } else if (night != null) {
+  }
+  // Υπνάκοι του ρολογιού (C1): αποθηκεύονται χωριστά, και μέρα χωρίς νύχτα· ποτέ μέσα στη διάρκεια του ύπνου.
+  if (watchNight) {
+    final nap = d.naps[dayOf(day)] ?? 0;
+    if (nap > 0) put(K.napMin, nap);
+  }
+  if (watchNight && night != null) {
     // Διάρκεια μόνο από φάσεις (πραγματικός ύπνος). Νύχτα χωρίς φάσεις: η διάρκεια της Samsung έχει τα ξυπνήματα,
     // οπότε δεν μπαίνει στις Τάσεις, στην εβδομάδα και στην αναφορά (οι ώρες ύπνου/ξυπνήματος μπαίνουν κανονικά).
     if (night.staged) put(K.sleepMin, night.minutes);

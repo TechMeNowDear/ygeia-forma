@@ -65,4 +65,75 @@ class DataRulesTest {
         assertFalse(DataRules.ALLOWED_HOSTS.contains("ouraring.com.evil.com"))
         assertEquals(3, DataRules.ALLOWED_HOSTS.size)
     }
+
+    @Test
+    fun sleepWithTwoSessionsBecomesTwoRecords() {
+        // Έλεγχος 2, C2: η νύχτα 2→3/11 ως ΜΙΑ εγγραφή της Samsung με δύο συνεδρίες (23:43–02:40, 03:50–07:08).
+        val m = 60_000L
+        val t0 = 1_762_119_780_000L // 23:43
+        val a = DataRules.SessionIn(t0, t0 + 177 * m, 177, listOf(DataRules.StageIn("LIGHT", t0, t0 + 177 * m)))
+        val b = DataRules.SessionIn(t0 + 247 * m, t0 + 445 * m, 198, emptyList())
+        val out = DataRules.splitSleep(t0, t0 + 445 * m, 445, 40, listOf(b, a))
+        assertEquals(2, out.size)
+        assertEquals(t0, out[0].start)
+        assertEquals(t0 + 177 * m, out[0].end)
+        assertEquals(177L, out[0].minutes)
+        assertEquals(1, out[0].stages.size)
+        assertEquals(t0 + 247 * m, out[1].start)
+        assertEquals(t0 + 445 * m, out[1].end)
+        assertTrue("συνεδρία χωρίς φάσεις μένει χωριστή", out[1].stages.isEmpty())
+        assertNull("η βαθμολογία είναι όλης της εγγραφής, όχι μιας συνεδρίας", out[0].score)
+        assertNull(out[1].score)
+        // Το κενό 02:40–03:50 δεν ανήκει σε καμία εγγραφή.
+        assertTrue(out.none { it.start < t0 + 247 * m && it.end > t0 + 177 * m })
+    }
+
+    @Test
+    fun sleepWithOneSessionStaysAsBefore() {
+        val s = DataRules.SessionIn(5L, 100L, null, listOf(DataRules.StageIn("DEEP", 5L, 100L)))
+        assertEquals(listOf(DataRules.SleepOut(0L, 120L, 2L, 77, s.stages)), DataRules.splitSleep(0L, 120L, 2L, 77, listOf(s)))
+        assertEquals(listOf(DataRules.SleepOut(0L, 120L, 2L, 77, emptyList())), DataRules.splitSleep(0L, 120L, 2L, 77, emptyList()))
+        // Συνεδρίες χωρίς χρόνους: παίρνουν τα όρια από τις φάσεις τους, ή (καμία) όλη η εγγραφή.
+        val x = DataRules.SessionIn(null, null, null, listOf(DataRules.StageIn("LIGHT", 10L, 70_010L)))
+        val y = DataRules.SessionIn(null, null, null, emptyList())
+        assertEquals(listOf(DataRules.SleepOut(10L, 70_010L, 1L, null, x.stages)), DataRules.splitSleep(0L, 200_000L, 3L, 9, listOf(x, y)))
+    }
+
+    @Test
+    fun watchFilterEmptyIsAnError() {
+        // Έλεγχος 2, C6: 0 με φίλτρο ρολογιού ενώ υπάρχουν χωρίς φίλτρο = σφάλμα (κρατάμε το ιστορικό).
+        assertTrue(DataRules.watchFilterEmpty(0, 1))
+        assertFalse(DataRules.watchFilterEmpty(0, 0))
+        assertFalse(DataRules.watchFilterEmpty(3, 5))
+        assertEquals("watch_filter_empty", DataRules.WATCH_FILTER_EMPTY)
+    }
+
+    @Test
+    fun corruptHandlerClosesOnlyAnOpenDatabase() {
+        // Έλεγχος 2, C8: στο πρώτο άνοιγμα η βάση δεν είναι ανοιχτή ακόμα· close() θα έκανε το άνοιγμα να αποτύχει.
+        var closed = 0
+        DataRules.closeIfOpen(false) { closed++ }
+        assertEquals(0, closed)
+        DataRules.closeIfOpen(true) { closed++ }
+        assertEquals(1, closed)
+        DataRules.closeIfOpen(true) { throw IllegalStateException("ήδη κλειστή") }
+    }
+
+    @Test
+    fun corruptMoveKeepsMainDbWhenWalCannotMove() {
+        // C14 (R11): αν δεν μετακινηθεί το -wal, η κύρια βάση ΔΕΝ φεύγει (αλλιώς η νέα βάση θα έπαιζε το παλιό -wal).
+        val root = Files.createTempDirectory("ygeia").toFile()
+        val db = File(root, "ygeia.db").apply { writeText("ΒΑΣΗ") }
+        File(root, "ygeia.db-wal").writeText("WAL")
+        val dir = File(root, "corrupt")
+        // Ο προορισμός του -wal είναι φάκελος με περιεχόμενο: ούτε μετονομασία ούτε αντιγραφή γίνεται.
+        File(dir, "ygeia.db-wal.corrupt-7").apply { mkdirs() }.resolve("x").writeText("x")
+        try {
+            DataRules.keepCorrupt(db, dir, 7L)
+        } catch (_: Throwable) {
+        }
+        assertTrue("η κύρια βάση μένει στη θέση της", db.exists())
+        assertEquals("ΒΑΣΗ", db.readText())
+        root.deleteRecursively()
+    }
 }

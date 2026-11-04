@@ -40,6 +40,18 @@ object DataRules {
         }
     }
 
+    /**
+     * Χαλασμένη βάση (C8): κλείνει ΜΟΝΟ αν είναι ανοιχτή. Στο πρώτο άνοιγμα το Android καλεί τον χειριστή πριν ανοίξει η
+     * βάση και μετά ξαναδοκιμάζει στο ίδιο αντικείμενο: ένα close() τότε θα έκανε το άνοιγμα να αποτύχει.
+     */
+    fun closeIfOpen(isOpen: Boolean, close: () -> Unit) {
+        if (!isOpen) return
+        try {
+            close()
+        } catch (_: Throwable) {
+        }
+    }
+
     /** Όνομα αντιγράφου μιας χαλασμένης βάσης (A7): ποτέ δεν σβήνεται, κρατιέται με την ώρα. */
     fun corruptName(name: String, ms: Long): String = "$name.corrupt-$ms"
 
@@ -50,7 +62,9 @@ object DataRules {
     fun keepCorrupt(db: File, dir: File, ms: Long): File? {
         dir.mkdirs()
         var main: File? = null
-        for (suffix in listOf("", "-wal", "-shm", "-journal")) {
+        // C14 (R11): πρώτα τα -wal/-shm/-journal και τελευταία η κύρια βάση· αλλιώς, αν αποτύχει η μετακίνηση του -wal,
+        // η καινούργια βάση θα «έπαιζε» το παλιό -wal και θα χαλούσε κι αυτή.
+        for (suffix in listOf("-wal", "-shm", "-journal", "")) {
             val f = File(db.path + suffix)
             if (!f.exists()) continue
             val to = File(dir, corruptName(db.name + suffix, ms))
@@ -62,6 +76,44 @@ object DataRules {
         }
         return main
     }
+
+    /** Μία φάση ύπνου (όνομα όπως η Samsung, π.χ. «LIGHT»· χρόνοι σε ms). */
+    data class StageIn(val stage: String, val start: Long, val end: Long)
+
+    /** Μία συνεδρία (SleepSession) μέσα σε μια εγγραφή ύπνου της Samsung· οποιοδήποτε πεδίο μπορεί να λείπει. */
+    data class SessionIn(val start: Long?, val end: Long?, val minutes: Long?, val stages: List<StageIn>)
+
+    /** Μία εγγραφή ύπνου όπως πηγαίνει στη Flutter. */
+    data class SleepOut(val start: Long, val end: Long, val minutes: Long?, val score: Int?, val stages: List<StageIn>)
+
+    /**
+     * Έλεγχος 2, C2: μία εγγραφή ύπνου της Samsung μπορεί να έχει πολλές συνεδρίες (όταν ξυπνάς για ώρα). Βγαίνει ΜΙΑ
+     * εγγραφή ανά συνεδρία, με τα δικά της όρια, διάρκεια και φάσεις, ώστε το κενό ανάμεσα να μη μετρά ποτέ ως ύπνος
+     * (ούτε στους παλμούς/οξυγόνο της νύχτας) και μια συνεδρία χωρίς φάσεις να φαίνεται χωριστά. Η βαθμολογία της
+     * Samsung αφορά όλη την εγγραφή: μπαίνει μόνο όταν η συνεδρία είναι μία.
+     */
+    fun splitSleep(start: Long, end: Long, minutes: Long?, score: Int?, sessions: List<SessionIn>): List<SleepOut> {
+        if (sessions.size <= 1) return listOf(SleepOut(start, end, minutes, score, sessions.firstOrNull()?.stages ?: emptyList()))
+        val out = ArrayList<SleepOut>()
+        for (x in sessions) {
+            val a = x.start ?: x.stages.minOfOrNull { it.start } ?: continue
+            val b = x.end ?: x.stages.maxOfOrNull { it.end } ?: continue
+            if (b <= a) continue
+            out.add(SleepOut(a, b, x.minutes ?: ((b - a) / 60000), null, x.stages))
+        }
+        if (out.isEmpty()) return listOf(SleepOut(start, end, minutes, score, sessions.flatMap { it.stages }))
+        return out.sortedBy { it.start }
+    }
+
+    /**
+     * Έλεγχος 2, C6: το φίλτρο «μόνο ρολόι» δεν βρήκε καμία εγγραφή, ενώ χωρίς φίλτρο υπάρχουν στο ίδιο διάστημα. Αυτό
+     * είναι σφάλμα ανάγνωσης (π.χ. το ρολόι δεν αναγνωρίζεται ως ρολόι μετά από αλλαγή κινητού), όχι «δεν κοιμήθηκες»:
+     * η εφαρμογή κρατά το ιστορικό και το λέει στο «Τι φτάνει».
+     */
+    fun watchFilterEmpty(filtered: Int, unfiltered: Int): Boolean = filtered == 0 && unfiltered > 0
+
+    /** Το μήνυμα του σφάλματος [watchFilterEmpty] (η Flutter το αναγνωρίζει με αυτό το κλειδί). */
+    const val WATCH_FILTER_EMPTY = "watch_filter_empty"
 
     /**
      * Μόνο αυτές οι σελίδες ανοίγουν στον browser από την εφαρμογή (σύνδεση Oura): η σελίδα σύνδεσης για νέες

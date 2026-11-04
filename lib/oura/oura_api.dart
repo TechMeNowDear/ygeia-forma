@@ -193,6 +193,14 @@ enum OuraErrorKind {
 
   /// Δεν άνοιξε ο browser.
   noBrowser,
+
+  /// Ο μεσάζων στο Netlify δεν έχει το μυστικό της εφαρμογής (503 proxy_not_configured): δεν είναι πρόβλημα δικτύου
+  /// ούτε χρειάζεται νέα σύνδεση (έλεγχος 2, C10).
+  proxyNotConfigured,
+
+  /// Ο μεσάζων (ή η Oura για το Client ID/secret μας) απέρριψε το αίτημα ως λάθος δικό μας (400/401 invalid_client,
+  /// invalid_request, unsupported_grant_type): ΟΧΙ «νέα σύνδεση», τα tokens μένουν (C10).
+  proxyRejected,
 }
 
 class OuraError implements Exception {
@@ -241,6 +249,10 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.incomplete => 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά.',
       OuraErrorKind.notConfigured => 'Η εγγραφή στην Oura γίνεται τη μέρα που θα έρθει το δαχτυλίδι.',
       OuraErrorKind.noBrowser => 'Δεν άνοιξε ο browser του κινητού.',
+      OuraErrorKind.proxyNotConfigured =>
+        'Ο μεσάζων δεν έχει ρυθμιστεί (λείπει το μυστικό της εφαρμογής στο Netlify). Δεν άλλαξε τίποτα· θα ξαναδοκιμάσει σε μία ώρα.',
+      OuraErrorKind.proxyRejected =>
+        'Ο μεσάζων της σύνδεσης δεν δέχτηκε το αίτημα. Δεν χρειάζεται νέα σύνδεση· το είδαμε και θα το διορθώσουμε.',
     };
 
 /// Κείμενο για το αποτέλεσμα μιας ΣΥΝΔΕΣΗΣ (έλεγχος 4/11, A13): ο κωδικός μιας σύνδεσης είναι μιας χρήσης, άρα τίποτα
@@ -258,6 +270,21 @@ String ouraLoginErrorText(OuraErrorKind k, {String? code}) {
     _ => ouraErrorText(k),
   };
   return code == null ? text : '$text (κωδικός: $code)';
+}
+
+/// Κωδικοί OAuth που σημαίνουν λάθος στο ΔΙΚΟ ΜΑΣ αίτημα ή στη ρύθμιση του μεσάζοντα, όχι ληγμένη σύνδεση.
+const _proxyFaults = {'invalid_client', 'invalid_request', 'unsupported_grant_type'};
+
+/// Το είδος σφάλματος μιας απάντησης του /oauth/token (μέσω του μεσάζοντα), έλεγχος 2, C10:
+/// - 503 proxy_not_configured → [OuraErrorKind.proxyNotConfigured] (όχι «δίκτυο» για πάντα),
+/// - 400/401 με invalid_client/invalid_request/unsupported_grant_type → [OuraErrorKind.proxyRejected],
+/// - άλλο 400/401 (π.χ. invalid_grant: το refresh token δεν ισχύει) → [refused] («νέα σύνδεση» ή «απορρίφθηκε»),
+/// - τα υπόλοιπα όπως [kindForStatus] (502 upstream_unreachable = δίκτυο).
+OuraErrorKind tokenErrorKind(int status, String body, {required OuraErrorKind refused}) {
+  final code = oauthCodeOfBody(body);
+  if (status == 503 && code == 'proxy_not_configured') return OuraErrorKind.proxyNotConfigured;
+  if (status == 400 || status == 401) return _proxyFaults.contains(code) ? OuraErrorKind.proxyRejected : refused;
+  return kindForStatus(status);
 }
 
 /// Το είδος σφάλματος από έναν κωδικό HTTP (εκτός 2xx).
@@ -472,7 +499,10 @@ class OuraLink {
       // π.χ. «invalid_client» (θέλει Client Secret) ή «invalid_grant» (κωδικός/verifier): κρατιέται για το Sentry.
       throw OuraError(OuraErrorKind.tokenRejected, status: res.status, code: oauthCodeOfBody(res.body));
     }
-    if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
+    if (res.status != 200) {
+      throw OuraError(tokenErrorKind(res.status, res.body, refused: OuraErrorKind.tokenRejected),
+          status: res.status, retryAfter: res.retryAfter, code: oauthCodeOfBody(res.body));
+    }
     final t = OuraTokens.parseResponse(res.body, _clock());
     return (tokens: t, from: pending.from, gen: gen);
   }
@@ -581,11 +611,12 @@ class OuraLink {
       'refresh_token': old.refresh,
       'client_id': clientId,
     });
-    if (res.status == 400 || res.status == 401) {
-      // Το refresh token δεν ισχύει πια (μιας χρήσης, ή ανακλήθηκε στην Oura).
-      throw OuraError(OuraErrorKind.reconnect, status: res.status);
+    if (res.status != 200) {
+      // 400/401 invalid_grant: το refresh token δεν ισχύει πια (μιας χρήσης, ή ανακλήθηκε στην Oura) → νέα σύνδεση.
+      // Λάθος του μεσάζοντα (invalid_client, 503 proxy_not_configured): ΟΧΙ νέα σύνδεση, τα tokens μένουν (C10).
+      throw OuraError(tokenErrorKind(res.status, res.body, refused: OuraErrorKind.reconnect),
+          status: res.status, retryAfter: res.retryAfter, code: oauthCodeOfBody(res.body));
     }
-    if (res.status != 200) throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
     final t = OuraTokens.parseResponse(res.body, _clock());
     // ΠΡΩΤΑ αποθήκευση του νέου refresh token, ΜΕΤΑ χρήση της νέας πρόσβασης. Μετά από αποσύνδεση δεν
     // αποθηκεύεται τίποτα (τα tokens επιστρέφονται μόνο για να ανακληθούν).

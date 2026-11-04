@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/heart_day.dart';
+import 'package:ygeia_forma/history.dart';
 
 /// Η νύχτα 25→26/10 του χρήστη, όπως την έδωσε η Samsung: δύο κομμάτια με κενό 1,5 ώρας,
 /// χωρίς βήματα και με παλμούς ύπνου μέσα στο κενό.
@@ -53,15 +54,18 @@ void main() {
     expect(n.score, isNull, reason: 'σπασμένη νύχτα: η Samsung βαθμολογεί κάθε κομμάτι χωριστά');
   });
 
-  test('Βήματα στο κενό (A6): χωρίς πιθανό ύπνο, και το μικρό κομμάτι πριν είναι χωριστό (υπνάκος)', () {
+  // Έλεγχος 2, C1: πριν (A6) τα 200 βήματα «έκοβαν» τη νύχτα και το πρώτο κομμάτι γινόταν υπνάκος. Τώρα κομμάτι με κενό
+  // ως 4 ώρες είναι η ίδια νύχτα ανεξάρτητα από βήματα· τα βήματα αλλάζουν μόνο την ετικέτα του κενού.
+  test('Βήματα στο κενό (C1): ίδια νύχτα· χωρίς «πιθανό ύπνο», το κενό δεν μετρά', () {
     final n = Dashboard.fromJson(night(gapSteps: 200)).nights.single;
     expect(n.estimatedMinutes, 0);
-    expect(n.minutes, 141, reason: 'σηκώθηκε και περπάτησε (200 βήματα): το κομμάτι των 63 λεπτών δεν είναι η ίδια νύχτα');
-    expect(n.napMinutes, 63);
-    expect(n.start, DateTime(2026, 10, 26, 5, 34));
+    expect(n.minutes, 63 + 141, reason: 'μια βόλτα στο κενό δεν κόβει τη νύχτα· το κενό των 99 λεπτών δεν μετρά');
+    expect(n.betweenMinutes, 99);
+    expect(n.napMinutes, 0);
+    expect(n.start, DateTime(2026, 10, 26, 2, 52));
   });
 
-  group('A6: κομμάτια της ίδιας ημερομηνίας ενώνονται μόνο με ήσυχο κενό', () {
+  group('C1: κομμάτια με κενό ως 4 ώρες είναι η ίδια νύχτα· υπνάκοι μόνο το βράδυ ως τις 22:00 ή το πρωί', () {
     int ms(DateTime t) => t.millisecondsSinceEpoch;
     Map<String, dynamic> rec(DateTime a, DateTime b) =>
         {'start': ms(a), 'end': ms(b), 'minutes': b.difference(a).inMinutes, 'stages': []};
@@ -110,13 +114,15 @@ void main() {
       expect(d.nights.single.napMinutes, 0);
     });
 
-    test('Χωρίς στοιχεία βημάτων για το κενό: χωριστά (δεν μαντεύουμε)', () {
-      final d = Dashboard.fromJson(json([
-        rec(DateTime(2026, 11, 1, 23, 30), DateTime(2026, 11, 2, 5)),
-        rec(DateTime(2026, 11, 2, 6), DateTime(2026, 11, 2, 7)),
-      ], known: false));
-      expect(d.nights.single.minutes, 330);
-      expect(d.nights.single.napMinutes, 60);
+    test('Χωρίς στοιχεία βημάτων για το κενό: ίδια νύχτα, όπως με βήματα (C1: καμία αλλαγή όταν η νύχτα παλιώσει)', () {
+      Dashboard read(bool known) => Dashboard.fromJson(json([
+            rec(DateTime(2026, 11, 1, 23, 30), DateTime(2026, 11, 2, 5)),
+            rec(DateTime(2026, 11, 2, 6), DateTime(2026, 11, 2, 7)),
+          ], known: known));
+      for (final known in [false, true]) {
+        expect(read(known).nights.single.minutes, 330 + 60, reason: 'βήματα γνωστά: $known');
+        expect(read(known).nights.single.napMinutes, 0);
+      }
     });
 
     test('Δεύτερο κομμάτι 3 ωρών και πάνω με βήματα στο κενό: μένει μέρος της νύχτας (δεν είναι λαγοκοίμισμα)', () {
@@ -145,15 +151,27 @@ void main() {
     final d = Dashboard.fromJson(night(secondStart: DateTime(2026, 10, 26, 5, 0).add(const Duration(hours: 5, minutes: 30))));
     // κενό 03:55 → 10:30 = 6,5 ώρες: πάνω από το όριο των 4 ωρών, άρα υπνάκος όπως πριν
     expect(d.nights.single.napMinutes, 141);
-    // Κυριακή 25/10: 05:55–09:50 και 10:53–… με κενό 63 λεπτών χωρίς βήματα.
+    // Κυριακή 25/10: 05:55–09:50 και 10:53–… με κενό 63 λεπτών χωρίς βήματα. Κανόνας C1 (έλεγχος 2): κομμάτι που
+    // αρχίζει μετά τις 06:00 και ΠΑΝΩ από 60 λεπτά μετά το ξύπνημα είναι πρωινός υπνάκος, ανεξάρτητα από βήματα/παλμούς
+    // (πριν: τα βήματα και οι παλμοί το ένωναν, και η ίδια μέρα άλλαζε τιμή όταν περνούσαν 7 μέρες). Δεν χάνεται:
+    // μετρά στον υπνάκο της μέρας (napMin).
     final sunday = Dashboard.fromJson(night(
       firstStart: DateTime(2026, 10, 26, 5, 55),
       firstEnd: DateTime(2026, 10, 26, 9, 50),
       secondStart: DateTime(2026, 10, 26, 10, 53),
-    )).nights;
-    expect(sunday.single.napMinutes, 0);
-    expect(sunday.single.estimatedMinutes, 63);
-    expect(sunday.single.minutes, 63 + 141);
+    ));
+    expect(sunday.nights.single.napMinutes, 141);
+    expect(sunday.nights.single.estimatedMinutes, 0);
+    expect(sunday.nights.single.minutes, 63);
+    expect(summarizeDay(sunday, DateTime(2026, 10, 26))[K.napMin], 141);
+    // Κενό ακριβώς 60 λεπτών: ίδια νύχτα.
+    final close = Dashboard.fromJson(night(
+      firstStart: DateTime(2026, 10, 26, 5, 55),
+      firstEnd: DateTime(2026, 10, 26, 9, 50),
+      secondStart: DateTime(2026, 10, 26, 10, 50),
+    )).nights.single;
+    expect(close.napMinutes, 0);
+    expect(close.minutes, 63 + 141);
   });
 
   test('Υπνάκος με βήματα πριν: μένει υπνάκος', () {

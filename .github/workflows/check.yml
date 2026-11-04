@@ -55,6 +55,10 @@ jobs:
           fi
           echo "::notice title=Ανάλυση κώδικα::$(tail -1 analyze.log | tr -cd '[:print:]' | tail -c 120)"
 
+      # Έλεγχος 2, C10: ο μεσάζων της Oura τρέχει πραγματικά με node (ψεύτικα Netlify.env και fetch).
+      - name: Μεσάζων Oura (node)
+        run: node test/node/oura_token_test.mjs site/netlify/functions/oura-token.mjs
+
       - name: Έλεγχοι (ώρα Αθήνας)
         run: |
           set -o pipefail

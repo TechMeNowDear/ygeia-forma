@@ -203,7 +203,7 @@ const ouraKeys = <String, String>{
 final Set<String> ouraKeySet = ouraKeys.values.toSet();
 
 /// Μετρήσεις που δίνει μόνο το Oura: με το ρολόι ως πηγή δεν έχουν τιμή (όχι «0», απλώς κενό).
-const ouraOnlyMetrics = {K.lowHr, K.hrv, K.breath, K.napMin};
+const ouraOnlyMetrics = {K.lowHr, K.hrv, K.breath};
 
 /// Μετρήσεις του ρολογιού που αλλάζουν ΟΡΙΣΜΟ όταν η νύχτα έρχεται από το Oura (έλεγχος 4/11, A4):
 /// - οξυγόνο: πριν, οι μετρήσεις μέσα στον ύπνο του ρολογιού· μετά, μέσα στις ώρες ύπνου του Oura,
@@ -213,7 +213,7 @@ const definitionMetrics = {K.spo2Avg, K.spo2Min, K.spo2Low, K.dayHr, K.restHr, K
 
 /// Τιμές της «νύχτας» από το ρολόι, όπως αποθηκεύονται (χωρίς το οξυγόνο, που είναι πάντα του ρολογιού).
 const watchNightKeys = {
-  K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake, K.sleepHr, K.skinTemp, K.energy,
+  K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake, K.sleepHr, K.skinTemp, K.energy, K.napMin,
 };
 
 /// Πόσες μέρες μετά τη σύνδεση φαίνεται η «Σύγκριση πηγών» (και διαβάζεται ο ύπνος του ρολογιού γι' αυτήν).

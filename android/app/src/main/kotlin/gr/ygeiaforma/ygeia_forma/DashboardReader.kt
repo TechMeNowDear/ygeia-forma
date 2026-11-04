@@ -209,27 +209,36 @@ class DashboardReader(
 
     private suspend fun sleep(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.SLEEP.readDataRequestBuilder, from, to, source = WATCH)) {
+        for (p in readAll(DataTypes.SLEEP.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.SLEEP.readDataRequestBuilder)) {
             val start = ms(p.startTime) ?: continue
             val duration: Duration? = p.getValue(DataType.SleepType.DURATION)
             val score: Int? = p.getValue(DataType.SleepType.SLEEP_SCORE)
             val sessions: List<SleepSession>? = p.getValue(DataType.SleepType.SESSIONS)
-            val stages = JSONArray()
-            for (session in sessions ?: emptyList()) {
-                for (stage in session.stages ?: emptyList()) {
-                    val a = ms(stage.startTime) ?: continue
-                    val b = ms(stage.endTime) ?: continue
-                    stages.put(JSONArray().put(stage.stage?.toString() ?: "UNDEFINED").put(a).put(b))
-                }
+            val input = (sessions ?: emptyList()).map { session ->
+                DataRules.SessionIn(
+                    ms(session.startTime),
+                    ms(session.endTime),
+                    session.duration?.toMinutes(),
+                    (session.stages ?: emptyList()).mapNotNull { stage ->
+                        val a = ms(stage.startTime) ?: return@mapNotNull null
+                        val b = ms(stage.endTime) ?: return@mapNotNull null
+                        DataRules.StageIn(stage.stage?.toString() ?: "UNDEFINED", a, b)
+                    },
+                )
             }
-            out.put(
-                JSONObject()
-                    .put("start", start)
-                    .put("end", ms(p.endTime) ?: start)
-                    .put("minutes", duration?.toMinutes() ?: JSONObject.NULL)
-                    .put("score", score ?: JSONObject.NULL)
-                    .put("stages", stages)
-            )
+            // C2: μία εγγραφή ανά συνεδρία (το κενό ανάμεσα δεν μετρά ποτέ ως ύπνος).
+            for (r in DataRules.splitSleep(start, ms(p.endTime) ?: start, duration?.toMinutes(), score, input)) {
+                val stages = JSONArray()
+                for (x in r.stages) stages.put(JSONArray().put(x.stage).put(x.start).put(x.end))
+                out.put(
+                    JSONObject()
+                        .put("start", r.start)
+                        .put("end", r.end)
+                        .put("minutes", r.minutes ?: JSONObject.NULL)
+                        .put("score", r.score ?: JSONObject.NULL)
+                        .put("stages", stages)
+                )
+            }
         }
         return out
     }
@@ -239,7 +248,7 @@ class DashboardReader(
     private suspend fun heart(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
         // Το ρολόι μετρά συνεχώς: περισσότερες σελίδες από τα άλλα είδη (όριο 60.000 εγγραφές).
-        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES, source = WATCH)) {
+        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES, source = WATCH, unfiltered = DataTypes.HEART_RATE.readDataRequestBuilder)) {
             val series: List<HeartRate>? = p.getValue(DataType.HeartRateType.SERIES_DATA)
             if (!series.isNullOrEmpty()) {
                 for (h in series) {
@@ -279,7 +288,7 @@ class DashboardReader(
 
     private suspend fun spo2(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to, source = WATCH)) {
+        for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.BLOOD_OXYGEN.readDataRequestBuilder)) {
             val avg: Float? = p.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION)
             if (avg == null || !avg.isFinite()) continue
             val a = ms(p.startTime) ?: continue
@@ -329,7 +338,7 @@ class DashboardReader(
 
     private suspend fun skinTemp(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, from, to, source = WATCH)) {
+        for (p in readAll(DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder)) {
             val avg: Float? = p.getValue(DataType.SkinTemperatureType.SKIN_TEMPERATURE)
             if (avg == null || avg.isNaN()) continue
             val a = ms(p.startTime) ?: continue
@@ -466,6 +475,8 @@ class DashboardReader(
         to: LocalDateTime,
         maxPages: Int = MAX_PAGES,
         source: ReadSourceFilter? = null,
+        /** Καινούργιος builder του ίδιου είδους ΧΩΡΙΣ φίλτρο, για τον έλεγχο C6 (null = χωρίς έλεγχο). */
+        unfiltered: ReadDataRequest.DualTimeBuilder<HealthDataPoint>? = null,
     ): List<HealthDataPoint> {
         val all = ArrayList<HealthDataPoint>()
         var token: String? = null
@@ -484,6 +495,17 @@ class DashboardReader(
         } while (!token.isNullOrEmpty() && pages < maxPages)
         // Έμειναν κι άλλες σελίδες: η ανάγνωση είναι μισή. Καλύτερα σφάλμα (η εφαρμογή κρατά τις παλιές
         // τιμές) παρά μισά δεδομένα που θα έμοιαζαν πλήρη.
+        // C6: με φίλτρο «μόνο ρολόι» καμία εγγραφή — υπάρχουν όμως χωρίς φίλτρο; Τότε σφάλμα (η εφαρμογή κρατά το
+        // ιστορικό), όχι άδεια λίστα. Μόνο όταν βγήκε άδειο: μία σελίδα μίας εγγραφής, σχεδόν χωρίς κόστος.
+        if (unfiltered != null && all.isEmpty()) {
+            val probe = unfiltered
+                .setLocalTimeFilter(LocalTimeFilter.of(from, to))
+                .setOrdering(Ordering.ASC)
+                .setPageSize(1)
+            if (DataRules.watchFilterEmpty(0, s.readData(probe.build()).dataList.size)) {
+                throw IllegalStateException(DataRules.WATCH_FILTER_EMPTY)
+            }
+        }
         if (!token.isNullOrEmpty()) {
             val e = IllegalStateException("Πάρα πολλές εγγραφές (όριο ${maxPages * PAGE_SIZE})")
             // Να το μάθουμε (Sentry), μία φορά ανά άνοιγμα της εφαρμογής: κάθε επόμενη ανάγνωση θα κοπεί ξανά.
