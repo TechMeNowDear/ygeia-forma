@@ -137,8 +137,8 @@ class ComparePage extends StatelessWidget {
                 // Έλεγχος υπολογισμών F7 (4/11): δύο διαφορετικοί ορισμοί, γραμμένοι ρητά.
                 Text(
                   'Τι συγκρίνεται: πραγματικός ύπνος και στις δύο, χωρίς τα ξυπνήματα (ρολόι: βαθύς + ελαφρύς + REM της '
-                  'Samsung· νύχτα χωρίς φάσεις: «—»). Ο χρόνος ξύπνιος και ο χρόνος από τον ύπνο ως το ξύπνημα φαίνονται '
-                  'χωριστά· και οι δύο συσκευές μετρούν λιγότερα ξυπνήματα απ\' όσα είναι.',
+                  'Samsung· νύχτα χωρίς φάσεις: «—»). Χωριστά ο χρόνος ξύπνιος και ο χρόνος «με τα ξυπνήματα» (από τον '
+                  'ύπνο ως το ξύπνημα)· και οι δύο συσκευές μετρούν λιγότερα ξυπνήματα απ\' όσα είναι.',
                   style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
                 ),
                 const SizedBox(height: 8),
@@ -201,7 +201,8 @@ class _CompareCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final r = row;
-    String dur(int? m) => m == null ? '—' : hoursMinutes(m);
+    // Σύντομη μορφή: στα 400 dp το «7 ώρες 16 λεπτά» έσπαγε σε 2 γραμμές σε κάθε κελί.
+    String dur(int? m) => m == null ? '—' : hoursMinutesShort(m);
     String t(DateTime? x) => x == null ? '—' : hm(x);
     String hr(double? x) => x == null ? '—' : '${x.round()} bpm';
 
@@ -243,9 +244,10 @@ class _CompareCard extends StatelessWidget {
                 const Align(alignment: Alignment.centerLeft, child: SourceTag(Source.watch)),
               ]),
               // Ίδιο με ίδιο (έλεγχος 4/11): πραγματικός ύπνος με πραγματικό, «με τα ξυπνήματα» με «με τα ξυπνήματα».
-              line('Ύπνος (χωρίς τα ξυπνήματα)', dur(r.ouraMinutes), dur(r.watchMinutes)),
+              // Οι ορισμοί είναι γραμμένοι στην κάρτα «Τι συγκρίνεται»· εδώ σύντομες ετικέτες.
+              line('Πραγματικός ύπνος', dur(r.ouraMinutes), dur(r.watchMinutes)),
               line('Ξύπνιος μέσα', dur(r.ouraAwake), dur(r.watchAwake)),
-              line('Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)', dur(r.ouraSpan), dur(r.watchSpan)),
+              line('Με τα ξυπνήματα', dur(r.ouraSpan), dur(r.watchSpan)),
               line('Κοιμήθηκες', t(r.ouraStart), t(r.watchStart)),
               line('Ξύπνησες', t(r.ouraEnd), t(r.watchEnd)),
               line('Κομμάτια', r.ouraMinutes == null ? '—' : '1', r.watchParts == 0 ? '—' : '${r.watchParts}'),

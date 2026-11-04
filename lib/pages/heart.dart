@@ -196,7 +196,7 @@ class HeartPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού. $oxygenAboutText',
+                    'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική). $oxygenAboutText',
                     style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                   ),
                   const Hairline(vertical: 12),
@@ -205,7 +205,8 @@ class HeartPage extends StatelessWidget {
                   for (final n in oxNights)
                     InfoRow(
                       shortDayDate(n.$1),
-                      '${n.$2.round()}% · χαμηλότερη ${n.$3 == null ? '—' : lowestText(n.$3!)}% (ενδεικτικό)',
+                      // Χωρίς «(ενδεικτικό)» σε κάθε γραμμή (το λέει το κείμενο πάνω): στα 400 dp η ημερομηνία έσπαγε σε 2 γραμμές.
+                      '${n.$2.round()}% · χαμηλότερη ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
                     ),
                   const SizedBox(height: 10),
                   OxygenNotes(guidance: oxGuidance),

@@ -101,6 +101,15 @@ String signedDec(num v, [int digits = 1]) {
 }
 
 /// Διαφορά λεπτών: «25 λεπτά περισσότερα», «1 ώρα 5 λεπτά λιγότερα».
+/// Σύντομη διάρκεια για στενές στήλες: 436 → «7 ώρ. 16 λεπ.», 22 → «22 λεπ.», 420 → «7 ώρ.».
+String hoursMinutesShort(int minutes) {
+  if (minutes < 0) return '−${hoursMinutesShort(-minutes)}';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '$m λεπ.';
+  return m == 0 ? '$h ώρ.' : '$h ώρ. $m λεπ.';
+}
+
 String moreLessMinutes(int v) {
   if (v == 0) return 'ίδια διάρκεια';
   return v > 0 ? '${hoursMinutes(v)} περισσότερο' : '${hoursMinutes(-v)} λιγότερο';

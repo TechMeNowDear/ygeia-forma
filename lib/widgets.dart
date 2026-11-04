@@ -361,8 +361,11 @@ enum TrendKind { good, bad, neutral }
 
 /// «Χάπι» τάσης: ↑/↓ με χρώμα καλό/κακό/ουδέτερο.
 class TrendPill extends StatelessWidget {
-  const TrendPill(this.text, {super.key, this.kind = TrendKind.neutral, this.up, this.onDark = false});
+  const TrendPill(this.text, {super.key, this.kind = TrendKind.neutral, this.up, this.onDark = false, this.maxLines = 1});
   final String text;
+
+  /// Γραμμές πριν κοπεί με «…» (2 όπου το κείμενο είναι πρόταση, π.χ. η σύγκριση με το συνηθισμένο).
+  final int maxLines;
   final TrendKind kind;
   final bool? up;
   final bool onDark;
@@ -393,7 +396,7 @@ class TrendPill extends StatelessWidget {
           Flexible(
             child: Text(
               text,
-              maxLines: 1,
+              maxLines: maxLines,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: color),
             ),

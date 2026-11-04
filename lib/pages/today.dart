@@ -424,6 +424,7 @@ class _SleepCard extends StatelessWidget {
                       diff.abs() < 10 ? 'Όσο κοιμάσαι συνήθως' : '${moreLessMinutes(diff)} από ό,τι συνήθως',
                       up: diff.abs() < 10 ? null : diff > 0,
                       onDark: true,
+                      maxLines: 2,
                     ),
                   ),
                 ],
