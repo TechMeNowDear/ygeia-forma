@@ -301,7 +301,7 @@ void main() {
       final g = oxygenGuidance({_add(last, -16): 72, _add(last, -6): 74.6, last: 91}, last);
       final m = g.messages.single;
       expect(m, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες (14/10: 72%, 24/10: 74,6%)'));
-      expect(m, contains('ένα αρνητικό τεστ άπνοιας του ρολογιού δεν το αποκλείει'));
+      expect(m, contains('ένα αρνητικό τεστ άπνοιας του ρολογιού δεν αποκλείει πρόβλημα στην αναπνοή στον ύπνο'));  // κλινικός έλεγχος 4, C2/C5
       expect(m, isNot(contains('ενήλικες')));
     });
 

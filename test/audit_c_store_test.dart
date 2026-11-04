@@ -250,13 +250,27 @@ void main() {
   });
 
   group('Έλεγχος 3, E3: φίλτρο ρολογιού μόνο στις πρόσφατες αναγνώσεις', () {
-    test('Κομμάτι με ύπνο μόνο από άλλη συσκευή: δεκτό με την πρώτη (όχι 3 ξαναδοκιμές)· η διάρκεια φυλάσσεται χωριστά', () async {
+    // Έλεγχος 4 (red team M1, 1_data M3): ΟΛΕΣ οι τιμές ύπνου της μέρας κρυφές («nw.*»), όχι μόνο η διάρκεια (πριν:
+    // ώρες, φάσεις, παλμοί, οξυγόνο, θερμοκρασία, υπνάκοι σβήνονταν)· και μόνο πριν από τον πρώτο ύπνο ρολογιού.
+    test('Κομμάτι με ύπνο μόνο από άλλη συσκευή, πριν από τον πρώτο ύπνο ρολογιού: δεκτό με την πρώτη· όλες οι τιμές ύπνου χωριστά', () async {
       final old = add(today, -33);
       final a = Android(now)
         ..prefs = {'historyVersion': 2}
-        ..range = jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'readAt': now.millisecondsSinceEpoch});
+        // Ο ύπνος του ρολογιού αρχίζει τη μέρα −6: η κανονική ανάγνωση (30 μέρες) δεν έχει νύχτες πριν.
+        ..dashboard = jsonEncode(sampleDashboardJson(now)..['sleep'] = [])
+        ..range = jsonEncode({
+          'ok': true,
+          'sleep': [],
+          'nonWatch': ['sleep'],
+          'firstWatchSleep': add(today, -6).millisecondsSinceEpoch,
+          'readAt': now.millisecondsSinceEpoch,
+        });
+      const sleepRow = {
+        K.bedtime: 330.0, K.wake: 800.0, K.deepPct: 12.0, K.remPct: 20.0, K.awakeMin: 30.0, K.sleepScore: 80.0,
+        K.sleepHr: 58.0, K.spo2Avg: 94.0, K.spo2Min: 74.0, K.spo2Low: 1.0, K.skinTemp: 34.1, K.napMin: 25.0,
+      };
       for (var i = 0; i < 6; i++) {
-        a.days[dateKey(add(old, -i))] = {K.sleepMin: 400.0 + i, K.bedtime: 330, K.steps: 4000};
+        a.days[dateKey(add(old, -i))] = {K.sleepMin: 400.0 + i, ...sleepRow, K.steps: 4000};
       }
       final s = await boot(a);
       expect(a.rangeCalls, isNotEmpty);
@@ -264,10 +278,84 @@ void main() {
       expect(a.prefs['staleMonths'] ?? const [], isEmpty);
       for (var i = 0; i < 6; i++) {
         final row = a.days[dateKey(add(old, -i))]!;
-        expect(row.containsKey(K.sleepMin), isFalse, reason: 'δεν φαίνεται ως ύπνος του ρολογιού');
+        expect(row.keys.where(sleepKeys.contains), isEmpty, reason: 'δεν φαίνεται ως ύπνος του ρολογιού');
         expect(row[nonWatchSleepKey], 400.0 + i, reason: 'ποτέ δεν σβήνεται');
+        for (final e in sleepRow.entries) {
+          expect(row['$archivePrefix${e.key}'], e.value, reason: '${e.key}: ποτέ δεν σβήνεται');
+        }
+        expect(row[otherDeviceKey], 1);
         expect(row[K.steps], 4000);
       }
+      expect(otherDeviceNights(s.history), 6, reason: 'μετριέται στο «Τι φτάνει»');
+      s.dispose();
+    });
+
+    test('«Άλλη συσκευή» ΜΕΤΑ τον πρώτο ύπνο ρολογιού: σφάλμα ανάγνωσης, οι τιμές μένουν· μία ξαναδοκιμή ανά άνοιγμα', () async {
+      final old = add(today, -33);
+      final a = Android(now)
+        ..prefs = {'historyVersion': 2}
+        ..range = jsonEncode({
+          'ok': true,
+          'sleep': [],
+          'nonWatch': ['sleep'],
+          'firstWatchSleep': DateTime(2019, 3, 1).millisecondsSinceEpoch,
+          'readAt': now.millisecondsSinceEpoch,
+        });
+      final row = {K.sleepMin: 410.0, K.bedtime: 330.0, K.sleepHr: 58.0, K.spo2Min: 74.0, K.steps: 4000.0};
+      a.days[dateKey(old)] = {...row};
+      var s = await boot(a);
+      final k = (a.prefs['monthFails'] as Map).keys.single;
+      expect((a.prefs['monthFails'] as Map)[k], 1);
+      expect(a.days[dateKey(old)], row, reason: 'οι τιμές μένουν όπως ήταν');
+      final calls = a.rangeCalls.length;
+      // Ίδιο άνοιγμα: μία ξαναδοκιμή, μετά τίποτα ως το επόμενο άνοιγμα (όχι ανάγνωση σε κάθε επιστροφή).
+      await s.refresh();
+      await settle(s);
+      expect(a.rangeCalls.length, calls + 1);
+      expect((a.prefs['monthFails'] as Map)[k], 2);
+      await s.refresh();
+      await settle(s);
+      expect(a.rangeCalls.length, calls + 1, reason: 'όχι τρίτη φορά στο ίδιο άνοιγμα');
+      s.dispose();
+      // Νέο άνοιγμα: τρίτη αποτυχία → προχωρά κρατώντας τις τιμές, ο μήνας σημειώνεται.
+      s = await boot(a);
+      expect(a.prefs['staleMonths'], contains(k));
+      expect(a.days[dateKey(old)], row, reason: 'καμία τιμή δεν κρύφτηκε ή χάθηκε');
+      expect(otherDeviceNights(s.history), 0);
+      // Χωρίς απάντηση για τον πρώτο ύπνο ρολογιού (σφάλμα): επίσης σφάλμα, ποτέ «άλλη συσκευή».
+      expect(
+        parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'firstWatchSleep': {'error': 'x'}, 'readAt': 1}),
+                add(today, -60), add(today, -31))
+            .otherDeviceOk,
+        isFalse,
+      );
+      expect(parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'readAt': 1}), add(today, -60), add(today, -31)).otherDeviceOk,
+          isFalse);
+      expect(
+        parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'firstWatchSleep': null, 'readAt': 1}),
+                add(today, -60), add(today, -31))
+            .otherDeviceOk,
+        isTrue,
+        reason: 'κανένας ύπνος ρολογιού ποτέ: το κομμάτι είναι πριν από αυτόν',
+      );
+      s.dispose();
+    });
+
+    test('Επανανάγνωση: νύχτα του ρολογιού χωρίς έγκυρη νέα διάρκεια → όλες οι τιμές ύπνου κρυφές, όχι ως ύπνος (πριν: η διάρκεια v2 έμενε)', () async {
+      final old = add(today, -33);
+      final a = Android(now)
+        ..prefs = {'historyVersion': 2}
+        ..dashboard = jsonEncode(sampleDashboardJson(now)..['sleep'] = [])
+        ..range = jsonEncode({'ok': true, 'sleep': [], 'readAt': now.millisecondsSinceEpoch});
+      a.days[dateKey(old)] = {K.sleepMin: 452, K.bedtime: 330, K.sleepHr: 58, K.steps: 4000};
+      final s = await boot(a);
+      final r = a.days[dateKey(old)]!;
+      expect(r.containsKey(K.sleepMin), isFalse, reason: 'η διάρκεια «με τα ξυπνήματα» δεν φαίνεται ως ύπνος');
+      expect(r[nonWatchSleepKey], 452);
+      expect(r['${archivePrefix}bedtime'], 330);
+      expect(r['${archivePrefix}sleepHr'], 58);
+      expect(r.containsKey(otherDeviceKey), isFalse, reason: 'όχι «άλλη συσκευή»');
+      expect(r[K.steps], 4000);
       s.dispose();
     });
 
@@ -302,7 +390,7 @@ void main() {
     final plan = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -48));
     final changed = archiveNonWatchSleep(h, {dateKey(add(today, -49)): {K.sleepMin: 395}}, from: from, to: to, plan: plan);
     expect(changed, {dateKey(add(today, -50))});
-    expect(h[dateKey(add(today, -50))], {K.steps: 1, nonWatchSleepKey: 380});
+    expect(h[dateKey(add(today, -50))], {K.steps: 1, nonWatchSleepKey: 380, otherDeviceKey: 1});
     expect(h[dateKey(add(today, -49))], {K.sleepMin: 390}, reason: 'ήρθε νέα τιμή ρολογιού: το merge την αντικαθιστά');
     expect(h[dateKey(add(today, -48))], {'o.sleepMin': 400, K.sleepMin: 1}, reason: 'νύχτα του Oura: όχι εδώ');
   });

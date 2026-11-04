@@ -266,31 +266,59 @@ Set<String> stripChangedDefinitions(Map<String, Map<String, double>> history, So
 /// ρολογιού. Δεν φαίνεται πουθενά (δεν είναι ύπνος του ρολογιού) αλλά δεν σβήνεται ποτέ.
 const nonWatchSleepKey = 'nw.sleepMin';
 
-/// E3: σε κομμάτι ιστορικού όπου ο ύπνος ήρθε ΜΟΝΟ από άλλη συσκευή (το φίλτρο ρολογιού άδειο, «nonWatch»), η
-/// αποθηκευμένη διάρκεια μιας νύχτας του ρολογιού χωρίς νέα τιμή ([rows]) μεταφέρεται στο [nonWatchSleepKey]: έτσι
-/// δεν μένει ως ύπνος του ρολογιού (C3 θα την κρατούσε) και δεν χάνεται. Επιστρέφει τις μέρες που άλλαξαν.
+/// Έλεγχος 4: οι κρυφές τιμές ύπνου έχουν το πρόθεμα «nw.» (π.χ. «nw.bedtime»). Καμία οθόνη, Τάση ή αναφορά δεν τις
+/// διαβάζει (δεν είναι κλειδιά [K]).
+const archivePrefix = 'nw.';
+
+/// Σημάδι στη μέρα: η νύχτα κρατήθηκε χωριστά ως «από άλλη συσκευή» (κομμάτι χωρίς ύπνο ρολογιού, E3). Μετριέται στο
+/// «Τι φτάνει» ([otherDeviceNights]).
+const otherDeviceKey = 'nw.device';
+
+/// Έλεγχος 4 (1_data M2/M3/L1, red team M1): μια αξιόπιστη νέα ανάγνωση ύπνου ([rows]) δεν έδωσε έγκυρη διάρκεια ύπνου
+/// ρολογιού για μια νύχτα του ρολογιού που είχε (νύχτα χωρίς φάσεις ή με > 5% άγνωστες, νύχτα μόνο από κινητό ή
+/// βραχιόλι, ή κομμάτι «από άλλη συσκευή»). Τότε ΟΛΕΣ οι τιμές ύπνου της μέρας ([sleepKeys]: διάρκεια, ώρες, φάσεις,
+/// βαθμολογία, οξυγόνο, θερμοκρασία, παλμοί ύπνου, υπνάκοι) μεταφέρονται σε κρυφά κλειδιά «nw.*»: ούτε μένουν ως ύπνος
+/// του ρολογιού (θα ανακάτευαν δύο ορισμούς) ούτε σβήνονται. Ένα «nw.*» που υπάρχει ήδη δεν αλλάζει (η πρώτη, αρχική
+/// τιμή μένει). Οι νέες τιμές της ανάγνωσης γράφονται μετά, κανονικά ([mergeHistory]). [otherDevice]: σημάδι
+/// [otherDeviceKey]. Επιστρέφει τις μέρες που άλλαξαν.
+Set<String> archiveSleep(
+  Map<String, Map<String, double>> history,
+  Map<String, Map<String, double>> rows, {
+  required DateTime from,
+  required DateTime to,
+  required SourcePlan plan,
+  bool otherDevice = false,
+}) {
+  final changed = <String>{};
+  for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
+    final k = dateKey(day);
+    final old = history[k];
+    if (old == null || old[K.sleepMin] == null || plan.nightSource(day) != Source.watch) continue;
+    if (rows[k]?.containsKey(K.sleepMin) ?? false) continue;
+    history[k] = {
+      for (final e in old.entries) if (!sleepKeys.contains(e.key)) e.key: e.value,
+      for (final e in old.entries)
+        if (sleepKeys.contains(e.key) && !old.containsKey('$archivePrefix${e.key}')) '$archivePrefix${e.key}': e.value,
+      if (otherDevice) otherDeviceKey: 1,
+    };
+    changed.add(k);
+  }
+  return changed;
+}
+
+/// E3 (όνομα του έλεγχου 3): κομμάτι «από άλλη συσκευή». Από τον έλεγχο 4 μεταφέρονται ΟΛΕΣ οι τιμές ύπνου της μέρας.
 Set<String> archiveNonWatchSleep(
   Map<String, Map<String, double>> history,
   Map<String, Map<String, double>> rows, {
   required DateTime from,
   required DateTime to,
   required SourcePlan plan,
-}) {
-  final changed = <String>{};
-  for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
-    final k = dateKey(day);
-    final old = history[k];
-    final v = old?[K.sleepMin];
-    if (old == null || v == null || plan.nightSource(day) != Source.watch) continue;
-    if (rows[k]?.containsKey(K.sleepMin) ?? false) continue;
-    history[k] = {
-      for (final e in old.entries) if (e.key != K.sleepMin) e.key: e.value,
-      nonWatchSleepKey: v,
-    };
-    changed.add(k);
-  }
-  return changed;
-}
+}) =>
+    archiveSleep(history, rows, from: from, to: to, plan: plan, otherDevice: true);
+
+/// Πόσες νύχτες κρατήθηκαν χωριστά ως «από άλλη συσκευή» ([otherDeviceKey]).
+int otherDeviceNights(Map<String, Map<String, double>> history) =>
+    history.values.where((r) => r.containsKey(otherDeviceKey)).length;
 
 /// Πόσες μέρες στο [from, to] έχουν ήδη ύπνο στο ιστορικό.
 int sleepDaysIn(Map<String, Map<String, double>> history, DateTime from, DateTime to) {

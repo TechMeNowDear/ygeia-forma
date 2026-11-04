@@ -390,7 +390,7 @@ void main() {
       expect(g.veryLowRepeated, isTrue, reason: 'πριν (since = σύνδεση) δεν έβγαινε καμία σημείωση');
       expect(g.messages.single, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες'));
       expect(g.messages.single, contains('(27/10: 72%, 2/11: 74%)'));
-      expect(g.messages.single, contains('ένα αρνητικό τεστ άπνοιας του ρολογιού δεν το αποκλείει'));
+      expect(g.messages.single, contains('ένα αρνητικό τεστ άπνοιας του ρολογιού δεν αποκλείει πρόβλημα στην αναπνοή στον ύπνο'));  // κλινικός έλεγχος 4, C2/C5
     });
 
     test('Οθόνες του ρολογιού (νύχτες ρολογιού) και κατά την επανανάγνωση: το ίδιο', () {

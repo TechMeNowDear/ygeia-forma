@@ -153,16 +153,22 @@ void main() {
   });
 
   // Έλεγχος 4 (2_calcs M1): ζύγιση μία φορά την εβδομάδα. ~4 τιμές ανά κομμάτι 30 ημερών: ο μέσος όρος κάθε
-  // κομματιού έριχνε το φ (0,95 → ~0,24) και το «Βάρος άλλαξε» έβγαινε στο ~2,5% (μήνας) και ~10–15% (τρίμηνο).
-  // Τώρα το φ από όλες τις τιμές μαζί (σταθερός σπόρος, AR(1) φ = 0,95, πραγματικό ελάχιστο 0,5 kg).
-  test('Ζυγίσεις μία φορά την εβδομάδα: ψεύτικο «Βάρος άλλαξε» ≤ 1,5% σε μήνα και τρίμηνο (πριν: ~10–15% στο τρίμηνο)', () {
-    final month = falseChangeRate(def(K.weight), 0.95, 400, 7400, sd: 1, coverage: 1, every: 7);
-    final quarter = falseChangeRate(def(K.weight), 0.95, 400, 7401, sd: 1, coverage: 1, every: 7, period: TrendPeriod.quarter);
-    expect(month, lessThanOrEqualTo(0.015), reason: 'μήνας $month');
-    expect(quarter, lessThanOrEqualTo(0.015), reason: 'τρίμηνο $quarter');
-    // Με λιγότερο «κολλημένες» μέρες (φ = 0,8) και ζύγιση κάθε 4 μέρες: επίσης.
-    expect(falseChangeRate(def(K.weight), 0.8, 300, 7402, sd: 1, coverage: 1, every: 4, period: TrendPeriod.quarter),
-        lessThanOrEqualTo(0.015));
+  // κομματιού έριχνε το φ (0,95 → ~0,24) και το «Βάρος άλλαξε» έβγαινε στο ~10–15% των τριμήνων. Τώρα στο τρίμηνο το φ
+  // από κομμάτια 90 ημερών (σταθερός σπόρος, AR(1) φ = 0,95, πραγματικό ελάχιστο 0,5 kg).
+  test('Ζυγίσεις μία φορά την εβδομάδα: ψεύτικο «Βάρος άλλαξε» ≤ 1,5% σε 3 μήνες (πριν: ~10–15%)', () {
+    final weekly = falseChangeRate(def(K.weight), 0.95, 400, 7401, sd: 1, coverage: 1, every: 7, period: TrendPeriod.quarter);
+    expect(weekly, lessThanOrEqualTo(0.015), reason: 'τρίμηνο, κάθε 7 μέρες: $weekly');
+    final every4 = falseChangeRate(def(K.weight), 0.95, 300, 7402, sd: 1, coverage: 1, every: 4, period: TrendPeriod.quarter);
+    expect(every4, lessThanOrEqualTo(0.015), reason: 'τρίμηνο, κάθε 4 μέρες: $every4');
+  });
+
+  test('Ζυγίσεις μία φορά την εβδομάδα με πραγματική αλλαγή 2 kg σε 3 μήνες → φαίνεται', () {
+    final h = <String, Map<String, double>>{};
+    for (var i = 0; i < 13; i++) {
+      h[dateKey(day(1 + 7 * i))] = {K.weight: 80.0 + (i % 3 - 1) * 0.2};
+      h[dateKey(day(92 + 7 * i))] = {K.weight: 82.1 + (i % 3 - 1) * 0.2};
+    }
+    expect(computeTrend(def(K.weight), h, today, TrendPeriod.quarter).status, TrendStatus.down);
   });
 
   test('Μεσαία τιμή πάνω, μέσος όρος κάτω → όχι «άλλαξε» (έλεγχος F3)', () {

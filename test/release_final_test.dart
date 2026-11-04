@@ -2,7 +2,9 @@
 // 2: PDF μετά το Oura, μία γραμμή για κάθε συσκευή (2_calcs M2 = κλινικός C3).
 // 5: κλινικά (C1 κόκκινο μόνο με τον κανόνα του «Εκτός συνηθισμένου», C2 κείμενο οξυγόνου).
 // 6: αναζήτηση τροφίμων (N2 καταλήξεις, N3 άλλα ονόματα).
+// 4β: η κανονική ανάγνωση (30 μέρες) κρύβει, δεν σβήνει, τις τιμές ύπνου νύχτας χωρίς έγκυρη διάρκεια· «Τι φτάνει».
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/food/food_store.dart';
@@ -15,6 +17,7 @@ import 'package:ygeia_forma/pages/today.dart';
 import 'package:ygeia_forma/report.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/ti_ftanei.dart';
 import 'package:ygeia_forma/unusual.dart';
 import 'package:ygeia_forma/widgets.dart';
 
@@ -34,6 +37,14 @@ Future<void> _pump(WidgetTester t, Widget w, {Size size = const Size(400, 3000)}
 void main() {
   // -------------------------------------------------------------------------
   group('2: PDF μετά το Oura: ύπνος και παλμοί ύπνου, μία γραμμή για κάθε συσκευή, ποτέ μαζί', () {
+    // Η γραμματοσειρά της εφαρμογής (όπως στο PDF): με την προεπιλογή των δοκιμών κάθε γράμμα είναι τετράγωνο.
+    setUpAll(() async {
+      final inter = FontLoader('Inter');
+      for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+        inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+      }
+      await inter.load();
+    });
     final now = DateTime(2026, 11, 14, 10, 20);
     final ouraFrom = DateTime(2026, 11, 6);
     final plan = SourcePlan.samsungOnly.withEra(Source.oura, ouraFrom);
@@ -200,6 +211,69 @@ void main() {
           {'Σοκολάτα μαύρη 70%', 'Σοκολάτα μαύρη 50%'});
       expect(basicFoods().where((f) => f.aliases.contains('μοσχαρίσια μπριζόλα')).map((f) => f.name).toList(),
           ['Μοσχαράκι μπριζόλα (ψητή)']);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  group('4β: τιμές ύπνου κρυφές, ποτέ σβησμένες', () {
+    final now = DateTime(2026, 10, 24, 16, 30);
+    final today = dayOf(now);
+
+    test('1_data M2: νύχτα του ρολογιού χωρίς έγκυρη διάρκεια στην κανονική ανάγνωση → ΟΛΕΣ οι παλιές τιμές ύπνου σε «nw.*»', () {
+      final d = Dashboard.fromJson(sampleDashboardJson(now));
+      final x = dateKey(_add(today, -12));
+      final y = dateKey(_add(today, -11));
+      final h = <String, Map<String, double>>{
+        x: {K.sleepMin: 452, K.bedtime: 330, K.wake: 800, K.deepPct: 10, K.sleepHr: 60, K.spo2Min: 74, K.napMin: 20, K.steps: 5000},
+        y: {K.sleepMin: 400, K.bedtime: 340, K.steps: 6000},
+      };
+      // Η νέα ανάγνωση: η νύχτα x χωρίς φάσεις (ώρα ύπνου, όχι διάρκεια)· η y κανονική.
+      final rows = {
+        x: {K.bedtime: 335.0, K.wake: 805.0, K.steps: 5100.0},
+        y: {K.sleepMin: 410.0, K.bedtime: 345.0, K.steps: 6100.0},
+      };
+      final changed = applyRecentRead(h, d, plan: SourcePlan.samsungOnly, rows: rows);
+      expect(changed, containsAll([x, y]));
+      final r = h[x]!;
+      expect(r.containsKey(K.sleepMin), isFalse, reason: 'η διάρκεια «με τα ξυπνήματα» δεν φαίνεται ως ύπνος');
+      expect(r[nonWatchSleepKey], 452, reason: 'πριν: σβηνόταν');
+      for (final (k, v) in [(K.bedtime, 330.0), (K.wake, 800.0), (K.deepPct, 10.0), (K.sleepHr, 60.0), (K.spo2Min, 74.0), (K.napMin, 20.0)]) {
+        expect(r['$archivePrefix$k'], v, reason: k);
+      }
+      expect(r[K.bedtime], 335, reason: 'οι νέες τιμές γράφονται κανονικά');
+      expect(r[K.steps], 5100);
+      expect(r.containsKey(otherDeviceKey), isFalse);
+      expect(h[y], {K.sleepMin: 410, K.bedtime: 345, K.steps: 6100}, reason: 'κανονική νύχτα: όπως πριν');
+      // Οθόνες, Τάσεις, αναφορά: μόνο κλειδιά K, ποτέ «nw.*».
+      expect(SourcePlan.samsungOnly.value(h, K.sleepMin, _add(today, -12)), isNull);
+      expect(buildReport(h, now).stat(K.sleepMin).values.any((v) => v.$2 == 452), isFalse);
+      // Ξανά η ίδια ανάγνωση: τίποτα δεν αλλάζει (η αρχική τιμή μένει στο «nw.*»).
+      applyRecentRead(h, d, plan: SourcePlan.samsungOnly, rows: rows);
+      expect(h[x]![nonWatchSleepKey], 452);
+      // Ανάγνωση με σφάλμα στον ύπνο: τίποτα δεν κρύβεται.
+      final h2 = <String, Map<String, double>>{x: {K.sleepMin: 452, K.bedtime: 330}};
+      applyRecentRead(h2, d, plan: SourcePlan.samsungOnly, rows: rows, sleepFailed: true);
+      expect(h2[x]![K.sleepMin], 452);
+      expect(h2[x]!.containsKey(nonWatchSleepKey), isFalse);
+    });
+
+    testWidgets('«Τι φτάνει»: πόσες νύχτες κρατήθηκαν χωριστά ως «από άλλη συσκευή»', (t) async {
+      const channel = MethodChannel('ygeia/samsung');
+      final m = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      m.setMockMethodCallHandler(channel, (call) async => '{"ok":false,"kind":"other"}');
+      addTearDown(() => m.setMockMethodCallHandler(channel, null));
+      final h = {
+        '2020-01-01': {nonWatchSleepKey: 400.0, otherDeviceKey: 1.0},
+        '2020-01-02': {nonWatchSleepKey: 410.0, otherDeviceKey: 1.0},
+        '2020-01-03': {nonWatchSleepKey: 420.0},
+      };
+      expect(otherDeviceNights(h), 2);
+      await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: TiFtaneiScreen(otherDeviceNights: otherDeviceNights(h))));
+      await t.pumpAndSettle();
+      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-other-device'))).data, startsWith('2 νύχτες του ιστορικού ήρθαν από άλλη συσκευή'));
+      await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const TiFtaneiScreen()));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ti-ftanei-other-device')), findsNothing);
     });
   });
 }

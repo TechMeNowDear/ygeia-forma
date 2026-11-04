@@ -9,7 +9,10 @@ import 'theme.dart';
 /// Βήμα 1 — «Τι φτάνει»: δείχνει τι διαβάζει η εφαρμογή από το Samsung Health,
 /// για να αποφασίσουμε με πραγματικά δεδομένα τι θα χτίσουμε.
 class TiFtaneiScreen extends StatefulWidget {
-  const TiFtaneiScreen({super.key});
+  const TiFtaneiScreen({super.key, this.otherDeviceNights = 0});
+
+  /// Έλεγχος 4: νύχτες του ιστορικού που κρατήθηκαν χωριστά ως «από άλλη συσκευή» (δεν μετρούν ως ύπνος ρολογιού).
+  final int otherDeviceNights;
 
   @override
   State<TiFtaneiScreen> createState() => _TiFtaneiScreenState();
@@ -119,6 +122,16 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
                           'Τι διαβάζει η εφαρμογή από το Samsung Health τις τελευταίες $_days μέρες.',
                           style: TextStyle(fontSize: 16, color: c.textSecondary),
                         ),
+                        if (widget.otherDeviceNights > 0) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${widget.otherDeviceNights == 1 ? '1 νύχτα' : '${thousands(widget.otherDeviceNights)} νύχτες'} '
+                            'του ιστορικού ήρθαν από άλλη συσκευή (όχι από το ρολόι): κρατιούνται χωριστά, δεν σβήνονται, '
+                            'αλλά δεν μετρούν ως ύπνος του ρολογιού.',
+                            key: const ValueKey('ti-ftanei-other-device'),
+                            style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         _StatusCard(
                           busy: _busy,

@@ -1056,6 +1056,10 @@ typedef ParsedRange = ({
   bool heartFailed,
   bool anyError,
   Set<String> nonWatch,
+
+  /// Έλεγχος 4 (red team M1): ο ύπνος «από άλλη συσκευή» γίνεται δεκτός μόνο αν το κομμάτι τελειώνει πριν από την
+  /// πρώτη εγγραφή ύπνου ρολογιού όλου του ιστορικού («firstWatchSleep» της Kotlin· null εκεί = καμία).
+  bool otherDeviceOk,
 });
 
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
@@ -1078,6 +1082,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
     heartFailed: false,
     anyError: true,
     nonWatch: <String>{},
+    otherDeviceOk: false,
   );
   try {
     final j = jsonDecode(raw);
@@ -1092,6 +1097,11 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
       anyError: d.failed.isNotEmpty,
       // E3: είδη με δεδομένα μόνο από άλλη συσκευή σε αυτό το κομμάτι (δεκτό: «χωρίς δεδομένα ρολογιού εδώ»).
       nonWatch: {for (final x in (j['nonWatch'] is List ? j['nonWatch'] as List : const [])) if (x is String) x},
+      // Μόνο με γνωστή απάντηση: αριθμός (η πρώτη εγγραφή ρολογιού) ή ρητό null (καμία). Σφάλμα ή απουσία = άγνωστο.
+      otherDeviceOk: j.containsKey('firstWatchSleep') &&
+          (j['firstWatchSleep'] == null ||
+              (j['firstWatchSleep'] is num &&
+                  dayOf(to).isBefore(dayOf(DateTime.fromMillisecondsSinceEpoch((j['firstWatchSleep'] as num).toInt()))))),
     );
   } catch (_) {
     return fail;
@@ -1170,14 +1180,19 @@ Set<String> applyRecentRead(
   // Τα βήματα κρίνουν μόνο το πρωινό κενό· η απόφαση που πάρθηκε με βήματα είναι κλειδωμένη στο ιστορικό ([K.napLock],
   // έλεγχος 3, E1.6), άρα η μέρα 8–29 χωρίς βήματα βγαίνει ίδια με τη μέρα 0–7.
   final sleepFrom = !sleepFailed && d.sleepOk ? DateTime(today.year, today.month, today.day - recentSummaryDays + 1) : null;
-  final changed = mergeHistory(
+  // Έλεγχος 4 (1_data M2): νύχτα του ρολογιού που τώρα ήρθε χωρίς έγκυρη διάρκεια (χωρίς φάσεις, άγνωστες φάσεις, ή
+  // καθόλου): οι αποθηκευμένες τιμές ύπνου της μέρας κρατιούνται κρυφές («nw.*»), όπως στην επανανάγνωση· πριν
+  // σβηνόταν η διάρκεια εδώ, ενώ η επανανάγνωση την κρατούσε ως ύπνο.
+  final archived =
+      sleepFrom == null ? <String>{} : archiveSleep(history, rows, from: sleepFrom, to: today, plan: plan);
+  final changed = archived..addAll(mergeHistory(
     history,
     rows,
     sleepFrom: sleepFrom,
     plan: plan,
     keepKeys: heartFailed ? heartKeys : const {},
     ouraNights: windows.mains.keys.toSet(),
-  );
+  ));
   // Έλεγχος 2, C12: παλμοί μέρας που είχαν γραφτεί από μισή μέρα (π.χ. το απόγευμα), ενώ τώρα δεν βγαίνουν επειδή
   // λείπει η νύχτα του Oura που χρειάζονται: φεύγουν (ο κανόνας λέει «χωρίς τιμή», όχι η παλιά μισή).
   // Μόνο με γνωστές ώρες ύπνου του Oura (το αρχείο νυχτών διαβάστηκε): αλλιώς δεν ξέρουμε ότι λείπει η νύχτα.
@@ -1909,6 +1924,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// ξαναδιαβάζουμε σε κάθε ανανέωση (μπαταρία). Οι αποτυχίες ανά μήνα είναι αποθηκευμένες ([Prefs.monthFails]).
   int _backfillFails = 0;
 
+  /// Κομμάτια με «άλλη συσκευή» μετά τον πρώτο ύπνο ρολογιού που απέτυχαν ήδη μία φορά σε αυτό το άνοιγμα (έλεγχος 4).
+  final Set<String> _nonWatchRetried = {};
+
   /// Ένα κομμάτι [from, cursor) από τη Samsung: διαβάζεται σε άλλο νήμα και γράφεται στο ιστορικό.
   /// Επιστρέφει null αν σταματάμε για τώρα (θα ξαναδοκιμαστεί), αλλιώς αν ήταν εντελώς άδειο.
   Future<bool?> _readChunk(DateTime from, DateTime cursor) async {
@@ -1930,22 +1948,32 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // (π.χ. νέο κινητό που δεν έχει συγχρονίσει ακόμα): σαν αποτυχία ανάγνωσης, ώστε να μη σβηστούν.
     final had = sleepDaysIn(history, from, to);
     final got = p.rows.values.where((v) => v.containsKey(K.sleepMin)).length;
-    // E3: όχι όταν το κομμάτι έχει ύπνο μόνο από άλλη συσκευή (δεκτό ως «χωρίς ρολόι», χωρίς ξαναδοκιμές).
+    // E3: ύπνος μόνο από άλλη συσκευή. Έλεγχος 4 (red team M1): δεκτό («χωρίς ρολόι», χωρίς ξαναδοκιμές) ΜΟΝΟ για
+    // κομμάτι που τελειώνει πριν από τον πρώτο ύπνο ρολογιού όλου του ιστορικού (π.χ. πριν από το ρολόι). Μετά από αυτόν
+    // (ρολόι που δεν αναγνωρίστηκε, μήνας χωρίς ρολόι με ύπνο από κινητό): σφάλμα ανάγνωσης, οι τιμές μένουν.
+    final nonWatch = p.sleepOk && p.nonWatch.contains('sleep');
+    final otherDevice = nonWatch && p.otherDeviceOk;
+    final nonWatchError = nonWatch && !p.otherDeviceOk;
     final tooFew = !p.nonWatch.contains('sleep') && had >= 4 && got < had / 2;
     // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ξανά στην επόμενη ανανέωση. Μετά από 3 φορές
     // προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
-    final failed = p.sleepFailed || tooFew;
+    final failed = p.sleepFailed || tooFew || nonWatchError;
     final k = dateKey(cursor);
     if (failed) {
       // C4: αποθηκευμένο (όχι στη μνήμη): μετά από 3 αποτυχίες, και με επανεκκινήσεις στο μεταξύ, προχωράμε.
       final n = prefs.monthFails[k] = (prefs.monthFails[k] ?? 0) + 1;
       await _savePrefs();
-      if (n < 3) return null;
+      if (n < 3) {
+        // Έλεγχος 4: «άλλη συσκευή» μετά τον πρώτο ύπνο ρολογιού ξαναδοκιμάζεται το πολύ μία φορά σε κάθε άνοιγμα της
+        // εφαρμογής (όχι σε κάθε επιστροφή): η δεύτερη αποτυχία σταματά τη συμπλήρωση ως το επόμενο άνοιγμα.
+        if (nonWatchError && !_nonWatchRetried.add(k)) _backfillFails = 3;
+        return null;
+      }
     }
-    // E3: κομμάτι με ύπνο μόνο από άλλη συσκευή (π.χ. πριν από το ρολόι): δεκτό χωρίς ξαναδοκιμές· η αποθηκευμένη
-    // διάρκεια από άλλη πηγή δεν φαίνεται πια ως ύπνος του ρολογιού, αλλά ΔΕΝ σβήνεται (φυλάσσεται χωριστά).
-    final archived = !failed && p.sleepOk && p.nonWatch.contains('sleep')
-        ? archiveNonWatchSleep(history, p.rows, from: from, to: to, plan: plan)
+    // Έλεγχος 4 (1_data M2/M3/L1): νύχτες του ρολογιού χωρίς έγκυρη νέα διάρκεια: ΟΛΕΣ οι τιμές ύπνου της μέρας
+    // κρυφές («nw.*»), ποτέ σβησμένες· στο κομμάτι «από άλλη συσκευή» και με σημάδι (μετριέται στο «Τι φτάνει»).
+    final archived = !failed && p.sleepOk
+        ? archiveSleep(history, p.rows, from: from, to: to, plan: plan, otherDevice: otherDevice)
         : <String>{};
     final saved = await _saveDays({
       ...archived,

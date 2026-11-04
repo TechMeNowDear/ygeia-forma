@@ -126,7 +126,22 @@ class DashboardReader(
         o.put("readAt", epochMs(to.minusSeconds(1)))
         // E3: είδη με δεδομένα στο κομμάτι, αλλά κανένα από ρολόι (δεκτό ως «χωρίς δεδομένα ρολογιού»).
         o.put("nonWatch", JSONArray(nonWatch.toList()))
+        // Έλεγχος 4 (red team M1): η πρώτη εγγραφή ύπνου ρολογιού όλου του ιστορικού (null = καμία). Η εφαρμογή δέχεται
+        // τον ύπνο «από άλλη συσκευή» μόνο για κομμάτι πριν από αυτήν· μία σελίδα μίας εγγραφής, μόνο όταν χρειάζεται.
+        if ("sleep" in nonWatch) o.put("firstWatchSleep", safe { firstWatchSleep() })
         return o
+    }
+
+    /** Η αρχή (ms) της πρώτης εγγραφής ύπνου ρολογιού στα τελευταία 10 χρόνια, ή JSONObject.NULL αν δεν υπάρχει. */
+    private suspend fun firstWatchSleep(): Any {
+        val now = LocalDateTime.now()
+        val b = DataTypes.SLEEP.readDataRequestBuilder
+            .setLocalTimeFilter(LocalTimeFilter.of(now.minusDays(3660), now))
+            .setOrdering(Ordering.ASC)
+            .setPageSize(1)
+        b.setSourceFilter(WATCH)
+        val first = s.readData(b.build()).dataList.firstOrNull() ?: return JSONObject.NULL
+        return ms(first.startTime) ?: JSONObject.NULL
     }
 
     private fun epochMs(t: LocalDateTime): Long = t.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

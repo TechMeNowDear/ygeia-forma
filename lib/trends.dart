@@ -305,7 +305,8 @@ const _maxCorrelation = 0.95;
 /// Όταν δεν βγαίνει εκτίμηση (π.χ. ζυγίσεις κάθε 10 μέρες): συντηρητικά, σαν οι μέρες να μοιάζουν πολύ.
 const _fallbackCorrelation = 0.9;
 
-/// Κάτω από τόσες τιμές ανά κομμάτι (κατά μέσο όρο) ο μέσος όρος κάθε κομματιού είναι πολύ θορυβώδης για το φ.
+/// Κάτω από τόσες τιμές ανά κομμάτι 30 ημερών (κατά μέσο όρο) ο μέσος όρος κάθε κομματιού είναι πολύ θορυβώδης για
+/// το φ ([_correlationFor]).
 const _minBlockPoints = 8;
 
 /// Αυτοσυσχέτιση από μέρα σε μέρα (φ, μοντέλο AR(1): δύο τιμές που απέχουν g μέρες έχουν συσχέτιση φ^g).
@@ -319,17 +320,7 @@ const _minBlockPoints = 8;
 /// - Στο [0, 0,95]. null = λιγότερα από 6 ζευγάρια (δεν βγαίνει εκτίμηση).
 /// [blocks]: κομμάτια με τον δικό τους μέσο όρο (π.χ. 30 ημερών), ώστε μια πραγματική αλλαγή επιπέδου να μη
 /// μοιάζει με συσχέτιση· παλιότερη τιμή πρώτη μέσα σε κάθε κομμάτι.
-/// Έλεγχος 4 (2_calcs M1): με αραιές τιμές (λιγότερες από [_minBlockPoints] ανά κομμάτι, π.χ. ζύγιση μία φορά την
-/// εβδομάδα: ~4 ανά 30 μέρες) η αφαίρεση του μέσου όρου κάθε κομματιού έριχνε το φ (0,95 → ~0,24) και το «Βάρος
-/// άλλαξε» έβγαινε ψεύτικα στο ~10–15% των τριμήνων. Τότε το φ βγαίνει από ΟΛΕΣ τις τιμές μαζί, με έναν μέσο όρο
-/// (συντηρητικά: μια πραγματική αλλαγή επιπέδου το μεγαλώνει, άρα λιγότερα «άλλαξε», ποτέ περισσότερα).
 double? dailyCorrelation(List<List<(DateTime, double)>> blocks) {
-  final full = [for (final w in blocks) if (w.length >= 2) w];
-  final count = full.fold<int>(0, (s, w) => s + w.length);
-  if (full.length > 1 && count < _minBlockPoints * full.length) {
-    final pooled = [for (final w in blocks) ...w]..sort((a, b) => a.$1.compareTo(b.$1));
-    return dailyCorrelation([pooled]);
-  }
   final products = <double>[];
   final gaps = <int>[];
   var den = 0.0;
@@ -586,20 +577,32 @@ double _correlationFor(
   required DateTime previousEnd,
 }) {
   final seg = sp.segmentStart(def.key, end);
-  final blocks = <List<(DateTime, double)>>[];
-  void add(DateTime last, int count) {
-    for (var b = 0; b < count; b++) {
-      final to = _add(last, -30 * b);
-      if (seg != null && to.isBefore(seg)) break;
-      final from = _add(to, -29);
-      blocks.add(collect(seg != null && from.isBefore(seg) ? seg : from, to));
+  final window = daysBetween(previousFrom, previousEnd) + 1;
+  List<List<(DateTime, double)>> blocksOf(int size) {
+    final blocks = <List<(DateTime, double)>>[];
+    void add(DateTime last, int count) {
+      for (var b = 0; b < count; b++) {
+        final to = _add(last, -size * b);
+        if (seg != null && to.isBefore(seg)) break;
+        final from = _add(to, -(size - 1));
+        blocks.add(collect(seg != null && from.isBefore(seg) ? seg : from, to));
+      }
     }
+
+    add(end, 180 ~/ size);
+    if (previousEnd.isBefore(_add(end, -179))) add(previousEnd, math.max(1, window ~/ size));
+    return blocks;
   }
 
-  add(end, 6);
-  if (previousEnd.isBefore(_add(end, -179))) {
-    add(previousEnd, math.max(1, (daysBetween(previousFrom, previousEnd) + 1) ~/ 30));
-  }
+  var blocks = blocksOf(30);
+  // Έλεγχος 4 (2_calcs M1): αραιές τιμές (π.χ. ζύγιση μία φορά την εβδομάδα, ~4 ανά 30 μέρες). Ο μέσος όρος κάθε
+  // κομματιού 30 ημερών έριχνε το φ (0,95 → ~0,24) και το «Βάρος άλλαξε» έβγαινε ψεύτικα στο ~10–15% των τριμήνων. Στο
+  // τρίμηνο και στον χρόνο τα κομμάτια γίνονται όσο το διάστημα της σύγκρισης (90 μέρες, ~13 ζυγίσεις, ένας μέσος όρος
+  // στο καθένα· η πραγματική αλλαγή ανάμεσα στα δύο διαστήματα δεν μετρά ως συσχέτιση). Στον μήνα μένουν 30 μέρες: με
+  // 4 + 4 ζυγίσεις ένα συντηρητικό φ δεν θα έδειχνε ούτε καθαρή αλλαγή 2 kg (γνωστό όριο, ~2,5% ψεύτικα «άλλαξε»).
+  final full = blocks.where((w) => w.length >= 2).toList();
+  final points = full.fold<int>(0, (n, w) => n + w.length);
+  if (window > 30 && full.isNotEmpty && points < _minBlockPoints * full.length) blocks = blocksOf(window);
   return dailyCorrelation(blocks) ?? _fallbackCorrelation;
 }
 

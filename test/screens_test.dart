@@ -258,7 +258,8 @@ Future<void> _tiFtanei(WidgetTester tester, {required String name, required Size
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-      home: const TiFtaneiScreen(),
+      // Έλεγχος 4: η γραμμή «νύχτες από άλλη συσκευή» στο στιγμιότυπο του κινητού.
+      home: TiFtaneiScreen(otherDeviceNights: name.startsWith('140') ? 12 : 0),
     ),
   ));
   await tester.pumpAndSettle();

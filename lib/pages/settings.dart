@@ -6,6 +6,7 @@ import '../data.dart';
 import '../food/food_channel.dart';
 import '../food/food_store.dart';
 import '../format.dart';
+import '../history.dart' show otherDeviceNights;
 import '../theme.dart';
 import '../sources.dart';
 import '../ti_ftanei.dart';
@@ -141,7 +142,7 @@ class SettingsPage extends StatelessWidget {
                                   settings: const RouteSettings(name: 'Έλεγχος δεδομένων'),
                                   builder: (_) => Scaffold(
                                     appBar: AppBar(title: const Text('Έλεγχος δεδομένων')),
-                                    body: const TiFtaneiScreen(),
+                                    body: TiFtaneiScreen(otherDeviceNights: otherDeviceNights(store.history)),
                                   ),
                                 ),
                               ),
