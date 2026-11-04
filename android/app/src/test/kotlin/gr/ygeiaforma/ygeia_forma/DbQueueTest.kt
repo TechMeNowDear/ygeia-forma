@@ -32,6 +32,8 @@ class DbQueueTest {
         assertTrue(latch.await(10, TimeUnit.SECONDS))
         assertEquals((0 until n).toList(), ran.toList())
         assertEquals((0 until n).map { "$it" }, answered.toList())
-        assertEquals(setOf(DbQueue.THREAD), threads.toSet())
+        // Με το debug των coroutines (ελέγχοι με -ea) το όνομα παίρνει « @coroutine#N»: ένα νήμα, το δικό μας.
+        assertTrue(threads.toString(), threads.isNotEmpty() && threads.all { it.startsWith(DbQueue.THREAD) })
+        assertEquals(1, threads.map { it.substringBefore(" @") }.toSet().size)
     }
 }

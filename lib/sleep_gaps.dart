@@ -246,7 +246,7 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
         } else {
           final lock = napLockOf?.call(lockKey);
           joins = lock == null || g.start.isBefore(lock);
-          if (!joins) locks[m.key] ??= lock!;
+          if (!joins) locks[m.key] ??= lock;
         }
       }
       if (!joins) break;

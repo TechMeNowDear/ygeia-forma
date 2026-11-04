@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
-import '../history.dart' show K;
 import '../oura/oura_view.dart' show atLeast, minNightsForAverage;
 import '../oxygen_note.dart';
 import '../trends.dart' show circularMeanMinutes, unwrapMinutes;
