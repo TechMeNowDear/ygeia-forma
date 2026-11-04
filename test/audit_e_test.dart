@@ -261,6 +261,26 @@ void main() {
       expect(row.containsKey(K.napMin), isFalse);
     });
 
+    test('Κυρ. 1/11: 08:04–11:10 με 155′ ύπνο → νύχτα 155′ στις 1/11, ώρες 08:04–11:10 (πριν: καμία νύχτα)', () {
+      final r = both([(at(11, 1, 8, 4), at(11, 1, 11, 10), 155)], early);
+      expect(r.nights, {'2026-11-01': 155});
+      expect(r.naps, isEmpty);
+      expect(r.d.nights.single.start, at(11, 1, 8, 4));
+      expect(r.d.nights.single.end, at(11, 1, 11, 10));
+    });
+
+    test('Παρ. 30/10: νύχτα 08:32–11:36 (155′, όπως ο «πραγματικός ύπνος» της Samsung) και υπνάκος 16:22–18:24 χωριστά', () {
+      final r = both([(at(10, 30, 8, 32), at(10, 30, 11, 36), 155), (at(10, 30, 16, 22), at(10, 30, 18, 24), 114)], early);
+      expect(r.nights, {'2026-10-30': 155}, reason: 'όχι 269 (το σύνολο της Samsung μαζί με τον υπνάκο)');
+      expect(r.naps, {'2026-10-30': 114}, reason: 'αρχή μετά τις 12:00 και κενό > 90′: υπνάκος');
+      final n = r.d.nights.single;
+      expect(n.start, at(10, 30, 8, 32));
+      expect(n.end, at(10, 30, 11, 36));
+      final row = summarizeDay(r.d, DateTime(2026, 10, 30));
+      expect(row[K.sleepMin], 155);
+      expect(row[K.napMin], 114);
+    });
+
     test('31/10: 07:43–10:37 όπως πριν (λίγα λεπτά πριν από τις 08:00)', () {
       expect(both([(at(10, 31, 7, 43), at(10, 31, 10, 37), 174)], early).nights, {'2026-10-31': 174});
     });
