@@ -5,6 +5,7 @@ import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
+import 'package:ygeia_forma/pages/compare_page.dart';
 import 'package:ygeia_forma/report.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/trends.dart';
@@ -103,5 +104,31 @@ void main() {
       expect(plain.periods, isEmpty);
       expect(plain.n, 90);
     });
+  });
+
+  test('Σύγκριση πηγών: νύχτα Oura σε κομμάτια = όλα τα κομμάτια (διάρκεια, ώρες, ξύπνιος, κομμάτια)', () {
+    Map<String, dynamic> rec(String id, DateTime a, DateTime b, int awake) => {
+          'id': id,
+          'day': '2026-11-03',
+          'type': 'sleep',
+          'bedtime_start': a.toUtc().toIso8601String(),
+          'bedtime_end': b.toUtc().toIso8601String(),
+          'total_sleep_duration': b.difference(a).inSeconds - 600 - awake * 60,
+          'awake_time': awake * 60,
+          'latency': 600,
+        };
+    final oura = parseOura(sleep: [
+      rec('a', DateTime(2026, 11, 2, 23, 0), DateTime(2026, 11, 3, 1, 30), 10),
+      rec('b', DateTime(2026, 11, 3, 3, 0), DateTime(2026, 11, 3, 5, 45), 5),
+    ], dailySleep: const [], readiness: const [])
+        .nights;
+    final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 3));
+    final r = buildCompareRows(plan: plan, oura: oura, watch: const [], today: DateTime(2026, 11, 3)).single;
+    expect(r.ouraMinutes, 130 + 150);
+    expect(r.ouraParts, 2);
+    expect(r.ouraStart!.millisecondsSinceEpoch, DateTime(2026, 11, 2, 23, 10).millisecondsSinceEpoch);
+    expect(r.ouraEnd!.millisecondsSinceEpoch, DateTime(2026, 11, 3, 5, 45).millisecondsSinceEpoch);
+    expect(r.ouraAwake, 15);
+    expect(r.ouraSpan, 140 + 165, reason: 'από τον ύπνο ως το ξύπνημα κάθε κομματιού, χωρίς το κενό');
   });
 }

@@ -200,6 +200,7 @@ class CompareRow {
     this.watchStart,
     this.watchEnd,
     this.watchParts = 0,
+    this.ouraParts = 0,
     this.watchHr,
     this.watchAwake,
     this.ouraSpan,
@@ -231,6 +232,9 @@ class CompareRow {
   final DateTime? watchStart;
   final DateTime? watchEnd;
   final int watchParts;
+
+  /// Κομμάτια της νύχτας Oura που μετρούν (κοινός κανόνας με το ρολόι).
+  final int ouraParts;
   final double? watchHr;
 
   bool get both => ouraMinutes != null && watchMinutes != null;

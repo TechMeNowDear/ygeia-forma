@@ -439,6 +439,8 @@ class _TypeCard extends StatelessWidget {
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text),
                   ),
                 ),
+                // Κενό ανάμεσα στον τίτλο και την ετικέτα (στα 360 dp «Θερμοκρασία δέρματος» ακουμπούσε το «Έρχεται»).
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(

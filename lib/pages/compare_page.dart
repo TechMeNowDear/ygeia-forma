@@ -69,6 +69,7 @@ List<CompareRow> buildCompareRows({
       watchStart: w?.start,
       watchEnd: w?.end,
       watchParts: w?.parts.length ?? 0,
+      ouraParts: parts.length,
       watchHr: w?.sleepingHr,
       watchAwake: w == null || w.stageMinutes.isEmpty ? null : w.awakeMinutes,
     ));
@@ -270,7 +271,7 @@ class _CompareCard extends StatelessWidget {
               line('Με τα ξυπνήματα', dur(r.ouraSpan), dur(r.watchSpan)),
               line('Κοιμήθηκες', t(r.ouraStart), t(r.watchStart)),
               line('Ξύπνησες', t(r.ouraEnd), t(r.watchEnd)),
-              line('Κομμάτια', r.ouraMinutes == null ? '—' : '1', r.watchParts == 0 ? '—' : '${r.watchParts}'),
+              line('Κομμάτια', r.ouraMinutes == null || r.ouraParts == 0 ? '—' : '${r.ouraParts}', r.watchParts == 0 ? '—' : '${r.watchParts}'),
               line('Παλμοί ύπνου', hr(r.ouraHr), hr(r.watchHr)),
             ],
           ),
