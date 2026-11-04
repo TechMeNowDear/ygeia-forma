@@ -113,7 +113,8 @@ void main() {
 
   // B1 (έλεγχος υπολογισμών F2, 4/11): πριν, το «άλλαξε» έβγαινε στο 2–10% των συγκρίσεων χωρίς καμία
   // αλλαγή, όταν έλειπαν μέρες. Προσομοίωση με σταθερό σπόρο: AR(1), 75% των ημερών με τιμή, 180 μέρες.
-  double falseChangeRate(MetricDef def, double phi, int sims, int seed, {double sd = 1, double coverage = 0.75, int every = 1}) {
+  double falseChangeRate(MetricDef def, double phi, int sims, int seed,
+      {double sd = 1, double coverage = 0.75, int every = 1, TrendPeriod period = TrendPeriod.month}) {
     final r = math.Random(seed);
     double normal() => math.sqrt(-2 * math.log(1 - r.nextDouble())) * math.cos(2 * math.pi * r.nextDouble());
     var tested = 0, changed = 0;
@@ -124,7 +125,7 @@ void main() {
         x = phi * x + math.sqrt(1 - phi * phi) * sd * normal();
         if (ago % every == 0 && r.nextDouble() < coverage) h[dateKey(day(ago))] = {def.key: 60 + x};
       }
-      final t = computeTrend(def, h, today, TrendPeriod.month);
+      final t = computeTrend(def, h, today, period);
       if (t.status == TrendStatus.insufficient) continue;
       tested++;
       if (t.changed) changed++;
@@ -149,6 +150,19 @@ void main() {
 
   test('Ζυγίσεις μέρα παρά μέρα: ψεύτικο «Βάρος άλλαξε» κατά προσέγγιση ≤ 1,5% σε μοντέλο AR(1) (πριν: ~20–25%)', () {
     expect(falseChangeRate(def(K.weight), 0.95, 400, 7200, sd: 0.5, coverage: 1, every: 2), lessThanOrEqualTo(0.015));
+  });
+
+  // Έλεγχος 4 (2_calcs M1): ζύγιση μία φορά την εβδομάδα. ~4 τιμές ανά κομμάτι 30 ημερών: ο μέσος όρος κάθε
+  // κομματιού έριχνε το φ (0,95 → ~0,24) και το «Βάρος άλλαξε» έβγαινε στο ~2,5% (μήνας) και ~10–15% (τρίμηνο).
+  // Τώρα το φ από όλες τις τιμές μαζί (σταθερός σπόρος, AR(1) φ = 0,95, πραγματικό ελάχιστο 0,5 kg).
+  test('Ζυγίσεις μία φορά την εβδομάδα: ψεύτικο «Βάρος άλλαξε» ≤ 1,5% σε μήνα και τρίμηνο (πριν: ~10–15% στο τρίμηνο)', () {
+    final month = falseChangeRate(def(K.weight), 0.95, 400, 7400, sd: 1, coverage: 1, every: 7);
+    final quarter = falseChangeRate(def(K.weight), 0.95, 400, 7401, sd: 1, coverage: 1, every: 7, period: TrendPeriod.quarter);
+    expect(month, lessThanOrEqualTo(0.015), reason: 'μήνας $month');
+    expect(quarter, lessThanOrEqualTo(0.015), reason: 'τρίμηνο $quarter');
+    // Με λιγότερο «κολλημένες» μέρες (φ = 0,8) και ζύγιση κάθε 4 μέρες: επίσης.
+    expect(falseChangeRate(def(K.weight), 0.8, 300, 7402, sd: 1, coverage: 1, every: 4, period: TrendPeriod.quarter),
+        lessThanOrEqualTo(0.015));
   });
 
   test('Μεσαία τιμή πάνω, μέσος όρος κάτω → όχι «άλλαξε» (έλεγχος F3)', () {

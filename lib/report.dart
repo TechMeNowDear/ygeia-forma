@@ -49,7 +49,7 @@ class ReportStat {
   }
 }
 
-/// Ένα κομμάτι του διαστήματος με τον ίδιο ορισμό της νύχτας (μόνο για το οξυγόνο).
+/// Ένα κομμάτι του διαστήματος με τον ίδιο ορισμό της νύχτας (οξυγόνο), ή με την ίδια συσκευή ([reportDeviceKeys]).
 class ReportPeriod {
   ReportPeriod({required this.from, required this.to, required this.night, required this.stat, this.oldRules = false});
   final DateTime from;
@@ -69,6 +69,12 @@ class ReportPeriod {
 /// έλεγχος K1: οι νύχτες με 72% και 74% πριν από το Oura είναι ο λόγος της επίσκεψης). Η «Διαφορά» μένει «Αλλαγή
 /// ορισμού»: δεν συγκρίνεται πάνω από την αλλαγή.
 const reportSensorKeys = {K.spo2Avg, K.spo2Min};
+
+/// Ύπνος και παλμοί ύπνου: άλλη συσκευή μετά τη σύνδεση του Oura. Έλεγχος 4 (2_calcs M2 = κλινικός C3): όταν η
+/// συσκευή άλλαξε μέσα στις 90 μέρες, μία γραμμή για κάθε περίοδο συσκευής («ως 5/11: ρολόι», «↳ από 6/11: Oura»),
+/// η καθεμία με τη δική της μεσαία τιμή και εύρος, «Διαφορά» = «Αλλαγή συσκευής». Ποτέ μαζί οι δύο πηγές (πριν: μόνο
+/// οι νύχτες του Oura, και ο γιατρός έχανε τις ~80 νύχτες του ρολογιού).
+const reportDeviceKeys = {K.sleepHr, K.sleepMin, K.bedtime, K.wake};
 
 class ReportData {
   ReportData({
@@ -159,6 +165,13 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
       stats[key] = _sensorStat(history, p, key, start, last, trend);
       continue;
     }
+    if (reportDeviceKeys.contains(key)) {
+      final devices = _deviceStat(history, p, key, start, last, trend);
+      if (devices != null) {
+        stats[key] = devices;
+        continue;
+      }
+    }
     // Μόνο μία πηγή ανά δείκτη: αν άλλαξε μέσα στους 3 μήνες, μετρούν μόνο οι μέρες της νέας.
     final series = planSeries(history, p, key, start, last);
     stats[key] = ReportStat(values: series.points, trend: trend, source: series.source, since: series.cut);
@@ -228,5 +241,45 @@ ReportStat _sensorStat(
       ));
     }
   }
+  return ReportStat(values: values, trend: trend, source: p.sourceFor(key, last), periods: periods);
+}
+
+/// [reportDeviceKeys] με αλλαγή συσκευής μέσα στις 90 μέρες: ένα κομμάτι για κάθε περίοδο (και για το όριο της
+/// επανανάγνωσης, αν είναι μέσα), κάθε τιμή ΜΟΝΟ από την πηγή της μέρας της. null = καμία αλλαγή συσκευής μέσα στο
+/// διάστημα (τότε όπως πριν: [planSeries]).
+ReportStat? _deviceStat(
+  Map<String, Map<String, double>> history,
+  SourcePlan p,
+  String key,
+  DateTime start,
+  DateTime last,
+  TrendResult? trend,
+) {
+  DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
+  final cuts = [for (final c in p.changeDates(key)) if (c.isAfter(start) && !c.isAfter(last)) c];
+  if (!cuts.any((c) => p.nightSource(add(c, -1)) != p.nightSource(c))) return null;
+  final values = <(DateTime, double)>[];
+  for (var d = start; !d.isAfter(last); d = add(d, 1)) {
+    final v = p.value(history, key, d);
+    if (v != null) values.add((d, v));
+  }
+  final bounds = [start, ...cuts, add(last, 1)];
+  final periods = <ReportPeriod>[
+    for (var i = 0; i + 1 < bounds.length; i++)
+      () {
+        final from = bounds[i];
+        final to = add(bounds[i + 1], -1);
+        return ReportPeriod(
+          from: from,
+          to: to,
+          night: p.nightSource(from),
+          stat: ReportStat(
+            values: [for (final v in values) if (!v.$1.isBefore(from) && !v.$1.isAfter(to)) v],
+            source: p.nightSource(from),
+          ),
+          oldRules: p.rulesFrom != null && to.isBefore(p.rulesFrom!),
+        );
+      }(),
+  ];
   return ReportStat(values: values, trend: trend, source: p.sourceFor(key, last), periods: periods);
 }

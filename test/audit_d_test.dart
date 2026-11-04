@@ -175,8 +175,10 @@ void main() {
       expect(s.periods.first.stat.n + s.periods.last.stat.n, 90);
       expect(r.stat(K.spo2Avg).trend?.status, TrendStatus.sourceChange, reason: 'η «Διαφορά» μένει «Αλλαγή ορισμού»');
       expect(r.stat(K.spo2Avg).n, 90);
-      // Η διάρκεια ύπνου (άλλη συσκευή) μένει μία πηγή, κομμένη στην αλλαγή.
-      expect(r.stat(K.sleepMin).since, ouraFrom);
+      // Η διάρκεια ύπνου (άλλη συσκευή): έλεγχος 4 (C3, σκόπιμη αλλαγή) μία γραμμή για κάθε συσκευή, όχι κομμένη.
+      expect(r.stat(K.sleepMin).since, isNull);
+      expect([for (final p in r.stat(K.sleepMin).periods) p.night], [Source.watch, Source.oura]);
+      expect(r.stat(K.sleepMin).periods.last.from, ouraFrom);
     });
 
     test('M4: ζώνες 90/85/80 και νύχτες κάτω από 85% με χρονολογική σειρά (84,6 μετρά)', () {

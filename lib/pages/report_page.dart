@@ -451,6 +451,8 @@ class _PageOne extends StatelessWidget {
     // «από τις …». Τα βήματα είναι το σύνολο της Samsung Health (ρολόι και κινητό, χωρίς διπλομέτρηση).
     String label((String, String, String Function(double), MetricDef?) r) {
       final s = d.stat(r.$2);
+      // Αλλαγή συσκευής μέσα στις 90 μέρες (έλεγχος 4, C3): η συσκευή γράφεται σε κάθε γραμμή περιόδου.
+      if (s.periods.isNotEmpty && reportDeviceKeys.contains(r.$2)) return r.$1;
       final since = s.since == null ? '' : ', από ${s.since!.day}/${s.since!.month}';
       return '${r.$1} · ${metricSourceName(r.$2, s.source)}$since';
     }
@@ -460,8 +462,10 @@ class _PageOne extends StatelessWidget {
     String night(ReportPeriod p) => p.oldRules
         ? 'παλιός κανόνας νύχτας'
         : (p.night == Source.oura ? 'νύχτα = ώρες ύπνου Oura' : 'νύχτα = ύπνος ρολογιού');
-    String periodLabel(ReportPeriod p, bool first) =>
-        first ? 'ως ${p.to.day}/${p.to.month}: ${night(p)}' : '  ↳ από ${p.from.day}/${p.from.month}: ${night(p)}';
+    String periodLabel(String key, ReportPeriod p, bool first) {
+      final what = reportDeviceKeys.contains(key) ? reportPeriodDevice(p) : night(p);
+      return first ? 'ως ${p.to.day}/${p.to.month}: $what' : '  ↳ από ${p.from.day}/${p.from.month}: $what';
+    }
 
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
     final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
@@ -550,14 +554,25 @@ class _PageOne extends StatelessWidget {
                 return TableRow(
                   children: [
                     pad(Text(
-                      part == null ? label(r) : (i == 0 ? '${label(r)}\n${periodLabel(part, true)}' : periodLabel(part, false)),
+                      part == null
+                          ? label(r)
+                          : (i == 0 ? '${label(r)}\n${periodLabel(r.$2, part, true)}' : periodLabel(r.$2, part, false)),
                       style: cell,
                     )),
                     pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
                     pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
                     pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
                     pad(Text('${s.n}', style: cell)),
-                    pad(Text(last ? (r.$2 == K.spo2Min ? lowestDiffText(whole) : trendText(whole, r.$4)) : '', style: cell)),
+                    pad(Text(
+                      !last
+                          ? ''
+                          : r.$2 == K.spo2Min
+                              ? lowestDiffText(whole)
+                              // Αλλαγή συσκευής μέσα στις 90 μέρες: ποτέ σύγκριση πάνω από την αλλαγή (και για την ώρα
+                              // που ξύπνησε, που αλλιώς δεν έχει «Διαφορά»).
+                              : (part != null && reportDeviceKeys.contains(r.$2) ? 'Αλλαγή συσκευής' : trendText(whole, r.$4)),
+                      style: cell,
+                    )),
                   ],
                 );
               }(),
@@ -770,8 +785,8 @@ class _PageThree extends StatelessWidget {
                   'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
                   'Galaxy Watch Ultra 2. Διάρκεια ύπνου: πραγματικός ύπνος, χωρίς τα ξυπνήματα (και στις δύο συσκευές). '
                   'Οξυγόνο: Galaxy Watch Ultra 2 (αισθητήρας καρπού)· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. '
-                  'Βήματα: $samsungTotalLabel. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής μετρούν μόνο οι μέρες '
-                  'της νέας.'
+                  'Βήματα: $samsungTotalLabel. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής: χωριστή γραμμή για '
+                  'κάθε συσκευή, ποτέ ανάμειξη ή σύγκριση ανάμεσά τους.'
               : 'Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
                   'αισθητήρας καρπού· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. Διάρκεια ύπνου: πραγματικός ύπνος '
                   'από τις φάσεις της Samsung, χωρίς τα ξυπνήματα. Βήματα: $samsungTotalLabel. Χωρίς HRV και παλμούς '
@@ -808,6 +823,16 @@ class _PageThree extends StatelessWidget {
 
 MetricDef? _def(String key) => metricDef(key);
 
+/// Η συσκευή μιας περιόδου στις γραμμές ύπνου και παλμών ύπνου ([reportDeviceKeys]).
+String reportPeriodDevice(ReportPeriod p) {
+  final device = switch (p.night) {
+    Source.oura => 'Oura',
+    Source.watch => 'ρολόι',
+    _ => 'χωρίς πηγή',
+  };
+  return p.oldRules ? '$device, παλιός κανόνας νύχτας' : device;
+}
+
 // --- Σελίδα 2: γραφήματα ---
 
 class _PageTwo extends StatelessWidget {
@@ -830,7 +855,16 @@ class _PageTwo extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Κομμένη σειρά (αλλαγή συσκευής): το λέει ο τίτλος, γιατί ο άξονας είναι πια οι ίδιες 90 μέρες για όλα (F6).
-          _Title(s.since == null ? title : '$title · μόνο ${metricSourceName(key, s.source)}, από ${s.since!.day}/${s.since!.month}'),
+          _Title(s.since != null
+              ? '$title · μόνο ${metricSourceName(key, s.source)}, από ${s.since!.day}/${s.since!.month}'
+              // Αλλαγή συσκευής (έλεγχος 4, C3): κάθε κομμάτι με τη δική του μεσαία τιμή, γραμμένο στον τίτλο.
+              : reportDeviceKeys.contains(key) && parts.isNotEmpty
+                  ? '$title · ${[
+                      for (final (i, p) in s.periods.indexed)
+                        if (p.stat.n > 0)
+                          '${reportPeriodDevice(p)} ${i == s.periods.length - 1 ? 'από ${p.from.day}/${p.from.month}' : 'ως ${p.to.day}/${p.to.month}'}',
+                    ].join(', ')}'
+                  : title),
           if (s.n < 2)
             SizedBox(
               height: 96,

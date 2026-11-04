@@ -318,6 +318,20 @@ void main() {
       for (final now in [add(ouraFrom, 5), add(ouraFrom, 40), add(ouraFrom, 120)]) {
         final r = buildReport(history, now, plan: plan);
         for (final e in r.stats.entries) {
+          // Έλεγχος 4 (C3, σκόπιμη αλλαγή): ύπνος και παλμοί ύπνου με αλλαγή συσκευής μέσα στις 90 μέρες: μία γραμμή
+          // για κάθε συσκευή, κάθε γραμμή μόνο από τη δική της πηγή (πριν: μόνο οι μέρες του Oura).
+          if (reportDeviceKeys.contains(e.key) && e.value.periods.isNotEmpty) {
+            final from = add(dayOf(now), -(reportDays - 1));
+            expect(from.isBefore(ouraFrom), isTrue, reason: '${e.key} ${dateKey(now)}');
+            expect(e.value.since, isNull);
+            expect([for (final p in e.value.periods) p.night], [Source.watch, Source.oura], reason: e.key);
+            for (final p in e.value.periods) {
+              final pv = [for (final v in p.stat.values) v.$2];
+              expect(pv, isNotEmpty, reason: e.key);
+              expect(pv.every(p.night == Source.oura ? isOura : isWatch), isTrue, reason: '${e.key} ${p.night}');
+            }
+            continue;
+          }
           final vals = [for (final v in e.value.values) v.$2];
           expect(vals.every(isWatch) || vals.every(isOura), isTrue, reason: '${e.key} ${dateKey(now)}');
           final expected = plan.sourceFor(e.key, now);

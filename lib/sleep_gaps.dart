@@ -69,14 +69,19 @@ GapVerdict judgeGap(
 
 /// Βήματα στο διάστημα [start, end), ή null αν δεν ξέρουμε ότι μετρήθηκαν (λεπτά χωρίς βήματα δεν υπάρχουν
 /// στον πίνακα, οπότε χωρίς [stepsFrom] πριν από την αρχή δεν ξεχωρίζει το «0 βήματα» από το «δεν μετρήθηκε»).
-int? gapSteps(DateTime start, DateTime end, {required Map<int, int> stepsByMinute, required DateTime? stepsFrom}) {
+/// [stepsTo]: πότε διαβάστηκαν τα βήματα (έλεγχος 4, 1_data M1). Τα λεπτά μετά από αυτό είναι ΑΓΝΩΣΤΑ, όχι 0: αν το
+/// κενό περνά πέρα από αυτό, null, εκτός αν τα γνωστά βήματα ήδη ξεπερνούν το [maxGapSteps] (σηκώθηκε, σίγουρα).
+int? gapSteps(DateTime start, DateTime end,
+    {required Map<int, int> stepsByMinute, required DateTime? stepsFrom, DateTime? stepsTo}) {
   if (stepsFrom == null || start.isBefore(stepsFrom)) return null;
+  final cut = stepsTo != null && end.isAfter(stepsTo);
   var steps = 0;
   final from = start.millisecondsSinceEpoch ~/ 60000;
-  final to = end.millisecondsSinceEpoch ~/ 60000;
+  final to = (cut ? stepsTo : end).millisecondsSinceEpoch ~/ 60000;
   for (var m = from; m < to; m++) {
     steps += stepsByMinute[m] ?? 0;
   }
+  if (cut && steps <= maxGapSteps) return null;
   return steps;
 }
 

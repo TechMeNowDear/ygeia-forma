@@ -17,6 +17,7 @@ import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/oura/oura_store.dart';
 import 'package:ygeia_forma/oura/oura_view.dart';
 import 'package:ygeia_forma/plan_file.dart';
+import 'package:ygeia_forma/sleep_gaps.dart' show gapSteps;
 import 'package:ygeia_forma/sources.dart';
 
 import 'sample_data.dart';
@@ -28,6 +29,10 @@ class FakeAndroid {
 
   /// «ok», «corrupt» (χαλασμένο αρχείο) ή «read» (δεν διαβάστηκε τώρα).
   String prefsMode = 'ok';
+
+  /// Η ανάγνωση της Samsung (null = το δείγμα στο [now]) και η αποθηκευμένη του RefreshWorker (null = καμία).
+  Map<String, dynamic>? dashboard;
+  Map<String, dynamic>? cached;
   Map<String, dynamic> prefs = {};
   final days = <String, Map<String, double>>{};
   final savedPrefs = <Map<String, dynamic>>[];
@@ -78,9 +83,9 @@ class FakeAndroid {
           }
           return '{"ok":true}';
         case 'dashboard':
-          return jsonEncode(sampleDashboardJson(now));
+          return jsonEncode(dashboard ?? sampleDashboardJson(now));
         case 'cachedDashboard':
-          return '{}';
+          return cached == null ? '{}' : jsonEncode(cached);
         case 'readRange':
           return '{"ok":false,"kind":"other"}';
       }
@@ -101,6 +106,9 @@ class FakeOura {
   final DateTime now;
   int status = 200;
   bool noData = false;
+
+  /// Οι περίοδοι ύπνου που δίνει (null = το δείγμα).
+  List<Map<String, dynamic>>? sleep;
   Completer<void>? gate;
   final calls = <(String, Uri)>[];
   final revoked = <String>[];
@@ -117,7 +125,7 @@ class FakeOura {
     if (gate != null) await gate!.future;
     if (status != 200) return OuraResponse(status, '{}');
     final ep = url.pathSegments.last;
-    final data = ep == 'sleep' && !noData ? sampleOuraSleep(ouraStart, now) : <Map<String, dynamic>>[];
+    final data = ep == 'sleep' && !noData ? (sleep ?? sampleOuraSleep(ouraStart, now)) : <Map<String, dynamic>>[];
     return OuraResponse(200, jsonEncode({'data': data, 'next_token': null}));
   }
 
@@ -552,15 +560,15 @@ void main() {
 
   // ---------------------------------------------------------------------------
   group('Σύνδεση, αποσύνδεση, αναίρεση, «ξανά από το ρολόι»', () {
-    test('15:00: από απόψε, χωρίς ερώτηση· η χθεσινή μένει του ρολογιού και δεν σβήνεται', () async {
+    test('15:00, «Όχι, από απόψε» (προεπιλογή): η χθεσινή μένει του ρολογιού και δεν σβήνεται', () async {
       final a = app(plan: null);
       await boot(a.store);
       final watchSleep = a.android.days[dateKey(today)]?[K.sleepMin];
       expect(watchSleep, isNotNull, reason: 'η χθεσινή νύχτα του ρολογιού');
-      expect(firstNightChoice(now), FirstNightChoice.tomorrow);
+      expect(firstNightChoice(now), FirstNightChoice.ask, reason: '04:00–23:59: ερώτηση');
       await connect(a.store, a.vault);
       expect(a.store.ouraLoginError, isNull);
-      expect(a.store.plan.ouraFrom, add(today, 1), reason: '15:00: από απόψε');
+      expect(a.store.plan.ouraFrom, add(today, 1), reason: '15:00, «Όχι»: από απόψε');
       expect(a.store.plan.nightSource(today), Source.watch);
       expect(a.store.ouraStatus, OuraStatus.starting);
       expect(a.store.ouraEraStarted, isFalse, reason: 'M-12: χωρίς «Αναίρεση»');
@@ -618,7 +626,7 @@ void main() {
       await connect(a.store, a.vault, wore: true);
       expect(a.store.plan.ouraFrom, today);
       expect(a.store.plan.nightSource(today), Source.oura);
-      expect(a.store.ouraFirstNightText, 'Η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι');
+      expect(a.store.ouraFirstNightText, 'Η τελευταία νύχτα μετρά από το δαχτυλίδι');
       await a.store.refresh();
       final row = a.android.days[dateKey(today)]!;
       expect(row[ouraKeys[K.sleepMin]], isNotNull, reason: 'η νύχτα από το Oura');
@@ -637,6 +645,20 @@ void main() {
       expect(a.store.data!.nights.any((n) => sameDay(n.date, today)), isTrue, reason: 'ξαναφαίνεται');
       expect(a.store.canWatchLastNight, isFalse);
       expect(a.store.ouraHasTokens, isTrue, reason: 'η σύνδεση μένει');
+    });
+
+    test('20:00, «Ναι» (απόφαση 4/11: ερώτηση ως τις 23:59): σήμερα· «περιμένει», όχι «χωρίς ύπνο»', () async {
+      final at = DateTime(today.year, today.month, today.day, 20);
+      final a = app(plan: null, at: at);
+      a.oura.noData = true;
+      await boot(a.store);
+      expect(firstNightChoice(at), FirstNightChoice.ask);
+      await connect(a.store, a.vault, wore: true);
+      expect(a.store.plan.ouraFrom, today);
+      expect(a.store.plan.nightSource(today), Source.oura);
+      expect(a.store.ouraStatus, OuraStatus.startingNow, reason: 'μέρα σύνδεσης: περιμένει την εφαρμογή Oura');
+      expect(a.store.ouraFirstNightText, 'Η τελευταία νύχτα μετρά από το δαχτυλίδι');
+      expect(a.store.canWatchLastNight, isTrue);
     });
 
     test('Δεν γράφτηκε το σχέδιο πηγών: τα tokens δεν κρατιούνται (ανάκληση), τίποτα δεν αλλάζει', () async {
@@ -736,17 +758,11 @@ void main() {
         expect(firstOuraNight(x), d);
       }
     });
-    test('04:00–11:59: ερώτηση· «Ναι» σήμερα, «Όχι» (προεπιλογή) αύριο', () {
-      for (final x in [t(4), t(9), t(11, 59)]) {
-        expect(firstNightChoice(x), FirstNightChoice.ask);
+    test('04:00–23:59: ερώτηση· «Ναι» σήμερα, «Όχι» (προεπιλογή) αύριο', () {
+      for (final x in [t(4), t(9), t(11, 59), t(12), t(15), t(23, 59)]) {
+        expect(firstNightChoice(x), FirstNightChoice.ask, reason: '$x');
         expect(firstOuraNight(x, woreRing: true), d);
         expect(firstOuraNight(x), next);
-      }
-    });
-    test('12:00–23:59: αύριο, χωρίς ερώτηση', () {
-      for (final x in [t(12), t(15), t(23, 59)]) {
-        expect(firstNightChoice(x), FirstNightChoice.tomorrow);
-        expect(firstOuraNight(x, woreRing: true), next);
       }
     });
     test('Η απόφαση ταξιδεύει κρυπτογραφημένη με το state (και ξαναδιαβάζεται)', () {
@@ -916,6 +932,41 @@ void main() {
       }
       // Οι παλμοί της μέρας του ρολογιού υπολογίστηκαν με τις ώρες ύπνου του Oura (ήρθε πρώτο).
       expect(a.android.days[dateKey(add(today, -1))]?.containsKey(K.dayHr), isTrue);
+    });
+
+    // Έλεγχος 4 (1_data M1): η ανάγνωση του Oura πριν από τη Samsung είχε μόνο τα αποθηκευμένα βήματα (06:30). Ο
+    // ιδιοκτήτης περπάτησε 07:00–07:45 και το δαχτυλίδι μέτρησε 07:45–08:30. Πριν: τα λεπτά μετά τις 06:30 μετρούσαν
+    // «0 βήματα», το κομμάτι έμπαινε στη νύχτα (+45′, ξύπνημα 08:30) και η δεύτερη ανάγνωση παραλειπόταν (30′).
+    test('1_data M1: λεπτά μετά την ανάγνωση των βημάτων = άγνωστα· ξανά με τα φρέσκα βήματα → υπνάκος, όχι νύχτα', () async {
+      final at = DateTime(today.year, today.month, today.day, 9);
+      final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, today), withTokens: true, at: at);
+      DateTime h(int hh, [int mm = 0, int day = 0]) => DateTime(today.year, today.month, today.day + day, hh, mm);
+      int ms(DateTime t) => t.millisecondsSinceEpoch;
+      Map<String, dynamic> period(String id, DateTime x, DateTime y) => {
+            'id': id,
+            'day': dateKey(today),
+            'type': 'sleep',
+            'bedtime_start': x.toUtc().toIso8601String(),
+            'bedtime_end': y.toUtc().toIso8601String(),
+            'total_sleep_duration': y.difference(x).inSeconds,
+          };
+      a.oura.sleep = [period('main', h(23, 30, -1), h(7)), period('late', h(7, 45), h(8, 30))];
+      a.android.cached = sampleDashboardJson(h(6, 30));
+      final fresh = sampleDashboardJson(at);
+      (fresh['stepsMin'] as List).addAll([
+        for (var k = 0; k < 6; k++) [ms(h(7, 10 + k)), 50],
+      ]);
+      a.android.dashboard = fresh;
+      await boot(a.store);
+      final row = a.android.days[dateKey(today)]!;
+      expect(row[ouraKeys[K.sleepMin]], 450, reason: '23:30–07:00 μόνο· το 07:45–08:30 είναι υπνάκος μετά από 300 βήματα');
+      expect(row[ouraKeys[K.napLock]], isNotNull, reason: 'η απόφαση κρατιέται');
+      expect(a.store.watchStepsBetween(h(7), h(8)), 300);
+      // Χωρίς φρέσκα βήματα: κενό που περνά πέρα από την ανάγνωση = άγνωστο (όχι 0).
+      expect(gapSteps(h(6), h(7, 45), stepsByMinute: const {}, stepsFrom: h(0), stepsTo: h(6, 30)), isNull);
+      expect(gapSteps(h(6), h(7, 45), stepsByMinute: {h(6, 10).millisecondsSinceEpoch ~/ 60000: 40}, stepsFrom: h(0), stepsTo: h(6, 30)), 40,
+          reason: 'τα γνωστά βήματα ήδη πάνω από το όριο: σηκώθηκε');
+      expect(gapSteps(h(6), h(6, 20), stepsByMinute: const {}, stepsFrom: h(0), stepsTo: h(6, 30)), 0, reason: 'πριν από την ανάγνωση: 0');
     });
 
     test('S7: όριο συχνότητας σε κάθε αποτέλεσμα (και σφάλματα)· «Ενημέρωση τώρα» το πολύ μία φορά το λεπτό', () async {

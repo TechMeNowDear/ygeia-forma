@@ -111,7 +111,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
   OuraErrorKind? _error;
   bool _opening = false;
 
-  /// 04:00–11:59: «Φορούσες το δαχτυλίδι την τελευταία νύχτα;». null = έκλεισε χωρίς απάντηση (τίποτα δεν ανοίγει).
+  /// 04:00–23:59: «Φορούσες το δαχτυλίδι την τελευταία νύχτα;». null = έκλεισε χωρίς απάντηση (τίποτα δεν ανοίγει).
   Future<bool?> _askLastNight() => showModalBottomSheet<bool>(
         context: context,
         showDragHandle: true,
@@ -129,7 +129,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
                       style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
                   const SizedBox(height: 8),
                   Text(
-                    'Αν ναι, η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι. Αν όχι, μένει όπως τη μέτρησε το ρολόι και '
+                    'Αν ναι, η τελευταία νύχτα μετρά από το δαχτυλίδι. Αν όχι, μένει όπως τη μέτρησε το ρολόι και '
                     'το δαχτυλίδι μετρά από απόψε.',
                     style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
                   ),
@@ -278,7 +278,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               const SizedBox(height: 6),
               Text(
                 'Από την πρώτη νύχτα του δαχτυλιδιού ο ύπνος έρχεται μόνο από αυτό. Οι νύχτες πριν μένουν όπως είναι, '
-                'από το ρολόι. Αν συνδέσεις το πρωί, θα σε ρωτήσουμε για τη νύχτα που μόλις τελείωσε.',
+                'από το ρολόι. Μετά τις 04:00 θα σε ρωτήσουμε για την τελευταία νύχτα.',
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
             ],
@@ -375,7 +375,7 @@ class OuraManagePage extends StatelessWidget {
     ));
   }
 
-  /// Μόνο τη μέρα της σύνδεσης: η νύχτα που μόλις τελείωσε από το ρολόι, το δαχτυλίδι από απόψε.
+  /// Μόνο τη μέρα της σύνδεσης: η τελευταία νύχτα από το ρολόι, το δαχτυλίδι από απόψε.
   Future<void> _watchLastNight(BuildContext context) async {
     final asleep = store.ouraClock().hour < 4;
     final ok = await showDialog<bool>(
@@ -386,7 +386,7 @@ class OuraManagePage extends StatelessWidget {
         content: Text(
           asleep
               ? 'Η νύχτα που κοιμάσαι τώρα θα μετρά από το Galaxy Watch. Το δαχτυλίδι μετρά από το επόμενο βράδυ.'
-              : 'Η νύχτα που μόλις τελείωσε θα φαίνεται όπως τη μέτρησε το Galaxy Watch. Το δαχτυλίδι μετρά από απόψε.',
+              : 'Η τελευταία νύχτα θα φαίνεται όπως τη μέτρησε το Galaxy Watch. Το δαχτυλίδι μετρά από απόψε.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),

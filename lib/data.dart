@@ -1662,7 +1662,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       if (_canWrite) {
         await _upgradeHistory();
         // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας.
-        await syncOura();
+        // [regroup] (έλεγχος 4, 1_data M1): η ανάγνωση πριν από τη Samsung είχε παλιά βήματα για ένα πρωινό κενό·
+        // ξανά τώρα, με τα φρέσκα, ώστε ένας «υπνάκος» μετά από περπάτημα να μη μείνει μέσα στη νύχτα.
+        await syncOura(regroup: true);
         // Οι συνόψεις από το άλλο νήμα μόνο αν το σχέδιο και οι νύχτες του Oura δεν άλλαξαν στο μεταξύ.
         final same = parsePlan != null && parsePlan == plan && identical(parseNights, ouraNights);
         if (readPlan == plan) {
@@ -1756,8 +1758,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   int? watchStepsBetween(DateTime from, DateTime to) {
     final d = _raw;
-    return d == null ? null : gapSteps(from, to, stepsByMinute: d.stepsByMinute, stepsFrom: d.stepsMinuteFrom);
+    // Έλεγχος 4 (1_data M1): τα λεπτά μετά την ανάγνωση των βημάτων είναι άγνωστα, όχι 0.
+    return d == null
+        ? null
+        : gapSteps(from, to, stepsByMinute: d.stepsByMinute, stepsFrom: d.stepsMinuteFrom, stepsTo: d.readAt);
   }
+
+  @override
+  DateTime? get watchStepsReadAt => _raw?.readAt;
 
   @override
   Future<bool> savePrefsNow() => _savePrefs();

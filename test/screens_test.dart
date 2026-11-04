@@ -746,7 +746,7 @@ void main() {
           s.ouraNights = [for (final n in s.ouraNights) if (dateKey(n.day) != '2026-11-14') n, short];
         },
       ));
-  testWidgets('Σύνδεση Oura · 04:00–11:59 · ερώτηση για την τελευταία νύχτα', (t) => _page(
+  testWidgets('Σύνδεση Oura · 04:00–23:59 · ερώτηση για την τελευταία νύχτα', (t) => _page(
         t,
         name: '89_oura_connect_question',
         size: fold,
@@ -756,6 +756,21 @@ void main() {
         prepare: (s) {
           s.ouraLink = OuraLink(vault: MemoryVault(), clientId: 'SCREENSHOT');
           s.ouraClock = () => ouraNow;
+        },
+        act: (t) async {
+          await t.tap(find.byKey(const ValueKey('oura-connect')));
+        },
+      ));
+  testWidgets('Σύνδεση Oura · 20:30 · η ερώτηση και το βράδυ (απόφαση 4/11)', (t) => _page(
+        t,
+        name: '89b_oura_connect_question_evening',
+        size: fold,
+        brightness: Brightness.light,
+        oura: false,
+        page: (s) => OuraConnectPage(store: s, now: DateTime(2026, 11, 14, 20, 30)),
+        prepare: (s) {
+          s.ouraLink = OuraLink(vault: MemoryVault(), clientId: 'SCREENSHOT');
+          s.ouraClock = () => DateTime(2026, 11, 14, 20, 30);
         },
         act: (t) async {
           await t.tap(find.byKey(const ValueKey('oura-connect')));

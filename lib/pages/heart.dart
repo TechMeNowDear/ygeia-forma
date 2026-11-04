@@ -8,6 +8,7 @@ import '../oxygen_note.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
+import '../unusual.dart';
 import '../widgets.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
@@ -130,7 +131,10 @@ class HeartPage extends StatelessWidget {
                   '${signedShown(diff)} bpm · συνήθως ${base.round()}',
                   up: diff > 0,
                   // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4): μπορεί να είναι φάρμακο ή κρύο δωμάτιο.
-                  kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
+                  // Κόκκινο μόνο με τον κανόνα του «Εκτός συνηθισμένου» (κλινικός έλεγχος 4, C1)· αλλιώς γκρι.
+                  kind: diff > 0 && rhrNight != null && sleepHrOff(store.history, rhrNight, plan: store.analysisPlan)
+                      ? TrendKind.bad
+                      : TrendKind.neutral,
                 );
         }
 

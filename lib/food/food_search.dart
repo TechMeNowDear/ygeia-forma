@@ -93,7 +93,7 @@ List<String> _words(String s) => _allWords(s).where((w) => !_stopWords.contains(
 
 /// Ρίζα λέξης (σε φωνητική μορφή), για να βρίσκονται πληθυντικοί και πτώσεις:
 /// «ντομάτες» = «ντομάτα», «πιπεριές» = «πιπεριά», «φακή» = «φακές», «αμύγδαλο» = «αμύγδαλα».
-const _endings = ['ies', 'ia', 'es', 'as', 'os', 'is', 'us', 'on', 'a', 'e', 'i', 'o', 's'];
+const _endings = ['es', 'as', 'os', 'is', 'us', 'on', 'a', 'e', 'i', 'o', 's'];
 String stem(String w) {
   if (w.length < 4 || w.contains(RegExp(r'[^a-z]'))) return w;
   for (final e in _endings) {

@@ -260,8 +260,11 @@ class TodayPage extends StatelessWidget {
           : TrendPill(
               '${signedShown(diff)} · συνήθως ${base.round()}',
               up: diff > 0,
-              // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4).
-              kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
+              // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4). Κόκκινο μόνο με τον κανόνα του «Εκτός
+              // συνηθισμένου» (κλινικός έλεγχος 4, C1)· αλλιώς γκρι.
+              kind: diff > 0 && sleepHrOff(store.history, d.lastNight!.date, plan: store.analysisPlan)
+                  ? TrendKind.bad
+                  : TrendKind.neutral,
             );
     }
     final recent = d.nights.where((n) => n.sleepingHr != null).toList();

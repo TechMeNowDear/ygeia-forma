@@ -134,28 +134,21 @@ enum FirstNightChoice {
   /// 00:00–03:59: η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι (σήμερα).
   today,
 
-  /// 04:00–11:59: μία ερώτηση «Φορούσες το δαχτυλίδι την τελευταία νύχτα;» (προεπιλογή «Όχι, από απόψε»).
+  /// 04:00–23:59: μία ερώτηση «Φορούσες το δαχτυλίδι την τελευταία νύχτα;» (προεπιλογή «Όχι, από απόψε»).
+  /// (Απόφαση 4/11: όλη τη μέρα, όχι μόνο ως τις 11:59· όποιος συνδέει το απόγευμα μπορεί να φορούσε το δαχτυλίδι.)
   ask,
-
-  /// 12:00–23:59: από απόψε (αύριο).
-  tomorrow,
 }
 
-FirstNightChoice firstNightChoice(DateTime now) => now.hour < 4
-    ? FirstNightChoice.today
-    : now.hour < 12
-        ? FirstNightChoice.ask
-        : FirstNightChoice.tomorrow;
+FirstNightChoice firstNightChoice(DateTime now) => now.hour < 4 ? FirstNightChoice.today : FirstNightChoice.ask;
 
 /// Η πρώτη νύχτα του Oura (η ημερομηνία της είναι το πρωί που τελειώνει). [woreRing]: η απάντηση στην ερώτηση
-/// (04:00–11:59)· χωρίς απάντηση, από απόψε.
+/// (04:00–23:59)· χωρίς απάντηση, από απόψε.
 DateTime firstOuraNight(DateTime now, {bool woreRing = false}) {
   final today = dayOf(now);
   final tomorrow = DateTime(today.year, today.month, today.day + 1);
   return switch (firstNightChoice(now)) {
     FirstNightChoice.today => today,
     FirstNightChoice.ask => woreRing ? today : tomorrow,
-    FirstNightChoice.tomorrow => tomorrow,
   };
 }
 
@@ -187,6 +180,21 @@ mixin OuraStore on ChangeNotifier {
   /// Έλεγχος 3, E1.5: τα βήματα ανά λεπτό του ΡΟΛΟΓΙΟΥ στο [from, to) (null = άγνωστα), μόνο για το πρωινό κενό του
   /// κοινού κανόνα της νύχτας (ποτέ ως τιμή του Oura).
   int? watchStepsBetween(DateTime from, DateTime to);
+
+  /// Πότε διαβάστηκαν τα βήματα του [watchStepsBetween] (null = δεν υπάρχουν ακόμα).
+  DateTime? get watchStepsReadAt;
+
+  /// Έλεγχος 4 (1_data M1): η τελευταία ανάγνωση του Oura σε αυτή τη συνεδρία ρώτησε βήματα για κενό που περνούσε
+  /// πέρα από την ανάγνωση της Samsung (ή χωρίς καμία ανάγνωση): με τα βήματα αυτής της ώρας ([_ouraStepsAt]).
+  bool _ouraStepsStale = false;
+  DateTime? _ouraStepsAt;
+
+  /// Τα βήματα για τον κοινό κανόνα, σημειώνοντας αν κάποιο κενό ήθελε λεπτά που δεν είχαν διαβαστεί ακόμα.
+  int? _ouraSteps(DateTime from, DateTime to) {
+    final at = watchStepsReadAt;
+    if (at == null || to.isAfter(at)) _ouraStepsStale = true;
+    return watchStepsBetween(from, to);
+  }
 
   /// Οι αποθηκευμένες αποφάσεις «πρωινός υπνάκος» των νυχτών του Oura («o.napLock»), E1.6.
   Map<String, int> get _ouraNapLocks {
@@ -363,7 +371,9 @@ mixin OuraStore on ChangeNotifier {
     if (ouraNightFor(today)?.main != null) return OuraStatus.ok;
     final morning = ouraClock().hour < 12;
     final c = ouraConnectedMs;
-    if (morning && sameDay(plan.ouraFrom ?? DateTime(2000), today) && c != null &&
+    // Μέρα της σύνδεσης με πρώτη νύχτα τη σημερινή («Ναι» στην ερώτηση, ως τις 23:59): «περιμένει το Oura» όλη τη
+    // μέρα, όχι «χωρίς ύπνο» πριν καν συγχρονίσει η εφαρμογή Oura.
+    if (sameDay(plan.ouraFrom ?? DateTime(2000), today) && c != null &&
         sameDay(DateTime.fromMillisecondsSinceEpoch(c), today)) {
       return OuraStatus.startingNow;
     }
@@ -655,11 +665,11 @@ mixin OuraStore on ChangeNotifier {
     await savePrefsNow();
   }
 
-  /// Πριν από τις 04:00: «η νύχτα που κοιμάσαι τώρα»· μετά: «η νύχτα που μόλις τελείωσε» (ακόμα κι αν η σύνδεση
-  /// έγινε μέσα στη νύχτα: το πρωί έχει ήδη τελειώσει).
+  /// Πριν από τις 04:00: «η νύχτα που κοιμάσαι τώρα»· μετά: «η τελευταία νύχτα» (ακόμα κι αν η σύνδεση έγινε μέσα
+  /// στη νύχτα: το πρωί έχει ήδη τελειώσει· και το βράδυ, όχι «μόλις τελείωσε»).
   String get ouraFirstNightText {
     final asleep = ouraClock().hour < 4;
-    return asleep ? 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι' : 'Η νύχτα που μόλις τελείωσε μετρά από το δαχτυλίδι';
+    return asleep ? 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι' : 'Η τελευταία νύχτα μετρά από το δαχτυλίδι';
   }
 
   /// Το κουμπί της αναίρεσης: πριν από τις 04:00 η νύχτα δεν έχει τελειώσει ακόμα.
@@ -769,8 +779,10 @@ mixin OuraStore on ChangeNotifier {
   Future<void>? _sync;
 
   /// Διαβάζει το Oura αν είναι η πηγή του ύπνου και πέρασε αρκετή ώρα (ή [force], το πολύ μία φορά το λεπτό).
-  /// Μία ανάγνωση τη φορά.
-  Future<void> syncOura({bool force = false}) => _sync ??= _syncOnce(force).whenComplete(() => _sync = null);
+  /// Μία ανάγνωση τη φορά. [regroup]: και πριν από τα 30 λεπτά, αν η προηγούμενη ανάγνωση αυτής της συνεδρίας
+  /// έκρινε ένα πρωινό κενό χωρίς τα βήματα του και τώρα υπάρχουν πιο φρέσκα (έλεγχος 4, 1_data M1).
+  Future<void> syncOura({bool force = false, bool regroup = false}) =>
+      _sync ??= _syncOnce(force, regroup: regroup).whenComplete(() => _sync = null);
 
   /// Πόσο μένει ώσπου να επιτρέπεται πάλι «Ενημέρωση τώρα» (μία φορά το λεπτό). Μηδέν = τώρα.
   /// Μια δοκιμή «στο μέλλον» (το ρολόι πήγε πίσω) δεν μπλοκάρει.
@@ -844,7 +856,7 @@ mixin OuraStore on ChangeNotifier {
     return a == null || b == null ? null : (from: a, to: b);
   }
 
-  Future<void> _syncOnce(bool force, {bool last = false}) async {
+  Future<void> _syncOnce(bool force, {bool last = false, bool regroup = false}) async {
     if (!historyReady || !prefsReady || !planReady) return;
     final now = ouraClock();
     final today = dayOf(now);
@@ -865,7 +877,12 @@ mixin OuraStore on ChangeNotifier {
       if (!ouraCanSyncNow) return;
     } else {
       if (backoff != null && ms < backoff) return;
-      if (tried != null && ms - tried < ouraMinInterval.inMilliseconds) return;
+      final stepsAt = watchStepsReadAt;
+      final fresher = regroup &&
+          _ouraStepsStale &&
+          stepsAt != null &&
+          (_ouraStepsAt == null || stepsAt.isAfter(_ouraStepsAt!));
+      if (!fresher && tried != null && ms - tried < ouraMinInterval.inMilliseconds) return;
     }
     final from = range.from;
     final to = range.to;
@@ -873,9 +890,11 @@ mixin OuraStore on ChangeNotifier {
     final epoch = _ouraEpoch;
     ouraTriedMs = ms;
     ouraSyncing = true;
+    _ouraStepsStale = false;
+    _ouraStepsAt = watchStepsReadAt;
     notifyListeners();
     try {
-      final batch = await ouraLink.fetchNights(from, to, stepsBetween: watchStepsBetween, napLocks: _ouraNapLocks);
+      final batch = await ouraLink.fetchNights(from, to, stepsBetween: _ouraSteps, napLocks: _ouraNapLocks);
       if (epoch != _ouraEpoch) return; // αποσυνδέθηκε στο μεταξύ: τίποτα δεν κρατιέται
       final rows = await ouraRowsOffMain(batch.nights);
       if (epoch != _ouraEpoch) return;
@@ -891,8 +910,7 @@ mixin OuraStore on ChangeNotifier {
       final older = saved ? ouraOlderRange() : null;
       var olderSaved = true;
       if (older != null) {
-        final b2 = await ouraLink.fetchNights(older.from, older.to,
-            stepsBetween: watchStepsBetween, napLocks: _ouraNapLocks);
+        final b2 = await ouraLink.fetchNights(older.from, older.to, stepsBetween: _ouraSteps, napLocks: _ouraNapLocks);
         if (epoch != _ouraEpoch) return;
         final rows2 = await ouraRowsOffMain(b2.nights);
         if (epoch != _ouraEpoch) return;
