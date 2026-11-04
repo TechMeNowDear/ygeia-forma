@@ -193,7 +193,9 @@ class _ChangedCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'Τίποτα δεν άλλαξε ουσιαστικά. Ό,τι διαφορές υπάρχουν είναι μέσα στις συνηθισμένες μέρα-με-μέρα διακυμάνσεις σου.',
+                // Κλινικός έλεγχος M7 (4/11): όχι «ουσιαστικά», που διαβάζεται ως «κλινικά».
+                'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
+                'διακυμάνσεις σου. Αυτό δεν είναι ιατρικός έλεγχος.',
                 style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
               ),
             )
@@ -230,7 +232,7 @@ class _ChangeRow extends StatelessWidget {
                 Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                 const SizedBox(height: 2),
                 Text(
-                  'από ${r.def.format(r.previous!)} σε ${r.def.format(r.current!)}',
+                  'από ${r.def.formatAs(r.previous!, r.source)} σε ${r.def.formatAs(r.current!, r.source)}',
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular),
                 ),
               ],
@@ -288,7 +290,10 @@ class _MetricRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final value = r.current == null ? '—' : r.def.format(r.current!);
+    // Με λίγες μέρες (π.χ. μία νύχτα μετά από αλλαγή πηγής) η «μεσαία της περιόδου» δεν λέει κάτι: «—»
+    // (έλεγχος υπολογισμών F10). Η τιμή και το πλήθος φαίνονται στις λεπτομέρειες.
+    final few = r.nCurrent < r.needed && (r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange);
+    final value = r.current == null || few ? '—' : r.def.formatAs(r.current!, r.source);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -311,7 +316,7 @@ class _MetricRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: r.current == null ? c.textTertiary : c.text,
+                          color: r.current == null || few ? c.textTertiary : c.text,
                           fontFeatures: tabular,
                         ),
                       ),
@@ -397,12 +402,12 @@ class _MetricDetail extends StatelessWidget {
               children: [
                 InfoRow(
                   'Τώρα · ${dayMonth(r.currentFrom)} – ${dayMonth(r.end)}',
-                  r.current == null ? '—' : def.format(r.current!),
+                  r.current == null ? '—' : def.formatAs(r.current!, r.source),
                   dot: c.text,
                 ),
                 InfoRow(
                   'Πριν · ${dayMonth(r.previousFrom)} – ${dayMonth(r.previousEnd)}',
-                  r.previous == null ? '—' : def.format(r.previous!),
+                  r.previous == null ? '—' : def.formatAs(r.previous!, r.source),
                   dot: c.textSecondary,
                 ),
                 InfoRow('Με δεδομένα (τώρα)', count(r.nCurrent)),
@@ -457,7 +462,8 @@ String _explain(TrendResult r) {
   };
   final b = StringBuffer()
     ..write('Συγκρίνω τη μεσαία τιμή κάθε περιόδου (μισές μέρες πάνω, μισές κάτω), ώστε μια περίεργη μέρα να μη χαλάει το αποτέλεσμα. ')
-    ..write('Λέω «άλλαξε» μόνο αν η διαφορά είναι τουλάχιστον $minDiff και ξεκάθαρα μεγαλύτερη από τις συνηθισμένες διακυμάνσεις σου. ');
+    ..write('Λέω «άλλαξε» μόνο αν η διαφορά είναι τουλάχιστον $minDiff, ξεκάθαρα μεγαλύτερη από τις συνηθισμένες διακυμάνσεις σου, '
+        'και ο μέσος όρος αλλάζει προς την ίδια κατεύθυνση. Είναι ένδειξη, όχι ιατρικός έλεγχος. ');
   if (def.sparse) {
     b.write('Χρειάζονται τουλάχιστον ${r.needed} ζυγίσεις σε κάθε περίοδο.');
   } else {

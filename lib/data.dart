@@ -10,10 +10,12 @@ import 'format.dart';
 import 'history.dart';
 import 'oura/oura_model.dart';
 import 'oura/oura_store.dart';
+import 'oxygen_note.dart' show oxygenWindowNights;
 import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
 import 'sources.dart';
+import 'trends.dart' show usualMean;
 
 // ---------------------------------------------------------------------------
 // Μοντέλα
@@ -95,6 +97,17 @@ class Night {
   int get estimatedMinutes => estimatedGaps.fold(0, (s, g) => s + g.$2.difference(g.$1).inMinutes);
 
   int get awakeMinutes => stageMinutes['AWAKE'] ?? 0;
+
+  /// Πραγματικός ύπνος από τα στάδια: βαθύς + ελαφρύς + REM, χωρίς τον χρόνο ξύπνιος.
+  int get asleepStageMinutes => ['DEEP', 'LIGHT', 'REM'].fold(0, (s, k) => s + (stageMinutes[k] ?? 0));
+
+  /// Ποσοστό ενός σταδίου ύπνου επί του πραγματικού ύπνου (όχι επί του χρόνου με τα ξυπνήματα), ίδιος ορισμός
+  /// για ρολόι και Oura (έλεγχος 4/11, F6/B4). Το «ξύπνιος» δεν είναι ποσοστό του ύπνου: null (φαίνεται σε λεπτά).
+  double? stagePct(String stage) {
+    final asleep = asleepStageMinutes;
+    if (asleep <= 0 || stage == 'AWAKE') return null;
+    return 100 * (stageMinutes[stage] ?? 0) / asleep;
+  }
 }
 
 /// Κομμάτια ύπνου που ανήκουν μαζί (πριν μοιραστούν σε νύχτες και υπνάκους).
@@ -646,6 +659,35 @@ class Dashboard {
     ]);
   }
 
+  /// Η χαμηλότερη μέτρηση οξυγόνου του ρολογιού ανά νύχτα, για τις σημειώσεις χαμηλού οξυγόνου (B7), με τον ίδιο
+  /// ορισμό που δείχνουν οι κάρτες (A4): οι [oxygenWindowNights] νύχτες ως και την [last]· νύχτες του ρολογιού, ή
+  /// — με [ouraNights] — οι μετρήσεις του ρολογιού μέσα στις ώρες ύπνου του Oura ([windows]). [since]: αρχή της
+  /// εποχής του ορισμού ([SourcePlan.segmentStart]), ώστε να μη μετρούν νύχτες με άλλον ορισμό. Το ελάχιστο μετρά
+  /// και σε νύχτα με μόνο σύντομες μετρήσεις (χωρίς μέσο όρο).
+  Map<DateTime, double> spo2MinByNight(
+    DateTime last, {
+    bool ouraNights = false,
+    SleepWindows windows = SleepWindows.empty,
+    DateTime? since,
+  }) {
+    final out = <DateTime, double>{};
+    final end = dayOf(last);
+    for (var i = 0; i < oxygenWindowNights; i++) {
+      final day = DateTime(end.year, end.month, end.day - i);
+      if (since != null && day.isBefore(dayOf(since))) break;
+      double? min;
+      if (ouraNights) {
+        min = watchSpo2(day, windows)?.min;
+      } else {
+        for (final n in nights) {
+          if (sameDay(n.date, day)) min = n.spo2Min;
+        }
+      }
+      if (min != null) out[day] = min;
+    }
+    return out;
+  }
+
   // ---------- Υπολογισμοί για τις οθόνες ----------
 
   /// Η πιο πρόσφατη νύχτα (συνήθως η χθεσινή).
@@ -664,15 +706,22 @@ class Dashboard {
     return v.reduce((a, b) => a + b) / v.length;
   }
 
+  /// Οι νύχτες πριν από τη νύχτα [date] (ποτέ η ίδια μέσα στο «συνηθισμένο» της).
+  Iterable<Night> nightsBefore(DateTime date) => nights.where((n) => n.date.isBefore(dayOf(date)));
+
+  /// «Συνήθως» για τη διάρκεια της τελευταίας νύχτας ([usualMean]: τουλάχιστον 7 προηγούμενες νύχτες).
   /// Μόνο νύχτες με φάσεις (πραγματικός ύπνος): μια νύχτα χωρίς φάσεις έχει διάρκεια με τα ξυπνήματα.
-  double? get sleepBaseline => mean(previousNights().where((n) => n.staged).map((n) => n.minutes.toDouble()));
+  double? get sleepBaseline => lastNight == null
+      ? null
+      : usualMean(nightsBefore(lastNight!.date).where((n) => n.staged).map((n) => n.minutes.toDouble()));
 
-  double? get restingHrBaseline => mean(previousNights(14).map((n) => n.sleepingHr));
+  double? get restingHrBaseline => lastNight == null ? null : restingHrBaselineFor(lastNight!.date);
 
-  double? get skinTempBaseline {
-    final prev = previousNights(14).map((n) => n.skinTemp).whereType<double>().toList();
-    return prev.length >= 3 ? mean(prev) : null;
-  }
+  /// Ο μέσος όρος παλμών ύπνου πριν από τη νύχτα [date] (η νύχτα που δείχνουμε, όχι απαραίτητα η τελευταία).
+  double? restingHrBaselineFor(DateTime date) => usualMean(nightsBefore(date).map((n) => n.sleepingHr));
+
+  double? get skinTempBaseline =>
+      lastNight == null ? null : usualMean(nightsBefore(lastNight!.date).map((n) => n.skinTemp));
 
   DayValue? valueFor(List<DayValue> list, DateTime day) {
     for (final v in list.reversed) {
@@ -685,11 +734,7 @@ class Dashboard {
 
   double? get todaySteps => valueFor(steps, readAt)?.value;
 
-  double? get stepsBaseline {
-    final prev = steps.where((s) => !sameDay(s.day, readAt)).toList();
-    final last7 = prev.length <= 7 ? prev : prev.sublist(prev.length - 7);
-    return mean(last7.map((s) => s.value));
-  }
+  double? get stepsBaseline => usualMean(steps.where((s) => s.day.isBefore(dayOf(readAt))).map((s) => s.value));
 
   /// Ελάχιστοι και μέγιστοι παλμοί μιας ημέρας. [exclude]: χρονικά διαστήματα (π.χ. ο ύπνος από το Oura)
   /// που δεν μετρούν, ώστε το «χαμηλότερο της μέρας» να μην είναι παλμός του ύπνου.

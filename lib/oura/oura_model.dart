@@ -389,8 +389,9 @@ Map<String, double> ouraRow(OuraNight n) {
     final onset = m.onset;
     if (onset != null) put(K.bedtime, minutesFromSix(onset));
     put(K.wake, minutesFromSix(m.end));
-    if (m.deep != null && m.light != null && m.rem != null && m.awake != null) {
-      final staged = m.deep! + m.light! + m.rem! + m.awake!;
+    // Ποσοστό του ύπνου (χωρίς τον χρόνο ξύπνιος), όπως στην εφαρμογή Oura (έλεγχος υπολογισμών F6, 4/11).
+    if (m.deep != null && m.light != null && m.rem != null) {
+      final staged = m.deep! + m.light! + m.rem!;
       if (staged > 0) {
         put(K.deepPct, 100 * m.deep! / staged);
         put(K.remPct, 100 * m.rem! / staged);

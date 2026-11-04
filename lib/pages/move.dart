@@ -83,7 +83,7 @@ class ExercisePage extends StatelessWidget {
               if (d.stepsBaseline != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  '14 ημέρες · η διακεκομμένη γραμμή είναι ο μέσος όρος των 7 προηγούμενων',
+                  '14 ημέρες · η διακεκομμένη γραμμή είναι ο μέσος όρος των προηγούμενων ημερών (έως 14)',
                   style: TextStyle(color: c.textSecondary, fontSize: 12.5),
                 ),
               ],
@@ -102,10 +102,12 @@ class ExercisePage extends StatelessWidget {
           StatCard(
             icon: Icons.local_fire_department_rounded,
             color: c.heart,
-            title: title('Θερμίδες που έκαψες', calories),
+            // Κλινικός έλεγχος M9 (4/11): μεγάλο λάθος σε όλα τα ρολόγια, ειδικά στα βάρη (σημείωση κάτω από τις κάρτες).
+            // Σύντομος τίτλος για τη μισή κάρτα· με ημερομηνία όταν η τιμή δεν είναι σημερινή (A11).
+            title: title('Θερμίδες', calories),
             value: calories == null ? null : thousands(calories),
             unit: 'kcal',
-            note: activeCalories == null ? 'Μαζί με τον βασικό μεταβολισμό' : 'Από κίνηση ${thousands(activeCalories)} kcal',
+            note: 'Εκτίμηση ρολογιού · ${activeCalories == null ? 'μαζί με τον βασικό μεταβολισμό' : 'από κίνηση ${thousands(activeCalories)} kcal'}',
           ),
           StatCard(
             icon: Icons.straighten_rounded,
@@ -140,12 +142,20 @@ class ExercisePage extends StatelessWidget {
           ),
         );
 
+        final caloriesNote = Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Θερμίδες: τα ρολόγια κάνουν μεγάλα λάθη, ειδικά στα βάρη. Δες τις μόνο ως τάση, όχι για να ισοφαρίσεις φαγητό.',
+            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
+          ),
+        );
+
         return PageFrame(
           title: 'Άσκηση',
           onRefresh: () => store.refresh(),
-          single: [stepsCard, ...stats, floorsCard],
+          single: [stepsCard, ...stats, caloriesNote, floorsCard],
           left: [stepsCard, floorsCard],
-          right: stats,
+          right: [...stats, caloriesNote],
         );
       },
     );

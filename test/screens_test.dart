@@ -224,7 +224,7 @@ void main() {
       ));
   testWidgets('Αναφορά για γιατρό', (tester) async {
     tester.view.devicePixelRatio = 2.0;
-    tester.view.physicalSize = const Size(680, 2200) * 2.0;
+    tester.view.physicalSize = const Size(680, 3200) * 2.0;
     addTearDown(tester.view.reset);
     final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
     store.history = sampleHistory(now, store.data!);
@@ -244,7 +244,7 @@ void main() {
   });
   testWidgets('Αναφορά για γιατρό · με σημείωση 160 χαρακτήρων (να χωράει)', (tester) async {
     tester.view.devicePixelRatio = 2.0;
-    tester.view.physicalSize = const Size(680, 2200) * 2.0;
+    tester.view.physicalSize = const Size(680, 3200) * 2.0;
     addTearDown(tester.view.reset);
     final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
     store.history = sampleHistory(now, store.data!);
@@ -261,6 +261,27 @@ void main() {
     );
     await tester.pumpAndSettle();
     await expectLater(find.byKey(key), matchesGoldenFile('shots/13b_report_note.png'));
+  });
+  testWidgets('Αναφορά για γιατρό · με Oura (να χωράει η σελίδα 1 με τις 3 επιπλέον γραμμές)', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(680, 3200) * 2.0;
+    addTearDown(tester.view.reset);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(ouraNow));
+    store.history = sampleHistory(ouraNow, store.data!);
+    prepareOura(store);
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light),
+          home: ReportPage(store: store, now: ouraNow, note: 'Φάρμακα: ' * 16),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13c_report_oura.png'));
   });
   testWidgets('Σήμερα · μικρό κινητό 360', (t) => _shot(t, name: '25_today_360', size: const Size(360, 1900), brightness: Brightness.light, tab: 0));
   testWidgets('Σήμερα · Fold ανοιχτό 750', (t) => _shot(t, name: '26_today_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: 0));

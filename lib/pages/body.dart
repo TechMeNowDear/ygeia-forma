@@ -170,7 +170,7 @@ class _LatestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}. Η ζυγαριά (ρεύμα στο σώμα) αλλάζει από μέρα σε μέρα '
-              'με το νερό και το φαγητό: αλλαγή κάτω από 1 kg ή 1% δεν σημαίνει κάτι.',
+              'με το νερό και το φαγητό: αλλαγή κάτω από 1 kg στο βάρος ή κάτω από 2 μονάδες στο λίπος δεν σημαίνει κάτι.',
               style: TextStyle(color: c.textSecondary, fontSize: 13),
             ),
           ],
@@ -180,7 +180,7 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Μάζα λίπους', withDiff(last.fatKg, p?.fatKg, 'kg')),
           InfoRow('Σκελετικοί μύες', withDiff(last.smm, p?.smm, 'kg')),
           InfoRow('Άλιπη μάζα', withDiff(last.leanMass, p?.leanMass, 'kg')),
-          if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση)', '${thousands(last.bmr!)} kcal'),
+          if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
           if (last.bmi != null) InfoRow('Δείκτης μάζας σώματος', dec(last.bmi!)),
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
           const SizedBox(height: 8),

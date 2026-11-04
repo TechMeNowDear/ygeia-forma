@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart';
+import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/trends.dart';
 import 'package:ygeia_forma/weekly.dart';
 
@@ -34,7 +36,8 @@ void main() {
     final t = computeTrend(def(K.sleepHr), history, today, TrendPeriod.month);
     expect(t.status, TrendStatus.down);
     expect(t.diff!, closeTo(-3, 0.6));
-    expect(t.goodness, 1, reason: 'λιγότεροι παλμοί = καλύτερα');
+    // Από 4/11 (κλινικός έλεγχος M4): η πτώση των παλμών ύπνου είναι ουδέτερη, μόνο η άνοδος είναι «προσοχή».
+    expect(t.goodness, 0, reason: 'λιγότεροι παλμοί δεν είναι πάντα καλύτερα');
   });
 
   test('Θόρυβος χωρίς αλλαγή → σταθερό', () {
@@ -84,10 +87,111 @@ void main() {
     expect(t.status, isNot(TrendStatus.insufficient));
   });
 
-  test('Αραιές μετρήσεις: καμία αυτοσυσχέτιση', () {
-    expect(lagOneCorrelation([
+  test('Αραιές μετρήσεις: η αυτοσυσχέτιση βγαίνει και από τιμές που απέχουν μέρες (όχι 0)', () {
+    // Πριν (έλεγχος F4): χωρίς διαδοχικές μέρες, φ = 0, σαν να ήταν ανεξάρτητες. Τώρα: φ^g από τα κενά.
+    final w = <(DateTime, double)>[];
+    var x = 0.0;
+    final r = math.Random(5);
+    for (var ago = 120; ago >= 0; ago -= 2) {
+      x = 0.81 * x + (r.nextDouble() - 0.5); // φ ημέρας 0,9 → φ² = 0,81 ανά δύο μέρες
+      w.add((day(ago), 80 + x));
+    }
+    final phi = dailyCorrelation([w])!;
+    expect(phi, greaterThan(0.6));
+    // Λίγα ζευγάρια: δεν βγαίνει εκτίμηση (και η σύγκριση παίρνει συντηρητική τιμή).
+    expect(dailyCorrelation([
       [(day(1), 80.0), (day(8), 81.0), (day(15), 80.0)],
-    ]), 0);
+    ]), isNull);
+  });
+
+  test('Πραγματικό πλήθος με κενά: λιγότερο από n, ίσο με n όταν φ = 0', () {
+    final days = [for (var i = 0; i < 30; i += 2) day(i)].reversed.toList();
+    expect(effectiveN(days, 0), days.length);
+    // 15 τιμές μέρα παρά μέρα με φ = 0,5: φ² = 0,25 ανά ζευγάρι → ≈ 9,3.
+    expect(effectiveN(days, 0.5), closeTo(9.33, 0.05));
+  });
+
+  // B1 (έλεγχος υπολογισμών F2, 4/11): πριν, το «άλλαξε» έβγαινε στο 2–10% των συγκρίσεων χωρίς καμία
+  // αλλαγή, όταν έλειπαν μέρες. Προσομοίωση με σταθερό σπόρο: AR(1), 75% των ημερών με τιμή, 180 μέρες.
+  double falseChangeRate(MetricDef def, double phi, int sims, int seed, {double sd = 1, double coverage = 0.75, int every = 1}) {
+    final r = math.Random(seed);
+    double normal() => math.sqrt(-2 * math.log(1 - r.nextDouble())) * math.cos(2 * math.pi * r.nextDouble());
+    var tested = 0, changed = 0;
+    for (var s = 0; s < sims; s++) {
+      final h = <String, Map<String, double>>{};
+      var x = normal() * sd;
+      for (var ago = 179; ago >= 0; ago--) {
+        x = phi * x + math.sqrt(1 - phi * phi) * sd * normal();
+        if (ago % every == 0 && r.nextDouble() < coverage) h[dateKey(day(ago))] = {def.key: 60 + x};
+      }
+      final t = computeTrend(def, h, today, TrendPeriod.month);
+      if (t.status == TrendStatus.insufficient) continue;
+      tested++;
+      if (t.changed) changed++;
+    }
+    return changed / tested;
+  }
+
+  test('Αυτοσυσχέτιση με κενές μέρες: ψεύτικο «άλλαξε» ≤ ~1,5% (προσομοίωση)', () {
+    // Μόνο ο στατιστικός έλεγχος (ελάχιστη διαφορά 0): το αυστηρότερο σενάριο.
+    const pure = MetricDef(key: K.sleepHr, label: 'x', section: TrendSection.heart, minDiff: 0, unit: 'bpm');
+    final rates = [
+      for (final (i, phi) in [0.3, 0.6, 0.85].indexed) falseChangeRate(pure, phi, 600, 7000 + i),
+    ];
+    final overall = rates.reduce((a, b) => a + b) / rates.length;
+    expect(overall, lessThanOrEqualTo(0.015), reason: 'ανά φ: $rates (πριν: ~2%, ~3,5%, ~10%)');
+    for (final v in rates) {
+      expect(v, lessThanOrEqualTo(0.025), reason: 'ανά φ: $rates');
+    }
+    // Με τα πραγματικά όρια (παλμοί ύπνου: τυπική απόκλιση 3 bpm, ελάχιστο 2 bpm), φ = 0,85.
+    expect(falseChangeRate(def(K.sleepHr), 0.85, 400, 7100, sd: 3), lessThanOrEqualTo(0.015));
+  });
+
+  test('Ζυγίσεις μέρα παρά μέρα: ψεύτικο «Βάρος άλλαξε» ≤ ~1,5% (πριν: ~20–25%)', () {
+    expect(falseChangeRate(def(K.weight), 0.95, 400, 7200, sd: 0.5, coverage: 1, every: 2), lessThanOrEqualTo(0.015));
+  });
+
+  test('Μεσαία τιμή πάνω, μέσος όρος κάτω → όχι «άλλαξε» (έλεγχος F3)', () {
+    // Πριν: 16 νύχτες 20 λεπτά και 14 νύχτες 80 (μεσαία 20, μέσος 48)· τώρα 30 λεπτά κάθε νύχτα.
+    // Ο έλεγχος βρίσκει πτώση του μέσου όρου, η κάρτα θα έλεγε «↑ 10 λεπτά». Τώρα: «Σταθερό».
+    final h = <String, Map<String, double>>{};
+    final prev = [for (var i = 0; i < 14; i++) ...[20.0, 80.0], 20.0, 20.0];
+    for (var i = 0; i < 30; i++) {
+      h[dateKey(day(59 - i))] = {K.awakeMin: prev[i]};
+      h[dateKey(day(29 - i))] = {K.awakeMin: 30};
+    }
+    final t = computeTrend(def(K.awakeMin), h, today, TrendPeriod.month);
+    expect(t.diff, 10);
+    expect(t.status, TrendStatus.stable);
+  });
+
+  test('Ώρες γύρω στις 18:00: κυκλικός μέσος όρος (έλεγχος F13)', () {
+    final v = [for (final (h, m) in [(17, 40), (18, 20), (17, 50), (18, 10)]) minutesFromSix(DateTime(2026, 1, 1, h, m)).toDouble()];
+    expect(clockFromSix(circularMeanMinutes(v)), '18:00');
+    expect(unwrapMinutes(1420, 5), -20);
+    expect(unwrapMinutes(390, 360), 390);
+  });
+
+  test('Απόκλιση θερμοκρασίας του Oura με πρόσημο· χωρίς «-0,0» (έλεγχος F12, F14)', () {
+    final skin = def(K.skinTemp);
+    expect(skin.formatAs(0.3, Source.oura), '+0,3 °C');
+    expect(skin.formatAs(-0.04, Source.oura), '0 °C');
+    expect(skin.formatAs(34.2, Source.watch), '34,2 °C');
+    expect(dec(-0.04), '0,0');
+    expect(hoursMinutes(-5), '−5 λεπτά');
+    expect(hoursMinutes(-65), '−1 ώρα 5 λεπτά');
+  });
+
+  test('Χρώματα: βαθύς ύπνος, ξύπνιος και πτώση παλμών ουδέτερα· άνοδος παλμών «προσοχή» (κλινικός έλεγχος M3/M4)', () {
+    expect(def(K.deepPct).better, 0);
+    expect(def(K.awakeMin).better, 0);
+    final h = <String, Map<String, double>>{};
+    for (var ago = 0; ago < 60; ago++) {
+      h[dateKey(day(ago))] = {K.sleepHr: (ago < 30 ? 66 : 60) + (ago % 3) * 0.3};
+    }
+    final up = computeTrend(def(K.sleepHr), h, today, TrendPeriod.month);
+    expect(up.status, TrendStatus.up);
+    expect(up.goodness, -1);
   });
 
   test('Χρόνος: τελευταίοι 3 μήνες με τους ίδιους μήνες πέρσι', () {

@@ -10,12 +10,14 @@ library;
 import '../format.dart';
 import '../history.dart';
 import '../sources.dart';
+import '../trends.dart' show usualMinNights, usualNights;
 import 'oura_model.dart';
 
 /// Ελάχιστες νύχτες για μέσο όρο ή «συνηθισμένο».
 const minNightsForAverage = 4;
-const minNightsForBaseline = 7;
-const baselineNights = 14;
+// Ίδιοι κανόνες «συνηθισμένου» με το ρολόι (trends.dart › usualMean).
+const minNightsForBaseline = usualMinNights;
+const baselineNights = usualNights;
 
 /// Η τιμή μιας νύχτας μπροστά στο συνηθισμένο σου (μέση τιμή των προηγούμενων 14 νυχτών Oura).
 class NightBaseline {
@@ -186,12 +188,14 @@ class CompareRow {
     this.ouraStart,
     this.ouraEnd,
     this.ouraHr,
+    this.ouraAwake,
     this.watchMinutes,
     this.watchEstimated = 0,
     this.watchStart,
     this.watchEnd,
     this.watchParts = 0,
     this.watchHr,
+    this.watchAwake,
     this.ouraSpan,
     this.watchSpan,
   });
@@ -207,7 +211,12 @@ class CompareRow {
   final DateTime? ouraEnd;
   final double? ouraHr;
 
-  /// Πραγματικός ύπνος του ρολογιού (από τις φάσεις, χωρίς τα ξυπνήματα): μόνο όταν όλα τα κομμάτια είχαν φάσεις,
+  /// Λεπτά ξύπνιος μέσα στη νύχτα, όπως τα μέτρησε κάθε συσκευή (και οι δύο μετρούν λιγότερα απ' όσα είναι).
+  final int? ouraAwake;
+  final int? watchAwake;
+
+  /// Oura: μόνο ύπνος (total_sleep_duration, χωρίς τον χρόνο ξύπνιος).
+  /// Ρολόι: πραγματικός ύπνος (από τις φάσεις, χωρίς τα ξυπνήματα): μόνο όταν όλα τα κομμάτια είχαν φάσεις,
   /// αλλιώς null — ποτέ «χρόνος με τα ξυπνήματα» δίπλα στον πραγματικό ύπνο του Oura.
   final int? watchMinutes;
 

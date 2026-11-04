@@ -39,6 +39,9 @@ List<CompareRow> buildCompareRows({
       ouraStart: o?.onset ?? o?.start,
       ouraEnd: o?.end,
       ouraHr: o?.avgHr,
+      ouraAwake: o?.awake == null ? null : (o!.awake! / 60).round(),
+      // Ίδιος ορισμός και στις δύο: πραγματικός ύπνος (χωρίς τα ξυπνήματα). Ρολόι: Night.minutes, που είναι
+      // βαθύς + ελαφρύς + REM από τα στάδια· νύχτα χωρίς στάδια: «—» (η διάρκειά της έχει τα ξυπνήματα).
       watchMinutes: w != null && w.staged ? w.minutes : null,
       ouraSpan: o?.onset == null ? null : o!.end.difference(o.onset!).inMinutes,
       watchSpan: w?.spanMinutes,
@@ -47,6 +50,7 @@ List<CompareRow> buildCompareRows({
       watchEnd: w?.end,
       watchParts: w?.parts.length ?? 0,
       watchHr: w?.sleepingHr,
+      watchAwake: w == null || w.stageMinutes.isEmpty ? null : w.awakeMinutes,
     ));
   }
   return rows;
@@ -130,6 +134,14 @@ class ComparePage extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 10),
+                // Έλεγχος υπολογισμών F7 (4/11): δύο διαφορετικοί ορισμοί, γραμμένοι ρητά.
+                Text(
+                  'Τι συγκρίνεται: πραγματικός ύπνος και στις δύο, χωρίς τα ξυπνήματα (ρολόι: βαθύς + ελαφρύς + REM της '
+                  'Samsung· νύχτα χωρίς φάσεις: «—»). Ο χρόνος ξύπνιος και ο χρόνος από τον ύπνο ως το ξύπνημα φαίνονται '
+                  'χωριστά· και οι δύο συσκευές μετρούν λιγότερα ξυπνήματα απ\' όσα είναι.',
+                  style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   'Καμία συσκευή δεν είναι «η σωστή». Εδώ βλέπεις πόσο διαφέρουν· οι φάσεις ύπνου διαφέρουν πολύ ακόμα '
                   'και ανάμεσα σε καλές συσκευές, γι\' αυτό δεν τις συγκρίνουμε.',
@@ -218,7 +230,7 @@ class _CompareCard extends StatelessWidget {
                 child: Text(longDate(r.day), style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
               ),
               if (r.diff != null)
-                TrendPill(r.diff!.abs() < 5 ? 'ίδια διάρκεια' : 'διαφορά ${hoursMinutes(r.diff!.abs())}'),
+                TrendPill(r.diff!.abs() < 5 ? 'σχεδόν ίδια' : 'διαφορά ${hoursMinutes(r.diff!.abs())}'),
             ],
           ),
           const SizedBox(height: 8),
@@ -232,6 +244,7 @@ class _CompareCard extends StatelessWidget {
               ]),
               // Ίδιο με ίδιο (έλεγχος 4/11): πραγματικός ύπνος με πραγματικό, «με τα ξυπνήματα» με «με τα ξυπνήματα».
               line('Ύπνος (χωρίς τα ξυπνήματα)', dur(r.ouraMinutes), dur(r.watchMinutes)),
+              line('Ξύπνιος μέσα', dur(r.ouraAwake), dur(r.watchAwake)),
               line('Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)', dur(r.ouraSpan), dur(r.watchSpan)),
               line('Κοιμήθηκες', t(r.ouraStart), t(r.watchStart)),
               line('Ξύπνησες', t(r.ouraEnd), t(r.watchEnd)),

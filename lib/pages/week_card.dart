@@ -26,7 +26,7 @@ class WeekCard extends StatelessWidget {
         (
           Icons.bedtime_rounded,
           c.sleep,
-          'Καλύτερη βαθμολογία ύπνου',
+          'Καλύτερη βαθμολογία ύπνου (εκτίμηση)',
           // Η νύχτα έχει την ημερομηνία του πρωινού: «Τρί→Τετ» = η νύχτα από Τρίτη προς Τετάρτη.
           '${_weekday(DateTime(r.bestNight!.year, r.bestNight!.month, r.bestNight!.day - 1))}→${_weekday(r.bestNight!)} · ${r.bestNightScore!.round()}',
         ),
@@ -103,7 +103,9 @@ class WeekCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Μεσαία τιμή της εβδομάδας. «Σταθερό» σημαίνει ότι η διαφορά χωράει στις συνηθισμένες διακυμάνσεις σου.'
-            '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα και στον ενεργό χρόνο, γιατί δεν έχει τελειώσει.' : ''}',
+            '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα και στον ενεργό χρόνο, γιατί δεν έχει τελειώσει.' : ''}'
+            // Έλεγχος υπολογισμών F17: δύο ζυγίσεις μιας εβδομάδας απέχουν συχνά 0,5–1 kg μόνο από το νερό.
+            '${r.weightFirst != null && r.weightLast != null && r.weightFirst!.$1 != r.weightLast!.$1 ? ' Το βάρος αλλάζει 0,5–1 kg από μέρα σε μέρα με το νερό και το φαγητό· μία εβδομάδα δεν δείχνει τάση.' : ''}',
             style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textTertiary),
           ),
         ],
@@ -135,7 +137,9 @@ class _Highlight extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  maxLines: 2,
+                  // 3 γραμμές: «Καλύτερη βαθμολογία ύπνου (εκτίμηση)» σε μισό πλάτος 360–400 dp δεν χωρά σε 2.
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12.5, height: 1.2, fontWeight: FontWeight.w600, color: c.textSecondary),
                 ),
               ),
@@ -176,12 +180,12 @@ class _WeekRow extends StatelessWidget {
                 Text(metricLabel(t.def, t.source), style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 const SizedBox(height: 1),
                 Text(
-                  t.def.format(t.current!),
+                  t.def.formatAs(t.current!, t.source),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                 ),
                 if (t.previous != null)
                   Text(
-                    'συνήθως ${t.def.format(t.previous!)}',
+                    'συνήθως ${t.def.formatAs(t.previous!, t.source)}',
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
                   ),
               ],

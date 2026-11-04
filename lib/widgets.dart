@@ -862,7 +862,7 @@ class _TimelinePainter extends CustomPainter {
   bool shouldRepaint(_TimelinePainter old) => true;
 }
 
-/// Υπόμνημα φάσεων σε πλέγμα 2×2: χρώμα, όνομα, διάρκεια, ποσοστό.
+/// Υπόμνημα φάσεων σε πλέγμα 2×2: χρώμα, όνομα, διάρκεια, ποσοστό του πραγματικού ύπνου (το «ξύπνιος» μόνο σε λεπτά).
 class StageLegend extends StatelessWidget {
   const StageLegend({super.key, required this.night, this.onBlue = false});
   final Night night;
@@ -871,13 +871,12 @@ class StageLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final total = stageOrder.fold<int>(0, (s, n) => s + (night.stageMinutes[n] ?? 0));
     final main = onBlue ? Colors.white : c.text;
     final sub = onBlue ? Colors.white.withValues(alpha: 0.7) : c.textSecondary;
 
     Widget item(String name) {
       final m = night.stageMinutes[name] ?? 0;
-      final pct = total == 0 ? 0 : (m * 100 / total).round();
+      final pct = night.stagePct(name)?.round();
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -893,7 +892,7 @@ class StageLegend extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${stageLabel(name)} · $pct%',
+                  pct == null ? stageLabel(name) : '${stageLabel(name)} · $pct%',
                   style: TextStyle(color: sub, fontSize: 12.5, fontWeight: FontWeight.w500),
                 ),
                 Text(
