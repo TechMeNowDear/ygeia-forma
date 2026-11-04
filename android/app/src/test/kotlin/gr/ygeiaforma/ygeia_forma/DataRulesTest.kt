@@ -100,6 +100,33 @@ class DataRulesTest {
     }
 
     @Test
+    fun watchFilterOnlyAnErrorInRecentReads() {
+        // Έλεγχος 3, E3: κανονική ανάγνωση → σφάλμα· κομμάτι ιστορικού → «χωρίς ρολόι εδώ», δεκτό.
+        assertEquals(DataRules.FilterOutcome.ERROR, DataRules.filterOutcome(0, 4, recent = true))
+        assertEquals(DataRules.FilterOutcome.NON_WATCH, DataRules.filterOutcome(0, 4, recent = false))
+        assertEquals(DataRules.FilterOutcome.OK, DataRules.filterOutcome(0, 0, recent = false))
+        assertEquals(DataRules.FilterOutcome.OK, DataRules.filterOutcome(5, 9, recent = true))
+    }
+
+    @Test
+    fun nightsFileErrorIsNotMissing() {
+        // Έλεγχος 3, E4: σφάλμα ανάγνωσης ≠ «δεν υπάρχει».
+        assertEquals("{\"state\":\"missing\"}", DataRules.nightsState(false) { error("δεν καλείται") })
+        assertEquals("{\"state\":\"ok\",\"json\":\"{}\"}", DataRules.nightsState(true) { "{}" })
+        assertEquals("{\"state\":\"error\"}", DataRules.nightsState(true) { throw java.io.IOException("x") })
+    }
+
+    @Test
+    fun keystoreKeyNeverReplacedWhileAliasExists() {
+        // Έλεγχος 3, E6: προσωρινό «δεν βρέθηκε» με υπάρχον alias → ξανά, μετά σφάλμα· νέο κλειδί μόνο χωρίς alias.
+        assertEquals(DataRules.KeyAction.USE, DataRules.keyAction(aliasExists = true, keyFound = true, attempt = 1, maxAttempts = 3))
+        assertEquals(DataRules.KeyAction.RETRY, DataRules.keyAction(aliasExists = true, keyFound = false, attempt = 1, maxAttempts = 3))
+        assertEquals(DataRules.KeyAction.RETRY, DataRules.keyAction(aliasExists = true, keyFound = false, attempt = 2, maxAttempts = 3))
+        assertEquals(DataRules.KeyAction.FAIL, DataRules.keyAction(aliasExists = true, keyFound = false, attempt = 3, maxAttempts = 3))
+        assertEquals(DataRules.KeyAction.GENERATE, DataRules.keyAction(aliasExists = false, keyFound = false, attempt = 1, maxAttempts = 3))
+    }
+
+    @Test
     fun watchFilterEmptyIsAnError() {
         // Έλεγχος 2, C6: 0 με φίλτρο ρολογιού ενώ υπάρχουν χωρίς φίλτρο = σφάλμα (κρατάμε το ιστορικό).
         assertTrue(DataRules.watchFilterEmpty(0, 1))
@@ -164,8 +191,12 @@ class DataRulesTest {
         val merged = DataRules.mergeDeviceOnlyPrefs(shared, own)
         assertTrue(merged.contains("\"reportName\":\"Γιώργος Π.\""))
         assertTrue(merged.contains("\"units\":\"kg\""))
-        // Χωρίς όνομα: τίποτα ιδιωτικό (το αρχείο σβήνεται).
+        // Έλεγχος 3, E6: χωρίς το κλειδί (π.χ. ρυθμίσεις από προεπιλογές μετά από χαλασμένο prefs.json): το ιδιωτικό
+        // αρχείο ΜΕΝΕΙ (πριν σβηνόταν και χανόταν το όνομα)· με το κλειδί κενό (ο χρήστης το έσβησε): σβήνεται.
         assertNull(DataRules.splitDeviceOnlyPrefs("""{"kcal":2200}""").second)
+        val cleared = DataRules.splitDeviceOnlyPrefs("""{"kcal":2200,"reportName":null}""")
+        assertEquals(DataRules.DEVICE_PREFS_DELETE, cleared.second)
+        assertFalse(cleared.first.contains("reportName"))
         // Επαναφορά από αντίγραφο σε νέο κινητό: prefs.json χωρίς όνομα, κανένα ιδιωτικό αρχείο → οι ρυθμίσεις ως έχουν.
         assertEquals(shared, DataRules.mergeDeviceOnlyPrefs(shared, null))
         // Σφάλμα ανάγνωσης ή χαλασμένο JSON: ποτέ δεν «διορθώνεται» σε προεπιλογές.

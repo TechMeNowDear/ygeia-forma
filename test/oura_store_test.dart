@@ -1190,4 +1190,31 @@ void main() {
       expect(ok['2026-11-09']!.containsKey(K.dayHr), isFalse, reason: 'η νύχτα 10/11 λείπει πραγματικά (C12)');
     });
   });
+
+  group('Έλεγχος 3, E6', () {
+    test('Διπλή επιστροφή της Oura όσο τρέχει η πρώτη: μία ανταλλαγή, κανένα «δεν δέχτηκε»', () async {
+      final a = app(plan: null);
+      await boot(a.store);
+      expect(await a.store.beginOuraLogin(from: firstOuraNight(a.store.ouraClock())), isNull);
+      final state = OuraPending.fromJson(a.vault.data[vaultPending])!.state;
+      final uri = '$ouraRedirectHttps?code=C&state=$state';
+      await Future.wait([a.store.completeOuraLogin(uri), a.store.completeOuraLogin(uri)]);
+      expect(a.oura.calls.where((c) => c.$1 == 'POST').length, 1, reason: 'πριν: ο ίδιος κωδικός δύο φορές');
+      expect(a.store.ouraLoginError, isNull);
+      expect(a.store.ouraHasTokens, isTrue);
+    });
+
+    test('Όνομα αναφοράς πριν διαβαστούν οι ρυθμίσεις: δεν χάνεται· ρυθμίσεις από προεπιλογές δεν το σβήνουν', () async {
+      final a = app();
+      a.android.prefs = {'kcal': 2000};
+      a.store.setReportName('Γιάννης Π.');
+      await a.store.loadPrefs();
+      expect(a.store.prefs.reportName, 'Γιάννης Π.');
+      expect(a.android.savedPrefs.last['reportName'], 'Γιάννης Π.');
+      // Ρυθμίσεις από προεπιλογές: το κλειδί λείπει (η Kotlin αφήνει το όνομα στο κινητό)· γνωστό null: «σβήσ' το».
+      expect(jsonDecode(Prefs({}).toJson()).containsKey('reportName'), isFalse);
+      expect((jsonDecode(Prefs.fromJson({}).toJson()) as Map)['reportName'], isNull);
+      expect((jsonDecode(Prefs.fromJson({}).toJson()) as Map).containsKey('reportName'), isTrue);
+    });
+  });
 }

@@ -3,13 +3,19 @@
 // E1 νέος κανόνας νύχτας (κύρια ομάδα στο 22:00–08:00, ίδιος για ρολόι και Oura, κλείδωμα απόφασης με βήματα).
 // E2 ζυγίσεις: ποτέ διαγραφή· φίλτρο εμφάνισης από την πρώτη ζύγιση InBody.
 // E5 σημειώσεις οξυγόνου από όλες τις 30 νύχτες (πάνω από τη σύνδεση του Oura και την επανανάγνωση), με ημερομηνίες.
+// E6 ανθεκτικότητα: σειρά της βάσης, ανανέωση Oura, Sentry (οι έλεγχοι καταστήματος στο oura_store_test).
 // E7 ξύπνιος του Oura χωρίς τον χρόνο ως τον ύπνο.
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/error_report.dart';
 import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart';
+import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
 import 'package:ygeia_forma/report.dart';
@@ -433,5 +439,55 @@ void main() {
     expect(row[ouraKeys[K.awakeMin]], 28.5);
     // Από τον ύπνο (23:15) ως το ξύπνημα (07:00) = 465′ = ύπνος 436,5′ + ξύπνιος 28,5′.
     expect(row[ouraKeys[K.sleepMin]]! + row[ouraKeys[K.awakeMin]]!, 465);
+  });
+
+  group('E6: ανθεκτικότητα', () {
+    test('Ανανέωση: invalid_request ή invalid_grant από την Oura → νέα σύνδεση (όχι ξαναδοκιμή κάθε ώρα για πάντα)', () async {
+      expect(tokenErrorKind(400, '{"error":"invalid_request"}', refused: OuraErrorKind.reconnect, refresh: true),
+          OuraErrorKind.reconnect);
+      expect(tokenErrorKind(400, '{"error":"invalid_grant"}', refused: OuraErrorKind.reconnect, refresh: true),
+          OuraErrorKind.reconnect);
+      // Λάθος του μεσάζοντα (client): όπως πριν, τα tokens μένουν.
+      expect(tokenErrorKind(400, '{"error":"invalid_client"}', refused: OuraErrorKind.reconnect, refresh: true),
+          OuraErrorKind.proxyRejected);
+      // Στην πρώτη ανταλλαγή (όχι ανανέωση) το invalid_request μένει λάθος του αιτήματος.
+      expect(tokenErrorKind(400, '{"error":"invalid_request"}', refused: OuraErrorKind.tokenRejected),
+          OuraErrorKind.proxyRejected);
+      final now = DateTime(2026, 11, 10, 9);
+      final v = MemoryVault()
+        ..data[vaultTokens] = OuraTokens(access: 'A0', refresh: 'R0', expiresAt: now.millisecondsSinceEpoch).toJson();
+      Future<OuraResponse> send(String m, Uri u, {Map<String, String> headers = const {}, String? form}) async =>
+          const OuraResponse(400, '{"error":"invalid_request","error_description":"refresh token"}');
+      final l = OuraLink(vault: v, send: send, clock: () => now, clientId: 'CID');
+      await expectLater(
+          l.refresh(), throwsA(isA<OuraError>().having((e) => e.kind, 'kind', OuraErrorKind.reconnect)));
+    });
+
+    test('Sentry: από ένα σφάλμα της Flutter φεύγει μόνο το είδος του context, ποτέ το κείμενο του widget', () {
+      final extra = flutterErrorExtra(FlutterErrorDetails(
+        exception: StateError('x'),
+        library: 'widgets library',
+        context: ErrorDescription('building Text("Γιάννης Π. 82,4 kg")'),
+      ));
+      expect(extra['library'], 'widgets library');
+      expect(jsonEncode(extra), isNot(contains('Γιάννης')));
+      expect(jsonEncode(extra), isNot(contains('82,4')));
+      expect(extra['context'], isA<String>());
+    });
+
+    test('Βάση: οι κλήσεις του ιστορικού και του φαγητού ξεκινούν κατευθείαν στη σειρά της (χωρίς Dispatchers.Default)', () {
+      const dir = 'android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma';
+      final bridge = File('$dir/SamsungHealthBridge.kt').readAsStringSync();
+      for (final m in ['saveDays', 'loadDays', 'clearDays', 'dbStatus', 'dbStatusSeen']) {
+        expect(bridge, contains('"$m" -> respondDb(result)'), reason: m);
+      }
+      final food = File('$dir/FoodBridge.kt').readAsStringSync();
+      for (final m in ['logRange', 'logPut', 'logDelete', 'myFoods', 'myFoodPut', 'myFoodDelete']) {
+        expect(food, contains('"$m" -> respondDb(result)'), reason: m);
+      }
+      final q = File('$dir/DbQueue.kt').readAsStringSync();
+      expect(q, contains('newSingleThreadExecutor'));
+      expect(q, contains('scope.launch(dispatcher)'));
+    });
   });
 }

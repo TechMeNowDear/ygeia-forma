@@ -795,6 +795,7 @@ class Prefs {
       {this.backfillFrom,
       this.kitchen,
       this.reportName,
+      this.reportNameKnown = false,
       this.themeMode = 'auto',
       this.dayTheme = 'aigaio',
       this.nightTheme = 'aigaio',
@@ -837,6 +838,7 @@ class Prefs {
       backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
       kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
       reportName: j['reportName'] is String ? j['reportName'] as String : null,
+      reportNameKnown: true,
       themeMode: const ['auto', 'light', 'dark'].contains(j['themeMode']) ? j['themeMode'] as String : 'auto',
       dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
@@ -942,6 +944,11 @@ class Prefs {
   /// το γράφει χωριστά στο noBackupFilesDir, DataRules.splitDeviceOnlyPrefs· συγχώνευση 4/11).
   String? reportName;
 
+  /// Έλεγχος 3, E6: το [reportName] είναι γνωστό (ήρθε από τις αποθηκευμένες ρυθμίσεις ή το άλλαξε ο χρήστης). Μόνο
+  /// τότε γράφεται (και το null σημαίνει «σβήσ' το»)· με ρυθμίσεις από προεπιλογές (χαλασμένο prefs.json) το κλειδί
+  /// λείπει και η Kotlin αφήνει το όνομα στο κινητό όπως είναι (πριν το έσβηνε).
+  bool reportNameKnown;
+
   final Map<String, bool> cards;
 
   /// Ως πού έχει φτάσει το ιστορικό προς τα πίσω («2025-11-01»).
@@ -955,7 +962,7 @@ class Prefs {
         'cards': cards,
         'backfillFrom': backfillFrom,
         'kitchen': kitchen,
-        if (reportName != null) 'reportName': reportName,
+        if (reportNameKnown) 'reportName': reportName,
         'themeMode': themeMode,
         'dayTheme': dayTheme,
         'nightTheme': nightTheme,
@@ -2215,6 +2222,13 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       });
 
   void setCard(String key, bool on) => _changePrefs((p) => p.cards[key] = on);
+
+  /// Έλεγχος 3, E6: το όνομα της αναφοράς. Αν οι ρυθμίσεις δεν έχουν διαβαστεί ακόμα, μπαίνει πάνω τους όταν έρθουν
+  /// (πριν χανόταν: γραφόταν στις προεπιλογές, που αντικαθίσταντο).
+  void setReportName(String? name) => _changePrefs((p) {
+        p.reportName = name;
+        p.reportNameKnown = true;
+      });
 
   @override
   void dispose() {

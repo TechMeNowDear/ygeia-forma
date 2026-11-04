@@ -149,6 +149,20 @@ object DataRules {
         return o.toString()
     }
 
+    /** Τι κάνει το Vault με το κλειδί του Keystore (έλεγχος 3, E6). */
+    enum class KeyAction { USE, RETRY, FAIL, GENERATE }
+
+    /**
+     * Νέο κλειδί ΜΟΝΟ όταν το alias δεν υπάρχει. Υπάρχει αλλά δεν βρέθηκε το κλειδί (προσωρινό): ξανά ως [maxAttempts]
+     * φορές, μετά σφάλμα — ποτέ αντικατάσταση (θα χανόταν η δυνατότητα να διαβαστούν τα tokens).
+     */
+    fun keyAction(aliasExists: Boolean, keyFound: Boolean, attempt: Int, maxAttempts: Int): KeyAction = when {
+        keyFound -> KeyAction.USE
+        !aliasExists -> KeyAction.GENERATE
+        attempt < maxAttempts -> KeyAction.RETRY
+        else -> KeyAction.FAIL
+    }
+
     /** Τι σημαίνει ένα άδειο αποτέλεσμα με φίλτρο ρολογιού ([watchFilterEmpty]). */
     enum class FilterOutcome { OK, ERROR, NON_WATCH }
 
@@ -183,18 +197,27 @@ object DataRules {
     const val DEVICE_PREFS_FILE = "device_prefs.json"
 
     /**
-     * Χωρίζει το JSON των ρυθμίσεων: (ό,τι πάει στο prefs.json, τα [DEVICE_ONLY_PREFS] ως JSON ή null αν δεν υπάρχουν).
+     * Χωρίζει το JSON των ρυθμίσεων: (ό,τι πάει στο prefs.json, τι γίνεται με το ιδιωτικό αρχείο):
+     * - null: κανένα από τα [DEVICE_ONLY_PREFS] δεν υπάρχει στο JSON → το αρχείο του κινητού ΜΕΝΕΙ όπως είναι
+     *   (έλεγχος 3, E6: ρυθμίσεις από προεπιλογές μετά από χαλασμένο prefs.json δεν σβήνουν το όνομα),
+     * - [DEVICE_PREFS_DELETE] («{}»): υπάρχουν αλλά κενά (null) → το αρχείο σβήνεται (ο χρήστης έσβησε το όνομα),
+     * - αλλιώς το JSON με τις τιμές → γράφεται.
      * Μη έγκυρο JSON (ή όχι αντικείμενο): ως έχει, χωρίς τίποτα ιδιωτικό (ποτέ δεν χάνονται ρυθμίσεις).
      */
     fun splitDeviceOnlyPrefs(json: String): Pair<String, String?> {
         val o = parseObject(json) ?: return json to null
         val own = JsonObject()
+        var present = false
         for (k in DEVICE_ONLY_PREFS) {
             val v = o.remove(k) ?: continue
+            present = true
             if (!v.isJsonNull) own.add(k, v)
         }
-        return o.toString() to (if (own.size() == 0) null else own.toString())
+        return o.toString() to (if (!present) null else own.toString())
     }
+
+    /** Το «σβήσε το ιδιωτικό αρχείο» του [splitDeviceOnlyPrefs]. */
+    const val DEVICE_PREFS_DELETE = "{}"
 
     /**
      * Ενώνει το prefs.json με τα ιδιωτικά κλειδιά του κινητού. Τα ιδιωτικά υπερισχύουν· παλιό prefs.json που έχει

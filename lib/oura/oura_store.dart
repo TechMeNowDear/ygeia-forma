@@ -443,6 +443,10 @@ mixin OuraStore on ChangeNotifier {
   Future<void> completeOuraLogin(String uri) async {
     final cb = parseCallback(uri);
     if (cb == null) return;
+    // Έλεγχος 3, E6: μία ανταλλαγή τη φορά. Δεύτερη επιστροφή όσο τρέχει η πρώτη (διπλό πάτημα στη σελίδα επιστροφής,
+    // ή η ίδια επιστροφή από το takeCallback και από τον χειριστή): αγνοείται σιωπηλά (πριν, ο ίδιος κωδικός πήγαινε
+    // δύο φορές στην Oura και η δεύτερη έβγαζε «Η Oura δεν δέχτηκε» μετά από επιτυχημένη σύνδεση).
+    if (ouraConnecting) return;
     // Χωρίς γνωστό σχέδιο πηγών δεν συνδέεται (δεν θα μπορούσε να αλλάξει η πηγή): ο κωδικός δεν χρησιμοποιείται.
     if (!canChangePlan) {
       ouraLoginError = OuraErrorKind.cancelled;

@@ -65,25 +65,25 @@ class SamsungHealthBridge(
                 readRange(call.argument<String>("from") ?: "", call.argument<String>("to") ?: "")
             }
             // Βάση: όλες οι εγγραφές και αναγνώσεις μία-μία, με τη σειρά που ζητήθηκαν (A8, DbQueue).
-            "saveDays" -> respond(result) {
+            "saveDays" -> respondDb(result) {
                 val json = call.argument<String>("json") ?: "[]"
                 withContext(DbQueue.dispatcher) { dayStore.save(JSONArray(json)) }
                 JSONObject().put("ok", true)
             }
-            "loadDays" -> respond(result) {
+            "loadDays" -> respondDb(result) {
                 val rows = withContext(DbQueue.dispatcher) { dayStore.loadAll() }
                 JSONObject().put("ok", true).put("days", rows)
             }
-            "clearDays" -> respond(result) {
+            "clearDays" -> respondDb(result) {
                 withContext(DbQueue.dispatcher) { dayStore.clear() }
                 JSONObject().put("ok", true)
             }
             // Η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ώρα σε ms ή null}.
-            "dbStatus" -> respond(result) {
+            "dbStatus" -> respondDb(result) {
                 val at = withContext(DbQueue.dispatcher) { DayStore.corruptAt(activity.applicationContext) }
                 JSONObject().put("ok", true).put("corrupt", at ?: JSONObject.NULL)
             }
-            "dbStatusSeen" -> respond(result) {
+            "dbStatusSeen" -> respondDb(result) {
                 withContext(DbQueue.dispatcher) { DayStore.clearCorrupt(activity.applicationContext) }
                 JSONObject().put("ok", true)
             }
@@ -147,6 +147,19 @@ class SamsungHealthBridge(
     /** Η δουλειά και η σειριοποίηση εκτός main thread (A9). */
     private fun respond(result: MethodChannel.Result, block: suspend () -> JSONObject) =
         respondText(result) { block().toString() }
+
+    /** Έλεγχος 3, E6: εργασία της βάσης ΚΑΤΕΥΘΕΙΑΝ στη σειρά της ([DbQueue.run]), αυστηρά με τη σειρά των κλήσεων. */
+    private fun respondDb(result: MethodChannel.Result, block: suspend () -> JSONObject) {
+        DbQueue.run(scope, { result.success(it) }) {
+            try {
+                block().toString()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                errorJson(e).toString()
+            }
+        }
+    }
 
     /** Για ό,τι ανοίγει οθόνη (άδειες Samsung): στο main thread. */
     private fun respondMain(result: MethodChannel.Result, block: suspend () -> JSONObject) {
@@ -231,10 +244,15 @@ class SamsungHealthBridge(
     private fun devicePrefsFile() = java.io.File(activity.noBackupFilesDir, DataRules.DEVICE_PREFS_FILE)
 
     /** Τα ιδιωτικά κλειδιά των ρυθμίσεων (ή σβήσιμο του αρχείου όταν δεν υπάρχουν πια). `false` αν απέτυχε. */
+    /** Δες [DataRules.splitDeviceOnlyPrefs]: null = μένει όπως είναι (E6), «{}» = σβήνεται, αλλιώς γράφεται. */
     private fun writeDevicePrefs(own: String?): Boolean =
         try {
             val f = devicePrefsFile()
-            if (own == null) !f.exists() || f.delete() else OuraBridge.atomicWrite(f, own.toByteArray(Charsets.UTF_8))
+            when (own) {
+                null -> true
+                DataRules.DEVICE_PREFS_DELETE -> !f.exists() || f.delete()
+                else -> OuraBridge.atomicWrite(f, own.toByteArray(Charsets.UTF_8))
+            }
         } catch (e: Throwable) {
             false
         }

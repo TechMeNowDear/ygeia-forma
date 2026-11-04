@@ -34,13 +34,13 @@ class FoodBridge(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "logRange" -> respond(result) {
+            "logRange" -> respondDb(result) {
                 val from = call.argument<String>("from") ?: ""
                 val to = call.argument<String>("to") ?: ""
                 val rows = withContext(DbQueue.dispatcher) { store.logRange(from, to) }
                 JSONObject().put("ok", true).put("entries", rows)
             }
-            "logPut" -> respond(result) {
+            "logPut" -> respondDb(result) {
                 val json = JSONObject(call.argument<String>("json") ?: "{}")
                 val id = json.optString("id")
                 val day = json.optString("day")
@@ -48,23 +48,23 @@ class FoodBridge(
                 withContext(DbQueue.dispatcher) { store.logPut(id, day, json.toString()) }
                 JSONObject().put("ok", true)
             }
-            "logDelete" -> respond(result) {
+            "logDelete" -> respondDb(result) {
                 val id = call.argument<String>("id") ?: ""
                 withContext(DbQueue.dispatcher) { store.logDelete(id) }
                 JSONObject().put("ok", true)
             }
-            "myFoods" -> respond(result) {
+            "myFoods" -> respondDb(result) {
                 val rows = withContext(DbQueue.dispatcher) { store.myFoods() }
                 JSONObject().put("ok", true).put("foods", rows)
             }
-            "myFoodPut" -> respond(result) {
+            "myFoodPut" -> respondDb(result) {
                 val json = JSONObject(call.argument<String>("json") ?: "{}")
                 val id = json.optString("id")
                 require(id.isNotEmpty()) { "Λείπει id" }
                 withContext(DbQueue.dispatcher) { store.myFoodPut(id, json.toString()) }
                 JSONObject().put("ok", true)
             }
-            "myFoodDelete" -> respond(result) {
+            "myFoodDelete" -> respondDb(result) {
                 withContext(DbQueue.dispatcher) { store.myFoodDelete(call.argument<String>("id") ?: "") }
                 JSONObject().put("ok", true)
             }
@@ -109,6 +109,11 @@ class FoodBridge(
             val text = withContext(Dispatchers.Default) { guarded(block).toString() }
             result.success(text)
         }
+    }
+
+    /** Έλεγχος 3, E6: εργασία της βάσης ΚΑΤΕΥΘΕΙΑΝ στη σειρά της ([DbQueue.run]), αυστηρά με τη σειρά των κλήσεων. */
+    private fun respondDb(result: MethodChannel.Result, block: suspend () -> JSONObject) {
+        DbQueue.run(scope, { result.success(it) }) { guarded(block).toString() }
     }
 
     /** Για ό,τι ανοίγει οθόνη (επιλογέας αρχείων, κοινοποίηση, σαρωτής): στο main thread. */

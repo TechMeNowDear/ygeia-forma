@@ -366,6 +366,13 @@ class _Resume with WidgetsBindingObserver {
   }
 }
 
+/// Τα επιπλέον της αναφοράς για ένα σφάλμα της Flutter. Έλεγχος 3, E6: το «context» μπορεί να περιγράφει widget με
+/// το κείμενό του (π.χ. «building Text("…")», με όνομα ή τιμή)· στέλνεται ΜΟΝΟ το είδος του, ποτέ η περιγραφή.
+Map<String, Object?> flutterErrorExtra(FlutterErrorDetails details) => {
+      if (details.library != null) 'library': details.library,
+      if (details.context != null) 'context': details.context.runtimeType.toString(),
+    };
+
 /// Στήνεται στην αρχή της main(). Πιάνει σφάλματα της Flutter και ό,τι ξεφύγει (async).
 /// Τα στοιχεία συσκευής και ο φάκελος έρχονται από την πλευρά Android χωρίς να καθυστερεί η πρώτη οθόνη.
 void installErrorReporting() {
@@ -373,10 +380,7 @@ void installErrorReporting() {
   FlutterError.onError = (details) {
     if (!kReleaseMode) previous?.call(details);
     if (details.silent) return;
-    unawaited(errors.report(details.exception, details.stack, handled: false, extra: {
-      if (details.library != null) 'library': details.library,
-      if (details.context != null) 'context': details.context!.toDescription(),
-    }));
+    unawaited(errors.report(details.exception, details.stack, handled: false, extra: flutterErrorExtra(details)));
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     unawaited(errors.report(error, stack, handled: false));

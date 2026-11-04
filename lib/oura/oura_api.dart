@@ -290,9 +290,13 @@ const _proxyFaults = {'invalid_client', 'invalid_request', 'unsupported_grant_ty
 /// - 400/401 με invalid_client/invalid_request/unsupported_grant_type → [OuraErrorKind.proxyRejected],
 /// - άλλο 400/401 (π.χ. invalid_grant: το refresh token δεν ισχύει) → [refused] («νέα σύνδεση» ή «απορρίφθηκε»),
 /// - τα υπόλοιπα όπως [kindForStatus] (502 upstream_unreachable = δίκτυο).
-OuraErrorKind tokenErrorKind(int status, String body, {required OuraErrorKind refused}) {
+/// Έλεγχος 3, E6: στην ΑΝΑΝΕΩΣΗ ([refresh]), invalid_grant και invalid_request = το refresh token δεν γίνεται δεκτό
+/// → [refused] (νέα σύνδεση). Ο μεσάζων περνά αυτούσια την απάντηση της Oura, και η Oura μπορεί να απαντήσει σε νεκρό
+/// refresh token με invalid_request· πριν, αυτό ήταν «λάθος του μεσάζοντα» και ξαναδοκίμαζε κάθε ώρα για πάντα.
+OuraErrorKind tokenErrorKind(int status, String body, {required OuraErrorKind refused, bool refresh = false}) {
   final code = oauthCodeOfBody(body);
   if (status == 503 && code == 'proxy_not_configured') return OuraErrorKind.proxyNotConfigured;
+  if (refresh && (status == 400 || status == 401) && (code == 'invalid_grant' || code == 'invalid_request')) return refused;
   if (status == 400 || status == 401) return _proxyFaults.contains(code) ? OuraErrorKind.proxyRejected : refused;
   return kindForStatus(status);
 }
@@ -625,7 +629,7 @@ class OuraLink {
     if (res.status != 200) {
       // 400/401 invalid_grant: το refresh token δεν ισχύει πια (μιας χρήσης, ή ανακλήθηκε στην Oura) → νέα σύνδεση.
       // Λάθος του μεσάζοντα (invalid_client, 503 proxy_not_configured): ΟΧΙ νέα σύνδεση, τα tokens μένουν (C10).
-      throw OuraError(tokenErrorKind(res.status, res.body, refused: OuraErrorKind.reconnect),
+      throw OuraError(tokenErrorKind(res.status, res.body, refused: OuraErrorKind.reconnect, refresh: true),
           status: res.status, retryAfter: res.retryAfter, code: oauthCodeOfBody(res.body));
     }
     final t = OuraTokens.parseResponse(res.body, _clock());

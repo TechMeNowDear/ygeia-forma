@@ -235,6 +235,7 @@ class OuraBridge(
 object Vault {
     private const val ALIAS = "ygeia_oura_v1"
     private const val VERSION: Byte = 1
+    private const val KEY_ATTEMPTS = 3
     private val allowed = OuraRules.VAULT_NAMES
 
     private fun file(context: Context, name: String): File {
@@ -244,16 +245,28 @@ object Vault {
 
     @Synchronized
     private fun key(): SecretKey {
-        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        try {
-            (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
-        } catch (e: Throwable) {
-            // Έλεγχος 2, C14 (R14): κλειδί που δεν ανακτάται πια (π.χ. μετά από αλλαγή κλειδώματος): νέο κλειδί, αλλιώς
-            // κάθε νέα σύνδεση θα αποτύγχανε για πάντα. Τα παλιά tokens δεν διαβάζονται ούτως ή άλλως (νέα σύνδεση).
-            if (!DataRules.regenerateKeyOn(e)) throw e
-            try {
-                ks.deleteEntry(ALIAS)
-            } catch (_: Throwable) {
+        // Έλεγχος 3, E6: νέο κλειδί ΜΟΝΟ αν το alias δεν υπάρχει. Αν υπάρχει αλλά το getKey γύρισε null (προσωρινό),
+        // ξανά λίγες φορές και μετά σφάλμα (τα αρχεία μένουν)· πριν, ένα προσωρινό null έγραφε νέο κλειδί πάνω στο
+        // παλιό και τα tokens δεν διαβάζονταν ποτέ ξανά (νέα σύνδεση).
+        for (attempt in 1..KEY_ATTEMPTS) {
+            val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            val k = try {
+                ks.getKey(ALIAS, null) as? SecretKey
+            } catch (e: Throwable) {
+                // Έλεγχος 2, C14 (R14): κλειδί που δεν ανακτάται πια (π.χ. μετά από αλλαγή κλειδώματος): νέο κλειδί,
+                // αλλιώς κάθε νέα σύνδεση θα αποτύγχανε για πάντα. Τα παλιά tokens δεν διαβάζονται ούτως ή άλλως.
+                if (!DataRules.regenerateKeyOn(e)) throw e
+                try {
+                    ks.deleteEntry(ALIAS)
+                } catch (_: Throwable) {
+                }
+                null
+            }
+            when (DataRules.keyAction(ks.containsAlias(ALIAS), k != null, attempt, KEY_ATTEMPTS)) {
+                DataRules.KeyAction.USE -> return k!!
+                DataRules.KeyAction.RETRY -> Thread.sleep(150)
+                DataRules.KeyAction.FAIL -> throw IllegalStateException("Keystore: το κλειδί δεν διαβάστηκε τώρα")
+                DataRules.KeyAction.GENERATE -> break
             }
         }
         val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")

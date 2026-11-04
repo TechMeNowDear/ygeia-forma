@@ -50,8 +50,7 @@ class _ReportPageState extends State<ReportPage> {
     final v = _name.trim();
     final stored = widget.store.prefs.reportName ?? '';
     if (v == stored) return;
-    widget.store.prefs.reportName = v.isEmpty ? null : v;
-    widget.store.savePrefsNow();
+    widget.store.setReportName(v.isEmpty ? null : v);
   }
 
   @override
