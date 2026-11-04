@@ -85,9 +85,9 @@ jobs:
           fp="$(keytool -list -v -keystore "$store" -storepass "$pw" -alias ygeia | grep -m1 'SHA256:' | sed 's/.*SHA256: *//')"
           [ -n "$fp" ] || { echo "::error title=Κλειδί υπογραφής::Δεν διαβάστηκε το κλειδί (λάθος κωδικός ή αρχείο)."; exit 1; }
           echo "::notice title=Αποτύπωμα κλειδιού::SHA-256 $fp"
-          # App Link της Oura: το site/.well-known/assetlinks.json πρέπει να έχει αυτό το αποτύπωμα (ανεβαίνει με το χέρι).
+          # App Link της Oura: το site/public/.well-known/assetlinks.json πρέπει να έχει αυτό το αποτύπωμα (ανεβαίνει με το χέρι).
           # Δύο αντίγραφα: το drag and drop του Netlify παραλείπει τον κρυφό .well-known (δες site/README.md).
-          for f in site/.well-known/assetlinks.json site/assetlinks.json; do
+          for f in site/public/.well-known/assetlinks.json site/public/assetlinks.json; do
             if [ -f "$f" ] && ! grep -q "$fp" "$f"; then
               echo "::warning title=assetlinks.json::Το $f δεν έχει το αποτύπωμα του κλειδιού υπογραφής. Η επιστροφή από την Oura θα περνά από τη σελίδα αντί για App Link ώσπου να διορθωθεί και να ξαναανέβει στο Netlify."
             fi

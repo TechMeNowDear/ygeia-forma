@@ -7,16 +7,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('assetlinks.json: ίδιο στη ρίζα και στο .well-known, σωστό πακέτο', () {
-    final root = File('site/assetlinks.json').readAsStringSync();
-    expect(File('site/.well-known/assetlinks.json').readAsStringSync(), root);
+    final root = File('site/public/assetlinks.json').readAsStringSync();
+    expect(File('site/public/.well-known/assetlinks.json').readAsStringSync(), root);
     final j = jsonDecode(root) as List;
     expect(j.single['target']['package_name'], 'gr.ygeiaforma.ygeia_forma');
     expect((j.single['target']['sha256_cert_fingerprints'] as List).single, matches(RegExp(r'^([0-9A-F]{2}:){31}[0-9A-F]{2}$')));
   });
 
   test('_redirects και _headers', () {
-    expect(File('site/_redirects').readAsStringSync().trim(), '/.well-known/assetlinks.json  /assetlinks.json  200!');
-    final h = File('site/_headers').readAsStringSync();
+    expect(File('site/public/_redirects').readAsStringSync().trim(), '/.well-known/assetlinks.json  /assetlinks.json  200!');
+    final h = File('site/public/_headers').readAsStringSync();
     for (final path in ['/.well-known/assetlinks.json', '/assetlinks.json']) {
       final block = h.split(RegExp(r'\n\s*\n')).firstWhere((b) => b.trim().split('\n').first.trim() == path);
       expect(block, contains('Content-Type: application/json'), reason: path);
