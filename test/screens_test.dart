@@ -1,6 +1,7 @@
 // Ζωγραφίζει τις οθόνες με δείγμα δεδομένων, για έλεγχο της εμφάνισης.
 // Τρέχει μόνο με: flutter test test/screens_test.dart --update-goldens
 // Τα PNG γράφονται στο test/shots/ και ανεβαίνουν στο branch «screenshots».
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -24,6 +25,7 @@ import 'package:ygeia_forma/pages/oura_pages.dart';
 import 'package:ygeia_forma/pages/sources_page.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/plan_file.dart';
+import 'package:ygeia_forma/ti_ftanei.dart';
 
 import 'sample_data.dart';
 import 'sample_food.dart';
@@ -177,6 +179,69 @@ Future<void> _page(
     await act(tester);
     await tester.pumpAndSettle();
   }
+  await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
+}
+
+/// «Τι φτάνει» με απαντήσεις της γέφυρας Samsung όπως στο κινητό (κανάλι «ygeia/samsung», χωρίς συσκευή).
+Future<void> _tiFtanei(WidgetTester tester, {required String name, required Size size, required Brightness brightness}) async {
+  tester.view.devicePixelRatio = 2.0;
+  tester.view.physicalSize = size * 2.0;
+  addTearDown(tester.view.reset);
+  const channel = MethodChannel('ygeia/samsung');
+  final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  Map<String, dynamic> src(String device, int n, {bool? counts}) =>
+      {'app': 'com.sec.android.app.shealth', 'device': device, 'count': n, if (counts != null) 'counts': counts};
+  final all = {
+    'ok': true,
+    'readAt': '2026-11-14T10:20:00',
+    'days': 30,
+    'today': {
+      'stepsByDay': [
+        for (var i = 0; i < 7; i++) {'date': dateKey(DateTime(2026, 11, 14 - i)), 'value': i == 0 ? 1965 : 5200 + 731 * i},
+      ],
+      'totalCalories': 1843.6,
+      'activeCalories': 312.4,
+    },
+    'types': [
+      {'key': 'sleep', 'state': 'ok', 'count': 34, 'latest': '2026-11-14T08:40:00', 'sources': [src('Galaxy Watch Ultra 2', 34)], 'fields': [
+        {'name': 'duration', 'value': '347', 'seen': true},
+        {'name': 'sessions', 'value': '2', 'seen': true},
+      ]},
+      {'key': 'heart_rate', 'state': 'ok', 'count': 5000, 'capped': true, 'latest': '2026-11-14T10:12:00', 'sources': [src('Galaxy Watch Ultra 2', 5000)]},
+      {'key': 'body_composition', 'state': 'ok', 'count': 7, 'counted': 6, 'ignored': 1, 'latest': '2026-11-10T07:42:00', 'sources': [
+        {'app': 'com.inbody2014.inbody', 'device': 'InBody H40', 'count': 6, 'counts': true},
+        src('Galaxy Z Fold 8', 1, counts: false),
+      ], 'fields': [
+        {'name': 'weight', 'value': '82.4', 'seen': true},
+        {'name': 'bodyFat', 'value': '21.3', 'seen': true},
+        {'name': 'height', 'seen': false},
+      ]},
+      {'key': 'blood_oxygen', 'state': 'ok', 'count': 31, 'latest': '2026-11-14T08:40:00', 'sources': [src('Galaxy Watch Ultra 2', 31)]},
+      {'key': 'skin_temperature', 'state': 'ok', 'count': 30, 'latest': '2026-11-14T08:40:00', 'sources': [src('Galaxy Watch Ultra 2', 30)]},
+      {'key': 'blood_pressure', 'state': 'empty', 'days': 30},
+      {'key': 'body_temperature', 'state': 'empty', 'days': 30},
+      {'key': 'sleep_apnea', 'state': 'unsupported'},
+      {'key': 'water_intake', 'state': 'no_permission'},
+    ],
+  };
+  messenger.setMockMethodCallHandler(channel, (call) async => switch (call.method) {
+        'status' || 'requestPermissions' => jsonEncode({'ok': true, 'granted': 17, 'total': 17}),
+        'readAll' => jsonEncode(all),
+        _ => jsonEncode({'ok': false, 'kind': 'other', 'message': call.method}),
+      });
+  addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  final key = GlobalKey();
+  await tester.pumpWidget(RepaintBoundary(
+    key: key,
+    child: MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+      home: const TiFtaneiScreen(),
+    ),
+  ));
+  await tester.pumpAndSettle();
   await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
 }
 
@@ -595,7 +660,7 @@ void main() {
           s.debugSetRecovery(evidence: true);
         },
         act: (t) async {
-          await t.tap(find.text('Όπως φαίνεται από τα αποθηκευμένα δεδομένα'));
+          await t.tap(find.textContaining('Κράτα: '));
         },
       ));
   testWidgets('Πηγές · άγνωστο σχέδιο · ιστορικό όχι ακόμα', (t) => _page(
@@ -722,6 +787,70 @@ void main() {
           s.history[dateKey(DateTime(2026, 11, 14))]?.removeWhere((k, _) => k.startsWith('o.'));
         },
       ));
+  // Δεύτερος έλεγχος UX (U1, D13): tablet οριζόντια (1280×800) και παράθυρο PC (1600×1000), φωτεινό και σκοτεινό,
+  // και το «Τι φτάνει» (400 και 860), που δεν είχε κανένα στιγμιότυπο.
+  const tablet = Size(1280, 800);
+  const pc = Size(1600, 1000);
+  for (final (n, size, b, tag) in [
+    (100, tablet, Brightness.light, 'tablet_light'),
+    (110, tablet, Brightness.dark, 'tablet_dark'),
+    (120, pc, Brightness.light, 'pc_light'),
+    (130, pc, Brightness.dark, 'pc_dark'),
+  ]) {
+    testWidgets('Μεγάλη οθόνη · Σήμερα · $tag', (t) => _shot(t, name: '${n}_today_$tag', size: size, brightness: b, tab: 0));
+    testWidgets('Μεγάλη οθόνη · Διατροφή · $tag', (t) => _shot(t, name: '${n + 1}_nutrition_$tag', size: size, brightness: b, tab: Cat.food));
+    testWidgets('Μεγάλη οθόνη · Ύπνος · $tag',
+        (t) => _shot(t, name: '${n + 2}_sleep_$tag', size: size, brightness: b, tab: Cat.health, sub: HealthTab.sleep));
+    testWidgets('Μεγάλη οθόνη · Καρδιά · $tag',
+        (t) => _shot(t, name: '${n + 3}_heart_$tag', size: size, brightness: b, tab: Cat.health, sub: HealthTab.heart));
+    testWidgets('Μεγάλη οθόνη · Σύγκριση · $tag',
+        (t) => _page(t, name: '${n + 4}_compare_$tag', size: size, brightness: b, page: (s) => ComparePage(store: s, now: ouraNow)));
+    testWidgets('Μεγάλη οθόνη · Πηγές · $tag',
+        (t) => _page(t, name: '${n + 5}_sources_$tag', size: size, brightness: b, page: (s) => SourcesPage(store: s, now: ouraNow)));
+    testWidgets('Μεγάλη οθόνη · Αναφορά · $tag', (t) => _page(
+          t,
+          name: '${n + 6}_report_$tag',
+          size: size,
+          brightness: b,
+          page: (s) => ReportPage(store: s, now: ouraNow),
+        ));
+    testWidgets('Μεγάλη οθόνη · Oura Σήμερα · $tag',
+        (t) => _shot(t, name: '${n + 7}_oura_today_$tag', size: size, brightness: b, tab: 0, at: ouraNow, oura: true));
+  }
+  testWidgets('Τι φτάνει · κινητό', (t) => _tiFtanei(t, name: '140_ti_ftanei_400', size: const Size(400, 2600), brightness: Brightness.light));
+  testWidgets('Τι φτάνει · Fold ανοιχτό · σκοτεινό',
+      (t) => _tiFtanei(t, name: '141_ti_ftanei_860_dark', size: const Size(860, 1800), brightness: Brightness.dark));
+  testWidgets('Τι φτάνει · μικρό κινητό 360', (t) => _tiFtanei(t, name: '142_ti_ftanei_360', size: const Size(360, 2600), brightness: Brightness.light));
+  // Δεύτερος γύρος (D1/D4): αναφορά με Oura, όνομα και σημείωση 400 χαρακτήρων· η σελίδα 1 πρέπει να χωράει τις δύο
+  // γραμμές οξυγόνου (μία ανά ορισμό της νύχτας) χωρίς υπερχείλιση.
+  testWidgets('Αναφορά για γιατρό · Oura + όνομα + σημείωση 400 χαρακτήρων', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(680, 3600) * 2.0;
+    addTearDown(tester.view.reset);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(ouraNow));
+    store.history = sampleHistory(ouraNow, store.data!);
+    prepareOura(store);
+    store.prefs.reportName = 'Γιάννης Παπαδόπουλος';
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light),
+          home: ReportPage(
+            store: store,
+            now: ouraNow,
+            note: ('Φάρμακα: βισοπρολόλη 2,5 mg πρωί. Κάπνισμα 10/μέρα. Ροχαλητό (σύζυγος). Τεστ άπνοιας Samsung 20/10 '
+                    'και 23/10 αρνητικά. Ζαλάδα το πρωί κάποιες μέρες. ' * 3)
+                .substring(0, 400),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13d_report_oura_note400.png'));
+  });
   testWidgets('Σήμερα · άγνωστο σχέδιο', (t) => _shot(
         t,
         name: '84_today_plan_unknown',

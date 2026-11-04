@@ -15,6 +15,7 @@ import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/oura/oura_view.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
+import 'package:ygeia_forma/plan_file.dart' show shortTimeline;
 import 'package:ygeia_forma/pages/heart.dart';
 import 'package:ygeia_forma/pages/oura_today.dart';
 import 'package:ygeia_forma/pages/oxygen_widgets.dart';
@@ -218,7 +219,7 @@ void main() {
     final h = <String, Map<String, double>>{};
     var i = 0;
     for (var d = _add(dayOf(now), -89); !d.isAfter(dayOf(now)); d = _add(d, 1)) {
-      h[dateKey(d)] = {K.spo2Min: i++.isEven ? 89 : 90, K.spo2Avg: 95};
+      h[dateKey(d)] = {K.spo2Min: i++.isEven ? 89.0 : 90.0, K.spo2Avg: 95.0};
     }
     final store = HealthStore()
       ..data = Dashboard.fromJson(sampleDashboardJson(now))
@@ -528,6 +529,12 @@ void main() {
       await _pump(t, SingleChildScrollView(child: OuraStatusCard(store: s, now: clock)));
       expect(find.text('Ρυθμίσεις Oura'), findsOneWidget);
       expect(find.text('Oura'), findsNothing);
+    });
+
+    test('U11: το κουμπί επαναφοράς λέει τι κρατά, με ημερομηνίες', () {
+      final p = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 6));
+      expect(shortTimeline(p), 'ρολόι ως 5/11, Oura από 6/11');
+      expect(shortTimeline(p.withEra(Source.none, DateTime(2026, 11, 13))), 'ρολόι ως 5/11, Oura 6/11–12/11, χωρίς πηγή από 13/11');
     });
 
     test('U12: σύντομη νύχτα σε δύο κομμάτια = άθροισμα· κομμάτι με κενό πάνω από 4 ώρες μένει χωριστά', () {

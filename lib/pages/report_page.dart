@@ -393,14 +393,15 @@ class _Footer extends StatelessWidget {
 }
 
 class _Title extends StatelessWidget {
-  const _Title(this.text);
+  const _Title(this.text, {this.top = 14});
   final String text;
+  final double top;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.light;
     return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 6),
+      padding: EdgeInsets.only(top: top, bottom: 6),
       child: Text(text, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.text)),
     );
   }
@@ -451,16 +452,19 @@ class _PageOne extends StatelessWidget {
     }
 
     // Οξυγόνο με αλλαγή ορισμού της νύχτας: μία γραμμή για κάθε ορισμό (δεύτερος κλινικός έλεγχος K1), όλες οι 90 μέρες.
-    String periodLabel(ReportPeriod p, bool first) => first
-        ? 'ως ${p.to.day}/${p.to.month}, νύχτα από τον ύπνο του ρολογιού'
-        : 'από ${p.from.day}/${p.from.month}, νύχτα από τις ώρες ύπνου ${p.night == Source.oura ? 'του Oura' : 'του ρολογιού'}';
+    // Σύντομα, για να χωρά η σελίδα 1· ο πλήρης ορισμός είναι στη σελίδα 3.
+    String night(ReportPeriod p) => p.night == Source.oura ? 'νύχτα = ώρες ύπνου Oura' : 'νύχτα = ύπνος ρολογιού';
+    String periodLabel(ReportPeriod p, bool first) =>
+        first ? 'ως ${p.to.day}/${p.to.month}: ${night(p)}' : '  ↳ από ${p.from.day}/${p.from.month}: ${night(p)}';
 
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
     final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
     final bold = cell.copyWith(fontWeight: FontWeight.w700);
     final small = TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4);
 
-    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 4.5, horizontal: 4), child: w);
+    // Πυκνότερες γραμμές (3 αντί 4,5): με Oura, δύο γραμμές οξυγόνου ανά ορισμό και σημείωση 400 χαρακτήρων η σελίδα
+    // 1 πρέπει να χωρά.
+    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4), child: w);
 
     String trendText(ReportStat s, MetricDef? def) {
       final t = s.trend;
@@ -507,7 +511,7 @@ class _PageOne extends StatelessWidget {
             style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
           ),
         ),
-        _Title('Σύνοψη'),
+        _Title('Σύνοψη', top: 10),
         Table(
           columnWidths: const {
             0: FlexColumnWidth(3.0),
@@ -542,7 +546,7 @@ class _PageOne extends StatelessWidget {
                   return TableRow(
                     children: [
                       pad(Text(
-                        part == null ? label(r) : (i == 0 ? '${label(r)} · ${periodLabel(part, true)}' : periodLabel(part, false)),
+                        part == null ? label(r) : (i == 0 ? '${label(r)}\n${periodLabel(part, true)}' : periodLabel(part, false)),
                         style: cell,
                       )),
                       pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
@@ -555,7 +559,7 @@ class _PageOne extends StatelessWidget {
                 }(),
           ],
         ),
-        _Title('Πώς διαβάζεται'),
+        _Title('Πώς διαβάζεται', top: 10),
         Text(
           // Έλεγχος υπολογισμών F9 (4/11): χωρίς ισχυρισμό «1%»· είναι ένδειξη ανά δείκτη.
           // Δεύτερος έλεγχος υπολογισμών C4 (D8): ο έλεγχος είναι κατά προσέγγιση· στους 3 μήνες πιάνει και αργές μεταβολές.
@@ -564,11 +568,9 @@ class _PageOne extends StatelessWidget {
           'τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών '
           'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), ή «—» όταν '
           'οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια ένδειξη μπορεί να είναι '
-          'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού.',
-          style: small,
+          'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού. Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.',
+          style: small.copyWith(fontSize: 8.4),
         ),
-        const SizedBox(height: 6),
-        Text('Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.', style: small.copyWith(fontWeight: FontWeight.w600)),
         const Spacer(),
         _Footer(data: d, page: 1),
       ],
