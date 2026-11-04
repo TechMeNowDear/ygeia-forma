@@ -215,15 +215,17 @@ class _OuraNightCard extends StatelessWidget {
                     ? Text('—', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: c.text))
                     : DurationValue(minutes, size: 30),
               ),
-              ScoreRing(
-                value: night.sleepScore?.toDouble(),
-                size: 64,
-                stroke: 6,
-                color: c.sleep,
-                track: c.tint(c.sleep),
-                textColor: c.text,
-                caption: 'σκορ · εκτίμηση',
-              ),
+              // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8).
+              if (night.sleepScore != null)
+                ScoreRing(
+                  value: night.sleepScore!.toDouble(),
+                  size: 64,
+                  stroke: 6,
+                  color: c.sleep,
+                  track: c.tint(c.sleep),
+                  textColor: c.text,
+                  caption: 'σκορ · εκτίμηση',
+                ),
             ],
           ),
           const SizedBox(height: 14),

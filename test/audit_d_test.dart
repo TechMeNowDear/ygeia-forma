@@ -219,7 +219,8 @@ void main() {
     final h = <String, Map<String, double>>{};
     var i = 0;
     for (var d = _add(dayOf(now), -89); !d.isAfter(dayOf(now)); d = _add(d, 1)) {
-      h[dateKey(d)] = {K.spo2Min: i++.isEven ? 89.0 : 90.0, K.spo2Avg: 95.0};
+      h[dateKey(d)] = {K.spo2Min: i.isEven ? 89.0 : 90.0, K.spo2Avg: 95.0};
+      i++;
     }
     final store = HealthStore()
       ..data = Dashboard.fromJson(sampleDashboardJson(now))

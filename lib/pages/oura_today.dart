@@ -231,20 +231,23 @@ class OuraSleepTodayCard extends StatelessWidget {
                     ? const Text('—', style: TextStyle(color: white, fontSize: 42, fontWeight: FontWeight.w800))
                     : DurationValue(minutes, size: 42, color: white, unitColor: soft),
               ),
-              const SizedBox(width: 12),
-              Column(
-                children: [
-                  ScoreRing(
-                    value: night.sleepScore?.toDouble(),
-                    size: 60,
-                    stroke: 6,
-                    color: c.ring,
-                    track: Colors.white.withValues(alpha: 0.16),
-                  ),
-                  const SizedBox(height: 4),
-                  EstimateNote('σκορ · εκτίμηση', onDark: true),
-                ],
-              ),
+              // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8, ίδιο με το ρολόι).
+              if (night.sleepScore != null) ...[
+                const SizedBox(width: 12),
+                Column(
+                  children: [
+                    ScoreRing(
+                      value: night.sleepScore!.toDouble(),
+                      size: 60,
+                      stroke: 6,
+                      color: c.ring,
+                      track: Colors.white.withValues(alpha: 0.16),
+                    ),
+                    const SizedBox(height: 4),
+                    EstimateNote('σκορ · εκτίμηση', onDark: true),
+                  ],
+                ),
+              ],
             ],
           ),
           if (diff != null) ...[
