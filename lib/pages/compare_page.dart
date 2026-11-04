@@ -47,11 +47,16 @@ List<CompareRow> buildCompareRows({
     final onset = parts.isEmpty ? null : parts.first.onset;
     int? span;
     if (onset != null) {
-      var total = 0;
+      var secs = 0;
       for (final (i, x) in parts.indexed) {
-        total += x.end.difference(i == 0 ? onset : x.start).inMinutes;
+        secs += x.end.difference(i == 0 ? onset : x.start).inSeconds;
       }
-      span = total;
+      span = (secs / 60).round();
+      // Συγχώνευση 3: ύπνος + ξύπνιος = «με τα ξυπνήματα» (E7)· η Oura δίνει δευτερόλεπτα, και τρεις χωριστές
+      // στρογγυλοποιήσεις έβγαζαν «7:16 + 22′ = 7:37». Διαφορά μόνο από στρογγυλοποίηση (≤ 1′): το άθροισμα.
+      final sleep = on?.nightMinutes;
+      final awake = awakeParts == null ? null : (awakeParts / 60).round();
+      if (sleep != null && awake != null && (sleep + awake - span).abs() <= 1) span = sleep + awake;
     }
     rows.add(CompareRow(
       day: d,

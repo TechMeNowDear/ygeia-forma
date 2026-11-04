@@ -15,6 +15,7 @@ import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
+import 'package:ygeia_forma/pages/compare_page.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/theme.dart';
@@ -187,6 +188,29 @@ void main() {
     test('Αλλαγές γραμμής → « · », διπλά κενά → ένα· κανένας χαρακτήρας δεν χάνεται', () {
       expect(reportNoteText('Φάρμακα: Α\n\nΚάπνισμα  ναι \n Ροχαλητό'), 'Φάρμακα: Α · Κάπνισμα ναι · Ροχαλητό');
     });
+  });
+
+  test('Σύγκριση πηγών: Oura ύπνος + ξύπνιος = «με τα ξυπνήματα» και με δευτερόλεπτα (στιγμιότυπο 62: 7:16 + 22′ ≠ 7:37)', () {
+    final bed = DateTime(2026, 11, 2, 23, 40);
+    const latency = 630, sleep = 26190, awakeIn = 1290; // 10,5′ · 436,5′ · 21,5′
+    final oura = parseOura(sleep: [
+      {
+        'id': 'x',
+        'day': '2026-11-03',
+        'type': 'long_sleep',
+        'bedtime_start': bed.toUtc().toIso8601String(),
+        'bedtime_end': bed.add(const Duration(seconds: latency + sleep + awakeIn)).toUtc().toIso8601String(),
+        'time_in_bed': latency + sleep + awakeIn,
+        'total_sleep_duration': sleep,
+        'awake_time': awakeIn + latency,
+        'latency': latency,
+      },
+    ], dailySleep: const [], readiness: const []).nights;
+    final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 3));
+    final r = buildCompareRows(plan: plan, oura: oura, watch: const [], today: DateTime(2026, 11, 3)).single;
+    expect(r.ouraMinutes, 437);
+    expect(r.ouraAwake, 22);
+    expect(r.ouraSpan, r.ouraMinutes! + r.ouraAwake!, reason: 'πριν: 458 (κομμένα λεπτά)');
   });
 
   test('Ο κώδικας της σελίδας 1 δεν έχει πια όριο γραμμών στη σημείωση', () {
