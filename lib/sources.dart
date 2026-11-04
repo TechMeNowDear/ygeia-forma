@@ -503,7 +503,7 @@ class SourcePlan {
 /// Ώρες ύπνου από την πηγή του ύπνου (Oura), ΜΟΝΟ ως χρονικά παράθυρα: για να μη μετρούν ως «μέρα»
 /// οι παλμοί του ρολογιού όσο κοιμάσαι. Δεν δίνουν καμία τιμή σε καμία μέτρηση.
 class SleepWindows {
-  const SleepWindows(this.ranges, this.mains);
+  const SleepWindows(this.ranges, this.mains, [this.pieces = const {}]);
 
   /// Όλες οι περίοδοι ύπνου (νύχτες και υπνάκοι).
   final List<(DateTime, DateTime)> ranges;
@@ -511,10 +511,38 @@ class SleepWindows {
   /// Η κύρια νύχτα κάθε μέρας (πρωινό, «2026-11-06») → από πότε ως πότε.
   final Map<String, (DateTime, DateTime)> mains;
 
+  /// Έλεγχος 3, S5: νύχτα σε κομμάτια → ΟΛΑ τα κομμάτια που μετρούν ως η νύχτα (κύριο + κομμάτια, όχι τα κενά),
+  /// ενωμένα και με χρονολογική σειρά. Χωρίς εγγραφή εδώ: μόνο η [mains].
+  final Map<String, List<(DateTime, DateTime)>> pieces;
+
   /// Οι μέρες που έχουν κύρια νύχτα.
   Iterable<String> get nights => mains.keys;
 
+  /// Οι ώρες της νύχτας [day] («2026-11-06») που μετρούν: η ένωση των κομματιών της, χωρίς τα κενά ανάμεσα·
+  /// χωρίς κομμάτια, η κύρια περίοδος· κενό αν η μέρα δεν έχει νύχτα.
+  List<(DateTime, DateTime)> nightPieces(String day) {
+    final main = mains[day];
+    if (main == null) return const [];
+    final p = pieces[day];
+    return p == null || p.isEmpty ? [main] : p;
+  }
+
   static const empty = SleepWindows([], {});
+}
+
+/// Η ένωση χρονικών διαστημάτων: όσα επικαλύπτονται ή αγγίζονται γίνονται ένα, με χρονολογική σειρά. Τα κενά ανάμεσα
+/// μένουν έξω.
+List<(DateTime, DateTime)> unionOfRanges(Iterable<(DateTime, DateTime)> ranges) {
+  final sorted = [for (final r in ranges) if (!r.$2.isBefore(r.$1)) r]..sort((a, b) => a.$1.compareTo(b.$1));
+  final out = <(DateTime, DateTime)>[];
+  for (final r in sorted) {
+    if (out.isNotEmpty && !r.$1.isAfter(out.last.$2)) {
+      if (r.$2.isAfter(out.last.$2)) out[out.length - 1] = (out.last.$1, r.$2);
+    } else {
+      out.add(r);
+    }
+  }
+  return out;
 }
 
 /// Οι τιμές της μέτρησης [metric] στο [from, to], ΜΟΝΟ από την πηγή της τελευταίας μέρας: αν η πηγή άλλαξε

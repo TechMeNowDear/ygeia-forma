@@ -653,15 +653,17 @@ class Dashboard {
   /// ΜΟΝΟ του ρολογιού, αλλά «νύχτα» = οι μετρήσεις του ρολογιού μέσα στις ώρες της κύριας νύχτας του Oura
   /// ([windows], μόνο ώρες· ποτέ τιμές του Oura). Χωρίς νύχτα του Oura δεν ξέρουμε πότε κοιμήθηκες: κενό
   /// (όχι «18:00–12:00», που θα έπιανε και μετρήσεις της μέρας). Δες [oxygenOf] για μέσο όρο και ελάχιστο.
+  /// Έλεγχος 3, S5: νύχτα του Oura σε κομμάτια → οι μετρήσεις μέσα σε ΟΠΟΙΟΔΗΠΟΤΕ κομμάτι που μετρά
+  /// ([SleepWindows.nightPieces], η ένωσή τους), ποτέ μέσα στο κενό ανάμεσα. Ίδιος κανόνας με τη νύχτα του ρολογιού.
   NightOxygen? watchSpo2(DateTime day, SleepWindows windows) {
-    final w = windows.mains[dateKey(day)];
-    if (w == null) return null;
-    final (from, to) = w;
-    // Μέσα στο παράθυρο: με διάρκεια που το τέμνει, ή στιγμιαία μέσα του.
-    return oxygenOf([
-      for (final s in spo2)
-        if (s.start.isBefore(to) && (s.end.isAfter(from) || (s.end == s.start && !s.start.isBefore(from)))) s,
-    ]);
+    final parts = windows.nightPieces(dateKey(day));
+    if (parts.isEmpty) return null;
+    // Μέσα σε ένα κομμάτι: με διάρκεια που το τέμνει, ή στιγμιαία μέσα του.
+    bool inside(Sample s) => parts.any((w) {
+          final (from, to) = w;
+          return s.start.isBefore(to) && (s.end.isAfter(from) || (s.end == s.start && !s.start.isBefore(from)));
+        });
+    return oxygenOf([for (final s in spo2) if (inside(s)) s]);
   }
 
   /// Η χαμηλότερη μέτρηση οξυγόνου του ρολογιού ανά νύχτα, για τις σημειώσεις χαμηλού οξυγόνου (B7), με τον ίδιο

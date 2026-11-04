@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
@@ -48,6 +49,25 @@ Future<void> _loadFonts() async {
       await icons.load();
     }
   }
+}
+
+/// Συγχώνευση 3: η σημείωση της αναφοράς φαίνεται ολόκληρη (χωρίς όριο γραμμών και «…», το ύψος στην οθόνη = το
+/// ύψος όλου του κειμένου) και η σελίδα 1 δεν ξεχειλίζει (η σημείωση και ο πίνακας πάνω από το υποσέλιδο).
+void _expectWholeNote(WidgetTester tester) {
+  expect(tester.takeException(), isNull);
+  final f = find.byKey(const ValueKey('report-note-text'));
+  final w = tester.widget<Text>(f);
+  expect(w.maxLines, isNull);
+  expect(w.overflow, isNot(TextOverflow.ellipsis));
+  final p = tester.renderObject<RenderParagraph>(f);
+  expect(p.didExceedMaxLines, isFalse);
+  final tp = TextPainter(text: p.text, textDirection: TextDirection.ltr, textScaler: TextScaler.noScaling)
+    ..layout(maxWidth: p.constraints.maxWidth);
+  expect(p.size.height, closeTo(tp.height, 0.01));
+  tp.dispose();
+  final footer = tester.getRect(find.textContaining('σελίδα 1 από'));
+  expect(tester.getRect(f).bottom, lessThan(footer.top));
+  expect(tester.getRect(find.text('Πώς διαβάζεται').first).bottom, lessThan(footer.top));
 }
 
 Future<void> _shot(
@@ -858,7 +878,37 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    _expectWholeNote(tester);
     await expectLater(find.byKey(key), matchesGoldenFile('shots/13d_report_oura_note400.png'));
+  });
+  // Συγχώνευση 3: χειρότερη περίπτωση, 400 φαρδιοί χαρακτήρες με αλλαγές γραμμής, Oura και όνομα: η σημείωση
+  // ολόκληρη και η σελίδα 1 χωρίς υπερχείλιση (μικραίνει λίγο αν χρειαστεί, δεν κόβεται).
+  testWidgets('Αναφορά για γιατρό · Oura + όνομα + σημείωση 400 φαρδιών χαρακτήρων με αλλαγές γραμμής', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(680, 3600) * 2.0;
+    addTearDown(tester.view.reset);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(ouraNow));
+    store.history = sampleHistory(ouraNow, store.data!);
+    prepareOura(store);
+    store.prefs.reportName = 'Γιάννης Παπαδόπουλος';
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light),
+          home: ReportPage(
+            store: store,
+            now: ouraNow,
+            note: List.generate(40, (i) => i.isEven ? 'ΩΜΩΜΩΜΩΜΩ\n' : 'ΜΩΜΩΜΩΜΩΜ ').join(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    _expectWholeNote(tester);
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13e_report_oura_note400_wide.png'));
   });
   testWidgets('Σήμερα · άγνωστο σχέδιο', (t) => _shot(
         t,

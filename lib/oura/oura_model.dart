@@ -502,6 +502,12 @@ SleepWindows ouraSleepWindows(List<OuraNight> nights) => SleepWindows(
         ],
       ],
       {for (final n in nights) if (n.main != null) dateKey(n.day): (n.main!.start, n.main!.end)},
+      // Έλεγχος 3, S5: νύχτα σε κομμάτια → το οξυγόνο του ρολογιού από ΟΛΑ τα κομμάτια που μετρούν (όχι τα κενά).
+      {
+        for (final n in nights)
+          if (n.main != null && n.pieces.isNotEmpty)
+            dateKey(n.day): unionOfRanges([for (final x in n.counted) (x.start, x.end)]),
+      },
     );
 
 /// Όλη η απάντηση μιας ανάγνωσης, διαβασμένη.

@@ -483,107 +483,130 @@ class _PageOne extends StatelessWidget {
       return '${up ? '↑' : '↓'} ${def.formatDiff(t.displayDiff!)}';
     }
 
+    final body = <Widget>[
+      if (note.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            'Σημείωση: ${reportNoteText(note)}',
+            key: const ValueKey('report-note-text'),
+            // Ποτέ κομμένη σημείωση στον γιατρό (συγχώνευση 3): ολόκληρη, χωρίς όριο γραμμών και χωρίς «…». Αν μαζί με
+            // τον πίνακα δεν χωρά, μικραίνει όλη η σελίδα 1 λίγο (παρακάτω), δεν κόβεται τίποτα.
+            softWrap: true,
+            style: TextStyle(fontSize: 9, color: c.text, height: 1.25),
+          ),
+        ),
+      // Κλινικός έλεγχος H2 (4/11): η απουσία ρυθμού/άπνοιας εδώ δεν σημαίνει ότι ήταν φυσιολογικά.
+      Container(
+        key: const ValueKey('report-not-included'),
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(4)),
+        child: Text.rich(
+          TextSpan(children: [
+            TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
+            // Δεύτερος κλινικός έλεγχος M6: και η πίεση (η πρώτη ερώτηση του καρδιολόγου).
+            const TextSpan(
+              text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor, και μετρήσεις '
+                  'πίεσης. Η εφαρμογή δεν έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν '
+                  'φυσιολογικά. Αν υπάρχουν, δείτε τα αποτελέσματα στο Samsung Health Monitor.',
+            ),
+          ]),
+          style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
+        ),
+      ),
+      _Title('Σύνοψη', top: 10),
+      Table(
+        columnWidths: const {
+          0: FlexColumnWidth(3.0),
+          1: FlexColumnWidth(1.1),
+          2: FlexColumnWidth(1.6),
+          3: FlexColumnWidth(1.6),
+          4: FlexColumnWidth(0.8),
+          5: FlexColumnWidth(1.4),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: c.background),
+            children: [
+              pad(Text('Δείκτης · πηγή', style: header)),
+              pad(Text('Μεσαία τιμή', style: header)),
+              pad(Text('Συνήθως\n(8 στις 10 μέρες)', style: header)),
+              pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
+              // Μία λέξη: το «Μέρες με / μέτρηση» έσπαγε στη μέση της λέξης (έλεγχος UX U3).
+              pad(Text('Μέρες', style: header)),
+              pad(Text('Διαφορά από τους\n3 προηγ. μήνες', style: header)),
+            ],
+          ),
+          for (final r in rows)
+            for (final (i, part) in <ReportPeriod?>[if (d.stat(r.$2).periods.isEmpty) null else ...d.stat(r.$2).periods].indexed)
+              () {
+                final whole = d.stat(r.$2);
+                final s = part?.stat ?? whole;
+                final f = r.$3;
+                final last = part == null || i == whole.periods.length - 1;
+                return TableRow(
+                  children: [
+                    pad(Text(
+                      part == null ? label(r) : (i == 0 ? '${label(r)}\n${periodLabel(part, true)}' : periodLabel(part, false)),
+                      style: cell,
+                    )),
+                    pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
+                    pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
+                    pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
+                    pad(Text('${s.n}', style: cell)),
+                    pad(Text(last ? (r.$2 == K.spo2Min ? lowestDiffText(whole) : trendText(whole, r.$4)) : '', style: cell)),
+                  ],
+                );
+              }(),
+        ],
+      ),
+      _Title('Πώς διαβάζεται', top: 8),
+      Text(
+        // Έλεγχος υπολογισμών F9 (4/11): χωρίς ισχυρισμό «1%»· είναι ένδειξη ανά δείκτη.
+        // Δεύτερος έλεγχος υπολογισμών C4 (D8): ο έλεγχος είναι κατά προσέγγιση· στους 3 μήνες πιάνει και αργές μεταβολές.
+        'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
+        'ένδειξη αλλαγής ανά δείκτη, μόνο όταν η διαφορά των μεσαίων τιμών ξεπερνά ένα ελάχιστο και, κατά προσέγγιση, '
+        'τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών '
+        'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), ή «—» όταν '
+        'οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια ένδειξη μπορεί να είναι '
+        'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού. Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.',
+        style: small.copyWith(fontSize: 8.2, height: 1.35),
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(data: d, page: 1, name: name),
-        if (note.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'Σημείωση: $note',
-              key: const ValueKey('report-note-text'),
-              // 400 χαρακτήρες χωράνε σε 5 γραμμές· ποτέ κομμένη σημείωση στον γιατρό.
-              maxLines: 6,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 9, color: c.text, height: 1.25),
-            ),
-          ),
-        // Κλινικός έλεγχος H2 (4/11): η απουσία ρυθμού/άπνοιας εδώ δεν σημαίνει ότι ήταν φυσιολογικά.
-        Container(
-          key: const ValueKey('report-not-included'),
-          margin: const EdgeInsets.only(top: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(4)),
-          child: Text.rich(
-            TextSpan(children: [
-              TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
-              // Δεύτερος κλινικός έλεγχος M6: και η πίεση (η πρώτη ερώτηση του καρδιολόγου).
-              const TextSpan(
-                text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor, και μετρήσεις '
-                    'πίεσης. Η εφαρμογή δεν έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν '
-                    'φυσιολογικά. Αν υπάρχουν, δείτε τα αποτελέσματα στο Samsung Health Monitor.',
+        // Συγχώνευση 3: το σώμα της σελίδας 1 στο ύψος του A4. Συνήθως χωρά όπως είναι (κλίμακα 1)· με πολύ μεγάλη
+        // σημείωση (400 φαρδιοί χαρακτήρες) μαζί με Oura και δύο ορισμούς οξυγόνου μικραίνει λίγο, αντί να κοπεί η
+        // σημείωση ή να βγει έξω από τη σελίδα.
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) => FittedBox(
+              key: const ValueKey('report-page1-body'),
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: box.maxWidth,
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: body),
               ),
-            ]),
-            style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
+            ),
           ),
         ),
-        _Title('Σύνοψη', top: 10),
-        Table(
-          columnWidths: const {
-            0: FlexColumnWidth(3.0),
-            1: FlexColumnWidth(1.1),
-            2: FlexColumnWidth(1.6),
-            3: FlexColumnWidth(1.6),
-            4: FlexColumnWidth(0.8),
-            5: FlexColumnWidth(1.4),
-          },
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
-          children: [
-            TableRow(
-              decoration: BoxDecoration(color: c.background),
-              children: [
-                pad(Text('Δείκτης · πηγή', style: header)),
-                pad(Text('Μεσαία τιμή', style: header)),
-                pad(Text('Συνήθως\n(8 στις 10 μέρες)', style: header)),
-                pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
-                // Μία λέξη: το «Μέρες με / μέτρηση» έσπαγε στη μέση της λέξης (έλεγχος UX U3).
-                pad(Text('Μέρες', style: header)),
-                pad(Text('Διαφορά από τους\n3 προηγ. μήνες', style: header)),
-              ],
-            ),
-            for (final r in rows)
-              for (final (i, part) in <ReportPeriod?>[if (d.stat(r.$2).periods.isEmpty) null else ...d.stat(r.$2).periods].indexed)
-                () {
-                  final whole = d.stat(r.$2);
-                  final s = part?.stat ?? whole;
-                  final f = r.$3;
-                  final last = part == null || i == whole.periods.length - 1;
-                  return TableRow(
-                    children: [
-                      pad(Text(
-                        part == null ? label(r) : (i == 0 ? '${label(r)}\n${periodLabel(part, true)}' : periodLabel(part, false)),
-                        style: cell,
-                      )),
-                      pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
-                      pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
-                      pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
-                      pad(Text('${s.n}', style: cell)),
-                      pad(Text(last ? (r.$2 == K.spo2Min ? lowestDiffText(whole) : trendText(whole, r.$4)) : '', style: cell)),
-                    ],
-                  );
-                }(),
-          ],
-        ),
-        _Title('Πώς διαβάζεται', top: 8),
-        Text(
-          // Έλεγχος υπολογισμών F9 (4/11): χωρίς ισχυρισμό «1%»· είναι ένδειξη ανά δείκτη.
-          // Δεύτερος έλεγχος υπολογισμών C4 (D8): ο έλεγχος είναι κατά προσέγγιση· στους 3 μήνες πιάνει και αργές μεταβολές.
-          'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
-          'ένδειξη αλλαγής ανά δείκτη, μόνο όταν η διαφορά των μεσαίων τιμών ξεπερνά ένα ελάχιστο και, κατά προσέγγιση, '
-          'τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών '
-          'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), ή «—» όταν '
-          'οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια ένδειξη μπορεί να είναι '
-          'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού. Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.',
-          style: small.copyWith(fontSize: 8.2, height: 1.35),
-        ),
-        const Spacer(),
         _Footer(data: d, page: 1),
       ],
     );
   }
 }
+
+/// Η σημείωση όπως μπαίνει στο PDF: ολόκληρη. Οι αλλαγές γραμμής γίνονται « · » (μία σημείωση 400 χαρακτήρων με
+/// 30 σύντομες γραμμές θα έπιανε μισή σελίδα), τα διπλά κενά ένα.
+String reportNoteText(String note) =>
+    note.trim().replaceAll(RegExp(r'\s*\n\s*'), ' · ').replaceAll(RegExp(r'[ \t]+'), ' ');
 
 // --- Σελίδα 3: οξυγόνο και ζυγίσεις ---
 
