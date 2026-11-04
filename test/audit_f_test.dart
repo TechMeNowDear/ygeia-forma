@@ -9,13 +9,14 @@ import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/food/off.dart';
 import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart';
+import 'package:ygeia_forma/main.dart';
+import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
 import 'package:ygeia_forma/pages/body.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
 import 'package:ygeia_forma/pages/heart.dart';
 import 'package:ygeia_forma/pages/move.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
-import 'package:ygeia_forma/pages/nutrition.dart';
 import 'package:ygeia_forma/pages/oura_today.dart';
 import 'package:ygeia_forma/pages/oxygen_widgets.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
@@ -541,9 +542,17 @@ void main() {
 
     testWidgets('U11: Διατροφή στο tablet: η σύνοψη δεξιά (κοντή στήλη κάτω από το «+ Φαγητό»), τα γεύματα αριστερά',
         (t) async {
-      await _pump(t, NutritionPage(food: sampleFoodStore(_now), now: _now), size: const Size(1280, 2400));
-      expect(t.getTopLeft(find.text('Σύνολο ημέρας')).dx, greaterThan(640));
-      expect(t.getTopLeft(find.text('Πρωινό').first).dx, lessThan(640));
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(1280, 2400);
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: Shell(store: _sample(), food: sampleFoodStore(_now), initialIndex: Cat.food, now: _now),
+      ));
+      await t.pumpAndSettle();
+      final summary = t.getTopLeft(find.text('Σύνολο ημέρας')).dx;
+      final meal = t.getTopLeft(find.text('Μεσημέρι').last).dx;
+      expect(summary, greaterThan(meal + 200), reason: 'η σύνοψη στη δεξιά στήλη, τα γεύματα στην αριστερή');
     });
   });
 
