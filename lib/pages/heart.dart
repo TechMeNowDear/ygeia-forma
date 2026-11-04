@@ -183,11 +183,20 @@ class HeartPage extends StatelessWidget {
                   const Hairline(vertical: 12),
                   if (oxNights.isEmpty)
                     Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
+                  // UX U4: «χαμηλότερη μέτρηση» όπως σε κάθε οθόνη, μία φορά ως επικεφαλίδα της στήλης· στις γραμμές μόνο
+                  // οι τιμές, για να μη σπάει η ημερομηνία σε 2 γραμμές στα 360–400 dp.
+                  if (oxNights.isNotEmpty)
+                    Text(
+                      'μέσο · χαμηλότερη μέτρηση',
+                      key: const ValueKey('heart-oxygen-columns'),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(color: c.textTertiary, fontSize: 12.5),
+                    ),
                   for (final n in oxNights)
                     InfoRow(
                       shortDayDate(n.$1),
                       // Χωρίς «(ενδεικτικό)» σε κάθε γραμμή (το λέει το κείμενο πάνω): στα 400 dp η ημερομηνία έσπαγε σε 2 γραμμές.
-                      '${spo2AvgText(n.$2)}% · χαμηλότερη μέτρηση ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
+                      '${spo2AvgText(n.$2)}% · ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
                     ),
                   const SizedBox(height: 10),
                   OxygenNotes(guidance: oxGuidance),

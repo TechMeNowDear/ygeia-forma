@@ -581,8 +581,12 @@ IconData _sectionIcon(TrendSection s) => switch (s) {
 /// π.χ. 33,6 °C, διαβαζόταν ως υποθερμία). Η θερμοκρασία του Oura είναι ήδη απόκλιση και φαίνεται όπως είναι.
 bool relativeTemp(TrendResult r) => r.def.key == K.skinTemp && r.source != Source.oura;
 
-/// «+1,6 °C»: η αλλαγή «τώρα» − «πριν» από τα νούμερα όπως θα φαίνονταν· «—» χωρίς «πριν».
-String relativeTempText(TrendResult r) => r.current == null || r.previous == null
+/// «+1,6 °C»: η αλλαγή «τώρα» − «πριν» από τα νούμερα όπως θα φαίνονταν· «—» όταν δεν συγκρίνεται (χωρίς «πριν»,
+/// λίγα δεδομένα ή αλλαγή πηγής: τότε ένα «0 °C» δίπλα στο «Λίγα δεδομένα» θα έμοιαζε με αποτέλεσμα).
+String relativeTempText(TrendResult r) => r.current == null ||
+        r.previous == null ||
+        r.status == TrendStatus.insufficient ||
+        r.status == TrendStatus.sourceChange
     ? '—'
     : '${signedDec(shownDiff(r.current!, r.previous!, r.def.digits), r.def.digits)} ${r.def.unit}';
 

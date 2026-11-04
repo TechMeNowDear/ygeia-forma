@@ -207,6 +207,15 @@ void main() {
       expect(find.text('σε σχέση με πριν · όχι θερμοκρασία σώματος'), findsWidgets);
     });
 
+    test('Τάσεις: χωρίς σύγκριση (λίγα δεδομένα) η θερμοκρασία καρπού είναι «—», όχι «0 °C»', () {
+      final s = _sample();
+      final r = computeTrend(metricDef(K.skinTemp)!, s.history, dayOf(_now), TrendPeriod.year);
+      expect(r.status, TrendStatus.insufficient);
+      expect(relativeTempText(r), '—');
+      final m = computeTrend(metricDef(K.skinTemp)!, s.history, dayOf(_now), TrendPeriod.month);
+      expect(relativeTempText(m), matches(RegExp(r'^[+−]\d,\d °C$')));
+    });
+
     testWidgets('Σώμα: χωρίς «Ο μέσος όρος σου είναι 35,2 °C»· γράφημα απόκλισης από το «συνήθως»', (t) async {
       final s = _sample();
       await _pump(t, BodyPage(store: s), size: const Size(400, 4000));
@@ -588,7 +597,9 @@ void main() {
       // Καρδιά
       await _pump(t, HeartPage(store: s, now: _now), size: const Size(400, 3000));
       expect(t.widgetList<BigValue>(find.byType(BigValue)).first.value, hr);
-      expect(find.textContaining('χαμηλότερη μέτρηση $low'), findsWidgets);
+      expect(find.byKey(const ValueKey('heart-oxygen-columns')), findsOneWidget);
+      final heartRow = t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == shortDayDate(n.date));
+      expect(heartRow.value, endsWith('· $low'));
 
       // Ύπνος
       await _pump(t, SleepPage(store: s, now: _now), size: const Size(400, 3200));
