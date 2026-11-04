@@ -19,7 +19,7 @@ void main() {
 
   test('Κανόνες: ακριβώς τα αρχεία που δεν ξαναδιαβάζονται, ίδια στο Google και στη μεταφορά', () {
     final rules = File('tools/android/xml/data_extraction_rules.xml').readAsStringSync();
-    final cloud = RegExp(r'<cloud-backup>([\s\S]*?)</cloud-backup>').firstMatch(rules)![1]!;
+    final cloud = RegExp(r'<cloud-backup[^>]*>([\s\S]*?)</cloud-backup>').firstMatch(rules)![1]!;
     final transfer = RegExp(r'<device-transfer>([\s\S]*?)</device-transfer>').firstMatch(rules)![1]!;
     expect(includes(cloud), expected);
     expect(includes(transfer), expected);

@@ -275,6 +275,8 @@ String ouraLoginErrorText(OuraErrorKind k, {String? code}) {
     OuraErrorKind.subscription =>
       'Η Oura δεν δίνει δεδομένα: χρειάζεται ενεργή συνδρομή Oura. Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
     OuraErrorKind.reconnect => 'Η Oura δεν δέχτηκε τη σύνδεση. Δεν άλλαξε τίποτα· πάτα ξανά «Σύνδεση με Oura».',
+    OuraErrorKind.proxyNotConfigured =>
+      'Ο μεσάζων δεν έχει ρυθμιστεί (λείπει το μυστικό της εφαρμογής στο Netlify). Δεν άλλαξε τίποτα· ο ύπνος μένει από το ρολόι.',
     _ => ouraErrorText(k),
   };
   return code == null ? text : '$text (κωδικός: $code)';
@@ -728,7 +730,8 @@ class OuraLink {
   Future<void> disconnect({String? marker}) async {
     // ΠΡΩΤΑ το σημάδι «συνδέεται»: ένα σημάδι που θα έμενε χωρίς tokens θα αναιρούσε στην εκκίνηση μια σύνδεση που
     // είχε χρησιμοποιηθεί.
-    if (marker == null || !await vault.save(vaultConnecting, marker)) await vault.delete(vaultConnecting);
+    await vault.delete(vaultConnecting);
+    if (marker != null) await vault.save(vaultConnecting, marker);
     OuraTokens? t;
     try {
       t = _loaded ? _tokens : OuraTokens.fromJson(await vault.load(vaultTokens));

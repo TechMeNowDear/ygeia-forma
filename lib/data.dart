@@ -860,6 +860,7 @@ class Prefs {
       this.dbReset,
       this.rereadVersion,
       this.ouraRefetchTo,
+      this.ouraRules = 0,
       Map<String, int>? monthFails,
       List<String>? staleMonths})
       : plan = plan ?? SourcePlan.samsungOnly,
@@ -900,6 +901,7 @@ class Prefs {
       dbReset: (j['dbReset'] as num?)?.toInt(),
       rereadVersion: (j['rereadVersion'] as num?)?.toInt(),
       ouraRefetchTo: j['ouraRefetchTo'] is String ? j['ouraRefetchTo'] as String : null,
+      ouraRules: (j['ouraRules'] as num?)?.toInt() ?? 0,
       monthFails: {
         if (j['monthFails'] is Map)
           for (final e in (j['monthFails'] as Map).entries)
@@ -911,6 +913,9 @@ class Prefs {
       ],
     );
   }
+
+  /// Έλεγχος 2, C12: με ποιους κανόνες γράφτηκαν οι τιμές «o.*» (δες [ouraRulesVersion]).
+  int ouraRules;
 
   /// Έλεγχος 2, C9: ως πού μένει να ξαναδιαβαστεί το Oura πιο πίσω από τις 90 μέρες (μετά από καινούργια βάση).
   String? ouraRefetchTo;
@@ -1009,10 +1014,15 @@ class Prefs {
         if (dbReset != null) 'dbReset': dbReset,
         if (rereadVersion != null) 'rereadVersion': rereadVersion,
         if (ouraRefetchTo != null) 'ouraRefetchTo': ouraRefetchTo,
+        if (ouraRules != 0) 'ouraRules': ouraRules,
         if (monthFails.isNotEmpty) 'monthFails': monthFails,
         if (staleMonths.isNotEmpty) 'staleMonths': staleMonths,
       });
 }
+
+/// Έλεγχος 2, C12: έκδοση των κανόνων για τις τιμές του Oura στο ιστορικό. 1: ποσοστά φάσεων επί του πραγματικού
+/// ύπνου (η #66 τα έγραφε επί του χρόνου με τα ξυπνήματα). Όταν αλλάζει, το Oura ξαναδιαβάζεται από την αρχή του.
+const ouraRulesVersion = 1;
 
 /// Μια απάντηση της Samsung, διαβασμένη: [status] (ok ή το σφάλμα), [data] αν ήταν εντάξει,
 /// [sleepFailed] αν κάποιο είδος του ύπνου δεν διαβάστηκε (δες sleepReadFailed), [heartFailed] αν οι παλμοί
@@ -1563,6 +1573,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     await _loadPlan();
     await _checkDatabase();
     await _upgradeHistory();
+    await _upgradeOura();
     await startOura();
     final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw());
     if (cached.data != null) data = cached.data;
@@ -1771,6 +1782,21 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     prefs.rereadVersion = historyRulesVersion;
     prefs.monthFails.clear();
     prefs.staleMonths.clear();
+    await _savePrefs();
+  }
+
+  /// Έλεγχος 2, C12: παλιές τιμές του Oura με άλλον ορισμό (π.χ. o.deepPct της #66): το Oura ξαναδιαβάζεται από την αρχή
+  /// του (90 μέρες με την κανονική ανάγνωση, πιο πίσω ανά 90 μέρες), μία φορά για κάθε αλλαγή κανόνων.
+  Future<void> _upgradeOura() async {
+    if (!_prefsLoaded || planState != PlanState.ok || prefs.ouraRules >= ouraRulesVersion) return;
+    // Μόνο αν υπάρχουν αποθηκευμένα ποσοστά φάσεων του Oura (αλλιώς δεν υπάρχει τίποτα με τον παλιό ορισμό).
+    final old = ouraKeys[K.deepPct]!;
+    if (_plan.hasOura && _historyLoaded && history.values.any((r) => r.containsKey(old))) {
+      prefs
+        ..ouraSyncedTo = null
+        ..ouraRefetchTo = dateKey(addDays(dayOf(ouraClock()), -(ouraMaxBackDays + 1)));
+    }
+    prefs.ouraRules = ouraRulesVersion;
     await _savePrefs();
   }
 
@@ -2116,6 +2142,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..emptyFrom = prefs.emptyFrom
       ..emptyChecked = prefs.emptyChecked
       ..rereadVersion = prefs.rereadVersion
+      ..ouraRules = prefs.ouraRules
+      ..ouraRefetchTo = prefs.ouraRefetchTo
       ..monthFails.clear()
       ..monthFails.addAll(prefs.monthFails)
       ..staleMonths.clear()

@@ -228,4 +228,22 @@ void main() {
       s.dispose();
     });
   });
+
+  test('C12: παλιές τιμές του Oura (ποσοστά φάσεων της #66) ξαναδιαβάζονται από την αρχή του Oura, μία φορά', () async {
+    final plan = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -120));
+    final a = Android(now)..prefs = {'historyVersion': historyRulesVersion, 'ouraSyncedTo': dateKey(add(today, -1))};
+    a.days[dateKey(add(today, -100))] = {'o.deepPct': 18.0, 'o.sleepMin': 420};
+    var s = await boot(a, plan: plan);
+    expect(a.prefs['ouraRules'], ouraRulesVersion);
+    expect(a.prefs.containsKey('ouraSyncedTo'), isFalse);
+    expect(a.prefs['ouraRefetchTo'], dateKey(add(today, -91)));
+    s.dispose();
+    // Δεύτερη εκκίνηση: δεν ξαναγίνεται.
+    a.prefs['ouraSyncedTo'] = dateKey(today);
+    a.prefs.remove('ouraRefetchTo');
+    s = await boot(a, plan: plan);
+    expect(a.prefs['ouraSyncedTo'], dateKey(today));
+    expect(a.prefs.containsKey('ouraRefetchTo'), isFalse);
+    s.dispose();
+  });
 }
