@@ -37,20 +37,33 @@ List<CompareRow> buildCompareRows({
       if (sameDay(n.date, d)) w = n;
     }
     if (o == null && w == null) continue;
+    // Νύχτα σε κομμάτια (κοινός κανόνας με το ρολόι): διάρκεια, ώρες, ξύπνιος και «με τα ξυπνήματα» από ΟΛΑ τα
+    // κομμάτια που μετρούν, όπως στον Ύπνο και στο ιστορικό· το κενό ανάμεσα δεν μετρά. Παλμοί: της κύριας περιόδου.
+    final parts = on?.counted ?? const <OuraSleep>[];
+    final awakeParts = parts.any((x) => x.awake == null) ? null : parts.fold<int>(0, (a, x) => a + x.awake!);
+    final onset = parts.isEmpty ? null : parts.first.onset;
+    int? span;
+    if (onset != null) {
+      var total = 0;
+      for (final (i, x) in parts.indexed) {
+        total += x.end.difference(i == 0 ? onset : x.start).inMinutes;
+      }
+      span = total;
+    }
     rows.add(CompareRow(
       day: d,
       // Νύχτα σε κομμάτια: όλα τα κομμάτια που μετρούν (ίδιο με τον Ύπνο και το ιστορικό, U12).
       ouraMinutes: on?.nightMinutes,
-      ouraStart: o?.onset ?? o?.start,
-      ouraEnd: o?.end,
+      ouraStart: parts.isEmpty ? null : (onset ?? parts.first.start),
+      ouraEnd: parts.isEmpty ? null : parts.last.end,
       ouraHr: o?.avgHr,
-      ouraAwake: o?.awake == null ? null : (o!.awake! / 60).round(),
+      ouraAwake: parts.isEmpty || awakeParts == null ? null : (awakeParts / 60).round(),
       // Ίδιος ορισμός και στις δύο: πραγματικός ύπνος (χωρίς τα ξυπνήματα). Ρολόι: Night.minutes, που είναι
       // βαθύς + ελαφρύς + REM από τα στάδια· νύχτα χωρίς στάδια: «—» (η διάρκειά της έχει τα ξυπνήματα).
       // Νύχτα «μερικώς χωρίς φάσεις» (C3): τα λεπτά της είναι μόνο τα κομμάτια με φάσεις, όχι όλη η νύχτα — δεν μπαίνουν
       // δίπλα στον πραγματικό ύπνο του Oura.
       watchMinutes: w != null && w.staged && !w.partial ? w.minutes : null,
-      ouraSpan: o?.onset == null ? null : o!.end.difference(o.onset!).inMinutes,
+      ouraSpan: span,
       watchSpan: w?.spanMinutes,
       watchEstimated: w?.estimatedMinutes ?? 0,
       watchStart: w?.start,

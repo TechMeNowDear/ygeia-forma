@@ -835,7 +835,8 @@ void main() {
       final rows = ouraRows(fixtureBatch().nights);
       final changed = mergeOura(h, rows, from: DateTime(2026, 10, 23), to: DateTime(2026, 10, 27), plan: plan);
       expect(h['2026-10-23'], {K.sleepMin: 400, K.steps: 5000}, reason: 'νύχτα του ρολογιού: το Oura δεν γράφεται');
-      expect(h['2026-10-24']!['o.sleepMin'], 280);
+      // Δύο long_sleep με κενό 2 ώρες 5 λεπτά: μία νύχτα (κοινός κανόνας με το ρολόι, συγχώνευση 4/11).
+      expect(h['2026-10-24']!['o.sleepMin'], 475);
       expect(h['2026-10-26']!['o.sleepMin'], 360);
       expect(h['2026-10-26']!.containsKey('o.hrv'), isFalse, reason: 'δεν ήρθε πια → φεύγει');
       expect(h['2026-10-26']![K.steps], 6000);
