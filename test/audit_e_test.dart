@@ -192,6 +192,121 @@ void main() {
     }
   });
 
+  // Τελικός έλεγχος (release-fix2): νύχτα με ΟΛΟ τον ύπνο μετά τις 08:00 χανόταν (καμία κύρια ομάδα στο 22:00–08:00).
+  // Πραγματική νύχτα του ιδιοκτήτη, Δευτ. 2/11: 08:28–12:54, πραγματικός ύπνος 3 ώρες 39′ (219′).
+  group('Κύρια ομάδα χωρίς λεπτά στο 22:00–08:00 (1β): ίδια για ρολόι και Oura', () {
+    final early = Steps(DateTime(2026, 10, 1));
+
+    /// Κομμάτι με [asleep] λεπτά πραγματικού ύπνου στην αρχή και ξύπνιος ως το τέλος (ρολόι: φάσεις, Oura: total).
+    ({Map<String, int> nights, Map<String, int> naps, Dashboard d, List<OuraNight> o}) both(
+        List<(DateTime, DateTime, int)> pieces, Steps steps, {Map<String, int> napLocks = const {}}) {
+      final d = Dashboard.fromJson({
+        'readAt': ms(pieces.last.$2.add(const Duration(hours: 6))),
+        'sleep': [
+          for (final (a, b, m) in pieces)
+            {
+              'start': ms(a),
+              'end': ms(b),
+              'minutes': b.difference(a).inMinutes,
+              'stages': [
+                ['LIGHT', ms(a), ms(a.add(Duration(minutes: m)))],
+                if (m < b.difference(a).inMinutes) ['AWAKE', ms(a.add(Duration(minutes: m))), ms(b)],
+              ],
+            },
+        ],
+        ...steps.json(),
+      }, napLocks: napLocks);
+      var i = 0;
+      final o = parseOura(
+        sleep: [
+          for (final (a, b, m) in pieces)
+            {
+              'id': 'p${i++}',
+              'day': ouraDay(a, b),
+              'type': 'sleep',
+              'bedtime_start': a.toUtc().toIso8601String(),
+              'bedtime_end': b.toUtc().toIso8601String(),
+              'total_sleep_duration': m * 60,
+            },
+        ],
+        dailySleep: const [],
+        readiness: const [],
+        stepsBetween: steps.between,
+        napLocks: napLocks,
+      ).nights;
+      final w = (
+        nights: {for (final n in d.nights) dateKey(n.date): n.minutes},
+        naps: {for (final e in d.naps.entries) dateKey(e.key): e.value},
+      );
+      final ou = (
+        nights: {for (final n in o) if (n.nightMinutes != null) dateKey(n.day): n.nightMinutes!},
+        naps: {for (final n in o) if (n.napMinutes > 0) dateKey(n.day): n.napMinutes},
+      );
+      expect(ou.nights, w.nights, reason: 'Oura = ρολόι');
+      expect(ou.naps, w.naps, reason: 'Oura = ρολόι');
+      return (nights: w.nights, naps: w.naps, d: d, o: o);
+    }
+
+    test('2/11: 08:28–12:54 με 219′ ύπνο → νύχτα 219′ στις 2/11, ώρες 08:28–12:54 (πριν: καμία νύχτα)', () {
+      final r = both([(at(11, 2, 8, 28), at(11, 2, 12, 54), 219)], early);
+      expect(r.nights, {'2026-11-02': 219});
+      expect(r.naps, isEmpty);
+      final n = r.d.nights.single;
+      expect(n.start, at(11, 2, 8, 28));
+      expect(n.end, at(11, 2, 12, 54));
+      // Η σύνοψη της μέρας (Τάσεις, PDF, «συνήθως»): μετρά όπως κάθε νύχτα.
+      final row = summarizeDay(r.d, DateTime(2026, 11, 2));
+      expect(row[K.sleepMin], 219);
+      expect(row[K.wake], minutesFromSix(at(11, 2, 12, 54)));
+      expect(row.containsKey(K.napMin), isFalse);
+    });
+
+    test('31/10: 07:43–10:37 όπως πριν (λίγα λεπτά πριν από τις 08:00)', () {
+      expect(both([(at(10, 31, 7, 43), at(10, 31, 10, 37), 174)], early).nights, {'2026-10-31': 174});
+    });
+
+    test('10:30–11:15 (45′) μόνο του → καμία νύχτα, υπνάκος 45′', () {
+      final r = both([(at(11, 2, 10, 30), at(11, 2, 11, 15), 45)], early);
+      expect(r.nights, isEmpty);
+      expect(r.naps, {'2026-11-02': 45});
+    });
+
+    test('13:00–16:00 μόνο του → καμία νύχτα (αρχή μετά τις 12:00), υπνάκος', () {
+      final r = both([(at(11, 2, 13, 0), at(11, 2, 16, 0), 180)], early);
+      expect(r.nights, isEmpty);
+      expect(r.naps, {'2026-11-02': 180});
+    });
+
+    test('Κανονική νύχτα και πρωινό κομμάτι: όπως πριν', () {
+      final r = both([(at(11, 1, 23, 30), at(11, 2, 6, 30), 420), (at(11, 2, 9, 0), at(11, 2, 10, 30), 90)],
+          Steps(DateTime(2026, 10, 1), [(at(11, 2, 7, 30), 800)]));
+      expect(r.nights, {'2026-11-02': 420});
+      expect(r.naps, {'2026-11-02': 90});
+    });
+
+    test('Ισοπαλία ανάμεσα σε δύο πρωινές ομάδες → η νωρίτερη κύρια· μετά οι ίδιοι κανόνες ένωσης', () {
+      final r = both([(at(11, 2, 8, 30), at(11, 2, 10, 0), 90), (at(11, 2, 10, 30), at(11, 2, 12, 0), 90)], early);
+      expect(r.nights, {'2026-11-02': 180}, reason: 'κενό 30′, 0 βήματα → ενώνεται');
+      expect(r.d.nights.single.start, at(11, 2, 8, 30));
+    });
+
+    test('Αποθηκευμένη απόφαση v3 χωρίς κύρια ομάδα δεν μπλοκάρει την 1β· απόφαση με πραγματική κύρια μένει', () {
+      final pieces = [(at(11, 2, 8, 28), at(11, 2, 10, 0), 92), (at(11, 2, 10, 30), at(11, 2, 12, 54), 127)];
+      // Η «απόφαση» v3 στην αρχή του πρώτου κομματιού (τότε δεν υπήρχε κύρια ομάδα): σαν να μην υπάρχει.
+      final v3 = {'2026-11-02': ms(at(11, 2, 8, 28)) ~/ 60000};
+      expect(both(pieces, Steps.unknown, napLocks: v3).nights, {'2026-11-02': 219});
+      // Απόφαση μετά την αρχή της κύριας (πάρθηκε με βήματα για αυτήν τη νύχτα): μετρά όπως πάντα.
+      final real = {'2026-11-02': ms(at(11, 2, 10, 30)) ~/ 60000};
+      final r = both(pieces, Steps.unknown, napLocks: real);
+      expect(r.nights, {'2026-11-02': 92});
+      expect(r.naps, {'2026-11-02': 127});
+      // Κανονική νύχτα με αποθηκευμένη απόφαση: όπως πριν (υπνάκος).
+      final normal = both([(at(11, 1, 23, 30), at(11, 2, 6, 30), 420), (at(11, 2, 7, 30), at(11, 2, 8, 30), 60)], Steps.unknown,
+          napLocks: {'2026-11-02': ms(at(11, 2, 7, 30)) ~/ 60000});
+      expect(normal.nights, {'2026-11-02': 420});
+    });
+  });
+
   group('E1.6: η απόφαση «υπνάκος» με βήματα κλειδώνει (μέρα 8, επανανάγνωση, Oura)', () {
     final pieces = [(at(11, 2, 23, 30), at(11, 3, 6, 30)), (at(11, 3, 8, 0), at(11, 3, 9, 30))];
     final day0Steps = Steps(DateTime(2026, 10, 27), [(at(11, 3, 7, 15), 1200)]);

@@ -121,6 +121,9 @@ class _PieceGroup<T> {
     if (s.end.isAfter(end)) end = s.end;
   }
 
+  /// Όλα τα λεπτά πραγματικού ύπνου της ομάδας.
+  double get totalMinutes => spans.fold<double>(0, (s, x) => s + x.minutes);
+
   /// Λεπτά ύπνου μέσα στο [from, to): κάθε κομμάτι κατ' αναλογία του χρόνου του που πέφτει μέσα.
   double minutesWithin(DateTime from, DateTime to) {
     var sum = 0.0;
@@ -140,6 +143,9 @@ class _PieceGroup<T> {
   }
 }
 
+/// Έλεγχος 4: ελάχιστος πραγματικός ύπνος για να γίνει νύχτα μια ομάδα χωρίς κανένα λεπτό στο [nightWindow] (1β).
+const fallbackMainMinutes = 60;
+
 /// Το «παράθυρο νύχτας» της ημερομηνίας [date] (το πρωί): 22:00 της προηγούμενης μέρας ως 08:00 (τοπική ώρα).
 ({DateTime from, DateTime to}) nightWindow(DateTime date) =>
     (from: DateTime(date.year, date.month, date.day - 1, 22), to: DateTime(date.year, date.month, date.day, 8));
@@ -151,7 +157,8 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
 /// Ο κανόνας της νύχτας, ΙΔΙΟΣ για το ρολόι και το Oura (έλεγχος 3, E1· ο τύπος περιόδου της Oura δεν αποφασίζει):
 /// 0. Ομάδα = κομμάτια που αγγίζονται ή επικαλύπτονται (χωρίς κενό).
 /// 1. Κύρια ομάδα μιας ημερομηνίας = η ομάδα με τα περισσότερα λεπτά ύπνου μέσα στο 22:00–08:00 ([nightWindow])·
-///    ισοπαλία → η νωρίτερη. Ομάδα χωρίς κανένα λεπτό στο παράθυρο δεν γίνεται ποτέ κύρια.
+///    ισοπαλία → η νωρίτερη. Ημερομηνία χωρίς καμία τέτοια ομάδα (1β, έλεγχος 4): κύρια η ομάδα με τον περισσότερο
+///    πραγματικό ύπνο από όσες αρχίζουν 20:00 (προηγούμενο βράδυ) – 12:00, αν έχει ≥ [fallbackMainMinutes] λεπτά.
 /// 2. Ομάδες ΠΡΙΝ από την κύρια: μέρος της νύχτας αν αρχίζουν από τις 20:00 του προηγούμενου βραδιού και μετά ΚΑΙ το
 ///    κενό ως την (ήδη ενωμένη) νύχτα είναι ως [maxGap] (4 ώρες)· αλλιώς υπνάκος.
 /// 3. Ομάδες ΜΕΤΑ από την κύρια που αρχίζουν πριν από τις 06:00: μέρος της νύχτας αν το κενό είναι ως 4 ώρες· αλλιώς
@@ -208,6 +215,34 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
       mainMinutes[best] = bestMin;
     }
   }
+  // 1β. Έλεγχος 4 (πραγματική νύχτα 2/11: ύπνος 08:28–12:54, κανένα λεπτό στο 22:00–08:00 → η νύχτα χανόταν). Ημερομηνία
+  // χωρίς κύρια ομάδα: κύρια γίνεται η ομάδα με τον περισσότερο πραγματικό ύπνο ανάμεσα σε όσες αρχίζουν από τις 20:00
+  // του προηγούμενου βραδιού ως τις 12:00 της μέρας (ισοπαλία → η νωρίτερη), μόνο αν έχει τουλάχιστον
+  // [fallbackMainMinutes] λεπτά. Μετά οι ίδιοι κανόνες ένωσης. Η νύχτα ανήκει στη μέρα που ξυπνάς.
+  final mainSet = mainOf.values.toSet();
+  final fallback = <int>{};
+  final fallbackOf = <DateTime, int>{};
+  for (var i = 0; i < groups.length; i++) {
+    if (mainSet.contains(i)) continue;
+    final st = groups[i].start;
+    final DateTime d;
+    if (st.hour >= 20) {
+      d = DateTime(st.year, st.month, st.day + 1);
+    } else if (st.hour < 12) {
+      d = dayOf(st);
+    } else {
+      continue;
+    }
+    if (mainOf.containsKey(d)) continue;
+    final total = groups[i].totalMinutes;
+    if (total < fallbackMainMinutes) continue;
+    final prev = fallbackOf[d];
+    if (prev == null || total > groups[prev].totalMinutes) fallbackOf[d] = i;
+  }
+  for (final e in fallbackOf.entries) {
+    mainOf[e.key] = e.value;
+    fallback.add(e.value);
+  }
   final mains = mainOf.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
 
   // Ποια νύχτα (δείκτης κύριας ομάδας) κρατά κάθε ομάδα· null = υπνάκος.
@@ -249,7 +284,10 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
           joins = steps <= maxGapSteps;
           if (!joins) locks[m.key] ??= g.start;
         } else {
-          final lock = napLockOf?.call(lockKey);
+          var lock = napLockOf?.call(lockKey);
+          // Κύρια από το 1β: μια αποθηκευμένη απόφαση ως την αρχή της είχε παρθεί χωρίς κύρια ομάδα (κανόνες ως v3)·
+          // δεν μετρά (σαν να μην υπάρχει).
+          if (lock != null && fallback.contains(m.value) && !lock.isAfter(groups[m.value].start)) lock = null;
           joins = lock == null || g.start.isBefore(lock);
           if (!joins) locks[m.key] ??= lock;
         }

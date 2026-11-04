@@ -134,6 +134,40 @@ void main() {
       s.dispose();
     });
 
+    // Τελικός έλεγχος (release-fix2): κανόνες 4 (νύχτα με όλο τον ύπνο μετά τις 08:00). Μια επανανάγνωση v3 σε εξέλιξη
+    // στο κινητό ξεκινά καθαρά ως v4: πρόοδος από την αρχή, όριο «Ενημερώνεται το ιστορικό», καμία τιμή χαμένη ή σε nw.*.
+    test('Επανανάγνωση v3 σε εξέλιξη → ξεκινά από την αρχή ως v4, χωρίς απώλεια δεδομένων', () async {
+      final oldDay = dateKey(add(today, -500));
+      final a = Android(now)
+        ..prefs = {
+          'historyVersion': 2,
+          'rereadVersion': 3,
+          'backfillFrom': dateKey(add(today, -400)),
+          'monthFails': {dateKey(add(today, -370)): 2},
+          'staleMonths': [dateKey(add(today, -340))],
+        }
+        // Ο ύπνος του κομματιού δεν διαβάζεται: τίποτα δεν γράφεται (βλέπουμε μόνο τη μετάβαση).
+        ..range = jsonEncode({'ok': true, 'sleep': {'error': 'x'}, 'readAt': now.millisecondsSinceEpoch});
+      a.days[oldDay] = {K.sleepMin: 400, K.bedtime: 330, K.napLock: 29000000, K.steps: 4000};
+      a.days[dateKey(add(today, -450))] = {nonWatchSleepKey: 380, otherDeviceKey: 1};
+      final before = {for (final e in a.days.entries) e.key: {...e.value}};
+      final s = await boot(a);
+      expect(historyRulesVersion, 4);
+      expect(a.prefs['rereadVersion'], 4, reason: 'η v3 δεν συνεχίζει· ξεκινά η v4');
+      expect(a.prefs['historyVersion'], 2, reason: 'όχι πριν ξαναδιαβαστεί όλο το ιστορικό');
+      expect(a.prefs['staleMonths'] ?? const [], isEmpty, reason: 'οι σημειώσεις της v3 φεύγουν');
+      expect((a.prefs['monthFails'] as Map).keys, isNot(contains(dateKey(add(today, -370)))));
+      final from = a.prefs['backfillFrom'];
+      expect(from == null || parseDateKey(from as String).isAfter(add(today, -60)), isTrue,
+          reason: 'από την αρχή (τις πρόσφατες μέρες), όχι από το σημείο της v3');
+      expect(s.rereading, isTrue);
+      expect(s.analysisPlan.rulesFrom, isNotNull, reason: '«Ενημερώνεται το ιστορικό»');
+      for (final e in before.entries) {
+        expect(a.days[e.key], e.value, reason: '${e.key}: καμία τιμή χαμένη, τίποτα νέο σε nw.*');
+      }
+      s.dispose();
+    });
+
     test('Ολοκλήρωση: όταν φτάσει στην αρχή, η έκδοση γίνεται η νέα και το όριο φεύγει', () async {
       final a = Android(now)
         ..prefs = {
