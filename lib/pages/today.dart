@@ -92,9 +92,9 @@ class TodayPage extends StatelessWidget {
             : OuraStatusCard.shows(store)
                 ? OuraStatusCard(store: store, now: now)
                 : null;
-        final review = prefs.show('week') ? currentWeekReview(store.history, now, plan: store.plan) : null;
+        final review = prefs.show('week') ? currentWeekReview(store.history, now, plan: store.analysisPlan) : null;
         final week = review == null ? null : WeekCard(review: review);
-        final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.plan) : null;
+        final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.analysisPlan) : null;
         final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
         final foodCard = prefs.show('food')
             ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))

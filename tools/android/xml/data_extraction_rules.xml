@@ -6,9 +6,10 @@
   - ΟΧΙ: το βοηθητικό αρχείο της Samsung (dashboard.json, ξαναδιαβάζεται), η ουρά σφαλμάτων, προσωρινά αρχεία, και ποτέ
     τα tokens του Oura (είναι στο noBackupFilesDir, κρυπτογραφημένα με κλειδί που δεν φεύγει από το κινητό).
   Μόλις υπάρχουν κανόνες «include», μπαίνουν μόνο αυτά τα αρχεία.
+  Έλεγχος 2, C14 (R9): στο Google μόνο με κρυπτογράφηση από άκρη σε άκρη (κινητό με κλείδωμα οθόνης)· αλλιώς τίποτα.
 -->
 <data-extraction-rules>
-    <cloud-backup>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
         <include domain="database" path="ygeia.db" />
         <include domain="database" path="ygeia.db-wal" />
         <include domain="file" path="prefs.json" />

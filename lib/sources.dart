@@ -211,6 +211,13 @@ const ouraOnlyMetrics = {K.lowHr, K.hrv, K.breath};
 /// Η τιμή μένει πάντα του ρολογιού, αλλά δεν συγκρίνεται πάνω από την αλλαγή ([SourcePlan.changeDates]).
 const definitionMetrics = {K.spo2Avg, K.spo2Min, K.spo2Low, K.dayHr, K.restHr, K.walkHr};
 
+/// Τιμές που αλλάζουν όταν αλλάζουν οι κανόνες του ιστορικού (historyRulesVersion): ό,τι βγαίνει από την ομαδοποίηση
+/// του ύπνου και το οξυγόνο της νύχτας. Όσο ξαναϋπολογίζονται, δεν συγκρίνονται πάνω από το όριο ([SourcePlan.rulesFrom]).
+const rulesMetrics = {
+  K.sleepMin, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake, K.napMin, K.sleepHr, K.skinTemp, K.sleepScore,
+  K.spo2Avg, K.spo2Min, K.spo2Low,
+};
+
 /// Τιμές της «νύχτας» από το ρολόι, όπως αποθηκεύονται (χωρίς το οξυγόνο, που είναι πάντα του ρολογιού).
 const watchNightKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake, K.sleepHr, K.skinTemp, K.energy, K.napMin,
@@ -238,7 +245,20 @@ class SourceEra {
 
 /// Το σχέδιο πηγών: για κάθε μέτρηση και μέρα, ΜΙΑ πηγή και ΕΝΑ κλειδί αποθήκευσης.
 class SourcePlan {
-  SourcePlan(List<SourceEra> eras) : eras = List.unmodifiable([...eras]..sort((a, b) => a.from.compareTo(b.from)));
+  SourcePlan(List<SourceEra> eras, {this.rulesFrom})
+      : eras = List.unmodifiable([...eras]..sort((a, b) => a.from.compareTo(b.from)));
+
+  /// Έλεγχος 2, C4: όσο το ιστορικό ξαναϋπολογίζεται με νέους κανόνες, οι μέρες πριν από αυτή την ημερομηνία έχουν
+  /// ακόμα τον παλιό ορισμό των τιμών ύπνου ([rulesMetrics]). Για τις Τάσεις, την αναφορά και το «εκτός συνηθισμένου»
+  /// είναι αλλαγή ορισμού ([changeDates]): καμία σύγκριση πάνω από αυτήν. ΔΕΝ αποθηκεύεται και δεν μετρά στην
+  /// ισότητα (είναι πρόοδος της επανανάγνωσης, όχι μέρος του σχεδίου πηγών).
+  final DateTime? rulesFrom;
+
+  /// Το ίδιο σχέδιο με όριο επανανάγνωσης [from] (null = χωρίς).
+  SourcePlan withRulesFrom(DateTime? from) => SourcePlan(eras, rulesFrom: from == null ? null : dayOf(from));
+
+  /// Αν η αλλαγή της μέρας [d] είναι το όριο της επανανάγνωσης («Ενημερώνεται το ιστορικό»), όχι αλλαγή πηγής.
+  bool isRulesChange(DateTime? d) => d != null && rulesFrom != null && sameDay(d, rulesFrom!);
 
   /// Πριν από οποιαδήποτε σύνδεση: όλα όπως πάντα (ρολόι και ζυγαριά).
   static final samsungOnly = SourcePlan(const []);
@@ -323,6 +343,13 @@ class SourcePlan {
   /// - Οξυγόνο νύχτας και παλμοί μέρας ([definitionMetrics]): μένουν του ρολογιού, αλλά ο ορισμός τους αλλάζει
   ///   όταν η νύχτα περνά από το ρολόι στο Oura και πίσω (A4)· «καμία» δεν δίνει τιμή.
   List<DateTime> changeDates(String metric) {
+    final eraChanges = _eraChangeDates(metric);
+    final r = rulesFrom;
+    if (r == null || !rulesMetrics.contains(metric) || eraChanges.any((d) => sameDay(d, r))) return eraChanges;
+    return [...eraChanges, r]..sort();
+  }
+
+  List<DateTime> _eraChangeDates(String metric) {
     final night = metricGroups[metric] == SourceGroup.night;
     final definition = definitionMetrics.contains(metric);
     if (!night && !definition) return const [];
@@ -426,8 +453,8 @@ class SourcePlan {
     final f = dayOf(from);
     final kept = [for (final e in eras) if (e.from.isBefore(f)) e];
     final before = SourcePlan(kept).nightSource(DateTime(f.year, f.month, f.day - 1));
-    if (before == source) return SourcePlan(kept);
-    return SourcePlan([...kept, SourceEra(source, f)]);
+    if (before == source) return SourcePlan(kept, rulesFrom: rulesFrom);
+    return SourcePlan([...kept, SourceEra(source, f)], rulesFrom: rulesFrom);
   }
 
   @override

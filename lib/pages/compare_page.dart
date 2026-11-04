@@ -42,7 +42,9 @@ List<CompareRow> buildCompareRows({
       ouraAwake: o?.awake == null ? null : (o!.awake! / 60).round(),
       // Ίδιος ορισμός και στις δύο: πραγματικός ύπνος (χωρίς τα ξυπνήματα). Ρολόι: Night.minutes, που είναι
       // βαθύς + ελαφρύς + REM από τα στάδια· νύχτα χωρίς στάδια: «—» (η διάρκειά της έχει τα ξυπνήματα).
-      watchMinutes: w != null && w.staged ? w.minutes : null,
+      // Νύχτα «μερικώς χωρίς φάσεις» (C3): τα λεπτά της είναι μόνο τα κομμάτια με φάσεις, όχι όλη η νύχτα — δεν μπαίνουν
+      // δίπλα στον πραγματικό ύπνο του Oura.
+      watchMinutes: w != null && w.staged && !w.partial ? w.minutes : null,
       ouraSpan: o?.onset == null ? null : o!.end.difference(o.onset!).inMinutes,
       watchSpan: w?.spanMinutes,
       watchEstimated: w?.estimatedMinutes ?? 0,

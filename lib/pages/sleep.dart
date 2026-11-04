@@ -99,7 +99,7 @@ class SleepPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   BarChart(
-                    values: [for (final n in last14) n.minutes / 60],
+                    values: [for (final n in last14) sleepBarHours(n)],
                     labels: [for (final n in last14) weekdayShort(n.date)],
                     average: avg7 == null ? null : avg7 / 60,
                     valueLabel: (v) => hoursMinutes((v * 60).round()),
@@ -198,6 +198,14 @@ class _LastNightCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Χωρίς φάσεις από τη Samsung· διάρκεια με τα ξυπνήματα. Δεν μετρά στους μέσους όρους.',
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
+          if (n.partial) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Μερικώς χωρίς φάσεις: ένα κομμάτι της νύχτας ήρθε χωρίς φάσεις από τη Samsung. Η διάρκεια μετρά μόνο '
+              'τα κομμάτια με φάσεις.',
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
@@ -401,9 +409,11 @@ class _NightRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    hoursMinutes(night.minutes),
+                    nightRowDuration(night),
                     style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 15, fontFeatures: tabular),
                   ),
+                  if (nightRowNote(night) case final note?)
+                    Text(note, style: TextStyle(color: c.textSecondary, fontSize: 12.5)),
                   if (night.score != null)
                     Text(
                       'σκορ ${night.score}',
@@ -420,3 +430,13 @@ class _NightRow extends StatelessWidget {
     );
   }
 }
+
+/// Έλεγχος 2, C13: η στήλη μιας νύχτας στο γράφημα 14 νυχτών. Νύχτα χωρίς φάσεις: κενή (η διάρκεια της Samsung έχει
+/// τα ξυπνήματα και δεν μπαίνει δίπλα στον πραγματικό ύπνο των άλλων νυχτών).
+double? sleepBarHours(Night n) => n.staged ? n.minutes / 60 : null;
+
+/// C13: η διάρκεια στη γραμμή «Νύχτα προς νύχτα»: «—» για νύχτα χωρίς φάσεις (ποτέ η διάρκεια της Samsung).
+String nightRowDuration(Night n) => n.staged ? hoursMinutes(n.minutes) : '—';
+
+/// C13: η σημείωση κάτω από τη διάρκεια («χωρίς φάσεις» / «μερικώς χωρίς φάσεις»), null αν δεν χρειάζεται.
+String? nightRowNote(Night n) => !n.staged ? 'χωρίς φάσεις' : (n.partial ? 'μερικώς χωρίς φάσεις' : null);

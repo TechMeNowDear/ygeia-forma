@@ -192,6 +192,12 @@ mixin OuraStore on ChangeNotifier {
   set ouraSyncedMs(int? v);
   String? get ouraSyncedTo;
   set ouraSyncedTo(String? v);
+
+  /// Έλεγχος 2, C9: μετά από καινούργια βάση (χαλασμένη), ως ποια μέρα (μαζί) μένει να ξαναδιαβαστεί το Oura πιο πίσω
+  /// από τις [ouraMaxBackDays] μέρες, ανά [ouraMaxBackDays] μέρες τη φορά, ως την αρχή της πρώτης εποχής του Oura.
+  /// null = τίποτα.
+  String? get ouraRefetchTo;
+  set ouraRefetchTo(String? v);
   int? get ouraTriedMs;
   set ouraTriedMs(int? v);
   int? get ouraBackoffMs;
@@ -431,8 +437,9 @@ mixin OuraStore on ChangeNotifier {
       }
       // Έλεγχος πρόσβασης ΠΡΙΝ από οποιαδήποτε αλλαγή (A13): αν η Oura δεν δίνει δεδομένα ύπνου με αυτή τη σύνδεση
       // (άδεια, συνδρομή, άχρηστο token), τα tokens ανακαλούνται και το σχέδιο πηγών μένει όπως ήταν.
+      DateTime? server;
       try {
-        await ouraLink.verifyAccess(ex.tokens);
+        server = await ouraLink.verifyAccess(ex.tokens);
       } on OuraError {
         await ouraLink.discard(ex.tokens);
         rethrow;
@@ -441,7 +448,10 @@ mixin OuraStore on ChangeNotifier {
         await ouraLink.discard(ex.tokens);
         return;
       }
-      final now = ouraClock();
+      // Έλεγχος 2, C12: ρολόι κινητού πολύ μπροστά (πάνω από μία μέρα από την ώρα της Oura): η πρώτη νύχτα μετριέται
+      // με την ώρα της Oura, ώστε η εποχή να μην αρχίσει στο μέλλον (και το Oura να «ξεκινά» για μήνες).
+      final phone = ouraClock();
+      final now = clampToServer(phone, server);
       final today = dayOf(now);
       // Χωρίς αποθηκευμένη απόφαση (παλιά εκκρεμής σύνδεση): από απόψε. Ποτέ πριν από σήμερα.
       var from = ex.from ?? DateTime(today.year, today.month, today.day + 1);
@@ -473,9 +483,11 @@ mixin OuraStore on ChangeNotifier {
       if (epoch != _ouraEpoch || !await ouraLink.adopt(ex.tokens, ex.gen)) {
         // Τα tokens δεν γράφτηκαν (ή αποσυνδέθηκε στο μεταξύ): το σχέδιο επιστρέφει, τίποτα μισό. Η αποσύνδεση
         // περιμένει να τελειώσει αυτό ([_connectDone]) πριν αλλάξει το σχέδιο, άρα το σχέδιο είναι ακόμα το [next].
-        if (changed && plan == next) await setPlan(before);
+        // Έλεγχος 2, C12: το σημάδι «συνδέεται» σβήνεται ΜΟΝΟ αν το σχέδιο επέστρεψε· αλλιώς μένει, και η επόμενη
+        // εκκίνηση το διορθώνει ([_finishMarker]), αντί να μείνει «Oura χωρίς σύνδεση».
+        final reverted = !(changed && plan == next) || await setPlan(before);
         await ouraLink.discard(ex.tokens);
-        await ouraLink.clearConnecting();
+        if (reverted) await ouraLink.clearConnecting();
         ouraLoginError = OuraErrorKind.cancelled;
         return;
       }
@@ -552,6 +564,16 @@ mixin OuraStore on ChangeNotifier {
     } catch (_) {}
     // Τα tokens δεν διαβάστηκαν: τίποτα δεν κρίνεται τώρα (ούτε «ολοκληρώθηκε» ούτε «μισή»), ξανά σε επόμενη εκκίνηση.
     if (!_tokensKnown) return;
+    // Έλεγχος 2, C12: αποσύνδεση που διακόπηκε (η εφαρμογή έκλεισε στη μέση): ολοκληρώνεται, ποτέ «Oura χωρίς σύνδεση».
+    if (j?['disconnecting'] == true) {
+      if (ouraHasTokens) {
+        await ouraLink.disconnect(marker: raw);
+        ouraHasTokens = false;
+      }
+      if (await _disconnectPlan()) await ouraLink.clearConnecting();
+      await savePrefsNow();
+      return;
+    }
     if (ouraHasTokens) {
       // Ολοκληρώθηκε· αν έκλεισε πριν αποθηκευτεί η ώρα σύνδεσης, παίρνεται από το σημάδι.
       if (ouraConnectedMs == null && j?['at'] is num) {
@@ -661,21 +683,31 @@ mixin OuraStore on ChangeNotifier {
     try {
       await _connectDone;
     } catch (_) {}
-    final today = dayOf(ouraClock());
-    final from = DateTime(today.year, today.month, today.day + 1);
-    await ouraLink.disconnect();
+    // Έλεγχος 2, C12: σημάδι «αποσυνδέεται» ΠΡΙΝ από την ανάκληση: αν η εφαρμογή κλείσει ανάμεσα στο σβήσιμο των
+    // tokens και στην αλλαγή του σχεδίου, η επόμενη εκκίνηση ολοκληρώνει την αποσύνδεση ([_finishMarker]).
+    await ouraLink.disconnect(marker: jsonEncode({'disconnecting': true, 'at': ouraClock().millisecondsSinceEpoch}));
     ouraHasTokens = false;
     ouraError = null;
     ouraTriedMs = null;
     ouraBackoffMs = null;
     ouraConnectedMs = null;
     ouraIncomplete = false;
-    if (plan.eras.any((e) => e.source == Source.oura && e.from.isAfter(today))) {
-      await setPlan(SourcePlan([for (final e in plan.eras) if (!(e.source == Source.oura && e.from.isAfter(today))) e]));
-    }
-    if (plan.nightSource(from) == Source.oura) await setPlan(plan.withEra(Source.none, from));
+    if (await _disconnectPlan()) await ouraLink.clearConnecting();
     await savePrefsNow();
     notifyListeners();
+  }
+
+  /// Το σχέδιο μετά την αποσύνδεση: φεύγουν οι μελλοντικές εποχές Oura και από απόψε χωρίς πηγή. `false` αν δεν
+  /// γράφτηκε.
+  Future<bool> _disconnectPlan() async {
+    final today = dayOf(ouraClock());
+    final from = DateTime(today.year, today.month, today.day + 1);
+    var ok = true;
+    if (plan.eras.any((e) => e.source == Source.oura && e.from.isAfter(today))) {
+      ok = await setPlan(SourcePlan([for (final e in plan.eras) if (!(e.source == Source.oura && e.from.isAfter(today))) e]));
+    }
+    if (ok && plan.nightSource(from) == Source.oura) ok = await setPlan(plan.withEra(Source.none, from));
+    return ok;
   }
 
   /// Αναίρεση της αποσύνδεσης αμέσως μετά (το πλήκτρο «Αναίρεση»): μόνο το σχέδιο πηγών επιστρέφει.
@@ -717,6 +749,26 @@ mixin OuraStore on ChangeNotifier {
   /// - ό,τι δεν είχε διαβαστεί (η εφαρμογή έμεινε κλειστή πάνω από 2 μέρες· ή ποτέ: από την αρχή),
   /// - κάθε νύχτα του Oura των τελευταίων [ouraMissingDays] ημερών που λείπει ακόμα από το ιστορικό.
   /// null = τίποτα να διαβαστεί.
+  /// C9: το επόμενο παλιότερο κομμάτι για ξαναδιάβασμα μετά από καινούργια βάση: από [ouraRefetchTo] προς τα πίσω, ως
+  /// [ouraMaxBackDays] μέρες, όχι πριν από την αρχή της πρώτης εποχής του Oura. [next]: πού συνεχίζει (null = τέλος).
+  ({DateTime from, DateTime to, DateTime? next})? ouraOlderRange() {
+    final r = ouraRefetchTo;
+    if (r == null) return null;
+    DateTime? first;
+    for (final e in plan.eras) {
+      if (e.source == Source.oura && (first == null || e.from.isBefore(first))) first = e.from;
+    }
+    final to = parseDateKey(r);
+    if (first == null || to.isBefore(first)) {
+      ouraRefetchTo = null;
+      return null;
+    }
+    var from = DateTime(to.year, to.month, to.day - (ouraMaxBackDays - 1));
+    if (from.isBefore(first)) from = first;
+    final next = DateTime(from.year, from.month, from.day - 1);
+    return (from: from, to: to, next: next.isBefore(first) ? null : next);
+  }
+
   ({DateTime from, DateTime to})? ouraSyncRange(DateTime today) {
     final floor = DateTime(today.year, today.month, today.day - ouraMaxBackDays);
     bool oura(DateTime d) => !d.isBefore(floor) && !d.isAfter(today) && plan.nightSource(d) == Source.oura;
@@ -792,7 +844,18 @@ mixin OuraStore on ChangeNotifier {
       ouraNights = mergeOuraNights(ouraNights, batch.nights, from: from, to: to, today: today, keepDays: ouraDetailDays);
       await _writeNights(encodeOuraNights(ouraNights));
       ouraError = null;
-      if (saved) {
+      // C9: ένα παλιότερο κομμάτι (ως 90 μέρες) μετά από καινούργια βάση, ώσπου να φτάσει στην αρχή του Oura.
+      final older = saved ? ouraOlderRange() : null;
+      var olderSaved = true;
+      if (older != null) {
+        final b2 = await ouraLink.fetchNights(older.from, older.to);
+        if (epoch != _ouraEpoch) return;
+        final rows2 = await ouraRowsOffMain(b2.nights);
+        if (epoch != _ouraEpoch) return;
+        olderSaved = await saveDaysNow(mergeOura(history, rows2, from: older.from, to: older.to, plan: plan));
+        if (olderSaved) ouraRefetchTo = older.next == null ? null : dateKey(older.next!);
+      }
+      if (saved && olderSaved) {
         ouraSyncedMs = ms;
         ouraSyncedTo = dateKey(today);
         ouraBackoffMs = null;
@@ -877,4 +940,12 @@ class MemoryNightsFile implements OuraNightsFile {
 
   @override
   Future<void> write(String json) async => content = json;
+}
+
+/// Έλεγχος 2, C12: «τώρα» για την πρώτη νύχτα μιας σύνδεσης. Αν το ρολόι του κινητού είναι πάνω από μία μέρα μπροστά
+/// από την ώρα του διακομιστή της Oura ([server], κεφαλίδα Date), ισχύει η ώρα του διακομιστή (σε τοπική ώρα).
+DateTime clampToServer(DateTime phone, DateTime? server) {
+  if (server == null) return phone;
+  final local = server.toLocal();
+  return phone.difference(local) > const Duration(days: 1) ? local : phone;
 }

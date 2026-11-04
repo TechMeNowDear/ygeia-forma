@@ -1,6 +1,7 @@
 // Έλεγχος 2 (4/11), κομμάτι C (δεδομένα, ανθεκτικότητα): κάθε διόρθωση με έλεγχο που αποτυγχάνει χωρίς αυτήν.
 // C1 ομαδοποίηση νύχτας χωρίς βήματα · C3 άγνωστες φάσεις / κομμάτι χωρίς φάσεις · C6 φίλτρο ρολογιού ·
-// C7 δημοσίευση μόνο μετά το smoke · C10 σφάλματα του μεσάζοντα.
+// C5 ζυγίσεις άλλων εφαρμογών · C7 δημοσίευση μόνο μετά το smoke · C10 μεσάζων · C11 ορισμοί μετά από επαναφορά ·
+// C12 μικρά (λόγος κενής νύχτας, ρολόι, παλμοί μισής μέρας) · C13 σελίδα ύπνου.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,8 @@ import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_store.dart';
+import 'package:ygeia_forma/oura/oura_view.dart';
+import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/ti_ftanei.dart';
 
@@ -331,6 +334,128 @@ void main() {
         await expectLater(l.refresh(), throwsA(isA<OuraError>().having((e) => e.kind, 'kind', kind)));
         expect(v.data[vaultTokens], old);
       }
+    });
+  });
+
+  test('C10: η σελίδα απορρήτου λέει ότι ο κωδικός σύνδεσης περνά από τον μεσάζοντα (χωρίς δεδομένα υγείας)', () {
+    final p = File('site/public/privacy/index.html').readAsStringSync();
+    expect(p, contains('μικρή υπηρεσία μας στο Netlify'));
+    expect(p, contains('δεδομένα υγείας δεν περνούν ποτέ από εκεί'));
+    expect(p, contains('small service of ours on Netlify'));
+    expect(p.contains('Δεν υπάρχει δικός μας server ή λογαριασμός.'), isFalse);
+  });
+
+  test('C5: ζυγίσεις άλλων εφαρμογών από παλιές εκδόσεις φεύγουν από όλο το ιστορικό· της InBody ποτέ', () {
+    final readAt = DateTime(2026, 11, 20, 12);
+    final body = <Map<String, dynamic>>[
+      // 10 μέρες με BIA του ρολογιού, χωρίς InBody (πριν: έμεναν για πάντα, όριο «ως 3»).
+      for (var i = 1; i <= 10; i++)
+        {'time': ms(DateTime(2026, 10, i, 8)), 'weight': 80.0 + i, 'fatPct': 20.0, 'app': 'com.samsung.android.wear.shealth'},
+      // Μέρα με ρολόι ΚΑΙ InBody: μένει η InBody.
+      {'time': ms(DateTime(2026, 10, 15, 8)), 'weight': 90.0, 'app': 'com.samsung.android.wear.shealth'},
+      {'time': ms(DateTime(2026, 10, 15, 9)), 'weight': 82.0, 'fatPct': 24.0, 'app': 'com.inbody2014.inbody'},
+    ];
+    final d = Dashboard.fromJson({'readAt': ms(readAt), 'body': body});
+    final h = <String, Map<String, double>>{
+      for (var i = 1; i <= 10; i++) '2026-10-${i.toString().padLeft(2, '0')}': {K.weight: 80.0 + i, K.fatPct: 20, K.steps: 1000},
+      '2026-10-15': {K.weight: 90.0},
+      // Ζυγίσεις που δεν υπάρχουν τώρα στη Samsung (ίσως δεν συγχρόνισε ακόμα): δεν αγγίζονται εδώ.
+      for (var i = 20; i <= 24; i++) '2026-10-$i': {K.weight: 81.0},
+    };
+    applyRecentRead(h, d, plan: SourcePlan.samsungOnly);
+    for (var i = 1; i <= 10; i++) {
+      final k = '2026-10-${i.toString().padLeft(2, '0')}';
+      expect(h[k], {K.steps: 1000}, reason: k);
+    }
+    expect(h['2026-10-15']![K.weight], 82.0);
+    expect(h['2026-10-15']![K.fatPct], 24.0);
+    for (var i = 20; i <= 24; i++) {
+      expect(h['2026-10-$i']![K.weight], 81.0);
+    }
+  });
+
+  test('C11: αλλαγή πηγής εκ των υστέρων σβήνει μόνο οξυγόνο/παλμούς μέρας των ημερών με άλλη πηγή νύχτας', () {
+    final h = <String, Map<String, double>>{
+      '2026-10-01': {K.spo2Avg: 95, K.dayHr: 70, K.sleepMin: 400},
+      '2026-10-09': {K.dayHr: 72},
+      '2026-10-10': {K.spo2Avg: 94, K.restHr: 55, 'o.sleepMin': 420},
+    };
+    final before = SourcePlan.samsungOnly;
+    final after = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 10, 10));
+    expect(stripChangedDefinitions(h, before, after), {'2026-10-09', '2026-10-10'});
+    expect(h['2026-10-01'], {K.spo2Avg: 95, K.dayHr: 70, K.sleepMin: 400});
+    expect(h['2026-10-09'], isEmpty, reason: 'οι παλμοί της μέρας εξαιρούν τον ύπνο του βραδιού, που άλλαξε πηγή');
+    expect(h['2026-10-10'], {'o.sleepMin': 420});
+  });
+
+  group('C12', () {
+    test('Παλιά νύχτα που διαβάστηκε ήδη: «δεν υπάρχουν δεδομένα», όχι «πρόβλημα σύνδεσης» μετά από αποσύνδεση', () {
+      final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 1));
+      final nowT = DateTime(2026, 11, 10, 15);
+      final r = emptyNightReason(
+        plan: plan,
+        day: DateTime(2026, 11, 5),
+        now: nowT,
+        night: null,
+        hasTokens: false,
+        synced: DateTime(2026, 11, 6, 9),
+      );
+      expect(r, EmptyNight.noRing);
+      // Δεν διαβάστηκε ποτέ μετά το πρωί της: η σύνδεση λείπει → «νέα σύνδεση».
+      expect(
+        emptyNightReason(plan: plan, day: DateTime(2026, 11, 8), now: nowT, night: null, hasTokens: false,
+            synced: DateTime(2026, 11, 6, 9)),
+        EmptyNight.reconnect,
+      );
+    });
+
+    test('Ρολόι κινητού μπροστά: η πρώτη νύχτα με την ώρα της Oura', () {
+      final server = DateTime.utc(2026, 11, 10, 8);
+      expect(clampToServer(DateTime(2027, 3, 1, 10), server), server.toLocal());
+      final ok = DateTime(2026, 11, 10, 10, 30);
+      expect(clampToServer(ok, server), ok);
+      expect(clampToServer(ok, null), ok);
+    });
+
+    test('Παλμοί μέρας από μισή μέρα: φεύγουν όταν λείπει πια η νύχτα του Oura που χρειάζονται', () {
+      final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 1));
+      final readAt = DateTime(2026, 11, 10, 12);
+      final d = Dashboard.fromJson({'readAt': ms(readAt), 'sleep': <Object>[], 'heart': <Object>[]});
+      final windows = SleepWindows(const [], {
+        '2026-11-08': (DateTime(2026, 11, 7, 23), DateTime(2026, 11, 8, 7)),
+        '2026-11-09': (DateTime(2026, 11, 8, 23), DateTime(2026, 11, 9, 7)),
+      });
+      final h = <String, Map<String, double>>{
+        // Η μέρα 9/11 γράφτηκε το απόγευμα της (μισή)· η νύχτα 10/11 δεν ήρθε από το δαχτυλίδι.
+        '2026-11-09': {K.dayHr: 74, K.restHr: 60, K.steps: 5000},
+        '2026-11-08': {K.dayHr: 70},
+      };
+      applyRecentRead(h, d, plan: plan, windows: windows);
+      expect(h['2026-11-09'], {K.steps: 5000});
+      expect(h['2026-11-08']![K.dayHr], 70, reason: 'οι νύχτες 8 και 9/11 υπάρχουν: δεν αγγίζεται');
+      expect(dayHeartNeedsMissingWindow(plan, windows, DateTime(2026, 11, 9), DateTime(2026, 11, 10)), isTrue);
+    });
+  });
+
+  group('C13: σελίδα ύπνου', () {
+    test('Νύχτα χωρίς φάσεις: κενή στήλη, «—» και «χωρίς φάσεις»· μερικώς: διάρκεια και σημείωση', () {
+      final staged = Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': ownerNight()}).nights.single;
+      final unstaged = Dashboard.fromJson({
+        'readAt': ms(t(3, 12, 0)),
+        'sleep': [
+          for (final r in ownerNight()) {...r, 'stages': <Object>[]},
+        ],
+      }).nights.single;
+      final partialSleep = ownerNight();
+      partialSleep[0] = {...partialSleep[0], 'stages': <Object>[]};
+      final partial = Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': partialSleep}).nights.single;
+      expect(sleepBarHours(staged), 5.5);
+      expect(sleepBarHours(unstaged), isNull, reason: 'ποτέ η διάρκεια της Samsung (με τα ξυπνήματα) στο γράφημα');
+      expect(nightRowDuration(unstaged), '—');
+      expect(nightRowNote(unstaged), 'χωρίς φάσεις');
+      expect(nightRowNote(partial), 'μερικώς χωρίς φάσεις');
+      expect(nightRowNote(staged), isNull);
+      expect(nightRowDuration(staged), isNot('—'));
     });
   });
 }

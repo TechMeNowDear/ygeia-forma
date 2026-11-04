@@ -32,6 +32,18 @@ void main() {
     }
   });
 
+  // Έλεγχος 2, C14 (R9): 10 χρόνια δεδομένων υγείας στο Google μόνο με κρυπτογράφηση από άκρη σε άκρη.
+  test('Αντίγραφο Google μόνο με κρυπτογράφηση από άκρη σε άκρη', () {
+    final rules = File('tools/android/xml/data_extraction_rules.xml').readAsStringSync();
+    expect(rules.contains('<cloud-backup disableIfNoEncryptionCapabilities="true">'), isTrue);
+    final old = File('tools/android/xml/backup_rules.xml').readAsStringSync();
+    final inc = RegExp(r'<include [^>]*>').allMatches(old).map((m) => m[0]!).toList();
+    expect(inc, isNotEmpty);
+    for (final i in inc) {
+      expect(i.contains('requireFlags="clientSideEncryption"'), isTrue, reason: i);
+    }
+  });
+
   test('Το manifest δείχνει τους κανόνες και τα αρχεία μπαίνουν στο res/xml (δύο φορές = ίδιο αποτέλεσμα)', () {
     final dir = Directory.systemTemp.createTempSync('manifest');
     final m = File('${dir.path}/AndroidManifest.xml')

@@ -120,8 +120,17 @@ class OuraBridge(
     fun deliver(uri: String) {
         pendingCallback = uri
         try {
-            channel.invokeMethod("callback", uri)
-            pendingCallback = null
+            // Έλεγχος 2, C14 (R12): σβήνεται ΜΟΝΟ αν η Flutter το δέχτηκε. Χωρίς χειριστή ακόμα (η εφαρμογή ξεκινά),
+            // μένει για το takeCallback· πριν χανόταν, γιατί το invokeMethod χωρίς απάντηση δεν πετά ποτέ σφάλμα.
+            channel.invokeMethod("callback", uri, object : MethodChannel.Result {
+                override fun success(result: Any?) {
+                    if (DataRules.callbackDelivered("success") && pendingCallback == uri) pendingCallback = null
+                }
+
+                override fun error(code: String, message: String?, details: Any?) {}
+
+                override fun notImplemented() {}
+            })
         } catch (_: Throwable) {
             // Η Flutter δεν είναι έτοιμη ακόμα: θα το πάρει με takeCallback.
         }
@@ -228,7 +237,17 @@ object Vault {
     @Synchronized
     private fun key(): SecretKey {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        try {
+            (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        } catch (e: Throwable) {
+            // Έλεγχος 2, C14 (R14): κλειδί που δεν ανακτάται πια (π.χ. μετά από αλλαγή κλειδώματος): νέο κλειδί, αλλιώς
+            // κάθε νέα σύνδεση θα αποτύγχανε για πάντα. Τα παλιά tokens δεν διαβάζονται ούτως ή άλλως (νέα σύνδεση).
+            if (!DataRules.regenerateKeyOn(e)) throw e
+            try {
+                ks.deleteEntry(ALIAS)
+            } catch (_: Throwable) {
+            }
+        }
         val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         gen.init(
             KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)

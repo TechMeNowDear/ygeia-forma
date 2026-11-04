@@ -198,7 +198,12 @@ class TrendResult {
     required this.end,
     this.source = Source.watch,
     this.changedOn,
+    this.rereading = false,
   });
+
+  /// Έλεγχος 2, C4: η «αλλαγή» είναι το όριο της επανανάγνωσης του ιστορικού με νέους κανόνες, όχι αλλαγή πηγής:
+  /// «Ενημερώνεται το ιστορικό».
+  final bool rereading;
 
   /// Από πού είναι οι τιμές (η πηγή του τρέχοντος διαστήματος).
   final Source source;
@@ -452,6 +457,7 @@ TrendResult compareWindows(
       end: end,
       source: sp.sourceFor(def.key, end),
       changedOn: change,
+      rereading: sp.isRulesChange(change),
     );
   }
 
@@ -601,3 +607,21 @@ List<MetricDef> trendMetricsFor(SourcePlan plan) =>
 List<TrendResult> computeAllTrends(Map<String, Map<String, double>> history, DateTime today, TrendPeriod period,
         {SourcePlan? plan}) =>
     [for (final m in trendMetricsFor(plan ?? SourcePlan.samsungOnly)) computeTrend(m, history, today, period, plan: plan)];
+
+/// Έλεγχος 2, C4: το κείμενο όσο το ιστορικό ξαναϋπολογίζεται με νέους κανόνες.
+String rereadNote(DateTime from) =>
+    'Ενημερώνεται το ιστορικό: οι μέρες πριν από τις ${from.day}/${from.month}/${from.year} υπολογίζονται ξανά με τους νέους '
+    'κανόνες ύπνου. Ως τότε δεν συγκρίνω τιμές από πριν και μετά, ούτε στην αναφορά για τον γιατρό.';
+
+/// Έλεγχος 2, C4: κομμάτια του ιστορικού που κράτησαν τον παλιό ορισμό (3 αποτυχίες ανάγνωσης).
+String staleMonthsNote(List<String> keys) {
+  final months = <String>{
+    for (final k in keys)
+      () {
+        final p = k.split('-');
+        return p.length == 3 ? '${int.tryParse(p[1]) ?? p[1]}/${p[0]}' : k;
+      }(),
+  }.toList();
+  return 'Δεν ξαναϋπολογίστηκαν (η Samsung δεν τα έδωσε όλα): οι 30 μέρες ως ${months.join(', ')}. Κρατούν τον παλιό ορισμό '
+      'του ύπνου (με τα ξυπνήματα).';
+}

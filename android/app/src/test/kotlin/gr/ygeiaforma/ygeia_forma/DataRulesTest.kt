@@ -136,4 +136,19 @@ class DataRulesTest {
         assertEquals("ΒΑΣΗ", db.readText())
         root.deleteRecursively()
     }
+
+    @Test
+    fun reportsNoDataSnippetsKeystoreRegeneratesCallbackKeptUntilAccepted() {
+        // C14 (R13): μηνύματα org.json / require() έχουν κομμάτια δεδομένων· στο Sentry μόνο ο τύπος.
+        assertEquals("", DataRules.reportableMessage("org.json.JSONException", "Value {\"kcal\":12} of type x"))
+        assertEquals("", DataRules.reportableMessage("java.lang.IllegalArgumentException", "Failed requirement: 82.4"))
+        assertEquals("Η βάση χάλασε", DataRules.reportableMessage("java.lang.IllegalStateException", "Η βάση χάλασε"))
+        // C14 (R14): κλειδί που δεν ανακτάται → νέο κλειδί· άλλο σφάλμα → όχι.
+        assertTrue(DataRules.regenerateKeyOn(java.security.UnrecoverableKeyException("x")))
+        assertFalse(DataRules.regenerateKeyOn(java.io.IOException("x")))
+        // C14 (R12): η επιστροφή της Oura μένει ώσπου η Flutter να απαντήσει «success».
+        assertTrue(DataRules.callbackDelivered("success"))
+        assertFalse(DataRules.callbackDelivered("notImplemented"))
+        assertFalse(DataRules.callbackDelivered("error"))
+    }
 }

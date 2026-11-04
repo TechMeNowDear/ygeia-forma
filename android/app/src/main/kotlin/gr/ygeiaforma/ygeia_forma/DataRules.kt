@@ -52,6 +52,21 @@ object DataRules {
         }
     }
 
+    /**
+     * C14 (R13): το μήνυμα ενός σφάλματος για το Sentry. Τα org.json και τα require() βάζουν στο μήνυμα κομμάτι από τα
+     * δεδομένα (π.χ. «Value {...} of type ...»): για αυτά μόνο ο τύπος, χωρίς μήνυμα.
+     */
+    fun reportableMessage(className: String, message: String): String =
+        if (className == "org.json.JSONException" || className == "java.lang.IllegalArgumentException") "" else message
+
+    /** C14 (R14): νέο κλειδί στο Keystore όταν το παλιό δεν ανακτάται πια. */
+    fun regenerateKeyOn(e: Throwable): Boolean =
+        e is java.security.UnrecoverableKeyException ||
+            e.javaClass.name == "android.security.keystore.KeyPermanentlyInvalidatedException"
+
+    /** C14 (R12): η επιστροφή της Oura σβήνεται από την αναμονή μόνο όταν η Flutter απάντησε «success». */
+    fun callbackDelivered(outcome: String): Boolean = outcome == "success"
+
     /** Όνομα αντιγράφου μιας χαλασμένης βάσης (A7): ποτέ δεν σβήνεται, κρατιέται με την ώρα. */
     fun corruptName(name: String, ms: Long): String = "$name.corrupt-$ms"
 

@@ -36,7 +36,7 @@ class _TrendsPageState extends State<TrendsPage> {
       builder: (context, _) {
         final c = Aigaio.of(context);
         final today = dayOf(widget.now ?? store.data?.readAt ?? DateTime.now());
-        final results = computeAllTrends(store.history, today, _period, plan: store.plan);
+        final results = computeAllTrends(store.history, today, _period, plan: store.analysisPlan);
         final changed = results.where((r) => r.changed).toList()..sort((a, b) => b.z.compareTo(a.z));
 
         final selector = _PeriodSelector(
@@ -44,8 +44,12 @@ class _TrendsPageState extends State<TrendsPage> {
           onChanged: (p) => setState(() => _period = p),
         );
 
-        final progress = store.backfillVisible
-            ? _BackfillCard(reached: store.backfillReached)
+        final progress = store.backfillVisible || store.rereading || store.prefs.staleMonths.isNotEmpty
+            ? _BackfillCard(
+                reached: store.backfillReached,
+                rereadFrom: store.rereadBoundary,
+                stale: store.prefs.staleMonths,
+              )
             : null;
 
         final Widget summary = store.history.isEmpty
@@ -140,10 +144,16 @@ class _PeriodSelector extends StatelessWidget {
 }
 
 class _BackfillCard extends StatelessWidget {
-  const _BackfillCard({required this.reached});
+  const _BackfillCard({required this.reached, this.rereadFrom, this.stale = const []});
 
   /// Ως πού έχει φτάσει (null = μόλις ξεκίνησε).
   final DateTime? reached;
+
+  /// C4: το ιστορικό ξαναϋπολογίζεται με νέους κανόνες· πριν από αυτή τη μέρα, ακόμα ο παλιός ορισμός.
+  final DateTime? rereadFrom;
+
+  /// C4: κομμάτια (30 μέρες ως τη μέρα-κλειδί) που δεν ξαναϋπολογίστηκαν μετά από 3 προσπάθειες.
+  final List<String> stale;
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +163,11 @@ class _BackfillCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(icon: Icons.history_rounded, title: 'Φέρνω το ιστορικό σου από το Samsung Health', color: c.primary),
+          CardHeader(
+            icon: Icons.history_rounded,
+            title: rereadFrom != null ? 'Ενημερώνεται το ιστορικό' : 'Φέρνω το ιστορικό σου από το Samsung Health',
+            color: c.primary,
+          ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
@@ -168,6 +182,17 @@ class _BackfillCard extends StatelessWidget {
             'Μέχρι τότε, οι συγκρίσεις 3 μηνών και χρόνου μπορεί να λένε «λίγα δεδομένα».',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
           ),
+          if (rereadFrom != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              rereadNote(rereadFrom!),
+              style: TextStyle(color: c.text, fontSize: 13, height: 1.4),
+            ),
+          ],
+          if (stale.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(staleMonthsNote(stale), style: TextStyle(color: c.text, fontSize: 13, height: 1.4)),
+          ],
         ],
       ),
     );
@@ -381,7 +406,9 @@ class _MetricDetail extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: c.tint(c.sleep), borderRadius: BorderRadius.circular(16)),
               child: Text(
-                definitionMetrics.contains(def.key)
+                r.rereading
+                    ? rereadNote(r.changedOn!)
+                    : definitionMetrics.contains(def.key)
                     // Ίδια συσκευή (ρολόι), άλλος ορισμός: μετά τη σύνδεση του Oura μετρά μέσα στις ώρες ύπνου του.
                     ? 'Αλλαγή ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα ο ύπνος έρχεται από άλλη πηγή, οπότε η τιμή '
                         'του ρολογιού υπολογίζεται μέσα σε άλλες ώρες ύπνου. Δεν συγκρίνω τιμές από πριν και μετά. Το '
@@ -435,6 +462,7 @@ class TrendStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     if (r.status == TrendStatus.insufficient) return const TrendPill('Λίγα δεδομένα');
     if (r.status == TrendStatus.sourceChange) {
+      if (r.rereading) return const TrendPill('Ενημερώνεται το ιστορικό');
       return TrendPill(definitionMetrics.contains(r.def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή πηγής');
     }
     if (r.status == TrendStatus.stable) return const TrendPill('Σταθερό');

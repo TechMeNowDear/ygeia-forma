@@ -115,7 +115,7 @@ object ErrorQueue : MethodChannel.MethodCallHandler {
                 JSONObject()
                     .put("type", x.javaClass.simpleName)
                     .put("module", x.javaClass.`package`?.name ?: "")
-                    .put("value", firstLine(x.message).take(300))
+                    .put("value", DataRules.reportableMessage(x.javaClass.name, firstLine(x.message)).take(300))
                     .put("stacktrace", JSONObject().put("frames", frames))
                     .put("mechanism", JSONObject().put("type", if (handled) "handled" else "uncaught").put("handled", handled)),
             )

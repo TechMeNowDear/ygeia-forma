@@ -61,9 +61,12 @@ class StageAverages {
 }
 
 StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan plan) {
+  // Έλεγχος 2, C12: μόνο νύχτες της ίδιας εποχής Oura (μετά από Oura → καμία → Oura, όχι μαζί με την παλιά).
+  final seg = plan.segmentStart(K.deepPct, day);
   final recent = [
     for (final n in nights.reversed)
       if (!n.day.isAfter(day) &&
+          (seg == null || !n.day.isBefore(seg)) &&
           n.day.isAfter(DateTime(day.year, day.month, day.day - 7)) &&
           plan.nightSource(n.day) == Source.oura &&
           n.main != null)
@@ -165,6 +168,10 @@ EmptyNight? emptyNightReason({
   if (night != null && night.onlyNap) return EmptyNight.onlyNap;
   final today = dayOf(now);
   final isToday = sameDay(day, today);
+  // Έλεγχος 2, C12: νύχτα που διαβάστηκε ΗΔΗ μετά το πρωί της και δεν είχε δεδομένα: «δεν υπάρχουν δεδομένα από το
+  // δαχτυλίδι», όποια κι αν είναι η σύνδεση τώρα (μετά από αποσύνδεση ή χαμένα tokens δεν έγινε «πρόβλημα σύνδεσης»).
+  final readAfter = synced != null && !synced.isBefore(DateTime(day.year, day.month, day.day, 4));
+  if (readAfter && !(isToday && now.hour < 12)) return EmptyNight.noRing;
   // Αποσυνδέθηκε (από απόψε χωρίς πηγή): όχι «νέα σύνδεση».
   if (!hasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) == Source.none) {
     return EmptyNight.disconnected;
@@ -173,7 +180,6 @@ EmptyNight? emptyNightReason({
   if (!hasTokens || error == 'reconnect' || error == 'noRefresh' || error == 'scopeMissing') return EmptyNight.reconnect;
   if (error == 'subscription') return EmptyNight.subscription;
   // Δεν διαβάστηκε μετά το πρωί αυτής της νύχτας: δεν ξέρουμε ακόμα.
-  final readAfter = synced != null && !synced.isBefore(DateTime(day.year, day.month, day.day, 4));
   if (!readAfter) return isToday && now.hour < 12 ? EmptyNight.waiting : EmptyNight.notRead;
   // Διαβάστηκε: το πρωί περιμένουμε την εφαρμογή Oura, μετά τις 12:00 λέμε ότι δεν υπάρχει.
   if (isToday && now.hour < 12) return EmptyNight.waiting;

@@ -64,6 +64,19 @@ const historyRulesVersion = 3;
 /// Τιμές από τους παλμούς (ύπνου και μέρας): αν η ανάγνωση των παλμών απέτυχε ή κόπηκε, οι παλιές μένουν (A12).
 const heartKeys = {K.sleepHr, K.restHr, K.dayHr, K.walkHr};
 
+/// Παλμοί της μέρας (χωρίς τους παλμούς του ύπνου).
+const dayHeartKeys = {K.restHr, K.dayHr, K.walkHr};
+
+/// Έλεγχος 2, C12: οι παλμοί της μέρας [day] δεν βγαίνουν επειδή λείπει η νύχτα του Oura (της ίδιας ή της επόμενης
+/// μέρας, ως [today]) που ορίζει τις ώρες ύπνου ([_heartWithPlan]).
+bool dayHeartNeedsMissingWindow(SourcePlan plan, SleepWindows windows, DateTime day, DateTime today) {
+  for (final n in [dayOf(day), DateTime(day.year, day.month, day.day + 1)]) {
+    if (n.isAfter(today)) continue;
+    if (plan.nightSource(n) == Source.oura && !windows.mains.containsKey(dateKey(n))) return true;
+  }
+  return false;
+}
+
 /// Οξυγόνο της νύχτας (πάντα του ρολογιού).
 const spo2Keys = {K.spo2Avg, K.spo2Min, K.spo2Low};
 
@@ -212,6 +225,28 @@ Set<String> stripForeignWatchNight(Map<String, Map<String, double>> history, Sou
     if (plan.nightSource(day) == Source.watch || plan.keepsWatchNight(day)) continue;
     if (!e.value.keys.any(watchNightKeys.contains)) continue;
     history[e.key] = {for (final v in e.value.entries) if (!watchNightKeys.contains(v.key)) v.key: v.value};
+    changed.add(e.key);
+  }
+  return changed;
+}
+
+/// Έλεγχος 2, C11: μετά από αλλαγή σχεδίου πηγών εκ των υστέρων (επαναφορά αντιγράφου, ανάκτηση), στις μέρες που η
+/// «νύχτα» άλλαξε από ρολόι σε άλλη πηγή ή αντίστροφα, οι τιμές με ορισμό που εξαρτάται από την πηγή της νύχτας
+/// ([definitionMetrics]: οξυγόνο νύχτας, παλμοί μέρας) σβήνονται, ώστε να ξαναϋπολογιστούν (ποτέ δύο ορισμοί σε ένα
+/// κομμάτι). Επιστρέφει τις μέρες που άλλαξαν.
+Set<String> stripChangedDefinitions(Map<String, Map<String, double>> history, SourcePlan before, SourcePlan after) {
+  final changed = <String>{};
+  for (final e in history.entries.toList()) {
+    final day = parseDateKey(e.key);
+    final was = before.nightSource(day) == Source.watch;
+    final now = after.nightSource(day) == Source.watch;
+    // Και η νύχτα της επόμενης μέρας μετρά για τους παλμούς της μέρας (ο ύπνος του βραδιού).
+    final next = DateTime(day.year, day.month, day.day + 1);
+    final wasNext = before.nightSource(next) == Source.watch;
+    final nowNext = after.nightSource(next) == Source.watch;
+    if (was == now && wasNext == nowNext) continue;
+    if (!e.value.keys.any(definitionMetrics.contains)) continue;
+    history[e.key] = {for (final v in e.value.entries) if (!definitionMetrics.contains(v.key)) v.key: v.value};
     changed.add(e.key);
   }
   return changed;

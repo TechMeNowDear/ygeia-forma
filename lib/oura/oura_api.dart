@@ -21,9 +21,12 @@ import 'sha256.dart';
 // ---------------------------------------------------------------------------
 
 class OuraResponse {
-  const OuraResponse(this.status, this.body, {this.retryAfter});
+  const OuraResponse(this.status, this.body, {this.retryAfter, this.serverTime});
   final int status;
   final String body;
+
+  /// Η ώρα του διακομιστή (κεφαλίδα Date), για έλεγχο του ρολογιού του κινητού (C12).
+  final DateTime? serverTime;
 
   /// Από την κεφαλίδα Retry-After (δευτερόλεπτα), στο 429.
   final Duration? retryAfter;
@@ -48,7 +51,12 @@ Future<OuraResponse> ouraHttp(String method, Uri url, {Map<String, String> heade
     final res = await req.close().timeout(const Duration(seconds: 30));
     final body = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 30));
     final ra = int.tryParse(res.headers.value('retry-after') ?? '');
-    return OuraResponse(res.statusCode, body, retryAfter: ra == null ? null : Duration(seconds: ra));
+    DateTime? date;
+    try {
+      final h = res.headers.value(HttpHeaders.dateHeader);
+      date = h == null ? null : HttpDate.parse(h);
+    } catch (_) {}
+    return OuraResponse(res.statusCode, body, retryAfter: ra == null ? null : Duration(seconds: ra), serverTime: date);
   } finally {
     client.close(force: true);
   }
@@ -519,7 +527,8 @@ class OuraLink {
 
   /// Έλεγχος πρόσβασης ΠΡΙΝ αλλάξει το σχέδιο πηγών (έλεγχος 4/11, A13): μία κλήση στο daily_sleep με τα νέα tokens
   /// (κενά δεδομένα είναι εντάξει· θέλουμε 200). 401 = λείπει άδεια ή άχρηστο token, 403 = συνδρομή, αλλιώς δίκτυο.
-  Future<void> verifyAccess(OuraTokens t) async {
+  /// Επιστρέφει την ώρα του διακομιστή της Oura (αν τη δώσει), για έλεγχο του ρολογιού του κινητού (C12).
+  Future<DateTime?> verifyAccess(OuraTokens t) async {
     final now = _clock();
     String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
     final url = Uri.parse('${apiBase}daily_sleep').replace(queryParameters: {
@@ -527,7 +536,7 @@ class OuraLink {
       'end_date': d(DateTime(now.year, now.month, now.day + 1)),
     });
     final res = await _getWith(url, t.access);
-    if (res.status == 200) return;
+    if (res.status == 200) return res.serverTime;
     if (res.status == 401) throw const OuraError(OuraErrorKind.scopeMissing, status: 401);
     throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
   }
@@ -714,10 +723,12 @@ class OuraLink {
 
   /// Αποσύνδεση: ανάκληση στην Oura (αν γίνεται) και σβήσιμο των tokens από το κινητό. Δεν πετάει ποτέ.
   /// Κερδίζει κάθε αίτημα που τρέχει: νέα γενιά αμέσως, και ό,τι ανανέωση έτρεχε δεν αποθηκεύεται.
-  Future<void> disconnect() async {
+  /// [marker]: στη θέση του σημαδιού «συνδέεται» γράφεται αυτό («αποσυνδέεται», C12), ώστε μια διακοπή στη μέση να
+  /// ολοκληρωθεί στην επόμενη εκκίνηση.
+  Future<void> disconnect({String? marker}) async {
     // ΠΡΩΤΑ το σημάδι «συνδέεται»: ένα σημάδι που θα έμενε χωρίς tokens θα αναιρούσε στην εκκίνηση μια σύνδεση που
     // είχε χρησιμοποιηθεί.
-    await vault.delete(vaultConnecting);
+    if (marker == null || !await vault.save(vaultConnecting, marker)) await vault.delete(vaultConnecting);
     OuraTokens? t;
     try {
       t = _loaded ? _tokens : OuraTokens.fromJson(await vault.load(vaultTokens));

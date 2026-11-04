@@ -13,7 +13,7 @@
 <div class="card">
 <h2>Με λίγα λόγια</h2>
 <ul>
-<li>Τα δεδομένα υγείας και φαγητού μένουν <strong>μόνο στο κινητό</strong>. Δεν υπάρχει δικός μας server ή λογαριασμός.</li>
+<li>Τα δεδομένα υγείας και φαγητού μένουν <strong>μόνο στο κινητό</strong>. Δεν υπάρχει δικός μας server που να βλέπει ή να κρατά δεδομένα υγείας, ούτε λογαριασμός.</li>
 <li>Δεν πουλάμε, δεν δίνουμε και δεν δείχνουμε δεδομένα σε κανέναν. Δεν τα χρησιμοποιούμε για διαφημίσεις ούτε για AI.</li>
 <li>Δεν υπάρχουν cookies, αναλυτικά στατιστικά (analytics) ή διαφημίσεις, ούτε στην εφαρμογή ούτε σε αυτόν τον ιστότοπο.</li>
 </ul>
@@ -23,7 +23,7 @@
 <h3>Samsung Health</h3>
 <p>Με την άδεια του χρήστη διαβάζει από τη Samsung Health ύπνο, παλμούς, οξυγόνο, βήματα, ορόφους, θερμίδες και μετρήσεις σώματος. Τα διαβάζει και τα αποθηκεύει στο κινητό.</p>
 <h3>Oura</h3>
-<p>Αν ο χρήστης συνδέσει το Oura, η εφαρμογή ζητά από την Oura μόνο την άδεια «daily» και διαβάζει ύπνο, παλμούς και HRV στον ύπνο, αναπνοές, απόκλιση θερμοκρασίας, βαθμολογία ύπνου και ετοιμότητα. Τα δεδομένα έρχονται κατευθείαν από την Oura στο κινητό. Τα κλειδιά σύνδεσης φυλάγονται κρυπτογραφημένα στο κινητό (Android Keystore) και δεν μπαίνουν σε αντίγραφα ασφαλείας. Δεν ζητάμε email ή προσωπικά στοιχεία από την Oura. Τα δεδομένα της Oura δεν δίνονται σε τρίτους και δεν χρησιμοποιούνται για εκπαίδευση ή λειτουργία μοντέλων AI.</p>
+<p>Αν ο χρήστης συνδέσει το Oura, η εφαρμογή ζητά από την Oura μόνο την άδεια «daily» και διαβάζει ύπνο, παλμούς και HRV στον ύπνο, αναπνοές, απόκλιση θερμοκρασίας, βαθμολογία ύπνου και ετοιμότητα. Τα δεδομένα έρχονται κατευθείαν από την Oura στο κινητό. Για τη σύνδεση με την Oura, ο κωδικός σύνδεσης και η ανανέωσή του περνούν από μια μικρή υπηρεσία μας στο Netlify, που προσθέτει το μυστικό της εφαρμογής και δεν αποθηκεύει ή καταγράφει τίποτα· δεδομένα υγείας δεν περνούν ποτέ από εκεί. Τα κλειδιά σύνδεσης φυλάγονται κρυπτογραφημένα στο κινητό (Android Keystore) και δεν μπαίνουν σε αντίγραφα ασφαλείας. Δεν ζητάμε email ή προσωπικά στοιχεία από την Oura. Τα δεδομένα της Oura δεν δίνονται σε τρίτους και δεν χρησιμοποιούνται για εκπαίδευση ή λειτουργία μοντέλων AI.</p>
 <h3>Ημερολόγιο φαγητού</h3>
 <p>Ό,τι καταχωρίζει ο χρήστης μένει στο κινητό. Όταν σκανάρει barcode, ο αριθμός του barcode στέλνεται στο Open Food Facts για να βρεθεί το προϊόν. Δεν στέλνεται τίποτα άλλο.</p>
 <h3>Αναφορές σφαλμάτων</h3>
@@ -51,7 +51,7 @@
 </div>
 <div class="card" lang="en">
 <h2>In English</h2>
-<p>All health and food data stays on the user's phone; there is no app server or account. With the user's permission the app reads Samsung Health data and, if the user connects Oura, Oura data with the "daily" scope only (sleep, sleep heart rate and HRV, breathing rate, temperature deviation, sleep score and readiness), directly from Oura to the phone. Oura tokens are encrypted with the Android Keystore and excluded from backups. Oura data is never sold, shared with third parties, or used to train or run AI models. Barcode numbers are sent to Open Food Facts when scanning. Crash reports (error text, screen, app version, device model, Android version; no health or food data; no IP stored) go to Sentry (EU). No cookies, analytics or ads. Users can disconnect Oura at any time in the app settings or in their Oura account; uninstalling deletes all app data from the phone. The app is not a medical device.</p>
+<p>All health and food data stays on the user's phone; there is no app server or account. With the user's permission the app reads Samsung Health data and, if the user connects Oura, Oura data with the "daily" scope only (sleep, sleep heart rate and HRV, breathing rate, temperature deviation, sleep score and readiness), directly from Oura to the phone. To connect Oura, the sign-in code and its renewal pass through a small service of ours on Netlify that adds the app's secret and stores or logs nothing; health data never passes through it. Oura tokens are encrypted with the Android Keystore and excluded from backups. Oura data is never sold, shared with third parties, or used to train or run AI models. Barcode numbers are sent to Open Food Facts when scanning. Crash reports (error text, screen, app version, device model, Android version; no health or food data; no IP stored) go to Sentry (EU). No cookies, analytics or ads. Users can disconnect Oura at any time in the app settings or in their Oura account; uninstalling deletes all app data from the phone. The app is not a medical device.</p>
 </div>
 <nav><a href="/">Αρχική</a><a href="/privacy/">Απόρρητο</a><a href="/terms/">Όροι χρήσης</a></nav>
 </div>

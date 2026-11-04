@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'error_report.dart';
 import 'format.dart';
 import 'history.dart';
+import 'oura/config.dart' show ouraMaxBackDays;
 import 'oura/oura_model.dart';
 import 'oura/oura_store.dart';
 import 'oxygen_note.dart' show oxygenWindowNights;
@@ -300,7 +301,12 @@ class Dashboard {
     this.compareNights = const [],
     this.bodyOther = 0,
     this.naps = const {},
+    this.otherBodyDays = const {},
   });
+
+  /// Μέρες («2026-11-10») με ζύγιση από ΑΛΛΗ εφαρμογή (όχι InBody) στη Samsung Health (C5): οι παλιές εκδόσεις τις
+  /// έγραφαν στο ιστορικό· τώρα φεύγουν από εκεί όπου δεν υπάρχει ζύγιση InBody την ίδια μέρα.
+  final Set<String> otherBodyDays;
 
   /// Υπνάκοι του ρολογιού (λεπτά) ανά ημερομηνία νύχτας (C1): αποθηκεύονται στο ιστορικό (napMin), ακόμα και μέρα
   /// χωρίς νύχτα, ώστε μετρημένος ύπνος να μη χάνεται.
@@ -353,6 +359,7 @@ class Dashboard {
       failed: failed,
       bodyOther: bodyOther,
       naps: naps,
+      otherBodyDays: otherBodyDays,
     );
   }
 
@@ -511,6 +518,7 @@ class Dashboard {
       ]..sort((a, b) => a.day.compareTo(b.day)),
       body: body,
       bodyOther: allBody.length - body.length,
+      otherBodyDays: {for (final b in allBody) if (!isScaleApp(b.app)) dateKey(b.time)},
       activity: j['activity'] is Map<String, dynamic> ? j['activity'] as Map<String, dynamic> : const {},
       sleepRecords: records,
       stepsByMinute: stepsByMinute,
@@ -849,8 +857,14 @@ class Prefs {
       this.planAt,
       this.ouraErr,
       this.ouraConnected,
-      this.dbReset})
-      : plan = plan ?? SourcePlan.samsungOnly;
+      this.dbReset,
+      this.rereadVersion,
+      this.ouraRefetchTo,
+      Map<String, int>? monthFails,
+      List<String>? staleMonths})
+      : plan = plan ?? SourcePlan.samsungOnly,
+        monthFails = monthFails ?? {},
+        staleMonths = staleMonths ?? [];
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
@@ -884,8 +898,34 @@ class Prefs {
       ouraErr: j['ouraErr'] is String ? j['ouraErr'] as String : null,
       ouraConnected: (j['ouraConnected'] as num?)?.toInt(),
       dbReset: (j['dbReset'] as num?)?.toInt(),
+      rereadVersion: (j['rereadVersion'] as num?)?.toInt(),
+      ouraRefetchTo: j['ouraRefetchTo'] is String ? j['ouraRefetchTo'] as String : null,
+      monthFails: {
+        if (j['monthFails'] is Map)
+          for (final e in (j['monthFails'] as Map).entries)
+            if (e.key is String && e.value is num) e.key as String: (e.value as num).toInt(),
+      },
+      staleMonths: [
+        if (j['staleMonths'] is List)
+          for (final m in j['staleMonths'] as List) if (m is String) m,
+      ],
     );
   }
+
+  /// Έλεγχος 2, C9: ως πού μένει να ξαναδιαβαστεί το Oura πιο πίσω από τις 90 μέρες (μετά από καινούργια βάση).
+  String? ouraRefetchTo;
+
+  /// Έλεγχος 2, C4: η έκδοση κανόνων που ξαναϋπολογίζεται τώρα (null = καμία). Η [historyVersion] αλλάζει ΜΟΝΟ όταν
+  /// ξαναδιαβαστεί ΟΛΟ το ιστορικό· ως τότε οι μέρες πριν από το [backfillFrom] έχουν τον παλιό ορισμό.
+  int? rereadVersion;
+
+  /// Αποτυχίες ανά κομμάτι της επανανάγνωσης (κλειδί: η μέρα-δείκτης «2026-10-01»), αποθηκευμένες: μια επανεκκίνηση
+  /// της εφαρμογής δεν τις μηδενίζει (πριν: μόνο στη μνήμη, και ο ίδιος μήνας ξαναδοκιμαζόταν για πάντα).
+  final Map<String, int> monthFails;
+
+  /// Κομμάτια («2026-10-01» = οι 30 μέρες ως εκείνη τη μέρα) που απέτυχαν 3 φορές και κράτησαν τις παλιές τιμές
+  /// ύπνου: φαίνονται στις Τάσεις («δεν ξαναϋπολογίστηκαν»), ποτέ σιωπηλά.
+  final List<String> staleMonths;
 
   /// Για ποια χαλασμένη βάση (ώρα, ms) ξεκίνησε ήδη η ξαναδιάβαση του ιστορικού (A7): μία φορά για κάθε βλάβη.
   int? dbReset;
@@ -967,6 +1007,10 @@ class Prefs {
         if (ouraTried != null) 'ouraTried': ouraTried,
         if (ouraBackoff != null) 'ouraBackoff': ouraBackoff,
         if (dbReset != null) 'dbReset': dbReset,
+        if (rereadVersion != null) 'rereadVersion': rereadVersion,
+        if (ouraRefetchTo != null) 'ouraRefetchTo': ouraRefetchTo,
+        if (monthFails.isNotEmpty) 'monthFails': monthFails,
+        if (staleMonths.isNotEmpty) 'staleMonths': staleMonths,
       });
 }
 
@@ -1125,6 +1169,21 @@ Set<String> applyRecentRead(
     keepKeys: heartFailed ? heartKeys : const {},
     ouraNights: windows.mains.keys.toSet(),
   );
+  // Έλεγχος 2, C12: παλμοί μέρας που είχαν γραφτεί από μισή μέρα (π.χ. το απόγευμα), ενώ τώρα δεν βγαίνουν επειδή
+  // λείπει η νύχτα του Oura που χρειάζονται: φεύγουν (ο κανόνας λέει «χωρίς τιμή», όχι η παλιά μισή).
+  // Μόνο με γνωστές ώρες ύπνου του Oura (το αρχείο νυχτών διαβάστηκε): αλλιώς δεν ξέρουμε ότι λείπει η νύχτα.
+  if (!heartFailed && windows.mains.isNotEmpty) {
+    for (var day = DateTime(today.year, today.month, today.day - recentSummaryDays + 1);
+        day.isBefore(today);
+        day = DateTime(day.year, day.month, day.day + 1)) {
+      final k = dateKey(day);
+      final old = history[k];
+      if (old == null || !old.keys.any(dayHeartKeys.contains) || (rows[k]?.containsKey(K.dayHr) ?? false)) continue;
+      if (!dayHeartNeedsMissingWindow(plan, windows, day, today)) continue;
+      history[k] = {for (final e in old.entries) if (!dayHeartKeys.contains(e.key)) e.key: e.value};
+      changed.add(k);
+    }
+  }
   changed.addAll(mergeBody(history, bodyRows(d.body)));
   // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
   final f = plan.eras.isEmpty ? null : plan.eras.first.from;
@@ -1132,6 +1191,19 @@ Set<String> applyRecentRead(
   // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
   // Με προφύλαξη: αν η Samsung δεν δίνει καμία ζύγιση (π.χ. μόλις επανεγκαταστάθηκε) ή θα έφευγαν
   // πολλές μαζί, δεν σβήνεται τίποτα· μια λάθος ζύγιση που σβήνεις είναι μία-δύο μέρες.
+  // Έλεγχος 2, C5: ζυγίσεις άλλων εφαρμογών (χειροκίνητο βάρος, BIA του ρολογιού, Health Connect) που είχαν γράψει
+  // παλιότερες εκδόσεις: φεύγουν από ΟΛΟ το ιστορικό, χωρίς όριο μερών, ΜΟΝΟ σε μέρες που η Samsung έχει ζύγιση άλλης
+  // εφαρμογής και καμία της InBody (ξαναδιαβασμένες με την εφαρμογή τους). Μέρα με ζύγιση InBody δεν αγγίζεται ποτέ,
+  // ούτε μέρα χωρίς καμία ζύγιση τώρα (π.χ. η Samsung δεν έχει συγχρονίσει ακόμα): γι' αυτήν ισχύει η προφύλαξη κάτω.
+  if (d.bodyOk && d.otherBodyDays.isNotEmpty) {
+    final inbody = {for (final b in d.body) dateKey(b.time)};
+    for (final k in d.otherBodyDays) {
+      final row = history[k];
+      if (inbody.contains(k) || row == null || !row.keys.any(bodyKeys.contains)) continue;
+      history[k] = {for (final e in row.entries) if (!bodyKeys.contains(e.key)) e.key: e.value};
+      changed.add(k);
+    }
+  }
   if (d.bodyOk && d.body.isNotEmpty) {
     final days = {for (final b in d.body) dateKey(b.time)};
     final from = DateTime(today.year - 10, today.month, today.day + 1);
@@ -1380,6 +1452,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   String? get ouraSyncedTo => prefs.ouraSyncedTo;
   @override
   set ouraSyncedTo(String? v) => prefs.ouraSyncedTo = v;
+  @override
+  String? get ouraRefetchTo => prefs.ouraRefetchTo;
+  @override
+  set ouraRefetchTo(String? v) => prefs.ouraRefetchTo = v;
 
   /// Φέρνω το ιστορικό (μία φορά, ανά μήνα).
   bool backfilling = false;
@@ -1483,8 +1559,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // Αν δεν ήρθαν ακόμα, μία ακόμα προσπάθεια εδώ· μετά ξαναδοκιμάζει κάθε ανανέωση.
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 5));
     await _loadHistory();
-    await _checkDatabase();
+    // Το σχέδιο πριν από τον έλεγχο της βάσης (C9): μετά από βλάβη ξαναδιαβάζεται και το Oura, αν είναι στο σχέδιο.
     await _loadPlan();
+    await _checkDatabase();
     await _upgradeHistory();
     await startOura();
     final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw());
@@ -1508,6 +1585,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       }
     }
 
+    // C9: χαλασμένη βάση που βρέθηκε όσο η εφαρμογή ήταν ανοιχτή (η Kotlin άνοιξε καινούργια).
+    if (_historyLoaded && _prefsLoaded) await _checkDatabase(midSession: true);
+
     // Το σχέδιο πηγών πριν από την ανάγνωση: η Samsung διαβάζει ύπνο του ρολογιού μόνο ως το όριό του.
     if (planState != PlanState.ok) await _loadPlan();
     await _syncPlanFile();
@@ -1515,12 +1595,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // Πρώτα το Oura (όταν είναι η πηγή του ύπνου): οι ώρες ύπνου του χρειάζονται για τους παλμούς της μέρας και το
     // οξυγόνο, που υπολογίζονται μαζί με το διάβασμα της Samsung (A9).
     // Χωρίς απάντηση σε 90″ (π.χ. κόλλησε η Samsung) δεν μένει «φορτώνει» για πάντα. Η Samsung και το Oura μαζί.
+    // Έλεγχος 2, C12: το σχέδιο ΠΡΙΝ από την ανάγνωση (η Samsung διαβάζει τον ύπνο του ρολογιού ως το όριο αυτού του
+    // σχεδίου). Αν αλλάξει ως να έρθει η απάντηση (π.χ. «η τελευταία νύχτα από το ρολόι»), το ιστορικό δεν γράφεται
+    // από αυτή την ανάγνωση (θα έσβηνε μια νύχτα που δεν διαβάστηκε)· γράφεται στην επόμενη.
+    final readPlan = plan;
     final rawRead = SamsungHealth.dashboardRaw().timeout(const Duration(seconds: 90),
         onTimeout: () => jsonEncode({'ok': false, 'kind': 'other', 'message': 'Η Samsung δεν απάντησε. Δοκίμασε ξανά.'}));
     if (_canWrite) await syncOura();
     final raw = await rawRead;
     // Οι υπολογισμοί (νύχτες, παλμοί, συνόψεις 30 ημερών, μερικά MB δεδομένων) σε άλλο νήμα: η οθόνη δεν «κολλάει».
-    final parsePlan = _canWrite ? plan : null;
+    final parsePlan = _canWrite && readPlan == plan ? readPlan : null;
     final parseNights = ouraNights;
     final p = await parseDashboard(raw, plan: parsePlan, windows: parsePlan == null ? SleepWindows.empty : ouraWindows);
     final ok = p.data != null;
@@ -1548,7 +1632,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         await syncOura();
         // Οι συνόψεις από το άλλο νήμα μόνο αν το σχέδιο και οι νύχτες του Oura δεν άλλαξαν στο μεταξύ.
         final same = parsePlan != null && parsePlan == plan && identical(parseNights, ouraNights);
-        await _updateRecentHistory(d, sleepFailed: p.sleepFailed, heartFailed: p.heartFailed, rows: same ? p.rows : null);
+        if (readPlan == plan) {
+          await _updateRecentHistory(d, sleepFailed: p.sleepFailed, heartFailed: p.heartFailed, rows: same ? p.rows : null);
+        }
         _backfill();
       }
     } else if (_canWrite) {
@@ -1562,11 +1648,17 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   /// Χαλασμένη βάση: ξεκίνησε καινούργια (το παλιό αρχείο κρατήθηκε). Το ιστορικό ξαναδιαβάζεται από τη Samsung από
   /// την αρχή (μία φορά για κάθε βλάβη)· το ημερολόγιο φαγητού επανέρχεται από το αντίγραφο ασφαλείας.
-  Future<void> _checkDatabase() async {
+  ///
+  /// Έλεγχος 2, C9: και το Oura ξαναδιαβάζεται από την αρχή της πρώτης εποχής του (90 μέρες με την κανονική ανάγνωση,
+  /// και πιο πίσω ανά 90 μέρες, [OuraStore.ouraOlderRange]). [midSession]: η βλάβη βρέθηκε ενώ η εφαρμογή ήταν ανοιχτή·
+  /// τότε το ιστορικό στη μνήμη (πλήρες, από πριν) ξαναγράφεται όλο στη νέα βάση.
+  Future<void> _checkDatabase({bool midSession = false}) async {
     final r = await SamsungHealth.dbStatus();
     final at = r['ok'] == true && r['corrupt'] is num ? (r['corrupt'] as num).toInt() : null;
+    if (at == null && midSession) return;
     dbCorruptAt = at;
     if (at == null || !_prefsLoaded || prefs.dbReset == at) return;
+    final today = dayOf(ouraClock());
     prefs
       ..backfillFrom = null
       ..emptyFrom = null
@@ -1575,7 +1667,18 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..gapTo = null
       ..recentTo = null
       ..dbReset = at;
+    if (_plan.hasOura || prefs.plan.hasOura) {
+      prefs
+        ..ouraSyncedTo = null
+        ..ouraRefetchTo = dateKey(addDays(today, -(ouraMaxBackDays + 1)));
+    }
     await _savePrefs();
+    // Το ιστορικό στη μνήμη είναι από ΠΡΙΝ τη βλάβη: γράφεται όλο στη νέα βάση (αλλιώς θα έμεναν μόνο όσες μέρες
+    // αλλάξουν από εδώ και πέρα).
+    if (midSession && _historyLoaded && history.isNotEmpty) {
+      await _saveDays(history.keys.toSet());
+      notifyListeners();
+    }
   }
 
   /// «Εντάξει» στην κάρτα της χαλασμένης βάσης.
@@ -1650,14 +1753,52 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// μήνας αντικαθιστά τις τιμές ύπνου του με τους νέους κανόνες, ώστε όλες οι μέρες να έχουν τον
   /// ίδιο ορισμό. Οι παλιές τιμές **δεν σβήνονται από πριν**: μένουν ώσπου να έρθουν οι νέες,
   /// ώστε μια ανάγνωση που αποτυγχάνει να μην αφήνει κενά.
+  /// Έλεγχος 2, C4: η [Prefs.historyVersion] γίνεται η νέα ΜΟΝΟ όταν ξαναδιαβαστεί όλο το ιστορικό ([_finishReread])·
+  /// ως τότε [Prefs.rereadVersion] και η πρόοδος ([Prefs.backfillFrom]) είναι αποθηκευμένα, και οι Τάσεις/αναφορά δεν
+  /// συγκρίνουν πάνω από το όριο ([analysisPlan]).
   Future<void> _upgradeHistory() async {
     if (!_prefsLoaded || !_historyLoaded || prefs.historyVersion >= historyRulesVersion) return;
+    if (prefs.rereadVersion == historyRulesVersion) return; // ήδη σε εξέλιξη (συνεχίζει από το backfillFrom)
+    if (history.isEmpty) {
+      // Νέα εγκατάσταση: δεν υπάρχει παλιός ορισμός να ξαναϋπολογιστεί (η πρώτη συμπλήρωση γίνεται κανονικά).
+      prefs.historyVersion = historyRulesVersion;
+      await _savePrefs();
+      return;
+    }
     prefs.backfillFrom = null;
     prefs.emptyFrom = null;
     prefs.emptyChecked = null;
-    prefs.historyVersion = historyRulesVersion;
+    prefs.rereadVersion = historyRulesVersion;
+    prefs.monthFails.clear();
+    prefs.staleMonths.clear();
     await _savePrefs();
   }
+
+  /// Η επανανάγνωση έφτασε στην αρχή του ιστορικού: από εδώ και πέρα όλο το ιστορικό έχει τους νέους κανόνες.
+  Future<void> _finishReread() async {
+    final v = prefs.rereadVersion;
+    if (v == null) return;
+    prefs.historyVersion = v;
+    prefs.rereadVersion = null;
+    prefs.monthFails.clear();
+    await _savePrefs();
+  }
+
+  /// Αν το ιστορικό ξαναϋπολογίζεται τώρα με νέους κανόνες (C4).
+  bool get rereading => prefs.rereadVersion != null;
+
+  /// Ως πού (προς τα πίσω) έχει ξαναϋπολογιστεί: οι μέρες πριν από αυτήν έχουν ακόμα τον παλιό ορισμό. null = όλο.
+  DateTime? get rereadBoundary {
+    if (!rereading) return null;
+    final f = prefs.backfillFrom;
+    // Πριν από το πρώτο κομμάτι: μόνο οι μέρες της κανονικής ανάγνωσης (30 μέρες) έχουν τους νέους κανόνες.
+    if (f == null) return addDays(dayOf(DateTime.now()), -(recentSummaryDays - 1));
+    return parseDateKey(f);
+  }
+
+  /// Το σχέδιο πηγών για Τάσεις, αναφορά, «εκτός συνηθισμένου» και εβδομάδα: όσο το ιστορικό ξαναϋπολογίζεται, το
+  /// όριο είναι αλλαγή ορισμού (καμία σύγκριση παλιού με νέο ορισμό). Οι οθόνες ύπνου χρησιμοποιούν το [plan].
+  SourcePlan get analysisPlan => rereading ? plan.withRulesFrom(rereadBoundary) : plan;
 
   /// Οι τελευταίες 30 μέρες από την κανονική ανάγνωση + όλες οι ζυγίσεις.
   /// Ο ύπνος ξαναγράφεται μόνο για τις μέρες με βήματα ανά λεπτό (δες mergeHistory).
@@ -1699,19 +1840,21 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     notifyListeners();
   }
 
-  /// Αποτυχίες της συμπλήρωσης σε αυτή τη χρήση της εφαρμογής: ανά μήνα (σφάλμα σε είδος ύπνου)
-  /// και συνολικά (η ανάγνωση δεν έγινε καθόλου). Μετά από 3, δεν ξαναδιαβάζουμε τα ίδια
-  /// σε κάθε ανανέωση (μπαταρία).
-  final Map<String, int> _backfillMonthFails = {};
+  /// Αποτυχίες της συμπλήρωσης σε αυτή τη χρήση της εφαρμογής (η ανάγνωση δεν έγινε καθόλου). Μετά από 3, δεν
+  /// ξαναδιαβάζουμε σε κάθε ανανέωση (μπαταρία). Οι αποτυχίες ανά μήνα είναι αποθηκευμένες ([Prefs.monthFails]).
   int _backfillFails = 0;
 
   /// Ένα κομμάτι [from, cursor) από τη Samsung: διαβάζεται σε άλλο νήμα και γράφεται στο ιστορικό.
   /// Επιστρέφει null αν σταματάμε για τώρα (θα ξαναδοκιμαστεί), αλλιώς αν ήταν εντελώς άδειο.
   Future<bool?> _readChunk(DateTime from, DateTime cursor) async {
     final to = addDays(cursor, -1);
+    final readPlan = plan;
     final raw = await SamsungHealth.readRangeRaw(dateKey(from), dateKey(cursor))
         .timeout(const Duration(seconds: 120), onTimeout: () => '{"ok":false,"kind":"timeout"}');
-    final p = await parseRange(raw, from, to, plan: plan, windows: ouraWindows);
+    final p = await parseRange(raw, from, to, plan: readPlan, windows: ouraWindows);
+    // Έλεγχος 2, C11: το σχέδιο πηγών άλλαξε όσο διαβαζόταν (π.χ. επαναφορά αντιγράφου): οι τιμές υπολογίστηκαν με
+    // το παλιό· δεν γράφονται, το κομμάτι ξαναδιαβάζεται στην επόμενη ανανέωση (χωρίς να μετρά ως αποτυχία).
+    if (readPlan != plan) return null;
     if (!p.ok) {
       // Δεν διαβάστηκε τίποτα: ξανά στην επόμενη ανανέωση (ως 3 φορές), χωρίς να προχωρήσουμε.
       _backfillFails++;
@@ -1726,9 +1869,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ξανά στην επόμενη ανανέωση. Μετά από 3 φορές
     // προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
     final failed = p.sleepFailed || tooFew;
+    final k = dateKey(cursor);
     if (failed) {
-      final k = dateKey(cursor);
-      final n = _backfillMonthFails[k] = (_backfillMonthFails[k] ?? 0) + 1;
+      // C4: αποθηκευμένο (όχι στη μνήμη): μετά από 3 αποτυχίες, και με επανεκκινήσεις στο μεταξύ, προχωράμε.
+      final n = prefs.monthFails[k] = (prefs.monthFails[k] ?? 0) + 1;
+      await _savePrefs();
       if (n < 3) return null;
     }
     final saved = await _saveDays(mergeHistory(
@@ -1745,6 +1890,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     if (!saved) {
       _backfillFails++;
       return null;
+    }
+    // C4: κομμάτι που κράτησε τις παλιές τιμές ύπνου (3 αποτυχίες) σημειώνεται και φαίνεται· ποτέ σιωπηλά.
+    if (prefs.monthFails.remove(k) != null || failed) {
+      if (failed && rereading && !prefs.staleMonths.contains(k)) prefs.staleMonths.add(k);
+      await _savePrefs();
     }
     // «Άδειο» μόνο αν δεν υπήρχε τίποτα και δεν απέτυχε κανένα είδος δεδομένων.
     return p.rows.isEmpty && !p.anyError;
@@ -1783,7 +1933,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     }
     final gapFrom = prefs.gapFrom != null ? parseDateKey(prefs.gapFrom!) : null;
     var cursor = prefs.backfillFrom != null ? parseDateKey(prefs.backfillFrom!) : start;
-    if (gapFrom == null && !cursor.isAfter(oldest)) return;
+    if (gapFrom == null && !cursor.isAfter(oldest)) {
+      await _finishReread();
+      return;
+    }
 
     backfilling = true;
     _fillingGap = gapFrom != null;
@@ -1838,6 +1991,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         backfillReached = cursor;
         notifyListeners();
       }
+      if (!cursor.isAfter(oldest)) await _finishReread();
     } catch (_) {
       // Ξανά στην επόμενη ανανέωση (ως 3 φορές σε αυτή τη χρήση της εφαρμογής).
       _backfillFails++;
@@ -1929,9 +2083,21 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       return true;
     });
     if (!ok) return false;
+    final before = prefs.plan;
     prefs.plan = p;
     prefs.planAt = at;
     _data = _raw?.restrict(p);
+    // Έλεγχος 2, C11: οι μέρες που η νύχτα άλλαξε πηγή (ρολόι ↔ άλλη) με την επαναφορά: οξυγόνο νύχτας και παλμοί μέρας
+    // είχαν υπολογιστεί με τον άλλο ορισμό (ώρες ύπνου του ρολογιού αντί του Oura ή το αντίστροφο). Φεύγουν, και το
+    // ιστορικό ξαναδιαβάζεται, ώστε να ξαναϋπολογιστούν με τον σωστό ορισμό όπου υπάρχουν οι ώρες ύπνου.
+    final changed = stripChangedDefinitions(history, before, p);
+    if (changed.isNotEmpty) {
+      await _saveDays(changed);
+      prefs
+        ..backfillFrom = null
+        ..emptyFrom = null
+        ..emptyChecked = null;
+    }
     notifyListeners();
     if (!await _savePrefs()) await _savePrefs();
     return true;
@@ -1949,6 +2115,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..gapTo = prefs.gapTo
       ..emptyFrom = prefs.emptyFrom
       ..emptyChecked = prefs.emptyChecked
+      ..rereadVersion = prefs.rereadVersion
+      ..monthFails.clear()
+      ..monthFails.addAll(prefs.monthFails)
+      ..staleMonths.clear()
+      ..staleMonths.addAll(prefs.staleMonths)
       // Οι πηγές και η σύνδεση Oura ανήκουν σε αυτό το κινητό, όχι στο αντίγραφο.
       ..plan = _plan
       ..ouraSynced = prefs.ouraSynced

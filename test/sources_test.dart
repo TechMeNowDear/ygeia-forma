@@ -111,10 +111,12 @@ void main() {
     test('A5: κάθε νέα εποχή Oura είναι αλλαγή (Oura → καμία → Oura), και για τις μετρήσεις μόνο του Oura', () {
       final again = plan.withEra(Source.none, d(2026, 12, 1)).withEra(Source.oura, d(2027, 1, 5));
       expect(again.changeDates(K.sleepMin), [ouraFrom, d(2027, 1, 5)]);
-      for (final k in [K.hrv, K.lowHr, K.breath, K.napMin]) {
+      for (final k in [K.hrv, K.lowHr, K.breath]) {
         // Η πρώτη σύνδεση δεν είναι αλλαγή (απλώς αρχίζουν τιμές)· η δεύτερη εποχή είναι.
         expect(again.changeDates(k), [d(2027, 1, 5)], reason: k);
       }
+      // Έλεγχος 2, C1: οι υπνάκοι έχουν πια και τιμή του ρολογιού (napMin), άρα η πρώτη σύνδεση ΕΙΝΑΙ αλλαγή πηγής.
+      expect(again.changeDates(K.napMin), [ouraFrom, d(2027, 1, 5)]);
       // Oura → ρολόι → Oura: και για το HRV (το ρολόι δεν δίνει τιμή, αλλά η νέα εποχή Oura είναι νέα αρχή).
       final viaWatch = plan.withEra(Source.watch, d(2026, 12, 1)).withEra(Source.oura, d(2027, 1, 5));
       expect(viaWatch.changeDates(K.hrv), [d(2027, 1, 5)]);

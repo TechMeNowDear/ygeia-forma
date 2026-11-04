@@ -44,7 +44,7 @@ class _ReportPageState extends State<ReportPage> {
     super.dispose();
   }
 
-  late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now(), plan: widget.store.plan);
+  late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now(), plan: widget.store.analysisPlan);
 
   String get _fileName {
     final t = _data.created;
@@ -407,6 +407,7 @@ class _PageOne extends StatelessWidget {
       final t = s.trend;
       if (def == null || t == null || t.status == TrendStatus.insufficient) return '—';
       if (t.status == TrendStatus.stable) return 'Σταθερό';
+      if (t.status == TrendStatus.sourceChange && t.rereading) return 'Ενημερώνεται το ιστορικό';
       if (t.status == TrendStatus.sourceChange) return definitionMetrics.contains(def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή συσκευής';
       final up = t.status == TrendStatus.up;
       if (def.kind == ValueKind.clock) return '${def.formatDiff(t.displayDiff!)} ${up ? 'αργότερα' : 'νωρίτερα'}';
