@@ -10,6 +10,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/format.dart' show sameDay;
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/pages/sleep.dart';
