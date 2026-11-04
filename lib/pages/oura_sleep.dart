@@ -464,7 +464,10 @@ class _NightLine extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      m == null
+                      // Τελικός έλεγχος: μέρα με μόνο υπνάκο: οι ώρες και το σύνολο, ποτέ «χωρίς ύπνο».
+                      m == null && reason == EmptyNight.onlyNap && napTimes(night).isNotEmpty
+                          ? '${night!.naps.length == 1 ? 'Υπνάκος' : 'Υπνάκοι'} ${napTimes(night)}'
+                          : m == null
                           ? emptyNightText(reason ?? EmptyNight.noRing)
                           : '${hm(night!.counted.first.onset ?? night!.counted.first.start)} – ${hm(night!.counted.last.end)}'
                               '${night!.counted.length > 1 ? ' · ${night!.counted.length} κομμάτια' : ''}',
@@ -473,6 +476,8 @@ class _NightLine extends StatelessWidget {
                   ],
                 ),
               ),
+              if (m == null && reason == EmptyNight.onlyNap)
+                Text('Μόνο υπνάκος', style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
               if (m != null)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,

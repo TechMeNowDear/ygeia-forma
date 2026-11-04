@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
+import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
@@ -760,6 +761,37 @@ void main() {
         },
         act: (t) async {
           await t.tap(find.byKey(const ValueKey('oura-connect')));
+        },
+      ));
+  // release-fix2: μέρα με μόνο υπνάκο (15:00–21:00, καμία νύχτα) στη λίστα του Ύπνου.
+  testWidgets('Ύπνος · μέρα με μόνο υπνάκο', (t) => _page(
+        t,
+        name: '07b_sleep_nap_only_phone_light',
+        size: const Size(400, 3600),
+        brightness: Brightness.light,
+        oura: false,
+        page: (s) => SleepPage(store: s, now: ouraNow),
+        prepare: (s) {
+          final day = DateTime(ouraNow.year, ouraNow.month, ouraNow.day - 1);
+          int ms(DateTime x) => x.millisecondsSinceEpoch;
+          final a = DateTime(day.year, day.month, day.day, 15);
+          final b = DateTime(day.year, day.month, day.day, 21);
+          final j = sampleDashboardJson(ouraNow);
+          j['sleep'] = [
+            for (final r in j['sleep'] as List)
+              if (!sameDay(DateTime.fromMillisecondsSinceEpoch((r as Map)['end'] as int), day)) r,
+            {
+              'start': ms(a),
+              'end': ms(b),
+              'minutes': 360,
+              'stages': [
+                ['LIGHT', ms(a), ms(a.add(const Duration(minutes: 340)))],
+                ['AWAKE', ms(a.add(const Duration(minutes: 340))), ms(b)],
+              ],
+            },
+          ];
+          s.data = Dashboard.fromJson(j);
+          s.history = sampleHistory(ouraNow, s.data!);
         },
       ));
   testWidgets('Σύνδεση Oura · 20:30 · η ερώτηση και το βράδυ (απόφαση 4/11)', (t) => _page(

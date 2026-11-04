@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
+import '../history.dart' show K;
 import '../oura/oura_view.dart' show atLeast, minNightsForAverage;
 import '../oxygen_note.dart';
 import '../shown.dart';
@@ -55,6 +56,12 @@ class SleepPage extends StatelessWidget {
         }
 
         final last14 = nights.length <= 14 ? nights : nights.sublist(nights.length - 14);
+        // Τελικός έλεγχος: μέρες με μόνο υπνάκο (καμία νύχτα) φαίνονται κι αυτές στη λίστα και στο γράφημα (κενή
+        // στήλη), ως «Μόνο υπνάκος». Δεν μπαίνουν σε κανέναν μέσο όρο ή στατιστικό νύχτας.
+        final timeline = <(DateTime, Night?)>[
+          for (final n in last14) (n.date, n),
+          for (final x in napOnlyDays(d, store.plan, last14.first.date)) (x, null),
+        ]..sort((a, b) => a.$1.compareTo(b.$1));
         // Εβδομάδα = οι νύχτες των 7 τελευταίων ημερών, όχι οι 7 τελευταίες καταγραφές (έλεγχος υπολογισμών F15).
         final lastDay = nights.last.date;
         final week = [
@@ -105,8 +112,8 @@ class SleepPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   BarChart(
-                    values: [for (final n in last14) sleepBarHours(n)],
-                    labels: [for (final n in last14) weekdayShort(n.date)],
+                    values: [for (final t in timeline) t.$2 == null ? null : sleepBarHours(t.$2!)],
+                    labels: [for (final t in timeline) weekdayShort(t.$1)],
                     average: avg7 == null ? null : avg7 / 60,
                     valueLabel: (v) => hoursMinutes((v * 60).round()),
                     color: c.sleep,
@@ -123,7 +130,10 @@ class SleepPage extends StatelessWidget {
           ],
           right: [
             const SectionHeader('Νύχτα προς νύχτα · 14 νύχτες'),
-            for (final n in nights.reversed.take(14)) _NightRow(night: n, now: d.readAt),
+            for (final t in timeline.reversed)
+              t.$2 == null
+                  ? _NapOnlyRow(day: t.$1, naps: d.napTimes[t.$1]!, now: d.readAt)
+                  : _NightRow(night: t.$2!, now: d.readAt),
           ],
         );
       },
@@ -444,6 +454,69 @@ class _NightRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Τελικός έλεγχος: μέρα χωρίς νύχτα, μόνο με υπνάκο. Χωρίς βαθμολογία, φάσεις, οξυγόνο ή παλμούς· ποτέ «χωρίς ύπνο».
+class _NapOnlyRow extends StatelessWidget {
+  const _NapOnlyRow({required this.day, required this.naps, required this.now});
+  final DateTime day;
+  final List<(DateTime, DateTime, int)> naps;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return AppCard(
+      key: ValueKey('nap-only-${day.year}-${day.month}-${day.day}'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  relativeDay(day, now) == 'Σήμερα' ? 'Σήμερα' : shortDayDate(day),
+                  style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                const SizedBox(height: 2),
+                Text(napOnlyText(naps), style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontFeatures: tabular)),
+              ],
+            ),
+          ),
+          Text(napOnlyLabel, style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Η ετικέτα της μέρας με μόνο υπνάκο (ρολόι και Oura).
+const napOnlyLabel = 'Μόνο υπνάκος';
+
+/// «Υπνάκος 15:00–21:00 · 5 ώρες 40 λεπτά» (πολλοί: «Υπνάκοι 13:00–14:00, 16:00–17:00 · σύνολο»).
+String napOnlyText(List<(DateTime, DateTime, int)> naps) {
+  final total = naps.fold<int>(0, (s, x) => s + x.$3);
+  return '${naps.length == 1 ? 'Υπνάκος' : 'Υπνάκοι'} ${[for (final x in naps) '${hm(x.$1)}–${hm(x.$2)}'].join(', ')} · '
+      '${hoursMinutes(total)}';
+}
+
+/// Οι μέρες από το [from] με υπνάκο του ρολογιού και χωρίς νύχτα, μόνο όπου ο ύπνος είναι του ρολογιού (τρέχουσα
+/// εποχή), παλιότερη πρώτη.
+List<DateTime> napOnlyDays(Dashboard d, SourcePlan plan, DateTime from) {
+  final today = dayOf(d.readAt);
+  final seg = plan.segmentStart(K.sleepMin, today);
+  return [
+    for (final e in d.napTimes.entries)
+      if (e.value.isNotEmpty &&
+          !e.key.isBefore(dayOf(from)) &&
+          !e.key.isAfter(today) &&
+          plan.nightSource(e.key) == Source.watch &&
+          (seg == null || !e.key.isBefore(seg)) &&
+          !d.nights.any((n) => sameDay(n.date, e.key)))
+        e.key,
+  ]..sort();
 }
 
 /// Έλεγχος 2, C13: η στήλη μιας νύχτας στο γράφημα 14 νυχτών. Νύχτα χωρίς φάσεις: κενή (η διάρκεια της Samsung έχει

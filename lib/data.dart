@@ -294,8 +294,13 @@ class Dashboard {
     this.compareNights = const [],
     this.bodyOther = 0,
     this.naps = const {},
+    this.napTimes = const {},
     this.otherBodyDays = const {},
   });
+
+  /// Οι ώρες των υπνάκων ανά ημερομηνία (αρχή, τέλος, λεπτά ύπνου), ενωμένα τα κομμάτια που αγγίζονται. Για τη μέρα
+  /// χωρίς νύχτα στη λίστα του Ύπνου («Μόνο υπνάκος», τελικός έλεγχος)· δεν μετρούν πουθενά ως νύχτα.
+  final Map<DateTime, List<(DateTime, DateTime, int)>> napTimes;
 
   /// Μέρες («2026-11-10») με ζύγιση από ΑΛΛΗ εφαρμογή (όχι InBody) στη Samsung Health: οι παλιές εκδόσεις τις
   /// έγραφαν στο ιστορικό. Έλεγχος 3, E2: δεν σβήνονται ποτέ· μετρούν ως «υπάρχουν ακόμα» στη Samsung.
@@ -352,6 +357,7 @@ class Dashboard {
       failed: failed,
       bodyOther: bodyOther,
       naps: naps,
+      napTimes: napTimes,
       otherBodyDays: otherBodyDays,
     );
   }
@@ -498,6 +504,7 @@ class Dashboard {
       total: (j['total'] as num?)?.toInt() ?? 0,
       nights: nights,
       naps: grouped.naps,
+      napTimes: grouped.napTimes,
       heart: heart,
       spo2: spo2,
       skin: skin,
@@ -539,7 +546,7 @@ class Dashboard {
   ///   χωριστά ως napMin).
   /// - Η απόφαση «υπνάκος λόγω βημάτων» κλειδώνει ([Night.napLock] → [K.napLock], [napLocks] στην επόμενη ανάγνωση).
   /// - Βήματα και παλμοί κρίνουν επίσης την ετικέτα του κενού («πιθανός ύπνος» ή «κενό»), που δεν μετρά.
-  static ({List<Night> nights, Map<DateTime, int> naps}) _groupNights(
+  static ({List<Night> nights, Map<DateTime, int> naps, Map<DateTime, List<(DateTime, DateTime, int)>> napTimes}) _groupNights(
     List<SleepRecord> records, {
     List<Sample> heart = const [],
     Map<int, int> stepsByMinute = const {},
@@ -561,6 +568,19 @@ class Dashboard {
     final naps = <DateTime, int>{
       for (final e in grouped.naps.entries) e.key: e.value.fold(0, (sum, r) => sum + r.sleepMinutes),
     };
+    final napTimes = <DateTime, List<(DateTime, DateTime, int)>>{};
+    for (final e in grouped.naps.entries) {
+      final out = <(DateTime, DateTime, int)>[];
+      for (final r in [...e.value]..sort((a, b) => a.start.compareTo(b.start))) {
+        if (out.isNotEmpty && !r.start.isAfter(out.last.$2)) {
+          final l = out.removeLast();
+          out.add((l.$1, r.end.isAfter(l.$2) ? r.end : l.$2, l.$3 + r.sleepMinutes));
+        } else {
+          out.add((r.start, r.end, r.sleepMinutes));
+        }
+      }
+      napTimes[e.key] = out;
+    }
 
     final nights = <Night>[];
     for (final g in grouped.nights) {
@@ -629,7 +649,7 @@ class Dashboard {
       }
       n.napMinutes = naps[n.date] ?? 0;
     }
-    return (nights: nights, naps: naps);
+    return (nights: nights, naps: naps, napTimes: napTimes);
   }
 
   static void _fillNightMetrics(Night n, List<Sample> heart, List<Sample> spo2, List<Sample> skin) {
