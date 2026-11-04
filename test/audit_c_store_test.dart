@@ -1,6 +1,5 @@
 // Έλεγχος 2, κομμάτι C: η εφαρμογή ολόκληρη (HealthStore) με ψεύτικη πλευρά Android.
 // C4 επανανάγνωση με αποθηκευμένη πρόοδο · C9 καινούργια βάση · C11 επαναφορά πηγών · C12 διακοπή αποσύνδεσης.
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
