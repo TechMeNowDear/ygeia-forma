@@ -17,6 +17,7 @@ import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/oxygen_note.dart';
 import 'package:ygeia_forma/pages/compare_page.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
+import 'package:ygeia_forma/report.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/theme.dart';
 
@@ -211,6 +212,14 @@ void main() {
     expect(r.ouraMinutes, 437);
     expect(r.ouraAwake, 22);
     expect(r.ouraSpan, r.ouraMinutes! + r.ouraAwake!, reason: 'πριν: 458 (κομμένα λεπτά)');
+  });
+
+  test('Δείγμα στιγμιοτύπων: οι ζυγίσεις της InBody έχουν το σημάδι της (όχι «όχι InBody» στην αναφορά)', () {
+    final now = DateTime(2026, 11, 14, 10, 20);
+    final d = Dashboard.fromJson(sampleDashboardJson(now));
+    final r = buildReport(sampleHistory(now, d), now);
+    expect(r.weighIns, isNotEmpty);
+    expect(r.otherWeighIns, isEmpty);
   });
 
   test('Ο κώδικας της σελίδας 1 δεν έχει πια όριο γραμμών στη σημείωση', () {

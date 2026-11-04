@@ -193,6 +193,9 @@ Map<String, Map<String, double>> sampleHistory(DateTime now, Dashboard d) {
       if (b.weight != null) K.weight: b.weight!,
       if (b.fatPct != null) K.fatPct: b.fatPct!,
       if (b.smm != null) K.smm: b.smm!,
+      // Όπως το [bodyRows] της εφαρμογής (έλεγχος 3, E2): ζύγιση της InBody με το σημάδι της· χωρίς αυτό η αναφορά
+      // έγραφε «όχι InBody» σε κάθε ζύγιση του δείγματος (συγχώνευση 3, στιγμιότυπα 13).
+      if (b.app == inbodyApp) K.inbody: 1,
     };
   }
   out.addAll(recent);
