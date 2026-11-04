@@ -541,8 +541,10 @@ class Dashboard {
   ///   από βήματα ή παλμούς (μια βόλτα ως την τουαλέτα δεν «κόβει» τη νύχτα· και ο κανόνας δεν αλλάζει όταν η νύχτα
   ///   παλιώσει και δεν υπάρχουν πια βήματα ανά λεπτό). Τα βήματα/παλμοί χρησιμεύουν μόνο για την ετικέτα του κενού
   ///   («πιθανός ύπνος» ή «κενό»), που δεν μετρά.
-  /// - Υπνάκοι είναι ΜΟΝΟ: (α) βραδινό λαγοκοίμισμα που τελειώνει ως τις 22:00 ([_eveningDoze]), (β) πρωινός υπνάκος
-  ///   που αρχίζει μετά τις 06:00 και πάνω από 60 λεπτά μετά το τέλος της νύχτας ([_morningNap]), (γ) απογευματινός:
+  /// - Υπνάκοι είναι ΜΟΝΟ: (α) βραδινό λαγοκοίμισμα που τελειώνει ως τις 22:00 ([_eveningDoze]), (β) κομμάτι που
+  ///   αρχίζει μετά τις 06:00 και μετά το τέλος της νύχτας, εκτός αν το κενό είναι ως 90 λεπτά ΚΑΙ (δεν υπάρχουν
+  ///   βήματα ανά λεπτό για το κενό Ή τα βήματα είναι ως [maxGapSteps]) — τότε είναι η ίδια νύχτα, π.χ. Κυριακή 25/10:
+  ///   05:55–09:50 και 10:53→, 0 βήματα, παλμοί ύπνου ([_startsMorningNap]), (γ) απογευματινός:
   ///   αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες (όπως πριν). Οι υπνάκοι μετρούν στα [Night.napMinutes] της
   ///   νύχτας με την ίδια ημερομηνία και αποθηκεύονται (napMin), ώστε να μη χάνονται.
   /// - Δύο ομάδες με την ίδια ημερομηνία (κενό πάνω από 4 ώρες): η μεγαλύτερη που δεν είναι λαγοκοίμισμα είναι η
@@ -559,7 +561,7 @@ class Dashboard {
     _SleepGroup? previous;
     for (final r in recs) {
       final g = previous;
-      if (g != null && g.isNight && _joins(g, r)) {
+      if (g != null && g.isNight && _joins(g, r, stepsByMinute, stepsFrom)) {
         final last = g.parts.last;
         // Μόνο η ετικέτα του κενού κρίνεται με βήματα και παλμούς («πιθανός ύπνος»)· δεν μετρά ποτέ στη διάρκεια.
         if (r.start.isAfter(g.end) &&
@@ -597,7 +599,8 @@ class Dashboard {
       final main = (candidates.isEmpty ? list : candidates).reduce((a, b) => a.minutes >= b.minutes ? a : b);
       final n = Night(entry.key);
       for (final g in list) {
-        if (!identical(g, main) && (_eveningDoze(g) || _morningNap(g, main))) {
+        if (!identical(g, main) &&
+            (_eveningDoze(g) || _startsMorningNap(g.start, main.end, stepsByMinute, stepsFrom))) {
           addNap(entry.key, g.minutes);
           continue;
         }
@@ -660,12 +663,12 @@ class Dashboard {
 
   /// Αν το κομμάτι [r] συνεχίζει την ομάδα [g] (ίδια νύχτα): κενό ως 4 ώρες, εκτός αν η ομάδα είναι βραδινό
   /// λαγοκοίμισμα ή το [r] πρωινός υπνάκος. Συνεχόμενα ή επικαλυπτόμενα κομμάτια: πάντα μαζί.
-  static bool _joins(_SleepGroup g, SleepRecord r) {
+  static bool _joins(_SleepGroup g, SleepRecord r, Map<int, int> stepsByMinute, DateTime? stepsFrom) {
     final gap = r.start.difference(g.end);
     if (gap <= Duration.zero) return true;
     if (gap > maxGap) return false;
     if (_eveningDoze(g)) return false;
-    return !_startsMorningNap(r.start, g.end);
+    return !_startsMorningNap(r.start, g.end, stepsByMinute, stepsFrom);
   }
 
   /// Βραδινό λαγοκοίμισμα: αρχίζει μετά το μεσημέρι και τελειώνει την ίδια μέρα ως τις 22:00.
@@ -675,11 +678,15 @@ class Dashboard {
     return s.hour >= 12 && sameDay(s, e) && !e.isAfter(DateTime(e.year, e.month, e.day, 22));
   }
 
-  /// Πρωινός υπνάκος: η ομάδα [g] αρχίζει μετά τις 06:00 και πάνω από 60 λεπτά μετά το τέλος της νύχτας [main].
-  static bool _morningNap(_SleepGroup g, _SleepGroup main) => _startsMorningNap(g.start, main.end);
-
-  static bool _startsMorningNap(DateTime start, DateTime nightEnd) =>
-      start.hour >= 6 && start.hour < 20 && start.difference(nightEnd) > const Duration(minutes: 60);
+  /// Πρωινός υπνάκος: κομμάτι που αρχίζει 06:00–20:00, μετά το τέλος της νύχτας ([nightEnd]). Είναι η ίδια νύχτα
+  /// (όχι υπνάκος) αν το κενό είναι ως [morningJoinGap] ΚΑΙ για το κενό δεν υπάρχουν βήματα ανά λεπτό ή είναι ως
+  /// [maxGapSteps]. Το κενό δεν μετρά ποτέ ως ύπνος. Κομμάτια που αρχίζουν 20:00–06:00 δεν κρίνονται εδώ (πάντα νύχτα).
+  static bool _startsMorningNap(DateTime start, DateTime nightEnd, Map<int, int> stepsByMinute, DateTime? stepsFrom) {
+    if (start.hour < 6 || start.hour >= 20 || !start.isAfter(nightEnd)) return false;
+    if (start.difference(nightEnd) > morningJoinGap) return true;
+    final steps = gapSteps(nightEnd, start, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
+    return steps != null && steps > maxGapSteps;
+  }
 
   static void _fillNightMetrics(Night n, List<Sample> heart, List<Sample> spo2, List<Sample> skin) {
     bool inside(Sample s) => n.parts.any((p) => s.start.isBefore(p.end) && s.end.isAfter(p.start));

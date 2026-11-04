@@ -124,6 +124,63 @@ void main() {
       expect(soon.napMinutes, 0);
     });
 
+    // Συντονιστής (4/11): η Κυριακή 25/10 του χρήστη (05:55–09:50, 10:53–13:14, 0 βήματα, παλμοί ύπνου) ΔΕΝ ήταν
+    // ξύπνημα. Πρωινό κομμάτι: ίδια νύχτα αν κενό ≤ 90′ ΚΑΙ (χωρίς βήματα ανά λεπτό Ή ≤ 30 βήματα)· αλλιώς υπνάκος.
+    Map<String, dynamic> morning(List<Map<String, dynamic>> sleep, {List<List<num>> steps = const [], DateTime? stepsFrom}) => {
+          'readAt': ms(DateTime(2026, 10, 26, 15)),
+          'sleep': sleep,
+          'stepsMin': steps,
+          if (stepsFrom != null) 'stepsFrom': ms(stepsFrom),
+        };
+    final sun1 = rec(DateTime(2026, 10, 26, 5, 55), DateTime(2026, 10, 26, 9, 50));
+    final sun2 = rec(DateTime(2026, 10, 26, 10, 53), DateTime(2026, 10, 26, 13, 14));
+
+    test('25/10: κενό 63′ με 0 βήματα → η ίδια νύχτα (το κενό δεν μετρά)', () {
+      final d = Dashboard.fromJson(morning([sun1, sun2], stepsFrom: DateTime(2026, 10, 19)));
+      final n = d.nights.single;
+      expect(n.parts.length, 2);
+      expect(n.minutes, 235 + 141);
+      expect(n.napMinutes, 0);
+      expect(n.end, DateTime(2026, 10, 26, 13, 14));
+      expect(n.betweenMinutes + n.estimatedMinutes, 63);
+      expect(summarizeDay(d, DateTime(2026, 10, 26))[K.sleepMin], 376);
+    });
+
+    test('25/10 χωρίς βήματα ανά λεπτό (π.χ. σε 30 μέρες) → η ίδια νύχτα', () {
+      for (final j in [
+        morning([sun1, sun2], stepsFrom: DateTime(2026, 10, 26, 12)),
+        {...morning([sun1, sun2]), 'stepsMin': null},
+      ]) {
+        final n = Dashboard.fromJson(j).nights.single;
+        expect(n.minutes, 376);
+        expect(n.napMinutes, 0);
+      }
+    });
+
+    test('Ξύπνημα 07:00, 200 βήματα, υπνάκος 08:30–09:30 → υπνάκος', () {
+      final d = Dashboard.fromJson(morning(
+        [rec(t(2, 23, 0), t(3, 7, 0)), rec(t(3, 8, 30), t(3, 9, 30))],
+        steps: [
+          [ms(t(3, 7, 40)), 200],
+        ],
+        stepsFrom: DateTime(2026, 10, 27),
+      ));
+      final n = d.nights.single;
+      expect(n.minutes, 480);
+      expect(n.end, t(3, 7, 0));
+      expect(n.napMinutes, 60);
+      expect(summarizeDay(d, DateTime(2026, 11, 3))[K.napMin], 60);
+    });
+
+    test('Ξύπνημα 07:00, υπνάκος 10:00–11:00 (κενό 3 ώρες) → υπνάκος, ακόμα και χωρίς βήματα', () {
+      final d = Dashboard.fromJson(morning(
+        [rec(t(2, 23, 0), t(3, 7, 0)), rec(t(3, 10, 0), t(3, 11, 0))],
+        stepsFrom: DateTime(2026, 10, 27),
+      ));
+      expect(d.nights.single.minutes, 480);
+      expect(d.nights.single.napMinutes, 60);
+    });
+
     test('Υπνάκος μέρας χωρίς νύχτα του ρολογιού: αποθηκεύεται (δεν χάνεται)', () {
       final d = Dashboard.fromJson({
         'readAt': ms(t(3, 18, 0)),

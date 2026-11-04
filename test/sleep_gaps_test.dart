@@ -151,27 +151,17 @@ void main() {
     final d = Dashboard.fromJson(night(secondStart: DateTime(2026, 10, 26, 5, 0).add(const Duration(hours: 5, minutes: 30))));
     // κενό 03:55 → 10:30 = 6,5 ώρες: πάνω από το όριο των 4 ωρών, άρα υπνάκος όπως πριν
     expect(d.nights.single.napMinutes, 141);
-    // Κυριακή 25/10: 05:55–09:50 και 10:53–… με κενό 63 λεπτών χωρίς βήματα. Κανόνας C1 (έλεγχος 2): κομμάτι που
-    // αρχίζει μετά τις 06:00 και ΠΑΝΩ από 60 λεπτά μετά το ξύπνημα είναι πρωινός υπνάκος, ανεξάρτητα από βήματα/παλμούς
-    // (πριν: τα βήματα και οι παλμοί το ένωναν, και η ίδια μέρα άλλαζε τιμή όταν περνούσαν 7 μέρες). Δεν χάνεται:
-    // μετρά στον υπνάκο της μέρας (napMin).
+    // Κυριακή 25/10: 05:55–09:50 και 10:53–… με κενό 63 λεπτών χωρίς βήματα (ο χρήστης ΔΕΝ ξύπνησε· η Samsung χώρισε
+    // τη νύχτα). Κανόνας C1: πρωινό κομμάτι με κενό ως 90 λεπτά και χωρίς βήματα (ως 30) = η ίδια νύχτα.
     final sunday = Dashboard.fromJson(night(
       firstStart: DateTime(2026, 10, 26, 5, 55),
       firstEnd: DateTime(2026, 10, 26, 9, 50),
       secondStart: DateTime(2026, 10, 26, 10, 53),
     ));
-    expect(sunday.nights.single.napMinutes, 141);
-    expect(sunday.nights.single.estimatedMinutes, 0);
-    expect(sunday.nights.single.minutes, 63);
-    expect(summarizeDay(sunday, DateTime(2026, 10, 26))[K.napMin], 141);
-    // Κενό ακριβώς 60 λεπτών: ίδια νύχτα.
-    final close = Dashboard.fromJson(night(
-      firstStart: DateTime(2026, 10, 26, 5, 55),
-      firstEnd: DateTime(2026, 10, 26, 9, 50),
-      secondStart: DateTime(2026, 10, 26, 10, 50),
-    )).nights.single;
-    expect(close.napMinutes, 0);
-    expect(close.minutes, 63 + 141);
+    expect(sunday.nights.single.napMinutes, 0);
+    expect(sunday.nights.single.estimatedMinutes, 63);
+    expect(sunday.nights.single.minutes, 63 + 141);
+    expect(summarizeDay(sunday, DateTime(2026, 10, 26)).containsKey(K.napMin), isFalse);
   });
 
   test('Υπνάκος με βήματα πριν: μένει υπνάκος', () {
