@@ -121,7 +121,11 @@ class _PieceGroup<T> {
     var sum = 0.0;
     for (final s in spans) {
       final len = s.end.difference(s.start).inMilliseconds;
-      if (len <= 0) continue;
+      if (len <= 0) {
+        // Κομμάτι χωρίς διάρκεια (π.χ. δεδομένα δοκιμής της Oura): μετρά όλο αν η στιγμή του είναι μέσα.
+        if (!s.start.isBefore(from) && s.start.isBefore(to)) sum += s.minutes;
+        continue;
+      }
       final a = s.start.isAfter(from) ? s.start : from;
       final b = s.end.isBefore(to) ? s.end : to;
       final inside = b.difference(a).inMilliseconds;

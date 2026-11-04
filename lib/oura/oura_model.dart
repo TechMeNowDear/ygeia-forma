@@ -106,6 +106,16 @@ class OuraSleep {
   /// Νύχτα κάτω από 3 ώρες (η Oura την καταγράφει ως «sleep» αντί για «long_sleep»).
   bool get isShortNight => type == 'sleep';
 
+  /// Ξύπνιος ΜΕΣΑ στον ύπνο (δευτερόλεπτα), όπως το «ξύπνιος» του ρολογιού (έλεγχος 3, E7): το awake_time της Oura
+  /// περιέχει και τον χρόνο ως τον ύπνο (latency· στα δεδομένα: time_in_bed = total + awake_time), οπότε αφαιρείται
+  /// (ποτέ κάτω από 0). Έτσι ύπνος + ξύπνιος = από τον ύπνο ως το ξύπνημα, όπως στο ρολόι.
+  int? get awakeInSleep {
+    final a = awake;
+    if (a == null) return null;
+    final v = a - (latency ?? 0);
+    return v < 0 ? 0 : v;
+  }
+
   /// Πότε αποκοιμήθηκες (ξάπλωμα + χρόνος ως τον ύπνο). Χωρίς «latency» δεν το ξέρουμε.
   DateTime? get onset => latency == null ? null : start.add(Duration(seconds: latency!));
 
@@ -459,7 +469,8 @@ Map<String, double> ouraRow(OuraNight n) {
         put(K.remPct, 100 * rem / staged);
       }
     }
-    final awake = sum((x) => x.awake);
+    // E7: ξύπνιος μέσα στον ύπνο, χωρίς τον χρόνο ως τον ύπνο (ίδιος ορισμός με το ρολόι).
+    final awake = sum((x) => x.awakeInSleep);
     put(K.awakeMin, awake == null ? null : awake / 60);
     put(K.sleepHr, m.avgHr);
     put(K.lowHr, m.lowestHr);

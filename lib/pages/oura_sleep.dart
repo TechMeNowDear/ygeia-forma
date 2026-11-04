@@ -361,11 +361,10 @@ class _BreathCard extends StatelessWidget {
     final b = ouraBaseline(store.history, plan, K.breath, day);
     final windows = store.ouraWindows;
     final ox = store.data?.watchSpo2(day, windows);
-    // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4: ρολόι μέσα στις ώρες ύπνου του Oura, μόνο νύχτες
-    // της ίδιας εποχής (όπως η λίστα της Καρδιάς).
-    final oxSeg = plan.segmentStart(K.spo2Avg, day);
+    // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4: ρολόι μέσα στις ώρες ύπνου του Oura· όλες οι 30
+    // νύχτες, και πριν από τη σύνδεση (έλεγχος 3, E5: ίδιος αισθητήρας, όπως η αναφορά).
     final g = oxygenGuidance(
-      store.data?.spo2MinByNight(day, ouraNights: true, windows: windows, since: oxSeg) ?? const {},
+      store.data?.spo2MinByNight(day, ouraNights: true, windows: windows, history: store.history) ?? const {},
       day,
       today: now,
     );

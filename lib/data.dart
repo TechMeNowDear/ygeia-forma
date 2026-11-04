@@ -667,20 +667,21 @@ class Dashboard {
   /// Η χαμηλότερη μέτρηση οξυγόνου του ρολογιού ανά νύχτα, για τις σημειώσεις χαμηλού οξυγόνου (B7), με τον ίδιο
   /// ορισμό που δείχνουν οι κάρτες (A4): οι [oxygenLongWindowNights] νύχτες ως και την [last] (30: ο κανόνας «κάτω
   /// από 80% σε 2 από τις 30», δεύτερος κλινικός έλεγχος K2)· νύχτες του ρολογιού, ή
-  /// — με [ouraNights] — οι μετρήσεις του ρολογιού μέσα στις ώρες ύπνου του Oura ([windows]). [since]: αρχή της
-  /// εποχής του ορισμού ([SourcePlan.segmentStart]), ώστε να μη μετρούν νύχτες με άλλον ορισμό. Το ελάχιστο μετρά
-  /// και σε νύχτα με μόνο σύντομες μετρήσεις (χωρίς μέσο όρο).
+  /// — με [ouraNights] — οι μετρήσεις του ρολογιού μέσα στις ώρες ύπνου του Oura ([windows]).
+  /// Έλεγχος 3, E5: ΟΛΕΣ οι 30 νύχτες, πάνω από τη σύνδεση του Oura και το όριο της επανανάγνωσης (ίδιος αισθητήρας,
+  /// όπως η αναφορά γιατρού): νύχτα που δεν υπάρχει στην ανάγνωση (π.χ. πριν από το Oura) παίρνει την τιμή του
+  /// ρολογιού από το [history] (K.spo2Min, πάντα του ρολογιού). Το ελάχιστο μετρά και σε νύχτα με μόνο σύντομες
+  /// μετρήσεις (χωρίς μέσο όρο).
   Map<DateTime, double> spo2MinByNight(
     DateTime last, {
     bool ouraNights = false,
     SleepWindows windows = SleepWindows.empty,
-    DateTime? since,
+    Map<String, Map<String, double>> history = const {},
   }) {
     final out = <DateTime, double>{};
     final end = dayOf(last);
     for (var i = 0; i < oxygenLongWindowNights; i++) {
       final day = DateTime(end.year, end.month, end.day - i);
-      if (since != null && day.isBefore(dayOf(since))) break;
       double? min;
       if (ouraNights) {
         min = watchSpo2(day, windows)?.min;
@@ -689,7 +690,8 @@ class Dashboard {
           if (sameDay(n.date, day)) min = n.spo2Min;
         }
       }
-      if (min != null) out[day] = min;
+      min ??= history[dateKey(day)]?[K.spo2Min];
+      if (min != null && min.isFinite) out[day] = min;
     }
     return out;
   }
@@ -996,7 +998,16 @@ typedef ParsedDashboard = ({
   bool sleepFailed,
   bool heartFailed,
   Map<String, Map<String, double>>? rows,
+  bool sleepFilterEmpty,
 });
+
+/// Έλεγχος 3, E3: ο ύπνος της κανονικής ανάγνωσης γύρισε «φίλτρο ρολογιού άδειο» (C6): το φίλτρο ίσως δεν βρίσκει το
+/// ρολόι σου. Όσο ισχύει, η συμπλήρωση/επανανάγνωση ΔΕΝ τρέχει (εκεί ένα άδειο αποτέλεσμα θα γινόταν δεκτό ως «χωρίς
+/// ρολόι» για όλο το ιστορικό).
+bool sleepFilterEmpty(Map<String, dynamic> r) {
+  final v = r['sleep'];
+  return v is Map && '${v['error']}'.contains('watch_filter_empty');
+}
 
 /// Σε ξεχωριστό νήμα (isolate), ώστε το άνοιγμα να μην «παγώνει». Αν το νήμα δεν ξεκινήσει,
 /// γίνεται εδώ (πιο αργά, αλλά ποτέ «κολλημένο»).
@@ -1035,6 +1046,7 @@ typedef ParsedRange = ({
   bool sleepFailed,
   bool heartFailed,
   bool anyError,
+  Set<String> nonWatch,
 });
 
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
@@ -1056,6 +1068,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
     sleepFailed: false,
     heartFailed: false,
     anyError: true,
+    nonWatch: <String>{},
   );
   try {
     final j = jsonDecode(raw);
@@ -1068,6 +1081,8 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
       sleepFailed: sleepReadFailed(j),
       heartFailed: heartReadFailed(j),
       anyError: d.failed.isNotEmpty,
+      // E3: είδη με δεδομένα μόνο από άλλη συσκευή σε αυτό το κομμάτι (δεκτό: «χωρίς δεδομένα ρολογιού εδώ»).
+      nonWatch: {for (final x in (j['nonWatch'] is List ? j['nonWatch'] as List : const [])) if (x is String) x},
     );
   } catch (_) {
     return fail;
@@ -1084,10 +1099,10 @@ ParsedDashboard parseDashboardSync(String raw,
   try {
     j = jsonDecode(raw);
   } catch (e) {
-    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false, heartFailed: false, rows: null);
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Χαλασμένη απάντηση'}, data: null, sleepFailed: false, heartFailed: false, rows: null, sleepFilterEmpty: false);
   }
   if (j is! Map<String, dynamic>) {
-    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false, heartFailed: false, rows: null);
+    return (status: {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'}, data: null, sleepFailed: false, heartFailed: false, rows: null, sleepFilterEmpty: false);
   }
   if (j['ok'] != true) {
     return (
@@ -1096,6 +1111,7 @@ ParsedDashboard parseDashboardSync(String raw,
       sleepFailed: false,
       heartFailed: false,
       rows: null,
+      sleepFilterEmpty: false,
     );
   }
   try {
@@ -1110,9 +1126,10 @@ ParsedDashboard parseDashboardSync(String raw,
           ? null
           : summarizeRange(d, DateTime(today.year, today.month, today.day - recentSummaryDays + 1), today,
               plan: plan, windows: windows),
+      sleepFilterEmpty: sleepFilterEmpty(j),
     );
   } catch (e) {
-    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false, heartFailed: false, rows: null);
+    return (status: {'ok': false, 'kind': 'other', 'message': e.toString()}, data: null, sleepFailed: false, heartFailed: false, rows: null, sleepFilterEmpty: false);
   }
 }
 
@@ -1130,6 +1147,7 @@ Set<String> applyRecentRead(
   bool sleepFailed = false,
   bool heartFailed = false,
   Map<String, Map<String, double>>? rows,
+  bool windowsComplete = true,
 }) {
   final today = dayOf(d.readAt);
   // Από τη μέρα −29: η νύχτα της μέρας −30 μπορεί να ξεκίνησε πριν από την αρχή της ανάγνωσης. [rows]: ήδη
@@ -1154,11 +1172,15 @@ Set<String> applyRecentRead(
   // Έλεγχος 2, C12: παλμοί μέρας που είχαν γραφτεί από μισή μέρα (π.χ. το απόγευμα), ενώ τώρα δεν βγαίνουν επειδή
   // λείπει η νύχτα του Oura που χρειάζονται: φεύγουν (ο κανόνας λέει «χωρίς τιμή», όχι η παλιά μισή).
   // Μόνο με γνωστές ώρες ύπνου του Oura (το αρχείο νυχτών διαβάστηκε): αλλιώς δεν ξέρουμε ότι λείπει η νύχτα.
-  if (!heartFailed && windows.mains.isNotEmpty) {
+  // Έλεγχος 3, E4: ποτέ μετά από σφάλμα ανάγνωσης του αρχείου ([windowsComplete] false), και ποτέ για μέρα πριν από την
+  // πρώτη νύχτα που ξέρουμε (ένα αρχείο με λίγες νύχτες δεν λέει τίποτα για τις παλιότερες).
+  final known = windows.mains.keys.toList()..sort();
+  if (!heartFailed && windowsComplete && known.isNotEmpty) {
     for (var day = DateTime(today.year, today.month, today.day - recentSummaryDays + 1);
         day.isBefore(today);
         day = DateTime(day.year, day.month, day.day + 1)) {
       final k = dateKey(day);
+      if (k.compareTo(known.first) < 0) continue;
       final old = history[k];
       if (old == null || !old.keys.any(dayHeartKeys.contains) || (rows[k]?.containsKey(K.dayHr) ?? false)) continue;
       if (!dayHeartNeedsMissingWindow(plan, windows, day, today)) continue;
@@ -1303,7 +1325,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   Future<bool> _findOuraEvidence() async {
     if (_prefsLoaded && !_prefsDefaulted && prefs.ouraSyncedTo != null) return true;
     try {
-      if (decodeOuraNights(await ouraNightsFile.read()).isNotEmpty) return true;
+      if (decodeOuraNights((await ouraNightsFile.read()).json).isNotEmpty) return true;
     } catch (_) {}
     return false;
   }
@@ -1613,6 +1635,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       data = p.data;
       error = null;
       _lastRefresh = DateTime.now();
+      _recentFilterEmpty = p.sleepFilterEmpty;
     } else {
       error = p.status;
     }
@@ -1840,6 +1863,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       sleepFailed: sleepFailed,
       heartFailed: heartFailed,
       rows: rows,
+      windowsComplete: ouraWindowsComplete,
     );
     // Μέρες με άλλη πηγή ύπνου που είχαν ακόμα τιμές νύχτας του ρολογιού (π.χ. η μέρα της σύνδεσης): φεύγουν.
     final today = dayOf(d.readAt);
@@ -1889,7 +1913,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // (π.χ. νέο κινητό που δεν έχει συγχρονίσει ακόμα): σαν αποτυχία ανάγνωσης, ώστε να μη σβηστούν.
     final had = sleepDaysIn(history, from, to);
     final got = p.rows.values.where((v) => v.containsKey(K.sleepMin)).length;
-    final tooFew = had >= 4 && got < had / 2;
+    // E3: όχι όταν το κομμάτι έχει ύπνο μόνο από άλλη συσκευή (δεκτό ως «χωρίς ρολόι», χωρίς ξαναδοκιμές).
+    final tooFew = !p.nonWatch.contains('sleep') && had >= 4 && got < had / 2;
     // Σφάλμα σε είδος από το οποίο βγαίνει ο ύπνος: ξανά στην επόμενη ανανέωση. Μετά από 3 φορές
     // προχωράμε, κρατώντας τις τιμές ύπνου που υπάρχουν ήδη.
     final failed = p.sleepFailed || tooFew;
@@ -1900,7 +1925,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       await _savePrefs();
       if (n < 3) return null;
     }
-    final saved = await _saveDays(mergeHistory(
+    // E3: κομμάτι με ύπνο μόνο από άλλη συσκευή (π.χ. πριν από το ρολόι): δεκτό χωρίς ξαναδοκιμές· η αποθηκευμένη
+    // διάρκεια από άλλη πηγή δεν φαίνεται πια ως ύπνος του ρολογιού, αλλά ΔΕΝ σβήνεται (φυλάσσεται χωριστά).
+    final archived = !failed && p.sleepOk && p.nonWatch.contains('sleep')
+        ? archiveNonWatchSleep(history, p.rows, from: from, to: to, plan: plan)
+        : <String>{};
+    final saved = await _saveDays({
+      ...archived,
+      ...mergeHistory(
       history,
       p.rows,
       replaceSleep: !failed && p.sleepOk,
@@ -1909,7 +1941,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       plan: plan,
       keepKeys: p.heartFailed ? heartKeys : const {},
       ouraNights: ouraWindows.mains.keys.toSet(),
-    ));
+    ),
+    });
     // Δεν γράφτηκε στο κινητό: δεν προχωράμε, ώστε ο μήνας να ξαναδιαβαστεί.
     if (!saved) {
       _backfillFails++;
@@ -1939,8 +1972,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Συμπληρώνει το ιστορικό, μόνο όσο η εφαρμογή είναι ανοιχτή· αν κλείσει, συνεχίζει την επόμενη φορά.
   /// 1. Πρώτα το κενό από όσο έμεινε κλειστή η εφαρμογή (πάνω από 6 μέρες).
   /// 2. Μετά προς τα πίσω ανά 30 μέρες, ως 10 χρόνια ή ως εκεί που αρχίζουν τα δεδομένα σου.
+  /// E3: η τελευταία κανονική ανάγνωση έδωσε «φίλτρο ρολογιού άδειο» για τον ύπνο ([sleepFilterEmpty]).
+  bool _recentFilterEmpty = false;
+
   Future<void> _backfill() async {
     if (backfilling || !_canWrite || _backfillFails >= 3) return;
+    // E3: όσο το φίλτρο ρολογιού δεν βρίσκει τίποτα στις 30 μέρες (όπου περιμένουμε ρολόι), κανένα κομμάτι ιστορικού:
+    // εκεί ένα άδειο αποτέλεσμα γίνεται δεκτό ως «χωρίς ρολόι» και θα έκρυβε όλο τον παλιό ύπνο.
+    if (_recentFilterEmpty) return;
     final today = dayOf(DateTime.now());
     // Το πρώτο κομμάτι φτάνει ως τη μέρα −7 (η −6 και μετά ξαναγράφονται σε κάθε ανανέωση).
     final start = addDays(today, -(_recentDays - 1));

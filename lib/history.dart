@@ -262,6 +262,36 @@ Set<String> stripChangedDefinitions(Map<String, Map<String, double>> history, So
   return changed;
 }
 
+/// Έλεγχος 3, E3: η διάρκεια ύπνου από ΑΛΛΗ συσκευή (κινητό, βραχιόλι), που είχαν γράψει παλιές εκδόσεις χωρίς φίλτρο
+/// ρολογιού. Δεν φαίνεται πουθενά (δεν είναι ύπνος του ρολογιού) αλλά δεν σβήνεται ποτέ.
+const nonWatchSleepKey = 'nw.sleepMin';
+
+/// E3: σε κομμάτι ιστορικού όπου ο ύπνος ήρθε ΜΟΝΟ από άλλη συσκευή (το φίλτρο ρολογιού άδειο, «nonWatch»), η
+/// αποθηκευμένη διάρκεια μιας νύχτας του ρολογιού χωρίς νέα τιμή ([rows]) μεταφέρεται στο [nonWatchSleepKey]: έτσι
+/// δεν μένει ως ύπνος του ρολογιού (C3 θα την κρατούσε) και δεν χάνεται. Επιστρέφει τις μέρες που άλλαξαν.
+Set<String> archiveNonWatchSleep(
+  Map<String, Map<String, double>> history,
+  Map<String, Map<String, double>> rows, {
+  required DateTime from,
+  required DateTime to,
+  required SourcePlan plan,
+}) {
+  final changed = <String>{};
+  for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
+    final k = dateKey(day);
+    final old = history[k];
+    final v = old?[K.sleepMin];
+    if (old == null || v == null || plan.nightSource(day) != Source.watch) continue;
+    if (rows[k]?.containsKey(K.sleepMin) ?? false) continue;
+    history[k] = {
+      for (final e in old.entries) if (e.key != K.sleepMin) e.key: e.value,
+      nonWatchSleepKey: v,
+    };
+    changed.add(k);
+  }
+  return changed;
+}
+
 /// Πόσες μέρες στο [from, to] έχουν ήδη ύπνο στο ιστορικό.
 int sleepDaysIn(Map<String, Map<String, double>> history, DateTime from, DateTime to) {
   var n = 0;

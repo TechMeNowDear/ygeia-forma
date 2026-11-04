@@ -113,9 +113,8 @@ class TodayPage extends StatelessWidget {
           if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise)),
           if (prefs.show('spo2'))
             ouraNight
-                ? _watchSpo2Card(context, d, now, store.ouraWindows, store.plan.segmentStart(K.spo2Avg, now),
-                    () => open(Cat.health, HealthTab.heart))
-                : _spo2Card(context, d, now, store.plan.segmentStart(K.spo2Avg, now), () => open(Cat.health, HealthTab.heart)),
+                ? _watchSpo2Card(context, d, now, store.ouraWindows, store.history, () => open(Cat.health, HealthTab.heart))
+                : _spo2Card(context, d, now, store.history, () => open(Cat.health, HealthTab.heart)),
           if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
@@ -263,12 +262,13 @@ class TodayPage extends StatelessWidget {
   /// Οξυγόνο της νύχτας από το ρολόι όταν ο ύπνος είναι του Oura: μετρήσεις του ρολογιού μέσα στις ώρες της
   /// νύχτας του Oura. Χωρίς νύχτα του Oura δεν ξέρουμε πότε κοιμήθηκες: κενό, με τον λόγο.
   Widget _watchSpo2Card(
-      BuildContext context, Dashboard d, DateTime now, SleepWindows windows, DateTime? oxSince, VoidCallback onTap) {
+      BuildContext context, Dashboard d, DateTime now, SleepWindows windows, Map<String, Map<String, double>> history,
+      VoidCallback onTap) {
     final c = Aigaio.of(context);
     final ox = d.watchSpo2(now, windows);
     final noWindow = !windows.mains.containsKey(dateKey(dayOf(now)));
-    // Σημείωση χαμηλού οξυγόνου (B7) με τις τιμές του ορισμού A4, μόνο νύχτες της ίδιας εποχής.
-    final g = oxygenGuidance(d.spo2MinByNight(now, ouraNights: true, windows: windows, since: oxSince), now, today: now);
+    // Σημείωση χαμηλού οξυγόνου (B7) με τις τιμές του ορισμού A4· όλες οι 30 νύχτες (E5: ίδιος αισθητήρας).
+    final g = oxygenGuidance(d.spo2MinByNight(now, ouraNights: true, windows: windows, history: history), now, today: now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
@@ -303,11 +303,12 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _spo2Card(BuildContext context, Dashboard d, DateTime now, DateTime? oxSince, VoidCallback onTap) {
+  Widget _spo2Card(
+      BuildContext context, Dashboard d, DateTime now, Map<String, Map<String, double>> history, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final n = d.lastNight;
     final min = n?.spo2Min;
-    final g = n == null ? null : oxygenGuidance(d.spo2MinByNight(n.date, since: oxSince), n.date, today: now);
+    final g = n == null ? null : oxygenGuidance(d.spo2MinByNight(n.date, history: history), n.date, today: now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,

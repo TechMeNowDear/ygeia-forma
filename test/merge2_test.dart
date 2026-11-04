@@ -117,7 +117,8 @@ void main() {
           'bedtime_start': a.toUtc().toIso8601String(),
           'bedtime_end': b.toUtc().toIso8601String(),
           'total_sleep_duration': b.difference(a).inSeconds - 600 - awake * 60,
-          'awake_time': awake * 60,
+          // Όπως η Oura: το awake_time περιέχει το latency (time_in_bed = total + awake_time)· έλεγχος 3, E7.
+          'awake_time': awake * 60 + 600,
           'latency': 600,
         };
     final oura = parseOura(sleep: [

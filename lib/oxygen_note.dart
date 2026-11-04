@@ -33,10 +33,16 @@ const oxygenWindowNights = 7;
 const oxygenLongWindowNights = 30;
 const oxygenVeryLowRepeatNights = 2;
 
-/// Νέο (K2): ≥ 2 νύχτες < 80% στις 30 τελευταίες.
-String oxygenVeryLowRepeatText(int n) => 'Το οξυγόνο έπεσε κάτω από 80% σε $n από τις 30 τελευταίες νύχτες. Σε υγιείς '
-    'ενήλικες αυτό είναι σπάνιο, ακόμα κι αν κάποια τιμή είναι λάθος του αισθητήρα. Δεν είναι διάγνωση· πες το στον '
-    'γιατρό σου και δείξε του την αναφορά (Τάσεις › Για γιατρό).';
+/// Νέο (K2): ≥ 2 νύχτες < 80% στις 30 τελευταίες μέρες. Έλεγχος 3, E5 (κείμενο του κλινικού ελέγχου 4, C4): «σε N
+/// νύχτες μέσα στις τελευταίες 30 μέρες» (μετρούν μόνο νύχτες με μέτρηση) και ΠΟΙΕΣ, με την τιμή τους, ώστε να τις
+/// βρεις (η λίστα της Καρδιάς δείχνει μόνο 10). [nights]: (νύχτα, χαμηλότερη μέτρηση), με χρονολογική σειρά.
+String oxygenVeryLowRepeatText(List<(DateTime, double)> nights) {
+  final list = [for (final (d, v) in nights) '${d.day}/${d.month}: ${lowestText(v)}%'].join(', ');
+  return 'Το οξυγόνο έπεσε κάτω από 80% σε ${nights.length} νύχτες μέσα στις τελευταίες 30 μέρες ($list). Με ιατρικό '
+      'οξύμετρο, σε υγιείς ανθρώπους τέτοιες τιμές στον ύπνο είναι σπάνιες· μία τιμή του ρολογιού μπορεί να είναι '
+      'λάθος, δύο σε έναν μήνα δύσκολα. Δεν είναι διάγνωση, και ένα αρνητικό τεστ άπνοιας του ρολογιού δεν το '
+      'αποκλείει. Πες το στον γιατρό σου και δείξε του την αναφορά (Τάσεις › Για γιατρό).';
+}
 
 /// Μία νύχτα < 80%, χωρίς άλλο μήνυμα (K2): ουδέτερο, ούτε «συνήθως λάθος» ούτε συναγερμός.
 const oxygenVeryLowText = 'Πολύ χαμηλή τιμή τη χθεσινή νύχτα. Μπορεί να είναι λάθος του αισθητήρα (κίνηση, πίεση '
@@ -77,9 +83,13 @@ class OxygenGuidance {
     required this.lowNights,
     this.measuredNights = 0,
     this.veryLowNights30 = 0,
+    this.veryLowList = const [],
     this.lastNight,
     this.today,
   });
+
+  /// Οι νύχτες των 30 τελευταίων ημερών με χαμηλότερη μέτρηση κάτω από 80%, με χρονολογική σειρά (E5).
+  final List<(DateTime, double)> veryLowList;
 
   /// Η τελευταία νύχτα είχε χαμηλότερη μέτρηση κάτω από 80%.
   final bool veryLowLastNight;
@@ -106,7 +116,7 @@ class OxygenGuidance {
   /// ΕΝΑ μήνυμα, το σημαντικότερο (K3: δύο μαζί αντέφασκαν). Χωρίς το σταθερό των σημαδιών κινδύνου.
   List<String> get messages => [
         if (veryLowRepeated)
-          oxygenVeryLowRepeatText(veryLowNights30)
+          oxygenVeryLowRepeatText(veryLowList)
         else if (repeated)
           oxygenRepeatText(lowNights, measuredNights)
         else if (veryLowLastNight)
@@ -133,11 +143,15 @@ OxygenGuidance oxygenGuidance(Map<DateTime, double> minByNight, DateTime lastNig
   var low = 0;
   var measured = 0;
   var veryLow30 = 0;
+  final veryLowList = <(DateTime, double)>[];
   double? lastValue;
   for (final e in minByNight.entries) {
     final d = DateTime(e.key.year, e.key.month, e.key.day);
     if (d.isBefore(from30) || d.isAfter(last) || !e.value.isFinite) continue;
-    if (e.value < oxygenVeryLow) veryLow30++;
+    if (e.value < oxygenVeryLow) {
+      veryLow30++;
+      veryLowList.add((d, e.value));
+    }
     if (d.isBefore(from7)) continue;
     measured++;
     if (e.value < oxygenLow) low++;
@@ -148,6 +162,7 @@ OxygenGuidance oxygenGuidance(Map<DateTime, double> minByNight, DateTime lastNig
     lowNights: low,
     measuredNights: measured,
     veryLowNights30: veryLow30,
+    veryLowList: veryLowList..sort((a, b) => a.$1.compareTo(b.$1)),
     lastNight: last,
     today: today == null ? null : dayOf(today),
   );

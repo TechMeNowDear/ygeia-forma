@@ -23,6 +23,9 @@ class Android {
   Map<String, dynamic> prefs = {};
   final days = <String, Map<String, double>>{};
   String range = '{"ok":false,"kind":"other"}';
+
+  /// Η απάντηση της κανονικής ανάγνωσης (null = το δείγμα).
+  String? dashboard;
   int? corrupt;
   final rangeCalls = <String>[];
 
@@ -50,7 +53,7 @@ class Android {
           }
           return '{"ok":true}';
         case 'dashboard':
-          return jsonEncode(sampleDashboardJson(now));
+          return dashboard ?? jsonEncode(sampleDashboardJson(now));
         case 'cachedDashboard':
           return '{}';
         case 'readRange':
@@ -244,5 +247,63 @@ void main() {
     expect(a.prefs['ouraSyncedTo'], dateKey(today));
     expect(a.prefs.containsKey('ouraRefetchTo'), isFalse);
     s.dispose();
+  });
+
+  group('Έλεγχος 3, E3: φίλτρο ρολογιού μόνο στις πρόσφατες αναγνώσεις', () {
+    test('Κομμάτι με ύπνο μόνο από άλλη συσκευή: δεκτό με την πρώτη (όχι 3 ξαναδοκιμές)· η διάρκεια φυλάσσεται χωριστά', () async {
+      final old = add(today, -33);
+      final a = Android(now)
+        ..prefs = {'historyVersion': 2}
+        ..range = jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'readAt': now.millisecondsSinceEpoch});
+      for (var i = 0; i < 6; i++) {
+        a.days[dateKey(add(old, -i))] = {K.sleepMin: 400.0 + i, K.bedtime: 330, K.steps: 4000};
+      }
+      final s = await boot(a);
+      expect(a.rangeCalls, isNotEmpty);
+      expect(a.prefs['monthFails'] ?? const {}, isEmpty, reason: 'καμία αποτυχία, καμία ξαναδοκιμή');
+      expect(a.prefs['staleMonths'] ?? const [], isEmpty);
+      for (var i = 0; i < 6; i++) {
+        final row = a.days[dateKey(add(old, -i))]!;
+        expect(row.containsKey(K.sleepMin), isFalse, reason: 'δεν φαίνεται ως ύπνος του ρολογιού');
+        expect(row[nonWatchSleepKey], 400.0 + i, reason: 'ποτέ δεν σβήνεται');
+        expect(row[K.steps], 4000);
+      }
+      s.dispose();
+    });
+
+    test('Η κανονική ανάγνωση λέει «φίλτρο ρολογιού άδειο» για τον ύπνο: καμία συμπλήρωση/επανανάγνωση', () async {
+      final j = sampleDashboardJson(now)..['sleep'] = {'error': 'java.lang.IllegalStateException: watch_filter_empty'};
+      final a = Android(now)
+        ..prefs = {'historyVersion': 2}
+        ..dashboard = jsonEncode(j)
+        ..range = jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep'], 'readAt': now.millisecondsSinceEpoch});
+      a.days[dateKey(add(today, -40))] = {K.sleepMin: 410};
+      final s = await boot(a);
+      expect(a.rangeCalls, isEmpty);
+      expect(a.days[dateKey(add(today, -40))], {K.sleepMin: 410});
+      expect(sleepFilterEmpty(j), isTrue);
+      expect(sleepFilterEmpty(sampleDashboardJson(now)), isFalse);
+      s.dispose();
+    });
+  });
+
+  test('Έλεγχος 3, E3: «nonWatch» του κομματιού διαβάζεται· χωρίς αυτό, τίποτα', () {
+    final from = add(today, -60);
+    final to = add(today, -31);
+    final r = parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'nonWatch': ['sleep', 'spo2'], 'readAt': 1}), from, to);
+    expect(r.nonWatch, {'sleep', 'spo2'});
+    expect(parseRangeSync(jsonEncode({'ok': true, 'sleep': [], 'readAt': 1}), from, to).nonWatch, isEmpty);
+    // Η μεταφορά: μόνο νύχτες του ρολογιού χωρίς νέα διάρκεια.
+    final h = <String, Map<String, double>>{
+      dateKey(add(today, -50)): {K.sleepMin: 380, K.steps: 1},
+      dateKey(add(today, -49)): {K.sleepMin: 390},
+      dateKey(add(today, -48)): {'o.sleepMin': 400, K.sleepMin: 1},
+    };
+    final plan = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -48));
+    final changed = archiveNonWatchSleep(h, {dateKey(add(today, -49)): {K.sleepMin: 395}}, from: from, to: to, plan: plan);
+    expect(changed, {dateKey(add(today, -50))});
+    expect(h[dateKey(add(today, -50))], {K.steps: 1, nonWatchSleepKey: 380});
+    expect(h[dateKey(add(today, -49))], {K.sleepMin: 390}, reason: 'ήρθε νέα τιμή ρολογιού: το merge την αντικαθιστά');
+    expect(h[dateKey(add(today, -48))], {'o.sleepMin': 400, K.sleepMin: 1}, reason: 'νύχτα του Oura: όχι εδώ');
   });
 }

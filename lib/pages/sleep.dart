@@ -77,7 +77,7 @@ class SleepPage extends StatelessWidget {
             _LastNightCard(
               night: nights.last,
               data: d,
-              oxSince: store.plan.segmentStart(K.spo2Avg, nights.last.date),
+              oxHistory: store.history,
               today: now ?? DateTime.now(),
             ),
             _WatchStagesCard(nights: week),
@@ -151,7 +151,7 @@ class _Summary extends StatelessWidget {
 }
 
 class _LastNightCard extends StatelessWidget {
-  const _LastNightCard({required this.night, required this.data, required this.today, this.oxSince});
+  const _LastNightCard({required this.night, required this.data, required this.today, this.oxHistory = const {}});
   final Night night;
   final Dashboard data;
 
@@ -159,7 +159,8 @@ class _LastNightCard extends StatelessWidget {
   final DateTime today;
 
   /// Αρχή της εποχής του ορισμού του οξυγόνου (οι σημειώσεις δεν μετρούν νύχτες με άλλον ορισμό, A4).
-  final DateTime? oxSince;
+  /// Έλεγχος 3, E5: το ιστορικό, για τις νύχτες του μήνα πριν από τη σύνδεση του Oura/την επανανάγνωση.
+  final Map<String, Map<String, double>> oxHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +271,7 @@ class _LastNightCard extends StatelessWidget {
           if (n.spo2Avg != null || n.spo2Min != null) ...[
             const SizedBox(height: 6),
             OxygenNotes(
-              guidance: oxygenGuidance(data.spo2MinByNight(n.date, since: oxSince), n.date, today: today),
+              guidance: oxygenGuidance(data.spo2MinByNight(n.date, history: oxHistory), n.date, today: today),
             ),
             const SizedBox(height: 6),
           ],

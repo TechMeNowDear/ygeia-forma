@@ -227,7 +227,8 @@ List<Map<String, dynamic>> sampleOuraSleep(DateTime ouraFrom, DateTime now, {Set
       'deep_sleep_duration': deep,
       'rem_sleep_duration': rem,
       'light_sleep_duration': total - deep - rem,
-      'awake_time': awake,
+      // Όπως η Oura (έλεγχος 3, E7): time_in_bed = total + awake_time, δηλαδή το awake_time περιέχει και το latency.
+      'awake_time': awake + latency,
       'latency': latency,
       'efficiency': 85 + rnd.nextInt(8),
       'lowest_heart_rate': 51 + rnd.nextInt(5),

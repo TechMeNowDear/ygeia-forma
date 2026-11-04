@@ -40,7 +40,9 @@ List<CompareRow> buildCompareRows({
     // Νύχτα σε κομμάτια (κοινός κανόνας με το ρολόι): διάρκεια, ώρες, ξύπνιος και «με τα ξυπνήματα» από ΟΛΑ τα
     // κομμάτια που μετρούν, όπως στον Ύπνο και στο ιστορικό· το κενό ανάμεσα δεν μετρά. Παλμοί: της κύριας περιόδου.
     final parts = on?.counted ?? const <OuraSleep>[];
-    final awakeParts = parts.any((x) => x.awake == null) ? null : parts.fold<int>(0, (a, x) => a + x.awake!);
+    // Έλεγχος 3, E7: «ξύπνιος μέσα» χωρίς τον χρόνο ως τον ύπνο (το awake_time της Oura τον περιέχει), όπως στο ρολόι.
+    final awakeParts =
+        parts.any((x) => x.awakeInSleep == null) ? null : parts.fold<int>(0, (a, x) => a + x.awakeInSleep!);
     final onset = parts.isEmpty ? null : parts.first.onset;
     int? span;
     if (onset != null) {

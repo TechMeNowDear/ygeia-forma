@@ -239,6 +239,32 @@ mixin OuraStore on ChangeNotifier {
   /// Οι τελευταίες νύχτες του Oura με τις λεπτομέρειές τους, παλιότερη πρώτη.
   List<OuraNight> ouraNights = const [];
 
+  /// Έλεγχος 3, E4: το αρχείο νυχτών υπάρχει αλλά δεν διαβάστηκε (σφάλμα, όχι «δεν υπάρχει»). Όσο ισχύει: το αρχείο
+  /// δεν ξαναγράφεται (θα έμεναν μόνο οι λίγες νύχτες της νέας ανάγνωσης στη θέση των 45) και οι παλμοί μέρας δεν
+  /// σβήνονται επειδή «λείπει» νύχτα ([ouraWindowsComplete]). Ξαναδοκιμάζεται σε κάθε ανάγνωση της Oura.
+  bool ouraNightsReadFailed = false;
+
+  /// Οι ώρες ύπνου του Oura είναι πλήρεις (το αρχείο νυχτών διαβάστηκε): μόνο τότε μια νύχτα που λείπει σημαίνει «δεν
+  /// υπάρχει» (C12).
+  bool get ouraWindowsComplete => !ouraNightsReadFailed;
+
+  Future<void> _readNightsFile() async {
+    try {
+      final r = await ouraNightsFile.read();
+      if (r.failed) {
+        ouraNightsReadFailed = true;
+        return;
+      }
+      final fresh = decodeOuraNights(r.json);
+      // Νύχτες που ήρθαν στο μεταξύ (στη μνήμη) μένουν· του αρχείου συμπληρώνουν τις υπόλοιπες μέρες.
+      final byDay = {for (final n in fresh) dateKey(n.day): n, for (final n in ouraNights) dateKey(n.day): n};
+      ouraNights = byDay.values.toList()..sort((a, b) => a.day.compareTo(b.day));
+      ouraNightsReadFailed = false;
+    } catch (_) {
+      ouraNightsReadFailed = true;
+    }
+  }
+
   /// Οι ώρες ύπνου του Oura, ΜΟΝΟ από νύχτες που η πηγή τους είναι το Oura (για τους παλμούς της μέρας).
   SleepWindows get ouraWindows =>
       ouraSleepWindows([for (final n in ouraNights) if (plan.nightSource(n.day) == Source.oura) n]);
@@ -295,9 +321,7 @@ mixin OuraStore on ChangeNotifier {
       // Η αποθήκευση δεν απάντησε τώρα: τα tokens δεν θεωρούνται χαμένα (ξανά στην επόμενη ανάγνωση).
       ouraHasTokens = plan.ouraFrom != null;
     } catch (_) {}
-    try {
-      ouraNights = decodeOuraNights(await ouraNightsFile.read());
-    } catch (_) {}
+    await _readNightsFile();
     await _cleanHalfConnection();
     // Αν η εφαρμογή άνοιξε από την επιστροφή της Oura (πριν ήταν έτοιμη η Flutter).
     try {
@@ -560,7 +584,7 @@ mixin OuraStore on ChangeNotifier {
     }
     // Χωρίς tokens και χωρίς σημάδι δεν υπάρχει τίποτα να καθαριστεί (κανένα ψάξιμο στο ιστορικό).
     if (!ouraHasTokens || plan.hasOura) return;
-    if (ouraNights.isNotEmpty || ouraSyncedTo != null) return;
+    if (ouraNights.isNotEmpty || ouraNightsReadFailed || ouraSyncedTo != null) return;
     if (history.values.any((r) => r.keys.any(ouraKeySet.contains))) return;
     _ouraEpoch++;
     await ouraLink.disconnect();
@@ -854,8 +878,10 @@ mixin OuraStore on ChangeNotifier {
       final changed = mergeOura(history, rows, from: from, to: to, plan: plan);
       final saved = await saveDaysNow(changed);
       if (epoch != _ouraEpoch) return;
+      // E4: αν το αρχείο νυχτών δεν είχε διαβαστεί, πρώτα ξανά· αλλιώς οι νέες νύχτες μόνο στη μνήμη (ποτέ πάνω στις 45).
+      if (ouraNightsReadFailed) await _readNightsFile();
       ouraNights = mergeOuraNights(ouraNights, batch.nights, from: from, to: to, today: today, keepDays: ouraDetailDays);
-      await _writeNights(encodeOuraNights(ouraNights));
+      if (!ouraNightsReadFailed) await _writeNights(encodeOuraNights(ouraNights));
       ouraError = null;
       // C9: ένα παλιότερο κομμάτι (ως 90 μέρες) μετά από καινούργια βάση, ώσπου να φτάσει στην αρχή του Oura.
       final older = saved ? ouraOlderRange() : null;
@@ -920,9 +946,29 @@ mixin OuraStore on ChangeNotifier {
   }
 }
 
+/// Η ανάγνωση του αρχείου νυχτών (έλεγχος 3, E4): [json] null = δεν υπάρχει αρχείο· [failed] = υπάρχει αλλά δεν
+/// διαβάστηκε τώρα (ποτέ «δεν υπάρχει», που θα έγραφε 3 νύχτες πάνω στις 45).
+typedef NightsRead = ({String? json, bool failed});
+
+/// Η απάντηση της Kotlin {"state": missing|ok|error, "json"} (όπως το readPlan).
+NightsRead parseNightsRead(Object? v) {
+  if (v is! String) return (json: null, failed: true);
+  try {
+    final j = jsonDecode(v);
+    if (j is! Map) return (json: null, failed: true);
+    return switch (j['state']) {
+      'missing' => (json: null, failed: false),
+      'ok' when j['json'] is String => (json: j['json'] as String, failed: false),
+      _ => (json: null, failed: true),
+    };
+  } catch (_) {
+    return (json: null, failed: true);
+  }
+}
+
 /// Οι λεπτομέρειες των τελευταίων νυχτών (ώρες, φάσεις, υπνάκοι) στο κινητό.
 abstract class OuraNightsFile {
-  Future<String?> read();
+  Future<NightsRead> read();
   Future<void> write(String json);
 }
 
@@ -930,11 +976,11 @@ class ChannelNightsFile implements OuraNightsFile {
   const ChannelNightsFile();
 
   @override
-  Future<String?> read() async {
+  Future<NightsRead> read() async {
     try {
-      return await ChannelVault.channel.invokeMethod<String>('readNights');
+      return parseNightsRead(await ChannelVault.channel.invokeMethod<String>('readNights'));
     } catch (_) {
-      return null;
+      return (json: null, failed: true);
     }
   }
 
@@ -949,11 +995,18 @@ class ChannelNightsFile implements OuraNightsFile {
 class MemoryNightsFile implements OuraNightsFile {
   String? content;
 
-  @override
-  Future<String?> read() async => content;
+  /// Για τους ελέγχους: η ανάγνωση αποτυγχάνει (E4).
+  bool failRead = false;
+  int writes = 0;
 
   @override
-  Future<void> write(String json) async => content = json;
+  Future<NightsRead> read() async => failRead ? (json: null, failed: true) : (json: content, failed: false);
+
+  @override
+  Future<void> write(String json) async {
+    writes++;
+    content = json;
+  }
 }
 
 /// Έλεγχος 2, C12: «τώρα» για την πρώτη νύχτα μιας σύνδεσης. Αν το ρολόι του κινητού είναι πάνω από μία μέρα μπροστά

@@ -232,7 +232,8 @@ void main() {
       // Ποσοστό του ύπνου, όπως η εφαρμογή Oura (χωρίς τον χρόνο ξύπνιος· έλεγχος υπολογισμών F6).
       expect(row[ouraKeys[K.deepPct]], closeTo(100 * 4200 / (4200 + 14400 + 6600), 1e-9));
       expect(row[ouraKeys[K.remPct]], closeTo(100 * 6600 / (4200 + 14400 + 6600), 1e-9));
-      expect(row[ouraKeys[K.awakeMin]], 43.5);
+      // Έλεγχος 3, E7 (σκόπιμα): ξύπνιος μέσα στον ύπνο = awake_time − latency (2610 − 900 δευτ.), όπως στο ρολόι.
+      expect(row[ouraKeys[K.awakeMin]], 28.5);
     });
 
     test('Σελίδα με λάθος μορφή → FormatException', () {
@@ -390,16 +391,23 @@ void main() {
       expect(late.counted.length, 1, reason: 'κενό 2 ώρες 30 λεπτά: πρωινός υπνάκος');
       expect(late.napMinutes, 55);
       expect(ouraRow(late)[ouraKeys[K.napMin]], 55);
-      final evening = only([rec('late_nap', at(2, 20, 30), at(2, 21, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
+      // Έλεγχος 3, E1 (σκόπιμα): πριν από την κύρια, υπνάκος μόνο ό,τι αρχίζει πριν από τις 20:00· από τις 20:00 με
+      // κενό ως 4 ώρες είναι μέρος της νύχτας.
+      final evening = only([rec('late_nap', at(2, 19, 30), at(2, 20, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
       expect(evening.counted.single.type, 'long_sleep');
       expect(evening.naps.single.type, 'late_nap');
+      final evening20 = only([rec('late_nap', at(2, 20, 30), at(2, 21, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
+      expect(evening20.counted.length, 2);
+      expect(evening20.naps, isEmpty);
       final after22 = only([rec('sleep', at(2, 21, 0), at(2, 22, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
       expect(after22.counted.length, 2, reason: 'τελειώνει μετά τις 22:00: μέρος της νύχτας, όπως στο ρολόι');
       expect(after22.naps, isEmpty);
-      // Κενό πάνω από 4 ώρες, ίδια μέρα, όχι υπνάκος: μέρος της νύχτας (όπως στο ρολόι)· το κενό δεν μετρά.
+      // E1 (σκόπιμα): κύρια η 05:00–07:30 (περισσότερα λεπτά στο 22:00–08:00)· η 00:10–00:50 απέχει πάνω από 4 ώρες →
+      // υπνάκος (όπως στο ρολόι).
       final far = only([rec('sleep', at(3, 0, 10), at(3, 0, 50)), rec('sleep', at(3, 5, 0), at(3, 7, 30))]);
-      expect(far.counted.length, 2);
-      expect(far.nightMinutes, 35 + 145);
+      expect(far.counted.length, 1);
+      expect(far.nightMinutes, 145);
+      expect(far.napMinutes, 35);
     });
 
     test('late_nap στις 19:00: ποτέ νύχτα', () {

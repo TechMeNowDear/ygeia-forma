@@ -69,7 +69,15 @@ class OuraBridge(
                 pendingCallback = null
                 result.success(uri)
             }
-            "readNights" -> io(result) { readText(NIGHTS_FILE) }
+            // Έλεγχος 3, E4: {"state": missing|ok|error, "json"} (όπως το readPlan). Πριν, ένα σφάλμα ανάγνωσης γύριζε
+            // null, ίδιο με «δεν υπάρχει», και η επόμενη ανάγνωση της Oura έγραφε 3 νύχτες πάνω στις 45.
+            "readNights" -> scope.launch {
+                val out = withContext(Dispatchers.IO) {
+                    val f = File(activity.filesDir, NIGHTS_FILE)
+                    DataRules.nightsState(f.exists()) { f.readText() }
+                }
+                result.success(out)
+            }
             // Στην εκκίνηση: προσωρινά αρχεία που έμειναν από εγγραφή που διακόπηκε (μόνο τα δικά μας).
             "cleanTmp" -> io(result) { cleanTmp(activity) }
             // Το σχέδιο πηγών (δικό του αρχείο, ανεξάρτητο από τις ρυθμίσεις): {"state": missing|ok|error, "json"}.

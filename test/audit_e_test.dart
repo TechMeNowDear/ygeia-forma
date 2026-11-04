@@ -2,6 +2,8 @@
 // χωρίς αυτήν.
 // E1 νέος κανόνας νύχτας (κύρια ομάδα στο 22:00–08:00, ίδιος για ρολόι και Oura, κλείδωμα απόφασης με βήματα).
 // E2 ζυγίσεις: ποτέ διαγραφή· φίλτρο εμφάνισης από την πρώτη ζύγιση InBody.
+// E5 σημειώσεις οξυγόνου από όλες τις 30 νύχτες (πάνω από τη σύνδεση του Oura και την επανανάγνωση), με ημερομηνίες.
+// E7 ξύπνιος του Oura χωρίς τον χρόνο ως τον ύπνο.
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,7 @@ import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
+import 'package:ygeia_forma/oxygen_note.dart';
 import 'package:ygeia_forma/report.dart';
 import 'package:ygeia_forma/sleep_gaps.dart';
 import 'package:ygeia_forma/sources.dart';
@@ -349,5 +352,86 @@ void main() {
       expect(h['2026-10-02']![K.weight], 85.0);
       expect(h['2026-10-03']!.containsKey(K.weight), isFalse);
     });
+  });
+
+  group('E5: οξυγόνο, όλες οι 30 νύχτες (ίδιος αισθητήρας), με ημερομηνίες', () {
+    // Oura από τη μέρα X· οι νύχτες X−10 (72%) και X−4 (74%) είναι νύχτες του ρολογιού στο ιστορικό.
+    final x = DateTime(2026, 11, 6);
+    DateTime dx(int n) => DateTime(x.year, x.month, x.day + n);
+    final history = <String, Map<String, double>>{
+      for (var i = -25; i <= 0; i++) dateKey(dx(i)): {K.spo2Min: 91, K.spo2Avg: 95},
+      dateKey(dx(-10)): {K.spo2Min: 72, K.spo2Avg: 93},
+      dateKey(dx(-4)): {K.spo2Min: 74, K.spo2Avg: 93},
+    };
+    // Η ανάγνωση της μέρας X+1: καμία νύχτα ρολογιού (ο ύπνος είναι του Oura), οξυγόνο μέσα στο παράθυρο του Oura.
+    final d = Dashboard.fromJson({
+      'readAt': ms(DateTime(2026, 11, 7, 10)),
+      'sleep': <Object>[],
+      'spo2': [
+        [ms(DateTime(2026, 11, 7, 3)), ms(DateTime(2026, 11, 7, 3, 5)), 93.0, 90.0, 95.0],
+      ],
+    });
+    final windows = SleepWindows(const [], {
+      dateKey(dx(1)): (DateTime(2026, 11, 6, 23), DateTime(2026, 11, 7, 7)),
+    });
+
+    test('Μετά τη σύνδεση του Oura: «2 νύχτες» από τις νύχτες του ρολογιού πριν (Καρδιά/Ύπνος Oura/Σήμερα)', () {
+      final m = d.spo2MinByNight(dx(1), ouraNights: true, windows: windows, history: history);
+      expect(m[dx(-10)], 72);
+      expect(m[dx(-4)], 74);
+      expect(m[dx(1)], 90, reason: 'η νύχτα του Oura: το ρολόι μέσα στις ώρες του Oura');
+      final g = oxygenGuidance(m, dx(1), today: dx(1));
+      expect(g.veryLowRepeated, isTrue, reason: 'πριν (since = σύνδεση) δεν έβγαινε καμία σημείωση');
+      expect(g.messages.single, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες'));
+      expect(g.messages.single, contains('(27/10: 72%, 2/11: 74%)'));
+      expect(g.messages.single, contains('ένα αρνητικό τεστ άπνοιας του ρολογιού δεν το αποκλείει'));
+    });
+
+    test('Οθόνες του ρολογιού (νύχτες ρολογιού) και κατά την επανανάγνωση: το ίδιο', () {
+      // Χωρίς νύχτες στην ανάγνωση (π.χ. οθόνη ρολογιού μετά από «ξανά από το ρολόι»): από το ιστορικό.
+      final m = d.spo2MinByNight(dx(0), history: history);
+      expect(oxygenGuidance(m, dx(0)).veryLowRepeated, isTrue);
+      // Το όριο της επανανάγνωσης δεν κόβει τίποτα: δεν υπάρχει πια «since».
+      expect(m.length, 26);
+    });
+
+    test('Χωρίς ιστορικό: μόνο ό,τι έχει η ανάγνωση (όπως πριν)', () {
+      final m = d.spo2MinByNight(dx(1), ouraNights: true, windows: windows);
+      expect(m.keys.toList(), [dx(1)]);
+    });
+  });
+
+  test('E7: ξύπνιος του Oura = awake_time − latency (ποτέ κάτω από 0)· ύπνος + ξύπνιος = από τον ύπνο ως το ξύπνημα', () {
+    OuraSleep s(int awake, int? latency) => OuraSleep.fromJson({
+          'id': 'a',
+          'day': '2026-11-03',
+          'type': 'long_sleep',
+          'bedtime_start': DateTime(2026, 11, 2, 23).toUtc().toIso8601String(),
+          'bedtime_end': DateTime(2026, 11, 3, 7).toUtc().toIso8601String(),
+          'time_in_bed': 8 * 3600,
+          'total_sleep_duration': 8 * 3600 - awake,
+          'awake_time': awake,
+          if (latency != null) 'latency': latency,
+        })!;
+    expect(s(2610, 900).awakeInSleep, 1710);
+    expect(s(300, 900).awakeInSleep, 0);
+    expect(s(1200, null).awakeInSleep, 1200);
+    final n = parseOura(sleep: [
+      {
+        'id': 'a',
+        'day': '2026-11-03',
+        'type': 'long_sleep',
+        'bedtime_start': DateTime(2026, 11, 2, 23).toUtc().toIso8601String(),
+        'bedtime_end': DateTime(2026, 11, 3, 7).toUtc().toIso8601String(),
+        'time_in_bed': 8 * 3600,
+        'total_sleep_duration': 8 * 3600 - 2610,
+        'awake_time': 2610,
+        'latency': 900,
+      },
+    ], dailySleep: const [], readiness: const []).nights.single;
+    final row = ouraRow(n);
+    expect(row[ouraKeys[K.awakeMin]], 28.5);
+    // Από τον ύπνο (23:15) ως το ξύπνημα (07:00) = 465′ = ύπνος 436,5′ + ξύπνιος 28,5′.
+    expect(row[ouraKeys[K.sleepMin]]! + row[ouraKeys[K.awakeMin]]!, 465);
   });
 }

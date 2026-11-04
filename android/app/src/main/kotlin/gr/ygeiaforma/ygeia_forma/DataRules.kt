@@ -129,6 +129,41 @@ object DataRules {
      */
     fun watchFilterEmpty(filtered: Int, unfiltered: Int): Boolean = filtered == 0 && unfiltered > 0
 
+    /**
+     * Έλεγχος 3, E4: η ανάγνωση του αρχείου νυχτών του Oura ως {"state": missing|ok|error, "json"}. Ένα σφάλμα
+     * ανάγνωσης ΔΕΝ είναι «δεν υπάρχει» (τότε η Flutter δεν ξαναγράφει το αρχείο ούτε σβήνει παλμούς μέρας).
+     */
+    fun nightsState(exists: Boolean, read: () -> String): String {
+        val o = JsonObject()
+        if (!exists) {
+            o.addProperty("state", "missing")
+            return o.toString()
+        }
+        try {
+            val text = read()
+            o.addProperty("state", "ok")
+            o.addProperty("json", text)
+        } catch (e: Throwable) {
+            o.addProperty("state", "error")
+        }
+        return o.toString()
+    }
+
+    /** Τι σημαίνει ένα άδειο αποτέλεσμα με φίλτρο ρολογιού ([watchFilterEmpty]). */
+    enum class FilterOutcome { OK, ERROR, NON_WATCH }
+
+    /**
+     * Έλεγχος 3, E3: το C6 ισχύει ΜΟΝΟ για την κανονική ανάγνωση των τελευταίων 30 ημερών ([recent]), όπου περιμένουμε
+     * δεδομένα ρολογιού: εκεί είναι σφάλμα (το ιστορικό μένει). Σε κομμάτι συμπλήρωσης/επανανάγνωσης ένα άδειο
+     * αποτέλεσμα με φίλτρο σημαίνει «δεν υπάρχουν δεδομένα ρολογιού εδώ» (π.χ. πριν από το ρολόι, από κινητό ή
+     * βραχιόλι): δεκτό, χωρίς ξαναδοκιμές, σημειωμένο ως [FilterOutcome.NON_WATCH].
+     */
+    fun filterOutcome(filtered: Int, unfiltered: Int, recent: Boolean): FilterOutcome = when {
+        !watchFilterEmpty(filtered, unfiltered) -> FilterOutcome.OK
+        recent -> FilterOutcome.ERROR
+        else -> FilterOutcome.NON_WATCH
+    }
+
     /** Το μήνυμα του σφάλματος [watchFilterEmpty] (η Flutter το αναγνωρίζει με αυτό το κλειδί). */
     const val WATCH_FILTER_EMPTY = "watch_filter_empty"
 

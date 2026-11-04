@@ -66,15 +66,18 @@ void main() {
       final g = oxygenGuidance({for (var i = 0; i < 30; i++) day(i): i == 3 ? 75.0 : (i == 20 ? 78.0 : 90.0)}, today);
       expect(g.veryLowNights30, 2);
       expect(g.veryLowRepeated, isTrue);
-      expect(g.messages, [oxygenVeryLowRepeatText(2)]);
-      expect(g.messages.single, contains('σε 2 από τις 30 τελευταίες νύχτες'));
+      // Έλεγχος 3, E5 (σκόπιμα): «σε 2 νύχτες μέσα στις τελευταίες 30 μέρες» και ποιες, με την τιμή τους.
+      expect(g.messages, [oxygenVeryLowRepeatText([(day(20), 78.0), (day(3), 75.0)])]);
+      expect(g.messages.single, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες'));
+      expect(g.messages.single, contains('(${day(20).day}/${day(20).month}: 78%, ${day(3).day}/${day(3).month}: 75%)'));
       expect(g.short, contains('30 μέρες'));
     });
 
     test('K3: ΕΝΑ μήνυμα όταν ισχύουν πολλά (τελευταία νύχτα 72%, 74% και 83% στην ίδια εβδομάδα)', () {
       final g = oxygenGuidance({day(0): 72, day(2): 74, day(4): 83, day(5): 91}, today);
       expect(g.messages.length, 1);
-      expect(g.messages.single, oxygenVeryLowRepeatText(2), reason: 'το σημαντικότερο: δύο νύχτες κάτω από 80%');
+      expect(g.messages.single, oxygenVeryLowRepeatText([(day(2), 74.0), (day(0), 72.0)]),
+          reason: 'το σημαντικότερο: δύο νύχτες κάτω από 80%');
       expect(g.messages.single, isNot(contains('δες αν επαναλαμβάνεται')));
     });
 
@@ -574,10 +577,11 @@ void main() {
       ], dailySleep: const [], readiness: const [])
           .nights
           .single;
-      // Συγχώνευση 4/11 (ένας κανόνας με το ρολόι): κενό 4 ώρες 10 λεπτά, ίδια μέρα, όχι λαγοκοίμισμα ούτε πρωινός
-      // υπνάκος → μέρος της νύχτας (το κενό δεν μετρά), όπως η νύχτα του ρολογιού.
-      expect(far.counted.length, 2, reason: 'κενό 4 ώρες 10 λεπτά');
-      expect(far.nightMinutes, 30 + 140);
+      // Έλεγχος 3, E1 (σκόπιμα): κύρια η 05:00–07:30 (περισσότερα λεπτά στο 22:00–08:00)· η 00:10–00:50 είναι πριν
+      // από την κύρια με κενό 4 ώρες 10 λεπτά > 4 ώρες → υπνάκος (πριν: μέρος της νύχτας), όπως στο ρολόι.
+      expect(far.counted.length, 1, reason: 'κενό 4 ώρες 10 λεπτά');
+      expect(far.nightMinutes, 140);
+      expect(far.napMinutes, 30);
     });
   });
 }

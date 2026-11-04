@@ -47,6 +47,13 @@ class DashboardReader(
     private val bodyDays: Long = 3653,
 ) {
 
+    /**
+     * Έλεγχος 3, E3: true στην κανονική ανάγνωση (30 μέρες), false σε κομμάτι ιστορικού ([readRange]). Μόνο στην
+     * κανονική το «φίλτρο ρολογιού άδειο» είναι σφάλμα· στο κομμάτι σημειώνεται στο [nonWatch] («nonWatch» στο JSON).
+     */
+    private var recent = true
+    private val nonWatch = java.util.LinkedHashSet<String>()
+
     /** Το τέλος της ανάγνωσης ύπνου: 18:00 της τελευταίας επιτρεπτής νύχτας (μετά αρχίζει η επόμενη νύχτα). */
     private fun sleepEnd(to: LocalDateTime): LocalDateTime {
         val cut = sleepUntil?.atTime(18, 0) ?: return to
@@ -97,6 +104,8 @@ class DashboardReader(
         val from = fromDate.atStartOfDay()
         val to = toDate.atStartOfDay()
         val o = JSONObject()
+        recent = false
+        nonWatch.clear()
 
         fun has(t: DataType) = t.name in grantedNames
 
@@ -115,6 +124,8 @@ class DashboardReader(
         if (has(DataTypes.ACTIVITY_SUMMARY)) o.put("activityDaily", safe { activityDaily(from, to) })
         if (has(DataTypes.EXERCISE)) o.put("exercise", safe { exercise(from.minusDays(1), to) })
         o.put("readAt", epochMs(to.minusSeconds(1)))
+        // E3: είδη με δεδομένα στο κομμάτι, αλλά κανένα από ρολόι (δεκτό ως «χωρίς δεδομένα ρολογιού»).
+        o.put("nonWatch", JSONArray(nonWatch.toList()))
         return o
     }
 
@@ -209,7 +220,7 @@ class DashboardReader(
 
     private suspend fun sleep(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.SLEEP.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.SLEEP.readDataRequestBuilder)) {
+        for (p in readAll(DataTypes.SLEEP.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.SLEEP.readDataRequestBuilder, kind = "sleep")) {
             val start = ms(p.startTime) ?: continue
             val duration: Duration? = p.getValue(DataType.SleepType.DURATION)
             val score: Int? = p.getValue(DataType.SleepType.SLEEP_SCORE)
@@ -248,7 +259,7 @@ class DashboardReader(
     private suspend fun heart(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
         // Το ρολόι μετρά συνεχώς: περισσότερες σελίδες από τα άλλα είδη (όριο 60.000 εγγραφές).
-        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES, source = WATCH, unfiltered = DataTypes.HEART_RATE.readDataRequestBuilder)) {
+        for (p in readAll(DataTypes.HEART_RATE.readDataRequestBuilder, from, to, maxPages = HEART_MAX_PAGES, source = WATCH, unfiltered = DataTypes.HEART_RATE.readDataRequestBuilder, kind = "heart")) {
             val series: List<HeartRate>? = p.getValue(DataType.HeartRateType.SERIES_DATA)
             if (!series.isNullOrEmpty()) {
                 for (h in series) {
@@ -288,7 +299,7 @@ class DashboardReader(
 
     private suspend fun spo2(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.BLOOD_OXYGEN.readDataRequestBuilder)) {
+        for (p in readAll(DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.BLOOD_OXYGEN.readDataRequestBuilder, kind = "spo2")) {
             val avg: Float? = p.getValue(DataType.BloodOxygenType.OXYGEN_SATURATION)
             if (avg == null || !avg.isFinite()) continue
             val a = ms(p.startTime) ?: continue
@@ -338,7 +349,7 @@ class DashboardReader(
 
     private suspend fun skinTemp(from: LocalDateTime, to: LocalDateTime): JSONArray {
         val out = JSONArray()
-        for (p in readAll(DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder)) {
+        for (p in readAll(DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, from, to, source = WATCH, unfiltered = DataTypes.SKIN_TEMPERATURE.readDataRequestBuilder, kind = "skinTemp")) {
             val avg: Float? = p.getValue(DataType.SkinTemperatureType.SKIN_TEMPERATURE)
             if (avg == null || avg.isNaN()) continue
             val a = ms(p.startTime) ?: continue
@@ -477,6 +488,8 @@ class DashboardReader(
         source: ReadSourceFilter? = null,
         /** Καινούργιος builder του ίδιου είδους ΧΩΡΙΣ φίλτρο, για τον έλεγχο C6 (null = χωρίς έλεγχο). */
         unfiltered: ReadDataRequest.DualTimeBuilder<HealthDataPoint>? = null,
+        /** Το όνομα του είδους στο JSON (για το «nonWatch» του E3). */
+        kind: String = "",
     ): List<HealthDataPoint> {
         val all = ArrayList<HealthDataPoint>()
         var token: String? = null
@@ -502,8 +515,10 @@ class DashboardReader(
                 .setLocalTimeFilter(LocalTimeFilter.of(from, to))
                 .setOrdering(Ordering.ASC)
                 .setPageSize(1)
-            if (DataRules.watchFilterEmpty(0, s.readData(probe.build()).dataList.size)) {
-                throw IllegalStateException(DataRules.WATCH_FILTER_EMPTY)
+            when (DataRules.filterOutcome(0, s.readData(probe.build()).dataList.size, recent)) {
+                DataRules.FilterOutcome.ERROR -> throw IllegalStateException(DataRules.WATCH_FILTER_EMPTY)
+                DataRules.FilterOutcome.NON_WATCH -> nonWatch.add(kind)
+                DataRules.FilterOutcome.OK -> {}
             }
         }
         if (!token.isNullOrEmpty()) {

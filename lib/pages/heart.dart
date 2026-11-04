@@ -107,7 +107,7 @@ class HeartPage extends StatelessWidget {
         // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4 (παράθυρο Oura / νύχτα ρολογιού, ίδια εποχή).
         final oxLast = ouraHr ? day : (d.lastNight?.date ?? day);
         final oxGuidance = oxygenGuidance(
-          d.spo2MinByNight(oxLast, ouraNights: ouraHr, windows: windows, since: oxSeg),
+          d.spo2MinByNight(oxLast, ouraNights: ouraHr, windows: windows, history: store.history),
           oxLast,
           today: day,
         );

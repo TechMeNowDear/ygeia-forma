@@ -83,7 +83,8 @@ StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan
     deep: avg((s) => s.deep),
     light: avg((s) => s.light),
     rem: avg((s) => s.rem),
-    awake: avg((s) => s.awake),
+    // E7: χωρίς τον χρόνο ως τον ύπνο (latency), ίδιος ορισμός με το ρολόι.
+    awake: avg((s) => s.awakeInSleep),
   );
 }
 

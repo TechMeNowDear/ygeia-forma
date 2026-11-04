@@ -1131,4 +1131,63 @@ void main() {
       expect(b.store.plan, newer);
     });
 });
+
+  group('Έλεγχος 3, E4: σφάλμα ανάγνωσης του αρχείου νυχτών ≠ «δεν υπάρχει»', () {
+    test('Σφάλμα: το αρχείο των 40 νυχτών δεν ξαναγράφεται με τις λίγες νέες· στην επόμενη ανάγνωση ενώνονται', () async {
+      var clockNow = now;
+      final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, ouraStart), withTokens: true, clock: () => clockNow);
+      final old = parseOura(sleep: sampleOuraSleep(add(today, -40), now), dailySleep: const [], readiness: const []).nights;
+      final content = encodeOuraNights(old);
+      a.nights
+        ..content = content
+        ..failRead = true;
+      await boot(a.store);
+      expect(a.oura.gets, greaterThan(0), reason: 'η Oura διαβάστηκε');
+      expect(a.store.ouraNightsReadFailed, isTrue);
+      expect(a.nights.writes, 0, reason: 'πριν: 3–4 νύχτες έγραφαν πάνω στις 40');
+      expect(a.nights.content, content);
+      expect(a.store.ouraWindowsComplete, isFalse);
+      // Η ανάγνωση πετυχαίνει την επόμενη φορά: οι παλιές και οι νέες μαζί, και μετά γράφεται.
+      a.nights.failRead = false;
+      clockNow = now.add(const Duration(hours: 1));
+      await a.store.syncOura();
+      expect(a.store.ouraNightsReadFailed, isFalse);
+      expect(a.nights.writes, greaterThan(0));
+      expect(decodeOuraNights(a.nights.content).length, greaterThanOrEqualTo(old.length));
+    });
+
+    test('Η απάντηση της Kotlin: missing / ok / error (και ό,τι άλλο = σφάλμα)', () {
+      expect(parseNightsRead('{"state":"missing"}'), (json: null, failed: false));
+      expect(parseNightsRead('{"state":"ok","json":"{}"}'), (json: '{}', failed: false));
+      expect(parseNightsRead('{"state":"error"}').failed, isTrue);
+      expect(parseNightsRead(null).failed, isTrue, reason: 'πριν: null = «δεν υπάρχει»');
+      expect(parseNightsRead('χάλια').failed, isTrue);
+    });
+
+    test('Παλμοί μέρας: δεν σβήνονται μετά από σφάλμα, ούτε για μέρες πριν από την πρώτη γνωστή νύχτα', () {
+      final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 10, 1));
+      final d = Dashboard.fromJson({
+        'readAt': DateTime(2026, 11, 10, 12).millisecondsSinceEpoch,
+        'sleep': <Object>[],
+        'heart': <Object>[],
+      });
+      // Μόνο οι 2 τελευταίες νύχτες στο αρχείο (π.χ. ξαναγράφτηκε με λίγες).
+      final windows = SleepWindows(const [], {
+        '2026-11-08': (DateTime(2026, 11, 7, 23), DateTime(2026, 11, 8, 7)),
+        '2026-11-09': (DateTime(2026, 11, 8, 23), DateTime(2026, 11, 9, 7)),
+      });
+      Map<String, Map<String, double>> h() => {
+            '2026-10-20': {K.dayHr: 71, K.steps: 3000},
+            '2026-11-09': {K.dayHr: 74, K.steps: 5000},
+          };
+      final failed = h();
+      applyRecentRead(failed, d, plan: plan, windows: windows, windowsComplete: false);
+      expect(failed['2026-11-09']![K.dayHr], 74, reason: 'σφάλμα ανάγνωσης: δεν ξέρουμε ότι λείπει η νύχτα');
+      expect(failed['2026-10-20']![K.dayHr], 71);
+      final ok = h();
+      applyRecentRead(ok, d, plan: plan, windows: windows);
+      expect(ok['2026-10-20']![K.dayHr], 71, reason: 'πριν από την πρώτη γνωστή νύχτα: άγνωστο, μένει');
+      expect(ok['2026-11-09']!.containsKey(K.dayHr), isFalse, reason: 'η νύχτα 10/11 λείπει πραγματικά (C12)');
+    });
+  });
 }
