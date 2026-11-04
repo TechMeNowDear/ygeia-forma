@@ -79,7 +79,7 @@ class SourcesPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SectionLabel('Από πού παίρνουμε τι'),
+                const SectionLabel('Ποια συσκευή μετρά τι'),
                 const SizedBox(height: 6),
                 Text(
                   'Μία συσκευή για κάθε μέτρηση, ποτέ ανάμειξη, ούτε όταν λείπει.'

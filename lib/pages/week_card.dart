@@ -102,7 +102,9 @@ class WeekCard extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           Text(
-            'Μεσαία τιμή της εβδομάδας. «Σταθερό» σημαίνει ότι η διαφορά χωράει στις συνηθισμένες διακυμάνσεις σου.'
+            // Δεύτερος έλεγχος υπολογισμών C1: με 7 μέρες ο έλεγχος σπάνια βλέπει αλλαγή· «Σταθερό» δεν σημαίνει «χωράει».
+            'Μεσαία τιμή της εβδομάδας. «Σταθερό»: δεν φαίνεται καθαρή αλλαγή· μία εβδομάδα σπάνια αρκεί για να φανεί.'
+            '${r.items.any((t) => t.current != null && t.inconclusive) ? ' «Λίγες μέρες για συμπέρασμα»: οι μέρες μοιάζουν πολύ μεταξύ τους και δεν φτάνουν για σύγκριση.' : ''}'
             '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα και στον ενεργό χρόνο, γιατί δεν έχει τελειώσει.' : ''}'
             // Έλεγχος υπολογισμών F17: δύο ζυγίσεις μιας εβδομάδας απέχουν συχνά 0,5–1 kg μόνο από το νερό.
             '${r.weightFirst != null && r.weightLast != null && r.weightFirst!.$1 != r.weightLast!.$1 ? ' Το βάρος αλλάζει 0,5–1 kg από μέρα σε μέρα με το νερό και το φαγητό· μία εβδομάδα δεν δείχνει τάση.' : ''}',
@@ -183,16 +185,21 @@ class _WeekRow extends StatelessWidget {
                   t.def.formatAs(t.current!, t.source),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                 ),
+                // «πριν», όχι «συνήθως»: εδώ είναι η μεσαία τιμή των 4 προηγούμενων εβδομάδων, όχι το «συνήθως» της
+                // εφαρμογής (δεύτερος έλεγχος υπολογισμών C7).
                 if (t.previous != null)
                   Text(
-                    'συνήθως ${t.def.formatAs(t.previous!, t.source)}',
+                    'πριν ${t.def.formatAs(t.previous!, t.source)}',
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
                   ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          TrendStatusPill(r: t),
+          if (t.inconclusive)
+            const Flexible(child: TrendPill('Λίγες μέρες για συμπέρασμα', maxLines: 2))
+          else
+            TrendStatusPill(r: t),
         ],
       ),
     );

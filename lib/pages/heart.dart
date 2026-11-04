@@ -12,8 +12,11 @@ import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
 class HeartPage extends StatelessWidget {
-  const HeartPage({super.key, required this.store, this.now});
+  const HeartPage({super.key, required this.store, this.now, this.onOpenSleep});
   final HealthStore store;
+
+  /// Άνοιγμα της καρτέλας «Ύπνος» (για το HRV του Oura· κουμπί, όχι διαδρομή γραμμένη ως κείμενο, έλεγχος UX U11).
+  final VoidCallback? onOpenSleep;
 
   /// Για τα στιγμιότυπα δοκιμών.
   final DateTime? now;
@@ -78,7 +81,9 @@ class HeartPage extends StatelessWidget {
         final windows = store.ouraWindows;
         final (double, double)? today;
         if (!dayOnly) {
-          today = d.heartRange(d.readAt);
+          // Και με το ρολόι εξαιρείται ο ύπνος του ρολογιού (έλεγχος υπολογισμών C14, 4/11): «Χαμηλότεροι σήμερα»
+          // σημαίνει παντού «ξύπνιος», όχι «μαζί με τον ύπνο» πριν από το Oura και «ξύπνιος» μετά.
+          today = d.heartRange(d.readAt, exclude: [for (final r in d.sleepRecords) (r.start, r.end)]);
         } else if (store.plan.nightSource(readDay) == Source.oura && windows.mains.containsKey(dateKey(readDay))) {
           today = d.heartRange(d.readAt, exclude: windows.ranges);
         } else {
@@ -104,15 +109,18 @@ class HeartPage extends StatelessWidget {
         final oxGuidance = oxygenGuidance(
           d.spo2MinByNight(oxLast, ouraNights: ouraHr, windows: windows, since: oxSeg),
           oxLast,
+          today: day,
         );
 
         Widget? trend;
         if (lastRhr != null && base != null) {
-          final diff = (lastRhr - base).round();
+          // Η διαφορά των δύο νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6): «61 · +2 από το συνηθισμένο (59)»,
+          // ποτέ «61 … 3 πάνω (59)». Ίδια λέξη «συνήθως» σε όλη την εφαρμογή (C7/U7), με μονάδα.
+          final diff = lastRhr.round() - base.round();
           trend = diff == 0
-              ? const TrendPill('Όπως ο μέσος όρος σου')
+              ? const TrendPill('Όπως συνήθως')
               : TrendPill(
-                  '${diff.abs()} ${diff > 0 ? 'πάνω' : 'κάτω'} από τον μέσο όρο (${base.round()})',
+                  '${diff > 0 ? '+' : '−'}${diff.abs()} bpm · συνήθως ${base.round()}',
                   up: diff > 0,
                   // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4): μπορεί να είναι φάρμακο ή κρύο δωμάτιο.
                   kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
@@ -195,10 +203,7 @@ class HeartPage extends StatelessWidget {
                     trailing: ouraHr ? const SourceTag(Source.watch) : null,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική). $oxygenAboutText',
-                    style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
-                  ),
+                  const OxygenAbout(lead: 'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική).'),
                   const Hairline(vertical: 12),
                   if (oxNights.isEmpty)
                     Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
@@ -225,7 +230,9 @@ class HeartPage extends StatelessWidget {
                 icon: Icons.timeline_rounded,
                 color: c.sleep,
                 title: 'HRV (μεταβλητότητα παλμών)',
-                text: 'Έρχεται από το Oura: Υγεία › Ύπνος › «Καρδιά στον ύπνο».',
+                text: 'Έρχεται από το Oura και φαίνεται στον Ύπνο, στην κάρτα «Καρδιά στον ύπνο».',
+                buttonText: onOpenSleep == null ? null : 'Άνοιγμα Ύπνου',
+                onPressed: onOpenSleep,
               ),
             // Κλινικός έλεγχος M6 (4/11): όποιος έχει συμπτώματα ανοίγει πρώτα την Καρδιά.
             Padding(

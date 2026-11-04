@@ -190,7 +190,7 @@ class _ShellState extends State<Shell> {
         tabs: const ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'],
         pages: [
           SleepPage(store: store, now: widget.now),
-          HeartPage(store: store, now: widget.now),
+          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.sleep),
           BodyPage(store: store),
           TrendsPage(store: store, now: widget.now),
         ],

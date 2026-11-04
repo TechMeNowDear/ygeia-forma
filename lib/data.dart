@@ -11,7 +11,7 @@ import 'history.dart';
 import 'oura/config.dart' show ouraMaxBackDays;
 import 'oura/oura_model.dart';
 import 'oura/oura_store.dart';
-import 'oxygen_note.dart' show oxygenWindowNights;
+import 'oxygen_note.dart' show oxygenLongWindowNights;
 import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
@@ -131,17 +131,6 @@ class Night {
     if (asleep <= 0 || stage == 'AWAKE') return null;
     return 100 * (stageMinutes[stage] ?? 0) / asleep;
   }
-}
-
-/// Κομμάτια ύπνου που ανήκουν μαζί (πριν μοιραστούν σε νύχτες και υπνάκους).
-class _SleepGroup {
-  _SleepGroup(SleepRecord first, {required this.isNight}) : parts = [first];
-  final List<SleepRecord> parts;
-  final bool isNight;
-  final List<(DateTime, DateTime)> gaps = [];
-  int get minutes => parts.fold(0, (s, p) => s + p.sleepMinutes);
-  DateTime get start => parts.first.start;
-  DateTime get end => parts.map((p) => p.end).reduce((a, b) => a.isAfter(b) ? a : b);
 }
 
 /// Διπλές ή επικαλυπτόμενες εγγραφές ύπνου δεν αθροίζονται (π.χ. η ίδια νύχτα από δύο πηγές).
@@ -541,14 +530,15 @@ class Dashboard {
   ///   από βήματα ή παλμούς (μια βόλτα ως την τουαλέτα δεν «κόβει» τη νύχτα· και ο κανόνας δεν αλλάζει όταν η νύχτα
   ///   παλιώσει και δεν υπάρχουν πια βήματα ανά λεπτό). Τα βήματα/παλμοί χρησιμεύουν μόνο για την ετικέτα του κενού
   ///   («πιθανός ύπνος» ή «κενό»), που δεν μετρά.
-  /// - Υπνάκοι είναι ΜΟΝΟ: (α) βραδινό λαγοκοίμισμα που τελειώνει ως τις 22:00 ([_eveningDoze]), (β) κομμάτι που
+  /// - Υπνάκοι είναι ΜΟΝΟ: (α) βραδινό λαγοκοίμισμα που τελειώνει ως τις 22:00, (β) κομμάτι που
   ///   αρχίζει μετά τις 06:00 και μετά το τέλος της νύχτας, εκτός αν το κενό είναι ως 90 λεπτά ΚΑΙ (δεν υπάρχουν
   ///   βήματα ανά λεπτό για το κενό Ή τα βήματα είναι ως [maxGapSteps]) — τότε είναι η ίδια νύχτα, π.χ. Κυριακή 25/10:
-  ///   05:55–09:50 και 10:53→, 0 βήματα, παλμοί ύπνου ([_startsMorningNap]), (γ) απογευματινός:
+  ///   05:55–09:50 και 10:53→, 0 βήματα, παλμοί ύπνου, (γ) απογευματινός:
   ///   αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες (όπως πριν). Οι υπνάκοι μετρούν στα [Night.napMinutes] της
   ///   νύχτας με την ίδια ημερομηνία και αποθηκεύονται (napMin), ώστε να μη χάνονται.
   /// - Δύο ομάδες με την ίδια ημερομηνία (κενό πάνω από 4 ώρες): η μεγαλύτερη που δεν είναι λαγοκοίμισμα είναι η
   ///   νύχτα· η άλλη είναι υπνάκος μόνο κατά τα (α)/(β), αλλιώς μέρος της νύχτας (με το κενό να μη μετρά).
+  /// - Ο κανόνας είναι ΚΟΙΝΟΣ με το Oura ([groupSleepPieces] στο sleep_gaps.dart)· το Oura δεν έχει βήματα (= άγνωστα).
   static ({List<Night> nights, Map<DateTime, int> naps}) _groupNights(
     List<SleepRecord> records, {
     List<Sample> heart = const [],
@@ -556,56 +546,32 @@ class Dashboard {
     DateTime? stepsFrom,
   }) {
     final recs = dedupeSleep(records);
-    // Ομάδες: κομμάτια με κενό ως 4 ώρες (χωρίς βήματα/παλμούς στην απόφαση).
-    final groups = <_SleepGroup>[];
-    _SleepGroup? previous;
-    for (final r in recs) {
-      final g = previous;
-      if (g != null && g.isNight && _joins(g, r, stepsByMinute, stepsFrom)) {
-        final last = g.parts.last;
-        // Μόνο η ετικέτα του κενού κρίνεται με βήματα και παλμούς («πιθανός ύπνος»)· δεν μετρά ποτέ στη διάρκεια.
-        if (r.start.isAfter(g.end) &&
-            judgeGap(last, r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) == GapVerdict.asleep) {
-          g.gaps.add((g.end, r.start));
-        }
-        g.parts.add(r);
-        continue;
-      }
-      final isNap = r.start.hour >= 10 && r.start.hour < 18 && r.sleepMinutes < 180;
-      final ng = _SleepGroup(r, isNight: !isNap);
-      groups.add(ng);
-      previous = ng;
-    }
-
-    final naps = <DateTime, int>{};
-    void addNap(DateTime day, int minutes) => naps[day] = (naps[day] ?? 0) + minutes;
-
-    final byDate = <DateTime, List<_SleepGroup>>{};
-    for (final g in groups) {
-      final end = g.end;
-      final date = end.hour >= 18 ? DateTime(end.year, end.month, end.day + 1) : dayOf(end);
-      if (!g.isNight) {
-        // Απογευματινός υπνάκος: της νύχτας με την ίδια ημερομηνία (το πρωί της ίδιας μέρας).
-        addNap(dayOf(g.parts.first.start), g.minutes);
-        continue;
-      }
-      byDate.putIfAbsent(date, () => []).add(g);
-    }
+    // Ο ΕΝΑΣ κανόνας της νύχτας (sleep_gaps.dart, [groupSleepPieces]), ίδιος με του Oura. Τα βήματα κρίνουν μόνο το
+    // πρωινό κομμάτι (κενό ως 90′) και την ετικέτα του κενού, ποτέ τα κομμάτια 20:00–06:00.
+    final grouped = groupSleepPieces<SleepRecord>(
+      recs,
+      (r) => (start: r.start, end: r.end, minutes: r.sleepMinutes),
+      stepsBetween: (a, b) => gapSteps(a, b, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom),
+    );
+    final naps = <DateTime, int>{
+      for (final e in grouped.naps.entries) e.key: e.value.fold(0, (sum, r) => sum + r.sleepMinutes),
+    };
 
     final nights = <Night>[];
-    for (final entry in byDate.entries) {
-      final list = entry.value..sort((a, b) => a.start.compareTo(b.start));
-      final candidates = [for (final g in list) if (!_eveningDoze(g)) g];
-      final main = (candidates.isEmpty ? list : candidates).reduce((a, b) => a.minutes >= b.minutes ? a : b);
-      final n = Night(entry.key);
-      for (final g in list) {
-        if (!identical(g, main) &&
-            (_eveningDoze(g) || _startsMorningNap(g.start, main.end, stepsByMinute, stepsFrom))) {
-          addNap(entry.key, g.minutes);
-          continue;
+    for (final g in grouped.nights) {
+      final n = Night(g.date);
+      for (final seg in g.segments) {
+        // Μόνο η ετικέτα του κενού κρίνεται με βήματα και παλμούς («πιθανός ύπνος»)· δεν μετρά ποτέ στη διάρκεια.
+        var reach = seg.first.end;
+        for (var i = 1; i < seg.length; i++) {
+          final r = seg[i];
+          if (r.start.isAfter(reach) &&
+              judgeGap(seg[i - 1], r, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom) == GapVerdict.asleep) {
+            n.estimatedGaps.add((reach, r.start));
+          }
+          if (r.end.isAfter(reach)) reach = r.end;
         }
-        n.parts.addAll(g.parts);
-        n.estimatedGaps.addAll(g.gaps);
+        n.parts.addAll(seg);
       }
       nights.add(n);
     }
@@ -661,33 +627,6 @@ class Dashboard {
     return (nights: nights, naps: naps);
   }
 
-  /// Αν το κομμάτι [r] συνεχίζει την ομάδα [g] (ίδια νύχτα): κενό ως 4 ώρες, εκτός αν η ομάδα είναι βραδινό
-  /// λαγοκοίμισμα ή το [r] πρωινός υπνάκος. Συνεχόμενα ή επικαλυπτόμενα κομμάτια: πάντα μαζί.
-  static bool _joins(_SleepGroup g, SleepRecord r, Map<int, int> stepsByMinute, DateTime? stepsFrom) {
-    final gap = r.start.difference(g.end);
-    if (gap <= Duration.zero) return true;
-    if (gap > maxGap) return false;
-    if (_eveningDoze(g)) return false;
-    return !_startsMorningNap(r.start, g.end, stepsByMinute, stepsFrom);
-  }
-
-  /// Βραδινό λαγοκοίμισμα: αρχίζει μετά το μεσημέρι και τελειώνει την ίδια μέρα ως τις 22:00.
-  static bool _eveningDoze(_SleepGroup g) {
-    final s = g.start;
-    final e = g.end;
-    return s.hour >= 12 && sameDay(s, e) && !e.isAfter(DateTime(e.year, e.month, e.day, 22));
-  }
-
-  /// Πρωινός υπνάκος: κομμάτι που αρχίζει 06:00–20:00, μετά το τέλος της νύχτας ([nightEnd]). Είναι η ίδια νύχτα
-  /// (όχι υπνάκος) αν το κενό είναι ως [morningJoinGap] ΚΑΙ για το κενό δεν υπάρχουν βήματα ανά λεπτό ή είναι ως
-  /// [maxGapSteps]. Το κενό δεν μετρά ποτέ ως ύπνος. Κομμάτια που αρχίζουν 20:00–06:00 δεν κρίνονται εδώ (πάντα νύχτα).
-  static bool _startsMorningNap(DateTime start, DateTime nightEnd, Map<int, int> stepsByMinute, DateTime? stepsFrom) {
-    if (start.hour < 6 || start.hour >= 20 || !start.isAfter(nightEnd)) return false;
-    if (start.difference(nightEnd) > morningJoinGap) return true;
-    final steps = gapSteps(nightEnd, start, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
-    return steps != null && steps > maxGapSteps;
-  }
-
   static void _fillNightMetrics(Night n, List<Sample> heart, List<Sample> spo2, List<Sample> skin) {
     bool inside(Sample s) => n.parts.any((p) => s.start.isBefore(p.end) && s.end.isAfter(p.start));
 
@@ -721,7 +660,8 @@ class Dashboard {
   }
 
   /// Η χαμηλότερη μέτρηση οξυγόνου του ρολογιού ανά νύχτα, για τις σημειώσεις χαμηλού οξυγόνου (B7), με τον ίδιο
-  /// ορισμό που δείχνουν οι κάρτες (A4): οι [oxygenWindowNights] νύχτες ως και την [last]· νύχτες του ρολογιού, ή
+  /// ορισμό που δείχνουν οι κάρτες (A4): οι [oxygenLongWindowNights] νύχτες ως και την [last] (30: ο κανόνας «κάτω
+  /// από 80% σε 2 από τις 30», δεύτερος κλινικός έλεγχος K2)· νύχτες του ρολογιού, ή
   /// — με [ouraNights] — οι μετρήσεις του ρολογιού μέσα στις ώρες ύπνου του Oura ([windows]). [since]: αρχή της
   /// εποχής του ορισμού ([SourcePlan.segmentStart]), ώστε να μη μετρούν νύχτες με άλλον ορισμό. Το ελάχιστο μετρά
   /// και σε νύχτα με μόνο σύντομες μετρήσεις (χωρίς μέσο όρο).
@@ -733,7 +673,7 @@ class Dashboard {
   }) {
     final out = <DateTime, double>{};
     final end = dayOf(last);
-    for (var i = 0; i < oxygenWindowNights; i++) {
+    for (var i = 0; i < oxygenLongWindowNights; i++) {
       final day = DateTime(end.year, end.month, end.day - i);
       if (since != null && day.isBefore(dayOf(since))) break;
       double? min;
@@ -827,7 +767,7 @@ class TodayCard {
 
 const todayCards = <TodayCard>[
   TodayCard('sleep', 'Ύπνος της νύχτας', true),
-  TodayCard('unusual', 'Εκτός συνηθισμένου (όταν ξεφεύγουν 2 δείκτες)', true),
+  TodayCard('unusual', 'Εκτός συνηθισμένου (όταν ξεφεύγουν μαζί παλμοί ύπνου και θερμοκρασία)', true),
   TodayCard('week', 'Απολογισμός εβδομάδας (Κυριακή βράδυ και Δευτέρα)', true),
   TodayCard('food', 'Διατροφή της ημέρας', true),
   TodayCard('steps', 'Βήματα', true),
@@ -847,6 +787,7 @@ class Prefs {
   Prefs(this.cards,
       {this.backfillFrom,
       this.kitchen,
+      this.reportName,
       this.themeMode = 'auto',
       this.dayTheme = 'aigaio',
       this.nightTheme = 'aigaio',
@@ -888,6 +829,7 @@ class Prefs {
       },
       backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
       kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
+      reportName: j['reportName'] is String ? j['reportName'] as String : null,
       themeMode: const ['auto', 'light', 'dark'].contains(j['themeMode']) ? j['themeMode'] as String : 'auto',
       dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
@@ -988,6 +930,11 @@ class Prefs {
   /// «Η κουζίνα μου» (δες food/kitchen.dart), όπως αποθηκεύεται.
   Map<String, dynamic>? kitchen;
 
+  /// Όνομα για την αναφορά γιατρού (προαιρετικό). Μένει μόνο στο κινητό: ΔΕΝ μπαίνει στο αρχείο αντιγράφου
+  /// ασφαλείας (backupPrefKeys), ούτε σε αναφορά σφάλματος, ούτε στο αντίγραφο Google/μεταφορά του Android (η Kotlin
+  /// το γράφει χωριστά στο noBackupFilesDir, DataRules.splitDeviceOnlyPrefs· συγχώνευση 4/11).
+  String? reportName;
+
   final Map<String, bool> cards;
 
   /// Ως πού έχει φτάσει το ιστορικό προς τα πίσω («2025-11-01»).
@@ -1001,6 +948,7 @@ class Prefs {
         'cards': cards,
         'backfillFrom': backfillFrom,
         'kitchen': kitchen,
+        if (reportName != null) 'reportName': reportName,
         'themeMode': themeMode,
         'dayTheme': dayTheme,
         'nightTheme': nightTheme,
@@ -1028,7 +976,9 @@ class Prefs {
 }
 
 /// Έλεγχος 2, C12: έκδοση των κανόνων για τις τιμές του Oura στο ιστορικό. 1: ποσοστά φάσεων επί του πραγματικού
-/// ύπνου (η #66 τα έγραφε επί του χρόνου με τα ξυπνήματα). Όταν αλλάζει, το Oura ξαναδιαβάζεται από την αρχή του.
+/// ύπνου (η #66 τα έγραφε επί του χρόνου με τα ξυπνήματα) και ο κοινός κανόνας νύχτας με το ρολόι (συγχώνευση 4/11:
+/// κομμάτια ως 4 ώρες μαζί, υπνάκοι μόνο λαγοκοίμισμα ως τις 22:00 / πρωί / απόγευμα). Όταν αλλάζει, το Oura
+/// ξαναδιαβάζεται από την αρχή του.
 const ouraRulesVersion = 1;
 
 /// Μια απάντηση της Samsung, διαβασμένη: [status] (ok ή το σφάλμα), [data] αν ήταν εντάξει,
@@ -1796,7 +1746,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// του (90 μέρες με την κανονική ανάγνωση, πιο πίσω ανά 90 μέρες), μία φορά για κάθε αλλαγή κανόνων.
   Future<void> _upgradeOura() async {
     if (!_prefsLoaded || planState != PlanState.ok || prefs.ouraRules >= ouraRulesVersion) return;
-    // Μόνο αν υπάρχουν αποθηκευμένα ποσοστά φάσεων του Oura (αλλιώς δεν υπάρχει τίποτα με τον παλιό ορισμό).
+    // Μόνο αν υπάρχουν αποθηκευμένα ποσοστά φάσεων του Oura (αλλιώς δεν υπάρχει τίποτα με τον παλιό ορισμό). Η Oura
+    // δίνει φάσεις σε κάθε νύχτα, οπότε έτσι ξαναδιαβάζονται και οι νύχτες σε κομμάτια (κοινός κανόνας, 4/11).
     final old = ouraKeys[K.deepPct]!;
     if (_plan.hasOura && _historyLoaded && history.values.any((r) => r.containsKey(old))) {
       prefs

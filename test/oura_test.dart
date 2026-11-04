@@ -159,13 +159,17 @@ void main() {
       expect(row[ouraKeys[K.napMin]], 30);
     });
 
-    test('rest (λάθος ανίχνευση) αγνοείται· δύο long_sleep: κύρια η μεγαλύτερη, η άλλη χωριστά', () {
+    // Συγχώνευση 4/11 (ένας κανόνας νύχτας με το ρολόι): δύο long_sleep 23:30–03:05 και 05:10–10:20 με κενό 2 ώρες
+    // 5 λεπτά είναι ΜΙΑ νύχτα σε δύο κομμάτια· μετρούν και οι δύο, το κενό όχι. Πριν: μόνο η μεγαλύτερη (280′).
+    test('rest (λάθος ανίχνευση) αγνοείται· δύο long_sleep με κενό 2 ώρες: μία νύχτα, κύρια η μεγαλύτερη, άθροισμα', () {
       final n = night(fixtureBatch(), '2026-10-24');
       expect(n.main!.id, 's-1024-b');
-      expect(n.others.single.id, 's-1024-a');
+      expect(n.pieces.single.id, 's-1024-a');
+      expect(n.others, isEmpty);
       expect(n.naps, isEmpty);
-      // Η διάρκεια της νύχτας είναι ΜΟΝΟ της κύριας περιόδου (όχι άθροισμα).
-      expect(ouraRow(n)[ouraKeys[K.sleepMin]], 280);
+      // 195′ + 280′, χωρίς τα 125′ του κενού.
+      expect(ouraRow(n)[ouraKeys[K.sleepMin]], 475);
+      expect(n.nightMinutes, 475);
       // Φάσεις από το app_sleep_phase_5_min όταν το sleep_phase_5_min είναι null.
       expect(n.main!.phases, '42222111223333222224');
     });
@@ -262,7 +266,8 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // S-C: χωρίς long_sleep, η νύχτα = η μεγαλύτερη «sleep» στο νυχτερινό παράθυρο· ποτέ άθροισμα.
+  // S-C: χωρίς long_sleep, η νύχτα = η μεγαλύτερη «sleep» στο νυχτερινό παράθυρο, μαζί με τα κομμάτια του ίδιου
+  // παραθύρου που απέχουν ως 4 ώρες (δεύτερος γύρος ελέγχου, U12).
   group('Σύντομη νύχτα (μόνο «sleep»)', () {
     final d = DateTime(2026, 11, 3);
     var seq = 0;
@@ -318,7 +323,9 @@ void main() {
       expect(emptyNightText(r!), 'Μόνο υπνάκος από το δαχτυλίδι');
     });
 
-    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η άλλη «άλλο κομμάτι», ποτέ άθροισμα', () {
+    // Δεύτερος γύρος ελέγχου (U12, ίδιος κανόνας με τη νύχτα του ρολογιού C1): κομμάτια με κενό ως 4 ώρες μετρούν
+    // μαζί, το κενό όχι. Πριν: «μόνο η κύρια (160′)», ενώ κοιμήθηκε ~5 ώρες σε δύο κομμάτια.
+    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η νύχτα = άθροισμα των κομματιών (όχι το κενό)', () {
       final n = only([
         rec('sleep', at(2, 23, 0), at(3, 1, 30)),
         rec('sleep', at(3, 3, 0), at(3, 5, 45)),
@@ -328,9 +335,12 @@ void main() {
       expect(hm(n.pieces.single.start), '23:00');
       expect(n.naps, isEmpty);
       final row = ouraRow(n);
-      expect(row[ouraKeys[K.sleepMin]], 160, reason: 'μόνο η κύρια (165′ − 5′)');
+      expect(row[ouraKeys[K.sleepMin]], 305, reason: '145′ + 160′, χωρίς τα 90′ του κενού');
+      expect(n.nightMinutes, 305);
+      expect(n.counted.length, 2);
+      expect(row[ouraKeys[K.bedtime]], isNull, reason: 'χωρίς «latency» δεν ξέρουμε πότε αποκοιμήθηκε');
       expect(row.containsKey(ouraKeys[K.napMin]), isFalse);
-      // Αποθήκευση και ανάγνωση: το κομμάτι μένει χωριστά.
+      // Αποθήκευση και ανάγνωση: το κομμάτι μένει ως κομμάτι και μετρά ξανά το ίδιο.
       final back = decodeOuraNights(encodeOuraNights([n])).single;
       expect(back.pieces.length, 1);
       expect(ouraRow(back), row);
@@ -345,30 +355,51 @@ void main() {
       expect(ouraRow(n)[ouraKeys[K.napMin]], 115);
     });
 
-    test('Σύντομη νύχτα που τελείωσε πριν από τα μεσάνυχτα (21:30–23:50): «Μόνο υπνάκος», με τις ώρες του', () {
+    // Συγχώνευση 4/11: ίδιος κανόνας με το ρολόι. Ύπνος που τελειώνει μετά τις 22:00 ΔΕΝ είναι λαγοκοίμισμα: είναι η
+    // νύχτα (σύντομη), όπως στο ρολόι. Λαγοκοίμισμα που τελειώνει ως τις 22:00 και δεν ακολουθεί νύχτα: «Μόνο υπνάκος».
+    test('Ύπνος 21:30–23:50 (μετά τις 22:00): νύχτα, όπως στο ρολόι· λαγοκοίμισμα 20:00–21:40: «Μόνο υπνάκος», με τις ώρες', () {
       final n = only([rec('sleep', at(2, 21, 30), at(2, 23, 50))]);
-      expect(n.main, isNull);
-      expect(n.onlyNap, isTrue);
-      expect(napTimes(n), '21:30–23:50 · 2 ώρες 15 λεπτά');
+      expect(n.main, isNotNull);
+      expect(n.shortNight, isTrue);
+      expect(n.nightMinutes, 135);
+      final doze = only([rec('sleep', at(2, 20, 0), at(2, 21, 40))]);
+      expect(doze.main, isNull);
+      expect(doze.onlyNap, isTrue);
+      expect(napTimes(doze), '20:00–21:40 · 1 ώρα 35 λεπτά');
       expect(napTimes(null), '');
     });
 
     test('M-3: «χθες βράδυ» δεν δείχνει ποτέ απογευματινό υπνάκο της ίδιας μέρας', () {
-      final n = only([rec('sleep', at(2, 22, 0), at(2, 23, 40)), rec('sleep', at(3, 14, 0), at(3, 14, 40))]);
+      final n = only([rec('sleep', at(2, 20, 0), at(2, 21, 40)), rec('sleep', at(3, 14, 0), at(3, 14, 40))]);
       expect(n.onlyNap, isTrue);
-      expect(napTimes(n, nightOnly: true), '22:00–23:40 · 1 ώρα 35 λεπτά');
+      expect(napTimes(n, nightOnly: true), '20:00–21:40 · 1 ώρα 35 λεπτά');
       expect(napTimes(n), contains('14:00–14:40'));
       final afternoon = only([rec('sleep', at(3, 13, 0), at(3, 13, 40))]);
       expect(napTimes(afternoon, nightOnly: true), '');
     });
 
-    test('Παράθυρο: μόνο ό,τι επικαλύπτει 00:00–06:00 της μέρας', () {
-      OuraSleep s(DateTime a, DateTime b) => OuraSleep.fromJson(rec('sleep', a, b))!;
-      expect(inNightWindow(s(at(2, 22, 0), at(3, 0, 30)), d), isTrue);
-      expect(inNightWindow(s(at(3, 5, 30), at(3, 8, 0)), d), isTrue);
-      expect(inNightWindow(s(at(3, 6, 0), at(3, 8, 0)), d), isFalse);
-      expect(inNightWindow(s(at(2, 20, 0), at(2, 23, 59)), d), isFalse);
-      expect(inNightWindow(s(at(3, 14, 0), at(3, 15, 0)), d), isFalse);
+    // Συγχώνευση 4/11: τα κομμάτια του Oura περνούν από τον ΙΔΙΟ κανόνα με το ρολόι (groupSleepPieces): πρωινό κομμάτι
+    // μετά τις 06:00 με κενό ως 90′ = η ίδια νύχτα (το Oura δεν έχει βήματα), πάνω από 90′ = υπνάκος· λαγοκοίμισμα ως
+    // τις 22:00 πριν από τη νύχτα = υπνάκος· ο τύπος της Oura δεν αποφασίζει.
+    test('Κοινός κανόνας με το ρολόι: πρωί ως 90′ μαζί, πάνω από 90′ υπνάκος· λαγοκοίμισμα ως τις 22:00 υπνάκος', () {
+      final soon = only([rec('long_sleep', at(2, 23, 30), at(3, 7, 0)), rec('sleep', at(3, 8, 0), at(3, 9, 0))]);
+      expect(soon.counted.length, 2, reason: 'κενό 60′, χωρίς βήματα: ίδια νύχτα');
+      expect(soon.naps, isEmpty);
+      expect(soon.nightMinutes, 445 + 55);
+      final late = only([rec('long_sleep', at(2, 23, 30), at(3, 7, 0)), rec('sleep', at(3, 9, 30), at(3, 10, 30))]);
+      expect(late.counted.length, 1, reason: 'κενό 2 ώρες 30 λεπτά: πρωινός υπνάκος');
+      expect(late.napMinutes, 55);
+      expect(ouraRow(late)[ouraKeys[K.napMin]], 55);
+      final evening = only([rec('late_nap', at(2, 20, 30), at(2, 21, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
+      expect(evening.counted.single.type, 'long_sleep');
+      expect(evening.naps.single.type, 'late_nap');
+      final after22 = only([rec('sleep', at(2, 21, 0), at(2, 22, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
+      expect(after22.counted.length, 2, reason: 'τελειώνει μετά τις 22:00: μέρος της νύχτας, όπως στο ρολόι');
+      expect(after22.naps, isEmpty);
+      // Κενό πάνω από 4 ώρες, ίδια μέρα, όχι υπνάκος: μέρος της νύχτας (όπως στο ρολόι)· το κενό δεν μετρά.
+      final far = only([rec('sleep', at(3, 0, 10), at(3, 0, 50)), rec('sleep', at(3, 5, 0), at(3, 7, 30))]);
+      expect(far.counted.length, 2);
+      expect(far.nightMinutes, 35 + 145);
     });
 
     test('late_nap στις 19:00: ποτέ νύχτα', () {
@@ -411,8 +442,10 @@ void main() {
       );
       expect(b.skipped, 0);
       expect(b.nights.length, 32);
-      expect(b.nights.where((n) => n.main != null).length, 16);
-      expect(b.nights.where((n) => n.naps.isNotEmpty).length, 16);
+      // Συγχώνευση 4/11: ο τύπος της Oura δεν αποφασίζει νύχτα ή υπνάκο. Οι «late_nap» του sandbox είναι στις 03:00
+      // (κομμάτι μέσα στη νύχτα, όχι λαγοκοίμισμα ως τις 22:00): με τον κοινό κανόνα είναι νύχτες.
+      expect(b.nights.where((n) => n.main != null).length, 32);
+      expect(b.nights.where((n) => n.naps.isNotEmpty).length, 0);
       for (final n in b.nights) {
         expect(n.sleepScore, isNotNull);
         expect(n.readiness, isNotNull);

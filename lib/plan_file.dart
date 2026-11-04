@@ -280,7 +280,8 @@ List<RecoveryOption>? recoveryOptions({
   var base = SourcePlan.samsungOnly;
   if (rebuilt.eras.isNotEmpty) {
     base = rebuilt;
-    out.add(RecoveryOption('Όπως φαίνεται από τα αποθηκευμένα δεδομένα', rebuilt, primary: true));
+    // Ρήμα και ημερομηνίες, όχι «Όπως φαίνεται από τα αποθηκευμένα δεδομένα» (έλεγχος UX U11).
+    out.add(RecoveryOption('Κράτα: ${shortTimeline(rebuilt)}', rebuilt, primary: true));
   }
   // Με ένδειξη Oura (αρχείο νυχτών, ανάγνωση, τιμές) υπάρχει ΠΑΝΤΑ η επιλογή «από το Oura».
   final anyOura = evidence || rebuilt.eras.isNotEmpty;
@@ -305,4 +306,29 @@ List<String> describePlan(SourcePlan p) {
     'Ως τη νύχτα προς ${shortDayDate(DateTime(first.year, first.month, first.day - 1))}: ${sourceName(Source.watch)}',
     for (final e in p.eras) 'Από τη νύχτα προς ${shortDayDate(e.from)}: ${sourceName(e.source)}',
   ];
+}
+
+/// Η χρονογραμμή σε μία γραμμή, για κουμπί: «ρολόι ως 5/11, Oura από 6/11».
+String shortTimeline(SourcePlan p) {
+  String name(Source s) => switch (s) {
+        Source.oura => 'Oura',
+        Source.watch => 'ρολόι',
+        _ => 'χωρίς πηγή',
+      };
+  String dm(DateTime d) => '${d.day}/${d.month}';
+  if (p.eras.isEmpty) return 'ρολόι';
+  final parts = <String>[];
+  for (var i = -1; i < p.eras.length; i++) {
+    final source = i < 0 ? Source.watch : p.eras[i].source;
+    final next = i + 1 < p.eras.length ? p.eras[i + 1].from : null;
+    final until = next == null ? null : DateTime(next.year, next.month, next.day - 1);
+    if (i < 0) {
+      parts.add('${name(source)} ως ${dm(until!)}');
+    } else if (until == null) {
+      parts.add('${name(source)} από ${dm(p.eras[i].from)}');
+    } else {
+      parts.add('${name(source)} ${dm(p.eras[i].from)}–${dm(until)}');
+    }
+  }
+  return parts.join(', ');
 }

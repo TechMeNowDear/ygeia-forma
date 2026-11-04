@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Το ίδιο με το data_extraction_rules.xml, για Android 10–11 (A10). Μόνο με κρυπτογράφηση από άκρη σε άκρη (C14, R9). -->
+<!-- Το ίδιο με το data_extraction_rules.xml, για Android 10–11 (A10). Μόνο με κρυπτογράφηση από άκρη σε άκρη (C14, R9).
+     Το όνομα της αναφοράς για τον γιατρό ΔΕΝ είναι στο prefs.json: μένει στο noBackupFilesDir (συγχώνευση 4/11). -->
 <full-backup-content>
     <include domain="database" path="ygeia.db" requireFlags="clientSideEncryption" />
     <include domain="database" path="ygeia.db-wal" requireFlags="clientSideEncryption" />

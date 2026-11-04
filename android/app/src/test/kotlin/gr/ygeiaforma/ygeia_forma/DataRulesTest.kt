@@ -151,4 +151,25 @@ class DataRulesTest {
         assertFalse(DataRules.callbackDelivered("notImplemented"))
         assertFalse(DataRules.callbackDelivered("error"))
     }
+
+    @Test
+    fun reportNameStaysOnDeviceOutOfPrefsBackup() {
+        // Συγχώνευση 4/11: το prefs.json μπαίνει στο αντίγραφο Google· το όνομα της αναφοράς όχι.
+        val (shared, own) = DataRules.splitDeviceOnlyPrefs("""{"kcal":2200,"reportName":"Γιώργος Π.","units":"kg"}""")
+        assertFalse(shared.contains("reportName"))
+        assertFalse(shared.contains("Γιώργος"))
+        assertTrue(shared.contains("\"kcal\":2200"))
+        assertEquals("""{"reportName":"Γιώργος Π."}""", own)
+        // Ανάγνωση: ένα ενιαίο JSON για τη Flutter, με το όνομα πίσω.
+        val merged = DataRules.mergeDeviceOnlyPrefs(shared, own)
+        assertTrue(merged.contains("\"reportName\":\"Γιώργος Π.\""))
+        assertTrue(merged.contains("\"units\":\"kg\""))
+        // Χωρίς όνομα: τίποτα ιδιωτικό (το αρχείο σβήνεται).
+        assertNull(DataRules.splitDeviceOnlyPrefs("""{"kcal":2200}""").second)
+        // Επαναφορά από αντίγραφο σε νέο κινητό: prefs.json χωρίς όνομα, κανένα ιδιωτικό αρχείο → οι ρυθμίσεις ως έχουν.
+        assertEquals(shared, DataRules.mergeDeviceOnlyPrefs(shared, null))
+        // Σφάλμα ανάγνωσης ή χαλασμένο JSON: ποτέ δεν «διορθώνεται» σε προεπιλογές.
+        assertEquals("""{"ok":false,"kind":"read"}""", DataRules.mergeDeviceOnlyPrefs("""{"ok":false,"kind":"read"}""", "χάλια"))
+        assertEquals("χάλια", DataRules.splitDeviceOnlyPrefs("χάλια").first)
+    }
 }

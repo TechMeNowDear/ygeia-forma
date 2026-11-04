@@ -1,5 +1,7 @@
 package gr.ygeiaforma.ygeia_forma
 
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import java.io.File
 import java.time.LocalDate
 
@@ -135,4 +137,50 @@ object DataRules {
      * εφαρμογές (developer.ouraring.com/authorize, A13), η κλασική και ο διακομιστής v2.
      */
     val ALLOWED_HOSTS = setOf("developer.ouraring.com", "cloud.ouraring.com", "api.ouraring.com")
+
+    /**
+     * Ρυθμίσεις που μένουν ΜΟΝΟ σε αυτό το κινητό (συγχώνευση 4/11): το όνομα για την αναφορά προς τον γιατρό.
+     * Το prefs.json μπαίνει στο αντίγραφο Google και στη μεταφορά σε νέο κινητό (backup_rules.xml,
+     * data_extraction_rules.xml)· αυτά τα κλειδιά γράφονται χωριστά στο noBackupFilesDir ([DEVICE_PREFS_FILE]),
+     * που το Android δεν βάζει ποτέ σε αντίγραφο. Η Flutter δεν αλλάζει: στέλνει και διαβάζει ένα ενιαίο JSON.
+     */
+    val DEVICE_ONLY_PREFS = setOf("reportName")
+    const val DEVICE_PREFS_FILE = "device_prefs.json"
+
+    /**
+     * Χωρίζει το JSON των ρυθμίσεων: (ό,τι πάει στο prefs.json, τα [DEVICE_ONLY_PREFS] ως JSON ή null αν δεν υπάρχουν).
+     * Μη έγκυρο JSON (ή όχι αντικείμενο): ως έχει, χωρίς τίποτα ιδιωτικό (ποτέ δεν χάνονται ρυθμίσεις).
+     */
+    fun splitDeviceOnlyPrefs(json: String): Pair<String, String?> {
+        val o = parseObject(json) ?: return json to null
+        val own = JsonObject()
+        for (k in DEVICE_ONLY_PREFS) {
+            val v = o.remove(k) ?: continue
+            if (!v.isJsonNull) own.add(k, v)
+        }
+        return o.toString() to (if (own.size() == 0) null else own.toString())
+    }
+
+    /**
+     * Ενώνει το prefs.json με τα ιδιωτικά κλειδιά του κινητού. Τα ιδιωτικά υπερισχύουν· παλιό prefs.json που έχει
+     * ακόμα το κλειδί (πριν από τον χωρισμό) το κρατά, ώσπου η επόμενη αποθήκευση να το μεταφέρει. Αν το prefs.json
+     * δεν διαβάζεται ως αντικείμενο (π.χ. σφάλμα ανάγνωσης), επιστρέφεται ως έχει.
+     */
+    fun mergeDeviceOnlyPrefs(prefs: String, deviceOnly: String?): String {
+        if (deviceOnly == null) return prefs
+        val o = parseObject(prefs) ?: return prefs
+        val d = parseObject(deviceOnly) ?: return prefs
+        for (k in DEVICE_ONLY_PREFS) {
+            val v = d.get(k) ?: continue
+            o.add(k, v)
+        }
+        return o.toString()
+    }
+
+    private fun parseObject(json: String): JsonObject? = try {
+        val e = JsonParser.parseString(json)
+        if (e.isJsonObject) e.asJsonObject else null
+    } catch (_: Throwable) {
+        null
+    }
 }

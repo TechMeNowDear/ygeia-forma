@@ -26,7 +26,7 @@ void main() {
     expect(includes(File('tools/android/xml/backup_rules.xml').readAsStringSync()), expected);
     for (final f in ['tools/android/xml/data_extraction_rules.xml', 'tools/android/xml/backup_rules.xml']) {
       final body = File(f).readAsStringSync().replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
-      for (final never in ['dashboard.json', 'errq', 'bg-failures', 'oura_tokens', 'oura_pending', 'no_backup', '.tmp']) {
+      for (final never in ['dashboard.json', 'errq', 'bg-failures', 'oura_tokens', 'oura_pending', 'no_backup', '.tmp', 'device_prefs']) {
         expect(body.contains(never), isFalse, reason: '$never στο $f');
       }
     }
@@ -66,5 +66,17 @@ void main() {
     expect(File('${dir.path}/res/xml/data_extraction_rules.xml').existsSync(), isTrue);
     expect(File('${dir.path}/res/xml/backup_rules.xml').existsSync(), isTrue);
     dir.deleteSync(recursive: true);
+  });
+
+  // Συγχώνευση 4/11: το όνομα της αναφοράς για τον γιατρό μένει ΜΟΝΟ στο κινητό. Η Kotlin το βγάζει από το prefs.json
+  // (που μπαίνει στο αντίγραφο Google) και το γράφει στο noBackupFilesDir (DataRules.splitDeviceOnlyPrefs, έλεγχος
+  // Kotlin reportNameStaysOnDeviceOutOfPrefsBackup).
+  test('Όνομα αναφοράς: έξω από το prefs.json του αντιγράφου, στο noBackupFilesDir', () {
+    final rules = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/DataRules.kt').readAsStringSync();
+    expect(rules.contains('val DEVICE_ONLY_PREFS = setOf("reportName")'), isTrue);
+    final bridge = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/SamsungHealthBridge.kt').readAsStringSync();
+    expect(bridge.contains('DataRules.splitDeviceOnlyPrefs(json)'), isTrue);
+    expect(bridge.contains('DataRules.mergeDeviceOnlyPrefs(shared, own)'), isTrue);
+    expect(bridge.contains('activity.noBackupFilesDir, DataRules.DEVICE_PREFS_FILE'), isTrue);
   });
 }

@@ -108,7 +108,9 @@ class SamsungHealthBridge(
             "loadPrefs" -> result.success(loadPrefsText())
             "savePrefs" -> respond(result) {
                 val json = call.argument<String>("json") ?: "{}"
-                val ok = withContext(Dispatchers.IO) { writeFile(PREFS_FILE, json) }
+                // Το όνομα της αναφοράς μένει μόνο στο κινητό (noBackupFilesDir), έξω από το αντίγραφο Google.
+                val (shared, own) = DataRules.splitDeviceOnlyPrefs(json)
+                val ok = withContext(Dispatchers.IO) { writeDevicePrefs(own) && writeFile(PREFS_FILE, shared) }
                 if (ok) JSONObject().put("ok", true) else JSONObject().put("ok", false).put("kind", "write")
             }
             "resolve" -> {
@@ -210,12 +212,31 @@ class SamsungHealthBridge(
 
     // «Δεν υπάρχει αρχείο» = {} (προεπιλογές). Αρχείο που υπάρχει αλλά δεν διαβάστηκε = σφάλμα,
     // ώστε η εφαρμογή να μη γράψει προεπιλογές πάνω στις ρυθμίσεις.
-    private fun loadPrefsText(): String =
-        try {
+    private fun loadPrefsText(): String {
+        val shared = try {
             val f = java.io.File(activity.filesDir, PREFS_FILE)
             if (f.exists()) f.readText() else "{}"
         } catch (e: Throwable) {
-            """{"ok":false,"kind":"read"}"""
+            return """{"ok":false,"kind":"read"}"""
+        }
+        val own = try {
+            val f = devicePrefsFile()
+            if (f.exists()) f.readText() else null
+        } catch (e: Throwable) {
+            null
+        }
+        return DataRules.mergeDeviceOnlyPrefs(shared, own)
+    }
+
+    private fun devicePrefsFile() = java.io.File(activity.noBackupFilesDir, DataRules.DEVICE_PREFS_FILE)
+
+    /** Τα ιδιωτικά κλειδιά των ρυθμίσεων (ή σβήσιμο του αρχείου όταν δεν υπάρχουν πια). `false` αν απέτυχε. */
+    private fun writeDevicePrefs(own: String?): Boolean =
+        try {
+            val f = devicePrefsFile()
+            if (own == null) !f.exists() || f.delete() else OuraBridge.atomicWrite(f, own.toByteArray(Charsets.UTF_8))
+        } catch (e: Throwable) {
+            false
         }
 
     private fun readFile(name: String): String? =

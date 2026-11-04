@@ -25,8 +25,12 @@ List<CompareRow> buildCompareRows({
   for (var d = dayOf(last); !d.isBefore(from); d = DateTime(d.year, d.month, d.day - 1)) {
     if (plan.nightSource(d) != Source.oura) continue;
     OuraSleep? o;
+    OuraNight? on;
     for (final n in oura) {
-      if (sameDay(n.day, d)) o = n.main;
+      if (sameDay(n.day, d)) {
+        o = n.main;
+        on = n;
+      }
     }
     Night? w;
     for (final n in watch) {
@@ -35,7 +39,8 @@ List<CompareRow> buildCompareRows({
     if (o == null && w == null) continue;
     rows.add(CompareRow(
       day: d,
-      ouraMinutes: o?.totalMinutes,
+      // Νύχτα σε κομμάτια: όλα τα κομμάτια που μετρούν (ίδιο με τον Ύπνο και το ιστορικό, U12).
+      ouraMinutes: on?.nightMinutes,
       ouraStart: o?.onset ?? o?.start,
       ouraEnd: o?.end,
       ouraHr: o?.avgHr,

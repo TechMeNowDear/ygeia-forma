@@ -3,12 +3,12 @@
 /// Πεδία επαληθευμένα στο επίσημο OpenAPI 1.43 (PublicModifiedSleepModel, PublicDailySleep,
 /// PublicDailyReadiness) και στο sandbox της Oura. Κανόνες:
 /// - Ό,τι λείπει (null) μένει κενό· ποτέ 0.
-/// - Η νύχτα μιας μέρας είναι η περίοδος «long_sleep» με τον περισσότερο ύπνο. Αν δεν υπάρχει (νύχτα κάτω από
-///   3 ώρες: η Oura τη λέει «sleep»), νύχτα είναι η μεγαλύτερη «sleep» μέσα στο νυχτερινό παράθυρο ([inNightWindow])
-///   — «Σύντομη νύχτα». Άλλα κομμάτια στο ίδιο παράθυρο φαίνονται ως «άλλο κομμάτι» και ΔΕΝ προστίθενται.
-///   Οι υπνάκοι («sleep» εκτός παραθύρου, «late_nap») φαίνονται χωριστά και δεν προστίθενται. Οι «rest» (λάθος
-///   ανίχνευση που απέρριψε ο χρήστης) και «deleted» αγνοούνται.
-/// - Η μέρα κάθε περιόδου είναι το «day» της Oura (το πρωί που ξύπνησες)· δεν την ξαναϋπολογίζουμε.
+/// - Νύχτα και υπνάκοι: ο ΙΔΙΟΣ κανόνας με το ρολόι ([groupOura] → groupSleepPieces, συγχώνευση 4/11): κομμάτια
+///   με κενό ως 4 ώρες = μία νύχτα (το κενό δεν μετρά)· λαγοκοίμισμα ως τις 22:00, πρωινό κομμάτι με κενό πάνω από
+///   90 λεπτά και απογευματινό κάτω από 3 ώρες = υπνάκοι (χωριστά, δεν προστίθενται). Ο τύπος της Oura διαλέγει μόνο
+///   την κύρια περίοδο (long_sleep με τον περισσότερο ύπνο, αλλιώς η μεγαλύτερη). «Σύντομη νύχτα»: κάτω από 3 ώρες.
+///   Οι «rest» (λάθος ανίχνευση που απέρριψε ο χρήστης) και «deleted» αγνοούνται.
+/// - Η μέρα κάθε νύχτας είναι το «day» της Oura (της μεγαλύτερης περιόδου: το πρωί που ξύπνησες).
 /// - Οι ώρες έρχονται με τη ζώνη ώρας τους (π.χ. +02:00) και δείχνονται στην ώρα του κινητού.
 library;
 
@@ -17,6 +17,7 @@ import 'dart:convert';
 import '../data.dart' show Stage, Night;
 import '../format.dart';
 import '../history.dart';
+import '../sleep_gaps.dart' show groupSleepPieces;
 import '../sources.dart';
 
 int? _int(Object? v) => v is num && v.isFinite ? v.round() : null;
@@ -211,21 +212,46 @@ class OuraNight {
 
   final DateTime day;
 
-  /// Η νύχτα (long_sleep). Null = δεν υπάρχει νύχτα από το δαχτυλίδι αυτή τη μέρα.
+  /// Η κύρια περίοδος της νύχτας (long_sleep με τον περισσότερο ύπνο, αλλιώς η μεγαλύτερη). Null = δεν υπάρχει νύχτα
+  /// από το δαχτυλίδι αυτή τη μέρα.
   final OuraSleep? main;
 
-  /// Υπνάκοι (sleep, late_nap): φαίνονται χωριστά, δεν προστίθενται στη νύχτα.
+  /// Υπνάκοι κατά τον κοινό κανόνα της νύχτας ([groupOura]): φαίνονται χωριστά, δεν προστίθενται στη νύχτα.
   final List<OuraSleep> naps;
 
-  /// Άλλες μεγάλες περίοδοι της ίδιας μέρας (σπάνιο): φαίνονται, δεν προστίθενται.
+  /// Περίοδοι της νύχτας που επικαλύπτονται με άλλη που ήδη μετρά (σπάνιο): φαίνονται, δεν προστίθενται (ο ίδιος
+  /// χρόνος δεν μετρά ποτέ δύο φορές).
   final List<OuraSleep> others;
 
-  /// Σύντομη νύχτα σε κομμάτια: τα άλλα κομμάτια του νυχτερινού παραθύρου («άλλο κομμάτι»). Φαίνονται κάτω
-  /// από τη νύχτα, ΔΕΝ προστίθενται ούτε στη νύχτα ούτε στους υπνάκους.
+  /// Τα άλλα κομμάτια της νύχτας (εκτός από την κύρια περίοδο): κατά τον κοινό κανόνα με το ρολόι ([groupOura]),
+  /// μετρούν μαζί της ([counted]). Το κενό ανάμεσα δεν μετρά.
   final List<OuraSleep> pieces;
 
-  /// Η νύχτα είναι κάτω από 3 ώρες («Σύντομη νύχτα»).
-  bool get shortNight => main?.isShortNight ?? false;
+  /// Οι περίοδοι ύπνου που μετρούν ως η νύχτα, παλιότερη πρώτη: η κύρια και τα [pieces] (ίδιος κανόνας με τη νύχτα
+  /// του ρολογιού, έλεγχος 2, C1/U12). Το κενό ανάμεσα ΔΕΝ μετρά ως ύπνος. Πριν, μια νύχτα 23:00–01:30 και
+  /// 03:00–05:45 έδειχνε μόνο 2 ώρες 35 λεπτά και «άλλο κομμάτι (χωριστά)».
+  List<OuraSleep> get counted {
+    final m = main;
+    if (m == null) return const [];
+    if (pieces.isEmpty) return [m];
+    return [m, ...pieces]..sort((a, b) => a.start.compareTo(b.start));
+  }
+
+  /// Ο ύπνος της νύχτας σε λεπτά: το άθροισμα των περιόδων που μετρούν ([counted]), χωρίς τα κενά. Null αν η κύρια
+  /// δεν έχει διάρκεια ύπνου.
+  int? get nightMinutes {
+    final m = main;
+    if (m == null || m.total == null) return null;
+    final secs = counted.fold<int>(0, (s, x) => s + (x.total ?? 0));
+    return (secs / 60).round();
+  }
+
+  /// Η νύχτα είναι κάτω από 3 ώρες («Σύντομη νύχτα»). Ίδιος ορισμός για κάθε τύπο περιόδου (ο τύπος της Oura δεν αποφασίζει, συγχώνευση 4/11): ο ύπνος της νύχτας
+  /// (όλα τα κομμάτια που μετρούν) είναι κάτω από 3 ώρες.
+  bool get shortNight {
+    final m = nightMinutes;
+    return m != null && m < 180;
+  }
 
   /// Υπάρχει μόνο υπνάκος από το δαχτυλίδι, καμία νύχτα.
   bool get onlyNap => main == null && naps.isNotEmpty;
@@ -240,15 +266,19 @@ class OuraNight {
   int get napMinutes => naps.fold(0, (s, n) => s + (n.totalMinutes ?? 0));
   bool get hasAny => main != null || naps.isNotEmpty || others.isNotEmpty || pieces.isNotEmpty || daily != null;
 
-  /// Η νύχτα στη μορφή της εφαρμογής, για το υπνόγραμμα (μόνο φάσεις και ώρες).
+  /// Η νύχτα στη μορφή της εφαρμογής, για το υπνόγραμμα (μόνο φάσεις και ώρες). Νύχτα σε κομμάτια: από την αρχή
+  /// του πρώτου ως το τέλος του τελευταίου, με τις φάσεις όλων (το κενό μένει κενό).
   Night? toNight() {
     final m = main;
     if (m == null) return null;
+    final parts = counted;
     final n = Night(day)
-      ..start = m.start
-      ..end = m.end
-      ..minutes = m.totalMinutes ?? 0;
-    n.stages.addAll(m.stages);
+      ..start = parts.first.start
+      ..end = parts.last.end
+      ..minutes = nightMinutes ?? 0;
+    for (final p in parts) {
+      n.stages.addAll(p.stages);
+    }
     return n;
   }
 
@@ -305,50 +335,50 @@ OuraSleep? selectMainSleep(Iterable<OuraSleep> periods) {
   return best;
 }
 
-/// Το νυχτερινό παράθυρο της μέρας [day] (πρωινό): η περίοδος επικαλύπτει 00:00–06:00 της ίδιας μέρας (ώρα κινητού).
-bool inNightWindow(OuraSleep s, DateTime day) {
-  // Επικάλυψη με 00:00–06:00 (ώρα κινητού) της μέρας D: όχι απογευματινοί/βραδινοί υπνάκοι (π.χ. 19:00–21:00).
-  final from = DateTime(day.year, day.month, day.day);
-  final to = DateTime(day.year, day.month, day.day, 6);
-  return s.start.isBefore(to) && s.end.isAfter(from);
-}
-
-/// Χωρίς «long_sleep»: η σύντομη νύχτα = η «sleep» με τον περισσότερο ύπνο μέσα στο νυχτερινό παράθυρο
-/// (ποτέ «late_nap», «rest», «deleted»).
-OuraSleep? selectShortNight(Iterable<OuraSleep> periods, DateTime day) {
-  OuraSleep? best;
-  for (final p in periods) {
-    if (!p.isShortNight || !inNightWindow(p, day)) continue;
-    if (best == null || (p.total ?? -1) > (best.total ?? -1)) best = p;
-  }
-  return best;
-}
-
-/// Ομαδοποίηση ανά μέρα, παλιότερη πρώτη.
+/// Ομαδοποίηση ανά μέρα, παλιότερη πρώτη, με τον ΙΔΙΟ κανόνα νύχτας με το ρολόι ([groupSleepPieces], έλεγχος 2,
+/// C1/U12, συγχώνευση 4/11): κομμάτια με κενό ως 4 ώρες = μία νύχτα (το κενό δεν μετρά)· λαγοκοίμισμα που
+/// τελειώνει ως τις 22:00, πρωινό κομμάτι μετά τις 06:00 με κενό πάνω από 90 λεπτά (το Oura δεν έχει βήματα: «άγνωστα»)
+/// και απογευματινό κάτω από 3 ώρες = υπνάκοι. Ο τύπος της Oura (long_sleep/sleep/late_nap) ΔΕΝ αποφασίζει νύχτα ή
+/// υπνάκο· διαλέγει μόνο την κύρια περίοδο (της οποίας οι παλμοί/HRV/αναπνοές δείχνονται): η long_sleep με τον
+/// περισσότερο ύπνο, αλλιώς η μεγαλύτερη περίοδος. Ημερομηνία: η «day» της Oura (της μεγαλύτερης περιόδου).
 List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies) {
-  final byDay = <String, List<OuraSleep>>{};
-  for (final s in sleeps) {
-    if (s.type == 'rest' || s.type == 'deleted') continue;
-    byDay.putIfAbsent(dateKey(s.day), () => []).add(s);
-  }
-  final days = {...byDay.keys, ...dailies.keys}.toList()..sort();
+  final periods = [
+    for (final s in sleeps)
+      if (s.type != 'rest' && s.type != 'deleted') s,
+  ]..sort((a, b) => a.start.compareTo(b.start));
+  int mins(OuraSleep s) => s.totalMinutes ?? 0;
+  final grouped = groupSleepPieces<OuraSleep>(
+    periods,
+    (s) => (start: s.start, end: s.end, minutes: mins(s)),
+    dateOf: (parts) => parts.reduce((a, b) => mins(b) > mins(a) ? b : a).day,
+  );
+  final nightsByDay = <String, List<OuraSleep>>{
+    for (final n in grouped.nights) dateKey(n.date): n.parts,
+  };
+  final napsByDay = <String, List<OuraSleep>>{
+    for (final e in grouped.naps.entries) dateKey(e.key): e.value,
+  };
+  final days = {...nightsByDay.keys, ...napsByDay.keys, ...dailies.keys}.toList()..sort();
   return [
     for (final k in days)
       () {
-        final list = (byDay[k] ?? const <OuraSleep>[]).toList()..sort((a, b) => a.start.compareTo(b.start));
-        final day = parseDateKey(k);
-        final long = selectMainSleep(list);
-        final main = long ?? selectShortNight(list, day);
-        // Τα άλλα κομμάτια μιας σύντομης νύχτας (ίδιο παράθυρο): «άλλο κομμάτι», όχι υπνάκοι.
-        final pieces = long != null || main == null
-            ? const <OuraSleep>[]
-            : [for (final p in list) if (!identical(p, main) && p.isShortNight && inNightWindow(p, day)) p];
+        final parts = (nightsByDay[k] ?? const <OuraSleep>[]).toList()..sort((a, b) => a.start.compareTo(b.start));
+        final main = selectMainSleep(parts) ??
+            (parts.isEmpty ? null : parts.reduce((a, b) => (b.total ?? -1) > (a.total ?? -1) ? b : a));
+        // Κομμάτια που επικαλύπτονται με ό,τι ήδη μετρά (δεν συμβαίνει στην Oura): χωριστά, ποτέ δύο φορές.
+        final counted = <OuraSleep>[if (main != null) main];
+        final others = <OuraSleep>[];
+        for (final p in parts) {
+          if (identical(p, main)) continue;
+          final overlaps = counted.any((x) => p.start.isBefore(x.end) && p.end.isAfter(x.start));
+          (overlaps ? others : counted).add(p);
+        }
         return OuraNight(
-          day: day,
+          day: parseDateKey(k),
           main: main,
-          naps: [for (final p in list) if (p.isNap && !identical(p, main) && !pieces.any((x) => identical(x, p))) p],
-          others: [for (final p in list) if (p.isMain && !identical(p, main)) p],
-          pieces: pieces,
+          naps: (napsByDay[k] ?? const <OuraSleep>[]).toList()..sort((a, b) => a.start.compareTo(b.start)),
+          others: others,
+          pieces: [for (final p in counted) if (!identical(p, main)) p],
           daily: dailies[k],
         );
       }(),
@@ -385,19 +415,26 @@ Map<String, double> ouraRow(OuraNight n) {
 
   final m = n.main;
   if (m != null) {
-    put(K.sleepMin, m.total == null ? null : m.total! / 60);
-    final onset = m.onset;
+    // Νύχτα σε κομμάτια ([OuraNight.counted]): διάρκεια, φάσεις και ξύπνιος από όλα τα κομμάτια που μετρούν, ώρα
+    // ύπνου από το πρώτο, ξύπνημα από το τελευταίο (δεύτερος γύρος ελέγχου, U12). Παλμοί, HRV, αναπνοές: της κύριας
+    // περιόδου (μέσοι όροι της Oura ανά περίοδο· δεν ανακατεύονται).
+    final parts = n.counted;
+    int? sum(int? Function(OuraSleep) f) => parts.any((x) => f(x) == null) ? null : parts.fold<int>(0, (s, x) => s + f(x)!);
+    put(K.sleepMin, m.total == null ? null : parts.fold<int>(0, (s, x) => s + (x.total ?? 0)) / 60);
+    final onset = parts.first.onset;
     if (onset != null) put(K.bedtime, minutesFromSix(onset));
-    put(K.wake, minutesFromSix(m.end));
+    put(K.wake, minutesFromSix(parts.last.end));
     // Ποσοστό του ύπνου (χωρίς τον χρόνο ξύπνιος), όπως στην εφαρμογή Oura (έλεγχος υπολογισμών F6, 4/11).
-    if (m.deep != null && m.light != null && m.rem != null) {
-      final staged = m.deep! + m.light! + m.rem!;
+    final deep = sum((x) => x.deep), light = sum((x) => x.light), rem = sum((x) => x.rem);
+    if (deep != null && light != null && rem != null) {
+      final staged = deep + light + rem;
       if (staged > 0) {
-        put(K.deepPct, 100 * m.deep! / staged);
-        put(K.remPct, 100 * m.rem! / staged);
+        put(K.deepPct, 100 * deep / staged);
+        put(K.remPct, 100 * rem / staged);
       }
     }
-    put(K.awakeMin, m.awake == null ? null : m.awake! / 60);
+    final awake = sum((x) => x.awake);
+    put(K.awakeMin, awake == null ? null : awake / 60);
     put(K.sleepHr, m.avgHr);
     put(K.lowHr, m.lowestHr);
     put(K.hrv, m.avgHrv);

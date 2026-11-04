@@ -146,10 +146,13 @@ void main() {
       final r = computeTrend(def, h, add(ouraFrom, 10), TrendPeriod.month, plan: plan);
       expect(r.status, TrendStatus.sourceChange);
       expect(r.changedOn, ouraFrom);
-      // Αναφορά: μόνο οι μέρες από τη σύνδεση.
+      // Αναφορά (δεύτερος κλινικός έλεγχος K1, 4/11): ίδιος αισθητήρας, άρα ΟΛΕΣ οι 90 μέρες, με ένα κομμάτι για κάθε
+      // ορισμό της νύχτας (πριν: μόνο οι μέρες από τη σύνδεση, και χάνονταν οι νύχτες πριν από το Oura).
       final rep = buildReport(h, add(ouraFrom, 20), plan: plan);
-      expect(rep.stats[K.spo2Avg]!.since, ouraFrom);
-      expect(rep.stats[K.spo2Avg]!.values.every((v) => !v.$1.isBefore(ouraFrom)), isTrue);
+      expect(rep.stats[K.spo2Avg]!.since, isNull);
+      expect(rep.stats[K.spo2Avg]!.values.any((v) => v.$1.isBefore(ouraFrom)), isTrue);
+      expect([for (final p in rep.stats[K.spo2Avg]!.periods) p.night], [Source.watch, Source.oura]);
+      expect(rep.stats[K.spo2Avg]!.periods.last.from, ouraFrom);
     });
 
     test('Αποθήκευση και ανάγνωση του σχεδίου', () {

@@ -108,20 +108,34 @@ const _sameStem = {'vrast': 'vrasmen'};
 /// Λέξη μετά από «χωρίς» δεν σημαίνει ότι το τρόφιμο είναι αυτό («Σαρδέλα, χωρίς λάδι» δεν είναι λάδι).
 const _negation = 'horis';
 
-/// Ευρετήριο: για κάθε τρόφιμο, οι λέξεις του ονόματος και των άλλων ονομάτων σε φωνητική μορφή.
+/// Ευρετήριο: για κάθε τρόφιμο, οι λέξεις του ονόματος και τα άλλα ονόματα σε φωνητική μορφή.
+///
+/// Τα άλλα ονόματα με πολλές λέξεις ταιριάζουν ΜΟΝΟ ως φράση (δεύτερος έλεγχος διατροφής N1): το «ξερά σύκα»
+/// μετρά μόνο όταν η αναζήτηση έχει και το «ξερά» και το «σύκα». Πριν, η σκέτη λέξη «σύκα» έδινε στο ξερό σύκο
+/// (261 kcal) τον ίδιο βαθμό με το φρέσκο (68 kcal), και «καφές» έβρισκε «καφέ ρύζι».
 class FoodIndex {
   FoodIndex(this.foods)
       : _name = [for (final f in foods) _words(phonetic(f.name))],
-        _alias = [for (final f in foods) _words(phonetic('${f.aliases.join(' ')} ${f.brand ?? ''}'))] {
+        _alias = [
+          for (final f in foods)
+            [
+              for (final a in f.aliases)
+                if (_words(phonetic(a)) case final ws when ws.isNotEmpty) ws,
+              // Μάρκα: κάθε λέξη μόνη της (όπως πριν).
+              for (final w in _words(phonetic(f.brand ?? ''))) [w],
+            ],
+        ] {
     _nameStem = [for (final ws in _name) [for (final w in ws) stem(w)]];
-    _aliasStem = [for (final ws in _alias) [for (final w in ws) stem(w)]];
+    _aliasStem = [for (final phrases in _alias) [for (final ws in phrases) [for (final w in ws) stem(w)]]];
   }
 
   final List<Food> foods;
   final List<List<String>> _name;
-  final List<List<String>> _alias;
+
+  /// Για κάθε τρόφιμο: τα άλλα ονόματα, το καθένα ως λίστα λέξεων (φράση).
+  final List<List<List<String>>> _alias;
   late final List<List<String>> _nameStem;
-  late final List<List<String>> _aliasStem;
+  late final List<List<List<String>>> _aliasStem;
 
   /// Όπως [_search]· αν δεν βρεθεί τίποτα με λατινικά, δοκιμάζει και τις άλλες συνηθισμένες γραφές του
   /// greeklish: «x» για ξ («xeres» = ξερές), «h» για η («hliosporoi» = ηλιόσποροι), «au» για αυ («augo»).
@@ -163,11 +177,29 @@ class FoodIndex {
     var q = _words(p);
     if (q.isEmpty) q = _allWords(p);
     if (q.isEmpty) return (const <Food>[], 0.0);
+    final qStem = [for (final w in q) stem(w)];
+    // Μια φράση πολλών λέξεων ταιριάζει όταν ΚΑΘΕ λέξη της βρίσκεται στην αναζήτηση (ίδια, αρχή της, ή ίδια ρίζα).
+    bool phraseInQuery(List<String> words, List<String> stems) {
+      for (var k = 0; k < words.length; k++) {
+        var found = false;
+        for (var j = 0; j < q.length && !found; j++) {
+          found = words[k] == q[j] || words[k].startsWith(q[j]) || (qStem[j].length >= 3 && stems[k] == qStem[j]);
+        }
+        if (!found) return false;
+      }
+      return true;
+    }
+
     final scored = <(double, int)>[];
     var top = double.negativeInfinity;
     for (var i = 0; i < foods.length; i++) {
       var score = 0.0;
       var all = true;
+      // Ποιες φράσεις του τροφίμου ταιριάζουν με την αναζήτηση (οι μονολεκτικές πάντα).
+      final phrases = [
+        for (var a = 0; a < _alias[i].length; a++)
+          if (_alias[i][a].length == 1 || phraseInQuery(_alias[i][a], _aliasStem[i][a])) a,
+      ];
       for (final w in q) {
         final ws = stem(w);
         var best = 0.0;
@@ -188,18 +220,20 @@ class FoodIndex {
           if (s > 0 && k > 0 && _name[i][k - 1] == _negation) s = 1;
           if (s > best) best = s;
         }
-        for (var k = 0; k < _alias[i].length; k++) {
-          final aw = _alias[i][k];
-          // Τα «άλλα ονόματα» είναι επιλεγμένα με το χέρι: ακριβές ταίριασμα μετρά σχεδόν όσο το όνομα.
-          // Ίδια ρίζα μόνο λίγο («φέτα» ≠ «τυρί σε φέτες»).
-          final s = aw == w
-              ? 9.0
-              : aw.startsWith(w)
-                  ? 4.0
-                  : (ws.length >= 3 && _aliasStem[i][k] == ws)
-                      ? 3.0
-                      : 0.0;
-          if (s > best) best = s;
+        for (final a in phrases) {
+          for (var k = 0; k < _alias[i][a].length; k++) {
+            final aw = _alias[i][a][k];
+            // Τα «άλλα ονόματα» είναι επιλεγμένα με το χέρι: ακριβές ταίριασμα μετρά σχεδόν όσο το όνομα.
+            // Ίδια ρίζα μόνο λίγο («φέτα» ≠ «τυρί σε φέτες»).
+            final s = aw == w
+                ? 9.0
+                : aw.startsWith(w)
+                    ? 4.0
+                    : (ws.length >= 3 && _aliasStem[i][a][k] == ws)
+                        ? 3.0
+                        : 0.0;
+            if (s > best) best = s;
+          }
         }
         if (best == 0) {
           all = false;
@@ -217,6 +251,10 @@ class FoodIndex {
       score -= f.name.length / 60; // τα πιο σύντομα ονόματα λίγο πιο πάνω
       scored.add((score, i));
     }
+    // Μία ολόκληρη λέξη 5+ γραμμάτων που βρίσκεται μόνο ΜΕΣΑ σε άλλη λέξη (π.χ. «σαλάτα» → «Φρουτοσαλάτα»):
+    // κανένα αποτέλεσμα, όχι ένα άσχετο τρόφιμο που μοιάζει με απάντηση (δεύτερος έλεγχος διατροφής N5). Η κάρτα
+    // «Δεν βρέθηκε» προτείνει barcode ή υλικά ένα-ένα.
+    if (q.length == 1 && q.first.length >= 5 && top <= 2) return (const <Food>[], top);
     scored.sort((a, b) => b.$1.compareTo(a.$1));
     return ([for (final s in scored.take(limit)) foods[s.$2]], top);
   }

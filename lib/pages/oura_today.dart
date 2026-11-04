@@ -32,6 +32,9 @@ class OuraStatusCard extends StatelessWidget {
     final s = store.ouraStatus;
     final missing = store.ouraMissingNights;
     final last = store.lastOuraNight;
+    // Σφάλμα με παλιά δεδομένα στην οθόνη: λέμε ως πότε είναι (έλεγχος UX U5· ποτέ «χθες βράδυ» για παλιά νύχτα).
+    final synced = store.ouraLastSync;
+    final syncedText = synced == null ? '' : ' Ό,τι βλέπεις ήρθε ως τον τελευταίο συγχρονισμό, ${shortDayDate(synced)} ${hm(synced)}.';
     final (title, text, color, button) = switch (s) {
       OuraStatus.waiting => (
           'Περιμένει το Oura',
@@ -73,7 +76,7 @@ class OuraStatusCard extends StatelessWidget {
           'Το Oura συνδέθηκε. ${now.hour < 4 ? 'Όταν ξυπνήσεις, άνοιξε' : 'Άνοιξε'} την εφαρμογή Oura για να συγχρονίσει, '
               'και μετά γύρνα εδώ. Ο ύπνος έρχεται μόνο από το δαχτυλίδι.',
           c.sleep,
-          store.canWatchLastNight && now.hour >= 4 ? 'Oura' : null,
+          store.canWatchLastNight && now.hour >= 4 ? 'Ρυθμίσεις Oura' : null,
         ),
       OuraStatus.incomplete => (
           'Η σύνδεση δεν ολοκληρώθηκε',
@@ -90,16 +93,21 @@ class OuraStatusCard extends StatelessWidget {
       OuraStatus.reconnect => (
           'Χρειάζεται νέα σύνδεση με το Oura',
           'Γίνεται μετά από αλλαγή κινητού ή αν αφαιρέσεις την άδεια στην Oura. Δεν χάνεται τίποτα· οι νύχτες που '
-              'έλειψαν έρχονται μετά.',
+              'έλειψαν έρχονται μετά.$syncedText',
           c.bad,
           'Σύνδεση ξανά',
         ),
-      OuraStatus.subscription => ('Η Oura δεν δίνει δεδομένα', ouraErrorText(OuraErrorKind.subscription), c.bad, null),
+      OuraStatus.subscription => (
+          'Η Oura δεν δίνει νέα δεδομένα',
+          '${ouraErrorText(OuraErrorKind.subscription)}$syncedText',
+          c.bad,
+          null,
+        ),
       OuraStatus.disconnected => (
           'Ο ύπνος δεν έχει πηγή',
           'Το Oura αποσυνδέθηκε. Οι νύχτες μένουν κενές ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι.',
           c.textSecondary,
-          'Oura',
+          'Ρυθμίσεις Oura',
         ),
       _ => ('', '', c.textSecondary, null),
     };
@@ -167,14 +175,30 @@ class OuraSleepTodayCard extends StatelessWidget {
     Widget body;
     if (m == null) {
       final reason = store.ouraNightReason(today, now);
-      body = Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Text(
-          reason == null ? 'Δεν υπάρχουν δεδομένα από το δαχτυλίδι' : emptyNightText(reason),
-          style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w700),
-        ),
+      // Η τελευταία νύχτα που ήρθε, ΜΕ την ημερομηνία της (έλεγχος UX U5): ποτέ ως «χθες βράδυ».
+      final older = store.lastOuraNight;
+      final olderMinutes = older == null || sameDay(older.day, today) ? null : older.nightMinutes;
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              reason == null ? 'Δεν υπάρχουν δεδομένα από το δαχτυλίδι' : emptyNightText(reason),
+              style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (olderMinutes != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Τελευταία νύχτα που ήρθε: ${shortDayDate(older!.day)} · ${hoursMinutes(olderMinutes)}',
+              key: const ValueKey('oura-today-older-night'),
+              style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
       );
-      // «Μόνο υπνάκος»: οι ώρες του φαίνονται (π.χ. σύντομη νύχτα που τελείωσε πριν από τα μεσάνυχτα).
+      // «Μόνο υπνάκος»: οι ώρες του φαίνονται (π.χ. λαγοκοίμισμα που τελείωσε ως τις 22:00).
       if (reason == EmptyNight.onlyNap && napTimes(night, nightOnly: true).isNotEmpty) {
         body = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -190,17 +214,12 @@ class OuraSleepTodayCard extends StatelessWidget {
         );
       }
     } else {
-      // Συνηθισμένη διάρκεια: μόνο από νύχτες του Oura (το ίδιο κομμάτι πηγής), τουλάχιστον 4.
-      final usual = <double>[];
-      final seg = store.plan.segmentStart(K.sleepMin, today);
-      for (var i = 1; i <= 7; i++) {
-        final d = DateTime(today.year, today.month, today.day - i);
-        if (seg != null && d.isBefore(seg)) break;
-        final v = store.plan.value(store.history, K.sleepMin, d);
-        if (v != null) usual.add(v);
-      }
-      final base = usual.length >= minNightsForAverage ? usual.reduce((a, b) => a + b) / usual.length : null;
-      final diff = base == null || m.totalMinutes == null ? null : m.totalMinutes! - base.round();
+      // Συνηθισμένη διάρκεια: ο ίδιος κανόνας «συνήθως» με όλη την εφαρμογή (μεσαία τιμή έως 14 προηγούμενων νυχτών,
+      // τουλάχιστον 7), μόνο από νύχτες του Oura του ίδιου κομματιού πηγής (έλεγχος υπολογισμών C7, D9).
+      final minutes = night!.nightMinutes;
+      final base = ouraBaseline(store.history, store.plan, K.sleepMin, today)?.usual;
+      final diff = base == null || minutes == null ? null : minutes - base.round();
+      final parts = night.counted;
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -208,24 +227,27 @@ class OuraSleepTodayCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: m.totalMinutes == null
+                child: minutes == null
                     ? const Text('—', style: TextStyle(color: white, fontSize: 42, fontWeight: FontWeight.w800))
-                    : DurationValue(m.totalMinutes!, size: 42, color: white, unitColor: soft),
+                    : DurationValue(minutes, size: 42, color: white, unitColor: soft),
               ),
-              const SizedBox(width: 12),
-              Column(
-                children: [
-                  ScoreRing(
-                    value: night!.sleepScore?.toDouble(),
-                    size: 60,
-                    stroke: 6,
-                    color: c.ring,
-                    track: Colors.white.withValues(alpha: 0.16),
-                  ),
-                  const SizedBox(height: 4),
-                  EstimateNote('σκορ · εκτίμηση', onDark: true),
-                ],
-              ),
+              // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8, ίδιο με το ρολόι).
+              if (night.sleepScore != null) ...[
+                const SizedBox(width: 12),
+                Column(
+                  children: [
+                    ScoreRing(
+                      value: night.sleepScore!.toDouble(),
+                      size: 60,
+                      stroke: 6,
+                      color: c.ring,
+                      track: Colors.white.withValues(alpha: 0.16),
+                    ),
+                    const SizedBox(height: 4),
+                    EstimateNote('σκορ · εκτίμηση', onDark: true),
+                  ],
+                ),
+              ],
             ],
           ),
           if (diff != null) ...[
@@ -244,12 +266,12 @@ class OuraSleepTodayCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Κοιμήθηκες ${m.onset == null ? '—' : hm(m.onset!)}',
+                  'Κοιμήθηκες ${parts.first.onset == null ? '—' : hm(parts.first.onset!)}',
                   style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600, fontFeatures: tabular),
                 ),
               ),
               Text(
-                'Ξύπνησες ${hm(m.end)}',
+                'Ξύπνησες ${hm(parts.last.end)}',
                 style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600, fontFeatures: tabular),
               ),
             ],
@@ -258,8 +280,8 @@ class OuraSleepTodayCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               [
-                if (night.shortNight) shortNightLabel,
-                if (night.pieces.isNotEmpty) 'και άλλο κομμάτι ${hm(night.pieces.first.start)}–${hm(night.pieces.first.end)} (χωριστά)',
+                if (night.shortNight && (minutes ?? 0) < 180) shortNightLabel,
+                if (parts.length > 1) 'σε ${parts.length} κομμάτια: ${[for (final p in parts) '${hm(p.start)}–${hm(p.end)}'].join(' και ')} (το κενό δεν μετρά)',
               ].join(' · '),
               style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
             ),
@@ -334,12 +356,13 @@ class OuraRestCard extends StatelessWidget {
     final temp = plan.value(store.history, K.skinTemp, day);
     final readiness = plan.value(store.history, K.energy, day);
 
-    String note(NightBaseline? b, {required double same, String up = 'πάνω', String down = 'κάτω'}) {
+    // Ίδια λέξη «συνήθως» και η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6/C7, UX U7).
+    String note(NightBaseline? b, {required double same}) {
       if (b == null) return '—';
       if (b.usual == null) return 'μαθαίνει';
-      final d = b.diff!;
-      if (d.abs() < same) return 'συνηθισμένο';
-      return '${d.abs().round()} ${d > 0 ? up : down}';
+      final d = b.value.round() - b.usual!.round();
+      if (d.abs() < same) return 'όπως συνήθως';
+      return 'συνήθως ${b.usual!.round()}';
     }
 
     Widget cell(String label, String value, String unit, String sub) => Expanded(
@@ -372,11 +395,12 @@ class OuraRestCard extends StatelessWidget {
           Row(children: [
             cell('HRV (RMSSD)', hrv == null ? '—' : '${hrv.value.round()}', 'ms', note(hrv, same: 3)),
             cell('Παλμοί στον ύπνο', hr == null ? '—' : '${hr.value.round()}', 'bpm', note(hr, same: 2)),
+            // Πάντα ως απόκλιση από το συνηθισμένο, ποτέ σαν θερμοκρασία σώματος (κλινικός έλεγχος M7, UX U4).
             cell(
               'Θερμοκρασία',
               temp == null ? '—' : signedDec(temp),
               '°C',
-              temp == null ? '—' : (temp.abs() < 0.3 ? 'συνηθισμένη' : (temp > 0 ? 'πιο ζεστά' : 'πιο κρύα')),
+              temp == null ? '—' : 'απόκλιση από το συνηθισμένο',
             ),
           ]),
           const Hairline(vertical: 12),

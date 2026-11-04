@@ -132,7 +132,7 @@ void main() {
     return changed / tested;
   }
 
-  test('Αυτοσυσχέτιση με κενές μέρες: ψεύτικο «άλλαξε» ≤ ~1,5% (προσομοίωση)', () {
+  test('Αυτοσυσχέτιση με κενές μέρες: ψεύτικο «άλλαξε» κατά προσέγγιση ≤ 1,5% σε μοντέλο AR(1) (προσομοίωση· όχι για αργές μεταβολές)', () {
     // Μόνο ο στατιστικός έλεγχος (ελάχιστη διαφορά 0): το αυστηρότερο σενάριο.
     const pure = MetricDef(key: K.sleepHr, label: 'x', section: TrendSection.heart, minDiff: 0, unit: 'bpm');
     final rates = [
@@ -147,7 +147,7 @@ void main() {
     expect(falseChangeRate(def(K.sleepHr), 0.85, 400, 7100, sd: 3), lessThanOrEqualTo(0.015));
   });
 
-  test('Ζυγίσεις μέρα παρά μέρα: ψεύτικο «Βάρος άλλαξε» ≤ ~1,5% (πριν: ~20–25%)', () {
+  test('Ζυγίσεις μέρα παρά μέρα: ψεύτικο «Βάρος άλλαξε» κατά προσέγγιση ≤ 1,5% σε μοντέλο AR(1) (πριν: ~20–25%)', () {
     expect(falseChangeRate(def(K.weight), 0.95, 400, 7200, sd: 0.5, coverage: 1, every: 2), lessThanOrEqualTo(0.015));
   });
 

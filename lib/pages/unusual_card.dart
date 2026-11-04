@@ -83,8 +83,9 @@ class _UnusualCardState extends State<UnusualCard> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(16)),
               child: Text(
-                'Συνηθισμένο σου = η μεσαία τιμή των $unusualBaselineDays προηγούμενων ημερών '
-                '(τουλάχιστον $unusualMinBaseline με μέτρηση). Ένας δείκτης μετράει μόνο αν ξεφύγει '
+                'Συνήθως = η μεσαία τιμή των $usualNights πιο πρόσφατων μετρήσεων, ίδια με όλη την εφαρμογή· οι '
+                'συνηθισμένες διακυμάνσεις σου από τις $unusualBaselineDays προηγούμενες μέρες (τουλάχιστον '
+                '$unusualMinBaseline με μέτρηση). Ένας δείκτης μετράει μόνο αν ξεφύγει '
                 'και πάνω από ένα ελάχιστο ('
                 '${r.signals.any((s) => s.source == Source.oura) ? 'παλμοί ύπνου +3 bpm, απόκλιση θερμοκρασίας +0,4 °C, ετοιμότητα του Oura −10' : 'παλμοί +3 bpm, δέρμα +0,4 °C, Energy Score −10'}) '
                 'και πάνω από τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις σου. '
@@ -110,10 +111,11 @@ class _SignalRow extends StatelessWidget {
     final c = Aigaio.of(context);
     final def = s.rule.def;
     final oura = s.source == Source.oura;
-    // Η θερμοκρασία του Oura είναι απόκλιση (με πρόσημο), ποτέ απόλυτη θερμοκρασία καρπού.
-    final deviation = oura && def.key == K.skinTemp;
-    String fmt(double v) => deviation ? '${signedDec(v)} °C' : def.format(v);
-    final diff = s.value - s.usual;
+    // Θερμοκρασία: ΠΑΝΤΑ ως απόκλιση από το συνηθισμένο, ποτέ απόλυτη θερμοκρασία καρπού (π.χ. «35,9 °C» διαβαζόταν
+    // ως θερμοκρασία σώματος· δεύτερος κλινικός έλεγχος M7, ίδιος κανόνας με τη Σήμερα, L5).
+    final deviation = def.key == K.skinTemp;
+    // Η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6): «62 · συνήθως 58 · +4», ποτέ «+3».
+    final diff = def.rounded(s.value) - def.rounded(s.usual);
     final sign = diff >= 0 ? '+' : '−';
     final diffText = def.digits == 0 ? '$sign${diff.abs().round()}' : '$sign${dec(diff.abs(), def.digits)}';
     return Padding(
@@ -132,11 +134,13 @@ class _SignalRow extends StatelessWidget {
               children: [
                 Text(metricLabel(def, s.source), style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 Text(
-                  fmt(s.value),
+                  deviation ? '${signedDec(diff)} °C' : def.format(s.value),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                 ),
                 Text(
-                  'συνήθως ${fmt(s.usual)}${oura ? ' · Oura' : ''}',
+                  deviation
+                      ? 'απόκλιση από το συνηθισμένο σου · όχι θερμοκρασία σώματος${oura ? ' · Oura' : ''}'
+                      : 'συνήθως ${def.format(s.usual)}${oura ? ' · Oura' : ''}',
                   style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
                 ),
               ],

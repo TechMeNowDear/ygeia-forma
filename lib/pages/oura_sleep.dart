@@ -73,7 +73,7 @@ class OuraSleepPage extends StatelessWidget {
     );
 
     final heart = _OuraHeartCard(store: store, day: last?.day ?? today);
-    final breath = _BreathCard(store: store, day: last?.day ?? today);
+    final breath = _BreathCard(store: store, day: last?.day ?? today, now: now);
 
     final compare = plan.compareActive(today)
         ? AppCard(
@@ -85,11 +85,11 @@ class OuraSleepPage extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Έλεγχος με το ρολόι · ως ${shortDayDate(plan.compareUntil!)}',
+                    'Σύγκριση με το ρολόι (έως ${shortDayDate(plan.compareUntil!)})',
                     style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text),
                   ),
                 ),
-                Text('Σύγκριση', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.primary)),
+                Text('Άνοιγμα', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.primary)),
                 Icon(Icons.chevron_right_rounded, color: c.primary),
               ],
             ),
@@ -166,8 +166,10 @@ class _OuraNightCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final m = night.main!;
     final n = night.toNight()!;
+    // Νύχτα σε κομμάτια (ως 4 ώρες κενό): μετρούν όλα μαζί, το κενό όχι (δεύτερος γύρος ελέγχου, U12).
+    final parts = night.counted;
+    final minutes = night.nightMinutes;
     Widget clock(String label, DateTime? t) => Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,7 +201,7 @@ class _OuraNightCard extends StatelessWidget {
             ),
             const SourceTag(Source.oura),
           ]),
-          if (night.shortNight) ...[
+          if (night.shortNight && (minutes ?? 0) < 180) ...[
             const SizedBox(height: 8),
             Text(shortNightLabel,
                 key: const ValueKey('oura-short-night'),
@@ -209,23 +211,25 @@ class _OuraNightCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: m.totalMinutes == null
+                child: minutes == null
                     ? Text('—', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: c.text))
-                    : DurationValue(m.totalMinutes!, size: 30),
+                    : DurationValue(minutes, size: 30),
               ),
-              ScoreRing(
-                value: night.sleepScore?.toDouble(),
-                size: 64,
-                stroke: 6,
-                color: c.sleep,
-                track: c.tint(c.sleep),
-                textColor: c.text,
-                caption: 'σκορ · εκτίμηση',
-              ),
+              // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8).
+              if (night.sleepScore != null)
+                ScoreRing(
+                  value: night.sleepScore!.toDouble(),
+                  size: 64,
+                  stroke: 6,
+                  color: c.sleep,
+                  track: c.tint(c.sleep),
+                  textColor: c.text,
+                  caption: 'σκορ · εκτίμηση',
+                ),
             ],
           ),
           const SizedBox(height: 14),
-          Row(children: [clock('Ξάπλωσες', m.start), clock('Κοιμήθηκες', m.onset), clock('Ξύπνησες', m.end)]),
+          Row(children: [clock('Ξάπλωσες', parts.first.start), clock('Κοιμήθηκες', parts.first.onset), clock('Ξύπνησες', parts.last.end)]),
           if (n.stages.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text('Πώς κύλησε η νύχτα · εκτίμηση του Oura', style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -233,16 +237,24 @@ class _OuraNightCard extends StatelessWidget {
             Hypnogram(night: n, height: 64),
             const SizedBox(height: 4),
             Row(children: [
-              Text(hm(m.start), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+              Text(hm(n.start), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
               const Spacer(),
-              Text(hm(m.end), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+              Text(hm(n.end), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
             ]),
           ],
-          if (night.naps.isNotEmpty || night.others.isNotEmpty || night.pieces.isNotEmpty) ...[
+          if (parts.length > 1) ...[
             const Hairline(vertical: 12),
-            // Άλλα κομμάτια ύπνου της ίδιας νύχτας: φαίνονται χωριστά, ποτέ δεν προστίθενται στη νύχτα.
-            for (final x in night.pieces)
-              InfoRow('Άλλο κομμάτι ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+            for (final x in parts)
+              InfoRow('Κομμάτι ${hm(x.start)}–${hm(x.end)}', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+            InfoRow(
+              'Κενό ανάμεσα (δεν μετρά)',
+              hoursMinutes([for (var i = 1; i < parts.length; i++) parts[i].start.difference(parts[i - 1].end).inMinutes].fold(0, (a, b) => a + b)),
+              dot: c.textTertiary,
+            ),
+          ],
+          if (night.naps.isNotEmpty || night.others.isNotEmpty) ...[
+            const Hairline(vertical: 12),
+            // Υπνάκοι κατά τον κοινό κανόνα με το ρολόι, και περίοδοι που επικαλύπτονται: χωριστά, δεν προστίθενται.
             for (final x in night.naps)
               InfoRow('Υπνάκος ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
             for (final x in night.others)
@@ -337,9 +349,10 @@ class _OuraHeartCard extends StatelessWidget {
 
 /// Αναπνοή (Oura) και οξυγόνο (ρολόι): δύο γραμμές, κάθε μία με την πηγή της. Ποτέ μαζί σε μία τιμή.
 class _BreathCard extends StatelessWidget {
-  const _BreathCard({required this.store, required this.day});
+  const _BreathCard({required this.store, required this.day, required this.now});
   final HealthStore store;
   final DateTime day;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
@@ -354,6 +367,7 @@ class _BreathCard extends StatelessWidget {
     final g = oxygenGuidance(
       store.data?.spo2MinByNight(day, ouraNights: true, windows: windows, since: oxSeg) ?? const {},
       day,
+      today: now,
     );
 
     Widget row(String title, String sub, Source s) => Padding(
@@ -377,12 +391,13 @@ class _BreathCard extends StatelessWidget {
           ),
         );
 
+    // Η ίδια λέξη «συνήθως» και η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6/C7).
     String breathNote() {
       if (b == null) return 'Δεν υπάρχει για αυτή τη νύχτα';
       if (b.usual == null) return 'Το συνηθισμένο σου βγαίνει μετά από $minNightsForBaseline νύχτες';
-      final d = b.diff!;
-      if (d.abs() < 1) return 'Συνηθισμένες για σένα (συνήθως ${dec(b.usual!)})';
-      return '${dec(d.abs())} ${d > 0 ? 'πάνω' : 'κάτω'} από τις συνηθισμένες σου (${dec(b.usual!)})';
+      final d = double.parse(b.value.toStringAsFixed(1)) - double.parse(b.usual!.toStringAsFixed(1));
+      if (d.abs() < 1) return 'Όπως συνήθως (${dec(b.usual!)})';
+      return '${signedDec(d)} · συνήθως ${dec(b.usual!)}';
     }
 
     return AppCard(
@@ -400,13 +415,14 @@ class _BreathCard extends StatelessWidget {
                     ? 'Δεν υπάρχουν μετρήσεις του ρολογιού μέσα στις ώρες ύπνου'
                     : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο μένει κενό')
                 : 'Χαμηλότερο ${lowestText(ox.min)}% · ενδεικτικό'
-                    '${ox.below90 == null ? '' : ' · κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ενδεικτικό)'}',
+                    // Κλινικός έλεγχος L6: ο χρόνος από τον καρπό δεν είναι το T90 μιας οξυμετρίας.
+                    '${ox.below90 == null ? '' : ' · χρόνος κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ρολόι, ενδεικτικό· όχι T90 οξυμετρίας)'}',
             Source.watch,
           ),
           const SizedBox(height: 6),
-          // Κλινικός έλεγχος C1 (4/11): το τεστ άπνοιας του ρολογιού είναι διαλογή, όχι «το σωστό εργαλείο».
-          Text(oxygenAboutText, style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4)),
-          const SizedBox(height: 10),
+          // Κλινικός έλεγχος C1/M3 (4/11): το τεστ άπνοιας του ρολογιού είναι διαλογή· το πλήρες κείμενο με «Τι σημαίνει».
+          const OxygenAbout(),
+          const SizedBox(height: 4),
           OxygenNotes(guidance: g),
         ],
       ),
@@ -426,6 +442,7 @@ class _NightLine extends StatelessWidget {
     final c = Aigaio.of(context);
     final m = night?.main;
     final n = night?.toNight();
+    final minutes = night?.nightMinutes;
     return AppCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
@@ -444,7 +461,10 @@ class _NightLine extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      m == null ? emptyNightText(reason ?? EmptyNight.noRing) : '${hm(m.onset ?? m.start)} – ${hm(m.end)}',
+                      m == null
+                          ? emptyNightText(reason ?? EmptyNight.noRing)
+                          : '${hm(night!.counted.first.onset ?? night!.counted.first.start)} – ${hm(night!.counted.last.end)}'
+                              '${night!.counted.length > 1 ? ' · ${night!.counted.length} κομμάτια' : ''}',
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontFeatures: tabular),
                     ),
                   ],
@@ -455,7 +475,7 @@ class _NightLine extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      m.totalMinutes == null ? '—' : hoursMinutes(m.totalMinutes!),
+                      minutes == null ? '—' : hoursMinutes(minutes),
                       style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 15, fontFeatures: tabular),
                     ),
                     if (night!.sleepScore != null)
