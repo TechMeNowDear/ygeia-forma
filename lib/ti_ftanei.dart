@@ -336,8 +336,11 @@ class _TodayCard extends StatelessWidget {
         .cast<Map<String, dynamic>>();
     final todaySteps = steps.isNotEmpty ? steps.first['value'] : null;
 
+    // Κενό ανάμεσα στις στήλες: στα 360 dp το «Θερμίδες που έκαψες» κολλούσε στο «Ενεργές θερμίδες».
     Widget tile(String label, Object? value) => Expanded(
-          child: Column(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -347,6 +350,7 @@ class _TodayCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(label, style: TextStyle(color: c.textSecondary)),
             ],
+          ),
           ),
         );
 
