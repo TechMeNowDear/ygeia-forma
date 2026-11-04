@@ -1,6 +1,7 @@
 // release-fix2: μέρα με μόνο υπνάκο (καμία νύχτα) φαίνεται στη λίστα του Ύπνου ως «Μόνο υπνάκος», με ώρες και σύνολο,
 // χωρίς να μετρά σε κανένα στατιστικό νύχτας. Ρολόι και Oura.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/format.dart';
@@ -38,6 +39,15 @@ Map<String, dynamic> napOnlyJson(DateTime now, DateTime day) {
 }
 
 void main() {
+  // Η γραμματοσειρά της εφαρμογής (με την προεπιλογή των δοκιμών κάθε γράμμα είναι τετράγωνο και οι γραμμές ξεχειλίζουν).
+  setUpAll(() async {
+    final inter = FontLoader('Inter');
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+      inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+    }
+    await inter.load();
+  });
+
   final now = DateTime(2026, 10, 24, 16, 30);
   final today = dayOf(now);
   final day = DateTime(today.year, today.month, today.day - 3);
