@@ -262,7 +262,8 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // S-C: χωρίς long_sleep, η νύχτα = η μεγαλύτερη «sleep» στο νυχτερινό παράθυρο· ποτέ άθροισμα.
+  // S-C: χωρίς long_sleep, η νύχτα = η μεγαλύτερη «sleep» στο νυχτερινό παράθυρο, μαζί με τα κομμάτια του ίδιου
+  // παραθύρου που απέχουν ως 4 ώρες (δεύτερος γύρος ελέγχου, U12).
   group('Σύντομη νύχτα (μόνο «sleep»)', () {
     final d = DateTime(2026, 11, 3);
     var seq = 0;
@@ -318,7 +319,9 @@ void main() {
       expect(emptyNightText(r!), 'Μόνο υπνάκος από το δαχτυλίδι');
     });
 
-    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η άλλη «άλλο κομμάτι», ποτέ άθροισμα', () {
+    // Δεύτερος γύρος ελέγχου (U12, ίδιος κανόνας με τη νύχτα του ρολογιού C1): κομμάτια με κενό ως 4 ώρες μετρούν
+    // μαζί, το κενό όχι. Πριν: «μόνο η κύρια (160′)», ενώ κοιμήθηκε ~5 ώρες σε δύο κομμάτια.
+    test('Δύο «sleep» 23:00–01:30 και 03:00–05:45: κύρια η μεγαλύτερη, η νύχτα = άθροισμα των κομματιών (όχι το κενό)', () {
       final n = only([
         rec('sleep', at(2, 23, 0), at(3, 1, 30)),
         rec('sleep', at(3, 3, 0), at(3, 5, 45)),
@@ -328,9 +331,13 @@ void main() {
       expect(hm(n.pieces.single.start), '23:00');
       expect(n.naps, isEmpty);
       final row = ouraRow(n);
-      expect(row[ouraKeys[K.sleepMin]], 160, reason: 'μόνο η κύρια (165′ − 5′)');
+      expect(row[ouraKeys[K.sleepMin]], 305, reason: '145′ + 160′, χωρίς τα 90′ του κενού');
+      expect(n.nightMinutes, 305);
+      expect(n.counted.length, 2);
+      expect(n.separatePieces, isEmpty);
+      expect(row[ouraKeys[K.bedtime]], isNull, reason: 'χωρίς «latency» δεν ξέρουμε πότε αποκοιμήθηκε');
       expect(row.containsKey(ouraKeys[K.napMin]), isFalse);
-      // Αποθήκευση και ανάγνωση: το κομμάτι μένει χωριστά.
+      // Αποθήκευση και ανάγνωση: το κομμάτι μένει ως κομμάτι και μετρά ξανά το ίδιο.
       final back = decodeOuraNights(encodeOuraNights([n])).single;
       expect(back.pieces.length, 1);
       expect(ouraRow(back), row);

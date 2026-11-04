@@ -5,6 +5,9 @@
 /// - Ηρεμία (ξύπνιος): χωρίς βήματα στη μέτρηση ΚΑΙ στα προηγούμενα 20 λεπτά.
 /// - Εξαιρούνται ύπνος και ασκήσεις.
 /// - Διάμεσος με βάρος τη διάρκεια· κάτω από 30 λεπτά δεδομένων δεν βγαίνει τιμή.
+/// - «Μέσος όρος ημέρας» (ξύπνιος, όλες οι καταστάσεις): μόνο με τουλάχιστον 6 ώρες μετρήσεων (δεύτερος έλεγχος
+///   υπολογισμών C11). Πριν αρκούσαν 30 λεπτά: μια μέρα με το ρολόι 35 λεπτά το βράδυ έδινε «μέσο όρο ημέρας» ίσο
+///   με τους παλμούς ηρεμίας και μετρούσε στις Τάσεις.
 library;
 
 import 'data.dart';
@@ -13,6 +16,7 @@ import 'format.dart';
 enum HeartBand { still, light, walk, brisk }
 
 const minMinutesForValue = 30;
+const minMinutesForDayValue = 360;
 const restLeadMinutes = 20;
 
 String bandLabel(HeartBand b) => switch (b) {
@@ -171,9 +175,9 @@ extension HeartByDay on Dashboard {
     }
 
     double minutesOf(List<_W> l) => l.fold<double>(0, (t, w) => t + w.weight);
-    HeartFigure figure(List<_W> l, {bool mean = false}) {
+    HeartFigure figure(List<_W> l, {bool mean = false, num min = minMinutesForValue}) {
       final m = minutesOf(l);
-      if (m < minMinutesForValue) return HeartFigure(null, m);
+      if (m < min) return HeartFigure(null, m);
       return HeartFigure(mean ? weightedMean(l) : weightedMedian(l), m);
     }
 
@@ -184,7 +188,7 @@ extension HeartByDay on Dashboard {
       typicalInterval: intervals.isEmpty ? null : intervals[intervals.length ~/ 2],
       excludedSleepMinutes: sleepMinutes,
       excludedExerciseMinutes: exerciseMinutes,
-      awake: figure(awake, mean: true),
+      awake: figure(awake, mean: true, min: minMinutesForDayValue),
       resting: figure(resting),
       bands: {for (final b in HeartBand.values) b: figure(bands[b]!)},
     );

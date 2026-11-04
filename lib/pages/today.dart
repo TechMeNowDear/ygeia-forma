@@ -188,9 +188,11 @@ class TodayPage extends StatelessWidget {
     if (last?.weight != null && prev?.weight != null) {
       final diff = last!.weight! - prev!.weight!;
       trend = TrendPill(
-        '${signedDec(diff)} kg από ${dayMonth(prev.time)}',
+        // Σύντομη ημερομηνία και έως 2 γραμμές: στα 360 dp το «από 13 Αυγ» κοβόταν (έλεγχος UX U2).
+        '${signedDec(diff)} kg από ${prev.time.day}/${prev.time.month}',
         // Ουδέτερο χρώμα: χωρίς στόχο (μετά τον γιατρό) ούτε η πτώση ούτε η άνοδος είναι «καλή» ή «κακή».
         kind: TrendKind.neutral,
+        maxLines: 2,
       );
     }
     final weights = [for (final b in d.body) if (b.weight != null) b.weight!];
@@ -232,11 +234,12 @@ class TodayPage extends StatelessWidget {
     final base = d.restingHrBaseline;
     Widget? trend;
     if (hr != null && base != null) {
-      final diff = (hr - base).round();
+      // Η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6) και η ίδια λέξη «συνήθως» παντού (C7/U7).
+      final diff = hr.round() - base.round();
       trend = diff == 0
           ? const TrendPill('Όπως συνήθως')
           : TrendPill(
-              '${diff > 0 ? '+' : '−'}${diff.abs()} από τον μ.ό.',
+              '${diff > 0 ? '+' : '−'}${diff.abs()} · συνήθως ${base.round()}',
               up: diff > 0,
               // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4).
               kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
@@ -265,7 +268,7 @@ class TodayPage extends StatelessWidget {
     final ox = d.watchSpo2(now, windows);
     final noWindow = !windows.mains.containsKey(dateKey(dayOf(now)));
     // Σημείωση χαμηλού οξυγόνου (B7) με τις τιμές του ορισμού A4, μόνο νύχτες της ίδιας εποχής.
-    final g = oxygenGuidance(d.spo2MinByNight(now, ouraNights: true, windows: windows, since: oxSince), now);
+    final g = oxygenGuidance(d.spo2MinByNight(now, ouraNights: true, windows: windows, since: oxSince), now, today: now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
@@ -304,7 +307,7 @@ class TodayPage extends StatelessWidget {
     final c = Aigaio.of(context);
     final n = d.lastNight;
     final min = n?.spo2Min;
-    final g = n == null ? null : oxygenGuidance(d.spo2MinByNight(n.date, since: oxSince), n.date);
+    final g = n == null ? null : oxygenGuidance(d.spo2MinByNight(n.date, since: oxSince), n.date, today: now);
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
@@ -331,7 +334,7 @@ class TodayPage extends StatelessWidget {
       // Χωρίς μέσο όρο δεν δείχνουμε απόλυτη τιμή καρπού (π.χ. 33,6 °C διαβάζεται ως υποθερμία· κλινικός έλεγχος L5).
       value: t == null || base == null ? null : signedDec(t - base),
       unit: '°C',
-      note: (t != null && base != null) ? 'Απόκλιση από τον μέσο όρο σου' : null,
+      note: (t != null && base != null) ? 'Απόκλιση από τα συνηθισμένα σου' : null,
       empty: t == null ? 'Έρχεται μετά από έναν ύπνο με το ρολόι.' : 'Μαθαίνει το συνηθισμένο σου (7 νύχτες).',
       onTap: onTap,
     );
@@ -406,14 +409,18 @@ class _SleepCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(child: DurationValue(n.minutes, size: 42, color: white, unitColor: soft)),
-                    const SizedBox(width: 12),
-                    ScoreRing(
-                      value: n.score?.toDouble(),
-                      size: 64,
-                      stroke: 6,
-                      color: c.ring,
-                      track: Colors.white.withValues(alpha: 0.16),
-                    ),
+                    // Χωρίς βαθμολογία της νύχτας (π.χ. σε κομμάτια, η Samsung βαθμολογεί το καθένα): χωρίς άδειο
+                    // δαχτυλίδι «—», που ήθελε εξήγηση (έλεγχος UX U8).
+                    if (n.score != null) ...[
+                      const SizedBox(width: 12),
+                      ScoreRing(
+                        value: n.score!.toDouble(),
+                        size: 64,
+                        stroke: 6,
+                        color: c.ring,
+                        track: Colors.white.withValues(alpha: 0.16),
+                      ),
+                    ],
                   ],
                 ),
                 if (diff != null) ...[

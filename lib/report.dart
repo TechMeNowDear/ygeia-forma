@@ -13,7 +13,11 @@ const reportDays = 90;
 
 /// Στατιστικά ενός δείκτη στο διάστημα της αναφοράς.
 class ReportStat {
-  ReportStat({required this.values, this.trend, this.source = Source.watch, this.since});
+  ReportStat({required this.values, this.trend, this.source = Source.watch, this.since, this.periods = const []});
+
+  /// Οξυγόνο (ίδιος αισθητήρας, άλλος ορισμός νύχτας μετά το Oura): οι τιμές ΟΛΩΝ των 90 ημερών στο [values], και
+  /// εδώ ένα κομμάτι για κάθε ορισμό της νύχτας, παλιότερο πρώτο (κενό αν ο ορισμός δεν άλλαξε μέσα στο διάστημα).
+  final List<ReportPeriod> periods;
 
   /// Από ποια συσκευή είναι όλες οι τιμές (μία, πάντα).
   final Source source;
@@ -45,6 +49,23 @@ class ReportStat {
   }
 }
 
+/// Ένα κομμάτι του διαστήματος με τον ίδιο ορισμό της νύχτας (μόνο για το οξυγόνο).
+class ReportPeriod {
+  ReportPeriod({required this.from, required this.to, required this.night, required this.stat});
+  final DateTime from;
+  final DateTime to;
+
+  /// Από πού ορίζεται η νύχτα: ρολόι (ο ύπνος του ρολογιού) ή Oura (οι ώρες ύπνου του Oura).
+  final Source night;
+  final ReportStat stat;
+}
+
+/// Μετρήσεις του ίδιου αισθητήρα (ρολόι, καρπός) με ορισμό νύχτας που αλλάζει με την πηγή του ύπνου. Στην αναφορά
+/// μπαίνουν ΟΛΕΣ οι 90 μέρες, με ετικέτα για κάθε ορισμό· ποτέ κομμένες στη σύνδεση του Oura (δεύτερος κλινικός
+/// έλεγχος K1: οι νύχτες με 72% και 74% πριν από το Oura είναι ο λόγος της επίσκεψης). Η «Διαφορά» μένει «Αλλαγή
+/// ορισμού»: δεν συγκρίνεται πάνω από την αλλαγή.
+const reportSensorKeys = {K.spo2Avg, K.spo2Min};
+
 class ReportData {
   ReportData({
     required this.from,
@@ -69,10 +90,21 @@ class ReportData {
   /// Κλειδί (K.*) → στατιστικά.
   final Map<String, ReportStat> stats;
 
-  /// Νύχτες με ελάχιστο οξυγόνο κάτω από 90%, (μέρα, ελάχιστο), η χαμηλότερη πρώτη.
+  /// Νύχτες με ελάχιστο οξυγόνο κάτω από 90%, (μέρα, ελάχιστο), με χρονολογική σειρά (δεύτερος κλινικός έλεγχος M4).
   final List<(DateTime, double)> lowOxygenNights;
 
   ReportStat stat(String key) => stats[key] ?? ReportStat(values: const []);
+
+  /// Οι νύχτες με χαμηλότερη μέτρηση οξυγόνου κάτω από [limit]%, με χρονολογική σειρά (σύγκριση πριν από
+  /// στρογγυλοποίηση: 84,6 μετρά ως κάτω από 85).
+  List<(DateTime, double)> oxygenBelow(double limit) => [
+        for (final v in stat(K.spo2Min).values)
+          if (v.$2 < limit) v,
+      ];
+
+  /// Νύχτες χωρίς φάσεις: έχουν ώρα ύπνου αλλά όχι διάρκεια (η διάρκεια μετρά μόνο τον πραγματικό ύπνο από τις
+  /// φάσεις). Γράφεται στην αναφορά (δεύτερος έλεγχος υπολογισμών C10).
+  int get nightsWithoutStages => math.max(0, stat(K.bedtime).n - stat(K.sleepMin).n);
 }
 
 const reportKeys = [
@@ -91,30 +123,38 @@ const reportKeys = [
 /// Μετά τη σύνδεση του Oura η αναφορά δείχνει και ό,τι δίνει μόνο αυτό.
 List<String> reportKeysFor(SourcePlan plan) => plan.hasOura ? [...reportKeys, K.lowHr, K.hrv, K.breath] : reportKeys;
 
-ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {SourcePlan? plan}) {
+/// [end]: η τελευταία μέρα του διαστήματος, ίδια με τις Τάσεις από όπου ανοίγει η αναφορά (δεύτερος έλεγχος
+/// υπολογισμών C12: μετά τα μεσάνυχτα, πριν από ανανέωση, οι Τάσεις τελείωναν χθες και η αναφορά σήμερα). Χωρίς
+/// [end]: η μέρα του [now]. Το [now] είναι πάντα η ώρα δημιουργίας.
+ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {SourcePlan? plan, DateTime? end}) {
   final p = plan ?? SourcePlan.samsungOnly;
   DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
-  final to = dayOf(now);
+  final to = dayOf(end ?? now);
   final from = add(to, -(reportDays - 1));
   final stats = <String, ReportStat>{};
 
   for (final key in reportKeysFor(p)) {
     // Βήματα: η σημερινή μέρα δεν έχει τελειώσει.
-    final end = key == K.steps ? add(to, -1) : to;
-    // Πάντα 90 μέρες ως το [end], ίδιο διάστημα με τη «Διαφορά» της ίδιας γραμμής (έλεγχος υπολογισμών F11:
+    final last = key == K.steps ? add(to, -1) : to;
+    // Πάντα 90 μέρες ως το [last], ίδιο διάστημα με τη «Διαφορά» της ίδιας γραμμής (έλεγχος υπολογισμών F11:
     // πριν, τα βήματα είχαν 89 μέρες στον πίνακα και 90 στη σύγκριση).
-    final start = add(end, -(reportDays - 1));
-    // Μόνο μία πηγή ανά δείκτη: αν άλλαξε μέσα στους 3 μήνες, μετρούν μόνο οι μέρες της νέας.
-    final series = planSeries(history, p, key, start, end);
+    final start = add(last, -(reportDays - 1));
     final def = metricDef(key);
-    final trend = def == null ? null : computeTrend(def, history, now, TrendPeriod.quarter, plan: p);
+    final trend = def == null ? null : computeTrend(def, history, to, TrendPeriod.quarter, plan: p);
+    if (reportSensorKeys.contains(key)) {
+      stats[key] = _sensorStat(history, p, key, start, last, trend);
+      continue;
+    }
+    // Μόνο μία πηγή ανά δείκτη: αν άλλαξε μέσα στους 3 μήνες, μετρούν μόνο οι μέρες της νέας.
+    final series = planSeries(history, p, key, start, last);
     stats[key] = ReportStat(values: series.points, trend: trend, source: series.source, since: series.cut);
   }
 
+  // Χρονολογική σειρά (M4): ο γιατρός διαβάζει το μοτίβο και τη σχέση με φάρμακα και συμπτώματα.
   final low = [
     for (final v in stats[K.spo2Min]!.values)
       if (v.$2 < 90) v,
-  ]..sort((a, b) => a.$2.compareTo(b.$2));
+  ];
 
   final weighDays = history.keys.where((k) => p.value(history, K.weight, parseDateKey(k)) != null).toList()..sort();
   final weighIns = [
@@ -136,4 +176,37 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
     weighIns: weighIns,
     plan: p,
   );
+}
+
+/// Οξυγόνο: όλες οι 90 μέρες του ρολογιού (ίδιος αισθητήρας), και ένα κομμάτι για κάθε ορισμό της νύχτας.
+ReportStat _sensorStat(
+  Map<String, Map<String, double>> history,
+  SourcePlan p,
+  String key,
+  DateTime start,
+  DateTime last,
+  TrendResult? trend,
+) {
+  DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
+  final values = <(DateTime, double)>[];
+  for (var d = start; !d.isAfter(last); d = add(d, 1)) {
+    final v = p.value(history, key, d);
+    if (v != null) values.add((d, v));
+  }
+  final cuts = [for (final c in p.changeDates(key)) if (c.isAfter(start) && !c.isAfter(last)) c];
+  final periods = <ReportPeriod>[];
+  if (cuts.isNotEmpty) {
+    final bounds = [start, ...cuts, add(last, 1)];
+    for (var i = 0; i + 1 < bounds.length; i++) {
+      final from = bounds[i];
+      final to = add(bounds[i + 1], -1);
+      periods.add(ReportPeriod(
+        from: from,
+        to: to,
+        night: p.nightSource(from) == Source.oura ? Source.oura : Source.watch,
+        stat: ReportStat(values: [for (final v in values) if (!v.$1.isBefore(from) && !v.$1.isAfter(to)) v]),
+      ));
+    }
+  }
+  return ReportStat(values: values, trend: trend, source: p.sourceFor(key, last), periods: periods);
 }

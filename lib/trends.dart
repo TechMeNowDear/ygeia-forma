@@ -9,8 +9,12 @@
 ///   μοιάζουν μεταξύ τους (αυτοσυσχέτιση), άρα 30 μέρες δεν είναι 30 ανεξάρτητες μετρήσεις.
 ///   Από 4/11 (έλεγχος υπολογισμών F2–F4): αυτοσυσχέτιση σωστή και με κενά ή αραιές μετρήσεις, διόρθωση της
 ///   διακύμανσης, και «άλλαξε» μόνο όταν μέσος όρος και μεσαία τιμή δείχνουν προς την ίδια κατεύθυνση.
-///   Προσομοίωση (test/trends_test.dart): ψεύτικο «άλλαξε» ≤ ~1,5% ανά δείκτη, χωρίς καμία αλλαγή.
-///   Είναι ένδειξη ανά δείκτη, όχι ιατρικός έλεγχος· με 16–19 δείκτες μαζί, κάποιος μπορεί να βγει τυχαία.
+///   Προσομοίωση (test/trends_test.dart): ψεύτικο «άλλαξε» κατά προσέγγιση ≤ 1,5% ανά δείκτη, χωρίς καμία αλλαγή,
+///   ΟΤΑΝ οι μέρες μοιάζουν μεταξύ τους όπως στο μοντέλο AR(1). Δεν ισχύει για όλες τις συνθήκες (δεύτερος έλεγχος
+///   υπολογισμών C4): αργές μεταβολές εβδομάδων (εποχή, φυσική κατάσταση) δεν φαίνονται στο φ από κοντινές μέρες, και
+///   στους 3 μήνες / στο έτος μπορεί να βγει «άλλαξε» για μια τέτοια αργή, πραγματική μεταβολή (προσομοίωση με δύο
+///   κλίμακες: 12–22%). Είναι ένδειξη ανά δείκτη, όχι ιατρικός έλεγχος· με 16–19 δείκτες μαζί, κάποιος μπορεί να
+///   βγει τυχαία.
 library;
 
 import 'dart:math' as math;
@@ -135,7 +139,9 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.activeMin, label: 'Ενεργός χρόνος', section: TrendSection.move, minDiff: 5, better: 1, kind: ValueKind.duration, includeToday: false),
   // Άλλα
   MetricDef(key: K.energy, label: 'Energy Score', section: TrendSection.other, minDiff: 3, better: 1),
-  MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο', section: TrendSection.other, minDiff: 1, unit: '%', better: 1),
+  // Οξυγόνο: ουδέτερο χρώμα (δεύτερος κλινικός έλεγχος M8). Μια διαφορά 1–2% είναι μέσα στο λάθος του καρπού
+  // (RMSE ~2%), και αν κόψεις το κάπνισμα η ένδειξη πέφτει (λιγότερη καρβοξυαιμοσφαιρίνη): δεν είναι «χειρότερα».
+  MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο', section: TrendSection.other, minDiff: 1, unit: '%'),
 ];
 
 /// Μετρήσεις που υπάρχουν μόνο με το Oura.
@@ -198,7 +204,21 @@ class TrendResult {
     required this.end,
     this.source = Source.watch,
     this.changedOn,
+    this.effectiveCurrent,
+    this.tCritical,
   });
+
+  /// «Πραγματικό» πλήθος ανεξάρτητων ημερών του τρέχοντος διαστήματος και η κρίσιμη τιμή του ελέγχου (null όταν δεν
+  /// έγινε έλεγχος). Για την εβδομάδα (δεύτερος έλεγχος υπολογισμών C1): με 7 μέρες που μοιάζουν πολύ μεταξύ τους
+  /// μένουν ~2 «πραγματικές», και ο έλεγχος σχεδόν ποτέ δεν λέει «άλλαξε», ακόμα και για +5 bpm.
+  final double? effectiveCurrent;
+  final double? tCritical;
+
+  /// «Σταθερό» που δεν σημαίνει τίποτα: πολύ λίγες ανεξάρτητες μέρες για να φανεί αλλαγή. Λέγεται «Λίγες μέρες για
+  /// συμπέρασμα», όχι «Σταθερό» (που διαβάζεται σαν «χωράει στις διακυμάνσεις σου»).
+  bool get inconclusive =>
+      status == TrendStatus.stable &&
+      ((effectiveCurrent != null && effectiveCurrent! < minEffectiveDays) || (tCritical != null && tCritical! > maxTCritical));
 
   /// Από πού είναι οι τιμές (η πηγή του τρέχοντος διαστήματος).
   final Source source;
@@ -240,6 +260,11 @@ class TrendResult {
     return (up ? 1 : -1) * def.better;
   }
 }
+
+/// Κάτω από τόσες «πραγματικές» μέρες, ή πάνω από τόση κρίσιμη τιμή (βαθμοί ελευθερίας < 5), ένα «Σταθερό» δεν λέει
+/// τίποτα ([TrendResult.inconclusive]).
+const minEffectiveDays = 4.0;
+const maxTCritical = 4.1;
 
 /// Περίοδος: πόσες μέρες, και πόσες μέρες πίσω αρχίζει η προηγούμενη για σύγκριση.
 enum TrendPeriod { month, quarter, year }
@@ -474,6 +499,8 @@ TrendResult compareWindows(
 
   TrendStatus status;
   var z = 0.0;
+  double? effCurrent;
+  double? tCrit;
   if (c.length < needed || p.length < (neededPrevious ?? needed) || mc == null || mp == null) {
     status = TrendStatus.insufficient;
   } else {
@@ -499,7 +526,9 @@ TrendResult compareWindows(
     // Ο έλεγχος είναι στους μέσους όρους, η τιμή που φαίνεται είναι η μεσαία: «άλλαξε» μόνο όταν δείχνουν
     // προς την ίδια κατεύθυνση (έλεγχος υπολογισμών F3).
     final agree = d.sign == meanDiff.sign;
-    if (d.abs() >= def.minDiff && agree && z >= tCritical01(df.toDouble())) {
+    effCurrent = nc;
+    tCrit = tCritical01(df.toDouble());
+    if (d.abs() >= def.minDiff && agree && z >= tCrit) {
       status = d > 0 ? TrendStatus.up : TrendStatus.down;
     } else {
       status = TrendStatus.stable;
@@ -521,6 +550,8 @@ TrendResult compareWindows(
     previousEnd: previousEnd,
     end: end,
     source: sp.sourceFor(def.key, end),
+    effectiveCurrent: effCurrent,
+    tCritical: tCrit,
   );
 }
 
@@ -579,19 +610,23 @@ double unwrapMinutes(double m, double center) {
   return v;
 }
 
-/// Το «συνηθισμένο» μιας νύχτας ή μέρας, ίδιο σε όλη την εφαρμογή (έλεγχος υπολογισμών F8, κλινικός M10, 4/11):
-/// ο μέσος όρος των έως [usualNights] προηγούμενων τιμών, και μόνο με τουλάχιστον [usualMinNights]. Πριν,
-/// μία νύχτα αρκούσε για κόκκινο «+3 από τον μ.ό.».
+/// Το «συνήθως» μιας νύχτας ή μέρας, ΕΝΑ σε όλη την εφαρμογή (Σήμερα, Καρδιά, «Εκτός συνηθισμένου», Oura):
+/// η μεσαία τιμή των έως [usualNights] προηγούμενων τιμών, μόνο με τουλάχιστον [usualMinNights] (έλεγχος υπολογισμών
+/// F8, κλινικός M10· δεύτερος έλεγχος C7/U7: πριν, η ίδια λέξη σήμαινε μέσο όρο 14 νυχτών σε μια κάρτα και μεσαία
+/// τιμή 28 ημερών σε άλλη, με άλλο νούμερο στην ίδια οθόνη). Μεσαία τιμή: μια περίεργη νύχτα δεν το μετακινεί.
 const usualNights = 14;
 const usualMinNights = 7;
 
 /// [previous]: οι τιμές πριν από τη νύχτα/μέρα που δείχνουμε, παλιότερη πρώτη (τα κενά αγνοούνται).
-double? usualMean(Iterable<double?> previous) {
+double? usualOf(Iterable<double?> previous) {
   final all = previous.whereType<double>().toList();
   final v = all.length <= usualNights ? all : all.sublist(all.length - usualNights);
   if (v.length < usualMinNights) return null;
-  return v.reduce((a, b) => a + b) / v.length;
+  return median(v);
 }
+
+/// Παλιό όνομα του [usualOf] (το χρησιμοποιεί το data.dart). Είναι η ΜΕΣΑΙΑ τιμή, όχι ο μέσος όρος.
+double? usualMean(Iterable<double?> previous) => usualOf(previous);
 
 /// Οι μετρήσεις των Τάσεων για το σχέδιο πηγών: όσο το Oura δεν έχει συνδεθεί, όπως πάντα· μετά, και
 /// οι μετρήσεις που δίνει μόνο το Oura (HRV, αναπνοές, χαμηλότεροι παλμοί).

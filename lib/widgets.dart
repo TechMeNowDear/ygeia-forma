@@ -1176,10 +1176,15 @@ class LineChart extends StatelessWidget {
     this.dateLabel,
     this.minRange = 1,
     this.levels = const [],
+    this.reference,
   });
 
   /// Οριζόντιες διακεκομμένες γραμμές ανά διάστημα (π.χ. η μεσαία τιμή κάθε περιόδου στις Τάσεις).
   final List<(DateTime, DateTime, double, Color)> levels;
+
+  /// Γραμμή αναφοράς (τιμή, ετικέτα, χρώμα): ΔΙΑΣΤΙΚΤΗ σε όλο το πλάτος, με την ετικέτα στη δεξιά άκρη, ώστε να
+  /// ξεχωρίζει από τις διακεκομμένες [levels] ακόμα κι όταν πέφτει πάνω τους (δεύτερος κλινικός έλεγχος M5).
+  final (double, String, Color)? reference;
 
   /// Ελάχιστο εύρος του κάθετου άξονα, ώστε μικρές διαφορές να μη φαίνονται τεράστιες.
   final double minRange;
@@ -1207,6 +1212,7 @@ class LineChart extends StatelessWidget {
           dateLabel: dateLabel ?? (d) => '${d.day}/${d.month}',
           minRange: minRange,
           levels: levels,
+          reference: reference,
         ),
       ),
     );
@@ -1225,10 +1231,12 @@ class _LinePainter extends CustomPainter {
     required this.format,
     required this.dateLabel,
     required this.minRange,
+    this.reference,
   });
 
   final double minRange;
   final List<(DateTime, DateTime, double, Color)> levels;
+  final (double, String, Color)? reference;
   final List<(DateTime, double)> points;
   final Color color;
   final Color text;
@@ -1248,8 +1256,9 @@ class _LinePainter extends CustomPainter {
     final w = size.width - left - right;
     final h = size.height - bottom - top;
 
-    var minV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3)].reduce(math.min);
-    var maxV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3)].reduce(math.max);
+    final refs = [if (reference != null) reference!.$1];
+    var minV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs].reduce(math.min);
+    var maxV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs].reduce(math.max);
     if (maxV - minV < minRange) {
       final mid = (maxV + minV) / 2;
       minV = mid - minRange / 2;
@@ -1330,6 +1339,16 @@ class _LinePainter extends CustomPainter {
       for (var x = x0; x < x1; x += 9) {
         canvas.drawLine(Offset(x, a.dy), Offset(math.min(x + 5, x1), a.dy), dash);
       }
+    }
+    if (reference != null) {
+      final (v, label, col) = reference!;
+      final y = top + h * (1 - (v - minV) / (maxV - minV));
+      final dot = Paint()..color = col;
+      for (var x = left; x <= left + w; x += 5) {
+        canvas.drawCircle(Offset(x, y), 1.1, dot);
+      }
+      final tp = _painter(label, col, 10.5, bold: true);
+      tp.paint(canvas, Offset(left + w - tp.width - 2, y - tp.height - 1));
     }
     final last = at(points.last);
     canvas.drawCircle(last, 6, Paint()..color = card);

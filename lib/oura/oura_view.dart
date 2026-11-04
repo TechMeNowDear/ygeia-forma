@@ -10,16 +10,16 @@ library;
 import '../format.dart';
 import '../history.dart';
 import '../sources.dart';
-import '../trends.dart' show usualMinNights, usualNights;
+import '../trends.dart' show usualMinNights, usualNights, usualOf;
 import 'oura_model.dart';
 
 /// Ελάχιστες νύχτες για μέσο όρο ή «συνηθισμένο».
 const minNightsForAverage = 4;
-// Ίδιοι κανόνες «συνηθισμένου» με το ρολόι (trends.dart › usualMean).
+// Ίδιοι κανόνες «συνηθισμένου» με το ρολόι (trends.dart › usualOf: μεσαία τιμή έως 14 νυχτών, τουλάχιστον 7).
 const minNightsForBaseline = usualMinNights;
 const baselineNights = usualNights;
 
-/// Η τιμή μιας νύχτας μπροστά στο συνηθισμένο σου (μέση τιμή των προηγούμενων 14 νυχτών Oura).
+/// Η τιμή μιας νύχτας μπροστά στο συνηθισμένο σου (μεσαία τιμή των προηγούμενων 14 νυχτών Oura, [usualOf]).
 class NightBaseline {
   const NightBaseline(this.value, this.usual, this.count);
   final double value;
@@ -45,7 +45,7 @@ NightBaseline? ouraBaseline(Map<String, Map<String, double>> history, SourcePlan
     if (x != null) prev.add(x);
   }
   if (prev.length < minNightsForBaseline) return NightBaseline(v, null, prev.length);
-  return NightBaseline(v, prev.reduce((a, b) => a + b) / prev.length, prev.length);
+  return NightBaseline(v, usualOf(prev.reversed), prev.length);
 }
 
 /// Μέσοι όροι φάσεων (λεπτά) των τελευταίων 7 νυχτών Oura ως τη νύχτα [day].

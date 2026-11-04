@@ -17,9 +17,12 @@ import '../widgets.dart';
 
 /// Αναφορά για γιατρό: προεπισκόπηση των σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
-  const ReportPage({super.key, required this.store, this.now, this.note = ''});
+  const ReportPage({super.key, required this.store, this.now, this.note = '', this.end});
   final HealthStore store;
   final DateTime? now;
+
+  /// Η τελευταία μέρα του διαστήματος (από τις Τάσεις: η ίδια μέρα με αυτές, έλεγχος υπολογισμών C12).
+  final DateTime? end;
 
   /// Αρχική σημείωση (για δοκιμές· στην εφαρμογή γράφεται στην οθόνη).
   final String note;
@@ -38,13 +41,29 @@ class _ReportPageState extends State<ReportPage> {
   late String _note = widget.note;
   late final _noteField = TextEditingController(text: widget.note);
 
+  /// Όνομα στην αναφορά (προαιρετικό, δεύτερος κλινικός έλεγχος M6): μένει ΜΟΝΟ στο κινητό (στις ρυθμίσεις, όχι
+  /// στο αρχείο αντιγράφου ασφαλείας, ποτέ σε αναφορά σφάλματος), για να μη γράφεται κάθε φορά.
+  late String _name = widget.store.prefs.reportName ?? '';
+  late final _nameField = TextEditingController(text: _name);
+
+  void _keepName() {
+    final v = _name.trim();
+    final stored = widget.store.prefs.reportName ?? '';
+    if (v == stored) return;
+    widget.store.prefs.reportName = v.isEmpty ? null : v;
+    widget.store.savePrefsNow();
+  }
+
   @override
   void dispose() {
+    _keepName();
     _noteField.dispose();
+    _nameField.dispose();
     super.dispose();
   }
 
-  late final ReportData _data = buildReport(widget.store.history, widget.now ?? DateTime.now(), plan: widget.store.plan);
+  late final ReportData _data =
+      buildReport(widget.store.history, widget.now ?? DateTime.now(), plan: widget.store.plan, end: widget.end);
 
   String get _fileName {
     final t = _data.created;
@@ -52,6 +71,7 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   Future<void> _save() async {
+    _keepName();
     setState(() {
       _saving = true;
       _error = null;
@@ -89,7 +109,12 @@ class _ReportPageState extends State<ReportPage> {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final pages = [_PageOne(data: _data, note: _note.trim()), _PageTwo(data: _data), _PageThree(data: _data)];
+    final name = _name.trim();
+    final pages = [
+      _PageOne(data: _data, note: _note.trim(), name: name),
+      _PageTwo(data: _data, name: name),
+      _PageThree(data: _data, name: name),
+    ];
 
     return Scaffold(
       backgroundColor: c.background,
@@ -112,20 +137,38 @@ class _ReportPageState extends State<ReportPage> {
                     Text(
                       'Οι τελευταίοι 3 μήνες σε τρεις σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
                       'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση. '
-                      // Κλινικός έλεγχος H2 (4/11).
-                      'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού ή τεστ άπνοιας· αυτά τα δείχνεις από το Samsung Health Monitor.',
+                      // Κλινικός έλεγχος H2 και M6 (4/11).
+                      'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού, τεστ άπνοιας ή μετρήσεις πίεσης· τα αποτελέσματα του Samsung '
+                      'Health Monitor τα δείχνεις από εκεί.',
                       style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      key: const ValueKey('report-name'),
+                      controller: _nameField,
+                      maxLength: reportNameMax,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Όνομα στην αναφορά (προαιρετικά)',
+                        helperText: 'Μένει μόνο σε αυτό το κινητό.',
+                      ),
+                      onChanged: (v) => setState(() {
+                        _name = v;
+                        _uri = null;
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      key: const ValueKey('report-note'),
                       controller: _noteField,
-                      maxLength: 160,
-                      maxLines: 2,
+                      maxLength: reportNoteMax,
+                      maxLines: 4,
                       minLines: 1,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: const InputDecoration(
                         labelText: 'Σημείωση για τον γιατρό (προαιρετικά)',
-                        hintText: 'π.χ. φάρμακα και δόση, κάπνισμα, συμπτώματα',
+                        // Δεύτερος κλινικός έλεγχος M6: φάρμακα, ροχαλητό και τεστ άπνοιας χωράνε και φαίνονται.
+                        hintText: 'π.χ. φάρμακα και δόση, κάπνισμα, ροχαλητό, τεστ άπνοιας (ημερομηνία, αποτέλεσμα)',
                       ),
                       onChanged: (v) => setState(() {
                         _note = v;
@@ -237,6 +280,10 @@ class _ReportPageState extends State<ReportPage> {
 
 const _a4 = Size(595, 842);
 
+/// Σημείωση ως 400 χαρακτήρες (πριν 160: δεν χωρούσαν φάρμακα, ροχαλητό και τεστ άπνοιας μαζί) και όνομα ως 60.
+const reportNoteMax = 400;
+const reportNameMax = 60;
+
 /// Σελίδες: 1 σύνοψη και ορισμοί, 2 γραφήματα, 3 οξυγόνο και ζυγίσεις (από 4/11, για να χωρούν οι εξηγήσεις).
 const _pageCount = 3;
 
@@ -266,9 +313,12 @@ class _Paper extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.data, required this.page});
+  const _Header({required this.data, required this.page, this.name = ''});
   final ReportData data;
   final int page;
+
+  /// Το όνομα (αν γράφτηκε), σε κάθε σελίδα: οι σελίδες τυπώνονται και μπαίνουν χωριστά στον φάκελο.
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +343,9 @@ class _Header extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${dayMonth(data.from)} – ${dayMonthYear(data.to)} · $reportDays ημέρες',
+                    '${name.isEmpty ? '' : '$name · '}${dayMonth(data.from)} – ${dayMonthYear(data.to)} · $reportDays ημέρες',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 10.5, color: c.textSecondary),
                   ),
                 ],
@@ -357,9 +409,10 @@ class _Title extends StatelessWidget {
 // --- Σελίδα 1: πίνακας ---
 
 class _PageOne extends StatelessWidget {
-  const _PageOne({required this.data, this.note = ''});
+  const _PageOne({required this.data, this.note = '', this.name = ''});
   final ReportData data;
   final String note;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -382,7 +435,8 @@ class _PageOne extends StatelessWidget {
       if (withOura) ('HRV νύχτας, RMSSD, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
       if (withOura) ('Αναπνοές στον ύπνο (ανά λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
       ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)', K.spo2Avg, pct, _def(K.spo2Avg)),
-      ('Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση νύχτας (%)', K.spo2Min, pct, null),
+      // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών C5, κλινικός L2): μεσαία 89,5 → «89,5%», όχι «90%».
+      ('Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση νύχτας (%)', K.spo2Min, (v) => '${lowestText(v)}%', null),
       ('Διάρκεια ύπνου, χωρίς τα ξυπνήματα (ώρες:λεπτά)', K.sleepMin, dur, _def(K.sleepMin)),
       ('Ώρα που κοιμήθηκε (ώρα:λεπτά)', K.bedtime, clockFromSix, _def(K.bedtime)),
       ('Ώρα που ξύπνησε (ώρα:λεπτά)', K.wake, clockFromSix, null),
@@ -395,6 +449,11 @@ class _PageOne extends StatelessWidget {
       final since = s.since == null ? '' : ', από ${s.since!.day}/${s.since!.month}';
       return '${r.$1} · ${metricSourceName(r.$2, s.source)}$since';
     }
+
+    // Οξυγόνο με αλλαγή ορισμού της νύχτας: μία γραμμή για κάθε ορισμό (δεύτερος κλινικός έλεγχος K1), όλες οι 90 μέρες.
+    String periodLabel(ReportPeriod p, bool first) => first
+        ? 'ως ${p.to.day}/${p.to.month}, νύχτα από τον ύπνο του ρολογιού'
+        : 'από ${p.from.day}/${p.from.month}, νύχτα από τις ώρες ύπνου ${p.night == Source.oura ? 'του Oura' : 'του ρολογιού'}';
 
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
     final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
@@ -416,15 +475,17 @@ class _PageOne extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(data: d, page: 1),
+        _Header(data: d, page: 1, name: name),
         if (note.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               'Σημείωση: $note',
-              maxLines: 2,
+              key: const ValueKey('report-note-text'),
+              // 400 χαρακτήρες χωράνε σε 5 γραμμές· ποτέ κομμένη σημείωση στον γιατρό.
+              maxLines: 6,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 9.5, color: c.text, height: 1.35),
+              style: TextStyle(fontSize: 9, color: c.text, height: 1.3),
             ),
           ),
         // Κλινικός έλεγχος H2 (4/11): η απουσία ρυθμού/άπνοιας εδώ δεν σημαίνει ότι ήταν φυσιολογικά.
@@ -436,10 +497,11 @@ class _PageOne extends StatelessWidget {
           child: Text.rich(
             TextSpan(children: [
               TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
+              // Δεύτερος κλινικός έλεγχος M6: και η πίεση (η πρώτη ερώτηση του καρδιολόγου).
               const TextSpan(
-                text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor. Η εφαρμογή δεν '
-                    'έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν φυσιολογικά. Αν υπάρχουν, δείτε '
-                    'τα PDF του Samsung Health Monitor.',
+                text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor, και μετρήσεις '
+                    'πίεσης. Η εφαρμογή δεν έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν '
+                    'φυσιολογικά. Αν υπάρχουν, δείτε τα αποτελέσματα στο Samsung Health Monitor.',
               ),
             ]),
             style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
@@ -465,35 +527,44 @@ class _PageOne extends StatelessWidget {
                 pad(Text('Μεσαία τιμή', style: header)),
                 pad(Text('Συνήθως\n(8 στις 10 μέρες)', style: header)),
                 pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
-                pad(Text('Μέρες με\nμέτρηση', style: header)),
+                // Μία λέξη: το «Μέρες με / μέτρηση» έσπαγε στη μέση της λέξης (έλεγχος UX U3).
+                pad(Text('Μέρες', style: header)),
                 pad(Text('Διαφορά από τους\n3 προηγ. μήνες', style: header)),
               ],
             ),
             for (final r in rows)
-              () {
-                final s = d.stat(r.$2);
-                final f = r.$3;
-                return TableRow(
-                  children: [
-                    pad(Text(label(r), style: cell)),
-                    pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
-                    pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
-                    pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
-                    pad(Text('${s.n}', style: cell)),
-                    pad(Text(trendText(s, r.$4), style: cell)),
-                  ],
-                );
-              }(),
+              for (final (i, part) in <ReportPeriod?>[if (d.stat(r.$2).periods.isEmpty) null else ...d.stat(r.$2).periods].indexed)
+                () {
+                  final whole = d.stat(r.$2);
+                  final s = part?.stat ?? whole;
+                  final f = r.$3;
+                  final last = part == null || i == whole.periods.length - 1;
+                  return TableRow(
+                    children: [
+                      pad(Text(
+                        part == null ? label(r) : (i == 0 ? '${label(r)} · ${periodLabel(part, true)}' : periodLabel(part, false)),
+                        style: cell,
+                      )),
+                      pad(Text(s.median == null ? '—' : f(s.median!), style: bold)),
+                      pad(Text(s.p10 == null ? '—' : '${f(s.p10!)} – ${f(s.p90!)}', style: cell)),
+                      pad(Text(s.low == null ? '—' : '${f(s.low!)} – ${f(s.high!)}', style: cell)),
+                      pad(Text('${s.n}', style: cell)),
+                      pad(Text(last ? trendText(whole, r.$4) : '', style: cell)),
+                    ],
+                  );
+                }(),
           ],
         ),
         _Title('Πώς διαβάζεται'),
         Text(
           // Έλεγχος υπολογισμών F9 (4/11): χωρίς ισχυρισμό «1%»· είναι ένδειξη ανά δείκτη.
+          // Δεύτερος έλεγχος υπολογισμών C4 (D8): ο έλεγχος είναι κατά προσέγγιση· στους 3 μήνες πιάνει και αργές μεταβολές.
           'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
-          'ένδειξη αλλαγής ανά δείκτη, μόνο όταν η διαφορά των μεσαίων τιμών ξεπερνά ένα ελάχιστο και τις συνηθισμένες '
-          'μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών ημερών)· αλλιώς '
-          '«Σταθερό», ή «—» όταν οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια '
-          'ένδειξη μπορεί να είναι τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού.',
+          'ένδειξη αλλαγής ανά δείκτη, μόνο όταν η διαφορά των μεσαίων τιμών ξεπερνά ένα ελάχιστο και, κατά προσέγγιση, '
+          'τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών '
+          'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), ή «—» όταν '
+          'οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια ένδειξη μπορεί να είναι '
+          'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού.',
           style: small,
         ),
         const SizedBox(height: 6),
@@ -508,8 +579,9 @@ class _PageOne extends StatelessWidget {
 // --- Σελίδα 3: οξυγόνο και ζυγίσεις ---
 
 class _PageThree extends StatelessWidget {
-  const _PageThree({required this.data});
+  const _PageThree({required this.data, this.name = ''});
   final ReportData data;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -524,35 +596,58 @@ class _PageThree extends StatelessWidget {
     final avgN = d.stat(K.spo2Avg).n;
     final plan = d.plan ?? SourcePlan.samsungOnly;
     final withOura = plan.hasOura;
+    final below85 = d.oxygenBelow(85);
+    final periods = d.stat(K.spo2Min).periods;
+    String dmy(DateTime t) => '${t.day}/${t.month}/${t.year}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(data: d, page: 3),
-        // Κλινικός έλεγχος H3 (4/11): μία μεμονωμένη τιμή του καρπού, όχι αποκορεσμοί ή T90.
-        _Title('Νύχτες με χαμηλότερη μεμονωμένη μέτρηση οξυγόνου κάτω από 90% (ρολόι, καρπός)'),
+        _Header(data: d, page: 3, name: name),
+        // Δεύτερος κλινικός έλεγχος M4: ζώνες 90/85/80%, νύχτες κάτω από 85% με χρονολογική σειρά, αναφορά με SD.
+        _Title('Χαμηλότερη μεμονωμένη μέτρηση οξυγόνου ανά νύχτα (ρολόι, καρπός)'),
         Text(
-          'Μία μεμονωμένη μέτρηση του ρολογιού ανά νύχτα, όχι ιατρική οξυμετρία, όχι δείκτης αποκορεσμών (ODI) ούτε '
-          'χρόνος κάτω από 90% (T90). Αναφορά: σε υγιείς ενήλικες το ελάχιστο της νύχτας είναι κατά μέσο όρο περίπου '
-          '90% (Gries & Brooks, Chest 1996).',
+          'Μία τιμή ανά νύχτα από τον αισθητήρα του καρπού: όχι ιατρική οξυμετρία, όχι δείκτης αποκορεσμών (ODI), όχι '
+          'χρόνος κάτω από 90% (T90). Αναφορά: σε 350 υγιή άτομα (1 μηνός–85 ετών, οξύμετρο δαχτύλου, χωρίς τα σφάλματα '
+          'κίνησης) το ελάχιστο της νύχτας ήταν 90,4% ± 3,1% (Gries & Brooks, Chest 1996).',
           style: TextStyle(fontSize: 9.5, color: c.text, height: 1.4),
         ),
         const SizedBox(height: 6),
-        if (d.lowOxygenNights.isEmpty)
-          Text('Καμία στο διάστημα ($minN νύχτες με μέτρηση).', style: cell)
+        Text(
+          'Νύχτες με μέτρηση: $minN · κάτω από 90%: ${d.lowOxygenNights.length} · κάτω από 85%: ${below85.length} · '
+          'κάτω από 80%: ${d.oxygenBelow(80).length}.',
+          key: const ValueKey('report-oxygen-counts'),
+          style: cell,
+        ),
+        const SizedBox(height: 4),
+        if (below85.isEmpty)
+          Text('Καμία νύχτα κάτω από 85%.', style: cell)
         else ...[
-          Text(
-            '${d.lowOxygenNights.length} από $minN νύχτες με μέτρηση. Οι χαμηλότερες:',
-            style: cell,
-          ),
-          const SizedBox(height: 4),
+          Text('Νύχτες κάτω από 85%:', style: cell),
+          const SizedBox(height: 2),
           Wrap(
+            key: const ValueKey('report-oxygen-below85'),
             spacing: 14,
             runSpacing: 2,
             children: [
-              // Ποτέ «90%» σε λίστα «κάτω από 90%» (έλεγχος υπολογισμών F16): χωρίς στρογγυλοποίηση προς τα πάνω.
-              for (final n in d.lowOxygenNights.take(16)) Text('${dayMonthYear(n.$1)}: ${lowestText(n.$2)}%', style: bold),
+              // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών F16): 84,6 → «84,6%».
+              for (final n in below85.take(30)) Text('${dmy(n.$1)}: ${lowestText(n.$2)}%', style: bold),
+              if (below85.length > 30) Text('και ${below85.length - 30} ακόμα (γράφημα, σελίδα 2)', style: cell),
             ],
+          ),
+        ],
+        if (periods.length > 1) ...[
+          const SizedBox(height: 6),
+          // Δεύτερος κλινικός έλεγχος K1: ίδιος αισθητήρας, άλλος ορισμός της νύχτας· όλες οι νύχτες φαίνονται.
+          Text(
+            '${[
+              for (final (i, p) in periods.indexed)
+                i == 0
+                    ? 'Ως ${p.to.day}/${p.to.month} η νύχτα ορίζεται από ${p.night == Source.oura ? 'τις ώρες ύπνου του Oura' : 'τον ύπνο του ρολογιού'}'
+                    : 'από ${p.from.day}/${p.from.month} από ${p.night == Source.oura ? 'τις ώρες ύπνου του Oura' : 'τον ύπνο του ρολογιού'}',
+            ].join('· ')}. Ο αισθητήρας οξυγόνου είναι ο ίδιος (καρπός).',
+            key: const ValueKey('report-oxygen-definition'),
+            style: small,
           ),
         ],
         if (minN != avgN) ...[
@@ -623,6 +718,15 @@ class _PageThree extends StatelessWidget {
                   'ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
           style: small,
         ),
+        if (d.nightsWithoutStages > 0) ...[
+          const SizedBox(height: 6),
+          // Δεύτερος έλεγχος υπολογισμών C10: η διάρκεια μετρά μόνο νύχτες με φάσεις· το λέμε, με πόσες λείπουν.
+          Text(
+            'Νύχτες χωρίς φάσεις δεν μετρούν στη διάρκεια ύπνου (${countText(d.nightsWithoutStages, 'νύχτα', 'νύχτες')}).',
+            key: const ValueKey('report-unstaged'),
+            style: small,
+          ),
+        ],
         const SizedBox(height: 6),
         Text(
           // Κλινικός έλεγχος H4 (4/11).
@@ -642,8 +746,9 @@ MetricDef? _def(String key) => metricDef(key);
 // --- Σελίδα 2: γραφήματα ---
 
 class _PageTwo extends StatelessWidget {
-  const _PageTwo({required this.data});
+  const _PageTwo({required this.data, this.name = ''});
   final ReportData data;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -654,6 +759,8 @@ class _PageTwo extends StatelessWidget {
         {double? reference, String? note}) {
       final s = d.stat(key);
       final med = s.median;
+      // Οξυγόνο με αλλαγή ορισμού της νύχτας: μία μεσαία τιμή για κάθε ορισμό (όχι μία πάνω από την αλλαγή).
+      final parts = s.periods.where((p) => p.stat.n > 0).toList();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -674,9 +781,11 @@ class _PageTwo extends StatelessWidget {
               minRange: minRange,
               dateLabel: dayMonth,
               levels: [
-                if (med != null) (s.values.first.$1, s.values.last.$1, med, c.textSecondary),
-                if (reference != null) (s.values.first.$1, s.values.last.$1, reference, c.textTertiary),
+                if (parts.isEmpty && med != null) (s.values.first.$1, s.values.last.$1, med, c.textSecondary),
+                for (final p in parts) (p.stat.values.first.$1, p.stat.values.last.$1, p.stat.median!, c.textSecondary),
               ],
+              // Διάστικτη με ετικέτα, ώστε να ξεχωρίζει από τη διακεκομμένη μεσαία τιμή (δεύτερος κλινικός έλεγχος M5).
+              reference: reference == null ? null : (reference, '${reference.round()}%', c.textTertiary),
             ),
           if (note != null)
             Padding(
@@ -690,7 +799,7 @@ class _PageTwo extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(data: d, page: 2),
+        _Header(data: d, page: 2, name: name),
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(
@@ -704,11 +813,12 @@ class _PageTwo extends StatelessWidget {
           'Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση ανά νύχτα (%, καρπός)',
           K.spo2Min,
           c.energy,
-          (v) => v.round().toString(),
+          lowestText,
           8,
           reference: 90,
-          // Κλινικός έλεγχος H6: γκρι γραμμή αναφοράς, όχι κόκκινο «όριο».
-          note: 'Γραμμή αναφοράς 90% (όχι διαγνωστικό όριο).',
+          // Κλινικός έλεγχος H6 και M5: γκρι διάστικτη γραμμή αναφοράς, όχι κόκκινο «όριο».
+          note: 'Διάστικτη γραμμή: αναφορά 90% (όχι διαγνωστικό όριο). Διακεκομμένη: η μεσαία τιμή'
+              '${d.stat(K.spo2Min).periods.length > 1 ? ' κάθε ορισμού της νύχτας (ίδιος αισθητήρας· ορισμοί: σελίδα 3)' : ''}.',
         ),
         chart('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, c.sleep, (v) {
           final m = v.round();

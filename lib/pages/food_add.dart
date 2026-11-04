@@ -790,6 +790,8 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       servingLabel: widget.draft.servingLabel,
       values: values,
       fromOff: widget.draft.fromOff,
+      // Το «ανά 100 ml» μένει στο προϊόν (πριν χανόταν στην αποθήκευση· δεύτερος έλεγχος διατροφής N9).
+      perMl: widget.draft.perMl,
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }
@@ -800,7 +802,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final values = _values;
-    final mismatch = energyMismatch(values);
+    final mismatch = energyMismatch(values, alcohol: widget.draft.alcohol ?? 0, polyols: widget.draft.polyols ?? 0);
     final impossible = impossibleValues(values);
     final doubtful = doubtfulValues(values);
 
@@ -892,7 +894,8 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
                   child: Text(
                     'Οι θερμίδες δεν ταιριάζουν με τα υπόλοιπα: από πρωτεΐνη, υδατάνθρακες και λίπος βγαίνουν '
-                    'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα ή σε kJ;).',
+                    'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα ή σε kJ;). '
+                    'Αλκοόλ και γλυκαντικές πολυόλες δίνουν θερμίδες που δεν φαίνονται εδώ.',
                     style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text),
                   ),
                 ),

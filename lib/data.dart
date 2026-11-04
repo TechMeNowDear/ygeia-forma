@@ -10,7 +10,7 @@ import 'format.dart';
 import 'history.dart';
 import 'oura/oura_model.dart';
 import 'oura/oura_store.dart';
-import 'oxygen_note.dart' show oxygenWindowNights;
+import 'oxygen_note.dart' show oxygenLongWindowNights;
 import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
@@ -660,7 +660,8 @@ class Dashboard {
   }
 
   /// Η χαμηλότερη μέτρηση οξυγόνου του ρολογιού ανά νύχτα, για τις σημειώσεις χαμηλού οξυγόνου (B7), με τον ίδιο
-  /// ορισμό που δείχνουν οι κάρτες (A4): οι [oxygenWindowNights] νύχτες ως και την [last]· νύχτες του ρολογιού, ή
+  /// ορισμό που δείχνουν οι κάρτες (A4): οι [oxygenLongWindowNights] νύχτες ως και την [last] (30: ο κανόνας «κάτω
+  /// από 80% σε 2 από τις 30», δεύτερος κλινικός έλεγχος K2)· νύχτες του ρολογιού, ή
   /// — με [ouraNights] — οι μετρήσεις του ρολογιού μέσα στις ώρες ύπνου του Oura ([windows]). [since]: αρχή της
   /// εποχής του ορισμού ([SourcePlan.segmentStart]), ώστε να μη μετρούν νύχτες με άλλον ορισμό. Το ελάχιστο μετρά
   /// και σε νύχτα με μόνο σύντομες μετρήσεις (χωρίς μέσο όρο).
@@ -672,7 +673,7 @@ class Dashboard {
   }) {
     final out = <DateTime, double>{};
     final end = dayOf(last);
-    for (var i = 0; i < oxygenWindowNights; i++) {
+    for (var i = 0; i < oxygenLongWindowNights; i++) {
       final day = DateTime(end.year, end.month, end.day - i);
       if (since != null && day.isBefore(dayOf(since))) break;
       double? min;
@@ -766,7 +767,7 @@ class TodayCard {
 
 const todayCards = <TodayCard>[
   TodayCard('sleep', 'Ύπνος της νύχτας', true),
-  TodayCard('unusual', 'Εκτός συνηθισμένου (όταν ξεφεύγουν 2 δείκτες)', true),
+  TodayCard('unusual', 'Εκτός συνηθισμένου (όταν ξεφεύγουν μαζί παλμοί ύπνου και θερμοκρασία)', true),
   TodayCard('week', 'Απολογισμός εβδομάδας (Κυριακή βράδυ και Δευτέρα)', true),
   TodayCard('food', 'Διατροφή της ημέρας', true),
   TodayCard('steps', 'Βήματα', true),
@@ -786,6 +787,7 @@ class Prefs {
   Prefs(this.cards,
       {this.backfillFrom,
       this.kitchen,
+      this.reportName,
       this.themeMode = 'auto',
       this.dayTheme = 'aigaio',
       this.nightTheme = 'aigaio',
@@ -820,6 +822,7 @@ class Prefs {
       },
       backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
       kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
+      reportName: j['reportName'] is String ? j['reportName'] as String : null,
       themeMode: const ['auto', 'light', 'dark'].contains(j['themeMode']) ? j['themeMode'] as String : 'auto',
       dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
@@ -890,6 +893,10 @@ class Prefs {
   /// «Η κουζίνα μου» (δες food/kitchen.dart), όπως αποθηκεύεται.
   Map<String, dynamic>? kitchen;
 
+  /// Όνομα για την αναφορά γιατρού (προαιρετικό). Μένει μόνο στο κινητό: ΔΕΝ μπαίνει στο αρχείο αντιγράφου
+  /// ασφαλείας (backupPrefKeys) ούτε σε αναφορά σφάλματος.
+  String? reportName;
+
   final Map<String, bool> cards;
 
   /// Ως πού έχει φτάσει το ιστορικό προς τα πίσω («2025-11-01»).
@@ -903,6 +910,7 @@ class Prefs {
         'cards': cards,
         'backfillFrom': backfillFrom,
         'kitchen': kitchen,
+        if (reportName != null) 'reportName': reportName,
         'themeMode': themeMode,
         'dayTheme': dayTheme,
         'nightTheme': nightTheme,

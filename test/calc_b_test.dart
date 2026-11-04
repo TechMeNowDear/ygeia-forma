@@ -31,21 +31,23 @@ void main() {
       expect(oxygenGuidance({day(3): 75, day(0): 91}, today).veryLowLastNight, isFalse);
     });
 
-    test('Κάτω από 88% σε 3 από τις 7 τελευταίες νύχτες → «πες το στον γιατρό σου»', () {
-      final g = oxygenGuidance({day(0): 90, day(2): 87.6, day(4): 86, day(6): 85, day(7): 70}, today);
-      expect(g.lowNights, 3, reason: 'η 8η νύχτα πίσω δεν μετρά· το 87,6 μετρά (πριν από στρογγυλοποίηση)');
+    // Δεύτερος κλινικός έλεγχος (M1, M2): όριο 85% (όχι 88%), μόνο νύχτες με μέτρηση στον παρονομαστή.
+    test('Κάτω από 85% σε 3 από τις νύχτες με μέτρηση της εβδομάδας → «πες το στον γιατρό σου»', () {
+      final g = oxygenGuidance({day(0): 90, day(2): 84.6, day(4): 83, day(6): 80, day(7): 70}, today);
+      expect(g.lowNights, 3, reason: 'η 8η νύχτα πίσω δεν μετρά· το 84,6 μετρά (πριν από στρογγυλοποίηση)');
+      expect(g.measuredNights, 4);
       expect(g.repeated, isTrue);
-      expect(g.messages.first, contains('σε 3 από τις 7 τελευταίες νύχτες'));
-      expect(g.messages.first, contains('γιατρό σου'));
+      expect(g.messages.single, contains('σε 3 από τις 4 νύχτες με μέτρηση της τελευταίας εβδομάδας'));
+      expect(g.messages.single, contains('γιατρό σου'));
     });
 
-    test('2 νύχτες κάτω από 88% → όχι ακόμα', () {
-      expect(oxygenGuidance({day(1): 86, day(2): 85, day(3): 88}, today).repeated, isFalse);
+    test('2 νύχτες κάτω από 85% → όχι ακόμα', () {
+      expect(oxygenGuidance({day(1): 84, day(2): 83, day(3): 85}, today).repeated, isFalse);
     });
 
     test('Τα κείμενα δεν λένε ότι το τεστ άπνοιας είναι «το σωστό εργαλείο» (κλινικός έλεγχος C1)', () {
       expect(oxygenAboutText, isNot(contains('σωστό εργαλείο')));
-      expect(oxygenAboutText, contains('αρνητικό αποτέλεσμα δεν την αποκλείει'));
+      expect(oxygenAboutText, contains('αρνητικό αποτέλεσμα δεν αποκλείει άπνοια'));
       expect(oxygenAboutText, contains('μελέτη ύπνου'));
       expect(oxygenRedFlagText, contains('166 ή 112'));
       expect(heartRhythmNote, contains('δεν αποκλείεται κολπική μαρμαρυγή'));
@@ -62,7 +64,8 @@ void main() {
   test('«Συνηθισμένο»: χρειάζεται τουλάχιστον 7 προηγούμενες τιμές (έλεγχος υπολογισμών F8)', () {
     expect(usualMean([52.0]), isNull, reason: 'πριν: μία νύχτα έφτανε για κόκκινο «+4 από τον μ.ό.»');
     expect(usualMean([60, 60, 60, null, 60, 60, 60]), isNull);
-    expect(usualMean([60, 60, 60, 60, 60, 61, 62]), closeTo(60.43, 0.01));
+    // Από τον δεύτερο έλεγχο (C7): μεσαία τιμή, ΕΝΑ «συνήθως» σε όλη την εφαρμογή (πριν: μέσος όρος 60,43).
+    expect(usualMean([60, 60, 60, 60, 60, 61, 62]), 60);
     // Το πολύ οι 14 πιο πρόσφατες.
     expect(usualMean([for (var i = 0; i < 20; i++) i < 6 ? 100.0 : 50.0]), 50);
   });

@@ -70,28 +70,34 @@ class SleepPage extends StatelessWidget {
 
         return PageFrame(
           title: 'Ύπνος',
-          subtitle: 'Οι τελευταίες ${nights.length} νύχτες',
+          // Έλεγχος UX U6: τα διαστήματα της σελίδας γραμμένα μία φορά, ίδια σε κάθε κάρτα.
+          subtitle: 'Η τελευταία νύχτα · μέσοι όροι 7 νυχτών · γράφημα 14 νυχτών',
           onRefresh: () => store.refresh(),
           left: [
-            _LastNightCard(night: nights.last, data: d, oxSince: store.plan.segmentStart(K.spo2Avg, nights.last.date)),
+            _LastNightCard(
+              night: nights.last,
+              data: d,
+              oxSince: store.plan.segmentStart(K.spo2Avg, nights.last.date),
+              today: now ?? DateTime.now(),
+            ),
             _WatchStagesCard(nights: week),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Διάρκεια, 14 νύχτες', color: c.sleep),
+                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Διάρκεια · 14 νύχτες', color: c.sleep),
                   const SizedBox(height: 14),
                   Row(
                     children: [
                       Expanded(
                         child: _Summary(
-                          label: timed == 7 ? 'Μέσος όρος εβδομάδας' : 'Μέσος όρος εβδομάδας (${countText(timed, 'νύχτα', 'νύχτες')})',
+                          label: timed == 7 ? 'Μέσος όρος 7 νυχτών' : 'Μέσος όρος 7 νυχτών (από ${countText(timed, 'νύχτα', 'νύχτες')})',
                           value: avg7 == null ? '—' : hoursMinutes(avg7.round()),
                         ),
                       ),
                       Expanded(
                         child: _Summary(
-                          label: scored == week.length ? 'Μέση βαθμολογία' : 'Μέση βαθμολογία (${countText(scored, 'νύχτα', 'νύχτες')})',
+                          label: scored == week.length ? 'Μέση βαθμολογία 7 νυχτών' : 'Μέση βαθμολογία 7 νυχτών (από ${countText(scored, 'νύχτα', 'νύχτες')})',
                           value: scoreAvg == null ? '—' : '${scoreAvg.round()} από 100',
                         ),
                       ),
@@ -107,7 +113,7 @@ class SleepPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Η διακεκομμένη γραμμή είναι ο μέσος όρος της εβδομάδας.',
+                    'Η διακεκομμένη γραμμή είναι ο μέσος όρος των 7 νυχτών.',
                     style: TextStyle(color: c.textTertiary, fontSize: 12.5),
                   ),
                 ],
@@ -116,7 +122,7 @@ class SleepPage extends StatelessWidget {
             _ConsistencyCard(nights: last14),
           ],
           right: [
-            const SectionHeader('Νύχτα προς νύχτα'),
+            const SectionHeader('Νύχτα προς νύχτα · 14 νύχτες'),
             for (final n in nights.reversed.take(14)) _NightRow(night: n, now: d.readAt),
           ],
         );
@@ -145,9 +151,12 @@ class _Summary extends StatelessWidget {
 }
 
 class _LastNightCard extends StatelessWidget {
-  const _LastNightCard({required this.night, required this.data, this.oxSince});
+  const _LastNightCard({required this.night, required this.data, required this.today, this.oxSince});
   final Night night;
   final Dashboard data;
+
+  /// Σήμερα: για να μη λέγεται «χθεσινή» μια παλιότερη νύχτα στη σημείωση του οξυγόνου.
+  final DateTime today;
 
   /// Αρχή της εποχής του ορισμού του οξυγόνου (οι σημειώσεις δεν μετρούν νύχτες με άλλον ορισμό, A4).
   final DateTime? oxSince;
@@ -183,15 +192,17 @@ class _LastNightCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: DurationValue(n.minutes, size: 30)),
-              ScoreRing(
-                value: n.score?.toDouble(),
-                size: 64,
-                stroke: 6,
-                color: c.sleep,
-                track: c.tint(c.sleep),
-                textColor: c.text,
-                caption: 'σκορ · εκτίμηση',
-              ),
+              // Χωρίς βαθμολογία της νύχτας: όχι άδειο δαχτυλίδι «—» δίπλα στις βαθμολογίες των κομματιών (έλεγχος UX U8).
+              if (n.score != null)
+                ScoreRing(
+                  value: n.score!.toDouble(),
+                  size: 64,
+                  stroke: 6,
+                  color: c.sleep,
+                  track: c.tint(c.sleep),
+                  textColor: c.text,
+                  caption: 'σκορ · εκτίμηση',
+                ),
             ],
           ),
           if (!n.staged) ...[
@@ -251,7 +262,7 @@ class _LastNightCard extends StatelessWidget {
           if (n.spo2Avg != null || n.spo2Min != null) ...[
             const SizedBox(height: 6),
             OxygenNotes(
-              guidance: oxygenGuidance(data.spo2MinByNight(n.date, since: oxSince), n.date),
+              guidance: oxygenGuidance(data.spo2MinByNight(n.date, since: oxSince), n.date, today: today),
             ),
             const SizedBox(height: 6),
           ],
@@ -354,7 +365,7 @@ class _ConsistencyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(icon: Icons.schedule_rounded, title: 'Ωράριο, 14 νύχτες', color: c.sleep),
+          CardHeader(icon: Icons.schedule_rounded, title: 'Ωράριο · 14 νύχτες', color: c.sleep),
           const SizedBox(height: 8),
           InfoRow('Συνήθως κοιμάσαι', _clock(bedAvg)),
           InfoRow('Συνήθως ξυπνάς', _clock(wakeAvg)),

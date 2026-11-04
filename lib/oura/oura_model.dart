@@ -220,9 +220,48 @@ class OuraNight {
   /// Άλλες μεγάλες περίοδοι της ίδιας μέρας (σπάνιο): φαίνονται, δεν προστίθενται.
   final List<OuraSleep> others;
 
-  /// Σύντομη νύχτα σε κομμάτια: τα άλλα κομμάτια του νυχτερινού παραθύρου («άλλο κομμάτι»). Φαίνονται κάτω
-  /// από τη νύχτα, ΔΕΝ προστίθενται ούτε στη νύχτα ούτε στους υπνάκους.
+  /// Σύντομη νύχτα σε κομμάτια: τα άλλα κομμάτια του νυχτερινού παραθύρου («άλλο κομμάτι»). Όσα απέχουν ως
+  /// [maxNightGap] από τη νύχτα μετρούν μαζί της ([counted]), όπως τα κομμάτια του ρολογιού· τα υπόλοιπα φαίνονται
+  /// χωριστά. Ποτέ στους υπνάκους.
   final List<OuraSleep> pieces;
+
+  /// Οι περίοδοι ύπνου που μετρούν ως η νύχτα, παλιότερη πρώτη: η κύρια, και σε σύντομη νύχτα τα κομμάτια του
+  /// νυχτερινού παραθύρου που απέχουν το πολύ [maxNightGap] από το επόμενο ή το προηγούμενο (ίδιος κανόνας με τη
+  /// νύχτα του ρολογιού, έλεγχος 4/11 δεύτερος γύρος, C1/U12). Το κενό ανάμεσα ΔΕΝ μετρά ως ύπνος. Πριν, μια νύχτα
+  /// 23:00–01:30 και 03:00–05:45 έδειχνε μόνο 2 ώρες 35 λεπτά και «άλλο κομμάτι (χωριστά)».
+  List<OuraSleep> get counted {
+    final m = main;
+    if (m == null) return const [];
+    if (pieces.isEmpty) return [m];
+    final all = [m, ...pieces]..sort((a, b) => a.start.compareTo(b.start));
+    // Επικαλυπτόμενες περίοδοι (δεν συμβαίνει στην Oura) δεν ενώνονται: δεν μετρά ποτέ δύο φορές ο ίδιος χρόνος.
+    bool near(OuraSleep a, OuraSleep b) {
+      final g = b.start.difference(a.end);
+      return !g.isNegative && g <= maxNightGap;
+    }
+
+    var lo = all.indexWhere((x) => identical(x, m));
+    var hi = lo;
+    while (lo > 0 && near(all[lo - 1], all[lo])) {
+      lo--;
+    }
+    while (hi < all.length - 1 && near(all[hi], all[hi + 1])) {
+      hi++;
+    }
+    return all.sublist(lo, hi + 1);
+  }
+
+  /// Τα κομμάτια που ΔΕΝ μετρούν στη νύχτα (μακριά από αυτήν): φαίνονται χωριστά.
+  List<OuraSleep> get separatePieces => [for (final p in pieces) if (!counted.any((x) => identical(x, p))) p];
+
+  /// Ο ύπνος της νύχτας σε λεπτά: το άθροισμα των περιόδων που μετρούν ([counted]), χωρίς τα κενά. Null αν η κύρια
+  /// δεν έχει διάρκεια ύπνου.
+  int? get nightMinutes {
+    final m = main;
+    if (m == null || m.total == null) return null;
+    final secs = counted.fold<int>(0, (s, x) => s + (x.total ?? 0));
+    return (secs / 60).round();
+  }
 
   /// Η νύχτα είναι κάτω από 3 ώρες («Σύντομη νύχτα»).
   bool get shortNight => main?.isShortNight ?? false;
@@ -240,15 +279,19 @@ class OuraNight {
   int get napMinutes => naps.fold(0, (s, n) => s + (n.totalMinutes ?? 0));
   bool get hasAny => main != null || naps.isNotEmpty || others.isNotEmpty || pieces.isNotEmpty || daily != null;
 
-  /// Η νύχτα στη μορφή της εφαρμογής, για το υπνόγραμμα (μόνο φάσεις και ώρες).
+  /// Η νύχτα στη μορφή της εφαρμογής, για το υπνόγραμμα (μόνο φάσεις και ώρες). Νύχτα σε κομμάτια: από την αρχή
+  /// του πρώτου ως το τέλος του τελευταίου, με τις φάσεις όλων (το κενό μένει κενό).
   Night? toNight() {
     final m = main;
     if (m == null) return null;
+    final parts = counted;
     final n = Night(day)
-      ..start = m.start
-      ..end = m.end
-      ..minutes = m.totalMinutes ?? 0;
-    n.stages.addAll(m.stages);
+      ..start = parts.first.start
+      ..end = parts.last.end
+      ..minutes = nightMinutes ?? 0;
+    for (final p in parts) {
+      n.stages.addAll(p.stages);
+    }
     return n;
   }
 
@@ -324,6 +367,9 @@ OuraSleep? selectShortNight(Iterable<OuraSleep> periods, DateTime day) {
   return best;
 }
 
+/// Το πολύ τόσο κενό ανάμεσα σε δύο κομμάτια της ίδιας νύχτας (ίδιο με τη νύχτα του ρολογιού).
+const maxNightGap = Duration(hours: 4);
+
 /// Ομαδοποίηση ανά μέρα, παλιότερη πρώτη.
 List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies) {
   final byDay = <String, List<OuraSleep>>{};
@@ -385,19 +431,26 @@ Map<String, double> ouraRow(OuraNight n) {
 
   final m = n.main;
   if (m != null) {
-    put(K.sleepMin, m.total == null ? null : m.total! / 60);
-    final onset = m.onset;
+    // Νύχτα σε κομμάτια ([OuraNight.counted]): διάρκεια, φάσεις και ξύπνιος από όλα τα κομμάτια που μετρούν, ώρα
+    // ύπνου από το πρώτο, ξύπνημα από το τελευταίο (δεύτερος γύρος ελέγχου, U12). Παλμοί, HRV, αναπνοές: της κύριας
+    // περιόδου (μέσοι όροι της Oura ανά περίοδο· δεν ανακατεύονται).
+    final parts = n.counted;
+    int? sum(int? Function(OuraSleep) f) => parts.any((x) => f(x) == null) ? null : parts.fold<int>(0, (s, x) => s + f(x)!);
+    put(K.sleepMin, m.total == null ? null : parts.fold<int>(0, (s, x) => s + (x.total ?? 0)) / 60);
+    final onset = parts.first.onset;
     if (onset != null) put(K.bedtime, minutesFromSix(onset));
-    put(K.wake, minutesFromSix(m.end));
+    put(K.wake, minutesFromSix(parts.last.end));
     // Ποσοστό του ύπνου (χωρίς τον χρόνο ξύπνιος), όπως στην εφαρμογή Oura (έλεγχος υπολογισμών F6, 4/11).
-    if (m.deep != null && m.light != null && m.rem != null) {
-      final staged = m.deep! + m.light! + m.rem!;
+    final deep = sum((x) => x.deep), light = sum((x) => x.light), rem = sum((x) => x.rem);
+    if (deep != null && light != null && rem != null) {
+      final staged = deep + light + rem;
       if (staged > 0) {
-        put(K.deepPct, 100 * m.deep! / staged);
-        put(K.remPct, 100 * m.rem! / staged);
+        put(K.deepPct, 100 * deep / staged);
+        put(K.remPct, 100 * rem / staged);
       }
     }
-    put(K.awakeMin, m.awake == null ? null : m.awake! / 60);
+    final awake = sum((x) => x.awake);
+    put(K.awakeMin, awake == null ? null : awake / 60);
     put(K.sleepHr, m.avgHr);
     put(K.lowHr, m.lowestHr);
     put(K.hrv, m.avgHrv);

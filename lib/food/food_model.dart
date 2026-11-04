@@ -80,7 +80,12 @@ class Food {
     this.rawId,
     this.cookedLabel,
     this.cooked = const [],
+    this.perMl = false,
   });
+
+  /// Οι τιμές είναι ανά 100 ml (υγρό από το Open Food Facts). Αποθηκεύεται, ώστε η διόρθωση αργότερα να λέει ξανά
+  /// «ανά 100 ml» και όχι «ανά 100 g» (δεύτερος έλεγχος διατροφής N9).
+  final bool perMl;
 
   final String id;
   final String name;
@@ -127,6 +132,7 @@ class Food {
         servingLabel: j['servingLabel'] as String?,
         rawId: j['rawId'] as String?,
         cookedLabel: j['cookedLabel'] as String?,
+        perMl: j['perMl'] == true,
         cooked: [
           for (final c in (j['cooked'] as List?) ?? const [])
             if (c is Map) ((c['id'] as String), (c['label'] as String)),
@@ -150,6 +156,7 @@ class Food {
         if (rawId != null) 'rawId': rawId,
         if (cookedLabel != null) 'cookedLabel': cookedLabel,
         if (cooked.isNotEmpty) 'cooked': [for (final c in cooked) {'id': c.$1, 'label': c.$2}],
+        if (perMl) 'perMl': true,
         'n': n.toJson(),
       };
 

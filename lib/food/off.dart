@@ -15,6 +15,8 @@ class FoodDraft {
     Map<String, double>? values,
     this.fromOff = false,
     this.perMl = false,
+    this.alcohol,
+    this.polyols,
   }) : values = values ?? {};
 
   String name;
@@ -30,6 +32,12 @@ class FoodDraft {
   /// Υγρό στο Open Food Facts: τα πεδία «_100g» είναι τότε ανά 100 ml (έλεγχος διατροφής M4, 4/11).
   /// Η εφαρμογή μετρά σε γραμμάρια· το λέμε στη φόρμα, χωρίς να μαντεύουμε πυκνότητα.
   final bool perMl;
+
+  /// Αλκοόλ και πολυόλες σε g ανά 100 (από το Open Food Facts), ΜΟΝΟ για τον έλεγχο θερμίδων: δίνουν θερμίδες που
+  /// δεν φαίνονται στα μακροθρεπτικά (αλκοόλ 7 kcal/g, πολυόλες 2,4 kcal/g, Κανονισμός ΕΕ 1169/2011). Δεν
+  /// αποθηκεύονται ως θρεπτικά (δεύτερος έλεγχος διατροφής N9: μπίρα και κρασί έβγαζαν «οι θερμίδες δεν ταιριάζουν»).
+  final double? alcohol;
+  final double? polyols;
 
   static const required = [Nk.kcal, Nk.protein, Nk.carbs, Nk.fat];
 
@@ -74,6 +82,9 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   final brand = pick(['brands'])?.split(',').first.trim();
   final perMl = isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size'])) ||
       (p['nutrition_data_per'] is String && (p['nutrition_data_per'] as String).toLowerCase().contains('ml'));
+  // Στο Open Food Facts το «alcohol» είναι % vol: g ανά 100 ml = % vol × 0,789 (πυκνότητα αιθανόλης).
+  final alcoholVol = _num(n['alcohol_100g']) ?? _num(n['alcohol']);
+  final polyols = _num(n['polyols_100g']);
   return FoodDraft(
     name: pick(['product_name_el', 'generic_name_el', 'product_name']) ?? '',
     brand: brand,
@@ -83,6 +94,8 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
     values: values,
     fromOff: true,
     perMl: perMl,
+    alcohol: alcoholVol == null || alcoholVol <= 0 ? null : alcoholVol * 0.789,
+    polyols: polyols == null || polyols <= 0 ? null : polyols,
   );
 }
 
@@ -90,12 +103,14 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
 bool isLiquidQuantity(String? q) =>
     q != null && RegExp(r'\d\s*(ml|cl|dl|l|lt)\b', caseSensitive: false).hasMatch(q);
 
-/// Έλεγχος λογικής: θερμίδες ετικέτας vs υπολογισμένες από τα μακροθρεπτικά (συντελεστές ΕΕ).
-/// Επιστρέφει τις υπολογισμένες αν η απόκλιση είναι >15% και >20 kcal.
-double? energyMismatch(Map<String, double> v) {
+/// Έλεγχος λογικής: θερμίδες ετικέτας vs υπολογισμένες από τα μακροθρεπτικά (συντελεστές ΕΕ: πρωτεΐνη 4,
+/// υδατάνθρακες 4, λίπος 9, ίνες 2, αλκοόλ 7, πολυόλες 2,4· στην ετικέτα ΕΕ οι υδατάνθρακες περιέχουν τις πολυόλες).
+/// [alcohol], [polyols]: g ανά 100. Επιστρέφει τις υπολογισμένες αν η απόκλιση είναι >15% και >20 kcal.
+double? energyMismatch(Map<String, double> v, {double alcohol = 0, double polyols = 0}) {
   final k = v[Nk.kcal], p = v[Nk.protein], c = v[Nk.carbs], f = v[Nk.fat];
   if (k == null || p == null || c == null || f == null) return null;
-  final calc = 4 * p + 4 * c + 9 * f + 2 * (v[Nk.fiber] ?? 0);
+  final sugarAlcohols = polyols.clamp(0.0, c);
+  final calc = 4 * p + 4 * (c - sugarAlcohols) + 9 * f + 2 * (v[Nk.fiber] ?? 0) + 7 * alcohol + 2.4 * sugarAlcohols;
   final diff = (k - calc).abs();
   return (diff > 20 && diff / (k > 1 ? k : 1) > 0.15) ? calc : null;
 }
@@ -136,6 +151,7 @@ FoodDraft draftFromFood(Food f) => FoodDraft(
       servingLabel: f.servingLabel,
       values: {for (final e in f.n.values.entries) e.key: e.value.value},
       fromOff: f.source == 'Open Food Facts',
+      perMl: f.perMl,
     );
 
 const myFoodsCategory = 'Τα προϊόντα μου';
@@ -149,5 +165,6 @@ Food foodFromDraft(FoodDraft d, String id) => Food(
       source: d.fromOff ? 'Open Food Facts' : 'Ετικέτα',
       servingGrams: d.servingGrams,
       servingLabel: d.servingLabel,
+      perMl: d.perMl,
       n: Nutrients({for (final e in d.values.entries) e.key: NValue(e.value)}),
     );
