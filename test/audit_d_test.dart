@@ -1,6 +1,7 @@
 // Δεύτερος γύρος ελέγχου (4/11), κομμάτι D: κλινικά κείμενα, υπολογισμοί στην οθόνη, PDF για γιατρό, αναζήτηση
 // τροφίμων, UX. Κάθε διόρθωση με έλεγχο που αποτυγχάνει χωρίς αυτήν (D1–D13 στο audit2_reports/0_triage.md).
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/data.dart';
@@ -46,6 +47,16 @@ Future<void> _pump(WidgetTester t, Widget w, {Size size = const Size(400, 2400)}
 }
 
 void main() {
+  // Η γραμματοσειρά της εφαρμογής (όπως στα στιγμιότυπα): με τη γραμματοσειρά δοκιμών κάθε γράμμα είναι τετράγωνο
+  // και οι σελίδες A4 / οι γραμμές «ξεχειλίζουν» χωρίς λόγο.
+  setUpAll(() async {
+    final inter = FontLoader('Inter');
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+      inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+    }
+    await inter.load();
+  });
+
   final today = DateTime(2026, 11, 4);
   DateTime day(int ago) => _add(today, -ago);
 

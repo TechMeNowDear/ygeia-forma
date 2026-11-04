@@ -482,20 +482,20 @@ class _PageOne extends StatelessWidget {
         _Header(data: d, page: 1, name: name),
         if (note.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
               'Σημείωση: $note',
               key: const ValueKey('report-note-text'),
               // 400 χαρακτήρες χωράνε σε 5 γραμμές· ποτέ κομμένη σημείωση στον γιατρό.
               maxLines: 6,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 9, color: c.text, height: 1.3),
+              style: TextStyle(fontSize: 9, color: c.text, height: 1.25),
             ),
           ),
         // Κλινικός έλεγχος H2 (4/11): η απουσία ρυθμού/άπνοιας εδώ δεν σημαίνει ότι ήταν φυσιολογικά.
         Container(
           key: const ValueKey('report-not-included'),
-          margin: const EdgeInsets.only(top: 8),
+          margin: const EdgeInsets.only(top: 6),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(4)),
           child: Text.rich(
@@ -559,7 +559,7 @@ class _PageOne extends StatelessWidget {
                 }(),
           ],
         ),
-        _Title('Πώς διαβάζεται', top: 10),
+        _Title('Πώς διαβάζεται', top: 8),
         Text(
           // Έλεγχος υπολογισμών F9 (4/11): χωρίς ισχυρισμό «1%»· είναι ένδειξη ανά δείκτη.
           // Δεύτερος έλεγχος υπολογισμών C4 (D8): ο έλεγχος είναι κατά προσέγγιση· στους 3 μήνες πιάνει και αργές μεταβολές.
@@ -569,7 +569,7 @@ class _PageOne extends StatelessWidget {
           'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), ή «—» όταν '
           'οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια ένδειξη μπορεί να είναι '
           'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού. Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.',
-          style: small.copyWith(fontSize: 8.4),
+          style: small.copyWith(fontSize: 8.2, height: 1.35),
         ),
         const Spacer(),
         _Footer(data: d, page: 1),
