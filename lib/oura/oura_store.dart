@@ -184,6 +184,19 @@ mixin OuraStore on ChangeNotifier {
   bool get planUnknown;
   Future<bool> saveDaysNow(Set<String> keys);
 
+  /// Έλεγχος 3, E1.5: τα βήματα ανά λεπτό του ΡΟΛΟΓΙΟΥ στο [from, to) (null = άγνωστα), μόνο για το πρωινό κενό του
+  /// κοινού κανόνα της νύχτας (ποτέ ως τιμή του Oura).
+  int? watchStepsBetween(DateTime from, DateTime to);
+
+  /// Οι αποθηκευμένες αποφάσεις «πρωινός υπνάκος» των νυχτών του Oura («o.napLock»), E1.6.
+  Map<String, int> get _ouraNapLocks {
+    final key = ouraKeys[K.napLock]!;
+    return {
+      for (final e in history.entries)
+        if (e.value[key] case final v? when v.isFinite) e.key: v.round(),
+    };
+  }
+
   Future<bool> savePrefsNow();
   Future<bool> setPlan(SourcePlan p);
 
@@ -834,7 +847,7 @@ mixin OuraStore on ChangeNotifier {
     ouraSyncing = true;
     notifyListeners();
     try {
-      final batch = await ouraLink.fetchNights(from, to);
+      final batch = await ouraLink.fetchNights(from, to, stepsBetween: watchStepsBetween, napLocks: _ouraNapLocks);
       if (epoch != _ouraEpoch) return; // αποσυνδέθηκε στο μεταξύ: τίποτα δεν κρατιέται
       final rows = await ouraRowsOffMain(batch.nights);
       if (epoch != _ouraEpoch) return;
@@ -848,7 +861,8 @@ mixin OuraStore on ChangeNotifier {
       final older = saved ? ouraOlderRange() : null;
       var olderSaved = true;
       if (older != null) {
-        final b2 = await ouraLink.fetchNights(older.from, older.to);
+        final b2 = await ouraLink.fetchNights(older.from, older.to,
+            stepsBetween: watchStepsBetween, napLocks: _ouraNapLocks);
         if (epoch != _ouraEpoch) return;
         final rows2 = await ouraRowsOffMain(b2.nights);
         if (epoch != _ouraEpoch) return;

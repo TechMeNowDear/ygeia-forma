@@ -114,6 +114,10 @@ class Night {
   double? skinTemp;
   int napMinutes = 0;
 
+  /// Έλεγχος 3, E1.6: η απόφαση «πρωινός υπνάκος» που πάρθηκε με βήματα (αρχή του κομματιού που έγινε υπνάκος),
+  /// ώστε να αποθηκευτεί ([K.napLock]) και να μην αλλάξει όταν τα βήματα ανά λεπτό δεν υπάρχουν πια.
+  DateTime? napLock;
+
   /// Κενά της Samsung ανάμεσα στα κομμάτια, με παλμούς σαν του ύπνου (δες sleep_gaps.dart).
   /// «Πιθανός ύπνος»: φαίνονται χωριστά και **δεν** μετρούν στα [minutes].
   final List<(DateTime, DateTime)> estimatedGaps = [];
@@ -293,8 +297,8 @@ class Dashboard {
     this.otherBodyDays = const {},
   });
 
-  /// Μέρες («2026-11-10») με ζύγιση από ΑΛΛΗ εφαρμογή (όχι InBody) στη Samsung Health (C5): οι παλιές εκδόσεις τις
-  /// έγραφαν στο ιστορικό· τώρα φεύγουν από εκεί όπου δεν υπάρχει ζύγιση InBody την ίδια μέρα.
+  /// Μέρες («2026-11-10») με ζύγιση από ΑΛΛΗ εφαρμογή (όχι InBody) στη Samsung Health: οι παλιές εκδόσεις τις
+  /// έγραφαν στο ιστορικό. Έλεγχος 3, E2: δεν σβήνονται ποτέ· μετρούν ως «υπάρχουν ακόμα» στη Samsung.
   final Set<String> otherBodyDays;
 
   /// Υπνάκοι του ρολογιού (λεπτά) ανά ημερομηνία νύχτας (C1): αποθηκεύονται στο ιστορικό (napMin), ακόμα και μέρα
@@ -392,7 +396,9 @@ class Dashboard {
 
   bool get hasAnyPermission => granted > 0;
 
-  factory Dashboard.fromJson(Map<String, dynamic> j) {
+  /// [napLocks]: οι αποθηκευμένες αποφάσεις «πρωινός υπνάκος» ανά νύχτα («2026-11-03» → λεπτά από την εποχή Unix,
+  /// [K.napLock] του ιστορικού), για τις νύχτες που δεν έχουν πια βήματα ανά λεπτό (E1.6).
+  factory Dashboard.fromJson(Map<String, dynamic> j, {Map<String, int> napLocks = const {}}) {
     DateTime t(dynamic ms) => DateTime.fromMillisecondsSinceEpoch((ms as num).toInt());
     // Χρόνος «0» ή πριν από το 2000: η εγγραφή αγνοείται (αλλιώς μια νύχτα του 1970 θα «κατάπινε» όλες τις άλλες).
     bool okTime(dynamic ms) => ms is num && ms >= _oldestMs;
@@ -476,7 +482,8 @@ class Dashboard {
               }())
         : null;
 
-    final grouped = _groupNights(records, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom);
+    final grouped =
+        _groupNights(records, heart: heart, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom, napLocks: napLocks);
     final nights = grouped.nights..forEach((n) => _fillNightMetrics(n, heart, spo2, skin));
 
     return Dashboard._(
@@ -523,27 +530,21 @@ class Dashboard {
     );
   }
 
-  /// Ο ύπνος ομαδοποιείται σε νύχτες (έλεγχος 2, C1· στοιχεία της νύχτας 2→3/11 του χρήστη):
+  /// Ο ύπνος ομαδοποιείται σε νύχτες με τον ΕΝΑΝ κανόνα, κοινό με το Oura ([groupSleepPieces], έλεγχος 3, E1):
   /// - Η διάρκεια είναι **μόνο** ό,τι μέτρησε η Samsung (πραγματικός ύπνος από τις φάσεις). Τα κενά ανάμεσα στα
   ///   κομμάτια **δεν** μετρούν ποτέ ως ύπνος.
-  /// - Κομμάτι ανήκει στη νύχτα αν το κενό από το προηγούμενο κομμάτι της είναι ως 4 ώρες ([maxGap]), ΑΝΕΞΑΡΤΗΤΑ
-  ///   από βήματα ή παλμούς (μια βόλτα ως την τουαλέτα δεν «κόβει» τη νύχτα· και ο κανόνας δεν αλλάζει όταν η νύχτα
-  ///   παλιώσει και δεν υπάρχουν πια βήματα ανά λεπτό). Τα βήματα/παλμοί χρησιμεύουν μόνο για την ετικέτα του κενού
-  ///   («πιθανός ύπνος» ή «κενό»), που δεν μετρά.
-  /// - Υπνάκοι είναι ΜΟΝΟ: (α) βραδινό λαγοκοίμισμα που τελειώνει ως τις 22:00, (β) κομμάτι που
-  ///   αρχίζει μετά τις 06:00 και μετά το τέλος της νύχτας, εκτός αν το κενό είναι ως 90 λεπτά ΚΑΙ (δεν υπάρχουν
-  ///   βήματα ανά λεπτό για το κενό Ή τα βήματα είναι ως [maxGapSteps]) — τότε είναι η ίδια νύχτα, π.χ. Κυριακή 25/10:
-  ///   05:55–09:50 και 10:53→, 0 βήματα, παλμοί ύπνου, (γ) απογευματινός:
-  ///   αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες (όπως πριν). Οι υπνάκοι μετρούν στα [Night.napMinutes] της
-  ///   νύχτας με την ίδια ημερομηνία και αποθηκεύονται (napMin), ώστε να μη χάνονται.
-  /// - Δύο ομάδες με την ίδια ημερομηνία (κενό πάνω από 4 ώρες): η μεγαλύτερη που δεν είναι λαγοκοίμισμα είναι η
-  ///   νύχτα· η άλλη είναι υπνάκος μόνο κατά τα (α)/(β), αλλιώς μέρος της νύχτας (με το κενό να μη μετρά).
-  /// - Ο κανόνας είναι ΚΟΙΝΟΣ με το Oura ([groupSleepPieces] στο sleep_gaps.dart)· το Oura δεν έχει βήματα (= άγνωστα).
+  /// - Κύρια ομάδα = τα περισσότερα λεπτά ύπνου μέσα στο 22:00–08:00· πριν από αυτήν μπαίνει ό,τι αρχίζει από τις 20:00
+  ///   με κενό ως 4 ώρες, μετά από αυτήν ό,τι αρχίζει πριν από τις 06:00 με κενό ως 4 ώρες, ή από τις 06:00 με κενό ως
+  ///   90 λεπτά και ως 30 βήματα (ή άγνωστα βήματα)· όλα τα άλλα είναι υπνάκοι ([Night.napMinutes], αποθηκεύονται
+  ///   χωριστά ως napMin).
+  /// - Η απόφαση «υπνάκος λόγω βημάτων» κλειδώνει ([Night.napLock] → [K.napLock], [napLocks] στην επόμενη ανάγνωση).
+  /// - Βήματα και παλμοί κρίνουν επίσης την ετικέτα του κενού («πιθανός ύπνος» ή «κενό»), που δεν μετρά.
   static ({List<Night> nights, Map<DateTime, int> naps}) _groupNights(
     List<SleepRecord> records, {
     List<Sample> heart = const [],
     Map<int, int> stepsByMinute = const {},
     DateTime? stepsFrom,
+    Map<String, int> napLocks = const {},
   }) {
     final recs = dedupeSleep(records);
     // Ο ΕΝΑΣ κανόνας της νύχτας (sleep_gaps.dart, [groupSleepPieces]), ίδιος με του Oura. Τα βήματα κρίνουν μόνο το
@@ -552,6 +553,10 @@ class Dashboard {
       recs,
       (r) => (start: r.start, end: r.end, minutes: r.sleepMinutes),
       stepsBetween: (a, b) => gapSteps(a, b, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom),
+      napLockOf: (date) {
+        final m = napLocks[dateKey(date)];
+        return m == null ? null : DateTime.fromMillisecondsSinceEpoch(m * 60000);
+      },
     );
     final naps = <DateTime, int>{
       for (final e in grouped.naps.entries) e.key: e.value.fold(0, (sum, r) => sum + r.sleepMinutes),
@@ -559,7 +564,7 @@ class Dashboard {
 
     final nights = <Night>[];
     for (final g in grouped.nights) {
-      final n = Night(g.date);
+      final n = Night(g.date)..napLock = g.napLock;
       for (final seg in g.segments) {
         // Μόνο η ετικέτα του κενού κρίνεται με βήματα και παλμούς («πιθανός ύπνος»)· δεν μετρά ποτέ στη διάρκεια.
         var reach = seg.first.end;
@@ -997,14 +1002,22 @@ typedef ParsedDashboard = ({
 /// γίνεται εδώ (πιο αργά, αλλά ποτέ «κολλημένο»).
 /// Με [plan] υπολογίζονται εκεί και οι συνόψεις των 30 ημερών (A9: όχι στο νήμα της οθόνης). Το αποτέλεσμα
 /// επιστρέφει χωρίς αντιγραφή (Isolate.run).
-Future<ParsedDashboard> parseDashboard(String raw, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) async {
+Future<ParsedDashboard> parseDashboard(String raw,
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) async {
   try {
-    return await Isolate.run(() => parseDashboardSync(raw, plan: plan, windows: windows));
+    return await Isolate.run(() => parseDashboardSync(raw, plan: plan, windows: windows, napLocks: napLocks));
   } catch (e, st) {
     _isolateFailed(e, st);
-    return parseDashboardSync(raw, plan: plan, windows: windows);
+    return parseDashboardSync(raw, plan: plan, windows: windows, napLocks: napLocks);
   }
 }
+
+/// Έλεγχος 3, E1.6: οι αποθηκευμένες αποφάσεις «πρωινός υπνάκος» του ρολογιού ([K.napLock]) ανά νύχτα, για την
+/// ομαδοποίηση ([Dashboard.fromJson]). [key]: «napLock» (ρολόι) ή «o.napLock» (Oura).
+Map<String, int> napLocksOf(Map<String, Map<String, double>> history, {String key = K.napLock}) => {
+      for (final e in history.entries)
+        if (e.value[key] case final v? when v.isFinite) e.key: v.round(),
+    };
 
 /// Αν το νήμα δεν ξεκινά, η εφαρμογή δουλεύει (πιο αργά)· το λέμε στο Sentry μία φορά, για να το δούμε.
 bool _isolateReported = false;
@@ -1025,17 +1038,17 @@ typedef ParsedRange = ({
 });
 
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) async {
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) async {
   try {
-    return await Isolate.run(() => parseRangeSync(raw, from, to, plan: plan, windows: windows));
+    return await Isolate.run(() => parseRangeSync(raw, from, to, plan: plan, windows: windows, napLocks: napLocks));
   } catch (e, st) {
     _isolateFailed(e, st);
-    return parseRangeSync(raw, from, to, plan: plan, windows: windows);
+    return parseRangeSync(raw, from, to, plan: plan, windows: windows, napLocks: napLocks);
   }
 }
 
 ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) {
   const fail = (
     ok: false,
     rows: <String, Map<String, double>>{},
@@ -1047,7 +1060,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
   try {
     final j = jsonDecode(raw);
     if (j is! Map<String, dynamic> || j['ok'] != true) return fail;
-    final d = Dashboard.fromJson(j);
+    final d = Dashboard.fromJson(j, napLocks: napLocks);
     return (
       ok: true,
       rows: summarizeRange(d, from, to, plan: plan, windows: windows),
@@ -1065,7 +1078,8 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
 const recentSummaryDays = 30;
 
 /// [plan]/[windows]: αν δοθούν, υπολογίζονται και οι συνόψεις των 30 ημερών ([ParsedDashboard.rows]).
-ParsedDashboard parseDashboardSync(String raw, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
+ParsedDashboard parseDashboardSync(String raw,
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) {
   Object? j;
   try {
     j = jsonDecode(raw);
@@ -1085,7 +1099,7 @@ ParsedDashboard parseDashboardSync(String raw, {SourcePlan? plan, SleepWindows w
     );
   }
   try {
-    final d = Dashboard.fromJson(j);
+    final d = Dashboard.fromJson(j, napLocks: napLocks);
     final today = dayOf(d.readAt);
     return (
       status: const {'ok': true},
@@ -1103,7 +1117,7 @@ ParsedDashboard parseDashboardSync(String raw, {SourcePlan? plan, SleepWindows w
 }
 
 /// Μια κανονική ανάγνωση (30 μέρες + όλες οι ζυγίσεις) στο ιστορικό. Επιστρέφει τις μέρες που άλλαξαν.
-/// - Οι 30 μέρες περνούν από το [mergeHistory] (ύπνος χωρίς εξάρτηση από βήματα, C1· πηγή κάθε νύχτας).
+/// - Οι 30 μέρες περνούν από το [mergeHistory] (ύπνος με κλειδωμένες αποφάσεις πρωινού υπνάκου, E1.6· πηγή κάθε νύχτας).
 /// - Οι ζυγίσεις μπαίνουν ΧΩΡΙΣΤΑ ([mergeBody]): μία ολόκληρη ζύγιση InBody ανά μέρα, χωρίς να αγγίζεται τίποτα
 ///   άλλο της μέρας (A1: πριν, μια ζύγιση σε παλιά μέρα του Oura έσβηνε το οξυγόνο της νύχτας).
 /// - Νύχτες με άλλη πηγή που είχαν ακόμα τιμές του ρολογιού: φεύγουν· ζύγιση που σβήστηκε στη Samsung: φεύγει
@@ -1125,8 +1139,9 @@ Set<String> applyRecentRead(
   for (final r in rows.values) {
     r.removeWhere((k, _) => bodyKeys.contains(k));
   }
-  // Η ομαδοποίηση του ύπνου δεν εξαρτάται πια από βήματα ανά λεπτό (C1): όλες οι μέρες της ανάγνωσης έχουν τον ίδιο
-  // ορισμό και ξαναγράφονται (όχι μόνο οι 7 με βήματα), όταν ο ύπνος διαβάστηκε κανονικά.
+  // Όλες οι μέρες της ανάγνωσης ξαναγράφονται (όχι μόνο οι 7 με βήματα ανά λεπτό), όταν ο ύπνος διαβάστηκε κανονικά.
+  // Τα βήματα κρίνουν μόνο το πρωινό κενό· η απόφαση που πάρθηκε με βήματα είναι κλειδωμένη στο ιστορικό ([K.napLock],
+  // έλεγχος 3, E1.6), άρα η μέρα 8–29 χωρίς βήματα βγαίνει ίδια με τη μέρα 0–7.
   final sleepFrom = !sleepFailed && d.sleepOk ? DateTime(today.year, today.month, today.day - recentSummaryDays + 1) : null;
   final changed = mergeHistory(
     history,
@@ -1158,21 +1173,12 @@ Set<String> applyRecentRead(
   // Ζύγιση που σβήστηκε στη Samsung / InBody: φεύγει και από το ιστορικό (Τάσεις, αναφορά γιατρού).
   // Με προφύλαξη: αν η Samsung δεν δίνει καμία ζύγιση (π.χ. μόλις επανεγκαταστάθηκε) ή θα έφευγαν
   // πολλές μαζί, δεν σβήνεται τίποτα· μια λάθος ζύγιση που σβήνεις είναι μία-δύο μέρες.
-  // Έλεγχος 2, C5: ζυγίσεις άλλων εφαρμογών (χειροκίνητο βάρος, BIA του ρολογιού, Health Connect) που είχαν γράψει
-  // παλιότερες εκδόσεις: φεύγουν από ΟΛΟ το ιστορικό, χωρίς όριο μερών, ΜΟΝΟ σε μέρες που η Samsung έχει ζύγιση άλλης
-  // εφαρμογής και καμία της InBody (ξαναδιαβασμένες με την εφαρμογή τους). Μέρα με ζύγιση InBody δεν αγγίζεται ποτέ,
-  // ούτε μέρα χωρίς καμία ζύγιση τώρα (π.χ. η Samsung δεν έχει συγχρονίσει ακόμα): γι' αυτήν ισχύει η προφύλαξη κάτω.
-  if (d.bodyOk && d.otherBodyDays.isNotEmpty) {
-    final inbody = {for (final b in d.body) dateKey(b.time)};
-    for (final k in d.otherBodyDays) {
-      final row = history[k];
-      if (inbody.contains(k) || row == null || !row.keys.any(bodyKeys.contains)) continue;
-      history[k] = {for (final e in row.entries) if (!bodyKeys.contains(e.key)) e.key: e.value};
-      changed.add(k);
-    }
-  }
+  // Έλεγχος 3, E2: ζυγίσεις άλλων εφαρμογών (χειροκίνητο βάρος, BIA του ρολογιού) που είχαν γράψει παλιές εκδόσεις
+  // ΔΕΝ σβήνονται ποτέ (πριν, το C5 τις έσβηνε από όλο το ιστορικό, και όλες αν δεν βρισκόταν καμία ζύγιση InBody).
+  // Μετρούν ως «υπάρχουν ακόμα» ([Dashboard.otherBodyDays]) και απλώς δεν φαίνονται από την πρώτη ζύγιση InBody και
+  // μετά ([SourcePlan.scaleFrom], σημάδι [K.inbody]).
   if (d.bodyOk && d.body.isNotEmpty) {
-    final days = {for (final b in d.body) dateKey(b.time)};
+    final days = {for (final b in d.body) dateKey(b.time), ...d.otherBodyDays};
     final from = DateTime(today.year - 10, today.month, today.day + 1);
     final copy = {for (final e in history.entries) e.key: e.value};
     final gone = removeMissingBody(copy, days, from: from);
@@ -1208,8 +1214,34 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   /// Το σχέδιο πηγών: από το δικό του αρχείο (plan_file.dart). Ως να διαβαστεί, τίποτα δεν γράφεται.
   @override
-  SourcePlan get plan => _plan;
+  /// Το σχέδιο πηγών, με το όριο της ζυγαριάς από το ιστορικό (έλεγχος 3, E2: [SourcePlan.scaleFrom]).
+  SourcePlan get plan {
+    final s = _scaleFrom;
+    if (s == null) return _plan;
+    final c = _planView;
+    if (c != null && identical(_planViewBase, _plan) && c.scaleFrom == s) return c;
+    _planViewBase = _plan;
+    return _planView = _plan.withScaleFrom(s);
+  }
+
   SourcePlan _plan = SourcePlan.samsungOnly;
+  SourcePlan? _planView;
+  SourcePlan? _planViewBase;
+
+  /// E2: η πρώτη ζύγιση InBody όταν υπάρχουν και παλιές ζυγίσεις χωρίς σημάδι ([scaleFromOf]). Ξαναϋπολογίζεται μόνο
+  /// όταν αλλάζει το ιστορικό (νέος χάρτης ή αποθήκευση).
+  DateTime? get _scaleFrom {
+    if (_scaleDirty || !identical(_scaleFor, history)) {
+      _scaleFor = history;
+      _scaleDirty = false;
+      _scaleValue = scaleFromOf(history);
+    }
+    return _scaleValue;
+  }
+
+  Map<String, Map<String, double>>? _scaleFor;
+  bool _scaleDirty = true;
+  DateTime? _scaleValue;
   PlanState planState = PlanState.loading;
 
   /// Πού κρατιέται το σχέδιο (αντικαθίσταται στις δοκιμές).
@@ -1532,7 +1564,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     await _upgradeHistory();
     await _upgradeOura();
     await startOura();
-    final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw());
+    final cached = await parseDashboard(await SamsungHealth.cachedDashboardRaw(), napLocks: napLocksOf(history));
     if (cached.data != null) data = cached.data;
     notifyListeners();
     await refresh();
@@ -1574,7 +1606,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // Οι υπολογισμοί (νύχτες, παλμοί, συνόψεις 30 ημερών, μερικά MB δεδομένων) σε άλλο νήμα: η οθόνη δεν «κολλάει».
     final parsePlan = _canWrite && readPlan == plan ? readPlan : null;
     final parseNights = ouraNights;
-    final p = await parseDashboard(raw, plan: parsePlan, windows: parsePlan == null ? SleepWindows.empty : ouraWindows);
+    final p = await parseDashboard(raw,
+        plan: parsePlan, windows: parsePlan == null ? SleepWindows.empty : ouraWindows, napLocks: napLocksOf(history));
     final ok = p.data != null;
     if (ok) {
       data = p.data;
@@ -1689,6 +1722,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   Future<bool> saveDaysNow(Set<String> keys) => _saveDays(keys);
 
   @override
+  int? watchStepsBetween(DateTime from, DateTime to) {
+    final d = _raw;
+    return d == null ? null : gapSteps(from, to, stepsByMinute: d.stepsByMinute, stepsFrom: d.stepsMinuteFrom);
+  }
+
+  @override
   Future<bool> savePrefsNow() => _savePrefs();
 
   /// Οι εγγραφές του ιστορικού γίνονται μία-μία, με τη σειρά που ζητήθηκαν (έλεγχος 4/11, A8): η ανάγνωση των
@@ -1698,6 +1737,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   /// `true` αν γράφτηκαν (ή δεν υπήρχε κάτι να γραφτεί).
   Future<bool> _saveDays(Set<String> keys) {
+    if (keys.isNotEmpty) _scaleDirty = true;
     final run = _daysWrites.catchError((_) => false).then((_) async {
       final all = {...keys, ..._unsavedDays};
       if (all.isEmpty) return true;
@@ -1835,7 +1875,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     final readPlan = plan;
     final raw = await SamsungHealth.readRangeRaw(dateKey(from), dateKey(cursor))
         .timeout(const Duration(seconds: 120), onTimeout: () => '{"ok":false,"kind":"timeout"}');
-    final p = await parseRange(raw, from, to, plan: readPlan, windows: ouraWindows);
+    final p = await parseRange(raw, from, to, plan: readPlan, windows: ouraWindows, napLocks: napLocksOf(history));
     // Έλεγχος 2, C11: το σχέδιο πηγών άλλαξε όσο διαβαζόταν (π.χ. επαναφορά αντιγράφου): οι τιμές υπολογίστηκαν με
     // το παλιό· δεν γράφονται, το κομμάτι ξαναδιαβάζεται στην επόμενη ανανέωση (χωρίς να μετρά ως αποτυχία).
     if (readPlan != plan) return null;

@@ -699,7 +699,8 @@ class _PageThree extends StatelessWidget {
                     pad(Text(w.$2 == null ? '—' : '${dec(w.$2!)} kg', style: bold)),
                     pad(Text(w.$3 == null ? '—' : '${dec(w.$3!)}%', style: cell)),
                     pad(Text(w.$4 == null ? '—' : '${dec(w.$4!)} kg', style: cell)),
-                    const SizedBox(),
+                    // Έλεγχος 3, E2: παλιά ζύγιση άλλης πηγής (πριν από την πρώτη της InBody), με την πηγή της.
+                    d.otherWeighIns.contains(w.$1) ? pad(Text('όχι InBody', style: small)) : const SizedBox(),
                   ],
                 ),
             ],

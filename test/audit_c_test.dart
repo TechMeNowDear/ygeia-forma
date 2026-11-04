@@ -82,10 +82,12 @@ void main() {
       }
     });
 
-    test('Βραδινό λαγοκοίμισμα 20:30–21:30 και ύπνος 23:30: χωριστός υπνάκος, αποθηκεύεται ως napMin', () {
+    // Έλεγχος 3, E1 (σκόπιμη αλλαγή): πριν από την κύρια ομάδα μπαίνει ό,τι αρχίζει από τις 20:00 με κενό ως 4 ώρες·
+    // πριν, το λαγοκοίμισμα ως τις 22:00 ήταν πάντα υπνάκος. Υπνάκος μένει ό,τι αρχίζει πριν από τις 20:00.
+    test('Βραδινό λαγοκοίμισμα 19:30–20:30 και ύπνος 23:30: χωριστός υπνάκος (napMin)· από τις 20:00: μέρος της νύχτας', () {
       final d = Dashboard.fromJson({
         'readAt': ms(t(3, 12, 0)),
-        'sleep': [rec(t(2, 20, 30), t(2, 21, 30)), rec(t(2, 23, 30), t(3, 7, 0))],
+        'sleep': [rec(t(2, 19, 30), t(2, 20, 30)), rec(t(2, 23, 30), t(3, 7, 0))],
       });
       final n = d.nights.single;
       expect(n.start, t(2, 23, 30));
@@ -94,14 +96,16 @@ void main() {
       final row = summarizeDay(d, DateTime(2026, 11, 3));
       expect(row[K.sleepMin], 450);
       expect(row[K.napMin], 60);
-      // Το ίδιο, αλλά συνεχίζει μετά τις 22:00: μέρος της νύχτας (το κενό δεν μετρά).
-      final late = Dashboard.fromJson({
-        'readAt': ms(t(3, 12, 0)),
-        'sleep': [rec(t(2, 21, 0), t(2, 22, 30)), rec(t(2, 23, 30), t(3, 7, 0))],
-      }).nights.single;
-      expect(late.start, t(2, 21, 0));
-      expect(late.minutes, 90 + 450);
-      expect(late.napMinutes, 0);
+      // Από τις 20:00 και μετά, με κενό ως 4 ώρες: μέρος της νύχτας (το κενό δεν μετρά).
+      for (final early in [rec(t(2, 20, 30), t(2, 21, 30)), rec(t(2, 21, 0), t(2, 22, 30))]) {
+        final late = Dashboard.fromJson({
+          'readAt': ms(t(3, 12, 0)),
+          'sleep': [early, rec(t(2, 23, 30), t(3, 7, 0))],
+        }).nights.single;
+        expect(late.start.millisecondsSinceEpoch, early['start']);
+        expect(late.minutes, (early['minutes'] as int) + 450);
+        expect(late.napMinutes, 0);
+      }
     });
 
     test('Πρωινός υπνάκος 09:30–10:30 μετά από ξύπνημα 07:00: υπνάκος, η νύχτα τελειώνει 07:00', () {
@@ -402,7 +406,9 @@ void main() {
     expect(p.contains('Δεν υπάρχει δικός μας server ή λογαριασμός.'), isFalse);
   });
 
-  test('C5: ζυγίσεις άλλων εφαρμογών από παλιές εκδόσεις φεύγουν από όλο το ιστορικό· της InBody ποτέ', () {
+  // Έλεγχος 3, E2 (σκόπιμη αλλαγή του C5): οι ζυγίσεις άλλων εφαρμογών ΔΕΝ σβήνονται ποτέ· από την πρώτη της InBody
+  // και μετά απλώς δεν φαίνονται (SourcePlan.scaleFrom, έλεγχοι στο audit_e_test).
+  test('C5 → E2: ζυγίσεις άλλων εφαρμογών από παλιές εκδόσεις ΜΕΝΟΥΝ στο ιστορικό· η InBody κερδίζει τη μέρα της', () {
     final readAt = DateTime(2026, 11, 20, 12);
     final body = <Map<String, dynamic>>[
       // 10 μέρες με BIA του ρολογιού, χωρίς InBody (πριν: έμεναν για πάντα, όριο «ως 3»).
@@ -422,10 +428,11 @@ void main() {
     applyRecentRead(h, d, plan: SourcePlan.samsungOnly);
     for (var i = 1; i <= 10; i++) {
       final k = '2026-10-${i.toString().padLeft(2, '0')}';
-      expect(h[k], {K.steps: 1000}, reason: k);
+      expect(h[k], {K.weight: 80.0 + i, K.fatPct: 20, K.steps: 1000}, reason: k);
     }
     expect(h['2026-10-15']![K.weight], 82.0);
     expect(h['2026-10-15']![K.fatPct], 24.0);
+    expect(h['2026-10-15']![K.inbody], 1);
     for (var i = 20; i <= 24; i++) {
       expect(h['2026-10-$i']![K.weight], 81.0);
     }

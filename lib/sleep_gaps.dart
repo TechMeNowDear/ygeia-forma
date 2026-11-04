@@ -10,7 +10,7 @@
 library;
 
 import 'data.dart' show Sample, SleepRecord;
-import 'format.dart' show dayOf, sameDay;
+import 'format.dart' show dayOf;
 
 /// Μέγιστο κενό που εξετάζουμε. Πιο μεγάλο δεν το «γεμίζουμε» ποτέ.
 const maxGap = Duration(hours: 4);
@@ -81,134 +81,200 @@ int? gapSteps(DateTime start, DateTime end, {required Map<int, int> stepsByMinut
 }
 
 // ---------------------------------------------------------------------------
-// Ο ΕΝΑΣ κανόνας της νύχτας, για το ρολόι ΚΑΙ για το Oura (έλεγχος 2, C1 + U12, συγχώνευση 4/11)
+// Ο ΕΝΑΣ κανόνας της νύχτας, για το ρολόι ΚΑΙ για το Oura (έλεγχος 3, E1: νέος κανόνας με «κύρια» ομάδα στη νύχτα)
 // ---------------------------------------------------------------------------
 
 /// Ένα κομμάτι ύπνου για τον κοινό κανόνα: αρχή, τέλος και λεπτά ύπνου (χωρίς ξυπνήματα όπου είναι γνωστά).
 typedef SleepSpan = ({DateTime start, DateTime end, int minutes});
 
-/// Μία νύχτα από τον κοινό κανόνα: η ημερομηνία της (το πρωί) και τα κομμάτια της σε ομάδες. Κάθε ομάδα έχει
-/// κομμάτια με κενό ως [maxGap]· δύο ομάδες στην ίδια νύχτα = ίδια ημερομηνία, χωρίς να είναι υπνάκος η μία.
+/// Μία νύχτα από τον κοινό κανόνα: η ημερομηνία της (το πρωί) και τα κομμάτια της. Όλα τα κενά μιας νύχτας είναι ως
+/// [maxGap] (4 ώρες), άρα ένα ενιαίο «κομμάτι» ([segments] έχει ένα στοιχείο, με τα κομμάτια κατά αρχή).
+/// [napLock]: η απόφαση «πρωινός υπνάκος» που πάρθηκε με βήματα (η αρχή του πρώτου κομματιού που έγινε υπνάκος
+/// λόγω βημάτων), για να αποθηκευτεί και να μην αλλάξει όταν τα βήματα ανά λεπτό δεν υπάρχουν πια (E1.6).
 class NightPieces<T> {
-  NightPieces(this.date, this.segments);
+  NightPieces(this.date, this.segments, {this.napLock});
   final DateTime date;
   final List<List<T>> segments;
+  final DateTime? napLock;
   List<T> get parts => [for (final s in segments) ...s];
 }
 
 class _PieceGroup<T> {
-  _PieceGroup(T first, SleepSpan s, {required this.isNight})
+  _PieceGroup(T first, SleepSpan s)
       : parts = [first],
+        spans = [s],
         start = s.start,
-        end = s.end,
-        minutes = s.minutes;
+        end = s.end;
   final List<T> parts;
-  final bool isNight;
+  final List<SleepSpan> spans;
   final DateTime start;
   DateTime end;
-  int minutes;
 
   void add(T p, SleepSpan s) {
     parts.add(p);
+    spans.add(s);
     if (s.end.isAfter(end)) end = s.end;
-    minutes += s.minutes;
+  }
+
+  /// Λεπτά ύπνου μέσα στο [from, to): κάθε κομμάτι κατ' αναλογία του χρόνου του που πέφτει μέσα.
+  double minutesWithin(DateTime from, DateTime to) {
+    var sum = 0.0;
+    for (final s in spans) {
+      final len = s.end.difference(s.start).inMilliseconds;
+      if (len <= 0) continue;
+      final a = s.start.isAfter(from) ? s.start : from;
+      final b = s.end.isBefore(to) ? s.end : to;
+      final inside = b.difference(a).inMilliseconds;
+      if (inside > 0) sum += s.minutes * inside / len;
+    }
+    return sum;
   }
 }
 
-/// Ο κανόνας της νύχτας, ΙΔΙΟΣ για το ρολόι και το Oura (ο τύπος περιόδου της Oura δεν αποφασίζει):
-/// - Κομμάτι συνεχίζει τη νύχτα αν το κενό από το προηγούμενο είναι ως [maxGap] (4 ώρες), ανεξάρτητα από βήματα ή
-///   παλμούς. Το κενό δεν μετρά ποτέ ως ύπνος.
-/// - Υπνάκος είναι μόνο: (α) βραδινό λαγοκοίμισμα που αρχίζει μετά το μεσημέρι και τελειώνει ως τις 22:00 της ίδιας
-///   μέρας· (β) κομμάτι που αρχίζει 06:00–20:00 μετά το τέλος της νύχτας, εκτός αν το κενό είναι ως [morningJoinGap]
-///   (90 λεπτά) ΚΑΙ τα βήματα του κενού είναι ως [maxGapSteps] ή άγνωστα ([stepsBetween] null ή επιστρέφει null· το
-///   Oura δεν έχει βήματα, άρα «άγνωστα»)· (γ) απογευματινός: αρχίζει 10:00–18:00 και κρατά λιγότερο από 3 ώρες.
-/// - Δύο ομάδες με την ίδια ημερομηνία (κενό πάνω από 4 ώρες): η μεγαλύτερη που δεν είναι λαγοκοίμισμα είναι η νύχτα·
-///   η άλλη είναι υπνάκος μόνο κατά τα (α)/(β), αλλιώς μέρος της νύχτας (το κενό δεν μετρά). Μόνο λαγοκοίμισμα, χωρίς
-///   νύχτα: υπνάκος.
-/// - Ημερομηνία ([dateOf]): εξ ορισμού το πρωί του τέλους (τέλος μετά τις 18:00 → η επόμενη μέρα)· ο απογευματινός
-///   υπνάκος στη μέρα που άρχισε. Το Oura δίνει τη δική του μέρα ανά περίοδο (ίδια λογική) και τη χρησιμοποιεί.
-/// [sorted]: τα κομμάτια ταξινομημένα κατά αρχή. Οι υπνάκοι επιστρέφονται ανά ημερομηνία νύχτας.
+/// Το «παράθυρο νύχτας» της ημερομηνίας [date] (το πρωί): 22:00 της προηγούμενης μέρας ως 08:00 (τοπική ώρα).
+({DateTime from, DateTime to}) nightWindow(DateTime date) =>
+    (from: DateTime(date.year, date.month, date.day - 1, 22), to: DateTime(date.year, date.month, date.day, 8));
+
+/// Η ημερομηνία ενός υπνάκου (ίδια σύμβαση για ρολόι και Oura, όπως το «day» της Oura): αρχή από τις 18:00 και μετά →
+/// η επόμενη μέρα (ανήκει στη νύχτα που ακολουθεί), αλλιώς η μέρα που άρχισε.
+DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, start.month, start.day + 1) : dayOf(start);
+
+/// Ο κανόνας της νύχτας, ΙΔΙΟΣ για το ρολόι και το Oura (έλεγχος 3, E1· ο τύπος περιόδου της Oura δεν αποφασίζει):
+/// 0. Ομάδα = κομμάτια που αγγίζονται ή επικαλύπτονται (χωρίς κενό).
+/// 1. Κύρια ομάδα μιας ημερομηνίας = η ομάδα με τα περισσότερα λεπτά ύπνου μέσα στο 22:00–08:00 ([nightWindow])·
+///    ισοπαλία → η νωρίτερη. Ομάδα χωρίς κανένα λεπτό στο παράθυρο δεν γίνεται ποτέ κύρια.
+/// 2. Ομάδες ΠΡΙΝ από την κύρια: μέρος της νύχτας αν αρχίζουν από τις 20:00 του προηγούμενου βραδιού και μετά ΚΑΙ το
+///    κενό ως την (ήδη ενωμένη) νύχτα είναι ως [maxGap] (4 ώρες)· αλλιώς υπνάκος.
+/// 3. Ομάδες ΜΕΤΑ από την κύρια που αρχίζουν πριν από τις 06:00: μέρος της νύχτας αν το κενό είναι ως 4 ώρες· αλλιώς
+///    υπνάκος.
+/// 4. Ομάδες ΜΕΤΑ από την κύρια που αρχίζουν από τις 06:00: μέρος της νύχτας αν το κενό είναι ως [morningJoinGap]
+///    (90 λεπτά) ΚΑΙ τα βήματα στο κενό είναι ως [maxGapSteps] ή άγνωστα· αλλιώς υπνάκος.
+/// 5. Βήματα ([stepsBetween]): από τα βήματα ανά λεπτό του ΡΟΛΟΓΙΟΥ, και για τις νύχτες του Oura (μόνο ώρες· κρίνουν
+///    μόνο το κενό, δεν φαίνονται πουθενά). null = άγνωστα.
+/// 6. Η απόφαση «υπνάκος λόγω βημάτων» ΚΛΕΙΔΩΝΕΙ ([NightPieces.napLock] → αποθηκεύεται)· όταν τα βήματα δεν υπάρχουν
+///    πια, [napLockOf] τη δίνει πίσω για την ίδια ημερομηνία και δεν αλλάζει ποτέ σε «μέρος της νύχτας» (ανάγνωση 30
+///    ημερών, συμπλήρωση, επανανάγνωση). Χωρίς βήματα και χωρίς αποθηκευμένη απόφαση: μέρος της νύχτας.
+/// 7. Τα κενά δεν μετρούν ποτέ ως ύπνος· οι υπνάκοι επιστρέφονται χωριστά ανά ημερομηνία ([napDateOf]).
+/// Ημερομηνία νύχτας: η ημερομηνία του παραθύρου της κύριας ομάδας, ή [dateOf] (Oura: το «day» της Oura) αν δοθεί.
+/// [sorted]: τα κομμάτια ταξινομημένα κατά αρχή.
 ({List<NightPieces<T>> nights, Map<DateTime, List<T>> naps}) groupSleepPieces<T>(
   List<T> sorted,
   SleepSpan Function(T) span, {
   int? Function(DateTime from, DateTime to)? stepsBetween,
   DateTime Function(List<T> parts)? dateOf,
+  DateTime? Function(DateTime date)? napLockOf,
 }) {
+  // 0. Ομάδες χωρίς κενό.
   final groups = <_PieceGroup<T>>[];
-  _PieceGroup<T>? previous;
   for (final r in sorted) {
     final s = span(r);
-    final g = previous;
-    if (g != null && g.isNight && _joinsNight(g, s, stepsBetween)) {
-      g.add(r, s);
-      continue;
+    final last = groups.isEmpty ? null : groups.last;
+    if (last != null && !s.start.isAfter(last.end)) {
+      last.add(r, s);
+    } else {
+      groups.add(_PieceGroup<T>(r, s));
     }
-    final isNap = s.start.hour >= 10 && s.start.hour < 18 && s.minutes < 180;
-    final ng = _PieceGroup<T>(r, s, isNight: !isNap);
-    groups.add(ng);
-    previous = ng;
   }
 
+  // 1. Κύρια ομάδα ανά ημερομηνία: κάθε ομάδα «διεκδικεί» την ημερομηνία όπου έχει τα περισσότερα λεπτά στο παράθυρο.
+  final mainOf = <DateTime, int>{};
+  final mainMinutes = <DateTime, double>{};
+  for (var i = 0; i < groups.length; i++) {
+    final g = groups[i];
+    DateTime? best;
+    var bestMin = 0.0;
+    final last = DateTime(g.end.year, g.end.month, g.end.day + 1);
+    for (var d = dayOf(g.start); !d.isAfter(last); d = DateTime(d.year, d.month, d.day + 1)) {
+      final w = nightWindow(d);
+      final m = g.minutesWithin(w.from, w.to);
+      if (m > bestMin) {
+        bestMin = m;
+        best = d;
+      }
+    }
+    if (best == null) continue;
+    final prev = mainMinutes[best];
+    if (prev == null || bestMin > prev) {
+      mainOf[best] = i;
+      mainMinutes[best] = bestMin;
+    }
+  }
+  final mains = mainOf.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
+
+  // Ποια νύχτα (δείκτης κύριας ομάδας) κρατά κάθε ομάδα· null = υπνάκος.
+  final owner = List<int?>.filled(groups.length, null);
+  for (final m in mains) {
+    owner[m.value] = m.value;
+  }
+  // 2. Πριν από την κύρια (πρώτα αυτά: ένα βραδινό κομμάτι πριν από τη νύχτα ανήκει σε αυτήν).
+  for (final m in mains) {
+    final date = m.key;
+    final evening = DateTime(date.year, date.month, date.day - 1, 20);
+    var nightStart = groups[m.value].start;
+    for (var j = m.value - 1; j >= 0 && owner[j] == null; j--) {
+      final g = groups[j];
+      if (g.start.isBefore(evening) || nightStart.difference(g.end) > maxGap) break;
+      owner[j] = m.value;
+      nightStart = g.start;
+    }
+  }
+  // 3–4. Μετά από την κύρια.
+  final locks = <DateTime, DateTime>{};
+  for (final m in mains) {
+    final date = m.key;
+    // Το κλειδί της αποθηκευμένης απόφασης: η ημερομηνία της νύχτας (Oura: το «day» της κύριας ομάδας).
+    final lockKey = dateOf?.call(groups[m.value].parts) ?? date;
+    final six = DateTime(date.year, date.month, date.day, 6);
+    var nightEnd = groups[m.value].end;
+    for (var j = m.value + 1; j < groups.length && owner[j] == null; j++) {
+      final g = groups[j];
+      final gap = g.start.difference(nightEnd);
+      final bool joins;
+      if (g.start.isBefore(six)) {
+        joins = gap <= maxGap;
+      } else if (gap > morningJoinGap) {
+        joins = false;
+      } else {
+        final steps = stepsBetween?.call(nightEnd, g.start);
+        if (steps != null) {
+          joins = steps <= maxGapSteps;
+          if (!joins) locks[m.key] ??= g.start;
+        } else {
+          final lock = napLockOf?.call(lockKey);
+          joins = lock == null || g.start.isBefore(lock);
+          if (!joins) locks[m.key] ??= lock!;
+        }
+      }
+      if (!joins) break;
+      owner[j] = m.value;
+      if (g.end.isAfter(nightEnd)) nightEnd = g.end;
+    }
+  }
+
+  // 7. Νύχτες και υπνάκοι.
   final naps = <DateTime, List<T>>{};
-  final byDate = <DateTime, List<_PieceGroup<T>>>{};
-  for (final g in groups) {
-    if (!g.isNight) {
-      // Απογευματινός υπνάκος: της νύχτας με την ίδια ημερομηνία (το πρωί της ίδιας μέρας).
-      naps.putIfAbsent(dateOf?.call(g.parts) ?? dayOf(g.start), () => []).addAll(g.parts);
-      continue;
+  final byMain = <int, List<T>>{};
+  for (var i = 0; i < groups.length; i++) {
+    final o = owner[i];
+    if (o == null) {
+      final g = groups[i];
+      naps.putIfAbsent(dateOf?.call(g.parts) ?? napDateOf(g.start), () => []).addAll(g.parts);
+    } else {
+      byMain.putIfAbsent(o, () => []).addAll(groups[i].parts);
     }
-    final e = g.end;
-    final date = dateOf?.call(g.parts) ?? (e.hour >= 18 ? DateTime(e.year, e.month, e.day + 1) : dayOf(e));
-    byDate.putIfAbsent(date, () => []).add(g);
   }
-
-  final nights = <NightPieces<T>>[];
-  for (final entry in byDate.entries) {
-    final list = entry.value..sort((a, b) => a.start.compareTo(b.start));
-    final candidates = [for (final g in list) if (!_eveningDoze(g.start, g.end)) g];
-    if (candidates.isEmpty) {
-      // Μόνο βραδινό λαγοκοίμισμα (π.χ. ανάγνωση στις 22:30, πριν από τον ύπνο): υπνάκος, ποτέ «η νύχτα».
-      for (final g in list) {
-        naps.putIfAbsent(entry.key, () => []).addAll(g.parts);
-      }
-      continue;
-    }
-    final main = candidates.reduce((a, b) => a.minutes >= b.minutes ? a : b);
-    final segments = <List<T>>[];
-    for (final g in list) {
-      if (!identical(g, main) &&
-          (_eveningDoze(g.start, g.end) || _startsMorningNap(g.start, main.end, stepsBetween))) {
-        naps.putIfAbsent(entry.key, () => []).addAll(g.parts);
-        continue;
-      }
-      segments.add(g.parts);
-    }
-    nights.add(NightPieces(entry.key, segments));
+  final byDate = <DateTime, ({List<T> parts, DateTime? lock})>{};
+  for (final m in mains) {
+    final parts = byMain[m.value]!;
+    final date = dateOf?.call(parts) ?? m.key;
+    final old = byDate[date];
+    // Δύο κύριες ομάδες με την ίδια ημερομηνία του Oura (σχεδόν ποτέ): μία νύχτα, χωρίς να μετρά το κενό.
+    byDate[date] = old == null
+        ? (parts: parts, lock: locks[m.key])
+        : (parts: [...old.parts, ...parts], lock: old.lock ?? locks[m.key]);
   }
-  nights.sort((a, b) => a.date.compareTo(b.date));
+  final nights = <NightPieces<T>>[
+    for (final e in byDate.entries) NightPieces<T>(e.key, [e.value.parts], napLock: e.value.lock),
+  ]..sort((a, b) => a.date.compareTo(b.date));
   return (nights: nights, naps: naps);
-}
-
-/// Αν το κομμάτι [s] συνεχίζει την ομάδα [g] (ίδια νύχτα): κενό ως 4 ώρες, εκτός αν η ομάδα είναι βραδινό
-/// λαγοκοίμισμα ή το [s] πρωινός υπνάκος. Συνεχόμενα ή επικαλυπτόμενα κομμάτια: πάντα μαζί.
-bool _joinsNight<T>(_PieceGroup<T> g, SleepSpan s, int? Function(DateTime, DateTime)? stepsBetween) {
-  final gap = s.start.difference(g.end);
-  if (gap <= Duration.zero) return true;
-  if (gap > maxGap) return false;
-  if (_eveningDoze(g.start, g.end)) return false;
-  return !_startsMorningNap(s.start, g.end, stepsBetween);
-}
-
-/// Βραδινό λαγοκοίμισμα: αρχίζει μετά το μεσημέρι και τελειώνει την ίδια μέρα ως τις 22:00.
-bool _eveningDoze(DateTime s, DateTime e) =>
-    s.hour >= 12 && sameDay(s, e) && !e.isAfter(DateTime(e.year, e.month, e.day, 22));
-
-/// Πρωινός υπνάκος: κομμάτι που αρχίζει 06:00–20:00, μετά το τέλος της νύχτας ([nightEnd]). Είναι η ίδια νύχτα
-/// (όχι υπνάκος) αν το κενό είναι ως [morningJoinGap] ΚΑΙ τα βήματα του κενού είναι άγνωστα ή ως [maxGapSteps].
-/// Κομμάτια που αρχίζουν 20:00–06:00 δεν κρίνονται εδώ (πάντα νύχτα).
-bool _startsMorningNap(DateTime start, DateTime nightEnd, int? Function(DateTime, DateTime)? stepsBetween) {
-  if (start.hour < 6 || start.hour >= 20 || !start.isAfter(nightEnd)) return false;
-  if (start.difference(nightEnd) > morningJoinGap) return true;
-  final steps = stepsBetween?.call(nightEnd, start);
-  return steps != null && steps > maxGapSteps;
 }

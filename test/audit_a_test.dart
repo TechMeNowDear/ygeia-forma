@@ -40,6 +40,8 @@ void main() {
         K.weight: 82.0,
         K.fatPct: 24.0,
         K.smm: 35.0,
+        // Έλεγχος 3, E2 (σκόπιμα): σημάδι «ζύγιση InBody» δίπλα στις τιμές της.
+        K.inbody: 1,
       });
       expect(changed, contains(dateKey(day)));
     });

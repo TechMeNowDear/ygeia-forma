@@ -713,11 +713,15 @@ class OuraLink {
   }
 
   /// Ύπνος, βαθμολογίες ύπνου και ετοιμότητα για τις μέρες [from, to], διαβασμένα.
-  Future<OuraBatch> fetchNights(DateTime from, DateTime to) async {
+  /// [stepsBetween]/[napLocks]: τα βήματα του ρολογιού και οι αποθηκευμένες αποφάσεις για τον κοινό κανόνα της
+  /// νύχτας (έλεγχος 3, E1.5/E1.6, δες [groupOura]).
+  Future<OuraBatch> fetchNights(DateTime from, DateTime to,
+      {int? Function(DateTime from, DateTime to)? stepsBetween, Map<String, int> napLocks = const {}}) async {
     final sleep = await fetchAll('sleep', from, to);
     final dailySleep = await fetchAll('daily_sleep', from, to);
     final readiness = await fetchAll('daily_readiness', from, to);
-    final b = parseOura(sleep: sleep, dailySleep: dailySleep, readiness: readiness);
+    final b = parseOura(
+        sleep: sleep, dailySleep: dailySleep, readiness: readiness, stepsBetween: stepsBetween, napLocks: napLocks);
     final a = DateTime(from.year, from.month, from.day);
     final z = DateTime(to.year, to.month, to.day);
     return OuraBatch([for (final n in b.nights) if (!n.day.isBefore(a) && !n.day.isAfter(z)) n], skipped: b.skipped);

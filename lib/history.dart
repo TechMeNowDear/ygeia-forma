@@ -34,10 +34,20 @@ abstract final class K {
   static const weight = 'weight';
   static const fatPct = 'fatPct';
   static const smm = 'smm';
+
+  /// Έλεγχος 3, E2: σημάδι ότι οι τιμές ζύγισης της μέρας ήρθαν από την InBody (1). Ζύγιση χωρίς σημάδι = από παλιά
+  /// έκδοση, ίσως από άλλη εφαρμογή (χειροκίνητο βάρος, BIA του ρολογιού): ΠΟΤΕ δεν σβήνεται· από την πρώτη ζύγιση
+  /// InBody και μετά απλώς δεν φαίνεται ([SourcePlan.scaleFrom]).
+  static const inbody = 'inbody';
   static const floors = 'floors';
   /// Υπνάκοι: του ρολογιού ως «napMin» (C1: βραδινό λαγοκοίμισμα, πρωινός και απογευματινός υπνάκος), του Oura ως
   /// «o.napMin». Δεν μετρούν ποτέ στη διάρκεια της νύχτας.
   static const napMin = 'napMin';
+
+  /// Έλεγχος 3, E1.6: η απόφαση «πρωινός υπνάκος» της νύχτας, παρμένη με βήματα (λεπτά από την εποχή Unix: η αρχή του
+  /// κομματιού που έγινε υπνάκος). Δεν είναι μέτρηση και δεν φαίνεται· κρατά την απόφαση ίδια όταν τα βήματα ανά λεπτό
+  /// δεν υπάρχουν πια (ρολόι: «napLock», Oura: «o.napLock»).
+  static const napLock = 'napLock';
   // Μόνο από το Oura (αποθηκεύονται με πρόθεμα «o.», δες sources.dart).
   static const lowHr = 'lowHr';
   static const hrv = 'hrv';
@@ -47,7 +57,7 @@ abstract final class K {
 /// Τιμές που βγαίνουν από τον ύπνο μιας νύχτας.
 const sleepKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake,
-  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.skinTemp, K.napMin,
+  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.skinTemp, K.napMin, K.napLock,
 };
 
 /// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
@@ -264,6 +274,26 @@ int sleepDaysIn(Map<String, Map<String, double>> history, DateTime from, DateTim
 /// Τιμές που έρχονται από τις ζυγίσεις.
 const bodyKeys = {K.weight, K.fatPct, K.smm};
 
+/// Όλα τα κλειδιά μιας ζύγισης στο ιστορικό: οι τιμές και το σημάδι της InBody.
+const bodyRowKeys = {K.weight, K.fatPct, K.smm, K.inbody};
+
+/// Έλεγχος 3, E2: η πρώτη μέρα με ζύγιση InBody ([K.inbody]), ΑΝ υπάρχουν και ζυγίσεις χωρίς σημάδι (παλιές εκδόσεις,
+/// ίσως άλλη εφαρμογή). Από εκείνη τη μέρα και μετά φαίνονται μόνο οι ζυγίσεις της InBody, και είναι αλλαγή πηγής για
+/// βάρος/λίπος/μύες. null = τίποτα να κρυφτεί (καμία ζύγιση InBody, ή όλες της InBody).
+DateTime? scaleFromOf(Map<String, Map<String, double>> history) {
+  String? first;
+  var unmarked = false;
+  for (final e in history.entries) {
+    final r = e.value;
+    if (r[K.inbody] != null) {
+      if (first == null || e.key.compareTo(first) < 0) first = e.key;
+    } else if (r.keys.any(bodyKeys.contains)) {
+      unmarked = true;
+    }
+  }
+  return first != null && unmarked ? parseDateKey(first) : null;
+}
+
 /// Μία ολόκληρη ζύγιση ανά μέρα: η τελευταία της μέρας από την InBody (ποτέ πεδία από δύο διαφορετικές
 /// ζυγίσεις μαζί). Κλειδί = μέρα («2026-11-10»).
 Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
@@ -279,6 +309,8 @@ Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
         if (e.value.weight != null && e.value.weight!.isFinite) K.weight: e.value.weight!,
         if (e.value.fatPct != null && e.value.fatPct!.isFinite) K.fatPct: e.value.fatPct!,
         if (e.value.smm != null && e.value.smm!.isFinite) K.smm: e.value.smm!,
+        // E2: μόνο ζυγίσεις της InBody φτάνουν εδώ ([Dashboard.body]).
+        K.inbody: 1,
       },
   };
 }
@@ -289,10 +321,10 @@ Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
 Set<String> mergeBody(Map<String, Map<String, double>> history, Map<String, Map<String, double>> rows) {
   final changed = <String>{};
   for (final e in rows.entries) {
-    if (e.value.isEmpty) continue;
+    if (!e.value.keys.any(bodyKeys.contains)) continue;
     final old = history[e.key] ?? const <String, double>{};
     final next = {
-      for (final v in old.entries) if (!bodyKeys.contains(v.key)) v.key: v.value,
+      for (final v in old.entries) if (!bodyRowKeys.contains(v.key)) v.key: v.value,
       ...e.value,
     };
     if (!_sameValues(history[e.key], next)) changed.add(e.key);
@@ -308,7 +340,7 @@ Set<String> removeMissingBody(Map<String, Map<String, double>> history, Set<Stri
   for (final e in history.entries.toList()) {
     if (bodyDays.contains(e.key) || !e.value.keys.any(bodyKeys.contains)) continue;
     if (parseDateKey(e.key).isBefore(dayOf(from))) continue;
-    history[e.key] = {for (final v in e.value.entries) if (!bodyKeys.contains(v.key)) v.key: v.value};
+    history[e.key] = {for (final v in e.value.entries) if (!bodyRowKeys.contains(v.key)) v.key: v.value};
     changed.add(e.key);
   }
   return changed;
@@ -382,6 +414,8 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
     if (nap > 0) put(K.napMin, nap);
   }
   if (watchNight && night != null) {
+    final lock = night.napLock;
+    if (lock != null) put(K.napLock, lock.millisecondsSinceEpoch ~/ 60000);
     // Διάρκεια μόνο από φάσεις (πραγματικός ύπνος). Νύχτα χωρίς φάσεις: η διάρκεια της Samsung έχει τα ξυπνήματα,
     // οπότε δεν μπαίνει στις Τάσεις, στην εβδομάδα και στην αναφορά (οι ώρες ύπνου/ξυπνήματος μπαίνουν κανονικά).
     if (night.staged) put(K.sleepMin, night.minutes);

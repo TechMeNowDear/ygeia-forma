@@ -190,6 +190,7 @@ const ouraKeys = <String, String>{
   K.remPct: 'o.remPct',
   K.awakeMin: 'o.awakeMin',
   K.napMin: 'o.napMin',
+  K.napLock: 'o.napLock',
   K.sleepHr: 'o.sleepHr',
   K.lowHr: 'o.lowHr',
   K.hrv: 'o.hrv',
@@ -221,6 +222,7 @@ const rulesMetrics = {
 /// Τιμές της «νύχτας» από το ρολόι, όπως αποθηκεύονται (χωρίς το οξυγόνο, που είναι πάντα του ρολογιού).
 const watchNightKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake, K.sleepHr, K.skinTemp, K.energy, K.napMin,
+  K.napLock,
 };
 
 /// Πόσες μέρες μετά τη σύνδεση φαίνεται η «Σύγκριση πηγών» (και διαβάζεται ο ύπνος του ρολογιού γι' αυτήν).
@@ -245,8 +247,25 @@ class SourceEra {
 
 /// Το σχέδιο πηγών: για κάθε μέτρηση και μέρα, ΜΙΑ πηγή και ΕΝΑ κλειδί αποθήκευσης.
 class SourcePlan {
-  SourcePlan(List<SourceEra> eras, {this.rulesFrom})
+  SourcePlan(List<SourceEra> eras, {this.rulesFrom, this.scaleFrom})
       : eras = List.unmodifiable([...eras]..sort((a, b) => a.from.compareTo(b.from)));
+
+  /// Έλεγχος 3, E2: η πρώτη μέρα με ζύγιση InBody, όταν το ιστορικό έχει και ζυγίσεις χωρίς σημάδι InBody (παλιές
+  /// εκδόσεις, ίσως άλλη εφαρμογή· [scaleFromOf]). Από αυτήν και μετά φαίνονται μόνο ζυγίσεις της InBody ([value])·
+  /// πριν από αυτήν οι παλιές μένουν και φαίνονται (με την πηγή τους). Είναι αλλαγή πηγής για βάρος/λίπος/μύες
+  /// ([changeDates]). ΔΕΝ αποθηκεύεται και δεν μετρά στην ισότητα (βγαίνει από το ιστορικό). null = κανένα φίλτρο.
+  final DateTime? scaleFrom;
+
+  /// Το ίδιο σχέδιο με όριο ζυγαριάς [from] (E2).
+  SourcePlan withScaleFrom(DateTime? from) =>
+      SourcePlan(eras, rulesFrom: rulesFrom, scaleFrom: from == null ? null : dayOf(from));
+
+  /// Αν η τιμή ζύγισης της μέρας [day] είναι παλιά, χωρίς σημάδι InBody (E2: πριν από το [scaleFrom] φαίνεται με την
+  /// πηγή της· μετά δεν φαίνεται).
+  static bool isOtherWeighIn(Map<String, Map<String, double>> history, DateTime day) {
+    final r = history[dateKey(day)];
+    return r != null && r[K.inbody] == null && r.keys.any(bodyKeys.contains);
+  }
 
   /// Έλεγχος 2, C4: όσο το ιστορικό ξαναϋπολογίζεται με νέους κανόνες, οι μέρες πριν από αυτή την ημερομηνία έχουν
   /// ακόμα τον παλιό ορισμό των τιμών ύπνου ([rulesMetrics]). Για τις Τάσεις, την αναφορά και το «εκτός συνηθισμένου»
@@ -255,7 +274,8 @@ class SourcePlan {
   final DateTime? rulesFrom;
 
   /// Το ίδιο σχέδιο με όριο επανανάγνωσης [from] (null = χωρίς).
-  SourcePlan withRulesFrom(DateTime? from) => SourcePlan(eras, rulesFrom: from == null ? null : dayOf(from));
+  SourcePlan withRulesFrom(DateTime? from) =>
+      SourcePlan(eras, rulesFrom: from == null ? null : dayOf(from), scaleFrom: scaleFrom);
 
   /// Αν η αλλαγή της μέρας [d] είναι το όριο της επανανάγνωσης («Ενημερώνεται το ιστορικό»), όχι αλλαγή πηγής.
   bool isRulesChange(DateTime? d) => d != null && rulesFrom != null && sameDay(d, rulesFrom!);
@@ -330,7 +350,14 @@ class SourcePlan {
   /// Η τιμή της μέτρησης [metric] τη μέρα [day], μόνο από την πηγή της.
   double? value(Map<String, Map<String, double>> history, String metric, DateTime day) {
     final k = keyFor(metric, day);
-    return k == null ? null : history[dateKey(day)]?[k];
+    if (k == null) return null;
+    final row = history[dateKey(day)];
+    // E2: από την πρώτη ζύγιση InBody και μετά, μόνο ζυγίσεις της InBody (οι άλλες μένουν αποθηκευμένες, κρυφές).
+    final s = scaleFrom;
+    if (s != null && row != null && row[K.inbody] == null && metricGroups[metric] == SourceGroup.scale && !dayOf(day).isBefore(s)) {
+      return null;
+    }
+    return row?[k];
   }
 
   /// Οι μέρες που η μέτρηση [metric] αλλάζει πηγή ή ορισμό (η πρώτη μέρα της νέας εποχής), παλιότερη πρώτη.
@@ -343,6 +370,9 @@ class SourcePlan {
   /// - Οξυγόνο νύχτας και παλμοί μέρας ([definitionMetrics]): μένουν του ρολογιού, αλλά ο ορισμός τους αλλάζει
   ///   όταν η νύχτα περνά από το ρολόι στο Oura και πίσω (A4)· «καμία» δεν δίνει τιμή.
   List<DateTime> changeDates(String metric) {
+    // E2: η πρώτη ζύγιση InBody, όταν πριν υπάρχουν ζυγίσεις άλλης πηγής: καμία σύγκριση πάνω από αυτήν.
+    final s = scaleFrom;
+    if (metricGroups[metric] == SourceGroup.scale) return s == null ? const [] : [s];
     final eraChanges = _eraChangeDates(metric);
     final r = rulesFrom;
     if (r == null || !rulesMetrics.contains(metric) || eraChanges.any((d) => sameDay(d, r))) return eraChanges;
@@ -453,8 +483,8 @@ class SourcePlan {
     final f = dayOf(from);
     final kept = [for (final e in eras) if (e.from.isBefore(f)) e];
     final before = SourcePlan(kept).nightSource(DateTime(f.year, f.month, f.day - 1));
-    if (before == source) return SourcePlan(kept, rulesFrom: rulesFrom);
-    return SourcePlan([...kept, SourceEra(source, f)], rulesFrom: rulesFrom);
+    if (before == source) return SourcePlan(kept, rulesFrom: rulesFrom, scaleFrom: scaleFrom);
+    return SourcePlan([...kept, SourceEra(source, f)], rulesFrom: rulesFrom, scaleFrom: scaleFrom);
   }
 
   @override

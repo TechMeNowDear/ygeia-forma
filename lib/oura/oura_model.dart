@@ -208,9 +208,20 @@ class OuraDaily {
 
 /// Μία μέρα του Oura: η νύχτα, οι υπνάκοι και οι ημερήσιες τιμές.
 class OuraNight {
-  OuraNight({required this.day, this.main, this.naps = const [], this.others = const [], this.pieces = const [], this.daily});
+  OuraNight(
+      {required this.day,
+      this.main,
+      this.naps = const [],
+      this.others = const [],
+      this.pieces = const [],
+      this.daily,
+      this.napLock});
 
   final DateTime day;
+
+  /// Έλεγχος 3, E1.6: η απόφαση «πρωινός υπνάκος» που πάρθηκε με τα βήματα του ρολογιού (αρχή του κομματιού που έγινε
+  /// υπνάκος)· αποθηκεύεται ([K.napLock] → «o.napLock») και δεν αλλάζει όταν τα βήματα δεν υπάρχουν πια.
+  final DateTime? napLock;
 
   /// Η κύρια περίοδος της νύχτας (long_sleep με τον περισσότερο ύπνο, αλλιώς η μεγαλύτερη). Null = δεν υπάρχει νύχτα
   /// από το δαχτυλίδι αυτή τη μέρα.
@@ -291,6 +302,7 @@ class OuraNight {
         if (daily?.sleepScore != null) 'score': daily!.sleepScore,
         if (daily?.readiness != null) 'readiness': daily!.readiness,
         if (daily?.tempDeviation != null) 'temp': daily!.tempDeviation,
+        if (napLock != null) 'napLock': napLock!.millisecondsSinceEpoch ~/ 60000,
       };
 
   static OuraNight? fromJson(Object? j) {
@@ -310,6 +322,7 @@ class OuraNight {
       naps: list(j['naps']),
       others: list(j['others']),
       pieces: list(j['pieces']),
+      napLock: j['napLock'] is num ? DateTime.fromMillisecondsSinceEpoch((j['napLock'] as num).toInt() * 60000) : null,
       daily: hasDaily
           ? (OuraDaily(day)
             ..sleepScore = _int(j['score'])
@@ -341,7 +354,10 @@ OuraSleep? selectMainSleep(Iterable<OuraSleep> periods) {
 /// και απογευματινό κάτω από 3 ώρες = υπνάκοι. Ο τύπος της Oura (long_sleep/sleep/late_nap) ΔΕΝ αποφασίζει νύχτα ή
 /// υπνάκο· διαλέγει μόνο την κύρια περίοδο (της οποίας οι παλμοί/HRV/αναπνοές δείχνονται): η long_sleep με τον
 /// περισσότερο ύπνο, αλλιώς η μεγαλύτερη περίοδος. Ημερομηνία: η «day» της Oura (της μεγαλύτερης περιόδου).
-List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies) {
+/// [stepsBetween]: τα βήματα ανά λεπτό του ΡΟΛΟΓΙΟΥ (έλεγχος 3, E1.5: μόνο για το πρωινό κενό, ποτέ ως τιμή)·
+/// [napLocks]: οι αποθηκευμένες αποφάσεις «υπνάκος» («o.napLock» του ιστορικού, ανά «day»).
+List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies,
+    {int? Function(DateTime from, DateTime to)? stepsBetween, Map<String, int> napLocks = const {}}) {
   final periods = [
     for (final s in sleeps)
       if (s.type != 'rest' && s.type != 'deleted') s,
@@ -351,9 +367,18 @@ List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies
     periods,
     (s) => (start: s.start, end: s.end, minutes: mins(s)),
     dateOf: (parts) => parts.reduce((a, b) => mins(b) > mins(a) ? b : a).day,
+    stepsBetween: stepsBetween,
+    napLockOf: (date) {
+      final m = napLocks[dateKey(date)];
+      return m == null ? null : DateTime.fromMillisecondsSinceEpoch(m * 60000);
+    },
   );
   final nightsByDay = <String, List<OuraSleep>>{
     for (final n in grouped.nights) dateKey(n.date): n.parts,
+  };
+  final locksByDay = <String, DateTime>{
+    for (final n in grouped.nights)
+      if (n.napLock != null) dateKey(n.date): n.napLock!,
   };
   final napsByDay = <String, List<OuraSleep>>{
     for (final e in grouped.naps.entries) dateKey(e.key): e.value,
@@ -380,6 +405,7 @@ List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies
           others: others,
           pieces: [for (final p in counted) if (!identical(p, main)) p],
           daily: dailies[k],
+          napLock: locksByDay[k],
         );
       }(),
   ];
@@ -442,6 +468,7 @@ Map<String, double> ouraRow(OuraNight n) {
   }
   final napped = [for (final x in n.naps) if (x.total != null) x.total!];
   if (napped.isNotEmpty) put(K.napMin, napped.fold<int>(0, (a, b) => a + b) / 60);
+  if (m != null && n.napLock != null) put(K.napLock, n.napLock!.millisecondsSinceEpoch ~/ 60000);
   // Βαθμολογία ύπνου μόνο για μέρα με κύρια νύχτα (όχι για μέρα με μόνο υπνάκο: η κάρτα λέει «Μόνο υπνάκος»).
   if (m != null) put(K.sleepScore, n.sleepScore);
   put(K.energy, n.readiness);
@@ -480,6 +507,8 @@ OuraBatch parseOura({
   required List<Map<String, dynamic>> sleep,
   required List<Map<String, dynamic>> dailySleep,
   required List<Map<String, dynamic>> readiness,
+  int? Function(DateTime from, DateTime to)? stepsBetween,
+  Map<String, int> napLocks = const {},
 }) {
   var skipped = 0;
   final periods = <OuraSleep>[];
@@ -491,7 +520,9 @@ OuraBatch parseOura({
       periods.add(s);
     }
   }
-  return OuraBatch(groupOura(periods, mergeDailies(dailySleep, readiness)), skipped: skipped);
+  return OuraBatch(
+      groupOura(periods, mergeDailies(dailySleep, readiness), stepsBetween: stepsBetween, napLocks: napLocks),
+      skipped: skipped);
 }
 
 /// Μία σελίδα απάντησης: τα «data» και το «next_token». Πετάει [FormatException] αν δεν είναι η μορφή της Oura.

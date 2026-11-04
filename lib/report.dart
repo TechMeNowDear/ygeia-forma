@@ -79,7 +79,12 @@ class ReportData {
     required this.lowOxygenNights,
     required this.weighIns,
     this.plan,
+    this.otherWeighIns = const {},
   });
+
+  /// Έλεγχος 3, E2: οι ζυγίσεις του [weighIns] που ΔΕΝ είναι της InBody (παλιές εκδόσεις, πριν από την πρώτη ζύγιση
+  /// InBody): φαίνονται με την πηγή τους («όχι InBody»), ποτέ ως ζυγίσεις της InBody.
+  final Set<DateTime> otherWeighIns;
 
   /// Οι πηγές (για τη σημείωση «Πώς μετρήθηκαν»).
   final SourcePlan? plan;
@@ -178,6 +183,10 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
     stats: stats,
     lowOxygenNights: low,
     weighIns: weighIns,
+    otherWeighIns: {
+      for (final w in weighIns)
+        if (SourcePlan.isOtherWeighIn(history, w.$1)) w.$1,
+    },
     plan: p,
   );
 }
