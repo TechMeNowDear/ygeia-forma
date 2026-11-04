@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../format.dart';
 import '../history.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
@@ -91,7 +92,9 @@ class _UnusualCardState extends State<UnusualCard> {
                 'και πάνω από τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις σου. '
                 'Η κάρτα βγαίνει μόνο όταν ξεφεύγουν και οι παλμοί και η θερμοκρασία το ίδιο πρωί, γιατί ένας μόνος συχνά '
                 'είναι τυχαίος. ${r.signals.any((s) => s.source == Source.oura) ? 'Η ετοιμότητα' : 'Το Energy Score'} βγαίνει '
-                'εν μέρει από τους ίδιους παλμούς και τη θερμοκρασία, γι\' αυτό δεν μετρά ως ξεχωριστός δείκτης.',
+                'εν μέρει από τους ίδιους παλμούς και τη θερμοκρασία, γι\' αυτό δεν μετρά ως ξεχωριστός δείκτης.'
+                '${r.signals.any((s) => s.source == Source.oura && s.rule.key == K.skinTemp) ? ' Η θερμοκρασία του Oura '
+                    'είναι ήδη απόκλιση από το συνηθισμένο σου, όπως τη δίνει το Oura· φαίνεται όπως είναι.' : ''}',
                 style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.45),
               ),
             ),
@@ -115,9 +118,9 @@ class _SignalRow extends StatelessWidget {
     // ως θερμοκρασία σώματος· δεύτερος κλινικός έλεγχος M7, ίδιος κανόνας με τη Σήμερα, L5).
     final deviation = def.key == K.skinTemp;
     // Η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6): «62 · συνήθως 58 · +4», ποτέ «+3».
-    final diff = def.rounded(s.value) - def.rounded(s.usual);
-    final sign = diff >= 0 ? '+' : '−';
-    final diffText = def.digits == 0 ? '$sign${diff.abs().round()}' : '$sign${dec(diff.abs(), def.digits)}';
+    // Oura θερμοκρασία: το «συνήθως» είναι 0 (F2), άρα το νούμερο είναι η απόκλιση του ίδιου του Oura.
+    final diff = shownDiff(s.value, s.usual, def.digits);
+    final diffText = signedShown(diff, def.digits);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -134,22 +137,25 @@ class _SignalRow extends StatelessWidget {
               children: [
                 Text(metricLabel(def, s.source), style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 Text(
-                  deviation ? '${signedDec(diff)} °C' : def.format(s.value),
+                  deviation ? '${signedDec(diff, def.digits)} °C' : def.format(s.value),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                 ),
                 Text(
                   deviation
-                      ? 'απόκλιση από το συνηθισμένο σου · όχι θερμοκρασία σώματος${oura ? ' · Oura' : ''}'
+                      ? '${oura ? ouraTempDeviationLabel : 'απόκλιση από το συνηθισμένο σου'} · όχι θερμοκρασία σώματος'
                       : 'συνήθως ${def.format(s.usual)}${oura ? ' · Oura' : ''}',
                   style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
                 ),
               ],
             ),
           ),
-          TrendPill(
-            s.off ? '$diffText${def.unit.isEmpty ? '' : def.unit == '%' ? '%' : ' ${def.unit}'}' : 'Όπως συνήθως',
-            kind: TrendKind.neutral,
-          ),
+          // Θερμοκρασία: χωρίς «χάπι», γιατί το νούμερο είναι ήδη η διαφορά (UX U6: «+0,8 °C» δύο φορές). Αλλιώς ένας
+          // κανόνας παντού (F1): «Όπως συνήθως» μόνο για διαφορά 0, ακόμα κι αν ο δείκτης δεν «ξεφεύγει».
+          if (!deviation)
+            TrendPill(
+              diff == 0 ? asUsualText : '$diffText${def.unit.isEmpty ? '' : def.unit == '%' ? '%' : ' ${def.unit}'}',
+              kind: TrendKind.neutral,
+            ),
         ],
       ),
     );

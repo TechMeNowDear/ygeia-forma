@@ -107,8 +107,13 @@ class ReportData {
       ];
 
   /// Νύχτες χωρίς φάσεις: έχουν ώρα ύπνου αλλά όχι διάρκεια (η διάρκεια μετρά μόνο τον πραγματικό ύπνο από τις
-  /// φάσεις). Γράφεται στην αναφορά (δεύτερος έλεγχος υπολογισμών C10).
-  int get nightsWithoutStages => math.max(0, stat(K.bedtime).n - stat(K.sleepMin).n);
+  /// φάσεις). Γράφεται στην αναφορά (δεύτερος έλεγχος υπολογισμών C10). Τρίτος έλεγχος F4: μετριούνται ΜΕΡΑ-ΜΕΡΑ (ώρα
+  /// ύπνου χωρίς διάρκεια), όχι ως διαφορά δύο πληθών: μια μέρα με διάρκεια αλλά χωρίς ώρα ύπνου (κρατημένη διάρκεια
+  /// μετά από ανάγνωση χωρίς ύπνο) «έτρωγε» μια νύχτα χωρίς φάσεις από το μέτρημα.
+  int get nightsWithoutStages {
+    final timed = {for (final v in stat(K.sleepMin).values) dateKey(v.$1)};
+    return stat(K.bedtime).values.where((v) => !timed.contains(dateKey(v.$1))).length;
+  }
 }
 
 const reportKeys = [

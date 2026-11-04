@@ -7,6 +7,7 @@ import '../oura/oura_model.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
 import '../oxygen_note.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -309,7 +310,9 @@ class _OuraHeartCard extends StatelessWidget {
           if (hrv?.usual != null) ...[
             const SizedBox(height: 8),
             Text(
-              'HRV: συνήθως ${hrv!.usual!.round()} ms (οι ${hrv.count} προηγούμενες νύχτες σου)',
+              // Ίδιος κανόνας και ίδια μορφή με τη Σήμερα και την Καρδιά (τρίτος έλεγχος F1).
+              'HRV: ${asUsual(hrv!.value, hrv.usual!) ? 'όπως συνήθως' : '${signedShown(shownDiff(hrv.value, hrv.usual!))} ms'} · '
+              'συνήθως ${hrv.usual!.round()} ms (οι ${hrv.count} προηγούμενες νύχτες σου)',
               style: TextStyle(color: c.textSecondary, fontSize: 13.5),
             ),
           ] else if (hrv != null) ...[
@@ -395,9 +398,10 @@ class _BreathCard extends StatelessWidget {
     String breathNote() {
       if (b == null) return 'Δεν υπάρχει για αυτή τη νύχτα';
       if (b.usual == null) return 'Το συνηθισμένο σου βγαίνει μετά από $minNightsForBaseline νύχτες';
-      final d = double.parse(b.value.toStringAsFixed(1)) - double.parse(b.usual!.toStringAsFixed(1));
-      if (d.abs() < 1) return 'Όπως συνήθως (${dec(b.usual!)})';
-      return '${signedDec(d)} · συνήθως ${dec(b.usual!)}';
+      // Τρίτος έλεγχος F1: «Όπως συνήθως» μόνο για διαφορά 0 (πριν: ως ±0,9, που φαινόταν ως διαφορά).
+      final d = shownDiff(b.value, b.usual!, 1);
+      if (d == 0) return '$asUsualText (${dec(b.usual!)})';
+      return '${signedShown(d, 1)} · συνήθως ${dec(b.usual!)}';
     }
 
     return AppCard(
@@ -409,14 +413,14 @@ class _BreathCard extends StatelessWidget {
           row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
           const Hairline(vertical: 2),
           row(
-            ox?.avg == null ? 'Οξυγόνο —' : 'Οξυγόνο ${ox!.avg!.round()}%',
+            ox?.avg == null ? 'Οξυγόνο —' : 'Οξυγόνο ${spo2AvgText(ox!.avg!)}%',
             ox == null
                 ? (windows.mains.containsKey(dateKey(day))
                     ? 'Δεν υπάρχουν μετρήσεις του ρολογιού μέσα στις ώρες ύπνου'
                     : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο μένει κενό')
-                : 'Χαμηλότερο ${lowestText(ox.min)}% · ενδεικτικό'
-                    // Κλινικός έλεγχος L6: ο χρόνος από τον καρπό δεν είναι το T90 μιας οξυμετρίας.
-                    '${ox.below90 == null ? '' : ' · χρόνος κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ρολόι, ενδεικτικό· όχι T90 οξυμετρίας)'}',
+                // UX U4: ίδια λέξη με τις άλλες οθόνες· C13: χωρίς «T90» (εξηγείται στο PDF).
+                : 'Χαμηλότερη μέτρηση ${lowestText(ox.min)}% · ενδεικτικό'
+                    '${ox.below90 == null ? '' : ' · χρόνος κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (από το ρολόι, ενδεικτικό)'}',
             Source.watch,
           ),
           const SizedBox(height: 6),

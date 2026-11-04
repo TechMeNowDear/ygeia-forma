@@ -217,7 +217,8 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                           style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
                           onPressed: _manual,
                           icon: const Icon(Icons.edit_note_rounded),
-                          label: const Text('Χειροκίνητα'),
+                          // UX U5: ίδιο όνομα με το κουμπί της αναζήτησης για την ίδια ενέργεια.
+                          label: const Text('Από ετικέτα'),
                         ),
                       ),
                     ],

@@ -13,9 +13,15 @@
 /// - Από 4/11 (κλινικός έλεγχος M1): το Energy Score / η ετοιμότητα του Oura βγαίνει εν μέρει από τους ίδιους παλμούς
 ///   και τη θερμοκρασία, άρα δεν είναι ανεξάρτητος δείκτης. Κάρτα μόνο όταν ξεφεύγουν ΚΑΙ οι παλμοί ΚΑΙ η θερμοκρασία·
 ///   η ετοιμότητα φαίνεται ως τρίτη γραμμή, χωρίς να μετρά μόνη της.
+/// - Τρίτος έλεγχος (F2): η θερμοκρασία του Oura είναι ΗΔΗ απόκλιση από το συνηθισμένο του (temperature_deviation).
+///   Το «συνήθως» της είναι 0 και η κάρτα δείχνει το ίδιο νούμερο με την κάρτα «Καρδιά και θερμοκρασία» (πριν
+///   αφαιρούσε ξανά τη μεσαία τιμή των προηγούμενων αποκλίσεων: +0,3 εκεί, +0,5 εδώ, την ίδια νύχτα).
+/// - Τρίτος έλεγχος (F4): η απόκλιση μετριέται από τα νούμερα όπως φαίνονται, όπως το κόκκινο χρώμα της Καρδιάς
+///   (61,9 με συνήθως 59,2 φαίνεται «62 · συνήθως 59 · +3» και μετρά +3, όχι 2,6).
 library;
 
 import 'history.dart';
+import 'shown.dart';
 import 'sources.dart';
 import 'trends.dart';
 
@@ -64,8 +70,9 @@ class UnusualSignal {
   final double threshold;
   final int baselineCount;
 
-  /// Απόκλιση προς την κατεύθυνση που μας απασχολεί (θετική = προς το «χειρότερο»).
-  double get deviation => (value - usual) * rule.direction;
+  /// Απόκλιση προς την κατεύθυνση που μας απασχολεί (θετική = προς το «χειρότερο»), από τα νούμερα όπως φαίνονται
+  /// (τρίτος έλεγχος F4: ίδιος κανόνας με την Καρδιά και το νούμερο της κάρτας).
+  double get deviation => shownDiff(value, usual, rule.def.digits) * rule.direction;
   bool get off => deviation >= threshold;
 }
 
@@ -110,8 +117,9 @@ UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime da
     final mad = _median([for (final v in base) (v - med).abs()])!;
     final spread = mad * 1.4826;
     final threshold = rule.minDiff > 2 * spread ? rule.minDiff : 2 * spread;
-    // Το «base» έχει πρώτη τη χθεσινή· το usualOf θέλει παλιότερη πρώτη.
-    final usual = usualOf(base.reversed)!;
+    final source = p.sourceFor(rule.key, day);
+    // Το «base» έχει πρώτη τη χθεσινή· το usualOf θέλει παλιότερη πρώτη. Oura θερμοκρασία: ήδη απόκλιση (F2), «συνήθως» 0.
+    final usual = rule.key == K.skinTemp && source == Source.oura ? 0.0 : usualOf(base.reversed)!;
     signals.add(UnusualSignal(
       rule: rule,
       value: x,
@@ -119,7 +127,7 @@ UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime da
       spread: spread,
       threshold: threshold,
       baselineCount: base.length,
-      source: p.sourceFor(rule.key, day),
+      source: source,
     ));
   }
   final prev = checkPrevious ? checkUnusual(history, add(day, -1), checkPrevious: false, plan: p).show : false;

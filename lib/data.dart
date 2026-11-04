@@ -775,7 +775,7 @@ const todayCards = <TodayCard>[
   TodayCard('energy', 'Energy Score', false),
   TodayCard('rhr', 'Παλμοί στον ύπνο', false),
   TodayCard('calories', 'Θερμίδες που έκαψα', false),
-  TodayCard('spo2', 'Οξυγόνο στον ύπνο', false),
+  TodayCard('spo2', 'Οξυγόνο στον ύπνο (εμφανίζεται μόνο του όταν επαναλαμβάνεται χαμηλό)', false),
   TodayCard('skin', 'Θερμοκρασία καρπού στον ύπνο', false),
 ];
 

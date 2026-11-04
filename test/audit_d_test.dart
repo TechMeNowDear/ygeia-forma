@@ -66,15 +66,17 @@ void main() {
       final g = oxygenGuidance({for (var i = 0; i < 30; i++) day(i): i == 3 ? 75.0 : (i == 20 ? 78.0 : 90.0)}, today);
       expect(g.veryLowNights30, 2);
       expect(g.veryLowRepeated, isTrue);
-      expect(g.messages, [oxygenVeryLowRepeatText(2)]);
-      expect(g.messages.single, contains('σε 2 από τις 30 τελευταίες νύχτες'));
+      // Τρίτος έλεγχος (C4, σκόπιμη αλλαγή): «σε 2 νύχτες μέσα στις τελευταίες 30 μέρες» και ποιες νύχτες.
+      expect(g.messages, [oxygenVeryLowRepeatText(2, [(day(20), 78.0), (day(3), 75.0)])]);
+      expect(g.messages.single, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες'));
       expect(g.short, contains('30 μέρες'));
     });
 
     test('K3: ΕΝΑ μήνυμα όταν ισχύουν πολλά (τελευταία νύχτα 72%, 74% και 83% στην ίδια εβδομάδα)', () {
       final g = oxygenGuidance({day(0): 72, day(2): 74, day(4): 83, day(5): 91}, today);
       expect(g.messages.length, 1);
-      expect(g.messages.single, oxygenVeryLowRepeatText(2), reason: 'το σημαντικότερο: δύο νύχτες κάτω από 80%');
+      expect(g.messages.single, oxygenVeryLowRepeatText(2, [(day(2), 74.0), (day(0), 72.0)]),
+          reason: 'το σημαντικότερο: δύο νύχτες κάτω από 80%');
       expect(g.messages.single, isNot(contains('δες αν επαναλαμβάνεται')));
     });
 
@@ -530,7 +532,8 @@ void main() {
       final s = oura(clock: clock, nights: [night(DateTime(2026, 11, 14))]);
       s.history[dateKey(DateTime(2026, 11, 14))] = {'o.skinTemp': 0.2, 'o.hrv': 41, 'o.sleepHr': 60};
       await _pump(t, SingleChildScrollView(child: OuraRestCard(store: s, now: clock, onTap: () {})));
-      expect(find.text('απόκλιση από το συνηθισμένο'), findsOneWidget);
+      // Τρίτος έλεγχος F2 (σκόπιμη αλλαγή): ίδια ετικέτα με το «Εκτός συνηθισμένου», «… (Oura)».
+      expect(find.text('απόκλιση από το συνηθισμένο (Oura)'), findsOneWidget);
       expect(find.text('συνηθισμένη'), findsNothing);
     });
 

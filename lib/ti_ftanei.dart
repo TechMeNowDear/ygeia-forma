@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'format.dart' show thousands;
 import 'labels.dart';
 import 'samsung.dart';
 import 'theme.dart';
@@ -410,13 +411,14 @@ class _TypeCard extends StatelessWidget {
     switch (state) {
       case 'ok':
         final capped = type['capped'] == true ? '+' : '';
-        line = '${type['count']}$capped εγγραφές · τελευταία ${_formatDateTime(type['latest'] as String?)}';
+        line = '${countNumber(type['count'])}$capped εγγραφές · τελευταία ${_formatDateTime(type['latest'] as String?)}';
       case 'empty':
         line = 'Καμία εγγραφή τις τελευταίες ${type['days'] ?? 30} μέρες.';
       case 'no_permission':
         line = 'Δεν δόθηκε άδεια ανάγνωσης.';
       case 'unsupported':
-        line = 'Το SDK δεν επιτρέπει ανάγνωση εγγραφών εδώ.';
+        // UX U9: χωρίς «SDK».
+        line = unsupportedText;
       default:
         final e = type['error'] as Map<String, dynamic>?;
         line = errorText(e?['kind'] as String? ?? 'other');
@@ -467,8 +469,8 @@ class _TypeCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Μετρούν ${type['counted']} · αγνοούνται ${type['ignored']} από άλλη πηγή '
-                  '(${key == 'body_composition' ? 'μόνο InBody' : 'μόνο ρολόι'})',
+                  countedIgnoredText(type['counted'] as num, type['ignored'] as num,
+                      key == 'body_composition' ? 'μόνο InBody' : 'μόνο ρολόι'),
                   style: TextStyle(color: c.text, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -478,7 +480,7 @@ class _TypeCard extends StatelessWidget {
                 child: Text(
                   'Από: ${appLabel(s['app'] as String? ?? '')}'
                   '${(s['device'] as String? ?? '').isNotEmpty ? ' · ${s['device']}' : ''}'
-                  ' · ${s['count']}'
+                  ' · ${countNumber(s['count'])}'
                   '${s['counts'] == false ? ' · δεν μετρά' : ''}',
                   style: TextStyle(color: c.textSecondary, fontSize: 13),
                 ),
@@ -615,3 +617,14 @@ String? filterWarning(Map<String, dynamic> type) {
       ? 'Καμία ζύγιση από την InBody: οι $count ζυγίσεις είναι από άλλες εφαρμογές. Το ιστορικό ζυγίσεων μένει όπως ήταν.'
       : 'Το φίλτρο ρολογιού δεν βρήκε τίποτα: οι $count εγγραφές είναι από άλλη συσκευή. Το ιστορικό μένει όπως ήταν.';
 }
+
+/// UX U9 (τρίτος έλεγχος): απλά ελληνικά, χωρίς «SDK».
+const unsupportedText = 'Η Samsung δεν επιτρέπει σε άλλες εφαρμογές να το διαβάσουν.';
+
+/// UX U9: αριθμοί με τελεία χιλιάδων, όπως σε όλη την εφαρμογή («1.965», όχι «1965»).
+String countNumber(Object? v) => v is num ? thousands(v) : '${v ?? '—'}';
+
+/// «Μετρούν 3 · αγνοείται 1 από άλλη πηγή (μόνο ρολόι)»: ενικός για το 1 (UX U9: όχι «αγνοούνται 1»).
+String countedIgnoredText(num counted, num ignored, String only) =>
+    '${counted == 1 ? 'Μετρά' : 'Μετρούν'} ${thousands(counted)} · ${ignored == 1 ? 'αγνοείται' : 'αγνοούνται'} '
+    '${thousands(ignored)} από άλλη πηγή ($only)';

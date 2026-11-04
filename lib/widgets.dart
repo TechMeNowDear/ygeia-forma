@@ -330,11 +330,15 @@ class IconBadge extends StatelessWidget {
 
 /// Κεφαλίδα κάρτας: εικονίδιο + τίτλος (+ κάτι δεξιά).
 class CardHeader extends StatelessWidget {
-  const CardHeader({super.key, required this.icon, required this.title, required this.color, this.trailing});
+  const CardHeader({super.key, required this.icon, required this.title, required this.color, this.trailing, this.subtitle});
   final IconData icon;
   final String title;
   final Color color;
   final Widget? trailing;
+
+  /// Μικρή δεύτερη γραμμή κάτω από τον τίτλο (π.χ. η ημερομηνία «Σάβ 24/10»), ώστε ο τίτλος να μην κόβεται σε στενή
+  /// κάρτα (UX U1: «Ενεργός χρόνος · Σ…» στα 860 dp).
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -344,12 +348,29 @@ class CardHeader extends StatelessWidget {
         IconBadge(icon, color, size: 30),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
-          ),
+          child: subtitle == null
+              ? Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                    ),
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      style: TextStyle(fontSize: 12, height: 1.25, color: c.textTertiary, fontFeatures: tabular),
+                    ),
+                  ],
+                ),
         ),
         if (trailing != null) trailing!,
       ],
@@ -506,11 +527,15 @@ class StatCard extends StatelessWidget {
     this.chart,
     this.empty,
     this.onTap,
+    this.subtitle,
   });
 
   final IconData icon;
   final Color color;
   final String title;
+
+  /// Η ημερομηνία (ή άλλη μικρή πληροφορία) σε δική της γραμμή κάτω από τον τίτλο (UX U1).
+  final String? subtitle;
   final String? value;
   final String? unit;
   final Widget? trend;
@@ -528,7 +553,7 @@ class StatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CardHeader(icon: icon, title: title, color: color),
+          CardHeader(icon: icon, title: title, color: color, subtitle: subtitle),
           const SizedBox(height: 14),
           if (value == null) ...[
             Text(
@@ -1177,7 +1202,14 @@ class LineChart extends StatelessWidget {
     this.minRange = 1,
     this.levels = const [],
     this.reference,
+    this.from,
+    this.to,
   });
+
+  /// Το διάστημα του οριζόντιου άξονα (π.χ. οι 90 μέρες της αναφοράς), ίδιο για όλα τα γραφήματα μιας σελίδας, ώστε
+  /// να συγκρίνονται τα σχήματα (τρίτος κλινικός έλεγχος C8/F6). Χωρίς αυτά: από την πρώτη ως την τελευταία τιμή.
+  final DateTime? from;
+  final DateTime? to;
 
   /// Οριζόντιες διακεκομμένες γραμμές ανά διάστημα (π.χ. η μεσαία τιμή κάθε περιόδου στις Τάσεις).
   final List<(DateTime, DateTime, double, Color)> levels;
@@ -1213,6 +1245,8 @@ class LineChart extends StatelessWidget {
           minRange: minRange,
           levels: levels,
           reference: reference,
+          from: from,
+          to: to,
         ),
       ),
     );
@@ -1232,8 +1266,12 @@ class _LinePainter extends CustomPainter {
     required this.dateLabel,
     required this.minRange,
     this.reference,
+    this.from,
+    this.to,
   });
 
+  final DateTime? from;
+  final DateTime? to;
   final double minRange;
   final List<(DateTime, DateTime, double, Color)> levels;
   final (double, String, Color)? reference;
@@ -1268,12 +1306,13 @@ class _LinePainter extends CustomPainter {
     minV -= pad;
     maxV += pad;
 
-    final t0 = points.first.$1.millisecondsSinceEpoch.toDouble();
-    final t1 = points.last.$1.millisecondsSinceEpoch.toDouble();
+    final ranged = from != null && to != null;
+    final t0 = (ranged ? from! : points.first.$1).millisecondsSinceEpoch.toDouble();
+    final t1 = (ranged ? to! : points.last.$1).millisecondsSinceEpoch.toDouble();
     final span = math.max(t1 - t0, 1.0);
 
     Offset at((DateTime, double) p) {
-      final x = points.length == 1 ? left + w / 2 : left + w * ((p.$1.millisecondsSinceEpoch - t0) / span);
+      final x = points.length == 1 && !ranged ? left + w / 2 : left + w * ((p.$1.millisecondsSinceEpoch - t0) / span);
       final y = top + h * (1 - (p.$2 - minV) / (maxV - minV));
       return Offset(x, y);
     }
@@ -1356,9 +1395,9 @@ class _LinePainter extends CustomPainter {
     _text(canvas, format(points.last.$2), Offset(math.min(last.dx, left + w - 16), last.dy - 24), strongText, 12,
         bold: true);
 
-    _textLeft(canvas, dateLabel(points.first.$1), Offset(left, size.height - bottom + 6), text, 11);
-    if (points.length > 1) {
-      final label = dateLabel(points.last.$1);
+    _textLeft(canvas, dateLabel(ranged ? from! : points.first.$1), Offset(left, size.height - bottom + 6), text, 11);
+    if (points.length > 1 || ranged) {
+      final label = dateLabel(ranged ? to! : points.last.$1);
       final tp = _painter(label, text, 11);
       tp.paint(canvas, Offset(left + w - tp.width, size.height - bottom + 6));
     }

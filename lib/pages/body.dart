@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
+import '../shown.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -82,8 +83,11 @@ class BodyPage extends StatelessWidget {
                 ],
               ),
             ),
+          // Θερμοκρασία καρπού: μόνο ως απόκλιση από το «συνήθως» (τρίτος έλεγχος F2/C5), ποτέ βαθμοί (33,6 °C διαβαζόταν ως
+          // υποθερμία). Το «συνήθως» είναι η μεσαία τιμή των 14 προηγούμενων νυχτών (όχι «μέσος όρος»).
           if (skinNights.length >= 2)
             AppCard(
+              key: const ValueKey('body-skin'),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -91,20 +95,24 @@ class BodyPage extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     skinBase == null
-                        ? 'Χρειάζονται λίγες ακόμα νύχτες για τον μέσο όρο σου.'
-                        : 'Ο μέσος όρος σου είναι ${dec(skinBase)} °C. Αλλάζει πολύ με τη θερμοκρασία του δωματίου, τα σκεπάσματα '
-                            'και το λουράκι. Δείχνει μόνο τι άλλαξε σε σχέση με εσένα· δεν είναι θερμοκρασία σώματος ούτε πυρετός.',
+                        ? 'Χρειάζονται λίγες ακόμα νύχτες για το «συνήθως» σου (7 νύχτες).'
+                        : 'Κάθε νύχτα σε σχέση με το «συνήθως» σου (η μεσαία τιμή των 14 προηγούμενων νυχτών, 0 στο '
+                            'γράφημα). Αλλάζει πολύ με τη θερμοκρασία του δωματίου, τα σκεπάσματα και το λουράκι. Δείχνει '
+                            'μόνο τι άλλαξε σε σχέση με εσένα· δεν είναι θερμοκρασία σώματος ούτε πυρετός.',
                     style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
                   ),
-                  const SizedBox(height: 12),
-                  LineChart(
-                    points: [
-                      for (final n in skinNights.length <= 30 ? skinNights : skinNights.sublist(skinNights.length - 30))
-                        (n.date, n.skinTemp!),
-                    ],
-                    format: (v) => dec(v),
-                    color: c.move,
-                  ),
+                  if (skinBase != null) ...[
+                    const SizedBox(height: 12),
+                    LineChart(
+                      points: [
+                        for (final n in skinNights.length <= 30 ? skinNights : skinNights.sublist(skinNights.length - 30))
+                          (n.date, shownDiff(n.skinTemp!, skinBase, 1)),
+                      ],
+                      format: (v) => signedDec(v),
+                      color: c.move,
+                      dateLabel: dayMonth,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -150,8 +158,9 @@ class _LatestCard extends StatelessWidget {
       if (value == null) return '—';
       final base = '${dec(value, digits)} $unit';
       if (before == null) return base;
-      final diff = value - before;
-      if (diff.abs() < 0.05) return base;
+      // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2».
+      final diff = shownDiff(value, before, digits);
+      if (diff == 0) return base;
       return '$base  (${signedDec(diff, digits)})';
     }
 

@@ -638,6 +638,7 @@ class FoodDetailScreen extends StatelessWidget {
     ('monoFat', '  μονοακόρεστα', 'g', 1),
     ('polyFat', '  πολυακόρεστα', 'g', 1),
     ('salt', 'Αλάτι', 'g', 2),
+    ('sodium', 'Νάτριο', 'mg', 0),
     ('cholesterol', 'Χοληστερόλη', 'mg', 0),
     ('water', 'Νερό', 'g', 1),
     ('calcium', 'Ασβέστιο', 'mg', 0),
@@ -674,8 +675,14 @@ class FoodDetailScreen extends StatelessWidget {
                   children: [
                     CardHeader(icon: Icons.science_outlined, title: 'Ανά 100 g', color: c.food),
                     const SizedBox(height: 6),
+                    // Τρίτος έλεγχος διατροφής N6: το αλάτι της βάσης είναι νάτριο × 2,5 (κανόνας ΕΕ), όχι η στήλη αλατιού της
+                    // CIQUAL· το λέει η ετικέτα, και φαίνεται και το νάτριο.
                     for (final r in _rows)
-                      if (f.n.has(r.$1)) InfoRow(r.$2, '${nValueText(f.n[r.$1], digits: r.$4)} ${r.$3}'),
+                      if (f.n.has(r.$1))
+                        InfoRow(
+                          r.$1 == 'salt' && !f.isMine && f.n.has('sodium') ? saltFromSodiumLabel : r.$2,
+                          '${nValueText(f.n[r.$1], digits: r.$4)} ${r.$3}',
+                        ),
                     if (f.energyCalc)
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
@@ -875,7 +882,10 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                     f.$4 ? f.$2 : '${f.$2} (προαιρετικό)',
                     suffix: f.$3,
                     error: impossible[f.$1] ?? (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
-                    warning: doubtful[f.$1],
+                    warning: doubtful[f.$1] ??
+                        (f.$1 == Nk.salt && widget.draft.saltFromSodium
+                            ? 'Από νάτριο × 2,5 (το Open Food Facts έδωσε μόνο νάτριο). Έλεγξέ το με την ετικέτα.'
+                            : null),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -997,3 +1007,6 @@ Future<Food?> scanToFood(
           ? 'Βρέθηκε στο Open Food Facts. Έλεγξε ότι τα νούμερα ταιριάζουν με την ετικέτα και πάτα Αποθήκευση.'
           : 'Βρέθηκε στο Open Food Facts, αλλά λείπουν τιμές. Συμπλήρωσέ τες από την ετικέτα.');
 }
+
+/// Η ετικέτα του αλατιού για τρόφιμα της βάσης (τρίτος έλεγχος διατροφής N6).
+const saltFromSodiumLabel = 'Αλάτι (από νάτριο × 2,5)';

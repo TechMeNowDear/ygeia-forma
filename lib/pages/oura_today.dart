@@ -7,6 +7,7 @@ import '../oura/oura_api.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
 import '../plan_file.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -254,9 +255,10 @@ class OuraSleepTodayCard extends StatelessWidget {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
+              // Ένας κανόνας για το «συνήθως» σε όλες τις οθόνες (τρίτος έλεγχος F1).
               child: TrendPill(
-                diff.abs() < 10 ? 'Όσο κοιμάσαι συνήθως' : '${moreLessMinutes(diff)} από ό,τι συνήθως',
-                up: diff.abs() < 10 ? null : diff > 0,
+                sleepVsUsualText(diff),
+                up: diff == 0 ? null : diff > 0,
                 onDark: true,
               ),
             ),
@@ -356,13 +358,15 @@ class OuraRestCard extends StatelessWidget {
     final temp = plan.value(store.history, K.skinTemp, day);
     final readiness = plan.value(store.history, K.energy, day);
 
-    // Ίδια λέξη «συνήθως» και η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6/C7, UX U7).
-    String note(NightBaseline? b, {required double same}) {
+    // Ίδια λέξη «συνήθως» και η διαφορά των νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6/C7, UX U7). Τρίτος
+    // έλεγχος F1: ΕΝΑΣ κανόνας με την Καρδιά: «όπως συνήθως» μόνο για διαφορά 0 (πριν: ±2 bpm / ±3 ms εδώ, 0 εκεί,
+    // οπότε 60 με συνήθως 59 ήταν «όπως συνήθως» εδώ και «+1 bpm» στην Καρδιά).
+    String note(NightBaseline? b) {
       if (b == null) return '—';
       if (b.usual == null) return 'μαθαίνει';
-      final d = b.value.round() - b.usual!.round();
-      if (d.abs() < same) return 'όπως συνήθως';
-      return 'συνήθως ${b.usual!.round()}';
+      final d = shownDiff(b.value, b.usual!);
+      if (d == 0) return 'όπως συνήθως';
+      return '${signedShown(d)} · συνήθως ${b.usual!.round()}';
     }
 
     Widget cell(String label, String value, String unit, String sub) => Expanded(
@@ -393,14 +397,15 @@ class OuraRestCard extends StatelessWidget {
           ]),
           const SizedBox(height: 12),
           Row(children: [
-            cell('HRV (RMSSD)', hrv == null ? '—' : '${hrv.value.round()}', 'ms', note(hrv, same: 3)),
-            cell('Παλμοί στον ύπνο', hr == null ? '—' : '${hr.value.round()}', 'bpm', note(hr, same: 2)),
-            // Πάντα ως απόκλιση από το συνηθισμένο, ποτέ σαν θερμοκρασία σώματος (κλινικός έλεγχος M7, UX U4).
+            cell('HRV (RMSSD)', hrv == null ? '—' : '${hrv.value.round()}', 'ms', note(hrv)),
+            cell('Παλμοί στον ύπνο', hr == null ? '—' : '${hr.value.round()}', 'bpm', note(hr)),
+            // Πάντα ως απόκλιση από το συνηθισμένο, ποτέ σαν θερμοκρασία σώματος (κλινικός έλεγχος M7, UX U4). Τρίτος
+            // έλεγχος F2: η απόκλιση του ίδιου του Oura, ίδιο νούμερο και ίδια ετικέτα με το «Εκτός συνηθισμένου».
             cell(
               'Θερμοκρασία',
               temp == null ? '—' : signedDec(temp),
               '°C',
-              temp == null ? '—' : 'απόκλιση από το συνηθισμένο',
+              temp == null ? '—' : ouraTempDeviationLabel,
             ),
           ]),
           const Hairline(vertical: 12),

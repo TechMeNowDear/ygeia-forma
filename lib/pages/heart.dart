@@ -5,6 +5,7 @@ import '../format.dart';
 import '../history.dart';
 import '../oura/oura_view.dart';
 import '../oxygen_note.dart';
+import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -58,10 +59,14 @@ class HeartPage extends StatelessWidget {
         final List<(DateTime, double)> rhrPoints;
         final double? lastRhr;
         final double? base;
+        // Η νύχτα της τιμής που δείχνουμε: αν δεν είναι η τελευταία (π.χ. η χθεσινή χωρίς παλμούς), γράφεται η
+        // ημερομηνία της (τρίτος έλεγχος F4), όπως στη Σήμερα.
+        DateTime? rhrNight;
         if (ouraHr) {
           rhrPoints = planSeries(store.history, store.plan, K.sleepHr, DateTime(day.year, day.month, day.day - 29), day).points;
           final b = rhrPoints.isEmpty ? null : ouraBaseline(store.history, store.plan, K.sleepHr, rhrPoints.last.$1);
           lastRhr = rhrPoints.isEmpty ? null : rhrPoints.last.$2;
+          rhrNight = rhrPoints.isEmpty ? null : rhrPoints.last.$1;
           base = b?.usual;
         } else {
           final rhrNights = d.nights.where((n) => n.sleepingHr != null).toList();
@@ -70,6 +75,7 @@ class HeartPage extends StatelessWidget {
               (n.date, n.sleepingHr!),
           ];
           lastRhr = rhrNights.isEmpty ? null : rhrNights.last.sleepingHr;
+          rhrNight = rhrNights.isEmpty ? null : rhrNights.last.date;
           // Το «συνηθισμένο» από τις νύχτες ΠΡΙΝ από αυτή που δείχνουμε (έλεγχος υπολογισμών F8).
           base = rhrNights.isEmpty ? null : d.restingHrBaselineFor(rhrNights.last.date);
         }
@@ -116,11 +122,12 @@ class HeartPage extends StatelessWidget {
         if (lastRhr != null && base != null) {
           // Η διαφορά των δύο νούμερων όπως φαίνονται (έλεγχος υπολογισμών C6): «61 · +2 από το συνηθισμένο (59)»,
           // ποτέ «61 … 3 πάνω (59)». Ίδια λέξη «συνήθως» σε όλη την εφαρμογή (C7/U7), με μονάδα.
-          final diff = lastRhr.round() - base.round();
+          // Ένας κανόνας σε όλες τις οθόνες (τρίτος έλεγχος F1): «Όπως συνήθως» μόνο για διαφορά 0.
+          final diff = shownDiff(lastRhr, base);
           trend = diff == 0
-              ? const TrendPill('Όπως συνήθως')
+              ? const TrendPill(asUsualText)
               : TrendPill(
-                  '${diff > 0 ? '+' : '−'}${diff.abs()} bpm · συνήθως ${base.round()}',
+                  '${signedShown(diff)} bpm · συνήθως ${base.round()}',
                   up: diff > 0,
                   // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4): μπορεί να είναι φάρμακο ή κρύο δωμάτιο.
                   kind: diff >= 3 ? TrendKind.bad : TrendKind.neutral,
@@ -138,7 +145,7 @@ class HeartPage extends StatelessWidget {
                 children: [
                   CardHeader(
                     icon: Icons.bedtime_rounded,
-                    title: 'Παλμοί στον ύπνο',
+                    title: datedTitle('Παλμοί στον ύπνο', rhrNight, day),
                     color: c.sleep,
                     trailing: store.plan.nightSource(day) == Source.oura ? const SourceTag(Source.oura) : null,
                   ),
@@ -157,6 +164,33 @@ class HeartPage extends StatelessWidget {
                     const SizedBox(height: 14),
                     LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.sleep, minRange: 8),
                   ],
+                ],
+              ),
+            ),
+            // Στο tablet/PC κάτω από τους παλμούς ύπνου, για να μη μένει η αριστερή στήλη με μία κάρτα (UX U10).
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CardHeader(
+                    icon: Icons.air_rounded,
+                    title: 'Οξυγόνο στον ύπνο',
+                    color: c.sleep,
+                    trailing: ouraHr ? const SourceTag(Source.watch) : null,
+                  ),
+                  const SizedBox(height: 8),
+                  const OxygenAbout(lead: 'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική).'),
+                  const Hairline(vertical: 12),
+                  if (oxNights.isEmpty)
+                    Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
+                  for (final n in oxNights)
+                    InfoRow(
+                      shortDayDate(n.$1),
+                      // Χωρίς «(ενδεικτικό)» σε κάθε γραμμή (το λέει το κείμενο πάνω): στα 400 dp η ημερομηνία έσπαγε σε 2 γραμμές.
+                      '${spo2AvgText(n.$2)}% · χαμηλότερη μέτρηση ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
+                    ),
+                  const SizedBox(height: 10),
+                  OxygenNotes(guidance: oxGuidance),
                 ],
               ),
             ),
@@ -189,32 +223,6 @@ class HeartPage extends StatelessWidget {
                     ),
                   if (latest == null && today == null && !dayOnly)
                     Text('Δεν υπάρχουν μετρήσεις σήμερα.', style: TextStyle(color: c.textSecondary)),
-                ],
-              ),
-            ),
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CardHeader(
-                    icon: Icons.air_rounded,
-                    title: 'Οξυγόνο στον ύπνο',
-                    color: c.sleep,
-                    trailing: ouraHr ? const SourceTag(Source.watch) : null,
-                  ),
-                  const SizedBox(height: 8),
-                  const OxygenAbout(lead: 'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική).'),
-                  const Hairline(vertical: 12),
-                  if (oxNights.isEmpty)
-                    Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
-                  for (final n in oxNights)
-                    InfoRow(
-                      shortDayDate(n.$1),
-                      // Χωρίς «(ενδεικτικό)» σε κάθε γραμμή (το λέει το κείμενο πάνω): στα 400 dp η ημερομηνία έσπαγε σε 2 γραμμές.
-                      '${n.$2.round()}% · χαμηλότερη ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
-                    ),
-                  const SizedBox(height: 10),
-                  OxygenNotes(guidance: oxGuidance),
                 ],
               ),
             ),

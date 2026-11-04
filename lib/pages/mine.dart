@@ -29,8 +29,8 @@ class MinePage extends StatelessWidget {
           color: c.food,
           title: 'Τα προϊόντα μου',
           text: n == 0
-              ? 'Πέρασε ό,τι αγοράζεις, με barcode ή χειροκίνητα, χωρίς να το φας.'
-              : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · πρόσθεσε κι άλλα με barcode ή χειροκίνητα',
+              ? 'Πέρασε ό,τι αγοράζεις, με barcode ή από την ετικέτα, χωρίς να το φας.'
+              : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · πρόσθεσε κι άλλα με barcode ή από την ετικέτα',
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: food))),
         );
         final kitchen = _EntryCard(
