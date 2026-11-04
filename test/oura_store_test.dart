@@ -953,8 +953,8 @@ void main() {
       a.oura.sleep = [period('main', h(23, 30, -1), h(7)), period('late', h(7, 45), h(8, 30))];
       a.android.cached = sampleDashboardJson(h(6, 30));
       final fresh = sampleDashboardJson(at);
-      (fresh['stepsMin'] as List).addAll([
-        for (var k = 0; k < 6; k++) [ms(h(7, 10 + k)), 50],
+      (fresh['stepsMin'] as List<List<num>>).addAll(<List<num>>[
+        for (var k = 0; k < 6; k++) <num>[ms(h(7, 10 + k)), 50],
       ]);
       a.android.dashboard = fresh;
       await boot(a.store);

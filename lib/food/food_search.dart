@@ -93,7 +93,19 @@ List<String> _words(String s) => _allWords(s).where((w) => !_stopWords.contains(
 
 /// Ρίζα λέξης (σε φωνητική μορφή), για να βρίσκονται πληθυντικοί και πτώσεις:
 /// «ντομάτες» = «ντομάτα», «πιπεριές» = «πιπεριά», «φακή» = «φακές», «αμύγδαλο» = «αμύγδαλα».
+/// Κλινικός/διατροφικός έλεγχος 4 (N2): χωρίς «ies»/«ia», ώστε «πιπεριές» = «πιπεριά» ≠ «πιπέρι», «μαγιά» ≠ «μάνγκο»,
+/// «μοσχαρίσια» = «μοσχαρίσιο», «πρόβεια» = «πρόβειο». Το «κρεμμύδια» = «κρεμμύδι» το κρατά το [_pluralStem].
 const _endings = ['es', 'as', 'os', 'is', 'us', 'on', 'a', 'e', 'i', 'o', 's'];
+
+/// Η παλιά ρίζα των «-ια»/«-ιες» (κρεμμύδια → κρεμμύδ-, όπως κρεμμύδι), μόνο με 4+ γράμματα («μαγιά» → «mag» όχι).
+/// Ταίριασμα μόνο με χαμηλό βαθμό: «πιπεριές» βγάζει πρώτα τις πιπεριές, το «πιπέρι» μετά.
+String? _pluralStem(String w) {
+  if (w.contains(RegExp(r'[^a-z]'))) return null;
+  for (final e in const ['ies', 'ia']) {
+    if (w.endsWith(e) && w.length - e.length >= 4) return w.substring(0, w.length - e.length);
+  }
+  return null;
+}
 String stem(String w) {
   if (w.length < 4 || w.contains(RegExp(r'[^a-z]'))) return w;
   for (final e in _endings) {
@@ -208,6 +220,7 @@ class FoodIndex {
       ];
       for (final w in q) {
         final ws = stem(w);
+        final wp = _pluralStem(w);
         var best = 0.0;
         for (var k = 0; k < _name[i].length; k++) {
           final nw = _name[i][k];
@@ -219,6 +232,8 @@ class FoodIndex {
             s = first ? 7 : 5;
           } else if (ws.length >= 3 && _nameStem[i][k] == ws) {
             s = first ? 7 : 5;
+          } else if (wp != null && _nameStem[i][k] == wp) {
+            s = first ? 4 : 3;
           } else if (w.length >= 5 && nw.contains(w)) {
             // Κομμάτι λέξης μόνο για 5+ γράμματα: «κόλα» δεν βρίσκει «σοκολάτα», «πίτα» δεν βρίσκει «χτυπητά».
             s = 2;
@@ -237,7 +252,9 @@ class FoodIndex {
                     ? 4.0
                     : (ws.length >= 3 && _aliasStem[i][a][k] == ws)
                         ? 3.0
-                        : 0.0;
+                        : (wp != null && _aliasStem[i][a][k] == wp)
+                            ? 2.0
+                            : 0.0;
             if (s > best) best = s;
           }
         }
