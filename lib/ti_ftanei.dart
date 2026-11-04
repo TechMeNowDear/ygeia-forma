@@ -377,7 +377,7 @@ class _TodayCard extends StatelessWidget {
             if (steps.length > 1) ...[
               const SizedBox(height: 12),
               Text(
-                'Βήματα 7 ημερών: ${steps.map((s) => '${_shortDate(s['date'] as String?)} ${s['value']}').join(' · ')}',
+                'Βήματα 7 ημερών: ${steps.map((s) => '${_shortDate(s['date'] as String?)} ${countNumber(s['value'] is num ? s['value'] : num.tryParse('${s['value']}') ?? s['value'])}').join(' · ')}',
                 style: TextStyle(color: c.textSecondary),
               ),
             ],
@@ -604,7 +604,8 @@ String _shortDate(String? iso) {
 String _round(Object value) {
   final n = num.tryParse(value.toString());
   if (n == null) return value.toString();
-  return n.round().toString();
+  // UX U9: τελεία χιλιάδων όπως σε όλη την εφαρμογή («1.965»).
+  return thousands(n);
 }
 
 /// Έλεγχος 2, C6: το φίλτρο πηγής δεν άφησε καμία εγγραφή, ενώ η Samsung έχει εγγραφές αυτού του είδους. Η εφαρμογή

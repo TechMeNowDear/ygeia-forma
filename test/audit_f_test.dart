@@ -535,6 +535,7 @@ void main() {
     test('U9: «Τι φτάνει»: χωρίς «SDK», τελεία χιλιάδων, «αγνοείται 1»', () {
       expect(unsupportedText, isNot(contains('SDK')));
       expect(countNumber(1965), '1.965');
+      expect(countNumber(1965.4), '1.965');
       expect(countedIgnoredText(3, 1, 'μόνο ρολόι'), 'Μετρούν 3 · αγνοείται 1 από άλλη πηγή (μόνο ρολόι)');
       expect(countedIgnoredText(1965, 2, 'μόνο InBody'), 'Μετρούν 1.965 · αγνοούνται 2 από άλλη πηγή (μόνο InBody)');
     });
