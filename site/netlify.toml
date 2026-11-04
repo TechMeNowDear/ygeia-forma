@@ -1,4 +1,9 @@
-# Netlify (συνδεδεμένο με το GitHub repo, base directory: site). Ανεβαίνει μόνο του σε κάθε push στο main.
+# Netlify (συνδεδεμένο με το GitHub repo, base directory: site).
+# Κάθε ανέβασμα στην παραγωγή κοστίζει 15 credits (δωρεάν πλάνο: 300 τον μήνα· αν τελειώσουν, ο ιστότοπος και ο
+# μεσάζων Oura σταματούν ως τον επόμενο μήνα). Γι' αυτό ανεβαίνει ΜΟΝΟ όταν άλλαξε κάτι μέσα στο site/: ένα push στο
+# main που αλλάζει μόνο την εφαρμογή ακυρώνεται (έξοδος 0 = παράλειψη). Το πρώτο χτίσιμο (ίδιο CACHED_COMMIT_REF και
+# COMMIT_REF) και ένα χειροκίνητο «Trigger deploy» χτίζουν πάντα.
 [build]
   publish = "public"
   functions = "netlify/functions"
+  ignore = "[ \"$CACHED_COMMIT_REF\" != \"$COMMIT_REF\" ] && git diff --quiet \"$CACHED_COMMIT_REF\" \"$COMMIT_REF\" -- ."
