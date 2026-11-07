@@ -67,10 +67,10 @@ class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
     // Μόνο αν η νέα σύνδεση ολοκληρώθηκε ΜΕΤΑ το πάτημα (όχι όσο ο χρήστης είναι ακόμα στη σελίδα της Oura).
     final asked = s.ouraOxygenAskedMs, done = s.ouraConnectedMs;
     if (s.ouraSpo2 != false || asked == null || done == null || done < asked) return null;
-    final given = s.ouraLastScope == null ? '' : ' (έδωσε: ${s.ouraLastScope})';
-    return 'Η Oura συνδέθηκε ξανά, αλλά χωρίς την άδεια για το οξυγόνο$given. Συνήθως συμβαίνει επειδή θυμάται την '
-        'παλιά έγκριση και δεν δείχνει τη σελίδα με τις επιλογές. Λύση: στην εφαρμογή Oura, ☰ › Ρυθμίσεις › '
-        'App integrations, αφαίρεσε την πρόσβαση της «Ygeia Forma» και ξαναπάτα εδώ.';
+    final given = s.ouraLastScope == null ? '' : ' (έδωσε μόνο: ${s.ouraLastScope})';
+    return 'Η Oura συνδέθηκε ξανά, αλλά χωρίς την άδεια για το οξυγόνο$given. Στη σελίδα της Oura πρέπει να '
+        'φαίνεται και διακόπτης για το οξυγόνο· αν δεν φαίνεται, η άδεια SpO2 δεν είναι ενεργή στις ρυθμίσεις της '
+        'εφαρμογής στο developer.ouraring.com. Η εφαρμογή δοκιμάζει πάντως μία φορά τη μέρα να το διαβάσει.';
   }
 
   Future<void> _go() async {

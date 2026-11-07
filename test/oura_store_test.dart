@@ -857,7 +857,7 @@ void main() {
       a.android.prefs = {'sources': p.toJson(), 'ouraSyncedTo': dateKey(add(today, -2))};
       a.android.days[dateKey(ouraStart)] = {'o.sleepMin': 420};
       await boot(a.store);
-      expect(a.oura.gets, 3);
+      expect(a.oura.gets, 4, reason: 'sleep, daily_sleep, daily_readiness + η μία δοκιμή οξυγόνου της μέρας');
       expect(a.android.days[dateKey(add(today, -2))]?['o.sleepMin'], isNotNull, reason: 'η νύχτα που έλειπε ήρθε');
       expect(a.android.days[dateKey(today)]?.containsKey('o.sleepMin') ?? false, isFalse, reason: 'νύχτα του ρολογιού');
     });
@@ -922,7 +922,7 @@ void main() {
     test('Πρώτα το Oura, μετά το ιστορικό της Samsung· μόνο κλειδιά «o.*» για τις νύχτες του Oura', () async {
       final a = app(plan: SourcePlan.samsungOnly.withEra(Source.oura, ouraStart), withTokens: true);
       await boot(a.store);
-      expect(a.oura.gets, 3, reason: 'sleep, daily_sleep, daily_readiness μία φορά');
+      expect(a.oura.gets, 4, reason: 'sleep, daily_sleep, daily_readiness μία φορά + η μία δοκιμή οξυγόνου της μέρας');
       for (var d = ouraStart; !d.isAfter(today); d = add(d, 1)) {
         final row = a.android.days[dateKey(d)]!;
         expect(row[ouraKeys[K.sleepMin]], isNotNull, reason: dateKey(d));

@@ -13,6 +13,7 @@ import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'info_sheet.dart';
+import 'metric_page.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
@@ -407,7 +408,12 @@ class _BreathCard extends StatelessWidget {
             trailing: Row(mainAxisSize: MainAxisSize.min, children: const [InfoButton(K.breath), InfoButton(K.ringSpo2)]),
           ),
           const SizedBox(height: 6),
-          row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
+          InkWell(
+            key: const ValueKey('sleep-breath'),
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => Navigator.of(context).push(MetricPage.route(store, K.breath, now: now)),
+            child: row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
+          ),
           const Hairline(vertical: 2),
           row(
             rox.avg == null ? 'Οξυγόνο, μέσος όρος —' : 'Οξυγόνο, μέσος όρος ${spo2AvgText(rox.avg!)}%',
