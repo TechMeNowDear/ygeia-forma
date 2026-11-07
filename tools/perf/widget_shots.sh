@@ -7,16 +7,17 @@ PKG=gr.ygeiaforma.ygeia_forma
 ACT="$PKG/.WidgetConfigActivity"
 mkdir -p widget_shots
 ok=1
-for spec in "sleep 92 300" "move 180 400" "food 180 190" "body 370 190" "sleep 180 190"; do
+for spec in "sleep 92 300" "move 180 400" "food 180 190" "body 370 190"; do
   set -- $spec
-  adb shell am force-stop "$PKG"; sleep 1
-  adb shell am start -W -n "$ACT" --es ygeia_kind "$1" --ei ygeia_w "$2" --ei ygeia_h "$3" > /dev/null
+  # Κάθε εντολή με όριο χρόνου: ένα κόλλημα του emulator δεν σταματά όλο τον έλεγχο.
+  timeout 20 adb shell am force-stop "$PKG"; sleep 1
+  timeout 40 adb shell am start -n "$ACT" --es ygeia_kind "$1" --ei ygeia_w "$2" --ei ygeia_h "$3" > /dev/null
   sleep 12
-  adb exec-out screencap -p > "widget_shots/$1_$2x$3.png" || ok=0
-  pid=$(adb shell pidof "$PKG" | tr -d '\r')
+  timeout 30 adb exec-out screencap -p > "widget_shots/$1_$2x$3.png" || ok=0
+  pid=$(timeout 15 adb shell pidof "$PKG" | tr -d '\r')
   [ -z "$pid" ] && { echo "$1 $2x$3: η οθόνη ρύθμισης έκλεισε"; ok=0; }
 done
-adb logcat -b crash -d > widget_crash.log 2>&1 || true
+timeout 30 adb logcat -b crash -d > widget_crash.log 2>&1 || true
 if grep -q "Process: $PKG\|>>> $PKG <<<" widget_crash.log; then
   echo "Κρασάρισμα στην οθόνη ρύθμισης widget:"; grep -A30 "Process: $PKG\|>>> $PKG <<<" widget_crash.log | head -40; ok=0
 fi
