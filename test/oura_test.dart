@@ -487,13 +487,30 @@ void main() {
       expect(calls, ['sleep', 'daily_sleep', 'daily_readiness', 'daily_spo2']);
       expect(OuraTokens.fromJson(v.data[vaultTokens])!.spo2, isFalse);
       calls.clear();
-      await link(http, v).fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
-      expect(calls, ['sleep', 'daily_sleep', 'daily_readiness'], reason: 'δεν ξαναζητείται χωρίς νέα σύνδεση');
-      // Παλιά σύνδεση (χωρίς «o2»): ποτέ daily_spo2.
-      final old = MemoryVault()..data[vaultTokens] = tokens().toJson();
+      final l = link(http, v);
+      await l.fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(calls, ['sleep', 'daily_sleep', 'daily_readiness', 'daily_spo2'], reason: 'χωρίς άδεια: μία δοκιμή τη μέρα');
+      expect(OuraTokens.fromJson(v.data[vaultTokens])!.spo2, isFalse, reason: 'η άρνηση στη δοκιμή δεν αλλάζει τίποτα');
       calls.clear();
-      await link(http, old).fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
-      expect(calls, isNot(contains('daily_spo2')));
+      await l.fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(calls, ['sleep', 'daily_sleep', 'daily_readiness'], reason: 'όχι δεύτερη δοκιμή την ίδια μέρα');
+    });
+
+    test('7/11 οξυγόνο: χωρίς τη χωριστή άδεια, αν η Oura δώσει τιμές → η σύνδεση γίνεται «με οξυγόνο»', () async {
+      final http = FakeHttp((m, u, h, f) {
+        if (u.pathSegments.last == 'daily_spo2') {
+          return OuraResponse(200, jsonEncode({
+            'data': [
+              {'id': 's1', 'day': '2026-11-06', 'spo2_percentage': {'average': 96.1}}
+            ],
+            'next_token': null
+          }));
+        }
+        return OuraResponse(200, jsonEncode({'data': <Object>[], 'next_token': null}));
+      });
+      final v = MemoryVault()..data[vaultTokens] = tokens().toJson();
+      await link(http, v).fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(OuraTokens.fromJson(v.data[vaultTokens])!.spo2, isTrue);
     });
 
     test('7/11 οξυγόνο: token με «scope» χωρίς spo2 → χωρίς οξυγόνο· χωρίς scope → όπως ζητήθηκε', () {

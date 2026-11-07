@@ -493,6 +493,16 @@ class OuraLink {
 
   /// Η Oura αρνήθηκε το οξυγόνο (401/403): η σύνδεση σημειώνεται «χωρίς οξυγόνο», ώστε να μη ζητείται ξανά σε κάθε
   /// ανάγνωση (και να μην ανανεώνεται άσκοπα η πρόσβαση). Ξανά μόνο με νέα σύνδεση.
+  /// Η μέρα της τελευταίας δοκιμής για οξυγόνο χωρίς την άδεια (μία τη μέρα, όσο τρέχει η εφαρμογή).
+  int? _spo2ProbeDay;
+
+  /// Η Oura έδωσε οξυγόνο χωρίς τη χωριστή άδεια: η σύνδεση σημειώνεται «με οξυγόνο».
+  Future<void> _yesSpo2(int gen) async {
+    final t = _tokens;
+    if (t == null || t.spo2 || gen != _gen) return;
+    await _store(t.withSpo2(true), gen);
+  }
+
   Future<void> _noSpo2(int gen) async {
     final t = _tokens;
     if (t == null || !t.spo2 || gen != _gen) return;
@@ -765,12 +775,20 @@ class OuraLink {
     // Οξυγόνο (7/11): χωριστά, και ποτέ δεν χαλάει την ανάγνωση του ύπνου. Μόνο αν η σύνδεση έχει την άδεια.
     var spo2 = const <Map<String, dynamic>>[];
     final gen = _gen;
-    if ((await tokens())?.spo2 == true) {
+    final has = (await tokens())?.spo2;
+    // Χωρίς τη χωριστή άδεια (7/11: η σελίδα έγκρισης της Oura δεν έδειξε το SpO2): μία δοκιμή τη μέρα. Αν η Oura
+    // δώσει οξυγόνο (200 με τιμές), η σύνδεση σημειώνεται «με οξυγόνο»· αλλιώς τίποτα δεν αλλάζει.
+    final now = _clock();
+    final dayNo = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final probe = has == false && _spo2ProbeDay != dayNo;
+    if (has == true || probe) {
+      if (probe) _spo2ProbeDay = dayNo;
       try {
         spo2 = await fetchAll('daily_spo2', from, to);
+        if (probe && spo2.isNotEmpty) await _yesSpo2(gen);
       } on OuraError catch (e) {
         final refused = e.status == 401 || e.status == 403 || e.kind == OuraErrorKind.reconnect;
-        if (refused) await _noSpo2(gen);
+        if (refused && !probe) await _noSpo2(gen);
       }
     }
     final b = parseOura(
