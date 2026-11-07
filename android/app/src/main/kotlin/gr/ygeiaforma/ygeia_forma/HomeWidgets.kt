@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.SizeF
@@ -217,8 +216,9 @@ object HomeWidgets {
 
     private fun open(ctx: Context, id: Int, part: Int, target: String): PendingIntent {
         val i = Intent(ctx, MainActivity::class.java).apply {
-            action = "gr.ygeiaforma.WIDGET_OPEN"
-            data = Uri.parse("ygeia-widget://open/$id/$part")
+            // Χωρίς data URI: η Flutter παίρνει κάθε data URI ως σελίδα (deep link) και, χωρίς τέτοια σελίδα, βγάζει
+            // σφάλμα (Sentry YGEIA-FORMA-3). Κάθε πάτημα ξεχωρίζει από τον requestCode του PendingIntent.
+            action = "gr.ygeiaforma.WIDGET_OPEN.$id.$part"
             putExtra(EXTRA_OPEN, target)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
