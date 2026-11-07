@@ -218,9 +218,11 @@ class WidgetStyle {
   static WidgetStyle fromJson(Map<String, dynamic> j) {
     final kind = WKind.all.contains(j['kind']) ? j['kind'] as String : WKind.sleep;
     final keys = {for (final m in wMetrics[kind]!) m.key};
-    int i(String k, int d, [int lo = -0x7fffffff, int hi = 0x7fffffff]) {
+    int i(String k, int d, [int? lo, int? hi]) {
       final v = j[k];
-      return v is num ? v.toInt().clamp(lo, hi) : d;
+      if (v is! num) return d;
+      final x = v.toInt();
+      return lo == null || hi == null ? x : x.clamp(lo, hi);
     }
 
     bool b(String k, bool d) => j[k] is bool ? j[k] as bool : d;

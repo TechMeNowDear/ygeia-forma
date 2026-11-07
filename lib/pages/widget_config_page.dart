@@ -72,7 +72,10 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
       final w = t.width!, h = t.height!;
       _size = w < 120 ? 0 : (h >= w * 1.45 ? 1 : (w >= h * 1.7 ? 3 : 2));
     }
-    _render();
+    // Μετά το πρώτο καρέ: η προεπισκόπηση χρειάζεται το θέμα του κινητού (MediaQuery).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _render();
+    });
   }
 
   WSize get _sz => wSizes[_size];
