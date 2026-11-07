@@ -972,4 +972,25 @@ void main() {
     expect(scopeOfBody('{"access_token":"A"}'), isNull);
     expect(scopeOfBody('όχι json'), isNull);
   });
+
+  test('Audit 7/11 B1: παράλογες τιμές του Oura (0 ή εκτός ορίων) δεν μπαίνουν στο ιστορικό', () {
+    final day = DateTime(2026, 11, 6);
+    final m = OuraSleep.fromJson({
+      'id': 'x',
+      'day': '2026-11-06',
+      'type': 'long_sleep',
+      'bedtime_start': '2026-11-05T23:30:00+02:00',
+      'bedtime_end': '2026-11-06T07:00:00+02:00',
+      'total_sleep_duration': 25200,
+      'average_heart_rate': 0,
+      'lowest_heart_rate': 52,
+      'average_hrv': 0,
+      'average_breath': 14.2,
+    })!;
+    final row = ouraRow(OuraNight(day: day, main: m, naps: const [], others: const [], pieces: [m]));
+    expect(row[ouraKeys[K.sleepHr]!], isNull);
+    expect(row[ouraKeys[K.hrv]!], isNull);
+    expect(row[ouraKeys[K.lowHr]!], 52);
+    expect(row[ouraKeys[K.breath]!], 14.2);
+  });
 }

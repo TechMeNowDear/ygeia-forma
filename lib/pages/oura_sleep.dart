@@ -329,15 +329,6 @@ class _OuraHeartCard extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 8),
-          Text(
-            // Κλινικός έλεγχος H5 (4/11): χωρίς «ανεβαίνει όσο ξεκουράζεσαι» και «με ακρίβεια».
-            'HRV (RMSSD): πόσο αλλάζει το διάστημα από χτύπο σε χτύπο. Χαμηλώνει με την ηλικία, το αλκοόλ, την ασθένεια '
-            'και την κούραση, και αλλάζει με φάρμακα. Κάθε σημείο είναι ο μέσος όρος μιας νύχτας, που είναι πιο αξιόπιστος '
-            'από μεμονωμένες μετρήσεις. Έχει νόημα μόνο σε σύγκριση με τις δικές σου νύχτες. Ακανόνιστος ρυθμός ή έκτακτες '
-            'συστολές μπορεί να ανεβάσουν ψεύτικα την τιμή.',
-            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
-          ),
         ],
       ),
     );
@@ -405,7 +396,7 @@ class _BreathCard extends StatelessWidget {
             icon: Icons.air_rounded,
             title: 'Αναπνοή και οξυγόνο τη νύχτα',
             color: c.sleep,
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: const [InfoButton(K.breath), InfoButton(K.ringSpo2)]),
+            trailing: const InfoButton(K.ringSpo2),
           ),
           const SizedBox(height: 6),
           InkWell(

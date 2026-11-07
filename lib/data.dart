@@ -420,6 +420,7 @@ class Dashboard {
     bool okTime(dynamic ms) => ms is num && ms >= _oldestMs;
     List<dynamic> list(String key) => j[key] is List ? j[key] as List<dynamic> : const [];
     double? d(dynamic v) => v is num ? v.toDouble() : null;
+    double? within(double? v, double lo, double hi) => v != null && v.isFinite && v >= lo && v <= hi ? v : null;
 
     // Τιμή έξω από τα λογικά όρια = σφάλμα αισθητήρα: η εγγραφή αγνοείται· ελάχιστο/μέγιστο έξω από τα όρια
     // παίρνουν τη μέση τιμή της εγγραφής (π.χ. «ελάχιστο 0%» δεν είναι μέτρηση).
@@ -469,15 +470,16 @@ class Dashboard {
     final allBody = <BodyMeasurement>[
       for (final e in list('body'))
         if (e is Map<String, dynamic> && okTime(e['time']))
+          // Audit 7/11 (B2): τιμή έξω από τα λογικά όρια (0, μισή ζύγιση) = δεν μετρήθηκε, όχι «0 kg».
           BodyMeasurement(
             time: t(e['time']),
-            weight: d(e['weight']),
-            fatPct: d(e['fatPct']),
-            fatKg: d(e['fatKg']),
-            smm: d(e['smm']),
-            ffm: d(e['ffm']),
-            bmi: d(e['bmi']),
-            water: d(e['water']),
+            weight: within(d(e['weight']), 20, 350),
+            fatPct: within(d(e['fatPct']), 2, 75),
+            fatKg: within(d(e['fatKg']), 1, 250),
+            smm: within(d(e['smm']), 5, 100),
+            ffm: within(d(e['ffm']), 10, 200),
+            bmi: within(d(e['bmi']), 8, 80),
+            water: within(d(e['water']), 5, 120),
             bmr: (e['bmr'] as num?)?.toInt(),
             app: e['app'] is String ? e['app'] as String : '',
           ),

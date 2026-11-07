@@ -458,6 +458,9 @@ Map<String, OuraDaily> mergeDailies(List<Map<String, dynamic>> dailySleep, List<
 }
 
 /// Οι τιμές μιας μέρας του Oura για το ιστορικό, με τα κλειδιά του Oura («o.*», δες sources.dart).
+/// [v] αν είναι μέσα στα λογικά όρια [lo, hi], αλλιώς null (σφάλμα ή «δεν μετρήθηκε»).
+num? _within(num? v, num lo, num hi) => v != null && v.isFinite && v >= lo && v <= hi ? v : null;
+
 Map<String, double> ouraRow(OuraNight n) {
   final out = <String, double>{};
   void put(String metric, num? v) {
@@ -487,18 +490,19 @@ Map<String, double> ouraRow(OuraNight n) {
     // E7: ξύπνιος μέσα στον ύπνο, χωρίς τον χρόνο ως τον ύπνο (ίδιος ορισμός με το ρολόι).
     final awake = sum((x) => x.awakeInSleep);
     put(K.awakeMin, awake == null ? null : awake / 60);
-    put(K.sleepHr, m.avgHr);
-    put(K.lowHr, m.lowestHr);
-    put(K.hrv, m.avgHrv);
-    put(K.breath, m.avgBreath);
+    // Audit 7/11 (B1): μόνο λογικές τιμές, όπως στο ρολόι (hrRange)· 0 ή άκυρο = δεν μετρήθηκε, όχι «0 bpm».
+    put(K.sleepHr, _within(m.avgHr, 25, 250));
+    put(K.lowHr, _within(m.lowestHr, 25, 250));
+    put(K.hrv, _within(m.avgHrv, 1, 400));
+    put(K.breath, _within(m.avgBreath, 4, 40));
   }
   final napped = [for (final x in n.naps) if (x.total != null) x.total!];
   if (napped.isNotEmpty) put(K.napMin, napped.fold<int>(0, (a, b) => a + b) / 60);
   if (m != null && n.napLock != null) put(K.napLock, n.napLock!.millisecondsSinceEpoch ~/ 60000);
   // Βαθμολογία ύπνου μόνο για μέρα με κύρια νύχτα (όχι για μέρα με μόνο υπνάκο: η κάρτα λέει «Μόνο υπνάκος»).
-  if (m != null) put(K.sleepScore, n.sleepScore);
-  put(K.energy, n.readiness);
-  put(K.skinTemp, n.tempDeviation);
+  if (m != null) put(K.sleepScore, _within(n.sleepScore, 0, 100));
+  put(K.energy, _within(n.readiness, 0, 100));
+  put(K.skinTemp, _within(n.tempDeviation, -5, 5));
   // Οξυγόνο: μόνο για μέρα με κύρια νύχτα (όπως η βαθμολογία ύπνου).
   if (m != null) put(K.ringSpo2, n.spo2Avg);
   return out;

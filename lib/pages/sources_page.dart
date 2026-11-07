@@ -83,7 +83,7 @@ class SourcesPage extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'Μία συσκευή για κάθε μέτρηση, ποτέ ανάμειξη, ούτε όταν λείπει.'
-                  '${plan.hasOura ? ' Ο ύπνος του ρολογιού φαίνεται μόνο στη Σύγκριση πηγών.' : ''}',
+                  '${plan.hasOura ? ' Ο ύπνος του ρολογιού δεν διαβάζεται.' : ''}',
                   style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                 ),
                 const SizedBox(height: 8),
