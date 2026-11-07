@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'info_sheet.dart';
 import 'me_page.dart';
+import 'metric_page.dart';
 
 class BodyPage extends StatelessWidget {
   const BodyPage({super.key, required this.store});
@@ -54,6 +55,7 @@ class BodyPage extends StatelessWidget {
           if (body.where((b) => b.weight != null).length >= 2)
             _chartCard(
               context,
+              K.weight,
               'Βάρος (kg)',
               [for (final b in body) if (b.weight != null) (b.time, b.weight!)],
               c.body,
@@ -61,6 +63,7 @@ class BodyPage extends StatelessWidget {
           if (body.where((b) => b.fatPct != null).length >= 2)
             _chartCard(
               context,
+              K.fatPct,
               'Λίπος (%)',
               [for (final b in body) if (b.fatPct != null) (b.time, b.fatPct!)],
               c.heart,
@@ -71,6 +74,7 @@ class BodyPage extends StatelessWidget {
           if (body.where((b) => b.smm != null).length >= 2)
             _chartCard(
               context,
+              K.smm,
               'Σκελετικοί μύες (kg)',
               [for (final b in body) if (b.smm != null) (b.time, b.smm!)],
               c.energy,
@@ -140,12 +144,19 @@ class BodyPage extends StatelessWidget {
     );
   }
 
-  Widget _chartCard(BuildContext context, String title, List<(DateTime, double)> points, Color color) {
+  Widget _chartCard(BuildContext context, String metric, String title, List<(DateTime, double)> points, Color color) {
     return AppCard(
+      key: ValueKey('body-$metric'),
+      onTap: () => Navigator.of(context).push(MetricPage.route(store, metric)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(icon: Icons.show_chart_rounded, title: title, color: color),
+          CardHeader(
+            icon: Icons.show_chart_rounded,
+            title: title,
+            color: color,
+            trailing: Icon(Icons.chevron_right_rounded, color: Aigaio.of(context).textTertiary),
+          ),
           const SizedBox(height: 12),
           LineChart(points: points, color: color, format: (v) => dec(v), dateLabel: dayMonth),
         ],

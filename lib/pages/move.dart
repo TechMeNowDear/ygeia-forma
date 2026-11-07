@@ -4,6 +4,10 @@ import '../data.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'info_sheet.dart';
+import 'metric_page.dart';
+import '../reference.dart';
+import '../history.dart';
 
 /// Άσκηση › Κίνηση: βήματα, ενεργός χρόνος, θερμίδες, απόσταση, όροφοι.
 /// Οι προπονήσεις (Hevy) θα μπουν εδώ ως δεύτερη καρτέλα, όταν φτιαχτούν.
@@ -48,7 +52,14 @@ class ExercisePage extends StatelessWidget {
         final last14 = d.steps.length <= 14 ? d.steps : d.steps.sublist(d.steps.length - 14);
         final floors14 = [for (var i = 13; i >= 0; i--) DateTime(d.readAt.year, d.readAt.month, d.readAt.day - i)];
 
+        final stepsRef = stepsRange(store.profile, today);
+        // Η τελευταία ΟΛΟΚΛΗΡΩΜΕΝΗ μέρα (όχι η σημερινή, που δεν έχει τελειώσει).
+        DayValue? fullDay;
+        for (final s in last14) {
+          if (dayOf(s.day).isBefore(dayOf(today))) fullDay = s;
+        }
         final stepsCard = AppCard(
+          onTap: () => Navigator.of(context).push(MetricPage.route(store, K.steps)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -57,6 +68,7 @@ class ExercisePage extends StatelessWidget {
                 icon: Icons.directions_walk_rounded,
                 title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα σήμερα' : 'Βήματα · ${shortDayDate(d.readAt)}',
                 color: c.exercise,
+                trailing: InfoButton(K.steps, range: stepsRef),
               ),
               const SizedBox(height: 12),
               Row(
@@ -73,6 +85,20 @@ class ExercisePage extends StatelessWidget {
                   ],
                 ],
               ),
+              // 7/11: εύρος με πηγή (Paluch 2022) για τη χθεσινή ολοκληρωμένη μέρα, όχι για τη μισή σημερινή.
+              if (stepsRef != null && fullDay != null) ...[
+                const SizedBox(height: 12),
+                RangeNote(
+                  value: fullDay.value,
+                  range: stepsRef,
+                  min: 0,
+                  max: 14000,
+                  color: c.exercise,
+                ),
+                const SizedBox(height: 2),
+                Text(shortDayDate(fullDay.day),
+                    style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+              ],
               const SizedBox(height: 16),
               BarChart(
                 values: [for (final s in last14) s.value],

@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../unusual.dart';
 import '../widgets.dart';
 import 'info_sheet.dart';
+import 'metric_page.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
@@ -148,6 +149,7 @@ class HeartPage extends StatelessWidget {
           onRefresh: () => store.refresh(),
           left: [
             AppCard(
+              onTap: () => Navigator.of(context).push(MetricPage.route(store, K.sleepHr, now: now)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -297,6 +299,7 @@ class _AwakeHeartCard extends StatelessWidget {
     }
     return AppCard(
       key: const ValueKey('heart-awake'),
+      onTap: () => Navigator.of(context).push(MetricPage.route(store, K.dayHr, now: day)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

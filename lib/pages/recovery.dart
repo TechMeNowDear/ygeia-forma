@@ -9,6 +9,7 @@ import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'info_sheet.dart';
+import 'metric_page.dart';
 import 'source_widgets.dart';
 
 /// Υγεία › Ανάκαμψη (7/11): πόσο ξεκουράστηκες. Ετοιμότητα, HRV, θερμοκρασία της νύχτας — όλα από το Oura, όλα
@@ -67,6 +68,7 @@ class RecoveryPage extends StatelessWidget {
           }
           return AppCard(
             key: ValueKey('recovery-$metric'),
+            onTap: () => Navigator.of(context).push(MetricPage.route(store, metric, now: now)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

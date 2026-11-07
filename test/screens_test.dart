@@ -494,6 +494,32 @@ void main() {
   testWidgets('Σώμα · κινητό', (t) => _shot(t, name: '09_body_phone_light', size: tall, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body));
   testWidgets('Σώμα · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '10_body_open_dark', size: open, brightness: Brightness.dark, tab: Cat.health, sub: HealthTab.body));
   testWidgets('Διατροφή · τα δικά μου', (t) => _shot(t, name: '22_mine_phone_light', size: phone, brightness: Brightness.light, tab: Cat.food, sub: FoodTab.mine));
+  testWidgets('Σελίδα μέτρησης · βάρος · κινητό', (t) => _shot(
+        t,
+        name: '40_metric_weight_phone',
+        size: phone,
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.body,
+        act: (t) async {
+          await t.ensureVisible(find.byKey(const ValueKey('body-weight')));
+          await t.tap(find.byKey(const ValueKey('body-weight')));
+          await t.pumpAndSettle();
+        },
+      ));
+  testWidgets('Σελίδα μέτρησης · HRV · Fold ανοιχτό · σκοτεινό', (t) => _shot(
+        t,
+        name: '41_metric_hrv_open_dark',
+        size: open,
+        brightness: Brightness.dark,
+        tab: Cat.health,
+        sub: HealthTab.recovery,
+        oura: true,
+        act: (t) async {
+          await t.tap(find.byKey(const ValueKey('recovery-hrv')));
+          await t.pumpAndSettle();
+        },
+      ));
   testWidgets('Άσκηση · κινητό', (t) => _shot(t, name: '23_exercise_phone_light', size: tall, brightness: Brightness.light, tab: Cat.exercise));
   testWidgets('Άσκηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '24_exercise_open_dark', size: open, brightness: Brightness.dark, tab: Cat.exercise));
 
