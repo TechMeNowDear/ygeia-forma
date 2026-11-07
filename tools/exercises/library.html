@@ -1,0 +1,177 @@
+<title>Κινούμενες ασκήσεις</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: λίστα ασκήσεων (αριστερά σε μεγάλη οθόνη, πάνω σε κινητό), η κίνηση με τα σημεία προσοχής, και από κάτω τα κείμενα. Χρώματα της ενότητας Άσκηση της εφαρμογής. */
+:root{
+  --bg:#F4F6FA; --card:#FFFFFF; --fg:#0F172A; --muted:#5B6576; --line:#E6EAF1;
+  --accent:#C2410C; --accent-soft:#FFF6F1; --good:#3F7D20; --bad:#B42318;
+  --fig:#1E293B; --far:#94A3B8; --stage:#EEF2F7; --floor:#D6DCE6; --m1:#DC2626; --m2:#FDBA74; --labelbg:rgba(255,255,255,.85);
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B1220;--card:#121A2B;--fg:#E8EDF5;--muted:#9AA6B8;--line:#1F2A3E;--accent:#F08A4B;--accent-soft:#2A1A12;--good:#7CC25A;--bad:#F97066;--fig:#CBD5E1;--far:#5B6B82;--stage:#0F182A;--floor:#223049;--labelbg:rgba(15,24,42,.85);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0B1220;--card:#121A2B;--fg:#E8EDF5;--muted:#9AA6B8;--line:#1F2A3E;--accent:#F08A4B;--accent-soft:#2A1A12;--good:#7CC25A;--bad:#F97066;--fig:#CBD5E1;--far:#5B6B82;--stage:#0F182A;--floor:#223049;--labelbg:rgba(15,24,42,.85);color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-block:18px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.lead{color:var(--muted);margin:2px 0 0;max-width:70ch}
+.layout{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:900px){.layout{grid-template-columns:260px minmax(0,1fr)}}
+.side{display:grid;gap:10px;align-content:start;min-width:0}
+.search{width:100%;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:0 14px;font:500 15px var(--sans)}
+.search:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.list{display:grid;gap:4px;max-height:none}
+@media (max-width:899px){.list{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px;scrollbar-width:thin}}
+.grp{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:8px 4px 2px}
+@media (max-width:899px){.grp{display:none}}
+.item{border:1px solid transparent;background:none;color:var(--fg);text-align:left;padding:8px 10px;border-radius:12px;font:600 14.5px var(--sans);cursor:pointer;white-space:nowrap}
+@media (min-width:900px){.item{white-space:normal}}
+@media (max-width:899px){.item{border-color:var(--line);background:var(--card);border-radius:999px}}
+.item[aria-current="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.item:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.main{display:grid;gap:14px;min-width:0}
+.top{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:1100px){.top{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;min-width:0}
+.stage{border-radius:16px;overflow:hidden;touch-action:pan-y}
+canvas{display:block;width:100%;height:auto;cursor:grab}
+.ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:8px 14px;font:600 14px var(--sans);cursor:pointer;min-height:40px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.phase{margin-left:auto;font-weight:700;color:var(--accent);font-size:15px}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--muted);margin-top:10px;align-items:center;flex-wrap:wrap}
+.sw{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:6px}
+h2{font-size:17px;margin:0 0 8px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:14px;margin:2px 0 0}
+.caution{background:var(--accent-soft);border:1px solid var(--accent);border-radius:14px;padding:10px 12px;font-size:14px;margin-top:10px}
+.cues{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.cues li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:14px;border:1px solid var(--line);transition:background .2s,border-color .2s}
+.cues li.on{background:var(--accent-soft);border-color:var(--accent)}
+.cues b{color:var(--accent);min-width:18px}
+.cols{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:700px){.cols{grid-template-columns:1fr 1fr}}
+ol,ul.l{margin:0;padding-left:22px;display:grid;gap:6px}
+ul.l{list-style:none;padding-left:0}
+ul.l li{display:grid;grid-template-columns:20px 1fr;gap:6px}
+.x{color:var(--bad);font-weight:800}.v{color:var(--good);font-weight:800}
+.mrow{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;margin-top:6px}
+.mrow small{display:block;color:var(--muted);font-size:13px}
+.feel{font-size:14px;background:var(--accent-soft);border-radius:12px;padding:10px 12px;margin:12px 0 0}
+.note{font-size:13px;color:var(--muted);max-width:90ch}
+@media (prefers-reduced-motion:reduce){.cues li{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Κινούμενες ασκήσεις</h1>
+    <p class="lead">Οι 29 ασκήσεις της βιβλιοθήκης, με τον εξοπλισμό του μπαλκονιού σου και αναλογίες για 177 cm. Σύρε πάνω στην εικόνα για να γυρίσεις τη φιγούρα. Το ίδιο θα δεις στην εφαρμογή, στην καρτέλα Άσκηση › Ασκήσεις.</p>
+  </header>
+  <div class="layout">
+    <nav class="side" aria-label="Ασκήσεις">
+      <input class="search" id="q" type="search" placeholder="Αναζήτηση: στήθος, αλτήρες…" aria-label="Αναζήτηση άσκησης">
+      <div class="list" id="list"></div>
+    </nav>
+    <main class="main">
+      <div class="top">
+        <section class="card" aria-label="Η κίνηση">
+          <div class="stage"><canvas id="cv" width="900" height="740" role="img" aria-label="Κινούμενη εικόνα της άσκησης"></canvas></div>
+          <div class="ctrl">
+            <button class="chip" id="play" aria-pressed="true">Παύση</button>
+            <button class="chip" id="slow" aria-pressed="false">Αργά</button>
+            <button class="chip" id="view" aria-pressed="false">Άλλη όψη</button>
+            <button class="chip" id="mus" aria-pressed="true">Μύες</button>
+            <button class="chip" id="guides" aria-pressed="true">Οδηγοί</button>
+            <span class="phase" id="phase" aria-live="polite"></span>
+          </div>
+          <div class="legend"><span><i class="sw" style="background:var(--m1)"></i>κύριοι μύες</span><span><i class="sw" style="background:var(--m2)"></i>βοηθητικοί</span></div>
+        </section>
+        <section class="card" aria-label="Σημεία προσοχής">
+          <h2 id="title"></h2>
+          <p class="sub" id="equip"></p>
+          <div id="caution"></div>
+          <h2 style="margin-top:14px">Πρόσεξε τώρα</h2>
+          <ul class="cues" id="cues"></ul>
+          <div id="muscles" style="margin-top:14px"></div>
+        </section>
+      </div>
+      <div class="cols">
+        <section class="card"><h2>Στήσιμο</h2><ol id="setup"></ol></section>
+        <section class="card"><h2>Πώς γίνεται</h2><ol id="steps"></ol></section>
+        <section class="card"><h2>Συχνά λάθη</h2><ul class="l" id="mistakes"></ul></section>
+        <section class="card"><h2>Συμβουλές</h2><ul class="l" id="tips"></ul></section>
+      </div>
+      <p class="note">Ο εξοπλισμός στις εικόνες είναι σχηματικός. Τεχνική: NSCA, Essentials of Strength Training and Conditioning, 4η έκδ. Οι μελέτες που αναφέρονται στις συμβουλές είναι γραμμένες στη σελίδα κάθε άσκησης στην εφαρμογή.</p>
+    </main>
+  </div>
+</div>
+<script>/*DATA*/</script>
+<script>/*RENDER*/</script>
+<script>
+(function(){
+  const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const colors=()=>({labelbg:css('--labelbg'),fig:css('--fig'),far:css('--far'),m1:css('--m1'),m2:css('--m2'),stage:css('--stage'),floor:css('--floor'),acc:css('--accent'),good:css('--good')});
+  const G={chest:'Στήθος',arms:'Χέρια',abs:'Κοιλιακοί',back:'Πλάτη',shoulders:'Ώμοι',legs:'Πόδια'};
+  const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const plain=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ς/g,'σ');
+  const listEl=document.getElementById('list'), cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+  let ex=DATA.ex[0], yaw=ex.yaw, second=false, playing=true, slow=false, mus=true, guides=true, t=0, last=null, phaseI=-1;
+  function hay(e){return plain([e.name,e.en,e.equip,G[e.group],...e.primary.map(m=>m[1]),...e.secondary.map(m=>m[1])].join(' '));}
+  function renderList(){
+    const q=plain(document.getElementById('q').value.trim());
+    let h='';
+    for(const g of Object.keys(G)){
+      const items=DATA.ex.filter(e=>e.group===g&&(!q||hay(e).includes(q)));
+      if(!items.length)continue;
+      h+='<div class="grp">'+G[g]+'</div>'+items.map(e=>'<button class="item" data-id="'+e.id+'" aria-current="'+(e===ex)+'">'+esc(e.name)+'</button>').join('');
+    }
+    listEl.innerHTML=h||'<p class="sub">Καμία άσκηση. Δοκίμασε άλλη λέξη.</p>';
+  }
+  function setEx(e){
+    ex=e; yaw=e.yaw; second=false; t=e.tempo[0][2]*0.6; phaseI=-1; e._fit=null;
+    document.getElementById('title').textContent=e.name;
+    document.getElementById('equip').textContent=G[e.group]+' · '+e.equip;
+    document.getElementById('caution').innerHTML=e.caution?'<div class="caution">'+esc(e.caution)+'</div>':'';
+    document.getElementById('cues').innerHTML=e.cues.map((c,i)=>'<li data-i="'+i+'"><b>'+(i+1)+'</b><span>'+esc(c[0])+'</span></li>').join('');
+    const row=(m,v)=>'<div class="mrow"><i class="sw" style="background:var('+v+');margin-top:3px"></i><span>'+esc(m[1])+(m[2]?'<small>'+esc(m[2])+'</small>':'')+'</span></div>';
+    document.getElementById('muscles').innerHTML='<h2>Τι γυμνάζει</h2>'+e.primary.map(m=>row(m,'--m1')).join('')+e.secondary.map(m=>row(m,'--m2')).join('')+'<p class="feel"><strong>Πού το νιώθεις:</strong> '+esc(e.feel)+'</p>';
+    document.getElementById('setup').innerHTML=e.setup.map(s=>'<li>'+esc(s)+'</li>').join('');
+    document.getElementById('steps').innerHTML=e.steps.map(s=>'<li>'+esc(s)+'</li>').join('');
+    document.getElementById('mistakes').innerHTML=e.mistakes.map(s=>'<li><span class="x">✕</span><span>'+esc(s)+'</span></li>').join('');
+    document.getElementById('tips').innerHTML=e.tips.map(s=>'<li><span class="v">✓</span><span>'+esc(s)+'</span></li>').join('');
+    document.getElementById('guides').hidden=!e.anim.guides.length;
+    renderList();
+    try{localStorage.setItem('ex',e.id)}catch(_){}
+  }
+  listEl.addEventListener('click',ev=>{const b=ev.target.closest('.item');if(b)setEx(DATA.ex.find(e=>e.id===b.dataset.id));});
+  document.getElementById('q').addEventListener('input',renderList);
+  const tog=(id,fn)=>{const b=document.getElementById(id);b.addEventListener('click',()=>{const v=fn();if(v!==undefined)b.setAttribute('aria-pressed',v);});return b;};
+  const playB=tog('play',()=>{playing=!playing;last=null;playB.textContent=playing?'Παύση':'Συνέχεια';return playing;});
+  tog('slow',()=>slow=!slow);
+  tog('view',()=>{second=!second;yaw=second?(ex.yaw2??0):ex.yaw;return second;});
+  tog('mus',()=>mus=!mus);
+  tog('guides',()=>guides=!guides);
+  let drag=null;
+  cv.addEventListener('pointerdown',e=>{drag=e.clientX;cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener('pointermove',e=>{if(drag===null)return;yaw-=(e.clientX-drag)*0.5;drag=e.clientX;});
+  cv.addEventListener('pointerup',()=>drag=null);
+  cv.addEventListener('dblclick',()=>{yaw=second?(ex.yaw2??0):ex.yaw;});
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){slow=true;document.getElementById('slow').setAttribute('aria-pressed','true');}
+  function frame(now){
+    const dt=last===null?0:Math.min(0.1,(now-last)/1000); last=now;
+    if(playing)t+=dt*(slow?0.4:1);
+    const ph=ExRender.phase(ex.tempo,t);
+    const def=!second&&Math.abs(yaw-ex.yaw)<12;
+    ExRender.draw(ctx,cv.width,cv.height,DATA,ex,ph.p,{yaw,elev:second?(ex.elev2??8):(ex.elev??8),colors:colors(),muscles:mus,guides:guides&&def});
+    if(ph.i!==phaseI){phaseI=ph.i;document.getElementById('phase').textContent=ex.tempo[ph.i][3];
+      document.querySelectorAll('#cues li').forEach(li=>li.classList.toggle('on',ex.cues[+li.dataset.i][1].includes(ph.i)));}
+    requestAnimationFrame(frame);
+  }
+  let start=DATA.ex[0];
+  try{const id=localStorage.getItem('ex');start=DATA.ex.find(e=>e.id===id)||start;}catch(_){}
+  setEx(start);
+  requestAnimationFrame(frame);
+})();
+</script>

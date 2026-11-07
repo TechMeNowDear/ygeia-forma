@@ -134,12 +134,12 @@
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]);
     if (g.l) {
       const at = pr(P[g.c]);
-      ctx.font = '600 ' + Math.round(Math.max(12, 0.036 * s)) + 'px Inter, system-ui, sans-serif';
+      ctx.font = '600 ' + Math.round(Math.max(13, ctx.canvas.width * 0.026)) + 'px Inter, system-ui, sans-serif';
       ctx.fillStyle = col(g.col); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       const tw = ctx.measureText(g.l).width;
-      const fs = Math.round(Math.max(12, 0.036 * s));
+      const fs = Math.round(Math.max(13, ctx.canvas.width * 0.026));
       let x = Math.min(Math.max(6, at[0] - tw / 2), ctx.canvas.width - tw - 6), y = Math.max(fs + 6, at[1]);
-      ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.fillRect(x - 4, y - fs - 3, tw + 8, fs + 6);
+      ctx.fillStyle = col('labelbg') === 'labelbg' ? 'rgba(255,255,255,.82)' : col('labelbg'); ctx.fillRect(x - 4, y - fs - 3, tw + 8, fs + 6);
       ctx.fillStyle = col(g.col);
       ctx.fillText(g.l, x, y);
     }

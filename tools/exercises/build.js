@@ -78,7 +78,10 @@ fs.writeFileSync(dest, JSON.stringify(out));
 const outDir = path.join(__dirname, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 const html = fs.readFileSync(path.join(__dirname, 'preview.html'), 'utf8')
-  .replace('/*RENDER*/', fs.readFileSync(path.join(__dirname, 'render.js'), 'utf8'))
-  .replace('/*DATA*/', 'window.DATA=' + JSON.stringify(out) + ';');
+  .replace('/*RENDER*/', () => fs.readFileSync(path.join(__dirname, 'render.js'), 'utf8'))
+  .replace('/*DATA*/', () => 'window.DATA=' + JSON.stringify(out) + ';');
 fs.writeFileSync(path.join(outDir, 'preview.html'), html);
+fs.writeFileSync(path.join(outDir, 'library.html'), fs.readFileSync(path.join(__dirname, 'library.html'), 'utf8')
+  .replace('/*RENDER*/', () => fs.readFileSync(path.join(__dirname, 'render.js'), 'utf8'))
+  .replace('/*DATA*/', () => 'window.DATA=' + JSON.stringify(out) + ';'));
 console.log('ασκήσεις:', out.ex.length, 'μέγεθος:', (fs.statSync(dest).size / 1024).toFixed(0) + ' KB');
