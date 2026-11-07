@@ -286,10 +286,7 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
           child: ReorderableListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
             itemCount: w.items.length,
-            onReorder: (a, b) => setState(() {
-              if (b > a) b--;
-              w.items.insert(b, w.items.removeAt(a));
-            }),
+            onReorderItem: (a, b) => setState(() => w.items.insert(b, w.items.removeAt(a))),
             itemBuilder: (context, i) {
               final it = w.items[i];
               return Padding(

@@ -92,7 +92,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(10)),
                   child: Column(children: [
-                    Text(weekdayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
+                    Text(dayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
                     Text(
                       () {
                         final w = p.workout(p.days[d]);

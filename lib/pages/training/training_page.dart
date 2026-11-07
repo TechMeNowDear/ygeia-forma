@@ -269,7 +269,7 @@ class _TrainingPageState extends State<TrainingPage> {
                   border: isToday ? Border.all(color: c.exercise, width: 1.5) : null,
                 ),
                 child: Column(children: [
-                  Text(weekdayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
+                  Text(dayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
                   const SizedBox(height: 2),
                   Text(
                     w == null ? '—' : (w.isCardio ? 'Περ.' : w.id) + (done ? ' ✓' : ''),
