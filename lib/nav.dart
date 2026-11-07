@@ -22,3 +22,11 @@ class FoodTab {
   static const diary = 0;
   static const mine = 1;
 }
+
+/// Καρτέλες μέσα στην Άσκηση.
+class ExerciseTab {
+  static const move = 0;
+
+  /// 8/11: η βιβλιοθήκη με τις κινούμενες ασκήσεις.
+  static const library = 1;
+}

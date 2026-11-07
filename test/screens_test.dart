@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ygeia_forma/exercise/ex_data.dart';
+import 'package:ygeia_forma/exercise/ex_player.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/format.dart' show sameDay;
 import 'package:ygeia_forma/main.dart';
@@ -544,6 +546,25 @@ void main() {
   }
   testWidgets('Άσκηση · κινητό', (t) => _shot(t, name: '23_exercise_phone_light', size: tall, brightness: Brightness.light, tab: Cat.exercise));
   testWidgets('Άσκηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '24_exercise_open_dark', size: open, brightness: Brightness.dark, tab: Cat.exercise));
+
+  // 8/11: βιβλιοθήκη ασκήσεων με κινούμενες εικόνες (σταματημένες στο στιγμιότυπο).
+  Future<void> exShot(WidgetTester t, String name, Size size, Brightness b, {String? detail}) async {
+    ExClock.frozen = true;
+    await t.runAsync(() => ExLibrary.load(inline: true));
+    await _shot(t, name: name, size: size, brightness: b, tab: Cat.exercise, sub: ExerciseTab.library,
+        act: detail == null
+            ? null
+            : (t) async {
+                await t.tap(find.byKey(ValueKey('ex-row-$detail')));
+                await t.pumpAndSettle();
+              });
+  }
+
+  testWidgets('Ασκήσεις · κινητό', (t) => exShot(t, '44_ex_library_phone', tall, Brightness.light));
+  testWidgets('Ασκήσεις · Fold ανοιχτό · σκοτεινό', (t) => exShot(t, '45_ex_library_open_dark', open, Brightness.dark));
+  testWidgets('Άσκηση · πιεστικό · κινητό', (t) => exShot(t, '46_ex_detail_phone', tall, Brightness.light, detail: 'db_press'));
+  testWidgets('Άσκηση · ρόδα · σκοτεινό', (t) => exShot(t, '47_ex_detail_phone_dark', tall, Brightness.dark, detail: 'ab_wheel'));
+  testWidgets('Άσκηση · κάμψεις · Fold ανοιχτό', (t) => exShot(t, '48_ex_detail_open', open, Brightness.light, detail: 'db_curl'));
 
   // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».
   for (final (n, p) in [(30, Aigaio.elia), (32, Aigaio.avgi), (34, Aigaio.stivos), (36, Aigaio.anasa)]) {

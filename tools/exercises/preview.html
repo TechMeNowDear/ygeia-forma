@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ασκήσεις · προεπισκόπηση</title>
+<style>
+body{margin:0;background:#F4F6FA;font:14px Inter,system-ui,sans-serif;color:#0F172A}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:10px}
+.c{background:#fff;border:1px solid #E6EAF1;border-radius:14px;padding:8px}
+.c h3{margin:0 0 4px;font-size:14px}
+.row{display:flex;gap:4px}
+canvas{width:100%;height:auto;border-radius:10px;display:block}
+</style></head><body>
+<div class="g" id="g"></div>
+<script>/*DATA*/</script>
+<script>/*RENDER*/</script>
+<script>
+const C={fig:'#1E293B',far:'#94A3B8',m1:'#DC2626',m2:'#FDBA74',stage:'#EEF2F7',floor:'#D6DCE6',acc:'#C2410C',good:'#3F7D20'};
+const q=new URLSearchParams(location.search);
+const snap=q.get('snap'), only=q.get('ex');
+const g=document.getElementById('g');
+const list=DATA.ex.filter(e=>!only||only.split(',').includes(e.id));
+if(snap){
+  // στατικό πλέγμα: κάθε άσκηση σε p = 0, 0.5, 1, πλάι και μπροστά
+  g.style.gridTemplateColumns='repeat(1,1fr)';
+  for(const e of list){
+    const d=document.createElement('div'); d.className='c';
+    d.innerHTML='<h3>'+e.id+' · '+e.name+'</h3><div class="row"></div>';
+    const row=d.querySelector('.row');
+    const v1=[e.yaw,e.elev??8],v2=[e.yaw2??0,e.elev2??8];
+    const views=snap==='both'?[[v1,0],[v1,.5],[v1,1],[v2,0],[v2,1]]:[[v1,0],[v1,.5],[v1,1]];
+    for(const [[yaw,elev],p] of views){
+      const cv=document.createElement('canvas'); cv.width=360; cv.height=300; row.appendChild(cv);
+      ExRender.draw(cv.getContext('2d'),cv.width,cv.height,DATA,e,p,{yaw,elev,colors:C,muscles:true,guides:yaw===e.yaw});
+    }
+    g.appendChild(d);
+  }
+  document.title='ready';
+}else{
+  const cs=[];
+  for(const e of list){
+    const d=document.createElement('div'); d.className='c';
+    d.innerHTML='<h3>'+e.name+'</h3>';
+    const cv=document.createElement('canvas'); cv.width=600; cv.height=480; d.appendChild(cv);
+    let yaw=e.yaw;
+    cv.addEventListener('pointermove',ev=>{if(ev.buttons){yaw+=ev.movementX*0.6;e._fit=null;}});
+    g.appendChild(d); cs.push([cv,e,()=>yaw]);
+  }
+  const t0=performance.now();
+  (function loop(now){
+    const t=(now-t0)/1000;
+    for(const [cv,e,y] of cs){const ph=ExRender.phase(e.tempo,t);ExRender.draw(cv.getContext('2d'),cv.width,cv.height,DATA,e,ph.p,{yaw:y(),elev:e.elev??8,colors:C,muscles:true,guides:Math.abs(y()-e.yaw)<15});}
+    requestAnimationFrame(loop);
+  })(t0);
+}
+</script></body></html>

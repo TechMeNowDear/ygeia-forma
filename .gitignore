@@ -35,3 +35,4 @@ android/key.properties
 
 # Στιγμιότυπα (ανεβαίνουν στο branch screenshots)
 test/shots/
+tools/exercises/out/

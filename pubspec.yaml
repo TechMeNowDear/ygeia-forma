@@ -20,6 +20,7 @@ flutter:
 
   assets:
     - assets/foods/basic_foods.json
+    - assets/exercises/exercises.json
 
   fonts:
     - family: Inter

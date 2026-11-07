@@ -5,6 +5,7 @@ import 'error_report.dart';
 import 'food/food_store.dart';
 import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
+import 'pages/exercise_library.dart';
 import 'pages/body.dart';
 import 'pages/category.dart';
 import 'pages/food_add.dart';
@@ -130,13 +131,13 @@ class _ShellState extends State<Shell> {
   late final FoodStore _food = widget.food ?? FoodStore.preloaded(foods: const []);
   late final _healthTab = ValueNotifier(widget.initialIndex == Cat.health ? widget.initialTab : 0);
   late final _foodTab = ValueNotifier(widget.initialIndex == Cat.food ? widget.initialTab : 0);
-  final _exerciseTab = ValueNotifier(0);
+  late final _exerciseTab = ValueNotifier(widget.initialIndex == Cat.exercise ? widget.initialTab : 0);
 
   // Για την αναφορά σφαλμάτων: σε ποια κατηγορία και καρτέλα είμαι.
   static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
   static const _healthTabs = ['Ύπνος', 'Ανάκαμψη', 'Καρδιά', 'Σώμα', 'Τάσεις'];
   static const _foodTabs = ['Ημερολόγιο', 'Τα δικά μου'];
-  static const _exerciseTabs = ['Κίνηση'];
+  static const _exerciseTabs = ['Κίνηση', 'Ασκήσεις'];
 
   /// Πάτημα σε widget της αρχικής οθόνης: «w:<είδος>:<πάτημα>:<κεντρική τιμή>» (HomeWidgets.kt).
   void _fromWidget() {
@@ -260,8 +261,8 @@ class _ShellState extends State<Shell> {
         solid: c.exerciseSolid,
         tab: _exerciseTab,
         now: widget.now,
-        tabs: const ['Κίνηση'],
-        pages: [ExercisePage(store: store)],
+        tabs: _exerciseTabs,
+        pages: [ExercisePage(store: store), const ExerciseLibraryPage()],
       ),
     ];
 
