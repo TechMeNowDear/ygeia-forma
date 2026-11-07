@@ -45,6 +45,36 @@ CALLBACK = (
     "            </intent-filter>\n"
     "        </activity>"
 )
+# Widgets αρχικής οθόνης (7/11): τέσσερις παροχείς και η οθόνη ρύθμισης (Flutter, διαδρομή «/widget»).
+WIDGETS = "\n        <!-- Widgets αρχικής οθόνης (7/11). Η ρύθμιση ανοίγει όταν μπαίνει widget και με παρατεταμένο πάτημα. -->\n" + (
+    "        <activity\n"
+    '            android:name=".WidgetConfigActivity"\n'
+    '            android:exported="true"\n'
+    '            android:taskAffinity=""\n'
+    '            android:excludeFromRecents="true"\n'
+    '            android:theme="@style/LaunchTheme"\n'
+    '            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"\n'
+    '            android:hardwareAccelerated="true"\n'
+    '            android:windowSoftInputMode="adjustResize">\n'
+    '            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>\n'
+    "            <intent-filter>\n"
+    '                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>\n'
+    "            </intent-filter>\n"
+    "        </activity>"
+) + "".join(
+    "\n        <receiver\n"
+    f'            android:name=".{cls}"\n'
+    '            android:exported="false"\n'
+    f'            android:label="{label}">\n'
+    "            <intent-filter>\n"
+    '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
+    "            </intent-filter>\n"
+    f'            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_{res}"/>\n'
+    "        </receiver>"
+    for cls, label, res in (("SleepWidget", "Ύπνος", "sleep"), ("MoveWidget", "Κίνηση", "move"),
+                            ("FoodWidget", "Φαγητό", "food"), ("BodyWidget", "Σώμα", "body"))
+)
+
 BROWSER = (
     "\n        <!-- Σύνδεση Oura: άνοιγμα της σελίδας σύνδεσης στον browser. -->\n"
     "        <intent>\n"
@@ -63,6 +93,9 @@ if ".OuraCallbackActivity" not in s:
         sys.exit("Δεν βρέθηκε το τέλος του application")
     s = s.replace("</application>", CALLBACK.lstrip("\n") + "\n    </application>", 1)
 
+if ".WidgetConfigActivity" not in s:
+    s = s.replace("</application>", WIDGETS.lstrip("\n") + "\n    </application>", 1)
+
 if "<!-- Σύνδεση Oura: άνοιγμα" not in s:
     if "<queries>" in s:
         s = s.replace("<queries>", "<queries>" + BROWSER, 1)
@@ -73,8 +106,15 @@ if "<!-- Σύνδεση Oura: άνοιγμα" not in s:
 xml_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xml")
 xml_dst = os.path.join(os.path.dirname(os.path.abspath(path)), "res", "xml")
 os.makedirs(xml_dst, exist_ok=True)
-for name in ("data_extraction_rules.xml", "backup_rules.xml"):
+for name in ("data_extraction_rules.xml", "backup_rules.xml", "widget_sleep.xml", "widget_move.xml", "widget_food.xml",
+             "widget_body.xml"):
     shutil.copyfile(os.path.join(xml_src, name), os.path.join(xml_dst, name))
+# Διατάξεις των widgets (ημέρας και νύχτας).
+for folder in ("layout", "layout-night"):
+    dst = os.path.join(os.path.dirname(os.path.abspath(path)), "res", folder)
+    os.makedirs(dst, exist_ok=True)
+    shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), folder, "home_widget.xml"),
+                    os.path.join(dst, "home_widget.xml"))
 
 BACKUP = ('android:allowBackup="true"', 'android:fullBackupContent="@xml/backup_rules"',
           'android:dataExtractionRules="@xml/data_extraction_rules"')
@@ -97,7 +137,9 @@ if after_main != before_main:
     sys.exit("Η MainActivity άλλαξε· δεν έπρεπε")
 for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiaforma"', 'android:host="oura-callback"',
                'android:host="ygeia-forma.netlify.app"', 'android:path="/oura/callback"', 'android:autoVerify="true"',
-               "<!-- Σύνδεση Oura: άνοιγμα") + BACKUP:
+               "<!-- Σύνδεση Oura: άνοιγμα", 'android:name=".WidgetConfigActivity"', 'android:name=".SleepWidget"',
+               'android:name=".MoveWidget"', 'android:name=".FoodWidget"', 'android:name=".BodyWidget"',
+               "android.appwidget.action.APPWIDGET_CONFIGURE") + BACKUP:
     if needle not in s:
         sys.exit("Λείπει μετά την αλλαγή: " + needle)
 if s.count('android:scheme="ygeiaforma"') != 1:

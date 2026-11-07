@@ -59,7 +59,15 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val text = withContext(Dispatchers.Default) { o.toString() }
             withContext(Dispatchers.IO) {
                 // Η εφαρμογή έγραψε στο μεταξύ νεότερα δεδομένα: δεν τα πατάμε.
-                if (!(cache.exists() && cache.lastModified() > started)) writeAtomically(SamsungHealthBridge.DASHBOARD_FILE, text)
+                if (!(cache.exists() && cache.lastModified() > started)) {
+                    writeAtomically(SamsungHealthBridge.DASHBOARD_FILE, text)
+                    // Widgets (7/11): η Κίνηση της μέρας από τη νέα ανάγνωση· αν αποτύχει, δεν πειράζει τίποτα άλλο.
+                    try {
+                        HomeWidgets.refreshMoveFromDashboard(applicationContext, o)
+                    } catch (e: Throwable) {
+                        ErrorQueue.report(e, "widget")
+                    }
+                }
                 failFile().delete()
             }
             Result.success()

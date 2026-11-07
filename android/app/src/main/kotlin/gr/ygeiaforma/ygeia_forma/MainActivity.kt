@@ -1,5 +1,6 @@
 package gr.ygeiaforma.ygeia_forma
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -33,8 +34,42 @@ class MainActivity : FlutterFragmentActivity() {
         documentPicker.launch(arrayOf("application/json", "application/gzip", "application/x-gzip", "text/plain", "application/octet-stream"))
     }
 
+    // Widgets (7/11): κανάλι για το στιγμιότυπο και για τα πατήματα σε widget.
+    private var widgets: MethodChannel? = null
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val target = intent.getStringExtra(HomeWidgets.EXTRA_OPEN) ?: return
+        val ch = widgets
+        if (ch != null) ch.invokeMethod("open", target) else HomeWidgets.pendingOpen = target
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        intent?.getStringExtra(HomeWidgets.EXTRA_OPEN)?.let { HomeWidgets.pendingOpen = it }
+        widgets = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/widgets").also { ch ->
+            ch.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "count" -> result.success(try { HomeWidgets.count(this) } catch (_: Throwable) { 0 })
+                    "update" -> {
+                        val text = call.arguments as? String
+                        try {
+                            if (text != null) HomeWidgets.saveSnapshot(this, text)
+                            result.success(true)
+                        } catch (e: Throwable) {
+                            ErrorQueue.report(e, "widget")
+                            result.success(false)
+                        }
+                    }
+                    "takeOpen" -> {
+                        val o = HomeWidgets.pendingOpen
+                        HomeWidgets.pendingOpen = null
+                        result.success(o)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
         // Σφάλματα για το Sentry: μόνο γράφει σε αρχείο όταν κάτι χαλάσει· τα στέλνει η Flutter.
         ErrorQueue.install(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/errors")
@@ -57,6 +92,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        widgets = null
         if (OuraBridge.live === oura) OuraBridge.live = null
         oura = null
         scope.cancel()

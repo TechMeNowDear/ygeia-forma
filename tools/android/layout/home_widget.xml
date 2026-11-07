@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget αρχικής οθόνης (7/11): η εικόνα τη ζωγραφίζει ο WidgetRenderer. Δύο εικόνες, ημέρας και νύχτας· αυτή η
+     διάταξη (ημέρα) δείχνει την πρώτη, η layout-night τη δεύτερη. Το «+» του Φαγητού: περιοχή πατήματος πάνω δεξιά. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/widget_image_day"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:visibility="visible" />
+    <ImageView
+        android:id="@+id/widget_image_night"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:visibility="gone" />
+    <ImageView
+        android:id="@+id/widget_plus"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="top|end"
+        android:contentDescription="Προσθήκη φαγητού"
+        android:visibility="gone" />
+</FrameLayout>

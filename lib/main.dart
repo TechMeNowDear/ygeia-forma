@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'data.dart';
 import 'error_report.dart';
 import 'food/food_store.dart';
+import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
 import 'pages/body.dart';
 import 'pages/category.dart';
 import 'pages/food_add.dart';
 import 'pages/heart.dart';
+import 'pages/metric_page.dart';
 import 'pages/mine.dart';
 import 'pages/move.dart';
 import 'pages/nutrition.dart';
@@ -16,14 +18,20 @@ import 'pages/settings.dart';
 import 'pages/sleep.dart';
 import 'pages/today.dart';
 import 'pages/trends.dart';
+import 'pages/widget_config_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
 export 'nav.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
   installErrorReporting();
+  // Η οθόνη ρύθμισης widget (WidgetConfigActivity): μόνη της, χωρίς φόρτωση δεδομένων.
+  if (binding.platformDispatcher.defaultRouteName.startsWith('/widget')) {
+    runApp(const WidgetConfigApp());
+    return;
+  }
   final store = HealthStore();
   final food = FoodStore();
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
@@ -31,6 +39,7 @@ Future<void> main() async {
   runApp(YgeiaFormaApp(store: store, food: food));
   store.start();
   food.start();
+  WidgetPublisher(store, food).start();
 }
 
 class YgeiaFormaApp extends StatefulWidget {
@@ -129,6 +138,38 @@ class _ShellState extends State<Shell> {
   static const _foodTabs = ['Ημερολόγιο', 'Τα δικά μου'];
   static const _exerciseTabs = ['Κίνηση'];
 
+  /// Πάτημα σε widget της αρχικής οθόνης: «w:<είδος>:<πάτημα>:<κεντρική τιμή>» (HomeWidgets.kt).
+  void _fromWidget() {
+    final req = widgetOpenRequest.value;
+    if (req == null) return;
+    widgetOpenRequest.value = null;
+    final p = req.split(':');
+    if (p.length < 3 || p[0] != 'w') return;
+    final kind = p[1], tap = p[2], hero = p.length > 3 ? p[3] : '';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      void section() => switch (kind) {
+            'sleep' => _open(Cat.health, HealthTab.sleep),
+            'body' => _open(Cat.health, HealthTab.body),
+            'food' => _open(Cat.food, FoodTab.diary),
+            _ => _open(Cat.exercise),
+          };
+      switch (tap) {
+        case 'today':
+          _open(Cat.today);
+        case 'add':
+          _open(Cat.food, FoodTab.diary);
+          openAddFood(context, _food);
+        case 'metric' when metricSpecs.containsKey(hero):
+          section();
+          Navigator.of(context).push(MetricPage.route(widget.store, hero));
+        default:
+          section();
+      }
+    });
+  }
+
   void _track() {
     final (tabs, t) = switch (_index) {
       Cat.health => (_healthTabs, _healthTab.value),
@@ -146,10 +187,13 @@ class _ShellState extends State<Shell> {
     _healthTab.addListener(_track);
     _foodTab.addListener(_track);
     _exerciseTab.addListener(_track);
+    widgetOpenRequest.addListener(_fromWidget);
+    _fromWidget();
   }
 
   @override
   void dispose() {
+    widgetOpenRequest.removeListener(_fromWidget);
     _healthTab.dispose();
     _foodTab.dispose();
     _exerciseTab.dispose();

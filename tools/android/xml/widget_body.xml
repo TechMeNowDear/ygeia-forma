@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget «body» (7/11): αλλάζει μέγεθος ελεύθερα, από στήλη μίας θέσης ως 4×4. Χωρίς περιοδική ανανέωση (μπαταρία). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="80dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="60dp"
+    android:minResizeHeight="80dp"
+    android:maxResizeWidth="720dp"
+    android:maxResizeHeight="720dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/home_widget"
+    android:configure="gr.ygeiaforma.ygeia_forma.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen" />

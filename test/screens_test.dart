@@ -24,6 +24,8 @@ import 'package:ygeia_forma/unusual.dart';
 import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/pages/compare_page.dart';
+import 'package:ygeia_forma/pages/widget_config_page.dart';
+import 'package:ygeia_forma/home_widgets/widget_bridge.dart';
 import 'package:ygeia_forma/pages/oura_pages.dart';
 import 'package:ygeia_forma/pages/sources_page.dart';
 import 'package:ygeia_forma/sources.dart';
@@ -521,6 +523,24 @@ void main() {
           await t.pumpAndSettle();
         },
       ));
+  for (final (name, tab) in [('42_widget_config_content', 0), ('43_widget_config_look', 1)]) {
+    testWidgets('Ρύθμιση widget · $name', (t) async {
+      t.view.devicePixelRatio = 2.0;
+      t.view.physicalSize = phone * 2.0;
+      addTearDown(t.view.reset);
+      final key = GlobalKey();
+      await t.pumpWidget(RepaintBoundary(
+        key: key,
+        child: const WidgetConfigApp(initial: WidgetTarget(id: 5, kind: 'sleep', width: 92, height: 300)),
+      ));
+      await t.pumpAndSettle();
+      if (tab == 1) {
+        await t.tap(find.text('Εμφάνιση'));
+        await t.pumpAndSettle();
+      }
+      await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
+    });
+  }
   testWidgets('Άσκηση · κινητό', (t) => _shot(t, name: '23_exercise_phone_light', size: tall, brightness: Brightness.light, tab: Cat.exercise));
   testWidgets('Άσκηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '24_exercise_open_dark', size: open, brightness: Brightness.dark, tab: Cat.exercise));
 
