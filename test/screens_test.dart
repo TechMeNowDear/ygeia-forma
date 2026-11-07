@@ -514,6 +514,7 @@ void main() {
         brightness: Brightness.dark,
         tab: Cat.health,
         sub: HealthTab.recovery,
+        at: ouraNow,
         oura: true,
         act: (t) async {
           await t.tap(find.byKey(const ValueKey('recovery-hrv')));
