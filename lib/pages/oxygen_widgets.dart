@@ -60,6 +60,19 @@ class OuraOxygenAccessCard extends StatefulWidget {
 class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
   bool _busy = false;
 
+  /// Τι έγινε στην τελευταία προσπάθεια (μόνο αφού πατήθηκε το κουμπί): λάθος της Oura, ή σύνδεση χωρίς οξυγόνο.
+  static String? _result(HealthStore s) {
+    if (!s.ouraOxygenAsked || s.ouraConnecting) return null;
+    if (s.ouraLoginError case final e?) return ouraLoginErrorText(e, code: s.ouraLoginCode);
+    // Μόνο αν η νέα σύνδεση ολοκληρώθηκε ΜΕΤΑ το πάτημα (όχι όσο ο χρήστης είναι ακόμα στη σελίδα της Oura).
+    final asked = s.ouraOxygenAskedMs, done = s.ouraConnectedMs;
+    if (s.ouraSpo2 != false || asked == null || done == null || done < asked) return null;
+    final given = s.ouraLastScope == null ? '' : ' (έδωσε: ${s.ouraLastScope})';
+    return 'Η Oura συνδέθηκε ξανά, αλλά χωρίς την άδεια για το οξυγόνο$given. Συνήθως συμβαίνει επειδή θυμάται την '
+        'παλιά έγκριση και δεν δείχνει τη σελίδα με τις επιλογές. Λύση: στην εφαρμογή Oura, ☰ › Ρυθμίσεις › '
+        'App integrations, αφαίρεσε την πρόσβαση της «Ygeia Forma» και ξαναπάτα εδώ.';
+  }
+
   Future<void> _go() async {
     setState(() => _busy = true);
     final e = await widget.store.addOuraOxygen();
@@ -94,6 +107,15 @@ class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
             'Ο ύπνος και τα υπόλοιπα συνεχίζουν κανονικά.',
             style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4),
           ),
+          if (_result(widget.store) case final r?) ...[
+            const SizedBox(height: 10),
+            Container(
+              key: const ValueKey('oura-oxygen-result'),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: c.tint(c.move), borderRadius: BorderRadius.circular(14)),
+              child: Text(r, style: TextStyle(fontSize: 13.5, color: c.text, height: 1.4)),
+            ),
+          ],
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,

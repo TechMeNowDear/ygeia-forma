@@ -281,6 +281,13 @@ mixin OuraStore on ChangeNotifier {
 
   /// Αν η τωρινή σύνδεση δίνει τον μέσο όρο οξυγόνου (άδεια spo2Daily, 7/11). null = δεν ξέρουμε ακόμα.
   bool? ouraSpo2;
+
+  /// Πατήθηκε «Σύνδεση για το οξυγόνο» σε αυτή τη χρήση της εφαρμογής: η κάρτα δείχνει μετά τι έγινε.
+  bool ouraOxygenAsked = false;
+  int? ouraOxygenAskedMs;
+
+  /// Οι άδειες που έδωσε η Oura στην τελευταία σύνδεση (null = δεν τις είπε).
+  String? ouraLastScope;
   bool ouraSyncing = false;
   bool ouraConnecting = false;
 
@@ -450,7 +457,15 @@ mixin OuraStore on ChangeNotifier {
   Future<OuraErrorKind?> addOuraOxygen() async {
     final now = dayOf(ouraClock());
     if (plan.nightSource(now) != Source.oura) return OuraErrorKind.cancelled;
-    return beginOuraLogin(from: now);
+    final e = await beginOuraLogin(from: now);
+    if (e == null) {
+      ouraOxygenAsked = true;
+      ouraOxygenAskedMs = ouraClock().millisecondsSinceEpoch;
+      ouraLoginError = null;
+      ouraLoginCode = null;
+      notifyListeners();
+    }
+    return e;
   }
 
   /// Το αποτέλεσμα της τελευταίας σύνδεσης, για να το δείξει η οθόνη (μία φορά), και ο κωδικός OAuth του.
@@ -561,6 +576,7 @@ mixin OuraStore on ChangeNotifier {
       ouraConnectedMs = now.millisecondsSinceEpoch;
       ouraJustConnected = true;
       ouraSpo2 = ex.tokens.spo2;
+      ouraLastScope = ex.scope;
       await savePrefsNow();
       await ouraLink.clearConnecting();
       // Αν η πρώτη νύχτα είναι η σημερινή, διαβάζεται αμέσως (μπορεί να έχει ήδη έρθει).

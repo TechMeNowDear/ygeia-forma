@@ -948,4 +948,11 @@ void main() {
       expect(w.ranges.length, 7);
     });
   });
+
+  test('scopeOfBody: οι άδειες της απάντησης, χωρίς tokens', () {
+    expect(scopeOfBody('{"access_token":"A","scope":"daily"}'), 'daily');
+    expect(scopeOfBody('{"access_token":"A","scope":" daily spo2Daily "}'), 'daily spo2Daily');
+    expect(scopeOfBody('{"access_token":"A"}'), isNull);
+    expect(scopeOfBody('όχι json'), isNull);
+  });
 }

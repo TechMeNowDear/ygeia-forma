@@ -275,6 +275,17 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
 /// Κείμενο για το αποτέλεσμα μιας ΣΥΝΔΕΣΗΣ (έλεγχος 4/11, A13): ο κωδικός μιας σύνδεσης είναι μιας χρήσης, άρα τίποτα
 /// δεν ξαναδοκιμάζεται μόνο του· κάθε κείμενο λέει τι έγινε και ότι το σχέδιο πηγών δεν άλλαξε. [code]: ο κωδικός
 /// OAuth (π.χ. «invalid_client»), σε μικρά γράμματα στο τέλος, για να ξέρουμε τι να διορθώσουμε.
+/// Οι άδειες που λέει η απάντηση της Oura («scope»), για να φαίνεται τι δόθηκε. Ποτέ tokens.
+String? scopeOfBody(String body) {
+  try {
+    final j = jsonDecode(body);
+    final s = j is Map ? j['scope'] : null;
+    return s is String && s.trim().isNotEmpty ? s.trim() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 String ouraLoginErrorText(OuraErrorKind k, {String? code}) {
   final text = switch (k) {
     OuraErrorKind.network => 'Δεν υπήρχε σύνδεση με την Oura. Δεν άλλαξε τίποτα· πάτα ξανά «Σύνδεση με Oura».',
@@ -508,7 +519,7 @@ class OuraLink {
 
   /// Η επιστροφή από την Oura: έλεγχος state και ανταλλαγή του κωδικού. Τα tokens ΔΕΝ αποθηκεύονται εδώ
   /// ([adopt]). null = δεν είναι δική μας επιστροφή (αγνοείται).
-  Future<({OuraTokens tokens, DateTime? from, int gen})?> exchange(String uri) async {
+  Future<({OuraTokens tokens, DateTime? from, int gen, String? scope})?> exchange(String uri) async {
     final cb = parseCallback(uri);
     if (cb == null) return null;
     final gen = _gen;
@@ -545,7 +556,7 @@ class OuraLink {
           status: res.status, retryAfter: res.retryAfter, code: oauthCodeOfBody(res.body));
     }
     final t = OuraTokens.parseResponse(res.body, _clock(), spo2: ouraRequestsSpo2(endpoints));
-    return (tokens: t, from: pending.from, gen: gen);
+    return (tokens: t, from: pending.from, gen: gen, scope: scopeOfBody(res.body));
   }
 
   /// Αν υπάρχει εκκρεμής σύνδεση (για το μήνυμα «η σύνδεση έληξε» σε επιστροφή που άργησε). Αν η αποθήκευση δεν
