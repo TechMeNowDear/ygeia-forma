@@ -26,6 +26,7 @@ import 'package:ygeia_forma/oura/oura_model.dart';
 import 'package:ygeia_forma/pages/compare_page.dart';
 import 'package:ygeia_forma/pages/widget_config_page.dart';
 import 'package:ygeia_forma/home_widgets/widget_bridge.dart';
+import 'package:ygeia_forma/home_widgets/widget_style.dart';
 import 'package:ygeia_forma/pages/oura_pages.dart';
 import 'package:ygeia_forma/pages/sources_page.dart';
 import 'package:ygeia_forma/sources.dart';
@@ -531,7 +532,7 @@ void main() {
       final key = GlobalKey();
       await t.pumpWidget(RepaintBoundary(
         key: key,
-        child: const WidgetConfigApp(initial: WidgetTarget(id: 5, kind: 'sleep', width: 92, height: 300)),
+        child: const WidgetConfigApp(bridge: _NoRender(), initial: WidgetTarget(id: 5, kind: 'sleep', width: 92, height: 300)),
       ));
       await t.pumpAndSettle();
       if (tab == 1) {
@@ -1016,4 +1017,12 @@ void main() {
         oura: true,
         prepare: (s) => s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown),
       ));
+}
+
+/// Η προεπισκόπηση τη ζωγραφίζει η Kotlin· στα τεστ Flutter δεν υπάρχει (τη δείχνει ο έλεγχος στο emulator).
+class _NoRender extends WidgetConfigBridge {
+  const _NoRender();
+
+  @override
+  Future<Uint8List?> render(WidgetStyle style, double w, double h, {required bool dark}) async => null;
 }
