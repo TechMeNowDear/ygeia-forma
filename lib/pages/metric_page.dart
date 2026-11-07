@@ -25,6 +25,7 @@ class MetricSpec {
     this.dayComplete = false,
     this.range,
     this.scale,
+    this.periods = const [7, 30, 90],
   });
 
   final String metric;
@@ -46,6 +47,9 @@ class MetricSpec {
   /// Τα άκρα της μπάρας εύρους.
   final (double, double) Function(RefRange r)? scale;
 
+  /// Οι περίοδοι του γραφήματος σε μέρες· η μεσαία ανοίγει πρώτη. Ζύγιση μία φορά την εβδομάδα → 30/90/365.
+  final List<int> periods;
+
   String show(double v) {
     if (signed) return signedDec(v, digits);
     if (thousandsSep) return thousands(v.round());
@@ -58,6 +62,8 @@ RefRange? _weightRange(Profile p, DateTime _) {
   if (w == null) return null;
   return RefRange(low: w.$1, high: w.$2, text: 'υγιές βάρος για το ύψος σου ${dec(w.$1)}–${dec(w.$2)} kg', cite: bmiRange.cite);
 }
+
+const _bodyPeriods = [30, 90, 365];
 
 final metricSpecs = <String, MetricSpec>{
   K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart),
@@ -82,6 +88,7 @@ final metricSpecs = <String, MetricSpec>{
     digits: 1,
     range: _weightRange,
     scale: (r) => (r.low! - 15, r.high! + 25),
+    periods: _bodyPeriods,
   ),
   K.fatPct: MetricSpec(
     metric: K.fatPct,
@@ -91,8 +98,9 @@ final metricSpecs = <String, MetricSpec>{
     digits: 1,
     range: fatRange,
     scale: (_) => (5, 40),
+    periods: _bodyPeriods,
   ),
-  K.smm: MetricSpec(metric: K.smm, title: 'Σκελετικοί μύες', unit: 'kg', color: (c) => c.body, digits: 1),
+  K.smm: MetricSpec(metric: K.smm, title: 'Σκελετικοί μύες', unit: 'kg', color: (c) => c.body, digits: 1, periods: _bodyPeriods),
   K.steps: MetricSpec(
     metric: K.steps,
     title: 'Βήματα',
@@ -123,7 +131,12 @@ class MetricPage extends StatefulWidget {
 }
 
 class _MetricPageState extends State<MetricPage> {
-  int _days = 30;
+  late int _days = widget.spec.periods[1];
+
+  String _label(int d, bool first) {
+    if (d == 365) return '1 χρόνος';
+    return first ? '$d μέρες' : '$d';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,10 +203,12 @@ class _MetricPageState extends State<MetricPage> {
               SegmentedButton<int>(
                 key: const ValueKey('metric-period'),
                 showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 7, label: Text('7 μέρες', style: TextStyle(fontFamily: 'Inter'))),
-                  ButtonSegment(value: 30, label: Text('30', style: TextStyle(fontFamily: 'Inter'))),
-                  ButtonSegment(value: 90, label: Text('90', style: TextStyle(fontFamily: 'Inter'))),
+                segments: [
+                  for (final d in s.periods)
+                    ButtonSegment(
+                      value: d,
+                      label: Text(_label(d, d == s.periods.first), style: const TextStyle(fontFamily: 'Inter')),
+                    ),
                 ],
                 selected: {_days},
                 onSelectionChanged: (v) => setState(() => _days = v.first),
@@ -243,7 +258,8 @@ class _MetricPageState extends State<MetricPage> {
               if (!wide) {
                 return ListView(padding: pad, children: [head, const SizedBox(height: 12), chart, const SizedBox(height: 12), recent]);
               }
-              return Center(
+              return Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1100),
                   child: SingleChildScrollView(
