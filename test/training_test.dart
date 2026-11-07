@@ -64,7 +64,8 @@ void main() {
     test('στήσιμο και αλλαγή δίσκων σε απλά λόγια', () {
       expect(setupText(LoadKind.bar, 20), 'μπάρα 10 + ανά πλευρά 5');
       expect(setupText(LoadKind.bar, 21), 'μπάρα 10 + ανά πλευρά 5 + 0,5');
-      expect(setupText(LoadKind.dbPair, 14.3), 'κάθε αλτήρας: λαβή + ανά άκρη 5 + 1,25');
+      expect(setupText(LoadKind.dbPair, 14.3), 'λαβή + ανά άκρη 5 + 1,25, και στους δύο αλτήρες');
+      expect(setupText(LoadKind.db, 14.3), 'λαβή + ανά άκρη 5 + 1,25');
       expect(plateChange(LoadKind.dbPair, 11.8, LoadKind.db, 14.3), 'βάλε 1,25 σε κάθε άκρη');
       expect(plateChange(LoadKind.dbPair, 14.3, LoadKind.dbPair, 11.8), 'βγάλε 1,25 σε κάθε άκρη');
       expect(plateChange(LoadKind.dbPair, 9.3, LoadKind.dbPair, 9.3), 'ίδιοι δίσκοι');

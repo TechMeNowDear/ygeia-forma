@@ -151,7 +151,7 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.program == null ? 'Νέο πρόγραμμα' : 'Αλλαγές προγράμματος'),
+        title: Text(widget.program == null ? 'Νέο πρόγραμμα' : 'Αλλαγές'),
         actions: [TextButton(key: const ValueKey('ed-save'), onPressed: _save, child: const Text('Αποθήκευση')), const SizedBox(width: 6)],
       ),
       body: SafeArea(

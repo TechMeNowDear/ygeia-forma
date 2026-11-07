@@ -133,14 +133,13 @@ class _SessionPageState extends State<SessionPage> {
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       SizedBox(
                         width: 320,
-                        child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 8, 24), children: [
-                          _list(context, s, vertical: true),
-                          if (rest != null) ...[const SizedBox(height: 12), rest],
-                        ]),
+                        child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 8, 24), children: [_list(context, s, vertical: true)]),
                       ),
                       Expanded(
                         child: Column(children: [
                           Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(8, 8, 20, 16), children: [card])),
+                          // Το διάλειμμα πάνω από τα κουμπιά, όπως στο κινητό: εκεί που κοιτάς μετά το ✓.
+                          if (rest != null) Padding(padding: const EdgeInsets.fromLTRB(8, 0, 20, 10), child: rest),
                           Padding(padding: const EdgeInsets.fromLTRB(8, 0, 20, 16), child: actions),
                         ]),
                       ),
@@ -528,30 +527,34 @@ class _SessionPageState extends State<SessionPage> {
   Widget _actions(BuildContext context, Session s, ExLog e) {
     final c = Aigaio.of(context);
     final last = _idx >= s.items.length - 1;
+    // Μικρό εσωτερικό περιθώριο: στο στενό κινητό οι λέξεις χωράνε σε μία γραμμή.
+    const pad = EdgeInsets.symmetric(horizontal: 6);
     return Row(children: [
       Expanded(
+        flex: 5,
         child: OutlinedButton(
           key: const ValueKey('sess-swap'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50), padding: pad),
           onPressed: () => _swap(context, e),
-          child: const Text('Αλλαγή'),
+          child: const Text('Αλλαγή', maxLines: 1, softWrap: false),
         ),
       ),
       const SizedBox(width: 8),
       Expanded(
+        flex: 5,
         child: OutlinedButton(
           key: const ValueKey('sess-skip'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50), padding: pad),
           onPressed: e.done.isNotEmpty ? null : () => t.skip(e, !e.skipped),
-          child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη'),
+          child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false),
         ),
       ),
       const SizedBox(width: 8),
       Expanded(
-        flex: 2,
+        flex: 8,
         child: FilledButton(
           key: const ValueKey('sess-next'),
-          style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50)),
+          style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50), padding: pad),
           onPressed: last ? () => _finish(context) : () => setState(() => _idx++),
           child: Text(last ? 'Τέλος προπόνησης' : 'Επόμενη άσκηση', style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
@@ -655,7 +658,8 @@ class _SummaryPageState extends State<SummaryPage> {
     final t = widget.training;
     final s = widget.session;
     final c = Aigaio.of(context);
-    final mins = s.duration.inMinutes;
+    // Με το ρολόι της αποθήκης (όχι της συσκευής), για να ταιριάζει με την αρχή της προπόνησης.
+    final mins = (s.end ?? t.now).difference(s.start).inMinutes;
     final prog = t.program?.workout(s.workout);
 
     PlanItem itemFor(ExLog e) {
@@ -688,9 +692,8 @@ class _SummaryPageState extends State<SummaryPage> {
       next.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: Text(exName(e.ex), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text))),
-            const SizedBox(width: 8),
+          Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
+            Text(exName(e.ex), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
             Text(
               tg.variant != null ? '→ ${exName(tg.variant!)}' : '${targetLine(item, tg)}$arrow',
               style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: col),
@@ -707,12 +710,14 @@ class _SummaryPageState extends State<SummaryPage> {
         for (final e in s.items)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: Text(exName(e.ex), style: TextStyle(fontSize: 15, color: e.skipped ? c.textSecondary : c.text))),
+            child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
+              Text(exName(e.ex), style: TextStyle(fontSize: 15, color: e.skipped || e.done.isEmpty ? c.textSecondary : c.text)),
               Text(
                 e.skipped
                     ? 'παραλείφθηκε'
-                    : '${hasLoad(e.kind) ? '${loadLabel(e.kind, e.workLoad)} · ' : ''}${e.done.map((x) => x.reps).join(', ')}',
+                    : e.done.isEmpty
+                        ? 'δεν έγινε'
+                        : '${hasLoad(e.kind) ? '${loadLabel(e.kind, e.workLoad)} · ' : ''}${e.done.map((x) => x.reps).join(', ')}',
                 style: TextStyle(fontSize: 14, color: c.textSecondary),
               ),
             ]),

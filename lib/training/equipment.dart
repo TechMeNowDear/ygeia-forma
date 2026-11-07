@@ -305,9 +305,9 @@ String setupText(LoadKind k, double? v) {
     case LoadKind.dbPair:
     case LoadKind.db:
       final p = platesPerSide(k, w);
-      final one = k == LoadKind.dbPair ? 'κάθε αλτήρας' : 'αλτήρας';
-      if (p == null) return '$one ${kgText(w)} kg';
-      return p.isEmpty ? '$one: μόνο η λαβή (1,8 kg)' : '$one: λαβή + ανά άκρη ${p.map(kgText).join(' + ')}';
+      final both = k == LoadKind.dbPair ? ', και στους δύο αλτήρες' : '';
+      if (p == null) return 'αλτήρας ${kgText(w)} kg$both';
+      return p.isEmpty ? 'μόνο η λαβή (1,8 kg)$both' : 'λαβή + ανά άκρη ${p.map(kgText).join(' + ')}$both';
     case LoadKind.horn:
       final p = platesPerSide(k, w);
       if (w <= 0) return 'κέρατο χωρίς δίσκους';

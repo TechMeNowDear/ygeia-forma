@@ -261,7 +261,10 @@ class _TrainingPageState extends State<TrainingPage> {
             Expanded(child: () {
               final day = DateTime(monday.year, monday.month, monday.day + d - 1);
               final w = p.workout(p.days[d]);
-              final done = week.any((s) => s.finished && sameDay(s.start, day));
+              final ds = [for (final s in week) if (s.finished && sameDay(s.start, day)) s];
+              final done = ds.isNotEmpty;
+              // Ό,τι έγινε πράγματι εκείνη τη μέρα (μπορεί να διαφέρει από το πρόγραμμα), με ✓.
+              final doneW = done ? p.workout(ds.last.workout) : null;
               final isToday = sameDay(day, today);
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -275,7 +278,9 @@ class _TrainingPageState extends State<TrainingPage> {
                   Text(dayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
                   const SizedBox(height: 2),
                   Text(
-                    w == null ? '—' : (w.isCardio ? 'Περ.' : w.id) + (done ? ' ✓' : ''),
+                    done
+                        ? (doneW == null || doneW.isCardio || doneW.id.length > 2 ? '✓' : '${doneW.id} ✓')
+                        : (w == null ? '—' : (w.isCardio ? 'Περ.' : w.id)),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12, color: done ? c.good : c.textSecondary, fontWeight: done ? FontWeight.w700 : FontWeight.w500),
