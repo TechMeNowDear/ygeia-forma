@@ -15,6 +15,7 @@ void main() {
     'file/sources.json',
     'file/sources_log.json',
     'file/oura_nights.json',
+    'file/training.json',
   };
 
   test('Κανόνες: ακριβώς τα αρχεία που δεν ξαναδιαβάζονται, ίδια στο Google και στη μεταφορά', () {

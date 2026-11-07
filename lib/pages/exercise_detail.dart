@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../exercise/ex_data.dart';
 import '../exercise/ex_player.dart';
+import '../format.dart';
+import '../training/equipment.dart';
+import '../training/session.dart';
+import '../training/training_store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -193,8 +197,9 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
       style: TextStyle(fontSize: 12.5, height: 1.45, color: c.textSecondary),
     );
 
+    final progress = _progress(context, ex);
     final leftCol = [if (caution != null) caution, player, cues];
-    final rightCol = [muscles, setup, steps, mistakes, tips, if (alt != null) alt, sources];
+    final rightCol = [if (progress != null) progress, muscles, setup, steps, mistakes, tips, if (alt != null) alt, sources];
 
     return Scaffold(
       appBar: AppBar(
@@ -250,6 +255,40 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
       ),
     );
   }
+}
+
+/// «Η πρόοδός σου»: από τις προπονήσεις που έγιναν (βάρος, ή επαναλήψεις στις ασκήσεις σώματος).
+Widget? _progress(BuildContext context, Ex ex) {
+  final t = TrainingStore.main;
+  if (!t.ready) return null;
+  final hist = t.historyOf(ex.id).reversed.toList();
+  if (hist.isEmpty) return null;
+  final c = Aigaio.of(context);
+  final k = loadKindOf(ex.id);
+  final byLoad = hasLoad(k);
+  double val((DateTime, ExLog) h) => byLoad ? (h.$2.workLoad ?? 0) : h.$2.done.fold<int>(0, (m, s) => s.reps > m ? s.reps : m).toDouble();
+  final pts = [for (final h in hist) (h.$1, val(h))];
+  final last = hist.last;
+  return AppCard(
+    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(child: Text('Η πρόοδός σου', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text))),
+        Text(byLoad ? 'βάρος' : 'καλύτερο σετ', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+      ]),
+      if (pts.length > 1) ...[
+        const SizedBox(height: 8),
+        LineChart(points: pts, height: 140, color: c.exercise, format: (v) => byLoad ? loadLabel(k, v) : '${v.round()}'),
+      ],
+      const SizedBox(height: 6),
+      for (final h in hist.reversed.take(5))
+        InfoRow(
+          shortDayDate(h.$1),
+          '${byLoad ? '${loadLabel(k, h.$2.workLoad)} · ' : ''}${h.$2.done.map((s) => s.reps).join(', ')}',
+        ),
+      if (last.$2.pain.isNotEmpty)
+        Text('Τελευταία φορά: ενόχληση', style: TextStyle(fontSize: 13, color: c.bad)),
+    ]),
+  );
 }
 
 class _Title extends StatelessWidget {

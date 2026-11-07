@@ -88,6 +88,11 @@ if not re.search(r'<activity\b[^>]*android:name="\.MainActivity"', s, re.S):
     sys.exit("Δεν βρέθηκε η MainActivity στο manifest")
 before_main = re.search(r'<activity\b[^>]*android:name="\.MainActivity"[^>]*>', s, re.S).group(0)
 
+# Προπόνηση (8/11): δόνηση στο τέλος του διαλείμματος και ειδοποίηση με αντίστροφη μέτρηση.
+for perm in ("android.permission.VIBRATE", "android.permission.POST_NOTIFICATIONS"):
+    if f'android:name="{perm}"' not in s:
+        s = s.replace("<application", f'<uses-permission android:name="{perm}"/>\n    <application', 1)
+
 if ".OuraCallbackActivity" not in s:
     if "</application>" not in s:
         sys.exit("Δεν βρέθηκε το τέλος του application")
@@ -139,7 +144,8 @@ for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiafor
                'android:host="ygeia-forma.netlify.app"', 'android:path="/oura/callback"', 'android:autoVerify="true"',
                "<!-- Σύνδεση Oura: άνοιγμα", 'android:name=".WidgetConfigActivity"', 'android:name=".SleepWidget"',
                'android:name=".MoveWidget"', 'android:name=".FoodWidget"', 'android:name=".BodyWidget"',
-               "android.appwidget.action.APPWIDGET_CONFIGURE") + BACKUP:
+               "android.appwidget.action.APPWIDGET_CONFIGURE", "android.permission.VIBRATE",
+               "android.permission.POST_NOTIFICATIONS") + BACKUP:
     if needle not in s:
         sys.exit("Λείπει μετά την αλλαγή: " + needle)
 if s.count('android:scheme="ygeiaforma"') != 1:

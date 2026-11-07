@@ -6,6 +6,8 @@ import 'food/food_store.dart';
 import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
 import 'pages/exercise_library.dart';
+import 'pages/training/training_page.dart';
+import 'training/training_store.dart';
 import 'pages/body.dart';
 import 'pages/category.dart';
 import 'pages/food_add.dart';
@@ -137,7 +139,7 @@ class _ShellState extends State<Shell> {
   static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
   static const _healthTabs = ['Ύπνος', 'Ανάκαμψη', 'Καρδιά', 'Σώμα', 'Τάσεις'];
   static const _foodTabs = ['Ημερολόγιο', 'Τα δικά μου'];
-  static const _exerciseTabs = ['Κίνηση', 'Ασκήσεις'];
+  static const _exerciseTabs = ['Προπόνηση', 'Κίνηση', 'Ασκήσεις'];
 
   /// Πάτημα σε widget της αρχικής οθόνης: «w:<είδος>:<πάτημα>:<κεντρική τιμή>» (HomeWidgets.kt).
   void _fromWidget() {
@@ -154,7 +156,7 @@ class _ShellState extends State<Shell> {
             'sleep' => _open(Cat.health, HealthTab.sleep),
             'body' => _open(Cat.health, HealthTab.body),
             'food' => _open(Cat.food, FoodTab.diary),
-            _ => _open(Cat.exercise),
+            _ => _open(Cat.exercise, ExerciseTab.move),
           };
       switch (tap) {
         case 'today':
@@ -211,6 +213,7 @@ class _ShellState extends State<Shell> {
     if (tab != null) {
       if (category == Cat.health) _healthTab.value = tab;
       if (category == Cat.food) _foodTab.value = tab;
+      if (category == Cat.exercise) _exerciseTab.value = tab;
     }
     _go(category);
   }
@@ -262,7 +265,7 @@ class _ShellState extends State<Shell> {
         tab: _exerciseTab,
         now: widget.now,
         tabs: _exerciseTabs,
-        pages: [ExercisePage(store: store), const ExerciseLibraryPage()],
+        pages: [TrainingPage(training: TrainingStore.main), ExercisePage(store: store), const ExerciseLibraryPage()],
       ),
     ];
 

@@ -25,8 +25,10 @@ class FoodTab {
 
 /// Καρτέλες μέσα στην Άσκηση.
 class ExerciseTab {
-  static const move = 0;
+  /// 8/11: η σημερινή προπόνηση, το πρόγραμμα, το ιστορικό.
+  static const train = 0;
+  static const move = 1;
 
   /// 8/11: η βιβλιοθήκη με τις κινούμενες ασκήσεις.
-  static const library = 1;
+  static const library = 2;
 }

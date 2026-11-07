@@ -78,6 +78,9 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")
             .setMethodCallHandler(FoodBridge(this, scope))
+        // Προπόνηση (8/11): αρχείο προπονήσεων, οθόνη αναμμένη, διάλειμμα με ειδοποίηση.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/training")
+            .setMethodCallHandler(TrainingBridge(this, scope))
         val ouraChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/oura")
         oura = OuraBridge(this, scope, ouraChannel).also {
             ouraChannel.setMethodCallHandler(it)

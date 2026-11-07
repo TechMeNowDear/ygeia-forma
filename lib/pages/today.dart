@@ -108,7 +108,7 @@ class TodayPage extends StatelessWidget {
             : null;
 
         final pair = <Widget>[
-          if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise)),
+          if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
           if (prefs.show('weight')) _weightCard(context, d, () => open(Cat.health, HealthTab.body)),
         ];
 
@@ -135,7 +135,7 @@ class TodayPage extends StatelessWidget {
         final extras = <Widget>[
           if (!ouraNight && prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
           if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
-          if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise)),
+          if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
           if (prefs.show('spo2')) oxCard(),
           if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];

@@ -8,4 +8,5 @@
     <include domain="file" path="sources.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="sources_log.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="oura_nights.json" requireFlags="clientSideEncryption" />
+    <include domain="file" path="training.json" requireFlags="clientSideEncryption" />
 </full-backup-content>

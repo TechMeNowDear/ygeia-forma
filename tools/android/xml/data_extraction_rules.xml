@@ -17,6 +17,7 @@
         <include domain="file" path="sources.json" />
         <include domain="file" path="sources_log.json" />
         <include domain="file" path="oura_nights.json" />
+        <include domain="file" path="training.json" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="ygeia.db" />
@@ -25,5 +26,6 @@
         <include domain="file" path="sources.json" />
         <include domain="file" path="sources_log.json" />
         <include domain="file" path="oura_nights.json" />
+        <include domain="file" path="training.json" />
     </device-transfer>
 </data-extraction-rules>

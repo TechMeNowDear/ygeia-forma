@@ -34,9 +34,11 @@ import 'package:ygeia_forma/pages/sources_page.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/plan_file.dart';
 import 'package:ygeia_forma/ti_ftanei.dart';
+import 'package:ygeia_forma/training/training_store.dart';
 
 import 'sample_data.dart';
 import 'sample_food.dart';
+import 'training_sample.dart';
 
 final now = DateTime(2026, 10, 24, 16, 30);
 
@@ -544,8 +546,8 @@ void main() {
       await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
     });
   }
-  testWidgets('Άσκηση · κινητό', (t) => _shot(t, name: '23_exercise_phone_light', size: tall, brightness: Brightness.light, tab: Cat.exercise));
-  testWidgets('Άσκηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '24_exercise_open_dark', size: open, brightness: Brightness.dark, tab: Cat.exercise));
+  testWidgets('Άσκηση · κινητό', (t) => _shot(t, name: '23_exercise_phone_light', size: tall, brightness: Brightness.light, tab: Cat.exercise, sub: ExerciseTab.move));
+  testWidgets('Άσκηση · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '24_exercise_open_dark', size: open, brightness: Brightness.dark, tab: Cat.exercise, sub: ExerciseTab.move));
 
   // 8/11: βιβλιοθήκη ασκήσεων με κινούμενες εικόνες (σταματημένες στο στιγμιότυπο).
   Future<void> exShot(WidgetTester t, String name, Size size, Brightness b, {String? detail}) async {
@@ -565,6 +567,59 @@ void main() {
   testWidgets('Άσκηση · πιεστικό · κινητό', (t) => exShot(t, '46_ex_detail_phone', tall, Brightness.light, detail: 'db_press'));
   testWidgets('Άσκηση · ρόδα · σκοτεινό', (t) => exShot(t, '47_ex_detail_phone_dark', tall, Brightness.dark, detail: 'ab_wheel'));
   testWidgets('Άσκηση · κάμψεις · Fold ανοιχτό', (t) => exShot(t, '48_ex_detail_open', open, Brightness.light, detail: 'db_curl'));
+
+  // 8/11: προπόνηση (Παρασκευή 13/11 = Προπόνηση Α, με δύο προηγούμενες φορές για την πρόοδο).
+  final trainAt = DateTime(2026, 11, 13, 17, 30);
+  Future<void> trainShot(WidgetTester t, String name, Size size, Brightness b,
+      {bool approved = true, Future<void> Function(WidgetTester)? act}) async {
+    ExClock.frozen = true;
+    await t.runAsync(() => ExLibrary.load(inline: true));
+    final prev = TrainingStore.main;
+    TrainingStore.main = sampleTraining(trainAt, approved: approved);
+    addTearDown(() => TrainingStore.main = prev);
+    await _shot(t, name: name, size: size, brightness: b, tab: Cat.exercise, sub: ExerciseTab.train, at: trainAt, act: act);
+  }
+
+  Future<void> tapKey(WidgetTester t, String key) async {
+    final f = find.byKey(ValueKey(key));
+    await t.ensureVisible(f);
+    await t.pumpAndSettle();
+    await t.tap(f);
+    await t.pumpAndSettle();
+  }
+
+  Future<void> startSession(WidgetTester t) => tapKey(t, 'train-start');
+  Future<void> firstExerciseDone(WidgetTester t) async {
+    await startSession(t);
+    for (var i = 0; i < 3; i++) {
+      await tapKey(t, 'sess-tick-$i');
+    }
+    await tapKey(t, 'rir-2');
+    await tapKey(t, 'rir-ok');
+  }
+
+  const phoneShort = Size(400, 880);
+  testWidgets('Προπόνηση · πριν την έγκριση', (t) => trainShot(t, 'T1_train_locked', phone, Brightness.light, approved: false));
+  testWidgets('Προπόνηση · σήμερα', (t) => trainShot(t, 'T2_train_today', phone, Brightness.light));
+  testWidgets('Προπόνηση · σήμερα · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T3_train_today_open_dark', open, Brightness.dark));
+  testWidgets('Προπόνηση · σε εξέλιξη · διάλειμμα', (t) => trainShot(t, 'T4_session_rest', phoneShort, Brightness.light, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'sess-tick-0');
+      }));
+  testWidgets('Προπόνηση · ρεζέρβα', (t) => trainShot(t, 'T5_session_rir', phoneShort, Brightness.light, act: (t) async {
+        await startSession(t);
+        for (var i = 0; i < 3; i++) {
+          await tapKey(t, 'sess-tick-$i');
+        }
+        await tapKey(t, 'rir-2');
+      }));
+  testWidgets('Προπόνηση · σε εξέλιξη · Fold ανοιχτό', (t) => trainShot(t, 'T6_session_open', open, Brightness.light, act: firstExerciseDone));
+  testWidgets('Προπόνηση · σε εξέλιξη · σκοτεινό', (t) => trainShot(t, 'T7_session_dark', phoneShort, Brightness.dark, act: firstExerciseDone));
+  testWidgets('Προπόνηση · τέλος', (t) => trainShot(t, 'T8_summary', phone, Brightness.light, act: (t) async {
+        await firstExerciseDone(t);
+        await tapKey(t, 'sess-finish');
+      }));
+  testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
 
   // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».
   for (final (n, p) in [(30, Aigaio.elia), (32, Aigaio.avgi), (34, Aigaio.stivos), (36, Aigaio.anasa)]) {
