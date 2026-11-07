@@ -83,7 +83,7 @@ void main() {
       expect(u.queryParameters['state'], 'st');
       expect(u.queryParameters['code_challenge_method'], 'S256');
       expect(u.queryParameters['code_challenge'], 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
-      expect(u.queryParameters['scope'], 'daily spo2Daily');
+      expect(u.queryParameters['scope'], 'daily spo2');
       expect(u.queryParameters.containsKey('client_secret'), isFalse);
     });
 
@@ -659,7 +659,7 @@ void main() {
       final p = OuraPending(state: 'st', verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', created: DateTime(2026, 11, 6));
       final c = ouraAuthorizeUrl(clientId: 'CID', p: p, endpoints: OuraOAuthEndpoints.classic);
       expect('${c.scheme}://${c.host}${c.path}', 'https://cloud.ouraring.com/oauth/authorize');
-      expect(c.queryParameters['scope'], 'daily spo2Daily');
+      expect(c.queryParameters['scope'], 'daily spo2');
       final v2 = ouraAuthorizeUrl(clientId: 'CID', p: p, endpoints: OuraOAuthEndpoints.v2);
       expect('${v2.scheme}://${v2.host}${v2.path}', 'https://api.ouraring.com/v2/oauth/authorize');
       expect(v2.queryParameters['scope'], 'extapi:daily');
@@ -968,7 +968,7 @@ void main() {
 
   test('scopeOfBody: οι άδειες της απάντησης, χωρίς tokens', () {
     expect(scopeOfBody('{"access_token":"A","scope":"daily"}'), 'daily');
-    expect(scopeOfBody('{"access_token":"A","scope":" daily spo2Daily "}'), 'daily spo2Daily');
+    expect(scopeOfBody('{"access_token":"A","scope":" daily spo2 "}'), 'daily spo2');
     expect(scopeOfBody('{"access_token":"A"}'), isNull);
     expect(scopeOfBody('όχι json'), isNull);
   });

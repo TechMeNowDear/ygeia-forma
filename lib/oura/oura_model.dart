@@ -215,7 +215,7 @@ class OuraDaily {
   /// Απόκλιση θερμοκρασίας δέρματος (°C) από το συνηθισμένο σου, κατά την Oura.
   double? tempDeviation;
 
-  /// Μέσος όρος οξυγόνου της νύχτας (%), από το daily_spo2 (spo2_percentage.average). Μόνο με την άδεια spo2Daily.
+  /// Μέσος όρος οξυγόνου της νύχτας (%), από το daily_spo2 (spo2_percentage.average). Μόνο με την άδεια spo2.
   double? spo2Avg;
 }
 

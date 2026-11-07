@@ -55,7 +55,8 @@ class OuraOAuthEndpoints {
 
   /// Προεπιλογή όταν το [ouraScopes] είναι κενό. Μόνο ό,τι χρειάζεται: «daily» («Daily summaries of sleep, activity and readiness», OpenAPI 1.43).
   /// Καλύπτει τα /sleep (με τους παλμούς, το HRV και τις αναπνοές της νύχτας), /daily_sleep, /daily_readiness.
-  /// Και «spo2Daily» (7/11): ο μέσος όρος οξυγόνου της νύχτας (daily_spo2).
+  /// Και «spo2» (7/11): ο μέσος όρος οξυγόνου της νύχτας (daily_spo2). Το όνομα είναι «spo2» κατά την επίσημη
+  /// τεκμηρίωση (cloud.ouraring.com/docs/authentication)· το «spo2Daily» η Oura το αγνοεί σιωπηλά.
   /// Όχι heartrate (δεν διαβάζουμε τη χρονοσειρά παλμών), email, personal, workout, tag, session.
   final String scopes;
 
@@ -66,7 +67,7 @@ class OuraOAuthEndpoints {
     'https://cloud.ouraring.com/oauth/authorize',
     'https://api.ouraring.com/oauth/token',
     'https://api.ouraring.com/oauth/revoke',
-    'daily spo2Daily',
+    'daily spo2',
     'access_token',
   );
 
@@ -75,7 +76,7 @@ class OuraOAuthEndpoints {
     'https://developer.ouraring.com/authorize',
     'https://api.ouraring.com/oauth/token',
     'https://api.ouraring.com/oauth/revoke',
-    'daily spo2Daily',
+    'daily spo2',
     'access_token',
   );
 
@@ -91,7 +92,7 @@ class OuraOAuthEndpoints {
 /// Η διεύθυνση για ανταλλαγή κωδικού και ανανέωση (η Oura ή ο διακομιστής-μεσάζων).
 String get ouraTokenEndpoint => ouraTokenProxy.isNotEmpty ? ouraTokenProxy : ouraOAuth.token;
 
-/// Αν η σύνδεση ζητά το οξυγόνο (άδεια «spo2Daily»).
+/// Αν η σύνδεση ζητά το οξυγόνο (άδεια «spo2»).
 bool ouraRequestsSpo2([OuraOAuthEndpoints e = ouraOAuth]) =>
     (ouraScopes.trim().isEmpty ? e.scopes : ouraScopes).toLowerCase().contains('spo2');
 

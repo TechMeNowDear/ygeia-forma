@@ -231,7 +231,7 @@ Set<String> mergeOura(
     final row = rows[k] ?? const <String, double>{};
     final next = {
       for (final v in old.entries) if (!ouraKeySet.contains(v.key)) v.key: v.value,
-      // Το οξυγόνο του Oura έρχεται χωριστά (άδεια spo2Daily): απάντηση χωρίς αυτό δεν σβήνει το αποθηκευμένο.
+      // Το οξυγόνο του Oura έρχεται χωριστά (άδεια spo2): απάντηση χωρίς αυτό δεν σβήνει το αποθηκευμένο.
       if (!row.containsKey(ouraSpo2Key) && old[ouraSpo2Key] != null) ouraSpo2Key: old[ouraSpo2Key]!,
       for (final v in row.entries)
         if (ouraKeySet.contains(v.key) && v.value.isFinite) v.key: v.value,
