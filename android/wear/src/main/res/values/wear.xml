@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- Το κινητό βρίσκει με αυτό αν η εφαρμογή του ρολογιού είναι εγκατεστημένη και κοντά. -->
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>ygeia_watch</item>
+    </string-array>
+</resources>

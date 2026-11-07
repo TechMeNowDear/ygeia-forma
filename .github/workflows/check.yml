@@ -100,6 +100,29 @@ jobs:
             | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
           echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
 
+      # Ρολόι (8/11): χωριστή εφαρμογή Wear OS στο android/wear. Μπαίνει στο settings μόνο εδώ, για να μην αγγίζει το χτίσιμο του κινητού.
+      - name: Ρολόι (Wear OS) — έλεγχοι και χτίσιμο
+        run: |
+          set -o pipefail
+          cd android
+          grep -q '":wear"' settings.gradle.kts || echo 'include(":wear")' >> settings.gradle.kts
+          if ! ./gradlew :wear:testDebugUnitTest :wear:assembleRelease --console=plain 2>&1 | tee ../wear.log; then
+            grep -E -A6 "FAILED|AssertionError|^e: |error:|What went wrong|Unresolved reference" ../wear.log | head -120 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -100 ../wear.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Ρολόι::$msg"
+            exit 1
+          fi
+          ls -l ../build/wear/outputs/apk/release/ || true
+          echo "::notice title=Ρολόι::$(du -h ../build/wear/outputs/apk/release/*.apk | head -1)"
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: wear-check
+          path: build/wear/outputs/apk/release/*.apk
+          retention-days: 7
+
   # Oura: ο πραγματικός κώδικας ανάγνωσης πάνω στα συνθετικά δεδομένα του sandbox της Oura (χωρίς δαχτυλίδι).
   # Δεν μπλοκάρει αν η Oura δεν απαντά· αποτυγχάνει αν η απάντηση δεν διαβάζεται σωστά.
   oura-sandbox:
