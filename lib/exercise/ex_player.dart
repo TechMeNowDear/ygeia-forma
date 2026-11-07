@@ -200,8 +200,9 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.exercise),
               ),
             ),
-            IconButton.filledTonal(
+            IconButton.filled(
               key: const ValueKey('ex-play'),
+              style: IconButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid),
               tooltip: _playing ? 'Παύση' : 'Συνέχεια',
               onPressed: _toggle,
               icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
@@ -213,6 +214,7 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
           spacing: 8,
           runSpacing: 8,
           children: [
+            for (final chip in <Widget>[
             TabChip(label: 'Αργά', selected: _slow, solid: c.exerciseSolid, onTap: () => setState(() => _slow = !_slow)),
             TabChip(key: const ValueKey('ex-view'), label: other, selected: false, solid: c.exerciseSolid, onTap: _view),
             TabChip(label: 'Μύες', selected: _muscles, solid: c.exerciseSolid, onTap: () {
@@ -224,6 +226,8 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
                 setState(() => _guides = !_guides);
                 _repaint.value++;
               }),
+            ])
+              IntrinsicWidth(child: chip),
           ],
         ),
         if (_muscles) ...[

@@ -156,8 +156,10 @@ void main() {
       final l = ExLibrary.loaded!;
       await pump(t, ExerciseDetailPage(ex: l.byId('db_press')!, lib: l));
       expect(find.byKey(const ValueKey('ex-anim-db_press')), findsOneWidget);
-      expect(find.text('Συχνά λάθη'), findsOneWidget);
       expect(find.text('Πρόσεξε τώρα'), findsOneWidget);
+      await t.scrollUntilVisible(find.text('Συχνά λάθη'), 300);
+      expect(find.text('Συχνά λάθη'), findsOneWidget);
+      await t.scrollUntilVisible(find.byKey(const ValueKey('ex-view')), -300);
       await t.tap(find.byKey(const ValueKey('ex-view')));
       await t.pump();
       // Παίζει και σταματά χωρίς σφάλματα.

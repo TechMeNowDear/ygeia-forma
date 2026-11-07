@@ -363,7 +363,7 @@ class ExPainter extends CustomPainter {
     if (label == null) return;
     final fs = math.max(11.0, math.min(15.0, 0.034 * s));
     final tp = TextPainter(
-      text: TextSpan(text: label, style: TextStyle(color: col, fontSize: fs, fontWeight: FontWeight.w600)),
+      text: TextSpan(text: label, style: TextStyle(fontFamily: 'Inter', color: col, fontSize: fs, fontWeight: FontWeight.w600)),
       textDirection: TextDirection.ltr,
       maxLines: 2,
     )..layout(maxWidth: size.width * 0.7);
