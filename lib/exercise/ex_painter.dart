@@ -368,8 +368,8 @@ class ExPainter extends CustomPainter {
       maxLines: 2,
     )..layout(maxWidth: size.width * 0.7);
     final at = pr(g.c);
-    final x = (at.dx - tp.width / 2).clamp(6.0, math.max(6.0, size.width - tp.width - 6));
-    final y = (at.dy - tp.height).clamp(6.0, math.max(6.0, size.height - tp.height - 6));
+    final x = (at.dx - tp.width / 2).clamp(6.0, math.max(6.0, size.width - tp.width - 6)).toDouble();
+    final y = (at.dy - tp.height).clamp(6.0, math.max(6.0, size.height - tp.height - 6)).toDouble();
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(x - 5, y - 3, tp.width + 10, tp.height + 6), const Radius.circular(6)),
       Paint()..color = colors.labelBg,

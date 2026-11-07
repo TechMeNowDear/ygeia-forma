@@ -63,7 +63,7 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Title('Πρόσεξε τώρα'),
+          const _Title('Πρόσεξε τώρα'),
           const SizedBox(height: 8),
           ValueListenableBuilder<int>(
             valueListenable: _phase,
@@ -101,13 +101,13 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Title('Τι γυμνάζει'),
+          const _Title('Τι γυμνάζει'),
           const SizedBox(height: 6),
-          _Small('Κύριοι'),
+          const _Small('Κύριοι'),
           for (final m in ex.primary) muscleRow(m, colors.primary),
           if (ex.secondary.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _Small('Βοηθητικοί'),
+            const _Small('Βοηθητικοί'),
             for (final m in ex.secondary) muscleRow(m, colors.secondary),
           ],
           const SizedBox(height: 14),
@@ -164,7 +164,7 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _Title('Αντί γι’ αυτή'),
+                const _Title('Αντί γι’ αυτή'),
                 for (final a in alts)
                   InkWell(
                     borderRadius: BorderRadius.circular(12),

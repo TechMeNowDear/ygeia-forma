@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/painting.dart' show Color;
 
 /// Η βιβλιοθήκη ασκήσεων: κείμενα και κίνηση (θέσεις 3D σε [n] σημεία της κίνησης).
 /// Τα δεδομένα τα παράγει το tools/exercises/build.js στο assets/exercises/exercises.json.
