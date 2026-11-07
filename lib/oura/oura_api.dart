@@ -438,13 +438,18 @@ class OuraLink {
     this.endpoints = ouraOAuth,
     String? tokenEndpoint,
     this.apiBase = ouraApiBase,
+    Future<void> Function(Duration)? wait,
   })  : _send = send ?? ouraHttp,
         _clock = clock ?? DateTime.now,
+        _wait = wait ?? Future<void>.delayed,
         tokenEndpoint = tokenEndpoint ?? ouraTokenEndpoint;
 
   final OuraVault vault;
   final OuraSend _send;
   final DateTime Function() _clock;
+
+  /// Αναμονή πριν από τη δεύτερη προσπάθεια του [verifyAccess] (στους ελέγχους: χωρίς αναμονή).
+  final Future<void> Function(Duration) _wait;
   final String clientId;
   final OuraOAuthEndpoints endpoints;
   final String tokenEndpoint;
@@ -588,6 +593,8 @@ class OuraLink {
   /// Έλεγχος πρόσβασης ΠΡΙΝ αλλάξει το σχέδιο πηγών (έλεγχος 4/11, A13): μία κλήση στο daily_sleep με τα νέα tokens
   /// (κενά δεδομένα είναι εντάξει· θέλουμε 200). 401 = λείπει άδεια ή άχρηστο token, 403 = συνδρομή, αλλιώς δίκτυο.
   /// Επιστρέφει την ώρα του διακομιστή της Oura (αν τη δώσει), για έλεγχο του ρολογιού του κινητού (C12).
+  static const verifyRetryDelay = Duration(seconds: 2);
+
   Future<DateTime?> verifyAccess(OuraTokens t) async {
     final now = _clock();
     String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
@@ -595,7 +602,14 @@ class OuraLink {
       'start_date': d(DateTime(now.year, now.month, now.day - 7)),
       'end_date': d(DateTime(now.year, now.month, now.day + 1)),
     });
-    final res = await _getWith(url, t.access);
+    var res = await _getWith(url, t.access);
+    // Sentry YGEIA-FORMA-2 (4/11, #69): αμέσως μετά την ανταλλαγή η Oura έδωσε μία φορά 401 σε token που λίγο μετά
+    // δούλευε (η δεύτερη σύνδεση πέτυχε). Το καινούργιο token δεν «ενεργοποιείται» πάντα αμέσως: μία νέα προσπάθεια
+    // μετά από 2″ πριν δείξουμε «Λείπει άδεια». Μόνο για 401· ένα αληθινό πρόβλημα άδειας δίνει πάλι 401.
+    if (res.status == 401) {
+      await _wait(verifyRetryDelay);
+      res = await _getWith(url, t.access);
+    }
     if (res.status == 200) return res.serverTime;
     if (res.status == 401) throw const OuraError(OuraErrorKind.scopeMissing, status: 401);
     throw OuraError(kindForStatus(res.status), status: res.status, retryAfter: res.retryAfter);
