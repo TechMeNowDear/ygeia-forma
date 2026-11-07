@@ -162,7 +162,7 @@ class _MePageState extends State<MePage> {
                                 if (d > 1) const SizedBox(width: 6),
                                 Expanded(
                                   child: _DayChip(
-                                    label: weekdayShort[d - 1],
+                                    label: weekdayChips[d - 1],
                                     semantics: weekdayNames[d - 1],
                                     selected: p.weighDay == d,
                                     onTap: () => _save(p.copyWith(weighDay: d)),
