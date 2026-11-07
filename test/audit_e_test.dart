@@ -515,7 +515,8 @@ void main() {
       'readAt': ms(DateTime(2026, 11, 7, 10)),
       'sleep': <Object>[],
       'spo2': [
-        [ms(DateTime(2026, 11, 7, 3)), ms(DateTime(2026, 11, 7, 3, 5)), 93.0, 90.0, 95.0],
+        // 7/11: η χαμηλότερη μετρά μόνο με κάλυψη ≥ 50% των ωρών ύπνου του Oura → μία μεγάλη μέτρηση 23:30–06:30.
+        [ms(DateTime(2026, 11, 6, 23, 30)), ms(DateTime(2026, 11, 7, 6, 30)), 93.0, 90.0, 95.0],
       ],
     });
     final windows = SleepWindows(const [], {

@@ -11,7 +11,6 @@ import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'compare_page.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
@@ -76,27 +75,6 @@ class OuraSleepPage extends StatelessWidget {
     final heart = _OuraHeartCard(store: store, day: last?.day ?? today);
     final breath = _BreathCard(store: store, day: last?.day ?? today, now: now);
 
-    final compare = plan.compareActive(today)
-        ? AppCard(
-            key: const ValueKey('sleep-compare'),
-            onTap: () => Navigator.of(context).push(ComparePage.route(store, now: this.now)),
-            child: Row(
-              children: [
-                IconBadge(Icons.compare_arrows_rounded, c.sleep, size: 34),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Σύγκριση με το ρολόι (έως ${shortDayDate(plan.compareUntil!)})',
-                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text),
-                  ),
-                ),
-                Text('Άνοιγμα', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.primary)),
-                Icon(Icons.chevron_right_rounded, color: c.primary),
-              ],
-            ),
-          )
-        : null;
-
     final list = [
       const SectionHeader('Νύχτα προς νύχτα'),
       for (var i = 0; i < 14; i++)
@@ -119,7 +97,7 @@ class OuraSleepPage extends StatelessWidget {
       title: 'Ύπνος',
       subtitle: plan.nightSource(today) == Source.none ? 'Το Oura δεν είναι συνδεδεμένο' : 'Από το Oura Ring 5',
       onRefresh: () => store.refresh(),
-      left: [lastCard, if (compare != null) compare, stagesCard, heart, breath],
+      left: [lastCard, stagesCard, heart, breath],
       right: list.length > 1 ? list : const [],
     );
   }
@@ -363,7 +341,7 @@ class _BreathCard extends StatelessWidget {
     final plan = store.plan;
     final b = ouraBaseline(store.history, plan, K.breath, day);
     final windows = store.ouraWindows;
-    final ox = store.data?.watchSpo2(day, windows);
+    final rox = ringOxygen(store, store.data, day, windows);
     // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4: ρολόι μέσα στις ώρες ύπνου του Oura· όλες οι 30
     // νύχτες, και πριν από τη σύνδεση (έλεγχος 3, E5: ίδιος αισθητήρας, όπως η αναφορά).
     final g = oxygenGuidance(
@@ -412,14 +390,19 @@ class _BreathCard extends StatelessWidget {
           row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
           const Hairline(vertical: 2),
           row(
-            ox?.avg == null ? 'Οξυγόνο —' : 'Οξυγόνο ${spo2AvgText(ox!.avg!)}%',
-            ox == null
-                ? (windows.mains.containsKey(dateKey(day))
-                    ? 'Δεν υπάρχουν μετρήσεις του ρολογιού μέσα στις ώρες ύπνου'
-                    : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο μένει κενό')
-                // UX U4: ίδια λέξη με τις άλλες οθόνες· C13: χωρίς «T90» (εξηγείται στο PDF).
-                : 'Χαμηλότερη μέτρηση ${lowestText(ox.min)}% · ενδεικτικό'
-                    '${ox.below90 == null ? '' : ' · χρόνος κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (από το ρολόι, ενδεικτικό)'}',
+            rox.avg == null ? 'Οξυγόνο, μέσος όρος —' : 'Οξυγόνο, μέσος όρος ${spo2AvgText(rox.avg!)}%',
+            rox.avg == null
+                ? (windows.mains.containsKey(dateKey(day)) ? ringAvgMissing(store) : 'Χωρίς νύχτα από το δαχτυλίδι')
+                : 'Όλη τη νύχτα',
+            Source.oura,
+          ),
+          const Hairline(vertical: 2),
+          // 7/11: η χαμηλότερη από το ρολόι, μόνο με κάλυψη ≥ 50% του ύπνου του Oura.
+          row(
+            rox.min == null ? 'Χαμηλότερο —' : 'Χαμηλότερο ${lowestText(rox.min!)}%',
+            windows.mains.containsKey(dateKey(day))
+                ? watchLowText(rox.watch)
+                : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες',
             Source.watch,
           ),
           const SizedBox(height: 6),

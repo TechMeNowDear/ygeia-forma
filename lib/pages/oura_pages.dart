@@ -9,7 +9,6 @@ import '../oura/oura_store.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'compare_page.dart';
 
 /// Κοινός σκελετός για τις σελίδες του Oura: μία στήλη στο κινητό, δύο σε ανοιχτό Fold.
 class _OuraScaffold extends StatelessWidget {
@@ -535,30 +534,7 @@ class OuraManagePage extends StatelessWidget {
             ),
         ];
 
-        final compare = plan.compareActive(today)
-            ? AppCard(
-                onTap: () => Navigator.of(context).push(ComparePage.route(store, now: now)),
-                child: Row(
-                  children: [
-                    IconBadge(Icons.compare_arrows_rounded, c.sleep, size: 38),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Σύγκριση με το ρολόι', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
-                          Text(
-                            'Ανοιχτή ως ${shortDayDate(plan.compareUntil!)}, μόνο για έλεγχο',
-                            style: TextStyle(fontSize: 13, color: c.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-                  ],
-                ),
-              )
-            : null;
+        final compare = OuraOxygenAccessCard.orNull(store);
 
         final what = AppCard(
           child: Column(

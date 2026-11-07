@@ -183,7 +183,16 @@ class Sample {
 
 /// Οξυγόνο μιας νύχτας από το ρολόι: μέσο (null αν υπάρχουν μόνο σύντομες μετρήσεις), χαμηλότερη μέτρηση
 /// (ενδεικτική), λεπτά κάτω από 90% (αν βγαίνουν).
-typedef NightOxygen = ({double? avg, double min, double? below90});
+/// [cov]: σε νύχτα του Oura, το μέρος (0–1) των ωρών ύπνου του Oura με μετρήσεις ≥ [spo2MinRecord]· null = νύχτα του
+/// ρολογιού (μετρά μέσα στον δικό του ύπνο).
+typedef NightOxygen = ({double? avg, double min, double? below90, double? cov});
+
+/// Απόφαση 7/11: η χαμηλότερη τιμή του ρολογιού σε νύχτα του Oura φαίνεται (και μετρά στις σημειώσεις) μόνο όταν το
+/// ρολόι μέτρησε τουλάχιστον το μισό του ύπνου του Oura. Αλλιώς: «λίγη κάλυψη».
+const spo2MinCoverage = 0.5;
+
+/// Αν η χαμηλότερη τιμή μιας νύχτας μπορεί να φανεί: νύχτα του ρολογιού ([cov] null) ή κάλυψη ≥ [spo2MinCoverage].
+bool spo2MinShown(double? cov) => cov == null || cov >= spo2MinCoverage;
 
 /// Λεπτά κάτω από 90%: μόνο αν ΚΑΘΕ μέτρηση της νύχτας το δίνει (αλλιώς δεν ξέρουμε, άρα κενό).
 double? _below90Minutes(List<Sample> ox) {
@@ -262,7 +271,7 @@ NightOxygen? oxygenOf(List<Sample> ox) {
     }
     avg = sum / secs;
   }
-  return (avg: avg, min: ox.map((s) => s.min).reduce(math.min), below90: _below90Minutes(long));
+  return (avg: avg, min: ox.map((s) => s.min).reduce(math.min), below90: _below90Minutes(long), cov: null);
 }
 
 // ---------------------------------------------------------------------------
@@ -683,7 +692,25 @@ class Dashboard {
           final (from, to) = w;
           return s.start.isBefore(to) && (s.end.isAfter(from) || (s.end == s.start && !s.start.isBefore(from)));
         });
-    return oxygenOf([for (final s in spo2) if (inside(s)) s]);
+    final ox = oxygenOf([for (final s in spo2) if (inside(s)) s]);
+    if (ox == null) return null;
+    // Κάλυψη: η ένωση των μεγάλων μετρήσεων, κομμένη στα κομμάτια του ύπνου, προς τη διάρκεια των κομματιών.
+    var total = 0;
+    for (final (a, b) in parts) {
+      total += b.difference(a).inSeconds;
+    }
+    final clipped = <(DateTime, DateTime)>[
+      for (final s in spo2)
+        if (s.end.difference(s.start) >= spo2MinRecord)
+          for (final (a, b) in parts)
+            if (s.start.isBefore(b) && s.end.isAfter(a)) (s.start.isBefore(a) ? a : s.start, s.end.isAfter(b) ? b : s.end),
+    ];
+    var covered = 0;
+    for (final (a, b) in unionOfRanges(clipped)) {
+      covered += b.difference(a).inSeconds;
+    }
+    final cov = total <= 0 ? 0.0 : math.min(1.0, covered / total);
+    return (avg: ox.avg, min: ox.min, below90: ox.below90, cov: cov);
   }
 
   /// Η χαμηλότερη μέτρηση οξυγόνου του ρολογιού ανά νύχτα, για τις σημειώσεις χαμηλού οξυγόνου (B7), με τον ίδιο
@@ -706,13 +733,16 @@ class Dashboard {
       final day = DateTime(end.year, end.month, end.day - i);
       double? min;
       if (ouraNights) {
-        min = watchSpo2(day, windows)?.min;
+        final ox = watchSpo2(day, windows);
+        if (ox != null && spo2MinShown(ox.cov)) min = ox.min;
+        if (ox != null && !spo2MinShown(ox.cov)) continue;
       } else {
         for (final n in nights) {
           if (sameDay(n.date, day)) min = n.spo2Min;
         }
       }
-      min ??= history[dateKey(day)]?[K.spo2Min];
+      final row = history[dateKey(day)];
+      if (min == null && row != null && spo2MinShown(row[K.spo2Cov])) min = row[K.spo2Min];
       if (min != null && min.isFinite) out[day] = min;
     }
     return out;

@@ -23,6 +23,13 @@ abstract final class K {
   static const spo2Min = 'spo2Min';
   /// Λεπτά με οξυγόνο κάτω από 90% (ενδεικτικό· μόνο όταν βγαίνει από τις αναλυτικές μετρήσεις).
   static const spo2Low = 'spo2Low';
+
+  /// Κάλυψη του οξυγόνου του ρολογιού σε νύχτα του Oura (0–1): πόσο από τις ώρες ύπνου του Oura έχουν μετρήσεις
+  /// οξυγόνου ≥ 60″ από το ρολόι. Η χαμηλότερη τιμή φαίνεται μόνο με κάλυψη ≥ [spo2MinCoverage] (απόφαση 7/11).
+  static const spo2Cov = 'spo2Cov';
+
+  /// Μέσος όρος οξυγόνου της νύχτας από το Oura (daily_spo2), αποθηκεύεται ως «o.spo2».
+  static const ringSpo2 = 'ringSpo2';
   static const skinTemp = 'skinTemp';
   static const restHr = 'restHr';
   static const dayHr = 'dayHr';
@@ -57,7 +64,7 @@ abstract final class K {
 /// Τιμές που βγαίνουν από τον ύπνο μιας νύχτας.
 const sleepKeys = {
   K.sleepMin, K.sleepScore, K.deepPct, K.remPct, K.awakeMin, K.bedtime, K.wake,
-  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.skinTemp, K.napMin, K.napLock,
+  K.sleepHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov, K.skinTemp, K.napMin, K.napLock,
 };
 
 /// Έκδοση των κανόνων του ιστορικού. Όταν αλλάζει, οι τιμές ύπνου ξαναϋπολογίζονται από την αρχή.
@@ -90,7 +97,7 @@ bool dayHeartNeedsMissingWindow(SourcePlan plan, SleepWindows windows, DateTime 
 }
 
 /// Οξυγόνο της νύχτας (πάντα του ρολογιού).
-const spo2Keys = {K.spo2Avg, K.spo2Min, K.spo2Low};
+const spo2Keys = {K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov};
 
 /// Βάζει νέες συνόψεις στο [history] και επιστρέφει τις μέρες που άλλαξαν (για αποθήκευση).
 ///
@@ -221,9 +228,12 @@ Set<String> mergeOura(
     final k = dateKey(day);
     if (!rows.containsKey(k)) continue;
     final old = history[k] ?? const <String, double>{};
+    final row = rows[k] ?? const <String, double>{};
     final next = {
       for (final v in old.entries) if (!ouraKeySet.contains(v.key)) v.key: v.value,
-      for (final v in (rows[k] ?? const <String, double>{}).entries)
+      // Το οξυγόνο του Oura έρχεται χωριστά (άδεια spo2Daily): απάντηση χωρίς αυτό δεν σβήνει το αποθηκευμένο.
+      if (!row.containsKey(ouraSpo2Key) && old[ouraSpo2Key] != null) ouraSpo2Key: old[ouraSpo2Key]!,
+      for (final v in row.entries)
         if (ouraKeySet.contains(v.key) && v.value.isFinite) v.key: v.value,
     };
     if (next.isEmpty && history[k] == null) continue;
@@ -478,6 +488,7 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
       put(K.spo2Avg, ox.avg);
       put(K.spo2Min, ox.min);
       put(K.spo2Low, ox.below90);
+      put(K.spo2Cov, ox.cov);
     }
   }
   // Υπνάκοι του ρολογιού (C1): αποθηκεύονται χωριστά, και μέρα χωρίς νύχτα· ποτέ μέσα στη διάρκεια του ύπνου.

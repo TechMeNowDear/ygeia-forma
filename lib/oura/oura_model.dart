@@ -214,6 +214,9 @@ class OuraDaily {
 
   /// Απόκλιση θερμοκρασίας δέρματος (°C) από το συνηθισμένο σου, κατά την Oura.
   double? tempDeviation;
+
+  /// Μέσος όρος οξυγόνου της νύχτας (%), από το daily_spo2 (spo2_percentage.average). Μόνο με την άδεια spo2Daily.
+  double? spo2Avg;
 }
 
 /// Μία μέρα του Oura: η νύχτα, οι υπνάκοι και οι ημερήσιες τιμές.
@@ -283,6 +286,7 @@ class OuraNight {
 
   /// Από το daily_readiness· αν λείπει, από την ίδια νύχτα (ίδια πηγή, ίδια τιμή της Oura).
   double? get tempDeviation => daily?.tempDeviation ?? main?.readinessTemp;
+  double? get spo2Avg => daily?.spo2Avg;
 
   int get napMinutes => naps.fold(0, (s, n) => s + (n.totalMinutes ?? 0));
   bool get hasAny => main != null || naps.isNotEmpty || others.isNotEmpty || pieces.isNotEmpty || daily != null;
@@ -312,6 +316,7 @@ class OuraNight {
         if (daily?.sleepScore != null) 'score': daily!.sleepScore,
         if (daily?.readiness != null) 'readiness': daily!.readiness,
         if (daily?.tempDeviation != null) 'temp': daily!.tempDeviation,
+        if (daily?.spo2Avg != null) 'spo2': daily!.spo2Avg,
         if (napLock != null) 'napLock': napLock!.millisecondsSinceEpoch ~/ 60000,
       };
 
@@ -325,7 +330,7 @@ class OuraNight {
               if (x is Map) OuraSleep.fromJson(Map<String, dynamic>.from(x)),
         ].whereType<OuraSleep>().toList();
     final main = j['main'] is Map ? OuraSleep.fromJson(Map<String, dynamic>.from(j['main'] as Map)) : null;
-    final hasDaily = j['score'] != null || j['readiness'] != null || j['temp'] != null;
+    final hasDaily = j['score'] != null || j['readiness'] != null || j['temp'] != null || j['spo2'] != null;
     return OuraNight(
       day: day,
       main: main,
@@ -337,7 +342,8 @@ class OuraNight {
           ? (OuraDaily(day)
             ..sleepScore = _int(j['score'])
             ..readiness = _int(j['readiness'])
-            ..tempDeviation = _dbl(j['temp']))
+            ..tempDeviation = _dbl(j['temp'])
+            ..spo2Avg = _dbl(j['spo2']))
           : null,
     );
   }
@@ -422,7 +428,8 @@ List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies
 }
 
 /// Τα ημερήσια (daily_sleep, daily_readiness) ενωμένα ανά μέρα.
-Map<String, OuraDaily> mergeDailies(List<Map<String, dynamic>> dailySleep, List<Map<String, dynamic>> readiness) {
+Map<String, OuraDaily> mergeDailies(List<Map<String, dynamic>> dailySleep, List<Map<String, dynamic>> readiness,
+    [List<Map<String, dynamic>> spo2 = const []]) {
   final out = <String, OuraDaily>{};
   OuraDaily at(DateTime d) => out.putIfAbsent(dateKey(d), () => OuraDaily(d));
   for (final j in dailySleep) {
@@ -437,8 +444,16 @@ Map<String, OuraDaily> mergeDailies(List<Map<String, dynamic>> dailySleep, List<
       ..readiness = _int(j['score'])
       ..tempDeviation = _dbl(j['temperature_deviation']);
   }
+  for (final j in spo2) {
+    final d = _day(j['day']);
+    if (d == null) continue;
+    final p = j['spo2_percentage'];
+    final v = p is Map ? _dbl(p['average']) : null;
+    // Μόνο λογικές τιμές (όπως spo2Range του ρολογιού)· 0 ή κενό = δεν μετρήθηκε.
+    if (v != null && v >= 50 && v <= 100) at(d).spo2Avg = v;
+  }
   // Μέρα χωρίς καμία τιμή: δεν μένει άδεια εγγραφή.
-  out.removeWhere((_, v) => v.sleepScore == null && v.readiness == null && v.tempDeviation == null);
+  out.removeWhere((_, v) => v.sleepScore == null && v.readiness == null && v.tempDeviation == null && v.spo2Avg == null);
   return out;
 }
 
@@ -484,6 +499,8 @@ Map<String, double> ouraRow(OuraNight n) {
   if (m != null) put(K.sleepScore, n.sleepScore);
   put(K.energy, n.readiness);
   put(K.skinTemp, n.tempDeviation);
+  // Οξυγόνο: μόνο για μέρα με κύρια νύχτα (όπως η βαθμολογία ύπνου).
+  if (m != null) put(K.ringSpo2, n.spo2Avg);
   return out;
 }
 
@@ -524,6 +541,7 @@ OuraBatch parseOura({
   required List<Map<String, dynamic>> sleep,
   required List<Map<String, dynamic>> dailySleep,
   required List<Map<String, dynamic>> readiness,
+  List<Map<String, dynamic>> spo2 = const [],
   int? Function(DateTime from, DateTime to)? stepsBetween,
   Map<String, int> napLocks = const {},
 }) {
@@ -538,7 +556,7 @@ OuraBatch parseOura({
     }
   }
   return OuraBatch(
-      groupOura(periods, mergeDailies(dailySleep, readiness), stepsBetween: stepsBetween, napLocks: napLocks),
+      groupOura(periods, mergeDailies(dailySleep, readiness, spo2), stepsBetween: stepsBetween, napLocks: napLocks),
       skipped: skipped);
 }
 
@@ -589,6 +607,24 @@ List<OuraNight> mergeOuraNights(
   final byDay = <String, OuraNight>{for (final n in old) dateKey(n.day): n};
   for (final n in fresh) {
     if (n.day.isBefore(dayOf(from)) || n.day.isAfter(dayOf(to))) continue;
+    // Το οξυγόνο έρχεται χωριστά: νέα νύχτα χωρίς αυτό κρατά το παλιό (όπως το «o.spo2» στο ιστορικό).
+    final prev = byDay[dateKey(n.day)];
+    final keep = prev?.spo2Avg;
+    if (keep != null && n.spo2Avg == null) {
+      byDay[dateKey(n.day)] = OuraNight(
+          day: n.day,
+          main: n.main,
+          naps: n.naps,
+          others: n.others,
+          pieces: n.pieces,
+          napLock: n.napLock,
+          daily: (OuraDaily(n.day)
+            ..sleepScore = n.daily?.sleepScore
+            ..readiness = n.daily?.readiness
+            ..tempDeviation = n.daily?.tempDeviation
+            ..spo2Avg = keep));
+      continue;
+    }
     byDay[dateKey(n.day)] = n;
   }
   final out = [for (final n in byDay.values) if (!n.day.isBefore(oldest)) n]..sort((a, b) => a.day.compareTo(b.day));

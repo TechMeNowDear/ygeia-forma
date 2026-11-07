@@ -17,6 +17,7 @@ import 'oura_today.dart';
 import 'sources_page.dart';
 import 'unusual_card.dart';
 import 'week_card.dart';
+import 'oxygen_widgets.dart';
 
 /// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
 /// Πώς κοιμήθηκα; Τι έφαγα; Κουνήθηκα; Πού πάει το βάρος μου; Οι ειδοποιήσεις μόνο όταν υπάρχουν.
@@ -289,21 +290,22 @@ class TodayPage extends StatelessWidget {
   Widget _watchSpo2Card(BuildContext context, Dashboard d, DateTime now, SleepWindows windows, OxygenGuidance g,
       VoidCallback onTap, {bool auto = false}) {
     final c = Aigaio.of(context);
-    final ox = d.watchSpo2(now, windows);
+    // 7/11: μέσος όρος από το Oura, χαμηλότερη από το ρολόι (μόνο με κάλυψη ≥ 50%).
+    final rox = ringOxygen(store, d, now, windows);
     final noWindow = !windows.mains.containsKey(dateKey(dayOf(now)));
     return StatCard(
       icon: Icons.air_rounded,
       color: c.sleep,
-      title: 'Οξυγόνο · ρολόι',
-      value: ox?.avg == null ? null : spo2AvgText(ox!.avg!),
+      title: 'Οξυγόνο στον ύπνο',
+      value: rox.avg == null ? null : spo2AvgText(rox.avg!),
       unit: '%',
-      trend: ox == null ? null : TrendPill('Χαμηλότερη μέτρηση ${lowestText(ox.min)}% · ενδεικτικό'),
-      note: ox == null ? null : g.short,
+      trend: rox.min == null ? null : TrendPill('Χαμηλότερο ${lowestText(rox.min!)}% · ρολόι'),
+      note: rox.isEmpty ? null : (g.short ?? (rox.avg == null ? ringAvgMissing(store) : 'Μέσος όρος · Oura')),
       empty: auto && g.short != null
           ? g.short
           : noWindow
               ? 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες· το οξυγόνο της νύχτας μένει κενό.'
-              : 'Δεν υπάρχουν μετρήσεις οξυγόνου του ρολογιού μέσα στον ύπνο.',
+              : ringAvgMissing(store),
       onTap: onTap,
     );
   }

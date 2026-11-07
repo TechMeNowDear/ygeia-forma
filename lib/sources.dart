@@ -132,10 +132,17 @@ const sourceRows = <SourceRow>[
     ouraNote: 'Μόνο Oura· εκτίμηση, όχι μέτρηση',
   ),
   SourceRow(
-    title: 'Οξυγόνο τη νύχτα',
+    title: 'Οξυγόνο τη νύχτα, μέσος όρος',
+    group: SourceGroup.night,
+    metrics: [K.ringSpo2],
+    watchNote: 'Με το ρολόι ως πηγή ύπνου: ο μέσος όρος του ρολογιού (από κάτω)',
+    ouraNote: 'Μόνο Oura· μέσος όρος όλης της νύχτας',
+  ),
+  SourceRow(
+    title: 'Οξυγόνο τη νύχτα, χαμηλότερη τιμή',
     group: SourceGroup.watch,
-    metrics: [K.spo2Avg, K.spo2Min, K.spo2Low],
-    watchNote: 'Μόνο ρολόι· μέσο, χαμηλότερο, χρόνος κάτω από 90% (ενδεικτικό). Του δαχτυλιδιού δεν διαβάζεται',
+    metrics: [K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov],
+    watchNote: 'Μόνο ρολόι· με το Oura, μόνο όταν μέτρησε τουλάχιστον το μισό του ύπνου',
   ),
   SourceRow(
     title: 'Βήματα, όροφοι, θερμίδες',
@@ -169,10 +176,10 @@ String metricSourceName(String metric, Source s) => samsungTotalMetrics.contains
 /// Τι ΔΕΝ διαβάζεται ή δεν φαίνεται, ώστε να μην ανακατευτεί ποτέ (δείχνεται στην οθόνη «Πηγές» μετά τη σύνδεση).
 const notUsedWithOura = <String>[
   'Βήματα του δαχτυλιδιού: δεν διαβάζονται',
-  'Οξυγόνο του δαχτυλιδιού: δεν διαβάζεται',
+  'Μέσος όρος οξυγόνου του ρολογιού: δεν φαίνεται (μόνο του Oura)',
   'Δείκτης διαταραχών αναπνοής του Oura: δεν φαίνεται (δεν είναι τεστ άπνοιας)',
   'Βαθμολογία ύπνου και Energy Score της Samsung: δεν φαίνονται',
-  'Ύπνος του ρολογιού: μόνο στη «Σύγκριση πηγών», τις πρώτες $compareDays μέρες',
+  'Ύπνος του ρολογιού: δεν διαβάζεται',
 ];
 
 /// Σε ποια ομάδα ανήκει κάθε μέτρηση (από τον [sourceRows]).
@@ -198,13 +205,17 @@ const ouraKeys = <String, String>{
   K.skinTemp: 'o.skinTemp',
   K.sleepScore: 'o.sleepScore',
   K.energy: 'o.readiness',
+  K.ringSpo2: 'o.spo2',
 };
+
+/// Το κλειδί του μέσου οξυγόνου του Oura (έρχεται χωριστά, με την άδεια spo2Daily).
+const ouraSpo2Key = 'o.spo2';
 
 /// Όλα τα κλειδιά αποθήκευσης του Oura.
 final Set<String> ouraKeySet = ouraKeys.values.toSet();
 
 /// Μετρήσεις που δίνει μόνο το Oura: με το ρολόι ως πηγή δεν έχουν τιμή (όχι «0», απλώς κενό).
-const ouraOnlyMetrics = {K.lowHr, K.hrv, K.breath};
+const ouraOnlyMetrics = {K.lowHr, K.hrv, K.breath, K.ringSpo2};
 
 /// Μετρήσεις του ρολογιού που αλλάζουν ΟΡΙΣΜΟ όταν η νύχτα έρχεται από το Oura (έλεγχος 4/11, A4):
 /// - οξυγόνο: πριν, οι μετρήσεις μέσα στον ύπνο του ρολογιού· μετά, μέσα στις ώρες ύπνου του Oura,
@@ -225,8 +236,12 @@ const watchNightKeys = {
   K.napLock,
 };
 
-/// Πόσες μέρες μετά τη σύνδεση φαίνεται η «Σύγκριση πηγών» (και διαβάζεται ο ύπνος του ρολογιού γι' αυτήν).
+/// Πόσες μέρες μετά τη σύνδεση θα φαινόταν η «Σύγκριση πηγών».
 const compareDays = 14;
+
+/// Απόφαση χρήστη 7/11: το ρολόι βγαίνει εντελώς από τον ύπνο. Η «Σύγκριση πηγών» δεν ανοίγει ποτέ και ο ύπνος του
+/// ρολογιού δεν διαβάζεται για νύχτες του Oura. (Ο κώδικας της σύγκρισης μένει, κλειστός.)
+const compareOpen = false;
 
 /// Από μια μέρα και μετά, η «νύχτα» έρχεται από την [source].
 class SourceEra {
@@ -438,6 +453,7 @@ class SourcePlan {
   /// Αν φαίνεται σήμερα η «Σύγκριση πηγών»: μόνο όσο ο ύπνος είναι του Oura (όχι μετά από αποσύνδεση
   /// ή «ξανά από το ρολόι»), και μόνο τις [compareDays] πρώτες νύχτες.
   bool compareActive(DateTime today) {
+    if (!compareOpen) return false;
     final f = ouraFrom;
     final u = compareUntil;
     if (f == null || u == null) return false;

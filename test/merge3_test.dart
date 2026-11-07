@@ -69,8 +69,8 @@ void main() {
         ox(DateTime(2026, 11, 3, 0, 0), DateTime(2026, 11, 3, 0, 30), 90, 76, 600),
         // Στο κενό (ξύπνιος): ΔΕΝ μετρά.
         ox(DateTime(2026, 11, 3, 2, 0), DateTime(2026, 11, 3, 2, 30), 70, 60, 1800),
-        // Κύριο κομμάτι: 90′, μέσο 96, ελάχιστο 92, 0′ κάτω από 90%.
-        ox(DateTime(2026, 11, 3, 4, 0), DateTime(2026, 11, 3, 5, 30), 96, 92, 0),
+        // Κύριο κομμάτι: 180′, μέσο 96, ελάχιστο 92, 0′ κάτω από 90% (κάλυψη 210′ από 375′ ≥ 50%, 7/11).
+        ox(DateTime(2026, 11, 3, 3, 30), DateTime(2026, 11, 3, 6, 30), 96, 92, 0),
       ],
     });
 
@@ -85,16 +85,32 @@ void main() {
     test('Μέσος όρος (στάθμιση διάρκειας), χαμηλότερη και λεπτά < 90% από ΟΛΑ τα κομμάτια· το κενό έξω', () {
       final o = d.watchSpo2(day, windows)!;
       // Πριν: μόνο η κύρια περίοδος → μέσο 96, ελάχιστο 92, 0′.
-      expect(o.avg, closeTo((90 * 30 + 96 * 90) / 120, 1e-9));
+      expect(o.avg, closeTo((90 * 30 + 96 * 180) / 210, 1e-9));
       expect(o.min, 76);
       expect(o.below90, closeTo(10, 1e-9));
+      expect(o.cov, closeTo(210 / 375, 1e-9));
+    });
+
+    test('7/11: κάλυψη κάτω από 50% → η χαμηλότερη δεν μετρά (ούτε στις σημειώσεις)', () {
+      final thin = Dashboard.fromJson({
+        'readAt': ms(DateTime(2026, 11, 3, 10)),
+        'sleep': <Object>[],
+        'spo2': [ox(DateTime(2026, 11, 3, 4, 0), DateTime(2026, 11, 3, 5, 0), 90, 70, 600)],
+      });
+      final o = thin.watchSpo2(day, windows)!;
+      expect(o.cov, closeTo(60 / 375, 1e-9));
+      expect(spo2MinShown(o.cov), isFalse);
+      final history = {dateKey(day): {K.spo2Min: 70.0, K.spo2Cov: 60 / 375}};
+      expect(thin.spo2MinByNight(day, ouraNights: true, windows: windows, history: history), isEmpty);
+      final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 10, 20));
+      expect(summarizeDay(thin, day, plan: plan, windows: windows)[K.spo2Cov], closeTo(60 / 375, 1e-9));
     });
 
     test('Ίδια τιμή στο ιστορικό (Τάσεις, αναφορά) και στις σημειώσεις οξυγόνου', () {
       final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 10, 20));
       final row = summarizeDay(d, day, plan: plan, windows: windows);
       expect(row[K.spo2Min], 76);
-      expect(row[K.spo2Avg], closeTo(94.5, 1e-9));
+      expect(row[K.spo2Avg], closeTo((90 * 30 + 96 * 180) / 210, 1e-9));
       expect(row[K.spo2Low], closeTo(10, 1e-9));
       // Μία ακόμα νύχτα < 80% στον μήνα: με την πρώτη περίοδο μέσα, «2 νύχτες» (πριν: η 76% χανόταν).
       final history = {

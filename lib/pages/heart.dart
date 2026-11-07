@@ -100,16 +100,18 @@ class HeartPage extends StatelessWidget {
         // Οξυγόνο: πάντα του ρολογιού. Μετά τη σύνδεση του Oura ανά νύχτα μέσα στις ώρες ύπνου του Oura, και ΜΟΝΟ
         // νύχτες της ίδιας εποχής (ποτέ νύχτες πριν από την αλλαγή με άλλον ορισμό στην ίδια λίστα, A4).
         final oxSeg = store.plan.segmentStart(K.spo2Avg, day);
-        final oxNights = ouraHr
+        // 7/11: με το Oura, μέσος όρος από το Oura και χαμηλότερη από το ρολόι (μόνο με κάλυψη ≥ 50%).
+        final List<(DateTime, double?, double?)> oxNights = ouraHr
             ? [
                 for (var i = 0; i < 14; i++)
                   if (oxSeg == null || !DateTime(day.year, day.month, day.day - i).isBefore(oxSeg))
-                    if (d.watchSpo2(DateTime(day.year, day.month, day.day - i), windows) case final o? when o.avg != null)
-                      (DateTime(day.year, day.month, day.day - i), o.avg!, o.min),
+                    if (ringOxygen(store, d, DateTime(day.year, day.month, day.day - i), windows) case final o
+                        when o.avg != null || o.min != null)
+                      (DateTime(day.year, day.month, day.day - i), o.avg, o.min),
               ].take(10).toList()
             : [
                 for (final n in d.nights.where((n) => n.spo2Avg != null && (oxSeg == null || !n.date.isBefore(oxSeg))).toList().reversed.take(10))
-                  (n.date, n.spo2Avg!, n.spo2Min),
+                  (n.date, n.spo2Avg, n.spo2Min),
               ];
         // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4 (παράθυρο Oura / νύχτα ρολογιού, ίδια εποχή).
         final oxLast = ouraHr ? day : (d.lastNight?.date ?? day);
@@ -180,10 +182,17 @@ class HeartPage extends StatelessWidget {
                     icon: Icons.air_rounded,
                     title: 'Οξυγόνο στον ύπνο',
                     color: c.sleep,
-                    trailing: ouraHr ? const SourceTag(Source.watch) : null,
                   ),
                   const SizedBox(height: 8),
-                  const OxygenAbout(lead: 'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική).'),
+                  OxygenAbout(
+                      lead: ouraHr
+                          ? 'Μέσος όρος της νύχτας από το Oura· χαμηλότερη μέτρηση από το ρολόι, μόνο όταν μέτρησε '
+                              'τουλάχιστον το μισό του ύπνου (ενδεικτική).'
+                          : 'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική).'),
+                  if (ouraHr && store.ouraSpo2 == false) ...[
+                    const SizedBox(height: 8),
+                    Text(ringAvgMissing(store), style: TextStyle(color: c.textSecondary, fontSize: 13.5)),
+                  ],
                   const Hairline(vertical: 12),
                   if (oxNights.isEmpty)
                     Text('Δεν υπάρχουν μετρήσεις οξυγόνου.', style: TextStyle(color: c.textSecondary)),
@@ -191,7 +200,7 @@ class HeartPage extends StatelessWidget {
                   // οι τιμές, για να μη σπάει η ημερομηνία σε 2 γραμμές στα 360–400 dp.
                   if (oxNights.isNotEmpty)
                     Text(
-                      'μέσο · χαμηλότερη μέτρηση',
+                      ouraHr ? 'μέσο (Oura) · χαμηλότερο (ρολόι)' : 'μέσο · χαμηλότερη μέτρηση',
                       key: const ValueKey('heart-oxygen-columns'),
                       textAlign: TextAlign.right,
                       style: TextStyle(color: c.textTertiary, fontSize: 12.5),
@@ -200,7 +209,7 @@ class HeartPage extends StatelessWidget {
                     InfoRow(
                       shortDayDate(n.$1),
                       // Χωρίς «(ενδεικτικό)» σε κάθε γραμμή (το λέει το κείμενο πάνω): στα 400 dp η ημερομηνία έσπαγε σε 2 γραμμές.
-                      '${spo2AvgText(n.$2)}% · ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
+                      '${n.$2 == null ? '—' : '${spo2AvgText(n.$2!)}%'} · ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
                     ),
                   const SizedBox(height: 10),
                   OxygenNotes(guidance: oxGuidance),

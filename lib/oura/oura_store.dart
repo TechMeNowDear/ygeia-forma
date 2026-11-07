@@ -278,6 +278,9 @@ mixin OuraStore on ChangeNotifier {
       ouraSleepWindows([for (final n in ouraNights) if (plan.nightSource(n.day) == Source.oura) n]);
 
   bool ouraHasTokens = false;
+
+  /// Αν η τωρινή σύνδεση δίνει τον μέσο όρο οξυγόνου (άδεια spo2Daily, 7/11). null = δεν ξέρουμε ακόμα.
+  bool? ouraSpo2;
   bool ouraSyncing = false;
   bool ouraConnecting = false;
 
@@ -442,6 +445,14 @@ mixin OuraStore on ChangeNotifier {
     }
   }
 
+  /// Νέα σύνδεση μόνο για να δοθεί η άδεια του οξυγόνου (7/11). Η πηγή του ύπνου δεν αλλάζει (η εποχή του Oura
+  /// συνεχίζει: «από σήμερα» πέφτει μέσα στην ίδια εποχή)· τα παλιά tokens μένουν ώσπου να πετύχει η νέα σύνδεση.
+  Future<OuraErrorKind?> addOuraOxygen() async {
+    final now = dayOf(ouraClock());
+    if (plan.nightSource(now) != Source.oura) return OuraErrorKind.cancelled;
+    return beginOuraLogin(from: now);
+  }
+
   /// Το αποτέλεσμα της τελευταίας σύνδεσης, για να το δείξει η οθόνη (μία φορά), και ο κωδικός OAuth του.
   OuraErrorKind? ouraLoginError;
   String? ouraLoginCode;
@@ -549,6 +560,7 @@ mixin OuraStore on ChangeNotifier {
       ouraBackoffMs = null;
       ouraConnectedMs = now.millisecondsSinceEpoch;
       ouraJustConnected = true;
+      ouraSpo2 = ex.tokens.spo2;
       await savePrefsNow();
       await ouraLink.clearConnecting();
       // Αν η πρώτη νύχτα είναι η σημερινή, διαβάζεται αμέσως (μπορεί να έχει ήδη έρθει).
@@ -906,6 +918,7 @@ mixin OuraStore on ChangeNotifier {
       ouraNights = mergeOuraNights(ouraNights, batch.nights, from: from, to: to, today: today, keepDays: ouraDetailDays);
       if (!ouraNightsReadFailed) await _writeNights(encodeOuraNights(ouraNights));
       ouraError = null;
+      ouraSpo2 = await ouraLink.spo2Granted();
       // C9: ένα παλιότερο κομμάτι (ως 90 μέρες) μετά από καινούργια βάση, ώσπου να φτάσει στην αρχή του Oura.
       final older = saved ? ouraOlderRange() : null;
       var olderSaved = true;

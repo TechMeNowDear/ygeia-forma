@@ -83,7 +83,7 @@ void main() {
       expect(u.queryParameters['state'], 'st');
       expect(u.queryParameters['code_challenge_method'], 'S256');
       expect(u.queryParameters['code_challenge'], 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
-      expect(u.queryParameters['scope'], 'daily');
+      expect(u.queryParameters['scope'], 'daily spo2Daily');
       expect(u.queryParameters.containsKey('client_secret'), isFalse);
     });
 
@@ -470,6 +470,77 @@ void main() {
     OuraLink link(FakeHttp http, MemoryVault v) =>
         OuraLink(vault: v, send: http.send, clock: () => now, clientId: 'CID', tokenEndpoint: 'https://api.ouraring.com/oauth/token');
 
+    test('7/11 οξυγόνο: daily_spo2 μόνο με την άδεια· 403 → «χωρίς οξυγόνο», ο ύπνος διαβάζεται κανονικά', () async {
+      final calls = <String>[];
+      final http = FakeHttp((m, u, h, f) {
+        if (m == 'POST') {
+          return OuraResponse(200, jsonEncode({'access_token': 'A1', 'refresh_token': 'R1', 'expires_in': 86400}));
+        }
+        final ep = u.pathSegments.last;
+        calls.add(ep);
+        if (ep == 'daily_spo2') return const OuraResponse(403, '{}');
+        return OuraResponse(200, jsonEncode({'data': <Object>[], 'next_token': null}));
+      });
+      final v = MemoryVault()..data[vaultTokens] = tokens().withSpo2(true).toJson();
+      final b = await link(http, v).fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(b.nights, isEmpty);
+      expect(calls, ['sleep', 'daily_sleep', 'daily_readiness', 'daily_spo2']);
+      expect(OuraTokens.fromJson(v.data[vaultTokens])!.spo2, isFalse);
+      calls.clear();
+      await link(http, v).fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(calls, ['sleep', 'daily_sleep', 'daily_readiness'], reason: 'δεν ξαναζητείται χωρίς νέα σύνδεση');
+      // Παλιά σύνδεση (χωρίς «o2»): ποτέ daily_spo2.
+      final old = MemoryVault()..data[vaultTokens] = tokens().toJson();
+      calls.clear();
+      await link(http, old).fetchNights(DateTime(2026, 11, 1), DateTime(2026, 11, 7));
+      expect(calls, isNot(contains('daily_spo2')));
+    });
+
+    test('7/11 οξυγόνο: token με «scope» χωρίς spo2 → χωρίς οξυγόνο· χωρίς scope → όπως ζητήθηκε', () {
+      final a = OuraTokens.parseResponse(
+          jsonEncode({'access_token': 'A', 'refresh_token': 'R', 'expires_in': 60, 'scope': 'daily'}), now,
+          spo2: true);
+      expect(a.spo2, isFalse);
+      final b = OuraTokens.parseResponse(
+          jsonEncode({'access_token': 'A', 'refresh_token': 'R', 'expires_in': 60, 'scope': 'extapi:daily extapi:spo2Daily'}),
+          now);
+      expect(b.spo2, isTrue);
+      final c = OuraTokens.parseResponse(jsonEncode({'access_token': 'A', 'refresh_token': 'R', 'expires_in': 60}), now, spo2: true);
+      expect(c.spo2, isTrue);
+      expect(OuraTokens.fromJson(c.toJson())!.spo2, isTrue);
+      expect(ouraRequestsSpo2(), isTrue);
+      expect(ouraRequestsSpo2(OuraOAuthEndpoints.v2), isFalse);
+    });
+
+    test('7/11 οξυγόνο: daily_spo2 → μέσος όρος· νέα απάντηση χωρίς αυτό δεν σβήνει τον παλιό', () {
+      final m = mergeDailies(const [], const [], [
+        {'day': '2026-11-06', 'spo2_percentage': {'average': 95.4}, 'breathing_disturbance_index': 3},
+        {'day': '2026-11-07', 'spo2_percentage': null},
+        {'day': '2026-11-08', 'spo2_percentage': {'average': 0}},
+      ]);
+      expect(m['2026-11-06']!.spo2Avg, 95.4);
+      expect(m.containsKey('2026-11-07'), isFalse);
+      expect(m.containsKey('2026-11-08'), isFalse, reason: '0 = δεν μετρήθηκε');
+      final day = DateTime(2026, 11, 6);
+      final n = OuraNight(day: day, daily: m['2026-11-06']);
+      expect(OuraNight.fromJson(jsonDecode(jsonEncode(n.toJson())))!.spo2Avg, 95.4);
+      final fresh = OuraNight(day: day, daily: OuraDaily(day)..readiness = 80);
+      final merged = mergeOuraNights([n], [fresh], from: day, to: day, today: day);
+      expect(merged.single.spo2Avg, 95.4);
+      expect(merged.single.readiness, 80);
+      final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 1));
+      final h = {
+        '2026-11-06': {ouraSpo2Key: 95.4, 'o.readiness': 70.0},
+      };
+      mergeOura(h, {
+        '2026-11-06': {'o.readiness': 80.0},
+      }, from: day, to: day, plan: plan);
+      expect(h['2026-11-06']![ouraSpo2Key], 95.4);
+      expect(h['2026-11-06']!['o.readiness'], 80.0);
+      expect(plan.value(h, K.ringSpo2, day), 95.4);
+      expect(plan.value(h, K.ringSpo2, DateTime(2026, 10, 30)), isNull, reason: 'πριν από το Oura: κανένας μέσος όρος δαχτυλιδιού');
+    });
+
     test('Σελίδες: next_token μέχρι null, όλα μαζί', () async {
       final http = FakeHttp((m, u, h, f) {
         final p = u.queryParameters['next_token'] == null ? 'sleep_page1.json' : 'sleep_page2.json';
@@ -571,7 +642,7 @@ void main() {
       final p = OuraPending(state: 'st', verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', created: DateTime(2026, 11, 6));
       final c = ouraAuthorizeUrl(clientId: 'CID', p: p, endpoints: OuraOAuthEndpoints.classic);
       expect('${c.scheme}://${c.host}${c.path}', 'https://cloud.ouraring.com/oauth/authorize');
-      expect(c.queryParameters['scope'], 'daily');
+      expect(c.queryParameters['scope'], 'daily spo2Daily');
       final v2 = ouraAuthorizeUrl(clientId: 'CID', p: p, endpoints: OuraOAuthEndpoints.v2);
       expect('${v2.scheme}://${v2.host}${v2.path}', 'https://api.ouraring.com/v2/oauth/authorize');
       expect(v2.queryParameters['scope'], 'extapi:daily');

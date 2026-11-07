@@ -7,7 +7,6 @@ import '../plan_file.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'compare_page.dart';
 import 'oura_pages.dart';
 import 'source_widgets.dart';
 
@@ -151,32 +150,7 @@ class SourcesPage extends StatelessWidget {
           // Το σχέδιο πηγών δεν διαβάστηκε: ρητή επιλογή, τίποτα αυτόματο.
           final unknown = store.planState == PlanState.unknown ? PlanRecoveryCard(store: store) : null;
 
-          final compare = plan.compareActive(today)
-              ? AppCard(
-                  key: const ValueKey('sources-compare'),
-                  onTap: () => Navigator.of(context).push(ComparePage.route(store, now: now)),
-                  child: Row(
-                    children: [
-                      IconBadge(Icons.compare_arrows_rounded, c.sleep, size: 40),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Σύγκριση πηγών', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Oura δίπλα στο ρολόι, μόνο για έλεγχο · ως ${shortDayDate(plan.compareUntil!)}',
-                              style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-                    ],
-                  ),
-                )
-              : null;
+          final compare = OuraOxygenAccessCard.orNull(store);
 
           final noSource = nightSrc == Source.none
               ? EmptyCard(

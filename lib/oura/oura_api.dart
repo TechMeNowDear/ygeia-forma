@@ -117,30 +117,37 @@ const vaultConnecting = 'oura_connecting';
 // ---------------------------------------------------------------------------
 
 class OuraTokens {
-  const OuraTokens({required this.access, required this.refresh, required this.expiresAt});
+  const OuraTokens({required this.access, required this.refresh, required this.expiresAt, this.spo2 = false});
   final String access;
   final String refresh;
+
+  /// Αν αυτή η σύνδεση δίνει οξυγόνο (άδεια spo2Daily, από 7/11). Παλιές συνδέσεις: false ώσπου να γίνει νέα σύνδεση.
+  final bool spo2;
 
   /// Πότε λήγει η πρόσβαση (ms από την εποχή Unix).
   final int expiresAt;
 
   bool expiringSoon(DateTime now) => now.millisecondsSinceEpoch > expiresAt - const Duration(minutes: 10).inMilliseconds;
 
-  String toJson() => jsonEncode({'a': access, 'r': refresh, 'e': expiresAt});
+  String toJson() => jsonEncode({'a': access, 'r': refresh, 'e': expiresAt, if (spo2) 'o2': true});
+
+  OuraTokens withSpo2(bool v) => OuraTokens(access: access, refresh: refresh, expiresAt: expiresAt, spo2: v);
 
   static OuraTokens? fromJson(String? raw) {
     if (raw == null) return null;
     try {
       final j = jsonDecode(raw);
       if (j is! Map || j['a'] is! String || j['r'] is! String || j['e'] is! num) return null;
-      return OuraTokens(access: j['a'] as String, refresh: j['r'] as String, expiresAt: (j['e'] as num).toInt());
+      return OuraTokens(
+          access: j['a'] as String, refresh: j['r'] as String, expiresAt: (j['e'] as num).toInt(), spo2: j['o2'] == true);
     } catch (_) {
       return null;
     }
   }
 
   /// Από την απάντηση του /oauth/token. Χωρίς refresh_token δεν μπορεί να ανανεώνεται μόνη της: σφάλμα.
-  static OuraTokens parseResponse(String body, DateTime now) {
+  /// [spo2]: αν ζητήθηκε (ή είχε δοθεί) η άδεια οξυγόνου· αν η απάντηση λέει τα δικαιώματα («scope»), μετρά αυτό.
+  static OuraTokens parseResponse(String body, DateTime now, {bool spo2 = false}) {
     final j = jsonDecode(body);
     if (j is! Map) throw const FormatException('token: όχι αντικείμενο');
     final a = j['access_token'];
@@ -149,7 +156,9 @@ class OuraTokens {
     if (a is! String || a.isEmpty) throw const FormatException('token: λείπει access_token');
     if (r is! String || r.isEmpty) throw const OuraError(OuraErrorKind.noRefresh);
     final secs = e is num ? e.toInt() : 86400;
-    return OuraTokens(access: a, refresh: r, expiresAt: now.add(Duration(seconds: secs)).millisecondsSinceEpoch);
+    final scope = j['scope'];
+    final o2 = scope is String && scope.trim().isNotEmpty ? scope.toLowerCase().contains('spo2') : spo2;
+    return OuraTokens(access: a, refresh: r, expiresAt: now.add(Duration(seconds: secs)).millisecondsSinceEpoch, spo2: o2);
   }
 }
 
@@ -461,6 +470,24 @@ class OuraLink {
 
   Future<bool> get hasTokens async => (await tokens()) != null;
 
+  /// Αν η τωρινή σύνδεση δίνει οξυγόνο. null = άγνωστο (η αποθήκευση δεν απαντά).
+  Future<bool?> spo2Granted() async {
+    try {
+      final t = await tokens();
+      return t == null ? null : t.spo2;
+    } on OuraError {
+      return null;
+    }
+  }
+
+  /// Η Oura αρνήθηκε το οξυγόνο (401/403): η σύνδεση σημειώνεται «χωρίς οξυγόνο», ώστε να μη ζητείται ξανά σε κάθε
+  /// ανάγνωση (και να μην ανανεώνεται άσκοπα η πρόσβαση). Ξανά μόνο με νέα σύνδεση.
+  Future<void> _noSpo2(int gen) async {
+    final t = _tokens;
+    if (t == null || !t.spo2 || gen != _gen) return;
+    await _store(t.withSpo2(false), gen);
+  }
+
   /// Ξεκινά τη σύνδεση: φτιάχνει και κρατά (κρυπτογραφημένα) state και verifier, και δίνει τη διεύθυνση.
   /// [from]: η πρώτη νύχτα του Oura, κρατιέται με το state ως την επιστροφή.
   Future<Uri> begin({DateTime? from}) async {
@@ -517,7 +544,7 @@ class OuraLink {
       throw OuraError(tokenErrorKind(res.status, res.body, refused: OuraErrorKind.tokenRejected),
           status: res.status, retryAfter: res.retryAfter, code: oauthCodeOfBody(res.body));
     }
-    final t = OuraTokens.parseResponse(res.body, _clock());
+    final t = OuraTokens.parseResponse(res.body, _clock(), spo2: ouraRequestsSpo2(endpoints));
     return (tokens: t, from: pending.from, gen: gen);
   }
 
@@ -632,7 +659,7 @@ class OuraLink {
       throw OuraError(tokenErrorKind(res.status, res.body, refused: OuraErrorKind.reconnect, refresh: true),
           status: res.status, retryAfter: res.retryAfter, code: oauthCodeOfBody(res.body));
     }
-    final t = OuraTokens.parseResponse(res.body, _clock());
+    final t = OuraTokens.parseResponse(res.body, _clock(), spo2: old.spo2);
     // ΠΡΩΤΑ αποθήκευση του νέου refresh token, ΜΕΤΑ χρήση της νέας πρόσβασης. Μετά από αποσύνδεση δεν
     // αποθηκεύεται τίποτα (τα tokens επιστρέφονται μόνο για να ανακληθούν).
     await _store(t, gen);
@@ -724,8 +751,24 @@ class OuraLink {
     final sleep = await fetchAll('sleep', from, to);
     final dailySleep = await fetchAll('daily_sleep', from, to);
     final readiness = await fetchAll('daily_readiness', from, to);
+    // Οξυγόνο (7/11): χωριστά, και ποτέ δεν χαλάει την ανάγνωση του ύπνου. Μόνο αν η σύνδεση έχει την άδεια.
+    var spo2 = const <Map<String, dynamic>>[];
+    final gen = _gen;
+    if ((await tokens())?.spo2 == true) {
+      try {
+        spo2 = await fetchAll('daily_spo2', from, to);
+      } on OuraError catch (e) {
+        final refused = e.status == 401 || e.status == 403 || e.kind == OuraErrorKind.reconnect;
+        if (refused) await _noSpo2(gen);
+      }
+    }
     final b = parseOura(
-        sleep: sleep, dailySleep: dailySleep, readiness: readiness, stepsBetween: stepsBetween, napLocks: napLocks);
+        sleep: sleep,
+        dailySleep: dailySleep,
+        readiness: readiness,
+        spo2: spo2,
+        stepsBetween: stepsBetween,
+        napLocks: napLocks);
     final a = DateTime(from.year, from.month, from.day);
     final z = DateTime(to.year, to.month, to.day);
     return OuraBatch([for (final n in b.nights) if (!n.day.isBefore(a) && !n.day.isAfter(z)) n], skipped: b.skipped);

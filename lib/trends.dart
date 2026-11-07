@@ -141,7 +141,7 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.energy, label: 'Energy Score', section: TrendSection.other, minDiff: 3, better: 1),
   // Οξυγόνο: ουδέτερο χρώμα (δεύτερος κλινικός έλεγχος M8). Μια διαφορά 1–2% είναι μέσα στο λάθος του καρπού
   // (RMSE ~2%), και αν κόψεις το κάπνισμα η ένδειξη πέφτει (λιγότερη καρβοξυαιμοσφαιρίνη): δεν είναι «χειρότερα».
-  MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο', section: TrendSection.other, minDiff: 1, unit: '%'),
+  MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο (ρολόι)', section: TrendSection.other, minDiff: 1, unit: '%'),
 ];
 
 /// Μετρήσεις που υπάρχουν μόνο με το Oura.
@@ -150,6 +150,8 @@ const ouraTrendMetrics = <MetricDef>[
   MetricDef(key: K.hrv, label: 'HRV νύχτας (RMSSD)', section: TrendSection.heart, minDiff: 3, unit: 'ms'),
   MetricDef(key: K.lowHr, label: 'Χαμηλότεροι παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm'),
   MetricDef(key: K.breath, label: 'Αναπνοές στον ύπνο', section: TrendSection.other, minDiff: 0.5, unit: 'το λεπτό', digits: 1),
+  // 7/11: ο μέσος όρος οξυγόνου της νύχτας από το Oura (ουδέτερο χρώμα, όπως του ρολογιού).
+  MetricDef(key: K.ringSpo2, label: 'Οξυγόνο στον ύπνο (Oura)', section: TrendSection.other, minDiff: 1, unit: '%'),
 ];
 
 /// Ο ορισμός μιας μέτρησης (και όσων υπάρχουν μόνο με το Oura).
