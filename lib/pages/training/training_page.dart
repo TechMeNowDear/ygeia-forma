@@ -198,11 +198,14 @@ class _TrainingPageState extends State<TrainingPage> {
         final (col, arrow) = changeLook(context, tg.change);
         children.add(Padding(
           padding: const EdgeInsets.symmetric(vertical: 7),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: Text(exName(item.ex), style: TextStyle(fontSize: 15, color: c.text))),
-            const SizedBox(width: 8),
-            Text('${targetLine(item, tg)}$arrow', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: col)),
-          ]),
+          // Όνομα αριστερά, στόχος δεξιά· αν δεν χωράνε (μεγάλα γράμματα), ο στόχος πάει από κάτω.
+          child: SizedBox(
+            width: double.infinity,
+            child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
+              Text(exName(item.ex), style: TextStyle(fontSize: 15, color: c.text)),
+              Text('${targetLine(item, tg)}$arrow', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: col)),
+            ]),
+          ),
         ));
       }
       final setup = _setupHint(w);

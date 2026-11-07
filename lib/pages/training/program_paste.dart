@@ -118,13 +118,17 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
             for (final i in w.items)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text))),
-                  Text(
-                    '${repsRange(i)} · ${restText(i.rest)}${hasLoad(i.kind) && i.load != null ? ' · ${loadLabel(i.kind, i.load)}' : ''}',
-                    style: TextStyle(fontSize: 13.5, color: c.textSecondary),
-                  ),
-                ]),
+                // Όνομα αριστερά, στόχος δεξιά· αν δεν χωράνε (μεγάλα γράμματα), ο στόχος πάει από κάτω.
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
+                    Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text)),
+                    Text(
+                      '${repsRange(i)} · ${restText(i.rest)}${hasLoad(i.kind) && i.load != null ? ' · ${loadLabel(i.kind, i.load)}' : ''}',
+                      style: TextStyle(fontSize: 13.5, color: c.textSecondary),
+                    ),
+                  ]),
+                ),
               ),
           ]),
         ));
