@@ -5,7 +5,7 @@ name: Έλεγχος κλάδου
 
 on:
   push:
-    branches-ignore: [main, screenshots, screenshots-dev, food-raw]
+    branches-ignore: [main, screenshots, screenshots-dev, food-raw, widget-shots]
 
 permissions:
   contents: write
@@ -238,10 +238,10 @@ jobs:
             exit 1
           fi
 
-      - name: Στιγμιότυπα widgets
+      - name: Στιγμιότυπα widgets (κλάδος widget-shots)
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: widget-shots
-          path: widget_shots/
-          if-no-files-found: ignore
+        run: |
+          [ -d widget_shots ] && [ -n "$(ls widget_shots)" ] || exit 0
+          cd widget_shots
+          git init -q && git checkout -q -b widget-shots && git add . && git -c user.name=ci -c user.email=ci@x commit -qm "widget shots ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" widget-shots
