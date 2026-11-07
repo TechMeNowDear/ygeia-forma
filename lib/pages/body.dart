@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
+import '../history.dart';
+import '../profile.dart';
+import '../reference.dart';
 import '../shown.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'info_sheet.dart';
+import 'me_page.dart';
 
 class BodyPage extends StatelessWidget {
   const BodyPage({super.key, required this.store});
@@ -39,7 +44,13 @@ class BodyPage extends StatelessWidget {
               text: 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ μέσω Samsung Health σε λίγα λεπτά.',
             )
           else
-            _LatestCard(last: last, previous: d?.previousBody, now: d?.readAt ?? DateTime.now()),
+            _LatestCard(
+              last: last,
+              previous: d?.previousBody,
+              now: d?.readAt ?? DateTime.now(),
+              profile: store.profile,
+              onProfile: () => Navigator.of(context).push(MePage.route(store)),
+            ),
           if (body.where((b) => b.weight != null).length >= 2)
             _chartCard(
               context,
@@ -144,10 +155,12 @@ class BodyPage extends StatelessWidget {
 }
 
 class _LatestCard extends StatelessWidget {
-  const _LatestCard({required this.last, required this.previous, required this.now});
+  const _LatestCard({required this.last, required this.previous, required this.now, required this.profile, required this.onProfile});
   final BodyMeasurement last;
   final BodyMeasurement? previous;
   final DateTime now;
+  final Profile profile;
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -172,14 +185,14 @@ class _LatestCard extends StatelessWidget {
             icon: Icons.monitor_weight_rounded,
             title: 'Τελευταία ζύγιση · ${relativeDay(last.time, now)} ${hm(last.time)}',
             color: c.body,
+            trailing: const InfoButton(K.weight),
           ),
           const SizedBox(height: 14),
           BigValue(last.weight == null ? '—' : dec(last.weight!), unit: 'kg', size: 34),
           if (p != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}. Η ζυγαριά (ρεύμα στο σώμα) αλλάζει από μέρα σε μέρα '
-              'με το νερό και το φαγητό: αλλαγή κάτω από 1 kg στο βάρος ή κάτω από 2 μονάδες στο λίπος δεν σημαίνει κάτι.',
+              'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}.',
               style: TextStyle(color: c.textSecondary, fontSize: 13),
             ),
           ],
@@ -191,18 +204,58 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Άλιπη μάζα', withDiff(last.leanMass, p?.leanMass, 'kg')),
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
           if (last.bmi != null) InfoRow('Δείκτης μάζας σώματος', dec(last.bmi!)),
+          if (last.bmi == null && bmiOf(last.weight, profile.heightCm) != null)
+            InfoRow('Δείκτης μάζας σώματος', dec(bmiOf(last.weight, profile.heightCm)!)),
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
+          // 7/11: εύρη αναφοράς με πηγή (λίπος ανά ηλικία και φύλο, υγιές βάρος για το ύψος). Η εξήγηση στο «i».
+          const Hairline(vertical: 12),
+          ..._ranges(context),
           const SizedBox(height: 8),
-          // Απόφαση 2/11: ό,τι δεν είναι ζύγισμα κιλών το λέμε εκτίμηση, και πώς γίνεται συγκρίσιμη.
           Text(
-            'Λίπος, μύες, άλιπη μάζα και μεταβολισμός είναι εκτιμήσεις της ζυγαριάς, όχι μέτρηση εργαστηρίου: '
-            'η τιμή μπορεί να απέχει μερικές μονάδες από την πραγματική. Η αλλαγή μέσα σε εβδομάδες λέει περισσότερα '
-            'από την ίδια την τιμή, αν ζυγίζεσαι πάντα με τον ίδιο τρόπο: πρωί, πριν φας ή πιεις, μετά την τουαλέτα '
-            'και πριν από την άσκηση.',
+            'Λίπος και μύες είναι εκτιμήσεις της ζυγαριάς· σύγκρινε ζυγίσεις με τις ίδιες συνθήκες.',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
           ),
         ],
       ),
     );
+  }
+
+  List<Widget> _ranges(BuildContext context) {
+    final c = Aigaio.of(context);
+    final fat = fatRange(profile, now);
+    final weightRange = healthyWeight(profile.heightCm);
+    final label = TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.text);
+    final out = <Widget>[];
+    if (last.fatPct != null && fat != null) {
+      out.addAll([
+        Row(children: [Expanded(child: Text('Λίπος', style: label)), const InfoButton(K.fatPct)]),
+        RangeNote(value: last.fatPct!, range: fat, min: 5, max: 40, color: c.body),
+        const SizedBox(height: 12),
+      ]);
+    }
+    if (last.weight != null && weightRange != null) {
+      final (lo, hi) = weightRange;
+      final r = RefRange(
+        low: lo,
+        high: hi,
+        text: 'υγιές βάρος για το ύψος σου ${dec(lo)}–${dec(hi)} kg',
+        cite: bmiRange.cite,
+      );
+      out.addAll([
+        Text('Βάρος', style: label),
+        const SizedBox(height: 6),
+        RangeNote(value: last.weight!, range: r, min: lo - 15, max: hi + 25, color: c.body),
+      ]);
+    }
+    if (fat == null || weightRange == null) {
+      out.add(Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(
+          onPressed: onProfile,
+          child: const Text('Πρόσθεσε ηλικία, φύλο και ύψος για να δεις τα εύρη'),
+        ),
+      ));
+    }
+    return out;
   }
 }

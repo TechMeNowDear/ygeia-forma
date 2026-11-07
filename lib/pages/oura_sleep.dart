@@ -7,10 +7,12 @@ import '../oura/oura_model.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
 import '../oxygen_note.dart';
+import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
@@ -39,7 +41,11 @@ class OuraSleepPage extends StatelessWidget {
     final lastCard = last == null
         ? _EmptyNightCard(reason: reason ?? EmptyNight.noRing, day: today, night: store.ouraNightFor(today))
         : _OuraNightCard(
-            night: last, now: now, reason: sameDay(last.day, today) ? null : reason, todayNight: store.ouraNightFor(today));
+            night: last,
+            now: now,
+            reason: sameDay(last.day, today) ? null : reason,
+            todayNight: store.ouraNightFor(today),
+            range: sleepRange(store.profile, today));
 
     final stagesCard = AppCard(
       child: Column(
@@ -132,8 +138,11 @@ class _EmptyNightCard extends StatelessWidget {
 }
 
 class _OuraNightCard extends StatelessWidget {
-  const _OuraNightCard({required this.night, required this.now, this.reason, this.todayNight});
+  const _OuraNightCard({required this.night, required this.now, this.reason, this.todayNight, this.range});
   final OuraNight night;
+
+  /// 7/11: το εύρος αναφοράς του ύπνου (≥ 7 ώρες για ενήλικες), αν ισχύει για την ηλικία.
+  final RefRange? range;
 
   /// Η χθεσινή (π.χ. μόνο υπνάκος), για να φαίνονται οι ώρες της.
   final OuraNight? todayNight;
@@ -179,6 +188,7 @@ class _OuraNightCard extends StatelessWidget {
               child: CardHeader(icon: Icons.bedtime_rounded, title: 'Τελευταία νύχτα · ${shortDayDate(night.day)}', color: c.sleep),
             ),
             const SourceTag(Source.oura),
+            InfoButton(K.sleepMin, range: range),
           ]),
           if (night.shortNight && (minutes ?? 0) < 180) ...[
             const SizedBox(height: 8),
@@ -207,6 +217,10 @@ class _OuraNightCard extends StatelessWidget {
                 ),
             ],
           ),
+          if (minutes != null && range != null) ...[
+            const SizedBox(height: 12),
+            RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep),
+          ],
           const SizedBox(height: 14),
           Row(children: [clock('Ξάπλωσες', parts.first.start), clock('Κοιμήθηκες', parts.first.onset), clock('Ξύπνησες', parts.last.end)]),
           if (n.stages.isNotEmpty) ...[
@@ -278,6 +292,7 @@ class _OuraHeartCard extends StatelessWidget {
           Row(children: [
             Expanded(child: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά στον ύπνο', color: c.heart)),
             const SourceTag(Source.oura),
+            const InfoButton(K.hrv),
           ]),
           const SizedBox(height: 12),
           Row(children: [
@@ -385,7 +400,12 @@ class _BreathCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(icon: Icons.air_rounded, title: 'Αναπνοή και οξυγόνο τη νύχτα', color: c.sleep),
+          CardHeader(
+            icon: Icons.air_rounded,
+            title: 'Αναπνοή και οξυγόνο τη νύχτα',
+            color: c.sleep,
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: const [InfoButton(K.breath), InfoButton(K.ringSpo2)]),
+          ),
           const SizedBox(height: 6),
           row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
           const Hairline(vertical: 2),

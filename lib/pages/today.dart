@@ -7,6 +7,7 @@ import '../history.dart';
 import '../labels.dart';
 import '../nav.dart';
 import '../oxygen_note.dart';
+import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
@@ -17,6 +18,7 @@ import 'oura_today.dart';
 import 'sources_page.dart';
 import 'unusual_card.dart';
 import 'week_card.dart';
+import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
 
 /// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
@@ -98,6 +100,9 @@ class TodayPage extends StatelessWidget {
         final week = review == null ? null : WeekCard(review: review);
         final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.analysisPlan) : null;
         final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
+        // 7/11: εβδομαδιαίο ζύγισμα. Τη μέρα ζυγίσματος, ώσπου να φτάσει ζύγιση της ίδιας μέρας.
+        final weighedToday = d.latestBody != null && sameDay(d.latestBody!.time, now);
+        final weigh = now.weekday == store.profile.weighDay && !weighedToday ? const _WeighCard() : null;
         final foodCard = prefs.show('food')
             ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))
             : null;
@@ -165,6 +170,7 @@ class TodayPage extends StatelessWidget {
           onRefresh: () => store.refresh(),
           single: [
             ...alerts,
+            if (weigh != null) weigh,
             if (sleep != null) sleep,
             if (rest != null) rest,
             if (week != null) week,
@@ -173,7 +179,7 @@ class TodayPage extends StatelessWidget {
             footer,
           ],
           top: alerts,
-          left: [if (sleep != null) sleep, if (rest != null) rest, if (week != null) week],
+          left: [if (weigh != null) weigh, if (sleep != null) sleep, if (rest != null) rest, if (week != null) week],
           right: [if (foodCard != null) foodCard, ...more, footer],
         );
       },
@@ -610,6 +616,51 @@ class _DatabaseCard extends StatelessWidget {
           'Samsung Health. Το ημερολόγιο φαγητού επανέρχεται από το αντίγραφό σου (Ρυθμίσεις › Αντίγραφο ασφαλείας).',
       buttonText: 'Εντάξει',
       onPressed: () => store.dismissDatabaseNotice(),
+    );
+  }
+}
+
+/// «Σήμερα ζύγιση» (7/11): τη μέρα που όρισε ο χρήστης (Τα στοιχεία μου). Φεύγει μόνη της μόλις φτάσει ζύγιση της
+/// ίδιας μέρας από την InBody. Χωρίς ειδοποίηση· μόνο κάρτα.
+class _WeighCard extends StatelessWidget {
+  const _WeighCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Container(
+      key: const ValueKey('today-weigh'),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: c.tint(c.body),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.body.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconBadge(Icons.monitor_weight_rounded, c.body, size: 40),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Σήμερα ζύγιση', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text)),
+                const SizedBox(height: 4),
+                Text(
+                  'Το πρωί, μετά την τουαλέτα, πριν φας ή πιεις. Η κάρτα φεύγει μόλις φτάσει η ζύγιση από το InBody.',
+                  style: TextStyle(fontSize: 14, height: 1.4, color: c.text),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
+                  onPressed: () => showMetricInfo(context, metricInfos[K.weight]!),
+                  child: const Text('Πώς ζυγίζομαι σωστά'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -17,7 +17,7 @@ const backupApp = 'ygeia-forma';
 const backupVersion = 1;
 
 /// Οι ρυθμίσεις που μπαίνουν στο αντίγραφο (όχι η πρόοδος του ιστορικού, που είναι τεχνική).
-const backupPrefKeys = ['cards', 'kitchen', 'themeMode', 'dayTheme', 'nightTheme'];
+const backupPrefKeys = ['cards', 'kitchen', 'themeMode', 'dayTheme', 'nightTheme', 'me'];
 
 String buildBackup({
   required List<Map<String, dynamic>> foodLog,

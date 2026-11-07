@@ -11,6 +11,7 @@ import 'pages/heart.dart';
 import 'pages/mine.dart';
 import 'pages/move.dart';
 import 'pages/nutrition.dart';
+import 'pages/recovery.dart';
 import 'pages/settings.dart';
 import 'pages/sleep.dart';
 import 'pages/today.dart';
@@ -124,7 +125,7 @@ class _ShellState extends State<Shell> {
 
   // Για την αναφορά σφαλμάτων: σε ποια κατηγορία και καρτέλα είμαι.
   static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
-  static const _healthTabs = ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'];
+  static const _healthTabs = ['Ύπνος', 'Ανάκαμψη', 'Καρδιά', 'Σώμα', 'Τάσεις'];
   static const _foodTabs = ['Ημερολόγιο', 'Τα δικά μου'];
   static const _exerciseTabs = ['Κίνηση'];
 
@@ -187,10 +188,11 @@ class _ShellState extends State<Shell> {
         solid: c.healthSolid,
         tab: _healthTab,
         now: widget.now,
-        tabs: const ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'],
+        tabs: _healthTabs,
         pages: [
           SleepPage(store: store, now: widget.now),
-          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.sleep),
+          RecoveryPage(store: store, now: widget.now),
+          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.recovery),
           BodyPage(store: store),
           TrendsPage(store: store, now: widget.now),
         ],

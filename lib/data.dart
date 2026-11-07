@@ -10,6 +10,7 @@ import 'format.dart';
 import 'history.dart';
 import 'oura/config.dart' show ouraMaxBackDays;
 import 'oura/oura_model.dart';
+import 'profile.dart';
 import 'oura/oura_store.dart';
 import 'oxygen_note.dart' show oxygenLongWindowNights;
 import 'plan_file.dart';
@@ -869,6 +870,7 @@ class Prefs {
       this.rereadVersion,
       this.ouraRefetchTo,
       this.ouraRules = 0,
+      this.me,
       Map<String, int>? monthFails,
       List<String>? staleMonths})
       : plan = plan ?? SourcePlan.samsungOnly,
@@ -912,6 +914,7 @@ class Prefs {
       rereadVersion: (j['rereadVersion'] as num?)?.toInt(),
       ouraRefetchTo: j['ouraRefetchTo'] is String ? j['ouraRefetchTo'] as String : null,
       ouraRules: (j['ouraRules'] as num?)?.toInt() ?? 0,
+      me: j['me'] is Map ? Map<String, dynamic>.from(j['me'] as Map) : null,
       monthFails: {
         if (j['monthFails'] is Map)
           for (final e in (j['monthFails'] as Map).entries)
@@ -926,6 +929,9 @@ class Prefs {
 
   /// Έλεγχος 2, C12: με ποιους κανόνες γράφτηκαν οι τιμές «o.*» (δες [ouraRulesVersion]).
   int ouraRules;
+
+  /// «Τα στοιχεία μου» (7/11, profile.dart): γέννηση, φύλο, ύψος, μέρα ζυγίσματος.
+  Map<String, dynamic>? me;
 
   /// Έλεγχος 2, C9: ως πού μένει να ξαναδιαβαστεί το Oura πιο πίσω από τις 90 μέρες (μετά από καινούργια βάση).
   String? ouraRefetchTo;
@@ -1036,6 +1042,7 @@ class Prefs {
         if (rereadVersion != null) 'rereadVersion': rereadVersion,
         if (ouraRefetchTo != null) 'ouraRefetchTo': ouraRefetchTo,
         if (ouraRules != 0) 'ouraRules': ouraRules,
+        if (me != null) 'me': me,
         if (monthFails.isNotEmpty) 'monthFails': monthFails,
         if (staleMonths.isNotEmpty) 'staleMonths': staleMonths,
       });
@@ -2326,6 +2333,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       });
 
   void setCard(String key, bool on) => _changePrefs((p) => p.cards[key] = on);
+
+  /// «Τα στοιχεία μου» (7/11).
+  Profile get profile => Profile.fromJson(prefs.me);
+  void setProfile(Profile v) => _changePrefs((p) => p.me = v.toJson());
 
   /// Έλεγχος 3, E6: το όνομα της αναφοράς. Αν οι ρυθμίσεις δεν έχουν διαβαστεί ακόμα, μπαίνει πάνω τους όταν έρθουν
   /// (πριν χανόταν: γραφόταν στις προεπιλογές, που αντικαθίσταντο).

@@ -9,9 +9,12 @@ class Cat {
 /// Καρτέλες μέσα στην Υγεία.
 class HealthTab {
   static const sleep = 0;
-  static const heart = 1;
-  static const body = 2;
-  static const trends = 3;
+
+  /// 7/11: Ετοιμότητα, HRV, θερμοκρασία (από το Oura).
+  static const recovery = 1;
+  static const heart = 2;
+  static const body = 3;
+  static const trends = 4;
 }
 
 /// Καρτέλες μέσα στη Διατροφή.

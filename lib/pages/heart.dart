@@ -5,11 +5,13 @@ import '../format.dart';
 import '../history.dart';
 import '../oura/oura_view.dart';
 import '../oxygen_note.dart';
+import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../unusual.dart';
 import '../widgets.dart';
+import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 
@@ -153,7 +155,10 @@ class HeartPage extends StatelessWidget {
                     icon: Icons.bedtime_rounded,
                     title: datedTitle('Παλμοί στον ύπνο', rhrNight, day),
                     color: c.sleep,
-                    trailing: store.plan.nightSource(day) == Source.oura ? const SourceTag(Source.oura) : null,
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (store.plan.nightSource(day) == Source.oura) const SourceTag(Source.oura),
+                      const InfoButton(K.sleepHr),
+                    ]),
                   ),
                   const SizedBox(height: 14),
                   if (lastRhr != null) BigValue('${lastRhr.round()}', unit: 'bpm', size: 34),
@@ -173,6 +178,7 @@ class HeartPage extends StatelessWidget {
                 ],
               ),
             ),
+            _AwakeHeartCard(store: store, day: day),
             // Στο tablet/PC κάτω από τους παλμούς ύπνου, για να μη μένει η αριστερή στήλη με μία κάρτα (UX U10).
             AppCard(
               child: Column(
@@ -182,6 +188,7 @@ class HeartPage extends StatelessWidget {
                     icon: Icons.air_rounded,
                     title: 'Οξυγόνο στον ύπνο',
                     color: c.sleep,
+                    trailing: ouraHr ? const InfoButton(K.ringSpo2) : null,
                   ),
                   const SizedBox(height: 8),
                   OxygenAbout(
@@ -248,22 +255,6 @@ class HeartPage extends StatelessWidget {
                 ],
               ),
             ),
-            if (!ouraHr)
-              EmptyCard(
-                icon: Icons.timeline_rounded,
-                color: c.sleep,
-                title: 'HRV (μεταβλητότητα παλμών)',
-                text: 'Η Samsung δεν το δίνει σε άλλες εφαρμογές, γι\' αυτό δεν φαίνεται εδώ.',
-              )
-            else
-              EmptyCard(
-                icon: Icons.timeline_rounded,
-                color: c.sleep,
-                title: 'HRV (μεταβλητότητα παλμών)',
-                text: 'Έρχεται από το Oura και φαίνεται στον Ύπνο, στην κάρτα «Καρδιά στον ύπνο».',
-                buttonText: onOpenSleep == null ? null : 'Άνοιγμα Ύπνου',
-                onPressed: onOpenSleep,
-              ),
             // Κλινικός έλεγχος M6 (4/11): όποιος έχει συμπτώματα ανοίγει πρώτα την Καρδιά.
             Padding(
               key: const ValueKey('heart-red-flags'),
@@ -273,6 +264,62 @@ class HeartPage extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+
+/// Παλμοί ξύπνιος (7/11): ο μέσος όρος των παλμών του ρολογιού όλη τη μέρα έξω από τον ύπνο (ώρες ύπνου από το Oura),
+/// με βάρος τον χρόνο, μαζί με την κίνηση. Μόνο ολοκληρωμένες μέρες (η σημερινή δεν μετρά). Χωρίς εύρος: δεν υπάρχει
+/// δημοσιευμένο για αυτόν τον μέσο όρο· μόνο το «συνήθως» του χρήστη.
+class _AwakeHeartCard extends StatelessWidget {
+  const _AwakeHeartCard({required this.store, required this.day});
+  final HealthStore store;
+  final DateTime day;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final plan = store.plan;
+    DateTime? last;
+    for (var i = 1; i <= 3 && last == null; i++) {
+      final d = DateTime(day.year, day.month, day.day - i);
+      if (plan.value(store.history, K.dayHr, d) != null) last = d;
+    }
+    final b = last == null ? null : personalBaseline(store.history, plan, K.dayHr, last);
+    final pts = planSeries(store.history, plan, K.dayHr, DateTime(day.year, day.month, day.day - 30), DateTime(day.year, day.month, day.day - 1)).points;
+    String? usual;
+    if (b?.usual != null) {
+      final d = shownDiff(b!.value, b.usual!);
+      usual = d == 0 ? '$asUsualText · συνήθως ${b.usual!.round()} bpm' : '${signedShown(d)} bpm · συνήθως ${b.usual!.round()} bpm';
+    } else if (b != null) {
+      usual = 'Το συνηθισμένο σου βγαίνει μετά από 7 μέρες';
+    }
+    return AppCard(
+      key: const ValueKey('heart-awake'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CardHeader(
+            icon: Icons.directions_walk_rounded,
+            title: 'Παλμοί ξύπνιος',
+            subtitle: last == null ? null : shortDayDate(last),
+            color: c.heart,
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: const [SourceTag(Source.watch), InfoButton(K.dayHr)]),
+          ),
+          const SizedBox(height: 10),
+          BigValue(b == null ? '—' : '${b.value.round()}', unit: 'bpm', size: 34),
+          const SizedBox(height: 6),
+          Text(
+            usual ?? 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.',
+            style: TextStyle(color: c.textSecondary, fontSize: 13.5),
+          ),
+          if (pts.length >= 2) ...[
+            const SizedBox(height: 14),
+            LineChart(points: pts, color: c.heart, format: (v) => v.round().toString(), minRange: 8, dateLabel: dayMonth),
+          ],
+        ],
+      ),
     );
   }
 }

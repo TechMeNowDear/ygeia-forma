@@ -13,6 +13,8 @@ import '../ti_ftanei.dart';
 import '../widgets.dart';
 import 'appearance.dart';
 import 'sources_page.dart';
+import 'me_page.dart';
+import '../profile.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
@@ -74,6 +76,30 @@ class SettingsPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      AppCard(
+                        key: const ValueKey('settings-me'),
+                        onTap: () => Navigator.of(context).push(MePage.route(store)),
+                        child: Row(
+                          children: [
+                            IconBadge(Icons.person_rounded, c.body, size: 40),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Τα στοιχεία μου', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Ηλικία, φύλο, ύψος για τα εύρη · ζύγιση κάθε ${weekdayNames[store.profile.weighDay - 1]}',
+                                    style: TextStyle(color: c.textSecondary, fontSize: 13.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+                          ],
+                        ),
+                      ),                      const SizedBox(height: 12),
                       AppCard(
                         key: const ValueKey('settings-sources'),
                         onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
