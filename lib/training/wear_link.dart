@@ -9,6 +9,7 @@ import '../exercise/ex_data.dart';
 import 'equipment.dart';
 import 'program.dart';
 import 'session.dart';
+import 'training_device.dart';
 import 'training_store.dart';
 
 /// Τι στέλνει το κινητό στο ρολόι: το πρόγραμμα με έτοιμους στόχους ανά σετ (ίδιοι με του κινητού) και το όριο παλμών.
@@ -130,6 +131,7 @@ class WearLink with WidgetsBindingObserver {
   TrainingStore? _t;
   StreamSubscription<dynamic>? _sub;
   String? _lastPlan;
+  String? _lastSafety;
   String? _lastSession;
   bool _started = false;
 
@@ -203,7 +205,11 @@ class WearLink with WidgetsBindingObserver {
       final plan = jsonEncode(watchPlan(t, t.now, _name));
       if (plan != _lastPlan) {
         _lastPlan = plan;
-        _m.invokeMethod<bool>('putPlan', {'json': plan}).catchError((_) => false);
+        // Έγκριση ή όριο παλμών άλλαξε: να φτάσει αμέσως, όχι όποτε βολέψει το σύστημα.
+        final safety = '${t.approved}|${t.hrLimit}';
+        final urgent = safety != _lastSafety;
+        _lastSafety = safety;
+        _m.invokeMethod<bool>('putPlan', {'json': plan, 'urgent': urgent}).catchError((_) => false);
       }
       final sess = jsonEncode(watchSession(t, _name));
       if (sess != _lastSession) {
@@ -261,7 +267,60 @@ class WearLink with WidgetsBindingObserver {
         if (bpm > 0) hr.value = (bpm, DateTime.now());
         ready.value = true;
       case '/ygeia/cmd':
-        _cmds.add(WatchCmd(j['op'] as String? ?? '', j));
+        final c = WatchCmd(j['op'] as String? ?? '', j);
+        if (t != null) apply(t, c);
+        _cmds.add(c);
+    }
+  }
+
+  /// Εντολή από το ρολόι, κατευθείαν στην αποθήκη: γράφεται ακόμα κι αν η οθόνη της προπόνησης
+  /// δεν είναι ανοιχτή (έλεγχος 8/11). Ίδια αποτελέσματα με τα πατήματα στο κινητό, χωρίς φύλλα ερωτήσεων.
+  void apply(TrainingStore t, WatchCmd c) {
+    final s = t.current;
+    if (s == null || (c.sid.isNotEmpty && c.sid != s.id)) return;
+    switch (c.op) {
+      case 'goto':
+        if (c.i >= 0 && c.i < s.items.length) t.focus = c.i;
+        return;
+      case 'rest':
+        if (c.v == 'plus') {
+          final end = (t.restEnd ?? t.now).add(const Duration(seconds: 30));
+          t.restEnd = end;
+          TrainingDevice.rest(end, title: 'Διάλειμμα', text: 'Συνέχισε όταν τελειώσει', doneTitle: 'Τέλος διαλείμματος', doneText: 'Επόμενο σετ');
+        } else {
+          t.restEnd = null;
+          TrainingDevice.restCancel();
+        }
+        return;
+    }
+    if (c.i < 0 || c.i >= s.items.length) return;
+    final e = s.items[c.i];
+    switch (c.op) {
+      case 'tick':
+        if (c.s < 0 || c.s >= e.log.length || e.log[c.s].done) return;
+        t.tick(e, c.s);
+        String? next;
+        if (e.complete) {
+          final n = s.items.indexWhere((x) => !x.skipped && !x.complete);
+          if (n >= 0) {
+            t.focus = n;
+            next = _name(s.items[n].ex);
+          }
+        } else {
+          next = '${_name(e.ex)} · σετ ${e.done.length + 1}';
+        }
+        if (next != null && e.rest > 0) {
+          final end = t.now.add(Duration(seconds: e.rest));
+          t.restEnd = end;
+          TrainingDevice.rest(end, title: 'Διάλειμμα', text: 'Επόμενο: $next', doneTitle: 'Τέλος διαλείμματος', doneText: 'Επόμενο: $next');
+        }
+      case 'rir':
+        // Μόνο για άσκηση που τελείωσε και δεν έχει ήδη απάντηση (να μη γραφτεί σε λάθος άσκηση).
+        final v = c.v;
+        if (v is num && e.complete && e.rirAnswer == null) t.answer(e, v.toInt().clamp(0, 4));
+      case 'reps':
+        final v = c.v;
+        if (v is num && c.s >= 0 && c.s < e.log.length) t.setReps(e, c.s, v.toInt());
     }
   }
 

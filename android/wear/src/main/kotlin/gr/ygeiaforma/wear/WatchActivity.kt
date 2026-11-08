@@ -196,8 +196,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun answer(rir: Int) {
         val s = Repo.session ?: return
         val now = System.currentTimeMillis()
-        val i = s.idx
-        val next = s.answer(rir, now)
+        val (next, i) = s.answer(rir, now)
         if (s.phone) cmd(JSONObject().put("op", "rir").put("i", i).put("v", rir))
         else Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)))
         if (next == LiveSession.Next.END && !s.phone) {
@@ -271,7 +270,43 @@ class WatchActivity : Activity(), WatchView.Actions {
         Repo.alarmMutedUntil = System.currentTimeMillis() + 60_000
     }
 
+    override fun feel() {
+        Repo.symBack = Repo.screen
+        Repo.symSent = false
+        Repo.screen = Repo.Screen.SYM
+        redraw()
+    }
+
+    override fun feelBack() {
+        Repo.screen = Repo.symBack
+        redraw()
+    }
+
+    /** «Σταμάτησα»: γράφεται στο κινητό (μένει ώσπου να το πάρει) και σταματά η μέτρηση. */
+    override fun feelStop() {
+        val now = System.currentTimeMillis()
+        val o = JSONObject().put("v", 1).put("kind", "sym").put("at", now)
+        Repo.phone?.id?.let { o.put("sid", it) }
+        scope.launch { Link.putResult(this@WatchActivity, "sym$now", o) }
+        Repo.symSent = true
+        // Η δική του προπόνηση/περπάτημα: σταματά και γράφεται ό,τι έγινε. Του κινητού: τη σταματά το κινητό.
+        if (Repo.running != null && !Repo.runningPhone) {
+            ExerciseService.stop(this)
+        } else if (Repo.running == null && Repo.local != null) {
+            val s = Repo.local!!
+            Repo.local = null
+            if (s.setsDone > 0) {
+                val r = s.resultJson(now, HrStats(now))
+                Repo.snapshot(this, r)
+                scope.launch { if (Link.putResult(this@WatchActivity, s.id, r)) Repo.snapshot(this@WatchActivity, null) }
+            }
+        }
+        Repo.screen = Repo.Screen.SYM
+        redraw()
+    }
+
     override fun doneOk() {
+        Repo.symSent = false
         Repo.screen = Repo.Screen.HOME
     }
 }

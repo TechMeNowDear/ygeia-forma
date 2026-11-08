@@ -35,7 +35,9 @@ class HrBar extends StatelessWidget {
             Text('bpm', style: TextStyle(fontSize: 13, color: c.textSecondary)),
             const Spacer(),
             if (over)
-              Text('Σταμάτα, ανάσα', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.bad))
+              Flexible(
+                child: Text('Ξεκουράσου μέχρι να πέσουν', textAlign: TextAlign.end, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.bad)),
+              )
             else if (limit != null)
               Text('όριο $limit', style: TextStyle(fontSize: 13, color: c.textSecondary)),
           ]),
@@ -43,6 +45,42 @@ class HrBar extends StatelessWidget {
             const SizedBox(height: 8),
             SizedBox(height: 10, child: CustomPaint(painter: _BarPainter(bpm, limit!, c))),
           ],
+        ]),
+      ),
+    );
+  }
+}
+
+/// Οι παλμοί σταμάτησαν να έρχονται από το ρολόι: να φαίνεται, όχι να εξαφανίζεται η γραμμή (έλεγχος 8/11).
+class HrStale extends StatelessWidget {
+  const HrStale({super.key, this.limit});
+  final int? limit;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const ValueKey('hr-stale'),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: BoxDecoration(
+          color: c.exercise.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: c.exercise),
+        ),
+        child: Row(children: [
+          Icon(Icons.heart_broken_outlined, color: c.exercise, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Οι παλμοί δεν έρχονται από το ρολόι', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
+              Text(
+                limit == null ? 'Σφίξε λίγο το λουρί, πάνω από το κόκαλο του καρπού.' : 'Σφίξε λίγο το λουρί. Μέχρι να ξανάρθουν, πήγαινε με την κούραση.',
+                style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary),
+              ),
+            ]),
+          ),
         ]),
       ),
     );
@@ -110,8 +148,12 @@ class HrCard extends StatelessWidget {
         if (limit != null) ...[
           const SizedBox(height: 8),
           Text(
-            h.overSec == 0 ? 'Δεν ξεπέρασες το όριο ($limit).' : 'Πάνω από το όριο ($limit) για περίπου $mins′.',
-            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec == 0 ? c.good : c.bad),
+            h.overSec > 0
+                ? 'Πάνω από το όριο ($limit) για περίπου $mins′.'
+                : (h.max != null && h.max! >= limit!)
+                    ? 'Έφτασες στιγμιαία το όριο ($limit).'
+                    : 'Δεν ξεπέρασες το όριο ($limit).',
+            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec > 0 ? c.bad : c.text),
           ),
         ],
       ]),

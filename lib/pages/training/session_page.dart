@@ -16,6 +16,7 @@ import '../../training/wear_link.dart';
 import '../../widgets.dart';
 import '../exercise_detail.dart';
 import 'hr_widgets.dart';
+import 'symptom_sheet.dart';
 import 'training_common.dart';
 
 /// Μετακίνηση ανάμεσα στα διαθέσιμα βάρη (με τα βελάκια). Στο λάστιχο βοήθειας περιλαμβάνεται και το «χωρίς».
@@ -52,7 +53,6 @@ class _SessionPageState extends State<SessionPage> {
   set _restEnd(DateTime? v) => t.restEnd = v;
   Timer? _timer;
   final _tick = ValueNotifier<int>(0);
-  StreamSubscription<WatchCmd>? _watch;
 
   @override
   void initState() {
@@ -62,7 +62,6 @@ class _SessionPageState extends State<SessionPage> {
       final i = s.items.indexWhere((e) => !e.skipped && !e.complete);
       t.setFocusQuiet(i < 0 ? s.items.length - 1 : i);
     }
-    _watch = WearLink.main.commands.listen(_onWatch);
     TrainingDevice.keepOn(true);
     TrainingDevice.askNotify();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -77,47 +76,10 @@ class _SessionPageState extends State<SessionPage> {
 
   @override
   void dispose() {
-    _watch?.cancel();
     _timer?.cancel();
     _tick.dispose();
     TrainingDevice.keepOn(false);
     super.dispose();
-  }
-
-  /// Εντολή από το ρολόι: ίδια αποτελέσματα με τα πατήματα εδώ, χωρίς φύλλα ερωτήσεων (η ρεζέρβα έρχεται από το ρολόι).
-  void _onWatch(WatchCmd c) {
-    final s = t.current;
-    if (s == null || !mounted || (c.sid.isNotEmpty && c.sid != s.id)) return;
-    switch (c.op) {
-      case 'goto':
-        if (c.i >= 0 && c.i < s.items.length) setState(() => _idx = c.i);
-        return;
-      case 'rest':
-        c.v == 'plus' ? _restAdd(30) : _restStop();
-        return;
-    }
-    if (c.i < 0 || c.i >= s.items.length) return;
-    final e = s.items[c.i];
-    switch (c.op) {
-      case 'tick':
-        if (c.s < 0 || c.s >= e.log.length || e.log[c.s].done) return;
-        t.tick(e, c.s);
-        if (e.complete) {
-          final next = s.items.indexWhere((x) => !x.skipped && !x.complete);
-          if (next >= 0) {
-            setState(() => _idx = next);
-            _rest(e, exName(s.items[next].ex));
-          }
-        } else {
-          _rest(e, '${exName(e.ex)} · σετ ${e.done.length + 1}');
-        }
-      case 'rir':
-        final v = c.v;
-        if (v is num) t.answer(e, v.toInt().clamp(0, 4));
-      case 'reps':
-        final v = c.v;
-        if (v is num && c.s >= 0 && c.s < e.log.length) t.setReps(e, c.s, v.toInt());
-    }
   }
 
   void _rest(ExLog e, String next) {
@@ -159,6 +121,17 @@ class _SessionPageState extends State<SessionPage> {
               ),
             ]),
             actions: [
+              TextButton.icon(
+                key: const ValueKey('feel'),
+                style: TextButton.styleFrom(foregroundColor: c.bad),
+                onPressed: () async {
+                  await feelSomething(context, t, where: 'session');
+                  // Το σύμπτωμα σταματά την προπόνηση: πίσω στην αρχή της προπόνησης.
+                  if (context.mounted && t.current == null) Navigator.of(context).maybePop();
+                },
+                icon: const Icon(Icons.monitor_heart_outlined, size: 20),
+                label: const Text('Νιώθω κάτι'),
+              ),
               TextButton(key: const ValueKey('sess-finish'), onPressed: () => _finish(context), child: const Text('Τέλος')),
               const SizedBox(width: 6),
             ],
@@ -166,7 +139,28 @@ class _SessionPageState extends State<SessionPage> {
           body: SafeArea(
             child: LayoutBuilder(builder: (context, k) {
               final wide = k.maxWidth >= 720;
-              final card = _exerciseCard(context, s, e);
+              final ex = _exerciseCard(context, s, e);
+              // «Νιώθω κάτι» από το ρολόι: πρώτο απ’ όλα.
+              final card = t.pendingWatchSymptom == null
+                  ? ex
+                  : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Material(
+                        color: c.bad.withValues(alpha: .1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: c.bad)),
+                        child: ListTile(
+                          key: const ValueKey('sess-watch-sym'),
+                          leading: Icon(Icons.monitor_heart_outlined, color: c.bad),
+                          title: const Text('Στο ρολόι πάτησες «Νιώθω κάτι»'),
+                          subtitle: const Text('Πες τι ένιωσες'),
+                          onTap: () async {
+                            await feelSomething(context, t, where: 'watch');
+                            if (context.mounted && t.current == null) Navigator.of(context).maybePop();
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ex,
+                    ]);
               final rest = _restEnd == null ? null : _restBar(context, s);
               final actions = _actions(context, s, e);
               if (wide) {
@@ -212,13 +206,15 @@ class _SessionPageState extends State<SessionPage> {
     );
   }
 
-  /// Ζωντανοί παλμοί από το ρολόι· τίποτα όταν δεν έρχονται (χωρίς ρολόι ή εκτός καρπού).
+  /// Ζωντανοί παλμοί από το ρολόι. Χωρίς ρολόι: τίποτα. Με ρολόι που δεν στέλνει: πορτοκαλί μήνυμα.
   Widget _hr(EdgeInsets pad) => ListenableBuilder(
-        listenable: Listenable.merge([WearLink.main.hr, _tick]),
+        listenable: Listenable.merge([WearLink.main.hr, WearLink.main.ready, _tick]),
         builder: (context, _) {
-          final bpm = WearLink.main.bpmAt(DateTime.now());
-          if (bpm == null) return const SizedBox.shrink();
-          return Padding(padding: pad, child: HrBar(bpm: bpm, limit: t.hrLimit));
+          final w = WearLink.main;
+          final bpm = w.bpmAt(DateTime.now());
+          if (bpm != null) return Padding(padding: pad, child: HrBar(bpm: bpm, limit: t.hrLimit));
+          if (w.hr.value != null || (w.ready.value && t.hrLimit != null)) return Padding(padding: pad, child: HrStale(limit: t.hrLimit));
+          return const SizedBox.shrink();
         },
       );
 
@@ -450,7 +446,7 @@ class _SessionPageState extends State<SessionPage> {
     final first = i == 0 && t.isFirstTime(e.ex) && hasLoad(e.kind) && e.done.length == 1 && e.sets > 1;
     if (first) {
       final rir = await _askRir(context, first: true);
-      if (rir != null && context.mounted) {
+      if (rir != null && rir >= 0 && context.mounted) {
         final v = t.calibrateAfterFirst(e, rir);
         if (v != null) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Τα επόμενα σετ: ${loadLabel(e.kind, v)}.')));
@@ -461,7 +457,7 @@ class _SessionPageState extends State<SessionPage> {
     if (e.complete) {
       if (e.rirAnswer == null) {
         final rir = await _askRir(context, first: false, e: e);
-        if (rir != null) t.answer(e, rir);
+        if (rir != null && rir >= 0) t.answer(e, rir);
       }
       if (!context.mounted) return;
       final next = s.items.indexWhere((x) => !x.skipped && !x.complete);
@@ -475,16 +471,18 @@ class _SessionPageState extends State<SessionPage> {
   }
 
   /// «Πόσες ακόμα θα έβγαζες;» (0–4+). Στο τέλος της άσκησης και ενοχλήσεις.
+  /// Δεν κλείνει κατά λάθος (έλεγχος 8/11): ή απάντηση ή «Δεν ξέρω» (−1, και τότε δεν ανεβαίνει τίποτα).
   Future<int?> _askRir(BuildContext context, {required bool first, ExLog? e}) {
     var pick = -1;
     return showModalBottomSheet<int>(
       context: context,
-      showDragHandle: true,
+      isDismissible: false,
+      enableDrag: false,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
         final c = Aigaio.of(ctx);
         return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(first ? 'Πρώτο σετ: πόσες ακόμα θα έβγαζες;' : 'Τελευταίο σετ: πόσες ακόμα θα έβγαζες;',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
@@ -535,6 +533,12 @@ class _SessionPageState extends State<SessionPage> {
               style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50)),
               onPressed: pick < 0 ? null : () => Navigator.of(ctx).pop(pick),
               child: const Text('Συνέχεια'),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              key: const ValueKey('rir-unknown'),
+              onPressed: () => Navigator.of(ctx).pop(-1),
+              child: const Text('Δεν ξέρω'),
             ),
           ]),
         );
@@ -751,7 +755,7 @@ class _SummaryPageState extends State<SummaryPage> {
       if (e.skipped || e.done.isEmpty) continue;
       final history = widget.live ? [(s.start, e), ...t.historyOf(e.ex)] : t.historyOf(e.ex);
       final item = itemFor(e);
-      final tg = nextTarget(item, history, t.now);
+      final tg = nextTarget(item, history, t.now, caution: TrainingStore.isCaution(e.ex));
       final (col, arrow) = changeLook(context, tg.change);
       next.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),

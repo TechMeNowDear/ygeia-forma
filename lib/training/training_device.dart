@@ -21,4 +21,7 @@ class TrainingDevice {
       _call('rest', {'endAt': end.millisecondsSinceEpoch, 'title': title, 'text': text, 'doneTitle': doneTitle, 'doneText': doneText});
   static Future<void> restCancel() => _call('restCancel');
   static Future<void> buzz() => _call('buzz');
+
+  /// Ανοίγει την κλήση με τον αριθμό έτοιμο (χωρίς άδεια τηλεφώνου: πατάς εσύ «κλήση»).
+  static Future<void> dial(String number) => _call('dial', {'n': number});
 }

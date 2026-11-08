@@ -54,12 +54,6 @@ jobs:
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
           grep -n 'INTERNET' android/app/src/main/AndroidManifest.xml
 
-      - name: Προσωρινή μνήμη για το κλειδί υπογραφής
-        uses: actions/cache@v4
-        with:
-          path: ~/.ygeia-signing
-          key: ygeia-signing-v1
-
       - name: Κλειδί υπογραφής
         env:
           KEYSTORE_B64: ${{ secrets.YGEIA_KEYSTORE_B64 }}
@@ -71,14 +65,10 @@ jobs:
             store="$HOME/.ygeia-secret/release.jks"
             pw="$KEYSTORE_PASSWORD"
             echo "Κλειδί από τα Secrets του repository."
-          elif [ -f "$HOME/.ygeia-signing/release.jks" ] && [ -f "$HOME/.ygeia-signing/password" ]; then
-            store="$HOME/.ygeia-signing/release.jks"
-            pw="$(cat "$HOME/.ygeia-signing/password")"
-            echo "::warning title=Κλειδί υπογραφής::Το κλειδί βρίσκεται μόνο στην προσωρινή μνήμη του GitHub, που σβήνεται μετά από 7 μέρες χωρίς χτίσιμο. Πρέπει να μπει στα Secrets (YGEIA_KEYSTORE_B64, YGEIA_KEYSTORE_PASSWORD)."
           else
             # Ποτέ νέο κλειδί: ένα νέο κλειδί σημαίνει ότι η έκδοση δεν μπαίνει πάνω στην παλιά
             # και η απεγκατάσταση σβήνει τα δεδομένα του κινητού. Καλύτερα να σταματήσει το χτίσιμο.
-            echo "::error title=Κλειδί υπογραφής::Δεν βρέθηκε το κλειδί υπογραφής (ούτε στα Secrets ούτε στην προσωρινή μνήμη). Το χτίσιμο σταματά για να μη φτιαχτεί έκδοση με άλλο κλειδί."
+            echo "::error title=Κλειδί υπογραφής::Δεν βρέθηκε το κλειδί υπογραφής στα Secrets (YGEIA_KEYSTORE_B64, YGEIA_KEYSTORE_PASSWORD). Το χτίσιμο σταματά για να μη φτιαχτεί έκδοση με άλλο κλειδί."
             exit 1
           fi
           echo "::add-mask::$pw"
@@ -95,29 +85,7 @@ jobs:
           echo "YGEIA_KEYSTORE=$store" >> "$GITHUB_ENV"
           echo "YGEIA_KEYSTORE_PASSWORD=$pw" >> "$GITHUB_ENV"
 
-      # Μόνο όταν το ζητήσουμε ([export-key] στο μήνυμα του commit): αντίγραφο του κλειδιού για 1 μέρα,
-      # ώστε να μπει στα Secrets του repository και σε διαχειριστή κωδικών.
-      - name: Αντίγραφο κλειδιού υπογραφής
-        if: contains(github.event.head_commit.message, '[export-key]')
-        run: |
-          mkdir -p key-export
-          cp "$YGEIA_KEYSTORE" key-export/release.jks
-          base64 -w0 "$YGEIA_KEYSTORE" > key-export/YGEIA_KEYSTORE_B64.txt
-          printf '%s' "$YGEIA_KEYSTORE_PASSWORD" > key-export/YGEIA_KEYSTORE_PASSWORD.txt
-          printf '%s\n' \
-            "Κλειδί υπογραφής της εφαρμογής «Υγεία & Φόρμα»." \
-            "1. Το περιεχόμενο του YGEIA_KEYSTORE_B64.txt μπαίνει στο Secret YGEIA_KEYSTORE_B64." \
-            "2. Το περιεχόμενο του YGEIA_KEYSTORE_PASSWORD.txt μπαίνει στο Secret YGEIA_KEYSTORE_PASSWORD." \
-            "3. Όλος ο φάκελος φυλάγεται σε διαχειριστή κωδικών. Αν χαθεί, οι νέες εκδόσεις δεν θα μπαίνουν πάνω στην παλιά." \
-            > key-export/ODIGIES.txt
-
-      - uses: actions/upload-artifact@v4
-        if: contains(github.event.head_commit.message, '[export-key]')
-        with:
-          name: kleidi-ypografis
-          path: key-export/
-          retention-days: 1
-
+      # Έλεγχος 8/11: το κλειδί υπάρχει μόνο στα Secrets· καμία προσωρινή μνήμη και καμία εξαγωγή του.
       - name: Ανάλυση κώδικα (σταματά μόνο σε σφάλματα)
         run: |
           set -o pipefail

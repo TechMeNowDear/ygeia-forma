@@ -649,6 +649,26 @@ void main() {
     await trainShot(t, 'T12_walk_live', phone, Brightness.light);
   });
 
+  // Έλεγχος 8/11: έγκριση γιατρού, «Νιώθω κάτι», κλείδωμα μετά από σύμπτωμα, «Πώς είσαι σήμερα;».
+  testWidgets('Προπόνηση · έγκριση γιατρού', (t) => trainShot(t, 'T13_clearance', phone, Brightness.light, approved: false, act: (t) async {
+        await tapKey(t, 'train-approve');
+        await tapKey(t, 'clear-limit');
+      }));
+  testWidgets('Προπόνηση · Νιώθω κάτι', (t) => trainShot(t, 'T14_feel', phone, Brightness.light, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'feel');
+        await tapKey(t, 'sym-palp');
+      }));
+  testWidgets('Προπόνηση · κόκκινο σύμπτωμα', (t) => trainShot(t, 'T15_feel_red', phone, Brightness.light, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'feel');
+        await tapKey(t, 'sym-chest');
+        await tapKey(t, 'sym-ok');
+      }));
+  testWidgets('Προπόνηση · κλειδωμένη μετά από σύμπτωμα', (t) => trainShot(t, 'T16_locked_symptom', phone, Brightness.light,
+      prep: (s) => s.reportSymptoms(['breath'])));
+  testWidgets('Προπόνηση · Πώς είσαι σήμερα', (t) => trainShot(t, 'T17_readiness', phone, Brightness.light,
+      prep: (s) => s.approve(hr: 140), act: startSession));
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
 
   // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».

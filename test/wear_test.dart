@@ -169,6 +169,63 @@ void main() {
     });
   });
 
+  group('έλεγχος 8/11', () {
+    test('εντολές ρολογιού γράφονται και χωρίς ανοιχτή οθόνη προπόνησης', () {
+      final t = sampleTraining(now);
+      final link = WearLink()..attachForTest(t);
+      final s = t.start(t.program!.workout('A')!);
+      link.handle('/ygeia/cmd', {'op': 'tick', 'i': 0, 's': 0, 'sid': s.id});
+      expect(s.items.first.log.first.done, isTrue);
+      expect(t.restEnd, isNotNull);
+      link.handle('/ygeia/cmd', {'op': 'rest', 'v': 'stop', 'sid': s.id});
+      expect(t.restEnd, isNull);
+      // ρεζέρβα για άσκηση που δεν τελείωσε: αγνοείται (να μη γραφτεί σε λάθος άσκηση)
+      link.handle('/ygeia/cmd', {'op': 'rir', 'i': 1, 'v': 0, 'sid': s.id});
+      expect(s.items[1].rirAnswer, isNull);
+      link.handle('/ygeia/cmd', {'op': 'tick', 'i': 0, 's': 1, 'sid': s.id});
+      link.handle('/ygeia/cmd', {'op': 'tick', 'i': 0, 's': 2, 'sid': s.id});
+      expect(t.focus, 1);
+      link.handle('/ygeia/cmd', {'op': 'rir', 'i': 0, 'v': 3, 'sid': s.id});
+      expect(s.items.first.rirAnswer, 3);
+      // δεύτερη απάντηση για την ίδια άσκηση δεν αλλάζει την πρώτη
+      link.handle('/ygeia/cmd', {'op': 'rir', 'i': 0, 'v': 0, 'sid': s.id});
+      expect(s.items.first.rirAnswer, 3);
+    });
+
+    test('στο τέλος, τα σετ του ρολογιού συμπληρώνουν όσα χάθηκαν στο κινητό', () {
+      final t = sampleTraining(now);
+      final s = t.start(t.program!.workout('A')!);
+      t.tick(s.items.first, 0);
+      final items = [
+        for (final e in s.items) e.toJson(),
+      ];
+      final log = (items.first['log'] as List).cast<Map<String, dynamic>>();
+      log[1] = {...log[1], 'd': 1, 'r': 9, 't': now.millisecondsSinceEpoch};
+      log[2] = {...log[2], 'd': 1, 'r': 8, 't': now.millisecondsSinceEpoch};
+      items.first['ra'] = 2;
+      // το κινητό είχε ήδη γράψει το 1ο σετ με άλλες επαναλήψεις: μένει όπως είναι
+      final first = s.items.first.log.first.reps;
+      expect(t.importWatch({'v': 1, 'kind': 'hr', 'sid': s.id, 'items': jsonDecode(jsonEncode(items))}), isTrue);
+      expect(s.items.first.done.length, 3);
+      expect(s.items.first.log[1].reps, 9);
+      expect(s.items.first.log.first.reps, first);
+      expect(s.items.first.rirAnswer, 2);
+      expect(s.items[1].done, isEmpty);
+    });
+
+    test('σύνοψη: όταν ο υψηλότερος έφτασε το όριο, όχι «Δεν ξεπέρασες»', () {
+      final t = sampleTraining(now);
+      final s = t.sessions.last
+        ..hrMax = 141
+        ..hr.addAll([
+          [0, 100],
+          [10, 130],
+        ]);
+      expect(HrSummary(s, 140).overSec, 0);
+      expect(HrSummary(s, 140).max, 141);
+    });
+  });
+
   group('οθόνες', () {
     setUp(() => ExClock.frozen = true);
 
@@ -225,6 +282,28 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(HrCard), findsOneWidget);
       expect(find.text('Δεν ξεπέρασες το όριο (140).'), findsOneWidget);
+      s.hrMax = 141;
+      await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s, key: UniqueKey())));
+      await tester.pumpAndSettle();
+      expect(find.text('Δεν ξεπέρασες το όριο (140).'), findsNothing);
+      expect(find.text('Έφτασες στιγμιαία το όριο (140).'), findsOneWidget);
+    });
+
+    testWidgets('παλμοί που σταμάτησαν να έρχονται: πορτοκαλί μήνυμα, όχι κενό', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 900);
+      addTearDown(tester.view.reset);
+      await tester.runAsync(() => ExLibrary.load(inline: true));
+      final t = sampleTraining(now);
+      t.start(t.program!.workout('A')!);
+      WearLink.main.attachForTest(t);
+      WearLink.main.hr.value = (128, DateTime.now().subtract(const Duration(minutes: 2)));
+      addTearDown(() => WearLink.main.hr.value = null);
+      await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SessionPage(training: t)));
+      await tester.pump();
+      expect(find.byType(HrBar), findsNothing);
+      expect(find.byKey(const ValueKey('hr-stale')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     });
   });
 }

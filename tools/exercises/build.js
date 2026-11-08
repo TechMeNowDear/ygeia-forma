@@ -68,6 +68,9 @@ for (const ex of EXS) {
   if (ids.has(ex.id)) throw new Error('διπλό ' + ex.id); ids.add(ex.id);
   if (!GROUPS.includes(ex.group)) throw new Error(ex.id + ': ομάδα ' + ex.group);
   if (!process.env.DRAFT) for (const k of ['name', 'equip', 'feel', 'setup', 'steps', 'cues', 'mistakes', 'tips', 'tempo']) if (!text[k]) throw new Error(ex.id + ': λείπει ' + k);
+  // Έλεγχος 8/11 (ιατρικό συμβούλιο MED-09): κάθε άσκηση λέει πώς αναπνέεις (όχι κράτημα της ανάσας).
+  if (!process.env.DRAFT && !/ανάσα|αναπνο|εκπνοή/i.test([...(text.tips || []), ...(text.cues || []).map((c) => (Array.isArray(c) ? c[0] : c))].join(' ')))
+    throw new Error(ex.id + ': λείπει οδηγία για την αναπνοή');
   for (const c of text.cues || []) for (const i of c[1]) if (i < 0 || i >= text.tempo.length) throw new Error(ex.id + ': φάση ' + i);
   out.ex.push({ ...text, primary: mlist(text.primary), secondary: mlist(text.secondary), anim: sample(ex) });
 }

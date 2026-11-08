@@ -57,6 +57,9 @@ class WatchShotsTest {
         override fun finish() {}
         override fun muteAlarm() {}
         override fun doneOk() {}
+        override fun feel() {}
+        override fun feelBack() {}
+        override fun feelStop() {}
     }
 
     @After
@@ -68,6 +71,7 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.HOME
         Repo.resetExercise()
         Repo.alarm.limit = null
+        Repo.symSent = false
     }
 
     private fun shot(name: String) {
@@ -124,17 +128,29 @@ class WatchShotsTest {
         shot("W4_rir")
 
         Repo.bpm = 143
-        Repo.alarm.feed(143)
-        Repo.alarm.feed(143)
+        Repo.alarm.feed(143, now)
+        Repo.alarm.feed(143, now + 6_000)
         shot("W5_alarm")
 
         // Λάστιχο: μεγάλη ετικέτα στη θέση των κιλών.
-        Repo.alarm.feed(100)
-        Repo.alarm.feed(100)
+        Repo.alarm.feed(100, now + 60_000)
+        Repo.alarm.feed(100, now + 60_000)
         Repo.bpm = 118
         s.idx = 2
         Repo.screen = Repo.Screen.SET
         shot("W6_set_band")
+
+        // Δεν φτάνουν παλμοί: φαίνεται καθαρά.
+        Repo.bpmAt = now - 60_000
+        shot("W6b_no_hr")
+        Repo.bpmAt = now
+
+        // «Νιώθω κάτι»: πριν και μετά το «Σταμάτησα».
+        Repo.screen = Repo.Screen.SYM
+        shot("W10_feel")
+        Repo.symSent = true
+        shot("W10b_feel_sent")
+        Repo.symSent = false
 
         Repo.local = null
         Repo.resetExercise()

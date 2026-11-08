@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -22,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.health.services.client.ExerciseUpdateCallback
 import androidx.health.services.client.HealthServices
 import androidx.health.services.client.data.Availability
+import androidx.health.services.client.data.BatchingMode
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseLapSummary
@@ -82,6 +84,7 @@ class ExerciseService : Service() {
     private var restBuzzedFor = 0L
     private var lastHrSent = 0L
     private var lastLiveSent = 0L
+    private var lostBuzzed = false
     private var exerciseStarted = false
     private var stopping = false
 
@@ -123,6 +126,7 @@ class ExerciseService : Service() {
         Repo.startedAt = now
         Repo.hr = HrStats(now)
         Repo.alarm.limit = Repo.plan?.hrLimit
+        Repo.alarm.reset()
 
         val walk = kind == "walk"
         val location = walk && has(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -169,11 +173,18 @@ class ExerciseService : Service() {
             }
             types.retainAll(supported)
             client.setUpdateCallback(callback)
+            // Παλμοί κάθε ~5″ και με σβηστή οθόνη (χωρίς αυτό το ρολόι τους στέλνει σε πακέτα ανά λίγα λεπτά).
+            val batching = if (DataType.HEART_RATE_BPM in types && BatchingMode.HEART_RATE_5_SECONDS in caps.supportedBatchingModeOverrides) {
+                setOf(BatchingMode.HEART_RATE_5_SECONDS)
+            } else {
+                emptySet()
+            }
             val config = ExerciseConfig(
                 exerciseType = type,
                 dataTypes = types,
                 isAutoPauseAndResumeEnabled = false,
                 isGpsEnabled = location && DataType.LOCATION in types,
+                batchingModeOverrides = batching,
             )
             client.startExerciseAsync(config).await()
             exerciseStarted = true
@@ -194,17 +205,21 @@ class ExerciseService : Service() {
         override fun onExerciseUpdateReceived(update: ExerciseUpdate) {
             val now = System.currentTimeMillis()
             val m = update.latestMetrics
-            val hrPoints = m.getData(DataType.HEART_RATE_BPM)
-            val last = hrPoints.lastOrNull()
-            if (last != null) {
-                val bpm = Math.round(last.value).toInt()
-                if (bpm in 26..249) {
+            // Κάθε τιμή με τον δικό της χρόνο (σε ένα πακέτο μπορεί να έρθουν πολλές).
+            val boot = Instant.ofEpochMilli(now - SystemClock.elapsedRealtime())
+            var buzz = -1
+            for (p in m.getData(DataType.HEART_RATE_BPM)) {
+                val bpm = Math.round(p.value).toInt()
+                if (bpm !in 26..249) continue
+                val at = p.getTimeInstant(boot).toEpochMilli().coerceAtMost(now)
+                Repo.hr?.add(bpm, at)
+                if (at >= Repo.bpmAt) {
                     Repo.bpm = bpm
-                    Repo.bpmAt = now
-                    for (p in hrPoints) Repo.hr?.add(Math.round(p.value).toInt(), now)
-                    if (Repo.alarm.feed(bpm)) onAlarm(bpm)
+                    Repo.bpmAt = at
                 }
+                if (Repo.alarm.feed(bpm, at)) buzz = bpm
             }
+            if (buzz > 0) onAlarm(buzz)
             m.getData(DataType.DISTANCE_TOTAL)?.let { Repo.meters = it.total }
             m.getData(DataType.STEPS_TOTAL)?.let { Repo.steps = it.total }
             update.activeDurationCheckpoint?.let { c ->
@@ -249,6 +264,14 @@ class ExerciseService : Service() {
                         .put("m", Repo.meters).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0),
                 )
             }
+            // Περπάτημα με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις.
+            val fresh = Repo.bpmFresh(now)
+            if (fresh) {
+                lostBuzzed = false
+            } else if (Repo.running == "walk" && Repo.alarm.limit != null && Repo.bpmAt > 0 && !lostBuzzed) {
+                lostBuzzed = true
+                vibrate(longArrayOf(0, 120, 120, 120))
+            }
             // Η προπόνηση του κινητού έκλεισε εκεί: τέλος και εδώ.
             if (Repo.runningPhone && Repo.phone == null && Repo.local == null) {
                 scope.launch { finish() } // όχι μέσα σε αυτόν τον βρόχο: το finish τον σταματά
@@ -269,7 +292,7 @@ class ExerciseService : Service() {
         val n = NotificationCompat.Builder(this, CH_ALARM)
             .setSmallIcon(R.drawable.ic_heart)
             .setContentTitle("Πάνω από το όριο: $bpm")
-            .setContentText("Σταμάτα, ανάσα. Όριο γιατρού ${Repo.alarm.limit}.")
+            .setContentText(alarmAdvice() + " Όριο γιατρού ${Repo.alarm.limit}.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pi)
@@ -281,6 +304,8 @@ class ExerciseService : Service() {
         } catch (_: SecurityException) {
         }
     }
+
+    private fun alarmAdvice(): String = if (Repo.running == "walk") "Κόψε ρυθμό." else "Ξεκουράσου μέχρι να πέσουν κάτω από ${Repo.alarm.limit}."
 
     private fun vibrate(pattern: LongArray) {
         val v: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
@@ -326,7 +351,12 @@ class ExerciseService : Service() {
             Repo.runningPhone -> {
                 // Η προπόνηση γράφτηκε στο κινητό· εδώ μόνο οι παλμοί, για την περίπτωση που χάθηκαν μηνύματα.
                 val sid = Repo.phone?.id ?: lastPhoneId
-                if (sid.isNullOrEmpty()) null else ("hr$sid" to JSONObject().put("v", 1).put("kind", "hr").put("sid", sid).also { hr.writeTo(it) })
+                // Και τα σετ όπως τα ξέρει το ρολόι: αν το κινητό έχασε κάποιο ✓, το συμπληρώνει (έλεγχος 8/11).
+                val items = Repo.phone?.takeIf { it.id == sid }?.resultJson(now, hr)?.optJSONArray("items")
+                if (sid.isNullOrEmpty()) null else ("hr$sid" to JSONObject().put("v", 1).put("kind", "hr").put("sid", sid).also {
+                    hr.writeTo(it)
+                    if (items != null) it.put("items", items)
+                })
             }
             else -> null
         }
@@ -337,7 +367,11 @@ class ExerciseService : Service() {
         Repo.local = null
         Repo.resetExercise()
         // Προπόνηση του κινητού: γράφεται εκεί, εδώ πίσω στην αρχή. Δική του: «Αποθηκεύτηκε».
-        Repo.screen = if (result != null && kind != null && !wasPhone) Repo.Screen.END else Repo.Screen.HOME
+        Repo.screen = when {
+            Repo.screen == Repo.Screen.SYM -> Repo.Screen.SYM // «Νιώθω κάτι»: μένει το μήνυμα
+            result != null && kind != null && !wasPhone -> Repo.Screen.END
+            else -> Repo.Screen.HOME
+        }
         Repo.changed()
         getSystemService(NotificationManager::class.java).cancel(ALARM_ID)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)

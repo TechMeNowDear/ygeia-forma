@@ -35,6 +35,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         fun finish()
         fun muteAlarm()
         fun doneOk()
+        fun feel()
+        fun feelBack()
+        fun feelStop()
     }
 
     private val orange = Color.parseColor("#EA580C")
@@ -83,6 +86,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.Screen.REST -> drawRest(c, now)
             Repo.Screen.WALK -> drawWalk(c, now)
             Repo.Screen.END -> drawEnd(c)
+            Repo.Screen.SYM -> drawSym(c)
         }
         Repo.notice?.let { small(c, it, 186f, gray, 8f, 120f) }
     }
@@ -137,6 +141,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun heart(c: Canvas, y: Float, now: Long, size: Float = 12f) {
         val fresh = Repo.bpmFresh(now)
         val over = fresh && Repo.alarm.limit != null && Repo.bpm >= Repo.alarm.limit!!
+        if (!fresh && Repo.running != null) {
+            // Δεν φτάνουν τιμές: να φαίνεται, όχι μια παύλα που μοιάζει με «όλα καλά».
+            t(c, "♥ δεν μετριούνται", y, if (Repo.alarm.limit != null) orange else gray, size * 0.75f, true)
+            return
+        }
         val s = if (fresh) "♥ ${Repo.bpm}" else "♥ —"
         t(c, s, y, if (over) red else if (fresh) Color.WHITE else gray, size, true)
         if (fresh) {
@@ -169,6 +178,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             pill(c, "Παλμοί εδώ", 122f, 96f, 30f, orange, Color.WHITE) { actions.joinPhone() }
             small(c, "και ✓ στον καρπό", 150f, gray, 9f, 120f)
             return
+        }
+        if (plan?.approved == true) {
+            // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11).
+            val lim = plan.hrLimit
+            small(c, if (lim != null) "όριο παλμών $lim" else "χωρίς όριο παλμών", 34f, if (lim != null) orange else gray, 8f, 96f)
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
@@ -284,14 +298,44 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         pillAt(c, "+30″", 76f, 164f, 40f, 24f, card, Color.WHITE, 10f) { actions.restPlus() }
         pillAt(c, "Πάμε", 124f, 164f, 40f, 24f, Color.WHITE, Color.BLACK, 10f) { actions.restStop() }
+        feelLink(c, 186f)
+    }
+
+    /** «Νιώθω κάτι» στο κάτω μέρος της οθόνης. */
+    private fun feelLink(c: Canvas, y: Float) {
+        small(c, "Νιώθω κάτι", y, Color.parseColor("#F87171"), 8.5f, 80f)
+        hits.add(Hit(RectF(cx - 40 * u, (y - 9) * u, cx + 40 * u, (y + 9) * u)) { actions.feel() })
+    }
+
+    // ------------------------------------------------------------------ «Νιώθω κάτι»
+    private fun drawSym(c: Canvas) {
+        if (!Repo.symSent) {
+            t(c, "Σταμάτα.", 62f, Color.WHITE, 15f, true)
+            t(c, "Κάθισε.", 80f, Color.WHITE, 15f, true)
+            small(c, "Αν δεν περνά σε 5′", 100f, Color.WHITE, 9.5f, 140f)
+            small(c, "ή είναι έντονο: 166", 113f, Color.WHITE, 9.5f, 140f)
+            pill(c, "Σταμάτησα", 140f, 100f, 28f, red, Color.WHITE, 12f) { actions.feelStop() }
+            hits.add(Hit(RectF(cx - 40 * u, 160 * u, cx + 40 * u, 184 * u)) { actions.feelBack() })
+            small(c, "Πίσω", 172f, gray, 9f, 60f)
+        } else {
+            t(c, "Γράφτηκε", 66f, Color.WHITE, 15f, true)
+            small(c, "Στο κινητό πες", 90f, Color.WHITE, 9.5f, 140f)
+            small(c, "τι ένιωσες.", 103f, Color.WHITE, 9.5f, 140f)
+            small(c, "Αν δεν περνά: 166", 120f, Color.parseColor("#FCA5A5"), 9.5f, 140f)
+            pill(c, "OK", 150f, 70f, 26f, card, Color.WHITE, 12f) { actions.doneOk() }
+        }
     }
 
     // ------------------------------------------------------------------ Δ. όριο παλμών
     private fun drawAlarm(c: Canvas) {
         small(c, "ΠΑΝΩ ΑΠΟ ΤΟ ΟΡΙΟ", 60f, Color.WHITE, 9f, 130f)
         t(c, "♥ ${Repo.bpm}", 98f, Color.WHITE, 30f, true)
-        t(c, "Σταμάτα, ανάσα", 122f, Color.WHITE, 13f, true)
-        small(c, "όριο γιατρού ${Repo.alarm.limit ?: ""}", 140f, Color.WHITE, 9f, 130f)
+        if (Repo.running == "walk") {
+            t(c, "Κόψε ρυθμό", 122f, Color.WHITE, 13f, true)
+        } else {
+            t(c, "Ξεκουράσου", 120f, Color.WHITE, 13f, true)
+        }
+        small(c, if (Repo.running == "walk") "όριο γιατρού ${Repo.alarm.limit ?: ""}" else "μέχρι κάτω από ${Repo.alarm.limit ?: ""}", 140f, Color.WHITE, 9f, 130f)
         small(c, "πάτα για να κλείσει", 166f, Color.parseColor("#FCA5A5"), 8f, 120f)
         hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat())) { actions.muteAlarm() })
     }
@@ -306,6 +350,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         heart(c, 128f, now, 11f)
         if (!Repo.gps) small(c, "χωρίς GPS", 146f, gray, 8f, 100f)
         pill(c, "Τέλος", 166f, 70f, 24f, card, Color.WHITE, 11f) { actions.finish() }
+        feelLink(c, 188f)
     }
 
     // ------------------------------------------------------------------ τέλος

@@ -92,7 +92,7 @@ class WearBridge(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "status" -> scope.launch { result.success(status()) }
-            "putPlan" -> scope.launch { result.success(put(PLAN, call.argument<String>("json") ?: "{}", urgent = false)) }
+            "putPlan" -> scope.launch { result.success(put(PLAN, call.argument<String>("json") ?: "{}", urgent = call.argument<Boolean>("urgent") == true)) }
             "putSession" -> scope.launch { result.success(put(SESSION, call.argument<String>("json") ?: "{}", urgent = true)) }
             "takeResults" -> scope.launch { result.success(results()) }
             "ackResult" -> scope.launch { result.success(ack(call.argument<String>("path") ?: "")) }

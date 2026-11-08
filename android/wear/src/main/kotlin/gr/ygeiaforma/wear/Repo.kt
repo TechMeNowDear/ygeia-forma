@@ -10,7 +10,7 @@ import org.json.JSONObject
  * Όλες οι αλλαγές γίνονται στο κύριο νήμα· η οθόνη ακούει με [listen].
  */
 object Repo {
-    enum class Screen { HOME, SET, RIR, REST, WALK, END }
+    enum class Screen { HOME, SET, RIR, REST, WALK, END, SYM }
 
     var plan: Plan? = null
     /** Προπόνηση που τρέχει στο κινητό (καθρέφτης). */
@@ -37,6 +37,10 @@ object Repo {
     val alarm = HrAlarm(null)
     /** Μέχρι πότε έχει σιγήσει η κόκκινη οθόνη (ο χρήστης την πάτησε). */
     var alarmMutedUntil = 0L
+
+    /** «Νιώθω κάτι»: η οθόνη πριν (για «Πίσω») και αν στάλθηκε ήδη. */
+    var symBack = Screen.HOME
+    var symSent = false
 
     var meters = 0.0
     var steps = 0L
@@ -90,6 +94,8 @@ object Repo {
                 }
                 if (it.rir == null) it.rir = old.rir
             }
+            // Η ερώτηση για ρεζέρβα μένει για την άσκηση που τελείωσε, όχι για όποια δείχνει τώρα το κινητό.
+            if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
         }
         phone = s
         if (s != null) lastPhoneId = s.id

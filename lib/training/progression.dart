@@ -75,7 +75,8 @@ List<int> _same(int sets, int r) => List.filled(sets, r);
 String _l(LoadKind k, double? v) => loadLabel(k, v);
 
 /// [history]: οι προηγούμενες φορές της ίδιας άσκησης, νεότερη πρώτη, με την ημερομηνία τους.
-Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today) {
+/// [caution]: άσκηση με προσοχή στη βιβλιοθήκη (ώμοι, μέση): χωρίς απάντηση για ρεζέρβα δεν ανεβαίνει τίποτα.
+Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today, {bool caution = false}) {
   final k = item.kind;
   final sets = item.sets, lo = item.lo, hi = item.hi;
   final usable = [for (final h in history) if (!h.$2.skipped && h.$2.done.isNotEmpty) h];
@@ -124,7 +125,10 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   }
 
   final complete = done.length >= sets;
-  final rirOk = last.rirAnswer == null || last.rirAnswer! >= item.rir;
+  // Χωρίς απάντηση δεν ξέρουμε πόσο κοντά στην αποτυχία ήταν: ποτέ περισσότερα κιλά (έλεγχος 8/11).
+  final ra = last.rirAnswer;
+  final rirOk = ra != null && ra >= item.rir;
+  final strict = k == LoadKind.bar || caution;
 
   // Kettlebell: όταν το επόμενο είναι πάνω από 20% βαρύτερο, πρώτα 3 επαναλήψεις παραπάνω από το εύρος.
   var ceiling = hi;
@@ -185,7 +189,29 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       load: lastLoad,
       reps: asLast(),
       change: Change.hold,
-      reason: 'Έφτασες στις $ceiling, αλλά με ${last.rirAnswer} ρεζέρβα: ίδια μία φορά ακόμα, να γίνει πιο άνετα.',
+      reason: ra == null
+          ? 'Έφτασες στις $ceiling, αλλά δεν ξέρουμε πόση ρεζέρβα είχες: ίδια, και πες μετά το τελευταίο σετ.'
+          : 'Έφτασες στις $ceiling, αλλά με ${ra == 4 ? '4+' : ra} ρεζέρβα: ίδια μία φορά ακόμα, να γίνει πιο άνετα.',
+    );
+  }
+
+  if (inRange && ra != null && ra < item.rir) {
+    return Target(
+      load: lastLoad,
+      reps: asLast(),
+      change: Change.hold,
+      reason: ra == 0
+          ? 'Την προηγούμενη φορά έφτασες στο όριο (0 ρεζέρβα): ίδιες επαναλήψεις, να βγουν πιο άνετα.'
+          : 'Την προηγούμενη φορά έμεινες με $ra ρεζέρβα, λιγότερη από ${item.rir}: ίδιες επαναλήψεις.',
+    );
+  }
+
+  if (inRange && ra == null && strict) {
+    return Target(
+      load: lastLoad,
+      reps: asLast(),
+      change: Change.hold,
+      reason: 'Δεν ξέρουμε πόση ρεζέρβα είχες. Σε αυτή την άσκηση δεν ανεβαίνει τίποτα χωρίς απάντηση: ίδια.',
     );
   }
 

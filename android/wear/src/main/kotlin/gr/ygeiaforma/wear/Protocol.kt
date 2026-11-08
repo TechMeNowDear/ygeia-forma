@@ -143,6 +143,11 @@ class LiveSession(
     val phone: Boolean = false,
     /** Το κινητό έκλεισε την προπόνηση (μόνο για [phone]). */
     var ended: Boolean = false,
+    /**
+     * Η άσκηση που περιμένει απάντηση για ρεζέρβα (−1 = καμία). Κλειδώνει τη στιγμή του τελευταίου ✓,
+     * γιατί στο μεταξύ το κινητό μπορεί να έχει ήδη πάει στην επόμενη άσκηση (έλεγχος 8/11).
+     */
+    var rirIdx: Int = -1,
 ) {
     val current: ItemT? get() = items.getOrNull(idx)
     val allDone: Boolean get() = items.all { it.complete }
@@ -159,17 +164,21 @@ class LiveSession(
             restEnd = if (it.rest > 0) now + it.rest * 1000L else 0
             return Next.REST
         }
+        rirIdx = idx
         return Next.ASK_RIR
     }
 
-    /** Ρεζέρβα μετά το τελευταίο σετ· μετά πάει στην επόμενη άσκηση που δεν έχει τελειώσει. */
-    fun answer(rir: Int, now: Long): Next {
-        current?.rir = rir
-        return advance(now)
+    /** Ρεζέρβα μετά το τελευταίο σετ· μετά πάει στην επόμενη άσκηση που δεν έχει τελειώσει. Επιστρέφει και ποια άσκηση πήρε την απάντηση. */
+    fun answer(rir: Int, now: Long): Pair<Next, Int> {
+        val i = if (rirIdx >= 0) rirIdx else idx
+        val restSec = items.getOrNull(i)?.rest ?: 0
+        items.getOrNull(i)?.rir = rir
+        rirIdx = -1
+        return advance(now, restSec) to i
     }
 
-    private fun advance(now: Long): Next {
-        val restSec = current?.rest ?: 0
+    private fun advance(now: Long, restOf: Int? = null): Next {
+        val restSec = restOf ?: current?.rest ?: 0
         val next = items.indexOfFirst { !it.complete }
         if (next < 0) {
             restEnd = 0
@@ -287,26 +296,48 @@ class HrStats(private val start: Long, private val step: Int = 10) {
     }
 }
 
-/** Ειδοποίηση ορίου παλμών: ανάβει μετά από 2 συνεχόμενες τιμές στο όριο ή πάνω, σβήνει κάτω από όριο − 5. */
-class HrAlarm(var limit: Int?) {
+/**
+ * Ειδοποίηση ορίου παλμών, με βάση τον χρόνο κάθε τιμής (όχι πόσες τιμές ήρθαν μαζί):
+ * ανάβει όταν οι παλμοί μένουν στο όριο ή πάνω για [holdMs] (5″), ξαναδονείται κάθε [repeatMs] (30″)
+ * όσο μένουν πάνω, σβήνει κάτω από όριο − 5. Έλεγχος 8/11: πριν μετρούσε «2 μηνύματα», που
+ * με τα πακέτα των παλμών μπορούσε να σημαίνει και 2–3 λεπτά καθυστέρηση.
+ */
+class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val repeatMs: Long = 30_000) {
     var on = false
         private set
-    private var over = 0
+    private var overSince = -1L
+    private var lastBuzz = 0L
 
-    /** true τη στιγμή που ανάβει (για να δονηθεί μία φορά). */
-    fun feed(bpm: Int): Boolean {
-        val l = limit ?: return false.also { on = false; over = 0 }
+    /** true όταν πρέπει να δονηθεί (τη στιγμή που ανάβει και ανά 30″ όσο μένει πάνω). [at]: χρόνος της τιμής (ms). */
+    fun feed(bpm: Int, at: Long): Boolean {
+        val l = limit
+        if (l == null) {
+            on = false
+            overSince = -1
+            return false
+        }
         if (bpm >= l) {
-            over++
-            if (!on && over >= 2) {
+            if (overSince < 0) overSince = at
+            if (!on && at - overSince >= holdMs) {
                 on = true
+                lastBuzz = at
+                return true
+            }
+            if (on && at - lastBuzz >= repeatMs) {
+                lastBuzz = at
                 return true
             }
         } else {
-            over = 0
+            overSince = -1
             if (on && bpm < l - 5) on = false
         }
         return false
+    }
+
+    fun reset() {
+        on = false
+        overSince = -1
+        lastBuzz = 0
     }
 }
 

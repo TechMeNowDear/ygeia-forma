@@ -51,12 +51,12 @@ class ProtocolTest {
         // σετ 2 (τελευταίο της άσκησης) → ρεζέρβα
         assertEquals(LiveSession.Next.ASK_RIR, s.tick(200_000))
         // ρεζέρβα → επόμενη άσκηση με το διάλειμμα της προηγούμενης
-        assertEquals(LiveSession.Next.REST, s.answer(2, 201_000))
+        assertEquals(LiveSession.Next.REST, s.answer(2, 201_000).first)
         assertEquals(1, s.idx)
         assertEquals(2, s.items[0].rir)
         // τελευταία άσκηση χωρίς διάλειμμα
         assertEquals(LiveSession.Next.ASK_RIR, s.tick(400_000))
-        assertEquals(LiveSession.Next.END, s.answer(3, 401_000))
+        assertEquals(LiveSession.Next.END, s.answer(3, 401_000).first)
         assertTrue(s.allDone)
         // το πλάνο μένει ανέγγιχτο
         assertFalse(p.todayWorkout!!.items[0].sets[0].done)
@@ -101,17 +101,49 @@ class ProtocolTest {
     @Test
     fun alarm() {
         val a = HrAlarm(140)
-        assertFalse(a.feed(139))
-        assertFalse(a.feed(141)) // μία τιμή δεν αρκεί
-        assertTrue(a.feed(142)) // δεύτερη: ανάβει
-        assertFalse(a.feed(143)) // ήδη αναμμένο
+        assertFalse(a.feed(139, 0))
+        assertFalse(a.feed(141, 1_000)) // πάνω, αλλά όχι ακόμα 5″
+        assertFalse(a.feed(142, 4_000))
+        assertTrue(a.feed(142, 6_000)) // 5″ πάνω: ανάβει
+        assertFalse(a.feed(143, 11_000)) // ήδη αναμμένο
         assertTrue(a.on)
-        a.feed(137)
+        assertTrue(a.feed(143, 36_000)) // ακόμα πάνω μετά από 30″: ξανά δόνηση
+        a.feed(137, 40_000)
         assertTrue(a.on) // όχι αρκετά κάτω
-        a.feed(134)
+        a.feed(134, 45_000)
+        assertFalse(a.on)
+        // μία στιγμιαία τιμή δεν ανάβει
+        assertFalse(a.feed(150, 50_000))
+        assertFalse(a.feed(130, 51_000))
+        assertFalse(a.feed(150, 52_000))
         assertFalse(a.on)
         val none = HrAlarm(null)
-        assertFalse(none.feed(200))
+        assertFalse(none.feed(200, 0))
+        assertFalse(none.feed(200, 60_000))
+    }
+
+    @Test
+    fun alarmFromOneBatch() {
+        // Πακέτο με 5 τιμές ανά 1″: ο χρόνος κάθε τιμής μετράει, όχι το πλήθος των πακέτων.
+        val a = HrAlarm(140)
+        var fired = false
+        for (i in 0..5) fired = fired or a.feed(145, 100_000L + i * 1000)
+        assertTrue(fired)
+    }
+
+    @Test
+    fun rirStaysWithFinishedExercise() {
+        val p = Plan.parse(planJson)!!
+        val s = LiveSession.fromPlan(p.todayWorkout!!, 1_000)
+        s.tick(1_000)
+        assertEquals(LiveSession.Next.ASK_RIR, s.tick(200_000))
+        // στο μεταξύ το κινητό πήγε ήδη στην επόμενη άσκηση
+        s.idx = 1
+        val (_, i) = s.answer(1, 201_000)
+        assertEquals(0, i)
+        assertEquals(1, s.items[0].rir)
+        assertNull(s.items[1].rir)
+        assertEquals(-1, s.rirIdx)
     }
 
     @Test
