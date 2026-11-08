@@ -44,6 +44,18 @@ jobs:
           # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
 
+      # Το Gradle κατεβαίνει από το GitHub· μνήμη + ξαναδοκιμή, γιατί κάποιες φορές απαντά 504 (8/11).
+      - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-dist-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Gradle (κατέβασμα)
+        run: |
+          cd android
+          for i in 1 2 3 4 5; do ./gradlew --version --console=plain >/dev/null 2>&1 && exit 0; echo "Ξαναδοκιμή $i"; sleep $((i * 20)); done
+          ./gradlew --version --console=plain
+
       - name: Ανάλυση κώδικα (σταματά μόνο σε σφάλματα)
         run: |
           set -o pipefail
@@ -226,6 +238,18 @@ jobs:
             sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
           python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
+
+      # Το Gradle κατεβαίνει από το GitHub· μνήμη + ξαναδοκιμή, γιατί κάποιες φορές απαντά 504 (8/11).
+      - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-dist-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Gradle (κατέβασμα)
+        run: |
+          cd android
+          for i in 1 2 3 4 5; do ./gradlew --version --console=plain >/dev/null 2>&1 && exit 0; echo "Ξαναδοκιμή $i"; sleep $((i * 20)); done
+          ./gradlew --version --console=plain
 
       - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)
         run: flutter build apk --release --target-platform android-x64
