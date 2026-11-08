@@ -53,6 +53,7 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -76,4 +77,6 @@ dependencies {
     // Μόνο για τους ελέγχους σε απλό JVM: το org.json του Android είναι «άδειο» εκεί.
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    // Στιγμιότυπα των οθονών του ρολογιού σε JVM (WatchShotsTest), χωρίς ρολόι ή emulator.
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
