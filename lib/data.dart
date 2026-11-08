@@ -102,6 +102,10 @@ class Night {
   /// χωρίς φάσεις»), ποτέ με τα ξυπνήματα του άλλου κομματιού.
   bool partial = false;
 
+  /// Η διάρκεια είναι όλη η νύχτα, χωρίς ξυπνήματα: μόνο αυτή μπαίνει σε μέσους όρους, «συνήθως», Τάσεις και αναφορά
+  /// (έλεγχος 8/11, DATA-01: μια μερική νύχτα έδινε 177′ αντί για ~330′ και τραβούσε κάτω τους μέσους όρους).
+  bool get fullDuration => staged && !partial;
+
   /// Από τον ύπνο ως το ξύπνημα, ΜΕ τα ξυπνήματα («Χρόνος ύπνου» της Samsung): άθροισμα αρχή→τέλος των κομματιών.
   int spanMinutes = 0;
 
@@ -776,7 +780,7 @@ class Dashboard {
   /// Μόνο νύχτες με φάσεις (πραγματικός ύπνος): μια νύχτα χωρίς φάσεις έχει διάρκεια με τα ξυπνήματα.
   double? get sleepBaseline => lastNight == null
       ? null
-      : usualMean(nightsBefore(lastNight!.date).where((n) => n.staged).map((n) => n.minutes.toDouble()));
+      : usualMean(nightsBefore(lastNight!.date).where((n) => n.fullDuration).map((n) => n.minutes.toDouble()));
 
   double? get restingHrBaseline => lastNight == null ? null : restingHrBaselineFor(lastNight!.date);
 

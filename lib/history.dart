@@ -501,7 +501,7 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
     if (lock != null) put(K.napLock, lock.millisecondsSinceEpoch ~/ 60000);
     // Διάρκεια μόνο από φάσεις (πραγματικός ύπνος). Νύχτα χωρίς φάσεις: η διάρκεια της Samsung έχει τα ξυπνήματα,
     // οπότε δεν μπαίνει στις Τάσεις, στην εβδομάδα και στην αναφορά (οι ώρες ύπνου/ξυπνήματος μπαίνουν κανονικά).
-    if (night.staged) put(K.sleepMin, night.minutes);
+    if (night.fullDuration) put(K.sleepMin, night.minutes);
     put(K.sleepScore, night.score);
     // Ποσοστά επί του πραγματικού ύπνου (βαθύς + ελαφρύς + REM), όπως στο Oura· ο χρόνος ξύπνιος χωριστά σε λεπτά
     // (έλεγχος 4/11, B4: πριν, ποσοστά επί του χρόνου μαζί με τα ξυπνήματα).

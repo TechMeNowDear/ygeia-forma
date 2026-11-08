@@ -69,8 +69,8 @@ class SleepPage extends StatelessWidget {
             if (n.date.isAfter(DateTime(lastDay.year, lastDay.month, lastDay.day - 7))) n,
         ];
         // Μέσος όρος μόνο από νύχτες με φάσεις (πραγματικός ύπνος, χωρίς τα ξυπνήματα)· η ετικέτα λέει από πόσες.
-        final timed = week.where((n) => n.staged).length;
-        final avg7 = Dashboard.mean(week.where((n) => n.staged).map((n) => n.minutes.toDouble()));
+        final timed = week.where((n) => n.fullDuration).length;
+        final avg7 = Dashboard.mean(week.where((n) => n.fullDuration).map((n) => n.minutes.toDouble()));
         final scoreAvg = Dashboard.mean(week.map((n) => n.score?.toDouble()));
         // Οι χωρισμένες νύχτες δεν έχουν βαθμολογία: λέμε από πόσες βγαίνει ο μέσος όρος.
         final scored = week.where((n) => n.score != null).length;
@@ -227,7 +227,7 @@ class _LastNightCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Μερικώς χωρίς φάσεις: ένα κομμάτι της νύχτας ήρθε χωρίς φάσεις από τη Samsung. Η διάρκεια μετρά μόνο '
-              'τα κομμάτια με φάσεις.',
+              'τα κομμάτια με φάσεις, γι’ αυτό δεν μετρά στους μέσους όρους.',
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],

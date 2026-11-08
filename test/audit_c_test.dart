@@ -258,7 +258,9 @@ void main() {
       expect(n.staged, isTrue);
       expect(n.partial, isTrue);
       expect(n.minutes, 177, reason: 'μόνο το κομμάτι με φάσεις (80+71+26), ποτέ τα 177 λεπτά «με τα ξυπνήματα» του άλλου');
-      expect(summarizeDay(d, DateTime(2026, 11, 3))[K.sleepMin], 177);
+      // Έλεγχος 8/11 (DATA-01): η μερική διάρκεια δεν μπαίνει στο ιστορικό (Τάσεις, εβδομάδα, αναφορά).
+      expect(summarizeDay(d, DateTime(2026, 11, 3)).containsKey(K.sleepMin), isFalse);
+      expect(n.fullDuration, isFalse);
       // Όλη με φάσεις: όχι «μερικώς».
       expect(Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': ownerNight()}).nights.single.partial, isFalse);
     });

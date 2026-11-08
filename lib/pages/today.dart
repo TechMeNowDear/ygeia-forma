@@ -402,7 +402,7 @@ class _SleepCard extends StatelessWidget {
     final soft = Colors.white.withValues(alpha: 0.75);
     final base = data.sleepBaseline;
     // Σύγκριση μόνο για νύχτα με φάσεις (πραγματικός ύπνος): χωρίς φάσεις η διάρκεια έχει τα ξυπνήματα.
-    final diff = base == null || !n.staged ? null : n.minutes - base.round();
+    final diff = base == null || !n.fullDuration ? null : n.minutes - base.round();
     // Ένας κανόνας για το «συνήθως» (τρίτος έλεγχος F1): «Όσο κοιμάσαι συνήθως» μόνο για 0 λεπτά διαφορά.
     final total = stageOrder.fold<int>(0, (s, k) => s + (n.stageMinutes[k] ?? 0));
     final stages = [for (final k in stageOrder) if ((n.stageMinutes[k] ?? 0) > 0) k];
@@ -473,6 +473,13 @@ class _SleepCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Χωρίς φάσεις από τη Samsung· διάρκεια με τα ξυπνήματα',
+                    style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
+                  ),
+                ],
+                if (n.partial) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ένα κομμάτι της νύχτας ήρθε χωρίς φάσεις: η διάρκεια είναι μικρότερη από τον πραγματικό ύπνο',
                     style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
                   ),
                 ],
