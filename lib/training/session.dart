@@ -138,6 +138,8 @@ class Session {
     this.meters,
     this.steps,
     this.source,
+    this.hrMode,
+    this.hrGap,
   })  : items = items ?? [],
         hr = hr ?? [];
 
@@ -165,6 +167,11 @@ class Session {
   /// «watch» αν έγινε μόνο στο ρολόι.
   String? source;
 
+  /// Πώς έφταναν οι παλμοί στο ρολόι: «5s» (ανά 5″ και με σβηστή οθόνη), «sensor» (εφεδρεία αισθητήρα),
+  /// «default» (σε πακέτα όταν η οθόνη σβήνει). Και το μεγαλύτερο κενό σε δευτερόλεπτα (έλεγχος 8/11).
+  String? hrMode;
+  int? hrGap;
+
   bool get isCardio => cardioMinutes != null;
 
   bool get finished => end != null;
@@ -189,6 +196,8 @@ class Session {
         if (meters != null) 'm': meters,
         if (steps != null) 'steps': steps,
         if (source != null) 'src': source,
+        if (hrMode != null) 'hrm': hrMode,
+        if (hrGap != null) 'hrg': hrGap,
       };
 
   factory Session.fromJson(Map<String, dynamic> j) => Session(
@@ -211,5 +220,7 @@ class Session {
         meters: (j['m'] as num?)?.toDouble(),
         steps: (j['steps'] as num?)?.toInt(),
         source: j['src'] as String?,
+        hrMode: j['hrm'] as String?,
+        hrGap: (j['hrg'] as num?)?.toInt(),
       );
 }

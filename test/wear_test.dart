@@ -150,6 +150,12 @@ void main() {
       expect(t.sessions.last.hrAvg, 115);
       expect(HrSummary(t.sessions.last, 140).overSec, 10);
       expect(t.importWatch({'v': 1, 'kind': 'hr', 'sid': 'άγνωστο'}), isFalse);
+      // πώς έφταναν οι παλμοί (8/11): μένει στην προπόνηση και φαίνεται στη σύνοψη
+      expect(t.importWatch({'v': 1, 'kind': 'hr', 'sid': s.id, 'hrMode': '5s', 'hrGap': 6}), isTrue);
+      expect(t.sessions.last.hrMode, '5s');
+      expect(t.sessions.last.hrGap, 6);
+      final back = Session.fromJson(jsonDecode(jsonEncode(t.sessions.last.toJson())) as Map<String, dynamic>);
+      expect(back.hrGap, 6);
     });
 
     test('ζωντανοί παλμοί: δείγμα ανά 10″ στην προπόνηση που τρέχει', () {
@@ -287,6 +293,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Δεν ξεπέρασες το όριο (140).'), findsNothing);
       expect(find.text('Έφτασες στιγμιαία το όριο (140).'), findsOneWidget);
+      // μεγάλο κενό στους παλμούς: φαίνεται
+      s.hrGap = 95;
+      await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s, key: UniqueKey())));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Μεγαλύτερο κενό στους παλμούς: 95″'), findsOneWidget);
     });
 
     testWidgets('παλμοί που σταμάτησαν να έρχονται: πορτοκαλί μήνυμα, όχι κενό', (tester) async {

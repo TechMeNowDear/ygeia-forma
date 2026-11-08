@@ -156,6 +156,17 @@ class HrCard extends StatelessWidget {
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec > 0 ? c.bad : c.text),
           ),
         ],
+        if (session.hrGap case final g?) ...[
+          const SizedBox(height: 6),
+          // Πόσο γρήγορα έφταναν οι παλμοί από το ρολόι (8/11): μέτρο για το πόσο μπορεί να αργήσει η ειδοποίηση.
+          Text(
+            g <= 12
+                ? 'Οι παλμοί έφταναν κάθε λίγα δευτερόλεπτα (μεγαλύτερο κενό $g″)${session.hrMode == 'sensor' ? ', απευθείας από τον αισθητήρα' : ''}.'
+                : 'Μεγαλύτερο κενό στους παλμούς: ${g < 120 ? '$g″' : '${(g / 60).round()}′'}. Τόσο μπορεί να άργησε η ειδοποίηση.',
+            key: const ValueKey('hr-gap'),
+            style: TextStyle(fontSize: 12.5, height: 1.35, color: g <= 12 ? c.textSecondary : c.exercise),
+          ),
+        ],
       ]),
     );
   }

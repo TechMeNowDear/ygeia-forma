@@ -418,6 +418,7 @@ class TrainingStore extends ChangeNotifier {
       }
       if (hrMax != null && (s.hrMax == null || hrMax > s.hrMax!)) s.hrMax = hrMax;
       if (hrAvg != null) s.hrAvg = hrAvg;
+      _watchHrInfo(s, j);
       _mergeWatchSets(s, j['items']);
       save();
       return true;
@@ -440,6 +441,7 @@ class TrainingStore extends ChangeNotifier {
       hr: samples,
       source: 'watch',
     );
+    _watchHrInfo(s, j);
     if (cardio != null) {
       final sec = (cardio['sec'] as num?)?.toInt() ?? end.difference(start).inSeconds;
       s.cardioMinutes = (sec / 60).round();
@@ -453,6 +455,11 @@ class TrainingStore extends ChangeNotifier {
     sessions.insert(at, s);
     save();
     return true;
+  }
+
+  static void _watchHrInfo(Session s, Map<String, dynamic> j) {
+    if (j['hrMode'] is String) s.hrMode = j['hrMode'] as String;
+    if (j['hrGap'] is num) s.hrGap = (j['hrGap'] as num).toInt();
   }
 
   /// Σετ που πατήθηκαν ✓ στο ρολόι αλλά δεν έφτασαν στο κινητό (π.χ. η εφαρμογή ήταν κλειστή): προστίθενται.

@@ -34,6 +34,11 @@ object Repo {
     var bpm = 0
     var bpmAt = 0L
     var hr: HrStats? = null
+
+    /** Πώς έρχονται οι παλμοί: «5s» (ανά 5″ και με σβηστή οθόνη), «sensor» (εφεδρεία αισθητήρα), «default». */
+    var hrMode = ""
+    /** Κενά στην παράδοση παλμών (ό,τι φτάνει στην εφαρμογή, όχι ό,τι μετρά το ρολόι). */
+    var hrGaps = GapMeter()
     val alarm = HrAlarm(null)
     /** Μέχρι πότε έχει σιγήσει η κόκκινη οθόνη (ο χρήστης την πάτησε). */
     var alarmMutedUntil = 0L
@@ -110,6 +115,8 @@ object Repo {
         bpm = 0
         bpmAt = 0
         hr = null
+        hrMode = ""
+        hrGaps = GapMeter()
         meters = 0.0
         steps = 0
         activeSec = 0

@@ -341,6 +341,32 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
     }
 }
 
+/** Χρόνος τιμής αισθητήρα (ns από την εκκίνηση) → ώρα (ms), ποτέ στο μέλλον. */
+fun sensorWallTime(eventNanos: Long, nowWallMs: Long, nowElapsedNanos: Long): Long =
+    (nowWallMs - (nowElapsedNanos - eventNanos) / 1_000_000).coerceAtMost(nowWallMs)
+
+/**
+ * Πόσο συχνά φτάνουν πραγματικά οι παλμοί στην εφαρμογή (το μεγαλύτερο κενό ανάμεσα σε δύο παραδόσεις).
+ * Για τον έλεγχο στη συσκευή: δείχνει αν η ειδοποίηση ορίου μπορεί να αργήσει (8/11).
+ */
+class GapMeter {
+    private var last = 0L
+    var maxGapMs = 0L
+        private set
+
+    fun mark(at: Long) {
+        if (last > 0 && at > last) maxGapMs = maxOf(maxGapMs, at - last)
+        last = at
+    }
+
+    /** Και ο χρόνος ως το τέλος (αν σταμάτησαν να έρχονται). */
+    fun close(at: Long) {
+        if (last > 0 && at > last) maxGapMs = maxOf(maxGapMs, at - last)
+    }
+
+    val maxGapSec: Int get() = ((maxGapMs + 500) / 1000).toInt()
+}
+
 /** «1:04», «24:31», «1:02:05». */
 fun clock(sec: Long): String {
     val s = if (sec < 0) 0 else sec

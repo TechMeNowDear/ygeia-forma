@@ -85,6 +85,8 @@ class ExerciseService : Service() {
     private var lastHrSent = 0L
     private var lastLiveSent = 0L
     private var lostBuzzed = false
+    /** Εφεδρεία αισθητήρα για την ειδοποίηση (μόνο χωρίς παράδοση ανά 5″ και με όριο). */
+    private var sensor: HrSensor? = null
     private var exerciseStarted = false
     private var stopping = false
 
@@ -106,6 +108,8 @@ class ExerciseService : Service() {
     }
 
     override fun onDestroy() {
+        sensor?.stop()
+        sensor = null
         ticker?.cancel()
         scope.cancel()
         Link.detach(this)
@@ -188,6 +192,16 @@ class ExerciseService : Service() {
             )
             client.startExerciseAsync(config).await()
             exerciseStarted = true
+            Repo.hrMode = if (batching.isNotEmpty()) "5s" else "default"
+            // Χωρίς παράδοση ανά 5″: με σβηστή οθόνη οι παλμοί μπορεί να έρθουν σε πακέτα με καθυστέρηση λεπτών.
+            // Για την ειδοποίηση ορίου, τότε και μόνο, ο αισθητήρας απευθείας (μόνο όσο τρέχει η άσκηση).
+            if (batching.isEmpty() && DataType.HEART_RATE_BPM in types && Repo.alarm.limit != null) {
+                val s = HrSensor(this) { bpm, at -> scope.launch { onSensorBpm(bpm, at) } }
+                if (s.start()) {
+                    sensor = s
+                    Repo.hrMode = "sensor"
+                }
+            }
         } catch (e: Exception) {
             Repo.notice = "Δεν ξεκίνησε η μέτρηση παλμών στο ρολόι."
             Repo.changed()
@@ -208,7 +222,9 @@ class ExerciseService : Service() {
             // Κάθε τιμή με τον δικό της χρόνο (σε ένα πακέτο μπορεί να έρθουν πολλές).
             val boot = Instant.ofEpochMilli(now - SystemClock.elapsedRealtime())
             var buzz = -1
-            for (p in m.getData(DataType.HEART_RATE_BPM)) {
+            val points = m.getData(DataType.HEART_RATE_BPM)
+            if (points.isNotEmpty() && sensor == null) Repo.hrGaps.mark(now)
+            for (p in points) {
                 val bpm = Math.round(p.value).toInt()
                 if (bpm !in 26..249) continue
                 val at = p.getTimeInstant(boot).toEpochMilli().coerceAtMost(now)
@@ -217,7 +233,8 @@ class ExerciseService : Service() {
                     Repo.bpm = bpm
                     Repo.bpmAt = at
                 }
-                if (Repo.alarm.feed(bpm, at)) buzz = bpm
+                // Με την εφεδρεία ενεργή, η ειδοποίηση ακούει μόνο τον αισθητήρα (μία σειρά χρόνων, όχι ανακατεμένες).
+                if (sensor == null && Repo.alarm.feed(bpm, at)) buzz = bpm
             }
             if (buzz > 0) onAlarm(buzz)
             m.getData(DataType.DISTANCE_TOTAL)?.let { Repo.meters = it.total }
@@ -235,6 +252,18 @@ class ExerciseService : Service() {
         override fun onLapSummaryReceived(lapSummary: ExerciseLapSummary) {}
 
         override fun onAvailabilityChanged(dataType: DataType<*, *>, availability: Availability) {}
+    }
+
+    /** Τιμή από την εφεδρεία αισθητήρα: ένδειξη και ειδοποίηση (όχι στατιστικά: αυτά από το Health Services). */
+    private fun onSensorBpm(bpm: Int, at: Long) {
+        if (stopping) return
+        Repo.hrGaps.mark(System.currentTimeMillis())
+        if (at >= Repo.bpmAt) {
+            Repo.bpm = bpm
+            Repo.bpmAt = at
+        }
+        if (Repo.alarm.feed(bpm, at)) onAlarm(bpm)
+        Repo.changed()
     }
 
     // ------------------------------------------------------------------ κάθε δευτερόλεπτο
@@ -326,6 +355,9 @@ class ExerciseService : Service() {
         stopping = true
         val now = System.currentTimeMillis()
         ticker?.cancel()
+        sensor?.stop()
+        sensor = null
+        Repo.hrGaps.close(if (Repo.bpmAt > 0) minOf(now, Repo.bpmAt + 60_000) else now)
         if (exerciseStarted) {
             try {
                 client.endExerciseAsync().await()
@@ -360,6 +392,8 @@ class ExerciseService : Service() {
             }
             else -> null
         }
+        // Για τον έλεγχο στη συσκευή: πώς ήρθαν οι παλμοί και το μεγαλύτερο κενό (φαίνεται στη σύνοψη του κινητού).
+        if (result != null && Repo.hrMode.isNotEmpty()) result.second.put("hrMode", Repo.hrMode).put("hrGap", Repo.hrGaps.maxGapSec)
         if (result != null) {
             Repo.snapshot(this, result.second)
             if (Link.putResult(this, result.first, result.second)) Repo.snapshot(this, null)

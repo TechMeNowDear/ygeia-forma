@@ -147,6 +147,23 @@ class ProtocolTest {
     }
 
     @Test
+    fun sensorTimeAndGaps() {
+        // τιμή 3″ πριν (σε ns από την εκκίνηση) → 3″ πριν σε ώρα· ποτέ στο μέλλον
+        assertEquals(97_000L, sensorWallTime(7_000_000_000L, 100_000L, 10_000_000_000L))
+        assertEquals(100_000L, sensorWallTime(11_000_000_000L, 100_000L, 10_000_000_000L))
+        val g = GapMeter()
+        assertEquals(0, g.maxGapSec)
+        g.mark(1_000)
+        g.mark(6_000)
+        g.mark(11_200)
+        assertEquals(5, g.maxGapSec)
+        g.mark(90_000)
+        assertEquals(79, g.maxGapSec)
+        g.close(200_000)
+        assertEquals(110, g.maxGapSec)
+    }
+
+    @Test
     fun formats() {
         assertEquals("1:04", clock(64))
         assertEquals("1:02:05", clock(3725))
