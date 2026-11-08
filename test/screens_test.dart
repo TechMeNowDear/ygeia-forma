@@ -35,6 +35,7 @@ import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/plan_file.dart';
 import 'package:ygeia_forma/ti_ftanei.dart';
 import 'package:ygeia_forma/training/training_store.dart';
+import 'package:ygeia_forma/training/wear_link.dart';
 
 import 'sample_data.dart';
 import 'sample_food.dart';
@@ -571,11 +572,12 @@ void main() {
   // 8/11: προπόνηση (Παρασκευή 13/11 = Προπόνηση Α, με δύο προηγούμενες φορές για την πρόοδο).
   final trainAt = DateTime(2026, 11, 13, 17, 30);
   Future<void> trainShot(WidgetTester t, String name, Size size, Brightness b,
-      {bool approved = true, Future<void> Function(WidgetTester)? act}) async {
+      {bool approved = true, Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep}) async {
     ExClock.frozen = true;
     await t.runAsync(() => ExLibrary.load(inline: true));
     final prev = TrainingStore.main;
     TrainingStore.main = sampleTraining(trainAt, approved: approved);
+    prep?.call(TrainingStore.main);
     addTearDown(() => TrainingStore.main = prev);
     await _shot(t, name: name, size: size, brightness: b, tab: Cat.exercise, sub: ExerciseTab.train, at: trainAt, act: act);
   }
@@ -619,6 +621,34 @@ void main() {
         await firstExerciseDone(t);
         await tapKey(t, 'sess-finish');
       }));
+  // Ρολόι (8/11): ζωντανοί παλμοί στην προπόνηση, παλμοί στη σύνοψη, περπάτημα ζωντανά από το ρολόι.
+  testWidgets('Προπόνηση · παλμοί από το ρολόι', (t) async {
+    WearLink.main.hr.value = (128, DateTime.now());
+    addTearDown(() => WearLink.main.hr.value = null);
+    await trainShot(t, 'T10_session_hr', phoneShort, Brightness.light, act: startSession);
+  });
+  testWidgets('Προπόνηση · σύνοψη με παλμούς', (t) => trainShot(t, 'T11_summary_hr', phone, Brightness.light,
+      prep: (s) => s.sessions.last
+        ..hrAvg = 116
+        ..hrMax = 137
+        ..hr.addAll([for (var i = 0; i < 360; i++) [i * 10, 95 + (i % 18) * 2 + (i ~/ 40)]]),
+      act: (t) async {
+        final f = find.textContaining('11/11 · Προπόνηση Α');
+        await t.ensureVisible(f);
+        await t.pumpAndSettle();
+        await t.tap(f);
+        await t.pumpAndSettle();
+      }));
+  testWidgets('Προπόνηση · περπάτημα ζωντανά από το ρολόι', (t) async {
+    WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'steps': 3104, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
+    WearLink.main.ready.value = true;
+    addTearDown(() {
+      WearLink.main.live.value = null;
+      WearLink.main.ready.value = false;
+    });
+    await trainShot(t, 'T12_walk_live', phone, Brightness.light);
+  });
+
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
 
   // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».

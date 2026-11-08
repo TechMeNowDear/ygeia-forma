@@ -178,6 +178,27 @@ jobs:
           echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
 
       # Μόνο όταν το ζητήσουμε: πραγματικό σφάλμα στο Sentry με τον κώδικα της εφαρμογής και την ίδια έκδοση.
+      # Ρολόι (8/11): η εφαρμογή Wear OS, με το ίδιο κλειδί υπογραφής (το θέλει η σύνδεση με το κινητό).
+      - name: Χτίσιμο εφαρμογής ρολογιού
+        env:
+          YGEIA_BUILD: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          cd android
+          grep -q '":wear"' settings.gradle.kts || echo 'include(":wear")' >> settings.gradle.kts
+          if ! ./gradlew :wear:testDebugUnitTest :wear:assembleRelease --console=plain 2>&1 | tee ../wear.log; then
+            grep -E -A6 "FAILED|AssertionError|^e: |error:|What went wrong|Unresolved reference" ../wear.log | head -120 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -100 ../wear.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Ρολόι::$msg"
+            exit 1
+          fi
+          cd ..
+          w=build/wear/outputs/apk/release/wear-release.apk
+          test -f "$w" || { echo "::error title=Ρολόι::Δεν βγήκε υπογεγραμμένο APK ρολογιού"; ls -l build/wear/outputs/apk/release/ || true; exit 1; }
+          cp "$w" ygeia-forma-watch-${{ github.run_number }}.apk
+          ls -lh ygeia-forma-watch-*.apk
+
       - name: Δοκιμαστικό σφάλμα στο Sentry
         if: contains(github.event.head_commit.message, '[sentry-test]') || inputs.sentry_test
         run: |
@@ -331,13 +352,17 @@ jobs:
           set -e
           apk=ygeia-forma-${{ github.run_number }}.apk
           test -f "$apk"
+          # Η εφαρμογή του ρολογιού μπαίνει δίπλα (εγκατάσταση στο ρολόι από υπολογιστή ή από το Play Console).
+          watch=ygeia-forma-watch-${{ github.run_number }}.apk
+          extra=""
+          [ -f "$watch" ] && extra="$watch"
           # Πρώτα ένα αντίγραφο με δικό του όνομα: αν η δημοσίευση διακοπεί ανάμεσα στο σβήσιμο και στη δημιουργία της
           # «latest», η έκδοση υπάρχει ακόμα στο Releases.
-          gh release create "build-${{ github.run_number }}" "$apk" --target "${{ github.sha }}" \
+          gh release create "build-${{ github.run_number }}" "$apk" $extra --target "${{ github.sha }}" \
             --title "Έκδοση #${{ github.run_number }}" --notes "Χτίστηκε από το commit ${{ github.sha }}." --prerelease
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest "$apk" \
+          gh release create latest "$apk" $extra \
             --target "${{ github.sha }}" \
             --title "Τελευταία έκδοση · #${{ github.run_number }}" \
-            --notes "Χτίστηκε από το commit ${{ github.sha }}. Κατέβασε το .apk στο Fold και πάτα «Εγκατάσταση»."
+            --notes "Χτίστηκε από το commit ${{ github.sha }}. Στο Fold κατέβασε το ygeia-forma-${{ github.run_number }}.apk και πάτα «Εγκατάσταση». Το ygeia-forma-watch-${{ github.run_number }}.apk είναι για το ρολόι (δεν μπαίνει στο κινητό)."
           gh release delete "build-${{ github.run_number }}" --yes --cleanup-tag || true
