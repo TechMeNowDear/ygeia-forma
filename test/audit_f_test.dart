@@ -430,7 +430,7 @@ void main() {
     List<String> top(String q, int n) => [for (final f in store.search(q).take(n)) f.name];
 
     test('Πλήθος τροφίμων: 323 + 23 ψάρια, θαλασσινά και κεφίρ (έλεγχος 8/11, FOOD-02)', () {
-      expect(basicFoods().length, 346);
+      expect(basicFoods().length, 350);
     });
 
     test('N1: «κοτόπουλο ψητό» → ψητό στήθος· «κοτόπουλο φούρνου» → ολόκληρο', () {

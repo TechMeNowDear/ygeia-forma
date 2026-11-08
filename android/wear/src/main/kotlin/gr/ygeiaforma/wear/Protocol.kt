@@ -29,7 +29,8 @@ object Paths {
     const val CAPABILITY = "ygeia_watch"
 }
 
-class SetT(val load: Double?, val label: String, var reps: Int, var done: Boolean = false, var at: Long = 0)
+/** [confirmed]: το κινητό έχει δει το ✓ (στην κατάσταση που στέλνει). Ως τότε το ✓ του ρολογιού κρατιέται (έλεγχος #2). */
+class SetT(val load: Double?, val label: String, var reps: Int, var done: Boolean = false, var at: Long = 0, var confirmed: Boolean = false)
 
 class ItemT(
     val ex: String,
@@ -316,9 +317,26 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
         private set
     private var overSince = -1L
     private var lastBuzz = 0L
+    private var lastAt = Long.MIN_VALUE
 
-    /** true όταν πρέπει να δονηθεί (τη στιγμή που ανάβει και ανά 30″ όσο μένει πάνω). [at]: χρόνος της τιμής (ms). */
+    /**
+     * true όταν πρέπει να δονηθεί (τη στιγμή που ανάβει και ανά 30″ όσο μένει πάνω). [at]: χρόνος της τιμής (ms).
+     * Τιμές παλαιότερες από την τελευταία αγνοούνται: έτσι ακούει και τις δύο πηγές (Health Services και αισθητήρα)
+     * χωρίς να ανακατεύονται οι χρόνοι, και αν σταματήσει η μία, συνεχίζει η άλλη (έλεγχος #2, W2-04).
+     */
     fun feed(bpm: Int, at: Long): Boolean {
+        if (at < lastAt) return false
+        lastAt = at
+        return step(bpm, at)
+    }
+
+    /**
+     * Καμία νέα τιμή, αλλά η τελευταία ([bpm], ακόμα φρέσκια) ισχύει και τώρα: ο αισθητήρας στέλνει μόνο αλλαγές, οπότε
+     * σταθεροί παλμοί πάνω από το όριο δεν θα έφερναν ποτέ δόνηση (έλεγχος #2, W2-02).
+     */
+    fun steady(bpm: Int, now: Long): Boolean = step(bpm, now)
+
+    private fun step(bpm: Int, at: Long): Boolean {
         val l = limit
         if (l == null) {
             on = false
@@ -347,6 +365,7 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
         on = false
         overSince = -1
         lastBuzz = 0
+        lastAt = Long.MIN_VALUE
     }
 }
 

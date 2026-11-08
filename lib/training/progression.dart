@@ -65,6 +65,7 @@ double? defaultStart(LoadKind k) => switch (k) {
       LoadKind.kb => 8,
       LoadKind.horn => 2.5,
       LoadKind.band => 20,
+      LoadKind.bandPair => 30,
       LoadKind.bandAssist => 50,
       LoadKind.plate => 0,
       LoadKind.bodyweight => null,

@@ -164,6 +164,20 @@ class ProtocolTest {
     }
 
     @Test
+    fun alarmTwoSourcesAndSteady() {
+        val a = HrAlarm(140)
+        // αισθητήρας (νεότερες τιμές) και Health Services (πακέτο με παλιότερες): οι παλιές αγνοούνται
+        assertFalse(a.feed(150, 10_000))
+        assertFalse(a.feed(100, 8_000))
+        // σταθεροί παλμοί χωρίς νέα τιμή: μετά από 5″ ανάβει
+        assertFalse(a.steady(150, 12_000))
+        assertTrue(a.steady(150, 15_000))
+        assertTrue(a.on)
+        // ο αισθητήρας σώπασε: οι νεότερες του Health Services περνούν
+        assertTrue(a.feed(152, 46_000))
+    }
+
+    @Test
     fun holdAfterSymptom() {
         fun plan(extra: String) = Plan.parse("{\"v\":1,\"approved\":true,\"day\":\"2026-11-08\",\"workouts\":[]$extra}")
         val today = "2026-11-08"

@@ -461,7 +461,7 @@ class _PageOne extends StatelessWidget {
       if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο (bpm)', K.lowHr, num0, _def(K.lowHr)),
       if (withOura) ('HRV νύχτας, RMSSD, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
       if (withOura) ('Αναπνοές στον ύπνο (ανά λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
-      ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)${withOura ? ', ρολόι (νύχτες χωρίς δαχτυλίδι)' : ''}', K.spo2Avg, pct, _def(K.spo2Avg)),
+      ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)${withOura ? ', από το ρολόι' : ''}', K.spo2Avg, pct, _def(K.spo2Avg)),
       if (withOura) ('Οξυγόνο στον ύπνο, μέσο νύχτας από το δαχτυλίδι (%)', K.ringSpo2, pct, _def(K.ringSpo2)),
       // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών C5, κλινικός L2): μεσαία 89,5 → «89,5%», όχι «90%».
       ('Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση νύχτας (%)', K.spo2Min, (v) => '${lowestText(v)}%', null),

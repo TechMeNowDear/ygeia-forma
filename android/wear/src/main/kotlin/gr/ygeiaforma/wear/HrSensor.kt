@@ -18,6 +18,19 @@ import android.os.SystemClock
 class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long) -> Unit) : SensorEventListener {
     private var sm: SensorManager? = null
 
+    /**
+     * Ο αισθητήρας στέλνει τιμή μόνο όταν αλλάζει (on-change): σταθεροί παλμοί = καμία τιμή. Για να μη φαίνονται τότε
+     * ως «δεν μετριούνται», κρατάμε την τελευταία τιμή και αν υπάρχει επαφή με το δέρμα (έλεγχος #2, W2-02).
+     */
+    var last = 0
+        private set
+    var contact = true
+        private set
+
+    /** Πότε ήρθε η τελευταία τιμή (ms). */
+    var lastAt = 0L
+        private set
+
     /** true αν ξεκίνησε (υπάρχει αισθητήρας και δέχτηκε την εγγραφή). */
     fun start(): Boolean {
         val m = ctx.getSystemService(SensorManager::class.java) ?: return false
@@ -39,13 +52,21 @@ class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long)
     override fun onSensorChanged(e: SensorEvent) {
         if (e.sensor.type != Sensor.TYPE_HEART_RATE || e.values.isEmpty()) return
         // Χωρίς επαφή ή αναξιόπιστη: όχι τιμή (το «δεν μετριούνται» βγαίνει από την έλλειψη τιμών).
-        if (e.accuracy == SensorManager.SENSOR_STATUS_NO_CONTACT || e.accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE) return
+        if (e.accuracy == SensorManager.SENSOR_STATUS_NO_CONTACT || e.accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE) {
+            contact = false
+            return
+        }
         val bpm = Math.round(e.values[0])
         if (bpm !in 26..249) return
+        contact = true
+        last = bpm
+        lastAt = System.currentTimeMillis()
         onBpm(bpm, sensorWallTime(e.timestamp, System.currentTimeMillis(), SystemClock.elapsedRealtimeNanos()))
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        contact = accuracy != SensorManager.SENSOR_STATUS_NO_CONTACT && accuracy != SensorManager.SENSOR_STATUS_UNRELIABLE
+    }
 
     companion object {
         private const val SAMPLING_US = 1_000_000

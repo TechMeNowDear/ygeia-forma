@@ -22,6 +22,10 @@ enum LoadKind {
   /// Λάστιχο: αντίσταση σε lb (συνδυασμοί λάστιχων).
   band,
 
+  /// Δύο λάστιχα, ένα σε κάθε χέρι (ανοίγματα): ίδια αντίσταση ανά πλευρά, με διαφορετικά χρώματα, αφού υπάρχει
+  /// ένα λάστιχο από κάθε χρώμα. Το φορτίο είναι lb ανά πλευρά (έλεγχος #2, T2-06).
+  bandPair,
+
   /// Λάστιχο που βοηθά (έλξεις): πρόοδος = λιγότερη βοήθεια.
   bandAssist,
 
@@ -38,7 +42,7 @@ const exerciseLoad = <String, LoadKind>{
   'incline_press': LoadKind.dbPair,
   'pushup_handles': LoadKind.bodyweight,
   'pushup_bench': LoadKind.bodyweight,
-  'band_fly': LoadKind.band,
+  'band_fly': LoadKind.bandPair,
   'dips': LoadKind.bodyweight,
   'db_curl': LoadKind.dbPair,
   'incline_curl': LoadKind.dbPair,
@@ -78,7 +82,7 @@ const kettlebells = [4.0, 6.0, 8.0, 10.0, 12.0, 16.0];
 const bands = <String, int>{'yellow': 10, 'blue': 20, 'green': 30, 'black': 40, 'red': 50};
 const bandNames = <String, String>{'yellow': 'κίτρινο', 'blue': 'μπλε', 'green': 'πράσινο', 'black': 'μαύρο', 'red': 'κόκκινο'};
 
-bool usesKg(LoadKind k) => k != LoadKind.band && k != LoadKind.bandAssist && k != LoadKind.bodyweight;
+bool usesKg(LoadKind k) => k != LoadKind.band && k != LoadKind.bandPair && k != LoadKind.bandAssist && k != LoadKind.bodyweight;
 bool hasLoad(LoadKind k) => k != LoadKind.bodyweight;
 
 double _r(double v) => (v * 100).round() / 100;
@@ -126,9 +130,39 @@ List<double> available(LoadKind k) {
     case LoadKind.band:
     case LoadKind.bandAssist:
       return [for (final v in bandCombos().keys) v.toDouble()];
+    case LoadKind.bandPair:
+      return [for (final v in bandPairs().keys) v.toDouble()];
     case LoadKind.bodyweight:
       return const [0];
   }
+}
+
+/// Δύο χέρια με ίδια αντίσταση από ΔΙΑΦΟΡΕΤΙΚΑ λάστιχα: lb ανά πλευρά → (αριστερά, δεξιά), με τα λιγότερα λάστιχα.
+/// Με κίτρινο 10, μπλε 20, πράσινο 30, μαύρο 40, κόκκινο 50 βγαίνουν 30–70 lb ανά πλευρά.
+Map<int, (List<String>, List<String>)> bandPairs() {
+  final names = bands.keys.toList();
+  final out = <int, (List<String>, List<String>)>{};
+  final n = names.length;
+  for (var a = 1; a < (1 << n); a++) {
+    for (var b = 1; b < (1 << n); b++) {
+      if (a & b != 0) continue;
+      List<String> pick(int m) => [for (var i = 0; i < n; i++) if (m & (1 << i) != 0) names[i]]..sort((x, y) => bands[y]!.compareTo(bands[x]!));
+      final l = pick(a), r = pick(b);
+      final la = l.fold(0, (s, x) => s + bands[x]!), lb = r.fold(0, (s, x) => s + bands[x]!);
+      if (la != lb) continue;
+      final cur = out[la];
+      if (cur == null || l.length + r.length < cur.$1.length + cur.$2.length) out[la] = (l, r);
+    }
+  }
+  return Map.fromEntries(out.entries.toList()..sort((x, y) => x.key.compareTo(y.key)));
+}
+
+/// «αριστερά πράσινο, δεξιά κίτρινο + μπλε (30 lb ανά πλευρά)».
+String bandPairText(double lb) {
+  final p = bandPairs()[lb.round()];
+  if (p == null) return '${lb.round()} lb ανά πλευρά';
+  String side(List<String> c) => c.map((x) => bandNames[x]).join(' + ');
+  return '${side(p.$1)} / ${side(p.$2)} (${lb.round()} lb ανά πλευρά)';
 }
 
 /// Συνδυασμοί λάστιχων: lb → χρώματα (με τα λιγότερα λάστιχα).
@@ -214,7 +248,7 @@ double scaled(LoadKind k, double v, double ratio) {
     // Περισσότερη βοήθεια: το επόμενο βαρύτερο λάστιχο.
     return stepDown(k, v) ?? v;
   }
-  if (!usesKg(k) && k != LoadKind.band) return v;
+  if (!usesKg(k) && k != LoadKind.band && k != LoadKind.bandPair) return v;
   final s = snap(k, v * ratio);
   return s >= v ? (stepDown(k, v) ?? v) : s;
 }
@@ -239,6 +273,8 @@ String loadLabel(LoadKind k, double? v) {
       return 'σώμα';
     case LoadKind.band:
       return bandText(v ?? 0);
+    case LoadKind.bandPair:
+      return bandPairText(v ?? 0);
     case LoadKind.bandAssist:
       return (v ?? 0) <= 0 ? 'χωρίς βοήθεια' : 'βοήθεια: ${bandText(v!)}';
     case LoadKind.plate:
@@ -316,6 +352,10 @@ String setupText(LoadKind k, double? v) {
       return 'kettlebell ${kgText(w)} kg';
     case LoadKind.band:
       return 'λάστιχο ${bandText(w)}';
+    case LoadKind.bandPair:
+      final p = bandPairs()[w.round()];
+      if (p == null) return 'λάστιχα ${w.round()} lb ανά πλευρά';
+      return 'αριστερό χέρι ${p.$1.map((x) => bandNames[x]).join(' + ')}, δεξί ${p.$2.map((x) => bandNames[x]).join(' + ')}';
     case LoadKind.bandAssist:
       return w <= 0 ? 'χωρίς λάστιχο βοήθειας' : 'λάστιχο βοήθειας ${bandText(w)}';
     case LoadKind.plate:

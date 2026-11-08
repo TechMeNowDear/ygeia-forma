@@ -307,7 +307,11 @@ class TrainingStore extends ChangeNotifier {
     if (!approved && (lockReason == 'red' || lockReason == 'amber2')) return 'lock';
     if (pendingWatchSymptom != null) return 'pending';
     final n = now;
-    if (symptoms.any((x) => x.code != watchCode && x.at.year == n.year && x.at.month == n.month && x.at.day == n.day)) return 'today';
+    // Σύμπτωμα σήμερα (που δεν το έχει δει ήδη γιατρός: πριν από νέα έγκριση την ίδια μέρα δεν μετρά).
+    bool afterOk(Symptom x) => approvedAt == null || x.at.isAfter(approvedAt!);
+    if (symptoms.any((x) => x.code != watchCode && afterOk(x) && x.at.year == n.year && x.at.month == n.month && x.at.day == n.day)) {
+      return 'today';
+    }
     if (needsCheck) return 'check';
     return null;
   }

@@ -176,7 +176,10 @@ class SymptomResultPage extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
-            child: ListView(padding: const EdgeInsets.fromLTRB(24, 0, 24, 24), children: [
+            // Όλα χτισμένα (όχι ListView): τα κουμπιά στο τέλος υπάρχουν πάντα, και σε μικρή οθόνη.
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Icon(red ? Icons.emergency_rounded : Icons.pause_circle_outline_rounded, size: 56, color: red ? c.bad : c.exercise),
               const SizedBox(height: 14),
               Text(title, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, height: 1.2, color: c.text)),
@@ -206,7 +209,7 @@ class SymptomResultPage extends StatelessWidget {
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(red ? 'Κλείσιμο' : 'Εντάξει'),
               ),
-            ]),
+            ])),
           ),
         ),
       ),

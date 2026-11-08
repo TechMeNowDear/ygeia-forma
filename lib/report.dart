@@ -221,12 +221,11 @@ ReportStat _sensorStat(
   TrendResult? trend,
 ) {
   DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
-  // Έλεγχος #2 (D2-01): ίδιοι κανόνες με την εφαρμογή. Σε νύχτα του Oura ο μέσος όρος του ρολογιού δεν μπαίνει
-  // (μπαίνει του δαχτυλιδιού, χωριστή γραμμή), και η χαμηλότερη μόνο όταν το ρολόι μέτρησε τουλάχιστον το μισό
-  // ύπνο ([spo2MinCoverage]). Παλιές μέρες χωρίς κάλυψη γραμμένη: όπως ήταν.
+  // Έλεγχος #2 (D2-01): ίδιος κανόνας με την εφαρμογή για τη χαμηλότερη: σε νύχτα του Oura μόνο όταν το ρολόι
+  // μέτρησε τουλάχιστον το μισό ύπνο ([spo2MinCoverage]). Παλιές μέρες χωρίς κάλυψη γραμμένη: όπως ήταν. Ο μέσος όρος
+  // του ρολογιού μένει όλες τις 90 μέρες (K1), με ετικέτα «ρολόι»· του δαχτυλιδιού έχει δική του γραμμή.
   bool keep(DateTime d) {
     if (p.nightSource(d) != Source.oura) return true;
-    if (key == K.spo2Avg) return false;
     if (key == K.spo2Min) {
       final cov = history[dateKey(d)]?[K.spo2Cov];
       return cov == null || cov >= spo2MinCoverage;

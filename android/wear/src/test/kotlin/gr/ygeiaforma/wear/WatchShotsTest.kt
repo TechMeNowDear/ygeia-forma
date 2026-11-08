@@ -7,6 +7,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.view.View
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -184,5 +186,27 @@ class WatchShotsTest {
         Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":true,\"hold\":\"check\""))
         shot("W12_home_check")
         Repo.plan = Plan.parse(planJson)
+    }
+
+    @Test
+    fun watchTickKeptUntilPhoneSeesIt() {
+        fun phone(done: Boolean) = LiveSession.parsePhone(
+            "{\"active\":true,\"id\":\"s1\",\"w\":\"A\",\"name\":\"Α\",\"start\":1,\"idx\":0," +
+                "\"items\":[{\"ex\":\"db_press\",\"name\":\"Π\",\"rest\":90,\"sets\":[{\"label\":\"\",\"reps\":8${if (done) ",\"done\":true" else ""}},{\"label\":\"\",\"reps\":8}]}]}",
+        )
+        Repo.applyPhone(null)
+        Repo.applyPhone(phone(false))
+        // ✓ στο ρολόι· το κινητό (κλειστή εφαρμογή) στέλνει ακόμα την παλιά κατάσταση, και μετά από ώρα
+        Repo.phone!!.items[0].sets[0].apply { done = true; at = 1 }
+        Repo.applyPhone(phone(false))
+        assertTrue(Repo.phone!!.items[0].sets[0].done)
+        assertEquals(listOf(0 to 0), Repo.pendingTicks)
+        // το κινητό το είδε: επιβεβαιωμένο, τίποτα για αποστολή
+        Repo.applyPhone(phone(true))
+        assertTrue(Repo.pendingTicks.isEmpty())
+        // ο χρήστης το έβγαλε στο κινητό: βγαίνει κι εδώ
+        Repo.applyPhone(phone(false))
+        assertFalse(Repo.phone!!.items[0].sets[0].done)
+        Repo.applyPhone(null)
     }
 }

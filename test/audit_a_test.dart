@@ -229,7 +229,10 @@ void main() {
       expect(d.heart.single.min, 64);
       expect(d.heart.single.max, 64);
       expect(d.spo2.length, 1);
-      expect(d.spo2.single.min, 95);
+      // Έλεγχος #2: ελάχιστο οξυγόνου έξω από τα όρια = καμία χαμηλότερη τιμή (όχι ο μέσος όρος, που έκρυβε τη νύχτα).
+      expect(d.spo2.single.min.isNaN, isTrue);
+      expect(oxygenOf(d.spo2)!.min, isNull);
+      expect(oxygenOf(d.spo2)!.avg, 95);
       expect(d.skin.single.avg, 34.5);
       expect(d.heartRange(a), (64, 64));
     });

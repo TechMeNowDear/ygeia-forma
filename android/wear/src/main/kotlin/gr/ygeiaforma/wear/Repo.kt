@@ -92,16 +92,28 @@ object Repo {
         syncedAt = System.currentTimeMillis()
     }
 
-    /** Νέα κατάσταση από το κινητό. Κρατά ό,τι ✓ έγινε στο ρολόι και δεν έχει φτάσει ακόμα εκεί. */
+    /** ✓ του ρολογιού που το κινητό δεν έχει δει ακόμα (άσκηση, σετ): ξαναστέλνονται (έλεγχος #2, W2-05). */
+    var pendingTicks: List<Pair<Int, Int>> = emptyList()
+
+    /**
+     * Νέα κατάσταση από το κινητό. Κρατά κάθε ✓ που έγινε στο ρολόι και δεν έχει φτάσει ακόμα εκεί (όσο κι αν αργήσει,
+     * π.χ. κλειστή εφαρμογή στο κινητό)· ένα ✓ που το κινητό είχε δει και μετά το έβγαλε, βγαίνει κι εδώ.
+     */
     fun applyPhone(s: LiveSession?) {
         val prev = phone
+        val pending = mutableListOf<Pair<Int, Int>>()
+        s?.items?.forEach { it.sets.forEach { set -> if (set.done) set.confirmed = true } }
         if (s != null && prev != null && prev.id == s.id) {
             for ((i, it) in s.items.withIndex()) {
                 val old = prev.items.getOrNull(i) ?: continue
                 if (old.ex != it.ex) continue
                 for ((k, set) in it.sets.withIndex()) {
                     val o = old.sets.getOrNull(k) ?: continue
-                    if (o.done && !set.done && System.currentTimeMillis() - o.at < 10_000) set.done = true
+                    if (o.done && !set.done && !o.confirmed) {
+                        set.done = true
+                        set.at = o.at
+                        pending.add(i to k)
+                    }
                 }
                 if (it.rir == null) it.rir = old.rir
             }
@@ -109,6 +121,7 @@ object Repo {
             if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
         }
         phone = s
+        pendingTicks = pending
         if (s != null) lastPhoneId = s.id
         if (s == null && prev != null) prev.ended = true
         syncedAt = System.currentTimeMillis()

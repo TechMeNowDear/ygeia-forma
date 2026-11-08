@@ -312,7 +312,8 @@ class WearLink with WidgetsBindingObserver {
         } else {
           next = '${_name(e.ex)} · σετ ${e.done.length + 1}';
         }
-        if (next != null && e.rest > 0) {
+        // Ξανασταλμένο ✓ που είχε χαθεί (έλεγχος #2): γράφεται, χωρίς νέο διάλειμμα για ένα σετ του παρελθόντος.
+        if (next != null && e.rest > 0 && c.j['late'] != true) {
           final end = t.now.add(Duration(seconds: e.rest));
           t.restEnd = end;
           TrainingDevice.rest(end, title: 'Διάλειμμα', text: 'Επόμενο: $next', doneTitle: 'Τέλος διαλείμματος', doneText: 'Επόμενο: $next');

@@ -13,6 +13,8 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.media.AudioAttributes
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -58,7 +60,10 @@ class ExerciseService : Service() {
         private const val NOTIF_ID = 41
         private const val ALARM_ID = 42
         private const val CH_WORKOUT = "workout"
-        private const val CH_ALARM = "hr_alarm"
+        // Νέο κανάλι (έλεγχος #2): χωρίς δική του δόνηση, για να μη «κόβει» τη δόνηση ξυπνητηριού της εφαρμογής.
+        // Οι ρυθμίσεις ενός καναλιού δεν αλλάζουν μετά τη δημιουργία του, γι' αυτό νέο όνομα· το παλιό σβήνεται.
+        private const val CH_ALARM = "hr_alarm2"
+        private const val CH_ALARM_OLD = "hr_alarm"
 
         fun start(ctx: Context, kind: String, phone: Boolean) {
             val i = Intent(ctx, ExerciseService::class.java).setAction(ACTION_START)
@@ -85,6 +90,7 @@ class ExerciseService : Service() {
     private var lastHrSent = 0L
     private var lastLiveSent = 0L
     private var lostBuzzed = false
+    private var lastPendingSent = 0L
     /** Εφεδρεία αισθητήρα για την ειδοποίηση (μόνο χωρίς παράδοση ανά 5″ και με όριο). */
     private var sensor: HrSensor? = null
     private var exerciseStarted = false
@@ -233,10 +239,12 @@ class ExerciseService : Service() {
                     Repo.bpm = bpm
                     Repo.bpmAt = at
                 }
-                // Με την εφεδρεία ενεργή, η ειδοποίηση ακούει μόνο τον αισθητήρα (μία σειρά χρόνων, όχι ανακατεμένες).
-                if (sensor == null && Repo.alarm.feed(bpm, at)) buzz = bpm
+                // Και οι δύο πηγές πάνε στην ειδοποίηση· οι παλιότερες τιμές αγνοούνται (HrAlarm.feed), οπότε αν ο
+                // αισθητήρας σωπάσει, συνεχίζει το Health Services (έλεγχος #2, W2-04).
+                if (Repo.alarm.feed(bpm, at)) buzz = bpm
             }
             if (buzz > 0) onAlarm(buzz)
+            if (points.isNotEmpty()) sendHrToPhone(now)
             m.getData(DataType.DISTANCE_TOTAL)?.let { Repo.meters = it.total }
             m.getData(DataType.STEPS_TOTAL)?.let { Repo.steps = it.total }
             update.activeDurationCheckpoint?.let { c ->
@@ -263,7 +271,19 @@ class ExerciseService : Service() {
             Repo.bpmAt = at
         }
         if (Repo.alarm.feed(bpm, at)) onAlarm(bpm)
+        sendHrToPhone(System.currentTimeMillis())
         Repo.changed()
+    }
+
+    /**
+     * Παλμοί προς το κινητό (ανά 5″), όταν η προπόνηση τρέχει εκεί. Από την ίδια την παράδοση παλμών, όχι από τον βρόχο
+     * του δευτερολέπτου, που σταματά όταν κοιμάται ο επεξεργαστής (έλεγχος #2, W2-03).
+     */
+    private fun sendHrToPhone(now: Long) {
+        if (!Repo.runningPhone || !Repo.bpmFresh(now) || now - lastHrSent < 5000) return
+        lastHrSent = now
+        val o = JSONObject().put("bpm", Repo.bpm).put("t", Repo.bpmAt).put("sid", Repo.phone?.id ?: "")
+        scope.launch { Link.sendJson(this@ExerciseService, Paths.HR, o) }
     }
 
     // ------------------------------------------------------------------ κάθε δευτερόλεπτο
@@ -278,26 +298,37 @@ class ExerciseService : Service() {
                 if (Repo.screen == Repo.Screen.REST) Repo.screen = Repo.Screen.SET
                 Repo.changed()
             }
-            // Παλμοί προς το κινητό, όταν η προπόνηση τρέχει εκεί.
-            if (Repo.runningPhone && Repo.bpmFresh(now) && now - lastHrSent >= 5000) {
-                lastHrSent = now
-                val ph = Repo.phone
-                Link.sendJson(this, Paths.HR, JSONObject().put("bpm", Repo.bpm).put("t", Repo.bpmAt).put("sid", ph?.id ?: ""))
-            }
-            // Περπάτημα: ζωντανά στο κινητό (αν είναι ανοιχτή η εφαρμογή εκεί).
+            // Παλμοί προς το κινητό (και αν δεν ήρθε νέα τιμή, π.χ. σταθεροί παλμοί από τον αισθητήρα).
+            sendHrToPhone(now)
+            // Περπάτημα: ζωντανά στο κινητό (αν είναι ανοιχτή η εφαρμογή εκεί). Χωρίς αναμονή μέσα στον βρόχο.
             if (Repo.running == "walk" && now - lastLiveSent >= 10_000) {
                 lastLiveSent = now
-                Link.sendJson(
-                    this, Paths.LIVE,
-                    JSONObject().put("kind", "walk").put("start", Repo.startedAt).put("sec", Repo.activeSec)
-                        .put("m", Repo.meters).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0),
-                )
+                val o = JSONObject().put("kind", "walk").put("start", Repo.startedAt).put("sec", Repo.activeSec)
+                    .put("m", Repo.meters).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0)
+                scope.launch { Link.sendJson(this@ExerciseService, Paths.LIVE, o) }
             }
-            // Περπάτημα με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις.
+            // ✓ του ρολογιού που δεν έφτασαν στο κινητό: ξανά, ανά 10″ (το κινητό αγνοεί όσα έχει ήδη· έλεγχος #2).
+            val pend = Repo.pendingTicks
+            val ph = Repo.phone
+            if (Repo.runningPhone && ph != null && pend.isNotEmpty() && now - lastPendingSent >= 10_000) {
+                lastPendingSent = now
+                for ((i, k) in pend) {
+                    val o = JSONObject().put("op", "tick").put("i", i).put("s", k).put("sid", ph.id).put("late", true)
+                    scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
+                }
+            }
+            // Εφεδρεία αισθητήρα με επαφή και ίδια τιμή: οι παλμοί είναι απλώς σταθεροί, όχι χαμένοι (ως 2′).
+            val sn = sensor
+            if (sn != null && sn.contact && sn.last > 0 && Repo.bpm == sn.last && now - sn.lastAt <= 120_000L && !Repo.bpmFresh(now)) {
+                Repo.bpmAt = now
+            }
             val fresh = Repo.bpmFresh(now)
+            // Εφεδρεία αισθητήρα: στέλνει μόνο αλλαγές· σταθεροί παλμοί πάνω από το όριο μετρούν κι αυτοί (W2-02).
+            if (sensor != null && fresh && Repo.alarm.steady(Repo.bpm, now)) onAlarm(Repo.bpm)
+            // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2).
             if (fresh) {
                 lostBuzzed = false
-            } else if (Repo.running == "walk" && Repo.alarm.limit != null && Repo.bpmAt > 0 && !lostBuzzed) {
+            } else if (Repo.alarm.limit != null && Repo.bpmAt > 0 && !lostBuzzed) {
                 lostBuzzed = true
                 vibrate(longArrayOf(0, 120, 120, 120))
             }
@@ -336,6 +367,10 @@ class ExerciseService : Service() {
 
     private fun alarmAdvice(): String = if (Repo.running == "walk") "Κόψε ρυθμό." else "Ξεκουράσου μέχρι να πέσουν κάτω από ${Repo.alarm.limit}."
 
+    /**
+     * Δόνηση ως «ξυπνητήρι» (USAGE_ALARM): αλλιώς η Εξοικονόμηση μπαταρίας και η Σίγαση την κόβουν, και οι σύντομες
+     * μπορεί να θεωρηθούν δόνηση αφής (έλεγχος #2, W2-01). Μόνο όσο τρέχει άσκηση.
+     */
     private fun vibrate(pattern: LongArray) {
         val v: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
             getSystemService(VibratorManager::class.java)?.defaultVibrator
@@ -343,8 +378,14 @@ class ExerciseService : Service() {
             @Suppress("DEPRECATION")
             getSystemService(Vibrator::class.java)
         }
+        val effect = VibrationEffect.createWaveform(pattern, -1)
         try {
-            v?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            if (Build.VERSION.SDK_INT >= 33) {
+                v?.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM))
+            } else {
+                @Suppress("DEPRECATION")
+                v?.vibrate(effect, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build())
+            }
         } catch (_: Exception) {
         }
     }
@@ -419,10 +460,12 @@ class ExerciseService : Service() {
     private fun channels() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CH_WORKOUT, "Άσκηση σε εξέλιξη", NotificationManager.IMPORTANCE_LOW))
+        nm.deleteNotificationChannel(CH_ALARM_OLD)
         nm.createNotificationChannel(
             NotificationChannel(CH_ALARM, "Όριο παλμών", NotificationManager.IMPORTANCE_HIGH).apply {
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 500, 200, 500)
+                // Η δόνηση είναι της εφαρμογής (ως ξυπνητήρι)· το κανάλι μόνο ανάβει την οθόνη με το μήνυμα.
+                enableVibration(false)
+                setSound(null, null)
             },
         )
     }
