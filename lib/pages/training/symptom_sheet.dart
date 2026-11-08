@@ -159,7 +159,7 @@ class SymptomResultPage extends StatelessWidget {
             : 'Γράφτηκε. Ξεκουράσου. Αν ξανασυμβεί μέσα σε 14 μέρες, τα βάρη κλειδώνουν μέχρι να σε δει γιατρός. '
                 'Αν χειροτερέψει ή εμφανιστεί κάτι σοβαρό: 166.';
     return Scaffold(
-      backgroundColor: red ? c.bad.withValues(alpha: .08) : null,
+      backgroundColor: red ? Color.alphaBlend(c.bad.withValues(alpha: .08), c.background) : c.background,
       appBar: AppBar(backgroundColor: Colors.transparent, automaticallyImplyLeading: false),
       body: SafeArea(
         child: Center(
