@@ -257,10 +257,10 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(t.focus, 2);
-      // ρεζέρβα από το ρολόι
+      // ρεζέρβα από το ρολόι για άσκηση που δεν τελείωσε: αγνοείται (έλεγχος 8/11)
       WearLink.main.handle('/ygeia/cmd', {'op': 'rir', 'i': 0, 'v': 3, 'sid': s.id});
       await tester.pump();
-      expect(s.items.first.rirAnswer, 3);
+      expect(s.items.first.rirAnswer, isNull);
       await tester.pumpWidget(const SizedBox());
     });
 

@@ -460,6 +460,8 @@ void main() {
       store.setLimits(hr: 140, notes: '');
       await tester.pumpAndSettle();
       expect(find.textContaining('όριο παλμών 140'), findsOneWidget);
+      await tester.ensureVisible(find.textContaining('όριο παλμών 140'));
+      await tester.pumpAndSettle();
       await tester.tap(find.textContaining('όριο παλμών 140'));
       await tester.pumpAndSettle();
       await tapKey(tester, 'train-approve-ok');

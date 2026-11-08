@@ -635,7 +635,9 @@ class _ClearanceSheetState extends State<_ClearanceSheet> {
       child: SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .9),
-          child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), children: [
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(widget.edit ? 'Οδηγίες γιατρού' : 'Τι είπε ο καρδιολόγος;', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
             const SizedBox(height: 12),
             option('limit', 'Μου έδωσε όριο παλμών', 'Το ρολόι δονείται αν το ξεπεράσεις.'),
@@ -693,7 +695,7 @@ class _ClearanceSheetState extends State<_ClearanceSheet> {
                 child: Text('Παύση των βαρών (κλείδωμα ξανά)', style: TextStyle(color: c.bad)),
               ),
             ],
-          ]),
+          ])),
         ),
       ),
     );

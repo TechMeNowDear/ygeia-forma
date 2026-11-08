@@ -94,7 +94,10 @@ class _SymptomPickerState extends State<_SymptomPicker> {
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .88),
-        child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          // Όλα χτισμένα (όχι ListView): το κουμπί στο τέλος υπάρχει πάντα.
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Τι νιώθεις;', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
           const SizedBox(height: 4),
           Text('Πρώτα σταμάτα και κάθισε. Διάλεξε ό,τι ισχύει.', style: TextStyle(fontSize: 14.5, color: c.textSecondary)),
@@ -122,7 +125,7 @@ class _SymptomPickerState extends State<_SymptomPicker> {
               },
               child: const Text('Τελικά τίποτα, πατήθηκε κατά λάθος'),
             ),
-        ]),
+        ])),
       ),
     );
   }
