@@ -90,13 +90,16 @@ class TabChip extends StatelessWidget {
           child: Container(
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected ? c.onSolid : c.text,
+            // Στο πλάτος του κειμένου (μέσα σε Wrap δεν απλώνεται σε όλη τη γραμμή).
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: selected ? c.onSolid : c.text,
+                ),
               ),
             ),
           ),
