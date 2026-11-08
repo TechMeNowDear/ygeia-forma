@@ -50,10 +50,14 @@ String targetLine(PlanItem item, Target t) {
 }
 
 class Stepper2 extends StatelessWidget {
-  const Stepper2({super.key, required this.value, required this.onMinus, required this.onPlus, this.width = 64, this.labelMinus = 'Λιγότερο', this.labelPlus = 'Περισσότερο'});
+  const Stepper2(
+      {super.key, required this.value, required this.onMinus, required this.onPlus, this.width = 64, this.button = 40, this.labelMinus = 'Λιγότερο', this.labelPlus = 'Περισσότερο'});
   final String value;
   final VoidCallback? onMinus, onPlus;
   final double width;
+
+  /// Μέγεθος κουμπιών −/+ (48 στην προπόνηση: ιδρωμένα χέρια, έλεγχος 8/11 UX-02).
+  final double button;
   final String labelMinus, labelPlus;
 
   @override
@@ -66,8 +70,8 @@ class Stepper2 extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             onTap: f,
             child: Container(
-              width: 40,
-              height: 40,
+              width: button,
+              height: button,
               decoration: BoxDecoration(border: Border.all(color: c.hairline), borderRadius: BorderRadius.circular(10), color: c.card),
               child: Icon(i, size: 20, color: f == null ? c.textTertiary : c.text),
             ),

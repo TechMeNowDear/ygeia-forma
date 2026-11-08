@@ -393,45 +393,52 @@ class _SessionPageState extends State<SessionPage> {
             ),
           ),
         );
-    final row = Row(children: [
-      SizedBox(width: 30, child: Text('${i + 1}', style: numStyle)),
-      if (hasLoad(k))
-        Expanded(
-          child: isCurrent
-              ? Align(
-                  alignment: Alignment.centerLeft,
-                  child: FittedBox(
-                    child: Stepper2(
-                      value: loadText,
-                      width: usesKg(k) ? 56 : 92,
-                      labelMinus: 'Λιγότερο βάρος',
-                      labelPlus: 'Περισσότερο βάρος',
-                      onMinus: shiftLoad(k, set.load, -1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, -1)!),
-                      onPlus: shiftLoad(k, set.load, 1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, 1)!),
-                    ),
-                  ),
-                )
-              : Text(loadText, style: numStyle),
-        ),
-      Expanded(
-        child: isCurrent
-            ? Align(
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  child: Stepper2(
-                    value: '${set.reps}',
-                    width: 40,
-                    labelMinus: 'Λιγότερες',
-                    labelPlus: 'Περισσότερες',
-                    onMinus: set.reps > 0 ? () => t.setReps(e, i, set.reps - 1) : null,
-                    onPlus: () => t.setReps(e, i, set.reps + 1),
-                  ),
-                ),
-              )
-            : Text('${set.reps}', style: numStyle),
-      ),
-      SizedBox(width: 52, child: Align(alignment: Alignment.centerRight, child: tick())),
-    ]);
+    // Τρέχον σετ: τα −/+ σε δική τους γραμμή, σε πλήρες μέγεθος 48 dp (χωρίς FittedBox που τα μίκραινε στα ~30 dp·
+    // έλεγχος 8/11, UX-02). Σε στενή οθόνη πάνε σε δύο γραμμές.
+    final Widget row;
+    if (isCurrent) {
+      row = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          SizedBox(width: 30, child: Text('${i + 1}', style: numStyle)),
+          Expanded(
+            child: Text(
+              hasLoad(k) ? '$loadText${usesKg(k) ? ' kg' : ''} × ${set.reps}' : '× ${set.reps}',
+              style: numStyle,
+            ),
+          ),
+          SizedBox(width: 52, child: Align(alignment: Alignment.centerRight, child: tick())),
+        ]),
+        const SizedBox(height: 8),
+        Wrap(spacing: 16, runSpacing: 8, children: [
+          if (hasLoad(k))
+            Stepper2(
+              value: loadText,
+              width: usesKg(k) ? 56 : 92,
+              button: 48,
+              labelMinus: 'Λιγότερο βάρος',
+              labelPlus: 'Περισσότερο βάρος',
+              onMinus: shiftLoad(k, set.load, -1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, -1)!),
+              onPlus: shiftLoad(k, set.load, 1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, 1)!),
+            ),
+          Stepper2(
+            value: '${set.reps}',
+            width: 40,
+            button: 48,
+            labelMinus: 'Λιγότερες',
+            labelPlus: 'Περισσότερες',
+            onMinus: set.reps > 0 ? () => t.setReps(e, i, set.reps - 1) : null,
+            onPlus: () => t.setReps(e, i, set.reps + 1),
+          ),
+        ]),
+      ]);
+    } else {
+      row = Row(children: [
+        SizedBox(width: 30, child: Text('${i + 1}', style: numStyle)),
+        if (hasLoad(k)) Expanded(child: Text(loadText, style: numStyle)),
+        Expanded(child: Text('${set.reps}', style: numStyle)),
+        SizedBox(width: 52, child: Align(alignment: Alignment.centerRight, child: tick())),
+      ]);
+    }
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: isCurrent ? const EdgeInsets.symmetric(horizontal: 6, vertical: 6) : const EdgeInsets.symmetric(horizontal: 6),
