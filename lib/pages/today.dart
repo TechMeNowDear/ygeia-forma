@@ -140,14 +140,27 @@ class TodayPage extends StatelessWidget {
           if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
+        // Σε tablet/PC (ποντίκι) κουμπί «Ανανέωση» αντί για «τράβηξε προς τα κάτω» (έλεγχος 8/11, UX-19).
+        final wide = MediaQuery.sizeOf(context).width >= 600;
+        final updated = 'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now)} '}${hm(d.readAt)}';
         final footer = Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now)} '}${hm(d.readAt)} · '
-            'τράβηξε προς τα κάτω για ανανέωση',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: c.textTertiary, fontSize: 12.5),
-          ),
+          child: wide
+              ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(updated, style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    key: const ValueKey('today-refresh'),
+                    onPressed: () => store.refresh(),
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Ανανέωση'),
+                  ),
+                ])
+              : Text(
+                  '$updated · τράβηξε προς τα κάτω για ανανέωση',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: c.textTertiary, fontSize: 12.5),
+                ),
         );
 
         final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
