@@ -4,6 +4,7 @@ library;
 
 import 'dart:math' as math;
 
+import 'data.dart' show spo2MinCoverage;
 import 'format.dart';
 import 'history.dart';
 import 'sources.dart';
@@ -141,7 +142,7 @@ const reportKeys = [
 ];
 
 /// Μετά τη σύνδεση του Oura η αναφορά δείχνει και ό,τι δίνει μόνο αυτό.
-List<String> reportKeysFor(SourcePlan plan) => plan.hasOura ? [...reportKeys, K.lowHr, K.hrv, K.breath] : reportKeys;
+List<String> reportKeysFor(SourcePlan plan) => plan.hasOura ? [...reportKeys, K.lowHr, K.hrv, K.breath, K.ringSpo2] : reportKeys;
 
 /// [end]: η τελευταία μέρα του διαστήματος, ίδια με τις Τάσεις από όπου ανοίγει η αναφορά (δεύτερος έλεγχος
 /// υπολογισμών C12: μετά τα μεσάνυχτα, πριν από ανανέωση, οι Τάσεις τελείωναν χθες και η αναφορά σήμερα). Χωρίς
@@ -220,10 +221,23 @@ ReportStat _sensorStat(
   TrendResult? trend,
 ) {
   DateTime add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
+  // Έλεγχος #2 (D2-01): ίδιοι κανόνες με την εφαρμογή. Σε νύχτα του Oura ο μέσος όρος του ρολογιού δεν μπαίνει
+  // (μπαίνει του δαχτυλιδιού, χωριστή γραμμή), και η χαμηλότερη μόνο όταν το ρολόι μέτρησε τουλάχιστον το μισό
+  // ύπνο ([spo2MinCoverage]). Παλιές μέρες χωρίς κάλυψη γραμμένη: όπως ήταν.
+  bool keep(DateTime d) {
+    if (p.nightSource(d) != Source.oura) return true;
+    if (key == K.spo2Avg) return false;
+    if (key == K.spo2Min) {
+      final cov = history[dateKey(d)]?[K.spo2Cov];
+      return cov == null || cov >= spo2MinCoverage;
+    }
+    return true;
+  }
+
   final values = <(DateTime, double)>[];
   for (var d = start; !d.isAfter(last); d = add(d, 1)) {
     final v = p.value(history, key, d);
-    if (v != null) values.add((d, v));
+    if (v != null && keep(d)) values.add((d, v));
   }
   final cuts = [for (final c in p.changeDates(key)) if (c.isAfter(start) && !c.isAfter(last)) c];
   final periods = <ReportPeriod>[];

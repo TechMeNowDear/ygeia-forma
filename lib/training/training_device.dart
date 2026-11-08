@@ -23,5 +23,14 @@ class TrainingDevice {
   static Future<void> buzz() => _call('buzz');
 
   /// Ανοίγει την κλήση με τον αριθμό έτοιμο (χωρίς άδεια τηλεφώνου: πατάς εσύ «κλήση»).
-  static Future<void> dial(String number) => _call('dial', {'n': number});
+  /// false μόνο αν το Android είπε ότι δεν άνοιξε (π.χ. χωρίς εφαρμογή τηλεφώνου).
+  static Future<bool> dial(String number) async {
+    try {
+      return await _c.invokeMethod<bool>('dial', {'n': number}) ?? true;
+    } on MissingPluginException {
+      return true; // δοκιμές
+    } catch (_) {
+      return false;
+    }
+  }
 }

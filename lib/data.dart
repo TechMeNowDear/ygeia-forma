@@ -190,7 +190,7 @@ class Sample {
 /// (ενδεικτική), λεπτά κάτω από 90% (αν βγαίνουν).
 /// [cov]: σε νύχτα του Oura, το μέρος (0–1) των ωρών ύπνου του Oura με μετρήσεις ≥ [spo2MinRecord]· null = νύχτα του
 /// ρολογιού (μετρά μέσα στον δικό του ύπνο).
-typedef NightOxygen = ({double? avg, double min, double? below90, double? cov});
+typedef NightOxygen = ({double? avg, double? min, double? below90, double? cov});
 
 /// Απόφαση 7/11: η χαμηλότερη τιμή του ρολογιού σε νύχτα του Oura φαίνεται (και μετρά στις σημειώσεις) μόνο όταν το
 /// ρολόι μέτρησε τουλάχιστον το μισό του ύπνου του Oura. Αλλιώς: «λίγη κάλυψη».
@@ -276,7 +276,8 @@ NightOxygen? oxygenOf(List<Sample> ox) {
     }
     avg = sum / secs;
   }
-  return (avg: avg, min: ox.map((s) => s.min).reduce(math.min), below90: _below90Minutes(long), cov: null);
+  final mins = [for (final s in ox) if (s.min.isFinite) s.min];
+  return (avg: avg, min: mins.isEmpty ? null : mins.reduce(math.min), below90: _below90Minutes(long), cov: null);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +429,9 @@ class Dashboard {
 
     // Τιμή έξω από τα λογικά όρια = σφάλμα αισθητήρα: η εγγραφή αγνοείται· ελάχιστο/μέγιστο έξω από τα όρια
     // παίρνουν τη μέση τιμή της εγγραφής (π.χ. «ελάχιστο 0%» δεν είναι μέτρηση).
-    List<Sample> samples(String key, (double, double) range) {
+    // Οξυγόνο ([noMin]): ελάχιστο έξω από τα όρια = καμία χαμηλότερη τιμή (NaN), όχι ο μέσος όρος· αλλιώς μια
+    // αμφίβολη νύχτα έμοιαζε φυσιολογική και ξέφευγε από τους κανόνες «κάτω από 80/85%» (έλεγχος #2).
+    List<Sample> samples(String key, (double, double) range, {bool noMin = false}) {
       bool inRange(num v) => v >= range.$1 && v <= range.$2;
       return [
         for (final e in list(key))
@@ -437,7 +440,9 @@ class Dashboard {
               t(e[0]),
               e[1] is num && (e[1] as num) >= (e[0] as num) ? t(e[1]) : t(e[0]),
               (e[2] as num).toDouble(),
-              e.length > 3 && e[3] is num && inRange(e[3] as num) ? (e[3] as num).toDouble() : (e[2] as num).toDouble(),
+              e.length > 3 && e[3] is num && inRange(e[3] as num)
+                  ? (e[3] as num).toDouble()
+                  : (noMin && e.length > 3 && e[3] is num ? double.nan : (e[2] as num).toDouble()),
               e.length > 4 && e[4] is num && inRange(e[4] as num) ? (e[4] as num).toDouble() : (e[2] as num).toDouble(),
               e.length > 5 && e[5] is num ? (e[5] as num).toDouble() : null,
             ),
@@ -460,7 +465,7 @@ class Dashboard {
     ]..sort((a, b) => a.start.compareTo(b.start));
 
     final heart = samples('heart', hrRange)..sort((a, b) => a.start.compareTo(b.start));
-    final spo2 = samples('spo2', spo2Range);
+    final spo2 = samples('spo2', spo2Range, noMin: true);
     final skin = samples('skinTemp', skinRange);
 
     final floorsByDay = <DateTime, double>{};

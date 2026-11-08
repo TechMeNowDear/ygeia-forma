@@ -127,7 +127,10 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final complete = done.length >= sets;
   // Χωρίς απάντηση δεν ξέρουμε πόσο κοντά στην αποτυχία ήταν: ποτέ περισσότερα κιλά (έλεγχος 8/11).
   final ra = last.rirAnswer;
-  final rirOk = ra != null && ra >= item.rir;
+  // Τουλάχιστον 2 ρεζέρβα σε όλες τις ασκήσεις, ως να πει άλλα ο καρδιολόγος: η πίεση ανεβαίνει απότομα
+  // όσο πλησιάζεις την αποτυχία (MacDougall 1985· έλεγχος #2). Το πρόγραμμα μπορεί να ζητά περισσότερη.
+  final rirGoal = math.max(item.rir, 2);
+  final rirOk = ra != null && ra >= rirGoal;
   final strict = k == LoadKind.bar || caution;
 
   // Kettlebell: όταν το επόμενο είναι πάνω από 20% βαρύτερο, πρώτα 3 επαναλήψεις παραπάνω από το εύρος.
@@ -138,13 +141,15 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final top = complete && done.every((s) => s.reps >= ceiling);
   final inRange = complete && done.every((s) => s.reps >= lo);
 
-  // Μπάρα χωρίς βραχίονες ασφαλείας: με λιγότερη από 2 ρεζέρβα, ποτέ αύξηση.
-  if (k == LoadKind.bar && last.rirAnswer != null && last.rirAnswer! < 2) {
+  // Με λιγότερη από 2 ρεζέρβα, ποτέ αύξηση (μπάρα χωρίς βραχίονες ασφαλείας, και για την καρδιά σε όλες).
+  if (ra != null && ra < 2 && inRange) {
     return Target(
       load: lastLoad,
       reps: asLast(),
       change: Change.hold,
-      reason: 'Μπάρα χωρίς βραχίονες ασφαλείας: έμεινες με ${last.rirAnswer} ρεζέρβα. Ίδια κιλά, κράτα 2 ή περισσότερες.',
+      reason: k == LoadKind.bar
+          ? 'Μπάρα χωρίς βραχίονες ασφαλείας: έμεινες με $ra ρεζέρβα. Ίδια κιλά, κράτα 2 ή περισσότερες.'
+          : 'Έμεινες με $ra ρεζέρβα. Ίδια κιλά, και σταμάτα το σετ όταν σου μένουν 2: έτσι η πίεση δεν ανεβαίνει απότομα.',
     );
   }
 
@@ -195,14 +200,14 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     );
   }
 
-  if (inRange && ra != null && ra < item.rir) {
+  if (inRange && ra != null && ra < rirGoal) {
     return Target(
       load: lastLoad,
       reps: asLast(),
       change: Change.hold,
       reason: ra == 0
           ? 'Την προηγούμενη φορά έφτασες στο όριο (0 ρεζέρβα): ίδιες επαναλήψεις, να βγουν πιο άνετα.'
-          : 'Την προηγούμενη φορά έμεινες με $ra ρεζέρβα, λιγότερη από ${item.rir}: ίδιες επαναλήψεις.',
+          : 'Την προηγούμενη φορά έμεινες με $ra ρεζέρβα, λιγότερη από $rirGoal: ίδιες επαναλήψεις.',
     );
   }
 
@@ -224,11 +229,11 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     );
   }
 
-  // Κάτω από το εύρος: δύο φορές στη σειρά με το ίδιο βάρος → ένα σκαλί κάτω.
+  // Κάτω από το εύρος: δύο φορές στη σειρά με το ίδιο βάρος → ένα σκαλί κάτω. Μόνο από σετ που έγιναν:
+  // όσα έμειναν (τελείωσες νωρίτερα) δεν μετράνε, όπως λέει και το «Τελείωσες νωρίτερα;» (έλεγχος #2, T2-03).
   var streak = 0;
   for (final (_, h) in usable) {
-    final hDone = h.done;
-    final below = hDone.length < h.sets || hDone.any((s) => s.reps < lo);
+    final below = h.done.any((s) => s.reps < lo);
     if (!below || h.workLoad != lastLoad) break;
     streak++;
   }

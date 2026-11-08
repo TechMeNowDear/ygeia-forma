@@ -45,6 +45,7 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Repo.loadHold(this)
         view = WatchView(this, this)
         setContentView(view)
         handle(intent)
@@ -149,6 +150,9 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun startWorkout(id: String) {
         val w = Repo.plan?.workout(id) ?: return
         if (Repo.plan?.approved != true) return
+        // Μετά από σύμπτωμα, ή όταν θέλει «Πώς είσαι σήμερα;» στο κινητό: όχι βάρη από εδώ (έλεγχος #2).
+        val h = Repo.hold()
+        if (holdsAll(h) || h == "check") return
         withPermissions(false) {
             Repo.notice = null
             Repo.local = LiveSession.fromPlan(w, System.currentTimeMillis())
@@ -159,6 +163,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun startWalk() {
+        if (holdsAll(Repo.hold())) return
         withPermissions(true) {
             Repo.notice = null
             Repo.screen = Repo.Screen.WALK
@@ -300,6 +305,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         Repo.phone?.id?.let { o.put("sid", it) }
         scope.launch { Link.putResult(this@WatchActivity, "sym$now", o) }
         Repo.symSent = true
+        // Καμία άσκηση από το ρολόι ώσπου να πεις στο κινητό τι ένιωσες (έλεγχος #2, U2-04).
+        Repo.setHold(this, now)
         // Η δική του προπόνηση/περπάτημα: σταματά και γράφεται ό,τι έγινε. Του κινητού: τη σταματά το κινητό.
         if (Repo.running != null && !Repo.runningPhone) {
             ExerciseService.stop(this)

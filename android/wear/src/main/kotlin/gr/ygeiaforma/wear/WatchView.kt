@@ -179,6 +179,28 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             small(c, "και ✓ στον καρπό", 150f, gray, 9f, 120f)
             return
         }
+        // Μετά από σύμπτωμα: καμία άσκηση από το ρολόι, ούτε περπάτημα (έλεγχος #2, U2-04).
+        val hold = Repo.hold()
+        if (holdsAll(hold)) {
+            small(c, "ΧΩΡΙΣ ΑΣΚΗΣΗ", 50f, Color.parseColor("#F87171"), 9f, 120f)
+            when (hold) {
+                "pending" -> {
+                    t(c, "Πες στο κινητό", 74f, Color.WHITE, 13f, true)
+                    t(c, "τι ένιωσες", 90f, Color.WHITE, 13f, true)
+                }
+                "today" -> {
+                    t(c, "Σήμερα όχι,", 74f, Color.WHITE, 13f, true)
+                    t(c, "μετά από σύμπτωμα", 90f, Color.WHITE, 12f, true)
+                }
+                else -> {
+                    t(c, "μέχρι να σε δει", 74f, Color.WHITE, 13f, true)
+                    t(c, "γιατρός", 90f, Color.WHITE, 13f, true)
+                }
+            }
+            small(c, "Αν δεν περνά ή ξαναέρθει: 166", 116f, Color.parseColor("#FCA5A5"), 9f, 150f)
+            feelLink(c, 150f)
+            return
+        }
         if (plan?.approved == true) {
             // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11).
             val lim = plan.hrLimit
@@ -223,7 +245,13 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                         invalidate()
                     })
                 }
-                pill(c, "Ξεκίνα", 120f, 90f, 30f, orange, Color.WHITE) { actions.startWorkout(shown.id) }
+                if (hold == "check") {
+                    // «Πώς είσαι σήμερα;» θέλει το κινητό (έλεγχος #2, T2-02).
+                    small(c, "Βάρη σήμερα: ξεκίνα", 114f, Color.WHITE, 9.5f, 150f)
+                    small(c, "από το κινητό", 127f, Color.WHITE, 9.5f, 150f)
+                } else {
+                    pill(c, "Ξεκίνα", 120f, 90f, 30f, orange, Color.WHITE) { actions.startWorkout(shown.id) }
+                }
                 hits.add(Hit(RectF(cx - 60 * u, 140 * u, cx + 60 * u, 164 * u)) { actions.startWalk() })
                 small(c, "↓ Περπάτημα", 154f, gray, 9f, 120f)
             }
@@ -312,8 +340,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         if (!Repo.symSent) {
             t(c, "Σταμάτα.", 62f, Color.WHITE, 15f, true)
             t(c, "Κάθισε.", 80f, Color.WHITE, 15f, true)
-            small(c, "Αν δεν περνά σε 5′", 100f, Color.WHITE, 9.5f, 140f)
-            small(c, "ή είναι έντονο: 166", 113f, Color.WHITE, 9.5f, 140f)
+            small(c, "Αν δεν περνά σε 5′,", 100f, Color.WHITE, 9.5f, 140f)
+            small(c, "ξαναέρθει ή έντονο: 166", 113f, Color.WHITE, 9.5f, 140f)
             pill(c, "Σταμάτησα", 140f, 100f, 28f, red, Color.WHITE, 12f) { actions.feelStop() }
             hits.add(Hit(RectF(cx - 40 * u, 160 * u, cx + 40 * u, 184 * u)) { actions.feelBack() })
             small(c, "Πίσω", 172f, gray, 9f, 60f)

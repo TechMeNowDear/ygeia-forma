@@ -511,7 +511,7 @@ void main() {
       expect(store.approved, isFalse);
       await tapKey(tester, 'sym-close');
       await tester.pumpAndSettle();
-      expect(find.text('Τα βάρη κλείδωσαν μετά από σύμπτωμα'), findsOneWidget);
+      expect(find.text('Η άσκηση κλείδωσε μετά από σύμπτωμα'), findsOneWidget);
       expect(find.text('Με είδε γιατρός'), findsOneWidget);
     });
 

@@ -60,6 +60,8 @@ class SamsungHealthBridge(
             // Ανοίγει οθόνη της Samsung: στο main thread.
             "requestPermissions" -> respondMain(result) { requestPermissions() }
             "readAll" -> respond(result) { readAll(call.argument<Int>("days") ?: 30) }
+            // Για την αναφορά γιατρού (έλεγχος #2): τεστ άπνοιας, ειδοποιήσεις ρυθμού, πίεση, όπως τα δίνει η Samsung.
+            "medical" -> respond(result) { readMedical(call.argument<Int>("days") ?: 120) }
             "dashboard" -> respondText(result) { dashboard() }
             "readRange" -> respond(result) {
                 readRange(call.argument<String>("from") ?: "", call.argument<String>("to") ?: "")
@@ -353,6 +355,58 @@ class SamsungHealthBridge(
             .put("readAt", to.withNano(0).toString())
             .put("types", types)
             .put("today", today)
+    }
+
+    /**
+     * Τεστ άπνοιας, ειδοποιήσεις ακανόνιστου ρυθμού και πίεση: κάθε εγγραφή με την ώρα της και όλα τα πεδία της
+     * όπως τα δίνει η Samsung (ονόματα πεδίων, χωρίς ερμηνεία). Ως [MAX_MEDICAL] ανά είδος, νεότερη πρώτη.
+     * Ποτέ πουθενά αλλού: μόνο στην αναφορά για τον γιατρό, όταν ανοίγει (δεν αποθηκεύεται).
+     */
+    private suspend fun readMedical(days: Int): JSONObject {
+        val s = store()
+        val granted = s.getGrantedPermissions(permissions).map { it.dataType.name }.toSet()
+        val to = LocalDateTime.now()
+        val from = to.minusDays(days.toLong())
+        val out = JSONObject()
+        for ((key, type) in listOf(
+            "sleep_apnea" to DataTypes.SLEEP_APNEA,
+            "irregular_heart_rhythm" to DataTypes.IRREGULAR_HEART_RHYTHM_NOTIFICATION,
+            "blood_pressure" to DataTypes.BLOOD_PRESSURE,
+        )) {
+            val o = JSONObject()
+            if (type.name !in granted) {
+                out.put(key, o.put("state", "no_permission"))
+                continue
+            }
+            try {
+                val request = buildRequest(type, from, to, null)
+                if (request == null) {
+                    out.put(key, o.put("state", "unsupported"))
+                    continue
+                }
+                val items = JSONArray()
+                for (p in s.readData(request).dataList) {
+                    if (items.length() >= MAX_MEDICAL) break
+                    val f = JSONObject()
+                    for (field in type.allFields) {
+                        val v = describe(valueOf(p, field)) ?: continue
+                        f.put(field.name, v)
+                    }
+                    items.put(
+                        JSONObject()
+                            .put("t", localText(p.startTime))
+                            .put("app", p.dataSource?.appId ?: "")
+                            .put("f", f)
+                    )
+                }
+                out.put(key, o.put("state", if (items.length() == 0) "empty" else "ok").put("items", items))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                out.put(key, o.put("state", "error").put("error", errorJson(e)))
+            }
+        }
+        return JSONObject().put("ok", true).put("days", days).put("types", out)
     }
 
     private suspend fun readOne(
@@ -657,5 +711,6 @@ class SamsungHealthBridge(
         const val PREFS_FILE = "prefs.json"
         const val PAGE_SIZE = 1000
         const val MAX_PAGES = 20
+        const val MAX_MEDICAL = 30
     }
 }

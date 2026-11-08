@@ -672,6 +672,83 @@ void main() {
       prep: (s) => s.approve(hr: 140), act: startSession));
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
 
+  // Έλεγχος #2 (8/11): 166 με ένα πάτημα, σκούρο θέμα (αντίθεση), ερώτηση για τον αριστερό ώμο, Σήμερα, σελίδα 4 PDF.
+  testWidgets('Προπόνηση · κόκκινο σύμπτωμα · σκοτεινό', (t) => trainShot(t, 'T18_feel_red_dark', phone, Brightness.dark, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'feel');
+        await tapKey(t, 'sym-chest');
+        await tapKey(t, 'sym-ok');
+      }));
+  testWidgets('Προπόνηση · Νιώθω κάτι · σκοτεινό', (t) => trainShot(t, 'T18b_feel_dark', phone, Brightness.dark, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'feel');
+        await tapKey(t, 'sym-chest');
+      }));
+  testWidgets('Προπόνηση · ρεζέρβα · αριστερός ώμος', (t) => trainShot(t, 'T19_rir_cardiac', phoneShort, Brightness.light, act: (t) async {
+        await startSession(t);
+        for (var i = 0; i < 3; i++) {
+          await tapKey(t, 'sess-tick-$i');
+        }
+        await tapKey(t, 'pain-shoulderL');
+      }));
+  testWidgets('Προπόνηση · ιστορικό συμπτωμάτων', (t) => trainShot(t, 'T20_symptom_history', open, Brightness.light,
+      prep: (s) => s
+        ..reportSymptoms(['dizzy'], where: 'day')
+        ..reportSymptoms(['chest', 'sweat'], where: 'session')));
+  testWidgets('Σήμερα · μετά από σοβαρό σύμπτωμα', (t) async {
+    final prev = TrainingStore.main;
+    TrainingStore.main = sampleTraining(trainAt)..reportSymptoms(['chest']);
+    await TrainingStore.main.load();
+    addTearDown(() => TrainingStore.main = prev);
+    await _shot(t, name: '29_today_symptom', size: phone, brightness: Brightness.light, tab: 0, at: trainAt);
+  });
+  testWidgets('Σήμερα · μετά από σοβαρό σύμπτωμα · σκοτεινό', (t) async {
+    final prev = TrainingStore.main;
+    TrainingStore.main = sampleTraining(trainAt)..reportSymptoms(['chest']);
+    await TrainingStore.main.load();
+    addTearDown(() => TrainingStore.main = prev);
+    await _shot(t, name: '29b_today_symptom_dark', size: phone, brightness: Brightness.dark, tab: 0, at: trainAt);
+  });
+  testWidgets('Αναφορά για γιατρό · σελίδα 4 (συμπτώματα και άσκηση)', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(680, 4300) * 2.0;
+    addTearDown(tester.view.reset);
+    final prev = TrainingStore.main;
+    final tr = sampleTraining(trainAt);
+    final last = tr.sessions.last
+      ..hrMax = 146
+      ..hrAvg = 118
+      ..hrGap = 9;
+    last.hr.addAll([
+      [0, 96],
+      [600, 132],
+      [1200, 146],
+      [1260, 141],
+    ]);
+    tr
+      ..reportSymptoms(['dizzy'], where: 'day')
+      ..reportSymptoms(['chest', 'sweat'], where: 'session');
+    TrainingStore.main = tr;
+    await TrainingStore.main.load();
+    addTearDown(() => TrainingStore.main = prev);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(trainAt));
+    store.history = sampleHistory(trainAt, store.data!);
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light),
+          home: ReportPage(store: store, now: trainAt),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('report-page4-body')), findsOneWidget);
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13d_report_p4.png'));
+  });
+
   // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».
   for (final (n, p) in [(30, Aigaio.elia), (32, Aigaio.avgi), (34, Aigaio.stivos), (36, Aigaio.anasa)]) {
     final b = p.dark ? Brightness.dark : Brightness.light;

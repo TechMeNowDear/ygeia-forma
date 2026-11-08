@@ -177,5 +177,12 @@ class WatchShotsTest {
         Repo.applyPhone(null)
         Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":false"))
         shot("W10_home_locked")
+
+        // Έλεγχος #2: μετά από σοβαρό σύμπτωμα, καμία άσκηση από το ρολόι· και «βάρη από το κινητό».
+        Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":false,\"hold\":\"lock\""))
+        shot("W11_home_symptom_lock")
+        Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":true,\"hold\":\"check\""))
+        shot("W12_home_check")
+        Repo.plan = Plan.parse(planJson)
     }
 }

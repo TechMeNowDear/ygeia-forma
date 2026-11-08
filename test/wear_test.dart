@@ -287,11 +287,11 @@ void main() {
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s)));
       await tester.pumpAndSettle();
       expect(find.byType(HrCard), findsOneWidget);
-      expect(find.text('Δεν ξεπέρασες το όριο (140).'), findsOneWidget);
+      expect(find.textContaining('Το ρολόι δεν έδειξε παλμούς πάνω από το όριο (140)'), findsOneWidget);
       s.hrMax = 141;
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s, key: UniqueKey())));
       await tester.pumpAndSettle();
-      expect(find.text('Δεν ξεπέρασες το όριο (140).'), findsNothing);
+      expect(find.textContaining('Το ρολόι δεν έδειξε παλμούς πάνω από το όριο'), findsNothing);
       expect(find.text('Έφτασες στιγμιαία το όριο (140).'), findsOneWidget);
       // μεγάλο κενό στους παλμούς: φαίνεται
       s.hrGap = 95;

@@ -13,6 +13,10 @@ import '../samsung.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
+import '../training/session.dart';
+import '../training/symptoms.dart';
+import '../training/training_store.dart';
+import '../training/wear_link.dart' show HrSummary;
 import '../trends.dart';
 import '../widgets.dart';
 
@@ -60,6 +64,21 @@ class _ReportPageState extends State<ReportPage> {
     _noteField.dispose();
     _nameField.dispose();
     super.dispose();
+  }
+
+  /// Από το Samsung Health Monitor (τεστ άπνοιας, ρυθμός, πίεση), όπως τα δίνει η Samsung· μόνο για αυτό το PDF.
+  Map<String, dynamic>? _medical;
+
+  @override
+  void initState() {
+    super.initState();
+    // Σελίδα 4 (έλεγχος #2): συμπτώματα και άσκηση από την εφαρμογή, και τα αποτελέσματα του Samsung Health Monitor.
+    TrainingStore.main.load().then((_) {
+      if (mounted) setState(() {});
+    });
+    SamsungHealth.medical().then((m) {
+      if (mounted) setState(() => _medical = m);
+    });
   }
 
   late final ReportData _data =
@@ -114,6 +133,7 @@ class _ReportPageState extends State<ReportPage> {
       _PageOne(data: _data, note: _note.trim(), name: name),
       _PageTwo(data: _data, name: name),
       _PageThree(data: _data, name: name, stale: widget.store.prefs.staleMonths),
+      _PageFour(data: _data, name: name, training: TrainingStore.main, medical: _medical),
     ];
 
     return Scaffold(
@@ -135,11 +155,10 @@ class _ReportPageState extends State<ReportPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Οι τελευταίοι 3 μήνες σε τρεις σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
-                      'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση. '
-                      // Κλινικός έλεγχος H2 και M6 (4/11).
-                      'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού, τεστ άπνοιας ή μετρήσεις πίεσης· τα αποτελέσματα του Samsung '
-                      'Health Monitor τα δείχνεις από εκεί.',
+                      'Οι τελευταίοι 3 μήνες σε τέσσερις σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
+                      'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες, και στη σελίδα 4 τα '
+                      'συμπτώματα, οι προπονήσεις και ό,τι δίνει το Samsung Health Monitor (τεστ άπνοιας, ειδοποιήσεις ρυθμού, '
+                      'μετρήσεις πίεσης). Χωρίς διάγνωση. Δεν περιέχει ΗΚΓ: τα ΗΚΓ τα εξάγεις ως PDF από το Samsung Health Monitor.',
                       style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
                     ),
                     const SizedBox(height: 12),
@@ -262,7 +281,8 @@ class _ReportPageState extends State<ReportPage> {
                 ] else
                   FilledButton.icon(
                     style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                    onPressed: _saving ? null : _save,
+                    // Περιμένει τη σελίδα 4 (Samsung Health Monitor), για να μη βγει PDF χωρίς αυτά.
+                    onPressed: _saving || _medical == null ? null : _save,
                     icon: _saving
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.picture_as_pdf_rounded, size: 20),
@@ -287,8 +307,9 @@ const _a4 = Size(595, 842);
 const reportNoteMax = 400;
 const reportNameMax = 60;
 
-/// Σελίδες: 1 σύνοψη και ορισμοί, 2 γραφήματα, 3 οξυγόνο και ζυγίσεις (από 4/11, για να χωρούν οι εξηγήσεις).
-const _pageCount = 3;
+/// Σελίδες: 1 σύνοψη και ορισμοί, 2 γραφήματα, 3 οξυγόνο και ζυγίσεις (από 4/11, για να χωρούν οι εξηγήσεις),
+/// 4 συμπτώματα, άσκηση και Samsung Health Monitor (έλεγχος #2, 8/11).
+const _pageCount = 4;
 
 class _Paper extends StatelessWidget {
   const _Paper({required this.child});
@@ -340,7 +361,8 @@ class _Header extends StatelessWidget {
                     switch (page) {
                       1 => 'Αναφορά υγείας',
                       2 => 'Αναφορά υγείας · γραφήματα',
-                      _ => 'Αναφορά υγείας · οξυγόνο και ζυγίσεις',
+                      3 => 'Αναφορά υγείας · οξυγόνο και ζυγίσεις',
+                      _ => 'Αναφορά υγείας · συμπτώματα και άσκηση',
                     },
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.3),
                   ),
@@ -439,7 +461,8 @@ class _PageOne extends StatelessWidget {
       if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο (bpm)', K.lowHr, num0, _def(K.lowHr)),
       if (withOura) ('HRV νύχτας, RMSSD, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
       if (withOura) ('Αναπνοές στον ύπνο (ανά λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
-      ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)', K.spo2Avg, pct, _def(K.spo2Avg)),
+      ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)${withOura ? ', ρολόι (νύχτες χωρίς δαχτυλίδι)' : ''}', K.spo2Avg, pct, _def(K.spo2Avg)),
+      if (withOura) ('Οξυγόνο στον ύπνο, μέσο νύχτας από το δαχτυλίδι (%)', K.ringSpo2, pct, _def(K.ringSpo2)),
       // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών C5, κλινικός L2): μεσαία 89,5 → «89,5%», όχι «90%».
       ('Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση νύχτας (%)', K.spo2Min, (v) => '${lowestText(v)}%', null),
       ('Διάρκεια ύπνου, χωρίς τα ξυπνήματα (ώρες:λεπτά)', K.sleepMin, dur, _def(K.sleepMin)),
@@ -510,10 +533,11 @@ class _PageOne extends StatelessWidget {
           TextSpan(children: [
             TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
             // Δεύτερος κλινικός έλεγχος M6: και η πίεση (η πρώτη ερώτηση του καρδιολόγου).
+            // Έλεγχος #2 (M2-04): η εφαρμογή διαβάζει άπνοια, ρυθμό και πίεση· μόνο τα ΗΚΓ δεν φτάνουν σε εφαρμογές.
             const TextSpan(
-              text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor, και μετρήσεις '
-                  'πίεσης. Η εφαρμογή δεν έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν '
-                  'φυσιολογικά. Αν υπάρχουν, δείτε τα αποτελέσματα στο Samsung Health Monitor.',
+              text: 'ΗΚΓ του ρολογιού (δεν φτάνουν σε άλλες εφαρμογές· δείτε τα στο Samsung Health Monitor). Τεστ άπνοιας, '
+                  'ειδοποιήσεις ακανόνιστου ρυθμού και μετρήσεις πίεσης: στη σελίδα 4, όπως τα δίνει η Samsung. Ό,τι λείπει '
+                  'εκεί δεν σημαίνει ότι ήταν φυσιολογικό.',
             ),
           ]),
           style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
@@ -953,4 +977,225 @@ String lowestDiffText(ReportStat s) {
     return s.periods.any((p) => p.oldRules) ? 'Ενημερώνεται το ιστορικό' : 'Αλλαγή ορισμού';
   }
   return 'Δεν συγκρίνεται (σελ. 3)';
+}
+
+// --- Σελίδα 4: συμπτώματα, άσκηση, Samsung Health Monitor (έλεγχος #2: M2-03, M2-04, X3) ---
+
+class _PageFour extends StatelessWidget {
+  const _PageFour({required this.data, required this.training, this.medical, this.name = ''});
+  final ReportData data;
+  final TrainingStore training;
+  final Map<String, dynamic>? medical;
+  final String name;
+
+  static const _where = {'session': 'στην προπόνηση', 'walk': 'στο περπάτημα', 'watch': 'από το ρολόι', 'check': 'πριν την προπόνηση', 'day': 'στην καθημερινότητα'};
+
+  static String _dt(DateTime d) => '${d.day}/${d.month} ${two(d.hour)}:${two(d.minute)}';
+
+  /// «2026-11-03T02:14:00» → «3/11 02:14».
+  static String _isoText(String s) {
+    final d = DateTime.tryParse(s);
+    return d == null ? s : _dt(d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.light;
+    final t = training;
+    final from = data.from;
+    final small = TextStyle(fontSize: 8.6, color: c.textSecondary, height: 1.35);
+    final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
+    final cell = TextStyle(fontSize: 9, color: c.text, fontFeatures: tabular, height: 1.3);
+    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 4), child: w);
+    TableRow head(List<String> l) => TableRow(decoration: BoxDecoration(color: c.background), children: [for (final x in l) pad(Text(x, style: header))]);
+    TableRow row(List<String> l, {bool red = false}) =>
+        TableRow(children: [for (final (i, x) in l.indexed) pad(Text(x, style: i == 1 && red ? cell.copyWith(fontWeight: FontWeight.w700) : cell))]);
+    Table table(Map<int, TableColumnWidth> w, List<TableRow> rows) => Table(
+          columnWidths: w,
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
+          children: rows,
+        );
+
+    // Οδηγίες γιατρού όπως τις έγραψε ο χρήστης στην εφαρμογή.
+    final state = t.approved
+        ? 'Η άσκηση εγκρίθηκε${t.approvedAt == null ? '' : ' στις ${t.approvedAt!.day}/${t.approvedAt!.month}'}'
+        : t.lockReason == 'red' || t.lockReason == 'amber2'
+            ? 'Κλειδωμένη μετά από σύμπτωμα${t.lockedAt == null ? '' : ' (${t.lockedAt!.day}/${t.lockedAt!.month})'}'
+            : t.lockReason == 'meds'
+                ? 'Κλειδωμένη: νέο φάρμακο για καρδιά ή πίεση'
+                : t.waitingTests
+                    ? 'Δεν έχει εγκριθεί ακόμα: περιμένει εξετάσεις'
+                    : 'Δεν έχει εγκριθεί ακόμα (περιμένει καρδιολόγο)';
+    final doctor = [
+      state,
+      if (t.hrLimit != null) 'όριο παλμών ${t.hrLimit} bpm' else if (t.approved) 'χωρίς όριο παλμών (με την κούραση)',
+      if (t.hrMeds) 'παίρνει φάρμακο που κόβει τους παλμούς',
+      if (t.limits != null && t.limits!.isNotEmpty) 'περιορισμοί: ${t.limits}',
+    ].join(' · ');
+
+    final syms = [
+      for (final x in t.symptoms.reversed)
+        if (!x.at.isBefore(from)) x,
+    ];
+    final shownSyms = syms.take(12).toList();
+
+    final sess = [
+      for (final s in t.sessions.reversed)
+        if (s.finished && !s.start.isBefore(from)) s,
+    ];
+    final shownSess = sess.take(14).toList();
+    final walks = sess.where((s) => s.isCardio).length;
+
+    String hrText(Session s) {
+      final h = HrSummary(s, t.hrLimit);
+      if (h.avg == null && h.max == null) return '—';
+      return '${h.avg ?? '—'} / ${h.max ?? '—'}';
+    }
+
+    String overText(Session s) {
+      if (t.hrLimit == null || s.hr.isEmpty) return '—';
+      final sec = HrSummary(s, t.hrLimit).overSec;
+      return sec == 0 ? '0' : '${(sec / 60).ceil()}′';
+    }
+
+    // Samsung Health Monitor: χωρίς ερμηνεία, ονόματα πεδίων όπως τα δίνει η Samsung.
+    final med = medical;
+    final types = (med?['types'] as Map?)?.cast<String, dynamic>();
+    String fields(String key, Map<String, dynamic> f) {
+      if (key == 'blood_pressure') {
+        String? pick(String n) {
+          for (final e in f.entries) {
+            if (e.key.toUpperCase().contains(n)) return e.value.toString().replaceAll(RegExp(r'\.00$'), '');
+          }
+          return null;
+        }
+
+        final sys = pick('SYSTOLIC'), dia = pick('DIASTOLIC'), pulse = pick('PULSE');
+        if (sys != null && dia != null) return '$sys/$dia mmHg${pulse == null ? '' : ' · σφυγμοί $pulse'}';
+      }
+      final keep = [
+        for (final e in f.entries)
+          if (!RegExp(r'TIME|ZONE|UID|OFFSET', caseSensitive: false).hasMatch(e.key)) '${e.key.toLowerCase()}: ${e.value}',
+      ];
+      return keep.isEmpty ? '(χωρίς πεδία)' : keep.take(4).join(' · ');
+    }
+
+    Widget samsung(String key, String title) {
+      final o = (types?[key] as Map?)?.cast<String, dynamic>();
+      final st = o?['state'] as String?;
+      final items = [for (final i in (o?['items'] as List? ?? const [])) (i as Map).cast<String, dynamic>()];
+      final String? line = med == null
+          ? 'Διαβάζεται…'
+          : med['ok'] != true
+              ? 'Δεν διαβάστηκε από το Samsung Health (${med['message'] ?? 'σφάλμα'}).'
+              : switch (st) {
+                  'no_permission' => 'Δεν έχει δοθεί άδεια στην εφαρμογή.',
+                  'unsupported' => 'Δεν υποστηρίζεται σε αυτή την έκδοση του Samsung Health.',
+                  'error' => 'Δεν διαβάστηκε (σφάλμα).',
+                  'empty' => 'Καμία καταγραφή στις ${med['days'] ?? 120} μέρες.',
+                  _ => null,
+                };
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 5, bottom: 2),
+          child: Text(title, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: c.text)),
+        ),
+        if (line != null)
+          Text(line, style: small)
+        else
+          for (final i in items.take(key == 'blood_pressure' ? 8 : 6))
+            Text('${_isoText(i['t'] as String? ?? '')} · ${fields(key, (i['f'] as Map? ?? const {}).cast<String, dynamic>())}', style: cell),
+        if (line == null && items.length > (key == 'blood_pressure' ? 8 : 6))
+          Text('και ${items.length - (key == 'blood_pressure' ? 8 : 6)} ακόμα', style: small),
+      ]);
+    }
+
+    final body = <Widget>[
+      _Title('Οδηγίες γιατρού στην εφαρμογή', top: 4),
+      Text(doctor, key: const ValueKey('report-doctor'), style: cell),
+      _Title('Συμπτώματα («Νιώθω κάτι»), τελευταίοι 3 μήνες'),
+      if (syms.isEmpty)
+        Text('Καμία καταγραφή.', style: small)
+      else ...[
+        table(const {0: FixedColumnWidth(62), 1: FlexColumnWidth(4), 2: FlexColumnWidth(1.6), 3: FixedColumnWidth(52)}, [
+          head(['Πότε', 'Τι ένιωσε (όπως το διάλεξε)', 'Πού', 'Βαθμίδα']),
+          for (final x in shownSyms)
+            row([
+              _dt(x.at),
+              x.code == watchCode ? '«Νιώθω κάτι» στο ρολόι, χωρίς λεπτομέρειες ακόμα' : x.text,
+              _where[x.where] ?? '',
+              x.code == watchCode ? '—' : (x.red ? 'σοβαρό' : 'άλλο'),
+            ], red: x.red),
+        ]),
+        if (syms.length > shownSyms.length) Text('και ${syms.length - shownSyms.length} παλαιότερα', style: small),
+      ],
+      _Title('Άσκηση με την εφαρμογή, τελευταίοι 3 μήνες'),
+      Text(
+        sess.isEmpty
+            ? 'Καμία καταγραφή.'
+            : '${sess.length - walks} προπονήσεις με βάρη, $walks περπατήματα. Παλμοί από το ρολόι (καρπός): στα βάρη ο '
+                'καρπός συχνά μετρά πιο χαμηλά από τους πραγματικούς.',
+        style: small,
+      ),
+      if (shownSess.isNotEmpty) ...[
+        const SizedBox(height: 3),
+        table(const {
+          0: FixedColumnWidth(62),
+          1: FlexColumnWidth(2.6),
+          2: FixedColumnWidth(40),
+          3: FixedColumnWidth(70),
+          4: FixedColumnWidth(54),
+          5: FixedColumnWidth(48),
+        }, [
+          head(['Πότε', 'Τι', 'Λεπτά', 'Παλμοί\nμέσος / υψηλ.', 'Πάνω από\nτο όριο', 'Μεγαλύτ.\nκενό']),
+          for (final s in shownSess)
+            row([
+              _dt(s.start),
+              '${s.isCardio ? 'Περπάτημα' : s.name}${s.isCardio || s.setsDone == 0 ? '' : ', ${s.setsDone} σετ'}'
+                  '${s.stopped ? ' · σταμάτησε: σύμπτωμα' : ''}',
+              '${s.isCardio ? (s.cardioMinutes ?? 0) : s.duration.inMinutes}',
+              hrText(s),
+              overText(s),
+              s.hrGap == null ? '—' : (s.hrGap! < 120 ? '${s.hrGap}″' : '${(s.hrGap! / 60).round()}′'),
+            ], red: s.stopped),
+        ]),
+        if (sess.length > shownSess.length) Text('και ${sess.length - shownSess.length} παλαιότερες', style: small),
+        Text('«Μεγαλύτερο κενό»: πόση ώρα το πολύ δεν έφτασαν παλμοί από το ρολόι (τόσο μπορεί να άργησε η ειδοποίηση ορίου).',
+            style: small),
+      ],
+      _Title('Από το Samsung Health Monitor (όπως τα δίνει η Samsung, χωρίς ερμηνεία)'),
+      samsung('sleep_apnea', 'Τεστ άπνοιας ύπνου του ρολογιού'),
+      samsung('irregular_heart_rhythm', 'Ειδοποιήσεις ακανόνιστου ρυθμού'),
+      samsung('blood_pressure', 'Μετρήσεις πίεσης'),
+      const SizedBox(height: 6),
+      Text(
+        'Το τεστ άπνοιας του ρολογιού ψάχνει μόνο αποφρακτική άπνοια και δεν την αποκλείει όταν είναι αρνητικό. Η πίεση από '
+        'το ρολόι (χωρίς περιχειρίδα) θέλει βαθμονόμηση και δεν αρκεί για διάγνωση· οι μετρήσεις από πιεσόμετρο μπράτσου '
+        'φαίνονται εδώ μόνο αν γράφτηκαν στο Samsung Health. Τα ΗΚΓ του ρολογιού δεν περιλαμβάνονται.',
+        style: small,
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Header(data: data, page: 4, name: name),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) => FittedBox(
+              key: const ValueKey('report-page4-body'),
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: box.maxWidth,
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: body),
+              ),
+            ),
+          ),
+        ),
+        _Footer(data: data, page: 4),
+      ],
+    );
+  }
 }

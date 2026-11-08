@@ -62,6 +62,13 @@ class Plan(
     val at: Long,
     /** Μέρα εβδομάδας (1 = Δευτέρα … 7 = Κυριακή) → id προπόνησης. */
     val days: Map<Int, String> = emptyMap(),
+    /**
+     * Τι επιτρέπεται μετά από σύμπτωμα (έλεγχος #2): «lock» καμία άσκηση ως τον γιατρό, «pending» «Νιώθω κάτι» χωρίς
+     * λεπτομέρειες, «today» καμία άσκηση σήμερα, «check» τα βάρη ξεκινούν από το κινητό («Πώς είσαι σήμερα;»).
+     */
+    val hold: String? = null,
+    /** Το πιο πρόσφατο «Νιώθω κάτι» του ρολογιού που έφτασε στο κινητό (ms). */
+    val symSeen: Long = 0,
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
 
@@ -84,6 +91,8 @@ class Plan(
                 days = j.optJSONObject("days")?.let { d ->
                     d.keys().asSequence().mapNotNull { k -> k.toIntOrNull()?.let { it to d.getString(k) } }.toMap()
                 } ?: emptyMap(),
+                hold = j.optStringOrNull("hold"),
+                symSeen = j.optLong("symSeen", 0),
             )
         } catch (_: Exception) {
             null
@@ -385,3 +394,20 @@ fun pace(meters: Double, sec: Long): String {
     val p = (sec / (meters / 1000.0)).toLong()
     return "%d′%02d″".format(p / 60, p % 60)
 }
+
+/**
+ * Τι δεν ξεκινά στο ρολόι τώρα (έλεγχος #2, U2-04/T2-02/X4). [symHoldAt]: πότε πατήθηκε «Σταμάτησα» εδώ (0 = ποτέ)·
+ * μένει παύση ώσπου το κινητό να το δει ([Plan.symSeen]). «today» ισχύει μόνο για τη μέρα του προγράμματος ([today],
+ * «2026-11-08»). Επιστρέφει «lock» | «pending» | «today» | «check» | null.
+ */
+fun holdOf(plan: Plan?, symHoldAt: Long, today: String): String? {
+    if (plan?.hold == "lock") return "lock"
+    if (symHoldAt > 0 && symHoldAt > (plan?.symSeen ?: 0L)) return "pending"
+    val h = plan?.hold ?: return null
+    val day = plan?.day
+    if ((h == "today" || h == "check") && day != null && day != today) return null
+    return h
+}
+
+/** Καμία άσκηση (ούτε περπάτημα) ξεκινά από το ρολόι. */
+fun holdsAll(h: String?): Boolean = h == "lock" || h == "pending" || h == "today"

@@ -7,6 +7,7 @@ import '../../theme.dart';
 import '../../training/equipment.dart';
 import '../../training/program.dart';
 import '../../training/session.dart';
+import '../../training/symptoms.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
 import '../../widgets.dart';
@@ -91,6 +92,7 @@ class _TrainingPageState extends State<TrainingPage> {
     final recent = [for (final s in t.sessions.reversed) if (s.finished) s].take(6).toList();
     if (recent.isNotEmpty) side.add(_recentCard(context, recent));
     if (t.approved) side.add(_doctorCard(context));
+    if (t.symptoms.any((x) => x.code != watchCode)) side.add(SymptomHistoryCard(training: t));
     // Και στην καθημερινότητα (σκάλες, ανηφόρα), όχι μόνο στην προπόνηση.
     side.add(FeelButton(training: t, where: walk != null ? 'walk' : 'day'));
 
@@ -131,7 +133,7 @@ class _TrainingPageState extends State<TrainingPage> {
     final why = t.lockReason;
     final symptom = why == 'red' || why == 'amber2';
     final title = symptom
-        ? 'Τα βάρη κλείδωσαν μετά από σύμπτωμα'
+        ? 'Η άσκηση κλείδωσε μετά από σύμπτωμα'
         : why == 'meds'
             ? 'Τα βάρη κλείδωσαν: νέο φάρμακο'
             : why == 'manual'
@@ -141,7 +143,8 @@ class _TrainingPageState extends State<TrainingPage> {
                     : 'Τα βάρη περιμένουν τον καρδιολόγο';
     final text = symptom
         ? 'Στις ${t.lockedAt == null ? '' : dayMonth(t.lockedAt!)} κατέγραψες ${why == 'red' ? 'σοβαρό σύμπτωμα' : 'σύμπτωμα για δεύτερη φορά μέσα σε 14 μέρες'}. '
-            'Ανοίγει ξανά όταν σε δει γιατρός. Αν ξανασυμβεί ή χειροτερέψει: 166.'
+            'Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε γρήγορο περπάτημα (και το ρολόι δεν ξεκινά). '
+            'Αν δεν σε έχει δει ακόμα, πάρε σήμερα τον καρδιολόγο σου. Αν ξανασυμβεί ή χειροτερέψει: 166.'
         : why == 'meds'
             ? 'Ανοίγει ξανά όταν ο γιατρός πει ότι το φάρμακο δεν αλλάζει την άσκηση (ή δώσει νέο όριο παλμών).'
             : t.waitingTests
@@ -157,6 +160,7 @@ class _TrainingPageState extends State<TrainingPage> {
         ]),
         const SizedBox(height: 10),
         Text(text, style: TextStyle(fontSize: 15, height: 1.45, color: c.text)),
+        if (symptom) ...[const SizedBox(height: 12), const Call166Button()],
         const SizedBox(height: 12),
         OutlinedButton(
           key: const ValueKey('train-approve'),
@@ -184,7 +188,7 @@ class _TrainingPageState extends State<TrainingPage> {
         ),
         FilledButton(
           key: const ValueKey('watch-sym'),
-          style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: Colors.white),
+          style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: onBad(c)),
           onPressed: () => feelSomething(context, t, where: 'watch'),
           child: const Text('Πες'),
         ),
@@ -469,6 +473,19 @@ class _TrainingPageState extends State<TrainingPage> {
   }
 
   Future<void> _start(BuildContext context, Workout w) async {
+    // «Νιώθω κάτι» από το ρολόι χωρίς λεπτομέρειες: πρώτα αυτό, όχι προπόνηση (έλεγχος #2, T2-02).
+    if (t.pendingWatchSymptom != null) {
+      await feelSomething(context, t, where: 'watch');
+      return;
+    }
+    // Σύμπτωμα σήμερα: όχι προπόνηση σήμερα.
+    if (t.watchHold == 'today') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Σήμερα έγραψες σύμπτωμα: χωρίς άσκηση σήμερα. Αν χειροτερέψει: 166.'),
+        duration: Duration(seconds: 6),
+      ));
+      return;
+    }
     // Τις πρώτες 4 εβδομάδες και μετά από σύμπτωμα: «Πώς είσαι σήμερα;» πριν από τα βάρη.
     if (t.needsCheck && !await readinessCheck(context, t)) return;
     if (!context.mounted) return;
@@ -672,7 +689,7 @@ class _ClearanceSheetState extends State<_ClearanceSheet> {
               value: _meds,
               onChanged: (x) => setState(() => _meds = x),
               title: Text('Παίρνω φάρμακο που κόβει τους παλμούς', style: TextStyle(fontSize: 14.5, color: c.text)),
-              subtitle: Text('π.χ. β-αναστολέα. Τότε μετράει η κούραση περισσότερο από τους παλμούς.', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+              subtitle: Text('π.χ. β-αναστολέα. Οι παλμοί ανεβαίνουν λιγότερο: το όριο ισχύει μόνο αν το έδωσε ο γιατρός με το φάρμακο, αλλιώς πήγαινε με την κούραση.', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
             ),
             const SizedBox(height: 6),
             TextField(

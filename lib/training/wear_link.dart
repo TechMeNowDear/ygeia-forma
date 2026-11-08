@@ -40,6 +40,9 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     'v': 1,
     'approved': t.approved,
     if (t.hrLimit != null) 'hrLimit': t.hrLimit,
+    // Τι επιτρέπει το ρολόι μετά από σύμπτωμα ή πριν τον έλεγχο «Πώς είσαι σήμερα;» (έλεγχος #2).
+    if (t.watchHold != null) 'hold': t.watchHold,
+    if (t.watchSeenAt > 0) 'symSeen': t.watchSeenAt,
     if (p?.forDay(now) != null) 'today': p!.forDay(now)!.id,
     // Οι μέρες, για να βρίσκει το ρολόι μόνο του τη σημερινή (και αν το κινητό δεν άνοιξε σήμερα).
     if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},
@@ -205,8 +208,8 @@ class WearLink with WidgetsBindingObserver {
       final plan = jsonEncode(watchPlan(t, t.now, _name));
       if (plan != _lastPlan) {
         _lastPlan = plan;
-        // Έγκριση ή όριο παλμών άλλαξε: να φτάσει αμέσως, όχι όποτε βολέψει το σύστημα.
-        final safety = '${t.approved}|${t.hrLimit}';
+        // Έγκριση, όριο παλμών ή παύση μετά από σύμπτωμα άλλαξε: να φτάσει αμέσως, όχι όποτε βολέψει το σύστημα.
+        final safety = '${t.approved}|${t.hrLimit}|${t.watchHold}|${t.watchSeenAt}';
         final urgent = safety != _lastSafety;
         _lastSafety = safety;
         _m.invokeMethod<bool>('putPlan', {'json': plan, 'urgent': urgent}).catchError((_) => false);

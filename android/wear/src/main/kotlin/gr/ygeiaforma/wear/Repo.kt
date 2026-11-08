@@ -47,6 +47,12 @@ object Repo {
     var symBack = Screen.HOME
     var symSent = false
 
+    /** Πότε πατήθηκε «Σταμάτησα» (ms, 0 = ποτέ). Μένει και μετά από επανεκκίνηση, ώσπου να το δει το κινητό. */
+    var symHoldAt = 0L
+
+    /** Τι δεν ξεκινά τώρα: δες [holdOf]. */
+    fun hold(): String? = holdOf(plan, symHoldAt, java.time.LocalDate.now().toString())
+
     var meters = 0.0
     var steps = 0L
     var activeSec = 0L
@@ -128,6 +134,17 @@ object Repo {
     // Αν η εφαρμογή κλείσει απότομα στη μέση, το τελευταίο στιγμιότυπο στέλνεται στο κινητό στο επόμενο άνοιγμα.
     private const val PREFS = "ygeia_watch"
     private const val PENDING = "pending"
+
+    private const val HOLD = "symHoldAt"
+
+    fun loadHold(ctx: Context) {
+        symHoldAt = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(HOLD, 0L)
+    }
+
+    fun setHold(ctx: Context, at: Long) {
+        symHoldAt = at
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(HOLD, at).apply()
+    }
 
     fun snapshot(ctx: Context, json: JSONObject?) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

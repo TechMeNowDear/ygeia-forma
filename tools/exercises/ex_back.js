@@ -3,12 +3,12 @@ const E = require('./engine');
 const { add, sub, mul, norm, lerp, stand, body, anchor, A, solve, footFlat, ortho, len } = E;
 const { inclined, ARM } = require('./poses');
 
-const BREATH = 'Ανάσα κανονικά, εκπνοή στο τράβηγμα. Μην κρατάς την αναπνοή.';
+const BREATH = 'Ανάσα σε κάθε επανάληψη: εκπνοή στο τράβηγμα, εισπνοή στην επιστροφή. Μην κρατάς καθόλου την αναπνοή.';
 const BANDCHECK = 'Πριν από κάθε σετ, έλεγξε το λάστιχο για ρωγμές και άσπρες γραμμές, κυρίως κοντά στα κλιπ (13).';
 
 const dbRow = {
   id: 'db_row', name: 'Κωπηλασία με αλτήρα', en: 'one arm dumbbell row', group: 'back', equip: 'Αλτήρας, πάγκος', yaw: 90, yaw2: 160, elev2: 15,
-  tempo: [[0, 1, 1.2, 'Τράβα'], [1, 1, 0.5, 'Σφίξε'], [1, 0, 2.0, 'Κάτω, αργά'], [0, 0, 0.6, 'Τέντωμα']],
+  tempo: [[0, 1, 1.2, 'Τράβα'], [1, 1, 0.5, 'Σφίξε'], [1, 0, 2.0, 'Κάτω, εισπνοή'], [0, 0, 0.6, 'Τέντωμα']],
   primary: ['lats', 'upperback'], secondary: ['reardelt', 'biceps', ['forearm', 'κράτημα']],
   feel: 'Στο πλάι της πλάτης, κάτω από τη μασχάλη, και ανάμεσα στις ωμοπλάτες. Λιγότερο στο μπράτσο.',
   setup: [
@@ -120,7 +120,7 @@ const pulldown = {
 
 const assisted = {
   id: 'assisted_pullup', name: 'Έλξεις με λάστιχο (βοήθεια)', en: 'band assisted pull up chin up neutral grip', group: 'back', equip: 'Μονόζυγο, λάστιχο', yaw: 90, yaw2: 25, elev2: 10,
-  tempo: [[0, 1, 1.5, 'Πάνω'], [1, 1, 0.4, 'Πάνω'], [1, 0, 2.4, 'Κάτω, αργά'], [0, 0, 0.6, 'Κρέμασμα']],
+  tempo: [[0, 1, 1.5, 'Πάνω'], [1, 1, 0.4, 'Πάνω'], [1, 0, 2.4, 'Κάτω, εισπνοή'], [0, 0, 0.6, 'Κρέμασμα']],
   primary: ['lats'], secondary: ['biceps', 'upperback', ['forearm', 'κράτημα']],
   feel: 'Στο πλάι της πλάτης και στα μπράτσα. Το λάστιχο σε βοηθά περισσότερο στο κάτω μέρος.',
   setup: [
@@ -266,7 +266,7 @@ const bandER = {
 const shoulderPress = {
   id: 'shoulder_press', name: 'Πίεση ώμων με αλτήρες, καθιστός', en: 'seated dumbbell shoulder press overhead', group: 'shoulders', equip: 'Αλτήρες, πάγκος σε κλίση', yaw: 25, elev: 8, yaw2: 90,
   caution: 'Σταδιακά και μόνο χωρίς πόνο: πίεση πάνω από το κεφάλι (ώμοι).',
-  tempo: [[0, 1, 2.0, 'Κάτω, αργά'], [1, 1, 0.3, 'Κάτω'], [1, 0, 1.2, 'Πάνω'], [0, 0, 0.6, 'Πάνω']],
+  tempo: [[0, 1, 2.0, 'Κάτω, εισπνοή'], [1, 1, 0.3, 'Κάτω'], [1, 0, 1.2, 'Πάνω, εκπνοή'], [0, 0, 0.6, 'Πάνω']],
   primary: ['frontdelt', 'sidedelt'], secondary: ['triceps', ['upperback', 'τραπεζοειδής']],
   feel: 'Μπροστά και στο πλάι των ώμων, και πίσω στα μπράτσα.',
   setup: [
@@ -308,7 +308,7 @@ const shoulderPress = {
 
 const lateral = {
   id: 'lateral_raise', name: 'Πλάγιες ανυψώσεις', en: 'lateral raise side delt dumbbell', group: 'shoulders', equip: 'Αλτήρες', yaw: 0, elev: 6, yaw2: 90,
-  tempo: [[0, 1, 1.4, 'Πάνω'], [1, 1, 0.4, 'Πάνω'], [1, 0, 2.4, 'Κάτω, αργά'], [0, 0, 0.4, 'Κάτω']],
+  tempo: [[0, 1, 1.4, 'Πάνω'], [1, 1, 0.4, 'Πάνω'], [1, 0, 2.4, 'Κάτω, εισπνοή'], [0, 0, 0.4, 'Κάτω']],
   primary: ['sidedelt'], secondary: ['frontdelt', ['upperback', 'τραπεζοειδής']],
   feel: 'Στο πλάι των ώμων. Αν το νιώθεις κυρίως στον σβέρκο, κατέβασε το βάρος.',
   setup: ['Δύο ελαφριοί αλτήρες (Φ14). Εδώ αρκούν λίγα κιλά.', 'Όρθιος, γόνατα χαλαρά, κορμός λίγο μπροστά.'],

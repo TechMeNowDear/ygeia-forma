@@ -140,6 +140,7 @@ class Session {
     this.source,
     this.hrMode,
     this.hrGap,
+    this.stopped = false,
   })  : items = items ?? [],
         hr = hr ?? [];
 
@@ -172,6 +173,9 @@ class Session {
   String? hrMode;
   int? hrGap;
 
+  /// Σταμάτησε από σύμπτωμα («Νιώθω κάτι», «Σταμάτησα» στο ρολόι): δεν μετρά για την πρόοδο (έλεγχος #2).
+  bool stopped;
+
   bool get isCardio => cardioMinutes != null;
 
   bool get finished => end != null;
@@ -198,6 +202,7 @@ class Session {
         if (source != null) 'src': source,
         if (hrMode != null) 'hrm': hrMode,
         if (hrGap != null) 'hrg': hrGap,
+        if (stopped) 'stop': 1,
       };
 
   factory Session.fromJson(Map<String, dynamic> j) => Session(
@@ -222,5 +227,7 @@ class Session {
         source: j['src'] as String?,
         hrMode: j['hrm'] as String?,
         hrGap: (j['hrg'] as num?)?.toInt(),
+        // Παλιές καταγραφές (#81–#83): μόνο η σημείωση έδειχνε τη διακοπή από σύμπτωμα.
+        stopped: j['stop'] == 1 || ((j['note'] as String?)?.startsWith('Σταμάτησε: ') ?? false),
       );
 }

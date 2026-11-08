@@ -15,20 +15,40 @@ class SymptomDef {
   final bool callNow;
 }
 
+// Έλεγχος #2 (8/11): ο πόνος στο στήθος μετρά και σε ηρεμία (AHA/ACC 2021, Gulati)· ζάλη στην προσπάθεια
+// κλειδώνει από την πρώτη φορά (Fletcher 2013)· νέα: λαχάνιασμα σε ηρεμία/ξαπλωμένος, πρήξιμο αστραγάλων.
+// Οι παλιοί κωδικοί μένουν ίδιοι (π.χ. 'dizzy' = ζάλη που περνά όταν κάτσω), για τις παλιές καταγραφές.
 const redSymptoms = [
-  SymptomDef('chest', 'Πόνος, πίεση ή σφίξιμο στο στήθος (ή λαιμό, σαγόνι, χέρι, πλάτη) που ήρθε με την προσπάθεια', red: true),
+  SymptomDef('chest', 'Πόνος, πίεση, βάρος ή σφίξιμο στο στήθος (ή σε λαιμό, σαγόνι, χέρι, πλάτη, στομάχι), στην προσπάθεια ή σε ηρεμία',
+      red: true),
   SymptomDef('faint', 'Λιποθύμησα ή κόντεψα να λιποθυμήσω', red: true, callNow: true),
-  SymptomDef('breath', 'Λαχάνιασμα πολύ μεγαλύτερο από την προσπάθεια, που δεν περνά με ξεκούραση', red: true),
+  SymptomDef('breath', 'Λαχάνιασμα πολύ μεγαλύτερο από την προσπάθεια, ή λαχάνιασμα σε ηρεμία ή όταν ξαπλώνω', red: true),
   SymptomDef('palp', 'Η καρδιά χτυπά ακανόνιστα ή πολύ γρήγορα και δεν ηρεμεί στο διάλειμμα', red: true),
+  SymptomDef('dizzyx', 'Ζάλη την ώρα της προσπάθειας', red: true),
   SymptomDef('headache', 'Ξαφνικός πολύ δυνατός πονοκέφαλος', red: true, callNow: true),
   SymptomDef('stroke', 'Μούδιασμα ή αδυναμία στη μία πλευρά, στραβό στόμα, μπερδεμένη ομιλία', red: true, callNow: true),
 ];
 
 const amberSymptoms = [
-  SymptomDef('dizzy', 'Ζάλη που περνά όταν κάτσω', red: false),
+  SymptomDef('dizzy', 'Ζάλη όταν σηκώνομαι, που περνά όταν κάτσω', red: false),
   SymptomDef('nausea', 'Ναυτία', red: false),
+  SymptomDef('sweat', 'Κρύος ιδρώτας χωρίς λόγο', red: false),
   SymptomDef('tired', 'Ασυνήθιστη κούραση', red: false),
+  SymptomDef('swell', 'Πρησμένοι αστράγαλοι, ή πάνω από 2 κιλά σε 3 μέρες', red: false),
+  SymptomDef('other', 'Κάτι άλλο που με ανησυχεί', red: false),
 ];
+
+/// «166 τώρα»: ένα σύμπτωμα που το θέλει μόνο του, ή στήθος/ταχυπαλμία μαζί με ό,τι δείχνει οξύ επεισόδιο
+/// (ιδρώτας, ναυτία, ζάλη, λαχάνιασμα: AHA warning signs, ESC 2023 ACS, NICE CG95).
+bool callNowFor(Iterable<String> codes) {
+  final s = codes.toSet();
+  if (s.any((c) => symptomDef(c)?.callNow ?? false)) return true;
+  const withChest = {'nausea', 'sweat', 'dizzy', 'dizzyx', 'breath', 'palp'};
+  const withPalp = {'dizzy', 'dizzyx', 'breath', 'chest'};
+  if (s.contains('chest') && s.any(withChest.contains)) return true;
+  if (s.contains('palp') && s.any(withPalp.contains)) return true;
+  return false;
+}
 
 /// Πατήθηκε «Νιώθω κάτι» στο ρολόι, χωρίς λεπτομέρειες ακόμα (τις ρωτά το κινητό).
 const watchCode = 'watch';

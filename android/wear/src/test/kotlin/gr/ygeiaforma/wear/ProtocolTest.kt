@@ -164,6 +164,26 @@ class ProtocolTest {
     }
 
     @Test
+    fun holdAfterSymptom() {
+        fun plan(extra: String) = Plan.parse("{\"v\":1,\"approved\":true,\"day\":\"2026-11-08\",\"workouts\":[]$extra}")
+        val today = "2026-11-08"
+        // κανένα σύμπτωμα: τίποτα
+        assertEquals(null, holdOf(plan(""), 0, today))
+        // «Σταμάτησα» εδώ, το κινητό δεν το είδε ακόμα: παύση
+        assertEquals("pending", holdOf(plan(",\"symSeen\":100"), 200, today))
+        // το κινητό το είδε και δεν βάζει παύση (π.χ. «Τελικά τίποτα»): ελεύθερο
+        assertEquals(null, holdOf(plan(",\"symSeen\":200"), 200, today))
+        // κλείδωμα από σύμπτωμα: πάντα, και χωρίς κινητό σήμερα
+        assertEquals("lock", holdOf(plan(",\"hold\":\"lock\""), 0, "2026-11-20"))
+        // «σήμερα» και «check» λήγουν την άλλη μέρα
+        assertEquals("today", holdOf(plan(",\"hold\":\"today\""), 0, today))
+        assertEquals(null, holdOf(plan(",\"hold\":\"today\""), 0, "2026-11-09"))
+        assertEquals("check", holdOf(plan(",\"hold\":\"check\""), 0, today))
+        assertTrue(holdsAll("lock") && holdsAll("pending") && holdsAll("today"))
+        assertTrue(!holdsAll("check") && !holdsAll(null))
+    }
+
+    @Test
     fun formats() {
         assertEquals("1:04", clock(64))
         assertEquals("1:02:05", clock(3725))

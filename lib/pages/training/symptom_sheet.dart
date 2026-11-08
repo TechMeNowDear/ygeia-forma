@@ -1,6 +1,9 @@
 // «Νιώθω κάτι» και «Πώς είσαι σήμερα;» (έλεγχος 8/11, δεύτερη ιατρική γνώμη 1.1).
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import '../../format.dart';
 import '../../theme.dart';
 import '../../training/symptoms.dart';
 import '../../training/training_device.dart';
@@ -41,7 +44,7 @@ Future<SymptomOutcome> feelSomething(BuildContext context, TrainingStore t, {Str
     builder: (ctx) => _SymptomPicker(training: t),
   );
   if (picked == null || picked.isEmpty || !context.mounted) return SymptomOutcome.none;
-  final callNow = picked.any((c) => symptomDef(c)?.callNow ?? false);
+  final callNow = callNowFor(picked);
   final out = t.reportSymptoms(picked, where: where);
   if (out == SymptomOutcome.none || !context.mounted) return out;
   final red = picked.any((c) => symptomDef(c)?.red ?? false);
@@ -101,6 +104,9 @@ class _SymptomPickerState extends State<_SymptomPicker> {
           Text('Τι νιώθεις;', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
           const SizedBox(height: 4),
           Text('Πρώτα σταμάτα και κάθισε. Διάλεξε ό,τι ισχύει.', style: TextStyle(fontSize: 14.5, color: c.textSecondary)),
+          const SizedBox(height: 12),
+          // Το 166 χωρίς να διαλέξεις τίποτα (έλεγχος #2, U2-01): δύο πατήματα από παντού.
+          const Call166Button(compact: true),
           const SizedBox(height: 14),
           Text('Σοβαρά', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: c.bad)),
           const SizedBox(height: 6),
@@ -112,7 +118,7 @@ class _SymptomPickerState extends State<_SymptomPicker> {
           const SizedBox(height: 10),
           FilledButton(
             key: const ValueKey('sym-ok'),
-            style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(50)),
+            style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: onBad(c), minimumSize: const Size.fromHeight(50)),
             onPressed: _on.isEmpty ? null : () => Navigator.of(context).pop(_on.toList()),
             child: const Text('Συνέχεια'),
           ),
@@ -149,15 +155,20 @@ class SymptomResultPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final title = red ? 'Σταμάτα. Κάθισε. Μην οδηγήσεις.' : 'Σταμάτα για σήμερα';
+    // Έλεγχος #2 (M2-02, ίδια κείμενα με την ανεξάρτητη ιατρική γνώμη): και όταν περάσει, γιατρός σήμερα.
     final body = red
         ? (callNow
             ? 'Πάρε τώρα το 166. Μην περιμένεις να περάσει.'
-            : 'Αν δεν περάσει μέσα σε 5 λεπτά ξεκούρασης, αν είναι έντονο, ή αν έχεις κρύο ιδρώτα: πάρε τώρα το 166.')
+            : 'Πάρε τώρα το 166 αν δεν περάσει μέσα σε 5 λεπτά ξεκούρασης, αν ξαναέρθει, αν ήρθε ενώ καθόσουν, '
+                'αν απλώνεται σε χέρι, σαγόνι ή πλάτη, ή αν έχεις κρύο ιδρώτα, ναυτία, ζάλη ή λαχάνιασμα.')
         : escalated
-            ? 'Γράφτηκε. Είναι η δεύτερη φορά μέσα σε 14 μέρες, γι’ αυτό τα βάρη κλείδωσαν μέχρι να σε δει γιατρός. '
+            ? 'Γράφτηκε. Είναι η δεύτερη φορά μέσα σε 14 μέρες, γι’ αυτό η άσκηση κλείδωσε μέχρι να σε δει γιατρός. '
                 'Αν χειροτερέψει ή εμφανιστεί κάτι σοβαρό: 166.'
-            : 'Γράφτηκε. Ξεκουράσου. Αν ξανασυμβεί μέσα σε 14 μέρες, τα βάρη κλειδώνουν μέχρι να σε δει γιατρός. '
-                'Αν χειροτερέψει ή εμφανιστεί κάτι σοβαρό: 166.';
+            : 'Γράφτηκε. Ξεκουράσου, χωρίς άσκηση σήμερα. Αν ξανασυμβεί μέσα σε 14 μέρες, η άσκηση κλειδώνει μέχρι να σε δει γιατρός. '
+                'Αν χειροτερέψει ή σου φαίνεται σοβαρό: 166.';
+    final after = red && !callNow
+        ? 'Ακόμα κι αν πέρασε: πάρε σήμερα τον καρδιολόγο σου. Αν δεν τον βρεις, πάρε το 166 ή πήγαινε στα επείγοντα.'
+        : null;
     return Scaffold(
       backgroundColor: red ? Color.alphaBlend(c.bad.withValues(alpha: .08), c.background) : c.background,
       appBar: AppBar(backgroundColor: Colors.transparent, automaticallyImplyLeading: false),
@@ -171,29 +182,22 @@ class SymptomResultPage extends StatelessWidget {
               Text(title, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, height: 1.2, color: c.text)),
               const SizedBox(height: 10),
               Text(body, style: TextStyle(fontSize: 17, height: 1.45, color: c.text)),
+              if (after != null) ...[
+                const SizedBox(height: 10),
+                Text(after, key: const ValueKey('sym-today'), style: TextStyle(fontSize: 17, height: 1.45, fontWeight: FontWeight.w700, color: c.text)),
+              ],
               if (red || escalated) ...[
                 const SizedBox(height: 10),
-                Text('Τα βάρη κλείδωσαν. Ανοίγουν ξανά όταν σε δει γιατρός.', style: TextStyle(fontSize: 15, height: 1.4, color: c.textSecondary)),
+                Text('Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε γρήγορο περπάτημα. Η προπόνηση κλείδωσε, και στο ρολόι.',
+                    style: TextStyle(fontSize: 15, height: 1.4, color: c.textSecondary)),
               ],
               const SizedBox(height: 24),
-              FilledButton.icon(
-                key: const ValueKey('call-166'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: red ? c.bad : c.card,
-                  foregroundColor: red ? Colors.white : c.bad,
-                  side: red ? null : BorderSide(color: c.bad),
-                  minimumSize: Size.fromHeight(red ? 64 : 52),
-                  textStyle: TextStyle(fontSize: red ? 20 : 16, fontWeight: FontWeight.w800),
-                ),
-                onPressed: () => TrainingDevice.dial('166'),
-                icon: const Icon(Icons.call_rounded),
-                label: const Text('Κλήση 166'),
-              ),
+              Call166Button(strong: red),
               const SizedBox(height: 10),
               OutlinedButton(
                 key: const ValueKey('call-112'),
                 style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                onPressed: () => TrainingDevice.dial('112'),
+                onPressed: () => dialEmergency(context, '112'),
                 child: const Text('Κλήση 112'),
               ),
               const SizedBox(height: 18),
@@ -303,6 +307,161 @@ class _ReadinessState extends State<_Readiness> {
           ],
         ]),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- 166 (έλεγχος #2, U2-01/U2-02/P2-14)
+
+/// Κείμενο πάνω στο κόκκινο: λευκό ή το φόντο του θέματος, ό,τι ξεχωρίζει περισσότερο
+/// (στα σκούρα θέματα το κόκκινο είναι ανοιχτό και το λευκό έβγαινε 1,9–2,5:1).
+Color onBad(Aigaio c) {
+  double ratio(Color a, Color b) {
+    final x = a.computeLuminance(), y = b.computeLuminance();
+    return (math.max(x, y) + .05) / (math.min(x, y) + .05);
+  }
+
+  return ratio(Colors.white, c.bad) >= ratio(c.background, c.bad) ? Colors.white : c.background;
+}
+
+/// Ανοίγει την κλήση με τον αριθμό έτοιμο. Αν δεν ανοίξει (π.χ. tablet χωρίς τηλέφωνο), το λέει.
+Future<void> dialEmergency(BuildContext context, String number) async {
+  final ok = await TrainingDevice.dial(number);
+  if (ok || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text('Δεν άνοιξε η κλήση σε αυτή τη συσκευή. Κάλεσε το $number από το κινητό σου.'),
+    duration: const Duration(seconds: 8),
+  ));
+}
+
+/// Το κουμπί «Κλήση 166». [strong]: μεγάλο, γεμάτο κόκκινο· αλλιώς περίγραμμα.
+class Call166Button extends StatelessWidget {
+  const Call166Button({super.key, this.strong = false, this.compact = false});
+  final bool strong;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return FilledButton.icon(
+      key: ValueKey(compact ? 'sym-call' : 'call-166'),
+      style: FilledButton.styleFrom(
+        backgroundColor: strong ? c.bad : c.card,
+        foregroundColor: strong ? onBad(c) : c.bad,
+        side: strong ? null : BorderSide(color: c.bad),
+        minimumSize: Size.fromHeight(strong ? 64 : (compact ? 48 : 52)),
+        textStyle: TextStyle(fontSize: strong ? 20 : 16, fontWeight: FontWeight.w800),
+      ),
+      onPressed: () => dialEmergency(context, '166'),
+      icon: const Icon(Icons.call_rounded),
+      label: Text(compact ? 'Κλήση 166 τώρα' : 'Κλήση 166'),
+    );
+  }
+}
+
+/// Τα συμπτώματα που γράφτηκαν, νεότερο πρώτο (έλεγχος #2, U2-03). Για εσένα και για τον γιατρό.
+class SymptomHistoryCard extends StatelessWidget {
+  const SymptomHistoryCard({super.key, required this.training, this.max = 8});
+  final TrainingStore training;
+  final int max;
+
+  static const _where = {'session': 'στην προπόνηση', 'walk': 'στο περπάτημα', 'watch': 'από το ρολόι', 'check': 'πριν την προπόνηση', 'day': ''};
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final list = [for (final x in training.symptoms.reversed) if (x.code != watchCode) x];
+    final shown = list.take(max).toList();
+    return Container(
+      key: const ValueKey('sym-history'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.hairline)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Συμπτώματα που έγραψες', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
+        const SizedBox(height: 2),
+        Text('Μπαίνουν και στην αναφορά για τον γιατρό.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+        const SizedBox(height: 8),
+        for (final x in shown)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Container(width: 9, height: 9, decoration: BoxDecoration(color: x.red ? c.bad : c.exercise, shape: BoxShape.circle)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    '${shortDayDate(x.at)} ${hm(x.at)}${(_where[x.where] ?? '').isEmpty ? '' : ' · ${_where[x.where]}'}',
+                    style: TextStyle(fontSize: 12.5, color: c.textSecondary),
+                  ),
+                  Text(x.text, style: TextStyle(fontSize: 14.5, height: 1.3, color: c.text)),
+                ]),
+              ),
+            ]),
+          ),
+        if (list.length > shown.length)
+          Text('και ${list.length - shown.length} παλαιότερα', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+      ]),
+    );
+  }
+}
+
+/// Στο «Σήμερα», μετά από σοβαρό σύμπτωμα ή «Νιώθω κάτι» στο ρολόι: το 166 με ένα πάτημα (έλεγχος #2, U2-01).
+class SymptomAlertCard extends StatelessWidget {
+  const SymptomAlertCard({super.key, required this.training});
+  final TrainingStore training;
+
+  /// Εκκρεμεί «Νιώθω κάτι» του ρολογιού, ή σοβαρό σύμπτωμα/κλείδωμα τις τελευταίες 72 ώρες.
+  static bool shows(TrainingStore t) {
+    if (!t.ready) return false;
+    if (t.pendingWatchSymptom != null) return true;
+    final n = t.now;
+    if (!t.approved && t.lockReason == 'red' && t.lockedAt != null && n.difference(t.lockedAt!).inHours < 72) return true;
+    return t.symptoms.any((x) => x.red && n.difference(x.at).inHours < 72);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final pending = training.pendingWatchSymptom != null;
+    return Container(
+      key: const ValueKey('today-symptom'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(c.bad.withValues(alpha: .08), c.card),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.bad.withValues(alpha: .7)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(Icons.monitor_heart_outlined, color: c.bad),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(pending ? 'Στο ρολόι πάτησες «Νιώθω κάτι»' : 'Έγραψες σοβαρό σύμπτωμα',
+                style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800, color: c.text)),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Text(
+          pending
+              ? 'Πες τι ένιωσες, για να ξέρεις τι κάνεις τώρα. Μέχρι τότε: καμία άσκηση.'
+              : 'Αν δεν σε έχει δει ακόμα γιατρός, πάρε σήμερα τον καρδιολόγο σου. Αν ξαναέρθει ή δεν περνά: 166.',
+          style: TextStyle(fontSize: 14.5, height: 1.4, color: c.text),
+        ),
+        const SizedBox(height: 12),
+        if (pending) ...[
+          FilledButton(
+            key: const ValueKey('today-symptom-tell'),
+            style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: onBad(c), minimumSize: const Size.fromHeight(48)),
+            onPressed: () => feelSomething(context, training, where: 'watch'),
+            child: const Text('Πες τι ένιωσες'),
+          ),
+          const SizedBox(height: 8),
+        ],
+        const Call166Button(),
+      ]),
     );
   }
 }

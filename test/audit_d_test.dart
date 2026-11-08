@@ -222,7 +222,7 @@ void main() {
 
       await t.enterText(find.byKey(const ValueKey('report-name')), 'Γιάννης Π.');
       await t.pump();
-      expect(find.textContaining('Γιάννης Π. · '), findsNWidgets(3), reason: 'σε κάθε σελίδα');
+      expect(find.textContaining('Γιάννης Π. · '), findsNWidgets(4), reason: 'σε κάθε σελίδα');
       await t.pumpWidget(const SizedBox());
       expect(store.prefs.reportName, 'Γιάννης Π.');
       expect(store.prefs.toJson(), contains('reportName'));

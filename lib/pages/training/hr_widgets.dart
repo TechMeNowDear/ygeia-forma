@@ -152,7 +152,9 @@ class HrCard extends StatelessWidget {
                 ? 'Πάνω από το όριο ($limit) για περίπου $mins′.'
                 : (h.max != null && h.max! >= limit!)
                     ? 'Έφτασες στιγμιαία το όριο ($limit).'
-                    : 'Δεν ξεπέρασες το όριο ($limit).',
+                    // Ο καρπός μετρά λιγότερο όσο δυναμώνει η προσπάθεια (Boudreaux 2018· έλεγχος #2).
+                    : 'Το ρολόι δεν έδειξε παλμούς πάνω από το όριο ($limit). Στα βάρη ο καρπός συχνά μετρά πιο χαμηλά· '
+                        'πρώτα μετράει πώς νιώθεις.',
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec > 0 ? c.bad : c.text),
           ),
         ],
