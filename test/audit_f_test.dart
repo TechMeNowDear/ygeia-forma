@@ -493,11 +493,13 @@ void main() {
       expect(d.saltFromSodium, isTrue);
       expect(d.values[Nk.kcal], closeTo(239.0, 0.05));
       expect(draftFromOff('1', {'nutriments': {'salt_100g': 1.2, 'sodium_100g': 0.4}}).saltFromSodium, isFalse);
+      // Έλεγχος 8/11 (FOOD-01): το OFF στέλνει πάντα «100g»· για υγρά οι τιμές είναι ανά 100 ml.
       expect(
         draftFromOff('1', {'quantity': '1 l', 'nutrition_data_per': '100g', 'nutriments': {'energy-kcal_100g': 824}}).perMl,
-        isFalse,
-        reason: 'ελαιόλαδο 1 l με τιμές ανά 100 g',
+        isTrue,
+        reason: 'ελαιόλαδο 1 l: οι τιμές του OFF είναι ανά 100 ml',
       );
+      expect(draftFromOff('1', {'quantity': '500 g', 'nutrition_data_per': '100g', 'nutriments': {}}).perMl, isFalse);
       expect(draftFromOff('1', {'quantity': '500 g', 'nutrition_data_per': '100ml', 'nutriments': {}}).perMl, isTrue);
     });
   });

@@ -58,6 +58,15 @@ String phonetic(String s) {
         i += 3;
         continue;
       }
+      // αυ/ευ: [af]/[ef] πριν από άηχο σύμφωνο ή στο τέλος («λευκό» = lefko, «αυτό» = afto),
+      // [av]/[ev] αλλού («αυγό» = avgo). Έλεγχος 8/11, FOOD-03.
+      if (two == 'αυ' || two == 'ευ') {
+        final next = i + 2 < p.length ? p[i + 2] : '';
+        final voiceless = next.isEmpty || 'θκξπστφχψ'.contains(next) || !_grLetters.containsKey(next);
+        out.write(two == 'αυ' ? (voiceless ? 'af' : 'av') : (voiceless ? 'ef' : 'ev'));
+        i += 2;
+        continue;
+      }
       if (_grDigraphs.containsKey(two)) {
         out.write(_grDigraphs[two]);
         i += 2;
@@ -168,6 +177,9 @@ class FoodIndex {
       // «yiaourti», «yaourti» = γιαούρτι: το y/yi στην αρχή λέξης ως «γι» (τρίτος έλεγχος διατροφής N5). Μόνο ως
       // δεύτερη γραφή, άρα το «yogurt» (άλλο όνομα) δεν αλλάζει.
       lower.replaceAll(RegExp(r'\byi?'), 'gi'),
+      // «levko» / «avto»: το αυ/ευ γραμμένο με v αντί για f (και ανάποδα).
+      lower.replaceAll('ev', 'ef').replaceAll('av', 'af'),
+      lower.replaceAll('ef', 'ev').replaceAll('af', 'av'),
     };
     for (final v in variants) {
       if (v == lower) continue;

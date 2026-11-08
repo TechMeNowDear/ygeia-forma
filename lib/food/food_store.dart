@@ -25,6 +25,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   }) : _offline = true {
     _basic = foods;
     _mine = mine;
+    _mineRead = true;
     _rebuildIndex();
     for (final e in entries) {
       _entries[e.id] = e;
@@ -47,6 +48,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   List<Food> _basic = const [];
   List<Food> _mine = const [];
+
+  /// «Τα προϊόντα μου» διαβάστηκαν σωστά (αλλιώς δεν κρύβεται κανένα δικό μου από τα «Πρόσφατα/Συχνά»).
+  bool _mineRead = false;
   FoodIndex _index = FoodIndex(const []);
   final Map<String, LogEntry> _entries = {};
 
@@ -91,6 +95,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         } catch (_) {}
       }
       _mine = out;
+      _mineRead = true;
     }
   }
 
@@ -162,7 +167,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Τρόφιμο της βάσης που δεν υπάρχει πια (ούτε με νέο id): δεν προτείνεται ξανά.
   /// (Αν η βάση δεν φορτώθηκε, δεν κρύβεται τίποτα.)
-  bool _gone(Food f) => !f.isMine && _basic.isNotEmpty && byId(_idNow(f.id)) == null;
+  /// Δικό μου προϊόν που σβήστηκε (π.χ. είχε λάθος τιμές): ούτε αυτό ξαναπροτείνεται (έλεγχος 8/11, FOOD-04).
+  /// Οι παλιές καταχωρίσεις κρατούν τις τιμές τους.
+  bool _gone(Food f) => f.isMine ? _mineRead && byId(f.id) == null : _basic.isNotEmpty && byId(_idNow(f.id)) == null;
 
   /// Πρόσφατα: τα τελευταία διαφορετικά τρόφιμα.
   List<Food> recent({int limit = 15}) {

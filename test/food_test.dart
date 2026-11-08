@@ -20,6 +20,18 @@ void main() {
       expect(phonetic('ΦΑΚΈΣ'), phonetic('fakes'));
       expect(phonetic('μπέικον'), phonetic('mpeikon'));
       expect(phonetic('κοτόπουλο'), phonetic('kotopoylo'));
+      // αυ/ευ: f πριν από άηχο σύμφωνο, v αλλού (έλεγχος 8/11, FOOD-03)
+      expect(phonetic('λευκό'), phonetic('lefko'));
+      expect(phonetic('αυτό'), phonetic('afto'));
+      expect(phonetic('αυγό'), phonetic('avgo'));
+      expect(phonetic('Εύα'), phonetic('eva'));
+    });
+
+    test('«lefko», «levko», «zahari lefki»: βρίσκουν τα λευκά', () {
+      final i = FoodIndex(basicFoods());
+      for (final q in ['lefko', 'levko', 'zahari lefki']) {
+        expect(i.search(q).take(5).any((f) => plain(f.name).contains('λευκ')), isTrue, reason: q);
+      }
     });
 
     final index = FoodIndex(basicFoods());
@@ -345,6 +357,24 @@ void main() {
       expect(s.entriesFor(DateTime(2026, 10, 23), Meal.lunch).single.food.n.amount(Nk.kcal), 187);
       final copied = await s.copyMeal(DateTime(2026, 10, 23), Meal.lunch, DateTime(2026, 10, 24));
       expect(copied.single.food.id, 'U169704');
+    });
+
+    test('Δικό μου προϊόν που σβήστηκε: δεν ξαναπροτείνεται, οι παλιές μέρες κρατούν τις τιμές (έλεγχος 8/11)', () async {
+      final now = DateTime(2026, 10, 24, 13);
+      final bar = Food.fromJson({
+        'id': 'L1', 'name': 'Μπάρα (λάθος τιμές)', 'cat': 'Τα δικά μου', 'source': 'Ετικέτα',
+        'n': {'kcal': 900, 'protein': 10, 'carbs': 60, 'fat': 70},
+      });
+      final s = FoodStore.preloaded(foods: basicFoods(), now: now, mine: [bar], entries: [
+        LogEntry(id: 'b1', day: '2026-10-23', meal: Meal.snack, food: bar, grams: 40, time: DateTime(2026, 10, 23, 11)),
+        LogEntry(id: 'b2', day: '2026-10-22', meal: Meal.snack, food: bar, grams: 40, time: DateTime(2026, 10, 22, 11)),
+      ]);
+      expect(s.recent().map((f) => f.id), contains('L1'));
+      expect(s.frequent().map((f) => f.id), contains('L1'));
+      await s.deleteMyFood(bar);
+      expect(s.recent().map((f) => f.id), isNot(contains('L1')));
+      expect(s.frequent().map((f) => f.id), isNot(contains('L1')));
+      expect(s.entriesFor(DateTime(2026, 10, 23), Meal.snack).single.food.n.amount(Nk.kcal), 900);
     });
 
     test('Διόρθωση προϊόντος: βρίσκει τις καταχωρίσεις με τις παλιές τιμές και τις διορθώνει', () async {

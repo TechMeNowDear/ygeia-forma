@@ -96,12 +96,11 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   }
 
   final brand = pick(['brands'])?.split(',').first.trim();
-  // «Ανά 100 ml» από τη βάση των τιμών (nutrition_data_per), όχι από τη συσκευασία: ελαιόλαδο «1 l» με τιμές ανά
-  // 100 g δεν είναι «ανά 100 ml» (τρίτος έλεγχος διατροφής N7). Μόνο όταν η βάση λείπει, η συσκευασία υγρού.
+  // «Ανά 100 ml»: στο Open Food Facts το nutrition_data_per είναι μόνο «100g» ή «serving», και τα «_100g» των υγρών
+  // σημαίνουν ανά 100 ml (τεκμηρίωση OFF, Product-Nutrition schema). Άρα το υγρό φαίνεται από τη συσκευασία
+  // (έλεγχος 8/11, FOOD-01· ο κανόνας N7 βασιζόταν σε τιμή «100ml» που το OFF δεν στέλνει).
   final per = (p['nutrition_data_per'] is String ? p['nutrition_data_per'] as String : '').trim().toLowerCase();
-  final perMl = per.isNotEmpty
-      ? per.contains('ml')
-      : isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size']));
+  final perMl = per.contains('ml') || isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size']));
   // Στο Open Food Facts το «alcohol» είναι % vol: g ανά 100 ml = % vol × 0,789 (πυκνότητα αιθανόλης).
   final alcoholVol = _num(n['alcohol_100g']) ?? _num(n['alcohol']);
   final polyols = _num(n['polyols_100g']);
