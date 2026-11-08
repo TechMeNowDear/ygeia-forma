@@ -443,7 +443,8 @@ bool _failed(Map<String, dynamic> r, String k) {
 bool sleepReadFailed(Map<String, dynamic> r) => sleepReadKeys.any((k) => _failed(r, k));
 
 /// Οι παλμοί δεν διαβάστηκαν (ή κόπηκαν): οι τιμές από τους παλμούς δεν αλλάζουν σε αυτή την ανάγνωση.
-bool heartReadFailed(Map<String, dynamic> r) => _failed(r, 'heart');
+/// Το ίδιο όταν απέτυχαν οι ασκήσεις: χωρίς αυτές οι παλμοί της άσκησης θα μετρούσαν ως «ξύπνιος» (έλεγχος 8/11, DATA-06).
+bool heartReadFailed(Map<String, dynamic> r) => _failed(r, 'heart') || _failed(r, 'exercise');
 
 /// «2026-10-24»
 String dateKey(DateTime d) => '${d.year}-${two(d.month)}-${two(d.day)}';

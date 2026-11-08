@@ -189,6 +189,9 @@ void main() {
       j['heart'] = {'error': 'Πάρα πολλές εγγραφές'};
       expect(sleepReadFailed(j), isFalse);
       expect(heartReadFailed(j), isTrue);
+      // Έλεγχος 8/11 (DATA-06): και όταν απέτυχαν οι ασκήσεις.
+      expect(heartReadFailed({...sampleDashboardJson(now), 'exercise': {'error': 'x'}}), isTrue);
+      expect(heartReadFailed(sampleDashboardJson(now)), isFalse);
       final d = Dashboard.fromJson(j);
       final k = dateKey(add(today, -1));
       final h = <String, Map<String, double>>{
