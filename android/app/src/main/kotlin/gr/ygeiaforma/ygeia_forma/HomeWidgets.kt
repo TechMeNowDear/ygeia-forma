@@ -1,5 +1,6 @@
 package gr.ygeiaforma.ygeia_forma
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -30,6 +31,9 @@ object HomeWidgets {
     const val PREFS = "home_widgets"
     const val SNAPSHOT = "widget_data.json"
     const val EXTRA_OPEN = "ygeia_open"
+
+    /** Μεσάνυχτα: ξαναζωγραφίζονται τα widgets με τον κανόνα της ημέρας (καμία ανάγνωση δεδομένων). */
+    const val ACTION_DAY = "gr.ygeiaforma.widgets.DAY"
 
     private val providers = mapOf(
         SleepWidget::class.java.name to "sleep",
@@ -122,6 +126,7 @@ object HomeWidgets {
 
     // ---------------------------------------------------------------- ζωγραφική
     fun updateAll(ctx: Context, only: String? = null) {
+        scheduleMidnight(ctx)
         val mgr = AppWidgetManager.getInstance(ctx)
         for (id in allIds(ctx)) {
             if (only != null && kindOf(ctx, id) != only) continue
@@ -155,10 +160,54 @@ object HomeWidgets {
         return if (minW > 0 && maxH > 0) SizeF(minW.toFloat(), maxH.toFloat()) else null
     }
 
+    /**
+     * Έλεγχος 8/11 (DATA-02): τιμές «σήμερα» (κίνηση, φαγητό) άλλης μέρας δεν φαίνονται σαν σημερινές.
+     * Μένουν τα ονόματα και το γράφημα, οι τιμές γίνονται «—» ώσπου να ανοίξει η εφαρμογή ή να διαβαστούν ξανά.
+     */
+    fun forToday(data: JSONObject?, today: LocalDate = LocalDate.now()): JSONObject? {
+        val day = data?.optString("day", "") ?: return null
+        if (day.isEmpty() || day == today.toString()) return data
+        val c = JSONObject(data.toString())
+        val m = c.optJSONObject("m") ?: return c
+        for (k in m.keys().asSequence().toList()) {
+            m.optJSONObject(k)?.apply {
+                put("v", "—")
+                put("u", "")
+                remove("cap")
+                remove("d")
+                remove("us")
+                remove("r")
+            }
+        }
+        c.remove("bar")
+        c.put("src", "νέα μέρα · άνοιξε την εφαρμογή")
+        return c
+    }
+
+    /** Ένα ξυπνητήρι στα μεσάνυχτα, μόνο όσο υπάρχουν widgets (ανακριβές, χωρίς άδεια, χωρίς να ξυπνά τη συσκευή). */
+    private fun scheduleMidnight(ctx: Context) {
+        try {
+            val am = ctx.getSystemService(AlarmManager::class.java) ?: return
+            val pi = PendingIntent.getBroadcast(
+                ctx, 7400, Intent(ctx, MoveWidget::class.java).setAction(ACTION_DAY),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            if (count(ctx) == 0) {
+                am.cancel(pi)
+                return
+            }
+            val zone = ZoneId.systemDefault()
+            val next = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() + 60_000
+            am.set(AlarmManager.RTC, next, pi)
+        } catch (e: Throwable) {
+            ErrorQueue.report(e, "widget")
+        }
+    }
+
     fun update(ctx: Context, mgr: AppWidgetManager, id: Int) {
         val kind = kindOf(ctx, id) ?: return
         val style = style(ctx, id)
-        val data = kindData(ctx, kind)
+        val data = forToday(kindData(ctx, kind))
         val list = sizes(mgr.getAppWidgetOptions(id))
         val views = if (Build.VERSION.SDK_INT >= 31 && list.size > 1) {
             RemoteViews(list.associateWith { views(ctx, id, kind, style, data, it) })
@@ -268,6 +317,9 @@ object HomeWidgets {
             m.put(key, e)
         }
         val steps = perDay("steps", sum = false)
+        // Χωρίς βήματα σήμερα ακόμα: όχι τα χθεσινά με σημερινή ώρα.
+        if (steps[today] == null) m.optJSONObject("steps")?.put("v", "—")?.remove("cap")
+        if (perDay("floors", sum = true)[today] == null) m.remove("floors")
         steps[today]?.let { s ->
             val e = m.optJSONObject("steps") ?: JSONObject()
             e.put("l", "Βήματα").put("v", thousands(s.toLong())).put("u", "")
@@ -284,7 +336,7 @@ object HomeWidgets {
             if (a.has("distance")) put("distance", "Απόσταση", dec1(a.optDouble("distance") / 1000), " km")
         }
         val t = Instant.ofEpochMilli(readAt).atZone(zone).toLocalTime()
-        move.put("src", "ρολόι · %02d:%02d".format(t.hour, t.minute)).put("at", readAt)
+        move.put("src", "ρολόι · %02d:%02d".format(t.hour, t.minute)).put("at", readAt).put("day", today.toString())
         kinds.put("move", move)
         writeSnapshot(ctx, snap.toString())
         updateAll(ctx, only = "move")
@@ -313,6 +365,14 @@ abstract class HomeWidgetProvider : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, ids: IntArray) {
         HomeWidgets.forget(context, ids)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == HomeWidgets.ACTION_DAY) {
+            HomeWidgets.updateAll(context)
+            return
+        }
+        super.onReceive(context, intent)
     }
 }
 

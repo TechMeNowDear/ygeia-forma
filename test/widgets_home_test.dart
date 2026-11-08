@@ -62,6 +62,9 @@ void main() {
     // Ο ύπνος: «ώρες:λεπτά».
     final sleep = ((kinds[WKind.sleep] as Map)['m'] as Map)['sleepMin'] as Map;
     expect(sleep['v'], matches(RegExp(r'^\d+:\d\d$')));
+    // Έλεγχος 8/11 (DATA-02): κίνηση και φαγητό λένε για ποια μέρα είναι (άλλη μέρα → «—» στο widget).
+    expect((kinds[WKind.move] as Map)['day'], '2026-11-07');
+    expect((kinds[WKind.food] as Map)['day'], '2026-11-07');
     // Το JSON βγαίνει (το διαβάζει η Kotlin).
     expect(() => jsonEncode(snap), returnsNormally);
   });

@@ -116,7 +116,8 @@ Map<String, dynamic> _move(HealthStore store, DateTime today) {
   if (n('distance') case final v?) out['distance'] = _entry('Απόσταση', dec(v / 1000), ' km');
   final dayHr = store.plan.value(store.history, K.dayHr, _minus(today, 1));
   if (dayHr != null) out['dayHr'] = _entry('Παλμοί χθες', '${dayHr.round()}', ' bpm');
-  return {'src': 'ρολόι · ${hm(d.readAt)}', 'at': d.readAt.millisecondsSinceEpoch, 'm': out};
+  // 'day': η μέρα των τιμών· άλλη μέρα στο widget = «—» (έλεγχος 8/11, DATA-02, HomeWidgets.forToday).
+  return {'src': 'ρολόι · ${hm(d.readAt)}', 'at': d.readAt.millisecondsSinceEpoch, 'day': dateKey(today), 'm': out};
 }
 
 /// Φαγητό: τα σύνολα της σημερινής μέρας, μόνο από τη βάση τροφίμων.
@@ -138,6 +139,7 @@ Map<String, dynamic> _food(FoodStore food, DateTime today) {
     'sugars': _entry('Σάκχαρα', g(t.sugars), ' g'),
   };
   return {
+    'day': dateKey(today),
     'src': entries.isEmpty ? 'σήμερα' : (meals == 1 ? '1 γεύμα' : '$meals γεύματα'),
     'bar': [t.protein * 4, t.carbs * 4, t.fat * 9],
     'm': out,
