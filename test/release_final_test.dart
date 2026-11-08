@@ -182,7 +182,7 @@ void main() {
     List<String> top(String q, int n) => [for (final f in store.search(q).take(n)) f.name];
 
     test('Καμία νέα τροφή', () {
-      expect(basicFoods().length, 323);
+      expect(basicFoods().length, 346); // 323 + 23 ψάρια, θαλασσινά, κεφίρ (έλεγχος 8/11)
     });
 
     test('N2: «μαγιά» δεν βγάζει μάνγκο (η μαγιά δεν είναι στη βάση)', () {
