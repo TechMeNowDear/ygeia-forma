@@ -59,6 +59,7 @@ class WatchShotsTest {
         override fun finish() {}
         override fun muteAlarm() {}
         override fun doneOk() {}
+        override fun clearHold() {}
         override fun feel() {}
         override fun feelBack() {}
         override fun feelStop() {}
