@@ -45,6 +45,10 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     // Σκανάρισμα barcode από το Google Play services (χωρίς άδεια κάμερας, χωρίς δική μας κάμερα).
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    // Ρολόι (8/11): σύνδεση με την εφαρμογή Wear OS (πρόγραμμα, παλμοί, ✓) και άνοιγμά της από το κινητό.
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    implementation("androidx.wear:wear-remote-interactions:1.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     // Μόνο για τους ελέγχους Kotlin σε απλό JVM (android/app/src/test): δεν μπαίνει ποτέ στην εφαρμογή.
     testImplementation("junit:junit:4.13.2")
 }

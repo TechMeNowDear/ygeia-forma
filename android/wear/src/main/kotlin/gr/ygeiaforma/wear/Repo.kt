@@ -70,7 +70,7 @@ object Repo {
 
     fun bpmFresh(now: Long): Boolean = bpm > 0 && now - bpmAt < 15_000
 
-    fun setPlan(p: Plan?) {
+    fun applyPlan(p: Plan?) {
         if (p == null) return
         plan = p
         alarm.limit = p.hrLimit
@@ -78,7 +78,7 @@ object Repo {
     }
 
     /** Νέα κατάσταση από το κινητό. Κρατά ό,τι ✓ έγινε στο ρολόι και δεν έχει φτάσει ακόμα εκεί. */
-    fun setPhone(s: LiveSession?) {
+    fun applyPhone(s: LiveSession?) {
         val prev = phone
         if (s != null && prev != null && prev.id == s.id) {
             for ((i, it) in s.items.withIndex()) {

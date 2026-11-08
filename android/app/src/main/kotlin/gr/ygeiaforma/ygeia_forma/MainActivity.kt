@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     // Widgets (7/11): κανάλι για το στιγμιότυπο και για τα πατήματα σε widget.
     private var widgets: MethodChannel? = null
+
+    private var wear: WearBridge? = null
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -81,6 +84,11 @@ class MainActivity : FlutterFragmentActivity() {
         // Προπόνηση (8/11): αρχείο προπονήσεων, οθόνη αναμμένη, διάλειμμα με ειδοποίηση.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/training")
             .setMethodCallHandler(TrainingBridge(this, scope))
+        // Ρολόι (8/11): πρόγραμμα και προπόνηση προς το ρολόι, παλμοί και ✓ από εκεί, όσο ζει η εφαρμογή.
+        wear = WearBridge(this, scope).also { w ->
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/wear").setMethodCallHandler(w)
+            EventChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/wear/events").setStreamHandler(w)
+        }
         val ouraChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/oura")
         oura = OuraBridge(this, scope, ouraChannel).also {
             ouraChannel.setMethodCallHandler(it)
@@ -96,6 +104,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onDestroy() {
         widgets = null
+        wear?.dispose()
+        wear = null
         if (OuraBridge.live === oura) OuraBridge.live = null
         oura = null
         scope.cancel()

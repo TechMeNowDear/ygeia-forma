@@ -8,8 +8,10 @@ import '../../training/equipment.dart';
 import '../../training/program.dart';
 import '../../training/session.dart';
 import '../../training/training_store.dart';
+import '../../training/wear_link.dart';
 import '../../widgets.dart';
 import 'program_editor.dart';
+import 'hr_widgets.dart';
 import 'program_paste.dart';
 import 'session_page.dart';
 import 'training_common.dart';
@@ -40,7 +42,10 @@ class _TrainingPageState extends State<TrainingPage> {
             Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())),
           ]);
         }
-        return ListenableBuilder(listenable: t, builder: (context, _) => _page(context));
+        return ListenableBuilder(
+          listenable: Listenable.merge([t, WearLink.main.ready, WearLink.main.live]),
+          builder: (context, _) => _page(context),
+        );
       },
     );
   }
@@ -68,6 +73,8 @@ class _TrainingPageState extends State<TrainingPage> {
 
     final cur = t.current;
     if (cur != null) cards.add(_resumeCard(context, cur));
+    final walk = _liveWalk();
+    if (walk != null) cards.add(_walkCard(context, walk));
     if (!t.approved) cards.add(_lockedCard(context));
 
     if (p == null) {
@@ -184,12 +191,21 @@ class _TrainingPageState extends State<TrainingPage> {
         Text('${cardio.name} ${cardio.minutes}′', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
         if (cardio.note != null) Text(cardio.note!, style: TextStyle(fontSize: 14.5, color: c.textSecondary)),
         const SizedBox(height: 8),
-        Text('Θα ξεκινά από το ρολόι, με παλμούς και απόσταση, όταν έρθει η εφαρμογή του ρολογιού. Ως τότε τα βήματα μετριούνται στην «Κίνηση».',
+        Text(
+            WearLink.main.ready.value
+                ? 'Ξεκινά από το ρολόι («Ξεκίνα» στην εφαρμογή του ρολογιού), με παλμούς και απόσταση. Αν έχεις μαζί το κινητό, το βλέπεις ζωντανά εδώ.'
+                : 'Ξεκινά από το ρολόι, με παλμούς και απόσταση, όταν μπει η εφαρμογή του ρολογιού. Ως τότε τα βήματα μετριούνται στην «Κίνηση».',
             style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
       ]);
     } else {
       children.add(Row(children: [
         Expanded(child: Text('ΣΗΜΕΡΑ · ${w.name.toUpperCase()}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary))),
+        if (WearLink.main.ready.value) ...[
+          Icon(Icons.watch_rounded, size: 15, color: c.good),
+          const SizedBox(width: 3),
+          Text('ρολόι έτοιμο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.good)),
+          const SizedBox(width: 10),
+        ],
         Text('~${w.minutes}′', style: TextStyle(fontSize: 13, color: c.textSecondary)),
       ]));
       if (w.note != null) children.add(Text(w.note!, style: TextStyle(fontSize: 14, color: c.textSecondary)));
@@ -343,7 +359,10 @@ class _TrainingPageState extends State<TrainingPage> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${shortDayDate(s.start)} · ${s.name}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
-                    Text('${s.duration.inMinutes}′ · ${s.setsDone} σετ${s.volume > 0 ? ' · ${thousands(s.volume.round())} kg' : ''}',
+                    Text(
+                        s.isCardio
+                            ? '${s.cardioMinutes}′${s.meters != null ? ' · ${(s.meters! / 1000).toStringAsFixed(2).replaceAll('.', ',')} km' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}'
+                            : '${s.duration.inMinutes}′ · ${s.setsDone} σετ${s.volume > 0 ? ' · ${thousands(s.volume.round())} kg' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}',
                         style: TextStyle(fontSize: 13, color: c.textSecondary)),
                   ]),
                 ),
@@ -430,7 +449,52 @@ class _TrainingPageState extends State<TrainingPage> {
 
   void _start(BuildContext context, Workout w) {
     t.start(w);
+    // Ανοίγει και η εφαρμογή στο ρολόι (παλμοί, ✓ στον καρπό), αν υπάρχει.
+    WearLink.main.openWatch();
     _openSession(context);
+  }
+
+  /// Περπάτημα που τρέχει τώρα στο ρολόι (ήρθε μήνυμα τα τελευταία 30″).
+  Map<String, dynamic>? _liveWalk() {
+    final l = WearLink.main.live.value;
+    if (l == null) return null;
+    final at = (l['at'] as num?)?.toInt() ?? 0;
+    if (DateTime.now().millisecondsSinceEpoch - at > 30000) return null;
+    return l;
+  }
+
+  Widget _walkCard(BuildContext context, Map<String, dynamic> l) {
+    final c = Aigaio.of(context);
+    final sec = (l['sec'] as num?)?.toInt() ?? 0;
+    final m = (l['m'] as num?)?.toDouble() ?? 0;
+    final steps = (l['steps'] as num?)?.toInt() ?? 0;
+    final bpm = (l['bpm'] as num?)?.toInt() ?? 0;
+    String two(int v) => v.toString().padLeft(2, '0');
+    final time = sec >= 3600 ? '${sec ~/ 3600}:${two(sec % 3600 ~/ 60)}:${two(sec % 60)}' : '${sec ~/ 60}:${two(sec % 60)}';
+    String pace() {
+      if (m < 50 || sec <= 0) return '—';
+      final p = (sec / (m / 1000)).round();
+      return '${p ~/ 60}′${two(p % 60)}″';
+    }
+
+    Widget stat(String v, String label) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(v, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: c.text)),
+            Text(label, style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+          ]),
+        );
+    return AppCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΖΩΝΤΑΝΑ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+        const SizedBox(height: 8),
+        if (bpm > 0) ...[HrBar(bpm: bpm, limit: t.hrLimit), const SizedBox(height: 10)],
+        Row(children: [stat(time, 'χρόνος'), stat(m > 0 ? (m / 1000).toStringAsFixed(2).replaceAll('.', ',') : '—', 'km')]),
+        const SizedBox(height: 8),
+        Row(children: [stat(pace(), 'ανά km'), stat(steps > 0 ? thousands(steps) : '—', 'βήματα')]),
+        const SizedBox(height: 6),
+        Text('Τελειώνει από το ρολόι. Μόλις τελειώσει, γράφεται εδώ.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+      ]),
+    );
   }
 
   void _openSession(BuildContext context) => Navigator.of(context).push(SessionPage.route(t));

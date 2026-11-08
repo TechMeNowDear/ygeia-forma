@@ -232,8 +232,110 @@ class TrainingStore extends ChangeNotifier {
     );
   }
 
+  // ---------------------------------------------------------------- οθόνη προπόνησης (στη μνήμη· τη βλέπει και το ρολόι)
+  int _focus = 0;
+
+  /// Η άσκηση που δείχνει τώρα η προπόνηση (κινητό και ρολόι).
+  int get focus => _focus;
+  set focus(int v) {
+    if (v == _focus) return;
+    _focus = v;
+    notifyListeners();
+  }
+
+  /// Για τη σελίδα προπόνησης, μέσα στο build/initState (χωρίς ειδοποίηση).
+  void setFocusQuiet(int v) => _focus = v;
+
+  DateTime? _restEnd;
+
+  /// Τέλος διαλείμματος, ή null.
+  DateTime? get restEnd => _restEnd;
+  set restEnd(DateTime? v) {
+    if (v == _restEnd) return;
+    _restEnd = v;
+    notifyListeners();
+  }
+
+  DateTime? _hrSaved;
+
+  /// Παλμοί από το ρολόι για την προπόνηση που τρέχει (δείγμα ανά ~10″, αποθήκευση ανά λεπτό).
+  void addHr(int bpm, DateTime at, {String? sid}) {
+    final s = current;
+    if (s == null || bpm <= 25 || bpm >= 250) return;
+    if (sid != null && sid.isNotEmpty && sid != s.id) return;
+    final sec = at.difference(s.start).inSeconds;
+    if (sec < 0) return;
+    if (s.hr.isEmpty || sec - s.hr.last[0] >= 10) s.hr.add([sec, bpm]);
+    if (s.hrMax == null || bpm > s.hrMax!) s.hrMax = bpm;
+    if (_hrSaved == null || at.difference(_hrSaved!).inSeconds >= 60) {
+      _hrSaved = at;
+      save();
+    }
+  }
+
+  /// Ό,τι έγινε μόνο στο ρολόι (προπόνηση, περπάτημα) ή οι παλμοί μιας προπόνησης του κινητού. true αν άλλαξε κάτι.
+  bool importWatch(Map<String, dynamic> j) {
+    final kind = j['kind'] as String? ?? 'strength';
+    final samples = [
+      for (final p in (j['hr'] as List? ?? const []))
+        if (p is List && p.length == 2) [(p[0] as num).toInt(), (p[1] as num).toInt()],
+    ];
+    final hrAvg = (j['hrAvg'] as num?)?.toInt();
+    final hrMax = (j['hrMax'] as num?)?.toInt();
+    if (kind == 'hr') {
+      final sid = j['sid'] as String?;
+      Session? s;
+      for (final x in [...sessions, if (current != null) current!]) {
+        if (x.id == sid) s = x;
+      }
+      if (s == null) return false;
+      if (samples.length > s.hr.length) {
+        s.hr
+          ..clear()
+          ..addAll(samples);
+      }
+      if (hrMax != null && (s.hrMax == null || hrMax > s.hrMax!)) s.hrMax = hrMax;
+      if (hrAvg != null) s.hrAvg = hrAvg;
+      save();
+      return true;
+    }
+    final id = 'w-${j['id']}';
+    if (sessions.any((x) => x.id == id)) return false;
+    final start = DateTime.fromMillisecondsSinceEpoch((j['start'] as num).toInt());
+    final end = DateTime.fromMillisecondsSinceEpoch((j['end'] as num? ?? j['start'] as num).toInt());
+    final cardio = kind == 'cardio' ? (j['cardio'] as Map?)?.cast<String, dynamic>() ?? const {} : null;
+    final s = Session(
+      id: id,
+      workout: j['w'] as String? ?? '',
+      name: j['name'] as String? ?? (cardio != null ? 'Περπάτημα' : 'Προπόνηση'),
+      programId: program?.id ?? '',
+      start: start,
+      end: end,
+      items: cardio != null ? [] : [for (final e in (j['items'] as List? ?? const [])) ExLog.fromJson((e as Map).cast<String, dynamic>())],
+      hrAvg: hrAvg,
+      hrMax: hrMax,
+      hr: samples,
+      source: 'watch',
+    );
+    if (cardio != null) {
+      final sec = (cardio['sec'] as num?)?.toInt() ?? end.difference(start).inSeconds;
+      s.cardioMinutes = (sec / 60).round();
+      s.meters = (cardio['m'] as num?)?.toDouble();
+      s.steps = (cardio['steps'] as num?)?.toInt();
+    }
+    var at = sessions.length;
+    while (at > 0 && sessions[at - 1].start.isAfter(start)) {
+      at--;
+    }
+    sessions.insert(at, s);
+    save();
+    return true;
+  }
+
   Session start(Workout w) {
     final p = program!;
+    _focus = 0;
+    _restEnd = null;
     final s = Session(
       id: 's${now.millisecondsSinceEpoch}',
       workout: w.id,
@@ -341,13 +443,16 @@ class TrainingStore extends ChangeNotifier {
     s
       ..end = now
       ..feel = feel;
+    if (s.hr.isNotEmpty) s.hrAvg = (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round();
     sessions.add(s);
     current = null;
+    _restEnd = null;
     save();
   }
 
   void discard() {
     current = null;
+    _restEnd = null;
     save();
   }
 
@@ -362,7 +467,15 @@ class TrainingStore extends ChangeNotifier {
     if (p != null) b.writeln('Πρόγραμμα: ${p.name} (έκδοση ${p.version}, ${p.author == 'claude' ? 'από τον Claude' : 'δικό μου'}), id ${p.id}');
     if (hrLimit != null) b.writeln('Όριο παλμών γιατρού: $hrLimit');
     if (limits != null && limits!.isNotEmpty) b.writeln('Περιορισμοί γιατρού: $limits');
-    b.writeln('Προπονήσεις: ${list.length}');
+    final walks = [for (final s in list) if (s.isCardio) s];
+    b.writeln('Προπονήσεις με βάρη: ${list.length - walks.length}');
+    if (walks.isNotEmpty) {
+      final km = walks.fold<double>(0, (a, s) => a + (s.meters ?? 0)) / 1000;
+      final mins = walks.fold<int>(0, (a, s) => a + (s.cardioMinutes ?? 0));
+      b.writeln('Περπάτημα: ${walks.length} φορές, $mins λεπτά${km > 0 ? ', ${km.toStringAsFixed(1)} km' : ''}');
+    }
+    final hrAvgs = [for (final s in list) if (s.hrAvg != null) s.hrAvg!];
+    if (hrAvgs.isNotEmpty) b.writeln('Μέσοι παλμοί ανά προπόνηση: ${hrAvgs.join(', ')}');
     final feels = [for (final s in list) if (s.feel != null) s.feel!];
     if (feels.isNotEmpty) b.writeln('Πώς ένιωσα (1 πολύ εύκολα – 5 πολύ δύσκολα): μέσος ${(feels.reduce((a, c) => a + c) / feels.length).toStringAsFixed(1)}');
     final hrs = [for (final s in list) if (s.hrMax != null) s.hrMax!];

@@ -134,7 +134,12 @@ class Session {
     this.hrMax,
     this.cardioMinutes,
     this.note,
-  }) : items = items ?? [];
+    List<List<int>>? hr,
+    this.meters,
+    this.steps,
+    this.source,
+  })  : items = items ?? [],
+        hr = hr ?? [];
 
   final String id;
   final String workout;
@@ -149,6 +154,18 @@ class Session {
   int? hrAvg, hrMax;
   int? cardioMinutes;
   String? note;
+
+  /// Παλμοί από το ρολόι: [δευτερόλεπτα από την αρχή, bpm] ανά ~10″.
+  final List<List<int>> hr;
+
+  /// Περπάτημα/αερόβια από το ρολόι: απόσταση (m) και βήματα.
+  double? meters;
+  int? steps;
+
+  /// «watch» αν έγινε μόνο στο ρολόι.
+  String? source;
+
+  bool get isCardio => cardioMinutes != null;
 
   bool get finished => end != null;
   int get setsDone => items.fold(0, (s, e) => s + e.done.length);
@@ -168,6 +185,10 @@ class Session {
         if (hrMax != null) 'hrMax': hrMax,
         if (cardioMinutes != null) 'cmin': cardioMinutes,
         if (note != null) 'note': note,
+        if (hr.isNotEmpty) 'hr': hr,
+        if (meters != null) 'm': meters,
+        if (steps != null) 'steps': steps,
+        if (source != null) 'src': source,
       };
 
   factory Session.fromJson(Map<String, dynamic> j) => Session(
@@ -183,5 +204,12 @@ class Session {
         hrMax: (j['hrMax'] as num?)?.toInt(),
         cardioMinutes: (j['cmin'] as num?)?.toInt(),
         note: j['note'] as String?,
+        hr: [
+          for (final p in (j['hr'] as List? ?? const []))
+            if (p is List && p.length == 2) [(p[0] as num).toInt(), (p[1] as num).toInt()],
+        ],
+        meters: (j['m'] as num?)?.toDouble(),
+        steps: (j['steps'] as num?)?.toInt(),
+        source: j['src'] as String?,
       );
 }

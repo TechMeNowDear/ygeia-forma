@@ -46,11 +46,11 @@ object Link {
         val text = textOf(item) ?: return false
         return when (item.uri.path) {
             Paths.PLAN -> {
-                Repo.setPlan(Plan.parse(text))
+                Repo.applyPlan(Plan.parse(text))
                 true
             }
             Paths.SESSION -> {
-                Repo.setPhone(LiveSession.parsePhone(text))
+                Repo.applyPhone(LiveSession.parsePhone(text))
                 true
             }
             else -> false

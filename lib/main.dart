@@ -8,6 +8,7 @@ import 'nav.dart';
 import 'pages/exercise_library.dart';
 import 'pages/training/training_page.dart';
 import 'training/training_store.dart';
+import 'training/wear_link.dart';
 import 'pages/body.dart';
 import 'pages/category.dart';
 import 'pages/food_add.dart';
@@ -43,6 +44,8 @@ Future<void> main() async {
   store.start();
   food.start();
   WidgetPublisher(store, food).start();
+  // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
+  TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
 }
 
 class YgeiaFormaApp extends StatefulWidget {

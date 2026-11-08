@@ -12,8 +12,10 @@ import '../../training/program.dart';
 import '../../training/session.dart';
 import '../../training/training_device.dart';
 import '../../training/training_store.dart';
+import '../../training/wear_link.dart';
 import '../../widgets.dart';
 import '../exercise_detail.dart';
+import 'hr_widgets.dart';
 import 'training_common.dart';
 
 /// Μετακίνηση ανάμεσα στα διαθέσιμα βάρη (με τα βελάκια). Στο λάστιχο βοήθειας περιλαμβάνεται και το «χωρίς».
@@ -43,10 +45,14 @@ class SessionPage extends StatefulWidget {
 
 class _SessionPageState extends State<SessionPage> {
   TrainingStore get t => widget.training;
-  int _idx = 0;
-  DateTime? _restEnd;
+  // Η άσκηση και το διάλειμμα ζουν στην αποθήκη (τα βλέπει και το ρολόι).
+  int get _idx => t.focus;
+  set _idx(int v) => t.focus = v;
+  DateTime? get _restEnd => t.restEnd;
+  set _restEnd(DateTime? v) => t.restEnd = v;
   Timer? _timer;
   final _tick = ValueNotifier<int>(0);
+  StreamSubscription<WatchCmd>? _watch;
 
   @override
   void initState() {
@@ -54,8 +60,9 @@ class _SessionPageState extends State<SessionPage> {
     final s = t.current;
     if (s != null) {
       final i = s.items.indexWhere((e) => !e.skipped && !e.complete);
-      _idx = i < 0 ? s.items.length - 1 : i;
+      t.setFocusQuiet(i < 0 ? s.items.length - 1 : i);
     }
+    _watch = WearLink.main.commands.listen(_onWatch);
     TrainingDevice.keepOn(true);
     TrainingDevice.askNotify();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -70,10 +77,47 @@ class _SessionPageState extends State<SessionPage> {
 
   @override
   void dispose() {
+    _watch?.cancel();
     _timer?.cancel();
     _tick.dispose();
     TrainingDevice.keepOn(false);
     super.dispose();
+  }
+
+  /// Εντολή από το ρολόι: ίδια αποτελέσματα με τα πατήματα εδώ, χωρίς φύλλα ερωτήσεων (η ρεζέρβα έρχεται από το ρολόι).
+  void _onWatch(WatchCmd c) {
+    final s = t.current;
+    if (s == null || !mounted || (c.sid.isNotEmpty && c.sid != s.id)) return;
+    switch (c.op) {
+      case 'goto':
+        if (c.i >= 0 && c.i < s.items.length) setState(() => _idx = c.i);
+        return;
+      case 'rest':
+        c.v == 'plus' ? _restAdd(30) : _restStop();
+        return;
+    }
+    if (c.i < 0 || c.i >= s.items.length) return;
+    final e = s.items[c.i];
+    switch (c.op) {
+      case 'tick':
+        if (c.s < 0 || c.s >= e.log.length || e.log[c.s].done) return;
+        t.tick(e, c.s);
+        if (e.complete) {
+          final next = s.items.indexWhere((x) => !x.skipped && !x.complete);
+          if (next >= 0) {
+            setState(() => _idx = next);
+            _rest(e, exName(s.items[next].ex));
+          }
+        } else {
+          _rest(e, '${exName(e.ex)} · σετ ${e.done.length + 1}');
+        }
+      case 'rir':
+        final v = c.v;
+        if (v is num) t.answer(e, v.toInt().clamp(0, 4));
+      case 'reps':
+        final v = c.v;
+        if (v is num && c.s >= 0 && c.s < e.log.length) t.setReps(e, c.s, v.toInt());
+    }
   }
 
   void _rest(ExLog e, String next) {
@@ -101,7 +145,7 @@ class _SessionPageState extends State<SessionPage> {
       builder: (context, _) {
         final s = t.current;
         if (s == null) return const Scaffold(body: Center(child: Text('Δεν υπάρχει προπόνηση σε εξέλιξη.')));
-        if (_idx >= s.items.length) _idx = s.items.length - 1;
+        if (_idx >= s.items.length) t.setFocusQuiet(s.items.length - 1);
         final c = Aigaio.of(context);
         final e = s.items[_idx];
         return Scaffold(
@@ -133,7 +177,10 @@ class _SessionPageState extends State<SessionPage> {
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       SizedBox(
                         width: 320,
-                        child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 8, 24), children: [_list(context, s, vertical: true)]),
+                        child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 8, 24), children: [
+                          _hr(const EdgeInsets.only(bottom: 12)),
+                          _list(context, s, vertical: true),
+                        ]),
                       ),
                       Expanded(
                         child: Column(children: [
@@ -148,6 +195,7 @@ class _SessionPageState extends State<SessionPage> {
                 );
               }
               return Column(children: [
+                _hr(const EdgeInsets.fromLTRB(16, 8, 16, 0)),
                 SizedBox(height: 54, child: _list(context, s, vertical: false)),
                 Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: [card])),
                 if (rest != null) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 8), child: rest),
@@ -163,6 +211,16 @@ class _SessionPageState extends State<SessionPage> {
       },
     );
   }
+
+  /// Ζωντανοί παλμοί από το ρολόι· τίποτα όταν δεν έρχονται (χωρίς ρολόι ή εκτός καρπού).
+  Widget _hr(EdgeInsets pad) => ListenableBuilder(
+        listenable: Listenable.merge([WearLink.main.hr, _tick]),
+        builder: (context, _) {
+          final bpm = WearLink.main.bpmAt(DateTime.now());
+          if (bpm == null) return const SizedBox.shrink();
+          return Padding(padding: pad, child: HrBar(bpm: bpm, limit: t.hrLimit));
+        },
+      );
 
   static String _clock(Duration d) {
     final m = d.inMinutes, s = d.inSeconds % 60;
@@ -672,7 +730,13 @@ class _SummaryPageState extends State<SummaryPage> {
 
     final stats = AppCard(
       child: Row(children: [
-        for (final (v, l) in [('$mins′', 'διάρκεια'), ('${s.setsDone}', 'σετ'), (s.volume > 0 ? thousands(s.volume.round()) : '—', 'kg όγκος')])
+        for (final (v, l) in s.isCardio
+            ? [
+                ('${s.cardioMinutes ?? mins}′', 'διάρκεια'),
+                (s.meters == null ? '—' : (s.meters! / 1000).toStringAsFixed(2).replaceAll('.', ','), 'km'),
+                (s.steps == null ? '—' : thousands(s.steps!), 'βήματα'),
+              ]
+            : [('$mins′', 'διάρκεια'), ('${s.setsDone}', 'σετ'), (s.volume > 0 ? thousands(s.volume.round()) : '—', 'kg όγκος')])
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(v, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: c.text)),
@@ -725,6 +789,8 @@ class _SummaryPageState extends State<SummaryPage> {
       ]),
     );
 
+    final hrCard = s.hrMax == null ? null : HrCard(session: s, limit: t.hrLimit);
+
     final feel = AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('Πώς ένιωσες;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
@@ -748,7 +814,7 @@ class _SummaryPageState extends State<SummaryPage> {
       ]),
     );
 
-    final left = <Widget>[stats, done];
+    final left = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio) done];
     final right = <Widget>[if (next.isNotEmpty) nextCard, if (widget.live || s.feel != null) feel];
     return Scaffold(
       appBar: AppBar(
