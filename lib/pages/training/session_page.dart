@@ -578,7 +578,7 @@ class _SessionPageState extends State<SessionPage> {
                 ]),
               ),
               b('+30″', () => _restAdd(30), const ValueKey('rest-plus')),
-              b('Τέλος', _restStop, const ValueKey('rest-stop')),
+              b('Συνέχεια', _restStop, const ValueKey('rest-stop')),
             ]),
           ),
         );
@@ -683,6 +683,22 @@ class _SessionPageState extends State<SessionPage> {
         if (context.mounted) Navigator.of(context).pop();
       }
       return;
+    }
+    // Νωρίτερα από το πρόγραμμα: ερώτηση, για να μη γραφτεί κατά λάθος μισή προπόνηση (η πρόοδος βγαίνει από αυτή).
+    final total = s.items.where((e) => !e.skipped).fold<int>(0, (a, e) => a + e.sets);
+    if (s.setsDone < total) {
+      final end = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Τελείωσες νωρίτερα;'),
+          content: Text('Έγιναν ${s.setsDone} από $total σετ. Όσα δεν έγιναν δεν μετράνε στην πρόοδο.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Συνέχεια προπόνησης')),
+            TextButton(key: const ValueKey('sess-finish-ok'), onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Τέλος')),
+          ],
+        ),
+      );
+      if (end != true || !context.mounted) return;
     }
     _restStop();
     if (!context.mounted) return;
@@ -822,7 +838,9 @@ class _SummaryPageState extends State<SummaryPage> {
     final right = <Widget>[if (next.isNotEmpty) nextCard, if (widget.live || s.feel != null) feel];
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.live ? 'Μπράβο, τελείωσες' : '${shortDayDate(s.start)} · ${s.name}'),
+        title: Text(widget.live
+            ? (s.items.every((e) => e.skipped || e.complete) ? 'Μπράβο, τελείωσες' : 'Η προπόνηση σταμάτησε')
+            : '${shortDayDate(s.start)} · ${s.name}'),
         automaticallyImplyLeading: !widget.live,
       ),
       body: SafeArea(
@@ -853,16 +871,28 @@ class _SummaryPageState extends State<SummaryPage> {
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: FilledButton(
-                  key: const ValueKey('summary-save'),
-                  style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
-                  onPressed: () {
-                    t.finish(feel: _feel);
-                    TrainingDevice.restCancel();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Αποθήκευση', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
+                child: Row(children: [
+                  // Πίσω στην προπόνηση (αν πατήθηκε «Τέλος» κατά λάθος): τίποτα δεν έχει γραφτεί ακόμα ως τελειωμένο.
+                  OutlinedButton(
+                    key: const ValueKey('summary-back'),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+                    onPressed: () => Navigator.of(context).pushReplacement(SessionPage.route(t)),
+                    child: const Text('Πίσω'),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('summary-save'),
+                      style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
+                      onPressed: () {
+                        t.finish(feel: _feel);
+                        TrainingDevice.restCancel();
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text('Αποθήκευση', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ]),
               ),
             ),
     );

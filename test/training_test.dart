@@ -409,6 +409,10 @@ void main() {
       expect(store.current!.items.first.rirAnswer, 2);
       await tapKey(tester, 'sess-finish');
       await tester.pumpAndSettle();
+      // μόνο η 1η άσκηση: ερώτηση πριν από το τέλος
+      expect(find.text('Τελείωσες νωρίτερα;'), findsOneWidget);
+      await tapKey(tester, 'sess-finish-ok');
+      await tester.pumpAndSettle();
       expect(find.byType(SummaryPage), findsOneWidget);
       await tapKey(tester, 'summary-save');
       await tester.pumpAndSettle();

@@ -620,6 +620,7 @@ void main() {
   testWidgets('Προπόνηση · τέλος', (t) => trainShot(t, 'T8_summary', phone, Brightness.light, act: (t) async {
         await firstExerciseDone(t);
         await tapKey(t, 'sess-finish');
+        await tapKey(t, 'sess-finish-ok');
       }));
   // Ρολόι (8/11): ζωντανοί παλμοί στην προπόνηση, παλμοί στη σύνοψη, περπάτημα ζωντανά από το ρολόι.
   testWidgets('Προπόνηση · παλμοί από το ρολόι', (t) async {

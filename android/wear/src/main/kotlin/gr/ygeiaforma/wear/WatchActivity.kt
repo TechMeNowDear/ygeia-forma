@@ -21,6 +21,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     private var pending: (() -> Unit)? = null
     private var joinWhenReady = false
     private var finishArmedUntil = 0L
+    private var skipArmedUntil = 0L
     private var visible = false
 
     private val redraw: () -> Unit = {
@@ -218,6 +219,16 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun nextExercise() {
         val s = Repo.session ?: return
+        // Δύο πατήματα (έλεγχος 8/11, UX-05): ένα τυχαίο άγγιγμα στο όνομα δεν αλλάζει άσκηση.
+        val now = System.currentTimeMillis()
+        if (now > skipArmedUntil) {
+            skipArmedUntil = now + 3000
+            Repo.notice = SKIP_NOTICE
+            view.postDelayed({ if (Repo.notice == SKIP_NOTICE) { Repo.notice = null; view.invalidate() } }, 3000)
+            return
+        }
+        skipArmedUntil = 0
+        Repo.notice = null
         s.skip()
         if (s.phone) cmd(JSONObject().put("op", "goto").put("i", s.idx))
         Repo.screen = Repo.Screen.SET
@@ -310,3 +321,5 @@ class WatchActivity : Activity(), WatchView.Actions {
         Repo.screen = Repo.Screen.HOME
     }
 }
+
+private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
