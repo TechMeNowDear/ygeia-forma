@@ -143,7 +143,7 @@ class _TrainingPageState extends State<TrainingPage> {
                     : 'Τα βάρη περιμένουν τον καρδιολόγο';
     final text = symptom
         ? 'Στις ${t.lockedAt == null ? '' : dayMonth(t.lockedAt!)} κατέγραψες ${why == 'red' ? 'σοβαρό σύμπτωμα' : 'σύμπτωμα για δεύτερη φορά μέσα σε 14 μέρες'}. '
-            'Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε γρήγορο περπάτημα (και το ρολόι δεν ξεκινά). '
+            'Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε περπάτημα για άσκηση (και το ρολόι δεν ξεκινά). '
             'Αν δεν σε έχει δει ακόμα, πάρε σήμερα τον καρδιολόγο σου. Αν ξανασυμβεί ή χειροτερέψει: 166.'
         : why == 'meds'
             ? 'Ανοίγει ξανά όταν ο γιατρός πει ότι το φάρμακο δεν αλλάζει την άσκηση (ή δώσει νέο όριο παλμών).'
@@ -306,7 +306,7 @@ class _TrainingPageState extends State<TrainingPage> {
     final parts = <String>[];
     for (final i in w.items) {
       final k = i.kind;
-      final tool = switch (k) { LoadKind.dbPair || LoadKind.db => 'db', LoadKind.bar => 'bar', LoadKind.kb => 'kb', _ => '' };
+      final tool = switch (k) { LoadKind.dbPair || LoadKind.db => 'db', LoadKind.bar => 'bar', LoadKind.kb => 'kb', LoadKind.bandPair => 'bands', _ => '' };
       if (tool.isEmpty || !seen.add(tool)) continue;
       parts.add(setupText(k, t.targetFor(i).load));
     }

@@ -213,6 +213,9 @@ class TrainingStore extends ChangeNotifier {
   void waitForTests({String? notes}) {
     approved = false;
     waitingTests = true;
+    // Ο γιατρός σε είδε: όχι πια «μέχρι να σε δει γιατρός» (έλεγχος #2). Τα βάρη μένουν κλειδωμένα.
+    lockReason = null;
+    lockedAt = null;
     if (notes != null && notes.isNotEmpty) limits = notes;
     save();
   }
@@ -316,6 +319,21 @@ class TrainingStore extends ChangeNotifier {
     return null;
   }
 
+  /// Ως πότε θέλει «Πώς είσαι σήμερα;» (για το ρολόι, που δεν πρέπει να το ξεχνά τα μεσάνυχτα· έλεγχος #2).
+  DateTime? get checkUntil {
+    if (!approved) return null;
+    DateTime? end;
+    void take(DateTime d) {
+      if (end == null || d.isAfter(end!)) end = d;
+    }
+
+    if (approvedAt != null) take(approvedAt!.add(const Duration(days: 28)));
+    for (final x in symptoms) {
+      take(x.at.add(const Duration(days: 14)));
+    }
+    return end != null && end!.isAfter(now) ? end : null;
+  }
+
   /// Ερώτηση «Πώς είσαι σήμερα;» πριν από την προπόνηση: τις πρώτες 4 εβδομάδες μετά την έγκριση
   /// και για 14 μέρες μετά από κάθε σύμπτωμα.
   bool get needsCheck {
@@ -385,7 +403,7 @@ class TrainingStore extends ChangeNotifier {
       sets: item.sets,
       lo: item.lo,
       hi: item.hi,
-      rir: item.rir,
+      rir: item.rir < 2 ? 2 : item.rir,
       rest: item.rest,
       log: [for (final r in t.reps) SetLog(load: t.load, reps: r)],
       reason: t.reason,
@@ -482,7 +500,10 @@ class TrainingStore extends ChangeNotifier {
       hrMax: hrMax,
       hr: samples,
       source: 'watch',
+      // «Σταμάτησα» στο ρολόι: διακοπή από σύμπτωμα, όχι για την πρόοδο (έλεγχος #2).
+      stopped: j['stop'] == 1,
     );
+    if (s.stopped) s.note = 'Σταμάτησε: «Σταμάτησα» στο ρολόι';
     _watchHrInfo(s, j);
     if (cardio != null) {
       final sec = (cardio['sec'] as num?)?.toInt() ?? end.difference(start).inSeconds;
@@ -747,8 +768,11 @@ class TrainingStore extends ChangeNotifier {
     sessions.sort((a, b) => a.start.compareTo(b.start));
     final syms = {for (final x in symptoms) '${x.at.millisecondsSinceEpoch}|${x.code}'};
     for (final x in other.symptoms) {
+      // Ένα «Νιώθω κάτι» του ρολογιού που έχει ήδη απαντηθεί εδώ δεν ξαναγίνεται εκκρεμότητα.
+      if (x.code == watchCode && x.at.millisecondsSinceEpoch <= watchSeenAt) continue;
       if (syms.add('${x.at.millisecondsSinceEpoch}|${x.code}')) symptoms.add(x);
     }
+    if (other.watchSeenAt > watchSeenAt) watchSeenAt = other.watchSeenAt;
     symptoms.sort((a, b) => a.at.compareTo(b.at));
     save();
     return added;

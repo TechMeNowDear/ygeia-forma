@@ -50,6 +50,18 @@ object Repo {
     /** Πότε πατήθηκε «Σταμάτησα» (ms, 0 = ποτέ). Μένει και μετά από επανεκκίνηση, ώσπου να το δει το κινητό. */
     var symHoldAt = 0L
 
+    /** «Σταμάτησα» στη μέση της άσκησης: το αποτέλεσμα γράφεται ως διακοπή από σύμπτωμα (όχι για την πρόοδο). */
+    var stopSym = false
+
+    /**
+     * Αισθητήρας που στέλνει μόνο αλλαγές, με επαφή και ίδια τιμή: οι παλμοί είναι σταθεροί, όχι χαμένοι, ως αυτή
+     * την ώρα (ms). Μόνο για την ένδειξη και την ειδοποίηση· ποτέ ως τιμή προς το κινητό (έλεγχος #2).
+     */
+    var steadyUntil = 0L
+
+    /** Παλμοί που ισχύουν τώρα (φρέσκια τιμή ή σταθεροί από τον αισθητήρα). */
+    fun hrLive(now: Long): Boolean = bpmFresh(now) || (bpm > 0 && now < steadyUntil)
+
     /** Τι δεν ξεκινά τώρα: δες [holdOf]. */
     fun hold(): String? = holdOf(plan, symHoldAt, java.time.LocalDate.now().toString())
 
@@ -141,6 +153,7 @@ object Repo {
         activeSec = 0
         gps = false
         alarmMutedUntil = 0
+        steadyUntil = 0
     }
 
     // ------------------------------------------------------------------ αντίγραφο ασφαλείας
@@ -158,6 +171,20 @@ object Repo {
         symHoldAt = at
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(HOLD, at).apply()
     }
+
+    // «Σταμάτησα» που δεν έφτασε ακόμα στο κινητό: κρατιέται και ξαναστέλνεται (έλεγχος #2, B1).
+    private const val SYM = "pendingSym"
+
+    fun keepSym(ctx: Context, json: JSONObject?) {
+        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        if (json == null) p.remove(SYM) else p.putString(SYM, json.toString())
+        p.apply()
+    }
+
+    fun pendingSym(ctx: Context): JSONObject? =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYM, null)?.let {
+            try { JSONObject(it) } catch (_: Exception) { null }
+        }
 
     fun snapshot(ctx: Context, json: JSONObject?) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

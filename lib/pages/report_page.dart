@@ -77,7 +77,8 @@ class _ReportPageState extends State<ReportPage> {
       if (mounted) setState(() {});
     });
     // Αν το Samsung Health δεν απαντήσει, το PDF βγαίνει χωρίς αυτά (το γράφει), όχι κουμπί κλειδωμένο για πάντα.
-    SamsungHealth.medical()
+    // Από την αρχή της αναφοράς ως σήμερα (φιλτράρεται στο διάστημά της στη σελίδα 4).
+    SamsungHealth.medical(days: DateTime.now().difference(_data.from).inDays + 1)
         .timeout(const Duration(seconds: 12), onTimeout: () => {'ok': false, 'message': 'δεν απάντησε εγκαίρως'})
         .then((m) {
       if (mounted) setState(() => _medical = m);
@@ -1006,6 +1007,9 @@ class _PageFour extends StatelessWidget {
     final c = Aigaio.light;
     final t = training;
     final from = data.from;
+    // Ως το τέλος της τελευταίας μέρας της αναφοράς: μια αναφορά για παλιό διάστημα δεν δείχνει μεταγενέστερα.
+    final end = DateTime(data.to.year, data.to.month, data.to.day + 1);
+    bool inside(DateTime d) => !d.isBefore(from) && d.isBefore(end);
     final small = TextStyle(fontSize: 8.6, color: c.textSecondary, height: 1.35);
     final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
     final cell = TextStyle(fontSize: 9, color: c.text, fontFeatures: tabular, height: 1.3);
@@ -1039,13 +1043,13 @@ class _PageFour extends StatelessWidget {
 
     final syms = [
       for (final x in t.symptoms.reversed)
-        if (!x.at.isBefore(from)) x,
+        if (inside(x.at)) x,
     ];
     final shownSyms = syms.take(12).toList();
 
     final sess = [
       for (final s in t.sessions.reversed)
-        if (s.finished && !s.start.isBefore(from)) s,
+        if (s.finished && inside(s.start)) s,
     ];
     final shownSess = sess.take(14).toList();
     final walks = sess.where((s) => s.isCardio).length;
@@ -1087,7 +1091,10 @@ class _PageFour extends StatelessWidget {
     Widget samsung(String key, String title) {
       final o = (types?[key] as Map?)?.cast<String, dynamic>();
       final st = o?['state'] as String?;
-      final items = [for (final i in (o?['items'] as List? ?? const [])) (i as Map).cast<String, dynamic>()];
+      final items = [
+        for (final i in (o?['items'] as List? ?? const []))
+          if (DateTime.tryParse((i as Map)['t'] as String? ?? '') case final d? when inside(d)) i.cast<String, dynamic>(),
+      ];
       final String? line = med == null
           ? 'Διαβάζεται…'
           : med['ok'] != true
@@ -1096,8 +1103,8 @@ class _PageFour extends StatelessWidget {
                   'no_permission' => 'Δεν έχει δοθεί άδεια στην εφαρμογή.',
                   'unsupported' => 'Δεν υποστηρίζεται σε αυτή την έκδοση του Samsung Health.',
                   'error' => 'Δεν διαβάστηκε (σφάλμα).',
-                  'empty' => 'Καμία καταγραφή στις ${med['days'] ?? 120} μέρες.',
-                  _ => null,
+                  'empty' => 'Καμία καταγραφή στο διάστημα της αναφοράς.',
+                  _ => items.isEmpty ? 'Καμία καταγραφή στο διάστημα της αναφοράς.' : null,
                 };
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(

@@ -191,8 +191,13 @@ class ProtocolTest {
         assertEquals("lock", holdOf(plan(",\"hold\":\"lock\""), 0, "2026-11-20"))
         // «σήμερα» και «check» λήγουν την άλλη μέρα
         assertEquals("today", holdOf(plan(",\"hold\":\"today\""), 0, today))
-        assertEquals(null, holdOf(plan(",\"hold\":\"today\""), 0, "2026-11-09"))
+        // χθεσινό «today» χωρίς νέο πρόγραμμα: τουλάχιστον «Πώς είσαι σήμερα;» στο κινητό, όχι ελεύθερο
+        assertEquals("check", holdOf(plan(",\"hold\":\"today\""), 0, "2026-11-09"))
+        // «check» με ημερομηνία λήξης: ισχύει και τις επόμενες μέρες, ως τη λήξη
+        assertEquals("check", holdOf(plan(",\"checkUntil\":5000"), 0, "2026-11-12", 4000))
+        assertEquals(null, holdOf(plan(",\"checkUntil\":5000"), 0, "2026-11-12", 6000))
         assertEquals("check", holdOf(plan(",\"hold\":\"check\""), 0, today))
+        assertEquals(null, holdOf(plan(",\"hold\":\"check\""), 0, "2026-11-09", 0))
         assertTrue(holdsAll("lock") && holdsAll("pending") && holdsAll("today"))
         assertTrue(!holdsAll("check") && !holdsAll(null))
     }

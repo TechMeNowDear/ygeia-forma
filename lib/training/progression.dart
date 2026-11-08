@@ -95,7 +95,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   }
 
   final (lastDay, last) = usable.first;
-  final lastLoad = last.workLoad ?? (hasLoad(k) ? (item.load ?? defaultStart(k)) : null);
+  var lastLoad = last.workLoad ?? (hasLoad(k) ? (item.load ?? defaultStart(k)) : null);
+  // Ανοίγματα με λάστιχο, από πριν το «ανά πλευρά» (π.χ. 20): στο πλησιέστερο που βγαίνει (ελάχιστο 30/πλευρά).
+  if (k == LoadKind.bandPair && lastLoad != null) lastLoad = snap(k, lastLoad);
   final done = last.done;
   final gap = DateTime(today.year, today.month, today.day).difference(DateTime(lastDay.year, lastDay.month, lastDay.day)).inDays;
 
@@ -150,7 +152,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       change: Change.hold,
       reason: k == LoadKind.bar
           ? 'Μπάρα χωρίς βραχίονες ασφαλείας: έμεινες με $ra ρεζέρβα. Ίδια κιλά, κράτα 2 ή περισσότερες.'
-          : 'Έμεινες με $ra ρεζέρβα. Ίδια κιλά, και σταμάτα το σετ όταν σου μένουν 2: έτσι η πίεση δεν ανεβαίνει απότομα.',
+          : 'Έμεινες με $ra ρεζέρβα. ${usesKg(k) ? 'Ίδια κιλά' : 'Ίδιο φορτίο'}, και σταμάτα το σετ όταν σου μένουν 2: έτσι η πίεση '
+              'δεν ανεβαίνει απότομα.',
     );
   }
 

@@ -70,6 +70,8 @@ class Plan(
     val hold: String? = null,
     /** Το πιο πρόσφατο «Νιώθω κάτι» του ρολογιού που έφτασε στο κινητό (ms). */
     val symSeen: Long = 0,
+    /** Ως πότε (ms) τα βάρη θέλουν «Πώς είσαι σήμερα;» στο κινητό· δεν λήγει τα μεσάνυχτα (έλεγχος #2). */
+    val checkUntil: Long = 0,
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
 
@@ -94,6 +96,7 @@ class Plan(
                 } ?: emptyMap(),
                 hold = j.optStringOrNull("hold"),
                 symSeen = j.optLong("symSeen", 0),
+                checkUntil = j.optLong("checkUntil", 0),
             )
         } catch (_: Exception) {
             null
@@ -419,13 +422,18 @@ fun pace(meters: Double, sec: Long): String {
  * μένει παύση ώσπου το κινητό να το δει ([Plan.symSeen]). «today» ισχύει μόνο για τη μέρα του προγράμματος ([today],
  * «2026-11-08»). Επιστρέφει «lock» | «pending» | «today» | «check» | null.
  */
-fun holdOf(plan: Plan?, symHoldAt: Long, today: String): String? {
+fun holdOf(plan: Plan?, symHoldAt: Long, today: String, nowMs: Long = System.currentTimeMillis()): String? {
     if (plan?.hold == "lock") return "lock"
     if (symHoldAt > 0 && symHoldAt > (plan?.symSeen ?: 0L)) return "pending"
-    val h = plan?.hold ?: return null
-    val day = plan?.day
-    if ((h == "today" || h == "check") && day != null && day != today) return null
-    return h
+    val h = plan?.hold
+    val sameDay = plan?.day == null || plan.day == today
+    if (h == "today" && sameDay) return "today"
+    // Τα βάρη θέλουν «Πώς είσαι σήμερα;» ως το [Plan.checkUntil]: και αν το κινητό δεν άνοιξε σήμερα.
+    if (plan != null && plan.checkUntil > nowMs) return "check"
+    if (h == "check" && sameDay) return "check"
+    // Χθεσινό «today» χωρίς ενημέρωση από το κινητό: τουλάχιστον «Πώς είσαι σήμερα;» πριν από βάρη.
+    if (h == "today") return "check"
+    return null
 }
 
 /** Καμία άσκηση (ούτε περπάτημα) ξεκινά από το ρολόι. */

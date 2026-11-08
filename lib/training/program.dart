@@ -278,9 +278,12 @@ List<String> _warnings(Program p) {
   final w = <String>[];
   for (final wo in p.workouts) {
     for (final i in wo.items) {
-      if (i.kind == LoadKind.bar && i.rir < 2) {
+      // Ρεζέρβα τουλάχιστον 2 σε όλες τις ασκήσεις, ως να πει άλλα ο καρδιολόγος (έλεγχος #2).
+      if (i.rir < 2) {
         i.rir = 2;
-        w.add('Μπάρα χωρίς βραχίονες ασφαλείας: η ρεζέρβα στο «${i.ex}» έγινε 2.');
+        w.add(i.kind == LoadKind.bar
+            ? 'Μπάρα χωρίς βραχίονες ασφαλείας: η ρεζέρβα στο «${i.ex}» έγινε 2.'
+            : 'Ρεζέρβα τουλάχιστον 2 (για την πίεση, ως να πει άλλα ο καρδιολόγος): στο «${i.ex}» έγινε 2.');
       }
       if (i.load != null && hasLoad(i.kind)) {
         final s = snap(i.kind, i.load!);

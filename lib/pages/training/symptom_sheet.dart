@@ -48,7 +48,8 @@ Future<SymptomOutcome> feelSomething(BuildContext context, TrainingStore t, {Str
   final out = t.reportSymptoms(picked, where: where);
   if (out == SymptomOutcome.none || !context.mounted) return out;
   final red = picked.any((c) => symptomDef(c)?.red ?? false);
-  await Navigator.of(context).push(SymptomResultPage.route(red: red, escalated: !red && out == SymptomOutcome.red, callNow: callNow));
+  await Navigator.of(context)
+      .push(SymptomResultPage.route(red: red, escalated: !red && out == SymptomOutcome.red, callNow: callNow, chest: picked.contains('chest')));
   return out;
 }
 
@@ -139,16 +140,20 @@ class _SymptomPickerState extends State<_SymptomPicker> {
 
 /// Τι κάνεις τώρα: κόκκινο (166) ή πορτοκαλί (σταματάς για σήμερα).
 class SymptomResultPage extends StatelessWidget {
-  const SymptomResultPage({super.key, required this.red, this.escalated = false, this.callNow = false});
+  const SymptomResultPage({super.key, required this.red, this.escalated = false, this.callNow = false, this.chest = false});
   final bool red;
+
+  /// Πόνος στο στήθος: οδηγίες για τον πόνο (απλώνεται, ήρθε σε ηρεμία)· αλλιώς γενικές.
+  final bool chest;
 
   /// Δεύτερο πορτοκαλί μέσα σε 14 μέρες: κλειδώνει όπως το κόκκινο, αλλά χωρίς «166 τώρα».
   final bool escalated;
   final bool callNow;
 
-  static Route<void> route({required bool red, bool escalated = false, bool callNow = false}) => MaterialPageRoute<void>(
+  static Route<void> route({required bool red, bool escalated = false, bool callNow = false, bool chest = false}) =>
+      MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'Σύμπτωμα'),
-        builder: (_) => SymptomResultPage(red: red, escalated: escalated, callNow: callNow),
+        builder: (_) => SymptomResultPage(red: red, escalated: escalated, callNow: callNow, chest: chest),
       );
 
   @override
@@ -159,8 +164,11 @@ class SymptomResultPage extends StatelessWidget {
     final body = red
         ? (callNow
             ? 'Πάρε τώρα το 166. Μην περιμένεις να περάσει.'
-            : 'Πάρε τώρα το 166 αν δεν περάσει μέσα σε 5 λεπτά ξεκούρασης, αν ξαναέρθει, αν ήρθε ενώ καθόσουν, '
-                'αν απλώνεται σε χέρι, σαγόνι ή πλάτη, ή αν έχεις κρύο ιδρώτα, ναυτία, ζάλη ή λαχάνιασμα.')
+            : chest
+                ? 'Πάρε τώρα το 166 αν δεν περάσει μέσα σε 5 λεπτά ξεκούρασης, αν ξαναέρθει, αν ήρθε ενώ καθόσουν, '
+                    'αν απλώνεται σε χέρι, σαγόνι ή πλάτη, ή αν έχεις κρύο ιδρώτα, ναυτία, ζάλη ή λαχάνιασμα.'
+                : 'Πάρε τώρα το 166 αν δεν περάσει μέσα σε 5 λεπτά ξεκούρασης, αν ξαναέρθει, αν χειροτερεύει, ή αν έρθει '
+                    'πόνος στο στήθος ή λιποθυμία.')
         : escalated
             ? 'Γράφτηκε. Είναι η δεύτερη φορά μέσα σε 14 μέρες, γι’ αυτό η άσκηση κλείδωσε μέχρι να σε δει γιατρός. '
                 'Αν χειροτερέψει ή εμφανιστεί κάτι σοβαρό: 166.'
@@ -191,7 +199,7 @@ class SymptomResultPage extends StatelessWidget {
               ],
               if (red || escalated) ...[
                 const SizedBox(height: 10),
-                Text('Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε γρήγορο περπάτημα. Η προπόνηση κλείδωσε, και στο ρολόι.',
+                Text('Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε περπάτημα για άσκηση. Η προπόνηση κλείδωσε, και στο ρολόι.',
                     style: TextStyle(fontSize: 15, height: 1.4, color: c.textSecondary)),
               ],
               const SizedBox(height: 24),
@@ -331,10 +339,19 @@ Color onBad(Aigaio c) {
 Future<void> dialEmergency(BuildContext context, String number) async {
   final ok = await TrainingDevice.dial(number);
   if (ok || !context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text('Δεν άνοιξε η κλήση σε αυτή τη συσκευή. Κάλεσε το $number από το κινητό σου.'),
-    duration: const Duration(seconds: 8),
-  ));
+  // Παράθυρο (όχι μήνυμα κάτω): φαίνεται και πάνω από το φύλλο «Τι νιώθεις;» (έλεγχος #2).
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Η κλήση δεν άνοιξε εδώ'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Κάλεσε από το κινητό σου:'),
+        const SizedBox(height: 8),
+        Text(number, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Εντάξει'))],
+    ),
+  );
 }
 
 /// Το κουμπί «Κλήση 166». [strong]: μεγάλο, γεμάτο κόκκινο· αλλιώς περίγραμμα.

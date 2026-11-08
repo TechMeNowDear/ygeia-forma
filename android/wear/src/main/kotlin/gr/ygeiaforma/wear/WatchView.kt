@@ -35,6 +35,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         fun finish()
         fun muteAlarm()
         fun doneOk()
+        fun clearHold()
         fun feel()
         fun feelBack()
         fun feelStop()
@@ -139,7 +140,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     }
 
     private fun heart(c: Canvas, y: Float, now: Long, size: Float = 12f) {
-        val fresh = Repo.bpmFresh(now)
+        val fresh = Repo.hrLive(now)
         val over = fresh && Repo.alarm.limit != null && Repo.bpm >= Repo.alarm.limit!!
         if (!fresh && Repo.running != null) {
             // Δεν φτάνουν τιμές: να φαίνεται, όχι μια παύλα που μοιάζει με «όλα καλά».
@@ -171,34 +172,18 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun drawHome(c: Canvas) {
         val plan = Repo.plan
         val phone = Repo.phone
+        // Μετά από σύμπτωμα: καμία άσκηση από το ρολόι, ούτε περπάτημα, ούτε «Παλμοί εδώ» (έλεγχος #2, U2-04).
+        val hold = Repo.hold()
+        if (holdsAll(hold)) {
+            drawHold(c, hold)
+            return
+        }
         if (phone != null && !phone.ended) {
             small(c, "ΣΤΟ ΚΙΝΗΤΟ", 52f, gray, 9f, 120f)
             t(c, phone.name, 74f, Color.WHITE, 15f, true)
             small(c, "${phone.setsDone} σετ ως τώρα", 92f, gray, 9f, 130f)
             pill(c, "Παλμοί εδώ", 122f, 96f, 30f, orange, Color.WHITE) { actions.joinPhone() }
             small(c, "και ✓ στον καρπό", 150f, gray, 9f, 120f)
-            return
-        }
-        // Μετά από σύμπτωμα: καμία άσκηση από το ρολόι, ούτε περπάτημα (έλεγχος #2, U2-04).
-        val hold = Repo.hold()
-        if (holdsAll(hold)) {
-            small(c, "ΧΩΡΙΣ ΑΣΚΗΣΗ", 50f, Color.parseColor("#F87171"), 9f, 120f)
-            when (hold) {
-                "pending" -> {
-                    t(c, "Πες στο κινητό", 74f, Color.WHITE, 13f, true)
-                    t(c, "τι ένιωσες", 90f, Color.WHITE, 13f, true)
-                }
-                "today" -> {
-                    t(c, "Σήμερα όχι,", 74f, Color.WHITE, 13f, true)
-                    t(c, "μετά από σύμπτωμα", 90f, Color.WHITE, 12f, true)
-                }
-                else -> {
-                    t(c, "μέχρι να σε δει", 74f, Color.WHITE, 13f, true)
-                    t(c, "γιατρός", 90f, Color.WHITE, 13f, true)
-                }
-            }
-            small(c, "Αν δεν περνά ή ξαναέρθει: 166", 116f, Color.parseColor("#FCA5A5"), 9f, 150f)
-            feelLink(c, 150f)
             return
         }
         if (plan?.approved == true) {
@@ -327,6 +312,42 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         pillAt(c, "+30″", 76f, 164f, 40f, 24f, card, Color.WHITE, 10f) { actions.restPlus() }
         pillAt(c, "Πάμε", 124f, 164f, 40f, 24f, Color.WHITE, Color.BLACK, 10f) { actions.restStop() }
         feelLink(c, 186f)
+    }
+
+    /** Παύση μετά από σύμπτωμα. Στο «pending» και ένα κρυφό ξεκλείδωμα με δύο πατήματα (αν δεν υπάρχει κινητό). */
+    private var unlockAsk = 0L
+
+    private fun drawHold(c: Canvas, hold: String?) {
+        small(c, "ΧΩΡΙΣ ΑΣΚΗΣΗ", 50f, Color.parseColor("#F87171"), 9f, 120f)
+        when (hold) {
+            "pending" -> {
+                t(c, "Πες στο κινητό", 74f, Color.WHITE, 13f, true)
+                t(c, "τι ένιωσες", 90f, Color.WHITE, 13f, true)
+            }
+            "today" -> {
+                t(c, "Σήμερα όχι,", 74f, Color.WHITE, 13f, true)
+                t(c, "μετά από σύμπτωμα", 90f, Color.WHITE, 12f, true)
+            }
+            else -> {
+                t(c, "μέχρι να σε δει", 74f, Color.WHITE, 13f, true)
+                t(c, "γιατρός", 90f, Color.WHITE, 13f, true)
+            }
+        }
+        small(c, "Αν δεν περνά ή ξαναέρθει: 166", 116f, Color.parseColor("#FCA5A5"), 9f, 150f)
+        feelLink(c, 140f)
+        if (hold == "pending") {
+            val asking = System.currentTimeMillis() - unlockAsk < 5_000
+            small(c, if (asking) "Πάτα ξανά: ξεκλείδωμα" else "Χωρίς κινητό; ξεκλείδωμα", 164f, if (asking) Color.WHITE else gray, 8f, 120f)
+            hits.add(Hit(RectF(cx - 55 * u, 155 * u, cx + 55 * u, 174 * u)) {
+                if (System.currentTimeMillis() - unlockAsk < 5_000) {
+                    unlockAsk = 0
+                    actions.clearHold()
+                } else {
+                    unlockAsk = System.currentTimeMillis()
+                    invalidate()
+                }
+            })
+        }
     }
 
     /** «Νιώθω κάτι» στο κάτω μέρος της οθόνης. */

@@ -24,7 +24,7 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
       'rest': i.rest,
       'lo': i.lo,
       'hi': i.hi,
-      'rir': i.rir,
+      'rir': i.rir < 2 ? 2 : i.rir,
       'sets': [
         for (final r in tg.reps)
           {
@@ -43,6 +43,7 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     // Τι επιτρέπει το ρολόι μετά από σύμπτωμα ή πριν τον έλεγχο «Πώς είσαι σήμερα;» (έλεγχος #2).
     if (t.watchHold != null) 'hold': t.watchHold,
     if (t.watchSeenAt > 0) 'symSeen': t.watchSeenAt,
+    if (t.checkUntil != null) 'checkUntil': t.checkUntil!.millisecondsSinceEpoch,
     if (p?.forDay(now) != null) 'today': p!.forDay(now)!.id,
     // Οι μέρες, για να βρίσκει το ρολόι μόνο του τη σημερινή (και αν το κινητό δεν άνοιξε σήμερα).
     if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},
@@ -306,7 +307,7 @@ class WearLink with WidgetsBindingObserver {
         if (e.complete) {
           final n = s.items.indexWhere((x) => !x.skipped && !x.complete);
           if (n >= 0) {
-            t.focus = n;
+            if (c.j['late'] != true) t.focus = n;
             next = _name(s.items[n].ex);
           }
         } else {

@@ -131,6 +131,7 @@ class ExerciseService : Service() {
             return
         }
         Repo.resetExercise()
+        Repo.stopSym = false
         Repo.running = kind
         Repo.runningPhone = phone
         Repo.startedAt = now
@@ -318,19 +319,21 @@ class ExerciseService : Service() {
                 }
             }
             // Εφεδρεία αισθητήρα με επαφή και ίδια τιμή: οι παλμοί είναι απλώς σταθεροί, όχι χαμένοι (ως 2′).
+            // Μόνο για ένδειξη/ειδοποίηση· δεν γίνεται «τιμή» προς το κινητό (έλεγχος #2).
             val sn = sensor
-            if (sn != null && sn.contact && sn.last > 0 && Repo.bpm == sn.last && now - sn.lastAt <= 120_000L && !Repo.bpmFresh(now)) {
-                Repo.bpmAt = now
-            }
-            val fresh = Repo.bpmFresh(now)
+            Repo.steadyUntil = if (sn != null && sn.contact && sn.last > 0 && Repo.bpm == sn.last) sn.lastAt + 120_000L else 0L
+            val fresh = Repo.hrLive(now)
             // Εφεδρεία αισθητήρα: στέλνει μόνο αλλαγές· σταθεροί παλμοί πάνω από το όριο μετρούν κι αυτοί (W2-02).
             if (sensor != null && fresh && Repo.alarm.steady(Repo.bpm, now)) onAlarm(Repo.bpm)
-            // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2).
+            // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2):
+            // στο περπάτημα μετά από 15″, στα βάρη μετά από 45″ (ο καρπός που λυγίζει κόβει συχνά για λίγο). Τρεις
+            // σύντομες, για να μη μοιάζει με το τέλος του διαλείμματος (δύο μεγαλύτερες).
+            val lostAfter = if (Repo.running == "walk") 15_000L else 45_000L
             if (fresh) {
                 lostBuzzed = false
-            } else if (Repo.alarm.limit != null && Repo.bpmAt > 0 && !lostBuzzed) {
+            } else if (Repo.alarm.limit != null && Repo.bpmAt > 0 && now - maxOf(Repo.bpmAt, Repo.steadyUntil) >= lostAfter && !lostBuzzed) {
                 lostBuzzed = true
-                vibrate(longArrayOf(0, 120, 120, 120))
+                vibrate(longArrayOf(0, 70, 90, 70, 90, 70))
             }
             // Η προπόνηση του κινητού έκλεισε εκεί: τέλος και εδώ.
             if (Repo.runningPhone && Repo.phone == null && Repo.local == null) {
@@ -435,6 +438,9 @@ class ExerciseService : Service() {
         }
         // Για τον έλεγχο στη συσκευή: πώς ήρθαν οι παλμοί και το μεγαλύτερο κενό (φαίνεται στη σύνοψη του κινητού).
         if (result != null && Repo.hrMode.isNotEmpty()) result.second.put("hrMode", Repo.hrMode).put("hrGap", Repo.hrGaps.maxGapSec)
+        // «Σταμάτησα»: διακοπή από σύμπτωμα, όχι για την πρόοδο (έλεγχος #2).
+        if (result != null && Repo.stopSym) result.second.put("stop", 1)
+        Repo.stopSym = false
         if (result != null) {
             Repo.snapshot(this, result.second)
             if (Link.putResult(this, result.first, result.second)) Repo.snapshot(this, null)

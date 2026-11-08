@@ -693,7 +693,7 @@ void main() {
       }));
   testWidgets('Προπόνηση · ιστορικό συμπτωμάτων', (t) => trainShot(t, 'T20_symptom_history', open, Brightness.light,
       prep: (s) => s
-        ..reportSymptoms(['dizzy'], where: 'day')
+        ..reportSymptoms(['dizzyup'], where: 'day')
         ..reportSymptoms(['chest', 'sweat'], where: 'session')));
   testWidgets('Σήμερα · μετά από σοβαρό σύμπτωμα', (t) async {
     final prev = TrainingStore.main;
@@ -726,7 +726,7 @@ void main() {
       [1260, 141],
     ]);
     tr
-      ..reportSymptoms(['dizzy'], where: 'day')
+      ..reportSymptoms(['dizzyup'], where: 'day')
       ..reportSymptoms(['chest', 'sweat'], where: 'session');
     TrainingStore.main = tr;
     await TrainingStore.main.load();

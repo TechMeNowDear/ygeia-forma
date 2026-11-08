@@ -17,7 +17,8 @@ class SymptomDef {
 
 // Έλεγχος #2 (8/11): ο πόνος στο στήθος μετρά και σε ηρεμία (AHA/ACC 2021, Gulati)· ζάλη στην προσπάθεια
 // κλειδώνει από την πρώτη φορά (Fletcher 2013)· νέα: λαχάνιασμα σε ηρεμία/ξαπλωμένος, πρήξιμο αστραγάλων.
-// Οι παλιοί κωδικοί μένουν ίδιοι (π.χ. 'dizzy' = ζάλη που περνά όταν κάτσω), για τις παλιές καταγραφές.
+// Οι παλιοί κωδικοί κρατούν το νόημά τους στις παλιές καταγραφές ([legacySymptoms]): η ορθοστατική ζάλη έχει νέο
+// κωδικό ('dizzyup'), ώστε το παλιό 'dizzy' να μη διαβάζεται διαφορετικά στο ιστορικό και στην αναφορά.
 const redSymptoms = [
   SymptomDef('chest', 'Πόνος, πίεση, βάρος ή σφίξιμο στο στήθος (ή σε λαιμό, σαγόνι, χέρι, πλάτη, στομάχι), στην προσπάθεια ή σε ηρεμία',
       red: true),
@@ -30,12 +31,17 @@ const redSymptoms = [
 ];
 
 const amberSymptoms = [
-  SymptomDef('dizzy', 'Ζάλη όταν σηκώνομαι, που περνά όταν κάτσω', red: false),
+  SymptomDef('dizzyup', 'Ζάλη όταν σηκώνομαι, που περνά όταν κάτσω', red: false),
   SymptomDef('nausea', 'Ναυτία', red: false),
   SymptomDef('sweat', 'Κρύος ιδρώτας χωρίς λόγο', red: false),
   SymptomDef('tired', 'Ασυνήθιστη κούραση', red: false),
-  SymptomDef('swell', 'Πρησμένοι αστράγαλοι, ή πάνω από 2 κιλά σε 3 μέρες', red: false),
+  SymptomDef('swell', 'Πρησμένοι αστράγαλοι, ή πήρα πάνω από 2 κιλά μέσα σε 3 μέρες', red: false),
   SymptomDef('other', 'Κάτι άλλο που με ανησυχεί', red: false),
+];
+
+/// Παλιοί κωδικοί που δεν προσφέρονται πια, αλλά διαβάζονται με το αρχικό τους κείμενο.
+const legacySymptoms = [
+  SymptomDef('dizzy', 'Ζάλη που περνά όταν κάτσω', red: false),
 ];
 
 /// «166 τώρα»: ένα σύμπτωμα που το θέλει μόνο του, ή στήθος/ταχυπαλμία μαζί με ό,τι δείχνει οξύ επεισόδιο
@@ -43,8 +49,8 @@ const amberSymptoms = [
 bool callNowFor(Iterable<String> codes) {
   final s = codes.toSet();
   if (s.any((c) => symptomDef(c)?.callNow ?? false)) return true;
-  const withChest = {'nausea', 'sweat', 'dizzy', 'dizzyx', 'breath', 'palp'};
-  const withPalp = {'dizzy', 'dizzyx', 'breath', 'chest'};
+  const withChest = {'nausea', 'sweat', 'dizzy', 'dizzyup', 'dizzyx', 'breath', 'palp'};
+  const withPalp = {'dizzy', 'dizzyup', 'dizzyx', 'breath', 'chest'};
   if (s.contains('chest') && s.any(withChest.contains)) return true;
   if (s.contains('palp') && s.any(withPalp.contains)) return true;
   return false;
@@ -54,7 +60,7 @@ bool callNowFor(Iterable<String> codes) {
 const watchCode = 'watch';
 
 SymptomDef? symptomDef(String code) {
-  for (final d in [...redSymptoms, ...amberSymptoms]) {
+  for (final d in [...redSymptoms, ...amberSymptoms, ...legacySymptoms]) {
     if (d.code == code) return d;
   }
   return null;

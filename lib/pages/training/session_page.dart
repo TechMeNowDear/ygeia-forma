@@ -83,7 +83,8 @@ class _SessionPageState extends State<SessionPage> {
   }
 
   void _rest(ExLog e, String next) {
-    if (e.rest <= 0) return;
+    // Η προπόνηση σταμάτησε στο μεταξύ (σύμπτωμα, «Σταμάτησα» στο ρολόι): κανένα νέο διάλειμμα (έλεγχος #2, B2).
+    if (e.rest <= 0 || t.current == null) return;
     final end = t.now.add(Duration(seconds: e.rest));
     setState(() => _restEnd = end);
     TrainingDevice.rest(end, title: 'Διάλειμμα', text: 'Επόμενο: $next', doneTitle: 'Τέλος διαλείμματος', doneText: 'Επόμενο: $next');
@@ -108,7 +109,7 @@ class _SessionPageState extends State<SessionPage> {
         final s = t.current;
         if (s == null) {
           // Π.χ. «Σταμάτησα» στο ρολόι: η προπόνηση σταμάτησε, ρωτάμε τι ένιωσες (έλεγχος #2).
-          final pending = t.pendingWatchSymptom != null;
+          final pending = t.pendingWatchSymptom != null && t.sessions.isNotEmpty && t.sessions.last.stopped;
           return Scaffold(
             appBar: AppBar(),
             body: Center(
@@ -477,20 +478,23 @@ class _SessionPageState extends State<SessionPage> {
     t.tick(e, i);
     HapticFeedback.lightImpact();
     final first = i == 0 && t.isFirstTime(e.ex) && hasLoad(e.kind) && e.done.length == 1 && e.sets > 1;
+    bool gone() => !context.mounted || t.current?.id != s.id;
     if (first) {
       final rir = await _askRir(context, first: true);
-      if (rir != null && rir >= 0 && context.mounted) {
+      if (gone()) return;
+      if (rir != null && rir >= 0) {
         final v = t.calibrateAfterFirst(e, rir);
         if (v != null) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Τα επόμενα σετ: ${loadLabel(e.kind, v)}.')));
         }
       }
     }
-    if (!context.mounted) return;
+    if (gone()) return;
     if (e.complete) {
       if (e.rirAnswer == null) {
         final rir = await _askRir(context, first: false, e: e);
-        if (rir == -2 && context.mounted) {
+        if (gone()) return;
+        if (rir == -2) {
           // Ενόχληση στον αριστερό ώμο μαζί με σημάδι από την καρδιά: «Νιώθω κάτι» (έλεγχος #2, U2-07).
           await feelSomething(context, t, where: 'session');
           if (context.mounted && t.current == null) Navigator.of(context).maybePop();
@@ -498,7 +502,7 @@ class _SessionPageState extends State<SessionPage> {
         }
         if (rir != null && rir >= 0) t.answer(e, rir);
       }
-      if (!context.mounted) return;
+      if (gone()) return;
       final next = s.items.indexWhere((x) => !x.skipped && !x.complete);
       if (next >= 0) {
         setState(() => _idx = next);

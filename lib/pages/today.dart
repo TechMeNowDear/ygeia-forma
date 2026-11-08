@@ -48,7 +48,8 @@ class TodayPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: store,
+      // Και η προπόνηση: η κάρτα μετά από σύμπτωμα να εμφανίζεται/φεύγει αμέσως (έλεγχος #2).
+      listenable: Listenable.merge([store, TrainingStore.main]),
       builder: (context, _) {
         final c = Aigaio.of(context);
         final d = store.data;

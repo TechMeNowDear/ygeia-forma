@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'training_store.dart';
@@ -28,7 +29,8 @@ class TrainingDevice {
     try {
       return await _c.invokeMethod<bool>('dial', {'n': number}) ?? true;
     } on MissingPluginException {
-      return true; // δοκιμές
+      // Δοκιμές (που τρέχουν ως Android) ναι· σε υπολογιστή, όπου δεν υπάρχει κλήση, όχι (έλεγχος #2).
+      return defaultTargetPlatform == TargetPlatform.android;
     } catch (_) {
       return false;
     }
