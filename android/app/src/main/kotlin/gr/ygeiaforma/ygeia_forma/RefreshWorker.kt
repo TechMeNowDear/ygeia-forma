@@ -32,9 +32,9 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         // Πρόσφατη ανάγνωση (π.χ. η εφαρμογή ήταν ανοιχτή): δεν χρειάζεται άλλη.
         val cache = java.io.File(applicationContext.filesDir, SamsungHealthBridge.DASHBOARD_FILE)
         if (cache.exists() && System.currentTimeMillis() - cache.lastModified() < FRESH_MS) return Result.success()
-        // Η Samsung αρνήθηκε 3 φορές στη σειρά σε αυτή την έκδοση: δεν ξαναδοκιμάζουμε (μπαταρία)·
-        // τα δεδομένα έρχονται κανονικά όταν ανοίγει η εφαρμογή.
-        if (failures() >= MAX_FAILURES) return Result.success()
+        // Η Samsung αρνήθηκε 3 φορές στη σειρά: παύση για μία μέρα (μπαταρία), όχι για πάντα (έλεγχος 8/11, DATA-07).
+        // Το άνοιγμα της εφαρμογής μηδενίζει τον μετρητή (schedule).
+        if (failures() >= MAX_FAILURES && System.currentTimeMillis() - failFile().lastModified() < PAUSE_MS) return Result.success()
         val started = System.currentTimeMillis()
         return try {
             val store = HealthDataService.getStore(applicationContext)
@@ -118,12 +118,18 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         private const val NAME = "ygeia-refresh"
         private const val FRESH_MS = 150 * 60 * 1000L // 2,5 ώρες
         private const val MAX_FAILURES = 3
+        private const val PAUSE_MS = 24 * 60 * 60 * 1000L
 
         /**
          * Καλείται όταν ανοίγει η εφαρμογή. UPDATE: κρατά το πρόγραμμα, αλλά παίρνει τις νέες ρυθμίσεις
          * αν αλλάξουν σε νεότερη έκδοση. Η πρώτη εκτέλεση μία ώρα μετά (όχι πάνω στο άνοιγμα).
          */
         fun schedule(context: Context) {
+            // Η εφαρμογή άνοιξε: ό,τι απέτυχε στο παρασκήνιο ξαναδοκιμάζεται από την αρχή.
+            try {
+                java.io.File(context.filesDir, "bg-failures").delete()
+            } catch (_: Throwable) {
+            }
             val request = PeriodicWorkRequestBuilder<RefreshWorker>(3, TimeUnit.HOURS)
                 .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
                 .setInitialDelay(1, TimeUnit.HOURS)
