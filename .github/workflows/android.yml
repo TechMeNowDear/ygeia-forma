@@ -58,8 +58,12 @@ jobs:
       - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
         uses: actions/cache@v4
         with:
-          path: ~/.gradle/wrapper/dists
-          key: gradle-dist-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches/modules-2/files-2.1
+            ~/.gradle/caches/modules-2/metadata-*
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-
       - name: Gradle (κατέβασμα)
         run: |
           cd android
@@ -274,8 +278,12 @@ jobs:
       - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
         uses: actions/cache@v4
         with:
-          path: ~/.gradle/wrapper/dists
-          key: gradle-dist-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches/modules-2/files-2.1
+            ~/.gradle/caches/modules-2/metadata-*
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-
       - name: Gradle (κατέβασμα)
         run: |
           cd android
