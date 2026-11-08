@@ -149,6 +149,7 @@ class WearLink with WidgetsBindingObserver {
       _sub = _e.receiveBroadcastStream().listen(_onEvent, onError: (_) {});
     } catch (_) {}
     t.addListener(_publish);
+    ready.addListener(_publish);
     refresh();
   }
 
@@ -196,7 +197,8 @@ class WearLink with WidgetsBindingObserver {
   /// Στέλνει πρόγραμμα/προπόνηση μόνο όταν αλλάζουν (σύγκριση κειμένου).
   void _publish() {
     final t = _t;
-    if (t == null || !t.ready) return;
+    // Χωρίς ρολόι με την εφαρμογή μας: τίποτα (ούτε κλήσεις στις υπηρεσίες της Google).
+    if (t == null || !t.ready || !ready.value) return;
     try {
       final plan = jsonEncode(watchPlan(t, t.now, _name));
       if (plan != _lastPlan) {
