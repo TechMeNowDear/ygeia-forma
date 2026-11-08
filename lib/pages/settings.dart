@@ -10,6 +10,7 @@ import '../history.dart' show otherDeviceNights;
 import '../theme.dart';
 import '../sources.dart';
 import '../ti_ftanei.dart';
+import '../training/training_store.dart';
 import '../widgets.dart';
 import 'appearance.dart';
 import 'sources_page.dart';
@@ -217,6 +218,13 @@ class _BackupCardState extends State<_BackupCard> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), action: action, duration: const Duration(seconds: 6)));
   }
 
+  /// Οι προπονήσεις για το αντίγραφο (μόνο αν διαβάστηκαν σωστά).
+  Future<Map<String, dynamic>?> _training() async {
+    final t = TrainingStore.main;
+    await t.load();
+    return t.ready && !t.readError ? t.toJson() : null;
+  }
+
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
@@ -234,6 +242,7 @@ class _BackupCardState extends State<_BackupCard> {
         prefs: widget.store.prefsLoaded ? widget.store.prefsJson() : const {},
         now: now,
         sources: await widget.store.sourcesForBackup(),
+        training: await _training(),
       );
       final r = await FoodChannel.saveBackup(json, name);
       if (r['ok'] != true || r['uri'] is! String) {
@@ -280,6 +289,7 @@ class _BackupCardState extends State<_BackupCard> {
             'Τίποτα δεν σβήνεται· καταχωρίσεις που έσβησες μετά το αντίγραφο ξαναμπαίνουν.'
             '${b.prefs.isEmpty ? '' : '\n\nΘα αντικατασταθούν οι ρυθμίσεις: «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση.'}'
             '${b.sources == null ? '' : '\n\nΠηγές ύπνου (π.χ. από πότε μετρά το Oura): από το αντίγραφο, μόνο αν το κινητό δεν έχει νεότερες.'}'
+            '${b.training == null ? '' : '\n\nΠροπονήσεις: μπαίνουν όσες λείπουν. Η έγκριση του γιατρού και το όριο παλμών δεν μπαίνουν· τα ξαναλές.'}'
             '${b.skipped == 0 ? '' : '\n\n${countText(b.skipped, 'χαλασμένη εγγραφή θα παραλειφθεί', 'χαλασμένες εγγραφές θα παραλειφθούν')}.'}',
           ),
           actions: [
@@ -297,6 +307,11 @@ class _BackupCardState extends State<_BackupCard> {
       final (e, f, failed, existing) = res;
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       final sourcesIn = b.sources != null && await widget.store.restoreSources(b.sources!);
+      var trainingIn = 0;
+      if (b.training != null) {
+        await TrainingStore.main.load();
+        trainingIn = TrainingStore.main.mergeBackup(b.training!);
+      }
       _say([
         'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
         if (existing > 0)
@@ -304,6 +319,7 @@ class _BackupCardState extends State<_BackupCard> {
         if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
         if (sourcesIn) 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
+        if (trainingIn > 0) countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),
         if (b.sources != null && !sourcesIn) 'Οι πηγές ύπνου του κινητού είναι νεότερες και έμειναν.',
       ].join(' '));
     } finally {
@@ -321,7 +337,7 @@ class _BackupCardState extends State<_BackupCard> {
           const SectionLabel('Αντίγραφο ασφαλείας'),
           const SizedBox(height: 6),
           Text(
-            'Το ημερολόγιο φαγητού, «Τα προϊόντα μου» και οι ρυθμίσεις υπάρχουν μόνο σε αυτό το κινητό. '
+            'Το ημερολόγιο φαγητού, «Τα προϊόντα μου», οι προπονήσεις και οι ρυθμίσεις υπάρχουν μόνο σε αυτό το κινητό. '
             'Κράτα ένα αντίγραφο (π.χ. μία φορά την εβδομάδα). Τα δεδομένα της Samsung δεν χρειάζονται: ξαναδιαβάζονται.',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
           ),

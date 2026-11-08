@@ -671,4 +671,37 @@ class TrainingStore extends ChangeNotifier {
 
   @visibleForTesting
   void replaceAll(Map<String, dynamic> j) => _fromJson(j);
+
+  /// Επαναφορά από αντίγραφο: προσθέτει μόνο ό,τι λείπει (προγράμματα, προπονήσεις, συμπτώματα). Ποτέ η έγκριση
+  /// του γιατρού και το όριο παλμών: αυτά τα ξαναλές (έλεγχος 8/11, TRN-17). Επιστρέφει πόσες προπονήσεις μπήκαν.
+  int mergeBackup(Map<String, dynamic> j) {
+    if (readError || !ready) return 0;
+    final other = TrainingStore(io: _io, clock: _clock);
+    try {
+      other._fromJson(j);
+    } catch (_) {
+      return 0;
+    }
+    final have = {for (final p in programs) '${p.id}#${p.version}'};
+    for (final p in other.programs) {
+      if (have.add('${p.id}#${p.version}')) programs.add(p);
+    }
+    activeId ??= other.activeId;
+    final ids = {for (final s in sessions) s.id};
+    var added = 0;
+    for (final s in other.sessions) {
+      if (ids.add(s.id)) {
+        sessions.add(s);
+        added++;
+      }
+    }
+    sessions.sort((a, b) => a.start.compareTo(b.start));
+    final syms = {for (final x in symptoms) '${x.at.millisecondsSinceEpoch}|${x.code}'};
+    for (final x in other.symptoms) {
+      if (syms.add('${x.at.millisecondsSinceEpoch}|${x.code}')) symptoms.add(x);
+    }
+    symptoms.sort((a, b) => a.at.compareTo(b.at));
+    save();
+    return added;
+  }
 }

@@ -5,6 +5,9 @@ import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/plan_file.dart';
 import 'package:ygeia_forma/sources.dart';
+import 'package:ygeia_forma/training/training_store.dart';
+
+import 'training_sample.dart';
 
 void main() {
   final food = {
@@ -84,5 +87,23 @@ void main() {
     expect(parseBackup(buildBackup(foodLog: const [], myFoods: const [], prefs: const {}, now: DateTime(2026, 11, 7))).sources, isNull);
     final broken = jsonEncode({'app': backupApp, 'version': 1, 'sources': {'plan': '{"v":1,"sources":"x"}'}});
     expect(parseBackup(broken).sources, isNull);
+  });
+
+  test('Προπονήσεις στο αντίγραφο· επαναφορά μόνο όσων λείπουν, ποτέ η έγκριση (έλεγχος 8/11, TRN-17)', () async {
+    final now = DateTime(2026, 11, 20, 18);
+    final src = sampleTraining(now);
+    src.reportSymptoms(['dizzy']);
+    final b = parseBackup(buildBackup(foodLog: const [], myFoods: const [], prefs: const {}, now: now, training: src.toJson()));
+    expect(b.training, isNotNull);
+    final fresh = TrainingStore(io: MemoryTrainingIO(), clock: () => now);
+    await fresh.load();
+    expect(fresh.mergeBackup(b.training!), src.sessions.length);
+    expect(fresh.approved, isFalse, reason: 'η έγκριση του γιατρού δεν έρχεται από αντίγραφο');
+    expect(fresh.hrLimit, isNull);
+    expect(fresh.program, isNotNull);
+    expect(fresh.symptoms.length, 1);
+    // δεύτερη φορά: τίποτα διπλό
+    expect(fresh.mergeBackup(b.training!), 0);
+    expect(fresh.sessions.length, src.sessions.length);
   });
 }

@@ -25,6 +25,7 @@ String buildBackup({
   required Map<String, dynamic> prefs,
   required DateTime now,
   ({String plan, String? log})? sources,
+  Map<String, dynamic>? training,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
   return jsonEncode({
@@ -39,12 +40,17 @@ String buildBackup({
     },
     // Τα αρχεία του σχεδίου πηγών όπως είναι (με την ώρα τους, «at»).
     if (sources != null) 'sources': {'plan': sources.plan, if (sources.log != null) 'log': sources.log},
+    // Προπονήσεις, προγράμματα, «Νιώθω κάτι» (έλεγχος 8/11, TRN-17): υπάρχουν μόνο στο κινητό.
+    if (training != null) 'training': training,
   });
 }
 
 /// Ό,τι βρέθηκε σε ένα αρχείο αντιγράφου, ελεγμένο.
 class BackupContents {
-  BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped, {this.sources});
+  BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped, {this.sources, this.training});
+
+  /// Οι προπονήσεις (όπως το training.json), αν υπήρχαν.
+  final Map<String, dynamic>? training;
 
   /// Το σχέδιο πηγών και το ημερολόγιό του (κείμενο των αρχείων), αν υπήρχαν και διαβάζονται.
   final ({String plan, String? log})? sources;
@@ -114,6 +120,7 @@ BackupContents parseBackup(String text) {
     j['created'] is String ? DateTime.tryParse(j['created'] as String) : null,
     skipped,
     sources: plan == null ? null : (plan: plan, log: (src as Map)['log'] is String ? src['log'] as String : null),
+    training: j['training'] is Map ? Map<String, dynamic>.from(j['training'] as Map) : null,
   );
 }
 
