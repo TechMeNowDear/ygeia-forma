@@ -24,6 +24,11 @@ class WatchActivity : Activity(), WatchView.Actions {
     private var visible = false
 
     private val redraw: () -> Unit = {
+        // Το κινητό άνοιξε την εφαρμογή πριν φτάσει η προπόνησή του: μπαίνει μόλις φτάσει.
+        if (joinWhenReady && Repo.phone != null && Repo.running == null) {
+            joinWhenReady = false
+            joinPhone()
+        }
         syncScreen()
         if (::view.isInitialized) view.invalidate()
     }
@@ -247,8 +252,18 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (Repo.running != null) {
             ExerciseService.stop(this)
         } else {
+            // Χωρίς υπηρεσία (π.χ. δεν δόθηκε καμία άδεια): η προπόνηση γράφεται κανονικά, χωρίς παλμούς.
+            val s = Repo.local
             Repo.local = null
-            Repo.screen = Repo.Screen.HOME
+            if (s != null && s.setsDone > 0) {
+                val now2 = System.currentTimeMillis()
+                val o = s.resultJson(now2, HrStats(now2))
+                Repo.snapshot(this, o)
+                scope.launch { if (Link.putResult(this@WatchActivity, s.id, o)) Repo.snapshot(this@WatchActivity, null) }
+                Repo.screen = Repo.Screen.END
+            } else {
+                Repo.screen = Repo.Screen.HOME
+            }
         }
     }
 

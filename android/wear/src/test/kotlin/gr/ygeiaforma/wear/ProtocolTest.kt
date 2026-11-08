@@ -34,6 +34,14 @@ class ProtocolTest {
     }
 
     @Test
+    fun weekdayFromDays() {
+        val p = Plan.parse(planJson.replace("\"at\":5,", "\"at\":5,\"days\":{\"5\":\"A\",\"2\":\"walk\"},"))!!
+        assertEquals("A", p.forWeekday(5)!!.id)
+        assertTrue(p.forWeekday(2)!!.isCardio)
+        assertNull(p.forWeekday(1))
+    }
+
+    @Test
     fun sessionFlow() {
         val p = Plan.parse(planJson)!!
         val s = LiveSession.fromPlan(p.todayWorkout!!, 1_000)

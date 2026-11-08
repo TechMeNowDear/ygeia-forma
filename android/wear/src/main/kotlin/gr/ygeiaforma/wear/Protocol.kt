@@ -55,14 +55,20 @@ class WorkoutT(val id: String, val name: String, val minutes: Int, val items: Li
 class Plan(
     val approved: Boolean,
     val hrLimit: Int?,
-    /** Το id της σημερινής προπόνησης (ή null για μέρα ξεκούρασης). */
+    /** Το id της προπόνησης της μέρας που το έστειλε το κινητό (ή null για ξεκούραση). */
     val today: String?,
     val day: String?,
     val workouts: List<WorkoutT>,
     val at: Long,
+    /** Μέρα εβδομάδας (1 = Δευτέρα … 7 = Κυριακή) → id προπόνησης. */
+    val days: Map<Int, String> = emptyMap(),
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
-    val todayWorkout: WorkoutT? get() = workout(today)
+
+    /** Η προπόνηση μιας μέρας (για να είναι σωστή και αν το κινητό δεν άνοιξε σήμερα). */
+    fun forWeekday(weekday: Int): WorkoutT? = if (days.isEmpty()) workout(today) else workout(days[weekday])
+
+    val todayWorkout: WorkoutT? get() = forWeekday(java.time.LocalDate.now().dayOfWeek.value)
 
     companion object {
         fun parse(text: String): Plan? = try {
@@ -75,6 +81,9 @@ class Plan(
                 day = j.optStringOrNull("day"),
                 workouts = (0 until ws.length()).map { workoutOf(ws.getJSONObject(it)) },
                 at = j.optLong("at", 0),
+                days = j.optJSONObject("days")?.let { d ->
+                    d.keys().asSequence().mapNotNull { k -> k.toIntOrNull()?.let { it to d.getString(k) } }.toMap()
+                } ?: emptyMap(),
             )
         } catch (_: Exception) {
             null

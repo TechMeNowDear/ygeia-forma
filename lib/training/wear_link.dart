@@ -40,6 +40,8 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     'approved': t.approved,
     if (t.hrLimit != null) 'hrLimit': t.hrLimit,
     if (p?.forDay(now) != null) 'today': p!.forDay(now)!.id,
+    // Οι μέρες, για να βρίσκει το ρολόι μόνο του τη σημερινή (και αν το κινητό δεν άνοιξε σήμερα).
+    if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},
     'day': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
     'workouts': [
       for (final w in p?.workouts ?? const <Workout>[])

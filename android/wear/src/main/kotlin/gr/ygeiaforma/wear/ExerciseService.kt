@@ -313,6 +313,7 @@ class ExerciseService : Service() {
         }
         val hr = Repo.hr ?: HrStats(now)
         val kind = Repo.running
+        val wasPhone = Repo.runningPhone
         val local = Repo.local
         val result: Pair<String, JSONObject>? = when {
             kind == "walk" -> {
@@ -335,7 +336,8 @@ class ExerciseService : Service() {
         }
         Repo.local = null
         Repo.resetExercise()
-        Repo.screen = if (result != null && kind != null) Repo.Screen.END else Repo.Screen.HOME
+        // Προπόνηση του κινητού: γράφεται εκεί, εδώ πίσω στην αρχή. Δική του: «Αποθηκεύτηκε».
+        Repo.screen = if (result != null && kind != null && !wasPhone) Repo.Screen.END else Repo.Screen.HOME
         Repo.changed()
         getSystemService(NotificationManager::class.java).cancel(ALARM_ID)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
