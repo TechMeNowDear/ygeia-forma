@@ -429,8 +429,8 @@ void main() {
     String first(String q) => store.search(q).first.name;
     List<String> top(String q, int n) => [for (final f in store.search(q).take(n)) f.name];
 
-    test('Καμία νέα τροφή: ίδιο πλήθος', () {
-      expect(basicFoods().length, 323);
+    test('Πλήθος τροφίμων: 323 + 23 ψάρια, θαλασσινά και κεφίρ (έλεγχος 8/11, FOOD-02)', () {
+      expect(basicFoods().length, 346);
     });
 
     test('N1: «κοτόπουλο ψητό» → ψητό στήθος· «κοτόπουλο φούρνου» → ολόκληρο', () {

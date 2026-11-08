@@ -27,6 +27,16 @@ void main() {
       expect(phonetic('Εύα'), phonetic('eva'));
     });
 
+    test('Ελληνικά ψάρια και θαλασσινά από τη CIQUAL (έλεγχος 8/11, FOOD-02)', () {
+      final i = FoodIndex(basicFoods());
+      for (final (q, want) in [('σολομός', 'Σολομός'), ('τσιπούρα', 'Τσιπούρα'), ('λαβράκι', 'Λαβράκι'), ('γαρίδες', 'Γαρίδες'),
+          ('μύδια', 'Μύδια'), ('γαύρος', 'Γαύρος'), ('κεφίρ', 'Κεφίρ'), ('tsipoura', 'Τσιπούρα')]) {
+        expect(i.search(q).first.name, startsWith(want), reason: q);
+      }
+      final bream = basicFoods().firstWhere((f) => f.id == 'C27031');
+      expect(bream.n.amount(Nk.kcal), 148);
+    });
+
     test('«lefko», «levko», «zahari lefki»: βρίσκουν τα λευκά', () {
       final i = FoodIndex(basicFoods());
       for (final q in ['lefko', 'levko', 'zahari lefki']) {
