@@ -517,9 +517,11 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ),
                   const SizedBox(height: 4),
                   Text(
+                    // Έλεγχος 8/11 (FOOD-05): το λάδι του μαγειρέματος είναι συχνά οι περισσότερες θερμίδες του πιάτου.
                     f.rawId == null
-                        ? 'Βάρος πριν το μαγείρεμα (το πιο ακριβές).'
-                        : 'Βάρος μετά το μαγείρεμα· οι τιμές είναι για ${(f.cookedLabel ?? 'μαγειρεμένο').toLowerCase()}.',
+                        ? 'Βάρος πριν το μαγείρεμα (το πιο ακριβές). Λάδι ή βούτυρο για το μαγείρεμα: γράψ’ το χωριστά.'
+                        : 'Βάρος μετά το μαγείρεμα· οι τιμές είναι για ${(f.cookedLabel ?? 'μαγειρεμένο').toLowerCase()}'
+                            '${(f.cookedLabel ?? '').toLowerCase().contains('τηγαν') ? ', μαζί με το λάδι που ρούφηξε' : ''}.',
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary),
                   ),
                 ],
