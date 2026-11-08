@@ -39,23 +39,21 @@ class CategoryPage extends StatelessWidget {
             PageTitle(title, eyebrow: longDate(now ?? DateTime.now()), eyebrowColor: color),
             if (tabs.length > 1) ...[
               const SizedBox(height: 14),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                child: Row(
-                  children: [
-                    for (var k = 0; k < tabs.length; k++) ...[
-                      if (k > 0) const SizedBox(width: 8),
-                      TabChip(
-                        key: ValueKey('tab-${tabs[k]}'),
-                        label: tabs[k],
-                        selected: k == i,
-                        solid: solid,
-                        onTap: () => tab.value = k,
-                      ),
-                    ],
-                  ],
-                ),
+              // Όλες οι καρτέλες ορατές (σε δύο σειρές αν δεν χωράνε): πριν, η «Τάσεις» έμενε κρυμμένη δεξιά
+              // ακόμα κι όταν ήταν ανοιχτή (έλεγχος 8/11, UX-04).
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var k = 0; k < tabs.length; k++)
+                    TabChip(
+                      key: ValueKey('tab-${tabs[k]}'),
+                      label: tabs[k],
+                      selected: k == i,
+                      solid: solid,
+                      onTap: () => tab.value = k,
+                    ),
+                ],
               ),
             ],
           ],
