@@ -77,7 +77,8 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   final bed = plan.value(h, K.bedtime, d0), wake = plan.value(h, K.wake, d0);
   final sleepMin = plan.value(h, K.sleepMin, d0);
   final sr = sleepRange(store.profile, today);
-  add(K.sleepMin, 'Ύπνος', '', (v) => '${v ~/ 60}:${two(v.round() % 60)}',
+  // Στρογγύλεμα πρώτα (έλεγχος 8/11, DATA-03): 419,5 λεπτά → 7:00, όχι 6:00.
+  add(K.sleepMin, 'Ύπνος', '', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
       range: sleepMin != null && sr != null ? sr.placeText(sleepMin) : null);
   add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
@@ -88,7 +89,18 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   add(K.ringSpo2, 'Οξυγόνο', '%', spo2AvgText, digits: 1);
   add(K.breath, 'Αναπνοές', '', (v) => dec(v), digits: 1,
       range: plan.value(h, K.breath, d0) == null ? null : breathRange.placeText(plan.value(h, K.breath, d0)!));
-  add(K.skinTemp, 'Θερμοκρ.', '°', (v) => signedDec(v), digits: 1);
+  // Θερμοκρασία: το Oura δίνει απόκλιση (+0,3°), το ρολόι απόλυτη τιμή καρπού (33,6 °C), που δεν δείχνεται ποτέ ως
+  // «+33,6°» (έλεγχος 8/11, DATA-04). Από το ρολόι: μόνο η απόκλιση από τα συνηθισμένα, αν υπάρχουν.
+  if (src == Source.oura) {
+    add(K.skinTemp, 'Θερμοκρ.', '°', (v) => signedDec(v), digits: 1);
+  } else {
+    final v = plan.value(h, K.skinTemp, d0);
+    final b = personalBaseline(h, plan, K.skinTemp, d0);
+    if (v != null && b?.usual != null) {
+      final diff = shownDiff(v, b!.usual!, 1);
+      out[K.skinTemp] = _entry('Θερμοκρ.', signedDec(diff), '°', cap: 'απόκλιση καρπού');
+    }
+  }
   return {'src': '${src == Source.oura ? 'Oura' : 'ρολόι'} · ${shortDayDate(d0)}', 'm': out};
 }
 

@@ -62,6 +62,9 @@ void main() {
     // Ο ύπνος: «ώρες:λεπτά».
     final sleep = ((kinds[WKind.sleep] as Map)['m'] as Map)['sleepMin'] as Map;
     expect(sleep['v'], matches(RegExp(r'^\d+:\d\d$')));
+    // Έλεγχος 8/11 (DATA-03/04): ύπνος 419,5′ = 7:00· θερμοκρασία ποτέ «+33,6°».
+    final temp = ((kinds[WKind.sleep] as Map)['m'] as Map)['skinTemp'] as Map?;
+    if (temp != null) expect((temp['v'] as String).replaceAll(RegExp(r'[^0-9,]'), '').length, lessThan(4));
     // Έλεγχος 8/11 (DATA-02): κίνηση και φαγητό λένε για ποια μέρα είναι (άλλη μέρα → «—» στο widget).
     expect((kinds[WKind.move] as Map)['day'], '2026-11-07');
     expect((kinds[WKind.food] as Map)['day'], '2026-11-07');

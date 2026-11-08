@@ -51,7 +51,9 @@ class MetricSpec {
   final List<int> periods;
 
   String show(double v) {
-    if (signed) return signedDec(v, digits);
+    // Απόκλιση (Oura, ±λίγοι βαθμοί) με πρόσημο· απόλυτη τιμή καρπού (ρολόι, ~33 °C) ποτέ ως «+33,6» (έλεγχος 8/11, DATA-04).
+    if (signed && v.abs() < 10) return signedDec(v, digits);
+    if (signed) return dec(v, digits);
     if (thousandsSep) return thousands(v.round());
     return digits == 0 ? '${v.round()}' : dec(v, digits);
   }
