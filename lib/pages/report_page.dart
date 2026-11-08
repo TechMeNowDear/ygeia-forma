@@ -68,6 +68,7 @@ class _ReportPageState extends State<ReportPage> {
 
   /// Από το Samsung Health Monitor (τεστ άπνοιας, ρυθμός, πίεση), όπως τα δίνει η Samsung· μόνο για αυτό το PDF.
   Map<String, dynamic>? _medical;
+  late Future<Map<String, dynamic>> _medicalRead;
 
   @override
   void initState() {
@@ -76,11 +77,9 @@ class _ReportPageState extends State<ReportPage> {
     TrainingStore.main.load().then((_) {
       if (mounted) setState(() {});
     });
-    // Αν το Samsung Health δεν απαντήσει, το PDF βγαίνει χωρίς αυτά (το γράφει), όχι κουμπί κλειδωμένο για πάντα.
     // Από την αρχή της αναφοράς ως σήμερα (φιλτράρεται στο διάστημά της στη σελίδα 4).
-    SamsungHealth.medical(days: DateTime.now().difference(_data.from).inDays + 1)
-        .timeout(const Duration(seconds: 12), onTimeout: () => {'ok': false, 'message': 'δεν απάντησε εγκαίρως'})
-        .then((m) {
+    _medicalRead = SamsungHealth.medical(days: DateTime.now().difference(_data.from).inDays + 1);
+    _medicalRead.then((m) {
       if (mounted) setState(() => _medical = m);
     });
   }
@@ -100,6 +99,14 @@ class _ReportPageState extends State<ReportPage> {
       _error = null;
     });
     try {
+      // Η σελίδα 4 περιμένει το Samsung Health ως 12″· αν δεν απαντήσει, το PDF βγαίνει χωρίς αυτά (και το γράφει).
+      if (_medical == null) {
+        final m = await _medicalRead.timeout(const Duration(seconds: 12),
+            onTimeout: () => <String, dynamic>{'ok': false, 'message': 'δεν απάντησε εγκαίρως'});
+        if (!mounted) return;
+        setState(() => _medical = m);
+        await WidgetsBinding.instance.endOfFrame;
+      }
       await WidgetsBinding.instance.endOfFrame;
       final pages = <Uint8List>[];
       for (final k in _keys) {
@@ -285,8 +292,7 @@ class _ReportPageState extends State<ReportPage> {
                 ] else
                   FilledButton.icon(
                     style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                    // Περιμένει τη σελίδα 4 (Samsung Health Monitor), για να μη βγει PDF χωρίς αυτά.
-                    onPressed: _saving || _medical == null ? null : _save,
+                    onPressed: _saving ? null : _save,
                     icon: _saving
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.picture_as_pdf_rounded, size: 20),
