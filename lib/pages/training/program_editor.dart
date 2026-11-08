@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../exercise/ex_data.dart';
 import '../../food/food_search.dart' show plain;
+import '../../format.dart';
 import '../../theme.dart';
 import '../../training/equipment.dart';
 import '../../training/program.dart';
@@ -403,7 +404,7 @@ Future<String?> pickExercise(BuildContext context) => showModalBottomSheet<Strin
                     if (list.any((e) => e.group == g.key)) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                        child: Text(g.value.toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+                        child: Text(upperGr(g.value), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
                       ),
                       for (final e in list.where((e) => e.group == g.key))
                         ListTile(

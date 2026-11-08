@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../format.dart';
 import '../../theme.dart';
 import '../../training/equipment.dart';
 import '../../training/program.dart';
@@ -109,7 +110,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
       for (final w in p.workouts) {
         body.add(AppCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('${w.name.toUpperCase()} · ~${w.minutes}′', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+            Text('${upperGr(w.name)} · ~${w.minutes}′', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
             if (w.isCardio)
               Padding(
                 padding: const EdgeInsets.only(top: 6),

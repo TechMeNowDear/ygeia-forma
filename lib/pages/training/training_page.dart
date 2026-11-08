@@ -231,7 +231,7 @@ class _TrainingPageState extends State<TrainingPage> {
     } else if (w.isCardio) {
       final cardio = w.cardio!;
       children.addAll([
-        Text('ΣΗΜΕΡΑ · ${w.name.toUpperCase()}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+        Text('ΣΗΜΕΡΑ · ${upperGr(w.name)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
         const SizedBox(height: 4),
         Text('${cardio.name} ${cardio.minutes}′', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
         if (cardio.note != null) Text(cardio.note!, style: TextStyle(fontSize: 14.5, color: c.textSecondary)),
@@ -244,7 +244,7 @@ class _TrainingPageState extends State<TrainingPage> {
       ]);
     } else {
       children.add(Row(children: [
-        Expanded(child: Text('ΣΗΜΕΡΑ · ${w.name.toUpperCase()}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary))),
+        Expanded(child: Text('ΣΗΜΕΡΑ · ${upperGr(w.name)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary))),
         if (WearLink.main.ready.value) ...[
           Icon(Icons.watch_rounded, size: 15, color: c.good),
           const SizedBox(width: 3),

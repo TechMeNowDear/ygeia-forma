@@ -126,3 +126,14 @@ String greeting(DateTime now) => (now.hour >= 4 && now.hour < 13) ? 'Καλημ�
 
 /// «1 καταχώριση» / «3 καταχωρίσεις».
 String countText(int n, String one, String many) => n == 1 ? '1 $one' : '$n $many';
+
+/// Κεφαλαία ελληνικά χωρίς τόνους («Προπόνηση» → «ΠΡΟΠΟΝΗΣΗ»), όπως γράφονται σωστά (έλεγχος 8/11, UX-14).
+String upperGr(String s) {
+  const strip = {'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω', 'ΐ': 'ϊ', 'ΰ': 'ϋ',
+    'Ά': 'Α', 'Έ': 'Ε', 'Ή': 'Η', 'Ί': 'Ι', 'Ό': 'Ο', 'Ύ': 'Υ', 'Ώ': 'Ω'};
+  final b = StringBuffer();
+  for (final ch in s.split('')) {
+    b.write(strip[ch] ?? ch);
+  }
+  return b.toString().toUpperCase();
+}
