@@ -162,7 +162,7 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   List<double?> series(double? Function(BodyMeasurement b) f) =>
       [for (var i = 0; i < 7 - recent.length; i++) null, for (final b in recent) f(b)];
   final p = store.profile;
-  final bmi = last.bmi ?? bmiOf(last.weight, p.heightCm);
+  final bmi = bmiOf(last.weight, p.heightCm) ?? last.bmi;
   final fat = fatRange(p, today);
   final hw = healthyWeight(p.heightCm);
 

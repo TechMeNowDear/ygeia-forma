@@ -82,8 +82,13 @@ const bmiRange = RefRange(low: 18.5, high: 25, text: '18,5–24,9 (φυσιολ�
 (double, double)? healthyWeight(double? heightCm) {
   if (heightCm == null) return null;
   final m = heightCm / 100;
-  return (18.5 * m * m, 24.9 * m * m);
+  // Ίδιο όριο με τον δείκτη (κάτω από 25): πριν 24,9 → ένα βάρος έδειχνε δείκτη «24,9» και «πάνω από το εύρος» (έλεγχος 8/11, MED-12).
+  return (18.5 * m * m, 25 * m * m);
 }
+
+/// Το ύψος που χρησιμοποίησε η ζυγαριά, από το βάρος και τον δείκτη της (cm).
+double? inBodyHeight(double? weight, double? bmi) =>
+    weight == null || bmi == null || bmi <= 0 ? null : math.sqrt(weight / bmi) * 100;
 
 /// Δείκτης μάζας σώματος από βάρος και ύψος.
 double? bmiOf(double? weight, double? heightCm) =>

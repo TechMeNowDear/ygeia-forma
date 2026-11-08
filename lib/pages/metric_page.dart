@@ -60,7 +60,7 @@ class MetricSpec {
 RefRange? _weightRange(Profile p, DateTime _) {
   final w = healthyWeight(p.heightCm);
   if (w == null) return null;
-  return RefRange(low: w.$1, high: w.$2, text: 'υγιές βάρος για το ύψος σου ${dec(w.$1)}–${dec(w.$2)} kg', cite: bmiRange.cite);
+  return RefRange(low: w.$1, high: w.$2, text: 'φυσιολογικός δείκτης για το ύψος σου: ${dec(w.$1)}–${dec(w.$2)} kg', cite: bmiRange.cite);
 }
 
 const _bodyPeriods = [30, 90, 365];

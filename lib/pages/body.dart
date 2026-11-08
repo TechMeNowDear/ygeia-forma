@@ -214,9 +214,17 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Σκελετικοί μύες', withDiff(last.smm, p?.smm, 'kg')),
           InfoRow('Άλιπη μάζα', withDiff(last.leanMass, p?.leanMass, 'kg')),
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
-          if (last.bmi != null) InfoRow('Δείκτης μάζας σώματος', dec(last.bmi!)),
-          if (last.bmi == null && bmiOf(last.weight, profile.heightCm) != null)
-            InfoRow('Δείκτης μάζας σώματος', dec(bmiOf(last.weight, profile.heightCm)!)),
+          // Ένα ύψος για όλα (έλεγχος 8/11, DATA-08): από τα στοιχεία σου· της InBody μόνο αν δεν έχεις δώσει ύψος.
+          if (bmiOf(last.weight, profile.heightCm) ?? last.bmi case final bmi?) InfoRow('Δείκτης μάζας σώματος', dec(bmi)),
+          if (inBodyHeight(last.weight, last.bmi) case final h? when profile.heightCm != null && (h - profile.heightCm!).abs() >= 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 6),
+              child: Text(
+                'Η εφαρμογή InBody έχει ύψος ${h.round()} cm, τα στοιχεία σου ${profile.heightCm!.round()} cm. Εδώ μετρά το δικό σου· '
+                'διόρθωσέ το και στην InBody, για να βγάζει σωστά λίπος και μύες.',
+                style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+              ),
+            ),
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
           // 7/11: εύρη αναφοράς με πηγή (λίπος ανά ηλικία και φύλο, υγιές βάρος για το ύψος). Η εξήγηση στο «i».
           const Hairline(vertical: 12),
@@ -249,7 +257,7 @@ class _LatestCard extends StatelessWidget {
       final r = RefRange(
         low: lo,
         high: hi,
-        text: 'υγιές βάρος για το ύψος σου ${dec(lo)}–${dec(hi)} kg',
+        text: 'φυσιολογικός δείκτης για το ύψος σου: ${dec(lo)}–${dec(hi)} kg',
         cite: bmiRange.cite,
       );
       out.addAll([
