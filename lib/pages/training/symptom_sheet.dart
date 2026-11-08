@@ -353,7 +353,7 @@ class Call166Button extends StatelessWidget {
         foregroundColor: strong ? onBad(c) : c.bad,
         side: strong ? null : BorderSide(color: c.bad),
         minimumSize: Size.fromHeight(strong ? 64 : (compact ? 48 : 52)),
-        textStyle: TextStyle(fontSize: strong ? 20 : 16, fontWeight: FontWeight.w800),
+        textStyle: TextStyle(fontFamily: fontFamily, fontSize: strong ? 20 : 16, fontWeight: FontWeight.w800),
       ),
       onPressed: () => dialEmergency(context, '166'),
       icon: const Icon(Icons.call_rounded),
@@ -390,14 +390,14 @@ class SymptomHistoryCard extends StatelessWidget {
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
                 padding: const EdgeInsets.only(top: 5),
-                child: Container(width: 9, height: 9, decoration: BoxDecoration(color: x.red ? c.bad : c.exercise, shape: BoxShape.circle)),
+                child: Container(width: 9, height: 9, decoration: BoxDecoration(color: x.red ? c.bad : c.textTertiary, shape: BoxShape.circle)),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(
-                    '${shortDayDate(x.at)} ${hm(x.at)}${(_where[x.where] ?? '').isEmpty ? '' : ' · ${_where[x.where]}'}',
-                    style: TextStyle(fontSize: 12.5, color: c.textSecondary),
+                    '${shortDayDate(x.at)} ${hm(x.at)}${(_where[x.where] ?? '').isEmpty ? '' : ' · ${_where[x.where]}'}${x.red ? ' · σοβαρό' : ''}',
+                    style: TextStyle(fontSize: 12.5, color: x.red ? c.bad : c.textSecondary, fontWeight: x.red ? FontWeight.w600 : null),
                   ),
                   Text(x.text, style: TextStyle(fontSize: 14.5, height: 1.3, color: c.text)),
                 ]),

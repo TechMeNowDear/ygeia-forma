@@ -76,7 +76,10 @@ class _ReportPageState extends State<ReportPage> {
     TrainingStore.main.load().then((_) {
       if (mounted) setState(() {});
     });
-    SamsungHealth.medical().then((m) {
+    // Αν το Samsung Health δεν απαντήσει, το PDF βγαίνει χωρίς αυτά (το γράφει), όχι κουμπί κλειδωμένο για πάντα.
+    SamsungHealth.medical()
+        .timeout(const Duration(seconds: 12), onTimeout: () => {'ok': false, 'message': 'δεν απάντησε εγκαίρως'})
+        .then((m) {
       if (mounted) setState(() => _medical = m);
     });
   }
@@ -1118,7 +1121,7 @@ class _PageFour extends StatelessWidget {
       if (syms.isEmpty)
         Text('Καμία καταγραφή.', style: small)
       else ...[
-        table(const {0: FixedColumnWidth(62), 1: FlexColumnWidth(4), 2: FlexColumnWidth(1.6), 3: FixedColumnWidth(52)}, [
+        table(const {0: FixedColumnWidth(70), 1: FlexColumnWidth(4), 2: FlexColumnWidth(1.6), 3: FixedColumnWidth(52)}, [
           head(['Πότε', 'Τι ένιωσε (όπως το διάλεξε)', 'Πού', 'Βαθμίδα']),
           for (final x in shownSyms)
             row([
@@ -1141,14 +1144,14 @@ class _PageFour extends StatelessWidget {
       if (shownSess.isNotEmpty) ...[
         const SizedBox(height: 3),
         table(const {
-          0: FixedColumnWidth(62),
+          0: FixedColumnWidth(70),
           1: FlexColumnWidth(2.6),
           2: FixedColumnWidth(40),
           3: FixedColumnWidth(70),
           4: FixedColumnWidth(54),
           5: FixedColumnWidth(48),
         }, [
-          head(['Πότε', 'Τι', 'Λεπτά', 'Παλμοί\nμέσος / υψηλ.', 'Πάνω από\nτο όριο', 'Μεγαλύτ.\nκενό']),
+          head(['Πότε', 'Τι', 'Λεπτά', 'Παλμοί\nμέσος / υψηλ.', 'Πάνω από\nτο όριο', 'Κενό\nπαλμών']),
           for (final s in shownSess)
             row([
               _dt(s.start),
@@ -1161,7 +1164,7 @@ class _PageFour extends StatelessWidget {
             ], red: s.stopped),
         ]),
         if (sess.length > shownSess.length) Text('και ${sess.length - shownSess.length} παλαιότερες', style: small),
-        Text('«Μεγαλύτερο κενό»: πόση ώρα το πολύ δεν έφτασαν παλμοί από το ρολόι (τόσο μπορεί να άργησε η ειδοποίηση ορίου).',
+        Text('«Κενό παλμών»: η μεγαλύτερη διάρκεια χωρίς παλμούς από το ρολόι (τόσο μπορεί να άργησε η ειδοποίηση ορίου).',
             style: small),
       ],
       _Title('Από το Samsung Health Monitor (όπως τα δίνει η Samsung, χωρίς ερμηνεία)'),
