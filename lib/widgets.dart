@@ -121,7 +121,9 @@ class PageFrame extends StatelessWidget {
         builder: (context, constraints) {
           final side = constraints.maxWidth >= 600 ? 28.0 : 16.0;
           final available = constraints.maxWidth - side * 2;
-          final twoColumns = available >= 680 && right.isNotEmpty;
+          // Δύο στήλες από ~580 dp περιεχομένου (στήλες ~283 dp, όσο ένα στενό κινητό): το ανοιχτό Fold με την πλαϊνή
+          // μπάρα έμενε σε μία στήλη με το 680 (έλεγχος 8/11, UX-20).
+          final twoColumns = available >= 580 && right.isNotEmpty;
           // Μία στήλη σε φαρδιά οθόνη: όχι τεντωμένη, έως 640 στο κέντρο.
           final width = math.min(available, twoColumns ? 1080.0 : 640.0);
 
