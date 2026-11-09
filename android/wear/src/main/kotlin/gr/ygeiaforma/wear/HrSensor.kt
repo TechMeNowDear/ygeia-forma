@@ -15,7 +15,7 @@ import android.os.SystemClock
  *
  * Οι τιμές πάνε μόνο στην ειδοποίηση και στην ένδειξη· οι μετρήσεις της προπόνησης έρχονται από το Health Services.
  */
-class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long) -> Unit) : SensorEventListener {
+class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long, atEl: Long) -> Unit) : SensorEventListener {
     private var sm: SensorManager? = null
 
     /**
@@ -29,6 +29,10 @@ class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long)
 
     /** Πότε ήρθε η τελευταία τιμή (ms). */
     var lastAt = 0L
+        private set
+
+    /** Το ίδιο σε elapsedRealtime (ms): δεν αλλάζει όταν αλλάζει η ώρα του ρολογιού (W3-14). */
+    var lastEl = 0L
         private set
 
     /** true αν ξεκίνησε (υπάρχει αισθητήρας και δέχτηκε την εγγραφή). */
@@ -61,7 +65,8 @@ class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long)
         contact = true
         last = bpm
         lastAt = System.currentTimeMillis()
-        onBpm(bpm, sensorWallTime(e.timestamp, System.currentTimeMillis(), SystemClock.elapsedRealtimeNanos()))
+        lastEl = SystemClock.elapsedRealtime()
+        onBpm(bpm, sensorWallTime(e.timestamp, System.currentTimeMillis(), SystemClock.elapsedRealtimeNanos()), minOf(e.timestamp / 1_000_000, lastEl))
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {

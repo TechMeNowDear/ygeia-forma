@@ -32,7 +32,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         fun nextExercise()
         fun restPlus()
         fun restStop()
-        fun finish()
+        /** «Τέλος» της άσκησης (όχι Activity.finish(): το «Πίσω» δεν τελειώνει την άσκηση, V-A-17). */
+        fun finishWorkout()
         fun pauseWalk(on: Boolean)
         fun muteAlarm()
         fun doneOk()
@@ -56,6 +57,18 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     /** Η προπόνηση που δείχνει η αρχική (μπορεί να αλλάξει με πάτημα στο όνομα). */
     var chosen: String? = null
 
+    /**
+     * Ambient (αχνή οθόνη «πάντα ανοιχτή», έλεγχος 9/11, W3-08): μαύρο φόντο, μόνο λευκά/γκρι γράμματα χωρίς εξομάλυνση
+     * (οθόνες με λίγα bit), καθόλου γεμάτα σχήματα ή κουμπιά, χρόνος σε λεπτά (ανανέωση μία φορά το λεπτό).
+     */
+    var ambient = false
+        set(v) {
+            if (field == v) return
+            field = v
+            text.isAntiAlias = !v
+            invalidate()
+        }
+
     private var u = 1f
     private var cx = 0f
     private var cy = 0f
@@ -71,6 +84,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         cx = width / 2f
         cy = height / 2f
         val now = System.currentTimeMillis()
+        if (ambient) {
+            c.drawColor(Color.BLACK)
+            drawAmbient(c, now)
+            return
+        }
         val alarm = Repo.alarm.on && Repo.running != null && now >= Repo.alarmMutedUntil
         c.drawColor(if (alarm) alarmBg else Color.BLACK)
         if (alarm) {
@@ -99,6 +117,36 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     }
 
     private var noticeOpen = false
+
+    /** Ambient: τα βασικά μόνο, λευκό/γκρι σε μαύρο, χωρίς δευτερόλεπτα. Δεν πατιέται τίποτα. */
+    private fun drawAmbient(c: Canvas, now: Long) {
+        val light = Color.WHITE
+        val dimText = Color.parseColor("#8A8A8A")
+        when {
+            Repo.running == "walk" -> {
+                small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 56f, dimText, 9f, 120f)
+                val sec = Repo.activeSecNow(now).let { if (it > 0) it else (now - Repo.startedAt) / 1000 }
+                t(c, "${sec / 60}′", 100f, light, 30f, true)
+                if (Repo.meters > 0) small(c, "${km(Repo.meters)} km", 124f, light, 11f, 150f)
+                Repo.alarm.limit?.let { small(c, "όριο $it", 146f, dimText, 9f, 120f) }
+            }
+            Repo.session != null && Repo.running != null -> {
+                val s = Repo.session!!
+                val it = s.current
+                small(c, s.name, 64f, dimText, 9f, 140f)
+                if (it != null) {
+                    t(c, it.name, 96f, light, 12f, true)
+                    val si = it.nextSet.let { n -> if (n < 0) it.sets.size - 1 else n }
+                    small(c, "ΣΕΤ ${si + 1}/${it.sets.size}", 118f, dimText, 9f, 120f)
+                }
+                val mins = (now - Repo.startedAt) / 60_000
+                small(c, "$mins′", 142f, light, 11f, 120f)
+            }
+            else -> {
+                t(c, "Υγεία & Φόρμα", 100f, dimText, 11f, true)
+            }
+        }
+    }
 
     /** Ολόκληρο το μήνυμα, σε πολλές γραμμές· πάτημα οπουδήποτε κλείνει. */
     private fun drawNotice(c: Canvas, note: String) {
@@ -201,18 +249,25 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun drawHome(c: Canvas) {
         val plan = Repo.plan
         val phone = Repo.phone
+        if (Repo.updateNeeded) {
+            // Πρόγραμμα από νεότερη έκδοση του κινητού (V-A-08): δεν διαβάστηκε.
+            small(c, "Ενημέρωσε την εφαρμογή", 30f, orange, 8f, 110f)
+            small(c, "στο ρολόι", 39f, orange, 8f, 90f)
+        }
         if (phone != null && !phone.ended) {
             small(c, "ΣΤΟ ΚΙΝΗΤΟ", 52f, gray, 9f, 120f)
             t(c, phone.name, 74f, Color.WHITE, 15f, true)
             small(c, "${phone.setsDone} σετ ως τώρα", 92f, gray, 9f, 130f)
             pill(c, "Παλμοί εδώ", 122f, 96f, 30f, orange, Color.WHITE) { actions.joinPhone() }
-            small(c, "και ✓ στον καρπό", 150f, gray, 9f, 120f)
+            // Και περπάτημα από εδώ, ακόμα κι αν η προπόνηση του κινητού έμεινε ανοιχτή (έλεγχος 9/11, V-A-09).
+            hits.add(Hit(RectF(cx - 60 * u, 142 * u, cx + 60 * u, 164 * u)) { actions.startWalk() })
+            small(c, "↓ Περπάτημα", 154f, gray, 9f, 120f)
             return
         }
-        if (plan != null) {
-            // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11).
-            val lim = plan.hrLimit
-            small(c, if (lim != null) "όριο παλμών $lim" else "χωρίς όριο παλμών", 34f, if (lim != null) orange else gray, 8f, 96f)
+        if (plan != null || Repo.knownLimit != null) {
+            // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11)· και χωρίς πρόγραμμα, το τελευταίο που ήρθε (V-A-06).
+            val lim = Repo.limitNow()
+            if (!Repo.updateNeeded) small(c, if (lim != null) "όριο παλμών $lim" else "χωρίς όριο παλμών", 34f, if (lim != null) orange else gray, 8f, 96f)
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
@@ -264,6 +319,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val s = Repo.session ?: return drawHome(c)
         // «Ελεύθερη άσκηση» του κινητού χωρίς ασκήσεις ακόμα (9/11): οι παλμοί μετράνε, η άσκηση διαλέγεται στο κινητό.
         if (s.phone && s.items.isEmpty()) return drawPickOnPhone(c, now)
+        // Όλες οι ασκήσεις έγιναν (W3-13): όχι ένα ✓ που δεν κάνει τίποτα.
+        if (s.phone && s.allDone) return if (s.workout == "_free") drawPickOnPhone(c, now, next = true) else drawAllDone(c, now)
         val it = s.current ?: return drawEnd(c)
         heart(c, 40f, now)
         val si = it.nextSet.let { n -> if (n < 0) it.sets.size - 1 else n }
@@ -282,17 +339,34 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             pillAt(c, "+", 146f, ry, 24f, 20f, card, Color.WHITE, 14f) { actions.reps(1) }
         }
         pill(c, "✓", 152f, 80f, 30f, green, Color.WHITE, 18f) { actions.tick() }
-        hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finish() })
+        hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finishWorkout() })
         small(c, "Τέλος", 182f, gray, 8.5f, 60f)
     }
 
-    private fun drawPickOnPhone(c: Canvas, now: Long) {
+    private fun drawPickOnPhone(c: Canvas, now: Long, next: Boolean = false) {
         heart(c, 52f, now)
-        t(c, "Διάλεξε άσκηση", 92f, Color.WHITE, 14f, true)
-        t(c, "στο κινητό", 112f, Color.WHITE, 14f, true)
+        if (next) {
+            small(c, "Διάλεξε επόμενη", 84f, Color.WHITE, 13f, 150f)
+            small(c, "άσκηση στο κινητό", 100f, Color.WHITE, 13f, 150f)
+            small(c, "${s0()} σετ ως τώρα", 116f, gray, 8.5f, 140f)
+        } else {
+            t(c, "Διάλεξε άσκηση", 92f, Color.WHITE, 14f, true)
+            t(c, "στο κινητό", 112f, Color.WHITE, 14f, true)
+        }
         small(c, if (Repo.bpmFresh(now)) "οι παλμοί ήδη μετράνε" else "περιμένω παλμούς", 134f, gray, 8.5f, 140f)
-        hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finish() })
+        hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finishWorkout() })
         small(c, "Τέλος", 182f, gray, 8.5f, 60f)
+    }
+
+    private fun s0(): Int = Repo.session?.setsDone ?: 0
+
+    /** Προπόνηση του κινητού με όλα τα σετ ✓: τέλος εδώ ή στο κινητό. */
+    private fun drawAllDone(c: Canvas, now: Long) {
+        heart(c, 52f, now)
+        t(c, "✓", 88f, green, 22f, true)
+        t(c, "Όλα τα σετ έγιναν", 110f, Color.WHITE, 12f, true)
+        small(c, "Τέλος εδώ ή στο κινητό", 126f, gray, 8.5f, 140f)
+        pill(c, "Τέλος", 158f, 80f, 28f, card, Color.WHITE, 11f) { actions.finishWorkout() }
     }
 
     // ------------------------------------------------------------------ ρεζέρβα
@@ -352,17 +426,20 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     // ------------------------------------------------------------------ Ε. περπάτημα
     private fun drawWalk(c: Canvas, now: Long) {
         small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 50f, if (Repo.paused) orange else gray, 9f, 120f)
-        val sec = if (Repo.activeSec > 0) Repo.activeSec else (now - Repo.startedAt) / 1000
+        // Ο χρόνος προχωρά κάθε δευτερόλεπτο από το σημείο ελέγχου του Health Services (W3-12).
+        val sec = Repo.activeSecNow(now).let { if (it > 0 || Repo.cpWall > 0) it else (now - Repo.startedAt) / 1000 }
         t(c, clock(sec), 88f, if (Repo.paused) gray else Color.WHITE, 30f, true)
         val dist = if (Repo.meters > 0) "${km(Repo.meters)} km · ${pace(Repo.meters, sec)}" else if (Repo.steps > 0) "${Repo.steps} βήματα" else "—"
         small(c, dist, 108f, Color.WHITE, 11f, 150f)
         heart(c, 128f, now, 11f)
-        if (!Repo.gps) small(c, "χωρίς GPS", 146f, gray, 8f, 100f)
+        // Χωρίς όριο: να φαίνεται (W3-18), όχι σιωπηλά.
+        val tags = listOfNotNull(if (!Repo.gps) "χωρίς GPS" else null, if (Repo.alarm.limit == null) "χωρίς όριο" else null)
+        if (tags.isNotEmpty()) small(c, tags.joinToString(" · "), 146f, gray, 8f, 110f)
         // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν).
         pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 72f, 166f, 54f, 26f, if (Repo.paused) orange else card, Color.WHITE, 10f) {
             actions.pauseWalk(!Repo.paused)
         }
-        pillAt(c, "Τέλος", 128f, 166f, 50f, 26f, card, Color.WHITE, 10f) { actions.finish() }
+        pillAt(c, "Τέλος", 128f, 166f, 50f, 26f, card, Color.WHITE, 10f) { actions.finishWorkout() }
     }
 
     /**
@@ -376,7 +453,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val left = ((Repo.recoveryUntil - now + 999) / 1000).coerceAtLeast(0)
         t(c, "$left″", 116f, Color.WHITE, 26f, true)
         heart(c, 138f, now, 11f)
-        pill(c, "Παράλειψη", 166f, 80f, 24f, card, Color.WHITE, 10f) { actions.finish() }
+        pill(c, "Παράλειψη", 166f, 80f, 24f, card, Color.WHITE, 10f) { actions.finishWorkout() }
     }
 
     // ------------------------------------------------------------------ τέλος

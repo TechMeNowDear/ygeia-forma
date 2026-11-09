@@ -23,10 +23,31 @@ object Paths {
     const val HR = "/ygeia/hr"
     const val CMD = "/ygeia/cmd"
     const val LIVE = "/ygeia/live"
+    /**
+     * Ρολόι → κινητό (DataItem, έλεγχος 9/11, V-A-06): τι έχει το ρολόι (το όριο παλμών που ισχύει εκεί, η έκδοση της
+     * μορφής). Το κινητό γράφει «Στο ρολόι ✓ όριο 140» μόνο όταν το δει. Νέο path: το παλιό κινητό το αγνοεί.
+     */
+    const val STATE = "/ygeia/wstate"
     const val KEY = "json"
 
     /** Δυνατότητα που δηλώνει η εφαρμογή του ρολογιού (res/values/wear.xml), για να τη βρίσκει το κινητό. */
     const val CAPABILITY = "ygeia_watch"
+}
+
+/**
+ * Έκδοση της μορφής (πεδίο «v» σε πρόγραμμα, προπόνηση, αποτέλεσμα, εντολή). Αλλάζει ΜΟΝΟ όταν η μορφή αλλάζει με τρόπο
+ * που η παλιά έκδοση δεν μπορεί να διαβάσει σωστά (νέα πεδία δεν την αλλάζουν). Ό,τι έρχεται με μεγαλύτερο «v» δεν
+ * διαβάζεται: το ρολόι λέει «Ενημέρωσε την εφαρμογή στο ρολόι» (έλεγχος 9/11, V-A-08).
+ */
+object Proto {
+    const val MAJOR = 1
+
+    /** Κείμενο από νεότερη έκδοση της εφαρμογής (με «v» μεγαλύτερο από όσο ξέρουμε). Χωρίς «v» = 1. */
+    fun tooNew(text: String): Boolean = try {
+        JSONObject(text).optInt("v", 1) > MAJOR
+    } catch (_: Exception) {
+        false
+    }
 }
 
 /** [confirmed]: το κινητό έχει δει το ✓ (στην κατάσταση που στέλνει). Ως τότε το ✓ του ρολογιού κρατιέται (έλεγχος #2). */
@@ -108,6 +129,7 @@ internal fun itemOf(o: JSONObject): ItemT {
                 label = s.optString("label", ""),
                 reps = s.optInt("reps", 0),
                 done = s.optBoolean("done", false),
+                at = s.optLong("at", 0),
             )
         }.toMutableList(),
         rir = if (o.has("ra") && !o.isNull("ra")) o.getInt("ra") else null,
@@ -199,6 +221,26 @@ class LiveSession(
 
     enum class Next { SET, REST, ASK_RIR, END }
 
+    /** Η κατάσταση για το στιγμιότυπο (έλεγχος 9/11, V-A-03): ονόματα, στόχοι, ✓ με την ώρα τους, τρέχουσα άσκηση. */
+    fun toState(): JSONObject {
+        val arr = JSONArray()
+        for (it in items) {
+            val sets = JSONArray()
+            for (s in it.sets) {
+                val o = JSONObject().put("label", s.label).put("reps", s.reps)
+                if (s.load != null) o.put("load", finite(s.load))
+                if (s.done) o.put("done", true).put("at", s.at)
+                sets.put(o)
+            }
+            val o = JSONObject().put("ex", it.ex).put("name", it.name).put("rest", it.rest).put("lo", it.lo).put("hi", it.hi)
+                .put("rir", it.rirTarget).put("sets", sets)
+            it.rir?.let { r -> o.put("ra", r) }
+            arr.put(o)
+        }
+        return JSONObject().put("id", id).put("w", workout).put("name", name).put("start", start).put("idx", idx)
+            .put("restEnd", restEnd).put("rirIdx", rirIdx).put("items", arr)
+    }
+
     /** Για το κινητό: ίδια μορφή με το ExLog.toJson της εφαρμογής (l, r, d, t). */
     fun resultJson(end: Long, hr: HrStats, cardio: JSONObject? = null): JSONObject {
         val arr = JSONArray()
@@ -236,6 +278,23 @@ class LiveSession(
             },
         )
 
+        /** Από το στιγμιότυπο ([toState]), ή null αν δεν διαβάζεται. */
+        fun fromState(o: JSONObject): LiveSession? = try {
+            val arr = o.optJSONArray("items") ?: JSONArray()
+            LiveSession(
+                id = o.getString("id"),
+                workout = o.optString("w", ""),
+                name = o.optString("name", ""),
+                start = o.optLong("start", 0),
+                items = (0 until arr.length()).map { itemOf(arr.getJSONObject(it)) },
+                idx = o.optInt("idx", 0),
+                restEnd = o.optLong("restEnd", 0),
+                rirIdx = o.optInt("rirIdx", -1),
+            )
+        } catch (_: Exception) {
+            null
+        }
+
         /** Η προπόνηση του κινητού ([Paths.SESSION]). null αν δεν τρέχει καμία. */
         fun parsePhone(text: String): LiveSession? = try {
             val j = JSONObject(text)
@@ -264,8 +323,11 @@ class LiveSession(
  * Παλμοί μιας άσκησης: μέσος, μέγιστος και οι τιμές με τον χρόνο τους. Κρατά μία τιμή ανά [step] δευτερόλεπτα
  * (1″: όσο συχνά μετρά το ρολόι· ως #87 κρατούσε μία ανά 10″ και οι παλμοί ανά σετ δεν έβγαιναν σωστοί, 9/11).
  * [start] (ms) πάει μαζί με τις τιμές («hrT0»), ώστε το κινητό να τις βάλει στη σωστή ώρα της προπόνησής του.
+ *
+ * Παύσεις και «Τέλος» κρίνονται με τον χρόνο ΚΑΘΕ τιμής, όχι με την ώρα που έφτασε (έλεγχος 9/11, W3-11): οι τιμές
+ * έρχονται σε πακέτα (ανά 5″ ή και λεπτά), οπότε μια τιμή πριν από την παύση μπορεί να φτάσει μετά.
  */
-class HrStats(private val start: Long, private val step: Int = 1) {
+class HrStats(val start: Long, private val step: Int = 1) {
     private var sum = 0L
     private var n = 0
     var max = 0
@@ -275,26 +337,42 @@ class HrStats(private val start: Long, private val step: Int = 1) {
     val samples = mutableListOf<IntArray>()
     private var lastSampleSec = -1
 
-    /**
-     * Μετράνε στον μέσο και στον υψηλότερο; Όχι σε παύση του περπατήματος ούτε στο λεπτό αποκατάστασης μετά το «Τέλος»
-     * (9/11): οι τιμές κρατιούνται για την πτώση των παλμών, αλλά ο μέσος είναι μόνο της άσκησης.
-     */
+    /** Χειροκίνητο «δεν μετράει» (παλιός τρόπος· οι παύσεις πλέον με [pause]/[resume], ανά χρόνο τιμής). */
     var counting = true
+
+    /** Παύσεις σε δευτερόλεπτα από την αρχή: [από, ως) — «ως» = Int.MAX_VALUE όσο κρατά. */
+    private val pauses = mutableListOf<IntArray>()
 
     /** Το «Τέλος» (δευτερόλεπτα από την αρχή): ό,τι μετά είναι λεπτό αποκατάστασης και δεν πάει στο κινητό ως άσκηση. */
     var endSec = Int.MAX_VALUE
         private set
 
+    private fun secOf(at: Long): Int = ((at - start) / 1000).toInt()
+
     fun markEnd(at: Long) {
-        endSec = ((at - start) / 1000).toInt()
-        counting = false
+        endSec = secOf(at)
     }
+
+    /** Παύση από [at]: τιμές με χρόνο μέσα στην παύση δεν μετρούν στον μέσο/υψηλότερο (κρατιούνται ως τιμές). */
+    fun pause(at: Long) {
+        if (pauses.lastOrNull()?.get(1) == Int.MAX_VALUE) return
+        pauses.add(intArrayOf(secOf(at), Int.MAX_VALUE))
+    }
+
+    fun resume(at: Long) {
+        val p = pauses.lastOrNull() ?: return
+        if (p[1] == Int.MAX_VALUE) p[1] = maxOf(p[0], secOf(at))
+    }
+
+    private fun paused(sec: Int): Boolean = pauses.any { sec >= it[0] && sec < it[1] }
 
     fun add(bpm: Int, at: Long) {
         if (bpm <= 25 || bpm >= 250) return // όχι πραγματική τιμή (π.χ. το ρολόι δεν ακουμπά)
+        val sec = secOf(at)
+        // Ίδιο ή παλιότερο δευτερόλεπτο από ό,τι έχουμε ήδη (π.χ. ξαναπαράδοση μετά από επανασύνδεση, V-A-03): ήδη μετρήθηκε.
+        if (lastSampleSec >= 0 && sec <= lastSampleSec) return
         last = bpm
-        val sec = ((at - start) / 1000).toInt()
-        if (counting && sec <= endSec) {
+        if (counting && sec <= endSec && !paused(sec)) {
             sum += bpm
             n++
             if (bpm > max) max = bpm
@@ -318,7 +396,31 @@ class HrStats(private val start: Long, private val step: Int = 1) {
     /** Πτώση παλμών 1′ μετά το «Τέλος»: (παλμοί στο τέλος, παλμοί στο 1′), ή null. Δες [recovery]. */
     fun recovery(): Pair<Int, Int>? = if (endSec == Int.MAX_VALUE) null else recovery(samples, endSec)
 
+    /** Για το στιγμιότυπο της άσκησης (έλεγχος 9/11, V-A-03): όλη η κατάσταση, για να συνεχίσει μετά από απότομο κλείσιμο. */
+    fun toState(): JSONObject {
+        val s = JSONArray()
+        for (x in samples) s.put(JSONArray().put(x[0]).put(x[1]))
+        val p = JSONArray()
+        for (x in pauses) p.put(JSONArray().put(x[0]).put(x[1]))
+        return JSONObject().put("start", start).put("step", step).put("sum", sum).put("n", n).put("max", max).put("last", last)
+            .put("end", endSec).put("counting", counting).put("ls", lastSampleSec).put("s", s).put("pz", p)
+    }
+
     companion object {
+        fun fromState(o: JSONObject): HrStats {
+            val h = HrStats(o.getLong("start"), o.optInt("step", 1))
+            h.sum = o.optLong("sum", 0)
+            h.n = o.optInt("n", 0)
+            h.max = o.optInt("max", 0)
+            h.last = o.optInt("last", 0)
+            h.endSec = o.optInt("end", Int.MAX_VALUE)
+            h.counting = o.optBoolean("counting", true)
+            h.lastSampleSec = o.optInt("ls", -1)
+            o.optJSONArray("s")?.let { a -> for (i in 0 until a.length()) a.optJSONArray(i)?.let { h.samples.add(intArrayOf(it.getInt(0), it.getInt(1))) } }
+            o.optJSONArray("pz")?.let { a -> for (i in 0 until a.length()) a.optJSONArray(i)?.let { h.pauses.add(intArrayOf(it.getInt(0), it.getInt(1))) } }
+            return h
+        }
+
         /** Πόσο κρατά το λεπτό αποκατάστασης: ως το τέλος του παραθύρου γύρω από το 1′ (55″–65″). */
         const val RECOVERY_MS = 65_000L
 
@@ -364,6 +466,99 @@ class HrStats(private val start: Long, private val step: Int = 1) {
             }
             return cur
         }
+    }
+}
+
+/**
+ * Χρόνος ανά km (έλεγχος 9/11, V-A-19): η απόσταση έρχεται σε πακέτα (με σβηστή οθόνη και ανά 150″). Το km γράφεται τη
+ * στιγμή που ΠΕΡΑΣΤΗΚΕ, με γραμμική παρεμβολή ανάμεσα σε δύο τιμές απόστασης, με τους χρόνους των ίδιων των τιμών
+ * (όχι την ώρα που έφτασε το πακέτο). [splits]: [ενεργός χρόνος (″), ώρα (ms)] κάθε ολόκληρου km.
+ */
+class SplitTracker(startWall: Long) {
+    val splits = mutableListOf<LongArray>()
+    private var pm = 0.0
+    private var pt = startWall
+    private var pa = 0.0
+
+    /** Νέα συνολική απόσταση [totalM] τη στιγμή [atWall] (ms), με ενεργό χρόνο [activeSecAt] (″) εκείνη τη στιγμή. */
+    fun update(totalM: Double, atWall: Long, activeSecAt: Double) {
+        if (totalM.isNaN() || totalM.isInfinite() || totalM < pm) return
+        val t1 = maxOf(atWall, pt)
+        val a1 = maxOf(activeSecAt, pa)
+        while (totalM >= (splits.size + 1) * 1000.0) {
+            val target = (splits.size + 1) * 1000.0
+            val f = if (totalM > pm) ((target - pm) / (totalM - pm)).coerceIn(0.0, 1.0) else 1.0
+            splits.add(longArrayOf(Math.round(pa + f * (a1 - pa)), Math.round(pt + f * (t1 - pt))))
+        }
+        pm = totalM
+        pt = t1
+        pa = a1
+    }
+
+    fun toState(): JSONObject {
+        val a = JSONArray()
+        for (k in splits) a.put(JSONArray().put(k[0]).put(k[1]))
+        return JSONObject().put("m", pm).put("t", pt).put("a", pa).put("k", a)
+    }
+
+    companion object {
+        fun fromState(o: JSONObject, startWall: Long): SplitTracker {
+            val s = SplitTracker(startWall)
+            s.pm = o.optDouble("m", 0.0).takeIf { it.isFinite() } ?: 0.0
+            s.pt = o.optLong("t", startWall)
+            s.pa = o.optDouble("a", 0.0).takeIf { it.isFinite() } ?: 0.0
+            o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) a.optJSONArray(i)?.let { s.splits.add(longArrayOf(it.getLong(0), it.getLong(1))) } }
+            return s
+        }
+    }
+}
+
+/**
+ * Ενεργός χρόνος (″) τη στιγμή [now] από το σημείο ελέγχου του Health Services: [cpActiveMs] ενεργός χρόνος τη στιγμή
+ * [cpWall]· αν τρέχει, + ό,τι πέρασε από τότε (έλεγχος 9/11, W3-12: όχι μόνο όταν έρχεται ενημέρωση). Χωρίς σημείο
+ * ελέγχου ([cpWall] = 0): [fallbackSec].
+ */
+fun activeSecAt(cpActiveMs: Long, cpWall: Long, running: Boolean, now: Long, fallbackSec: Long): Long {
+    if (cpWall <= 0L) return fallbackSec
+    val ms = cpActiveMs + if (running) maxOf(0L, now - cpWall) else 0L
+    return maxOf(0L, ms / 1000)
+}
+
+/**
+ * Ενεργός χρόνος (″) τη στιγμή [t] (π.χ. ο χρόνος μιας τιμής απόστασης, V-A-19), από το σημείο ελέγχου: αν τρέχει από
+ * το [cpWall], + ό,τι πέρασε· αν είναι σε παύση από το [cpWall], − ό,τι ήταν πριν. Ποτέ αρνητικός.
+ */
+fun activeAtWall(cpActiveMs: Long, cpWall: Long, running: Boolean, t: Long, fallbackSec: Long): Double {
+    if (cpWall <= 0L) return fallbackSec.toDouble()
+    val ms = if (running) cpActiveMs + maxOf(0L, t - cpWall) else cpActiveMs - maxOf(0L, cpWall - t)
+    return maxOf(0L, ms) / 1000.0
+}
+
+/**
+ * Το «μηδέν» του χρονομέτρου της πρόσοψης (Ongoing Activity): θέλει χρόνο από την εκκίνηση της συσκευής
+ * (elapsedRealtime), όχι ώρα τοίχου (έλεγχος 9/11, W3-04). [elapsedMs]: πόσος χρόνος έχει ήδη μετρηθεί.
+ */
+fun stopwatchZero(nowElapsed: Long, elapsedMs: Long): Long = nowElapsed - maxOf(0L, elapsedMs)
+
+/** Πεπερασμένος αριθμός για JSON (το JSONObject δεν δέχεται NaN/άπειρο· DP-05). */
+fun finite(v: Double): Double = if (v.isFinite()) v else 0.0
+
+/**
+ * Τι γίνεται με άσκηση που έμεινε μισή (η εφαρμογή έκλεισε απότομα, έλεγχος 9/11, V-A-03):
+ * - [Action.ATTACH]: το Health Services την κρατά ακόμα για εμάς (ως 5′ χωρίς ακροατή): συνεχίζει από εκεί που ήταν.
+ * - [Action.RESUME]: προπόνηση με βάρη στο ρολόι, πρόσφατη: συνεχίζει (με νέα μέτρηση παλμών)· τα σετ δεν χάνονται.
+ * - [Action.FINALIZE]: γράφεται ως «μερική» με ό,τι είχε σωθεί και στέλνεται στο κινητό. Ένα αποτέλεσμα, με το ίδιο id.
+ */
+object Recovery {
+    enum class Action { ATTACH, RESUME, FINALIZE }
+
+    /** Πόσο πρόσφατη πρέπει να είναι μια προπόνηση με βάρη για να συνεχίσει (αλλιώς γράφεται ως μερική). */
+    const val RESUME_MS = 15 * 60_000L
+
+    fun decide(owned: Boolean, kind: String?, phone: Boolean, hasLocal: Boolean, savedAt: Long, now: Long): Action = when {
+        owned -> Action.ATTACH
+        kind == "strength" && !phone && hasLocal && now - savedAt in 0..RESUME_MS -> Action.RESUME
+        else -> Action.FINALIZE
     }
 }
 

@@ -4,8 +4,13 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.os.Build
+import android.hardware.display.DisplayManager
 import android.os.Bundle
+import android.view.Display
 import android.view.WindowManager
+import androidx.concurrent.futures.await
+import androidx.health.services.client.HealthServices
+import androidx.health.services.client.data.ExerciseTrackedStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,13 +39,43 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (::view.isInitialized) view.invalidate()
     }
 
+    /**
+     * Ανανέωση της οθόνης: κάθε 1″ κανονικά· στο ambient (Wear OS 6: η οθόνη μένει «ανοιχτή» και αχνή) μία φορά το λεπτό,
+     * στην αρχή κάθε λεπτού, χωρίς δευτερόλεπτα (έλεγχος 9/11, W3-08).
+     */
     private val tickRunnable = object : Runnable {
         override fun run() {
             if (!visible) return
             syncScreen()
             view.invalidate()
-            view.postDelayed(this, 1000)
+            val now = System.currentTimeMillis()
+            view.postDelayed(this, if (view.ambient) 60_000L - now % 60_000L else 1000L)
         }
+    }
+
+    /**
+     * Ambient χωρίς βιβλιοθήκη: η κατάσταση της οθόνης (DOZE = αχνή «πάντα ανοιχτή», OFF = σβηστή). Μόνο όσο η οθόνη
+     * της εφαρμογής είναι ορατή.
+     */
+    private val displays = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == Display.DEFAULT_DISPLAY) checkAmbient()
+        }
+    }
+
+    private fun checkAmbient() {
+        val st = try {
+            getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)?.state
+        } catch (_: Exception) {
+            null
+        } ?: return
+        val amb = isAmbientState(st)
+        if (amb == view.ambient) return
+        view.ambient = amb
+        view.removeCallbacks(tickRunnable)
+        if (visible) view.post(tickRunnable)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,15 +101,18 @@ class WatchActivity : Activity(), WatchView.Actions {
         visible = true
         Link.attach(this)
         Repo.listen(redraw)
+        try {
+            getSystemService(DisplayManager::class.java)?.registerDisplayListener(displays, null)
+        } catch (_: Exception) {
+        }
+        checkAmbient()
         scope.launch {
             Link.load(this@WatchActivity)
-            // Αποτέλεσμα που έμεινε από απότομο κλείσιμο: στέλνεται τώρα.
-            if (Repo.running == null) {
-                Repo.takeSnapshot(this@WatchActivity)?.let { s ->
-                    val o = try { JSONObject(s) } catch (_: Exception) { null }
-                    val id = o?.optString("id").orEmpty()
-                    if (o != null && id.isNotEmpty() && !Link.putResult(this@WatchActivity, id, o)) Repo.snapshot(this@WatchActivity, o)
-                }
+            // Άσκηση που έμεινε μισή από απότομο κλείσιμο (V-A-03) και αποτελέσματα που δεν έφτασαν ακόμα: τώρα. Μόνο αν
+            // δεν τρέχει τίποτα εδώ (αλλιώς θα στελνόταν μισή μια προπόνηση που συνεχίζεται, V-A-14).
+            if (Repo.running == null && Repo.local == null) {
+                recoverIfNeeded()
+                sendPending()
             }
             if (joinWhenReady && Repo.phone != null) {
                 joinWhenReady = false
@@ -85,8 +123,36 @@ class WatchActivity : Activity(), WatchView.Actions {
         view.post(tickRunnable)
     }
 
+    /** Στιγμιότυπο άσκησης χωρίς άσκηση στη μνήμη: η εφαρμογή έκλεισε απότομα. Συνέχεια ή μερικό αποτέλεσμα ([Recovery]). */
+    private suspend fun recoverIfNeeded() {
+        val o = Repo.readRun(this) ?: return
+        val owned = try {
+            HealthServices.getClient(this).exerciseClient.getCurrentExerciseInfoAsync().await().exerciseTrackedStatus ==
+                ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS
+        } catch (_: Exception) {
+            false
+        }
+        if (Repo.running != null || Repo.local != null) return
+        val action = Recovery.decide(owned, o.optString("kind"), o.optBoolean("phone", false), o.has("local"), o.optLong("saved", 0), System.currentTimeMillis())
+        try {
+            ExerciseService.recover(this, action)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Αποτελέσματα που δεν μπήκαν ακόμα στο Data Layer (ένα ανά id): τώρα. */
+    private suspend fun sendPending() {
+        for ((id, o) in Repo.pendingAll(this)) {
+            if (Link.putResult(this, id, o)) Repo.removePending(this, id)
+        }
+    }
+
     override fun onStop() {
         visible = false
+        try {
+            getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displays)
+        } catch (_: Exception) {
+        }
         view.removeCallbacks(tickRunnable)
         Repo.unlisten(redraw)
         Link.detach(this)
@@ -144,8 +210,22 @@ class WatchActivity : Activity(), WatchView.Actions {
     // ------------------------------------------------------------------ ενέργειες
     private fun cmd(o: JSONObject) {
         val s = Repo.phone ?: return
-        o.put("sid", s.id)
+        o.put("sid", s.id).put("v", Proto.MAJOR)
         scope.launch { Link.sendJson(this@WatchActivity, Paths.CMD, o) }
+    }
+
+    /**
+     * Στιγμιότυπο της προπόνησης του ρολογιού σε κάθε ✓ (V-A-03): με την άσκηση της υπηρεσίας, ή μόνο τα σετ αν η
+     * υπηρεσία δεν ξεκίνησε (π.χ. χωρίς άδεια). Ποτέ ως «αποτέλεσμα»: στέλνεται μόνο αν η εφαρμογή κλείσει απότομα.
+     */
+    private fun saveRun() {
+        val now = System.currentTimeMillis()
+        val o = Repo.captureRun(now) ?: Repo.local?.let { l ->
+            JSONObject().put("v", 1).put("kind", "strength").put("phone", false).put("start", l.start).put("saved", now)
+                .put("local", l.toState()).also { o -> Repo.alarm.limit?.let { o.put("lim", it) } }
+        } ?: return
+        val text = o.toString()
+        scope.launch(Dispatchers.IO) { Repo.writeRun(this@WatchActivity, text) }
     }
 
     override fun startWorkout(id: String) {
@@ -187,7 +267,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         val next = s.tick(now)
         // Με την ώρα του ✓ εδώ: το κινητό τη γράφει όπως είναι (παλμοί ανά σετ), όχι την ώρα που έφτασε (9/11).
         if (s.phone && si >= 0) cmd(JSONObject().put("op", "tick").put("i", i).put("s", si).put("at", now))
-        if (!s.phone) Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)).put("lim", Repo.alarm.limit ?: 0))
+        if (!s.phone) saveRun()
         Repo.screen = when (next) {
             LiveSession.Next.REST -> if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             LiveSession.Next.ASK_RIR -> Repo.Screen.RIR
@@ -201,7 +281,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         val now = System.currentTimeMillis()
         val (next, i) = s.answer(rir, now)
         if (s.phone) cmd(JSONObject().put("op", "rir").put("i", i).put("v", rir))
-        else Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)).put("lim", Repo.alarm.limit ?: 0))
+        else saveRun()
         if (next == LiveSession.Next.END && !s.phone) {
             ExerciseService.stop(this)
             return
@@ -250,7 +330,11 @@ class WatchActivity : Activity(), WatchView.Actions {
         Repo.screen = Repo.Screen.SET
     }
 
-    override fun finish() {
+    /**
+     * «Τέλος» της άσκησης. ΔΕΝ είναι το Activity.finish() (έλεγχος 9/11, V-A-17): το «Πίσω» και το σύρσιμο κλείνουν μόνο
+     * την οθόνη· η άσκηση συνεχίζει στην υπηρεσία.
+     */
+    override fun finishWorkout() {
         val now = System.currentTimeMillis()
         // Στο λεπτό αποκατάστασης «Παράλειψη»: ένα πάτημα (η άσκηση έχει ήδη τελειώσει).
         if (Repo.recoveryUntil > 0) {
@@ -260,8 +344,10 @@ class WatchActivity : Activity(), WatchView.Actions {
         // Δύο πατήματα για τέλος (ένα τυχαίο άγγιγμα δεν κλείνει την προπόνηση).
         if (now > finishArmedUntil) {
             finishArmedUntil = now + 3000
-            Repo.notice = "Πάτα ξανά «Τέλος»"
-            view.postDelayed({ if (Repo.notice == "Πάτα ξανά «Τέλος»") { Repo.notice = null; view.invalidate() } }, 3000)
+            // Σε προπόνηση του κινητού το «Τέλος» κλείνει και εκεί (V-A-09): να το ξέρει πριν το δεύτερο πάτημα.
+            val msg = if (Repo.runningPhone) FINISH_PHONE_NOTICE else FINISH_NOTICE
+            Repo.notice = msg
+            view.postDelayed({ if (Repo.notice == msg) { Repo.notice = null; view.invalidate() } }, 3000)
             return
         }
         finishArmedUntil = 0
@@ -274,11 +360,13 @@ class WatchActivity : Activity(), WatchView.Actions {
             Repo.local = null
             if (s != null && s.setsDone > 0) {
                 val now2 = System.currentTimeMillis()
-                val o = s.resultJson(now2, HrStats(now2))
-                Repo.snapshot(this, o)
-                scope.launch { if (Link.putResult(this@WatchActivity, s.id, o)) Repo.snapshot(this@WatchActivity, null) }
+                val o = s.resultJson(now2, HrStats(now2)).put("lim", Repo.alarm.limit ?: 0)
+                Repo.savePending(this, s.id, o)
+                Repo.clearRun(this)
+                scope.launch { if (Link.putResult(this@WatchActivity, s.id, o)) Repo.removePending(this@WatchActivity, s.id) }
                 Repo.screen = Repo.Screen.END
             } else {
+                Repo.clearRun(this)
                 Repo.screen = Repo.Screen.HOME
             }
         }
@@ -298,3 +386,9 @@ class WatchActivity : Activity(), WatchView.Actions {
 }
 
 private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
+private const val FINISH_NOTICE = "Πάτα ξανά «Τέλος»"
+private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και στο κινητό"
+
+/** Η οθόνη είναι στο ambient (αχνή, «πάντα ανοιχτή») ή σβηστή: καμία ανανέωση ανά δευτερόλεπτο (W3-08). */
+fun isAmbientState(state: Int): Boolean =
+    state == Display.STATE_DOZE || state == Display.STATE_DOZE_SUSPEND || state == Display.STATE_OFF
