@@ -6,6 +6,10 @@ name: Μέτρηση απόδοσης
 on:
   workflow_dispatch:
 
+# Μόνο ανάγνωση (έλεγχος 9/11): η μέτρηση δεν γράφει τίποτα στο repository.
+permissions:
+  contents: read
+
 concurrency:
   group: perf
   cancel-in-progress: true
@@ -21,27 +25,23 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
           df -h /
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
           cache: true
 
       - name: Συμπλήρωση αρχείων Android
-        run: |
-          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
-          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
-          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
-          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
+        run: bash tools/ci/prepare_android.sh
 
       - name: Χτίσιμο APK για emulator (x86_64)
         run: |
@@ -122,7 +122,7 @@ jobs:
             echo "::error title=Μέτρηση::Δεν έτρεξε το script (ο emulator δεν ξεκίνησε;)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: perf-${{ github.run_number }}

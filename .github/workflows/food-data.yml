@@ -4,13 +4,16 @@ on:
     branches: [main]
     paths: ['tools/food/fetch.sh']
   workflow_dispatch:
+permissions: {}
 jobs:
   fetch:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Κατέβασμα πηγών
         run: bash tools/food/fetch.sh
       - name: Ανέβασμα στο branch food-raw

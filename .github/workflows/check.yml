@@ -1,14 +1,17 @@
 # Έλεγχοι σε κάθε κλάδο εκτός από το main: τρέχουν όλοι οι έλεγχοι (με ώρα Αθήνας),
 # χτίζεται APK release όπως στο main, αλλά χωρίς το κλειδί (για να πιάνονται λάθη Kotlin και R8) και βγαίνουν στιγμιότυπα στο branch
-# «screenshots-dev». Επίσης ανοίγει την εφαρμογή σε emulator (smoke). Τίποτα δεν δημοσιεύεται στο Releases: αυτό γίνεται μόνο από το main.
+# «screenshots-dev». Επίσης ανοίγει την εφαρμογή σε emulator, καθαρή και ως αναβάθμιση της τελευταίας έκδοσης (smoke).
+# Τίποτα δεν δημοσιεύεται στο Releases: αυτό γίνεται μόνο από το main. Το κλειδί υπογραφής δεν χρησιμοποιείται ΠΟΤΕ εδώ.
+#
+# Ασφάλεια (έλεγχος 9/11): κάθε ενέργεια κλειδωμένη σε πλήρες SHA· τα jobs που χτίζουν έχουν μόνο ανάγνωση· τα
+# στιγμιότυπα τα ανεβάζουν μικρά jobs «…-push» (εγγραφή, χωρίς χτίσιμο), μέσω artifact.
 name: Έλεγχος κλάδου
 
 on:
   push:
     branches-ignore: [main, screenshots, screenshots-dev, food-raw, widget-shots, watch-shots]
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: check-${{ github.ref }}
@@ -18,17 +21,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       TZ: Europe/Athens
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
@@ -37,16 +44,11 @@ jobs:
       - name: Συμπλήρωση αρχείων Android
         run: |
           echo "::notice title=Flutter::$(flutter --version | head -1)"
-          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
-          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
-          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
-          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
+          bash tools/ci/prepare_android.sh
 
       # Το Gradle κατεβαίνει από το GitHub· μνήμη + ξαναδοκιμή, γιατί κάποιες φορές απαντά 504 (8/11).
       - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.gradle/wrapper/dists
@@ -74,6 +76,10 @@ jobs:
       # Έλεγχος 2, C10: ο μεσάζων της Oura τρέχει πραγματικά με node (ψεύτικα Netlify.env και fetch).
       - name: Μεσάζων Oura (node)
         run: node test/node/oura_token_test.mjs site/netlify/functions/oura-token.mjs
+
+      # Η πολιτική απορρήτου λέει την αλήθεια για ό,τι ζητά η εφαρμογή (Oura, Samsung, Sentry…), έλεγχος 9/11 (V-A-23).
+      - name: Πολιτική απορρήτου ↔ κώδικας
+        run: python3 -I tools/ci/check_privacy.py
 
       - name: Έλεγχοι (ώρα Αθήνας)
         run: |
@@ -133,36 +139,61 @@ jobs:
           for a in ../build/wear/outputs/apk/release/*.apk; do python3 -I ../tools/check_wear_capability.py "$a"; done
           echo "::notice title=Ρολόι::$(du -h ../build/wear/outputs/apk/release/*.apk | head -1)"
 
-      - name: Στιγμιότυπα ρολογιού στο branch watch-shots
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
-        run: |
-          d=android/wear/build/watch-shots
-          [ -d "$d" ] || exit 0
-          cd "$d"
-          git init -q
-          git checkout -q -b watch-shots
-          git add .
-          git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Ρολόι · ${{ github.ref_name }} · ${{ github.sha }}"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" watch-shots
+        with:
+          name: watch-shots
+          path: android/wear/build/watch-shots/
+          retention-days: 3
+          if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: success()
         with:
           name: wear-check
           path: build/wear/outputs/apk/release/*.apk
           retention-days: 7
 
+  watch-shots-push:
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: watch-shots
+          path: ${{ runner.temp }}/watch-shots
+      - name: Στιγμιότυπα ρολογιού στο branch watch-shots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          bash tools/ci/push_dir.sh "$RUNNER_TEMP/watch-shots" watch-shots "Ρολόι · $REF · $SHA"
+
   # Oura: ο πραγματικός κώδικας ανάγνωσης πάνω στα συνθετικά δεδομένα του sandbox της Oura (χωρίς δαχτυλίδι).
   # Δεν μπλοκάρει αν η Oura δεν απαντά· αποτυγχάνει αν η απάντηση δεν διαβάζεται σωστά.
   oura-sandbox:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     env:
       TZ: Europe/Athens
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.9
@@ -181,10 +212,14 @@ jobs:
   shots:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
@@ -201,52 +236,88 @@ jobs:
             exit 1
           fi
 
-      - name: Ανέβασμα στο branch screenshots-dev
+      - name: Log μαζί με τα στιγμιότυπα
         if: always()
         run: |
           [ -d test/shots ] || exit 0
           cp shots.log test/shots/ 2>/dev/null || true
-          cd test/shots
-          git init -q
-          git checkout -q -b screenshots-dev
-          git add .
-          git -c user.name="ygeia-ci" -c user.email="ci@ygeia.local" commit -qm "Στιγμιότυπα κλάδου ${{ github.ref_name }} · ${{ github.sha }}"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" screenshots-dev
 
-  # Ανοίγει την εφαρμογή σε emulator Android 14. Αν κλείνει στο άνοιγμα, ο κλάδος δεν συγχωνεύεται.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: screens
+          path: test/shots/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  shots-push:
+    needs: shots
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: screens
+          path: ${{ runner.temp }}/shots
+      - name: Ανέβασμα στο branch screenshots-dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          bash tools/ci/push_dir.sh "$RUNNER_TEMP/shots" screenshots-dev "Στιγμιότυπα κλάδου $REF · $SHA"
+
+  # Ανοίγει την εφαρμογή σε emulator Android 14, καθαρή ΚΑΙ ως αναβάθμιση της τελευταίας έκδοσης. Αν κλείνει, δείχνει
+  # σφάλμα Dart ή δεν διαβάζει τα δεδομένα της προηγούμενης, ο κλάδος δεν συγχωνεύεται.
   # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
       - name: Ελεύθερος χώρος στον δίσκο
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.47.9
           cache: true
 
-      - name: Συμπλήρωση αρχείων Android
+      - name: KVM
         run: |
-          flutter create --org gr.ygeiaforma --project-name ygeia_forma --platforms android .
-          cat android/ygeia/app-extra.gradle.kts >> android/app/build.gradle.kts
-          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          # Σύνδεση Oura: οθόνη επιστροφής ygeiaforma://oura-callback και <queries> για browser (η MainActivity δεν αλλάζει).
-          python3 tools/android/patch_manifest.py android/app/src/main/AndroidManifest.xml
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Ο emulator ξεκινά όσο χτίζονται τα APK (κερδίζει λεπτά).
+      - name: Emulator (εκκίνηση στο παρασκήνιο)
+        run: bash tools/ci/emulator.sh start
+
+      - name: Συμπλήρωση αρχείων Android
+        run: bash tools/ci/prepare_android.sh
 
       # Το Gradle κατεβαίνει από το GitHub· μνήμη + ξαναδοκιμή, γιατί κάποιες φορές απαντά 504 (8/11).
       - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.gradle/wrapper/dists
@@ -261,42 +332,37 @@ jobs:
           ./gradlew --version --console=plain
 
       - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)
-        run: flutter build apk --release --target-platform android-x64
-
-      - name: KVM
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+          flutter build apk --release --target-platform android-x64 --build-number=2
+          cp build/app/outputs/flutter-apk/app-release.apk new.apk
 
-      - name: Άνοιγμα σε emulator
+      - name: APK της τελευταίας έκδοσης (για τη δοκιμή αναβάθμισης)
         run: |
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          BIN="$SDK/cmdline-tools/latest/bin"
-          IMG="system-images;android-34;google_apis;x86_64"
-          export ANDROID_AVD_HOME="$HOME/.android/avd"
-          mkdir -p "$ANDROID_AVD_HOME"
-          yes | "$BIN/sdkmanager" --licenses > /dev/null || true
-          "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1 || true
-          echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force > /dev/null 2>&1 || \
-            echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" --force > /dev/null
-          export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
-          nohup emulator -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
-            -no-snapshot -camera-back none -camera-front none -memory 4096 > emu.log 2>&1 &
-          if ! timeout 600 adb wait-for-device; then
-            echo "::warning title=Άνοιγμα::Ο emulator δεν ξεκίνησε· ο έλεγχος ανοίγματος δεν έγινε"; exit 1
+          if bash tools/ci/build_old_apk.sh old.apk new.apk; then
+            echo "::notice title=Αναβάθμιση::Παλιά έκδοση έτοιμη ($(du -h old.apk | cut -f1))"
+          else
+            echo "::warning title=Αναβάθμιση::Δεν χτίστηκε η τελευταία έκδοση· η δοκιμή αναβάθμισης παραλείπεται"
           fi
-          for i in $(seq 1 120); do
-            [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break
-            sleep 5
-          done
-          sleep 15
-          if bash tools/perf/smoke.sh build/app/outputs/flutter-apk/app-release.apk > smoke.log 2>&1; then
+
+      - name: Άνοιγμα, αναβάθμιση και widgets σε emulator
+        run: |
+          set -o pipefail
+          bash tools/ci/emulator.sh wait || { echo "::error title=Άνοιγμα::Ο emulator δεν ξεκίνησε· ο έλεγχος δεν έγινε"; exit 1; }
+          if bash tools/perf/smoke.sh new.apk 2>&1 | tee smoke.log; then
             echo "::notice title=Άνοιγμα::$(tail -1 smoke.log)"
           else
             msg=$(head -60 smoke.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
-            echo "::error title=Η εφαρμογή κλείνει στο άνοιγμα::$msg"
+            echo "::error title=Η εφαρμογή δεν ανοίγει σωστά::$msg"
             exit 1
+          fi
+          if [ -f old.apk ]; then
+            if bash tools/perf/upgrade.sh old.apk new.apk 2>&1 | tee upgrade.log; then
+              echo "::notice title=Αναβάθμιση::$(grep -E '^Αναβάθμιση [0-9]' upgrade.log | tail -1) · $(tail -1 upgrade.log)"
+            else
+              msg=$(grep -v '^$' upgrade.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+              echo "::error title=Η αναβάθμιση χαλά::$msg"
+              exit 1
+            fi
           fi
           if timeout 300 bash tools/perf/widget_shots.sh > widget.log 2>&1; then
             echo "::notice title=Widgets::$(tail -1 widget.log)"
@@ -306,10 +372,46 @@ jobs:
             exit 1
           fi
 
-      - name: Στιγμιότυπα widgets (κλάδος widget-shots)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
+        with:
+          name: widget-shots
+          path: widget_shots/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: smoke
+          path: |
+            smoke_shots/
+            smoke.log
+            upgrade.log
+            crash.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  widget-shots-push:
+    needs: smoke
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: widget-shots
+          path: ${{ runner.temp }}/widget-shots
+      - name: Στιγμιότυπα widgets (κλάδος widget-shots)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
         run: |
-          [ -d widget_shots ] && [ -n "$(ls widget_shots)" ] || exit 0
-          cd widget_shots
-          git init -q && git checkout -q -b widget-shots && git add . && git -c user.name=ci -c user.email=ci@x commit -qm "widget shots ${{ github.sha }}"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" widget-shots
+          bash tools/ci/push_dir.sh "$RUNNER_TEMP/widget-shots" widget-shots "widget shots $SHA"
