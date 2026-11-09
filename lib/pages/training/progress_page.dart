@@ -115,10 +115,8 @@ class _ProgressPageState extends State<ProgressPage> {
 
 // ---------------------------------------------------------------- κείμενα
 
-String _hrDrop(double v) {
-  final r = v.round();
-  return r >= 0 ? '−$r' : '+${-r}';
-}
+/// Πτώση παλμών: πόσοι παλμοί (αρνητικό = ανέβηκαν, σπάνιο).
+String _hrDrop(double v) => '${v.round()}';
 
 String _paceRelText(PaceRel r) => switch (r) {
       PaceRel.same => 'ίδιος ρυθμός',
@@ -128,6 +126,9 @@ String _paceRelText(PaceRel r) => switch (r) {
     };
 
 String _repsText(List<int> reps) => reps.join(', ');
+
+/// «27″» κάτω από το λεπτό, αλλιώς «1′05″».
+String _secs(int s) => s < 60 ? '$s″' : paceText(s);
 
 String _setText(LoadKind k, ExLog e) =>
     hasLoad(k) ? '${loadLabel(k, e.workLoad)} × ${_repsText([for (final s in e.done) s.reps])}' : '${_repsText([for (final s in e.done) s.reps])} επαν.';
@@ -265,14 +266,14 @@ class _WalkCard extends StatelessWidget {
           detail: vals(w.pace, (v) => paceText(v.round())) + (w.pace.current == null ? '' : ' / km'),
           pill: w.pace.changed
               ? TrendPill(
-                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${paceText((w.pace.current! - w.pace.previous!).abs().round())}',
+                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${_secs((w.pace.current! - w.pace.previous!).abs().round())}',
                   kind: w.pace.status == TrendStatus.down ? TrendKind.good : TrendKind.neutral)
               : TrendStatusPill(r: w.pace),
         ),
         _Row(
           key: const ValueKey('prog-walk-hrr'),
           label: 'Πτώση παλμών στο 1′',
-          detail: vals(w.hrr, _hrDrop),
+          detail: vals(w.hrr, _hrDrop) + (w.hrr.current == null ? '' : ' παλμοί'),
           pill: pillFor(w.hrr),
         ),
         _Row(
@@ -309,8 +310,7 @@ class _StrengthCard extends StatelessWidget {
               return _Row(
                 key: ValueKey('prog-ex-${p.ex}'),
                 label: exName(p.ex),
-                detail: '${_setText(p.kind, p.before)} → ${_setText(p.kind, p.now)}',
-                extra: '${shortDayDate(p.beforeDay)} → ${shortDayDate(p.nowDay)}',
+                detail: '${shortDayDate(p.beforeDay)}: ${_setText(p.kind, p.before)}\n${shortDayDate(p.nowDay)}: ${_setText(p.kind, p.now)}',
                 pill: TrendPill(text, kind: kind, up: up, maxLines: 2),
                 line: i < items.length - 1,
               );
@@ -337,8 +337,8 @@ class _BodyCard extends StatelessWidget {
           _Row(
             label: metricLabel(results[i].def, results[i].source),
             detail: results[i].previous == null || results[i].current == null
-                ? (results[i].current == null ? '—' : 'τώρα ${results[i].def.format(results[i].current!)} ${results[i].def.unit}'.trim())
-                : '${results[i].def.format(results[i].previous!)} → ${results[i].def.format(results[i].current!)} ${results[i].def.unit}'.trim(),
+                ? (results[i].current == null ? '—' : 'τώρα ${results[i].def.formatAs(results[i].current!, results[i].source)}')
+                : '${results[i].def.formatAs(results[i].previous!, results[i].source)} → ${results[i].def.formatAs(results[i].current!, results[i].source)}',
             pill: TrendStatusPill(r: results[i]),
             line: i < results.length - 1,
           ),
@@ -378,12 +378,21 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
   }
   for (final p in strength) {
     if (p.change != StrengthChange.up && p.change != StrengthChange.down) continue;
-    final (text, kind, up) = strengthPill(p);
-    out.add(('${exName(p.ex)}: $text', kind, up));
+    final (_, kind, up) = strengthPill(p);
+    final r = p.repsDiff;
+    final String what;
+    if (p.loadDiff.abs() > 1e-6) {
+      what = p.kind == LoadKind.bandAssist
+          ? (p.loadDiff > 0 ? 'λιγότερη βοήθεια' : 'περισσότερη βοήθεια')
+          : '${loadLabel(p.kind, p.before.workLoad)} → ${loadLabel(p.kind, p.now.workLoad)}';
+    } else {
+      what = '${r > 0 ? '+' : '−'}${r.abs()} επαναλήψεις${hasLoad(p.kind) ? ' με το ίδιο βάρος' : ''}';
+    }
+    out.add(('${exName(p.ex)}: $what', kind, up));
   }
   for (final r in body) {
     if (!r.changed) continue;
-    out.add(('${metricLabel(r.def, r.source)}: ${r.def.format(r.previous!)} → ${r.def.format(r.current!)} ${r.def.unit}'.trim(), k(r.goodness), r.status == TrendStatus.up));
+    out.add(('${metricLabel(r.def, r.source)}: ${r.def.formatAs(r.previous!, r.source)} → ${r.def.formatAs(r.current!, r.source)}', k(r.goodness), r.status == TrendStatus.up));
   }
   return out;
 }

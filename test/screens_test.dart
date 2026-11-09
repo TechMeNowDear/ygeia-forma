@@ -830,6 +830,8 @@ void main() {
       ],
     ));
     st.sessions.sort((a, b) => a.start.compareTo(b.start));
+    // Η σελίδα ξαναφορτώνει από την αποθήκη: γράφεται.
+    st.save();
   }
 
   Future<void> openProgress(WidgetTester t) => tapKey(t, 'train-progress');
