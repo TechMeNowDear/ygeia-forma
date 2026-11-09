@@ -15,16 +15,11 @@ cpu_ticks() { # utime + stime της διεργασίας, σε «ticks» (συ�
   adb shell cat "/proc/$pid/stat" | tr -d '\r' | awk '{print $14 + $15}'
 }
 pss() { adb shell dumpsys meminfo "$PKG" | tr -d '\r' | awk '/TOTAL PSS:/ {print $3; exit} /^ *TOTAL / {print $2; exit}'; }
-tap_label() { # πατάει το στοιχείο με αυτή την ετικέτα (Flutter semantics → uiautomator)
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local b; b=$(adb shell cat /sdcard/ui.xml | tr -d '\r' | tr '>' '\n' | grep -m1 "content-desc=\"$1\"" | sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/')
-  if [ -n "$b" ]; then
-    set -- $b
-    adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
-    return 0
-  fi
-  return 1
-}
+# Πάτημα με το όνομα του στοιχείου (Flutter semantics → uiautomator), ίδια συνάρτηση με τον έλεγχο ανοίγματος
+# (tools/perf/ui.sh): ψάχνει στοιχείο που ΠΕΡΙΕΧΕΙ το όνομα και ξαναδοκιμάζει (έλεγχος 9/11, E3-09: η παλιά δεν έβρισκε
+# τα κουμπιά της κάτω μπάρας).
+. "$(dirname "$0")/ui.sh"
+tap_label() { ui_tap "$1"; }
 
 : > "$OUT"
 say "## Μέτρηση απόδοσης · $(date -u +%Y-%m-%d) · emulator $(adb shell getprop ro.build.version.release | tr -d '\r')"
