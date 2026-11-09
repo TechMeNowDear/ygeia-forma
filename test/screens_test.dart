@@ -3,6 +3,7 @@
 // Τα PNG γράφονται στο test/shots/ και ανεβαίνουν στο branch «screenshots».
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -346,22 +347,17 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(find.byKey(key), matchesGoldenFile('shots/13_report.png'));
   });
-  // Έλεγχος 9/11 (V-B-01): ζυγίσεις κάθε 25 μέρες· η στήλη «Διαφορά» λέει «Δεν φτάνουν για σύγκριση», όχι «Σταθερό».
-  testWidgets('Αναφορά για γιατρό · αραιές ζυγίσεις', (tester) async {
+  // Έλεγχος 9/11 (V-B-01): παλμοί ύπνου που αλλάζουν πολύ αργά (οι νύχτες μοιάζουν πολύ μεταξύ τους)· η στήλη
+  // «Διαφορά» λέει «Δεν φτάνουν για σύγκριση», όχι «Σταθερό».
+  testWidgets('Αναφορά για γιατρό · λίγες ανεξάρτητες νύχτες', (tester) async {
     tester.view.devicePixelRatio = 2.0;
     tester.view.physicalSize = const Size(680, 3200) * 2.0;
     addTearDown(tester.view.reset);
     final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
     final h = sampleHistory(now, store.data!);
-    for (final row in h.values) {
-      row
-        ..remove(K.weight)
-        ..remove(K.fatPct)
-        ..remove(K.smm);
-    }
-    for (var i = 0; i < 8; i++) {
-      final d = DateTime(now.year, now.month, now.day - (3 + 25 * i));
-      (h[dateKey(d)] ??= {}).addAll({K.weight: 82.4 + (i % 3) * 0.1, K.fatPct: 25.0 + (i % 2) * 0.2, K.smm: 33.2 + (i % 2) * 0.1});
+    for (var i = 0; i < 400; i++) {
+      final d = DateTime(now.year, now.month, now.day - i);
+      (h[dateKey(d)] ??= {})[K.sleepHr] = 60 + 3 * math.sin(2 * math.pi * i / 30);
     }
     store.history = h;
     final key = GlobalKey();
@@ -377,7 +373,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Δεν φτάνουν για σύγκριση'), findsWidgets);
-    await expectLater(find.byKey(key), matchesGoldenFile('shots/13f_report_sparse_weighins.png'));
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13f_report_inconclusive.png'));
   });
   testWidgets('Αναφορά για γιατρό · με σημείωση 160 χαρακτήρων (να χωράει)', (tester) async {
     tester.view.devicePixelRatio = 2.0;

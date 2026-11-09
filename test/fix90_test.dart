@@ -4,6 +4,7 @@
 // V-B-08 ουδέτερη πτώση παλμών · V-A-01 ack μόνο μετά από ασφαλή εγγραφή · V-B-12 κιλά ↑ μέσα στο εύρος = πρόοδος.
 // Όλα τα νούμερα είναι δοκιμαστικά.
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -112,8 +113,23 @@ Map<String, Map<String, double>> _sparseWeighIns() => {
         dateKey(_add(dayOf(now), -(3 + 25 * i))): {K.weight: 80.0 + (i % 3) * 0.1, K.fatPct: 24.0 + (i % 2) * 0.2, K.smm: 33.0 + (i % 2) * 0.1},
     };
 
+/// Παλμοί ύπνου κάθε νύχτα, σε αργό κύμα 30 ημερών (60 ± 3): οι νύχτες μοιάζουν πολύ με τις διπλανές τους, οπότε σε
+/// 90 μέρες μένουν < 4 «πραγματικές» ανεξάρτητες. Ίδιο μοτίβο στα δύο τρίμηνα: σταθερό, αλλά χωρίς δύναμη σύγκρισης.
+Map<String, Map<String, double>> _slowSleepHr() => {
+      for (var i = 0; i < 400; i++) dateKey(_add(dayOf(now), -i)): {K.sleepHr: 60 + 3 * math.sin(2 * math.pi * i / 30)},
+    };
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Η γραμματοσειρά της εφαρμογής: με τη γραμματοσειρά δοκιμών οι σελίδες A4 «ξεχειλίζουν» χωρίς λόγο.
+  setUpAll(() async {
+    final inter = FontLoader('Inter');
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+      inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+    }
+    await inter.load();
+  });
 
   // -------------------------------------------------------------------------
   group('V-B-01: «Δεν φτάνουν τα δεδομένα» δεν λέγεται «Σταθερό»', () {
@@ -137,17 +153,23 @@ void main() {
       expect(reportTrendText(_result(weight, TrendStatus.up, eff: 12, crit: 2.7), weight), startsWith('↑'));
     });
 
-    test('αραιές ζυγίσεις στο τρίμηνο: η αναφορά τις βρίσκει «δεν φτάνουν»', () {
+    test('αραιές ζυγίσεις στο τρίμηνο: «δεν φτάνουν» (όχι «σταθερό»)', () {
       final r = buildReport(_sparseWeighIns(), now);
       final w = r.stat(K.weight).trend!;
       expect(w.status, TrendStatus.stable);
       expect(w.inconclusive, isTrue, reason: '4 ζυγίσεις ανά 25 μέρες: < 4 «πραγματικές»');
     });
 
+    test('παλμοί ύπνου που αλλάζουν πολύ αργά: η αναφορά τους βρίσκει «δεν φτάνουν»', () {
+      final hr = buildReport(_slowSleepHr(), now).stat(K.sleepHr).trend!;
+      expect(hr.status, TrendStatus.stable);
+      expect(hr.inconclusive, isTrue, reason: 'αυτοσυσχέτιση ~0,95: λιγότερες από 4 «πραγματικές» νύχτες');
+    });
+
     testWidgets('PDF στην οθόνη: «Δεν φτάνουν για σύγκριση» και σωστή φράση για ΗΚΓ/πίεση (V-B-02)', (t) async {
       final store = HealthStore()
         ..data = Dashboard.fromJson(sampleDashboardJson(now))
-        ..history = _sparseWeighIns();
+        ..history = _slowSleepHr();
       t.view.devicePixelRatio = 1;
       t.view.physicalSize = const Size(680, 3600);
       addTearDown(t.view.reset);
