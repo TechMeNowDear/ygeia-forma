@@ -1,0 +1,489 @@
+# ΠΡΟΣΩΡΙΝΟ (κλάδος fix-ci): ακριβές αντίγραφο του android.yml με άλλο όνομα και trigger, για να δοκιμαστεί όλη η
+# διαδρομή χτίσιμο → άνοιγμα → αναβάθμιση → ΥΠΟΓΡΑΦΗ χωρίς δημοσίευση (το publish τρέχει μόνο στο main) και χωρίς να
+# καταναλωθεί αριθμός έκδοσης του android.yml. Σβήνεται πριν από τη συγχώνευση.
+name: Δοκιμή υπογραφής (προσωρινό)
+
+on:
+  push:
+    branches: [fix-ci]
+
+# Τίποτα από προεπιλογή· κάθε job δηλώνει ό,τι χρειάζεται.
+permissions: {}
+
+env:
+  # Το δημόσιο αποτύπωμα (SHA-256) του πιστοποιητικού υπογραφής· ίδιο με το site/public/assetlinks.json. ΔΕΝ αλλάζει.
+  YGEIA_CERT_SHA256: a4433ab12214f1c88f500f38604323730d0f0d6f3dda8305730d79b596213752
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    # Νέα αλλαγή στο main ακυρώνει το χτίσιμο της παλιάς (όχι όμως μια δημοσίευση που τρέχει).
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
+          cache: true
+
+      - name: Συμπλήρωση αρχείων Android
+        run: |
+          echo "::notice title=Flutter::$(flutter --version | head -1)"
+          bash tools/ci/prepare_android.sh
+
+      # Το Gradle κατεβαίνει από το GitHub· μνήμη + ξαναδοκιμή, γιατί κάποιες φορές απαντά 504 (8/11).
+      - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches/modules-2/files-2.1
+            ~/.gradle/caches/modules-2/metadata-*
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-
+      - name: Gradle (κατέβασμα)
+        run: |
+          cd android
+          for i in 1 2 3 4 5; do ./gradlew --version --console=plain >/dev/null 2>&1 && exit 0; echo "Ξαναδοκιμή $i"; sleep $((i * 20)); done
+          ./gradlew --version --console=plain
+
+      - name: Ανάλυση κώδικα (σταματά μόνο σε σφάλματα)
+        run: |
+          set -o pipefail
+          # Έλεγχος 4/11 (A14): σφάλματα του analyzer σταματούν το χτίσιμο· προειδοποιήσεις και υποδείξεις όχι (φαίνονται).
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log; then
+            msg=$(grep -E " error " analyze.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Ανάλυση κώδικα::$msg"
+            exit 1
+          fi
+          echo "::notice title=Ανάλυση κώδικα::$(tail -1 analyze.log | tr -cd '[:print:]' | tail -c 120)"
+
+      # Η πολιτική απορρήτου λέει την αλήθεια για ό,τι ζητά η εφαρμογή (Oura, Samsung, Sentry…), έλεγχος 9/11 (V-A-23).
+      - name: Πολιτική απορρήτου ↔ κώδικας
+        run: python3 -I tools/ci/check_privacy.py
+
+      - name: Έλεγχοι
+        env:
+          TZ: Europe/Athens
+        run: |
+          set -o pipefail
+          # Όλοι οι έλεγχοι εκτός από τα στιγμιότυπα και τη ζωντανή δοκιμή Sentry, με ώρα Αθήνας
+          # (ώστε να πιάνονται λάθη στην αλλαγή ώρας).
+          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test -e oura_sandbox_live_test)
+          if ! flutter test $files 2>&1 | tee tests.log; then
+            grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -120 > errors.txt || true
+            [ -s errors.txt ] || tail -80 tests.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα ελέγχων::$msg"
+            exit 1
+          fi
+
+      # Χωρίς το σταθερό κλειδί (το Gradle βάζει το προσωρινό κλειδί debug του runner)· το υπογράφει το job «sign».
+      - name: Χτίσιμο APK
+        env:
+          N: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          if ! flutter build apk --release --target-platform android-arm64 \
+            --build-name="0.1.$N" --build-number="$N" 2>&1 | tee build.log; then
+            # Τα σφάλματα γίνονται «σημειώσεις» (annotations), ώστε να διαβάζονται και χωρίς το πλήρες log.
+            grep -E -A3 "^e: |error:|Error:|What went wrong|ERROR|Missing class|Unresolved reference|Execution failed" build.log | head -150 > errors.txt || true
+            [ -s errors.txt ] || tail -120 build.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα χτισίματος::$msg"
+            exit 1
+          fi
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-release.apk "out/ygeia-forma-$N.apk"
+          ls -lh out/
+
+      # Και στο main (A14): οι έλεγχοι Kotlin σε απλό JVM, πριν δημοσιευτεί η έκδοση.
+      - name: Έλεγχοι Kotlin (JVM, χωρίς συσκευή)
+        run: |
+          set -o pipefail
+          cd android
+          if ! ./gradlew :app:testDebugUnitTest --console=plain 2>&1 | tee ../kotlin-tests.log; then
+            grep -E -A6 "FAILED|AssertionError|^e: |What went wrong" ../kotlin-tests.log | head -80 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -80 ../kotlin-tests.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Έλεγχοι Kotlin::$msg"
+            exit 1
+          fi
+          # Η Flutter βάζει το build του app στο ../build/app.
+          n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
+            | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
+          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
+
+      # Ρολόι (8/11): η εφαρμογή Wear OS. Χωρίς κλειδί εδώ· το job «sign» τη υπογράφει με το ΙΔΙΟ κλειδί με το κινητό
+      # (το θέλει η σύνδεση κινητού–ρολογιού).
+      - name: Χτίσιμο εφαρμογής ρολογιού
+        env:
+          YGEIA_BUILD: ${{ github.run_number }}
+          N: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          cd android
+          grep -q '":wear"' settings.gradle.kts || echo 'include(":wear")' >> settings.gradle.kts
+          if ! ./gradlew :wear:testDebugUnitTest :wear:assembleRelease --console=plain 2>&1 | tee ../wear.log; then
+            grep -E -A6 "FAILED|AssertionError|^e: |error:|What went wrong|Unresolved reference" ../wear.log | head -120 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -100 ../wear.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Ρολόι::$msg"
+            exit 1
+          fi
+          cd ..
+          w=$(ls build/wear/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          test -n "$w" || { echo "::error title=Ρολόι::Δεν βγήκε APK ρολογιού"; ls -l build/wear/outputs/apk/release/ || true; exit 1; }
+          python3 -I tools/check_wear_capability.py "$w"
+          cp "$w" "out/ygeia-forma-watch-$N.apk"
+          ls -lh out/
+
+      # Μόνο όταν το ζητήσουμε: πραγματικό σφάλμα στο Sentry με τον κώδικα της εφαρμογής και την ίδια έκδοση.
+      - name: Δοκιμαστικό σφάλμα στο Sentry
+        if: contains(github.event.head_commit.message, '[sentry-test]') || inputs.sentry_test
+        env:
+          N: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          if ! flutter test test/sentry_live_test.dart --dart-define=SENTRY_LIVE=1 \
+            --dart-define=APP_VERSION="0.1.$N" 2>&1 | tee live.log; then
+            msg=$(tail -60 live.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Δοκιμή Sentry::$msg"
+            exit 1
+          fi
+          # Να έτρεξε πραγματικά (όχι «skipped»).
+          test -f sentry_live_ok || { echo "::error title=Δοκιμή Sentry::Ο έλεγχος δεν έτρεξε"; exit 1; }
+          echo "::notice title=Δοκιμή Sentry::Στάλθηκε δοκιμαστικό σφάλμα για ygeia-forma@0.1.$N"
+
+      # Χωρίς υπογραφή με το σταθερό κλειδί: μόνο για το job «sign» (σβήνεται σε 1 μέρα).
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unsigned-${{ github.run_number }}
+          path: out/*.apk
+          retention-days: 1
+          if-no-files-found: error
+
+  # Στιγμιότυπα οθονών με δείγμα δεδομένων, για έλεγχο της εμφάνισης. Τα ανεβάζει στο branch «screenshots» το
+  # «shots-push» (μόνο στο main).
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    concurrency:
+      group: ${{ github.workflow }}-shots-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
+          cache: true
+
+      - name: Ζωγράφισμα οθονών
+        run: |
+          set -o pipefail
+          if ! flutter test test/screens_test.dart --update-goldens 2>&1 | tee shots.log; then
+            grep -E -A4 "Error:|error:|EXCEPTION|was thrown|overflowed|Expected|Test failed" shots.log | head -150 > errors.txt || true
+            [ -s errors.txt ] || tail -120 shots.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα στιγμιοτύπων::$msg"
+            ls -la test/shots || true
+            exit 1
+          fi
+          ls -la test/shots || true
+
+      - name: Log μαζί με τα στιγμιότυπα
+        if: always()
+        run: |
+          [ -d test/shots ] || exit 0
+          cp shots.log test/shots/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: screens-${{ github.run_number }}
+          path: test/shots/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  shots-push:
+    needs: shots
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: screens-${{ github.run_number }}
+          path: ${{ runner.temp }}/shots
+      - name: Ανέβασμα στο branch screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.run_number }}
+        run: |
+          bash tools/ci/push_dir.sh "$RUNNER_TEMP/shots" screenshots "Στιγμιότυπα #$N"
+
+  # Και στο main (A14): ανοίγει την εφαρμογή σε emulator Android 14, καθαρή ΚΑΙ ως αναβάθμιση της τελευταίας έκδοσης
+  # (tools/perf/smoke.sh, tools/perf/upgrade.sh). Αν κλείνει, δείχνει σφάλμα Dart ή δεν διαβάζει τα δεδομένα της
+  # προηγούμενης, η έκδοση ΔΕΝ υπογράφεται και ΔΕΝ δημοσιεύεται.
+  # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    concurrency:
+      group: ${{ github.workflow }}-smoke-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Ελεύθερος χώρος στον δίσκο
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Ο emulator ξεκινά όσο χτίζονται τα APK (κερδίζει λεπτά).
+      - name: Emulator (εκκίνηση στο παρασκήνιο)
+        run: bash tools/ci/emulator.sh start
+
+      - name: Συμπλήρωση αρχείων Android
+        run: bash tools/ci/prepare_android.sh
+
+      # Το Gradle κατεβαίνει από το GitHub· μνήμη + ξαναδοκιμή, γιατί κάποιες φορές απαντά 504 (8/11).
+      - name: Gradle (μνήμη και κατέβασμα με ξαναδοκιμή)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches/modules-2/files-2.1
+            ~/.gradle/caches/modules-2/metadata-*
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-
+      - name: Gradle (κατέβασμα)
+        run: |
+          cd android
+          for i in 1 2 3 4 5; do ./gradlew --version --console=plain >/dev/null 2>&1 && exit 0; echo "Ξαναδοκιμή $i"; sleep $((i * 20)); done
+          ./gradlew --version --console=plain
+
+      - name: APK release για emulator (x86_64, ίδιοι κανόνες R8)
+        run: |
+          flutter build apk --release --target-platform android-x64 --build-number=2
+          cp build/app/outputs/flutter-apk/app-release.apk new.apk
+
+      - name: APK της τελευταίας έκδοσης (για τη δοκιμή αναβάθμισης)
+        run: |
+          if bash tools/ci/build_old_apk.sh old.apk new.apk; then
+            echo "::notice title=Αναβάθμιση::Παλιά έκδοση έτοιμη ($(du -h old.apk | cut -f1))"
+          else
+            echo "::warning title=Αναβάθμιση::Δεν χτίστηκε η τελευταία έκδοση· η δοκιμή αναβάθμισης παραλείπεται"
+          fi
+
+      - name: Άνοιγμα και αναβάθμιση σε emulator
+        run: |
+          set -o pipefail
+          bash tools/ci/emulator.sh wait || { echo "::error title=Άνοιγμα::Ο emulator δεν ξεκίνησε· ο έλεγχος δεν έγινε"; exit 1; }
+          if bash tools/perf/smoke.sh new.apk 2>&1 | tee smoke.log; then
+            echo "::notice title=Άνοιγμα::$(tail -1 smoke.log)"
+          else
+            msg=$(head -60 smoke.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Η εφαρμογή δεν ανοίγει σωστά::$msg"
+            exit 1
+          fi
+          [ -f old.apk ] || exit 0
+          if bash tools/perf/upgrade.sh old.apk new.apk 2>&1 | tee upgrade.log; then
+            echo "::notice title=Αναβάθμιση::$(grep -E '^Αναβάθμιση [0-9]' upgrade.log | tail -1) · $(tail -1 upgrade.log)"
+          else
+            msg=$(grep -v '^$' upgrade.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Η αναβάθμιση χαλά::$msg"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: smoke-${{ github.run_number }}
+          path: |
+            smoke_shots/
+            smoke.log
+            upgrade.log
+            crash.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # Υπογραφή: ΜΟΝΟ εδώ υπάρχει το κλειδί, και μόνο στο βήμα «Υπογραφή». Κανένα χτίσιμο, καμία εξάρτηση, καμία μνήμη
+  # (cache). Τρέχει μόνο αν πέρασαν χτίσιμο, έλεγχοι, άνοιγμα και αναβάθμιση.
+  sign:
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: ${{ github.workflow }}-sign-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            tools/ci
+            site/public
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: unsigned-${{ github.run_number }}
+          path: apk
+
+      - name: Υπογραφή (το κλειδί μόνο σε αυτό το βήμα)
+        env:
+          YGEIA_KEYSTORE_B64: ${{ secrets.YGEIA_KEYSTORE_B64 }}
+          YGEIA_KEYSTORE_PASSWORD: ${{ secrets.YGEIA_KEYSTORE_PASSWORD }}
+          N: ${{ github.run_number }}
+        run: bash tools/ci/sign_apks.sh "apk/ygeia-forma-$N.apk" "apk/ygeia-forma-watch-$N.apk"
+
+      - name: Σβήσιμο του κλειδιού (πάντα)
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/ygeia-ks"
+          test ! -e "$RUNNER_TEMP/ygeia-ks" && echo "Κανένα αρχείο κλειδιού στο μηχάνημα"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ygeia-forma-${{ github.run_number }}
+          path: apk/*.apk
+          # Δοκιμή σε άλλον κλάδο: 1 μέρα.
+          retention-days: ${{ github.ref == 'refs/heads/main' && 14 || 1 }}
+          if-no-files-found: error
+
+  # Έλεγχος 2, C7: η έκδοση μπαίνει στο Releases ΜΟΝΟ αν πέρασαν χτίσιμο (έλεγχοι Dart/Kotlin), άνοιγμα, αναβάθμιση
+  # και υπογραφή με το σωστό πιστοποιητικό. Μια έκδοση που κλείνει στο άνοιγμα δεν φτάνει ποτέ στο κινητό (η επιστροφή
+  # σε παλιότερη θα ήθελε απεγκατάσταση, που σβήνει το ημερολόγιο φαγητού). Μόνο από το main.
+  publish:
+    needs: sign
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-publish-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ygeia-forma-${{ github.run_number }}
+
+      - name: Δημοσίευση στο Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          N: ${{ github.run_number }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -e
+          apk="ygeia-forma-$N.apk"
+          test -f "$apk"
+          # Η εφαρμογή του ρολογιού μπαίνει δίπλα (εγκατάσταση στο ρολόι από υπολογιστή ή από το Play Console).
+          watch="ygeia-forma-watch-$N.apk"
+          extra=""
+          [ -f "$watch" ] && extra="$watch"
+          # Ποτέ παλιότερη έκδοση πάνω από νεότερη (αν δύο χτισίματα τελειώσουν με αντίστροφη σειρά).
+          cur=$(gh api "repos/$GH_REPO/releases/tags/latest" --jq '.assets[].name' 2>/dev/null \
+            | sed -n 's/^ygeia-forma-\([0-9][0-9]*\)\.apk$/\1/p' | head -1 || true)
+          if [ -n "$cur" ] && [ "$cur" -gt "$N" ]; then
+            echo "::warning title=Δημοσίευση::Η «latest» είναι ήδη η νεότερη #$cur· η #$N δεν δημοσιεύεται"
+            exit 0
+          fi
+          sums=$(sha256sum "$apk" $extra | awk '{print "- " $2 ": SHA-256 " $1}')
+          # Πρώτα ένα αντίγραφο με δικό του όνομα: αν η δημοσίευση διακοπεί ανάμεσα στο σβήσιμο και στη δημιουργία της
+          # «latest», η έκδοση υπάρχει ακόμα στο Releases.
+          gh release create "build-$N" "$apk" $extra --target "$SHA" \
+            --title "Έκδοση #$N" --notes "Χτίστηκε από το commit $SHA." --prerelease
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest "$apk" $extra \
+            --target "$SHA" \
+            --title "Τελευταία έκδοση · #$N" \
+            --notes "Χτίστηκε από το commit $SHA. Στο Fold κατέβασε το ygeia-forma-$N.apk και πάτα «Εγκατάσταση». Το ygeia-forma-watch-$N.apk είναι για το ρολόι (δεν μπαίνει στο κινητό).
+
+          Έλεγχος αρχείων:
+          $sums"
+          gh release delete "build-$N" --yes --cleanup-tag || true
+          # Παλιά αντίγραφα «build-…» που έμειναν από διακομμένη δημοσίευση (π.χ. build-68).
+          for t in $(gh api "repos/$GH_REPO/releases?per_page=100" --jq '.[] | select(.prerelease) | .tag_name' | grep -E '^build-[0-9]+$' || true); do
+            if [ "${t#build-}" -lt "$N" ]; then gh release delete "$t" --yes --cleanup-tag && echo "Σβήστηκε το παλιό $t"; fi
+          done
+          echo "::notice title=Δημοσίευση::Τελευταία έκδοση #$N"
+
+  # Έλεγχος 9/11 (V-A-21): η παλιά μνήμη Actions «ygeia-signing-v1» (είχε το κλειδί ΚΑΙ τον κωδικό, ως το b2af444)
+  # σβήνεται αν υπάρχει ακόμα. Κανένα workflow δεν τη φτιάχνει πια. Ασφαλές να τρέχει κάθε φορά (δεν κάνει τίποτα αν λείπει).
+  old-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Σβήσιμο της μνήμης ygeia-signing-v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! keys=$(gh api "repos/$GH_REPO/actions/caches?per_page=100" --jq '.actions_caches[].key'); then
+            echo "::warning title=Μνήμη Actions::Δεν διαβάστηκε η λίστα των μνημών· έλεγξε με το χέρι (Actions › Caches)"
+            exit 0
+          fi
+          echo "Μνήμες Actions: $(printf '%s\n' "$keys" | grep -c . || true)"
+          if printf '%s\n' "$keys" | grep -q '^ygeia-signing'; then
+            for k in $(printf '%s\n' "$keys" | grep '^ygeia-signing' | sort -u); do
+              gh api -X DELETE "repos/$GH_REPO/actions/caches?key=$k" > /dev/null && echo "::notice title=Μνήμη Actions::Σβήστηκε η $k"
+            done
+          else
+            echo "::notice title=Μνήμη Actions::Καμία μνήμη ygeia-signing (σωστό)"
+          fi
+          if gh api "repos/$GH_REPO/actions/caches?per_page=100" --jq '.actions_caches[].key' | grep -q '^ygeia-signing'; then
+            echo "::error title=Μνήμη Actions::Η μνήμη ygeia-signing υπάρχει ακόμα· σβήσ' τη με το χέρι (Actions › Caches)"
+            exit 1
+          fi
