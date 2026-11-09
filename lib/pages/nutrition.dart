@@ -546,10 +546,19 @@ class FoodSourcesScreen extends StatelessWidget {
             children: [
               CardHeader(icon: Icons.verified_outlined, title: s.title, color: c.food),
               const SizedBox(height: 6),
-              InfoRow('Έκδοση', s.version),
-              InfoRow('Άδεια', s.licence),
-              if (s.link != null) InfoRow('Σελίδα', s.link!),
-              const SizedBox(height: 6),
+              // Μεγάλα κείμενα: ετικέτα πάνω, τιμή από κάτω σε όλο το πλάτος (όχι InfoRow, που θέλει σύντομες τιμές).
+              for (final (label, value) in [('Έκδοση', s.version), ('Άδεια', s.licence), if (s.link != null) ('Σελίδα', s.link!)])
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: TextStyle(fontSize: 12.5, color: c.textTertiary)),
+                      Text(value, style: TextStyle(fontSize: 14.5, height: 1.35, color: c.text)),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
               Text(s.detail, style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary)),
             ],
           ),

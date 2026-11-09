@@ -393,11 +393,11 @@ void main() {
       expect(find.text('330 ml'), findsOneWidget);
     });
     testWidgets('Μ4: υπενθύμιση λαδιού και χωρίς ωμή/μαγειρεμένη μορφή (μανιτάρια), όχι στα τηγανητά', (t) async {
-      await _pump(t, QuantitySheet(food: store, item: _food('C20010'), initialGrams: 200, meal: Meal.lunch));
+      await _pump(t, QuantitySheet(key: const ValueKey('C20010'), food: store, item: _food('C20010'), initialGrams: 200, meal: Meal.lunch));
       expect(find.byKey(const ValueKey('oil-note')), findsOneWidget);
-      await _pump(t, QuantitySheet(food: store, item: _food('C10084'), initialGrams: 200, meal: Meal.lunch));
+      await _pump(t, QuantitySheet(key: const ValueKey('C10084'), food: store, item: _food('C10084'), initialGrams: 200, meal: Meal.lunch));
       expect(find.byKey(const ValueKey('oil-note')), findsNothing);
-      await _pump(t, QuantitySheet(food: store, item: _food('C4002'), initialGrams: 200, meal: Meal.lunch));
+      await _pump(t, QuantitySheet(key: const ValueKey('C4002'), food: store, item: _food('C4002'), initialGrams: 200, meal: Meal.lunch));
       expect(find.byKey(const ValueKey('oil-note')), findsOneWidget, reason: 'πατάτα φούρνου «χωρίς λάδι»');
     });
     testWidgets('V-C-13: ο κιμάς λέει να διαλέξεις το % λιπαρών', (t) async {
