@@ -344,10 +344,15 @@ void main() {
       final t = sampleTraining(now);
       final link = WearLink()..attachForTest(t);
       final s = t.start(t.program!.workout('A')!);
-      link.handle('/ygeia/cmd', {'v': 2, 'op': 'tick', 'i': 0, 's': 0, 'sid': s.id});
+      link.handle('/ygeia/cmd', {'pv': 2, 'op': 'tick', 'i': 0, 's': 0, 'sid': s.id});
       expect(s.items.first.log.first.done, isFalse);
-      link.handle('/ygeia/cmd', {'v': 1, 'op': 'tick', 'i': 0, 's': 0, 'sid': s.id});
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'tick', 'i': 0, 's': 0, 'sid': s.id});
       expect(s.items.first.log.first.done, isTrue);
+      // Το «v» μιας εντολής είναι η τιμή της (π.χ. ρεζέρβα 3), όχι έκδοση: εκτελείται κανονικά.
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'tick', 'i': 0, 's': 1, 'sid': s.id});
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'tick', 'i': 0, 's': 2, 'sid': s.id});
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'rir', 'i': 0, 'v': 3, 'sid': s.id});
+      expect(s.items.first.rirAnswer, 3);
       expect(watchSession(t, (x) => x)['v'], 1);
     });
   });
@@ -475,13 +480,13 @@ void main() {
       final link = WearLink()..attachForTest(t);
       final s = t.start(t.program!.workout('A')!);
       // κανένα σετ: μένει ανοιχτή (αποφασίζεις εσύ)
-      link.handle('/ygeia/cmd', {'v': 1, 'op': 'end', 'sid': s.id, 'at': now.add(const Duration(minutes: 1)).millisecondsSinceEpoch});
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': s.id, 'at': now.add(const Duration(minutes: 1)).millisecondsSinceEpoch});
       expect(t.current, isNotNull);
       at = now.add(const Duration(minutes: 5));
       t.tick(s.items.first, 0);
       at = now.add(const Duration(minutes: 50));
       final end = now.add(const Duration(minutes: 40));
-      link.handle('/ygeia/cmd', {'v': 1, 'op': 'end', 'sid': s.id, 'at': end.millisecondsSinceEpoch});
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': s.id, 'at': end.millisecondsSinceEpoch});
       expect(t.current, isNull);
       expect(t.sessions.last.id, s.id);
       expect(t.sessions.last.end, end);
@@ -657,20 +662,26 @@ void main() {
       tester.view.physicalSize = const Size(400, 2400);
       addTearDown(tester.view.reset);
       await tester.runAsync(() => ExLibrary.load(inline: true));
-      final io = MemoryTrainingIO();
-      final t0 = TrainingStore(io: io, clock: () => now);
-      await tester.runAsync(() async {
-        await t0.load();
-        t0.importWatch(_walk('walkC', sec: 1200, partial: true));
-        await t0.flush();
-      });
-      final t = TrainingStore(io: io, clock: () => now);
-      await tester.runAsync(() => t.load());
+      // Όπως μετά από επανεκκίνηση: η προπόνηση στο training.json με «hrf», οι παλμοί στο αρχείο τους.
+      final start = now.subtract(const Duration(hours: 5)).millisecondsSinceEpoch;
+      final hr = [for (var t = 0; t <= 1200; t++) [t, 100 + t % 31]];
+      final io = MemoryTrainingIO()..hrFiles['w-walkC'] = encodeHr(hr);
+      final t = TrainingStore(io: io, clock: () => now)
+        ..replaceAll({
+          'v': 2,
+          'sessions': [
+            {
+              'id': 'w-walkC', 'w': 'walk', 'name': 'Περπάτημα', 'start': start, 'end': start + 1230 * 1000, 'items': [],
+              'cmin': 20, 'hrAvg': 115, 'hrMax': 130, 'hrf': hr.length, 'src': 'watch', 'part': 1, 'csec': 1200, 'm': 1500.0,
+            },
+          ],
+        });
       final s = t.sessions.single;
       expect(s.hrLoaded, isFalse);
+      expect(s.partial, isTrue);
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s)));
-      await tester.runAsync(() => t.ensureHr(s));
       await tester.pumpAndSettle();
+      expect(s.hrLoaded, isTrue);
       expect(s.hr.length, 1201);
       expect(find.byKey(const ValueKey('summary-partial')), findsOneWidget);
       expect(find.textContaining('έκλεισε πριν το «Τέλος»'), findsOneWidget);

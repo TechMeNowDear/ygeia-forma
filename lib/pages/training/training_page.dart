@@ -164,7 +164,7 @@ class _TrainingPageState extends State<TrainingPage> {
   Widget _forgottenCard(BuildContext context, Session s) {
     final c = Aigaio.of(context);
     final last = s.lastActivity;
-    final when = sameDay(s.start, _now) ? 'από τις ${hm(s.start)}' : 'της ${longDate(s.start)} (${hm(s.start)})';
+    final when = sameDay(s.start, _now) ? 'στις ${hm(s.start)}' : '${longDate(s.start)} στις ${hm(s.start)}';
     final none = s.setsDone == 0;
     return AppCard(
       key: const ValueKey('train-forgotten'),
@@ -177,8 +177,8 @@ class _TrainingPageState extends State<TrainingPage> {
         const SizedBox(height: 8),
         Text(
           none
-              ? '«${s.name}» $when είναι ακόμα ανοιχτή, χωρίς κανένα σετ.'
-              : '«${s.name}» $when είναι ακόμα ανοιχτή. Τελευταίο σετ στις ${hm(last)}${sameDay(last, _now) ? '' : ' (${shortDayDate(last)})'}.',
+              ? 'Η «${s.name}» που ξεκίνησε $when είναι ακόμα ανοιχτή, χωρίς κανένα σετ.'
+              : 'Η «${s.name}» που ξεκίνησε $when είναι ακόμα ανοιχτή. Τελευταίο σετ στις ${hm(last)}.',
           style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
         ),
         const SizedBox(height: 12),

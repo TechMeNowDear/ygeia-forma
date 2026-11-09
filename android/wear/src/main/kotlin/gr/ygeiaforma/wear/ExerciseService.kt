@@ -643,7 +643,7 @@ class ExerciseService : Service() {
             if (Repo.runningPhone && ph != null && pend.isNotEmpty() && nowEl - lastPendingSent >= 10_000) {
                 lastPendingSent = nowEl
                 for ((i, k) in pend) {
-                    val o = JSONObject().put("v", Proto.MAJOR).put("op", "tick").put("i", i).put("s", k).put("sid", ph.id).put("late", true)
+                    val o = JSONObject().put(Proto.CMD_VERSION, Proto.MAJOR).put("op", "tick").put("i", i).put("s", k).put("sid", ph.id).put("late", true)
                     ph.items.getOrNull(i)?.sets?.getOrNull(k)?.at?.takeIf { it > 0 }?.let { o.put("at", it) }
                     scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
                 }
@@ -838,7 +838,7 @@ class ExerciseService : Service() {
         // «fin» μέσα στο αποτέλεσμα, που μένει ώσπου να το πάρει το κινητό.
         val sid = result?.second?.optString("sid", "").orEmpty()
         if (userEnd && wasPhone && sid.isNotEmpty()) {
-            Link.sendJson(this, Paths.CMD, JSONObject().put("v", Proto.MAJOR).put("op", "end").put("sid", sid).put("at", now))
+            Link.sendJson(this, Paths.CMD, JSONObject().put(Proto.CMD_VERSION, Proto.MAJOR).put("op", "end").put("sid", sid).put("at", now))
         }
         if (result != null) {
             Repo.savePending(this, result.first, result.second)

@@ -42,6 +42,12 @@ object Paths {
 object Proto {
     const val MAJOR = 1
 
+    /**
+     * Στις εντολές ([Paths.CMD]) η έκδοση πάει στο «pv»: το «v» εκεί είναι ήδη η τιμή (ρεζέρβα, επαναλήψεις, διάλειμμα)
+     * από την πρώτη έκδοση και δεν αλλάζει.
+     */
+    const val CMD_VERSION = "pv"
+
     /** Κείμενο από νεότερη έκδοση της εφαρμογής (με «v» μεγαλύτερο από όσο ξέρουμε). Χωρίς «v» = 1. */
     fun tooNew(text: String): Boolean = try {
         JSONObject(text).optInt("v", 1) > MAJOR

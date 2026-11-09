@@ -353,9 +353,9 @@ class WearLink with WidgetsBindingObserver {
         if (bpm > 0) hr.value = (bpm, DateTime.now());
         ready.value = true;
       case '/ygeia/cmd':
-        // Εντολή νεότερης μορφής: δεν εκτελείται (V-A-08).
-        final v = j['v'];
-        if (v is num && v > TrainingStore.watchMajor) return;
+        // Εντολή νεότερης μορφής: δεν εκτελείται (V-A-08). Η έκδοση στο «pv»· το «v» εδώ είναι η τιμή (ρεζέρβα κ.λπ.).
+        final pv = j['pv'];
+        if (pv is num && pv > TrainingStore.watchMajor) return;
         final c = WatchCmd(j['op'] as String? ?? '', j);
         if (t != null) apply(t, c);
         _cmds.add(c);

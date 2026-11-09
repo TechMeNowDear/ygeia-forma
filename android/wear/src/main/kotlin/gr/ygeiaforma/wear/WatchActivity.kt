@@ -210,7 +210,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     // ------------------------------------------------------------------ ενέργειες
     private fun cmd(o: JSONObject) {
         val s = Repo.phone ?: return
-        o.put("sid", s.id).put("v", Proto.MAJOR)
+        o.put("sid", s.id).put(Proto.CMD_VERSION, Proto.MAJOR)
         scope.launch { Link.sendJson(this@WatchActivity, Paths.CMD, o) }
     }
 
