@@ -113,7 +113,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.Screen.RECOVER -> drawRecover(c, now)
             Repo.Screen.END -> drawEnd(c)
         }
-        if (note != null) small(c, note, 186f, gray, 8f, 120f)
+        // Στο «Αποθηκεύτηκε» το μήνυμα (π.χ. «σώθηκε ως τις…») γράφεται ολόκληρο μέσα στην οθόνη (drawEnd).
+        if (note != null && Repo.screen != Repo.Screen.END) small(c, note, 186f, gray, 8f, 120f)
     }
 
     private var noticeOpen = false
@@ -139,8 +140,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                     val si = it.nextSet.let { n -> if (n < 0) it.sets.size - 1 else n }
                     small(c, "ΣΕΤ ${si + 1}/${it.sets.size}", 118f, dimText, 9f, 120f)
                 }
-                val mins = (now - Repo.startedAt) / 60_000
-                small(c, "$mins′", 142f, light, 11f, 120f)
+                if (Repo.startedAt > 0) small(c, "${(now - Repo.startedAt) / 60_000}′", 142f, light, 11f, 120f)
             }
             else -> {
                 t(c, "Υγεία & Φόρμα", 100f, dimText, 11f, true)
@@ -250,9 +250,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val plan = Repo.plan
         val phone = Repo.phone
         if (Repo.updateNeeded) {
-            // Πρόγραμμα από νεότερη έκδοση του κινητού (V-A-08): δεν διαβάστηκε.
-            small(c, "Ενημέρωσε την εφαρμογή", 30f, orange, 8f, 110f)
-            small(c, "στο ρολόι", 39f, orange, 8f, 90f)
+            // Πρόγραμμα από νεότερη έκδοση του κινητού (V-A-08): δεν διαβάστηκε. Κάτω, εκεί που δεν πέφτει πάνω σε τίποτα.
+            small(c, "Ενημέρωσε την εφαρμογή", 172f, orange, 8.5f, 120f)
+            small(c, "στο ρολόι", 182f, orange, 8.5f, 90f)
         }
         if (phone != null && !phone.ended) {
             small(c, "ΣΤΟ ΚΙΝΗΤΟ", 52f, gray, 9f, 120f)
@@ -460,8 +460,27 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun drawEnd(c: Canvas) {
         t(c, "✓", 82f, green, 32f, true)
         t(c, "Αποθηκεύτηκε", 108f, Color.WHITE, 13f, true)
-        small(c, "Περνάει στο κινητό", 126f, gray, 9f, 140f)
-        small(c, "όταν είναι κοντά.", 138f, gray, 9f, 140f)
+        val note = Repo.notice
+        if (note != null) {
+            // Π.χ. «Σώθηκε ως τις 18:42: η εφαρμογή έκλεισε πριν το «Τέλος».» (V-A-03): ολόκληρο, σε ως 3 γραμμές.
+            text.color = orange
+            text.textSize = 8.5f * u
+            text.typeface = Typeface.DEFAULT
+            val w = (130f * u).toInt()
+            val tp = android.text.TextPaint(text).apply { textAlign = Paint.Align.LEFT }
+            val layout = android.text.StaticLayout.Builder.obtain(note, 0, note.length, tp, w)
+                .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER)
+                .setMaxLines(3)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .build()
+            c.save()
+            c.translate(cx - w / 2f, 116f * u)
+            layout.draw(c)
+            c.restore()
+        } else {
+            small(c, "Περνάει στο κινητό", 126f, gray, 9f, 140f)
+            small(c, "όταν είναι κοντά.", 138f, gray, 9f, 140f)
+        }
         pill(c, "ΟΚ", 164f, 60f, 24f, card, Color.WHITE, 11f) { actions.doneOk() }
     }
 

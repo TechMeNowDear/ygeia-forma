@@ -240,11 +240,10 @@ class ExerciseService : Service() {
         }
         if (action == Recovery.Action.FINALIZE) {
             val saved = o.optLong("saved", System.currentTimeMillis())
-            val walk = o.optString("kind") == "walk"
             val r = finalizeLeftover(o)
             if (r != null) {
                 Repo.screen = if (o.optBoolean("phone", false)) Repo.Screen.HOME else Repo.Screen.END
-                Repo.notice = "${if (walk) "Το περπάτημα" else "Η προπόνηση"} σώθηκε ως τις ${hm(saved)}: η εφαρμογή έκλεισε πριν το «Τέλος»."
+                Repo.notice = "Σώθηκε ως τις ${hm(saved)}: η εφαρμογή έκλεισε πριν το «Τέλος»."
             }
             Repo.changed()
             // Πρώτα στο Data Layer, μετά τέλος της υπηρεσίας (αλλιώς η αποστολή θα ακυρωνόταν).

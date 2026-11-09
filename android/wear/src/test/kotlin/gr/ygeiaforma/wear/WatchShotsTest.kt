@@ -201,7 +201,7 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.END
         shot("W8_end")
         // 9/11 (V-A-03): η εφαρμογή είχε κλείσει απότομα· το περπάτημα σώθηκε ως μερικό.
-        Repo.notice = "Το περπάτημα σώθηκε ως τις 18:42: η εφαρμογή έκλεισε πριν το «Τέλος»."
+        Repo.notice = "Σώθηκε ως τις 18:42: η εφαρμογή έκλεισε πριν το «Τέλος»."
         shot("W8b_end_recovered")
         Repo.notice = null
 
@@ -221,6 +221,7 @@ class WatchShotsTest {
             "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"ra":2,"sets":[{"label":"10,3 kg","reps":8,"done":true},{"label":"10,3 kg","reps":8,"done":true}]}]}"""))
         Repo.running = "strength"
         Repo.runningPhone = true
+        Repo.startedAt = now - 23 * 60_000
         Repo.bpm = 118
         Repo.bpmAt = now
         Repo.screen = Repo.Screen.SET
