@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../food/food_model.dart';
+import '../food/food_sources.dart';
 import '../food/food_store.dart';
 import '../format.dart';
 import '../theme.dart';
@@ -87,7 +88,7 @@ class NutritionPage extends StatelessWidget {
           action: switcher,
           onRefresh: () async {},
           single: [
-            if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
+            if (food.error != null) _ErrorCard(food: food),
             if (food.saveError != null)
               EmptyCard(
                 title: 'Δεν αποθηκεύτηκε',
@@ -101,7 +102,7 @@ class NutritionPage extends StatelessWidget {
             _SourcesNote(color: c.textTertiary),
           ],
           left: [
-            if (food.error != null) EmptyCard(title: 'Πρόβλημα', text: food.error!),
+            if (food.error != null) _ErrorCard(food: food),
             if (food.saveError != null)
               EmptyCard(
                 title: 'Δεν αποθηκεύτηκε',
@@ -164,7 +165,7 @@ class _SummaryCard extends StatelessWidget {
         children: [
           CardHeader(icon: Icons.restaurant_rounded, title: 'Σύνολο ημέρας', color: c.food),
           const SizedBox(height: 10),
-          BigValue(kcalText(t.kcal), unit: 'kcal', size: 44),
+          BigValue(thousands(t.shownKcal), unit: 'kcal', size: 44),
           const SizedBox(height: 14),
           MacroBreakdown(totals: t),
           const Hairline(vertical: 14),
@@ -172,6 +173,8 @@ class _SummaryCard extends StatelessWidget {
           InfoRow('Σάκχαρα', _atLeast(t, Nk.sugars, '${gramsText(t.sugars)} g')),
           InfoRow('Κορεσμένα λιπαρά', _atLeast(t, Nk.satFat, '${gramsText(t.satFat)} g')),
           InfoRow('Αλάτι', _atLeast(t, Nk.salt, '${dec(t.salt, 1)} g')),
+          // Έλεγχος 9/11 (Χ8): το αλκοόλ δίνει θερμίδες (7 kcal/g) που δεν είναι σε κανένα μακροθρεπτικό.
+          if (t.alcohol >= 0.05) InfoRow('Αλκοόλ', '${gramsText(t.alcohol)} g'),
           if (t.missing.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -202,6 +205,11 @@ class MacroBreakdown extends StatelessWidget {
     // (μετρούν και ίνες, αλκοόλ), ποτέ λιγότερο από το άθροισμα των τριών, ώστε να μην ξεπερνά το 100%.
     final pk = t.protein * 4, ck = t.carbs * 4, fk = t.fat * 9;
     final sum = math.max(t.kcal, pk + ck + fk);
+    // Έλεγχος 9/11 (Χ8): ό,τι λείπει ως το 100% είναι θερμίδες από ίνες (2 kcal/g) και αλκοόλ (7 kcal/g).
+    final pp = sum > 0 ? (100 * pk / sum).round() : 0;
+    final cp = sum > 0 ? (100 * ck / sum).round() : 0;
+    final fp = sum > 0 ? (100 * fk / sum).round() : 0;
+    final other = sum > 0 ? 100 - pp - cp - fp : 0;
 
     Widget macro(String label, double g, double kcalPart, Color color) => Expanded(
           child: Padding(
@@ -272,11 +280,20 @@ class MacroBreakdown extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             macro('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
-            // UX U7: σύντομα, ίδιο μέγεθος με «Πρωτεΐνη»/«Λίπος» (όπως στο φύλλο ποσότητας).
+            // UX U7: σύντομα, ίδιο μέγεθος με «Πρωτεΐνη»/«Λιπαρά» (όπως στο φύλλο ποσότητας).
             macro('Υδατάνθρ.', t.carbs, ck, carbsColor(c)),
-            macro('Λίπος', t.fat, fk, fatColor(c)),
+            macro('Λιπαρά', t.fat, fk, fatColor(c)),
           ],
         ),
+        if (percent && other >= 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Άλλα $other% θερμίδων: ${t.alcohol >= 0.05 ? 'φυτικές ίνες και αλκοόλ' : 'φυτικές ίνες'}.',
+              key: const ValueKey('macro-other'),
+              style: TextStyle(fontSize: 12, color: c.textTertiary),
+            ),
+          ),
       ],
     );
   }
@@ -316,7 +333,7 @@ class FoodTodayCard extends StatelessWidget {
                   style: TextStyle(fontSize: 15, color: c.textSecondary),
                 )
               else ...[
-                BigValue(kcalText(t.kcal), unit: 'kcal', size: 40),
+                BigValue(thousands(t.shownKcal), unit: 'kcal', size: 40),
                 const SizedBox(height: 14),
                 MacroBreakdown(totals: t, percent: false),
               ],
@@ -328,7 +345,7 @@ class FoodTodayCard extends StatelessWidget {
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: () => openAddFood(context, food, day: today),
+                onPressed: food.loaded ? () => openAddFood(context, food, day: today) : null,
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Φαγητό'),
               ),
@@ -350,13 +367,16 @@ class _MealCard extends StatelessWidget {
   DateTime get prevDay => DateTime(day.year, day.month, day.day - 1);
 
   Future<void> _copyFromPrevious(BuildContext context, DateTime from) async {
+    final skipped = food.notCopyable(from, meal);
     final added = await food.copyMeal(from, meal, day);
     if (!context.mounted || added.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(
       content: Text(
-        '${mealLabel(meal)}: ${added.length == 1 ? '1 τρόφιμο' : '${added.length} τρόφιμα'} όπως χθες',
+        '${mealLabel(meal)}: ${added.length == 1 ? '1 τρόφιμο' : '${added.length} τρόφιμα'} όπως χθες'
+        // Έλεγχος 9/11 (Μ3): σβησμένα προϊόντα (π.χ. με λάθος τιμές) δεν ξαναγράφονται.
+        '${skipped > 0 ? ' (χωρίς ${skipped == 1 ? '1 σβησμένο προϊόν' : '$skipped σβησμένα προϊόντα'})' : ''}',
       ),
       action: SnackBarAction(
         label: 'Αναίρεση',
@@ -373,7 +393,7 @@ class _MealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final t = Totals(entries);
-    final previous = entries.isEmpty ? food.entriesFor(prevDay, meal) : const <LogEntry>[];
+    final previous = entries.isEmpty ? food.copyable(prevDay, meal) : const <LogEntry>[];
     return AppCard(
       padding: const EdgeInsets.fromLTRB(18, 16, 10, 6),
       child: Column(
@@ -388,7 +408,7 @@ class _MealCard extends StatelessWidget {
               trailing: entries.isEmpty
                   ? null
                   : Text(
-                      '${kcalText(t.kcal)} kcal',
+                      '${thousands(t.shownKcal)} kcal',
                       style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                     ),
             ),
@@ -399,18 +419,18 @@ class _MealCard extends StatelessWidget {
           Wrap(
             children: [
               TextButton.icon(
-                onPressed: () => openAddFood(context, food, meal: meal, day: day),
+                onPressed: food.loaded ? () => openAddFood(context, food, meal: meal, day: day) : null,
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: Text(entries.isEmpty ? 'Προσθήκη' : 'Κι άλλο'),
               ),
               if (entries.isEmpty && previous.isNotEmpty)
                 TextButton.icon(
                   key: ValueKey('copy-${meal.name}'),
-                  onPressed: () => _copyFromPrevious(context, prevDay),
+                  onPressed: food.loaded ? () => _copyFromPrevious(context, prevDay) : null,
                   icon: const Icon(Icons.content_copy_rounded, size: 18),
                   // Με τις τωρινές τιμές, όπως θα γραφτούν (όχι με τα παλιά αντίγραφα).
                   label: Text(
-                      'Όπως χθες · ${kcalText(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).kcal)} kcal'),
+                      'Όπως χθες · ${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
                 ),
             ],
           ),
@@ -440,15 +460,17 @@ class _EntryRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Έλεγχος 9/11 (Χ9): 3 γραμμές, ώστε στη στενή στήλη να φαίνεται το κομμάτι που ξεχωρίζει
+                  // το τρόφιμο (π.χ. «2%» στο τέλος του ονόματος του γιαουρτιού).
                   Text(
                     e.food.name,
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${gramsText(e.grams)} g · πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
+                    '${gramsText(e.grams)} ${e.food.unit} · πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -456,7 +478,7 @@ class _EntryRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              kcalText(e.total(Nk.kcal)),
+              thousands(e.total(Nk.kcal).round()),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
             ),
           ],
@@ -472,11 +494,97 @@ class _SourcesNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text(
-        'Τιμές από CIQUAL 2025 (ANSES), USDA FoodData Central, Open Food Facts και ό,τι πέρασες από ετικέτες.',
-        style: TextStyle(fontSize: 12, height: 1.4, color: color),
+    return InkWell(
+      key: const ValueKey('food-sources'),
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => Navigator.of(context).push(FoodSourcesScreen.route()),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Text(
+          'Τιμές από CIQUAL 2025 (ANSES), USDA FoodData Central, Open Food Facts και ό,τι πέρασες από ετικέτες. '
+          'Πηγές και άδειες ›',
+          style: TextStyle(fontSize: 12, height: 1.4, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+/// Κάρτα σφάλματος ανάγνωσης, με «Ξαναδοκίμασε» (έλεγχος 9/11, Χ6).
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.food});
+  final FoodStore food;
+
+  @override
+  Widget build(BuildContext context) => EmptyCard(
+        title: 'Πρόβλημα',
+        text: food.loaded ? food.error! : '${food.error!} Μέχρι τότε η προσθήκη φαγητού είναι κλειδωμένη, για να μη γραφτεί κάτι διπλό.',
+        icon: Icons.error_outline_rounded,
+        buttonText: 'Ξαναδοκίμασε',
+        onPressed: food.retry,
+      );
+}
+
+/// «Πηγές και άδειες» της Διατροφής: έκδοση, ημερομηνία και άδεια κάθε πηγής (έλεγχος 9/11, Μ5· η Licence Ouverte
+/// ζητά την ημερομηνία της τελευταίας ενημέρωσης, το Open Food Facts αναφορά της ODbL).
+class FoodSourcesScreen extends StatelessWidget {
+  const FoodSourcesScreen({super.key});
+
+  static Route<void> route() => MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'Πηγές διατροφής'),
+        builder: (_) => const FoodSourcesScreen(),
+      );
+
+  @override
+  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
+    final c = Aigaio.of(context);
+    Widget card(FoodSourceInfo s) => AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CardHeader(icon: Icons.verified_outlined, title: s.title, color: c.food),
+              const SizedBox(height: 6),
+              // Μεγάλα κείμενα: ετικέτα πάνω, τιμή από κάτω σε όλο το πλάτος (όχι InfoRow, που θέλει σύντομες τιμές).
+              for (final (label, value) in [('Έκδοση', s.version), ('Άδεια', s.licence), if (s.link != null) ('Σελίδα', s.link!)])
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: TextStyle(fontSize: 12.5, color: c.textTertiary)),
+                      Text(value, style: TextStyle(fontSize: 14.5, height: 1.35, color: c.text)),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Text(s.detail, style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary)),
+            ],
+          ),
+        );
+    return Scaffold(
+      backgroundColor: c.background,
+      appBar: AppBar(backgroundColor: c.background, surfaceTintColor: Colors.transparent, title: const Text('Πηγές και άδειες')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 40),
+            children: [
+              Text(
+                'Οι αριθμοί διατροφής έρχονται μόνο από αυτές τις βάσεις ή από την ετικέτα που περνάς εσύ. Ποτέ από AI.',
+                style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
+              ),
+              const SizedBox(height: 14),
+              card(ciqualInfo),
+              const SizedBox(height: 14),
+              card(usdaInfo),
+              const SizedBox(height: 14),
+              card(offInfo),
+            ],
+          ),
+        ),
       ),
     );
   }

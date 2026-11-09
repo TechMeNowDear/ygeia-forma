@@ -159,7 +159,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
             children: [
               Text(
-                'Οι συνταγές θα χρησιμοποιούν μόνο ό,τι έχεις εδώ, με συσκευή, θερμοκρασία και χρόνο.',
+                // Έλεγχος 9/11 (Σ3): οι συνταγές δεν υπάρχουν ακόμα· να μη μοιάζει ότι υπάρχουν.
+                'Για τις συνταγές, όταν έρθουν: θα χρησιμοποιούν μόνο ό,τι έχεις εδώ, με συσκευή, θερμοκρασία και χρόνο.',
                 style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary),
               ),
               const SizedBox(height: 14),
@@ -196,7 +197,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
                       child: Text(
-                        'Τα σκεύη που έχεις. Οι συνταγές θα προτείνουν μόνο αυτά.',
+                        'Τα σκεύη που έχεις. Οι συνταγές (όταν έρθουν) θα προτείνουν μόνο αυτά.',
                         style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary),
                       ),
                     ),

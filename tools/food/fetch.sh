@@ -9,7 +9,7 @@ log() { echo "$@" | tee -a "$OUT/fetch.log"; }
 # --- CIQUAL: Recherche Data Gouv (Dataverse), DOI 10.57745/RDMHWY ---
 API="https://entrepot.recherche.data.gouv.fr/api"
 DOI="doi:10.57745/RDMHWY"
-UA="ygeia-forma-data-fetch/1.0 (personal research)"
+UA="ygeia-forma-data-fetch/1.1 (+https://github.com/TechMeNowDear/ygeia-forma)"
 if curl -sfL -A "$UA" "$API/datasets/:persistentId/?persistentId=$DOI" -o "$OUT/ciqual-meta.json"; then
   log "ciqual meta ok"
   python3 - "$OUT" <<'PY'

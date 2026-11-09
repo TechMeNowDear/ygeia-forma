@@ -184,7 +184,10 @@ class FoodBridge(
         try {
             conn.connectTimeout = 8000
             conn.readTimeout = 10000
-            conn.setRequestProperty("User-Agent", "YgeiaForma/0.1 (Android; personal use)")
+            // Η τεκμηρίωση του Open Food Facts ζητά «AppName/Version (επικοινωνία)». Επικοινωνία = η σελίδα του έργου
+            // (όχι προσωπικό email· έλεγχος 9/11, Μ5). Μένει το API v2: είναι «deprecated» αλλά υποστηρίζεται, ενώ το v3.5
+            // άλλαξε τη μορφή των θρεπτικών και είναι ακόμα υπό ανάπτυξη (changelog του API).
+            conn.setRequestProperty("User-Agent", "YgeiaForma/0.1 (+https://github.com/TechMeNowDear/ygeia-forma)")
             val status = conn.responseCode
             if (status == 404) return JSONObject().put("ok", true).put("found", false)
             if (status !in 200..299) {

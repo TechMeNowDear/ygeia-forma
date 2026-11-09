@@ -1,11 +1,47 @@
 name: Δεδομένα τροφίμων
+# Δύο δουλειές:
+# - «Ξαναχτίσιμο βάσης» (σε κάθε αλλαγή της λίστας, των εργαλείων ή της βάσης): φτιάχνει ξανά το
+#   assets/foods/basic_foods.json από τα αρχικά αρχεία του branch food-raw και ελέγχει ότι είναι ΙΔΙΟ byte προς byte
+#   (έλεγχος 9/11, Χ12· πριν δεν το έλεγχε κανένα workflow).
+# - «Λήψη πηγών» (μόνο χειροκίνητα): κατεβάζει ξανά τις πηγές. Η προηγούμενη λήψη ΔΕΝ χάνεται: μένει σε tag
+#   food-raw-<ημερομηνία>, ώστε μια παλιότερη βάση να ξαναφτιάχνεται πάντα.
 on:
   push:
-    branches: [main]
-    paths: ['tools/food/fetch.sh']
+    paths: ['tools/food/**', 'assets/foods/**', '.github/workflows/food-data.yml']
+  pull_request:
+    paths: ['tools/food/**', 'assets/foods/**', '.github/workflows/food-data.yml']
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
+  rebuild:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Αρχικά αρχεία (branch food-raw)
+        run: |
+          git fetch --depth 1 origin food-raw
+          mkdir -p /tmp/raw /tmp/raw/usda
+          git archive FETCH_HEAD | tar -x -C /tmp/raw
+          unzip -q /tmp/raw/usda_foundation_food_csv.zip -d /tmp/raw/usda
+          unzip -q /tmp/raw/usda_sr_legacy_food_csv.zip -d /tmp/raw/usda
+          (cd /tmp/raw && sha256sum ciqual_*.xml usda_*.zip)
+      - name: Ξαναχτίσιμο και σύγκριση
+        run: |
+          python3 tools/food/ciqual_parse.py /tmp/raw /tmp/raw/ciqual.json
+          python3 tools/food/usda_parse.py /tmp/raw/usda /tmp/raw/usda.json
+          python3 tools/food/build_list.py tools/food/greek_list.tsv /tmp/raw/ciqual.json /tmp/raw/usda.json /tmp/basic_foods.json | tee build.log
+          if ! grep -q "Κανένα πρόβλημα" build.log; then
+            echo "::error title=Βάση τροφίμων::Το build_list.py βρήκε προβλήματα (δες το log)."
+            exit 1
+          fi
+          if ! cmp /tmp/basic_foods.json assets/foods/basic_foods.json; then
+            echo "::error title=Βάση τροφίμων::Το assets/foods/basic_foods.json δεν ξαναβγαίνει από τις πηγές. Τρέξε το build_list.py και ανέβασε το αποτέλεσμα."
+            exit 1
+          fi
   fetch:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -13,12 +49,26 @@ jobs:
       - uses: actions/checkout@v5
       - name: Κατέβασμα πηγών
         run: bash tools/food/fetch.sh
-      - name: Ανέβασμα στο branch food-raw
+      - name: Ανέβασμα στο branch food-raw (η προηγούμενη λήψη μένει σε tag)
+        env:
+          TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
+          url="https://x-access-token:${TOKEN}@github.com/${REPO}.git"
+          # Η τωρινή λήψη, πριν αντικατασταθεί: tag με την ημερομηνία της (αν δεν έχει ήδη).
+          if git fetch -q origin food-raw 2>/dev/null; then
+            old="food-raw-$(git log -1 --format=%cs FETCH_HEAD)"
+            if ! git ls-remote --exit-code --tags origin "refs/tags/$old" >/dev/null; then
+              git tag "$old" FETCH_HEAD
+              git push -q "$url" "refs/tags/$old"
+            fi
+          fi
           cd food-raw
           git init -q -b food-raw
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add -A
           git commit -qm "Ακατέργαστα δεδομένα τροφίμων $(date -u +%F)"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" food-raw
+          new="food-raw-$(date -u +%F)"
+          git tag -f "$new"
+          git push -qf "$url" food-raw "refs/tags/$new"
