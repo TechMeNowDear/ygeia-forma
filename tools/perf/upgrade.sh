@@ -53,16 +53,49 @@ JSON
   adb shell rm -f /data/local/tmp/seed_training.json
 fi
 
+# 2β. Δείγμα στη βάση (έλεγχος 9/11, S-11): ένα «προϊόν μου» στον πίνακα my_foods, για να δοκιμάζεται και η αναβάθμιση της
+#     βάσης ΜΕ γραμμές (όχι μόνο άδειο αρχείο). Θέλει το sqlite3 της εικόνας του emulator· αν λείπει, προειδοποίηση.
+food_seeded=0
+DB="$D/databases/ygeia.db"
+if errq_root; then
+  if [ -z "$(adb shell 'command -v sqlite3' | tr -d '\r')" ]; then
+    echo "::warning title=Αναβάθμιση::Ο emulator δεν έχει sqlite3· η βάση δοκιμάζεται χωρίς γραμμές"
+  elif [ "$(adb shell "test -f $DB && echo y" | tr -d '\r')" != y ]; then
+    echo "::warning title=Αναβάθμιση::Η παλιά έκδοση δεν έφτιαξε ακόμα τη βάση· η βάση δοκιμάζεται χωρίς γραμμές"
+  else
+    ms=$(( $(date +%s) * 1000 ))
+    cat > seed_food.sql <<SQL
+INSERT OR REPLACE INTO my_foods(id, json, updated) VALUES('ci-seed-food', '{"id":"ci-seed-food","name":"Προϊόν δοκιμής αναβάθμισης","cat":"","source":"Ετικέτα","n":{"kcal":123,"protein":4,"carbs":20,"fat":3}}', $ms);
+SQL
+    adb push seed_food.sql /data/local/tmp/seed_food.sql > /dev/null
+    uid=$(adb shell stat -c %u "$D" | tr -d '\r')
+    if adb shell "sqlite3 $DB < /data/local/tmp/seed_food.sql && chown -R $uid:$uid $D/databases && restorecon -R $D/databases"; then
+      food_seeded=1
+    else
+      fail "δεν μπήκε το δείγμα στη βάση της παλιάς έκδοσης (my_foods)"
+    fi
+    adb shell rm -f /data/local/tmp/seed_food.sql
+  fi
+fi
+
 # 3. Η παλιά διαβάζει το δείγμα;
 if [ "$seeded" = 1 ]; then
   launch
   ui_wait "Σήμερα" 60 > /dev/null || true
+  # Έλεγχος 9/11, S-9: αν η παλιά δεν διαβάζει το δείγμα, η δοκιμή δεν δοκιμάζει τίποτα → αποτυχία με σωστή εξήγηση.
   if ui_tap "Άσκηση" && sleep 3 && ui_find_scroll "137 bpm" 6; then
     echo "Παλιά έκδοση ($old_ver): διαβάζει το δείγμα (137 bpm)"
   else
-    echo "::warning title=Αναβάθμιση::Η παλιά έκδοση δεν έδειξε το δείγμα (137 bpm)· ελέγχεται μόνο ότι η νέα το διαβάζει"
+    fail "η παλιά έκδοση δεν διάβασε το δείγμα: ενημέρωσε το seed_training.json (tools/perf/upgrade.sh) στη μορφή της «latest»"
   fi
   shot "upgrade_old" > /dev/null || true
+  if [ "$food_seeded" = 1 ]; then
+    if ui_tap "Διατροφή" && sleep 3 && ui_tap "Τα δικά μου" && sleep 3 && ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4; then
+      echo "Παλιά έκδοση: διαβάζει το δείγμα της βάσης («Τα δικά μου»)"
+    else
+      fail "η παλιά έκδοση δεν έδειξε το προϊόν-δείγμα: ενημέρωσε το seed_food.sql (tools/perf/upgrade.sh) στη μορφή της «latest»"
+    fi
+  fi
   adb shell am force-stop "$PKG"
 fi
 
@@ -95,6 +128,14 @@ if [ "$seeded" = 1 ]; then
   else
     fail "δεν βρέθηκε το κουμπί «Άσκηση»"
   fi
+fi
+if [ "$food_seeded" = 1 ]; then
+  if ui_tap "Διατροφή" && sleep 3 && ui_tap "Τα δικά μου" && sleep 3 && ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4; then
+    echo "Νέα έκδοση: διαβάζει τη βάση της παλιάς («Τα δικά μου»)"
+  else
+    fail "η νέα έκδοση δεν δείχνει το προϊόν της παλιάς βάσης («Τα δικά μου»)"
+  fi
+  shot "upgrade_new_food" > /dev/null || true
 fi
 sleep 5
 [ -n "$(app_pid)" ] || fail "η νέα έκδοση δεν τρέχει μετά το άνοιγμα"

@@ -36,13 +36,25 @@ def need(cond, msg):
         errors.append(msg)
 
 
+def grab(pat, text, what, flags=0, group=1):
+    """Ό,τι ζητά το pattern· αν δεν βρεθεί, καθαρό μήνυμα (όχι traceback): άλλαξε ο κώδικας και ο έλεγχος θέλει ενημέρωση."""
+    m = re.search(pat, text, flags)
+    if not m:
+        errors.append(f'Δεν βρέθηκε {what} — άλλαξε ο κώδικας; ενημέρωσε το tools/ci/check_privacy.py')
+        return ''
+    return m.group(group)
+
+
 # --- Oura: οι άδειες που ζητούνται ---
 cfg = read('lib/oura/config.dart')
-scopes = re.search(r"const ouraScopes = '([^']*)';", cfg).group(1).strip()
+scopes = grab(r"const ouraScopes = '([^']*)';", cfg, 'το ouraScopes στο lib/oura/config.dart').strip()
 if not scopes:
-    name = re.search(r'const ouraOAuth = OuraOAuthEndpoints\.(\w+);', cfg).group(1)
-    block = re.search(rf'static const {name} = OuraOAuthEndpoints\._\((.*?)\);', cfg, re.S).group(1)
-    scopes = re.findall(r"'([^']*)'", block)[3]
+    name = grab(r'const ouraOAuth = OuraOAuthEndpoints\.(\w+);', cfg, 'το ouraOAuth στο lib/oura/config.dart')
+    block = grab(rf'static const {name} = OuraOAuthEndpoints\._\((.*?)\);', cfg, f'το OuraOAuthEndpoints.{name}', re.S) if name else ''
+    args = re.findall(r"'([^']*)'", block)
+    # Η σειρά των ορισμάτων: authorize, token, revoke, scopes, revokeParam.
+    scopes = args[3] if len(args) >= 4 else ''
+    need(scopes, f'Δεν βρέθηκαν τα scopes του OuraOAuthEndpoints.{name}')
 for sc in scopes.split():
     need(f'«{sc}»' in greek, f'Oura: η εφαρμογή ζητά την άδεια «{sc}», αλλά η πολιτική (ελληνικά) δεν την αναφέρει')
     need(f'"{sc}"' in english, f'Oura: η άδεια "{sc}" λείπει από το αγγλικό κείμενο')
@@ -66,7 +78,7 @@ for t in sorted({t for block in lists for t in re.findall(r'DataTypes\.(\w+)', b
         need(SAMSUNG[t] in greek, f'Samsung: η εφαρμογή ζητά {t}, αλλά η πολιτική δεν λέει «{SAMSUNG[t]}»')
 
 # --- Μεσάζων Oura ---
-proxy = re.search(r"const ouraTokenProxy = '([^']*)';", cfg).group(1)
+proxy = grab(r"const ouraTokenProxy = '([^']*)';", cfg, 'το ouraTokenProxy στο lib/oura/config.dart')
 if 'netlify' in proxy:
     need('Netlify' in greek and 'ΗΠΑ' in greek, 'Oura: ο μεσάζων τρέχει στο Netlify (ΗΠΑ)· η πολιτική πρέπει να το λέει')
     need('US' in english, 'Oura: το αγγλικό κείμενο πρέπει να λέει ότι ο μεσάζων είναι στις ΗΠΑ (US)')
@@ -100,6 +112,28 @@ if '<cloud-backup' in rules:
     need('αντίγραφο της Google' in greek or 'Αυτόματο αντίγραφο της Google' in greek, 'Αντίγραφο: το αντίγραφο της Google πρέπει να γράφεται')
     if 'disableIfNoEncryptionCapabilities="true"' in rules:
         need('κρυπτογράφηση από άκρη σε άκρη' in greek, 'Αντίγραφο: να λέει «κρυπτογράφηση από άκρη σε άκρη»')
+if '<device-transfer' in rules:
+    need('νέο κινητό' in greek, 'Αντίγραφο: η μεταφορά σε νέο κινητό (device-transfer) πρέπει να γράφεται')
+    need('device-to-device' in english, 'Αντίγραφο: η μεταφορά σε νέο κινητό λείπει από το αγγλικό κείμενο')
+
+# --- Κάθε υπηρεσία στο διαδίκτυο που καλεί ο κώδικας πρέπει να είναι γνωστή (και γραμμένη στην πολιτική) ---
+KNOWN_HOSTS = {
+    'ouraring.com': 'Oura', 'netlify.app': 'Netlify', 'openfoodfacts.org': 'Open Food Facts', 'sentry.io': 'Sentry',
+}
+import os
+for base in ('lib', 'android/app/src/main', 'android/wear/src/main'):
+    for dirpath, _, files in os.walk(f'{ROOT}/{base}'):
+        for fn in files:
+            if not fn.endswith(('.dart', '.kt', '.java')):
+                continue
+            with open(os.path.join(dirpath, fn), encoding='utf-8', errors='replace') as f:
+                src = f.read()
+            for host in set(re.findall(r'https://([a-z0-9.-]+\.[a-z]{2,})', src)):
+                known = [k for k in KNOWN_HOSTS if host == k or host.endswith('.' + k)]
+                if not known:
+                    errors.append(f'Νέα υπηρεσία στο {base}/…/{fn}: {host} — γράψ\' τη στην πολιτική και στη λίστα KNOWN_HOSTS')
+                else:
+                    need(KNOWN_HOSTS[known[0]] in greek, f'{host}: η πολιτική πρέπει να αναφέρει {KNOWN_HOSTS[known[0]]}')
 
 # --- Γενικά ---
 need(re.search(r'Τελευταία ενημέρωση: \d{1,2} \w+ 20\d\d', page), 'Λείπει η «Τελευταία ενημέρωση: …»')

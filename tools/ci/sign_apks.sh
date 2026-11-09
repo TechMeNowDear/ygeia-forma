@@ -34,16 +34,31 @@ bt="$(ls -d "$sdk"/build-tools/* 2>/dev/null | sort -V | tail -1)"
 APKSIGNER="$bt/apksigner"
 echo "apksigner από build-tools $(basename "$bt")"
 
-# Το apksigner κρατά τη στοίχιση του Gradle (16 KB για τις .so) όταν το υποστηρίζει· ο έλεγχος μετά το επιβεβαιώνει.
+# 1. Στοίχιση ΠΡΙΝ από την υπογραφή (έλεγχος 9/11, M-1): ασυμπίεστα αρχεία στα 4 byte (αλλιώς το Android 11+ αρνείται την
+#    εγκατάσταση) και .so στα 16 KB. Χωρίς κλειδί ακόμα. Το ρολόι έρχεται πλέον «unsigned» από το Gradle· έτσι στοιχίζεται
+#    σίγουρα και αυτό. Η υπογραφή v2 ΔΕΝ αλλάζει τη θέση των αρχείων (--alignment-preserved), και το apk_check.py το ελέγχει.
+ZIPALIGN="$bt/zipalign"
+[ -x "$ZIPALIGN" ] || { echo "::error title=Υπογραφή::Δεν βρέθηκε το zipalign"; exit 1; }
+za_help=$("$ZIPALIGN" -h 2>&1 || true)
+case "$za_help" in
+  *"-P <pagesize_kb>"*) za=(-P 16) ;;
+  *) za=(-p) ;;  # παλιό zipalign: 4 KB· ο έλεγχος 16 KB μετά θα σταματήσει τη δημοσίευση
+esac
+help=$("$APKSIGNER" sign --help 2>&1 || true)
 extra=()
-if "$APKSIGNER" sign --help 2>&1 | grep -q -- '--alignment-preserved'; then extra+=(--alignment-preserved true); fi
+case "$help" in *--alignment-preserved*) extra+=(--alignment-preserved true) ;; esac
+echo "zipalign ${za[*]} 4 · apksigner ${extra[*]:-(στοίχιση του apksigner)}"
+for apk in "$@"; do
+  test -f "$apk" || { echo "::error title=Υπογραφή::Λείπει το $apk"; exit 1; }
+  "$ZIPALIGN" -f "${za[@]}" 4 "$apk" "$apk.aligned" > /dev/null || { echo "::error title=Υπογραφή::Το zipalign απέτυχε για το $apk"; exit 1; }
+  mv "$apk.aligned" "$apk"
+done
 
 mkdir -p "$KS_DIR"
 printf '%s' "$YGEIA_KEYSTORE_B64" | base64 -d > "$KS_DIR/release.jks"
 unset YGEIA_KEYSTORE_B64
 
 for apk in "$@"; do
-  test -f "$apk" || { echo "::error title=Υπογραφή::Λείπει το $apk"; exit 1; }
   out="$KS_DIR/out.apk"
   if ! "$APKSIGNER" sign \
       --ks "$KS_DIR/release.jks" --ks-key-alias ygeia \
@@ -67,6 +82,20 @@ for apk in "$@"; do
   "$APKSIGNER" verify --print-certs -v "$apk" > "$log" 2>&1 || { cat "$log"; echo "::error title=Υπογραφή::Η επαλήθευση του $apk απέτυχε"; exit 1; }
   python3 -I "$dir/apk_check.py" "$want" "$log" "$apk"
   rm -f "$log"
+  # Package και versionCode (ΑΠΑΡΑΒΑΤΟ: το applicationId δεν αλλάζει· ο αριθμός από το όνομα: κινητό N, ρολόι 1000000+N).
+  badging=$("$bt/aapt2" dump badging "$apk" 2> /dev/null || true)
+  line=$(printf '%s\n' "$badging" | sed -n '1p')
+  case "$line" in *"name='gr.ygeiaforma.ygeia_forma'"*) ;; *) echo "::error title=Υπογραφή::Λάθος package στο $apk: $line"; exit 1 ;; esac
+  base=$(basename "$apk")
+  case "$base" in
+    ygeia-forma-watch-*.apk) n=${base#ygeia-forma-watch-}; n=${n%.apk}; vc=$((1000000 + n)) ;;
+    ygeia-forma-*.apk) n=${base#ygeia-forma-}; n=${n%.apk}; vc=$n ;;
+    *) vc="" ;;
+  esac
+  if [ -n "$vc" ]; then
+    case "$line" in *"versionCode='$vc'"*) echo "$base: package gr.ygeiaforma.ygeia_forma · versionCode $vc" ;;
+      *) echo "::error title=Υπογραφή::$base: περιμέναμε versionCode $vc: $line"; exit 1 ;; esac
+  fi
   echo "::notice title=Υπογραφή::$(basename "$apk") · SHA-256 APK $(sha256sum "$apk" | cut -c1-16)… · πιστοποιητικό ${want:0:12}…"
 done
 

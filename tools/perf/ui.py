@@ -26,11 +26,24 @@ def _label(n):
     return (n.get('text') or '') + '\n' + (n.get('content-desc') or '')
 
 
+def _first(n):
+    return [(n.get('text') or '').split('\n')[0].strip(), (n.get('content-desc') or '').split('\n')[0].strip()]
+
+
+def _bottom(n):
+    try:
+        return int(n.get('bounds', '').split('][')[1].split(',')[1].rstrip(']'))
+    except (IndexError, ValueError):
+        return 0
+
+
 def find(path, want):
     hits = [n for n in _nodes(path) if want in _label(n)]
     if not hits:
         return 1
-    hits.sort(key=lambda n: n.get('clickable') != 'true')
+    # Προτίμηση (έλεγχος 9/11, S-10): 1) η ΠΡΩΤΗ γραμμή είναι ακριβώς το κείμενο (π.χ. η καρτέλα «Άσκηση», όχι μια κάρτα
+    # «Άσκηση σήμερα…»), 2) πατιέται, 3) το χαμηλότερο στην οθόνη (η κάτω μπάρα είναι κάτω από το περιεχόμενο).
+    hits.sort(key=lambda n: (want not in _first(n), n.get('clickable') != 'true', -_bottom(n)))
     b = hits[0].get('bounds', '')
     try:
         (x1, y1), (x2, y2) = [tuple(int(v) for v in p.split(',')) for p in b.strip('[]').split('][')]

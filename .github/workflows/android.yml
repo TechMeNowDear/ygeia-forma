@@ -6,8 +6,11 @@
 # ότι το πιστοποιητικό είναι ΑΚΡΙΒΩΣ το σταθερό (YGEIA_CERT_SHA256). Κάθε ενέργεια (action) είναι κλειδωμένη σε
 # πλήρες SHA. Κάθε job έχει μόνο τα δικαιώματα που χρειάζεται· γράφουν μόνο τα «publish», «shots-push», «old-cache».
 #
+# Τα APK «δένονται» με SHA-256 (outputs των jobs) από το build στο sign και από το sign στο publish.
+#
 # Δοκιμή χωρίς δημοσίευση: Actions › «Χτίσιμο Android» › Run workflow σε ΑΛΛΟΝ κλάδο. Τρέχουν χτίσιμο, έλεγχοι, άνοιγμα,
 # αναβάθμιση και υπογραφή (με έλεγχο πιστοποιητικού)· το Releases και τα στιγμιότυπα του main ΔΕΝ αλλάζουν (μόνο στο main).
+# Όταν ο χρήστης φτιάξει το environment «release» μόνο για το main (οδηγίες στο README), ο άλλος κλάδος ΔΕΝ υπογράφει.
 name: Χτίσιμο Android
 
 on:
@@ -33,6 +36,11 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    # SHA-256 των APK χωρίς υπογραφή: τα outputs ενός job δεν τα αλλάζει κανένα άλλο job, άρα το «sign» υπογράφει
+    # ΜΟΝΟ ό,τι έβγαλε αυτό το job (έλεγχος 9/11, S-6).
+    outputs:
+      phone: ${{ steps.sums.outputs.phone }}
+      watch: ${{ steps.sums.outputs.watch }}
     # Νέα αλλαγή στο main ακυρώνει το χτίσιμο της παλιάς (όχι όμως μια δημοσίευση που τρέχει).
     concurrency:
       group: ${{ github.workflow }}-build-${{ github.ref }}
@@ -182,12 +190,21 @@ jobs:
           test -f sentry_live_ok || { echo "::error title=Δοκιμή Sentry::Ο έλεγχος δεν έτρεξε"; exit 1; }
           echo "::notice title=Δοκιμή Sentry::Στάλθηκε δοκιμαστικό σφάλμα για ygeia-forma@0.1.$N"
 
-      # Χωρίς υπογραφή με το σταθερό κλειδί: μόνο για το job «sign» (σβήνεται σε 1 μέρα).
+      - name: SHA-256 των APK (για το job «sign»)
+        id: sums
+        env:
+          N: ${{ github.run_number }}
+        run: |
+          echo "phone=$(sha256sum "out/ygeia-forma-$N.apk" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "watch=$(sha256sum "out/ygeia-forma-watch-$N.apk" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          sha256sum out/*.apk
+
+      # Χωρίς υπογραφή με το σταθερό κλειδί: μόνο για το job «sign» (3 μέρες, ώστε να γίνεται «Re-run» και την επομένη).
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: unsigned-${{ github.run_number }}
           path: out/*.apk
-          retention-days: 1
+          retention-days: 3
           if-no-files-found: error
 
   # Στιγμιότυπα οθονών με δείγμα δεδομένων, για έλεγχο της εμφάνισης. Τα ανεβάζει στο branch «screenshots» το
@@ -376,6 +393,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      phone: ${{ steps.sums.outputs.phone }}
+      watch: ${{ steps.sums.outputs.watch }}
     concurrency:
       group: ${{ github.workflow }}-sign-${{ github.ref }}
       cancel-in-progress: false
@@ -392,6 +412,15 @@ jobs:
           name: unsigned-${{ github.run_number }}
           path: apk
 
+      - name: Είναι τα APK του «build»; (SHA-256)
+        env:
+          N: ${{ github.run_number }}
+          P: ${{ needs.build.outputs.phone }}
+          W: ${{ needs.build.outputs.watch }}
+        run: |
+          [ -n "$P" ] && [ -n "$W" ] || { echo "::error title=Υπογραφή::Λείπουν τα SHA-256 του build"; exit 1; }
+          printf '%s  %s\n' "$P" "apk/ygeia-forma-$N.apk" "$W" "apk/ygeia-forma-watch-$N.apk" | sha256sum -c -
+
       - name: Υπογραφή (το κλειδί μόνο σε αυτό το βήμα)
         env:
           YGEIA_KEYSTORE_B64: ${{ secrets.YGEIA_KEYSTORE_B64 }}
@@ -404,6 +433,14 @@ jobs:
         run: |
           rm -rf "$RUNNER_TEMP/ygeia-ks"
           test ! -e "$RUNNER_TEMP/ygeia-ks" && echo "Κανένα αρχείο κλειδιού στο μηχάνημα"
+
+      - name: SHA-256 των υπογεγραμμένων APK (για το job «publish»)
+        id: sums
+        env:
+          N: ${{ github.run_number }}
+        run: |
+          echo "phone=$(sha256sum "apk/ygeia-forma-$N.apk" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "watch=$(sha256sum "apk/ygeia-forma-watch-$N.apk" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -430,6 +467,15 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ygeia-forma-${{ github.run_number }}
+
+      - name: Είναι τα APK του «sign»; (SHA-256)
+        env:
+          N: ${{ github.run_number }}
+          P: ${{ needs.sign.outputs.phone }}
+          W: ${{ needs.sign.outputs.watch }}
+        run: |
+          [ -n "$P" ] && [ -n "$W" ] || { echo "::error title=Δημοσίευση::Λείπουν τα SHA-256 του sign"; exit 1; }
+          printf '%s  %s\n' "$P" "ygeia-forma-$N.apk" "$W" "ygeia-forma-watch-$N.apk" | sha256sum -c -
 
       - name: Δημοσίευση στο Releases
         env:
@@ -466,10 +512,7 @@ jobs:
           Έλεγχος αρχείων:
           $sums"
           gh release delete "build-$N" --yes --cleanup-tag || true
-          # Παλιά αντίγραφα «build-…» που έμειναν από διακομμένη δημοσίευση (π.χ. build-68).
-          for t in $(gh api "repos/$GH_REPO/releases?per_page=100" --jq '.[] | select(.prerelease) | .tag_name' | grep -E '^build-[0-9]+$' || true); do
-            if [ "${t#build-}" -lt "$N" ]; then gh release delete "$t" --yes --cleanup-tag && echo "Σβήστηκε το παλιό $t"; fi
-          done
+          # Τα παλιά «build-…» (π.χ. build-68) ΔΕΝ σβήνονται αυτόματα: είναι τα μόνα παλιά APK στο Releases (απόφαση χρήστη).
           echo "::notice title=Δημοσίευση::Τελευταία έκδοση #$N"
 
   # Έλεγχος 9/11 (V-A-21): η παλιά μνήμη Actions «ygeia-signing-v1» (είχε το κλειδί ΚΑΙ τον κωδικό, ως το b2af444)

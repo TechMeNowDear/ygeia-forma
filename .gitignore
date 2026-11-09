@@ -36,3 +36,7 @@ android/key.properties
 # Στιγμιότυπα (ανεβαίνουν στο branch screenshots)
 test/shots/
 tools/exercises/out/
+
+# Python (εργαλεία CI)
+__pycache__/
+*.pyc

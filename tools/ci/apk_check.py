@@ -8,7 +8,10 @@
   απεγκατάσταση σβήνει τα δεδομένα· το ρολόι δεν μιλά με το κινητό),
 - υπάρχουν περισσότεροι από ένας υπογράφοντες,
 - λείπει η υπογραφή v2 (όπως όλες οι εκδόσεις ως την #89: μόνο v2),
-- μια ασυμπίεστη βιβλιοθήκη .so δεν είναι στοιχισμένη στα 16 KB (Android 15+ σε συσκευές με σελίδες 16 KB).
+- μια ασυμπίεστη βιβλιοθήκη .so δεν είναι στοιχισμένη στα 16 KB (Android 15+ σε συσκευές με σελίδες 16 KB),
+- οποιοδήποτε άλλο ασυμπίεστο αρχείο δεν είναι στοιχισμένο στα 4 byte, ή το resources.arsc είναι συμπιεσμένο
+  (το Android 11+ με targetSdk ≥ 30 ΔΕΝ εγκαθιστά τέτοιο APK — έλεγχος 9/11, M-1),
+- το package δεν είναι gr.ygeiaforma.ygeia_forma ή ο versionCode δεν είναι ο αναμενόμενος (με το aapt2, στο sign_apks.sh).
 Μόνο βιβλιοθήκη της Python· δεν τυπώνει τίποτα μυστικό (το πιστοποιητικό είναι δημόσιο).
 """
 import re
@@ -32,6 +35,23 @@ def so_misaligned(path):
             if data % 16384:
                 bad.append(info.filename)
     return n, bad
+
+
+def stored_misaligned(path):
+    """Ασυμπίεστα αρχεία που δεν ξεκινούν σε όριο 4 byte, και συμπιεσμένο resources.arsc."""
+    bad = []
+    with open(path, 'rb') as f, zipfile.ZipFile(path) as z:
+        for info in z.infolist():
+            if info.compress_type != zipfile.ZIP_STORED:
+                if info.filename == 'resources.arsc':
+                    bad.append('resources.arsc (συμπιεσμένο)')
+                continue
+            f.seek(info.header_offset)
+            h = f.read(30)
+            name_len, extra_len = struct.unpack('<HH', h[26:30])
+            if (info.header_offset + 30 + name_len + extra_len) % 4:
+                bad.append(info.filename)
+    return bad
 
 
 def v2_certificates(path):
@@ -92,6 +112,9 @@ def main():
     n, bad = so_misaligned(apk)
     if bad:
         errors.append('βιβλιοθήκες χωρίς στοίχιση 16 KB: ' + ', '.join(bad))
+    bad4 = stored_misaligned(apk)
+    if bad4:
+        errors.append('αρχεία χωρίς στοίχιση 4 byte (το Android δεν θα το εγκαταστήσει): ' + ', '.join(bad4[:5]))
     schemes = ', '.join(v for v in ('v1', 'v2', 'v3', 'v4')
                         if re.search(rf'Verified using {v} scheme[^:]*: true', text)) or 'καμία'
     if errors:
@@ -102,7 +125,7 @@ def main():
             if re.match(r'(Verifie|Number of signers|Signer|WARNING|ERROR|DOES NOT VERIFY)', line) and 'DN:' not in line:
                 print('  ' + line[:200])
         sys.exit(1)
-    print(f'{apk}: πιστοποιητικό {got[:12]}… σωστό · σχήματα {schemes} · {n} βιβλιοθήκες .so στοιχισμένες στα 16 KB')
+    print(f'{apk}: πιστοποιητικό {got[:12]}… σωστό · σχήματα {schemes} · ασυμπίεστα στοιχισμένα (4 B) · {n} βιβλιοθήκες .so στα 16 KB')
 
 
 if __name__ == '__main__':
