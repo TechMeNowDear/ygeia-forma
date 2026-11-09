@@ -144,6 +144,15 @@ class _TrainingPageState extends State<TrainingPage> {
           icon: const Icon(Icons.edit_note_rounded),
           label: const Text('Φτιάξε το μόνος σου'),
         ),
+        // Και χωρίς πρόγραμμα να φαίνεται ότι το ρολόι βρέθηκε (9/11).
+        if (WearLink.main.ready.value) ...[
+          const SizedBox(height: 10),
+          Row(key: const ValueKey('train-watch-ready'), children: [
+            Icon(Icons.watch_rounded, size: 16, color: c.good),
+            const SizedBox(width: 4),
+            Text('ρολόι έτοιμο', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.good)),
+          ]),
+        ],
       ]),
     );
   }
