@@ -829,7 +829,7 @@ class _SummaryPageState extends State<SummaryPage> {
       for (var k = 0; k < s.items.length; k++)
         _ExerciseCard(e: s.items[k], hr: withHr ? perEx[k] : null, showHr: withHr, key: ValueKey('sum-ex-$k')),
     ];
-    final hrCard = s.hrMax == null ? null : HrCard(session: s, limit: t.hrLimit);
+    final hrCard = s.hrMax == null && s.hr.isEmpty ? null : HrCard(session: s, limit: t.hrLimit);
 
     final feel = AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

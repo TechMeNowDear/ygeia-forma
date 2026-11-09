@@ -207,7 +207,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final del = find.byKey(const ValueKey('summary-delete'));
-      await tester.ensureVisible(del);
+      await tester.scrollUntilVisible(del, 300, scrollable: find.byType(Scrollable).last);
       await tester.pumpAndSettle();
       await tester.tap(del);
       await tester.pumpAndSettle();

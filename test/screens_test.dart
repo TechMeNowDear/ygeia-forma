@@ -681,7 +681,11 @@ void main() {
       }));
   testWidgets('Προπόνηση · διαγραφή', (t) => trainShot(t, 'T23_delete', phone, Brightness.light, prep: perSet, act: (t) async {
         await openOld(t);
-        await tapKey(t, 'summary-delete');
+        // Η λίστα χτίζει μόνο ό,τι φαίνεται: κύλιση ως το κουμπί.
+        await t.scrollUntilVisible(find.byKey(const ValueKey('summary-delete')), 300, scrollable: find.byType(Scrollable).last);
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('summary-delete')));
+        await t.pumpAndSettle();
       }));
   testWidgets('Προπόνηση · περπάτημα ζωντανά από το ρολόι', (t) async {
     WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'steps': 3104, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
