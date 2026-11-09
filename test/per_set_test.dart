@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/exercise/ex_data.dart';
+import 'package:ygeia_forma/exercise/ex_player.dart';
 import 'package:ygeia_forma/pages/training/session_page.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/training/session.dart';
