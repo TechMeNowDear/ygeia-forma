@@ -40,7 +40,7 @@ FoodStore sampleFoodStore(DateTime now) {
     add(ago, Meal.breakfast, 'Καρύδια', 20, 9);
     if (ago.isEven) {
       add(ago, Meal.lunch, 'Φακές (βρασμένες)', 300, 14);
-      add(ago, Meal.lunch, 'Φέτα (ΠΟΠ, πρόβειο και κατσικίσιο)', 40, 14);
+      add(ago, Meal.lunch, 'Φέτα (πρόβειο και κατσικίσιο)', 40, 14);
     } else {
       add(ago, Meal.lunch, 'Κοτόπουλο στήθος χωρίς πέτσα (ψητό στο τηγάνι/σχάρα)', 180, 14);
       add(ago, Meal.lunch, 'Ρύζι καστανό/ολικής (βρασμένο)', 150, 14);
