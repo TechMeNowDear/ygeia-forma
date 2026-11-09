@@ -130,6 +130,7 @@ jobs:
             exit 1
           fi
           ls -l ../build/wear/outputs/apk/release/ || true
+          for a in ../build/wear/outputs/apk/release/*.apk; do python3 -I ../tools/check_wear_capability.py "$a"; done
           echo "::notice title=Ρολόι::$(du -h ../build/wear/outputs/apk/release/*.apk | head -1)"
 
       - name: Στιγμιότυπα ρολογιού στο branch watch-shots

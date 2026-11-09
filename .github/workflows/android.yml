@@ -180,6 +180,7 @@ jobs:
           cd ..
           w=build/wear/outputs/apk/release/wear-release.apk
           test -f "$w" || { echo "::error title=Ρολόι::Δεν βγήκε υπογεγραμμένο APK ρολογιού"; ls -l build/wear/outputs/apk/release/ || true; exit 1; }
+          python3 -I tools/check_wear_capability.py "$w"
           cp "$w" ygeia-forma-watch-${{ github.run_number }}.apk
           ls -lh ygeia-forma-watch-*.apk
 
