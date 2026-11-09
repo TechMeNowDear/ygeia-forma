@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
@@ -141,7 +142,8 @@ class ExerciseService : Service() {
         Repo.alarm.reset()
 
         val walk = kind == "walk"
-        val location = walk && has(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        // GPS μόνο με άδεια ΚΑΙ με την τοποθεσία του ρολογιού ανοιχτή (αλλιώς το Health Services αρνείται την άσκηση).
+        val location = walk && has(this, Manifest.permission.ACCESS_FINE_LOCATION) && locationOn()
         Repo.gps = location
         var type = 0
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
@@ -192,14 +194,44 @@ class ExerciseService : Service() {
             } else {
                 emptySet()
             }
-            val config = ExerciseConfig(
-                exerciseType = type,
-                dataTypes = types,
-                isAutoPauseAndResumeEnabled = false,
-                isGpsEnabled = location && DataType.LOCATION in types,
-                batchingModeOverrides = batching,
-            )
-            client.startExerciseAsync(config).await()
+            // Σε κάποια ρολόγια (Galaxy, One UI 9) το Health Services αρνείται όλη την άσκηση για την τοποθεσία, παρότι
+            // η άδεια έχει δοθεί (logcat 9/11: WHS_PermissionPolicy, ACCESS_FINE_LOCATION). Τότε ξανά χωρίς GPS, και
+            // στο τέλος μόνο με παλμούς: οι παλμοί και η ειδοποίηση ορίου μετράνε περισσότερο από την απόσταση.
+            val tries = buildList {
+                add(types.toSet())
+                if (DataType.LOCATION in types) add(types - DataType.LOCATION)
+                if (DataType.HEART_RATE_BPM in types && types.size > 1) add(setOf<DataType<*, *>>(DataType.HEART_RATE_BPM))
+            }.distinct()
+            var last: Exception? = null
+            var used: Set<DataType<*, *>>? = null
+            for (t in tries) {
+                try {
+                    client.startExerciseAsync(
+                        ExerciseConfig(
+                            exerciseType = type,
+                            dataTypes = t,
+                            isAutoPauseAndResumeEnabled = false,
+                            isGpsEnabled = DataType.LOCATION in t,
+                            batchingModeOverrides = if (DataType.HEART_RATE_BPM in t) batching else emptySet(),
+                        ),
+                    ).await()
+                    used = t
+                    break
+                } catch (e: Exception) {
+                    Log.w(TAG, "startExercise ${t.map { it.name }}", e)
+                    last = e
+                }
+            }
+            if (used == null) throw last ?: IllegalStateException("startExercise")
+            if (location && DataType.LOCATION !in used) {
+                Repo.gps = false
+                Repo.notice = "Χωρίς GPS: η απόσταση από τα βήματα."
+                Repo.changed()
+            }
+            if (DataType.HEART_RATE_BPM !in used) {
+                Repo.notice = "Το ρολόι δεν δίνει παλμούς σε αυτή την άσκηση."
+                Repo.changed()
+            }
             exerciseStarted = true
             Repo.hrMode = if (batching.isNotEmpty()) "5s" else "default"
             // Χωρίς παράδοση ανά 5″: με σβηστή οθόνη οι παλμοί μπορεί να έρθουν σε πακέτα με καθυστέρηση λεπτών.
@@ -217,6 +249,13 @@ class ExerciseService : Service() {
             Repo.notice = "Δεν ξεκίνησε η μέτρηση: ${why(e)}"
             Repo.changed()
         }
+    }
+
+    private fun locationOn(): Boolean = try {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        lm.isLocationEnabled && lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+    } catch (_: Exception) {
+        false
     }
 
     /** Σύντομη αιτία για την οθόνη: το είδος του σφάλματος και η αρχή του μηνύματος. */
