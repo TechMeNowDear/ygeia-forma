@@ -51,7 +51,8 @@ class _TrainingPageState extends State<TrainingPage> {
           ]);
         }
         return ListenableBuilder(
-          listenable: Listenable.merge([t, WearLink.main.ready, WearLink.main.live, WearLink.main.sentLimit]),
+          listenable: Listenable.merge(
+              [t, WearLink.main.ready, WearLink.main.live, WearLink.main.sentLimit, WearLink.main.watchLimit, WearLink.main.watchNewer]),
           builder: (context, _) => _page(context),
         );
       },
@@ -71,16 +72,28 @@ class _TrainingPageState extends State<TrainingPage> {
       cards.add(EmptyCard(
         icon: Icons.error_outline_rounded,
         color: c.bad,
-        title: 'Δεν διαβάστηκαν οι προπονήσεις',
-        text: 'Για να μη χαθεί τίποτα, δεν γράφεται καμία αλλαγή. Κλείσε και άνοιξε ξανά την εφαρμογή.',
+        title: t.newerFile ? 'Ενημέρωσε την εφαρμογή' : 'Δεν διαβάστηκαν οι προπονήσεις',
+        text: t.newerFile
+            ? 'Οι προπονήσεις γράφτηκαν από νεότερη έκδοση της εφαρμογής. Ως την ενημέρωση δεν γράφεται τίποτα, για να μη χαθεί.'
+            : 'Για να μη χαθεί τίποτα, δεν γράφεται καμία αλλαγή, και ό,τι έγινε στο ρολόι περιμένει εκεί. Κλείσε και άνοιξε ξανά την εφαρμογή.',
       ));
     }
     if (t.saveError != null) {
       cards.add(Text(t.saveError!, style: TextStyle(color: c.bad, fontWeight: FontWeight.w600)));
     }
+    // Αποτέλεσμα από ρολόι νεότερης έκδοσης (V-A-08): περιμένει στο ρολόι.
+    if (WearLink.main.watchNewer.value) {
+      cards.add(EmptyCard(
+        key: const ValueKey('train-watch-newer'),
+        icon: Icons.system_update_rounded,
+        color: c.exercise,
+        title: 'Ενημέρωσε την εφαρμογή στο κινητό',
+        text: 'Το ρολόι έχει νεότερη έκδοση. Ό,τι έγινε εκεί περιμένει στο ρολόι και περνά μόλις ενημερωθεί το κινητό.',
+      ));
+    }
 
     final cur = t.current;
-    if (cur != null) cards.add(_resumeCard(context, cur));
+    if (cur != null) cards.add(t.isStale(cur) ? _forgottenCard(context, cur) : _resumeCard(context, cur));
     final walk = _liveWalk();
     if (walk != null) cards.add(_walkCard(context, walk));
 
@@ -98,6 +111,20 @@ class _TrainingPageState extends State<TrainingPage> {
     final recent = [for (final s in t.sessions.reversed) if (s.finished) s].take(6).toList();
     if (recent.isNotEmpty) side.add(_recentCard(context, recent));
     side.add(_hrLimitCard(context));
+    // Προπονήσεις που δεν διαβάστηκαν (V-A-10): κρατιούνται στο αρχείο, όχι χαμένες· μόνο μια μικρή σημείωση.
+    if (t.quarantine.isNotEmpty) {
+      final n = t.quarantine.length;
+      side.add(Padding(
+        key: const ValueKey('train-quarantine'),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Text(
+          n == 1
+              ? '1 προπόνηση δεν διαβάστηκε (από άλλη έκδοση της εφαρμογής). Κρατιέται στο αρχείο και μπαίνει στο αντίγραφο.'
+              : '$n προπονήσεις δεν διαβάστηκαν (από άλλη έκδοση της εφαρμογής). Κρατιούνται στο αρχείο και μπαίνουν στο αντίγραφο.',
+          style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary),
+        ),
+      ));
+    }
 
     return PageFrame(
       title: 'Προπόνηση',
@@ -118,7 +145,8 @@ class _TrainingPageState extends State<TrainingPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${s.name} σε εξέλιξη', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-            Text('Από ${hm(s.start)} · ${s.setsDone} σετ', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+            Text('Από ${sameDay(s.start, _now) ? '' : '${shortDayDate(s.start)} '}${hm(s.start)} · ${s.setsDone} σετ',
+                style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
           ]),
         ),
         FilledButton(
@@ -127,6 +155,55 @@ class _TrainingPageState extends State<TrainingPage> {
           onPressed: () => _openSession(context),
           child: const Text('Συνέχεια'),
         ),
+      ]),
+    );
+  }
+
+  /// «Ξεχασμένη προπόνηση;» (έλεγχος 9/11, V-A-09): ανοιχτή χωρίς κίνηση εδώ και 3 ώρες. Ένα πάτημα «Τέλος (στις 19:22)» με
+  /// το τελευταίο ✓ ως τέλος· ποτέ διάρκεια 20 ωρών. Χωρίς κανένα σετ: «Σβήσιμο».
+  Widget _forgottenCard(BuildContext context, Session s) {
+    final c = Aigaio.of(context);
+    final last = s.lastActivity;
+    final when = sameDay(s.start, _now) ? 'από τις ${hm(s.start)}' : 'της ${longDate(s.start)} (${hm(s.start)})';
+    final none = s.setsDone == 0;
+    return AppCard(
+      key: const ValueKey('train-forgotten'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          IconBadge(Icons.history_toggle_off_rounded, c.exercise),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Ξεχασμένη προπόνηση;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+        ]),
+        const SizedBox(height: 8),
+        Text(
+          none
+              ? '«${s.name}» $when είναι ακόμα ανοιχτή, χωρίς κανένα σετ.'
+              : '«${s.name}» $when είναι ακόμα ανοιχτή. Τελευταίο σετ στις ${hm(last)}${sameDay(last, _now) ? '' : ' (${shortDayDate(last)})'}.',
+          style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          if (none)
+            FilledButton(
+              key: const ValueKey('train-forgotten-drop'),
+              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size(0, 48)),
+              onPressed: () => t.discard(),
+              child: const Text('Σβήσιμο'),
+            )
+          else
+            FilledButton(
+              key: const ValueKey('train-forgotten-end'),
+              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size(0, 48)),
+              onPressed: () => t.finish(end: last),
+              child: Text('Τέλος (στις ${hm(last)})'),
+            ),
+          TextButton(
+            key: const ValueKey('train-forgotten-resume'),
+            style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+            onPressed: () => _openSession(context),
+            child: const Text('Συνέχεια'),
+          ),
+        ]),
       ]),
     );
   }
@@ -429,13 +506,19 @@ class _TrainingPageState extends State<TrainingPage> {
     final hr = t.hrLimit;
     final link = WearLink.main;
     final sent = hr != null && link.sentLimit.value == '$hr';
+    // Έλεγχος 9/11 (V-A-06): «✓» μόνο όταν το ίδιο το ρολόι πει ότι έχει αυτό το όριο.
+    final acked = link.watchLimit.value;
     final (String, Color, IconData)? watch = hr == null
-        ? null
-        : sent
-            ? ('Στάλθηκε στο ρολόι', c.good, Icons.watch_rounded)
-            : link.ready.value
-                ? ('Στέλνεται στο ρολόι…', c.textSecondary, Icons.watch_rounded)
-                : ('Το ρολόι δεν βρέθηκε τώρα: δεν ξέρω αν έχει αυτό το όριο.', c.exercise, Icons.watch_rounded);
+        ? (acked != null && acked != 'null'
+            ? ('Το ρολόι έχει ακόμα όριο $acked: άνοιξε την εφαρμογή στο ρολόι για να το σβήσει.', c.exercise, Icons.watch_rounded)
+            : null)
+        : acked == '$hr'
+            ? ('Στο ρολόι ✓ όριο $hr', c.good, Icons.watch_rounded)
+            : sent
+                ? ('Στάλθηκε· θα επιβεβαιωθεί μόλις ανοίξεις την εφαρμογή στο ρολόι.', c.textSecondary, Icons.watch_rounded)
+                : link.ready.value
+                    ? ('Στέλνεται στο ρολόι…', c.textSecondary, Icons.watch_rounded)
+                    : ('Το ρολόι δεν βρέθηκε τώρα: δεν ξέρω αν έχει αυτό το όριο.', c.exercise, Icons.watch_rounded);
     return AppCard(
       key: const ValueKey('train-hrlimit'),
       onTap: () => _editHrLimit(context),

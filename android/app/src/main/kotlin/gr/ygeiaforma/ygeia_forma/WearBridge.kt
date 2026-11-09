@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import com.google.android.gms.wearable.CapabilityClient
+import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -39,6 +40,8 @@ class WearBridge(
         const val HR = "/ygeia/hr"
         const val CMD = "/ygeia/cmd"
         const val LIVE = "/ygeia/live"
+        /** Τι έχει το ρολόι (όριο παλμών, έκδοση μορφής): το γράφει το ρολόι (έλεγχος 9/11, V-A-06). */
+        const val STATE = "/ygeia/wstate"
         const val KEY = "json"
         const val CAPABILITY = "ygeia_watch"
     }
@@ -56,10 +59,29 @@ class WearBridge(
 
     private val data = DataClient.OnDataChangedListener { events: DataEventBuffer ->
         var result = false
+        var state: String? = null
         for (ev in events) {
-            if (ev.type == DataEvent.TYPE_CHANGED && ev.dataItem.uri.path?.startsWith(RESULT) == true) result = true
+            if (ev.type != DataEvent.TYPE_CHANGED) continue
+            val path = ev.dataItem.uri.path ?: continue
+            if (path.startsWith(RESULT)) result = true
+            if (path == STATE) {
+                state = try {
+                    DataMapItem.fromDataItem(ev.dataItem).dataMap.getString(KEY)
+                } catch (_: Throwable) {
+                    null
+                }
+            }
         }
         if (result) emit(mapOf("path" to RESULT, "json" to ""))
+        state?.let { emit(mapOf("path" to STATE, "json" to it)) }
+    }
+
+    /**
+     * Το ρολόι ήρθε κοντά (ή έφυγε) όσο είναι ανοιχτή η εφαρμογή: η Flutter ξανακοιτά (στέλνει το όριο, παίρνει
+     * αποτελέσματα). Μόνο όσο ακούει· τίποτα στο παρασκήνιο, καμία επανάληψη ανά χρόνο.
+     */
+    private val capability = CapabilityClient.OnCapabilityChangedListener { _: CapabilityInfo ->
+        emit(mapOf("path" to "cap", "json" to ""))
     }
 
     private fun emit(m: Map<String, String>) {
@@ -72,6 +94,7 @@ class WearBridge(
         try {
             Wearable.getMessageClient(ctx).addListener(messages)
             Wearable.getDataClient(ctx).addListener(data)
+            Wearable.getCapabilityClient(ctx).addListener(capability, CAPABILITY)
         } catch (e: Throwable) {
             // Χωρίς Wear OS στο κινητό: τίποτα.
         }
@@ -82,6 +105,7 @@ class WearBridge(
         try {
             Wearable.getMessageClient(ctx).removeListener(messages)
             Wearable.getDataClient(ctx).removeListener(data)
+            Wearable.getCapabilityClient(ctx).removeListener(capability, CAPABILITY)
         } catch (_: Throwable) {
         }
     }
@@ -95,19 +119,49 @@ class WearBridge(
             "putPlan" -> scope.launch { result.success(put(PLAN, call.argument<String>("json") ?: "{}", urgent = call.argument<Boolean>("urgent") == true)) }
             "putSession" -> scope.launch { result.success(put(SESSION, call.argument<String>("json") ?: "{}", urgent = true)) }
             "takeResults" -> scope.launch { result.success(results()) }
+            "watchState" -> scope.launch { result.success(watchState()) }
             "ackResult" -> scope.launch { result.success(ack(call.argument<String>("path") ?: "")) }
             "openWatch" -> scope.launch { result.success(openWatch()) }
             else -> result.notImplemented()
         }
     }
 
-    /** Πόσα ρολόγια είναι συνδεδεμένα και σε πόσα υπάρχει η εφαρμογή μας. */
+    /**
+     * Πόσα ρολόγια είναι συνδεδεμένα, σε πόσα υπάρχει η εφαρμογή μας τώρα («app») και σε πόσα γνωστά ρολόγια υπάρχει,
+     * κι ας μην είναι κοντά («known»): σε αυτά το όριο γράφεται ως DataItem και φτάνει μόλις συνδεθούν (V-A-06).
+     */
     private suspend fun status(): Map<String, Int> = try {
         val nodes = Wearable.getNodeClient(ctx).connectedNodes.await()
         val cap = Wearable.getCapabilityClient(ctx).getCapability(CAPABILITY, CapabilityClient.FILTER_REACHABLE).await()
-        mapOf("nodes" to nodes.size, "app" to cap.nodes.size)
+        val known = try {
+            Wearable.getCapabilityClient(ctx).getCapability(CAPABILITY, CapabilityClient.FILTER_ALL).await().nodes.size
+        } catch (_: Throwable) {
+            0
+        }
+        mapOf("nodes" to nodes.size, "app" to cap.nodes.size, "known" to maxOf(known, cap.nodes.size))
     } catch (_: Throwable) {
-        mapOf("nodes" to 0, "app" to 0)
+        mapOf("nodes" to 0, "app" to 0, "known" to 0)
+    }
+
+    /** Τι είπε το ρολόι για τον εαυτό του ([STATE]), ή null αν δεν έχει πει τίποτα (π.χ. ρολόι παλιότερης έκδοσης). */
+    private suspend fun watchState(): String? = try {
+        val buf = Wearable.getDataClient(ctx).dataItems.await()
+        var out: String? = null
+        try {
+            for (item in buf) {
+                if (item.uri.path != STATE) continue
+                out = try {
+                    DataMapItem.fromDataItem(item).dataMap.getString(KEY)
+                } catch (_: Throwable) {
+                    null
+                } ?: out
+            }
+        } finally {
+            buf.release()
+        }
+        out
+    } catch (_: Throwable) {
+        null
     }
 
     private suspend fun put(path: String, json: String, urgent: Boolean): Boolean = try {

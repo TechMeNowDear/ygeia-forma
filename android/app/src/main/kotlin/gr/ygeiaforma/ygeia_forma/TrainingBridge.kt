@@ -24,7 +24,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 
 /**
@@ -41,17 +40,18 @@ class TrainingBridge(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            // Το κείμενο ως έχει (όχι μέσα σε άλλο JSON: μία κωδικοποίηση λιγότερη, DP-02).
             "read" -> scope.launch {
-                val out = withContext(Dispatchers.IO) {
+                val out: Map<String, String> = withContext(Dispatchers.IO) {
                     val f = File(activity.filesDir, FILE)
                     try {
-                        if (!f.exists()) JSONObject().put("state", "missing")
-                        else JSONObject().put("state", "ok").put("json", f.readText())
+                        if (!f.exists()) mapOf("state" to "missing")
+                        else mapOf("state" to "ok", "json" to f.readText())
                     } catch (e: Throwable) {
-                        JSONObject().put("state", "error")
+                        mapOf("state" to "error")
                     }
                 }
-                result.success(out.toString())
+                result.success(out)
             }
             "write" -> scope.launch {
                 val text = call.argument<String>("json") ?: ""
@@ -59,6 +59,24 @@ class TrainingBridge(
                     OuraBridge.atomicWrite(File(activity.filesDir, FILE), text.toByteArray(Charsets.UTF_8))
                 }
                 result.success(ok)
+            }
+            // Οι παλμοί κάθε προπόνησης σε δικό της αρχείο (V-A-02).
+            "hrRead" -> scope.launch {
+                val id = call.argument<String>("id") ?: ""
+                val (state, json) = withContext(Dispatchers.IO) { HrFiles.readState(hrDir(), id) }
+                result.success(if (json == null) mapOf("state" to state) else mapOf("state" to state, "json" to json))
+            }
+            "hrWrite" -> scope.launch {
+                val id = call.argument<String>("id") ?: ""
+                val text = call.argument<String>("json") ?: ""
+                result.success(withContext(Dispatchers.IO) { HrFiles.write(hrDir(), id, text) })
+            }
+            "hrDelete" -> scope.launch {
+                val id = call.argument<String>("id") ?: ""
+                result.success(withContext(Dispatchers.IO) { HrFiles.delete(hrDir(), id) })
+            }
+            "hrList" -> scope.launch {
+                result.success(withContext(Dispatchers.IO) { HrFiles.list(hrDir()) })
             }
             "keepOn" -> {
                 val on = call.argument<Boolean>("on") == true
@@ -89,6 +107,8 @@ class TrainingBridge(
             else -> result.notImplemented()
         }
     }
+
+    private fun hrDir() = File(activity.filesDir, HrFiles.DIR)
 
     /** Ζητά άδεια ειδοποιήσεων (Android 13+), μία φορά, όταν ξεκινά η πρώτη προπόνηση. */
     private fun askNotify(): Boolean {

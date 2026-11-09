@@ -34,6 +34,8 @@ class OuraRulesTest {
         for (n in listOf(
             "sources.json.123456789.tmp", "sources_log.json.1.tmp", "oura_nights.json.42.tmp",
             "oura_tokens.bin.7.tmp", "oura_pending.bin.8.tmp", "oura_connecting.bin.9.tmp",
+            // DP-11 (έλεγχος 9/11): και του training.json
+            "training.json.123456789.tmp",
         )) assertTrue(n, OuraRules.isOwnTmp(n))
         for (n in listOf(
             "sources.json", "sources.json.tmp", "prefs.json.tmp", "dashboard.json.tmp", "days.json.123.tmp",
@@ -48,7 +50,7 @@ class OuraRulesTest {
         assertEquals(OuraRules.PLAN_LOG_FILE, OuraBridge.PLAN_LOG_FILE)
         assertEquals(
             listOf(
-                "oura_nights.json", "sources.json", "sources_log.json",
+                "oura_nights.json", "sources.json", "sources_log.json", "training.json",
                 "oura_tokens.bin", "oura_pending.bin", "oura_connecting.bin",
             ),
             OuraRules.OWN_FILES,

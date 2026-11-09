@@ -62,8 +62,10 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
 /// Η προπόνηση που τρέχει στο κινητό, για το ρολόι (Protocol.kt: LiveSession.parsePhone).
 Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name) {
   final s = t.current;
-  if (s == null) return {'active': false};
+  // «v»: η μορφή (Protocol.kt: Proto.MAJOR). Το παλιό ρολόι το αγνοεί· το νέο δεν διαβάζει νεότερη (V-A-08).
+  if (s == null) return {'v': TrainingStore.watchMajor, 'active': false};
   return {
+    'v': TrainingStore.watchMajor,
     'active': true,
     'id': s.id,
     'w': s.workout,
@@ -130,6 +132,17 @@ class WearLink with WidgetsBindingObserver {
   /// δεν στάλθηκε ακόμα. Για την κάρτα ορίου (έλεγχος 9/11, V-A-05): να φαίνεται αν το ρολόι το πήρε.
   final sentLimit = ValueNotifier<String?>(null);
 
+  /// Το όριο που ΕΠΙΒΕΒΑΙΩΣΕ το ρολόι ότι έχει («140», «null» = χωρίς όριο), ή null αν δεν έχει πει τίποτα (ρολόι
+  /// παλιότερης έκδοσης, ή η εφαρμογή του ρολογιού δεν άνοιξε ακόμα). Έλεγχος 9/11, V-A-06: «Στο ρολόι ✓ όριο 140».
+  final watchLimit = ValueNotifier<String?>(null);
+
+  /// Το ρολόι έστειλε αποτέλεσμα νεότερης μορφής (V-A-08): «Ενημέρωσε την εφαρμογή στο κινητό»· περιμένει εκεί.
+  final watchNewer = ValueNotifier<bool>(false);
+
+  /// Υπάρχει (γνωστό) ρολόι με την εφαρμογή, κι ας μην είναι κοντά τώρα: το πρόγραμμα/όριο γράφεται και φτάνει μόλις
+  /// συνδεθούν (DataItem). Χωρίς κανένα ρολόι: καμία κλήση.
+  bool _known = false;
+
   final _cmds = StreamController<WatchCmd>.broadcast();
   Stream<WatchCmd> get commands => _cmds.stream;
 
@@ -172,12 +185,33 @@ class WearLink with WidgetsBindingObserver {
     try {
       final st = await _m.invokeMapMethod<String, dynamic>('status');
       ready.value = ((st?['app'] as num?) ?? 0) > 0;
+      _known = ready.value || ((st?['known'] as num?) ?? 0) > 0;
     } catch (_) {
       ready.value = false;
     }
+    await readWatchState();
     _lastPlan = null;
     _publish();
     await importResults();
+  }
+
+  /// Τι λέει το ρολόι για τον εαυτό του (DataItem του ρολογιού).
+  Future<void> readWatchState() async {
+    try {
+      final text = await _m.invokeMethod<String>('watchState');
+      if (text != null) applyWatchState(text);
+    } catch (_) {}
+  }
+
+  /// Το όριο που έχει το ρολόι (0 = χωρίς όριο).
+  @visibleForTesting
+  void applyWatchState(String text) {
+    try {
+      final j = jsonDecode(text) as Map<String, dynamic>;
+      final lim = (j['lim'] as num?)?.toInt();
+      if (lim == null) return;
+      watchLimit.value = lim > 0 ? '$lim' : 'null';
+    } catch (_) {}
   }
 
   /// Ό,τι έγινε στο ρολόι, προς το κινητό. Το ρολόι σβήνει το αποτέλεσμα (ack) ΜΟΝΟ αφού γραφτεί με ασφάλεια εδώ
@@ -191,7 +225,9 @@ class WearLink with WidgetsBindingObserver {
         final m = (r as Map).cast<String, dynamic>();
         final path = m['path'] as String? ?? '';
         if (path.isEmpty) continue;
-        if (await importDurably(t, m['json'])) await _m.invokeMethod<bool>('ackResult', {'path': path});
+        if (await importDurably(t, m['json'], onNewer: () => watchNewer.value = true)) {
+          await _m.invokeMethod<bool>('ackResult', {'path': path});
+        }
       }
     } catch (_) {}
   }
@@ -199,11 +235,19 @@ class WearLink with WidgetsBindingObserver {
   /// Ένα αποτέλεσμα του ρολογιού στην αποθήκη. true μόνο όταν είναι γραμμένο στο αρχείο του κινητού (ή ήταν ήδη)·
   /// ποτέ με `readError`, με αποτέλεσμα που δεν διαβάζεται (π.χ. νεότερη μορφή από ρολόι νεότερης έκδοσης) ή με
   /// αποτυχημένη εγγραφή. Ό,τι δεν διαβάζεται μένει στο ρολόι (λίγα KB) ώσπου να το διαβάσει νεότερη έκδοση.
+  /// Αποτέλεσμα νεότερης μορφής («v» μεγαλύτερο από [TrainingStore.watchMajor], V-A-08): ούτε εισάγεται ούτε σβήνεται
+  /// από το ρολόι· [onNewer] για το «Ενημέρωσε την εφαρμογή στο κινητό».
   @visibleForTesting
-  static Future<bool> importDurably(TrainingStore t, Object? raw) async {
+  static Future<bool> importDurably(TrainingStore t, Object? raw, {void Function()? onNewer}) async {
     if (t.readError || !t.ready || raw is! String) return false;
     try {
-      t.importWatch(jsonDecode(raw) as Map<String, dynamic>);
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      final v = j['v'];
+      if (v is num && v > TrainingStore.watchMajor) {
+        onNewer?.call();
+        return false;
+      }
+      t.importWatch(j);
     } catch (_) {
       return false;
     }
@@ -215,8 +259,9 @@ class WearLink with WidgetsBindingObserver {
   /// Στέλνει πρόγραμμα/προπόνηση μόνο όταν αλλάζουν (σύγκριση κειμένου).
   void _publish() {
     final t = _t;
-    // Χωρίς ρολόι με την εφαρμογή μας: τίποτα (ούτε κλήσεις στις υπηρεσίες της Google).
-    if (t == null || !t.ready || !ready.value) return;
+    // Χωρίς κανένα ρολόι με την εφαρμογή μας: τίποτα (ούτε κλήσεις στις υπηρεσίες της Google). Με ρολόι που δεν είναι
+    // κοντά τώρα: γράφεται, και φτάνει μόλις συνδεθούν (έλεγχος 9/11, V-A-06· πριν: δεν γραφόταν καθόλου).
+    if (t == null || !t.ready || !(ready.value || _known)) return;
     try {
       final plan = jsonEncode(watchPlan(t, t.now, _name));
       if (plan != _lastPlan) {
@@ -271,6 +316,15 @@ class WearLink with WidgetsBindingObserver {
       importResults();
       return;
     }
+    if (path == '/ygeia/wstate') {
+      applyWatchState(text);
+      return;
+    }
+    // Το ρολόι ήρθε κοντά ή έφυγε: ξανά κατάσταση, όριο, αποτελέσματα (μόνο όσο είναι ανοιχτή η εφαρμογή).
+    if (path == 'cap') {
+      refresh();
+      return;
+    }
     Map<String, dynamic> j;
     try {
       j = jsonDecode(text) as Map<String, dynamic>;
@@ -299,6 +353,9 @@ class WearLink with WidgetsBindingObserver {
         if (bpm > 0) hr.value = (bpm, DateTime.now());
         ready.value = true;
       case '/ygeia/cmd':
+        // Εντολή νεότερης μορφής: δεν εκτελείται (V-A-08).
+        final v = j['v'];
+        if (v is num && v > TrainingStore.watchMajor) return;
         final c = WatchCmd(j['op'] as String? ?? '', j);
         if (t != null) apply(t, c);
         _cmds.add(c);
@@ -311,6 +368,14 @@ class WearLink with WidgetsBindingObserver {
     final s = t.current;
     if (s == null || (c.sid.isNotEmpty && c.sid != s.id)) return;
     switch (c.op) {
+      case 'end':
+        // «Τέλος» στο ρολόι (V-A-09): τέλος και εδώ, με την ώρα του ρολογιού.
+        final at = c.j['at'];
+        if (at is num) {
+          t.endFromWatch(s.id, at.toInt());
+          TrainingDevice.restCancel();
+        }
+        return;
       case 'goto':
         if (c.i >= 0 && c.i < s.items.length) t.focus = c.i;
         return;

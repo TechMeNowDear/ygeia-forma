@@ -7,6 +7,8 @@
     τα tokens του Oura (είναι στο noBackupFilesDir, κρυπτογραφημένα με κλειδί που δεν φεύγει από το κινητό).
   Μόλις υπάρχουν κανόνες «include», μπαίνουν μόνο αυτά τα αρχεία.
   Έλεγχος 2, C14 (R9): στο Google μόνο με κρυπτογράφηση από άκρη σε άκρη (κινητό με κλείδωμα οθόνης)· αλλιώς τίποτα.
+  Έλεγχος 9/11 (V-A-02): και ο φάκελος hr/ (οι παλμοί κάθε προπόνησης, σε συμπαγή μορφή· ~2,5 MB τον χρόνο αντί για
+  ~9,5 MB μέσα στο training.json).
   Το όνομα της αναφοράς για τον γιατρό ΔΕΝ είναι στο prefs.json: η Kotlin το κρατά στο noBackupFilesDir (συγχώνευση 4/11).
 -->
 <data-extraction-rules>
@@ -18,6 +20,7 @@
         <include domain="file" path="sources_log.json" />
         <include domain="file" path="oura_nights.json" />
         <include domain="file" path="training.json" />
+        <include domain="file" path="hr/" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="ygeia.db" />
@@ -27,5 +30,6 @@
         <include domain="file" path="sources_log.json" />
         <include domain="file" path="oura_nights.json" />
         <include domain="file" path="training.json" />
+        <include domain="file" path="hr/" />
     </device-transfer>
 </data-extraction-rules>

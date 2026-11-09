@@ -6,14 +6,24 @@ import 'package:flutter/services.dart';
 
 import '../exercise/ex_data.dart';
 import 'equipment.dart';
+import 'hr_file.dart';
 import 'progression.dart';
 import 'program.dart';
 import 'session.dart';
 
-/// Ανάγνωση/εγγραφή του training.json (μέσω Kotlin, ατομική εγγραφή· μπαίνει στο κρυπτογραφημένο αντίγραφο).
+/// Ανάγνωση/εγγραφή του training.json (μέσω Kotlin, ατομική εγγραφή· μπαίνει στο κρυπτογραφημένο αντίγραφο) και των
+/// αρχείων παλμών ανά προπόνηση (hr/<id>.json, έλεγχος 9/11, V-A-02).
 abstract class TrainingIO {
   Future<({String state, String? json})> read();
   Future<bool> write(String json);
+
+  /// Οι παλμοί μιας προπόνησης: «ok» με κείμενο, «missing», ή «error» (τότε δεν γράφεται τίποτα πάνω του).
+  Future<({String state, String? json})> readHr(String id);
+
+  /// false αν δεν γράφτηκε: τότε οι παλμοί μένουν μέσα στο training.json (όπως ως #90), τίποτα δεν χάνεται.
+  Future<bool> writeHr(String id, String json);
+  Future<bool> deleteHr(String id);
+  Future<List<String>> listHr();
 }
 
 class ChannelTrainingIO implements TrainingIO {
@@ -23,8 +33,10 @@ class ChannelTrainingIO implements TrainingIO {
   @override
   Future<({String state, String? json})> read() async {
     try {
-      final raw = await channel.invokeMethod<String>('read');
-      if (raw == null) return (state: 'error', json: null);
+      final raw = await channel.invokeMethod<Object?>('read');
+      // Από το #91 το κείμενο έρχεται ως έχει (χάρτης)· παλιότερα μέσα σε άλλο JSON.
+      if (raw is Map) return (state: raw['state'] as String? ?? 'error', json: raw['json'] as String?);
+      if (raw is! String) return (state: 'error', json: null);
       final j = jsonDecode(raw) as Map<String, dynamic>;
       return (state: j['state'] as String? ?? 'error', json: j['json'] as String?);
     } on MissingPluginException {
@@ -42,6 +54,46 @@ class ChannelTrainingIO implements TrainingIO {
       return false;
     }
   }
+
+  @override
+  Future<({String state, String? json})> readHr(String id) async {
+    try {
+      final raw = await channel.invokeMethod<Object?>('hrRead', {'id': id});
+      if (raw is Map) return (state: raw['state'] as String? ?? 'error', json: raw['json'] as String?);
+      return (state: 'error', json: null);
+    } on MissingPluginException {
+      return (state: 'missing', json: null);
+    } catch (_) {
+      return (state: 'error', json: null);
+    }
+  }
+
+  @override
+  Future<bool> writeHr(String id, String json) async {
+    try {
+      return await channel.invokeMethod<bool>('hrWrite', {'id': id, 'json': json}) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> deleteHr(String id) async {
+    try {
+      return await channel.invokeMethod<bool>('hrDelete', {'id': id}) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<List<String>> listHr() async {
+    try {
+      return (await channel.invokeListMethod<String>('hrList')) ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
 }
 
 /// Για δοκιμές: στη μνήμη.
@@ -49,6 +101,11 @@ class MemoryTrainingIO implements TrainingIO {
   MemoryTrainingIO([this.json]);
   String? json;
   int writes = 0;
+
+  /// Τα αρχεία παλμών (id → κείμενο).
+  final Map<String, String> hrFiles = {};
+  int hrWrites = 0;
+
   @override
   Future<({String state, String? json})> read() async => (state: json == null ? 'missing' : 'ok', json: json);
   @override
@@ -57,7 +114,29 @@ class MemoryTrainingIO implements TrainingIO {
     writes++;
     return true;
   }
+
+  @override
+  Future<({String state, String? json})> readHr(String id) async =>
+      hrFiles.containsKey(id) ? (state: 'ok', json: hrFiles[id]) : (state: 'missing', json: null);
+  @override
+  Future<bool> writeHr(String id, String j) async {
+    hrFiles[id] = j;
+    hrWrites++;
+    return true;
+  }
+
+  @override
+  Future<bool> deleteHr(String id) async {
+    hrFiles.remove(id);
+    return true;
+  }
+
+  @override
+  Future<List<String>> listHr() async => hrFiles.keys.toList()..sort();
 }
+
+/// Όνομα που μπορεί να γίνει αρχείο παλμών (ίδιος κανόνας με το HrFiles.kt).
+bool hrFileId(String id) => id.isNotEmpty && id.length <= 120 && RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(id) && id != '.' && id != '..';
 
 /// Όλη η προπόνηση: έγκριση γιατρού, προγράμματα (με εκδόσεις), προπονήσεις που έγιναν, η τρέχουσα.
 class TrainingStore extends ChangeNotifier {
@@ -76,7 +155,31 @@ class TrainingStore extends ChangeNotifier {
 
   /// Η ανάγνωση απέτυχε (το αρχείο υπάρχει αλλά δεν διαβάστηκε): τίποτα δεν γράφεται, για να μη χαθεί.
   bool readError = false;
+
+  /// Το αρχείο είναι από νεότερη έκδοση της εφαρμογής ([fileVersion]): δεν γράφεται τίποτα (V-A-08).
+  bool newerFile = false;
   String? saveError;
+
+  /// Η μορφή του training.json: 2 = οι παλμοί μπορεί να είναι στα αρχεία hr/ (#91). Νεότερη = μόνο ανάγνωση.
+  static const fileVersion = 2;
+
+  /// Η μορφή των αποτελεσμάτων/εντολών του ρολογιού που ξέρει αυτή η έκδοση (πεδίο «v», Protocol.kt: Proto.MAJOR).
+  static const watchMajor = 1;
+
+  /// Κλειδιά του αρχείου που δεν ξέρει αυτή η έκδοση: ξαναγράφονται αυτούσια (έλεγχος 9/11, V-A-07).
+  final Map<String, dynamic> _extra = {};
+
+  /// Προπονήσεις/προγράμματα που δεν διαβάστηκαν (V-A-10): κρατιούνται στο αρχείο όπως ήταν («bad»), δεν δείχνονται.
+  final List<Map<String, dynamic>> quarantine = [];
+
+  /// Τι δεν πήγε καλά στην τελευταία επαναφορά από αντίγραφο (null = τίποτα), για να το πει η οθόνη (V-A-10).
+  String? mergeProblem;
+
+  /// Η τελευταία προπόνηση του κινητού που έκλεισε με «Τέλος» στο ρολόι (V-A-09): η οθόνη της προπόνησης πάει στη σύνοψη.
+  Session? endedByWatch;
+
+  /// Μετά από πόσο χωρίς κίνηση μια ανοιχτή προπόνηση είναι «ξεχασμένη» (V-A-09).
+  static const staleAfter = Duration(hours: 3);
 
   /// Όριο παλμών από τον γιατρό (bpm), αν έδωσε: το ρολόι δονεί όταν το ξεπεράσεις. Κενό = τίποτα.
   int? hrLimit;
@@ -97,7 +200,16 @@ class TrainingStore extends ChangeNotifier {
     final r = await _io.read();
     if (r.state == 'ok' && r.json != null) {
       try {
-        _fromJson(jsonDecode(r.json!) as Map<String, dynamic>);
+        final j = jsonDecode(r.json!);
+        if (j is! Map) throw const FormatException();
+        final m = Map<String, dynamic>.from(j);
+        final v = m['v'];
+        if (v is num && v > fileVersion) {
+          newerFile = true;
+          readError = true;
+        } else {
+          _fromJson(m);
+        }
       } catch (_) {
         readError = true;
       }
@@ -106,32 +218,78 @@ class TrainingStore extends ChangeNotifier {
     }
     ready = true;
     notifyListeners();
+    if (!readError) {
+      // Μεταφορά (μία φορά): οι παλμοί που ήταν μέσα στο training.json πάνε στα δικά τους αρχεία και φεύγουν από τη
+      // μνήμη (φορτώνονται μόνο όταν τους χρειαστεί μια σύνοψη).
+      _release.addAll([for (final s in sessions) if (s.hrNeedsWrite) s.id]);
+      if (_release.isNotEmpty) save();
+      _queue = _queue.then((_) => _purgeDeletedHr());
+    }
   }
 
+  static const _knownTop = {'v', 'hrLimit', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz'};
+
+  /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μία χαλασμένη προπόνηση ή πρόγραμμα πάει σε καραντίνα, όχι όλο το
+  /// αρχείο σε «δεν διαβάζεται». Τα άγνωστα κλειδιά κρατιούνται (V-A-07).
   void _fromJson(Map<String, dynamic> j) {
-    // Τα παλιά κλειδιά (έγκριση, κλείδωμα, «Νιώθω κάτι», ως #84) αγνοούνται (απλοποίηση 9/11).
-    hrLimit = (j['hrLimit'] as num?)?.toInt();
-    programs
+    _extra
       ..clear()
-      ..addAll([for (final p in (j['programs'] as List? ?? const [])) Program.fromJson(p as Map<String, dynamic>)]);
-    activeId = j['active'] as String?;
-    sessions
+      ..addAll({
+        for (final e in j.entries)
+          if (!_knownTop.contains(e.key)) e.key: e.value,
+      });
+    final hl = j['hrLimit'];
+    hrLimit = hl is num ? hl.toInt() : null;
+    if (hl != null && hl is! num) _extra['hrLimit'] = hl;
+    quarantine
       ..clear()
-      ..addAll([for (final s in (j['sessions'] as List? ?? const [])) Session.fromJson(s as Map<String, dynamic>)]);
-    current = j['current'] is Map ? Session.fromJson(j['current'] as Map<String, dynamic>) : null;
+      ..addAll([
+        for (final x in (j['bad'] is List ? j['bad'] as List : const []))
+          if (x is Map) Map<String, dynamic>.from(x),
+      ]);
+    programs.clear();
+    for (final p in (j['programs'] is List ? j['programs'] as List : const [])) {
+      try {
+        programs.add(Program.fromJson(Map<String, dynamic>.from(p as Map)));
+      } catch (_) {
+        quarantine.add({'in': 'programs', 'j': p});
+      }
+    }
+    activeId = j['active'] is String ? j['active'] as String : null;
+    sessions.clear();
+    for (final x in (j['sessions'] is List ? j['sessions'] as List : const [])) {
+      try {
+        sessions.add(Session.fromJson(Map<String, dynamic>.from(x as Map)));
+      } catch (_) {
+        quarantine.add({'in': 'sessions', 'j': x});
+      }
+    }
+    current = null;
+    if (j['current'] is Map) {
+      try {
+        current = Session.fromJson(Map<String, dynamic>.from(j['current'] as Map));
+      } catch (_) {
+        quarantine.add({'in': 'current', 'j': j['current']});
+      }
+    }
     deleted
       ..clear()
-      ..addAll([for (final x in (j['del'] as List? ?? const [])) if (x is String) x]);
+      ..addAll([for (final x in (j['del'] is List ? j['del'] as List : const [])) if (x is String) x]);
+    _segments.clear();
+    _release.clear();
   }
 
   Map<String, dynamic> toJson() => {
-        'v': 1,
+        ..._extra,
+        'v': fileVersion,
         if (hrLimit != null) 'hrLimit': hrLimit,
         'programs': [for (final p in programs) p.toJson()],
         if (activeId != null) 'active': activeId,
-        'sessions': [for (final s in sessions) s.toJson()],
+        // Οι παλμοί κάθε τελειωμένης προπόνησης στο δικό της αρχείο, μόλις γραφτεί αυτό· ως τότε μέσα (καμία απώλεια).
+        'sessions': [for (final s in sessions) s.toJson(hrInline: !s.hrInFile)],
         if (deleted.isNotEmpty) 'del': deleted.toList(),
         if (current != null) 'current': current!.toJson(),
+        if (quarantine.isNotEmpty) 'bad': quarantine,
       };
 
   Future<void> _queue = Future.value();
@@ -139,29 +297,96 @@ class TrainingStore extends ChangeNotifier {
   /// Ό,τι είναι στη μνήμη έχει γραφτεί στο αρχείο: καμία εγγραφή σε αναμονή και η τελευταία πέτυχε (V-A-01).
   bool _written = true;
 
-  /// Κάθε αλλαγή γράφεται αμέσως (με σειρά): αν κλείσει η εφαρμογή στη μέση της προπόνησης, δεν χάνεται σετ.
+  /// Μετρητής αλλαγών: μια εγγραφή «πιάνει» μόνο αν δεν άλλαξε τίποτα από τότε που κωδικοποιήθηκε.
+  int _gen = 0;
+
+  /// Μια εγγραφή περιμένει στη σειρά και δεν έχει ξεκινήσει: νέες αλλαγές μπαίνουν σε αυτήν (καμία διπλή κωδικοποίηση).
+  bool _queued = false;
+
+  /// Παλμοί που μεταφέρθηκαν από το training.json: φεύγουν από τη μνήμη μόλις γραφτούν (φορτώνονται όταν χρειαστούν).
+  final Set<String> _release = {};
+
+  /// Κομμάτια παλμών από το ρολόι για προπόνηση της οποίας οι παλμοί δεν είναι στη μνήμη: ενώνονται στην εγγραφή.
+  final Map<String, List<(List<List<int>>, int?, int?)>> _segments = {};
+
+  /// Κάθε αλλαγή γράφεται αμέσως (με σειρά): αν κλείσει η εφαρμογή στη μέση της προπόνησης, δεν χάνεται σετ. Πολλές
+  /// αλλαγές μαζί (π.χ. 7 αποτελέσματα του ρολογιού) γίνονται μία εγγραφή.
   Future<void> save() {
     notifyListeners();
     if (readError) return Future.value();
-    // Πριν από την κωδικοποίηση: αν εκείνη πετάξει, η μνήμη έχει αλλάξει χωρίς εγγραφή, άρα «όχι γραμμένο» (κανένα ack).
+    _gen++;
     _written = false;
-    final text = jsonEncode(toJson());
-    _queue = _queue.then((_) async {
-      bool ok;
-      try {
-        ok = await _io.write(text);
-      } catch (_) {
-        // Ποτέ σπασμένη σειρά: μια εξαίρεση εδώ θα σταματούσε όλες τις επόμενες εγγραφές.
-        ok = false;
-      }
-      _written = ok;
-      final err = ok ? null : 'Δεν αποθηκεύτηκε η τελευταία αλλαγή στο κινητό.';
-      if (err != saveError) {
-        saveError = err;
-        notifyListeners();
-      }
-    });
+    if (_queued) return _queue;
+    _queued = true;
+    _queue = _queue.then((_) => _writeJob());
     return _queue;
+  }
+
+  Session? _finishedById(String id) {
+    for (final s in sessions) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  Future<void> _writeJob() async {
+    _queued = false;
+    var hrOk = true;
+    // 1) Οι παλμοί στα αρχεία τους (πριν από το training.json που τα αναφέρει).
+    for (final id in _segments.keys.toList()) {
+      if (_finishedById(id) == null) _segments.remove(id);
+    }
+    for (final s in sessions.toList()) {
+      if (!hrFileId(s.id)) continue;
+      final segs = _segments[s.id];
+      if (!s.hrNeedsWrite && segs == null) continue;
+      try {
+        if (!s.hrLoaded) {
+          final r = await _io.readHr(s.id);
+          if (r.state == 'error') {
+            hrOk = false;
+            continue;
+          }
+          if (!s.hrLoaded) {
+            s.hr
+              ..clear()
+              ..addAll(decodeHr(r.json));
+            s.hrLoaded = true;
+            s.hrInFile = true;
+          }
+        }
+        for (final seg in _segments.remove(s.id) ?? const <(List<List<int>>, int?, int?)>[]) {
+          mergeHrSegment(s, seg.$1, watchAvg: seg.$2, watchMax: seg.$3);
+        }
+        if (!s.hrNeedsWrite) continue;
+        if (await _io.writeHr(s.id, encodeHr(s.hr))) {
+          s.hrInFile = true;
+          s.hrCount = s.hr.length;
+          if (_release.remove(s.id)) {
+            s.hr.clear();
+            s.hrLoaded = false;
+          }
+        }
+      } catch (_) {
+        hrOk = false;
+      }
+    }
+    // 2) Το training.json.
+    final gen = _gen;
+    bool ok;
+    try {
+      ok = await _io.write(jsonEncode(toJson()));
+    } catch (_) {
+      // Ποτέ σπασμένη σειρά: μια εξαίρεση εδώ θα σταματούσε όλες τις επόμενες εγγραφές.
+      ok = false;
+    }
+    // Κομμάτια παλμών που δεν ενώθηκαν ακόμα (το αρχείο δεν διαβάστηκε) = όχι γραμμένα: κανένα ack.
+    _written = ok && hrOk && _segments.isEmpty && gen == _gen;
+    final err = ok ? null : 'Δεν αποθηκεύτηκε η τελευταία αλλαγή στο κινητό.';
+    if (err != saveError) {
+      saveError = err;
+      notifyListeners();
+    }
   }
 
   /// Περιμένει τις εγγραφές· αν η τελευταία απέτυχε, ξαναγράφει μία φορά. true μόνο αν ό,τι είναι στη μνήμη είναι
@@ -171,6 +396,50 @@ class TrainingStore extends ChangeNotifier {
     await _queue;
     if (!_written) await save();
     return !readError && _written;
+  }
+
+  /// Οι παλμοί μιας προπόνησης στη μνήμη (από το αρχείο τους), για τη σύνοψη. Μία ανάγνωση, μόνο όταν χρειάζεται.
+  Future<void> ensureHr(Session s) async {
+    if (s.hrLoaded) return;
+    _release.remove(s.id);
+    await _queue;
+    if (s.hrLoaded) return;
+    final r = await _io.readHr(s.id);
+    if (s.hrLoaded || r.state == 'error') return;
+    s.hr
+      ..clear()
+      ..addAll(decodeHr(r.json));
+    s.hrLoaded = true;
+    s.hrInFile = true;
+    notifyListeners();
+  }
+
+  /// Αρχεία παλμών προπονήσεων που σβήστηκαν (V-A-02): σβήνονται στο επόμενο άνοιγμα (ως τότε η «Αναίρεση» τα βρίσκει).
+  Future<void> _purgeDeletedHr() async {
+    try {
+      final ids = await _io.listHr();
+      for (final id in ids) {
+        if (deleted.contains(id) && !sessions.any((x) => x.id == id)) await _io.deleteHr(id);
+      }
+    } catch (_) {}
+  }
+
+  /// Το αντίγραφο ασφαλείας (V-A-02): όπως το training.json, και οι παλμοί όσων είναι στα αρχεία τους («hrz»).
+  Future<Map<String, dynamic>> backupJson() async {
+    await _queue;
+    final j = toJson();
+    final hrz = <String, String>{};
+    for (final s in sessions) {
+      if (!s.hrInFile) continue; // ήδη μέσα («hr»)
+      if (s.hrLoaded) {
+        if (s.hr.isNotEmpty) hrz[s.id] = encodeHr(s.hr);
+      } else if (s.hrCount > 0) {
+        final r = await _io.readHr(s.id);
+        if (r.state == 'ok' && r.json != null) hrz[s.id] = r.json!;
+      }
+    }
+    if (hrz.isNotEmpty) j['hrz'] = hrz;
+    return j;
   }
 
   // ---------------------------------------------------------------- όριο παλμών
@@ -326,15 +595,50 @@ class TrainingStore extends ChangeNotifier {
     }
   }
 
+  /// Ένα κομμάτι παλμών του ρολογιού ([seg], ήδη στον χρόνο της προπόνησης) στην προπόνηση [s] (έλεγχος 9/11, V-A-11):
+  /// ΕΝΩΝΕΤΑΙ με ό,τι υπάρχει (πριν: η μεγαλύτερη λίστα κέρδιζε και χανόταν το άλλο κομμάτι). Ό,τι υπήρχε μέσα στο
+  /// διάστημα του κομματιού (π.χ. οι ζωντανοί παλμοί ανά 10″, ή το ίδιο κομμάτι ξανά) δίνει τη θέση του στις τιμές ανά
+  /// 1″· ό,τι είναι έξω μένει. Μέσος και υψηλότερος ξαναϋπολογίζονται από όλες τις τιμές (ένα κομμάτι μόνο: ο μέσος
+  /// του ρολογιού, που ξέρει τις παύσεις). Σε τελειωμένη προπόνηση, όχι τιμές πολύ μετά το τέλος (DP-09).
+  static void mergeHrSegment(Session s, List<List<int>> seg, {int? watchAvg, int? watchMax}) {
+    if (seg.isEmpty) {
+      if (watchMax != null && (s.hrMax == null || watchMax > s.hrMax!)) s.hrMax = watchMax;
+      return;
+    }
+    final sorted = sortedHr(seg);
+    final from = sorted.first[0], to = sorted.last[0];
+    final other = s.hr.where((p) => p[0] < from || p[0] > to).toList();
+    s.hr
+      ..clear()
+      ..addAll(other)
+      ..addAll(sorted)
+      ..sort((a, b) => a[0].compareTo(b[0]));
+    final end = s.end;
+    if (end != null) {
+      final last = end.difference(s.start).inSeconds + 60;
+      s.hr.removeWhere((p) => p[0] > last);
+    }
+    s.hrInFile = false;
+    if (s.hr.isEmpty) return;
+    var max = 0, sum = 0;
+    for (final p in s.hr) {
+      sum += p[1];
+      if (p[1] > max) max = p[1];
+    }
+    s.hrAvg = other.isEmpty && watchAvg != null ? watchAvg : (sum / s.hr.length).round();
+    // Ο υψηλότερος μόνο ανεβαίνει (και του ρολογιού, που μετρά και τιμές μέσα στο ίδιο δευτερόλεπτο).
+    s.hrMax = [max, s.hrMax ?? 0, watchMax ?? 0].reduce((a, b) => a > b ? a : b);
+  }
+
   /// Ό,τι έγινε μόνο στο ρολόι (προπόνηση, περπάτημα) ή οι παλμοί μιας προπόνησης του κινητού. true αν άλλαξε κάτι.
   bool importWatch(Map<String, dynamic> j) {
     final kind = j['kind'] as String? ?? 'strength';
     final samples = [
-      for (final p in (j['hr'] as List? ?? const []))
-        if (p is List && p.length == 2) [(p[0] as num).toInt(), (p[1] as num).toInt()],
+      for (final p in (j['hr'] is List ? j['hr'] as List : const []))
+        if (p is List && p.length == 2 && p[0] is num && p[1] is num) [(p[0] as num).toInt(), (p[1] as num).toInt()],
     ];
-    final hrAvg = (j['hrAvg'] as num?)?.toInt();
-    final hrMax = (j['hrMax'] as num?)?.toInt();
+    final hrAvg = j['hrAvg'] is num ? (j['hrAvg'] as num).toInt() : null;
+    final hrMax = j['hrMax'] is num ? (j['hrMax'] as num).toInt() : null;
     // Παλιό «Νιώθω κάτι» από ρολόι ως #84: δεν υπάρχει πια.
     if (kind == 'sym') return false;
     if (kind == 'hr') {
@@ -346,24 +650,36 @@ class TrainingStore extends ChangeNotifier {
       }
       if (s == null) return false;
       final aligned = alignHr(samples, j['hrT0'], s.start);
-      if (aligned.length > s.hr.length) {
-        s.hr
-          ..clear()
-          ..addAll(aligned);
+      if (s.hrLoaded) {
+        mergeHrSegment(s, aligned, watchAvg: hrAvg, watchMax: hrMax);
+      } else {
+        // Οι παλμοί της είναι στο αρχείο τους: η ένωση γίνεται στην εγγραφή, αφού διαβαστεί (καμία απώλεια).
+        (_segments[s.id] ??= []).add((aligned, hrAvg, hrMax));
+        if (hrMax != null && (s.hrMax == null || hrMax > s.hrMax!)) s.hrMax = hrMax;
       }
-      if (hrMax != null && (s.hrMax == null || hrMax > s.hrMax!)) s.hrMax = hrMax;
-      if (hrAvg != null) s.hrAvg = hrAvg;
       // Προπόνηση του κινητού που ξεκίνησε πριν από την #90 (χωρίς όριο μέσα): το όριο που είχε το ρολόι.
       s.limit ??= Session.watchLimit(j['lim']);
       _watchHrInfo(s, j);
       _mergeWatchSets(s, j['items']);
+      // «Τέλος» στο ρολόι (V-A-09): τέλος και εδώ, με την ώρα του ρολογιού (αν δεν συνέχισε στο κινητό στο μεταξύ).
+      final fin = j['fin'];
+      if (fin is num && sid != null) endFromWatch(sid, fin.toInt());
       save();
       return true;
     }
     final id = 'w-${j['id']}';
-    if (deleted.contains(id) || sessions.any((x) => x.id == id)) return false;
+    if (deleted.contains(id)) return false;
     final start = DateTime.fromMillisecondsSinceEpoch((j['start'] as num).toInt());
     final end = DateTime.fromMillisecondsSinceEpoch((j['end'] as num? ?? j['start'] as num).toInt());
+    final partial = j['partial'] == 1;
+    // Ίδιο αποτέλεσμα ξανά: τίποτα. Μερικό (η εφαρμογή του ρολογιού έκλεισε απότομα) και μετά το κανονικό ή ένα
+    // πληρέστερο: «το τελικό κερδίζει» (έλεγχος 9/11, V-A-14).
+    final old = sessions.indexWhere((x) => x.id == id);
+    if (old >= 0) {
+      final o = sessions[old];
+      final better = o.partial && (!partial || end.isAfter(o.end ?? o.start));
+      if (!better) return false;
+    }
     final cardio = kind == 'cardio' ? (j['cardio'] as Map?)?.cast<String, dynamic>() ?? const {} : null;
     final s = Session(
       id: id,
@@ -383,6 +699,7 @@ class TrainingStore extends ChangeNotifier {
       // το στέλνει: τότε το όριο του κινητού τη στιγμή της εισαγωγής. Είναι το ίδιο που είχε σταλεί στο ρολόι, εκτός αν
       // άλλαξε στο κινητό ανάμεσα στην άσκηση και στη μεταφορά της (σπάνιο).
       limit: Session.watchLimit(j['lim']) ?? hrLimit ?? 0,
+      partial: partial,
     );
     if (s.stopped) s.note = 'Σταμάτησε: «Σταμάτησα» στο ρολόι';
     _watchHrInfo(s, j);
@@ -407,6 +724,15 @@ class TrainingStore extends ChangeNotifier {
         }
       }
     }
+    if (old >= 0) {
+      // Ό,τι έγραψε ο χρήστης στο μερικό μένει.
+      final o = sessions[old];
+      s.feel ??= o.feel;
+      if (o.note != null && s.note == null) s.note = o.note;
+      sessions[old] = s;
+      save();
+      return true;
+    }
     var at = sessions.length;
     while (at > 0 && sessions[at - 1].start.isAfter(start)) {
       at--;
@@ -415,6 +741,23 @@ class TrainingStore extends ChangeNotifier {
     save();
     return true;
   }
+
+  /// «Τέλος» στο ρολόι για την προπόνηση του κινητού [sid] τη στιγμή [at] (ms, έλεγχος 9/11, V-A-09): τέλος και εδώ, με
+  /// εκείνη την ώρα. Όχι αν δεν έγινε κανένα σετ (μένει ανοιχτή, για να αποφασίσεις), ούτε αν συνέχισες στο κινητό μετά.
+  bool endFromWatch(String sid, int at) {
+    final s = current;
+    if (s == null || s.id != sid || s.setsDone == 0) return false;
+    if (at < s.lastActivity.millisecondsSinceEpoch - 60000) return false;
+    final lo = s.start.millisecondsSinceEpoch;
+    final n = now.millisecondsSinceEpoch;
+    final end = at < lo ? lo : (at > n ? (n < lo ? lo : n) : at);
+    finish(end: DateTime.fromMillisecondsSinceEpoch(end));
+    endedByWatch = s;
+    return true;
+  }
+
+  /// Ανοιχτή προπόνηση χωρίς καμία κίνηση εδώ και [staleAfter] (V-A-09): «Ξεχασμένη προπόνηση;».
+  bool isStale(Session s) => now.difference(s.lastActivity) >= staleAfter;
 
   static void _watchHrInfo(Session s, Map<String, dynamic> j) {
     if (j['hrMode'] is String) s.hrMode = j['hrMode'] as String;
@@ -598,11 +941,13 @@ class TrainingStore extends ChangeNotifier {
     save();
   }
 
-  void finish({int? feel}) {
+  /// Τέλος της προπόνησης. Χωρίς [end]: τώρα — εκτός αν είναι «ξεχασμένη» ([isStale]): τότε στο τελευταίο ✓, ποτέ
+  /// διάρκεια 20 ωρών (V-A-09).
+  void finish({int? feel, DateTime? end}) {
     final s = current;
     if (s == null) return;
     s
-      ..end = now
+      ..end = end ?? (isStale(s) ? s.lastActivity : now)
       ..feel = feel;
     if (s.hr.isNotEmpty) s.hrAvg = (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round();
     sessions.add(s);
@@ -672,16 +1017,30 @@ class TrainingStore extends ChangeNotifier {
   @visibleForTesting
   void replaceAll(Map<String, dynamic> j) => _fromJson(j);
 
-  /// Επαναφορά από αντίγραφο: προσθέτει μόνο ό,τι λείπει (προγράμματα, προπονήσεις, συμπτώματα). Ποτέ η έγκριση
-  /// του γιατρού και το όριο παλμών: αυτά τα ξαναλές (έλεγχος 8/11, TRN-17). Επιστρέφει πόσες προπονήσεις μπήκαν.
+  /// Επαναφορά από αντίγραφο: προσθέτει μόνο ό,τι λείπει (προγράμματα, προπονήσεις, με τους παλμούς τους). Ποτέ το όριο
+  /// παλμών: αυτό το ξαναλές (έλεγχος 8/11, TRN-17). Επιστρέφει πόσες προπονήσεις μπήκαν· ό,τι δεν πήγε καλά το λέει το
+  /// [mergeProblem] (έλεγχος 9/11, V-A-10: ποτέ σιωπηλή άρνηση).
   int mergeBackup(Map<String, dynamic> j) {
-    if (readError || !ready) return 0;
+    mergeProblem = null;
+    if (readError || !ready) {
+      mergeProblem = newerFile
+          ? 'Οι προπονήσεις δεν μπήκαν: το αρχείο προπονήσεων του κινητού είναι από νεότερη έκδοση. Ενημέρωσε την εφαρμογή.'
+          : 'Οι προπονήσεις δεν μπήκαν: το αρχείο προπονήσεων του κινητού δεν διαβάζεται, οπότε δεν γράφεται τίποτα.';
+      return 0;
+    }
+    final v = j['v'];
+    if (v is num && v > fileVersion) {
+      mergeProblem = 'Οι προπονήσεις του αντιγράφου είναι από νεότερη έκδοση της εφαρμογής. Ενημέρωσε πρώτα την εφαρμογή.';
+      return 0;
+    }
     final other = TrainingStore(io: _io, clock: _clock);
     try {
       other._fromJson(j);
     } catch (_) {
+      mergeProblem = 'Οι προπονήσεις του αντιγράφου δεν διαβάστηκαν.';
       return 0;
     }
+    final hrz = j['hrz'] is Map ? Map<String, dynamic>.from(j['hrz'] as Map) : const <String, dynamic>{};
     final have = {for (final p in programs) '${p.id}#${p.version}'};
     for (final p in other.programs) {
       if (have.add('${p.id}#${p.version}')) programs.add(p);
@@ -695,9 +1054,33 @@ class TrainingStore extends ChangeNotifier {
     for (final s in other.sessions) {
       if (deleted.contains(s.id)) continue;
       if (ids.add(s.id)) {
+        // Οι παλμοί της: μέσα στην προπόνηση (αντίγραφο ως #90) ή στο «hrz» (#91): γράφονται στο αρχείο τους εδώ.
+        if (!s.hrLoaded) {
+          final text = hrz[s.id];
+          s.hr
+            ..clear()
+            ..addAll(text is String ? decodeHr(text) : const <List<int>>[]);
+          s.hrLoaded = true;
+          s.hrCount = 0;
+        }
+        s.hrInFile = false;
         sessions.add(s);
         added++;
       }
+    }
+    // Ό,τι δεν διαβάστηκε στο αντίγραφο κρατιέται κι αυτό (σε καραντίνα), και λέγεται.
+    final known = {for (final q in quarantine) jsonEncode(q)};
+    var bad = 0;
+    for (final q in other.quarantine) {
+      if (known.add(jsonEncode(q))) {
+        quarantine.add(q);
+        bad++;
+      }
+    }
+    if (bad > 0) {
+      mergeProblem = bad == 1
+          ? '1 προπόνηση του αντιγράφου δεν διαβάστηκε· κρατήθηκε στο αρχείο.'
+          : '$bad προπονήσεις του αντιγράφου δεν διαβάστηκαν· κρατήθηκαν στο αρχείο.';
     }
     sessions.sort((a, b) => a.start.compareTo(b.start));
     save();

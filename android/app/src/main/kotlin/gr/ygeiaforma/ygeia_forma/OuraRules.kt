@@ -14,12 +14,14 @@ object OuraRules {
     const val NIGHTS_FILE = "oura_nights.json"
     const val PLAN_FILE = "sources.json"
     const val PLAN_LOG_FILE = "sources_log.json"
+    /** Και το προσωρινό του training.json μιας εγγραφής που διακόπηκε σβήνεται (DP-11). */
+    const val TRAINING_FILE = "training.json"
 
     /** Τα κρυπτογραφημένα (Vault): αρχείο «όνομα.bin» στο noBackupFilesDir/oura. */
     val VAULT_NAMES = setOf("oura_tokens", "oura_pending", "oura_connecting")
 
     /** Τα αρχεία μας (στο filesDir ή στο noBackupFilesDir/oura). Το προσωρινό είναι «όνομα.<αριθμός>.tmp». */
-    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE) + VAULT_NAMES.map { "$it.bin" }
+    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, TRAINING_FILE) + VAULT_NAMES.map { "$it.bin" }
 
     /** Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback. */
     fun isCallback(scheme: String?, host: String?, port: Int, path: String?, userInfo: String?): Boolean {

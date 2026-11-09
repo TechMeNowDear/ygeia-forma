@@ -111,12 +111,23 @@ class _SessionPageState extends State<SessionPage> {
       builder: (context, _) {
         final s = t.current;
         if (s == null) {
+          // «Τέλος» στο ρολόι (έλεγχος 9/11, V-A-09): η προπόνηση έκλεισε εκεί· εδώ η σύνοψή της.
+          final ended = t.endedByWatch;
+          if (ended != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || t.current != null || t.endedByWatch != ended) return;
+              t.endedByWatch = null;
+              TrainingDevice.restCancel();
+              Navigator.of(context).pushReplacement(SummaryPage.route(t, ended));
+            });
+          }
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(
+            body: Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('Δεν υπάρχει προπόνηση σε εξέλιξη.', textAlign: TextAlign.center, style: TextStyle(fontSize: 17)),
+                padding: const EdgeInsets.all(24),
+                child: Text(ended != null ? 'Η προπόνηση τελείωσε από το ρολόι.' : 'Δεν υπάρχει προπόνηση σε εξέλιξη.',
+                    textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
               ),
             ),
           );
@@ -818,6 +829,12 @@ class _SummaryPageState extends State<SummaryPage> {
   void initState() {
     super.initState();
     _feel = widget.session.feel;
+    // Οι παλμοί είναι στο δικό τους αρχείο (V-A-02): φορτώνονται τώρα, μόνο για αυτή τη σύνοψη.
+    if (!widget.session.hrLoaded) {
+      widget.training.ensureHr(widget.session).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   static const _feels = ['Πολύ εύκολα', 'Εύκολα', 'Καλά', 'Δύσκολα', 'Πολύ δύσκολα'];
@@ -882,7 +899,7 @@ class _SummaryPageState extends State<SummaryPage> {
       return PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest, next: base?.next, load: base?.load);
     }
 
-    final stats = AppCard(
+    final stats0 = AppCard(
       child: Row(children: [
         for (final (v, l) in s.isCardio
             ? [
@@ -929,7 +946,7 @@ class _SummaryPageState extends State<SummaryPage> {
       for (var k = 0; k < s.items.length; k++)
         _ExerciseCard(e: s.items[k], hr: withHr ? perEx[k] : null, showHr: withHr, key: ValueKey('sum-ex-$k')),
     ];
-    final hrCard = s.hrMax == null && s.hr.isEmpty ? null : HrCard(session: s);
+    final hrCard = s.hrMax == null && !s.hasHr ? null : HrCard(session: s);
 
     final feel = AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -982,6 +999,18 @@ class _SummaryPageState extends State<SummaryPage> {
       if (RecoveryCard.shows(s)) RecoveryCard(session: s),
     ];
     final extra = s.isCardio && WalkExtraCard.shows(s) ? WalkExtraCard(session: s) : null;
+    // Γράφτηκε ως το τελευταίο στιγμιότυπο, γιατί η εφαρμογή του ρολογιού έκλεισε απότομα (V-A-03).
+    final partialNote = !s.partial
+        ? null
+        : Padding(
+            key: const ValueKey('summary-partial'),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              'Γράφτηκε ως τις ${hm(s.end ?? s.start)}: η εφαρμογή του ρολογιού έκλεισε πριν το «Τέλος».',
+              style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary),
+            ),
+          );
+    final stats = partialNote == null ? stats0 : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [stats0, const SizedBox(height: 8), partialNote]);
     final List<Widget> left, right;
     if (s.isCardio) {
       left = [stats, if (extra != null) extra, if (hrCard != null) hrCard];
