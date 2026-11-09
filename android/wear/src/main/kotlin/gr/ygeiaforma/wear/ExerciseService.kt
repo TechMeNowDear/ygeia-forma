@@ -365,6 +365,7 @@ class ExerciseService : Service() {
                 lastPendingSent = now
                 for ((i, k) in pend) {
                     val o = JSONObject().put("op", "tick").put("i", i).put("s", k).put("sid", ph.id).put("late", true)
+                    ph.items.getOrNull(i)?.sets?.getOrNull(k)?.at?.takeIf { it > 0 }?.let { o.put("at", it) }
                     scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
                 }
             }

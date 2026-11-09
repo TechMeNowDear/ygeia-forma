@@ -85,6 +85,9 @@ class TrainingStore extends ChangeNotifier {
   final List<Program> programs = [];
   String? activeId;
   final List<Session> sessions = [];
+
+  /// Προπονήσεις που σβήστηκαν (ids): να μην ξαναγυρίσουν από το ρολόι ή από παλιό αντίγραφο (9/11).
+  final Set<String> deleted = {};
   Session? current;
 
   Future<void>? _loading;
@@ -116,6 +119,9 @@ class TrainingStore extends ChangeNotifier {
       ..clear()
       ..addAll([for (final s in (j['sessions'] as List? ?? const [])) Session.fromJson(s as Map<String, dynamic>)]);
     current = j['current'] is Map ? Session.fromJson(j['current'] as Map<String, dynamic>) : null;
+    deleted
+      ..clear()
+      ..addAll([for (final x in (j['del'] as List? ?? const [])) if (x is String) x]);
   }
 
   Map<String, dynamic> toJson() => {
@@ -124,6 +130,7 @@ class TrainingStore extends ChangeNotifier {
         'programs': [for (final p in programs) p.toJson()],
         if (activeId != null) 'active': activeId,
         'sessions': [for (final s in sessions) s.toJson()],
+        if (deleted.isNotEmpty) 'del': deleted.toList(),
         if (current != null) 'current': current!.toJson(),
       };
 
@@ -244,6 +251,43 @@ class TrainingStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---------------------------------------------------------------- διαγραφή
+  /// Σβήνει μια τελειωμένη προπόνηση (ή περπάτημα) από παντού: ιστορικό, πρόοδο, σύνοψη, αντίγραφα. Επιστρέφει ό,τι
+  /// σβήστηκε, για «Αναίρεση». Η προπόνηση σε εξέλιξη δεν σβήνεται από εδώ.
+  Session? deleteSession(String id) {
+    final i = sessions.indexWhere((x) => x.id == id);
+    if (i < 0) return null;
+    final s = sessions.removeAt(i);
+    deleted.add(id);
+    save();
+    return s;
+  }
+
+  /// «Αναίρεση»: η προπόνηση γυρίζει στη θέση της (με τη σειρά της ώρας).
+  void undoDelete(Session s) {
+    deleted.remove(s.id);
+    if (!sessions.any((x) => x.id == s.id)) {
+      var at = sessions.length;
+      while (at > 0 && sessions[at - 1].start.isAfter(s.start)) {
+        at--;
+      }
+      sessions.insert(at, s);
+    }
+    save();
+  }
+
+  /// Οι παλμοί του ρολογιού έχουν χρόνο από τη στιγμή που ξεκίνησε η μέτρηση εκεί («hrT0», ms)· εδώ μετρούν από την
+  /// αρχή της προπόνησης. Χωρίς «hrT0» (ρολόι ως #87): όπως ήρθαν.
+  static List<List<int>> alignHr(List<List<int>> samples, Object? hrT0, DateTime start) {
+    if (hrT0 is! num) return samples;
+    final off = ((hrT0.toInt() - start.millisecondsSinceEpoch) / 1000).round();
+    if (off == 0) return samples;
+    return [
+      for (final p in samples)
+        if (p[0] + off >= 0) [p[0] + off, p[1]],
+    ];
+  }
+
   DateTime? _hrSaved;
 
   /// Παλμοί από το ρολόι για την προπόνηση που τρέχει (δείγμα ανά ~10″, αποθήκευση ανά λεπτό).
@@ -274,15 +318,17 @@ class TrainingStore extends ChangeNotifier {
     if (kind == 'sym') return false;
     if (kind == 'hr') {
       final sid = j['sid'] as String?;
+      if (sid != null && deleted.contains(sid)) return false;
       Session? s;
       for (final x in [...sessions, if (current != null) current!]) {
         if (x.id == sid) s = x;
       }
       if (s == null) return false;
-      if (samples.length > s.hr.length) {
+      final aligned = alignHr(samples, j['hrT0'], s.start);
+      if (aligned.length > s.hr.length) {
         s.hr
           ..clear()
-          ..addAll(samples);
+          ..addAll(aligned);
       }
       if (hrMax != null && (s.hrMax == null || hrMax > s.hrMax!)) s.hrMax = hrMax;
       if (hrAvg != null) s.hrAvg = hrAvg;
@@ -292,7 +338,7 @@ class TrainingStore extends ChangeNotifier {
       return true;
     }
     final id = 'w-${j['id']}';
-    if (sessions.any((x) => x.id == id)) return false;
+    if (deleted.contains(id) || sessions.any((x) => x.id == id)) return false;
     final start = DateTime.fromMillisecondsSinceEpoch((j['start'] as num).toInt());
     final end = DateTime.fromMillisecondsSinceEpoch((j['end'] as num? ?? j['start'] as num).toInt());
     final cardio = kind == 'cardio' ? (j['cardio'] as Map?)?.cast<String, dynamic>() ?? const {} : null;
@@ -306,7 +352,7 @@ class TrainingStore extends ChangeNotifier {
       items: cardio != null ? [] : [for (final e in (j['items'] as List? ?? const [])) ExLog.fromJson((e as Map).cast<String, dynamic>())],
       hrAvg: hrAvg,
       hrMax: hrMax,
-      hr: samples,
+      hr: alignHr(samples, j['hrT0'], start),
       source: 'watch',
       // «Σταμάτησα» από ρολόι με παλιά έκδοση (ως #84): δεν μετρά για την πρόοδο.
       stopped: j['stop'] == 1,
@@ -390,10 +436,14 @@ class TrainingStore extends ChangeNotifier {
   /// Πρώτη φορά για αυτή την άσκηση (χωρίς ιστορικό): μετά το 1ο σετ ρωτάμε για βαθμονόμηση.
   bool isFirstTime(String ex) => historyOf(ex).isEmpty;
 
-  void tick(ExLog e, int i) {
+  /// ✓ σε ένα σετ. [at]: η ώρα του ✓ στο ρολόι (ms), αν ήρθε από εκεί· κρατιέται μόνο αν είναι μέσα στην προπόνηση
+  /// (από την αρχή της ως τώρα + 1′, για μικρές διαφορές ρολογιού), αλλιώς η ώρα του κινητού (9/11).
+  void tick(ExLog e, int i, {int? at}) {
     final s = e.log[i];
+    final n = now.millisecondsSinceEpoch;
+    final start = current?.start.millisecondsSinceEpoch;
     s.done = true;
-    s.at = now.millisecondsSinceEpoch;
+    s.at = at != null && start != null && at >= start && at <= n + 60000 ? at : n;
     save();
   }
 
@@ -555,9 +605,13 @@ class TrainingStore extends ChangeNotifier {
       if (have.add('${p.id}#${p.version}')) programs.add(p);
     }
     activeId ??= other.activeId;
+    // Ό,τι σβήστηκε (εδώ ή στο αντίγραφο) μένει σβησμένο.
+    deleted.addAll(other.deleted);
+    sessions.removeWhere((x) => deleted.contains(x.id));
     final ids = {for (final s in sessions) s.id};
     var added = 0;
     for (final s in other.sessions) {
+      if (deleted.contains(s.id)) continue;
       if (ids.add(s.id)) {
         sessions.add(s);
         added++;

@@ -135,6 +135,12 @@ class HrCard extends StatelessWidget {
         Row(children: [
           Expanded(child: Text('Παλμοί', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
           Text('από το ρολόι', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+          IconButton(
+            key: const ValueKey('hr-info'),
+            tooltip: 'Πώς διαβάζονται οι παλμοί',
+            onPressed: () => showHrInfo(context, cardio: session.isCardio),
+            icon: Icon(Icons.info_outline_rounded, color: c.textSecondary),
+          ),
         ]),
         const SizedBox(height: 6),
         Wrap(spacing: 18, runSpacing: 4, children: [
@@ -223,4 +229,54 @@ class _HrChart extends CustomPainter {
 
   @override
   bool shouldRepaint(_HrChart old) => old.hr != hr || old.limit != limit || old.c != c;
+}
+
+/// «Πώς διαβάζονται οι παλμοί»: ορισμοί και όρια, χωρίς να γεμίζει η οθόνη της σύνοψης (9/11).
+Future<void> showHrInfo(BuildContext context, {bool cardio = false}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) {
+      final c = Aigaio.of(ctx);
+      Widget h(String t) => Padding(
+            padding: const EdgeInsets.only(top: 14, bottom: 4),
+            child: Text(t, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+          );
+      Widget p(String t) => Text(t, style: TextStyle(fontSize: 14.5, height: 1.45, color: c.text));
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .85),
+          child: SingleChildScrollView(
+            key: const ValueKey('hr-info-sheet'),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Πώς διαβάζονται οι παλμοί', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
+              h('Από πού έρχονται'),
+              p('Από τον αισθητήρα του ρολογιού, μία μέτρηση το δευτερόλεπτο, όσο τρέχει η προπόνηση ή το περπάτημα στο ρολόι. '
+                  'Αν το ρολόι δεν ήταν σε προπόνηση (π.χ. δεν πάτησες «Παλμοί εδώ»), δεν υπάρχουν παλμοί για εκείνη την ώρα.'),
+              if (!cardio) ...[
+                h('♥ σετ'),
+                p('Ο μέσος όρος των παλμών στα τελευταία 30 δευτερόλεπτα ως τη στιγμή που πάτησες ✓. '
+                    'Ίδιο παράθυρο για κάθε σετ, ώστε τα σετ να συγκρίνονται μεταξύ τους.'),
+                h('♥ διάλειμμα'),
+                p('Ως πόσο χαμηλά έπεσαν οι παλμοί πριν ξεκινήσεις το επόμενο σετ (ο χαμηλότερος μέσος όρος 10 δευτερολέπτων). '
+                    'Όσο πιο κάτω πέφτουν, τόσο καλύτερα ξεκουράζεσαι. Στο τελευταίο σετ δεν υπάρχει διάλειμμα.'),
+                h('♥ της άσκησης'),
+                p('Ο μέσος όρος των σετ της άσκησης που έχουν τιμή.'),
+                h('Γιατί «~»'),
+                p('Στα βάρη ο καρπός μετρά κατά προσέγγιση: όταν σφίγγεις τη λαβή, ο αισθητήρας χάνει λίγο την επαφή. '
+                    'Γι’ αυτό δείχνουμε μόνο μέσους όρους, όχι το υψηλότερο κάθε σετ.'),
+              ],
+              h('Γιατί «—»'),
+              p('Λιγότερες από 3 μετρήσεις σε εκείνο το διάστημα: καλύτερα κενό παρά αριθμός από μία-δύο τιμές.'),
+              h('Για πιο σωστές μετρήσεις'),
+              p('Λουρί σφιχτό αλλά άνετο, το ρολόι ένα με δύο δάχτυλα πάνω από το κόκαλο του καρπού. '
+                  'Στα βάρη, αν μπορείς, μη λυγίζεις πολύ τον καρπό.'),
+            ]),
+          ),
+        ),
+      );
+    },
+  );
 }

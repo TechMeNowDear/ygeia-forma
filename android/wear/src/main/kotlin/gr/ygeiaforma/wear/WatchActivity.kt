@@ -184,7 +184,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         val i = s.idx
         val si = s.current?.nextSet ?: -1
         val next = s.tick(now)
-        if (s.phone && si >= 0) cmd(JSONObject().put("op", "tick").put("i", i).put("s", si))
+        // Με την ώρα του ✓ εδώ: το κινητό τη γράφει όπως είναι (παλμοί ανά σετ), όχι την ώρα που έφτασε (9/11).
+        if (s.phone && si >= 0) cmd(JSONObject().put("op", "tick").put("i", i).put("s", si).put("at", now))
         if (!s.phone) Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)))
         Repo.screen = when (next) {
             LiveSession.Next.REST -> if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET

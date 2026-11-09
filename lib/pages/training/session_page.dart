@@ -10,6 +10,7 @@ import '../../training/equipment.dart';
 import '../../training/progression.dart';
 import '../../training/program.dart';
 import '../../training/session.dart';
+import '../../training/set_hr.dart';
 import '../../training/training_device.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
@@ -721,6 +722,49 @@ class _SummaryPageState extends State<SummaryPage> {
 
   static const _feels = ['Πολύ εύκολα', 'Εύκολα', 'Καλά', 'Δύσκολα', 'Πολύ δύσκολα'];
 
+  /// Διαγραφή με επιβεβαίωση· μετά «Αναίρεση» για λίγα δευτερόλεπτα, στην οθόνη από όπου ήρθες.
+  Future<void> _delete(BuildContext context) async {
+    final t = widget.training;
+    final s = widget.session;
+    final what = s.isCardio ? 'περπατήματος' : 'προπόνησης';
+    final desc = s.isCardio
+        ? '${shortDayDate(s.start)}, ${s.cardioMinutes ?? s.duration.inMinutes}′${s.meters == null ? '' : ', ${(s.meters! / 1000).toStringAsFixed(2).replaceAll('.', ',')} km'}'
+        : '${shortDayDate(s.start)}, ${s.name}, ${s.setsDone} σετ';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final c = Aigaio.of(ctx);
+        return AlertDialog(
+          title: Text('Διαγραφή $what;'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('$desc. Φεύγει από το ιστορικό, την πρόοδο και τις συγκρίσεις.', style: TextStyle(fontSize: 15, height: 1.4, color: c.text)),
+            const SizedBox(height: 8),
+            Text('Αν κάνεις επαναφορά από παλιό αντίγραφο, δεν ξαναγυρίζει.', style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary)),
+          ]),
+          actions: [
+            TextButton(key: const ValueKey('del-cancel'), onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
+            FilledButton(
+              key: const ValueKey('del-ok'),
+              style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: Colors.white),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Διαγραφή'),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final gone = t.deleteSession(s.id);
+    Navigator.of(context).pop();
+    if (gone == null) return;
+    messenger.showSnackBar(SnackBar(
+      duration: const Duration(seconds: 8),
+      content: Text('Διαγράφηκε: ${gone.isCardio ? 'περπάτημα' : gone.name} ${shortDayDate(gone.start)}'),
+      action: SnackBarAction(label: 'Αναίρεση', onPressed: () => t.undoDelete(gone)),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = widget.training;
@@ -778,27 +822,13 @@ class _SummaryPageState extends State<SummaryPage> {
       ));
     }
 
-    final done = AppCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Τι έκανες', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-        for (final e in s.items)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
-              Text(exName(e.ex), style: TextStyle(fontSize: 15, color: e.skipped || e.done.isEmpty ? c.textSecondary : c.text)),
-              Text(
-                e.skipped
-                    ? 'παραλείφθηκε'
-                    : e.done.isEmpty
-                        ? 'δεν έγινε'
-                        : '${hasLoad(e.kind) ? '${loadLabel(e.kind, e.workLoad)} · ' : ''}${e.done.map((x) => x.reps).join(', ')}',
-                style: TextStyle(fontSize: 14, color: c.textSecondary),
-              ),
-            ]),
-          ),
-      ]),
-    );
-
+    // Ανά άσκηση: κάθε σετ με κιλά × επαναλήψεις και, αν υπάρχουν παλμοί, ♥ σετ και ♥ διάλειμμα (9/11).
+    final perEx = sessionSetHr(s);
+    final withHr = perEx.isNotEmpty;
+    final exCards = <Widget>[
+      for (var k = 0; k < s.items.length; k++)
+        _ExerciseCard(e: s.items[k], hr: withHr ? perEx[k] : null, showHr: withHr, key: ValueKey('sum-ex-$k')),
+    ];
     final hrCard = s.hrMax == null ? null : HrCard(session: s, limit: t.hrLimit);
 
     final feel = AppCard(
@@ -824,8 +854,27 @@ class _SummaryPageState extends State<SummaryPage> {
       ]),
     );
 
-    final left = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio) done];
-    final right = <Widget>[if (next.isNotEmpty) nextCard, if (widget.live || s.feel != null) feel];
+    final left = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio && !withHr) ...exCards];
+    final del = widget.live || !t.sessions.any((x) => x.id == s.id)
+        ? null
+        : OutlinedButton.icon(
+            key: const ValueKey('summary-delete'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: c.bad,
+              side: BorderSide(color: c.bad.withValues(alpha: .5)),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: () => _delete(context),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: Text(s.isCardio ? 'Διαγραφή περπατήματος' : 'Διαγραφή προπόνησης', style: const TextStyle(fontWeight: FontWeight.w600)),
+          );
+    // Με παλμούς οι ασκήσεις πάνε δεξιά (Fold ανοιχτό: δίπλα στο γράφημα)· χωρίς, όπως πριν.
+    final right = <Widget>[
+      if (!s.isCardio && withHr) ...exCards,
+      if (next.isNotEmpty) nextCard,
+      if (widget.live || s.feel != null) feel,
+      if (del != null) del,
+    ];
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.live
@@ -885,6 +934,62 @@ class _SummaryPageState extends State<SummaryPage> {
                 ]),
               ),
             ),
+    );
+  }
+}
+
+/// Μία άσκηση στη σύνοψη: κάθε σετ (κιλά × επαναλήψεις) και, με παλμούς, ♥ σετ / ♥ διάλειμμα και μέσος όρος.
+class _ExerciseCard extends StatelessWidget {
+  const _ExerciseCard({super.key, required this.e, required this.hr, required this.showHr});
+  final ExLog e;
+  final ExHr? hr;
+  final bool showHr;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final head = TextStyle(fontSize: 12.5, color: c.textSecondary);
+    final cell = TextStyle(fontSize: 15, color: c.text, fontFeatures: const [FontFeature.tabularFigures()]);
+    final strong = cell.copyWith(fontWeight: FontWeight.w700);
+    final done = [for (var i = 0; i < e.log.length; i++) if (e.log[i].done) i];
+    String setText(SetLog x) => hasLoad(e.kind) ? '${loadLabel(e.kind, x.load)} × ${x.reps}' : '${x.reps} επαν.';
+    Widget row(List<Widget> cells, {bool line = true}) => Container(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+          child: Row(children: [
+            SizedBox(width: 40, child: cells[0]),
+            Expanded(child: cells[1]),
+            if (showHr) ...[SizedBox(width: 62, child: cells[2]), SizedBox(width: 84, child: cells[3])],
+          ]),
+        );
+    return AppCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Text(exName(e.ex), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+          if (showHr)
+            Text(hr?.avg == null ? '♥ —' : '♥ ~${hr!.avg}',
+                key: ValueKey('sum-ex-avg-${e.ex}'),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: hr?.avg == null ? c.textSecondary : c.exercise)),
+        ]),
+        if (showHr && hr?.avg != null) Text('μέσος όρος των σετ', style: head),
+        const SizedBox(height: 6),
+        if (e.skipped || done.isEmpty)
+          Text(e.skipped ? 'Παραλείφθηκε' : 'Δεν έγινε', style: TextStyle(fontSize: 14.5, color: c.textSecondary))
+        else ...[
+          row([Text('σετ', style: head), Text(hasLoad(e.kind) ? 'κιλά × επαναλήψεις' : 'επαναλήψεις', style: head), Text('♥ σετ', style: head), Text('♥ διάλειμμα', style: head)]),
+          for (var j = 0; j < done.length; j++)
+            () {
+              final i = done[j];
+              final h = hr != null && i < hr!.sets.length ? hr!.sets[i] : null;
+              return row([
+                Text('${j + 1}', style: strong),
+                Text(setText(e.log[i]), style: cell),
+                Text(h?.set == null ? '—' : '~${h!.set}', key: ValueKey('sum-set-${e.ex}-$i'), style: h?.set == null ? cell.copyWith(color: c.textSecondary) : strong),
+                Text(h?.rest == null ? '—' : '↓ ${h!.rest}', style: h?.rest == null ? cell.copyWith(color: c.textSecondary) : cell.copyWith(color: c.good)),
+              ], line: j < done.length - 1);
+            }(),
+        ],
+      ]),
     );
   }
 }

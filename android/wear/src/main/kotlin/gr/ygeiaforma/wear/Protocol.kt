@@ -260,8 +260,12 @@ class LiveSession(
     }
 }
 
-/** Παλμοί μιας άσκησης: μέσος, υψηλότερος και δείγματα ανά [step] δευτερόλεπτα (για το γράφημα στο κινητό). */
-class HrStats(private val start: Long, private val step: Int = 10) {
+/**
+ * Παλμοί μιας άσκησης: μέσος, μέγιστος και οι τιμές με τον χρόνο τους. Κρατά μία τιμή ανά [step] δευτερόλεπτα
+ * (1″: όσο συχνά μετρά το ρολόι· ως #87 κρατούσε μία ανά 10″ και οι παλμοί ανά σετ δεν έβγαιναν σωστοί, 9/11).
+ * [start] (ms) πάει μαζί με τις τιμές («hrT0»), ώστε το κινητό να τις βάλει στη σωστή ώρα της προπόνησής του.
+ */
+class HrStats(private val start: Long, private val step: Int = 1) {
     private var sum = 0L
     private var n = 0
     var max = 0
@@ -288,10 +292,35 @@ class HrStats(private val start: Long, private val step: Int = 10) {
 
     fun writeTo(o: JSONObject) {
         if (n == 0) return
-        o.put("hrAvg", avg).put("hrMax", max)
+        o.put("hrAvg", avg).put("hrMax", max).put("hrT0", start)
         val a = JSONArray()
-        for (s in samples) a.put(JSONArray().put(s[0]).put(s[1]))
+        for (s in fit(samples)) a.put(JSONArray().put(s[0]).put(s[1]))
         o.put("hr", a)
+    }
+
+    companion object {
+        /** Ως τόσες τιμές σε ένα αποτέλεσμα (≈ 90′ ανά 1″): χωράνε άνετα στο όριο του Data Layer (100 KB). */
+        const val MAX_SAMPLES = 5400
+
+        /**
+         * Πάνω από [MAX_SAMPLES] (πολύ μεγάλη άσκηση): ανά δύο διαδοχικές τιμές μία, ο μέσος τους, στον χρόνο της
+         * πρώτης. Κανένα κενό και κανένα κομμάτι της άσκησης δεν χάνεται· χάνεται μόνο λεπτομέρεια.
+         */
+        fun fit(src: List<IntArray>): List<IntArray> {
+            var cur = src
+            while (cur.size > MAX_SAMPLES) {
+                val out = ArrayList<IntArray>((cur.size + 1) / 2)
+                var i = 0
+                while (i < cur.size) {
+                    val a = cur[i]
+                    val b = if (i + 1 < cur.size) cur[i + 1] else null
+                    out.add(if (b == null) a else intArrayOf(a[0], Math.round((a[1] + b[1]) / 2.0).toInt()))
+                    i += 2
+                }
+                cur = out
+            }
+            return cur
+        }
     }
 }
 

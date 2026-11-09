@@ -640,6 +640,49 @@ void main() {
         await t.tap(f);
         await t.pumpAndSettle();
       }));
+  // 9/11: παλμοί ανά σετ (μία τιμή το δευτερόλεπτο), ⓘ και διαγραφή στη σύνοψη μιας παλιάς προπόνησης.
+  void perSet(TrainingStore st) {
+    final s = st.sessions.last;
+    final t0 = s.start.millisecondsSinceEpoch;
+    var sec = 60;
+    final ticks = <int>[];
+    for (final e in s.items) {
+      for (final x in e.log) {
+        if (!x.done) continue;
+        x.at = t0 + sec * 1000;
+        ticks.add(sec);
+        sec += 95;
+      }
+    }
+    s.hr
+      ..clear()
+      ..addAll([
+        for (var t = 0; t <= sec; t++)
+          [t, ticks.any((x) => t > x - 30 && t <= x) ? 112 + (ticks.indexWhere((x) => t <= x) % 4) * 4 : 96 - (t % 7)],
+      ]);
+    s
+      ..hrAvg = 104
+      ..hrMax = 129;
+  }
+
+  Future<void> openOld(WidgetTester t) async {
+    final f = find.textContaining('11/11 · Προπόνηση Α');
+    await t.ensureVisible(f);
+    await t.pumpAndSettle();
+    await t.tap(f);
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('Προπόνηση · σύνοψη ανά σετ', (t) => trainShot(t, 'T21_summary_sets', phone, Brightness.light, prep: perSet, act: openOld));
+  testWidgets('Προπόνηση · σύνοψη ανά σετ · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T21b_summary_sets_open_dark', open, Brightness.dark, prep: perSet, act: openOld));
+  testWidgets('Προπόνηση · πώς διαβάζονται οι παλμοί', (t) => trainShot(t, 'T22_hr_info', phone, Brightness.light, prep: perSet, act: (t) async {
+        await openOld(t);
+        await tapKey(t, 'hr-info');
+      }));
+  testWidgets('Προπόνηση · διαγραφή', (t) => trainShot(t, 'T23_delete', phone, Brightness.light, prep: perSet, act: (t) async {
+        await openOld(t);
+        await tapKey(t, 'summary-delete');
+      }));
   testWidgets('Προπόνηση · περπάτημα ζωντανά από το ρολόι', (t) async {
     WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'steps': 3104, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
     WearLink.main.ready.value = true;

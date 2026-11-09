@@ -299,7 +299,7 @@ class WearLink with WidgetsBindingObserver {
     switch (c.op) {
       case 'tick':
         if (c.s < 0 || c.s >= e.log.length || e.log[c.s].done) return;
-        t.tick(e, c.s);
+        t.tick(e, c.s, at: (c.j['at'] as num?)?.toInt());
         String? next;
         if (e.complete) {
           final n = s.items.indexWhere((x) => !x.skipped && !x.complete);

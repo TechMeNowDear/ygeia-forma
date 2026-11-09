@@ -82,6 +82,23 @@ class ProtocolTest {
         assertEquals(110, o.getInt("hrAvg"))
         assertEquals(120, o.getInt("hrMax"))
         assertEquals(2, o.getJSONArray("hr").length())
+        // Η αρχή της μέτρησης πάει μαζί: το κινητό βάζει τους παλμούς στη σωστή ώρα της προπόνησής του (9/11).
+        assertEquals(1_000L, o.getLong("hrT0"))
+    }
+
+    @Test
+    fun hrEverySecondAndCap() {
+        val hr = HrStats(0)
+        for (s in 0 until 120) hr.add(100 + (s % 2), s * 1000L)
+        // Μία τιμή το δευτερόλεπτο (ως #87: μία ανά 10″).
+        assertEquals(120, hr.samples.size)
+        // Πολύ μεγάλη άσκηση: μισές τιμές, μέσος κάθε ζευγαριού, ίδια διάρκεια.
+        val big = List(HrStats.MAX_SAMPLES + 2) { intArrayOf(it, if (it % 2 == 0) 100 else 102) }
+        val fit = HrStats.fit(big)
+        assertTrue(fit.size <= HrStats.MAX_SAMPLES)
+        assertEquals(101, fit[0][1])
+        assertEquals(0, fit[0][0])
+        assertEquals(big.last()[0] - 1, fit.last()[0])
     }
 
     @Test
