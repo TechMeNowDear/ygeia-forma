@@ -65,7 +65,9 @@ class _TrendsPageState extends State<TrendsPage> {
                 changed: changed,
                 period: _period,
                 // UX U2: όταν καμία γραμμή δεν έχει αρκετά δεδομένα, δεν λέμε «καμία διαφορά», λέμε ότι δεν συγκρίθηκε.
-                nothingCompared: results.every((r) => r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange),
+                // Έλεγχος 9/11 (V-B-01): και όσα δεν είχαν αρκετές ανεξάρτητες μέρες δεν συγκρίθηκαν πραγματικά.
+                nothingCompared: results.every(
+                    (r) => r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange || r.inconclusive),
               );
 
         Widget section(TrendSection s) => _SectionCard(
@@ -489,9 +491,9 @@ class _MetricDetail extends StatelessWidget {
   }
 }
 
-/// Το «χάπι» δεξιά: ↓ 3 bpm / Σταθερό / Λίγα δεδομένα.
+/// Το «χάπι» δεξιά: ↓ 3 bpm / Σταθερό / Λίγες μέρες για συμπέρασμα / Λίγα δεδομένα.
 class TrendStatusPill extends StatelessWidget {
-  const TrendStatusPill({required this.r});
+  const TrendStatusPill({super.key, required this.r});
   final TrendResult r;
 
   @override
@@ -500,6 +502,16 @@ class TrendStatusPill extends StatelessWidget {
     if (r.status == TrendStatus.sourceChange) {
       if (r.rereading) return const TrendPill('Ενημερώνεται το ιστορικό');
       return TrendPill(definitionMetrics.contains(r.def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή πηγής');
+    }
+    // Έλεγχος 9/11 (V-B-01): «Σταθερό» μόνο όταν ο έλεγχος μπορούσε να δει αλλαγή. Με πολύ λίγες ανεξάρτητες μέρες
+    // (π.χ. αραιές ζυγίσεις) λέμε ότι δεν φτάνουν, όχι ότι «δεν άλλαξε». Σε δύο γραμμές, με όριο πλάτους, ώστε να
+    // χωρά δίπλα στο όνομα σε κάθε γραμμή (και με μεγάλα γράμματα).
+    if (r.inconclusive) {
+      return ConstrainedBox(
+        key: const ValueKey('trend-inconclusive'),
+        constraints: const BoxConstraints(maxWidth: 150),
+        child: TrendPill(inconclusiveText(r.def), maxLines: 2),
+      );
     }
     if (r.status == TrendStatus.stable) return const TrendPill('Σταθερό');
     final up = r.status == TrendStatus.up;
@@ -535,6 +547,10 @@ String _explain(TrendResult r) {
   }
   if (def.partial && r.source == Source.watch) {
     b.write(' Μετρούν μόνο οι νύχτες που η Samsung δεν χώρισε σε κομμάτια, γιατί μόνο αυτές έχουν μία βαθμολογία.');
+  }
+  if (r.inconclusive) {
+    b.write(' «${inconclusiveText(def)}»: οι τιμές μοιάζουν πολύ από μέρα σε μέρα, οπότε οι ανεξάρτητες μετρήσεις δεν '
+        'φτάνουν για να φανεί αλλαγή. Δεν σημαίνει ότι έμεινε ίδιο.');
   }
   if (!def.includeToday) b.write(' Η σημερινή μέρα δεν μετράει, γιατί δεν έχει τελειώσει.');
   if (def.key == K.dayHr) {

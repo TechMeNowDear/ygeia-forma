@@ -16,6 +16,24 @@ import '../theme.dart';
 import '../trends.dart';
 import '../widgets.dart';
 
+/// Η στήλη «Διαφορά» της σελίδας 1. Έλεγχος 9/11 (V-B-01): με πολύ λίγες ανεξάρτητες μέρες (π.χ. αραιές ζυγίσεις)
+/// ΟΧΙ «Σταθερό», που ο γιατρός διαβάζει «δεν άλλαξε», αλλά «Δεν φτάνουν για σύγκριση».
+String reportTrendText(TrendResult? t, MetricDef? def) {
+  if (def == null || t == null || t.status == TrendStatus.insufficient) return '—';
+  if (t.inconclusive) return reportInconclusiveText;
+  if (t.status == TrendStatus.stable) return 'Σταθερό';
+  if (t.status == TrendStatus.sourceChange && t.rereading) return 'Ενημερώνεται το ιστορικό';
+  if (t.status == TrendStatus.sourceChange) return definitionMetrics.contains(def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή συσκευής';
+  final up = t.status == TrendStatus.up;
+  if (def.kind == ValueKind.clock) return '${def.formatDiff(t.displayDiff!)} ${up ? 'αργότερα' : 'νωρίτερα'}';
+  return '${up ? '↑' : '↓'} ${def.formatDiff(t.displayDiff!)}';
+}
+
+/// Τι ΔΕΝ περιέχει η αναφορά (έλεγχος 9/11, V-B-02). Πριν: «Η εφαρμογή δεν έχει πρόσβαση», που δεν ισχύει (ζητά τις
+/// άδειες της Samsung). Αυτή η πρόταση μένει σωστή ό,τι κι αν γίνει με τις άδειες.
+const reportNotIncludedText = 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού, τεστ άπνοιας και πίεση. Η απουσία τους εδώ δεν '
+    'σημαίνει ότι ήταν φυσιολογικά· τα αποτελέσματα είναι στο Samsung Health Monitor.';
+
 /// Αναφορά για γιατρό: προεπισκόπηση των σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key, required this.store, this.now, this.note = '', this.end});
@@ -477,16 +495,7 @@ class _PageOne extends StatelessWidget {
     // 1 πρέπει να χωρά.
     Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4), child: w);
 
-    String trendText(ReportStat s, MetricDef? def) {
-      final t = s.trend;
-      if (def == null || t == null || t.status == TrendStatus.insufficient) return '—';
-      if (t.status == TrendStatus.stable) return 'Σταθερό';
-      if (t.status == TrendStatus.sourceChange && t.rereading) return 'Ενημερώνεται το ιστορικό';
-      if (t.status == TrendStatus.sourceChange) return definitionMetrics.contains(def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή συσκευής';
-      final up = t.status == TrendStatus.up;
-      if (def.kind == ValueKind.clock) return '${def.formatDiff(t.displayDiff!)} ${up ? 'αργότερα' : 'νωρίτερα'}';
-      return '${up ? '↑' : '↓'} ${def.formatDiff(t.displayDiff!)}';
-    }
+    String trendText(ReportStat s, MetricDef? def) => reportTrendText(s.trend, def);
 
     final body = <Widget>[
       if (note.isNotEmpty)
@@ -511,11 +520,9 @@ class _PageOne extends StatelessWidget {
           TextSpan(children: [
             TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
             // Δεύτερος κλινικός έλεγχος M6: και η πίεση (η πρώτη ερώτηση του καρδιολόγου).
-            const TextSpan(
-              text: 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας του Samsung Health Monitor, και μετρήσεις '
-                  'πίεσης. Η εφαρμογή δεν έχει πρόσβαση σε αυτά, άρα η απουσία τους εδώ δεν σημαίνει ότι ήταν '
-                  'φυσιολογικά. Αν υπάρχουν, δείτε τα αποτελέσματα στο Samsung Health Monitor.',
-            ),
+            // Έλεγχος 9/11 (V-B-02): όχι «δεν έχει πρόσβαση» (η εφαρμογή ζητά τις άδειες)· ό,τι κι αν γίνει με τις
+            // άδειες, η πρόταση μένει σωστή.
+            const TextSpan(text: reportNotIncludedText),
           ]),
           style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
         ),
@@ -586,7 +593,8 @@ class _PageOne extends StatelessWidget {
         'Μεσαία τιμή: οι μισές μέρες πάνω, οι μισές κάτω. «Συνήθως»: εκεί βρίσκονται 8 στις 10 μέρες. «Διαφορά»: '
         'ένδειξη αλλαγής ανά δείκτη, μόνο όταν η διαφορά των μεσαίων τιμών ξεπερνά ένα ελάχιστο και, κατά προσέγγιση, '
         'τις συνηθισμένες μέρα-με-μέρα διακυμάνσεις (στατιστικός έλεγχος με διόρθωση για τη συσχέτιση διαδοχικών '
-        'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), ή «—» όταν '
+        'ημερών)· μπορεί να είναι και αργή μεταβολή εβδομάδων. Αλλιώς «Σταθερό» (δεν φάνηκε καθαρή αλλαγή), '
+        '«$reportInconclusiveText» (οι τιμές μοιάζουν πολύ μεταξύ τους και δεν φτάνουν για να φανεί αλλαγή), ή «—» όταν '
         'οι μετρήσεις είναι λίγες. Δεν είναι κλινικό όριο, και με πολλούς δείκτες μαζί κάποια ένδειξη μπορεί να είναι '
         'τυχαία. Οι νύχτες έχουν την ημερομηνία του πρωινού. Πώς μετρήθηκαν, ορισμοί, οξυγόνο και ζυγίσεις: σελίδα 3.',
         style: small.copyWith(fontSize: 8.2, height: 1.35),
