@@ -112,15 +112,23 @@ class _TrainingPageState extends State<TrainingPage> {
     if (recent.isNotEmpty) side.add(_recentCard(context, recent));
     side.add(_hrLimitCard(context));
     // Προπονήσεις που δεν διαβάστηκαν (V-A-10): κρατιούνται στο αρχείο, όχι χαμένες· μόνο μια μικρή σημείωση.
-    if (t.quarantine.isNotEmpty) {
+    final badHr = t.sessions.where((s) => s.hrBad != null).length;
+    if (t.quarantine.isNotEmpty || badHr > 0) {
       final n = t.quarantine.length;
       side.add(Padding(
         key: const ValueKey('train-quarantine'),
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Text(
-          n == 1
-              ? '1 προπόνηση δεν διαβάστηκε (από άλλη έκδοση της εφαρμογής). Κρατιέται στο αρχείο και μπαίνει στο αντίγραφο.'
-              : '$n προπονήσεις δεν διαβάστηκαν (από άλλη έκδοση της εφαρμογής). Κρατιούνται στο αρχείο και μπαίνουν στο αντίγραφο.',
+          [
+            if (n > 0)
+              n == 1
+                  ? '1 καταγραφή προπόνησης δεν διαβάστηκε· κρατιέται στο αρχείο και μπαίνει στο αντίγραφο.'
+                  : '$n καταγραφές προπόνησης δεν διαβάστηκαν· κρατιούνται στο αρχείο και μπαίνουν στο αντίγραφο.',
+            if (badHr > 0)
+              badHr == 1
+                  ? 'Οι παλμοί 1 προπόνησης δεν διαβάστηκαν· το αρχείο τους κρατήθηκε στην άκρη.'
+                  : 'Οι παλμοί $badHr προπονήσεων δεν διαβάστηκαν· τα αρχεία τους κρατήθηκαν στην άκρη.',
+          ].join(' '),
           style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary),
         ),
       ));
@@ -515,7 +523,7 @@ class _TrainingPageState extends State<TrainingPage> {
         : acked == '$hr'
             ? ('Στο ρολόι ✓ όριο $hr', c.good, Icons.watch_rounded)
             : sent
-                ? ('Στάλθηκε· θα επιβεβαιωθεί μόλις ανοίξεις την εφαρμογή στο ρολόι.', c.textSecondary, Icons.watch_rounded)
+                ? ('Στάλθηκε· θα επιβεβαιωθεί μόλις ανοίξεις την εφαρμογή στο ρολόι (ή την ενημερώσεις εκεί).', c.textSecondary, Icons.watch_rounded)
                 : link.ready.value
                     ? ('Στέλνεται στο ρολόι…', c.textSecondary, Icons.watch_rounded)
                     : ('Το ρολόι δεν βρέθηκε τώρα: δεν ξέρω αν έχει αυτό το όριο.', c.exercise, Icons.watch_rounded);

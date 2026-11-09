@@ -41,6 +41,24 @@ class HrFilesTest {
         dir.deleteRecursively()
     }
 
+    /** Έλεγχος του #91 (S1): αρχείο που δεν διαβάζεται κρατιέται στην άκρη, δεν σβήνεται, δεν γράφεται από πάνω. */
+    @Test
+    fun unreadableFileIsSetAsideNotDeleted() {
+        val dir = Files.createTempDirectory("hr").toFile()
+        assertTrue(HrFiles.write(dir, "s1", "{χαλασμένο"))
+        assertEquals("s1.json.bad", HrFiles.setAside(dir, "s1"))
+        assertNull(HrFiles.read(dir, "s1"))
+        assertEquals("{χαλασμένο", java.io.File(dir, "s1.json.bad").readText())
+        assertTrue(HrFiles.list(dir).isEmpty())
+        // νέο αρχείο με το ίδιο id: το παλιό μένει όπως ήταν
+        assertTrue(HrFiles.write(dir, "s1", "{\"v\":1}"))
+        assertEquals("s1.json.42.bad", HrFiles.setAside(dir, "s1", now = 42))
+        assertEquals("{χαλασμένο", java.io.File(dir, "s1.json.bad").readText())
+        assertNull(HrFiles.setAside(dir, "δεν-υπάρχει"))
+        assertNull(HrFiles.setAside(dir, "../x"))
+        dir.deleteRecursively()
+    }
+
     @Test
     fun staleTempFilesAreCleaned() {
         val dir = Files.createTempDirectory("hr").toFile()

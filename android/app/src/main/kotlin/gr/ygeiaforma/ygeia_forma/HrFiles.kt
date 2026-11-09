@@ -59,6 +59,24 @@ object HrFiles {
         }
     }
 
+    /**
+     * Αρχείο που δεν διαβάζεται: μετονομάζεται σε «<id>.json.bad» (ή «<id>.json.<ώρα>.bad» αν υπάρχει ήδη) και κρατιέται·
+     * ποτέ δεν σβήνεται και ποτέ δεν γράφεται από πάνω (έλεγχος του #91, S1). Το νέο όνομα, ή null αν δεν έγινε.
+     */
+    @Synchronized
+    fun setAside(dir: File, id: String, now: Long = System.currentTimeMillis()): String? {
+        if (!validId(id)) return null
+        val f = file(dir, id)
+        if (!f.exists()) return null
+        var bad = File(dir, "$id.json.bad")
+        if (bad.exists()) bad = File(dir, "$id.json.$now.bad")
+        return try {
+            if (f.renameTo(bad)) bad.name else null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     /** true και όταν δεν υπήρχε. */
     @Synchronized
     fun delete(dir: File, id: String): Boolean {

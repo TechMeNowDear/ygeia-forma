@@ -75,6 +75,10 @@ class TrainingBridge(
                 val id = call.argument<String>("id") ?: ""
                 result.success(withContext(Dispatchers.IO) { HrFiles.delete(hrDir(), id) })
             }
+            "hrBad" -> scope.launch {
+                val id = call.argument<String>("id") ?: ""
+                result.success(withContext(Dispatchers.IO) { HrFiles.setAside(hrDir(), id) })
+            }
             "hrList" -> scope.launch {
                 result.success(withContext(Dispatchers.IO) { HrFiles.list(hrDir()) })
             }

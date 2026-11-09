@@ -317,7 +317,9 @@ object Repo {
         runningPhone = o.optBoolean("phone", false)
         runningSid = o.optStringOrNull("sid")
         startedAt = start
-        startedEl = nowEl - (nowWall - start).coerceIn(0L, nowEl)
+        // Η αναμονή των 30″ για τον «πρώτο» παλμό ξεκινά από τη συνέχεια, όχι από την αρχική έναρξη: αλλιώς μόλις συνεχίσει
+        // θα δονούσε «κανένας παλμός» πριν προλάβει να έρθει ο πρώτος (έλεγχος του #91, S2).
+        startedEl = nowEl
         hr = o.optJSONObject("hr")?.let { HrStats.fromState(it) } ?: HrStats(start)
         activeSec = o.optLong("sec", 0)
         cpActiveMs = o.optLong("cpA", 0)
@@ -343,8 +345,17 @@ object Repo {
 
     private fun runFile(ctx: Context) = File(ctx.filesDir, RUN_FILE)
 
-    /** Ατομική εγγραφή (προσωρινό αρχείο + μετονομασία): ποτέ μισό αρχείο. Σε νήμα εκτός οθόνης. */
-    fun writeRun(ctx: Context, text: String): Boolean = synchronized(this) {
+    /**
+     * «Γενιά» του στιγμιότυπου (έλεγχος του #91, S3): αλλάζει σε κάθε [clearRun]. Μια εγγραφή που ετοιμάστηκε πριν από το
+     * τέλος της άσκησης και φτάνει μετά ([writeRun] σε άλλο νήμα) δεν γράφει τίποτα: μια τελειωμένη άσκηση δεν «ξαναζεί».
+     */
+    @Volatile
+    var runGen = 0L
+        private set
+
+    /** Ατομική εγγραφή (προσωρινό αρχείο + μετονομασία): ποτέ μισό αρχείο. Σε νήμα εκτός οθόνης. Μόνο αν [gen] ισχύει ακόμα. */
+    fun writeRun(ctx: Context, text: String, gen: Long = runGen): Boolean = synchronized(this) {
+        if (gen != runGen) return@synchronized false
         try {
             val f = runFile(ctx)
             val tmp = File(f.parentFile, "$RUN_FILE.tmp")
@@ -370,10 +381,86 @@ object Repo {
 
     fun clearRun(ctx: Context) {
         synchronized(this) {
+            runGen++
             try {
                 runFile(ctx).delete()
             } catch (_: Exception) {
             }
         }
     }
+
+    /** Στιγμιότυπο που δεν διαβάζεται/δεν γίνεται αποτέλεσμα: μετονομάζεται σε «run.bad.json» (κρατιέται, δεν σβήνεται, S4). */
+    fun quarantineRun(ctx: Context) {
+        synchronized(this) {
+            runGen++
+            try {
+                val f = runFile(ctx)
+                var bad = File(ctx.filesDir, "run.bad.json")
+                if (bad.exists()) bad = File(ctx.filesDir, "run.${System.currentTimeMillis()}.bad.json")
+                if (f.exists() && !f.renameTo(bad)) f.delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Το id (όνομα DataItem) που θα έχει το αποτέλεσμα της άσκησης του στιγμιότυπου [o], ή null. */
+    fun runId(o: JSONObject): String? {
+        val start = o.optLong("start", 0)
+        return when {
+            o.optString("kind") == "walk" && start > 0 -> "walk$start"
+            o.optBoolean("phone", false) -> o.optStringOrNull("sid")?.let { "hr$it-$start" }
+            else -> o.optJSONObject("local")?.optStringOrNull("id")
+        }
+    }
+
+    /** Υπάρχει ήδη στην αναμονή το ΚΑΝΟΝΙΚΟ (όχι μερικό) αποτέλεσμα [id]: η άσκηση έχει τελειώσει (S3). */
+    fun hasFinalPending(ctx: Context, id: String): Boolean {
+        val v = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PENDING_PREFIX + id, null) ?: return false
+        return try {
+            JSONObject(v).optInt("partial", 0) != 1
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Το στιγμιότυπο [o] ως μερικό αποτέλεσμα (ίδιο id με το κανονικό, «partial»), στην αναμονή. Ποτέ: πάνω σε κανονικό που
+     * περιμένει ακόμα (S3)· ποτέ εξαίρεση (S4): ό,τι δεν διαβάζεται κρατιέται στο «run.bad.json» με μήνυμα. Η άσκηση που
+     * ετοιμάζεται τώρα (π.χ. η νέα προπόνηση του ρολογιού) δεν πειράζεται. Επιστρέφει το αποτέλεσμα για αποστολή, ή null.
+     */
+    fun finalizeRun(ctx: Context, o: JSONObject, now: Long, nowEl: Long): Pair<String, JSONObject>? {
+        val keepLocal = local
+        local = null
+        try {
+            val id = runId(o)
+            if (id != null && hasFinalPending(ctx, id)) {
+                clearRun(ctx)
+                return null
+            }
+            if (!restoreRun(o, now, nowEl)) {
+                quarantineRun(ctx)
+                notice = BAD_RUN_NOTICE
+                return null
+            }
+            val r = Results.build(now, partialAt = o.optLong("saved", now))
+            if (r != null && hasFinalPending(ctx, r.first)) {
+                clearRun(ctx)
+                return null
+            }
+            if (r != null) savePending(ctx, r.first, r.second)
+            clearRun(ctx)
+            return r
+        } catch (e: Exception) {
+            android.util.Log.e("YgeiaWatch", "finalizeRun", e)
+            quarantineRun(ctx)
+            notice = BAD_RUN_NOTICE
+            return null
+        } finally {
+            resetExercise()
+            local = keepLocal
+        }
+    }
+
+    /** Μήνυμα όταν ένα στιγμιότυπο δεν έγινε αποτέλεσμα (κρατιέται στο ρολόι, για να μη χαθεί). */
+    const val BAD_RUN_NOTICE = "Μια άσκηση που είχε μείνει μισή δεν διαβάστηκε· κρατήθηκε στο ρολόι."
 }

@@ -207,6 +207,14 @@ class Session {
   /// Οι παλμοί πρέπει να γραφτούν στο αρχείο τους.
   bool get hrNeedsWrite => hrLoaded && !hrInFile && hr.isNotEmpty;
 
+  /// Μετρητής αλλαγών των παλμών στη μνήμη (δεν αποθηκεύεται): μια εγγραφή του αρχείου «πιάνει» μόνο αν οι παλμοί δεν
+  /// άλλαξαν όσο γραφόταν (έλεγχος του #91, M1).
+  int hrRev = 0;
+
+  /// Το αρχείο παλμών που δεν διαβάστηκε και κρατήθηκε στην άκρη (π.χ. «s1.json.bad»), ή null. Μένει στο training.json,
+  /// για να μη χαθεί ποτέ η σύνδεση με αυτό (έλεγχος του #91, S1).
+  String? hrBad;
+
   /// Υπάρχουν παλμοί (στη μνήμη ή στο αρχείο τους).
   bool get hasHr => hr.isNotEmpty || (!hrLoaded && hrCount > 0);
 
@@ -290,7 +298,7 @@ class Session {
 
   static const _known = {
     'id', 'w', 'name', 'prog', 'start', 'end', 'items', 'feel', 'hrAvg', 'hrMax', 'cmin', 'note', 'hr', 'hrf', 'm', 'steps', 'src',
-    'hrm', 'hrg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part',
+    'hrm', 'hrg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad',
   };
 
   /// [hrInline]: οι παλμοί μέσα (όπως ως #90)· αλλιώς μόνο πόσοι είναι («hrf»), γιατί είναι στο δικό τους αρχείο.
@@ -327,6 +335,7 @@ class Session {
       if (hrr1 != null) 'hrr1': hrr1,
       if (limit != null) 'lim': limit,
       if (partial) 'part': 1,
+      if (hrBad != null) 'hrbad': hrBad,
     };
   }
 
@@ -337,7 +346,8 @@ class Session {
       ];
 
   /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μόνο το id και η αρχή είναι υποχρεωτικά (αλλιώς σφάλμα και η προπόνηση
-  /// μπαίνει σε καραντίνα, όχι όλο το αρχείο)· ένα προαιρετικό πεδίο με λάθος τύπο μένει όπως ήταν στο [extra].
+  /// μπαίνει σε καραντίνα, όχι όλο το αρχείο)· ένα προαιρετικό αριθμητικό/λογικό πεδίο με λάθος τύπο μένει όπως ήταν
+  /// στο [extra] (όχι τα «w», «name», «prog», που γράφονται πάντα).
   factory Session.fromJson(Map<String, dynamic> j) {
     final extra = unknownKeys(j, _known);
     T? opt<T>(String k) {
@@ -392,6 +402,7 @@ class Session {
       partial: j['part'] == 1,
       extra: extra,
     );
+    s.hrBad = opt<String>('hrbad');
     // Οι παλμοί στο δικό τους αρχείο (V-A-02): δεν φορτώνονται τώρα.
     if (hr.isEmpty && hrf > 0) {
       s.hrLoaded = false;

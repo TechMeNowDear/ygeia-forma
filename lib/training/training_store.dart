@@ -24,6 +24,10 @@ abstract class TrainingIO {
   Future<bool> writeHr(String id, String json);
   Future<bool> deleteHr(String id);
   Future<List<String>> listHr();
+
+  /// Αρχείο παλμών που δεν διαβάζεται: μετονομάζεται (π.χ. «id.json.bad»), ποτέ δεν σβήνεται και ποτέ δεν γράφεται από
+  /// πάνω. Επιστρέφει το νέο όνομα, ή null αν δεν έγινε (τότε δεν αλλάζει τίποτα).
+  Future<String?> markHrBad(String id);
 }
 
 class ChannelTrainingIO implements TrainingIO {
@@ -94,6 +98,15 @@ class ChannelTrainingIO implements TrainingIO {
       return const [];
     }
   }
+
+  @override
+  Future<String?> markHrBad(String id) async {
+    try {
+      return await channel.invokeMethod<String>('hrBad', {'id': id});
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// Για δοκιμές: στη μνήμη.
@@ -133,6 +146,18 @@ class MemoryTrainingIO implements TrainingIO {
 
   @override
   Future<List<String>> listHr() async => hrFiles.keys.toList()..sort();
+
+  /// Αρχεία παλμών που μπήκαν στην άκρη (όνομα → κείμενο).
+  final Map<String, String> badHrFiles = {};
+
+  @override
+  Future<String?> markHrBad(String id) async {
+    final text = hrFiles.remove(id);
+    if (text == null) return null;
+    final name = '$id.json.bad';
+    badHrFiles[name] = text;
+    return name;
+  }
 }
 
 /// Όνομα που μπορεί να γίνει αρχείο παλμών (ίδιος κανόνας με το HrFiles.kt).
@@ -177,6 +202,9 @@ class TrainingStore extends ChangeNotifier {
 
   /// Η τελευταία προπόνηση του κινητού που έκλεισε με «Τέλος» στο ρολόι (V-A-09): η οθόνη της προπόνησης πάει στη σύνοψη.
   Session? endedByWatch;
+
+  /// Η τελευταία προπόνηση του κινητού σβήστηκε με «Τέλος» στο ρολόι, γιατί δεν είχε κανένα σετ (S7): το λέει η οθόνη της.
+  bool discardedByWatch = false;
 
   /// Μετά από πόσο χωρίς κίνηση μια ανοιχτή προπόνηση είναι «ξεχασμένη» (V-A-09).
   static const staleAfter = Duration(hours: 3);
@@ -297,6 +325,9 @@ class TrainingStore extends ChangeNotifier {
   /// Ό,τι είναι στη μνήμη έχει γραφτεί στο αρχείο: καμία εγγραφή σε αναμονή και η τελευταία πέτυχε (V-A-01).
   bool _written = true;
 
+  /// Πόσων προπονήσεων οι παλμοί δεν μπήκαν στο τελευταίο αντίγραφο ([backupJson]): το λέει η εξαγωγή (S5).
+  int backupHrMissing = 0;
+
   /// Μετρητής αλλαγών: μια εγγραφή «πιάνει» μόνο αν δεν άλλαξε τίποτα από τότε που κωδικοποιήθηκε.
   int _gen = 0;
 
@@ -332,6 +363,8 @@ class TrainingStore extends ChangeNotifier {
   Future<void> _writeJob() async {
     _queued = false;
     var hrOk = true;
+    // Παλμοί που άλλαξαν όσο γραφόταν το αρχείο τους (π.χ. ένα δεύτερο κομμάτι από το ρολόι): ΟΧΙ «γραμμένο» (M1).
+    var stale = false;
     // 1) Οι παλμοί στα αρχεία τους (πριν από το training.json που τα αναφέρει).
     for (final id in _segments.keys.toList()) {
       if (_finishedById(id) == null) _segments.remove(id);
@@ -348,18 +381,35 @@ class TrainingStore extends ChangeNotifier {
             continue;
           }
           if (!s.hrLoaded) {
-            s.hr
-              ..clear()
-              ..addAll(decodeHr(r.json));
-            s.hrLoaded = true;
-            s.hrInFile = true;
+            final hr = decodeHr(r.json);
+            if (hr == null) {
+              // Το αρχείο δεν διαβάζεται: στην άκρη, όχι από πάνω (S1). Αν δεν γίνει, τίποτα δεν αλλάζει (κανένα ack).
+              if (!await _setAsideHr(s)) {
+                hrOk = false;
+                continue;
+              }
+            } else if (!s.hrLoaded) {
+              s.hr
+                ..clear()
+                ..addAll(hr);
+              s.hrLoaded = true;
+              s.hrInFile = true;
+              s.hrRev++;
+            }
           }
         }
         for (final seg in _segments.remove(s.id) ?? const <(List<List<int>>, int?, int?)>[]) {
           mergeHrSegment(s, seg.$1, watchAvg: seg.$2, watchMax: seg.$3);
         }
         if (!s.hrNeedsWrite) continue;
-        if (await _io.writeHr(s.id, encodeHr(s.hr))) {
+        final rev = s.hrRev;
+        final text = encodeHr(s.hr);
+        if (await _io.writeHr(s.id, text)) {
+          if (s.hrRev != rev) {
+            // Άλλαξαν όσο γραφόταν: το αρχείο έχει τα παλιά· η επόμενη εγγραφή τα γράφει όλα.
+            stale = true;
+            continue;
+          }
           s.hrInFile = true;
           s.hrCount = s.hr.length;
           if (_release.remove(s.id)) {
@@ -381,7 +431,7 @@ class TrainingStore extends ChangeNotifier {
       ok = false;
     }
     // Κομμάτια παλμών που δεν ενώθηκαν ακόμα (το αρχείο δεν διαβάστηκε) = όχι γραμμένα: κανένα ack.
-    _written = ok && hrOk && _segments.isEmpty && gen == _gen;
+    _written = ok && hrOk && !stale && _segments.isEmpty && gen == _gen;
     final err = ok ? null : 'Δεν αποθηκεύτηκε η τελευταία αλλαγή στο κινητό.';
     if (err != saveError) {
       saveError = err;
@@ -406,12 +456,34 @@ class TrainingStore extends ChangeNotifier {
     if (s.hrLoaded) return;
     final r = await _io.readHr(s.id);
     if (s.hrLoaded || r.state == 'error') return;
+    final hr = decodeHr(r.json);
+    if (hr == null) {
+      // Δεν διαβάζεται: στην άκρη (όχι σβήσιμο), και η προπόνηση το θυμάται (S1).
+      if (await _setAsideHr(s)) save();
+      return;
+    }
     s.hr
       ..clear()
-      ..addAll(decodeHr(r.json));
+      ..addAll(hr);
     s.hrLoaded = true;
     s.hrInFile = true;
+    s.hrRev++;
     notifyListeners();
+  }
+
+  /// Αρχείο παλμών που δεν διαβάζεται (S1): μετονομάζεται και κρατιέται, η προπόνηση γράφει το όνομά του («hrbad»), και
+  /// από εκεί και πέρα νέοι παλμοί πάνε σε καινούριο αρχείο. Ποτέ δεν γράφεται τίποτα πάνω του. false αν δεν έγινε.
+  Future<bool> _setAsideHr(Session s) async {
+    final name = await _io.markHrBad(s.id);
+    if (name == null) return false;
+    s.hrBad = name;
+    s.hr.clear();
+    s.hrLoaded = true;
+    s.hrInFile = false;
+    s.hrCount = 0;
+    s.hrRev++;
+    notifyListeners();
+    return true;
   }
 
   /// Αρχεία παλμών προπονήσεων που σβήστηκαν (V-A-02): σβήνονται στο επόμενο άνοιγμα (ως τότε η «Αναίρεση» τα βρίσκει).
@@ -419,7 +491,7 @@ class TrainingStore extends ChangeNotifier {
     try {
       final ids = await _io.listHr();
       for (final id in ids) {
-        if (deleted.contains(id) && !sessions.any((x) => x.id == id)) await _io.deleteHr(id);
+        if (deleted.contains(id) && !sessions.toList().any((x) => x.id == id)) await _io.deleteHr(id);
       }
     } catch (_) {}
   }
@@ -429,15 +501,22 @@ class TrainingStore extends ChangeNotifier {
     await _queue;
     final j = toJson();
     final hrz = <String, String>{};
-    for (final s in sessions) {
+    var missing = 0;
+    // Αντίγραφο της λίστας: όσο διαβάζονται τα αρχεία μπορεί να έρθει προπόνηση από το ρολόι (S5).
+    for (final s in sessions.toList()) {
       if (!s.hrInFile) continue; // ήδη μέσα («hr»)
       if (s.hrLoaded) {
         if (s.hr.isNotEmpty) hrz[s.id] = encodeHr(s.hr);
       } else if (s.hrCount > 0) {
         final r = await _io.readHr(s.id);
-        if (r.state == 'ok' && r.json != null) hrz[s.id] = r.json!;
+        if (r.state == 'ok' && r.json != null && decodeHr(r.json) != null) {
+          hrz[s.id] = r.json!;
+        } else {
+          missing++;
+        }
       }
     }
+    backupHrMissing = missing;
     if (hrz.isNotEmpty) j['hrz'] = hrz;
     return j;
   }
@@ -587,7 +666,10 @@ class TrainingStore extends ChangeNotifier {
     if (sid != null && sid.isNotEmpty && sid != s.id) return;
     final sec = at.difference(s.start).inSeconds;
     if (sec < 0) return;
-    if (s.hr.isEmpty || sec - s.hr.last[0] >= 10) s.hr.add([sec, bpm]);
+    if (s.hr.isEmpty || sec - s.hr.last[0] >= 10) {
+      s.hr.add([sec, bpm]);
+      s.hrRev++;
+    }
     if (s.hrMax == null || bpm > s.hrMax!) s.hrMax = bpm;
     if (_hrSaved == null || at.difference(_hrSaved!).inSeconds >= 60) {
       _hrSaved = at;
@@ -619,6 +701,7 @@ class TrainingStore extends ChangeNotifier {
       s.hr.removeWhere((p) => p[0] > last);
     }
     s.hrInFile = false;
+    s.hrRev++;
     if (s.hr.isEmpty) return;
     var max = 0, sum = 0;
     for (final p in s.hr) {
@@ -626,7 +709,7 @@ class TrainingStore extends ChangeNotifier {
       if (p[1] > max) max = p[1];
     }
     s.hrAvg = other.isEmpty && watchAvg != null ? watchAvg : (sum / s.hr.length).round();
-    // Ο υψηλότερος μόνο ανεβαίνει (και του ρολογιού, που μετρά και τιμές μέσα στο ίδιο δευτερόλεπτο).
+    // Ο υψηλότερος μόνο ανεβαίνει (και του ρολογιού, όπως τον μέτρησε εκείνο).
     s.hrMax = [max, s.hrMax ?? 0, watchMax ?? 0].reduce((a, b) => a > b ? a : b);
   }
 
@@ -743,11 +826,18 @@ class TrainingStore extends ChangeNotifier {
   }
 
   /// «Τέλος» στο ρολόι για την προπόνηση του κινητού [sid] τη στιγμή [at] (ms, έλεγχος 9/11, V-A-09): τέλος και εδώ, με
-  /// εκείνη την ώρα. Όχι αν δεν έγινε κανένα σετ (μένει ανοιχτή, για να αποφασίσεις), ούτε αν συνέχισες στο κινητό μετά.
+  /// εκείνη την ώρα. Χωρίς κανένα σετ: σβήνεται (όπως το «Κανένα σετ → Σβήσιμο» του κινητού· το ρολόι το λέει πριν από
+  /// το δεύτερο πάτημα), ώστε να μη μένει ανοιχτή. Όχι αν συνέχισες στο κινητό μετά.
   bool endFromWatch(String sid, int at) {
     final s = current;
-    if (s == null || s.id != sid || s.setsDone == 0) return false;
+    if (s == null || s.id != sid) return false;
     if (at < s.lastActivity.millisecondsSinceEpoch - 60000) return false;
+    if (s.setsDone == 0) {
+      endedByWatch = null;
+      discardedByWatch = true;
+      discard();
+      return true;
+    }
     final lo = s.start.millisecondsSinceEpoch;
     final n = now.millisecondsSinceEpoch;
     final end = at < lo ? lo : (at > n ? (n < lo ? lo : n) : at);
@@ -794,6 +884,8 @@ class TrainingStore extends ChangeNotifier {
 
   Session start(Workout w) {
     final p = program!;
+    endedByWatch = null;
+    discardedByWatch = false;
     _focus = 0;
     _restEnd = null;
     final s = Session(
@@ -814,6 +906,8 @@ class TrainingStore extends ChangeNotifier {
   /// «Ελεύθερη άσκηση» (9/11): χωρίς πρόγραμμα· οι ασκήσεις μπαίνουν μία-μία από τη βιβλιοθήκη. Το ρολόι ακολουθεί
   /// όπως σε κάθε προπόνηση του κινητού (παλμοί, ✓, διάλειμμα).
   Session startFree() {
+    endedByWatch = null;
+    discardedByWatch = false;
     _focus = 0;
     _restEnd = null;
     final s = Session(
@@ -1059,7 +1153,7 @@ class TrainingStore extends ChangeNotifier {
           final text = hrz[s.id];
           s.hr
             ..clear()
-            ..addAll(text is String ? decodeHr(text) : const <List<int>>[]);
+            ..addAll(text is String ? decodeHr(text) ?? const <List<int>>[] : const <List<int>>[]);
           s.hrLoaded = true;
           s.hrCount = 0;
         }

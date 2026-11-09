@@ -254,8 +254,19 @@ class ExerciseService : Service() {
             return
         }
         val now = System.currentTimeMillis()
-        if (!Repo.restoreRun(o, now, SystemClock.elapsedRealtime())) {
+        // Το κανονικό αποτέλεσμα αυτής της άσκησης περιμένει ήδη: έχει τελειώσει, δεν «ξαναζεί» (S3).
+        val runId = Repo.runId(o)
+        if (runId != null && Repo.hasFinalPending(this, runId)) {
             Repo.clearRun(this)
+            quitForeground()
+            stopSelf()
+            return
+        }
+        if (!Repo.restoreRun(o, now, SystemClock.elapsedRealtime())) {
+            // Δεν διαβάζεται: κρατιέται στην άκρη, όχι σβήσιμο (S4).
+            Repo.quarantineRun(this)
+            Repo.notice = Repo.BAD_RUN_NOTICE
+            Repo.changed()
             quitForeground()
             stopSelf()
             return
@@ -289,10 +300,11 @@ class ExerciseService : Service() {
             else -> Repo.Screen.SET
         }
         Repo.changed()
+        // Νέα αναμονή 30″ για τον πρώτο παλμό από εδώ (S2), με τον επεξεργαστή ξύπνιο ως τότε.
+        holdUntilFirstHr()
         if (action == Recovery.Action.ATTACH) {
             scope.launch { attach() }
         } else {
-            holdUntilFirstHr()
             scope.launch { startExercise(false, false) }
         }
         saveRun(force = true)
@@ -321,17 +333,8 @@ class ExerciseService : Service() {
      * που ετοιμάζεται τώρα (π.χ. η νέα προπόνηση του ρολογιού) δεν πειράζεται. Επιστρέφει το αποτέλεσμα (ήδη στην
      * αναμονή), για [put].
      */
-    private fun finalizeLeftover(o: JSONObject): Pair<String, JSONObject>? {
-        val keepLocal = Repo.local
-        Repo.local = null
-        val now = System.currentTimeMillis()
-        val r = if (Repo.restoreRun(o, now, SystemClock.elapsedRealtime())) Results.build(now, partialAt = o.optLong("saved", now)) else null
-        if (r != null) Repo.savePending(this, r.first, r.second)
-        Repo.clearRun(this)
-        Repo.resetExercise()
-        Repo.local = keepLocal
-        return r
-    }
+    private fun finalizeLeftover(o: JSONObject): Pair<String, JSONObject>? =
+        Repo.finalizeRun(this, o, System.currentTimeMillis(), SystemClock.elapsedRealtime())
 
     /**
      * Ξεκίνησε με startForegroundService αλλά δεν υπάρχει τίποτα να συνεχίσει: το σύστημα θέλει πάντα startForeground
@@ -357,8 +360,11 @@ class ExerciseService : Service() {
         val nowEl = SystemClock.elapsedRealtime()
         if (!force && nowEl - lastRunSave < RUN_SAVE_MS) return
         lastRunSave = nowEl
-        val text = Repo.captureRun(System.currentTimeMillis())?.toString() ?: return
-        scope.launch(Dispatchers.IO) { Repo.writeRun(this@ExerciseService, text) }
+        // Η κατάσταση αντιγράφεται εδώ· το κείμενο φτιάχνεται εκτός οθόνης. Με τη «γενιά» της στιγμής: αν η άσκηση
+        // τελειώσει πριν γραφτεί, δεν γράφεται (S3).
+        val o = Repo.captureRun(System.currentTimeMillis()) ?: return
+        val gen = Repo.runGen
+        scope.launch(Dispatchers.IO) { Repo.writeRun(this@ExerciseService, o.toString(), gen) }
     }
 
     private fun holdUntilFirstHr() {
@@ -579,11 +585,12 @@ class ExerciseService : Service() {
      */
     private fun endedElsewhere(reason: Int) {
         val text = when (reason) {
-            ExerciseEndReason.AUTO_END_PERMISSION_LOST -> "Η άσκηση σταμάτησε: χάθηκε μια άδεια του ρολογιού."
+            ExerciseEndReason.AUTO_END_PERMISSION_LOST -> "Η άσκηση σταμάτησε: χάθηκε μια άδεια."
             ExerciseEndReason.AUTO_END_SUPERSEDED -> "Η άσκηση σταμάτησε από άλλη εφαρμογή."
             else -> "Η άσκηση σταμάτησε από το ρολόι."
         }
-        Repo.notice = "$text Ό,τι μετρήθηκε σώθηκε· το όριο παλμών δεν σε προσέχει πια."
+        // Σύντομο, να χωρά ολόκληρο στην οθόνη «Αποθηκεύτηκε»· η ειδοποίηση λέει και για το όριο.
+        Repo.notice = "$text Ό,τι μετρήθηκε σώθηκε."
         vibrate(longArrayOf(0, 300, 120, 300, 120, 300))
         try {
             val pi = PendingIntent.getActivity(this, 2, Intent(this, WatchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE)

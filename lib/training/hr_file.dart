@@ -36,9 +36,10 @@ String encodeHr(List<List<int>> hr) {
   return jsonEncode({'v': hrFileVersion, 'n': s.length, 's0': s0, 'e': base64.encode(b.takeBytes())});
 }
 
-/// Οι τιμές από το αρχείο· κενή λίστα αν δεν διαβάζεται (το αρχείο μένει όπως είναι). Δέχεται και απλό
-/// `[[sec,bpm],…]` (ίδια μορφή με το παλιό «hr» του training.json).
-List<List<int>> decodeHr(String? text) {
+/// Οι τιμές από το αρχείο: κενή λίστα αν δεν υπάρχει κείμενο, **null αν το αρχείο δεν διαβάζεται** (χαλασμένο ή από
+/// νεότερη μορφή): τότε ποτέ δεν γράφεται τίποτα από πάνω (έλεγχος του #91, S1). Δέχεται και απλό `[[sec,bpm],…]`
+/// (ίδια μορφή με το παλιό «hr» του training.json).
+List<List<int>>? decodeHr(String? text) {
   if (text == null || text.isEmpty) return [];
   try {
     final j = jsonDecode(text);
@@ -48,9 +49,9 @@ List<List<int>> decodeHr(String? text) {
           if (p is List && p.length == 2 && p[0] is num && p[1] is num) [(p[0] as num).toInt(), (p[1] as num).toInt()],
       ];
     }
-    if (j is! Map || j['e'] is! String) return [];
+    if (j is! Map || j['e'] is! String) return null;
     final v = j['v'];
-    if (v is num && v > hrFileVersion) return [];
+    if (v is num && v > hrFileVersion) return null;
     final bytes = base64.decode(j['e'] as String);
     var t = (j['s0'] as num?)?.toInt() ?? 0;
     final out = <List<int>>[];
@@ -63,12 +64,13 @@ List<List<int>> decodeHr(String? text) {
         shift += 7;
         if (x < 0x80) break;
       }
-      if (i >= bytes.length) break;
+      if (i >= bytes.length) return null; // κομμένο
       t += d;
       out.add([t, bytes[i++]]);
     }
+    if (j['n'] is num && (j['n'] as num).toInt() != out.length) return null;
     return out;
   } catch (_) {
-    return [];
+    return null;
   }
 }

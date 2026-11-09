@@ -114,10 +114,38 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.Screen.END -> drawEnd(c)
         }
         // Στο «Αποθηκεύτηκε» το μήνυμα (π.χ. «σώθηκε ως τις…») γράφεται ολόκληρο μέσα στην οθόνη (drawEnd).
-        if (note != null && Repo.screen != Repo.Screen.END) small(c, note, 186f, gray, 8f, 120f)
+        if (note != null && Repo.screen != Repo.Screen.END) noteLines(c, note)
     }
 
     private var noticeOpen = false
+
+    /**
+     * Μήνυμα κάτω στη στρογγυλή οθόνη, σε ως δύο γραμμές (η κάτω πιο στενή): ολόκληρο το «Πάτα ξανά: τέλος και στο
+     * κινητό» κ.λπ., όχι κομμένο στις άκρες (W3-09). Πάτημα: ολόκληρο, σε όλη την οθόνη.
+     */
+    private fun noteLines(c: Canvas, note: String) {
+        text.textSize = 8f * u
+        text.typeface = Typeface.DEFAULT
+        if (text.measureText(note) <= 96f * u) {
+            small(c, note, 186f, gray, 8f, 100f)
+            return
+        }
+        val words = note.split(' ')
+        var best = 1
+        var bestDiff = Float.MAX_VALUE
+        for (k in 1 until words.size) {
+            val a = text.measureText(words.take(k).joinToString(" "))
+            val b = text.measureText(words.drop(k).joinToString(" "))
+            // η πάνω γραμμή χωρά πιο πολύ (πιο φαρδιά εκεί η οθόνη)
+            val diff = maxOf(a - 120f * u, b - 96f * u)
+            if (diff < bestDiff) {
+                bestDiff = diff
+                best = k
+            }
+        }
+        small(c, words.take(best).joinToString(" "), 178f, gray, 8f, 124f)
+        small(c, words.drop(best).joinToString(" "), 188f, gray, 8f, 98f)
+    }
 
     /** Ambient: τα βασικά μόνο, λευκό/γκρι σε μαύρο, χωρίς δευτερόλεπτα. Δεν πατιέται τίποτα. */
     private fun drawAmbient(c: Canvas, now: Long) {
@@ -129,7 +157,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                 val sec = Repo.activeSecNow(now).let { if (it > 0) it else (now - Repo.startedAt) / 1000 }
                 t(c, "${sec / 60}′", 100f, light, 30f, true)
                 if (Repo.meters > 0) small(c, "${km(Repo.meters)} km", 124f, light, 11f, 150f)
-                Repo.alarm.limit?.let { small(c, "όριο $it", 146f, dimText, 9f, 120f) }
+                Repo.alarm.limit?.let { small(c, "όριο παλμών $it", 146f, dimText, 9f, 130f) }
             }
             Repo.session != null && Repo.running != null -> {
                 val s = Repo.session!!
@@ -433,8 +461,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         small(c, dist, 108f, Color.WHITE, 11f, 150f)
         heart(c, 128f, now, 11f)
         // Χωρίς όριο: να φαίνεται (W3-18), όχι σιωπηλά.
-        val tags = listOfNotNull(if (!Repo.gps) "χωρίς GPS" else null, if (Repo.alarm.limit == null) "χωρίς όριο" else null)
-        if (tags.isNotEmpty()) small(c, tags.joinToString(" · "), 146f, gray, 8f, 110f)
+        val tags = listOfNotNull(if (!Repo.gps) "χωρίς GPS" else null, if (Repo.alarm.limit == null) "χωρίς όριο παλμών" else null)
+        if (tags.isNotEmpty()) small(c, tags.joinToString(" · "), 146f, gray, 8f, 150f)
         // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν).
         pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 72f, 166f, 54f, 26f, if (Repo.paused) orange else card, Color.WHITE, 10f) {
             actions.pauseWalk(!Repo.paused)

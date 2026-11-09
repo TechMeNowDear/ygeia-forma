@@ -126,6 +126,12 @@ class WatchActivity : Activity(), WatchView.Actions {
     /** Στιγμιότυπο άσκησης χωρίς άσκηση στη μνήμη: η εφαρμογή έκλεισε απότομα. Συνέχεια ή μερικό αποτέλεσμα ([Recovery]). */
     private suspend fun recoverIfNeeded() {
         val o = Repo.readRun(this) ?: return
+        // Το κανονικό αποτέλεσμα αυτής της άσκησης περιμένει ήδη: έχει τελειώσει, όχι «συνέχεια» ούτε μερικό από πάνω (S3).
+        val id = Repo.runId(o)
+        if (id != null && Repo.hasFinalPending(this, id)) {
+            Repo.clearRun(this)
+            return
+        }
         val owned = try {
             HealthServices.getClient(this).exerciseClient.getCurrentExerciseInfoAsync().await().exerciseTrackedStatus ==
                 ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS
@@ -224,8 +230,8 @@ class WatchActivity : Activity(), WatchView.Actions {
             JSONObject().put("v", 1).put("kind", "strength").put("phone", false).put("start", l.start).put("saved", now)
                 .put("local", l.toState()).also { o -> Repo.alarm.limit?.let { o.put("lim", it) } }
         } ?: return
-        val text = o.toString()
-        scope.launch(Dispatchers.IO) { Repo.writeRun(this@WatchActivity, text) }
+        val gen = Repo.runGen
+        scope.launch(Dispatchers.IO) { Repo.writeRun(this@WatchActivity, o.toString(), gen) }
     }
 
     override fun startWorkout(id: String) {
@@ -345,7 +351,12 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (now > finishArmedUntil) {
             finishArmedUntil = now + 3000
             // Σε προπόνηση του κινητού το «Τέλος» κλείνει και εκεί (V-A-09): να το ξέρει πριν το δεύτερο πάτημα.
-            val msg = if (Repo.runningPhone) FINISH_PHONE_NOTICE else FINISH_NOTICE
+            // Χωρίς κανένα σετ το κινητό τη σβήνει (όπως το δικό του «Κανένα σετ → Σβήσιμο»): το κείμενο λέει αυτό (S7).
+            val msg = when {
+                !Repo.runningPhone -> FINISH_NOTICE
+                (Repo.phone?.setsDone ?: 0) == 0 -> FINISH_PHONE_EMPTY_NOTICE
+                else -> FINISH_PHONE_NOTICE
+            }
             Repo.notice = msg
             view.postDelayed({ if (Repo.notice == msg) { Repo.notice = null; view.invalidate() } }, 3000)
             return
@@ -388,6 +399,7 @@ class WatchActivity : Activity(), WatchView.Actions {
 private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
 private const val FINISH_NOTICE = "Πάτα ξανά «Τέλος»"
 private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και στο κινητό"
+private const val FINISH_PHONE_EMPTY_NOTICE = "Πάτα ξανά: κανένα σετ, σβήνεται και στο κινητό"
 
 /** Η οθόνη είναι στο ambient (αχνή, «πάντα ανοιχτή») ή σβηστή: καμία ανανέωση ανά δευτερόλεπτο (W3-08). */
 fun isAmbientState(state: Int): Boolean =

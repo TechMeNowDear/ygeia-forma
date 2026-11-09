@@ -3,6 +3,7 @@
 // επιβεβαιώνει το ρολόι · V-A-07 άγνωστα κλειδιά μένουν · V-A-08 έκδοση μορφής · V-A-09 «Τέλος» στο ρολόι και ξεχασμένη
 // προπόνηση · V-A-10 καραντίνα αντί για «δεν διαβάζεται» · V-A-11 δεύτερο «Παλμοί εδώ» · V-A-14 το τελικό κερδίζει.
 // Όλα τα νούμερα είναι δοκιμαστικά.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -77,6 +78,22 @@ class _NoHrIO extends MemoryTrainingIO {
   Future<bool> writeHr(String id, String j) async => false;
 }
 
+/// Η πρώτη εγγραφή αρχείου παλμών περιμένει ([release]): για τον αγώνα «ένωση όσο γράφεται» (έλεγχος του #91, M1).
+class _SlowHrIO extends MemoryTrainingIO {
+  Completer<void>? waiting;
+  bool _first = true;
+  void release() => waiting?.complete();
+  @override
+  Future<bool> writeHr(String id, String j) async {
+    if (_first) {
+      _first = false;
+      waiting = Completer<void>();
+      await waiting!.future;
+    }
+    return super.writeHr(id, j);
+  }
+}
+
 /// Αρχείο παλμών που υπάρχει αλλά δεν διαβάζεται τώρα.
 class _HrReadErrorIO extends MemoryTrainingIO {
   bool fail = true;
@@ -107,9 +124,11 @@ void main() {
     });
 
     test('χαλασμένο ή νεότερο αρχείο: κενό (το αρχείο μένει όπως είναι)· και η παλιά μορφή «[[sec,bpm]]»', () {
-      expect(decodeHr('{χαλασμένο'), isEmpty);
+      // Δεν διαβάζεται = null (όχι «κενό»): ποτέ δεν γράφεται από πάνω (έλεγχος του #91, S1).
+      expect(decodeHr('{χαλασμένο'), isNull);
       expect(decodeHr(null), isEmpty);
-      expect(decodeHr(jsonEncode({'v': 9, 'n': 1, 's0': 0, 'e': 'AGQ='})), isEmpty);
+      expect(decodeHr(jsonEncode({'v': 9, 'n': 1, 's0': 0, 'e': 'AGQ='})), isNull);
+      expect(decodeHr(jsonEncode({'v': 1, 'n': 5, 's0': 0, 'e': 'AGQ='})), isNull, reason: 'κομμένο');
       expect(decodeHr('[[0,100],[1,101],["x",1]]'), [
         [0, 100],
         [1, 101],
@@ -478,10 +497,14 @@ void main() {
       var at = now;
       final t = TrainingStore(io: MemoryTrainingIO(), clock: () => at)..replaceAll(sampleTraining(now).toJson());
       final link = WearLink()..attachForTest(t);
+      // Έλεγχος του #91 (S7): κανένα σετ → σβήνεται και στο κινητό, όπως λέει το ρολόι· καμία ορφανή ανοιχτή προπόνηση.
+      final empty = t.start(t.program!.workout('A')!);
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': empty.id, 'at': now.add(const Duration(minutes: 1)).millisecondsSinceEpoch});
+      expect(t.current, isNull);
+      expect(t.sessions.any((x) => x.id == empty.id), isFalse);
+      expect(t.discardedByWatch, isTrue);
+      at = now.add(const Duration(seconds: 1));
       final s = t.start(t.program!.workout('A')!);
-      // κανένα σετ: μένει ανοιχτή (αποφασίζεις εσύ)
-      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': s.id, 'at': now.add(const Duration(minutes: 1)).millisecondsSinceEpoch});
-      expect(t.current, isNotNull);
       at = now.add(const Duration(minutes: 5));
       t.tick(s.items.first, 0);
       at = now.add(const Duration(minutes: 50));
@@ -685,6 +708,96 @@ void main() {
       expect(s.hr.length, 1201);
       expect(find.byKey(const ValueKey('summary-partial')), findsOneWidget);
       expect(find.textContaining('έκλεισε πριν το «Τέλος»'), findsOneWidget);
+    });
+  });
+
+  group('έλεγχος του #91 (M1, S1, S5)', () {
+    test('M1: κομμάτι παλμών που φτάνει ΟΣΟ γράφεται το αρχείο της ίδιας προπόνησης δεν χάνεται, και το ack περιμένει', () async {
+      final io = _SlowHrIO();
+      var at = now;
+      final t = TrainingStore(io: io, clock: () => at)..replaceAll(sampleTraining(now).toJson());
+      await t.load();
+      final s = t.start(t.program!.workout('A')!);
+      t.tick(s.items.first, 0);
+      at = now.add(const Duration(minutes: 60));
+      // 1ο κομμάτι (0–99″): ξεκινά η εγγραφή του αρχείου και «κολλάει»
+      t.importWatch({'v': 1, 'kind': 'hr', 'sid': s.id, 'hrT0': s.start.millisecondsSinceEpoch, 'hr': [for (var k = 0; k < 100; k++) [k, 120]]});
+      t.finish();
+      while (io.waiting == null) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      // 2ο κομμάτι (600–699″) όσο περιμένει η εγγραφή
+      var acked = false;
+      final second = WearLink.importDurably(t, jsonEncode({
+        'v': 1, 'kind': 'hr', 'sid': s.id, 'hrT0': s.start.add(const Duration(minutes: 10)).millisecondsSinceEpoch,
+        'hr': [for (var k = 0; k < 100; k++) [k, 100]],
+      })).then((ok) => acked = ok);
+      await Future<void>.delayed(Duration.zero);
+      expect(acked, isFalse, reason: 'όχι ack πριν γραφτεί');
+      io.release();
+      await second;
+      expect(acked, isTrue);
+      final file = decodeHr(io.hrFiles[s.id])!;
+      expect(file.length, 200, reason: 'και τα δύο κομμάτια στο αρχείο');
+      expect(file.any((p) => p[0] == 650), isTrue);
+      // ξανά από την αρχή: όλα εκεί
+      final back = TrainingStore(io: io, clock: () => at);
+      await back.load();
+      final f = back.sessions.firstWhere((x) => x.id == s.id);
+      await back.ensureHr(f);
+      expect(f.hr.length, 200);
+    });
+
+    test('S1: αρχείο παλμών που δεν διαβάζεται: κρατιέται στην άκρη, η σύνδεση μένει, τίποτα δεν γράφεται από πάνω', () async {
+      final io = MemoryTrainingIO();
+      final t = TrainingStore(io: io, clock: () => now);
+      await t.load();
+      t.importWatch(_walk('k9'));
+      await t.flush();
+      io.hrFiles['w-k9'] = '{χαλασμένο';
+      final back = TrainingStore(io: io, clock: () => now);
+      await back.load();
+      final s = back.sessions.single;
+      await back.ensureHr(s);
+      expect(await back.flush(), isTrue);
+      expect(io.badHrFiles['w-k9.json.bad'], '{χαλασμένο', reason: 'κρατήθηκε όπως ήταν');
+      expect(s.hrBad, 'w-k9.json.bad');
+      final saved = ((jsonDecode(io.json!) as Map)['sessions'] as List).cast<Map>().single;
+      expect(saved['hrbad'], 'w-k9.json.bad', reason: 'η σύνδεση με το αρχείο δεν χάνεται');
+      // νέο κομμάτι για αυτή την προπόνηση: σε νέο αρχείο, το παλιό ανέγγιχτο
+      expect(back.importWatch({'v': 1, 'kind': 'hr', 'sid': 'w-k9', 'hr': [[10, 99], [11, 98]]}), isTrue);
+      expect(await back.flush(), isTrue);
+      expect(decodeHr(io.hrFiles['w-k9']), [
+        [10, 99],
+        [11, 98],
+      ]);
+      expect(io.badHrFiles['w-k9.json.bad'], '{χαλασμένο');
+      // το ίδιο όταν φτάνει κομμάτι πριν ανοίξει η σύνοψη (ένωση στην εγγραφή)
+      final io2 = MemoryTrainingIO();
+      final t2 = TrainingStore(io: io2, clock: () => now);
+      await t2.load();
+      t2.importWatch(_walk('k8'));
+      await t2.flush();
+      io2.hrFiles['w-k8'] = '{"v":1,"n":3,"s0":0,"e":"AA=="}';
+      final b2 = TrainingStore(io: io2, clock: () => now);
+      await b2.load();
+      b2.importWatch({'v': 1, 'kind': 'hr', 'sid': 'w-k8', 'hr': [[5, 90]]});
+      expect(await b2.flush(), isTrue);
+      expect(io2.badHrFiles.keys, ['w-k8.json.bad']);
+      expect(b2.sessions.single.hrBad, 'w-k8.json.bad');
+    });
+
+    test('S5: αντίγραφο λέει πόσων προπονήσεων οι παλμοί δεν μπήκαν', () async {
+      final io = MemoryTrainingIO(jsonEncode(_oldFile()));
+      final t = TrainingStore(io: io, clock: () => now);
+      await t.load();
+      await t.flush();
+      await t.backupJson();
+      expect(t.backupHrMissing, 0);
+      io.hrFiles[io.hrFiles.keys.single] = '{χαλασμένο';
+      final j = await t.backupJson();
+      expect(t.backupHrMissing, 1);
+      expect(j.containsKey('hrz'), isFalse);
     });
   });
 }

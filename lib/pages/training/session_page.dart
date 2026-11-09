@@ -126,7 +126,12 @@ class _SessionPageState extends State<SessionPage> {
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(ended != null ? 'Η προπόνηση τελείωσε από το ρολόι.' : 'Δεν υπάρχει προπόνηση σε εξέλιξη.',
+                child: Text(
+                    ended != null
+                        ? 'Η προπόνηση τελείωσε από το ρολόι.'
+                        : t.discardedByWatch
+                            ? 'Η προπόνηση σβήστηκε από το ρολόι: δεν είχε κανένα σετ.'
+                            : 'Δεν υπάρχει προπόνηση σε εξέλιξη.',
                     textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
               ),
             ),
@@ -888,7 +893,8 @@ class _SummaryPageState extends State<SummaryPage> {
     final s = widget.session;
     final c = Aigaio.of(context);
     // Με το ρολόι της αποθήκης (όχι της συσκευής), για να ταιριάζει με την αρχή της προπόνησης.
-    final mins = (s.end ?? t.now).difference(s.start).inMinutes;
+    // Ξεχασμένη προπόνηση: η διάρκεια ως το τελευταίο ✓, όπως θα γραφτεί με την «Αποθήκευση» (όχι 20 ώρες).
+    final mins = (s.end ?? (t.current == s && t.isStale(s) ? s.lastActivity : t.now)).difference(s.start).inMinutes;
     final prog = t.program?.workout(s.workout);
 
     PlanItem itemFor(ExLog e) {
@@ -1000,15 +1006,17 @@ class _SummaryPageState extends State<SummaryPage> {
     ];
     final extra = s.isCardio && WalkExtraCard.shows(s) ? WalkExtraCard(session: s) : null;
     // Γράφτηκε ως το τελευταίο στιγμιότυπο, γιατί η εφαρμογή του ρολογιού έκλεισε απότομα (V-A-03).
-    final partialNote = !s.partial
+    final notes = [
+      if (s.partial) 'Γράφτηκε ως τις ${hm(s.end ?? s.start)}: η εφαρμογή του ρολογιού έκλεισε πριν το «Τέλος».',
+      // Έλεγχος του #91 (S1): το αρχείο παλμών δεν διαβάστηκε· κρατήθηκε, δεν σβήστηκε.
+      if (s.hrBad != null) 'Οι παλμοί αυτής της προπόνησης δεν διαβάστηκαν· το αρχείο τους κρατήθηκε στην άκρη.',
+    ];
+    final partialNote = notes.isEmpty
         ? null
         : Padding(
-            key: const ValueKey('summary-partial'),
+            key: ValueKey(s.partial ? 'summary-partial' : 'summary-hrbad'),
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              'Γράφτηκε ως τις ${hm(s.end ?? s.start)}: η εφαρμογή του ρολογιού έκλεισε πριν το «Τέλος».',
-              style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary),
-            ),
+            child: Text(notes.join(' '), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
           );
     final stats = partialNote == null ? stats0 : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [stats0, const SizedBox(height: 8), partialNote]);
     final List<Widget> left, right;
