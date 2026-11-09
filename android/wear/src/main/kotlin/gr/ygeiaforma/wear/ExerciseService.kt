@@ -13,6 +13,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.util.Log
 import android.media.AudioAttributes
 import android.os.VibrationAttributes
 import android.os.VibrationEffect
@@ -53,6 +54,7 @@ import java.time.Instant
 class ExerciseService : Service() {
 
     companion object {
+        const val TAG = "YgeiaWatch"
         const val ACTION_START = "gr.ygeiaforma.wear.START"
         const val ACTION_STOP = "gr.ygeiaforma.wear.STOP"
         const val EXTRA_KIND = "kind"
@@ -148,6 +150,7 @@ class ExerciseService : Service() {
         try {
             ServiceCompat.startForeground(this, NOTIF_ID, n, type)
         } catch (e: Exception) {
+            Log.e(TAG, "startForeground", e)
             Repo.notice = "Δεν ξεκίνησε η μέτρηση: λείπει άδεια."
             Repo.resetExercise()
             Repo.changed()
@@ -209,16 +212,25 @@ class ExerciseService : Service() {
                 }
             }
         } catch (e: Exception) {
-            Repo.notice = "Δεν ξεκίνησε η μέτρηση παλμών στο ρολόι."
+            // Η αιτία στην οθόνη και στο logcat (ετικέτα «YgeiaWatch»): χωρίς αυτήν δεν διορθώνεται (9/11).
+            Log.e(TAG, "startExercise", e)
+            Repo.notice = "Δεν ξεκίνησε η μέτρηση: ${why(e)}"
             Repo.changed()
         }
+    }
+
+    /** Σύντομη αιτία για την οθόνη: το είδος του σφάλματος και η αρχή του μηνύματος. */
+    private fun why(e: Throwable): String {
+        val c = (e.cause ?: e)
+        return "${c.javaClass.simpleName}: ${c.message.orEmpty()}".take(90)
     }
 
     private val callback = object : ExerciseUpdateCallback {
         override fun onRegistered() {}
 
         override fun onRegistrationFailed(throwable: Throwable) {
-            Repo.notice = "Δεν ξεκίνησε η μέτρηση παλμών στο ρολόι."
+            Log.e(TAG, "registration", throwable)
+            Repo.notice = "Δεν ξεκίνησε η μέτρηση: ${why(throwable)}"
             Repo.changed()
         }
 

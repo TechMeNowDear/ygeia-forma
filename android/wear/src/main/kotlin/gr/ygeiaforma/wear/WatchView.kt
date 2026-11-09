@@ -76,6 +76,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             drawAlarm(c)
             return
         }
+        val note = Repo.notice
+        if (noticeOpen && note != null) {
+            drawNotice(c, note)
+            return
+        }
+        noticeOpen = false
+        // Πάτημα στο μήνυμα: ολόκληρο (π.χ. η αιτία όταν δεν ξεκινά η μέτρηση· 9/11). Πρώτο στη λίστα, ώστε τα
+        // κουμπιά της οθόνης να κερδίζουν όπου ακουμπούν.
+        if (note != null) hits.add(Hit(RectF(cx - 60 * u, 176 * u, cx + 60 * u, 198 * u)) { noticeOpen = true; invalidate() })
         when (Repo.screen) {
             Repo.Screen.HOME -> drawHome(c)
             Repo.Screen.SET -> drawSet(c, now)
@@ -84,7 +93,27 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.Screen.WALK -> drawWalk(c, now)
             Repo.Screen.END -> drawEnd(c)
         }
-        Repo.notice?.let { small(c, it, 186f, gray, 8f, 120f) }
+        if (note != null) small(c, note, 186f, gray, 8f, 120f)
+    }
+
+    private var noticeOpen = false
+
+    /** Ολόκληρο το μήνυμα, σε πολλές γραμμές· πάτημα οπουδήποτε κλείνει. */
+    private fun drawNotice(c: Canvas, note: String) {
+        text.color = Color.WHITE
+        text.textSize = 10f * u
+        text.typeface = Typeface.DEFAULT
+        val w = (150f * u).toInt()
+        val tp = android.text.TextPaint(text).apply { textAlign = Paint.Align.LEFT }
+        val layout = android.text.StaticLayout.Builder.obtain(note, 0, note.length, tp, w)
+            .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER)
+            .setMaxLines(9)
+            .build()
+        c.save()
+        c.translate(cx - w / 2f, cy - layout.height / 2f)
+        layout.draw(c)
+        c.restore()
+        hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat())) { noticeOpen = false; invalidate() })
     }
 
     // ------------------------------------------------------------------ βοηθητικά
