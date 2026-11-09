@@ -34,21 +34,59 @@ def so_misaligned(path):
     return n, bad
 
 
+def v2_certificates(path):
+    """Τα πιστοποιητικά (SHA-256 του DER) του πρώτου κάθε υπογράφοντα στο APK Signing Block v2, χωρίς εργαλεία.
+    Η κρυπτογραφική επαλήθευση γίνεται από το apksigner· εδώ μόνο ΠΟΙΟ κλειδί υπέγραψε."""
+    import hashlib
+    data = open(path, 'rb').read()
+    eocd = data.rfind(b'PK\x05\x06')
+    if eocd < 0:
+        return None
+    cd_off = struct.unpack('<I', data[eocd + 16:eocd + 20])[0]
+    if data[cd_off - 16:cd_off] != b'APK Sig Block 42':
+        return None
+    size = struct.unpack('<Q', data[cd_off - 24:cd_off - 16])[0]
+    block = data[cd_off - size - 8:cd_off - 24]  # τα ζεύγη (μετά το πρώτο μέγεθος, πριν από το τελικό μέγεθος+magic)
+    pos, value = 8, None
+    while pos + 12 <= len(block):
+        n, i = struct.unpack('<QI', block[pos:pos + 12])
+        if i == 0x7109871a:
+            value = block[pos + 12:pos + 8 + n]
+        pos += 8 + n
+    if value is None:
+        return None
+
+    def seq(b):
+        out, p = [], 4
+        end = 4 + struct.unpack('<I', b[:4])[0]
+        while p < end:
+            n = struct.unpack('<I', b[p:p + 4])[0]
+            out.append(b[p + 4:p + 4 + n])
+            p += 4 + n
+        return out
+
+    certs = []
+    for signer in seq(value):
+        signed = signer[4:4 + struct.unpack('<I', signer[:4])[0]]
+        digests_len = struct.unpack('<I', signed[:4])[0]
+        cert_list = seq(signed[4 + digests_len:])
+        certs.append(hashlib.sha256(cert_list[0]).hexdigest() if cert_list else '')
+    return certs
+
+
 def main():
     want, verify_log, apk = sys.argv[1].lower().replace(':', ''), sys.argv[2], sys.argv[3]
     text = open(verify_log, encoding='utf-8', errors='replace').read()
     errors = []
     if not re.search(r'Verified using v2 scheme \(APK Signature Scheme v2\): true', text):
         errors.append('δεν υπάρχει υπογραφή v2')
-    # «Signer #1 certificate SHA-256 digest: …» (η μορφή αλλάζει λίγο ανάμεσα σε εκδόσεις του apksigner: δεκτά και
-    # κεφαλαία και άνω-κάτω τελείες).
-    signers = [(m.group(1).strip(), m.group(2).replace(':', '').lower())
-               for m in re.finditer(r'^(Signer[^\n]*?) certificate SHA-256 digest: ([0-9a-fA-F:]{64,95})\s*$', text, re.M)]
-    count = re.search(r'Number of signers: (\d+)', text)
-    n_signers = int(count.group(1)) if count else len({s[0] for s in signers})
-    if n_signers != 1 or not signers:
-        errors.append(f'περιμέναμε έναν υπογράφοντα, βρέθηκαν {n_signers}')
-    got = signers[0][1] if signers else ''
+    if not re.search(r'^Verifies\s*$', text, re.M):
+        errors.append('το apksigner δεν επαλήθευσε την υπογραφή')
+    # Ποιο κλειδί υπέγραψε: από το ίδιο το APK (η μορφή της εξόδου του apksigner αλλάζει από έκδοση σε έκδοση).
+    certs = v2_certificates(apk) or []
+    if len(certs) != 1:
+        errors.append(f'περιμέναμε έναν υπογράφοντα v2, βρέθηκαν {len(certs)}')
+    got = certs[0] if certs else ''
     if got != want:
         errors.append(f'άλλο πιστοποιητικό: {got[:12] or "κανένα"}… αντί για {want[:12]}…')
     n, bad = so_misaligned(apk)
