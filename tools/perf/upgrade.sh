@@ -22,6 +22,16 @@ NEW="$2"
 D="/data/data/$PKG"
 ok=1
 fail() { echo "ΑΠΟΤΥΧΙΑ: $*"; ok=0; }
+labels() { tr '>' '\n' < ui.xml 2> /dev/null | grep -o 'text="[^"]*"\|content-desc="[^"]*"' | grep -v '=""' | head -25 | tr '\n' ' '; echo; }
+food_mine() { # Διατροφή › Τα δικά μου › το προϊόν-δείγμα
+  ui_tap "Διατροφή" || { echo "  (δεν βρέθηκε «Διατροφή»)"; return 1; }
+  sleep 3
+  ui_tap "Τα δικά μου" || { echo "  (δεν βρέθηκε «Τα δικά μου»: $(labels))"; return 1; }
+  sleep 3
+  ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4 && return 0
+  echo "  (στην οθόνη: $(labels))"
+  return 1
+}
 
 if ! errq_root; then
   echo "::warning title=Αναβάθμιση::Χωρίς root στον emulator: η δοκιμή αναβάθμισης γίνεται χωρίς δείγμα δεδομένων"
@@ -71,6 +81,7 @@ SQL
     uid=$(adb shell stat -c %u "$D" | tr -d '\r')
     if adb shell "sqlite3 $DB < /data/local/tmp/seed_food.sql && chown -R $uid:$uid $D/databases && restorecon -R $D/databases"; then
       food_seeded=1
+      echo "Βάση: my_foods = $(adb shell "sqlite3 $DB 'SELECT count(*) FROM my_foods'" | tr -d '\r') γραμμές · $(adb shell "ls -lZ $D/databases" | tr -d '\r' | awk '{print $NF, $3, $5}' | tr '\n' ' ')"
     else
       fail "δεν μπήκε το δείγμα στη βάση της παλιάς έκδοσης (my_foods)"
     fi
@@ -90,7 +101,7 @@ if [ "$seeded" = 1 ]; then
   fi
   shot "upgrade_old" > /dev/null || true
   if [ "$food_seeded" = 1 ]; then
-    if ui_tap "Διατροφή" && sleep 3 && ui_tap "Τα δικά μου" && sleep 3 && ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4; then
+    if food_mine; then
       echo "Παλιά έκδοση: διαβάζει το δείγμα της βάσης («Τα δικά μου»)"
     else
       fail "η παλιά έκδοση δεν έδειξε το προϊόν-δείγμα: ενημέρωσε το seed_food.sql (tools/perf/upgrade.sh) στη μορφή της «latest»"
@@ -130,7 +141,7 @@ if [ "$seeded" = 1 ]; then
   fi
 fi
 if [ "$food_seeded" = 1 ]; then
-  if ui_tap "Διατροφή" && sleep 3 && ui_tap "Τα δικά μου" && sleep 3 && ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4; then
+  if food_mine; then
     echo "Νέα έκδοση: διαβάζει τη βάση της παλιάς («Τα δικά μου»)"
   else
     fail "η νέα έκδοση δεν δείχνει το προϊόν της παλιάς βάσης («Τα δικά μου»)"
