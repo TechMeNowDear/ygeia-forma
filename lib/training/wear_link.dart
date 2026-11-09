@@ -126,6 +126,10 @@ class WearLink with WidgetsBindingObserver {
   /// Περπάτημα που τρέχει στο ρολόι (για την κάρτα), ή null.
   final live = ValueNotifier<Map<String, dynamic>?>(null);
 
+  /// Το όριο παλμών που στάλθηκε στο ρολόι σε αυτό το άνοιγμα της εφαρμογής («140», «null» = χωρίς όριο), ή null αν
+  /// δεν στάλθηκε ακόμα. Για την κάρτα ορίου (έλεγχος 9/11, V-A-05): να φαίνεται αν το ρολόι το πήρε.
+  final sentLimit = ValueNotifier<String?>(null);
+
   final _cmds = StreamController<WatchCmd>.broadcast();
   Stream<WatchCmd> get commands => _cmds.stream;
 
@@ -176,6 +180,8 @@ class WearLink with WidgetsBindingObserver {
     await importResults();
   }
 
+  /// Ό,τι έγινε στο ρολόι, προς το κινητό. Το ρολόι σβήνει το αποτέλεσμα (ack) ΜΟΝΟ αφού γραφτεί με ασφάλεια εδώ
+  /// ([importDurably]): αλλιώς μένει στο ρολόι και ξαναδοκιμάζεται στο επόμενο άνοιγμα (έλεγχος 9/11, V-A-01).
   Future<void> importResults() async {
     final t = _t;
     if (t == null) return;
@@ -184,15 +190,24 @@ class WearLink with WidgetsBindingObserver {
       for (final r in list) {
         final m = (r as Map).cast<String, dynamic>();
         final path = m['path'] as String? ?? '';
-        try {
-          final j = jsonDecode(m['json'] as String) as Map<String, dynamic>;
-          t.importWatch(j);
-        } catch (_) {
-          // Χαλασμένο: σβήνεται κι αυτό, για να μην έρχεται ξανά και ξανά.
-        }
-        await _m.invokeMethod<bool>('ackResult', {'path': path});
+        if (path.isEmpty) continue;
+        if (await importDurably(t, m['json'])) await _m.invokeMethod<bool>('ackResult', {'path': path});
       }
     } catch (_) {}
+  }
+
+  /// Ένα αποτέλεσμα του ρολογιού στην αποθήκη. true μόνο όταν είναι γραμμένο στο αρχείο του κινητού (ή ήταν ήδη)·
+  /// ποτέ με `readError`, με αποτέλεσμα που δεν διαβάζεται (π.χ. νεότερη μορφή από ρολόι νεότερης έκδοσης) ή με
+  /// αποτυχημένη εγγραφή. Ό,τι δεν διαβάζεται μένει στο ρολόι (λίγα KB) ώσπου να το διαβάσει νεότερη έκδοση.
+  @visibleForTesting
+  static Future<bool> importDurably(TrainingStore t, Object? raw) async {
+    if (t.readError || !t.ready || raw is! String) return false;
+    try {
+      t.importWatch(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return false;
+    }
+    return t.flush();
   }
 
   String _name(String id) => ExLibrary.loaded?.byId(id)?.name ?? id;
@@ -210,7 +225,9 @@ class WearLink with WidgetsBindingObserver {
         final safety = '${t.hrLimit}';
         final urgent = safety != _lastSafety;
         _lastSafety = safety;
-        _m.invokeMethod<bool>('putPlan', {'json': plan, 'urgent': urgent}).catchError((_) => false);
+        _m.invokeMethod<bool>('putPlan', {'json': plan, 'urgent': urgent}).then((ok) {
+          if (ok == true && '${_t?.hrLimit}' == safety) sentLimit.value = safety;
+        }).catchError((_) {});
       }
       final sess = jsonEncode(watchSession(t, _name));
       if (sess != _lastSession) {

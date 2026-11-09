@@ -151,6 +151,7 @@ class Session {
     List<List<int>>? pauses,
     this.hrrEnd,
     this.hrr1,
+    this.limit,
   })  : items = items ?? [],
         hr = hr ?? [],
         splits = splits ?? [],
@@ -205,6 +206,13 @@ class Session {
   /// Πτώση παλμών στο 1′ μετά το «Τέλος»: παλμοί στο τέλος και στο 1′ (μετρημένα στο ρολόι), ή null.
   int? hrrEnd, hrr1;
 
+  /// Το όριο παλμών του γιατρού που ίσχυε σε αυτή την προπόνηση (έλεγχος 9/11, V-B-04), ώστε η σύνοψη να την κρίνει με
+  /// το δικό της όριο και όχι με το σημερινό. 0 = δεν υπήρχε όριο. null = δεν καταγράφηκε (προπονήσεις πριν από την #90).
+  int? limit;
+
+  /// Το όριο της προπόνησης, αν υπήρχε (null και όταν δεν καταγράφηκε).
+  int? get limitUsed => (limit ?? 0) > 0 ? limit : null;
+
   bool get isCardio => cardioMinutes != null;
 
   /// «Ελεύθερη άσκηση»: χωρίς πρόγραμμα, οι ασκήσεις μπαίνουν μία-μία.
@@ -242,6 +250,7 @@ class Session {
         if (pauses.isNotEmpty) 'pz': pauses,
         if (hrrEnd != null) 'hrrE': hrrEnd,
         if (hrr1 != null) 'hrr1': hrr1,
+        if (limit != null) 'lim': limit,
       };
 
   /// Λίστα από ζεύγη ακεραίων (π.χ. «km», «pz»), χωρίς ό,τι δεν είναι ζεύγος.
@@ -281,5 +290,12 @@ class Session {
         pauses: pairs(j['pz']),
         hrrEnd: (j['hrrE'] as num?)?.toInt(),
         hrr1: (j['hrr1'] as num?)?.toInt(),
+        limit: _limit(j['lim']),
       );
+
+  /// Όριο από αρχείο ή ρολόι: αριθμός ≥ 0· οτιδήποτε άλλο = δεν καταγράφηκε.
+  static int? _limit(Object? v) => v is num && v >= 0 ? v.toInt() : null;
+
+  /// Όριο που έστειλε το ρολόι (#90 και μετά), ή null για ρολόι παλιότερης έκδοσης.
+  static int? watchLimit(Object? v) => _limit(v);
 }

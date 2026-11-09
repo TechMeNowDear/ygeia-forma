@@ -51,14 +51,33 @@ class HrBar extends StatelessWidget {
   }
 }
 
-/// Οι παλμοί σταμάτησαν να έρχονται από το ρολόι: να φαίνεται, όχι να εξαφανίζεται η γραμμή (έλεγχος 8/11).
+/// Δεν έρχονται παλμοί από το ρολόι: να φαίνεται, όχι να εξαφανίζεται η γραμμή (έλεγχος 8/11).
+/// Με όριο γιατρού (έλεγχος 9/11, V-A-05): ξεκάθαρα ότι το όριο δεν σε προσέχει τώρα και τι να κάνεις, και όταν το ρολόι
+/// δεν βρέθηκε καθόλου (πριν: τίποτα στην οθόνη).
 class HrStale extends StatelessWidget {
-  const HrStale({super.key, this.limit});
+  const HrStale({super.key, this.limit, this.lost = true, this.watchFound = true});
   final int? limit;
+
+  /// Ήρθαν παλμοί σε αυτή την προπόνηση και σταμάτησαν (αλλιώς δεν ήρθε κανένας ακόμα).
+  final bool lost;
+
+  /// Βρέθηκε ρολόι με την εφαρμογή μας.
+  final bool watchFound;
+
+  /// Τι να κάνεις, ανάλογα με το γιατί δεν έρχονται.
+  String get hint {
+    final what = lost
+        ? 'Σφίξε λίγο το λουρί, πάνω από το κόκαλο του καρπού.'
+        : watchFound
+            ? 'Στο ρολόι πάτα «Παλμοί εδώ».'
+            : 'Το ρολόι δεν βρέθηκε: άνοιξε την εφαρμογή στο ρολόι και πάτα «Παλμοί εδώ».';
+    return limit == null ? what : '$what Ως τότε πήγαινε με την κούραση: να μπορείς να μιλάς.';
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    final lim = limit;
     return Semantics(
       liveRegion: true,
       child: Container(
@@ -67,18 +86,18 @@ class HrStale extends StatelessWidget {
         decoration: BoxDecoration(
           color: c.exercise.withValues(alpha: .12),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: c.exercise),
+          border: Border.all(color: c.exercise, width: lim == null ? 1 : 1.5),
         ),
-        child: Row(children: [
-          Icon(Icons.heart_broken_outlined, color: c.exercise, size: 22),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.heart_broken_outlined, color: c.exercise, size: 22)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Οι παλμοί δεν έρχονται από το ρολόι', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
-              Text(
-                limit == null ? 'Σφίξε λίγο το λουρί, πάνω από το κόκαλο του καρπού.' : 'Σφίξε λίγο το λουρί. Μέχρι να ξανάρθουν, πήγαινε με την κούραση.',
-                style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary),
-              ),
+              Text('Δεν έρχονται παλμοί από το ρολόι', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
+              if (lim != null)
+                Text('Το όριο ($lim) δεν σε προσέχει τώρα.',
+                    key: const ValueKey('hr-limit-off'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.exercise)),
+              Text(hint, style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary)),
             ]),
           ),
         ]),
@@ -117,7 +136,13 @@ class _BarPainter extends CustomPainter {
   bool shouldRepaint(_BarPainter old) => old.bpm != bpm || old.limit != limit || old.c != c;
 }
 
+/// Με ποιο όριο κρίνεται μια προπόνηση (έλεγχος 9/11, V-B-04): με αυτό που ίσχυε τότε ([Session.limit]). Παλιές
+/// προπονήσεις (πριν από την #90) δεν το έχουν: τότε με το σημερινό, και η σύνοψη το λέει «σημερινό όριο».
+({int? limit, bool today}) sessionLimit(Session s, int? current) =>
+    s.limit != null ? (limit: s.limitUsed, today: false) : (limit: current, today: current != null);
+
 /// Παλμοί μιας προπόνησης στη σύνοψη: μέσος, υψηλότερος, γράφημα με το όριο (σχέδιο 5, 8/11).
+/// [limit]: το σημερινό όριο· η προπόνηση κρίνεται με το δικό της όταν το έχει ([sessionLimit]).
 class HrCard extends StatelessWidget {
   const HrCard({super.key, required this.session, this.limit});
   final Session session;
@@ -126,8 +151,11 @@ class HrCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final h = HrSummary(session, limit);
+    final judged = sessionLimit(session, limit);
+    final lim = judged.limit, today = judged.today;
+    final h = HrSummary(session, lim);
     final mins = (h.overSec / 60).ceil();
+    final which = today ? 'το σημερινό όριο' : 'το όριο';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(20)),
@@ -149,23 +177,28 @@ class HrCard extends StatelessWidget {
         ]),
         if (session.hr.length >= 2) ...[
           const SizedBox(height: 10),
-          SizedBox(height: 70, child: CustomPaint(painter: _HrChart(session.hr, limit, c))),
+          SizedBox(height: 70, child: CustomPaint(painter: _HrChart(session.hr, lim, c))),
         ],
-        if (limit != null) ...[
+        if (lim != null) ...[
           const SizedBox(height: 8),
           Text(
             h.overSec > 0
-                ? 'Πάνω από το όριο ($limit) για περίπου $mins′.'
-                : (h.max != null && h.max! >= limit!)
-                    ? 'Έφτασες στιγμιαία το όριο ($limit).'
+                ? 'Πάνω από $which ($lim) για περίπου $mins′.'
+                : (h.max != null && h.max! >= lim)
+                    ? 'Έφτασες στιγμιαία $which ($lim).'
                     // Ο καρπός μετρά λιγότερο όσο δυναμώνει η προσπάθεια (Boudreaux 2018· έλεγχος #2).
                     // Στο περπάτημα ο καρπός μετρά καλά (σταθερή κίνηση)· η επιφύλαξη ισχύει μόνο για τα βάρη.
                     : session.isCardio
-                        ? 'Το ρολόι δεν έδειξε παλμούς πάνω από το όριο ($limit).'
-                        : 'Το ρολόι δεν έδειξε παλμούς πάνω από το όριο ($limit). Στα βάρη ο καρπός συχνά μετρά πιο χαμηλά· '
+                        ? 'Το ρολόι δεν έδειξε παλμούς πάνω από $which ($lim).'
+                        : 'Το ρολόι δεν έδειξε παλμούς πάνω από $which ($lim). Στα βάρη ο καρπός συχνά μετρά πιο χαμηλά· '
                             'πρώτα μετράει πώς νιώθεις.',
+            key: const ValueKey('hr-limit-line'),
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec > 0 ? c.bad : c.text),
           ),
+          // Παλιά προπόνηση χωρίς καταγραμμένο όριο: να μη διαβαστεί σαν να ίσχυε τότε αυτό το όριο.
+          if (today)
+            Text('Έγινε πριν η εφαρμογή αρχίσει να κρατά το όριο σε κάθε προπόνηση.',
+                key: const ValueKey('hr-limit-today'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textSecondary)),
         ],
         if (session.hrGap case final g?) ...[
           const SizedBox(height: 6),

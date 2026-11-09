@@ -51,7 +51,7 @@ class _TrainingPageState extends State<TrainingPage> {
           ]);
         }
         return ListenableBuilder(
-          listenable: Listenable.merge([t, WearLink.main.ready, WearLink.main.live]),
+          listenable: Listenable.merge([t, WearLink.main.ready, WearLink.main.live, WearLink.main.sentLimit]),
           builder: (context, _) => _page(context),
         );
       },
@@ -422,10 +422,20 @@ class _TrainingPageState extends State<TrainingPage> {
     );
   }
 
-  /// Όριο παλμών από τον γιατρό: αν υπάρχει, το ρολόι δονεί όταν το ξεπεράσεις. Κενό = τίποτα.
+  /// Όριο παλμών από τον γιατρό: αν υπάρχει, το ρολόι δονείται όσο μετρά άσκηση και οι παλμοί μείνουν πάνω του.
+  /// Έλεγχος 9/11 (V-B-05, V-A-05): όχι απόλυτη υπόσχεση, και φαίνεται αν το όριο έφτασε στο ρολόι.
   Widget _hrLimitCard(BuildContext context) {
     final c = Aigaio.of(context);
     final hr = t.hrLimit;
+    final link = WearLink.main;
+    final sent = hr != null && link.sentLimit.value == '$hr';
+    final (String, Color, IconData)? watch = hr == null
+        ? null
+        : sent
+            ? ('Στάλθηκε στο ρολόι', c.good, Icons.watch_rounded)
+            : link.ready.value
+                ? ('Στέλνεται στο ρολόι…', c.textSecondary, Icons.watch_rounded)
+                : ('Το ρολόι δεν βρέθηκε τώρα: δεν ξέρω αν έχει αυτό το όριο.', c.exercise, Icons.watch_rounded);
     return AppCard(
       key: const ValueKey('train-hrlimit'),
       onTap: () => _editHrLimit(context),
@@ -435,8 +445,17 @@ class _TrainingPageState extends State<TrainingPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Όριο παλμών από τον γιατρό', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
-            Text(hr != null ? '$hr bpm · το ρολόι δονείται αν το ξεπεράσεις' : 'Κανένα. Πάτα αν σου δώσει ο γιατρός.',
+            Text(hr != null ? '$hr bpm · δόνηση στο ρολόι όσο μετρά άσκηση' : 'Κανένα. Πάτα αν σου δώσει ο γιατρός.',
                 style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+            if (watch != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(key: const ValueKey('train-hr-watch'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Padding(padding: const EdgeInsets.only(top: 1), child: Icon(watch.$3, size: 15, color: watch.$2)),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text(watch.$1, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: watch.$2))),
+                ]),
+              ),
           ]),
         ),
         Icon(Icons.chevron_right_rounded, color: c.textTertiary),
@@ -524,6 +543,11 @@ extension on String {
   String ifEmpty(String other) => isEmpty ? other : this;
 }
 
+/// Η σταθερή πρόταση για τα φάρμακα στη φόρμα ορίου (έλεγχος 9/11, V-B-06· ESC 2020, Pelliccia κ.ά., Eur Heart J 2021:
+/// οι παλμοί προπόνησης ισχύουν με β-αναστολέα μόνο αν η ικανότητα μετρήθηκε με το φάρμακο).
+const hrLimitBetaBlockerText = 'Αν παίρνεις β-αναστολέα, το όριο ισχύει μόνο αν βγήκε από τεστ κοπώσεως που έγινε με το '
+    'φάρμακο. Αλλιώς πήγαινε με την κούραση: να μπορείς να μιλάς.';
+
 /// Τι επέλεξε στο φύλλο ορίου: αριθμός ή κανένα όριο (null).
 class _HrChoice {
   const _HrChoice(this.hr);
@@ -542,6 +566,7 @@ class _HrLimitSheet extends StatefulWidget {
 class _HrLimitSheetState extends State<_HrLimitSheet> {
   late final _hr = TextEditingController(text: widget.current?.toString() ?? '');
   bool _lowOk = false;
+  bool _more = false;
 
   @override
   void dispose() {
@@ -576,8 +601,43 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('Όριο παλμών από τον γιατρό', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
             const SizedBox(height: 6),
-            Text('Αν σου δώσει αριθμό, γράψ’ τον εδώ: το ρολόι δονείται όταν τον ξεπεράσεις, στα βάρη και στο περπάτημα.',
+            // Έλεγχος 9/11 (V-B-05, V-B-06): όχι απόλυτη υπόσχεση· πρώτα πώς νιώθεις· μία σταθερή πρόταση για β-αναστολέα
+            // (ESC 2020, Pelliccia κ.ά.). Οι λεπτομέρειες πίσω από το ⓘ, για να μη γεμίζει το φύλλο.
+            Text('Αν σου δώσει αριθμό, γράψ’ τον εδώ. Όσο το ρολόι μετρά άσκηση (βάρη ή περπάτημα), δονείται όταν οι παλμοί '
+                'μείνουν πάνω από τον αριθμό για 5″.',
                 style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
+            const SizedBox(height: 10),
+            Container(
+              key: const ValueKey('train-hr-caution'),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(12)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('Η δόνηση βοηθά, δεν εγγυάται: πρώτα μετράει πώς νιώθεις. Με πόνο στο στήθος, δύσπνοια ή ζάλη σταματάς, '
+                    'ό,τι κι αν δείχνει το ρολόι.',
+                    style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
+                const SizedBox(height: 6),
+                Text(hrLimitBetaBlockerText, key: const ValueKey('train-hr-beta'), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
+              ]),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const ValueKey('train-hr-more'),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                onPressed: () => setState(() => _more = !_more),
+                icon: Icon(_more ? Icons.expand_less_rounded : Icons.info_outline_rounded, size: 18),
+                label: const Text('Πότε δεν έρχεται δόνηση'),
+              ),
+            ),
+            if (_more)
+              Text(
+                'Μόνο όσο το ρολόι μετρά άσκηση: περπάτημα ή προπόνηση που ξεκίνησε στο ρολόι, ή «Παλμοί εδώ» στην προπόνηση του κινητού. Αν δεν '
+                'έρχονται παλμοί (χαλαρό λουρί, άδεια, ρολόι μακριά), το ρολόι δονείται σύντομα μία φορά για να το ξέρεις, και '
+                'το κινητό το γράφει στην οθόνη της προπόνησης. Στα βάρη ο καρπός συχνά μετρά λιγότερους παλμούς από τους '
+                'πραγματικούς.',
+                key: const ValueKey('train-hr-more-text'),
+                style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary),
+              ),
             const SizedBox(height: 14),
             TextField(
               key: const ValueKey('train-hr'),

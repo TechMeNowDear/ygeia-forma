@@ -346,6 +346,39 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(find.byKey(key), matchesGoldenFile('shots/13_report.png'));
   });
+  // Έλεγχος 9/11 (V-B-01): ζυγίσεις κάθε 25 μέρες· η στήλη «Διαφορά» λέει «Δεν φτάνουν για σύγκριση», όχι «Σταθερό».
+  testWidgets('Αναφορά για γιατρό · αραιές ζυγίσεις', (tester) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(680, 3200) * 2.0;
+    addTearDown(tester.view.reset);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
+    final h = sampleHistory(now, store.data!);
+    for (final row in h.values) {
+      row
+        ..remove(K.weight)
+        ..remove(K.fatPct)
+        ..remove(K.smm);
+    }
+    for (var i = 0; i < 8; i++) {
+      final d = DateTime(now.year, now.month, now.day - (3 + 25 * i));
+      (h[dateKey(d)] ??= {}).addAll({K.weight: 82.4 + (i % 3) * 0.1, K.fatPct: 25.0 + (i % 2) * 0.2, K.smm: 33.2 + (i % 2) * 0.1});
+    }
+    store.history = h;
+    final key = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.light),
+          home: ReportPage(store: store, now: now),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Δεν φτάνουν για σύγκριση'), findsWidgets);
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/13f_report_sparse_weighins.png'));
+  });
   testWidgets('Αναφορά για γιατρό · με σημείωση 160 χαρακτήρων (να χωράει)', (tester) async {
     tester.view.devicePixelRatio = 2.0;
     tester.view.physicalSize = const Size(680, 3200) * 2.0;
@@ -847,6 +880,23 @@ void main() {
 
   // Απλοποίηση (9/11): μόνο το όριο παλμών από τον γιατρό, χωρίς κλείδωμα.
   testWidgets('Προπόνηση · όριο παλμών', (t) => trainShot(t, 'T13_hr_limit', phone, Brightness.light, act: (t) => tapKey(t, 'train-hrlimit')));
+  // Έλεγχος 9/11 (V-B-05/06): οι λεπτομέρειες πίσω από το ⓘ· μεγάλα γράμματα να μη σπάνε.
+  testWidgets('Προπόνηση · όριο παλμών · πότε δεν έρχεται δόνηση', (t) => trainShot(t, 'T13b_hr_limit_more', phone, Brightness.light, act: (t) async {
+        await tapKey(t, 'train-hrlimit');
+        await tapKey(t, 'train-hr-more');
+      }));
+  // Έλεγχος 9/11 (V-A-05): προπόνηση με όριο, χωρίς ρολόι: «το όριο δεν σε προσέχει τώρα» (πριν: τίποτα).
+  testWidgets('Προπόνηση · χωρίς ρολόι, με όριο · Fold ανοιχτό', (t) => trainShot(t, 'T28_session_no_hr_limit_open', open, Brightness.light, act: startSession));
+  testWidgets('Προπόνηση · ρολόι κοντά, με όριο, όριο στάλθηκε', (t) async {
+    WearLink.main.ready.value = true;
+    WearLink.main.sentLimit.value = '140';
+    addTearDown(() {
+      WearLink.main.ready.value = false;
+      WearLink.main.sentLimit.value = null;
+    });
+    await trainShot(t, 'T28b_hr_limit_sent', phone, Brightness.light,
+        act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-hrlimit'))));
+  });
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
 
   testWidgets('Προπόνηση · ρεζέρβα με ενόχληση', (t) => trainShot(t, 'T19_rir_pain', phoneShort, Brightness.light, act: (t) async {
