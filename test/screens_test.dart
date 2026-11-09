@@ -19,6 +19,10 @@ import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
+import 'package:ygeia_forma/food/food_model.dart';
+import 'package:ygeia_forma/food/off.dart';
+import 'package:ygeia_forma/pages/food_add.dart';
+import 'package:ygeia_forma/pages/nutrition.dart';
 import 'package:ygeia_forma/pages/appearance.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/theme.dart';
@@ -456,6 +460,74 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(find.byKey(key), matchesGoldenFile('shots/21_kitchen.png'));
   });
+  // Έλεγχος 9/11 (διατροφή): αναζήτηση με λέξη που αγνοήθηκε, ετικέτα με νάτριο, ποσότητα σε ml, πηγές και άδειες.
+  testWidgets('Διατροφή · αναζήτηση χωρίς μια λέξη', (t) => _shot(
+        t,
+        name: 'food_search_ignored',
+        size: phone,
+        brightness: Brightness.light,
+        tab: Cat.food,
+        act: (t) async {
+          await t.tap(find.text('Φαγητό'));
+          await t.pumpAndSettle();
+          await t.enterText(find.byType(TextField), 'χταπόδι ψητό');
+        },
+      ));
+  Future<void> foodScreen(WidgetTester tester, String name, Widget home, {Future<void> Function(WidgetTester)? act}) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(400, 1400) * 2.0;
+    addTearDown(tester.view.reset);
+    final key = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(
+      key: key,
+      child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(Brightness.light), home: home),
+    ));
+    await tester.pumpAndSettle();
+    if (act != null) {
+      await act(tester);
+      await tester.pumpAndSettle();
+    }
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
+  }
+
+  testWidgets('Διατροφή · ετικέτα με νάτριο', (t) => foodScreen(
+        t,
+        'food_label_sodium',
+        FoodFormScreen(draft: FoodDraft(name: 'Κράκερ σίτου', brand: 'Δείγμα')),
+        act: (t) async {
+          await t.enterText(find.byKey(const ValueKey('field-kcal')), '450');
+          await t.enterText(find.byKey(const ValueKey('field-protein')), '8');
+          await t.enterText(find.byKey(const ValueKey('field-carbs')), '60');
+          await t.enterText(find.byKey(const ValueKey('field-fat')), '18');
+          await t.tap(find.text('Νάτριο mg'));
+          await t.pumpAndSettle();
+          await t.enterText(find.byKey(const ValueKey('field-salt')), '400');
+          await t.pumpAndSettle();
+          await t.ensureVisible(find.byKey(const ValueKey('field-salt')));
+        },
+      ));
+  testWidgets('Διατροφή · ποσότητα σε ml', (t) => foodScreen(
+        t,
+        'food_quantity_ml',
+        Scaffold(
+          body: QuantitySheet(
+            food: sampleFoodStore(now),
+            item: foodFromDraft(
+              FoodDraft(
+                name: 'Ελαιόλαδο εξαιρετικό παρθένο (φιάλη 1 l)',
+                brand: 'Δείγμα',
+                values: {Nk.kcal: 824, Nk.protein: 0, Nk.carbs: 0, Nk.fat: 91.6, Nk.satFat: 13, Nk.salt: 0},
+                perMl: true,
+                fromOff: true,
+              ),
+              'Mshot',
+            ),
+            initialGrams: 15,
+            meal: Meal.lunch,
+          ),
+        ),
+      ));
+  testWidgets('Διατροφή · πηγές και άδειες', (t) => foodScreen(t, 'food_sources', const FoodSourcesScreen()));
   testWidgets('Διατροφή · ποσότητα', (t) => _shot(
         t,
         name: '18_quantity_sheet',
