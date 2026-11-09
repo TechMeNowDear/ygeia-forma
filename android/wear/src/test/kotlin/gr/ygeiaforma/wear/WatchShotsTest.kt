@@ -157,6 +157,15 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.WALK
         shot("W7_walk")
 
+        // 9/11 (V-A-04): περπάτημα με όριο, χωρίς κανέναν παλμό: «το όριο δεν σε προσέχει».
+        Repo.alarm.limit = 140
+        Repo.bpm = 0
+        Repo.bpmAt = 0
+        shot("W7d_walk_no_hr_limit")
+        Repo.bpm = 104
+        Repo.bpmAt = now
+        Repo.alarm.limit = null
+
         // 9/11: παύση και λεπτό αποκατάστασης.
         Repo.paused = true
         shot("W7b_walk_paused")

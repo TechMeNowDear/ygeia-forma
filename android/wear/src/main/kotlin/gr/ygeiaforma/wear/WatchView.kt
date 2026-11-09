@@ -171,6 +171,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         if (!fresh && Repo.running != null) {
             // Δεν φτάνουν τιμές: να φαίνεται, όχι μια παύλα που μοιάζει με «όλα καλά».
             t(c, "♥ δεν μετριούνται", y, if (Repo.alarm.limit != null) orange else gray, size * 0.75f, true)
+            // Με όριο γιατρού (έλεγχος 9/11, V-A-04): ξεκάθαρα ότι το όριο δεν προσέχει τώρα.
+            if (Repo.alarm.limit != null) t(c, "το όριο δεν σε προσέχει", y + size * 0.85f, orange, size * 0.62f, false, 120f)
             return
         }
         val s = if (fresh) "♥ ${Repo.bpm}" else "♥ —"

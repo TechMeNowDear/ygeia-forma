@@ -102,7 +102,8 @@ class ExerciseService : Service() {
     private var restBuzzedFor = 0L
     private var lastHrSent = 0L
     private var lastLiveSent = 0L
-    private var lostBuzzed = false
+    /** «Δεν μετριούνται παλμοί» με όριο: μία δόνηση (V-A-04). */
+    private val silence = HrSilence()
     private var lastPendingSent = 0L
     /** Εφεδρεία αισθητήρα για την ειδοποίηση (μόνο χωρίς παράδοση ανά 5″ και με όριο). */
     private var sensor: HrSensor? = null
@@ -152,6 +153,7 @@ class ExerciseService : Service() {
         Repo.hr = HrStats(now)
         Repo.alarm.limit = Repo.plan?.hrLimit
         Repo.alarm.reset()
+        silence.reset()
 
         val walk = kind == "walk"
         // GPS μόνο με άδεια ΚΑΙ με την τοποθεσία του ρολογιού ανοιχτή (αλλιώς το Health Services αρνείται την άσκηση).
@@ -401,12 +403,12 @@ class ExerciseService : Service() {
             // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2):
             // στο περπάτημα μετά από 15″, στα βάρη μετά από 45″ (ο καρπός που λυγίζει κόβει συχνά για λίγο). Τρεις
             // σύντομες, για να μη μοιάζει με το τέλος του διαλείμματος (δύο μεγαλύτερες).
+            // Έλεγχος 9/11 (V-A-04): και όταν δεν ήρθε ΚΑΝΕΝΑΣ παλμός 30″ μετά την αρχή (πριν: καμία δόνηση), με άλλο
+            // μοτίβο (μία μακριά και δύο σύντομες). Μία φορά· ξανά μόνο αν ξαναέρθουν παλμοί και χαθούν.
             val lostAfter = if (Repo.running == "walk") 15_000L else 45_000L
-            if (fresh) {
-                lostBuzzed = false
-            } else if (!Repo.paused && Repo.alarm.limit != null && Repo.bpmAt > 0 && now - maxOf(Repo.bpmAt, Repo.steadyUntil) >= lostAfter && !lostBuzzed) {
-                lostBuzzed = true
-                vibrate(longArrayOf(0, 70, 90, 70, 90, 70))
+            val lastAt = if (Repo.bpmAt > 0) maxOf(Repo.bpmAt, Repo.steadyUntil) else 0L
+            if (silence.check(now, Repo.startedAt, lastAt, fresh, Repo.alarm.limit != null, Repo.paused, lostAfter)) {
+                vibrate(if (silence.state == HrSilence.Silence.NEVER) longArrayOf(0, 400, 150, 70, 90, 70) else longArrayOf(0, 70, 90, 70, 90, 70))
             }
             // Τέλος του λεπτού αποκατάστασης.
             if (Repo.recoveryUntil > 0 && now >= Repo.recoveryUntil) {
@@ -567,6 +569,8 @@ class ExerciseService : Service() {
         }
         // Για τον έλεγχο στη συσκευή: πώς ήρθαν οι παλμοί και το μεγαλύτερο κενό (φαίνεται στη σύνοψη του κινητού).
         if (result != null && Repo.hrMode.isNotEmpty()) result.second.put("hrMode", Repo.hrMode).put("hrGap", Repo.hrGaps.maxGapSec)
+        // Το όριο που ίσχυε στην άσκηση (έλεγχος 9/11, V-B-04· 0 = χωρίς όριο). Νέο πεδίο: το παλιό κινητό το αγνοεί.
+        result?.second?.put("lim", Repo.alarm.limit ?: 0)
         if (result != null) {
             Repo.snapshot(this, result.second)
             if (Link.putResult(this, result.first, result.second)) Repo.snapshot(this, null)

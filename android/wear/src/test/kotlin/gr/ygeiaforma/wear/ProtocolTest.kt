@@ -245,6 +245,53 @@ class ProtocolTest {
     }
 
     @Test
+    fun noHeartRateEverWithLimitBuzzesOnce() {
+        // V-A-04: άσκηση με όριο, κανένας παλμός ποτέ (π.χ. το Health Services αρνήθηκε): πριν, καμία δόνηση.
+        val s = HrSilence()
+        val t0 = 1_000_000L
+        assertFalse(s.check(t0 + 10_000, t0, 0, live = false, hasLimit = true, paused = false, lostMs = 15_000))
+        assertNull(s.state)
+        assertTrue(s.check(t0 + 30_000, t0, 0, live = false, hasLimit = true, paused = false, lostMs = 15_000))
+        assertEquals(HrSilence.Silence.NEVER, s.state)
+        // μία φορά, όχι κάθε δευτερόλεπτο
+        for (k in 31..200) assertFalse(s.check(t0 + k * 1_000L, t0, 0, false, true, false, 15_000))
+        assertEquals(HrSilence.Silence.NEVER, s.state)
+    }
+
+    @Test
+    fun noHeartRateWithoutLimitOrPausedDoesNotBuzz() {
+        val t0 = 1_000_000L
+        val a = HrSilence()
+        assertFalse(a.check(t0 + 60_000, t0, 0, live = false, hasLimit = false, paused = false, lostMs = 15_000))
+        // η οθόνη ξέρει ότι δεν μετριούνται, ακόμα και χωρίς όριο
+        assertEquals(HrSilence.Silence.NEVER, a.state)
+        val b = HrSilence()
+        assertFalse(b.check(t0 + 60_000, t0, 0, live = false, hasLimit = true, paused = true, lostMs = 15_000))
+        // μετά την παύση: δονείται
+        assertTrue(b.check(t0 + 61_000, t0, 0, live = false, hasLimit = true, paused = false, lostMs = 15_000))
+    }
+
+    @Test
+    fun lostHeartRateBuzzesAgainOnlyAfterRecovery() {
+        val s = HrSilence()
+        val t0 = 1_000_000L
+        // ήρθαν παλμοί: τίποτα
+        assertFalse(s.check(t0 + 5_000, t0, t0 + 5_000, live = true, hasLimit = true, paused = false, lostMs = 15_000))
+        // χάθηκαν: μετά από 15″ μία δόνηση (LOST, όχι NEVER)
+        assertFalse(s.check(t0 + 19_000, t0, t0 + 5_000, false, true, false, 15_000))
+        assertTrue(s.check(t0 + 20_000, t0, t0 + 5_000, false, true, false, 15_000))
+        assertEquals(HrSilence.Silence.LOST, s.state)
+        assertFalse(s.check(t0 + 60_000, t0, t0 + 5_000, false, true, false, 15_000))
+        // ξαναήρθαν και ξαναχάθηκαν: ξανά μία
+        assertFalse(s.check(t0 + 70_000, t0, t0 + 70_000, live = true, hasLimit = true, paused = false, lostMs = 15_000))
+        assertNull(s.state)
+        assertTrue(s.check(t0 + 86_000, t0, t0 + 70_000, false, true, false, 15_000))
+        assertFalse(s.check(t0 + 87_000, t0, t0 + 70_000, false, true, false, 15_000))
+        s.reset()
+        assertNull(s.state)
+    }
+
+    @Test
     fun formats() {
         assertEquals("1:04", clock(64))
         assertEquals("1:02:05", clock(3725))
