@@ -120,6 +120,9 @@ const painNames = {
   'knee': 'γόνατο',
 };
 
+/// Το [Session.workout] της «Ελεύθερης άσκησης». Με «_» μπροστά, για να μη συμπέσει ποτέ με προπόνηση προγράμματος.
+const freeWorkoutId = '_free';
+
 class Session {
   Session({
     required this.id,
@@ -198,6 +201,9 @@ class Session {
   int? hrrEnd, hrr1;
 
   bool get isCardio => cardioMinutes != null;
+
+  /// «Ελεύθερη άσκηση»: χωρίς πρόγραμμα, οι ασκήσεις μπαίνουν μία-μία.
+  bool get isFree => workout == freeWorkoutId;
 
   bool get finished => end != null;
   int get setsDone => items.fold(0, (s, e) => s + e.done.length);

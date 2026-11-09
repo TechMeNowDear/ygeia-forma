@@ -259,6 +259,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     // ------------------------------------------------------------------ Β. σετ
     private fun drawSet(c: Canvas, now: Long) {
         val s = Repo.session ?: return drawHome(c)
+        // «Ελεύθερη άσκηση» του κινητού χωρίς ασκήσεις ακόμα (9/11): οι παλμοί μετράνε, η άσκηση διαλέγεται στο κινητό.
+        if (s.phone && s.items.isEmpty()) return drawPickOnPhone(c, now)
         val it = s.current ?: return drawEnd(c)
         heart(c, 40f, now)
         val si = it.nextSet.let { n -> if (n < 0) it.sets.size - 1 else n }
@@ -277,6 +279,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             pillAt(c, "+", 146f, ry, 24f, 20f, card, Color.WHITE, 14f) { actions.reps(1) }
         }
         pill(c, "✓", 152f, 80f, 30f, green, Color.WHITE, 18f) { actions.tick() }
+        hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finish() })
+        small(c, "Τέλος", 182f, gray, 8.5f, 60f)
+    }
+
+    private fun drawPickOnPhone(c: Canvas, now: Long) {
+        heart(c, 52f, now)
+        t(c, "Διάλεξε άσκηση", 92f, Color.WHITE, 14f, true)
+        t(c, "στο κινητό", 112f, Color.WHITE, 14f, true)
+        small(c, "οι παλμοί ήδη μετράνε", 134f, gray, 8.5f, 140f)
         hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finish() })
         small(c, "Τέλος", 182f, gray, 8.5f, 60f)
     }

@@ -153,6 +153,18 @@ class ProtocolTest {
         assertEquals(99, s.restEnd)
     }
 
+    /** «Ελεύθερη άσκηση» του κινητού χωρίς ασκήσεις (9/11): κανένα σφάλμα, τίποτα δεν στέλνεται ως ✓. */
+    @Test
+    fun emptyFreePhoneSession() {
+        val s = LiveSession.parsePhone("""{"active":true,"id":"s2","w":"_free","name":"Ελεύθερη άσκηση","start":1,"idx":0,"items":[]}""")!!
+        assertNull(s.current)
+        assertEquals(LiveSession.Next.END, s.tick(5))
+        assertEquals(LiveSession.Next.END, s.skip())
+        assertEquals(0, s.setsDone)
+        Repo.applyPhone(s)
+        Repo.applyPhone(null)
+    }
+
     @Test
     fun alarm() {
         val a = HrAlarm(140)

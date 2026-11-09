@@ -78,9 +78,11 @@ class _TrainingPageState extends State<TrainingPage> {
 
     if (p == null) {
       cards.add(_noProgram(context));
+      if (cur == null) cards.add(_freeCard(context));
     } else {
       final w = _chosen == null ? p.forDay(today) : p.workout(_chosen);
       cards.add(_todayCard(context, p, w, today));
+      if (cur == null) cards.add(_freeCard(context));
       cards.add(_weekCard(context, p, today));
       side.add(_programCard(context, p));
     }
@@ -118,6 +120,33 @@ class _TrainingPageState extends State<TrainingPage> {
         ),
       ]),
     );
+  }
+
+  /// «Ελεύθερη άσκηση» (9/11): χωρίς πρόγραμμα, διαλέγεις τις ασκήσεις τη στιγμή. Το ρολόι ακολουθεί όπως πάντα.
+  Widget _freeCard(BuildContext context) {
+    final c = Aigaio.of(context);
+    return AppCard(
+      key: const ValueKey('train-free'),
+      onTap: () => _startFree(context),
+      child: Row(children: [
+        IconBadge(Icons.add_rounded, c.exercise),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Ελεύθερη άσκηση', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+            Text('Διαλέγεις τις ασκήσεις τη στιγμή, μία-μία.', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+          ]),
+        ),
+        Icon(Icons.chevron_right_rounded, color: c.textSecondary),
+      ]),
+    );
+  }
+
+  void _startFree(BuildContext context) {
+    if (t.current != null) return;
+    t.startFree();
+    WearLink.main.openWatch();
+    _openSession(context);
   }
 
   Widget _noProgram(BuildContext context) {

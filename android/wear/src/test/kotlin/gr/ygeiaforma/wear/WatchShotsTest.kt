@@ -175,6 +175,12 @@ class WatchShotsTest {
             "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"sets":[{"label":"10,3 kg","reps":8,"done":true}]}]}"""))
         shot("W9_home_phone")
 
+        // 9/11: «Ελεύθερη άσκηση» του κινητού, χωρίς ασκήσεις ακόμα.
+        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s2","w":"_free","name":"Ελεύθερη άσκηση","start":1,"idx":0,"items":[]}"""))
+        Repo.screen = Repo.Screen.SET
+        shot("W9b_free_pick_on_phone")
+        Repo.screen = Repo.Screen.HOME
+
         Repo.applyPhone(null)
         Repo.plan = Plan.parse(planJson)
     }

@@ -306,6 +306,9 @@ class WearLink with WidgetsBindingObserver {
           if (n >= 0) {
             if (c.j['late'] != true) t.focus = n;
             next = _name(s.items[n].ex);
+          } else if (s.isFree) {
+            // Ελεύθερη άσκηση: η επόμενη θα διαλεχτεί στο κινητό· διάλειμμα όπως στο κινητό (session_page._done).
+            next = 'νέα άσκηση';
           }
         } else {
           next = '${_name(e.ex)} · σετ ${e.done.length + 1}';

@@ -438,6 +438,43 @@ class TrainingStore extends ChangeNotifier {
     return s;
   }
 
+  /// «Ελεύθερη άσκηση» (9/11): χωρίς πρόγραμμα· οι ασκήσεις μπαίνουν μία-μία από τη βιβλιοθήκη. Το ρολόι ακολουθεί
+  /// όπως σε κάθε προπόνηση του κινητού (παλμοί, ✓, διάλειμμα).
+  Session startFree() {
+    _focus = 0;
+    _restEnd = null;
+    final s = Session(
+      id: 's${now.millisecondsSinceEpoch}',
+      workout: freeWorkoutId,
+      name: 'Ελεύθερη άσκηση',
+      programId: program?.id ?? '',
+      start: now,
+      items: [],
+    );
+    current = s;
+    save();
+    return s;
+  }
+
+  /// Νέα άσκηση στην προπόνηση που τρέχει. Σετ, επαναλήψεις και διάλειμμα όπως στο πρόγραμμα, αν η άσκηση είναι μέσα·
+  /// αλλιώς 3 σετ, 8–12, διάλειμμα 90″. Τα κιλά από το ιστορικό της άσκησης (όπως σε κάθε προπόνηση).
+  /// Γίνεται η τρέχουσα άσκηση. null χωρίς προπόνηση.
+  ExLog? addExercise(String ex) {
+    final cur = current;
+    if (cur == null) return null;
+    PlanItem? plan;
+    for (final w in program?.workouts ?? const <Workout>[]) {
+      for (final i in w.items) {
+        if (i.ex == ex) plan ??= i;
+      }
+    }
+    final e = _logFor(plan ?? PlanItem(ex: ex));
+    cur.items.add(e);
+    _focus = cur.items.length - 1;
+    save();
+    return e;
+  }
+
   PlanItem? itemOf(ExLog e) {
     final w = program?.workout(current?.workout);
     if (w == null) return null;

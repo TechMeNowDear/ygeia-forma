@@ -750,6 +750,41 @@ void main() {
     await trainShot(t, 'T12_walk_live', phone, Brightness.light);
   });
 
+  // Ελεύθερη άσκηση (9/11): άδεια → αναζήτηση → άσκηση.
+  Future<void> freeStart(WidgetTester t) async {
+    await tapKey(t, 'train-free');
+  }
+
+  Future<void> freePick(WidgetTester t, String q, String id) async {
+    await tapKey(t, 'free-add');
+    await t.enterText(find.byKey(const ValueKey('pick-search')), q);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(ValueKey('pick-$id')));
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('Ελεύθερη άσκηση · κάρτα', (t) => trainShot(t, 'T26_free_card', phone, Brightness.light,
+      act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-free')))));
+  testWidgets('Ελεύθερη άσκηση · άδεια', (t) => trainShot(t, 'T26b_free_empty', phoneShort, Brightness.light, act: freeStart));
+  testWidgets('Ελεύθερη άσκηση · διάλεξε', (t) => trainShot(t, 'T26c_free_picker', phoneShort, Brightness.light, act: (t) async {
+        await freeStart(t);
+        await tapKey(t, 'free-add');
+      }));
+  testWidgets('Ελεύθερη άσκηση · αναζήτηση', (t) => trainShot(t, 'T26d_free_search', phoneShort, Brightness.light, act: (t) async {
+        await freeStart(t);
+        await tapKey(t, 'free-add');
+        await t.enterText(find.byKey(const ValueKey('pick-search')), 'λαστιχο');
+        await t.pumpAndSettle();
+      }));
+  testWidgets('Ελεύθερη άσκηση · με άσκηση', (t) => trainShot(t, 'T26e_free_one', phoneShort, Brightness.light, act: (t) async {
+        await freeStart(t);
+        await freePick(t, 'πλαγιες', 'lateral_raise');
+      }));
+  testWidgets('Ελεύθερη άσκηση · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T26f_free_open_dark', open, Brightness.dark, act: (t) async {
+        await freeStart(t);
+        await freePick(t, 'πλαγιες', 'lateral_raise');
+      }));
+
   // Απλοποίηση (9/11): μόνο το όριο παλμών από τον γιατρό, χωρίς κλείδωμα.
   testWidgets('Προπόνηση · όριο παλμών', (t) => trainShot(t, 'T13_hr_limit', phone, Brightness.light, act: (t) => tapKey(t, 'train-hrlimit')));
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));

@@ -17,6 +17,7 @@ import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
 import '../../widgets.dart';
 import '../exercise_detail.dart';
+import 'ex_picker.dart';
 import 'hr_widgets.dart';
 import 'training_common.dart';
 import 'walk_widgets.dart';
@@ -62,7 +63,7 @@ class _SessionPageState extends State<SessionPage> {
     final s = t.current;
     if (s != null) {
       final i = s.items.indexWhere((e) => !e.skipped && !e.complete);
-      t.setFocusQuiet(i < 0 ? s.items.length - 1 : i);
+      t.setFocusQuiet(i < 0 ? (s.items.isEmpty ? 0 : s.items.length - 1) : i);
     }
     TrainingDevice.keepOn(true);
     TrainingDevice.askNotify();
@@ -120,8 +121,10 @@ class _SessionPageState extends State<SessionPage> {
             ),
           );
         }
-        if (_idx >= s.items.length) t.setFocusQuiet(s.items.length - 1);
         final c = Aigaio.of(context);
+        // «Ελεύθερη άσκηση» χωρίς ασκήσεις ακόμα: μόνο «Πρόσθεσε άσκηση».
+        if (s.items.isEmpty) return _emptyFree(context, s);
+        if (_idx >= s.items.length || _idx < 0) t.setFocusQuiet(s.items.length - 1);
         final e = s.items[_idx];
         return Scaffold(
           appBar: AppBar(
@@ -241,6 +244,27 @@ class _SessionPageState extends State<SessionPage> {
       );
     }
 
+    Widget addChip() => Padding(
+          padding: vertical ? const EdgeInsets.only(bottom: 8) : const EdgeInsets.only(right: 8),
+          child: Material(
+            color: c.card,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(vertical ? 16 : 999), side: BorderSide(color: c.exercise)),
+            child: InkWell(
+              key: const ValueKey('free-add-chip'),
+              customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(vertical ? 16 : 999)),
+              onTap: () => _addExercise(context),
+              child: Padding(
+                padding: vertical ? const EdgeInsets.symmetric(horizontal: 14, vertical: 12) : const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.add_rounded, size: 20, color: c.exercise),
+                  const SizedBox(width: 4),
+                  Text('Άσκηση', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.exercise)),
+                ]),
+              ),
+            ),
+          ),
+        );
+
     if (vertical) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
@@ -248,12 +272,13 @@ class _SessionPageState extends State<SessionPage> {
           child: Text('ΑΣΚΗΣΕΙΣ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
         ),
         for (var i = 0; i < s.items.length; i++) item(i),
+        if (s.isFree) addChip(),
       ]);
     }
     return ListView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      children: [for (var i = 0; i < s.items.length; i++) item(i)],
+      children: [for (var i = 0; i < s.items.length; i++) item(i), if (s.isFree) addChip()],
     );
   }
 
@@ -456,6 +481,9 @@ class _SessionPageState extends State<SessionPage> {
       if (next >= 0) {
         setState(() => _idx = next);
         _rest(e, exName(s.items[next].ex));
+      } else if (s.isFree) {
+        // Ελεύθερη: η επόμενη άσκηση δεν έχει διαλεχτεί ακόμα· το διάλειμμα μετρά κανονικά.
+        _rest(e, 'νέα άσκηση');
       }
     } else {
       _rest(e, '${exName(e.ex)} · σετ ${e.done.length + 1}');
@@ -610,11 +638,68 @@ class _SessionPageState extends State<SessionPage> {
         child: FilledButton(
           key: const ValueKey('sess-next'),
           style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50), padding: pad),
-          onPressed: last ? () => _finish(context) : () => setState(() => _idx++),
-          child: Text(last ? 'Τέλος προπόνησης' : 'Επόμενη άσκηση', style: const TextStyle(fontWeight: FontWeight.w700)),
+          onPressed: last ? (s.isFree ? () => _addExercise(context) : () => _finish(context)) : () => setState(() => _idx++),
+          child: Text(last ? (s.isFree ? 'Νέα άσκηση' : 'Τέλος προπόνησης') : 'Επόμενη άσκηση',
+              maxLines: 1, softWrap: false, style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       ),
     ]);
+  }
+
+  /// «Ελεύθερη άσκηση»: διάλεξε από τη βιβλιοθήκη. Αν είναι ήδη μέσα, πάει σε αυτή (όχι διπλή).
+  Future<void> _addExercise(BuildContext context) async {
+    final s = t.current;
+    if (s == null) return;
+    final id = await pickExercise(context, already: {for (final e in s.items) e.ex});
+    if (id == null || t.current?.id != s.id) return;
+    final at = s.items.indexWhere((e) => e.ex == id);
+    if (at >= 0) {
+      setState(() => _idx = at);
+      return;
+    }
+    t.addExercise(id);
+  }
+
+  Widget _emptyFree(BuildContext context, Session s) {
+    final c = Aigaio.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(s.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        actions: [
+          TextButton(key: const ValueKey('sess-finish'), onPressed: () => _finish(context), child: const Text('Τέλος')),
+          const SizedBox(width: 6),
+        ],
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+              _hr(const EdgeInsets.only(bottom: 12)),
+              AppCard(
+                key: const ValueKey('free-empty'),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text('Διάλεξε την πρώτη άσκηση', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
+                  const SizedBox(height: 6),
+                  Text('Μετά από κάθε άσκηση προσθέτεις την επόμενη. Τα κιλά βγαίνουν από τις προηγούμενες φορές της ίδιας άσκησης· '
+                      'σε άσκηση που κάνεις πρώτη φορά, μετά το 1ο σετ σε ρωτάει πώς πήγε, για να βρεθεί το σωστό βάρος.',
+                      style: TextStyle(fontSize: 14.5, height: 1.45, color: c.textSecondary)),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    key: const ValueKey('free-add'),
+                    style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
+                    onPressed: () => _addExercise(context),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Πρόσθεσε άσκηση', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _swap(BuildContext context, ExLog e) async {
