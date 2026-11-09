@@ -854,7 +854,8 @@ class _SummaryPageState extends State<SummaryPage> {
       ]),
     );
 
-    final left = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio && !withHr) ...exCards];
+    // Fold/tablet: αριστερά τα στοιχεία, οι παλμοί και ό,τι άλλο· δεξιά οι ασκήσεις με τα σετ. Στο κινητό μία στήλη.
+    final exRight = !s.isCardio && withHr;
     final del = widget.live || !t.sessions.any((x) => x.id == s.id)
         ? null
         : OutlinedButton.icon(
@@ -869,12 +870,14 @@ class _SummaryPageState extends State<SummaryPage> {
             label: Text(s.isCardio ? 'Διαγραφή περπατήματος' : 'Διαγραφή προπόνησης', style: const TextStyle(fontWeight: FontWeight.w600)),
           );
     // Με παλμούς οι ασκήσεις πάνε δεξιά (Fold ανοιχτό: δίπλα στο γράφημα)· χωρίς, όπως πριν.
-    final right = <Widget>[
-      if (!s.isCardio && withHr) ...exCards,
+    final others = <Widget>[
       if (next.isNotEmpty) nextCard,
       if (widget.live || s.feel != null) feel,
       if (del != null) del,
     ];
+    final left = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio && !exRight) ...exCards, if (exRight) ...others];
+    final right = <Widget>[if (exRight) ...exCards else ...others];
+    final narrow = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio) ...exCards, ...others];
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.live
@@ -887,7 +890,7 @@ class _SummaryPageState extends State<SummaryPage> {
           const gap = SizedBox(height: 12);
           List<Widget> spaced(List<Widget> l) => [for (var i = 0; i < l.length; i++) ...[if (i > 0) gap, l[i]]];
           if (k.maxWidth < 720) {
-            return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: spaced([...left, ...right]));
+            return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: spaced(narrow));
           }
           return Align(
             alignment: Alignment.topCenter,
@@ -967,16 +970,25 @@ class _ExerciseCard extends StatelessWidget {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(child: Text(exName(e.ex), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
           if (showHr)
-            Text(hr?.avg == null ? '♥ —' : '♥ ~${hr!.avg}',
-                key: ValueKey('sum-ex-avg-${e.ex}'),
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: hr?.avg == null ? c.textSecondary : c.exercise)),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.favorite_rounded, size: 15, color: hr?.avg == null ? c.textSecondary : c.exercise),
+              const SizedBox(width: 4),
+              Text(hr?.avg == null ? '—' : '~${hr!.avg}',
+                  key: ValueKey('sum-ex-avg-${e.ex}'),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: hr?.avg == null ? c.textSecondary : c.exercise)),
+            ]),
         ]),
         if (showHr && hr?.avg != null) Text('μέσος όρος των σετ', style: head),
         const SizedBox(height: 6),
         if (e.skipped || done.isEmpty)
           Text(e.skipped ? 'Παραλείφθηκε' : 'Δεν έγινε', style: TextStyle(fontSize: 14.5, color: c.textSecondary))
         else ...[
-          row([Text('σετ', style: head), Text(hasLoad(e.kind) ? 'κιλά × επαναλήψεις' : 'επαναλήψεις', style: head), Text('♥ σετ', style: head), Text('♥ διάλειμμα', style: head)]),
+          row([
+            Text('σετ', style: head),
+            Text(hasLoad(e.kind) ? 'κιλά × επαναλήψεις' : 'επαναλήψεις', style: head),
+            _HeartLabel('στο σετ', style: head, color: c.textSecondary),
+            _HeartLabel('διάλειμμα', style: head, color: c.textSecondary),
+          ]),
           for (var j = 0; j < done.length; j++)
             () {
               final i = done[j];
@@ -992,4 +1004,19 @@ class _ExerciseCard extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// Μικρή καρδιά + λέξη (το «♥» ως γράμμα δεν υπάρχει σε κάθε γραμματοσειρά).
+class _HeartLabel extends StatelessWidget {
+  const _HeartLabel(this.text, {required this.style, required this.color});
+  final String text;
+  final TextStyle style;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.favorite_rounded, size: 12, color: color),
+        const SizedBox(width: 3),
+        Flexible(child: Text(text, style: style, overflow: TextOverflow.ellipsis)),
+      ]);
 }
