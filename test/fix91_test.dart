@@ -497,9 +497,13 @@ void main() {
       var at = now;
       final t = TrainingStore(io: MemoryTrainingIO(), clock: () => at)..replaceAll(sampleTraining(now).toJson());
       final link = WearLink()..attachForTest(t);
-      // Έλεγχος του #91 (S7): κανένα σετ → σβήνεται και στο κινητό, όπως λέει το ρολόι· καμία ορφανή ανοιχτή προπόνηση.
+      // Έλεγχος του #91 (S7, N-M1): κανένα σετ → η εντολή «end» μόνη της δεν σβήνει (μπορεί να έρχονται ακόμα ✓/παλμοί)·
+      // σβήνεται με το αποτέλεσμα («fin») αν δεν ήρθε τίποτα: καμία ορφανή ανοιχτή προπόνηση.
       final empty = t.start(t.program!.workout('A')!);
-      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': empty.id, 'at': now.add(const Duration(minutes: 1)).millisecondsSinceEpoch});
+      final fin0 = now.add(const Duration(minutes: 1)).millisecondsSinceEpoch;
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': empty.id, 'at': fin0});
+      expect(t.current, same(empty));
+      expect(t.importWatch({'v': 1, 'kind': 'hr', 'sid': empty.id, 'fin': fin0}), isTrue);
       expect(t.current, isNull);
       expect(t.sessions.any((x) => x.id == empty.id), isFalse);
       expect(t.discardedByWatch, isTrue);
@@ -514,6 +518,40 @@ void main() {
       expect(t.sessions.last.id, s.id);
       expect(t.sessions.last.end, end);
       expect(t.endedByWatch, same(s));
+    });
+
+    test('N-M1: «end» χωρίς σετ, μετά καθυστερημένο ✓ και αποτέλεσμα με ✓ και παλμούς: τίποτα δεν χάνεται', () async {
+      var at = now;
+      final t = TrainingStore(io: MemoryTrainingIO(), clock: () => at)..replaceAll(sampleTraining(now).toJson());
+      t.ready = true;
+      final link = WearLink()..attachForTest(t);
+      final s = t.start(t.program!.workout('A')!);
+      at = now.add(const Duration(minutes: 3));
+      final fin = now.add(const Duration(minutes: 2)).millisecondsSinceEpoch;
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'end', 'sid': s.id, 'at': fin});
+      expect(t.current, same(s), reason: 'όχι σβήσιμο από το μήνυμα μόνο');
+      // καθυστερημένο ✓ (ξαναστάλθηκε) του 1ου σετ
+      link.handle('/ygeia/cmd', {'pv': 1, 'op': 'tick', 'i': 0, 's': 0, 'sid': s.id, 'late': true, 'at': fin - 30000});
+      // και το αποτέλεσμα, με ✓ του 2ου σετ και παλμούς
+      final items = [for (final e in s.items) e.toJson()];
+      final log = (items.first['log'] as List).cast<Map<String, dynamic>>();
+      log[1] = {...log[1], 'd': 1, 't': fin - 10000};
+      final r = jsonEncode({
+        'v': 1, 'kind': 'hr', 'sid': s.id, 'fin': fin, 'hrT0': s.start.millisecondsSinceEpoch,
+        'hr': [for (var k = 0; k < 60; k++) [k, 110]], 'items': items,
+      });
+      expect(await WearLink.importDurably(t, r), isTrue);
+      final kept = t.sessions.singleWhere((x) => x.id == s.id);
+      expect(kept.setsDone, 2);
+      expect(kept.hr.length, 60);
+      expect(kept.end!.millisecondsSinceEpoch, fin);
+      // μόνο παλμοί, κανένα σετ: κρατιέται κι αυτή (δεν σβήνονται μετρημένοι παλμοί)
+      at = now.add(const Duration(minutes: 10));
+      final h = t.start(t.program!.workout('A')!);
+      final fin2 = at.millisecondsSinceEpoch;
+      t.importWatch({'v': 1, 'kind': 'hr', 'sid': h.id, 'fin': fin2, 'hrT0': h.start.millisecondsSinceEpoch, 'hr': [[0, 100], [1, 101]]});
+      expect(t.current, isNull);
+      expect(t.sessions.any((x) => x.id == h.id), isTrue);
     });
 
     test('«fin» στο αποτέλεσμα (το κινητό ήταν κλειστό)· όχι αν συνέχισες στο κινητό μετά', () {

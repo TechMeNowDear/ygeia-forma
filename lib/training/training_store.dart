@@ -746,7 +746,7 @@ class TrainingStore extends ChangeNotifier {
       _mergeWatchSets(s, j['items']);
       // «Τέλος» στο ρολόι (V-A-09): τέλος και εδώ, με την ώρα του ρολογιού (αν δεν συνέχισε στο κινητό στο μεταξύ).
       final fin = j['fin'];
-      if (fin is num && sid != null) endFromWatch(sid, fin.toInt());
+      if (fin is num && sid != null) endFromWatch(sid, fin.toInt(), fromResult: true);
       save();
       return true;
     }
@@ -828,15 +828,22 @@ class TrainingStore extends ChangeNotifier {
   /// «Τέλος» στο ρολόι για την προπόνηση του κινητού [sid] τη στιγμή [at] (ms, έλεγχος 9/11, V-A-09): τέλος και εδώ, με
   /// εκείνη την ώρα. Χωρίς κανένα σετ: σβήνεται (όπως το «Κανένα σετ → Σβήσιμο» του κινητού· το ρολόι το λέει πριν από
   /// το δεύτερο πάτημα), ώστε να μη μένει ανοιχτή. Όχι αν συνέχισες στο κινητό μετά.
-  bool endFromWatch(String sid, int at) {
+  ///
+  /// [fromResult]: ήρθε με το αποτέλεσμα του ρολογιού («fin»), ΑΦΟΥ ενώθηκαν τα σετ και οι παλμοί του. Μόνο τότε μια
+  /// προπόνηση χωρίς σετ σβήνεται — και μόνο αν δεν έφτασε κανένας παλμός· η εντολή «end» μόνη της (μήνυμα) δεν σβήνει
+  /// τίποτα, γιατί ✓ και παλμοί μπορεί να έρχονται ακόμα (έλεγχος του #91, N-M1).
+  bool endFromWatch(String sid, int at, {bool fromResult = false}) {
     final s = current;
     if (s == null || s.id != sid) return false;
     if (at < s.lastActivity.millisecondsSinceEpoch - 60000) return false;
     if (s.setsDone == 0) {
-      endedByWatch = null;
-      discardedByWatch = true;
-      discard();
-      return true;
+      if (!fromResult) return false;
+      if (s.hr.isEmpty) {
+        endedByWatch = null;
+        discardedByWatch = true;
+        discard();
+        return true;
+      }
     }
     final lo = s.start.millisecondsSinceEpoch;
     final n = now.millisecondsSinceEpoch;
