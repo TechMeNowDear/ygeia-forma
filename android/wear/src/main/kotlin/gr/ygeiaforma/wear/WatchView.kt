@@ -287,7 +287,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         heart(c, 52f, now)
         t(c, "Διάλεξε άσκηση", 92f, Color.WHITE, 14f, true)
         t(c, "στο κινητό", 112f, Color.WHITE, 14f, true)
-        small(c, "οι παλμοί ήδη μετράνε", 134f, gray, 8.5f, 140f)
+        small(c, if (Repo.bpmFresh(now)) "οι παλμοί ήδη μετράνε" else "περιμένω παλμούς", 134f, gray, 8.5f, 140f)
         hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finish() })
         small(c, "Τέλος", 182f, gray, 8.5f, 60f)
     }
