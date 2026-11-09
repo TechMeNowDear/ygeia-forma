@@ -126,7 +126,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun noteLines(c: Canvas, note: String) {
         text.textSize = 8f * u
         text.typeface = Typeface.DEFAULT
-        if (text.measureText(note) <= 96f * u) {
+        // Δύο γραμμές μόνο στην οθόνη του σετ (εκεί κάτω είναι μόνο το «Τέλος», που κρύβεται όσο φαίνεται το μήνυμα).
+        if (Repo.screen != Repo.Screen.SET || text.measureText(note) <= 96f * u) {
             small(c, note, 186f, gray, 8f, 100f)
             return
         }
@@ -368,7 +369,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         pill(c, "✓", 152f, 80f, 30f, green, Color.WHITE, 18f) { actions.tick() }
         hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finishWorkout() })
-        small(c, "Τέλος", 182f, gray, 8.5f, 60f)
+        if (Repo.notice == null) small(c, "Τέλος", 182f, gray, 8.5f, 60f)
     }
 
     private fun drawPickOnPhone(c: Canvas, now: Long, next: Boolean = false) {
@@ -383,7 +384,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         small(c, if (Repo.bpmFresh(now)) "οι παλμοί ήδη μετράνε" else "περιμένω παλμούς", 134f, gray, 8.5f, 140f)
         hits.add(Hit(RectF(cx - 30 * u, 172 * u, cx + 30 * u, 196 * u)) { actions.finishWorkout() })
-        small(c, "Τέλος", 182f, gray, 8.5f, 60f)
+        if (Repo.notice == null) small(c, "Τέλος", 182f, gray, 8.5f, 60f)
     }
 
     private fun s0(): Int = Repo.session?.setsDone ?: 0
