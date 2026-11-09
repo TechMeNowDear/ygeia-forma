@@ -11,6 +11,7 @@ import '../../training/progression.dart';
 import '../../training/program.dart';
 import '../../training/session.dart';
 import '../../training/set_hr.dart';
+import '../../training/walk_stats.dart';
 import '../../training/training_device.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
@@ -18,6 +19,7 @@ import '../../widgets.dart';
 import '../exercise_detail.dart';
 import 'hr_widgets.dart';
 import 'training_common.dart';
+import 'walk_widgets.dart';
 
 /// Μετακίνηση ανάμεσα στα διαθέσιμα βάρη (με τα βελάκια). Στο λάστιχο βοήθειας περιλαμβάνεται και το «χωρίς».
 double? shiftLoad(LoadKind k, double? v, int dir) {
@@ -875,9 +877,24 @@ class _SummaryPageState extends State<SummaryPage> {
       if (widget.live || s.feel != null) feel,
       if (del != null) del,
     ];
-    final left = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio && !exRight) ...exCards, if (exRight) ...others];
-    final right = <Widget>[if (exRight) ...exCards else ...others];
-    final narrow = <Widget>[stats, if (hrCard != null) hrCard, if (!s.isCardio) ...exCards, ...others];
+    // Περπάτημα (9/11): ρυθμός, βήματα/λεπτό, παύσεις, ανά km (με GPS), πτώση παλμών στο 1′.
+    final km = s.isCardio ? walkSplits(s) : const <KmSplit>[];
+    final walk = <Widget>[
+      if (km.isNotEmpty) KmCard(splits: km),
+      if (RecoveryCard.shows(s)) RecoveryCard(session: s),
+    ];
+    final extra = s.isCardio && WalkExtraCard.shows(s) ? WalkExtraCard(session: s) : null;
+    final List<Widget> left, right;
+    if (s.isCardio) {
+      left = [stats, if (extra != null) extra, if (hrCard != null) hrCard];
+      right = [...walk, ...others];
+    } else {
+      left = [stats, if (hrCard != null) hrCard, if (!exRight) ...exCards, if (exRight) ...others];
+      right = [if (exRight) ...exCards else ...others];
+    }
+    final narrow = s.isCardio
+        ? <Widget>[stats, if (extra != null) extra, if (hrCard != null) hrCard, ...walk, ...others]
+        : <Widget>[stats, if (hrCard != null) hrCard, ...exCards, ...others];
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.live

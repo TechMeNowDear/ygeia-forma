@@ -87,6 +87,45 @@ class ProtocolTest {
     }
 
     @Test
+    fun recoveryAfterEnd() {
+        val hr = HrStats(0)
+        // 120″ περπάτημα στους 120, μετά «Τέλος» και πτώση: 100 στο 1′.
+        for (t in 0..120) hr.add(120, t * 1000L)
+        hr.markEnd(120_000)
+        for (t in 121..190) hr.add(if (t < 170) 110 else 100, t * 1000L)
+        val r = hr.recovery()!!
+        assertEquals(120, r.first)
+        // 55″–65″ μετά το τέλος = 175″–185″: όλα 100.
+        assertEquals(100, r.second)
+        // Ο μέσος και το υψηλότερο: μόνο ως το «Τέλος».
+        assertEquals(120, hr.avg)
+        assertEquals(120, hr.max)
+        // Στο κινητό πάνε μόνο οι τιμές ως το «Τέλος».
+        val o = JSONObject()
+        hr.writeTo(o)
+        val a = o.getJSONArray("hr")
+        assertEquals(120, a.getJSONArray(a.length() - 1).getInt(0))
+        // Λίγες τιμές στο 1′ (π.χ. έφυγε το ρολόι από τον καρπό): καμία τιμή.
+        val few = HrStats(0)
+        for (t in 0..60) few.add(120, t * 1000L)
+        few.markEnd(60_000)
+        few.add(100, 116_000)
+        assertNull(few.recovery())
+    }
+
+    @Test
+    fun pauseNotInAverage() {
+        val hr = HrStats(0)
+        hr.add(120, 1000)
+        hr.counting = false
+        hr.add(80, 2000)
+        hr.counting = true
+        hr.add(120, 3000)
+        assertEquals(120, hr.avg)
+        assertEquals(3, hr.samples.size)
+    }
+
+    @Test
     fun hrEverySecondAndCap() {
         val hr = HrStats(0)
         for (s in 0 until 120) hr.add(100 + (s % 2), s * 1000L)

@@ -141,8 +141,16 @@ class Session {
     this.hrMode,
     this.hrGap,
     this.stopped = false,
+    this.cardioSec,
+    this.gps,
+    List<List<int>>? splits,
+    List<List<int>>? pauses,
+    this.hrrEnd,
+    this.hrr1,
   })  : items = items ?? [],
-        hr = hr ?? [];
+        hr = hr ?? [],
+        splits = splits ?? [],
+        pauses = pauses ?? [];
 
   final String id;
   final String workout;
@@ -176,6 +184,19 @@ class Session {
   /// Σταμάτησε από σύμπτωμα (παλιές καταγραφές ως #84): δεν μετρά για την πρόοδο.
   bool stopped;
 
+  /// Περπάτημα (9/11): ενεργός χρόνος σε δευτερόλεπτα (χωρίς τις παύσεις) και αν μετρούσε το GPS.
+  int? cardioSec;
+  bool? gps;
+
+  /// Κάθε ολόκληρο km: [ενεργός χρόνος ως εκεί (″), ώρα από την αρχή (″)].
+  final List<List<int>> splits;
+
+  /// Παύσεις: [αρχή, τέλος] σε δευτερόλεπτα από την αρχή.
+  final List<List<int>> pauses;
+
+  /// Πτώση παλμών στο 1′ μετά το «Τέλος»: παλμοί στο τέλος και στο 1′ (μετρημένα στο ρολόι), ή null.
+  int? hrrEnd, hrr1;
+
   bool get isCardio => cardioMinutes != null;
 
   bool get finished => end != null;
@@ -203,7 +224,19 @@ class Session {
         if (hrMode != null) 'hrm': hrMode,
         if (hrGap != null) 'hrg': hrGap,
         if (stopped) 'stop': 1,
+        if (cardioSec != null) 'csec': cardioSec,
+        if (gps != null) 'gps': gps,
+        if (splits.isNotEmpty) 'km': splits,
+        if (pauses.isNotEmpty) 'pz': pauses,
+        if (hrrEnd != null) 'hrrE': hrrEnd,
+        if (hrr1 != null) 'hrr1': hrr1,
       };
+
+  /// Λίστα από ζεύγη ακεραίων (π.χ. «km», «pz»), χωρίς ό,τι δεν είναι ζεύγος.
+  static List<List<int>> pairs(Object? v) => [
+        for (final p in (v as List? ?? const []))
+          if (p is List && p.length == 2 && p[0] is num && p[1] is num) [(p[0] as num).toInt(), (p[1] as num).toInt()],
+      ];
 
   factory Session.fromJson(Map<String, dynamic> j) => Session(
         id: j['id'] as String,
@@ -229,5 +262,11 @@ class Session {
         hrGap: (j['hrg'] as num?)?.toInt(),
         // Παλιές καταγραφές (#81–#83): μόνο η σημείωση έδειχνε τη διακοπή από σύμπτωμα.
         stopped: j['stop'] == 1 || ((j['note'] as String?)?.startsWith('Σταμάτησε: ') ?? false),
+        cardioSec: (j['csec'] as num?)?.toInt(),
+        gps: j['gps'] as bool?,
+        splits: pairs(j['km']),
+        pauses: pairs(j['pz']),
+        hrrEnd: (j['hrrE'] as num?)?.toInt(),
+        hrr1: (j['hrr1'] as num?)?.toInt(),
       );
 }

@@ -10,7 +10,7 @@ import org.json.JSONObject
  * Όλες οι αλλαγές γίνονται στο κύριο νήμα· η οθόνη ακούει με [listen].
  */
 object Repo {
-    enum class Screen { HOME, SET, RIR, REST, WALK, END }
+    enum class Screen { HOME, SET, RIR, REST, WALK, RECOVER, END }
 
     var plan: Plan? = null
     /** Προπόνηση που τρέχει στο κινητό (καθρέφτης). */
@@ -56,6 +56,21 @@ object Repo {
     var steps = 0L
     var activeSec = 0L
     var gps = false
+
+    /** Περπάτημα σε παύση (9/11): χρόνος, απόσταση και μέσος παλμών σταματούν· η ειδοποίηση ορίου μένει. */
+    var paused = false
+    /** Παύσεις: [αρχή, τέλος] σε ms (το τέλος 0 όσο κρατά). */
+    val pauses = mutableListOf<LongArray>()
+
+    /** Κάθε ολόκληρο χιλιόμετρο: [ενεργός χρόνος (″), ώρα (ms)]. Μόνο με GPS δείχνεται ανά km στο κινητό. */
+    val splits = mutableListOf<LongArray>()
+
+    /**
+     * Λεπτό αποκατάστασης μετά το «Τέλος» του περπατήματος (9/11): ως πότε (ms), 0 αν δεν τρέχει. Χρόνος, απόσταση
+     * και βήματα έχουν «παγώσει» στο [endAt].
+     */
+    var recoveryUntil = 0L
+    var endAt = 0L
 
     /** Μήνυμα για τον χρήστη (π.χ. λείπει άδεια), ή null. */
     var notice: String? = null
@@ -139,6 +154,11 @@ object Repo {
         steps = 0
         activeSec = 0
         gps = false
+        paused = false
+        pauses.clear()
+        splits.clear()
+        recoveryUntil = 0
+        endAt = 0
         alarmMutedUntil = 0
         steadyUntil = 0
     }

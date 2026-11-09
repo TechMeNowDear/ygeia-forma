@@ -364,6 +364,20 @@ class TrainingStore extends ChangeNotifier {
       s.cardioMinutes = (sec / 60).round();
       s.meters = (cardio['m'] as num?)?.toDouble();
       s.steps = (cardio['steps'] as num?)?.toInt();
+      // 9/11: ενεργός χρόνος, GPS, χιλιόμετρα, παύσεις, πτώση παλμών στο 1′ (ρολόι από #89).
+      s.cardioSec = (cardio['sec'] as num?)?.toInt();
+      if (cardio['gps'] is bool) s.gps = cardio['gps'] as bool;
+      s.splits.addAll(Session.pairs(cardio['km']));
+      s.pauses.addAll(Session.pairs(cardio['pz']));
+      final hrr = cardio['hrr'];
+      if (hrr is Map && hrr['e'] is num && hrr['m'] is num) {
+        final e = (hrr['e'] as num).toInt(), m = (hrr['m'] as num).toInt();
+        // Μόνο λογικές τιμές (παλμοί 30–230): αλλιώς τίποτα.
+        if (e >= 30 && e <= 230 && m >= 30 && m <= 230) {
+          s.hrrEnd = e;
+          s.hrr1 = m;
+        }
+      }
     }
     var at = sessions.length;
     while (at > 0 && sessions[at - 1].start.isAfter(start)) {

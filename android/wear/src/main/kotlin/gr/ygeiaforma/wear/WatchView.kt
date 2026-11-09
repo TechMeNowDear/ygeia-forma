@@ -33,6 +33,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         fun restPlus()
         fun restStop()
         fun finish()
+        fun pauseWalk(on: Boolean)
         fun muteAlarm()
         fun doneOk()
     }
@@ -91,6 +92,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.Screen.RIR -> drawRir(c)
             Repo.Screen.REST -> drawRest(c, now)
             Repo.Screen.WALK -> drawWalk(c, now)
+            Repo.Screen.RECOVER -> drawRecover(c, now)
             Repo.Screen.END -> drawEnd(c)
         }
         if (note != null) small(c, note, 186f, gray, 8f, 120f)
@@ -335,14 +337,32 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     // ------------------------------------------------------------------ Ε. περπάτημα
     private fun drawWalk(c: Canvas, now: Long) {
-        small(c, "ΠΕΡΠΑΤΗΜΑ", 50f, gray, 9f, 120f)
+        small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 50f, if (Repo.paused) orange else gray, 9f, 120f)
         val sec = if (Repo.activeSec > 0) Repo.activeSec else (now - Repo.startedAt) / 1000
-        t(c, clock(sec), 88f, Color.WHITE, 30f, true)
+        t(c, clock(sec), 88f, if (Repo.paused) gray else Color.WHITE, 30f, true)
         val dist = if (Repo.meters > 0) "${km(Repo.meters)} km · ${pace(Repo.meters, sec)}" else if (Repo.steps > 0) "${Repo.steps} βήματα" else "—"
         small(c, dist, 108f, Color.WHITE, 11f, 150f)
         heart(c, 128f, now, 11f)
         if (!Repo.gps) small(c, "χωρίς GPS", 146f, gray, 8f, 100f)
-        pill(c, "Τέλος", 166f, 70f, 24f, card, Color.WHITE, 11f) { actions.finish() }
+        // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν).
+        pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 72f, 166f, 54f, 26f, if (Repo.paused) orange else card, Color.WHITE, 10f) {
+            actions.pauseWalk(!Repo.paused)
+        }
+        pillAt(c, "Τέλος", 128f, 166f, 50f, 26f, card, Color.WHITE, 10f) { actions.finish() }
+    }
+
+    /**
+     * Λεπτό αποκατάστασης μετά το «Τέλος» (9/11): κάθισε, χέρι ακίνητο, χωρίς ομιλία· στο τέλος του μετράμε πόσο έπεσαν
+     * οι παλμοί. «Παράλειψη»: τέλος αμέσως, χωρίς μέτρηση.
+     */
+    private fun drawRecover(c: Canvas, now: Long) {
+        small(c, "ΑΠΟΚΑΤΑΣΤΑΣΗ", 46f, green, 9f, 120f)
+        t(c, "Κάθισε", 68f, Color.WHITE, 15f, true)
+        small(c, "χέρι ακίνητο, μη μιλάς", 84f, Color.WHITE, 9.5f, 150f)
+        val left = ((Repo.recoveryUntil - now + 999) / 1000).coerceAtLeast(0)
+        t(c, "$left″", 116f, Color.WHITE, 26f, true)
+        heart(c, 138f, now, 11f)
+        pill(c, "Παράλειψη", 166f, 80f, 24f, card, Color.WHITE, 10f) { actions.finish() }
     }
 
     // ------------------------------------------------------------------ τέλος

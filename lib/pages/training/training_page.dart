@@ -427,7 +427,13 @@ class _TrainingPageState extends State<TrainingPage> {
         );
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΖΩΝΤΑΝΑ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+        Text(
+            l['rec'] == true
+                ? 'ΠΕΡΠΑΤΗΜΑ · ΛΕΠΤΟ ΑΠΟΚΑΤΑΣΤΑΣΗΣ'
+                : l['paused'] == true
+                    ? 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΣΕ ΠΑΥΣΗ'
+                    : 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΖΩΝΤΑΝΑ',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: l['paused'] == true ? c.exercise : c.textSecondary)),
         const SizedBox(height: 8),
         if (bpm > 0) ...[HrBar(bpm: bpm, limit: t.hrLimit), const SizedBox(height: 10)],
         Row(children: [stat(time, 'χρόνος'), stat(m > 0 ? (m / 1000).toStringAsFixed(2).replaceAll('.', ',') : '—', 'km')]),

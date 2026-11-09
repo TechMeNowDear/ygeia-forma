@@ -687,6 +687,59 @@ void main() {
         await t.tap(find.byKey(const ValueKey('summary-delete')));
         await t.pumpAndSettle();
       }));
+  // 9/11: περπάτημα από το ρολόι με παύση, ανά km (GPS) και πτώση παλμών στο 1′.
+  void walkDone(TrainingStore st) {
+    final start = trainAt.subtract(const Duration(days: 1, hours: 2)).millisecondsSinceEpoch;
+    int hrAt(int t) => t >= 900 && t <= 1020 ? 92 : 98 + (t ~/ 300) % 4 * 3 + (t % 9);
+    st.importWatch({
+      'v': 1,
+      'kind': 'cardio',
+      'id': 'walk$start',
+      'w': 'walk',
+      'name': 'Περπάτημα',
+      'start': start,
+      'end': start + 2050 * 1000,
+      'hrAvg': 106,
+      'hrMax': 118,
+      'hrT0': start,
+      'hr': [
+        for (var t = 0; t <= 2050; t++) [t, hrAt(t)],
+      ],
+      'cardio': {
+        'activity': 'walk',
+        'sec': 1930,
+        'm': 2410.0,
+        'steps': 3320,
+        'gps': true,
+        'km': [
+          [800, 800],
+          [1585, 1705],
+        ],
+        'pz': [
+          [900, 1020],
+        ],
+        'hrr': {'e': 112, 'm': 94},
+      },
+    });
+  }
+
+  Future<void> openWalk(WidgetTester t) async {
+    final f = find.textContaining('12/11 · Περπάτημα');
+    await t.ensureVisible(f);
+    await t.pumpAndSettle();
+    await t.tap(f);
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('Περπάτημα · σύνοψη', (t) => trainShot(t, 'T24_walk_summary', phone, Brightness.light, prep: walkDone, act: openWalk));
+  testWidgets('Περπάτημα · σύνοψη · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T24b_walk_summary_open_dark', open, Brightness.dark, prep: walkDone, act: openWalk));
+  testWidgets('Περπάτημα · πτώση παλμών: οδηγίες', (t) => trainShot(t, 'T25_hrr_info', phone, Brightness.light, prep: walkDone, act: (t) async {
+        await openWalk(t);
+        await t.scrollUntilVisible(find.byKey(const ValueKey('hrr-info')), 300, scrollable: find.byType(Scrollable).last);
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('hrr-info')));
+        await t.pumpAndSettle();
+      }));
   testWidgets('Προπόνηση · περπάτημα ζωντανά από το ρολόι', (t) async {
     WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'steps': 3104, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
     WearLink.main.ready.value = true;

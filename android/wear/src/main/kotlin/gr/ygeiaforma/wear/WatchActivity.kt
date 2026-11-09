@@ -106,12 +106,13 @@ class WatchActivity : Activity(), WatchView.Actions {
             Repo.Screen.REST -> if (s == null || s.restEnd <= now) Repo.screen = if (s == null) Repo.Screen.HOME else Repo.Screen.SET
             Repo.Screen.SET -> if (s == null && Repo.running == null) Repo.screen = Repo.Screen.HOME
                 else if (s != null && s.phone && s.restEnd > now) Repo.screen = Repo.Screen.REST
-            Repo.Screen.HOME -> if (Repo.running == "walk") Repo.screen = Repo.Screen.WALK
+            Repo.Screen.HOME, Repo.Screen.WALK -> if (Repo.running == "walk") Repo.screen = if (Repo.recoveryUntil > 0) Repo.Screen.RECOVER else Repo.Screen.WALK
                 else if (Repo.running != null && s != null) Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             else -> {}
         }
         // Οθόνη αναμμένη μόνο στο διάλειμμα (για να φαίνεται η αντίστροφη μέτρηση)· αλλιώς σβήνει κανονικά.
-        if (Repo.screen == Repo.Screen.REST) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Και στο λεπτό αποκατάστασης (αντίστροφη μέτρηση, 9/11).
+        if (Repo.screen == Repo.Screen.REST || Repo.screen == Repo.Screen.RECOVER) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
@@ -251,6 +252,11 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun finish() {
         val now = System.currentTimeMillis()
+        // Στο λεπτό αποκατάστασης «Παράλειψη»: ένα πάτημα (η άσκηση έχει ήδη τελειώσει).
+        if (Repo.recoveryUntil > 0) {
+            ExerciseService.stop(this)
+            return
+        }
         // Δύο πατήματα για τέλος (ένα τυχαίο άγγιγμα δεν κλείνει την προπόνηση).
         if (now > finishArmedUntil) {
             finishArmedUntil = now + 3000
@@ -276,6 +282,10 @@ class WatchActivity : Activity(), WatchView.Actions {
                 Repo.screen = Repo.Screen.HOME
             }
         }
+    }
+
+    override fun pauseWalk(on: Boolean) {
+        ExerciseService.pause(this, on)
     }
 
     override fun muteAlarm() {

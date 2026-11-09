@@ -275,13 +275,30 @@ class HrStats(private val start: Long, private val step: Int = 1) {
     val samples = mutableListOf<IntArray>()
     private var lastSampleSec = -1
 
+    /**
+     * Μετράνε στον μέσο και στον υψηλότερο; Όχι σε παύση του περπατήματος ούτε στο λεπτό αποκατάστασης μετά το «Τέλος»
+     * (9/11): οι τιμές κρατιούνται για την πτώση των παλμών, αλλά ο μέσος είναι μόνο της άσκησης.
+     */
+    var counting = true
+
+    /** Το «Τέλος» (δευτερόλεπτα από την αρχή): ό,τι μετά είναι λεπτό αποκατάστασης και δεν πάει στο κινητό ως άσκηση. */
+    var endSec = Int.MAX_VALUE
+        private set
+
+    fun markEnd(at: Long) {
+        endSec = ((at - start) / 1000).toInt()
+        counting = false
+    }
+
     fun add(bpm: Int, at: Long) {
         if (bpm <= 25 || bpm >= 250) return // όχι πραγματική τιμή (π.χ. το ρολόι δεν ακουμπά)
-        sum += bpm
-        n++
         last = bpm
-        if (bpm > max) max = bpm
         val sec = ((at - start) / 1000).toInt()
+        if (counting && sec <= endSec) {
+            sum += bpm
+            n++
+            if (bpm > max) max = bpm
+        }
         if (lastSampleSec < 0 || sec - lastSampleSec >= step) {
             samples.add(intArrayOf(sec, bpm))
             lastSampleSec = sec
@@ -294,11 +311,37 @@ class HrStats(private val start: Long, private val step: Int = 1) {
         if (n == 0) return
         o.put("hrAvg", avg).put("hrMax", max).put("hrT0", start)
         val a = JSONArray()
-        for (s in fit(samples)) a.put(JSONArray().put(s[0]).put(s[1]))
+        for (s in fit(samples.filter { it[0] <= endSec })) a.put(JSONArray().put(s[0]).put(s[1]))
         o.put("hr", a)
     }
 
+    /** Πτώση παλμών 1′ μετά το «Τέλος»: (παλμοί στο τέλος, παλμοί στο 1′), ή null. Δες [recovery]. */
+    fun recovery(): Pair<Int, Int>? = if (endSec == Int.MAX_VALUE) null else recovery(samples, endSec)
+
     companion object {
+        /** Πόσο κρατά το λεπτό αποκατάστασης: ως το τέλος του παραθύρου γύρω από το 1′ (55″–65″). */
+        const val RECOVERY_MS = 65_000L
+
+        /**
+         * Πτώση παλμών στο 1ο λεπτό μετά το «Τέλος» (Cole et al., N Engl J Med 1999· εδώ μόνο για σύγκριση με τον εαυτό σου):
+         * παλμοί στο τέλος = μέσος όρος των 10″ ως το «Τέλος»· παλμοί στο 1′ = μέσος όρος από 55″ ως 65″ μετά. Και τα δύο
+         * θέλουν τουλάχιστον 5 τιμές, αλλιώς null (καλύτερα τίποτα παρά λάθος αριθμός).
+         */
+        fun recovery(samples: List<IntArray>, endSec: Int): Pair<Int, Int>? {
+            fun mean(from: Int, to: Int): Int? {
+                var sum = 0
+                var n = 0
+                for (s in samples) if (s[0] in from..to) {
+                    sum += s[1]
+                    n++
+                }
+                return if (n < 5) null else Math.round(sum.toDouble() / n).toInt()
+            }
+            val end = mean(endSec - 10, endSec) ?: return null
+            val oneMin = mean(endSec + 55, endSec + 65) ?: return null
+            return end to oneMin
+        }
+
         /** Ως τόσες τιμές σε ένα αποτέλεσμα (≈ 90′ ανά 1″): χωράνε άνετα στο όριο του Data Layer (100 KB). */
         const val MAX_SAMPLES = 5400
 

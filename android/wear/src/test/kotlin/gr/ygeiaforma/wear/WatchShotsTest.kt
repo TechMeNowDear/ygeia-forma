@@ -57,6 +57,7 @@ class WatchShotsTest {
         override fun restPlus() {}
         override fun restStop() {}
         override fun finish() {}
+        override fun pauseWalk(on: Boolean) {}
         override fun muteAlarm() {}
         override fun doneOk() {}
     }
@@ -155,6 +156,15 @@ class WatchShotsTest {
         Repo.bpmAt = now
         Repo.screen = Repo.Screen.WALK
         shot("W7_walk")
+
+        // 9/11: παύση και λεπτό αποκατάστασης.
+        Repo.paused = true
+        shot("W7b_walk_paused")
+        Repo.paused = false
+        Repo.endAt = now
+        Repo.recoveryUntil = now + 47_000
+        Repo.screen = Repo.Screen.RECOVER
+        shot("W7c_recovery")
 
         Repo.resetExercise()
         Repo.screen = Repo.Screen.END

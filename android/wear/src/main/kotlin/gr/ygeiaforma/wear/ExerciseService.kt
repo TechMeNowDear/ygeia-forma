@@ -31,6 +31,7 @@ import androidx.health.services.client.data.BatchingMode
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseLapSummary
+import androidx.health.services.client.data.ExerciseState
 import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
 import androidx.wear.ongoing.OngoingActivity
@@ -43,6 +44,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Duration
 import java.time.Instant
@@ -58,6 +60,8 @@ class ExerciseService : Service() {
         const val TAG = "YgeiaWatch"
         const val ACTION_START = "gr.ygeiaforma.wear.START"
         const val ACTION_STOP = "gr.ygeiaforma.wear.STOP"
+        const val ACTION_PAUSE = "gr.ygeiaforma.wear.PAUSE"
+        const val ACTION_RESUME = "gr.ygeiaforma.wear.RESUME"
         const val EXTRA_KIND = "kind"
         const val EXTRA_PHONE = "phone"
         private const val NOTIF_ID = 41
@@ -77,6 +81,12 @@ class ExerciseService : Service() {
         fun stop(ctx: Context) {
             if (Repo.running == null) return
             ctx.startService(Intent(ctx, ExerciseService::class.java).setAction(ACTION_STOP))
+        }
+
+        /** Παύση / συνέχεια του περπατήματος (9/11). */
+        fun pause(ctx: Context, on: Boolean) {
+            if (Repo.running != "walk") return
+            ctx.startService(Intent(ctx, ExerciseService::class.java).setAction(if (on) ACTION_PAUSE else ACTION_RESUME))
         }
 
         fun has(ctx: Context, p: String) = ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED
@@ -110,7 +120,9 @@ class ExerciseService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> begin(intent.getStringExtra(EXTRA_KIND) ?: "strength", intent.getBooleanExtra(EXTRA_PHONE, false))
-            ACTION_STOP -> scope.launch { finish() }
+            ACTION_STOP -> scope.launch { stopRequested() }
+            ACTION_PAUSE -> scope.launch { setPaused(true) }
+            ACTION_RESUME -> scope.launch { setPaused(false) }
             else -> if (Repo.running == null) stopSelf()
         }
         return START_NOT_STICKY
@@ -296,10 +308,19 @@ class ExerciseService : Service() {
             }
             if (buzz > 0) onAlarm(buzz)
             if (points.isNotEmpty()) sendHrToPhone(now)
-            m.getData(DataType.DISTANCE_TOTAL)?.let { Repo.meters = it.total }
-            m.getData(DataType.STEPS_TOTAL)?.let { Repo.steps = it.total }
-            update.activeDurationCheckpoint?.let { c ->
-                Repo.activeSec = (c.activeDuration + Duration.between(c.time, Instant.now())).seconds
+            // Μετά το «Τέλος» (λεπτό αποκατάστασης) χρόνος, απόσταση και βήματα μένουν όπως ήταν· μόνο οι παλμοί.
+            if (Repo.recoveryUntil == 0L) {
+                update.activeDurationCheckpoint?.let { c ->
+                    // Σε παύση ο ενεργός χρόνος δεν τρέχει: όχι + ό,τι πέρασε από το σημείο ελέγχου (9/11).
+                    val running = update.exerciseStateInfo.state == ExerciseState.ACTIVE
+                    Repo.activeSec = (if (running) c.activeDuration + Duration.between(c.time, Instant.now()) else c.activeDuration).seconds
+                }
+                m.getData(DataType.DISTANCE_TOTAL)?.let { Repo.meters = it.total }
+                m.getData(DataType.STEPS_TOTAL)?.let { Repo.steps = it.total }
+                // Κάθε ολόκληρο χιλιόμετρο: ενεργός χρόνος και ώρα (για τον πίνακα ανά km στο κινητό).
+                while (Repo.running == "walk" && Repo.meters >= (Repo.splits.size + 1) * 1000.0) {
+                    Repo.splits.add(longArrayOf(Repo.activeSec, now))
+                }
             }
             if (update.exerciseStateInfo.state.isEnded && !stopping) {
                 // Τελείωσε από αλλού (άλλη εφαρμογή, χάθηκε άδεια): κρατάμε ό,τι γράφτηκε.
@@ -356,6 +377,7 @@ class ExerciseService : Service() {
                 lastLiveSent = now
                 val o = JSONObject().put("kind", "walk").put("start", Repo.startedAt).put("sec", Repo.activeSec)
                     .put("m", Repo.meters).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0)
+                    .put("paused", Repo.paused).put("rec", Repo.recoveryUntil > 0)
                 scope.launch { Link.sendJson(this@ExerciseService, Paths.LIVE, o) }
             }
             // ✓ του ρολογιού που δεν έφτασαν στο κινητό: ξανά, ανά 10″ (το κινητό αγνοεί όσα έχει ήδη· έλεγχος #2).
@@ -382,9 +404,14 @@ class ExerciseService : Service() {
             val lostAfter = if (Repo.running == "walk") 15_000L else 45_000L
             if (fresh) {
                 lostBuzzed = false
-            } else if (Repo.alarm.limit != null && Repo.bpmAt > 0 && now - maxOf(Repo.bpmAt, Repo.steadyUntil) >= lostAfter && !lostBuzzed) {
+            } else if (!Repo.paused && Repo.alarm.limit != null && Repo.bpmAt > 0 && now - maxOf(Repo.bpmAt, Repo.steadyUntil) >= lostAfter && !lostBuzzed) {
                 lostBuzzed = true
                 vibrate(longArrayOf(0, 70, 90, 70, 90, 70))
+            }
+            // Τέλος του λεπτού αποκατάστασης.
+            if (Repo.recoveryUntil > 0 && now >= Repo.recoveryUntil) {
+                scope.launch { finish() }
+                return
             }
             // Η προπόνηση του κινητού έκλεισε εκεί: τέλος και εδώ.
             if (Repo.runningPhone && Repo.phone == null && Repo.local == null) {
@@ -444,6 +471,44 @@ class ExerciseService : Service() {
         }
     }
 
+    // ------------------------------------------------------------------ παύση, αποκατάσταση
+    private suspend fun setPaused(on: Boolean) {
+        if (Repo.running != "walk" || Repo.recoveryUntil > 0 || Repo.paused == on || !exerciseStarted) return
+        try {
+            if (on) client.pauseExerciseAsync().await() else client.resumeExerciseAsync().await()
+        } catch (e: Exception) {
+            Log.w(TAG, "pause $on", e)
+            Repo.notice = if (on) "Δεν έγινε παύση." else "Δεν συνεχίστηκε."
+            Repo.changed()
+            return
+        }
+        val now = System.currentTimeMillis()
+        Repo.paused = on
+        Repo.hr?.counting = !on
+        if (on) Repo.pauses.add(longArrayOf(now, 0L)) else Repo.pauses.lastOrNull()?.let { if (it[1] == 0L) it[1] = now }
+        Repo.notice = null
+        Repo.changed()
+    }
+
+    /**
+     * «Τέλος»: στο περπάτημα, με παλμούς και χωρίς παύση, πρώτα το λεπτό αποκατάστασης (πτώση παλμών στο 1′, 9/11)·
+     * δεύτερο «Τέλος» (Παράλειψη) ή κάθε άλλη περίπτωση: τέλος αμέσως.
+     */
+    private suspend fun stopRequested() {
+        val now = System.currentTimeMillis()
+        val hr = Repo.hr
+        if (Repo.running == "walk" && Repo.recoveryUntil == 0L && !Repo.paused && exerciseStarted && hr != null && Repo.bpmFresh(now)) {
+            Repo.endAt = now
+            hr.markEnd(now)
+            Repo.recoveryUntil = now + HrStats.RECOVERY_MS
+            Repo.screen = Repo.Screen.RECOVER
+            vibrate(longArrayOf(0, 120))
+            Repo.changed()
+            return
+        }
+        finish()
+    }
+
     // ------------------------------------------------------------------ τέλος
     private suspend fun finish() {
         if (stopping) return
@@ -454,6 +519,12 @@ class ExerciseService : Service() {
         sensor = null
         Repo.hrGaps.close(if (Repo.bpmAt > 0) minOf(now, Repo.bpmAt + 60_000) else now)
         if (exerciseStarted) {
+            // Ό,τι έχει μετρηθεί και δεν έχει παραδοθεί ακόμα (πακέτα ανά 5″) έρχεται τώρα, πριν από τον λογαριασμό.
+            try {
+                client.flushAsync().await()
+                delay(400)
+            } catch (_: Exception) {
+            }
             try {
                 client.endExerciseAsync().await()
             } catch (_: Exception) {
@@ -470,9 +541,16 @@ class ExerciseService : Service() {
         val result: Pair<String, JSONObject>? = when {
             kind == "walk" -> {
                 val id = "walk${Repo.startedAt}"
+                val end = if (Repo.endAt > 0) Repo.endAt else now
+                Repo.pauses.lastOrNull()?.let { if (it[1] == 0L) it[1] = end }
+                fun sec(ms: Long) = ((ms - Repo.startedAt) / 1000)
                 val cardio = JSONObject().put("activity", "walk").put("sec", Repo.activeSec).put("m", Repo.meters).put("steps", Repo.steps)
+                    .put("gps", Repo.gps)
+                    .put("km", JSONArray().also { a -> for (k in Repo.splits) a.put(JSONArray().put(k[0]).put(sec(k[1]))) })
+                    .put("pz", JSONArray().also { a -> for (p in Repo.pauses) a.put(JSONArray().put(sec(p[0])).put(sec(p[1]))) })
+                hr.recovery()?.let { (e, m) -> cardio.put("hrr", JSONObject().put("e", e).put("m", m)) }
                 val w = Repo.plan?.todayWorkout?.takeIf { it.isCardio }
-                id to LiveSession(id, w?.id ?: "walk", w?.name ?: "Περπάτημα", Repo.startedAt, emptyList()).resultJson(now, hr, cardio)
+                id to LiveSession(id, w?.id ?: "walk", w?.name ?: "Περπάτημα", Repo.startedAt, emptyList()).resultJson(end, hr, cardio)
             }
             local != null && local.setsDone > 0 -> local.id to local.resultJson(now, hr)
             Repo.runningPhone -> {
