@@ -351,12 +351,9 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (now > finishArmedUntil) {
             finishArmedUntil = now + 3000
             // Σε προπόνηση του κινητού το «Τέλος» κλείνει και εκεί (V-A-09): να το ξέρει πριν το δεύτερο πάτημα.
-            // Χωρίς κανένα σετ το κινητό τη σβήνει (όπως το δικό του «Κανένα σετ → Σβήσιμο»): το κείμενο λέει αυτό (S7).
-            val msg = when {
-                !Repo.runningPhone -> FINISH_NOTICE
-                (Repo.phone?.setsDone ?: 0) == 0 -> FINISH_PHONE_EMPTY_NOTICE
-                else -> FINISH_PHONE_NOTICE
-            }
+            // Χωρίς κανένα σετ: το κινητό κρατά την προπόνηση μόνο αν έχει παλμούς, αλλιώς τη σβήνει. Το κείμενο λέει ακριβώς
+            // αυτό, με ό,τι ξέρει το ρολόι (S7).
+            val msg = finishNotice(Repo.runningPhone, Repo.phone?.setsDone ?: 0, (Repo.hr?.samples?.size ?: 0) > 0)
             Repo.notice = msg
             view.postDelayed({ if (Repo.notice == msg) { Repo.notice = null; view.invalidate() } }, 3000)
             return
@@ -399,7 +396,14 @@ class WatchActivity : Activity(), WatchView.Actions {
 private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
 private const val FINISH_NOTICE = "Πάτα ξανά «Τέλος»"
 private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και στο κινητό"
-private const val FINISH_PHONE_EMPTY_NOTICE = "Πάτα ξανά: κανένα σετ, σβήνεται και στο κινητό"
+
+/** Το μήνυμα πριν από το δεύτερο «Τέλος» (αληθινό σε κάθε περίπτωση, έλεγχος του #91, S7). */
+fun finishNotice(phone: Boolean, setsDone: Int, hasHr: Boolean): String = when {
+    !phone -> FINISH_NOTICE
+    setsDone > 0 -> FINISH_PHONE_NOTICE
+    hasHr -> "Κανένα σετ: στο κινητό μένουν μόνο οι παλμοί"
+    else -> "Κανένα σετ ούτε παλμοί: δεν αποθηκεύεται"
+}
 
 /** Η οθόνη είναι στο ambient (αχνή, «πάντα ανοιχτή») ή σβηστή: καμία ανανέωση ανά δευτερόλεπτο (W3-08). */
 fun isAmbientState(state: Int): Boolean =

@@ -261,9 +261,13 @@ class WatchShotsTest {
         Repo.bpm = 118
         Repo.bpmAt = now
         Repo.screen = Repo.Screen.SET
-        Repo.notice = "Πάτα ξανά: κανένα σετ, σβήνεται και στο κινητό"
+        assertEquals("Πάτα ξανά: τέλος και στο κινητό", finishNotice(true, 2, true))
+        assertEquals("Πάτα ξανά «Τέλος»", finishNotice(false, 0, false))
+        Repo.notice = finishNotice(true, 0, true)
         shot("W13_finish_phone_empty")
-        Repo.notice = "Πάτα ξανά: τέλος και στο κινητό"
+        Repo.notice = finishNotice(true, 0, false)
+        shot("W13c_finish_phone_nothing")
+        Repo.notice = finishNotice(true, 1, true)
         shot("W13b_finish_phone")
         Repo.notice = null
         Repo.applyPhone(null)
