@@ -1,0 +1,1985 @@
+{
+ "note": "Από το tools/food/search_expected.py· μην το αλλάζεις με το χέρι.",
+ "queries": [
+  {
+   "q": "φέτα",
+   "count": 3,
+   "top": [
+    "C12066",
+    "C12060",
+    "C7402"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γιαούρτι στραγγιστό 2%",
+   "count": 1,
+   "top": [
+    "U170903"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψωμί ολικής",
+   "count": 2,
+   "top": [
+    "C7110",
+    "C7402"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φακές",
+   "count": 2,
+   "top": [
+    "C20359",
+    "C20360"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ρεβίθια",
+   "count": 3,
+   "top": [
+    "C20516",
+    "C20507",
+    "C20532"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μακαρόνια βρασμένα",
+   "count": 2,
+   "top": [
+    "C9811",
+    "C9871"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ρύζι",
+   "count": 8,
+   "top": [
+    "C9100",
+    "C9119",
+    "C9101"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αυγό",
+   "count": 12,
+   "top": [
+    "C22000",
+    "C22011",
+    "C22014"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπανάνα",
+   "count": 1,
+   "top": [
+    "C13005"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ντομάτα",
+   "count": 6,
+   "top": [
+    "C20385",
+    "C20048",
+    "C20137"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αγγούρι",
+   "count": 1,
+   "top": [
+    "C20019"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κοτόπουλο μπούτι",
+   "count": 4,
+   "top": [
+    "C36002",
+    "C36024",
+    "C36004"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μοσχάρι κιμάς",
+   "count": 8,
+   "top": [
+    "C6250",
+    "C6252",
+    "C6254"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σολομός",
+   "count": 4,
+   "top": [
+    "C26036",
+    "C26229",
+    "C26230"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τόνος κονσέρβα",
+   "count": 2,
+   "top": [
+    "C26039",
+    "C26179"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ελαιόλαδο",
+   "count": 4,
+   "top": [
+    "C17270",
+    "C26040",
+    "C26179"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μέλι",
+   "count": 4,
+   "top": [
+    "C31008",
+    "C20053",
+    "C20002"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "καφές",
+   "count": 4,
+   "top": [
+    "C18004",
+    "C18071",
+    "C18073"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γάλα 1,5%",
+   "count": 1,
+   "top": [
+    "C19033"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κασέρι",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πατάτες φούρνου",
+   "count": 3,
+   "top": [
+    "C4002",
+    "C4030",
+    "U168483"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φασολάκια",
+   "count": 2,
+   "top": [
+    "C20061",
+    "C20320"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σπανάκι",
+   "count": 2,
+   "top": [
+    "C20059",
+    "C20336"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μήλο",
+   "count": 1,
+   "top": [
+    "C13039"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πορτοκάλι",
+   "count": 2,
+   "top": [
+    "C13034",
+    "C2013"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "καρύδια",
+   "count": 1,
+   "top": [
+    "C15005"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αμύγδαλα",
+   "count": 2,
+   "top": [
+    "C15000",
+    "C15041"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "βρώμη",
+   "count": 2,
+   "top": [
+    "C32140",
+    "C9313"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χυμός πορτοκάλι",
+   "count": 1,
+   "top": [
+    "C2013"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπύρα",
+   "count": 1,
+   "top": [
+    "C5001"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κρασί κόκκινο",
+   "count": 1,
+   "top": [
+    "C5214"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σοκολάτα",
+   "count": 3,
+   "top": [
+    "C31004",
+    "C31074",
+    "C31005"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "παξιμάδι",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χόρτα βραστά",
+   "count": 2,
+   "top": [
+    "U169227",
+    "C20301"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μελιτζάνα",
+   "count": 2,
+   "top": [
+    "C20053",
+    "C20002"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κολοκυθάκια",
+   "count": 3,
+   "top": [
+    "C20020",
+    "C20313",
+    "C20021"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πιπεριά",
+   "count": 5,
+   "top": [
+    "C20087",
+    "C20168",
+    "C20085"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ταχίνι",
+   "count": 1,
+   "top": [
+    "C15203"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χαλβάς",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σουβλάκι",
+   "count": 1,
+   "top": [
+    "C25506"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γιαούρτι",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπριζόλα",
+   "count": 4,
+   "top": [
+    "C28100",
+    "C28101",
+    "C6511"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ελιές",
+   "count": 3,
+   "top": [
+    "C13032",
+    "C13033",
+    "C13131"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ζάχαρη",
+   "count": 13,
+   "top": [
+    "C31016",
+    "C31017",
+    "C32113"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φασόλια",
+   "count": 6,
+   "top": [
+    "C20501",
+    "U173758",
+    "U174252"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "λάχανο",
+   "count": 4,
+   "top": [
+    "C20116",
+    "C20014",
+    "C20308"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γάλα",
+   "count": 11,
+   "top": [
+    "C19033",
+    "C19250",
+    "C19200"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αυγά",
+   "count": 12,
+   "top": [
+    "C22000",
+    "C22502",
+    "C22011"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κοτόπουλο",
+   "count": 10,
+   "top": [
+    "C36017",
+    "C36002",
+    "C36024"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μοσχάρι",
+   "count": 16,
+   "top": [
+    "C6206",
+    "U171812",
+    "C6207"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κιμάς",
+   "count": 8,
+   "top": [
+    "C6250",
+    "C6252",
+    "C6254"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πατάτες",
+   "count": 10,
+   "top": [
+    "C4008",
+    "C4003",
+    "C4002"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σύκο",
+   "count": 4,
+   "top": [
+    "C13012",
+    "C13013",
+    "C40106"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπιζέλια",
+   "count": 4,
+   "top": [
+    "C20084",
+    "C20326",
+    "C20515"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπακαλιάρος βραστός",
+   "count": 2,
+   "top": [
+    "C26025",
+    "C26024"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπακαλιαρος βραστος",
+   "count": 2,
+   "top": [
+    "C26025",
+    "C26024"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "bakaliaros vrastos",
+   "count": 2,
+   "top": [
+    "C26025",
+    "C26024"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπακαλιάρος",
+   "count": 5,
+   "top": [
+    "C26043",
+    "C26025",
+    "C26023"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπακαλιάρος παστός",
+   "count": 2,
+   "top": [
+    "C26024",
+    "C26098"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "παστός μπακαλιάρος",
+   "count": 2,
+   "top": [
+    "C26024",
+    "C26098"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μερλούσα βραστή",
+   "count": 1,
+   "top": [
+    "C26120"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σολομός καπνιστός",
+   "count": 1,
+   "top": [
+    "C26037"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φιστίκια",
+   "count": 4,
+   "top": [
+    "C15001",
+    "C15044",
+    "C15002"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φιστίκια αλατισμένα",
+   "count": 2,
+   "top": [
+    "C15002",
+    "C15009"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γαύρος",
+   "count": 2,
+   "top": [
+    "C26079",
+    "C26700"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αντζούγια",
+   "count": 1,
+   "top": [
+    "C26694"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "λάδι ελιάς",
+   "count": 2,
+   "top": [
+    "C17270",
+    "C13131"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "λαδι ελιας",
+   "count": 2,
+   "top": [
+    "C17270",
+    "C13131"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ladi elias",
+   "count": 2,
+   "top": [
+    "C17270",
+    "C13131"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "λάδι",
+   "count": 11,
+   "top": [
+    "C17270",
+    "C13131",
+    "C4032"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "siko",
+   "count": 4,
+   "top": [
+    "C13012",
+    "C13013",
+    "C40106"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σύκα",
+   "count": 2,
+   "top": [
+    "C13012",
+    "C13013"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ξερά σύκα",
+   "count": 1,
+   "top": [
+    "C13013"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σύκο ξερό",
+   "count": 1,
+   "top": [
+    "C13013"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τσίπουρο",
+   "count": 1,
+   "top": [
+    "C1001"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "tsipouro",
+   "count": 1,
+   "top": [
+    "C1001"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τσιπούρα",
+   "count": 3,
+   "top": [
+    "C26088",
+    "C26080",
+    "C27031"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κατσίκι",
+   "count": 4,
+   "top": [
+    "C21800",
+    "C21801",
+    "C12066"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πουρές",
+   "count": 2,
+   "top": [
+    "C4018",
+    "C20170"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πουρές ντομάτας",
+   "count": 1,
+   "top": [
+    "C20170"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "στήθος κοτόπουλου",
+   "count": 3,
+   "top": [
+    "C36017",
+    "C36018",
+    "C36029"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπούτι κοτόπουλου",
+   "count": 4,
+   "top": [
+    "C36002",
+    "C36024",
+    "C36004"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φιλέτο σολομού",
+   "count": 4,
+   "top": [
+    "C26036",
+    "C26229",
+    "C26230"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χυμός πορτοκαλιού",
+   "count": 1,
+   "top": [
+    "C2013"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψωμί ολικής αλέσεως",
+   "count": 1,
+   "top": [
+    "C7110"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χταπόδι ψητό",
+   "count": 2,
+   "top": [
+    "C10079",
+    "C10018"
+   ],
+   "ignored": [
+    "ψητό"
+   ],
+   "corrected": {}
+  },
+  {
+   "q": "χταπόδι σχάρας",
+   "count": 2,
+   "top": [
+    "C10079",
+    "C10018"
+   ],
+   "ignored": [
+    "σχάρας"
+   ],
+   "corrected": {}
+  },
+  {
+   "q": "χταπόδι βραστό",
+   "count": 2,
+   "top": [
+    "C10079",
+    "C10018"
+   ],
+   "ignored": [
+    "βραστό"
+   ],
+   "corrected": {}
+  },
+  {
+   "q": "τσιπούρα σχάρας",
+   "count": 1,
+   "top": [
+    "C27031"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πατάτες ψητές",
+   "count": 3,
+   "top": [
+    "C4002",
+    "C4030",
+    "U168483"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ρυζι ασπρο",
+   "count": 2,
+   "top": [
+    "C9100",
+    "C9104"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τυρί τριμμένο",
+   "count": 2,
+   "top": [
+    "C12122",
+    "C12120"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κοτόπολο",
+   "count": 10,
+   "top": [
+    "C36017",
+    "C36002",
+    "C36024"
+   ],
+   "ignored": [],
+   "corrected": {
+    "κοτόπολο": "κοτόπουλο"
+   }
+  },
+  {
+   "q": "γιαουτρι",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [],
+   "corrected": {
+    "γιαουτρι": "γιαούρτι"
+   }
+  },
+  {
+   "q": "μέλι θυμαρίσιο",
+   "count": 4,
+   "top": [
+    "C31008",
+    "C20053",
+    "C20002"
+   ],
+   "ignored": [
+    "θυμαρίσιο"
+   ],
+   "corrected": {}
+  },
+  {
+   "q": "τυρί cottage",
+   "count": 2,
+   "top": [
+    "U173417",
+    "U172182"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ελληνικός καφές",
+   "count": 4,
+   "top": [
+    "C18004",
+    "C18071",
+    "C18073"
+   ],
+   "ignored": [
+    "ελληνικός"
+   ],
+   "corrected": {}
+  },
+  {
+   "q": "ψάρι",
+   "count": 29,
+   "top": [
+    "C26065",
+    "C26044",
+    "C26051"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψάρια",
+   "count": 29,
+   "top": [
+    "C26065",
+    "C26044",
+    "C26051"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κρέας",
+   "count": 47,
+   "top": [
+    "C36017",
+    "C21800",
+    "C6206"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φρούτα",
+   "count": 33,
+   "top": [
+    "C13134",
+    "C13018",
+    "C13066"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "λαχανικά",
+   "count": 60,
+   "top": [
+    "C20009",
+    "U169226",
+    "C20059"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψάρι ψητό",
+   "count": 7,
+   "top": [
+    "C27030",
+    "C26019",
+    "C26136"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χόρτα",
+   "count": 3,
+   "top": [
+    "U169226",
+    "U169227",
+    "C20301"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αυγό τηγανητό",
+   "count": 1,
+   "top": [
+    "C22505"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σαρδέλες κονσέρβα",
+   "count": 1,
+   "top": [
+    "C26040"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κρασί λευκό",
+   "count": 1,
+   "top": [
+    "C5215"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "whey",
+   "count": 1,
+   "top": [
+    "U173180"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πρωτεΐνη",
+   "count": 1,
+   "top": [
+    "U173180"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γύρος πίτα",
+   "count": 1,
+   "top": [
+    "C25428"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "χούμους",
+   "count": 1,
+   "top": [
+    "C25621"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κρουασάν",
+   "count": 1,
+   "top": [
+    "C7603"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τοστ",
+   "count": 2,
+   "top": [
+    "C25547",
+    "C7200"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψωμί τοστ",
+   "count": 1,
+   "top": [
+    "C7200"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κεφτέδες",
+   "count": 1,
+   "top": [
+    "C25163"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γιαούρτι 0%",
+   "count": 2,
+   "top": [
+    "U170894",
+    "C19594"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "leuko",
+   "count": 11,
+   "top": [
+    "C9100",
+    "C20116",
+    "C9104"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "leyko",
+   "count": 11,
+   "top": [
+    "C9100",
+    "C20116",
+    "C9104"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "gayros",
+   "count": 2,
+   "top": [
+    "C26079",
+    "C26700"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "zahari leuki",
+   "count": 1,
+   "top": [
+    "C31016"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τόνος",
+   "count": 2,
+   "top": [
+    "C26039",
+    "C26179"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "fakes",
+   "count": 2,
+   "top": [
+    "C20359",
+    "C20360"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γιαουρτι 2",
+   "count": 1,
+   "top": [
+    "U170903"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ρεβύθια",
+   "count": 3,
+   "top": [
+    "C20516",
+    "C20507",
+    "C20532"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φιλετο κοτοπουλο",
+   "count": 10,
+   "top": [
+    "C36017",
+    "C36018",
+    "C36002"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μακαρονια",
+   "count": 4,
+   "top": [
+    "C9810",
+    "C9811",
+    "C9870"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ρυζι λευκο",
+   "count": 2,
+   "top": [
+    "C9100",
+    "C9104"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κοτοπουλο στηθος",
+   "count": 3,
+   "top": [
+    "C36017",
+    "C36018",
+    "C36029"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ξυλοκαρβουνο",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ντομάτες",
+   "count": 6,
+   "top": [
+    "C20385",
+    "C20048",
+    "C20137"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ntomates",
+   "count": 6,
+   "top": [
+    "C20385",
+    "C20048",
+    "C20137"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πιπεριές",
+   "count": 5,
+   "top": [
+    "C20087",
+    "C20168",
+    "C20085"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κρεμμύδια",
+   "count": 3,
+   "top": [
+    "C20034",
+    "C20238",
+    "C20035"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φακή",
+   "count": 2,
+   "top": [
+    "C20359",
+    "C20360"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "αμύγδαλο",
+   "count": 2,
+   "top": [
+    "C15000",
+    "C15041"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ελιά",
+   "count": 3,
+   "top": [
+    "C13032",
+    "C13033",
+    "C13131"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "hliosporoi",
+   "count": 2,
+   "top": [
+    "U170562",
+    "C15045"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "angouri",
+   "count": 1,
+   "top": [
+    "C20019"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "xoirino",
+   "count": 8,
+   "top": [
+    "C28100",
+    "C28001",
+    "C28479"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μακαρόνια βραστά",
+   "count": 2,
+   "top": [
+    "C9811",
+    "C9871"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "giaurti",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "augo",
+   "count": 12,
+   "top": [
+    "C22000",
+    "C22011",
+    "C22014"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "καλαμαράκια",
+   "count": 2,
+   "top": [
+    "C10001",
+    "C10084"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "pizza",
+   "count": 1,
+   "top": [
+    "C25404"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "cashew",
+   "count": 1,
+   "top": [
+    "C15054"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "yogurt",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φρουτοσαλάτα",
+   "count": 1,
+   "top": [
+    "C13134"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "καφέ ρύζι",
+   "count": 2,
+   "top": [
+    "C9102",
+    "U169704"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "xeres fakes",
+   "count": 1,
+   "top": [
+    "C20359"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "mango",
+   "count": 1,
+   "top": [
+    "C13025"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μάνγκο",
+   "count": 1,
+   "top": [
+    "C13025"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "xeres",
+   "count": 13,
+   "top": [
+    "C20359",
+    "C20516",
+    "U173758"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "δαμάσκηνα",
+   "count": 2,
+   "top": [
+    "C13100",
+    "C13042"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ketchup",
+   "count": 2,
+   "top": [
+    "C11008",
+    "C11073"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φραπέ",
+   "count": 1,
+   "top": [
+    "C18073"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κουάκερ",
+   "count": 1,
+   "top": [
+    "C32140"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "nescafe",
+   "count": 1,
+   "top": [
+    "C18073"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κόλα",
+   "count": 2,
+   "top": [
+    "C18018",
+    "C18060"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πίτα",
+   "count": 2,
+   "top": [
+    "C7180",
+    "C25428"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φασολάδα",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "γαλέτα",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σαλάτα",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τυ",
+   "count": 19,
+   "top": [
+    "C12068",
+    "C12069",
+    "C12060"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "με",
+   "count": 18,
+   "top": [
+    "C26044",
+    "C20053",
+    "C31008"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψωμί με",
+   "count": 7,
+   "top": [
+    "C7000",
+    "C7255",
+    "C7001"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "freddo",
+   "count": 1,
+   "top": [
+    "C18071"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "kotopoulo",
+   "count": 10,
+   "top": [
+    "C36017",
+    "C36002",
+    "C36024"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ψωμί",
+   "count": 7,
+   "top": [
+    "C7000",
+    "C7255",
+    "C7001"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "ρυζι βραστο",
+   "count": 4,
+   "top": [
+    "C9104",
+    "C9125",
+    "C9105"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κοτόπουλο ψητό",
+   "count": 4,
+   "top": [
+    "C36018",
+    "C36004",
+    "C36005"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "kotopoulo psito",
+   "count": 4,
+   "top": [
+    "C36018",
+    "C36004",
+    "C36005"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "κοτόπουλο φούρνου",
+   "count": 4,
+   "top": [
+    "C36005",
+    "C36018",
+    "C36004"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "παγωτό",
+   "count": 2,
+   "top": [
+    "C39500",
+    "C39517"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τυρί",
+   "count": 16,
+   "top": [
+    "C12066",
+    "C12729",
+    "C12736"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "tiri",
+   "count": 16,
+   "top": [
+    "C12066",
+    "C12729",
+    "C12736"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "τυρί κρέμα",
+   "count": 2,
+   "top": [
+    "C12068",
+    "C12069"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "φρυγανιά",
+   "count": 3,
+   "top": [
+    "C7300",
+    "C7500",
+    "C7340"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μπέργκερ",
+   "count": 3,
+   "top": [
+    "C25413",
+    "C25414",
+    "C7259"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "beer",
+   "count": 4,
+   "top": [
+    "C5001",
+    "C7259",
+    "C25413"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μοσχαρίσια μπριζόλα",
+   "count": 1,
+   "top": [
+    "C6511"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "yiaourti",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "yaourti",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "βούτυρο",
+   "count": 5,
+   "top": [
+    "C16400",
+    "C15202",
+    "C19051"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "voutiro",
+   "count": 5,
+   "top": [
+    "C16400",
+    "C15202",
+    "C19051"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μαγιά",
+   "count": 0,
+   "top": [],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πιπέρι",
+   "count": 5,
+   "top": [
+    "C11015",
+    "C20087",
+    "C20168"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "kremidia",
+   "count": 3,
+   "top": [
+    "C20034",
+    "C20238",
+    "C20035"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "μοσχαρίσια",
+   "count": 12,
+   "top": [
+    "U171812",
+    "U171811",
+    "C6250"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πρόβεια",
+   "count": 3,
+   "top": [
+    "C19882",
+    "C12066",
+    "C19250"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "σοκολάτα υγείας",
+   "count": 2,
+   "top": [
+    "C31074",
+    "C31005"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "olive oil",
+   "count": 1,
+   "top": [
+    "C17270"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "wine",
+   "count": 2,
+   "top": [
+    "C5214",
+    "C5215"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "spaghetti",
+   "count": 2,
+   "top": [
+    "C9810",
+    "C9811"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "πένες",
+   "count": 2,
+   "top": [
+    "C9810",
+    "C9811"
+   ],
+   "ignored": [],
+   "corrected": {}
+  },
+  {
+   "q": "water",
+   "count": 1,
+   "top": [
+    "C18066"
+   ],
+   "ignored": [],
+   "corrected": {}
+  }
+ ]
+}
