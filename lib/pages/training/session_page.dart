@@ -962,7 +962,7 @@ class _ExerciseCard extends StatelessWidget {
           child: Row(children: [
             SizedBox(width: 40, child: cells[0]),
             Expanded(child: cells[1]),
-            if (showHr) ...[SizedBox(width: 62, child: cells[2]), SizedBox(width: 84, child: cells[3])],
+            if (showHr) ...[SizedBox(width: 74, child: cells[2]), const SizedBox(width: 8), SizedBox(width: 88, child: cells[3])],
           ]),
         );
     return AppCard(
