@@ -351,17 +351,40 @@ void main() {
       return out;
     }
 
-    test('publish: needs [build, smoke]· μόνο εκεί «gh release create»· το αποτύπωμα του κλειδιού μένει στο build', () {
+    // Έλεγχος 9/11 (V-A-20): το κλειδί υπογραφής ΜΟΝΟ στο job «sign» (μετά από build ΚΑΙ smoke)· το publish μόνο από το main.
+    test('publish: needs sign, μόνο main· sign: needs [build, smoke], μόνο εκεί το κλειδί· μόνο το publish δημοσιεύει', () {
       final j = jobs();
-      expect(j.keys, containsAll(['build', 'smoke', 'publish']));
-      expect(j['publish'], contains('needs: [build, smoke]'));
+      expect(j.keys, containsAll(['build', 'smoke', 'sign', 'publish']));
+      expect(j['publish'], contains('needs: sign'));
+      expect(j['publish'], contains("if: github.ref == 'refs/heads/main'"));
       expect(j['publish'], contains('gh release create latest'));
+      expect(j['sign'], contains('needs: [build, smoke]'));
+      expect(j['sign'], contains('secrets.YGEIA_KEYSTORE_B64'));
+      expect(j['sign'], contains('tools/ci/sign_apks.sh'));
+      expect(j['sign'], contains('if: always()'), reason: 'το αρχείο του κλειδιού σβήνεται πάντα');
       for (final e in j.entries.where((e) => e.key != 'publish')) {
         expect(e.value.contains('gh release create'), isFalse, reason: '${e.key} δεν δημοσιεύει');
       }
-      expect(j['build'], contains('keytool -list'));
-      expect(j['build'], contains('assetlinks.json'));
+      for (final e in j.entries.where((e) => e.key != 'sign')) {
+        expect(e.value.contains('secrets.'), isFalse, reason: '${e.key} δεν βλέπει κανένα secret');
+      }
+      expect(yml.contains('GITHUB_ENV'), isFalse, reason: 'κανένα secret στο περιβάλλον των επόμενων βημάτων');
       expect(j['build'], contains('actions/upload-artifact'));
+      final sign = File('tools/ci/sign_apks.sh').readAsStringSync();
+      expect(sign, contains('assetlinks.json'));
+      expect(sign, contains('YGEIA_CERT_SHA256'));
+      expect(yml, contains('YGEIA_CERT_SHA256: a4433ab12214'));
+    });
+
+    test('όλα τα workflows: ενέργειες κλειδωμένες σε πλήρες SHA, permissions, χωρίς pull_request_target', () {
+      for (final f in Directory('.github/workflows').listSync().whereType<File>().where((f) => f.path.endsWith('.yml'))) {
+        final w = f.readAsStringSync();
+        for (final m in RegExp(r'uses:\s*(\S+)').allMatches(w)) {
+          expect(m.group(1), matches(RegExp(r'@[0-9a-f]{40}$')), reason: '${f.path}: ${m.group(1)}');
+        }
+        expect(w, contains('permissions:'), reason: f.path);
+        expect(w.contains('pull_request_target'), isFalse, reason: f.path);
+      }
     });
   });
 

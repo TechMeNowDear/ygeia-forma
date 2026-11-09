@@ -1,6 +1,9 @@
 # shellcheck shell=bash
 # Κοινές συναρτήσεις για τους ελέγχους σε emulator (smoke.sh, upgrade.sh, measure.sh). Φορτώνεται με «source».
 # Η Flutter δίνει στο uiautomator τα ονόματα των στοιχείων (semantics, π.χ. «Σήμερα», «Άσκηση» στην κάτω μπάρα).
+# adb από το Android SDK του runner (κάθε script τρέχει σε δικό του shell).
+SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+[ -n "$SDK_DIR" ] && export PATH="$SDK_DIR/platform-tools:$PATH"
 PKG=gr.ygeiaforma.ygeia_forma
 ACT="$PKG/.MainActivity"
 UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

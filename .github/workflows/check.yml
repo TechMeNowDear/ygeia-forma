@@ -347,6 +347,7 @@ jobs:
       - name: Άνοιγμα, αναβάθμιση και widgets σε emulator
         run: |
           set -o pipefail
+          export PATH="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/platform-tools:$PATH"
           bash tools/ci/emulator.sh wait || { echo "::error title=Άνοιγμα::Ο emulator δεν ξεκίνησε· ο έλεγχος δεν έγινε"; exit 1; }
           if bash tools/perf/smoke.sh new.apk 2>&1 | tee smoke.log; then
             echo "::notice title=Άνοιγμα::$(tail -1 smoke.log)"
