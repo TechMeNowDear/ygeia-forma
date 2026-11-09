@@ -136,13 +136,25 @@ class TrainingStore extends ChangeNotifier {
 
   Future<void> _queue = Future.value();
 
+  /// Ό,τι είναι στη μνήμη έχει γραφτεί στο αρχείο: καμία εγγραφή σε αναμονή και η τελευταία πέτυχε (V-A-01).
+  bool _written = true;
+
   /// Κάθε αλλαγή γράφεται αμέσως (με σειρά): αν κλείσει η εφαρμογή στη μέση της προπόνησης, δεν χάνεται σετ.
   Future<void> save() {
     notifyListeners();
     if (readError) return Future.value();
+    // Πριν από την κωδικοποίηση: αν εκείνη πετάξει, η μνήμη έχει αλλάξει χωρίς εγγραφή, άρα «όχι γραμμένο» (κανένα ack).
+    _written = false;
     final text = jsonEncode(toJson());
     _queue = _queue.then((_) async {
-      final ok = await _io.write(text);
+      bool ok;
+      try {
+        ok = await _io.write(text);
+      } catch (_) {
+        // Ποτέ σπασμένη σειρά: μια εξαίρεση εδώ θα σταματούσε όλες τις επόμενες εγγραφές.
+        ok = false;
+      }
+      _written = ok;
       final err = ok ? null : 'Δεν αποθηκεύτηκε η τελευταία αλλαγή στο κινητό.';
       if (err != saveError) {
         saveError = err;
@@ -150,6 +162,15 @@ class TrainingStore extends ChangeNotifier {
       }
     });
     return _queue;
+  }
+
+  /// Περιμένει τις εγγραφές· αν η τελευταία απέτυχε, ξαναγράφει μία φορά. true μόνο αν ό,τι είναι στη μνήμη είναι
+  /// γραμμένο στο αρχείο. Έλεγχος 9/11 (V-A-01): μόνο τότε σβήνεται ένα αποτέλεσμα από το ρολόι.
+  Future<bool> flush() async {
+    if (readError || !ready) return false;
+    await _queue;
+    if (!_written) await save();
+    return !readError && _written;
   }
 
   // ---------------------------------------------------------------- όριο παλμών
@@ -332,6 +353,8 @@ class TrainingStore extends ChangeNotifier {
       }
       if (hrMax != null && (s.hrMax == null || hrMax > s.hrMax!)) s.hrMax = hrMax;
       if (hrAvg != null) s.hrAvg = hrAvg;
+      // Προπόνηση του κινητού που ξεκίνησε πριν από την #90 (χωρίς όριο μέσα): το όριο που είχε το ρολόι.
+      s.limit ??= Session.watchLimit(j['lim']);
       _watchHrInfo(s, j);
       _mergeWatchSets(s, j['items']);
       save();
@@ -356,6 +379,10 @@ class TrainingStore extends ChangeNotifier {
       source: 'watch',
       // «Σταμάτησα» από ρολόι με παλιά έκδοση (ως #84): δεν μετρά για την πρόοδο.
       stopped: j['stop'] == 1,
+      // Το όριο που είχε το ρολόι σε αυτή την άσκηση (ρολόι #90 και μετά· 0 = χωρίς όριο). Ρολόι παλιότερης έκδοσης δεν
+      // το στέλνει: τότε το όριο του κινητού τη στιγμή της εισαγωγής. Είναι το ίδιο που είχε σταλεί στο ρολόι, εκτός αν
+      // άλλαξε στο κινητό ανάμεσα στην άσκηση και στη μεταφορά της (σπάνιο).
+      limit: Session.watchLimit(j['lim']) ?? hrLimit ?? 0,
     );
     if (s.stopped) s.note = 'Σταμάτησε: «Σταμάτησα» στο ρολόι';
     _watchHrInfo(s, j);
@@ -433,6 +460,8 @@ class TrainingStore extends ChangeNotifier {
       programId: p.id,
       start: now,
       items: [for (final i in w.items) _logFor(i)],
+      // Το όριο που ισχύει τώρα μένει μέσα στην προπόνηση (V-B-04): 0 = χωρίς όριο.
+      limit: hrLimit ?? 0,
     );
     current = s;
     save();
@@ -451,6 +480,7 @@ class TrainingStore extends ChangeNotifier {
       programId: program?.id ?? '',
       start: now,
       items: [],
+      limit: hrLimit ?? 0,
     );
     current = s;
     save();

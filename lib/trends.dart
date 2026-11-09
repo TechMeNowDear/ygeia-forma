@@ -273,6 +273,13 @@ class TrendResult {
 const minEffectiveDays = 4.0;
 const maxTCritical = 4.1;
 
+/// Τι γράφεται αντί για «Σταθερό» όταν οι μέρες δεν φτάνουν ([TrendResult.inconclusive]), ίδιο σε κάθε οθόνη
+/// (Τάσεις, εβδομάδα, Πρόοδος). Στο βάρος και στο σώμα μετρούν οι ζυγίσεις, όχι οι μέρες.
+String inconclusiveText(MetricDef def) => def.sparse ? 'Λίγες ζυγίσεις για συμπέρασμα' : 'Λίγες μέρες για συμπέρασμα';
+
+/// Το ίδιο στην αναφορά για τον γιατρό (στήλη «Διαφορά»).
+const reportInconclusiveText = 'Δεν φτάνουν για σύγκριση';
+
 /// Περίοδος: πόσες μέρες, και πόσες μέρες πίσω αρχίζει η προηγούμενη για σύγκριση.
 enum TrendPeriod { month, quarter, year }
 

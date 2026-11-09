@@ -197,7 +197,7 @@ class _WeekRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           if (t.inconclusive)
-            const Flexible(child: TrendPill('Λίγες μέρες για συμπέρασμα', maxLines: 2))
+            Flexible(child: TrendPill(inconclusiveText(t.def), maxLines: 2))
           else
             TrendStatusPill(r: t),
         ],

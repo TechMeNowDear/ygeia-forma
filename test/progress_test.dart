@@ -113,10 +113,12 @@ void main() {
       expect(walkProgress(twoMonths(hrBefore: 110, hrNow: 109), now, TrendPeriod.month).hr.status, TrendStatus.stable);
     });
 
-    test('μεγαλύτερη πτώση παλμών στο 1′ (16 → 24): καλύτερα', () {
+    // Έλεγχος 9/11 (V-B-08): πριν «καλύτερα» (goodness 1)· τώρα ουδέτερο, γιατί εξαρτάται κυρίως από την ένταση.
+    test('μεγαλύτερη πτώση παλμών στο 1′ (16 → 24): φαίνεται, αλλά ουδέτερα', () {
       final w = walkProgress(twoMonths(hrBefore: 110, hrNow: 110, hrrBefore: 16, hrrNow: 24), now, TrendPeriod.month);
       expect(w.hrr.status, TrendStatus.up);
-      expect(w.hrr.goodness, 1);
+      expect(w.hrr.goodness, 0);
+      expect(w.hrrEnd.current, 120);
     });
 
     test('λιγότερες από 4 μέρες σε μία περίοδο: «Λίγα δεδομένα», κανένα συμπέρασμα', () {
@@ -161,9 +163,19 @@ void main() {
       expect(strengthPill(r['hammer_curl']!), ('6 επαν.', TrendKind.bad, false));
     });
 
-    test('περισσότερο βάρος, λιγότερες επαναλήψεις: ούτε καλύτερα ούτε χειρότερα', () {
-      expect(r['goblet']!.change, StrengthChange.mixed);
-      expect(strengthPill(r['goblet']!).$2, TrendKind.neutral);
+    // Έλεγχος 9/11 (V-B-12): πριν «μικτό». 12 → 14 kg με 9, 9, 8 (κάτω όριο 8) είναι η κανονική πρόοδος του προγράμματος.
+    test('περισσότερο βάρος, λιγότερες επαναλήψεις αλλά μέσα στο εύρος: πρόοδος', () {
+      expect(r['goblet']!.change, StrengthChange.up);
+      expect(strengthPill(r['goblet']!), ('2 kg', TrendKind.good, true));
+    });
+
+    test('περισσότερο βάρος με σετ κάτω από το εύρος: ούτε καλύτερα ούτε χειρότερα', () {
+      final p = strengthProgress([
+        lift(40, [ex('goblet', 12, [12, 12, 12])]),
+        lift(2, [ex('goblet', 14, [9, 8, 7])]),
+      ], now, TrendPeriod.month).single;
+      expect(p.change, StrengthChange.mixed);
+      expect(strengthPill(p).$2, TrendKind.neutral);
     });
 
     test('λάστιχο βοήθειας: λιγότερη βοήθεια = πρόοδος', () {

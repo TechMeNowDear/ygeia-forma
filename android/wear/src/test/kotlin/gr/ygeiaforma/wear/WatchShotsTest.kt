@@ -139,9 +139,14 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.SET
         shot("W6_set_band")
 
-        // Δεν φτάνουν παλμοί: φαίνεται καθαρά.
+        // Δεν φτάνουν παλμοί: φαίνεται καθαρά. Πριν από την αναμονή μόνο «δεν μετριούνται»· μετά (χάθηκαν 45″) και «το
+        // όριο δεν σε προσέχει».
+        Repo.bpmAt = now - 10_000 - 15_000
+        shot("W6a_no_hr_waiting")
         Repo.bpmAt = now - 60_000
+        Repo.hrSilent = HrSilence.Silence.LOST
         shot("W6b_no_hr")
+        Repo.hrSilent = null
         Repo.bpmAt = now
 
         Repo.local = null
@@ -156,6 +161,17 @@ class WatchShotsTest {
         Repo.bpmAt = now
         Repo.screen = Repo.Screen.WALK
         shot("W7_walk")
+
+        // 9/11 (V-A-04): περπάτημα με όριο, χωρίς κανέναν παλμό: «το όριο δεν σε προσέχει».
+        Repo.alarm.limit = 140
+        Repo.bpm = 0
+        Repo.bpmAt = 0
+        Repo.hrSilent = HrSilence.Silence.NEVER
+        shot("W7d_walk_no_hr_limit")
+        Repo.hrSilent = null
+        Repo.bpm = 104
+        Repo.bpmAt = now
+        Repo.alarm.limit = null
 
         // 9/11: παύση και λεπτό αποκατάστασης.
         Repo.paused = true
