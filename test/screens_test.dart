@@ -34,6 +34,7 @@ import 'package:ygeia_forma/pages/sources_page.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/plan_file.dart';
 import 'package:ygeia_forma/ti_ftanei.dart';
+import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/training_store.dart';
 import 'package:ygeia_forma/training/wear_link.dart';
 
@@ -783,6 +784,63 @@ void main() {
   testWidgets('Ελεύθερη άσκηση · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T26f_free_open_dark', open, Brightness.dark, act: (t) async {
         await freeStart(t);
         await freePick(t, 'πλαγιες', 'lateral_raise');
+      }));
+
+  // Πρόοδος (9/11): δύο μήνες περπατήματος από το ρολόι και μία προπόνηση πριν από τον μήνα. Δοκιμαστικά νούμερα.
+  void progressData(TrainingStore st) {
+    const noise = [2, -2, 1, -1, 0, 2, -1, -2, 1, 0, -1, 2, 1, -1, 0, 2, -2, 1, 0, -1];
+    var i = 0;
+    for (var ago = 58; ago >= 1; ago -= 3, i++) {
+      final recent = ago < 30;
+      final start = DateTime(trainAt.year, trainAt.month, trainAt.day - ago, 19).millisecondsSinceEpoch;
+      final sec = 1800 + noise[i] * 40;
+      final km = (recent ? 2.36 : 2.28) * sec / 1800;
+      st.importWatch({
+        'v': 1,
+        'kind': 'cardio',
+        'id': 'p$start',
+        'w': 'walk',
+        'name': 'Περπάτημα',
+        'start': start,
+        'end': start + (sec + 70) * 1000,
+        'hrAvg': (recent ? 106 : 113) + noise[i],
+        'hrMax': (recent ? 118 : 125) + noise[i],
+        'cardio': {
+          'activity': 'walk',
+          'sec': sec,
+          'm': km * 1000,
+          'steps': (km * 1370).round(),
+          'gps': true,
+          'hrr': {'e': 112, 'm': 112 - (recent ? 19 : 15) - noise[(i + 5) % noise.length]},
+        },
+      });
+    }
+    st.sessions.add(Session(
+      id: 'old-a',
+      workout: 'A',
+      name: 'Προπόνηση Α',
+      programId: 'p-claude-1',
+      start: trainAt.subtract(const Duration(days: 35)),
+      end: trainAt.subtract(const Duration(days: 35)).add(const Duration(minutes: 55)),
+      items: [
+        ExLog(ex: 'db_press', sets: 3, lo: 8, hi: 12, rir: 2, rest: 120, log: [for (final r in [9, 8, 8]) SetLog(load: 8.3, reps: r, done: true)]),
+        ExLog(ex: 'db_row', sets: 3, lo: 8, hi: 12, rir: 2, rest: 90, log: [for (final r in [10, 10, 10]) SetLog(load: 14.3, reps: r, done: true)]),
+        ExLog(ex: 'goblet', sets: 3, lo: 8, hi: 12, rir: 2, rest: 120, log: [for (final r in [12, 12, 12]) SetLog(load: 10, reps: r, done: true)]),
+        ExLog(ex: 'incline_curl', sets: 3, lo: 10, hi: 15, rir: 2, rest: 75, log: [for (final r in [14, 13, 12]) SetLog(load: 5.3, reps: r, done: true)]),
+      ],
+    ));
+    st.sessions.sort((a, b) => a.start.compareTo(b.start));
+  }
+
+  Future<void> openProgress(WidgetTester t) => tapKey(t, 'train-progress');
+  testWidgets('Πρόοδος · κάρτα', (t) => trainShot(t, 'T27_progress_card', phone, Brightness.light, prep: progressData,
+      act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-progress')))));
+  testWidgets('Πρόοδος', (t) => trainShot(t, 'T27b_progress', phone, Brightness.light, prep: progressData, act: openProgress));
+  testWidgets('Πρόοδος · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T27c_progress_open_dark', open, Brightness.dark, prep: progressData, act: openProgress));
+  testWidgets('Πρόοδος · λίγα δεδομένα', (t) => trainShot(t, 'T27d_progress_few', phone, Brightness.light, act: openProgress));
+  testWidgets('Πρόοδος · πώς αποφασίζω', (t) => trainShot(t, 'T27e_progress_info', phone, Brightness.light, prep: progressData, act: (t) async {
+        await openProgress(t);
+        await tapKey(t, 'prog-walk-info');
       }));
 
   // Απλοποίηση (9/11): μόνο το όριο παλμών από τον γιατρό, χωρίς κλείδωμα.

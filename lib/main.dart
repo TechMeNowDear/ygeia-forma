@@ -268,7 +268,11 @@ class _ShellState extends State<Shell> {
         tab: _exerciseTab,
         now: widget.now,
         tabs: _exerciseTabs,
-        pages: [TrainingPage(training: TrainingStore.main), ExercisePage(store: store), const ExerciseLibraryPage()],
+        pages: [
+          TrainingPage(training: TrainingStore.main, health: store, onOpenTrends: () => _open(Cat.health, HealthTab.trends)),
+          ExercisePage(store: store),
+          const ExerciseLibraryPage(),
+        ],
       ),
     ];
 

@@ -146,6 +146,7 @@ class Session {
     this.stopped = false,
     this.cardioSec,
     this.gps,
+    this.activity,
     List<List<int>>? splits,
     List<List<int>>? pauses,
     this.hrrEnd,
@@ -191,6 +192,10 @@ class Session {
   int? cardioSec;
   bool? gps;
 
+  /// Είδος αερόβιας από το ρολόι («walk»· στο μέλλον ίσως τρέξιμο, ποδήλατο). null σε παλιές καταγραφές, που ήταν
+  /// όλες περπάτημα. Η «Πρόοδος» του περπατήματος δεν ανακατεύει άλλα είδη.
+  String? activity;
+
   /// Κάθε ολόκληρο km: [ενεργός χρόνος ως εκεί (″), ώρα από την αρχή (″)].
   final List<List<int>> splits;
 
@@ -232,6 +237,7 @@ class Session {
         if (stopped) 'stop': 1,
         if (cardioSec != null) 'csec': cardioSec,
         if (gps != null) 'gps': gps,
+        if (activity != null) 'act': activity,
         if (splits.isNotEmpty) 'km': splits,
         if (pauses.isNotEmpty) 'pz': pauses,
         if (hrrEnd != null) 'hrrE': hrrEnd,
@@ -270,6 +276,7 @@ class Session {
         stopped: j['stop'] == 1 || ((j['note'] as String?)?.startsWith('Σταμάτησε: ') ?? false),
         cardioSec: (j['csec'] as num?)?.toInt(),
         gps: j['gps'] as bool?,
+        activity: j['act'] as String?,
         splits: pairs(j['km']),
         pauses: pairs(j['pz']),
         hrrEnd: (j['hrrE'] as num?)?.toInt(),

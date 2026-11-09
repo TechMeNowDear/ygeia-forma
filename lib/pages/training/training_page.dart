@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import '../../exercise/ex_data.dart';
 import '../../format.dart';
 import '../../theme.dart';
+import '../../data.dart' show HealthStore;
 import '../../training/equipment.dart';
+import '../../training/progress.dart';
+import '../../trends.dart' show TrendPeriod;
 import '../../training/program.dart';
 import '../../training/session.dart';
 import '../../training/training_store.dart';
@@ -13,14 +16,19 @@ import '../../widgets.dart';
 import 'program_editor.dart';
 import 'hr_widgets.dart';
 import 'program_paste.dart';
+import 'progress_page.dart';
 import 'session_page.dart';
 import 'training_common.dart';
 
 /// Άσκηση › Προπόνηση: η σημερινή προπόνηση, η εβδομάδα, το πρόγραμμα, οι τελευταίες προπονήσεις.
 class TrainingPage extends StatefulWidget {
-  const TrainingPage({super.key, required this.training, this.now});
+  const TrainingPage({super.key, required this.training, this.now, this.health, this.onOpenTrends});
   final TrainingStore training;
   final DateTime? now;
+
+  /// Για την «Πρόοδο»: σώμα και ξεκούραση από τις «Τάσεις», και μετάβαση σε αυτές.
+  final HealthStore? health;
+  final VoidCallback? onOpenTrends;
 
   @override
   State<TrainingPage> createState() => _TrainingPageState();
@@ -86,6 +94,7 @@ class _TrainingPageState extends State<TrainingPage> {
       cards.add(_weekCard(context, p, today));
       side.add(_programCard(context, p));
     }
+    side.add(_progressCard(context));
     final recent = [for (final s in t.sessions.reversed) if (s.finished) s].take(6).toList();
     if (recent.isNotEmpty) side.add(_recentCard(context, recent));
     side.add(_hrLimitCard(context));
@@ -118,6 +127,34 @@ class _TrainingPageState extends State<TrainingPage> {
           onPressed: () => _openSession(context),
           child: const Text('Συνέχεια'),
         ),
+      ]),
+    );
+  }
+
+  /// «Πρόοδος» (9/11): οι δύο πιο ξεκάθαρες αλλαγές (μόνο από την προπόνηση· το σώμα φαίνεται μέσα στη σελίδα).
+  Widget _progressCard(BuildContext context) {
+    final c = Aigaio.of(context);
+    final walk = walkProgress(t.sessions, _now, TrendPeriod.month);
+    final strength = strengthProgress(t.sessions, _now, TrendPeriod.month);
+    final top = progressHighlights(walk, strength, const []).take(2).map((e) => e.$1).toList();
+    final sub = top.isNotEmpty
+        ? top.join(' · ')
+        : (walk.insufficient && strength.isEmpty
+            ? 'Η πρώτη σύγκριση μετά από λίγες εβδομάδες προπόνησης και περπατήματος.'
+            : 'Καμία ξεκάθαρη αλλαγή τον τελευταίο μήνα.');
+    return AppCard(
+      key: const ValueKey('train-progress'),
+      onTap: () => Navigator.of(context).push(ProgressPage.route(t, health: widget.health, onOpenTrends: widget.onOpenTrends, now: widget.now)),
+      child: Row(children: [
+        IconBadge(Icons.trending_up_rounded, c.exercise),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Πρόοδος', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+            Text(sub, style: TextStyle(fontSize: 13.5, height: 1.35, color: c.textSecondary)),
+          ]),
+        ),
+        Icon(Icons.chevron_right_rounded, color: c.textSecondary),
       ]),
     );
   }

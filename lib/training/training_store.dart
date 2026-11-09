@@ -367,6 +367,7 @@ class TrainingStore extends ChangeNotifier {
       // 9/11: ενεργός χρόνος, GPS, χιλιόμετρα, παύσεις, πτώση παλμών στο 1′ (ρολόι από #89).
       s.cardioSec = (cardio['sec'] as num?)?.toInt();
       if (cardio['gps'] is bool) s.gps = cardio['gps'] as bool;
+      if (cardio['activity'] is String) s.activity = cardio['activity'] as String;
       s.splits.addAll(Session.pairs(cardio['km']));
       s.pauses.addAll(Session.pairs(cardio['pz']));
       final hrr = cardio['hrr'];
