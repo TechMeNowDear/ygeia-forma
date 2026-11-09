@@ -183,6 +183,9 @@ void main() {
       expect(text, contains('πίεση'));
       expect(text, contains('Samsung Health Monitor'));
       expect(text, contains('δεν σημαίνει ότι ήταν φυσιολογικά'));
+      // Έλεγχος του #90 (M-1): η εξήγηση δεν διαβάζεται σαν «δεν άλλαξε».
+      expect(find.textContaining('δεν σημαίνει ότι δεν άλλαξε'), findsOneWidget);
+      expect(find.textContaining('οι τιμές μοιάζουν πολύ μεταξύ τους'), findsNothing);
     });
 
     testWidgets('Πρόοδος · Σώμα: αραιές ζυγίσεις = «Λίγες ζυγίσεις για συμπέρασμα»', (t) async {
@@ -247,7 +250,15 @@ void main() {
       expect(s.limit, 125);
     });
 
-    testWidgets('σύνοψη: κρίνεται με το δικό της όριο· παλιά με το «σημερινό»· χωρίς όριο τότε: καμία γραμμή', (tester) async {
+    test('προπόνηση του κινητού χωρίς όριο (0): το «lim» του ρολογιού δεν το αλλάζει', () {
+      final t = sampleTraining(now)..setHrLimit(null);
+      final s = t.start(t.program!.workout('A')!);
+      expect(s.limit, 0);
+      t.importWatch({'v': 1, 'kind': 'hr', 'sid': s.id, 'lim': 140});
+      expect(s.limit, 0);
+    });
+
+    testWidgets('σύνοψη: κρίνεται μόνο με το δικό της όριο· χωρίς όριο τότε ή παλιά: καμία γραμμή, καμία κρίση', (tester) async {
       final s = Session(
         id: 'x',
         workout: 'walk',
@@ -261,22 +272,22 @@ void main() {
           for (var t = 0; t <= 1800; t += 10) [t, t < 600 ? 110 : 134],
         ],
       );
-      Future<void> card(int? sessionLimit, int? today) async {
+      Future<void> card(int? sessionLimit) async {
         s.limit = sessionLimit;
-        await _pump(tester, SingleChildScrollView(child: HrCard(session: s, limit: today, key: UniqueKey())));
+        await _pump(tester, SingleChildScrollView(child: HrCard(session: s, key: UniqueKey())));
       }
 
-      // Τότε 130, σήμερα 140: κρίνεται με το 130.
-      await card(130, 140);
+      // Τότε 130 (σήμερα ό,τι κι αν είναι): κρίνεται με το 130.
+      await card(130);
       expect(find.textContaining('Πάνω από το όριο (130)'), findsOneWidget);
-      expect(find.byKey(const ValueKey('hr-limit-today')), findsNothing);
-      // Τότε χωρίς όριο, σήμερα 120: καμία κρίση αναδρομικά.
-      await card(0, 120);
+      // Τότε χωρίς όριο: καμία κρίση αναδρομικά.
+      await card(0);
       expect(find.byKey(const ValueKey('hr-limit-line')), findsNothing);
-      // Παλιά προπόνηση: με το σημερινό, και το λέει.
-      await card(null, 120);
-      expect(find.textContaining('Πάνω από το σημερινό όριο (120)'), findsOneWidget);
-      expect(find.byKey(const ValueKey('hr-limit-today')), findsOneWidget);
+      // Παλιά προπόνηση (πριν από την #90, δεν κράτησε όριο): μόνο οι παλμοί (V-B-04).
+      await card(null);
+      expect(find.byKey(const ValueKey('hr-limit-line')), findsNothing);
+      expect(find.textContaining('όριο'), findsNothing);
+      expect(find.text('134'), findsOneWidget);
     });
   });
 
@@ -328,10 +339,17 @@ void main() {
       expect(find.text(hrLimitBetaBlockerText), findsOneWidget);
       expect(hrLimitBetaBlockerText, contains('β-αναστολέα'));
       expect(hrLimitBetaBlockerText, contains('τεστ κοπώσεως'));
+      expect(hrLimitBetaBlockerText, contains('ρώτα τον γιατρό'));
+      expect(find.textContaining('φτάσουν ή ξεπεράσουν τον αριθμό'), findsOneWidget);
       expect(find.byKey(const ValueKey('train-hr-more-text')), findsNothing);
       await t.tap(find.byKey(const ValueKey('train-hr-more')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('train-hr-more-text')), findsOneWidget);
+      // Έλεγχος του #90 (M-2): ποτέ υπόσχεση δόνησης όταν το ρολόι είναι μακριά / δεν μετρά.
+      expect(hrLimitMoreText, isNot(contains('ρολόι μακριά), το ρολόι δονείται')));
+      expect(hrLimitMoreText, contains('• Στο ρολόι:'));
+      expect(hrLimitMoreText, contains('• Στο κινητό:'));
+      expect(hrLimitMoreText, contains('δεν έρχεται καμία δόνηση'));
     });
 
     Future<void> session(WidgetTester t, TrainingStore store) async {
@@ -368,6 +386,22 @@ void main() {
       await t.pump();
       await t.pump();
       expect(find.textContaining('Σφίξε λίγο το λουρί'), findsOneWidget);
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('ρολόι κοντά, πρώτα 30″: ήρεμο «Περιμένω παλμούς» (όσο και το ρολόι)· χωρίς ρολόι: αμέσως το πλαίσιο', (t) async {
+      final started = DateTime.now().subtract(const Duration(seconds: 5));
+      final store = sampleTraining(started);
+      store.start(store.program!.workout('A')!);
+      WearLink.main.ready.value = true;
+      await session(t, store);
+      expect(hrWaitSeconds, 30);
+      expect(find.byKey(const ValueKey('hr-waiting')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hr-stale')), findsNothing);
+      WearLink.main.ready.value = false;
+      await t.pump();
+      expect(find.byKey(const ValueKey('hr-waiting')), findsNothing);
+      expect(find.text('Το όριο (140) δεν σε προσέχει τώρα.'), findsOneWidget);
       await t.pumpWidget(const SizedBox());
     });
 
@@ -536,6 +570,47 @@ void main() {
       await (WearLink(channel: ch)..attachForTest(t)).importResults();
       expect(acks, ['/ygeia/result/walk2', '/ygeia/result/sym'], reason: 'το παλιό «Νιώθω κάτι» δεν υπάρχει πια: σβήνεται');
       expect(io.json, contains('w-walk2'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  group('Έλεγχος του #90 (Σ-8): όριο που δεν στάλθηκε', () {
+    const ch = MethodChannel('test/wear-plan');
+    test('αποτυχημένο putPlan: όχι «Στάλθηκε», και ξαναστέλνεται στην επόμενη αλλαγή', () async {
+      var ok = false;
+      var puts = 0;
+      final m = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      m.setMockMethodCallHandler(ch, (call) async {
+        switch (call.method) {
+          case 'status':
+            return {'nodes': 1, 'app': 1};
+          case 'takeResults':
+            return <Object>[];
+          case 'putPlan':
+            puts++;
+            return ok;
+        }
+        return true;
+      });
+      const events = MethodChannel('test/wear-plan-events');
+      m.setMockMethodCallHandler(events, (call) async => null);
+      addTearDown(() {
+        m.setMockMethodCallHandler(ch, null);
+        m.setMockMethodCallHandler(events, null);
+      });
+      final t = sampleTraining(now);
+      final link = WearLink(channel: ch, events: const EventChannel('test/wear-plan-events'));
+      link.start(t);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(puts, greaterThan(0));
+      expect(link.sentLimit.value, isNull);
+      ok = true;
+      final before = puts;
+      t.setHrLimit(140); // ίδιο όριο, ίδιο σχέδιο: στέλνεται μόνο επειδή το προηγούμενο απέτυχε
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(puts, before + 1);
+      expect(link.sentLimit.value, '140');
+      link.dispose();
     });
   });
 

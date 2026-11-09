@@ -193,7 +193,8 @@ class _SessionPageState extends State<SessionPage> {
 
   /// Ζωντανοί παλμοί από το ρολόι. Χωρίς όριο και χωρίς παλμούς ποτέ: τίποτα. Παλμοί που σταμάτησαν: πορτοκαλί μήνυμα.
   /// Με όριο γιατρού και χωρίς παλμούς (έλεγχος 9/11, V-A-05): ΠΑΝΤΑ μήνυμα, και όταν το ρολόι δεν βρέθηκε, γιατί τότε
-  /// καμία δόνηση δεν θα έρθει. Μόνο τα πρώτα [_hrGrace] δευτερόλεπτα με το ρολόι κοντά (ξεκινά μόνο του) δεν δείχνεται.
+  /// καμία δόνηση δεν θα έρθει. Τα πρώτα [hrWaitSeconds] (30″, όσο και το ρολόι) με το ρολόι κοντά: ήρεμο «Περιμένω
+  /// παλμούς από το ρολόι…» (ανοίγει μόνο του). Χωρίς ρολόι κοντά: αμέσως, γιατί δεν θα έρθουν.
   Widget _hr(EdgeInsets pad) => ListenableBuilder(
         listenable: Listenable.merge([WearLink.main.hr, WearLink.main.ready, _tick]),
         builder: (context, _) {
@@ -207,13 +208,13 @@ class _SessionPageState extends State<SessionPage> {
           final lost = last != null && (s == null || !last.$2.isBefore(s.start));
           final limit = t.hrLimit;
           if (limit == null) return last != null ? Padding(padding: pad, child: const HrStale()) : const SizedBox.shrink();
-          if (!lost && w.ready.value && s != null && now.difference(s.start).inSeconds < _hrGrace) return const SizedBox.shrink();
+          if (!lost && w.ready.value && s != null && now.difference(s.start).inSeconds < hrWaitSeconds) {
+            return Padding(padding: pad, child: const HrWaiting());
+          }
           return Padding(padding: pad, child: HrStale(limit: limit, lost: lost, watchFound: w.ready.value));
         },
       );
 
-  /// Δευτερόλεπτα από την αρχή, με το ρολόι κοντά, ώσπου να έρθει ο πρώτος παλμός χωρίς μήνυμα.
-  static const _hrGrace = 20;
 
   static String _clock(Duration d) {
     final m = d.inMinutes, s = d.inSeconds % 60;
@@ -928,7 +929,7 @@ class _SummaryPageState extends State<SummaryPage> {
       for (var k = 0; k < s.items.length; k++)
         _ExerciseCard(e: s.items[k], hr: withHr ? perEx[k] : null, showHr: withHr, key: ValueKey('sum-ex-$k')),
     ];
-    final hrCard = s.hrMax == null && s.hr.isEmpty ? null : HrCard(session: s, limit: t.hrLimit);
+    final hrCard = s.hrMax == null && s.hr.isEmpty ? null : HrCard(session: s);
 
     final feel = AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

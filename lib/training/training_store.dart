@@ -143,8 +143,9 @@ class TrainingStore extends ChangeNotifier {
   Future<void> save() {
     notifyListeners();
     if (readError) return Future.value();
-    final text = jsonEncode(toJson());
+    // Πριν από την κωδικοποίηση: αν εκείνη πετάξει, η μνήμη έχει αλλάξει χωρίς εγγραφή, άρα «όχι γραμμένο» (κανένα ack).
     _written = false;
+    final text = jsonEncode(toJson());
     _queue = _queue.then((_) async {
       bool ok;
       try {

@@ -225,9 +225,23 @@ class WearLink with WidgetsBindingObserver {
         final safety = '${t.hrLimit}';
         final urgent = safety != _lastSafety;
         _lastSafety = safety;
+        void failed() {
+          // Δεν στάλθηκε: ξανά με την επόμενη αλλαγή ή επιστροφή στην εφαρμογή (όχι «Στέλνεται…» για πάντα).
+          if (_lastPlan == plan) {
+            _lastPlan = null;
+            _lastSafety = null;
+          }
+        }
+
         _m.invokeMethod<bool>('putPlan', {'json': plan, 'urgent': urgent}).then((ok) {
-          if (ok == true && '${_t?.hrLimit}' == safety) sentLimit.value = safety;
-        }).catchError((_) {});
+          if (ok != true) {
+            failed();
+          } else if ('${_t?.hrLimit}' == safety) {
+            sentLimit.value = safety;
+          }
+        }).catchError((Object _) {
+          failed();
+        });
       }
       final sess = jsonEncode(watchSession(t, _name));
       if (sess != _lastSession) {

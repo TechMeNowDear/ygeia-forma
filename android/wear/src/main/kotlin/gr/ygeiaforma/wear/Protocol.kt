@@ -438,8 +438,13 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
  * Ξανά μόνο αφού ξαναέρθουν παλμοί και χαθούν πάλι (όχι κάθε δευτερόλεπτο). Σε παύση δεν δονείται.
  * Καθαρή λογική, χωρίς Android, για να ελέγχεται.
  */
-class HrSilence(private val firstMs: Long = 30_000) {
+class HrSilence(private val firstMs: Long = FIRST_MS) {
     enum class Silence { NEVER, LOST }
+
+    companion object {
+        /** Αναμονή για τον πρώτο παλμό (ίδια με του κινητού, `hrWaitSeconds`). */
+        const val FIRST_MS = 30_000L
+    }
 
     /** Τι λείπει τώρα (μετά τον χρόνο αναμονής), ή null. */
     var state: Silence? = null

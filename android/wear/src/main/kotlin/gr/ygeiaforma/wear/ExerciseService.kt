@@ -13,6 +13,7 @@ import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import android.media.AudioAttributes
@@ -71,6 +72,8 @@ class ExerciseService : Service() {
         // Οι ρυθμίσεις ενός καναλιού δεν αλλάζουν μετά τη δημιουργία του, γι' αυτό νέο όνομα· το παλιό σβήνεται.
         private const val CH_ALARM = "hr_alarm2"
         private const val CH_ALARM_OLD = "hr_alarm"
+        /** Το πολύ τόσο ξύπνιος ο επεξεργαστής στην αρχή, για τον έλεγχο «κανένας παλμός» (30″) και τη δόνησή του. */
+        private const val FIRST_HR_LOCK_MS = HrSilence.FIRST_MS + 10_000L
 
         fun start(ctx: Context, kind: String, phone: Boolean) {
             val i = Intent(ctx, ExerciseService::class.java).setAction(ACTION_START)
@@ -104,6 +107,14 @@ class ExerciseService : Service() {
     private var lastLiveSent = 0L
     /** «Δεν μετριούνται παλμοί» με όριο: μία δόνηση (V-A-04). */
     private val silence = HrSilence()
+
+    /**
+     * Ο επεξεργαστής ξύπνιος ώσπου να έρθει ο πρώτος παλμός (έλεγχος του #90, Σ-1): με σβηστή οθόνη ο βρόχος του
+     * δευτερολέπτου σταματά, και ακριβώς όταν δεν έρχονται παλμοί δεν υπάρχει τίποτα άλλο να τον ξυπνήσει. Μόνο με όριο,
+     * το πολύ [FIRST_HR_LOCK_MS] (40″) μία φορά ανά άσκηση· αφήνεται στον πρώτο παλμό ή μόλις γίνει ο έλεγχος των 30″.
+     * Μπαταρία: το πολύ 40″ ξύπνιος επεξεργαστής ανά έναρξη (η άσκηση ήδη κρατά τους αισθητήρες ανοιχτούς).
+     */
+    private var firstHrLock: PowerManager.WakeLock? = null
     private var lastPendingSent = 0L
     /** Εφεδρεία αισθητήρα για την ειδοποίηση (μόνο χωρίς παράδοση ανά 5″ και με όριο). */
     private var sensor: HrSensor? = null
@@ -130,6 +141,7 @@ class ExerciseService : Service() {
     }
 
     override fun onDestroy() {
+        releaseFirstHrLock()
         sensor?.stop()
         sensor = null
         ticker?.cancel()
@@ -174,8 +186,31 @@ class ExerciseService : Service() {
             return
         }
         Repo.changed()
+        holdUntilFirstHr()
         scope.launch { startExercise(walk, location) }
         ticker = scope.launch { tick() }
+    }
+
+    private fun holdUntilFirstHr() {
+        if (Repo.alarm.limit == null) return
+        try {
+            val pm = getSystemService(PowerManager::class.java) ?: return
+            firstHrLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ygeia:firstHr").apply {
+                setReferenceCounted(false)
+                acquire(FIRST_HR_LOCK_MS)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "wakelock", e)
+        }
+    }
+
+    private fun releaseFirstHrLock() {
+        val l = firstHrLock ?: return
+        firstHrLock = null
+        try {
+            if (l.isHeld) l.release()
+        } catch (_: Exception) {
+        }
     }
 
     private suspend fun startExercise(walk: Boolean, location: Boolean) {
@@ -410,6 +445,11 @@ class ExerciseService : Service() {
             if (silence.check(now, Repo.startedAt, lastAt, fresh, Repo.alarm.limit != null, Repo.paused, lostAfter)) {
                 vibrate(if (silence.state == HrSilence.Silence.NEVER) longArrayOf(0, 400, 150, 70, 90, 70) else longArrayOf(0, 70, 90, 70, 90, 70))
             }
+            Repo.hrSilent = silence.state
+            // Ήρθε ο πρώτος παλμός ή έγινε ο έλεγχος των 30″: ο επεξεργαστής ξανά ελεύθερος να κοιμηθεί.
+            if (firstHrLock != null && (fresh || Repo.bpmAt > 0 || silence.state != null || now - Repo.startedAt >= FIRST_HR_LOCK_MS)) {
+                releaseFirstHrLock()
+            }
             // Τέλος του λεπτού αποκατάστασης.
             if (Repo.recoveryUntil > 0 && now >= Repo.recoveryUntil) {
                 scope.launch { finish() }
@@ -515,6 +555,7 @@ class ExerciseService : Service() {
     private suspend fun finish() {
         if (stopping) return
         stopping = true
+        releaseFirstHrLock()
         val now = System.currentTimeMillis()
         ticker?.cancel()
         sensor?.stop()

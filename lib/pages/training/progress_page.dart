@@ -72,7 +72,7 @@ class _ProgressPageState extends State<ProgressPage> {
         final note = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text('«Άλλαξε» μόνο όταν η διαφορά είναι μεγαλύτερη από τις συνηθισμένες διακυμάνσεις σου· αλλιώς «Σταθερό», '
-              'ή «Λίγες μέρες για συμπέρασμα» όταν οι μέρες δεν φτάνουν για σύγκριση. Είναι ένδειξη, όχι ιατρικός έλεγχος.',
+              'ή «Λίγες μέρες (ή ζυγίσεις) για συμπέρασμα» όταν δεν φτάνουν για σύγκριση. Είναι ένδειξη, όχι ιατρικός έλεγχος.',
               style: TextStyle(fontSize: 12.5, height: 1.45, color: c.textSecondary)),
         );
         return Scaffold(

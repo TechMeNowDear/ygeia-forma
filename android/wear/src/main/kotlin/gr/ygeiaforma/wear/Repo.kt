@@ -49,6 +49,9 @@ object Repo {
      */
     var steadyUntil = 0L
 
+    /** Δεν μετριούνται παλμοί, μετά την αναμονή του [HrSilence] (30″ στην αρχή, 15″/45″ αν χάθηκαν), ή null. */
+    var hrSilent: HrSilence.Silence? = null
+
     /** Παλμοί που ισχύουν τώρα (φρέσκια τιμή ή σταθεροί από τον αισθητήρα). */
     fun hrLive(now: Long): Boolean = bpmFresh(now) || (bpm > 0 && now < steadyUntil)
 
@@ -161,6 +164,7 @@ object Repo {
         endAt = 0
         alarmMutedUntil = 0
         steadyUntil = 0
+        hrSilent = null
     }
 
     // ------------------------------------------------------------------ αντίγραφο ασφαλείας

@@ -106,6 +106,31 @@ class HrStale extends StatelessWidget {
   }
 }
 
+/// Τα πρώτα δευτερόλεπτα με το ρολόι κοντά (ανοίγει μόνο του και μπαίνει στην προπόνηση): ήρεμη γραμμή, όχι
+/// προειδοποίηση. Ίδιος χρόνος με το ρολόι ([hrWaitSeconds]).
+class HrWaiting extends StatelessWidget {
+  const HrWaiting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Container(
+      key: const ValueKey('hr-waiting'),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.hairline)),
+      child: Row(children: [
+        Icon(Icons.watch_rounded, color: c.textSecondary, size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Text('Περιμένω παλμούς από το ρολόι…', style: TextStyle(fontSize: 14, color: c.textSecondary))),
+      ]),
+    );
+  }
+}
+
+/// Πόσα δευτερόλεπτα από την αρχή, με το ρολόι κοντά, περιμένει το κινητό τον πρώτο παλμό πριν πει «το όριο δεν σε
+/// προσέχει». Ίδια με τον έλεγχο του ρολογιού (HrSilence, 30″), ώστε οι δύο να λένε το ίδιο την ίδια στιγμή.
+const hrWaitSeconds = 30;
+
 class _BarPainter extends CustomPainter {
   _BarPainter(this.bpm, this.limit, this.c);
   final int bpm, limit;
@@ -136,26 +161,21 @@ class _BarPainter extends CustomPainter {
   bool shouldRepaint(_BarPainter old) => old.bpm != bpm || old.limit != limit || old.c != c;
 }
 
-/// Με ποιο όριο κρίνεται μια προπόνηση (έλεγχος 9/11, V-B-04): με αυτό που ίσχυε τότε ([Session.limit]). Παλιές
-/// προπονήσεις (πριν από την #90) δεν το έχουν: τότε με το σημερινό, και η σύνοψη το λέει «σημερινό όριο».
-({int? limit, bool today}) sessionLimit(Session s, int? current) =>
-    s.limit != null ? (limit: s.limitUsed, today: false) : (limit: current, today: current != null);
-
 /// Παλμοί μιας προπόνησης στη σύνοψη: μέσος, υψηλότερος, γράφημα με το όριο (σχέδιο 5, 8/11).
-/// [limit]: το σημερινό όριο· η προπόνηση κρίνεται με το δικό της όταν το έχει ([sessionLimit]).
+/// Έλεγχος 9/11 (V-B-04): κρίνεται ΜΟΝΟ με το όριο που ίσχυε σε αυτή την προπόνηση ([Session.limitUsed]). Χωρίς όριο
+/// τότε, ή παλιά προπόνηση που δεν το κράτησε (πριν από την #90): μόνο οι παλμοί, χωρίς γραμμή ορίου και χωρίς κρίση
+/// (ποτέ αναδρομικά με το σημερινό όριο).
 class HrCard extends StatelessWidget {
-  const HrCard({super.key, required this.session, this.limit});
+  const HrCard({super.key, required this.session});
   final Session session;
-  final int? limit;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final judged = sessionLimit(session, limit);
-    final lim = judged.limit, today = judged.today;
+    final lim = session.limitUsed;
     final h = HrSummary(session, lim);
     final mins = (h.overSec / 60).ceil();
-    final which = today ? 'το σημερινό όριο' : 'το όριο';
+    const which = 'το όριο';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(20)),
@@ -195,10 +215,6 @@ class HrCard extends StatelessWidget {
             key: const ValueKey('hr-limit-line'),
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec > 0 ? c.bad : c.text),
           ),
-          // Παλιά προπόνηση χωρίς καταγραμμένο όριο: να μη διαβαστεί σαν να ίσχυε τότε αυτό το όριο.
-          if (today)
-            Text('Έγινε πριν η εφαρμογή αρχίσει να κρατά το όριο σε κάθε προπόνηση.',
-                key: const ValueKey('hr-limit-today'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textSecondary)),
         ],
         if (session.hrGap case final g?) ...[
           const SizedBox(height: 6),
