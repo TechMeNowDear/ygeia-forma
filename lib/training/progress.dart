@@ -127,6 +127,9 @@ WalkProgress walkProgress(Iterable<Session> sessions, DateTime today, TrendPerio
 
 enum StrengthChange { up, down, mixed, same }
 
+/// Μία επανάληψη πάνω-κάτω στο σύνολο των σετ δεν λέγεται αλλαγή.
+const repsTolerance = 1;
+
 class ExProgress {
   ExProgress({required this.ex, required this.kind, required this.beforeDay, required this.before, required this.nowDay, required this.now});
   final String ex;
@@ -156,13 +159,14 @@ class ExProgress {
     return ((kind == LoadKind.bandAssist ? a - b : b - a) * 100).round() / 100;
   }
 
+  /// ±[repsTolerance] επανάληψη στο σύνολο των σετ = ίδιο: τόσο αλλάζει από μέρα σε μέρα χωρίς πραγματική αλλαγή.
   StrengthChange get change {
     final l = loadDiff, r = repsDiff;
     const eps = 1e-6;
-    if (l > eps) return r >= 0 ? StrengthChange.up : StrengthChange.mixed;
-    if (l < -eps) return r > 0 ? StrengthChange.mixed : StrengthChange.down;
-    if (r > 0) return StrengthChange.up;
-    if (r < 0) return StrengthChange.down;
+    if (l > eps) return r >= -repsTolerance ? StrengthChange.up : StrengthChange.mixed;
+    if (l < -eps) return r > repsTolerance ? StrengthChange.mixed : StrengthChange.down;
+    if (r > repsTolerance) return StrengthChange.up;
+    if (r < -repsTolerance) return StrengthChange.down;
     return StrengthChange.same;
   }
 }

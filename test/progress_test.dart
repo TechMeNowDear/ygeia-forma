@@ -176,6 +176,16 @@ void main() {
       expect(r.containsKey('db_curl'), isFalse);
     });
 
+    test('μία επανάληψη πάνω-κάτω: «Ίδιο»· με περισσότερο βάρος και −1: πρόοδος', () {
+      final p = strengthProgress([
+        lift(40, [ex('db_row', 14.3, [10, 10, 10]), ex('db_curl', 6.8, [10, 10, 10])]),
+        lift(2, [ex('db_row', 14.3, [10, 10, 9]), ex('db_curl', 7.8, [10, 10, 9])]),
+      ], now, TrendPeriod.month);
+      final m = {for (final x in p) x.ex: x};
+      expect(m['db_row']!.change, StrengthChange.same);
+      expect(m['db_curl']!.change, StrengthChange.up);
+    });
+
     test('διαφορετικό πλήθος σετ: συγκρίνονται τα κοινά', () {
       final p = strengthProgress([
         lift(40, [ex('db_row', 14.3, [10, 10])]),

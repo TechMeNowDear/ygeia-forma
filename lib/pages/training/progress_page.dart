@@ -170,20 +170,19 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    // Όνομα και «χάπι» στην πρώτη γραμμή, τα νούμερα από κάτω σε όλο το πλάτος (δεν σπάνε σε στενό κινητό).
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
-      child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text)),
-            const SizedBox(height: 2),
-            Text(detail, style: TextStyle(fontSize: 14, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
-            if (extra != null && extra!.isNotEmpty) Text(extra!, style: TextStyle(fontSize: 13, color: c.textSecondary)),
-          ]),
-        ),
-        const SizedBox(width: 8),
-        Flexible(child: Align(alignment: Alignment.centerRight, child: pill)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text))),
+          const SizedBox(width: 8),
+          Flexible(child: Align(alignment: Alignment.topRight, child: pill)),
+        ]),
+        const SizedBox(height: 3),
+        Text(detail, style: TextStyle(fontSize: 14, height: 1.4, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
+        if (extra != null && extra!.isNotEmpty) Text(extra!, style: TextStyle(fontSize: 13, color: c.textSecondary)),
       ]),
     );
   }
@@ -500,7 +499,8 @@ Future<void> showStrengthProgressInfo(BuildContext context) => _sheet(context, '
       (
         'Πώς διαβάζεται',
         'Περισσότερο βάρος χωρίς λιγότερες επαναλήψεις, ή ίδιο βάρος με περισσότερες: πρόοδος. Περισσότερο βάρος με λιγότερες '
-            'επαναλήψεις: δεν λέω ούτε καλύτερα ούτε χειρότερα. Στις έλξεις με λάστιχο, λιγότερη βοήθεια σημαίνει πρόοδο.'
+            'επαναλήψεις: δεν λέω ούτε καλύτερα ούτε χειρότερα. Μία επανάληψη πάνω ή κάτω στο σύνολο των σετ μετρά ως «ίδιο»: '
+            'τόσο αλλάζει από μέρα σε μέρα. Στις έλξεις με λάστιχο, λιγότερη βοήθεια σημαίνει πρόοδο.'
       ),
       (
         'Τι το επηρεάζει',
