@@ -89,19 +89,16 @@ void main() {
     expect(parseBackup(broken).sources, isNull);
   });
 
-  test('Προπονήσεις στο αντίγραφο· επαναφορά μόνο όσων λείπουν, ποτέ η έγκριση (έλεγχος 8/11, TRN-17)', () async {
+  test('Προπονήσεις στο αντίγραφο· επαναφορά μόνο όσων λείπουν, ποτέ το όριο παλμών (έλεγχος 8/11, TRN-17)', () async {
     final now = DateTime(2026, 11, 20, 18);
     final src = sampleTraining(now);
-    src.reportSymptoms(['dizzy']);
     final b = parseBackup(buildBackup(foodLog: const [], myFoods: const [], prefs: const {}, now: now, training: src.toJson()));
     expect(b.training, isNotNull);
     final fresh = TrainingStore(io: MemoryTrainingIO(), clock: () => now);
     await fresh.load();
     expect(fresh.mergeBackup(b.training!), src.sessions.length);
-    expect(fresh.approved, isFalse, reason: 'η έγκριση του γιατρού δεν έρχεται από αντίγραφο');
-    expect(fresh.hrLimit, isNull);
+    expect(fresh.hrLimit, isNull, reason: 'η οδηγία του γιατρού δεν έρχεται από αντίγραφο');
     expect(fresh.program, isNotNull);
-    expect(fresh.symptoms.length, 1);
     // δεύτερη φορά: τίποτα διπλό
     expect(fresh.mergeBackup(b.training!), 0);
     expect(fresh.sessions.length, src.sessions.length);

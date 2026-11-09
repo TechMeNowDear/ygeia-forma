@@ -10,7 +10,7 @@ import org.junit.Test
 
 class ProtocolTest {
     private val planJson = """
-        {"v":1,"approved":true,"hrLimit":140,"today":"A","day":"2026-11-13","at":5,
+        {"v":1,"hrLimit":140,"today":"A","day":"2026-11-13","at":5,
          "workouts":[
           {"id":"A","name":"Προπόνηση Α","minutes":50,"items":[
             {"ex":"db_press","name":"Πιεστικό με αλτήρες","rest":120,"lo":8,"hi":12,"rir":2,
@@ -23,7 +23,6 @@ class ProtocolTest {
     @Test
     fun parsesPlan() {
         val p = Plan.parse(planJson)!!
-        assertTrue(p.approved)
         assertEquals(140, p.hrLimit)
         assertEquals("Προπόνηση Α", p.todayWorkout!!.name)
         assertEquals(2, p.todayWorkout!!.items.size)
@@ -175,31 +174,6 @@ class ProtocolTest {
         assertTrue(a.on)
         // ο αισθητήρας σώπασε: οι νεότερες του Health Services περνούν
         assertTrue(a.feed(152, 46_000))
-    }
-
-    @Test
-    fun holdAfterSymptom() {
-        fun plan(extra: String) = Plan.parse("{\"v\":1,\"approved\":true,\"day\":\"2026-11-08\",\"workouts\":[]$extra}")
-        val today = "2026-11-08"
-        // κανένα σύμπτωμα: τίποτα
-        assertEquals(null, holdOf(plan(""), 0, today))
-        // «Σταμάτησα» εδώ, το κινητό δεν το είδε ακόμα: παύση
-        assertEquals("pending", holdOf(plan(",\"symSeen\":100"), 200, today))
-        // το κινητό το είδε και δεν βάζει παύση (π.χ. «Τελικά τίποτα»): ελεύθερο
-        assertEquals(null, holdOf(plan(",\"symSeen\":200"), 200, today))
-        // κλείδωμα από σύμπτωμα: πάντα, και χωρίς κινητό σήμερα
-        assertEquals("lock", holdOf(plan(",\"hold\":\"lock\""), 0, "2026-11-20"))
-        // «σήμερα» και «check» λήγουν την άλλη μέρα
-        assertEquals("today", holdOf(plan(",\"hold\":\"today\""), 0, today))
-        // χθεσινό «today» χωρίς νέο πρόγραμμα: τουλάχιστον «Πώς είσαι σήμερα;» στο κινητό, όχι ελεύθερο
-        assertEquals("check", holdOf(plan(",\"hold\":\"today\""), 0, "2026-11-09"))
-        // «check» με ημερομηνία λήξης: ισχύει και τις επόμενες μέρες, ως τη λήξη
-        assertEquals("check", holdOf(plan(",\"checkUntil\":5000"), 0, "2026-11-12", 4000))
-        assertEquals(null, holdOf(plan(",\"checkUntil\":5000"), 0, "2026-11-12", 6000))
-        assertEquals("check", holdOf(plan(",\"hold\":\"check\""), 0, today))
-        assertEquals(null, holdOf(plan(",\"hold\":\"check\""), 0, "2026-11-09", 0))
-        assertTrue(holdsAll("lock") && holdsAll("pending") && holdsAll("today"))
-        assertTrue(!holdsAll("check") && !holdsAll(null))
     }
 
     @Test

@@ -9,8 +9,6 @@ import 'equipment.dart';
 import 'progression.dart';
 import 'program.dart';
 import 'session.dart';
-import 'symptoms.dart';
-import 'training_device.dart';
 
 /// Ανάγνωση/εγγραφή του training.json (μέσω Kotlin, ατομική εγγραφή· μπαίνει στο κρυπτογραφημένο αντίγραφο).
 abstract class TrainingIO {
@@ -80,31 +78,8 @@ class TrainingStore extends ChangeNotifier {
   bool readError = false;
   String? saveError;
 
-  bool approved = false;
-  DateTime? approvedAt;
-
-  /// Όριο παλμών από τον καρδιολόγο (bpm), αν έδωσε.
+  /// Όριο παλμών από τον γιατρό (bpm), αν έδωσε: το ρολόι δονεί όταν το ξεπεράσεις. Κενό = τίποτα.
   int? hrLimit;
-
-  /// Περιορισμοί από τον γιατρό, όπως τους έγραψε ο χρήστης.
-  String? limits;
-
-  /// Παίρνει φάρμακο που κόβει τους παλμούς (π.χ. β-αναστολέα): το όριο ισχύει μόνο αν το έδωσε ο γιατρός με το φάρμακο.
-  bool hrMeds = false;
-
-  /// «Θέλει εξετάσεις»: ο γιατρός περιμένει αποτελέσματα· μένει κλειδωμένο.
-  bool waitingTests = false;
-
-  /// Ξανακλείδωσε (σύμπτωμα, νέο φάρμακο, ή από τον χρήστη): 'red' | 'amber2' | 'meds' | 'manual'.
-  String? lockReason;
-  DateTime? lockedAt;
-
-  /// «Νιώθω κάτι»: όλες οι καταγραφές.
-  final List<Symptom> symptoms = [];
-
-  /// Το πιο πρόσφατο «Νιώθω κάτι» του ρολογιού που έφτασε εδώ (ms). Το ρολόι κρατά δική του παύση
-  /// ως να το δει στο πρόγραμμα που του στέλνουμε (έλεγχος #2).
-  int watchSeenAt = 0;
 
   /// Όλες οι εκδόσεις όλων των προγραμμάτων (η πιο πρόσφατη στο τέλος).
   final List<Program> programs = [];
@@ -131,18 +106,8 @@ class TrainingStore extends ChangeNotifier {
   }
 
   void _fromJson(Map<String, dynamic> j) {
-    approved = j['approved'] == true;
-    approvedAt = j['approvedAt'] is num ? DateTime.fromMillisecondsSinceEpoch((j['approvedAt'] as num).toInt()) : null;
+    // Τα παλιά κλειδιά (έγκριση, κλείδωμα, «Νιώθω κάτι», ως #84) αγνοούνται (απλοποίηση 9/11).
     hrLimit = (j['hrLimit'] as num?)?.toInt();
-    limits = j['limits'] as String?;
-    hrMeds = j['hrMeds'] == 1;
-    waitingTests = j['tests'] == 1;
-    lockReason = j['lock'] as String?;
-    lockedAt = j['lockedAt'] is num ? DateTime.fromMillisecondsSinceEpoch((j['lockedAt'] as num).toInt()) : null;
-    watchSeenAt = (j['wseen'] as num?)?.toInt() ?? 0;
-    symptoms
-      ..clear()
-      ..addAll([for (final x in (j['sym'] as List? ?? const [])) Symptom.fromJson((x as Map).cast<String, dynamic>())]);
     programs
       ..clear()
       ..addAll([for (final p in (j['programs'] as List? ?? const [])) Program.fromJson(p as Map<String, dynamic>)]);
@@ -155,16 +120,7 @@ class TrainingStore extends ChangeNotifier {
 
   Map<String, dynamic> toJson() => {
         'v': 1,
-        'approved': approved,
-        if (approvedAt != null) 'approvedAt': approvedAt!.millisecondsSinceEpoch,
         if (hrLimit != null) 'hrLimit': hrLimit,
-        if (limits != null && limits!.isNotEmpty) 'limits': limits,
-        if (hrMeds) 'hrMeds': 1,
-        if (waitingTests) 'tests': 1,
-        if (lockReason != null) 'lock': lockReason,
-        if (lockedAt != null) 'lockedAt': lockedAt!.millisecondsSinceEpoch,
-        if (symptoms.isNotEmpty) 'sym': [for (final x in symptoms) x.toJson()],
-        if (watchSeenAt > 0) 'wseen': watchSeenAt,
         'programs': [for (final p in programs) p.toJson()],
         if (activeId != null) 'active': activeId,
         'sessions': [for (final s in sessions) s.toJson()],
@@ -189,157 +145,11 @@ class TrainingStore extends ChangeNotifier {
     return _queue;
   }
 
-  // ---------------------------------------------------------------- έγκριση
-  void approve({int? hr, String? notes, bool? meds}) {
-    approved = true;
-    approvedAt = now;
+  // ---------------------------------------------------------------- όριο παλμών
+  /// Όριο παλμών από τον γιατρό (null = κανένα).
+  void setHrLimit(int? hr) {
     hrLimit = hr;
-    limits = notes;
-    if (meds != null) hrMeds = meds;
-    waitingTests = false;
-    lockReason = null;
-    lockedAt = null;
     save();
-  }
-
-  void setLimits({int? hr, String? notes, bool? meds}) {
-    hrLimit = hr;
-    limits = notes;
-    if (meds != null) hrMeds = meds;
-    save();
-  }
-
-  /// «Θέλει εξετάσεις»: τα βάρη μένουν κλειδωμένα, κρατά τις σημειώσεις.
-  void waitForTests({String? notes}) {
-    approved = false;
-    waitingTests = true;
-    // Ο γιατρός σε είδε: όχι πια «μέχρι να σε δει γιατρός» (έλεγχος #2). Τα βάρη μένουν κλειδωμένα.
-    lockReason = null;
-    lockedAt = null;
-    if (notes != null && notes.isNotEmpty) limits = notes;
-    save();
-  }
-
-  /// Ξανά κλείδωμα της προπόνησης ([reason]: 'red' | 'amber2' | 'meds' | 'manual'). Ανοίγει με νέα έγκριση.
-  void relock(String reason) {
-    approved = false;
-    lockReason = reason;
-    lockedAt = now;
-    save();
-  }
-
-  // ---------------------------------------------------------------- «Νιώθω κάτι»
-  /// Καταγραφή συμπτωμάτων. Σταματά την προπόνηση που τρέχει (γράφεται ό,τι έγινε).
-  /// Κόκκινο, ή δεύτερο πορτοκαλί μέσα σε 14 μέρες: κλειδώνει μέχρι «Με είδε γιατρός».
-  SymptomOutcome reportSymptoms(List<String> codes, {String? where}) {
-    final known = [for (final c in codes) if (symptomDef(c) != null) c];
-    if (known.isEmpty) return SymptomOutcome.none;
-    final at = now;
-    final sid = current?.id;
-    // Οι λεπτομέρειες για ένα «Νιώθω κάτι» από το ρολόι ήρθαν: φεύγει η εκκρεμότητα.
-    symptoms.removeWhere((x) => x.code == watchCode);
-    for (final c in known) {
-      symptoms.add(Symptom(at: at, code: c, sid: sid, where: where));
-    }
-    final red = known.any((c) => symptomDef(c)!.red);
-    // Πορτοκαλί «επεισόδια» (μία καταγραφή μπορεί να έχει πολλά) τις τελευταίες 14 μέρες.
-    final amberEvents = {
-      for (final x in symptoms)
-        if (!x.red && x.code != watchCode && at.difference(x.at).inDays < 14) x.at.millisecondsSinceEpoch,
-    }.length;
-    final lock = red || amberEvents >= 2;
-    _stopCurrent(red ? 'Σταμάτησε: κόκκινο σύμπτωμα' : 'Σταμάτησε: σύμπτωμα');
-    if (lock) {
-      approved = false;
-      lockReason = red ? 'red' : 'amber2';
-      lockedAt = at;
-    }
-    save();
-    return lock ? SymptomOutcome.red : SymptomOutcome.amber;
-  }
-
-  /// Σταματά την προπόνηση που τρέχει μετά από σύμπτωμα: γράφεται ό,τι έγινε, δεν μετρά για την πρόοδο,
-  /// και σβήνει η ειδοποίηση διαλείμματος (αλλιώς θα δονούσε αργότερα «Επόμενο σετ»· έλεγχος #2, T2-01).
-  void _stopCurrent(String note) {
-    final had = _restEnd != null || current != null;
-    if (current != null) {
-      current!
-        ..note = note
-        ..stopped = true;
-      finish();
-    }
-    _restEnd = null;
-    if (had) TrainingDevice.restCancel();
-  }
-
-  /// «Νιώθω κάτι» στο ρολόι: γράφεται και το κινητό ρωτά τι ένιωσες μόλις ανοίξει.
-  /// Αν ήταν η προπόνηση του κινητού, σταματά κι αυτή («Σταμάτησα» στο ρολόι = σταματάω).
-  bool watchSymptom(DateTime at, {String? sid}) {
-    final ms = at.millisecondsSinceEpoch;
-    if (ms > watchSeenAt) watchSeenAt = ms;
-    if (symptoms.any((x) => x.code == watchCode && x.at == at)) {
-      save();
-      return false;
-    }
-    symptoms.add(Symptom(at: at, code: watchCode, sid: sid, where: 'watch'));
-    final cur = current;
-    if (cur != null && !at.isBefore(cur.start) && (sid == null || sid.isEmpty || sid == cur.id)) _stopCurrent('Σταμάτησε: «Σταμάτησα» στο ρολόι');
-    save();
-    return true;
-  }
-
-  /// Εκκρεμεί «Νιώθω κάτι» από το ρολόι χωρίς λεπτομέρειες.
-  Symptom? get pendingWatchSymptom {
-    for (final x in symptoms.reversed) {
-      if (x.code == watchCode) return x;
-    }
-    return null;
-  }
-
-  /// «Τελικά τίποτα»: σβήνει η εκκρεμότητα του ρολογιού.
-  void clearWatchSymptom() {
-    symptoms.removeWhere((x) => x.code == watchCode);
-    save();
-  }
-
-  /// Τι επιτρέπει το ρολόι (πάει στο πρόγραμμα του ρολογιού· έλεγχος #2, U2-04/T2-02):
-  /// 'lock' κλείδωμα από σύμπτωμα (καμία άσκηση, ούτε περπάτημα, ως τον γιατρό) · 'pending' «Νιώθω κάτι» του ρολογιού
-  /// χωρίς λεπτομέρειες · 'today' σύμπτωμα σήμερα (καμία άσκηση σήμερα) · 'check' τα βάρη ξεκινούν από το κινητό
-  /// («Πώς είσαι σήμερα;») · null τίποτα.
-  String? get watchHold {
-    if (!approved && (lockReason == 'red' || lockReason == 'amber2')) return 'lock';
-    if (pendingWatchSymptom != null) return 'pending';
-    final n = now;
-    // Σύμπτωμα σήμερα (που δεν το έχει δει ήδη γιατρός: πριν από νέα έγκριση την ίδια μέρα δεν μετρά).
-    bool afterOk(Symptom x) => approvedAt == null || x.at.isAfter(approvedAt!);
-    if (symptoms.any((x) => x.code != watchCode && afterOk(x) && x.at.year == n.year && x.at.month == n.month && x.at.day == n.day)) {
-      return 'today';
-    }
-    if (needsCheck) return 'check';
-    return null;
-  }
-
-  /// Ως πότε θέλει «Πώς είσαι σήμερα;» (για το ρολόι, που δεν πρέπει να το ξεχνά τα μεσάνυχτα· έλεγχος #2).
-  DateTime? get checkUntil {
-    if (!approved) return null;
-    DateTime? end;
-    void take(DateTime d) {
-      if (end == null || d.isAfter(end!)) end = d;
-    }
-
-    if (approvedAt != null) take(approvedAt!.add(const Duration(days: 28)));
-    for (final x in symptoms) {
-      take(x.at.add(const Duration(days: 14)));
-    }
-    return end != null && end!.isAfter(now) ? end : null;
-  }
-
-  /// Ερώτηση «Πώς είσαι σήμερα;» πριν από την προπόνηση: τις πρώτες 4 εβδομάδες μετά την έγκριση
-  /// και για 14 μέρες μετά από κάθε σύμπτωμα.
-  bool get needsCheck {
-    if (!approved) return false;
-    if (approvedAt != null && now.difference(approvedAt!).inDays < 28) return true;
-    return symptoms.any((x) => now.difference(x.at).inDays < 14);
   }
 
   // ---------------------------------------------------------------- προγράμματα
@@ -460,10 +270,8 @@ class TrainingStore extends ChangeNotifier {
     ];
     final hrAvg = (j['hrAvg'] as num?)?.toInt();
     final hrMax = (j['hrMax'] as num?)?.toInt();
-    if (kind == 'sym') {
-      final at = DateTime.fromMillisecondsSinceEpoch((j['at'] as num? ?? now.millisecondsSinceEpoch).toInt());
-      return watchSymptom(at, sid: j['sid'] as String?);
-    }
+    // Παλιό «Νιώθω κάτι» από ρολόι ως #84: δεν υπάρχει πια.
+    if (kind == 'sym') return false;
     if (kind == 'hr') {
       final sid = j['sid'] as String?;
       Session? s;
@@ -500,7 +308,7 @@ class TrainingStore extends ChangeNotifier {
       hrMax: hrMax,
       hr: samples,
       source: 'watch',
-      // «Σταμάτησα» στο ρολόι: διακοπή από σύμπτωμα, όχι για την πρόοδο (έλεγχος #2).
+      // «Σταμάτησα» από ρολόι με παλιά έκδοση (ως #84): δεν μετρά για την πρόοδο.
       stopped: j['stop'] == 1,
     );
     if (s.stopped) s.note = 'Σταμάτησε: «Σταμάτησα» στο ρολόι';
@@ -687,16 +495,6 @@ class TrainingStore extends ChangeNotifier {
     b.writeln('Υγεία & Φόρμα · σύνοψη προπόνησης (${_d(since)}–${_d(now)})');
     if (p != null) b.writeln('Πρόγραμμα: ${p.name} (έκδοση ${p.version}, ${p.author == 'claude' ? 'από τον Claude' : 'δικό μου'}), id ${p.id}');
     if (hrLimit != null) b.writeln('Όριο παλμών γιατρού: $hrLimit');
-    if (limits != null && limits!.isNotEmpty) b.writeln('Περιορισμοί γιατρού: $limits');
-    if (hrMeds) b.writeln('Παίρνω φάρμακο που κόβει τους παλμούς (π.χ. β-αναστολέα): το όριο ισχύει μόνο αν δόθηκε με το φάρμακο, αλλιώς μετράει η κούραση.');
-    if (!approved) b.writeln('Η προπόνηση με βάρη είναι κλειδωμένη${waitingTests ? ' (περιμένω εξετάσεις)' : lockReason != null ? ' (ξανακλείδωσε ${_d(lockedAt ?? now)})' : ''}.');
-    final syms = [for (final x in symptoms) if (x.at.isAfter(since) && x.code != watchCode) x];
-    if (syms.isNotEmpty) {
-      b.writeln('Συμπτώματα («Νιώθω κάτι»):');
-      for (final x in syms) {
-        b.writeln('- ${_d(x.at)}: ${x.red ? 'ΚΟΚΚΙΝΟ' : 'πορτοκαλί'}, ${x.text}');
-      }
-    }
     final walks = [for (final s in list) if (s.isCardio) s];
     b.writeln('Προπονήσεις με βάρη: ${list.length - walks.length}');
     if (walks.isNotEmpty) {
@@ -766,14 +564,6 @@ class TrainingStore extends ChangeNotifier {
       }
     }
     sessions.sort((a, b) => a.start.compareTo(b.start));
-    final syms = {for (final x in symptoms) '${x.at.millisecondsSinceEpoch}|${x.code}'};
-    for (final x in other.symptoms) {
-      // Ένα «Νιώθω κάτι» του ρολογιού που έχει ήδη απαντηθεί εδώ δεν ξαναγίνεται εκκρεμότητα.
-      if (x.code == watchCode && x.at.millisecondsSinceEpoch <= watchSeenAt) continue;
-      if (syms.add('${x.at.millisecondsSinceEpoch}|${x.code}')) symptoms.add(x);
-    }
-    if (other.watchSeenAt > watchSeenAt) watchSeenAt = other.watchSeenAt;
-    symptoms.sort((a, b) => a.at.compareTo(b.at));
     save();
     return added;
   }

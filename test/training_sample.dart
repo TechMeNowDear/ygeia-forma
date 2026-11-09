@@ -34,10 +34,10 @@ const sampleProgramText = '''
 
 Program sampleProgram() => Program.fromJson(jsonDecode(sampleProgramText.substring(sampleProgramText.indexOf('{'), sampleProgramText.lastIndexOf('}') + 1)) as Map<String, dynamic>);
 
-/// Αποθήκη με εγκεκριμένη άσκηση, το δοκιμαστικό πρόγραμμα και δύο προηγούμενες προπονήσεις Α.
-TrainingStore sampleTraining(DateTime now, {bool approved = true, bool program = true, bool history = true}) {
+/// Αποθήκη με όριο παλμών 140, το δοκιμαστικό πρόγραμμα και δύο προηγούμενες προπονήσεις Α.
+TrainingStore sampleTraining(DateTime now, {bool program = true, bool history = true}) {
   final store = TrainingStore(io: MemoryTrainingIO(), clock: () => now);
-  final j = <String, dynamic>{'v': 1, 'approved': approved, if (approved) 'hrLimit': 140};
+  final j = <String, dynamic>{'v': 1, 'hrLimit': 140};
   if (program) {
     final p = sampleProgram()
       ..version = 1

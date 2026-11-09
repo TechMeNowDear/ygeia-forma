@@ -131,7 +131,6 @@ class ExerciseService : Service() {
             return
         }
         Repo.resetExercise()
-        Repo.stopSym = false
         Repo.running = kind
         Repo.runningPhone = phone
         Repo.startedAt = now
@@ -438,9 +437,6 @@ class ExerciseService : Service() {
         }
         // Για τον έλεγχο στη συσκευή: πώς ήρθαν οι παλμοί και το μεγαλύτερο κενό (φαίνεται στη σύνοψη του κινητού).
         if (result != null && Repo.hrMode.isNotEmpty()) result.second.put("hrMode", Repo.hrMode).put("hrGap", Repo.hrGaps.maxGapSec)
-        // «Σταμάτησα»: διακοπή από σύμπτωμα, όχι για την πρόοδο (έλεγχος #2).
-        if (result != null && Repo.stopSym) result.second.put("stop", 1)
-        Repo.stopSym = false
         if (result != null) {
             Repo.snapshot(this, result.second)
             if (Link.putResult(this, result.first, result.second)) Repo.snapshot(this, null)
@@ -449,7 +445,6 @@ class ExerciseService : Service() {
         Repo.resetExercise()
         // Προπόνηση του κινητού: γράφεται εκεί, εδώ πίσω στην αρχή. Δική του: «Αποθηκεύτηκε».
         Repo.screen = when {
-            Repo.screen == Repo.Screen.SYM -> Repo.Screen.SYM // «Νιώθω κάτι»: μένει το μήνυμα
             result != null && kind != null && !wasPhone -> Repo.Screen.END
             else -> Repo.Screen.HOME
         }

@@ -54,7 +54,6 @@ class WorkoutT(val id: String, val name: String, val minutes: Int, val items: Li
 }
 
 class Plan(
-    val approved: Boolean,
     val hrLimit: Int?,
     /** Το id της προπόνησης της μέρας που το έστειλε το κινητό (ή null για ξεκούραση). */
     val today: String?,
@@ -63,15 +62,6 @@ class Plan(
     val at: Long,
     /** Μέρα εβδομάδας (1 = Δευτέρα … 7 = Κυριακή) → id προπόνησης. */
     val days: Map<Int, String> = emptyMap(),
-    /**
-     * Τι επιτρέπεται μετά από σύμπτωμα (έλεγχος #2): «lock» καμία άσκηση ως τον γιατρό, «pending» «Νιώθω κάτι» χωρίς
-     * λεπτομέρειες, «today» καμία άσκηση σήμερα, «check» τα βάρη ξεκινούν από το κινητό («Πώς είσαι σήμερα;»).
-     */
-    val hold: String? = null,
-    /** Το πιο πρόσφατο «Νιώθω κάτι» του ρολογιού που έφτασε στο κινητό (ms). */
-    val symSeen: Long = 0,
-    /** Ως πότε (ms) τα βάρη θέλουν «Πώς είσαι σήμερα;» στο κινητό· δεν λήγει τα μεσάνυχτα (έλεγχος #2). */
-    val checkUntil: Long = 0,
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
 
@@ -85,7 +75,6 @@ class Plan(
             val j = JSONObject(text)
             val ws = j.optJSONArray("workouts") ?: JSONArray()
             Plan(
-                approved = j.optBoolean("approved", false),
                 hrLimit = if (j.has("hrLimit") && !j.isNull("hrLimit")) j.getInt("hrLimit") else null,
                 today = j.optStringOrNull("today"),
                 day = j.optStringOrNull("day"),
@@ -94,9 +83,6 @@ class Plan(
                 days = j.optJSONObject("days")?.let { d ->
                     d.keys().asSequence().mapNotNull { k -> k.toIntOrNull()?.let { it to d.getString(k) } }.toMap()
                 } ?: emptyMap(),
-                hold = j.optStringOrNull("hold"),
-                symSeen = j.optLong("symSeen", 0),
-                checkUntil = j.optLong("checkUntil", 0),
             )
         } catch (_: Exception) {
             null
@@ -416,25 +402,3 @@ fun pace(meters: Double, sec: Long): String {
     val p = (sec / (meters / 1000.0)).toLong()
     return "%d′%02d″".format(p / 60, p % 60)
 }
-
-/**
- * Τι δεν ξεκινά στο ρολόι τώρα (έλεγχος #2, U2-04/T2-02/X4). [symHoldAt]: πότε πατήθηκε «Σταμάτησα» εδώ (0 = ποτέ)·
- * μένει παύση ώσπου το κινητό να το δει ([Plan.symSeen]). «today» ισχύει μόνο για τη μέρα του προγράμματος ([today],
- * «2026-11-08»). Επιστρέφει «lock» | «pending» | «today» | «check» | null.
- */
-fun holdOf(plan: Plan?, symHoldAt: Long, today: String, nowMs: Long = System.currentTimeMillis()): String? {
-    if (plan?.hold == "lock") return "lock"
-    if (symHoldAt > 0 && symHoldAt > (plan?.symSeen ?: 0L)) return "pending"
-    val h = plan?.hold
-    val sameDay = plan?.day == null || plan.day == today
-    if (h == "today" && sameDay) return "today"
-    // Τα βάρη θέλουν «Πώς είσαι σήμερα;» ως το [Plan.checkUntil]: και αν το κινητό δεν άνοιξε σήμερα.
-    if (plan != null && plan.checkUntil > nowMs) return "check"
-    if (h == "check" && sameDay) return "check"
-    // Χθεσινό «today» χωρίς ενημέρωση από το κινητό: τουλάχιστον «Πώς είσαι σήμερα;» πριν από βάρη.
-    if (h == "today") return "check"
-    return null
-}
-
-/** Καμία άσκηση (ούτε περπάτημα) ξεκινά από το ρολόι. */
-fun holdsAll(h: String?): Boolean = h == "lock" || h == "pending" || h == "today"

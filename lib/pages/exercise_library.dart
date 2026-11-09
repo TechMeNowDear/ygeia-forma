@@ -106,7 +106,7 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
       ]),
     );
     final note = Text(
-      'Κάθε άσκηση με τον εξοπλισμό σου, σε κίνηση. Τα κιλά και το πρόγραμμα μπαίνουν μετά την έγκριση του καρδιολόγου.',
+      'Κάθε άσκηση με τον εξοπλισμό σου, σε κίνηση. Τα κιλά και το πρόγραμμα είναι στην «Προπόνηση».',
       style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.35),
     );
     final empty = EmptyCard(

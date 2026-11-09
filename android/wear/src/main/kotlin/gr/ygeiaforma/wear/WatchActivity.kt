@@ -34,12 +34,9 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (::view.isInitialized) view.invalidate()
     }
 
-    private var symRetryAt = 0L
-
     private val tickRunnable = object : Runnable {
         override fun run() {
             if (!visible) return
-            retrySym()
             syncScreen()
             view.invalidate()
             view.postDelayed(this, 1000)
@@ -48,7 +45,7 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Repo.loadHold(this)
+        Repo.dropOldKeys(this)
         view = WatchView(this, this)
         setContentView(view)
         handle(intent)
@@ -101,29 +98,9 @@ class WatchActivity : Activity(), WatchView.Actions {
         super.onDestroy()
     }
 
-    /**
-     * «Σταμάτησα» που το κινητό δεν έχει δει ακόμα (το πρόγραμμα που στέλνει δεν το έχει): ξανά, ανά 30″.
-     * Αν δεν υπάρχει πια τίποτα να σταλεί, η παύση μένει ως να τη δει το κινητό ή να την ανοίξεις εδώ.
-     */
-    private fun retrySym() {
-        val now = System.currentTimeMillis()
-        if (Repo.symHoldAt <= (Repo.plan?.symSeen ?: 0L)) {
-            if (Repo.symHoldAt > 0) Repo.keepSym(this, null)
-            return
-        }
-        if (now - symRetryAt < 30_000) return
-        symRetryAt = now
-        val o = Repo.pendingSym(this) ?: return
-        scope.launch { if (Link.putResult(this@WatchActivity, "sym${o.optLong("at")}", o)) symRetryAt = now }
-    }
-
     /** Η οθόνη ακολουθεί την κατάσταση (π.χ. ✓ στο κινητό → διάλειμμα και εδώ). */
     private fun syncScreen() {
         val now = System.currentTimeMillis()
-        // Μετά από «Σταμάτησα»: όχι πίσω στην προπόνηση του κινητού (έλεγχος #2).
-        if (holdsAll(Repo.hold()) && Repo.running == null && (Repo.screen == Repo.Screen.SET || Repo.screen == Repo.Screen.REST)) {
-            Repo.screen = Repo.Screen.HOME
-        }
         val s = Repo.session
         when (Repo.screen) {
             Repo.Screen.REST -> if (s == null || s.restEnd <= now) Repo.screen = if (s == null) Repo.Screen.HOME else Repo.Screen.SET
@@ -172,10 +149,6 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun startWorkout(id: String) {
         val w = Repo.plan?.workout(id) ?: return
-        if (Repo.plan?.approved != true) return
-        // Μετά από σύμπτωμα, ή όταν θέλει «Πώς είσαι σήμερα;» στο κινητό: όχι βάρη από εδώ (έλεγχος #2).
-        val h = Repo.hold()
-        if (holdsAll(h) || h == "check") return
         withPermissions(false) {
             Repo.notice = null
             Repo.local = LiveSession.fromPlan(w, System.currentTimeMillis())
@@ -186,7 +159,6 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun startWalk() {
-        if (holdsAll(Repo.hold())) return
         withPermissions(true) {
             Repo.notice = null
             Repo.screen = Repo.Screen.WALK
@@ -196,7 +168,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun joinPhone() {
-        if (Repo.phone == null || holdsAll(Repo.hold())) return
+        if (Repo.phone == null) return
         withPermissions(false) {
             Repo.notice = null
             val s = Repo.phone
@@ -309,55 +281,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         Repo.alarmMutedUntil = System.currentTimeMillis() + 60_000
     }
 
-    override fun feel() {
-        Repo.symBack = Repo.screen
-        Repo.symSent = false
-        Repo.screen = Repo.Screen.SYM
-        redraw()
-    }
-
-    override fun feelBack() {
-        Repo.screen = Repo.symBack
-        redraw()
-    }
-
-    /** «Σταμάτησα»: γράφεται στο κινητό (μένει ώσπου να το πάρει) και σταματά η μέτρηση. */
-    override fun feelStop() {
-        val now = System.currentTimeMillis()
-        val o = JSONObject().put("v", 1).put("kind", "sym").put("at", now)
-        Repo.phone?.id?.let { o.put("sid", it) }
-        // Κρατιέται ως να φτάσει (και ξαναστέλνεται, retrySym), ώστε να μη χαθεί ποτέ (έλεγχος #2, B1).
-        Repo.keepSym(this, o)
-        scope.launch { Link.putResult(this@WatchActivity, "sym$now", o) }
-        Repo.symSent = true
-        // Καμία άσκηση από το ρολόι ώσπου να πεις στο κινητό τι ένιωσες (έλεγχος #2, U2-04).
-        Repo.setHold(this, now)
-        // Σταματά η μέτρηση σε κάθε περίπτωση, και της προπόνησης του κινητού (το κινητό τη σταματά όταν το δει).
-        if (Repo.running != null) {
-            Repo.stopSym = true
-            ExerciseService.stop(this)
-        } else if (Repo.local != null) {
-            val s = Repo.local!!
-            Repo.local = null
-            if (s.setsDone > 0) {
-                val r = s.resultJson(now, HrStats(now)).put("stop", 1)
-                Repo.snapshot(this, r)
-                scope.launch { if (Link.putResult(this@WatchActivity, s.id, r)) Repo.snapshot(this@WatchActivity, null) }
-            }
-        }
-        Repo.screen = Repo.Screen.SYM
-        redraw()
-    }
-
-    /** «Ξεκλείδωμα» στο ρολόι (δεύτερο πάτημα): όταν το κινητό δεν μπορεί να το δει (έλεγχος #2, B1). */
-    override fun clearHold() {
-        Repo.setHold(this, 0)
-        Repo.keepSym(this, null)
-        redraw()
-    }
-
     override fun doneOk() {
-        Repo.symSent = false
         Repo.screen = Repo.Screen.HOME
     }
 }

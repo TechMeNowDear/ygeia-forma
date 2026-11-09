@@ -41,9 +41,9 @@ void main() {
       expect(() => jsonEncode(j), returnsNormally);
     });
 
-    test('χωρίς έγκριση: το ρολόι το ξέρει', () {
-      final j = watchPlan(sampleTraining(now, approved: false), now, name);
-      expect(j['approved'], isFalse);
+    test('χωρίς όριο παλμών: δεν στέλνεται όριο, και ποτέ κλείδωμα', () {
+      final j = watchPlan(sampleTraining(now)..setHrLimit(null), now, name);
+      expect(j['approved'], isTrue);
       expect(j.containsKey('hrLimit'), isFalse);
     });
 

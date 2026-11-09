@@ -14,7 +14,6 @@ import 'package:ygeia_forma/training/equipment.dart';
 import 'package:ygeia_forma/training/progression.dart';
 import 'package:ygeia_forma/training/program.dart';
 import 'package:ygeia_forma/training/session.dart';
-import 'package:ygeia_forma/training/symptoms.dart';
 import 'package:ygeia_forma/training/training_store.dart';
 
 import 'training_sample.dart';
@@ -253,7 +252,6 @@ void main() {
       await back.load();
       expect(back.sessions.length, 3);
       expect(back.program!.name, 'Πρόγραμμα 1');
-      expect(back.approved, isTrue);
       expect(back.hrLimit, 140);
     });
 
@@ -271,7 +269,7 @@ void main() {
       final t = TrainingStore(io: io, clock: () => now);
       await t.load();
       expect(t.readError, isTrue);
-      t.approve();
+      t.setHrLimit(150);
       await t.save();
       expect(io.json, '{χαλασμένο');
     });
@@ -286,67 +284,20 @@ void main() {
     });
   });
 
-  group('έγκριση και «Νιώθω κάτι»', () {
-    test('κόκκινο σύμπτωμα: σταματά η προπόνηση και κλειδώνει ως «Με είδε γιατρός»', () {
-      final t = sampleTraining(now);
-      final s = t.start(t.program!.workout('A')!);
-      t.tick(s.items.first, 0);
-      expect(t.reportSymptoms(['chest'], where: 'session'), SymptomOutcome.red);
-      expect(t.current, isNull);
-      expect(t.sessions.last.id, s.id);
-      expect(t.sessions.last.note, contains('σύμπτωμα'));
-      expect(t.approved, isFalse);
-      expect(t.lockReason, 'red');
-      expect(t.exportForClaude(), contains('ΚΟΚΚΙΝΟ'));
-      // νέα έγκριση: ανοίγει, καθαρό κλείδωμα
-      t.approve(hr: 130);
-      expect(t.approved, isTrue);
-      expect(t.lockReason, isNull);
-      expect(t.needsCheck, isTrue);
-    });
-
-    test('πορτοκαλί: μία φορά γράφεται χωρίς κλείδωμα· δεύτερη μέσα σε 14 μέρες κλειδώνει', () {
-      var at = now;
-      final t = TrainingStore(io: MemoryTrainingIO(), clock: () => at)..replaceAll({'v': 1, 'approved': true});
-      expect(t.reportSymptoms(['dizzy']), SymptomOutcome.amber);
-      expect(t.approved, isTrue);
-      expect(t.needsCheck, isTrue);
-      at = now.add(const Duration(days: 20));
-      expect(t.reportSymptoms(['nausea']), SymptomOutcome.amber, reason: 'η προηγούμενη ήταν πριν από 20 μέρες');
-      at = now.add(const Duration(days: 25));
-      expect(t.reportSymptoms(['tired']), SymptomOutcome.red);
-      expect(t.lockReason, 'amber2');
-      expect(t.reportSymptoms(['άγνωστο']), SymptomOutcome.none);
-    });
-
-    test('«Νιώθω κάτι» στο ρολόι: εκκρεμεί ως να πεις τι ήταν, και αποθηκεύεται', () async {
+  group('όριο παλμών από τον γιατρό', () {
+    test('αποθηκεύεται, φτάνει στη σύνοψη, σβήνει', () async {
       final io = MemoryTrainingIO();
-      final t = TrainingStore(io: io, clock: () => now)..replaceAll({'v': 1, 'approved': true});
-      expect(t.importWatch({'v': 1, 'kind': 'sym', 'at': now.millisecondsSinceEpoch}), isTrue);
-      expect(t.importWatch({'v': 1, 'kind': 'sym', 'at': now.millisecondsSinceEpoch}), isFalse);
-      expect(t.pendingWatchSymptom, isNotNull);
+      final t = TrainingStore(io: io, clock: () => now)..replaceAll({'v': 1});
+      expect(t.hrLimit, isNull);
+      t.setHrLimit(128);
       await t.save();
       final back = TrainingStore(io: io, clock: () => now);
       await back.load();
-      expect(back.pendingWatchSymptom, isNotNull);
-      back.reportSymptoms(['dizzy'], where: 'watch');
-      expect(back.pendingWatchSymptom, isNull);
-      expect(back.symptoms.single.code, 'dizzy');
-    });
-
-    test('θέλει εξετάσεις / παύση / νέο φάρμακο: κλειδωμένο, με τον λόγο', () {
-      final t = sampleTraining(now, approved: false);
-      t.waitForTests(notes: 'Holter');
-      expect(t.approved, isFalse);
-      expect(t.waitingTests, isTrue);
-      expect(t.limits, 'Holter');
-      t.approve(hr: null, meds: true);
-      expect(t.waitingTests, isFalse);
-      expect(t.hrMeds, isTrue);
-      expect(t.exportForClaude(), contains('φάρμακο που κόβει τους παλμούς'));
-      t.relock('meds');
-      expect(t.approved, isFalse);
-      expect(t.lockReason, 'meds');
+      expect(back.hrLimit, 128);
+      expect(back.exportForClaude(), contains('Όριο παλμών γιατρού: 128'));
+      back.setHrLimit(null);
+      expect(back.toJson().containsKey('hrLimit'), isFalse);
+      expect(back.exportForClaude(), isNot(contains('Όριο παλμών')));
     });
   });
 
@@ -370,22 +321,20 @@ void main() {
       await t.pump();
     }
 
-    testWidgets('κλειδωμένη ως την έγκριση· «Πήρα έγκριση» με όριο παλμών', (tester) async {
-      final store = sampleTraining(now, approved: false);
+    testWidgets('χωρίς κλείδωμα· όριο παλμών από την κάρτα', (tester) async {
+      final store = sampleTraining(now)..setHrLimit(null);
       await pump(tester, TrainingPage(training: store, now: now));
-      expect(find.text('Τα βάρη περιμένουν τον καρδιολόγο'), findsOneWidget);
-      expect(find.text('Ανοίγει μετά την έγκριση'), findsOneWidget);
-      await tapKey(tester, 'train-approve');
+      expect(find.text('Ξεκίνα την προπόνηση'), findsOneWidget);
+      expect(find.text('Κανένα. Πάτα αν σου δώσει ο γιατρός.'), findsOneWidget);
+      await tapKey(tester, 'train-hrlimit');
       await tester.pumpAndSettle();
-      await tapKey(tester, 'clear-limit');
-      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('train-hr-clear')), findsNothing, reason: 'χωρίς όριο: τίποτα να σβήσεις');
       await tester.enterText(find.byKey(const ValueKey('train-hr')), '135');
       await tester.pump();
-      await tapKey(tester, 'train-approve-ok');
+      await tapKey(tester, 'train-hr-save');
       await tester.pumpAndSettle();
-      expect(store.approved, isTrue);
       expect(store.hrLimit, 135);
-      expect(find.text('Ξεκίνα την προπόνηση'), findsOneWidget);
+      expect(find.textContaining('135 bpm'), findsOneWidget);
     });
 
     testWidgets('προπόνηση: ✓ ξεκινά διάλειμμα, το τελευταίο σετ ρωτά τη ρεζέρβα, τέλος → αποθήκευση', (tester) async {
@@ -423,96 +372,31 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('έγκριση: λάθος όριο δεν περνά, «χωρίς όριο» ρητά, χαμηλό όριο θέλει επιβεβαίωση', (tester) async {
-      final store = sampleTraining(now, approved: false);
+    testWidgets('όριο: λάθος αριθμός δεν περνά, χαμηλό θέλει επιβεβαίωση, «Χωρίς όριο» σβήνει', (tester) async {
+      final store = sampleTraining(now);
+      expect(store.hrLimit, 140);
       await pump(tester, TrainingPage(training: store, now: now));
-      await tapKey(tester, 'train-approve');
-      await tester.pumpAndSettle();
-      // τίποτα διαλεγμένο: δεν προχωρά
-      await tapKey(tester, 'train-approve-ok');
-      expect(store.approved, isFalse);
-      await tapKey(tester, 'clear-limit');
+      await tapKey(tester, 'train-hrlimit');
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('train-hr')), '70');
       await tester.pump();
       expect(find.text('Γράψε αριθμό από 80 έως 220'), findsOneWidget);
-      await tapKey(tester, 'train-approve-ok');
-      expect(store.approved, isFalse);
+      await tapKey(tester, 'train-hr-save');
+      expect(store.hrLimit, 140);
       await tester.enterText(find.byKey(const ValueKey('train-hr')), '95');
       await tester.pump();
-      await tapKey(tester, 'train-approve-ok');
-      expect(store.approved, isFalse, reason: 'κάτω από 100 θέλει «Σωστά;»');
+      await tapKey(tester, 'train-hr-save');
+      expect(store.hrLimit, 140, reason: 'κάτω από 100 θέλει «Σωστά;»');
       await tapKey(tester, 'train-hr-low');
       await tester.pump();
-      await tapKey(tester, 'train-approve-ok');
+      await tapKey(tester, 'train-hr-save');
       await tester.pumpAndSettle();
-      expect(store.approved, isTrue);
       expect(store.hrLimit, 95);
-    });
-
-    testWidgets('έγκριση χωρίς όριο, και αλλαγή που δεν σβήνει κατά λάθος το όριο', (tester) async {
-      final store = sampleTraining(now, approved: false);
-      await pump(tester, TrainingPage(training: store, now: now));
-      await tapKey(tester, 'train-approve');
+      await tapKey(tester, 'train-hrlimit');
       await tester.pumpAndSettle();
-      await tapKey(tester, 'clear-none');
-      await tester.pump();
-      await tapKey(tester, 'train-approve-ok');
+      await tapKey(tester, 'train-hr-clear');
       await tester.pumpAndSettle();
-      expect(store.approved, isTrue);
       expect(store.hrLimit, isNull);
-      store.setLimits(hr: 140, notes: '');
-      await tester.pumpAndSettle();
-      expect(find.textContaining('όριο παλμών 140'), findsOneWidget);
-      await tester.ensureVisible(find.textContaining('όριο παλμών 140'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('όριο παλμών 140'));
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'train-approve-ok');
-      await tester.pumpAndSettle();
-      expect(store.hrLimit, 140);
-    });
-
-    testWidgets('πρώτες εβδομάδες: «Πώς είσαι σήμερα;» πριν ξεκινήσει, δύο ίσες επιλογές', (tester) async {
-      final store = sampleTraining(now);
-      store.approve(hr: 140);
-      await pump(tester, TrainingPage(training: store, now: now));
-      await tapKey(tester, 'train-start');
-      await tester.pumpAndSettle();
-      expect(find.text('Πώς είσαι σήμερα;'), findsOneWidget);
-      await tapKey(tester, 'ready-bad');
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'ready-fever');
-      await tester.pumpAndSettle();
-      expect(store.current, isNull);
-      await tapKey(tester, 'train-start');
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'ready-ok');
-      await tester.pumpAndSettle();
-      expect(find.byType(SessionPage), findsOneWidget);
-    });
-
-    testWidgets('στην προπόνηση: «Νιώθω κάτι» → κόκκινο → 166 και κλείδωμα', (tester) async {
-      final store = sampleTraining(now);
-      await pump(tester, TrainingPage(training: store, now: now));
-      await tapKey(tester, 'train-start');
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'feel');
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'sym-ok');
-      expect(store.current, isNotNull, reason: 'χωρίς επιλογή δεν γίνεται τίποτα');
-      await tapKey(tester, 'sym-chest');
-      await tester.pump();
-      await tapKey(tester, 'sym-ok');
-      await tester.pumpAndSettle();
-      expect(find.text('Σταμάτα. Κάθισε. Μην οδηγήσεις.'), findsOneWidget);
-      expect(find.byKey(const ValueKey('call-166')), findsOneWidget);
-      expect(store.current, isNull);
-      expect(store.approved, isFalse);
-      await tapKey(tester, 'sym-close');
-      await tester.pumpAndSettle();
-      expect(find.text('Η άσκηση κλείδωσε μετά από σύμπτωμα'), findsOneWidget);
-      expect(find.text('Με είδε γιατρός'), findsOneWidget);
     });
 
     testWidgets('ρεζέρβα: δεν κλείνει κατά λάθος, «Δεν ξέρω» → χωρίς απάντηση', (tester) async {

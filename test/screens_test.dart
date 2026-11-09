@@ -572,11 +572,11 @@ void main() {
   // 8/11: προπόνηση (Παρασκευή 13/11 = Προπόνηση Α, με δύο προηγούμενες φορές για την πρόοδο).
   final trainAt = DateTime(2026, 11, 13, 17, 30);
   Future<void> trainShot(WidgetTester t, String name, Size size, Brightness b,
-      {bool approved = true, Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep}) async {
+      {Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep}) async {
     ExClock.frozen = true;
     await t.runAsync(() => ExLibrary.load(inline: true));
     final prev = TrainingStore.main;
-    TrainingStore.main = sampleTraining(trainAt, approved: approved);
+    TrainingStore.main = sampleTraining(trainAt);
     prep?.call(TrainingStore.main);
     addTearDown(() => TrainingStore.main = prev);
     await _shot(t, name: name, size: size, brightness: b, tab: Cat.exercise, sub: ExerciseTab.train, at: trainAt, act: act);
@@ -601,7 +601,7 @@ void main() {
   }
 
   const phoneShort = Size(400, 880);
-  testWidgets('Προπόνηση · πριν την έγκριση', (t) => trainShot(t, 'T1_train_locked', phone, Brightness.light, approved: false));
+  testWidgets('Προπόνηση · χωρίς όριο παλμών', (t) => trainShot(t, 'T1_train_no_limit', phone, Brightness.light, prep: (s) => s.setHrLimit(null)));
   testWidgets('Προπόνηση · σήμερα', (t) => trainShot(t, 'T2_train_today', phone, Brightness.light));
   testWidgets('Προπόνηση · σήμερα · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T3_train_today_open_dark', open, Brightness.dark));
   testWidgets('Προπόνηση · σε εξέλιξη · διάλειμμα', (t) => trainShot(t, 'T4_session_rest', phoneShort, Brightness.light, act: (t) async {
@@ -650,104 +650,17 @@ void main() {
     await trainShot(t, 'T12_walk_live', phone, Brightness.light);
   });
 
-  // Έλεγχος 8/11: έγκριση γιατρού, «Νιώθω κάτι», κλείδωμα μετά από σύμπτωμα, «Πώς είσαι σήμερα;».
-  testWidgets('Προπόνηση · έγκριση γιατρού', (t) => trainShot(t, 'T13_clearance', phone, Brightness.light, approved: false, act: (t) async {
-        await tapKey(t, 'train-approve');
-        await tapKey(t, 'clear-limit');
-      }));
-  testWidgets('Προπόνηση · Νιώθω κάτι', (t) => trainShot(t, 'T14_feel', phone, Brightness.light, act: (t) async {
-        await startSession(t);
-        await tapKey(t, 'feel');
-        await tapKey(t, 'sym-palp');
-      }));
-  testWidgets('Προπόνηση · κόκκινο σύμπτωμα', (t) => trainShot(t, 'T15_feel_red', phone, Brightness.light, act: (t) async {
-        await startSession(t);
-        await tapKey(t, 'feel');
-        await tapKey(t, 'sym-chest');
-        await tapKey(t, 'sym-ok');
-      }));
-  testWidgets('Προπόνηση · κλειδωμένη μετά από σύμπτωμα', (t) => trainShot(t, 'T16_locked_symptom', phone, Brightness.light,
-      prep: (s) => s.reportSymptoms(['breath'])));
-  testWidgets('Προπόνηση · Πώς είσαι σήμερα', (t) => trainShot(t, 'T17_readiness', phone, Brightness.light,
-      prep: (s) => s.approve(hr: 140), act: startSession));
+  // Απλοποίηση (9/11): μόνο το όριο παλμών από τον γιατρό, χωρίς κλείδωμα.
+  testWidgets('Προπόνηση · όριο παλμών', (t) => trainShot(t, 'T13_hr_limit', phone, Brightness.light, act: (t) => tapKey(t, 'train-hrlimit')));
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
 
-  // Έλεγχος #2 (8/11): 166 με ένα πάτημα, σκούρο θέμα (αντίθεση), ερώτηση για τον αριστερό ώμο, Σήμερα, σελίδα 4 PDF.
-  testWidgets('Προπόνηση · κόκκινο σύμπτωμα · σκοτεινό', (t) => trainShot(t, 'T18_feel_red_dark', phone, Brightness.dark, act: (t) async {
-        await startSession(t);
-        await tapKey(t, 'feel');
-        await tapKey(t, 'sym-chest');
-        await tapKey(t, 'sym-ok');
-      }));
-  testWidgets('Προπόνηση · Νιώθω κάτι · σκοτεινό', (t) => trainShot(t, 'T18b_feel_dark', phone, Brightness.dark, act: (t) async {
-        await startSession(t);
-        await tapKey(t, 'feel');
-        await tapKey(t, 'sym-chest');
-      }));
-  testWidgets('Προπόνηση · ρεζέρβα · αριστερός ώμος', (t) => trainShot(t, 'T19_rir_cardiac', phoneShort, Brightness.light, act: (t) async {
+  testWidgets('Προπόνηση · ρεζέρβα με ενόχληση', (t) => trainShot(t, 'T19_rir_pain', phoneShort, Brightness.light, act: (t) async {
         await startSession(t);
         for (var i = 0; i < 3; i++) {
           await tapKey(t, 'sess-tick-$i');
         }
         await tapKey(t, 'pain-shoulderL');
       }));
-  testWidgets('Προπόνηση · ιστορικό συμπτωμάτων', (t) => trainShot(t, 'T20_symptom_history', open, Brightness.light,
-      prep: (s) => s
-        ..reportSymptoms(['dizzyup'], where: 'day')
-        ..reportSymptoms(['chest', 'sweat'], where: 'session')));
-  testWidgets('Σήμερα · μετά από σοβαρό σύμπτωμα', (t) async {
-    final prev = TrainingStore.main;
-    TrainingStore.main = sampleTraining(trainAt)..reportSymptoms(['chest']);
-    await TrainingStore.main.load();
-    addTearDown(() => TrainingStore.main = prev);
-    await _shot(t, name: '29_today_symptom', size: phone, brightness: Brightness.light, tab: 0, at: trainAt);
-  });
-  testWidgets('Σήμερα · μετά από σοβαρό σύμπτωμα · σκοτεινό', (t) async {
-    final prev = TrainingStore.main;
-    TrainingStore.main = sampleTraining(trainAt)..reportSymptoms(['chest']);
-    await TrainingStore.main.load();
-    addTearDown(() => TrainingStore.main = prev);
-    await _shot(t, name: '29b_today_symptom_dark', size: phone, brightness: Brightness.dark, tab: 0, at: trainAt);
-  });
-  testWidgets('Αναφορά για γιατρό · σελίδα 4 (συμπτώματα και άσκηση)', (tester) async {
-    tester.view.devicePixelRatio = 2.0;
-    tester.view.physicalSize = const Size(680, 4300) * 2.0;
-    addTearDown(tester.view.reset);
-    final prev = TrainingStore.main;
-    final tr = sampleTraining(trainAt);
-    final last = tr.sessions.last
-      ..hrMax = 146
-      ..hrAvg = 118
-      ..hrGap = 9;
-    last.hr.addAll([
-      [0, 96],
-      [600, 132],
-      [1200, 146],
-      [1260, 141],
-    ]);
-    tr
-      ..reportSymptoms(['dizzyup'], where: 'day')
-      ..reportSymptoms(['chest', 'sweat'], where: 'session');
-    TrainingStore.main = tr;
-    await TrainingStore.main.load();
-    addTearDown(() => TrainingStore.main = prev);
-    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(trainAt));
-    store.history = sampleHistory(trainAt, store.data!);
-    final key = GlobalKey();
-    await tester.pumpWidget(
-      RepaintBoundary(
-        key: key,
-        child: MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: buildTheme(Brightness.light),
-          home: ReportPage(store: store, now: trainAt),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('report-page4-body')), findsOneWidget);
-    await expectLater(find.byKey(key), matchesGoldenFile('shots/13d_report_p4.png'));
-  });
 
   // Θέματα (1/11): η αρχική και ο ύπνος σε καθένα, και η οθόνη «Εμφάνιση».
   for (final (n, p) in [(30, Aigaio.elia), (32, Aigaio.avgi), (34, Aigaio.stivos), (36, Aigaio.anasa)]) {

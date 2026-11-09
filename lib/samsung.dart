@@ -54,10 +54,6 @@ class SamsungHealth {
 
   static Future<Map<String, dynamic>> readAll({int days = 30}) => _call('readAll', {'days': days});
 
-  /// Τεστ άπνοιας, ειδοποιήσεις ακανόνιστου ρυθμού και πίεση, για την αναφορά γιατρού (έλεγχος #2): ανά είδος
-  /// {state: ok|empty|no_permission|unsupported|error, items: [{t, app, f: {πεδίο: τιμή}}]}. Δεν αποθηκεύεται.
-  static Future<Map<String, dynamic>> medical({int days = 120}) => _call('medical', {'days': days});
-
 
 
   static Future<Map<String, dynamic>> loadPrefs() => _call('loadPrefs');

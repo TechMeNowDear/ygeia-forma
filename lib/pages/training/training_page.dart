@@ -7,7 +7,6 @@ import '../../theme.dart';
 import '../../training/equipment.dart';
 import '../../training/program.dart';
 import '../../training/session.dart';
-import '../../training/symptoms.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
 import '../../widgets.dart';
@@ -15,7 +14,6 @@ import 'program_editor.dart';
 import 'hr_widgets.dart';
 import 'program_paste.dart';
 import 'session_page.dart';
-import 'symptom_sheet.dart';
 import 'training_common.dart';
 
 /// Άσκηση › Προπόνηση: η σημερινή προπόνηση, η εβδομάδα, το πρόγραμμα, οι τελευταίες προπονήσεις.
@@ -73,13 +71,10 @@ class _TrainingPageState extends State<TrainingPage> {
       cards.add(Text(t.saveError!, style: TextStyle(color: c.bad, fontWeight: FontWeight.w600)));
     }
 
-    final pending = t.pendingWatchSymptom;
-    if (pending != null) cards.add(_watchSymptomCard(context));
     final cur = t.current;
     if (cur != null) cards.add(_resumeCard(context, cur));
     final walk = _liveWalk();
     if (walk != null) cards.add(_walkCard(context, walk));
-    if (!t.approved) cards.add(_lockedCard(context));
 
     if (p == null) {
       cards.add(_noProgram(context));
@@ -91,10 +86,7 @@ class _TrainingPageState extends State<TrainingPage> {
     }
     final recent = [for (final s in t.sessions.reversed) if (s.finished) s].take(6).toList();
     if (recent.isNotEmpty) side.add(_recentCard(context, recent));
-    if (t.approved) side.add(_doctorCard(context));
-    if (t.symptoms.any((x) => x.code != watchCode)) side.add(SymptomHistoryCard(training: t));
-    // Και στην καθημερινότητα (σκάλες, ανηφόρα), όχι μόνο στην προπόνηση.
-    side.add(FeelButton(training: t, where: walk != null ? 'walk' : 'day'));
+    side.add(_hrLimitCard(context));
 
     return PageFrame(
       title: 'Προπόνηση',
@@ -123,74 +115,6 @@ class _TrainingPageState extends State<TrainingPage> {
           style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid),
           onPressed: () => _openSession(context),
           child: const Text('Συνέχεια'),
-        ),
-      ]),
-    );
-  }
-
-  Widget _lockedCard(BuildContext context) {
-    final c = Aigaio.of(context);
-    final why = t.lockReason;
-    final symptom = why == 'red' || why == 'amber2';
-    final title = symptom
-        ? 'Η άσκηση κλείδωσε μετά από σύμπτωμα'
-        : why == 'meds'
-            ? 'Τα βάρη κλείδωσαν: νέο φάρμακο'
-            : why == 'manual'
-                ? 'Τα βάρη είναι σε παύση'
-                : t.waitingTests
-                    ? 'Τα βάρη περιμένουν τις εξετάσεις'
-                    : 'Τα βάρη περιμένουν τον καρδιολόγο';
-    final text = symptom
-        ? 'Στις ${t.lockedAt == null ? '' : dayMonth(t.lockedAt!)} κατέγραψες ${why == 'red' ? 'σοβαρό σύμπτωμα' : 'σύμπτωμα για δεύτερη φορά μέσα σε 14 μέρες'}. '
-            'Μέχρι να σε δει γιατρός: καμία άσκηση, ούτε περπάτημα για άσκηση (και το ρολόι δεν ξεκινά). '
-            'Αν δεν σε έχει δει ακόμα, πάρε σήμερα τον καρδιολόγο σου. Αν ξανασυμβεί ή χειροτερέψει: 166.'
-        : why == 'meds'
-            ? 'Ανοίγει ξανά όταν ο γιατρός πει ότι το φάρμακο δεν αλλάζει την άσκηση (ή δώσει νέο όριο παλμών).'
-            : t.waitingTests
-                ? 'Ο γιατρός ζήτησε εξετάσεις. Ανοίγει όταν πάρεις έγκριση με τα αποτελέσματα. Μέχρι τότε: χαλαρό περπάτημα.'
-                : 'Η προπόνηση ανοίγει όταν πεις ότι πήρες πράσινο φως. Μέχρι τότε: χαλαρό περπάτημα, σε ρυθμό που μπορείς να μιλάς. '
-                    'Μπορείς ήδη να ετοιμάσεις το πρόγραμμα.';
-    return AppCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          IconBadge(Icons.lock_outline_rounded, symptom ? c.bad : c.exercise),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text))),
-        ]),
-        const SizedBox(height: 10),
-        Text(text, style: TextStyle(fontSize: 15, height: 1.45, color: c.text)),
-        if (symptom) ...[const SizedBox(height: 12), const Call166Button()],
-        const SizedBox(height: 12),
-        OutlinedButton(
-          key: const ValueKey('train-approve'),
-          onPressed: () => _approve(context),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-          child: Text(symptom || why == 'meds' ? 'Με είδε γιατρός' : 'Πήρα έγκριση'),
-        ),
-      ]),
-    );
-  }
-
-  /// «Νιώθω κάτι» πατήθηκε στο ρολόι: τι ένιωσες;
-  Widget _watchSymptomCard(BuildContext context) {
-    final c = Aigaio.of(context);
-    return AppCard(
-      onTap: () => feelSomething(context, t, where: 'watch'),
-      child: Row(children: [
-        IconBadge(Icons.monitor_heart_outlined, c.bad),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Στο ρολόι πάτησες «Νιώθω κάτι»', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-            Text('Πες τι ένιωσες, για να ξέρεις τι κάνεις τώρα.', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
-          ]),
-        ),
-        FilledButton(
-          key: const ValueKey('watch-sym'),
-          style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: onBad(c)),
-          onPressed: () => feelSomething(context, t, where: 'watch'),
-          child: const Text('Πες'),
         ),
       ]),
     );
@@ -276,12 +200,12 @@ class _TrainingPageState extends State<TrainingPage> {
       final setup = _setupHint(w);
       if (setup != null) children.add(Padding(padding: const EdgeInsets.only(top: 4), child: Text(setup, style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary))));
       children.add(const SizedBox(height: 12));
-      final can = t.approved && t.current == null;
+      final can = t.current == null;
       children.add(FilledButton(
         key: const ValueKey('train-start'),
         style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
         onPressed: can ? () => _start(context, w) : null,
-        child: Text(t.current != null ? 'Υπάρχει προπόνηση σε εξέλιξη' : (t.approved ? 'Ξεκίνα την προπόνηση' : 'Ανοίγει μετά την έγκριση'),
+        child: Text(t.current != null ? 'Υπάρχει προπόνηση σε εξέλιξη' : 'Ξεκίνα την προπόνηση',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ));
     }
@@ -423,24 +347,21 @@ class _TrainingPageState extends State<TrainingPage> {
     );
   }
 
-  Widget _doctorCard(BuildContext context) {
+  /// Όριο παλμών από τον γιατρό: αν υπάρχει, το ρολόι δονεί όταν το ξεπεράσεις. Κενό = τίποτα.
+  Widget _hrLimitCard(BuildContext context) {
     final c = Aigaio.of(context);
+    final hr = t.hrLimit;
     return AppCard(
-      onTap: () => _approve(context, edit: true),
+      key: const ValueKey('train-hrlimit'),
+      onTap: () => _editHrLimit(context),
       child: Row(children: [
         IconBadge(Icons.favorite_rounded, c.bad),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Οδηγίες γιατρού', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
-            Text(
-              [
-                t.hrLimit != null ? 'όριο παλμών ${t.hrLimit}' : 'χωρίς όριο, με την κούραση',
-                if (t.hrMeds) 'φάρμακο για τους παλμούς',
-                if (t.limits != null && t.limits!.isNotEmpty) t.limits!,
-              ].join(' · '),
-              style: TextStyle(fontSize: 13.5, color: c.textSecondary),
-            ),
+            Text('Όριο παλμών από τον γιατρό', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
+            Text(hr != null ? '$hr bpm · το ρολόι δονείται αν το ξεπεράσεις' : 'Κανένα. Πάτα αν σου δώσει ο γιατρός.',
+                style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
           ]),
         ),
         Icon(Icons.chevron_right_rounded, color: c.textTertiary),
@@ -449,46 +370,17 @@ class _TrainingPageState extends State<TrainingPage> {
   }
 
   // ---------------------------------------------------------------- ενέργειες
-  Future<void> _approve(BuildContext context, {bool edit = false}) async {
-    final r = await showModalBottomSheet<_Clearance>(
+  Future<void> _editHrLimit(BuildContext context) async {
+    final r = await showModalBottomSheet<_HrChoice>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (ctx) => _ClearanceSheet(training: t, edit: edit),
+      builder: (ctx) => _HrLimitSheet(current: t.hrLimit),
     );
-    if (r == null) return;
-    switch (r.kind) {
-      case 'tests':
-        t.waitForTests(notes: r.notes);
-      case 'pause':
-        t.relock('manual');
-      default:
-        final limit = r.kind == 'limit' ? r.hr : null;
-        if (edit) {
-          t.setLimits(hr: limit, notes: r.notes, meds: r.meds);
-        } else {
-          t.approve(hr: limit, notes: r.notes, meds: r.meds);
-        }
-    }
+    if (r != null) t.setHrLimit(r.hr);
   }
 
   Future<void> _start(BuildContext context, Workout w) async {
-    // «Νιώθω κάτι» από το ρολόι χωρίς λεπτομέρειες: πρώτα αυτό, όχι προπόνηση (έλεγχος #2, T2-02).
-    if (t.pendingWatchSymptom != null) {
-      await feelSomething(context, t, where: 'watch');
-      return;
-    }
-    // Σύμπτωμα σήμερα: όχι προπόνηση σήμερα.
-    if (t.watchHold == 'today') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Σήμερα έγραψες σύμπτωμα: χωρίς άσκηση σήμερα. Αν χειροτερέψει: 166.'),
-        duration: Duration(seconds: 6),
-      ));
-      return;
-    }
-    // Τις πρώτες 4 εβδομάδες και μετά από σύμπτωμα: «Πώς είσαι σήμερα;» πριν από τα βάρη.
-    if (t.needsCheck && !await readinessCheck(context, t)) return;
-    if (!context.mounted) return;
     t.start(w);
     // Ανοίγει και η εφαρμογή στο ρολόι (παλμοί, ✓ στον καρπό), αν υπάρχει.
     WearLink.main.openWatch();
@@ -551,46 +443,34 @@ extension on String {
   String ifEmpty(String other) => isEmpty ? other : this;
 }
 
-class _Clearance {
-  const _Clearance(this.kind, {this.hr, this.notes, this.meds = false});
-
-  /// 'limit' | 'none' | 'tests' | 'pause'
-  final String kind;
+/// Τι επέλεξε στο φύλλο ορίου: αριθμός ή κανένα όριο (null).
+class _HrChoice {
+  const _HrChoice(this.hr);
   final int? hr;
-  final String? notes;
-  final bool meds;
 }
 
-/// Έγκριση γιατρού (έλεγχος 8/11): όριο παλμών με έλεγχο τιμής, «χωρίς όριο, με την κούραση» ρητά,
-/// «θέλει εξετάσεις» (μένει κλειδωμένο), φάρμακο για τους παλμούς, παύση.
-class _ClearanceSheet extends StatefulWidget {
-  const _ClearanceSheet({required this.training, required this.edit});
-  final TrainingStore training;
-  final bool edit;
+/// Όριο παλμών: αριθμός 80–220 (κάτω από 100 ζητά επιβεβαίωση), ή «Χωρίς όριο».
+class _HrLimitSheet extends StatefulWidget {
+  const _HrLimitSheet({this.current});
+  final int? current;
 
   @override
-  State<_ClearanceSheet> createState() => _ClearanceSheetState();
+  State<_HrLimitSheet> createState() => _HrLimitSheetState();
 }
 
-class _ClearanceSheetState extends State<_ClearanceSheet> {
-  TrainingStore get t => widget.training;
-  late String _kind = widget.edit ? (t.hrLimit != null ? 'limit' : 'none') : '';
-  late final _hr = TextEditingController(text: t.hrLimit?.toString() ?? '');
-  late final _notes = TextEditingController(text: t.limits ?? '');
-  late bool _meds = t.hrMeds;
+class _HrLimitSheetState extends State<_HrLimitSheet> {
+  late final _hr = TextEditingController(text: widget.current?.toString() ?? '');
   bool _lowOk = false;
 
   @override
   void dispose() {
     _hr.dispose();
-    _notes.dispose();
     super.dispose();
   }
 
   int? get _value => int.tryParse(_hr.text.trim());
 
   String? get _error {
-    if (_kind != 'limit') return null;
     final v = _value;
     if (_hr.text.trim().isEmpty) return null;
     if (v == null || v < 80 || v > 220) return 'Γράψε αριθμό από 80 έως 220';
@@ -598,121 +478,59 @@ class _ClearanceSheetState extends State<_ClearanceSheet> {
   }
 
   bool get _valid {
-    switch (_kind) {
-      case 'limit':
-        final v = _value;
-        return v != null && v >= 80 && v <= 220 && (v >= 100 || _lowOk);
-      case 'none':
-      case 'tests':
-        return true;
-    }
-    return false;
+    final v = _value;
+    return v != null && v >= 80 && v <= 220 && (v >= 100 || _lowOk);
   }
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    Widget option(String k, String title, String sub) {
-      final on = _kind == k;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Material(
-          color: on ? c.tint(c.exercise) : c.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: on ? c.exercise : c.hairline, width: on ? 2 : 1),
-          ),
-          child: InkWell(
-            key: ValueKey('clear-$k'),
-            customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            onTap: () => setState(() => _kind = k),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                Icon(on ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: on ? c.exercise : c.textTertiary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
-                    Text(sub, style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary)),
-                  ]),
-                ),
-              ]),
-            ),
-          ),
-        ),
-      );
-    }
-
     final v = _value;
-    final askLow = _kind == 'limit' && v != null && v >= 80 && v < 100;
-    final label = _kind == 'tests' ? 'Αποθήκευση' : (widget.edit ? 'Αποθήκευση' : 'Πήρα έγκριση');
+    final askLow = v != null && v >= 80 && v < 100;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .9),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(widget.edit ? 'Οδηγίες γιατρού' : 'Τι είπε ο καρδιολόγος;', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
-            const SizedBox(height: 12),
-            option('limit', 'Μου έδωσε όριο παλμών', 'Το ρολόι δονείται αν το ξεπεράσεις.'),
-            if (_kind == 'limit') ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
-                child: TextField(
-                  key: const ValueKey('train-hr'),
-                  controller: _hr,
-                  autofocus: !widget.edit,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)],
-                  onChanged: (_) => setState(() => _lowOk = false),
-                  decoration: InputDecoration(labelText: 'Όριο παλμών', suffixText: 'bpm', errorText: _error, border: const OutlineInputBorder()),
-                ),
-              ),
-              if (askLow)
-                CheckboxListTile(
-                  key: const ValueKey('train-hr-low'),
-                  contentPadding: EdgeInsets.zero,
-                  value: _lowOk,
-                  onChanged: (x) => setState(() => _lowOk = x == true),
-                  title: Text('Έγραψες $v. Σωστά;', style: TextStyle(fontSize: 14.5, color: c.text)),
-                ),
-            ],
-            option('none', 'Χωρίς όριο, με την κούραση', 'Δεν μου έδωσε αριθμό· πηγαίνω με το πόσο κουράζομαι.'),
-            if (!widget.edit) option('tests', 'Θέλει πρώτα εξετάσεις', 'Τα βάρη μένουν κλειδωμένα μέχρι τα αποτελέσματα.'),
-            const SizedBox(height: 4),
-            SwitchListTile(
-              key: const ValueKey('train-meds'),
-              contentPadding: EdgeInsets.zero,
-              value: _meds,
-              onChanged: (x) => setState(() => _meds = x),
-              title: Text('Παίρνω φάρμακο που κόβει τους παλμούς', style: TextStyle(fontSize: 14.5, color: c.text)),
-              subtitle: Text('π.χ. β-αναστολέα. Οι παλμοί ανεβαίνουν λιγότερο: το όριο ισχύει μόνο αν το έδωσε ο γιατρός με το φάρμακο, αλλιώς πήγαινε με την κούραση.', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
-            ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Όριο παλμών από τον γιατρό', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
             const SizedBox(height: 6),
+            Text('Αν σου δώσει αριθμό, γράψ’ τον εδώ: το ρολόι δονείται όταν τον ξεπεράσεις, στα βάρη και στο περπάτημα.',
+                style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
+            const SizedBox(height: 14),
             TextField(
-              controller: _notes,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Περιορισμοί (προαιρετικά)', hintText: 'π.χ. όχι βαριά πάνω από το κεφάλι', border: OutlineInputBorder()),
+              key: const ValueKey('train-hr'),
+              controller: _hr,
+              autofocus: widget.current == null,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)],
+              onChanged: (_) => setState(() => _lowOk = false),
+              decoration: InputDecoration(labelText: 'Όριο παλμών', suffixText: 'bpm', errorText: _error, border: const OutlineInputBorder()),
             ),
+            if (askLow)
+              CheckboxListTile(
+                key: const ValueKey('train-hr-low'),
+                contentPadding: EdgeInsets.zero,
+                value: _lowOk,
+                onChanged: (x) => setState(() => _lowOk = x == true),
+                title: Text('Έγραψες $v. Σωστά;', style: TextStyle(fontSize: 14.5, color: c.text)),
+              ),
             const SizedBox(height: 16),
             FilledButton(
-              key: const ValueKey('train-approve-ok'),
+              key: const ValueKey('train-hr-save'),
               style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50)),
-              onPressed: !_valid ? null : () => Navigator.of(context).pop(_Clearance(_kind, hr: _value, notes: _notes.text.trim(), meds: _meds)),
-              child: Text(label),
+              onPressed: !_valid ? null : () => Navigator.of(context).pop(_HrChoice(_value)),
+              child: const Text('Αποθήκευση'),
             ),
-            if (widget.edit) ...[
+            if (widget.current != null) ...[
               const SizedBox(height: 6),
               TextButton(
-                key: const ValueKey('train-pause'),
-                onPressed: () => Navigator.of(context).pop(const _Clearance('pause')),
-                child: Text('Παύση των βαρών (κλείδωμα ξανά)', style: TextStyle(color: c.bad)),
+                key: const ValueKey('train-hr-clear'),
+                onPressed: () => Navigator.of(context).pop(const _HrChoice(null)),
+                child: const Text('Χωρίς όριο'),
               ),
             ],
-          ])),
+          ]),
         ),
       ),
     );

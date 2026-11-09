@@ -30,7 +30,7 @@ class WatchShotsTest {
     private val size = 454 // Galaxy Watch Ultra: περίπου 1,5″, 480 px· στρογγυλό
 
     private val planJson = """
-        {"v":1,"approved":true,"hrLimit":140,"today":"A","at":1,
+        {"v":1,"hrLimit":140,"today":"A","at":1,
          "workouts":[
           {"id":"A","name":"Προπόνηση Α","minutes":50,"items":[
             {"ex":"db_press","name":"Πιεστικό με αλτήρες","rest":120,"lo":8,"hi":12,"rir":2,
@@ -59,10 +59,6 @@ class WatchShotsTest {
         override fun finish() {}
         override fun muteAlarm() {}
         override fun doneOk() {}
-        override fun clearHold() {}
-        override fun feel() {}
-        override fun feelBack() {}
-        override fun feelStop() {}
     }
 
     @After
@@ -74,7 +70,6 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.HOME
         Repo.resetExercise()
         Repo.alarm.limit = null
-        Repo.symSent = false
     }
 
     private fun shot(name: String) {
@@ -148,13 +143,6 @@ class WatchShotsTest {
         shot("W6b_no_hr")
         Repo.bpmAt = now
 
-        // «Νιώθω κάτι»: πριν και μετά το «Σταμάτησα».
-        Repo.screen = Repo.Screen.SYM
-        shot("W10_feel")
-        Repo.symSent = true
-        shot("W10b_feel_sent")
-        Repo.symSent = false
-
         Repo.local = null
         Repo.resetExercise()
         Repo.running = "walk"
@@ -178,14 +166,6 @@ class WatchShotsTest {
         shot("W9_home_phone")
 
         Repo.applyPhone(null)
-        Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":false"))
-        shot("W10_home_locked")
-
-        // Έλεγχος #2: μετά από σοβαρό σύμπτωμα, καμία άσκηση από το ρολόι· και «βάρη από το κινητό».
-        Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":false,\"hold\":\"lock\""))
-        shot("W11_home_symptom_lock")
-        Repo.plan = Plan.parse(planJson.replace("\"approved\":true", "\"approved\":true,\"hold\":\"check\""))
-        shot("W12_home_check")
         Repo.plan = Plan.parse(planJson)
     }
 

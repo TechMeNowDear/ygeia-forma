@@ -11,7 +11,6 @@ import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
-import '../training/training_store.dart';
 import '../widgets.dart';
 import '../unusual.dart';
 import 'nutrition.dart';
@@ -20,7 +19,6 @@ import 'sources_page.dart';
 import 'unusual_card.dart';
 import 'week_card.dart';
 import 'info_sheet.dart';
-import 'training/symptom_sheet.dart';
 import 'oxygen_widgets.dart';
 
 /// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
@@ -48,8 +46,7 @@ class TodayPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      // Και η προπόνηση: η κάρτα μετά από σύμπτωμα να εμφανίζεται/φεύγει αμέσως (έλεγχος #2).
-      listenable: Listenable.merge([store, TrainingStore.main]),
+      listenable: store,
       builder: (context, _) {
         final c = Aigaio.of(context);
         final d = store.data;
@@ -168,8 +165,6 @@ class TodayPage extends StatelessWidget {
 
         final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
         final alerts = [
-          // Μετά από σοβαρό σύμπτωμα: πρώτο απ’ όλα, με το 166 (έλεγχος #2).
-          if (SymptomAlertCard.shows(TrainingStore.main)) SymptomAlertCard(training: TrainingStore.main),
           if (dbNotice != null) dbNotice,
           if (ouraState != null) ouraState,
           if (error != null) error,

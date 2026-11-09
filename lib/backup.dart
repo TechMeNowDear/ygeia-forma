@@ -40,7 +40,7 @@ String buildBackup({
     },
     // Τα αρχεία του σχεδίου πηγών όπως είναι (με την ώρα τους, «at»).
     if (sources != null) 'sources': {'plan': sources.plan, if (sources.log != null) 'log': sources.log},
-    // Προπονήσεις, προγράμματα, «Νιώθω κάτι» (έλεγχος 8/11, TRN-17): υπάρχουν μόνο στο κινητό.
+    // Προπονήσεις και προγράμματα (έλεγχος 8/11, TRN-17): υπάρχουν μόνο στο κινητό.
     if (training != null) 'training': training,
   });
 }

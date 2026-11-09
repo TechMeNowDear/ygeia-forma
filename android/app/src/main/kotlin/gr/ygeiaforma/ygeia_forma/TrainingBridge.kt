@@ -86,17 +86,6 @@ class TrainingBridge(
                 vibrate(activity.applicationContext, longArrayOf(0, 300, 150, 300))
                 result.success(true)
             }
-            "dial" -> {
-                // ACTION_DIAL: ανοίγει το τηλέφωνο με τον αριθμό, χωρίς άδεια CALL_PHONE.
-                val n = (call.argument<String>("n") ?: "166").filter { it.isDigit() }
-                val ok = try {
-                    activity.startActivity(Intent(Intent.ACTION_DIAL, android.net.Uri.parse("tel:$n")))
-                    true
-                } catch (_: Exception) {
-                    false
-                }
-                result.success(ok)
-            }
             else -> result.notImplemented()
         }
     }

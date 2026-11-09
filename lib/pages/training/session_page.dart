@@ -16,7 +16,6 @@ import '../../training/wear_link.dart';
 import '../../widgets.dart';
 import '../exercise_detail.dart';
 import 'hr_widgets.dart';
-import 'symptom_sheet.dart';
 import 'training_common.dart';
 
 /// Μετακίνηση ανάμεσα στα διαθέσιμα βάρη (με τα βελάκια). Στο λάστιχο βοήθειας περιλαμβάνεται και το «χωρίς».
@@ -108,28 +107,12 @@ class _SessionPageState extends State<SessionPage> {
       builder: (context, _) {
         final s = t.current;
         if (s == null) {
-          // Π.χ. «Σταμάτησα» στο ρολόι: η προπόνηση σταμάτησε, ρωτάμε τι ένιωσες (έλεγχος #2).
-          final pending = t.pendingWatchSymptom != null && t.sessions.isNotEmpty && t.sessions.last.stopped;
           return Scaffold(
             appBar: AppBar(),
-            body: Center(
+            body: const Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text(pending ? 'Η προπόνηση σταμάτησε από το ρολόι.' : 'Δεν υπάρχει προπόνηση σε εξέλιξη.',
-                      textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
-                  if (pending) ...[
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      key: const ValueKey('sess-stopped-tell'),
-                      onPressed: () async {
-                        await feelSomething(context, t, where: 'watch');
-                        if (context.mounted) Navigator.of(context).maybePop();
-                      },
-                      child: const Text('Πες τι ένιωσες'),
-                    ),
-                  ],
-                ]),
+                padding: EdgeInsets.all(24),
+                child: Text('Δεν υπάρχει προπόνηση σε εξέλιξη.', textAlign: TextAlign.center, style: TextStyle(fontSize: 17)),
               ),
             ),
           );
@@ -148,17 +131,6 @@ class _SessionPageState extends State<SessionPage> {
               ),
             ]),
             actions: [
-              TextButton.icon(
-                key: const ValueKey('feel'),
-                style: TextButton.styleFrom(foregroundColor: c.bad),
-                onPressed: () async {
-                  await feelSomething(context, t, where: 'session');
-                  // Το σύμπτωμα σταματά την προπόνηση: πίσω στην αρχή της προπόνησης.
-                  if (context.mounted && t.current == null) Navigator.of(context).maybePop();
-                },
-                icon: const Icon(Icons.monitor_heart_outlined, size: 20),
-                label: const Text('Νιώθω κάτι'),
-              ),
               TextButton(key: const ValueKey('sess-finish'), onPressed: () => _finish(context), child: const Text('Τέλος')),
               const SizedBox(width: 6),
             ],
@@ -167,27 +139,7 @@ class _SessionPageState extends State<SessionPage> {
             child: LayoutBuilder(builder: (context, k) {
               final wide = k.maxWidth >= 720;
               final ex = _exerciseCard(context, s, e);
-              // «Νιώθω κάτι» από το ρολόι: πρώτο απ’ όλα.
-              final card = t.pendingWatchSymptom == null
-                  ? ex
-                  : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Material(
-                        color: c.bad.withValues(alpha: .1),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: c.bad)),
-                        child: ListTile(
-                          key: const ValueKey('sess-watch-sym'),
-                          leading: Icon(Icons.monitor_heart_outlined, color: c.bad),
-                          title: const Text('Στο ρολόι πάτησες «Νιώθω κάτι»'),
-                          subtitle: const Text('Πες τι ένιωσες'),
-                          onTap: () async {
-                            await feelSomething(context, t, where: 'watch');
-                            if (context.mounted && t.current == null) Navigator.of(context).maybePop();
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ex,
-                    ]);
+              final card = ex;
               final rest = _restEnd == null ? null : _restBar(context, s);
               final actions = _actions(context, s, e);
               if (wide) {
@@ -494,12 +446,6 @@ class _SessionPageState extends State<SessionPage> {
       if (e.rirAnswer == null) {
         final rir = await _askRir(context, first: false, e: e);
         if (gone()) return;
-        if (rir == -2) {
-          // Ενόχληση στον αριστερό ώμο μαζί με σημάδι από την καρδιά: «Νιώθω κάτι» (έλεγχος #2, U2-07).
-          await feelSomething(context, t, where: 'session');
-          if (context.mounted && t.current == null) Navigator.of(context).maybePop();
-          return;
-        }
         if (rir != null && rir >= 0) t.answer(e, rir);
       }
       if (gone()) return;
@@ -515,7 +461,6 @@ class _SessionPageState extends State<SessionPage> {
 
   /// «Πόσες ακόμα θα έβγαζες;» (0–4+). Στο τέλος της άσκησης και ενοχλήσεις.
   /// Δεν κλείνει κατά λάθος (έλεγχος 8/11): ή απάντηση ή «Δεν ξέρω» (−1, και τότε δεν ανεβαίνει τίποτα).
-  /// −2: «Νιώθω κάτι» από την ερώτηση για τον αριστερό ώμο.
   Future<int?> _askRir(BuildContext context, {required bool first, ExLog? e}) {
     var pick = -1;
     return showModalBottomSheet<int>(
@@ -571,30 +516,6 @@ class _SessionPageState extends State<SessionPage> {
                     onSelected: (_) => set(() => t.togglePain(e, p.key)),
                   ),
               ]),
-              // Ο αριστερός ώμος μπορεί να είναι η καρδιά: μία ερώτηση, όχι υπόθεση για μυ (έλεγχος #2, U2-07).
-              if (e.pain.contains('shoulderL')) ...[
-                const SizedBox(height: 12),
-                Container(
-                  key: const ValueKey('pain-cardiac'),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: c.bad.withValues(alpha: .08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: c.bad.withValues(alpha: .6)),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Text('Νιώθεις μαζί και σφίξιμο ή πίεση στο στήθος, λαχάνιασμα, κρύο ιδρώτα ή ζάλη;',
-                        style: TextStyle(fontSize: 14.5, height: 1.35, fontWeight: FontWeight.w600, color: c.text)),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      key: const ValueKey('rir-cardiac'),
-                      style: OutlinedButton.styleFrom(foregroundColor: c.bad, side: BorderSide(color: c.bad), minimumSize: const Size.fromHeight(46)),
-                      onPressed: () => Navigator.of(ctx).pop(-2),
-                      child: const Text('Ναι → Νιώθω κάτι'),
-                    ),
-                  ]),
-                ),
-              ],
             ],
             const SizedBox(height: 16),
             FilledButton(

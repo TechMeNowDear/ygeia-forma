@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'training_store.dart';
@@ -22,17 +21,4 @@ class TrainingDevice {
       _call('rest', {'endAt': end.millisecondsSinceEpoch, 'title': title, 'text': text, 'doneTitle': doneTitle, 'doneText': doneText});
   static Future<void> restCancel() => _call('restCancel');
   static Future<void> buzz() => _call('buzz');
-
-  /// Ανοίγει την κλήση με τον αριθμό έτοιμο (χωρίς άδεια τηλεφώνου: πατάς εσύ «κλήση»).
-  /// false μόνο αν το Android είπε ότι δεν άνοιξε (π.χ. χωρίς εφαρμογή τηλεφώνου).
-  static Future<bool> dial(String number) async {
-    try {
-      return await _c.invokeMethod<bool>('dial', {'n': number}) ?? true;
-    } on MissingPluginException {
-      // Δοκιμές (που τρέχουν ως Android) ναι· σε υπολογιστή, όπου δεν υπάρχει κλήση, όχι (έλεγχος #2).
-      return defaultTargetPlatform == TargetPlatform.android;
-    } catch (_) {
-      return false;
-    }
-  }
 }

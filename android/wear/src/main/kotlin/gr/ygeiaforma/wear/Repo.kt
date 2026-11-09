@@ -10,7 +10,7 @@ import org.json.JSONObject
  * Όλες οι αλλαγές γίνονται στο κύριο νήμα· η οθόνη ακούει με [listen].
  */
 object Repo {
-    enum class Screen { HOME, SET, RIR, REST, WALK, END, SYM }
+    enum class Screen { HOME, SET, RIR, REST, WALK, END }
 
     var plan: Plan? = null
     /** Προπόνηση που τρέχει στο κινητό (καθρέφτης). */
@@ -43,16 +43,6 @@ object Repo {
     /** Μέχρι πότε έχει σιγήσει η κόκκινη οθόνη (ο χρήστης την πάτησε). */
     var alarmMutedUntil = 0L
 
-    /** «Νιώθω κάτι»: η οθόνη πριν (για «Πίσω») και αν στάλθηκε ήδη. */
-    var symBack = Screen.HOME
-    var symSent = false
-
-    /** Πότε πατήθηκε «Σταμάτησα» (ms, 0 = ποτέ). Μένει και μετά από επανεκκίνηση, ώσπου να το δει το κινητό. */
-    var symHoldAt = 0L
-
-    /** «Σταμάτησα» στη μέση της άσκησης: το αποτέλεσμα γράφεται ως διακοπή από σύμπτωμα (όχι για την πρόοδο). */
-    var stopSym = false
-
     /**
      * Αισθητήρας που στέλνει μόνο αλλαγές, με επαφή και ίδια τιμή: οι παλμοί είναι σταθεροί, όχι χαμένοι, ως αυτή
      * την ώρα (ms). Μόνο για την ένδειξη και την ειδοποίηση· ποτέ ως τιμή προς το κινητό (έλεγχος #2).
@@ -61,9 +51,6 @@ object Repo {
 
     /** Παλμοί που ισχύουν τώρα (φρέσκια τιμή ή σταθεροί από τον αισθητήρα). */
     fun hrLive(now: Long): Boolean = bpmFresh(now) || (bpm > 0 && now < steadyUntil)
-
-    /** Τι δεν ξεκινά τώρα: δες [holdOf]. */
-    fun hold(): String? = holdOf(plan, symHoldAt, java.time.LocalDate.now().toString())
 
     var meters = 0.0
     var steps = 0L
@@ -161,30 +148,11 @@ object Repo {
     private const val PREFS = "ygeia_watch"
     private const val PENDING = "pending"
 
-    private const val HOLD = "symHoldAt"
-
-    fun loadHold(ctx: Context) {
-        symHoldAt = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(HOLD, 0L)
+    /** Κλειδιά της παύσης μετά από «Σταμάτησα» (ως #84): σβήνονται μία φορά (απλοποίηση 9/11). */
+    fun dropOldKeys(ctx: Context) {
+        val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (sp.contains("symHoldAt") || sp.contains("pendingSym")) sp.edit().remove("symHoldAt").remove("pendingSym").apply()
     }
-
-    fun setHold(ctx: Context, at: Long) {
-        symHoldAt = at
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(HOLD, at).apply()
-    }
-
-    // «Σταμάτησα» που δεν έφτασε ακόμα στο κινητό: κρατιέται και ξαναστέλνεται (έλεγχος #2, B1).
-    private const val SYM = "pendingSym"
-
-    fun keepSym(ctx: Context, json: JSONObject?) {
-        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        if (json == null) p.remove(SYM) else p.putString(SYM, json.toString())
-        p.apply()
-    }
-
-    fun pendingSym(ctx: Context): JSONObject? =
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SYM, null)?.let {
-            try { JSONObject(it) } catch (_: Exception) { null }
-        }
 
     fun snapshot(ctx: Context, json: JSONObject?) {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
