@@ -29,7 +29,7 @@ Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, Date
   food.syncToday();
   // Κάρτα της μέρας που φαινόταν (π.χ. οθόνη ανοιχτή από χθες βράδυ): πάει στη νέα σημερινή μέρα.
   final target = day == null || sameDay(day, shown) ? food.day : day;
-  return Navigator.of(context).push(
+  await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'Προσθήκη φαγητού'),
       builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: target),
