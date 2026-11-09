@@ -187,7 +187,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         val next = s.tick(now)
         // Με την ώρα του ✓ εδώ: το κινητό τη γράφει όπως είναι (παλμοί ανά σετ), όχι την ώρα που έφτασε (9/11).
         if (s.phone && si >= 0) cmd(JSONObject().put("op", "tick").put("i", i).put("s", si).put("at", now))
-        if (!s.phone) Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)))
+        if (!s.phone) Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)).put("lim", Repo.alarm.limit ?: 0))
         Repo.screen = when (next) {
             LiveSession.Next.REST -> if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             LiveSession.Next.ASK_RIR -> Repo.Screen.RIR
@@ -201,7 +201,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         val now = System.currentTimeMillis()
         val (next, i) = s.answer(rir, now)
         if (s.phone) cmd(JSONObject().put("op", "rir").put("i", i).put("v", rir))
-        else Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)))
+        else Repo.snapshot(this, s.resultJson(now, Repo.hr ?: HrStats(now)).put("lim", Repo.alarm.limit ?: 0))
         if (next == LiveSession.Next.END && !s.phone) {
             ExerciseService.stop(this)
             return

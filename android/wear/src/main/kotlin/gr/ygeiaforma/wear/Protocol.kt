@@ -430,6 +430,52 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
     }
 }
 
+/**
+ * «Δεν μετριούνται παλμοί» όσο ισχύει όριο γιατρού (έλεγχος 9/11, V-A-04). Μία δόνηση όταν:
+ * - δεν ήρθε ΚΑΝΕΝΑΣ παλμός [firstMs] (30″) μετά την αρχή (π.χ. λείπει η άδεια, το Health Services αρνήθηκε την
+ *   άσκηση, χαλαρό λουρί από την αρχή): [Silence.NEVER]·
+ * - χάθηκαν για [lostMs] αφού είχαν έρθει: [Silence.LOST] (όπως πριν: 15″ στο περπάτημα, 45″ στα βάρη).
+ * Ξανά μόνο αφού ξαναέρθουν παλμοί και χαθούν πάλι (όχι κάθε δευτερόλεπτο). Σε παύση δεν δονείται.
+ * Καθαρή λογική, χωρίς Android, για να ελέγχεται.
+ */
+class HrSilence(private val firstMs: Long = FIRST_MS) {
+    enum class Silence { NEVER, LOST }
+
+    companion object {
+        /** Αναμονή για τον πρώτο παλμό (ίδια με του κινητού, `hrWaitSeconds`). */
+        const val FIRST_MS = 30_000L
+    }
+
+    /** Τι λείπει τώρα (μετά τον χρόνο αναμονής), ή null. */
+    var state: Silence? = null
+        private set
+    private var buzzed = false
+
+    /**
+     * true = δόνηση τώρα. [lastAt]: πότε ήρθε ο τελευταίος παλμός (0 = κανένας), [live]: παλμοί που ισχύουν τώρα.
+     */
+    fun check(now: Long, startedAt: Long, lastAt: Long, live: Boolean, hasLimit: Boolean, paused: Boolean, lostMs: Long): Boolean {
+        if (live) {
+            state = null
+            buzzed = false
+            return false
+        }
+        state = when {
+            lastAt <= 0L -> if (startedAt > 0L && now - startedAt >= firstMs) Silence.NEVER else null
+            now - lastAt >= lostMs -> Silence.LOST
+            else -> null
+        }
+        if (state == null || !hasLimit || paused || buzzed) return false
+        buzzed = true
+        return true
+    }
+
+    fun reset() {
+        state = null
+        buzzed = false
+    }
+}
+
 /** Χρόνος τιμής αισθητήρα (ns από την εκκίνηση) → ώρα (ms), ποτέ στο μέλλον. */
 fun sensorWallTime(eventNanos: Long, nowWallMs: Long, nowElapsedNanos: Long): Long =
     (nowWallMs - (nowElapsedNanos - eventNanos) / 1_000_000).coerceAtMost(nowWallMs)

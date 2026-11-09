@@ -71,8 +71,8 @@ class _ProgressPageState extends State<ProgressPage> {
         final bodyCard = health == null ? null : _BodyCard(results: body, onOpenTrends: widget.onOpenTrends);
         final note = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Text('«Άλλαξε» μόνο όταν η διαφορά είναι μεγαλύτερη από τις συνηθισμένες διακυμάνσεις σου· αλλιώς «Σταθερό». '
-              'Είναι ένδειξη, όχι ιατρικός έλεγχος.',
+          child: Text('«Άλλαξε» μόνο όταν η διαφορά είναι μεγαλύτερη από τις συνηθισμένες διακυμάνσεις σου· αλλιώς «Σταθερό», '
+              'ή «Λίγες μέρες (ή ζυγίσεις) για συμπέρασμα» όταν δεν φτάνουν για σύγκριση. Είναι ένδειξη, όχι ιατρικός έλεγχος.',
               style: TextStyle(fontSize: 12.5, height: 1.45, color: c.textSecondary)),
         );
         return Scaffold(
@@ -117,6 +117,19 @@ class _ProgressPageState extends State<ProgressPage> {
 
 /// Πτώση παλμών: πόσοι παλμοί (αρνητικό = ανέβηκαν, σπάνιο).
 String _hrDrop(double v) => '${v.round()}';
+
+/// Πτώση παλμών στο 1′ που άλλαξε: ουδέτερα, χωρίς βέλος (έλεγχος 9/11, V-B-08).
+String hrrChangeText(TrendResult r) {
+  final d = (r.current! - r.previous!).round();
+  return d > 0 ? 'μεγαλύτερη κατά $d' : 'μικρότερη κατά ${-d}';
+}
+
+/// «παλμοί στο τέλος 112 → 118»: η ένταση των ίδιων περπατημάτων, για να διαβάζεται η πτώση.
+String? hrrEndText(TrendResult end) {
+  final a = end.previous, b = end.current;
+  if (b == null) return null;
+  return a == null ? 'παλμοί στο τέλος ${b.round()}' : 'παλμοί στο τέλος ${a.round()} → ${b.round()}';
+}
 
 String _paceRelText(PaceRel r) => switch (r) {
       PaceRel.same => 'ίδιος ρυθμός',
@@ -269,11 +282,13 @@ class _WalkCard extends StatelessWidget {
                   kind: w.pace.status == TrendStatus.down ? TrendKind.good : TrendKind.neutral)
               : TrendStatusPill(r: w.pace),
         ),
+        // Ουδέτερη (έλεγχος 9/11, V-B-08): χωρίς χρώμα και βέλος, με τους παλμούς στο τέλος από κάτω.
         _Row(
           key: const ValueKey('prog-walk-hrr'),
           label: 'Πτώση παλμών στο 1′',
           detail: vals(w.hrr, _hrDrop) + (w.hrr.current == null ? '' : ' παλμοί'),
-          pill: pillFor(w.hrr),
+          extra: w.hrr.current == null ? null : hrrEndText(w.hrrEnd),
+          pill: w.hrr.changed ? TrendPill(hrrChangeText(w.hrr)) : TrendStatusPill(r: w.hrr),
         ),
         _Row(
           key: const ValueKey('prog-walk-count'),
@@ -371,9 +386,10 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
     final faster = walk.pace.status == TrendStatus.down;
     out.add(('Ρυθμός: ${paceText(walk.pace.previous!.round())} → ${paceText(walk.pace.current!.round())} ανά km', faster ? TrendKind.good : TrendKind.neutral, !faster));
   }
+  // Ουδέτερη, χωρίς βέλος (έλεγχος 9/11, V-B-08), με την ένταση δίπλα.
   if (walk.hrr.changed) {
-    final up = walk.hrr.status == TrendStatus.up;
-    out.add(('Πτώση παλμών στο 1′: ${walk.hrr.previous!.round()} → ${walk.hrr.current!.round()}', up ? TrendKind.good : TrendKind.bad, up));
+    final end = hrrEndText(walk.hrrEnd);
+    out.add(('Πτώση παλμών στο 1′: ${walk.hrr.previous!.round()} → ${walk.hrr.current!.round()}${end == null ? '' : ' ($end)'}', TrendKind.neutral, null));
   }
   for (final p in strength) {
     if (p.change != StrengthChange.up && p.change != StrengthChange.down) continue;
@@ -468,7 +484,8 @@ Future<void> showWalkProgressInfo(BuildContext context) => _sheet(context, 'prog
         'Τι δείχνει',
         'Παλμοί: ο μέσος όρος σε κάθε περπάτημα, χωρίς τις παύσεις. Όσο βελτιώνεται η φυσική κατάσταση, η ίδια ταχύτητα θέλει '
             'λιγότερους παλμούς. Ρυθμός: λεπτά ανά χιλιόμετρο, χωρίς τις παύσεις. Πτώση παλμών στο 1′: πόσο πέφτουν οι παλμοί '
-            'στο πρώτο λεπτό μετά το «Τέλος» (μεγαλύτερη πτώση = καλύτερα).'
+            'στο πρώτο λεπτό μετά το «Τέλος». Εξαρτάται κυρίως από το πόσο γρήγορα περπάτησες (πιο γρήγορα = μεγαλύτερη πτώση), '
+            'γι\' αυτό δεν τη λέω «καλύτερα» ή «χειρότερα»· από κάτω φαίνονται οι παλμοί στο τέλος, για να συγκρίνεις ίδια ένταση.'
       ),
       (
         'Πώς αποφασίζω',
@@ -498,8 +515,9 @@ Future<void> showStrengthProgressInfo(BuildContext context) => _sheet(context, '
       ),
       (
         'Πώς διαβάζεται',
-        'Περισσότερο βάρος χωρίς λιγότερες επαναλήψεις, ή ίδιο βάρος με περισσότερες: πρόοδος. Περισσότερο βάρος με λιγότερες '
-            'επαναλήψεις: δεν λέω ούτε καλύτερα ούτε χειρότερα. Μία επανάληψη πάνω ή κάτω στο σύνολο των σετ μετρά ως «ίδιο»: '
+        'Περισσότερο βάρος με τις επαναλήψεις ακόμα μέσα στο εύρος του στόχου (π.χ. όλα τα σετ τουλάχιστον 8), ή ίδιο βάρος '
+            'με περισσότερες επαναλήψεις: πρόοδος. Περισσότερο βάρος με κάποιο σετ κάτω από το εύρος: δεν λέω ούτε καλύτερα '
+            'ούτε χειρότερα. Μία επανάληψη πάνω ή κάτω στο σύνολο των σετ μετρά ως «ίδιο»: '
             'τόσο αλλάζει από μέρα σε μέρα. Στις έλξεις με λάστιχο, λιγότερη βοήθεια σημαίνει πρόοδο.'
       ),
       (

@@ -276,7 +276,9 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.runAsync(() => ExLibrary.load(inline: true));
       final t = sampleTraining(now);
+      // Το όριο που ίσχυε σε αυτή την προπόνηση (έλεγχος 9/11, V-B-04· οι δοκιμαστικές προπονήσεις είναι «παλιές»).
       final s = t.sessions.last
+        ..limit = 140
         ..hrAvg = 118
         ..hrMax = 136
         ..hr.addAll([
