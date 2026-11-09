@@ -935,9 +935,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     (Nk.kcal, 'Ενέργεια', 'kcal', true),
     (Nk.protein, 'Πρωτεΐνες', 'g', true),
     (Nk.carbs, 'Υδατάνθρακες', 'g', true),
-    (Nk.sugars, 'από τους οποίους σάκχαρα', 'g', false),
+    (Nk.sugars, 'εκ των οποίων σάκχαρα', 'g', false),
     (Nk.fat, 'Λιπαρά', 'g', true),
-    (Nk.satFat, 'από τα οποία κορεσμένα', 'g', false),
+    (Nk.satFat, 'εκ των οποίων κορεσμένα', 'g', false),
     (Nk.fiber, 'Φυτικές (εδώδιμες) ίνες', 'g', false),
     (Nk.salt, 'Αλάτι', 'g', false),
   ];
@@ -1008,14 +1008,15 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final doubtful = doubtfulValues(values);
     final per = _perMl ? '100 ml' : '100 g';
 
-    InputDecoration deco(String label, {String? suffix, String? error, String? warning}) => InputDecoration(
+    InputDecoration deco(String label, {String? suffix, String? error, String? warning, bool info = false}) => InputDecoration(
           labelText: label,
           suffixText: suffix,
           errorText: error,
           errorMaxLines: 3,
           helperText: warning,
           helperMaxLines: 3,
-          helperStyle: TextStyle(fontSize: 12.5, color: c.bad),
+          // Προειδοποίηση σε κόκκινο· απλή πληροφορία (π.χ. «αποθηκεύεται ως αλάτι…») σε γκρι.
+          helperStyle: TextStyle(fontSize: 12.5, color: info ? c.textSecondary : c.bad),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         );
 
@@ -1126,6 +1127,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                             : impossible[f.$1]) ??
                         (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
                     warning: doubtful[f.$1] ?? (f.$1 == Nk.salt ? saltWarning() : null),
+                    info: doubtful[f.$1] == null && f.$1 == Nk.salt && _saltMode != SaltInput.salt,
                   ),
                 ),
                 const SizedBox(height: 10),
