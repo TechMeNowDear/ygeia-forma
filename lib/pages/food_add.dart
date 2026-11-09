@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../food/food_channel.dart';
 import '../food/food_model.dart';
+import '../food/food_search.dart' show FoodSearchResult, plain;
+import '../food/food_sources.dart';
 import '../food/food_store.dart';
 import '../food/off.dart';
 import '../food/weigh_hints.dart';
@@ -15,12 +17,19 @@ import 'nutrition.dart';
 // Είσοδοι
 // ---------------------------------------------------------------------------
 
-Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day}) {
+Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day}) async {
+  // Έλεγχος 9/11 (Χ6): αν δεν διαβάστηκε το ημερολόγιο, ό,τι γραφτεί μπορεί να βγει διπλό.
+  if (!food.loaded) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Δεν διαβάστηκε ακόμα το ημερολόγιο φαγητού. Πάτα «Ξαναδοκίμασε» στη Διατροφή.'),
+    ));
+    return;
+  }
   final shown = food.day;
   food.syncToday();
   // Κάρτα της μέρας που φαινόταν (π.χ. οθόνη ανοιχτή από χθες βράδυ): πάει στη νέα σημερινή μέρα.
   final target = day == null || sameDay(day, shown) ? food.day : day;
-  return Navigator.of(context).push(
+  await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'Προσθήκη φαγητού'),
       builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: target),
@@ -118,10 +127,13 @@ class MealPicker extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class AddFoodScreen extends StatefulWidget {
-  const AddFoodScreen({super.key, required this.food, required this.meal, required this.day});
+  const AddFoodScreen({super.key, required this.food, required this.meal, required this.day, this.clock});
   final FoodStore food;
   final Meal meal;
   final DateTime day;
+
+  /// Για δοκιμές: η ώρα «τώρα». Χωρίς αυτό, η ερώτηση «σε ποια μέρα;» γίνεται μόνο στο κινητό (όχι στα στιγμιότυπα).
+  final DateTime Function()? clock;
 
   @override
   State<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -131,6 +143,63 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   final _query = TextEditingController();
   late Meal _meal = widget.meal;
   bool _busy = false;
+
+  DateTime _now() => (widget.clock ?? DateTime.now)();
+
+  /// Πότε άνοιξε η οθόνη (για να φανεί αν πέρασαν τα μεσάνυχτα όσο ήταν ανοιχτή).
+  late final DateTime _openedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _openedAt = _now();
+  }
+
+  /// Η μέρα που διάλεξε ο χρήστης στην ερώτηση «σε ποια μέρα;» (μία φορά για όσο είναι ανοιχτή η οθόνη).
+  DateTime? _dayChoice;
+
+  /// Σε ποια μέρα γράφεται το φαγητό (έλεγχος 9/11, Χ11 και RT-14):
+  /// - η οθόνη άνοιξε «σήμερα» και στο μεταξύ πέρασαν τα μεσάνυχτα → ρωτά «χθες ή σήμερα;» (πριν πήγαινε σιωπηλά χθες)·
+  /// - 00:00–03:59 και η μέρα είναι η σημερινή → ρωτά, γιατί το βραδινό συχνά γράφεται μετά τα μεσάνυχτα.
+  /// null αν έκλεισε την ερώτηση χωρίς απάντηση.
+  Future<DateTime?> _targetDay() async {
+    final chosen = _dayChoice;
+    if (chosen != null) return chosen;
+    final opened = dayOf(widget.day);
+    if (widget.clock == null && !widget.food.followsClock) return opened;
+    final now = _now();
+    final today = dayOf(now);
+    DateTime? other;
+    if (sameDay(opened, dayOf(_openedAt)) && !sameDay(opened, today)) {
+      other = today;
+    } else if (sameDay(opened, today) && now.hour < 4) {
+      other = DateTime(today.year, today.month, today.day - 1);
+    }
+    if (other == null) return opened;
+    final yesterday = other.isBefore(opened) ? other : opened;
+    // Χωρίς κλείσιμο με πάτημα έξω ή «πίσω»: αλλιώς η ποσότητα που γράφτηκε χανόταν χωρίς μήνυμα (έλεγχος fix-food, 4.3).
+    final pick = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      routeSettings: const RouteSettings(name: 'Σε ποια μέρα'),
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+        title: const Text('Σε ποια μέρα;'),
+        content: const Text('Πέρασαν τα μεσάνυχτα. Είναι το χθεσινό βραδινό ή φαγητό της νέας μέρας;'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, yesterday),
+            child: Text('Χθες (${shortDayDate(yesterday)})'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx, today), child: const Text('Σήμερα')),
+        ],
+      ),
+      ),
+    );
+    if (pick != null) _dayChoice = pick;
+    return pick;
+  }
 
   @override
   void dispose() {
@@ -153,7 +222,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       ),
     );
     if (r == null || !mounted) return;
-    final e = await widget.food.add(r.food, r.grams, r.meal, on: widget.day);
+    final day = await _targetDay();
+    if (day == null || !mounted) return;
+    final e = await widget.food.add(r.food, r.grams, r.meal, on: day);
     if (!mounted) return;
     if (!widget.food.isSaved(e)) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -162,7 +233,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Προστέθηκε: ${r.food.name}, ${gramsText(r.grams)} g'),
+      content: Text('Προστέθηκε: ${r.food.name}, ${gramsText(r.grams)} ${r.food.unit}'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),
     ));
     setState(() => _meal = r.meal);
@@ -184,7 +255,28 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final q = _query.text;
-    final results = q.trim().isEmpty ? const <Food>[] : widget.food.search(q);
+    final found = q.trim().isEmpty ? null : widget.food.find(q);
+    final results = found?.foods ?? const <Food>[];
+    // Έλεγχος 9/11 (Υ3): αν βρέθηκε μόνο χωρίς μια λέξη ή με διόρθωση, το λέμε (να μη μοιάζει ακριβής απάντηση).
+    // Ανεξάρτητος έλεγχος του fix-food (3.3): αν αγνοήθηκε λέξη που αλλάζει τη διατροφή («γάλα σόγιας», «μπύρα χωρίς
+    // αλκοόλ», «σοκολάτα χωρίς ζάχαρη») ή ένα άλλο τρόφιμο («γιαούρτι με μέλι»), τα αποτελέσματα είναι ΑΛΛΟ τρόφιμο:
+    // έντονη προειδοποίηση, όχι γκρι σημείωση. Ο τρόπος μαγειρέματος («χταπόδι ψητό») μένει απλή σημείωση.
+    final kept = found?.kept.join(' ') ?? '';
+    final strong = found != null && results.isNotEmpty && strongSearchWarning(found);
+    final note = found == null || results.isEmpty
+        ? null
+        : found.corrected.isNotEmpty
+            ? 'Δεν βρέθηκε ${found.corrected.keys.map((w) => '«$w»').join(', ')}. '
+                'Αποτελέσματα για ${found.corrected.values.map((w) => '«$w»').join(', ')}.'
+            : found.ignored.isEmpty
+                ? null
+                : strong
+                    ? 'Δεν έχουμε «${q.trim()}». Τα παρακάτω είναι για «$kept»: άλλο τρόφιμο, με άλλες θερμίδες. Αν είναι '
+                        'συσκευασμένο, σκάναρε το barcode ή πέρασε την ετικέτα (κουμπιά πιο κάτω)· αν είναι σπιτικό, γράψε '
+                        'χωριστά και τα υπόλοιπα υλικά.'
+                    : kept.isEmpty
+                        ? 'Δεν βρέθηκε με όλες τις λέξεις. Αποτελέσματα χωρίς ${found.ignored.map((w) => '«$w»').join(', ')}.'
+                        : 'Δεν βρέθηκε «${q.trim()}». Αποτελέσματα για «$kept».';
     final recent = widget.food.recent(limit: 10);
     // «Συχνά»: όσα τρως συχνά αλλά δεν είναι ήδη στα «Πρόσφατα» (αλλιώς οι δύο λίστες βγαίνουν ίδιες).
     final recentIds = {for (final f in recent) f.id};
@@ -273,8 +365,39 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                       ),
                     )
-                  else
+                  else ...[
+                    if (note != null && strong)
+                      Container(
+                        key: const ValueKey('search-warning'),
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.warning_amber_rounded, size: 20, color: c.bad),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(note, style: TextStyle(fontSize: 14, height: 1.4, color: c.text))),
+                          ],
+                        ),
+                      )
+                    else if (note != null)
+                      Padding(
+                        key: const ValueKey('search-note'),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 18, color: c.textSecondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(note, style: TextStyle(fontSize: 13.5, height: 1.35, color: c.textSecondary)),
+                            ),
+                          ],
+                        ),
+                      ),
                     for (final f in results) _FoodTile(food: f, store: widget.food, onTap: () => _pick(f)),
+                  ],
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Row(
@@ -343,7 +466,7 @@ class _FoodTile extends StatelessWidget {
                     ),
                   const SizedBox(height: 2),
                   Text(
-                    '${kcalText(n.amount(Nk.kcal))} kcal · πρωτεΐνη ${nValueText(n[Nk.protein])} g ανά 100 g'
+                    '${kcalText(n.amount(Nk.kcal))} kcal · πρωτεΐνη ${nValueText(n[Nk.protein])} g ανά 100 ${food.unit}'
                     '${times > 0 ? ' · ${times == 1 ? '1 φορά' : '$times φορές'}' : ''}',
                     style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular),
                   ),
@@ -447,31 +570,54 @@ class _QuantitySheetState extends State<QuantitySheet> {
     final c = Aigaio.of(context);
     final f = _item;
     final g = _value;
+    final unit = f.unit;
     double tot(String k) => g == null ? 0 : f.n.amount(k) * g / 100;
 
     final chips = <(String, double)>[
       if (f.servingGrams != null && f.servingGrams! > 0)
-        ('1 μερίδα (${gramsText(f.servingGrams!)} g)', f.servingGrams!),
-      for (final v in const [50.0, 100.0, 150.0, 200.0]) ('${v.round()} g', v),
+        ('1 μερίδα (${gramsText(f.servingGrams!)} $unit)', f.servingGrams!),
+      // Υγρά ανά 100 ml (έλεγχος 9/11, Μ2): ποτήρι, κουτάκι.
+      for (final v in f.perMl ? const [100.0, 200.0, 250.0, 330.0] : const [50.0, 100.0, 150.0, 200.0]) ('${v.round()} $unit', v),
     ];
 
+    // Έλεγχος 9/11 (V-D-23): με μεγάλα γράμματα (1,3×–2×) η ετικέτα και η τιμή μικραίνουν αντί να κόβονται.
     Widget stat(String label, String value, Color color) => Expanded(
           child: Column(
             children: [
-              Text(value,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(value,
+                    maxLines: 1,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
+              ),
               const SizedBox(height: 2),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 4),
-                  Text(label, style: TextStyle(fontSize: 12, color: c.textSecondary)),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(label, maxLines: 1, style: TextStyle(fontSize: 12, color: c.textSecondary)),
+                    ),
+                  ),
                 ],
               ),
             ],
           ),
         );
+
+    // Έλεγχος 9/11 (Μ4): το λάδι του μαγειρέματος είναι συχνά οι μισές θερμίδες του πιάτου· η υπενθύμιση φαίνεται σε
+    // κάθε κρέας, ψάρι, λαχανικό, πατάτα και αυγό (όχι μόνο όταν υπάρχουν ωμή/μαγειρεμένη μορφή) και στα «χωρίς λάδι»,
+    // εκτός από ό,τι έχει ήδη μέσα το λάδι (τηγανητά, σε λάδι, με λιπαρή ουσία).
+    final pn = plain(f.name);
+    final hasFat = (pn.contains('τηγαν') && !pn.contains('χωρισ')) ||
+        pn.contains('σε λαδι') ||
+        pn.contains('σε ελαιολαδο') ||
+        pn.contains('με λιπαρη');
+    final oilNote = !hasFat && (_oilCats.contains(f.cat) || pn.contains('χωρισ λαδι') || pn.contains('χωρισ λιπαρη'));
+    final pickHint = pickHints[f.id] ?? pickHints[widget.food.currentOf(f).id];
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -491,7 +637,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
-                      '${f.brand != null ? '${f.brand} · ' : ''}${kcalText(f.n.amount(Nk.kcal))} kcal ανά 100 g · ${f.source} ›',
+                      '${f.brand != null ? '${f.brand} · ' : ''}${kcalText(f.n.amount(Nk.kcal))} kcal ανά 100 $unit · ${f.source} ›',
                       style: TextStyle(fontSize: 13.5, color: c.primary),
                     ),
                   ),
@@ -517,12 +663,43 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    // Έλεγχος 8/11 (FOOD-05): το λάδι του μαγειρέματος είναι συχνά οι περισσότερες θερμίδες του πιάτου.
                     f.rawId == null
-                        ? 'Βάρος πριν το μαγείρεμα (το πιο ακριβές). Λάδι ή βούτυρο για το μαγείρεμα: γράψ’ το χωριστά.'
+                        ? 'Βάρος πριν το μαγείρεμα (το πιο ακριβές).'
                         : 'Βάρος μετά το μαγείρεμα· οι τιμές είναι για ${(f.cookedLabel ?? 'μαγειρεμένο').toLowerCase()}'
-                            '${(f.cookedLabel ?? '').toLowerCase().contains('τηγαν') ? ', μαζί με το λάδι που ρούφηξε' : ''}.',
+                            '${(f.cookedLabel ?? '').toLowerCase().contains('τηγαν') && !(f.cookedLabel ?? '').toLowerCase().contains('χωρίς') ? ', μαζί με το λάδι που ρούφηξε' : ''}.',
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                  ),
+                ],
+                if (oilNote) ...[
+                  SizedBox(height: _states.length > 1 ? 2 : 10),
+                  Text(
+                    'Λάδι ή βούτυρο για το μαγείρεμα: γράψ’ το χωριστά.',
+                    key: const ValueKey('oil-note'),
+                    style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                  ),
+                ],
+                if (pickHint != null) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 18, color: c.textSecondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(pickHint, style: TextStyle(fontSize: 13.5, height: 1.35, color: c.text)),
+                      ),
+                    ],
+                  ),
+                ],
+                if (f.perMl) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    // Έλεγχος 9/11 (Μ2): οι τιμές μένουν όπως στην ετικέτα (ανά 100 ml) και η ποσότητα γράφεται σε ml.
+                    (f.n[Nk.fat]?.value ?? 0) >= 90
+                        ? 'Οι τιμές είναι ανά 100 ml, όπως στην ετικέτα: γράψε ml. Αν το ζυγίζεις, 10 g λάδι είναι περίπου 11 ml.'
+                        : 'Οι τιμές είναι ανά 100 ml, όπως στην ετικέτα: γράψε ml.',
+                    key: const ValueKey('ml-note'),
+                    style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textTertiary),
                   ),
                 ],
                 if (weighHints[f.id] case final hint?) ...[
@@ -559,8 +736,8 @@ class _QuantitySheetState extends State<QuantitySheet> {
                         onChanged: (_) => setState(() {}),
                         style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                         decoration: InputDecoration(
-                          suffixText: 'g',
-                          errorText: g == null ? 'Γράψε γραμμάρια' : null,
+                          suffixText: unit,
+                          errorText: g == null ? (f.perMl ? 'Γράψε ml' : 'Γράψε γραμμάρια') : null,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
@@ -588,7 +765,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       stat('kcal', kcalText(tot(Nk.kcal)), c.primary),
                       stat('Πρωτεΐνη', '${gramsText(tot(Nk.protein))} g', proteinColor(c)),
                       stat('Υδατάνθρ.', '${gramsText(tot(Nk.carbs))} g', carbsColor(c)),
-                      stat('Λίπος', '${gramsText(tot(Nk.fat))} g', fatColor(c)),
+                      stat('Λιπαρά', '${gramsText(tot(Nk.fat))} g', fatColor(c)),
                     ],
                   ),
                 ),
@@ -618,6 +795,46 @@ class _QuantitySheetState extends State<QuantitySheet> {
   }
 }
 
+/// Κατηγορίες που συνήθως μαγειρεύονται με λάδι ή βούτυρο (υπενθύμιση στην ποσότητα).
+const _oilCats = {'Κρέας', 'Πουλερικά', 'Ψάρια', 'Θαλασσινά', 'Λαχανικά', 'Πατάτες', 'Αυγά'};
+
+/// Συμβουλή επιλογής στην ποσότητα, όταν το ίδιο τρόφιμο έχει είδη με μεγάλη διαφορά θερμίδων (έλεγχος 9/11, V-C-13).
+final pickHints = <String, String>{
+  for (final id in const ['C6250', 'C6251', 'C6252', 'C6253', 'C6254', 'C6255', 'C6256', 'C6257'])
+    id: 'Τα λιπαρά αλλάζουν πολύ τις θερμίδες του κιμά: διάλεξε το % που γράφει η συσκευασία ή ρώτα τον κρεοπώλη.',
+};
+
+/// Λέξεις που, αν αγνοηθούν στην αναζήτηση, κάνουν το αποτέλεσμα άλλο τρόφιμο με άλλες θερμίδες (αρχές λέξεων, χωρίς
+/// τόνους): «γάλα σόγιας», «μπύρα χωρίς αλκοόλ», «κοτόπουλο πανέ», «σοκολάτα χωρίς ζάχαρη», «αμύγδαλα αλατισμένα».
+const _nutritionWords = [
+  'σογι', 'σοι', 'soy', 'αμυγδαλ', 'βρωμ', 'καρυδ', 'light', 'λαιτ', 'zero', 'ζιρο', 'διαιτ', 'αλκοολ', 'γλουτεν',
+  'πανε', 'μπαρ', 'αλατισμ', 'αναλατ', 'λαδι', 'ελαιολαδ', 'βουτυρ', 'τηγαν', 'ζαχαρ', 'μελι', 'σοκολατ', 'κρεμ',
+  'τυρι', 'γαλα', 'σιροπ', 'πρωτειν', 'κακαο', 'σοκολατουχ',
+  // Αγνοημένο «χωρίς» αλλάζει το νόημα («μαρμελάδα χωρίς ζάχαρη» → «με λιγότερη ζάχαρη»).
+  'χωρισ', 'without',
+];
+
+bool changesNutrition(String word) {
+  final w = plain(word);
+  return _nutritionWords.any(w.startsWith);
+}
+
+/// Έντονη προειδοποίηση «άλλο τρόφιμο» (δεύτερος ανεξάρτητος έλεγχος του fix-food, Σ-Α): μόνο όταν αγνοήθηκε λέξη που
+/// αλλάζει τη διατροφή ή λέξη που είναι τρόφιμο της βάσης — όχι για επίθετα («μήλο πράσινο»), «σπιτικές», «ελληνικός
+/// καφές», ούτε για «χωρίς λακτόζη» (ίδια θρεπτική αξία).
+bool strongSearchWarning(FoodSearchResult r) {
+  if (r.corrected.isNotEmpty || r.ignored.isEmpty) return false;
+  final lactoseFree = r.ignored.any((w) => plain(w).startsWith('λακτοζ') || plain(w).startsWith('lactose'));
+  return r.droppedFood ||
+      r.ignored.any((w) => changesNutrition(w) && !(lactoseFree && (plain(w).startsWith('χωρισ') || w == 'without')));
+}
+
+/// Τρόπος μαγειρέματος χωρίς λάδι: αν αγνοηθεί, οι μαγειρεμένες μορφές μπαίνουν ήδη πρώτες.
+bool isCookingWord(String word) {
+  final w = plain(word);
+  return const ['ψητ', 'βραστ', 'βρασμεν', 'σχαρ', 'φουρν', 'μαγειρ', 'ατμ', 'στιφαδ', 'κοκκινιστ'].any(w.startsWith);
+}
+
 // ---------------------------------------------------------------------------
 // Λεπτομέρειες τροφίμου (όλες οι τιμές ανά 100 g και η πηγή)
 // ---------------------------------------------------------------------------
@@ -635,12 +852,15 @@ class FoodDetailScreen extends StatelessWidget {
     ('carbs', 'Υδατάνθρακες', 'g', 1),
     ('sugars', '  από τα οποία σάκχαρα', 'g', 1),
     ('fiber', 'Φυτικές ίνες', 'g', 1),
-    ('fat', 'Λίπος', 'g', 1),
-    ('satFat', '  από το οποίο κορεσμένα', 'g', 1),
+    // «Λιπαρά», όπως στη διατροφική δήλωση της ΕΕ (έλεγχος 9/11, Χ10).
+    ('fat', 'Λιπαρά', 'g', 1),
+    ('satFat', '  από τα οποία κορεσμένα', 'g', 1),
     ('monoFat', '  μονοακόρεστα', 'g', 1),
     ('polyFat', '  πολυακόρεστα', 'g', 1),
     ('salt', 'Αλάτι', 'g', 2),
     ('sodium', 'Νάτριο', 'mg', 0),
+    ('alcohol', 'Αλκοόλ', 'g', 1),
+    ('polyols', 'Πολυόλες (γλυκαντικά)', 'g', 1),
     ('cholesterol', 'Χοληστερόλη', 'mg', 0),
     ('water', 'Νερό', 'g', 1),
     ('calcium', 'Ασβέστιο', 'mg', 0),
@@ -675,14 +895,14 @@ class FoodDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CardHeader(icon: Icons.science_outlined, title: 'Ανά 100 g', color: c.food),
+                    CardHeader(icon: Icons.science_outlined, title: 'Ανά 100 ${f.unit}', color: c.food),
                     const SizedBox(height: 6),
                     // Τρίτος έλεγχος διατροφής N6: το αλάτι της βάσης είναι νάτριο × 2,5 (κανόνας ΕΕ), όχι η στήλη αλατιού της
                     // CIQUAL· το λέει η ετικέτα, και φαίνεται και το νάτριο.
                     for (final r in _rows)
                       if (f.n.has(r.$1))
                         InfoRow(
-                          r.$1 == 'salt' && !f.isMine && f.n.has('sodium') ? saltFromSodiumLabel : r.$2,
+                          r.$1 == 'salt' && f.n.has('sodium') ? saltFromSodiumLabel : r.$2,
                           '${nValueText(f.n[r.$1], digits: r.$4)} ${r.$3}',
                         ),
                     if (f.energyCalc)
@@ -711,13 +931,9 @@ class FoodDetailScreen extends StatelessWidget {
                             style: TextStyle(fontSize: 13, color: c.textSecondary)),
                       ),
                     const SizedBox(height: 8),
+                    // Έλεγχος 9/11 (Μ5): έκδοση και ημερομηνία της πηγής, όπως ζητά η άδεια.
                     Text(
-                      switch (f.source) {
-                        'CIQUAL 2025' => 'ANSES, Table de composition nutritionnelle des aliments Ciqual 2025 (Licence Ouverte).',
-                        'Open Food Facts' => 'Open Food Facts, ανοιχτή βάση από εθελοντές (ODbL). Ελέγχθηκε με την ετικέτα.',
-                        'Ετικέτα' => 'Από την ετικέτα του προϊόντος, όπως την πέρασες.',
-                        _ => 'U.S. Department of Agriculture, FoodData Central (δημόσιο αγαθό).',
-                      },
+                      sourceSentence(f.source),
                       style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textTertiary),
                     ),
                   ],
@@ -747,6 +963,18 @@ class FoodFormScreen extends StatefulWidget {
   State<FoodFormScreen> createState() => _FoodFormScreenState();
 }
 
+/// Τι γράφει η ετικέτα στη θέση του αλατιού (έλεγχος 9/11, Μ1): οι ευρωπαϊκές «Αλάτι» σε g, οι αμερικάνικες και
+/// πολλές εισαγόμενες «Sodium» σε mg (ή σε g). Η εφαρμογή κρατά πάντα αλάτι = νάτριο × 2,5 (Κανονισμός ΕΕ 1169/2011,
+/// Παράρτημα I).
+enum SaltInput { salt, sodiumG, sodiumMg }
+
+/// Αλάτι σε g από ό,τι γράφει η ετικέτα.
+double saltFromInput(double v, SaltInput mode) => switch (mode) {
+      SaltInput.salt => v,
+      SaltInput.sodiumG => v * 2.5,
+      SaltInput.sodiumMg => v * 2.5 / 1000,
+    };
+
 class _FoodFormScreenState extends State<FoodFormScreen> {
   late final _name = TextEditingController(text: widget.draft.name);
   late final _brand = TextEditingController(text: widget.draft.brand ?? '');
@@ -755,18 +983,24 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   late final Map<String, TextEditingController> _v = {
     for (final k in _fields.map((e) => e.$1))
       // Μέχρι 4 δεκαδικά, ώστε μια διόρθωση μόνο του ονόματος να μη στρογγυλεύει τις τιμές (αλάτι 0,0125).
-      k: TextEditingController(text: widget.draft.values[k] == null ? '' : dec(widget.draft.values[k]!, 4).replaceAll(RegExp(r',?0+$'), '')),
+      k: TextEditingController(text: widget.draft.values[k] == null ? '' : _field(widget.draft.values[k]!)),
   };
   bool _tried = false;
+  SaltInput _saltMode = SaltInput.salt;
+
+  /// Οι τιμές είναι ανά 100 ml (υγρό) αντί για ανά 100 g (έλεγχος 9/11, Μ2): και για χειροκίνητη ετικέτα.
+  late bool _perMl = widget.draft.perMl;
+
+  static String _field(double v) => dec(v, 4).replaceAll(RegExp(r',?0+$'), '');
 
   static const _fields = <(String, String, String, bool)>[
     (Nk.kcal, 'Ενέργεια', 'kcal', true),
-    (Nk.protein, 'Πρωτεΐνη', 'g', true),
+    (Nk.protein, 'Πρωτεΐνες', 'g', true),
     (Nk.carbs, 'Υδατάνθρακες', 'g', true),
-    (Nk.sugars, 'από τα οποία σάκχαρα', 'g', false),
+    (Nk.sugars, 'εκ των οποίων σάκχαρα', 'g', false),
     (Nk.fat, 'Λιπαρά', 'g', true),
-    (Nk.satFat, 'από τα οποία κορεσμένα', 'g', false),
-    (Nk.fiber, 'Φυτικές ίνες', 'g', false),
+    (Nk.satFat, 'εκ των οποίων κορεσμένα', 'g', false),
+    (Nk.fiber, 'Φυτικές (εδώδιμες) ίνες', 'g', false),
     (Nk.salt, 'Αλάτι', 'g', false),
   ];
 
@@ -781,9 +1015,10 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     super.dispose();
   }
 
+  /// Οι τιμές όπως γράφτηκαν, με το αλάτι πάντα σε g αλατιού (και αν η ετικέτα έδινε νάτριο).
   Map<String, double> get _values => {
         for (final e in _v.entries)
-          if (parseNumber(e.value.text) case final v?) e.key: v,
+          if (parseNumber(e.value.text) case final v?) e.key: e.key == Nk.salt ? saltFromInput(v, _saltMode) : v,
       };
 
   void _save() {
@@ -791,6 +1026,15 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final values = _values;
     final missing = [for (final f in _fields) if (f.$4 && values[f.$1] == null) f.$1];
     if (_name.text.trim().isEmpty || missing.isNotEmpty || impossibleValues(values).isNotEmpty) return;
+    final typedSalt = parseNumber(_v[Nk.salt]!.text);
+    // Νάτριο σε mg: αν γράφτηκε νάτριο, αυτό· αν το αλάτι έμεινε όπως ήρθε (από νάτριο), το νάτριο της πηγής.
+    final sodiumMg = typedSalt == null
+        ? null
+        : switch (_saltMode) {
+            SaltInput.sodiumMg => typedSalt,
+            SaltInput.sodiumG => typedSalt * 1000,
+            SaltInput.salt => typedSalt == widget.draft.values[Nk.salt] ? widget.draft.sodiumMg : null,
+          };
     final d = FoodDraft(
       name: _name.text.trim(),
       brand: _brand.text.trim(),
@@ -800,9 +1044,37 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       values: values,
       fromOff: widget.draft.fromOff,
       // Το «ανά 100 ml» μένει στο προϊόν (πριν χανόταν στην αποθήκευση· δεύτερος έλεγχος διατροφής N9).
-      perMl: widget.draft.perMl,
+      perMl: _perMl,
+      alcohol: widget.draft.alcohol,
+      polyols: widget.draft.polyols,
+      erythritol: widget.draft.erythritol,
+      sodiumMg: sodiumMg,
+      // «<x» της πηγής: μόνο όσα έμειναν όπως ήρθαν.
+      lessThan: {
+        for (final k in widget.draft.lessThan)
+          if (values[k] != null && values[k] == widget.draft.values[k]) k,
+      },
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
+  }
+
+  /// Αλλαγή μονάδας αλατιού (ανεξάρτητος έλεγχος του fix-food, 4.1): αν το πεδίο έχει ακόμα την τιμή που ήρθε (π.χ.
+  /// από το Open Food Facts), μετατρέπεται στη νέα μονάδα ώστε να μένει το ίδιο αλάτι. Αν ο χρήστης έγραψε δικό του
+  /// αριθμό (π.χ. 400 από ξένη ετικέτα), μένει όπως είναι: απλώς λέει τι μονάδα είναι.
+  void _setSaltMode(SaltInput mode) {
+    final field = _v[Nk.salt]!;
+    final typed = parseNumber(field.text);
+    final original = widget.draft.values[Nk.salt];
+    // Με ανοχή: μετά από μετατροπή και στρογγύλεμα σε 4 δεκαδικά η ακριβής ισότητα μπορεί να αποτύχει (έλεγχος fix-food, Χ-Δ).
+    if (typed != null && original != null && mode != _saltMode && (saltFromInput(typed, _saltMode) - original).abs() < 1e-6) {
+      final v = switch (mode) {
+        SaltInput.salt => original,
+        SaltInput.sodiumG => original / 2.5,
+        SaltInput.sodiumMg => original / 2.5 * 1000,
+      };
+      field.text = _field(double.parse(v.toStringAsFixed(4)));
+    }
+    setState(() => _saltMode = mode);
   }
 
   @override
@@ -811,19 +1083,50 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final values = _values;
-    final mismatch = energyMismatch(values, alcohol: widget.draft.alcohol ?? 0, polyols: widget.draft.polyols ?? 0);
+    final mismatch = energyMismatch(values,
+        alcohol: widget.draft.alcohol ?? 0, polyols: widget.draft.polyols ?? 0, erythritol: widget.draft.erythritol ?? 0);
     final impossible = impossibleValues(values);
     final doubtful = doubtfulValues(values);
+    final per = _perMl ? '100 ml' : '100 g';
 
-    InputDecoration deco(String label, {String? suffix, String? error, String? warning}) => InputDecoration(
+    InputDecoration deco(String label, {String? suffix, String? error, String? warning, bool info = false}) => InputDecoration(
           labelText: label,
           suffixText: suffix,
           errorText: error,
+          errorMaxLines: 3,
           helperText: warning,
-          helperMaxLines: 2,
-          helperStyle: TextStyle(fontSize: 12.5, color: c.bad),
+          helperMaxLines: 3,
+          // Προειδοποίηση σε κόκκινο· απλή πληροφορία (π.χ. «αποθηκεύεται ως αλάτι…») σε γκρι.
+          helperStyle: TextStyle(fontSize: 12.5, color: info ? c.textSecondary : c.bad),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         );
+
+    Widget choices<T>(String label, List<(T, String)> items, T value, ValueChanged<T> onChanged, {Key? key}) => Padding(
+          key: key,
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(label, style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+              for (final it in items)
+                ChoiceChip(label: Text(it.$2), selected: it.$1 == value, onSelected: (_) => onChanged(it.$1)),
+            ],
+          ),
+        );
+
+    String? saltWarning() {
+      final typed = parseNumber(_v[Nk.salt]!.text);
+      if (typed == null) return null;
+      if (_saltMode != SaltInput.salt) return 'Αποθηκεύεται ως αλάτι ${dec(saltFromInput(typed, _saltMode), 2)} g (νάτριο × 2,5).';
+      if (widget.draft.saltFromSodium && typed == widget.draft.values[Nk.salt]) {
+        return widget.draft.fromOff
+            ? 'Από νάτριο × 2,5 (το Open Food Facts έδωσε μόνο νάτριο). Έλεγξέ το με την ετικέτα.'
+            : 'Από νάτριο × 2,5. Έλεγξέ το με την ετικέτα.';
+      }
+      return null;
+    }
 
     return Scaffold(
       backgroundColor: c.background,
@@ -861,33 +1164,51 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 Text('Barcode ${widget.draft.barcode}', style: TextStyle(color: c.textTertiary, fontSize: 13)),
               ],
               const SizedBox(height: 18),
-              Text(widget.draft.perMl ? 'Διατροφική ετικέτα, ανά 100 ml' : 'Διατροφική ετικέτα, ανά 100 g',
+              Text('Διατροφική ετικέτα, ανά $per',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
-              if (widget.draft.perMl) ...[
-                const SizedBox(height: 6),
-                // Έλεγχος διατροφής M4 (4/11): στο Open Food Facts τα υγρά είναι ανά 100 ml, ενώ εδώ ζυγίζεις γραμμάρια.
-                Text(
-                  'Το Open Food Facts δίνει αυτό το υγρό ανά 100 ml, ενώ η εφαρμογή μετρά γραμμάρια. Για νερό, γάλα, χυμούς '
-                  'και αναψυκτικά η διαφορά είναι μικρή (100 ml ≈ 100 g). Για λάδι 100 ml ζυγίζουν περίπου 92 g: αν η '
-                  'ετικέτα γράφει ανά 100 g, πέρασε εκείνες τις τιμές.',
-                  style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
+              const SizedBox(height: 8),
+              choices<bool>('Οι τιμές είναι:', const [(false, 'ανά 100 g'), (true, 'ανά 100 ml')], _perMl,
+                  (v) => setState(() => _perMl = v),
+                  key: const ValueKey('per-unit')),
+              if (_perMl)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    widget.draft.fromOff && widget.draft.perMl
+                        ? 'Το Open Food Facts δίνει τα υγρά ανά 100 ml. Θα γράφεις την ποσότητα σε ml.'
+                        : 'Θα γράφεις την ποσότητα σε ml.',
+                    style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
+                  ),
                 ),
-              ],
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
               for (final f in _fields) ...[
+                if (f.$1 == Nk.salt)
+                  choices<SaltInput>(
+                    'Η ετικέτα γράφει:',
+                    const [(SaltInput.salt, 'Αλάτι g'), (SaltInput.sodiumG, 'Νάτριο g'), (SaltInput.sodiumMg, 'Νάτριο mg')],
+                    _saltMode,
+                    _setSaltMode,
+                    key: const ValueKey('salt-mode'),
+                  ),
                 TextField(
+                  key: ValueKey('field-${f.$1}'),
                   controller: _v[f.$1],
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                   onChanged: (_) => setState(() {}),
                   decoration: deco(
-                    f.$4 ? f.$2 : '${f.$2} (προαιρετικό)',
-                    suffix: f.$3,
-                    error: impossible[f.$1] ?? (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
-                    warning: doubtful[f.$1] ??
-                        (f.$1 == Nk.salt && widget.draft.saltFromSodium
-                            ? 'Από νάτριο × 2,5 (το Open Food Facts έδωσε μόνο νάτριο). Έλεγξέ το με την ετικέτα.'
-                            : null),
+                    f.$1 == Nk.salt && _saltMode != SaltInput.salt
+                        ? 'Νάτριο (προαιρετικό)'
+                        : f.$4
+                            ? f.$2
+                            : '${f.$2} (προαιρετικό)',
+                    suffix: f.$1 == Nk.salt && _saltMode == SaltInput.sodiumMg ? 'mg' : f.$3,
+                    error: (f.$1 == Nk.salt && _saltMode != SaltInput.salt && impossible[Nk.salt] != null
+                            ? 'Τόσο νάτριο δεν γίνεται: έλεγξε τον αριθμό και τη μονάδα.'
+                            : impossible[f.$1]) ??
+                        (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
+                    warning: doubtful[f.$1] ?? (f.$1 == Nk.salt ? saltWarning() : null),
+                    info: doubtful[f.$1] == null && f.$1 == Nk.salt && _saltMode != SaltInput.salt,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -905,7 +1226,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
                   child: Text(
-                    'Οι θερμίδες δεν ταιριάζουν με τα υπόλοιπα: από πρωτεΐνη, υδατάνθρακες και λίπος βγαίνουν '
+                    'Οι θερμίδες δεν ταιριάζουν με τα υπόλοιπα: από πρωτεΐνες, υδατάνθρακες και λιπαρά βγαίνουν '
                     'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα ή σε kJ;). '
                     'Αλκοόλ και γλυκαντικές πολυόλες δίνουν θερμίδες που δεν φαίνονται εδώ.',
                     style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text),
@@ -915,7 +1236,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
               TextField(
                 controller: _serving,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: deco('Μία μερίδα (προαιρετικό)', suffix: 'g'),
+                decoration: deco('Μία μερίδα (προαιρετικό)', suffix: _perMl ? 'ml' : 'g'),
               ),
               const SizedBox(height: 22),
               FilledButton(
@@ -1000,7 +1321,7 @@ Future<Food?> scanToFood(
   if (r['found'] != true) {
     return createFood(context, food,
         draft: FoodDraft(barcode: code),
-        note: 'Το προϊόν δεν υπάρχει στο Open Food Facts. Πέρασε τα στοιχεία από την ετικέτα (ανά 100 g).');
+        note: 'Το προϊόν δεν υπάρχει στο Open Food Facts. Πέρασε τα στοιχεία από την ετικέτα.');
   }
   final d = draftFromOff(code, Map<String, dynamic>.from(r['product'] as Map));
   return createFood(context, food,

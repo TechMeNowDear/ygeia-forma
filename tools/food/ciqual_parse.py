@@ -11,7 +11,7 @@ src = sys.argv[1]
 out = sys.argv[2]
 
 KEYS = {
-    328: "kcal", 327: "kj", 25000: "protein", 31000: "carbs", 32000: "sugars", 33110: "starch",
+    328: "kcal", 327: "kj", 25003: "protein", 31000: "carbs", 32000: "sugars", 33110: "starch",
     34100: "fiber", 34000: "polyols", 40000: "fat", 40302: "satFat", 40303: "monoFat", 40304: "polyFat",
     41833: "ala", 42053: "epa", 42263: "dha", 10004: "salt", 10110: "sodium", 400: "water",
     60000: "alcohol", 75100: "cholesterol",

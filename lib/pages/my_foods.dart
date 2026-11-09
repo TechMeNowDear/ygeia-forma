@@ -54,27 +54,29 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
     if (f != null && mounted) _saved(f, fromScan: true);
   }
 
-  /// Όλα τα προϊόντα σε απλό κείμενο, για έλεγχο (π.χ. επικόλληση στη συζήτηση με τον Claude).
+  /// Όλα τα προϊόντα σε απλό κείμενο, για έλεγχο (π.χ. επικόλληση σε ένα μήνυμα ή σημείωση).
   Future<void> _copyForCheck() async {
     final all = widget.food.mine;
     String v(Food f, String k) => f.n.has(k) ? nValueText(f.n[k], digits: 2) : '—';
-    final b = StringBuffer('Τα προϊόντα μου (${all.length}), τιμές ανά 100 g\n');
+    final b = StringBuffer('Τα προϊόντα μου (${all.length})\n');
     for (final f in all) {
       b
         ..writeln()
         ..writeln(f.name)
         ..writeln('Μάρκα: ${f.brand ?? '—'} · Barcode: ${f.barcode ?? '—'} · Πηγή: ${f.source}')
-        ..writeln('Ενέργεια ${v(f, Nk.kcal)} kcal · Λιπαρά ${v(f, Nk.fat)} g (κορεσμένα ${v(f, Nk.satFat)}) · '
+        // Κάθε προϊόν με τη δική του βάση: τα υγρά είναι ανά 100 ml (έλεγχος 9/11, Μ2).
+        ..writeln('Ανά 100 ${f.unit}: Ενέργεια ${v(f, Nk.kcal)} kcal · Λιπαρά ${v(f, Nk.fat)} g (κορεσμένα ${v(f, Nk.satFat)}) · '
             'Υδατάνθρακες ${v(f, Nk.carbs)} g (σάκχαρα ${v(f, Nk.sugars)}) · Ίνες ${v(f, Nk.fiber)} g · '
-            'Πρωτεΐνη ${v(f, Nk.protein)} g · Αλάτι ${v(f, Nk.salt)} g')
-        ..writeln('Μερίδα: ${f.servingGrams == null ? '—' : '${gramsText(f.servingGrams!)} g'}');
+            'Πρωτεΐνες ${v(f, Nk.protein)} g · Αλάτι ${v(f, Nk.salt)} g')
+        ..writeln('Μερίδα: ${f.servingGrams == null ? '—' : '${gramsText(f.servingGrams!)} ${f.unit}'}');
     }
+    // Έλεγχος 9/11 (Μ5): χωρίς «Claude» στα κείμενα της εφαρμογής (έτοιμη για δημόσια κυκλοφορία).
     await Clipboard.setData(ClipboardData(text: b.toString()));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(all.length == 1
-          ? 'Αντιγράφηκε 1 προϊόν. Επικόλλησέ το στη συζήτηση με τον Claude.'
-          : 'Αντιγράφηκαν ${all.length} προϊόντα. Επικόλλησέ τα στη συζήτηση με τον Claude.'),
+          ? 'Αντιγράφηκε 1 προϊόν. Επικόλλησέ το όπου θέλεις να το ελέγξεις.'
+          : 'Αντιγράφηκαν ${all.length} προϊόντα. Επικόλλησέ τα όπου θέλεις να τα ελέγξεις.'),
     ));
   }
 
@@ -288,7 +290,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                                             const SizedBox(width: 8),
                                           ],
                                           Text(
-                                            '${kcalText(f.n.amount(Nk.kcal))} kcal/100 g'
+                                            '${kcalText(f.n.amount(Nk.kcal))} kcal/100 ${f.unit}'
                                             '${f.barcode != null ? ' · barcode' : ''}',
                                             style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                                           ),

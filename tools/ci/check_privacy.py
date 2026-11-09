@@ -120,6 +120,11 @@ if '<device-transfer' in rules:
 KNOWN_HOSTS = {
     'ouraring.com': 'Oura', 'netlify.app': 'Netlify', 'openfoodfacts.org': 'Open Food Facts', 'sentry.io': 'Sentry',
 }
+# Διευθύνσεις που υπάρχουν στον κώδικα αλλά η εφαρμογή ΔΕΝ τις καλεί (σύνδεσμοι πηγών που ανοίγει ο χρήστης, User-Agent).
+NOT_CONTACTED = {
+    'ciqual.anses.fr': 'σύνδεσμος πηγής (food_sources.dart)', 'fdc.nal.usda.gov': 'σύνδεσμος πηγής (food_sources.dart)',
+    'github.com': 'μόνο μέσα στο User-Agent προς το Open Food Facts',
+}
 import os
 for base in ('lib', 'android/app/src/main', 'android/wear/src/main'):
     for dirpath, _, files in os.walk(f'{ROOT}/{base}'):
@@ -129,6 +134,8 @@ for base in ('lib', 'android/app/src/main', 'android/wear/src/main'):
             with open(os.path.join(dirpath, fn), encoding='utf-8', errors='replace') as f:
                 src = f.read()
             for host in set(re.findall(r'https://([a-z0-9.-]+\.[a-z]{2,})', src)):
+                if host in NOT_CONTACTED:
+                    continue
                 known = [k for k in KNOWN_HOSTS if host == k or host.endswith('.' + k)]
                 if not known:
                     errors.append(f'Νέα υπηρεσία στο {base}/…/{fn}: {host} — γράψ\' τη στην πολιτική και στη λίστα KNOWN_HOSTS')

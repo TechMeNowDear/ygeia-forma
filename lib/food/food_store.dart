@@ -9,6 +9,7 @@ import '../history.dart' show dateKey;
 import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
+import 'off.dart' show normalizeBarcode;
 import 'replaced_foods.dart';
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
@@ -37,6 +38,34 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   final bool _offline;
   bool ready = false;
   String? error;
+
+  /// Η μέρα ακολουθεί το ρολόι του κινητού (όχι στις δοκιμές και τα στιγμιότυπα).
+  bool get followsClock => !_offline;
+
+  /// Διαβάστηκαν το ημερολόγιο και «Τα προϊόντα μου». Αν όχι, η προσθήκη κλειδώνει ώσπου να πετύχει το
+  /// «Ξαναδοκίμασε» (έλεγχος 9/11, Χ6: αλλιώς ό,τι γραφόταν μπορούσε να βγει διπλό).
+  bool get loaded => _offline || (_logRead && _mineRead);
+  bool _logRead = false;
+
+  /// Ξαναδιαβάζει ό,τι απέτυχε στο άνοιγμα.
+  Future<void> retry() async {
+    if (_offline) return;
+    error = null;
+    notifyListeners();
+    if (_basic.isEmpty) {
+      try {
+        final raw = await rootBundle.loadString('assets/foods/basic_foods.json');
+        final j = jsonDecode(raw) as Map<String, dynamic>;
+        _basic = [for (final f in j['foods'] as List) Food.fromJson(Map<String, dynamic>.from(f as Map))];
+      } catch (e) {
+        error = 'Δεν φορτώθηκε η βάση τροφίμων: $e';
+      }
+    }
+    if (!_mineRead) await _loadMine();
+    if (!_logRead) await _loadEntries();
+    _rebuildIndex();
+    notifyListeners();
+  }
 
   /// Τελευταία αλλαγή που δεν αποθηκεύτηκε στο κινητό (φαίνεται στη Διατροφή, μέχρι να κλείσει).
   String? saveError;
@@ -109,6 +138,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       error = 'Δεν διαβάστηκε το ημερολόγιο φαγητού. Κλείσε και άνοιξε ξανά την εφαρμογή πριν γράψεις κάτι.';
     }
     if (r['ok'] == true && r['entries'] is List) {
+      _logRead = true;
       for (final e in r['entries'] as List) {
         if (e is! Map) continue;
         try {
@@ -225,17 +255,23 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   // → το λευκό (όχι το μπασμάτι).
   // Τρίτος έλεγχος διατροφής (N1, N2, N4): «κοτόπουλο ψητό» → το ψητό στήθος (όχι ολόκληρο με πέτσα)· «παγωτό» → το
   // παγωτό (όχι το frozen yogurt)· «τυρί» → η φέτα (όχι το τυρί κρέμα). Τα «τυρί κρέμα», «κοτόπουλο φούρνου» δεν αλλάζουν.
+  // Έλεγχος 9/11: «γιαούρτι» → πρώτα το στραγγιστό 2% (το πιο συνηθισμένο· πριν έβγαινε πρώτο το 0% μόνο επειδή έχει
+  // πιο σύντομο όνομα, V-C-12)· «μπακαλιάρος παστός» → πρώτα ο ξαλμυρισμένος, όπως τρώγεται (όχι ο ξερός με 12 g αλάτι)·
+  // «καλαμάκι» → πρώτα το ανάμεικτο (το σκέτο καλαμάκι είναι συνήθως χοιρινό, πιο λιπαρό από κοτόπουλο/μοσχάρι).
   static const _preferred = {
     'C19033': 0.5, 'C2013': 0.5, 'C36017': 0.5, 'C7000': 0.5, 'C9104': 0.5,
-    'C36018': 0.5, 'C39500': 0.5, 'C12066': 1.5,
+    'C36018': 0.5, 'C39500': 0.5, 'C12066': 1.5, 'U170903': 0.5, 'C26024': 0.5, 'C25506': 0.5,
   };
 
   /// Η συχνότητα βοηθά μόνο ανάμεσα σε όσα ταιριάζουν περίπου το ίδιο: το πολύ +1,5, λιγότερο από
   /// τη διαφορά «ακριβώς η λέξη» / «ξεκινά με τη λέξη». Αλλιώς, μετά από 2 μελιτζάνες, το «μέλι»
   /// έβγαζε πρώτη τη μελιτζάνα.
-  List<Food> search(String q) {
+  List<Food> search(String q) => find(q).foods;
+
+  /// Όπως [search], μαζί με τις λέξεις που αγνοήθηκαν ή διορθώθηκαν για να βρεθεί κάτι (η οθόνη τις λέει).
+  FoodSearchResult find(String q) {
     final counts = _counts;
-    return _index.search(q, boost: {
+    return _index.find(q, boost: {
       ..._preferred,
       for (final e in counts.entries) e.key: math.min(1.5, e.value * 0.5) + (_preferred[e.key] ?? 0),
     });
@@ -264,9 +300,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     ];
   }
 
+  /// Το ίδιο προϊόν με όποια μορφή του barcode: UPC-A 12 ψηφίων = EAN-13 με «0» μπροστά, GTIN-14 με «0» μπροστά =
+  /// EAN-13 (έλεγχος 9/11, Χ5· πριν, το ίδιο προϊόν μπορούσε να περαστεί δύο φορές).
   Food? byBarcode(String code) {
+    final c = normalizeBarcode(code);
     for (final f in _mine) {
-      if (f.barcode == code) return f;
+      if (f.barcode != null && normalizeBarcode(f.barcode!) == c) return f;
     }
     return null;
   }
@@ -286,10 +325,17 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return e;
   }
 
+  /// Οι καταχωρίσεις ενός γεύματος που ξαναγράφονται με το «Όπως χθες»: χωρίς όσα δικά μου προϊόντα σβήστηκαν
+  /// (π.χ. είχαν λάθος τιμές) και όσα τρόφιμα της βάσης δεν υπάρχουν πια (έλεγχος 9/11, Μ3).
+  List<LogEntry> copyable(DateTime from, Meal meal) => [for (final e in entriesFor(from, meal)) if (!_gone(e.food)) e];
+
+  /// Πόσα από το γεύμα δεν ξαναγράφονται με το «Όπως χθες» (σβησμένα προϊόντα).
+  int notCopyable(DateTime from, Meal meal) => entriesFor(from, meal).length - copyable(from, meal).length;
+
   /// «Ίδιο με χθες»: ξαναγράφει τα τρόφιμα ενός γεύματος από άλλη μέρα, με τις ίδιες ποσότητες.
-  /// Οι τιμές παίρνονται από τη βάση όπως είναι τώρα (σαν να τα κατέγραφα ξανά).
+  /// Οι τιμές παίρνονται από τη βάση όπως είναι τώρα (σαν να τα κατέγραφα ξανά). Όσα έχουν σβηστεί δεν ξαναγράφονται.
   Future<List<LogEntry>> copyMeal(DateTime from, Meal meal, DateTime to, {Meal? into}) async {
-    final source = entriesFor(from, meal);
+    final source = copyable(from, meal);
     final d = dayOf(to);
     final now = DateTime.now();
     final base = DateTime(d.year, d.month, d.day, now.hour, now.minute, now.second);

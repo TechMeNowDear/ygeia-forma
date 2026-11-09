@@ -20,6 +20,14 @@ abstract final class Nk {
   static const fat = 'fat';
   static const satFat = 'satFat';
   static const salt = 'salt';
+
+  /// Νάτριο σε mg (της πηγής· ή από την ετικέτα, όταν γράφει νάτριο αντί για αλάτι).
+  static const sodium = 'sodium';
+
+  /// Αλκοόλ, πολυόλες και ερυθριτόλη σε g ανά 100 (δίνουν θερμίδες που δεν φαίνονται στα μακροθρεπτικά).
+  static const alcohol = 'alcohol';
+  static const polyols = 'polyols';
+  static const erythritol = 'erythritol';
 }
 
 /// Τιμή θρεπτικού όπως έρχεται από την πηγή.
@@ -117,6 +125,9 @@ class Food {
 
   bool get isMine => source == 'Open Food Facts' || source == 'Ετικέτα';
 
+  /// «ml» για υγρά με τιμές ανά 100 ml (η ποσότητα γράφεται τότε σε ml), αλλιώς «g».
+  String get unit => perMl ? 'ml' : 'g';
+
   factory Food.fromJson(Map<String, dynamic> j) => Food(
         id: j['id'] as String,
         name: j['name'] as String,
@@ -179,12 +190,13 @@ String mealLabel(Meal m) => switch (m) {
       Meal.snack => 'Σνακ',
     };
 
-/// Έξυπνη προεπιλογή γεύματος από την ώρα (έγγραφο › Καταχώριση).
+/// Έξυπνη προεπιλογή γεύματος από την ώρα (έγγραφο › Καταχώριση). Δείπνο ως τις 00:30: στην Ελλάδα τρώμε αργά
+/// (έλεγχος 9/11, RT-14· πριν, ό,τι γραφόταν μετά τις 23:00 έμπαινε «Σνακ»).
 Meal mealForTime(DateTime t) {
   final h = t.hour;
   if (h >= 5 && h < 11) return Meal.breakfast;
   if (h >= 12 && h < 17) return Meal.lunch;
-  if (h >= 19 && h < 23) return Meal.dinner;
+  if (h >= 19 || (h == 0 && t.minute < 30)) return Meal.dinner;
   return Meal.snack;
 }
 
@@ -245,14 +257,20 @@ class Totals {
       sugars += e.total(Nk.sugars);
       salt += e.total(Nk.salt);
       satFat += e.total(Nk.satFat);
+      alcohol += e.total(Nk.alcohol);
+      shownKcal += e.total(Nk.kcal).round();
       for (final k in const [Nk.fiber, Nk.sugars, Nk.salt, Nk.satFat]) {
         if (!e.food.n.has(k)) missing[k] = (missing[k] ?? 0) + 1;
       }
       count++;
     }
   }
-  double kcal = 0, protein = 0, carbs = 0, fat = 0, fiber = 0, sugars = 0, salt = 0, satFat = 0;
+  double kcal = 0, protein = 0, carbs = 0, fat = 0, fiber = 0, sugars = 0, salt = 0, satFat = 0, alcohol = 0;
   int count = 0;
+
+  /// Θερμίδες όπως φαίνονται: το άθροισμα των στρογγυλεμένων θερμίδων κάθε καταχώρισης, ώστε τα κομμάτια να
+  /// αθροίζουν ακριβώς στο σύνολο που γράφει η οθόνη (έλεγχος 9/11, Χ4). Διαφέρει από το [kcal] το πολύ λίγες kcal.
+  int shownKcal = 0;
 
   /// Πόσα τρόφιμα δεν έχουν τιμή για κάθε θρεπτικό (τότε το σύνολο είναι «τουλάχιστον»).
   final Map<String, int> missing = {};

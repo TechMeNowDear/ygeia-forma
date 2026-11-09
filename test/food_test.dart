@@ -136,7 +136,7 @@ void main() {
 
     test('Μικρές λέξεις (των, σε) και ρίζες στα άλλα ονόματα δεν φέρνουν άσχετα', () {
       expect(names('τόνος').every((n) => n.startsWith('Τόνος')), isTrue, reason: 'όχι «…όλων των ειδών»');
-      expect(names('φέτα').take(2), ['Φέτα (ΠΟΠ, πρόβειο και κατσικίσιο)', 'Τυρί τύπου φέτας από αγελαδινό γάλα']);
+      expect(names('φέτα').take(2), ['Φέτα (πρόβειο και κατσικίσιο)', 'Τυρί τύπου φέτας από αγελαδινό γάλα']);
       // Όσο πληκτρολογώ: «τυ» (→ τυρί), «με» (→ μέλι) δεν δίνουν «Δεν βρέθηκε».
       expect(names('τυ'), isNotEmpty);
       expect(names('με'), isNotEmpty);
@@ -297,7 +297,7 @@ void main() {
     test('Προσθήκη, ποσότητα από την τελευταία φορά, συχνά, διαγραφή και αναίρεση', () async {
       final now = DateTime(2026, 10, 24, 13);
       final s = FoodStore.preloaded(foods: basicFoods(), now: now);
-      final feta = foodNamed('Φέτα (ΠΟΠ, πρόβειο και κατσικίσιο)');
+      final feta = foodNamed('Φέτα (πρόβειο και κατσικίσιο)');
       await s.add(feta, 40, Meal.lunch);
       final e2 = await s.add(feta, 30, Meal.dinner);
       expect(s.entriesFor(now).length, 2);
