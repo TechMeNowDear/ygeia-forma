@@ -124,7 +124,13 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   // σημαίνουν ανά 100 ml (τεκμηρίωση OFF, Product-Nutrition schema). Άρα το υγρό φαίνεται από τη συσκευασία
   // (έλεγχος 8/11, FOOD-01· ο κανόνας N7 βασιζόταν σε τιμή «100ml» που το OFF δεν στέλνει).
   final per = (p['nutrition_data_per'] is String ? p['nutrition_data_per'] as String : '').trim().toLowerCase();
-  final perMl = per.contains('ml') || isLiquidQuantity(pick(['quantity'])) || isLiquidQuantity(pick(['serving_size']));
+  // Η μερίδα μετρά μόνο όταν δεν υπάρχει συσκευασία και δεν έχει γραμμάρια: «30 g (+125 ml γάλα)» ή «1 cup (240 ml)» σε
+  // δημητριακά δεν είναι υγρό (ανεξάρτητος έλεγχος του fix-food, 4.2).
+  final quantity = pick(['quantity']);
+  final serving = pick(['serving_size']);
+  final perMl = per.contains('ml') ||
+      isLiquidQuantity(quantity) ||
+      (quantity == null && serving != null && !RegExp(r'\d\s*g\b').hasMatch(serving) && isLiquidQuantity(serving));
   // Στο Open Food Facts το «alcohol» είναι % vol: g ανά 100 ml = % vol × 0,789 (πυκνότητα αιθανόλης).
   final alcoholVol = _num(n['alcohol_100g']) ?? _num(n['alcohol']);
   final polyols = _num(n['polyols_100g']);

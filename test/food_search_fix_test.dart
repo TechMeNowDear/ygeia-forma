@@ -11,6 +11,7 @@ import 'package:ygeia_forma/food/food_search.dart';
 import 'package:ygeia_forma/food/food_sources.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/food/off.dart';
+import 'package:ygeia_forma/food/replaced_foods.dart';
 import 'package:ygeia_forma/food/weigh_hints.dart';
 import 'package:ygeia_forma/format.dart' show dayOf;
 import 'package:ygeia_forma/history.dart' show dateKey;
@@ -62,7 +63,7 @@ void main() {
   }
 
   group('Αναζήτηση: ίδια με τη μεταφορά σε Python (tools/food/search_port.py)', () {
-    test('195 αναζητήσεις: ίδια 3 πρώτα, ίδιο πλήθος, ίδιες λέξεις που αγνοήθηκαν/διορθώθηκαν', () {
+    test('219 αναζητήσεις: ίδια 3 πρώτα, ίδιο πλήθος, ίδιες λέξεις που αγνοήθηκαν/διορθώθηκαν', () {
       final j = jsonDecode(File('test/fixtures/food_search_expected.json').readAsStringSync()) as Map<String, dynamic>;
       final qs = (j['queries'] as List).cast<Map<String, dynamic>>();
       expect(qs.length, greaterThanOrEqualTo(150));
@@ -73,6 +74,7 @@ void main() {
         expect(r.foods.length, e['count'], reason: q);
         expect(r.ignored, (e['ignored'] as List).cast<String>(), reason: q);
         expect(r.corrected, Map<String, String>.from(e['corrected'] as Map), reason: q);
+        expect(r.droppedFood, e['droppedFood'], reason: q);
       }
     });
   });
@@ -210,15 +212,16 @@ void main() {
   });
 
   group('Νέα τρόφιμα (μόνο ακριβείς αντιστοιχίες CIQUAL 2025 / USDA FDC)', () {
-    test('372 τρόφιμα· τα νέα υπάρχουν με την πηγή τους', () {
-      expect(basicFoods().length, 372);
+    test('374 τρόφιμα· τα νέα υπάρχουν με την πηγή τους', () {
+      expect(basicFoods().length, 374);
       const added = {
         'C26025': 'CIQUAL 2025', 'C26120': 'CIQUAL 2025', 'C26040': 'CIQUAL 2025', 'C6255': 'CIQUAL 2025',
         'C6257': 'CIQUAL 2025', 'C21800': 'CIQUAL 2025', 'C21801': 'CIQUAL 2025', 'C22505': 'CIQUAL 2025',
         'U169226': 'USDA SR Legacy', 'U169227': 'USDA SR Legacy', 'C20301': 'CIQUAL 2025', 'C4018': 'CIQUAL 2025',
         'C7200': 'CIQUAL 2025', 'C7603': 'CIQUAL 2025', 'C25621': 'CIQUAL 2025', 'C5215': 'CIQUAL 2025',
         'C1001': 'CIQUAL 2025', 'C25506': 'CIQUAL 2025', 'C25428': 'CIQUAL 2025', 'C25163': 'CIQUAL 2025',
-        'C25547': 'CIQUAL 2025', 'U173180': 'USDA SR Legacy',
+        'C25547': 'CIQUAL 2025', 'U173180': 'USDA SR Legacy', 'C25586': 'CIQUAL 2025', 'C25585': 'CIQUAL 2025',
+        'C15011': 'CIQUAL 2025',
       };
       for (final e in added.entries) {
         expect(_food(e.key).source, e.value, reason: e.key);
@@ -229,15 +232,16 @@ void main() {
       expect(_food('C5215').n.amount(Nk.kcal), 55.3);
     });
     test('Καθημερινά που έλειπαν', () {
-      expect(first('χόρτα'), startsWith('Ραδίκια'));
-      expect(first('χόρτα βραστά'), 'Ραδίκια (βραστά, χωρίς αλάτι)');
+      // Τα χόρτα τρώγονται βραστά: μόνο βραστά στο «χόρτα».
+      expect(store.search('χόρτα').every((f) => f.name.contains('βραστ')), isTrue);
+      expect(first('χόρτα βραστά'), contains('βραστ'));
       expect(first('αυγό τηγανητό'), 'Αυγό τηγανητό (μάτι, χωρίς λάδι)');
       expect(first('σαρδέλες κονσέρβα'), 'Σαρδέλα σε ελαιόλαδο (κονσέρβα, στραγγισμένη)');
       expect(first('κρασί λευκό'), 'Κρασί λευκό ξηρό');
       expect(first('whey'), startsWith('Πρωτεΐνη ορού γάλακτος'));
       expect(first('πρωτεΐνη'), startsWith('Πρωτεΐνη ορού γάλακτος'));
       expect(first('σουβλάκι'), 'Σουβλάκι με ανάμεικτα κρέατα');
-      expect(first('γύρος πίτα'), startsWith('Πίτα γύρος'));
+      expect(first('γύρος πίτα'), 'Πίτα με γύρο/κεμπάπ και ωμά λαχανικά (χωρίς πατάτες)');
       expect(first('χούμους'), startsWith('Χούμους'));
       expect(first('κρουασάν'), startsWith('Κρουασάν'));
       expect(first('τοστ'), startsWith('Τοστ ζαμπόν'));
@@ -517,8 +521,140 @@ void main() {
       await t.enterText(find.byType(TextField), 'μέλι θυμαρίσιο');
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('search-note')), findsOneWidget);
-      expect(find.textContaining('«θυμαρίσιο»'), findsOneWidget);
+      expect(find.byKey(const ValueKey('search-warning')), findsNothing);
+      expect(find.textContaining('Αποτελέσματα για «μέλι»'), findsOneWidget);
       expect(find.text('Μέλι'), findsOneWidget);
+    });
+  });
+
+  group('Ανεξάρτητος έλεγχος του fix-food: η αναζήτηση δεν αλλάζει σιωπηλά τρόφιμο', () {
+    test('3.1: ποτέ χωρίς την κύρια (πρώτη) λέξη', () {
+      expect(first('σοκολάτα χωρίς ζάχαρη'), startsWith('Σοκολάτα'));
+      expect(first('χυμός χωρίς ζάχαρη'), startsWith('Χυμός'));
+      expect(first('μαρμελάδα χωρίς ζάχαρη'), startsWith('Μαρμελάδα'));
+      expect(first('ψωμί χωρίς αλάτι'), startsWith('Ψωμί'));
+      expect(first('γιαούρτι με μέλι'), startsWith('Γιαούρτι'));
+      expect(first('κόλα light'), startsWith('Αναψυκτικό κόλα'));
+      expect(first('σουβλάκι κοτόπουλο'), 'Σουβλάκι κοτόπουλο (ψημένο)');
+      expect(first('καλαμάκι χοιρινό'), startsWith('Σουβλάκι'));
+      for (final q in ['σοκολάτα χωρίς ζάχαρη', 'ψωμί χωρίς αλάτι', 'γιαούρτι με μέλι', 'κόλα light']) {
+        expect(store.find(q).droppedFood, isTrue, reason: q);
+      }
+    });
+    test('3.2: «σε λάδι»/«με ζάχαρη» δεν «ταιριάζουν» με το «χωρίς λάδι/ζάχαρη» του ονόματος', () {
+      final egg = store.find('αυγό τηγανητό σε λάδι');
+      expect(egg.ignored, ['λάδι'], reason: 'βρέθηκε μόνο χωρίς τη λέξη, και η οθόνη το λέει');
+      final coffee = store.find('καφές με ζάχαρη');
+      expect(coffee.ignored, ['ζάχαρη']);
+      // Το «λάδι» δεν φέρνει πια τα «χωρίς λάδι» (πατάτα φούρνου, σαρδέλα ψητή).
+      expect(store.search('λάδι').any((f) => f.name.contains('χωρίς λάδι')), isFalse);
+      // Με «χωρίς» στην αναζήτηση ταιριάζουν κανονικά.
+      expect(first('πατάτες χωρίς λάδι'), 'Πατάτα φούρνου (χωρίς λάδι, ξεφλουδισμένη)');
+      expect(first('ρύζι χωρίς αλάτι'), startsWith('Ρύζι λευκό (βρασμένο'));
+    });
+    test('Ένα λάθος γράμμα μόνο για λέξη που δεν υπάρχει: «καλαμάκι» δεν γίνεται «καλαμάρι»', () {
+      final r = store.find('καλαμάκι');
+      expect(r.corrected, isEmpty);
+      expect(r.foods.first.name, startsWith('Σουβλάκι'));
+      expect(r.foods.any((f) => f.name.startsWith('Καλαμάρι')), isFalse);
+    });
+    test('«τόνος σε λάδι» → ο τόνος σε ελαιόλαδο', () {
+      expect(first('τόνος σε λάδι'), startsWith('Τόνος λευκός (albacore) σε ελαιόλαδο'));
+    });
+    test('Λέξεις που αλλάζουν τη διατροφή', () {
+      for (final w in ['σόγιας', 'light', 'αλκοόλ', 'πανέ', 'μπάρα', 'αλατισμένα', 'λάδι', 'ζάχαρη', 'χωρίς']) {
+        expect(changesNutrition(w), isTrue, reason: w);
+      }
+      for (final w in ['θυμαρίσιο', 'ψητό', 'σχάρας']) {
+        expect(changesNutrition(w), isFalse, reason: w);
+      }
+      expect(isCookingWord('ψητό'), isTrue);
+    });
+    testWidgets('«γάλα σόγιας» → έντονη προειδοποίηση «άλλο τρόφιμο», όχι γκρι σημείωση', (t) async {
+      final s = FoodStore.preloaded(foods: basicFoods(), now: DateTime(2026, 11, 9, 13));
+      await _pump(t, AddFoodScreen(food: s, meal: Meal.lunch, day: DateTime(2026, 11, 9)));
+      await t.enterText(find.byType(TextField), 'γάλα σόγιας');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-warning')), findsOneWidget);
+      expect(find.textContaining('άλλο τρόφιμο'), findsOneWidget);
+      await t.enterText(find.byType(TextField), 'χταπόδι ψητό');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-warning')), findsNothing);
+      expect(find.byKey(const ValueKey('search-note')), findsOneWidget);
+    });
+  });
+
+  group('Ανεξάρτητος έλεγχος του fix-food: δεδομένα, αλάτι, ml, μέρα', () {
+    test('1.1: ηλιόσποροι από CIQUAL (N × 6,25), ίδια βάση με τους αλατισμένους', () {
+      expect(_food('C15011').n.amount(Nk.protein), 25.1);
+      expect(_food('C15045').n.amount(Nk.protein), 25.0);
+      expect(basicFoods().any((f) => f.id == 'U170562'), isFalse);
+      expect(replacedFoods['U170562'], 'C15011');
+      expect(weighHints['C15011'], isNotNull);
+    });
+    test('1.2: η οθόνη πηγών λέει τον συντελεστή πρωτεΐνης της USDA', () {
+      expect(usdaInfo.detail, contains('Jones'));
+      expect(ciqualInfo.detail, contains('6,25'));
+    });
+    test('2.x: ονόματα που λένε ακριβώς τι είναι', () {
+      expect(_food('U169226').name, 'Ραδίκια πικραλίδας (ωμά)');
+      expect(_food('U169226').aliases, isNot(contains('χόρτα')));
+      expect(_food('C21800').aliases, isNot(contains('γίδα')));
+      expect(_food('C25506').aliases, isNot(contains('καλαμάκι')));
+      expect(_food('U173180').name, contains('προτίμησε το barcode'));
+    });
+    test('4.2: «30 g (+125 ml γάλα)» στη μερίδα δεν κάνει υγρό τα δημητριακά', () {
+      expect(draftFromOff('1', {'serving_size': '30 g (+125 ml γάλα)', 'nutriments': {}}).perMl, isFalse);
+      expect(draftFromOff('1', {'quantity': '500 g', 'serving_size': '1 cup (240 ml)', 'nutriments': {}}).perMl, isFalse);
+      expect(draftFromOff('1', {'serving_size': '250 ml', 'nutriments': {}}).perMl, isTrue);
+      expect(draftFromOff('1', {'quantity': '1 l', 'nutriments': {}}).perMl, isTrue);
+    });
+    testWidgets('4.1: αλλαγή μονάδας μετατρέπει την τιμή που ήρθε (ίδιο αλάτι), όχι αυτή που έγραψες', (t) async {
+      Food? saved;
+      final draft = draftFromOff('5201234567890', {
+        'product_name': 'Κράκερ',
+        'nutriments': {'energy-kcal_100g': 450, 'proteins_100g': 8, 'carbohydrates_100g': 60, 'fat_100g': 18, 'sodium_100g': 0.4},
+      });
+      await _pump(
+        t,
+        Builder(
+          builder: (ctx) => TextButton(
+            onPressed: () async {
+              saved = await Navigator.of(ctx).push<Food>(MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draft)));
+            },
+            child: const Text('άνοιξε'),
+          ),
+        ),
+      );
+      await t.tap(find.text('άνοιξε'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Νάτριο mg'));
+      await t.pumpAndSettle();
+      final field = t.widget<TextField>(find.byKey(const ValueKey('field-salt')));
+      expect(field.controller!.text, '400');
+      await t.ensureVisible(find.text('Αποθήκευση'));
+      await t.tap(find.text('Αποθήκευση'));
+      await t.pumpAndSettle();
+      expect(saved!.n.amount(Nk.salt), closeTo(1.0, 1e-9));
+      expect(saved!.n[Nk.sodium]!.value, 400);
+    });
+    testWidgets('4.3: «Σε ποια μέρα;» δεν κλείνει με πάτημα έξω (η ποσότητα δεν χάνεται)', (t) async {
+      final now = DateTime(2026, 11, 10, 0, 20);
+      final s = FoodStore.preloaded(foods: basicFoods(), now: now);
+      await _pump(t, AddFoodScreen(food: s, meal: Meal.dinner, day: dayOf(now), clock: () => now));
+      await t.enterText(find.byType(TextField), 'μέλι');
+      await t.pumpAndSettle();
+      await t.tap(find.text('Μέλι').first);
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('Προσθήκη στο'));
+      await t.pumpAndSettle();
+      expect(find.text('Σε ποια μέρα;'), findsOneWidget);
+      await t.tapAt(const Offset(5, 5));
+      await t.pumpAndSettle();
+      expect(find.text('Σε ποια μέρα;'), findsOneWidget);
+      await t.tap(find.text('Σήμερα'));
+      await t.pumpAndSettle();
+      expect(s.entriesFor(DateTime(2026, 11, 10)).single.food.id, 'C31008');
     });
   });
 

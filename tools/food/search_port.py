@@ -80,7 +80,7 @@ CAT_TERMS = {
 }
 CAT_SCORE = 6.0
 # Λέξεις τρόπου μαγειρέματος: αν χρειαστεί να αγνοηθούν, οι μαγειρεμένες μορφές μπαίνουν πρώτες.
-COOKING = {stem(phonetic(w)) for w in ['ψητό','βραστό','βρασμένο','σχάρας','φούρνου','τηγανητό','μαγειρεμένο','ατμού','στιφάδο','κοκκινιστό']}
+COOKING = {stem(phonetic(w)) for w in ['ψητό','βραστό','βρασμένο','σχάρας','φούρνου','τηγανητό','μαγειρεμένο','ατμού','στιφάδο','κοκκινιστό','πανέ']}
 PREFERRED = {'C19033':0.5,'C2013':0.5,'C36017':0.5,'C7000':0.5,'C9104':0.5,'C36018':0.5,'C39500':0.5,'C12066':1.5,
              'U170903':0.5,'C26024':0.5}
 
@@ -152,7 +152,8 @@ class Index:
         return self.find(query, boost, limit)[0]
 
     def find(self, query, boost=PREFERRED, limit=60):
-        """(τρόφιμα, αγνοήθηκαν, διορθώθηκαν{λάθος: σωστό})."""
+        """(τρόφιμα, αγνοήθηκαν, διορθώθηκαν{λάθος: σωστό}). self.dropped_food = FoodSearchResult.droppedFood της Dart."""
+        self.dropped_food = False
         r = self._with_variants(query, boost, limit)
         if r: return r, [], {}
         q = words(phonetic(query)) or allwords(phonetic(query))
@@ -161,42 +162,54 @@ class Index:
         for raw in re.split(r'[^0-9A-Za-zΑ-Ωα-ωάέήίόύώϊϋΐΰΆΈΉΊΌΎΏς%]+', query.lower()):
             for w in allwords(phonetic(raw)): typed.setdefault(w, raw)
         self._typed = typed
+        neg = NEG in q
         # 1. Ένα λάθος γράμμα σε λέξη 6+ γραμμάτων που δεν ταιριάζει πουθενά («κοτόπολο», «γιαουτρι»).
         fixed = {}
         q2 = list(q)
         for k, w in enumerate(q):
-            if len(w) >= 6 and not self._matches_any(w):
+            # Λέξη που υπάρχει ήδη στα ονόματα (π.χ. μέσα σε φράση) δεν είναι λάθος γράμμα («καλαμάκι» ≠ «καλαμάρι»).
+            if len(w) >= 6 and w not in self.vocab and not self._matches_any(w, neg):
                 best = None
                 for v in sorted(self.vocab):
-                    if v[0] == w[0] and osa1(w, v): best = v; break
+                    if v != w and v[0] == w[0] and osa1(w, v): best = v; break
                 if best is not None:
                     q2[k] = best; fixed[self._typed.get(w, w)] = self.vocab[best]
         if fixed:
             r, _ = self._search(' '.join(q2), boost, limit, phon=True)
             if r: return r, [], fixed
         # 2. Χωρίς τις λέξεις που δεν ταιριάζουν σε κανένα τρόφιμο («μέλι θυμαρίσιο» → μέλι).
-        keep = [w for w in q2 if self._matches_any(w)]
-        dropped = [w for w in q2 if not self._matches_any(w)]
+        keep = [w for w in q2 if self._matches_any(w, neg)]
+        dropped = [w for w in q2 if not self._matches_any(w, neg)]
         if keep and dropped:
             r, _ = self._search(' '.join(keep), boost, limit, phon=True, cooked_first=any(stem(w) in COOKING for w in dropped))
-            if r: return r, [self._show(w) for w in dropped], fixed
+            if r:
+                self.dropped_food = q2[0] in dropped
+                return r, [self._show(w) for w in dropped], fixed
         # 3. Κάθε λέξη ταιριάζει κάπου, αλλά όχι όλες μαζί: χωρίς μία λέξη (κρατά το καλύτερο ταίριασμα).
         if len(keep) >= 2:
             best = None
-            for k in range(len(keep)):
+            # Ποτέ χωρίς την ΠΡΩΤΗ λέξη (το ίδιο το τρόφιμο): «σοκολάτα χωρίς ζάχαρη» δεν γίνεται «μούσλι χωρίς ζάχαρη».
+            for k in range(1, len(keep)):
                 rest = keep[:k] + keep[k+1:]
                 r, top = self._search(' '.join(rest), boost, limit, phon=True, cooked_first=stem(keep[k]) in COOKING)
                 if r and (best is None or top > best[1]): best = (r, top, keep[k])
-            if best: return best[0], [self._show(w) for w in dropped] + [self._show(best[2])], fixed
+            if best:
+                self.dropped_food = True
+                return best[0], [self._show(w) for w in dropped] + [self._show(best[2])], fixed
+            # 3β. Μόνο η πρώτη λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
+            r, _ = self._search(keep[0], boost, limit, phon=True)
+            if r:
+                self.dropped_food = True
+                return r, [self._show(w) for w in dropped] + [self._show(w) for w in keep[1:]], fixed
         return [], [], {}
 
     # ---------- εσωτερικά ----------
     def _show(self, w):
         return self._typed.get(w) or self.vocab.get(w, w)
 
-    def _matches_any(self, w):
+    def _matches_any(self, w, neg_query):
         for i in range(len(self.foods)):
-            if self._word_score(i, w, stem(w), pluralstem(w), None, None) > 0: return True
+            if self._word_score(i, w, stem(w), pluralstem(w), None, None, neg_query) > 0: return True
         return False
 
     def _with_variants(self, query, boost, limit):
@@ -216,7 +229,7 @@ class Index:
             if alt and at > bestTop: best, bestTop = alt, at
         return best
 
-    def _word_score(self, i, w, ws, wp, phrases, catphr):
+    def _word_score(self, i, w, ws, wp, phrases, catphr, neg_query):
         # phrases/catphr = None: μόνο τα μονολεκτικά άλλα ονόματα και κατηγορίες (για «ταιριάζει κάπου;»)
         best = 0.0
         N = self.name[i]
@@ -228,7 +241,9 @@ class Index:
             elif len(ws) >= 3 and self.nstem[i][k] == ws: s = 7 if first else 5
             elif wp is not None and self.nstem[i][k] == wp: s = 4 if first else 3
             elif len(w) >= 5 and w in nw: s = 2
-            if s > 0 and k > 0 and N[k-1] == NEG: s = 1
+            # Λέξη μετά το «χωρίς» στο όνομα: ταιριάζει (λίγο) μόνο αν και η αναζήτηση λέει «χωρίς» («αυγό σε λάδι» ≠
+            # «αυγό χωρίς λάδι»).
+            if s > 0 and k > 0 and N[k-1] == NEG: s = 1 if neg_query else 0
             if s > INGR_CAP and self.ingr[i][k]: s = INGR_CAP
             best = max(best, s)
         al = range(len(self.alias[i])) if phrases is None else phrases
@@ -271,13 +286,14 @@ class Index:
                 used.add(hit)
             return True
         required = [w for w in q if w not in OPTIONAL] or q
+        neg = NEG in q
         scored = []; top = float('-inf')
         for i, f in enumerate(self.foods):
             score = 0.0; ok = True; counted = 0
             phr = [a for a in range(len(self.alias[i])) if len(self.alias[i][a]) == 1 or pin(self.alias[i][a], self.astem[i][a])]
             cph = [c for c in range(len(self.cat[i])) if len(self.cat[i][c]) == 1 or pin(self.cat[i][c], self.catstem[i][c])]
             for w in q:
-                best = self._word_score(i, w, stem(w), pluralstem(w), phr, cph)
+                best = self._word_score(i, w, stem(w), pluralstem(w), phr, cph, neg)
                 if best == 0:
                     if w in required: ok = False; break
                     continue

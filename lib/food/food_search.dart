@@ -216,7 +216,7 @@ const _ingredientCap = 2.0;
 /// μορφές μπαίνουν πρώτες.
 final _cooking = {
   for (final w in const ['ψητό', 'βραστό', 'βρασμένο', 'σχάρας', 'φούρνου', 'τηγανητό', 'μαγειρεμένο', 'ατμού', 'στιφάδο',
-    'κοκκινιστό'])
+    'κοκκινιστό', 'πανέ'])
     stem(phonetic(w)),
 };
 
@@ -259,8 +259,15 @@ bool _oneEdit(String a, String b) {
 
 /// Αποτέλεσμα αναζήτησης, με ό,τι χρειάστηκε για να βρεθεί κάτι.
 class FoodSearchResult {
-  const FoodSearchResult(this.foods, {this.ignored = const [], this.corrected = const {}});
+  const FoodSearchResult(this.foods,
+      {this.ignored = const [], this.corrected = const {}, this.kept = const [], this.droppedFood = false});
   final List<Food> foods;
+
+  /// Οι λέξεις (όπως γράφτηκαν) με τις οποίες βρέθηκαν τα αποτελέσματα, όταν κάποιες αγνοήθηκαν.
+  final List<String> kept;
+
+  /// Αγνοήθηκε λέξη που είναι τρόφιμο της βάσης (π.χ. «σουβλάκι κοτόπουλο» → σουβλάκι): τα αποτελέσματα είναι άλλο τρόφιμο.
+  final bool droppedFood;
 
   /// Λέξεις της αναζήτησης που αγνοήθηκαν (όπως γράφτηκαν), γιατί με αυτές δεν βρισκόταν τίποτα.
   final List<String> ignored;
@@ -372,15 +379,18 @@ class FoodIndex {
       }
     }
     String show(String w) => typed[w] ?? _vocab[w] ?? w;
+    // Η αναζήτηση λέει «χωρίς»: μόνο τότε μια λέξη μετά το «χωρίς» στο όνομα μετρά ως ταίριασμα.
+    final neg = q.contains(_negation);
 
     // 1. Ένα λάθος γράμμα.
     final corrected = <String, String>{};
     final q2 = [...q];
     for (var k = 0; k < q.length; k++) {
       final w = q[k];
-      if (w.length < 6 || _matchesAny(w)) continue;
+      // Λέξη που υπάρχει ήδη στα ονόματα (π.χ. μέσα σε φράση) δεν είναι λάθος γράμμα («καλαμάκι» ≠ «καλαμάρι»).
+      if (w.length < 6 || _vocab.containsKey(w) || _matchesAny(w, neg)) continue;
       for (final v in _vocabSorted) {
-        if (v[0] == w[0] && _oneEdit(w, v)) {
+        if (v != w && v[0] == w[0] && _oneEdit(w, v)) {
           q2[k] = v;
           corrected[typed[w] ?? w] = _vocab[v]!;
           break;
@@ -392,19 +402,27 @@ class FoodIndex {
       if (r1.isNotEmpty) return FoodSearchResult(r1, corrected: corrected);
     }
     // 2. Χωρίς τις λέξεις που δεν ταιριάζουν πουθενά.
-    final keep = [for (final w in q2) if (_matchesAny(w)) w];
-    final dropped = [for (final w in q2) if (!_matchesAny(w)) w];
+    final keep = [for (final w in q2) if (_matchesAny(w, neg)) w];
+    final dropped = [for (final w in q2) if (!_matchesAny(w, neg)) w];
     if (keep.isNotEmpty && dropped.isNotEmpty) {
       final (r2, _) = _search(keep.join(' '),
           boost: boost, limit: limit, isPhonetic: true, cookedFirst: dropped.any((w) => _cooking.contains(stem(w))));
-      if (r2.isNotEmpty) return FoodSearchResult(r2, ignored: [for (final w in dropped) show(w)], corrected: corrected);
+      if (r2.isNotEmpty) {
+        // Αν αγνοήθηκε η ΠΡΩΤΗ λέξη (π.χ. «μπάρα πρωτεΐνης» → μόνο «πρωτεΐνη»), τα αποτελέσματα είναι άλλο τρόφιμο.
+        return FoodSearchResult(r2,
+            ignored: [for (final w in dropped) show(w)],
+            kept: [for (final w in keep) show(w)],
+            corrected: corrected,
+            droppedFood: dropped.contains(q2.first));
+      }
     }
-    // 3. Χωρίς μία λέξη.
+    // 3. Χωρίς μία λέξη — ποτέ χωρίς την ΠΡΩΤΗ (το ίδιο το τρόφιμο): «σοκολάτα χωρίς ζάχαρη» δεν γίνεται «μούσλι χωρίς
+    // ζάχαρη», «ψωμί χωρίς αλάτι» δεν γίνεται «ρύζι χωρίς αλάτι» (ανεξάρτητος έλεγχος του fix-food, 3.1).
     if (keep.length >= 2) {
       List<Food>? best;
       var bestTop = double.negativeInfinity;
       String? left;
-      for (var k = 0; k < keep.length; k++) {
+      for (var k = 1; k < keep.length; k++) {
         final rest = [...keep.sublist(0, k), ...keep.sublist(k + 1)];
         final (r3, top) = _search(rest.join(' '),
             boost: boost, limit: limit, isPhonetic: true, cookedFirst: _cooking.contains(stem(keep[k])));
@@ -415,17 +433,30 @@ class FoodIndex {
         }
       }
       if (best != null) {
-        return FoodSearchResult(best, ignored: [for (final w in dropped) show(w), show(left!)], corrected: corrected);
+        return FoodSearchResult(best,
+            ignored: [for (final w in dropped) show(w), show(left!)],
+            kept: [for (final w in keep) if (w != left) show(w)],
+            corrected: corrected,
+            droppedFood: true);
+      }
+      // 3β. Μόνο η πρώτη λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
+      final (r4, _) = _search(keep.first, boost: boost, limit: limit, isPhonetic: true);
+      if (r4.isNotEmpty) {
+        return FoodSearchResult(r4,
+            ignored: [for (final w in dropped) show(w), for (final w in keep.skip(1)) show(w)],
+            kept: [show(keep.first)],
+            corrected: corrected,
+            droppedFood: true);
       }
     }
     return FoodSearchResult.empty;
   }
 
   /// Ταιριάζει η λέξη σε κάποιο τρόφιμο (με το όνομα, ένα μονολεκτικό άλλο όνομα ή την κατηγορία);
-  bool _matchesAny(String w) {
+  bool _matchesAny(String w, bool negQuery) {
     final ws = stem(w), wp = _pluralStem(w);
     for (var i = 0; i < foods.length; i++) {
-      if (_wordScore(i, w, ws, wp, null, null) > 0) return true;
+      if (_wordScore(i, w, ws, wp, null, null, negQuery) > 0) return true;
     }
     return false;
   }
@@ -477,7 +508,8 @@ class FoodIndex {
 
   /// Πόσο ταιριάζει μία λέξη της αναζήτησης στο τρόφιμο [i]. [phrases]/[catPhrases]: ποια άλλα ονόματα και
   /// κατηγορίες μετρούν· null = μόνο τα μονολεκτικά (για το «ταιριάζει κάπου;»).
-  double _wordScore(int i, String w, String ws, String? wp, List<int>? phrases, List<int>? catPhrases) {
+  /// [negQuery]: η αναζήτηση έχει «χωρίς».
+  double _wordScore(int i, String w, String ws, String? wp, List<int>? phrases, List<int>? catPhrases, bool negQuery) {
     var best = 0.0;
     final name = _name[i];
     for (var k = 0; k < name.length; k++) {
@@ -498,7 +530,9 @@ class FoodIndex {
         // Κομμάτι λέξης μόνο για 5+ γράμματα: «κόλα» δεν βρίσκει «σοκολάτα», «πίτα» δεν βρίσκει «χτυπητά».
         s = 2;
       }
-      if (s > 0 && k > 0 && name[k - 1] == _negation) s = 1;
+      // Λέξη μετά το «χωρίς» στο όνομα: ταιριάζει (λίγο) μόνο αν και η αναζήτηση λέει «χωρίς» — αλλιώς το «αυγό σε λάδι»
+      // έβρισκε σιωπηλά το «αυγό χωρίς λάδι» (ανεξάρτητος έλεγχος του fix-food, 3.2).
+      if (s > 0 && k > 0 && name[k - 1] == _negation) s = negQuery ? 1 : 0;
       if (s > _ingredientCap && k < _ingredient[i].length && _ingredient[i][k]) s = _ingredientCap;
       if (s > best) best = s;
     }
@@ -579,6 +613,7 @@ class FoodIndex {
     }
 
     final required = {for (final w in q) if (!_optional.contains(w)) w};
+    final neg = q.contains(_negation);
     if (required.isEmpty) required.addAll(q);
 
     final scored = <(double, int)>[];
@@ -597,7 +632,7 @@ class FoodIndex {
           if (_cat[i][c].length == 1 || phraseInQuery(_cat[i][c], _catStem[i][c])) c,
       ];
       for (final w in q) {
-        final best = _wordScore(i, w, stem(w), _pluralStem(w), phrases, catPhrases);
+        final best = _wordScore(i, w, stem(w), _pluralStem(w), phrases, catPhrases, neg);
         if (best == 0) {
           if (required.contains(w)) {
             all = false;

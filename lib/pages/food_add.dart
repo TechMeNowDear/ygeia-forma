@@ -177,10 +177,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
     if (other == null) return opened;
     final yesterday = other.isBefore(opened) ? other : opened;
+    // Χωρίς κλείσιμο με πάτημα έξω ή «πίσω»: αλλιώς η ποσότητα που γράφτηκε χανόταν χωρίς μήνυμα (έλεγχος fix-food, 4.3).
     final pick = await showDialog<DateTime>(
       context: context,
+      barrierDismissible: false,
       routeSettings: const RouteSettings(name: 'Σε ποια μέρα'),
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
         title: const Text('Σε ποια μέρα;'),
         content: const Text('Πέρασαν τα μεσάνυχτα. Είναι το χθεσινό βραδινό ή φαγητό της νέας μέρας;'),
         actions: [
@@ -190,6 +194,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           ),
           FilledButton(onPressed: () => Navigator.pop(ctx, today), child: const Text('Σήμερα')),
         ],
+      ),
       ),
     );
     if (pick != null) _dayChoice = pick;
@@ -253,14 +258,28 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     final found = q.trim().isEmpty ? null : widget.food.find(q);
     final results = found?.foods ?? const <Food>[];
     // Έλεγχος 9/11 (Υ3): αν βρέθηκε μόνο χωρίς μια λέξη ή με διόρθωση, το λέμε (να μη μοιάζει ακριβής απάντηση).
+    // Ανεξάρτητος έλεγχος του fix-food (3.3): αν αγνοήθηκε λέξη που αλλάζει τη διατροφή («γάλα σόγιας», «μπύρα χωρίς
+    // αλκοόλ», «σοκολάτα χωρίς ζάχαρη») ή ένα άλλο τρόφιμο («γιαούρτι με μέλι»), τα αποτελέσματα είναι ΑΛΛΟ τρόφιμο:
+    // έντονη προειδοποίηση, όχι γκρι σημείωση. Ο τρόπος μαγειρέματος («χταπόδι ψητό») μένει απλή σημείωση.
+    final kept = found?.kept.join(' ') ?? '';
+    final strong = found != null &&
+        results.isNotEmpty &&
+        found.corrected.isEmpty &&
+        found.ignored.any((w) => changesNutrition(w) || (found.droppedFood && !isCookingWord(w)));
     final note = found == null || results.isEmpty
         ? null
         : found.corrected.isNotEmpty
             ? 'Δεν βρέθηκε ${found.corrected.keys.map((w) => '«$w»').join(', ')}. '
                 'Αποτελέσματα για ${found.corrected.values.map((w) => '«$w»').join(', ')}.'
-            : found.ignored.isNotEmpty
-                ? 'Δεν βρέθηκε με όλες τις λέξεις. Αποτελέσματα χωρίς ${found.ignored.map((w) => '«$w»').join(', ')}.'
-                : null;
+            : found.ignored.isEmpty
+                ? null
+                : strong
+                    ? 'Δεν έχουμε «${q.trim()}». Τα παρακάτω είναι για «$kept»: άλλο τρόφιμο, με άλλες θερμίδες. Αν είναι '
+                        'συσκευασμένο, σκάναρε το barcode ή πέρασε την ετικέτα (κουμπιά πιο κάτω)· αν είναι σπιτικό, γράψε '
+                        'χωριστά και τα υπόλοιπα υλικά.'
+                    : kept.isEmpty
+                        ? 'Δεν βρέθηκε με όλες τις λέξεις. Αποτελέσματα χωρίς ${found.ignored.map((w) => '«$w»').join(', ')}.'
+                        : 'Δεν βρέθηκε «${q.trim()}». Αποτελέσματα για «$kept».';
     final recent = widget.food.recent(limit: 10);
     // «Συχνά»: όσα τρως συχνά αλλά δεν είναι ήδη στα «Πρόσφατα» (αλλιώς οι δύο λίστες βγαίνουν ίδιες).
     final recentIds = {for (final f in recent) f.id};
@@ -350,7 +369,22 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       ),
                     )
                   else ...[
-                    if (note != null)
+                    if (note != null && strong)
+                      Container(
+                        key: const ValueKey('search-warning'),
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.warning_amber_rounded, size: 20, color: c.bad),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(note, style: TextStyle(fontSize: 14, height: 1.4, color: c.text))),
+                          ],
+                        ),
+                      )
+                    else if (note != null)
                       Padding(
                         key: const ValueKey('search-note'),
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
@@ -773,6 +807,27 @@ final pickHints = <String, String>{
     id: 'Τα λιπαρά αλλάζουν πολύ τις θερμίδες του κιμά: διάλεξε το % που γράφει η συσκευασία ή ρώτα τον κρεοπώλη.',
 };
 
+/// Λέξεις που, αν αγνοηθούν στην αναζήτηση, κάνουν το αποτέλεσμα άλλο τρόφιμο με άλλες θερμίδες (αρχές λέξεων, χωρίς
+/// τόνους): «γάλα σόγιας», «μπύρα χωρίς αλκοόλ», «κοτόπουλο πανέ», «σοκολάτα χωρίς ζάχαρη», «αμύγδαλα αλατισμένα».
+const _nutritionWords = [
+  'σογι', 'σοι', 'soy', 'αμυγδαλ', 'βρωμ', 'καρυδ', 'light', 'λαιτ', 'zero', 'ζιρο', 'διαιτ', 'αλκοολ', 'γλουτεν',
+  'πανε', 'μπαρ', 'αλατισμ', 'αναλατ', 'λαδι', 'ελαιολαδ', 'βουτυρ', 'τηγαν', 'ζαχαρ', 'μελι', 'σοκολατ', 'κρεμ',
+  'τυρι', 'γαλα', 'σιροπ', 'πρωτειν',
+  // Αγνοημένο «χωρίς» αλλάζει το νόημα («μαρμελάδα χωρίς ζάχαρη» → «με λιγότερη ζάχαρη»).
+  'χωρισ', 'without',
+];
+
+bool changesNutrition(String word) {
+  final w = plain(word);
+  return _nutritionWords.any(w.startsWith);
+}
+
+/// Τρόπος μαγειρέματος χωρίς λάδι: αν αγνοηθεί, οι μαγειρεμένες μορφές μπαίνουν ήδη πρώτες.
+bool isCookingWord(String word) {
+  final w = plain(word);
+  return const ['ψητ', 'βραστ', 'βρασμεν', 'σχαρ', 'φουρν', 'μαγειρ', 'ατμ', 'στιφαδ', 'κοκκινιστ'].any(w.startsWith);
+}
+
 // ---------------------------------------------------------------------------
 // Λεπτομέρειες τροφίμου (όλες οι τιμές ανά 100 g και η πηγή)
 // ---------------------------------------------------------------------------
@@ -996,6 +1051,24 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }
 
+  /// Αλλαγή μονάδας αλατιού (ανεξάρτητος έλεγχος του fix-food, 4.1): αν το πεδίο έχει ακόμα την τιμή που ήρθε (π.χ.
+  /// από το Open Food Facts), μετατρέπεται στη νέα μονάδα ώστε να μένει το ίδιο αλάτι. Αν ο χρήστης έγραψε δικό του
+  /// αριθμό (π.χ. 400 από ξένη ετικέτα), μένει όπως είναι: απλώς λέει τι μονάδα είναι.
+  void _setSaltMode(SaltInput mode) {
+    final field = _v[Nk.salt]!;
+    final typed = parseNumber(field.text);
+    final original = widget.draft.values[Nk.salt];
+    if (typed != null && original != null && mode != _saltMode && saltFromInput(typed, _saltMode) == original) {
+      final v = switch (mode) {
+        SaltInput.salt => original,
+        SaltInput.sodiumG => original / 2.5,
+        SaltInput.sodiumMg => original / 2.5 * 1000,
+      };
+      field.text = _field(double.parse(v.toStringAsFixed(4)));
+    }
+    setState(() => _saltMode = mode);
+  }
+
   @override
   Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
 
@@ -1106,7 +1179,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                     'Η ετικέτα γράφει:',
                     const [(SaltInput.salt, 'Αλάτι g'), (SaltInput.sodiumG, 'Νάτριο g'), (SaltInput.sodiumMg, 'Νάτριο mg')],
                     _saltMode,
-                    (v) => setState(() => _saltMode = v),
+                    _setSaltMode,
                     key: const ValueKey('salt-mode'),
                   ),
                 TextField(

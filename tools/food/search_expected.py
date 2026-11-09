@@ -34,14 +34,21 @@ QUERIES = [
     'κοτόπουλο ψητό', 'kotopoulo psito', 'κοτόπουλο φούρνου', 'παγωτό', 'τυρί', 'tiri', 'τυρί κρέμα', 'φρυγανιά',
     'μπέργκερ', 'beer', 'μοσχαρίσια μπριζόλα', 'yiaourti', 'yaourti', 'βούτυρο', 'voutiro', 'μαγιά', 'πιπέρι', 'kremidia',
     'μοσχαρίσια', 'πρόβεια', 'σοκολάτα υγείας', 'olive oil', 'wine', 'spaghetti', 'πένες', 'water',
+    # ανεξάρτητος έλεγχος του fix-food: ποτέ χωρίς την κύρια λέξη, «χωρίς» στο όνομα, λέξεις που αλλάζουν τη διατροφή
+    'σοκολάτα χωρίς ζάχαρη', 'χυμός χωρίς ζάχαρη', 'μαρμελάδα χωρίς ζάχαρη', 'ψωμί χωρίς αλάτι', 'γιαούρτι με μέλι',
+    'κόλα light', 'σουβλάκι κοτόπουλο', 'καλαμάκι χοιρινό', 'καλαμάκι', 'αυγό τηγανητό σε λάδι', 'καφές με ζάχαρη',
+    'φραπέ με ζάχαρη', 'τσάι με ζάχαρη', 'τόνος σε λάδι', 'γάλα σόγιας', 'μπύρα χωρίς αλκοόλ', 'κοτόπουλο πανέ',
+    'μπάρα πρωτεΐνης', 'αμύγδαλα αλατισμένα', 'γάλα χωρίς λακτόζη', 'ψωμί χωρίς γλουτένη', 'ηλιόσποροι', 'ρύζι χωρίς αλάτι',
+    'πατάτες χωρίς λάδι', 'ζάχαρη', 'λάδι',
 ]
 
 def main():
     ix = Index(load())
     out = []
-    for q in QUERIES:
+    for q in dict.fromkeys(QUERIES):
         foods, ign, fix = ix.find(q, PREFERRED)
-        out.append({'q': q, 'count': len(foods), 'top': [f['id'] for f in foods[:3]], 'ignored': ign, 'corrected': fix})
+        out.append({'q': q, 'count': len(foods), 'top': [f['id'] for f in foods[:3]], 'ignored': ign, 'corrected': fix,
+                    'droppedFood': ix.dropped_food})
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'test', 'fixtures', 'food_search_expected.json')
     with open(path, 'w', encoding='utf-8') as fh:
         json.dump({'note': 'Από το tools/food/search_expected.py· μην το αλλάζεις με το χέρι.', 'queries': out}, fh,
