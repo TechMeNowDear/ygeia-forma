@@ -28,7 +28,10 @@ food_mine() { # Διατροφή › Τα δικά μου › το προϊόν-
   sleep 3
   ui_tap "Τα δικά μου" || { echo "  (δεν βρέθηκε «Τα δικά μου»: $(labels))"; return 1; }
   sleep 3
-  ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4 && return 0
+  # Η καρτέλα δείχνει μια κάρτα «Τα προϊόντα μου · N προϊόν»· η λίστα ανοίγει με πάτημα.
+  ui_tap "Τα προϊόντα μου" || { echo "  (δεν βρέθηκε η κάρτα «Τα προϊόντα μου»: $(labels))"; return 1; }
+  sleep 3
+  ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4 && { adb shell input keyevent KEYCODE_BACK; sleep 2; return 0; }
   echo "  (στην οθόνη: $(labels))"
   return 1
 }
