@@ -5,6 +5,8 @@ name: Δεδομένα τροφίμων
 #   (έλεγχος 9/11, Χ12· πριν δεν το έλεγχε κανένα workflow).
 # - «Λήψη πηγών» (μόνο χειροκίνητα): κατεβάζει ξανά τις πηγές. Η προηγούμενη λήψη ΔΕΝ χάνεται: μένει σε tag
 #   food-raw-<ημερομηνία>, ώστε μια παλιότερη βάση να ξαναφτιάχνεται πάντα.
+# Ασφάλεια (έλεγχος 9/11): ενέργειες κλειδωμένες σε πλήρες SHA· μόνο ανάγνωση εκτός από τη «Λήψη πηγών»· το token δεν
+# μπαίνει ποτέ σε URL ή στο .git/config (μόνο σε κεφαλίδα της ίδιας εντολής).
 on:
   push:
     paths: ['tools/food/**', 'assets/foods/**', '.github/workflows/food-data.yml']
@@ -18,7 +20,9 @@ jobs:
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Αρχικά αρχεία (branch food-raw)
         run: |
           git fetch --depth 1 origin food-raw
@@ -46,29 +50,24 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Κατέβασμα πηγών
         run: bash tools/food/fetch.sh
       - name: Ανέβασμα στο branch food-raw (η προηγούμενη λήψη μένει σε tag)
         env:
-          TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          url="https://x-access-token:${TOKEN}@github.com/${REPO}.git"
+          url="https://github.com/${REPO}.git"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           # Η τωρινή λήψη, πριν αντικατασταθεί: tag με την ημερομηνία της (αν δεν έχει ήδη).
           if git fetch -q origin food-raw 2>/dev/null; then
             old="food-raw-$(git log -1 --format=%cs FETCH_HEAD)"
             if ! git ls-remote --exit-code --tags origin "refs/tags/$old" >/dev/null; then
               git tag "$old" FETCH_HEAD
-              git push -q "$url" "refs/tags/$old"
+              git -c http.extraheader="$auth" push -q "$url" "refs/tags/$old"
             fi
           fi
-          cd food-raw
-          git init -q -b food-raw
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add -A
-          git commit -qm "Ακατέργαστα δεδομένα τροφίμων $(date -u +%F)"
-          new="food-raw-$(date -u +%F)"
-          git tag -f "$new"
-          git push -qf "$url" food-raw "refs/tags/$new"
+          bash tools/ci/push_dir.sh food-raw food-raw "Ακατέργαστα δεδομένα τροφίμων $(date -u +%F)"

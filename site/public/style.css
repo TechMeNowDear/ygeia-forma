@@ -19,3 +19,4 @@ nav{display:flex;flex-wrap:wrap;gap:8px 18px;margin:18px 0 0;font-size:15px}
 .lang{border-top:1px solid var(--line);margin-top:22px;padding-top:14px}
 .btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:999px;margin-top:10px}
 .center{text-align:center}
+.kv span{font-weight:700;color:var(--text)}

@@ -4,55 +4,139 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Απόρρητο · Υγεία & Φόρμα</title>
-<meta name="description" content="Πολιτική απορρήτου της εφαρμογής Υγεία & Φόρμα.">
+<meta name="description" content="Πολιτική απορρήτου της εφαρμογής Υγεία & Φόρμα: τι δεδομένα χρησιμοποιεί, πού πηγαίνουν, για πόσο, και τα δικαιώματά σου.">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="wrap">
-<div class="hero"><h1>Πολιτική απορρήτου</h1><p>Τελευταία ενημέρωση: 3 Νοεμβρίου 2026</p></div>
+<div class="hero"><h1>Πολιτική απορρήτου</h1><p>Τελευταία ενημέρωση: 9 Νοεμβρίου 2026</p></div>
+
 <div class="card">
 <h2>Με λίγα λόγια</h2>
 <ul>
-<li>Τα δεδομένα υγείας και φαγητού μένουν <strong>μόνο στο κινητό</strong>. Δεν υπάρχει δικός μας server που να βλέπει ή να κρατά δεδομένα υγείας, ούτε λογαριασμός.</li>
+<li>Τα δεδομένα υγείας, φαγητού και προπόνησης μένουν <strong>στο κινητό σου</strong>. Δεν υπάρχει λογαριασμός, ούτε δικός μας server που να κρατά ή να βλέπει δεδομένα υγείας.</li>
 <li>Δεν πουλάμε, δεν δίνουμε και δεν δείχνουμε δεδομένα σε κανέναν. Δεν τα χρησιμοποιούμε για διαφημίσεις ούτε για AI.</li>
+<li>Λίγα πράγματα φεύγουν από το κινητό, και μόνο για να δουλέψει κάτι που ζήτησες: ο αριθμός ενός barcode, η σύνδεση με την Oura, οι αναφορές σφαλμάτων, και το αντίγραφο ασφαλείας της Google (κρυπτογραφημένο). Όλα αναλυτικά παρακάτω.</li>
 <li>Δεν υπάρχουν cookies, αναλυτικά στατιστικά (analytics) ή διαφημίσεις, ούτε στην εφαρμογή ούτε σε αυτόν τον ιστότοπο.</li>
 </ul>
 </div>
+
 <div class="card">
-<h2>Τι δεδομένα χρησιμοποιεί η εφαρμογή</h2>
-<h3>Samsung Health</h3>
-<p>Με την άδεια του χρήστη διαβάζει από τη Samsung Health ύπνο, παλμούς, οξυγόνο, βήματα, ορόφους, θερμίδες και μετρήσεις σώματος. Τα διαβάζει και τα αποθηκεύει στο κινητό.</p>
-<h3>Oura</h3>
-<p>Αν ο χρήστης συνδέσει το Oura, η εφαρμογή ζητά από την Oura μόνο την άδεια «daily» και διαβάζει ύπνο, παλμούς και HRV στον ύπνο, αναπνοές, απόκλιση θερμοκρασίας, βαθμολογία ύπνου και ετοιμότητα. Τα δεδομένα έρχονται κατευθείαν από την Oura στο κινητό. Για τη σύνδεση με την Oura, ο κωδικός σύνδεσης και η ανανέωσή του περνούν από μια μικρή υπηρεσία μας στο Netlify, που προσθέτει το μυστικό της εφαρμογής και δεν αποθηκεύει ή καταγράφει τίποτα· δεδομένα υγείας δεν περνούν ποτέ από εκεί. Τα κλειδιά σύνδεσης φυλάγονται κρυπτογραφημένα στο κινητό (Android Keystore) και δεν μπαίνουν σε αντίγραφα ασφαλείας. Δεν ζητάμε email ή προσωπικά στοιχεία από την Oura. Τα δεδομένα της Oura δεν δίνονται σε τρίτους και δεν χρησιμοποιούνται για εκπαίδευση ή λειτουργία μοντέλων AI.</p>
-<h3>Ημερολόγιο φαγητού</h3>
-<p>Ό,τι καταχωρίζει ο χρήστης μένει στο κινητό. Όταν σκανάρει barcode, ο αριθμός του barcode στέλνεται στο Open Food Facts για να βρεθεί το προϊόν. Δεν στέλνεται τίποτα άλλο.</p>
-<h3>Αναφορές σφαλμάτων</h3>
-<p>Αν η εφαρμογή κρασάρει, στέλνεται αναφορά στο Sentry (διακομιστές στην ΕΕ): το κείμενο του σφάλματος, σε ποια οθόνη έγινε, η έκδοση της εφαρμογής, το μοντέλο της συσκευής και η έκδοση Android. Δεν στέλνονται ποτέ δεδομένα υγείας ή φαγητού, και η διεύθυνση IP δεν αποθηκεύεται.</p>
+<h2>Ποιος είναι υπεύθυνος</h2>
+<p>Η «Υγεία &amp; Φόρμα» είναι προσωπική εφαρμογή ενός ανεξάρτητου προγραμματιστή στην Ελλάδα, που είναι και ο υπεύθυνος για την επεξεργασία των δεδομένων. Για οτιδήποτε αφορά τα δεδομένα σου, δες την ενότητα «<a href="#epikoinonia">Επικοινωνία</a>».</p>
 </div>
+
+<div class="card">
+<h2>Τι δεδομένα χρησιμοποιεί και πού πηγαίνουν</h2>
+
+<h3>Samsung Health (κινητό, ρολόι, ζυγαριά)</h3>
+<p>Μόνο με την άδειά σου, που δίνεις στο παράθυρο της Samsung Health. Η εφαρμογή ζητά άδεια <strong>ανάγνωσης</strong> (ποτέ εγγραφής) για:</p>
+<ul>
+<li><strong>Για τις κάρτες και το ιστορικό:</strong> ύπνο (και στάδια), παλμούς, οξυγόνο αίματος, θερμοκρασία δέρματος, energy score, σύσταση σώματος (βάρος, λίπος, μυϊκή μάζα από τη ζυγαριά), βήματα, ορόφους, άσκηση, σύνοψη δραστηριότητας (θερμίδες, ενεργός χρόνος, απόσταση).</li>
+<li><strong>Μόνο για τη διαγνωστική οθόνη «Τι φτάνει»</strong> (δείχνει αν και πόσα δεδομένα υπάρχουν, δεν τα αποθηκεύει): αρτηριακή πίεση, θερμοκρασία σώματος, γλυκόζη αίματος, νερό, διατροφή της Samsung Health, άπνοια ύπνου, ειδοποιήσεις ακανόνιστου καρδιακού ρυθμού. Μπορείς να μην τα επιτρέψεις· η εφαρμογή δουλεύει κανονικά.</li>
+</ul>
+<p class="kv"><span>Πού μένουν:</span> μόνο στο κινητό. Η ανάγνωση γίνεται μέσα στο κινητό, από τη Samsung Health· δεν περνά από κανέναν server μας.</p>
+
+<h3>Εφαρμογή ρολογιού (Wear OS)</h3>
+<p>Όσο τρέχει άσκηση ή περπάτημα που ξεκίνησες, το ρολόι μετρά παλμούς, και στο περπάτημα απόσταση και βήματα. Για την απόσταση χρησιμοποιεί το GPS του ρολογιού (μόνο με την άδειά σου και μόνο στο περπάτημα): η <strong>θέση σου δεν αποθηκεύεται και δεν στέλνεται</strong>, κρατιούνται μόνο τα χιλιόμετρα και οι χρόνοι.</p>
+<p class="kv"><span>Πού πηγαίνουν:</span> από το ρολόι στο κινητό σου, μέσω των υπηρεσιών Google Play: με Bluetooth, ή, όταν δεν είναι κοντά, μέσω των servers της Google με κρυπτογράφηση από άκρη σε άκρη. Μόνο η ίδια εφαρμογή, με την ίδια υπογραφή, τα διαβάζει. Μένουν στο κινητό ως προπονήσεις.</p>
+<p class="kv"><span>Όριο παλμών:</span> αν βάλεις όριο (π.χ. από τον γιατρό σου), το ρολόι δονείται όταν το ξεπερνάς. Το όριο το γράφεις εσύ και μένει στο κινητό και στο ρολόι.</p>
+
+<h3>Oura</h3>
+<p>Μόνο αν συνδέσεις το δαχτυλίδι Oura. Η εφαρμογή ζητά από την Oura <strong>μόνο τις άδειες «daily» και «spo2»</strong>, και διαβάζει: ύπνο (διάρκεια, στάδια), παλμούς, HRV και αναπνοές στον ύπνο, απόκλιση θερμοκρασίας, βαθμολογία ύπνου, ετοιμότητα και τον μέσο όρο οξυγόνου της νύχτας. Δεν ζητά email, προσωπικά στοιχεία, προπονήσεις ή τη συνεχή καταγραφή παλμών.</p>
+<p class="kv"><span>Πού πηγαίνουν:</span> τα δεδομένα έρχονται <strong>κατευθείαν από την Oura στο κινητό</strong> και μένουν εκεί.</p>
+<p class="kv"><span>Η σύνδεση:</span> η Oura ζητά ένα «μυστικό» της εφαρμογής που δεν επιτρέπεται να είναι μέσα στο κινητό. Γι' αυτό ο κωδικός σύνδεσης και τα κλειδιά πρόσβασης (tokens), όταν δημιουργούνται ή ανανεώνονται, περνούν από μια μικρή υπηρεσία μας στο Netlify, που προσθέτει το μυστικό και τα στέλνει στην Oura. Η υπηρεσία τρέχει σε servers του Netlify <strong>στις ΗΠΑ</strong>· δεν αποθηκεύει και δεν καταγράφει τίποτα, και <strong>δεδομένα υγείας δεν περνούν ποτέ από εκεί</strong>. Το Netlify, ως πάροχος, βλέπει τη διεύθυνση IP του αιτήματος.</p>
+<p class="kv"><span>Κλειδιά πρόσβασης:</span> φυλάγονται στο κινητό κρυπτογραφημένα με κλειδί του Android Keystore, που δεν φεύγει από τη συσκευή, και δεν μπαίνουν σε αντίγραφα ασφαλείας.</p>
+<p>Τα δεδομένα της Oura δεν δίνονται σε τρίτους και δεν χρησιμοποιούνται για εκπαίδευση ή λειτουργία μοντέλων AI.</p>
+
+<h3>Ημερολόγιο φαγητού, «Τα προϊόντα μου», προπονήσεις, στοιχεία σου</h3>
+<p>Ό,τι γράφεις (φαγητά, ποσότητες, προϊόντα, προγράμματα, σετ, το ύψος και τα άλλα στοιχεία σου) μένει στο κινητό. Οι τιμές διατροφής έρχονται από τη βάση τροφίμων μέσα στην εφαρμογή.</p>
+
+<h3>Σκανάρισμα barcode</h3>
+<p>Το σκανάρισμα το κάνει ο σαρωτής της Google (Google Play services, ML Kit) <strong>μέσα στο κινητό</strong>: η εφαρμογή δεν έχει άδεια κάμερας, και η εικόνα δεν στέλνεται πουθενά. Η Google λαμβάνει από το ML Kit τεχνικά στοιχεία χρήσης (μοντέλο και έκδοση Android της συσκευής, όνομα και έκδοση της εφαρμογής, αναγνωριστικό εγκατάστασης, χρόνους, και, για το αυτόματο ζουμ, ένα αναγνωριστικό της σάρωσης), όχι την εικόνα ή το barcode.</p>
+<p class="kv"><span>Open Food Facts:</span> ο <strong>αριθμός του barcode</strong> στέλνεται στο Open Food Facts (world.openfoodfacts.org, Γαλλία) για να βρεθεί το προϊόν. Δεν στέλνεται τίποτα άλλο από την εφαρμογή· όπως κάθε ιστότοπος, το Open Food Facts βλέπει τη διεύθυνση IP.</p>
+
+<h3>Αναφορές σφαλμάτων (Sentry)</h3>
+<p>Όταν κάτι πάει στραβά μέσα στην εφαρμογή, στέλνεται αυτόματα αναφορά στο Sentry, σε servers στην <strong>ΕΕ (Γερμανία)</strong>, ώστε να διορθωθεί το σφάλμα.</p>
+<ul>
+<li><strong>Τι στέλνεται:</strong> το είδος του σφάλματος και η πρώτη γραμμή του μηνύματος (έως 300 χαρακτήρες), σε ποιο σημείο του κώδικα έγινε, το όνομα της οθόνης (π.χ. «Διατροφή › Ημερολόγιο»), η έκδοση της εφαρμογής, το μοντέλο της συσκευής και η έκδοση Android.</li>
+<li><strong>Τι δεν στέλνεται ποτέ:</strong> δεδομένα υγείας, φαγητού ή προπόνησης, ονόματα, λογαριασμοί, τοποθεσία, αναγνωριστικό χρήστη ή συσκευής. Όταν το σφάλμα είναι στη σχεδίαση μιας οθόνης, στέλνεται μόνο το είδος του στοιχείου, ποτέ το κείμενο που έδειχνε.</li>
+<li>Η εφαρμογή δεν στέλνει τη διεύθυνση IP· το Sentry, όπως κάθε server, τη βλέπει όταν φτάνει η αναφορά και μπορεί να κρατήσει την κατά προσέγγιση περιοχή (χώρα, πόλη) που προκύπτει από αυτήν.</li>
+<li>Χωρίς ίντερνετ οι αναφορές περιμένουν στο κινητό (το πολύ 20) και φεύγουν αργότερα· το πολύ 30 τη μέρα.</li>
+<li>Κρατιούνται στο Sentry έως 90 ημέρες.</li>
+</ul>
+
+<h3>Ό,τι αντιγράφεις εσύ</h3>
+<p>Κουμπιά όπως «Αντιγραφή για τον Claude» βάζουν ένα κείμενο (π.χ. την προπόνηση) <strong>στο πρόχειρο του κινητού</strong>, μόνο όταν τα πατάς. Η εφαρμογή δεν στέλνει τίποτα σε καμία υπηρεσία AI· πού θα το επικολλήσεις το αποφασίζεις εσύ.</p>
+
+<h3>Widgets</h3>
+<p>Αν βάλεις widgets στην αρχική οθόνη, δείχνουν τιμές (π.χ. ύπνο, βήματα, φαγητό) σε όποιον βλέπει την οθόνη σου.</p>
+</div>
+
 <div class="card">
 <h2>Αντίγραφα ασφαλείας</h2>
-<p>Το Android μπορεί να κρατά αντίγραφο των δεδομένων της εφαρμογής στον λογαριασμό Google του χρήστη (αυτόματο αντίγραφο του Android), εκτός από τα κλειδιά σύνδεσης της Oura. Ο χρήστης μπορεί επίσης να βγάλει ο ίδιος αρχείο αντιγράφου από τις Ρυθμίσεις.</p>
-</div>
-<div class="card">
-<h2>Έλεγχος από τον χρήστη</h2>
 <ul>
-<li>Αποσύνδεση της Oura οποτεδήποτε από τις Ρυθμίσεις της εφαρμογής. Η πρόσβαση ακυρώνεται και από τον λογαριασμό Oura.</li>
-<li>Αφαίρεση των αδειών της Samsung Health από τις ρυθμίσεις της Samsung Health.</li>
-<li>Η απεγκατάσταση της εφαρμογής σβήνει όλα τα δεδομένα της από το κινητό.</li>
+<li><strong>Αυτόματο αντίγραφο της Google (Android):</strong> κρατά αντίγραφο του ιστορικού, του ημερολογίου φαγητού, των προϊόντων σου, των ρυθμίσεων, των προπονήσεων και των νυχτών της Oura στον λογαριασμό Google σου, <strong>μόνο με κρυπτογράφηση από άκρη σε άκρη</strong> (θέλει κλείδωμα οθόνης· αλλιώς δεν κρατιέται τίποτα). Δεν μπαίνουν τα κλειδιά της Oura, οι αναφορές σφαλμάτων και τα προσωρινά αρχεία. Το κλείνεις από τις ρυθμίσεις Android (Google › Αντίγραφα ασφαλείας).</li>
+<li><strong>Μεταφορά σε νέο κινητό:</strong> όταν μεταφέρεις τα δεδομένα σου σε νέο κινητό Android (με καλώδιο ή Wi-Fi), περνούν απευθείας τα ίδια αρχεία με το αυτόματο αντίγραφο, χωρίς τα κλειδιά της Oura.</li>
+<li><strong>Αντίγραφο από τις Ρυθμίσεις της εφαρμογής:</strong> ένα αρχείο στις Λήψεις του κινητού, <strong>χωρίς κρυπτογράφηση</strong>. Το φτιάχνεις εσύ, και εσύ αποφασίζεις πού θα το κρατήσεις.</li>
+<li><strong>Αναφορά για τον γιατρό (PDF):</strong> αποθηκεύεται στις Λήψεις μόνο όταν το ζητήσεις.</li>
 </ul>
 </div>
+
+<div class="card">
+<h2>Με ποια νομική βάση</h2>
+<ul>
+<li><strong>Δεδομένα υγείας</strong> (Samsung Health, ρολόι, Oura, ό,τι γράφεις): η <strong>ρητή συγκατάθεσή σου</strong> (ΓΚΠΔ, άρθρο 9 παρ. 2 α), που δίνεις με τις άδειες. Την ανακαλείς οποτεδήποτε, αφαιρώντας τις άδειες ή αποσυνδέοντας την Oura.</li>
+<li><strong>Αναφορές σφαλμάτων:</strong> το έννομο συμφέρον να δουλεύει σωστά η εφαρμογή (άρθρο 6 παρ. 1 στ). Δεν περιέχουν δεδομένα υγείας.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>Για πόσο κρατιούνται</h2>
+<ul>
+<li>Στο κινητό: ώσπου να τα σβήσεις ή να απεγκαταστήσεις την εφαρμογή.</li>
+<li>Στο αντίγραφο της Google: όπως ορίζει η Google για τα αντίγραφα του Android.</li>
+<li>Αναφορές σφαλμάτων στο Sentry: έως 90 ημέρες.</li>
+<li>Υπηρεσία σύνδεσης Oura (Netlify): δεν κρατά τίποτα.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>Τα δικαιώματά σου</h2>
+<ul>
+<li><strong>Πρόσβαση και μεταφορά:</strong> όλα τα δεδομένα είναι στο κινητό σου· από τις Ρυθμίσεις φτιάχνεις αντίγραφο σε αρχείο, και από την αναφορά για τον γιατρό PDF.</li>
+<li><strong>Διόρθωση:</strong> ό,τι έγραψες το αλλάζεις μέσα στην εφαρμογή.</li>
+<li><strong>Διαγραφή:</strong> Ρυθμίσεις Android › Εφαρμογές › Υγεία &amp; Φόρμα › Αποθηκευτικός χώρος › «Διαγραφή δεδομένων» (ή απεγκατάσταση). Η απεγκατάσταση <strong>δεν</strong> σβήνει τα αρχεία που έβγαλες στις Λήψεις (αντίγραφο, PDF) ούτε το αντίγραφο της Google· αυτά τα σβήνεις από τα Αρχεία του κινητού και από το Google Drive (Αντίγραφα ασφαλείας). Η αποσύνδεση της Oura ακυρώνει την πρόσβαση (και από τον λογαριασμό σου στην Oura). Οι άδειες της Samsung Health αφαιρούνται από τις ρυθμίσεις της Samsung Health.</li>
+<li><strong>Αναφορές σφαλμάτων:</strong> επειδή δεν έχουν αναγνωριστικό, δεν συνδέονται με εσένα· αν θέλεις να σβηστούν, γράψε μας την ημερομηνία και την ώρα.</li>
+<li><strong>Καταγγελία:</strong> έχεις δικαίωμα να απευθυνθείς στην Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (<a href="https://www.dpa.gr">www.dpa.gr</a>).</li>
+</ul>
+</div>
+
+<div class="card" id="epikoinonia">
+<h2>Επικοινωνία</h2>
+<p>Για ερωτήσεις ή αιτήματα για τα δεδομένα σου, γράψε στη σελίδα του έργου στο GitHub: <a href="https://github.com/TechMeNowDear/ygeia-forma/issues">github.com/TechMeNowDear/ygeia-forma</a>. Τα μηνύματα εκεί είναι δημόσια· <strong>μη γράφεις δεδομένα υγείας</strong>.</p>
+</div>
+
+<div class="card">
+<h2>Δεν είναι ιατρική συσκευή</h2>
+<p>Η εφαρμογή δεν κάνει διάγνωση και δεν αντικαθιστά τον γιατρό. Το όριο παλμών είναι υπενθύμιση με δόνηση για ένα όριο που βάζεις εσύ· δεν είναι συναγερμός ασφαλείας, και δεν δουλεύει όταν η άσκηση δεν τρέχει στο ρολόι ή όταν το ρολόι δεν μετρά παλμούς.</p>
+</div>
+
 <div class="card">
 <h2>Αυτός ο ιστότοπος</h2>
 <p>Φιλοξενείται στο Netlify. Δεν έχει cookies, φόρμες ή στατιστικά. Ο πάροχος φιλοξενίας μπορεί να κρατά τυπικά αρχεία καταγραφής (logs) του server. Η σελίδα επιστροφής της Oura απλώς στέλνει τον χρήστη πίσω στην εφαρμογή και δεν αποθηκεύει τίποτα.</p>
 </div>
+
 <div class="card">
-<h2>Δεν είναι ιατρική συσκευή</h2>
-<p>Η εφαρμογή δεν κάνει διάγνωση και δεν αντικαθιστά τον γιατρό.</p>
+<h2>Αλλαγές</h2>
+<p>Αν αλλάξει κάτι στο τι δεδομένα χρησιμοποιεί η εφαρμογή, αυτή η σελίδα ενημερώνεται πρώτα, με νέα ημερομηνία.</p>
 </div>
+
 <div class="card" lang="en">
 <h2>In English</h2>
-<p>All health and food data stays on the user's phone; there is no app server or account. With the user's permission the app reads Samsung Health data and, if the user connects Oura, Oura data with the "daily" scope only (sleep, sleep heart rate and HRV, breathing rate, temperature deviation, sleep score and readiness), directly from Oura to the phone. To connect Oura, the sign-in code and its renewal pass through a small service of ours on Netlify that adds the app's secret and stores or logs nothing; health data never passes through it. Oura tokens are encrypted with the Android Keystore and excluded from backups. Oura data is never sold, shared with third parties, or used to train or run AI models. Barcode numbers are sent to Open Food Facts when scanning. Crash reports (error text, screen, app version, device model, Android version; no health or food data; no IP stored) go to Sentry (EU). No cookies, analytics or ads. Users can disconnect Oura at any time in the app settings or in their Oura account; uninstalling deletes all app data from the phone. The app is not a medical device.</p>
+<p>Health, food and training data stays on the user's phone; there is no account and no server of ours that stores or sees health data. With the user's permission the app reads Samsung Health data (read-only; some types are used only by the diagnostic screen and are not stored). The watch app measures heart rate during workouts and, for walks, distance via GPS; location itself is never stored or sent, and data travels watch-to-phone through Google Play services (Bluetooth, or Google's servers with end-to-end encryption). If the user connects Oura, the app requests only the "daily" and "spo2" scopes and data goes directly from Oura to the phone. The sign-in code and tokens (never health data) pass through a small service of ours on Netlify (US servers) that adds the app secret and stores or logs nothing; tokens are encrypted with the Android Keystore and excluded from backups. Barcode scanning runs on-device in Google Play services (ML Kit, which sends Google technical usage metrics, not images); the barcode number is sent to Open Food Facts. Crash reports (error type and first line, code location, screen name, app version, device model, Android version; no health or food data, no user ID) go automatically to Sentry in the EU and are kept up to 90 days; Sentry sees the connection's IP address and may keep an approximate location. Android Auto Backup keeps an end-to-end encrypted copy in the user's Google account, and Android device-to-device transfer copies the same files directly to the new phone (never the Oura tokens); manual backups and doctor PDFs are saved unencrypted to Downloads. Legal basis: explicit consent for health data (GDPR Art. 9(2)(a)); legitimate interest for crash reports (Art. 6(1)(f)). Users can delete all data via Android Settings › Apps › Storage › Clear data (files in Downloads and the Google backup are deleted separately), disconnect Oura at any time, and complain to the Hellenic DPA. Contact: the project's GitHub page (public; do not post health data). No cookies, analytics or ads. The app is not a medical device; the heart-rate limit is a vibration reminder of a limit the user sets, not a safety alarm.</p>
 </div>
+
 <nav><a href="/">Αρχική</a><a href="/privacy/">Απόρρητο</a><a href="/terms/">Όροι χρήσης</a></nav>
 </div>
 </body>

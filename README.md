@@ -9,10 +9,20 @@
 
 Κάθε αλλαγή στο `main` τρέχει το `.github/workflows/android.yml`:
 
-1. Το `flutter create` συμπληρώνει τα αρχεία Android που δεν κρατάμε στο repository.
-2. Στο `android/app/build.gradle.kts` προστίθεται το `android/ygeia/app-extra.gradle.kts`
-   (Samsung Health Data SDK, minSdk 29, υπογραφή).
-3. Βγαίνει APK (arm64) και ανεβαίνει στο Releases ως «latest».
+1. `tools/ci/prepare_android.sh`: το `flutter create` συμπληρώνει τα αρχεία Android που δεν κρατάμε στο repository,
+   προστίθεται το `android/ygeia/app-extra.gradle.kts` (Samsung Health Data SDK, minSdk 29) και διορθώνεται το manifest
+   (`tools/android/patch_manifest.py`). Ίδιο script σε όλα τα workflows.
+2. Job `build`: ανάλυση, έλεγχοι Dart/Kotlin, APK κινητού (arm64) και ρολογιού, **χωρίς** το κλειδί υπογραφής.
+3. Job `smoke`: emulator Android 14· καθαρή εγκατάσταση και **αναβάθμιση** πάνω στην τελευταία έκδοση με δείγμα
+   δεδομένων (`tools/perf/smoke.sh`, `tools/perf/upgrade.sh`). Αποτυγχάνει σε κρασάρισμα, σφάλμα Dart (ουρά
+   `files/errq`), κενή/γκρι οθόνη ή αν η νέα έκδοση δεν διαβάζει τα δεδομένα της παλιάς.
+4. Job `sign`: υπογραφή με το σταθερό κλειδί (`tools/ci/sign_apks.sh`) και έλεγχος ότι το πιστοποιητικό είναι
+   ακριβώς το `a4433ab1…` (ίδιο με το `site/public/assetlinks.json`).
+5. Job `publish` (μόνο στο `main`): ανεβαίνουν στο Releases ως «latest» τα `ygeia-forma-N.apk` και
+   `ygeia-forma-watch-N.apk`, με SHA-256 στις σημειώσεις.
+
+Δοκιμή χωρίς δημοσίευση: Actions › «Χτίσιμο Android» › Run workflow σε άλλον κλάδο (τρέχουν όλα εκτός από το `publish`
+και τα στιγμιότυπα του `main`· ο αριθμός έκδοσης όμως προχωρά).
 
 ## Φάκελοι
 
@@ -25,8 +35,15 @@
 
 ## Ασφάλεια
 
-Κανένα κλειδί ή κωδικός μέσα στο repository. Το κλειδί υπογραφής έρχεται από τα
-Secrets του GitHub (ή από την προσωρινή μνήμη του GitHub Actions).
+- Κανένα κλειδί ή κωδικός μέσα στο repository. Το κλειδί υπογραφής έρχεται **μόνο** από τα Secrets του GitHub
+  (`YGEIA_KEYSTORE_B64`, `YGEIA_KEYSTORE_PASSWORD`) και μόνο στο βήμα υπογραφής του job `sign`, σε καθαρό μηχάνημα
+  χωρίς χτίσιμο· το αρχείο του σβήνεται αμέσως μετά. Καμία προσωρινή μνήμη (cache) δεν έχει κλειδί· το job `old-cache`
+  σβήνει την παλιά `ygeia-signing-v1` αν υπάρχει ακόμα.
+- Όλες οι ενέργειες (actions) κλειδωμένες σε πλήρες SHA. Κάθε job έχει μόνο τα δικαιώματα που χρειάζεται: όσα
+  χτίζουν έχουν μόνο ανάγνωση· γράφουν μόνο τα μικρά jobs που ανεβάζουν στιγμιότυπα ή δημοσιεύουν.
+- Κανένα `pull_request_target`. Μόνο το «Δεδομένα τροφίμων» τρέχει σε pull request, με μόνο ανάγνωση και χωρίς secrets.
+- Πολιτική απορρήτου: `site/public/privacy/`. Το `tools/ci/check_privacy.py` (σε κάθε χτίσιμο) σταματά αν ο κώδικας
+  ζητά κάτι που η πολιτική δεν λέει (άδειες Oura, είδη Samsung Health, υπηρεσίες).
 
 ## Αναφορά σφαλμάτων (Sentry)
 
