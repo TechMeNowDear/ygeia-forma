@@ -104,7 +104,7 @@ void main() {
       expect(q('πιεστικο'), containsAll(['db_press', 'incline_press']));
       expect(q('ΚΟΙΛΙΑΚΟΙ'), contains('crunch'));
       expect(q('λαστιχο'), contains('band_pushdown'));
-      expect(q('zzzz'), isEmpty);
+      expect(q('ξφψω'), isEmpty);
     });
   });
 
@@ -132,7 +132,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('free-add')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('pick-sheet')), findsOneWidget);
-      await tester.enterText(find.byKey(const ValueKey('pick-search')), 'zzzz');
+      await tester.enterText(find.byKey(const ValueKey('pick-search')), 'ξφψω');
       await tester.pumpAndSettle();
       expect(find.textContaining('Καμία άσκηση'), findsOneWidget);
       await pick('πλαγιες', 'lateral_raise');
