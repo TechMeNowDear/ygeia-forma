@@ -957,7 +957,7 @@
     "ψητό"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "χταπόδι σχάρας",
@@ -970,7 +970,7 @@
     "σχάρας"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "χταπόδι βραστό",
@@ -983,7 +983,7 @@
     "βραστό"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "τσιπούρα σχάρας",
@@ -1094,7 +1094,7 @@
     "ελληνικός"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "ψάρι",
@@ -2216,7 +2216,7 @@
     "χωρίς"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "ψωμί χωρίς αλάτι",
@@ -2258,7 +2258,7 @@
     "light"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "σουβλάκι κοτόπουλο",
@@ -2272,8 +2272,9 @@
   },
   {
    "q": "καλαμάκι χοιρινό",
-   "count": 2,
+   "count": 3,
    "top": [
+    "C25506",
     "C25586",
     "C25585"
    ],
@@ -2285,8 +2286,9 @@
   },
   {
    "q": "καλαμάκι",
-   "count": 2,
+   "count": 3,
    "top": [
+    "C25506",
     "C25586",
     "C25585"
    ],
@@ -2304,7 +2306,7 @@
     "λάδι"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "καφές με ζάχαρη",
@@ -2379,7 +2381,7 @@
     "χωρίς"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "κοτόπουλο πανέ",
@@ -2405,7 +2407,7 @@
     "μπάρα"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "αμύγδαλα αλατισμένα",
@@ -2418,7 +2420,7 @@
     "αλατισμένα"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "γάλα χωρίς λακτόζη",
@@ -2433,7 +2435,7 @@
     "χωρίς"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "ψωμί χωρίς γλουτένη",
@@ -2448,7 +2450,7 @@
     "χωρίς"
    ],
    "corrected": {},
-   "droppedFood": true
+   "droppedFood": false
   },
   {
    "q": "ηλιόσποροι",
@@ -2478,6 +2480,106 @@
     "C4002"
    ],
    "ignored": [],
+   "corrected": {},
+   "droppedFood": false
+  },
+  {
+   "q": "μήλο πράσινο",
+   "count": 1,
+   "top": [
+    "C13039"
+   ],
+   "ignored": [
+    "πράσινο"
+   ],
+   "corrected": {},
+   "droppedFood": false
+  },
+  {
+   "q": "πατάτες τηγανητές σπιτικές",
+   "count": 2,
+   "top": [
+    "C4030",
+    "C4032"
+   ],
+   "ignored": [],
+   "corrected": {},
+   "droppedFood": false
+  },
+  {
+   "q": "γιαούρτι χωρίς λακτόζη",
+   "count": 7,
+   "top": [
+    "U170903",
+    "U170894",
+    "C19882"
+   ],
+   "ignored": [
+    "λακτόζη",
+    "χωρίς"
+   ],
+   "corrected": {},
+   "droppedFood": false
+  },
+  {
+   "q": "κοτόπουλο με ρύζι",
+   "count": 11,
+   "top": [
+    "C36017",
+    "C36002",
+    "C36024"
+   ],
+   "ignored": [
+    "ρύζι"
+   ],
+   "corrected": {},
+   "droppedFood": true
+  },
+  {
+   "q": "μακαρόνια με κιμά",
+   "count": 4,
+   "top": [
+    "C9810",
+    "C9811",
+    "C9870"
+   ],
+   "ignored": [
+    "κιμά"
+   ],
+   "corrected": {},
+   "droppedFood": true
+  },
+  {
+   "q": "καλαμάκι κοτόπουλο",
+   "count": 1,
+   "top": [
+    "C25586"
+   ],
+   "ignored": [],
+   "corrected": {},
+   "droppedFood": false
+  },
+  {
+   "q": "καλαμάκι μοσχαρίσιο",
+   "count": 1,
+   "top": [
+    "C25585"
+   ],
+   "ignored": [],
+   "corrected": {},
+   "droppedFood": false
+  },
+  {
+   "q": "γάλα με κακάο",
+   "count": 11,
+   "top": [
+    "C19033",
+    "C19250",
+    "C19200"
+   ],
+   "ignored": [
+    "κακάο"
+   ],
    "corrected": {},
    "droppedFood": false
   }

@@ -162,7 +162,7 @@ bool _homonym(String a, String b) {
 /// («φιλέτο σολομού» → σολομός). Μετρούν μόνο αν ταιριάζουν.
 final _optional = {
   for (final w in const ['φιλέτο', 'φιλέτα', 'φιλετάκι', 'φιλετάκια', 'κομμάτι', 'κομμάτια', 'μερίδα', 'σπιτικό', 'σπιτικός',
-    'σπιτική', 'σπιτικά'])
+    'σπιτική', 'σπιτικά', 'σπιτικές', 'σπιτικοί'])
     phonetic(w),
 };
 
@@ -266,7 +266,8 @@ class FoodSearchResult {
   /// Οι λέξεις (όπως γράφτηκαν) με τις οποίες βρέθηκαν τα αποτελέσματα, όταν κάποιες αγνοήθηκαν.
   final List<String> kept;
 
-  /// Αγνοήθηκε λέξη που είναι τρόφιμο της βάσης (π.χ. «σουβλάκι κοτόπουλο» → σουβλάκι): τα αποτελέσματα είναι άλλο τρόφιμο.
+  /// Αγνοήθηκε λέξη που είναι τρόφιμο της βάσης, δηλαδή η πρώτη λέξη κάποιου ονόματος (π.χ. «γιαούρτι με μέλι» →
+  /// γιαούρτι): τα αποτελέσματα είναι άλλο τρόφιμο. Όχι για επίθετα («μήλο πράσινο») ή άγνωστες λέξεις («ελληνικός»).
   final bool droppedFood;
 
   /// Λέξεις της αναζήτησης που αγνοήθηκαν (όπως γράφτηκαν), γιατί με αυτές δεν βρισκόταν τίποτα.
@@ -315,6 +316,7 @@ class FoodIndex {
     ];
     _catStem = [for (final phrases in _cat) [for (final ws in phrases) [for (final w in ws) stem(w)]]];
     _headBase = [for (final ws in _head) [for (final w in ws) stem(w, synonyms: false)]];
+    _foodHeads = {for (final ws in _name) if (ws.isNotEmpty) stem(ws.first)};
     _markedOf = [
       for (var i = 0; i < foods.length; i++)
         {
@@ -351,6 +353,9 @@ class FoodIndex {
   late final List<List<List<String>>> _catStem;
   late final List<List<String>> _headBase;
   late final List<Set<String>> _markedOf;
+
+  /// Ρίζες της πρώτης λέξης κάθε ονόματος: «λέξη που είναι τρόφιμο» (ρύζι, μέλι, ζάχαρη, χοιρινό).
+  late final Set<String> _foodHeads;
 
   /// Λέξεις (6+ γράμματα) των ονομάτων σε φωνητική μορφή → όπως γράφονται, για τη διόρθωση ενός γράμματος.
   late final Map<String, String> _vocab;
@@ -408,12 +413,10 @@ class FoodIndex {
       final (r2, _) = _search(keep.join(' '),
           boost: boost, limit: limit, isPhonetic: true, cookedFirst: dropped.any((w) => _cooking.contains(stem(w))));
       if (r2.isNotEmpty) {
-        // Αν αγνοήθηκε η ΠΡΩΤΗ λέξη (π.χ. «μπάρα πρωτεΐνης» → μόνο «πρωτεΐνη»), τα αποτελέσματα είναι άλλο τρόφιμο.
+        // Οι λέξεις αυτού του βήματος δεν υπάρχουν πουθενά στη βάση, άρα δεν είναι τρόφιμο της βάσης (droppedFood = false).
+        // Αν αλλάζουν τη διατροφή («σόγιας», «μπάρα»), την έντονη προειδοποίηση τη βγάζει η οθόνη από τη λέξη.
         return FoodSearchResult(r2,
-            ignored: [for (final w in dropped) show(w)],
-            kept: [for (final w in keep) show(w)],
-            corrected: corrected,
-            droppedFood: dropped.contains(q2.first));
+            ignored: [for (final w in dropped) show(w)], kept: [for (final w in keep) show(w)], corrected: corrected);
       }
     }
     // 3. Χωρίς μία λέξη — ποτέ χωρίς την ΠΡΩΤΗ (το ίδιο το τρόφιμο): «σοκολάτα χωρίς ζάχαρη» δεν γίνεται «μούσλι χωρίς
@@ -437,7 +440,7 @@ class FoodIndex {
             ignored: [for (final w in dropped) show(w), show(left!)],
             kept: [for (final w in keep) if (w != left) show(w)],
             corrected: corrected,
-            droppedFood: true);
+            droppedFood: _foodHeads.contains(stem(left)));
       }
       // 3β. Μόνο η πρώτη λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
       final (r4, _) = _search(keep.first, boost: boost, limit: limit, isPhonetic: true);
@@ -446,7 +449,7 @@ class FoodIndex {
             ignored: [for (final w in dropped) show(w), for (final w in keep.skip(1)) show(w)],
             kept: [show(keep.first)],
             corrected: corrected,
-            droppedFood: true);
+            droppedFood: keep.skip(1).any((w) => _foodHeads.contains(stem(w))));
       }
     }
     return FoodSearchResult.empty;

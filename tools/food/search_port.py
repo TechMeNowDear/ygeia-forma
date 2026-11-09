@@ -59,7 +59,7 @@ def homonym(a, b):
         if (a in g) != (b in g): return True
     return False
 # Λέξεις που περιγράφουν κομμάτι/μορφή, όχι το τρόφιμο: δεν χρειάζεται να ταιριάξουν («φιλέτο σολομού» → σολομός).
-OPTIONAL = {phonetic(w) for w in ['φιλέτο','φιλέτα','φιλετάκι','φιλετάκια','κομμάτι','κομμάτια','μερίδα','σπιτικό','σπιτικός','σπιτική','σπιτικά']}
+OPTIONAL = {phonetic(w) for w in ['φιλέτο','φιλέτα','φιλετάκι','φιλετάκια','κομμάτι','κομμάτια','μερίδα','σπιτικό','σπιτικός','σπιτική','σπιτικά','σπιτικές','σπιτικοί']}
 # Παραλλαγές με πολύ περισσότερο αλάτι ή ζάχαρη ανά 100 g: πάνε κάτω από το απλό τρόφιμο, αν δεν τις ζητήσεις.
 MARKED = {stem(phonetic(w)) for w in ['παστός','αλατισμένος','αλίπαστος','καπνιστός','μαρινάτος']}
 MARKED_CAT = {'Αποξηραμένα φρούτα': [phonetic(w) for w in ['ξερά', 'αποξηραμένα']]}
@@ -82,7 +82,7 @@ CAT_SCORE = 6.0
 # Λέξεις τρόπου μαγειρέματος: αν χρειαστεί να αγνοηθούν, οι μαγειρεμένες μορφές μπαίνουν πρώτες.
 COOKING = {stem(phonetic(w)) for w in ['ψητό','βραστό','βρασμένο','σχάρας','φούρνου','τηγανητό','μαγειρεμένο','ατμού','στιφάδο','κοκκινιστό','πανέ']}
 PREFERRED = {'C19033':0.5,'C2013':0.5,'C36017':0.5,'C7000':0.5,'C9104':0.5,'C36018':0.5,'C39500':0.5,'C12066':1.5,
-             'U170903':0.5,'C26024':0.5}
+             'U170903':0.5,'C26024':0.5,'C25506':0.5}
 
 def osa1(a, b):
     """Απόσταση ≤ 1 (αντικατάσταση, προσθήκη, αφαίρεση ή αντιμετάθεση δύο διπλανών γραμμάτων)."""
@@ -128,6 +128,8 @@ class Index:
         for i in range(len(foods)): assert len(self.ingr[i]) == len(self.name[i]), foods[i]['name']
         self.astem = [[[stem(w) for w in ws] for ws in phs] for phs in self.alias]
         self.head = [head_words(f['name']) for f in foods]
+        # Ρίζες της πρώτης λέξης κάθε ονόματος: «λέξη που είναι τρόφιμο» (ρύζι, μέλι, ζάχαρη), όχι επίθετο (πράσινο).
+        self.food_heads = {stem(ws[0]) for ws in self.name if ws}
         # Για το «ακριβές ταίριασμα όλης της αναζήτησης»: ρίζες ΧΩΡΙΣ τα συνώνυμα (φούρνου ≠ ψητό εδώ).
         self.headbase = [[stem(w, False) for w in ws] for ws in self.head]
         self.abase = [[[stem(w, False) for w in ws] for ws in phs] for phs in self.alias]
@@ -183,7 +185,7 @@ class Index:
         if keep and dropped:
             r, _ = self._search(' '.join(keep), boost, limit, phon=True, cooked_first=any(stem(w) in COOKING for w in dropped))
             if r:
-                self.dropped_food = q2[0] in dropped
+                # Οι λέξεις του βήματος 2 δεν υπάρχουν πουθενά στη βάση: δεν είναι τρόφιμο της βάσης.
                 return r, [self._show(w) for w in dropped], fixed
         # 3. Κάθε λέξη ταιριάζει κάπου, αλλά όχι όλες μαζί: χωρίς μία λέξη (κρατά το καλύτερο ταίριασμα).
         if len(keep) >= 2:
@@ -194,12 +196,12 @@ class Index:
                 r, top = self._search(' '.join(rest), boost, limit, phon=True, cooked_first=stem(keep[k]) in COOKING)
                 if r and (best is None or top > best[1]): best = (r, top, keep[k])
             if best:
-                self.dropped_food = True
+                self.dropped_food = stem(best[2]) in self.food_heads
                 return best[0], [self._show(w) for w in dropped] + [self._show(best[2])], fixed
             # 3β. Μόνο η πρώτη λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
             r, _ = self._search(keep[0], boost, limit, phon=True)
             if r:
-                self.dropped_food = True
+                self.dropped_food = any(stem(w) in self.food_heads for w in keep[1:])
                 return r, [self._show(w) for w in dropped] + [self._show(w) for w in keep[1:]], fixed
         return [], [], {}
 

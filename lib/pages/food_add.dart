@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../food/food_channel.dart';
 import '../food/food_model.dart';
-import '../food/food_search.dart' show plain;
+import '../food/food_search.dart' show FoodSearchResult, plain;
 import '../food/food_sources.dart';
 import '../food/food_store.dart';
 import '../food/off.dart';
@@ -262,10 +262,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     // αλκοόλ», «σοκολάτα χωρίς ζάχαρη») ή ένα άλλο τρόφιμο («γιαούρτι με μέλι»), τα αποτελέσματα είναι ΑΛΛΟ τρόφιμο:
     // έντονη προειδοποίηση, όχι γκρι σημείωση. Ο τρόπος μαγειρέματος («χταπόδι ψητό») μένει απλή σημείωση.
     final kept = found?.kept.join(' ') ?? '';
-    final strong = found != null &&
-        results.isNotEmpty &&
-        found.corrected.isEmpty &&
-        found.ignored.any((w) => changesNutrition(w) || (found.droppedFood && !isCookingWord(w)));
+    final strong = found != null && results.isNotEmpty && strongSearchWarning(found);
     final note = found == null || results.isEmpty
         ? null
         : found.corrected.isNotEmpty
@@ -812,7 +809,7 @@ final pickHints = <String, String>{
 const _nutritionWords = [
   'σογι', 'σοι', 'soy', 'αμυγδαλ', 'βρωμ', 'καρυδ', 'light', 'λαιτ', 'zero', 'ζιρο', 'διαιτ', 'αλκοολ', 'γλουτεν',
   'πανε', 'μπαρ', 'αλατισμ', 'αναλατ', 'λαδι', 'ελαιολαδ', 'βουτυρ', 'τηγαν', 'ζαχαρ', 'μελι', 'σοκολατ', 'κρεμ',
-  'τυρι', 'γαλα', 'σιροπ', 'πρωτειν',
+  'τυρι', 'γαλα', 'σιροπ', 'πρωτειν', 'κακαο', 'σοκολατουχ',
   // Αγνοημένο «χωρίς» αλλάζει το νόημα («μαρμελάδα χωρίς ζάχαρη» → «με λιγότερη ζάχαρη»).
   'χωρισ', 'without',
 ];
@@ -820,6 +817,16 @@ const _nutritionWords = [
 bool changesNutrition(String word) {
   final w = plain(word);
   return _nutritionWords.any(w.startsWith);
+}
+
+/// Έντονη προειδοποίηση «άλλο τρόφιμο» (δεύτερος ανεξάρτητος έλεγχος του fix-food, Σ-Α): μόνο όταν αγνοήθηκε λέξη που
+/// αλλάζει τη διατροφή ή λέξη που είναι τρόφιμο της βάσης — όχι για επίθετα («μήλο πράσινο»), «σπιτικές», «ελληνικός
+/// καφές», ούτε για «χωρίς λακτόζη» (ίδια θρεπτική αξία).
+bool strongSearchWarning(FoodSearchResult r) {
+  if (r.corrected.isNotEmpty || r.ignored.isEmpty) return false;
+  final lactoseFree = r.ignored.any((w) => plain(w).startsWith('λακτοζ') || plain(w).startsWith('lactose'));
+  return r.droppedFood ||
+      r.ignored.any((w) => changesNutrition(w) && !(lactoseFree && (plain(w).startsWith('χωρισ') || w == 'without')));
 }
 
 /// Τρόπος μαγειρέματος χωρίς λάδι: αν αγνοηθεί, οι μαγειρεμένες μορφές μπαίνουν ήδη πρώτες.
@@ -1058,7 +1065,8 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final field = _v[Nk.salt]!;
     final typed = parseNumber(field.text);
     final original = widget.draft.values[Nk.salt];
-    if (typed != null && original != null && mode != _saltMode && saltFromInput(typed, _saltMode) == original) {
+    // Με ανοχή: μετά από μετατροπή και στρογγύλεμα σε 4 δεκαδικά η ακριβής ισότητα μπορεί να αποτύχει (έλεγχος fix-food, Χ-Δ).
+    if (typed != null && original != null && mode != _saltMode && (saltFromInput(typed, _saltMode) - original).abs() < 1e-6) {
       final v = switch (mode) {
         SaltInput.salt => original,
         SaltInput.sodiumG => original / 2.5,

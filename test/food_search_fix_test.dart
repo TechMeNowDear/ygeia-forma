@@ -63,7 +63,7 @@ void main() {
   }
 
   group('Αναζήτηση: ίδια με τη μεταφορά σε Python (tools/food/search_port.py)', () {
-    test('219 αναζητήσεις: ίδια 3 πρώτα, ίδιο πλήθος, ίδιες λέξεις που αγνοήθηκαν/διορθώθηκαν', () {
+    test('227 αναζητήσεις: ίδια 3 πρώτα, ίδιο πλήθος, ίδιες λέξεις που αγνοήθηκαν/διορθώθηκαν', () {
       final j = jsonDecode(File('test/fixtures/food_search_expected.json').readAsStringSync()) as Map<String, dynamic>;
       final qs = (j['queries'] as List).cast<Map<String, dynamic>>();
       expect(qs.length, greaterThanOrEqualTo(150));
@@ -538,7 +538,7 @@ void main() {
       expect(first('σουβλάκι κοτόπουλο'), 'Σουβλάκι κοτόπουλο (ψημένο)');
       expect(first('καλαμάκι χοιρινό'), startsWith('Σουβλάκι'));
       for (final q in ['σοκολάτα χωρίς ζάχαρη', 'ψωμί χωρίς αλάτι', 'γιαούρτι με μέλι', 'κόλα light']) {
-        expect(store.find(q).droppedFood, isTrue, reason: q);
+        expect(strongSearchWarning(store.find(q)), isTrue, reason: q);
       }
     });
     test('3.2: «σε λάδι»/«με ζάχαρη» δεν «ταιριάζουν» με το «χωρίς λάδι/ζάχαρη» του ονόματος', () {
@@ -555,8 +555,34 @@ void main() {
     test('Ένα λάθος γράμμα μόνο για λέξη που δεν υπάρχει: «καλαμάκι» δεν γίνεται «καλαμάρι»', () {
       final r = store.find('καλαμάκι');
       expect(r.corrected, isEmpty);
-      expect(r.foods.first.name, startsWith('Σουβλάκι'));
       expect(r.foods.any((f) => f.name.startsWith('Καλαμάρι')), isFalse);
+    });
+    test('Σ-Β: σκέτο «καλαμάκι» → πρώτο το ανάμεικτο (το καλαμάκι είναι συνήθως χοιρινό), μετά κοτόπουλο/μοσχάρι', () {
+      final r = store.search('καλαμάκι');
+      expect(r.first.name, 'Σουβλάκι με ανάμεικτα κρέατα');
+      expect(r.skip(1).take(2).map((f) => f.id).toSet(), {'C25586', 'C25585'});
+      expect(first('καλαμάκι κοτόπουλο'), 'Σουβλάκι κοτόπουλο (ψημένο)');
+      expect(first('καλαμάκι μοσχαρίσιο'), 'Σουβλάκι μοσχαρίσιο (ψημένο)');
+      // «καλαμάκι χοιρινό»: δεν υπάρχει ψημένο χοιρινό σουβλάκι στην πηγή → το ανάμεικτο, ΜΕ προειδοποίηση.
+      final pork = store.find('καλαμάκι χοιρινό');
+      expect(pork.foods.first.name, 'Σουβλάκι με ανάμεικτα κρέατα');
+      expect(strongSearchWarning(pork), isTrue);
+    });
+    test('Σ-Α: η κόκκινη κάρτα μόνο για τρόφιμο ή λέξη που αλλάζει τη διατροφή', () {
+      for (final q in ['μήλο πράσινο', 'πατάτες τηγανητές σπιτικές', 'ελληνικός καφές', 'γάλα χωρίς λακτόζη',
+          'γιαούρτι χωρίς λακτόζη', 'μέλι θυμαρίσιο', 'χταπόδι ψητό']) {
+        final r = store.find(q);
+        expect(r.foods, isNotEmpty, reason: q);
+        expect(strongSearchWarning(r), isFalse, reason: q);
+      }
+      for (final q in ['γάλα σόγιας', 'κόλα light', 'γιαούρτι με μέλι', 'σοκολάτα χωρίς ζάχαρη', 'μπύρα χωρίς αλκοόλ',
+          'κοτόπουλο πανέ', 'μπάρα πρωτεΐνης', 'αυγό τηγανητό σε λάδι', 'κοτόπουλο με ρύζι', 'γάλα με κακάο']) {
+        final r = store.find(q);
+        expect(r.foods, isNotEmpty, reason: q);
+        expect(strongSearchWarning(r), isTrue, reason: q);
+      }
+      expect(store.find('μήλο πράσινο').droppedFood, isFalse);
+      expect(store.find('κοτόπουλο με ρύζι').droppedFood, isTrue);
     });
     test('«τόνος σε λάδι» → ο τόνος σε ελαιόλαδο', () {
       expect(first('τόνος σε λάδι'), startsWith('Τόνος λευκός (albacore) σε ελαιόλαδο'));
@@ -600,7 +626,7 @@ void main() {
       expect(_food('U169226').name, 'Ραδίκια πικραλίδας (ωμά)');
       expect(_food('U169226').aliases, isNot(contains('χόρτα')));
       expect(_food('C21800').aliases, isNot(contains('γίδα')));
-      expect(_food('C25506').aliases, isNot(contains('καλαμάκι')));
+      expect(_food('C25506').aliases, contains('καλαμάκι'));
       expect(_food('U173180').name, contains('προτίμησε το barcode'));
     });
     test('4.2: «30 g (+125 ml γάλα)» στη μερίδα δεν κάνει υγρό τα δημητριακά', () {
