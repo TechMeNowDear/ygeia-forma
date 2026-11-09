@@ -44,5 +44,13 @@ done
 
 errq_check "Άνοιγμα" || ok=0
 crash_check "Άνοιγμα" || ok=0
+
+# Αυτοέλεγχος: ένα ψεύτικο σφάλμα στην ουρά ΠΡΕΠΕΙ να πιάνεται (αλλιώς ο έλεγχος δεν βλέπει τίποτα και βγαίνει πράσινος).
+if errq_root; then
+  ev='{"event_id":"selftest","exception":{"values":[{"type":"StateError","value":"αυτοέλεγχος smoke"}]},"tags":{"screen":"Σήμερα"}}'
+  adb shell "mkdir -p /data/data/$PKG/files/errq && echo '$ev' > /data/data/$PKG/files/errq/00000000000000_selftest.json"
+  if errq_check "Αυτοέλεγχος" > /dev/null; then echo "Αυτοέλεγχος: ο έλεγχος ΔΕΝ είδε ψεύτικο σφάλμα στην ουρά"; ok=0; else echo "Αυτοέλεγχος: ο έλεγχος πιάνει σφάλμα στην ουρά"; fi
+  errq_clear
+fi
 [ "$ok" = 1 ] && echo "Άνοιγμα: εντάξει" && exit 0
 exit 1

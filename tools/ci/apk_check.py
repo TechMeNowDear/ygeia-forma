@@ -40,9 +40,14 @@ def main():
     errors = []
     if not re.search(r'Verified using v2 scheme \(APK Signature Scheme v2\): true', text):
         errors.append('δεν υπάρχει υπογραφή v2')
-    signers = re.findall(r'Signer #(\d+) certificate SHA-256 digest: ([0-9a-f]{64})', text)
-    if len({s[0] for s in signers}) != 1:
-        errors.append(f'περιμέναμε έναν υπογράφοντα, βρέθηκαν {len({s[0] for s in signers})}')
+    # «Signer #1 certificate SHA-256 digest: …» (η μορφή αλλάζει λίγο ανάμεσα σε εκδόσεις του apksigner: δεκτά και
+    # κεφαλαία και άνω-κάτω τελείες).
+    signers = [(m.group(1).strip(), m.group(2).replace(':', '').lower())
+               for m in re.finditer(r'^(Signer[^\n]*?) certificate SHA-256 digest: ([0-9a-fA-F:]{64,95})\s*$', text, re.M)]
+    count = re.search(r'Number of signers: (\d+)', text)
+    n_signers = int(count.group(1)) if count else len({s[0] for s in signers})
+    if n_signers != 1 or not signers:
+        errors.append(f'περιμέναμε έναν υπογράφοντα, βρέθηκαν {n_signers}')
     got = signers[0][1] if signers else ''
     if got != want:
         errors.append(f'άλλο πιστοποιητικό: {got[:12] or "κανένα"}… αντί για {want[:12]}…')
@@ -54,6 +59,10 @@ def main():
     if errors:
         for e in errors:
             print(f'::error title=Υπογραφή {apk}::{e}')
+        # Μόνο δημόσια στοιχεία (σχήματα, πλήθος, αποτυπώματα πιστοποιητικού) για διάγνωση.
+        for line in text.splitlines():
+            if re.match(r'(Verifie|Number of signers|Signer|WARNING|ERROR|DOES NOT VERIFY)', line) and 'DN:' not in line:
+                print('  ' + line[:200])
         sys.exit(1)
     print(f'{apk}: πιστοποιητικό {got[:12]}… σωστό · σχήματα {schemes} · {n} βιβλιοθήκες .so στοιχισμένες στα 16 KB')
 
