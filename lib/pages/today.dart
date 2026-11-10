@@ -55,7 +55,8 @@ class TodayPage extends StatelessWidget {
     final training = this.training ?? TrainingStore.main;
     return ListenableBuilder(
       // Το ζωντανό περπάτημα το ακούει μόνο η κάρτα «Άσκηση σήμερα» (όχι όλη η σελίδα σε κάθε μήνυμα του ρολογιού).
-      listenable: Listenable.merge([store, training, WearLink.main.ready]),
+      // Η αποθήκη προπονήσεων αλλάζει σε κάθε σετ: την ακούει μόνο η θέση της κάρτας (όχι όλη η σελίδα).
+      listenable: Listenable.merge([store, WearLink.main.ready]),
       builder: (context, _) {
         final c = Aigaio.of(context);
         final d = store.data;
@@ -111,8 +112,7 @@ class TodayPage extends StatelessWidget {
         final weighedToday = d.latestBody != null && sameDay(d.latestBody!.time, now);
         final weigh = now.weekday == store.profile.weighDay && !weighedToday ? const _WeighCard() : null;
         // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
-        final trainingCard =
-            TodayTrainingCard.shows(training, now) ? TodayTrainingCard(training: training, now: now) : null;
+        final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
         final foodCard = prefs.show('food')
             ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))
             : null;
@@ -150,29 +150,17 @@ class TodayPage extends StatelessWidget {
           if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
-        // Σε tablet/PC (ποντίκι) κουμπί «Ανανέωση»· στο κινητό μόνο «Ενημέρωση 18:40» (σχέδια 9/11: φεύγει το
-        // μόνιμο «τράβηξε για ανανέωση»· το τράβηγμα δουλεύει όπως πριν).
-        final wide = MediaQuery.sizeOf(context).width >= 600;
+        // Μόνο κινητό (απόφαση 10/11): το τράβηγμα ανανεώνει και στο ανοιχτό Fold· φαίνεται μόνο «Ενημέρωση 18:40»
+        // (σχέδια 9/11, 1α/1γ· έλεγχος premium, S8).
         final updated = 'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now)} '}${hm(d.readAt)}';
         final footer = Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: wide
-              ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(updated, style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    key: const ValueKey('today-refresh'),
-                    onPressed: () => store.refresh(),
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Ανανέωση'),
-                  ),
-                ])
-              : Text(
-                  updated,
-                  key: const ValueKey('today-updated'),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: c.textTertiary, fontSize: 12.5),
-                ),
+          child: Text(
+            updated,
+            key: const ValueKey('today-updated'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: c.textTertiary, fontSize: 12.5),
+          ),
         );
 
         final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
@@ -696,4 +684,20 @@ class _WeighCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Η θέση της «Άσκηση σήμερα»: ξαναχτίζεται μόνο αυτή όταν αλλάζει η αποθήκη προπονήσεων (έλεγχος premium, S5).
+/// Χωρίς κάρτα (ξεκούραση, χωρίς πρόγραμμα): τίποτα, ούτε κενό.
+class _TrainingSlot extends StatelessWidget with SelfSpaced {
+  const _TrainingSlot({required this.training, required this.now});
+  final TrainingStore training;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: training,
+        builder: (context, _) => TodayTrainingCard.shows(training, now)
+            ? Padding(padding: const EdgeInsets.only(top: PageFrame.gap), child: TodayTrainingCard(training: training, now: now))
+            : const SizedBox.shrink(key: ValueKey('today-training-none')),
+      );
 }

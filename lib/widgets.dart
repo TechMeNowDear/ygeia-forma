@@ -108,6 +108,9 @@ bool wordsFit(BuildContext context, Iterable<String> texts, TextStyle style, dou
 }
 
 /// Σκελετός κάθε σελίδας: τίτλος, ανανέωση με τράβηγμα, μία στήλη στο κινητό, δύο σε μεγάλη οθόνη.
+/// Κάρτα που βάζει μόνη της το κενό από πάνω (και τίποτα όταν δεν φαίνεται), π.χ. μια θέση που μπορεί να είναι άδεια.
+mixin SelfSpaced on Widget {}
+
 class PageFrame extends StatelessWidget {
   const PageFrame({
     super.key,
@@ -157,7 +160,7 @@ class PageFrame extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < items.length; i++) ...[
-                    if (i > 0) SizedBox(height: items[i] is SectionHeader ? 22 : gap),
+                    if (i > 0 && items[i] is! SelfSpaced) SizedBox(height: items[i] is SectionHeader ? 22 : gap),
                     items[i],
                   ],
                 ],
@@ -725,9 +728,17 @@ class ScoreRing extends StatelessWidget {
       height: size,
       child: CustomPaint(
         painter: _RingPainter((value ?? 0) / 100, stroke, color, track),
-        child: Center(
-          child: Text(
+        // Ο αριθμός μένει πάντα μέσα στον κύκλο (έλεγχος premium, M1): χωρά στο εσωτερικό του δαχτυλιδιού και μικραίνει
+        // αν χρειαστεί, όποιο κι αν είναι το μέγεθος γραμμάτων του συστήματος (ο κύκλος δεν μεγαλώνει).
+        child: Padding(
+          padding: EdgeInsets.all(stroke + size * 0.08),
+          child: Center(
+          child: FittedBox(
+            key: const ValueKey('score-ring-number'),
+            fit: BoxFit.scaleDown,
+            child: Text(
             value == null ? '—' : value!.round().toString(),
+            maxLines: 1,
             style: TextStyle(
               fontSize: size * 0.34,
               height: 1.0,
@@ -737,6 +748,8 @@ class ScoreRing extends StatelessWidget {
               fontFeatures: tabular,
             ),
           ),
+          ),
+        ),
         ),
       ),
     );

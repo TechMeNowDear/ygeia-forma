@@ -71,7 +71,17 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
      * «Δεν έρχονται παλμοί» με όριο γιατρού (σχέδια 9/11, 7γ): όλη η οθόνη, μία φορά για κάθε σιωπή. Μετά το
      * «Εντάξει» μένει «♥ —» σε κεχριμπάρι ώσπου να ξαναέρθουν παλμοί. Μόνο εμφάνιση· η δόνηση είναι όπως πριν.
      */
-    var noHrSeen = false
+    var noHrSeen: Boolean
+        get() = noHrSeenNow
+        set(v) {
+            noHrSeenNow = v
+        }
+
+    companion object {
+        /** Κρατιέται και αν ξαναφτιαχτεί η οθόνη (π.χ. αλλαγή μεγέθους γραμμάτων), για να μη ξαναβγεί (N3). */
+        @JvmStatic
+        internal var noHrSeenNow = false
+    }
 
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -329,7 +339,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         if (plan != null || Repo.knownLimit != null) {
             // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11)· και χωρίς πρόγραμμα, το τελευταίο που ήρθε (V-A-06).
             val lim = Repo.limitNow()
-            if (!Repo.updateNeeded) twoTone(c, "Σήμερα · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
+            // «Σήμερα» μόνο όταν το πρώτο κουμπί είναι η σημερινή· αλλιώς «Άλλη» (N5).
+            val isToday = chosen == null || chosen == plan?.todayWorkout?.id
+            if (!Repo.updateNeeded) twoTone(c, if (isToday) "Σήμερα · " else "Άλλη · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
@@ -354,10 +366,12 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                     actions.startWorkout(shown.id)
                 }
                 homeButton(c, "Περπάτημα", null, 92f, button2, Color.WHITE) { actions.startWalk() }
-                val other = strength.firstOrNull { it.id != shown.id }
+                val otherId = nextStrength(strength.map { it.id }, shown.id)
+                val other = strength.firstOrNull { it.id == otherId }
                 if (other != null) {
-                    // Πάτημα: έρχεται πρώτη (δεν ξεκινά αμέσως· μία απόφαση ανά οθόνη).
-                    homeButton(c, other.name, null, 140f, button3, soft, h = 32f, w = 112f, size = 11f) { chosen = other.id; invalidate() }
+                    // Πάτημα: έρχεται πρώτη (δεν ξεκινά αμέσως· μία απόφαση ανά οθόνη). Η επόμενη στη σειρά του
+                    // προγράμματος, κυκλικά: με 3+ προπονήσεις φτάνεις σε όλες (έλεγχος premium, M4).
+                    homeButton(c, other.name, null, 138f, button3, soft, h = 36f, w = 116f, size = 11f) { chosen = other.id; invalidate() }
                 }
             }
             else -> {
@@ -573,8 +587,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val lim = Repo.alarm.limit
         t(c, "Δεν έρχονται", 62f, Color.WHITE, 15f * fs, true, 160f)
         t(c, "παλμοί", 80f, Color.WHITE, 15f * fs, true, 160f)
+        // Ίδια ελεγμένη φράση με το κινητό και την ειδοποίηση (V-A-04/05): «δεν σε προσέχει».
         t(c, "Το όριο $lim δεν σε", 99f, amberSoft, 11.5f * fs, true, 170f)
-        t(c, "προστατεύει τώρα", 115f, amberSoft, 11.5f * fs, true, 170f)
+        t(c, "προσέχει τώρα", 115f, amberSoft, 11.5f * fs, true, 170f)
         t(c, "Σφίξε λίγο το λουράκι", 131f, soft, 10f * fs, false, 160f)
         pill(c, "Εντάξει", 160f, 100f, 38f, amber, amberInk, 13f * fs) { noHrSeen = true; invalidate() }
     }
@@ -719,4 +734,14 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         return super.onGenericMotionEvent(e)
     }
+}
+
+/**
+ * Η επόμενη προπόνηση βαρών μετά την [shownId], κυκλικά στη σειρά του προγράμματος (null αν υπάρχει μόνο μία).
+ * Το τρίτο κουμπί της αρχικής: πατώντας το ξανά και ξανά φτάνεις σε όλες.
+ */
+internal fun nextStrength(ids: List<String>, shownId: String): String? {
+    if (ids.size < 2) return null
+    val i = ids.indexOf(shownId)
+    return ids[(i + 1).mod(ids.size)].takeIf { it != shownId }
 }

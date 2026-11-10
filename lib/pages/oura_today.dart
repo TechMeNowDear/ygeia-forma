@@ -340,8 +340,9 @@ extension on OuraSleepTodayCard {
     final hrv = plan.value(store.history, K.hrv, day);
     final hr = plan.value(store.history, K.sleepHr, day);
     if (readiness == null && hrv == null && hr == null) return const [];
+    // Οι τιμές στην ίδια γραμμή ακόμα κι αν μια ετικέτα πάει σε δύο γραμμές (έλεγχος premium, M2).
     Widget cell(String label, double? v, String unit) => Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(label, maxLines: 2, style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500, height: 1.25)),
             const SizedBox(height: 2),
             FittedBox(
@@ -372,20 +373,25 @@ extension on OuraSleepTodayCard {
         builder: (context, box) {
           // Τρεις στήλες όσο χωράει κάθε λέξη· αλλιώς (μεγάλα γράμματα) γραμμές «ετικέτα … τιμή», ποτέ σπασμένη λέξη.
           if (wordsFit(context, labels, labelStyle, (box.maxWidth - 20) / 3)) {
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              cell(labels[0], readiness, '/100'),
-              const SizedBox(width: 10),
-              cell(labels[1], hrv, 'ms'),
-              const SizedBox(width: 10),
-              cell(labels[2], hr, 'bpm'),
-            ]);
+            return IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                cell(labels[0], readiness, '/100'),
+                const SizedBox(width: 10),
+                cell(labels[1], hrv, 'ms'),
+                const SizedBox(width: 10),
+                cell(labels[2], hr, 'bpm'),
+              ]),
+            );
           }
-          return Column(children: [
+          // Ίδια στοίχιση σε κάθε γραμμή (έλεγχος premium, M2): ετικέτα αριστερά, τιμή δεξιά.
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             for (var i = 0; i < 3; i++)
               Padding(
+                key: ValueKey('oura-today-night-line-$i'),
                 padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 10, children: [
-                  Text(labels[i], style: labelStyle),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                  Expanded(child: Text(labels[i], style: labelStyle)),
+                  const SizedBox(width: 10),
                   Text.rich(TextSpan(children: [
                     TextSpan(
                         text: values[i].$1 == null ? '—' : '${values[i].$1!.round()}',

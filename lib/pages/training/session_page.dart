@@ -144,14 +144,15 @@ class _SessionPageState extends State<SessionPage> {
         final e = s.items[_idx];
         return Scaffold(
           appBar: AppBar(
-            title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Ο τίτλος μεγαλώνει ως 1,3×, για να μη γίνεται «Προπ…» δίπλα στο «Τέλος» (έλεγχος premium, S4).
+            title: MediaQuery.withClampedTextScaling(maxScaleFactor: 1.3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(s.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               ValueListenableBuilder<int>(
                 valueListenable: _tick,
                 builder: (_, __, ___) => Text(_clock(t.now.difference(s.start)),
                     style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
               ),
-            ]),
+            ])),
             // Σχέδια 9/11 (6β): «Τέλος» ως απαλό κουμπί και ⋮ για τα σπάνια («Αλλαγή άσκησης»).
             actions: [
               OutlinedButton(
@@ -483,8 +484,9 @@ class _SessionPageState extends State<SessionPage> {
           Stepper2(
             value: band ? '${(set.load ?? 0).round()}' : loadText,
             leading: band ? BandDots(set.load, size: 14) : null,
-            width: usesKg(k) || band ? 64 : 92,
-            button: 48,
+            // Σχέδια 9/11 (6β) και έλεγχος premium (S4): οι δύο μετρητές σε μία σειρά και στο κλειστό Fold.
+            width: usesKg(k) || band ? 52 : 80,
+            button: 44,
             labelMinus: 'Λιγότερο βάρος',
             labelPlus: 'Περισσότερο βάρος',
             onMinus: shiftLoad(k, set.load, -1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, -1)!),
@@ -492,8 +494,8 @@ class _SessionPageState extends State<SessionPage> {
           ),
         Stepper2(
           value: '${set.reps}',
-          width: 48,
-          button: 48,
+          width: 36,
+          button: 44,
           labelMinus: 'Λιγότερες',
           labelPlus: 'Περισσότερες',
           onMinus: set.reps > 0 ? () => t.setReps(e, i, set.reps - 1) : null,
@@ -511,22 +513,17 @@ class _SessionPageState extends State<SessionPage> {
             Text('τώρα', style: TextStyle(fontSize: 13, color: c.textSecondary)),
           ]),
           const SizedBox(height: 10),
-          Wrap(spacing: 16, runSpacing: 8, alignment: WrapAlignment.spaceBetween, children: steppers),
+          Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.spaceBetween, children: steppers),
           const SizedBox(height: 10),
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              if (band)
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  BandDots(set.load, size: 14),
-                  Flexible(child: Text(bandName(set.load ?? 0), style: TextStyle(fontSize: 13.5, color: c.textSecondary))),
-                ])
-              else
-                const SizedBox.shrink(),
-              Semantics(
+          // «✓ Έγινε» πάντα δεξιά, το όνομα του λάστιχου αριστερά (με πολύ μεγάλα γράμματα το ένα κάτω από το άλλο).
+          () {
+            final label = band
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    BandDots(set.load, size: 14),
+                    Flexible(child: Text(bandName(set.load ?? 0), style: TextStyle(fontSize: 13.5, color: c.textSecondary))),
+                  ])
+                : const SizedBox.shrink();
+            final doneBtn = Semantics(
                 button: true,
                 label: 'Έγινε το σετ ${i + 1}',
                 excludeSemantics: true,
@@ -537,9 +534,16 @@ class _SessionPageState extends State<SessionPage> {
                   icon: const Icon(Icons.check_rounded),
                   label: const Text('Έγινε', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
-              ),
-            ],
-          ),
+              );
+            if (veryLargeText(context)) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (band) label,
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: doneBtn),
+              ]);
+            }
+            return Row(children: [Expanded(child: label), const SizedBox(width: 10), doneBtn]);
+          }(),
         ]),
       );
     }

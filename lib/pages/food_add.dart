@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -101,7 +103,7 @@ class MealPicker extends StatelessWidget {
                 customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () => onChanged(m),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
+                  constraints: const BoxConstraints(minHeight: 48),
                   child: Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -115,11 +117,20 @@ class MealPicker extends StatelessWidget {
             ),
           );
       const v = Meal.values;
-      return Column(children: [
-        Row(children: [b(v[0]), const SizedBox(width: 8), b(v[1])]),
-        const SizedBox(height: 8),
-        Row(children: [b(v[2]), const SizedBox(width: 8), b(v[3])]),
-      ]);
+      return LayoutBuilder(builder: (context, box) {
+        // Αν ένα όνομα γεύματος δεν χωρά ολόκληρο σε μισό πλάτος: ένα κουμπί ανά γραμμή (ποτέ «Μεσημέρ/ι»).
+        final half = (box.maxWidth - 8) / 2 - 12;
+        if (!wordsFit(context, [for (final m in v) mealLabel(m)], const TextStyle(fontSize: 15, fontWeight: FontWeight.w600), half)) {
+          return Column(key: const ValueKey('meal-list'), children: [
+            for (var k = 0; k < v.length; k++) ...[if (k > 0) const SizedBox(height: 8), Row(children: [b(v[k])])],
+          ]);
+        }
+        return Column(children: [
+          Row(children: [b(v[0]), const SizedBox(width: 8), b(v[1])]),
+          const SizedBox(height: 8),
+          Row(children: [b(v[2]), const SizedBox(width: 8), b(v[3])]),
+        ]);
+      });
     }
     return Container(
       padding: const EdgeInsets.all(4),
@@ -180,6 +191,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   final _query = TextEditingController();
   late Meal _meal = widget.meal;
   bool _busy = false;
+  bool _moreRecent = false;
 
   DateTime _now() => (widget.clock ?? DateTime.now)();
 
@@ -314,10 +326,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     : kept.isEmpty
                         ? 'Δεν βρέθηκε με όλες τις λέξεις. Αποτελέσματα χωρίς ${found.ignored.map((w) => '«$w»').join(', ')}.'
                         : 'Δεν βρέθηκε «${q.trim()}». Αποτελέσματα για «$kept».';
-    final recent = widget.food.recent(limit: 10);
+    // Έλεγχος premium (S3): λίγα από το καθένα (όπως ο πίνακας 10α), ώστε τα «Δικά μου» να φαίνονται χωρίς κύλιση
+    // πολλών οθονών· «Περισσότερα πρόσφατα» ανοίγει ως 10.
+    final allRecent = widget.food.recent(limit: 10);
+    final recent = _moreRecent ? allRecent : allRecent.take(3).toList();
     // «Συχνά»: όσα τρως συχνά αλλά δεν είναι ήδη στα «Πρόσφατα» (αλλιώς οι δύο λίστες βγαίνουν ίδιες).
     final recentIds = {for (final f in recent) f.id};
-    final frequent = [for (final f in widget.food.frequent(limit: 25)) if (!recentIds.contains(f.id)) f].take(10).toList();
+    final frequent = [for (final f in widget.food.frequent(limit: 25)) if (!recentIds.contains(f.id)) f].take(4).toList();
 
     // Σχέδια 9/11 (10α): Συχνά → Πρόσφατα → Δικά μου. Τα δικά μου που φαίνονται ήδη πιο πάνω δεν ξαναμπαίνουν.
     final shownIds = {...recentIds, for (final f in frequent) f.id};
@@ -344,6 +359,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 store: widget.food,
                 onTap: () => _pick(foods[k]),
                 onMore: more ? () => myFoodActions(context, widget.food, foods[k]) : null,
+                badge: !more,
                 line: k < foods.length - 1,
               ),
           ],
@@ -436,6 +452,18 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   if (q.trim().isEmpty) ...[
                     if (frequent.isNotEmpty) section('Συχνά', frequent),
                     if (recent.isNotEmpty) section('Πρόσφατα', recent),
+                    if (!_moreRecent && allRecent.length > recent.length)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            key: const ValueKey('add-more-recent'),
+                            onPressed: () => setState(() => _moreRecent = true),
+                            child: const Text('Περισσότερα πρόσφατα'),
+                          ),
+                        ),
+                      ),
                     if (recent.isEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
@@ -528,7 +556,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 }
 
 class _FoodTile extends StatelessWidget {
-  const _FoodTile({required this.food, required this.store, required this.onTap, this.onMore, this.line = false});
+  const _FoodTile({required this.food, required this.store, required this.onTap, this.onMore, this.line = false, this.badge = true});
+
+  /// Ετικέτα «δικό μου»/μάρκα· όχι μέσα στην ενότητα «Δικά μου», όπου περισσεύει (N8).
+  final bool badge;
   final Food food;
   final FoodStore store;
   final VoidCallback onTap;
@@ -562,7 +593,7 @@ class _FoodTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text),
                   ),
-                  if (food.isMine)
+                  if (food.isMine && badge)
                     Padding(
                       padding: const EdgeInsets.only(top: 3, bottom: 1),
                       child: MineBadge(text: food.brand ?? 'δικό μου'),
@@ -675,6 +706,12 @@ class _QuantitySheetState extends State<QuantitySheet> {
 
   @override
   Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+
+  /// Χωρούν ολόκληρες οι λέξεις των θρεπτικών σε πλακίδια 2×2; (πλάτος φύλλου ως 560, μείον περιθώρια)
+  bool _tilesFit(BuildContext context) {
+    final w = math.min(MediaQuery.sizeOf(context).width - 44, 560.0);
+    return wordsFit(context, const ['Υδατάνθρακες', 'Πρωτεΐνη', 'Λιπαρά'], const TextStyle(fontSize: 13), (w - 8) / 2 - 24 - 12);
+  }
 
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
@@ -933,7 +970,20 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ],
                 ]),
                 const SizedBox(height: 16),
-                if (large)
+                if (large && !_tilesFit(context))
+                  // Πολύ μεγάλα γράμματα (έλεγχος premium, M3): μία γραμμή ανά θρεπτικό, ποτέ σπασμένη λέξη.
+                  Container(
+                    key: const ValueKey('qty-nutrients-rows'),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(14)),
+                    child: Column(children: [
+                      InfoRow('kcal', kcalText(tot(Nk.kcal)), dot: c.primary),
+                      InfoRow('Πρωτεΐνη', '${gramsText(tot(Nk.protein))} g', dot: proteinColor(c)),
+                      InfoRow('Υδατάνθρακες', '${gramsText(tot(Nk.carbs))} g', dot: carbsColor(c)),
+                      InfoRow('Λιπαρά', '${gramsText(tot(Nk.fat))} g', dot: fatColor(c)),
+                    ]),
+                  )
+                else if (large)
                   Column(key: const ValueKey('qty-nutrients-grid'), children: [
                     Row(children: [
                       tile('kcal', kcalText(tot(Nk.kcal)), c.primary),

@@ -32,12 +32,10 @@ class OuraSleepPage extends StatelessWidget {
     final now = this.now ?? DateTime.now();
     final today = dayOf(now);
     final plan = store.plan;
-    final nights = store.ouraNights.where((n) => plan.nightSource(n.day) == Source.oura).toList();
     final last = store.lastOuraNight != null && plan.nightSource(store.lastOuraNight!.day) == Source.oura
         ? store.lastOuraNight
         : null;
     final reason = lastNightReason(store, now);
-    final stages = ouraStageAverages(nights, today, plan);
 
     final lastCard = last == null
         ? _EmptyNightCard(reason: reason ?? EmptyNight.noRing, day: today, night: store.ouraNightFor(today))
@@ -48,8 +46,57 @@ class OuraSleepPage extends StatelessWidget {
             todayNight: store.ouraNightFor(today),
             range: sleepRange(store.profile, today),
             readiness: plan.value(store.history, K.energy, last.day),
-            onHistory: () => Navigator.of(context).push(MetricPage.route(store, K.sleepMin, now: now)));
+            onHistory: () => Navigator.of(context).push(OuraNightsPage.route(store, now: this.now)),
+            onMetric: (k) => Navigator.of(context).push(MetricPage.route(store, k, now: this.now)));
 
+    final heart = _OuraRestCard(store: store, day: last?.day ?? today, now: now);
+    final breath = _BreathCard(store: store, day: last?.day ?? today, now: now);
+
+    // Χωρίς τελευταία νύχτα: ο δρόμος για τις 30 νύχτες μένει (έλεγχος premium, S2).
+    final history = last != null
+        ? null
+        : AppCard(
+            padding: EdgeInsets.zero,
+            child: NavRow(
+              key: const ValueKey('sleep-30-nights'),
+              icon: Icons.calendar_month_rounded,
+              color: c.sleep,
+              title: 'Ύπνος 30 νυχτών',
+              onTap: () => Navigator.of(context).push(OuraNightsPage.route(store, now: this.now)),
+            ),
+          );
+
+    return PageFrame(
+      title: 'Ύπνος',
+      subtitle: plan.nightSource(today) == Source.none ? 'Το Oura δεν είναι συνδεδεμένο' : 'Από το Oura Ring 5',
+      onRefresh: () => store.refresh(),
+      // Σχέδια 9/11 (2α): η σελίδα όπως ο πίνακας· οι φάσεις 7 νυχτών και η λίστα των νυχτών στο «Ύπνος 30 νυχτών ›».
+      single: [lastCard, if (history != null) history, heart, breath],
+      left: [lastCard, if (history != null) history, heart],
+      right: [breath],
+    );
+  }
+}
+
+/// «Ύπνος 30 νυχτών» (έλεγχος premium, S2): γράφημα διάρκειας, φάσεις 7 νυχτών και κάθε νύχτα μία-μία.
+class OuraNightsPage extends StatelessWidget {
+  const OuraNightsPage({super.key, required this.store, this.now});
+  final HealthStore store;
+  final DateTime? now;
+
+  static Route<void> route(HealthStore store, {DateTime? now}) => MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'Ύπνος 30 νυχτών'),
+        builder: (_) => OuraNightsPage(store: store, now: now),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final now = this.now ?? DateTime.now();
+    final today = dayOf(now);
+    final plan = store.plan;
+    final nights = store.ouraNights.where((n) => plan.nightSource(n.day) == Source.oura).toList();
+    final stages = ouraStageAverages(nights, today, plan);
     // Σχέδια 9/11 (4β): μία ετικέτα «εκτίμηση» στον τίτλο και ⓘ για το «γιατί», αντί για παράγραφο.
     final stagesCard = AppCard(
       key: const ValueKey('sleep-stages'),
@@ -85,12 +132,9 @@ class OuraSleepPage extends StatelessWidget {
       ),
     );
 
-    final heart = _OuraRestCard(store: store, day: last?.day ?? today, now: now);
-    final breath = _BreathCard(store: store, day: last?.day ?? today, now: now);
-
     final list = [
       const SectionHeader('Νύχτα προς νύχτα'),
-      for (var i = 0; i < 14; i++)
+      for (var i = 0; i < 30; i++)
         () {
           final d = DateTime(today.year, today.month, today.day - i);
           if (plan.nightSource(d) == Source.watch) return null;
@@ -106,12 +150,35 @@ class OuraSleepPage extends StatelessWidget {
         }(),
     ].whereType<Widget>().toList();
 
-    return PageFrame(
-      title: 'Ύπνος',
-      subtitle: plan.nightSource(today) == Source.none ? 'Το Oura δεν είναι συνδεδεμένο' : 'Από το Oura Ring 5',
-      onRefresh: () => store.refresh(),
-      left: [lastCard, stagesCard, heart, breath],
-      right: list.length > 1 ? list : const [],
+    final chart = AppCard(
+      padding: EdgeInsets.zero,
+      child: NavRow(
+        key: const ValueKey('sleep-duration-chart'),
+        icon: Icons.show_chart_rounded,
+        color: c.sleep,
+        title: 'Διάρκεια ύπνου, γράφημα',
+        onTap: () => Navigator.of(context).push(MetricPage.route(store, K.sleepMin, now: this.now)),
+      ),
+    );
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ύπνος 30 νυχτών')),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                chart,
+                const SizedBox(height: 12),
+                stagesCard,
+                const SizedBox(height: 16),
+                for (final w in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: w),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -146,7 +213,10 @@ class _EmptyNightCard extends StatelessWidget {
 
 class _OuraNightCard extends StatelessWidget {
   const _OuraNightCard(
-      {required this.night, required this.now, this.reason, this.todayNight, this.range, this.readiness, this.onHistory});
+      {required this.night, required this.now, this.reason, this.todayNight, this.range, this.readiness, this.onHistory, this.onMetric});
+
+  /// Πάτημα σε δαχτυλίδι: οι 30 νύχτες της μέτρησης (έλεγχος premium, S9).
+  final void Function(String metric)? onMetric;
   final OuraNight night;
 
   /// Ετοιμότητα του Oura για την ίδια μέρα (σχέδια 9/11: η «Ανάκαμψη» μοιράστηκε στον Ύπνο).
@@ -172,13 +242,13 @@ class _OuraNightCard extends StatelessWidget {
     // Νύχτα σε κομμάτια (ως 4 ώρες κενό): μετρούν όλα μαζί, το κενό όχι (δεύτερος γύρος ελέγχου, U12).
     final parts = night.counted;
     final minutes = night.nightMinutes;
-    Widget clock(String label, DateTime? t) => Expanded(
+    Widget clock(String label, String v) => Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, style: TextStyle(color: c.textSecondary, fontSize: 13)),
               Text(
-                t == null ? '—' : hm(t),
+                v,
                 style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w700, fontFeatures: tabular),
               ),
             ],
@@ -215,7 +285,7 @@ class _OuraNightCard extends StatelessWidget {
           // γράμματα το ένα κάτω από το άλλο). Χωρίς τιμή: χωρίς άδειο δαχτυλίδι (έλεγχος UX U8).
           if (night.sleepScore != null || readiness != null) ...[
             const SizedBox(height: 14),
-            _RingTiles(tiles: [
+            _RingTiles(onTap: onMetric, tiles: [
               if (night.sleepScore != null) (night.sleepScore!.toDouble(), 'Βαθμολογία', 'ύπνου', 'sleep-score'),
               if (readiness != null) (readiness!, 'Ετοιμότητα', 'για σήμερα', 'sleep-readiness'),
             ]),
@@ -227,11 +297,17 @@ class _OuraNightCard extends StatelessWidget {
           const SizedBox(height: 14),
           // Τρεις στήλες όσο χωράει κάθε λέξη· αλλιώς γραμμές «ετικέτα … ώρα» (ποτέ «00:2/6»).
           LayoutBuilder(builder: (context, box) {
-            final items = [('Ξάπλωσες', parts.first.start), ('Κοιμήθηκες', parts.first.onset), ('Ξύπνησες', parts.last.end)];
+            // Σχέδια 9/11 (2α): Κοιμήθηκες · Ξύπνησες · Ξύπνιος (ο χρόνος ξύπνιος ΜΕΣΑ στον ύπνο).
+            final awakeSec = parts.every((p) => p.awakeInSleep == null) ? null : parts.fold<int>(0, (a, p) => a + (p.awakeInSleep ?? 0));
+            final items = [
+              ('Κοιμήθηκες', parts.first.onset == null ? '—' : hm(parts.first.onset!)),
+              ('Ξύπνησες', hm(parts.last.end)),
+              ('Ξύπνιος', awakeSec == null ? '—' : hmList((awakeSec / 60).round())),
+            ];
             final fits = wordsFit(context, [for (final i in items) i.$1], TextStyle(fontSize: 13, color: c.textSecondary), box.maxWidth / 3 - 4) &&
                 wordsFit(context, const ['00:00'], const TextStyle(fontSize: 20, fontWeight: FontWeight.w700), box.maxWidth / 3 - 4);
             if (fits) return Row(children: [for (final i in items) clock(i.$1, i.$2)]);
-            return Column(children: [for (final i in items) InfoRow(i.$1, i.$2 == null ? '—' : hm(i.$2!))]);
+            return Column(children: [for (final i in items) InfoRow(i.$1, i.$2)]);
           }),
           if (n.stages.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -289,17 +365,23 @@ class _OuraNightCard extends StatelessWidget {
 
 /// Δαχτυλίδια βαθμολογίας σε απαλά πλακίδια: (τιμή, λέξη, δεύτερη λέξη, κλειδί).
 class _RingTiles extends StatelessWidget {
-  const _RingTiles({required this.tiles});
+  const _RingTiles({required this.tiles, this.onTap});
   final List<(double, String, String, String)> tiles;
+  final void Function(String metric)? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final big = MediaQuery.textScalerOf(context).scale(10) > 13.5;
-    Widget tile((double, String, String, String) t) => Container(
+    Widget tile((double, String, String, String) t) => Material(
+          color: c.tint(c.sleep),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
           key: ValueKey(t.$4),
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap == null ? null : () => onTap!(t.$4 == 'sleep-score' ? K.sleepScore : K.energy),
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 10, 6, 10),
-          decoration: BoxDecoration(color: c.tint(c.sleep), borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
             ScoreRing(value: t.$1, size: 44, stroke: 5, color: c.sleep, track: c.tint(c.sleep), textColor: c.text),
             const SizedBox(width: 8),
@@ -310,6 +392,8 @@ class _RingTiles extends StatelessWidget {
               ]),
             ),
           ]),
+          ),
+          ),
         );
     if (big || tiles.length == 1) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

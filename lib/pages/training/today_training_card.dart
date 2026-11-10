@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../exercise/ex_data.dart';
+import '../../exercise/ex_names.dart';
 import '../../format.dart';
 import '../../theme.dart';
 import '../../training/program.dart';
@@ -55,16 +56,8 @@ class TodayTrainingCard extends StatefulWidget {
 class _TodayTrainingCardState extends State<TodayTrainingCard> {
   TrainingStore get t => widget.training;
 
-  @override
-  void initState() {
-    super.initState();
-    // Τα ονόματα των ασκήσεων (μία φορά, από τα αρχεία της εφαρμογής).
-    if (ExLibrary.loaded == null && t.program != null) {
-      ExLibrary.load().then((_) {
-        if (mounted) setState(() {});
-      });
-    }
-  }
+  /// Όνομα άσκησης χωρίς να φορτωθεί η βιβλιοθήκη (~450 KB) με το άνοιγμα της Σήμερα (έλεγχος premium, S5).
+  static String _name(String id) => exNamesById[id] ?? ExLibrary.loaded?.byId(id)?.name ?? id;
 
   void _start(Workout w) {
     t.start(w);
@@ -148,7 +141,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
       );
     }
 
-    final names = [for (final i in w.items) exName(i.ex)];
+    final names = [for (final i in w.items) _name(i.ex)];
     final shown = names.take(3).toList();
     final list = [
       for (var k = 0; k < shown.length; k++) k == 0 ? shown[k] : _lowerFirst(shown[k]),
@@ -281,7 +274,8 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           const SizedBox(height: 12),
           Text.rich(
             TextSpan(children: [
-              TextSpan(text: 'Το όριο $limit δεν σε προστατεύει τώρα. ', style: const TextStyle(fontWeight: FontWeight.w700)),
+              // Ίδια ελεγμένη φράση παντού (V-A-04/05): «δεν σε προσέχει».
+              TextSpan(text: 'Το όριο $limit δεν σε προσέχει τώρα. ', style: const TextStyle(fontWeight: FontWeight.w700)),
               const TextSpan(text: 'Το ρολόι δεν στέλνει παλμούς.'),
             ]),
             style: TextStyle(fontSize: 15, height: 1.45, color: c.text),

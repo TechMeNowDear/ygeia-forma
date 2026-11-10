@@ -17,10 +17,14 @@ import 'package:ygeia_forma/pages/body.dart';
 import 'package:ygeia_forma/pages/category.dart';
 import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/info_sheet.dart';
-import 'package:ygeia_forma/history.dart' show K;
+import 'package:ygeia_forma/history.dart' show K, dateKey;
 import 'package:ygeia_forma/trends.dart' show TrendPeriod, periodLabel;
-import 'package:ygeia_forma/widgets.dart' show PeriodPicker;
+import 'package:ygeia_forma/widgets.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
+import 'package:ygeia_forma/pages/oura_today.dart';
+import 'package:ygeia_forma/oura/oura_model.dart';
+import 'package:ygeia_forma/sources.dart';
+import 'package:ygeia_forma/exercise/ex_names.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
 import 'package:ygeia_forma/pages/training/today_training_card.dart';
@@ -54,6 +58,22 @@ Future<void> _pump(WidgetTester t, Widget w, {Size size = const Size(400, 2400),
 double _lum(Color c) {
   double ch(double v) => v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
   return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+}
+
+/// Λέξεις που σπάνε σε δύο γραμμές («Πρωτεΐν|η») μέσα στο [scope]: ελέγχει πού ζωγραφίστηκε κάθε λέξη, όχι μόνο αν
+/// κάτι ξεχείλισε (έλεγχος premium, M3/S10).
+List<String> brokenWords(WidgetTester t, Finder scope) {
+  final out = <String>[];
+  for (final e in find.descendant(of: scope, matching: find.byType(RichText)).evaluate()) {
+    final p = e.renderObject! as RenderParagraph;
+    final text = p.text.toPlainText();
+    for (final m in RegExp(r'[^\s·,.:()/]+').allMatches(text)) {
+      if (m.end - m.start < 2) continue;
+      final boxes = p.getBoxesForSelection(TextSelection(baseOffset: m.start, extentOffset: m.end));
+      if ({for (final b in boxes) b.top.round()}.length > 1) out.add(m.group(0)!);
+    }
+  }
+  return out;
 }
 
 double contrast(Color a, Color b) {
@@ -392,6 +412,92 @@ void main() {
       expect(t.takeException(), isNull);
       expect(find.text('30'), findsOneWidget);
       expect(find.text('χρόνος'), findsOneWidget);
+    });
+  });
+
+  group('Έλεγχος premium: μεγάλα γράμματα χωρίς σπασμένες λέξεις και αριθμούς (M1–M3)', () {
+    testWidgets('M1: ο αριθμός μένει μέσα στο δαχτυλίδι και στο 2,0×', (t) async {
+      await _pump(
+          t,
+          Scaffold(
+              body: Center(
+                  child: ScoreRing(value: 83, size: 60, stroke: 6, color: Aigaio.light.sleep, track: Aigaio.light.hairline))),
+          size: const Size(360, 400),
+          textScale: 2.0);
+      final r = t.getRect(find.text('83'));
+      expect(r.width, lessThanOrEqualTo(60 - 2 * 6));
+      expect(r.height, lessThanOrEqualTo(60 - 2 * 6));
+    });
+
+    testWidgets('M2: «Ετοιμότητα · HRV · Παλμοί ύπνου» στο 2,0×: ίδια στοίχιση σε κάθε γραμμή', (t) async {
+      final day = DateTime(2026, 11, 14);
+      final clock = DateTime(2026, 11, 14, 10);
+      final s = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(clock));
+      s.debugSetPlan(SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 11, 1)));
+      s.history = {dateKey(day): {'o.readiness': 65.0, 'o.hrv': 39.0, 'o.sleepHr': 59.0}};
+      s.ouraNights = parseOura(sleep: [
+        {
+          'id': 'n',
+          'day': dateKey(day),
+          'type': 'long_sleep',
+          'bedtime_start': DateTime(2026, 11, 13, 23).toUtc().toIso8601String(),
+          'bedtime_end': DateTime(2026, 11, 14, 7).toUtc().toIso8601String(),
+          'time_in_bed': 8 * 3600,
+          'total_sleep_duration': 7 * 3600,
+        },
+      ], dailySleep: const [], readiness: const []).nights;
+      await _pump(t, Scaffold(body: SingleChildScrollView(child: OuraSleepTodayCard(store: s, now: clock, onTap: () {}))),
+          size: const Size(360, 2400), textScale: 2.0);
+      expect(t.takeException(), isNull);
+      final lefts = <double>{}, rights = <double>{};
+      for (var i = 0; i < 3; i++) {
+        final line = find.byKey(ValueKey('oura-today-night-line-$i'));
+        expect(line, findsOneWidget, reason: 'στο 2,0× οι τρεις στήλες γίνονται γραμμές');
+        final texts = find.descendant(of: line, matching: find.byType(RichText)).evaluate().toList();
+        lefts.add(t.getRect(find.byWidget(texts.first.widget)).left.roundToDouble());
+        rights.add(t.getRect(find.byWidget(texts.last.widget)).right.roundToDouble());
+      }
+      expect(lefts.length, 1, reason: 'ετικέτες στοιχισμένες αριστερά');
+      expect(rights.length, 1, reason: 'τιμές στοιχισμένες δεξιά');
+      expect(brokenWords(t, find.byType(OuraSleepTodayCard)), isEmpty);
+    });
+
+    for (final (scale, size) in [(1.0, const Size(360, 1400)), (1.3, const Size(360, 1800)), (2.0, const Size(360, 2800)), (1.3, const Size(400, 1800))]) {
+      testWidgets('M3: φύλλο ποσότητας ${size.width.round()} dp, $scale×: καμία λέξη δεν σπάει στη μέση', (t) async {
+        final food = sampleFoodStore(_now);
+        final f = food.recent(limit: 1).first;
+        await _pump(t, Scaffold(body: QuantitySheet(food: food, item: f, initialGrams: 300, meal: Meal.snack)), size: size, textScale: scale);
+        expect(t.takeException(), isNull);
+        expect(brokenWords(t, find.byType(QuantitySheet)), isEmpty);
+      });
+    }
+  });
+
+  group('Έλεγχος premium: SHOULD', () {
+    test('S5: τα ονόματα της κάρτας «Άσκηση σήμερα» χωρίς να φορτωθεί η βιβλιοθήκη, ίδια με τη βιβλιοθήκη', () async {
+      final lib = await ExLibrary.load(inline: true);
+      for (final e in lib.list) {
+        expect(exNamesById[e.id], e.name, reason: e.id);
+      }
+      expect(exNamesById.length, lib.list.length);
+    });
+
+    testWidgets('S3: τα «Δικά μου» φαίνονται στην πρώτη οθόνη του «+ Φαγητό»· «Περισσότερα πρόσφατα» ανοίγει τη λίστα', (t) async {
+      final food = sampleFoodStore(_now);
+      await _pump(t, AddFoodScreen(food: food, meal: Meal.snack, day: dayOf(_now)), size: const Size(400, 900));
+      final mine = find.byKey(const ValueKey('add-mine'));
+      expect(mine, findsOneWidget);
+      expect(t.getRect(mine).top, lessThan(900));
+      await t.tap(find.byKey(const ValueKey('add-more-recent')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('add-more-recent')), findsNothing);
+    });
+
+    testWidgets('M5: καμία σημείωση σχεδιασμού στη σελίδα συσκευών', (t) async {
+      await _pump(t, const DevicesPage(), size: const Size(400, 4000));
+      expect(find.textContaining('Ανοίγει από κάθε'), findsNothing);
+      expect(find.textContaining('Στις κάρτες'), findsNothing);
+      expect(find.textContaining('±10%'), findsNothing);
     });
   });
 }

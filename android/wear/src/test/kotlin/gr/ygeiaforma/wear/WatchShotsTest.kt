@@ -74,6 +74,24 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.HOME
         Repo.resetExercise()
         Repo.alarm.limit = null
+        WatchView.noHrSeenNow = false
+    }
+
+    /** Έλεγχος premium (M4): με 3 προπονήσεις βαρών το τρίτο κουμπί φτάνει σε όλες, κυκλικά. */
+    @Test
+    fun allWorkoutsReachable() {
+        assertEquals("B", nextStrength(listOf("A", "B", "C"), "A"))
+        assertEquals("C", nextStrength(listOf("A", "B", "C"), "B"))
+        assertEquals("A", nextStrength(listOf("A", "B", "C"), "C"))
+        assertEquals(null, nextStrength(listOf("A"), "A"))
+        val three = planJson.replace(
+            "{\"id\":\"walk\"",
+            "{\"id\":\"C\",\"name\":\"Προπόνηση Γ\",\"minutes\":40,\"items\":[{\"ex\":\"goblet\",\"name\":\"Κάθισμα\",\"rest\":90,\"lo\":8,\"hi\":12,\"rir\":2,\"sets\":[{\"load\":12,\"label\":\"12 kg\",\"reps\":10}]}]},\n          {\"id\":\"walk\"",
+        )
+        Repo.applyPlan(Plan.parse(three))
+        Repo.screen = Repo.Screen.HOME
+        // Μετά το Β, το τρίτο κουμπί δείχνει τη Γ (πριν: ξανά την Α, η Γ δεν φαινόταν ποτέ).
+        shot("W1d_home_third_workout") { it.chosen = "B" }
     }
 
     private fun shot(name: String, ambient: Boolean = false, prep: (WatchView) -> Unit = {}) {

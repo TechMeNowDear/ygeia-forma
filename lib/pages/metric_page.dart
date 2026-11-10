@@ -74,6 +74,7 @@ const _bodyPeriods = [30, 90, 365];
 
 final metricSpecs = <String, MetricSpec>{
   // Σχέδια 9/11 (2α): «Ύπνος 30 νυχτών ›» από την κάρτα της τελευταίας νύχτας.
+  K.sleepScore: MetricSpec(metric: K.sleepScore, title: 'Βαθμολογία ύπνου', unit: '/100', color: (c) => c.sleep),
   K.sleepMin: MetricSpec(metric: K.sleepMin, title: 'Διάρκεια ύπνου', unit: '', color: (c) => c.sleep, format: (v) => hmList(v.round())),
   K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart),
   K.dayHr: MetricSpec(metric: K.dayHr, title: 'Παλμοί ξύπνιος', unit: 'bpm', color: (c) => c.heart, dayComplete: true),

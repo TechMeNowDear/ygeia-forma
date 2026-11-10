@@ -278,7 +278,8 @@ class _WalkCard extends StatelessWidget {
         _Row(
           key: const ValueKey('prog-walk-pace'),
           label: 'Ρυθμός',
-          detail: vals(w.pace, (v) => paceText(v)),
+          // «11:30 → 11:15 /km»: η μονάδα μία φορά, στο τέλος (N2).
+          detail: w.pace.previous != null && w.pace.current != null ? '${clock(w.pace.previous!)} → ${paceText(w.pace.current!)}' : vals(w.pace, (v) => paceText(v)),
           pill: w.pace.changed
               ? TrendPill(
                   '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${_secs((w.pace.current! - w.pace.previous!).abs().round())}',

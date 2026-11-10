@@ -10,6 +10,7 @@ import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'devices_page.dart';
+import 'sources_page.dart';
 import 'kitchen.dart';
 import 'my_foods.dart';
 
@@ -197,21 +198,21 @@ class _MePageState extends State<MePage> {
                       const GroupLabel('Διατροφή'),
                       _nutrition(context, food),
                     ],
+                    // Έλεγχος premium (S6): όχι σταθερό κείμενο («Oura / Ρολόι / InBody») που θα έλεγε ψέματα χωρίς Oura·
+                    // οι πηγές όπως ισχύουν τώρα είναι στη σελίδα «Πηγές».
                     const GroupLabel('Από πού έρχεται κάθε μέτρηση'),
                     AppCard(
-                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const _SourceRow('Ύπνος, HRV, παλμοί ύπνου, αναπνοές, μέσο οξυγόνο', 'Oura', line: true),
-                          const _SourceRow('Βήματα, παλμοί ξύπνιος, χαμηλότερο οξυγόνο', 'Ρολόι', line: true),
-                          const _SourceRow('Βάρος, λίπος, μύες', 'InBody'),
-                          const SizedBox(height: 4),
-                          Text('Κάθε μέτρηση έρχεται από μία συσκευή· ποτέ ανακατεμένα.', style: hint),
-                        ],
+                      padding: EdgeInsets.zero,
+                      child: NavRow(
+                        key: const ValueKey('me-sources'),
+                        icon: Icons.hub_outlined,
+                        color: c.health,
+                        title: 'Πηγές',
+                        text: 'Ποια συσκευή δίνει κάθε μέτρηση, από πότε',
+                        line: true,
+                        onTap: () => Navigator.of(context).push(SourcesPage.route(widget.store)),
                       ),
                     ),
-                    const SizedBox(height: 12),
                     AppCard(
                       padding: EdgeInsets.zero,
                       child: NavRow(
@@ -261,32 +262,6 @@ class _MePageState extends State<MePage> {
           text: '${k.devices.length} συσκευές · ${k.cookware.length} σκεύη · για τις συνταγές, όταν έρθουν',
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
               settings: const RouteSettings(name: 'Η κουζίνα μου'), builder: (_) => KitchenScreen(store: widget.store))),
-        ),
-      ]),
-    );
-  }
-}
-
-/// «Ύπνος, HRV … · [Oura]»: η μέτρηση αριστερά, η συσκευή ως ετικέτα δεξιά.
-class _SourceRow extends StatelessWidget {
-  const _SourceRow(this.what, this.device, {this.line = false});
-  final String what;
-  final String device;
-  final bool line;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = Aigaio.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
-      child: Row(children: [
-        Expanded(child: Text(what, style: TextStyle(fontSize: 15, height: 1.35, color: c.text))),
-        const SizedBox(width: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-          decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.hairline)),
-          child: Text(device, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
         ),
       ]),
     );

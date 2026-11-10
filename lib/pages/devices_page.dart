@@ -110,14 +110,13 @@ class _DevicesPageState extends State<DevicesPage> {
                   TextSpan(children: [
                     const TextSpan(text: 'Από εδώ έρχονται οι αριθμοί της εφαρμογής. '),
                     const TextSpan(text: 'Καμία συσκευή δεν είναι ιατρική.', style: TextStyle(fontWeight: FontWeight.w700)),
-                    const TextSpan(text: ' Στις κάρτες βλέπεις μόνο μια μικρή ετικέτα· η εξήγηση είναι εδώ.'),
                   ]),
                   style: TextStyle(fontSize: 15, height: 1.45, color: c.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 AppCard(
                   child: Column(children: [
-                    legend(_Kind.measured, 'Ο αισθητήρας το μετρά απευθείας. Στις κάρτες δεν γράφεται τίποτα.'),
+                    legend(_Kind.measured, 'Ο αισθητήρας το μετρά απευθείας.'),
                     legend(_Kind.estimated, 'Η συσκευή το υπολογίζει από άλλα σήματα. Καλό για τάση, όχι για μία μέρα.'),
                     legend(_Kind.indicative, 'Μέτρηση με γνωστά λάθη στον καρπό ή στο δάχτυλο. Δεν κάνει διάγνωση.'),
                   ]),
@@ -143,7 +142,7 @@ class _DevicesPageState extends State<DevicesPage> {
                 device('inbody', Icons.monitor_weight_outlined, 'InBody H40', 'ζυγαριά · σώμα', [
                   row('Βάρος', null, _Kind.measured),
                   row('Λίπος, μύες', 'από ασθενές ρεύμα· ζυγίσου με τις ίδιες συνθήκες', _Kind.estimated),
-                  row('Βασικός μεταβολισμός', '±10%', _Kind.estimated, line: false),
+                  row('Βασικός μεταβολισμός', null, _Kind.estimated, line: false),
                 ]),
                 const SizedBox(height: 12),
                 AppCard(
@@ -168,12 +167,6 @@ class _DevicesPageState extends State<DevicesPage> {
                       child: Text(oxygenRedFlagText, style: body.copyWith(fontWeight: FontWeight.w600)),
                     ),
                   ]),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Ανοίγει από κάθε «i» (στο σωστό σημείο) και από το «Τα στοιχεία μου».',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: c.textSecondary),
                 ),
               ]),
             ),
