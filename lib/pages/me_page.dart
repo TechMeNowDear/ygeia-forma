@@ -9,6 +9,7 @@ import '../format.dart';
 import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'devices_page.dart';
 import 'kitchen.dart';
 import 'my_foods.dart';
 
@@ -208,6 +209,18 @@ class _MePageState extends State<MePage> {
                           const SizedBox(height: 4),
                           Text('Κάθε μέτρηση έρχεται από μία συσκευή· ποτέ ανακατεμένα.', style: hint),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: NavRow(
+                        key: const ValueKey('me-devices'),
+                        icon: Icons.layers_rounded,
+                        color: c.health,
+                        title: 'Τι μετράει κάθε συσκευή',
+                        text: 'Μέτρηση, εκτίμηση, ενδεικτικό',
+                        onTap: () => Navigator.of(context).push(DevicesPage.route()),
                       ),
                     ),
                   ],

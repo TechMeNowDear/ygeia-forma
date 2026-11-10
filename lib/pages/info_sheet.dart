@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../history.dart' show K;
 import '../reference.dart';
 import '../theme.dart';
+import 'devices_page.dart';
 
 /// Το «i» δίπλα σε μια μέτρηση (απόφαση 7/11): η εξήγηση δεν φαίνεται στη σελίδα· ανοίγει σε φύλλο από κάτω.
 class InfoButton extends StatelessWidget {
@@ -24,7 +26,7 @@ class InfoButton extends StatelessWidget {
       child: InkResponse(
         key: ValueKey('info-$metric'),
         radius: 22,
-        onTap: () => showMetricInfo(context, info, range: range),
+        onTap: () => showMetricInfo(context, info, range: range, device: deviceOf(metric)),
         child: SizedBox(
           width: 44,
           height: 44,
@@ -49,7 +51,15 @@ class InfoButton extends StatelessWidget {
   }
 }
 
-Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? range}) {
+/// Ποια ενότητα του «Τι μετράει κάθε συσκευή» αφορά μια μέτρηση.
+String deviceOf(String metric) => switch (metric) {
+      K.weight || K.fatPct || K.smm => 'inbody',
+      K.steps || K.dayHr => 'watch',
+      K.ringSpo2 => 'oxygen',
+      _ => 'oura',
+    };
+
+Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? range, String? device}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -119,6 +129,23 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
               if (info.cite != null) ...[
                 const SizedBox(height: 10),
                 Text(info.cite!, style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4)),
+              ],
+              if (device != null) ...[
+                const SizedBox(height: 8),
+                // Σχέδια 9/11 (4α): οι εξηγήσεις όλων των συσκευών σε μία σελίδα, στο σωστό σημείο.
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const ValueKey('info-devices'),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    onPressed: () {
+                      final nav = Navigator.of(context);
+                      nav.pop();
+                      nav.push(DevicesPage.route(focus: device));
+                    },
+                    child: const Text('Τι μετράει κάθε συσκευή ›'),
+                  ),
+                ),
               ],
               const SizedBox(height: 18),
               FilledButton(

@@ -19,6 +19,7 @@ import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
+import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/food/food_model.dart';
@@ -644,6 +645,18 @@ void main() {
   testWidgets('Καρδιά · κινητό', (t) => _shot(t, name: '08_heart_phone_light', size: phone, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.heart));
   testWidgets('Σώμα · κινητό', (t) => _shot(t, name: '09_body_phone_light', size: tall, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body));
   testWidgets('Σώμα · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '10_body_open_dark', size: open, brightness: Brightness.dark, tab: Cat.health, sub: HealthTab.body));
+  // Σχέδια 9/11 (4α): «Τι μετράει κάθε συσκευή».
+  for (final (name, size, scale, dark) in [
+    ('4a_devices', const Size(400, 2400), 1.0, false),
+    ('4b_devices_360_13x', const Size(360, 3000), 1.3, false),
+    ('4c_devices_open_dark', open, 1.0, true),
+  ]) {
+    testWidgets('Τι μετράει κάθε συσκευή · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _page(t, name: name, size: size, brightness: dark ? Brightness.dark : Brightness.light, oura: false, page: (_) => const DevicesPage());
+    });
+  }
   // Σχέδια 9/11 (10β): «Τα στοιχεία μου» με τα προϊόντα και την κουζίνα (πριν: «Διατροφή › Τα δικά μου»).
   for (final (name, size, scale, dark) in [
     ('22_me_phone_light', phone, 1.0, false),

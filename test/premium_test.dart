@@ -15,6 +15,9 @@ import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
 import 'package:ygeia_forma/pages/body.dart';
 import 'package:ygeia_forma/pages/category.dart';
+import 'package:ygeia_forma/pages/devices_page.dart';
+import 'package:ygeia_forma/pages/info_sheet.dart';
+import 'package:ygeia_forma/history.dart' show K;
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
@@ -338,5 +341,30 @@ void main() {
     expect(find.descendant(of: table, matching: find.text('Βάρος\nkg')), findsOneWidget);
     expect(find.descendant(of: table, matching: find.text('2025')), findsOneWidget);
     expect(find.descendant(of: table, matching: find.textContaining(' kg')), findsNothing, reason: 'η μονάδα δεν επαναλαμβάνεται σε κάθε γραμμή');
+  });
+
+  group('Οι εξηγήσεις σε μία σελίδα (σχέδια 9/11, 4α)', () {
+    testWidgets('ⓘ → «Τι μετράει κάθε συσκευή» στο σωστό σημείο', (t) async {
+      await _pump(t, const Scaffold(body: Center(child: InfoButton(K.weight))), size: const Size(400, 900));
+      await t.tap(find.byKey(const ValueKey('info-${K.weight}')));
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.byKey(const ValueKey('info-devices')));
+      await t.tap(find.byKey(const ValueKey('info-devices')));
+      await t.pumpAndSettle();
+      final page = t.widget<DevicesPage>(find.byType(DevicesPage));
+      expect(page.focus, 'inbody');
+      expect(find.text('InBody H40'), findsOneWidget);
+    });
+
+    test('κάθε μέτρηση δείχνει τη συσκευή της', () {
+      expect(deviceOf(K.steps), 'watch');
+      expect(deviceOf(K.ringSpo2), 'oxygen');
+      expect(deviceOf(K.hrv), 'oura');
+    });
+
+    testWidgets('360 dp με 2,0×: τίποτα δεν ξεχειλίζει', (t) async {
+      await _pump(t, const DevicesPage(), size: const Size(360, 6000), textScale: 2.0);
+      expect(t.takeException(), isNull);
+    });
   });
 }
