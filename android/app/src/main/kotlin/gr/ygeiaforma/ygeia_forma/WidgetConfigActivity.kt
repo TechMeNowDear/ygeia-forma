@@ -52,8 +52,9 @@ class WidgetConfigActivity : FlutterFragmentActivity() {
                     val valid = widgetId != AppWidgetManager.INVALID_APPWIDGET_ID
                     val k = kind()
                     val size = if (valid) HomeWidgets.sizeOf(this, widgetId) else null
-                    val w = size?.width?.toDouble() ?: intent?.getIntExtra("ygeia_w", 0)?.takeIf { it > 0 }?.toDouble()
-                    val h = size?.height?.toDouble() ?: intent?.getIntExtra("ygeia_h", 0)?.takeIf { it > 0 }?.toDouble()
+                    // Extras μόνο με λογικές τιμές (E3-24): όχι bitmap χιλιάδων dp από πλαστό intent.
+                    val w = size?.width?.toDouble() ?: DataRules.previewDp(intent?.getIntExtra("ygeia_w", 0) ?: 0)
+                    val h = size?.height?.toDouble() ?: DataRules.previewDp(intent?.getIntExtra("ygeia_h", 0) ?: 0)
                     result.success(
                         mapOf(
                             "id" to (if (valid) widgetId else 0),

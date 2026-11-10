@@ -81,11 +81,26 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
           themeAnimationDuration: const Duration(milliseconds: 220),
           navigatorObservers: [errors.observer],
           home: _home,
+          // Έλεγχος 9/11 (E3-08, Sentry YGEIA-FORMA-3): μια άγνωστη διαδρομή (π.χ. URI από άλλη εφαρμογή) δεν ρίχνει
+          // ποτέ την εφαρμογή· μένει στην αρχική. Μαζί με το flutter_deeplinking_enabled=false στο manifest.
+          onUnknownRoute: unknownRoute,
         );
       },
     );
   }
 }
+
+/// Άγνωστη διαδρομή → τίποτα καινούργιο: μια σελίδα που κλείνει αμέσως και αφήνει την οθόνη όπως ήταν.
+Route<void> unknownRoute(RouteSettings settings) => PageRouteBuilder<void>(
+      settings: const RouteSettings(name: 'άγνωστη διαδρομή'),
+      opaque: false,
+      pageBuilder: (context, _, __) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) Navigator.of(context).maybePop();
+        });
+        return const SizedBox.shrink();
+      },
+    );
 
 class _Dest {
   const _Dest(this.icon, this.selectedIcon, this.label, this.cat);

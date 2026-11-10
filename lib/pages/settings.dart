@@ -15,6 +15,7 @@ import '../widgets.dart';
 import 'appearance.dart';
 import 'sources_page.dart';
 import 'me_page.dart';
+import 'privacy_page.dart';
 import '../profile.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -182,6 +183,9 @@ class SettingsPage extends StatelessWidget {
                         const SizedBox(height: 12),
                         _BackupCard(store: store, food: food!),
                       ],
+                      // Απόρρητο (έλεγχος 9/11, E3-05): αναφορές σφαλμάτων και «Διαγραφή όλων των δεδομένων».
+                      const SizedBox(height: 12),
+                      PrivacyCard(store: store),
                       const SizedBox(height: 16),
                       Text(
                         'Υγεία & Φόρμα · προσωπική έκδοση. Η εφαρμογή διαβάζει δεδομένα μόνο όταν την ανοίγεις.',

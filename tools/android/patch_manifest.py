@@ -57,6 +57,7 @@ WIDGETS = "\n        <!-- Widgets αρχικής οθόνης (7/11). Η ρύθ�
     '            android:hardwareAccelerated="true"\n'
     '            android:windowSoftInputMode="adjustResize">\n'
     '            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>\n'
+    '            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>\n'
     "            <intent-filter>\n"
     '                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>\n'
     "            </intent-filter>\n"
@@ -87,6 +88,15 @@ BROWSER = (
 if not re.search(r'<activity\b[^>]*android:name="\.MainActivity"', s, re.S):
     sys.exit("Δεν βρέθηκε η MainActivity στο manifest")
 before_main = re.search(r'<activity\b[^>]*android:name="\.MainActivity"[^>]*>', s, re.S).group(0)
+
+# Έλεγχος 9/11 (E3-08, D2-06, Sentry YGEIA-FORMA-3): κανένα URI που φτάνει στη MainActivity (από άλλη εφαρμογή,
+# συντόμευση, ειδοποίηση) δεν γίνεται διαδρομή της Flutter. Τα widgets ανοίγουν με extra και κανάλι, η Oura από τη
+# δική της οθόνη: η εφαρμογή δεν χρησιμοποιεί deep links της Flutter. Μπαίνει ΜΕΣΑ στη MainActivity (η ετικέτα της
+# μένει ίδια) και στη WidgetConfigActivity (εκεί η διαδρομή «/widget» έρχεται από τον κώδικα, getInitialRoute).
+DEEPLINK = '\n            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>'
+main_at = s.index(before_main)
+if "flutter_deeplinking_enabled" not in s[main_at:s.index("</activity>", main_at)]:
+    s = s.replace(before_main, before_main + DEEPLINK, 1)
 
 # Προπόνηση (8/11): δόνηση στο τέλος του διαλείμματος και ειδοποίηση με αντίστροφη μέτρηση.
 for perm in ("android.permission.VIBRATE", "android.permission.POST_NOTIFICATIONS"):
@@ -140,6 +150,11 @@ with open(path, "w", encoding="utf-8") as f:
 after_main = re.search(r'<activity\b[^>]*android:name="\.MainActivity"[^>]*>', s, re.S).group(0)
 if after_main != before_main:
     sys.exit("Η MainActivity άλλαξε· δεν έπρεπε")
+main_at = s.index(after_main)
+if 'android:name="flutter_deeplinking_enabled" android:value="false"' not in s[main_at:s.index("</activity>", main_at)]:
+    sys.exit("Λείπει το flutter_deeplinking_enabled=false στη MainActivity")
+if s.count('android:name="flutter_deeplinking_enabled" android:value="false"') != 2:
+    sys.exit("Το flutter_deeplinking_enabled=false πρέπει να είναι σε MainActivity και WidgetConfigActivity")
 for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiaforma"', 'android:host="oura-callback"',
                'android:host="ygeia-forma.netlify.app"', 'android:path="/oura/callback"', 'android:autoVerify="true"',
                "<!-- Σύνδεση Oura: άνοιγμα", 'android:name=".WidgetConfigActivity"', 'android:name=".SleepWidget"',

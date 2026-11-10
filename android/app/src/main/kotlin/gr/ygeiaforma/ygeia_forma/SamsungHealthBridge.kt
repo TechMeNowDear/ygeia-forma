@@ -625,7 +625,13 @@ class SamsungHealthBridge(
     }
 
     companion object {
-        /** Τύποι που διαβάζονται εγγραφή-εγγραφή. */
+        /**
+         * Τύποι που διαβάζονται εγγραφή-εγγραφή: ΜΟΝΟ όσα διαβάζει το [DashboardReader] (έλεγχος 9/11, E3-06 / V-B-02:
+         * ελαχιστοποίηση δεδομένων, GDPR άρθρο 5(1)(γ), και ο κανόνας του Play «όχι άδειες που δεν χρειάζονται»).
+         * Πίεση, θερμοκρασία σώματος, γλυκόζη, νερό, διατροφή της Samsung, άπνοια και ακανόνιστος ρυθμός ΔΕΝ ζητούνται
+         * πια (η ανάγνωσή τους έφυγε με την #85). Νέο είδος μπαίνει εδώ μόνο μαζί με τη λειτουργία που το δείχνει·
+         * η δοκιμή `permissions_test.dart` ελέγχει ότι οι δύο λίστες συμφωνούν.
+         */
         val readTypes: List<Pair<String, DataType>> = listOf(
             "sleep" to DataTypes.SLEEP,
             "heart_rate" to DataTypes.HEART_RATE,
@@ -634,14 +640,7 @@ class SamsungHealthBridge(
             "energy_score" to DataTypes.ENERGY_SCORE,
             "blood_oxygen" to DataTypes.BLOOD_OXYGEN,
             "skin_temperature" to DataTypes.SKIN_TEMPERATURE,
-            "blood_pressure" to DataTypes.BLOOD_PRESSURE,
-            "body_temperature" to DataTypes.BODY_TEMPERATURE,
-            "blood_glucose" to DataTypes.BLOOD_GLUCOSE,
-            "water_intake" to DataTypes.WATER_INTAKE,
-            "nutrition" to DataTypes.NUTRITION,
             "floors_climbed" to DataTypes.FLOORS_CLIMBED,
-            "sleep_apnea" to DataTypes.SLEEP_APNEA,
-            "irregular_heart_rhythm" to DataTypes.IRREGULAR_HEART_RHYTHM_NOTIFICATION,
         )
 
         /** Τύποι που δίνουν μόνο σύνολα (π.χ. βήματα ανά μέρα). */

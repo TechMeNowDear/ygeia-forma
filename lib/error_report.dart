@@ -8,6 +8,11 @@
 // λίγο μετά το άνοιγμα και όταν επιστρέφω στην εφαρμογή — και μόνο αν υπάρχει κάτι στην ουρά.
 // Χωρίς ίντερνετ: τα σφάλματα μένουν ως αρχεία στη συσκευή (το πολύ 20) και φεύγουν αργότερα.
 // Το ίδιο αρχείο ουράς γεμίζει και η πλευρά Android (ErrorQueue.kt) όταν κρασάρει ο κώδικας Kotlin.
+//
+// Διακόπτης (έλεγχος 9/11, E3-05 / V-A-23): Ρυθμίσεις › Απόρρητο › «Αναφορές σφαλμάτων». Ανοιχτός από την αρχή, όπως
+// λέει η πολιτική απορρήτου (έννομο συμφέρον, με δικαίωμα αντίρρησης). Κλειστός: τίποτα δεν μπαίνει στην ουρά ούτε
+// στέλνεται, και ό,τι περίμενε σβήνεται. Η επιλογή ζει στην πλευρά Android (ErrorQueue.kt), ώστε να ισχύει και για τα
+// κρασαρίσματα Kotlin πριν ανοίξει η Flutter· η Flutter τη μαθαίνει με το «info» και ΔΕΝ στέλνει τίποτα πριν τη μάθει.
 
 import 'dart:async';
 import 'dart:convert';
@@ -60,8 +65,17 @@ class ErrorReporter {
     this.device = const {},
     Poster? post,
     DateTime Function()? clock,
+    this.persist,
   })  : _post = post ?? httpPost,
         _clock = clock ?? DateTime.now;
+
+  /// Αν επιτρέπεται η αποστολή (ο διακόπτης «Αναφορές σφαλμάτων»). Ως να έρθει η επιλογή από την πλευρά Android
+  /// ([configure]) δεν στέλνεται τίποτα ούτως ή άλλως (δεν υπάρχει φάκελος ουράς).
+  final ValueNotifier<bool> sending = ValueNotifier<bool>(true);
+  bool get enabled => sending.value;
+
+  /// Πού γράφεται η επιλογή (στην εφαρμογή: η πλευρά Android). Στις δοκιμές: τίποτα ή ψεύτικο.
+  Future<void> Function(bool on)? persist;
 
   /// Φάκελος της ουράς (files/errq στη συσκευή). Αν λείπει, η αναφορά απλώς δεν κάνει τίποτα.
   Directory? dir;
@@ -84,12 +98,17 @@ class ErrorReporter {
 
   /// Φάκελος, έκδοση και συσκευή, όταν έρθουν από την πλευρά Android.
   /// Ό,τι σφάλμα έγινε ως τότε μπαίνει τώρα στην ουρά.
-  Future<void> configure({required Directory dir, required String release, required Map<String, String> device}) async {
+  Future<void> configure({required Directory dir, required String release, required Map<String, String> device, bool enabled = true}) async {
     this.dir = dir;
     this.release = release;
     this.device = device;
+    sending.value = enabled;
     final early = List.of(_early);
     _early.clear();
+    if (!enabled) {
+      await _clearQueue();
+      return;
+    }
     for (final e in early) {
       e['release'] = release;
       e['contexts'] = _contexts();
@@ -116,7 +135,7 @@ class ErrorReporter {
   /// Κεντρική κλήση. Δεν πετάει ποτέ σφάλμα η ίδια· οι κλήσεις της εφαρμογής δεν την περιμένουν.
   Future<void> report(Object error, StackTrace? stack, {bool handled = true, Map<String, Object?> extra = const {}}) async {
     try {
-      if (isNoise(error)) return;
+      if (!enabled || isNoise(error)) return;
       final sig = '${error.runtimeType}:${_firstLine(error.toString())}';
       final now = _clock();
       final last = _recent[sig];
@@ -214,10 +233,39 @@ class ErrorReporter {
   /// Πόσα περιμένουν στην ουρά (για τους ελέγχους).
   Future<int> pending() async => (await _queued()).length;
 
+  /// Σβήνει ό,τι περιμένει (και όσα έγραψε η πλευρά Android).
+  Future<void> _clearQueue() async {
+    _early.clear();
+    for (final f in await _queued()) {
+      await _delete(f);
+    }
+  }
+
+  /// Ο διακόπτης «Αναφορές σφαλμάτων». Κλείσιμο: σβήνονται αμέσως όσα περίμεναν. Η επιλογή γράφεται πρώτα, ώστε μια
+  /// αποτυχία εγγραφής να μη δείχνει «κλειστό» ενώ μετά την επανεκκίνηση θα ήταν ανοιχτό. `false` αν δεν γράφτηκε.
+  Future<bool> setEnabled(bool on) async {
+    try {
+      await persist?.call(on);
+    } catch (_) {
+      return false;
+    }
+    sending.value = on;
+    if (!on) {
+      try {
+        await _clearQueue();
+      } catch (_) {}
+    }
+    return true;
+  }
+
   /// Στέλνει ό,τι περιμένει, με τη σειρά. Σταματά στο πρώτο σφάλμα δικτύου (θα ξαναδοκιμάσει αργότερα).
   /// Πάνω από [maxPerDay] αποστολές τη μέρα: τα υπόλοιπα πετιούνται (σημάδι βρόχου, όχι νέα πληροφορία).
   Future<void> flush() async {
     if (_busy) return;
+    if (!enabled) {
+      await _clearQueue();
+      return;
+    }
     _busy = true;
     try {
       final files = await _queued();
@@ -231,6 +279,8 @@ class ErrorReporter {
       } catch (_) {}
       final before = sent;
       for (final f in files) {
+        // Ο διακόπτης έκλεισε στη μέση: τίποτα άλλο δεν φεύγει.
+        if (!enabled) break;
         if (sent >= maxPerDay) {
           await _delete(f);
           continue;
@@ -388,6 +438,10 @@ void installErrorReporting() {
   };
 
   errors.onScreen = (s) => _channel.invokeMethod('screen', s).catchError((_) => null);
+  errors.persist = (on) async {
+    final ok = await _channel.invokeMethod<bool>('setEnabled', on);
+    if (ok != true) throw StateError('setEnabled');
+  };
   WidgetsBinding.instance.addObserver(_Resume());
 
   // Φάκελος και στοιχεία συσκευής αμέσως (μία γρήγορη κλήση, δεν καθυστερεί την πρώτη οθόνη)·
@@ -400,6 +454,8 @@ void installErrorReporting() {
         dir: Directory(info['dir'] as String),
         release: 'ygeia-forma@${info['version']}',
         device: {'model': '${info['model']}', 'android': '${info['android']}'},
+        // Παλιότερη πλευρά Android χωρίς τον διακόπτη: ανοιχτός (όπως πριν).
+        enabled: info['enabled'] != false,
       );
     } catch (_) {}
   }());

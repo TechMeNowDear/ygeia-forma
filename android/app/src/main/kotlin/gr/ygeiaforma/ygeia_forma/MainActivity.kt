@@ -42,14 +42,15 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        val target = intent.getStringExtra(HomeWidgets.EXTRA_OPEN) ?: return
+        // Μόνο η μορφή των widgets (E3-24): ό,τι άλλο στείλει άλλη εφαρμογή αγνοείται.
+        val target = DataRules.widgetOpenTarget(intent.getStringExtra(HomeWidgets.EXTRA_OPEN)) ?: return
         val ch = widgets
         if (ch != null) ch.invokeMethod("open", target) else HomeWidgets.pendingOpen = target
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        intent?.getStringExtra(HomeWidgets.EXTRA_OPEN)?.let { HomeWidgets.pendingOpen = it }
+        DataRules.widgetOpenTarget(intent?.getStringExtra(HomeWidgets.EXTRA_OPEN))?.let { HomeWidgets.pendingOpen = it }
         widgets = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/widgets").also { ch ->
             ch.setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -77,6 +78,9 @@ class MainActivity : FlutterFragmentActivity() {
         ErrorQueue.install(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/errors")
             .setMethodCallHandler(ErrorQueue)
+        // «Διαγραφή όλων των δεδομένων» (Ρυθμίσεις › Απόρρητο).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/privacy")
+            .setMethodCallHandler(DataWipe(this))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/samsung")
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")

@@ -15,12 +15,23 @@ import java.util.UUID
  * Δεν στέλνει τίποτα η ίδια: γράφει ένα αρχείο στην ουρά (files/errq) και την αποστολή
  * την κάνει η Flutter (lib/error_report.dart) — στο επόμενο άνοιγμα ή όταν επιστρέψω στην εφαρμογή.
  * Μόνο το σφάλμα, η στοίβα και η οθόνη· ποτέ δεδομένα υγείας ή φαγητού.
+ *
+ * Διακόπτης «Αναφορές σφαλμάτων» (έλεγχος 9/11, E3-05): η επιλογή γράφεται εδώ (SharedPreferences «errors»), ώστε να
+ * ισχύει και για κρασάρισμα πριν ανοίξει η Flutter. Κλειστός: τίποτα δεν γράφεται στην ουρά, και ό,τι περίμενε σβήνεται.
+ * Ανοιχτός από την αρχή, όπως λέει η πολιτική απορρήτου.
  */
 object ErrorQueue : MethodChannel.MethodCallHandler {
     private const val MAX_QUEUE = 20
     private const val DEDUPE_MS = 60_000L
 
     private var dir: File? = null
+    private const val PREFS = "errors"
+    private const val KEY_SEND = "send"
+
+    /** Ο διακόπτης· διαβάζεται στο [install]. */
+    @Volatile
+    var enabled: Boolean = true
+        private set
     private var version = "dev"
     private var installed = false
     private val recent = HashMap<String, Long>()
@@ -32,11 +43,17 @@ object ErrorQueue : MethodChannel.MethodCallHandler {
     fun install(context: Context) {
         val app = context.applicationContext
         dir = File(app.filesDir, "errq")
+        enabled = try {
+            app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_SEND, true)
+        } catch (_: Throwable) {
+            true
+        }
         version = try {
             app.packageManager.getPackageInfo(app.packageName, 0).versionName ?: "dev"
         } catch (_: Throwable) {
             "dev"
         }
+        prefsWriter = { on -> app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_SEND, on).commit() }
         if (installed) return
         installed = true
         // Κρασάρισμα: γράφω το σφάλμα και αφήνω το Android να κλείσει την εφαρμογή όπως πάντα.
@@ -55,8 +72,17 @@ object ErrorQueue : MethodChannel.MethodCallHandler {
                     "version" to version,
                     "model" to "${Build.MANUFACTURER} ${Build.MODEL}",
                     "android" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+                    "enabled" to enabled,
                 ),
             )
+            "setEnabled" -> {
+                val on = call.arguments as? Boolean
+                if (on == null) {
+                    result.success(false)
+                    return
+                }
+                result.success(setEnabled(on))
+            }
             "screen" -> {
                 (call.arguments as? String)?.let { screen = it }
                 result.success(null)
@@ -72,9 +98,28 @@ object ErrorQueue : MethodChannel.MethodCallHandler {
         write(e, handled = true, where = where)
     }
 
+    /** Γράφει την επιλογή (commit: πριν απαντήσει)· κλείσιμο = σβήνεται η ουρά. `false` αν δεν γράφτηκε. */
+    @Synchronized
+    private fun setEnabled(on: Boolean): Boolean {
+        val queue = dir ?: return false
+        val ok = try {
+            prefsWriter?.invoke(on) ?: false
+        } catch (_: Throwable) {
+            false
+        }
+        if (!ok) return false
+        enabled = on
+        if (!on) queue.listFiles()?.forEach { it.delete() }
+        return true
+    }
+
+    /** Ορίζεται στο [install] (χρειάζεται Context). */
+    private var prefsWriter: ((Boolean) -> Boolean)? = null
+
     @Synchronized
     private fun write(e: Throwable, handled: Boolean, where: String) {
         try {
+            if (!enabled) return
             val d = dir ?: return
             val sig = "${e.javaClass.name}:${firstLine(e.message)}"
             val now = System.currentTimeMillis()
@@ -115,7 +160,7 @@ object ErrorQueue : MethodChannel.MethodCallHandler {
                 JSONObject()
                     .put("type", x.javaClass.simpleName)
                     .put("module", x.javaClass.`package`?.name ?: "")
-                    .put("value", DataRules.reportableMessage(x.javaClass.name, firstLine(x.message)).take(300))
+                    .put("value", DataRules.reportableMessage(x.javaClass, firstLine(x.message)).take(300))
                     .put("stacktrace", JSONObject().put("frames", frames))
                     .put("mechanism", JSONObject().put("type", if (handled) "handled" else "uncaught").put("handled", handled)),
             )

@@ -59,7 +59,28 @@ object DataRules {
      * δεδομένα (π.χ. «Value {...} of type ...»): για αυτά μόνο ο τύπος, χωρίς μήνυμα.
      */
     fun reportableMessage(className: String, message: String): String =
-        if (className == "org.json.JSONException" || className == "java.lang.IllegalArgumentException") "" else message
+        if (className in NO_MESSAGE) "" else message
+
+    /**
+     * Έλεγχος 9/11 (E3-19, P2-18): το ίδιο και για ΚΑΘΕ υποκλάση. Π.χ. το NumberFormatException είναι
+     * IllegalArgumentException και το μήνυμά του είναι το κείμενο που δεν διαβάστηκε («For input string: "82,4"»).
+     */
+    fun reportableMessage(cls: Class<*>, message: String): String =
+        if (generateSequence(cls) { it.superclass }.any { it.name in NO_MESSAGE }) "" else message
+
+    private val NO_MESSAGE = setOf("org.json.JSONException", "java.lang.IllegalArgumentException")
+
+    /**
+     * Έλεγχος 9/11 (E3-24): ό,τι έρχεται στη MainActivity ως «ygeia_open» από άλλη εφαρμογή περνά μόνο αν έχει ακριβώς
+     * τη μορφή που φτιάχνουν τα widgets («w:<είδος>:<πάτημα>:<τιμή>», HomeWidgets.views). Αλλιώς αγνοείται.
+     */
+    fun widgetOpenTarget(raw: String?): String? =
+        raw?.takeIf { it.length <= 64 && WIDGET_OPEN.matches(it) }
+
+    private val WIDGET_OPEN = Regex("^w:(sleep|move|food|body):(section|today|add|metric):[A-Za-z0-9_.]{0,32}$")
+
+    /** Μέγεθος προεπισκόπησης από extras («ygeia_w/h», για τον έλεγχο στο emulator): μόνο λογικές τιμές σε dp. */
+    fun previewDp(v: Int): Double? = v.takeIf { it in 40..1200 }?.toDouble()
 
     /** C14 (R14): νέο κλειδί στο Keystore όταν το παλιό δεν ανακτάται πια. */
     fun regenerateKeyOn(e: Throwable): Boolean =

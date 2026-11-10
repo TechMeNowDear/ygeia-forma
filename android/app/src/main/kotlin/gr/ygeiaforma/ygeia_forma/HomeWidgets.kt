@@ -120,6 +120,31 @@ object HomeWidgets {
         updateAll(ctx)
     }
 
+    /**
+     * «Διαγραφή όλων των δεδομένων» (έλεγχος 9/11, E3-05): πριν σβηστούν τα δεδομένα της εφαρμογής, κάθε widget
+     * ξαναζωγραφίζεται ΧΩΡΙΣ τιμές. Αλλιώς η αρχική οθόνη θα έδειχνε για πάντα την τελευταία εικόνα (π.χ. ύπνο, βάρος),
+     * αφού μετά τη διαγραφή η εφαρμογή δεν ξέρει πια ποιο widget είναι ποιο. Το ξυπνητήρι των μεσανύχτων ακυρώνεται.
+     */
+    fun wipe(ctx: Context) {
+        try {
+            snapFile(ctx).delete()
+        } catch (_: Throwable) {}
+        val mgr = AppWidgetManager.getInstance(ctx)
+        for (id in allIds(ctx)) {
+            try {
+                update(ctx, mgr, id)
+            } catch (_: Throwable) {}
+        }
+        try {
+            val am = ctx.getSystemService(AlarmManager::class.java)
+            val pi = PendingIntent.getBroadcast(
+                ctx, 7400, Intent(ctx, MoveWidget::class.java).setAction(ACTION_DAY),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE,
+            )
+            if (am != null && pi != null) am.cancel(pi)
+        } catch (_: Throwable) {}
+    }
+
     fun kindData(ctx: Context, kind: String): JSONObject? = snapshot(ctx)?.optJSONObject("kinds")?.optJSONObject(kind)
 
     fun hasData(ctx: Context, kind: String): Boolean = (kindData(ctx, kind)?.optJSONObject("m")?.length() ?: 0) > 0

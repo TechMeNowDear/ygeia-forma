@@ -10,14 +10,7 @@ const typeLabels = <String, String>{
   'energy_score': 'Energy Score',
   'blood_oxygen': 'Οξυγόνο αίματος',
   'skin_temperature': 'Θερμοκρασία δέρματος',
-  'blood_pressure': 'Πίεση',
-  'body_temperature': 'Θερμοκρασία σώματος',
-  'blood_glucose': 'Γλυκόζη',
-  'water_intake': 'Νερό',
-  'nutrition': 'Διατροφή',
   'floors_climbed': 'Όροφοι',
-  'sleep_apnea': 'Άπνοια ύπνου',
-  'irregular_heart_rhythm': 'Ακανόνιστος καρδιακός ρυθμός',
 };
 
 /// Κλειδί: το όνομα του πεδίου με πεζά και χωρίς σύμβολα.

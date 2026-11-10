@@ -91,6 +91,17 @@ if m:
     region = {'de': 'ΕΕ', 'us': 'ΗΠΑ'}.get(m.group(1), m.group(1))
     need(region in greek.split('Sentry', 1)[-1][:600], f'Sentry: η περιοχή ({region}) πρέπει να γράφεται δίπλα στο Sentry')
 
+# Διακόπτης στις Ρυθμίσεις (έλεγχος 9/11, E3-05): αν υπάρχει στον κώδικα, η πολιτική λέει πώς κλείνει.
+if 'Future<bool> setEnabled(' in rep:
+    need('«Αναφορές σφαλμάτων»' in greek, 'Sentry: υπάρχει διακόπτης «Αναφορές σφαλμάτων»· η πολιτική πρέπει να λέει πώς κλείνει')
+    need('turn them off' in english, 'Sentry: ο διακόπτης λείπει από το αγγλικό κείμενο')
+
+# --- Διαγραφή μέσα στην εφαρμογή (E3-05) ---
+import pathlib
+if pathlib.Path(f'{ROOT}/lib/pages/privacy_page.dart').exists() and 'Διαγραφή όλων των δεδομένων' in read('lib/pages/privacy_page.dart'):
+    need('«Διαγραφή όλων των δεδομένων»' in greek, 'Διαγραφή: η εφαρμογή έχει «Διαγραφή όλων των δεδομένων»· η πολιτική πρέπει να τη λέει')
+    need('Delete all data' in english, 'Διαγραφή: λείπει από το αγγλικό κείμενο')
+
 # --- Barcode ---
 extra = read('android/ygeia/app-extra.gradle.kts')
 if 'play-services-code-scanner' in extra:

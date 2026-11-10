@@ -25,6 +25,16 @@ class WidgetConfigApp extends StatelessWidget {
       theme: buildTheme(Brightness.light, Aigaio.day(null)),
       darkTheme: buildTheme(Brightness.dark, Aigaio.night(null)),
       home: WidgetConfigPage(bridge: bridge, initial: initial),
+      // Έλεγχος 9/11 (E3-08): άγνωστη διαδρομή = καμία αλλαγή, ποτέ σφάλμα.
+      onUnknownRoute: (_) => PageRouteBuilder<void>(
+        opaque: false,
+        pageBuilder: (context, _, __) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) Navigator.of(context).maybePop();
+          });
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 }

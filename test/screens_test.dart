@@ -15,7 +15,10 @@ import 'package:ygeia_forma/exercise/ex_player.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/format.dart' show sameDay;
 import 'package:ygeia_forma/main.dart';
+import 'package:ygeia_forma/error_report.dart';
+import 'package:ygeia_forma/pages/privacy_page.dart';
 import 'package:ygeia_forma/pages/report_page.dart';
+import 'package:ygeia_forma/pages/settings.dart';
 import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
@@ -254,14 +257,13 @@ Future<void> _tiFtanei(WidgetTester tester, {required String name, required Size
       ]},
       {'key': 'blood_oxygen', 'state': 'ok', 'count': 31, 'latest': '2026-11-14T08:40:00', 'sources': [src('Galaxy Watch Ultra 2', 31)]},
       {'key': 'skin_temperature', 'state': 'ok', 'count': 30, 'latest': '2026-11-14T08:40:00', 'sources': [src('Galaxy Watch Ultra 2', 30)]},
-      {'key': 'blood_pressure', 'state': 'empty', 'days': 30},
-      {'key': 'body_temperature', 'state': 'empty', 'days': 30},
-      {'key': 'sleep_apnea', 'state': 'unsupported'},
-      {'key': 'water_intake', 'state': 'no_permission'},
+      // Μόνο όσα ζητά η εφαρμογή (έλεγχος 9/11, E3-06): όχι πίεση, άπνοια, ρυθμός, γλυκόζη, νερό, διατροφή.
+      {'key': 'floors_climbed', 'state': 'empty', 'days': 30},
+      {'key': 'energy_score', 'state': 'empty', 'days': 30},
     ],
   };
   messenger.setMockMethodCallHandler(channel, (call) async => switch (call.method) {
-        'status' || 'requestPermissions' => jsonEncode({'ok': true, 'granted': 17, 'total': 17}),
+        'status' || 'requestPermissions' => jsonEncode({'ok': true, 'granted': 10, 'total': 10}),
         'readAll' => jsonEncode(all),
         _ => jsonEncode({'ok': false, 'kind': 'other', 'message': call.method}),
       });
@@ -1446,6 +1448,68 @@ void main() {
         at: ouraNow,
         oura: true,
         prepare: (s) => s.debugSetPlan(SourcePlan([SourceEra(Source.none, ouraStart)]), state: PlanState.unknown),
+      ));
+
+  // ---------------------------------------------------------------- Απόρρητο (fix-accuracy, E3-05)
+  Future<void> privacyShot(WidgetTester tester, String name, Widget home,
+      {Size size = const Size(400, 1500), double textScale = 1, Brightness brightness = Brightness.light, Future<void> Function(WidgetTester)? act}) async {
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = size * 2.0;
+    addTearDown(tester.view.reset);
+    final key = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(
+      key: key,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+        home: Builder(
+          builder: (context) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)), child: home),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    if (act != null) {
+      await act(tester);
+      await tester.pumpAndSettle();
+    }
+    expect(tester.takeException(), isNull);
+    await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
+  }
+
+  testWidgets('Ρυθμίσεις · απόρρητο', (t) {
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
+    store.history = sampleHistory(now, store.data!);
+    return privacyShot(t, 'P1_settings_privacy', SettingsPage(store: store, food: sampleFoodStore(now)),
+        size: const Size(400, 2300), act: (t) async => t.ensureVisible(find.byKey(const ValueKey('settings-privacy'))));
+  });
+  testWidgets('Ρυθμίσεις · απόρρητο · αναφορές κλειστές · σκοτεινό', (t) async {
+    final r = ErrorReporter();
+    await r.setEnabled(false);
+    await privacyShot(t, 'P1b_privacy_off_dark', Scaffold(body: ListView(padding: const EdgeInsets.all(16), children: [PrivacyCard(store: null, reporter: r)])),
+        size: const Size(400, 600), brightness: Brightness.dark);
+  });
+  testWidgets('Διαγραφή όλων · βήμα 1', (t) => privacyShot(t, 'P2_delete_all_step1', const DeleteAllPage(store: null)));
+  testWidgets('Διαγραφή όλων · βήμα 2 · δεν έγινε', (t) => privacyShot(
+        t,
+        'P3_delete_all_step2_failed',
+        DeleteAllPage(store: null, initialStep: 2, wipe: () async => false),
+        size: const Size(400, 900),
+        act: (t) => t.tap(find.byKey(const ValueKey('wipe-confirm'))),
+      ));
+  testWidgets('Διαγραφή όλων · βήμα 1 · 360 dp, γράμματα 2×', (t) => privacyShot(
+        t,
+        'P4_delete_all_360_2x',
+        const DeleteAllPage(store: null),
+        size: const Size(360, 3400),
+        textScale: 2,
+      ));
+  testWidgets('Διαγραφή όλων · βήμα 2 · Fold ανοιχτό', (t) => privacyShot(
+        t,
+        'P5_delete_all_step2_fold',
+        DeleteAllPage(store: null, initialStep: 2, wipe: () async => true),
+        size: const Size(750, 900),
       ));
 }
 
