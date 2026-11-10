@@ -112,9 +112,9 @@ class WatchActivity : Activity(), WatchView.Actions {
             // δεν τρέχει τίποτα εδώ (αλλιώς θα στελνόταν μισή μια προπόνηση που συνεχίζεται, V-A-14).
             if (Repo.running == null && Repo.local == null) {
                 recoverIfNeeded()
-                // «Σβήσε» από το κινητό που περιμένει (έλεγχος του fix-accuracy, S1): τα παλιά αποτελέσματα δεν
-                // ξαναστέλνονται· σβήνονται μαζί με τα υπόλοιπα μόλις επιτρέπεται.
-                if (!Link.wipeWanted(this@WatchActivity)) sendPending()
+                // «Σβήσε» από το κινητό που περιμένει (S1/N1): τα παλιά αποτελέσματα δεν ξαναστέλνονται (σβήνονται μόλις
+                // επιτρέπεται)· όσα έγιναν μετά από αυτό στέλνονται κανονικά.
+                sendPending()
                 Link.tryWipe(this@WatchActivity)
             }
             if (joinWhenReady && Repo.phone != null) {
@@ -152,6 +152,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     /** Αποτελέσματα που δεν μπήκαν ακόμα στο Data Layer (ένα ανά id): τώρα. */
     private suspend fun sendPending() {
         for ((id, o) in Repo.pendingAll(this)) {
+            if (!Link.sendable(this, o)) continue
             if (Link.putResult(this, id, o)) Repo.removePending(this, id)
         }
     }

@@ -107,7 +107,8 @@ class MainActivity : FlutterFragmentActivity() {
         }
         // Ανανέωση κάθε 3 ώρες στο παρασκήνιο (δες RefreshWorker). Δεν αποτρέπει το άνοιγμα αν αποτύχει.
         try {
-            RefreshWorker.schedule(this)
+            // N2: με διαγραφή που δεν τελείωσε, καμία ανανέωση στο παρασκήνιο (θα έγραφε αρχεία πριν το σβήσιμο).
+            if (!DataWipe.unfinished(this)) RefreshWorker.schedule(this)
         } catch (e: Throwable) {
             ErrorQueue.report(e, "background")
         }

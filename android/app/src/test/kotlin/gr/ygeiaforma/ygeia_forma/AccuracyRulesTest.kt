@@ -46,5 +46,9 @@ class AccuracyRulesTest {
         assertTrue(DataRules.droppedByWipe(1762700000000L, 1762800000000L))
         assertFalse(DataRules.droppedByWipe(1762900000000L, 1762800000000L))
         assertFalse(DataRules.droppedByWipe(1762700000000L, 0L))
+        // N3: ό,τι γράφτηκε στο Data Layer πριν από τη διαγραφή σβήνεται όσο περιμένουμε το ρολόι.
+        assertTrue(DataRules.writtenBeforeWipe(1762700000000L, 1762800000000L))
+        assertFalse(DataRules.writtenBeforeWipe(1762900000000L, 1762800000000L))
+        assertFalse(DataRules.writtenBeforeWipe(1762700000000L, 0L))
     }
 }

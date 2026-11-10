@@ -5,7 +5,7 @@ import 'error_report.dart';
 import 'food/food_store.dart';
 import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
-import 'pages/privacy_page.dart' show WipeStatus, WipedPage, markWipeSeen, readWipeStatus, registerLicenses;
+import 'pages/privacy_page.dart' show WipeStatus, WipeUnfinishedApp, WipedPage, markWipeSeen, readWipeStatus, registerLicenses, startsApp;
 import 'pages/exercise_library.dart';
 import 'pages/training/training_page.dart';
 import 'heart_day.dart' show appExerciseRanges;
@@ -44,12 +44,17 @@ Future<void> main() async {
         for (final s in [...TrainingStore.main.sessions, if (TrainingStore.main.current case final c?) c])
           (s.start, (s.end ?? DateTime.now()).add(const Duration(minutes: 5))),
       ];
+  // «Διαγραφή όλων» (έλεγχος του fix-accuracy, M4): μετά τη νέα εκκίνηση, «Όλα διαγράφηκαν» αντί για την αρχική.
+  // N2: αν το σβήσιμο δεν τελείωσε, ΤΙΠΟΤΑ δεν ξεκινά (ούτε ρολόι ούτε αναγνώσεις): ό,τι γραφόταν τώρα θα σβηνόταν.
+  final wiped = await readWipeStatus();
+  if (!startsApp(wiped)) {
+    runApp(WipeUnfinishedApp(status: wiped!));
+    return;
+  }
   final store = HealthStore();
   final food = FoodStore();
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
   await store.loadPrefs();
-  // «Διαγραφή όλων» (έλεγχος του fix-accuracy, M4): μετά τη νέα εκκίνηση, «Όλα διαγράφηκαν» αντί για την αρχική.
-  final wiped = await readWipeStatus();
   runApp(YgeiaFormaApp(store: store, food: food, wiped: wiped?.show == true ? wiped : null));
   store.start();
   food.start();

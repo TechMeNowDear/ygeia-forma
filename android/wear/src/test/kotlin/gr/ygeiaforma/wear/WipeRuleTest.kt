@@ -39,7 +39,51 @@ class WipeRuleTest {
         val link = java.io.File("src/main/kotlin/gr/ygeiaforma/wear/Link.kt").readText()
         assertTrue(link.contains("Repo.readRun(ctx) != null"))
         // M1: σβήνονται και τα DataItems που έγραψε το ρολόι (του τοπικού κόμβου).
-        assertTrue(link.contains(".authority(me.id).path(\"/ygeia/\")"))
+        assertTrue(link.contains("u.host != me.id"))
+    }
+
+    @Test
+    fun wipeKeepsWhatHappenedAfterIt() {
+        // N1: «Διαγραφή όλων» στο κινητό στις `at`· περπάτημα στο ρολόι 1 ώρα μετά, πριν φτάσει το «σβήσε».
+        val at = 1_762_800_000_000L
+        val after = at + 3_600_000L
+        val before = at - 3_600_000L
+        val newWalk = Results0.walk(after)
+        val oldWalk = Results0.walk(before)
+        assertTrue(WipeRule.keepAfterWipe(newWalk, 0L, at))
+        assertFalse(WipeRule.keepAfterWipe(oldWalk, 0L, at))
+        // Παλμοί προπόνησης του κινητού: η αρχή από το id «hr<sid>-<ms>».
+        assertTrue(WipeRule.keepAfterWipe("""{"v":1,"kind":"hr","sid":"s1","id":"hrs1-$after"}""", 0L, at))
+        assertFalse(WipeRule.keepAfterWipe("""{"v":1,"kind":"hr","sid":"s1","id":"hrs1-$before"}""", 0L, at))
+        // Χωρίς χρόνο μέσα: η ώρα του DataItem.
+        assertTrue(WipeRule.keepAfterWipe("{}", after, at))
+        assertFalse(WipeRule.keepAfterWipe("{}", before, at))
+        // Καμία διαγραφή: όλα μένουν.
+        assertTrue(WipeRule.keepAfterWipe(oldWalk, 0L, 0L))
+        // Το ρολόι κρατά τα νέα στη διαγραφή και τα στέλνει όσο περιμένει το «σβήσε».
+        val link = java.io.File("src/main/kotlin/gr/ygeiaforma/wear/Link.kt").readText()
+        assertTrue(link.contains("Repo.pendingAll(ctx).filter { (_, o) -> WipeRule.keepAfterWipe(o.toString(), 0L, at) }"))
+        assertTrue(link.contains("for ((id, o) in keep) Repo.savePending(ctx, id, o)"))
+        val act = java.io.File("src/main/kotlin/gr/ygeiaforma/wear/WatchActivity.kt").readText()
+        assertFalse(act.contains("wipeWanted"))
+        assertTrue(act.contains("if (!Link.sendable(this, o)) continue"))
+    }
+
+    @Test
+    fun oldPhonePlanIsIgnoredAfterWipe() {
+        // N3: το παλιό πρόγραμμα/όριο του κινητού (γραμμένο πριν από τη διαγραφή που έγινε εδώ) δεν ξαναμπαίνει.
+        assertTrue(WipeRule.staleFromPhone(t = 1000, done = 2000))
+        assertFalse(WipeRule.staleFromPhone(t = 3000, done = 2000))
+        assertFalse(WipeRule.staleFromPhone(t = 1000, done = 0))
+        val link = java.io.File("src/main/kotlin/gr/ygeiaforma/wear/Link.kt").readText()
+        assertTrue(link.contains("WipeRule.staleFromPhone(t,"))
+    }
+
+    /** Ένα αποτέλεσμα περπατήματος όπως το γράφει το [Results] (id «walk<αρχή>», «start»). */
+    private object Results0 {
+        fun walk(start: Long): String = org.json.JSONObject()
+            .put("v", 1).put("id", "walk$start").put("kind", "cardio").put("start", start).put("end", start + 1_800_000L)
+            .toString()
     }
 
     @Test

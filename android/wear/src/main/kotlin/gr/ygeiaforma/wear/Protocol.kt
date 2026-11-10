@@ -745,6 +745,29 @@ object WipeRule {
     /** Η διαγραφή [at] έχει ήδη γίνει εδώ αλλά το κινητό δεν έχει πάρει την απάντηση ([acked] = η τελευταία που στάλθηκε). */
     fun shouldAck(at: Long, done: Long, acked: Long): Boolean = at > 0 && at <= done && acked < at
 
+    /**
+     * Πότε ξεκίνησε η άσκηση ενός αποτελέσματος («start», ή από το id «walk<ms>» / «w<ms>» / «hr<sid>-<ms>»), αλλιώς
+     * [putAt]. Ίδιος κανόνας με το κινητό (DataRules.resultStart).
+     */
+    fun resultStart(json: String, putAt: Long): Long {
+        Regex("\"start\"\\s*:\\s*(\\d{9,15})").find(json)?.let { return it.groupValues[1].toLong() }
+        val id = Regex("\"id\"\\s*:\\s*\"([^\"]{1,80})\"").find(json)?.groupValues?.get(1)
+        if (id != null) {
+            Regex("^(?:walk|w)(\\d{9,15})$").find(id)?.let { return it.groupValues[1].toLong() }
+            Regex("^hr.*-(\\d{9,15})$").find(id)?.let { return it.groupValues[1].toLong() }
+        }
+        return putAt
+    }
+
+    /**
+     * Έλεγχος του fix-accuracy (N1): η διαγραφή [at] σβήνει ΜΟΝΟ ό,τι έγινε πριν από αυτήν. Ένα περπάτημα που έγινε στο ρολόι
+     * μετά τη διαγραφή στο κινητό (πριν φτάσει εδώ το «σβήσε») μένει και στέλνεται.
+     */
+    fun keepAfterWipe(json: String, putAt: Long, at: Long): Boolean = at <= 0L || resultStart(json, putAt) >= at
+
+    /** Πρόγραμμα/προπόνηση του κινητού γραμμένα πριν από τη διαγραφή που έγινε εδώ ([done]): δεν ξαναμπαίνουν (N3). */
+    fun staleFromPhone(t: Long, done: Long): Boolean = done > 0L && t < done
+
     /** Η απάντηση «σβήστηκε» προς το κινητό ([Paths.WIPED]). */
     fun ackJson(at: Long): String = org.json.JSONObject().put("v", 1).put("at", at).toString()
 

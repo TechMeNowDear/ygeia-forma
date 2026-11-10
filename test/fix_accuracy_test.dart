@@ -294,6 +294,39 @@ void main() {
       expect(retried, 1);
     });
 
+    test('N2: με διαγραφή που δεν τελείωσε, τίποτα δεν ξεκινά (ούτε ρολόι ούτε αναγνώσεις)', () {
+      expect(startsApp(null), isTrue);
+      expect(startsApp(WipeStatus(at: DateTime(2026, 11, 10), done: true, seen: false, watchPending: true, oura: 'none')), isTrue);
+      expect(startsApp(WipeStatus(at: DateTime(2026, 11, 10), done: false, seen: false, watchPending: true, oura: 'none')), isFalse);
+      final main = File('lib/main.dart').readAsStringSync();
+      final body = main.substring(main.indexOf('Future<void> main() async {'));
+      expect(body.indexOf('await readWipeStatus()'), lessThan(body.indexOf('HealthStore()')));
+      expect(body.indexOf('runApp(WipeUnfinishedApp('), lessThan(body.indexOf('HealthStore()')));
+      expect(body.indexOf('return;\n  }\n  final store = HealthStore();'), greaterThan(0));
+      final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/MainActivity.kt').readAsStringSync();
+      expect(kt, contains('if (!DataWipe.unfinished(this)) RefreshWorker.schedule(this)'));
+      // N3: το κινητό σβήνει ό,τι παλιό «/ygeia/…» έμεινε (π.χ. πρόγραμμα, όριο) όσο περιμένει το ρολόι.
+      expect(File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/DataWipe.kt').readAsStringSync(),
+          contains('DataRules.writtenBeforeWipe(t, at)'));
+    });
+
+    testWidgets('N4: στις Ρυθμίσεις φαίνεται ότι το ρολόι δεν απάντησε· μετά από 2 μέρες λέει τι να κάνεις', (tester) async {
+      final at = DateTime(2026, 11, 10, 9);
+      var now = at.add(const Duration(hours: 1));
+      addTearDown(() => wipeState.value = null);
+      wipeState.value = WipeStatus(at: at, done: true, seen: true, watchPending: true, oura: 'none');
+      await tester.pumpWidget(_app(Scaffold(body: ListView(children: [DeleteAllRow(store: null, clock: () => now)]))));
+      expect(find.textContaining(wipeWatchPendingText), findsOneWidget);
+      now = at.add(const Duration(days: 3));
+      wipeState.value = WipeStatus(at: at, done: true, seen: true, watchPending: true, oura: 'none');
+      await tester.pump();
+      expect(find.textContaining(wipeWatchSilentText), findsOneWidget);
+      wipeState.value = WipeStatus(at: at, done: true, seen: true, watchPending: false, oura: 'none');
+      await tester.pump();
+      expect(find.textContaining('Ρολόι:'), findsNothing);
+      expect(find.text('Από αυτό το κινητό και το ρολόι'), findsOneWidget);
+    });
+
     test('κατάσταση από την Kotlin', () {
       expect(WipeStatus.fromMap(null), isNull);
       expect(WipeStatus.fromMap({'at': 0}), isNull);

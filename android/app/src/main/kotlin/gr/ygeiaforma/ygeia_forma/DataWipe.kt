@@ -133,6 +133,13 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
             0L
         }
 
+        /** Διαγραφή που δεν τελείωσε: τίποτα στο παρασκήνιο ώσπου να τελειώσει (N2). */
+        fun unfinished(ctx: Context): Boolean = try {
+            prefs(ctx).getString(STAGE, null) == DELETING
+        } catch (_: Throwable) {
+            false
+        }
+
         private fun begin(ctx: Context, at: Long, oura: String): Boolean = try {
             prefs(ctx).edit()
                 .putLong(AT, at)
@@ -253,10 +260,22 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
                 val dc = Wearable.getDataClient(ctx)
                 var acked = false
                 var present = false
+                // N3: ό,τι «/ygeia/…» γράφτηκε πριν από τη διαγραφή (π.χ. το παλιό πρόγραμμα και όριο, αν το κινητό
+                // έκλεισε πριν τα σβήσει) σβήνεται εδώ, όσο περιμένουμε το ρολόι.
+                val stale = mutableListOf<Uri>()
                 val buf = dc.dataItems.await()
                 try {
                     for (item in buf) {
-                        when (item.uri.path) {
+                        val path = item.uri.path ?: continue
+                        if (path.startsWith("/ygeia/") && path != WIPE && path != WIPED) {
+                            val t = try {
+                                DataMapItem.fromDataItem(item).dataMap.getLong("t", 0L)
+                            } catch (_: Throwable) {
+                                0L
+                            }
+                            if (DataRules.writtenBeforeWipe(t, at)) stale.add(item.uri)
+                        }
+                        when (path) {
                             WIPE -> present = true
                             WIPED -> {
                                 val text = try {
@@ -275,6 +294,12 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
                     }
                 } finally {
                     buf.release()
+                }
+                for (u in stale) {
+                    try {
+                        dc.deleteDataItems(u).await()
+                    } catch (_: Throwable) {
+                    }
                 }
                 if (acked) {
                     dc.deleteDataItems(Uri.Builder().scheme("wear").path(WIPE).build()).await()

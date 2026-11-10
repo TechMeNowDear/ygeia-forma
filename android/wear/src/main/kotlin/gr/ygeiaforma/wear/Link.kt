@@ -56,6 +56,17 @@ object Link {
             return false
         }
         if (path != Paths.PLAN && path != Paths.SESSION) return false
+        // Έλεγχος του fix-accuracy (N3): μετά από «σβήσε», παλιό πρόγραμμα/όριο του κινητού που έμεινε στο Data Layer
+        // (π.χ. κρασάρισμα του κινητού στη μέση) δεν ξαναμπαίνει.
+        val t = try {
+            DataMapItem.fromDataItem(item).dataMap.getLong("t", 0L)
+        } catch (_: Exception) {
+            0L
+        }
+        val ctx0 = app
+        if (ctx0 != null && WipeRule.staleFromPhone(t, ctx0.getSharedPreferences(WIPE_PREFS, Context.MODE_PRIVATE).getLong(WIPE_DONE, 0L))) {
+            return false
+        }
         // Από νεότερη έκδοση της εφαρμογής του κινητού (V-A-08): δεν διαβάζεται· το ρολόι ζητά ενημέρωση και κρατά ό,τι είχε
         // (ούτε «η προπόνηση του κινητού τελείωσε»).
         if (Proto.tooNew(text)) {
@@ -94,10 +105,14 @@ object Link {
         tryWipe(ctx)
     }
 
-    /** Περιμένει «σβήσε» που δεν έγινε ακόμα (π.χ. λόγω άσκησης): τότε τα παλιά αποτελέσματα δεν ξαναστέλνονται. */
-    fun wipeWanted(ctx: Context): Boolean {
+    /**
+     * Αποτέλεσμα σε αναμονή που επιτρέπεται να σταλεί τώρα: αν περιμένει «σβήσε», μόνο όσα έγιναν μετά από αυτό (N1)·
+     * τα παλιά σβήνονται με τη διαγραφή.
+     */
+    fun sendable(ctx: Context, o: JSONObject): Boolean {
         val sp = ctx.getSharedPreferences(WIPE_PREFS, Context.MODE_PRIVATE)
-        return sp.getLong(WIPE_WANT, 0L) > sp.getLong(WIPE_DONE, 0L)
+        val want = sp.getLong(WIPE_WANT, 0L)
+        return want <= sp.getLong(WIPE_DONE, 0L) || WipeRule.keepAfterWipe(o.toString(), 0L, want)
     }
 
     /**
@@ -118,10 +133,18 @@ object Link {
         }
         val busy = Repo.running != null || Repo.local != null || Repo.readRun(ctx) != null
         if (!WipeRule.shouldWipe(at, done, busy)) return
+        // N1: μόνο ό,τι έγινε πριν από τη διαγραφή. Αποτελέσματα σε αναμονή από ασκήσεις μετά το [at] μένουν.
+        val keep = try {
+            Repo.pendingAll(ctx).filter { (_, o) -> WipeRule.keepAfterWipe(o.toString(), 0L, at) }
+        } catch (_: Exception) {
+            emptyList()
+        }
         try {
-            ctx.filesDir.listFiles()?.forEach { it.deleteRecursively() }
+            ctx.filesDir.listFiles()?.forEach { if (it.lastModified() < at) it.deleteRecursively() }
             ctx.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+            // Πρόγραμμα, όριο, αναμονές (N3: και το όριο που θυμόταν το ρολόι)· μετά ξαναμπαίνουν μόνο οι νεότερες.
             ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE).edit().clear().commit()
+            for ((id, o) in keep) Repo.savePending(ctx, id, o)
         } catch (_: Exception) {
         }
         sp.edit().putLong(WIPE_DONE, at).commit()
@@ -130,10 +153,24 @@ object Link {
             try {
                 val dc = Wearable.getDataClient(ctx.applicationContext)
                 val me = Tasks.await(Wearable.getNodeClient(ctx.applicationContext).localNode, 10, TimeUnit.SECONDS)
-                Tasks.await(
-                    dc.deleteDataItems(Uri.Builder().scheme("wear").authority(me.id).path("/ygeia/").build(), DataClient.FILTER_PREFIX),
-                    10, TimeUnit.SECONDS,
-                )
+                // Τα DataItems του ρολογιού: όλα τα παλιά· αποτελέσματα από ασκήσεις μετά το [at] μένουν (N1).
+                val old = mutableListOf<Uri>()
+                val buf = Tasks.await(dc.dataItems, 10, TimeUnit.SECONDS)
+                try {
+                    for (item in buf) {
+                        val u = item.uri
+                        val p = u.path ?: continue
+                        if (u.host != me.id || !p.startsWith("/ygeia/") || p == Paths.WIPED) continue
+                        if (p.startsWith(Paths.RESULT)) {
+                            val m = DataMapItem.fromDataItem(item).dataMap
+                            if (WipeRule.keepAfterWipe(m.getString(Paths.KEY) ?: "", m.getLong("t", 0L), at)) continue
+                        }
+                        old.add(u)
+                    }
+                } finally {
+                    buf.release()
+                }
+                for (u in old) Tasks.await(dc.deleteDataItems(u), 10, TimeUnit.SECONDS)
             } catch (_: Exception) {
             }
             if (putWiped(ctx, at)) sp.edit().putLong(WIPE_ACKED, at).commit()

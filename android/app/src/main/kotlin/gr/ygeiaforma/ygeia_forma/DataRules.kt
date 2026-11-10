@@ -97,6 +97,9 @@ object DataRules {
         return putAt
     }
 
+    /** DataItem «/ygeia/…» γραμμένο ([t], το πεδίο «t») πριν από τη διαγραφή [wipeAt]: σβήνεται (N3). */
+    fun writtenBeforeWipe(t: Long, wipeAt: Long): Boolean = wipeAt > 0 && t < wipeAt
+
     /** Αποτέλεσμα του ρολογιού από άσκηση πριν από τη «Διαγραφή όλων» ([wipeAt], 0 = καμία): δεν μπαίνει, σβήνεται. */
     fun droppedByWipe(start: Long, wipeAt: Long): Boolean = wipeAt > 0 && start < wipeAt
 

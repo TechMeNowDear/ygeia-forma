@@ -1626,6 +1626,13 @@ void main() {
         size: const Size(750, 900),
         brightness: Brightness.dark,
       ));
+  testWidgets('Ρυθμίσεις · το ρολόι δεν απάντησε στη διαγραφή', (t) async {
+    final at = now.subtract(const Duration(days: 3));
+    wipeState.value = WipeStatus(at: at, done: true, seen: true, watchPending: true, oura: 'none');
+    addTearDown(() => wipeState.value = null);
+    await privacyShot(t, 'P1d_settings_watch_silent', SettingsPage(store: settingsStore(), food: sampleFoodStore(now)),
+        size: const Size(400, 1500));
+  });
   testWidgets('Η διαγραφή δεν τελείωσε', (t) => privacyShot(
         t,
         'P5c_wipe_unfinished',

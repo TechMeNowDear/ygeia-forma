@@ -47,6 +47,19 @@ const wipeOuraNotRevokedText = 'Η πρόσβαση στο Oura δεν ακυρ�
 const wipeWatchDoneText = 'Ρολόι: σβήστηκε.';
 const wipeWatchWaitingText = 'Ρολόι: περιμένει. Σβήνεται μόλις συνδεθεί και ανοίξεις την εφαρμογή του.';
 
+/// Στις Ρυθμίσεις, κάτω από «Διαγραφή όλων», όσο το ρολόι δεν έχει απαντήσει (N4).
+const wipeWatchPendingText = 'Ρολόι: δεν έχει επιβεβαιώσει ακόμα τη διαγραφή.';
+
+/// Μετά από [wipeWatchSilentAfter] χωρίς απάντηση (π.χ. παλιά εφαρμογή ρολογιού που δεν ξέρει το «σβήσε»).
+const wipeWatchSilentText = 'Το ρολόι δεν απάντησε. Άνοιξε την εφαρμογή του ρολογιού ή ενημέρωσέ τη.';
+const wipeWatchSilentAfter = Duration(days: 2);
+
+/// Η γραμμή για το ρολόι στις Ρυθμίσεις, ή null όταν δεν περιμένουμε τίποτα.
+String? wipeWatchLine(WipeStatus? s, DateTime now) {
+  if (s == null || !s.watchPending) return null;
+  return now.difference(s.at) >= wipeWatchSilentAfter ? wipeWatchSilentText : wipeWatchPendingText;
+}
+
 const errorsOnText = 'Όταν κάτι χαλάσει, στέλνεται μόνο τι χάλασε και σε ποια οθόνη. Ποτέ φαγητά, μετρήσεις υγείας ή ονόματα.';
 const errorsOffText = 'Κλειστές: δεν στέλνεται τίποτα, και όσες περίμεναν σβήστηκαν.';
 
@@ -110,12 +123,20 @@ class WipeStatus {
   }
 }
 
+/// Η τελευταία κατάσταση της διαγραφής (για τη γραμμή στις Ρυθμίσεις, N4). Την ενημερώνουν [readWipeStatus] και
+/// [wipeWatchState].
+final wipeState = ValueNotifier<WipeStatus?>(null);
+
+/// N2: η εφαρμογή ξεκινά κανονικά (stores, ρολόι, widgets) μόνο αν δεν υπάρχει διαγραφή στη μέση.
+bool startsApp(WipeStatus? s) => s == null || s.done;
+
 /// Στην εκκίνηση: έγινε «Διαγραφή όλων»; Με όριο χρόνου, ώστε να μην καθυστερεί ποτέ το άνοιγμα. Αν το ρολόι δεν έχει
 /// επιβεβαιώσει ακόμα, η Kotlin ξαναστέλνει το «σβήσε» (μόνο αν λείπει) και κοιτά για την επιβεβαίωση, στο παρασκήνιο.
 Future<WipeStatus?> readWipeStatus() async {
   try {
     final st = WipeStatus.fromMap(await _privacy.invokeMethod<Object?>('wipeStatus').timeout(const Duration(seconds: 2)));
-    if (st != null && st.watchPending) unawaited(wipeWatchState());
+    wipeState.value = st;
+    if (st != null && st.watchPending && st.done) unawaited(wipeWatchState());
     return st;
   } catch (_) {
     return null;
@@ -124,11 +145,17 @@ Future<WipeStatus?> readWipeStatus() async {
 
 /// Το ρολόι επιβεβαίωσε τη διαγραφή; («acked» / «waiting»).
 Future<String> wipeWatchState() async {
+  String r;
   try {
-    return await _privacy.invokeMethod<String>('wipeWatch') ?? 'waiting';
+    r = await _privacy.invokeMethod<String>('wipeWatch') ?? 'waiting';
   } catch (_) {
-    return 'waiting';
+    r = 'waiting';
   }
+  final s = wipeState.value;
+  if (r == 'acked' && s != null && s.watchPending) {
+    wipeState.value = WipeStatus(at: s.at, done: s.done, seen: s.seen, watchPending: false, oura: s.oura);
+  }
+  return r;
 }
 
 Future<void> markWipeSeen() async {
@@ -293,19 +320,28 @@ class PrivacyGroup extends StatelessWidget {
 
 /// Η γραμμή «Διαγραφή όλων των δεδομένων» (μέσα στο «ΤΑ ΔΕΔΟΜΕΝΑ ΜΟΥ»).
 class DeleteAllRow extends StatelessWidget {
-  const DeleteAllRow({super.key, required this.store, this.wipe, this.export});
+  const DeleteAllRow({super.key, required this.store, this.wipe, this.export, this.clock});
   final HealthStore? store;
   final Future<String> Function()? wipe;
   final Future<BackupResult> Function()? export;
 
+  /// Μόνο για δοκιμές (αλλιώς η ώρα του κινητού).
+  final DateTime Function()? clock;
+
   @override
-  Widget build(BuildContext context) => SettingsRow(
-        key: const ValueKey('privacy-delete'),
-        icon: Icons.delete_outline_rounded,
-        title: 'Διαγραφή όλων των δεδομένων',
-        subtitle: 'Από αυτό το κινητό και το ρολόι',
-        danger: true,
-        onTap: () => showDeleteAllSheet(context, store: store, wipe: wipe, export: export),
+  Widget build(BuildContext context) => ValueListenableBuilder<WipeStatus?>(
+        valueListenable: wipeState,
+        builder: (context, st, _) {
+          final watch = wipeWatchLine(st, (clock ?? DateTime.now)());
+          return SettingsRow(
+            key: const ValueKey('privacy-delete'),
+            icon: Icons.delete_outline_rounded,
+            title: 'Διαγραφή όλων των δεδομένων',
+            subtitle: watch == null ? 'Από αυτό το κινητό και το ρολόι' : 'Από αυτό το κινητό και το ρολόι.\n$watch',
+            danger: true,
+            onTap: () => showDeleteAllSheet(context, store: store, wipe: wipe, export: export),
+          );
+        },
       );
 }
 
@@ -658,4 +694,19 @@ class _WipedPageState extends State<WipedPage> {
       ),
     );
   }
+}
+
+/// N2: «Η διαγραφή δεν τελείωσε» χωρίς να ξεκινήσει τίποτα άλλο της εφαρμογής (ούτε ρολόι ούτε αναγνώσεις).
+class WipeUnfinishedApp extends StatelessWidget {
+  const WipeUnfinishedApp({super.key, required this.status});
+  final WipeStatus status;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        title: 'Υγεία & Φόρμα',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        home: WipedPage(status: status, onStart: () {}, onRestore: () {}),
+      );
 }
