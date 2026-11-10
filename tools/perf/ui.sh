@@ -111,3 +111,21 @@ launch() {
   adb shell am force-stop "$PKG"; sleep 2
   timeout 60 adb shell am start -W -n "$ACT" > /dev/null
 }
+
+# Εγκατάσταση με ξαναδοκιμή (10/11): στον emulator Android 17 η υπηρεσία package έσπαγε πού και πού αμέσως μετά την
+# εκκίνηση («Broken pipe», «Can't find service: package»). Μόνο σφάλματα υποδομής ξαναδοκιμάζονται· ένα πραγματικό
+# «INSTALL_FAILED_…» (π.χ. άλλο κλειδί, μικρότερος versionCode) αποτυγχάνει αμέσως, όπως πριν.
+apk_install() {
+  local i
+  for i in 1 2 3 4; do
+    [ "$i" = 4 ] && set -- --no-streaming "$@"
+    adb install "$@" > install.log 2>&1 && return 0
+    grep -q 'INSTALL_FAILED\|INSTALL_PARSE_FAILED' install.log && return 1
+    echo "Εγκατάσταση: ξαναδοκιμή $i ($(tr -d '\r' < install.log | tail -1))"
+    timeout 120 adb wait-for-device > /dev/null 2>&1
+    for _ in $(seq 1 30); do adb shell pm path android 2> /dev/null | grep -q '^package:' && break; sleep 2; done
+    sleep 10
+  done
+  timeout 20 adb logcat -b crash -d 2> /dev/null | tail -30
+  return 1
+}

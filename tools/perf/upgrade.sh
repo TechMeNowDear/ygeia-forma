@@ -53,7 +53,7 @@ fi
 
 # 1. Παλιά έκδοση, καθαρή.
 adb uninstall "$PKG" > /dev/null 2>&1 || true
-adb install "$OLD" > install.log 2>&1 || { cat install.log; echo "Η εγκατάσταση της παλιάς έκδοσης απέτυχε"; exit 2; }
+apk_install "$OLD" || { cat install.log; echo "Η εγκατάσταση της παλιάς έκδοσης απέτυχε"; exit 2; }
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS > /dev/null 2>&1 || true
 old_ver=$(adb shell dumpsys package "$PKG" | tr -d '\r' | grep -o 'versionCode=[0-9]*' | head -1 | cut -d= -f2)
 launch
@@ -132,7 +132,7 @@ adb logcat -c || true
 adb logcat -b crash -c || true
 
 # 4. Η νέα ΠΑΝΩ στην παλιά.
-if ! adb install -r "$NEW" > install.log 2>&1; then
+if ! apk_install -r "$NEW"; then
   cat install.log; echo "ΑΠΟΤΥΧΙΑ: η νέα έκδοση δεν μπαίνει πάνω στην παλιά"; exit 1
 fi
 new_ver=$(adb shell dumpsys package "$PKG" | tr -d '\r' | grep -o 'versionCode=[0-9]*' | head -1 | cut -d= -f2)

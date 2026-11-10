@@ -12,7 +12,7 @@ set -u
 APK="$1"
 
 adb uninstall "$PKG" > /dev/null 2>&1 || true
-adb install -r "$APK" > install.log 2>&1 || { cat install.log; echo "Η εγκατάσταση απέτυχε"; exit 2; }
+apk_install -r "$APK" || { cat install.log; echo "Η εγκατάσταση απέτυχε"; exit 2; }
 # Χωρίς παράθυρο αδειών πάνω από την πρώτη οθόνη.
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS > /dev/null 2>&1 || true
 adb logcat -c || true
