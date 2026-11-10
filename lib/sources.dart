@@ -11,6 +11,7 @@
 /// - Η οθόνη «Πηγές» φτιάχνεται από τον [sourceRows], ώστε να μη διαφωνεί ποτέ με τον κώδικα.
 library;
 
+import 'oxygen_note.dart' show oxygenAvgLabel, oxygenMinLabel;
 import 'format.dart';
 import 'history.dart';
 
@@ -132,17 +133,17 @@ const sourceRows = <SourceRow>[
     ouraNote: 'Μόνο Oura· εκτίμηση, όχι μέτρηση',
   ),
   SourceRow(
-    title: 'Οξυγόνο τη νύχτα, μέσος όρος',
+    title: oxygenAvgLabel,
     group: SourceGroup.night,
     metrics: [K.ringSpo2],
     watchNote: 'Με το ρολόι ως πηγή ύπνου: ο μέσος όρος του ρολογιού (από κάτω)',
-    ouraNote: 'Μόνο Oura· μέσος όρος όλης της νύχτας',
+    ouraNote: 'Μόνο Oura· όλης της νύχτας',
   ),
   SourceRow(
-    title: 'Οξυγόνο τη νύχτα, χαμηλότερη τιμή',
+    title: oxygenMinLabel,
     group: SourceGroup.watch,
     metrics: [K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov],
-    watchNote: 'Μόνο ρολόι· με το Oura, μόνο όταν μέτρησε τουλάχιστον το μισό του ύπνου',
+    watchNote: 'Μόνο ρολόι· με το Oura, όταν το ρολόι μέτρησε τουλάχιστον τον μισό ύπνο',
   ),
   SourceRow(
     title: 'Βήματα, όροφοι, θερμίδες',
@@ -176,7 +177,7 @@ String metricSourceName(String metric, Source s) => samsungTotalMetrics.contains
 /// Τι ΔΕΝ διαβάζεται ή δεν φαίνεται, ώστε να μην ανακατευτεί ποτέ (δείχνεται στην οθόνη «Πηγές» μετά τη σύνδεση).
 const notUsedWithOura = <String>[
   'Βήματα του δαχτυλιδιού: δεν διαβάζονται',
-  'Μέσος όρος οξυγόνου του ρολογιού: δεν φαίνεται (μόνο του Oura)',
+  'Μέσος όρος οξυγόνου του ρολογιού: δεν φαίνεται (μόνο του Oura· η χαμηλότερη τιμή είναι του ρολογιού)',
   'Δείκτης διαταραχών αναπνοής του Oura: δεν φαίνεται (δεν είναι τεστ άπνοιας)',
   'Βαθμολογία ύπνου και Energy Score της Samsung: δεν φαίνονται',
   'Ύπνος του ρολογιού: δεν διαβάζεται',

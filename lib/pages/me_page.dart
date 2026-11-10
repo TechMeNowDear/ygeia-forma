@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../data.dart';
+import '../oxygen_note.dart' show oxygenAvgLabel, oxygenMinLabel;
 import '../format.dart';
 import '../profile.dart';
 import '../theme.dart';
@@ -186,8 +187,11 @@ class _MePageState extends State<MePage> {
                         children: [
                           Text('Από πού έρχεται κάθε μέτρηση', style: label),
                           const SizedBox(height: 6),
-                          const InfoRow('Ύπνος, HRV, παλμοί ύπνου, αναπνοές, μέσο οξυγόνο', 'Oura'),
-                          const InfoRow('Βήματα, παλμοί ξύπνιος, χαμηλότερο οξυγόνο', 'Ρολόι'),
+                          const InfoRow('Ύπνος, HRV, παλμοί ύπνου, αναπνοές', 'Oura'),
+                          // Έλεγχος 9/11 (UX3-05): οι ίδιες ετικέτες οξυγόνου παντού.
+                          const InfoRow(oxygenAvgLabel, 'Oura'),
+                          const InfoRow(oxygenMinLabel, 'Ρολόι'),
+                          const InfoRow('Βήματα, παλμοί μέρας', 'Ρολόι'),
                           const InfoRow('Βάρος, λίπος, μύες', 'InBody'),
                           const SizedBox(height: 6),
                           Text('Κάθε μέτρηση έρχεται από μία συσκευή· ποτέ ανακατεμένα.', style: hint),

@@ -44,12 +44,17 @@ bool countsAsWalk(Session s) =>
     (s.cardioSec ?? 0) >= walkMinSec &&
     (s.meters ?? 0) >= 500;
 
-/// Μέσοι παλμοί του περπατήματος: του ρολογιού (χωρίς παύσεις και λεπτό αποκατάστασης), αλλιώς από τις τιμές.
-int? walkHr(Session s) {
-  if (s.hrAvg != null) return s.hrAvg;
-  if (s.hr.length < 30) return null;
-  return (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round();
-}
+/// Παλμοί του περπατήματος για σύγκριση: «σταθερό βάδισμα», από το 5′ ως το «Τέλος», χωρίς παύσεις ([Session.steadyHr]·
+/// έλεγχος 9/11, V-B-11). Όχι ο μέσος όλου του περπατήματος (εξαρτάται από τη διάρκεια, λόγω των πρώτων λεπτών), και
+/// ποτέ εφεδρικός μέσος με τις παύσεις μέσα (03-Χ3). Χωρίς αρκετές τιμές μετά το 5′: τίποτα.
+int? walkHr(Session s) => s.steadyHr;
+
+/// Μία τελεία ανά περπάτημα στο [from, end] (για το γράφημα της Προόδου, V-B-10).
+List<(DateTime, double)> walkHrPoints(Iterable<Session> sessions, DateTime from, DateTime end) => [
+      for (final s in sessions.where(countsAsWalk).toList()..sort((a, b) => a.start.compareTo(b.start)))
+        if (!dayOf(s.start).isBefore(from) && !dayOf(s.start).isAfter(end))
+          if (walkHr(s) case final v?) (s.start, v.toDouble()),
+    ];
 
 /// Μία τιμή ανά μέρα για κάθε δείκτη του περπατήματος (μέσος όρος των περπατημάτων της μέρας).
 Map<String, Map<String, double>> walkHistory(Iterable<Session> sessions) {

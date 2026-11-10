@@ -26,7 +26,9 @@ class WalkExtraCard extends StatelessWidget {
     return AppCard(
       key: const ValueKey('walk-extra'),
       child: Row(children: [
-        stat(pace == null ? '—' : paceText(pace), 'ανά km'),
+        // Χωρίς GPS ο ρυθμός βγαίνει από τα βήματα: «≈», όχι ακρίβεια δευτερολέπτου (έλεγχος 9/11, RT-12).
+        stat(pace == null ? '—' : '${distanceFromSteps(session) ? '≈ ' : ''}${paceText(pace)}',
+            distanceFromSteps(session) ? 'ανά km (από βήματα)' : 'ανά km'),
         stat(cad == null ? '—' : '$cad', 'βήματα / λεπτό'),
         stat(session.pauses.isEmpty ? '0' : '${session.pauses.length} · ${(paused / 60).ceil()}′', 'παύσεις'),
       ]),

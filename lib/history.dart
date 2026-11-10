@@ -376,17 +376,19 @@ DateTime? scaleFromOf(Map<String, Map<String, double>> history) {
   return first != null && unmarked ? parseDateKey(first) : null;
 }
 
-/// Μία ολόκληρη ζύγιση ανά μέρα: η τελευταία της μέρας από την InBody (ποτέ πεδία από δύο διαφορετικές
-/// ζυγίσεις μαζί). Κλειδί = μέρα («2026-11-10»).
+/// Μία ολόκληρη ζύγιση ανά μέρα: η ΠΡΩΤΗ της μέρας από την InBody (ποτέ πεδία από δύο διαφορετικές ζυγίσεις μαζί).
+/// Κλειδί = μέρα («2026-11-10»). Έλεγχος 9/11 (RT-15 / V-A-29): πριν ήταν η τελευταία· μια βραδινή ζύγιση μετά το
+/// φαγητό (+1–2 kg, και άλλο λίπος από το νερό) θα έμπαινε στις τάσεις αντί για την πρωινή. Η πρώτη της μέρας είναι
+/// συνήθως η πρωινή, νηστικός, οι ίδιες συνθήκες κάθε φορά.
 Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
-  final last = <String, BodyMeasurement>{};
+  final first = <String, BodyMeasurement>{};
   for (final b in body) {
     final k = dateKey(b.time);
-    final o = last[k];
-    if (o == null || !b.time.isBefore(o.time)) last[k] = b;
+    final o = first[k];
+    if (o == null || b.time.isBefore(o.time)) first[k] = b;
   }
   return {
-    for (final e in last.entries)
+    for (final e in first.entries)
       e.key: {
         if (e.value.weight != null && e.value.weight!.isFinite) K.weight: e.value.weight!,
         if (e.value.fatPct != null && e.value.fatPct!.isFinite) K.fatPct: e.value.fatPct!,
@@ -545,10 +547,10 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
     }
   }
 
-  // Ζύγιση: η τελευταία της μέρας.
+  // Ζύγιση: η πρώτη της μέρας (ίδιο με το [bodyRows], RT-15).
   BodyMeasurement? body;
   for (final b in d.body) {
-    if (sameDay(b.time, day)) body = b;
+    if (sameDay(b.time, day) && (body == null || b.time.isBefore(body.time))) body = b;
   }
   if (body != null) {
     put(K.weight, body.weight);

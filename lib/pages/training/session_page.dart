@@ -850,7 +850,7 @@ class _SummaryPageState extends State<SummaryPage> {
     final s = widget.session;
     final what = s.isCardio ? 'περπατήματος' : 'προπόνησης';
     final desc = s.isCardio
-        ? '${shortDayDate(s.start)}, ${s.cardioMinutes ?? s.duration.inMinutes}′${s.meters == null ? '' : ', ${(s.meters! / 1000).toStringAsFixed(2).replaceAll('.', ',')} km'}'
+        ? '${shortDayDate(s.start)}, ${s.cardioMinutes ?? s.duration.inMinutes}′${kmValue(s) == null ? '' : ', ${kmValue(s)} km'}'
         : '${shortDayDate(s.start)}, ${s.name}, ${s.setsDone} σετ';
     final ok = await showDialog<bool>(
       context: context,
@@ -910,7 +910,7 @@ class _SummaryPageState extends State<SummaryPage> {
         for (final (v, l) in s.isCardio
             ? [
                 ('${s.cardioMinutes ?? mins}′', 'διάρκεια'),
-                (s.meters == null ? '—' : (s.meters! / 1000).toStringAsFixed(2).replaceAll('.', ','), 'km'),
+                (kmValue(s) ?? '—', distanceFromSteps(s) ? 'km (από βήματα)' : 'km'),
                 (s.steps == null ? '—' : thousands(s.steps!), 'βήματα'),
               ]
             : [('$mins′', 'διάρκεια'), ('${s.setsDone}', 'σετ'), (s.volume > 0 ? thousands(s.volume.round()) : '—', 'kg όγκος')])

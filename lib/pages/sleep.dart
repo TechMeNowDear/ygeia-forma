@@ -277,8 +277,8 @@ class _LastNightCard extends StatelessWidget {
           // Στάδια μίας νύχτας σε λεπτά και %: όχι (κλινικός έλεγχος H1)· ο μέσος όρος 7 νυχτών είναι στην επόμενη κάρτα.
           const Hairline(vertical: 14),
           if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
-          if (n.spo2Avg != null) InfoRow('Οξυγόνο, μέσος όρος', '${spo2AvgText(n.spo2Avg!)}%', dot: c.sleep),
-          if (n.spo2Min != null) InfoRow('Οξυγόνο, χαμηλότερη μέτρηση', '${lowestText(n.spo2Min!)}% · ενδεικτικό', dot: c.sleep),
+          if (n.spo2Avg != null) InfoRow(oxygenAvgLabel, '${spo2AvgText(n.spo2Avg!)}%', dot: c.sleep),
+          if (n.spo2Min != null) InfoRow(oxygenMinLabel, '${lowestText(n.spo2Min!)}% · ενδεικτικό', dot: c.sleep),
           if (n.spo2Avg != null || n.spo2Min != null) ...[
             const SizedBox(height: 6),
             // Τρίτος κλινικός έλεγχος C2/F5: και εδώ το κείμενο για το τεστ άπνοιας (μία γραμμή κλειστό, όπως στην Καρδιά).

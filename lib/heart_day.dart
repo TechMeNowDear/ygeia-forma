@@ -100,6 +100,12 @@ double? weightedMean(List<_W> items) {
   return items.fold<double>(0, (s, w) => s + w.value * w.weight) / total;
 }
 
+/// Οι προπονήσεις και τα περπατήματα της ΙΔΙΑΣ της εφαρμογής ([αρχή, τέλος + 5′]), που εξαιρούνται από τους «παλμούς
+/// ξύπνιος» και την ηρεμία όπως οι ασκήσεις της Samsung (έλεγχος 9/11, DP-07 / V-A-15). Η Samsung Health ίσως δεν τις
+/// γράφει ως άσκηση· διπλή εξαίρεση του ίδιου διαστήματος δεν αλλάζει τίποτα. Τα 5′ μετά: οι παλμοί πέφτουν σιγά.
+/// Το ορίζει η main() από το TrainingStore (χωρίς εξάρτηση των δεδομένων υγείας από την προπόνηση).
+List<(DateTime, DateTime)> Function() appExerciseRanges = () => const [];
+
 extension HeartByDay on Dashboard {
   /// Αν υπάρχουν βήματα ανά λεπτό για αυτή τη μέρα (χωρίς αυτά δεν ξέρουμε την κατάσταση).
   bool hasStepCoverage(DateTime day) {
@@ -139,6 +145,7 @@ extension HeartByDay on Dashboard {
 
     var sleepMinutes = 0.0;
     var exerciseMinutes = 0.0;
+    final appRanges = appExerciseRanges();
     final intervals = <double>[];
     final awake = <_W>[];
     final resting = <_W>[];
@@ -152,7 +159,7 @@ extension HeartByDay on Dashboard {
         sleepMinutes += dur;
         continue;
       }
-      if (_overlaps(s, exercise)) {
+      if (_overlaps(s, exercise) || _overlaps(s, appRanges)) {
         exerciseMinutes += dur;
         continue;
       }

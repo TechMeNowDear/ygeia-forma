@@ -7,6 +7,7 @@ import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
 import 'pages/exercise_library.dart';
 import 'pages/training/training_page.dart';
+import 'heart_day.dart' show appExerciseRanges;
 import 'training/training_store.dart';
 import 'training/wear_link.dart';
 import 'pages/body.dart';
@@ -46,6 +47,11 @@ Future<void> main() async {
   WidgetPublisher(store, food).start();
   // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
   TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
+  // Έλεγχος 9/11 (DP-07): οι προπονήσεις της εφαρμογής δεν μετρούν στους παλμούς της μέρας και στην ηρεμία.
+  appExerciseRanges = () => [
+        for (final s in [...TrainingStore.main.sessions, if (TrainingStore.main.current case final c?) c])
+          (s.start, (s.end ?? DateTime.now()).add(const Duration(minutes: 5))),
+      ];
 }
 
 class YgeiaFormaApp extends StatefulWidget {

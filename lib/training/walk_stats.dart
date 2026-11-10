@@ -79,6 +79,19 @@ int? cadence(Session s) {
   return (st / (t / 60)).round();
 }
 
+/// Χωρίς GPS (έλεγχος 9/11, RT-12): η απόσταση βγαίνει από τα βήματα, άρα «≈».
+bool distanceFromSteps(Session s) => s.isCardio && s.gps == false;
+
+/// Απόσταση σε km για τις οθόνες: «2,31», «≈ 2,31» χωρίς GPS, «—» όταν δεν μετρήθηκε τίποτα (RT-18: ούτε GPS ούτε
+/// βήματα· πριν «0,00»).
+String? kmValue(Session s) {
+  final m = s.meters;
+  if (m == null) return null;
+  if (m < 10 && s.gps != true && (s.steps ?? 0) == 0) return null;
+  final v = (m / 1000).toStringAsFixed(2).replaceAll('.', ',');
+  return distanceFromSteps(s) ? '≈ $v' : v;
+}
+
 /// «13′17″».
 String paceText(int sec) => '${sec ~/ 60}′${(sec % 60).toString().padLeft(2, '0')}″';
 

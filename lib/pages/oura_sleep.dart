@@ -220,7 +220,7 @@ class _OuraNightCard extends StatelessWidget {
           ),
           if (minutes != null && range != null) ...[
             const SizedBox(height: 12),
-            RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep),
+            RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep, oneNight: true),
           ],
           const SizedBox(height: 14),
           Row(children: [clock('Ξάπλωσες', parts.first.start), clock('Κοιμήθηκες', parts.first.onset), clock('Ξύπνησες', parts.last.end)]),
@@ -407,7 +407,8 @@ class _BreathCard extends StatelessWidget {
           ),
           const Hairline(vertical: 2),
           row(
-            rox.avg == null ? 'Οξυγόνο, μέσος όρος —' : 'Οξυγόνο, μέσος όρος ${spo2AvgText(rox.avg!)}%',
+            // Έλεγχος 9/11 (UX3-05): οι ίδιες δύο ετικέτες παντού.
+            rox.avg == null ? '$oxygenAvgLabel —' : '$oxygenAvgLabel ${spo2AvgText(rox.avg!)}%',
             rox.avg == null
                 ? (windows.mains.containsKey(dateKey(day)) ? ringAvgMissing(store) : 'Χωρίς νύχτα από το δαχτυλίδι')
                 : 'Όλη τη νύχτα',
@@ -416,7 +417,7 @@ class _BreathCard extends StatelessWidget {
           const Hairline(vertical: 2),
           // 7/11: η χαμηλότερη από το ρολόι, μόνο με κάλυψη ≥ 50% του ύπνου του Oura.
           row(
-            rox.min == null ? 'Χαμηλότερο —' : 'Χαμηλότερο ${lowestText(rox.min!)}%',
+            rox.min == null ? '$oxygenMinLabel —' : '$oxygenMinLabel ${lowestText(rox.min!)}%',
             windows.mains.containsKey(dateKey(day))
                 ? watchLowText(rox.watch)
                 : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες',

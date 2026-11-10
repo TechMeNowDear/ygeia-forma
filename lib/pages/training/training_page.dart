@@ -6,6 +6,7 @@ import '../../format.dart';
 import '../../theme.dart';
 import '../../data.dart' show HealthStore;
 import '../../training/equipment.dart';
+import '../../training/walk_stats.dart' show kmValue;
 import '../../training/progress.dart';
 import '../../trends.dart' show TrendPeriod;
 import '../../training/program.dart';
@@ -219,14 +220,15 @@ class _TrainingPageState extends State<TrainingPage> {
   /// «Πρόοδος» (9/11): οι δύο πιο ξεκάθαρες αλλαγές (μόνο από την προπόνηση· το σώμα φαίνεται μέσα στη σελίδα).
   Widget _progressCard(BuildContext context) {
     final c = Aigaio.of(context);
-    final walk = walkProgress(t.sessions, _now, TrendPeriod.month);
-    final strength = strengthProgress(t.sessions, _now, TrendPeriod.month);
+    // Ίδια περίοδος με τη σελίδα «Πρόοδος» (3 μήνες, έλεγχος 9/11, V-B-10).
+    final walk = walkProgress(t.sessions, _now, TrendPeriod.quarter);
+    final strength = strengthProgress(t.sessions, _now, TrendPeriod.quarter);
     final top = progressHighlights(walk, strength, const []).take(2).map((e) => e.$1).toList();
     final sub = top.isNotEmpty
         ? top.join(' · ')
         : (walk.insufficient && strength.isEmpty
             ? 'Η πρώτη σύγκριση μετά από λίγες εβδομάδες προπόνησης και περπατήματος.'
-            : 'Καμία ξεκάθαρη αλλαγή τον τελευταίο μήνα.');
+            : 'Καμία ξεκάθαρη αλλαγή τους τελευταίους 3 μήνες.');
     return AppCard(
       key: const ValueKey('train-progress'),
       onTap: () => Navigator.of(context).push(ProgressPage.route(t, health: widget.health, onOpenTrends: widget.onOpenTrends, now: widget.now)),
@@ -494,7 +496,7 @@ class _TrainingPageState extends State<TrainingPage> {
                     Text('${shortDayDate(s.start)} · ${s.name}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                     Text(
                         s.isCardio
-                            ? '${s.cardioMinutes}′${s.meters != null ? ' · ${(s.meters! / 1000).toStringAsFixed(2).replaceAll('.', ',')} km' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}'
+                            ? '${s.cardioMinutes}′${kmValue(s) != null ? ' · ${kmValue(s)} km' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}'
                             : '${s.duration.inMinutes}′ · ${s.setsDone} σετ${s.volume > 0 ? ' · ${thousands(s.volume.round())} kg' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}',
                         style: TextStyle(fontSize: 13, color: c.textSecondary)),
                   ]),

@@ -14,7 +14,9 @@ final now = DateTime(2026, 12, 31, 20, 0);
 
 const _noise = [2, -2, 1, -1, 0, 2, -1, -2, 1, 0, -1, 2];
 
-/// Περπάτημα [daysAgo] μέρες πριν: 30′ ενεργά, [km] km, μέσοι παλμοί [hr], πτώση στο 1′ [hrr].
+/// Περπάτημα [daysAgo] μέρες πριν: 30′ ενεργά, [km] km, παλμοί σταθερού βαδίσματος [hr], πτώση στο 1′ [hrr].
+/// Έλεγχος 9/11 (V-B-11): η Πρόοδος συγκρίνει πια τους παλμούς από το 5′ και μετά, από τις τιμές· γι' αυτό τιμές ανά 10″
+/// (τα πρώτα 5′ πιο χαμηλά, όπως στο ζέσταμα, χωρίς να μετρούν).
 Session walk(int daysAgo, {int hr = 110, double km = 2.3, int? hrr, bool gps = true, int sec = 1800, String? activity, bool stopped = false}) {
   final start = DateTime(now.year, now.month, now.day - daysAgo, 18);
   return Session(
@@ -29,6 +31,7 @@ Session walk(int daysAgo, {int hr = 110, double km = 2.3, int? hrr, bool gps = t
     meters: km * 1000,
     gps: gps,
     hrAvg: hr,
+    hr: [for (var t = 0; t <= sec; t += 10) [t, t < 300 ? hr - 12 : hr]],
     hrrEnd: hrr == null ? null : 120,
     hrr1: hrr == null ? null : 120 - hrr,
     activity: activity,

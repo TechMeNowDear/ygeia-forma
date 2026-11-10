@@ -80,7 +80,7 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler(ErrorQueue)
         // «Διαγραφή όλων των δεδομένων» (Ρυθμίσεις › Απόρρητο).
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/privacy")
-            .setMethodCallHandler(DataWipe(this))
+            .setMethodCallHandler(DataWipe(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/samsung")
             .setMethodCallHandler(SamsungHealthBridge(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/food")

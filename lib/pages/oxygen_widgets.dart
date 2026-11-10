@@ -45,6 +45,10 @@ String watchLowText(NightOxygen? ox) {
   return '${pct == null ? '' : 'Μέτρησε το $pct% του ύπνου'}$below';
 }
 
+const oxygenNoPermissionTitle = 'Χωρίς οξυγόνο από το Oura';
+const oxygenNoPermissionText = 'Η Oura δεν έδωσε άδεια για το οξυγόνο. Δοκίμασε ξανά ή συνέχισε χωρίς· ο μέσος όρος '
+    'απλώς δεν θα φαίνεται.';
+
 /// Κάρτα για να δοθεί η άδεια οξυγόνου στο Oura (μόνο όταν η τωρινή σύνδεση δεν την έχει).
 class OuraOxygenAccessCard extends StatefulWidget {
   const OuraOxygenAccessCard({super.key, required this.store});
@@ -67,10 +71,8 @@ class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
     // Μόνο αν η νέα σύνδεση ολοκληρώθηκε ΜΕΤΑ το πάτημα (όχι όσο ο χρήστης είναι ακόμα στη σελίδα της Oura).
     final asked = s.ouraOxygenAskedMs, done = s.ouraConnectedMs;
     if (s.ouraSpo2 != false || asked == null || done == null || done < asked) return null;
-    final given = s.ouraLastScope == null ? '' : ' (έδωσε μόνο: ${s.ouraLastScope})';
-    return 'Η Oura συνδέθηκε ξανά, αλλά χωρίς την άδεια για το οξυγόνο$given. Στη σελίδα της Oura πρέπει να '
-        'φαίνεται και διακόπτης για το οξυγόνο· αν δεν φαίνεται, η άδεια SpO2 δεν είναι ενεργή στις ρυθμίσεις της '
-        'εφαρμογής στο developer.ouraring.com. Η εφαρμογή δοκιμάζει πάντως μία φορά τη μέρα να το διαβάσει.';
+    // Έλεγχος 9/11 (V-D-30, σχέδιο Oxygen): απλά, χωρίς κείμενο προγραμματιστή (οι λεπτομέρειες στο «Τι φτάνει»).
+    return oxygenNoPermissionText;
   }
 
   Future<void> _go() async {
@@ -113,7 +115,18 @@ class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
               key: const ValueKey('oura-oxygen-result'),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: c.tint(c.move), borderRadius: BorderRadius.circular(14)),
-              child: Text(r, style: TextStyle(fontSize: 13.5, color: c.text, height: 1.4)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (r == oxygenNoPermissionText)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(children: [
+                      Icon(Icons.warning_amber_rounded, size: 18, color: c.move),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(oxygenNoPermissionTitle, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text))),
+                    ]),
+                  ),
+                Text(r, style: TextStyle(fontSize: 13.5, color: c.text, height: 1.4)),
+              ]),
             ),
           ],
           const SizedBox(height: 10),
@@ -121,7 +134,7 @@ class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
             alignment: Alignment.centerLeft,
             child: FilledButton(
               onPressed: _busy ? null : _go,
-              child: Text(_busy ? 'Ανοίγει η Oura…' : 'Σύνδεση για το οξυγόνο'),
+              child: Text(_busy ? 'Ανοίγει η Oura…' : (_result(widget.store) == null ? 'Σύνδεση για το οξυγόνο' : 'Δοκίμασε ξανά')),
             ),
           ),
         ],

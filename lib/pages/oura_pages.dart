@@ -6,6 +6,7 @@ import '../data.dart';
 import '../format.dart';
 import '../oura/oura_api.dart';
 import '../oura/oura_store.dart';
+import '../oxygen_note.dart' show oxygenAvgLabel, oxygenMinLabel;
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -65,8 +66,9 @@ class _OuraScaffold extends StatelessWidget {
 }
 
 class _Bullet extends StatelessWidget {
-  const _Bullet(this.text, {this.icon = Icons.check_rounded, this.color});
+  const _Bullet(this.text, {this.icon = Icons.check_rounded, this.color, this.sub});
   final String text;
+  final String? sub;
   final IconData icon;
   final Color? color;
 
@@ -80,7 +82,14 @@ class _Bullet extends StatelessWidget {
         children: [
           Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 18, color: color ?? c.good)),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: TextStyle(fontSize: 15, color: c.text, height: 1.35))),
+          Expanded(
+            child: sub == null
+                ? Text(text, style: TextStyle(fontSize: 15, color: c.text, height: 1.35))
+                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(text, style: TextStyle(fontSize: 15, color: c.text, height: 1.35)),
+                    Text(sub!, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.35)),
+                  ]),
+          ),
         ],
       ),
     );
@@ -258,8 +267,10 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               const _Bullet('Ύπνος, ώρες και φάσεις'),
               const _Bullet('Παλμοί, HRV και αναπνοές στον ύπνο'),
               const _Bullet('Θερμοκρασία δέρματος στον ύπνο'),
-              const _Bullet('Βαθμολογία ύπνου και ετοιμότητα της Oura'),
-              _Bullet('Όχι email και προσωπικά στοιχεία, όχι βήματα, όχι οξυγόνο', icon: Icons.block_rounded, color: c.textTertiary),
+              const _Bullet('Βαθμολογία ύπνου και ετοιμότητα'),
+              // Έλεγχος 9/11 (UX3-05 / V-D-05): η εφαρμογή ΔΙΑΒΑΖΕΙ τον μέσο όρο οξυγόνου από το Oura (πριν: «όχι οξυγόνο»).
+              const _Bullet(oxygenAvgLabel, sub: 'Η χαμηλότερη τιμή έρχεται από το ρολόι.'),
+              _Bullet('Όχι email και προσωπικά στοιχεία, όχι βήματα', icon: Icons.block_rounded, color: c.textTertiary),
             ],
           ),
         );
@@ -541,12 +552,13 @@ class OuraManagePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SectionLabel('Τι παίρνουμε από το Oura'),
+              const SectionLabel('Από πού έρχεται τι'),
               const SizedBox(height: 4),
+              // Έλεγχος 9/11 (UX3-05): πηγή, όχι «Ναι» δίπλα σε «Όχι · από το ρολόι»· ίδιες ετικέτες με τις Πηγές.
               for (final r in sourceRows.where((r) => r.group == SourceGroup.night))
-                InfoRow(r.title, store.ouraActive ? 'Ναι' : (store.ouraStartsTonight ? 'Από απόψε' : 'Όχι τώρα')),
-              const InfoRow('Βήματα δαχτυλιδιού', 'Όχι · από το ρολόι'),
-              const InfoRow('Οξυγόνο δαχτυλιδιού', 'Όχι · από το ρολόι'),
+                InfoRow(r.title, store.ouraActive ? 'Oura' : (store.ouraStartsTonight ? 'Oura από απόψε' : 'Oura · όχι τώρα')),
+              const InfoRow(oxygenMinLabel, 'Ρολόι'),
+              const InfoRow('Βήματα', 'Ρολόι'),
             ],
           ),
         );

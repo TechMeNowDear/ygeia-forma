@@ -28,6 +28,8 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    // Σχέδιο «Settings» (premium, 10/11): γραμμές σε ενότητες. Το «Τι μετράει κάθε συσκευή» είναι στο σχέδιο, αλλά η
+    // οθόνη του δεν υπάρχει ακόμα (κλάδος premium UX).
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ρυθμίσεις'),
@@ -38,8 +40,10 @@ class SettingsPage extends StatelessWidget {
         listenable: store,
         builder: (context, _) {
           final d = store.data;
+          void push(String name, Widget Function(BuildContext) b) =>
+              Navigator.of(context).push(MaterialPageRoute<void>(settings: RouteSettings(name: name), builder: b));
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
               Center(
                 child: ConstrainedBox(
@@ -47,150 +51,75 @@ class SettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      AppCard(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(settings: const RouteSettings(name: 'Εμφάνιση'), builder: (_) => AppearancePage(store: store)),
+                      SettingsGroup(children: [
+                        SettingsRow(
+                          icon: Icons.palette_outlined,
+                          title: 'Εμφάνιση',
+                          subtitle: switch (store.prefs.themeMode) {
+                            'light' => 'Πάντα ανοιχτό · ${Aigaio.day(store.prefs.dayTheme).name}',
+                            'dark' => 'Πάντα σκοτεινό · ${Aigaio.night(store.prefs.nightTheme).name}',
+                            _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} · '
+                                'νύχτα ${Aigaio.night(store.prefs.nightTheme).name}',
+                          },
+                          onTap: () => push('Εμφάνιση', (_) => AppearancePage(store: store)),
                         ),
-                        child: Row(
-                          children: [
-                            IconBadge(Icons.palette_outlined, c.primary, size: 40),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Εμφάνιση', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    switch (store.prefs.themeMode) {
-                                      'light' => 'Πάντα ανοιχτό · ${Aigaio.day(store.prefs.dayTheme).name}',
-                                      'dark' => 'Πάντα σκοτεινό · ${Aigaio.night(store.prefs.nightTheme).name}',
-                                      _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} · '
-                                          'νύχτα ${Aigaio.night(store.prefs.nightTheme).name}',
-                                    },
-                                    style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-                          ],
+                        SettingsRow(
+                          key: const ValueKey('settings-me'),
+                          icon: Icons.person_outline_rounded,
+                          title: 'Τα στοιχεία μου',
+                          subtitle: 'Ηλικία, φύλο, ύψος για τα εύρη · ζύγιση κάθε ${weekdayNames[store.profile.weighDay - 1]}',
+                          onTap: () => Navigator.of(context).push(MePage.route(store)),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      AppCard(
-                        key: const ValueKey('settings-me'),
-                        onTap: () => Navigator.of(context).push(MePage.route(store)),
-                        child: Row(
-                          children: [
-                            IconBadge(Icons.person_rounded, c.body, size: 40),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Τα στοιχεία μου', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Ηλικία, φύλο, ύψος για τα εύρη · ζύγιση κάθε ${weekdayNames[store.profile.weighDay - 1]}',
-                                    style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-                          ],
+                        SettingsRow(
+                          key: const ValueKey('settings-sources'),
+                          icon: Icons.link_rounded,
+                          title: 'Πηγές',
+                          subtitle: 'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
+                              'βήματα: Samsung Health · βάρος: InBody',
+                          onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
                         ),
-                      ),                      const SizedBox(height: 12),
-                      AppCard(
-                        key: const ValueKey('settings-sources'),
-                        onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
-                        child: Row(
-                          children: [
-                            IconBadge(Icons.device_hub_rounded, c.sleep, size: 40),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Πηγές', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
-                                    'βήματα: Samsung Health · βάρος: InBody',
-                                    style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-                          ],
+                        SettingsRow(
+                          key: const ValueKey('settings-today-cards'),
+                          icon: Icons.grid_view_rounded,
+                          title: 'Κάρτες της «Σήμερα»',
+                          subtitle: 'Τι εμφανίζεται',
+                          onTap: () => push('Κάρτες της Σήμερα', (_) => _TodayCardsPage(store: store)),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      AppCard(
-                        padding: const EdgeInsets.fromLTRB(18, 16, 8, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SectionLabel('Τι βλέπω στο «Σήμερα»'),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Τα δεδομένα διαβάζονται όλα· εδώ διαλέγεις μόνο τι εμφανίζεται.',
-                              style: TextStyle(color: c.textSecondary, fontSize: 13),
+                      ]),
+                      const SettingsSection('Απόρρητο'),
+                      const PrivacyGroup(),
+                      const SettingsSection('Τα δεδομένα μου'),
+                      _DataGroup(store: store, food: food),
+                      const SettingsSection('Για προχωρημένους'),
+                      SettingsGroup(children: [
+                        SettingsRow(
+                          icon: Icons.build_outlined,
+                          color: c.textSecondary,
+                          title: 'Έλεγχος δεδομένων',
+                          subtitle: '«Τι φτάνει» από κάθε πηγή',
+                          onTap: () => push(
+                            'Έλεγχος δεδομένων',
+                            (_) => Scaffold(
+                              appBar: AppBar(title: const Text('Έλεγχος δεδομένων')),
+                              body: TiFtaneiScreen(otherDeviceNights: otherDeviceNights(store.history)),
                             ),
-                            for (final card in todayCards)
-                              SwitchListTile(
-                                contentPadding: const EdgeInsets.only(right: 4),
-                                title: Text(card.label),
-                                value: store.prefs.show(card.key),
-                                onChanged: (on) => store.setCard(card.key, on),
-                              ),
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      AppCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SectionLabel('Samsung Health'),
-                            const SizedBox(height: 6),
-                            InfoRow('Άδειες', d == null ? '—' : '${d.granted} από ${d.total}'),
-                            InfoRow('Τελευταία ανάγνωση', d == null ? '—' : '${relativeDay(d.readAt, DateTime.now())} ${hm(d.readAt)}'),
-                            const SizedBox(height: 10),
-                            OutlinedButton(
-                              onPressed: () => store.refresh(askPermissions: true),
-                              child: const Text('Άδειες Samsung Health'),
-                            ),
-                            const SizedBox(height: 8),
-                            OutlinedButton(
-                              onPressed: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  settings: const RouteSettings(name: 'Έλεγχος δεδομένων'),
-                                  builder: (_) => Scaffold(
-                                    appBar: AppBar(title: const Text('Έλεγχος δεδομένων')),
-                                    body: TiFtaneiScreen(otherDeviceNights: otherDeviceNights(store.history)),
-                                  ),
-                                ),
-                              ),
-                              child: const Text('Έλεγχος δεδομένων («Τι φτάνει»)'),
-                            ),
-                          ],
+                        SettingsRow(
+                          icon: Icons.watch_outlined,
+                          color: c.textSecondary,
+                          title: 'Άδειες Samsung Health',
+                          subtitle: d == null
+                              ? '—'
+                              : '${d.granted} από ${d.total} · ανάγνωση ${relativeDay(d.readAt, DateTime.now())} ${hm(d.readAt)}',
+                          onTap: () => store.refresh(askPermissions: true),
                         ),
-                      ),
-                      if (food != null) ...[
-                        const SizedBox(height: 12),
-                        _BackupCard(store: store, food: food!),
-                      ],
-                      // Απόρρητο (έλεγχος 9/11, E3-05): αναφορές σφαλμάτων και «Διαγραφή όλων των δεδομένων».
-                      const SizedBox(height: 12),
-                      PrivacyCard(store: store),
-                      const SizedBox(height: 16),
+                      ]),
+                      const SizedBox(height: 20),
                       Text(
-                        'Υγεία & Φόρμα · προσωπική έκδοση. Η εφαρμογή διαβάζει δεδομένα μόνο όταν την ανοίγεις.',
+                        'Υγεία & Φόρμα · προσωπική έκδοση\nΗ εφαρμογή διαβάζει δεδομένα μόνο όταν την ανοίγεις.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: c.textSecondary, fontSize: 13),
+                        style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.45),
                       ),
                     ],
                   ),
@@ -204,17 +133,55 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Αντίγραφο ασφαλείας: όσα υπάρχουν μόνο σε αυτό το κινητό.
-class _BackupCard extends StatefulWidget {
-  const _BackupCard({required this.store, required this.food});
+/// «Κάρτες της Σήμερα»: τι εμφανίζεται (πριν: κάρτα με διακόπτες μέσα στις Ρυθμίσεις).
+class _TodayCardsPage extends StatelessWidget {
+  const _TodayCardsPage({required this.store});
   final HealthStore store;
-  final FoodStore food;
 
   @override
-  State<_BackupCard> createState() => _BackupCardState();
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Κάρτες της «Σήμερα»'), backgroundColor: c.background, surfaceTintColor: Colors.transparent),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) => ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: AppCard(
+                padding: const EdgeInsets.fromLTRB(18, 12, 8, 8),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text('Τα δεδομένα διαβάζονται όλα· εδώ διαλέγεις μόνο τι εμφανίζεται.',
+                      style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4)),
+                  for (final card in todayCards)
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.only(right: 4),
+                      title: Text(card.label),
+                      value: store.prefs.show(card.key),
+                      onChanged: (on) => store.setCard(card.key, on),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
-class _BackupCardState extends State<_BackupCard> {
+/// «ΤΑ ΔΕΔΟΜΕΝΑ ΜΟΥ»: αντίγραφο ασφαλείας (όσα υπάρχουν μόνο σε αυτό το κινητό) και «Διαγραφή όλων».
+class _DataGroup extends StatefulWidget {
+  const _DataGroup({required this.store, required this.food});
+  final HealthStore store;
+  final FoodStore? food;
+
+  @override
+  State<_DataGroup> createState() => _DataGroupState();
+}
+
+class _DataGroupState extends State<_DataGroup> {
   bool _busy = false;
 
   void _say(String text, {SnackBarAction? action}) {
@@ -232,7 +199,7 @@ class _BackupCardState extends State<_BackupCard> {
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
-      final raw = await widget.food.exportRaw();
+      final raw = await widget.food!.exportRaw();
       if (raw == null) {
         _say('Δεν διαβάστηκαν τα δεδομένα. Δοκίμασε ξανά.');
         return;
@@ -308,7 +275,7 @@ class _BackupCardState extends State<_BackupCard> {
         ),
       );
       if (ok != true) return;
-      final res = await widget.food.importBackup(b.entries, b.myFoods);
+      final res = await widget.food!.importBackup(b.entries, b.myFoods);
       if (res == null) {
         _say('Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.');
         return;
@@ -339,36 +306,26 @@ class _BackupCardState extends State<_BackupCard> {
 
   @override
   Widget build(BuildContext context) {
-    final c = Aigaio.of(context);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SectionLabel('Αντίγραφο ασφαλείας'),
-          const SizedBox(height: 6),
-          Text(
-            'Το ημερολόγιο φαγητού, «Τα προϊόντα μου», οι προπονήσεις και οι ρυθμίσεις υπάρχουν μόνο σε αυτό το κινητό. '
-            'Κράτα ένα αντίγραφο (π.χ. μία φορά την εβδομάδα). Τα δεδομένα της Samsung δεν χρειάζονται: ξαναδιαβάζονται.',
-            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _busy ? null : _export,
-            icon: const Icon(Icons.save_alt_rounded),
-            label: const Text('Εξαγωγή αντιγράφου'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _import,
-            icon: const Icon(Icons.restore_rounded),
-            label: const Text('Επαναφορά από αντίγραφο'),
-          ),
-          if (_busy) ...[
-            const SizedBox(height: 10),
-            const LinearProgressIndicator(),
-          ],
-        ],
-      ),
-    );
+    final hasFood = widget.food != null;
+    return SettingsGroup(key: const ValueKey('settings-data'), children: [
+      if (hasFood) ...[
+        SettingsRow(
+          key: const ValueKey('backup-export'),
+          icon: Icons.download_rounded,
+          title: 'Εξαγωγή αντιγράφου',
+          // Φαγητό, προϊόντα, προπονήσεις και ρυθμίσεις υπάρχουν μόνο σε αυτό το κινητό· η Samsung ξαναδιαβάζεται.
+          subtitle: 'Ένα αρχείο στις Λήψεις: φαγητό, προϊόντα, προπονήσεις, ρυθμίσεις',
+          onTap: _busy ? null : _export,
+        ),
+        SettingsRow(
+          key: const ValueKey('backup-import'),
+          icon: Icons.upload_rounded,
+          title: 'Επαναφορά από αντίγραφο',
+          onTap: _busy ? null : _import,
+        ),
+      ],
+      if (_busy) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: LinearProgressIndicator()),
+      DeleteAllRow(store: widget.store, export: hasFood ? _export : null),
+    ]);
   }
 }

@@ -7,7 +7,7 @@ import 'package:flutter/rendering.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
-import '../oxygen_note.dart' show lowestText;
+import '../oxygen_note.dart' show lowestText, oxygenRangeText;
 import '../report.dart';
 import '../samsung.dart';
 import '../shown.dart';
@@ -682,7 +682,8 @@ class _PageThree extends StatelessWidget {
           'χρόνος κάτω από 90% (T90). Αναφορά: σε 350 υγιή άτομα (1 μηνός–85 ετών, ιατρικό οξύμετρο σε εργαστήριο ύπνου, '
           'χωρίς τα σφάλματα κίνησης) το ελάχιστο της νύχτας ήταν 90,4% ± 3,1% (Gries & Brooks, Chest 1996)· στους άνω '
           'των 60 οι τιμές ήταν χαμηλότερες. Δεν συγκρίνεται με τους προηγούμενους μήνες (μία ακραία τιμή ανά νύχτα)· '
-          'μετρούν οι νύχτες κάτω από 90, 85 και 80%.',
+          // Έλεγχος 9/11 (V-B-13): το εύρος που έχει ελεγχθεί η ακρίβεια του ρολογιού.
+          'μετρούν οι νύχτες κάτω από 90, 85 και 80%. $oxygenRangeText',
           style: TextStyle(fontSize: 9.5, color: c.text, height: 1.4),
         ),
         const SizedBox(height: 6),

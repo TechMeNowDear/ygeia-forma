@@ -48,6 +48,10 @@ object Link {
     private fun apply(item: DataItem): Boolean {
         val text = textOf(item) ?: return false
         val path = item.uri.path
+        if (path == Paths.WIPE) {
+            app?.let { wipe(it, WipeRule.parseAt(text)) }
+            return false
+        }
         if (path != Paths.PLAN && path != Paths.SESSION) return false
         // Από νεότερη έκδοση της εφαρμογής του κινητού (V-A-08): δεν διαβάζεται· το ρολόι ζητά ενημέρωση και κρατά ό,τι είχε
         // (ούτε «η προπόνηση του κινητού τελείωσε»).
@@ -74,6 +78,27 @@ object Link {
     }
 
     private const val ACKED = "acked"
+    private const val WIPE_PREFS = "ygeia_wipe"
+    private const val WIPE_DONE = "done"
+
+    /**
+     * «Διαγραφή όλων» από το κινητό (E3-05): αρχεία (run.json, στιγμιότυπα, ό,τι άλλο) και ρυθμίσεις του ρολογιού
+     * (πρόγραμμα, όριο, αποτελέσματα σε αναμονή) σβήνονται· μένει μόνο η ώρα αυτής της διαγραφής, για να μη γίνει ξανά.
+     * Στη μέση άσκησης περιμένει (γίνεται στο επόμενο άνοιγμα). Μετά η εφαρμογή κλείνει, ώστε να μη μείνει τίποτα στη
+     * μνήμη. Τα DataItems τα έχει ήδη σβήσει το κινητό.
+     */
+    private fun wipe(ctx: Context, at: Long) {
+        val sp = ctx.getSharedPreferences(WIPE_PREFS, Context.MODE_PRIVATE)
+        if (!WipeRule.shouldWipe(at, sp.getLong(WIPE_DONE, 0L), Repo.running != null)) return
+        try {
+            ctx.filesDir.listFiles()?.forEach { it.deleteRecursively() }
+            ctx.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+            ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE).edit().clear().commit()
+        } catch (_: Exception) {
+        }
+        sp.edit().putLong(WIPE_DONE, at).commit()
+        android.os.Process.killProcess(android.os.Process.myPid())
+    }
 
     /**
      * Το ρολόι λέει στο κινητό ποιο όριο έχει (DataItem [Paths.STATE], έλεγχος 9/11, V-A-06): το κινητό γράφει

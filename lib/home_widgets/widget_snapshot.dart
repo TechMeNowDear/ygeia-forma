@@ -75,12 +75,19 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   }
 
   final bed = plan.value(h, K.bedtime, d0), wake = plan.value(h, K.wake, d0);
-  final sleepMin = plan.value(h, K.sleepMin, d0);
   final sr = sleepRange(store.profile, today);
+  // Έλεγχος 9/11 (04-M5 / V-B-15): η κρίση «κάτω/μέσα στο εύρος» από τον μέσο όρο 7 νυχτών (τουλάχιστον 4 με τιμή),
+  // όχι από μία νύχτα· η τιμή της νύχτας μένει η μεγάλη τιμή.
+  double? week(String key) {
+    final vs = [for (var i = 0; i < 7; i++) plan.value(h, key, _minus(d0, i))].whereType<double>().toList();
+    return vs.length < 4 ? null : vs.reduce((a, b) => a + b) / vs.length;
+  }
+
+  final sleepWeek = week(K.sleepMin), breathWeek = week(K.breath);
   // Στρογγύλεμα πρώτα (έλεγχος 8/11, DATA-03): 419,5 λεπτά → 7:00, όχι 6:00.
   add(K.sleepMin, 'Ύπνος', '', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
-      range: sleepMin != null && sr != null ? sr.placeText(sleepMin) : null);
+      range: sleepWeek != null && sr != null ? '7 νύχτες ${sr.placeText(sleepWeek)}' : null);
   add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
   add(K.sleepScore, 'Σκορ', '', (v) => '${v.round()}');
   add(K.hrv, 'HRV', ' ms', (v) => '${v.round()}');
@@ -88,7 +95,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   add(K.lowHr, 'Χαμηλότεροι', ' bpm', (v) => '${v.round()}');
   add(K.ringSpo2, 'Οξυγόνο', '%', spo2AvgText, digits: 1);
   add(K.breath, 'Αναπνοές', '', (v) => dec(v), digits: 1,
-      range: plan.value(h, K.breath, d0) == null ? null : breathRange.placeText(plan.value(h, K.breath, d0)!));
+      range: breathWeek == null ? null : '7 νύχτες ${breathRange.placeText(breathWeek)}');
   // Θερμοκρασία: το Oura δίνει απόκλιση (+0,3°), το ρολόι απόλυτη τιμή καρπού (33,6 °C), που δεν δείχνεται ποτέ ως
   // «+33,6°» (έλεγχος 8/11, DATA-04). Από το ρολόι: μόνο η απόκλιση από τα συνηθισμένα, αν υπάρχουν.
   if (src == Source.oura) {

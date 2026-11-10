@@ -192,7 +192,7 @@ class _MetricPageState extends State<MetricPage> {
               ],
               if (range != null && last != null && s.scale != null) ...[
                 const SizedBox(height: 14),
-                RangeNote(value: last.$2, range: range, min: s.scale!(range).$1, max: s.scale!(range).$2, color: color),
+                RangeNote(value: last.$2, range: range, min: s.scale!(range).$1, max: s.scale!(range).$2, color: color, oneNight: s.metric == K.breath),
               ],
             ],
           ),

@@ -138,7 +138,9 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.steps, label: 'Βήματα', section: TrendSection.move, minDiff: 500, better: 1, includeToday: false),
   MetricDef(key: K.activeMin, label: 'Ενεργός χρόνος', section: TrendSection.move, minDiff: 5, better: 1, kind: ValueKind.duration, includeToday: false),
   // Άλλα
-  MetricDef(key: K.energy, label: 'Energy Score', section: TrendSection.other, minDiff: 3, better: 1),
+  // Ουδέτερο χρώμα (έλεγχος 9/11, 08-N-05): ιδιόκτητος δείκτης χωρίς ανεξάρτητη επικύρωση, που βγαίνει εν μέρει από
+  // τους ίδιους παλμούς και τη θερμοκρασία· «πέφτει» και μετά από μια μέρα με περισσότερο περπάτημα.
+  MetricDef(key: K.energy, label: 'Energy Score', section: TrendSection.other, minDiff: 3),
   // Οξυγόνο: ουδέτερο χρώμα (δεύτερος κλινικός έλεγχος M8). Μια διαφορά 1–2% είναι μέσα στο λάθος του καρπού
   // (RMSE ~2%), και αν κόψεις το κάπνισμα η ένδειξη πέφτει (λιγότερη καρβοξυαιμοσφαιρίνη): δεν είναι «χειρότερα».
   MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο (ρολόι)', section: TrendSection.other, minDiff: 1, unit: '%'),

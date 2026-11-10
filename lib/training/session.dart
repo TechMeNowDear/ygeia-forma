@@ -218,6 +218,40 @@ class Session {
   /// Υπάρχουν παλμοί (στη μνήμη ή στο αρχείο τους).
   bool get hasHr => hr.isNotEmpty || (!hrLoaded && hrCount > 0);
 
+  /// «Παλμοί σταθερού βαδίσματος» (έλεγχος 9/11, V-B-11 / 03-M2α / 08-N-03): ο μέσος όρος από το 5ο λεπτό ενεργού
+  /// χρόνου ως το «Τέλος», χωρίς τις παύσεις. Τα πρώτα λεπτά οι παλμοί ακόμα ανεβαίνουν (σταθερή κατάσταση μετά από
+  /// 3–4′, Buchheit 2014), οπότε ο μέσος όλου του περπατήματος εξαρτάται από τη διάρκεια. Αποθηκεύεται («hrs»), γιατί
+  /// οι παλμοί ζουν στο δικό τους αρχείο και δεν είναι πάντα στη μνήμη. null με λιγότερες από [steadyMinSamples] τιμές.
+  int? hrSteady;
+
+  static const steadyFromSec = 5 * 60;
+  static const steadyMinSamples = 30;
+
+  /// Η τιμή από τους παλμούς της μνήμης (όταν υπάρχουν), αλλιώς η αποθηκευμένη.
+  int? get steadyHr => hrLoaded && hr.isNotEmpty ? (hrSteady = steadyFrom(hr, pauses)) : hrSteady;
+
+  /// Υπολογισμός από [samples] ([δευτερόλεπτα από την αρχή, bpm]) και [pauses] ([αρχή, τέλος] σε δευτερόλεπτα).
+  static int? steadyFrom(List<List<int>> samples, List<List<int>> pauses) {
+    int pausedBefore(int t) {
+      var p = 0;
+      for (final x in pauses) {
+        if (x[0] >= t) continue;
+        p += (x[1] < t ? x[1] : t) - x[0];
+      }
+      return p;
+    }
+
+    var sum = 0, n = 0;
+    for (final s in samples) {
+      final t = s[0];
+      if (pauses.any((x) => t >= x[0] && t <= x[1])) continue;
+      if (t - pausedBefore(t) < steadyFromSec) continue;
+      sum += s[1];
+      n++;
+    }
+    return n < steadyMinSamples ? null : (sum / n).round();
+  }
+
   /// Η τελευταία κίνηση στην προπόνηση: το τελευταίο ✓ (ή η αρχή, αν δεν έγινε κανένα). Για την «ξεχασμένη» προπόνηση
   /// (έλεγχος 9/11, V-A-09): το τέλος της δεν είναι «τώρα», 20 ώρες μετά.
   DateTime get lastActivity {
@@ -298,7 +332,7 @@ class Session {
 
   static const _known = {
     'id', 'w', 'name', 'prog', 'start', 'end', 'items', 'feel', 'hrAvg', 'hrMax', 'cmin', 'note', 'hr', 'hrf', 'm', 'steps', 'src',
-    'hrm', 'hrg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad',
+    'hrm', 'hrg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs',
   };
 
   /// [hrInline]: οι παλμοί μέσα (όπως ως #90)· αλλιώς μόνο πόσοι είναι («hrf»), γιατί είναι στο δικό τους αρχείο.
@@ -336,6 +370,7 @@ class Session {
       if (limit != null) 'lim': limit,
       if (partial) 'part': 1,
       if (hrBad != null) 'hrbad': hrBad,
+      if (steadyHr case final v?) 'hrs': v,
     };
   }
 
@@ -403,6 +438,7 @@ class Session {
       extra: extra,
     );
     s.hrBad = opt<String>('hrbad');
+    s.hrSteady = optInt('hrs');
     // Οι παλμοί στο δικό τους αρχείο (V-A-02): δεν φορτώνονται τώρα.
     if (hr.isEmpty && hrf > 0) {
       s.hrLoaded = false;

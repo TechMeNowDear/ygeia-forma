@@ -916,6 +916,8 @@ void main() {
         'end': start + (sec + 70) * 1000,
         'hrAvg': (recent ? 106 : 113) + noise[i],
         'hrMax': (recent ? 118 : 125) + noise[i],
+        // Τιμές ανά 10″ (V-B-11: η Πρόοδος μετρά από το 5′)· τα πρώτα 5′ ζέσταμα, πιο χαμηλά.
+        'hr': [for (var t = 0; t <= sec; t += 10) [t, (recent ? 106 : 113) + noise[i] - (t < 300 ? 10 : 0)]],
         'cardio': {
           'activity': 'walk',
           'sec': sec,
@@ -1528,38 +1530,51 @@ void main() {
     await expectLater(find.byKey(key), matchesGoldenFile('shots/$name.png'));
   }
 
-  testWidgets('Ρυθμίσεις · απόρρητο', (t) {
+  HealthStore settingsStore() {
     final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
     store.history = sampleHistory(now, store.data!);
-    return privacyShot(t, 'P1_settings_privacy', SettingsPage(store: store, food: sampleFoodStore(now)),
-        size: const Size(400, 2300), act: (t) async => t.ensureVisible(find.byKey(const ValueKey('settings-privacy'))));
-  });
-  testWidgets('Ρυθμίσεις · απόρρητο · αναφορές κλειστές · σκοτεινό', (t) async {
+    return store;
+  }
+
+  testWidgets('Ρυθμίσεις · Fold κλειστό', (t) => privacyShot(t, 'P1_settings', SettingsPage(store: settingsStore(), food: sampleFoodStore(now)),
+      size: const Size(400, 1500)));
+  testWidgets('Ρυθμίσεις · Fold ανοιχτό · σκοτεινό', (t) => privacyShot(
+      t, 'P1c_settings_fold_open_dark', SettingsPage(store: settingsStore(), food: sampleFoodStore(now)),
+      size: const Size(750, 1300), brightness: Brightness.dark));
+  testWidgets('Ρυθμίσεις · αναφορές κλειστές · σκοτεινό', (t) async {
     final r = ErrorReporter();
     await r.setEnabled(false);
-    await privacyShot(t, 'P1b_privacy_off_dark', Scaffold(body: ListView(padding: const EdgeInsets.all(16), children: [PrivacyCard(store: null, reporter: r)])),
-        size: const Size(400, 600), brightness: Brightness.dark);
+    await privacyShot(t, 'P1b_privacy_off_dark', Scaffold(body: ListView(padding: const EdgeInsets.all(16), children: [PrivacyGroup(reporter: r)])),
+        size: const Size(400, 420), brightness: Brightness.dark);
   });
-  testWidgets('Διαγραφή όλων · βήμα 1', (t) => privacyShot(t, 'P2_delete_all_step1', const DeleteAllPage(store: null)));
-  testWidgets('Διαγραφή όλων · βήμα 2 · δεν έγινε', (t) => privacyShot(
+  testWidgets('Διαγραφή όλων · φύλλο πάνω από τις Ρυθμίσεις', (t) => privacyShot(
         t,
-        'P3_delete_all_step2_failed',
-        DeleteAllPage(store: null, initialStep: 2, wipe: () async => false),
+        'P2_delete_sheet',
+        SettingsPage(store: settingsStore(), food: sampleFoodStore(now)),
         size: const Size(400, 900),
-        act: (t) => t.tap(find.byKey(const ValueKey('wipe-confirm'))),
+        act: (t) async {
+          await t.ensureVisible(find.byKey(const ValueKey('privacy-delete')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('privacy-delete')));
+        },
       ));
-  testWidgets('Διαγραφή όλων · βήμα 1 · 360 dp, γράμματα 2×', (t) => privacyShot(
+  testWidgets('Διαγραφή όλων · «Κατάλαβα» · δεν έγινε', (t) => privacyShot(
         t,
-        'P4_delete_all_360_2x',
-        const DeleteAllPage(store: null),
-        size: const Size(360, 3400),
+        'P3_delete_sheet_failed',
+        Scaffold(body: DeleteAllSheet(understood: true, wipe: () async => false, export: () async {})),
+        size: const Size(400, 900),
+        act: (t) async {
+          await t.ensureVisible(find.byKey(const ValueKey('wipe-confirm')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('wipe-confirm')));
+        },
+      ));
+  testWidgets('Διαγραφή όλων · Fold κλειστό, γράμματα 2×', (t) => privacyShot(
+        t,
+        'P4_delete_sheet_2x',
+        Scaffold(body: DeleteAllSheet(export: () async {})),
+        size: const Size(400, 1900),
         textScale: 2,
-      ));
-  testWidgets('Διαγραφή όλων · βήμα 2 · Fold ανοιχτό', (t) => privacyShot(
-        t,
-        'P5_delete_all_step2_fold',
-        DeleteAllPage(store: null, initialStep: 2, wipe: () async => true),
-        size: const Size(750, 900),
       ));
 }
 

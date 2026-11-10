@@ -34,7 +34,9 @@ class ProgressPage extends StatefulWidget {
 }
 
 class _ProgressPageState extends State<ProgressPage> {
-  TrendPeriod _period = TrendPeriod.month;
+  // 3 μήνες από προεπιλογή (έλεγχος 9/11, V-B-10 / 03-M1): η βελτίωση με την προπόνηση είναι σταδιακή, και δύο
+  // διαδοχικοί μήνες τη δείχνουν σπάνια (3–14%)· στο τρίμηνο 28–72%.
+  TrendPeriod _period = TrendPeriod.quarter;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +68,10 @@ class _ProgressPageState extends State<ProgressPage> {
           ]),
         );
         final summary = _SummaryCard(walk: walk, strength: strength, body: body);
-        final walkCard = _WalkCard(walk: walk, period: _period);
+        final w = progressWindows(today, _period);
+        // RT-12: περπατήματα χωρίς GPS δεν μετράνε· λέγεται, ώστε να μη μοιάζει «χαλασμένη» η Πρόοδος.
+        final noGps = t.sessions.where((s) => s.isCardio && s.finished && s.gps == false && !dayOf(s.start).isBefore(w.prevFrom)).length;
+        final walkCard = _WalkCard(walk: walk, period: _period, points: walkHrPoints(t.sessions, w.prevFrom, w.end), window: w, noGps: noGps);
         final strengthCard = _StrengthCard(items: strength);
         final bodyCard = health == null ? null : _BodyCard(results: body, onOpenTrends: widget.onOpenTrends);
         final note = Padding(
@@ -214,9 +219,20 @@ Widget _foot(BuildContext context, String t) =>
     Padding(padding: const EdgeInsets.only(top: 8), child: Text(t, style: TextStyle(fontSize: 12.5, height: 1.4, color: Aigaio.of(context).textSecondary)));
 
 class _WalkCard extends StatelessWidget {
-  const _WalkCard({required this.walk, required this.period});
+  const _WalkCard({required this.walk, required this.period, this.points = const [], this.window, this.noGps = 0});
   final WalkProgress walk;
+
+  /// Περπατήματα των δύο περιόδων χωρίς GPS (δεν μετράνε).
+  final int noGps;
+  String get _noGpsText => noGps == 0
+      ? ''
+      : ' ${noGps == 1 ? '1 περπάτημα' : '$noGps περπατήματα'} χωρίς GPS δεν ${noGps == 1 ? 'μετράει' : 'μετράνε'}: '
+          'στο ρολόι άνοιξε την τοποθεσία πριν από το «Ξεκίνα».';
   final TrendPeriod period;
+
+  /// Μία τιμή ανά περπάτημα (παλμοί σταθερού βαδίσματος), και στις δύο περιόδους.
+  final List<(DateTime, double)> points;
+  final ({DateTime from, DateTime end, DateTime prevFrom, DateTime prevEnd})? window;
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +258,7 @@ class _WalkCard extends StatelessWidget {
             key: const ValueKey('prog-walk-few'),
           ),
           _foot(context, 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση του μήνα βγαίνει περίπου 5–6 εβδομάδες μετά το πρώτο. '
-              'Μετράνε μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS.'),
+              'Μετράνε μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS.$_noGpsText'),
         ]),
       );
     }
@@ -257,9 +273,11 @@ class _WalkCard extends StatelessWidget {
     String vals(TrendResult r, String Function(double) f) =>
         r.previous == null || r.current == null ? (r.current == null ? '—' : 'τώρα ${f(r.current!)}') : '${f(r.previous!)} → ${f(r.current!)}';
 
+    // V-B-11: με άλλο ρυθμό οι παλμοί δεν συγκρίνονται (ουδέτερο)· η πύλη ρυθμού μένει (όχι ANCOVA).
     final hrExtra = w.hr.changed && w.hrGoodness == 0
-        ? '${_paceRelText(w.paceRel)}: δεν μετρά ως βελτίωση ή χειροτέρευση'
+        ? '${_paceRelText(w.paceRel)}: άλλος ρυθμός, δεν συγκρίνεται'
         : _paceRelText(w.paceRel);
+    final win = window;
     final hours = w.secNow / 3600;
     return AppCard(
       key: const ValueKey('prog-walk'),
@@ -269,9 +287,28 @@ class _WalkCard extends StatelessWidget {
           key: const ValueKey('prog-walk-hr'),
           label: 'Παλμοί στο περπάτημα',
           detail: vals(w.hr, (v) => '${v.round()}') + (w.hr.current == null ? '' : ' bpm'),
-          extra: hrExtra,
+          extra: hrExtra.isEmpty ? 'από το 5ο λεπτό ως το «Τέλος»' : 'από το 5ο λεπτό · $hrExtra',
           pill: pillFor(w.hr, goodness: w.hrGoodness),
         ),
+        // Μία τιμή ανά περπάτημα (V-B-10): φαίνεται η πορεία, όχι μόνο δύο μεσαίες τιμές.
+        if (points.length >= 2 && win != null)
+          Padding(
+            key: const ValueKey('prog-walk-chart'),
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: LineChart(
+              points: points,
+              height: 120,
+              minRange: 10,
+              from: win.prevFrom,
+              to: win.end,
+              color: c.heart,
+              format: (v) => '${v.round()}',
+              levels: [
+                if (w.hr.previous != null) (win.prevFrom, win.prevEnd, w.hr.previous!, c.textTertiary),
+                if (w.hr.current != null) (win.from, win.end, w.hr.current!, c.heart),
+              ],
+            ),
+          ),
         _Row(
           key: const ValueKey('prog-walk-pace'),
           label: 'Ρυθμός',
@@ -297,7 +334,7 @@ class _WalkCard extends StatelessWidget {
           pill: TrendPill(w.countNow == w.countBefore ? 'Ίδιο' : '${w.countNow > w.countBefore ? '+' : '−'}${(w.countNow - w.countBefore).abs()}'),
           line: false,
         ),
-        _foot(context, 'Μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS. ${w.countNow} τώρα, ${w.countBefore} πριν.'),
+        _foot(context, 'Μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS. ${w.countNow} τώρα, ${w.countBefore} πριν.$_noGpsText'),
       ]),
     );
   }
@@ -482,7 +519,9 @@ Future<void> _sheet(BuildContext context, String key, String title, List<(String
 Future<void> showWalkProgressInfo(BuildContext context) => _sheet(context, 'prog-walk-sheet', 'Πρόοδος στο περπάτημα', const [
       (
         'Τι δείχνει',
-        'Παλμοί: ο μέσος όρος σε κάθε περπάτημα, χωρίς τις παύσεις. Όσο βελτιώνεται η φυσική κατάσταση, η ίδια ταχύτητα θέλει '
+        'Παλμοί: ο μέσος όρος σε κάθε περπάτημα από το 5ο λεπτό ως το «Τέλος», χωρίς τις παύσεις (τα πρώτα λεπτά οι παλμοί '
+            'ακόμα ανεβαίνουν, και θα έκαναν τα σύντομα περπατήματα να μοιάζουν αλλιώς). Το γράφημα έχει μία τελεία για κάθε '
+            'περπάτημα. Όσο βελτιώνεται η φυσική κατάσταση, η ίδια ταχύτητα θέλει '
             'λιγότερους παλμούς. Ρυθμός: λεπτά ανά χιλιόμετρο, χωρίς τις παύσεις. Πτώση παλμών στο 1′: πόσο πέφτουν οι παλμοί '
             'στο πρώτο λεπτό μετά το «Τέλος». Εξαρτάται κυρίως από το πόσο γρήγορα περπάτησες (πιο γρήγορα = μεγαλύτερη πτώση), '
             'γι\' αυτό δεν τη λέω «καλύτερα» ή «χειρότερα»· από κάτω φαίνονται οι παλμοί στο τέλος, για να συγκρίνεις ίδια ένταση.'
@@ -500,7 +539,8 @@ Future<void> showWalkProgressInfo(BuildContext context) => _sheet(context, 'prog
       ),
       (
         'Τι το επηρεάζει',
-        'Ζέστη, ανηφόρες, κούραση, λίγος ύπνος, καφές, αφυδάτωση και φάρμακα που αλλάζουν τους παλμούς. Για πιο καθαρή σύγκριση, '
+        'Η ζέστη και οι ανηφόρες ανεβάζουν τους παλμούς στον ίδιο ρυθμό: καλοκαίρι με φθινόπωρο δεν συγκρίνονται καθαρά. '
+            'Το ίδιο κούραση, λίγος ύπνος, καφές, αφυδάτωση και φάρμακα που αλλάζουν τους παλμούς. Για πιο καθαρή σύγκριση, '
             'περπάτα όσο γίνεται στην ίδια διαδρομή. Είναι ένδειξη, όχι ιατρικός έλεγχος.'
       ),
       ('Ποια περπατήματα μετράνε', 'Μόνο από το ρολόι, με GPS, με τουλάχιστον 15 λεπτά ενεργό χρόνο και 500 μέτρα.'),

@@ -7,6 +7,7 @@ library;
 
 import 'dart:math' as math;
 
+import '../format.dart' show daysBetween;
 import 'equipment.dart';
 import 'program.dart';
 import 'session.dart';
@@ -99,7 +100,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // Ανοίγματα με λάστιχο, από πριν το «ανά πλευρά» (π.χ. 20): στο πλησιέστερο που βγαίνει (ελάχιστο 30/πλευρά).
   if (k == LoadKind.bandPair && lastLoad != null) lastLoad = snap(k, lastLoad);
   final done = last.done;
-  final gap = DateTime(today.year, today.month, today.day).difference(DateTime(lastDay.year, lastDay.month, lastDay.day)).inDays;
+  // Ημερολογιακές μέρες σε UTC (έλεγχος 9/11, RT-17 / V-B-17): πάνω από την αλλαγή ώρας του Μαρτίου, 15 μέρες δεν
+  // μετριούνται πια 14 (14 μέρες + 23 ώρες).
+  final gap = daysBetween(lastDay, today);
 
   // Μετά από πάνω από 2 εβδομάδες: περίπου 10% πιο ελαφριά.
   if (gap > 14 && lastLoad != null && hasLoad(k)) {
@@ -152,8 +155,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       change: Change.hold,
       reason: k == LoadKind.bar
           ? 'Μπάρα χωρίς βραχίονες ασφαλείας: έμεινες με $ra ρεζέρβα. Ίδια κιλά, κράτα 2 ή περισσότερες.'
-          : 'Έμεινες με $ra ρεζέρβα. ${usesKg(k) ? 'Ίδια κιλά' : 'Ίδιο φορτίο'}, και σταμάτα το σετ όταν σου μένουν 2: έτσι η πίεση '
-              'δεν ανεβαίνει απότομα.',
+          // Έλεγχος 9/11 (V-B-07, AHA 2023): με ρεζέρβα 2 η πίεση ανεβαίνει λιγότερο, όχι «δεν ανεβαίνει».
+          : 'Έμεινες με $ra ρεζέρβα. ${usesKg(k) ? 'Ίδια κιλά' : 'Ίδιο φορτίο'}, και σταμάτα το σετ όταν σου μένουν 2: η πίεση '
+              'ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση· πόση ένταση σου επιτρέπεται, το λέει ο γιατρός.',
     );
   }
 

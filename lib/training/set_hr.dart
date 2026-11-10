@@ -3,8 +3,11 @@
 /// Ορισμοί (ίδιοι στην οθόνη, στο ⓘ και στις δοκιμές):
 /// - «♥ σετ»: ο μέσος όρος των παλμών στα [setWindow] δευτερόλεπτα ως το ✓ του σετ. Ένα σετ 8–12 επαναλήψεων
 ///   κρατά περίπου τόσο· με σταθερό παράθυρο τα σετ συγκρίνονται μεταξύ τους χωρίς να ξέρουμε πότε ξεκίνησε το καθένα.
-/// - «♥ διάλειμμα»: ο χαμηλότερος μέσος όρος [restWindow] δευτερολέπτων ανάμεσα στο ✓ και στην αρχή του επόμενου σετ
-///   (ως πόσο έπεσαν οι παλμοί). Μόνο αν το διάλειμμα κράτησε τουλάχιστον [minRest] δευτερόλεπτα.
+/// - «♥ διάλειμμα»: ο μέσος όρος των τελευταίων [restWindow] δευτερολέπτων πριν από την αρχή του επόμενου σετ (οι
+///   παλμοί λίγο πριν ξαναρχίσεις). Μόνο αν το διάλειμμα κράτησε τουλάχιστον [minRest] δευτερόλεπτα. Έλεγχος 9/11
+///   (03-Χ1): πριν ήταν ο ΧΑΜΗΛΟΤΕΡΟΣ μέσος 10″ όλου του διαλείμματος· το ελάχιστο πολλών θορυβωδών μέσων πέφτει κάτω
+///   από την αληθινή τιμή (−0,5 ως −3,9 bpm, περισσότερο στα μεγάλα διαλείμματα), άρα «καλύτερη πτώση» από τεχνούργημα.
+/// - Παράθυρα [από, έως): «30″» = 30 τιμές, «10″» = 10 (έλεγχος 9/11, 03-Χ4· πριν ήταν κλειστά και στις δύο άκρες).
 /// - Κάθε μέσος όρος θέλει τουλάχιστον [minSamples] τιμές μέσα στο παράθυρο, αλλιώς «—» (καλύτερα κενό παρά
 ///   αριθμός από μία-δύο τιμές).
 /// - Ο καρπός στα βάρη μετρά κατά προσέγγιση (Boudreaux et al., Med Sci Sports Exerc 2018): γι' αυτό μόνο μέσοι όροι,
@@ -52,26 +55,21 @@ int _first(List<List<int>> hr, num t) {
   return lo;
 }
 
-/// Μέσος όρος των τιμών με χρόνο στο [from, to] (δευτερόλεπτα από την αρχή, ταξινομημένες), ή null με λιγότερες
+/// Μέσος όρος των τιμών με χρόνο στο [from, to) (δευτερόλεπτα από την αρχή, ταξινομημένες), ή null με λιγότερες
 /// από [minSamples].
 int? meanIn(List<List<int>> hr, num from, num to) {
   var sum = 0, n = 0;
-  for (var i = _first(hr, from); i < hr.length && hr[i][0] <= to; i++) {
+  for (var i = _first(hr, from); i < hr.length && hr[i][0] < to; i++) {
     sum += hr[i][1];
     n++;
   }
   return n < minSamples ? null : (sum / n).round();
 }
 
-/// Ο χαμηλότερος μέσος όρος [restWindow]″ μέσα στο [from, to], ή null.
-int? lowestIn(List<List<int>> hr, num from, num to) {
+/// Ο μέσος όρος των τελευταίων [restWindow]″ του διαλείμματος [from, to), ή null (μικρό διάλειμμα, λίγες τιμές).
+int? restIn(List<List<int>> hr, num from, num to) {
   if (to - from < minRest) return null;
-  int? best;
-  for (var i = _first(hr, from); i < hr.length && hr[i][0] + restWindow <= to; i++) {
-    final m = meanIn(hr, hr[i][0], hr[i][0] + restWindow);
-    if (m != null && (best == null || m < best)) best = m;
-  }
-  return best;
+  return meanIn(hr, to - restWindow, to);
 }
 
 /// Παλμοί ανά σετ για κάθε άσκηση της [s] (ίδια σειρά με [Session.items]). Χωρίς παλμούς: κενή λίστα.
@@ -107,7 +105,7 @@ List<ExHr> sessionSetHr(Session s) {
                 final n = nextAfter(end);
                 return SetHr(
                   set: meanIn(hr, end - setWindow, end),
-                  rest: n == null ? null : lowestIn(hr, end, n - setWindow),
+                  rest: n == null ? null : restIn(hr, end, n - setWindow),
                 );
               }(),
         ];

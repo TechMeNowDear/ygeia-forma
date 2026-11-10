@@ -28,6 +28,11 @@ object Paths {
      * μορφής). Το κινητό γράφει «Στο ρολόι ✓ όριο 140» μόνο όταν το δει. Νέο path: το παλιό κινητό το αγνοεί.
      */
     const val STATE = "/ygeia/wstate"
+    /**
+     * Κινητό → ρολόι (DataItem, έλεγχος 9/11, E3-05): «Διαγραφή όλων των δεδομένων» στο κινητό. `{"at": ms}`. Το ρολόι
+     * σβήνει τα δικά του αρχεία και ρυθμίσεις όταν το δει (όχι στη μέση άσκησης). Νέο path: το παλιό ρολόι το αγνοεί.
+     */
+    const val WIPE = "/ygeia/wipe"
     const val KEY = "json"
 
     /** Δυνατότητα που δηλώνει η εφαρμογή του ρολογιού (res/values/wear.xml), για να τη βρίσκει το κινητό. */
@@ -433,13 +438,14 @@ class HrStats(val start: Long, private val step: Int = 1) {
         /**
          * Πτώση παλμών στο 1ο λεπτό μετά το «Τέλος» (Cole et al., N Engl J Med 1999· εδώ μόνο για σύγκριση με τον εαυτό σου):
          * παλμοί στο τέλος = μέσος όρος των 10″ ως το «Τέλος»· παλμοί στο 1′ = μέσος όρος από 55″ ως 65″ μετά. Και τα δύο
-         * θέλουν τουλάχιστον 5 τιμές, αλλιώς null (καλύτερα τίποτα παρά λάθος αριθμός).
+         * θέλουν τουλάχιστον 5 τιμές, αλλιώς null (καλύτερα τίποτα παρά λάθος αριθμός). Παράθυρα [από, έως): «10″» = 10
+         * τιμές, όπως στο ⓘ (έλεγχος 9/11, 03-Χ4· πριν ήταν κλειστά και στις δύο άκρες, δηλαδή 11).
          */
         fun recovery(samples: List<IntArray>, endSec: Int): Pair<Int, Int>? {
             fun mean(from: Int, to: Int): Int? {
                 var sum = 0
                 var n = 0
-                for (s in samples) if (s[0] in from..to) {
+                for (s in samples) if (s[0] >= from && s[0] < to) {
                     sum += s[1]
                     n++
                 }
@@ -720,4 +726,16 @@ fun pace(meters: Double, sec: Long): String {
     if (meters < 50 || sec <= 0) return "—"
     val p = (sec / (meters / 1000.0)).toLong()
     return "%d′%02d″".format(p / 60, p % 60)
+}
+
+/** Πότε σβήνει το ρολόι τα δεδομένα του μετά από «Διαγραφή όλων» στο κινητό (καθαρό, με δοκιμές). */
+object WipeRule {
+    /** [at]: πότε ζητήθηκε· [done]: η τελευταία διαγραφή που έγινε εδώ· [running]: τρέχει άσκηση (τότε περιμένει). */
+    fun shouldWipe(at: Long, done: Long, running: Boolean): Boolean = at > 0 && at > done && !running
+
+    fun parseAt(text: String?): Long = try {
+        if (text == null) 0L else org.json.JSONObject(text).optLong("at", 0L)
+    } catch (_: Exception) {
+        0L
+    }
 }

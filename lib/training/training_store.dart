@@ -413,6 +413,8 @@ class TrainingStore extends ChangeNotifier {
           s.hrInFile = true;
           s.hrCount = s.hr.length;
           if (_release.remove(s.id)) {
+            // Οι «παλμοί σταθερού βαδίσματος» κρατιούνται πριν φύγουν οι παλμοί από τη μνήμη (έλεγχος 9/11, V-B-11).
+            s.hrSteady = s.steadyHr;
             s.hr.clear();
             s.hrLoaded = false;
           }

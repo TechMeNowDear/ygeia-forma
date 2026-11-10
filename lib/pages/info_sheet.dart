@@ -195,8 +195,11 @@ class RangeBar extends StatelessWidget {
 
 /// Μία γραμμή κάτω από την τιμή: πού βρίσκεται σε σχέση με το εύρος, με την πηγή σε μικρά γράμματα.
 class RangeNote extends StatelessWidget {
-  const RangeNote({super.key, required this.value, required this.range, required this.min, required this.max, required this.color});
+  const RangeNote({super.key, required this.value, required this.range, required this.min, required this.max, required this.color, this.oneNight = false});
   final double value;
+
+  /// Τιμή μίας νύχτας (έλεγχος 9/11, 04-M5 / V-B-15): το εύρος αφορά τον μέσο όρο πολλών νυχτών· λέγεται ρητά.
+  final bool oneNight;
   final RefRange range;
   final double min;
   final double max;
@@ -210,7 +213,8 @@ class RangeNote extends StatelessWidget {
       children: [
         RangeBar(value: value, range: range, min: min, max: max, color: color),
         const SizedBox(height: 6),
-        Text('${_cap(range.placeText(value))} · ${range.text}',
+        Text('${oneNight ? 'Μία νύχτα: ${range.placeText(value)}' : _cap(range.placeText(value))} · ${range.text}'
+            '${oneNight ? '. Μετρά ο μέσος όρος πολλών νυχτών.' : ''}',
             style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.35)),
       ],
     );

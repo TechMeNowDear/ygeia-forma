@@ -608,7 +608,7 @@ void main() {
       await _pump(t, SleepPage(store: s, now: _now), size: const Size(400, 3200));
       final rows = t.widgetList<InfoRow>(find.byType(InfoRow)).toList();
       expect(rows.firstWhere((r) => r.label == 'Παλμοί στον ύπνο').value, '$hr bpm');
-      expect(rows.firstWhere((r) => r.label == 'Οξυγόνο, χαμηλότερη μέτρηση').value, startsWith(low));
+      expect(rows.firstWhere((r) => r.label == 'Οξυγόνο τη νύχτα, χαμηλότερη τιμή').value, startsWith(low));
       expect(t.widgetList<DurationValue>(find.byType(DurationValue)).first.minutes, n.minutes);
 
       // «Εκτός συνηθισμένου» (από το ιστορικό, όπως η κάρτα)
