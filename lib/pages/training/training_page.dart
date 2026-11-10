@@ -352,7 +352,7 @@ class _TrainingPageState extends State<TrainingPage> {
     final aux = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
     if (w == null) {
       children.add(Text('$dayName: ξεκούραση', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)));
-      children.add(Text('Αν θες, διάλεξε προπόνηση από το ⋮.', style: TextStyle(fontSize: 14, color: c.textSecondary)));
+      children.add(Text('Αν θες, διάλεξε προπόνηση από τις τρεις τελείες, πάνω δεξιά.', style: TextStyle(fontSize: 14, color: c.textSecondary)));
     } else if (w.isCardio) {
       final cardio = w.cardio!;
       children.addAll([

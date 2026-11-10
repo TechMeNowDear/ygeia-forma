@@ -50,23 +50,17 @@ class _DevicesPageState extends State<DevicesPage> {
     Widget row(String title, String? sub, _Kind k, {bool line = true}) => Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
-          // Ετικέτα και τίτλος· αν δεν χωρούν, η ετικέτα πάει ολόκληρη από κάτω (ποτέ κομμένη).
-          child: Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 10,
-            runSpacing: 6,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 180),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Text(title, style: TextStyle(fontSize: 15, height: 1.35, color: c.text)),
-                  if (sub != null) Text(sub, style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
-                ]),
-              ),
-              tag(k),
-            ],
-          ),
+          // Τίτλος αριστερά, ετικέτα δεξιά· με πολύ μεγάλα γράμματα η ετικέτα πάει από κάτω (ποτέ κομμένη).
+          child: () {
+            final words = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text(title, style: TextStyle(fontSize: 15, height: 1.35, color: c.text)),
+              if (sub != null) Text(sub, style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
+            ]);
+            if (veryLargeText(context)) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [words, const SizedBox(height: 6), tag(k)]);
+            }
+            return Row(children: [Expanded(child: words), const SizedBox(width: 10), tag(k)]);
+          }(),
         );
     Widget device(String key, IconData icon, String name, String what, List<Widget> rows) => AppCard(
           key: _keys[key],
@@ -177,7 +171,7 @@ class _DevicesPageState extends State<DevicesPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Ανοίγει από κάθε ⓘ (στο σωστό σημείο) και από το «Τα στοιχεία μου».',
+                  'Ανοίγει από κάθε «i» (στο σωστό σημείο) και από το «Τα στοιχεία μου».',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: c.textSecondary),
                 ),
