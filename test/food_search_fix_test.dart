@@ -412,7 +412,8 @@ void main() {
       await _pump(t, QuantitySheet(food: store, item: _food('C20360'), initialGrams: 1234, meal: Meal.lunch),
           size: const Size(360, 2400), textScale: 2.0);
       expect(t.takeException(), isNull);
-      expect(find.text('Υδατάνθρ.'), findsOneWidget);
+      // Σχέδια 9/11 (9α): με μεγάλα γράμματα τα θρεπτικά πάνε σε 2×2 και η λέξη γράφεται ολόκληρη.
+      expect(find.text('Υδατάνθρακες'), findsOneWidget);
     });
   });
 

@@ -108,9 +108,10 @@ class _DevicesPageState extends State<DevicesPage> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
-            child: ListView(
+            // Όλη η σελίδα χτισμένη (όχι ListView): το ⓘ πρέπει να βρίσκει και την τελευταία ενότητα για να πάει εκεί.
+            child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Text.rich(
                   TextSpan(children: [
                     const TextSpan(text: 'Από εδώ έρχονται οι αριθμοί της εφαρμογής. '),
@@ -180,7 +181,7 @@ class _DevicesPageState extends State<DevicesPage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: c.textSecondary),
                 ),
-              ],
+              ]),
             ),
           ),
         ),
