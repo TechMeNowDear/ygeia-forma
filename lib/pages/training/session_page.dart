@@ -362,12 +362,12 @@ class _SessionPageState extends State<SessionPage> {
     }
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // Σχέδια 9/11 (6β): ελληνικό όνομα πρώτα, αγγλικό σε γκρι· «3 σετ × 12–15 · άφησε 2 · ξεκούραση 1:30».
+        // Σχέδια 9/11 (6β): «3 σετ × 12–15 · άφησε 2 · ξεκούραση 1:30». (Το αγγλικό δεν μπαίνει: η βιβλιοθήκη έχει
+        // μόνο λέξεις αναζήτησης, όχι σύντομο όνομα.)
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(exName(e.ex), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, color: c.text)),
-              if ((ex?.en ?? '').isNotEmpty) Text(ex!.en, style: TextStyle(fontSize: 13, color: c.textSecondary)),
             ]),
           ),
           if (ex != null && lib != null)

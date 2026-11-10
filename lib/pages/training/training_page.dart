@@ -373,7 +373,6 @@ class _TrainingPageState extends State<TrainingPage> {
       for (var n = 0; n < shown.length; n++) {
         final item = shown[n];
         final tg = t.targetFor(item);
-        final en = ExLibrary.loaded?.byId(item.ex)?.en ?? '';
         final k = item.kind;
         // Σχέδια 9/11 (6α): «ανεβαίνει» αντί για «↑», σε λέξη· +1 επανάληψη γράφεται στη γραμμή του στόχου.
         final (String, Color)? pill = switch (tg.change) {
@@ -394,7 +393,6 @@ class _TrainingPageState extends State<TrainingPage> {
                 child: Text.rich(
                   TextSpan(children: [
                     TextSpan(text: exName(item.ex), style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
-                    if (en.isNotEmpty) TextSpan(text: ' · $en', style: TextStyle(color: c.textSecondary)),
                   ]),
                   style: const TextStyle(fontSize: 15, height: 1.35),
                 ),

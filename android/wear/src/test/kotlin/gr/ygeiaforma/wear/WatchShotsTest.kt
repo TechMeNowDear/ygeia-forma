@@ -76,9 +76,10 @@ class WatchShotsTest {
         Repo.alarm.limit = null
     }
 
-    private fun shot(name: String, ambient: Boolean = false) {
+    private fun shot(name: String, ambient: Boolean = false, prep: (WatchView) -> Unit = {}) {
         val v = WatchView(RuntimeEnvironment.getApplication(), noop)
         v.ambient = ambient
+        prep(v)
         val spec = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
         v.measure(spec, spec)
         v.layout(0, 0, size, size)
@@ -111,6 +112,10 @@ class WatchShotsTest {
 
         Repo.screen = Repo.Screen.HOME
         shot("W1_home")
+        // Σχέδια 9/11: τα γράμματα ακολουθούν τη ρύθμιση μεγέθους του ρολογιού, ως 1,3×.
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W1c_home_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         val s = LiveSession.fromPlan(Repo.plan!!.todayWorkout!!, now - 18 * 60_000)
         Repo.local = s
@@ -165,6 +170,9 @@ class WatchShotsTest {
         Repo.bpmAt = now
         Repo.screen = Repo.Screen.WALK
         shot("W7_walk")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W7g_walk_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         // 9/11 (V-A-04): περπάτημα με όριο, χωρίς κανέναν παλμό: «το όριο δεν σε προσέχει».
         Repo.alarm.limit = 140
@@ -172,6 +180,8 @@ class WatchShotsTest {
         Repo.bpmAt = 0
         Repo.hrSilent = HrSilence.Silence.NEVER
         shot("W7d_walk_no_hr_limit")
+        // Σχέδια 9/11 (7γ): μετά το «Εντάξει» μένει «♥ —» σε κεχριμπάρι.
+        shot("W7f_walk_no_hr_after_ok") { it.noHrSeen = true }
         Repo.hrSilent = null
         Repo.bpm = 104
         Repo.bpmAt = now
