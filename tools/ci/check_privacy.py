@@ -135,6 +135,7 @@ KNOWN_HOSTS = {
 NOT_CONTACTED = {
     'ciqual.anses.fr': 'σύνδεσμος πηγής (food_sources.dart)', 'fdc.nal.usda.gov': 'σύνδεσμος πηγής (food_sources.dart)',
     'github.com': 'μόνο μέσα στο User-Agent προς το Open Food Facts',
+    'www.apache.org': 'μόνο κείμενο στη σελίδα «Άδειες λογισμικού» (privacy_page.dart)',
 }
 import os
 for base in ('lib', 'android/app/src/main', 'android/wear/src/main'):
