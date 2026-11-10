@@ -234,6 +234,15 @@ class WatchShotsTest {
         // Μ3: το πρώτο «Τέλος» στο περπάτημα: «όσο περπατάς ακόμα», στη θέση του «χωρίς GPS».
         Repo.notice = WALK_FINISH_NOTICE
         shot("W7h_walk_finish_notice")
+        // S1: «αργή δόνηση» πρώτη, ολόκληρη σε όλη την οθόνη, μαζί με το μήνυμα για το GPS.
+        Repo.notice = withSafety(SLOW_ALARM_TEXT, "Χωρίς GPS: η απόσταση από τα βήματα.")
+        Repo.openNotice = true
+        shot("W7k_walk_slow_alarm")
+        RuntimeEnvironment.setFontScale(1.3f)
+        Repo.openNotice = true
+        shot("W7l_walk_slow_alarm_font13")
+        RuntimeEnvironment.setFontScale(1f)
+        Repo.openNotice = false
         // RT-18: μόνο παλμοί.
         Repo.notice = "Μόνο παλμοί σε αυτό το περπάτημα."
         Repo.gps = false
