@@ -897,14 +897,16 @@ void main() {
         await freePick(t, 'πλαγιες', 'lateral_raise');
       }));
 
-  // Πρόοδος (9/11): δύο μήνες περπατήματος από το ρολόι και μία προπόνηση πριν από τον μήνα. Δοκιμαστικά νούμερα.
+  // Πρόοδος (9/11): έξι μήνες περπατήματος από το ρολόι (η Πρόοδος δείχνει πια 3 μήνες, V-B-10) και μία προπόνηση πριν
+  // από τον μήνα. Δοκιμαστικά νούμερα.
   void progressData(TrainingStore st) {
     const noise = [2, -2, 1, -1, 0, 2, -1, -2, 1, 0, -1, 2, 1, -1, 0, 2, -2, 1, 0, -1];
     var i = 0;
-    for (var ago = 58; ago >= 1; ago -= 3, i++) {
-      final recent = ago < 30;
+    for (var ago = 178; ago >= 1; ago -= 3, i++) {
+      final recent = ago < 90;
       final start = DateTime(trainAt.year, trainAt.month, trainAt.day - ago, 19).millisecondsSinceEpoch;
-      final sec = 1800 + noise[i] * 40;
+      final n = noise[i % noise.length];
+      final sec = 1800 + n * 40;
       final km = (recent ? 2.36 : 2.28) * sec / 1800;
       st.importWatch({
         'v': 1,
@@ -914,10 +916,10 @@ void main() {
         'name': 'Περπάτημα',
         'start': start,
         'end': start + (sec + 70) * 1000,
-        'hrAvg': (recent ? 106 : 113) + noise[i],
-        'hrMax': (recent ? 118 : 125) + noise[i],
+        'hrAvg': (recent ? 106 : 113) + n,
+        'hrMax': (recent ? 118 : 125) + n,
         // Τιμές ανά 10″ (V-B-11: η Πρόοδος μετρά από το 5′)· τα πρώτα 5′ ζέσταμα, πιο χαμηλά.
-        'hr': [for (var t = 0; t <= sec; t += 10) [t, (recent ? 106 : 113) + noise[i] - (t < 300 ? 10 : 0)]],
+        'hr': [for (var t = 0; t <= sec; t += 10) [t, (recent ? 106 : 113) + n - (t < 300 ? 10 : 0)]],
         'cardio': {
           'activity': 'walk',
           'sec': sec,

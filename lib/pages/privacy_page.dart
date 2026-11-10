@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 
 import '../data.dart';
 import '../error_report.dart';
+import '../format.dart' show upperGr;
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -91,7 +92,7 @@ class SettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-        child: Text(text.toUpperCase(),
+        child: Text(upperGr(text),
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .3, color: Aigaio.of(context).textSecondary)),
       );
 }

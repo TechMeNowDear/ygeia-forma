@@ -210,7 +210,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Ο ύπνος σου από το Oura Ring 5',
+                'Ο ύπνος σου από το Oura',
                 style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4),
               ),
               const SizedBox(height: 8),
@@ -329,7 +329,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               const SizedBox(height: 4),
               TextButton(
                 onPressed: () => Navigator.of(context).maybePop(),
-                child: const Text('Αργότερα · Ρυθμίσεις › Πηγές'),
+                child: const Text('Όχι τώρα'),
               ),
             ],
           ),
