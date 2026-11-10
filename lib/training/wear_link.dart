@@ -83,6 +83,8 @@ Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name)
           'hi': e.hi,
           'rir': e.rir,
           if (e.rirAnswer != null) 'ra': e.rirAnswer,
+          // Παραλείφθηκε εδώ (έλεγχος γ2, W2-06): το ρολόι δεν πηγαίνει εκεί. Νέο πεδίο: το παλιό ρολόι το αγνοεί.
+          if (e.skipped) 'skip': 1,
           'sets': [
             for (final x in e.log)
               {
@@ -153,6 +155,16 @@ class WearLink with WidgetsBindingObserver {
   String? _lastSession;
   bool _started = false;
 
+  /// Ο τελευταίος αύξων αριθμός («q») που εφαρμόστηκε για τις επαναλήψεις κάθε σετ (έλεγχος γ2, W2-19): μια παλιότερη
+  /// εντολή που φτάνει αργότερα δεν σβήνει τη νεότερη. Ρολόι παλιότερης έκδοσης δεν στέλνει «q»: όπως πριν.
+  final _repsQ = <String, int>{};
+
+  /// «Κοιτάζω» προς το ρολόι ανά [watchingEvery] όσο η εφαρμογή είναι μπροστά (έλεγχος γ2, W3-15): μόνο τότε το ρολόι
+  /// στέλνει «ζωντανά» το περπάτημα (πριν: ανά 10″ για όλο το περπάτημα, ακόμα και με την εφαρμογή κλειστή).
+  Timer? _watchTimer;
+  static const watchingEvery = Duration(seconds: 45);
+  static const watchingTtl = Duration(seconds: 60);
+
   /// Παλμοί «φρέσκοι» (τελευταία 15″).
   int? bpmAt(DateTime now) {
     final v = hr.value;
@@ -171,12 +183,37 @@ class WearLink with WidgetsBindingObserver {
     t.addListener(_publish);
     ready.addListener(_publish);
     refresh();
+    _watching(true);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) refresh();
+    if (state == AppLifecycleState.resumed) {
+      refresh();
+      _watching(true);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
+      _watching(false);
+    }
   }
+
+  void _watching(bool on) {
+    _watchTimer?.cancel();
+    _watchTimer = null;
+    if (on) _watchTimer = Timer.periodic(watchingEvery, (_) => sendWatching(watchingTtl));
+    sendWatching(on ? watchingTtl : Duration.zero);
+  }
+
+  /// «Κοιτάζω» ([ttl] > 0) ή «έκλεισα» (0) προς το ρολόι. Χωρίς κανένα γνωστό ρολόι: καμία κλήση.
+  @visibleForTesting
+  Future<void> sendWatching(Duration ttl) async {
+    if (!(ready.value || _known)) return;
+    try {
+      await _m.invokeMethod<bool>('watching', {'json': jsonEncode({'v': 1, 'ttl': ttl.inMilliseconds})});
+    } catch (_) {}
+  }
+
+  @visibleForTesting
+  set knownForTest(bool v) => _known = v;
 
   /// Κατάσταση ρολογιού, πρόγραμμα προς το ρολόι, ό,τι έγινε στο ρολόι προς το κινητό.
   Future<void> refresh() async {
@@ -193,6 +230,8 @@ class WearLink with WidgetsBindingObserver {
     _lastPlan = null;
     _publish();
     await importResults();
+    // Η εφαρμογή είναι μπροστά (ο χρονομετρητής τρέχει): «κοιτάζω» μόλις μάθουμε ότι υπάρχει ρολόι (W3-15).
+    if (_watchTimer != null) await sendWatching(watchingTtl);
   }
 
   /// Τι λέει το ρολόι για τον εαυτό του (DataItem του ρολογιού).
@@ -395,6 +434,9 @@ class WearLink with WidgetsBindingObserver {
     switch (c.op) {
       case 'tick':
         if (c.s < 0 || c.s >= e.log.length || e.log[c.s].done) return;
+        // Σετ στο ρολόι σε άσκηση που παραλείφθηκε εδώ (ρολόι παλιότερης έκδοσης, W2-06): έγινε, άρα δεν είναι πια
+        // «παράλειψη» — αλλιώς το σετ θα χανόταν στη σύνοψη και στην πρόοδο.
+        if (e.skipped) t.skip(e, false);
         t.tick(e, c.s, at: (c.j['at'] as num?)?.toInt());
         String? next;
         if (e.complete) {
@@ -421,6 +463,12 @@ class WearLink with WidgetsBindingObserver {
         if (v is num && e.complete && e.rirAnswer == null) t.answer(e, v.toInt().clamp(0, 4));
       case 'reps':
         final v = c.v;
+        final q = c.j['q'];
+        if (q is num) {
+          final key = '${c.sid}:${c.i}:${c.s}';
+          if (q.toInt() <= (_repsQ[key] ?? 0)) return;
+          _repsQ[key] = q.toInt();
+        }
         if (v is num && c.s >= 0 && c.s < e.log.length) t.setReps(e, c.s, v.toInt());
     }
   }
@@ -431,6 +479,7 @@ class WearLink with WidgetsBindingObserver {
   }
 
   void dispose() {
+    _watchTimer?.cancel();
     _sub?.cancel();
     _t?.removeListener(_publish);
     WidgetsBinding.instance.removeObserver(this);

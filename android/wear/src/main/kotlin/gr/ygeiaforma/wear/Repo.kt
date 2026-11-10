@@ -86,8 +86,38 @@ object Repo {
     /** Δεν μετριούνται παλμοί, μετά την αναμονή του [HrSilence] (30″ στην αρχή, 15″/45″ αν χάθηκαν), ή null. */
     var hrSilent: HrSilence.Silence? = null
 
-    /** Παλμοί που ισχύουν τώρα (φρέσκια τιμή ή σταθεροί από τον αισθητήρα). */
-    fun hrLive(now: Long): Boolean = bpmFresh(now) || (bpm > 0 && now < steadyUntil)
+    /**
+     * Τι λέει το Health Services για τους παλμούς (έλεγχος γ2, W2-02): true = μετρά, false = το ρολόι δεν είναι στον καρπό,
+     * null = δεν είπε τίποτα ακόμα.
+     */
+    var hrAvailable: Boolean? = null
+
+    /**
+     * Παλμοί που ισχύουν τώρα: φρέσκια τιμή, σταθεροί από τον αισθητήρα, ή (όχι σε «5s») η τελευταία τιμή ως 60″ όσο το
+     * Health Services λέει ότι μετρά: κάποια ρολόγια στέλνουν τιμή μόνο όταν αλλάζει (W2-02). Ποτέ όταν λέει ότι το
+     * ρολόι βγήκε από τον καρπό.
+     */
+    fun hrLive(now: Long): Boolean {
+        if (hrAvailable == false) return false
+        if (bpmFresh(now) || (bpm > 0 && now < steadyUntil)) return true
+        return hrAvailable == true && hrMode != "5s" && bpm > 0 && now - bpmAt in 0 until 60_000
+    }
+
+    /** Το σφάλμα που σταμάτησε τη μέτρηση (είδος: μήνυμα), για τη σύνοψη στο κινητό (έλεγχος γ2, W2-14), ή null. */
+    var lastErr: String? = null
+
+    /** Τι μπορεί το ρολόι (για τον έλεγχο στη συσκευή, W2-14/W3-10): π.χ. «5s=1 wake=1». */
+    var diag = ""
+
+    /**
+     * Ως πότε (ώρα του ρολογιού, ms) το κινητό κοιτάζει το περπάτημα («/ygeia/watching», έλεγχος γ2, W3-15), και αν το
+     * κινητό ξέρει να το λέει (νεότερη έκδοση). Παλιό κινητό: «ζωντανά» ανά 10″ όπως πριν.
+     */
+    var watchingUntil = 0L
+    var phoneKnowsWatching = false
+
+    /** Το «επεισόδιο» του ορίου που σίγησε ο χρήστης (W2-16): η σίγαση δεν κόβει ένα νέο. */
+    var alarmMutedEpisode = -1
 
     var meters = 0.0
     var steps = 0L
@@ -151,8 +181,19 @@ object Repo {
     fun applyPlan(p: Plan?) {
         if (p == null) return
         plan = p
+        // Νέο όριο στη μέση της άσκησης: η κόκκινη οθόνη κρίνεται ξανά με αυτό (HrAlarm.limit, W2-16).
         alarm.limit = p.hrLimit
         syncedAt = System.currentTimeMillis()
+    }
+
+    /** Η κόκκινη οθόνη του ορίου φαίνεται τώρα (αναμμένο και όχι σε σίγαση για αυτό το επεισόδιο). */
+    fun alarmShown(now: Long): Boolean =
+        alarm.on && running != null && !(now < alarmMutedUntil && alarmMutedEpisode == alarm.episode)
+
+    /** «Πάτα για να κλείσει»: σίγαση 60″ για το ίδιο επεισόδιο (οι δονήσεις ανά 30″ συνεχίζουν, W2-16). */
+    fun muteAlarm(now: Long) {
+        alarmMutedUntil = now + 60_000
+        alarmMutedEpisode = alarm.episode
     }
 
     /**
@@ -190,6 +231,7 @@ object Repo {
             // Η ερώτηση για ρεζέρβα μένει για την άσκηση που τελείωσε, όχι για όποια δείχνει τώρα το κινητό.
             if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
         }
+        if (s != null) s.restLen = phoneRestLen(prev?.takeIf { it.id == s.id }, s, System.currentTimeMillis())
         phone = s
         if (s != null) {
             lastPhoneId = s.id
@@ -197,6 +239,18 @@ object Repo {
         }
         if (s == null && prev != null) prev.ended = true
         syncedAt = System.currentTimeMillis()
+    }
+
+    /**
+     * Πόσο κρατά όλο το διάλειμμα της προπόνησης του κινητού (για το δαχτυλίδι, W2-20): ίδιο διάλειμμα → ίδιο· «+30″» →
+     * + όσο μεγάλωσε· νέο → από τώρα ως το τέλος του.
+     */
+    fun phoneRestLen(prev: LiveSession?, s: LiveSession, now: Long): Long = when {
+        s.restEnd <= now -> 0
+        prev != null && prev.restEnd == s.restEnd -> prev.restLen
+        prev != null && prev.restEnd > now && prev.restLen > 0 && s.restEnd > prev.restEnd -> prev.restLen + (s.restEnd - prev.restEnd)
+        prev != null && prev.restEnd > now && prev.restLen > 0 && s.restEnd > now && prev.restEnd - s.restEnd < 3_000 -> prev.restLen
+        else -> s.restEnd - now
     }
 
     fun resetExercise() {
@@ -227,6 +281,10 @@ object Repo {
         steadyUntil = 0
         steadyUntilEl = 0
         hrSilent = null
+        hrAvailable = null
+        lastErr = null
+        diag = ""
+        alarmMutedEpisode = -1
     }
 
     // ------------------------------------------------------------------ αντίγραφα ασφαλείας

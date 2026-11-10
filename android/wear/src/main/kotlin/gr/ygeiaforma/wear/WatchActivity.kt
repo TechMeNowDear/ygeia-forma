@@ -16,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /** Η μία οθόνη της εφαρμογής του ρολογιού. Ό,τι μετράει ζει στην [ExerciseService]· εδώ μόνο εικόνα και πατήματα. */
@@ -28,10 +30,15 @@ class WatchActivity : Activity(), WatchView.Actions {
     private var finishArmedUntil = 0L
     private var skipArmedUntil = 0L
     private var visible = false
+    /** Οι εντολές προς το κινητό φεύγουν μία-μία, με τη σειρά, και με αύξοντα αριθμό «q» (έλεγχος γ2, W2-19). */
+    private val cmdLock = Mutex()
+    private var cmdSeq = System.currentTimeMillis()
 
     private val redraw: () -> Unit = {
         // Το κινητό άνοιξε την εφαρμογή πριν φτάσει η προπόνησή του: μπαίνει μόλις φτάσει.
-        if (joinWhenReady && Repo.phone != null && Repo.running == null) {
+        // Τρέχει ήδη κάτι εδώ (π.χ. περπάτημα): το «μπες» του κινητού δεν περιμένει για αργότερα (W2-23).
+        joinWhenReady = pendingJoin(joinWhenReady, Repo.running, Repo.local != null)
+        if (joinWhenReady && Repo.phone != null) {
             joinWhenReady = false
             joinPhone()
         }
@@ -89,6 +96,9 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handle(intent)
+        // Η εφαρμογή ήταν ήδη ανοιχτή: η προπόνηση του κινητού έχει ήδη έρθει, οπότε μπαίνει τώρα (όχι με την επόμενη
+        // αλλαγή του κινητού, έλεγχος γ2, W2-23).
+        redraw()
     }
 
     /** Άνοιγμα από το κινητό («Ξεκίνα» εκεί): μπαίνει στην προπόνηση του κινητού με παλμούς. */
@@ -116,10 +126,6 @@ class WatchActivity : Activity(), WatchView.Actions {
                 // επιτρέπεται)· όσα έγιναν μετά από αυτό στέλνονται κανονικά.
                 sendPending()
                 Link.tryWipe(this@WatchActivity)
-            }
-            if (joinWhenReady && Repo.phone != null) {
-                joinWhenReady = false
-                joinPhone()
             }
             redraw()
         }
@@ -180,6 +186,9 @@ class WatchActivity : Activity(), WatchView.Actions {
         val s = Repo.session
         when (Repo.screen) {
             Repo.Screen.REST -> if (s == null || s.restEnd <= now) Repo.screen = if (s == null) Repo.Screen.HOME else Repo.Screen.SET
+            // Η ρεζέρβα απαντήθηκε στο κινητό: η ερώτηση φεύγει κι από εδώ (W2-18).
+            Repo.Screen.RIR -> if (s == null) Repo.screen = Repo.Screen.HOME
+                else if (s.phone && !s.rirPending) Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             Repo.Screen.SET -> if (s == null && Repo.running == null) Repo.screen = Repo.Screen.HOME
                 else if (s != null && s.phone && s.restEnd > now) Repo.screen = Repo.Screen.REST
             Repo.Screen.HOME, Repo.Screen.WALK -> if (Repo.running == "walk") Repo.screen = if (Repo.recoveryUntil > 0) Repo.Screen.RECOVER else Repo.Screen.WALK
@@ -220,8 +229,8 @@ class WatchActivity : Activity(), WatchView.Actions {
     // ------------------------------------------------------------------ ενέργειες
     private fun cmd(o: JSONObject) {
         val s = Repo.phone ?: return
-        o.put("sid", s.id).put(Proto.CMD_VERSION, Proto.MAJOR)
-        scope.launch { Link.sendJson(this@WatchActivity, Paths.CMD, o) }
+        o.put("sid", s.id).put(Proto.CMD_VERSION, Proto.MAJOR).put("q", ++cmdSeq)
+        scope.launch { cmdLock.withLock { Link.sendJson(this@WatchActivity, Paths.CMD, o) } }
     }
 
     /**
@@ -290,6 +299,11 @@ class WatchActivity : Activity(), WatchView.Actions {
         val s = Repo.session ?: return
         val now = System.currentTimeMillis()
         val (next, i) = s.answer(rir, now)
+        if (i < 0) {
+            // Καμία άσκηση δεν περιμένει απάντηση (π.χ. απαντήθηκε στο κινητό): δεν γράφεται πουθενά (W2-18).
+            Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
+            return
+        }
         if (s.phone) cmd(JSONObject().put("op", "rir").put("i", i).put("v", rir))
         else saveRun()
         if (next == LiveSession.Next.END && !s.phone) {
@@ -307,6 +321,16 @@ class WatchActivity : Activity(), WatchView.Actions {
         val set = it.sets[si]
         set.reps = (set.reps + delta).coerceIn(0, 99)
         if (s.phone) cmd(JSONObject().put("op", "reps").put("i", s.idx).put("s", si).put("v", set.reps))
+    }
+
+    /** Διόρθωση των επαναλήψεων του σετ που μόλις έγινε, στο διάλειμμα (έλεγχος γ2, RT-13): «έκανες × 8». */
+    override fun lastReps(delta: Int) {
+        val s = Repo.session ?: return
+        val (i, k) = s.lastDone(System.currentTimeMillis()) ?: return
+        val set = s.items[i].sets[k]
+        set.reps = (set.reps + delta).coerceIn(0, 99)
+        if (s.phone) cmd(JSONObject().put("op", "reps").put("i", i).put("s", k).put("v", set.reps))
+        else saveRun()
     }
 
     override fun nextExercise() {
@@ -329,13 +353,14 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun restPlus() {
         val s = Repo.session ?: return
         val now = System.currentTimeMillis()
-        s.restEnd = maxOf(now, s.restEnd) + 30_000
+        s.addRest(now)
         if (s.phone) cmd(JSONObject().put("op", "rest").put("v", "plus"))
     }
 
     override fun restStop() {
         val s = Repo.session ?: return
         s.restEnd = 0
+        s.restLen = 0
         if (s.phone) cmd(JSONObject().put("op", "rest").put("v", "stop"))
         Repo.screen = Repo.Screen.SET
     }
@@ -357,7 +382,8 @@ class WatchActivity : Activity(), WatchView.Actions {
             // Σε προπόνηση του κινητού το «Τέλος» κλείνει και εκεί (V-A-09): να το ξέρει πριν το δεύτερο πάτημα.
             // Χωρίς κανένα σετ: το κινητό κρατά την προπόνηση μόνο αν έχει παλμούς, αλλιώς τη σβήνει. Το κείμενο λέει ακριβώς
             // αυτό, με ό,τι ξέρει το ρολόι (S7).
-            val msg = finishNotice(Repo.runningPhone, Repo.phone?.setsDone ?: 0, (Repo.hr?.samples?.size ?: 0) > 0)
+            val msg = if (Repo.running == "walk" && !Repo.paused) WALK_FINISH_NOTICE
+                else finishNotice(Repo.runningPhone, Repo.phone?.setsDone ?: 0, (Repo.hr?.samples?.size ?: 0) > 0)
             Repo.notice = msg
             view.postDelayed({ if (Repo.notice == msg) { Repo.notice = null; view.invalidate() } }, 3000)
             return
@@ -389,7 +415,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun muteAlarm() {
-        Repo.alarmMutedUntil = System.currentTimeMillis() + 60_000
+        Repo.muteAlarm(System.currentTimeMillis())
     }
 
     override fun doneOk() {
@@ -400,6 +426,18 @@ class WatchActivity : Activity(), WatchView.Actions {
 private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
 private const val FINISH_NOTICE = "Πάτα ξανά «Τέλος»"
 private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και στο κινητό"
+
+/**
+ * Περπάτημα (έλεγχος γ2, 03-Μ3): η πτώση παλμών στο 1′ μετρά από τους παλμούς ΤΗΣ ΣΤΙΓΜΗΣ του «Τέλος»· αν σταμάτησες
+ * πρώτα (πόρτα, φανάρι), έχουν ήδη πέσει. Κείμενο προς έγκριση από τον χρήστη.
+ */
+const val WALK_FINISH_NOTICE = "Πάτα ξανά «Τέλος» όσο περπατάς ακόμα"
+
+/**
+ * Το «μπες στην προπόνηση του κινητού» (άνοιγμα από το κινητό) περιμένει μόνο αν δεν τρέχει τίποτα εδώ: αλλιώς σβήνει,
+ * για να μη μπει αργότερα μόνο του, π.χ. μετά από ένα περπάτημα (έλεγχος γ2, W2-23).
+ */
+fun pendingJoin(flag: Boolean, running: String?, local: Boolean): Boolean = flag && running == null && !local
 
 /** Το μήνυμα πριν από το δεύτερο «Τέλος» (αληθινό σε κάθε περίπτωση, έλεγχος του #91, S7). */
 fun finishNotice(phone: Boolean, setsDone: Int, hasHr: Boolean): String = when {

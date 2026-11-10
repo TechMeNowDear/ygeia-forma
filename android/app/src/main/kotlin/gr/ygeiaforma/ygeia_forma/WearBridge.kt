@@ -42,6 +42,8 @@ class WearBridge(
         const val LIVE = "/ygeia/live"
         /** Τι έχει το ρολόι (όριο παλμών, έκδοση μορφής): το γράφει το ρολόι (έλεγχος 9/11, V-A-06). */
         const val STATE = "/ygeia/wstate"
+        /** «Κοιτάζω» προς το ρολόι (έλεγχος γ2, W3-15): μόνο τότε στέλνει «ζωντανά» το περπάτημα. */
+        const val WATCHING = "/ygeia/watching"
         const val KEY = "json"
         const val CAPABILITY = "ygeia_watch"
     }
@@ -122,6 +124,7 @@ class WearBridge(
             "watchState" -> scope.launch { result.success(watchState()) }
             "ackResult" -> scope.launch { result.success(ack(call.argument<String>("path") ?: "")) }
             "openWatch" -> scope.launch { result.success(openWatch()) }
+            "watching" -> scope.launch { result.success(watching(call.argument<String>("json") ?: "{}")) }
             else -> result.notImplemented()
         }
     }
@@ -220,6 +223,26 @@ class WearBridge(
             Wearable.getDataClient(ctx).deleteDataItems(uri).await()
             true
         }
+    } catch (_: Throwable) {
+        false
+    }
+
+    /**
+     * «Κοιτάζω» (μήνυμα, όχι DataItem: δεν μένει, και δεν φτάνει σε ρολόι μακριά — δεν χρειάζεται). Μόνο σε ρολόγια
+     * κοντά με την εφαρμογή μας.
+     */
+    private suspend fun watching(json: String): Boolean = try {
+        val cap = Wearable.getCapabilityClient(ctx).getCapability(CAPABILITY, CapabilityClient.FILTER_REACHABLE).await()
+        val mc = Wearable.getMessageClient(ctx)
+        var ok = false
+        for (n in cap.nodes) {
+            try {
+                mc.sendMessage(n.id, WATCHING, json.toByteArray(Charsets.UTF_8)).await()
+                ok = true
+            } catch (_: Throwable) {
+            }
+        }
+        ok
     } catch (_: Throwable) {
         false
     }

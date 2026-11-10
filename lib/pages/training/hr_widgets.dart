@@ -227,13 +227,15 @@ class HrCard extends StatelessWidget {
         if (session.hrGap case final g?) ...[
           const SizedBox(height: 6),
           // Πόσο γρήγορα έφταναν οι παλμοί από το ρολόι (8/11): μέτρο για το πόσο μπορεί να αργήσει η ειδοποίηση.
-          Text(
-            g <= 12
-                ? 'Οι παλμοί έφταναν κάθε λίγα δευτερόλεπτα (μεγαλύτερο κενό $g″)${session.hrMode == 'sensor' ? ', απευθείας από τον αισθητήρα' : ''}.'
-                : 'Μεγαλύτερο κενό στους παλμούς: ${g < 120 ? '$g″' : '${(g / 60).round()}′'}. Τόσο μπορεί να άργησε η ειδοποίηση.',
-            key: const ValueKey('hr-gap'),
-            style: TextStyle(fontSize: 12.5, height: 1.35, color: g <= 12 ? c.textSecondary : c.exercise),
-          ),
+          Builder(builder: (context) {
+            final (text, warn) = hrGapText(g, session.hrMode, session.hrDel, lim != null);
+            return Text(text, key: const ValueKey('hr-gap'), style: TextStyle(fontSize: 12.5, height: 1.35, color: warn ? c.exercise : c.textSecondary));
+          }),
+        ],
+        // Έλεγχος γ2 (W2-14): γιατί σταμάτησε η μέτρηση στο ρολόι (για τη δοκιμή στη συσκευή), όχι μια γενική φράση.
+        if (session.watchErr case final e?) ...[
+          const SizedBox(height: 4),
+          Text('Σφάλμα στο ρολόι: $e', key: const ValueKey('hr-watch-err'), style: TextStyle(fontSize: 12, height: 1.3, color: c.textSecondary)),
         ],
       ]),
     );
@@ -244,6 +246,22 @@ class HrCard extends StatelessWidget {
         const SizedBox(width: 4),
         Text(l, style: TextStyle(fontSize: 13, color: c.textSecondary)),
       ]);
+}
+
+/// Πόσο συχνά ήρθαν οι παλμοί από το ρολόι, για τη σύνοψη (8/11· έλεγχος γ2, W2-08). [gap]: μεγαλύτερο κενό (″),
+/// [deliveries]: πόσες φορές ήρθαν (ρολόι από γ2· null = παλιό ρολόι), [hasLimit]: είχε όριο. Επιστρέφει (κείμενο,
+/// προειδοποίηση). Όλο το περπάτημα σε μία-δύο φορές δεν είναι «κάθε λίγα δευτερόλεπτα»· χωρίς όριο δεν υπάρχει
+/// ειδοποίηση που «άργησε».
+(String, bool) hrGapText(int gap, String? mode, int? deliveries, bool hasLimit) {
+  final late = hasLimit ? ' Η ειδοποίηση μπορεί να άργησε.' : '';
+  if (deliveries != null && deliveries < 3) {
+    return (deliveries <= 1 ? 'Οι παλμοί ήρθαν όλοι μαζί, μία φορά.$late' : 'Οι παλμοί ήρθαν όλοι μαζί, σε $deliveries φορές.$late', true);
+  }
+  if (gap <= 12) {
+    return ('Οι παλμοί έφταναν κάθε λίγα δευτερόλεπτα (μεγαλύτερο κενό $gap″)${mode == 'sensor' ? ', απευθείας από τον αισθητήρα' : ''}.', false);
+  }
+  final t = gap < 120 ? '$gap″' : '${(gap / 60).round()}′';
+  return (hasLimit ? 'Μεγαλύτερο κενό στους παλμούς: $t. Τόσο μπορεί να άργησε η ειδοποίηση.' : 'Οι παλμοί έλειπαν έως $t.', true);
 }
 
 class _HrChart extends CustomPainter {

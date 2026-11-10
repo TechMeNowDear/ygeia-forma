@@ -38,6 +38,11 @@ object Paths {
      * Μόλις το δει, το κινητό σβήνει και τα δύο. Νέο path: το παλιό κινητό το αγνοεί.
      */
     const val WIPED = "/ygeia/wiped"
+    /**
+     * Κινητό → ρολόι (μήνυμα, έλεγχος γ2, W3-15): «κοιτάζω» `{"v":1,"ttl": ms}`: όσο είναι ανοιχτή η εφαρμογή στο κινητό
+     * (ξανά ανά ~45″), το ρολόι στέλνει «ζωντανά» το περπάτημα· `ttl` 0 = έκλεισε. Νέο path: το παλιό ρολόι το αγνοεί.
+     */
+    const val WATCHING = "/ygeia/watching"
     const val KEY = "json"
 
     /** Δυνατότητα που δηλώνει η εφαρμογή του ρολογιού (res/values/wear.xml), για να τη βρίσκει το κινητό. */
@@ -78,8 +83,13 @@ class ItemT(
     val rirTarget: Int,
     val sets: MutableList<SetT>,
     var rir: Int? = null,
+    /** Παραλείφθηκε στο κινητό («skip»: 1, έλεγχος γ2, W2-06): το ρολόι δεν πηγαίνει εκεί. */
+    val skipped: Boolean = false,
 ) {
     val complete: Boolean get() = sets.all { it.done }
+
+    /** Δεν μένει τίποτα να γίνει εδώ: όλα τα σετ ✓ ή παραλείφθηκε (για το «επόμενη άσκηση»). */
+    val finished: Boolean get() = complete || skipped
     val doneCount: Int get() = sets.count { it.done }
     val nextSet: Int get() = sets.indexOfFirst { !it.done }
 }
@@ -149,6 +159,7 @@ internal fun itemOf(o: JSONObject): ItemT {
             )
         }.toMutableList(),
         rir = if (o.has("ra") && !o.isNull("ra")) o.getInt("ra") else null,
+        skipped = o.optInt("skip", 0) == 1,
     )
 }
 
@@ -185,9 +196,64 @@ class LiveSession(
      * γιατί στο μεταξύ το κινητό μπορεί να έχει ήδη πάει στην επόμενη άσκηση (έλεγχος 8/11).
      */
     var rirIdx: Int = -1,
+    /**
+     * Πόσο κρατά όλο το τρέχον διάλειμμα (ms), για το δαχτυλίδι (έλεγχος γ2, W2-20): το διάλειμμα μετά το τελευταίο σετ
+     * είναι της άσκησης που τελείωσε, όχι της επόμενης (που δείχνει πια το [idx]). 0 = άγνωστο.
+     */
+    var restLen: Long = 0,
 ) {
     val current: ItemT? get() = items.getOrNull(idx)
-    val allDone: Boolean get() = items.all { it.complete }
+
+    /**
+     * Περιμένει απάντηση για ρεζέρβα (το ρολόι δείχνει την ερώτηση). Σε προπόνηση του κινητού: αν απαντήθηκε στο κινητό,
+     * όχι πια — η οθόνη του ρολογιού την αφήνει (έλεγχος γ2, W2-18).
+     */
+    val rirPending: Boolean get() = rirIdx >= 0 && items.getOrNull(rirIdx)?.rir == null
+
+    /** Όλες οι ασκήσεις τελείωσαν (ή παραλείφθηκαν στο κινητό). */
+    val allDone: Boolean get() = items.all { it.finished }
+
+    /** Διάλειμμα [sec] δευτερόλεπτα από τώρα (0 = κανένα). */
+    private fun startRest(now: Long, sec: Int) {
+        restEnd = if (sec > 0) now + sec * 1000L else 0
+        restLen = if (sec > 0) sec * 1000L else 0
+    }
+
+    /**
+     * Το σετ που μόλις έγινε σε αυτό το ρολόι ([άσκηση, σετ]), για διόρθωση των επαναλήψεων στο διάλειμμα (RT-13): το
+     * πιο πρόσφατο ✓ με ώρα, μόνο όσο κρατά το διάλειμμα που ξεκίνησε με αυτό.
+     */
+    fun lastDone(now: Long): Pair<Int, Int>? {
+        if (restEnd <= now) return null
+        var best: Pair<Int, Int>? = null
+        var at = 0L
+        for ((i, it) in items.withIndex()) for ((k, set) in it.sets.withIndex()) {
+            if (set.done && set.at > at) {
+                at = set.at
+                best = i to k
+            }
+        }
+        val from = restEnd - (if (restLen > 0) restLen else 0L) - 2_000
+        return if (best != null && (restLen <= 0 || at >= from)) best else null
+    }
+
+    /** «+30″» στο διάλειμμα. */
+    fun addRest(now: Long, ms: Long = 30_000) {
+        if (restEnd > now) {
+            restEnd += ms
+            restLen = maxOf(restLen, 0) + ms
+        } else {
+            restEnd = now + ms
+            restLen = ms
+        }
+    }
+
+    /** Πόσο από το διάλειμμα μένει (1 = όλο, 0 = τελείωσε), για το δαχτυλίδι. */
+    fun restLeft(now: Long): Float {
+        val left = (restEnd - now).coerceAtLeast(0)
+        val total = if (restLen > 0) restLen else (items.getOrNull(idx)?.rest ?: 90).coerceAtLeast(1) * 1000L
+        return (left.toFloat() / maxOf(total, left).coerceAtLeast(1)).coerceIn(0f, 1f)
+    }
     val setsDone: Int get() = items.sumOf { it.doneCount }
 
     /** ✓ στο τρέχον σετ. Επιστρέφει τι ακολουθεί. */
@@ -198,16 +264,24 @@ class LiveSession(
         it.sets[s].done = true
         it.sets[s].at = now
         if (!it.complete) {
-            restEnd = if (it.rest > 0) now + it.rest * 1000L else 0
+            startRest(now, it.rest)
             return Next.REST
         }
         rirIdx = idx
         return Next.ASK_RIR
     }
 
-    /** Ρεζέρβα μετά το τελευταίο σετ· μετά πάει στην επόμενη άσκηση που δεν έχει τελειώσει. Επιστρέφει και ποια άσκηση πήρε την απάντηση. */
+    /**
+     * Ρεζέρβα μετά το τελευταίο σετ· μετά πάει στην επόμενη άσκηση που δεν έχει τελειώσει. Επιστρέφει και ποια άσκηση πήρε
+     * την απάντηση: −1 αν καμία δεν περιμένει απάντηση (π.χ. απαντήθηκε ήδη στο κινητό)· τότε δεν γράφεται πουθενά, ποτέ
+     * στην άσκηση που δείχνει τώρα (έλεγχος γ2, W2-18).
+     */
     fun answer(rir: Int, now: Long): Pair<Next, Int> {
-        val i = if (rirIdx >= 0) rirIdx else idx
+        val i = rirIdx
+        if (i < 0 || items.getOrNull(i) == null) {
+            rirIdx = -1
+            return (if (current == null || allDone) Next.END else Next.SET) to -1
+        }
         val restSec = items.getOrNull(i)?.rest ?: 0
         items.getOrNull(i)?.rir = rir
         rirIdx = -1
@@ -216,20 +290,21 @@ class LiveSession(
 
     private fun advance(now: Long, restOf: Int? = null): Next {
         val restSec = restOf ?: current?.rest ?: 0
-        val next = items.indexOfFirst { !it.complete }
+        val next = items.indexOfFirst { !it.finished }
         if (next < 0) {
-            restEnd = 0
+            startRest(now, 0)
             return Next.END
         }
         idx = next
-        restEnd = if (restSec > 0) now + restSec * 1000L else 0
+        startRest(now, restSec)
         return Next.REST
     }
 
     /** Παράλειψη της τρέχουσας άσκησης (πάει στην επόμενη, χωρίς διάλειμμα). */
     fun skip(): Next {
-        val n = items.indices.firstOrNull { it > idx && !items[it].complete } ?: items.indices.firstOrNull { it != idx && !items[it].complete }
+        val n = items.indices.firstOrNull { it > idx && !items[it].finished } ?: items.indices.firstOrNull { it != idx && !items[it].finished }
         restEnd = 0
+        restLen = 0
         if (n == null) return Next.END
         idx = n
         return Next.SET
@@ -251,10 +326,11 @@ class LiveSession(
             val o = JSONObject().put("ex", it.ex).put("name", it.name).put("rest", it.rest).put("lo", it.lo).put("hi", it.hi)
                 .put("rir", it.rirTarget).put("sets", sets)
             it.rir?.let { r -> o.put("ra", r) }
+            if (it.skipped) o.put("skip", 1)
             arr.put(o)
         }
         return JSONObject().put("id", id).put("w", workout).put("name", name).put("start", start).put("idx", idx)
-            .put("restEnd", restEnd).put("rirIdx", rirIdx).put("items", arr)
+            .put("restEnd", restEnd).put("rirIdx", rirIdx).put("restLen", restLen).put("items", arr)
     }
 
     /** Για το κινητό: ίδια μορφή με το ExLog.toJson της εφαρμογής (l, r, d, t). */
@@ -306,6 +382,7 @@ class LiveSession(
                 idx = o.optInt("idx", 0),
                 restEnd = o.optLong("restEnd", 0),
                 rirIdx = o.optInt("rirIdx", -1),
+                restLen = o.optLong("restLen", 0),
             )
         } catch (_: Exception) {
             null
@@ -581,16 +658,37 @@ object Recovery {
 
 /**
  * Ειδοποίηση ορίου παλμών, με βάση τον χρόνο κάθε τιμής (όχι πόσες τιμές ήρθαν μαζί):
- * ανάβει όταν οι παλμοί μένουν στο όριο ή πάνω για [holdMs] (5″), ξαναδονείται κάθε [repeatMs] (30″)
- * όσο μένουν πάνω, σβήνει κάτω από όριο − 5. Έλεγχος 8/11: πριν μετρούσε «2 μηνύματα», που
- * με τα πακέτα των παλμών μπορούσε να σημαίνει και 2–3 λεπτά καθυστέρηση.
+ * ανάβει όταν οι παλμοί μένουν στο όριο ή πάνω τα 4 από τα τελευταία 5″ ([holdMs]), ξαναδονείται κάθε [repeatMs] (30″)
+ * όσο μένουν πάνω, σβήνει κάτω από όριο − 5. Έλεγχος 8/11: πριν μετρούσε «2 μηνύματα», που με τα πακέτα των παλμών
+ * μπορούσε να σημαίνει και 2–3 λεπτά καθυστέρηση.
+ *
+ * Έλεγχος γ2 (W2-02): κάθε τιμή ισχύει ώσπου να έρθει η επόμενη (το ρολόι μπορεί να στέλνει μόνο όταν αλλάζει), και μία
+ * στιγμιαία τιμή κάτω από το όριο δεν μηδενίζει πια τη μέτρηση (πριν: 133, 133, 133, 133, 129… με όριο 130 = καμία δόνηση).
  */
-class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val repeatMs: Long = 30_000) {
+class HrAlarm(limit: Int?, private val holdMs: Long = 5_000, private val repeatMs: Long = 30_000) {
+    /** Αλλαγή ορίου στη μέση της άσκησης (W2-16): η κόκκινη οθόνη κρίνεται ξανά από την αρχή με το νέο όριο. */
+    var limit: Int? = limit
+        set(v) {
+            if (v == field) return
+            field = v
+            on = false
+            lastBuzz = 0
+        }
     var on = false
         private set
-    private var overSince = -1L
+
+    /** Αυξάνει κάθε φορά που ανάβει (νέο «επεισόδιο»): η σίγαση 60″ ισχύει μόνο για το ίδιο (W2-16). */
+    var episode = 0
+        private set
+
+    /** Η τελευταία τιμή που ήρθε (για την καθυστερημένη ειδοποίηση, W2-17). */
+    var lastBpm = 0
+        private set
     private var lastBuzz = 0L
     private var lastAt = Long.MIN_VALUE
+
+    /** Οι τιμές των τελευταίων [holdMs] (και μία πριν), [χρόνος, παλμοί]. */
+    private val window = ArrayDeque<LongArray>()
 
     /**
      * true όταν πρέπει να δονηθεί (τη στιγμή που ανάβει και ανά 30″ όσο μένει πάνω). [at]: χρόνος της τιμής (ms).
@@ -600,6 +698,10 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
     fun feed(bpm: Int, at: Long): Boolean {
         if (at < lastAt) return false
         lastAt = at
+        lastBpm = bpm
+        window.addLast(longArrayOf(at, bpm.toLong()))
+        // Κρατά μία τιμή πριν από το παράθυρο (ισχύει ως την επόμενη).
+        while (window.size > 2 && window[1][0] <= at - holdMs) window.removeFirst()
         return step(bpm, at)
     }
 
@@ -607,19 +709,31 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
      * Καμία νέα τιμή, αλλά η τελευταία ([bpm], ακόμα φρέσκια) ισχύει και τώρα: ο αισθητήρας στέλνει μόνο αλλαγές, οπότε
      * σταθεροί παλμοί πάνω από το όριο δεν θα έφερναν ποτέ δόνηση (έλεγχος #2, W2-02).
      */
-    fun steady(bpm: Int, now: Long): Boolean = step(bpm, now)
+    fun steady(bpm: Int, now: Long): Boolean = if (now < lastAt || window.isEmpty()) false else step(bpm, now)
+
+    /** Πόση ώρα από τα τελευταία [holdMs] ως το [at] οι παλμοί ήταν στο όριο [l] ή πάνω (κάθε τιμή ισχύει ως την επόμενη). */
+    private fun overMs(l: Int, at: Long): Long {
+        val from = at - holdMs
+        if (window.isEmpty() || window.first()[0] > from) return 0 // δεν έχουμε ακόμα 5″
+        var sum = 0L
+        for (k in window.indices) {
+            val a = maxOf(window[k][0], from)
+            val b = if (k + 1 < window.size) minOf(window[k + 1][0], at) else at
+            if (b > a && window[k][1] >= l) sum += b - a
+        }
+        return sum
+    }
 
     private fun step(bpm: Int, at: Long): Boolean {
         val l = limit
         if (l == null) {
             on = false
-            overSince = -1
             return false
         }
         if (bpm >= l) {
-            if (overSince < 0) overSince = at
-            if (!on && at - overSince >= holdMs) {
+            if (!on && overMs(l, at) >= holdMs * 4 / 5) {
                 on = true
+                episode++
                 lastBuzz = at
                 return true
             }
@@ -627,19 +741,83 @@ class HrAlarm(var limit: Int?, private val holdMs: Long = 5_000, private val rep
                 lastBuzz = at
                 return true
             }
-        } else {
-            overSince = -1
-            if (on && bpm < l - 5) on = false
+        } else if (on && bpm < l - 5) {
+            on = false
         }
         return false
     }
 
     fun reset() {
         on = false
-        overSince = -1
         lastBuzz = 0
         lastAt = Long.MIN_VALUE
+        lastBpm = 0
+        window.clear()
     }
+}
+
+/**
+ * Ειδοποίηση ορίου που ήρθε με καθυστέρηση (πακέτο παλμών, έλεγχος γ2, W2-17): [ageMs] πόσο παλιά είναι η τιμή που την
+ * άναψε, [stillOver] αν η τελευταία τιμή είναι ακόμα στο όριο ή πάνω. Αν οι παλμοί έπεσαν ήδη και η τιμή είναι πάνω από
+ * 30″ παλιά, καμία δόνηση (θα έλεγε «τώρα» κάτι που πέρασε)· γράφεται μόνο στο logcat.
+ */
+fun lateAlarmBuzz(ageMs: Long, stillOver: Boolean): Boolean = stillOver || ageMs <= 30_000
+
+/**
+ * Τι λέει η ειδοποίηση ορίου (έλεγχος γ2, L7/W2-16): στο περπάτημα «Κόψε ρυθμό»· στο λεπτό αποκατάστασης (κάθεσαι
+ * ήδη) και στα βάρη «Ξεκουράσου», όπως το κινητό («Ξεκουράσου μέχρι να πέσουν»). Χωρίς «κάτω από 140»: η κόκκινη οθόνη
+ * σβήνει λίγο πιο κάτω (όριο − 5), οπότε το «κάτω από το όριο» δεν ήταν ακριβές.
+ */
+fun alarmAdvice(walk: Boolean, recovery: Boolean): String = when {
+    recovery -> "Ξεκουράσου."
+    walk -> "Κόψε ρυθμό."
+    else -> "Ξεκουράσου μέχρι να πέσουν."
+}
+
+/** Η μεγάλη λέξη της κόκκινης οθόνης. */
+fun alarmHeadline(walk: Boolean, recovery: Boolean): String = if (walk && !recovery) "Κόψε ρυθμό" else "Ξεκουράσου"
+
+/** «» για τωρινή τιμή, αλλιώς « (πριν 40″)» / « (πριν 2′)» για την ειδοποίηση (W2-17). */
+fun ageText(ageMs: Long): String = when {
+    ageMs < 20_000 -> ""
+    ageMs < 60_000 -> " (πριν ${ageMs / 1000}″)"
+    else -> " (πριν ${ageMs / 60_000}′)"
+}
+
+/**
+ * Το μήνυμα στην αρχή του περπατήματος για ό,τι ΔΕΝ μετριέται (έλεγχος γ2, RT-18): [gpsAsked] ζητήθηκε GPS, [gps]/
+ * [distance]/[hr]: τι δέχτηκε τελικά το Health Services. null = όλα όπως ζητήθηκαν.
+ */
+fun walkStartNotice(gpsAsked: Boolean, gps: Boolean, distance: Boolean, hr: Boolean): String? = when {
+    !hr -> "Το ρολόι δεν δίνει παλμούς σε αυτή την άσκηση."
+    !distance -> "Μόνο παλμοί σε αυτό το περπάτημα."
+    gpsAsked && !gps -> "Χωρίς GPS: η απόσταση από τα βήματα."
+    else -> null
+}
+
+/**
+ * Ενεργός χρόνος περπατήματος (″) όταν το Health Services δεν έδωσε κανένα σημείο ελέγχου (έλεγχος γ2, W2-11): ώρα από
+ * την αρχή ως το τέλος, χωρίς τις παύσεις ([pauses]: [αρχή, τέλος] ms, τέλος 0 = κρατά ακόμα). Πριν: 0 λεπτά.
+ */
+fun wallActiveSec(start: Long, end: Long, pauses: List<LongArray>): Long {
+    if (start <= 0 || end <= start) return 0
+    var ms = end - start
+    for (p in pauses) {
+        val a = p[0].coerceIn(start, end)
+        val b = (if (p[1] == 0L) end else p[1]).coerceIn(start, end)
+        if (b > a) ms -= b - a
+    }
+    return maxOf(0L, ms) / 1000
+}
+
+/**
+ * «Ζωντανά» του περπατήματος προς το κινητό (έλεγχος γ2, W3-15): ανά 10″ μόνο όσο το κινητό λέει ότι κοιτάζει
+ * ([watchingUntil], από το μήνυμα «/ygeia/watching»). Κινητό που δεν έχει στείλει ποτέ τέτοιο μήνυμα ([phoneKnowsWatching]
+ * = false: παλιά έκδοση) τα παίρνει όπως πριν, ανά 10″. Το πρώτο στέλνεται πάντα (το κινητό μαθαίνει ότι τρέχει περπάτημα).
+ */
+fun liveDue(now: Long, lastSent: Long, phoneKnowsWatching: Boolean, watchingUntil: Long): Boolean {
+    if (lastSent > 0 && now - lastSent < 10_000) return false
+    return lastSent <= 0 || !phoneKnowsWatching || now < watchingUntil
 }
 
 /**
@@ -695,15 +873,27 @@ fun sensorWallTime(eventNanos: Long, nowWallMs: Long, nowElapsedNanos: Long): Lo
 /**
  * Πόσο συχνά φτάνουν πραγματικά οι παλμοί στην εφαρμογή (το μεγαλύτερο κενό ανάμεσα σε δύο παραδόσεις).
  * Για τον έλεγχο στη συσκευή: δείχνει αν η ειδοποίηση ορίου μπορεί να αργήσει (8/11).
+ *
+ * Έλεγχος γ2 (W2-08): μετρά και από την αρχή της άσκησης ως την πρώτη παράδοση ([start]) και ως το τέλος χωρίς όριο
+ * 60″ (πριν: ένα λουρί χαλαρό τα τελευταία 30′ έβγαζε «60″»), και πόσες παραδόσεις έγιναν ([deliveries]): όλο το
+ * περπάτημα σε ένα πακέτο δεν είναι «κάθε λίγα δευτερόλεπτα».
  */
 class GapMeter {
     private var last = 0L
     var maxGapMs = 0L
         private set
+    var deliveries = 0
+        private set
+
+    /** Η αρχή της άσκησης: το κενό ως την πρώτη παράδοση μετράει κι αυτό. */
+    fun start(at: Long) {
+        if (last == 0L && deliveries == 0) last = at
+    }
 
     fun mark(at: Long) {
         if (last > 0 && at > last) maxGapMs = maxOf(maxGapMs, at - last)
-        last = at
+        last = maxOf(last, at)
+        deliveries++
     }
 
     /** Και ο χρόνος ως το τέλος (αν σταμάτησαν να έρχονται). */
@@ -731,6 +921,13 @@ fun pace(meters: Double, sec: Long): String {
     if (meters < 50 || sec <= 0) return "—"
     val p = Math.round(sec / (meters / 1000.0))
     return "%d:%02d /km".format(java.util.Locale.ROOT, p / 60, p % 60)
+}
+
+/** Πόσο ισχύει ένα «κοιτάζω» του κινητού (ms), από το μήνυμα: 0–120″ (ό,τι άλλο → 0). */
+fun watchingTtl(text: String?): Long = try {
+    if (text == null) 0L else JSONObject(text).optLong("ttl", 0L).coerceIn(0L, 120_000L)
+} catch (_: Exception) {
+    0L
 }
 
 /** Πότε σβήνει το ρολόι τα δεδομένα του μετά από «Διαγραφή όλων» στο κινητό (καθαρό, με δοκιμές). */

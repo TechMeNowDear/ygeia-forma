@@ -28,7 +28,9 @@ object Results {
                 val end = if (Repo.endAt > 0) Repo.endAt else end0
                 Repo.pauses.lastOrNull()?.let { if (it[1] == 0L) it[1] = end }
                 fun sec(ms: Long) = ((ms - Repo.startedAt) / 1000)
-                val cardio = JSONObject().put("activity", "walk").put("sec", Repo.activeSecNow(end)).put("m", finite(Repo.meters))
+                // Χωρίς κανένα σημείο ελέγχου από το Health Services (π.χ. δεν ξεκίνησε η μέτρηση): ο χρόνος από την ώρα, όχι 0 (W2-11).
+                val sec = if (Repo.cpWall > 0 || Repo.activeSec > 0) Repo.activeSecNow(end) else wallActiveSec(Repo.startedAt, end, Repo.pauses)
+                val cardio = JSONObject().put("activity", "walk").put("sec", sec).put("m", finite(Repo.meters))
                     .put("steps", Repo.steps).put("gps", Repo.gps)
                     .put("km", JSONArray().also { a -> for (k in Repo.splits) a.put(JSONArray().put(k[0]).put(sec(k[1]))) })
                     .put("pz", JSONArray().also { a -> for (p in Repo.pauses) a.put(JSONArray().put(sec(p[0])).put(sec(p[1]))) })
@@ -56,6 +58,11 @@ object Results {
         val o = result.second
         // Για τον έλεγχο στη συσκευή: πώς ήρθαν οι παλμοί και το μεγαλύτερο κενό (φαίνεται στη σύνοψη του κινητού).
         if (Repo.hrMode.isNotEmpty()) o.put("hrMode", Repo.hrMode).put("hrGap", Repo.hrGaps.maxGapSec)
+        // Έλεγχος γ2 (W2-08/W2-14): πόσες παραδόσεις παλμών, τι μπορεί το ρολόι, και το σφάλμα που σταμάτησε τη μέτρηση.
+        // Νέα πεδία: το παλιό κινητό τα αγνοεί.
+        if (Repo.hrMode.isNotEmpty()) o.put("hrDel", Repo.hrGaps.deliveries)
+        if (Repo.diag.isNotEmpty()) o.put("diag", Repo.diag)
+        Repo.lastErr?.let { o.put("err", it.take(120)) }
         // Το όριο που ίσχυε στην άσκηση (έλεγχος 9/11, V-B-04· 0 = χωρίς όριο). Νέο πεδίο: το παλιό κινητό το αγνοεί.
         o.put("lim", Repo.alarm.limit ?: 0)
         if (partialAt != null) o.put("partial", 1)

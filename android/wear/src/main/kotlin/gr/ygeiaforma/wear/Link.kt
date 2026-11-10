@@ -8,6 +8,8 @@ import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataItem
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.tasks.await
@@ -31,14 +33,32 @@ object Link {
         if (any) Repo.changed()
     }
 
+    /** «Κοιτάζω» από το κινητό (W3-15): ως πότε, και ότι το κινητό το ξέρει (μένει, για τις επόμενες φορές). */
+    private val messages = MessageClient.OnMessageReceivedListener { e: MessageEvent ->
+        if (e.path != Paths.WATCHING) return@OnMessageReceivedListener
+        val ttl = watchingTtl(String(e.data, Charsets.UTF_8))
+        Repo.watchingUntil = if (ttl > 0) System.currentTimeMillis() + ttl else 0L
+        if (!Repo.phoneKnowsWatching) {
+            Repo.phoneKnowsWatching = true
+            app?.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE)?.edit()?.putBoolean(WATCH_KNOWN, true)?.apply()
+        }
+    }
+
     fun attach(ctx: Context) {
         app = ctx.applicationContext
         Repo.loadLimit(ctx.applicationContext)
-        if (users++ == 0) Wearable.getDataClient(ctx.applicationContext).addListener(listener)
+        if (users++ == 0) {
+            Wearable.getDataClient(ctx.applicationContext).addListener(listener)
+            Wearable.getMessageClient(ctx.applicationContext).addListener(messages)
+            Repo.phoneKnowsWatching = ctx.applicationContext.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE).getBoolean(WATCH_KNOWN, false)
+        }
     }
 
     fun detach(ctx: Context) {
-        if (users > 0 && --users == 0) Wearable.getDataClient(ctx.applicationContext).removeListener(listener)
+        if (users > 0 && --users == 0) {
+            Wearable.getDataClient(ctx.applicationContext).removeListener(listener)
+            Wearable.getMessageClient(ctx.applicationContext).removeListener(messages)
+        }
     }
 
     private fun textOf(item: DataItem): String? = try {
@@ -96,6 +116,8 @@ object Link {
     private const val WIPE_WANT = "want"
     private const val WIPE_DONE = "done"
     private const val WIPE_ACKED = "acked"
+    /** Το κινητό στέλνει «κοιτάζω» (W3-15). Σβήνεται με τη «Διαγραφή όλων»· ξαναγράφεται στο επόμενο «κοιτάζω». */
+    private const val WATCH_KNOWN = "watchKnown"
 
     /** Το κινητό ζήτησε «σβήσε»: κρατιέται (σε αρχείο που δεν σβήνεται) και γίνεται μόλις επιτρέπεται ([tryWipe]). */
     private fun onWipe(ctx: Context, at: Long) {

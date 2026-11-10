@@ -711,7 +711,12 @@ class _TrainingPageState extends State<TrainingPage> {
                     : 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΖΩΝΤΑΝΑ',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: l['paused'] == true ? c.exercise : c.textSecondary)),
         const SizedBox(height: 8),
-        if (bpm > 0) ...[HrBar(bpm: bpm, limit: t.hrLimit), const SizedBox(height: 10)],
+        if (bpm > 0)
+          ...[HrBar(bpm: bpm, limit: t.hrLimit), const SizedBox(height: 10)]
+        // Με όριο και χωρίς παλμούς (μετά την αναμονή): κεχριμπάρι «δεν σε προσέχει», όχι απλώς να χάνεται η γραμμή
+        // (έλεγχος γ2, W2-15· όπως η κάρτα της Σήμερα).
+        else if (t.hrLimit != null && sec >= hrWaitSeconds)
+          ...[HrStale(limit: t.hrLimit), const SizedBox(height: 10)],
         Row(children: [stat(time, 'χρόνος'), stat(m > 0 ? (m / 1000).toStringAsFixed(2).replaceAll('.', ',') : '—', 'km')]),
         const SizedBox(height: 8),
         Row(children: [stat(pace(), 'ρυθμός'), stat(steps > 0 ? thousands(steps) : '—', 'βήματα')]),

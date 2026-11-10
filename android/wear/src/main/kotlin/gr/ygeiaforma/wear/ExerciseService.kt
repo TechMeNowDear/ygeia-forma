@@ -30,6 +30,7 @@ import androidx.health.services.client.HealthServices
 import androidx.health.services.client.data.Availability
 import androidx.health.services.client.data.BatchingMode
 import androidx.health.services.client.data.DataType
+import androidx.health.services.client.data.DataTypeAvailability
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseEndReason
 import androidx.health.services.client.data.ExerciseLapSummary
@@ -38,6 +39,7 @@ import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
 import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import android.annotation.SuppressLint
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +49,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.time.Instant
 
@@ -80,6 +83,12 @@ class ExerciseService : Service() {
         private const val CH_ALARM_OLD = "hr_alarm"
         /** Το πολύ τόσο ξύπνιος ο επεξεργαστής στην αρχή, για τον έλεγχο «κανένας παλμός» (30″) και τη δόνησή του. */
         private const val FIRST_HR_LOCK_MS = HrSilence.FIRST_MS + 10_000L
+        /** Το πολύ τόσο ξύπνιος ο επεξεργαστής σε ένα διάλειμμα, για τη δόνηση του τέλους του (W2-03). */
+        private const val REST_LOCK_MAX_MS = 5 * 60_000L
+        /** Το πολύ τόσο ξύπνιος στο «Τέλος», ώσπου να γραφτεί και να σταλεί το αποτέλεσμα (W2-09). */
+        private const val FINISH_LOCK_MS = 20_000L
+        /** Πόσο περιμένει την τελευταία ενημέρωση («ENDED») του Health Services μετά το «Τέλος» (W2-09). */
+        private const val ENDED_WAIT_MS = 5_000L
 
         fun start(ctx: Context, kind: String, phone: Boolean) {
             val i = Intent(ctx, ExerciseService::class.java).setAction(ACTION_START)
@@ -106,6 +115,9 @@ class ExerciseService : Service() {
             if (Repo.running != "walk") return
             ctx.startService(Intent(ctx, ExerciseService::class.java).setAction(if (on) ACTION_PAUSE else ACTION_RESUME))
         }
+
+        /** Χωρίς παλμούς ανά 5″ και χωρίς αισθητήρα αφύπνισης, με όριο (W3-10). Κείμενο προς έγκριση από τον χρήστη. */
+        const val SLOW_ALARM_NOTICE = "Η δόνηση του ορίου μπορεί να αργήσει ως 3′ σε αυτό το ρολόι."
 
         fun has(ctx: Context, p: String) = ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED
 
@@ -135,6 +147,15 @@ class ExerciseService : Service() {
     private var sensor: HrSensor? = null
     private var exerciseStarted = false
     private var stopping = false
+    /** Το Health Services δέχτηκε παλμούς σε αυτή την άσκηση (για να ξεκινήσει η εφεδρεία αν το όριο έρθει αργότερα, W2-04). */
+    private var hrInExercise = false
+    /** Ο επεξεργαστής ξύπνιος ως το τέλος του διαλείμματος ([restLockFor]), για τη δόνηση (έλεγχος γ2, W2-03). */
+    private var restLock: PowerManager.WakeLock? = null
+    private var restLockFor = 0L
+    /** Ήρθε η τελευταία ενημέρωση («ENDED») μετά το «Τέλος» (W2-09). */
+    private var ended: CompletableDeferred<Unit>? = null
+    /** Ο διάλειμμα/κατάσταση αλλάζει και από την οθόνη ή το κινητό: ο επεξεργαστής κρατιέται ξύπνιος αμέσως (W2-03). */
+    private val onRepo: () -> Unit = { holdForRest() }
     /** Πότε γράφτηκε το τελευταίο στιγμιότυπο (elapsedRealtime). */
     private var lastRunSave = 0L
     /** Η ένδειξη στην πρόσοψη (για να αλλάζει στην παύση). */
@@ -162,6 +183,8 @@ class ExerciseService : Service() {
     }
 
     override fun onDestroy() {
+        Repo.unlisten(onRepo)
+        releaseRestLock()
         releaseFirstHrLock()
         sensor?.stop()
         sensor = null
@@ -206,21 +229,45 @@ class ExerciseService : Service() {
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
         if (location) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         val n = ongoing(if (walk) "Περπάτημα" else (Repo.session?.name ?: "Προπόνηση"))
-        try {
-            ServiceCompat.startForeground(this, NOTIF_ID, n, type)
-        } catch (e: Exception) {
-            Log.e(TAG, "startForeground", e)
+        val gpsOk = startForegroundOrWithoutGps(n, type, location)
+        if (gpsOk == null) {
             Repo.notice = "Δεν ξεκίνησε η μέτρηση: λείπει άδεια."
             Repo.resetExercise()
             Repo.changed()
             stopSelf()
             return
         }
+        Repo.gps = gpsOk
+        Repo.hrGaps.start(now)
+        Repo.listen(onRepo)
         Repo.changed()
         holdUntilFirstHr()
         saveRun(force = true)
-        scope.launch { startExercise(walk, location) }
+        scope.launch { startExercise(walk, gpsOk) }
         ticker = scope.launch { tick() }
+    }
+
+    /**
+     * Υπηρεσία προσκηνίου. Αν το σύστημα αρνηθεί τον τύπο «τοποθεσία» (π.χ. κλειστή τοποθεσία, έλεγχος γ2, W2-21), ξανά
+     * μόνο με «υγεία»: το περπάτημα γράφεται χωρίς GPS αντί να μη γραφτεί καθόλου. Επιστρέφει αν έχει GPS, ή null αν απέτυχε.
+     */
+    private fun startForegroundOrWithoutGps(n: Notification, type: Int, location: Boolean): Boolean? {
+        try {
+            ServiceCompat.startForeground(this, NOTIF_ID, n, type)
+            return location
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground", e)
+            Repo.lastErr = why(e)
+            if (!location) return null
+        }
+        return try {
+            ServiceCompat.startForeground(this, NOTIF_ID, n, type and ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION.inv())
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground (χωρίς GPS)", e)
+            Repo.lastErr = why(e)
+            null
+        }
     }
 
     // ------------------------------------------------------------------ μετά από απότομο κλείσιμο (V-A-03)
@@ -277,10 +324,8 @@ class ExerciseService : Service() {
         var type = 0
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
         if (location) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-        try {
-            ServiceCompat.startForeground(this, NOTIF_ID, ongoing(if (walk) "Περπάτημα" else (Repo.session?.name ?: "Προπόνηση")), type)
-        } catch (e: Exception) {
-            Log.e(TAG, "startForeground (recover)", e)
+        val gpsOk = startForegroundOrWithoutGps(ongoing(if (walk) "Περπάτημα" else (Repo.session?.name ?: "Προπόνηση")), type, location)
+        if (gpsOk == null) {
             // Δεν μπορεί να συνεχίσει: ό,τι σώθηκε γράφεται ως μερικό (τίποτα δεν χάνεται).
             val saved = o.optLong("saved", now)
             Repo.resetExercise()
@@ -294,6 +339,9 @@ class ExerciseService : Service() {
             }
             return
         }
+        if (location && !gpsOk) Repo.gps = false
+        Repo.hrGaps.start(System.currentTimeMillis())
+        Repo.listen(onRepo)
         Repo.notice = "Συνεχίζει: η εφαρμογή είχε κλείσει απότομα."
         Repo.screen = when {
             walk -> if (Repo.recoveryUntil > 0) Repo.Screen.RECOVER else Repo.Screen.WALK
@@ -305,7 +353,7 @@ class ExerciseService : Service() {
         if (action == Recovery.Action.ATTACH) {
             scope.launch { attach() }
         } else {
-            scope.launch { startExercise(false, false) }
+            scope.launch { startExercise(walk, walk && Repo.gps) }
         }
         saveRun(force = true)
         ticker = scope.launch { tick() }
@@ -317,12 +365,11 @@ class ExerciseService : Service() {
             client.setUpdateCallback(callback)
             exerciseStarted = true
             // Εφεδρεία αισθητήρα όπως πριν (μόνο αν τη χρησιμοποιούσε και υπάρχει όριο).
-            if (Repo.hrMode == "sensor" && Repo.alarm.limit != null && has(this, heartPermission)) {
-                val s = HrSensor(this) { bpm, at, atEl -> scope.launch { onSensorBpm(bpm, at, atEl) } }
-                if (s.start()) sensor = s
-            }
+            hrInExercise = has(this, heartPermission)
+            if (Repo.hrMode == "sensor" && Repo.alarm.limit != null && hrInExercise) startSensor()
         } catch (e: Exception) {
             Log.e(TAG, "attach", e)
+            Repo.lastErr = why(e)
             Repo.notice = "Δεν συνεχίστηκε η μέτρηση: ${why(e)}"
             Repo.changed()
         }
@@ -448,32 +495,55 @@ class ExerciseService : Service() {
                 }
             }
             if (used == null) throw last ?: IllegalStateException("startExercise")
-            if (location && DataType.LOCATION !in used) {
-                Repo.gps = false
-                Repo.notice = "Χωρίς GPS: η απόσταση από τα βήματα."
-                Repo.changed()
-            }
-            if (DataType.HEART_RATE_BPM !in used) {
-                Repo.notice = "Το ρολόι δεν δίνει παλμούς σε αυτή την άσκηση."
+            if (location && DataType.LOCATION !in used) Repo.gps = false
+            // Ό,τι δεν μετριέται, ειπωμένο σωστά (έλεγχος γ2, RT-18: χωρίς απόσταση και βήματα όχι «από τα βήματα»).
+            val hrOk = DataType.HEART_RATE_BPM in used
+            val distOk = !walk || DataType.DISTANCE_TOTAL in used || DataType.STEPS_TOTAL in used
+            walkStartNotice(walk && location, DataType.LOCATION in used, distOk, hrOk)?.let {
+                Repo.notice = it
                 Repo.changed()
             }
             exerciseStarted = true
-            Repo.hrMode = if (batching.isNotEmpty()) "5s" else "default"
+            hrInExercise = hrOk
+            Repo.hrMode = if (hrOk && batching.isNotEmpty()) "5s" else "default"
+            // Για τον έλεγχο στη συσκευή (W2-14/W3-10): τι μπορεί το ρολόι. Στη σύνοψη του κινητού και στο logcat.
+            Repo.diag = "5s=${if (BatchingMode.HEART_RATE_5_SECONDS in caps.supportedBatchingModeOverrides) 1 else 0} wake=${if (HrSensor.hasWakeUp(this)) 1 else 0}"
+            Log.i(TAG, "hrMode=${Repo.hrMode} ${Repo.diag} types=${used.map { it.name }}")
             // Χωρίς παράδοση ανά 5″: με σβηστή οθόνη οι παλμοί μπορεί να έρθουν σε πακέτα με καθυστέρηση λεπτών.
             // Για την ειδοποίηση ορίου, τότε και μόνο, ο αισθητήρας απευθείας (μόνο όσο τρέχει η άσκηση).
-            if (batching.isEmpty() && DataType.HEART_RATE_BPM in types && Repo.alarm.limit != null) {
-                val s = HrSensor(this) { bpm, at, atEl -> scope.launch { onSensorBpm(bpm, at, atEl) } }
-                if (s.start()) {
-                    sensor = s
-                    Repo.hrMode = "sensor"
-                }
+            if (Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null) startSensor()
+            // Ούτε ανά 5″ ούτε αισθητήρας αφύπνισης: το λέμε, όχι σιωπηλά (έλεγχος γ2, W3-10).
+            if (Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null && Repo.notice == null) {
+                Repo.notice = SLOW_ALARM_NOTICE
+                Repo.changed()
             }
         } catch (e: Exception) {
             // Η αιτία στην οθόνη και στο logcat (ετικέτα «YgeiaWatch»): χωρίς αυτήν δεν διορθώνεται (9/11).
             Log.e(TAG, "startExercise", e)
+            Repo.lastErr = why(e)
             Repo.notice = "Δεν ξεκίνησε η μέτρηση: ${why(e)}"
             Repo.changed()
         }
+    }
+
+    /**
+     * Εφεδρεία αισθητήρα (μόνο αισθητήρας αφύπνισης, W2-04). Οι τιμές του περνούν αμέσως, μέσα στην παράδοση (όχι
+     * αργότερα σε άλλη εργασία: ο επεξεργαστής μένει ξύπνιος μόνο όσο κρατά η παράδοση).
+     */
+    private fun startSensor() {
+        if (sensor != null) return
+        val s = HrSensor(this) { bpm, at, atEl -> onSensorBpm(bpm, at, atEl) }
+        if (s.start()) {
+            sensor = s
+            Repo.hrMode = "sensor"
+        }
+    }
+
+    private fun stopSensor() {
+        val s = sensor ?: return
+        s.stop()
+        sensor = null
+        if (Repo.hrMode == "sensor") Repo.hrMode = "default"
     }
 
     private fun locationOn(): Boolean = try {
@@ -494,6 +564,7 @@ class ExerciseService : Service() {
 
         override fun onRegistrationFailed(throwable: Throwable) {
             Log.e(TAG, "registration", throwable)
+            Repo.lastErr = why(throwable)
             Repo.notice = "Δεν ξεκίνησε η μέτρηση: ${why(throwable)}"
             Repo.changed()
         }
@@ -505,8 +576,10 @@ class ExerciseService : Service() {
             // Κάθε τιμή με τον δικό της χρόνο (σε ένα πακέτο μπορεί να έρθουν πολλές).
             val boot = Instant.ofEpochMilli(now - nowEl)
             var buzz = -1
+            var buzzEl = 0L
             val points = m.getData(DataType.HEART_RATE_BPM)
-            if (points.isNotEmpty() && sensor == null) Repo.hrGaps.mark(now)
+            // Κάθε παράδοση μετράει (και με την εφεδρεία αισθητήρα): το κενό είναι όσο δεν έφτανε τίποτα (W2-08).
+            if (points.isNotEmpty()) Repo.hrGaps.mark(now)
             for (p in points) {
                 val bpm = Math.round(p.value).toInt()
                 if (bpm !in 26..249) continue
@@ -521,9 +594,24 @@ class ExerciseService : Service() {
                 if (atEl > Repo.bpmEl) Repo.bpmEl = atEl
                 // Και οι δύο πηγές πάνε στην ειδοποίηση· οι παλιότερες τιμές αγνοούνται (HrAlarm.feed), οπότε αν ο
                 // αισθητήρας σωπάσει, συνεχίζει το Health Services (έλεγχος #2, W2-04).
-                if (Repo.alarm.feed(bpm, atEl)) buzz = bpm
+                if (Repo.alarm.feed(bpm, atEl)) {
+                    buzz = bpm
+                    buzzEl = atEl
+                }
             }
-            if (buzz > 0) onAlarm(buzz)
+            // Σταθεροί παλμοί χωρίς νέα τιμή (όχι στο «5s», που στέλνει κάθε 5″): κρίνονται και σε κάθε ενημέρωση, όχι μόνο
+            // στον βρόχο του δευτερολέπτου, που σταματά με σβηστή οθόνη (W2-02, W3-10).
+            if (buzz < 0 && Repo.hrMode != "5s" && Repo.hrLive(now) && Repo.alarm.steady(Repo.bpm, nowEl)) {
+                buzz = Repo.bpm
+                buzzEl = nowEl
+            }
+            // Από πακέτο με καθυστέρηση (W2-17): με την ηλικία της τιμής· καμία δόνηση αν έπεσαν ήδη και πέρασαν >30″.
+            if (buzz > 0) {
+                val age = nowEl - buzzEl
+                val lim = Repo.alarm.limit
+                if (lateAlarmBuzz(age, lim != null && Repo.alarm.lastBpm >= lim)) onAlarm(buzz, age)
+                else Log.i(TAG, "όριο: παλιά τιμή $buzz πριν ${age / 1000}″, οι παλμοί έπεσαν ήδη (χωρίς δόνηση)")
+            }
             if (points.isNotEmpty()) sendHrToPhone(now)
             // Μετά το «Τέλος» (λεπτό αποκατάστασης) χρόνος, απόσταση και βήματα μένουν όπως ήταν· μόνο οι παλμοί.
             if (Repo.recoveryUntil == 0L) {
@@ -544,6 +632,7 @@ class ExerciseService : Service() {
                 }
                 m.getData(DataType.STEPS_TOTAL)?.let { Repo.steps = it.total }
             }
+            if (update.exerciseStateInfo.state.isEnded) ended?.complete(Unit)
             if (update.exerciseStateInfo.state.isEnded && !stopping) {
                 val reason = update.exerciseStateInfo.endReason
                 // Τελείωσε από αλλού (άλλη εφαρμογή, χάθηκε άδεια): κρατάμε ό,τι γράφτηκε, και το λέμε με δόνηση (V-A-16):
@@ -562,7 +651,20 @@ class ExerciseService : Service() {
 
         override fun onLapSummaryReceived(lapSummary: ExerciseLapSummary) {}
 
-        override fun onAvailabilityChanged(dataType: DataType<*, *>, availability: Availability) {}
+        /**
+         * Αν μετρά (AVAILABLE) ή αν το ρολόι βγήκε από τον καρπό (OFF_BODY): για το «δεν μετριούνται» (έλεγχος γ2, W2-02).
+         * Στο logcat για τη δοκιμή στη συσκευή.
+         */
+        override fun onAvailabilityChanged(dataType: DataType<*, *>, availability: Availability) {
+            if (dataType != DataType.HEART_RATE_BPM) return
+            Log.i(TAG, "παλμοί: $availability")
+            Repo.hrAvailable = when (availability) {
+                DataTypeAvailability.AVAILABLE -> true
+                DataTypeAvailability.UNAVAILABLE_DEVICE_OFF_BODY -> false
+                else -> null
+            }
+            Repo.changed()
+        }
     }
 
     /** Τιμή από την εφεδρεία αισθητήρα: ένδειξη και ειδοποίηση (όχι στατιστικά: αυτά από το Health Services). */
@@ -574,7 +676,7 @@ class ExerciseService : Service() {
             Repo.bpmAt = at
         }
         if (atEl > Repo.bpmEl) Repo.bpmEl = atEl
-        if (Repo.alarm.feed(bpm, atEl)) onAlarm(bpm)
+        if (Repo.alarm.feed(bpm, atEl)) onAlarm(bpm, SystemClock.elapsedRealtime() - atEl)
         sendHrToPhone(System.currentTimeMillis())
         Repo.changed()
     }
@@ -631,12 +733,15 @@ class ExerciseService : Service() {
                 restBuzzedFor = s.restEnd
                 vibrate(longArrayOf(0, 180, 120, 180))
                 if (Repo.screen == Repo.Screen.REST) Repo.screen = Repo.Screen.SET
+                releaseRestLock()
                 Repo.changed()
             }
+            holdForRest()
             // Παλμοί προς το κινητό (και αν δεν ήρθε νέα τιμή, π.χ. σταθεροί παλμοί από τον αισθητήρα).
             sendHrToPhone(now)
             // Περπάτημα: ζωντανά στο κινητό (αν είναι ανοιχτή η εφαρμογή εκεί). Χωρίς αναμονή μέσα στον βρόχο.
-            if (Repo.running == "walk" && now - lastLiveSent >= 10_000) {
+            // Μόνο όσο το κινητό λέει ότι κοιτάζει (W3-15)· στο παλιό κινητό όπως πριν.
+            if (Repo.running == "walk" && liveDue(now, lastLiveSent, Repo.phoneKnowsWatching, Repo.watchingUntil)) {
                 lastLiveSent = now
                 val o = JSONObject().put("v", Proto.MAJOR).put("kind", "walk").put("start", Repo.startedAt).put("sec", Repo.activeSecNow(now))
                     .put("m", finite(Repo.meters)).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0)
@@ -661,8 +766,11 @@ class ExerciseService : Service() {
             Repo.steadyUntil = if (steady) sn!!.lastAt + 120_000L else 0L
             Repo.steadyUntilEl = if (steady) sn!!.lastEl + 120_000L else 0L
             val fresh = Repo.hrLive(now)
-            // Εφεδρεία αισθητήρα: στέλνει μόνο αλλαγές· σταθεροί παλμοί πάνω από το όριο μετρούν κι αυτοί (W2-02).
-            if (sensor != null && fresh && Repo.alarm.steady(Repo.bpm, nowEl)) onAlarm(Repo.bpm)
+            // Εφεδρεία αισθητήρα (ή ρολόι που στέλνει μόνο αλλαγές): σταθεροί παλμοί πάνω από το όριο μετρούν κι αυτοί (W2-02).
+            if ((sensor != null || Repo.hrMode == "default") && fresh && Repo.alarm.steady(Repo.bpm, nowEl)) onAlarm(Repo.bpm, 0)
+            // Το όριο ήρθε ή έφυγε στη μέση της άσκησης: η εφεδρεία αισθητήρα ξεκινά ή σταματά μαζί του (W2-04).
+            if (exerciseStarted && hrInExercise && Repo.alarm.limit != null && Repo.hrMode == "default" && sensor == null && has(this, heartPermission)) startSensor()
+            if (sensor != null && Repo.alarm.limit == null) stopSensor()
             // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2):
             // στο περπάτημα μετά από 15″, στα βάρη μετά από 45″ (ο καρπός που λυγίζει κόβει συχνά για λίγο). Τρεις
             // σύντομες, για να μη μοιάζει με το τέλος του διαλείμματος (δύο μεγαλύτερες).
@@ -696,16 +804,19 @@ class ExerciseService : Service() {
     }
 
     // ------------------------------------------------------------------ όριο παλμών
-    private fun onAlarm(bpm: Int) {
+    /**
+     * Δόνηση ορίου. [ageMs]: πόσο παλιά είναι η τιμή (πακέτο με καθυστέρηση, W2-17): η ειδοποίηση το λέει. Η σίγαση
+     * «πάτα για να κλείσει» κρατά 60″ για το ίδιο επεισόδιο, με δόνηση ανά 30″ (W2-16· πριν έσβηνε στη 2η δόνηση).
+     */
+    private fun onAlarm(bpm: Int, ageMs: Long) {
         vibrate(longArrayOf(0, 500, 200, 500, 200, 500))
-        Repo.alarmMutedUntil = 0
         // Αν η οθόνη δεν είναι ανοιχτή: ειδοποίηση υψηλής προτεραιότητας (ανάβει και δονείται).
         val nm = getSystemService(NotificationManager::class.java)
         val pi = PendingIntent.getActivity(this, 1, Intent(this, WatchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(this, CH_ALARM)
             .setSmallIcon(R.drawable.ic_heart)
-            .setContentTitle("Πάνω από το όριο: $bpm")
-            .setContentText(alarmAdvice() + " Όριο γιατρού ${Repo.alarm.limit}.")
+            .setContentTitle("Πάνω από το όριο: $bpm${ageText(ageMs)}")
+            .setContentText(alarmAdvice(Repo.running == "walk", Repo.recoveryUntil > 0) + " Όριο γιατρού ${Repo.alarm.limit}.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pi)
@@ -718,7 +829,39 @@ class ExerciseService : Service() {
         }
     }
 
-    private fun alarmAdvice(): String = if (Repo.running == "walk") "Κόψε ρυθμό." else "Ξεκουράσου μέχρι να πέσουν κάτω από ${Repo.alarm.limit}."
+    // ------------------------------------------------------------------ ξύπνιος ως το τέλος του διαλείμματος (W2-03)
+    /**
+     * Με σβηστή οθόνη ο επεξεργαστής κοιμάται και ο βρόχος του δευτερολέπτου σταματά: η δόνηση «τέλος διαλείμματος» θα
+     * ερχόταν λεπτά αργότερα. Όσο κρατά ένα διάλειμμα, ξύπνιος ως το τέλος του + 3″ (το πολύ 5′)· αφήνεται στη δόνηση.
+     */
+    private fun holdForRest() {
+        val s = Repo.session
+        val now = System.currentTimeMillis()
+        val end = if (Repo.running != null && s != null && s.restEnd > now) s.restEnd else 0L
+        if (end == restLockFor) return
+        releaseRestLock()
+        if (end == 0L) return
+        restLockFor = end
+        try {
+            val pm = getSystemService(PowerManager::class.java) ?: return
+            restLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ygeia:rest").apply {
+                setReferenceCounted(false)
+                acquire((end - now + 3_000).coerceIn(1_000, REST_LOCK_MAX_MS))
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "wakelock rest", e)
+        }
+    }
+
+    private fun releaseRestLock() {
+        restLockFor = 0
+        val l = restLock ?: return
+        restLock = null
+        try {
+            if (l.isHeld) l.release()
+        } catch (_: Exception) {
+        }
+    }
 
     /**
      * Δόνηση ως «ξυπνητήρι» (USAGE_ALARM): αλλιώς η Εξοικονόμηση μπαταρίας και η Σίγαση την κόβουν, και οι σύντομες
@@ -808,11 +951,21 @@ class ExerciseService : Service() {
         if (stopping) return
         stopping = true
         releaseFirstHrLock()
+        releaseRestLock()
+        Repo.unlisten(onRepo)
+        // Ξύπνιος ώσπου να γραφτεί και να σταλεί το αποτέλεσμα (το πολύ 20″), όχι μισό στον ύπνο.
+        val finishLock = try {
+            getSystemService(PowerManager::class.java)?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ygeia:finish")?.apply {
+                setReferenceCounted(false)
+                acquire(FINISH_LOCK_MS)
+            }
+        } catch (_: Exception) {
+            null
+        }
         val now = System.currentTimeMillis()
         ticker?.cancel()
         sensor?.stop()
         sensor = null
-        Repo.hrGaps.close(if (Repo.bpmAt > 0) minOf(now, Repo.bpmAt + 60_000) else now)
         if (exerciseStarted) {
             // Ό,τι έχει μετρηθεί και δεν έχει παραδοθεί ακόμα (πακέτα ανά 5″) έρχεται τώρα, πριν από τον λογαριασμό.
             try {
@@ -820,15 +973,22 @@ class ExerciseService : Service() {
                 delay(400)
             } catch (_: Exception) {
             }
+            // Οι τελευταίες τιμές (ως 150″ σε πακέτα) και ο τελικός χρόνος/απόσταση έρχονται με την ενημέρωση «ENDED»,
+            // που μπορεί να φτάσει μετά την απάντηση του «τέλος» (W2-09): την περιμένουμε ως 5″ πριν κλείσει ο ακροατής.
+            val wait = if (endReason == null) CompletableDeferred<Unit>().also { ended = it } else null
             try {
                 client.endExerciseAsync().await()
             } catch (_: Exception) {
             }
+            if (wait != null && withTimeoutOrNull(ENDED_WAIT_MS) { wait.await() } == null) Log.w(TAG, "χωρίς ENDED σε ${ENDED_WAIT_MS / 1000}″")
+            ended = null
             try {
                 client.clearUpdateCallbackAsync(callback).await()
             } catch (_: Exception) {
             }
         }
+        // Το κενό ως το τέλος, χωρίς όριο (W2-08): ένα λουρί χαλαρό στο τέλος φαίνεται ολόκληρο.
+        Repo.hrGaps.close(now)
         val kind = Repo.running
         val wasPhone = Repo.runningPhone
         var failed = false
@@ -865,6 +1025,10 @@ class ExerciseService : Service() {
         getSystemService(NotificationManager::class.java).cancel(ALARM_ID)
         ongoingActivity = null
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        try {
+            finishLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) {
+        }
         stopSelf()
     }
 

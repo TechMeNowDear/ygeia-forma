@@ -169,6 +169,9 @@ class Session {
     this.source,
     this.hrMode,
     this.hrGap,
+    this.hrDel,
+    this.watchErr,
+    this.watchDiag,
     this.stopped = false,
     this.cardioSec,
     this.gps,
@@ -293,6 +296,13 @@ class Session {
   String? hrMode;
   int? hrGap;
 
+  /// Έλεγχος γ2 του ρολογιού (W2-08/W2-14): πόσες φορές ήρθαν παλμοί από το ρολόι (λίγες = όλοι μαζί, η ειδοποίηση
+  /// μπορεί να άργησε), το σφάλμα που σταμάτησε τη μέτρηση και τι μπορεί το ρολόι («5s=1 wake=0»). Για τη δοκιμή στη
+  /// συσκευή· ρολόι παλιότερης έκδοσης δεν τα στέλνει.
+  int? hrDel;
+  String? watchErr;
+  String? watchDiag;
+
   /// Σταμάτησε από σύμπτωμα (παλιές καταγραφές ως #84): δεν μετρά για την πρόοδο.
   bool stopped;
 
@@ -332,7 +342,7 @@ class Session {
 
   static const _known = {
     'id', 'w', 'name', 'prog', 'start', 'end', 'items', 'feel', 'hrAvg', 'hrMax', 'cmin', 'note', 'hr', 'hrf', 'm', 'steps', 'src',
-    'hrm', 'hrg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs',
+    'hrm', 'hrg', 'hrd', 'werr', 'wdg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs',
   };
 
   /// [hrInline]: οι παλμοί μέσα (όπως ως #90)· αλλιώς μόνο πόσοι είναι («hrf»), γιατί είναι στο δικό τους αρχείο.
@@ -359,6 +369,9 @@ class Session {
       if (source != null) 'src': source,
       if (hrMode != null) 'hrm': hrMode,
       if (hrGap != null) 'hrg': hrGap,
+      if (hrDel != null) 'hrd': hrDel,
+      if (watchErr != null) 'werr': watchErr,
+      if (watchDiag != null) 'wdg': watchDiag,
       if (stopped) 'stop': 1,
       if (cardioSec != null) 'csec': cardioSec,
       if (gps != null) 'gps': gps,
@@ -424,6 +437,9 @@ class Session {
       source: opt<String>('src'),
       hrMode: opt<String>('hrm'),
       hrGap: optInt('hrg'),
+      hrDel: optInt('hrd'),
+      watchErr: opt<String>('werr'),
+      watchDiag: opt<String>('wdg'),
       // Παλιές καταγραφές (#81–#83): μόνο η σημείωση έδειχνε τη διακοπή από σύμπτωμα.
       stopped: j['stop'] == 1 || (note?.startsWith('Σταμάτησε: ') ?? false),
       cardioSec: optInt('csec'),

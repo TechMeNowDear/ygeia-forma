@@ -10,7 +10,7 @@ import android.os.SystemClock
 /**
  * Εφεδρεία για την ειδοποίηση ορίου (8/11): απευθείας ο αισθητήρας παλμών, ΜΟΝΟ όταν το ρολόι δεν υποστηρίζει
  * παράδοση παλμών ανά 5″ με σβηστή οθόνη (BatchingMode.HEART_RATE_5_SECONDS) και υπάρχει όριο γιατρού,
- * και μόνο όσο τρέχει η άσκηση. Αισθητήρας «αφύπνισης» (wake-up), για να έρχονται τιμές και με σβηστή οθόνη·
+ * και μόνο όσο τρέχει η άσκηση. ΜΟΝΟ αισθητήρας «αφύπνισης» (wake-up), για να έρχονται τιμές και με σβηστή οθόνη·
  * μικρή ομαδοποίηση στο υλικό ([MAX_LATENCY_US]) ώστε ο επεξεργαστής να ξυπνά ανά ~2″ και όχι κάθε τιμή.
  *
  * Οι τιμές πάνε μόνο στην ειδοποίηση και στην ένδειξη· οι μετρήσεις της προπόνησης έρχονται από το Health Services.
@@ -38,7 +38,9 @@ class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long,
     /** true αν ξεκίνησε (υπάρχει αισθητήρας και δέχτηκε την εγγραφή). */
     fun start(): Boolean {
         val m = ctx.getSystemService(SensorManager::class.java) ?: return false
-        val s = m.getDefaultSensor(Sensor.TYPE_HEART_RATE, true) ?: m.getDefaultSensor(Sensor.TYPE_HEART_RATE) ?: return false
+        // ΜΟΝΟ αισθητήρας αφύπνισης (έλεγχος γ2, W2-04): ο απλός σταματά με σβηστή οθόνη, ακριβώς όταν χρειάζεται.
+        // Χωρίς τέτοιον, καμία εφεδρεία: η ειδοποίηση έρχεται από το Health Services και η οθόνη λέει ότι μπορεί να αργήσει.
+        val s = m.getDefaultSensor(Sensor.TYPE_HEART_RATE, true) ?: return false
         val ok = try {
             m.registerListener(this, s, SAMPLING_US, MAX_LATENCY_US)
         } catch (_: SecurityException) {
@@ -74,6 +76,13 @@ class HrSensor(private val ctx: Context, private val onBpm: (bpm: Int, at: Long,
     }
 
     companion object {
+        /** Υπάρχει αισθητήρας παλμών αφύπνισης (για τη διάγνωση στη σύνοψη, W2-14). */
+        fun hasWakeUp(ctx: Context): Boolean = try {
+            ctx.getSystemService(SensorManager::class.java)?.getDefaultSensor(Sensor.TYPE_HEART_RATE, true) != null
+        } catch (_: Exception) {
+            false
+        }
+
         private const val SAMPLING_US = 1_000_000
         private const val MAX_LATENCY_US = 2_000_000
     }

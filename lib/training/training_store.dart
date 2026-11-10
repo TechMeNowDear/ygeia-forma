@@ -826,12 +826,15 @@ class TrainingStore extends ChangeNotifier {
     if (s.stopped) s.note = 'Σταμάτησε: «Σταμάτησα» στο ρολόι';
     _watchHrInfo(s, j);
     if (cardio != null) {
-      final sec = (cardio['sec'] as num?)?.toInt() ?? end.difference(start).inSeconds;
+      // Ρολόι παλιότερης έκδοσης έστελνε 0 όταν το Health Services δεν έδωσε χρόνο (έλεγχος γ2, W2-11): τότε από τις ώρες.
+      final raw = (cardio['sec'] as num?)?.toInt();
+      final watchSec = raw != null && raw > 0 ? raw : null;
+      final sec = watchSec ?? end.difference(start).inSeconds;
       s.cardioMinutes = (sec / 60).round();
       s.meters = (cardio['m'] as num?)?.toDouble();
       s.steps = (cardio['steps'] as num?)?.toInt();
       // 9/11: ενεργός χρόνος, GPS, χιλιόμετρα, παύσεις, πτώση παλμών στο 1′ (ρολόι από #89).
-      s.cardioSec = (cardio['sec'] as num?)?.toInt();
+      s.cardioSec = watchSec;
       if (cardio['gps'] is bool) s.gps = cardio['gps'] as bool;
       if (cardio['activity'] is String) s.activity = cardio['activity'] as String;
       s.splits.addAll(Session.pairs(cardio['km']));
@@ -898,6 +901,10 @@ class TrainingStore extends ChangeNotifier {
   static void _watchHrInfo(Session s, Map<String, dynamic> j) {
     if (j['hrMode'] is String) s.hrMode = j['hrMode'] as String;
     if (j['hrGap'] is num) s.hrGap = (j['hrGap'] as num).toInt();
+    // Έλεγχος γ2 (W2-08/W2-14): νέα πεδία του ρολογιού (το παλιό ρολόι δεν τα στέλνει).
+    if (j['hrDel'] is num) s.hrDel = (j['hrDel'] as num).toInt();
+    if (j['err'] is String) s.watchErr = (j['err'] as String).length > 120 ? (j['err'] as String).substring(0, 120) : j['err'] as String;
+    if (j['diag'] is String) s.watchDiag = (j['diag'] as String).length > 40 ? (j['diag'] as String).substring(0, 40) : j['diag'] as String;
   }
 
   /// Σετ που πατήθηκαν ✓ στο ρολόι αλλά δεν έφτασαν στο κινητό (π.χ. η εφαρμογή ήταν κλειστή): προστίθενται.

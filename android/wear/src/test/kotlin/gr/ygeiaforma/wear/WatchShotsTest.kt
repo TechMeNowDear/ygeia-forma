@@ -60,6 +60,7 @@ class WatchShotsTest {
         override fun pauseWalk(on: Boolean) {}
         override fun muteAlarm() {}
         override fun doneOk() {}
+        override fun lastReps(delta: Int) {}
     }
 
     @After
@@ -147,19 +148,37 @@ class WatchShotsTest {
         s.restEnd = 0
         Repo.screen = Repo.Screen.SET
         shot("W2_set")
+        // Έλεγχος γ2 (W3-09): γράμματα 1,3× στο σετ, διάλειμμα, ρεζέρβα.
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W2b_set_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         s.restEnd = now + 64_000
         Repo.screen = Repo.Screen.REST
         Repo.bpm = 112
         shot("W3_rest")
+        // RT-13: το σετ που μόλις έγινε, με − / + στο διάλειμμα (W2-20: δαχτυλίδι 64″ από 120″).
+        s.items[0].sets[1].at = now - 56_000
+        s.restLen = 120_000
+        shot("W3b_rest_edit_reps")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W3c_rest_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         Repo.screen = Repo.Screen.RIR
         shot("W4_rir")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W4b_rir_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         Repo.bpm = 143
         Repo.alarm.feed(143, now)
         Repo.alarm.feed(143, now + 6_000)
         shot("W5_alarm")
+        // W2-16: χωρίς νέους παλμούς ο αριθμός λέει πόσο παλιός είναι.
+        Repo.bpmAt = now - 40_000
+        shot("W5b_alarm_stale")
+        Repo.bpmAt = now
 
         // Λάστιχο: μεγάλη ετικέτα στη θέση των κιλών.
         Repo.alarm.feed(100, now + 60_000)
@@ -212,10 +231,33 @@ class WatchShotsTest {
         Repo.paused = true
         shot("W7b_walk_paused")
         Repo.paused = false
+        // Μ3: το πρώτο «Τέλος» στο περπάτημα: «όσο περπατάς ακόμα», στη θέση του «χωρίς GPS».
+        Repo.notice = WALK_FINISH_NOTICE
+        shot("W7h_walk_finish_notice")
+        // RT-18: μόνο παλμοί.
+        Repo.notice = "Μόνο παλμοί σε αυτό το περπάτημα."
+        Repo.gps = false
+        Repo.meters = 0.0
+        Repo.steps = 0
+        shot("W7i_walk_hr_only")
+        Repo.notice = null
+        Repo.gps = true
+        Repo.meters = 2180.0
+        Repo.steps = 3104
         Repo.endAt = now
         Repo.recoveryUntil = now + 47_000
         Repo.screen = Repo.Screen.RECOVER
         shot("W7c_recovery")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W7j_recovery_font13")
+        RuntimeEnvironment.setFontScale(1f)
+        // L7: πάνω από το όριο στο λεπτό αποκατάστασης: «Ξεκουράσου», όχι «Κόψε ρυθμό».
+        Repo.alarm.limit = 100
+        Repo.alarm.reset()
+        Repo.alarm.feed(104, now)
+        Repo.alarm.feed(104, now + 6_000)
+        shot("W5c_alarm_recovery")
+        Repo.alarm.limit = null
 
         // 9/11 (W3-18): περπάτημα χωρίς όριο: γράφεται «χωρίς όριο».
         Repo.recoveryUntil = 0
@@ -234,12 +276,18 @@ class WatchShotsTest {
         // 9/11 (V-A-03): η εφαρμογή είχε κλείσει απότομα· το περπάτημα σώθηκε ως μερικό.
         Repo.notice = "Σώθηκε ως τις 18:42: η εφαρμογή έκλεισε πριν το «Τέλος»."
         shot("W8b_end_recovered")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W8c_end_recovered_font13")
+        RuntimeEnvironment.setFontScale(1f)
         Repo.notice = null
 
         Repo.screen = Repo.Screen.HOME
         Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s1","w":"A","name":"Προπόνηση Α","start":1,"idx":1,
             "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"sets":[{"label":"10,3 kg","reps":8,"done":true}]}]}"""))
         shot("W9_home_phone")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W9e_home_phone_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         // 9/11: «Ελεύθερη άσκηση» του κινητού, χωρίς ασκήσεις ακόμα.
         Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s2","w":"_free","name":"Ελεύθερη άσκηση","start":1,"idx":0,"items":[]}"""))
@@ -473,5 +521,54 @@ class WatchShotsTest {
         Repo.applyPhone(phone(false))
         assertFalse(Repo.phone!!.items[0].sets[0].done)
         Repo.applyPhone(null)
+    }
+
+    /**
+     * Έλεγχος γ2 (W3-09): το TalkBack βρίσκει τι δείχνει η οθόνη και κάθε κουμπί με όνομα, και το διπλό πάτημα το πατά.
+     * Τα − / + δεν ακουμπούν πουθενά το ✓ (ένα πάτημα στο «−» δεν γράφει σετ).
+     */
+    @Test
+    fun talkBackAndTouchTargets() {
+        val now = System.currentTimeMillis()
+        Repo.applyPlan(Plan.parse(planJson))
+        Repo.local = LiveSession.fromPlan(Repo.plan!!.todayWorkout!!, now)
+        running(now)
+        Repo.screen = Repo.Screen.SET
+        val did = mutableListOf<String>()
+        val acts = object : WatchView.Actions by noop {
+            override fun tick() { did.add("tick") }
+            override fun reps(delta: Int) { did.add("reps$delta") }
+        }
+        val v = WatchView(RuntimeEnvironment.getApplication(), acts)
+        val spec = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
+        v.measure(spec, spec)
+        v.layout(0, 0, size, size)
+        v.draw(Canvas(Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)))
+        val items = v.a11yItems
+        assertTrue(items.first().first, items.first().first.startsWith("Παλμοί 128"))
+        assertFalse(items.first().second)
+        val labels = items.map { it.first }
+        assertTrue(labels.toString(), "Έγινε το σετ" in labels && "Μία επανάληψη λιγότερη" in labels && "Τέλος" in labels)
+        assertTrue(v.a11yClick(labels.indexOf("Έγινε το σετ")))
+        assertEquals(listOf("tick"), did)
+        // Κάθε σημείο της περιοχής του «−» πατά «−», ποτέ ✓.
+        val p = v.accessibilityNodeProvider
+        val minus = android.graphics.Rect()
+        @Suppress("DEPRECATION")
+        p.createAccessibilityNodeInfo(labels.indexOf("Μία επανάληψη λιγότερη"))!!.getBoundsInParent(minus)
+        val check = android.graphics.Rect()
+        @Suppress("DEPRECATION")
+        p.createAccessibilityNodeInfo(labels.indexOf("Έγινε το σετ"))!!.getBoundsInParent(check)
+        assertFalse("$minus / $check", android.graphics.Rect.intersects(minus, check))
+        // ≥ 48 dp ≈ 40u (u = πλάτος/200)
+        val u = size / 200f
+        assertTrue("${minus.height()}", minus.height() >= 40 * u - 1 && minus.width() >= 40 * u - 1)
+        did.clear()
+        val t0 = android.os.SystemClock.uptimeMillis()
+        for (y in listOf(minus.top + 2, minus.centerY(), minus.bottom - 2)) {
+            v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0, android.view.MotionEvent.ACTION_DOWN, minus.centerX().toFloat(), y.toFloat(), 0))
+            v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0 + 50, android.view.MotionEvent.ACTION_UP, minus.centerX().toFloat(), y.toFloat(), 0))
+        }
+        assertEquals(listOf("reps-1", "reps-1", "reps-1"), did)
     }
 }
