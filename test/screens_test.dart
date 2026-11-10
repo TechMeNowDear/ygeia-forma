@@ -424,6 +424,14 @@ void main() {
   testWidgets('Σήμερα · μικρό κινητό 360', (t) => _shot(t, name: '25_today_360', size: const Size(360, 1900), brightness: Brightness.light, tab: 0));
   testWidgets('Σήμερα · Fold ανοιχτό 750', (t) => _shot(t, name: '26_today_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: 0));
   testWidgets('Υγεία · Fold ανοιχτό 750', (t) => _shot(t, name: '27_body_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body));
+  // Σχέδια 9/11 (9β): Σώμα σε Fold 750 dp με 1,3× (δύο στήλες, ζυγίσεις σε πίνακα) και στα 360 με 2,0×.
+  for (final (name, size, scale) in [('27b_body_fold750_13x', const Size(750, 1700), 1.3), ('09b_body_360_2x', const Size(360, 3600), 2.0)]) {
+    testWidgets('Σώμα · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body);
+    });
+  }
   testWidgets('Διατροφή · Fold ανοιχτό 750', (t) => _shot(t, name: '28_nutrition_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: Cat.food));
   testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.trends));
   testWidgets('Διατροφή · κινητό', (t) => _shot(t, name: '14_nutrition_phone_light', size: tall, brightness: Brightness.light, tab: Cat.food));
@@ -590,6 +598,20 @@ void main() {
           await t.tap(find.text('Φακές (βρασμένες)').first);
         },
       ));
+  // Σχέδια 9/11 (9α): φύλλο ποσότητας με μεγάλα γράμματα: θρεπτικά και γεύματα 2×2, «Ζύγισα» σε γραμμές.
+  for (final (name, size, scale) in [('18b_quantity_sheet_13x', phone, 1.3), ('18c_quantity_sheet_360_2x', const Size(360, 2400), 2.0)]) {
+    testWidgets('Διατροφή · ποσότητα · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.food, act: (t) async {
+        await t.tap(find.text('Φαγητό'));
+        await t.pumpAndSettle();
+        await t.enterText(find.byType(TextField), 'fakes');
+        await t.pumpAndSettle();
+        await t.tap(find.text('Φακές (βρασμένες)').first);
+      });
+    });
+  }
   testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(
         t,
         name: '05_trends_phone_dark_open_row',

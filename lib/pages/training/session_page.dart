@@ -520,7 +520,7 @@ class _SessionPageState extends State<SessionPage> {
               if (band)
                 Row(mainAxisSize: MainAxisSize.min, children: [
                   BandDots(set.load, size: 14),
-                  Text(bandName(set.load ?? 0), style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+                  Flexible(child: Text(bandName(set.load ?? 0), style: TextStyle(fontSize: 13.5, color: c.textSecondary))),
                 ])
               else
                 const SizedBox.shrink(),

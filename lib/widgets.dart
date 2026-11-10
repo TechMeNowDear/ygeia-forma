@@ -280,9 +280,10 @@ class CardPair extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (veryLargeText(context)) {
+      // IntrinsicHeight: οι κάρτες με Spacer (γράφημα κάτω) παίρνουν το φυσικό τους ύψος.
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        first,
-        if (second != null) ...[const SizedBox(height: PageFrame.gap), second!],
+        IntrinsicHeight(child: first),
+        if (second != null) ...[const SizedBox(height: PageFrame.gap), IntrinsicHeight(child: second!)],
       ]);
     }
     return IntrinsicHeight(

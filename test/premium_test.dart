@@ -13,6 +13,7 @@ import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
+import 'package:ygeia_forma/pages/body.dart';
 import 'package:ygeia_forma/pages/category.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
@@ -297,5 +298,45 @@ void main() {
     expect(hmList(83), '1 ω 23 λ');
     expect(hmList(425), '7 ω 05 λ');
     expect(hmList(45), '45 λ');
+  });
+
+  group('Φύλλο ποσότητας με μεγάλα γράμματα (σχέδια 9/11, 9α)', () {
+    Future<void> sheet(WidgetTester t, double scale, Size size) async {
+      final food = sampleFoodStore(_now);
+      final f = food.recent(limit: 1).first;
+      await _pump(t, Scaffold(body: QuantitySheet(food: food, item: f, initialGrams: 300, meal: Meal.snack)),
+          size: size, textScale: scale);
+    }
+
+    testWidgets('1,0×: θρεπτικά σε 4 στήλες, γεύματα σε μία σειρά', (t) async {
+      await sheet(t, 1.0, const Size(400, 1400));
+      expect(find.byKey(const ValueKey('qty-nutrients-grid')), findsNothing);
+      expect(find.byKey(const ValueKey('meal-snack')), findsNothing);
+    });
+
+    testWidgets('1,3×: θρεπτικά 2×2 με ολόκληρη τη λέξη, γεύματα 2×2, τίποτα κομμένο', (t) async {
+      await sheet(t, 1.3, const Size(400, 1800));
+      expect(t.takeException(), isNull);
+      expect(find.byKey(const ValueKey('qty-nutrients-grid')), findsOneWidget);
+      expect(find.text('Υδατάνθρακες'), findsOneWidget);
+      expect(find.byKey(const ValueKey('meal-snack')), findsOneWidget);
+    });
+
+    testWidgets('2,0× στα 360: τίποτα δεν ξεχειλίζει', (t) async {
+      await sheet(t, 2.0, const Size(360, 2600));
+      expect(t.takeException(), isNull);
+    });
+  });
+
+  testWidgets('Ζυγίσεις σε πίνακα: μονάδες μία φορά επάνω, η άλλη χρονιά ως διαχωριστικό (σχέδια 9/11, 9β)', (t) async {
+    final at = DateTime(2026, 10, 24, 16, 30);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(at));
+    await _pump(t, Scaffold(body: BodyPage(store: store)), size: const Size(750, 2400), textScale: 1.3);
+    expect(t.takeException(), isNull);
+    final table = find.byKey(const ValueKey('body-weighings'));
+    expect(table, findsOneWidget);
+    expect(find.descendant(of: table, matching: find.text('Βάρος\nkg')), findsOneWidget);
+    expect(find.descendant(of: table, matching: find.text('2025')), findsOneWidget);
+    expect(find.descendant(of: table, matching: find.textContaining(' kg')), findsNothing, reason: 'η μονάδα δεν επαναλαμβάνεται σε κάθε γραμμή');
   });
 }

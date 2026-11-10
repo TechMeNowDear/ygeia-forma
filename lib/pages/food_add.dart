@@ -78,13 +78,49 @@ String gramsField(double v) => v == v.roundToDouble() ? '${v.round()}' : dec(v, 
 
 /// Επιλογή γεύματος: 4 ίσα κουμπιά που χωράνε πάντα σε μία γραμμή.
 class MealPicker extends StatelessWidget {
-  const MealPicker({super.key, required this.value, required this.onChanged});
+  const MealPicker({super.key, required this.value, required this.onChanged, this.grid = false});
   final Meal value;
   final ValueChanged<Meal> onChanged;
+
+  /// Σχέδια 9/11 (9α): με μεγάλα γράμματα τα γεύματα σε 2×2, ποτέ μικρυμένα ή κομμένα.
+  final bool grid;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    if (grid) {
+      Widget b(Meal m) => Expanded(
+            child: Material(
+              color: m == value ? c.foodSolid : c.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: m == value ? c.foodSolid : c.hairline, width: 1.5),
+              ),
+              child: InkWell(
+                key: ValueKey('meal-${m.name}'),
+                customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () => onChanged(m),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      child: Text(mealLabel(m),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: m == value ? c.onSolid : c.text)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      const v = Meal.values;
+      return Column(children: [
+        Row(children: [b(v[0]), const SizedBox(width: 8), b(v[1])]),
+        const SizedBox(height: 8),
+        Row(children: [b(v[2]), const SizedBox(width: 8), b(v[3])]),
+      ]);
+    }
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.hairline)),
@@ -654,6 +690,27 @@ class _QuantitySheetState extends State<QuantitySheet> {
       for (final v in f.perMl ? const [100.0, 200.0, 250.0, 330.0] : const [50.0, 100.0, 150.0, 200.0]) ('${v.round()} $unit', v),
     ];
 
+    // Σχέδια 9/11 (9α): από 1,3× γράμματα θρεπτικά 2×2, γεύματα 2×2, «Ζύγισα» σε γραμμές· στο 1,0× μένουν οι 4 στήλες.
+    final large = MediaQuery.textScalerOf(context).scale(10) >= 12.5;
+    Widget tile(String label, String value, Color color) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(14)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, maxLines: 1, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
+              ),
+              Row(children: [
+                Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                const SizedBox(width: 5),
+                Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
+              ]),
+            ]),
+          ),
+        );
+
     // Έλεγχος 9/11 (V-D-23): με μεγάλα γράμματα (1,3×–2×) η ετικέτα και η τιμή μικραίνουν αντί να κόβονται.
     Widget stat(String label, String value, Color color) => Expanded(
           child: Column(
@@ -720,6 +777,31 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   const SizedBox(height: 12),
                   Text('Ζύγισα:', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
                   const SizedBox(height: 6),
+                  if (large)
+                    Column(children: [
+                      for (final st in _states) ...[
+                        () {
+                          final on = st.$1.id == widget.food.currentOf(f).id;
+                          return SizedBox(
+                            width: double.infinity,
+                            child: on
+                                ? FilledButton.icon(
+                                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), alignment: Alignment.centerLeft),
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.check_rounded),
+                                    label: Text(st.$2),
+                                  )
+                                : OutlinedButton(
+                                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), alignment: Alignment.centerLeft, foregroundColor: c.text),
+                                    onPressed: () => setState(() => _item = st.$1),
+                                    child: Text(st.$2),
+                                  ),
+                          );
+                        }(),
+                        const SizedBox(height: 8),
+                      ],
+                    ])
+                  else
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
@@ -825,12 +907,47 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [for (final ch in chips) ActionChip(label: Text(ch.$1), onPressed: () => _set(ch.$2))],
-                ),
+                // Σχέδια 9/11 (9α): οι ποσότητες ως ίσα κουμπιά σε μία σειρά (η μερίδα, αν υπάρχει, από πάνω ολόκληρη).
+                for (final ch in chips.where((x) => x.$1.startsWith('1 μερίδα')))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), foregroundColor: c.text),
+                      onPressed: () => _set(ch.$2),
+                      child: Text(ch.$1),
+                    ),
+                  ),
+                Row(children: [
+                  for (final (k, ch) in [
+                    for (final x in chips)
+                      if (!x.$1.startsWith('1 μερίδα')) x
+                  ].asMap().entries.map((e) => (e.key, e.value))) ...[
+                    if (k > 0) const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), padding: const EdgeInsets.symmetric(horizontal: 4), foregroundColor: c.text),
+                        onPressed: () => _set(ch.$2),
+                        child: FittedBox(fit: BoxFit.scaleDown, child: Text(ch.$1, maxLines: 1)),
+                      ),
+                    ),
+                  ],
+                ]),
                 const SizedBox(height: 16),
+                if (large)
+                  Column(key: const ValueKey('qty-nutrients-grid'), children: [
+                    Row(children: [
+                      tile('kcal', kcalText(tot(Nk.kcal)), c.primary),
+                      const SizedBox(width: 8),
+                      tile('Πρωτεΐνη', '${gramsText(tot(Nk.protein))} g', proteinColor(c)),
+                    ]),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      tile('Υδατάνθρακες', '${gramsText(tot(Nk.carbs))} g', carbsColor(c)),
+                      const SizedBox(width: 8),
+                      tile('Λιπαρά', '${gramsText(tot(Nk.fat))} g', fatColor(c)),
+                    ]),
+                  ])
+                else
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
                   decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(16)),
@@ -844,7 +961,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                MealPicker(value: _meal, onChanged: (m) => setState(() => _meal = m)),
+                MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
                 const SizedBox(height: 18),
                 FilledButton(
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),

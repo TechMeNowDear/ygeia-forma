@@ -79,25 +79,7 @@ class BodyPage extends StatelessWidget {
               [for (final b in body) if (b.smm != null) (b.time, b.smm!)],
               c.energy,
             ),
-          if (body.isNotEmpty)
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CardHeader(icon: Icons.list_alt_rounded, title: 'Ζυγίσεις', color: c.body),
-                  const SizedBox(height: 8),
-                  for (final b in body.reversed.take(12))
-                    InfoRow(
-                      dayMonthYear(b.time),
-                      [
-                        if (b.weight != null) '${dec(b.weight!)} kg',
-                        if (b.fatPct != null) '${dec(b.fatPct!)}%',
-                        if (b.smm != null) 'μύες ${dec(b.smm!)}',
-                      ].join(' · '),
-                    ),
-                ],
-              ),
-            ),
+          if (body.isNotEmpty) _WeighTable(body: body.reversed.take(12).toList(), now: d?.readAt ?? DateTime.now()),
           // Θερμοκρασία καρπού: μόνο ως απόκλιση από το «συνήθως» (τρίτος έλεγχος F2/C5), ποτέ βαθμοί (33,6 °C διαβαζόταν ως
           // υποθερμία). Το «συνήθως» είναι η μεσαία τιμή των 14 προηγούμενων νυχτών (όχι «μέσος όρος»).
           if (skinNights.length >= 2)
@@ -194,20 +176,32 @@ class _LatestCard extends StatelessWidget {
         children: [
           CardHeader(
             icon: Icons.monitor_weight_rounded,
-            title: 'Τελευταία ζύγιση · ${relativeDay(last.time, now)} ${hm(last.time)}',
+            title: 'Τελευταία ζύγιση',
+            subtitle: '${relativeDay(last.time, now)} ${hm(last.time)}',
             color: c.body,
             trailing: const InfoButton(K.weight),
           ),
           const SizedBox(height: 14),
-          BigValue(last.weight == null ? '—' : dec(last.weight!), unit: 'kg', size: 34),
-          if (p != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}.',
-              style: TextStyle(color: c.textSecondary, fontSize: 13),
+          BigValue(last.weight == null ? '—' : dec(last.weight!), unit: 'kg', size: 44),
+          if (p != null && last.weight != null && p.weight != null && shownDiff(last.weight!, p.weight!, 1) != 0) ...[
+            const SizedBox(height: 6),
+            // Σχέδια 9/11 (Spec): αλλαγή χωρίς κρίση, σε γκρι.
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TrendPill('${signedDec(shownDiff(last.weight!, p.weight!, 1))} kg από ${p.time.day}/${p.time.month}'),
             ),
           ],
-          const Hairline(vertical: 12),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: Text(upperGr('Σύσταση σώματος'),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+            ),
+            const LabelTag('εκτίμηση'),
+          ]),
+          if (p != null)
+            Text('Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}.', style: TextStyle(color: c.textSecondary, fontSize: 13)),
+          const SizedBox(height: 4),
           InfoRow('Βάρος', withDiff(last.weight, p?.weight, 'kg')),
           InfoRow('Λίπος', withDiff(last.fatPct, p?.fatPct, '%')),
           InfoRow('Μάζα λίπους', withDiff(last.fatKg, p?.fatKg, 'kg')),
@@ -276,5 +270,77 @@ class _LatestCard extends StatelessWidget {
       ));
     }
     return out;
+  }
+}
+
+/// Ζυγίσεις ως πίνακας (σχέδια 9/11, 9β): οι μονάδες μία φορά επάνω, η χρονιά ως διαχωριστικό («2025»), αριθμοί
+/// με σταθερό πλάτος που μικραίνουν αντί να σπάνε.
+class _WeighTable extends StatelessWidget {
+  const _WeighTable({required this.body, required this.now});
+  final List<BodyMeasurement> body;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final head = TextStyle(fontSize: 13, height: 1.25, color: c.textSecondary);
+    final numStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular);
+    Widget cell(String s, TextStyle st, {TextAlign align = TextAlign.right}) => Expanded(
+          flex: 3,
+          child: Align(
+            alignment: align == TextAlign.right ? Alignment.centerRight : Alignment.centerLeft,
+            child: FittedBox(fit: BoxFit.scaleDown, child: Text(s, maxLines: 2, textAlign: align, style: st)),
+          ),
+        );
+    final rows = <Widget>[];
+    int? year = now.year;
+    for (var i = 0; i < body.length; i++) {
+      final b = body[i];
+      if (b.time.year != year) {
+        year = b.time.year;
+        rows.add(Container(
+          padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))),
+          child: Text('${b.time.year}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textSecondary)),
+        ));
+      }
+      final date = i == 0 && b.time.year == now.year ? shortDayDate(b.time) : '${b.time.day}/${b.time.month}';
+      rows.add(Container(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: i < body.length - 1 ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+        child: Row(children: [
+          Expanded(
+            flex: 4,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(date, maxLines: 1, style: numStyle),
+            ),
+          ),
+          cell(b.weight == null ? '—' : dec(b.weight!), numStyle),
+          cell(b.fatPct == null ? '—' : dec(b.fatPct!), numStyle),
+          cell(b.smm == null ? '—' : dec(b.smm!), numStyle),
+        ]),
+      ));
+    }
+    return AppCard(
+      key: const ValueKey('body-weighings'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CardHeader(icon: Icons.list_alt_rounded, title: 'Ζυγίσεις', color: c.body),
+          const SizedBox(height: 8),
+          Row(children: [
+            const Expanded(flex: 4, child: SizedBox()),
+            cell('Βάρος\nkg', head),
+            cell('Λίπος\n%', head),
+            cell('Μύες\nkg', head),
+          ]),
+          const SizedBox(height: 4),
+          Divider(height: 1, color: c.hairline),
+          ...rows,
+        ],
+      ),
+    );
   }
 }
