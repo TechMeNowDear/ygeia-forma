@@ -14,9 +14,15 @@ import 'package:ygeia_forma/pages/food_add.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
+import 'package:ygeia_forma/pages/training/today_training_card.dart';
+import 'package:ygeia_forma/exercise/ex_data.dart';
+import 'package:ygeia_forma/training/session.dart';
+import 'package:ygeia_forma/training/training_store.dart';
+import 'package:ygeia_forma/training/wear_link.dart';
 import 'package:ygeia_forma/theme.dart';
 
 import 'sample_data.dart';
+import 'training_sample.dart';
 import 'sample_food.dart';
 
 final _now = DateTime(2026, 11, 9, 16, 5);
@@ -118,7 +124,9 @@ void main() {
     testWidgets('ένα δικό μου που φαίνεται ήδη στα Πρόσφατα δεν ξαναμπαίνει στα «Δικά μου»', (t) async {
       final food = sampleFoodStore(_now);
       final mine = food.mine.first;
-      await food.add(mine, 100, Meal.snack, on: dayOf(_now));
+      // Μέρα μετά από όλο το δείγμα: σίγουρα η πιο πρόσφατη καταχώριση.
+      await food.add(mine, 100, Meal.snack, on: DateTime(2026, 11, 12));
+      expect(food.recent(limit: 10).map((f) => f.id), contains(mine.id));
       await _pump(t, AddFoodScreen(food: food, meal: Meal.snack, day: dayOf(_now)));
       final inMine = find.descendant(of: find.byKey(const ValueKey('add-mine')), matching: find.text(mine.name));
       expect(inMine, findsNothing);
@@ -164,6 +172,67 @@ void main() {
     testWidgets('«+ Φαγητό» στο 360 με 2,0× γράμματα: τίποτα δεν ξεχειλίζει', (t) async {
       await _pump(t, AddFoodScreen(food: sampleFoodStore(_now), meal: Meal.snack, day: dayOf(_now)), size: const Size(360, 3000), textScale: 2.0);
       expect(t.takeException(), isNull);
+    });
+  });
+
+  group('«Άσκηση σήμερα» στη Σήμερα (σχέδια 9/11, 1β)', () {
+    final fri = DateTime(2026, 11, 13, 17, 30); // «A» στο δείγμα
+    final tue = DateTime(2026, 11, 10, 17, 30); // περπάτημα
+
+    Future<void> card(WidgetTester t, TrainingStore s, DateTime at) async {
+      await t.runAsync(() => ExLibrary.load(inline: true));
+      await _pump(t, Scaffold(body: SingleChildScrollView(child: TodayTrainingCard(training: s, now: at))));
+    }
+
+    test('χωρίς πρόγραμμα ή μέρα ξεκούρασης: καμία κάρτα', () {
+      expect(TodayTrainingCard.shows(sampleTraining(fri, program: false, history: false), fri), isFalse);
+      expect(TodayTrainingCard.shows(TrainingStore(), fri), isFalse, reason: 'δεν έχει διαβαστεί ακόμα');
+      expect(TodayTrainingCard.shows(sampleTraining(fri), fri), isTrue);
+    });
+
+    testWidgets('μέρα βαρών: όνομα, ασκήσεις, «Ξεκίνα την προπόνηση»', (t) async {
+      await card(t, sampleTraining(fri), fri);
+      expect(find.text('Άσκηση σήμερα'), findsOneWidget);
+      expect(find.text('Προπόνηση Α'), findsOneWidget);
+      expect(find.textContaining('όριο παλμών 140'), findsOneWidget);
+      expect(find.byKey(const ValueKey('today-train-start')), findsOneWidget);
+    });
+
+    testWidgets('μέρα περπατήματος: ξεκινά από το ρολόι, χωρίς κουμπί', (t) async {
+      await card(t, sampleTraining(tue), tue);
+      expect(find.byKey(const ValueKey('today-train-walk-hint')), findsOneWidget);
+      expect(find.byKey(const ValueKey('today-train-start')), findsNothing);
+    });
+
+    testWidgets('χωρίς παλμούς με όριο γιατρού: κεχριμπάρι, ποτέ πράσινο', (t) async {
+      WearLink.main.live.value = {'kind': 'walk', 'sec': 120, 'm': 300.0, 'bpm': 0, 'at': DateTime.now().millisecondsSinceEpoch};
+      addTearDown(() => WearLink.main.live.value = null);
+      await card(t, sampleTraining(fri), fri);
+      expect(find.byKey(const ValueKey('today-training-nohr')), findsOneWidget);
+      expect(find.textContaining('Το όριο 140 δεν σε προστατεύει τώρα'), findsOneWidget);
+    });
+
+    testWidgets('περπάτημα ζωντανά: χρονόμετρο και ρυθμός «/km»', (t) async {
+      WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
+      addTearDown(() => WearLink.main.live.value = null);
+      await card(t, sampleTraining(fri), fri);
+      expect(find.text('24:31'), findsOneWidget);
+      expect(find.text('2,18 km'), findsOneWidget);
+      expect(find.text(paceText(1471 / 2.18)), findsOneWidget);
+    });
+
+    testWidgets('τελείωσε σήμερα: «έγινε» και «Δες τη σύνοψη»', (t) async {
+      final s = sampleTraining(fri);
+      s.sessions.add(Session.fromJson({
+        ...s.sessions.last.toJson(),
+        'id': 'today',
+        'start': fri.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+        'end': fri.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
+      }));
+      await card(t, s, fri);
+      expect(find.text('έγινε'), findsOneWidget);
+      expect(find.byKey(const ValueKey('today-training-summary')), findsOneWidget);
+      expect(find.text('σύνολο κιλών'), findsOneWidget);
     });
   });
 }

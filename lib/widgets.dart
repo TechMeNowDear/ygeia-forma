@@ -355,7 +355,7 @@ class CardHeader extends StatelessWidget {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                  style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +364,7 @@ class CardHeader extends StatelessWidget {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                      style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                     ),
                     Text(
                       subtitle!,

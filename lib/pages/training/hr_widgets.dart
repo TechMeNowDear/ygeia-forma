@@ -8,9 +8,12 @@ import '../../training/wear_link.dart';
 
 /// Ζωντανοί παλμοί από το ρολόι, με γραμμή ως το όριο του γιατρού (σχέδιο 3, 8/11).
 class HrBar extends StatelessWidget {
-  const HrBar({super.key, required this.bpm, this.limit});
+  const HrBar({super.key, required this.bpm, this.limit, this.bare = false});
   final int bpm;
   final int? limit;
+
+  /// Χωρίς δικό του πλαίσιο, μέσα σε άλλη κάρτα (σχέδια 9/11, «Άσκηση σήμερα»).
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
@@ -20,12 +23,14 @@ class HrBar extends StatelessWidget {
       liveRegion: true,
       label: 'Παλμοί $bpm${limit == null ? '' : ', όριο $limit'}${over ? ', πάνω από το όριο' : ''}',
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        decoration: BoxDecoration(
-          color: over ? c.bad.withValues(alpha: .12) : c.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: over ? c.bad : c.hairline, width: over ? 1.5 : 1),
-        ),
+        padding: bare ? EdgeInsets.zero : const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        decoration: bare
+            ? null
+            : BoxDecoration(
+                color: over ? c.bad.withValues(alpha: .12) : c.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: over ? c.bad : c.hairline, width: over ? 1.5 : 1),
+              ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Icon(Icons.favorite_rounded, color: c.heart, size: 22),

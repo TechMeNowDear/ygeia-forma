@@ -338,12 +338,15 @@ class FoodTodayCard extends StatelessWidget {
                 MacroBreakdown(totals: t, percent: false),
               ],
               const SizedBox(height: 16),
+              // Σχέδια 9/11: ένα γεμάτο κουμπί ανά οθόνη· το «+ Φαγητό» είναι απαλό, για να μην παλεύει με το «Ξεκίνα».
               FilledButton.icon(
+                key: const ValueKey('today-add-food'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: c.foodSolid,
-                  foregroundColor: c.onSolid,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  backgroundColor: c.tint(c.food),
+                  foregroundColor: c.food,
+                  elevation: 0,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: food.loaded ? () => openAddFood(context, food, day: today) : null,
                 icon: const Icon(Icons.add_rounded),

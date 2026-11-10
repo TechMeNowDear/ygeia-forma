@@ -885,6 +885,70 @@ void main() {
         await t.tap(find.byKey(const ValueKey('hrr-info')));
         await t.pumpAndSettle();
       }));
+  // Σχέδια 9/11 (1α–1γ): «Άσκηση σήμερα» στη Σήμερα, σε όλες τις μορφές της, Fold κλειστό/ανοιχτό και μεγάλα γράμματα.
+  Future<void> todayShot(WidgetTester t, String name, Size size,
+      {DateTime? at, double scale = 1.0, Brightness b = Brightness.light, void Function(TrainingStore)? prep, bool oura = true}) async {
+    ExClock.frozen = true;
+    await t.runAsync(() => ExLibrary.load(inline: true));
+    final when = at ?? trainAt;
+    final prev = TrainingStore.main;
+    TrainingStore.main = sampleTraining(when);
+    prep?.call(TrainingStore.main);
+    addTearDown(() => TrainingStore.main = prev);
+    t.platformDispatcher.textScaleFactorTestValue = scale;
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+    await _shot(t, name: name, size: size, brightness: b, tab: Cat.today, at: when, oura: oura);
+  }
+
+  void liveWalk(int bpm, {int sec = 1471}) {
+    WearLink.main.live.value = {'kind': 'walk', 'sec': sec, 'm': 2180.0, 'steps': 3104, 'bpm': bpm, 'at': DateTime.now().millisecondsSinceEpoch};
+    WearLink.main.ready.value = true;
+    addTearDown(() {
+      WearLink.main.live.value = null;
+      WearLink.main.ready.value = false;
+    });
+  }
+
+  void doneToday(TrainingStore s) {
+    final last = s.sessions.last;
+    s.sessions.add(Session.fromJson({
+      ...last.toJson(),
+      'id': 'today',
+      'start': trainAt.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+      'end': trainAt.subtract(const Duration(hours: 1, minutes: 8)).millisecondsSinceEpoch,
+    })
+      ..hrMax = 132);
+  }
+
+  testWidgets('Σήμερα · άσκηση σήμερα', (t) async {
+    WearLink.main.ready.value = true;
+    addTearDown(() => WearLink.main.ready.value = false);
+    await todayShot(t, 'TT1_today_training', const Size(400, 1900));
+  });
+  testWidgets('Σήμερα · άσκηση σήμερα · 360', (t) => todayShot(t, 'TT2_today_training_360', const Size(360, 1900)));
+  testWidgets('Σήμερα · άσκηση σήμερα · Fold ανοιχτό', (t) async {
+    WearLink.main.ready.value = true;
+    addTearDown(() => WearLink.main.ready.value = false);
+    await todayShot(t, 'TT3_today_training_fold', const Size(880, 1100));
+  });
+  testWidgets('Σήμερα · άσκηση σήμερα · 360 · 1,3×', (t) => todayShot(t, 'TT4_today_training_360_13x', const Size(360, 2200), scale: 1.3));
+  testWidgets('Σήμερα · άσκηση σήμερα · 360 · 2×', (t) => todayShot(t, 'TT4b_today_training_360_2x', const Size(360, 3000), scale: 2.0));
+  testWidgets('Σήμερα · μέρα περπατήματος', (t) async {
+    WearLink.main.ready.value = true;
+    addTearDown(() => WearLink.main.ready.value = false);
+    await todayShot(t, 'TT5_today_walk_day', const Size(400, 1900), at: DateTime(2026, 11, 10, 17, 30));
+  });
+  testWidgets('Σήμερα · περπάτημα ζωντανά', (t) async {
+    liveWalk(104);
+    await todayShot(t, 'TT6_today_walk_live', const Size(400, 1900));
+  });
+  testWidgets('Σήμερα · περπάτημα χωρίς παλμούς με όριο', (t) async {
+    liveWalk(0, sec: 120);
+    await todayShot(t, 'TT7_today_walk_no_hr', const Size(400, 1900));
+  });
+  testWidgets('Σήμερα · άσκηση έγινε', (t) => todayShot(t, 'TT8_today_training_done', const Size(400, 1900), prep: doneToday));
+  testWidgets('Σήμερα · άσκηση σήμερα · σκοτεινό', (t) => todayShot(t, 'TT9_today_training_dark', const Size(400, 1900), b: Brightness.dark));
+
   testWidgets('Προπόνηση · περπάτημα ζωντανά από το ρολόι', (t) async {
     WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'steps': 3104, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
     WearLink.main.ready.value = true;

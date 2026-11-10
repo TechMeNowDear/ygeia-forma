@@ -88,10 +88,11 @@ class _MePageState extends State<MePage> {
                               Expanded(
                                 child: DropdownButtonFormField<int>(
                                   key: const ValueKey('me-month'),
+                                  isExpanded: true,
                                   initialValue: p.birthMonth,
                                   decoration: const InputDecoration(labelText: 'Μήνας'),
                                   items: [
-                                    for (var m = 1; m <= 12; m++) DropdownMenuItem(value: m, child: Text(monthNames[m - 1])),
+                                    for (var m = 1; m <= 12; m++) DropdownMenuItem(value: m, child: Text(monthNames[m - 1], overflow: TextOverflow.ellipsis)),
                                   ],
                                   onChanged: (v) => _save(p.copyWith(birthMonth: v)),
                                 ),
@@ -100,6 +101,7 @@ class _MePageState extends State<MePage> {
                               Expanded(
                                 child: DropdownButtonFormField<int>(
                                   key: const ValueKey('me-year'),
+                                  isExpanded: true,
                                   initialValue: p.birthYear,
                                   decoration: const InputDecoration(labelText: 'Έτος'),
                                   items: [
@@ -303,8 +305,13 @@ class _DayChip extends StatelessWidget {
           child: SizedBox(
             height: 44,
             child: Center(
-              child: Text(label,
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? c.onSolid : c.text)),
+              // Μεγάλα γράμματα: η συντομογραφία μικραίνει για να χωρά, ποτέ κομμένη (σχέδια 9/11).
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(label,
+                    maxLines: 1,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? c.onSolid : c.text)),
+              ),
             ),
           ),
         ),

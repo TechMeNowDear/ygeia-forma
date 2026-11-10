@@ -245,7 +245,7 @@ class OuraSleepTodayCard extends StatelessWidget {
                       track: Colors.white.withValues(alpha: 0.16),
                     ),
                     const SizedBox(height: 4),
-                    EstimateNote('σκορ · εκτίμηση', onDark: true),
+                    Text('βαθμολογία', style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ],
@@ -263,20 +263,13 @@ class OuraSleepTodayCard extends StatelessWidget {
               ),
             ),
           ],
+          // Σχέδια 9/11 (1α): η «Καρδιά και θερμοκρασία στον ύπνο» γίνεται μία σειρά μέσα στον Ύπνο.
+          ..._nightRow(soft),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Κοιμήθηκες ${parts.first.onset == null ? '—' : hm(parts.first.onset!)}',
-                  style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600, fontFeatures: tabular),
-                ),
-              ),
-              Text(
-                'Ξύπνησες ${hm(parts.last.end)}',
-                style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600, fontFeatures: tabular),
-              ),
-            ],
+          Text(
+            'Κοιμήθηκες ${parts.first.onset == null ? '—' : hm(parts.first.onset!)} · ξύπνησες ${hm(parts.last.end)}',
+            key: const ValueKey('oura-today-times'),
+            style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500, fontFeatures: tabular),
           ),
           if (night.shortNight || night.pieces.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -333,6 +326,54 @@ class OuraSleepTodayCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+extension on OuraSleepTodayCard {
+  /// Ετοιμότητα · HRV · Παλμοί ύπνου της χθεσινής νύχτας (από το Oura), κάτω από τη διάρκεια. Τίποτα αν λείπουν όλα.
+  List<Widget> _nightRow(Color soft) {
+    final day = dayOf(now);
+    final plan = store.plan;
+    final readiness = plan.value(store.history, K.energy, day);
+    final hrv = plan.value(store.history, K.hrv, day);
+    final hr = plan.value(store.history, K.sleepHr, day);
+    if (readiness == null && hrv == null && hr == null) return const [];
+    Widget cell(String label, double? v, String unit) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, maxLines: 2, style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500, height: 1.25)),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                      text: v == null ? '—' : '${v.round()}',
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  if (v != null) TextSpan(text: ' $unit', style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+                maxLines: 1,
+                style: const TextStyle(fontFeatures: tabular),
+              ),
+            ),
+          ]),
+        );
+    return [
+      const SizedBox(height: 14),
+      Divider(height: 1, color: Colors.white.withValues(alpha: 0.18)),
+      const SizedBox(height: 12),
+      Row(
+        key: const ValueKey('oura-today-night-row'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          cell('Ετοιμότητα', readiness, '/100'),
+          const SizedBox(width: 10),
+          cell('HRV', hrv, 'ms'),
+          const SizedBox(width: 10),
+          cell('Παλμοί ύπνου', hr, 'bpm'),
+        ],
+      ),
+    ];
   }
 }
 

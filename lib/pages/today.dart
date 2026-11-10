@@ -13,10 +13,13 @@ import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../unusual.dart';
+import '../training/training_store.dart';
+import '../training/wear_link.dart';
 import 'nutrition.dart';
 import 'oura_today.dart';
 import 'sources_page.dart';
 import 'unusual_card.dart';
+import 'training/today_training_card.dart';
 import 'week_card.dart';
 import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
@@ -31,7 +34,11 @@ class TodayPage extends StatelessWidget {
     required this.open,
     required this.openSettings,
     this.now,
+    this.training,
   });
+
+  /// Για την κάρτα «Άσκηση σήμερα» (χωρίς αυτό: [TrainingStore.main]).
+  final TrainingStore? training;
 
   final HealthStore store;
   final FoodStore food;
@@ -45,8 +52,10 @@ class TodayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final training = this.training ?? TrainingStore.main;
     return ListenableBuilder(
-      listenable: store,
+      // Το ζωντανό περπάτημα το ακούει μόνο η κάρτα «Άσκηση σήμερα» (όχι όλη η σελίδα σε κάθε μήνυμα του ρολογιού).
+      listenable: Listenable.merge([store, training, WearLink.main.ready]),
       builder: (context, _) {
         final c = Aigaio.of(context);
         final d = store.data;
@@ -87,10 +96,8 @@ class TodayPage extends StatelessWidget {
             : ouraNight
                 ? OuraSleepTodayCard(store: store, now: now, onTap: openSleep)
                 : _SleepCard(data: d, onTap: openSleep);
-        // Μόνο όταν η χθεσινή νύχτα έχει τιμές από το Oura (αλλιώς η κάρτα ύπνου λέει ήδη γιατί λείπει).
-        final rest = ouraNight && store.plan.nightSource(now) == Source.oura && OuraRestCard.hasData(store, now)
-            ? OuraRestCard(store: store, now: now, onTap: openSleep)
-            : null;
+        // Σχέδια 9/11 (1α): Ετοιμότητα, HRV και παλμοί ύπνου είναι πια μία σειρά μέσα στην κάρτα του Ύπνου (όχι
+        // χωριστή κάρτα)· η πλήρης κάρτα, με θερμοκρασία και «συνήθως», είναι στην Υγεία › Ύπνος.
         final ouraState = PlanUnknownCard.shows(store)
             ? PlanUnknownCard(onOpen: () => Navigator.of(context).push(SourcesPage.route(store, now: this.now)))
             : OuraStatusCard.shows(store)
@@ -103,6 +110,9 @@ class TodayPage extends StatelessWidget {
         // 7/11: εβδομαδιαίο ζύγισμα. Τη μέρα ζυγίσματος, ώσπου να φτάσει ζύγιση της ίδιας μέρας.
         final weighedToday = d.latestBody != null && sameDay(d.latestBody!.time, now);
         final weigh = now.weekday == store.profile.weighDay && !weighedToday ? const _WeighCard() : null;
+        // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
+        final trainingCard =
+            TodayTrainingCard.shows(training, now) ? TodayTrainingCard(training: training, now: now) : null;
         final foodCard = prefs.show('food')
             ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))
             : null;
@@ -140,7 +150,8 @@ class TodayPage extends StatelessWidget {
           if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
-        // Σε tablet/PC (ποντίκι) κουμπί «Ανανέωση» αντί για «τράβηξε προς τα κάτω» (έλεγχος 8/11, UX-19).
+        // Σε tablet/PC (ποντίκι) κουμπί «Ανανέωση»· στο κινητό μόνο «Ενημέρωση 18:40» (σχέδια 9/11: φεύγει το
+        // μόνιμο «τράβηξε για ανανέωση»· το τράβηγμα δουλεύει όπως πριν).
         final wide = MediaQuery.sizeOf(context).width >= 600;
         final updated = 'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now)} '}${hm(d.readAt)}';
         final footer = Padding(
@@ -157,7 +168,8 @@ class TodayPage extends StatelessWidget {
                   ),
                 ])
               : Text(
-                  '$updated · τράβηξε προς τα κάτω για ανανέωση',
+                  updated,
+                  key: const ValueKey('today-updated'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: c.textTertiary, fontSize: 12.5),
                 ),
@@ -185,14 +197,15 @@ class TodayPage extends StatelessWidget {
             ...alerts,
             if (weigh != null) weigh,
             if (sleep != null) sleep,
-            if (rest != null) rest,
+            if (trainingCard != null) trainingCard,
             if (week != null) week,
             if (foodCard != null) foodCard,
             ...more,
             footer,
           ],
           top: alerts,
-          left: [if (weigh != null) weigh, if (sleep != null) sleep, if (rest != null) rest, if (week != null) week],
+          // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
+          left: [if (weigh != null) weigh, if (sleep != null) sleep, if (trainingCard != null) trainingCard, if (week != null) week],
           right: [if (foodCard != null) foodCard, ...more, footer],
         );
       },
