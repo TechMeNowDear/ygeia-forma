@@ -503,7 +503,7 @@ void main() {
 
   testWidgets('Επανέλεγχος: σωστός ενικός («1 συσκευή · 0 σκεύη», όχι «1 συσκευές»)', (t) async {
     final store = HealthStore();
-    store.prefs.kitchen = {'devices': ['oven'], 'cookware': <Object>[]};
+    store.prefs.kitchen = {'devices': ['oven'], 'cookware': <Object>[], 'seed': 2};
     await _pump(t, MePage(store: store, food: sampleFoodStore(_now)));
     expect(find.textContaining('1 συσκευή · 0 σκεύη'), findsOneWidget);
     expect(find.textContaining('1 συσκευές'), findsNothing);
