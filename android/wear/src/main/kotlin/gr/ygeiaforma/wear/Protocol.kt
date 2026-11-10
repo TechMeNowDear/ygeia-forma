@@ -33,6 +33,11 @@ object Paths {
      * σβήνει τα δικά του αρχεία και ρυθμίσεις όταν το δει (όχι στη μέση άσκησης). Νέο path: το παλιό ρολόι το αγνοεί.
      */
     const val WIPE = "/ygeia/wipe"
+    /**
+     * Ρολόι → κινητό (DataItem, έλεγχος του fix-accuracy, M1/M4): «σβήστηκε» `{"v":1,"at": ms}` (το «at» του «σβήσε»).
+     * Μόλις το δει, το κινητό σβήνει και τα δύο. Νέο path: το παλιό κινητό το αγνοεί.
+     */
+    const val WIPED = "/ygeia/wiped"
     const val KEY = "json"
 
     /** Δυνατότητα που δηλώνει η εφαρμογή του ρολογιού (res/values/wear.xml), για να τη βρίσκει το κινητό. */
@@ -730,8 +735,18 @@ fun pace(meters: Double, sec: Long): String {
 
 /** Πότε σβήνει το ρολόι τα δεδομένα του μετά από «Διαγραφή όλων» στο κινητό (καθαρό, με δοκιμές). */
 object WipeRule {
-    /** [at]: πότε ζητήθηκε· [done]: η τελευταία διαγραφή που έγινε εδώ· [running]: τρέχει άσκηση (τότε περιμένει). */
+    /**
+     * [at]: πότε ζητήθηκε· [done]: η τελευταία διαγραφή που έγινε εδώ· [running]: τρέχει άσκηση, ή υπάρχει άσκηση που
+     * έμεινε μισή από απότομο κλείσιμο (στιγμιότυπο run.json, έλεγχος του fix-accuracy, S1)· τότε περιμένει ώσπου να
+     * τελειώσει ή να σωθεί.
+     */
     fun shouldWipe(at: Long, done: Long, running: Boolean): Boolean = at > 0 && at > done && !running
+
+    /** Η διαγραφή [at] έχει ήδη γίνει εδώ αλλά το κινητό δεν έχει πάρει την απάντηση ([acked] = η τελευταία που στάλθηκε). */
+    fun shouldAck(at: Long, done: Long, acked: Long): Boolean = at > 0 && at <= done && acked < at
+
+    /** Η απάντηση «σβήστηκε» προς το κινητό ([Paths.WIPED]). */
+    fun ackJson(at: Long): String = org.json.JSONObject().put("v", 1).put("at", at).toString()
 
     fun parseAt(text: String?): Long = try {
         if (text == null) 0L else org.json.JSONObject(text).optLong("at", 0L)

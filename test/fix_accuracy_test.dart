@@ -1,5 +1,7 @@
 // Κλάδος fix-accuracy (έλεγχος 9/11): ακρίβεια, ιατρικά/στατιστικά κείμενα, πλατφόρμα, ΓΚΠΔ.
 // Κάθε δοκιμή αποτυγχάνει χωρίς την αντίστοιχη διόρθωση.
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -15,6 +17,9 @@ import 'package:ygeia_forma/training/progress.dart';
 import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/set_hr.dart';
 import 'package:ygeia_forma/training/walk_stats.dart';
+import 'package:ygeia_forma/pages/training/hr_widgets.dart';
+import 'package:ygeia_forma/training/hr_file.dart';
+import 'package:ygeia_forma/training/training_store.dart';
 import 'package:ygeia_forma/trends.dart';
 import 'package:ygeia_forma/home_widgets/widget_snapshot.dart';
 import 'package:ygeia_forma/home_widgets/widget_style.dart' show WKind;
@@ -112,6 +117,23 @@ void main() {
       final dart = File('lib/error_report.dart').readAsStringSync();
       expect(dart, contains("enabled: info['enabled'] != false"));
     });
+
+    test('N5: ArgumentError / RangeError στέλνουν μόνο τον τύπο (η τιμή μένει στο κινητό)', () async {
+      final sent = <String>[];
+      final r = ErrorReporter(post: (b) async {
+        sent.add(b);
+        return 200;
+      });
+      await r.configure(dir: dir, release: 'x', device: const {});
+      await r.report(ArgumentError.value(82.4, 'βάρος'), StackTrace.current);
+      await r.report(RangeError.range(98765, 0, 3), StackTrace.current);
+      expect(sent, hasLength(2));
+      for (final b in sent) {
+        expect(b, isNot(contains('82.4')));
+        expect(b, isNot(contains('98765')));
+      }
+      expect(sent.first, contains('ArgumentError'));
+    });
   });
 
   // ------------------------------------------------------------ E3-05: «Διαγραφή όλων των δεδομένων»
@@ -123,47 +145,94 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('δύο επιβεβαιώσεις: χωρίς «Κατάλαβα» το κουμπί δεν σβήνει· λέει τι μένει', (tester) async {
+    bool enabled(WidgetTester tester, String key) => tester.widget<ButtonStyleButton>(find.byKey(ValueKey(key))).onPressed != null;
+
+    testWidgets('δύο επιβεβαιώσεις και αντίγραφο ή ρητά «χωρίς»· λέει τι μένει', (tester) async {
       var calls = 0, exported = 0;
       await tester.pumpWidget(_app(Scaffold(
         body: DeleteAllSheet(
           wipe: () async {
             calls++;
-            return true;
+            return 'x';
           },
-          export: () async => exported++,
+          export: () async {
+            exported++;
+            return (ok: true, text: 'Αποθηκεύτηκε στις Λήψεις: a.json');
+          },
         ),
       )));
       expect(find.text(wipeKeepsText), findsOneWidget);
-      expect(wipeKeepsText, contains('Samsung Health'));
-      expect(wipeKeepsText, contains('Λήψεις'));
-      expect(wipeKeepsText, contains('αντίγραφο της Google'));
-      expect(wipeKeepsText, contains('ρολόι'));
+      for (final t in ['Samsung Health', 'Λήψεις', 'αντίγραφο της Google', 'ρολόι', 'άδειες', 'αναφορές σφαλμάτων']) {
+        expect(wipeKeepsText, contains(t));
+      }
+      await tap(tester, 'wipe-understood');
+      expect(enabled(tester, 'wipe-confirm'), isFalse, reason: 'ούτε αντίγραφο ούτε «Χωρίς αντίγραφο»');
       await tap(tester, 'wipe-confirm');
-      expect(calls, 0, reason: 'χωρίς «Κατάλαβα» δεν σβήνει τίποτα');
+      expect(calls, 0);
       await tap(tester, 'wipe-export');
       expect(exported, 1);
-      await tap(tester, 'wipe-understood');
+      expect(find.text('Αποθηκεύτηκε στις Λήψεις: a.json'), findsOneWidget, reason: 'το αποτέλεσμα μέσα στο φύλλο');
+      expect(enabled(tester, 'wipe-confirm'), isTrue);
       await tap(tester, 'wipe-confirm');
       expect(calls, 1);
     });
 
-    testWidgets('αποτυχία: λέει πώς γίνεται από τις Ρυθμίσεις Android', (tester) async {
-      await tester.pumpWidget(_app(Scaffold(body: DeleteAllSheet(understood: true, wipe: () async => false))));
-      await tap(tester, 'wipe-confirm');
-      expect(find.byKey(const ValueKey('wipe-failed')), findsOneWidget);
-      expect(find.text(wipeFailedText), findsOneWidget);
+    testWidgets('M2: η εξαγωγή περιμένεται· αποτυχία φαίνεται στο φύλλο και η διαγραφή μένει κλειστή ως «Χωρίς αντίγραφο»',
+        (tester) async {
+      final done = Completer<BackupResult>();
+      await tester.pumpWidget(_app(Scaffold(
+        body: DeleteAllSheet(understood: true, wipe: () async => 'x', export: () => done.future),
+      )));
+      await tester.ensureVisible(find.byKey(const ValueKey('wipe-export')));
+      await tester.tap(find.byKey(const ValueKey('wipe-export')));
+      await tester.pump();
+      expect(find.text('Αποθηκεύεται…'), findsOneWidget);
+      expect(enabled(tester, 'wipe-confirm'), isFalse, reason: 'όσο γράφεται το αντίγραφο');
+      expect(enabled(tester, 'wipe-cancel'), isFalse);
+      done.complete((ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: γεμάτος χώρος'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('wipe-export-result')), findsOneWidget);
+      expect(find.text('Δεν αποθηκεύτηκε το αντίγραφο: γεμάτος χώρος'), findsOneWidget);
+      expect(enabled(tester, 'wipe-confirm'), isFalse);
+      await tap(tester, 'wipe-no-backup');
+      expect(find.text(wipeNoBackupText), findsOneWidget);
+      expect(enabled(tester, 'wipe-confirm'), isTrue);
     });
 
-    testWidgets('η γραμμή στις Ρυθμίσεις ανοίγει το φύλλο· «Άκυρο» = τίποτα', (tester) async {
+    testWidgets('μισό αντίγραφο (προπονήσεις έξω) δεν ανοίγει μόνο του τη διαγραφή', (tester) async {
+      await tester.pumpWidget(_app(Scaffold(
+        body: DeleteAllSheet(
+          understood: true,
+          wipe: () async => 'x',
+          export: () async => (ok: false, text: 'Αποθηκεύτηκε… Οι προπονήσεις δεν μπήκαν'),
+        ),
+      )));
+      await tap(tester, 'wipe-export');
+      expect(enabled(tester, 'wipe-confirm'), isFalse);
+      expect(File('lib/pages/settings.dart').readAsStringSync(), contains('ok: !trainingOut && hrMissing == 0'));
+    });
+
+    testWidgets('δεν ξεκίνησε: το φύλλο λέει τι έγινε (Oura) και τι όχι', (tester) async {
+      await tester.pumpWidget(_app(Scaffold(
+        body: DeleteAllSheet(understood: true, noBackup: true, wipe: () async => wipeNotStartedText(ouraClosed: true), export: () async => (ok: true, text: '')),
+      )));
+      await tap(tester, 'wipe-confirm');
+      expect(find.byKey(const ValueKey('wipe-failed')), findsOneWidget);
+      expect(find.text(wipeNotStartedText(ouraClosed: true)), findsOneWidget);
+      expect(wipeNotStartedText(ouraClosed: true), contains('Oura'));
+      expect(wipeNotStartedText(ouraClosed: false), isNot(contains('Oura')));
+    });
+
+    testWidgets('S3: όσο σβήνει, το φύλλο δεν κλείνει (πίσω/έξω)· «Άκυρο» πριν = τίποτα', (tester) async {
       var calls = 0;
+      final hold = Completer<String>();
       await tester.pumpWidget(_app(Scaffold(
         body: ListView(children: [
           DeleteAllRow(
             store: null,
-            wipe: () async {
+            wipe: () {
               calls++;
-              return true;
+              return hold.future;
             },
           ),
         ]),
@@ -175,21 +244,102 @@ void main() {
       await tap(tester, 'wipe-cancel');
       expect(calls, 0);
       expect(find.text('Διαγραφή όλων των δεδομένων;'), findsNothing);
+      await tap(tester, 'privacy-delete');
+      await tap(tester, 'wipe-understood');
+      await tester.ensureVisible(find.byKey(const ValueKey('wipe-confirm')));
+      await tester.tap(find.byKey(const ValueKey('wipe-confirm')));
+      await tester.pump();
+      expect(calls, 1);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.text('Διαγραφή όλων των δεδομένων;'), findsOneWidget, reason: 'το «πίσω» δεν το κλείνει στη μέση');
+      hold.complete('δεν έγινε');
+      await tester.pumpAndSettle();
+      expect(find.text('δεν έγινε'), findsOneWidget);
     });
 
-    test('η πλευρά Android: ίδιο με «Διαγραφή δεδομένων» του συστήματος, widgets χωρίς τιμές πριν', () {
+    testWidgets('«Όλα διαγράφηκαν»: το ρολόι «περιμένει» ώσπου να επιβεβαιώσει· Oura χωρίς ανάκληση λέγεται', (tester) async {
+      var answer = 'waiting';
+      var started = 0;
+      await tester.pumpWidget(_app(WipedPage(
+        status: WipeStatus(at: DateTime(2026, 11, 10), done: true, seen: false, watchPending: true, oura: 'failed'),
+        onStart: () => started++,
+        onRestore: () {},
+        watch: () async => answer,
+      )));
+      await tester.pump();
+      expect(find.text('Όλα διαγράφηκαν'), findsOneWidget);
+      expect(find.text(wipeWatchWaitingText), findsOneWidget);
+      expect(find.text(wipeOuraNotRevokedText), findsOneWidget);
+      answer = 'acked';
+      await tester.pump(const Duration(seconds: 16));
+      await tester.pump();
+      expect(find.text(wipeWatchDoneText), findsOneWidget);
+      await tap(tester, 'wiped-start');
+      expect(started, 1);
+    });
+
+    testWidgets('δεν τελείωσε: «Συνέχεια διαγραφής», όχι «Όλα διαγράφηκαν»', (tester) async {
+      var retried = 0;
+      await tester.pumpWidget(_app(WipedPage(
+        status: WipeStatus(at: DateTime(2026, 11, 10), done: false, seen: false, watchPending: true, oura: 'none'),
+        onStart: () {},
+        onRestore: () {},
+        watch: () async => 'waiting',
+        retry: () async => retried++,
+      )));
+      expect(find.text('Όλα διαγράφηκαν'), findsNothing);
+      expect(find.byKey(const ValueKey('wiped-start')), findsNothing);
+      await tap(tester, 'wiped-retry');
+      expect(retried, 1);
+    });
+
+    test('κατάσταση από την Kotlin', () {
+      expect(WipeStatus.fromMap(null), isNull);
+      expect(WipeStatus.fromMap({'at': 0}), isNull);
+      final s = WipeStatus.fromMap({'at': 1762800000000, 'stage': 'done', 'seen': true, 'pending': true, 'oura': 'revoked'})!;
+      expect(s.show, isFalse);
+      expect(s.watchPending, isTrue);
+      expect(WipeStatus.fromMap({'at': 1762800000000, 'stage': 'deleting', 'seen': true})!.show, isTrue);
+    });
+
+    test('η πλευρά Android: σβήνει μόνη της (όχι «Διαγραφή δεδομένων» του συστήματος), σημάδι πρώτα, τελειώνει πριν τη Flutter', () {
       final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/DataWipe.kt').readAsStringSync();
-      expect(kt, contains('clearApplicationUserData()'));
-      expect(kt.indexOf('HomeWidgets.wipe(activity)'), lessThan(kt.indexOf('?.clearApplicationUserData()')));
+      expect(kt, isNot(contains('clearApplicationUserData()')));
+      final code = kt.substring(kt.indexOf('"wipe" -> scope.launch'));
+      expect(code.indexOf('begin(activity, at, oura)'), lessThan(code.indexOf('sendWipe(activity, at, deleteOld = true)')));
+      expect(code.indexOf('sendWipe(activity, at, deleteOld = true)'), lessThan(code.indexOf('wipeLocal(activity)')));
+      expect(code.indexOf('HomeWidgets.wipe(activity)'), lessThan(code.indexOf('wipeLocal(activity)')));
+      expect(kt, contains('KeyStore.getInstance("AndroidKeyStore")'));
+      expect(kt, contains('"\$MARKER.xml"'));
       final main = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/MainActivity.kt').readAsStringSync();
       expect(main, contains('"ygeia/privacy"'));
-      expect(kt.indexOf('withTimeoutOrNull(8_000) { watch() }'), lessThan(kt.indexOf('?.clearApplicationUserData()')));
-      expect(kt, contains('FILTER_PREFIX'));
+      expect(main.indexOf('DataWipe.finishIfNeeded(this)'), lessThan(main.indexOf('super.onCreate(savedInstanceState)')));
+      // M1: παλιά αποτελέσματα του ρολογιού δεν μπαίνουν ποτέ (δοκιμή Kotlin AccuracyRulesTest).
+      final wear = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/WearBridge.kt').readAsStringSync();
+      expect(wear, contains('DataRules.droppedByWipe('));
       final settings = File('lib/pages/settings.dart').readAsStringSync();
       expect(settings, contains('const PrivacyGroup()'));
-      expect(settings, contains('DeleteAllRow(store: widget.store'));
-      // Το ρολόι σβήνει όταν δει το «/ygeia/wipe» (δοκιμή Kotlin WipeRuleTest).
-      expect(File('android/wear/src/main/kotlin/gr/ygeiaforma/wear/Link.kt').readAsStringSync(), contains('path == Paths.WIPE'));
+      expect(settings, contains('DeleteAllRow(store: widget.store, export: hasFood ? _exportForWipe : null)'));
+      // Το ρολόι: δοκιμή Kotlin WipeRuleTest.
+      final link = File('android/wear/src/main/kotlin/gr/ygeiaforma/wear/Link.kt').readAsStringSync();
+      expect(link, contains('path == Paths.WIPE'));
+      expect(File('lib/main.dart').readAsStringSync(), contains('WipedPage('));
+    });
+
+    test('S4: η ανάκληση της Oura λέει αν πέτυχε', () {
+      final api = File('lib/oura/oura_api.dart').readAsStringSync();
+      expect(api, contains('Future<bool> disconnect('));
+      expect(api, contains('return r.status >= 200 && r.status < 300;'));
+      final page = File('lib/pages/privacy_page.dart').readAsStringSync();
+      expect(page, contains("oura = revoked ? 'revoked' : 'failed';"));
+    });
+
+    test('S5: η πολιτική λέει πού είναι η διαγραφή και ότι η «Διαγραφή δεδομένων» του Android ΔΕΝ σβήνει το ρολόι', () {
+      final html = File('site/public/privacy/index.html').readAsStringSync();
+      expect(html, contains('Ρυθμίσεις › Τα δεδομένα μου › «Διαγραφή όλων των δεδομένων»'));
+      expect(html, isNot(contains('Το ίδιο κάνει το Ρυθμίσεις Android')));
+      expect(html, contains('σβήνει μόνο το κινητό'));
     });
   });
 
@@ -299,6 +449,37 @@ void main() {
       expect(walkHr(s), 112);
     });
 
+    test('S6: παλιά περπατήματα (παλμοί στο αρχείο, χωρίς «hrs») παίρνουν την τιμή μία φορά στο άνοιγμα', () async {
+      final hr = [for (var t = 0; t <= 1800; t += 5) [t, t < 300 ? 90 : 112]];
+      final j = {...w(hr: hr).toJson(), 'hrf': hr.length}
+        ..remove('hr')
+        ..remove('hrs');
+      final io = MemoryTrainingIO()
+        ..json = jsonEncode({'v': 2, 'sessions': [j]})
+        ..hrFiles['w1'] = encodeHr(hr);
+      final t = TrainingStore(io: io, clock: () => DateTime(2026, 11, 2));
+      await t.load();
+      await t.flush();
+      final s = t.sessions.single;
+      expect(s.hrLoaded, isFalse, reason: 'οι παλμοί δεν μένουν στη μνήμη');
+      expect(walkHr(s), 112);
+      expect(io.json, contains('"hrs":112'));
+      expect(io.json, contains('"hrsDone":1'));
+      // Δεύτερο άνοιγμα: καμία ανάγνωση αρχείων παλμών ξανά.
+      final t2 = TrainingStore(io: io..hrFiles.clear(), clock: () => DateTime(2026, 11, 2));
+      await t2.load();
+      await t2.flush();
+      expect(walkHr(t2.sessions.single), 112);
+    });
+
+    testWidgets('S8: η σύνοψη του περπατήματος δείχνει την τιμή της Προόδου («από το 5′»)', (tester) async {
+      final hr = [for (var t = 0; t <= 1800; t += 5) [t, t < 300 ? 90 : 112]];
+      await tester.pumpWidget(_app(Scaffold(body: SingleChildScrollView(child: HrCard(session: w(hr: hr, avg: 104))))));
+      expect(find.byKey(const ValueKey('hr-steady')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('hr-steady')), matching: find.text('112')), findsOneWidget);
+      expect(find.text('από το 5′'), findsOneWidget);
+    });
+
     test('Πρόοδος: 3 μήνες από προεπιλογή· κάρτα και ⓘ το λένε', () {
       final page = File('lib/pages/training/progress_page.dart').readAsStringSync();
       expect(page, contains('TrendPeriod _period = TrendPeriod.quarter;'));
@@ -374,6 +555,34 @@ void main() {
     expect(File('lib/main.dart').readAsStringSync(), contains('appExerciseRanges = () => ['));
   });
 
+  test('M3: DP-07 ισχύει και μέσα στο isolate (parseDashboard / parseRange): οι συνόψεις του ιστορικού χωρίς την προπόνηση',
+      () async {
+    final day = DateTime(2026, 10, 24);
+    int ms(DateTime t) => t.millisecondsSinceEpoch;
+    DateTime at(int h, int m) => DateTime(day.year, day.month, day.day, h, m);
+    final raw = jsonEncode({
+      'ok': true,
+      'readAt': ms(at(20, 0)),
+      'granted': 10,
+      'total': 10,
+      'heart': [
+        for (var t = at(9, 0); t.isBefore(at(12, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 70, 67, 73],
+        for (var t = at(18, 0); t.isBefore(at(19, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 120, 117, 123],
+      ],
+      'stepsMin': [for (var t = at(0, 0); t.isBefore(at(23, 0)); t = t.add(const Duration(minutes: 1))) [ms(t), 0]],
+    });
+    addTearDown(() => appExerciseRanges = () => const []);
+    // Χωρίς προπόνηση: ο μέσος της μέρας ανεβαίνει από την ώρα με 120 (έλεγχος ότι η δοκιμή «βλέπει» τη διαφορά).
+    final plain = await parseDashboard(raw, plan: SourcePlan.samsungOnly);
+    expect(plain.rows!['2026-10-24']![K.dayHr]!, greaterThan(75));
+    // Η προπόνηση της εφαρμογής 18:00–19:00, όπως την ορίζει η main() στο κύριο isolate.
+    appExerciseRanges = () => [(at(18, 0), at(19, 0))];
+    final p = await parseDashboard(raw, plan: SourcePlan.samsungOnly);
+    expect(p.rows!['2026-10-24']![K.dayHr]!, closeTo(70, 1));
+    final r = await parseRange(raw, day, day, plan: SourcePlan.samsungOnly);
+    expect(r.rows['2026-10-24']![K.dayHr]!, closeTo(70, 1));
+  });
+
   // ------------------------------------------------------------ RT-12 / RT-18
   test('χωρίς GPS: «≈» και «από βήματα»· χωρίς τίποτα: «—», όχι 0,00', () {
     Session c({bool? gps, double? m, int? steps}) => Session(
@@ -405,7 +614,7 @@ void main() {
     expect(breathRange.text, isNot(contains('υγιείς')));
     expect(metricInfos[K.breath]!.compare, contains('χρήστες Fitbit'));
     final snap = File('lib/home_widgets/widget_snapshot.dart').readAsStringSync();
-    expect(snap, contains("'7 νύχτες \${sr.placeText(sleepWeek)}'"));
+    expect(snap, contains("'${sleepWeek.$2} νύχτες ${sr.placeText(sleepWeek.$1)}'"));
     expect(metricInfos[K.weight]!.accuracy, contains('0,5–1 kg'));
     expect(metricInfos[K.fatPct]!.accuracy, contains('DXA'));
     expect(metricInfos[K.steps]!.accuracy, contains('στη μέση'));

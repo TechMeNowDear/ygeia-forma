@@ -188,7 +188,11 @@ class ErrorReporter {
 
   /// Μόνο η πρώτη γραμμή του μηνύματος και ως 300 χαρακτήρες: κάποια σφάλματα (π.χ. FormatException)
   /// κουβαλάνε κομμάτι από το κείμενο που διάβαζαν.
+  /// Έλεγχος του fix-accuracy (N5), όπως στην Kotlin (E3-19): τα ArgumentError / RangeError γράφουν την τιμή που
+  /// απορρίφθηκε («Invalid argument: 82.4»)· στέλνεται μόνο ο τύπος τους.
   static String _message(Object e) {
+    final x = e is FlutterErrorDetails ? e.exception : e;
+    if (x is ArgumentError) return '';
     final s = _firstLine(e is FlutterErrorDetails ? e.exceptionAsString() : e.toString());
     return s.length > 300 ? '${s.substring(0, 300)}…' : s;
   }

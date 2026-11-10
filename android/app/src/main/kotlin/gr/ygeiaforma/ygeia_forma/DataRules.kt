@@ -82,6 +82,24 @@ object DataRules {
     /** Μέγεθος προεπισκόπησης από extras («ygeia_w/h», για τον έλεγχο στο emulator): μόνο λογικές τιμές σε dp. */
     fun previewDp(v: Int): Double? = v.takeIf { it in 40..1200 }?.toDouble()
 
+    /**
+     * «Διαγραφή όλων» (έλεγχος του fix-accuracy, M1): πότε ξεκίνησε η άσκηση ενός αποτελέσματος του ρολογιού. Από το
+     * «start» (περπάτημα/προπόνηση του ρολογιού) ή από το id («walk<ms>», «w<ms>», «hr<sid>-<ms>»)· αλλιώς [putAt] (πότε
+     * γράφτηκε το DataItem). Χωρίς org.json (καθαρός Kotlin, για τις δοκιμές JVM).
+     */
+    fun resultStart(json: String, putAt: Long): Long {
+        Regex("\"start\"\\s*:\\s*(\\d{9,15})").find(json)?.let { return it.groupValues[1].toLong() }
+        val id = Regex("\"id\"\\s*:\\s*\"([^\"]{1,80})\"").find(json)?.groupValues?.get(1)
+        if (id != null) {
+            Regex("^(?:walk|w)(\\d{9,15})$").find(id)?.let { return it.groupValues[1].toLong() }
+            Regex("^hr.*-(\\d{9,15})$").find(id)?.let { return it.groupValues[1].toLong() }
+        }
+        return putAt
+    }
+
+    /** Αποτέλεσμα του ρολογιού από άσκηση πριν από τη «Διαγραφή όλων» ([wipeAt], 0 = καμία): δεν μπαίνει, σβήνεται. */
+    fun droppedByWipe(start: Long, wipeAt: Long): Boolean = wipeAt > 0 && start < wipeAt
+
     /** C14 (R14): νέο κλειδί στο Keystore όταν το παλιό δεν ανακτάται πια. */
     fun regenerateKeyOn(e: Throwable): Boolean =
         e is java.security.UnrecoverableKeyException ||

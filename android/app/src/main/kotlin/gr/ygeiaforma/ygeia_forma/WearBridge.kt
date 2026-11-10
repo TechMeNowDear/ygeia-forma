@@ -177,24 +177,35 @@ class WearBridge(
         false
     }
 
-    /** Ό,τι έγινε μόνο στο ρολόι και δεν έχει περάσει ακόμα. */
+    /**
+     * Ό,τι έγινε μόνο στο ρολόι και δεν έχει περάσει ακόμα. Μετά από «Διαγραφή όλων» (έλεγχος του fix-accuracy, M1):
+     * αποτελέσματα από άσκηση που ξεκίνησε ΠΡΙΝ από τη διαγραφή δεν μπαίνουν ποτέ· σβήνονται από το Data Layer.
+     */
     private suspend fun results(): List<Map<String, String>> = try {
+        val wipedAt = DataWipe.wipedAt(ctx)
         val buf = Wearable.getDataClient(ctx).dataItems.await()
         val out = mutableListOf<Map<String, String>>()
+        val drop = mutableListOf<String>()
         try {
             for (item in buf) {
                 val path = item.uri.path ?: continue
                 if (!path.startsWith(RESULT)) continue
-                val json = try {
-                    DataMapItem.fromDataItem(item).dataMap.getString(KEY)
+                val map = try {
+                    DataMapItem.fromDataItem(item).dataMap
                 } catch (_: Throwable) {
                     null
                 } ?: continue
+                val json = map.getString(KEY) ?: continue
+                if (DataRules.droppedByWipe(DataRules.resultStart(json, map.getLong("t", 0L)), wipedAt)) {
+                    drop.add(path)
+                    continue
+                }
                 out.add(mapOf("path" to path, "json" to json))
             }
         } finally {
             buf.release()
         }
+        for (path in drop) ack(path)
         out
     } catch (_: Throwable) {
         emptyList()

@@ -143,7 +143,7 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.energy, label: 'Energy Score', section: TrendSection.other, minDiff: 3),
   // Οξυγόνο: ουδέτερο χρώμα (δεύτερος κλινικός έλεγχος M8). Μια διαφορά 1–2% είναι μέσα στο λάθος του καρπού
   // (RMSE ~2%), και αν κόψεις το κάπνισμα η ένδειξη πέφτει (λιγότερη καρβοξυαιμοσφαιρίνη): δεν είναι «χειρότερα».
-  MetricDef(key: K.spo2Avg, label: 'Οξυγόνο στον ύπνο (ρολόι)', section: TrendSection.other, minDiff: 1, unit: '%'),
+  MetricDef(key: K.spo2Avg, label: 'Οξυγόνο τη νύχτα, μέσος όρος (ρολόι)', section: TrendSection.other, minDiff: 1, unit: '%'),
 ];
 
 /// Μετρήσεις που υπάρχουν μόνο με το Oura.

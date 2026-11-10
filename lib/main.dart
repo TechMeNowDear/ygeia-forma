@@ -5,7 +5,7 @@ import 'error_report.dart';
 import 'food/food_store.dart';
 import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
-import 'pages/privacy_page.dart' show registerLicenses;
+import 'pages/privacy_page.dart' show WipeStatus, WipedPage, markWipeSeen, readWipeStatus, registerLicenses;
 import 'pages/exercise_library.dart';
 import 'pages/training/training_page.dart';
 import 'heart_day.dart' show appExerciseRanges;
@@ -39,27 +39,32 @@ Future<void> main() async {
     runApp(const WidgetConfigApp());
     return;
   }
+  // Έλεγχος 9/11 (DP-07), πριν από την πρώτη ανάγνωση: οι προπονήσεις της εφαρμογής δεν μετρούν στους παλμούς της μέρας και στην ηρεμία.
+  appExerciseRanges = () => [
+        for (final s in [...TrainingStore.main.sessions, if (TrainingStore.main.current case final c?) c])
+          (s.start, (s.end ?? DateTime.now()).add(const Duration(minutes: 5))),
+      ];
   final store = HealthStore();
   final food = FoodStore();
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
   await store.loadPrefs();
-  runApp(YgeiaFormaApp(store: store, food: food));
+  // «Διαγραφή όλων» (έλεγχος του fix-accuracy, M4): μετά τη νέα εκκίνηση, «Όλα διαγράφηκαν» αντί για την αρχική.
+  final wiped = await readWipeStatus();
+  runApp(YgeiaFormaApp(store: store, food: food, wiped: wiped?.show == true ? wiped : null));
   store.start();
   food.start();
   WidgetPublisher(store, food).start();
   // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
   TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
-  // Έλεγχος 9/11 (DP-07): οι προπονήσεις της εφαρμογής δεν μετρούν στους παλμούς της μέρας και στην ηρεμία.
-  appExerciseRanges = () => [
-        for (final s in [...TrainingStore.main.sessions, if (TrainingStore.main.current case final c?) c])
-          (s.start, (s.end ?? DateTime.now()).add(const Duration(minutes: 5))),
-      ];
 }
 
 class YgeiaFormaApp extends StatefulWidget {
-  const YgeiaFormaApp({super.key, required this.store, required this.food});
+  const YgeiaFormaApp({super.key, required this.store, required this.food, this.wiped});
   final HealthStore store;
   final FoodStore food;
+
+  /// Μόλις έγινε «Διαγραφή όλων»: πρώτα η οθόνη «Όλα διαγράφηκαν».
+  final WipeStatus? wiped;
 
   @override
   State<YgeiaFormaApp> createState() => _YgeiaFormaAppState();
@@ -68,6 +73,17 @@ class YgeiaFormaApp extends StatefulWidget {
 class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
   // Ίδιο αντικείμενο σε κάθε αλλαγή θέματος: αλλάζουν μόνο τα χρώματα, όχι η κατάσταση.
   late final Widget _home = Shell(store: widget.store, food: widget.food);
+  late WipeStatus? _wiped = widget.wiped;
+  final _nav = GlobalKey<NavigatorState>();
+
+  void _leaveWiped({bool restore = false}) {
+    markWipeSeen();
+    setState(() => _wiped = null);
+    if (!restore) return;
+    // «Επαναφορά από αντίγραφο»: οι Ρυθμίσεις, όπου είναι η επαναφορά (ΤΑ ΔΕΔΟΜΕΝΑ ΜΟΥ).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _nav.currentState?.push(MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'Ρυθμίσεις'), builder: (_) => SettingsPage(store: widget.store, food: widget.food))));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +104,10 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
           darkTheme: buildTheme(Brightness.dark, Aigaio.night(p.nightTheme)),
           themeAnimationDuration: const Duration(milliseconds: 220),
           navigatorObservers: [errors.observer],
-          home: _home,
+          navigatorKey: _nav,
+          home: _wiped == null
+              ? _home
+              : WipedPage(status: _wiped!, onStart: _leaveWiped, onRestore: () => _leaveWiped(restore: true)),
           // Έλεγχος 9/11 (E3-08, Sentry YGEIA-FORMA-3): μια άγνωστη διαδρομή (π.χ. URI από άλλη εφαρμογή) δεν ρίχνει
           // ποτέ την εφαρμογή· μένει στην αρχική. Μαζί με το flutter_deeplinking_enabled=false στο manifest.
           onUnknownRoute: unknownRoute,

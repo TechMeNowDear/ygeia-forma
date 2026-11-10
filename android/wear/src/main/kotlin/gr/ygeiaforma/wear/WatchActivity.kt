@@ -112,7 +112,10 @@ class WatchActivity : Activity(), WatchView.Actions {
             // δεν τρέχει τίποτα εδώ (αλλιώς θα στελνόταν μισή μια προπόνηση που συνεχίζεται, V-A-14).
             if (Repo.running == null && Repo.local == null) {
                 recoverIfNeeded()
-                sendPending()
+                // «Σβήσε» από το κινητό που περιμένει (έλεγχος του fix-accuracy, S1): τα παλιά αποτελέσματα δεν
+                // ξαναστέλνονται· σβήνονται μαζί με τα υπόλοιπα μόλις επιτρέπεται.
+                if (!Link.wipeWanted(this@WatchActivity)) sendPending()
+                Link.tryWipe(this@WatchActivity)
             }
             if (joinWhenReady && Repo.phone != null) {
                 joinWhenReady = false

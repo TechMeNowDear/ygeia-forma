@@ -252,10 +252,45 @@ class TrainingStore extends ChangeNotifier {
       _release.addAll([for (final s in sessions) if (s.hrNeedsWrite) s.id]);
       if (_release.isNotEmpty) save();
       _queue = _queue.then((_) => _purgeDeletedHr());
+      if (!_steadyDone) _queue = _queue.then((_) => _migrateSteady());
     }
   }
 
-  static const _knownTop = {'v', 'hrLimit', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz'};
+  /// Οι «παλμοί σταθερού βαδίσματος» ([Session.hrSteady]) έχουν σωθεί και για τα παλιά περπατήματα ([_migrateSteady]).
+  bool _steadyDone = false;
+
+  /// Μεταφορά, μία φορά (έλεγχος του fix-accuracy, S6): τα περπατήματα από πριν από τη V-B-11 έχουν τους παλμούς στο
+  /// αρχείο τους αλλά όχι «hrs», οπότε η Πρόοδος δεν θα τα έβλεπε για μήνες. Ένα-ένα, χωρίς να μένουν στη μνήμη.
+  /// Αν κάποιο αρχείο δεν διαβαστεί τώρα, ξαναδοκιμάζει στο επόμενο άνοιγμα.
+  Future<void> _migrateSteady() async {
+    var changed = false;
+    var complete = true;
+    for (final s in sessions.toList()) {
+      if (s.hrSteady != null || s.hrLoaded || !s.hrInFile || !s.isCardio || !s.finished) continue;
+      try {
+        final r = await _io.readHr(s.id);
+        if (r.state == 'missing') continue;
+        final hr = r.state == 'ok' ? decodeHr(r.json) : null;
+        if (hr == null) {
+          complete = false;
+          continue;
+        }
+        if (s.hrLoaded || s.hrSteady != null) continue;
+        final v = Session.steadyFrom(hr, s.pauses);
+        if (v != null) {
+          s.hrSteady = v;
+          changed = true;
+        }
+      } catch (_) {
+        complete = false;
+      }
+    }
+    // Η σημαία γράφεται με την επόμενη εγγραφή (καμία εγγραφή μόνο γι' αυτήν, όταν δεν άλλαξε τίποτα).
+    if (complete) _steadyDone = true;
+    if (changed) save();
+  }
+
+  static const _knownTop = {'v', 'hrLimit', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone'};
 
   /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μία χαλασμένη προπόνηση ή πρόγραμμα πάει σε καραντίνα, όχι όλο το
   /// αρχείο σε «δεν διαβάζεται». Τα άγνωστα κλειδιά κρατιούνται (V-A-07).
@@ -284,6 +319,7 @@ class TrainingStore extends ChangeNotifier {
       }
     }
     activeId = j['active'] is String ? j['active'] as String : null;
+    _steadyDone = j['hrsDone'] == 1;
     sessions.clear();
     for (final x in (j['sessions'] is List ? j['sessions'] as List : const [])) {
       try {
@@ -318,6 +354,7 @@ class TrainingStore extends ChangeNotifier {
         if (deleted.isNotEmpty) 'del': deleted.toList(),
         if (current != null) 'current': current!.toJson(),
         if (quarantine.isNotEmpty) 'bad': quarantine,
+        if (_steadyDone) 'hrsDone': 1,
       };
 
   Future<void> _queue = Future.value();

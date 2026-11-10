@@ -622,18 +622,22 @@ class OuraLink {
   /// Tokens που δεν κρατήθηκαν (π.χ. δεν γράφτηκε το σχέδιο πηγών): ανάκληση στην Oura, τίποτα στο κινητό.
   Future<void> discard(OuraTokens t) => _revoke(t);
 
-  Future<void> _revoke(OuraTokens t) async {
+  /// true μόνο αν η Oura απάντησε 2xx (η πρόσβαση ακυρώθηκε εκεί). Δεν πετάει ποτέ.
+  Future<bool> _revoke(OuraTokens t) async {
     try {
       final u = Uri.parse(endpoints.revoke);
+      final OuraResponse r;
       if (endpoints.revokeParam == 'access_token') {
         // Όπως στην τεκμηρίωση της Oura (4/11/2026): /oauth/revoke?access_token=… — η μορφή διεύθυνσης χωρίς σώμα
         // είναι GET (το POST είχε δώσει 405 σε δοκιμή, έλεγχος 3, F7).
-        await _send('GET', u.replace(queryParameters: {'access_token': t.access})).timeout(const Duration(seconds: 15));
+        r = await _send('GET', u.replace(queryParameters: {'access_token': t.access})).timeout(const Duration(seconds: 15));
       } else {
-        await _send('POST', u, form: _form({'token': t.refresh, 'client_id': clientId})).timeout(const Duration(seconds: 15));
+        r = await _send('POST', u, form: _form({'token': t.refresh, 'client_id': clientId})).timeout(const Duration(seconds: 15));
       }
+      return r.status >= 200 && r.status < 300;
     } catch (_) {
       // Χωρίς ίντερνετ: τα tokens σβήνονται έτσι κι αλλιώς από το κινητό.
+      return false;
     }
   }
 
@@ -807,7 +811,9 @@ class OuraLink {
   /// Κερδίζει κάθε αίτημα που τρέχει: νέα γενιά αμέσως, και ό,τι ανανέωση έτρεχε δεν αποθηκεύεται.
   /// [marker]: στη θέση του σημαδιού «συνδέεται» γράφεται αυτό («αποσυνδέεται», C12), ώστε μια διακοπή στη μέση να
   /// ολοκληρωθεί στην επόμενη εκκίνηση.
-  Future<void> disconnect({String? marker}) async {
+  /// Επιστρέφει αν η πρόσβαση ακυρώθηκε και στην Oura (true και όταν δεν υπήρχαν tokens)· «Διαγραφή όλων» το λέει
+  /// αν όχι (έλεγχος του fix-accuracy, S4).
+  Future<bool> disconnect({String? marker}) async {
     // ΠΡΩΤΑ το σημάδι «συνδέεται»: ένα σημάδι που θα έμενε χωρίς tokens θα αναιρούσε στην εκκίνηση μια σύνδεση που
     // είχε χρησιμοποιηθεί.
     await vault.delete(vaultConnecting);
@@ -827,11 +833,12 @@ class OuraLink {
         t = await running.timeout(const Duration(seconds: 30)) ?? t;
       } catch (_) {}
     }
-    if (t != null) await _revoke(t);
+    final revoked = t == null || await _revoke(t);
     _tokens = null;
     _loaded = true;
     _unsaved = false;
     await vault.delete(vaultTokens);
     await vault.delete(vaultPending);
+    return revoked;
   }
 }

@@ -1,6 +1,7 @@
 package gr.ygeiaforma.ygeia_forma
 
 import android.content.Intent
+import android.os.Bundle
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -40,6 +41,12 @@ class MainActivity : FlutterFragmentActivity() {
 
     private var wear: WearBridge? = null
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // «Διαγραφή όλων» που ξεκίνησε: τελειώνει εδώ, πριν ξεκινήσει η Flutter (έλεγχος του fix-accuracy, M4).
+        DataWipe.finishIfNeeded(this)
+        super.onCreate(savedInstanceState)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Μόνο η μορφή των widgets (E3-24): ό,τι άλλο στείλει άλλη εφαρμογή αγνοείται.
@@ -78,7 +85,7 @@ class MainActivity : FlutterFragmentActivity() {
         ErrorQueue.install(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/errors")
             .setMethodCallHandler(ErrorQueue)
-        // «Διαγραφή όλων των δεδομένων» (Ρυθμίσεις › Απόρρητο).
+        // «Διαγραφή όλων των δεδομένων» (Ρυθμίσεις › Τα δεδομένα μου), αντιγραφή ευαίσθητου, πολιτική απορρήτου.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/privacy")
             .setMethodCallHandler(DataWipe(this, scope))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/samsung")

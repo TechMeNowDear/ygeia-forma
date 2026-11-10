@@ -78,16 +78,17 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   final sr = sleepRange(store.profile, today);
   // Έλεγχος 9/11 (04-M5 / V-B-15): η κρίση «κάτω/μέσα στο εύρος» από τον μέσο όρο 7 νυχτών (τουλάχιστον 4 με τιμή),
   // όχι από μία νύχτα· η τιμή της νύχτας μένει η μεγάλη τιμή.
-  double? week(String key) {
+  // Το κείμενο λέει πόσες νύχτες μέτρησαν (4–7), όχι πάντα «7».
+  (double, int)? week(String key) {
     final vs = [for (var i = 0; i < 7; i++) plan.value(h, key, _minus(d0, i))].whereType<double>().toList();
-    return vs.length < 4 ? null : vs.reduce((a, b) => a + b) / vs.length;
+    return vs.length < 4 ? null : (vs.reduce((a, b) => a + b) / vs.length, vs.length);
   }
 
   final sleepWeek = week(K.sleepMin), breathWeek = week(K.breath);
   // Στρογγύλεμα πρώτα (έλεγχος 8/11, DATA-03): 419,5 λεπτά → 7:00, όχι 6:00.
   add(K.sleepMin, 'Ύπνος', '', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
-      range: sleepWeek != null && sr != null ? '7 νύχτες ${sr.placeText(sleepWeek)}' : null);
+      range: sleepWeek != null && sr != null ? '${sleepWeek.$2} νύχτες ${sr.placeText(sleepWeek.$1)}' : null);
   add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
   add(K.sleepScore, 'Σκορ', '', (v) => '${v.round()}');
   add(K.hrv, 'HRV', ' ms', (v) => '${v.round()}');
@@ -95,7 +96,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   add(K.lowHr, 'Χαμηλότεροι', ' bpm', (v) => '${v.round()}');
   add(K.ringSpo2, 'Οξυγόνο', '%', spo2AvgText, digits: 1);
   add(K.breath, 'Αναπνοές', '', (v) => dec(v), digits: 1,
-      range: breathWeek == null ? null : '7 νύχτες ${breathRange.placeText(breathWeek)}');
+      range: breathWeek == null ? null : '${breathWeek.$2} νύχτες ${breathRange.placeText(breathWeek.$1)}');
   // Θερμοκρασία: το Oura δίνει απόκλιση (+0,3°), το ρολόι απόλυτη τιμή καρπού (33,6 °C), που δεν δείχνεται ποτέ ως
   // «+33,6°» (έλεγχος 8/11, DATA-04). Από το ρολόι: μόνο η απόκλιση από τα συνηθισμένα, αν υπάρχουν.
   if (src == Source.oura) {

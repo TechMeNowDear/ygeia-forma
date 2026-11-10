@@ -194,6 +194,9 @@ class HrCard extends StatelessWidget {
         Wrap(spacing: 18, runSpacing: 4, children: [
           if (h.avg != null) _stat(c, '${h.avg}', 'μέσος'),
           if (h.max != null) _stat(c, '${h.max}', 'υψηλότερος'),
+          // Η τιμή της Προόδου («Παλμοί στο περπάτημα», σταθερό βάδισμα· έλεγχος του fix-accuracy, S8): να βρίσκεται.
+          if (session.isCardio && session.steadyHr != null)
+            KeyedSubtree(key: const ValueKey('hr-steady'), child: _stat(c, '${session.steadyHr}', 'από το 5′')),
         ]),
         if (session.hr.length >= 2) ...[
           const SizedBox(height: 10),

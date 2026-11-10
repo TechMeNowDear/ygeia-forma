@@ -1560,23 +1560,82 @@ void main() {
           await t.tap(find.byKey(const ValueKey('privacy-delete')));
         },
       ));
-  testWidgets('Διαγραφή όλων · «Κατάλαβα» · δεν έγινε', (t) => privacyShot(
+  testWidgets('Διαγραφή όλων · αντίγραφο απέτυχε, «Χωρίς αντίγραφο», δεν ξεκίνησε', (t) => privacyShot(
         t,
         'P3_delete_sheet_failed',
-        Scaffold(body: DeleteAllSheet(understood: true, wipe: () async => false, export: () async {})),
-        size: const Size(400, 900),
+        Scaffold(
+          body: DeleteAllSheet(
+            understood: true,
+            wipe: () async => wipeNotStartedText(ouraClosed: true),
+            export: () async => (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: δεν υπάρχει χώρος.'),
+          ),
+        ),
+        size: const Size(400, 1100),
         act: (t) async {
-          await t.ensureVisible(find.byKey(const ValueKey('wipe-confirm')));
+          for (final k in ['wipe-export', 'wipe-no-backup', 'wipe-confirm']) {
+            await t.ensureVisible(find.byKey(ValueKey(k)));
+            await t.pumpAndSettle();
+            await t.tap(find.byKey(ValueKey(k)));
+            await t.pumpAndSettle();
+          }
+        },
+      ));
+  testWidgets('Διαγραφή όλων · αντίγραφο έγινε · Fold ανοιχτό σκοτεινό', (t) => privacyShot(
+        t,
+        'P2b_delete_sheet_saved_open_dark',
+        Scaffold(
+          body: DeleteAllSheet(
+            understood: true,
+            export: () async => (ok: true, text: 'Αποθηκεύτηκε στις Λήψεις: ygeia-forma-2026-11-10.json · 412 καταχωρίσεις, 18 προϊόντα'),
+          ),
+        ),
+        size: const Size(750, 1100),
+        brightness: Brightness.dark,
+        act: (t) async {
+          await t.ensureVisible(find.byKey(const ValueKey('wipe-export')));
           await t.pumpAndSettle();
-          await t.tap(find.byKey(const ValueKey('wipe-confirm')));
+          await t.tap(find.byKey(const ValueKey('wipe-export')));
         },
       ));
   testWidgets('Διαγραφή όλων · Fold κλειστό, γράμματα 2×', (t) => privacyShot(
         t,
         'P4_delete_sheet_2x',
-        Scaffold(body: DeleteAllSheet(export: () async {})),
-        size: const Size(400, 1900),
+        Scaffold(body: DeleteAllSheet(export: () async => (ok: true, text: ''))),
+        size: const Size(400, 2100),
         textScale: 2,
+      ));
+  testWidgets('Όλα διαγράφηκαν · ρολόι περιμένει, Oura χωρίς ανάκληση', (t) => privacyShot(
+        t,
+        'P5_wiped_waiting',
+        WipedPage(
+          status: WipeStatus(at: now, done: true, seen: false, watchPending: true, oura: 'failed'),
+          onStart: () {},
+          onRestore: () {},
+          watch: () async => 'waiting',
+        ),
+        size: const Size(400, 880),
+      ));
+  testWidgets('Όλα διαγράφηκαν · ρολόι σβήστηκε · Fold ανοιχτό σκοτεινό', (t) => privacyShot(
+        t,
+        'P5b_wiped_done_open_dark',
+        WipedPage(
+          status: WipeStatus(at: now, done: true, seen: false, watchPending: false, oura: 'revoked'),
+          onStart: () {},
+          onRestore: () {},
+        ),
+        size: const Size(750, 900),
+        brightness: Brightness.dark,
+      ));
+  testWidgets('Η διαγραφή δεν τελείωσε', (t) => privacyShot(
+        t,
+        'P5c_wipe_unfinished',
+        WipedPage(
+          status: WipeStatus(at: now, done: false, seen: false, watchPending: true, oura: 'none'),
+          onStart: () {},
+          onRestore: () {},
+          watch: () async => 'waiting',
+        ),
+        size: const Size(400, 880),
       ));
 }
 

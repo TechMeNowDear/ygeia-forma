@@ -43,7 +43,7 @@ class SettingsPage extends StatelessWidget {
           void push(String name, Widget Function(BuildContext) b) =>
               Navigator.of(context).push(MaterialPageRoute<void>(settings: RouteSettings(name: name), builder: b));
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 32 + MediaQuery.paddingOf(context).bottom),
             children: [
               Center(
                 child: ConstrainedBox(
@@ -153,7 +153,7 @@ class _TodayCardsPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Κάρτες της «Σήμερα»'), backgroundColor: c.background, surfaceTintColor: Colors.transparent),
       body: ListenableBuilder(
         listenable: store,
-        builder: (context, _) => ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
+        builder: (context, _) => ListView(padding: EdgeInsets.fromLTRB(16, 4, 16, 32 + MediaQuery.paddingOf(context).bottom), children: [
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 680),
@@ -204,43 +204,59 @@ class _DataGroupState extends State<_DataGroup> {
     return t.ready && !t.readError ? await t.backupJson() : null;
   }
 
+  /// Η εξαγωγή χωρίς μηνύματα: (πλήρες αντίγραφο γράφτηκε, κείμενο για τον χρήστη, πού). Τη χρησιμοποιούν η γραμμή
+  /// «Εξαγωγή αντιγράφου» (μήνυμα κάτω) και το φύλλο «Διαγραφή όλων» (μέσα στο φύλλο, έλεγχος του fix-accuracy, M2).
+  Future<({bool ok, String text, String? uri})> _exportNow() async {
+    final raw = await widget.food!.exportRaw();
+    if (raw == null) return (ok: false, text: 'Δεν διαβάστηκαν τα δεδομένα. Δοκίμασε ξανά.', uri: null);
+    final now = DateTime.now();
+    final name = backupFileName(now);
+    // Οι ρυθμίσεις μπαίνουν μόνο αν έχουν διαβαστεί (αλλιώς θα έμπαιναν οι αρχικές).
+    final json = buildBackup(
+      foodLog: raw.$1,
+      myFoods: raw.$2,
+      prefs: widget.store.prefsLoaded ? widget.store.prefsJson() : const {},
+      now: now,
+      sources: await widget.store.sourcesForBackup(),
+      training: await _training(),
+    );
+    final trainingOut = TrainingStore.main.readError;
+    final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
+    final r = await FoodChannel.saveBackup(json, name);
+    if (r['ok'] != true || r['uri'] is! String) {
+      return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}', uri: null);
+    }
+    final saved = r['name'] is String ? r['name'] as String : name;
+    return (
+      // Πλήρες μόνο αν μπήκαν και οι προπονήσεις με τους παλμούς τους.
+      ok: !trainingOut && hrMissing == 0,
+      text: 'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
+          // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
+          '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
+          // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
+          '${hrMissing > 0 ? '. ${countText(hrMissing, 'προπόνηση μπήκε χωρίς παλμούς', 'προπονήσεις μπήκαν χωρίς παλμούς')}: τα αρχεία τους δεν διαβάστηκαν.' : ''}',
+      uri: r['uri'] as String,
+    );
+  }
+
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
-      final raw = await widget.food!.exportRaw();
-      if (raw == null) {
-        _say('Δεν διαβάστηκαν τα δεδομένα. Δοκίμασε ξανά.');
-        return;
-      }
-      final now = DateTime.now();
-      final name = backupFileName(now);
-      // Οι ρυθμίσεις μπαίνουν μόνο αν έχουν διαβαστεί (αλλιώς θα έμπαιναν οι αρχικές).
-      final json = buildBackup(
-        foodLog: raw.$1,
-        myFoods: raw.$2,
-        prefs: widget.store.prefsLoaded ? widget.store.prefsJson() : const {},
-        now: now,
-        sources: await widget.store.sourcesForBackup(),
-        training: await _training(),
-      );
-      final trainingOut = TrainingStore.main.readError;
-      final r = await FoodChannel.saveBackup(json, name);
-      if (r['ok'] != true || r['uri'] is! String) {
-        _say('Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}');
-        return;
-      }
-      final uri = r['uri'] as String;
-      final saved = r['name'] is String ? r['name'] as String : name;
-      _say(
-        'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
-        // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
-        '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
-        // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
-        '${!trainingOut && TrainingStore.main.backupHrMissing > 0 ? '. ${countText(TrainingStore.main.backupHrMissing, 'προπόνηση μπήκε χωρίς παλμούς', 'προπονήσεις μπήκαν χωρίς παλμούς')}: τα αρχεία τους δεν διαβάστηκαν.' : ''}',
-        action: SnackBarAction(label: 'Αποστολή', onPressed: () => FoodChannel.shareBackup(uri)),
-      );
+      final r = await _exportNow();
+      final uri = r.uri;
+      _say(r.text, action: uri == null ? null : SnackBarAction(label: 'Αποστολή', onPressed: () => FoodChannel.shareBackup(uri)));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Για το φύλλο «Διαγραφή όλων»: το αποτέλεσμα γυρίζει στο φύλλο (το SnackBar θα ήταν κάτω από αυτό).
+  Future<BackupResult> _exportForWipe() async {
+    try {
+      final r = await _exportNow();
+      return (ok: r.ok, text: r.text);
+    } catch (_) {
+      return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο. Δοκίμασε ξανά.');
     }
   }
 
@@ -333,7 +349,7 @@ class _DataGroupState extends State<_DataGroup> {
         ),
       ],
       if (_busy) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: LinearProgressIndicator()),
-      DeleteAllRow(store: widget.store, export: hasFood ? _export : null),
+      DeleteAllRow(store: widget.store, export: hasFood ? _exportForWipe : null),
     ]);
   }
 }

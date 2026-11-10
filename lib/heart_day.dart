@@ -104,6 +104,9 @@ double? weightedMean(List<_W> items) {
 /// ξύπνιος» και την ηρεμία όπως οι ασκήσεις της Samsung (έλεγχος 9/11, DP-07 / V-A-15). Η Samsung Health ίσως δεν τις
 /// γράφει ως άσκηση· διπλή εξαίρεση του ίδιου διαστήματος δεν αλλάζει τίποτα. Τα 5′ μετά: οι παλμοί πέφτουν σιγά.
 /// Το ορίζει η main() από το TrainingStore (χωρίς εξάρτηση των δεδομένων υγείας από την προπόνηση).
+/// ΠΡΟΣΟΧΗ: μέσα σε άλλο isolate (Isolate.run) αυτή η μεταβλητή είναι πάλι η αρχική (κενή). Γι' αυτό οι υπολογισμοί σε
+/// isolate παίρνουν τα διαστήματα ως παράμετρο ([HeartByDay.heartForDay] `appRanges`, από τα [parseDashboard] /
+/// [parseRange]· έλεγχος του fix-accuracy, M3).
 List<(DateTime, DateTime)> Function() appExerciseRanges = () => const [];
 
 extension HeartByDay on Dashboard {
@@ -128,7 +131,8 @@ extension HeartByDay on Dashboard {
 
   /// [sleepRanges]: ποιες ώρες εξαιρούνται ως ύπνος. Χωρίς αυτό: ο ύπνος της Samsung (πριν από το Oura).
   /// Μετά τη σύνδεση του Oura τις δίνει ο υπολογισμός του ιστορικού από την πηγή κάθε νύχτας.
-  DayHeart? heartForDay(DateTime day, {List<(DateTime, DateTime)>? sleepRanges}) {
+  /// [appRanges]: οι προπονήσεις της εφαρμογής ([appExerciseRanges]· ρητά όταν τρέχει σε άλλο isolate).
+  DayHeart? heartForDay(DateTime day, {List<(DateTime, DateTime)>? sleepRanges, List<(DateTime, DateTime)>? appRanges}) {
     if (!hasStepCoverage(day)) return null;
     final start = dayOf(day);
     final end = DateTime(start.year, start.month, start.day + 1); // ημερολογιακή μέρα (23/25 ώρες στην αλλαγή ώρας)
@@ -145,7 +149,7 @@ extension HeartByDay on Dashboard {
 
     var sleepMinutes = 0.0;
     var exerciseMinutes = 0.0;
-    final appRanges = appExerciseRanges();
+    final ownRanges = appRanges ?? appExerciseRanges();
     final intervals = <double>[];
     final awake = <_W>[];
     final resting = <_W>[];
@@ -159,7 +163,7 @@ extension HeartByDay on Dashboard {
         sleepMinutes += dur;
         continue;
       }
-      if (_overlaps(s, exercise) || _overlaps(s, appRanges)) {
+      if (_overlaps(s, exercise) || _overlaps(s, ownRanges)) {
         exerciseMinutes += dur;
         continue;
       }

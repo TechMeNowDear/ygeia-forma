@@ -1,7 +1,9 @@
 package gr.ygeiaforma.ygeia_forma
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Έλεγχος 9/11 (fix-accuracy): μηνύματα για το Sentry και extras από άλλες εφαρμογές (απλό JVM). */
@@ -30,5 +32,19 @@ class AccuracyRulesTest {
         assertEquals(180.0, DataRules.previewDp(180)!!, 0.0)
         assertNull(DataRules.previewDp(0))
         assertNull(DataRules.previewDp(100000))
+    }
+
+    @Test
+    fun watchResultsFromBeforeWipeAreDropped() {
+        // M1: η ώρα αρχής κάθε είδους αποτελέσματος του ρολογιού.
+        assertEquals(1762700000000L, DataRules.resultStart("""{"v":1,"id":"walk1762700000000","kind":"cardio","start":1762700000000,"end":1762701800000}""", 5L))
+        assertEquals(1762700000000L, DataRules.resultStart("""{"v":1,"kind":"hr","sid":"s9","id":"hrs9-1762700000000","hr":[]}""", 5L))
+        assertEquals(1762700000000L, DataRules.resultStart("""{"v":1,"id":"w1762700000000","items":[]}""", 5L))
+        assertEquals(42L, DataRules.resultStart("""{"v":1}""", 42L))
+        assertEquals(42L, DataRules.resultStart("όχι json", 42L))
+        // Πριν από τη διαγραφή: δεν μπαίνει· μετά: μπαίνει· καμία διαγραφή: πάντα.
+        assertTrue(DataRules.droppedByWipe(1762700000000L, 1762800000000L))
+        assertFalse(DataRules.droppedByWipe(1762900000000L, 1762800000000L))
+        assertFalse(DataRules.droppedByWipe(1762700000000L, 0L))
     }
 }

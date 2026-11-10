@@ -471,7 +471,9 @@ String clockFromSix(double minutesFromSix) {
 /// παλμοί ύπνου, θερμοκρασία, βαθμολογία, Energy Score)· μόνο το οξυγόνο της νύχτας του ρολογιού, μέσα στις
 /// ώρες της νύχτας του Oura ([Dashboard.watchSpo2]).
 /// [windows]: οι ώρες ύπνου του Oura, μόνο ως χρονικά παράθυρα (παλμοί της μέρας, οξυγόνο της νύχτας).
-Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
+/// [appRanges]: οι προπονήσεις της εφαρμογής (DP-07)· null = [appExerciseRanges] (μόνο στο κύριο isolate).
+Map<String, double> summarizeDay(Dashboard d, DateTime day,
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, List<(DateTime, DateTime)>? appRanges}) {
   final p = plan ?? SourcePlan.samsungOnly;
   final out = <String, double>{};
   void put(String k, num? v) {
@@ -528,7 +530,7 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
   // αρχίζει το βράδυ), όχι από το «αν συνδέθηκε ποτέ το Oura». Με το ρολόι και στις δύο: όπως πάντα.
   final next = DateTime(day.year, day.month, day.day + 1);
   final planned = p.nightSource(day) != Source.watch || p.nightSource(next) != Source.watch;
-  final h = planned ? _heartWithPlan(d, day, p, windows) : d.heartForDay(day);
+  final h = planned ? _heartWithPlan(d, day, p, windows, appRanges) : d.heartForDay(day, appRanges: appRanges);
   if (h != null) {
     // Υπολογίζονται και κρατιούνται (για αργότερα), αλλά δεν φαίνονται πια: δικοί μας ορισμοί χωρίς επαλήθευση.
     put(K.restHr, h.resting.value);
@@ -563,7 +565,7 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day, {SourcePlan? plan, S
 /// Παλμοί μέρας όταν υπάρχει Oura στο σχέδιο: ο ύπνος που εξαιρείται έρχεται από την πηγή κάθε νύχτας
 /// (της νύχτας που τελειώνει το πρωί και αυτής που αρχίζει το βράδυ). Αν μία από τις δύο δεν είναι γνωστή,
 /// δεν βγαίνει τιμή: αλλιώς ο ύπνος θα μετρούσε ως «μέρα». Οι τιμές είναι πάντα μόνο του ρολογιού.
-DayHeart? _heartWithPlan(Dashboard d, DateTime day, SourcePlan p, SleepWindows windows) {
+DayHeart? _heartWithPlan(Dashboard d, DateTime day, SourcePlan p, SleepWindows windows, [List<(DateTime, DateTime)>? appRanges]) {
   final today = dayOf(d.readAt);
   final ranges = <(DateTime, DateTime)>[];
   var watchAdded = false;
@@ -595,15 +597,15 @@ DayHeart? _heartWithPlan(Dashboard d, DateTime day, SourcePlan p, SleepWindows w
         return null;
     }
   }
-  return d.heartForDay(day, sleepRanges: ranges);
+  return d.heartForDay(day, sleepRanges: ranges, appRanges: appRanges);
 }
 
 /// Συνόψεις για κάθε μέρα στο [from, to] (συμπεριλαμβανομένων), μόνο όσες έχουν κάτι.
 Map<String, Map<String, double>> summarizeRange(Dashboard d, DateTime from, DateTime to,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty}) {
+    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, List<(DateTime, DateTime)>? appRanges}) {
   final out = <String, Map<String, double>>{};
   for (var day = dayOf(from); !day.isAfter(dayOf(to)); day = DateTime(day.year, day.month, day.day + 1)) {
-    final s = summarizeDay(d, day, plan: plan, windows: windows);
+    final s = summarizeDay(d, day, plan: plan, windows: windows, appRanges: appRanges);
     if (s.isNotEmpty) out[dateKey(day)] = s;
   }
   return out;

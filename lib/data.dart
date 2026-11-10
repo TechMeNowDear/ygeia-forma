@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import 'error_report.dart';
 import 'format.dart';
+import 'heart_day.dart' show appExerciseRanges;
 import 'history.dart';
 import 'oura/config.dart' show ouraMaxBackDays;
 import 'oura/oura_model.dart';
@@ -1098,13 +1099,19 @@ bool sleepFilterEmpty(Map<String, dynamic> r) {
 /// γίνεται εδώ (πιο αργά, αλλά ποτέ «κολλημένο»).
 /// Με [plan] υπολογίζονται εκεί και οι συνόψεις των 30 ημερών (A9: όχι στο νήμα της οθόνης). Το αποτέλεσμα
 /// επιστρέφει χωρίς αντιγραφή (Isolate.run).
+/// [appRanges]: οι προπονήσεις της εφαρμογής (DP-07). Διαβάζονται ΕΔΩ, στο κύριο isolate, και περνούν ως τιμή: μέσα
+/// στο Isolate.run η [appExerciseRanges] είναι κενή (M3).
 Future<ParsedDashboard> parseDashboard(String raw,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) async {
+    {SourcePlan? plan,
+    SleepWindows windows = SleepWindows.empty,
+    Map<String, int> napLocks = const {},
+    List<(DateTime, DateTime)>? appRanges}) async {
+  final own = appRanges ?? appExerciseRanges();
   try {
-    return await Isolate.run(() => parseDashboardSync(raw, plan: plan, windows: windows, napLocks: napLocks));
+    return await Isolate.run(() => parseDashboardSync(raw, plan: plan, windows: windows, napLocks: napLocks, appRanges: own));
   } catch (e, st) {
     _isolateFailed(e, st);
-    return parseDashboardSync(raw, plan: plan, windows: windows, napLocks: napLocks);
+    return parseDashboardSync(raw, plan: plan, windows: windows, napLocks: napLocks, appRanges: own);
   }
 }
 
@@ -1143,17 +1150,24 @@ typedef ParsedRange = ({
 });
 
 Future<ParsedRange> parseRange(String raw, DateTime from, DateTime to,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) async {
+    {SourcePlan? plan,
+    SleepWindows windows = SleepWindows.empty,
+    Map<String, int> napLocks = const {},
+    List<(DateTime, DateTime)>? appRanges}) async {
+  final own = appRanges ?? appExerciseRanges();
   try {
-    return await Isolate.run(() => parseRangeSync(raw, from, to, plan: plan, windows: windows, napLocks: napLocks));
+    return await Isolate.run(() => parseRangeSync(raw, from, to, plan: plan, windows: windows, napLocks: napLocks, appRanges: own));
   } catch (e, st) {
     _isolateFailed(e, st);
-    return parseRangeSync(raw, from, to, plan: plan, windows: windows, napLocks: napLocks);
+    return parseRangeSync(raw, from, to, plan: plan, windows: windows, napLocks: napLocks, appRanges: own);
   }
 }
 
 ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) {
+    {SourcePlan? plan,
+    SleepWindows windows = SleepWindows.empty,
+    Map<String, int> napLocks = const {},
+    List<(DateTime, DateTime)>? appRanges}) {
   const fail = (
     ok: false,
     rows: <String, Map<String, double>>{},
@@ -1171,7 +1185,7 @@ ParsedRange parseRangeSync(String raw, DateTime from, DateTime to,
     final d = Dashboard.fromJson(j, napLocks: napLocks);
     return (
       ok: true,
-      rows: summarizeRange(d, from, to, plan: plan, windows: windows),
+      rows: summarizeRange(d, from, to, plan: plan, windows: windows, appRanges: appRanges),
       sleepOk: d.sleepOk,
       sleepFailed: sleepReadFailed(j),
       heartFailed: heartReadFailed(j),
@@ -1193,7 +1207,10 @@ const recentSummaryDays = 30;
 
 /// [plan]/[windows]: αν δοθούν, υπολογίζονται και οι συνόψεις των 30 ημερών ([ParsedDashboard.rows]).
 ParsedDashboard parseDashboardSync(String raw,
-    {SourcePlan? plan, SleepWindows windows = SleepWindows.empty, Map<String, int> napLocks = const {}}) {
+    {SourcePlan? plan,
+    SleepWindows windows = SleepWindows.empty,
+    Map<String, int> napLocks = const {},
+    List<(DateTime, DateTime)>? appRanges}) {
   Object? j;
   try {
     j = jsonDecode(raw);
@@ -1224,7 +1241,7 @@ ParsedDashboard parseDashboardSync(String raw,
       rows: plan == null
           ? null
           : summarizeRange(d, DateTime(today.year, today.month, today.day - recentSummaryDays + 1), today,
-              plan: plan, windows: windows),
+              plan: plan, windows: windows, appRanges: appRanges),
       sleepFilterEmpty: sleepFilterEmpty(j),
     );
   } catch (e) {
