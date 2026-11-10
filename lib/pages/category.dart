@@ -55,7 +55,7 @@ class CategoryPage extends StatelessWidget {
 }
 
 /// Καρτέλες σε μία σειρά (σχέδια 9/11, 2β): γκρι πλαίσιο 48 dp, η επιλεγμένη γεμάτη στο χρώμα της ενότητας.
-/// Κάθε καρτέλα θέλει πλάτος = κείμενο + 24 dp· αν το σύνολο χωρά, μοιράζονται όλο το πλάτος· αλλιώς η σειρά κυλά.
+/// Κάθε καρτέλα θέλει πλάτος = κείμενο + 12 dp· αν το σύνολο χωρά, μοιράζονται όλο το πλάτος· αλλιώς η σειρά κυλά.
 class SegmentTabs extends StatefulWidget {
   const SegmentTabs({super.key, required this.tabs, required this.selected, required this.solid, required this.onTap});
   final List<String> tabs;
@@ -63,7 +63,7 @@ class SegmentTabs extends StatefulWidget {
   final Color solid;
   final ValueChanged<int> onTap;
 
-  static const pad = 12.0;
+  static const pad = 6.0;
 
   @override
   State<SegmentTabs> createState() => _SegmentTabsState();

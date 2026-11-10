@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/food/food_model.dart';
@@ -56,6 +57,15 @@ double contrast(Color a, Color b) {
 }
 
 void main() {
+  // Τα πλάτη των καρτελών μετριούνται με το Inter της εφαρμογής (όχι με τη γραμματοσειρά δοκιμών).
+  setUpAll(() async {
+    final inter = FontLoader('Inter');
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+      inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+    }
+    await inter.load();
+  });
+
   group('Ρυθμός και χρονόμετρο (σχέδια 9/11)', () {
     test('«11:15 /km» παντού', () {
       expect(paceText(675), '11:15 /km');

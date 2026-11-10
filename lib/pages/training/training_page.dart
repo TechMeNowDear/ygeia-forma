@@ -9,6 +9,7 @@ import '../../training/equipment.dart';
 import '../../training/progress.dart';
 import '../../trends.dart' show TrendPeriod;
 import '../../training/program.dart';
+import '../../training/progression.dart' show Change;
 import '../../training/session.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
@@ -103,6 +104,9 @@ class _TrainingPageState extends State<TrainingPage> {
     } else {
       final w = _chosen == null ? p.forDay(today) : p.workout(_chosen);
       cards.add(_todayCard(context, p, w, today));
+      final strengthDone = [for (final x in t.sessions.reversed) if (x.finished && !x.isCardio) x];
+      final lastStrength = strengthDone.isEmpty ? null : strengthDone.first;
+      if (lastStrength != null) cards.add(_lastCard(context, lastStrength));
       if (cur == null) cards.add(_freeCard(context));
       cards.add(_weekCard(context, p, today));
       side.add(_programCard(context, p));
@@ -308,57 +312,125 @@ class _TrainingPageState extends State<TrainingPage> {
     );
   }
 
+  /// ⋮ του προγράμματος (σχέδια 9/11, 6α): αλλαγές, επικόλληση νέου, αντιγραφή, και άλλη προπόνηση για σήμερα.
+  Widget _programMenu(BuildContext context, Program p, {Workout? w, required String key, bool picks = true}) {
+    final others = [if (picks) for (final x in p.workouts) if (x.id != w?.id) x];
+    return PopupMenuButton<String>(
+      key: ValueKey(key),
+      tooltip: 'Πρόγραμμα',
+      icon: const Icon(Icons.more_vert_rounded),
+      onSelected: (v) {
+        switch (v) {
+          case 'edit':
+            Navigator.of(context).push(ProgramEditorPage.route(t, p));
+          case 'paste':
+            Navigator.of(context).push(ProgramPastePage.route(t));
+          case 'export':
+            _export(context);
+          default:
+            if (v.startsWith('pick:')) setState(() => _chosen = v.substring(5));
+        }
+      },
+      itemBuilder: (_) => [
+        for (final x in others)
+          PopupMenuItem(value: 'pick:${x.id}', key: ValueKey('train-pick-${x.id}'), child: Text('Σήμερα: ${x.name}')),
+        if (others.isNotEmpty) const PopupMenuDivider(),
+        const PopupMenuItem(value: 'edit', key: ValueKey('train-edit'), child: Text('Αλλαγές στο πρόγραμμα')),
+        const PopupMenuItem(value: 'paste', key: ValueKey('train-paste-new'), child: Text('Επικόλληση νέου')),
+        const PopupMenuItem(value: 'export', key: ValueKey('train-export'), child: Text('Αντιγραφή για τον Claude')),
+      ],
+    );
+  }
+
+  bool _allItems = false;
+
   Widget _todayCard(BuildContext context, Program p, Workout? w, DateTime today) {
     final c = Aigaio.of(context);
-    final strength = [for (final x in p.workouts) if (!x.isCardio) x];
     final dayName = weekdayLong[today.weekday]!;
     final children = <Widget>[];
+    final title = TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: c.text);
+    final aux = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
     if (w == null) {
-      children.add(Text('$dayName: ξεκούραση', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)));
-      children.add(Text('Αν θες, διάλεξε προπόνηση από κάτω.', style: TextStyle(fontSize: 14, color: c.textSecondary)));
+      children.add(Text('$dayName: ξεκούραση', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)));
+      children.add(Text('Αν θες, διάλεξε προπόνηση από το ⋮.', style: TextStyle(fontSize: 14, color: c.textSecondary)));
     } else if (w.isCardio) {
       final cardio = w.cardio!;
       children.addAll([
-        Text('ΣΗΜΕΡΑ · ${upperGr(w.name)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
-        const SizedBox(height: 4),
-        Text('${cardio.name} ${cardio.minutes}′', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
-        if (cardio.note != null) Text(cardio.note!, style: TextStyle(fontSize: 14.5, color: c.textSecondary)),
-        const SizedBox(height: 8),
+        Text(cardio.name, style: title),
+        Text(['${cardio.minutes} λεπτά', if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()].join(' · '), style: aux),
+        const SizedBox(height: 12),
         Text(
             WearLink.main.ready.value
-                ? 'Ξεκινά από το ρολόι («Ξεκίνα» στην εφαρμογή του ρολογιού), με παλμούς και απόσταση. Αν έχεις μαζί το κινητό, το βλέπεις ζωντανά εδώ.'
+                ? 'Ξεκινά από το ρολόι: πάτα «${cardio.name}», με παλμούς και απόσταση. Αν έχεις μαζί το κινητό, το βλέπεις ζωντανά εδώ.'
                 : 'Ξεκινά από το ρολόι, με παλμούς και απόσταση, όταν μπει η εφαρμογή του ρολογιού. Ως τότε τα βήματα μετριούνται στην «Κίνηση».',
-            style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+            style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
       ]);
     } else {
-      children.add(Row(children: [
-        Expanded(child: Text('ΣΗΜΕΡΑ · ${upperGr(w.name)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary))),
-        if (WearLink.main.ready.value) ...[
-          Icon(Icons.watch_rounded, size: 15, color: c.good),
-          const SizedBox(width: 3),
-          Text('ρολόι έτοιμο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.good)),
-          const SizedBox(width: 10),
-        ],
-        Text('~${w.minutes}′', style: TextStyle(fontSize: 13, color: c.textSecondary)),
-      ]));
+      children.add(Text(w.name, style: title));
+      children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά', style: aux));
       if (w.note != null) children.add(Text(w.note!, style: TextStyle(fontSize: 14, color: c.textSecondary)));
-      for (final item in w.items) {
+      final shown = _allItems || w.items.length <= 6 ? w.items : w.items.take(5).toList();
+      for (var n = 0; n < shown.length; n++) {
+        final item = shown[n];
         final tg = t.targetFor(item);
-        final (col, arrow) = changeLook(context, tg.change);
-        children.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          // Όνομα αριστερά, στόχος δεξιά· αν δεν χωράνε (μεγάλα γράμματα), ο στόχος πάει από κάτω.
-          child: SizedBox(
-            width: double.infinity,
-            child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
-              Text(exName(item.ex), style: TextStyle(fontSize: 15, color: c.text)),
-              Text('${targetLine(item, tg)}$arrow', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: col)),
+        final en = ExLibrary.loaded?.byId(item.ex)?.en ?? '';
+        final k = item.kind;
+        // Σχέδια 9/11 (6α): «ανεβαίνει» αντί για «↑», σε λέξη· +1 επανάληψη γράφεται στη γραμμή του στόχου.
+        final (String, Color)? pill = switch (tg.change) {
+          Change.up || Change.variant => ('ανεβαίνει', c.good),
+          Change.down || Change.back => ('πιο ελαφρύ', c.textSecondary),
+          Change.pain => ('πόνεσε', c.warn),
+          _ => null,
+        };
+        final reps = repsList(tg.reps);
+        final more = tg.change == Change.more ? ' · +1 επανάληψη' : '';
+        children.add(Container(
+          key: ValueKey('train-item-${item.ex}'),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: n < shown.length - 1 ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: exName(item.ex), style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
+                    if (en.isNotEmpty) TextSpan(text: ' · $en', style: TextStyle(color: c.textSecondary)),
+                  ]),
+                  style: const TextStyle(fontSize: 15, height: 1.35),
+                ),
+              ),
+              if (pill != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: c.tint(pill.$2), borderRadius: BorderRadius.circular(999)),
+                  child: Text(pill.$1, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: pill.$2)),
+                ),
+              ],
             ]),
+            Text('${item.sets} σετ × ${item.lo == item.hi ? '${item.lo}' : '${item.lo}–${item.hi}'} · άφησε ${item.rir}', style: aux),
+            if (isBand(k) && (tg.load ?? 0) > 0)
+              Row(children: [
+                BandDots(tg.load, size: 14),
+                Flexible(child: Text('${bandName(tg.load!)} · $reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular))),
+              ])
+            else
+              Text('${hasLoad(k) ? '${loadLabel(k, tg.load)} · ' : ''}$reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular)),
+          ]),
+        ));
+      }
+      if (shown.length < w.items.length) {
+        final rest = w.items.length - shown.length;
+        children.add(Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const ValueKey('train-more-items'),
+            style: TextButton.styleFrom(foregroundColor: c.textSecondary, padding: EdgeInsets.zero),
+            onPressed: () => setState(() => _allItems = true),
+            child: Text(rest == 1 ? 'και 1 ακόμα άσκηση' : 'και $rest ακόμα ασκήσεις'),
           ),
         ));
       }
-      final setup = _setupHint(w);
-      if (setup != null) children.add(Padding(padding: const EdgeInsets.only(top: 4), child: Text(setup, style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary))));
       children.add(const SizedBox(height: 12));
       final can = t.current == null;
       children.add(FilledButton(
@@ -366,22 +438,29 @@ class _TrainingPageState extends State<TrainingPage> {
         style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
         onPressed: can ? () => _start(context, w) : null,
         child: Text(t.current != null ? 'Υπάρχει προπόνηση σε εξέλιξη' : 'Ξεκίνα την προπόνηση',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ));
-    }
-    if (strength.length > 1 || (w == null && strength.isNotEmpty)) {
       children.add(const SizedBox(height: 12));
-      children.add(Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final x in p.workouts)
-          Pill(
-            key: ValueKey('train-pick-${x.id}'),
-            label: x.name,
-            selected: (w?.id) == x.id,
-            onTap: () => setState(() => _chosen = x.id),
-          ),
+      children.add(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(Icons.directions_walk_rounded, size: 18, color: c.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(child: Text('Για περπάτημα: στο ρολόι πάτα «Περπάτημα».', style: aux)),
       ]));
     }
-    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children));
+    return AppCard(
+      key: const ValueKey('train-today'),
+      padding: const EdgeInsets.fromLTRB(16, 10, 4, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: CardHeader(icon: Icons.fitness_center_rounded, title: 'Σήμερα', color: c.exercise)),
+          _programMenu(context, p, w: w, key: 'train-today-more'),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+        ),
+      ]),
+    );
   }
 
   /// Ποιοι δίσκοι στους αλτήρες/μπάρα στην αρχή (από την πρώτη άσκηση κάθε οργάνου).
@@ -445,33 +524,58 @@ class _TrainingPageState extends State<TrainingPage> {
   Widget _programCard(BuildContext context, Program p) {
     final c = Aigaio.of(context);
     return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 4, 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Το πρόγραμμα', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
+        Row(children: [
+          Expanded(child: Text('Το πρόγραμμα', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text))),
+          // Σχέδια 9/11 (6α): τα τρία κουμπιά του προγράμματος στο ⋮.
+          _programMenu(context, p, key: 'train-program-more', picks: false),
+        ]),
         const SizedBox(height: 4),
         Text(p.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
         Text(
           'Έκδοση ${p.version} · ${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' · από ${shortDayDate(p.from!)}'}',
           style: TextStyle(fontSize: 13.5, color: c.textSecondary),
         ),
-        const SizedBox(height: 12),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          OutlinedButton.icon(
-            key: const ValueKey('train-edit'),
-            onPressed: () => Navigator.of(context).push(ProgramEditorPage.route(t, p)),
-            icon: const Icon(Icons.edit_rounded, size: 18),
-            label: const Text('Αλλαγές'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(ProgramPastePage.route(t)),
-            icon: const Icon(Icons.content_paste_rounded, size: 18),
-            label: const Text('Επικόλληση νέου'),
-          ),
-          OutlinedButton.icon(
-            key: const ValueKey('train-export'),
-            onPressed: () => _export(context),
-            icon: const Icon(Icons.copy_rounded, size: 18),
-            label: const Text('Αντιγραφή για τον Claude'),
-          ),
+      ]),
+    );
+  }
+
+  /// «Τελευταία φορά · Πέμ 5/11» (σχέδια 9/11, 6α): διάρκεια, σετ, σύνολο κιλών· πάτημα → σύνοψη.
+  Widget _lastCard(BuildContext context, Session s) {
+    final c = Aigaio.of(context);
+    Widget stat(String v, String unit, String label) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: v, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
+                  if (unit.isNotEmpty) TextSpan(text: ' $unit', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.textSecondary)),
+                ]),
+                maxLines: 1,
+                style: const TextStyle(fontFeatures: tabular),
+              ),
+            ),
+            Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+          ]),
+        );
+    return AppCard(
+      key: const ValueKey('train-last'),
+      onTap: () => Navigator.of(context).push(SummaryPage.route(t, s)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        CardHeader(
+          icon: Icons.check_rounded,
+          title: 'Τελευταία φορά · ${shortDayDate(s.start)}',
+          color: c.good,
+          trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+        ),
+        const SizedBox(height: 10),
+        Row(children: [
+          stat('${s.duration.inMinutes}', 'λ', 'διάρκεια'),
+          stat('${s.setsDone}', '', 'σετ'),
+          stat(s.volume > 0 ? thousands(s.volume.round()) : '—', s.volume > 0 ? 'kg' : '', 'σύνολο κιλών'),
         ]),
       ]),
     );

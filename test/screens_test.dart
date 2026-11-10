@@ -741,7 +741,9 @@ void main() {
   // 8/11: προπόνηση (Παρασκευή 13/11 = Προπόνηση Α, με δύο προηγούμενες φορές για την πρόοδο).
   final trainAt = DateTime(2026, 11, 13, 17, 30);
   Future<void> trainShot(WidgetTester t, String name, Size size, Brightness b,
-      {Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep}) async {
+      {Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep, double scale = 1.0}) async {
+    t.platformDispatcher.textScaleFactorTestValue = scale;
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
     ExClock.frozen = true;
     await t.runAsync(() => ExLibrary.load(inline: true));
     final prev = TrainingStore.main;
@@ -770,6 +772,33 @@ void main() {
   }
 
   const phoneShort = Size(400, 880);
+  // Σχέδια 9/11 (6α–6γ): Άσκηση › Σήμερα, προπόνηση με λάστιχο, ερώτηση «άφησε» και «Πόνεσε κάπου;».
+  Future<void> bandSet(WidgetTester t) async {
+    await startSession(t);
+    await tapKey(t, 'sess-ex-4');
+    await tapKey(t, 'sess-tick-0');
+    await tapKey(t, 'rest-stop');
+  }
+
+  testWidgets('Άσκηση › Σήμερα · 360', (t) => trainShot(t, 'T40_train_day_360', const Size(360, 1900), Brightness.light));
+  testWidgets('Άσκηση › Σήμερα · 360 · 1,3×', (t) => trainShot(t, 'T41_train_day_360_13x', const Size(360, 2400), Brightness.light, scale: 1.3));
+  testWidgets('Άσκηση › Σήμερα · Fold ανοιχτό', (t) => trainShot(t, 'T42_train_day_fold', const Size(860, 1500), Brightness.light));
+  testWidgets('Προπόνηση · λάστιχο', (t) => trainShot(t, 'T43_session_band', phoneShort, Brightness.light, act: bandSet));
+  testWidgets('Προπόνηση · λάστιχο · 360 · 1,3×', (t) => trainShot(t, 'T44_session_band_360_13x', const Size(360, 1000), Brightness.light, scale: 1.3, act: bandSet));
+  testWidgets('Προπόνηση · λάστιχο · 360 · 2×', (t) => trainShot(t, 'T45_session_band_360_2x', const Size(360, 1400), Brightness.light, scale: 2.0, act: bandSet));
+  testWidgets('Προπόνηση · άφησε και πόνος', (t) => trainShot(t, 'T46_session_ask_pain', phoneShort, Brightness.light, act: (t) async {
+        await bandSet(t);
+        await tapKey(t, 'sess-tick-1');
+        await tapKey(t, 'rest-stop');
+        await tapKey(t, 'sess-tick-2');
+        await tapKey(t, 'rir-2');
+        await tapKey(t, 'pain-shoulderL');
+      }));
+  testWidgets('Προπόνηση · ⋮', (t) => trainShot(t, 'T47_session_menu', phoneShort, Brightness.light, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'sess-more');
+      }));
+
   testWidgets('Προπόνηση · χωρίς όριο παλμών', (t) => trainShot(t, 'T1_train_no_limit', phone, Brightness.light, prep: (s) => s.setHrLimit(null)));
   testWidgets('Προπόνηση · σήμερα', (t) => trainShot(t, 'T2_train_today', phone, Brightness.light));
   testWidgets('Προπόνηση · σήμερα · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T3_train_today_open_dark', open, Brightness.dark));
@@ -1104,7 +1133,11 @@ void main() {
     await trainShot(t, 'T28b_hr_limit_sent', phone, Brightness.light,
         act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-hrlimit'))));
   });
-  testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
+  testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) async {
+        // Σχέδια 9/11 (6α): τα κουμπιά του προγράμματος στο ⋮.
+        await tapKey(t, 'train-program-more');
+        await tapKey(t, 'train-edit');
+      }));
 
   // Έλεγχος 9/11 (V-A-06): «✓» μόνο όταν το ρολόι επιβεβαιώσει ότι έχει το όριο.
   testWidgets('Προπόνηση · όριο επιβεβαιωμένο από το ρολόι', (t) async {
