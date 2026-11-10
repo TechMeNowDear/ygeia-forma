@@ -232,6 +232,11 @@ class HrCard extends StatelessWidget {
             return Text(text, key: const ValueKey('hr-gap'), style: TextStyle(fontSize: 12.5, height: 1.35, color: warn ? c.exercise : c.textSecondary));
           }),
         ],
+        // Έλεγχος του γ2 (S1): με όριο, ρολόι σε «default» (ούτε ανά 5″ ούτε αισθητήρας): η δόνηση μπορεί να άργησε.
+        if (lim != null && session.hrMode == 'default') ...[
+          const SizedBox(height: 4),
+          Text(slowAlarmText, key: const ValueKey('hr-slow'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.exercise)),
+        ],
         // Έλεγχος γ2 (W2-14): γιατί σταμάτησε η μέτρηση στο ρολόι (για τη δοκιμή στη συσκευή), όχι μια γενική φράση.
         if (session.watchErr case final e?) ...[
           const SizedBox(height: 4),
@@ -247,6 +252,10 @@ class HrCard extends StatelessWidget {
         Text(l, style: TextStyle(fontSize: 13, color: c.textSecondary)),
       ]);
 }
+
+/// Το ρολόι στέλνει παλμούς αργά με σβηστή οθόνη (ούτε ανά 5″ ούτε αισθητήρας αφύπνισης· έλεγχος του γ2, S1). Ίδιο
+/// κείμενο με το ρολόι, χωρίς αριθμό που δεν έχει μετρηθεί.
+const slowAlarmText = 'Με σβηστή οθόνη η δόνηση του ορίου μπορεί να αργήσει λίγα λεπτά σε αυτό το ρολόι.';
 
 /// Πόσο συχνά ήρθαν οι παλμοί από το ρολόι, για τη σύνοψη (8/11· έλεγχος γ2, W2-08). [gap]: μεγαλύτερο κενό (″),
 /// [deliveries]: πόσες φορές ήρθαν (ρολόι από γ2· null = παλιό ρολόι), [hasLimit]: είχε όριο. Επιστρέφει (κείμενο,

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/exercise/ex_data.dart';
 import 'package:ygeia_forma/pages/training/hr_widgets.dart';
+import 'package:ygeia_forma/pages/training/session_page.dart';
 import 'package:ygeia_forma/pages/training/training_page.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/training/session.dart';
@@ -116,5 +117,71 @@ void main() {
       expect(find.byKey(const ValueKey('hr-limit-off')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
     });
-  });
+  
+    test('S3/S4: ώρα του σετ προς το ρολόι· διόρθωση επαναλήψεων μόνο στο ίδιο σετ της ίδιας άσκησης', () {
+      final t = sampleTraining(now);
+      final s = t.start(t.program!.workout('A')!);
+      final e = s.items[0];
+      t.tick(e, 0);
+      final at = e.log[0].at!;
+      final sets = ((watchSession(t, (id) => id)['items'] as List)[0] as Map)['sets'] as List;
+      expect((sets[0] as Map)['at'], at);
+      expect((sets[1] as Map).containsKey('at'), isFalse);
+      final link = WearLink()..attachForTest(t);
+      void reps(int v, Map<String, dynamic> extra) => link.apply(t, WatchCmd('reps', {'op': 'reps', 'i': 0, 's': 0, 'v': v, 'sid': s.id, ...extra}));
+      // άλλη άσκηση στη θέση 0 (εναλλακτική): αγνοείται
+      reps(5, {'ex': 'άλλη', 'at': at});
+      expect(e.log[0].reps, isNot(5));
+      // άλλη ώρα σετ: αγνοείται
+      reps(5, {'ex': e.ex, 'at': at - 60000});
+      expect(e.log[0].reps, isNot(5));
+      // ίδια άσκηση και ίδιο σετ: γράφεται
+      reps(5, {'ex': e.ex, 'at': at});
+      expect(e.log[0].reps, 5);
+      // ρολόι παλιότερης έκδοσης (χωρίς ex/at): όπως πριν
+      reps(6, {});
+      expect(e.log[0].reps, 6);
+    });
+
+    test('NIT 1: «q» πολύ πιο πίσω (η ώρα του ρολογιού άλλαξε) γίνεται δεκτό', () {
+      final t = sampleTraining(now);
+      final s = t.start(t.program!.workout('A')!);
+      final link = WearLink()..attachForTest(t);
+      void reps(int v, int q) => link.apply(t, WatchCmd('reps', {'op': 'reps', 'i': 0, 's': 0, 'v': v, 'sid': s.id, 'q': q}));
+      reps(9, 10000000);
+      reps(7, 9999000);
+      expect(s.items[0].log[0].reps, 9);
+      reps(8, 1000);
+      expect(s.items[0].log[0].reps, 8);
+    });
+
+    testWidgets('S1: «αργή δόνηση» από το ρολόι στην κάρτα ορίου και στη σύνοψη, χωρίς αριθμό', (tester) async {
+      expect(RegExp(r'\d').hasMatch(slowAlarmText), isFalse);
+      final link = WearLink();
+      link.applyWatchState('{"v":1,"lim":140,"planAt":5,"slow":1}');
+      expect(link.watchSlow.value, isTrue);
+      link.applyWatchState('{"v":1,"lim":140,"planAt":5}');
+      expect(link.watchSlow.value, isFalse);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 1600);
+      addTearDown(tester.view.reset);
+      await tester.runAsync(() => ExLibrary.load(inline: true));
+      final t = sampleTraining(now);
+      WearLink.main.watchSlow.value = true;
+      addTearDown(() => WearLink.main.watchSlow.value = false);
+      await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: TrainingPage(training: t, now: now))));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('train-hr-slow')), findsOneWidget);
+      final s = t.sessions.last
+        ..limit = 140
+        ..hrMode = 'default'
+        ..hrGap = 4
+        ..hrAvg = 118
+        ..hrMax = 130;
+      await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('hr-slow')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+});
 }

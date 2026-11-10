@@ -116,8 +116,11 @@ class ExerciseService : Service() {
             ctx.startService(Intent(ctx, ExerciseService::class.java).setAction(if (on) ACTION_PAUSE else ACTION_RESUME))
         }
 
-        /** Χωρίς παλμούς ανά 5″ και χωρίς αισθητήρα αφύπνισης, με όριο (W3-10). Κείμενο προς έγκριση από τον χρήστη. */
-        const val SLOW_ALARM_NOTICE = "Η δόνηση του ορίου μπορεί να αργήσει ως 3′ σε αυτό το ρολόι."
+        /**
+         * Χωρίς παλμούς ανά 5″ και χωρίς αισθητήρα αφύπνισης, με όριο (W3-10). Χωρίς αριθμό: δεν έχει μετρηθεί στο ρολόι
+         * (έλεγχος του γ2, S1). Κείμενο προς έγκριση από τον χρήστη.
+         */
+        const val SLOW_ALARM_NOTICE = SLOW_ALARM_TEXT
 
         fun has(ctx: Context, p: String) = ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED
 
@@ -367,6 +370,11 @@ class ExerciseService : Service() {
             // Εφεδρεία αισθητήρα όπως πριν (μόνο αν τη χρησιμοποιούσε και υπάρχει όριο).
             hrInExercise = has(this, heartPermission)
             if (Repo.hrMode == "sensor" && Repo.alarm.limit != null && hrInExercise) startSensor()
+            // Συνέχεια σε ρολόι που στέλνει αργά: το μήνυμα ασφάλειας ξανά, πρώτο (S1).
+            if (Repo.hrMode == "default" && Repo.alarm.limit != null && hrInExercise) {
+                Repo.notice = withSafety(SLOW_ALARM_NOTICE, Repo.notice)
+                Repo.openNotice = true
+            }
         } catch (e: Exception) {
             Log.e(TAG, "attach", e)
             Repo.lastErr = why(e)
@@ -513,10 +521,16 @@ class ExerciseService : Service() {
             // Για την ειδοποίηση ορίου, τότε και μόνο, ο αισθητήρας απευθείας (μόνο όσο τρέχει η άσκηση).
             if (Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null) startSensor()
             // Ούτε ανά 5″ ούτε αισθητήρας αφύπνισης: το λέμε, όχι σιωπηλά (έλεγχος γ2, W3-10).
-            if (Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null && Repo.notice == null) {
-                Repo.notice = SLOW_ALARM_NOTICE
+            // Πρώτο, πριν από κάθε άλλο μήνυμα (π.χ. «Χωρίς GPS…»), ώστε να μην κρύβεται (S1).
+            val slow = Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null
+            if (slow) {
+                Repo.notice = withSafety(SLOW_ALARM_NOTICE, Repo.notice)
+                // Ολόκληρο, σε όλη την οθόνη ώσπου να το πατήσεις (σε μία γραμμή θα κοβόταν).
+                Repo.openNotice = true
                 Repo.changed()
             }
+            // Και στο κινητό (κάρτα ορίου, πριν από την επόμενη άσκηση): «/ygeia/wstate» με «slow».
+            if (hrOk) Link.setSlow(this, Repo.hrMode == "default")
         } catch (e: Exception) {
             // Η αιτία στην οθόνη και στο logcat (ετικέτα «YgeiaWatch»): χωρίς αυτήν δεν διορθώνεται (9/11).
             Log.e(TAG, "startExercise", e)
@@ -580,6 +594,8 @@ class ExerciseService : Service() {
             val points = m.getData(DataType.HEART_RATE_BPM)
             // Κάθε παράδοση μετράει (και με την εφεδρεία αισθητήρα): το κενό είναι όσο δεν έφτανε τίποτα (W2-08).
             if (points.isNotEmpty()) Repo.hrGaps.mark(now)
+            // Μετά το «Τέλος» (αναμονή της ENDED) καμία δόνηση ορίου (έλεγχος του γ2, NIT 3).
+            val alarmOk = !stopping
             for (p in points) {
                 val bpm = Math.round(p.value).toInt()
                 if (bpm !in 26..249) continue
@@ -603,10 +619,11 @@ class ExerciseService : Service() {
             // στον βρόχο του δευτερολέπτου, που σταματά με σβηστή οθόνη (W2-02, W3-10).
             if (buzz < 0 && Repo.hrMode != "5s" && Repo.hrLive(now) && Repo.alarm.steady(Repo.bpm, nowEl)) {
                 buzz = Repo.bpm
-                buzzEl = nowEl
+                // Με την ηλικία της τελευταίας τιμής, όχι «τώρα» (NIT 4).
+                buzzEl = if (Repo.bpmEl > 0) Repo.bpmEl else nowEl
             }
             // Από πακέτο με καθυστέρηση (W2-17): με την ηλικία της τιμής· καμία δόνηση αν έπεσαν ήδη και πέρασαν >30″.
-            if (buzz > 0) {
+            if (buzz > 0 && alarmOk) {
                 val age = nowEl - buzzEl
                 val lim = Repo.alarm.limit
                 if (lateAlarmBuzz(age, lim != null && Repo.alarm.lastBpm >= lim)) onAlarm(buzz, age)
@@ -838,7 +855,8 @@ class ExerciseService : Service() {
         val s = Repo.session
         val now = System.currentTimeMillis()
         val end = if (Repo.running != null && s != null && s.restEnd > now) s.restEnd else 0L
-        if (end == restLockFor) return
+        // Ίδιο διάλειμμα και ο επεξεργαστής ακόμα ξύπνιος: τίποτα. Αν έληξε (διάλειμμα > 5′ με «+30″»), ξανά (NIT 2).
+        if (end == restLockFor && (end == 0L || restLock?.isHeld == true)) return
         releaseRestLock()
         if (end == 0L) return
         restLockFor = end

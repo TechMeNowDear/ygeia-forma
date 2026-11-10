@@ -180,6 +180,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             return
         }
         val note = Repo.notice
+        if (Repo.openNotice && note != null) {
+            Repo.openNotice = false
+            noticeOpen = true
+        }
         if (noticeOpen && note != null) {
             drawNotice(c, note)
             return

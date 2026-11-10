@@ -57,10 +57,15 @@ object Results {
         }
         val o = result.second
         // Για τον έλεγχο στη συσκευή: πώς ήρθαν οι παλμοί και το μεγαλύτερο κενό (φαίνεται στη σύνοψη του κινητού).
-        if (Repo.hrMode.isNotEmpty()) o.put("hrMode", Repo.hrMode).put("hrGap", Repo.hrGaps.maxGapSec)
+        // Μετά από απότομο κλείσιμο (μερικό ή συνέχεια) τα κενά δεν είναι γνωστά (ο μετρητής ξεκίνησε από τη συνέχεια):
+        // κανένα «hrGap»/«hrDel» αντί για ψεύτικο «ήρθαν όλοι μαζί» (έλεγχος του γ2, S2)· «hrRec» = 1 για τη σύνοψη.
+        val gapsKnown = partialAt == null && !Repo.restored
+        if (Repo.hrMode.isNotEmpty()) o.put("hrMode", Repo.hrMode)
+        if (Repo.hrMode.isNotEmpty() && gapsKnown) o.put("hrGap", Repo.hrGaps.maxGapSec)
         // Έλεγχος γ2 (W2-08/W2-14): πόσες παραδόσεις παλμών, τι μπορεί το ρολόι, και το σφάλμα που σταμάτησε τη μέτρηση.
         // Νέα πεδία: το παλιό κινητό τα αγνοεί.
-        if (Repo.hrMode.isNotEmpty()) o.put("hrDel", Repo.hrGaps.deliveries)
+        if (Repo.hrMode.isNotEmpty() && gapsKnown) o.put("hrDel", Repo.hrGaps.deliveries)
+        if (!gapsKnown) o.put("hrRec", 1)
         if (Repo.diag.isNotEmpty()) o.put("diag", Repo.diag)
         Repo.lastErr?.let { o.put("err", it.take(120)) }
         // Το όριο που ίσχυε στην άσκηση (έλεγχος 9/11, V-B-04· 0 = χωρίς όριο). Νέο πεδίο: το παλιό κινητό το αγνοεί.

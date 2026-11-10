@@ -92,6 +92,9 @@ Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name)
                 'label': hasLoad(e.kind) ? loadLabel(e.kind, x.load) : '',
                 'reps': x.reps,
                 if (x.done) 'done': true,
+                // Η ώρα του ✓ (έλεγχος του γ2, S3): το ρολόι δείχνει «έκανες × 8» στο διάλειμμα και για ✓ του κινητού.
+                // Νέο πεδίο: το παλιό ρολόι το αγνοεί.
+                if (x.done && x.at != null) 'at': x.at,
               },
           ],
         },
@@ -137,6 +140,10 @@ class WearLink with WidgetsBindingObserver {
   /// Το όριο που ΕΠΙΒΕΒΑΙΩΣΕ το ρολόι ότι έχει («140», «null» = χωρίς όριο), ή null αν δεν έχει πει τίποτα (ρολόι
   /// παλιότερης έκδοσης, ή η εφαρμογή του ρολογιού δεν άνοιξε ακόμα). Έλεγχος 9/11, V-A-06: «Στο ρολόι ✓ όριο 140».
   final watchLimit = ValueNotifier<String?>(null);
+
+  /// Το ρολόι είπε ότι με σβηστή οθόνη στέλνει παλμούς αργά (ούτε ανά 5″ ούτε αισθητήρας αφύπνισης· έλεγχος του γ2,
+  /// S1): η κάρτα ορίου το λέει πριν από την άσκηση. false = δεν το είπε (ή ρολόι παλιότερης έκδοσης).
+  final watchSlow = ValueNotifier<bool>(false);
 
   /// Το ρολόι έστειλε αποτέλεσμα νεότερης μορφής (V-A-08): «Ενημέρωσε την εφαρμογή στο κινητό»· περιμένει εκεί.
   final watchNewer = ValueNotifier<bool>(false);
@@ -199,14 +206,24 @@ class WearLink with WidgetsBindingObserver {
   void _watching(bool on) {
     _watchTimer?.cancel();
     _watchTimer = null;
-    if (on) _watchTimer = Timer.periodic(watchingEvery, (_) => sendWatching(watchingTtl));
+    // Ανά 45″ μόνο όσο τρέχει περπάτημα στο ρολόι (NIT 8)· στο άνοιγμα μία φορά, για να ξεκινήσουν τα «ζωντανά».
+    if (on) _watchTimer = Timer.periodic(watchingEvery, (_) => liveFresh() ? sendWatching(watchingTtl) : null);
     sendWatching(on ? watchingTtl : Duration.zero);
+  }
+
+  DateTime? _watchingSent;
+
+  /// Περπάτημα στο ρολόι που έστειλε «ζωντανά» το τελευταίο λεπτό.
+  bool liveFresh() {
+    final at = (live.value?['at'] as num?)?.toInt();
+    return at != null && DateTime.now().millisecondsSinceEpoch - at < 60000;
   }
 
   /// «Κοιτάζω» ([ttl] > 0) ή «έκλεισα» (0) προς το ρολόι. Χωρίς κανένα γνωστό ρολόι: καμία κλήση.
   @visibleForTesting
   Future<void> sendWatching(Duration ttl) async {
     if (!(ready.value || _known)) return;
+    _watchingSent = ttl > Duration.zero ? DateTime.now() : null;
     try {
       await _m.invokeMethod<bool>('watching', {'json': jsonEncode({'v': 1, 'ttl': ttl.inMilliseconds})});
     } catch (_) {}
@@ -249,6 +266,7 @@ class WearLink with WidgetsBindingObserver {
       final j = jsonDecode(text) as Map<String, dynamic>;
       final lim = (j['lim'] as num?)?.toInt();
       if (lim == null) return;
+      watchSlow.value = j['slow'] == 1;
       watchLimit.value = lim > 0 ? '$lim' : 'null';
     } catch (_) {}
   }
@@ -388,6 +406,11 @@ class WearLink with WidgetsBindingObserver {
         ready.value = true;
       case '/ygeia/live':
         live.value = {...j, 'at': DateTime.now().millisecondsSinceEpoch};
+        // Ξεκίνησε περπάτημα και η εφαρμογή είναι μπροστά: «κοιτάζω» αμέσως, όχι στα επόμενα 45″.
+        final sent = _watchingSent;
+        if (_watchTimer != null && (sent == null || DateTime.now().difference(sent) > const Duration(seconds: 40))) {
+          sendWatching(watchingTtl);
+        }
         final bpm = (j['bpm'] as num?)?.toInt() ?? 0;
         if (bpm > 0) hr.value = (bpm, DateTime.now());
         ready.value = true;
@@ -466,10 +489,20 @@ class WearLink with WidgetsBindingObserver {
         final q = c.j['q'];
         if (q is num) {
           final key = '${c.sid}:${c.i}:${c.s}';
-          if (q.toInt() <= (_repsQ[key] ?? 0)) return;
+          final last = _repsQ[key] ?? 0;
+          // Παλιότερη εντολή: αγνοείται. Πολύ πιο πίσω (> 10′: η ώρα του ρολογιού άλλαξε μετά από επανεκκίνηση): δεκτή (NIT 1).
+          if (q.toInt() <= last && last - q.toInt() < 600000) return;
           _repsQ[key] = q.toInt();
         }
-        if (v is num && c.s >= 0 && c.s < e.log.length) t.setReps(e, c.s, v.toInt());
+        if (v is! num || c.s < 0 || c.s >= e.log.length) return;
+        // Μόνο στο ίδιο σετ που εννοεί το ρολόι (έλεγχος του γ2, S4): αν η άσκηση άλλαξε στο μεταξύ (εναλλακτική), ή το
+        // σετ έχει άλλη ώρα, αγνοείται. Ρολόι παλιότερης έκδοσης δεν στέλνει «ex»/«at»: όπως πριν.
+        final ex = c.j['ex'];
+        if (ex is String && ex != e.ex) return;
+        final at = c.j['at'];
+        final setAt = e.log[c.s].at;
+        if (at is num && (setAt == null || (setAt - at.toInt()).abs() > 2000)) return;
+        t.setReps(e, c.s, v.toInt());
     }
   }
 

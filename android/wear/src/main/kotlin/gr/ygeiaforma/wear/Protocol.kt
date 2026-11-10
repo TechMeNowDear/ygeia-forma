@@ -771,8 +771,19 @@ fun lateAlarmBuzz(ageMs: Long, stillOver: Boolean): Boolean = stillOver || ageMs
 fun alarmAdvice(walk: Boolean, recovery: Boolean): String = when {
     recovery -> "Ξεκουράσου."
     walk -> "Κόψε ρυθμό."
-    else -> "Ξεκουράσου μέχρι να πέσουν."
+    else -> "Ξεκουράσου μέχρι να πέσουν οι παλμοί."
 }
+
+/**
+ * Ρολόι χωρίς παλμούς ανά 5″ και χωρίς αισθητήρα αφύπνισης, με όριο (W3-10· έλεγχος του γ2, S1): χωρίς αριθμό που
+ * δεν έχει μετρηθεί.
+ */
+const val SLOW_ALARM_TEXT = "Με σβηστή οθόνη η δόνηση του ορίου μπορεί να αργήσει λίγα λεπτά σε αυτό το ρολόι."
+
+/** Το μήνυμα ασφάλειας πρώτο· ένα άλλο μήνυμα (π.χ. για το GPS) ακολουθεί, δεν το κρύβει (S1). */
+fun withSafety(safety: String, other: String?): String =
+    if (other.isNullOrEmpty() || other.contains(safety)) safety else "$safety $other"
+
 
 /** Η μεγάλη λέξη της κόκκινης οθόνης. */
 fun alarmHeadline(walk: Boolean, recovery: Boolean): String = if (walk && !recovery) "Κόψε ρυθμό" else "Ξεκουράσου"

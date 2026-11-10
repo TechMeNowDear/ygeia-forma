@@ -320,7 +320,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (si < 0) return
         val set = it.sets[si]
         set.reps = (set.reps + delta).coerceIn(0, 99)
-        if (s.phone) cmd(JSONObject().put("op", "reps").put("i", s.idx).put("s", si).put("v", set.reps))
+        if (s.phone) cmd(repsCmd(s.idx, si, it.ex, set.reps, 0))
     }
 
     /** Διόρθωση των επαναλήψεων του σετ που μόλις έγινε, στο διάλειμμα (έλεγχος γ2, RT-13): «έκανες × 8». */
@@ -329,7 +329,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         val (i, k) = s.lastDone(System.currentTimeMillis()) ?: return
         val set = s.items[i].sets[k]
         set.reps = (set.reps + delta).coerceIn(0, 99)
-        if (s.phone) cmd(JSONObject().put("op", "reps").put("i", i).put("s", k).put("v", set.reps))
+        // Με την άσκηση και την ώρα του σετ (S4): αν στο μεταξύ η άσκηση άλλαξε στο κινητό, η διόρθωση δεν πάει αλλού.
+        if (s.phone) cmd(repsCmd(i, k, s.items[i].ex, set.reps, set.at))
         else saveRun()
     }
 
@@ -432,6 +433,13 @@ private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και σ
  * πρώτα (πόρτα, φανάρι), έχουν ήδη πέσει. Κείμενο προς έγκριση από τον χρήστη.
  */
 const val WALK_FINISH_NOTICE = "Πάτα ξανά «Τέλος» όσο περπατάς ακόμα"
+
+/**
+ * Εντολή «επαναλήψεις» προς το κινητό: άσκηση [i], σετ [k], και (νέα πεδία, έλεγχος του γ2, S4) το id της άσκησης [ex]
+ * και η ώρα του σετ [at] (αν έγινε), ώστε το κινητό να την αγνοήσει αν δεν ταιριάζουν πια. Το παλιό κινητό τα αγνοεί.
+ */
+fun repsCmd(i: Int, k: Int, ex: String, reps: Int, at: Long): JSONObject =
+    JSONObject().put("op", "reps").put("i", i).put("s", k).put("v", reps).put("ex", ex).also { if (at > 0) it.put("at", at) }
 
 /**
  * Το «μπες στην προπόνηση του κινητού» (άνοιγμα από το κινητό) περιμένει μόνο αν δεν τρέχει τίποτα εδώ: αλλιώς σβήνει,

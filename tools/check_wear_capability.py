@@ -32,7 +32,11 @@ def find_aapt2():
         root = os.environ.get(env)
         if not root:
             continue
-        found = sorted(glob.glob(os.path.join(root, 'build-tools', '*', 'aapt2')))
+        # Η νεότερη έκδοση build-tools, με ταξινόμηση αριθμών («34.0.0» μετά από «9.0.0»).
+        def ver(path):
+            name = os.path.basename(os.path.dirname(path))
+            return [int(x) if x.isdigit() else -1 for x in name.replace('-', '.').split('.')]
+        found = sorted(glob.glob(os.path.join(root, 'build-tools', '*', 'aapt2')), key=ver)
         if found:
             return found[-1]
     return None

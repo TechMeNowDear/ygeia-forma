@@ -55,7 +55,7 @@ class _TrainingPageState extends State<TrainingPage> {
         }
         return ListenableBuilder(
           listenable: Listenable.merge(
-              [t, WearLink.main.ready, WearLink.main.live, WearLink.main.sentLimit, WearLink.main.watchLimit, WearLink.main.watchNewer]),
+              [t, WearLink.main.ready, WearLink.main.live, WearLink.main.sentLimit, WearLink.main.watchLimit, WearLink.main.watchNewer, WearLink.main.watchSlow]),
           builder: (context, _) => _page(context),
         );
       },
@@ -643,6 +643,12 @@ class _TrainingPageState extends State<TrainingPage> {
             Text('Όριο παλμών από τον γιατρό', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
             Text(hr != null ? '$hr bpm · δόνηση στο ρολόι όσο μετρά άσκηση' : 'Κανένα. Πάτα αν σου δώσει ο γιατρός.',
                 style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+            // Έλεγχος του γ2 (S1): το ρολόι στέλνει παλμούς αργά με σβηστή οθόνη· να το ξέρεις πριν από την άσκηση.
+            if (hr != null && link.watchSlow.value)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(slowAlarmText, key: const ValueKey('train-hr-slow'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.warn)),
+              ),
             if (watch != null)
               Padding(
                 padding: const EdgeInsets.only(top: 3),

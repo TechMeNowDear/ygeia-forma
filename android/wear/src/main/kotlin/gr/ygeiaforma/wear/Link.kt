@@ -217,8 +217,9 @@ object Link {
      * καμία επανάληψη από εδώ. Γράφεται μόνο όταν αλλάζει (όχι σε κάθε άνοιγμα).
      */
     fun ack(ctx: Context, p: Plan) {
-        val text = ackJson(p.hrLimit, p.at).toString()
-        val key = "${p.hrLimit ?: 0}/${p.at}"
+        val slow = ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE).getBoolean(SLOW, false)
+        val text = ackJson(p.hrLimit, p.at, slow).toString()
+        val key = "${p.hrLimit ?: 0}/${p.at}/$slow"
         val sp = ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE)
         if (sp.getString(ACKED, null) == key) return
         try {
@@ -233,8 +234,22 @@ object Link {
     }
 
     /** Τι λέει το ρολόι για τον εαυτό του: το όριο που ισχύει (0 = χωρίς), από ποιο πρόγραμμα, ποια μορφή ξέρει. */
-    fun ackJson(limit: Int?, planAt: Long): JSONObject =
-        JSONObject().put("v", Proto.MAJOR).put("lim", limit ?: 0).put("planAt", planAt)
+    fun ackJson(limit: Int?, planAt: Long, slow: Boolean = false): JSONObject =
+        JSONObject().put("v", Proto.MAJOR).put("lim", limit ?: 0).put("planAt", planAt).also { if (slow) it.put("slow", 1) }
+
+    private const val SLOW = "slow"
+
+    /**
+     * Το ρολόι έμαθε (στην αρχή μιας άσκησης) αν στέλνει παλμούς αργά με σβηστή οθόνη (έλεγχος του γ2, S1): κρατιέται και
+     * πάει στο κινητό με το «/ygeia/wstate» («slow»: 1), για την κάρτα ορίου εκεί. Μόνο όταν αλλάζει.
+     */
+    fun setSlow(ctx: Context, slow: Boolean) {
+        val sp = ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE)
+        if (sp.getBoolean(SLOW, false) == slow) return
+        sp.edit().putBoolean(SLOW, slow).apply()
+        val p = Repo.plan ?: Plan(Repo.knownLimit, null, null, emptyList(), 0)
+        ack(ctx, p)
+    }
 
     /** Διαβάζει ό,τι έχει ήδη στείλει το κινητό (στο άνοιγμα). */
     suspend fun load(ctx: Context) {

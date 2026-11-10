@@ -92,7 +92,7 @@ class Watch2Test {
         assertEquals("Ξεκουράσου.", alarmAdvice(walk = true, recovery = true))
         assertEquals("Ξεκουράσου", alarmHeadline(walk = true, recovery = true))
         // βάρη: χωρίς «κάτω από 140» (η οθόνη σβήνει κάτω από 135)
-        assertEquals("Ξεκουράσου μέχρι να πέσουν.", alarmAdvice(walk = false, recovery = false))
+        assertEquals("Ξεκουράσου μέχρι να πέσουν οι παλμοί.", alarmAdvice(walk = false, recovery = false))
     }
 
     /** RT-18: μόνο παλμοί (χωρίς απόσταση και βήματα) δεν λέει «από τα βήματα». */
@@ -274,5 +274,74 @@ class Watch2Test {
         val o: JSONObject = Results.build(t0 + 600_000)!!.second
         for (k in listOf("v", "id", "kind", "w", "name", "start", "end", "items", "hrAvg", "hrMax", "hrT0", "hr", "cardio", "lim")) assertTrue(k, o.has(k))
         assertEquals(1, o.getInt("v"))
+    }
+
+    /** Έλεγχος του γ2, S1: το μήνυμα ασφάλειας χωρίς αριθμό που δεν μετρήθηκε, πρώτο, και στο κινητό («slow»). */
+    @Test
+    fun slowAlarmNoticeFirstAndWithoutNumbers() {
+        assertFalse(SLOW_ALARM_TEXT, SLOW_ALARM_TEXT.any { it.isDigit() })
+        assertTrue(SLOW_ALARM_TEXT.startsWith("Με σβηστή οθόνη"))
+        assertEquals("$SLOW_ALARM_TEXT Χωρίς GPS: η απόσταση από τα βήματα.", withSafety(SLOW_ALARM_TEXT, "Χωρίς GPS: η απόσταση από τα βήματα."))
+        assertEquals(SLOW_ALARM_TEXT, withSafety(SLOW_ALARM_TEXT, null))
+        assertEquals(SLOW_ALARM_TEXT, withSafety(SLOW_ALARM_TEXT, withSafety(SLOW_ALARM_TEXT, null)))
+        assertEquals(1, Link.ackJson(140, 5, slow = true).getInt("slow"))
+        assertFalse(Link.ackJson(140, 5).has("slow"))
+    }
+
+    /** Έλεγχος του γ2, S2: μετά από απότομο κλείσιμο κανένα «ήρθαν όλοι μαζί» (τα κενά δεν είναι γνωστά). */
+    @Test
+    fun recoveredResultHasNoGapClaims() {
+        val t0 = 1_700_000_000_000L
+        Repo.running = "walk"
+        Repo.startedAt = t0
+        Repo.hrMode = "5s"
+        Repo.hr = HrStats(t0).also { h -> for (k in 0 until 600) h.add(100, t0 + k * 1000L) }
+        val snap = Repo.captureRun(t0 + 600_000)!!
+        Repo.resetExercise()
+        assertTrue(Repo.restoreRun(JSONObject(snap.toString()), t0 + 900_000, 5_000))
+        // μερικό (FINALIZE)
+        val p = Results.build(t0 + 900_000, partialAt = t0 + 600_000)!!.second
+        assertFalse(p.has("hrDel"))
+        assertFalse(p.has("hrGap"))
+        assertEquals(1, p.getInt("hrRec"))
+        assertEquals("5s", p.getString("hrMode"))
+        // συνέχεια (ATTACH) και κανονικό «Τέλος»: επίσης άγνωστα
+        val f = Results.build(t0 + 1_200_000)!!.second
+        assertFalse(f.has("hrDel"))
+        // κανονική άσκηση χωρίς κλείσιμο: όπως πριν
+        Repo.resetExercise()
+        Repo.running = "walk"
+        Repo.startedAt = t0
+        Repo.hrMode = "5s"
+        val n = Results.build(t0 + 60_000)!!.second
+        assertTrue(n.has("hrDel") && n.has("hrGap") && !n.has("hrRec"))
+    }
+
+    /** Έλεγχος του γ2, S3: «έκανες × 8» και για ✓ του κινητού (το κινητό στέλνει την ώρα του σετ). */
+    @Test
+    fun lastDoneWorksForPhoneTicks() {
+        val now = System.currentTimeMillis()
+        Repo.applyPhone(LiveSession.parsePhone(
+            """{"active":true,"id":"s1","w":"A","name":"Α","start":1,"idx":0,"restEnd":${now + 80_000},
+              "items":[{"ex":"a","name":"A","rest":90,"sets":[{"label":"","reps":8,"done":true,"at":${now - 10_000}},{"label":"","reps":8}]}]}""",
+        ))
+        assertEquals(0 to 0, Repo.phone!!.lastDone(now))
+        // παλιό κινητό (χωρίς «at»): απλώς δεν φαίνεται
+        Repo.applyPhone(null)
+        Repo.applyPhone(LiveSession.parsePhone(
+            """{"active":true,"id":"s2","w":"A","name":"Α","start":1,"idx":0,"restEnd":${now + 80_000},
+              "items":[{"ex":"a","name":"A","rest":90,"sets":[{"label":"","reps":8,"done":true},{"label":"","reps":8}]}]}""",
+        ))
+        assertNull(Repo.phone!!.lastDone(now))
+    }
+
+    /** Έλεγχος του γ2, S4: η διόρθωση επαναλήψεων λέει ποια άσκηση και ποιο σετ (ώρα). */
+    @Test
+    fun repsCommandNamesTheSet() {
+        val o = repsCmd(1, 2, "db_row", 9, 12_345L)
+        assertEquals("reps", o.getString("op"))
+        assertEquals("db_row", o.getString("ex"))
+        assertEquals(12_345L, o.getLong("at"))
+        assertFalse(repsCmd(0, 0, "a", 8, 0).has("at"))
     }
 }

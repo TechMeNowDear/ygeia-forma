@@ -106,6 +106,9 @@ object Repo {
     /** Το σφάλμα που σταμάτησε τη μέτρηση (είδος: μήνυμα), για τη σύνοψη στο κινητό (έλεγχος γ2, W2-14), ή null. */
     var lastErr: String? = null
 
+    /** Η άσκηση ξαναστήθηκε από στιγμιότυπο (απότομο κλείσιμο): τα κενά των παλμών δεν είναι γνωστά (S2). */
+    var restored = false
+
     /** Τι μπορεί το ρολόι (για τον έλεγχο στη συσκευή, W2-14/W3-10): π.χ. «5s=1 wake=1». */
     var diag = ""
 
@@ -153,6 +156,9 @@ object Repo {
 
     /** Μήνυμα για τον χρήστη (π.χ. λείπει άδεια), ή null. */
     var notice: String? = null
+
+    /** Το μήνυμα να ανοίξει ολόκληρο σε όλη την οθόνη (μήνυμα ασφάλειας, S1)· η οθόνη το σβήνει μόλις το δείξει. */
+    var openNotice = false
 
     /** Τελευταία φορά που ήρθαν δεδομένα από το κινητό (ms), για το «άνοιξε την εφαρμογή στο κινητό». */
     var syncedAt = 0L
@@ -284,6 +290,7 @@ object Repo {
         hrAvailable = null
         lastErr = null
         diag = ""
+        restored = false
         alarmMutedEpisode = -1
     }
 
@@ -395,6 +402,7 @@ object Repo {
         alarm.limit = if (o.has("lim")) o.getInt("lim") else null
         alarm.reset()
         o.optJSONObject("local")?.let { local = LiveSession.fromState(it) }
+        restored = true
         true
     } catch (_: Exception) {
         resetExercise()
