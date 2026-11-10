@@ -247,7 +247,7 @@ void main() {
       addTearDown(() => WearLink.main.live.value = null);
       await card(t, sampleTraining(fri), fri);
       expect(find.byKey(const ValueKey('today-training-nohr')), findsOneWidget);
-      expect(find.textContaining('Το όριο 140 δεν σε προστατεύει τώρα'), findsOneWidget);
+      expect(find.textContaining('Το όριο 140 δεν σε προσέχει τώρα'), findsOneWidget);
     });
 
     testWidgets('περπάτημα ζωντανά: χρονόμετρο και ρυθμός «/km»', (t) async {
