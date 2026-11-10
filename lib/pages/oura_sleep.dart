@@ -46,15 +46,20 @@ class OuraSleepPage extends StatelessWidget {
             now: now,
             reason: sameDay(last.day, today) ? null : reason,
             todayNight: store.ouraNightFor(today),
-            range: sleepRange(store.profile, today));
+            range: sleepRange(store.profile, today),
+            readiness: plan.value(store.history, K.energy, last.day),
+            onHistory: () => Navigator.of(context).push(MetricPage.route(store, K.sleepMin, now: now)));
 
+    // Σχέδια 9/11 (4β): μία ετικέτα «εκτίμηση» στον τίτλο και ⓘ για το «γιατί», αντί για παράγραφο.
     final stagesCard = AppCard(
+      key: const ValueKey('sleep-stages'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            Expanded(child: CardHeader(icon: Icons.layers_rounded, title: 'Στάδια · μέσος όρος 7 νυχτών', color: c.sleep)),
-            const SourceTag(Source.oura),
+            Expanded(child: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep)),
+            const LabelTag('εκτίμηση'),
+            const InfoButton(stagesInfoKey),
           ]),
           const SizedBox(height: 12),
           if (stages.deep == null)
@@ -64,22 +69,24 @@ class OuraSleepPage extends StatelessWidget {
               style: TextStyle(color: c.textSecondary, fontSize: 14, height: 1.4),
             )
           else ...[
-            InfoRow(stageLabel('DEEP'), hoursMinutes(stages.deep!), dot: c.stage('DEEP')),
-            InfoRow(stageLabel('LIGHT'), hoursMinutes(stages.light!), dot: c.stage('LIGHT')),
-            InfoRow(stageLabel('REM'), hoursMinutes(stages.rem!), dot: c.stage('REM')),
-            InfoRow('Ξύπνιος τη νύχτα', atLeast(stages.awake!), dot: c.stage('AWAKE')),
+            StackedBar(parts: [
+              (stages.deep!.toDouble(), c.stage('DEEP')),
+              (stages.light!.toDouble(), c.stage('LIGHT')),
+              (stages.rem!.toDouble(), c.stage('REM')),
+              (stages.awake!.toDouble(), c.stage('AWAKE')),
+            ]),
+            const SizedBox(height: 6),
+            InfoRow(stageLabel('DEEP'), hmList(stages.deep!), dot: c.stage('DEEP')),
+            InfoRow(stageLabel('LIGHT'), hmList(stages.light!), dot: c.stage('LIGHT')),
+            InfoRow(stageLabel('REM'), hmList(stages.rem!), dot: c.stage('REM')),
+            // «≥»: τα ξυπνήματα μετριούνται λιγότερα απ' όσα είναι (το «γιατί» στο ⓘ).
+            InfoRow('Ξύπνιος', '≥ ${hmList(stages.awake!)}', dot: c.stage('AWAKE')),
           ],
-          const SizedBox(height: 8),
-          Text(
-            'Τα στάδια μίας νύχτας έχουν μεγάλο λάθος σε κάθε συσκευή. Γι\' αυτό βλέπεις τον μέσο όρο της εβδομάδας. '
-            'Τα ξυπνήματα συνήθως μετριούνται λιγότερα απ\' όσα είναι.',
-            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
-          ),
         ],
       ),
     );
 
-    final heart = _OuraHeartCard(store: store, day: last?.day ?? today);
+    final heart = _OuraRestCard(store: store, day: last?.day ?? today, now: now);
     final breath = _BreathCard(store: store, day: last?.day ?? today, now: now);
 
     final list = [
@@ -139,8 +146,15 @@ class _EmptyNightCard extends StatelessWidget {
 }
 
 class _OuraNightCard extends StatelessWidget {
-  const _OuraNightCard({required this.night, required this.now, this.reason, this.todayNight, this.range});
+  const _OuraNightCard(
+      {required this.night, required this.now, this.reason, this.todayNight, this.range, this.readiness, this.onHistory});
   final OuraNight night;
+
+  /// Ετοιμότητα του Oura για την ίδια μέρα (σχέδια 9/11: η «Ανάκαμψη» μοιράστηκε στον Ύπνο).
+  final double? readiness;
+
+  /// «Ύπνος 30 νυχτών ›».
+  final VoidCallback? onHistory;
 
   /// 7/11: το εύρος αναφοράς του ύπνου (≥ 7 ώρες για ενήλικες), αν ισχύει για την ηλικία.
   final RefRange? range;
@@ -198,26 +212,18 @@ class _OuraNightCard extends StatelessWidget {
                 style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontWeight: FontWeight.w600)),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: minutes == null
-                    ? Text('—', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: c.text))
-                    : DurationValue(minutes, size: 30),
-              ),
-              // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8).
-              if (night.sleepScore != null)
-                ScoreRing(
-                  value: night.sleepScore!.toDouble(),
-                  size: 64,
-                  stroke: 6,
-                  color: c.sleep,
-                  track: c.tint(c.sleep),
-                  textColor: c.text,
-                  caption: 'σκορ · εκτίμηση',
-                ),
-            ],
-          ),
+          minutes == null
+              ? Text('—', style: TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: c.text))
+              : DurationValue(minutes, size: 44),
+          // Σχέδια 9/11 (2α): δύο δαχτυλίδια δίπλα δίπλα, Βαθμολογία ύπνου και Ετοιμότητα για σήμερα (με μεγάλα
+          // γράμματα το ένα κάτω από το άλλο). Χωρίς τιμή: χωρίς άδειο δαχτυλίδι (έλεγχος UX U8).
+          if (night.sleepScore != null || readiness != null) ...[
+            const SizedBox(height: 14),
+            _RingTiles(tiles: [
+              if (night.sleepScore != null) (night.sleepScore!.toDouble(), 'Βαθμολογία', 'ύπνου', 'sleep-score'),
+              if (readiness != null) (readiness!, 'Ετοιμότητα', 'για σήμερα', 'sleep-readiness'),
+            ]),
+          ],
           if (minutes != null && range != null) ...[
             const SizedBox(height: 12),
             RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep),
@@ -226,7 +232,10 @@ class _OuraNightCard extends StatelessWidget {
           Row(children: [clock('Ξάπλωσες', parts.first.start), clock('Κοιμήθηκες', parts.first.onset), clock('Ξύπνησες', parts.last.end)]),
           if (n.stages.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Text('Πώς κύλησε η νύχτα · εκτίμηση του Oura', style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            Row(children: [
+              Expanded(child: Text('Φάσεις', style: TextStyle(color: c.text, fontSize: 15, fontWeight: FontWeight.w600))),
+              const LabelTag('εκτίμηση'),
+            ]),
             const SizedBox(height: 8),
             Hypnogram(night: n, height: 64),
             const SizedBox(height: 4),
@@ -254,81 +263,129 @@ class _OuraNightCard extends StatelessWidget {
             for (final x in night.others)
               InfoRow('Άλλος ύπνος ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
           ],
+          if (onHistory != null) ...[
+            const Hairline(vertical: 8),
+            InkWell(
+              key: const ValueKey('sleep-30-nights'),
+              onTap: onHistory,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(children: [
+                  Expanded(child: Text('Ύπνος 30 νυχτών', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.health))),
+                  Icon(Icons.chevron_right_rounded, color: c.health),
+                ]),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Παλμοί και HRV ύπνου, μόνο από το Oura, σε σύγκριση με τις δικές σου 14 τελευταίες νύχτες.
-class _OuraHeartCard extends StatelessWidget {
-  const _OuraHeartCard({required this.store, required this.day});
+/// Δαχτυλίδια βαθμολογίας σε απαλά πλακίδια: (τιμή, λέξη, δεύτερη λέξη, κλειδί).
+class _RingTiles extends StatelessWidget {
+  const _RingTiles({required this.tiles});
+  final List<(double, String, String, String)> tiles;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final big = MediaQuery.textScalerOf(context).scale(10) > 13.5;
+    Widget tile((double, String, String, String) t) => Container(
+          key: ValueKey(t.$4),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: c.tint(c.sleep), borderRadius: BorderRadius.circular(16)),
+          child: Row(children: [
+            ScoreRing(value: t.$1, size: 48, stroke: 5, color: c.sleep, track: c.tint(c.sleep), textColor: c.text),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t.$2, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.25)),
+                Text(t.$3, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, height: 1.25)),
+              ]),
+            ),
+          ]),
+        );
+    if (big || tiles.length == 1) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(height: 8), tile(tiles[i])],
+      ]);
+    }
+    return Row(children: [
+      for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(width: 10), Expanded(child: tile(tiles[i]))],
+    ]);
+  }
+}
+
+/// «Καρδιά και θερμοκρασία στον ύπνο» (σχέδια 9/11, 2α): HRV, παλμοί ύπνου, θερμοκρασία δέρματος, μόνο από το Oura,
+/// σε σύγκριση με τις δικές σου 14 τελευταίες νύχτες. Κάθε γραμμή ανοίγει τις 30 νύχτες, άρα δεν χάνεται τίποτα από
+/// την πρώην «Ανάκαμψη». Τίτλος: κλινικός έλεγχος M8 (4/11), όχι «ξεκούραση».
+class _OuraRestCard extends StatelessWidget {
+  const _OuraRestCard({required this.store, required this.day, required this.now});
   final HealthStore store;
   final DateTime day;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final plan = store.plan;
-    final low = plan.value(store.history, K.lowHr, day);
-    final avg = plan.value(store.history, K.sleepHr, day);
     final hrv = ouraBaseline(store.history, plan, K.hrv, day);
-    final series = planSeries(store.history, plan, K.hrv, DateTime(day.year, day.month, day.day - 29), day).points;
+    final hr = ouraBaseline(store.history, plan, K.sleepHr, day);
+    final temp = plan.value(store.history, K.skinTemp, day);
 
-    Widget value(String label, String v, String unit) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(color: c.textSecondary, fontSize: 12.5, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              BigValue(v, unit: unit, size: 22),
-            ],
+    // Ίδιος κανόνας «συνήθως» με τη Σήμερα και την Καρδιά (τρίτος έλεγχος F1): βέλος + διαφορά, «συνήθως» σε γκρι.
+    Widget? usual(NightBaseline? b) {
+      if (b == null) return null;
+      if (b.usual == null) return Text('μαθαίνει το συνηθισμένο σου', style: TextStyle(fontSize: 13, color: c.textSecondary));
+      final d = shownDiff(b.value, b.usual!);
+      return Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, children: [
+        if (d != 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(color: c.tint(c.textSecondary), borderRadius: BorderRadius.circular(8)),
+            child: Text('${d > 0 ? '↑' : '↓'} ${d.abs().round()}',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textSecondary, fontFeatures: tabular)),
+          ),
+        Text(d == 0 ? 'όπως συνήθως (${b.usual!.round()})' : 'συνήθως ${b.usual!.round()}',
+            style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular)),
+      ]);
+    }
+
+    Widget row(String metric, String label, String value, {Widget? sub, bool line = true}) => InkWell(
+          key: ValueKey('sleep-rest-$metric'),
+          onTap: () => Navigator.of(context).push(MetricPage.route(store, metric, now: now)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              // Ετικέτα και τιμή· αν δεν χωρούν, η τιμή πάει ολόκληρη στην επόμενη γραμμή (σχέδια 9/11, 9β).
+              Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, children: [
+                Text(label, style: TextStyle(fontSize: 15, color: c.text)),
+                Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
+              ]),
+              if (sub != null) ...[const SizedBox(height: 3), sub],
+            ]),
           ),
         );
 
     return AppCard(
+      key: const ValueKey('sleep-rest'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            Expanded(child: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά στον ύπνο', color: c.heart)),
+            Expanded(child: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά και θερμοκρασία στον ύπνο', color: c.heart)),
             const SourceTag(Source.oura),
             const InfoButton(K.hrv),
           ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            value('Χαμηλότεροι παλμοί', low == null ? '—' : '${low.round()}', 'bpm'),
-            value('Μέσοι παλμοί', avg == null ? '—' : '${avg.round()}', 'bpm'),
-            value('HRV (RMSSD)', hrv == null ? '—' : '${hrv.value.round()}', 'ms'),
-          ]),
-          if (hrv?.usual != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              // Ίδιος κανόνας και ίδια μορφή με τη Σήμερα και την Καρδιά (τρίτος έλεγχος F1).
-              'HRV: ${asUsual(hrv!.value, hrv.usual!) ? 'όπως συνήθως' : '${signedShown(shownDiff(hrv.value, hrv.usual!))} ms'} · '
-              'συνήθως ${hrv.usual!.round()} ms (οι ${hrv.count} προηγούμενες νύχτες σου)',
-              style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-            ),
-          ] else if (hrv != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Το συνηθισμένο σου βγαίνει μετά από $minNightsForBaseline νύχτες με το δαχτυλίδι.',
-              style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-            ),
-          ],
-          if (series.length >= 2) ...[
-            const SizedBox(height: 12),
-            LineChart(
-              points: series,
-              color: c.sleep,
-              format: (v) => v.round().toString(),
-              minRange: 10,
-              dateLabel: dayMonth,
-              levels: [
-                if (hrv?.usual != null) (series.first.$1, series.last.$1, hrv!.usual!, c.textSecondary),
-              ],
-            ),
-          ],
+          const SizedBox(height: 4),
+          row(K.hrv, 'HRV', hrv == null ? '—' : '${hrv.value.round()} ms', sub: usual(hrv)),
+          row(K.sleepHr, 'Παλμοί ύπνου', hr == null ? '—' : '${hr.value.round()} bpm', sub: usual(hr)),
+          row(K.skinTemp, 'Θερμοκρασία δέρματος', temp == null ? '—' : '${signedDec(temp)} °C',
+              sub: Text(ouraTempDeviationLabel, style: TextStyle(fontSize: 13, color: c.textSecondary)), line: false),
         ],
       ),
     );

@@ -658,12 +658,44 @@ void main() {
         size: open,
         brightness: Brightness.dark,
         tab: Cat.health,
-        sub: HealthTab.recovery,
+        sub: HealthTab.sleep,
         at: ouraNow,
         oura: true,
         act: (t) async {
-          await t.tap(find.byKey(const ValueKey('recovery-hrv')));
+          // Σχέδια 9/11: η «Ανάκαμψη» μοιράστηκε στον Ύπνο· η γραμμή HRV ανοίγει τις 30 νύχτες.
+          await t.ensureVisible(find.byKey(const ValueKey('sleep-rest-hrv')));
           await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('sleep-rest-hrv')));
+          await t.pumpAndSettle();
+        },
+      ));
+  // Σχέδια 9/11 (2α–2β): Υγεία › Ύπνος με το Oura, 4 καρτέλες σε μία σειρά στα 360 dp με 1,0× · 1,3× · 2,0×.
+  for (final (name, size, scale) in [
+    ('2a_health_sleep_oura', const Size(400, 2400), 1.0),
+    ('2b_health_tabs_360_1x', const Size(360, 2400), 1.0),
+    ('2c_health_tabs_360_13x', const Size(360, 2800), 1.3),
+    ('2d_health_tabs_360_2x', const Size(360, 3600), 2.0),
+    ('2e_health_sleep_fold', const Size(860, 1600), 1.0),
+  ]) {
+    testWidgets('Υγεία › Ύπνος · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.sleep, at: ouraNow, oura: true);
+    });
+  }
+  testWidgets('Υγεία › Ύπνος 30 νυχτών', (t) => _shot(
+        t,
+        name: '2f_sleep_30_nights',
+        size: phone,
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.sleep,
+        at: ouraNow,
+        oura: true,
+        act: (t) async {
+          await t.ensureVisible(find.byKey(const ValueKey('sleep-30-nights')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('sleep-30-nights')));
         },
       ));
   for (final (name, tab) in [('42_widget_config_content', 0), ('43_widget_config_look', 1)]) {

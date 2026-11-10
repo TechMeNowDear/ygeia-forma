@@ -5,11 +5,13 @@ import '../format.dart';
 import '../history.dart' show K;
 import '../oura/oura_view.dart' show atLeast, minNightsForAverage;
 import '../oxygen_note.dart';
+import '../reference.dart' show stagesInfoKey;
 import '../shown.dart';
 import '../trends.dart' show circularMeanMinutes, unwrapMinutes;
 import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'info_sheet.dart';
 import 'oura_sleep.dart';
 import 'oxygen_widgets.dart';
 
@@ -330,7 +332,11 @@ class _WatchStagesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(icon: Icons.layers_rounded, title: 'Στάδια · μέσος όρος 7 νυχτών', color: c.sleep),
+          Row(children: [
+            Expanded(child: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep)),
+            const LabelTag('εκτίμηση'),
+            const InfoButton(stagesInfoKey),
+          ]),
           const SizedBox(height: 12),
           if (!enough)
             Text(
@@ -339,17 +345,13 @@ class _WatchStagesCard extends StatelessWidget {
               style: TextStyle(color: c.textSecondary, fontSize: 14, height: 1.4),
             )
           else ...[
-            InfoRow(stageLabel('DEEP'), hoursMinutes(avg('DEEP')), dot: c.stage('DEEP')),
-            InfoRow(stageLabel('LIGHT'), hoursMinutes(avg('LIGHT')), dot: c.stage('LIGHT')),
-            InfoRow(stageLabel('REM'), hoursMinutes(avg('REM')), dot: c.stage('REM')),
-            InfoRow('Ξύπνιος τη νύχτα', atLeast(avg('AWAKE')), dot: c.stage('AWAKE')),
+            StackedBar(parts: [for (final k in ['DEEP', 'LIGHT', 'REM', 'AWAKE']) (avg(k).toDouble(), c.stage(k))]),
+            const SizedBox(height: 6),
+            InfoRow(stageLabel('DEEP'), hmList(avg('DEEP')), dot: c.stage('DEEP')),
+            InfoRow(stageLabel('LIGHT'), hmList(avg('LIGHT')), dot: c.stage('LIGHT')),
+            InfoRow(stageLabel('REM'), hmList(avg('REM')), dot: c.stage('REM')),
+            InfoRow('Ξύπνιος', '≥ ${hmList(avg('AWAKE'))}', dot: c.stage('AWAKE')),
           ],
-          const SizedBox(height: 8),
-          Text(
-            'Εκτίμηση της Samsung. Τα στάδια μίας νύχτας έχουν μεγάλο λάθος σε κάθε συσκευή. Γι\' αυτό βλέπεις τον μέσο όρο '
-            'της εβδομάδας. Τα ξυπνήματα συνήθως μετριούνται λιγότερα απ\' όσα είναι.',
-            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
-          ),
         ],
       ),
     );

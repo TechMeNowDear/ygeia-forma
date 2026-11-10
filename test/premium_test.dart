@@ -3,6 +3,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/food/food_model.dart';
@@ -11,6 +12,7 @@ import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
+import 'package:ygeia_forma/pages/category.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
@@ -234,5 +236,56 @@ void main() {
       expect(find.byKey(const ValueKey('today-training-summary')), findsOneWidget);
       expect(find.text('σύνολο κιλών'), findsOneWidget);
     });
+  });
+
+  group('Υγεία: 4 καρτέλες, πάντα μία σειρά (σχέδια 9/11, 2β)', () {
+    const tabs = ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'];
+    Future<void> pump(WidgetTester t, double scale, {int selected = 0}) => _pump(
+          t,
+          Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentTabs(tabs: tabs, selected: selected, solid: Aigaio.light.healthSolid, onTap: (_) {}),
+            ),
+          ),
+          size: const Size(360, 800),
+          textScale: scale,
+        );
+    Finder scroll() => find.descendant(of: find.byKey(const ValueKey('segment-tabs')), matching: find.byType(SingleChildScrollView));
+
+    testWidgets('360 dp, 1,0× και 1,3×: χωρούν σε μία σειρά, χωρίς κύλιση', (t) async {
+      for (final scale in [1.0, 1.3]) {
+        await pump(t, scale);
+        expect(t.takeException(), isNull);
+        expect(scroll(), findsNothing, reason: '$scale×');
+        final ys = {for (final l in tabs) t.getCenter(find.byKey(ValueKey('tab-$l'))).dy.round()};
+        expect(ys.length, 1, reason: 'μία σειρά στο $scale×');
+      }
+    });
+
+    testWidgets('360 dp, 2,0×: η ίδια σειρά κυλά, ποτέ δύο σειρές ή κομμένη λέξη', (t) async {
+      await pump(t, 2.0, selected: 3);
+      expect(t.takeException(), isNull);
+      expect(scroll(), findsOneWidget);
+      for (final l in tabs) {
+        final p = t.renderObject<RenderParagraph>(find.descendant(of: find.byKey(ValueKey('tab-$l')), matching: find.byType(RichText)));
+        expect(p.didExceedMaxLines, isFalse, reason: l);
+      }
+      // Η επιλεγμένη («Τάσεις») ορατή μέσα στη σειρά.
+      final box = t.getRect(find.byKey(const ValueKey('segment-tabs')));
+      final sel = t.getRect(find.byKey(const ValueKey('tab-Τάσεις')));
+      expect(sel.right, lessThanOrEqualTo(box.right + 0.5));
+      expect(sel.left, greaterThanOrEqualTo(box.left - 0.5));
+    });
+
+    test('η «Ανάκαμψη» δεν είναι πια καρτέλα', () {
+      expect([HealthTab.sleep, HealthTab.heart, HealthTab.body, HealthTab.trends], [0, 1, 2, 3]);
+    });
+  });
+
+  test('διάρκεια σε λίστα: «1 ω 23 λ», «7 ω 05 λ», «45 λ»', () {
+    expect(hmList(83), '1 ω 23 λ');
+    expect(hmList(425), '7 ω 05 λ');
+    expect(hmList(45), '45 λ');
   });
 }

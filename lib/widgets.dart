@@ -1589,3 +1589,55 @@ class NavRow extends StatelessWidget {
     );
   }
 }
+
+/// Ετικέτα αξιοπιστίας δίπλα στον τίτλο (σχέδια 9/11): «εκτίμηση», «ενδεικτικό», «μέτρηση». Η εξήγηση είναι στο ⓘ.
+class LabelTag extends StatelessWidget {
+  const LabelTag(this.text, {super.key, this.warn = false, this.strong = false});
+  final String text;
+
+  /// «ενδεικτικό»: κεχριμπάρι.
+  final bool warn;
+
+  /// «μέτρηση»: σκούρο περίγραμμα.
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final color = warn ? c.warn : (strong ? c.text : c.textSecondary);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      decoration: BoxDecoration(
+        color: warn ? c.warnBg : null,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: warn ? c.warnLine : (strong ? c.text : c.hairline), width: strong ? 1.5 : 1),
+      ),
+      child: Text(text, maxLines: 1, softWrap: false, style: TextStyle(fontSize: 13, height: 1.5, fontWeight: strong ? FontWeight.w700 : FontWeight.w500, color: color)),
+    );
+  }
+}
+
+/// Οριζόντια μπάρα με κομμάτια (φάσεις ύπνου, μακροθρεπτικά): μικρά κενά ανάμεσα, στρογγυλές άκρες.
+class StackedBar extends StatelessWidget {
+  const StackedBar({super.key, required this.parts, this.height = 12});
+  final List<(double, Color)> parts;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = [for (final p in parts) if (p.$1 > 0) p];
+    if (shown.isEmpty) return SizedBox(height: height);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(height / 2),
+      child: SizedBox(
+        height: height,
+        child: Row(children: [
+          for (var i = 0; i < shown.length; i++) ...[
+            if (i > 0) const SizedBox(width: 2),
+            Expanded(flex: (shown[i].$1 * 100).round().clamp(1, 1 << 30), child: ColoredBox(color: shown[i].$2)),
+          ],
+        ]),
+      ),
+    );
+  }
+}

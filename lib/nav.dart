@@ -7,14 +7,13 @@ class Cat {
 }
 
 /// Καρτέλες μέσα στην Υγεία.
+/// Σχέδια 9/11 (2β): 4 καρτέλες. Η «Ανάκαμψη» μοιράστηκε στον Ύπνο (δαχτυλίδι Ετοιμότητας και κάρτα «Καρδιά και
+/// θερμοκρασία στον ύπνο», κάθε γραμμή ανοίγει τις 30 νύχτες).
 class HealthTab {
   static const sleep = 0;
-
-  /// 7/11: Ετοιμότητα, HRV, θερμοκρασία (από το Oura).
-  static const recovery = 1;
-  static const heart = 2;
-  static const body = 3;
-  static const trends = 4;
+  static const heart = 1;
+  static const body = 2;
+  static const trends = 3;
 }
 
 /// Η Διατροφή (σχέδια 9/11): μία σελίδα, χωρίς υπο-καρτέλες· τα δικά μου ζουν στο «+ Φαγητό» και στο «Τα στοιχεία μου».

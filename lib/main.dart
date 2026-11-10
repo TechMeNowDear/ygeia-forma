@@ -16,7 +16,6 @@ import 'pages/heart.dart';
 import 'pages/metric_page.dart';
 import 'pages/move.dart';
 import 'pages/nutrition.dart';
-import 'pages/recovery.dart';
 import 'pages/settings.dart';
 import 'pages/sleep.dart';
 import 'pages/today.dart';
@@ -133,13 +132,13 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   late int _index = widget.initialIndex;
   late final FoodStore _food = FoodStore.shared = widget.food ?? FoodStore.preloaded(foods: const []);
-  late final _healthTab = ValueNotifier(widget.initialIndex == Cat.health ? widget.initialTab : 0);
+  late final _healthTab = ValueNotifier(widget.initialIndex == Cat.health && widget.initialTab < _healthTabs.length ? widget.initialTab : 0);
   late final _foodTab = ValueNotifier(0);
   late final _exerciseTab = ValueNotifier(widget.initialIndex == Cat.exercise ? widget.initialTab : 0);
 
   // Για την αναφορά σφαλμάτων: σε ποια κατηγορία και καρτέλα είμαι.
   static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
-  static const _healthTabs = ['Ύπνος', 'Ανάκαμψη', 'Καρδιά', 'Σώμα', 'Τάσεις'];
+  static const _healthTabs = ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'];
 
   /// Σχέδια 9/11 (10β): η Διατροφή είναι μία σελίδα, χωρίς υπο-καρτέλες. «Τα προϊόντα μου» φαίνονται στο «+ Φαγητό»
   /// (Δικά μου) και, μαζί με την κουζίνα, στο «Τα στοιχεία μου».
@@ -244,8 +243,7 @@ class _ShellState extends State<Shell> {
         tabs: _healthTabs,
         pages: [
           SleepPage(store: store, now: widget.now),
-          RecoveryPage(store: store, now: widget.now),
-          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.recovery),
+          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.sleep),
           BodyPage(store: store),
           TrendsPage(store: store, now: widget.now),
         ],
@@ -390,8 +388,12 @@ class _BottomBar extends StatelessWidget {
     final c = Aigaio.of(context);
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Container(
-        height: 68,
+      // Μεγάλα γράμματα (σχέδια 9/11): η μπάρα ψηλώνει όσο χρειάζεται (πριν: σταθερά 68 dp, ξεχείλιζε στο 1,3×)· τα
+      // ονόματα μεγαλώνουν ως 1,5×, για να χωρούν και τα τέσσερα σε μία γραμμή.
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.5,
+        child: Container(
+        constraints: const BoxConstraints(minHeight: 68),
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           color: c.nav,
@@ -413,6 +415,7 @@ class _BottomBar extends StatelessWidget {
           ],
         ),
       ),
+      )
     );
   }
 }
