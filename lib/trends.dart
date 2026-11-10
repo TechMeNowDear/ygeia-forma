@@ -283,10 +283,18 @@ const reportInconclusiveText = 'Δεν φτάνουν για σύγκριση';
 /// Περίοδος: πόσες μέρες, και πόσες μέρες πίσω αρχίζει η προηγούμενη για σύγκριση.
 enum TrendPeriod { month, quarter, year }
 
+/// Σχέδια 9/11: ένα λεξιλόγιο για τις περιόδους («30 μέρες», «3 μήνες», «1 χρόνος»).
 String periodLabel(TrendPeriod p) => switch (p) {
-      TrendPeriod.month => 'Μήνας',
+      TrendPeriod.month => '30 μέρες',
       TrendPeriod.quarter => '3 μήνες',
-      TrendPeriod.year => 'Χρόνος',
+      TrendPeriod.year => '1 χρόνος',
+    };
+
+/// Μέρες της περιόδου (για τον κοινό επιλογέα).
+int periodDays(TrendPeriod p) => switch (p) {
+      TrendPeriod.month => 30,
+      TrendPeriod.quarter => 90,
+      TrendPeriod.year => 365,
     };
 
 /// Πώς συγκρίνει κάθε περίοδος, σε απλά ελληνικά.

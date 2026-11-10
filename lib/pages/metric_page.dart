@@ -142,11 +142,6 @@ class MetricPage extends StatefulWidget {
 class _MetricPageState extends State<MetricPage> {
   late int _days = widget.spec.periods[1];
 
-  String _label(int d, bool first) {
-    if (d == 365) return '1 χρόνος';
-    return first ? '$d μέρες' : '$d';
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = widget.spec;
@@ -209,18 +204,14 @@ class _MetricPageState extends State<MetricPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SegmentedButton<int>(
+              PeriodPicker<int>(
                 key: const ValueKey('metric-period'),
-                showSelectedIcon: false,
-                segments: [
-                  for (final d in s.periods)
-                    ButtonSegment(
-                      value: d,
-                      label: Text(_label(d, d == s.periods.first), style: const TextStyle(fontFamily: 'Inter')),
-                    ),
-                ],
-                selected: {_days},
-                onSelectionChanged: (v) => setState(() => _days = v.first),
+                values: s.periods,
+                days: (d) => d,
+                selected: _days,
+                onChanged: (d) => setState(() => _days = d),
+                color: color,
+                keyOf: (d) => 'metric-period-$d',
               ),
               const SizedBox(height: 14),
               if (pts.length >= 2)

@@ -55,10 +55,14 @@ class _ProgressPageState extends State<ProgressPage> {
         final period = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Wrap(spacing: 8, children: [
-              Pill(key: const ValueKey('prog-month'), label: 'Μήνας', selected: _period == TrendPeriod.month, onTap: () => setState(() => _period = TrendPeriod.month)),
-              Pill(key: const ValueKey('prog-quarter'), label: '3 μήνες', selected: _period == TrendPeriod.quarter, onTap: () => setState(() => _period = TrendPeriod.quarter)),
-            ]),
+            PeriodPicker<TrendPeriod>(
+              values: const [TrendPeriod.month, TrendPeriod.quarter],
+              days: periodDays,
+              selected: _period,
+              onChanged: (p) => setState(() => _period = p),
+              color: c.exercise,
+              keyOf: (p) => p == TrendPeriod.month ? 'prog-month' : 'prog-quarter',
+            ),
             const SizedBox(height: 8),
             Text(_period == TrendPeriod.month ? 'Τελευταίες 30 μέρες σε σχέση με τις 30 πριν.' : 'Τελευταίοι 3 μήνες σε σχέση με τους 3 πριν.',
                 style: TextStyle(fontSize: 13.5, color: c.textSecondary)),

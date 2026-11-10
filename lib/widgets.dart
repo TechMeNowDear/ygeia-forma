@@ -1714,3 +1714,73 @@ class TitleRow extends StatelessWidget {
     return Row(children: [Expanded(child: header), ...trailing]);
   }
 }
+
+/// «7 μέρες», «30 μέρες», «3 μήνες», «1 χρόνος» (σχέδια 9/11: ένα λεξιλόγιο για κάθε επιλογέα περιόδου).
+(String, String) periodWords(int days) => switch (days) {
+      90 => ('3', 'μήνες'),
+      365 => ('1', 'χρόνος'),
+      _ => ('$days', 'μέρες'),
+    };
+
+/// Ο επιλογέας περιόδου της εφαρμογής (σχέδια 9/11, οδηγός): γκρι πλαίσιο, λευκή επιλογή με γράμματα στο χρώμα
+/// της ενότητας (για να μη μοιάζει με τις καρτέλες). Από 1,3× γράμματα: αριθμός πάνω, λέξη κάτω· ποτέ κομμένο.
+class PeriodPicker<T> extends StatelessWidget {
+  const PeriodPicker({super.key, required this.values, required this.days, required this.selected, required this.onChanged, required this.color, this.keyOf});
+  final List<T> values;
+  final int Function(T) days;
+  final T selected;
+  final ValueChanged<T> onChanged;
+
+  /// Χρώμα της ενότητας για την επιλογή.
+  final Color color;
+  final String Function(T)? keyOf;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final twoLines = MediaQuery.textScalerOf(context).scale(10) >= 12.5;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: c.dark ? c.background : c.hairline, borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        for (final v in values)
+          Expanded(
+            child: () {
+              final on = v == selected;
+              final (n, w) = periodWords(days(v));
+              final st = TextStyle(fontFamily: fontFamily, fontSize: 15, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? color : c.textSecondary);
+              return Semantics(
+                selected: on,
+                button: true,
+                child: Material(
+                  color: on ? c.card : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  elevation: on && !c.dark ? 1 : 0,
+                  shadowColor: const Color(0x220F172A),
+                  child: InkWell(
+                    key: keyOf == null ? null : ValueKey(keyOf!(v)),
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => onChanged(v),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          child: twoLines
+                              ? Column(mainAxisSize: MainAxisSize.min, children: [
+                                  Text(n, style: st.copyWith(height: 1.1)),
+                                  FittedBox(fit: BoxFit.scaleDown, child: Text(w, maxLines: 1, style: st.copyWith(height: 1.1))),
+                                ])
+                              : FittedBox(fit: BoxFit.scaleDown, child: Text('$n $w', maxLines: 1, style: st)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }(),
+          ),
+      ]),
+    );
+  }
+}

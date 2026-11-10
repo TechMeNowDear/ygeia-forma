@@ -18,6 +18,8 @@ import 'package:ygeia_forma/pages/category.dart';
 import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/info_sheet.dart';
 import 'package:ygeia_forma/history.dart' show K;
+import 'package:ygeia_forma/trends.dart' show TrendPeriod, periodLabel;
+import 'package:ygeia_forma/widgets.dart' show PeriodPicker;
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
@@ -365,6 +367,31 @@ void main() {
     testWidgets('360 dp με 2,0×: τίποτα δεν ξεχειλίζει', (t) async {
       await _pump(t, const DevicesPage(), size: const Size(360, 6000), textScale: 2.0);
       expect(t.takeException(), isNull);
+    });
+  });
+
+  group('Ένας επιλογέας περιόδου (σχέδια 9/11, οδηγός)', () {
+    Widget picker(int sel) => Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: PeriodPicker<int>(values: const [7, 30, 90, 365], days: (d) => d, selected: sel, onChanged: (_) {}, color: Aigaio.light.health),
+          ),
+        );
+
+    testWidgets('ένα λεξιλόγιο: «7 μέρες · 30 μέρες · 3 μήνες · 1 χρόνος»', (t) async {
+      await _pump(t, picker(30), size: const Size(400, 300));
+      for (final w in ['7 μέρες', '30 μέρες', '3 μήνες', '1 χρόνος']) {
+        expect(find.text(w), findsOneWidget);
+      }
+      expect(periodLabel(TrendPeriod.month), '30 μέρες');
+      expect(periodLabel(TrendPeriod.year), '1 χρόνος');
+    });
+
+    testWidgets('1,3× στα 360: αριθμός πάνω, λέξη κάτω, τίποτα κομμένο', (t) async {
+      await _pump(t, picker(30), size: const Size(360, 300), textScale: 1.3);
+      expect(t.takeException(), isNull);
+      expect(find.text('30'), findsOneWidget);
+      expect(find.text('χρόνος'), findsOneWidget);
     });
   });
 }
