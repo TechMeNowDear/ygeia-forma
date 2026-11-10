@@ -259,7 +259,7 @@ class _MePageState extends State<MePage> {
           icon: Icons.soup_kitchen_outlined,
           color: c.food,
           title: 'Η κουζίνα μου',
-          text: '${k.devices.length} συσκευές · ${k.cookware.length} σκεύη · για τις συνταγές, όταν έρθουν',
+          text: '${countText(k.devices.length, 'συσκευή', 'συσκευές')} · ${countText(k.cookware.length, 'σκεύος', 'σκεύη')} · για τις συνταγές, όταν έρθουν',
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
               settings: const RouteSettings(name: 'Η κουζίνα μου'), builder: (_) => KitchenScreen(store: widget.store))),
         ),

@@ -36,7 +36,7 @@ class WeekCard extends StatelessWidget {
         (
           Icons.timer_rounded,
           c.move,
-          r.activeDays == 7 ? 'Ενεργός χρόνος, σύνολο' : 'Ενεργός χρόνος, ${r.activeDays} μέρες',
+          r.activeDays == 7 ? 'Ενεργός χρόνος, σύνολο' : 'Ενεργός χρόνος, ${countText(r.activeDays, 'μέρα', 'μέρες')}',
           hoursMinutes(r.activeTotal!.round()),
         ),
       if (r.weightLast != null)

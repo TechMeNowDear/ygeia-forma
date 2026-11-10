@@ -341,7 +341,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             val lim = Repo.limitNow()
             // «Σήμερα» μόνο όταν το πρώτο κουμπί είναι η σημερινή· αλλιώς «Άλλη» (N5).
             val isToday = chosen == null || chosen == plan?.todayWorkout?.id
-            if (!Repo.updateNeeded) twoTone(c, if (isToday) "Σήμερα · " else "Άλλη · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
+            if (!Repo.updateNeeded) twoTone(c, if (isToday) "Σήμερα · " else "Άλλη προπόνηση · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
@@ -362,7 +362,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             }
             shown != null -> {
                 // Σχέδια 9/11 (7α): δύο ίσα κουμπιά ~48 dp και η άλλη προπόνηση τρίτη, χωρίς κρυφή χειρονομία.
-                homeButton(c, shown.name, "${shown.items.size} ασκήσεις · ${shown.minutes} λ", 44f, orange, Color.WHITE) {
+                homeButton(c, shown.name, "${countText(shown.items.size, "άσκηση", "ασκήσεις")} · ${shown.minutes} λ", 44f, orange, Color.WHITE) {
                     actions.startWorkout(shown.id)
                 }
                 homeButton(c, "Περπάτημα", null, 92f, button2, Color.WHITE) { actions.startWalk() }
@@ -627,12 +627,20 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     }
 
     /** Δύο χρώματα σε μία κεντραρισμένη γραμμή («Σήμερα · » γκρι + «όριο 140» χρώμα). */
-    private fun twoTone(c: Canvas, a: String, b: String, y: Float, colorB: Int, size: Float) {
-        text.textSize = size * u
-        text.typeface = Typeface.DEFAULT
-        val wa = text.measureText(a)
-        text.typeface = Typeface.DEFAULT_BOLD
-        val wb = text.measureText(b)
+    private fun twoTone(c: Canvas, a: String, b: String, y: Float, colorB: Int, size0: Float) {
+        // Μικραίνει ώσπου να χωρά στον κύκλο (π.χ. «Άλλη προπόνηση · όριο 140» με γράμματα 1,3×).
+        var size = size0
+        var wa: Float
+        var wb: Float
+        while (true) {
+            text.textSize = size * u
+            text.typeface = Typeface.DEFAULT
+            wa = text.measureText(a)
+            text.typeface = Typeface.DEFAULT_BOLD
+            wb = text.measureText(b)
+            if (wa + wb <= 136f * u || size <= 8f) break
+            size -= 0.5f
+        }
         val old = text.textAlign
         text.textAlign = Paint.Align.LEFT
         val x = cx - (wa + wb) / 2
@@ -745,3 +753,6 @@ internal fun nextStrength(ids: List<String>, shownId: String): String? {
     val i = ids.indexOf(shownId)
     return ids[(i + 1).mod(ids.size)].takeIf { it != shownId }
 }
+
+/** «1 άσκηση» / «4 ασκήσεις». */
+internal fun countText(n: Int, one: String, many: String): String = if (n == 1) "1 $one" else "$n $many"

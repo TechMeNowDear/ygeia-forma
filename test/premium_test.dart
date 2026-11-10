@@ -500,4 +500,28 @@ void main() {
       expect(find.textContaining('±10%'), findsNothing);
     });
   });
+
+  testWidgets('Επανέλεγχος: σωστός ενικός («1 συσκευή · 0 σκεύη», όχι «1 συσκευές»)', (t) async {
+    final store = HealthStore();
+    store.prefs.kitchen = {'devices': ['oven'], 'cookware': <Object>[]};
+    await _pump(t, MePage(store: store, food: sampleFoodStore(_now)));
+    expect(find.textContaining('1 συσκευή · 0 σκεύη'), findsOneWidget);
+    expect(find.textContaining('1 συσκευές'), findsNothing);
+  });
+
+  testWidgets('Επανέλεγχος: ο τίτλος κάρτας δεν κόβεται ποτέ με «…»', (t) async {
+    await _pump(
+        t,
+        Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 200,
+              child: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά και θερμοκρασία στον ύπνο, μια πολύ μεγάλη κεφαλίδα', color: Aigaio.light.heart),
+            ),
+          ),
+        ),
+        size: const Size(400, 600));
+    final p = t.renderObject<RenderParagraph>(find.textContaining('Καρδιά και θερμοκρασία'));
+    expect(p.didExceedMaxLines, isFalse);
+  });
 }

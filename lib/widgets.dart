@@ -389,18 +389,14 @@ class CardHeader extends StatelessWidget {
           child: subtitle == null
               ? Text(
                   title,
-                  maxLines: veryLargeText(context) ? 4 : 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                                    style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      maxLines: veryLargeText(context) ? 4 : 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                                            style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                     ),
                     Text(
                       subtitle!,

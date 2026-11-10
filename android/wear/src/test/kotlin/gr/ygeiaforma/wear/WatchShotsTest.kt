@@ -84,6 +84,9 @@ class WatchShotsTest {
         assertEquals("C", nextStrength(listOf("A", "B", "C"), "B"))
         assertEquals("A", nextStrength(listOf("A", "B", "C"), "C"))
         assertEquals(null, nextStrength(listOf("A"), "A"))
+        // Επανέλεγχος: «1 άσκηση», όχι «1 ασκήσεις».
+        assertEquals("1 άσκηση", countText(1, "άσκηση", "ασκήσεις"))
+        assertEquals("4 ασκήσεις", countText(4, "άσκηση", "ασκήσεις"))
         val three = planJson.replace(
             "{\"id\":\"walk\"",
             "{\"id\":\"C\",\"name\":\"Προπόνηση Γ\",\"minutes\":40,\"items\":[{\"ex\":\"goblet\",\"name\":\"Κάθισμα\",\"rest\":90,\"lo\":8,\"hi\":12,\"rir\":2,\"sets\":[{\"load\":12,\"label\":\"12 kg\",\"reps\":10}]}]},\n          {\"id\":\"walk\"",
