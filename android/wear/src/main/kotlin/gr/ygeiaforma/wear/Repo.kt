@@ -256,7 +256,11 @@ object Repo {
         prev != null && prev.restEnd == s.restEnd -> prev.restLen
         prev != null && prev.restEnd > now && prev.restLen > 0 && s.restEnd > prev.restEnd -> prev.restLen + (s.restEnd - prev.restEnd)
         prev != null && prev.restEnd > now && prev.restLen > 0 && s.restEnd > now && prev.restEnd - s.restEnd < 3_000 -> prev.restLen
-        else -> s.restEnd - now
+        else -> {
+            // Νέο διάλειμμα: από την ώρα του ✓ που το ξεκίνησε, αν το κινητό τη στέλνει (S3)· αλλιώς από τώρα.
+            val at = s.items.maxOfOrNull { it.sets.maxOfOrNull { x -> if (x.done) x.at else 0L } ?: 0L } ?: 0L
+            if (at in 1..now && s.restEnd - at in 1..15 * 60_000L) s.restEnd - at else s.restEnd - now
+        }
     }
 
     fun resetExercise() {
