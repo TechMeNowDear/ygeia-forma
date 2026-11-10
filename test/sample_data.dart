@@ -141,8 +141,8 @@ Map<String, dynamic> sampleDashboardJson(DateTime now) {
   return {
     'ok': true,
     'readAt': ms(now),
-    'granted': 17,
-    'total': 17,
+    'granted': 10,
+    'total': 10,
     'sleep': sleep,
     'heart': heart,
     'spo2': spo2,
