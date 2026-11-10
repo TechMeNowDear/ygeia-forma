@@ -566,8 +566,8 @@ void main() {
       'granted': 10,
       'total': 10,
       'heart': [
-        for (var t = at(9, 0); t.isBefore(at(12, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 70, 67, 73],
-        for (var t = at(18, 0); t.isBefore(at(19, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 120, 117, 123],
+        for (var t = at(8, 0); t.isBefore(at(16, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 70, 67, 73],
+        for (var t = at(18, 0); t.isBefore(at(19, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 130, 127, 133],
       ],
       'stepsMin': [for (var t = at(0, 0); t.isBefore(at(23, 0)); t = t.add(const Duration(minutes: 1))) [ms(t), 0]],
     });
