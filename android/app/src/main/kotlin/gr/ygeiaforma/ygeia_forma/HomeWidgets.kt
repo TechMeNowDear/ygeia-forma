@@ -209,6 +209,8 @@ object HomeWidgets {
         return c
     }
 
+    fun ensureMidnight(ctx: Context) = scheduleMidnight(ctx)
+
     /** Ένα ξυπνητήρι στα μεσάνυχτα, μόνο όσο υπάρχουν widgets (ανακριβές, χωρίς άδεια, χωρίς να ξυπνά τη συσκευή). */
     private fun scheduleMidnight(ctx: Context) {
         try {
@@ -321,6 +323,9 @@ object HomeWidgets {
         val m = move.optJSONObject("m") ?: JSONObject().also { move.put("m", it) }
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
+        // Έλεγχος 9/11 (D2-05a): ό,τι ήταν «χθες» στο στιγμιότυπο άλλης μέρας (π.χ. «Παλμοί χθες») δεν ξαναγράφεται εδώ·
+        // δεν μένει με τη σημερινή ημερομηνία.
+        if (move.optString("day", "") != today.toString()) m.remove("dayHr")
         fun dayOf(ms: Long) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
         fun perDay(key: String, sum: Boolean): Map<LocalDate, Double> {
             val out = HashMap<LocalDate, Double>()
@@ -371,6 +376,8 @@ object HomeWidgets {
 abstract class HomeWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         ErrorQueue.install(context)
+        // Έλεγχος 9/11 (D2-05b): το ξυπνητήρι των μεσανύχτων χάνεται στην επανεκκίνηση· μετά από αυτήν έρχεται onUpdate.
+        HomeWidgets.ensureMidnight(context)
         for (id in ids) {
             try {
                 HomeWidgets.update(context, manager, id)
@@ -393,7 +400,10 @@ abstract class HomeWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == HomeWidgets.ACTION_DAY) {
+        // Νέα μέρα, ή άλλαξε η ώρα / η ζώνη ώρας (D2-05b): ξανά όλα, με τον κανόνα «άλλη μέρα = —».
+        if (intent.action == HomeWidgets.ACTION_DAY || intent.action == Intent.ACTION_TIME_CHANGED ||
+            intent.action == Intent.ACTION_TIMEZONE_CHANGED
+        ) {
             HomeWidgets.updateAll(context)
             return
         }

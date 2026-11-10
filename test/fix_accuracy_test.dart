@@ -16,6 +16,11 @@ import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/set_hr.dart';
 import 'package:ygeia_forma/training/walk_stats.dart';
 import 'package:ygeia_forma/trends.dart';
+import 'package:ygeia_forma/home_widgets/widget_snapshot.dart';
+import 'package:ygeia_forma/home_widgets/widget_style.dart' show WKind;
+
+import 'sample_data.dart';
+import 'sample_food.dart';
 import 'package:ygeia_forma/main.dart' show unknownRoute;
 import 'package:ygeia_forma/pages/privacy_page.dart';
 import 'package:ygeia_forma/theme.dart';
@@ -175,10 +180,10 @@ void main() {
     test('η πλευρά Android: ίδιο με «Διαγραφή δεδομένων» του συστήματος, widgets χωρίς τιμές πριν', () {
       final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/DataWipe.kt').readAsStringSync();
       expect(kt, contains('clearApplicationUserData()'));
-      expect(kt.indexOf('HomeWidgets.wipe'), lessThan(kt.indexOf('clearApplicationUserData()')));
+      expect(kt.indexOf('HomeWidgets.wipe(activity)'), lessThan(kt.indexOf('?.clearApplicationUserData()')));
       final main = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/MainActivity.kt').readAsStringSync();
       expect(main, contains('"ygeia/privacy"'));
-      expect(kt.indexOf('"/ygeia/wipe"'), lessThan(kt.indexOf('clearApplicationUserData()')));
+      expect(kt.indexOf('withTimeoutOrNull(8_000) { watch() }'), lessThan(kt.indexOf('?.clearApplicationUserData()')));
       expect(kt, contains('FILTER_PREFIX'));
       final settings = File('lib/pages/settings.dart').readAsStringSync();
       expect(settings, contains('const PrivacyGroup()'));
@@ -387,7 +392,7 @@ void main() {
     expect(oxygenSourceText, 'Μέσος όρος από το Oura, χαμηλότερη τιμή από το ρολόι.');
     expect([for (final r in sourceRows) r.title], containsAll([oxygenAvgLabel, oxygenMinLabel]));
     final oura = File('lib/pages/oura_pages.dart').readAsStringSync();
-    expect(oura, isNot(contains('όχι οξυγόνο')));
+    expect(oura, isNot(contains("όχι βήματα, όχι οξυγόνο")));
     expect(oura, isNot(contains("'Οξυγόνο δαχτυλιδιού', 'Όχι · από το ρολόι'")));
     expect(File('lib/pages/oxygen_widgets.dart').readAsStringSync(), isNot(contains('developer.ouraring.com')));
     expect(metricInfos[K.ringSpo2]!.accuracy, contains('70–100%'));
@@ -412,5 +417,43 @@ void main() {
     final ex = File('assets/exercises/exercises.json').readAsStringSync();
     expect(ex, isNot(contains('Σε ίδια κούραση')));
     expect(ex, isNot(contains('ως κάτω και αργά')));
+  });
+
+  test('DATA-13: στάδιο που περνά το όριο δύο επικαλυπτόμενων κομματιών κόβεται, δεν χάνεται', () {
+    DateTime t(int h, int m) => DateTime(2026, 11, 1, h, m);
+    final a = SleepRecord(t(0, 0), t(3, 0), 180, null, [Stage('deep', t(0, 0), t(3, 0))]);
+    // Επικάλυψη 30′ (λιγότερο από το μισό του μικρότερου): μένει το κομμάτι μετά το 03:00.
+    final b = SleepRecord(t(2, 30), t(6, 0), 210, null, [Stage('light', t(2, 30), t(4, 0)), Stage('rem', t(4, 0), t(6, 0))]);
+    final out = dedupeSleep([a, b]);
+    expect(out, hasLength(2));
+    final st = out[1].stages;
+    expect(st.first.name, 'light');
+    expect(st.first.start, t(3, 0));
+    expect(st.first.end, t(4, 0));
+    expect(st.length, 2);
+  });
+
+  test('E3-21: η άδεια της Inter μπαίνει στο APK και στη σελίδα «Άδειες»· E3-20: αντιγραφή ως ευαίσθητο', () {
+    expect(File('pubspec.yaml').readAsStringSync(), contains('- assets/fonts/Inter-OFL.txt'));
+    expect(File('lib/main.dart').readAsStringSync(), contains('registerLicenses();'));
+    expect(File('lib/pages/settings.dart').readAsStringSync(), contains('openLicenses(context)'));
+    for (final f in ['lib/ti_ftanei.dart', 'lib/pages/training/training_page.dart', 'lib/pages/my_foods.dart']) {
+      final src = File(f).readAsStringSync();
+      expect(src, contains('copySensitive('), reason: f);
+      expect(src, isNot(contains('Clipboard.setData')), reason: f);
+    }
+    expect(File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/DataWipe.kt').readAsStringSync(), contains('EXTRA_IS_SENSITIVE'));
+  });
+
+  test('D2-05: widget «Κίνηση» με τη μέρα της ανάγνωσης· στο κινητό καθαρίζει το «χθες» άλλης μέρας', () {
+    final read = DateTime(2026, 11, 6, 23, 40);
+    final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(read));
+    store.history = sampleHistory(read, store.data!);
+    final snap = buildWidgetSnapshot(store, sampleFoodStore(read), DateTime(2026, 11, 7, 0, 5));
+    expect(((snap['kinds'] as Map)[WKind.move] as Map)['day'], '2026-11-06');
+    final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/HomeWidgets.kt').readAsStringSync();
+    expect(kt, contains('m.remove("dayHr")'));
+    expect(kt, contains('HomeWidgets.ensureMidnight(context)'));
+    expect(kt, contains('Intent.ACTION_TIMEZONE_CHANGED'));
   });
 }

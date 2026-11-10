@@ -7,6 +7,7 @@ import '../food/food_search.dart';
 import '../food/food_store.dart';
 import '../food/off.dart';
 import '../theme.dart';
+import 'privacy_page.dart' show copySensitive;
 import 'food_add.dart';
 
 /// «Τα προϊόντα μου»: περνάω προϊόντα στη βάση μου χωρίς να τα καταγράψω ως φαγητό
@@ -71,7 +72,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
         ..writeln('Μερίδα: ${f.servingGrams == null ? '—' : '${gramsText(f.servingGrams!)} ${f.unit}'}');
     }
     // Έλεγχος 9/11 (Μ5): χωρίς «Claude» στα κείμενα της εφαρμογής (έτοιμη για δημόσια κυκλοφορία).
-    await Clipboard.setData(ClipboardData(text: b.toString()));
+    await copySensitive(b.toString());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(all.length == 1

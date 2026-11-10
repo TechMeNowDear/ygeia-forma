@@ -136,7 +136,9 @@ Map<String, dynamic> _move(HealthStore store, DateTime today) {
   final dayHr = store.plan.value(store.history, K.dayHr, _minus(today, 1));
   if (dayHr != null) out['dayHr'] = _entry('Παλμοί χθες', '${dayHr.round()}', ' bpm');
   // 'day': η μέρα των τιμών· άλλη μέρα στο widget = «—» (έλεγχος 8/11, DATA-02, HomeWidgets.forToday).
-  return {'src': 'ρολόι · ${hm(d.readAt)}', 'at': d.readAt.millisecondsSinceEpoch, 'day': dateKey(today), 'm': out};
+  // Έλεγχος 9/11 (D2-05c): η μέρα της ΑΝΑΓΝΩΣΗΣ, όχι η σημερινή: τιμές χθεσινής ανάγνωσης (π.χ. άνοιγμα στις 00:05
+  // με παλιά μνήμη) δεν φαίνονται σαν σημερινές.
+  return {'src': 'ρολόι · ${hm(d.readAt)}', 'at': d.readAt.millisecondsSinceEpoch, 'day': dateKey(dayOf(d.readAt)), 'm': out};
 }
 
 /// Φαγητό: τα σύνολα της σημερινής μέρας, μόνο από τη βάση τροφίμων.

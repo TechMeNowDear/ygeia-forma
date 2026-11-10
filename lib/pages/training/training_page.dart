@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../exercise/ex_data.dart';
 import '../../format.dart';
 import '../../theme.dart';
+import '../privacy_page.dart' show copySensitive;
 import '../../data.dart' show HealthStore;
 import '../../training/equipment.dart';
 import '../../training/walk_stats.dart' show kmValue;
@@ -626,7 +627,7 @@ class _TrainingPageState extends State<TrainingPage> {
   void _openSession(BuildContext context) => Navigator.of(context).push(SessionPage.route(t));
 
   Future<void> _export(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: t.exportForClaude(names: exNames())));
+    await copySensitive(t.exportForClaude(names: exNames()));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Αντιγράφηκε. Επικόλλησέ το στη συζήτηση με τον Claude.')));
   }

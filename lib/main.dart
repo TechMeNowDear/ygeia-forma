@@ -5,6 +5,7 @@ import 'error_report.dart';
 import 'food/food_store.dart';
 import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
+import 'pages/privacy_page.dart' show registerLicenses;
 import 'pages/exercise_library.dart';
 import 'pages/training/training_page.dart';
 import 'heart_day.dart' show appExerciseRanges;
@@ -32,6 +33,7 @@ export 'nav.dart';
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   installErrorReporting();
+  registerLicenses();
   // Η οθόνη ρύθμισης widget (WidgetConfigActivity): μόνη της, χωρίς φόρτωση δεδομένων.
   if (binding.platformDispatcher.defaultRouteName.startsWith('/widget')) {
     runApp(const WidgetConfigApp());

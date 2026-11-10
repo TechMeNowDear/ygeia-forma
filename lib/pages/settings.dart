@@ -114,6 +114,14 @@ class SettingsPage extends StatelessWidget {
                               : '${d.granted} από ${d.total} · ανάγνωση ${relativeDay(d.readAt, DateTime.now())} ${hm(d.readAt)}',
                           onTap: () => store.refresh(askPermissions: true),
                         ),
+                        SettingsRow(
+                          key: const ValueKey('settings-licenses'),
+                          icon: Icons.description_outlined,
+                          color: c.textSecondary,
+                          title: 'Άδειες λογισμικού',
+                          subtitle: 'Γραμματοσειρά Inter, βιβλιοθήκες',
+                          onTap: () => openLicenses(context),
+                        ),
                       ]),
                       const SizedBox(height: 20),
                       Text(

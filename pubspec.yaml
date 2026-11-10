@@ -21,6 +21,8 @@ flutter:
   assets:
     - assets/foods/basic_foods.json
     - assets/exercises/exercises.json
+    # Η άδεια της γραμματοσειράς (SIL OFL 1.1 θέλει να συνοδεύει τη γραμματοσειρά· έλεγχος 9/11, E3-21).
+    - assets/fonts/Inter-OFL.txt
 
   fonts:
     - family: Inter

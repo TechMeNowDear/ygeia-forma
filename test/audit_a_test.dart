@@ -81,10 +81,11 @@ void main() {
       expect(summarizeDay(d, day)[K.weight], 82.4);
     });
 
-    test('Δύο ζυγίσεις InBody την ίδια μέρα: η τελευταία ολόκληρη, ποτέ πεδία από δύο ζυγίσεις', () {
+    // Σκόπιμη αλλαγή (έλεγχος 9/11, RT-15 / V-A-29): μετρά η ΠΡΩΤΗ ζύγιση της μέρας (πρωινή), όχι η τελευταία.
+    test('Δύο ζυγίσεις InBody την ίδια μέρα: η πρώτη ολόκληρη, ποτέ πεδία από δύο ζυγίσεις', () {
       final d = Dashboard.fromJson(withBody([
-        {'time': ms(day.add(const Duration(hours: 7))), 'weight': 82.4, 'fatPct': 21.3, 'smm': 36.1, 'app': inbodyApp},
-        {'time': ms(day.add(const Duration(hours: 20))), 'weight': 83.0, 'app': inbodyApp},
+        {'time': ms(day.add(const Duration(hours: 7))), 'weight': 83.0, 'app': inbodyApp},
+        {'time': ms(day.add(const Duration(hours: 20))), 'weight': 82.4, 'fatPct': 21.3, 'smm': 36.1, 'app': inbodyApp},
       ]));
       final h = <String, Map<String, double>>{
         dateKey(day): {K.weight: 80, K.fatPct: 20, K.smm: 30, K.steps: 9000},
@@ -249,7 +250,7 @@ void main() {
     });
   });
 
-  // Η πραγματική νύχτα Δευ 2 → Τρ 3/11 όπως τη δείχνει η Samsung Health (στοιχεία του χρήστη, 4/11):
+  // Νύχτα-δείγμα Δευ 2 → Τρ 3/11, στη μορφή της Samsung Health:
   // - «υπνάκος» 23:43–02:40: χρόνος ύπνου 2ω57, πραγματικός ύπνος 2ω32,
   // - κύρια 03:50–07:08: χρόνος ύπνου 3ω18, πραγματικός ύπνος 2ω57, βαθύς 0,
   // - σύνολο μέρας: χρόνος ύπνου 6ω15, πραγματικός 5ω29. Κενό 02:40–03:50 (70 λεπτά ξύπνιος).

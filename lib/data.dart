@@ -168,7 +168,15 @@ List<SleepRecord> dedupeSleep(List<SleepRecord> records) {
       r.end,
       math.max(0, r.minutes - overlap.inMinutes),
       r.score,
-      [for (final s in r.stages) if (!s.start.isBefore(k.end)) s],
+      // Έλεγχος 9/11 (DATA-13): στάδιο που ξεκινά πριν από το τέλος του προηγούμενου κομματιού κόβεται εκεί, δεν
+      // πετιέται ολόκληρο (πριν χανόταν και το κομμάτι του μετά την επικάλυψη).
+      [
+        for (final s in r.stages)
+          if (!s.start.isBefore(k.end))
+            s
+          else if (s.end.isAfter(k.end))
+            Stage(s.name, k.end, s.end),
+      ],
     ));
   }
   return out;

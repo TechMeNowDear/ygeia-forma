@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -50,6 +51,29 @@ Future<bool> wipeAllData(HealthStore? store) async {
     return false;
   }
 }
+
+/// Αντιγραφή με σήμανση «ευαίσθητο» (έλεγχος 9/11, E3-20): το Android 13+ δεν δείχνει το κείμενο στην προεπισκόπηση
+/// και πληκτρολόγια σαν το Samsung Keyboard δεν το κρατούν στο ιστορικό προχείρου. Αν δεν γίνει, κανονική αντιγραφή.
+Future<void> copySensitive(String text) async {
+  try {
+    if (await _privacy.invokeMethod<bool>('copy', text) == true) return;
+  } catch (_) {}
+  await Clipboard.setData(ClipboardData(text: text));
+}
+
+/// Άδειες λογισμικού (έλεγχος 9/11, E3-21): η Flutter δείχνει μόνες τους τις άδειες των πακέτων Dart· εδώ μπαίνουν
+/// η γραμματοσειρά Inter (SIL OFL 1.1, το κείμενό της ταξιδεύει στο APK) και οι βιβλιοθήκες Android (Apache 2.0).
+void registerLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(['Inter (γραμματοσειρά)'], await rootBundle.loadString('assets/fonts/Inter-OFL.txt'));
+    yield const LicenseEntryWithLineBreaks(
+      ['AndroidX', 'Kotlin coroutines', 'Gson', 'Health Services', 'Wear Ongoing'],
+      'Apache License, Version 2.0. https://www.apache.org/licenses/LICENSE-2.0',
+    );
+  });
+}
+
+void openLicenses(BuildContext context) => showLicensePage(context: context, applicationName: 'Υγεία & Φόρμα');
 
 Future<void> openPrivacyPolicy() async {
   try {

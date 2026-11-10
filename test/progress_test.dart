@@ -221,6 +221,9 @@ void main() {
       t.sessions.addAll([...twoMonths(hrBefore: 112, hrNow: 105), lift(40, [ex('db_press', 9.3, [8, 8, 7])]), lift(3, [ex('db_press', 11.3, [10, 9, 9])])]);
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: ProgressPage(training: t, now: now)));
       await tester.pumpAndSettle();
+      // Από προεπιλογή 3 μήνες (έλεγχος 9/11, V-B-10)· τα δεδομένα εδώ είναι για τον μήνα.
+      await tester.tap(find.byKey(const ValueKey('prog-month')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('prog-summary')), findsOneWidget);
       expect(find.textContaining('έπεσαν 8'), findsOneWidget);
       expect(find.byKey(const ValueKey('prog-walk-hr')), findsOneWidget);

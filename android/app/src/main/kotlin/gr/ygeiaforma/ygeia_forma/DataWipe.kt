@@ -2,6 +2,11 @@ package gr.ygeiaforma.ygeia_forma
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.os.Build
+import android.os.PersistableBundle
 import android.content.Intent
 import android.net.Uri
 import androidx.work.WorkManager
@@ -47,6 +52,19 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
                 // Με επιτυχία η εφαρμογή κλείνει από το σύστημα· η απάντηση ίσως δεν φτάσει ποτέ.
                 result.success(ok)
             }
+            // E3-20: αντιγραφή με σήμανση ευαίσθητου (υγεία/φαγητό).
+            "copy" -> result.success(
+                try {
+                    val text = call.arguments as? String ?: ""
+                    val clip = ClipData.newPlainText("Υγεία & Φόρμα", text)
+                    clip.description.extras = PersistableBundle().apply {
+                        putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
+                    }
+                    activity.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip) != null
+                } catch (_: Throwable) {
+                    false
+                },
+            )
             "openPolicy" -> result.success(
                 try {
                     activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(POLICY)).addCategory(Intent.CATEGORY_BROWSABLE))

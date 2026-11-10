@@ -69,7 +69,10 @@ WIDGETS = "\n        <!-- Widgets αρχικής οθόνης (7/11). Η ρύθ�
     f'            android:label="{label}">\n'
     "            <intent-filter>\n"
     '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
-    "            </intent-filter>\n"
+    # Έλεγχος 9/11 (D2-05): αλλαγή ώρας ή ζώνης → ξαναζωγράφισμα (εξαιρούνται από τα όρια των σιωπηρών broadcasts).
+    + ('                <action android:name="android.intent.action.TIME_SET"/>\n'
+       '                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>\n' if cls == "MoveWidget" else "")
+    + "            </intent-filter>\n"
     f'            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_{res}"/>\n'
     "        </receiver>"
     for cls, label, res in (("SleepWidget", "Ύπνος", "sleep"), ("MoveWidget", "Κίνηση", "move"),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'pages/privacy_page.dart' show copySensitive;
+
 import 'format.dart' show thousands;
 import 'labels.dart';
 import 'samsung.dart';
@@ -77,7 +79,7 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
   }
 
   Future<void> _copyReport() async {
-    await Clipboard.setData(ClipboardData(text: _buildReport()));
+    await copySensitive(_buildReport());
     if (!mounted) return;
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
