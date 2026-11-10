@@ -236,24 +236,49 @@ object HomeWidgets {
         val style = style(ctx, id)
         val data = forToday(kindData(ctx, kind))
         val list = sizes(mgr.getAppWidgetOptions(id))
-        val views = if (Build.VERSION.SDK_INT >= 31 && list.size > 1) {
-            RemoteViews(list.associateWith { views(ctx, id, kind, style, data, it) })
-        } else {
-            views(ctx, id, kind, style, data, list.first())
+        val multi = Build.VERSION.SDK_INT >= 31 && list.size > 1
+        // Android 17 (targetSdk 37): όριο για ΟΛΕΣ τις εικόνες μαζί (WidgetBudget). Μετράμε 2 εικόνες ανά μέγεθος
+        // (ημέρας, νύχτας). Αν το Android απαντήσει «όχι», ξανά με μικρότερες εικόνες· ποτέ κενό widget χωρίς λόγο.
+        val dm = ctx.resources.displayMetrics
+        val budget = WidgetBudget.systemBudget(dm.widthPixels, dm.heightPixels)
+        val images = 2 * (if (multi) list.size else 1)
+        var last: Throwable? = null
+        for (share in WidgetBudget.SHARES) {
+            val cap = WidgetBudget.imageCap(budget, images, share)
+            val views = if (multi) {
+                RemoteViews(list.associateWith { views(ctx, id, kind, style, data, it, cap) })
+            } else {
+                views(ctx, id, kind, style, data, list.first(), cap)
+            }
+            try {
+                mgr.updateAppWidget(id, views)
+                return
+            } catch (e: IllegalArgumentException) {
+                if (!WidgetBudget.isBitmapLimit(e)) throw e
+                last = e
+            }
         }
-        mgr.updateAppWidget(id, views)
+        throw last ?: IllegalStateException("widget")
     }
 
-    private fun views(ctx: Context, id: Int, kind: String, style: JSONObject?, data: JSONObject?, size: SizeF): RemoteViews {
+    private fun views(
+        ctx: Context,
+        id: Int,
+        kind: String,
+        style: JSONObject?,
+        data: JSONObject?,
+        size: SizeF,
+        cap: Long,
+    ): RemoteViews {
         val v = RemoteViews(ctx.packageName, R.layout.home_widget)
         val shape = WidgetRenderer.shapeOf(size.width, size.height)
         // Δύο εικόνες: ημέρας και νύχτας. Η αρχική οθόνη δείχνει τη σωστή (layout και layout-night) όταν αλλάζει το θέμα
         // του κινητού, χωρίς να ξυπνήσει η εφαρμογή. Ίδιο bitmap όταν το θέμα δεν εξαρτάται από τη νύχτα.
         val wallpaper = style?.optString("theme") == "wallpaper"
         val auto = style == null || !style.has("text")
-        val day = WidgetRenderer.render(ctx, kind, style, data ?: emptyData(), size.width, size.height, dark = false)
+        val day = WidgetRenderer.render(ctx, kind, style, data ?: emptyData(), size.width, size.height, dark = false, capBytes = cap)
         val night = if (wallpaper || auto) {
-            WidgetRenderer.render(ctx, kind, style, data ?: emptyData(), size.width, size.height, dark = true)
+            WidgetRenderer.render(ctx, kind, style, data ?: emptyData(), size.width, size.height, dark = true, capBytes = cap)
         } else {
             day
         }

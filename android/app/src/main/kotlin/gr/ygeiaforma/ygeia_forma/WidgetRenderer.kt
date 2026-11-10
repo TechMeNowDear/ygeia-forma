@@ -18,7 +18,6 @@ import org.json.JSONObject
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /**
  * Ο ΕΝΑΣ ζωγράφος των widgets (απόφαση 7/11): ίδια εικόνα στην αρχική οθόνη και στην προεπισκόπηση της ρύθμισης.
@@ -105,14 +104,19 @@ object WidgetRenderer {
      * [kindData]: το είδος από το στιγμιότυπο ({src, m, bar}). [dark]: το θέμα του κινητού (για την «Ταπετσαρία» και
      * για τα αυτόματα χρώματα γραμμάτων με διαφανές φόντο).
      */
-    fun render(ctx: Context, kind: String, style: JSONObject?, kindData: JSONObject?, wDp: Float, hDp: Float, dark: Boolean): Bitmap {
-        val metrics = ctx.resources.displayMetrics
-        var d = metrics.density
-        // Όριο μνήμης: έως ~3 MB ανά εικόνα (το Android κόβει μεγάλα bitmaps στα widgets).
-        val bytes = wDp * d * hDp * d * 4
-        if (bytes > 3_000_000f) d *= sqrt(3_000_000f / bytes)
-        val wPx = max(1, (wDp * d).roundToInt())
-        val hPx = max(1, (hDp * d).roundToInt())
+    fun render(
+        ctx: Context,
+        kind: String,
+        style: JSONObject?,
+        kindData: JSONObject?,
+        wDp: Float,
+        hDp: Float,
+        dark: Boolean,
+        capBytes: Long = WidgetBudget.MAX_IMAGE_BYTES,
+    ): Bitmap {
+        // Όριο μνήμης ανά εικόνα (Android 17: όλες οι εικόνες ενός widget μαζί έχουν όριο· βλ. WidgetBudget).
+        val d = WidgetBudget.density(wDp, hDp, ctx.resources.displayMetrics.density, capBytes)
+        val (wPx, hPx) = WidgetBudget.pixels(wDp, hDp, d)
         val bmp = Bitmap.createBitmap(wPx, hPx, Bitmap.Config.ARGB_8888)
         val cv = Canvas(bmp)
         Painter(ctx, cv, kind, style, kindData, wPx.toFloat(), hPx.toFloat(), d, shapeOf(wDp, hDp), dark).draw()
