@@ -93,9 +93,11 @@ bool veryLargeText(BuildContext context) => MediaQuery.textScalerOf(context).sca
 /// Χωράει κάθε λέξη των [texts] σε πλάτος [width]; (αλλιώς μια στενή στήλη θα έσπαγε λέξη στη μέση).
 bool wordsFit(BuildContext context, Iterable<String> texts, TextStyle style, double width) {
   final scaler = MediaQuery.textScalerOf(context);
+  // Με τη γραμματοσειρά της εφαρμογής (Inter), όπως θα ζωγραφιστεί.
+  final base = DefaultTextStyle.of(context).style;
   for (final t in texts) {
     for (final w in t.split(' ')) {
-      final tp = TextPainter(text: TextSpan(text: w, style: style), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
+      final tp = TextPainter(text: TextSpan(text: w, style: base.merge(style)), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
         ..layout();
       final over = tp.width > width;
       tp.dispose();
@@ -640,33 +642,44 @@ class InfoRow extends StatelessWidget {
     final dotW = dot == null
         ? null
         : Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 10), decoration: BoxDecoration(color: dot, shape: BoxShape.circle));
-    // Πολύ μεγάλα γράμματα: αν ετικέτα και τιμή δεν χωρούν, η τιμή πάει ολόκληρη στην από κάτω γραμμή (σχέδια 9/11).
-    if (veryLargeText(context)) {
+    // Σχέδια 9/11 (9β): αν μια λέξη της ετικέτας δεν χωρά δίπλα στην τιμή, η τιμή πάει ολόκληρη στην από κάτω
+    // γραμμή, δεξιά· ποτέ σπασμένη λέξη («Σκελετικο/ί») ή σπασμένος αριθμός.
+    final labelStyle = TextStyle(color: c.textSecondary, fontSize: 15);
+    return LayoutBuilder(builder: (context, box) {
+      final scaler = MediaQuery.textScalerOf(context);
+      final tp = TextPainter(
+          text: TextSpan(text: value, style: DefaultTextStyle.of(context).style.merge(valueText.style)),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: 1)
+        ..layout();
+      final valueW = tp.width;
+      tp.dispose();
+      final room = box.maxWidth - valueW - 12 - (dotW == null ? 0 : 18);
+      if (box.maxWidth.isFinite && !wordsFit(context, [label], labelStyle, room)) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              if (dotW != null) dotW,
+              Expanded(child: Text(label, style: labelStyle)),
+            ]),
+            Align(alignment: Alignment.centerRight, child: valueText),
+          ]),
+        );
+      }
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
-        child: SizedBox(
-          width: double.infinity,
-          child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              if (dotW != null) dotW,
-              Flexible(child: Text(label, style: TextStyle(color: c.textSecondary, fontSize: 15))),
-            ]),
+        child: Row(
+          children: [
+            if (dotW != null) dotW,
+            Expanded(child: Text(label, style: labelStyle)),
+            const SizedBox(width: 12),
             valueText,
-          ]),
+          ],
         ),
       );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          if (dotW != null) dotW,
-          Expanded(child: Text(label, style: TextStyle(color: c.textSecondary, fontSize: 15))),
-          const SizedBox(width: 12),
-          valueText,
-        ],
-      ),
-    );
+    });
   }
 }
 

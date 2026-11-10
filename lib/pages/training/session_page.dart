@@ -214,7 +214,8 @@ class _SessionPageState extends State<SessionPage> {
               }
               return Column(children: [
                 _hr(const EdgeInsets.fromLTRB(16, 8, 16, 0)),
-                SizedBox(height: 54, child: _list(context, s, vertical: false)),
+                // Με μεγάλα γράμματα η λωρίδα των ασκήσεων ψηλώνει (πριν: σταθερά 54 dp, κομμένα γράμματα).
+                SizedBox(height: MediaQuery.textScalerOf(context).scale(54).clamp(54.0, 96.0), child: _list(context, s, vertical: false)),
                 Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: [card])),
                 if (rest != null) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 8), child: rest),
                 Container(
@@ -420,6 +421,7 @@ class _SessionPageState extends State<SessionPage> {
             TextButton(onPressed: () => t.skip(e, false), child: const Text('Αναίρεση')),
           ])
         else ...[
+          if (!veryLargeText(context))
           Row(children: [
             SizedBox(width: 30, child: Text('Σετ', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600))),
             if (hasLoad(k)) Expanded(child: Text(usesKg(k) ? 'Κιλά' : (isBand(k) ? 'Λάστιχο' : 'Βάρος'), style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600))),
@@ -538,6 +540,23 @@ class _SessionPageState extends State<SessionPage> {
               ),
             ],
           ),
+        ]),
+      );
+    }
+    if (veryLargeText(context)) {
+      // Πολύ μεγάλα γράμματα: μία πρόταση ανά σετ («Σετ 1 · ● 30 lb × 14»), όχι στήλες με σπασμένες λέξεις.
+      return Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Row(children: [
+          Expanded(
+            child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, children: [
+              Text('Σετ ${i + 1}', style: numStyle.copyWith(fontWeight: FontWeight.w600)),
+              if (hasLoad(k)) loadCell(numStyle),
+              Text('× ${set.reps}', style: numStyle),
+            ]),
+          ),
+          tick(),
         ]),
       );
     }
@@ -756,7 +775,7 @@ class _SessionPageState extends State<SessionPage> {
           key: const ValueKey('sess-skip'),
           style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), padding: pad, foregroundColor: c.text),
           onPressed: e.done.isNotEmpty ? null : () => t.skip(e, !e.skipped),
-          child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false),
+          child: FittedBox(fit: BoxFit.scaleDown, child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false)),
         ),
       ),
       const SizedBox(width: 8),
@@ -766,8 +785,11 @@ class _SessionPageState extends State<SessionPage> {
           key: const ValueKey('sess-next'),
           style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52), padding: pad),
           onPressed: last ? (s.isFree ? () => _addExercise(context) : () => _finish(context)) : () => setState(() => _idx++),
-          child: Text(last ? (s.isFree ? 'Νέα άσκηση' : 'Τέλος προπόνησης') : 'Επόμενη άσκηση',
-              maxLines: 1, softWrap: false, style: const TextStyle(fontWeight: FontWeight.w700)),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(last ? (s.isFree ? 'Νέα άσκηση' : 'Τέλος προπόνησης') : 'Επόμενη άσκηση',
+                maxLines: 1, softWrap: false, style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
         ),
       ),
     ]);

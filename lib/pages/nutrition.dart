@@ -231,15 +231,21 @@ class MacroBreakdown extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              Text.rich(
-                TextSpan(children: [
-                  TextSpan(
-                    text: gramsText(g),
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.6, color: c.text),
-                  ),
-                  TextSpan(text: ' g', style: TextStyle(fontSize: 14, color: c.textSecondary)),
-                ]),
-                style: const TextStyle(fontFeatures: tabular),
+              // Ο αριθμός και το «g» πάντα μαζί· μικραίνουν αντί να σπάνε (σχέδια 9/11).
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                      text: gramsText(g),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.6, color: c.text),
+                    ),
+                    TextSpan(text: ' g', style: TextStyle(fontSize: 14, color: c.textSecondary)),
+                  ]),
+                  maxLines: 1,
+                  style: const TextStyle(fontFeatures: tabular),
+                ),
               ),
               if (percent)
                 Text(
@@ -276,6 +282,17 @@ class MacroBreakdown extends StatelessWidget {
                 ),
         ),
         const SizedBox(height: 14),
+        // Πολύ μεγάλα γράμματα: μία γραμμή ανά μακροθρεπτικό («● Πρωτεΐνη …… 68 g»).
+        if (veryLargeText(context))
+          Column(children: [
+            for (final (label, g, part, color) in [
+              ('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
+              ('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
+              ('Λιπαρά', t.fat, fk, fatColor(c)),
+            ])
+              InfoRow(label, '${gramsText(g)} g${percent && sum > 0 ? ' · ${(100 * part / sum).round()}%' : ''}', dot: color),
+          ])
+        else
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

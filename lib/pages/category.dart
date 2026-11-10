@@ -116,7 +116,11 @@ class _SegmentTabsState extends State<SegmentTabs> {
     return LayoutBuilder(builder: (context, box) {
       final widths = <double>[];
       for (final t in widget.tabs) {
-        final tp = TextPainter(text: TextSpan(text: t, style: _style(true, c)), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
+        final tp = TextPainter(
+            text: TextSpan(text: t, style: DefaultTextStyle.of(context).style.merge(_style(true, c))),
+            textDirection: TextDirection.ltr,
+            textScaler: scaler,
+            maxLines: 1)
           ..layout();
         widths.add(tp.width + 2 * SegmentTabs.pad);
         tp.dispose();
