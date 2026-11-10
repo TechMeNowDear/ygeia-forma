@@ -88,9 +88,10 @@ class BandDots extends StatelessWidget {
 /// «Πράσινο λάστιχο · 30 lb», «Πράσινο + κίτρινο λάστιχο · 40 lb».
 String bandName(double lb) {
   final names = bandCombos()[lb.round()];
-  if (names == null || names.isEmpty) return '${lb.round()} lb';
+  // Αδιάσπαστο κενό: «30 lb» ποτέ σε δύο γραμμές.
+  if (names == null || names.isEmpty) return '${lb.round()}\u00A0lb';
   final t = names.map((n) => bandNames[n]).join(' + ');
-  return '${t[0].toUpperCase()}${t.substring(1)} λάστιχο · ${lb.round()} lb';
+  return '${t[0].toUpperCase()}${t.substring(1)} λάστιχο · ${lb.round()}\u00A0lb';
 }
 
 class Stepper2 extends StatelessWidget {
