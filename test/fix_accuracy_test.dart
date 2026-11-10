@@ -424,12 +424,14 @@ void main() {
   });
 
   // ------------------------------------------------------------ E3-23 / E3-22
-  test('targetSdk 36 ρητά (και στο ρολόι)· το σχόλιο της υπογραφής λέει την αλήθεια', () {
+  test('targetSdk 37 ρητά (και στο ρολόι)· το σχόλιο της υπογραφής λέει την αλήθεια', () {
     final g = File('android/ygeia/app-extra.gradle.kts').readAsStringSync();
-    expect(g, contains('targetSdk = 36'));
-    expect(g, contains('compileSdk = 36'));
+    expect(g, contains('targetSdk = 37'));
+    expect(g, contains('compileSdk = 37'));
     expect(g, isNot(contains('προσωρινή μνήμη')));
-    expect(File('android/wear/build.gradle.kts').readAsStringSync(), contains('targetSdk = 36'));
+    final wear = File('android/wear/build.gradle.kts').readAsStringSync();
+    expect(wear, contains('targetSdk = 37'));
+    expect(wear, contains('compileSdk = 37'));
   });
 
   // ------------------------------------------------------------ V-B-11 / 03-M2α / 08-N-03 / 03-Χ3: σταθερό βάδισμα

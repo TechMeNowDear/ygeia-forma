@@ -12,13 +12,14 @@ val ygeiaBuild = (System.getenv("YGEIA_BUILD") ?: "1").toInt()
 
 android {
     namespace = "gr.ygeiaforma.wear"
-    compileSdk = 36
+    // 37 = Android 17 (Wear OS 7, το Galaxy Watch Ultra 2 του χρήστη· σημείωση fix-sdk37).
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "gr.ygeiaforma.ygeia_forma"
         // Wear OS 3 και πάνω (Health Services).
         minSdk = 30
-        targetSdk = 36
+        targetSdk = 37
         // Χωριστή αρίθμηση από το κινητό (το Play Console θέλει μοναδικό αριθμό σε κάθε αρχείο).
         versionCode = 1_000_000 + ygeiaBuild
         versionName = "0.1.$ygeiaBuild"

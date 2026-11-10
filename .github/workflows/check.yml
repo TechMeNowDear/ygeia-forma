@@ -139,6 +139,19 @@ jobs:
           for a in ../build/wear/outputs/apk/release/*.apk; do python3 -I ../tools/check_wear_capability.py "$a"; done
           echo "::notice title=Ρολόι::$(du -h ../build/wear/outputs/apk/release/*.apk | head -1)"
 
+      # fix-sdk37: τα APK που βγαίνουν έχουν πράγματι targetSdk 37 (κινητό και ρολόι· το «flutter create» δεν το αλλάζει σιωπηλά).
+      - name: Επίπεδο Android των APK (targetSdk 37)
+        run: |
+          sdk="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          bt="$(ls -d "$sdk"/build-tools/* | sort -V | tail -1)"
+          for a in build/app/outputs/flutter-apk/app-release.apk build/wear/outputs/apk/release/*.apk; do
+            t=$("$bt/aapt2" dump badging "$a" | grep -o "targetSdkVersion:'[0-9]*'" || true)
+            c=$("$bt/aapt2" dump badging "$a" | grep -o "compileSdkVersion='[0-9]*'" || true)
+            echo "$a · $t · $c"
+            [ "$t" = "targetSdkVersion:'37'" ] || { echo "::error title=targetSdk::$a: «$t» (αναμενόταν 37)"; exit 1; }
+          done
+          echo "::notice title=targetSdk::κινητό και ρολόι: 37 (Android 17)"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
@@ -278,11 +291,20 @@ jobs:
   # Ανοίγει την εφαρμογή σε emulator Android 14, καθαρή ΚΑΙ ως αναβάθμιση της τελευταίας έκδοσης. Αν κλείνει, δείχνει
   # σφάλμα Dart ή δεν διαβάζει τα δεδομένα της προηγούμενης, ο κλάδος δεν συγχωνεύεται.
   # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
+  # fix-sdk37: και σε Android 17 (API 37), όπου ισχύουν οι αλλαγές του targetSdk 37 (το Fold 8 τρέχει Android 17).
+  # Τρέχουν παράλληλα· τα στιγμιότυπα widget ανεβαίνουν μόνο από το Android 14 (ίδια με πριν).
   smoke:
+    name: smoke (API ${{ matrix.api }})
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [34, 37]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
+    env:
+      EMU_API: ${{ matrix.api }}
     steps:
       - name: Ελεύθερος χώρος στον δίσκο
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
@@ -374,7 +396,7 @@ jobs:
           fi
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
+        if: ${{ always() && matrix.api == 34 }}
         with:
           name: widget-shots
           path: widget_shots/
@@ -384,7 +406,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: smoke
+          name: smoke-${{ matrix.api }}
           path: |
             smoke_shots/
             smoke.log

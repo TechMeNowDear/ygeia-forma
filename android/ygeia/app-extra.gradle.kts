@@ -8,15 +8,16 @@
 apply(plugin = "kotlin-parcelize")
 
 android {
-    // Ρητά (έλεγχος 9/11, E3-23): μια νέα Flutter δεν αλλάζει σιωπηλά το επίπεδο Android της εφαρμογής. Το 36
-    // (Android 16) είναι ό,τι είχε ήδη η #89 από το πρότυπο της Flutter 3.47.9· το ίδιο έχει και το ρολόι.
-    // Ό,τι αλλάζει με το 36 ισχύει ήδη (edge-to-edge, predictive back, ειδοποιήσεις με άδεια). Αλλαγή του αριθμού
-    // = νέος έλεγχος των αλλαγών συμπεριφοράς του Android (developer.android.com/about/versions/*/behavior-changes-*).
-    compileSdk = 36
+    // Ρητά (έλεγχος 9/11, E3-23): μια νέα Flutter δεν αλλάζει σιωπηλά το επίπεδο Android της εφαρμογής.
+    // 37 = Android 17 (10/11: το Fold 8 τρέχει Android 17, το ρολόι Wear OS 7 = Android 17). Το AGP 9.1 της Flutter
+    // 3.47.9 υποστηρίζει έως το 37. Οι αλλαγές συμπεριφοράς του 37 ελέγχθηκαν μία-μία (σημείωση fix-sdk37: όριο
+    // μνήμης εικόνων widget → WidgetBudget· τα υπόλοιπα δεν αφορούν την εφαρμογή). Αλλαγή του αριθμού = νέος έλεγχος
+    // των αλλαγών συμπεριφοράς του Android (developer.android.com/about/versions/*/behavior-changes-*).
+    compileSdk = 37
     defaultConfig {
         // Το Samsung Health Data SDK θέλει Android 10 (API 29) και πάνω.
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 37
     }
 }
 

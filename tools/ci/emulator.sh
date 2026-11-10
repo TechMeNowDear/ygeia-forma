@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Emulator Android 14 (google_apis, x86_64) για τους ελέγχους ανοίγματος και αναβάθμισης (check.yml, android.yml).
+# Με EMU_API=37: Android 17, όπου ισχύουν οι αλλαγές του targetSdk 37 (fix-sdk37· το Fold 8 τρέχει Android 17).
 #
 #   bash tools/ci/emulator.sh start   # κατέβασμα + εκκίνηση στο παρασκήνιο (ο emulator ξεκινά όσο χτίζεται το APK)
 #   bash tools/ci/emulator.sh wait    # περιμένει να ανοίξει, root, χωρίς κινούμενα σχέδια, ΧΩΡΙΣ δίκτυο
@@ -10,7 +11,13 @@
 set -u
 SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
 BIN="$SDK/cmdline-tools/latest/bin"
-IMG="system-images;android-34;google_apis;x86_64"
+API="${EMU_API:-34}"
+# Από το Android 16 QPR οι εικόνες έχουν και δευτερεύοντα αριθμό (π.χ. android-37.0)· δοκιμάζονται και οι δύο μορφές.
+case "$API" in
+  34) CANDIDATES="system-images;android-34;google_apis;x86_64" ;;
+  *) CANDIDATES="system-images;android-$API.0;google_apis;x86_64 system-images;android-$API;google_apis;x86_64" ;;
+esac
+IMG="${CANDIDATES%% *}"
 export ANDROID_AVD_HOME="$HOME/.android/avd"
 export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
 
@@ -20,9 +27,14 @@ start)
   yes | "$BIN/sdkmanager" --licenses > /dev/null 2>&1 || true
   # Το κατέβασμα αποτυγχάνει πού και πού (δίκτυο): έως 3 φορές.
   for i in 1 2 3; do
-    "$BIN/sdkmanager" "emulator" "platform-tools" "$IMG" > sdk.log 2>&1 && break
+    got=""
+    for c in $CANDIDATES; do
+      "$BIN/sdkmanager" "emulator" "platform-tools" "$c" > sdk.log 2>&1 && [ -d "$SDK/$(echo "$c" | tr ';' '/')" ] && got="$c" && break
+    done
+    [ -n "$got" ] && IMG="$got" && break
     echo "sdkmanager: ξαναδοκιμή $i"; sleep $((i * 15))
   done
+  echo "Εικόνα emulator: $IMG"
   echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force > /dev/null 2>&1 || \
     echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" --force > /dev/null
   nohup "$SDK/emulator/emulator" -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
