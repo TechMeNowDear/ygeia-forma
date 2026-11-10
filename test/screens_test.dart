@@ -17,6 +17,7 @@ import 'package:ygeia_forma/format.dart' show sameDay;
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/error_report.dart';
 import 'package:ygeia_forma/pages/privacy_page.dart';
+import 'package:ygeia_forma/pages/oxygen_widgets.dart' show OuraOxygenAccessCard;
 import 'package:ygeia_forma/pages/report_page.dart';
 import 'package:ygeia_forma/pages/settings.dart';
 import 'package:ygeia_forma/pages/sleep.dart';
@@ -1834,6 +1835,33 @@ void main() {
     await privacyShot(t, 'P1d_settings_watch_silent', SettingsPage(store: settingsStore(), food: sampleFoodStore(now)),
         size: const Size(400, 1500));
   });
+  testWidgets('Ρυθμίσεις · Fold κλειστό, γράμματα 2×', (t) => privacyShot(
+      t, 'P1e_settings_2x', SettingsPage(store: settingsStore(), food: sampleFoodStore(now)),
+      size: const Size(400, 3000), textScale: 2));
+  testWidgets('Όλα διαγράφηκαν · γράμματα 2×', (t) => privacyShot(
+        t,
+        'P5d_wiped_2x',
+        WipedPage(
+          status: WipeStatus(at: now, done: true, seen: false, watchPending: true, oura: 'failed'),
+          onStart: () {},
+          onRestore: () {},
+          watch: () async => 'waiting',
+        ),
+        size: const Size(400, 1500),
+        textScale: 2,
+      ));
+  HealthStore noOxygenStore() => settingsStore()
+    ..ouraSpo2 = false
+    ..ouraOxygenAsked = true
+    ..ouraOxygenAskedMs = 1000
+    ..ouraConnectedMs = 2000;
+  Widget oxygenCard() => Scaffold(body: ListView(padding: const EdgeInsets.all(16), children: [OuraOxygenAccessCard(store: noOxygenStore())]));
+  testWidgets('Οξυγόνο · η Oura δεν έδωσε άδεια · Fold κλειστό', (t) => privacyShot(t, 'O1_oxygen_no_permission', oxygenCard(),
+      size: const Size(400, 640)));
+  testWidgets('Οξυγόνο · η Oura δεν έδωσε άδεια · Fold ανοιχτό σκοτεινό', (t) => privacyShot(
+      t, 'O1b_oxygen_no_permission_open_dark', oxygenCard(), size: const Size(750, 560), brightness: Brightness.dark));
+  testWidgets('Οξυγόνο · η Oura δεν έδωσε άδεια · γράμματα 2×', (t) => privacyShot(
+      t, 'O1c_oxygen_no_permission_2x', oxygenCard(), size: const Size(400, 1300), textScale: 2));
   testWidgets('Η διαγραφή δεν τελείωσε', (t) => privacyShot(
         t,
         'P5c_wipe_unfinished',
