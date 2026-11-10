@@ -37,8 +37,18 @@ start)
   echo "Εικόνα emulator: $IMG"
   echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force > /dev/null 2>&1 || \
     echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" --force > /dev/null
+  # Η εικόνα του Android 17 έχει μικρό χώρο δεδομένων («not enough space» στην εγκατάσταση, 10/11): 6 GB όπως ένα
+  # κανονικό κινητό. Το Android 14 μένει ακριβώς όπως ήταν.
+  if [ "$API" != 34 ]; then
+    cfg="$ANDROID_AVD_HOME/smoke.avd/config.ini"
+    sed -i '/^disk.dataPartition.size/d' "$cfg" 2> /dev/null || true
+    echo "disk.dataPartition.size=6G" >> "$cfg"
+    PART="-partition-size 6144"
+  else
+    PART=""
+  fi
   nohup "$SDK/emulator/emulator" -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim \
-    -no-snapshot -camera-back none -camera-front none -memory 4096 > emu.log 2>&1 &
+    -no-snapshot -camera-back none -camera-front none -memory 4096 $PART > emu.log 2>&1 &
   echo "Ο emulator ξεκινά στο παρασκήνιο (pid $!)"
   ;;
 wait)
@@ -62,6 +72,7 @@ wait)
   adb shell settings put global animator_duration_scale 0
   adb shell cmd connectivity airplane-mode enable > /dev/null 2>&1 || true
   echo "Emulator έτοιμος · Android $(adb shell getprop ro.build.version.release | tr -d '\r') · root: $(adb shell id -u | tr -d '\r' | sed 's/^0$/ναι/;s/^[1-9].*/όχι/') · πτήση: $(adb shell settings get global airplane_mode_on | tr -d '\r')"
+  echo "Χώρος δεδομένων: $(adb shell df -h /data 2> /dev/null | tail -1 | tr -s ' ' | cut -d' ' -f2,4 | tr -d '\r')"
   sleep 10
   ;;
 *)
