@@ -67,6 +67,13 @@ wait)
     [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
     sleep 2
   done
+  # boot_completed=1 δεν σημαίνει πάντα ότι τρέχει ο διαχειριστής πακέτων (Android 17, 10/11: «Can't find service:
+  # package» στην εγκατάσταση). Περιμένουμε να απαντά, έως 3 λεπτά.
+  for _ in $(seq 1 90); do
+    adb shell pm path android 2> /dev/null | grep -q '^package:' && break
+    sleep 2
+  done
+  adb shell pm path android 2> /dev/null | grep -q '^package:' || { echo "Ο διαχειριστής πακέτων δεν απαντά"; exit 1; }
   adb shell settings put global window_animation_scale 0
   adb shell settings put global transition_animation_scale 0
   adb shell settings put global animator_duration_scale 0
