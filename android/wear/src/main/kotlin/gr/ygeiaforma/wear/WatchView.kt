@@ -568,7 +568,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val done = s.lastDone(now)
         if (done != null) {
             val reps = s.items[done.first].sets[done.second].reps
-            small(c, "έκανες × $reps", 119f, Color.WHITE, 12f * fs, 80f)
+            // Μικραίνει αντί να ακουμπά τα − / + (γράμματα 1,3×).
+            text.typeface = Typeface.DEFAULT
+            fitPlain(c, "έκανες × $reps", 119f, Color.WHITE, 12f * fs, 72f)
             sayAdd("Έκανες $reps επαναλήψεις")
             roundKey(c, "−", 46f, 115f, 22f, 44f, 34f, "Έκανες μία λιγότερη") { actions.lastReps(-1) }
             roundKey(c, "+", 154f, 115f, 22f, 44f, 34f, "Έκανες μία παραπάνω") { actions.lastReps(1) }
@@ -792,9 +794,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     // ------------------------------------------------------------------ τέλος
     private fun drawEnd(c: Canvas) {
-        t(c, "✓", 76f, green, 32f, true)
-        t(c, "Αποθηκεύτηκε", 100f, Color.WHITE, 13f * fs, true)
         val note = Repo.notice
+        // Με μήνυμα: όλα λίγο πιο ψηλά, ώστε οι 3 γραμμές να μη φτάνουν στο «ΟΚ» (γράμματα 1,3×).
+        val up = if (note != null) 12f else 0f
+        t(c, "✓", 76f - up, green, 32f, true)
+        t(c, "Αποθηκεύτηκε", 100f - up, Color.WHITE, 13f * fs, true)
         if (note != null) {
             // Π.χ. «Σώθηκε ως τις 18:42: η εφαρμογή έκλεισε πριν το «Τέλος».» (V-A-03): ολόκληρο, σε ως 3 γραμμές.
             text.color = orange
@@ -808,7 +812,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .build()
             c.save()
-            c.translate(cx - w / 2f, 106f * u)
+            c.translate(cx - w / 2f, (106f - up) * u)
             layout.draw(c)
             c.restore()
             sayAdd("Αποθηκεύτηκε. $note")
@@ -817,7 +821,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             small(c, "όταν είναι κοντά.", 118f + 12f * fs, gray, ess(10f), 150f)
             sayAdd("Αποθηκεύτηκε. Περνάει στο κινητό όταν είναι κοντά")
         }
-        pill(c, "ΟΚ", 166f, 72f, 32f, card, Color.WHITE, 12f * fs, desc = "Εντάξει") { actions.doneOk() }
+        pill(c, "ΟΚ", if (note != null) 172f else 166f, 72f, if (note != null) 28f else 32f, card, Color.WHITE, 12f * fs, desc = "Εντάξει") { actions.doneOk() }
     }
 
     // ------------------------------------------------------------------ αφή και περιστροφή
