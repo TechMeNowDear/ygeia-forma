@@ -22,7 +22,9 @@ import 'package:ygeia_forma/pages/settings.dart';
 import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
+import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
+import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/off.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
@@ -425,6 +427,14 @@ void main() {
   testWidgets('Σήμερα · μικρό κινητό 360', (t) => _shot(t, name: '25_today_360', size: const Size(360, 1900), brightness: Brightness.light, tab: 0));
   testWidgets('Σήμερα · Fold ανοιχτό 750', (t) => _shot(t, name: '26_today_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: 0));
   testWidgets('Υγεία · Fold ανοιχτό 750', (t) => _shot(t, name: '27_body_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body));
+  // Σχέδια 9/11 (9β): Σώμα σε Fold 750 dp με 1,3× (δύο στήλες, ζυγίσεις σε πίνακα) και στα 360 με 2,0×.
+  for (final (name, size, scale) in [('27b_body_fold750_13x', const Size(750, 1700), 1.3), ('09b_body_360_2x', const Size(360, 3600), 2.0)]) {
+    testWidgets('Σώμα · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body);
+    });
+  }
   testWidgets('Διατροφή · Fold ανοιχτό 750', (t) => _shot(t, name: '28_nutrition_fold750', size: const Size(750, 1500), brightness: Brightness.light, tab: Cat.food));
   testWidgets('Τάσεις · κινητό', (t) => _shot(t, name: '04_trends_phone_light', size: tall, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.trends));
   testWidgets('Διατροφή · κινητό', (t) => _shot(t, name: '14_nutrition_phone_light', size: tall, brightness: Brightness.light, tab: Cat.food));
@@ -451,17 +461,35 @@ void main() {
           await t.tap(find.text('Φαγητό'));
         },
       ));
+  // Σχέδια 9/11 (10α): «Τα προϊόντα μου» ανοίγουν από το «Δικά μου» του «+ Φαγητό».
   testWidgets('Διατροφή · τα προϊόντα μου', (t) => _shot(
         t,
         name: '19_my_foods',
         size: phone,
         brightness: Brightness.light,
         tab: Cat.food,
-        sub: FoodTab.mine,
         act: (t) async {
-          await t.tap(find.byKey(const ValueKey('mine-products')));
+          await t.tap(find.text('Φαγητό'));
+          await t.pumpAndSettle();
+          await t.ensureVisible(find.byKey(const ValueKey('add-mine-all')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('add-mine-all')));
         },
       ));
+  // Σχέδια 9/11 (10α): «+ Φαγητό» σε φωτεινό, με Συχνά → Πρόσφατα → Δικά μου (Fold κλειστό, 360 και 1,3×).
+  for (final (name, size, scale) in [
+    ('17b_add_food_mine', phone, 1.0),
+    ('17c_add_food_mine_360', const Size(360, 1900), 1.0),
+    ('17d_add_food_mine_13x', phone, 1.3),
+  ]) {
+    testWidgets('Διατροφή · προσθήκη · δικά μου · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.food, act: (t) async {
+        await t.tap(find.text('Φαγητό'));
+      });
+    });
+  }
   testWidgets('Διατροφή · αναζήτηση με μάρκα', (t) => _shot(
         t,
         name: '20_search_branded',
@@ -573,6 +601,20 @@ void main() {
           await t.tap(find.text('Φακές (βρασμένες)').first);
         },
       ));
+  // Σχέδια 9/11 (9α): φύλλο ποσότητας με μεγάλα γράμματα: θρεπτικά και γεύματα 2×2, «Ζύγισα» σε γραμμές.
+  for (final (name, size, scale) in [('18b_quantity_sheet_13x', phone, 1.3), ('18c_quantity_sheet_360_2x', const Size(360, 2400), 2.0)]) {
+    testWidgets('Διατροφή · ποσότητα · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.food, act: (t) async {
+        await t.tap(find.text('Φαγητό'));
+        await t.pumpAndSettle();
+        await t.enterText(find.byType(TextField), 'fakes');
+        await t.pumpAndSettle();
+        await t.tap(find.text('Φακές (βρασμένες)').first);
+      });
+    });
+  }
   testWidgets('Τάσεις · κινητό · ανοιχτή γραμμή', (t) => _shot(
         t,
         name: '05_trends_phone_dark_open_row',
@@ -605,7 +647,35 @@ void main() {
   testWidgets('Καρδιά · κινητό', (t) => _shot(t, name: '08_heart_phone_light', size: phone, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.heart));
   testWidgets('Σώμα · κινητό', (t) => _shot(t, name: '09_body_phone_light', size: tall, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body));
   testWidgets('Σώμα · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '10_body_open_dark', size: open, brightness: Brightness.dark, tab: Cat.health, sub: HealthTab.body));
-  testWidgets('Διατροφή · τα δικά μου', (t) => _shot(t, name: '22_mine_phone_light', size: phone, brightness: Brightness.light, tab: Cat.food, sub: FoodTab.mine));
+  // Σχέδια 9/11 (4α): «Τι μετράει κάθε συσκευή».
+  for (final (name, size, scale, dark) in [
+    ('4a_devices', const Size(400, 2400), 1.0, false),
+    ('4b_devices_360_13x', const Size(360, 3000), 1.3, false),
+    ('4c_devices_open_dark', open, 1.0, true),
+  ]) {
+    testWidgets('Τι μετράει κάθε συσκευή · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _page(t, name: name, size: size, brightness: dark ? Brightness.dark : Brightness.light, oura: false, page: (_) => const DevicesPage());
+    });
+  }
+  // Σχέδια 9/11 (10β): «Τα στοιχεία μου» με τα προϊόντα και την κουζίνα (πριν: «Διατροφή › Τα δικά μου»).
+  for (final (name, size, scale, dark) in [
+    ('22_me_phone_light', phone, 1.0, false),
+    ('22b_me_360_13x', const Size(360, 1900), 1.3, false),
+    ('22c_me_open_dark', open, 1.0, true),
+  ]) {
+    testWidgets('Τα στοιχεία μου · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _page(t,
+          name: name,
+          size: size,
+          brightness: dark ? Brightness.dark : Brightness.light,
+          oura: false,
+          page: (s) => MePage(store: s, food: sampleFoodStore(now)));
+    });
+  }
   testWidgets('Σελίδα μέτρησης · βάρος · κινητό', (t) => _shot(
         t,
         name: '40_metric_weight_phone',
@@ -625,12 +695,44 @@ void main() {
         size: open,
         brightness: Brightness.dark,
         tab: Cat.health,
-        sub: HealthTab.recovery,
+        sub: HealthTab.sleep,
         at: ouraNow,
         oura: true,
         act: (t) async {
-          await t.tap(find.byKey(const ValueKey('recovery-hrv')));
+          // Σχέδια 9/11: η «Ανάκαμψη» μοιράστηκε στον Ύπνο· η γραμμή HRV ανοίγει τις 30 νύχτες.
+          await t.ensureVisible(find.byKey(const ValueKey('sleep-rest-hrv')));
           await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('sleep-rest-hrv')));
+          await t.pumpAndSettle();
+        },
+      ));
+  // Σχέδια 9/11 (2α–2β): Υγεία › Ύπνος με το Oura, 4 καρτέλες σε μία σειρά στα 360 dp με 1,0× · 1,3× · 2,0×.
+  for (final (name, size, scale) in [
+    ('2a_health_sleep_oura', const Size(400, 2400), 1.0),
+    ('2b_health_tabs_360_1x', const Size(360, 2400), 1.0),
+    ('2c_health_tabs_360_13x', const Size(360, 2800), 1.3),
+    ('2d_health_tabs_360_2x', const Size(360, 3600), 2.0),
+    ('2e_health_sleep_fold', const Size(860, 1600), 1.0),
+  ]) {
+    testWidgets('Υγεία › Ύπνος · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.sleep, at: ouraNow, oura: true);
+    });
+  }
+  testWidgets('Υγεία › Ύπνος 30 νυχτών', (t) => _shot(
+        t,
+        name: '2f_sleep_30_nights',
+        size: phone,
+        brightness: Brightness.light,
+        tab: Cat.health,
+        sub: HealthTab.sleep,
+        at: ouraNow,
+        oura: true,
+        act: (t) async {
+          await t.ensureVisible(find.byKey(const ValueKey('sleep-30-nights')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('sleep-30-nights')));
         },
       ));
   for (final (name, tab) in [('42_widget_config_content', 0), ('43_widget_config_look', 1)]) {
@@ -676,7 +778,9 @@ void main() {
   // 8/11: προπόνηση (Παρασκευή 13/11 = Προπόνηση Α, με δύο προηγούμενες φορές για την πρόοδο).
   final trainAt = DateTime(2026, 11, 13, 17, 30);
   Future<void> trainShot(WidgetTester t, String name, Size size, Brightness b,
-      {Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep}) async {
+      {Future<void> Function(WidgetTester)? act, void Function(TrainingStore)? prep, double scale = 1.0}) async {
+    t.platformDispatcher.textScaleFactorTestValue = scale;
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
     ExClock.frozen = true;
     await t.runAsync(() => ExLibrary.load(inline: true));
     final prev = TrainingStore.main;
@@ -705,6 +809,35 @@ void main() {
   }
 
   const phoneShort = Size(400, 880);
+  // Σχέδια 9/11 (6α–6γ): Άσκηση › Σήμερα, προπόνηση με λάστιχο, ερώτηση «άφησε» και «Πόνεσε κάπου;».
+  Future<void> bandSet(WidgetTester t) async {
+    await startSession(t);
+    for (var i = 0; i < 4; i++) {
+      await tapKey(t, 'sess-next');
+    }
+    await tapKey(t, 'sess-tick-0');
+    await tapKey(t, 'rest-stop');
+  }
+
+  testWidgets('Άσκηση › Σήμερα · 360', (t) => trainShot(t, 'T40_train_day_360', const Size(360, 1900), Brightness.light));
+  testWidgets('Άσκηση › Σήμερα · 360 · 1,3×', (t) => trainShot(t, 'T41_train_day_360_13x', const Size(360, 2400), Brightness.light, scale: 1.3));
+  testWidgets('Άσκηση › Σήμερα · Fold ανοιχτό', (t) => trainShot(t, 'T42_train_day_fold', const Size(860, 1500), Brightness.light));
+  testWidgets('Προπόνηση · λάστιχο', (t) => trainShot(t, 'T43_session_band', phoneShort, Brightness.light, act: bandSet));
+  testWidgets('Προπόνηση · λάστιχο · 360 · 1,3×', (t) => trainShot(t, 'T44_session_band_360_13x', const Size(360, 1000), Brightness.light, scale: 1.3, act: bandSet));
+  testWidgets('Προπόνηση · λάστιχο · 360 · 2×', (t) => trainShot(t, 'T45_session_band_360_2x', const Size(360, 1400), Brightness.light, scale: 2.0, act: bandSet));
+  testWidgets('Προπόνηση · άφησε και πόνος', (t) => trainShot(t, 'T46_session_ask_pain', phoneShort, Brightness.light, act: (t) async {
+        await bandSet(t);
+        await tapKey(t, 'sess-tick-1');
+        await tapKey(t, 'rest-stop');
+        await tapKey(t, 'sess-tick-2');
+        await tapKey(t, 'rir-2');
+        await tapKey(t, 'pain-shoulderL');
+      }));
+  testWidgets('Προπόνηση · ⋮', (t) => trainShot(t, 'T47_session_menu', phoneShort, Brightness.light, act: (t) async {
+        await startSession(t);
+        await tapKey(t, 'sess-more');
+      }));
+
   testWidgets('Προπόνηση · χωρίς όριο παλμών', (t) => trainShot(t, 'T1_train_no_limit', phone, Brightness.light, prep: (s) => s.setHrLimit(null)));
   testWidgets('Προπόνηση · σήμερα', (t) => trainShot(t, 'T2_train_today', phone, Brightness.light));
   testWidgets('Προπόνηση · σήμερα · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T3_train_today_open_dark', open, Brightness.dark));
@@ -852,6 +985,70 @@ void main() {
         await t.tap(find.byKey(const ValueKey('hrr-info')));
         await t.pumpAndSettle();
       }));
+  // Σχέδια 9/11 (1α–1γ): «Άσκηση σήμερα» στη Σήμερα, σε όλες τις μορφές της, Fold κλειστό/ανοιχτό και μεγάλα γράμματα.
+  Future<void> todayShot(WidgetTester t, String name, Size size,
+      {DateTime? at, double scale = 1.0, Brightness b = Brightness.light, void Function(TrainingStore)? prep, bool oura = true}) async {
+    ExClock.frozen = true;
+    await t.runAsync(() => ExLibrary.load(inline: true));
+    final when = at ?? trainAt;
+    final prev = TrainingStore.main;
+    TrainingStore.main = sampleTraining(when);
+    prep?.call(TrainingStore.main);
+    addTearDown(() => TrainingStore.main = prev);
+    t.platformDispatcher.textScaleFactorTestValue = scale;
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+    await _shot(t, name: name, size: size, brightness: b, tab: Cat.today, at: when, oura: oura);
+  }
+
+  void liveWalk(int bpm, {int sec = 1471}) {
+    WearLink.main.live.value = {'kind': 'walk', 'sec': sec, 'm': 2180.0, 'steps': 3104, 'bpm': bpm, 'at': DateTime.now().millisecondsSinceEpoch};
+    WearLink.main.ready.value = true;
+    addTearDown(() {
+      WearLink.main.live.value = null;
+      WearLink.main.ready.value = false;
+    });
+  }
+
+  void doneToday(TrainingStore s) {
+    final last = s.sessions.last;
+    s.sessions.add(Session.fromJson({
+      ...last.toJson(),
+      'id': 'today',
+      'start': trainAt.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+      'end': trainAt.subtract(const Duration(hours: 1, minutes: 8)).millisecondsSinceEpoch,
+    })
+      ..hrMax = 132);
+  }
+
+  testWidgets('Σήμερα · άσκηση σήμερα', (t) async {
+    WearLink.main.ready.value = true;
+    addTearDown(() => WearLink.main.ready.value = false);
+    await todayShot(t, 'TT1_today_training', const Size(400, 1900));
+  });
+  testWidgets('Σήμερα · άσκηση σήμερα · 360', (t) => todayShot(t, 'TT2_today_training_360', const Size(360, 1900)));
+  testWidgets('Σήμερα · άσκηση σήμερα · Fold ανοιχτό', (t) async {
+    WearLink.main.ready.value = true;
+    addTearDown(() => WearLink.main.ready.value = false);
+    await todayShot(t, 'TT3_today_training_fold', const Size(880, 1100));
+  });
+  testWidgets('Σήμερα · άσκηση σήμερα · 360 · 1,3×', (t) => todayShot(t, 'TT4_today_training_360_13x', const Size(360, 2200), scale: 1.3));
+  testWidgets('Σήμερα · άσκηση σήμερα · 360 · 2×', (t) => todayShot(t, 'TT4b_today_training_360_2x', const Size(360, 3000), scale: 2.0));
+  testWidgets('Σήμερα · μέρα περπατήματος', (t) async {
+    WearLink.main.ready.value = true;
+    addTearDown(() => WearLink.main.ready.value = false);
+    await todayShot(t, 'TT5_today_walk_day', const Size(400, 1900), at: DateTime(2026, 11, 10, 17, 30));
+  });
+  testWidgets('Σήμερα · περπάτημα ζωντανά', (t) async {
+    liveWalk(104);
+    await todayShot(t, 'TT6_today_walk_live', const Size(400, 1900));
+  });
+  testWidgets('Σήμερα · περπάτημα χωρίς παλμούς με όριο', (t) async {
+    liveWalk(0, sec: 120);
+    await todayShot(t, 'TT7_today_walk_no_hr', const Size(400, 1900));
+  });
+  testWidgets('Σήμερα · άσκηση έγινε', (t) => todayShot(t, 'TT8_today_training_done', const Size(400, 1900), prep: doneToday));
+  testWidgets('Σήμερα · άσκηση σήμερα · σκοτεινό', (t) => todayShot(t, 'TT9_today_training_dark', const Size(400, 1900), b: Brightness.dark));
+
   testWidgets('Προπόνηση · περπάτημα ζωντανά από το ρολόι', (t) async {
     WearLink.main.live.value = {'kind': 'walk', 'sec': 1471, 'm': 2180.0, 'steps': 3104, 'bpm': 104, 'at': DateTime.now().millisecondsSinceEpoch};
     WearLink.main.ready.value = true;
@@ -979,7 +1176,11 @@ void main() {
     await trainShot(t, 'T28b_hr_limit_sent', phone, Brightness.light,
         act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-hrlimit'))));
   });
-  testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
+  testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) async {
+        // Σχέδια 9/11 (6α): τα κουμπιά του προγράμματος στο ⋮.
+        await tapKey(t, 'train-program-more');
+        await tapKey(t, 'train-edit');
+      }));
 
   // Έλεγχος 9/11 (V-A-06): «✓» μόνο όταν το ρολόι επιβεβαιώσει ότι έχει το όριο.
   testWidgets('Προπόνηση · όριο επιβεβαιωμένο από το ρολόι', (t) async {

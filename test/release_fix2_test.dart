@@ -139,6 +139,12 @@ void main() {
       addTearDown(t.view.reset);
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SleepPage(store: s, now: now)));
       await t.pumpAndSettle();
+      // Έλεγχος premium (S2): η λίστα των νυχτών είναι στο «Ύπνος 30 νυχτών ›».
+      expect(find.text('Νύχτα προς νύχτα'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('sleep-30-nights')));
+      await t.pumpAndSettle();
+      expect(find.text('Νύχτα προς νύχτα'), findsOneWidget);
+      expect(find.byKey(const ValueKey('sleep-stages')), findsOneWidget);
       expect(find.text('Υπνάκος 15:00–21:00 · 5 ώρες 40 λεπτά'), findsOneWidget);
       expect(find.text('Μόνο υπνάκος'), findsOneWidget);
       expect(find.textContaining('χωρίς ύπνο'), findsNothing);

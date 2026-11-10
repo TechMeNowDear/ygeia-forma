@@ -8,9 +8,12 @@ import '../../training/wear_link.dart';
 
 /// Ζωντανοί παλμοί από το ρολόι, με γραμμή ως το όριο του γιατρού (σχέδιο 3, 8/11).
 class HrBar extends StatelessWidget {
-  const HrBar({super.key, required this.bpm, this.limit});
+  const HrBar({super.key, required this.bpm, this.limit, this.bare = false});
   final int bpm;
   final int? limit;
+
+  /// Χωρίς δικό του πλαίσιο, μέσα σε άλλη κάρτα (σχέδια 9/11, «Άσκηση σήμερα»).
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
@@ -20,15 +23,17 @@ class HrBar extends StatelessWidget {
       liveRegion: true,
       label: 'Παλμοί $bpm${limit == null ? '' : ', όριο $limit'}${over ? ', πάνω από το όριο' : ''}',
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        decoration: BoxDecoration(
-          color: over ? c.bad.withValues(alpha: .12) : c.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: over ? c.bad : c.hairline, width: over ? 1.5 : 1),
-        ),
+        padding: bare ? EdgeInsets.zero : const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        decoration: bare
+            ? null
+            : BoxDecoration(
+                color: over ? c.bad.withValues(alpha: .12) : c.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: over ? c.bad : c.hairline, width: over ? 1.5 : 1),
+              ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Icon(Icons.favorite_rounded, color: c.bad, size: 22),
+            Icon(Icons.favorite_rounded, color: c.heart, size: 22),
             const SizedBox(width: 8),
             Text('$bpm', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: over ? c.bad : c.text, height: 1)),
             const SizedBox(width: 4),
@@ -84,19 +89,19 @@ class HrStale extends StatelessWidget {
         key: const ValueKey('hr-stale'),
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         decoration: BoxDecoration(
-          color: c.exercise.withValues(alpha: .12),
+          color: c.warnBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: c.exercise, width: lim == null ? 1 : 1.5),
+          border: Border.all(color: c.warnLine, width: lim == null ? 1 : 1.5),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.heart_broken_outlined, color: c.exercise, size: 22)),
+          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.warning_amber_rounded, color: c.warn, size: 22)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Δεν έρχονται παλμοί από το ρολόι', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
               if (lim != null)
                 Text('Το όριο ($lim) δεν σε προσέχει τώρα.',
-                    key: const ValueKey('hr-limit-off'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.exercise)),
+                    key: const ValueKey('hr-limit-off'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.warn)),
               Text(hint, style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary)),
             ]),
           ),

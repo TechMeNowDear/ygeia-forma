@@ -447,7 +447,9 @@ class ProtocolTest {
         assertEquals("1:04", clock(64))
         assertEquals("1:02:05", clock(3725))
         assertEquals("2,18", km(2180.0))
-        assertEquals("11′15″", pace(2000.0, 1350))
+        assertEquals("11:15 /km", pace(2000.0, 1350))
+        // 659,5″ ανά km στρογγυλεύεται σε 11:00, ποτέ «10:60».
+        assertEquals("11:00 /km", pace(2000.0, 1319))
         assertEquals("—", pace(10.0, 100))
         assertTrue(JSONObject().put("x", 1).has("x"))
     }

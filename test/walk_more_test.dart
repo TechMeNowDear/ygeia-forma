@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/exercise/ex_data.dart';
 import 'package:ygeia_forma/exercise/ex_player.dart';
+import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/pages/training/session_page.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/training/session.dart';
@@ -114,7 +115,7 @@ void main() {
     test('ρυθμός και βήματα ανά λεπτό από τον ενεργό χρόνο', () {
       final s = walk();
       expect(paceSecPerKm(s), (1700 / 2.41).round());
-      expect(paceText(paceSecPerKm(s)!), '11′45″');
+      expect(paceText(paceSecPerKm(s)!), '11:45 /km');
       expect(cadence(s), (3300 / (1700 / 60)).round());
       expect(pausedSec(s), 10);
     });
@@ -135,10 +136,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('walk-km')), findsOneWidget);
       expect(find.text('0,41'), findsOneWidget);
-      expect(find.text('10′00″'), findsOneWidget);
+      expect(find.text('10:00'), findsOneWidget);
       expect(find.byKey(const ValueKey('hrr-drop')), findsOneWidget);
       expect(find.text('−18'), findsOneWidget);
-      expect(find.text('11′45″'), findsOneWidget);
+      expect(find.text('11:45 /km'), findsOneWidget);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('hrr-info')), 200, scrollable: find.byType(Scrollable).last);
       await tester.tap(find.byKey(const ValueKey('hrr-info')));
       await tester.pumpAndSettle();

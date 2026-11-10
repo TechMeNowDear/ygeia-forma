@@ -88,7 +88,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   // Στρογγύλεμα πρώτα (έλεγχος 8/11, DATA-03): 419,5 λεπτά → 7:00, όχι 6:00.
   add(K.sleepMin, 'Ύπνος', '', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
-      range: sleepWeek != null && sr != null ? '${sleepWeek.$2} νύχτες ${sr.placeText(sleepWeek.$1)}' : null);
+      range: sleepWeek != null && sr != null ? '${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1)}' : null);
   add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
   add(K.sleepScore, 'Σκορ', '', (v) => '${v.round()}');
   add(K.hrv, 'HRV', ' ms', (v) => '${v.round()}');
@@ -96,7 +96,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   add(K.lowHr, 'Χαμηλότεροι', ' bpm', (v) => '${v.round()}');
   add(K.ringSpo2, 'Οξυγόνο', '%', spo2AvgText, digits: 1);
   add(K.breath, 'Αναπνοές', '', (v) => dec(v), digits: 1,
-      range: breathWeek == null ? null : '${breathWeek.$2} νύχτες ${breathRange.placeText(breathWeek.$1)}');
+      range: breathWeek == null ? null : '${countText(breathWeek.$2, 'νύχτα', 'νύχτες')} ${breathRange.placeText(breathWeek.$1)}');
   // Θερμοκρασία: το Oura δίνει απόκλιση (+0,3°), το ρολόι απόλυτη τιμή καρπού (33,6 °C), που δεν δείχνεται ποτέ ως
   // «+33,6°» (έλεγχος 8/11, DATA-04). Από το ρολόι: μόνο η απόκλιση από τα συνηθισμένα, αν υπάρχουν.
   if (src == Source.oura) {

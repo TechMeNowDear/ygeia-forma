@@ -144,17 +144,41 @@ class _SessionPageState extends State<SessionPage> {
         final e = s.items[_idx];
         return Scaffold(
           appBar: AppBar(
-            title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Ο τίτλος μεγαλώνει ως 1,3×, για να μη γίνεται «Προπ…» δίπλα στο «Τέλος» (έλεγχος premium, S4).
+            title: MediaQuery.withClampedTextScaling(maxScaleFactor: 1.3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(s.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               ValueListenableBuilder<int>(
                 valueListenable: _tick,
                 builder: (_, __, ___) => Text(_clock(t.now.difference(s.start)),
                     style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
               ),
-            ]),
+            ])),
+            // Σχέδια 9/11 (6β): «Τέλος» ως απαλό κουμπί και ⋮ για τα σπάνια («Αλλαγή άσκησης»).
             actions: [
-              TextButton(key: const ValueKey('sess-finish'), onPressed: () => _finish(context), child: const Text('Τέλος')),
-              const SizedBox(width: 6),
+              OutlinedButton(
+                key: const ValueKey('sess-finish'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: c.exercise,
+                  backgroundColor: c.card,
+                  minimumSize: const Size(64, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  side: BorderSide(color: c.hairline),
+                ),
+                onPressed: () => _finish(context),
+                child: const Text('Τέλος', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              PopupMenuButton<String>(
+                key: const ValueKey('sess-more'),
+                tooltip: 'Περισσότερα',
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (v) {
+                  if (v == 'swap') _swap(context, e);
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'swap', key: ValueKey('sess-swap'), child: Text('Αλλαγή άσκησης')),
+                ],
+              ),
+              const SizedBox(width: 4),
             ],
           ),
           body: SafeArea(
@@ -191,7 +215,8 @@ class _SessionPageState extends State<SessionPage> {
               }
               return Column(children: [
                 _hr(const EdgeInsets.fromLTRB(16, 8, 16, 0)),
-                SizedBox(height: 54, child: _list(context, s, vertical: false)),
+                // Με μεγάλα γράμματα η λωρίδα των ασκήσεων ψηλώνει (πριν: σταθερά 54 dp, κομμένα γράμματα).
+                SizedBox(height: MediaQuery.textScalerOf(context).scale(54).clamp(54.0, 96.0), child: _list(context, s, vertical: false)),
                 Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: [card])),
                 if (rest != null) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 8), child: rest),
                 Container(
@@ -335,20 +360,35 @@ class _SessionPageState extends State<SessionPage> {
       final (d, l) = hist.first;
       lastTime = 'Τελευταία φορά (${shortDayDate(d)}): '
           '${hasLoad(k) ? '${loadLabel(k, l.workLoad)} · ' : ''}${l.done.map((x) => x.reps).join(', ')}'
-          '${l.rirAnswer == null ? '' : ' · ρεζέρβα ${l.rirAnswer == 4 ? '4+' : l.rirAnswer}'}';
+          '${l.rirAnswer == null ? '' : ' · άφησες ${l.rirAnswer == 4 ? '4+' : l.rirAnswer}'}';
     }
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // Σχέδια 9/11 (6β): «3 σετ × 12–15 · άφησε 2 · ξεκούραση 1:30». (Το αγγλικό δεν μπαίνει: η βιβλιοθήκη έχει
+        // μόνο λέξεις αναζήτησης, όχι σύντομο όνομα.)
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(child: Text(exName(e.ex), style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: c.text))),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(exName(e.ex), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, color: c.text)),
+            ]),
+          ),
           if (ex != null && lib != null)
             TextButton(
+              style: TextButton.styleFrom(foregroundColor: c.exercise),
               onPressed: () => Navigator.of(context).push(ExerciseDetailPage.route(ex, lib)),
               child: const Text('Πώς γίνεται'),
             ),
         ]),
-        Text('${repsRange(PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi))} · ρεζέρβα ${e.rir} · διάλειμμα ${restText(e.rest)}',
-            style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+        const SizedBox(height: 8),
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(text: '${e.sets} σετ × ${e.lo == e.hi ? '${e.lo}' : '${e.lo}–${e.hi}'} · '),
+            TextSpan(text: 'άφησε ${e.rir}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            TextSpan(text: ' · ξεκούραση ${clock(e.rest)}'),
+          ]),
+          key: const ValueKey('sess-plan'),
+          style: TextStyle(fontSize: 15, height: 1.4, color: c.text),
+        ),
         if (hasLoad(k) || change != null) ...[
           const SizedBox(height: 10),
           Container(
@@ -382,9 +422,10 @@ class _SessionPageState extends State<SessionPage> {
             TextButton(onPressed: () => t.skip(e, false), child: const Text('Αναίρεση')),
           ])
         else ...[
+          if (!veryLargeText(context))
           Row(children: [
             SizedBox(width: 30, child: Text('Σετ', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600))),
-            if (hasLoad(k)) Expanded(child: Text(usesKg(k) ? 'Κιλά' : 'Λάστιχο', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600))),
+            if (hasLoad(k)) Expanded(child: Text(usesKg(k) ? 'Κιλά' : (isBand(k) ? 'Λάστιχο' : 'Βάρος'), style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600))),
             Expanded(child: Text('Επαναλήψεις', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600))),
             const SizedBox(width: 52),
           ]),
@@ -396,8 +437,8 @@ class _SessionPageState extends State<SessionPage> {
           ),
           if (e.complete && e.rirAnswer != null)
             Text(
-              'Ρεζέρβα ${e.rirAnswer == 4 ? '4+' : e.rirAnswer}${e.pain.isEmpty ? '' : ' · ενόχληση: ${e.pain.map((p) => painNames[p]).join(', ')}'}',
-              style: TextStyle(fontSize: 13.5, color: e.pain.isEmpty ? c.textSecondary : c.bad),
+              'Άφησες ${e.rirAnswer == 4 ? '4+' : e.rirAnswer}${e.pain.isEmpty ? '' : ' · ενόχληση: ${e.pain.map((p) => painNames[p]).join(', ')}'}',
+              style: TextStyle(fontSize: 13.5, color: e.pain.isEmpty ? c.textSecondary : c.warn),
             ),
         ],
       ]),
@@ -408,8 +449,15 @@ class _SessionPageState extends State<SessionPage> {
     final c = Aigaio.of(context);
     final k = e.kind;
     final set = e.log[i];
+    final band = isBand(k);
     final numStyle = TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: set.done ? c.textSecondary : c.text, fontFeatures: const [FontFeature.tabularFigures()]);
-    final loadText = !hasLoad(k) ? '' : (usesKg(k) ? kgText(set.load ?? 0) : loadLabel(k, set.load));
+    // Λάστιχο: κουκκίδα στο χρώμα του και «30 lb» (σχέδια 9/11)· αλλιώς κιλά ή η ετικέτα του φορτίου.
+    final loadText = !hasLoad(k) ? '' : (usesKg(k) ? kgText(set.load ?? 0) : (band ? '${(set.load ?? 0).round()} lb' : loadLabel(k, set.load)));
+    Widget loadCell(TextStyle st) => Row(mainAxisSize: MainAxisSize.min, children: [
+          if (band) BandDots(set.load, size: 16),
+          Flexible(child: Text(loadText, maxLines: 1, overflow: TextOverflow.ellipsis, style: st)),
+        ]);
+    // Σετ που έγινε: γεμάτο πράσινο ✓· σετ που έρχεται: απαλό πλαίσιο με γκρι ✓ (πατιέται κι αυτό).
     Widget tick() => Semantics(
           button: true,
           label: set.done ? 'Αναίρεση σετ ${i + 1}' : 'Έγινε το σετ ${i + 1}',
@@ -423,63 +471,108 @@ class _SessionPageState extends State<SessionPage> {
               decoration: BoxDecoration(
                 color: set.done ? c.good : c.card,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: c.good, width: 2),
+                border: Border.all(color: set.done ? c.good : c.hairline, width: set.done ? 2 : 1.5),
               ),
-              child: Icon(Icons.check_rounded, color: set.done ? Colors.white : c.good),
+              child: Icon(Icons.check_rounded, color: set.done ? Colors.white : c.textTertiary),
             ),
           ),
         );
-    // Τρέχον σετ: τα −/+ σε δική τους γραμμή, σε πλήρες μέγεθος 48 dp (χωρίς FittedBox που τα μίκραινε στα ~30 dp·
-    // έλεγχος 8/11, UX-02). Σε στενή οθόνη πάνε σε δύο γραμμές.
-    final Widget row;
     if (isCurrent) {
-      row = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          SizedBox(width: 30, child: Text('${i + 1}', style: numStyle)),
-          Expanded(
-            child: Text(
-              hasLoad(k) ? '$loadText${usesKg(k) ? ' kg' : ''} × ${set.reps}' : '× ${set.reps}',
-              style: numStyle,
-            ),
-          ),
-          SizedBox(width: 52, child: Align(alignment: Alignment.centerRight, child: tick())),
-        ]),
-        const SizedBox(height: 8),
-        Wrap(spacing: 16, runSpacing: 8, children: [
-          if (hasLoad(k))
-            Stepper2(
-              value: loadText,
-              width: usesKg(k) ? 56 : 92,
-              button: 48,
-              labelMinus: 'Λιγότερο βάρος',
-              labelPlus: 'Περισσότερο βάρος',
-              onMinus: shiftLoad(k, set.load, -1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, -1)!),
-              onPlus: shiftLoad(k, set.load, 1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, 1)!),
-            ),
+      // Τρέχον σετ (σχέδια 9/11, 6β): μόνο οι μετρητές (όχι η τιμή δύο φορές), κουμπιά 48 dp, «Έγινε» από κάτω.
+      final steppers = <Widget>[
+        if (hasLoad(k))
           Stepper2(
-            value: '${set.reps}',
-            width: 40,
-            button: 48,
-            labelMinus: 'Λιγότερες',
-            labelPlus: 'Περισσότερες',
-            onMinus: set.reps > 0 ? () => t.setReps(e, i, set.reps - 1) : null,
-            onPlus: () => t.setReps(e, i, set.reps + 1),
+            value: band ? '${(set.load ?? 0).round()}' : loadText,
+            leading: band ? BandDots(set.load, size: 14) : null,
+            // Σχέδια 9/11 (6β) και έλεγχος premium (S4): οι δύο μετρητές σε μία σειρά και στο κλειστό Fold.
+            width: usesKg(k) || band ? 52 : 80,
+            button: 44,
+            labelMinus: 'Λιγότερο βάρος',
+            labelPlus: 'Περισσότερο βάρος',
+            onMinus: shiftLoad(k, set.load, -1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, -1)!),
+            onPlus: shiftLoad(k, set.load, 1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, 1)!),
           ),
+        Stepper2(
+          value: '${set.reps}',
+          width: 36,
+          button: 44,
+          labelMinus: 'Λιγότερες',
+          labelPlus: 'Περισσότερες',
+          onMinus: set.reps > 0 ? () => t.setReps(e, i, set.reps - 1) : null,
+          onPlus: () => t.setReps(e, i, set.reps + 1),
+        ),
+      ];
+      return Container(
+        key: ValueKey('sess-current-$i'),
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        decoration: BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(16)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text('Σετ ${i + 1}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+            Text('τώρα', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.spaceBetween, children: steppers),
+          const SizedBox(height: 10),
+          // «✓ Έγινε» πάντα δεξιά, το όνομα του λάστιχου αριστερά (με πολύ μεγάλα γράμματα το ένα κάτω από το άλλο).
+          () {
+            final label = band
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    BandDots(set.load, size: 14),
+                    Flexible(child: Text(bandName(set.load ?? 0), style: TextStyle(fontSize: 13.5, color: c.textSecondary))),
+                  ])
+                : const SizedBox.shrink();
+            final doneBtn = Semantics(
+                button: true,
+                label: 'Έγινε το σετ ${i + 1}',
+                excludeSemantics: true,
+                child: FilledButton.icon(
+                  key: ValueKey('sess-tick-$i'),
+                  style: FilledButton.styleFrom(backgroundColor: c.good, foregroundColor: Colors.white, minimumSize: const Size(120, 48)),
+                  onPressed: () => _done(context, s, e, i),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Έγινε', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+              );
+            if (veryLargeText(context)) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (band) label,
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: doneBtn),
+              ]);
+            }
+            return Row(children: [Expanded(child: label), const SizedBox(width: 10), doneBtn]);
+          }(),
         ]),
-      ]);
-    } else {
-      row = Row(children: [
-        SizedBox(width: 30, child: Text('${i + 1}', style: numStyle)),
-        if (hasLoad(k)) Expanded(child: Text(loadText, style: numStyle)),
-        Expanded(child: Text('${set.reps}', style: numStyle)),
-        SizedBox(width: 52, child: Align(alignment: Alignment.centerRight, child: tick())),
-      ]);
+      );
+    }
+    if (veryLargeText(context)) {
+      // Πολύ μεγάλα γράμματα: μία πρόταση ανά σετ («Σετ 1 · ● 30 lb × 14»), όχι στήλες με σπασμένες λέξεις.
+      return Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Row(children: [
+          Expanded(
+            child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, children: [
+              Text('Σετ ${i + 1}', style: numStyle.copyWith(fontWeight: FontWeight.w600)),
+              if (hasLoad(k)) loadCell(numStyle),
+              Text('× ${set.reps}', style: numStyle),
+            ]),
+          ),
+          tick(),
+        ]),
+      );
     }
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: isCurrent ? const EdgeInsets.symmetric(horizontal: 6, vertical: 6) : const EdgeInsets.symmetric(horizontal: 6),
-      decoration: isCurrent ? BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(14)) : null,
-      child: row,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Row(children: [
+        SizedBox(width: 30, child: Text('${i + 1}', style: numStyle)),
+        if (hasLoad(k)) Expanded(child: loadCell(numStyle)),
+        Expanded(child: Text('${set.reps}', style: numStyle)),
+        SizedBox(width: 52, child: Align(alignment: Alignment.centerRight, child: tick())),
+      ]),
     );
   }
 
@@ -528,16 +621,22 @@ class _SessionPageState extends State<SessionPage> {
       isDismissible: false,
       enableDrag: false,
       isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
       builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
         final c = Aigaio.of(ctx);
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
+        // Με μεγάλα γράμματα το φύλλο κυλά (ποτέ ξεχείλισμα).
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(first ? 'Πρώτο σετ: πόσες ακόμα θα έβγαζες;' : 'Τελευταίο σετ: πόσες ακόμα θα έβγαζες;',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.25, color: c.text)),
             const SizedBox(height: 4),
-            Text(first ? 'Με καλή τεχνική. Από αυτό βρίσκεται το σωστό βάρος για τα επόμενα σετ.' : 'Με καλή τεχνική, χωρίς να «κλέψεις».',
-                style: TextStyle(fontSize: 14, color: c.textSecondary)),
+            Text(
+                first
+                    ? 'Με καλή τεχνική. Από αυτό βρίσκεται το σωστό βάρος για τα επόμενα σετ.'
+                    : 'Με καλή τεχνική. Αυτό είναι το «άφησε» του προγράμματος.',
+                style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
             const SizedBox(height: 14),
             Row(children: [
               for (var v = 0; v <= 4; v++)
@@ -545,10 +644,10 @@ class _SessionPageState extends State<SessionPage> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: Material(
-                      color: pick == v ? c.tint(c.exercise) : c.card,
+                      color: pick == v ? c.exerciseSolid : c.card,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(color: pick == v ? c.exercise : c.hairline, width: pick == v ? 2 : 1),
+                        side: BorderSide(color: pick == v ? c.exerciseSolid : c.hairline, width: 1.5),
                       ),
                       child: InkWell(
                         key: ValueKey('rir-$v'),
@@ -556,7 +655,13 @@ class _SessionPageState extends State<SessionPage> {
                         onTap: () => set(() => pick = v),
                         child: SizedBox(
                           height: 54,
-                          child: Center(child: Text(v == 4 ? '4+' : '$v', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text))),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(v == 4 ? '4+' : '$v',
+                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: pick == v ? c.onSolid : c.text)),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -564,29 +669,54 @@ class _SessionPageState extends State<SessionPage> {
                 ),
             ]),
             if (!first && e != null) ...[
-              const SizedBox(height: 14),
-              Text('Ενόχληση; (προαιρετικά)', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
-              const SizedBox(height: 6),
+              const SizedBox(height: 18),
+              // Σχέδια 9/11 (6γ): πόνος σε κεχριμπάρι, χωρίς ✓ και χωρίς πράσινο.
+              Text('Πόνεσε κάπου;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+              Text('Μόνο αν ναι.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+              const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final p in painNames.entries)
-                  FilterChip(
-                    key: ValueKey('pain-${p.key}'),
-                    label: Text(p.value),
-                    selected: e.pain.contains(p.key),
-                    onSelected: (_) => set(() => t.togglePain(e, p.key)),
-                  ),
+                  () {
+                    final on = e.pain.contains(p.key);
+                    return Semantics(
+                      selected: on,
+                      button: true,
+                      child: Material(
+                        color: on ? c.warnBg : c.card,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: on ? c.warnLine : c.hairline, width: on ? 2 : 1.5),
+                        ),
+                        child: InkWell(
+                          key: ValueKey('pain-${p.key}'),
+                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          onTap: () => set(() => t.togglePain(e, p.key)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                            child: Text(p.value,
+                                style: TextStyle(fontSize: 15, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? c.warn : c.text)),
+                          ),
+                        ),
+                      ),
+                    );
+                  }(),
               ]),
+              if (e.pain.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text('Σημειώνεται στη σύνοψη της προπόνησης.', style: TextStyle(fontSize: 13.5, color: c.warn)),
+              ],
             ],
             const SizedBox(height: 16),
             FilledButton(
               key: const ValueKey('rir-ok'),
-              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50)),
+              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
               onPressed: pick < 0 ? null : () => Navigator.of(ctx).pop(pick),
               child: const Text('Συνέχεια'),
             ),
             const SizedBox(height: 4),
             TextButton(
               key: const ValueKey('rir-unknown'),
+              style: TextButton.styleFrom(foregroundColor: c.textSecondary, minimumSize: const Size.fromHeight(48)),
               onPressed: () => Navigator.of(ctx).pop(-1),
               child: const Text('Δεν ξέρω'),
             ),
@@ -641,24 +771,15 @@ class _SessionPageState extends State<SessionPage> {
     final last = _idx >= s.items.length - 1;
     // Μικρό εσωτερικό περιθώριο: στο στενό κινητό οι λέξεις χωράνε σε μία γραμμή.
     const pad = EdgeInsets.symmetric(horizontal: 6);
+    // Σχέδια 9/11 (6β): δύο κουμπιά· η «Αλλαγή άσκησης» πήγε στο ⋮.
     return Row(children: [
       Expanded(
         flex: 5,
         child: OutlinedButton(
-          key: const ValueKey('sess-swap'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50), padding: pad),
-          onPressed: () => _swap(context, e),
-          child: const Text('Αλλαγή', maxLines: 1, softWrap: false),
-        ),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        flex: 5,
-        child: OutlinedButton(
           key: const ValueKey('sess-skip'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50), padding: pad),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), padding: pad, foregroundColor: c.text),
           onPressed: e.done.isNotEmpty ? null : () => t.skip(e, !e.skipped),
-          child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false),
+          child: FittedBox(fit: BoxFit.scaleDown, child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false)),
         ),
       ),
       const SizedBox(width: 8),
@@ -666,10 +787,13 @@ class _SessionPageState extends State<SessionPage> {
         flex: 8,
         child: FilledButton(
           key: const ValueKey('sess-next'),
-          style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(50), padding: pad),
+          style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52), padding: pad),
           onPressed: last ? (s.isFree ? () => _addExercise(context) : () => _finish(context)) : () => setState(() => _idx++),
-          child: Text(last ? (s.isFree ? 'Νέα άσκηση' : 'Τέλος προπόνησης') : 'Επόμενη άσκηση',
-              maxLines: 1, softWrap: false, style: const TextStyle(fontWeight: FontWeight.w700)),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(last ? (s.isFree ? 'Νέα άσκηση' : 'Τέλος προπόνησης') : 'Επόμενη άσκηση',
+                maxLines: 1, softWrap: false, style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
         ),
       ),
     ]);

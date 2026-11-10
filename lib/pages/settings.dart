@@ -13,6 +13,7 @@ import '../ti_ftanei.dart';
 import '../training/training_store.dart';
 import '../widgets.dart';
 import 'appearance.dart';
+import 'devices_page.dart';
 import 'sources_page.dart';
 import 'me_page.dart';
 import 'privacy_page.dart';
@@ -28,8 +29,7 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    // Σχέδιο «Settings» (premium, 10/11): γραμμές σε ενότητες. Το «Τι μετράει κάθε συσκευή» είναι στο σχέδιο, αλλά η
-    // οθόνη του δεν υπάρχει ακόμα (κλάδος premium UX).
+    // Σχέδιο «Settings» (premium, 10/11): γραμμές σε ενότητες, με «Τι μετράει κάθε συσκευή» (DevicesPage του premium).
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ρυθμίσεις'),
@@ -67,7 +67,8 @@ class SettingsPage extends StatelessWidget {
                           key: const ValueKey('settings-me'),
                           icon: Icons.person_outline_rounded,
                           title: 'Τα στοιχεία μου',
-                          subtitle: 'Ηλικία, φύλο, ύψος για τα εύρη · ζύγιση κάθε ${weekdayNames[store.profile.weighDay - 1]}',
+                          // Σχέδιο Settings + premium: η κουζίνα και τα προϊόντα μου είναι πια μέσα στα «Τα στοιχεία μου».
+                          subtitle: 'Ηλικία, ύψος, ζύγιση κάθε ${weekdayNames[store.profile.weighDay - 1]} · η κουζίνα μου · τα προϊόντα μου',
                           onTap: () => Navigator.of(context).push(MePage.route(store)),
                         ),
                         SettingsRow(
@@ -77,6 +78,13 @@ class SettingsPage extends StatelessWidget {
                           subtitle: 'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
                               'βήματα: Samsung Health · βάρος: InBody',
                           onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
+                        ),
+                        SettingsRow(
+                          key: const ValueKey('settings-devices'),
+                          icon: Icons.layers_rounded,
+                          title: 'Τι μετράει κάθε συσκευή',
+                          subtitle: 'Μέτρηση, εκτίμηση, ενδεικτικό',
+                          onTap: () => Navigator.of(context).push(DevicesPage.route()),
                         ),
                         SettingsRow(
                           key: const ValueKey('settings-today-cards'),

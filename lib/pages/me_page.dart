@@ -3,16 +3,25 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../data.dart';
-import '../oxygen_note.dart' show oxygenAvgLabel, oxygenMinLabel;
+import '../food/food_store.dart';
+import '../food/kitchen.dart';
 import '../format.dart';
 import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'devices_page.dart';
+import 'sources_page.dart';
+import 'kitchen.dart';
+import 'my_foods.dart';
 
 /// «Τα στοιχεία μου» (7/11): γέννηση, φύλο, ύψος για τα εύρη αναφοράς· η μέρα του εβδομαδιαίου ζυγίσματος.
+/// Σχέδια 9/11 (10β): εδώ ζουν και «Τα προϊόντα μου» (όλη η λίστα) και «Η κουζίνα μου».
 class MePage extends StatefulWidget {
-  const MePage({super.key, required this.store});
+  const MePage({super.key, required this.store, this.food});
   final HealthStore store;
+
+  /// Χωρίς αυτό: η αποθήκη φαγητού της εφαρμογής ([FoodStore.shared]).
+  final FoodStore? food;
 
   static Route<void> route(HealthStore store) =>
       MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τα στοιχεία μου'), builder: (_) => MePage(store: store));
@@ -51,8 +60,9 @@ class _MePageState extends State<MePage> {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final now = DateTime.now();
+    final food = widget.food ?? FoodStore.shared;
     return ListenableBuilder(
-      listenable: widget.store,
+      listenable: Listenable.merge([widget.store, if (food != null) food]),
       builder: (context, _) {
         final p = widget.store.profile;
         final suggested = _scaleHeight();
@@ -80,10 +90,11 @@ class _MePageState extends State<MePage> {
                               Expanded(
                                 child: DropdownButtonFormField<int>(
                                   key: const ValueKey('me-month'),
+                                  isExpanded: true,
                                   initialValue: p.birthMonth,
                                   decoration: const InputDecoration(labelText: 'Μήνας'),
                                   items: [
-                                    for (var m = 1; m <= 12; m++) DropdownMenuItem(value: m, child: Text(monthNames[m - 1])),
+                                    for (var m = 1; m <= 12; m++) DropdownMenuItem(value: m, child: Text(monthNames[m - 1], overflow: TextOverflow.ellipsis)),
                                   ],
                                   onChanged: (v) => _save(p.copyWith(birthMonth: v)),
                                 ),
@@ -92,6 +103,7 @@ class _MePageState extends State<MePage> {
                               Expanded(
                                 child: DropdownButtonFormField<int>(
                                   key: const ValueKey('me-year'),
+                                  isExpanded: true,
                                   initialValue: p.birthYear,
                                   decoration: const InputDecoration(labelText: 'Έτος'),
                                   items: [
@@ -151,6 +163,7 @@ class _MePageState extends State<MePage> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
                     AppCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -181,21 +194,34 @@ class _MePageState extends State<MePage> {
                         ],
                       ),
                     ),
+                    if (food != null) ...[
+                      const GroupLabel('Διατροφή'),
+                      _nutrition(context, food),
+                    ],
+                    // Έλεγχος premium (S6): όχι σταθερό κείμενο («Oura / Ρολόι / InBody») που θα έλεγε ψέματα χωρίς Oura·
+                    // οι πηγές όπως ισχύουν τώρα είναι στη σελίδα «Πηγές».
+                    const GroupLabel('Από πού έρχεται κάθε μέτρηση'),
                     AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text('Από πού έρχεται κάθε μέτρηση', style: label),
-                          const SizedBox(height: 6),
-                          const InfoRow('Ύπνος, HRV, παλμοί ύπνου, αναπνοές', 'Oura'),
-                          // Έλεγχος 9/11 (UX3-05): οι ίδιες ετικέτες οξυγόνου παντού.
-                          const InfoRow(oxygenAvgLabel, 'Oura'),
-                          const InfoRow(oxygenMinLabel, 'Ρολόι'),
-                          const InfoRow('Βήματα, παλμοί μέρας', 'Ρολόι'),
-                          const InfoRow('Βάρος, λίπος, μύες', 'InBody'),
-                          const SizedBox(height: 6),
-                          Text('Κάθε μέτρηση έρχεται από μία συσκευή· ποτέ ανακατεμένα.', style: hint),
-                        ],
+                      padding: EdgeInsets.zero,
+                      child: NavRow(
+                        key: const ValueKey('me-sources'),
+                        icon: Icons.hub_outlined,
+                        color: c.health,
+                        title: 'Πηγές',
+                        text: 'Ποια συσκευή δίνει κάθε μέτρηση, από πότε',
+                        line: true,
+                        onTap: () => Navigator.of(context).push(SourcesPage.route(widget.store)),
+                      ),
+                    ),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: NavRow(
+                        key: const ValueKey('me-devices'),
+                        icon: Icons.layers_rounded,
+                        color: c.health,
+                        title: 'Τι μετράει κάθε συσκευή',
+                        text: 'Μέτρηση, εκτίμηση, ενδεικτικό',
+                        onTap: () => Navigator.of(context).push(DevicesPage.route()),
                       ),
                     ),
                   ],
@@ -205,6 +231,39 @@ class _MePageState extends State<MePage> {
           ),
         );
       },
+    );
+  }
+
+  /// «Τα προϊόντα μου» και «Η κουζίνα μου» (πριν: υπο-καρτέλα «Τα δικά μου» της Διατροφής).
+  Widget _nutrition(BuildContext context, FoodStore food) {
+    final c = Aigaio.of(context);
+    final n = food.mine.length;
+    final k = Kitchen.fromJson(widget.store.prefs.kitchen);
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        NavRow(
+          key: const ValueKey('mine-products'),
+          icon: Icons.inventory_2_outlined,
+          color: c.food,
+          title: 'Τα προϊόντα μου',
+          text: n == 0
+              ? 'Πέρασε ό,τι αγοράζεις, με «Σάρωση» ή από την ετικέτα, χωρίς να το φας.'
+              : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · αλλαγή, αντιγραφή, διαγραφή',
+          line: true,
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: food))),
+        ),
+        NavRow(
+          key: const ValueKey('mine-kitchen'),
+          icon: Icons.soup_kitchen_outlined,
+          color: c.food,
+          title: 'Η κουζίνα μου',
+          text: '${countText(k.devices.length, 'συσκευή', 'συσκευές')} · ${countText(k.cookware.length, 'σκεύος', 'σκεύη')} · για τις συνταγές, όταν έρθουν',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'Η κουζίνα μου'), builder: (_) => KitchenScreen(store: widget.store))),
+        ),
+      ]),
     );
   }
 }
@@ -235,8 +294,13 @@ class _DayChip extends StatelessWidget {
           child: SizedBox(
             height: 44,
             child: Center(
-              child: Text(label,
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? c.onSolid : c.text)),
+              // Μεγάλα γράμματα: η συντομογραφία μικραίνει για να χωρά, ποτέ κομμένη (σχέδια 9/11).
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(label,
+                    maxLines: 1,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? c.onSolid : c.text)),
+              ),
             ),
           ),
         ),

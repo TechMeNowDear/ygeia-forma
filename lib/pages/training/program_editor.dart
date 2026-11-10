@@ -131,7 +131,7 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(w.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
                 Text(
-                  w.isCardio ? '${w.cardio!.name} · ${w.cardio!.minutes}′' : '${w.items.length} ασκήσεις · ~${w.minutes}′',
+                  w.isCardio ? '${w.cardio!.name} · ${w.cardio!.minutes}′' : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · ~${w.minutes}′',
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                 ),
                 if (!w.isCardio && w.items.isNotEmpty)

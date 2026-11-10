@@ -68,7 +68,7 @@ class _PickerState extends State<_Picker> {
             Text(e.equip, style: TextStyle(fontSize: 13, color: c.textSecondary)),
             if (e.caution != null)
               Row(children: [
-                Icon(Icons.warning_amber_rounded, size: 15, color: c.exercise),
+                Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
                 const SizedBox(width: 4),
                 Flexible(child: Text('Σταδιακά, χωρίς πόνο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.exercise))),
               ]),

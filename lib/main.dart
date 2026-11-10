@@ -16,10 +16,8 @@ import 'pages/category.dart';
 import 'pages/food_add.dart';
 import 'pages/heart.dart';
 import 'pages/metric_page.dart';
-import 'pages/mine.dart';
 import 'pages/move.dart';
 import 'pages/nutrition.dart';
-import 'pages/recovery.dart';
 import 'pages/settings.dart';
 import 'pages/sleep.dart';
 import 'pages/today.dart';
@@ -180,15 +178,18 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   late int _index = widget.initialIndex;
-  late final FoodStore _food = widget.food ?? FoodStore.preloaded(foods: const []);
-  late final _healthTab = ValueNotifier(widget.initialIndex == Cat.health ? widget.initialTab : 0);
-  late final _foodTab = ValueNotifier(widget.initialIndex == Cat.food ? widget.initialTab : 0);
+  late final FoodStore _food = FoodStore.shared = widget.food ?? FoodStore.preloaded(foods: const []);
+  late final _healthTab = ValueNotifier(widget.initialIndex == Cat.health && widget.initialTab < _healthTabs.length ? widget.initialTab : 0);
+  late final _foodTab = ValueNotifier(0);
   late final _exerciseTab = ValueNotifier(widget.initialIndex == Cat.exercise ? widget.initialTab : 0);
 
   // Για την αναφορά σφαλμάτων: σε ποια κατηγορία και καρτέλα είμαι.
   static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
-  static const _healthTabs = ['Ύπνος', 'Ανάκαμψη', 'Καρδιά', 'Σώμα', 'Τάσεις'];
-  static const _foodTabs = ['Ημερολόγιο', 'Τα δικά μου'];
+  static const _healthTabs = ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'];
+
+  /// Σχέδια 9/11 (10β): η Διατροφή είναι μία σελίδα, χωρίς υπο-καρτέλες. «Τα προϊόντα μου» φαίνονται στο «+ Φαγητό»
+  /// (Δικά μου) και, μαζί με την κουζίνα, στο «Τα στοιχεία μου».
+  static const _foodTabs = ['Ημερολόγιο'];
   static const _exerciseTabs = ['Προπόνηση', 'Κίνηση', 'Ασκήσεις'];
 
   /// Πάτημα σε widget της αρχικής οθόνης: «w:<είδος>:<πάτημα>:<κεντρική τιμή>» (HomeWidgets.kt).
@@ -262,7 +263,7 @@ class _ShellState extends State<Shell> {
   void _open(int category, [int? tab]) {
     if (tab != null) {
       if (category == Cat.health) _healthTab.value = tab;
-      if (category == Cat.food) _foodTab.value = tab;
+      if (category == Cat.food) _foodTab.value = FoodTab.diary;
       if (category == Cat.exercise) _exerciseTab.value = tab;
     }
     _go(category);
@@ -289,8 +290,7 @@ class _ShellState extends State<Shell> {
         tabs: _healthTabs,
         pages: [
           SleepPage(store: store, now: widget.now),
-          RecoveryPage(store: store, now: widget.now),
-          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.recovery),
+          HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.sleep),
           BodyPage(store: store),
           TrendsPage(store: store, now: widget.now),
         ],
@@ -301,11 +301,10 @@ class _ShellState extends State<Shell> {
         solid: c.foodSolid,
         tab: _foodTab,
         now: widget.now,
-        tabs: const ['Ημερολόγιο', 'Τα δικά μου'],
+        tabs: _foodTabs,
         pages: [
           // Οθόνες φαγητού: κουμπιά στο χρώμα της Διατροφής, σε κάθε θέμα.
           FoodTheme(child: NutritionPage(food: _food, now: widget.now)),
-          FoodTheme(child: MinePage(food: _food, store: store)),
         ],
       ),
       CategoryPage(
@@ -408,13 +407,16 @@ class _NavItem extends StatelessWidget {
                 child: Icon(selected ? dest.selectedIcon : dest.icon, size: 21, color: iconColor),
               ),
               const SizedBox(height: 4),
-              Text(
-                dest.label,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: selected ? c.navLabel : c.navIdle,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  dest.label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: selected ? c.navLabel : c.navIdle,
+                  ),
                 ),
               ),
             ],
@@ -436,8 +438,12 @@ class _BottomBar extends StatelessWidget {
     final c = Aigaio.of(context);
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Container(
-        height: 68,
+      // Μεγάλα γράμματα (σχέδια 9/11): η μπάρα ψηλώνει όσο χρειάζεται (πριν: σταθερά 68 dp, ξεχείλιζε στο 1,3×)· τα
+      // ονόματα μεγαλώνουν ως 1,5×, για να χωρούν και τα τέσσερα σε μία γραμμή.
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.5,
+        child: Container(
+        constraints: const BoxConstraints(minHeight: 68),
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           color: c.nav,
@@ -459,6 +465,7 @@ class _BottomBar extends StatelessWidget {
           ],
         ),
       ),
+      )
     );
   }
 }

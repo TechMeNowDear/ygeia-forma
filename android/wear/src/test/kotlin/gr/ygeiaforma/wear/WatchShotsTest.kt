@@ -74,11 +74,33 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.HOME
         Repo.resetExercise()
         Repo.alarm.limit = null
+        WatchView.noHrSeenNow = false
     }
 
-    private fun shot(name: String, ambient: Boolean = false) {
+    /** Έλεγχος premium (M4): με 3 προπονήσεις βαρών το τρίτο κουμπί φτάνει σε όλες, κυκλικά. */
+    @Test
+    fun allWorkoutsReachable() {
+        assertEquals("B", nextStrength(listOf("A", "B", "C"), "A"))
+        assertEquals("C", nextStrength(listOf("A", "B", "C"), "B"))
+        assertEquals("A", nextStrength(listOf("A", "B", "C"), "C"))
+        assertEquals(null, nextStrength(listOf("A"), "A"))
+        // Επανέλεγχος: «1 άσκηση», όχι «1 ασκήσεις».
+        assertEquals("1 άσκηση", countText(1, "άσκηση", "ασκήσεις"))
+        assertEquals("4 ασκήσεις", countText(4, "άσκηση", "ασκήσεις"))
+        val three = planJson.replace(
+            "{\"id\":\"walk\"",
+            "{\"id\":\"C\",\"name\":\"Προπόνηση Γ\",\"minutes\":40,\"items\":[{\"ex\":\"goblet\",\"name\":\"Κάθισμα\",\"rest\":90,\"lo\":8,\"hi\":12,\"rir\":2,\"sets\":[{\"load\":12,\"label\":\"12 kg\",\"reps\":10}]}]},\n          {\"id\":\"walk\"",
+        )
+        Repo.applyPlan(Plan.parse(three))
+        Repo.screen = Repo.Screen.HOME
+        // Μετά το Β, το τρίτο κουμπί δείχνει τη Γ (πριν: ξανά την Α, η Γ δεν φαινόταν ποτέ).
+        shot("W1d_home_third_workout") { it.chosen = "B" }
+    }
+
+    private fun shot(name: String, ambient: Boolean = false, prep: (WatchView) -> Unit = {}) {
         val v = WatchView(RuntimeEnvironment.getApplication(), noop)
         v.ambient = ambient
+        prep(v)
         val spec = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
         v.measure(spec, spec)
         v.layout(0, 0, size, size)
@@ -111,6 +133,10 @@ class WatchShotsTest {
 
         Repo.screen = Repo.Screen.HOME
         shot("W1_home")
+        // Σχέδια 9/11: τα γράμματα ακολουθούν τη ρύθμιση μεγέθους του ρολογιού, ως 1,3×.
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W1c_home_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         val s = LiveSession.fromPlan(Repo.plan!!.todayWorkout!!, now - 18 * 60_000)
         Repo.local = s
@@ -165,6 +191,9 @@ class WatchShotsTest {
         Repo.bpmAt = now
         Repo.screen = Repo.Screen.WALK
         shot("W7_walk")
+        RuntimeEnvironment.setFontScale(1.3f)
+        shot("W7g_walk_font13")
+        RuntimeEnvironment.setFontScale(1f)
 
         // 9/11 (V-A-04): περπάτημα με όριο, χωρίς κανέναν παλμό: «το όριο δεν σε προσέχει».
         Repo.alarm.limit = 140
@@ -172,6 +201,8 @@ class WatchShotsTest {
         Repo.bpmAt = 0
         Repo.hrSilent = HrSilence.Silence.NEVER
         shot("W7d_walk_no_hr_limit")
+        // Σχέδια 9/11 (7γ): μετά το «Εντάξει» μένει «♥ —» σε κεχριμπάρι.
+        shot("W7f_walk_no_hr_after_ok") { it.noHrSeen = true }
         Repo.hrSilent = null
         Repo.bpm = 104
         Repo.bpmAt = now

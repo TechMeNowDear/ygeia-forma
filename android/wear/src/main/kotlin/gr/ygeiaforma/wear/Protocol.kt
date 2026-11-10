@@ -726,11 +726,11 @@ fun clock(sec: Long): String {
 /** «2,18» km. */
 fun km(meters: Double): String = "%.2f".format(java.util.Locale.ROOT, meters / 1000.0).replace('.', ',')
 
-/** Ρυθμός ανά km: «11′15″». */
+/** Ρυθμός ανά km, ίδιος με το κινητό (σχέδια 9/11): «11:15 /km». Στρογγυλεύει πριν χωρίσει, άρα ποτέ «10:60». */
 fun pace(meters: Double, sec: Long): String {
     if (meters < 50 || sec <= 0) return "—"
-    val p = (sec / (meters / 1000.0)).toLong()
-    return "%d′%02d″".format(p / 60, p % 60)
+    val p = Math.round(sec / (meters / 1000.0))
+    return "%d:%02d /km".format(java.util.Locale.ROOT, p / 60, p % 60)
 }
 
 /** Πότε σβήνει το ρολόι τα δεδομένα του μετά από «Διαγραφή όλων» στο κινητό (καθαρό, με δοκιμές). */

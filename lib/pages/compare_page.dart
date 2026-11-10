@@ -158,7 +158,7 @@ class ComparePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Ρολόι σε κομμάτια: ${summary.splitNights} από ${summary.nights} νύχτες',
+                    'Ρολόι σε κομμάτια: ${summary.splitNights} από ${countText(summary.nights, 'νύχτα', 'νύχτες')}',
                     style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                   ),
                 ],

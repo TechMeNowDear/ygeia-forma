@@ -91,9 +91,7 @@ String? kmValue(Session s) {
   final v = (m / 1000).toStringAsFixed(2).replaceAll('.', ',');
   return distanceFromSteps(s) ? '≈ $v' : v;
 }
-
-/// «13′17″».
-String paceText(int sec) => '${sec ~/ 60}′${(sec % 60).toString().padLeft(2, '0')}″';
+/// Ο ρυθμός γράφεται με το [paceText] του format.dart («11:15 /km»).
 
 /// Συνολικός χρόνος παύσεων (δευτερόλεπτα).
 int pausedSec(Session s) => s.pauses.fold(0, (a, p) => a + (p[1] - p[0]).clamp(0, 1 << 30));

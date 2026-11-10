@@ -5,7 +5,10 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
@@ -46,6 +49,39 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private val gray = Color.parseColor("#9CA3AF")
     private val dim = Color.parseColor("#374151")
     private val card = Color.parseColor("#1F2937")
+
+    // Σχέδια 9/11 (7α–7γ): κουμπιά αρχικής, ανοιχτό «Τέλος», κεχριμπάρι «προσοχή», απαλό κόκκινο-σομόν για την καρδιά.
+    private val button2 = Color.parseColor("#2B303B")
+    private val button3 = Color.parseColor("#1C2028")
+    private val light = Color.parseColor("#E8ECF4")
+    private val ink = Color.parseColor("#0F172A")
+    private val amber = Color.parseColor("#F2B13C")
+    private val amberSoft = Color.parseColor("#F7D9A0")
+    private val amberInk = Color.parseColor("#2A1A04")
+    private val salmon = Color.parseColor("#F28B6C")
+    private val soft = Color.parseColor("#C7CDD8")
+
+    /**
+     * Μέγεθος γραμμάτων του ρολογιού (σχέδια 9/11): τα κείμενα της αρχικής, του περπατήματος και της οθόνης «δεν
+     * έρχονται παλμοί» ακολουθούν τη ρύθμιση του ρολογιού, ως 1,3×.
+     */
+    private val fs: Float get() = resources.configuration.fontScale.coerceIn(1f, 1.3f)
+
+    /**
+     * «Δεν έρχονται παλμοί» με όριο γιατρού (σχέδια 9/11, 7γ): όλη η οθόνη, μία φορά για κάθε σιωπή. Μετά το
+     * «Εντάξει» μένει «♥ —» σε κεχριμπάρι ώσπου να ξαναέρθουν παλμοί. Μόνο εμφάνιση· η δόνηση είναι όπως πριν.
+     */
+    var noHrSeen: Boolean
+        get() = noHrSeenNow
+        set(v) {
+            noHrSeenNow = v
+        }
+
+    companion object {
+        /** Κρατιέται και αν ξαναφτιαχτεί η οθόνη (π.χ. αλλαγή μεγέθους γραμμάτων), για να μη ξαναβγεί (N3). */
+        @JvmStatic
+        internal var noHrSeenNow = false
+    }
 
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -101,6 +137,13 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             return
         }
         noticeOpen = false
+        if (Repo.hrSilent == null) noHrSeen = false
+        if (!noHrSeen && Repo.running != null && Repo.alarm.limit != null && Repo.hrSilent != null &&
+            Repo.screen != Repo.Screen.HOME && Repo.screen != Repo.Screen.END && Repo.screen != Repo.Screen.RECOVER
+        ) {
+            drawNoHr(c)
+            return
+        }
         // Πάτημα στο μήνυμα: ολόκληρο (π.χ. η αιτία όταν δεν ξεκινά η μέτρηση· 9/11). Πρώτο στη λίστα, ώστε τα
         // κουμπιά της οθόνης να κερδίζουν όπου ακουμπούν.
         if (note != null) hits.add(Hit(RectF(cx - 60 * u, 176 * u, cx + 60 * u, 198 * u)) { noticeOpen = true; invalidate() })
@@ -247,10 +290,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val over = fresh && Repo.alarm.limit != null && Repo.bpm >= Repo.alarm.limit!!
         if (!fresh && Repo.running != null) {
             // Δεν φτάνουν τιμές: να φαίνεται, όχι μια παύλα που μοιάζει με «όλα καλά».
-            t(c, "♥ δεν μετριούνται", y, if (Repo.alarm.limit != null) orange else gray, size * 0.75f, true)
+            t(c, "♥ δεν μετριούνται", y, if (Repo.alarm.limit != null) amber else gray, size * 0.75f, true)
             // Με όριο γιατρού (έλεγχος 9/11, V-A-04): ξεκάθαρα ότι το όριο δεν προσέχει τώρα. Μόνο μετά την αναμονή (ίδια
             // στιγμή με τη δόνηση και με το κινητό), όχι στα πρώτα δευτερόλεπτα κάθε έναρξης.
-            if (Repo.alarm.limit != null && Repo.hrSilent != null) t(c, "το όριο δεν σε προσέχει", y + size * 0.85f, orange, size * 0.62f, false, 120f)
+            if (Repo.alarm.limit != null && Repo.hrSilent != null) t(c, "το όριο δεν σε προσέχει", y + size * 0.85f, amber, size * 0.62f, false, 120f)
             return
         }
         val s = if (fresh) "♥ ${Repo.bpm}" else "♥ —"
@@ -296,7 +339,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         if (plan != null || Repo.knownLimit != null) {
             // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11)· και χωρίς πρόγραμμα, το τελευταίο που ήρθε (V-A-06).
             val lim = Repo.limitNow()
-            if (!Repo.updateNeeded) small(c, if (lim != null) "όριο παλμών $lim" else "χωρίς όριο παλμών", 34f, if (lim != null) orange else gray, 8f, 96f)
+            // «Σήμερα» μόνο όταν το πρώτο κουμπί είναι η σημερινή· αλλιώς «Άλλη» (N5).
+            val isToday = chosen == null || chosen == plan?.todayWorkout?.id
+            if (!Repo.updateNeeded) twoTone(c, if (isToday) "Σήμερα · " else "Άλλη προπόνηση · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
@@ -309,31 +354,25 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                 pill(c, "Περπάτημα", 132f, 96f, 30f, card, Color.WHITE) { actions.startWalk() }
             }
             today?.isCardio == true && chosen == null -> {
-                small(c, "ΣΗΜΕΡΑ", 52f, gray, 9f, 120f)
-                t(c, today.cardio?.name ?: "Περπάτημα", 74f, Color.WHITE, 15f, true)
-                small(c, "${today.cardio?.minutes ?: 30}′ ${today.cardio?.note ?: ""}".trim(), 92f, gray, 9f, 140f)
-                pill(c, "Ξεκίνα", 122f, 90f, 30f, orange, Color.WHITE) { actions.startWalk() }
-                if (strength.isNotEmpty()) {
-                    val w = strength.first()
-                    hits.add(Hit(RectF(cx - 60 * u, 142 * u, cx + 60 * u, 162 * u)) { chosen = w.id; invalidate() })
-                    small(c, "Προπόνηση με βάρη ›", 154f, gray, 9f, 120f)
-                }
+                // Μέρα περπατήματος: πρώτο το περπάτημα, δεύτερη η προπόνηση με βάρη.
+                val w = strength.firstOrNull()
+                homeButton(c, today.cardio?.name ?: "Περπάτημα", "${today.cardio?.minutes ?: 30} λ${today.cardio?.note?.let { " · $it" } ?: ""}",
+                    44f, orange, Color.WHITE) { actions.startWalk() }
+                if (w != null) homeButton(c, w.name, null, 92f, button2, Color.WHITE) { actions.startWorkout(w.id) }
             }
             shown != null -> {
-                small(c, if (shown.id == today?.id) "ΣΗΜΕΡΑ" else "ΑΛΛΗ ΠΡΟΠΟΝΗΣΗ", 50f, gray, 9f, 120f)
-                t(c, shown.name, 72f, Color.WHITE, 15f, true)
-                small(c, "${shown.items.size} ασκήσεις · ~${shown.minutes}′", 90f, gray, 9f, 140f)
-                if (strength.size > 1) {
-                    // Πάτημα στο όνομα: η επόμενη προπόνηση του προγράμματος.
-                    hits.add(Hit(RectF(cx - 70 * u, 56 * u, cx + 70 * u, 96 * u)) {
-                        val i = strength.indexOfFirst { it.id == shown.id }
-                        chosen = strength[(i + 1) % strength.size].id
-                        invalidate()
-                    })
+                // Σχέδια 9/11 (7α): δύο ίσα κουμπιά ~48 dp και η άλλη προπόνηση τρίτη, χωρίς κρυφή χειρονομία.
+                homeButton(c, shown.name, "${countText(shown.items.size, "άσκηση", "ασκήσεις")} · ${shown.minutes} λ", 44f, orange, Color.WHITE) {
+                    actions.startWorkout(shown.id)
                 }
-                pill(c, "Ξεκίνα", 120f, 90f, 30f, orange, Color.WHITE) { actions.startWorkout(shown.id) }
-                hits.add(Hit(RectF(cx - 60 * u, 140 * u, cx + 60 * u, 164 * u)) { actions.startWalk() })
-                small(c, "↓ Περπάτημα", 154f, gray, 9f, 120f)
+                homeButton(c, "Περπάτημα", null, 92f, button2, Color.WHITE) { actions.startWalk() }
+                val otherId = nextStrength(strength.map { it.id }, shown.id)
+                val other = strength.firstOrNull { it.id == otherId }
+                if (other != null) {
+                    // Πάτημα: έρχεται πρώτη (δεν ξεκινά αμέσως· μία απόφαση ανά οθόνη). Η επόμενη στη σειρά του
+                    // προγράμματος, κυκλικά: με 3+ προπονήσεις φτάνεις σε όλες (έλεγχος premium, M4).
+                    homeButton(c, other.name, null, 138f, button3, soft, h = 36f, w = 116f, size = 11f) { chosen = other.id; invalidate() }
+                }
             }
             else -> {
                 small(c, "ΣΗΜΕΡΑ", 56f, gray, 9f, 120f)
@@ -454,21 +493,164 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     // ------------------------------------------------------------------ Ε. περπάτημα
     private fun drawWalk(c: Canvas, now: Long) {
-        small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 50f, if (Repo.paused) orange else gray, 9f, 120f)
+        // Σχέδια 9/11 (7β): μεγάλος χρόνος, «2,18 km · 11:15 /km», παλμοί με όριο, «Παύση» σκούρο και «Τέλος» ανοιχτό.
+        text.letterSpacing = 0.08f
+        small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 33f, if (Repo.paused) orange else soft, 9.5f * fs, 120f)
+        text.letterSpacing = 0f
         // Ο χρόνος προχωρά κάθε δευτερόλεπτο από το σημείο ελέγχου του Health Services (W3-12).
         val sec = Repo.activeSecNow(now).let { if (it > 0 || Repo.cpWall > 0) it else (now - Repo.startedAt) / 1000 }
-        t(c, clock(sec), 88f, if (Repo.paused) gray else Color.WHITE, 30f, true)
+        fit(c, clock(sec), 78f, if (Repo.paused) gray else Color.WHITE, 40f * fs, 150f)
         val dist = if (Repo.meters > 0) "${km(Repo.meters)} km · ${pace(Repo.meters, sec)}" else if (Repo.steps > 0) "${Repo.steps} βήματα" else "—"
-        small(c, dist, 108f, Color.WHITE, 11f, 150f)
-        heart(c, 128f, now, 11f)
-        // Χωρίς όριο: να φαίνεται (W3-18), όχι σιωπηλά.
+        text.typeface = Typeface.DEFAULT_BOLD
+        fitPlain(c, dist, 96f, Color.WHITE, 10.5f * fs, 150f)
+        walkHeart(c, 117f, now)
+        // Χωρίς όριο ή χωρίς GPS: να φαίνεται (W3-18), όχι σιωπηλά.
         val tags = listOfNotNull(if (!Repo.gps) "χωρίς GPS" else null, if (Repo.alarm.limit == null) "χωρίς όριο παλμών" else null)
-        if (tags.isNotEmpty()) small(c, tags.joinToString(" · "), 146f, gray, 8f, 150f)
-        // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν).
-        pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 72f, 166f, 54f, 26f, if (Repo.paused) orange else card, Color.WHITE, 10f) {
+        if (tags.isNotEmpty()) small(c, tags.joinToString(" · "), 135f, gray, 8.5f, 150f)
+        // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν). ~40 u ≈ 48 dp ύψος.
+        pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 69f, 158f, 60f, 36f, if (Repo.paused) orange else button2, Color.WHITE, 11.5f * fs) {
             actions.pauseWalk(!Repo.paused)
         }
-        pillAt(c, "Τέλος", 128f, 166f, 50f, 26f, card, Color.WHITE, 10f) { actions.finishWorkout() }
+        pillAt(c, "Τέλος", 133f, 158f, 60f, 36f, light, ink, 11.5f * fs) { actions.finishWorkout() }
+    }
+
+    /** «♥ 104  όριο 140» και γραμμή ως το όριο· χωρίς παλμούς «♥ —» (κεχριμπάρι με όριο). */
+    private fun walkHeart(c: Canvas, y: Float, now: Long) {
+        val fresh = Repo.hrLive(now)
+        val lim = Repo.alarm.limit
+        val over = fresh && lim != null && Repo.bpm >= lim
+        if (!fresh && Repo.running != null && lim == null) {
+            t(c, "♥ δεν μετριούνται", y, gray, 9.5f * fs, true)
+            return
+        }
+        val heartC = if (!fresh) amber else if (over) red else salmon
+        val num = if (fresh) "${Repo.bpm}" else "—"
+        val tail = if (lim != null) "   όριο $lim" else ""
+        text.textSize = 15f * fs * u
+        text.typeface = Typeface.DEFAULT_BOLD
+        val wHeart = text.measureText("♥ ")
+        val wNum = text.measureText(num)
+        text.textSize = 9.5f * fs * u
+        text.typeface = Typeface.DEFAULT
+        val wTail = text.measureText(tail)
+        var x = cx - (wHeart + wNum + wTail) / 2
+        val old = text.textAlign
+        text.textAlign = Paint.Align.LEFT
+        text.textSize = 15f * fs * u
+        text.typeface = Typeface.DEFAULT_BOLD
+        text.color = heartC
+        c.drawText("♥ ", x, y * u, text)
+        x += wHeart
+        text.color = if (over) red else if (fresh) Color.WHITE else amber
+        c.drawText(num, x, y * u, text)
+        x += wNum
+        text.textSize = 9.5f * fs * u
+        text.typeface = Typeface.DEFAULT
+        text.color = gray
+        c.drawText(tail, x, y * u, text)
+        text.textAlign = old
+        if (!fresh || lim == null) return
+        val w = 100f
+        val x0 = cx - w * u / 2
+        val yy = (y + 6) * u
+        fill.color = dim
+        c.drawRoundRect(RectF(x0, yy, x0 + w * u, yy + 3.5f * u), 2 * u, 2 * u, fill)
+        val lo = 60f
+        val hi = lim + 20f
+        val p = ((Repo.bpm - lo) / (hi - lo)).coerceIn(0f, 1f)
+        fill.color = if (over) red else salmon
+        c.drawRoundRect(RectF(x0, yy, x0 + w * u * p, yy + 3.5f * u), 2 * u, 2 * u, fill)
+        val lp = ((lim - lo) / (hi - lo)).coerceIn(0f, 1f)
+        fill.color = Color.WHITE
+        c.drawRect(RectF(x0 + w * u * lp - 0.7f * u, yy - 2f * u, x0 + w * u * lp + 0.7f * u, yy + 5.5f * u), fill)
+    }
+
+    /** Σχέδια 9/11 (7γ): «Δεν έρχονται παλμοί» με όριο γιατρού, σε όλη την οθόνη, με «Εντάξει». */
+    private fun drawNoHr(c: Canvas) {
+        fill.shader = RadialGradient(cx, cy * 0.85f, width * 0.62f, Color.parseColor("#5A3A0A"), Color.parseColor("#1E1404"), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fill)
+        fill.shader = null
+        // Τρίγωνο προσοχής.
+        val tri = Path().apply {
+            moveTo(cx, 24f * u)
+            lineTo(cx + 11f * u, 43f * u)
+            lineTo(cx - 11f * u, 43f * u)
+            close()
+        }
+        ring.color = amber
+        ring.strokeWidth = 2.4f * u
+        ring.strokeJoin = Paint.Join.ROUND
+        c.drawPath(tri, ring)
+        fill.color = amber
+        c.drawRect(cx - 1.1f * u, 30f * u, cx + 1.1f * u, 37f * u, fill)
+        c.drawCircle(cx, 40f * u, 1.3f * u, fill)
+        val lim = Repo.alarm.limit
+        t(c, "Δεν έρχονται", 62f, Color.WHITE, 15f * fs, true, 160f)
+        t(c, "παλμοί", 80f, Color.WHITE, 15f * fs, true, 160f)
+        // Ίδια ελεγμένη φράση με το κινητό και την ειδοποίηση (V-A-04/05): «δεν σε προσέχει».
+        t(c, "Το όριο $lim δεν σε", 99f, amberSoft, 11.5f * fs, true, 170f)
+        t(c, "προσέχει τώρα", 115f, amberSoft, 11.5f * fs, true, 170f)
+        t(c, "Σφίξε λίγο το λουράκι", 131f, soft, 10f * fs, false, 160f)
+        pill(c, "Εντάξει", 160f, 100f, 38f, amber, amberInk, 13f * fs) { noHrSeen = true; invalidate() }
+    }
+
+    /** Κουμπί της αρχικής: τίτλος (και μικρή γραμμή) μέσα σε στρογγυλεμένο ορθογώνιο, από το [top] σε u. */
+    private fun homeButton(
+        c: Canvas, title: String, sub: String?, top: Float, bg: Int, fg: Int,
+        h: Float = 40f, w: Float = 144f, size: Float = 13f, run: () -> Unit,
+    ) {
+        val r = RectF(cx - w * u / 2, top * u, cx + w * u / 2, (top + h) * u)
+        fill.color = bg
+        c.drawRoundRect(r, h * u / 2, h * u / 2, fill)
+        if (sub == null) {
+            text.typeface = Typeface.DEFAULT_BOLD
+            fitPlain(c, title, (top + h / 2) / 1f + 0.36f * size * fs, fg, size * fs, w - 16f)
+        } else {
+            text.typeface = Typeface.DEFAULT_BOLD
+            fitPlain(c, title, top + h * 0.46f, fg, 12.5f * fs, w - 16f)
+            text.typeface = Typeface.DEFAULT
+            fitPlain(c, sub, top + h * 0.82f, fg, 9.5f * fs, w - 16f)
+        }
+        hits.add(Hit(RectF(r.left - 2 * u, r.top - 3 * u, r.right + 2 * u, r.bottom + 3 * u), run))
+    }
+
+    /** Σαν το [fit] αλλά με όποια γραμματοσειρά έχει ήδη το [text]. */
+    private fun fitPlain(c: Canvas, s: String, y: Float, color: Int, size: Float, maxW: Float) {
+        text.color = color
+        var sz = size
+        text.textSize = sz * u
+        while (text.measureText(s) > maxW * u && sz > 8f) {
+            sz -= 0.5f
+            text.textSize = sz * u
+        }
+        c.drawText(s, cx, y * u, text)
+    }
+
+    /** Δύο χρώματα σε μία κεντραρισμένη γραμμή («Σήμερα · » γκρι + «όριο 140» χρώμα). */
+    private fun twoTone(c: Canvas, a: String, b: String, y: Float, colorB: Int, size0: Float) {
+        // Μικραίνει ώσπου να χωρά στον κύκλο (π.χ. «Άλλη προπόνηση · όριο 140» με γράμματα 1,3×).
+        var size = size0
+        var wa: Float
+        var wb: Float
+        while (true) {
+            text.textSize = size * u
+            text.typeface = Typeface.DEFAULT
+            wa = text.measureText(a)
+            text.typeface = Typeface.DEFAULT_BOLD
+            wb = text.measureText(b)
+            if (wa + wb <= 136f * u || size <= 8f) break
+            size -= 0.5f
+        }
+        val old = text.textAlign
+        text.textAlign = Paint.Align.LEFT
+        val x = cx - (wa + wb) / 2
+        text.typeface = Typeface.DEFAULT
+        text.color = soft
+        c.drawText(a, x, y * u, text)
+        text.typeface = Typeface.DEFAULT_BOLD
+        text.color = colorB
+        c.drawText(b, x + wa, y * u, text)
+        text.textAlign = old
     }
 
     /**
@@ -561,3 +743,16 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         return super.onGenericMotionEvent(e)
     }
 }
+
+/**
+ * Η επόμενη προπόνηση βαρών μετά την [shownId], κυκλικά στη σειρά του προγράμματος (null αν υπάρχει μόνο μία).
+ * Το τρίτο κουμπί της αρχικής: πατώντας το ξανά και ξανά φτάνεις σε όλες.
+ */
+internal fun nextStrength(ids: List<String>, shownId: String): String? {
+    if (ids.size < 2) return null
+    val i = ids.indexOf(shownId)
+    return ids[(i + 1).mod(ids.size)].takeIf { it != shownId }
+}
+
+/** «1 άσκηση» / «4 ασκήσεις». */
+internal fun countText(n: Int, one: String, many: String): String = if (n == 1) "1 $one" else "$n $many"

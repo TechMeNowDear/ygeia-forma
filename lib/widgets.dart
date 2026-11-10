@@ -72,16 +72,45 @@ class PageTitle extends StatelessWidget {
               color: eyebrowColor ?? c.textSecondary,
             ),
           ),
-        Text(
-          title,
-          style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -1.1, color: c.text),
+        // Σχέδια 9/11: με μεγάλα γράμματα ο τίτλος μικραίνει για να χωρά, ποτέ σπασμένη λέξη («Καλησπ/έρα»).
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            title,
+            maxLines: 1,
+            style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -1.1, color: c.text),
+          ),
         ),
       ],
     );
   }
 }
 
+/// Πολύ μεγάλα γράμματα (πάνω από 1,5×): οι κάρτες που κάθονται δίπλα δίπλα πάνε η μία κάτω από την άλλη.
+bool veryLargeText(BuildContext context) => MediaQuery.textScalerOf(context).scale(10) > 15.01;
+
+/// Χωράει κάθε λέξη των [texts] σε πλάτος [width]; (αλλιώς μια στενή στήλη θα έσπαγε λέξη στη μέση).
+bool wordsFit(BuildContext context, Iterable<String> texts, TextStyle style, double width) {
+  final scaler = MediaQuery.textScalerOf(context);
+  // Με τη γραμματοσειρά της εφαρμογής (Inter), όπως θα ζωγραφιστεί.
+  final base = DefaultTextStyle.of(context).style;
+  for (final t in texts) {
+    for (final w in t.split(' ')) {
+      final tp = TextPainter(text: TextSpan(text: w, style: base.merge(style)), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
+        ..layout();
+      final over = tp.width > width;
+      tp.dispose();
+      if (over) return false;
+    }
+  }
+  return true;
+}
+
 /// Σκελετός κάθε σελίδας: τίτλος, ανανέωση με τράβηγμα, μία στήλη στο κινητό, δύο σε μεγάλη οθόνη.
+/// Κάρτα που βάζει μόνη της το κενό από πάνω (και τίποτα όταν δεν φαίνεται), π.χ. μια θέση που μπορεί να είναι άδεια.
+mixin SelfSpaced on Widget {}
+
 class PageFrame extends StatelessWidget {
   const PageFrame({
     super.key,
@@ -131,7 +160,7 @@ class PageFrame extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < items.length; i++) ...[
-                    if (i > 0) SizedBox(height: items[i] is SectionHeader ? 22 : gap),
+                    if (i > 0 && items[i] is! SelfSpaced) SizedBox(height: items[i] is SectionHeader ? 22 : gap),
                     items[i],
                   ],
                 ],
@@ -255,6 +284,13 @@ class CardPair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (veryLargeText(context)) {
+      // IntrinsicHeight: οι κάρτες με Spacer (γράφημα κάτω) παίρνουν το φυσικό τους ύψος.
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        IntrinsicHeight(child: first),
+        if (second != null) ...[const SizedBox(height: PageFrame.gap), IntrinsicHeight(child: second!)],
+      ]);
+    }
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -353,18 +389,14 @@ class CardHeader extends StatelessWidget {
           child: subtitle == null
               ? Text(
                   title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                                    style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13.5, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                                            style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                     ),
                     Text(
                       subtitle!,
@@ -419,8 +451,8 @@ class TrendPill extends StatelessWidget {
           Flexible(
             child: Text(
               text,
-              maxLines: maxLines,
-              overflow: TextOverflow.ellipsis,
+              // Ποτέ κομμένο (σχέδια 9/11): αν δεν χωρά, πάει σε δεύτερη γραμμή.
+              maxLines: maxLines < 3 ? 3 : maxLines,
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: color),
             ),
           ),
@@ -442,7 +474,11 @@ class BigValue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return Text.rich(
+    // Ποτέ κομμένος αριθμός ή μονάδα («1.200 k…»): με μεγάλα γράμματα μικραίνει για να χωρά (σχέδια 9/11).
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text.rich(
       TextSpan(
         children: [
           TextSpan(
@@ -467,7 +503,7 @@ class BigValue extends StatelessWidget {
         ],
       ),
       maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -593,28 +629,56 @@ class InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          if (dot != null) ...[
-            Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-            const SizedBox(width: 10),
-          ],
-          Expanded(child: Text(label, style: TextStyle(color: c.textSecondary, fontSize: 15))),
-          const SizedBox(width: 12),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? c.text,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              fontFeatures: tabular,
-            ),
-          ),
-        ],
+    final valueText = Text(
+      value,
+      style: TextStyle(
+        color: valueColor ?? c.text,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        fontFeatures: tabular,
       ),
     );
+    final dotW = dot == null
+        ? null
+        : Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 10), decoration: BoxDecoration(color: dot, shape: BoxShape.circle));
+    // Σχέδια 9/11 (9β): αν μια λέξη της ετικέτας δεν χωρά δίπλα στην τιμή, η τιμή πάει ολόκληρη στην από κάτω
+    // γραμμή, δεξιά· ποτέ σπασμένη λέξη («Σκελετικο/ί») ή σπασμένος αριθμός.
+    final labelStyle = TextStyle(color: c.textSecondary, fontSize: 15);
+    return LayoutBuilder(builder: (context, box) {
+      final scaler = MediaQuery.textScalerOf(context);
+      final tp = TextPainter(
+          text: TextSpan(text: value, style: DefaultTextStyle.of(context).style.merge(valueText.style)),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: 1)
+        ..layout();
+      final valueW = tp.width;
+      tp.dispose();
+      final room = box.maxWidth - valueW - 12 - (dotW == null ? 0 : 18);
+      if (box.maxWidth.isFinite && !wordsFit(context, [label], labelStyle, room)) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              if (dotW != null) dotW,
+              Expanded(child: Text(label, style: labelStyle)),
+            ]),
+            Align(alignment: Alignment.centerRight, child: valueText),
+          ]),
+        );
+      }
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            if (dotW != null) dotW,
+            Expanded(child: Text(label, style: labelStyle)),
+            const SizedBox(width: 12),
+            valueText,
+          ],
+        ),
+      );
+    });
   }
 }
 
@@ -660,9 +724,17 @@ class ScoreRing extends StatelessWidget {
       height: size,
       child: CustomPaint(
         painter: _RingPainter((value ?? 0) / 100, stroke, color, track),
-        child: Center(
-          child: Text(
+        // Ο αριθμός μένει πάντα μέσα στον κύκλο (έλεγχος premium, M1): χωρά στο εσωτερικό του δαχτυλιδιού και μικραίνει
+        // αν χρειαστεί, όποιο κι αν είναι το μέγεθος γραμμάτων του συστήματος (ο κύκλος δεν μεγαλώνει).
+        child: Padding(
+          padding: EdgeInsets.all(stroke + size * 0.08),
+          child: Center(
+          child: FittedBox(
+            key: const ValueKey('score-ring-number'),
+            fit: BoxFit.scaleDown,
+            child: Text(
             value == null ? '—' : value!.round().toString(),
+            maxLines: 1,
             style: TextStyle(
               fontSize: size * 0.34,
               height: 1.0,
@@ -672,6 +744,8 @@ class ScoreRing extends StatelessWidget {
               fontFeatures: tabular,
             ),
           ),
+          ),
+        ),
         ),
       ),
     );
@@ -1524,5 +1598,211 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     return Text(text, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.2));
+  }
+}
+
+/// Τίτλος ομάδας καρτών πάνω από την κάρτα (σχέδια 9/11): μικρά κεφαλαία χωρίς τόνους, γκρι, 24 dp πάνω.
+class GroupLabel extends StatelessWidget {
+  const GroupLabel(this.text, {super.key, this.trailing});
+  final String text;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
+      child: Row(children: [
+        Expanded(
+          child: Text(upperGr(text),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+        ),
+        if (trailing != null) trailing!,
+      ]),
+    );
+  }
+}
+
+/// Γραμμή που ανοίγει άλλη οθόνη, μέσα σε κάρτα: εικονίδιο, τίτλος, μία-δύο γραμμές εξήγηση, «›».
+class NavRow extends StatelessWidget {
+  const NavRow({super.key, required this.icon, required this.color, required this.title, this.text, required this.onTap, this.line = false});
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? text;
+  final VoidCallback onTap;
+
+  /// Λεπτή γραμμή από κάτω (όταν ακολουθεί κι άλλη γραμμή στην ίδια κάρτα).
+  final bool line;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+        child: Row(children: [
+          IconBadge(icon, color, size: 36),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+              if (text != null) ...[
+                const SizedBox(height: 2),
+                Text(text!, style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
+              ],
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Ετικέτα αξιοπιστίας δίπλα στον τίτλο (σχέδια 9/11): «εκτίμηση», «ενδεικτικό», «μέτρηση». Η εξήγηση είναι στο ⓘ.
+class LabelTag extends StatelessWidget {
+  const LabelTag(this.text, {super.key, this.warn = false, this.strong = false});
+  final String text;
+
+  /// «ενδεικτικό»: κεχριμπάρι.
+  final bool warn;
+
+  /// «μέτρηση»: σκούρο περίγραμμα.
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final color = warn ? c.warn : (strong ? c.text : c.textSecondary);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      decoration: BoxDecoration(
+        color: warn ? c.warnBg : null,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: warn ? c.warnLine : (strong ? c.text : c.hairline), width: strong ? 1.5 : 1),
+      ),
+      child: Text(text, maxLines: 1, softWrap: false, style: TextStyle(fontSize: 13, height: 1.5, fontWeight: strong ? FontWeight.w700 : FontWeight.w500, color: color)),
+    );
+  }
+}
+
+/// Οριζόντια μπάρα με κομμάτια (φάσεις ύπνου, μακροθρεπτικά): μικρά κενά ανάμεσα, στρογγυλές άκρες.
+class StackedBar extends StatelessWidget {
+  const StackedBar({super.key, required this.parts, this.height = 12});
+  final List<(double, Color)> parts;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = [for (final p in parts) if (p.$1 > 0) p];
+    if (shown.isEmpty) return SizedBox(height: height);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(height / 2),
+      child: SizedBox(
+        height: height,
+        child: Row(children: [
+          for (var i = 0; i < shown.length; i++) ...[
+            if (i > 0) const SizedBox(width: 2),
+            Expanded(flex: (shown[i].$1 * 100).round().clamp(1, 1 << 30), child: ColoredBox(color: shown[i].$2)),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+/// Κεφαλίδα κάρτας με ετικέτες/ⓘ δεξιά. Με πολύ μεγάλα γράμματα οι ετικέτες πάνε στην από κάτω γραμμή, για να
+/// μη στριμώχνεται ο τίτλος σε σπασμένες λέξεις (σχέδια 9/11).
+class TitleRow extends StatelessWidget {
+  const TitleRow({super.key, required this.header, this.trailing = const []});
+  final Widget header;
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    if (trailing.isEmpty) return header;
+    if (veryLargeText(context)) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        header,
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: trailing),
+      ]);
+    }
+    return Row(children: [Expanded(child: header), ...trailing]);
+  }
+}
+
+/// «7 μέρες», «30 μέρες», «3 μήνες», «1 χρόνος» (σχέδια 9/11: ένα λεξιλόγιο για κάθε επιλογέα περιόδου).
+(String, String) periodWords(int days) => switch (days) {
+      90 => ('3', 'μήνες'),
+      365 => ('1', 'χρόνος'),
+      _ => ('$days', 'μέρες'),
+    };
+
+/// Ο επιλογέας περιόδου της εφαρμογής (σχέδια 9/11, οδηγός): γκρι πλαίσιο, λευκή επιλογή με γράμματα στο χρώμα
+/// της ενότητας (για να μη μοιάζει με τις καρτέλες). Από 1,3× γράμματα: αριθμός πάνω, λέξη κάτω· ποτέ κομμένο.
+class PeriodPicker<T> extends StatelessWidget {
+  const PeriodPicker({super.key, required this.values, required this.days, required this.selected, required this.onChanged, required this.color, this.keyOf});
+  final List<T> values;
+  final int Function(T) days;
+  final T selected;
+  final ValueChanged<T> onChanged;
+
+  /// Χρώμα της ενότητας για την επιλογή.
+  final Color color;
+  final String Function(T)? keyOf;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final twoLines = MediaQuery.textScalerOf(context).scale(10) >= 12.5;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: c.dark ? c.background : c.hairline, borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        for (final v in values)
+          Expanded(
+            child: () {
+              final on = v == selected;
+              final (n, w) = periodWords(days(v));
+              final st = TextStyle(fontFamily: fontFamily, fontSize: 15, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? color : c.textSecondary);
+              return Semantics(
+                selected: on,
+                button: true,
+                child: Material(
+                  color: on ? c.card : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  elevation: on && !c.dark ? 1 : 0,
+                  shadowColor: const Color(0x220F172A),
+                  child: InkWell(
+                    key: keyOf == null ? null : ValueKey(keyOf!(v)),
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => onChanged(v),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          child: twoLines
+                              ? Column(mainAxisSize: MainAxisSize.min, children: [
+                                  Text(n, style: st.copyWith(height: 1.1)),
+                                  FittedBox(fit: BoxFit.scaleDown, child: Text(w, maxLines: 1, style: st.copyWith(height: 1.1))),
+                                ])
+                              : FittedBox(fit: BoxFit.scaleDown, child: Text('$n $w', maxLines: 1, style: st)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }(),
+          ),
+      ]),
+    );
   }
 }

@@ -26,7 +26,11 @@ class MetricSpec {
     this.range,
     this.scale,
     this.periods = const [7, 30, 90],
+    this.format,
   });
+
+  /// Δική της μορφή τιμής (π.χ. διάρκεια ύπνου «7 ω 05 λ»).
+  final String Function(double v)? format;
 
   final String metric;
   final String title;
@@ -51,6 +55,7 @@ class MetricSpec {
   final List<int> periods;
 
   String show(double v) {
+    if (format != null) return format!(v);
     // Απόκλιση (Oura, ±λίγοι βαθμοί) με πρόσημο· απόλυτη τιμή καρπού (ρολόι, ~33 °C) ποτέ ως «+33,6» (έλεγχος 8/11, DATA-04).
     if (signed && v.abs() < 10) return signedDec(v, digits);
     if (signed) return dec(v, digits);
@@ -68,6 +73,9 @@ RefRange? _weightRange(Profile p, DateTime _) {
 const _bodyPeriods = [30, 90, 365];
 
 final metricSpecs = <String, MetricSpec>{
+  // Σχέδια 9/11 (2α): «Ύπνος 30 νυχτών ›» από την κάρτα της τελευταίας νύχτας.
+  K.sleepScore: MetricSpec(metric: K.sleepScore, title: 'Βαθμολογία ύπνου', unit: '/100', color: (c) => c.sleep),
+  K.sleepMin: MetricSpec(metric: K.sleepMin, title: 'Διάρκεια ύπνου', unit: '', color: (c) => c.sleep, format: (v) => hmList(v.round())),
   K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart),
   K.dayHr: MetricSpec(metric: K.dayHr, title: 'Παλμοί ξύπνιος', unit: 'bpm', color: (c) => c.heart, dayComplete: true),
   K.energy: MetricSpec(metric: K.energy, title: 'Ετοιμότητα', unit: '/100', color: (c) => c.energy),
@@ -135,11 +143,6 @@ class MetricPage extends StatefulWidget {
 class _MetricPageState extends State<MetricPage> {
   late int _days = widget.spec.periods[1];
 
-  String _label(int d, bool first) {
-    if (d == 365) return '1 χρόνος';
-    return first ? '$d μέρες' : '$d';
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = widget.spec;
@@ -202,18 +205,14 @@ class _MetricPageState extends State<MetricPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SegmentedButton<int>(
+              PeriodPicker<int>(
                 key: const ValueKey('metric-period'),
-                showSelectedIcon: false,
-                segments: [
-                  for (final d in s.periods)
-                    ButtonSegment(
-                      value: d,
-                      label: Text(_label(d, d == s.periods.first), style: const TextStyle(fontFamily: 'Inter')),
-                    ),
-                ],
-                selected: {_days},
-                onSelectionChanged: (v) => setState(() => _days = v.first),
+                values: s.periods,
+                days: (d) => d,
+                selected: _days,
+                onChanged: (d) => setState(() => _days = d),
+                color: color,
+                keyOf: (d) => 'metric-period-$d',
               ),
               const SizedBox(height: 14),
               if (pts.length >= 2)

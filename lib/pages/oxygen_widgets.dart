@@ -114,15 +114,17 @@ class _OuraOxygenAccessCardState extends State<OuraOxygenAccessCard> {
             Container(
               key: const ValueKey('oura-oxygen-result'),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: c.tint(c.move), borderRadius: BorderRadius.circular(14)),
+              // Σχέδιο Oxygen: κεχριμπάρι «προσοχή» του θέματος (warnBg / warnLine / warn).
+              decoration: BoxDecoration(
+                  color: c.warnBg, border: Border.all(color: c.warnLine), borderRadius: BorderRadius.circular(14)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 if (r == oxygenNoPermissionText)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(children: [
-                      Icon(Icons.warning_amber_rounded, size: 18, color: c.move),
+                      Icon(Icons.warning_amber_rounded, size: 18, color: c.warn),
                       const SizedBox(width: 6),
-                      Expanded(child: Text(oxygenNoPermissionTitle, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text))),
+                      Expanded(child: Text(oxygenNoPermissionTitle, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.warn))),
                     ]),
                   ),
                 Text(r, style: TextStyle(fontSize: 13.5, color: c.text, height: 1.4)),

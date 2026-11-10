@@ -125,28 +125,14 @@ class _PeriodSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = Aigaio.of(context);
-    return SegmentedButton<TrendPeriod>(
-      showSelectedIcon: false,
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? c.primary : c.card,
-        ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? c.onPrimary : c.text,
-        ),
-        side: WidgetStatePropertyAll(BorderSide(color: c.hairline)),
-        textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontFamily: fontFamily, fontSize: 14.5, fontWeight: FontWeight.w600),
-        ),
-        visualDensity: VisualDensity.standard,
-        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 12)),
-      ),
-      segments: [
-        for (final p in TrendPeriod.values) ButtonSegment(value: p, label: Text(periodLabel(p), key: ValueKey('period-${p.name}'))),
-      ],
-      selected: {period},
-      onSelectionChanged: (s) => onChanged(s.first),
+    // Σχέδια 9/11: ο κοινός επιλογέας περιόδου («30 μέρες · 3 μήνες · 1 χρόνος»), επιλογή στο χρώμα της Υγείας.
+    return PeriodPicker<TrendPeriod>(
+      values: TrendPeriod.values,
+      days: periodDays,
+      selected: period,
+      onChanged: onChanged,
+      color: Aigaio.of(context).health,
+      keyOf: (p) => 'period-${p.name}',
     );
   }
 }

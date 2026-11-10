@@ -44,15 +44,71 @@ String targetLine(PlanItem item, Target t) {
     Change.up || Change.variant => (a.good, ' ↑'),
     Change.more => (a.good, ' +1'),
     Change.down || Change.back => (a.textSecondary, ' ↓'),
-    Change.pain => (a.bad, ''),
+    Change.pain => (a.warn, ''),
     _ => (a.textSecondary, ''),
   };
 }
 
+/// Χρώματα των λάστιχων (για την κουκκίδα δίπλα στα lb).
+const bandColors = <String, Color>{
+  'yellow': Color(0xFFEAB308),
+  'blue': Color(0xFF2563EB),
+  'green': Color(0xFF16A34A),
+  'black': Color(0xFF1F2937),
+  'red': Color(0xFFDC2626),
+};
+
+/// Κουκκίδες στο χρώμα των λάστιχων ενός φορτίου (σχέδια 9/11: «● 30 lb» αντί για «πράσινο (30 lb)»).
+class BandDots extends StatelessWidget {
+  const BandDots(this.lb, {super.key, this.size = 14});
+  final double? lb;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final names = (lb ?? 0) <= 0 ? const <String>[] : (bandCombos()[lb!.round()] ?? const <String>[]);
+    if (names.isEmpty) return const SizedBox.shrink();
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      for (final n in names)
+        Container(
+          width: size,
+          height: size,
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: bandColors[n] ?? Colors.grey,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.5),
+            boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 1)],
+          ),
+        ),
+    ]);
+  }
+}
+
+/// «Πράσινο λάστιχο · 30 lb», «Πράσινο + κίτρινο λάστιχο · 40 lb».
+String bandName(double lb) {
+  final names = bandCombos()[lb.round()];
+  // Αδιάσπαστο κενό: «30 lb» ποτέ σε δύο γραμμές.
+  if (names == null || names.isEmpty) return '${lb.round()}\u00A0lb';
+  final t = names.map((n) => bandNames[n]).join(' + ');
+  return '${t[0].toUpperCase()}${t.substring(1)} λάστιχο · ${lb.round()}\u00A0lb';
+}
+
 class Stepper2 extends StatelessWidget {
   const Stepper2(
-      {super.key, required this.value, required this.onMinus, required this.onPlus, this.width = 64, this.button = 40, this.labelMinus = 'Λιγότερο', this.labelPlus = 'Περισσότερο'});
+      {super.key,
+      required this.value,
+      required this.onMinus,
+      required this.onPlus,
+      this.width = 64,
+      this.button = 40,
+      this.labelMinus = 'Λιγότερο',
+      this.labelPlus = 'Περισσότερο',
+      this.leading});
   final String value;
+
+  /// Κάτι πριν από την τιμή (π.χ. η κουκκίδα του λάστιχου).
+  final Widget? leading;
   final VoidCallback? onMinus, onPlus;
   final double width;
 
@@ -81,7 +137,17 @@ class Stepper2 extends StatelessWidget {
       b(Icons.remove_rounded, onMinus, labelMinus),
       SizedBox(
         width: width,
-        child: Text(value, textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
+        // Ο αριθμός σε μία γραμμή που μικραίνει αν χρειαστεί, ποτέ «11,7 / 5» σε δύο γραμμές (σχέδια 9/11).
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (leading != null) ...[leading!, const SizedBox(width: 2)],
+            Text(value,
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
+          ]),
+        ),
       ),
       b(Icons.add_rounded, onPlus, labelPlus),
     ]);
@@ -117,3 +183,6 @@ class Pill extends StatelessWidget {
     );
   }
 }
+
+/// Ένα λάστιχο (όχι βοήθεια, όχι ζευγάρι ανά χέρι): δείχνεται με κουκκίδα και lb.
+bool isBand(LoadKind k) => k == LoadKind.band;

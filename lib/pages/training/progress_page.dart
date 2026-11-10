@@ -8,7 +8,6 @@ import '../../training/equipment.dart';
 import '../../training/progress.dart';
 import '../../training/session.dart';
 import '../../training/training_store.dart';
-import '../../training/walk_stats.dart' show paceText;
 import '../../trends.dart';
 import '../../widgets.dart';
 import '../trends.dart' show TrendStatusPill;
@@ -58,10 +57,14 @@ class _ProgressPageState extends State<ProgressPage> {
         final period = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Wrap(spacing: 8, children: [
-              Pill(key: const ValueKey('prog-month'), label: 'Μήνας', selected: _period == TrendPeriod.month, onTap: () => setState(() => _period = TrendPeriod.month)),
-              Pill(key: const ValueKey('prog-quarter'), label: '3 μήνες', selected: _period == TrendPeriod.quarter, onTap: () => setState(() => _period = TrendPeriod.quarter)),
-            ]),
+            PeriodPicker<TrendPeriod>(
+              values: const [TrendPeriod.month, TrendPeriod.quarter],
+              days: periodDays,
+              selected: _period,
+              onChanged: (p) => setState(() => _period = p),
+              color: c.exercise,
+              keyOf: (p) => p == TrendPeriod.month ? 'prog-month' : 'prog-quarter',
+            ),
             const SizedBox(height: 8),
             Text(_period == TrendPeriod.month ? 'Τελευταίες 30 μέρες σε σχέση με τις 30 πριν.' : 'Τελευταίοι 3 μήνες σε σχέση με τους 3 πριν.',
                 style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
@@ -146,7 +149,7 @@ String _paceRelText(PaceRel r) => switch (r) {
 String _repsText(List<int> reps) => reps.join(', ');
 
 /// «27″» κάτω από το λεπτό, αλλιώς «1′05″».
-String _secs(int s) => s < 60 ? '$s″' : paceText(s);
+String _secs(int s) => s < 60 ? '$s″' : clock(s);
 
 String _setText(LoadKind k, ExLog e) =>
     hasLoad(k) ? '${loadLabel(k, e.workLoad)} × ${_repsText([for (final s in e.done) s.reps])}' : '${_repsText([for (final s in e.done) s.reps])} επαν.';
@@ -313,7 +316,8 @@ class _WalkCard extends StatelessWidget {
         _Row(
           key: const ValueKey('prog-walk-pace'),
           label: 'Ρυθμός',
-          detail: vals(w.pace, (v) => paceText(v.round())) + (w.pace.current == null ? '' : ' / km'),
+          // «11:30 → 11:15 /km»: η μονάδα μία φορά, στο τέλος (N2).
+          detail: w.pace.previous != null && w.pace.current != null ? '${clock(w.pace.previous!)} → ${paceText(w.pace.current!)}' : vals(w.pace, (v) => paceText(v)),
           pill: w.pace.changed
               ? TrendPill(
                   '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${_secs((w.pace.current! - w.pace.previous!).abs().round())}',
@@ -422,7 +426,7 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
   }
   if (walk.pace.changed) {
     final faster = walk.pace.status == TrendStatus.down;
-    out.add(('Ρυθμός: ${paceText(walk.pace.previous!.round())} → ${paceText(walk.pace.current!.round())} ανά km', faster ? TrendKind.good : TrendKind.neutral, !faster));
+    out.add(('Ρυθμός: ${clock(walk.pace.previous!)} → ${paceText(walk.pace.current!)}', faster ? TrendKind.good : TrendKind.neutral, !faster));
   }
   // Ουδέτερη, χωρίς βέλος (έλεγχος 9/11, V-B-08), με την ένταση δίπλα.
   if (walk.hrr.changed) {

@@ -23,15 +23,26 @@ D="/data/data/$PKG"
 ok=1
 fail() { echo "ΑΠΟΤΥΧΙΑ: $*"; ok=0; }
 labels() { tr '>' '\n' < ui.xml 2> /dev/null | grep -o 'text="[^"]*"\|content-desc="[^"]*"' | grep -v '=""' | head -25 | tr '\n' ' '; echo; }
-food_mine() { # Διατροφή › Τα δικά μου › το προϊόν-δείγμα
+food_mine() { # Το προϊόν-δείγμα στα «δικά μου» (παλιά: Διατροφή › Τα δικά μου· από τα σχέδια 9/11: «+ Φαγητό» › Δικά μου)
   ui_tap "Διατροφή" || { echo "  (δεν βρέθηκε «Διατροφή»)"; return 1; }
   sleep 3
-  ui_tap "Τα δικά μου" || { echo "  (δεν βρέθηκε «Τα δικά μου»: $(labels))"; return 1; }
-  sleep 3
-  # Η καρτέλα δείχνει μια κάρτα «Τα προϊόντα μου · N προϊόν»· η λίστα ανοίγει με πάτημα.
-  ui_tap "Τα προϊόντα μου" || { echo "  (δεν βρέθηκε η κάρτα «Τα προϊόντα μου»: $(labels))"; return 1; }
-  sleep 3
-  ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4 && { adb shell input keyevent KEYCODE_BACK; sleep 2; return 0; }
+  if ui_tap "Τα δικά μου"; then
+    sleep 3
+    # Η καρτέλα δείχνει μια κάρτα «Τα προϊόντα μου · N προϊόν»· η λίστα ανοίγει με πάτημα.
+    ui_tap "Τα προϊόντα μου" || { echo "  (δεν βρέθηκε η κάρτα «Τα προϊόντα μου»: $(labels))"; return 1; }
+    sleep 3
+    ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4 && { adb shell input keyevent KEYCODE_BACK; sleep 2; return 0; }
+  else
+    # Νέα διάταξη: η Διατροφή χωρίς υπο-καρτέλες· τα δικά μου είναι στο «+ Φαγητό» (ενότητα «Δικά μου»).
+    ui_tap "Φαγητό" || { echo "  (δεν βρέθηκε το «Φαγητό»: $(labels))"; return 1; }
+    sleep 3
+    # Το πληκτρολόγιο της αναζήτησης ανοίγει μόνο του: κλείνει (μόνο αν φαίνεται), για να φαίνεται η λίστα.
+    if adb shell dumpsys input_method | tr -d '\r' | grep -q 'mInputShown=true'; then adb shell input keyevent KEYCODE_BACK; sleep 1; fi
+    if ui_find_scroll "Προϊόν δοκιμής αναβάθμισης" 4; then
+      adb shell input keyevent KEYCODE_BACK; sleep 2
+      return 0
+    fi
+  fi
   echo "  (στην οθόνη: $(labels))"
   return 1
 }
