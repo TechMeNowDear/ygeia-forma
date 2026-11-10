@@ -291,6 +291,157 @@ class ProtocolTest {
         assertNull(s.state)
     }
 
+    /** Έλεγχος 9/11 (W3-11): παύση και «Τέλος» κρίνονται με τον χρόνο της τιμής, όχι με την ώρα που έφτασε. */
+    @Test
+    fun pauseAndEndBySampleTime() {
+        val hr = HrStats(0)
+        // πριν την παύση (στα 10″) φτάνουν μόνο οι τιμές ως τα 7″
+        for (t in 0..7) hr.add(120, t * 1000L)
+        hr.pause(10_000)
+        // το πακέτο με τα 8″–9″ φτάνει μετά την παύση: μετρά (είναι πριν από αυτήν)
+        hr.add(150, 8_000)
+        hr.add(150, 9_000)
+        // τιμές μέσα στην παύση: όχι
+        hr.add(80, 12_000)
+        hr.resume(20_000)
+        hr.add(120, 21_000)
+        assertEquals(150, hr.max)
+        // «Τέλος» στα 30″, τιμή των 29″ που φτάνει μετά: μετρά· των 31″ όχι
+        hr.markEnd(30_000)
+        hr.add(160, 29_000)
+        hr.add(170, 31_000)
+        assertEquals(160, hr.max)
+        // 8 × 120 + 2 × 150 + 120 + 160 = 1540 / 12
+        assertEquals(Math.round(1540.0 / 12).toInt(), hr.avg)
+    }
+
+    /** Έλεγχος 9/11 (V-A-03): η κατάσταση των παλμών ξαναστήνεται ακριβώς· ξαναπαράδοση παλιών τιμών δεν μετρά διπλά. */
+    @Test
+    fun hrStateRoundTripAndNoDoubleCount() {
+        val hr = HrStats(1_000)
+        for (t in 0..59) hr.add(100 + t % 5, 1_000 + t * 1000L)
+        hr.pause(70_000)
+        val back = HrStats.fromState(JSONObject(hr.toState().toString()))
+        assertEquals(hr.avg, back.avg)
+        assertEquals(hr.max, back.max)
+        assertEquals(hr.samples.size, back.samples.size)
+        assertEquals(1_000L, back.start)
+        // οι ίδιες τιμές ξανά (κρυφή μνήμη του Health Services): δεν αλλάζουν τίποτα
+        for (t in 0..59) back.add(200, 1_000 + t * 1000L)
+        assertEquals(hr.avg, back.avg)
+        assertEquals(hr.samples.size, back.samples.size)
+        // η παύση έμεινε: τιμή μέσα της δεν μετρά
+        back.add(200, 75_000)
+        assertEquals(hr.max, back.max)
+    }
+
+    /**
+     * Έλεγχος 9/11 (V-A-19): σταθερά 5 km/h (12′00″ ανά km), απόσταση σε πακέτα ανά 150″ (σβηστή οθόνη). Πριν: 12′30″ και
+     * 10′00″. Τώρα κάθε km 12′00″, με παρεμβολή στους χρόνους των τιμών.
+     */
+    @Test
+    fun kmSplitsInterpolatedWithBatchedDistance() {
+        val t0 = 1_700_000_000_000L
+        val sp = SplitTracker(t0)
+        val speed = 5000.0 / 3600.0 // m/s
+        var t = 0
+        while (t <= 3750) {
+            sp.update(speed * t, t0 + t * 1000L, t.toDouble())
+            t += 150
+        }
+        assertEquals(5, sp.splits.size)
+        for ((k, s) in sp.splits.withIndex()) {
+            assertEquals("ενεργός χρόνος km ${k + 1}", 720L * (k + 1), s[0])
+            assertEquals("ώρα km ${k + 1}", t0 + 720_000L * (k + 1), s[1])
+        }
+        // Πακέτο που περνά δύο km μαζί: και τα δύο στη σωστή ώρα.
+        val two = SplitTracker(0)
+        two.update(500.0, 360_000, 360.0)
+        two.update(2500.0, 1_800_000, 1800.0)
+        assertEquals(2, two.splits.size)
+        assertEquals(720L, two.splits[0][0])
+        assertEquals(1440L, two.splits[1][0])
+        // Μικρότερη ή χαλασμένη τιμή: τίποτα.
+        two.update(Double.NaN, 1_900_000, 1900.0)
+        two.update(100.0, 1_900_000, 1900.0)
+        assertEquals(2, two.splits.size)
+        // Κατάσταση μπρος-πίσω.
+        val back = SplitTracker.fromState(JSONObject(two.toState().toString()), 0)
+        back.update(3000.0, 2_160_000, 2160.0)
+        assertEquals(3, back.splits.size)
+        assertEquals(2160L, back.splits[2][0])
+    }
+
+    /** W3-12: ο χρόνος στην οθόνη από το σημείο ελέγχου (κάθε δευτερόλεπτο)· σε παύση σταθερός. W3-04: μηδέν σε elapsedRealtime. */
+    @Test
+    fun activeTimeFromCheckpointAndStopwatchZero() {
+        assertEquals(125L, activeSecAt(120_000, 1_000_000, true, 1_005_000, 0))
+        assertEquals(120L, activeSecAt(120_000, 1_000_000, false, 1_005_000, 0))
+        assertEquals(42L, activeSecAt(0, 0, true, 5_000_000, 42))
+        // τρέχει από το σημείο ελέγχου (πριν ήταν σε παύση): πριν από αυτό ο ενεργός χρόνος ήταν ίδιος
+        assertEquals(120.0, activeAtWall(120_000, 1_000_000, true, 990_000, 0), 1e-9)
+        assertEquals(130.0, activeAtWall(120_000, 1_000_000, true, 1_010_000, 0), 1e-9)
+        assertEquals(110.0, activeAtWall(120_000, 1_000_000, false, 990_000, 0), 1e-9)
+        // 3 μέρες αναμμένο ρολόι, 10′ άσκηση: το μηδέν είναι 10′ πριν από το «τώρα» της εκκίνησης, όχι ώρα 1970.
+        val el = 3L * 24 * 3600 * 1000
+        assertEquals(el - 600_000, stopwatchZero(el, 600_000))
+    }
+
+    /** V-A-03: συνέχεια αν το Health Services κρατά την άσκηση· βάρη ρολογιού πρόσφατα: συνέχεια· αλλιώς μερικό. */
+    @Test
+    fun recoveryDecision() {
+        val now = 10_000_000L
+        assertEquals(Recovery.Action.ATTACH, Recovery.decide(true, "walk", false, false, now - 60_000, now))
+        assertEquals(Recovery.Action.FINALIZE, Recovery.decide(false, "walk", false, false, now - 60_000, now))
+        assertEquals(Recovery.Action.RESUME, Recovery.decide(false, "strength", false, true, now - 60_000, now))
+        assertEquals(Recovery.Action.FINALIZE, Recovery.decide(false, "strength", false, true, now - 20 * 60_000, now))
+        assertEquals(Recovery.Action.FINALIZE, Recovery.decide(false, "strength", true, false, now - 60_000, now))
+        assertEquals(Recovery.Action.ATTACH, Recovery.decide(true, "strength", true, false, now - 60_000, now))
+    }
+
+    /** V-A-08: νεότερη μορφή = δεν διαβάζεται· χωρίς «v» = 1. V-A-13: id και για τους παλμούς χωρίς «id». */
+    @Test
+    fun versionAndPendingIds() {
+        assertFalse(Proto.tooNew("""{"v":1}"""))
+        assertFalse(Proto.tooNew("""{"active":false}"""))
+        assertTrue(Proto.tooNew("""{"v":2,"hrLimit":120}"""))
+        assertFalse(Proto.tooNew("χαλασμένο"))
+        assertEquals("hrs1", Repo.pendingId(JSONObject().put("kind", "hr").put("sid", "s1")))
+        assertEquals("walk5", Repo.pendingId(JSONObject().put("kind", "cardio").put("id", "walk5")))
+        assertNull(Repo.pendingId(JSONObject().put("kind", "hr")))
+        val ack = Link.ackJson(140, 77)
+        assertEquals(140, ack.getInt("lim"))
+        assertEquals(1, ack.getInt("v"))
+        assertEquals(0, Link.ackJson(null, 0).getInt("lim"))
+    }
+
+    /**
+     * W3-14: η ώρα του ρολογιού πάει 20″ πίσω στη μέση. Με ώρα τοίχου η ειδοποίηση «τυφλωνόταν» 20″· με τον μονότονο
+     * χρόνο (που δίνει πλέον η υπηρεσία) δονείται κανονικά μετά από 5″.
+     */
+    @Test
+    fun alarmNotBlindedByClockGoingBack() {
+        val wall = HrAlarm(140)
+        assertFalse(wall.feed(150, 100_000))
+        // ώρα τοίχου 20″ πίσω: οι επόμενες 15″ τιμές αγνοούνται
+        var buzzWall = false
+        for (k in 1..15) buzzWall = buzzWall || wall.feed(150, 80_000L + k * 1000)
+        assertFalse(buzzWall)
+        val mono = HrAlarm(140)
+        assertFalse(mono.feed(150, 5_000))
+        var buzz = false
+        for (k in 1..15) buzz = buzz || mono.feed(150, 5_000L + k * 1000)
+        assertTrue(buzz)
+    }
+
+    @Test
+    fun ambientStates() {
+        assertTrue(isAmbientState(android.view.Display.STATE_DOZE))
+        assertTrue(isAmbientState(android.view.Display.STATE_DOZE_SUSPEND))
+        assertTrue(isAmbientState(android.view.Display.STATE_OFF))
+        assertFalse(isAmbientState(android.view.Display.STATE_ON))
+    }
+
     @Test
     fun formats() {
         assertEquals("1:04", clock(64))

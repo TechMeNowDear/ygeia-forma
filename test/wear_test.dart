@@ -49,7 +49,7 @@ void main() {
 
     test('προπόνηση του κινητού: ενεργή με σετ που έγιναν, μετά ανενεργή', () {
       final t = sampleTraining(now);
-      expect(watchSession(t, name), {'active': false});
+      expect(watchSession(t, name), {'v': 1, 'active': false});
       final s = t.start(t.program!.workout('A')!);
       t.tick(s.items.first, 0);
       t.restEnd = now.add(const Duration(seconds: 120));

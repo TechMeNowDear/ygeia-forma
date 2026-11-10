@@ -3,7 +3,10 @@ package gr.ygeiaforma.wear
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Η κατάσταση της εφαρμογής του ρολογιού, στη μνήμη (μία διεργασία: οθόνη + υπηρεσία άσκησης).
@@ -18,6 +21,27 @@ object Repo {
     /** Το id της τελευταίας προπόνησης του κινητού (για τους παλμούς της, αφού κλείσει). */
     var lastPhoneId: String? = null
 
+    /**
+     * Η τελευταία κατάσταση της προπόνησης του κινητού, και αφού εκείνη κλείσει (έλεγχος 9/11, V-A-12): τα ✓ του ρολογιού
+     * που δεν έφτασαν πάνε στο κινητό μέσα στο αποτέλεσμα («items»), ακόμα κι αν το κινητό έκλεισε πρώτο την προπόνηση.
+     */
+    var lastPhone: LiveSession? = null
+
+    /**
+     * Το τελευταίο όριο παλμών που ήρθε από το κινητό (μένει και μετά από επανεκκίνηση, έλεγχος 9/11, V-A-06): ισχύει και
+     * σε περπάτημα όταν δεν υπάρχει (ακόμα) πρόγραμμα στο ρολόι. null = χωρίς όριο.
+     */
+    var knownLimit: Int? = null
+
+    /** Το όριο που ισχύει τώρα: του προγράμματος, αλλιώς το τελευταίο που ήρθε. */
+    fun limitNow(): Int? {
+        val p = plan
+        return if (p != null) p.hrLimit else knownLimit
+    }
+
+    /** Ήρθε πρόγραμμα ή προπόνηση από νεότερη έκδοση της εφαρμογής του κινητού (V-A-08): «Ενημέρωσε την εφαρμογή στο ρολόι». */
+    var updateNeeded = false
+
     /** Προπόνηση που ξεκίνησε στο ρολόι. */
     var local: LiveSession? = null
 
@@ -31,8 +55,17 @@ object Repo {
     var runningPhone = false
     var startedAt = 0L
 
+    /** Η αρχή σε χρόνο από την εκκίνηση της συσκευής (elapsedRealtime): για τους χρόνους της ειδοποίησης (W3-14). */
+    var startedEl = 0L
+
+    /** Το id της προπόνησης του κινητού που μετράει τώρα («Παλμοί εδώ»). */
+    var runningSid: String? = null
+
     var bpm = 0
     var bpmAt = 0L
+
+    /** Ο χρόνος της τελευταίας τιμής σε elapsedRealtime (ms): δεν «πηδά» όταν αλλάζει η ώρα του ρολογιού (W3-14). */
+    var bpmEl = 0L
     var hr: HrStats? = null
 
     /** Πώς έρχονται οι παλμοί: «5s» (ανά 5″ και με σβηστή οθόνη), «sensor» (εφεδρεία αισθητήρα), «default». */
@@ -48,6 +81,7 @@ object Repo {
      * την ώρα (ms). Μόνο για την ένδειξη και την ειδοποίηση· ποτέ ως τιμή προς το κινητό (έλεγχος #2).
      */
     var steadyUntil = 0L
+    var steadyUntilEl = 0L
 
     /** Δεν μετριούνται παλμοί, μετά την αναμονή του [HrSilence] (30″ στην αρχή, 15″/45″ αν χάθηκαν), ή null. */
     var hrSilent: HrSilence.Silence? = null
@@ -60,13 +94,25 @@ object Repo {
     var activeSec = 0L
     var gps = false
 
+    /**
+     * Σημείο ελέγχου του Health Services για τον ενεργό χρόνο (W3-12): ο χρόνος στην οθόνη προχωρά κάθε δευτερόλεπτο,
+     * όχι μόνο όταν έρχεται ενημέρωση. [cpWall] = 0: δεν ήρθε ακόμα.
+     */
+    var cpActiveMs = 0L
+    var cpWall = 0L
+    var cpRunning = false
+
+    /** Ενεργός χρόνος (″) τώρα. */
+    fun activeSecNow(now: Long): Long = activeSecAt(cpActiveMs, cpWall, cpRunning, now, activeSec)
+
     /** Περπάτημα σε παύση (9/11): χρόνος, απόσταση και μέσος παλμών σταματούν· η ειδοποίηση ορίου μένει. */
     var paused = false
     /** Παύσεις: [αρχή, τέλος] σε ms (το τέλος 0 όσο κρατά). */
     val pauses = mutableListOf<LongArray>()
 
-    /** Κάθε ολόκληρο χιλιόμετρο: [ενεργός χρόνος (″), ώρα (ms)]. Μόνο με GPS δείχνεται ανά km στο κινητό. */
-    val splits = mutableListOf<LongArray>()
+    /** Κάθε ολόκληρο χιλιόμετρο, τη στιγμή που περάστηκε (V-A-19). Μόνο με GPS δείχνεται ανά km στο κινητό. */
+    var split = SplitTracker(0)
+    val splits: List<LongArray> get() = split.splits
 
     /**
      * Λεπτό αποκατάστασης μετά το «Τέλος» του περπατήματος (9/11): ως πότε (ms), 0 αν δεν τρέχει. Χρόνος, απόσταση
@@ -109,8 +155,17 @@ object Repo {
         syncedAt = System.currentTimeMillis()
     }
 
-    /** ✓ του ρολογιού που το κινητό δεν έχει δει ακόμα (άσκηση, σετ): ξαναστέλνονται (έλεγχος #2, W2-05). */
-    var pendingTicks: List<Pair<Int, Int>> = emptyList()
+    /**
+     * ✓ του ρολογιού που το κινητό δεν έχει δει ακόμα (άσκηση, σετ): ξαναστέλνονται (έλεγχος #2, W2-05). Κάθε φορά από την
+     * ίδια την κατάσταση (έλεγχος 9/11, W3-03): και όταν το κινητό δεν έστειλε τίποτα νέο από τότε.
+     */
+    val pendingTicks: List<Pair<Int, Int>>
+        get() {
+            val p = phone ?: return emptyList()
+            val out = mutableListOf<Pair<Int, Int>>()
+            for ((i, it) in p.items.withIndex()) for ((k, set) in it.sets.withIndex()) if (set.done && !set.confirmed) out.add(i to k)
+            return out
+        }
 
     /**
      * Νέα κατάσταση από το κινητό. Κρατά κάθε ✓ που έγινε στο ρολόι και δεν έχει φτάσει ακόμα εκεί (όσο κι αν αργήσει,
@@ -118,7 +173,6 @@ object Repo {
      */
     fun applyPhone(s: LiveSession?) {
         val prev = phone
-        val pending = mutableListOf<Pair<Int, Int>>()
         s?.items?.forEach { it.sets.forEach { set -> if (set.done) set.confirmed = true } }
         if (s != null && prev != null && prev.id == s.id) {
             for ((i, it) in s.items.withIndex()) {
@@ -129,7 +183,6 @@ object Repo {
                     if (o.done && !set.done && !o.confirmed) {
                         set.done = true
                         set.at = o.at
-                        pending.add(i to k)
                     }
                 }
                 if (it.rir == null) it.rir = old.rir
@@ -138,8 +191,10 @@ object Repo {
             if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
         }
         phone = s
-        pendingTicks = pending
-        if (s != null) lastPhoneId = s.id
+        if (s != null) {
+            lastPhoneId = s.id
+            lastPhone = s
+        }
         if (s == null && prev != null) prev.ended = true
         syncedAt = System.currentTimeMillis()
     }
@@ -147,30 +202,42 @@ object Repo {
     fun resetExercise() {
         running = null
         runningPhone = false
+        runningSid = null
         startedAt = 0
+        startedEl = 0
         bpm = 0
         bpmAt = 0
+        bpmEl = 0
         hr = null
         hrMode = ""
         hrGaps = GapMeter()
         meters = 0.0
         steps = 0
         activeSec = 0
+        cpActiveMs = 0
+        cpWall = 0
+        cpRunning = false
         gps = false
         paused = false
         pauses.clear()
-        splits.clear()
+        split = SplitTracker(0)
         recoveryUntil = 0
         endAt = 0
         alarmMutedUntil = 0
         steadyUntil = 0
+        steadyUntilEl = 0
         hrSilent = null
     }
 
-    // ------------------------------------------------------------------ αντίγραφο ασφαλείας
-    // Αν η εφαρμογή κλείσει απότομα στη μέση, το τελευταίο στιγμιότυπο στέλνεται στο κινητό στο επόμενο άνοιγμα.
+    // ------------------------------------------------------------------ αντίγραφα ασφαλείας
+    // 1) Άσκηση σε εξέλιξη: στιγμιότυπο ανά ~60″ και σε παύση/τέλος (αρχείο «run.json», ατομική εγγραφή). Αν η εφαρμογή
+    //    κλείσει απότομα, στο επόμενο άνοιγμα συνεχίζει ή γράφεται ως μερική (έλεγχος 9/11, V-A-03).
+    // 2) Αποτέλεσμα που δεν έφτασε ακόμα στο Data Layer: ένα ανά id («p:<id>»), στέλνεται στο επόμενο άνοιγμα (W3-17, V-A-13).
     private const val PREFS = "ygeia_watch"
     private const val PENDING = "pending"
+    private const val PENDING_PREFIX = "p:"
+    private const val RUN_FILE = "run.json"
+    private const val LIMIT = "limit"
 
     /** Κλειδιά της παύσης μετά από «Σταμάτησα» (ως #84): σβήνονται μία φορά (απλοποίηση 9/11). */
     fun dropOldKeys(ctx: Context) {
@@ -178,16 +245,222 @@ object Repo {
         if (sp.contains("symHoldAt") || sp.contains("pendingSym")) sp.edit().remove("symHoldAt").remove("pendingSym").apply()
     }
 
-    fun snapshot(ctx: Context, json: JSONObject?) {
-        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        if (json == null) p.remove(PENDING) else p.putString(PENDING, json.toString())
-        p.apply()
+    /** Αποτέλεσμα που πρέπει να φτάσει στο κινητό· μένει ώσπου να μπει στο Data Layer ([removePending]). */
+    fun savePending(ctx: Context, id: String, json: JSONObject): Boolean =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PENDING_PREFIX + id, json.toString()).commit()
+
+    fun removePending(ctx: Context, id: String) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(PENDING_PREFIX + id).commit()
     }
 
-    fun takeSnapshot(ctx: Context): String? {
+    /** Όλα τα αποτελέσματα σε αναμονή (id → JSON). Και το παλιό ένα «pending» (ως #90), με id ακόμα και για «hr» (V-A-13). */
+    fun pendingAll(ctx: Context): List<Pair<String, JSONObject>> {
         val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val s = sp.getString(PENDING, null) ?: return null
-        sp.edit().remove(PENDING).apply()
-        return s
+        sp.getString(PENDING, null)?.let { legacy ->
+            val o = try { JSONObject(legacy) } catch (_: Exception) { null }
+            val id = o?.let { pendingId(it) }
+            val e = sp.edit().remove(PENDING)
+            if (o != null && id != null) e.putString(PENDING_PREFIX + id, legacy)
+            e.commit()
+        }
+        val out = mutableListOf<Pair<String, JSONObject>>()
+        for ((k, v) in sp.all) {
+            if (!k.startsWith(PENDING_PREFIX) || v !is String) continue
+            val o = try { JSONObject(v) } catch (_: Exception) { null } ?: continue
+            out.add(k.removePrefix(PENDING_PREFIX) to o)
+        }
+        return out
     }
+
+    /** Το id (όνομα του DataItem) ενός αποτελέσματος: «id», ή για τους παλμούς προπόνησης του κινητού «hr<sid>». */
+    fun pendingId(o: JSONObject): String? {
+        val id = o.optString("id", "")
+        if (id.isNotEmpty()) return id
+        val sid = o.optString("sid", "")
+        return if (o.optString("kind") == "hr" && sid.isNotEmpty()) "hr$sid" else null
+    }
+
+    /** Το τελευταίο όριο από το κινητό, για επόμενες εκκινήσεις. */
+    fun rememberLimit(ctx: Context, limit: Int?) {
+        knownLimit = limit
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(LIMIT, limit ?: 0).apply()
+    }
+
+    fun loadLimit(ctx: Context) {
+        if (plan != null) return
+        val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (sp.contains(LIMIT)) knownLimit = sp.getInt(LIMIT, 0).takeIf { it > 0 }
+    }
+
+    // ------------------------------------------------------------------ στιγμιότυπο άσκησης (V-A-03)
+    /** Όλη η κατάσταση της άσκησης που τρέχει, για το στιγμιότυπο· null αν δεν τρέχει καμία. */
+    fun captureRun(now: Long): JSONObject? {
+        val kind = running ?: return null
+        val pz = JSONArray()
+        for (p in pauses) pz.put(JSONArray().put(p[0]).put(p[1]))
+        val o = JSONObject().put("v", 1).put("kind", kind).put("phone", runningPhone).put("start", startedAt).put("saved", now)
+            .put("sec", activeSecNow(now)).put("cpA", cpActiveMs).put("cpW", cpWall).put("cpR", cpRunning)
+            .put("m", finite(meters)).put("steps", steps).put("gps", gps).put("paused", paused).put("pz", pz)
+            .put("split", split.toState()).put("endAt", endAt).put("recUntil", recoveryUntil).put("hrMode", hrMode)
+        alarm.limit?.let { o.put("lim", it) }
+        hr?.let { o.put("hr", it.toState()) }
+        local?.let { o.put("local", it.toState()) }
+        runningSid?.let { o.put("sid", it) }
+        return o
+    }
+
+    /** Η άσκηση από το στιγμιότυπο, στη μνήμη (μετά από απότομο κλείσιμο). false αν δεν διαβάζεται. */
+    fun restoreRun(o: JSONObject, nowWall: Long, nowEl: Long): Boolean = try {
+        val start = o.getLong("start")
+        resetExercise()
+        running = o.getString("kind")
+        runningPhone = o.optBoolean("phone", false)
+        runningSid = o.optStringOrNull("sid")
+        startedAt = start
+        // Η αναμονή των 30″ για τον «πρώτο» παλμό ξεκινά από τη συνέχεια, όχι από την αρχική έναρξη: αλλιώς μόλις συνεχίσει
+        // θα δονούσε «κανένας παλμός» πριν προλάβει να έρθει ο πρώτος (έλεγχος του #91, S2).
+        startedEl = nowEl
+        hr = o.optJSONObject("hr")?.let { HrStats.fromState(it) } ?: HrStats(start)
+        activeSec = o.optLong("sec", 0)
+        cpActiveMs = o.optLong("cpA", 0)
+        cpWall = o.optLong("cpW", 0)
+        cpRunning = o.optBoolean("cpR", false)
+        meters = o.optDouble("m", 0.0).takeIf { it.isFinite() } ?: 0.0
+        steps = o.optLong("steps", 0)
+        gps = o.optBoolean("gps", false)
+        paused = o.optBoolean("paused", false)
+        o.optJSONArray("pz")?.let { a -> for (i in 0 until a.length()) a.optJSONArray(i)?.let { pauses.add(longArrayOf(it.getLong(0), it.getLong(1))) } }
+        split = o.optJSONObject("split")?.let { SplitTracker.fromState(it, start) } ?: SplitTracker(start)
+        endAt = o.optLong("endAt", 0)
+        recoveryUntil = o.optLong("recUntil", 0)
+        hrMode = o.optString("hrMode", "")
+        alarm.limit = if (o.has("lim")) o.getInt("lim") else null
+        alarm.reset()
+        o.optJSONObject("local")?.let { local = LiveSession.fromState(it) }
+        true
+    } catch (_: Exception) {
+        resetExercise()
+        false
+    }
+
+    private fun runFile(ctx: Context) = File(ctx.filesDir, RUN_FILE)
+
+    /**
+     * «Γενιά» του στιγμιότυπου (έλεγχος του #91, S3): αλλάζει σε κάθε [clearRun]. Μια εγγραφή που ετοιμάστηκε πριν από το
+     * τέλος της άσκησης και φτάνει μετά ([writeRun] σε άλλο νήμα) δεν γράφει τίποτα: μια τελειωμένη άσκηση δεν «ξαναζεί».
+     */
+    @Volatile
+    var runGen = 0L
+        private set
+
+    /** Ατομική εγγραφή (προσωρινό αρχείο + μετονομασία): ποτέ μισό αρχείο. Σε νήμα εκτός οθόνης. Μόνο αν [gen] ισχύει ακόμα. */
+    fun writeRun(ctx: Context, text: String, gen: Long = runGen): Boolean = synchronized(this) {
+        if (gen != runGen) return@synchronized false
+        try {
+            val f = runFile(ctx)
+            val tmp = File(f.parentFile, "$RUN_FILE.tmp")
+            FileOutputStream(tmp).use { out ->
+                out.write(text.toByteArray(Charsets.UTF_8))
+                out.flush()
+                out.fd.sync()
+            }
+            tmp.renameTo(f)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun readRun(ctx: Context): JSONObject? = synchronized(this) {
+        try {
+            val f = runFile(ctx)
+            if (!f.exists()) null else JSONObject(f.readText())
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun clearRun(ctx: Context) {
+        synchronized(this) {
+            runGen++
+            try {
+                runFile(ctx).delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Στιγμιότυπο που δεν διαβάζεται/δεν γίνεται αποτέλεσμα: μετονομάζεται σε «run.bad.json» (κρατιέται, δεν σβήνεται, S4). */
+    fun quarantineRun(ctx: Context) {
+        synchronized(this) {
+            runGen++
+            try {
+                val f = runFile(ctx)
+                var bad = File(ctx.filesDir, "run.bad.json")
+                if (bad.exists()) bad = File(ctx.filesDir, "run.${System.currentTimeMillis()}.bad.json")
+                if (f.exists() && !f.renameTo(bad)) f.delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Το id (όνομα DataItem) που θα έχει το αποτέλεσμα της άσκησης του στιγμιότυπου [o], ή null. */
+    fun runId(o: JSONObject): String? {
+        val start = o.optLong("start", 0)
+        return when {
+            o.optString("kind") == "walk" && start > 0 -> "walk$start"
+            o.optBoolean("phone", false) -> o.optStringOrNull("sid")?.let { "hr$it-$start" }
+            else -> o.optJSONObject("local")?.optStringOrNull("id")
+        }
+    }
+
+    /** Υπάρχει ήδη στην αναμονή το ΚΑΝΟΝΙΚΟ (όχι μερικό) αποτέλεσμα [id]: η άσκηση έχει τελειώσει (S3). */
+    fun hasFinalPending(ctx: Context, id: String): Boolean {
+        val v = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PENDING_PREFIX + id, null) ?: return false
+        return try {
+            JSONObject(v).optInt("partial", 0) != 1
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Το στιγμιότυπο [o] ως μερικό αποτέλεσμα (ίδιο id με το κανονικό, «partial»), στην αναμονή. Ποτέ: πάνω σε κανονικό που
+     * περιμένει ακόμα (S3)· ποτέ εξαίρεση (S4): ό,τι δεν διαβάζεται κρατιέται στο «run.bad.json» με μήνυμα. Η άσκηση που
+     * ετοιμάζεται τώρα (π.χ. η νέα προπόνηση του ρολογιού) δεν πειράζεται. Επιστρέφει το αποτέλεσμα για αποστολή, ή null.
+     */
+    fun finalizeRun(ctx: Context, o: JSONObject, now: Long, nowEl: Long): Pair<String, JSONObject>? {
+        val keepLocal = local
+        local = null
+        try {
+            val id = runId(o)
+            if (id != null && hasFinalPending(ctx, id)) {
+                clearRun(ctx)
+                return null
+            }
+            if (!restoreRun(o, now, nowEl)) {
+                quarantineRun(ctx)
+                notice = BAD_RUN_NOTICE
+                return null
+            }
+            val r = Results.build(now, partialAt = o.optLong("saved", now))
+            if (r != null && hasFinalPending(ctx, r.first)) {
+                clearRun(ctx)
+                return null
+            }
+            if (r != null) savePending(ctx, r.first, r.second)
+            clearRun(ctx)
+            return r
+        } catch (e: Exception) {
+            android.util.Log.e("YgeiaWatch", "finalizeRun", e)
+            quarantineRun(ctx)
+            notice = BAD_RUN_NOTICE
+            return null
+        } finally {
+            resetExercise()
+            local = keepLocal
+        }
+    }
+
+    /** Μήνυμα όταν ένα στιγμιότυπο δεν έγινε αποτέλεσμα (κρατιέται στο ρολόι, για να μη χαθεί). */
+    const val BAD_RUN_NOTICE = "Μια άσκηση που είχε μείνει μισή δεν διαβάστηκε· κρατήθηκε στο ρολόι."
 }

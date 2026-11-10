@@ -827,6 +827,13 @@ void main() {
     });
   }
 
+  // Έλεγχος 9/11 (V-A-03): περπάτημα που σώθηκε ως μερικό (η εφαρμογή του ρολογιού έκλεισε απότομα).
+  void walkPartial(TrainingStore st) {
+    walkDone(st);
+    final s = st.sessions.firstWhere((x) => x.isCardio);
+    s.partial = true;
+  }
+
   Future<void> openWalk(WidgetTester t) async {
     final f = find.textContaining('12/11 · Περπάτημα');
     await t.ensureVisible(f);
@@ -837,6 +844,7 @@ void main() {
 
   testWidgets('Περπάτημα · σύνοψη', (t) => trainShot(t, 'T24_walk_summary', phone, Brightness.light, prep: walkDone, act: openWalk));
   testWidgets('Περπάτημα · σύνοψη · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T24b_walk_summary_open_dark', open, Brightness.dark, prep: walkDone, act: openWalk));
+  testWidgets('Περπάτημα · μερικό (απότομο κλείσιμο στο ρολόι)', (t) => trainShot(t, 'T31_walk_partial', phone, Brightness.light, prep: walkPartial, act: openWalk));
   testWidgets('Περπάτημα · πτώση παλμών: οδηγίες', (t) => trainShot(t, 'T25_hrr_info', phone, Brightness.light, prep: walkDone, act: (t) async {
         await openWalk(t);
         await t.scrollUntilVisible(find.byKey(const ValueKey('hrr-info')), 300, scrollable: find.byType(Scrollable).last);
@@ -968,6 +976,48 @@ void main() {
         act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-hrlimit'))));
   });
   testWidgets('Προπόνηση · αλλαγές προγράμματος', (t) => trainShot(t, 'T9_editor', phone, Brightness.light, act: (t) => tapKey(t, 'train-edit')));
+
+  // Έλεγχος 9/11 (V-A-06): «✓» μόνο όταν το ρολόι επιβεβαιώσει ότι έχει το όριο.
+  testWidgets('Προπόνηση · όριο επιβεβαιωμένο από το ρολόι', (t) async {
+    WearLink.main.ready.value = true;
+    WearLink.main.sentLimit.value = '140';
+    WearLink.main.watchLimit.value = '140';
+    addTearDown(() {
+      WearLink.main.ready.value = false;
+      WearLink.main.sentLimit.value = null;
+      WearLink.main.watchLimit.value = null;
+    });
+    await trainShot(t, 'T30_hr_limit_acked', phone, Brightness.light,
+        act: (t) async => t.ensureVisible(find.byKey(const ValueKey('train-hrlimit'))));
+  });
+  // Έλεγχος 9/11 (V-A-09): ανοιχτή από χθες, χωρίς κίνηση: «Ξεχασμένη προπόνηση;» με «Τέλος (στις 18:42)».
+  void forgotten(TrainingStore st) {
+    final start = trainAt.subtract(const Duration(hours: 23));
+    final s = Session(
+      id: 's${start.millisecondsSinceEpoch}',
+      workout: 'A',
+      name: 'Προπόνηση Α',
+      programId: st.program!.id,
+      start: start,
+      items: [
+        ExLog(ex: 'db_press', sets: 3, lo: 8, hi: 12, rir: 2, rest: 120, log: [
+          for (var i = 0; i < 3; i++)
+            SetLog(load: 10.3, reps: 10, done: i < 2, at: i < 2 ? start.add(Duration(minutes: 4 + i * 4)).millisecondsSinceEpoch : null),
+        ]),
+      ],
+      limit: 140,
+    );
+    st.current = s;
+  }
+
+  testWidgets('Προπόνηση · ξεχασμένη', (t) => trainShot(t, 'T29_forgotten', phone, Brightness.light, prep: forgotten));
+  testWidgets('Προπόνηση · ξεχασμένη · Fold ανοιχτό · σκοτεινό', (t) => trainShot(t, 'T29b_forgotten_open_dark', open, Brightness.dark, prep: forgotten));
+  // Έλεγχος 9/11 (V-A-08): αποτέλεσμα από ρολόι νεότερης έκδοσης.
+  testWidgets('Προπόνηση · ρολόι νεότερης έκδοσης', (t) async {
+    WearLink.main.watchNewer.value = true;
+    addTearDown(() => WearLink.main.watchNewer.value = false);
+    await trainShot(t, 'T32_watch_newer', phone, Brightness.light);
+  });
 
   testWidgets('Προπόνηση · ρεζέρβα με ενόχληση', (t) => trainShot(t, 'T19_rir_pain', phoneShort, Brightness.light, act: (t) async {
         await startSession(t);

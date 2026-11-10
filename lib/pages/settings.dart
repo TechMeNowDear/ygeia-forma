@@ -222,11 +222,11 @@ class _BackupCardState extends State<_BackupCard> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), action: action, duration: const Duration(seconds: 6)));
   }
 
-  /// Οι προπονήσεις για το αντίγραφο (μόνο αν διαβάστηκαν σωστά).
+  /// Οι προπονήσεις για το αντίγραφο, με τους παλμούς τους (μόνο αν διαβάστηκαν σωστά).
   Future<Map<String, dynamic>?> _training() async {
     final t = TrainingStore.main;
     await t.load();
-    return t.ready && !t.readError ? t.toJson() : null;
+    return t.ready && !t.readError ? await t.backupJson() : null;
   }
 
   Future<void> _export() async {
@@ -248,6 +248,7 @@ class _BackupCardState extends State<_BackupCard> {
         sources: await widget.store.sourcesForBackup(),
         training: await _training(),
       );
+      final trainingOut = TrainingStore.main.readError;
       final r = await FoodChannel.saveBackup(json, name);
       if (r['ok'] != true || r['uri'] is! String) {
         _say('Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}');
@@ -256,7 +257,11 @@ class _BackupCardState extends State<_BackupCard> {
       final uri = r['uri'] as String;
       final saved = r['name'] is String ? r['name'] as String : name;
       _say(
-        'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}',
+        'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
+        // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
+        '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
+        // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
+        '${!trainingOut && TrainingStore.main.backupHrMissing > 0 ? '. ${countText(TrainingStore.main.backupHrMissing, 'προπόνηση μπήκε χωρίς παλμούς', 'προπονήσεις μπήκαν χωρίς παλμούς')}: τα αρχεία τους δεν διαβάστηκαν.' : ''}',
         action: SnackBarAction(label: 'Αποστολή', onPressed: () => FoodChannel.shareBackup(uri)),
       );
     } finally {
@@ -324,6 +329,7 @@ class _BackupCardState extends State<_BackupCard> {
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
         if (sourcesIn) 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
         if (trainingIn > 0) countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),
+        if (b.training != null && TrainingStore.main.mergeProblem != null) TrainingStore.main.mergeProblem!,
         if (b.sources != null && !sourcesIn) 'Οι πηγές ύπνου του κινητού είναι νεότερες και έμειναν.',
       ].join(' '));
     } finally {

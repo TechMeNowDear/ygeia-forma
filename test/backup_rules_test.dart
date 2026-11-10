@@ -16,6 +16,8 @@ void main() {
     'file/sources_log.json',
     'file/oura_nights.json',
     'file/training.json',
+    // Έλεγχος 9/11 (V-A-02): οι παλμοί κάθε προπόνησης σε δικό τους αρχείο.
+    'file/hr/',
   };
 
   test('Κανόνες: ακριβώς τα αρχεία που δεν ξαναδιαβάζονται, ίδια στο Google και στη μεταφορά', () {

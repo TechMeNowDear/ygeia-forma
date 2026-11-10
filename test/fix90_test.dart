@@ -297,6 +297,7 @@ void main() {
     tearDown(() {
       WearLink.main.ready.value = false;
       WearLink.main.sentLimit.value = null;
+      WearLink.main.watchLimit.value = null;
       WearLink.main.hr.value = null;
     });
 
@@ -318,11 +319,16 @@ void main() {
       WearLink.main.ready.value = true;
       WearLink.main.sentLimit.value = '140';
       await t.pumpAndSettle();
-      expect(find.text('Στάλθηκε στο ρολόι'), findsOneWidget);
-      // Άλλαξε το όριο: το παλιό που στάλθηκε δεν μετρά.
+      // Έλεγχος 9/11 (V-A-06): «στάλθηκε» δεν είναι «το έχει»· το ✓ μόνο όταν το επιβεβαιώσει το ρολόι.
+      expect(find.textContaining('Στάλθηκε· θα επιβεβαιωθεί'), findsOneWidget);
+      expect(find.textContaining('Στο ρολόι ✓'), findsNothing);
+      WearLink.main.applyWatchState('{"v":1,"lim":140,"planAt":0}');
+      await t.pumpAndSettle();
+      expect(find.text('Στο ρολόι ✓ όριο 140'), findsOneWidget);
+      // Άλλαξε το όριο: το παλιό που στάλθηκε/επιβεβαιώθηκε δεν μετρά.
       store.setHrLimit(130);
       await t.pumpAndSettle();
-      expect(find.text('Στάλθηκε στο ρολόι'), findsNothing);
+      expect(find.textContaining('Στο ρολόι ✓'), findsNothing);
       expect(find.text('Στέλνεται στο ρολόι…'), findsOneWidget);
     });
 

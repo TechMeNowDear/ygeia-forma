@@ -46,9 +46,12 @@ void main() {
         });
       expect(t.hrLimit, 130);
       final j = t.toJson();
-      expect(j.containsKey('sym'), isFalse);
-      expect(j.containsKey('lock'), isFalse);
-      expect(j.containsKey('approved'), isFalse);
+      // Έλεγχος 9/11 (V-A-07): δεν χρησιμοποιούνται, αλλά ούτε σβήνονται σιωπηλά από το αρχείο: ξαναγράφονται αυτούσια.
+      expect(j['sym'], [
+        {'at': now.millisecondsSinceEpoch, 'c': 'chest'}
+      ]);
+      expect(j['lock'], 'red');
+      expect(j['approved'], isFalse);
       final plan = watchPlan(t, now, (x) => x);
       expect(plan['approved'], isTrue, reason: 'ρολόι με παλιά έκδοση: ποτέ κλειδωμένο');
       expect(plan['hrLimit'], 130);

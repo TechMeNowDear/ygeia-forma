@@ -56,7 +56,7 @@ class WatchShotsTest {
         override fun nextExercise() {}
         override fun restPlus() {}
         override fun restStop() {}
-        override fun finish() {}
+        override fun finishWorkout() {}
         override fun pauseWalk(on: Boolean) {}
         override fun muteAlarm() {}
         override fun doneOk() {}
@@ -66,15 +66,19 @@ class WatchShotsTest {
     fun reset() {
         Repo.plan = null
         Repo.phone = null
+        Repo.lastPhone = null
         Repo.local = null
         Repo.notice = null
+        Repo.knownLimit = null
+        Repo.updateNeeded = false
         Repo.screen = Repo.Screen.HOME
         Repo.resetExercise()
         Repo.alarm.limit = null
     }
 
-    private fun shot(name: String) {
+    private fun shot(name: String, ambient: Boolean = false) {
         val v = WatchView(RuntimeEnvironment.getApplication(), noop)
+        v.ambient = ambient
         val spec = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
         v.measure(spec, spec)
         v.layout(0, 0, size, size)
@@ -182,9 +186,24 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.RECOVER
         shot("W7c_recovery")
 
+        // 9/11 (W3-18): περπάτημα χωρίς όριο: γράφεται «χωρίς όριο».
+        Repo.recoveryUntil = 0
+        Repo.endAt = 0
+        Repo.screen = Repo.Screen.WALK
+        Repo.alarm.limit = null
+        shot("W7e_walk_no_limit")
+        // 9/11 (W3-08): ambient, αχνή οθόνη: λεπτά, χωρίς κουμπιά και χρώματα.
+        Repo.alarm.limit = 140
+        shot("W10_walk_ambient", ambient = true)
+        Repo.alarm.limit = null
+
         Repo.resetExercise()
         Repo.screen = Repo.Screen.END
         shot("W8_end")
+        // 9/11 (V-A-03): η εφαρμογή είχε κλείσει απότομα· το περπάτημα σώθηκε ως μερικό.
+        Repo.notice = "Σώθηκε ως τις 18:42: η εφαρμογή έκλεισε πριν το «Τέλος»."
+        shot("W8b_end_recovered")
+        Repo.notice = null
 
         Repo.screen = Repo.Screen.HOME
         Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s1","w":"A","name":"Προπόνηση Α","start":1,"idx":1,
@@ -197,8 +216,210 @@ class WatchShotsTest {
         shot("W9b_free_pick_on_phone")
         Repo.screen = Repo.Screen.HOME
 
+        // 9/11 (W3-13): «Ελεύθερη άσκηση» με μία άσκηση που τελείωσε: «Διάλεξε επόμενη άσκηση στο κινητό».
+        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s3","w":"_free","name":"Ελεύθερη άσκηση","start":1,"idx":0,
+            "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"ra":2,"sets":[{"label":"10,3 kg","reps":8,"done":true},{"label":"10,3 kg","reps":8,"done":true}]}]}"""))
+        Repo.running = "strength"
+        Repo.runningPhone = true
+        Repo.startedAt = now - 23 * 60_000
+        Repo.bpm = 118
+        Repo.bpmAt = now
+        Repo.screen = Repo.Screen.SET
+        shot("W9c_free_next_on_phone")
+        // Πρόγραμμα του κινητού με όλα τα σετ ✓.
+        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s4","w":"A","name":"Προπόνηση Α","start":1,"idx":0,
+            "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"ra":2,"sets":[{"label":"10,3 kg","reps":8,"done":true}]}]}"""))
+        shot("W9d_all_done")
+        // Ambient σε προπόνηση.
+        shot("W10b_set_ambient", ambient = true)
+        Repo.resetExercise()
+
         Repo.applyPhone(null)
         Repo.plan = Plan.parse(planJson)
+        // 9/11 (V-A-08): πρόγραμμα από νεότερη έκδοση του κινητού.
+        Repo.updateNeeded = true
+        Repo.screen = Repo.Screen.HOME
+        shot("W12_home_update_needed")
+        Repo.updateNeeded = false
+        // 9/11 (V-A-06): χωρίς πρόγραμμα στο ρολόι, αλλά με το τελευταίο όριο που ήρθε.
+        Repo.plan = null
+        Repo.knownLimit = 130
+        shot("W1b_home_no_plan_known_limit")
+        assertEquals(130, Repo.limitNow())
+        Repo.knownLimit = null
+        Repo.plan = Plan.parse(planJson)
+    }
+
+    /** Έλεγχος του #91 (S7, W3-09): το μήνυμα των δύο πατημάτων χωρά ολόκληρο, σε δύο γραμμές. */
+    @Test
+    fun finishConfirmNotice() {
+        val now = System.currentTimeMillis()
+        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s5","w":"A","name":"Προπόνηση Α","start":1,"idx":0,
+            "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"sets":[{"label":"10,3 kg","reps":8},{"label":"10,3 kg","reps":8}]}]}"""))
+        Repo.running = "strength"
+        Repo.runningPhone = true
+        Repo.bpm = 118
+        Repo.bpmAt = now
+        Repo.screen = Repo.Screen.SET
+        assertEquals("Πάτα ξανά: τέλος και στο κινητό", finishNotice(true, 2, true))
+        assertEquals("Πάτα ξανά «Τέλος»", finishNotice(false, 0, false))
+        Repo.notice = finishNotice(true, 0, true)
+        shot("W13_finish_phone_empty")
+        Repo.notice = finishNotice(true, 0, false)
+        shot("W13c_finish_phone_nothing")
+        Repo.notice = finishNotice(true, 1, true)
+        shot("W13b_finish_phone")
+        Repo.notice = null
+        Repo.applyPhone(null)
+    }
+
+    /** Έλεγχος του #91 (S3): εγγραφή στιγμιοτύπου που φτάνει μετά το τέλος δεν το «ανασταίνει». */
+    @Test
+    fun lateSnapshotWriteDoesNotResurrect() {
+        val ctx = RuntimeEnvironment.getApplication()
+        Repo.clearRun(ctx)
+        val gen = Repo.runGen
+        Repo.clearRun(ctx) // το τέλος πρόλαβε
+        assertFalse(Repo.writeRun(ctx, "{\"kind\":\"walk\",\"start\":5}", gen))
+        assertEquals(null, Repo.readRun(ctx))
+        assertTrue(Repo.writeRun(ctx, "{\"kind\":\"walk\",\"start\":5}"))
+        assertEquals(5L, Repo.readRun(ctx)!!.getLong("start"))
+        Repo.clearRun(ctx)
+    }
+
+    /** Έλεγχος του #91 (S3): μερικό ποτέ πάνω σε κανονικό αποτέλεσμα που περιμένει ακόμα. */
+    @Test
+    fun partialNeverOverwritesPendingFinal() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val t0 = 1_700_000_000_000L
+        val final = org.json.JSONObject().put("v", 1).put("id", "walk$t0").put("kind", "cardio").put("end", t0 + 1_800_000)
+        Repo.savePending(ctx, "walk$t0", final)
+        val snap = org.json.JSONObject().put("v", 1).put("kind", "walk").put("start", t0).put("saved", t0 + 600_000)
+        assertEquals("walk$t0", Repo.runId(snap))
+        assertTrue(Repo.hasFinalPending(ctx, "walk$t0"))
+        Repo.writeRun(ctx, snap.toString())
+        assertEquals(null, Repo.finalizeRun(ctx, snap, t0 + 3_600_000, 10_000_000))
+        val kept = Repo.pendingAll(ctx).first { it.first == "walk$t0" }.second
+        assertEquals(t0 + 1_800_000, kept.getLong("end"))
+        assertFalse(kept.has("partial"))
+        assertEquals(null, Repo.readRun(ctx))
+        assertEquals(null, Repo.running)
+        Repo.removePending(ctx, "walk$t0")
+        // χωρίς κανονικό σε αναμονή: μερικό, στην αναμονή
+        val r = Repo.finalizeRun(ctx, snap, t0 + 3_600_000, 10_000_000)!!
+        assertEquals(1, r.second.getInt("partial"))
+        assertFalse(Repo.hasFinalPending(ctx, "walk$t0"))
+        Repo.removePending(ctx, "walk$t0")
+    }
+
+    /** Έλεγχος του #91 (S4): στιγμιότυπο που δεν γίνεται αποτέλεσμα: καμία εξαίρεση, κρατιέται (run.bad.json), μήνυμα. */
+    @Test
+    fun brokenSnapshotIsKeptNotCrashing() {
+        val ctx = RuntimeEnvironment.getApplication()
+        java.io.File(ctx.filesDir, "run.bad.json").delete()
+        val bad = org.json.JSONObject().put("v", 1).put("kind", "walk") // χωρίς «start»
+        Repo.writeRun(ctx, bad.toString())
+        assertEquals(null, Repo.finalizeRun(ctx, bad, 5_000_000, 10_000))
+        assertEquals(null, Repo.readRun(ctx))
+        assertTrue(java.io.File(ctx.filesDir, "run.bad.json").exists())
+        assertEquals(Repo.BAD_RUN_NOTICE, Repo.notice)
+        assertEquals(null, Repo.running)
+    }
+
+    /** Έλεγχος του #91 (S2): μετά από συνέχεια, καμία ψεύτικη δόνηση «κανένας παλμός» πριν περάσουν 30″ από τη συνέχεια. */
+    @Test
+    fun noFalseNoHrBuzzAfterRecovery() {
+        val t0 = 1_700_000_000_000L
+        val snap = org.json.JSONObject().put("v", 1).put("kind", "walk").put("start", t0).put("saved", t0 + 1_200_000).put("lim", 140)
+        val nowEl = 50_000_000L
+        assertTrue(Repo.restoreRun(snap, t0 + 1_230_000, nowEl))
+        val s = HrSilence()
+        assertFalse(s.check(nowEl + 5_000, Repo.startedEl, 0, live = false, hasLimit = true, paused = false, lostMs = 15_000))
+        assertFalse(s.check(nowEl + 29_000, Repo.startedEl, 0, live = false, hasLimit = true, paused = false, lostMs = 15_000))
+        assertTrue(s.check(nowEl + 30_000, Repo.startedEl, 0, live = false, hasLimit = true, paused = false, lostMs = 15_000))
+    }
+
+    /** Έλεγχος 9/11 (V-A-12): ✓ του ρολογιού που δεν επιβεβαιώθηκε πάει στο αποτέλεσμα και όταν το κινητό έκλεισε πρώτο. */
+    @Test
+    fun unconfirmedTickTravelsInResultAfterPhoneEnded() {
+        val now = 1_700_000_000_000L
+        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s9","w":"A","name":"Α","start":$now,"idx":0,
+            "items":[{"ex":"db_press","name":"Π","rest":90,"sets":[{"label":"","reps":8,"done":true},{"label":"","reps":8}]}]}"""))
+        Repo.running = "strength"
+        Repo.runningPhone = true
+        Repo.runningSid = "s9"
+        Repo.startedAt = now
+        Repo.hr = HrStats(now).also { for (k in 0..30) it.add(110, now + k * 1000L) }
+        // ✓ στο ρολόι, που το κινητό δεν είδε ποτέ
+        Repo.phone!!.items[0].sets[1].apply { done = true; at = now + 20_000 }
+        assertEquals(listOf(0 to 1), Repo.pendingTicks)
+        // το κινητό κλείνει την προπόνηση πρώτο
+        Repo.applyPhone(null)
+        assertTrue(Repo.pendingTicks.isEmpty())
+        val r = Results.build(now + 60_000, userEnd = true)!!
+        assertEquals("hrs9-$now", r.first)
+        val log = r.second.getJSONArray("items").getJSONObject(0).getJSONArray("log")
+        assertEquals(1, log.getJSONObject(1).getInt("d"))
+        assertEquals(now + 20_000, log.getJSONObject(1).getLong("t"))
+        assertEquals(now + 60_000, r.second.getLong("fin"))
+        assertEquals("s9", r.second.getString("sid"))
+    }
+
+    /**
+     * Έλεγχος 9/11 (V-A-03): η άσκηση γράφεται ως στιγμιότυπο και ξαναστήνεται όπως ήταν· ως μερική βγαίνει με το ΙΔΙΟ id.
+     */
+    @Test
+    fun walkSnapshotRestoresAndFinalizesWithSameId() {
+        val t0 = 1_700_000_000_000L
+        Repo.running = "walk"
+        Repo.startedAt = t0
+        Repo.gps = true
+        Repo.hr = HrStats(t0).also { h -> for (k in 0 until 600) h.add(100 + (k % 10), t0 + k * 1000L) }
+        Repo.split = SplitTracker(t0).also { it.update(1500.0, t0 + 900_000, 900.0) }
+        Repo.meters = 1500.0
+        Repo.steps = 2100
+        Repo.cpActiveMs = 600_000
+        Repo.cpWall = t0 + 600_000
+        Repo.cpRunning = true
+        Repo.pauses.add(longArrayOf(t0 + 100_000, t0 + 110_000))
+        Repo.alarm.limit = 130
+        val snap = Repo.captureRun(t0 + 900_000)!!
+        val text = snap.toString()
+        Repo.resetExercise()
+        Repo.alarm.limit = null
+        assertTrue(Repo.restoreRun(org.json.JSONObject(text), t0 + 2_000_000, 5_000_000))
+        assertEquals("walk", Repo.running)
+        assertEquals(t0, Repo.startedAt)
+        assertEquals(130, Repo.alarm.limit)
+        assertEquals(1, Repo.splits.size)
+        assertEquals(1500.0, Repo.meters, 0.01)
+        val r = Results.build(t0 + 2_000_000, partialAt = snap.getLong("saved"))!!
+        assertEquals("walk$t0", r.first)
+        assertEquals(1, r.second.getInt("partial"))
+        assertEquals(t0 + 900_000, r.second.getLong("end"))
+        val cardio = r.second.getJSONObject("cardio")
+        assertEquals(900, cardio.getLong("sec"))
+        assertEquals(1, cardio.getJSONArray("km").length())
+        assertEquals(600, r.second.getJSONArray("hr").length())
+        assertEquals(130, r.second.getInt("lim"))
+    }
+
+    /** Προπόνηση με βάρη του ρολογιού: τα ✓ και η τρέχουσα άσκηση ξαναστήνονται από το στιγμιότυπο. */
+    @Test
+    fun localWorkoutSnapshotKeepsSets() {
+        val now = 1_700_000_000_000L
+        val s = LiveSession.fromPlan(Plan.parse(planJson)!!.todayWorkout!!, now)
+        s.tick(now + 10_000)
+        s.tick(now + 200_000)
+        Repo.local = s
+        val o = Repo.captureRun(now + 300_000) ?: org.json.JSONObject().put("kind", "strength").put("start", now).put("saved", now + 300_000).put("local", s.toState())
+        Repo.local = null
+        val back = LiveSession.fromState(o.getJSONObject("local"))!!
+        assertEquals(s.id, back.id)
+        assertEquals(2, back.setsDone)
+        assertEquals(now + 200_000, back.items[0].sets[1].at)
+        assertEquals("Πιεστικό με αλτήρες", back.items[0].name)
+        assertEquals("10,3 kg", back.items[0].sets[0].label)
     }
 
     @Test

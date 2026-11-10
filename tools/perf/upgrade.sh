@@ -160,12 +160,22 @@ if errq_root; then
   if [ -n "$missing" ]; then fail "χάθηκαν αρχεία στην αναβάθμιση:"; echo "$missing"; else echo "Κανένα αρχείο δεν χάθηκε ($(wc -l < files_after.txt) αρχεία)"; fi
   if [ "$seeded" = 1 ]; then
     adb shell cat "$D/files/training.json" > training_after.json
+    # Οι παλμοί του δείγματος (3 τιμές): είτε ακόμα μέσα στο training.json είτε μεταφερμένοι στο hr/ci-seed-1.json (#91).
+    adb shell cat "$D/files/hr/ci-seed-1.json" > hr_after.json 2> /dev/null || true
     if python3 -I -c '
 import json, sys
 j = json.load(open("training_after.json"))
 assert j.get("hrLimit") == 137, "hrLimit"
-assert any(s.get("id") == "ci-seed-1" for s in j.get("sessions", [])), "session"
-'; then echo "training.json μετά την αναβάθμιση: διαβάζεται, έχει το δείγμα"; else fail "το training.json μετά την αναβάθμιση δεν έχει το δείγμα"; fi
+s = [s for s in j.get("sessions", []) if s.get("id") == "ci-seed-1"]
+assert s, "session"
+s = s[0]
+if s.get("hr"):
+    assert len(s["hr"]) == 3, "hr"
+else:
+    assert s.get("hrf") == 3, "hrf"
+    h = json.load(open("hr_after.json"))
+    assert h.get("n") == 3, "hr file"
+'; then echo "training.json μετά την αναβάθμιση: διαβάζεται, έχει το δείγμα και τους παλμούς του"; else fail "το training.json μετά την αναβάθμιση δεν έχει το δείγμα ή τους παλμούς του"; fi
   fi
 fi
 errq_check "Αναβάθμιση" || ok=0
