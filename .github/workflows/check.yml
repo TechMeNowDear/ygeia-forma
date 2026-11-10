@@ -291,20 +291,13 @@ jobs:
   # Ανοίγει την εφαρμογή σε emulator Android 14, καθαρή ΚΑΙ ως αναβάθμιση της τελευταίας έκδοσης. Αν κλείνει, δείχνει
   # σφάλμα Dart ή δεν διαβάζει τα δεδομένα της προηγούμενης, ο κλάδος δεν συγχωνεύεται.
   # (Μετά την #62: ένας κανόνας R8 που έλειπε την έκλεινε, ενώ όλοι οι άλλοι έλεγχοι ήταν πράσινοι.)
-  # fix-sdk37: και σε Android 17 (API 37), όπου ισχύουν οι αλλαγές του targetSdk 37 (το Fold 8 τρέχει Android 17).
-  # Τρέχουν παράλληλα· τα στιγμιότυπα widget ανεβαίνουν μόνο από το Android 14 (ίδια με πριν).
+  # fix-sdk37 (10/11): δοκιμάστηκε και emulator Android 17 (EMU_API=37 στο tools/ci/emulator.sh). Στο CI ήταν ασταθής
+  # (χώρος, υπηρεσία package, SurfaceFlinger «display event receiver status=-32») → μένει μόνο το Android 14.
   smoke:
-    name: smoke (API ${{ matrix.api }})
-    strategy:
-      fail-fast: false
-      matrix:
-        api: [34, 37]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
-    env:
-      EMU_API: ${{ matrix.api }}
     steps:
       - name: Ελεύθερος χώρος στον δίσκο
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY" || true
@@ -396,7 +389,7 @@ jobs:
           fi
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: ${{ always() && matrix.api == 34 }}
+        if: always()
         with:
           name: widget-shots
           path: widget_shots/
@@ -406,7 +399,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: smoke-${{ matrix.api }}
+          name: smoke
           path: |
             smoke_shots/
             smoke.log
