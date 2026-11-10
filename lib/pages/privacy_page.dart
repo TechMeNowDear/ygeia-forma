@@ -632,6 +632,8 @@ class _WipedPageState extends State<WipedPage> {
                       Text(done ? 'Όλα διαγράφηκαν' : 'Η διαγραφή δεν τελείωσε',
                           key: const ValueKey('wiped-title'),
                           textAlign: TextAlign.center,
+                          // Μεγάλα γράμματα (2×): ο τίτλος των 30 μένει ως 1,5×, ώστε το «διαγράφηκαν» να μη σπάει στη μέση.
+                          textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.5),
                           style: TextStyle(fontSize: 30, height: 1.15, fontWeight: FontWeight.w800, color: c.text)),
                       const SizedBox(height: 10),
                       Text(
