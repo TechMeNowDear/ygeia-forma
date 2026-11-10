@@ -28,7 +28,7 @@ class HrBar extends StatelessWidget {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Icon(Icons.favorite_rounded, color: c.bad, size: 22),
+            Icon(Icons.favorite_rounded, color: c.heart, size: 22),
             const SizedBox(width: 8),
             Text('$bpm', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: over ? c.bad : c.text, height: 1)),
             const SizedBox(width: 4),
@@ -84,19 +84,19 @@ class HrStale extends StatelessWidget {
         key: const ValueKey('hr-stale'),
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         decoration: BoxDecoration(
-          color: c.exercise.withValues(alpha: .12),
+          color: c.warnBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: c.exercise, width: lim == null ? 1 : 1.5),
+          border: Border.all(color: c.warnLine, width: lim == null ? 1 : 1.5),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.heart_broken_outlined, color: c.exercise, size: 22)),
+          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.warning_amber_rounded, color: c.warn, size: 22)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Δεν έρχονται παλμοί από το ρολόι', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
               if (lim != null)
                 Text('Το όριο ($lim) δεν σε προσέχει τώρα.',
-                    key: const ValueKey('hr-limit-off'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.exercise)),
+                    key: const ValueKey('hr-limit-off'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.warn)),
               Text(hint, style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary)),
             ]),
           ),

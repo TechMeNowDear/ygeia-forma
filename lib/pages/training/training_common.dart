@@ -44,7 +44,7 @@ String targetLine(PlanItem item, Target t) {
     Change.up || Change.variant => (a.good, ' ↑'),
     Change.more => (a.good, ' +1'),
     Change.down || Change.back => (a.textSecondary, ' ↓'),
-    Change.pain => (a.bad, ''),
+    Change.pain => (a.warn, ''),
     _ => (a.textSecondary, ''),
   };
 }

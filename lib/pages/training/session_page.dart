@@ -397,7 +397,7 @@ class _SessionPageState extends State<SessionPage> {
           if (e.complete && e.rirAnswer != null)
             Text(
               'Ρεζέρβα ${e.rirAnswer == 4 ? '4+' : e.rirAnswer}${e.pain.isEmpty ? '' : ' · ενόχληση: ${e.pain.map((p) => painNames[p]).join(', ')}'}',
-              style: TextStyle(fontSize: 13.5, color: e.pain.isEmpty ? c.textSecondary : c.bad),
+              style: TextStyle(fontSize: 13.5, color: e.pain.isEmpty ? c.textSecondary : c.warn),
             ),
         ],
       ]),

@@ -30,6 +30,9 @@ class Aigaio extends ThemeExtension<Aigaio> {
     required this.energy,
     required this.good,
     required this.bad,
+    required this.warn,
+    required this.warnBg,
+    required this.warnLine,
     required this.nav,
     required this.navBorder,
     required this.navIdle,
@@ -78,9 +81,16 @@ class Aigaio extends ThemeExtension<Aigaio> {
   final Color move;
   final Color energy;
 
-  /// Καλή / κακή τάση.
+  /// Καλή / κακή τάση. [bad]: «χειρότερα» και κίνδυνος (σχέδια 9/11: δικό του κόκκινο, ΠΟΤΕ ίδιο με το
+  /// πορτοκαλί της Άσκησης, και ποτέ για ουδέτερα πράγματα).
   final Color good;
   final Color bad;
+
+  /// Κεχριμπάρι «προσοχή» (σχέδια 9/11): λείπει κάτι, κάτι δεν μετριέται, πόνος. [warn] για κείμενο/εικονίδιο,
+  /// [warnBg] φόντο κουτιού, [warnLine] περίγραμμα.
+  final Color warn;
+  final Color warnBg;
+  final Color warnLine;
 
   /// Η μπάρα πλοήγησης.
   final Color nav;
@@ -152,7 +162,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     move: Color(0xFF8A6508),
     energy: Color(0xFF1D5BD8),
     good: Color(0xFF3F7D20),
-    bad: Color(0xFFC2410C),
+    bad: Color(0xFFB42318),
+    warn: Color(0xFF8A4B06),
+    warnBg: Color(0xFFFEF3DC),
+    warnLine: Color(0xFFE9B45A),
     nav: Color(0xFF0F172A),
     navBorder: Color(0x00000000),
     navIdle: Color(0xFFA3AEC2),
@@ -197,7 +210,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     move: Color(0xFF7A5E12),
     energy: Color(0xFF2F6E7E),
     good: Color(0xFF45601C),
-    bad: Color(0xFFA94C24),
+    bad: Color(0xFFB3261E),
+    warn: Color(0xFF7F4A0A),
+    warnBg: Color(0xFFFBF0D9),
+    warnLine: Color(0xFFDDB066),
     nav: Color(0xFF232A1C),
     navBorder: Color(0x00000000),
     navIdle: Color(0xFFAEB39E),
@@ -242,7 +258,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     move: Color(0xFF8C5A0B),
     energy: Color(0xFF1D4ED8),
     good: Color(0xFF15803D),
-    bad: Color(0xFFC2410C),
+    bad: Color(0xFFB42318),
+    warn: Color(0xFF8A4B06),
+    warnBg: Color(0xFFFEF3DC),
+    warnLine: Color(0xFFE9B45A),
     nav: Color(0xFFFFFFFF),
     navBorder: Color(0xFFF3E2D8),
     navIdle: Color(0xFF7A6058),
@@ -288,7 +307,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     move: Color(0xFFE0BC4A),
     energy: Color(0xFF6FA2FF),
     good: Color(0xFF9DBA63),
-    bad: Color(0xFFF08A63),
+    bad: Color(0xFFFF7A6E),
+    warn: Color(0xFFF5BE5B),
+    warnBg: Color(0xFF33260C),
+    warnLine: Color(0xFF8A6420),
     nav: Color(0xFF1A2236),
     navBorder: Color(0x00000000),
     navIdle: Color(0xFFA3AEC2),
@@ -333,7 +355,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     move: Color(0xFFF2C94C),
     energy: Color(0xFF6FE3F5),
     good: Color(0xFFC8F04A),
-    bad: Color(0xFFFF8A65),
+    bad: Color(0xFFFF6B6B),
+    warn: Color(0xFFF5BE5B),
+    warnBg: Color(0xFF2E2410),
+    warnLine: Color(0xFF7E6122),
     nav: Color(0xFF16181C),
     navBorder: Color(0xFF24272D),
     navIdle: Color(0xFF8A9089),
@@ -378,7 +403,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     move: Color(0xFFFDE68A),
     energy: Color(0xFF5EEAD4),
     good: Color(0xFFA3E07A),
-    bad: Color(0xFFFDA48A),
+    bad: Color(0xFFFF8A80),
+    warn: Color(0xFFF5C46B),
+    warnBg: Color(0xFF2C2A12),
+    warnLine: Color(0xFF7D6A2A),
     nav: Color(0xFF0D2124),
     navBorder: Color(0xFF183337),
     navIdle: Color(0xFF8AA5A2),

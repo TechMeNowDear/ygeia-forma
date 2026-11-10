@@ -371,11 +371,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         key: const ValueKey('search-warning'),
                         margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                         padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: c.warnBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.warnLine)),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.warning_amber_rounded, size: 20, color: c.bad),
+                            Icon(Icons.warning_amber_rounded, size: 20, color: c.warn),
                             const SizedBox(width: 10),
                             Expanded(child: Text(note, style: TextStyle(fontSize: 14, height: 1.4, color: c.text))),
                           ],
@@ -1216,7 +1216,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
               if (doubtful['total'] != null) ...[
                 Container(
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(color: c.warnBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.warnLine)),
                   child: Text(doubtful['total']!, style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text)),
                 ),
                 const SizedBox(height: 10),
@@ -1224,7 +1224,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
               if (mismatch != null)
                 Container(
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: c.tint(c.bad), borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(color: c.warnBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.warnLine)),
                   child: Text(
                     'Οι θερμίδες δεν ταιριάζουν με τα υπόλοιπα: από πρωτεΐνες, υδατάνθρακες και λιπαρά βγαίνουν '
                     'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα ή σε kJ;). '

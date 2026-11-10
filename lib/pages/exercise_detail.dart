@@ -51,11 +51,12 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
         : Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: c.tint(c.exercise),
+              color: c.warnBg,
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: c.warnLine),
             ),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(Icons.warning_amber_rounded, color: c.exercise),
+              Icon(Icons.warning_amber_rounded, color: c.warn),
               const SizedBox(width: 10),
               Expanded(child: Text(ex.caution!, style: TextStyle(fontSize: 14.5, height: 1.4, color: c.text))),
             ]),
@@ -286,7 +287,7 @@ Widget? _progress(BuildContext context, Ex ex) {
           '${byLoad ? '${loadLabel(k, h.$2.workLoad)} · ' : ''}${h.$2.done.map((s) => s.reps).join(', ')}',
         ),
       if (last.$2.pain.isNotEmpty)
-        Text('Τελευταία φορά: ενόχληση', style: TextStyle(fontSize: 13, color: c.bad)),
+        Text('Τελευταία φορά: ενόχληση', style: TextStyle(fontSize: 13, color: c.warn)),
     ]),
   );
 }

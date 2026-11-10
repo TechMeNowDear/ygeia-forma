@@ -121,6 +121,18 @@ String signedMinutes(int v) {
   return v > 0 ? '+${hoursMinutes(v)}' : '−${hoursMinutes(-v)}';
 }
 
+/// Χρονόμετρο (σχέδια 9/11): 1471 → «24:31», 3730 → «1:02:10». Στρογγυλεύει πρώτα, άρα ποτέ «10:60».
+String clock(num seconds) {
+  final t = seconds.round().abs();
+  final h = t ~/ 3600, m = t % 3600 ~/ 60, r = t % 60;
+  final s = h > 0 ? '$h:${two(m)}:${two(r)}' : '$m:${two(r)}';
+  return seconds.round() < 0 ? '−$s' : s;
+}
+
+/// Ρυθμός, ίδιος σε κινητό, ρολόι και PDF (σχέδια 9/11): 675 → «11:15 /km». Στρογγυλεύει ΠΡΙΝ χωρίσει σε λεπτά
+/// και δευτερόλεπτα: 659,5 → «11:00 /km», ποτέ «10:60».
+String paceText(num secPerKm) => '${clock(secPerKm)} /km';
+
 /// «Καλημέρα» / «Καλησπέρα» ανάλογα με την ώρα.
 String greeting(DateTime now) => (now.hour >= 4 && now.hour < 13) ? 'Καλημέρα' : 'Καλησπέρα';
 

@@ -187,7 +187,7 @@ class _Row extends StatelessWidget {
                   if (ex.caution != null) ...[
                     const SizedBox(height: 4),
                     Row(children: [
-                      Icon(Icons.warning_amber_rounded, size: 16, color: c.exercise),
+                      Icon(Icons.warning_amber_rounded, size: 16, color: c.warn),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text('Σταδιακά, χωρίς πόνο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.exercise)),

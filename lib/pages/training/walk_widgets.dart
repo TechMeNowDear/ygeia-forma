@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../format.dart';
 import '../../theme.dart';
 import '../../training/session.dart';
 import '../../training/walk_stats.dart';
@@ -26,7 +27,7 @@ class WalkExtraCard extends StatelessWidget {
     return AppCard(
       key: const ValueKey('walk-extra'),
       child: Row(children: [
-        stat(pace == null ? '—' : paceText(pace), 'ανά km'),
+        stat(pace == null ? '—' : paceText(pace), 'ρυθμός'),
         stat(cad == null ? '—' : '$cad', 'βήματα / λεπτό'),
         stat(session.pauses.isEmpty ? '0' : '${session.pauses.length} · ${(paused / 60).ceil()}′', 'παύσεις'),
       ]),
@@ -70,7 +71,7 @@ class KmCard extends StatelessWidget {
         for (var i = 0; i < splits.length; i++)
           row([
             Text(splits[i].label, style: cell.copyWith(fontWeight: FontWeight.w700)),
-            Text(paceText(splits[i].sec), style: cell),
+            Text(clock(splits[i].sec), style: cell),
             Text(splits[i].hr == null ? '—' : '${splits[i].hr}',
                 key: ValueKey('km-hr-$i'), style: splits[i].hr == null ? cell.copyWith(color: c.textSecondary) : cell.copyWith(fontWeight: FontWeight.w700)),
           ], line: i < splits.length - 1),

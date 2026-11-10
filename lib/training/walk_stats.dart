@@ -79,8 +79,7 @@ int? cadence(Session s) {
   return (st / (t / 60)).round();
 }
 
-/// «13′17″».
-String paceText(int sec) => '${sec ~/ 60}′${(sec % 60).toString().padLeft(2, '0')}″';
+/// Ο ρυθμός γράφεται με το [paceText] του format.dart («11:15 /km»).
 
 /// Συνολικός χρόνος παύσεων (δευτερόλεπτα).
 int pausedSec(Session s) => s.pauses.fold(0, (a, p) => a + (p[1] - p[0]).clamp(0, 1 << 30));

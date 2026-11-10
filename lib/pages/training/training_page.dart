@@ -526,12 +526,12 @@ class _TrainingPageState extends State<TrainingPage> {
                 ? ('Στάλθηκε· θα επιβεβαιωθεί μόλις ανοίξεις την εφαρμογή στο ρολόι (ή την ενημερώσεις εκεί).', c.textSecondary, Icons.watch_rounded)
                 : link.ready.value
                     ? ('Στέλνεται στο ρολόι…', c.textSecondary, Icons.watch_rounded)
-                    : ('Το ρολόι δεν βρέθηκε τώρα: δεν ξέρω αν έχει αυτό το όριο.', c.exercise, Icons.watch_rounded);
+                    : ('Το ρολόι δεν βρέθηκε τώρα: δεν ξέρω αν έχει αυτό το όριο.', c.warn, Icons.watch_rounded);
     return AppCard(
       key: const ValueKey('train-hrlimit'),
       onTap: () => _editHrLimit(context),
       child: Row(children: [
-        IconBadge(Icons.favorite_rounded, c.bad),
+        IconBadge(Icons.favorite_rounded, c.heart),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -587,13 +587,8 @@ class _TrainingPageState extends State<TrainingPage> {
     final m = (l['m'] as num?)?.toDouble() ?? 0;
     final steps = (l['steps'] as num?)?.toInt() ?? 0;
     final bpm = (l['bpm'] as num?)?.toInt() ?? 0;
-    String two(int v) => v.toString().padLeft(2, '0');
-    final time = sec >= 3600 ? '${sec ~/ 3600}:${two(sec % 3600 ~/ 60)}:${two(sec % 60)}' : '${sec ~/ 60}:${two(sec % 60)}';
-    String pace() {
-      if (m < 50 || sec <= 0) return '—';
-      final p = (sec / (m / 1000)).round();
-      return '${p ~/ 60}′${two(p % 60)}″';
-    }
+    final time = clock(sec);
+    String pace() => m < 50 || sec <= 0 ? '—' : paceText(sec / (m / 1000));
 
     Widget stat(String v, String label) => Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -614,7 +609,7 @@ class _TrainingPageState extends State<TrainingPage> {
         if (bpm > 0) ...[HrBar(bpm: bpm, limit: t.hrLimit), const SizedBox(height: 10)],
         Row(children: [stat(time, 'χρόνος'), stat(m > 0 ? (m / 1000).toStringAsFixed(2).replaceAll('.', ',') : '—', 'km')]),
         const SizedBox(height: 8),
-        Row(children: [stat(pace(), 'ανά km'), stat(steps > 0 ? thousands(steps) : '—', 'βήματα')]),
+        Row(children: [stat(pace(), 'ρυθμός'), stat(steps > 0 ? thousands(steps) : '—', 'βήματα')]),
         const SizedBox(height: 6),
         Text('Τελειώνει από το ρολόι. Μόλις τελειώσει, γράφεται εδώ.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
       ]),
