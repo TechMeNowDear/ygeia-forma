@@ -11,6 +11,7 @@ import '../food/weigh_hints.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'my_foods.dart';
 import 'nutrition.dart';
 
 // ---------------------------------------------------------------------------
@@ -272,7 +273,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 ? null
                 : strong
                     ? 'Δεν έχουμε «${q.trim()}». Τα παρακάτω είναι για «$kept»: άλλο τρόφιμο, με άλλες θερμίδες. Αν είναι '
-                        'συσκευασμένο, σκάναρε το barcode ή πέρασε την ετικέτα (κουμπιά πιο κάτω)· αν είναι σπιτικό, γράψε '
+                        'συσκευασμένο, πάτα «Σάρωση» ή «Από ετικέτα» (πιο πάνω)· αν είναι σπιτικό, γράψε '
                         'χωριστά και τα υπόλοιπα υλικά.'
                     : kept.isEmpty
                         ? 'Δεν βρέθηκε με όλες τις λέξεις. Αποτελέσματα χωρίς ${found.ignored.map((w) => '«$w»').join(', ')}.'
@@ -282,16 +283,59 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     final recentIds = {for (final f in recent) f.id};
     final frequent = [for (final f in widget.food.frequent(limit: 25)) if (!recentIds.contains(f.id)) f].take(10).toList();
 
-    Widget section(String title, List<Food> foods) => Column(
+    // Σχέδια 9/11 (10α): Συχνά → Πρόσφατα → Δικά μου. Τα δικά μου που φαίνονται ήδη πιο πάνω δεν ξαναμπαίνουν.
+    final shownIds = {...recentIds, for (final f in frequent) f.id};
+    final allMine = widget.food.mine;
+    final mine = [for (final f in allMine) if (!shownIds.contains(f.id)) f].take(3).toList();
+
+    Widget head(String title, {Widget? trailing}) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 8, 2),
+          child: Row(children: [
+            Expanded(
+              child: Text(upperGr(title),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+            ),
+            if (trailing != null) trailing,
+          ]),
+        );
+    Widget section(String title, List<Food> foods, {Widget? trailing, bool more = false}) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-              child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textSecondary)),
-            ),
-            for (final f in foods) _FoodTile(food: f, store: widget.food, onTap: () => _pick(f)),
+            head(title, trailing: trailing),
+            for (var k = 0; k < foods.length; k++)
+              _FoodTile(
+                food: foods[k],
+                store: widget.food,
+                onTap: () => _pick(foods[k]),
+                onMore: more ? () => myFoodActions(context, widget.food, foods[k]) : null,
+                line: k < foods.length - 1,
+              ),
           ],
         );
+    final tools = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              key: const ValueKey('add-scan'),
+              onPressed: _busy ? null : _scan,
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+              label: const Text('Σάρωση', maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              key: const ValueKey('add-label'),
+              onPressed: () => _newFood(draft: FoodDraft(name: q.trim())),
+              icon: const Icon(Icons.layers_outlined, size: 20),
+              label: const Text('Από ετικέτα', maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Scaffold(
       backgroundColor: c.background,
@@ -299,32 +343,40 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
-        title: TextField(
-          controller: _query,
-          autofocus: true,
-          onChanged: (_) => setState(() {}),
-          textInputAction: TextInputAction.search,
-          style: TextStyle(fontSize: 17, color: c.text),
-          decoration: InputDecoration(
-            hintText: 'Αναζήτηση τροφίμου',
-            border: InputBorder.none,
-            suffixIcon: q.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Καθαρισμός',
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => setState(_query.clear),
-                  ),
+        toolbarHeight: 64,
+        // Σχέδια 9/11 (10α): η αναζήτηση σε κουτί, «Σάρωση» και «Από ετικέτα» ως κουμπιά πιο κάτω (όχι εικονίδιο).
+        title: Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: c.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: c.hairline),
+            ),
+            child: TextField(
+              controller: _query,
+              autofocus: true,
+              onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.search,
+              style: TextStyle(fontSize: 17, color: c.text),
+              decoration: InputDecoration(
+                hintText: 'Ψάξε φαγητό ή μάρκα',
+                hintStyle: TextStyle(color: c.textTertiary, fontSize: 17),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                prefixIcon: Icon(Icons.search_rounded, color: c.textSecondary),
+                suffixIcon: q.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Καθαρισμός',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => setState(_query.clear),
+                      ),
+              ),
+            ),
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Σκανάρισμα barcode',
-            onPressed: _busy ? null : _scan,
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -344,6 +396,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               ListView(
                 padding: const EdgeInsets.only(bottom: 40),
                 children: [
+                  tools,
                   if (q.trim().isEmpty) ...[
                     if (frequent.isNotEmpty) section('Συχνά', frequent),
                     if (recent.isNotEmpty) section('Πρόσφατα', recent),
@@ -352,10 +405,32 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                         child: Text(
                           'Γράψε τι έφαγες, με ή χωρίς τόνους, ακόμα και σε greeklish («fakes», «kotopoulo»). '
-                          'Για συσκευασμένα προϊόντα πάτα το εικονίδιο του barcode πάνω δεξιά.',
+                          'Για συσκευασμένα προϊόντα πάτα «Σάρωση».',
                           style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                         ),
                       ),
+                    if (allMine.isNotEmpty)
+                      KeyedSubtree(
+                        key: const ValueKey('add-mine'),
+                        child: section(
+                          'Δικά μου',
+                          mine,
+                          more: true,
+                          trailing: TextButton(
+                            key: const ValueKey('add-mine-all'),
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                                settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: widget.food))),
+                            child: Text('Όλα (${allMine.length}) ›'),
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                      child: Text(
+                        'Νέο δικό σου προϊόν: «Σάρωση» ή «Από ετικέτα». Τα δικά σου βγαίνουν και όταν ψάχνεις.',
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
+                      ),
+                    ),
                   ] else if (results.isEmpty)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
@@ -396,30 +471,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                           ],
                         ),
                       ),
-                    for (final f in results) _FoodTile(food: f, store: widget.food, onTap: () => _pick(f)),
+                    for (var k = 0; k < results.length; k++)
+                      _FoodTile(
+                        food: results[k],
+                        store: widget.food,
+                        onTap: () => _pick(results[k]),
+                        line: k < results.length - 1,
+                      ),
                   ],
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _busy ? null : _scan,
-                            icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                            label: const Text('Barcode'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _newFood(draft: FoodDraft(name: q.trim())),
-                            icon: const Icon(Icons.edit_note_rounded, size: 18),
-                            label: const Text('Από ετικέτα'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
               if (_busy)
@@ -433,10 +492,16 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 }
 
 class _FoodTile extends StatelessWidget {
-  const _FoodTile({required this.food, required this.store, required this.onTap});
+  const _FoodTile({required this.food, required this.store, required this.onTap, this.onMore, this.line = false});
   final Food food;
   final FoodStore store;
   final VoidCallback onTap;
+
+  /// ⋮ για αλλαγή (μόνο στα δικά μου).
+  final VoidCallback? onMore;
+
+  /// Λεπτή γραμμή από κάτω (ανάμεσα σε γραμμές της ίδιας ενότητας).
+  final bool line;
 
   @override
   Widget build(BuildContext context) {
@@ -445,8 +510,10 @@ class _FoodTile extends StatelessWidget {
     final times = store.timesEaten(food.id);
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(4, 11, 0, 11),
+        decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
         child: Row(
           children: [
             Expanded(
@@ -473,7 +540,14 @@ class _FoodTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.add_circle_outline_rounded, color: c.food),
+            if (onMore != null)
+              IconButton(
+                key: ValueKey('mine-more-${food.id}'),
+                tooltip: 'Αλλαγή',
+                onPressed: onMore,
+                icon: Icon(Icons.more_vert_rounded, color: c.textSecondary),
+              ),
+            Icon(Icons.add_circle_outline_rounded, color: c.food, size: 28),
           ],
         ),
       ),

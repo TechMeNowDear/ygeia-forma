@@ -3,15 +3,23 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../data.dart';
+import '../food/food_store.dart';
+import '../food/kitchen.dart';
 import '../format.dart';
 import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'kitchen.dart';
+import 'my_foods.dart';
 
 /// «Τα στοιχεία μου» (7/11): γέννηση, φύλο, ύψος για τα εύρη αναφοράς· η μέρα του εβδομαδιαίου ζυγίσματος.
+/// Σχέδια 9/11 (10β): εδώ ζουν και «Τα προϊόντα μου» (όλη η λίστα) και «Η κουζίνα μου».
 class MePage extends StatefulWidget {
-  const MePage({super.key, required this.store});
+  const MePage({super.key, required this.store, this.food});
   final HealthStore store;
+
+  /// Χωρίς αυτό: η αποθήκη φαγητού της εφαρμογής ([FoodStore.shared]).
+  final FoodStore? food;
 
   static Route<void> route(HealthStore store) =>
       MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τα στοιχεία μου'), builder: (_) => MePage(store: store));
@@ -50,8 +58,9 @@ class _MePageState extends State<MePage> {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final now = DateTime.now();
+    final food = widget.food ?? FoodStore.shared;
     return ListenableBuilder(
-      listenable: widget.store,
+      listenable: Listenable.merge([widget.store, if (food != null) food]),
       builder: (context, _) {
         final p = widget.store.profile;
         final suggested = _scaleHeight();
@@ -180,16 +189,20 @@ class _MePageState extends State<MePage> {
                         ],
                       ),
                     ),
+                    if (food != null) ...[
+                      const GroupLabel('Διατροφή'),
+                      _nutrition(context, food),
+                    ],
+                    const GroupLabel('Από πού έρχεται κάθε μέτρηση'),
                     AppCard(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('Από πού έρχεται κάθε μέτρηση', style: label),
-                          const SizedBox(height: 6),
-                          const InfoRow('Ύπνος, HRV, παλμοί ύπνου, αναπνοές, μέσο οξυγόνο', 'Oura'),
-                          const InfoRow('Βήματα, παλμοί ξύπνιος, χαμηλότερο οξυγόνο', 'Ρολόι'),
-                          const InfoRow('Βάρος, λίπος, μύες', 'InBody'),
-                          const SizedBox(height: 6),
+                          const _SourceRow('Ύπνος, HRV, παλμοί ύπνου, αναπνοές, μέσο οξυγόνο', 'Oura', line: true),
+                          const _SourceRow('Βήματα, παλμοί ξύπνιος, χαμηλότερο οξυγόνο', 'Ρολόι', line: true),
+                          const _SourceRow('Βάρος, λίπος, μύες', 'InBody'),
+                          const SizedBox(height: 4),
                           Text('Κάθε μέτρηση έρχεται από μία συσκευή· ποτέ ανακατεμένα.', style: hint),
                         ],
                       ),
@@ -201,6 +214,65 @@ class _MePageState extends State<MePage> {
           ),
         );
       },
+    );
+  }
+
+  /// «Τα προϊόντα μου» και «Η κουζίνα μου» (πριν: υπο-καρτέλα «Τα δικά μου» της Διατροφής).
+  Widget _nutrition(BuildContext context, FoodStore food) {
+    final c = Aigaio.of(context);
+    final n = food.mine.length;
+    final k = Kitchen.fromJson(widget.store.prefs.kitchen);
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        NavRow(
+          key: const ValueKey('mine-products'),
+          icon: Icons.inventory_2_outlined,
+          color: c.food,
+          title: 'Τα προϊόντα μου',
+          text: n == 0
+              ? 'Πέρασε ό,τι αγοράζεις, με «Σάρωση» ή από την ετικέτα, χωρίς να το φας.'
+              : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · αλλαγή, αντιγραφή, διαγραφή',
+          line: true,
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: food))),
+        ),
+        NavRow(
+          key: const ValueKey('mine-kitchen'),
+          icon: Icons.soup_kitchen_outlined,
+          color: c.food,
+          title: 'Η κουζίνα μου',
+          text: '${k.devices.length} συσκευές · ${k.cookware.length} σκεύη · για τις συνταγές, όταν έρθουν',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'Η κουζίνα μου'), builder: (_) => KitchenScreen(store: widget.store))),
+        ),
+      ]),
+    );
+  }
+}
+
+/// «Ύπνος, HRV … · [Oura]»: η μέτρηση αριστερά, η συσκευή ως ετικέτα δεξιά.
+class _SourceRow extends StatelessWidget {
+  const _SourceRow(this.what, this.device, {this.line = false});
+  final String what;
+  final String device;
+  final bool line;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+      child: Row(children: [
+        Expanded(child: Text(what, style: TextStyle(fontSize: 15, height: 1.35, color: c.text))),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.hairline)),
+          child: Text(device, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
+        ),
+      ]),
     );
   }
 }

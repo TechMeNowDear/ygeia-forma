@@ -91,6 +91,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   static const historyDays = 90;
 
+  /// Η αποθήκη φαγητού της εφαρμογής (τη δηλώνει το Shell), για οθόνες που ανοίγουν από αλλού, π.χ. «Τα στοιχεία
+  /// μου» από τις Ρυθμίσεις (σχέδια 9/11: τα προϊόντα και η κουζίνα ζουν εκεί).
+  static FoodStore? shared;
+
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
     try {

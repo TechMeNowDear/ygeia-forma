@@ -20,6 +20,7 @@ import 'package:ygeia_forma/pages/sleep.dart';
 import 'package:ygeia_forma/pages/trends.dart';
 import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
+import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/off.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
@@ -449,17 +450,35 @@ void main() {
           await t.tap(find.text('Φαγητό'));
         },
       ));
+  // Σχέδια 9/11 (10α): «Τα προϊόντα μου» ανοίγουν από το «Δικά μου» του «+ Φαγητό».
   testWidgets('Διατροφή · τα προϊόντα μου', (t) => _shot(
         t,
         name: '19_my_foods',
         size: phone,
         brightness: Brightness.light,
         tab: Cat.food,
-        sub: FoodTab.mine,
         act: (t) async {
-          await t.tap(find.byKey(const ValueKey('mine-products')));
+          await t.tap(find.text('Φαγητό'));
+          await t.pumpAndSettle();
+          await t.ensureVisible(find.byKey(const ValueKey('add-mine-all')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const ValueKey('add-mine-all')));
         },
       ));
+  // Σχέδια 9/11 (10α): «+ Φαγητό» σε φωτεινό, με Συχνά → Πρόσφατα → Δικά μου (Fold κλειστό, 360 και 1,3×).
+  for (final (name, size, scale) in [
+    ('17b_add_food_mine', phone, 1.0),
+    ('17c_add_food_mine_360', const Size(360, 1900), 1.0),
+    ('17d_add_food_mine_13x', phone, 1.3),
+  ]) {
+    testWidgets('Διατροφή · προσθήκη · δικά μου · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _shot(t, name: name, size: size, brightness: Brightness.light, tab: Cat.food, act: (t) async {
+        await t.tap(find.text('Φαγητό'));
+      });
+    });
+  }
   testWidgets('Διατροφή · αναζήτηση με μάρκα', (t) => _shot(
         t,
         name: '20_search_branded',
@@ -603,7 +622,23 @@ void main() {
   testWidgets('Καρδιά · κινητό', (t) => _shot(t, name: '08_heart_phone_light', size: phone, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.heart));
   testWidgets('Σώμα · κινητό', (t) => _shot(t, name: '09_body_phone_light', size: tall, brightness: Brightness.light, tab: Cat.health, sub: HealthTab.body));
   testWidgets('Σώμα · Fold ανοιχτό · σκοτεινό', (t) => _shot(t, name: '10_body_open_dark', size: open, brightness: Brightness.dark, tab: Cat.health, sub: HealthTab.body));
-  testWidgets('Διατροφή · τα δικά μου', (t) => _shot(t, name: '22_mine_phone_light', size: phone, brightness: Brightness.light, tab: Cat.food, sub: FoodTab.mine));
+  // Σχέδια 9/11 (10β): «Τα στοιχεία μου» με τα προϊόντα και την κουζίνα (πριν: «Διατροφή › Τα δικά μου»).
+  for (final (name, size, scale, dark) in [
+    ('22_me_phone_light', phone, 1.0, false),
+    ('22b_me_360_13x', const Size(360, 1900), 1.3, false),
+    ('22c_me_open_dark', open, 1.0, true),
+  ]) {
+    testWidgets('Τα στοιχεία μου · $name', (t) async {
+      t.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+      await _page(t,
+          name: name,
+          size: size,
+          brightness: dark ? Brightness.dark : Brightness.light,
+          oura: false,
+          page: (s) => MePage(store: s, food: sampleFoodStore(now)));
+    });
+  }
   testWidgets('Σελίδα μέτρησης · βάρος · κινητό', (t) => _shot(
         t,
         name: '40_metric_weight_phone',

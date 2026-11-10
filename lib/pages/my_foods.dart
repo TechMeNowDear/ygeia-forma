@@ -85,88 +85,9 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
     if (f != null && mounted) _saved(f);
   }
 
-  Future<Food?> _edit(Food f, {String? note}) async {
-    final edited = await Navigator.of(context).push<Food>(
-      MaterialPageRoute(settings: const RouteSettings(name: 'Διόρθωση προϊόντος'), builder: (_) => FoodFormScreen(draft: draftFromFood(f), existingId: f.id, note: note)),
-    );
-    if (edited == null) return null;
-    if (!await widget.food.saveMyFood(edited)) return edited;
-    // Διόρθωση τιμών: προσφέρεται να διορθωθούν και οι μέρες που το έχω ήδη γράψει.
-    final old = widget.food.entriesWithOldValues(edited);
-    if (old.isNotEmpty && mounted) {
-      final yes = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Και στις μέρες που το έγραψες;'),
-          content: Text(
-            'Το «${edited.name}» υπάρχει σε ${countText(old.length, 'καταχώριση', 'καταχωρίσεις')} των τελευταίων '
-            '${FoodStore.historyDays} ημερών με τις παλιές τιμές. Να πάρουν τις νέες; Τα γραμμάρια μένουν ίδια.',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Όχι, μόνο από εδώ και πέρα')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ναι, διόρθωσέ τες')),
-          ],
-        ),
-      );
-      if (yes == true) {
-        final n = await widget.food.applyFoodToEntries(edited, old);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Διορθώθηκαν ${countText(n, 'καταχώριση', 'καταχωρίσεις')}.')));
-        }
-      }
-    }
-    return edited;
-  }
+  Future<Food?> _edit(Food f, {String? note}) => editMyFood(context, widget.food, f, note: note);
 
-  Future<void> _delete(Food f) async {
-    if (!await widget.food.deleteMyFood(f) || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Διαγράφηκε: ${f.name}'),
-      action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.saveMyFood(f)),
-    ));
-  }
-
-  Future<void> _actions(Food f) async {
-    final c = Aigaio.of(context);
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      routeSettings: const RouteSettings(name: 'Επιλογές προϊόντος'),
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Διόρθωση'),
-              onTap: () => Navigator.pop(ctx, 'edit'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline_rounded),
-              title: const Text('Όλες οι τιμές και η πηγή'),
-              onTap: () => Navigator.pop(ctx, 'detail'),
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_outline_rounded, color: c.bad),
-              title: Text('Διαγραφή', style: TextStyle(color: c.bad)),
-              subtitle: const Text('Ό,τι έχεις ήδη καταγράψει μένει όπως είναι.'),
-              onTap: () => Navigator.pop(ctx, 'delete'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted) return;
-    if (choice == 'edit') {
-      final e = await _edit(f);
-      if (e != null && mounted) _saved(e);
-    } else if (choice == 'detail') {
-      await Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τρόφιμο'), builder: (_) => FoodDetailScreen(food: f)));
-    } else if (choice == 'delete') {
-      await _delete(f);
-    }
-  }
+  Future<void> _actions(Food f) => myFoodActions(context, widget.food, f);
 
   @override
   Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
@@ -210,7 +131,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                           style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
                           onPressed: _busy ? null : _scan,
                           icon: const Icon(Icons.qr_code_scanner_rounded),
-                          label: const Text('Σκανάρισμα'),
+                          label: const Text('Σάρωση'),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -313,5 +234,93 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
         );
       },
     );
+  }
+}
+
+/// Διόρθωση ενός δικού μου προϊόντος (και, αν θέλει ο χρήστης, των μερών που το έχει ήδη γράψει).
+/// Κοινό για «Τα προϊόντα μου» και το «Δικά μου» του «+ Φαγητό» (σχέδια 9/11).
+Future<Food?> editMyFood(BuildContext context, FoodStore food, Food f, {String? note}) async {
+  final edited = await Navigator.of(context).push<Food>(
+    MaterialPageRoute(settings: const RouteSettings(name: 'Διόρθωση προϊόντος'), builder: (_) => FoodFormScreen(draft: draftFromFood(f), existingId: f.id, note: note)),
+  );
+  if (edited == null) return null;
+  if (!await food.saveMyFood(edited)) return edited;
+  // Διόρθωση τιμών: προσφέρεται να διορθωθούν και οι μέρες που το έχω ήδη γράψει.
+  final old = food.entriesWithOldValues(edited);
+  if (old.isNotEmpty && context.mounted) {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Και στις μέρες που το έγραψες;'),
+        content: Text(
+          'Το «${edited.name}» υπάρχει σε ${countText(old.length, 'καταχώριση', 'καταχωρίσεις')} των τελευταίων '
+          '${FoodStore.historyDays} ημερών με τις παλιές τιμές. Να πάρουν τις νέες; Τα γραμμάρια μένουν ίδια.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Όχι, μόνο από εδώ και πέρα')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ναι, διόρθωσέ τες')),
+        ],
+      ),
+    );
+    if (yes == true) {
+      final n = await food.applyFoodToEntries(edited, old);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Διορθώθηκαν ${countText(n, 'καταχώριση', 'καταχωρίσεις')}.')));
+      }
+    }
+  }
+  return edited;
+}
+
+Future<void> _deleteMyFood(BuildContext context, FoodStore food, Food f) async {
+  if (!await food.deleteMyFood(f) || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text('Διαγράφηκε: ${f.name}'),
+    action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.saveMyFood(f)),
+  ));
+}
+
+/// ⋮ ενός δικού μου προϊόντος: διόρθωση, όλες οι τιμές, διαγραφή.
+Future<void> myFoodActions(BuildContext context, FoodStore food, Food f) async {
+  final c = Aigaio.of(context);
+  final choice = await showModalBottomSheet<String>(
+    context: context,
+    routeSettings: const RouteSettings(name: 'Επιλογές προϊόντος'),
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: const Text('Διόρθωση'),
+            onTap: () => Navigator.pop(ctx, 'edit'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline_rounded),
+            title: const Text('Όλες οι τιμές και η πηγή'),
+            onTap: () => Navigator.pop(ctx, 'detail'),
+          ),
+          ListTile(
+            leading: Icon(Icons.delete_outline_rounded, color: c.bad),
+            title: Text('Διαγραφή', style: TextStyle(color: c.bad)),
+            subtitle: const Text('Ό,τι έχεις ήδη καταγράψει μένει όπως είναι.'),
+            onTap: () => Navigator.pop(ctx, 'delete'),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (!context.mounted) return;
+  if (choice == 'edit') {
+    final e = await editMyFood(context, food, f);
+    if (e != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Αποθηκεύτηκε: ${e.name}')));
+    }
+  } else if (choice == 'detail') {
+    await Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: 'Τρόφιμο'), builder: (_) => FoodDetailScreen(food: f)));
+  } else if (choice == 'delete') {
+    await _deleteMyFood(context, food, f);
   }
 }

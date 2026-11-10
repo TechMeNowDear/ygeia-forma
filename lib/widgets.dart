@@ -1526,3 +1526,66 @@ class SectionLabel extends StatelessWidget {
     return Text(text, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.2));
   }
 }
+
+/// Τίτλος ομάδας καρτών πάνω από την κάρτα (σχέδια 9/11): μικρά κεφαλαία χωρίς τόνους, γκρι, 24 dp πάνω.
+class GroupLabel extends StatelessWidget {
+  const GroupLabel(this.text, {super.key, this.trailing});
+  final String text;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
+      child: Row(children: [
+        Expanded(
+          child: Text(upperGr(text),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+        ),
+        if (trailing != null) trailing!,
+      ]),
+    );
+  }
+}
+
+/// Γραμμή που ανοίγει άλλη οθόνη, μέσα σε κάρτα: εικονίδιο, τίτλος, μία-δύο γραμμές εξήγηση, «›».
+class NavRow extends StatelessWidget {
+  const NavRow({super.key, required this.icon, required this.color, required this.title, this.text, required this.onTap, this.line = false});
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? text;
+  final VoidCallback onTap;
+
+  /// Λεπτή γραμμή από κάτω (όταν ακολουθεί κι άλλη γραμμή στην ίδια κάρτα).
+  final bool line;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+        child: Row(children: [
+          IconBadge(icon, color, size: 36),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+              if (text != null) ...[
+                const SizedBox(height: 2),
+                Text(text!, style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
+              ],
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+        ]),
+      ),
+    );
+  }
+}
