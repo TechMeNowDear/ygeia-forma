@@ -56,11 +56,10 @@ class OuraSleepPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(children: [
-            Expanded(child: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep)),
-            const LabelTag('εκτίμηση'),
-            const InfoButton(stagesInfoKey),
-          ]),
+          TitleRow(
+            header: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep),
+            trailing: const [LabelTag('εκτίμηση'), InfoButton(stagesInfoKey)],
+          ),
           const SizedBox(height: 12),
           if (stages.deep == null)
             Text(
@@ -198,13 +197,10 @@ class _OuraNightCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          Row(children: [
-            Expanded(
-              child: CardHeader(icon: Icons.bedtime_rounded, title: 'Τελευταία νύχτα · ${shortDayDate(night.day)}', color: c.sleep),
-            ),
-            const SourceTag(Source.oura),
-            InfoButton(K.sleepMin, range: range),
-          ]),
+          TitleRow(
+            header: CardHeader(icon: Icons.bedtime_rounded, title: 'Τελευταία νύχτα · ${shortDayDate(night.day)}', color: c.sleep),
+            trailing: [const SourceTag(Source.oura), InfoButton(K.sleepMin, range: range)],
+          ),
           if (night.shortNight && (minutes ?? 0) < 180) ...[
             const SizedBox(height: 8),
             Text(shortNightLabel,
@@ -229,7 +225,14 @@ class _OuraNightCard extends StatelessWidget {
             RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep),
           ],
           const SizedBox(height: 14),
-          Row(children: [clock('Ξάπλωσες', parts.first.start), clock('Κοιμήθηκες', parts.first.onset), clock('Ξύπνησες', parts.last.end)]),
+          // Τρεις στήλες όσο χωράει κάθε λέξη· αλλιώς γραμμές «ετικέτα … ώρα» (ποτέ «00:2/6»).
+          LayoutBuilder(builder: (context, box) {
+            final items = [('Ξάπλωσες', parts.first.start), ('Κοιμήθηκες', parts.first.onset), ('Ξύπνησες', parts.last.end)];
+            final fits = wordsFit(context, [for (final i in items) i.$1], TextStyle(fontSize: 13, color: c.textSecondary), box.maxWidth / 3 - 4) &&
+                wordsFit(context, const ['00:00'], const TextStyle(fontSize: 20, fontWeight: FontWeight.w700), box.maxWidth / 3 - 4);
+            if (fits) return Row(children: [for (final i in items) clock(i.$1, i.$2)]);
+            return Column(children: [for (final i in items) InfoRow(i.$1, i.$2 == null ? '—' : hm(i.$2!))]);
+          }),
           if (n.stages.isNotEmpty) ...[
             const SizedBox(height: 16),
             Row(children: [
@@ -295,11 +298,11 @@ class _RingTiles extends StatelessWidget {
     final big = MediaQuery.textScalerOf(context).scale(10) > 13.5;
     Widget tile((double, String, String, String) t) => Container(
           key: ValueKey(t.$4),
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.fromLTRB(8, 10, 6, 10),
           decoration: BoxDecoration(color: c.tint(c.sleep), borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
-            ScoreRing(value: t.$1, size: 48, stroke: 5, color: c.sleep, track: c.tint(c.sleep), textColor: c.text),
-            const SizedBox(width: 10),
+            ScoreRing(value: t.$1, size: 44, stroke: 5, color: c.sleep, track: c.tint(c.sleep), textColor: c.text),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t.$2, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.25)),
@@ -376,11 +379,10 @@ class _OuraRestCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(children: [
-            Expanded(child: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά και θερμοκρασία στον ύπνο', color: c.heart)),
-            const SourceTag(Source.oura),
-            const InfoButton(K.hrv),
-          ]),
+          TitleRow(
+            header: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά και θερμοκρασία στον ύπνο', color: c.heart),
+            trailing: const [SourceTag(Source.oura), InfoButton(K.hrv)],
+          ),
           const SizedBox(height: 4),
           row(K.hrv, 'HRV', hrv == null ? '—' : '${hrv.value.round()} ms', sub: usual(hrv)),
           row(K.sleepHr, 'Παλμοί ύπνου', hr == null ? '—' : '${hr.value.round()} bpm', sub: usual(hr)),

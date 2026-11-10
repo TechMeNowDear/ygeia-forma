@@ -360,13 +360,16 @@ class _NavItem extends StatelessWidget {
                 child: Icon(selected ? dest.selectedIcon : dest.icon, size: 21, color: iconColor),
               ),
               const SizedBox(height: 4),
-              Text(
-                dest.label,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: selected ? c.navLabel : c.navIdle,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  dest.label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: selected ? c.navLabel : c.navIdle,
+                  ),
                 ),
               ),
             ],

@@ -775,7 +775,9 @@ void main() {
   // Σχέδια 9/11 (6α–6γ): Άσκηση › Σήμερα, προπόνηση με λάστιχο, ερώτηση «άφησε» και «Πόνεσε κάπου;».
   Future<void> bandSet(WidgetTester t) async {
     await startSession(t);
-    await tapKey(t, 'sess-ex-4');
+    for (var i = 0; i < 4; i++) {
+      await tapKey(t, 'sess-next');
+    }
     await tapKey(t, 'sess-tick-0');
     await tapKey(t, 'rest-stop');
   }

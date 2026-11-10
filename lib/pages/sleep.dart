@@ -332,11 +332,10 @@ class _WatchStagesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(children: [
-            Expanded(child: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep)),
-            const LabelTag('εκτίμηση'),
-            const InfoButton(stagesInfoKey),
-          ]),
+          TitleRow(
+            header: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep),
+            trailing: const [LabelTag('εκτίμηση'), InfoButton(stagesInfoKey)],
+          ),
           const SizedBox(height: 12),
           if (!enough)
             Text(

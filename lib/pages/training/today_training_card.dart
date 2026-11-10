@@ -192,7 +192,11 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
 
   Widget _title(BuildContext context, String text) {
     final c = Aigaio.of(context);
-    return Text(text, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: c.text));
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(text, maxLines: 1, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: c.text)),
+    );
   }
 
   Widget _button(BuildContext context, String text, VoidCallback onTap, {required String key}) {

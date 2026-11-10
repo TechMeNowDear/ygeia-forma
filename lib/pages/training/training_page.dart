@@ -356,7 +356,7 @@ class _TrainingPageState extends State<TrainingPage> {
     } else if (w.isCardio) {
       final cardio = w.cardio!;
       children.addAll([
-        Text(cardio.name, style: title),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(cardio.name, maxLines: 1, style: title)),
         Text(['${cardio.minutes} λεπτά', if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()].join(' · '), style: aux),
         const SizedBox(height: 12),
         Text(
@@ -366,7 +366,7 @@ class _TrainingPageState extends State<TrainingPage> {
             style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
       ]);
     } else {
-      children.add(Text(w.name, style: title));
+      children.add(FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(w.name, maxLines: 1, style: title)));
       children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά', style: aux));
       if (w.note != null) children.add(Text(w.note!, style: TextStyle(fontSize: 14, color: c.textSecondary)));
       final shown = _allItems || w.items.length <= 6 ? w.items : w.items.take(5).toList();

@@ -72,13 +72,37 @@ class PageTitle extends StatelessWidget {
               color: eyebrowColor ?? c.textSecondary,
             ),
           ),
-        Text(
-          title,
-          style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -1.1, color: c.text),
+        // Σχέδια 9/11: με μεγάλα γράμματα ο τίτλος μικραίνει για να χωρά, ποτέ σπασμένη λέξη («Καλησπ/έρα»).
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            title,
+            maxLines: 1,
+            style: TextStyle(fontSize: 34, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -1.1, color: c.text),
+          ),
         ),
       ],
     );
   }
+}
+
+/// Πολύ μεγάλα γράμματα (πάνω από 1,5×): οι κάρτες που κάθονται δίπλα δίπλα πάνε η μία κάτω από την άλλη.
+bool veryLargeText(BuildContext context) => MediaQuery.textScalerOf(context).scale(10) > 15.01;
+
+/// Χωράει κάθε λέξη των [texts] σε πλάτος [width]; (αλλιώς μια στενή στήλη θα έσπαγε λέξη στη μέση).
+bool wordsFit(BuildContext context, Iterable<String> texts, TextStyle style, double width) {
+  final scaler = MediaQuery.textScalerOf(context);
+  for (final t in texts) {
+    for (final w in t.split(' ')) {
+      final tp = TextPainter(text: TextSpan(text: w, style: style), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
+        ..layout();
+      final over = tp.width > width;
+      tp.dispose();
+      if (over) return false;
+    }
+  }
+  return true;
 }
 
 /// Σκελετός κάθε σελίδας: τίτλος, ανανέωση με τράβηγμα, μία στήλη στο κινητό, δύο σε μεγάλη οθόνη.
@@ -255,6 +279,12 @@ class CardPair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (veryLargeText(context)) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        first,
+        if (second != null) ...[const SizedBox(height: PageFrame.gap), second!],
+      ]);
+    }
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -353,7 +383,7 @@ class CardHeader extends StatelessWidget {
           child: subtitle == null
               ? Text(
                   title,
-                  maxLines: 2,
+                  maxLines: veryLargeText(context) ? 4 : 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                 )
@@ -362,7 +392,7 @@ class CardHeader extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      maxLines: 2,
+                      maxLines: veryLargeText(context) ? 4 : 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
                     ),
@@ -419,8 +449,8 @@ class TrendPill extends StatelessWidget {
           Flexible(
             child: Text(
               text,
-              maxLines: maxLines,
-              overflow: TextOverflow.ellipsis,
+              // Ποτέ κομμένο (σχέδια 9/11): αν δεν χωρά, πάει σε δεύτερη γραμμή.
+              maxLines: maxLines < 3 ? 3 : maxLines,
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: color),
             ),
           ),
@@ -442,7 +472,11 @@ class BigValue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return Text.rich(
+    // Ποτέ κομμένος αριθμός ή μονάδα («1.200 k…»): με μεγάλα γράμματα μικραίνει για να χωρά (σχέδια 9/11).
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text.rich(
       TextSpan(
         children: [
           TextSpan(
@@ -467,7 +501,7 @@ class BigValue extends StatelessWidget {
         ],
       ),
       maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -593,25 +627,42 @@ class InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    final valueText = Text(
+      value,
+      style: TextStyle(
+        color: valueColor ?? c.text,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        fontFeatures: tabular,
+      ),
+    );
+    final dotW = dot == null
+        ? null
+        : Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 10), decoration: BoxDecoration(color: dot, shape: BoxShape.circle));
+    // Πολύ μεγάλα γράμματα: αν ετικέτα και τιμή δεν χωρούν, η τιμή πάει ολόκληρη στην από κάτω γραμμή (σχέδια 9/11).
+    if (veryLargeText(context)) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: SizedBox(
+          width: double.infinity,
+          child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              if (dotW != null) dotW,
+              Flexible(child: Text(label, style: TextStyle(color: c.textSecondary, fontSize: 15))),
+            ]),
+            valueText,
+          ]),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         children: [
-          if (dot != null) ...[
-            Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-            const SizedBox(width: 10),
-          ],
+          if (dotW != null) dotW,
           Expanded(child: Text(label, style: TextStyle(color: c.textSecondary, fontSize: 15))),
           const SizedBox(width: 12),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? c.text,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              fontFeatures: tabular,
-            ),
-          ),
+          valueText,
         ],
       ),
     );
@@ -1639,5 +1690,26 @@ class StackedBar extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Κεφαλίδα κάρτας με ετικέτες/ⓘ δεξιά. Με πολύ μεγάλα γράμματα οι ετικέτες πάνε στην από κάτω γραμμή, για να
+/// μη στριμώχνεται ο τίτλος σε σπασμένες λέξεις (σχέδια 9/11).
+class TitleRow extends StatelessWidget {
+  const TitleRow({super.key, required this.header, this.trailing = const []});
+  final Widget header;
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    if (trailing.isEmpty) return header;
+    if (veryLargeText(context)) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        header,
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: trailing),
+      ]);
+    }
+    return Row(children: [Expanded(child: header), ...trailing]);
   }
 }

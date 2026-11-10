@@ -161,6 +161,7 @@ class _MePageState extends State<MePage> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
                     AppCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,

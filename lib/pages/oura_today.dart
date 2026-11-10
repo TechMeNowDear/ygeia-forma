@@ -225,32 +225,34 @@ class OuraSleepTodayCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: minutes == null
-                    ? const Text('—', style: TextStyle(color: white, fontSize: 42, fontWeight: FontWeight.w800))
-                    : DurationValue(minutes, size: 42, color: white, unitColor: soft),
-              ),
-              // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8, ίδιο με το ρολόι).
-              if (night.sleepScore != null) ...[
-                const SizedBox(width: 12),
-                Column(
-                  children: [
-                    ScoreRing(
-                      value: night.sleepScore!.toDouble(),
-                      size: 60,
-                      stroke: 6,
-                      color: c.ring,
-                      track: Colors.white.withValues(alpha: 0.16),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('βαθμολογία', style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ],
-            ],
-          ),
+          () {
+            // Πολύ μεγάλα γράμματα: το δαχτυλίδι κάτω από τη διάρκεια, για να μη μικραίνει η διάρκεια (σχέδια 9/11).
+            final big = veryLargeText(context);
+            final dur = minutes == null
+                ? const Text('—', style: TextStyle(color: white, fontSize: 42, fontWeight: FontWeight.w800))
+                : DurationValue(minutes, size: 42, color: white, unitColor: soft);
+            // Χωρίς βαθμολογία από την Oura: χωρίς άδειο δαχτυλίδι «—» (έλεγχος UX U8, ίδιο με το ρολόι).
+            final ring = night.sleepScore == null
+                ? null
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ScoreRing(
+                        value: night.sleepScore!.toDouble(),
+                        size: 60,
+                        stroke: 6,
+                        color: c.ring,
+                        track: Colors.white.withValues(alpha: 0.16),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('βαθμολογία', style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  );
+            if (big) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [dur, if (ring != null) ...[const SizedBox(height: 8), ring]]);
+            }
+            return Row(children: [Expanded(child: dur), if (ring != null) ...[const SizedBox(width: 12), ring]]);
+          }(),
           if (diff != null) ...[
             const SizedBox(height: 8),
             Align(
@@ -264,7 +266,7 @@ class OuraSleepTodayCard extends StatelessWidget {
             ),
           ],
           // Σχέδια 9/11 (1α): η «Καρδιά και θερμοκρασία στον ύπνο» γίνεται μία σειρά μέσα στον Ύπνο.
-          ..._nightRow(soft),
+          ..._nightRow(context, soft),
           const SizedBox(height: 12),
           Text(
             'Κοιμήθηκες ${parts.first.onset == null ? '—' : hm(parts.first.onset!)} · ξύπνησες ${hm(parts.last.end)}',
@@ -331,7 +333,7 @@ class OuraSleepTodayCard extends StatelessWidget {
 
 extension on OuraSleepTodayCard {
   /// Ετοιμότητα · HRV · Παλμοί ύπνου της χθεσινής νύχτας (από το Oura), κάτω από τη διάρκεια. Τίποτα αν λείπουν όλα.
-  List<Widget> _nightRow(Color soft) {
+  List<Widget> _nightRow(BuildContext context, Color soft) {
     final day = dayOf(now);
     final plan = store.plan;
     final readiness = plan.value(store.history, K.energy, day);
@@ -358,20 +360,42 @@ extension on OuraSleepTodayCard {
             ),
           ]),
         );
+    const labels = ['Ετοιμότητα', 'HRV', 'Παλμοί ύπνου'];
+    final values = [(readiness, '/100'), (hrv, 'ms'), (hr, 'bpm')];
+    final labelStyle = TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500, height: 1.25);
     return [
       const SizedBox(height: 14),
       Divider(height: 1, color: Colors.white.withValues(alpha: 0.18)),
       const SizedBox(height: 12),
-      Row(
+      LayoutBuilder(
         key: const ValueKey('oura-today-night-row'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          cell('Ετοιμότητα', readiness, '/100'),
-          const SizedBox(width: 10),
-          cell('HRV', hrv, 'ms'),
-          const SizedBox(width: 10),
-          cell('Παλμοί ύπνου', hr, 'bpm'),
-        ],
+        builder: (context, box) {
+          // Τρεις στήλες όσο χωράει κάθε λέξη· αλλιώς (μεγάλα γράμματα) γραμμές «ετικέτα … τιμή», ποτέ σπασμένη λέξη.
+          if (wordsFit(context, labels, labelStyle, (box.maxWidth - 20) / 3)) {
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              cell(labels[0], readiness, '/100'),
+              const SizedBox(width: 10),
+              cell(labels[1], hrv, 'ms'),
+              const SizedBox(width: 10),
+              cell(labels[2], hr, 'bpm'),
+            ]);
+          }
+          return Column(children: [
+            for (var i = 0; i < 3; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 10, children: [
+                  Text(labels[i], style: labelStyle),
+                  Text.rich(TextSpan(children: [
+                    TextSpan(
+                        text: values[i].$1 == null ? '—' : '${values[i].$1!.round()}',
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, fontFeatures: tabular)),
+                    if (values[i].$1 != null) TextSpan(text: ' ${values[i].$2}', style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w600)),
+                  ])),
+                ]),
+              ),
+          ]);
+        },
       ),
     ];
   }
