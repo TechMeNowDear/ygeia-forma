@@ -219,6 +219,7 @@ class Goals {
     int? proteinSet,
     bool clearKcal = false,
     bool clearProtein = false,
+    bool clearBeta = false,
   }) =>
       Goals(
         aim: aim,
@@ -232,7 +233,7 @@ class Goals {
         male: male,
         nutsG: nutsG ?? this.nutsG,
         branG: branG ?? this.branG,
-        betaPer100: betaPer100 ?? this.betaPer100,
+        betaPer100: clearBeta ? null : (betaPer100 ?? this.betaPer100),
         legumesWeek: legumesWeek ?? this.legumesWeek,
         fishWeek: fishWeek ?? this.fishWeek,
         kcalSet: clearKcal ? null : (kcalSet ?? this.kcalSet),

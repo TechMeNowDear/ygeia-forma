@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../food/food_model.dart';
 import '../food/food_sources.dart';
+import '../data.dart';
 import '../food/food_store.dart';
 import '../format.dart';
+import '../goals.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'food_add.dart';
+import 'nutrition_goals.dart';
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
 Color proteinColor(Aigaio c) => c.sleep;
@@ -24,14 +27,17 @@ IconData mealIcon(Meal m) => switch (m) {
 
 /// Διατροφή: το ημερολόγιο της ημέρας.
 class NutritionPage extends StatelessWidget {
-  const NutritionPage({super.key, required this.food, this.now});
+  const NutritionPage({super.key, required this.food, this.health, this.now});
   final FoodStore food;
+
+  /// Για τους στόχους (12/11). Χωρίς αυτό: η σελίδα όπως πριν, χωρίς στόχους.
+  final HealthStore? health;
   final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: food,
+      listenable: Listenable.merge([food, if (health != null) health!]),
       builder: (context, _) {
         final c = Aigaio.of(context);
         final today = dayOf(now ?? DateTime.now());
@@ -76,7 +82,12 @@ class NutritionPage extends StatelessWidget {
           );
         }
 
-        final summary = _SummaryCard(totals: totals);
+        final goals = health?.goals;
+        final summary = goals != null
+            ? GoalsSummaryCard(totals: totals, goals: goals, today: sameDay(day, today), health: health!)
+            : _SummaryCard(totals: totals);
+        final cta = goals == null && health != null ? GoalsCtaCard(health: health!) : null;
+        final chol = goals != null && goals.doctor ? CholCard(food: food, goals: goals, day: day, today: today) : null;
         final meals = [
           for (final m in Meal.values)
             _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day),
@@ -98,6 +109,8 @@ class NutritionPage extends StatelessWidget {
                 onPressed: food.clearSaveError,
               ),
             summary,
+            if (cta != null) cta,
+            if (chol != null) chol,
             ...meals,
             _SourcesNote(color: c.textTertiary),
           ],
@@ -117,6 +130,8 @@ class NutritionPage extends StatelessWidget {
           ],
           right: [
             summary,
+            if (cta != null) cta,
+            if (chol != null) chol,
             _SourcesNote(color: c.textTertiary),
           ],
         );
@@ -318,10 +333,13 @@ class MacroBreakdown extends StatelessWidget {
 
 /// Η κάρτα της Διατροφής στο «Σήμερα»: τι έφαγα σήμερα και «+ Φαγητό».
 class FoodTodayCard extends StatelessWidget {
-  const FoodTodayCard({super.key, required this.food, required this.onOpen, this.now});
+  const FoodTodayCard({super.key, required this.food, required this.onOpen, this.now, this.goals});
   final FoodStore food;
   final VoidCallback onOpen;
   final DateTime? now;
+
+  /// Με στόχους (12/11): «Μένουν X kcal» αντί για το σύνολο.
+  final Goals? goals;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +362,21 @@ class FoodTodayCard extends StatelessWidget {
                 trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
               ),
               const SizedBox(height: 12),
-              if (entries.isEmpty)
+              if (goals != null) ...[
+                () {
+                  final left = kcalLeft(t.shownKcal, goals!.kcal, today: true);
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(left.label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: left.over ? c.warn : c.textSecondary)),
+                    BigValue(left.value, unit: 'kcal', size: 40, color: left.over ? c.warn : null),
+                    Text('έφαγες ${thousands(t.shownKcal)} · στόχος ${thousands(goals!.kcal)}',
+                        style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
+                  ]);
+                }(),
+                if (entries.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  MacroBreakdown(totals: t, percent: false),
+                ],
+              ] else if (entries.isEmpty)
                 Text(
                   'Δεν έχεις γράψει τίποτα ακόμα σήμερα.',
                   style: TextStyle(fontSize: 15, color: c.textSecondary),

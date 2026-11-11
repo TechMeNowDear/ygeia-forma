@@ -11,6 +11,8 @@ import '../widgets.dart';
 import 'info_sheet.dart';
 import 'me_page.dart';
 import 'metric_page.dart';
+import 'waist_sheet.dart';
+import '../waist.dart';
 
 class BodyPage extends StatelessWidget {
   const BodyPage({super.key, required this.store});
@@ -60,6 +62,7 @@ class BodyPage extends StatelessWidget {
               [for (final b in body) if (b.weight != null) (b.time, b.weight!)],
               c.body,
             ),
+          _WaistCard(store: store),
           if (body.where((b) => b.fatPct != null).length >= 2)
             _chartCard(
               context,
@@ -341,6 +344,60 @@ class _WeighTable extends StatelessWidget {
           ...rows,
         ],
       ),
+    );
+  }
+}
+
+/// Μέση με μεζούρα (σχέδια 12/11): η τελευταία τιμή, η αλλαγή από την πρώτη, το εύρος αναφοράς (ESC 2021) και η πορεία.
+/// Πιο χρήσιμη από τη ζυγαριά για το λίπος της κοιλιάς· αλλάζει αργά, γι’ αυτό μία φορά την εβδομάδα.
+class _WaistCard extends StatelessWidget {
+  const _WaistCard({required this.store});
+  final HealthStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final list = store.waist;
+    final p = store.profile;
+    final ref = waistRef(!p.female);
+    final last = list.isEmpty ? null : list.last;
+    final first = list.length >= 2 ? list.first : null;
+    DateTime day(String s) => DateTime.parse(s);
+    final small = TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary);
+    return AppCard(
+      key: const ValueKey('body-waist'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        CardHeader(icon: Icons.straighten_rounded, title: 'Μέση με μεζούρα', color: c.body),
+        const SizedBox(height: 10),
+        if (last == null)
+          Text('Μέτρησε τη μέση σου μία φορά την εβδομάδα (${weekdayNames[p.waistDay - 1]}). Δείχνει το λίπος της κοιλιάς '
+              'καλύτερα από τη ζυγαριά.', style: small)
+        else ...[
+          BigValue(dec(last.cm), unit: 'cm', size: 36),
+          const SizedBox(height: 4),
+          Text(
+            [
+              dayMonthYear(day(last.day)),
+              if (first != null) '${signedDec(shownDiff(last.cm, first.cm, 1))} cm από ${dayMonth(day(first.day))}',
+            ].join(' · '),
+            style: small,
+          ),
+          if (p.male || p.female)
+            Text('Εύρος αναφοράς: κάτω από ${dec(ref.ok, 0)} cm (ESC 2021)', style: small),
+          if (list.length >= 2) ...[
+            const SizedBox(height: 12),
+            LineChart(points: [for (final e in list) (day(e.day), e.cm)], color: c.body, format: (v) => dec(v), dateLabel: dayMonth),
+          ],
+        ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const ValueKey('body-waist-add'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.body),
+          onPressed: () => openWaistSheet(context, store),
+          icon: const Icon(Icons.add_rounded, size: 20),
+          label: const Text('Γράψε τη μέση'),
+        ),
+      ]),
     );
   }
 }

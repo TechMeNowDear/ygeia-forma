@@ -321,12 +321,18 @@ void main() {
       await t.pump();
     }
 
-    testWidgets('χωρίς κλείδωμα· όριο παλμών από την κάρτα', (tester) async {
+    testWidgets('χωρίς κλείδωμα· χωρίς όριο γιατρού καμία κάρτα· το όριο μπαίνει από τις Ρυθμίσεις (12/11)', (tester) async {
       final store = sampleTraining(now)..setHrLimit(null);
       await pump(tester, TrainingPage(training: store, now: now));
       expect(find.text('Ξεκίνα την προπόνηση'), findsOneWidget);
-      expect(find.text('Κανένα. Πάτα αν σου δώσει ο γιατρός.'), findsOneWidget);
-      await tapKey(tester, 'train-hrlimit');
+      expect(find.byKey(const ValueKey('train-hrlimit')), findsNothing);
+      // Ρυθμίσεις › Για προχωρημένους › «Όριο παλμών από γιατρό» καλεί το ίδιο φύλλο.
+      await pump(tester, Builder(builder: (context) => FilledButton(
+            key: const ValueKey('open-limit'),
+            onPressed: () => editDoctorLimit(context, store),
+            child: const Text('όριο'),
+          )));
+      await tapKey(tester, 'open-limit');
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('train-hr-clear')), findsNothing, reason: 'χωρίς όριο: τίποτα να σβήσεις');
       await tester.enterText(find.byKey(const ValueKey('train-hr')), '135');
@@ -334,6 +340,7 @@ void main() {
       await tapKey(tester, 'train-hr-save');
       await tester.pumpAndSettle();
       expect(store.hrLimit, 135);
+      await pump(tester, TrainingPage(training: store, now: now));
       expect(find.textContaining('135 bpm'), findsOneWidget);
     });
 

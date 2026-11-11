@@ -19,6 +19,7 @@ import 'nutrition.dart';
 import 'oura_today.dart';
 import 'sources_page.dart';
 import 'unusual_card.dart';
+import 'waist_sheet.dart';
 import 'training/today_training_card.dart';
 import 'week_card.dart';
 import 'info_sheet.dart';
@@ -108,13 +109,19 @@ class TodayPage extends StatelessWidget {
         final week = review == null ? null : WeekCard(review: review);
         final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.analysisPlan) : null;
         final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
-        // 7/11: εβδομαδιαίο ζύγισμα. Τη μέρα ζυγίσματος, ώσπου να φτάσει ζύγιση της ίδιας μέρας.
-        final weighedToday = d.latestBody != null && sameDay(d.latestBody!.time, now);
-        final weigh = now.weekday == store.profile.weighDay && !weighedToday ? const _WeighCard() : null;
+        // 12/11: ζύγισμα τις μέρες του χρήστη (προεπιλογή Δε · Τε · Πα) και μέση με μεζούρα τη μέρα της. Η κάρτα μένει
+        // ώσπου να γίνουν και τα δύο της ημέρας· η ζύγιση έρχεται μόνη της από την InBody.
+        final weighed = d.latestBody != null && sameDay(d.latestBody!.time, now) ? d.latestBody : null;
+        final weighDay = store.profile.weighDays.contains(now.weekday);
+        final waistDay = store.profile.waistDay == now.weekday;
+        final waistToday = waistDay && store.waist.any((e) => e.day == waistDayKey(now));
+        final weigh = (weighDay && weighed == null) || (waistDay && !waistToday)
+            ? _WeighCard(store: store, now: now, weighDay: weighDay, waistDay: waistDay, weighedKg: weighed?.weight, weighedAt: weighed?.time)
+            : null;
         // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
         final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
         final foodCard = prefs.show('food')
-            ? FoodTodayCard(food: food, now: now, onOpen: () => open(Cat.food, FoodTab.diary))
+            ? FoodTodayCard(food: food, now: now, goals: store.goals, onOpen: () => open(Cat.food, FoodTab.diary))
             : null;
 
         final pair = <Widget>[
@@ -641,14 +648,35 @@ class _DatabaseCard extends StatelessWidget {
   }
 }
 
-/// «Σήμερα ζύγιση» (7/11): τη μέρα που όρισε ο χρήστης (Τα στοιχεία μου). Φεύγει μόνη της μόλις φτάσει ζύγιση της
-/// ίδιας μέρας από την InBody. Χωρίς ειδοποίηση· μόνο κάρτα.
+/// «Σήμερα ζύγιση» (σχέδια 12/11, 5α): στις μέρες ζυγίσματος και στη μέρα της μέσης. Λίστα με ό,τι μένει: η ζύγιση
+/// σημειώνεται μόνη της όταν έρθει από την InBody· η μέση γράφεται από το κουμπί. Χωρίς ειδοποίηση· μόνο κάρτα.
 class _WeighCard extends StatelessWidget {
-  const _WeighCard();
+  const _WeighCard({required this.store, required this.now, required this.weighDay, required this.waistDay, this.weighedKg, this.weighedAt});
+  final HealthStore store;
+  final DateTime now;
+  final bool weighDay, waistDay;
+  final double? weighedKg;
+  final DateTime? weighedAt;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    final weighed = weighedAt != null;
+    Widget item(bool done, String text, {String? trailing}) => Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Row(children: [
+            done
+                ? Icon(Icons.check_circle_rounded, size: 24, color: c.good)
+                : Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.textTertiary, width: 2)),
+                  ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text))),
+            if (trailing != null) Text(trailing, style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
+          ]),
+        );
     return Container(
       key: const ValueKey('today-weigh'),
       padding: const EdgeInsets.all(18),
@@ -657,29 +685,48 @@ class _WeighCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: c.body.withValues(alpha: 0.25)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          IconBadge(Icons.monitor_weight_rounded, c.body, size: 40),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Σήμερα ζύγιση', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text)),
-                const SizedBox(height: 4),
-                Text(
-                  'Το πρωί, μετά την τουαλέτα, πριν φας ή πιεις. Η κάρτα φεύγει μόλις φτάσει η ζύγιση από το InBody.',
-                  style: TextStyle(fontSize: 14, height: 1.4, color: c.text),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
-                  onPressed: () => showMetricInfo(context, metricInfos[K.weight]!),
-                  child: const Text('Πώς ζυγίζομαι σωστά'),
-                ),
-              ],
+          Row(children: [
+            IconBadge(Icons.monitor_weight_rounded, c.body, size: 40),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                weighDay && waistDay ? 'Σήμερα ζύγιση και μέση' : (weighDay ? 'Σήμερα ζύγιση' : 'Σήμερα μέση'),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text),
+              ),
             ),
+          ]),
+          const SizedBox(height: 8),
+          Text(
+            'Το πρωί, μετά την τουαλέτα, πριν φας ή πιεις, με τα ίδια ρούχα.',
+            style: TextStyle(fontSize: 14, height: 1.4, color: c.text),
           ),
+          if (weighDay)
+            item(weighed, weighed && weighedKg != null ? 'Ζύγιση InBody · ${dec(weighedKg!)} kg' : 'Ζύγιση InBody',
+                trailing: weighed ? hm(weighedAt!) : null),
+          if (waistDay) item(false, 'Μέση με μεζούρα'),
+          if (waistDay)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: FilledButton.icon(
+                key: const ValueKey('today-waist'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: c.healthSolid, foregroundColor: c.onSolid),
+                onPressed: () => openWaistSheet(context, store, now: now),
+                icon: const Icon(Icons.straighten_rounded, size: 20),
+                label: const Text('Γράψε τη μέση'),
+              ),
+            ),
+          if (weighDay && !weighed)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
+                onPressed: () => showMetricInfo(context, metricInfos[K.weight]!),
+                child: const Text('Πώς ζυγίζομαι σωστά'),
+              ),
+            ),
         ],
       ),
     );

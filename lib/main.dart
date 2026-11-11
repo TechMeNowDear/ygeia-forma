@@ -321,7 +321,7 @@ class _ShellState extends State<Shell> {
         tabs: _foodTabs,
         pages: [
           // Οθόνες φαγητού: κουμπιά στο χρώμα της Διατροφής, σε κάθε θέμα.
-          FoodTheme(child: NutritionPage(food: _food, now: widget.now)),
+          FoodTheme(child: NutritionPage(food: _food, health: widget.store, now: widget.now)),
         ],
       ),
       CategoryPage(

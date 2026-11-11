@@ -26,6 +26,10 @@ import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
+import 'package:ygeia_forma/goals.dart';
+import 'package:ygeia_forma/pages/goals_page.dart';
+import 'package:ygeia_forma/profile.dart';
+import 'package:ygeia_forma/waist.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/off.dart';
 import 'package:ygeia_forma/pages/food_add.dart';
@@ -1873,6 +1877,155 @@ void main() {
         ),
         size: const Size(400, 880),
       ));
+
+  // ---------------------------------------------------------------- 12/11: στόχοι, χοληστερίνη, μέση, ζώνη
+  // Φανταστικός χρήστης (δημόσιο repo): άνδρας 40 ετών, 180 cm, 90 kg.
+  const me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+  Goals goals() => Goals(
+        aim: GoalAim.lose,
+        rate: 0.005,
+        activity: 1.5,
+        doctor: true,
+        since: '2026-11-09',
+        kg: 90,
+        age: 40,
+        heightCm: 180,
+        male: true,
+        nutsG: 30,
+        branG: 40,
+        betaPer100: 7,
+        legumesWeek: 4,
+        fishWeek: 6,
+      );
+  void withGoals(HealthStore s) => s
+    ..setProfile(me)
+    ..setGoals(goals());
+
+  Future<void> wizardTo(WidgetTester t, int steps) async {
+    await t.enterText(find.byKey(const ValueKey('wizard-kg')), '90');
+    await t.pumpAndSettle();
+    for (var k = 0; k < steps; k++) {
+      if (find.byKey(const ValueKey('opt-doc-yes')).evaluate().isNotEmpty) {
+        await t.tap(find.byKey(const ValueKey('opt-doc-yes')));
+        await t.pumpAndSettle();
+      }
+      await t.tap(find.byKey(const ValueKey('wizard-next')));
+      await t.pumpAndSettle();
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('Στόχοι · οδηγός · στοιχεία', (t) => _page(t,
+      name: '60a_goals_wizard_data', size: phone, brightness: Brightness.light, oura: false,
+      prepare: (s) => s.setProfile(me), page: (s) => GoalsWizard(store: s, now: trainAt)));
+  testWidgets('Στόχοι · οδηγός · στόχος', (t) => _page(t,
+      name: '60b_goals_wizard_aim', size: phone, brightness: Brightness.light, oura: false,
+      prepare: (s) => s.setProfile(me), page: (s) => GoalsWizard(store: s, now: trainAt), act: (t) => wizardTo(t, 1)));
+  testWidgets('Στόχοι · οδηγός · ρυθμός', (t) => _page(t,
+      name: '60c_goals_wizard_rate', size: phone, brightness: Brightness.light, oura: false,
+      prepare: (s) => s.setProfile(me), page: (s) => GoalsWizard(store: s, now: trainAt), act: (t) => wizardTo(t, 2)));
+  testWidgets('Στόχοι · οδηγός · γιατρός', (t) => _page(t,
+      name: '60d_goals_wizard_doctor', size: phone, brightness: Brightness.light, oura: false,
+      prepare: (s) => s.setProfile(me), page: (s) => GoalsWizard(store: s, now: trainAt), act: (t) => wizardTo(t, 4)));
+  testWidgets('Στόχοι · οδηγός · σύνοψη', (t) => _page(t,
+      name: '60e_goals_wizard_summary', size: phone, brightness: Brightness.light, oura: false,
+      prepare: (s) => s.setProfile(me), page: (s) => GoalsWizard(store: s, now: trainAt), act: (t) => wizardTo(t, 5)));
+  testWidgets('Στόχοι · σελίδα', (t) => _page(t,
+      name: '61a_goals_page', size: phone, brightness: Brightness.light, oura: false,
+      prepare: withGoals, page: (s) => GoalsPage(store: s, now: trainAt)));
+  testWidgets('Στόχοι · πώς υπολογίστηκε', (t) => _page(t,
+      name: '61b_goals_how', size: phone, brightness: Brightness.light, oura: false,
+      prepare: withGoals, page: (s) => GoalsPage(store: s, now: trainAt),
+      act: (t) async {
+        await t.tap(find.byKey(const ValueKey('goals-how')));
+      }));
+  testWidgets('Στόχοι · Fold ανοιχτό · σκοτεινό', (t) => _page(t,
+      name: '61c_goals_page_open_dark', size: open, brightness: Brightness.dark, oura: false,
+      prepare: withGoals, page: (s) => GoalsPage(store: s, now: trainAt)));
+
+  testWidgets('Διατροφή με στόχους · κινητό', (t) => _shot(t,
+      name: '62a_nutrition_goals_phone', size: phone, brightness: Brightness.light, tab: Cat.food, at: trainAt, prepare: withGoals));
+  testWidgets('Διατροφή με στόχους · 360 · 1,3×', (t) async {
+    t.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+    await _shot(t,
+        name: '62b_nutrition_goals_360_13x', size: const Size(360, 2400), brightness: Brightness.light, tab: Cat.food, at: trainAt, prepare: withGoals);
+  });
+  testWidgets('Διατροφή με στόχους · Fold ανοιχτό · σκοτεινό', (t) => _shot(t,
+      name: '62c_nutrition_goals_open_dark', size: open, brightness: Brightness.dark, tab: Cat.food, at: trainAt, prepare: withGoals));
+  testWidgets('Διατροφή χωρίς στόχους', (t) => _shot(t,
+      name: '62d_nutrition_no_goals', size: phone, brightness: Brightness.light, tab: Cat.food, at: trainAt, prepare: (s) => s.setProfile(me)));
+  testWidgets('Χοληστερίνη · εβδομάδα', (t) => _shot(t,
+      name: '63a_cholesterol_week', size: phone, brightness: Brightness.light, tab: Cat.food, at: trainAt, prepare: withGoals,
+      act: (t) async {
+        await t.ensureVisible(find.byKey(const ValueKey('nutrition-chol')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('nutrition-chol')));
+      }));
+  testWidgets('Χοληστερίνη · 4 εβδομάδες · σκοτεινό', (t) => _shot(t,
+      name: '63b_cholesterol_4w_dark', size: phone, brightness: Brightness.dark, tab: Cat.food, at: trainAt, prepare: withGoals,
+      act: (t) async {
+        await t.ensureVisible(find.byKey(const ValueKey('nutrition-chol')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('nutrition-chol')));
+        await t.pumpAndSettle();
+        await t.tap(find.text('4 εβδομάδες'));
+      }));
+
+  Future<void> fridayShot(WidgetTester t, String name, Size size,
+      {Brightness b = Brightness.light,
+      Future<void> Function(WidgetTester)? act,
+      void Function(HealthStore)? prepare,
+      int tab = Cat.today,
+      int sub = 0,
+      bool doctorLimit = false}) async {
+    ExClock.frozen = true;
+    await t.runAsync(() => ExLibrary.load(inline: true));
+    final prev = TrainingStore.main;
+    // Όπως ο χρήστης: χωρίς όριο από γιατρό (εκτός αν ζητηθεί).
+    TrainingStore.main = sampleTraining(trainAt)..setHrLimit(doctorLimit ? 140 : null);
+    addTearDown(() => TrainingStore.main = prev);
+    await _shot(t, name: name, size: size, brightness: b, tab: tab, sub: sub, at: trainAt, prepare: prepare ?? withGoals, act: act);
+  }
+
+  testWidgets('Σήμερα · Παρασκευή: ζύγιση και μέση', (t) => fridayShot(t, '64a_today_weigh_waist', phone));
+  testWidgets('Σήμερα · φύλλο «Μέση»', (t) => fridayShot(t, '64b_waist_sheet', phone, act: (t) async {
+        await t.tap(find.byKey(const ValueKey('today-waist')));
+        await t.pumpAndSettle();
+        await t.enterText(find.byKey(const ValueKey('waist-0')), '97');
+        await t.enterText(find.byKey(const ValueKey('waist-1')), '98,5');
+        await t.pumpAndSettle();
+        FocusManager.instance.primaryFocus?.unfocus();
+      }));
+  testWidgets('Σώμα · μέση', (t) => fridayShot(t, '64c_body_waist', phone, tab: Cat.health, sub: HealthTab.body,
+      prepare: (s) {
+        withGoals(s);
+        for (final (d, a, b) in [('2026-10-23', 99.0, 99.4), ('2026-10-30', 98.6, 98.8), ('2026-11-06', 98.2, 98.0)]) {
+          s.saveWaist(WaistEntry(d, [a, b]));
+        }
+      },
+      act: (t) async => t.ensureVisible(find.byKey(const ValueKey('body-waist')))));
+  testWidgets('Προπόνηση · ζώνη περπατήματος', (t) => fridayShot(t, '65a_training_zone', phone,
+      tab: Cat.exercise, sub: ExerciseTab.train));
+  testWidgets('Προπόνηση · ζώνη · Fold ανοιχτό', (t) => fridayShot(t, '65b_training_zone_open', open,
+      tab: Cat.exercise, sub: ExerciseTab.train));
+  testWidgets('Προπόνηση · ζώνη με όριο γιατρού', (t) => fridayShot(t, '65d_training_zone_doctor_limit', phone,
+      tab: Cat.exercise, sub: ExerciseTab.train, doctorLimit: true));
+  testWidgets('Προπόνηση · φύλλο ζώνης', (t) => fridayShot(t, '65c_zone_sheet', phone, tab: Cat.exercise, sub: ExerciseTab.train,
+      act: (t) async {
+        await t.ensureVisible(find.byKey(const ValueKey('zone-edit')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('zone-edit')));
+      }));
+  testWidgets('Τα στοιχεία μου · ζυγίσεις και μέση', (t) => _page(t,
+      name: '66_me_weigh_days', size: phone, brightness: Brightness.light, oura: false,
+      prepare: withGoals, page: (s) => MePage(store: s, food: sampleFoodStore(now)),
+      act: (t) async => t.ensureVisible(find.byKey(const ValueKey('me-goals')))));
+  testWidgets('Ρυθμίσεις · για προχωρημένους', (t) => _page(t,
+      name: '67_settings_advanced', size: phone, brightness: Brightness.light, oura: false,
+      page: (s) => SettingsPage(store: s, food: sampleFoodStore(now)),
+      act: (t) async => t.ensureVisible(find.byKey(const ValueKey('settings-hrlimit')))));
 }
 
 /// Η προεπισκόπηση τη ζωγραφίζει η Kotlin· στα τεστ Flutter δεν υπάρχει (τη δείχνει ο έλεγχος στο emulator).
