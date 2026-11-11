@@ -17,7 +17,7 @@ import 'devices_page.dart';
 import 'sources_page.dart';
 import 'me_page.dart';
 import 'privacy_page.dart';
-import '../profile.dart';
+import 'training/training_page.dart' show editDoctorLimit;
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
@@ -68,23 +68,8 @@ class SettingsPage extends StatelessWidget {
                           icon: Icons.person_outline_rounded,
                           title: 'Τα στοιχεία μου',
                           // Σχέδιο Settings + premium: η κουζίνα και τα προϊόντα μου είναι πια μέσα στα «Τα στοιχεία μου».
-                          subtitle: 'Ηλικία, ύψος, ζύγιση κάθε ${weekdayNames[store.profile.weighDay - 1]} · η κουζίνα μου · τα προϊόντα μου',
+                          subtitle: 'Ηλικία, ύψος, ζυγίσεις, στόχοι · η κουζίνα μου · τα προϊόντα μου',
                           onTap: () => Navigator.of(context).push(MePage.route(store)),
-                        ),
-                        SettingsRow(
-                          key: const ValueKey('settings-sources'),
-                          icon: Icons.link_rounded,
-                          title: 'Πηγές',
-                          subtitle: 'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
-                              'βήματα: Samsung Health · βάρος: InBody',
-                          onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
-                        ),
-                        SettingsRow(
-                          key: const ValueKey('settings-devices'),
-                          icon: Icons.layers_rounded,
-                          title: 'Τι μετράει κάθε συσκευή',
-                          subtitle: 'Μέτρηση, εκτίμηση, ενδεικτικό',
-                          onTap: () => Navigator.of(context).push(DevicesPage.route()),
                         ),
                         SettingsRow(
                           key: const ValueKey('settings-today-cards'),
@@ -100,6 +85,42 @@ class SettingsPage extends StatelessWidget {
                       _DataGroup(store: store, food: food),
                       const SettingsSection('Για προχωρημένους'),
                       SettingsGroup(children: [
+                        SettingsRow(
+                          key: const ValueKey('settings-sources'),
+                          icon: Icons.link_rounded,
+                          color: c.textSecondary,
+                          title: 'Πηγές',
+                          subtitle: 'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
+                              'βήματα: Samsung Health · βάρος: InBody',
+                          onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
+                        ),
+                        SettingsRow(
+                          key: const ValueKey('settings-devices'),
+                          icon: Icons.layers_rounded,
+                          color: c.textSecondary,
+                          title: 'Τι μετράει κάθε συσκευή',
+                          subtitle: 'Μέτρηση, εκτίμηση, ενδεικτικό',
+                          onTap: () => Navigator.of(context).push(DevicesPage.route()),
+                        ),
+                        // Σχέδια 12/11 (5δ): το όριο παλμών του γιατρού δεν είναι πια στην Προπόνηση (ο καρδιολόγος δεν έδωσε)·
+                        // μένει εδώ για όποιον έχει. Αν υπάρχει, φαίνεται ΚΑΙ στην Προπόνηση και νικά τη ζώνη στο ρολόι.
+                        ListenableBuilder(
+                          listenable: TrainingStore.main,
+                          builder: (context, _) {
+                            final hr = TrainingStore.main.ready ? TrainingStore.main.hrLimit : null;
+                            return SettingsRow(
+                              key: const ValueKey('settings-hrlimit'),
+                              icon: Icons.favorite_border_rounded,
+                              color: c.textSecondary,
+                              title: 'Όριο παλμών από γιατρό',
+                              subtitle: hr == null ? 'Κανένα · μόνο αν σου έδωσε γιατρός' : '$hr bpm · δόνηση στο ρολόι σε κάθε άσκηση',
+                              onTap: () async {
+                                await TrainingStore.main.load();
+                                if (context.mounted) await editDoctorLimit(context, TrainingStore.main);
+                              },
+                            );
+                          },
+                        ),
                         SettingsRow(
                           icon: Icons.build_outlined,
                           color: c.textSecondary,

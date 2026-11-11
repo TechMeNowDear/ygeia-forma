@@ -22,6 +22,7 @@ import 'program_paste.dart';
 import 'progress_page.dart';
 import 'session_page.dart';
 import 'training_common.dart';
+import 'zone_widgets.dart';
 
 /// Άσκηση › Προπόνηση: η σημερινή προπόνηση, η εβδομάδα, το πρόγραμμα, οι τελευταίες προπονήσεις.
 class TrainingPage extends StatefulWidget {
@@ -113,10 +114,13 @@ class _TrainingPageState extends State<TrainingPage> {
       cards.add(_weekCard(context, p, today));
       side.add(_programCard(context, p));
     }
+    if (widget.health != null) side.add(ZoneCard(health: widget.health!, training: t, now: _now));
+    side.add(WeekMovementCard(training: t, now: _now));
     side.add(_progressCard(context));
     final recent = [for (final s in t.sessions.reversed) if (s.finished) s].take(6).toList();
     if (recent.isNotEmpty) side.add(_recentCard(context, recent));
-    side.add(_hrLimitCard(context));
+    // Σχέδια 12/11 (4α): η ζώνη περπατήματος αντί για το όριο γιατρού. Το όριο φαίνεται μόνο αν υπάρχει (νικά πάντα).
+    if (t.hrLimit != null) side.add(_hrLimitCard(context));
     // Προπονήσεις που δεν διαβάστηκαν (V-A-10): κρατιούνται στο αρχείο, όχι χαμένες· μόνο μια μικρή σημείωση.
     final badHr = t.sessions.where((s) => s.hrBad != null).length;
     if (t.quarantine.isNotEmpty || badHr > 0) {
@@ -666,15 +670,7 @@ class _TrainingPageState extends State<TrainingPage> {
   }
 
   // ---------------------------------------------------------------- ενέργειες
-  Future<void> _editHrLimit(BuildContext context) async {
-    final r = await showModalBottomSheet<_HrChoice>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => _HrLimitSheet(current: t.hrLimit),
-    );
-    if (r != null) t.setHrLimit(r.hr);
-  }
+  Future<void> _editHrLimit(BuildContext context) => editDoctorLimit(context, t);
 
   Future<void> _start(BuildContext context, Workout w) async {
     t.start(w);
@@ -761,6 +757,18 @@ const hrLimitMoreText = 'Το ρολόι δονείται μόνο όσο μετ
     'Στα βάρη ο καρπός συχνά μετρά λιγότερους παλμούς από τους πραγματικούς.';
 
 /// Τι επέλεξε στο φύλλο ορίου: αριθμός ή κανένα όριο (null).
+/// Όριο παλμών από γιατρό: το φύλλο αλλαγής (από την Προπόνηση, όταν υπάρχει όριο, και από τις Ρυθμίσεις ›
+/// Για προχωρημένους).
+Future<void> editDoctorLimit(BuildContext context, TrainingStore t) async {
+  final r = await showModalBottomSheet<_HrChoice>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) => _HrLimitSheet(current: t.hrLimit),
+  );
+  if (r != null) t.setHrLimit(r.hr);
+}
+
 class _HrChoice {
   const _HrChoice(this.hr);
   final int? hr;

@@ -860,6 +860,11 @@ class TrainingStore extends ChangeNotifier {
       }
       s.splits.addAll(Session.pairs(cardio['km']));
       s.pauses.addAll(Session.pairs(cardio['pz']));
+      final zlo = s.zoneLo, zhi = s.zoneHi;
+      if (zlo != null && zhi != null && s.hr.isNotEmpty) {
+        final z = zoneTimes(s.hr, s.pauses, zlo, zhi, endSec: end.difference(start).inSeconds);
+        if (z.measured > 0) s.zoneTimes = [z.below, z.inZone, z.above];
+      }
       final hrr = cardio['hrr'];
       if (hrr is Map && hrr['e'] is num && hrr['m'] is num) {
         final e = (hrr['e'] as num).toInt(), m = (hrr['m'] as num).toInt();

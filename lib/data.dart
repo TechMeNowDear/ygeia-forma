@@ -1368,6 +1368,9 @@ Set<String> applyRecentRead(
 // ---------------------------------------------------------------------------
 
 class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore {
+  /// Η αποθήκη της εφαρμογής (για οθόνες που δεν την παίρνουν από αλλού, π.χ. τη σύνοψη περπατήματος). null στις δοκιμές.
+  static HealthStore? shared;
+
   /// Τα δεδομένα της Samsung για τις οθόνες, χωρισμένα πάντα κατά το σχέδιο πηγών ([Dashboard.restrict]).
   /// Το ιστορικό υπολογίζεται από τα πλήρη ([_raw]) με το σχέδιο πηγών.
   Dashboard? get data => _data;

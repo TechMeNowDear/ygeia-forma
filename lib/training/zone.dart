@@ -10,6 +10,8 @@ library;
 
 import 'dart:math' as math;
 
+import 'session.dart';
+
 const zoneLoPct = 0.40;
 const zoneHiPct = 0.59;
 const zoneLoMaxPct = 0.64;
@@ -125,8 +127,11 @@ Zone? computeZone({int? age, double? restHr, required ZoneSettings s}) {
   bool paused(int t) => pauses.any((p) => t >= p[0] && t < p[1]);
   for (var k = 0; k < samples.length; k++) {
     final t0 = samples[k][0];
+    // Μετά το «Τέλος» (λεπτό αποκατάστασης) δεν μετρά.
+    if (endSec != null && t0 >= endSec) break;
     final next = k + 1 < samples.length ? samples[k + 1][0] : (endSec ?? t0 + 1);
-    final until = math.min(next, t0 + maxGap);
+    var until = math.min(next, t0 + maxGap);
+    if (endSec != null) until = math.min(until, endSec);
     final bpm = samples[k][1];
     if (bpm <= 0) continue;
     for (var t = t0; t < until; t++) {
@@ -166,4 +171,28 @@ class WalkZone {
 
   @override
   int get hashCode => Object.hash(lo, hi, up, down);
+}
+
+/// Η εβδομάδα (Δευτέρα–Κυριακή) της [now]: λεπτά μέτριας άσκησης από τα περπατήματα (στη ζώνη ή πιο πάνω), μέρες με
+/// βάρη, και περπατήματα που δεν μετρούν (χωρίς παλμούς ή ζώνη).
+({int moderateMin, int strengthDays, int unmeasuredWalks}) weekMovement(Iterable<Session> sessions, DateTime now) {
+  final from = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+  final to = DateTime(from.year, from.month, from.day + 7);
+  var sec = 0, unmeasured = 0;
+  final strength = <String>{};
+  for (final s in sessions) {
+    if (!s.finished || s.start.isBefore(from) || !s.start.isBefore(to)) continue;
+    if (s.isCardio) {
+      if (s.activity != null && s.activity != 'walk') continue;
+      final z = s.zoneTimes;
+      if (z == null) {
+        unmeasured++;
+      } else {
+        sec += z[1] + z[2];
+      }
+    } else if (!s.stopped && s.setsDone > 0) {
+      strength.add('${s.start.year}-${s.start.month}-${s.start.day}');
+    }
+  }
+  return (moderateMin: (sec / 60).round(), strengthDays: strength.length, unmeasuredWalks: unmeasured);
 }

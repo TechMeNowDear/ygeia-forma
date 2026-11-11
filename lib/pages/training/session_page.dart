@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../exercise/ex_data.dart';
 import '../../format.dart';
 import '../../theme.dart';
+import '../../data.dart' show HealthStore;
 import '../../training/equipment.dart';
 import '../../training/progression.dart';
 import '../../training/program.dart';
@@ -20,6 +21,7 @@ import '../exercise_detail.dart';
 import 'ex_picker.dart';
 import 'hr_widgets.dart';
 import 'training_common.dart';
+import 'zone_widgets.dart';
 import 'walk_widgets.dart';
 
 /// Μετακίνηση ανάμεσα στα διαθέσιμα βάρη (με τα βελάκια). Στο λάστιχο βοήθειας περιλαμβάνεται και το «χωρίς».
@@ -1125,6 +1127,9 @@ class _SummaryPageState extends State<SummaryPage> {
     // Περπάτημα (9/11): ρυθμός, βήματα/λεπτό, παύσεις, ανά km (με GPS), πτώση παλμών στο 1′.
     final km = s.isCardio ? walkSplits(s) : const <KmSplit>[];
     final walk = <Widget>[
+      // Σχέδια 12/11 (4ε): χρόνος στη ζώνη και «τεστ ομιλίας» στα πρώτα περπατήματα.
+      if (ZoneTimeCard.shows(s)) ZoneTimeCard(session: s),
+      if (TalkTestCard.shows(s, HealthStore.shared)) TalkTestCard(session: s, health: HealthStore.shared!),
       if (km.isNotEmpty) KmCard(splits: km),
       if (RecoveryCard.shows(s)) RecoveryCard(session: s),
     ];

@@ -247,3 +247,36 @@ class RangeNote extends StatelessWidget {
     );
   }
 }
+
+/// Το ίδιο «i», για εξηγήσεις που δεν είναι μέτρηση του [metricInfos] (ζώνη, στόχοι, χοληστερίνη, 12/11).
+class InfoDot extends StatelessWidget {
+  const InfoDot(this.info, {super.key});
+  final MetricInfo info;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Semantics(
+      button: true,
+      label: 'Τι είναι: ${info.title}',
+      child: InkResponse(
+        radius: 22,
+        onTap: () => showMetricInfo(context, info),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.hairline), color: c.card),
+              alignment: Alignment.center,
+              child: Text('i',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

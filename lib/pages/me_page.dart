@@ -10,11 +10,13 @@ import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'devices_page.dart';
+import 'goals_page.dart';
 import 'sources_page.dart';
 import 'kitchen.dart';
 import 'my_foods.dart';
 
-/// «Τα στοιχεία μου» (7/11): γέννηση, φύλο, ύψος για τα εύρη αναφοράς· η μέρα του εβδομαδιαίου ζυγίσματος.
+/// «Τα στοιχεία μου» (7/11): γέννηση, φύλο, ύψος για τα εύρη αναφοράς· οι μέρες ζυγίσματος και της μέσης (11/11)·
+/// οι στόχοι διατροφής (12/11).
 /// Σχέδια 9/11 (10β): εδώ ζουν και «Τα προϊόντα μου» (όλη η λίστα) και «Η κουζίνα μου».
 class MePage extends StatefulWidget {
   const MePage({super.key, required this.store, this.food});
@@ -55,6 +57,12 @@ class _MePageState extends State<MePage> {
   }
 
   void _save(Profile p) => widget.store.setProfile(p);
+
+  String _goalsText() {
+    final g = widget.store.goals;
+    if (g == null) return 'Θερμίδες, πρωτεΐνη, χοληστερίνη · 2 λεπτά';
+    return '${thousands(g.kcal)} kcal · ${g.protein} g πρωτεΐνη${g.doctor ? ' · χοληστερίνη' : ''}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +176,7 @@ class _MePageState extends State<MePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('Μέρα ζυγίσματος', style: label),
+                          Text('Μέρες ζυγίσματος', style: label),
                           const SizedBox(height: 10),
                           Row(
                             children: [
@@ -176,10 +184,20 @@ class _MePageState extends State<MePage> {
                                 if (d > 1) const SizedBox(width: 6),
                                 Expanded(
                                   child: _DayChip(
+                                    key: ValueKey('me-weigh-$d'),
                                     label: weekdayChips[d - 1],
                                     semantics: weekdayNames[d - 1],
-                                    selected: p.weighDay == d,
-                                    onTap: () => _save(p.copyWith(weighDay: d)),
+                                    selected: p.weighDays.contains(d),
+                                    onTap: () {
+                                      final days = {...p.weighDays};
+                                      // Τουλάχιστον μία μέρα: η τελευταία δεν βγαίνει.
+                                      if (days.contains(d)) {
+                                        if (days.length > 1) days.remove(d);
+                                      } else {
+                                        days.add(d);
+                                      }
+                                      _save(p.copyWith(weighDays: days));
+                                    },
                                   ),
                                 ),
                               ],
@@ -187,11 +205,44 @@ class _MePageState extends State<MePage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Εκείνη τη μέρα η Σήμερα σου θυμίζει τη ζύγιση. Ίδια μέρα και ίδιες συνθήκες κάθε εβδομάδα: πρωί, μετά '
-                            'την τουαλέτα, πριν φας ή πιεις.',
+                            'Πρωί, μετά την τουαλέτα, πριν φας ή πιεις, με τα ίδια ρούχα. Με 3 ζυγίσεις την εβδομάδα η τάση του '
+                            'βάρους βγαίνει πιο σίγουρη και οι θερμίδες προσαρμόζονται πιο σωστά.',
                             style: hint,
                           ),
+                          const Hairline(vertical: 14),
+                          Text('Μέση με μεζούρα', style: label),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              for (var d = 1; d <= 7; d++) ...[
+                                if (d > 1) const SizedBox(width: 6),
+                                Expanded(
+                                  child: _DayChip(
+                                    key: ValueKey('me-waist-$d'),
+                                    label: weekdayChips[d - 1],
+                                    semantics: 'Μέση ${weekdayNames[d - 1]}',
+                                    selected: p.waistDay == d,
+                                    onTap: () => _save(p.copyWith(waistDay: d)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Μία φορά την εβδομάδα, μετά τη ζύγιση. Η Σήμερα σου το θυμίζει.', style: hint),
                         ],
+                      ),
+                    ),
+                    const GroupLabel('Στόχοι'),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: NavRow(
+                        key: const ValueKey('me-goals'),
+                        icon: Icons.flag_rounded,
+                        color: c.food,
+                        title: 'Στόχοι διατροφής',
+                        text: _goalsText(),
+                        onTap: () => openGoals(context, widget.store),
                       ),
                     ),
                     if (food != null) ...[
@@ -269,7 +320,7 @@ class _MePageState extends State<MePage> {
 }
 
 class _DayChip extends StatelessWidget {
-  const _DayChip({required this.label, required this.semantics, required this.selected, required this.onTap});
+  const _DayChip({super.key, required this.label, required this.semantics, required this.selected, required this.onTap});
   final String label;
   final String semantics;
   final bool selected;
