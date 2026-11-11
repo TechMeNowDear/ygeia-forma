@@ -637,7 +637,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             if (Repo.alarm.limit == null && zone == null) "χωρίς όριο παλμών" else null,
         )
         if (tags.isNotEmpty() && Repo.notice == null) {
-            small(c, tags.joinToString(" · "), 135f, where?.second ?: gray, ess(10f), 160f)
+            // Με μεγάλα γράμματα λίγο πιο κάτω, να μην ακουμπά τη γραμμή της ζώνης.
+            small(c, tags.joinToString(" · "), 135f + (fs - 1f) * 8f, where?.second ?: gray, ess(10f), 160f)
             sayAdd(tags.joinToString(", "))
         }
         // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν). ~40 u ≈ 48 dp ύψος.
