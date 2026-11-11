@@ -240,9 +240,9 @@ class CholCard extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 6),
-        if (g.nutsG > 0) CholRow(label: 'Ξηροί καρποί', value: '${gramsText(d.nutsG)} g', target: '${g.nutsG} g', done: d.nutsG >= g.nutsG - 1e-9),
+        if (g.nutsG > 0) CholRow(label: 'Ξηροί καρποί', value: '${d.nutsG.round()} g', target: '${g.nutsG} g', done: d.nutsG >= g.nutsG - 1e-9),
         if (g.branG > 0)
-          CholRow(label: 'Πίτουρο βρώμης', value: '${gramsText(d.branG)} g', target: '${g.branG} g', done: d.branG >= g.branG - 1e-9),
+          CholRow(label: 'Πίτουρο βρώμης', value: '${d.branG.round()} g', target: '${g.branG} g', done: d.branG >= g.branG - 1e-9),
         if (g.legumesWeek > 0)
           CholRow(label: 'Όσπρια', sub: 'αυτή την εβδομάδα', value: '$legumes', target: '${g.legumesWeek}', done: legumes >= g.legumesWeek),
         if (g.fishWeek > 0) CholRow(label: 'Ψάρι', sub: 'αυτή την εβδομάδα', value: '$fish', target: '${g.fishWeek}', done: fish >= g.fishWeek),
@@ -261,7 +261,7 @@ class CholRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     return Semantics(
-      label: '$label${sub == null ? '' : ', $sub'}: $value από $target${done ? ', έγινε' : ''}',
+      label: '$label${sub == null ? '' : ', $sub'}: $value${target.isEmpty ? '' : ' από $target'}${done ? ', έγινε' : ''}',
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
@@ -276,7 +276,7 @@ class CholRow extends StatelessWidget {
           Text.rich(
             TextSpan(children: [
               TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
-              TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
+              if (target.isNotEmpty) TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
             ]),
             style: const TextStyle(fontSize: 14.5, fontFeatures: tabular),
           ),
@@ -412,23 +412,23 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       CholRow(
                           label: 'Ξηροί καρποί',
                           sub: 'μέρες με ${g.nutsG} g',
-                          value: '${w.daysWithNuts(g.nutsG)} από ${w.fullDays}',
-                          target: 'μέρες',
+                          value: '${w.daysWithNuts(g.nutsG)} από ${w.fullDays} μέρες',
+                          target: '',
                           done: w.fullDays > 0 && w.daysWithNuts(g.nutsG) == w.fullDays),
                     if (g.branG > 0)
                       CholRow(
                           label: 'Πίτουρο βρώμης',
                           sub: 'μέρες με ${g.branG} g',
-                          value: '${w.daysWithBran(g.branG)} από ${w.fullDays}',
-                          target: 'μέρες',
+                          value: '${w.daysWithBran(g.branG)} από ${w.fullDays} μέρες',
+                          target: '',
                           done: w.fullDays > 0 && w.daysWithBran(g.branG) == w.fullDays),
                     if (g.legumesWeek > 0)
                       CholRow(label: 'Όσπρια', value: '${w.legumes}', target: '${g.legumesWeek} φορές', done: w.legumes >= g.legumesWeek),
                     if (g.fishWeek > 0) CholRow(label: 'Ψάρι', value: '${w.fish}', target: '${g.fishWeek} φορές', done: w.fish >= g.fishWeek),
                     CholRow(
                         label: 'Αλάτι κάτω από ${dec(g.salt, 0)} g',
-                        value: '${w.daysSaltOk(g.salt)} από ${w.fullDays}',
-                        target: 'μέρες',
+                        value: '${w.daysSaltOk(g.salt)} από ${w.fullDays} μέρες',
+                        target: '',
                         done: w.fullDays > 0 && w.daysSaltOk(g.salt) == w.fullDays),
                   ]),
                 ),

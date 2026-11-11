@@ -712,7 +712,7 @@ class _WeighCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 14),
               child: FilledButton.icon(
                 key: const ValueKey('today-waist'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: c.healthSolid, foregroundColor: c.onSolid),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: c.body, foregroundColor: c.dark ? const Color(0xFF14200A) : Colors.white),
                 onPressed: () => openWaistSheet(context, store, now: now),
                 icon: const Icon(Icons.straighten_rounded, size: 20),
                 label: const Text('Γράψε τη μέση'),

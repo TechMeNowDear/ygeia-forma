@@ -137,9 +137,8 @@ class _ZoneBar extends StatelessWidget {
             bottom: 0,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: c.tint(color),
+                color: color.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: color, width: 1.5),
               ),
             ),
           ),

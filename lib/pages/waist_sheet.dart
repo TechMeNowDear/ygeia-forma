@@ -136,7 +136,7 @@ class _WaistSheetState extends State<WaistSheet> {
           const SizedBox(height: 16),
           FilledButton(
             key: const ValueKey('waist-save'),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), backgroundColor: c.healthSolid, foregroundColor: c.onSolid),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), backgroundColor: c.body, foregroundColor: c.dark ? const Color(0xFF14200A) : Colors.white),
             onPressed: values == null
                 ? null
                 : () {
