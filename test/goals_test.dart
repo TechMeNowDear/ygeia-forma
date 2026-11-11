@@ -8,7 +8,9 @@ import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/goals.dart';
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/pages/goals_page.dart';
-import 'package:ygeia_forma/pages/nutrition.dart';
+import 'package:ygeia_forma/food/food_store.dart';
+import 'package:ygeia_forma/main.dart';
+import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/waist_sheet.dart';
 import 'package:ygeia_forma/profile.dart';
 import 'package:ygeia_forma/theme.dart';
@@ -16,6 +18,7 @@ import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/zone.dart';
 import 'package:ygeia_forma/waist.dart';
 
+import 'sample_data.dart';
 import 'sample_food.dart';
 
 final _now = DateTime(2026, 11, 12, 10);
@@ -33,6 +36,15 @@ Future<void> _pump(WidgetTester t, Widget w, {Size size = const Size(400, 2400),
     home: w,
   ));
   await t.pumpAndSettle();
+}
+
+/// Η Διατροφή όπως στην εφαρμογή (μέσα στο Shell, με την κεφαλίδα της κατηγορίας).
+Widget _shell(HealthStore store) {
+  store
+    ..data ??= Dashboard.fromJson(sampleDashboardJson(_now))
+    ..history = sampleHistory(_now, store.data!);
+  addTearDown(() => FoodStore.shared = null);
+  return Shell(store: store, food: sampleFoodStore(_now), initialIndex: Cat.food, now: _now);
 }
 
 /// Φανταστικός χρήστης: άνδρας 40 ετών, 180 cm.
@@ -333,9 +345,9 @@ void main() {
 
     testWidgets('Διατροφή με στόχους: «Μένουν», μπάρες και κάρτα «Χοληστερίνη»', (t) async {
       final store = HealthStore()..setProfile(_me)..setGoals(_goals());
-      await _pump(t, FoodTheme(child: NutritionPage(food: sampleFoodStore(_now), health: store, now: _now)), size: const Size(400, 3000));
+      await _pump(t, _shell(store), size: const Size(400, 3000));
       expect(find.byKey(const ValueKey('nutrition-goals')), findsOneWidget);
-      expect(find.text('Μένουν'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('nutrition-goals')), matching: find.text('Μένουν')), findsOneWidget);
       expect(find.text('Πρωτεΐνη'), findsWidgets);
       expect(find.byKey(const ValueKey('nutrition-chol')), findsOneWidget);
       await t.tap(find.text('Χοληστερίνη · τι τη ρίχνει'));
@@ -348,14 +360,14 @@ void main() {
 
     testWidgets('Διατροφή χωρίς στόχους: πρόσκληση στον οδηγό, χωρίς κάρτα χοληστερίνης', (t) async {
       final store = HealthStore()..setProfile(_me);
-      await _pump(t, FoodTheme(child: NutritionPage(food: sampleFoodStore(_now), health: store, now: _now)), size: const Size(400, 3000));
+      await _pump(t, _shell(store), size: const Size(400, 3000));
       expect(find.byKey(const ValueKey('nutrition-goals-cta')), findsOneWidget);
       expect(find.byKey(const ValueKey('nutrition-chol')), findsNothing);
     });
 
     testWidgets('Διατροφή με 2,0× γράμματα στο 360: τίποτα δεν ξεχειλίζει', (t) async {
       final store = HealthStore()..setProfile(_me)..setGoals(_goals());
-      await _pump(t, FoodTheme(child: NutritionPage(food: sampleFoodStore(_now), health: store, now: _now)),
+      await _pump(t, _shell(store),
           size: const Size(360, 5000), textScale: 2.0);
       expect(t.takeException(), isNull);
     });

@@ -50,7 +50,8 @@ Future<void> main() async {
     runApp(WipeUnfinishedApp(status: wiped!));
     return;
   }
-  final store = HealthStore.shared = HealthStore();
+  final store = HealthStore();
+  HealthStore.shared = store;
   final food = FoodStore();
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
   await store.loadPrefs();
