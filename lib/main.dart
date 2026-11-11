@@ -11,6 +11,7 @@ import 'pages/training/training_page.dart';
 import 'heart_day.dart' show appExerciseRanges;
 import 'training/training_store.dart';
 import 'training/wear_link.dart';
+import 'training/zone.dart';
 import 'pages/body.dart';
 import 'pages/category.dart';
 import 'pages/food_add.dart';
@@ -243,10 +244,26 @@ class _ShellState extends State<Shell> {
     _exerciseTab.addListener(_track);
     widgetOpenRequest.addListener(_fromWidget);
     _fromWidget();
+    widget.store.addListener(_zoneSync);
+    TrainingStore.main.addListener(_zoneSync);
+    _zoneSync();
+  }
+
+  /// Ζώνη περπατήματος (12/11): η εφαρμογή την υπολογίζει (ηλικία, παλμοί ύπνου) και τη δίνει στις προπονήσεις, που τη
+  /// στέλνουν στο ρολόι. Μόνο με διαβασμένες ρυθμίσεις και προπονήσεις: αλλιώς μια προσωρινή «καμία ζώνη» θα έσβηνε την
+  /// αποθηκευμένη. Δεν γράφει τίποτα αν δεν άλλαξε.
+  void _zoneSync() {
+    final t = TrainingStore.main;
+    if (!widget.store.prefsReady || !t.ready || t.readError) return;
+    final z = widget.store.zoneOn(widget.now ?? DateTime.now());
+    final s = widget.store.zoneSettings;
+    t.setZone(z == null ? null : WalkZone(z.lo, z.hi, up: s.alertHigh, down: s.alertLow));
   }
 
   @override
   void dispose() {
+    widget.store.removeListener(_zoneSync);
+    TrainingStore.main.removeListener(_zoneSync);
     widgetOpenRequest.removeListener(_fromWidget);
     _healthTab.dispose();
     _foodTab.dispose();

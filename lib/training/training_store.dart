@@ -10,6 +10,7 @@ import 'hr_file.dart';
 import 'progression.dart';
 import 'program.dart';
 import 'session.dart';
+import 'zone.dart';
 
 /// Ανάγνωση/εγγραφή του training.json (μέσω Kotlin, ατομική εγγραφή· μπαίνει στο κρυπτογραφημένο αντίγραφο) και των
 /// αρχείων παλμών ανά προπόνηση (hr/<id>.json, έλεγχος 9/11, V-A-02).
@@ -212,6 +213,10 @@ class TrainingStore extends ChangeNotifier {
   /// Όριο παλμών από τον γιατρό (bpm), αν έδωσε: το ρολόι δονεί όταν το ξεπεράσεις. Κενό = τίποτα.
   int? hrLimit;
 
+  /// Ζώνη περπατήματος (12/11) όπως τη στέλνουμε στο ρολόι. Την υπολογίζει η εφαρμογή (HealthStore.zoneOn) και την
+  /// περνά εδώ ([setZone]), ώστε να υπάρχει και πριν διαβαστεί το ιστορικό και να φτάνει στο ρολόι με το πρόγραμμα.
+  WalkZone? zone;
+
   /// Όλες οι εκδόσεις όλων των προγραμμάτων (η πιο πρόσφατη στο τέλος).
   final List<Program> programs = [];
   String? activeId;
@@ -290,7 +295,7 @@ class TrainingStore extends ChangeNotifier {
     if (changed) save();
   }
 
-  static const _knownTop = {'v', 'hrLimit', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone'};
+  static const _knownTop = {'v', 'hrLimit', 'zone', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone'};
 
   /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μία χαλασμένη προπόνηση ή πρόγραμμα πάει σε καραντίνα, όχι όλο το
   /// αρχείο σε «δεν διαβάζεται». Τα άγνωστα κλειδιά κρατιούνται (V-A-07).
@@ -304,6 +309,8 @@ class TrainingStore extends ChangeNotifier {
     final hl = j['hrLimit'];
     hrLimit = hl is num ? hl.toInt() : null;
     if (hl != null && hl is! num) _extra['hrLimit'] = hl;
+    zone = WalkZone.fromJson(j['zone']);
+    if (j['zone'] != null && zone == null) _extra['zone'] = j['zone'];
     quarantine
       ..clear()
       ..addAll([
@@ -347,6 +354,7 @@ class TrainingStore extends ChangeNotifier {
         ..._extra,
         'v': fileVersion,
         if (hrLimit != null) 'hrLimit': hrLimit,
+        if (zone != null) 'zone': zone!.toJson(),
         'programs': [for (final p in programs) p.toJson()],
         if (activeId != null) 'active': activeId,
         // Οι παλμοί κάθε τελειωμένης προπόνησης στο δικό της αρχείο, μόλις γραφτεί αυτό· ως τότε μέσα (καμία απώλεια).
@@ -564,6 +572,13 @@ class TrainingStore extends ChangeNotifier {
   /// Όριο παλμών από τον γιατρό (null = κανένα).
   void setHrLimit(int? hr) {
     hrLimit = hr;
+    save();
+  }
+
+  /// Ζώνη περπατήματος: γράφεται (και στέλνεται στο ρολόι) μόνο αν άλλαξε.
+  void setZone(WalkZone? z) {
+    if (z == zone) return;
+    zone = z;
     save();
   }
 
@@ -837,6 +852,12 @@ class TrainingStore extends ChangeNotifier {
       s.cardioSec = watchSec;
       if (cardio['gps'] is bool) s.gps = cardio['gps'] as bool;
       if (cardio['activity'] is String) s.activity = cardio['activity'] as String;
+      // Η ζώνη που είχε το ρολόι (ρολόι από 12/11), αλλιώς η ζώνη του κινητού τη στιγμή της εισαγωγής.
+      final wz = WalkZone.fromJson(cardio['zone']) ?? zone;
+      if (wz != null && (s.activity == null || s.activity == 'walk')) {
+        s.zoneLo = wz.lo;
+        s.zoneHi = wz.hi;
+      }
       s.splits.addAll(Session.pairs(cardio['km']));
       s.pauses.addAll(Session.pairs(cardio['pz']));
       final hrr = cardio['hrr'];

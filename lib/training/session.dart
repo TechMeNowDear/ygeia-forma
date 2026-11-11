@@ -181,6 +181,8 @@ class Session {
     this.hrrEnd,
     this.hrr1,
     this.limit,
+    this.zoneLo,
+    this.zoneHi,
     this.partial = false,
     Map<String, dynamic>? extra,
   })  : items = items ?? [],
@@ -327,6 +329,9 @@ class Session {
   /// το δικό της όριο και όχι με το σημερινό. 0 = δεν υπήρχε όριο. null = δεν καταγράφηκε (προπονήσεις πριν από την #90).
   int? limit;
 
+  /// Η ζώνη περπατήματος που ίσχυε (12/11), για τον «χρόνο στη ζώνη» με τη ζώνη της μέρας και όχι τη σημερινή.
+  int? zoneLo, zoneHi;
+
   /// Το όριο της προπόνησης, αν υπήρχε (null και όταν δεν καταγράφηκε).
   int? get limitUsed => (limit ?? 0) > 0 ? limit : null;
 
@@ -342,7 +347,7 @@ class Session {
 
   static const _known = {
     'id', 'w', 'name', 'prog', 'start', 'end', 'items', 'feel', 'hrAvg', 'hrMax', 'cmin', 'note', 'hr', 'hrf', 'm', 'steps', 'src',
-    'hrm', 'hrg', 'hrd', 'werr', 'wdg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs',
+    'hrm', 'hrg', 'hrd', 'werr', 'wdg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs', 'zlo', 'zhi',
   };
 
   /// [hrInline]: οι παλμοί μέσα (όπως ως #90)· αλλιώς μόνο πόσοι είναι («hrf»), γιατί είναι στο δικό τους αρχείο.
@@ -381,6 +386,7 @@ class Session {
       if (hrrEnd != null) 'hrrE': hrrEnd,
       if (hrr1 != null) 'hrr1': hrr1,
       if (limit != null) 'lim': limit,
+      if (zoneLo != null && zoneHi != null) ...{'zlo': zoneLo, 'zhi': zoneHi},
       if (partial) 'part': 1,
       if (hrBad != null) 'hrbad': hrBad,
       if (steadyHr case final v?) 'hrs': v,
@@ -450,6 +456,8 @@ class Session {
       hrrEnd: optInt('hrrE'),
       hrr1: optInt('hrr1'),
       limit: _limit(j['lim']),
+      zoneLo: optInt('zlo'),
+      zoneHi: optInt('zhi'),
       partial: j['part'] == 1,
       extra: extra,
     );

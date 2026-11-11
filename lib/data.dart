@@ -11,14 +11,17 @@ import 'heart_day.dart' show appExerciseRanges;
 import 'history.dart';
 import 'oura/config.dart' show ouraMaxBackDays;
 import 'oura/oura_model.dart';
+import 'goals.dart';
 import 'profile.dart';
+import 'training/zone.dart';
+import 'waist.dart';
 import 'oura/oura_store.dart';
 import 'oxygen_note.dart' show oxygenLongWindowNights;
 import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
 import 'sources.dart';
-import 'trends.dart' show usualMean;
+import 'trends.dart' show usualMean, usualOf;
 
 // ---------------------------------------------------------------------------
 // Μοντέλα
@@ -891,6 +894,9 @@ class Prefs {
       this.ouraRefetchTo,
       this.ouraRules = 0,
       this.me,
+      this.goals,
+      this.zone,
+      this.waist,
       Map<String, int>? monthFails,
       List<String>? staleMonths})
       : plan = plan ?? SourcePlan.samsungOnly,
@@ -935,6 +941,9 @@ class Prefs {
       ouraRefetchTo: j['ouraRefetchTo'] is String ? j['ouraRefetchTo'] as String : null,
       ouraRules: (j['ouraRules'] as num?)?.toInt() ?? 0,
       me: j['me'] is Map ? Map<String, dynamic>.from(j['me'] as Map) : null,
+      goals: j['goals'] is Map ? Map<String, dynamic>.from(j['goals'] as Map) : null,
+      zone: j['zone'] is Map ? Map<String, dynamic>.from(j['zone'] as Map) : null,
+      waist: j['waist'] is List ? List<Object?>.from(j['waist'] as List) : null,
       monthFails: {
         if (j['monthFails'] is Map)
           for (final e in (j['monthFails'] as Map).entries)
@@ -950,8 +959,17 @@ class Prefs {
   /// Έλεγχος 2, C12: με ποιους κανόνες γράφτηκαν οι τιμές «o.*» (δες [ouraRulesVersion]).
   int ouraRules;
 
-  /// «Τα στοιχεία μου» (7/11, profile.dart): γέννηση, φύλο, ύψος, μέρα ζυγίσματος.
+  /// «Τα στοιχεία μου» (7/11, profile.dart): γέννηση, φύλο, ύψος, μέρες ζυγίσματος.
   Map<String, dynamic>? me;
+
+  /// Στόχοι διατροφής (12/11, goals.dart), όπως αποθηκεύονται.
+  Map<String, dynamic>? goals;
+
+  /// Ζώνη περπατήματος: ρυθμίσεις του χρήστη (12/11, training/zone.dart).
+  Map<String, dynamic>? zone;
+
+  /// Μέση με μεζούρα (12/11, waist.dart): λίγα byte τον χρόνο.
+  List<Object?>? waist;
 
   /// Έλεγχος 2, C9: ως πού μένει να ξαναδιαβαστεί το Oura πιο πίσω από τις 90 μέρες (μετά από καινούργια βάση).
   String? ouraRefetchTo;
@@ -1063,6 +1081,9 @@ class Prefs {
         if (ouraRefetchTo != null) 'ouraRefetchTo': ouraRefetchTo,
         if (ouraRules != 0) 'ouraRules': ouraRules,
         if (me != null) 'me': me,
+        if (goals != null) 'goals': goals,
+        if (zone != null) 'zone': zone,
+        if (waist != null) 'waist': waist,
         if (monthFails.isNotEmpty) 'monthFails': monthFails,
         if (staleMonths.isNotEmpty) 'staleMonths': staleMonths,
       });
@@ -2323,7 +2344,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
   Future<bool> restorePrefs(Map<String, dynamic> p) async {
     if (!_prefsLoaded) return false;
-    final merged = {...prefsJson(), ...p, 'layout': todayLayout};
+    final mine = prefsJson();
+    final merged = {
+      ...mine,
+      ...p,
+      'layout': todayLayout,
+      // Μέση: οι μετρήσεις του κινητού μένουν, από το αντίγραφο μπαίνουν όσες λείπουν (12/11).
+      if (p['waist'] != null || mine['waist'] != null) 'waist': mergeWaist(mine['waist'], p['waist']),
+    };
     final restored = Prefs.fromJson(merged)
       ..backfillFrom = prefs.backfillFrom
       ..historyVersion = prefs.historyVersion
@@ -2370,9 +2398,60 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   void setCard(String key, bool on) => _changePrefs((p) => p.cards[key] = on);
 
+  /// Οι ρυθμίσεις έχουν διαβαστεί (πριν από αυτό, ό,τι φαίνεται είναι προεπιλογές).
+  bool get prefsReady => _prefsLoaded;
+
   /// «Τα στοιχεία μου» (7/11).
   Profile get profile => Profile.fromJson(prefs.me);
   void setProfile(Profile v) => _changePrefs((p) => p.me = v.toJson());
+
+  /// Στόχοι διατροφής (12/11). null: δεν έχουν φτιαχτεί (ή το αρχείο είναι άκυρο: τότε ξανά ο οδηγός).
+  Goals? get goals => Goals.fromJson(prefs.goals);
+  void setGoals(Goals? g) => _changePrefs((p) => p.goals = g?.toJson());
+
+  /// Ζώνη περπατήματος (12/11).
+  ZoneSettings get zoneSettings => ZoneSettings.fromJson(prefs.zone);
+  void setZoneSettings(ZoneSettings z) => _changePrefs((p) => p.zone = z.toJson());
+
+  /// Η ζώνη που ισχύει σήμερα: ηρεμία από τους παλμούς ύπνου (πηγή του ύπνου), μέγιστοι από την ηλικία ή από τεστ.
+  Zone? zoneOn(DateTime now) => computeZone(age: profile.ageOn(now), restHr: restHrForZone(now), s: zoneSettings);
+
+  /// Η μεσαία τιμή των παλμών ύπνου των 14 τελευταίων νυχτών (τουλάχιστον 7), από την πηγή του ύπνου κάθε νύχτας.
+  double? restHrForZone(DateTime now) {
+    final p = analysisPlan;
+    final day = dayOf(now);
+    final values = <double?>[];
+    // Δεν περνά πάνω από αλλαγή πηγής: μετρούν μόνο οι νύχτες της τωρινής πηγής (A5).
+    final changes = p.changeDates(K.sleepHr);
+    final from = changes.isEmpty ? null : changes.last;
+    for (var i = 27; i >= 0; i--) {
+      final d = DateTime(day.year, day.month, day.day - i);
+      if (from != null && d.isBefore(from)) continue;
+      values.add(p.value(history, K.sleepHr, d));
+    }
+    return usualOf(values);
+  }
+
+  /// Το πιο πρόσφατο βάρος (kg) και η μέρα του, από τη ζυγαριά.
+  ({double kg, DateTime day})? latestWeight() {
+    final b = data?.latestBody;
+    final w = b?.weight;
+    if (b == null || w == null || w < 20 || w > 350) return null;
+    return (kg: w, day: b.time);
+  }
+
+  /// Μέση με μεζούρα (12/11), παλιότερη πρώτη.
+  List<WaistEntry> get waist => waistFromJson(prefs.waist);
+
+  /// Μία μέτρηση τη μέρα: η νέα αντικαθιστά της ίδιας μέρας.
+  void saveWaist(WaistEntry e) => _changePrefs((p) {
+        final list = [for (final x in waistFromJson(p.waist)) if (x.day != e.day) x, e]..sort((a, b) => a.day.compareTo(b.day));
+        p.waist = [for (final x in list) x.toJson()];
+      });
+
+  void deleteWaist(String day) => _changePrefs((p) {
+        p.waist = [for (final x in waistFromJson(p.waist)) if (x.day != day) x.toJson()];
+      });
 
   /// Έλεγχος 3, E6: το όνομα της αναφοράς. Αν οι ρυθμίσεις δεν έχουν διαβαστεί ακόμα, μπαίνει πάνω τους όταν έρθουν
   /// (πριν χανόταν: γραφόταν στις προεπιλογές, που αντικαθίσταντο).
