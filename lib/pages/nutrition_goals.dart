@@ -494,7 +494,7 @@ class MiniBars extends StatelessWidget {
       excludeSemantics: true,
       child: Column(children: [
         SizedBox(
-          height: _h + 18,
+          height: _h + 26,
           child: Stack(children: [
             Positioned(
               left: 0,
@@ -511,11 +511,14 @@ class MiniBars extends StatelessWidget {
                       if (v != null)
                         Text(format(v), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: c.textSecondary, fontFeatures: tabular)),
                       const SizedBox(height: 2),
-                      Container(
-                        height: v == null ? 0 : math.max(2, y(v)),
-                        decoration: BoxDecoration(
-                          color: v != null && over != null && (higherIsWorse ? v > target + 1e-9 : v < target - 1e-9) ? over : color,
-                          borderRadius: BorderRadius.circular(5),
+                      // Με μεγάλα γράμματα η ετικέτα ψηλώνει: η μπάρα μικραίνει, δεν ξεχειλίζει.
+                      Flexible(
+                        child: Container(
+                          height: v == null ? 0 : math.max(2, y(v)),
+                          decoration: BoxDecoration(
+                            color: v != null && over != null && (higherIsWorse ? v > target + 1e-9 : v < target - 1e-9) ? over : color,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
                         ),
                       ),
                     ]),
