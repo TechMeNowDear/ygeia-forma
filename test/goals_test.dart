@@ -124,6 +124,11 @@ void main() {
       expect(Goals.fromJson({...g.toJson(), 'aim': 'x'}), isNull);
       expect(Goals.fromJson({...g.toJson(), 'age': 15}), isNull);
       expect(Goals.fromJson('x'), isNull);
+      // Χαλασμένη μέρα από αντίγραφο: ξανά ο οδηγός, όχι κόκκινη οθόνη (ανασκόπηση 11/11, S6).
+      expect(Goals.fromJson({...g.toJson(), 'since': 'χθες'}), isNull);
+      expect(Goals.fromJson({...g.toJson(), 'since': '2026-02-30'}), isNull);
+      expect(isDayKey('2026-11-16'), isTrue);
+      expect(waistFromJson([{'d': '16/11', 'v': [98, 98]}, {'d': '2026-11-13', 'v': [98, 99]}]).map((e) => e.day), ['2026-11-13']);
     });
 
     test('πίτουρο από την ετικέτα: γραμμάρια για 3 g β-γλυκάνες, στρογγυλεμένα προς τα πάνω', () {
@@ -372,6 +377,36 @@ void main() {
           size: const Size(360, 5000), textScale: 2.0);
       final e = t.takeException();
       expect(e, isNull, reason: e is FlutterError ? e.toStringDeep() : '$e');
+    });
+
+    testWidgets('Χοληστερίνη με 1,3× γράμματα στο 360: τίποτα δεν ξεχειλίζει (ανασκόπηση 11/11, S4)', (t) async {
+      final store = HealthStore()..setProfile(_me)..setGoals(_goals());
+      await _pump(t, _shell(store), size: const Size(360, 3000), textScale: 1.3);
+      await t.ensureVisible(find.byKey(const ValueKey('nutrition-chol')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('nutrition-chol')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('4 εβδομάδες'));
+      await t.pumpAndSettle();
+      final e = t.takeException();
+      expect(e, isNull, reason: e is FlutterError ? e.toStringDeep() : '$e');
+    });
+
+    testWidgets('«Ξανά ο οδηγός» από τη σελίδα «Στόχοι» γυρίζει σε αυτήν (μία σελίδα, όχι δύο)', (t) async {
+      final store = HealthStore()..setProfile(_me)..setGoals(_goals());
+      await _pump(t, GoalsPage(store: store, now: _now));
+      await t.ensureVisible(find.byKey(const ValueKey('goals-wizard')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('goals-wizard')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('wizard-kg')), '90');
+      await t.pumpAndSettle();
+      for (var k = 0; k < 6; k++) {
+        await t.tap(find.byKey(const ValueKey('wizard-next')));
+        await t.pumpAndSettle();
+      }
+      expect(find.byType(GoalsWizard), findsNothing);
+      expect(find.byType(GoalsPage), findsOneWidget);
     });
 
     testWidgets('φύλλο «Μέση»: τρίτη μέτρηση όταν διαφέρουν πάνω από 1 cm', (t) async {

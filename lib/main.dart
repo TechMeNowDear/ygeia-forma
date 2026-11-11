@@ -24,6 +24,7 @@ import 'pages/sleep.dart';
 import 'pages/today.dart';
 import 'pages/trends.dart';
 import 'pages/widget_config_page.dart';
+import 'plan_file.dart' show PlanState;
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -251,11 +252,13 @@ class _ShellState extends State<Shell> {
   }
 
   /// Ζώνη περπατήματος (12/11): η εφαρμογή την υπολογίζει (ηλικία, παλμοί ύπνου) και τη δίνει στις προπονήσεις, που τη
-  /// στέλνουν στο ρολόι. Μόνο με διαβασμένες ρυθμίσεις και προπονήσεις: αλλιώς μια προσωρινή «καμία ζώνη» θα έσβηνε την
-  /// αποθηκευμένη. Δεν γράφει τίποτα αν δεν άλλαξε.
+  /// στέλνουν στο ρολόι. Μόνο με διαβασμένες ρυθμίσεις, ιστορικό, σχέδιο πηγών και προπονήσεις: αλλιώς μια προσωρινή ζώνη
+  /// (π.χ. χωρίς παλμούς ύπνου ακόμα) θα έσβηνε την αποθηκευμένη και θα πήγαινε στο ρολόι (ανασκόπηση 11/11, M1). Αν το
+  /// ιστορικό δεν διαβαστεί, μένει η αποθηκευμένη. Δεν γράφει τίποτα αν δεν άλλαξε.
   void _zoneSync() {
     final t = TrainingStore.main;
-    if (!widget.store.prefsReady || !t.ready || t.readError) return;
+    final h = widget.store;
+    if (!h.prefsReady || !h.historyReady || h.planState == PlanState.loading || !t.ready || t.readError) return;
     final z = widget.store.zoneOn(widget.now ?? DateTime.now());
     final s = widget.store.zoneSettings;
     t.setZone(z == null ? null : WalkZone(z.lo, z.hi, up: s.alertHigh, down: s.alertLow));

@@ -29,7 +29,7 @@ class WaistEntry {
   Map<String, dynamic> toJson() => {'d': day, 'v': values};
 
   static WaistEntry? fromJson(Object? j) {
-    if (j is! Map || j['d'] is! String || j['v'] is! List) return null;
+    if (j is! Map || j['d'] is! String || j['v'] is! List || !isDayKey(j['d'] as String)) return null;
     final v = [
       for (final x in j['v'] as List)
         if (x is num && x >= waistMinCm && x <= waistMaxCm) x.toDouble(),
@@ -37,6 +37,13 @@ class WaistEntry {
     if (v.isEmpty || v.length > 3) return null;
     return WaistEntry(j['d'] as String, v);
   }
+}
+
+/// «2026-11-20» και υπαρκτή μέρα (ανασκόπηση 11/11, S6: χαλασμένη τιμή από αντίγραφο δεν ρίχνει την οθόνη).
+bool isDayKey(String s) {
+  if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(s)) return false;
+  final d = DateTime.tryParse(s);
+  return d != null && '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}' == s;
 }
 
 /// Χρειάζεται τρίτη μέτρηση;

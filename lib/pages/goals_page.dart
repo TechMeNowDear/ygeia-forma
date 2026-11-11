@@ -21,8 +21,10 @@ Future<void> openGoals(BuildContext context, HealthStore store, {DateTime? now})
 const goalsInfo = MetricInfo(
   title: 'Στόχοι διατροφής',
   what: 'Θερμίδες και θρεπτικά της ημέρας, από τύπους με επιστημονική πηγή. Κανένας αριθμός δεν βγαίνει από AI.',
-  shows: 'Πόσο να φας για τον στόχο σου. Ο στόχος θερμίδων είναι αρχική εκτίμηση: μετά από 3 εβδομάδες τον διορθώνουν οι '
-      'ζυγίσεις σου μαζί με ό,τι έφαγες.',
+  // Ανασκόπηση 11/11 (M2): η αυτόματη διόρθωση δεν υπάρχει ακόμα· τα κείμενα δεν την υπόσχονται ως έτοιμη. Αλλάζουν όταν
+  // μπει (συμφωνία: πριν από τις 7/12).
+  shows: 'Πόσο να φας για τον στόχο σου. Ο στόχος θερμίδων είναι αρχική εκτίμηση. Μετά από 3 εβδομάδες με ζυγίσεις και '
+      'καταγραφή φαγητού φαίνεται πόσες θερμίδες καις πραγματικά· η αυτόματη διόρθωση του στόχου έρχεται σε επόμενη έκδοση.',
   compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018) · λίπος 25–35% των θερμίδων (EFSA) · κορεσμένα έως 6% όταν ο γιατρός ζητά να '
       'πέσει η LDL (AHA/ACC), αλλιώς κάτω από 10% (Π.Ο.Υ.) · φυτικές ίνες 30 g (Reynolds 2019) · αλάτι κάτω από 5 g (Π.Ο.Υ.).',
   accuracy: 'Οι τύποι για τις θερμίδες πέφτουν συχνά 10–15% έξω σε έναν άνθρωπο. Γι’ αυτό η εφαρμογή τους διορθώνει με τα '
@@ -35,12 +37,16 @@ const goalsInfo = MetricInfo(
 
 /// Οδηγός με κάρτες (σχέδια 12/11, 1α–1στ): μία ερώτηση ανά οθόνη, προσυμπληρωμένος, «Αργότερα» πάντα.
 class GoalsWizard extends StatefulWidget {
-  const GoalsWizard({super.key, required this.store, this.now});
+  const GoalsWizard({super.key, required this.store, this.now, this.fromPage = false});
   final HealthStore store;
   final DateTime? now;
 
-  static Route<void> route(HealthStore store, {DateTime? now}) => MaterialPageRoute<void>(
-      settings: const RouteSettings(name: 'Στόχοι διατροφής · οδηγός'), builder: (_) => GoalsWizard(store: store, now: now));
+  /// Άνοιξε από τη σελίδα «Στόχοι» («Ξανά ο οδηγός»): στο τέλος γυρίζει πίσω σε αυτήν, όχι δεύτερη σελίδα από πάνω.
+  final bool fromPage;
+
+  static Route<void> route(HealthStore store, {DateTime? now, bool fromPage = false}) => MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'Στόχοι διατροφής · οδηγός'),
+      builder: (_) => GoalsWizard(store: store, now: now, fromPage: fromPage));
 
   @override
   State<GoalsWizard> createState() => _GoalsWizardState();
@@ -139,7 +145,11 @@ class _GoalsWizardState extends State<GoalsWizard> {
       fishWeek: o?.fishWeek ?? defaultFishWeek,
     );
     widget.store.setGoals(g);
-    Navigator.of(context).pushReplacement(GoalsPage.route(widget.store, now: widget.now));
+    if (widget.fromPage) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(GoalsPage.route(widget.store, now: widget.now));
+    }
   }
 
   @override
@@ -283,7 +293,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
         ];
       case _Step.aim:
         return [
-          _q(context, 'Τι θέλεις πρώτα;', 'Αλλάζει μόνο τις θερμίδες. Πρωτεΐνη και κορεσμένα μένουν ίδια.'),
+          _q(context, 'Τι θέλεις πρώτα;', 'Αλλάζει μόνο τις θερμίδες. Η πρωτεΐνη μένει ίδια, τα κορεσμένα ίδιο ποσοστό.'),
           _Opt(
             k: 'aim-lose',
             on: _aim == GoalAim.lose,
@@ -333,14 +343,14 @@ class _GoalsWizardState extends State<GoalsWizard> {
           const SizedBox(height: 4),
           _Note(
             _aim == GoalAim.lose
-                ? 'Ποτέ κάτω από ${p.female ? '1.200' : '1.500'} kcal. Αν χάνεις πάνω από 1% την εβδομάδα για 2 εβδομάδες, οι '
-                    'θερμίδες ανεβαίνουν.'
+                ? 'Ποτέ κάτω από ${p.female ? '1.200' : '1.500'} kcal. Αν χάνεις πάνω από 1% την εβδομάδα για 2 εβδομάδες, '
+                    'ανέβασε τις θερμίδες από τη σελίδα «Στόχοι».'
                 : 'Αύξηση 0,25–0,5% την εβδομάδα για όσους ξεκινούν βάρη (Iraki 2019).',
           ),
         ];
       case _Step.activity:
         return [
-          _q(context, 'Πόσο κινείσαι;', 'Μια πρώτη εκτίμηση. Μετά από 3 εβδομάδες τη διορθώνουν οι ζυγίσεις σου.'),
+          _q(context, 'Πόσο κινείσαι;', 'Μια πρώτη εκτίμηση. Οι ζυγίσεις σου θα δείξουν αν πέτυχε.'),
           _Opt(k: 'act-0', on: _activity == 0, title: 'Λίγο', sub: 'Γραφείο, λίγο περπάτημα, χωρίς προπόνηση', onTap: () => setState(() => _activity = 0)),
           _Opt(
             k: 'act-1',
@@ -407,8 +417,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
           ),
           const SizedBox(height: 12),
           _Note(
-              'Πρώτη διόρθωση από τα δεδομένα σου μετά από 3 εβδομάδες (${longDate(DateTime(_now.year, _now.month, _now.day + 21))}), '
-              'με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα.'),
+              'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, από '
+              '${longDate(DateTime(_now.year, _now.month, _now.day + 21))} θα φαίνεται πόσες θερμίδες καις πραγματικά. Η αυτόματη '
+              'διόρθωση του στόχου έρχεται σε επόμενη έκδοση.'),
         ];
     }
   }
@@ -548,7 +559,7 @@ class GoalsPage extends StatelessWidget {
                       ),
                       if (g.kcalSet != null)
                         Text('Τον άλλαξες εσύ (ο υπολογισμός λέει ${thousands(calc.kcal)}).', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
-                      Text('Πρώτη διόρθωση από τα δεδομένα σου: ${longDate(adjust)}', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+                      Text('Αρκετά δικά σου δεδομένα από: ${longDate(adjust)}', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
                       const SizedBox(height: 12),
                       OutlinedButton(
                         key: const ValueKey('goals-how'),
@@ -608,7 +619,7 @@ class GoalsPage extends StatelessWidget {
                   OutlinedButton(
                     key: const ValueKey('goals-wizard'),
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                    onPressed: () => Navigator.of(context).push(GoalsWizard.route(store, now: now)),
+                    onPressed: () => Navigator.of(context).push(GoalsWizard.route(store, now: now, fromPage: true)),
                     child: const Text('Ξανά ο οδηγός'),
                   ),
                 ]),
@@ -829,8 +840,8 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
               Text('Μετά από 3 εβδομάδες, από τα δικά σου δεδομένα', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
               const SizedBox(height: 4),
               Text(
-                'Η εφαρμογή συγκρίνει τι έφαγες με το πώς άλλαξε το βάρος σου. Έτσι βρίσκει πόσες θερμίδες καις πραγματικά και '
-                'διορθώνει τον στόχο το πολύ κατά 150 kcal την εβδομάδα.',
+                'Συγκρίνοντας τι έφαγες με το πώς άλλαξε το βάρος σου, φαίνεται πόσες θερμίδες καις πραγματικά. Η εφαρμογή θα '
+                'διορθώνει τον στόχο μόνη της, το πολύ 150 kcal την εβδομάδα: έρχεται σε επόμενη έκδοση.',
                 style: TextStyle(fontSize: 14, height: 1.45, color: c.text),
               ),
             ]),

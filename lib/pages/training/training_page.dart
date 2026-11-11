@@ -756,7 +756,6 @@ const hrLimitMoreText = 'Το ρολόι δονείται μόνο όσο μετ
     'ρολόι δεν μετρά άσκηση, δεν έρχεται καμία δόνηση.\n'
     'Στα βάρη ο καρπός συχνά μετρά λιγότερους παλμούς από τους πραγματικούς.';
 
-/// Τι επέλεξε στο φύλλο ορίου: αριθμός ή κανένα όριο (null).
 /// Όριο παλμών από γιατρό: το φύλλο αλλαγής (από την Προπόνηση, όταν υπάρχει όριο, και από τις Ρυθμίσεις ›
 /// Για προχωρημένους).
 Future<void> editDoctorLimit(BuildContext context, TrainingStore t) async {
@@ -769,6 +768,7 @@ Future<void> editDoctorLimit(BuildContext context, TrainingStore t) async {
   if (r != null) t.setHrLimit(r.hr);
 }
 
+/// Τι επέλεξε στο φύλλο ορίου: αριθμός ή κανένα όριο (null).
 class _HrChoice {
   const _HrChoice(this.hr);
   final int? hr;

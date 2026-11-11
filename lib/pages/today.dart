@@ -116,7 +116,14 @@ class TodayPage extends StatelessWidget {
         final waistDay = store.profile.waistDay == now.weekday;
         final waistToday = waistDay && store.waist.any((e) => e.day == waistDayKey(now));
         final weigh = (weighDay && weighed == null) || (waistDay && !waistToday)
-            ? _WeighCard(store: store, now: now, weighDay: weighDay, waistDay: waistDay, weighedKg: weighed?.weight, weighedAt: weighed?.time)
+            ? _WeighCard(
+                store: store,
+                now: now,
+                weighDay: weighDay,
+                waistDay: waistDay,
+                waistDone: waistToday,
+                weighedKg: weighed?.weight,
+                weighedAt: weighed?.time)
             : null;
         // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
         final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
@@ -651,10 +658,14 @@ class _DatabaseCard extends StatelessWidget {
 /// «Σήμερα ζύγιση» (σχέδια 12/11, 5α): στις μέρες ζυγίσματος και στη μέρα της μέσης. Λίστα με ό,τι μένει: η ζύγιση
 /// σημειώνεται μόνη της όταν έρθει από την InBody· η μέση γράφεται από το κουμπί. Χωρίς ειδοποίηση· μόνο κάρτα.
 class _WeighCard extends StatelessWidget {
-  const _WeighCard({required this.store, required this.now, required this.weighDay, required this.waistDay, this.weighedKg, this.weighedAt});
+  const _WeighCard(
+      {required this.store, required this.now, required this.weighDay, required this.waistDay, this.waistDone = false, this.weighedKg, this.weighedAt});
   final HealthStore store;
   final DateTime now;
   final bool weighDay, waistDay;
+
+  /// Η μέση της ημέρας γράφτηκε (η κάρτα μένει ως να έρθει η ζύγιση· ανασκόπηση 11/11, S3).
+  final bool waistDone;
   final double? weighedKg;
   final DateTime? weighedAt;
 
@@ -706,8 +717,8 @@ class _WeighCard extends StatelessWidget {
           if (weighDay)
             item(weighed, weighed && weighedKg != null ? 'Ζύγιση InBody · ${dec(weighedKg!)} kg' : 'Ζύγιση InBody',
                 trailing: weighed ? hm(weighedAt!) : null),
-          if (waistDay) item(false, 'Μέση με μεζούρα'),
-          if (waistDay)
+          if (waistDay) item(waistDone, 'Μέση με μεζούρα'),
+          if (waistDay && !waistDone)
             Padding(
               padding: const EdgeInsets.only(top: 14),
               child: FilledButton.icon(

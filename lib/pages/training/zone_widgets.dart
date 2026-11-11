@@ -40,7 +40,7 @@ class ZoneCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     return ListenableBuilder(
-      listenable: health,
+      listenable: Listenable.merge([health, training]),
       builder: (context, _) {
         final z = health.zoneOn(now);
         final s = health.zoneSettings;
@@ -95,7 +95,7 @@ class ZoneCard extends StatelessWidget {
             ],
             const Hairline(vertical: 12),
             Row(children: [
-              Expanded(child: Text('Δόνηση όταν τη ξεπερνάς', style: TextStyle(fontSize: 15, color: c.text))),
+              Expanded(child: Text('Δόνηση όταν την ξεπερνάς', style: TextStyle(fontSize: 15, color: c.text))),
               Switch(
                 key: const ValueKey('zone-alert-high'),
                 value: s.alertHigh,
@@ -200,7 +200,11 @@ class _ZoneSheetState extends State<ZoneSheet> {
     // Αν η ζώνη είναι όπως θα την υπολόγιζε η εφαρμογή με αυτούς τους μέγιστους, μένει «υπολογισμένη» (ακολουθεί τους
     // παλμούς ύπνου)· αλλιώς την όρισες εσύ.
     final calc = computeZone(age: widget.health.profile.ageOn(widget.now), restHr: widget.health.restHrForZone(widget.now), s: s.copyWith(clearManual: true));
-    s = calc != null && calc.lo == lo && calc.hi == hi ? s.copyWith(clearManual: true) : s.copyWith(lo: lo, hi: hi);
+    // Ανασκόπηση 11/11 (S1): κάτω/πάνω όπως ήταν (π.χ. άλλαξες μόνο τους μέγιστους) σε υπολογισμένη ζώνη = μένει
+    // υπολογισμένη, με τους νέους μέγιστους· όχι «την όρισες εσύ» με τα παλιά νούμερα.
+    final z0 = _z0;
+    final untouched = z0 != null && lo == z0.lo && hi == z0.hi && !_s.manual;
+    s = untouched || (calc != null && calc.lo == lo && calc.hi == hi) ? s.copyWith(clearManual: true) : s.copyWith(lo: lo, hi: hi);
     widget.health.setZoneSettings(s);
     Navigator.of(context).pop();
   }
@@ -421,6 +425,8 @@ class TalkTestCard extends StatefulWidget {
     if (s.activity != null && s.activity != 'walk') return false;
     final talk = h.zoneSettings.talk;
     if (talk.any((t) => t[0] == s.id)) return true; // έχει απαντηθεί: φαίνεται η απάντηση
+    // Μόνο για πρόσφατα περπατήματα (ανασκόπηση 11/11, N5): όχι για ένα παλιό που άνοιξες τυχαία.
+    if (DateTime.now().difference(s.start).inDays > 14) return false;
     return talk.length < talkAskWalks;
   }
 
@@ -432,12 +438,20 @@ class _TalkTestCardState extends State<TalkTestCard> {
   Future<void> _answer(String a) async {
     final h = widget.health;
     final s = h.zoneSettings;
+    String? before;
+    for (final t in s.talk) {
+      if (t[0] == widget.session.id) before = t[1];
+    }
     final talk = [for (final t in s.talk) if (t[0] != widget.session.id) t, [widget.session.id, a]];
     h.setZoneSettings(s.copyWith(talk: talk));
     final shift = talkShift(a);
     final z = h.zoneOn(DateTime.now());
-    if (shift == 0 || z == null || !mounted) return;
-    final lo = z.lo + shift, hi = z.hi + shift;
+    // Ανασκόπηση 11/11 (S2): η πρόταση βγαίνει από τη ζώνη ΑΥΤΟΥ του περπατήματος, όχι από την τωρινή, ώστε δεύτερο
+    // πάτημα να μη μετακινεί τη ζώνη ξανά. Ίδια απάντηση ή ζώνη ήδη εκεί: καμία ερώτηση.
+    final wLo = widget.session.zoneLo, wHi = widget.session.zoneHi;
+    if (shift == 0 || before == a || z == null || wLo == null || wHi == null || !mounted) return;
+    final lo = wLo + shift, hi = wHi + shift;
+    if (z.lo == lo && z.hi == hi) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

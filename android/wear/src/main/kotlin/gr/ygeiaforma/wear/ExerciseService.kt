@@ -843,14 +843,14 @@ class ExerciseService : Service() {
             za.hold()
             return
         }
-        val lim = Repo.alarm.limit
-        if (Repo.alarm.on || (lim != null && bpm >= lim)) return
+        // Με όριο γιατρού μιλά μόνο εκείνο (και η οθόνη δεν δείχνει ζώνη· ανασκόπηση 11/11, S7).
+        if (Repo.alarm.limit != null) return
+        // Ηλικία της τιμής ΠΡΙΝ αλλάξει η κατάσταση (S5, N2): στο «σταθεροί παλμοί» μετρά η τελευταία πραγματική τιμή,
+        // εκτός αν ο αισθητήρας έχει επαφή και ίδια τιμή (τότε είναι τωρινή). Παλιά τιμή: ούτε δόνηση ούτε κρίση.
+        val age = if (steady) (if (Repo.steadyUntilEl > nowEl) 0L else nowEl - Repo.bpmEl) else nowEl - atEl
+        if (age > ZONE_LATE_MS) return
         val b = if (steady) za.steady(bpm, atEl) else za.feed(bpm, atEl)
         if (b == ZoneAlarm.Buzz.NONE) return
-        if (nowEl - atEl > ZONE_LATE_MS) {
-            Log.i(TAG, "ζώνη: παλιά τιμή $bpm πριν ${(nowEl - atEl) / 1000}″ (χωρίς δόνηση)")
-            return
-        }
         Log.i(TAG, "ζώνη: $b στους $bpm")
         vibrate(if (b == ZoneAlarm.Buzz.UP) longArrayOf(0, 110, 120, 110) else longArrayOf(0, 260), alarm = false)
     }

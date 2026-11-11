@@ -16,6 +16,8 @@ library;
 
 import 'dart:math' as math;
 
+import 'waist.dart' show isDayKey;
+
 /// Τι θέλει ο χρήστης πρώτα.
 enum GoalAim { lose, keep, gain }
 
@@ -276,6 +278,8 @@ class Goals {
     final h = d(j['h']);
     final since = j['since'];
     if (aim == null || rate == null || pal == null || kg == null || age == null || h == null || since is! String) return null;
+    // Μέρα σε μορφή «2026-11-16»· αλλιώς (π.χ. χαλασμένο αντίγραφο) ξανά ο οδηγός, όχι κόκκινη οθόνη (ανασκόπηση 11/11, S6).
+    if (!isDayKey(since)) return null;
     if (rate < 0 || rate > 0.01 || pal < 1.2 || pal > 2.5 || kg < 30 || kg > 300 || age < 18 || age > 110 || h < 100 || h > 250) {
       return null;
     }
