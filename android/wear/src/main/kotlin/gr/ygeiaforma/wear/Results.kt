@@ -35,6 +35,8 @@ object Results {
                     .put("km", JSONArray().also { a -> for (k in Repo.splits) a.put(JSONArray().put(k[0]).put(sec(k[1]))) })
                     .put("pz", JSONArray().also { a -> for (p in Repo.pauses) a.put(JSONArray().put(sec(p[0])).put(sec(p[1]))) })
                 hr.recovery()?.let { (e, m) -> cardio.put("hrr", JSONObject().put("e", e).put("m", m)) }
+                // Η ζώνη που ίσχυε στο περπάτημα (12/11). Νέο πεδίο: το παλιό κινητό το αγνοεί.
+                Repo.zoneAlarm.zone?.let { cardio.put("zone", it.toJson()) }
                 val w = Repo.plan?.todayWorkout?.takeIf { it.isCardio }
                 id to LiveSession(id, w?.id ?: "walk", w?.name ?: "Περπάτημα", Repo.startedAt, emptyList()).resultJson(end, hr, cardio)
             }

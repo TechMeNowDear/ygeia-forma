@@ -64,6 +64,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private val amberSoft = Color.parseColor("#F7D9A0")
     private val amberInk = Color.parseColor("#2A1A04")
     private val salmon = Color.parseColor("#F28B6C")
+    private val zoneGreen = Color.parseColor("#9BE1A8")
     private val soft = Color.parseColor("#C7CDD8")
 
     /**
@@ -627,9 +628,16 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         walkHeart(c, 117f, now)
         sayAdd("${if (Repo.paused) "Παύση" else "Περπάτημα"}, ${clock(sec)}, $dist")
         // Χωρίς όριο ή χωρίς GPS: να φαίνεται (W3-18), όχι σιωπηλά. Αν υπάρχει μήνυμα, γράφεται εδώ στη θέση τους.
-        val tags = listOfNotNull(if (!Repo.gps) "χωρίς GPS" else null, if (Repo.alarm.limit == null) "χωρίς όριο παλμών" else null)
+        // 12/11: με ζώνη περπατήματος (και χωρίς όριο γιατρού), πρώτα πού είσαι ως προς τη ζώνη.
+        val zone = if (Repo.alarm.limit == null) Repo.zoneAlarm.zone else null
+        val where = if (zone != null && Repo.hrLive(now) && !Repo.paused) zoneWord(Repo.bpm, zone) else null
+        val tags = listOfNotNull(
+            where?.first,
+            if (!Repo.gps) "χωρίς GPS" else null,
+            if (Repo.alarm.limit == null && zone == null) "χωρίς όριο παλμών" else null,
+        )
         if (tags.isNotEmpty() && Repo.notice == null) {
-            small(c, tags.joinToString(" · "), 135f, gray, ess(10f), 160f)
+            small(c, tags.joinToString(" · "), 135f, where?.second ?: gray, ess(10f), 160f)
             sayAdd(tags.joinToString(", "))
         }
         // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν). ~40 u ≈ 48 dp ύψος.
@@ -676,7 +684,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         text.color = gray
         c.drawText(tail, x, y * u, text)
         text.textAlign = old
-        if (!fresh || lim == null) return
+        if (!fresh) return
+        if (lim == null) {
+            Repo.zoneAlarm.zone?.let { zoneBar(c, y, it) }
+            return
+        }
         val w = 100f
         val x0 = cx - w * u / 2
         val yy = (y + 6) * u
@@ -690,6 +702,29 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val lp = ((lim - lo) / (hi - lo)).coerceIn(0f, 1f)
         fill.color = Color.WHITE
         c.drawRect(RectF(x0 + w * u * lp - 0.7f * u, yy - 2f * u, x0 + w * u * lp + 0.7f * u, yy + 5.5f * u), fill)
+    }
+
+    /** Πού είσαι ως προς τη ζώνη (σχέδια 12/11, 4γ/4δ): κείμενο και χρώμα. */
+    private fun zoneWord(bpm: Int, z: WalkZone): Pair<String, Int> = when {
+        bpm > z.hi -> "πάνω · κόψε λίγο" to amber
+        bpm < z.lo -> "κάτω από τη ζώνη" to gray
+        else -> "στη ζώνη ${z.lo}–${z.hi}" to zoneGreen
+    }
+
+    /** Γραμμή με τη ζώνη (πράσινο κομμάτι) και τους παλμούς τώρα (λευκή κουκκίδα), κάτω από τον αριθμό. */
+    private fun zoneBar(c: Canvas, y: Float, z: WalkZone) {
+        val w = 100f
+        val x0 = cx - w * u / 2
+        val yy = (y + 6) * u
+        val lo = z.lo - 25f
+        val hi = z.hi + 25f
+        fun px(v: Float) = x0 + w * u * ((v - lo) / (hi - lo)).coerceIn(0f, 1f)
+        fill.color = dim
+        c.drawRoundRect(RectF(x0, yy, x0 + w * u, yy + 3.5f * u), 2 * u, 2 * u, fill)
+        fill.color = zoneGreen
+        c.drawRoundRect(RectF(px(z.lo.toFloat()), yy, px(z.hi.toFloat()), yy + 3.5f * u), 2 * u, 2 * u, fill)
+        fill.color = if (Repo.bpm > z.hi) amber else Color.WHITE
+        c.drawCircle(px(Repo.bpm.toFloat()), yy + 1.75f * u, 3.2f * u, fill)
     }
 
     /** Σχέδια 9/11 (7γ): «Δεν έρχονται παλμοί» με όριο γιατρού, σε όλη την οθόνη, με «Εντάξει». */

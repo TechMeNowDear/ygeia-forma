@@ -190,6 +190,89 @@ class ProtocolTest {
     }
 
     @Test
+    fun planZone() {
+        // Παλιό κινητό: χωρίς «zone», καμία δόνηση ζώνης.
+        assertNull(Plan.parse(planJson)!!.zone)
+        val withZone = planJson.replace("\"at\":5,", "\"at\":5,\"zone\":{\"lo\":108,\"hi\":131,\"up\":true,\"down\":false},")
+        assertEquals(WalkZone(108, 131, up = true, down = false), Plan.parse(withZone)!!.zone)
+        // Άκυρη ζώνη: αγνοείται, το πρόγραμμα διαβάζεται κανονικά.
+        val bad = planJson.replace("\"at\":5,", "\"at\":5,\"zone\":{\"lo\":140,\"hi\":120},")
+        assertNull(Plan.parse(bad)!!.zone)
+        assertEquals(140, Plan.parse(bad)!!.hrLimit)
+        assertEquals(WalkZone(100, 120, up = false, down = true), WalkZone.parse(WalkZone(100, 120, up = false, down = true).toJson()))
+    }
+
+    @Test
+    fun zoneAlarmUp() {
+        val z = ZoneAlarm()
+        z.start(WalkZone(108, 131), 0)
+        // Τα πρώτα 5′ τίποτα, όσο ψηλά κι αν είναι.
+        for (t in 0..290 step 10) assertEquals(ZoneAlarm.Buzz.NONE, z.feed(150, t * 1000L))
+        // Μετά: 20″ συνεχώς πάνω από το 131.
+        val t0 = 400_000L
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(120, t0))
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(135, t0 + 1_000))
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(136, t0 + 15_000))
+        assertEquals(ZoneAlarm.Buzz.UP, z.feed(136, t0 + 21_000))
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(137, t0 + 60_000))
+        // Ακόμα πάνω μετά από 2′: ξανά.
+        assertEquals(ZoneAlarm.Buzz.UP, z.feed(137, t0 + 141_000))
+        // Κάτω από 131 − 3: ξαναοπλίζεται· νέο ανέβασμα θέλει πάλι 20″.
+        z.feed(127, t0 + 150_000)
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(134, t0 + 160_000))
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(134, t0 + 170_000))
+        assertEquals(ZoneAlarm.Buzz.UP, z.feed(134, t0 + 180_000))
+        assertEquals(3, z.ups)
+    }
+
+    @Test
+    fun zoneAlarmShortHillAndOrder() {
+        val z = ZoneAlarm()
+        z.start(WalkZone(108, 131), 0)
+        val t0 = 600_000L
+        // Ανηφόρα 15″: καμία δόνηση.
+        z.feed(140, t0)
+        z.feed(140, t0 + 15_000)
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(125, t0 + 16_000))
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(140, t0 + 30_000))
+        // Παλιότερη τιμή από άλλη πηγή: αγνοείται.
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(140, t0 + 10_000))
+        // Σταθεροί παλμοί χωρίς νέα τιμή (αισθητήρας που στέλνει αλλαγές): μετρούν.
+        assertEquals(ZoneAlarm.Buzz.UP, z.steady(140, t0 + 51_000))
+        // Παύση: οι 20″ ξαναρχίζουν.
+        val y = ZoneAlarm()
+        y.start(WalkZone(108, 131), 0)
+        y.feed(140, t0)
+        y.hold()
+        assertEquals(ZoneAlarm.Buzz.NONE, y.feed(140, t0 + 25_000))
+        assertEquals(ZoneAlarm.Buzz.UP, y.feed(140, t0 + 45_000))
+    }
+
+    @Test
+    fun zoneAlarmDownOnlyWhenOn() {
+        val off = ZoneAlarm()
+        off.start(WalkZone(108, 131), 0)
+        for (t in 0..20) assertEquals(ZoneAlarm.Buzz.NONE, off.feed(95, 400_000L + t * 10_000L))
+        val on = ZoneAlarm()
+        on.start(WalkZone(108, 131, up = true, down = true), 0)
+        val t0 = 400_000L
+        assertEquals(ZoneAlarm.Buzz.NONE, on.feed(100, t0))
+        assertEquals(ZoneAlarm.Buzz.NONE, on.feed(100, t0 + 50_000))
+        assertEquals(ZoneAlarm.Buzz.DOWN, on.feed(100, t0 + 61_000))
+        assertEquals(ZoneAlarm.Buzz.NONE, on.feed(100, t0 + 200_000))
+        assertEquals(ZoneAlarm.Buzz.DOWN, on.feed(100, t0 + 361_000))
+        // Χωρίς ζώνη: τίποτα.
+        val none = ZoneAlarm()
+        none.start(null, 0)
+        assertFalse(none.active)
+        assertEquals(ZoneAlarm.Buzz.NONE, none.feed(200, 900_000))
+        // Ζώνη με κλειστές και τις δύο δονήσεις: δεν χρειάζεται αισθητήρας.
+        val quiet = ZoneAlarm()
+        quiet.start(WalkZone(108, 131, up = false, down = false), 0)
+        assertFalse(quiet.active)
+    }
+
+    @Test
     fun alarmFromOneBatch() {
         // Πακέτο με 5 τιμές ανά 1″: ο χρόνος κάθε τιμής μετράει, όχι το πλήθος των πακέτων.
         val a = HrAlarm(140)

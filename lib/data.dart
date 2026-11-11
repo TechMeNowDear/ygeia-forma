@@ -2401,9 +2401,6 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   void setCard(String key, bool on) => _changePrefs((p) => p.cards[key] = on);
 
-  /// Οι ρυθμίσεις έχουν διαβαστεί (πριν από αυτό, ό,τι φαίνεται είναι προεπιλογές).
-  bool get prefsReady => _prefsLoaded;
-
   /// «Τα στοιχεία μου» (7/11).
   Profile get profile => Profile.fromJson(prefs.me);
   void setProfile(Profile v) => _changePrefs((p) => p.me = v.toJson());

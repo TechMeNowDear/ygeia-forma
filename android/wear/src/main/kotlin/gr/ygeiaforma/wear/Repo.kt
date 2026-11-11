@@ -73,6 +73,17 @@ object Repo {
     /** Κενά στην παράδοση παλμών (ό,τι φτάνει στην εφαρμογή, όχι ό,τι μετρά το ρολόι). */
     var hrGaps = GapMeter()
     val alarm = HrAlarm(null)
+
+    /** Ζώνη περπατήματος (12/11), από το πρόγραμμα του κινητού· μόνο στο περπάτημα. */
+    val zoneAlarm = ZoneAlarm()
+
+    fun zoneNow(): WalkZone? = plan?.zone
+
+    /**
+     * Χρειάζονται παλμοί χωρίς καθυστέρηση (εφεδρεία αισθητήρα όταν το ρολόι δεν στέλνει ανά 5″): όριο γιατρού, ή
+     * δόνηση ζώνης σε περπάτημα. Αλλιώς τίποτα παραπάνω (μπαταρία).
+     */
+    fun fastHr(): Boolean = alarm.limit != null || (running == "walk" && zoneAlarm.active)
     /** Μέχρι πότε έχει σιγήσει η κόκκινη οθόνη (ο χρήστης την πάτησε). */
     var alarmMutedUntil = 0L
 
@@ -189,6 +200,8 @@ object Repo {
         plan = p
         // Νέο όριο στη μέση της άσκησης: η κόκκινη οθόνη κρίνεται ξανά με αυτό (HrAlarm.limit, W2-16).
         alarm.limit = p.hrLimit
+        // Νέα ζώνη στη μέση του περπατήματος: ισχύει από τώρα (η προθέρμανση δεν ξαναρχίζει).
+        if (running == "walk") zoneAlarm.zone = p.zone
         syncedAt = System.currentTimeMillis()
     }
 
@@ -296,6 +309,7 @@ object Repo {
         diag = ""
         restored = false
         alarmMutedEpisode = -1
+        zoneAlarm.stop()
     }
 
     // ------------------------------------------------------------------ αντίγραφα ασφαλείας

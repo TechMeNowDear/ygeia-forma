@@ -280,7 +280,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
             key: const ValueKey('zone-sheet-high'),
             contentPadding: EdgeInsets.zero,
             title: const Text('Πάνω από τη ζώνη'),
-            subtitle: Text('Δύο σύντομες δονήσεις όταν μείνεις πάνω ${zoneHoldSec}″. Ξανά μετά από 2′, αν δεν κατέβεις. '
+            subtitle: const Text('Δύο σύντομες δονήσεις όταν μείνεις πάνω ${zoneHoldSec}″. Ξανά μετά από 2′, αν δεν κατέβεις. '
                 'Όχι τα πρώτα 5 λεπτά.'),
             value: _s.alertHigh,
             onChanged: (v) => setState(() => _s = _s.copyWith(alertHigh: v)),

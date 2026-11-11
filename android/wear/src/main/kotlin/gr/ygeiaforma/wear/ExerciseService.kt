@@ -89,6 +89,8 @@ class ExerciseService : Service() {
         private const val FINISH_LOCK_MS = 20_000L
         /** Πόσο περιμένει την τελευταία ενημέρωση («ENDED») του Health Services μετά το «Τέλος» (W2-09). */
         private const val ENDED_WAIT_MS = 5_000L
+        /** Δόνηση ζώνης μόνο για τιμή το πολύ τόσο παλιά (12/11): αλλιώς οι παλμοί έχουν ήδη αλλάξει. */
+        private const val ZONE_LATE_MS = 30_000L
 
         fun start(ctx: Context, kind: String, phone: Boolean) {
             val i = Intent(ctx, ExerciseService::class.java).setAction(ACTION_START)
@@ -225,6 +227,8 @@ class ExerciseService : Service() {
         silence.reset()
 
         val walk = kind == "walk"
+        // Ζώνη περπατήματος (12/11): μόνο στο περπάτημα, από το πρόγραμμα του κινητού.
+        Repo.zoneAlarm.start(if (walk) Repo.zoneNow() else null, Repo.startedEl)
         // GPS μόνο με άδεια ΚΑΙ με την τοποθεσία του ρολογιού ανοιχτή (αλλιώς το Health Services αρνείται την άσκηση).
         val location = walk && has(this, Manifest.permission.ACCESS_FINE_LOCATION) && locationOn()
         Repo.gps = location
@@ -323,6 +327,7 @@ class ExerciseService : Service() {
         }
         silence.reset()
         val walk = Repo.running == "walk"
+        Repo.zoneAlarm.start(if (walk) Repo.zoneNow() else null, Repo.startedEl)
         val location = walk && Repo.gps && has(this, Manifest.permission.ACCESS_FINE_LOCATION) && locationOn()
         var type = 0
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
@@ -369,7 +374,7 @@ class ExerciseService : Service() {
             exerciseStarted = true
             // Εφεδρεία αισθητήρα όπως πριν (μόνο αν τη χρησιμοποιούσε και υπάρχει όριο).
             hrInExercise = has(this, heartPermission)
-            if (Repo.hrMode == "sensor" && Repo.alarm.limit != null && hrInExercise) startSensor()
+            if (Repo.hrMode == "sensor" && Repo.fastHr() && hrInExercise) startSensor()
             // Συνέχεια σε ρολόι που στέλνει αργά: το μήνυμα ασφάλειας ξανά, πρώτο (S1).
             if (Repo.hrMode == "default" && Repo.alarm.limit != null && hrInExercise) {
                 Repo.notice = withSafety(SLOW_ALARM_NOTICE, Repo.notice)
@@ -519,7 +524,8 @@ class ExerciseService : Service() {
             Log.i(TAG, "hrMode=${Repo.hrMode} ${Repo.diag} types=${used.map { it.name }}")
             // Χωρίς παράδοση ανά 5″: με σβηστή οθόνη οι παλμοί μπορεί να έρθουν σε πακέτα με καθυστέρηση λεπτών.
             // Για την ειδοποίηση ορίου, τότε και μόνο, ο αισθητήρας απευθείας (μόνο όσο τρέχει η άσκηση).
-            if (Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null) startSensor()
+            // 12/11: και για τη δόνηση ζώνης στο περπάτημα (Repo.fastHr).
+            if (Repo.hrMode == "default" && hrOk && Repo.fastHr()) startSensor()
             // Ούτε ανά 5″ ούτε αισθητήρας αφύπνισης: το λέμε, όχι σιωπηλά (έλεγχος γ2, W3-10).
             // Πρώτο, πριν από κάθε άλλο μήνυμα (π.χ. «Χωρίς GPS…»), ώστε να μην κρύβεται (S1).
             val slow = Repo.hrMode == "default" && hrOk && Repo.alarm.limit != null
@@ -614,6 +620,7 @@ class ExerciseService : Service() {
                     buzz = bpm
                     buzzEl = atEl
                 }
+                zoneCheck(bpm, atEl, nowEl)
             }
             // Σταθεροί παλμοί χωρίς νέα τιμή (όχι στο «5s», που στέλνει κάθε 5″): κρίνονται και σε κάθε ενημέρωση, όχι μόνο
             // στον βρόχο του δευτερολέπτου, που σταματά με σβηστή οθόνη (W2-02, W3-10).
@@ -694,6 +701,7 @@ class ExerciseService : Service() {
         }
         if (atEl > Repo.bpmEl) Repo.bpmEl = atEl
         if (Repo.alarm.feed(bpm, atEl)) onAlarm(bpm, SystemClock.elapsedRealtime() - atEl)
+        zoneCheck(bpm, atEl, SystemClock.elapsedRealtime())
         sendHrToPhone(System.currentTimeMillis())
         Repo.changed()
     }
@@ -786,8 +794,10 @@ class ExerciseService : Service() {
             // Εφεδρεία αισθητήρα (ή ρολόι που στέλνει μόνο αλλαγές): σταθεροί παλμοί πάνω από το όριο μετρούν κι αυτοί (W2-02).
             if ((sensor != null || Repo.hrMode == "default") && fresh && Repo.alarm.steady(Repo.bpm, nowEl)) onAlarm(Repo.bpm, 0)
             // Το όριο ήρθε ή έφυγε στη μέση της άσκησης: η εφεδρεία αισθητήρα ξεκινά ή σταματά μαζί του (W2-04).
-            if (exerciseStarted && hrInExercise && Repo.alarm.limit != null && Repo.hrMode == "default" && sensor == null && has(this, heartPermission)) startSensor()
-            if (sensor != null && Repo.alarm.limit == null) stopSensor()
+            if (exerciseStarted && hrInExercise && Repo.fastHr() && Repo.hrMode == "default" && sensor == null && has(this, heartPermission)) startSensor()
+            if (sensor != null && !Repo.fastHr()) stopSensor()
+            // Ζώνη: σταθεροί παλμοί χωρίς νέα τιμή μετρούν κι αυτοί (όπως το όριο, W2-02).
+            if (fresh) zoneCheck(Repo.bpm, nowEl, nowEl, steady = true)
             // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2):
             // στο περπάτημα μετά από 15″, στα βάρη μετά από 45″ (ο καρπός που λυγίζει κόβει συχνά για λίγο). Τρεις
             // σύντομες, για να μη μοιάζει με το τέλος του διαλείμματος (δύο μεγαλύτερες).
@@ -818,6 +828,31 @@ class ExerciseService : Service() {
             Repo.changed()
             delay(1000)
         }
+    }
+
+    // ------------------------------------------------------------------ ζώνη περπατήματος (12/11)
+    /**
+     * Δόνηση ζώνης: καθοδήγηση, όχι ασφάλεια. Απαλή (όχι «ξυπνητήρι»), ποτέ όταν μιλά το όριο του γιατρού, σε παύση ή στο
+     * λεπτό αποκατάστασης, και ποτέ για τιμή που ήρθε με καθυστέρηση (πακέτο παλμών): τότε ήδη άλλαξαν.
+     * Πάνω: δύο σύντομες. Κάτω: μία μακρύτερη.
+     */
+    private fun zoneCheck(bpm: Int, atEl: Long, nowEl: Long, steady: Boolean = false) {
+        val za = Repo.zoneAlarm
+        if (za.zone == null) return
+        if (Repo.running != "walk" || Repo.paused || Repo.recoveryUntil > 0 || stopping) {
+            za.hold()
+            return
+        }
+        val lim = Repo.alarm.limit
+        if (Repo.alarm.on || (lim != null && bpm >= lim)) return
+        val b = if (steady) za.steady(bpm, atEl) else za.feed(bpm, atEl)
+        if (b == ZoneAlarm.Buzz.NONE) return
+        if (nowEl - atEl > ZONE_LATE_MS) {
+            Log.i(TAG, "ζώνη: παλιά τιμή $bpm πριν ${(nowEl - atEl) / 1000}″ (χωρίς δόνηση)")
+            return
+        }
+        Log.i(TAG, "ζώνη: $b στους $bpm")
+        vibrate(if (b == ZoneAlarm.Buzz.UP) longArrayOf(0, 110, 120, 110) else longArrayOf(0, 260), alarm = false)
     }
 
     // ------------------------------------------------------------------ όριο παλμών
@@ -885,7 +920,8 @@ class ExerciseService : Service() {
      * Δόνηση ως «ξυπνητήρι» (USAGE_ALARM): αλλιώς η Εξοικονόμηση μπαταρίας και η Σίγαση την κόβουν, και οι σύντομες
      * μπορεί να θεωρηθούν δόνηση αφής (έλεγχος #2, W2-01). Μόνο όσο τρέχει άσκηση.
      */
-    private fun vibrate(pattern: LongArray) {
+    /** [alarm]: δόνηση «ξυπνητήρι» (όριο γιατρού, χαμένοι παλμοί)· αλλιώς ειδοποίησης (ζώνη, 12/11), πιο διακριτική. */
+    private fun vibrate(pattern: LongArray, alarm: Boolean = true) {
         val v: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
             getSystemService(VibratorManager::class.java)?.defaultVibrator
         } else {
@@ -895,10 +931,10 @@ class ExerciseService : Service() {
         val effect = VibrationEffect.createWaveform(pattern, -1)
         try {
             if (Build.VERSION.SDK_INT >= 33) {
-                v?.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM))
+                v?.vibrate(effect, VibrationAttributes.createForUsage(if (alarm) VibrationAttributes.USAGE_ALARM else VibrationAttributes.USAGE_NOTIFICATION))
             } else {
                 @Suppress("DEPRECATION")
-                v?.vibrate(effect, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build())
+                v?.vibrate(effect, AudioAttributes.Builder().setUsage(if (alarm) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_NOTIFICATION).build())
             }
         } catch (_: Exception) {
         }

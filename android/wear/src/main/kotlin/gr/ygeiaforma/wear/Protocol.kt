@@ -109,6 +109,8 @@ class Plan(
     val at: Long,
     /** Μέρα εβδομάδας (1 = Δευτέρα … 7 = Κυριακή) → id προπόνησης. */
     val days: Map<Int, String> = emptyMap(),
+    /** Ζώνη περπατήματος (κινητό από 12/11)· παλιό κινητό: null, καμία δόνηση ζώνης. */
+    val zone: WalkZone? = null,
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
 
@@ -130,9 +132,26 @@ class Plan(
                 days = j.optJSONObject("days")?.let { d ->
                     d.keys().asSequence().mapNotNull { k -> k.toIntOrNull()?.let { it to d.getString(k) } }.toMap()
                 } ?: emptyMap(),
+                zone = WalkZone.parse(j.optJSONObject("zone")),
             )
         } catch (_: Exception) {
             null
+        }
+    }
+}
+
+/** Η ζώνη περπατήματος όπως τη στέλνει το κινητό: κάτω/πάνω όριο και ποιες δονήσεις είναι ανοιχτές. */
+data class WalkZone(val lo: Int, val hi: Int, val up: Boolean = true, val down: Boolean = false) {
+    fun toJson(): JSONObject = JSONObject().put("lo", lo).put("hi", hi).put("up", up).put("down", down)
+
+    companion object {
+        /** null για ό,τι δεν μοιάζει σωστό (τότε καμία δόνηση, όχι λάθος δόνηση). */
+        fun parse(j: JSONObject?): WalkZone? {
+            if (j == null || !j.has("lo") || !j.has("hi")) return null
+            val lo = j.optInt("lo", -1)
+            val hi = j.optInt("hi", -1)
+            if (lo < 50 || hi > 220 || lo >= hi) return null
+            return WalkZone(lo, hi, j.optBoolean("up", true), j.optBoolean("down", false))
         }
     }
 }
@@ -983,5 +1002,138 @@ object WipeRule {
         if (text == null) 0L else org.json.JSONObject(text).optLong("at", 0L)
     } catch (_: Exception) {
         0L
+    }
+}
+
+/**
+ * Δόνηση ζώνης περπατήματος (σχέδια 12/11). Καθοδήγηση, όχι ασφάλεια: απαλή δόνηση, όχι ξυπνητήρι, και ποτέ όταν μιλά το
+ * όριο του γιατρού ([HrAlarm], το ελέγχει η υπηρεσία).
+ * - Πάνω: όταν οι παλμοί μείνουν πάνω από τη ζώνη [holdMs] (20″, όχι μια ανηφόρα). Ξανά κάθε [repeatMs] (2′) όσο μένουν
+ *   πάνω· ξαναοπλίζεται όταν πέσουν [REARM] παλμούς κάτω από το πάνω όριο.
+ * - Κάτω (αν είναι ανοιχτή): όταν μείνουν κάτω από τη ζώνη [lowHoldMs] (1′), ξανά κάθε [lowRepeatMs] (5′).
+ * - Τίποτα τα πρώτα [warmupMs] (5′): οι παλμοί ακόμα ανεβαίνουν.
+ * Χρόνοι σε ms από την εκκίνηση (elapsedRealtime), όπως στο [HrAlarm]. Κάθε τιμή ισχύει ως την επόμενη.
+ */
+class ZoneAlarm(
+    private val warmupMs: Long = 5 * 60_000L,
+    private val holdMs: Long = 20_000L,
+    private val repeatMs: Long = 120_000L,
+    private val lowHoldMs: Long = 60_000L,
+    private val lowRepeatMs: Long = 300_000L,
+) {
+    enum class Buzz { NONE, UP, DOWN }
+
+    /** Αλλαγή ζώνης στη μέση (νέο πρόγραμμα από το κινητό): η κρίση ξεκινά από την αρχή, όχι η προθέρμανση. */
+    var zone: WalkZone? = null
+        set(v) {
+            if (v == field) return
+            field = v
+            clear()
+        }
+
+    /** Ανοιχτή τουλάχιστον μία δόνηση. */
+    val active: Boolean get() = zone?.let { it.up || it.down } == true
+
+    /** Πόσες δονήσεις έγιναν (για τον έλεγχο στη συσκευή). */
+    var ups = 0
+        private set
+    var downs = 0
+        private set
+
+    private var startEl = 0L
+    private var lastAt = Long.MIN_VALUE
+    private var aboveSince = -1L
+    private var belowSince = -1L
+    private var upOn = false
+    private var downOn = false
+    private var lastUp = 0L
+    private var lastDown = 0L
+
+    fun start(z: WalkZone?, startEl: Long) {
+        zone = z
+        this.startEl = startEl
+        clear()
+        ups = 0
+        downs = 0
+    }
+
+    fun stop() {
+        zone = null
+        clear()
+    }
+
+    /** Παύση ή λεπτό αποκατάστασης: οι 20″/1′ μετρούν ξανά από την αρχή μετά. */
+    fun hold() {
+        aboveSince = -1
+        belowSince = -1
+    }
+
+    /** Νέα τιμή [bpm] τη στιγμή [at]. Παλιότερες από την τελευταία αγνοούνται (δύο πηγές: Health Services, αισθητήρας). */
+    fun feed(bpm: Int, at: Long): Buzz {
+        if (at < lastAt) return Buzz.NONE
+        lastAt = at
+        return step(bpm, at)
+    }
+
+    /** Καμία νέα τιμή, αλλά η τελευταία ισχύει ακόμα [now] (ο αισθητήρας στέλνει μόνο αλλαγές). */
+    fun steady(bpm: Int, now: Long): Buzz = if (lastAt == Long.MIN_VALUE || now < lastAt) Buzz.NONE else step(bpm, now)
+
+    private fun step(bpm: Int, at: Long): Buzz {
+        val z = zone ?: return Buzz.NONE
+        if (bpm <= 0) return Buzz.NONE
+        if (bpm > z.hi) {
+            if (aboveSince < 0) aboveSince = at
+        } else {
+            aboveSince = -1
+            if (bpm <= z.hi - REARM) upOn = false
+        }
+        if (bpm < z.lo) {
+            if (belowSince < 0) belowSince = at
+        } else {
+            belowSince = -1
+            if (bpm >= z.lo + REARM) downOn = false
+        }
+        if (at - startEl < warmupMs) return Buzz.NONE
+        if (z.up && aboveSince >= 0) {
+            if (!upOn && at - aboveSince >= holdMs) {
+                upOn = true
+                lastUp = at
+                ups++
+                return Buzz.UP
+            }
+            if (upOn && at - lastUp >= repeatMs) {
+                lastUp = at
+                ups++
+                return Buzz.UP
+            }
+        }
+        if (z.down && belowSince >= 0) {
+            if (!downOn && at - belowSince >= lowHoldMs) {
+                downOn = true
+                lastDown = at
+                downs++
+                return Buzz.DOWN
+            }
+            if (downOn && at - lastDown >= lowRepeatMs) {
+                lastDown = at
+                downs++
+                return Buzz.DOWN
+            }
+        }
+        return Buzz.NONE
+    }
+
+    private fun clear() {
+        lastAt = Long.MIN_VALUE
+        aboveSince = -1
+        belowSince = -1
+        upOn = false
+        downOn = false
+        lastUp = 0
+        lastDown = 0
+    }
+
+    companion object {
+        const val REARM = 3
     }
 }

@@ -274,6 +274,20 @@ class WatchShotsTest {
         Repo.screen = Repo.Screen.WALK
         Repo.alarm.limit = null
         shot("W7e_walk_no_limit")
+        // 12/11 (σχέδια 4γ/4δ): ζώνη περπατήματος, χωρίς όριο γιατρού: στη ζώνη, πάνω, κάτω.
+        Repo.zoneAlarm.start(WalkZone(108, 131), Repo.startedEl)
+        Repo.bpm = 118
+        shot("W7m_walk_zone_in")
+        Repo.bpm = 136
+        shot("W7n_walk_zone_above")
+        Repo.bpm = 98
+        shot("W7o_walk_zone_below")
+        RuntimeEnvironment.setFontScale(1.3f)
+        Repo.bpm = 136
+        shot("W7p_walk_zone_above_font13")
+        RuntimeEnvironment.setFontScale(1f)
+        Repo.bpm = 104
+        Repo.zoneAlarm.stop()
         // 9/11 (W3-08): ambient, αχνή οθόνη: λεπτά, χωρίς κουμπιά και χρώματα.
         Repo.alarm.limit = 140
         shot("W10_walk_ambient", ambient = true)
