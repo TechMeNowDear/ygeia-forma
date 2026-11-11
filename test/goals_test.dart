@@ -355,7 +355,8 @@ void main() {
       expect(find.byKey(const ValueKey('chol-range')), findsOneWidget);
       await t.tap(find.text('4 εβδομάδες'));
       await t.pumpAndSettle();
-      expect(t.takeException(), isNull);
+      final e = t.takeException();
+      expect(e, isNull, reason: e is FlutterError ? e.toStringDeep() : '$e');
     });
 
     testWidgets('Διατροφή χωρίς στόχους: πρόσκληση στον οδηγό, χωρίς κάρτα χοληστερίνης', (t) async {
@@ -369,7 +370,8 @@ void main() {
       final store = HealthStore()..setProfile(_me)..setGoals(_goals());
       await _pump(t, _shell(store),
           size: const Size(360, 5000), textScale: 2.0);
-      expect(t.takeException(), isNull);
+      final e = t.takeException();
+      expect(e, isNull, reason: e is FlutterError ? e.toStringDeep() : '$e');
     });
 
     testWidgets('φύλλο «Μέση»: τρίτη μέτρηση όταν διαφέρουν πάνω από 1 cm', (t) async {

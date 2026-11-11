@@ -52,17 +52,22 @@ class GoalsSummaryCard extends StatelessWidget {
               BigValue(left.value, unit: 'kcal', size: 44, color: left.over ? c.warn : null),
             ]),
           ),
-          InkWell(
+          // Με μεγάλα γράμματα: το «έφαγες / στόχος» σπάει σε γραμμές, δεν βγαίνει έξω από την κάρτα.
+          Flexible(
+            child: InkWell(
             key: const ValueKey('nutrition-goals-open'),
             borderRadius: BorderRadius.circular(12),
             onTap: () => openGoals(context, health),
             child: Padding(
               padding: const EdgeInsets.all(6),
               child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('έφαγες ${thousands(t.shownKcal)}', style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
-                Text('στόχος ${thousands(g.kcal)}', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.food, fontFeatures: tabular)),
+                Text('έφαγες ${thousands(t.shownKcal)}', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
+                Text('στόχος ${thousands(g.kcal)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.food, fontFeatures: tabular)),
               ]),
             ),
+          ),
           ),
         ]),
         const SizedBox(height: 10),
@@ -140,8 +145,8 @@ class GoalBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Expanded(child: Text(label, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text))),
+          Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, children: [
+            Text(label, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text)),
             Text.rich(
               TextSpan(children: [
                 TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: warn ? c.warn : c.text)),
@@ -273,12 +278,15 @@ class CholRow extends StatelessWidget {
             ]),
           ),
           if (done) Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.check_circle_rounded, size: 20, color: c.good)),
-          Text.rich(
-            TextSpan(children: [
-              TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
-              if (target.isNotEmpty) TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
-            ]),
-            style: const TextStyle(fontSize: 14.5, fontFeatures: tabular),
+          Flexible(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
+                if (target.isNotEmpty) TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
+              ]),
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 14.5, fontFeatures: tabular),
+            ),
           ),
         ]),
       ),
