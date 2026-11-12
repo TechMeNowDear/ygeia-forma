@@ -30,6 +30,14 @@ abstract final class Nk {
   static const erythritol = 'erythritol';
 }
 
+/// Η μεγαλύτερη ποσότητα μιας καταχώρισης (g ή ml). Το ίδιο όριο ισχύει για τη «μία μερίδα» ενός προϊόντος: μερίδα που
+/// δεν γίνεται να γραφτεί δεν προτείνεται (τελικός έλεγχος, Συμβούλιο 3).
+const maxEntryGrams = 5000.0;
+
+/// Η «μία μερίδα» όπως διαβάστηκε (αρχείο, αντίγραφο, Open Food Facts, φόρμα): μόνο αριθμός πάνω από 0 και ως
+/// [maxEntryGrams]. Οτιδήποτε άλλο (0, αρνητικό, τεράστιο, όχι αριθμός) = «χωρίς μερίδα».
+double? validServing(Object? v) => v is num && v.isFinite && v > 0 && v <= maxEntryGrams ? v.toDouble() : null;
+
 /// Τιμή θρεπτικού όπως έρχεται από την πηγή.
 class NValue {
   const NValue(this.value, {this.lessThan = false, this.traces = false});
@@ -139,7 +147,9 @@ class Food {
         brand: j['brand'] as String?,
         barcode: j['barcode'] as String?,
         energyCalc: j['energyCalc'] == true,
-        servingGrams: (j['servingGrams'] as num?)?.toDouble(),
+        // Τελικός έλεγχος (Συμβούλιο 3): μερίδα 0, αρνητική ή τεράστια (παλιά καταχώριση, πειραγμένο αντίγραφο) δεν
+        // προτείνεται ως ποσότητα· το προϊόν και οι τιμές του μένουν όπως είναι.
+        servingGrams: validServing(j['servingGrams']),
         servingLabel: j['servingLabel'] as String?,
         rawId: j['rawId'] as String?,
         cookedLabel: j['cookedLabel'] as String?,

@@ -47,6 +47,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   bool get loaded => _offline || (_logRead && _mineRead);
   bool _logRead = false;
 
+  /// Γραμμές της βάσης (καταχωρίσεις ή δικά μου προϊόντα) που δεν διαβάστηκαν και παραλείφθηκαν. Μία χαλασμένη γραμμή
+  /// δεν «κολλάει» τη Διατροφή, αλλά δεν χάνεται και σιωπηλά: μετριέται εδώ και φαίνεται στην «Αναφορά για έλεγχο»
+  /// (τελικός έλεγχος, Συμβούλιο 3). Οι γραμμές μένουν στη βάση και μπαίνουν όπως είναι στο αντίγραφο ασφαλείας.
+  int skippedRows = 0;
+
   /// Ξαναδιαβάζει ό,τι απέτυχε στο άνοιγμα.
   Future<void> retry() async {
     if (_offline) return;
@@ -122,10 +127,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       // Μία χαλασμένη εγγραφή δεν πρέπει να «κολλάει» όλη τη Διατροφή.
       final out = <Food>[];
       for (final f in r['foods'] as List) {
-        if (f is! Map) continue;
         try {
-          out.add(Food.fromJson(Map<String, dynamic>.from(f)));
-        } catch (_) {}
+          out.add(Food.fromJson(Map<String, dynamic>.from(f as Map)));
+        } catch (_) {
+          skippedRows++;
+        }
       }
       _mine = out;
       _mineRead = true;
@@ -144,11 +150,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     if (r['ok'] == true && r['entries'] is List) {
       _logRead = true;
       for (final e in r['entries'] as List) {
-        if (e is! Map) continue;
         try {
-          final le = LogEntry.fromJson(Map<String, dynamic>.from(e));
+          final le = LogEntry.fromJson(Map<String, dynamic>.from(e as Map));
           _entries[le.id] = le;
-        } catch (_) {}
+        } catch (_) {
+          skippedRows++;
+        }
       }
     }
   }
@@ -308,6 +315,8 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// EAN-13 (έλεγχος 9/11, Χ5· πριν, το ίδιο προϊόν μπορούσε να περαστεί δύο φορές).
   Food? byBarcode(String code) {
     final c = normalizeBarcode(code);
+    // Κωδικός χωρίς ψηφία δεν «βρίσκει» προϊόν που αποθηκεύτηκε κάποτε με κενό barcode (τελικός έλεγχος, Συμβούλιο 3).
+    if (c.isEmpty) return null;
     for (final f in _mine) {
       if (f.barcode != null && normalizeBarcode(f.barcode!) == c) return f;
     }

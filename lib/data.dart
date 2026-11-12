@@ -1091,6 +1091,21 @@ class Prefs {
       });
 }
 
+/// Οι ρυθμίσεις μετά από επαναφορά αντιγράφου ([HealthStore.restorePrefs]): του κινητού ([mine]) με όσα φέρνει το
+/// αντίγραφο ([backup], ήδη μόνο τα κλειδιά του backupPrefKeys). Κουζίνα, κάρτες και εμφάνιση: του αντιγράφου. Μέση: του
+/// κινητού, συν τις μέρες που λείπουν. Στόχοι και ζώνη: του κινητού αν υπάρχουν, αλλιώς του αντιγράφου. «Τα στοιχεία
+/// μου»: του κινητού, και όποιο πεδίο λείπει (π.χ. έτος γέννησης) από το αντίγραφο.
+Map<String, dynamic> mergePrefsForRestore(Map<String, dynamic> mine, Map<String, dynamic> backup) => {
+      ...mine,
+      ...backup,
+      'layout': todayLayout,
+      // Μέση: οι μετρήσεις του κινητού μένουν, από το αντίγραφο μπαίνουν όσες λείπουν (12/11).
+      if (backup['waist'] != null || mine['waist'] != null) 'waist': mergeWaist(mine['waist'], backup['waist']),
+      if (mine['goals'] != null) 'goals': mine['goals'],
+      if (mine['zone'] != null) 'zone': mine['zone'],
+      if (mine['me'] is Map) 'me': {if (backup['me'] is Map) ...(backup['me'] as Map), ...(mine['me'] as Map)},
+    };
+
 /// Έλεγχος 2, C12: έκδοση των κανόνων για τις τιμές του Oura στο ιστορικό. 1: ποσοστά φάσεων επί του πραγματικού
 /// ύπνου (η #66 τα έγραφε επί του χρόνου με τα ξυπνήματα) και ο κοινός κανόνας νύχτας με το ρολόι (συγχώνευση 4/11:
 /// κομμάτια ως 4 ώρες μαζί, υπνάκοι μόνο λαγοκοίμισμα ως τις 22:00 / πρωί / απόγευμα). Όταν αλλάζει, το Oura
@@ -2347,16 +2362,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   }
 
   /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
+  ///
+  /// Τελικός έλεγχος (Συμβούλιο 3, Α1): οι στόχοι διατροφής, η ζώνη περπατήματος και «Τα στοιχεία μου» του κινητού ΔΕΝ
+  /// αντικαθίστανται· από το αντίγραφο μπαίνουν μόνο αν λείπουν (στα «στοιχεία μου»: όποιο πεδίο λείπει). Πριν, ένα παλιό
+  /// αντίγραφο γύριζε σιωπηλά πίσω τον στόχο θερμίδων, το ιστορικό των ελέγχων του και τα όρια του γιατρού, ενώ το
+  /// παράθυρο της επαναφοράς λέει ότι αντικαθίστανται μόνο «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση, και ο
+  /// κανόνας της επαναφοράς είναι «δεν αλλάζει ό,τι υπάρχει ήδη» (backup.dart).
   Future<bool> restorePrefs(Map<String, dynamic> p) async {
     if (!_prefsLoaded) return false;
     final mine = prefsJson();
-    final merged = {
-      ...mine,
-      ...p,
-      'layout': todayLayout,
-      // Μέση: οι μετρήσεις του κινητού μένουν, από το αντίγραφο μπαίνουν όσες λείπουν (12/11).
-      if (p['waist'] != null || mine['waist'] != null) 'waist': mergeWaist(mine['waist'], p['waist']),
-    };
+    final merged = mergePrefsForRestore(mine, p);
     final restored = Prefs.fromJson(merged)
       ..backfillFrom = prefs.backfillFrom
       ..historyVersion = prefs.historyVersion

@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'food/food_model.dart';
 import 'format.dart';
 import 'plan_file.dart';
+import 'waist.dart' show isDayKey;
 
 const backupApp = 'ygeia-forma';
 const backupVersion = 1;
@@ -70,6 +71,14 @@ class BackupError implements Exception {
   String toString() => message;
 }
 
+/// Η μεγαλύτερη ποσότητα καταχώρισης που δέχεται η επαναφορά (g): 100 κιλά. Η οθόνη δέχεται ως 5.000 g· εδώ το όριο
+/// είναι πολύ πιο πάνω, ώστε να μη χαθεί ποτέ κάτι που έγραψε η ίδια η εφαρμογή, αλλά να μην περνά ένας αριθμός που
+/// δεν γίνεται να είναι φαγητό (χαλασμένο ή πειραγμένο αρχείο).
+const backupMaxGrams = 100000.0;
+
+/// Τιμές θρεπτικών που η εφαρμογή δεν γράφει ποτέ: αρνητικές ή μη πεπερασμένες (1e999 στο JSON γίνεται «άπειρο»).
+bool _badNutrients(Food f) => f.n.values.values.any((v) => !v.value.isFinite || v.value < 0);
+
 BackupContents parseBackup(String text) {
   Object? j;
   try {
@@ -81,25 +90,37 @@ BackupContents parseBackup(String text) {
     throw BackupError('Το αρχείο δεν είναι αντίγραφο της εφαρμογής.');
   }
   final v = j['version'];
-  if (v is! num || v.toInt() > backupVersion) {
+  // Τελικός έλεγχος (Συμβούλιο 3): έκδοση που δεν είναι αριθμός ή είναι «άπειρη» (1e999) = όχι δικό μας αρχείο. Πριν, το
+  // toInt() πετούσε άλλο σφάλμα, που η οθόνη δεν έπιανε: η επαναφορά σταματούσε χωρίς κανένα μήνυμα.
+  if (v is! num || !v.isFinite) {
+    throw BackupError('Το αρχείο δεν είναι αντίγραφο της εφαρμογής.');
+  }
+  if (v.toInt() > backupVersion) {
     throw BackupError('Το αντίγραφο είναι από νεότερη έκδοση της εφαρμογής. Ενημέρωσε πρώτα την εφαρμογή.');
   }
+  // Τελικός έλεγχος (Συμβούλιο 3): παραλείπεται (και μετριέται στο «χαλασμένες εγγραφές») ό,τι η εφαρμογή δεν γράφει ποτέ:
+  // μέρα που δεν είναι υπαρκτή ημερομηνία (η καταχώριση δεν θα φαινόταν σε καμία μέρα), ποσότητα μη πεπερασμένη ή πάνω
+  // από [backupMaxGrams], αρνητικές ή άπειρες τιμές θρεπτικών, και δεύτερη εγγραφή με το ίδιο id μέσα στο ίδιο αρχείο.
   var skipped = 0;
   final entries = <LogEntry>[];
+  final entryIds = <String>{};
   for (final e in (j['foodLog'] is List ? j['foodLog'] as List : const [])) {
     try {
       final le = LogEntry.fromJson(Map<String, dynamic>.from(e as Map));
-      if (le.id.isEmpty || le.day.isEmpty || !(le.grams > 0)) throw const FormatException();
+      if (le.id.isEmpty || !isDayKey(le.day) || !(le.grams > 0) || !(le.grams <= backupMaxGrams)) throw const FormatException();
+      if (_badNutrients(le.food) || !entryIds.add(le.id)) throw const FormatException();
       entries.add(le);
     } catch (_) {
       skipped++;
     }
   }
   final foods = <Food>[];
+  final foodIds = <String>{};
   for (final f in (j['myFoods'] is List ? j['myFoods'] as List : const [])) {
     try {
       final food = Food.fromJson(Map<String, dynamic>.from(f as Map));
-      if (food.id.isEmpty) throw const FormatException();
+      if (food.id.isEmpty || food.name.trim().isEmpty) throw const FormatException();
+      if (_badNutrients(food) || !foodIds.add(food.id)) throw const FormatException();
       foods.add(food);
     } catch (_) {
       skipped++;

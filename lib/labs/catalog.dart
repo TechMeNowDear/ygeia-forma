@@ -74,11 +74,11 @@ const labCatalog = <LabTest>[
   LabTest(id: 'ldl', name: 'LDL χοληστερίνη', cat: LabCat.lipids, unit: 'mg/dL', units: _chol, aliases: [
     'LDL', 'LDL-C', 'LDL χοληστερόλη', 'Χοληστερίνη LDL', 'Χοληστερόλη LDL', 'LDL cholesterol', 'Cholesterol LDL',
     'LDL υπολογιζόμενη', 'LDL (υπολογιζόμενη)', 'LDL calculated', 'LDL direct', 'LDL άμεση', 'Low density lipoprotein',
-    'Λιποπρωτεΐνη χαμηλής πυκνότητας',
+    'Λιποπρωτεΐνη χαμηλής πυκνότητας', 'Χοληστερόλη χαμηλής πυκνότητας λιποπρωτεϊνών',
   ]),
   LabTest(id: 'hdl', name: 'HDL χοληστερίνη', cat: LabCat.lipids, unit: 'mg/dL', units: _chol, aliases: [
     'HDL', 'HDL-C', 'HDL χοληστερόλη', 'Χοληστερίνη HDL', 'Χοληστερόλη HDL', 'HDL cholesterol', 'Cholesterol HDL',
-    'High density lipoprotein', 'Λιποπρωτεΐνη υψηλής πυκνότητας',
+    'High density lipoprotein', 'Λιποπρωτεΐνη υψηλής πυκνότητας', 'Χοληστερόλη υψηλής πυκνότητας λιποπρωτεϊνών',
   ]),
   LabTest(id: 'nonhdl', name: 'Non-HDL χοληστερίνη', cat: LabCat.lipids, unit: 'mg/dL', units: _chol, aliases: [
     'Non-HDL', 'Non HDL', 'Non-HDL-C', 'Non-HDL cholesterol', 'Μη HDL χοληστερίνη',
@@ -109,7 +109,14 @@ const labCatalog = <LabTest>[
       aliases: ['Κρεατινίνη', 'Creatinine', 'CREA', 'CREAT', 'CR']),
   LabTest(id: 'egfr', name: 'eGFR (σπειραματική διήθηση)', cat: LabCat.kidney, unit: 'mL/min/1,73m²', units: {
     'ml/min': UnitConv(1),
-  }, aliases: ['eGFR', 'GFR', 'Ρυθμός σπειραματικής διήθησης', 'Σπειραματική διήθηση', 'eGFR CKD-EPI']),
+  }, aliases: [
+    'eGFR', 'GFR', 'Ρυθμός σπειραματικής διήθησης', 'Σπειραματική διήθηση', 'eGFR CKD-EPI',
+    // Τελικός έλεγχος (Συμβούλιο 3, Λ2): η Βιοϊατρική το γράφει στις «Παρατηρήσεις» της κρεατινίνης, ως «Estimated GFR
+    // 2021 CKD-EPI Creatinine». Ολόκληρο το όνομα είναι ΑΛΛΗ εξέταση από την «Creatinine»: ταιριάζει μόνο ολόκληρο.
+    'Estimated GFR', 'Estimated GFR CKD-EPI', 'Estimated GFR 2021 CKD-EPI', 'Estimated GFR 2021 CKD-EPI Creatinine',
+    'eGFR 2021 CKD-EPI', 'eGFR CKD-EPI 2021', 'eGFR CKD-EPI Creatinine', 'Εκτιμώμενος ρυθμός σπειραματικής διήθησης',
+    'Εκτιμώμενη σπειραματική διήθηση',
+  ]),
   LabTest(id: 'urea', name: 'Ουρία', cat: LabCat.kidney, unit: 'mg/dL', units: {'mmol/l': UnitConv(6.006)}, aliases: ['Ουρία', 'Urea', 'UREA']),
   LabTest(id: 'uric', name: 'Ουρικό οξύ', cat: LabCat.kidney, unit: 'mg/dL', decimals: 1, units: {'µmol/l': UnitConv(1 / 59.48)},
       aliases: ['Ουρικό οξύ', 'Ουρικό', 'Uric acid', 'UA', 'URIC']),
@@ -151,7 +158,7 @@ const labCatalog = <LabTest>[
       aliases: ['Σίδηρος', 'Σίδηρος ορού', 'Iron', 'Serum iron', 'Fe']),
   // Θυρεοειδής
   LabTest(id: 'tsh', name: 'TSH', cat: LabCat.thyroid, unit: 'µIU/mL', decimals: 2, units: {'miu/l': UnitConv(1), 'mu/l': UnitConv(1)},
-      aliases: ['TSH', 'Θυρεοειδοτρόπος ορμόνη', 'Θυρεοτροπίνη', 'Thyroid stimulating hormone']),
+      aliases: ['TSH', 'Θυρεοειδοτρόπος ορμόνη', 'Θυρεοτρόπος ορμόνη', 'Θυρεοτροπίνη', 'Thyroid stimulating hormone']),
   LabTest(id: 'ft4', name: 'FT4 (ελεύθερη θυροξίνη)', cat: LabCat.thyroid, unit: 'ng/dL', decimals: 2, units: {'pmol/l': UnitConv(1 / 12.87)},
       aliases: ['FT4', 'Free T4', 'Ελεύθερη θυροξίνη', 'Ελεύθερη T4']),
   // Βιταμίνες
@@ -174,13 +181,19 @@ const labCatalog = <LabTest>[
       aliases: ['hs-CRP', 'hsCRP', 'CRP υψηλής ευαισθησίας', 'High sensitivity CRP']),
   // Άλλες
   LabTest(id: 'psa', name: 'PSA', cat: LabCat.other, unit: 'ng/mL', decimals: 2, units: {'µg/l': UnitConv(1)},
-      aliases: ['PSA', 'Total PSA', 'PSA ολικό', 'Ολικό PSA', 'Προστατικό ειδικό αντιγόνο']),
+      aliases: ['PSA', 'Total PSA', 'PSA ολικό', 'Ολικό PSA', 'Προστατικό ειδικό αντιγόνο', 'Ειδικό προστατικό αντιγόνο']),
 ];
 
 /// Γρήγορη αναζήτηση με id.
 final Map<String, LabTest> labById = {for (final t in labCatalog) t.id: t};
 
-const _accents = {'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω', 'ϊ': 'ι', 'ϋ': 'υ', 'ΐ': 'ι', 'ΰ': 'υ', 'ς': 'σ'};
+const _accents = {
+  'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω', 'ϊ': 'ι', 'ϋ': 'υ', 'ΐ': 'ι', 'ΰ': 'υ', 'ς': 'σ',
+  // Τελικός έλεγχος (Συμβούλιο 3, Λ3): τα ίδια τονισμένα γράμματα στο «πολυτονικό» μπλοκ του Unicode (U+1F71 ά … U+1F7D ώ,
+  // U+1FD3 ΐ, U+1FE3 ΰ). Μερικές γραμματοσειρές PDF τα βγάζουν έτσι· πριν χάνονταν ολόκληρα («Γλυκόζη» → «γλυκζη»).
+  '\u1F71': 'α', '\u1F73': 'ε', '\u1F75': 'η', '\u1F77': 'ι', '\u1F79': 'ο', '\u1F7B': 'υ', '\u1F7D': 'ω', '\u1FD3': 'ι',
+  '\u1FE3': 'υ',
+};
 
 /// Ελληνικά γράμματα που μοιάζουν με λατινικά (στα PDF συμβαίνει «ΗDL» με ελληνικό Η ή «Β12» με
 /// ελληνικό Β). Διπλώνονται και στις δύο πλευρές, άρα η σύγκριση μένει σωστή.
@@ -189,13 +202,17 @@ const _lookalike = {
   'υ': 'y', 'χ': 'x', 'µ': 'm',
 };
 
+/// Ό,τι μένει στο διπλωμένο όνομα: λατινικά πεζά, ψηφία, ελληνικά (U+0370–U+03FF). Τόνοι που ήρθαν χωριστά από το γράμμα
+/// («ο» + U+0301), κενά (και τα «σκληρά», U+00A0), παύλες, παρενθέσεις: φεύγουν.
+final _kept = RegExp(r'[a-z0-9Ͱ-Ͽ]');
+
 /// «Διπλωμένο» όνομα: πεζά, χωρίς τόνους, ελληνικά-λατινικά που μοιάζουν ίδια, χωρίς κενά και σημεία.
 String foldName(String s) {
   final b = StringBuffer();
   for (final ch in s.toLowerCase().split('')) {
     var c = _accents[ch] ?? ch;
     c = _lookalike[c] ?? c;
-    if (RegExp(r'[a-z0-9Ͱ-Ͽ]').hasMatch(c)) b.write(c);
+    if (_kept.hasMatch(c)) b.write(c);
   }
   return b.toString();
 }
@@ -237,6 +254,15 @@ const shortCodeLength = 3;
 /// είναι σύντομος κωδικός ([shortCodeLength]) και η εξέταση του καταλόγου ΔΕΝ δέχεται αυτή τη μονάδα, δεν ταιριάζει
 /// (null: η εφαρμογή ρωτά). Έτσι «Tg» σε ng/mL (θυρεοσφαιρίνη) δεν γίνεται ποτέ «Τριγλυκερίδια». Ένα ολόκληρο όνομα
 /// («Αιμοσφαιρίνη») ταιριάζει και με άγνωστη μονάδα («gr/dL»): τότε ρωτιέται μόνο η μονάδα. Όσα έμαθες εσύ δεν κρίνονται.
+///
+/// Όνομα με κωδικό στο τέλος (τελικός έλεγχος, Συμβούλιο 3, Λ1): «Γλυκόζη (GLUC)», «Μέσος Όγκος Ερυθρών (ΜCV)»,
+/// «25-υδροξυβιταμίνη D [25(ΟΗ)D]». Έτσι γράφει κάθε γραμμή η Βιοϊατρική· πριν δεν αναγνωριζόταν καμία τέτοια γραμμή.
+/// Κανόνας, πάντα προς το «η εφαρμογή ρωτά» όταν κάτι δεν δένει ([splitNameCode]):
+/// - όνομα ΚΑΙ κωδικός γνωστά: ταιριάζει μόνο αν δείχνουν την ίδια εξέταση («Χοληστερόλη (non-HDL)» → ρωτά)·
+/// - όνομα γνωστό, κωδικός άγνωστος: ρωτά («Χοληστερόλη (VLDL)» δεν γίνεται ποτέ «Ολική χοληστερίνη»)·
+/// - όνομα άγνωστο, κωδικός γνωστός: με γνωστή μονάδα ταιριάζει μόνο αν η εξέταση τη δέχεται («Θυρεοσφαιρίνη (TG)»
+///   σε ng/mL και «Κάθαρση κρεατινίνης (CREA)» σε mL/min → ρωτά)· χωρίς μονάδα, μόνο αν ο κωδικός δεν είναι σύντομος
+///   («…λιποπρωτεϊνών (ΗDL-C)»)· ποτέ όταν το όνομα λέει ούρα («Κάλιο ούρων (K)»).
 String? matchTest(String rawName, {Map<String, String> learned = const {}, String? unit}) {
   final k = foldName(rawName);
   if (k.isEmpty) return null;
@@ -246,19 +272,68 @@ String? matchTest(String rawName, {Map<String, String> learned = const {}, Strin
   // ολικό. Το δίπλωμα σβήνει τα «+», άρα θα γινόταν «Ca» = ολικό ασβέστιο χωρίς ερώτηση. Εδώ η εφαρμογή ρωτά.
   if (rawName.contains('++')) return null;
   final u = unit?.trim() ?? '';
+  bool unitFits(String id) => toBase(labById[id]!, 1, u) != null;
   String? checked(String? id, String key) {
     if (id == null || u.isEmpty || key.length > shortCodeLength) return id;
-    return toBase(labById[id]!, 1, u) == null ? null : id;
+    return unitFits(id) ? id : null;
   }
 
-  final hit = checked(_aliasIndex[k], k);
-  if (hit != null) return hit;
-  // Συχνή προσθήκη των εργαστηρίων: «ορού» / «serum» στο τέλος.
-  for (final suffix in _suffixes) {
-    if (k.endsWith(suffix) && k.length > suffix.length) {
-      final short = k.substring(0, k.length - suffix.length);
-      final h = checked(_aliasIndex[short], short);
-      if (h != null) return h;
+  /// Ένα διπλωμένο όνομα στον κατάλογο, και χωρίς το «ορού» / «serum» που προσθέτουν συχνά τα εργαστήρια στο τέλος.
+  String? lookup(String key) {
+    final hit = checked(_aliasIndex[key], key);
+    if (hit != null) return hit;
+    for (final suffix in _suffixes) {
+      if (key.endsWith(suffix) && key.length > suffix.length) {
+        final short = key.substring(0, key.length - suffix.length);
+        final h = checked(_aliasIndex[short], short);
+        if (h != null) return h;
+      }
+    }
+    return null;
+  }
+
+  final whole = lookup(k);
+  if (whole != null) return whole;
+
+  final parts = splitNameCode(rawName);
+  if (parts == null) return null;
+  final nameKey = foldName(parts.name), codeKey = foldName(parts.code);
+  if (nameKey.isEmpty || codeKey.isEmpty) return null;
+  final byName = lookup(nameKey);
+  // Ο κωδικός όπως είναι στον κατάλογο, χωρίς έλεγχο μονάδας: εδώ μετρά μόνο αν συμφωνεί με το όνομα.
+  final byCode = _aliasIndex[codeKey];
+  if (byName != null) return byCode == byName ? byName : null;
+  if (byCode == null) return null;
+  // Μόνο ο κωδικός είναι γνωστός. Το όνομα μπορεί να λέει άλλη εξέταση με τον ίδιο κωδικό:
+  // - δείγμα ούρων («Κάλιο ούρων (K)»): ο κατάλογος έχει μόνο εξετάσεις αίματος·
+  // - άλλη μονάδα («Κάθαρση κρεατινίνης (CREA)» σε mL/min): όταν η μονάδα είναι γνωστή, πρέπει να είναι της εξέτασης·
+  // - χωρίς μονάδα, ένας σύντομος κωδικός («TG», «K») δεν φτάνει μόνος του.
+  if (specimenKind(parts.name) == 'urine') return null;
+  if (u.isNotEmpty) return unitFits(byCode) ? byCode : null;
+  return codeKey.length > shortCodeLength ? byCode : null;
+}
+
+/// Χωρίζει ένα όνομα που τελειώνει με παρένθεση ή αγκύλη στο κυρίως όνομα και σε ό,τι έχει μέσα της: «Γλυκόζη (GLUC)» →
+/// («Γλυκόζη», «GLUC»), «25-υδροξυβιταμίνη D [25(ΟΗ)D]» → («25-υδροξυβιταμίνη D», «25(ΟΗ)D»). Μετρά τις φωλιασμένες
+/// παρενθέσεις, ώστε να βρει το σωστό ταίρι της τελευταίας. null: δεν τελειώνει έτσι, ή κάποιο από τα δύο μέρη είναι κενό.
+({String name, String code})? splitNameCode(String raw) {
+  final s = raw.trim();
+  if (s.length < 3) return null;
+  final close = s[s.length - 1];
+  final open = switch (close) { ')' => '(', ']' => '[', _ => null };
+  if (open == null) return null;
+  var depth = 0;
+  for (var i = s.length - 1; i >= 0; i--) {
+    final ch = s[i];
+    if (ch == close) {
+      depth++;
+    } else if (ch == open) {
+      depth--;
+      if (depth == 0) {
+        final name = s.substring(0, i).trim();
+        final code = s.substring(i + 1, s.length - 1).trim();
+        return name.isEmpty || code.isEmpty ? null : (name: name, code: code);
+      }
     }
   }
   return null;

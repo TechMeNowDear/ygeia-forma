@@ -22,6 +22,7 @@ import 'error_report.dart';
 import 'food/chol.dart';
 import 'food/food_model.dart';
 import 'food/food_store.dart';
+import 'food/off.dart' show impossibleValues;
 import 'format.dart' show daysBetween;
 import 'goals.dart';
 import 'history.dart' show dateKey;
@@ -310,11 +311,14 @@ Map<String, dynamic> diagnosticsFrom({
   check('prefs-read', store.prefsReady);
   check('history-read', store.historyReady);
   check('food-read', food.loaded && food.error == null, food.error);
+  // Τελικός έλεγχος (Συμβούλιο 3): γραμμές της βάσης που δεν διαβάστηκαν και παραλείφθηκαν στο άνοιγμα.
+  check('food-rows', food.skippedRows == 0, food.skippedRows == 0 ? null : '${food.skippedRows} γραμμές δεν διαβάστηκαν');
   check('food-save', food.saveError == null, food.saveError);
   check('training-read', !trainingReadError);
   check('samsung-read', d != null && d.failed.isEmpty, d == null ? 'καμία ανάγνωση' : (d.failed.isEmpty ? null : d.failed.join(',')));
 
   final badGrams = <String>[];
+  final badValues = <String>{};
   final noKcal = <String>[];
   final atwater = <String>{};
   final dup = <String>[];
@@ -323,6 +327,15 @@ Map<String, dynamic> diagnosticsFrom({
     for (final e in food.entriesFor(day)) {
       if (!e.grams.isFinite || e.grams <= 0 || e.grams > 3000) badGrams.add('${e.day} ${e.food.name} ${e.grams}');
       if (!e.food.n.has(Nk.kcal)) noKcal.add('${e.day} ${e.food.name}');
+      // Τελικός έλεγχος (Συμβούλιο 3): τιμές ανά 100 g που δεν γίνεται να ισχύουν (αρνητικές, άπειρες, πάνω από 900 kcal
+      // ή πάνω από 100 g): η φόρμα δεν τις δέχεται, άρα ήρθαν από αντίγραφο ή παλιά έκδοση.
+      final per100 = {
+        for (final k in const [Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fat, Nk.satFat, Nk.fiber, Nk.salt])
+          if (e.food.n[k] case final x?) k: x.value,
+      };
+      if (per100.values.any((x) => !x.isFinite || x < 0) || impossibleValues(per100).isNotEmpty) {
+        badValues.add('${e.food.id} ${e.food.name}');
+      }
       // Atwater (4/4/9 + ίνες 2 + αλκοόλ 7) ±20% και ±20 kcal: ετικέτα ή βάση με λάθος ενέργεια.
       final n = e.food.n;
       final calc = 4 * n.amount(Nk.protein) + 4 * n.amount(Nk.carbs) + 9 * n.amount(Nk.fat) + 2 * n.amount(Nk.fiber) + 7 * n.amount(Nk.alcohol);
@@ -335,6 +348,7 @@ Map<String, dynamic> diagnosticsFrom({
     }
   }
   check('food-grams', badGrams.isEmpty, badGrams.isEmpty ? null : badGrams.take(20).join('; '));
+  check('food-values', badValues.isEmpty, badValues.isEmpty ? null : badValues.take(20).join('; '));
   check('food-has-kcal', noKcal.isEmpty, noKcal.isEmpty ? null : noKcal.take(20).join('; '));
   check('food-atwater', atwater.isEmpty, atwater.isEmpty ? null : atwater.take(20).join('; '));
   check('food-duplicates', dup.isEmpty, dup.isEmpty ? null : dup.take(20).join('; '));

@@ -60,9 +60,9 @@ class Cookware {
   factory Cookware.fromJson(Map<String, dynamic> j) => Cookware(
         id: j['id'] as String,
         kind: j['kind'] as String,
-        size: j['size'] as String?,
-        brand: j['brand'] as String?,
-        note: j['note'] as String?,
+        size: j['size'] is String ? j['size'] as String : null,
+        brand: j['brand'] is String ? j['brand'] as String : null,
+        note: j['note'] is String ? j['note'] as String : null,
       );
 
   Map<String, Object?> toJson() => {
@@ -102,21 +102,24 @@ class Kitchen {
   /// ανεβαίνει και το [_upgrade] το προσθέτει χωρίς να σβήσει ό,τι έχει ήδη γράψει.
   static const seedVersion = 2;
 
+  /// Τελικός έλεγχος (Συμβούλιο 3): ανεκτική ανάγνωση. Η κουζίνα έρχεται και από αντίγραφο ασφαλείας· ένα πεδίο με λάθος
+  /// τύπο («hob»: 5, σκεύος χωρίς id, 1e999) αγνοείται. Πριν πετούσε σφάλμα κάθε φορά που άνοιγαν «Τα στοιχεία μου».
   factory Kitchen.fromJson(Map<String, dynamic>? j) {
     if (j == null) return Kitchen.initial();
+    double? number(Object? v) => v is num && v.isFinite ? v.toDouble() : null;
     final k = Kitchen(
-      devices: {for (final d in (j['devices'] as List?) ?? const []) d.toString()},
-      hob: j['hob'] as String?,
-      ovenFan: j['ovenFan'] as bool?,
-      steamerTiers: (j['steamerTiers'] as num?)?.toInt(),
-      airFryerLiters: (j['airFryerLiters'] as num?)?.toDouble(),
-      scaleMaxKg: (j['scaleMaxKg'] as num?)?.toDouble(),
+      devices: {for (final d in j['devices'] is List ? j['devices'] as List : const []) d.toString()},
+      hob: j['hob'] is String ? j['hob'] as String : null,
+      ovenFan: j['ovenFan'] is bool ? j['ovenFan'] as bool : null,
+      steamerTiers: number(j['steamerTiers'])?.toInt(),
+      airFryerLiters: number(j['airFryerLiters']),
+      scaleMaxKg: number(j['scaleMaxKg']),
       cookware: [
-        for (final c in (j['cookware'] as List?) ?? const [])
-          if (c is Map) Cookware.fromJson(Map<String, dynamic>.from(c)),
+        for (final c in j['cookware'] is List ? j['cookware'] as List : const [])
+          if (c is Map && c['id'] is String && c['kind'] is String) Cookware.fromJson(Map<String, dynamic>.from(c)),
       ],
     );
-    final seed = (j['seed'] as num?)?.toInt() ?? 1;
+    final seed = number(j['seed'])?.toInt() ?? 1;
     if (seed < 2) k._upgradeTo2();
     return k;
   }

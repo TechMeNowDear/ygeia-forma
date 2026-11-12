@@ -62,17 +62,32 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   }
 }
 
+final _numberSpaces = RegExp(r'[ \u00A0\u202F]');
+final _numberChars = RegExp(r'^[0-9.,]+$');
+final _dotThousands = RegExp(r'^[1-9]\d{0,2}(\.\d{3})+$');
+
 /// Αριθμός όπως τον γράφουμε στα ελληνικά: «12,5» ή «12.5»· η τελεία ως διαχωριστικό χιλιάδων
 /// («1.000», «1.250») διαβάζεται ως χιλιάδες, όχι ως «1».
+///
+/// Τελικός έλεγχος (Συμβούλιο 3, Τ1): ό,τι δεν είναι καθαρά αριθμός δεν μαντεύεται, γίνεται null (το πεδίο μένει άκυρο):
+/// - Μόνο ψηφία, τελείες και κόμμα. «-5», «1e3», «NaN», «Infinity» περνούσαν από το double.tryParse.
+/// - Ένα κόμμα το πολύ, και μετά από αυτό καμία τελεία: «1,250.75» (αμερικάνικη γραφή) διαβαζόταν 1,25075.
+/// - Τελείες πριν από το κόμμα μόνο ως σωστές χιλιάδες: «3.76,» διαβαζόταν 376 και «1.2,5» 12,5.
+/// - Πάντα πεπερασμένος αριθμός.
 double? parseNumber(String s) {
-  var t = s.trim().replaceAll(' ', '');
-  if (t.isEmpty) return null;
-  if (t.contains(',')) {
-    t = t.replaceAll('.', '').replaceAll(',', '.');
-  } else if (RegExp(r'^[1-9]\d{0,2}(\.\d{3})+$').hasMatch(t)) {
+  var t = s.trim().replaceAll(_numberSpaces, '');
+  if (t.isEmpty || !_numberChars.hasMatch(t)) return null;
+  final comma = t.indexOf(',');
+  if (comma >= 0) {
+    if (comma != t.lastIndexOf(',') || t.indexOf('.', comma) >= 0) return null;
+    final whole = t.substring(0, comma);
+    if (whole.contains('.') && !_dotThousands.hasMatch(whole)) return null;
+    t = '${whole.replaceAll('.', '')}.${t.substring(comma + 1)}';
+  } else if (_dotThousands.hasMatch(t)) {
     t = t.replaceAll('.', '');
   }
-  return double.tryParse(t);
+  final v = double.tryParse(t);
+  return v == null || !v.isFinite ? null : v;
 }
 
 /// Γραμμάρια στο πεδίο: χωρίς άσκοπα δεκαδικά, αλλά χωρίς να χάνεται το «,5».
@@ -699,7 +714,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
 
   double? get _value {
     final v = parseNumber(_grams.text);
-    return (v == null || v <= 0 || v > 5000) ? null : v;
+    return (v == null || !(v > 0 && v <= maxEntryGrams)) ? null : v;
   }
 
   void _set(double g) => setState(() => _grams.text = gramsField(g));
@@ -1280,7 +1295,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       name: _name.text.trim(),
       brand: _brand.text.trim(),
       barcode: widget.draft.barcode,
-      servingGrams: parseNumber(_serving.text),
+      // Μερίδα μόνο αν γίνεται να γραφτεί ως ποσότητα (πάνω από 0, ως 5.000· τελικός έλεγχος, Συμβούλιο 3). Πριν, «0»,
+      // αρνητικό ή τεράστιο αποθηκευόταν όπως ήταν και έβγαινε ως προτεινόμενη ποσότητα.
+      servingGrams: validServing(parseNumber(_serving.text)),
       servingLabel: widget.draft.servingLabel,
       values: values,
       fromOff: widget.draft.fromOff,
@@ -1477,6 +1494,8 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
               TextField(
                 controller: _serving,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                // Όπως τα υπόλοιπα πεδία αριθμών της φόρμας (πριν, το μόνο χωρίς φίλτρο: δεχόταν «-», γράμματα από επικόλληση).
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                 decoration: deco('Μία μερίδα (προαιρετικό)', suffix: _perMl ? 'ml' : 'g'),
               ),
               const SizedBox(height: 22),
@@ -1546,7 +1565,16 @@ Future<Food?> scanToFood(
     ));
     return null;
   }
-  final code = (s['code'] as String?) ?? '';
+  final code = (s['code'] is String ? s['code'] as String : '').trim();
+  // Ό,τι δεν είναι barcode προϊόντος (κενό, γράμματα, λάθος μήκος) δεν συνεχίζει (τελικός έλεγχος, Συμβούλιο 3): το ίδιο
+  // μήνυμα με τον σαρωτή που δεν άνοιξε, και τίποτα δεν αποθηκεύεται με άκυρο barcode.
+  if (scannedBarcode(code) == null) {
+    messenger.showSnackBar(const SnackBar(
+      duration: Duration(seconds: 8),
+      content: Text('Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν χειροκίνητα.'),
+    ));
+    return null;
+  }
   final mine = food.byBarcode(code);
   if (mine != null) return existing == null ? mine : existing(mine);
 

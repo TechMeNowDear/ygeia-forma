@@ -63,11 +63,15 @@ class FoodDraft {
   List<String> get missing => [for (final k in required) if (values[k] == null) k];
 }
 
+/// Αριθμός του Open Food Facts (αριθμός ή κείμενο). Τελικός έλεγχος (Συμβούλιο 3): μόνο πεπερασμένος· «NaN»,
+/// «Infinity» ή 1e999 μετρούν ως «λείπει» (πριν περνούσαν, και μια τέτοια τιμή δεν γράφεται σε JSON: η αποθήκευση έσκαγε).
 double? _num(Object? v) {
-  if (v is num) return v.toDouble();
-  if (v is String) return double.tryParse(v.replaceAll(',', '.'));
-  return null;
+  final d = v is num ? v.toDouble() : (v is String ? double.tryParse(v.trim().replaceAll(',', '.')) : null);
+  return d == null || !d.isFinite ? null : d;
 }
+
+/// Ποσοστό ή γραμμάρια ανά 100: πάνω από 0 και ως 100. Αλλιώς «δεν υπάρχει» (π.χ. αλκοόλ 400% vol από λάθος εθελοντή).
+double? _per100(double? v) => v == null || v <= 0 || v > 100 ? null : v;
 
 FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   final n = (p['nutriments'] is Map) ? Map<String, dynamic>.from(p['nutriments'] as Map) : <String, dynamic>{};
@@ -106,17 +110,18 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   put(Nk.fiber, 'fiber');
   put(Nk.salt, 'salt');
   // Μόνο νάτριο (συχνό σε εισαγόμενα): αλάτι = νάτριο × 2,5 (το νάτριο του Open Food Facts είναι σε g).
+  // Αλάτι 0 μαζί με νάτριο > 0 είναι λάθος δεδομένων, όπως το «kcal 0 με kJ > 0» πιο πάνω (τελικός έλεγχος, Συμβούλιο 3):
+  // μετρά το νάτριο, αλλιώς το προϊόν έμπαινε σιωπηλά «χωρίς αλάτι».
   var saltFromSodium = false;
   double? sodiumMg;
-  if (values[Nk.salt] == null) {
-    final na = _num(n['sodium_100g']);
-    if (na != null && na >= 0) {
-      values[Nk.salt] = double.parse((na * 2.5).toStringAsFixed(3));
-      saltFromSodium = true;
-      sodiumMg = double.parse((na * 1000).toStringAsFixed(1));
-      final mod = n['sodium_modifier'];
-      if (mod == '<' || mod == '≤' || mod == '<=') lessThan.add(Nk.salt);
-    }
+  final na = _num(n['sodium_100g']);
+  if (na != null && na >= 0 && (values[Nk.salt] == null || (values[Nk.salt] == 0 && na > 0))) {
+    values[Nk.salt] = double.parse((na * 2.5).toStringAsFixed(3));
+    saltFromSodium = true;
+    sodiumMg = double.parse((na * 1000).toStringAsFixed(1));
+    lessThan.remove(Nk.salt);
+    final mod = n['sodium_modifier'];
+    if (mod == '<' || mod == '≤' || mod == '<=') lessThan.add(Nk.salt);
   }
 
   final brand = pick(['brands'])?.split(',').first.trim();
@@ -132,21 +137,24 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
       isLiquidQuantity(quantity) ||
       (quantity == null && serving != null && !RegExp(r'\d\s*g\b').hasMatch(serving) && isLiquidQuantity(serving));
   // Στο Open Food Facts το «alcohol» είναι % vol: g ανά 100 ml = % vol × 0,789 (πυκνότητα αιθανόλης).
-  final alcoholVol = _num(n['alcohol_100g']) ?? _num(n['alcohol']);
-  final polyols = _num(n['polyols_100g']);
-  final erythritol = _num(n['erythritol_100g']);
+  // Ό,τι δεν είναι πάνω από 0 και ως 100 δεν μετρά (τελικός έλεγχος, Συμβούλιο 3): αυτές οι τρεις τιμές δεν φαίνονται
+  // στη φόρμα, άρα ο χρήστης δεν θα έβλεπε ποτέ μια παράλογη.
+  final alcoholVol = _per100(_num(n['alcohol_100g']) ?? _num(n['alcohol']));
+  final polyols = _per100(_num(n['polyols_100g']));
+  final erythritol = _per100(_num(n['erythritol_100g']));
   return FoodDraft(
     name: pick(['product_name_el', 'generic_name_el', 'product_name']) ?? '',
     brand: brand,
     barcode: barcode,
-    servingGrams: _num(p['serving_quantity']),
+    // Μερίδα μόνο αν γίνεται να γραφτεί ως ποσότητα (πάνω από 0, ως 5.000): αλλιώς «χωρίς μερίδα».
+    servingGrams: validServing(_num(p['serving_quantity'])),
     servingLabel: pick(['serving_size']),
     values: values,
     fromOff: true,
     perMl: perMl,
-    alcohol: alcoholVol == null || alcoholVol <= 0 ? null : alcoholVol * 0.789,
-    polyols: polyols == null || polyols <= 0 ? null : polyols,
-    erythritol: erythritol == null || erythritol <= 0 ? null : erythritol,
+    alcohol: alcoholVol == null ? null : alcoholVol * 0.789,
+    polyols: polyols,
+    erythritol: erythritol,
     saltFromSodium: saltFromSodium,
     sodiumMg: sodiumMg,
     lessThan: lessThan,
@@ -165,6 +173,18 @@ String normalizeBarcode(String code) {
   if (c.length == 12) c = '0$c';
   if (c.length == 14 && c.startsWith('0')) c = c.substring(1);
   return c;
+}
+
+/// Αυτό που έδωσε ο σαρωτής είναι barcode προϊόντος; Μόνο ψηφία, και μετά το [normalizeBarcode] 8 (EAN-8, UPC-E) ή 13
+/// (EAN-13, UPC-A). Επιστρέφει την ενιαία μορφή, ή null. Τελικός έλεγχος (Συμβούλιο 3): πριν, κενή ή άκυρη απάντηση του
+/// σαρωτή συνέχιζε ως «barcode», κατέληγε σε «Δεν έγινε σύνδεση…» και το προϊόν αποθηκευόταν με barcode «» (κενό)· ο
+/// επόμενος κενός κωδικός θα «έβρισκε» εκείνο το προϊόν.
+String? scannedBarcode(Object? raw) {
+  if (raw is! String) return null;
+  final t = raw.trim();
+  if (!RegExp(r'^[0-9]+$').hasMatch(t)) return null;
+  final c = normalizeBarcode(t);
+  return c.length == 8 || c.length == 13 ? c : null;
 }
 
 /// Έλεγχος λογικής: θερμίδες ετικέτας vs υπολογισμένες από τα μακροθρεπτικά (συντελεστές ΕΕ: πρωτεΐνη 4,

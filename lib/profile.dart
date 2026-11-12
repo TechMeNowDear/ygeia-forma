@@ -65,11 +65,13 @@ class Profile {
 
   static Profile fromJson(Object? j) {
     if (j is! Map) return const Profile();
-    int? i(Object? v) => v is num ? v.toInt() : null;
+    // Τελικός έλεγχος (Συμβούλιο 3): 1e999 στο JSON γίνεται «άπειρο» και το toInt() πετά σφάλμα· «Τα στοιχεία μου»
+    // διαβάζονται σε κάθε οθόνη, άρα ένα πειραγμένο αντίγραφο θα έριχνε όλη την εφαρμογή.
+    int? i(Object? v) => v is num && v.isFinite ? v.toInt() : null;
     bool day(int? d) => d != null && d >= 1 && d <= 7;
     final by = i(j['by']);
     final bm = i(j['bm']);
-    final h = j['h'] is num ? (j['h'] as num).toDouble() : null;
+    final h = j['h'] is num && (j['h'] as num).isFinite ? (j['h'] as num).toDouble() : null;
     final wd = i(j['wd']);
     final wds = <int>{
       if (j['wds'] is List)

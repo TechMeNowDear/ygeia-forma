@@ -304,6 +304,10 @@ class _DataGroupState extends State<_DataGroup> {
         parsed = await compute(parseBackup, r['json'] as String? ?? '');
       } on BackupError catch (e) {
         _say(e.message);
+      } catch (_) {
+        // Τελικός έλεγχος (Συμβούλιο 3): οποιοδήποτε άλλο σφάλμα ανάγνωσης λέγεται κι αυτό. Πριν, η επαναφορά σταματούσε
+        // χωρίς κανένα μήνυμα.
+        _say('Το αρχείο δεν είναι αντίγραφο της εφαρμογής.');
       }
       if (parsed == null) return;
       final b = parsed;
