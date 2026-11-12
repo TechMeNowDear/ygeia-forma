@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../exercise/ex_data.dart';
 import '../../theme.dart';
@@ -104,7 +105,8 @@ class Stepper2 extends StatelessWidget {
       this.button = 40,
       this.labelMinus = 'Λιγότερο',
       this.labelPlus = 'Περισσότερο',
-      this.leading});
+      this.leading,
+      this.haptic = false});
   final String value;
 
   /// Κάτι πριν από την τιμή (π.χ. η κουκκίδα του λάστιχου).
@@ -116,6 +118,9 @@ class Stepper2 extends StatelessWidget {
   final double button;
   final String labelMinus, labelPlus;
 
+  /// Μικρή δόνηση αφής σε κάθε πάτημα, για να το νιώθεις χωρίς να κοιτάς (προπόνηση· Συμβούλιο 5, Δ4, έγκριση 13/11).
+  final bool haptic;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
@@ -124,7 +129,12 @@ class Stepper2 extends StatelessWidget {
           label: label,
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: f,
+            onTap: f == null || !haptic
+                ? f
+                : () {
+                    HapticFeedback.selectionClick();
+                    f();
+                  },
             child: Container(
               width: button,
               height: button,

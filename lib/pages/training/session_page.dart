@@ -491,6 +491,7 @@ class _SessionPageState extends State<SessionPage> {
             // Σχέδια 9/11 (6β) και έλεγχος premium (S4): οι δύο μετρητές σε μία σειρά και στο κλειστό Fold.
             width: usesKg(k) || band ? 52 : 80,
             button: 44,
+            haptic: true,
             labelMinus: 'Λιγότερο βάρος',
             labelPlus: 'Περισσότερο βάρος',
             onMinus: shiftLoad(k, set.load, -1) == null ? null : () => t.setLoad(e, i, shiftLoad(k, set.load, -1)!),
@@ -500,6 +501,7 @@ class _SessionPageState extends State<SessionPage> {
           value: '${set.reps}',
           width: 36,
           button: 44,
+          haptic: true,
           labelMinus: 'Λιγότερες',
           labelPlus: 'Περισσότερες',
           onMinus: set.reps > 0 ? () => t.setReps(e, i, set.reps - 1) : null,

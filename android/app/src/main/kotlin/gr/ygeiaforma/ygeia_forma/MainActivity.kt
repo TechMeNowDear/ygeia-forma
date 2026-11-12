@@ -1,6 +1,7 @@
 package gr.ygeiaforma.ygeia_forma
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,6 +46,9 @@ class MainActivity : FlutterFragmentActivity() {
         // «Διαγραφή όλων» που ξεκίνησε: τελειώνει εδώ, πριν ξεκινήσει η Flutter (έλεγχος του fix-accuracy, M4).
         DataWipe.finishIfNeeded(this)
         super.onCreate(savedInstanceState)
+        // Τα δεδομένα υγείας δεν φαίνονται στη μικρογραφία των «πρόσφατων εφαρμογών» (Συμβούλιο 5, Δ5, έγκριση 13/11).
+        // Μόνο εκεί: τα στιγμιότυπα οθόνης που παίρνει ο χρήστης συνεχίζουν να δουλεύουν (όχι FLAG_SECURE).
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
     }
 
     override fun onNewIntent(intent: Intent) {

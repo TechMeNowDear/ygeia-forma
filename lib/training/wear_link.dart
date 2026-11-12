@@ -107,6 +107,17 @@ Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name)
 /// Οι επαναλήψεις που κουβαλά ένα ✓ του ρολογιού («r», τελικός έλεγχος, Συμβούλιο 4, W-4), για την άσκηση [ex] του
 /// κινητού: 0–99, ή null αν το ✓ δεν έχει επαναλήψεις (δεν τις άλλαξες στο ρολόι, ή ρολόι παλιότερης έκδοσης), ή αν
 /// αφορούν άλλη άσκηση (στο μεταξύ την άλλαξες στο κινητό).
+/// Ακέραιος από μήνυμα του ρολογιού (τελικός έλεγχος, Συμβούλιο 6): μόνο πεπερασμένος αριθμός. Κείμενο, null ή 1e999
+/// (στο JSON γίνεται «άπειρο») μετρούν ως «λείπει». Πριν, το `as num` ή το `toInt()` πετούσαν σφάλμα στη μέση της
+/// εντολής: το μήνυμα χανόταν, και στο ✓ μπορούσαν να έχουν ήδη γραφτεί οι επαναλήψεις χωρίς το ✓.
+int? wearInt(Object? v) => v is num && v.isFinite ? v.toInt() : null;
+
+/// Ώρα από μήνυμα του ρολογιού (ms από το 1970), ή null αν δεν είναι αριθμός που χωρά σε ημερομηνία.
+DateTime? wearTime(Object? v) {
+  final ms = wearInt(v);
+  return ms == null || ms.abs() > 8640000000000000 ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+}
+
 int? watchTickReps(Map<String, dynamic> j, String ex) {
   final r = j['r'];
   final forEx = j['ex'];
@@ -120,10 +131,10 @@ class WatchCmd {
   WatchCmd(this.op, this.j);
   final String op;
   final Map<String, dynamic> j;
-  int get i => (j['i'] as num?)?.toInt() ?? -1;
-  int get s => (j['s'] as num?)?.toInt() ?? -1;
+  int get i => wearInt(j['i']) ?? -1;
+  int get s => wearInt(j['s']) ?? -1;
   Object? get v => j['v'];
-  String get sid => j['sid'] as String? ?? '';
+  String get sid => j['sid'] is String ? j['sid'] as String : '';
 }
 
 /// Σύνδεση με την εφαρμογή του ρολογιού. Δουλεύει μόνο όσο είναι ανοιχτή η εφαρμογή· τίποτα στο παρασκήνιο.
@@ -410,11 +421,11 @@ class WearLink with WidgetsBindingObserver {
     final t = _t;
     switch (path) {
       case '/ygeia/hr':
-        final bpm = (j['bpm'] as num?)?.toInt() ?? 0;
-        final at = DateTime.fromMillisecondsSinceEpoch((j['t'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch);
+        final bpm = wearInt(j['bpm']) ?? 0;
+        final at = wearTime(j['t']) ?? DateTime.now();
         if (bpm > 0) {
           hr.value = (bpm, at);
-          t?.addHr(bpm, at, sid: j['sid'] as String?);
+          t?.addHr(bpm, at, sid: j['sid'] is String ? j['sid'] as String : null);
         }
         ready.value = true;
       case '/ygeia/live':
@@ -424,14 +435,14 @@ class WearLink with WidgetsBindingObserver {
         if (_watchTimer != null && (sent == null || DateTime.now().difference(sent) > const Duration(seconds: 40))) {
           sendWatching(watchingTtl);
         }
-        final bpm = (j['bpm'] as num?)?.toInt() ?? 0;
+        final bpm = wearInt(j['bpm']) ?? 0;
         if (bpm > 0) hr.value = (bpm, DateTime.now());
         ready.value = true;
       case '/ygeia/cmd':
         // Εντολή νεότερης μορφής: δεν εκτελείται (V-A-08). Η έκδοση στο «pv»· το «v» εδώ είναι η τιμή (ρεζέρβα κ.λπ.).
         final pv = j['pv'];
         if (pv is num && pv > TrainingStore.watchMajor) return;
-        final c = WatchCmd(j['op'] as String? ?? '', j);
+        final c = WatchCmd(j['op'] is String ? j['op'] as String : '', j);
         if (t != null) apply(t, c);
         _cmds.add(c);
     }
@@ -445,9 +456,9 @@ class WearLink with WidgetsBindingObserver {
     switch (c.op) {
       case 'end':
         // «Τέλος» στο ρολόι (V-A-09): τέλος και εδώ, με την ώρα του ρολογιού.
-        final at = c.j['at'];
-        if (at is num) {
-          t.endFromWatch(s.id, at.toInt());
+        final at = wearInt(c.j['at']);
+        if (at != null) {
+          t.endFromWatch(s.id, at);
           TrainingDevice.restCancel();
         }
         return;
@@ -479,7 +490,7 @@ class WearLink with WidgetsBindingObserver {
         // Ρολόι παλιότερης έκδοσης δεν στέλνει «r»: όπως πριν.
         final r = watchTickReps(c.j, e.ex);
         if (r != null) e.log[c.s].reps = r;
-        t.tick(e, c.s, at: (c.j['at'] as num?)?.toInt());
+        t.tick(e, c.s, at: wearInt(c.j['at']));
         String? next;
         if (e.complete) {
           final n = s.items.indexWhere((x) => !x.skipped && !x.complete);
@@ -501,27 +512,27 @@ class WearLink with WidgetsBindingObserver {
         }
       case 'rir':
         // Μόνο για άσκηση που τελείωσε και δεν έχει ήδη απάντηση (να μη γραφτεί σε λάθος άσκηση).
-        final v = c.v;
-        if (v is num && e.complete && e.rirAnswer == null) t.answer(e, v.toInt().clamp(0, 4));
+        final v = wearInt(c.v);
+        if (v != null && e.complete && e.rirAnswer == null) t.answer(e, v.clamp(0, 4));
       case 'reps':
-        final v = c.v;
-        final q = c.j['q'];
-        if (q is num) {
+        final v = wearInt(c.v);
+        final q = wearInt(c.j['q']);
+        if (q != null) {
           final key = '${c.sid}:${c.i}:${c.s}';
           final last = _repsQ[key] ?? 0;
           // Παλιότερη εντολή: αγνοείται. Πολύ πιο πίσω (> 10′: η ώρα του ρολογιού άλλαξε μετά από επανεκκίνηση): δεκτή (NIT 1).
-          if (q.toInt() <= last && last - q.toInt() < 600000) return;
-          _repsQ[key] = q.toInt();
+          if (q <= last && last - q < 600000) return;
+          _repsQ[key] = q;
         }
-        if (v is! num || c.s < 0 || c.s >= e.log.length) return;
+        if (v == null || c.s < 0 || c.s >= e.log.length) return;
         // Μόνο στο ίδιο σετ που εννοεί το ρολόι (έλεγχος του γ2, S4): αν η άσκηση άλλαξε στο μεταξύ (εναλλακτική), ή το
         // σετ έχει άλλη ώρα, αγνοείται. Ρολόι παλιότερης έκδοσης δεν στέλνει «ex»/«at»: όπως πριν.
         final ex = c.j['ex'];
         if (ex is String && ex != e.ex) return;
-        final at = c.j['at'];
+        final at = wearInt(c.j['at']);
         final setAt = e.log[c.s].at;
-        if (at is num && (setAt == null || (setAt - at.toInt()).abs() > 2000)) return;
-        t.setReps(e, c.s, v.toInt());
+        if (at != null && (setAt == null || (setAt - at).abs() > 2000)) return;
+        t.setReps(e, c.s, v);
     }
   }
 
