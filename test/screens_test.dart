@@ -2025,8 +2025,10 @@ void main() {
       name: '66_me_weigh_days', size: phone, brightness: Brightness.light, oura: false,
       prepare: withGoals, page: (s) => MePage(store: s, food: sampleFoodStore(now)),
       act: (t) async => t.ensureVisible(find.byKey(const ValueKey('me-goals')))));
-  // Αυτόματη διόρθωση θερμίδων (σχέδια A1–A4, 12/11). Στόχοι από Δευτέρα 16/11· πρώτος έλεγχος Δευτέρα 7/12.
-  final checkDay = DateTime(2026, 12, 7, 8, 20);
+  // Αυτόματη διόρθωση θερμίδων (σχέδια A1–A4, 12/11). Στόχοι από Δευτέρα 16/11. Τελικός έλεγχος, Συμβούλιο 2 (Α2): την 21η
+  // μέρα (Δευτέρα 7/12) η κάρτα λέει ότι μαζεύει δεδομένα· η πρώτη εκτίμηση βγαίνει την 28η (Δευτέρα 14/12).
+  final gatherDay = DateTime(2026, 12, 7, 8, 20);
+  final checkDay = DateTime(2026, 12, 14, 8, 20);
   final fastDay = DateTime(2026, 12, 4, 8, 20); // 18η μέρα: η πρώτη εβδομάδα δεν μετρά στη γρήγορη απώλεια (Συμβούλιο 2, Σ1)
   void Function(HealthStore) checkinPrep(DateTime at, {double eat = 2250, double tdee = 2600, Goals? goals}) => (s) {
         final j = sampleDashboardJson(at)..['body'] = bodyJson(simWeights(at, eat: eat, tdee: tdee));
@@ -2039,6 +2041,9 @@ void main() {
   testWidgets('Σήμερα · έλεγχος θερμίδων', (t) => _shot(t,
       name: '68a_today_checkin', size: phone, brightness: Brightness.light, tab: Cat.today, at: checkDay,
       prepare: checkinPrep(checkDay), food: checkinFood(checkDay)));
+  testWidgets('Σήμερα · έλεγχος θερμίδων · 21η μέρα, μαζεύω δεδομένα', (t) => _shot(t,
+      name: '68i_today_checkin_gathering', size: phone, brightness: Brightness.light, tab: Cat.today, at: gatherDay,
+      prepare: checkinPrep(gatherDay), food: checkinFood(gatherDay)));
   testWidgets('Σήμερα · έλεγχος θερμίδων · πώς βγήκε', (t) => _shot(t,
       name: '68b_checkin_how', size: phone, brightness: Brightness.light, tab: Cat.today, at: checkDay,
       prepare: checkinPrep(checkDay), food: checkinFood(checkDay),
@@ -2064,9 +2069,9 @@ void main() {
       prepare: checkinPrep(checkDay,
           goals: checkinGoals(kcalAdapt: 2110).copyWith(
               tdeeEst: 2600,
-              checkIn: '2026-12-07',
-              addLog: const AdaptLog(day: '2026-12-07', tdee: 2600, before: 2250, after: 2110, applied: true))),
-      page: (s) => GoalsPage(store: s, now: DateTime(2026, 12, 8, 18, 40))));
+              checkIn: '2026-12-14',
+              addLog: const AdaptLog(day: '2026-12-14', tdee: 2600, before: 2250, after: 2110, applied: true))),
+      page: (s) => GoalsPage(store: s, now: DateTime(2026, 12, 15, 18, 40))));
   testWidgets('Στόχοι · πριν από τον πρώτο έλεγχο', (t) => _page(t,
       name: '68h_goals_before_checkin', size: phone, brightness: Brightness.light, oura: false,
       prepare: (s) {

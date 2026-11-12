@@ -25,9 +25,11 @@ const goalsInfo = MetricInfo(
   title: 'Στόχοι διατροφής',
   what: 'Θερμίδες και θρεπτικά της ημέρας, από τύπους με επιστημονική πηγή. Κανένας αριθμός δεν βγαίνει από AI.',
   // 12/11: η αυτόματη διόρθωση μπήκε (σχέδια A1–A4)· πάντα με το δικό σου «Εφάρμοσε».
-  shows: 'Πόσο να φας για τον στόχο σου. Ο στόχος θερμίδων είναι αρχική εκτίμηση. Μετά από 3 εβδομάδες με ζυγίσεις και '
-      'καταγραφή φαγητού φαίνεται πόσες θερμίδες καις πραγματικά, και κάθε εβδομάδα η εφαρμογή προτείνει διόρθωση του '
-      'στόχου (το πολύ 150 kcal τη φορά). Αλλάζει μόνο όταν πατήσεις «Εφάρμοσε».',
+  // Τελικός έλεγχος, Συμβούλιο 2 (Α1, Α2): η πρώτη εβδομάδα δεν μετρά· πρόταση μόνο πέρα από το εύρος των ζυγίσεων.
+  shows: 'Πόσο να φας για τον στόχο σου. Ο στόχος θερμίδων είναι αρχική εκτίμηση. Η πρώτη εβδομάδα δεν μετρά, γιατί τότε '
+      'φεύγουν κυρίως νερά. Μετά από άλλες 3 εβδομάδες με ζυγίσεις και καταγραφή φαγητού φαίνεται πόσες θερμίδες καις '
+      'πραγματικά, και κάθε εβδομάδα η εφαρμογή ελέγχει τον στόχο. Προτείνει διόρθωση (το πολύ 150 kcal τη φορά) μόνο όταν '
+      'η διαφορά ξεπερνά το φυσιολογικό εύρος των ζυγίσεων. Αλλάζει μόνο όταν πατήσεις «Εφάρμοσε».',
   compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018) · λίπος 25–35% των θερμίδων (EFSA) · κορεσμένα έως 6% όταν ο γιατρός ζητά να '
       'πέσει η LDL (AHA/ACC), αλλιώς κάτω από 10% (Π.Ο.Υ.) · φυτικές ίνες 30 g (Reynolds 2019) · αλάτι κάτω από 5 g (Π.Ο.Υ.).',
   accuracy: 'Οι τύποι για τις θερμίδες πέφτουν συχνά 10–15% έξω σε έναν άνθρωπο. Γι’ αυτό η εφαρμογή τους διορθώνει με τα '
@@ -556,7 +558,11 @@ class GoalsPage extends StatelessWidget {
         }
         final calc = g.calc;
         final today = now ?? DateTime.now();
-        final next = nextCheckDay(g, today);
+        // Πριν από την πρώτη εκτίμηση, «Πρώτος έλεγχος» είναι η μέρα που θα βγει (28η μέρα· Συμβούλιο 2, Α2), όχι η 21η,
+        // που η κάρτα της Σήμερα λέει μόνο ότι μαζεύει δεδομένα.
+        final due = nextCheckDay(g, today);
+        final firstEstimate = firstEstimateDay(g);
+        final next = g.log.isEmpty && due.isBefore(firstEstimate) ? firstEstimate : due;
         final nextText = sameDay(next, today) ? 'σήμερα' : longDate(next);
         final lastApplied = g.log.where((l) => l.applied).lastOrNull;
         final adaptCards = _adaptCards(context, g, today, next);
@@ -733,12 +739,15 @@ class GoalsPage extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Πριν από τον πρώτο έλεγχο', style: title),
           const SizedBox(height: 2),
-          Text('Στις 3 τελευταίες εβδομάδες, ως χθες:', style: small),
+          Text('Μετά την πρώτη εβδομάδα, στις 3 τελευταίες, ως χθες:', style: small),
           InfoRow('Μέρες με φαγητό', '${r.intakeDays} από $adaptMinIntakeDays'),
           InfoRow('Ζυγίσεις', '${r.weighIns} από $adaptMinWeighIns'),
           InfoRow('Έλεγχος', when),
           const SizedBox(height: 4),
-          Text('Μετράνε μέρες με τουλάχιστον το 60% του στόχου γραμμένο· οι ζυγίσεις έρχονται μόνες τους από την InBody.', style: small),
+          Text(
+              'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά. Μετράνε μέρες με τουλάχιστον το 60% του στόχου γραμμένο· '
+              'οι ζυγίσεις έρχονται μόνες τους από την InBody.',
+              style: small),
         ]),
       ),
     ];
@@ -1033,11 +1042,13 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: c.tint(c.food), borderRadius: BorderRadius.circular(16)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Μετά από 3 εβδομάδες, από τα δικά σου δεδομένα', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
+              Text('Μετά από 4 εβδομάδες, από τα δικά σου δεδομένα', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
               const SizedBox(height: 4),
               Text(
-                'Συγκρίνοντας τι έφαγες με το πώς άλλαξε το βάρος σου, φαίνεται πόσες θερμίδες καις πραγματικά. Κάθε εβδομάδα '
-                'η Σήμερα σού προτείνει διόρθωση του στόχου, το πολύ 150 kcal τη φορά· αλλάζει μόνο αν πατήσεις «Εφάρμοσε».',
+                'Συγκρίνοντας τι έφαγες με το πώς άλλαξε το βάρος σου, φαίνεται πόσες θερμίδες καις πραγματικά. Η πρώτη '
+                'εβδομάδα δεν μετρά, γιατί τότε φεύγουν κυρίως νερά. Κάθε εβδομάδα η Σήμερα ελέγχει τον στόχο και προτείνει '
+                'διόρθωση μόνο όταν η διαφορά ξεπερνά το φυσιολογικό εύρος των ζυγίσεων, το πολύ 150 kcal τη φορά· αλλάζει '
+                'μόνο αν πατήσεις «Εφάρμοσε».',
                 style: TextStyle(fontSize: 14, height: 1.45, color: c.text),
               ),
             ]),

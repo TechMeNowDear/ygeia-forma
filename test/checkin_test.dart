@@ -15,7 +15,10 @@ import 'package:ygeia_forma/theme.dart';
 import 'sample_checkin.dart';
 import 'sample_data.dart';
 
-final _check = DateTime(2026, 12, 7, 8, 20); // Δευτέρα, 21 μέρες μετά τις 16/11
+// Τελικός έλεγχος (Συμβούλιο 2, Α2): η πρώτη εβδομάδα των στόχων δεν μετρά. Την 21η μέρα η κάρτα λέει ότι μαζεύει
+// δεδομένα· η πρώτη εκτίμηση βγαίνει την 28η.
+final _day21 = DateTime(2026, 12, 7, 8, 20); // Δευτέρα, 21 μέρες μετά τις 16/11
+final _check = DateTime(2026, 12, 14, 8, 20); // Δευτέρα, 28 μέρες μετά τις 16/11: η πρώτη μέρα με εκτίμηση
 const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
 
 CheckIn? _pending(Goals g, DateTime today, {double eat = 2250, double tdee = 2600, Set<int> skip = const {}, int weighs = 99}) {
@@ -68,20 +71,43 @@ void main() {
 
     test('θερμίδες ανά μέρα όπως στη Διατροφή· μέρες χωρίς φαγητό λείπουν', () {
       final f = checkinFood(_check, eat: 2250, skip: {2});
-      final m = dailyIntake(f, DateTime(2026, 12, 4), DateTime(2026, 12, 6));
-      expect(m.keys, [DateTime(2026, 12, 4), DateTime(2026, 12, 6)]);
-      expect(m[DateTime(2026, 12, 4)]!, closeTo(2250, 1));
+      final m = dailyIntake(f, DateTime(2026, 12, 11), DateTime(2026, 12, 13));
+      expect(m.keys, [DateTime(2026, 12, 11), DateTime(2026, 12, 13)]);
+      expect(m[DateTime(2026, 12, 11)]!, closeTo(2250, 1));
     });
   });
 
   group('τι εκκρεμεί', () {
-    test('μέρα ελέγχου με αρκετά δεδομένα: νέος στόχος ~2.110 (−140)', () {
+    test('μέρα ελέγχου με αρκετά δεδομένα (28η μέρα): νέος στόχος ~2.100 (−150)', () {
       final c = _pending(checkinGoals(), _check)!;
       expect(c.kind, CheckKind.proposal);
       expect(c.est!.tdee, closeTo(2600, 30));
       expect(c.proposal!.current, 2250);
       expect(c.proposal!.target, inInclusiveRange(2100, 2120));
       expect((c.days, c.weighs), (21, 9));
+      expect((c.est!.windowDays, c.est!.from, c.est!.to), (21, DateTime(2026, 11, 23), DateTime(2026, 12, 13)),
+          reason: 'η πρώτη εβδομάδα (16–22/11) μένει έξω');
+      expect(c.proposal!.withinNoise, isFalse, reason: 'οι ζυγίσεις εδώ πέφτουν σχεδόν πάνω στην ευθεία: μικρό περιθώριο');
+      expect(c.est!.guardKcal, lessThan(40));
+    });
+
+    test('Α2: την 21η μέρα η κάρτα μαζεύει ακόμα δεδομένα· καμία εκτίμηση, καμία πρόταση· η πρώτη βγαίνει την 28η', () {
+      final c = _pending(checkinGoals(), _day21)!;
+      expect((c.kind, c.status), (CheckKind.gathering, AdaptStatus.tooEarly));
+      expect((c.est, c.proposal), (null, null));
+      expect((c.days, c.weighs), (14, 6), reason: 'όσα μετρούν ως τώρα: από τις 23/11');
+      // Μένει ανοιχτή ως να απαντηθεί, και μέσα στην εβδομάδα λέει το ίδιο.
+      expect(_pending(checkinGoals(), DateTime(2026, 12, 9))!.kind, CheckKind.gathering);
+      final g = dismissCheckIn(c, _day21);
+      expect((g.kcal, g.checkIn, g.tdeeEst), (2250, '2026-12-07', null));
+      expect(g.log, isEmpty);
+      expect(_pending(g, _day21), isNull);
+      expect(firstCheckDay(g), DateTime(2026, 12, 7));
+      expect(firstEstimateDay(g), DateTime(2026, 12, 14));
+      expect(nextCheckDay(g, DateTime(2026, 12, 8)), DateTime(2026, 12, 14));
+      expect(_pending(g, _check)!.kind, CheckKind.proposal, reason: 'την 28η μέρα υπάρχουν 21 μέρες που μετρούν');
+      // Και χωρίς να απαντηθεί η κάρτα της 21ης μέρας, την 28η βγαίνει κανονικά η εκτίμηση.
+      expect(_pending(checkinGoals(), _check)!.kind, CheckKind.proposal);
     });
 
     test('«Εφάρμοσε»: ισχύει ο νέος, γράφεται στο ιστορικό, ο δικός σου αριθμός αντικαθίσταται· ξανά σε 7 μέρες', () {
@@ -90,13 +116,13 @@ void main() {
       final g = applyCheckIn(c, _check);
       expect(g.kcalSet, isNull);
       expect(g.kcal, c.proposal!.target);
-      expect(g.checkIn, '2026-12-07');
+      expect(g.checkIn, '2026-12-14');
       expect(g.log.single.applied, isTrue);
       expect(Goals.fromJson(g.toJson())!.toJson(), g.toJson(), reason: 'αποθηκεύεται και διαβάζεται ίδιο');
       expect(_pending(g, _check), isNull, reason: 'μία φορά τη μέρα ελέγχου');
-      expect(_pending(g, DateTime(2026, 12, 10)), isNull);
-      expect(nextCheckDay(g, DateTime(2026, 12, 10)), DateTime(2026, 12, 14));
-      expect(_pending(g, DateTime(2026, 12, 14))?.kind, isNotNull);
+      expect(_pending(g, DateTime(2026, 12, 17)), isNull);
+      expect(nextCheckDay(g, DateTime(2026, 12, 17)), DateTime(2026, 12, 21));
+      expect(_pending(g, DateTime(2026, 12, 21))?.kind, isNotNull);
     });
 
     test('«Όχι τώρα»: ο στόχος μένει, η εκτίμηση κρατιέται', () {
@@ -112,7 +138,7 @@ void main() {
       final c = _pending(checkinGoals(), _check, skip: {for (var k = 1; k <= 21; k += 2) k})!;
       expect((c.kind, c.status, c.days), (CheckKind.fewData, AdaptStatus.fewIntakeDays, 10));
       final g = dismissCheckIn(c, _check);
-      expect((g.kcal, g.checkIn), (2250, '2026-12-07'));
+      expect((g.kcal, g.checkIn), (2250, '2026-12-14'));
       expect(g.log, isEmpty);
       final w = _pending(checkinGoals(), _check, weighs: 4)!;
       expect((w.kind, w.status), (CheckKind.fewData, AdaptStatus.fewWeighIns));
@@ -121,6 +147,18 @@ void main() {
     test('πριν από την 21η μέρα: τίποτα (εκτός από γρήγορη απώλεια)', () {
       expect(_pending(checkinGoals(), DateTime(2026, 11, 30)), isNull);
       expect(nextCheckDay(checkinGoals(), DateTime(2026, 11, 20)), DateTime(2026, 12, 7));
+    });
+
+    test('πριν από τον πρώτο έλεγχο: μετρούν μόνο οι μέρες μετά την πρώτη εβδομάδα', () {
+      for (final (day, days, weighs) in [(DateTime(2026, 11, 20), 0, 0), (DateTime(2026, 12, 1), 8, 4), (DateTime(2026, 12, 8), 15, 7)]) {
+        final food = checkinFood(day);
+        final r = readiness(
+            goals: checkinGoals(),
+            today: day,
+            weights: dailyWeights(Dashboard.fromJson({...sampleDashboardJson(day), 'body': bodyJson(simWeights(day))}).body),
+            intake: (a, b) => dailyIntake(food, a, b));
+        expect((r.intakeDays, r.weighIns, r.first), (days, weighs, DateTime(2026, 12, 14)), reason: '$day');
+      }
     });
 
     test('γρήγορη απώλεια: άλλη μέρα, +150, μία φορά την εβδομάδα', () {
@@ -132,6 +170,12 @@ void main() {
       expect(c.kind, CheckKind.fast);
       expect(c.proposal!.change, 150);
       expect(c.fastSlope!, lessThan(-0.9));
+      // Η κάρτα γράφει ακριβώς τις μέρες που κρίθηκαν (εγκρίθηκε 12/11): από τις 23/11 ως τις 4/12 είναι 11.
+      expect(c.fastDays, 11);
+      expect(fastPeriodText(c.fastDays), 'Τις τελευταίες 11 μέρες');
+      expect(fastPeriodText(14), 'Τις 2 τελευταίες εβδομάδες');
+      expect(fastPeriodText(21), 'Τις 3 τελευταίες εβδομάδες');
+      expect(fastPeriodText(null), 'Τις τελευταίες μέρες');
       final g = applyCheckIn(c, fri);
       expect((g.kcal, g.fastAt, g.checkIn), (2400, '2026-12-04', null));
       expect(_pending(g, DateTime(2026, 12, 5), eat: 1600, tdee: 2900), isNull, reason: 'όχι ξανά μέσα στην εβδομάδα');
@@ -190,11 +234,28 @@ void main() {
       expect(find.byKey(const ValueKey('today-checkin')), findsNothing);
     });
 
+    testWidgets('Α2: την 21η μέρα η κάρτα λέει ότι μαζεύει δεδομένα· μόνο «Εντάξει», ο στόχος μένει', (t) async {
+      final s = _store(_day21);
+      await _today(t, s, checkinFood(_day21), _day21);
+      expect(find.text('Έλεγχος θερμίδων: μαζεύω δεδομένα'), findsOneWidget);
+      expect(find.textContaining('Η πρώτη εβδομάδα δεν μετρά'), findsOneWidget);
+      expect(find.textContaining('την επόμενη Δευτέρα'), findsOneWidget);
+      expect(find.byKey(const ValueKey('checkin-apply')), findsNothing);
+      expect(find.byKey(const ValueKey('checkin-how')), findsNothing);
+      await t.ensureVisible(find.byKey(const ValueKey('checkin-ok')));
+      await t.tap(find.byKey(const ValueKey('checkin-ok')));
+      await t.pumpAndSettle();
+      expect((s.goals!.kcal, s.goals!.checkIn), (2250, '2026-12-07'));
+      expect(s.goals!.log, isEmpty);
+      expect(find.byKey(const ValueKey('today-checkin')), findsNothing);
+    });
+
     testWidgets('γρήγορη απώλεια: «Όχι τώρα» κλείνει την κάρτα χωρίς αλλαγή', (t) async {
       final wed = DateTime(2026, 12, 4, 8, 20); // Παρασκευή, 18η μέρα (Συμβούλιο 2, Σ1: η πρώτη εβδομάδα δεν μετρά)
       final s = _store(wed, eat: 1600, tdee: 2900);
       await _today(t, s, checkinFood(wed, eat: 1600), wed);
       expect(find.text('Χάνεις πιο γρήγορα από το ασφαλές'), findsOneWidget);
+      expect(find.textContaining('Τις τελευταίες 11 μέρες: ', findRichText: true), findsOneWidget);
       await t.ensureVisible(find.byKey(const ValueKey('checkin-later')));
       await t.tap(find.byKey(const ValueKey('checkin-later')));
       await t.pumpAndSettle();
@@ -220,11 +281,27 @@ void main() {
       t.view.devicePixelRatio = 1.0;
       t.view.physicalSize = const Size(400, 2400);
       addTearDown(t.view.reset);
-      await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: GoalsPage(store: s, now: DateTime(2026, 12, 8))));
+      await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: GoalsPage(store: s, now: DateTime(2026, 12, 15))));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('goals-adapt-log')), findsOneWidget);
-      expect(find.text('Επόμενος έλεγχος: Δευτέρα 14 Δεκεμβρίου'), findsOneWidget);
+      expect(find.text('Επόμενος έλεγχος: Δευτέρα 21 Δεκεμβρίου'), findsOneWidget);
       expect(find.textContaining('Από τα δεδομένα σου'), findsOneWidget);
+    });
+
+    testWidgets('Στόχοι, Α2: ως την πρώτη εκτίμηση γράφει «Πρώτος έλεγχος» τη μέρα που θα βγει (28η), και την 21η', (t) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(400, 2400);
+      addTearDown(t.view.reset);
+      // 21η μέρα, με την κάρτα «μαζεύω δεδομένα» ανοιχτή στη Σήμερα.
+      await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: GoalsPage(store: _store(_day21), now: _day21)));
+      await t.pumpAndSettle();
+      expect(find.text('Πρώτος έλεγχος: Δευτέρα 14 Δεκεμβρίου'), findsOneWidget);
+      // Και αφού πατηθεί το «Εντάξει» της.
+      final seen = dismissCheckIn(_pending(checkinGoals(), _day21)!, _day21);
+      await t.pumpWidget(MaterialApp(
+          theme: buildTheme(Brightness.light), home: GoalsPage(key: const ValueKey('after'), store: _store(_day21, goals: seen), now: DateTime(2026, 12, 9))));
+      await t.pumpAndSettle();
+      expect(find.text('Πρώτος έλεγχος: Δευτέρα 14 Δεκεμβρίου'), findsOneWidget);
     });
   });
 }

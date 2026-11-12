@@ -173,7 +173,7 @@ void main() {
       expect(day.legumesDryG, closeTo(40, 1e-9));
       expect(day.legumes, isTrue);
       expect(day.fish, isTrue);
-      expect(day.full, isFalse, reason: 'λιγότερες από 1.200 kcal: δεν μπαίνει στους μέσους όρους');
+      expect(day.fullFor(2250), isFalse, reason: 'κάτω από το 60% του στόχου (1.350 kcal): δεν μπαίνει στους μέσους όρους');
       expect(CholDay([_e(d, 'Φακές (βρασμένες)', 90)]).legumes, isFalse);
       expect(CholDay([_e(d, 'Φακές (ξερές)', 40)]).legumes, isTrue);
     });
@@ -182,13 +182,43 @@ void main() {
       final mon = DateTime(2026, 11, 9);
       final full = CholDay([_e(mon, 'Καρύδια', 200), _e(mon, 'Πίτουρο βρώμης', 40)]); // 1.418 + 144 kcal
       final thin = CholDay([_e(mon, 'Καρύδια', 10)]);
-      final w = CholWeek([(mon, full), (DateTime(2026, 11, 10), thin)]);
-      expect(full.full, isTrue);
+      final w = CholWeek([(mon, full), (DateTime(2026, 11, 10), thin)], goalKcal: 2250);
+      expect(full.fullFor(2250), isTrue);
       expect(w.fullDays, 1);
       expect(w.daysWithNuts(30), 1);
       expect(w.daysWithBran(40), 1);
       expect(w.satPctMean, closeTo(full.satPct!, 1e-9));
       expect(weekStart(DateTime(2026, 11, 15)), DateTime(2026, 11, 9));
+    });
+
+    // Τελικός έλεγχος, Συμβούλιο 2, Α4 (εγκρίθηκε 12/11).
+    test('Α4: «πλήρης μέρα» = 60% του στόχου θερμίδων, ο ίδιος κανόνας με τη διόρθωση θερμίδων', () {
+      expect(fullDayShare, 0.6);
+      expect(fullDayKcalFor(2250), closeTo(1350, 1e-9));
+      expect(fullDayKcalFor(1200), closeTo(720, 1e-9));
+      final mon = DateTime(2026, 11, 9);
+      final day = CholDay([_e(mon, 'Καρύδια', 150)]); // περίπου 1.060 kcal
+      expect(day.kcal, inInclusiveRange(1000, 1150));
+      // Με στόχο 2.250 είναι «λίγη καταγραφή»· με στόχο 1.500 είναι πλήρης (πριν, με τις σταθερές 1.200, δεν μετρούσε ποτέ).
+      expect((day.fullFor(2250), day.fullFor(1500)), (false, true));
+      expect((CholWeek([(mon, day)], goalKcal: 2250).fullDays, CholWeek([(mon, day)], goalKcal: 1500).fullDays), (0, 1));
+    });
+
+    test('Α4: μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «αλάτι εντάξει»', () {
+      final mon = DateTime(2026, 11, 9), tue = DateTime(2026, 11, 10);
+      final nuts = foodNamed('Καρύδια');
+      expect(nuts.n.has(Nk.salt), isTrue, reason: 'η δοκιμή θέλει τρόφιμο ΜΕ τιμή αλατιού');
+      // Το ίδιο τρόφιμο χωρίς τιμή αλατιού στην πηγή του (όπως πολλά από το Open Food Facts).
+      final j = nuts.toJson();
+      final noSalt = Food.fromJson({...j, 'id': 'x-no-salt', 'n': {...(j['n'] as Map)}..remove(Nk.salt)});
+      expect(noSalt.n.has(Nk.salt), isFalse);
+      final known = CholDay([_e(mon, 'Καρύδια', 250)]);
+      final unknown = CholDay([LogEntry(id: 'u1', day: dateKey(tue), meal: Meal.lunch, food: noSalt, grams: 250, time: tue)]);
+      expect((known.saltMissing, unknown.saltMissing), (false, true));
+      final w = CholWeek([(mon, known), (tue, unknown)], goalKcal: 2250);
+      expect(w.fullDays, 2);
+      expect(w.daysSaltOk(5), 1, reason: 'πριν μετρούσαν και οι δύο: η άγνωστη τιμή διαβαζόταν ως 0 g');
+      expect(w.daysSaltUnknown, 1);
     });
   });
 

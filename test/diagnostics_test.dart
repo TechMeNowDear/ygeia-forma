@@ -17,7 +17,8 @@ import 'sample_checkin.dart';
 import 'sample_data.dart';
 import 'sample_food.dart';
 
-final _at = DateTime(2026, 12, 7, 8, 20);
+// 28η μέρα των στόχων (16/11): η πρώτη μέρα με εκτίμηση (τελικός έλεγχος, Συμβούλιο 2, Α2· την 21η η κάρτα μαζεύει δεδομένα).
+final _at = DateTime(2026, 12, 14, 8, 20);
 const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
 
 HealthStore _store({List<(DateTime, double)>? weights}) {
@@ -40,6 +41,17 @@ void main() {
     expect((calc['goals'] as Map)['inForce'], containsPair('kcal', 2250));
     expect(((calc['adaptive'] as Map)['pending'] as Map)['kind'], 'proposal');
     expect(((calc['adaptive'] as Map)['probe'] as Map)['status'], 'ok');
+    // Αποφάσεις 12/11 (Α1–Α3): η αναφορά δείχνει το παράθυρο, το τυπικό σφάλμα και το περιθώριο που έκριναν.
+    final adaptive = calc['adaptive'] as Map;
+    expect((adaptive['firstCheck'], adaptive['firstEstimate']), ('2026-12-07', '2026-12-14'));
+    final probe = adaptive['probe'] as Map;
+    expect(probe['window'], ['2026-11-23', '2026-12-13'], reason: 'χωρίς την πρώτη εβδομάδα των στόχων');
+    final est = probe['est'] as Map;
+    expect(est['windowDays'], 21);
+    expect(est['guardKcal'], closeTo(2 * (est['seKcal'] as num), 0.16));
+    expect((adaptive['fast'] as Map)['window'], ['2026-11-23', '2026-12-14']);
+    expect((calc['chol'] as Map)['fullDayKcal'], 1350);
+    expect((calc['chol'] as Map)['daysSaltUnknown'], 0);
     expect((calc['days'] as List).length, 22, reason: '21 μέρες + σήμερα');
     expect((calc['zone'] as Map)['age'], 40);
     expect(calc['chol'], isNotNull);
@@ -56,7 +68,7 @@ void main() {
   test('έλεγχοι: άλμα βάρους, 0 g, διπλή καταχώριση', () {
     final w = simWeights(_at);
     final jumped = [...w.take(w.length - 1), (w.last.$1, w.last.$2 + 4)];
-    final day = DateTime(2026, 12, 6, 13);
+    final day = DateTime(2026, 12, 13, 13);
     final bread = foodNamed('Ψωμί ολικής άλεσης');
     final food = FoodStore.preloaded(foods: basicFoods(), now: _at, entries: [
       LogEntry(id: 'a', day: dateKey(day), meal: Meal.lunch, food: bread, grams: 0, time: day),

@@ -10,6 +10,7 @@
 /// - Ψάρι: μία «φορά» = μέρα με τουλάχιστον 100 g ψάρι ή θαλασσινά.
 library;
 
+import '../goals.dart' show fullDayShare;
 import 'food_model.dart';
 
 const branFoodId = 'C9640';
@@ -17,8 +18,9 @@ const legumesDryMinG = 40.0;
 const legumesCookedFactor = 2.5;
 const fishMinG = 100.0;
 
-/// Μέρα με λιγότερες θερμίδες από αυτές λογαριάζεται «με λίγη καταγραφή» και δεν μπαίνει στους μέσους όρους.
-const fullDayKcal = 1200.0;
+/// Από πόσες θερμίδες και πάνω μια μέρα έχει «πλήρη καταγραφή» και μπαίνει στους μέσους όρους: το 60% του στόχου
+/// θερμίδων, ο ίδιος κανόνας με τη διόρθωση θερμίδων (τελικός έλεγχος, Συμβούλιο 2, Α4). Πριν ήταν σταθερές 1.200 kcal.
+double fullDayKcalFor(int goalKcal) => fullDayShare * goalKcal;
 
 String _plain(String s) {
   const from = 'άέήίόύώϊϋΐΰ';
@@ -48,6 +50,8 @@ class CholDay {
       salt += e.total(Nk.salt);
       if (!e.food.n.has(Nk.satFat)) satMissing = true;
       if (!e.food.n.has(Nk.fiber)) fiberMissing = true;
+      // Τρόφιμο χωρίς τιμή αλατιού μετρούσε ως 0 g και η μέρα έβγαινε «αλάτι εντάξει» (Συμβούλιο 2, μ4 / Α4).
+      if (!e.food.n.has(Nk.salt)) saltMissing = true;
       final f = e.food;
       if (isBran(f)) {
         branG += e.grams;
@@ -64,14 +68,14 @@ class CholDay {
 
   int count = 0;
   double kcal = 0, satFat = 0, fiber = 0, salt = 0;
-  bool satMissing = false, fiberMissing = false;
+  bool satMissing = false, fiberMissing = false, saltMissing = false;
   double nutsG = 0, branG = 0, legumesDryG = 0, fishG = 0;
 
   bool get legumes => legumesDryG >= legumesDryMinG - 1e-9;
   bool get fish => fishG >= fishMinG - 1e-9;
 
-  /// Αρκετή καταγραφή για μέσους όρους.
-  bool get full => kcal >= fullDayKcal;
+  /// Αρκετή καταγραφή για μέσους όρους, με στόχο [goalKcal] θερμίδες τη μέρα.
+  bool fullFor(int goalKcal) => kcal >= fullDayKcalFor(goalKcal);
 
   /// Κορεσμένα ως % των θερμίδων (null χωρίς θερμίδες).
   double? get satPct => kcal <= 0 ? null : satFat * 9 / kcal * 100;
@@ -82,12 +86,15 @@ DateTime weekStart(DateTime day) => DateTime(day.year, day.month, day.day - (day
 
 /// Σύνοψη για τις μέρες μιας εβδομάδας που ΕΧΟΥΝ τελειώσει ([days]: η κάθε μέρα με τις καταχωρίσεις της).
 class CholWeek {
-  CholWeek(this.days);
+  CholWeek(this.days, {required this.goalKcal});
 
   /// Παλιότερη πρώτη. Μπαίνουν μόνο μέρες που έχουν τελειώσει.
   final List<(DateTime, CholDay)> days;
 
-  Iterable<CholDay> get _full => days.map((d) => d.$2).where((d) => d.full);
+  /// Ο στόχος θερμίδων που ισχύει: κρίνει ποιες μέρες έχουν «πλήρη καταγραφή» ([CholDay.fullFor]).
+  final int goalKcal;
+
+  Iterable<CholDay> get _full => days.map((d) => d.$2).where((d) => d.fullFor(goalKcal));
   int get fullDays => _full.length;
 
   double? _mean(Iterable<double?> v) {
@@ -100,7 +107,12 @@ class CholWeek {
 
   int daysWithNuts(int target) => _full.where((d) => target > 0 && d.nutsG >= target - 1e-9).length;
   int daysWithBran(int target) => _full.where((d) => target > 0 && d.branG >= target - 1e-9).length;
-  int daysSaltOk(double max) => _full.where((d) => d.salt < max).length;
+  /// Μέρες με αλάτι κάτω από [max]. Μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «εντάξει»: το πραγματικό αλάτι
+  /// της είναι άγνωστο ([daysSaltUnknown]).
+  int daysSaltOk(double max) => _full.where((d) => !d.saltMissing && d.salt < max).length;
+
+  /// Μέρες με πλήρη καταγραφή όπου κάποιο τρόφιμο δεν έχει τιμή αλατιού στην πηγή του.
+  int get daysSaltUnknown => _full.where((d) => d.saltMissing).length;
 
   /// Όσπρια και ψάρι: κάθε μέρα που έγιναν, και με λίγη καταγραφή (το φαγητό έγινε).
   int get legumes => days.where((d) => d.$2.legumes).length;

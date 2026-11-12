@@ -206,8 +206,10 @@ const cholInfo = MetricInfo(
       'μέρα, όσπρια και ψάρι μέσα στην εβδομάδα. Η εφαρμογή δεν προβλέπει τη νέα σου LDL· αυτό το λένε μόνο οι εξετάσεις.',
   compare: 'Κορεσμένα έως 6% των θερμίδων (AHA/ACC) · φυτικές ίνες 30 g (Reynolds 2019) · 3 g β-γλυκάνες βρώμης τη μέρα '
       '(EFSA) · ξηροί καρποί περίπου 30 g (Del Gobbo 2015) · όσπρια και φυτικά τρόφιμα μαζί (Jenkins 2003).',
-  accuracy: 'Οι μέρες με λίγη καταγραφή (κάτω από 1.200 kcal) δεν μπαίνουν στους μέσους όρους. Αν ένα τρόφιμο δεν έχει τιμή '
-      'για κορεσμένα ή ίνες στην πηγή του, το σύνολο είναι «τουλάχιστον».',
+  // Τελικός έλεγχος, Συμβούλιο 2 (Α4): ίδιος κανόνας «πλήρους μέρας» με τη διόρθωση θερμίδων, και το αλάτι που λείπει.
+  accuracy: 'Οι μέρες με λίγη καταγραφή (κάτω από το 60% του στόχου θερμίδων) δεν μπαίνουν στους μέσους όρους. Αν ένα '
+      'τρόφιμο δεν έχει τιμή για κορεσμένα ή ίνες στην πηγή του, το σύνολο είναι «τουλάχιστον». Μέρα με τρόφιμο χωρίς '
+      'τιμή αλατιού δεν μετρά ως «αλάτι εντάξει».',
   cite: 'Eckel 2013 (AHA/ACC) · EFSA 2010/2011 · Reynolds 2019 (Lancet) · Del Gobbo 2015 (AJCN) · Jenkins 2003 (JAMA)',
 );
 
@@ -318,20 +320,20 @@ class _CholesterolPageState extends State<CholesterolPage> {
     final today = dayOf(widget.today);
     final ws = weekStart(today);
     // Μόνο οι μέρες που έχουν τελειώσει (σήμερα όχι).
-    final thisWeek = CholWeek(_daysOf(widget.food, ws, today));
+    final thisWeek = CholWeek(_daysOf(widget.food, ws, today), goalKcal: g.kcal);
     final weeks = [
       for (var k = 3; k >= 0; k--)
         () {
           final from = DateTime(ws.year, ws.month, ws.day - 7 * k);
           final to = k == 0 ? today : DateTime(from.year, from.month, from.day + 7);
-          return (from, CholWeek(_daysOf(widget.food, from, to)));
+          return (from, CholWeek(_daysOf(widget.food, from, to), goalKcal: g.kcal));
         }(),
     ];
     const dayLabels = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
     List<double?> perDay(double? Function(CholDay) f) => [
           for (var k = 0; k < 7; k++)
             () {
-              final hit = thisWeek.days.where((x) => x.$1.weekday == k + 1 && x.$2.full);
+              final hit = thisWeek.days.where((x) => x.$1.weekday == k + 1 && x.$2.fullFor(g.kcal));
               return hit.isEmpty ? null : f(hit.first.$2);
             }(),
         ];
@@ -435,6 +437,12 @@ class _CholesterolPageState extends State<CholesterolPage> {
                     if (g.fishWeek > 0) CholRow(label: 'Ψάρι', value: '${w.fish}', target: '${g.fishWeek} φορές', done: w.fish >= g.fishWeek),
                     CholRow(
                         label: 'Αλάτι κάτω από ${dec(g.salt, 0)} g',
+                        // Συμβούλιο 2, Α4: μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «εντάξει»· η γραμμή το λέει.
+                        sub: w.daysSaltUnknown == 0
+                            ? null
+                            : w.daysSaltUnknown == 1
+                                ? '1 μέρα με τρόφιμο χωρίς τιμή αλατιού'
+                                : '${w.daysSaltUnknown} μέρες με τρόφιμο χωρίς τιμή αλατιού',
                         value: '${w.daysSaltOk(g.salt)} από ${w.fullDays} μέρες',
                         target: '',
                         done: w.fullDays > 0 && w.daysSaltOk(g.salt) == w.fullDays),
@@ -442,8 +450,9 @@ class _CholesterolPageState extends State<CholesterolPage> {
                 ),
               const SizedBox(height: 10),
               Text(
-                'Μέρες με λίγη καταγραφή (κάτω από ${thousands(fullDayKcal.round())} kcal) δεν μετρούν στους μέσους όρους. Σήμερα δεν '
-                'μετρά μέχρι να τελειώσει η μέρα. Όσπρια: μία φορά = 40 g ξερά ή 100 g βρασμένα· ψάρι: 100 g.',
+                'Μέρες με λίγη καταγραφή (κάτω από ${thousands(fullDayKcalFor(g.kcal).round())} kcal, το 60% του στόχου σου) δεν '
+                'μετρούν στους μέσους όρους. Σήμερα δεν μετρά μέχρι να τελειώσει η μέρα. Όσπρια: μία φορά = 40 g ξερά ή 100 g '
+                'βρασμένα· ψάρι: 100 g.',
                 style: small,
               ),
             ]),

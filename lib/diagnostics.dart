@@ -208,9 +208,15 @@ Map<String, dynamic> diagnosticsFrom({
     final ready = readiness(goals: g, today: today, weights: weights, intake: intake);
     final to = DateTime(today.year, today.month, today.day - 1);
     final windowFrom = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1));
-    // Η εκτίμηση ΤΩΡΑ (όποια μέρα κι αν είναι), για έλεγχο· στην εφαρμογή φαίνεται μόνο τη μέρα ελέγχου.
+    final wideFrom = DateTime(to.year, to.month, to.day - (adaptMaxWindowDays - 1));
+    final since = DateTime.tryParse(g.since);
+    // Η εκτίμηση ΤΩΡΑ (όποια μέρα κι αν είναι), για έλεγχο· στην εφαρμογή φαίνεται μόνο τη μέρα ελέγχου. Με τους ίδιους
+    // κανόνες (Συμβούλιο 2, Α1–Α2): χωρίς την πρώτη εβδομάδα των στόχων, στο μεγαλύτερο παράθυρο που έχει αρκετά δεδομένα.
     final probe = estimateExpenditure(
-        intake: intake(windowFrom, to), weights: weights, today: today, formulaTdee: g.calc.tdee, goalKcal: g.kcal);
+        intake: intake(wideFrom, to), weights: weights, today: today, formulaTdee: g.calc.tdee, goalKcal: g.kcal, since: since);
+    final fastWindow = fastLossWindow(goals: g, today: today);
+    final fastWs = fastLossWeights(goals: g, weights: weights, today: today);
+    final fastFit = weightFit(fastWs);
     final w14 = [for (final w in weights) if (!w.$1.isBefore(DateTime(today.year, today.month, today.day - 14))) w];
     final w21 = [for (final w in weights) if (!w.$1.isBefore(windowFrom) && !w.$1.isAfter(to)) w];
     adaptive = {
@@ -238,8 +244,9 @@ Map<String, dynamic> diagnosticsFrom({
               'fastSlopeKgWeek': pending.fastSlope == null ? null : _r(pending.fastSlope!, 3),
             },
       'readiness': {'intakeDays': ready.intakeDays, 'weighIns': ready.weighIns, 'first': dateKey(ready.first)},
+      'firstEstimate': dateKey(firstEstimateDay(g)),
       'probe': {
-        'window': [dateKey(windowFrom), dateKey(to)],
+        'window': probe.est == null ? [dateKey(windowFrom), dateKey(to)] : [dateKey(probe.est!.from), dateKey(probe.est!.to)],
         'status': probe.status.name,
         if (probe.est != null)
           'est': {
@@ -248,9 +255,19 @@ Map<String, dynamic> diagnosticsFrom({
             'slopeKgWeek': _r(probe.est!.slopeKgWeek, 3),
             'intakeDays': probe.est!.intakeDays,
             'weighIns': probe.est!.weighIns,
+            'windowDays': probe.est!.windowDays,
+            'seKcal': _r(probe.est!.seKcal, 1),
+            'guardKcal': _r(probe.est!.guardKcal, 1),
           },
         'formulaTdee': _r(g.calc.tdee, 1),
         'plausibleBand': [_r(0.7 * g.calc.tdee, 0), _r(1.4 * g.calc.tdee, 0)],
+      },
+      // Η «γρήγορη απώλεια» όπως θα κρινόταν σήμερα (Συμβούλιο 2, Α3): παράθυρο, ζυγίσεις, κλίση και τυπικό σφάλμα.
+      'fast': {
+        'window': fastWindow == null ? null : [dateKey(fastWindow.$1), dateKey(fastWindow.$2)],
+        'weighIns': fastWs.length,
+        'slopeKgWeek': fastFit == null ? null : _r(fastFit.slope * 7, 3),
+        'seKgWeek': fastFit?.se == null ? null : _r(fastFit!.se! * 7, 3),
       },
       'slopeKgWeek14': w14.length < 2 ? null : _r((weightSlope(w14) ?? 0) * 7, 3),
       'slopeKgWeek21': w21.length < 2 ? null : _r((weightSlope(w21) ?? 0) * 7, 3),
@@ -261,7 +278,7 @@ Map<String, dynamic> diagnosticsFrom({
   Map<String, dynamic>? chol;
   if (g != null && g.doctor) {
     final ws = weekStart(today);
-    final week = CholWeek([for (final c in cholDays) if (!c.$1.isBefore(ws) && c.$1.isBefore(today)) c]);
+    final week = CholWeek([for (final c in cholDays) if (!c.$1.isBefore(ws) && c.$1.isBefore(today)) c], goalKcal: g.kcal);
     chol = {
       'weekStart': dateKey(ws),
       'fullDays': week.fullDays,
@@ -270,6 +287,8 @@ Map<String, dynamic> diagnosticsFrom({
       'daysWithNuts': week.daysWithNuts(g.nutsG),
       'daysWithBran': week.daysWithBran(g.branG),
       'daysSaltOk': week.daysSaltOk(g.salt),
+      'daysSaltUnknown': week.daysSaltUnknown,
+      'fullDayKcal': fullDayKcalFor(g.kcal).round(),
       'legumes': week.legumes,
       'fish': week.fish,
       'targets': {'nutsG': g.nutsG, 'branG': g.branG, 'legumesWeek': g.legumesWeek, 'fishWeek': g.fishWeek, 'doctor': g.docTargets.toJson()},
