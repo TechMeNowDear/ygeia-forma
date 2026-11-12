@@ -1,5 +1,6 @@
 // Τα features της #100 (13/11): «Τελευταίο αντίγραφο», διαστάσεις οθόνης, παλμοί ηρεμίας ξύπνιος, τάση HRV 7 νυχτών,
 // ποιότητα μετρήσεων παλμών, καθυστέρηση στο τέλος του διαλείμματος. Φανταστικές τιμές (δημόσιο repo).
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -16,7 +17,11 @@ import 'package:ygeia_forma/pages/training/hr_widgets.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/ti_ftanei.dart';
+import 'package:ygeia_forma/pages/training/training_common.dart';
 import 'package:ygeia_forma/training/hr_quality.dart';
+import 'package:ygeia_forma/training/program.dart';
+import 'package:ygeia_forma/training/training_store.dart';
+import 'package:ygeia_forma/training/wear_link.dart';
 import 'package:ygeia_forma/training/zone.dart';
 import 'package:ygeia_forma/widgets.dart';
 
@@ -150,6 +155,104 @@ void main() {
       expect(main, contains('openAddFood(context, _food, scan: true)'));
       // Το widget της προπόνησης δεν ξεκινά ποτέ προπόνηση από την αρχική οθόνη (πάτημα κατά λάθος).
       expect(kt, isNot(contains('start')));
+    });
+  });
+
+  group('4. Πρόγραμμα: ζέσταμα, αποθεραπεία και πλάνο περπατήματος ανά εβδομάδα', () {
+    // Φανταστικό πρόγραμμα (δημόσιο repo): Δευτέρα βάρη, Τρίτη περπάτημα με πλάνο 4 εβδομάδων από 16/11.
+    const text = '''
+{"kind":"ygeia-program","v":1,"id":"p-test","name":"Δοκιμή","author":"claude","from":"2026-11-16",
+ "days":{"mon":"A","tue":"walk"},
+ "workouts":[
+  {"id":"A","name":"Προπόνηση Α","warmup":["3 λεπτά περπάτημα επί τόπου","  10 κύκλοι ώμων  ",""],"cooldown":["Διάταση στήθους 30″ ανά πλευρά"],
+   "items":[{"ex":"db_press","sets":2,"reps":[10,12],"rir":3,"rest":90}]},
+  {"id":"walk","name":"Περπάτημα","warmup":["Τα πρώτα 5 λεπτά χαλαρά"],
+   "cardio":{"activity":"walk","minutes":30,"plan":[20,25,30,35]}}
+ ]}''';
+    const known = {'db_press'};
+
+    test('διαβάζεται, σώζεται και ξαναδιαβάζεται ίδιο· κενά βήματα φεύγουν', () {
+      final r = parseProgram(text, known);
+      expect(r.errors, isEmpty);
+      final p = r.program!;
+      final a = p.workout('A')!, walk = p.workout('walk')!;
+      expect(a.warmup, ['3 λεπτά περπάτημα επί τόπου', '10 κύκλοι ώμων']);
+      expect(a.cooldown, ['Διάταση στήθους 30″ ανά πλευρά']);
+      expect(walk.cardio!.plan, [20, 25, 30, 35]);
+      final back = Program.fromJson(jsonDecode(jsonEncode(p.toJson())) as Map<String, dynamic>);
+      expect(jsonEncode(back.toJson()), jsonEncode(p.toJson()));
+      expect(p.copy().workout('walk')!.cardio!.plan, [20, 25, 30, 35]);
+      expect(a.copy().warmup, a.warmup);
+      // Πρόγραμμα χωρίς τα νέα πεδία γράφεται όπως πριν (κανένα νέο κλειδί).
+      final old = sampleProgram();
+      expect(jsonEncode(old.toJson()).contains('warmup') || jsonEncode(old.toJson()).contains('"plan"'), isFalse);
+      expect(routineLabel(old.workouts.first), isNull);
+    });
+
+    test('τα λεπτά της εβδομάδας: 20 → 25 → 30 → 35, και μετά μένει 35', () {
+      final p = parseProgram(text, known).program!;
+      int tue(int day) => p.forDay(DateTime(2026, 11, day))!.cardio!.minutes;
+      expect([tue(17), tue(24)], [20, 25]);
+      expect(p.forDay(DateTime(2026, 12, 1))!.cardio!.minutes, 30);
+      expect(p.forDay(DateTime(2026, 12, 8))!.cardio!.minutes, 35);
+      expect(p.forDay(DateTime(2027, 3, 2))!.cardio!.minutes, 35);
+      // Πριν από την έναρξη: η πρώτη εβδομάδα. Η αλλαγή ώρας (29/3/2027) δεν μετακινεί την εβδομάδα.
+      expect(p.forDay(DateTime(2026, 11, 10))!.cardio!.minutes, 20);
+      expect((p.weekOf(DateTime(2026, 11, 22, 23, 59)), p.weekOf(DateTime(2026, 11, 23, 0, 1))), (0, 1));
+      // Το αποθηκευμένο πρόγραμμα δεν αλλάζει: το «at» δίνει αντίγραφο.
+      expect(p.workout('walk')!.cardio!.minutes, 30);
+      // Τα βάρη γυρίζουν το ίδιο αντικείμενο (καμία αντιγραφή χωρίς λόγο).
+      expect(identical(p.forDay(DateTime(2026, 11, 16)), p.workout('A')), isTrue);
+      final c = p.workout('walk')!.cardio!;
+      expect((c.planWeekText(0), c.planWeekText(3), c.planWeekText(4)), ('εβδομάδα 1 από 4', 'εβδομάδα 4 από 4', null));
+      expect(Cardio(minutes: 40).planWeekText(0), isNull);
+      expect(Cardio(minutes: 40).minutesInWeek(7), 40);
+    });
+
+    test('λάθη που δεν αφήνουν αποθήκευση: πλάνο χωρίς ημερομηνία, λεπτά εκτός ορίων, πάρα πολλά βήματα', () {
+      List<String> errs(String t) => parseProgram(t, known).errors;
+      expect(errs(text.replaceFirst('"from":"2026-11-16",', '')), contains('Περπάτημα: το πλάνο ανά εβδομάδα θέλει ημερομηνία έναρξης του προγράμματος.'));
+      expect(errs(text.replaceFirst('[20,25,30,35]', '[20,0,30]')).single, startsWith('Περπάτημα: το πλάνο θέλει ως 12 εβδομάδες'));
+      expect(errs(text.replaceFirst('[20,25,30,35]', '[${List.filled(13, 20).join(',')}]')).single, startsWith('Περπάτημα: το πλάνο θέλει ως 12 εβδομάδες'));
+      final many = [for (var i = 0; i < 11; i++) '"βήμα $i"'].join(',');
+      expect(errs(text.replaceFirst('"cooldown":["Διάταση στήθους 30″ ανά πλευρά"]', '"cooldown":[$many]')).single,
+          'Προπόνηση Α: η αποθεραπεία θέλει ως 10 βήματα, ως 160 γράμματα το καθένα.');
+      expect(errs(text.replaceFirst('Τα πρώτα 5 λεπτά χαλαρά', 'α' * 161)).single, 'Περπάτημα: το ζέσταμα θέλει ως 10 βήματα, ως 160 γράμματα το καθένα.');
+      // Ό,τι δεν είναι κείμενο ή αριθμός μέσα στις λίστες απλώς δεν διαβάζεται (ποτέ σφάλμα).
+      final odd = parseProgram(text.replaceFirst('[20,25,30,35]', '[20,"x",null,30]').replaceFirst('"  10 κύκλοι ώμων  "', '7'), known);
+      expect(odd.errors, isEmpty);
+      expect(odd.program!.workout('walk')!.cardio!.plan, [20, 30]);
+      expect(odd.program!.workout('A')!.warmup, ['3 λεπτά περπάτημα επί τόπου']);
+    });
+
+    test('το ρολόι και το widget παίρνουν τα λεπτά της εβδομάδας', () {
+      final now = DateTime(2026, 11, 24, 9); // Τρίτη, 2η εβδομάδα
+      final t = TrainingStore(io: MemoryTrainingIO(), clock: () => now)
+        ..replaceAll({'v': 1, 'programs': [parseProgram(text, known).program!.toJson()], 'active': 'p-test'})
+        ..ready = true;
+      final plan = watchPlan(t, now, (id) => id);
+      final walk = (plan['workouts'] as List).cast<Map>().firstWhere((w) => w['id'] == 'walk');
+      expect(((walk['cardio'] as Map)['minutes'], walk['minutes']), (25, 25));
+      final week = workoutSnapshot(t, DateTime(2026, 11, 24))['week'] as Map;
+      expect(week['2'], {'t': 'Περπάτημα', 's': '25 λεπτά'});
+      // Δευτέρα 23/11 ρωτάω για την Τρίτη 24/11 (ίδια εβδομάδα)· Τετάρτη 25/11 η επόμενη Τρίτη είναι 1/12 (3η εβδομάδα).
+      expect((workoutSnapshot(t, DateTime(2026, 11, 25))['week'] as Map)['2'], {'t': 'Περπάτημα', 's': '30 λεπτά'});
+    });
+
+    testWidgets('το φύλλο δείχνει τα βήματα με τη σειρά· χωρίς βήματα δεν υπάρχει κουμπί', (tester) async {
+      final p = parseProgram(text, known).program!;
+      expect(routineLabel(p.workout('A')!), 'Ζέσταμα και αποθεραπεία');
+      expect(routineLabel(p.workout('walk')!), 'Ζέσταμα');
+      Future<void> pump(Workout w) => tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: RoutineButton(w, key: UniqueKey()))));
+      await pump(Workout(id: 'x', name: 'Χ'));
+      expect(find.byKey(const ValueKey('routine-open')), findsNothing);
+      await pump(p.workout('A')!);
+      await tester.tap(find.byKey(const ValueKey('routine-open')));
+      await tester.pumpAndSettle();
+      expect(find.text('Ζέσταμα, πριν'), findsOneWidget);
+      expect(find.text('Αποθεραπεία, μετά'), findsOneWidget);
+      expect(find.text('10 κύκλοι ώμων'), findsOneWidget);
+      expect(find.text('Διάταση στήθους 30″ ανά πλευρά'), findsOneWidget);
     });
   });
 

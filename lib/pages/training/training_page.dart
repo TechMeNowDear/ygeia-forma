@@ -105,7 +105,9 @@ class _TrainingPageState extends State<TrainingPage> {
       cards.add(_noProgram(context));
       if (cur == null) cards.add(_freeCard(context));
     } else {
-      final w = _chosen == null ? p.forDay(today) : p.workout(_chosen);
+      // 13/11: και η προπόνηση που διάλεξες με το χέρι παίρνει τα λεπτά της εβδομάδας (πλάνο περπατήματος).
+      final picked = _chosen == null ? null : p.workout(_chosen);
+      final w = _chosen == null ? p.forDay(today) : (picked == null ? null : p.at(picked, today));
       cards.add(_todayCard(context, p, w, today));
       final strengthDone = [for (final x in t.sessions.reversed) if (x.finished && !x.isCardio) x];
       final lastStrength = strengthDone.isEmpty ? null : strengthDone.first;
@@ -364,7 +366,12 @@ class _TrainingPageState extends State<TrainingPage> {
       final cardio = w.cardio!;
       children.addAll([
         FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(cardio.name, maxLines: 1, style: title)),
-        Text(['${cardio.minutes} λεπτά', if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()].join(' · '), style: aux),
+        Text(
+            ['${cardio.minutes} λεπτά', if (cardio.planWeekText(p.weekOf(today)) case final wk?) wk, if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()]
+                .join(' · '),
+            key: const ValueKey('train-cardio-line'),
+            style: aux),
+        RoutineButton(w),
         const SizedBox(height: 12),
         Text(
             WearLink.main.ready.value
@@ -376,6 +383,7 @@ class _TrainingPageState extends State<TrainingPage> {
       children.add(FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(w.name, maxLines: 1, style: title)));
       children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά', style: aux));
       if (w.note != null) children.add(Text(w.note!, style: TextStyle(fontSize: 14, color: c.textSecondary)));
+      children.add(RoutineButton(w));
       final shown = _allItems || w.items.length <= 6 ? w.items : w.items.take(5).toList();
       for (var n = 0; n < shown.length; n++) {
         final item = shown[n];

@@ -144,6 +144,8 @@ class _SessionPageState extends State<SessionPage> {
         if (s.items.isEmpty) return _emptyFree(context, s);
         if (_idx >= s.items.length || _idx < 0) t.setFocusQuiet(s.items.length - 1);
         final e = s.items[_idx];
+        final planned = t.program?.workout(s.workout);
+        final routine = planned != null && routineLabel(planned) != null ? planned : null;
         return Scaffold(
           appBar: AppBar(
             // Ο τίτλος μεγαλώνει ως 1,3×, για να μη γίνεται «Προπ…» δίπλα στο «Τέλος» (έλεγχος premium, S4).
@@ -175,9 +177,12 @@ class _SessionPageState extends State<SessionPage> {
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (v) {
                   if (v == 'swap') _swap(context, e);
+                  if (v == 'routine' && routine != null) openRoutineSheet(context, routine);
                 },
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'swap', key: ValueKey('sess-swap'), child: Text('Αλλαγή άσκησης')),
+                  // 13/11: το ζέσταμα και η αποθεραπεία της προπόνησης, αν το πρόγραμμα έχει.
+                  if (routine != null) PopupMenuItem(value: 'routine', key: const ValueKey('sess-routine'), child: Text(routineLabel(routine)!)),
                 ],
               ),
               const SizedBox(width: 4),

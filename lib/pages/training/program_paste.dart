@@ -116,6 +116,11 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text('${w.cardio!.name} ${w.cardio!.minutes}′${w.cardio!.note == null ? '' : ' · ${w.cardio!.note}'}', style: TextStyle(fontSize: 15, color: c.text)),
               ),
+            // 13/11: τι άλλο φέρνει το πρόγραμμα, για να το δεις πριν το αποθηκεύσεις.
+            if (w.cardio != null && w.cardio!.plan.isNotEmpty)
+              Text('Ανά εβδομάδα: ${w.cardio!.plan.join(' · ')} λεπτά', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+            if (routineLabel(w) case final r?)
+              Text('$r: ${countText(w.warmup.length + w.cooldown.length, 'βήμα', 'βήματα')}', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
             for (final i in w.items)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),

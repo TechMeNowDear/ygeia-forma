@@ -48,7 +48,8 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},
     'day': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
     'workouts': [
-      for (final w in p?.workouts ?? const <Workout>[])
+      // 13/11: στην αερόβια με πλάνο ανά εβδομάδα, τα λεπτά της εβδομάδας που τρέχει (Program.at).
+      for (final w in [for (final x in p?.workouts ?? const <Workout>[]) p!.at(x, now)])
         {
           'id': w.id,
           'name': w.name,

@@ -248,14 +248,31 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
                   for (final a in Cardio.names.entries) Pill(label: a.value, selected: cd.activity == a.key, onTap: () => setState(() => cd.activity = a.key)),
                 ]),
                 const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(child: Text('Διάρκεια', style: TextStyle(fontSize: 15, color: c.text))),
-                  Stepper2(
-                    value: '${cd.minutes}′',
-                    onMinus: cardioMinutesMinus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesMinus(cd.minutes)!),
-                    onPlus: cardioMinutesPlus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesPlus(cd.minutes)!),
+                // 13/11: με πλάνο ανά εβδομάδα, τα λεπτά τα δίνει το πλάνο· το «− / +» γυρίζει όταν το βγάλεις.
+                if (cd.plan.isNotEmpty) ...[
+                  Text('Διάρκεια ανά εβδομάδα: ${cd.plan.join(' · ')} λεπτά',
+                      key: const ValueKey('ed-cardio-plan'), style: TextStyle(fontSize: 15, height: 1.4, color: c.text)),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: const ValueKey('ed-cardio-plan-off'),
+                      style: TextButton.styleFrom(minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 4)),
+                      onPressed: () => setState(() {
+                        cd.minutes = cd.plan.last;
+                        cd.plan = [];
+                      }),
+                      child: const Text('Ίδια λεπτά κάθε εβδομάδα'),
+                    ),
                   ),
-                ]),
+                ] else
+                  Row(children: [
+                    Expanded(child: Text('Διάρκεια', style: TextStyle(fontSize: 15, color: c.text))),
+                    Stepper2(
+                      value: '${cd.minutes}′',
+                      onMinus: cardioMinutesMinus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesMinus(cd.minutes)!),
+                      onPlus: cardioMinutesPlus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesPlus(cd.minutes)!),
+                    ),
+                  ]),
               ]),
             ),
           ),

@@ -77,25 +77,59 @@ class PlanItem {
 
 /// Αερόβια (περπάτημα κ.λπ.).
 class Cardio {
-  Cardio({this.activity = 'walk', this.minutes = 30, this.note});
+  Cardio({this.activity = 'walk', this.minutes = 30, this.note, List<int>? plan}) : plan = plan ?? [];
   String activity;
   int minutes;
   String? note;
 
+  /// Πλάνο περπατήματος (13/11): τα λεπτά ανά εβδομάδα του προγράμματος (η 1η εβδομάδα πρώτη), από την ημερομηνία
+  /// έναρξης ([Program.from]). Μετά την τελευταία εβδομάδα μένει η τελευταία τιμή. Άδειο = πάντα [minutes].
+  List<int> plan;
+
+  /// Τα λεπτά την εβδομάδα [week] (0 = η πρώτη).
+  int minutesInWeek(int week) => plan.isEmpty ? minutes : plan[week < 0 ? 0 : (week >= plan.length ? plan.length - 1 : week)];
+
+  /// «εβδομάδα 2 από 4», όσο το πλάνο τρέχει· null χωρίς πλάνο ή μετά το τέλος του.
+  String? planWeekText(int week) => plan.isEmpty || week < 0 || week >= plan.length ? null : 'εβδομάδα ${week + 1} από ${plan.length}';
+
   static const names = {'walk': 'Περπάτημα', 'brisk': 'Γρήγορο περπάτημα', 'bike': 'Ποδήλατο', 'stairs': 'Σκάλες'};
   String get name => names[activity] ?? 'Αερόβια';
 
-  Map<String, dynamic> toJson() => {'activity': activity, 'minutes': minutes, if (note != null) 'note': note};
-  factory Cardio.fromJson(Map<String, dynamic> j) =>
-      Cardio(activity: j['activity'] as String? ?? 'walk', minutes: (j['minutes'] as num?)?.toInt() ?? 30, note: j['note'] as String?);
+  Map<String, dynamic> toJson() => {'activity': activity, 'minutes': minutes, if (note != null) 'note': note, if (plan.isNotEmpty) 'plan': plan};
+  factory Cardio.fromJson(Map<String, dynamic> j) => Cardio(
+        activity: j['activity'] as String? ?? 'walk',
+        minutes: (j['minutes'] as num?)?.toInt() ?? 30,
+        note: j['note'] as String?,
+        plan: [
+          if (j['plan'] is List)
+            for (final v in j['plan'] as List)
+              if (v is num && v.isFinite) v.toInt(),
+        ],
+      );
 }
 
+/// Ζέσταμα και αποθεραπεία (13/11): ως [routineMaxSteps] σύντομα βήματα, ως [routineMaxChars] χαρακτήρες το καθένα.
+const routineMaxSteps = 10, routineMaxChars = 160;
+const planMaxWeeks = 12;
+
+List<String> _steps(Object? j) => [
+      if (j is List)
+        for (final s in j)
+          if (s is String && s.trim().isNotEmpty) s.trim(),
+    ];
+
 class Workout {
-  Workout({required this.id, required this.name, List<PlanItem>? items, this.cardio, this.note}) : items = items ?? [];
+  Workout({required this.id, required this.name, List<PlanItem>? items, this.cardio, this.note, List<String>? warmup, List<String>? cooldown})
+      : items = items ?? [],
+        warmup = warmup ?? [],
+        cooldown = cooldown ?? [];
   String id, name;
   final List<PlanItem> items;
   Cardio? cardio;
   String? note;
+
+  /// Ζέσταμα πριν και αποθεραπεία μετά (13/11): σύντομα βήματα, με τη σειρά που γίνονται. Άδειο = δεν φαίνεται τίποτα.
+  final List<String> warmup, cooldown;
 
   bool get isCardio => cardio != null;
 
@@ -109,13 +143,23 @@ class Workout {
     return (s / 60).round();
   }
 
-  Workout copy() => Workout(id: id, name: name, items: [for (final i in items) i.copy()], cardio: cardio == null ? null : Cardio.fromJson(cardio!.toJson()), note: note);
+  Workout copy() => Workout(
+        id: id,
+        name: name,
+        items: [for (final i in items) i.copy()],
+        cardio: cardio == null ? null : Cardio.fromJson(cardio!.toJson()),
+        note: note,
+        warmup: [...warmup],
+        cooldown: [...cooldown],
+      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         if (cardio != null) 'cardio': cardio!.toJson() else 'items': [for (final i in items) i.toJson()],
         if (note != null && note!.isNotEmpty) 'note': note,
+        if (warmup.isNotEmpty) 'warmup': warmup,
+        if (cooldown.isNotEmpty) 'cooldown': cooldown,
       };
 
   factory Workout.fromJson(Map<String, dynamic> j) => Workout(
@@ -124,6 +168,8 @@ class Workout {
         items: [for (final i in (j['items'] as List? ?? const [])) PlanItem.fromJson(i as Map<String, dynamic>)],
         cardio: j['cardio'] is Map ? Cardio.fromJson(j['cardio'] as Map<String, dynamic>) : null,
         note: j['note'] as String?,
+        warmup: _steps(j['warmup']),
+        cooldown: _steps(j['cooldown']),
       );
 }
 
@@ -165,7 +211,25 @@ class Program {
     return null;
   }
 
-  Workout? forDay(DateTime d) => workout(days[d.weekday]);
+  /// Η εβδομάδα του προγράμματος τη μέρα [d] (0 = η πρώτη). Χωρίς ημερομηνία έναρξης, ή πριν από αυτήν: 0.
+  int weekOf(DateTime d) {
+    final f = from;
+    if (f == null) return 0;
+    final n = DateTime.utc(d.year, d.month, d.day).difference(DateTime.utc(f.year, f.month, f.day)).inDays;
+    return n < 0 ? 0 : n ~/ 7;
+  }
+
+  /// Η προπόνηση [w] όπως ισχύει τη μέρα [d]: στην αερόβια με πλάνο, αντίγραφο με τα λεπτά της εβδομάδας. Αλλιώς η ίδια.
+  Workout at(Workout w, DateTime d) {
+    final c = w.cardio;
+    if (c == null || c.plan.isEmpty) return w;
+    return w.copy()..cardio!.minutes = c.minutesInWeek(weekOf(d));
+  }
+
+  Workout? forDay(DateTime d) {
+    final w = workout(days[d.weekday]);
+    return w == null ? null : at(w, d);
+  }
 
   Program copy() => Program.fromJson(jsonDecode(jsonEncode(toJson())) as Map<String, dynamic>);
 
@@ -272,6 +336,17 @@ List<String> validate(Program p, Set<String> known) {
     // Πριν δεν ελέγχονταν καθόλου: −5 ή 100.000 λεπτά περνούσαν ως την κάρτα της Σήμερα και το ρολόι.
     if (w.cardio != null && (w.cardio!.minutes < cardioMinMinutes || w.cardio!.minutes > cardioMaxMinutes)) {
       e.add('${w.name}: τα λεπτά της αερόβιας πρέπει να είναι από $cardioMinMinutes ως $cardioMaxMinutes.');
+    }
+    // 13/11: πλάνο περπατήματος ανά εβδομάδα, ζέσταμα και αποθεραπεία.
+    final plan = w.cardio?.plan ?? const <int>[];
+    if (plan.length > planMaxWeeks || plan.any((m) => m < cardioMinMinutes || m > cardioMaxMinutes)) {
+      e.add('${w.name}: το πλάνο θέλει ως $planMaxWeeks εβδομάδες, με $cardioMinMinutes ως $cardioMaxMinutes λεπτά η καθεμία.');
+    }
+    if (plan.isNotEmpty && p.from == null) e.add('${w.name}: το πλάνο ανά εβδομάδα θέλει ημερομηνία έναρξης του προγράμματος.');
+    for (final (label, steps) in [('το ζέσταμα', w.warmup), ('η αποθεραπεία', w.cooldown)]) {
+      if (steps.length > routineMaxSteps || steps.any((s) => s.length > routineMaxChars)) {
+        e.add('${w.name}: $label θέλει ως $routineMaxSteps βήματα, ως $routineMaxChars γράμματα το καθένα.');
+      }
     }
     for (final i in w.items) {
       if (!known.contains(i.ex)) e.add('Άγνωστη άσκηση «${i.ex}» στη «${w.name}».');

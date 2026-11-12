@@ -196,3 +196,66 @@ class Pill extends StatelessWidget {
 
 /// Ένα λάστιχο (όχι βοήθεια, όχι ζευγάρι ανά χέρι): δείχνεται με κουκκίδα και lb.
 bool isBand(LoadKind k) => k == LoadKind.band;
+
+// ---------------------------------------------------------------------------
+// Ζέσταμα και αποθεραπεία (13/11)
+// ---------------------------------------------------------------------------
+
+/// Το όνομα του κουμπιού, ανάλογα με το τι έχει η προπόνηση· null αν δεν έχει τίποτα από τα δύο.
+String? routineLabel(Workout w) => w.warmup.isEmpty && w.cooldown.isEmpty
+    ? null
+    : (w.cooldown.isEmpty ? 'Ζέσταμα' : (w.warmup.isEmpty ? 'Αποθεραπεία' : 'Ζέσταμα και αποθεραπεία'));
+
+/// Κουμπί που ανοίγει τα βήματα του ζεστάματος και της αποθεραπείας. Δεν φαίνεται αν η προπόνηση δεν έχει κανένα.
+class RoutineButton extends StatelessWidget {
+  const RoutineButton(this.workout, {super.key});
+  final Workout workout;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = routineLabel(workout);
+    if (label == null) return const SizedBox.shrink();
+    final c = Aigaio.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: const ValueKey('routine-open'),
+        style: TextButton.styleFrom(foregroundColor: c.exercise, minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 4)),
+        onPressed: () => openRoutineSheet(context, workout),
+        icon: const Icon(Icons.self_improvement_rounded, size: 20),
+        label: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+Future<void> openRoutineSheet(BuildContext context, Workout w) => showModalBottomSheet<void>(
+      context: context,
+      routeSettings: const RouteSettings(name: 'Ζέσταμα και αποθεραπεία'),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) {
+        final c = Aigaio.of(context);
+        Widget part(String title, List<String> steps) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
+              const SizedBox(height: 6),
+              for (var i = 0; i < steps.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    SizedBox(width: 26, child: Text('${i + 1}.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.textSecondary))),
+                    Expanded(child: Text(steps[i], style: TextStyle(fontSize: 15, height: 1.4, color: c.text))),
+                  ]),
+                ),
+            ]);
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(key: const ValueKey('routine-sheet'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (w.warmup.isNotEmpty) part('Ζέσταμα, πριν', w.warmup),
+            if (w.warmup.isNotEmpty && w.cooldown.isNotEmpty) const SizedBox(height: 18),
+            if (w.cooldown.isNotEmpty) part('Αποθεραπεία, μετά', w.cooldown),
+          ]),
+        );
+      },
+    );

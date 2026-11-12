@@ -115,7 +115,12 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           _title(context, cardio.name),
           const SizedBox(height: 4),
           Text(
-            ['${cardio.minutes} λεπτά', if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim(), if (limitText != null) limitText].join(' · '),
+            [
+              '${cardio.minutes} λεπτά',
+              if (p == null ? null : cardio.planWeekText(p.weekOf(now)) case final wk?) wk,
+              if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim(),
+              if (limitText != null) limitText,
+            ].join(' · '),
             style: _aux(c),
           ),
           const SizedBox(height: 16),

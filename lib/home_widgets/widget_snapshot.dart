@@ -47,7 +47,8 @@ Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
     'week': {
       if (p != null)
         for (var d = 1; d <= 7; d++)
-          if (p.workout(p.days[d]) case final w?)
+          // Η επόμενη μέρα με αυτό το όνομα (σήμερα μαζί), ώστε το πλάνο περπατήματος να δίνει τα λεπτά της δικής της εβδομάδας.
+          if (p.forDay(DateTime(today.year, today.month, today.day + (d - today.weekday) % 7)) case final w?)
             '$d': {
               't': w.cardio?.name ?? w.name,
               's': w.cardio != null ? '${w.cardio!.minutes} λεπτά' : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes}′',
