@@ -252,8 +252,8 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
                   Expanded(child: Text('Διάρκεια', style: TextStyle(fontSize: 15, color: c.text))),
                   Stepper2(
                     value: '${cd.minutes}′',
-                    onMinus: cd.minutes > 5 ? () => setState(() => cd.minutes -= 5) : null,
-                    onPlus: cd.minutes < 180 ? () => setState(() => cd.minutes += 5) : null,
+                    onMinus: cardioMinutesMinus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesMinus(cd.minutes)!),
+                    onPlus: cardioMinutesPlus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesPlus(cd.minutes)!),
                   ),
                 ]),
               ]),

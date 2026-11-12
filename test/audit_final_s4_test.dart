@@ -2,7 +2,14 @@
 // W-4: επαναλήψεις που αλλάζεις στο ρολόι δεν χάνονται όταν χαθεί ένα μήνυμα (Bluetooth, κλειστή εφαρμογή):
 // έρχονται μέσα στο ✓ («r») και, αν χρειαστεί, μέσα στο αποτέλεσμα του ρολογιού («rb»).
 // Η πλευρά του ρολογιού: android/wear/src/test/…/AuditFinalS4Test.kt. Όλα τα νούμερα είναι δοκιμαστικά.
+// Μετά τις αποφάσεις της 12/11: Γ1 (επαναφορά φαγητού σε μία συναλλαγή) και το «+» των λεπτών αερόβιας ως 600.
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ygeia_forma/food/food_model.dart';
+import 'package:ygeia_forma/food/food_store.dart';
+import 'package:ygeia_forma/training/program.dart';
 import 'package:ygeia_forma/training/training_store.dart';
 import 'package:ygeia_forma/training/wear_link.dart';
 
@@ -159,6 +166,144 @@ void main() {
         ],
       });
       expect(e.log[0].reps, planned + 5);
+    });
+  });
+
+  group('Συμβούλιο 4 · Γ1: επαναφορά φαγητού από αντίγραφο σε μία κλήση', () {
+    const channel = MethodChannel('ygeia/food');
+    tearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+
+    Map<String, Object> food(String id) => {
+          'id': id,
+          'name': 'Δοκιμαστικό $id',
+          'cat': 'Τα προϊόντα μου',
+          'source': 'Ετικέτα',
+          'n': {'kcal': 70, 'protein': 10},
+        };
+    Map<String, Object> entry(String id, DateTime at) => {
+          'id': id,
+          'day': '${at.year.toString().padLeft(4, '0')}-${at.month.toString().padLeft(2, '0')}-${at.day.toString().padLeft(2, '0')}',
+          'meal': 'lunch',
+          'food': food('M1'),
+          'grams': 170,
+          'time': at.millisecondsSinceEpoch,
+        };
+    final today = DateTime.now();
+    final recent = DateTime(today.year, today.month, today.day, 13);
+    final old = DateTime(today.year, today.month, today.day - 400, 13);
+
+    /// Το κινητό έχει ήδη την καταχώριση E1 και το προϊόν M1. [restore]: τι απαντά η βάση στην επαναφορά.
+    List<MethodCall> phone(Map<String, Object?> restore) {
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return switch (call.method) {
+          'logRange' => jsonEncode({
+              'ok': true,
+              'entries': [entry('E1', recent)],
+            }),
+          'myFoods' => jsonEncode({
+              'ok': true,
+              'foods': [food('M1')],
+            }),
+          'restorePut' => jsonEncode(restore),
+          _ => jsonEncode({'ok': true}),
+        };
+      });
+      return calls;
+    }
+
+    List<LogEntry> entries(List<Map<String, Object>> js) => [for (final j in js) LogEntry.fromJson(j)];
+    List<Food> foods(List<Map<String, Object>> js) => [for (final j in js) Food.fromJson(j)];
+
+    test('ό,τι λείπει πάει σε ΜΙΑ κλήση· ό,τι υπάρχει ήδη μένει· καμία εγγραφή μία-μία', () async {
+      final calls = phone({'ok': true, 'entries': 2, 'foods': 1});
+      final s = FoodStore();
+      addTearDown(s.dispose);
+      final res = await s.importBackup(
+        entries([entry('E1', recent), entry('E2', recent), entry('E3', old), entry('E2', recent)]),
+        foods([food('M1'), food('M2')]),
+      );
+      // (καταχωρίσεις, προϊόντα, αποτυχίες, υπήρχαν ήδη): E1, το δεύτερο E2 και το M1 υπήρχαν ήδη
+      expect(res, (2, 1, 0, 3));
+      final writes = calls.where((c) => c.method != 'logRange' && c.method != 'myFoods').toList();
+      expect(writes.map((c) => c.method), ['restorePut']);
+      final args = Map<String, dynamic>.from(writes.single.arguments as Map);
+      expect([for (final x in jsonDecode(args['log'] as String) as List) (x as Map)['id']], ['E2', 'E3']);
+      expect([for (final x in jsonDecode(args['foods'] as String) as List) (x as Map)['id']], ['M2']);
+      // κάθε καταχώριση έχει «id» και «day», όπως τα θέλει το Kotlin (FoodRules.restoreRows)
+      for (final x in jsonDecode(args['log'] as String) as List) {
+        expect((x as Map)['day'], isA<String>());
+      }
+      // στη μνήμη: η πρόσφατη φαίνεται, η παλιά (πάνω από 90 μέρες) όχι· το νέο προϊόν πρώτο, το παλιό μένει
+      expect(s.entriesFor(recent).map((x) => x.id), contains('E2'));
+      expect(s.entriesFor(old), isEmpty);
+      expect(s.mine.map((x) => x.id), ['M2', 'M1']);
+    });
+
+    test('η βάση αρνήθηκε: τίποτα στη μνήμη, όλα στις αποτυχίες (ή όλα ή τίποτα)', () async {
+      phone({'ok': false, 'kind': 'other', 'message': 'δοκιμή'});
+      final s = FoodStore();
+      addTearDown(s.dispose);
+      final res = await s.importBackup(entries([entry('E2', recent), entry('E3', old)]), foods([food('M2')]));
+      expect(res, (0, 0, 3, 0));
+      expect(s.entriesFor(recent), isEmpty);
+      expect(s.mine.map((x) => x.id), ['M1']);
+    });
+
+    test('δεν λείπει τίποτα: καμία εγγραφή στη βάση', () async {
+      final calls = phone({'ok': true, 'entries': 0, 'foods': 0});
+      final s = FoodStore();
+      addTearDown(s.dispose);
+      final res = await s.importBackup(entries([entry('E1', recent)]), foods([food('M1')]));
+      expect(res, (0, 0, 0, 2));
+      expect(calls.where((c) => c.method == 'restorePut'), isEmpty);
+    });
+
+    test('η βάση βρήκε κάτι ήδη εκεί (γράφτηκε στο μεταξύ): μετρά στα «υπήρχαν ήδη», όχι στις αποτυχίες', () async {
+      phone({'ok': true, 'entries': 1, 'foods': 0});
+      final s = FoodStore();
+      addTearDown(s.dispose);
+      final res = await s.importBackup(entries([entry('E2', recent), entry('E3', old)]), foods([food('M2')]));
+      expect(res, (1, 0, 0, 2));
+    });
+
+    test('απάντηση χωρίς αριθμούς (ή με άσχετους): μετρά όσα στάλθηκαν, ποτέ πάνω από αυτά', () async {
+      phone({'ok': true});
+      final s = FoodStore();
+      addTearDown(s.dispose);
+      expect(await s.importBackup(entries([entry('E2', recent)]), foods([food('M2')])), (1, 1, 0, 0));
+      phone({'ok': true, 'entries': 99, 'foods': -3});
+      final s2 = FoodStore();
+      addTearDown(s2.dispose);
+      expect(await s2.importBackup(entries([entry('E2', recent)]), foods([food('M2')])), (1, 0, 0, 1));
+    });
+  });
+
+  group('Συμβούλιο 4 · απόφαση 3: τα λεπτά αερόβιας στον επεξεργαστή', () {
+    test('το «+» φτάνει ως το όριο της επικόλλησης (600), με βήμα 5', () {
+      expect(cardioMinutesPlus(5), 10);
+      expect(cardioMinutesPlus(175), 180);
+      expect(cardioMinutesPlus(180), 185, reason: 'πριν σταματούσε εδώ');
+      expect(cardioMinutesPlus(240), 245);
+      expect(cardioMinutesPlus(598), 600, reason: 'ποτέ πάνω από το όριο');
+      expect(cardioMinutesPlus(600), isNull);
+      expect(cardioMinutesPlus(601), isNull);
+      expect(cardioMaxMinutes, 600);
+    });
+
+    test('το «−» όπως πριν (ως τα 5′)· από 240 με «−» και «+» γυρίζεις στο 240', () {
+      expect(cardioMinutesMinus(240), 235);
+      expect(cardioMinutesMinus(10), 5);
+      expect(cardioMinutesMinus(5), isNull);
+      expect(cardioMinutesMinus(3), isNull);
+      expect(cardioMinutesPlus(cardioMinutesMinus(240)!), 240);
+      // ό,τι δέχεται η επικόλληση, ο επεξεργαστής το δείχνει και το αλλάζει χωρίς να βγει από τα όρια
+      for (var m = cardioMinMinutes; m <= cardioMaxMinutes; m++) {
+        final up = cardioMinutesPlus(m), down = cardioMinutesMinus(m);
+        if (up != null) expect(up > m && up <= cardioMaxMinutes, isTrue, reason: '$m');
+        if (down != null) expect(down < m && down >= cardioMinMinutes, isTrue, reason: '$m');
+      }
     });
   });
 }

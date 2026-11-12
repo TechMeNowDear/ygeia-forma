@@ -254,6 +254,13 @@ PasteResult parseProgram(String text, Set<String> known) {
 /// Τα λεπτά μιας αερόβιας προπόνησης σε πρόγραμμα που επικολλάς: από 1 ως 600 (απόφαση 12/11, Συμβούλιο 3, Β4).
 const cardioMinMinutes = 1, cardioMaxMinutes = 600;
 
+/// Το «+» και το «−» στα λεπτά αερόβιας του επεξεργαστή προγράμματος: βήμα 5′. null = το κουμπί είναι σβηστό.
+/// Το «+» φτάνει ως το όριο της επικόλλησης (απόφαση 12/11, Συμβούλιο 4): πριν σταματούσε στα 180′, και από ένα πρόγραμμα
+/// με 240′ που είχες επικολλήσει, ένα «−» δεν γύριζε πίσω. Το «−» μένει όπως ήταν (ως τα 5′).
+int? cardioMinutesPlus(int minutes) =>
+    minutes < cardioMaxMinutes ? (minutes + 5 > cardioMaxMinutes ? cardioMaxMinutes : minutes + 5) : null;
+int? cardioMinutesMinus(int minutes) => minutes > 5 ? minutes - 5 : null;
+
 /// Λάθη που εμποδίζουν την αποθήκευση.
 List<String> validate(Program p, Set<String> known) {
   final e = <String>[];

@@ -36,6 +36,10 @@ class FoodChannel {
   static Future<Map<String, dynamic>> myFoods() => _call('myFoods');
   static Future<Map<String, dynamic>> myFoodPut(String json) => _write('myFoodPut', {'json': json});
   static Future<Map<String, dynamic>> myFoodDelete(String id) => _write('myFoodDelete', {'id': id});
+  /// Επαναφορά από αντίγραφο (τελικός έλεγχος, Συμβούλιο 4, Γ1): όλες οι καταχωρίσεις και τα προϊόντα που λείπουν σε μία
+  /// κλήση και μία συναλλαγή στη βάση (ή όλα ή τίποτα). [log] και [foods]: πίνακες JSON. Απάντηση: πόσα γράφτηκαν
+  /// («entries», «foods»). Μπαίνει στην ίδια σειρά με τις άλλες εγγραφές.
+  static Future<Map<String, dynamic>> restorePut(String log, String foods) => _write('restorePut', {'log': log, 'foods': foods});
   static Future<Map<String, dynamic>> scanBarcode() => _call('scanBarcode');
   static Future<Map<String, dynamic>> saveBackup(String json, String name) =>
       _call('saveBackup', {'json': json, 'name': name});

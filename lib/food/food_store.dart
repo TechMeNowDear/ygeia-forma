@@ -544,19 +544,22 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     };
     final today = dayOf(DateTime.now());
     final from = DateTime(today.year, today.month, today.day - historyDays);
+    // Ό,τι λείπει από το κινητό, μία φορά το καθένα (το ίδιο id δύο φορές στο αντίγραφο: μένει το πρώτο, όπως στη βάση).
+    final newEntries = <LogEntry>[];
     for (final le in entries) {
-      if (haveIds.contains(le.id)) {
+      if (!haveIds.add(le.id)) {
         existing++;
         continue;
       }
-      final r = await FoodChannel.logPut(jsonEncode(le.toJson()));
-      if (r['ok'] == true) {
-        e++;
-        // Στη μνήμη μόνο όσες φαίνονται (τελευταίες 90 μέρες), όπως όταν ανοίγει η εφαρμογή.
-        if (!le.time.isBefore(from)) _entries[le.id] = le;
-      } else {
-        failed++;
+      newEntries.add(le);
+    }
+    final newFoods = <Food>[];
+    for (final food in foods) {
+      if (!mineIds.add(food.id)) {
+        existing++;
+        continue;
       }
+      newFoods.add(food);
     }
     // Η λίστα από το κινητό (αν δεν είχε φορτωθεί στο άνοιγμα, να φαίνονται όλα, όχι μόνο τα νέα).
     final mine = <Food>[];
@@ -566,18 +569,29 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         mine.add(Food.fromJson(Map<String, dynamic>.from(x)));
       } catch (_) {}
     }
-    for (final food in foods) {
-      if (mineIds.contains(food.id)) {
-        existing++;
-        continue;
-      }
-      final r = await FoodChannel.myFoodPut(jsonEncode(food.toJson()));
+    // Τελικός έλεγχος, Συμβούλιο 4 (Γ1): όλα σε ΜΙΑ κλήση και μία συναλλαγή στη βάση. Πριν γράφονταν ένα-ένα· με χιλιάδες
+    // καταχωρίσεις αργούσε, και μια διακοπή στη μέση άφηνε μισή επαναφορά. Τώρα ή γράφονται όλα ή τίποτα.
+    if (newEntries.isNotEmpty || newFoods.isNotEmpty) {
+      final r = await FoodChannel.restorePut(
+        jsonEncode([for (final le in newEntries) le.toJson()]),
+        jsonEncode([for (final food in newFoods) food.toJson()]),
+      );
       if (r['ok'] == true) {
-        f++;
-        mine.removeWhere((x) => x.id == food.id);
-        mine.insert(0, food);
+        // Όσα έγραψε πραγματικά η βάση· ό,τι βρήκε ήδη εκεί (γράφτηκε στο μεταξύ) μετρά στα «υπήρχαν ήδη».
+        final wroteE = r['entries'], wroteF = r['foods'];
+        e = wroteE is num && wroteE.isFinite ? wroteE.toInt().clamp(0, newEntries.length) : newEntries.length;
+        f = wroteF is num && wroteF.isFinite ? wroteF.toInt().clamp(0, newFoods.length) : newFoods.length;
+        existing += (newEntries.length - e) + (newFoods.length - f);
+        for (final le in newEntries) {
+          // Στη μνήμη μόνο όσες φαίνονται (τελευταίες 90 μέρες), όπως όταν ανοίγει η εφαρμογή.
+          if (!le.time.isBefore(from)) _entries.putIfAbsent(le.id, () => le);
+        }
+        for (final food in newFoods) {
+          mine.removeWhere((x) => x.id == food.id);
+          mine.insert(0, food);
+        }
       } else {
-        failed++;
+        failed = newEntries.length + newFoods.length;
       }
     }
     _mine = mine;

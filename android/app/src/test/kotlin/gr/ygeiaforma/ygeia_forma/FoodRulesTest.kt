@@ -1,15 +1,17 @@
 package gr.ygeiaforma.ygeia_forma
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import java.io.ByteArrayInputStream
 
 /**
- * Τελικός έλεγχος, Συμβούλιο 4: barcode UPC-E (Β2) και απάντηση του Open Food Facts που δεν διαβάζεται (Β5).
- * Οι κωδικοί είναι δοκιμαστικοί (όχι πραγματικά προϊόντα), εκτός από το παράδειγμα της Wikipedia.
+ * Τελικός έλεγχος, Συμβούλιο 4: barcode UPC-E (Β2), απάντηση του Open Food Facts που δεν διαβάζεται (Β5) και οι γραμμές
+ * μιας επαναφοράς από αντίγραφο (Γ1). Οι κωδικοί είναι δοκιμαστικοί (όχι πραγματικά προϊόντα), εκτός από το παράδειγμα της Wikipedia.
  */
 class FoodRulesTest {
     @Test
@@ -121,5 +123,58 @@ class FoodRulesTest {
         assertEquals(100_000, FoodRules.readCapped(ByteArrayInputStream(big))!!.length)
         assertNull(FoodRules.readCapped(ByteArrayInputStream(big), 99_999))
         assertEquals("", FoodRules.readCapped(ByteArrayInputStream(ByteArray(0))))
+    }
+
+    // ------------------------------------------------------------------ Γ1: επαναφορά σε μία συναλλαγή
+    @Test
+    fun restoreRowsKeepEveryRowAsItCame() {
+        val log = """[{"id":"E1","day":"2026-11-01","meal":"lunch","grams":170,"food":{"id":"M1","name":"Γιαούρτι 2%"}},
+            {"id":"E2","day":"2026-11-02","grams":50.5}]"""
+        val foods = """[{"id":"M1","name":"Γιαούρτι 2%","n":{"kcal":70}}]"""
+        val r = FoodRules.restoreRows(log, foods)
+        assertEquals(listOf("E1", "E2"), r.log.map { it.first })
+        assertEquals(listOf("2026-11-01", "2026-11-02"), r.log.map { it.second })
+        assertEquals(listOf("M1"), r.foods.map { it.first })
+        // το JSON κάθε γραμμής είναι ολόκληρο, με σωστά ελληνικά και χωρίς να χαθεί πεδίο
+        val e1 = JSONObject(r.log[0].third)
+        assertEquals("Γιαούρτι 2%", e1.getJSONObject("food").getString("name"))
+        assertEquals(170, e1.getInt("grams"))
+        assertEquals(50.5, JSONObject(r.log[1].third).getDouble("grams"), 0.0)
+        assertEquals(70, JSONObject(r.foods[0].second).getJSONObject("n").getInt("kcal"))
+        // άδειοι πίνακες: τίποτα να γραφτεί, χωρίς σφάλμα
+        val none = FoodRules.restoreRows("[]", "[]")
+        assertTrue(none.log.isEmpty() && none.foods.isEmpty())
+    }
+
+    @Test
+    fun restoreRowsRefuseTheWholeBatchWhenOneRowIsWrong() {
+        val good = """{"id":"E1","day":"2026-11-01"}"""
+        val badLogs = listOf(
+            """[$good,{"day":"2026-11-01"}]""", // χωρίς id
+            """[$good,{"id":"E2"}]""", // χωρίς day
+            """[$good,{"id":"","day":"2026-11-01"}]""", // κενό id
+            """[$good,{"id":7,"day":"2026-11-01"}]""", // id που δεν είναι κείμενο
+            """[$good,{"id":"E2","day":20261101}]""", // day που δεν είναι κείμενο
+            """[$good,"σκουπίδι"]""",
+            """[$good,null]""",
+            """{"id":"E1","day":"2026-11-01"}""", // όχι πίνακας
+            "δεν είναι JSON",
+        )
+        for (log in badLogs) {
+            try {
+                FoodRules.restoreRows(log, "[]")
+                fail(log)
+            } catch (_: IllegalArgumentException) {
+            } catch (_: org.json.JSONException) {
+            }
+        }
+        for (foods in listOf("""[{"name":"χωρίς id"}]""", """[{"id":""}]""", """[{"id":5}]""", """[42]""", "{}")) {
+            try {
+                FoodRules.restoreRows("[$good]", foods)
+                fail(foods)
+            } catch (_: IllegalArgumentException) {
+            } catch (_: org.json.JSONException) {
+            }
+        }
     }
 }

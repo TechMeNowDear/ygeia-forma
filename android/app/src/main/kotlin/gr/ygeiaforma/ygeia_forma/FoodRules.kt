@@ -1,5 +1,6 @@
 package gr.ygeiaforma.ygeia_forma
 
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -7,7 +8,8 @@ import java.io.InputStream
 
 /**
  * Κανόνες του φαγητού χωρίς τύπους Android ή Google, ώστε να ελέγχονται σε απλό JVM (android/app/src/test).
- * Τελικός έλεγχος, Συμβούλιο 4: barcode UPC-E (Β2) και απάντηση του Open Food Facts που δεν διαβάζεται (Β5).
+ * Τελικός έλεγχος, Συμβούλιο 4: barcode UPC-E (Β2), απάντηση του Open Food Facts που δεν διαβάζεται (Β5) και οι γραμμές
+ * μιας επαναφοράς από αντίγραφο (Γ1).
  */
 object FoodRules {
     /** Το πολύ τόσο διαβάζεται από μια απάντηση του Open Food Facts (ένα προϊόν με τα πεδία που ζητάμε είναι λίγα KB). */
@@ -105,6 +107,36 @@ object FoodRules {
         val product = j.optJSONObject("product")
         if (j.optInt("status", 0) != 1 || product == null) return JSONObject().put("ok", true).put("found", false)
         return JSONObject().put("ok", true).put("found", true).put("product", product)
+    }
+
+    /** Οι γραμμές μιας επαναφοράς, έτοιμες για τη βάση: καταχωρίσεις (id, μέρα, JSON) και προϊόντα (id, JSON). */
+    class RestoreRows(val log: List<Triple<String, String, String>>, val foods: List<Pair<String, String>>)
+
+    /**
+     * Διαβάζει ό,τι στέλνει η Flutter για επαναφορά από αντίγραφο (Συμβούλιο 4, Γ1): δύο πίνακες JSON, [logJson] με
+     * καταχωρίσεις και [foodsJson] με προϊόντα. Κάθε καταχώριση θέλει «id» και «day», κάθε προϊόν «id» (κείμενο, όχι
+     * κενό), όπως στις «logPut» και «myFoodPut». Αν έστω ένα στοιχείο δεν είναι σωστό, πετά σφάλμα και ΔΕΝ γράφεται
+     * τίποτα: καλύτερα καμία επαναφορά από μια μισή. Το JSON κάθε γραμμής γράφεται όπως ήρθε.
+     */
+    fun restoreRows(logJson: String, foodsJson: String): RestoreRows {
+        val log = JSONArray(logJson)
+        val foods = JSONArray(foodsJson)
+        val outLog = ArrayList<Triple<String, String, String>>(log.length())
+        for (i in 0 until log.length()) {
+            val o = log.optJSONObject(i)
+            val id = (o?.opt("id") as? String).orEmpty()
+            val day = (o?.opt("day") as? String).orEmpty()
+            require(o != null && id.isNotEmpty() && day.isNotEmpty()) { "Επαναφορά: καταχώριση ${i + 1} χωρίς id ή day" }
+            outLog.add(Triple(id, day, o.toString()))
+        }
+        val outFoods = ArrayList<Pair<String, String>>(foods.length())
+        for (i in 0 until foods.length()) {
+            val o = foods.optJSONObject(i)
+            val id = (o?.opt("id") as? String).orEmpty()
+            require(o != null && id.isNotEmpty()) { "Επαναφορά: προϊόν ${i + 1} χωρίς id" }
+            outFoods.add(id to o.toString())
+        }
+        return RestoreRows(outLog, outFoods)
     }
 
     private fun connection(message: String): JSONObject =

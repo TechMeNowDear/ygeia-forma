@@ -155,6 +155,42 @@ class DayStore private constructor(context: Context) :
         writableDatabase.insertWithOnConflict("my_foods", null, v, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
+    /**
+     * Επαναφορά από αντίγραφο (τελικός έλεγχος, Συμβούλιο 4, Γ1): όλες οι καταχωρίσεις [log] (id, μέρα, JSON) και τα
+     * προϊόντα [foods] (id, JSON) σε ΜΙΑ συναλλαγή: ή γράφονται όλα ή, αν κάτι αποτύχει στη μέση, τίποτα. Πριν γράφονταν
+     * ένα-ένα (μία κλήση και μία συναλλαγή το καθένα)· μια διακοπή άφηνε μισή επαναφορά.
+     * Ό,τι υπάρχει ήδη στο κινητό με το ίδιο id μένει όπως είναι (CONFLICT_IGNORE): η επαναφορά μόνο προσθέτει.
+     * Επιστρέφει πόσες καταχωρίσεις και πόσα προϊόντα γράφτηκαν.
+     */
+    fun restoreFood(log: List<Triple<String, String, String>>, foods: List<Pair<String, String>>): Pair<Int, Int> {
+        val db = writableDatabase
+        val now = System.currentTimeMillis()
+        var entries = 0
+        var products = 0
+        db.beginTransaction()
+        try {
+            for ((id, day, json) in log) {
+                val v = ContentValues()
+                v.put("id", id)
+                v.put("day", day)
+                v.put("json", json)
+                v.put("updated", now)
+                if (db.insertWithOnConflict("food_log", null, v, SQLiteDatabase.CONFLICT_IGNORE) != -1L) entries++
+            }
+            for ((id, json) in foods) {
+                val v = ContentValues()
+                v.put("id", id)
+                v.put("json", json)
+                v.put("updated", now)
+                if (db.insertWithOnConflict("my_foods", null, v, SQLiteDatabase.CONFLICT_IGNORE) != -1L) products++
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        return entries to products
+    }
+
     fun myFoodDelete(id: String) {
         writableDatabase.delete("my_foods", "id = ?", arrayOf(id))
     }

@@ -68,6 +68,13 @@ class FoodBridge(
                 withContext(DbQueue.dispatcher) { store.myFoodDelete(call.argument<String>("id") ?: "") }
                 JSONObject().put("ok", true)
             }
+            // Τελικός έλεγχος, Συμβούλιο 4 (Γ1): επαναφορά από αντίγραφο σε ΜΙΑ συναλλαγή ([DayStore.restoreFood]). Ό,τι
+            // δεν είναι σωστό σταματά εδώ, πριν γραφτεί οτιδήποτε ([FoodRules.restoreRows]).
+            "restorePut" -> respondDb(result) {
+                val rows = FoodRules.restoreRows(call.argument<String>("log") ?: "[]", call.argument<String>("foods") ?: "[]")
+                val (entries, products) = withContext(DbQueue.dispatcher) { store.restoreFood(rows.log, rows.foods) }
+                JSONObject().put("ok", true).put("entries", entries).put("foods", products)
+            }
             "saveBackup" -> respond(result) {
                 val json = call.argument<String>("json") ?: ""
                 val name = call.argument<String>("name") ?: "ygeia-antigrafo.json"
