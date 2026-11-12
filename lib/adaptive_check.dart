@@ -84,6 +84,14 @@ class CheckIn {
     };
     return ((e.tdee + delta) / 10).round() * 10;
   }
+
+  /// Τα δεδομένα θέλουν στόχο κάτω από το όριο ασφαλείας· ο στόχος δεν φτάνει ποτέ εκεί, όσοι έλεγχοι κι αν γίνουν.
+  /// Το «Πώς βγήκε» γράφει τότε το όριο, όχι «τα δεδομένα λένε 1.210» (Συμβούλιο 2, μ1): ένας αριθμός κάτω από το όριο
+  /// δεν πρέπει να διαβαστεί ως στόχος που έρχεται.
+  bool get wantsBelowFloor {
+    final w = wanted;
+    return w != null && w < (goals.male ? kcalFloorMale : kcalFloorFemale);
+  }
 }
 
 /// Η πρώτη μέρα ελέγχου: 21 μέρες μετά την αρχή (ίδια μέρα της εβδομάδας).
@@ -156,8 +164,9 @@ CheckIn? pendingCheckIn({
   if (fa != null && daysBetween(fa, t) < 7) return null;
   final f = fastLossCheck(goals: g, weights: weights, today: t);
   if (f == null) return null;
-  final from = DateTime(t.year, t.month, t.day - adaptFastWindowDays);
-  final ws = [for (final w in weights) if (!w.$1.isBefore(from) && !w.$1.isAfter(t)) w];
+  // Οι ίδιες ζυγίσεις που έκριναν την ειδοποίηση (χωρίς την πρώτη εβδομάδα· Συμβούλιο 2, Σ1): ό,τι γράφει η κάρτα
+  // («−1,2 kg την εβδομάδα») είναι ακριβώς ο αριθμός που συγκρίθηκε με το 1%.
+  final ws = fastLossWeights(goals: g, weights: weights, today: t);
   final slope = weightSlope(ws);
   return CheckIn(kind: CheckKind.fast, goals: g, proposal: f, kgNow: ws.last.$2, fastSlope: slope == null ? null : slope * 7);
 }

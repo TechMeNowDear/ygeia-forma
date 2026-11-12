@@ -123,6 +123,18 @@ void main() {
       expect(Goals.fromJson({...g.toJson(), 'kg': 5}), isNull);
       expect(Goals.fromJson({...g.toJson(), 'aim': 'x'}), isNull);
       expect(Goals.fromJson({...g.toJson(), 'age': 15}), isNull);
+      // Τελικός έλεγχος (Συμβούλιο 2, μ2): χωρίς φύλο (ή με χαλασμένο) δεν γίνεται σιωπηλά «άνδρας».
+      expect(Goals.fromJson({...g.toJson()}..remove('m')), isNull);
+      expect(Goals.fromJson({...g.toJson(), 'm': 'άνδρας'}), isNull);
+      expect(Goals.fromJson({...g.toJson(), 'm': false})!.male, isFalse);
+      expect(Goals.fromJson({...g.toJson(), 'm': true})!.male, isTrue);
+      // Τελικός έλεγχος (Συμβούλιο 2, μ6): αποθηκευμένος στόχος κάτω από το όριο ασφαλείας (1.500 άνδρες, 1.200 γυναίκες)
+      // δεν ισχύει· μένει ο υπολογισμός. Στο όριο και πάνω ισχύει κανονικά.
+      expect(Goals.fromJson({...g.toJson(), 'kcal': 1400})!.kcal, 2250);
+      expect(Goals.fromJson({...g.toJson(), 'kcal': 1500})!.kcal, 1500);
+      expect(Goals.fromJson({...g.toJson(), 'ka': 1400}..remove('kcal'))!.kcal, 2250);
+      expect(Goals.fromJson({...g.toJson(), 'm': false, 'kcal': 1400})!.kcal, 1400, reason: 'για γυναίκα το όριο είναι 1.200');
+      expect(Goals.fromJson({...g.toJson(), 'm': false, 'kcal': 1100})!.kcalSet, isNull);
       expect(Goals.fromJson('x'), isNull);
       // Χαλασμένη μέρα από αντίγραφο: ξανά ο οδηγός, όχι κόκκινη οθόνη (ανασκόπηση 11/11, S6).
       expect(Goals.fromJson({...g.toJson(), 'since': 'χθες'}), isNull);

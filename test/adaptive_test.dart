@@ -1,4 +1,6 @@
 // Αυτόματη διόρθωση θερμίδων (12/11). Φανταστικά δεδομένα (δημόσιο repo).
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/adaptive.dart';
 import 'package:ygeia_forma/goals.dart';
@@ -111,6 +113,69 @@ void main() {
     expect(fastLossCheck(goals: _g(), weights: normal.weights, today: today), isNull);
     expect(fastLossCheck(goals: _g(aim: GoalAim.keep), weights: fast.weights, today: today), isNull);
     expect(fastLossCheck(goals: _g(since: '2026-12-01'), weights: fast.weights, today: today), isNull, reason: 'όχι πριν τη 14η μέρα');
+  });
+
+  // ------------------------------------------------------------------ τελικός έλεγχος, Συμβούλιο 2
+
+  test('Σ1: τα νερά της πρώτης εβδομάδας δεν βγάζουν «γρήγορη απώλεια» τη 14η μέρα', () {
+    // Στόχοι από Δευτέρα 16/11. Πρώτη εβδομάδα −1,8 kg (νερά και γλυκογόνο), μετά −0,1 kg ανά ζύγιση (≈ 0,3 kg/εβδ.).
+    final w = [
+      (DateTime(2026, 11, 16), 90.0),
+      (DateTime(2026, 11, 18), 89.2),
+      (DateTime(2026, 11, 20), 88.6),
+      (DateTime(2026, 11, 23), 88.2),
+      (DateTime(2026, 11, 25), 88.1),
+      (DateTime(2026, 11, 27), 88.0),
+      (DateTime(2026, 11, 30), 87.9),
+      (DateTime(2026, 12, 2), 87.8),
+      (DateTime(2026, 12, 4), 87.7),
+    ];
+    List<(DateTime, double)> upTo(DateTime d) => [for (final x in w) if (!x.$1.isAfter(d)) x];
+    // Τη 14η μέρα (30/11) οι 14 τελευταίες μέρες είναι ολόκληρη η πρώτη εβδομάδα μαζί: −1,0 kg/εβδ. στο σύνολο.
+    final day14 = DateTime(2026, 11, 30);
+    expect(weightSlope(upTo(day14))! * 7, lessThan(-0.01 * 87.9), reason: 'με την πρώτη εβδομάδα μέσα, η κλίση περνά το 1%');
+    expect(fastLossWeights(goals: _g(), weights: upTo(day14), today: day14).first.$1, DateTime(2026, 11, 23));
+    expect(fastLossCheck(goals: _g(), weights: upTo(day14), today: day14), isNull, reason: 'η πρώτη εβδομάδα δεν μετρά');
+    // Τη 18η μέρα (4/12): 6 ζυγίσεις από τις 23/11, −0,3 kg/εβδ. Καμία ειδοποίηση.
+    final day18 = DateTime(2026, 12, 4);
+    expect(fastLossWeights(goals: _g(), weights: w, today: day18).length, 6);
+    expect(fastLossCheck(goals: _g(), weights: w, today: day18), isNull);
+    // Αληθινά γρήγορη απώλεια ΜΕΤΑ την πρώτη εβδομάδα πιάνεται κανονικά (−0,6 kg ανά ζύγιση ≈ 1,9 kg/εβδ.).
+    final fast = [
+      for (var k = 0; k < 6; k++) (DateTime(2026, 11, 23 + [0, 2, 4, 7, 9, 11][k]), 88.0 - 0.6 * k),
+    ];
+    final p = fastLossCheck(goals: _g(), weights: fast, today: day18);
+    expect(p, isNotNull);
+    expect(p!.change, 150);
+  });
+
+  test('μ1: «δεν κατεβαίνει κάτω από το όριο ασφαλείας» μόνο όταν ο νέος στόχος είναι στο όριο', () {
+    final est = Expenditure(tdee: 1700, meanIntake: 1700, slopeKgWeek: 0, intakeDays: 20, weighIns: 9, from: DateTime(2026), to: DateTime(2026));
+    // Θέλει 1.700 − 495 ≈ 1.210, κάτω από το όριο των 1.500. Από 2.000 το βήμα των 150 τον πάει στο 1.850: δεν είναι στο όριο.
+    final far = proposeTarget(goals: _g(kcalAdapt: 2000), est: est, kgNow: 90);
+    expect((far.target, far.floored), (1850, false));
+    // Από 1.600 φτάνει στο 1.500: εκεί ισχύει το μήνυμα.
+    final at = proposeTarget(goals: _g(kcalAdapt: 1600), est: est, kgNow: 90);
+    expect((at.target, at.floored), (1500, true));
+  });
+
+  test('Σ2: οι μέρες μετριούνται ημερολογιακά, ποτέ «μείον n × 24 ώρες» (αλλαγή ώρας)', () {
+    // Η ίδια η συμπεριφορά στην αλλαγή ώρας ελέγχθηκε με ώρα Ελλάδας (25/10/2026 και 28/3/2027) έξω από εδώ: οι δοκιμές
+    // τρέχουν σε ζώνη χωρίς αλλαγή ώρας. Εδώ φυλάμε τον κανόνα στον κώδικα, για να μη γυρίσει πίσω.
+    for (final f in ['lib/adaptive.dart', 'lib/adaptive_check.dart']) {
+      final code = File(f).readAsStringSync();
+      expect(RegExp(r'\.(subtract|add)\(\s*(const\s+)?Duration\(\s*days').hasMatch(code), isFalse, reason: f);
+      expect(code.contains('.inDays'), isFalse, reason: '$f: μέρες με το daysBetween');
+    }
+    // Και οι μέρες ελέγχου πέφτουν πάντα σε τοπικά μεσάνυχτα.
+    final g = _g();
+    for (var d = 7; d <= 40; d++) {
+      final day = DateTime(2026, 12, d);
+      expect(checkInDue(goals: g, today: day, lastCheckIn: null), isTrue, reason: 'από την 21η μέρα εκκρεμεί ως να απαντηθεί');
+    }
+    expect(checkInDue(goals: g, today: DateTime(2026, 12, 12), lastCheckIn: '2026-12-07'), isFalse);
+    expect(checkInDue(goals: g, today: DateTime(2026, 12, 13), lastCheckIn: '2026-12-07'), isFalse);
+    expect(checkInDue(goals: g, today: DateTime(2026, 12, 14), lastCheckIn: '2026-12-07'), isTrue);
   });
 
   test('μέρα ελέγχου: ίδια μέρα της εβδομάδας με την αρχή, από την 21η μέρα, μία φορά', () {

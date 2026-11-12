@@ -336,6 +336,15 @@ class Goals {
     if (rate < 0 || rate > 0.01 || pal < 1.2 || pal > 2.5 || kg < 30 || kg > 300 || age < 18 || age > 110 || h < 100 || h > 250) {
       return null;
     }
+    // Τελικός έλεγχος (Συμβούλιο 2, μ2): και το φύλο είναι απαραίτητο. Πριν, αν έλειπε ή ήταν χαλασμένο (π.χ. αντίγραφο
+    // πειραγμένο με το χέρι), διαβαζόταν σιωπηλά «άνδρας»: +166 kcal στον τύπο και κάτω όριο 1.500 αντί για 1.200 για
+    // μια γυναίκα. Τώρα, όπως για κάθε άλλο απαραίτητο στοιχείο, η εφαρμογή ζητά ξανά τον οδηγό.
+    final male = j['m'];
+    if (male is! bool) return null;
+    // Τελικός έλεγχος (Συμβούλιο 2, μ6): αποθηκευμένος στόχος θερμίδων κάτω από το όριο ασφαλείας δεν ισχύει ποτέ. Η εφαρμογή
+    // δεν γράφει τέτοιον (η οθόνη «Θερμίδες τη μέρα» και ο εβδομαδιαίος έλεγχος σταματούν στο όριο)· μόνο ένα αντίγραφο
+    // πειραγμένο με το χέρι μπορεί. Τότε ισχύει ο υπολογισμός, που είναι πάντα στο όριο ή πάνω από αυτό.
+    final kcalFloor = male ? kcalFloorMale : kcalFloorFemale;
     int bounded(Object? v, int def, int lo, int hi) {
       final x = i(v);
       return x == null || x < lo || x > hi ? def : x;
@@ -358,15 +367,15 @@ class Goals {
       kg: kg,
       age: age,
       heightCm: h,
-      male: j['m'] != false,
+      male: male,
       nutsG: bounded(j['nuts'], defaultNutsG, 0, 100),
       branG: bounded(j['bran'], defaultBranG, 0, 150),
       betaPer100: beta != null && beta > 0 && beta <= 40 ? beta : null,
       legumesWeek: bounded(j['leg'], defaultLegumesWeek, 0, 7),
       fishWeek: bounded(j['fish'], defaultFishWeek, 0, 7),
-      kcalSet: kcal != null && kcal >= 1000 && kcal <= 6000 ? kcal : null,
+      kcalSet: kcal != null && kcal >= kcalFloor && kcal <= 6000 ? kcal : null,
       proteinSet: prot != null && prot >= 30 && prot <= 300 ? prot : null,
-      kcalAdapt: ka != null && ka >= 1000 && ka <= 6000 ? ka : null,
+      kcalAdapt: ka != null && ka >= kcalFloor && ka <= 6000 ? ka : null,
       tdeeEst: te != null && te >= 800 && te <= 8000 ? te : null,
       checkIn: ci is String && isDayKey(ci) ? ci : null,
       fastAt: fa is String && isDayKey(fa) ? fa : null,

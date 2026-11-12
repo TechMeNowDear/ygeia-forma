@@ -124,16 +124,36 @@ void main() {
     });
 
     test('γρήγορη απώλεια: άλλη μέρα, +150, μία φορά την εβδομάδα', () {
-      final wed = DateTime(2026, 12, 2);
-      final c = _pending(checkinGoals(), wed, eat: 1600, tdee: 2900)!;
+      // Τελικός έλεγχος (Συμβούλιο 2, Σ1): οι ζυγίσεις της πρώτης εβδομάδας δεν μετρούν, άρα η νωρίτερη μέρα είναι η 18η
+      // (Παρασκευή 4/12: ζυγίσεις από τις 23/11, 11 μέρες). Τη 16η (Τετάρτη 2/12) δεν φτάνουν ακόμα.
+      expect(_pending(checkinGoals(), DateTime(2026, 12, 2), eat: 1600, tdee: 2900), isNull, reason: '9 μέρες ζυγίσεων μετά την πρώτη εβδομάδα');
+      final fri = DateTime(2026, 12, 4);
+      final c = _pending(checkinGoals(), fri, eat: 1600, tdee: 2900)!;
       expect(c.kind, CheckKind.fast);
       expect(c.proposal!.change, 150);
       expect(c.fastSlope!, lessThan(-0.9));
-      final g = applyCheckIn(c, wed);
-      expect((g.kcal, g.fastAt, g.checkIn), (2400, '2026-12-02', null));
-      expect(_pending(g, DateTime(2026, 12, 3), eat: 1600, tdee: 2900), isNull, reason: 'όχι ξανά μέσα στην εβδομάδα');
-      final later = dismissCheckIn(c, wed);
-      expect((later.kcal, later.fastAt), (2250, '2026-12-02'));
+      final g = applyCheckIn(c, fri);
+      expect((g.kcal, g.fastAt, g.checkIn), (2400, '2026-12-04', null));
+      expect(_pending(g, DateTime(2026, 12, 5), eat: 1600, tdee: 2900), isNull, reason: 'όχι ξανά μέσα στην εβδομάδα');
+      final later = dismissCheckIn(c, fri);
+      expect((later.kcal, later.fastAt), (2250, '2026-12-04'));
+    });
+
+    test('μ1: όταν τα δεδομένα θέλουν κάτω από το όριο ασφαλείας, το «Πώς βγήκε» γράφει το όριο, όχι τον αριθμό τους', () {
+      Expenditure est(double tdee) =>
+          Expenditure(tdee: tdee, meanIntake: tdee, slopeKgWeek: 0, intakeDays: 20, weighIns: 9, from: DateTime(2026, 11, 16), to: DateTime(2026, 12, 6));
+      // 90 kg, 0,5% την εβδομάδα: −495 kcal. Εκτίμηση 1.700 → τα δεδομένα θέλουν ≈ 1.210, κάτω από τα 1.500 (άνδρας).
+      final g = checkinGoals(kcalAdapt: 2000);
+      final p = proposeTarget(goals: g, est: est(1700), kgNow: 90);
+      final c = CheckIn(kind: CheckKind.proposal, goals: g, est: est(1700), proposal: p, kgNow: 90);
+      expect((p.target, p.floored), (1850, false), reason: 'η κάρτα δεν μιλά για όριο: ο νέος στόχος απέχει 350 kcal από αυτό');
+      expect(c.wanted, lessThan(kcalFloorMale));
+      expect(c.wantsBelowFloor, isTrue, reason: 'το «Πώς βγήκε» γράφει «δεν κατεβαίνει κάτω από 1.500», όχι «τα δεδομένα λένε 1.210»');
+      // Εκτίμηση 2.600 → θέλουν ≈ 2.110: καμία σχέση με το όριο.
+      final ok = CheckIn(kind: CheckKind.proposal, goals: g, est: est(2600), proposal: proposeTarget(goals: g, est: est(2600), kgNow: 90), kgNow: 90);
+      expect(ok.wantsBelowFloor, isFalse);
+      // Χωρίς εκτίμηση (π.χ. κάρτα γρήγορης απώλειας): δεν υπάρχει «τι λένε τα δεδομένα».
+      expect(CheckIn(kind: CheckKind.fast, goals: g).wantsBelowFloor, isFalse);
     });
 
     test('ιστορικό: το πολύ $adaptLogMax, ίδια μέρα αντικαθίσταται, άκυρα πετιούνται', () {
@@ -171,14 +191,14 @@ void main() {
     });
 
     testWidgets('γρήγορη απώλεια: «Όχι τώρα» κλείνει την κάρτα χωρίς αλλαγή', (t) async {
-      final wed = DateTime(2026, 12, 2, 8, 20);
+      final wed = DateTime(2026, 12, 4, 8, 20); // Παρασκευή, 18η μέρα (Συμβούλιο 2, Σ1: η πρώτη εβδομάδα δεν μετρά)
       final s = _store(wed, eat: 1600, tdee: 2900);
       await _today(t, s, checkinFood(wed, eat: 1600), wed);
       expect(find.text('Χάνεις πιο γρήγορα από το ασφαλές'), findsOneWidget);
       await t.ensureVisible(find.byKey(const ValueKey('checkin-later')));
       await t.tap(find.byKey(const ValueKey('checkin-later')));
       await t.pumpAndSettle();
-      expect((s.goals!.kcal, s.goals!.fastAt), (2250, '2026-12-02'));
+      expect((s.goals!.kcal, s.goals!.fastAt), (2250, '2026-12-04'));
       expect(find.byKey(const ValueKey('today-checkin')), findsNothing);
     });
 

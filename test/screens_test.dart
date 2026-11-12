@@ -2027,7 +2027,7 @@ void main() {
       act: (t) async => t.ensureVisible(find.byKey(const ValueKey('me-goals')))));
   // Αυτόματη διόρθωση θερμίδων (σχέδια A1–A4, 12/11). Στόχοι από Δευτέρα 16/11· πρώτος έλεγχος Δευτέρα 7/12.
   final checkDay = DateTime(2026, 12, 7, 8, 20);
-  final fastDay = DateTime(2026, 12, 2, 8, 20);
+  final fastDay = DateTime(2026, 12, 4, 8, 20); // 18η μέρα: η πρώτη εβδομάδα δεν μετρά στη γρήγορη απώλεια (Συμβούλιο 2, Σ1)
   void Function(HealthStore) checkinPrep(DateTime at, {double eat = 2250, double tdee = 2600, Goals? goals}) => (s) {
         final j = sampleDashboardJson(at)..['body'] = bodyJson(simWeights(at, eat: eat, tdee: tdee));
         s.data = Dashboard.fromJson(j);

@@ -14,6 +14,11 @@
 ///   και το πολύ ±150 kcal ανά εβδομαδιαίο έλεγχο. Αλλαγή κάτω από 30 kcal: «μένει ίδιος».
 /// - Γρήγορη απώλεια: αν στις 14 τελευταίες μέρες χάνεις πάνω από 1% του βάρους την εβδομάδα, πρόταση +150 kcal αμέσως
 ///   (κρατά τους μύες· Helms 2014, Garthe 2011), από τη 14η μέρα και μετά (η πρώτη εβδομάδα έχει νερά και γλυκογόνο).
+///   Τελικός έλεγχος (Συμβούλιο 2, Σ1): οι ζυγίσεις των πρώτων [adaptFastSkipDays] ημερών ΔΕΝ μετρούν εδώ. Πριν, τη 14η
+///   μέρα το παράθυρο ήταν οι μέρες 0–14, δηλαδή ολόκληρη η πρώτη εβδομάδα: με 1 kg νερά η ειδοποίηση έβγαινε στα 8 από
+///   τα 10 (προσομοίωση), ενώ δεν χανόταν λίπος πιο γρήγορα. Στην πράξη η πρώτη ειδοποίηση μπορεί να βγει από τη 17η μέρα.
+/// - Μέρες: πάντα ημερολογιακές (DateTime(έτος, μήνας, μέρα − n)), ποτέ «μείον n × 24 ώρες»: στην αλλαγή ώρας μια μέρα
+///   κρατά 23 ή 25 ώρες (Συμβούλιο 2, Σ2: ο απαντημένος έλεγχος ξαναέβγαινε την εβδομάδα μετά την αλλαγή του Οκτωβρίου).
 library;
 
 import 'dart:math' as math;
@@ -30,6 +35,9 @@ const adaptMaxStep = 150;
 const adaptMinStep = 30;
 const adaptFastLossPct = 0.01;
 const adaptFastWindowDays = 14;
+
+/// Οι πρώτες μέρες των στόχων που δεν μετρούν στη «γρήγορη απώλεια»: νερά και γλυκογόνο της πρώτης εβδομάδας.
+const adaptFastSkipDays = 7;
 
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -86,7 +94,9 @@ enum AdaptStatus { ok, tooEarly, fewIntakeDays, fewWeighIns, implausible }
   required double formulaTdee,
   required int goalKcal,
 }) {
-  final to = _day(today).subtract(const Duration(days: 1));
+  // Χθες, ημερολογιακά (όχι «μείον 24 ώρες»: τη Δευτέρα μετά την αλλαγή ώρας του Μαρτίου έβγαινε Σάββατο 23:00).
+  final t = _day(today);
+  final to = DateTime(t.year, t.month, t.day - 1);
   final from = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1));
   bool inWindow(DateTime d) => !_day(d).isBefore(from) && !_day(d).isAfter(to);
 
@@ -159,21 +169,34 @@ AdaptProposal proposeTarget({required Goals goals, required Expenditure est, req
   if (change.abs() < adaptMinStep) change = 0;
   var target = current + change;
   if (target < floor) target = floor;
-  return AdaptProposal(current: current, target: target, est: est, fastLoss: false, floored: floored);
+  // «Δεν κατεβαίνει κάτω από το όριο ασφαλείας» μόνο όταν ο νέος στόχος ΕΙΝΑΙ στο όριο (Συμβούλιο 2, μ1). Πριν το έλεγε και
+  // όταν το βήμα των 150 τον άφηνε πολύ πιο πάνω (π.χ. 2.000 → 1.850 με όριο 1.500).
+  return AdaptProposal(current: current, target: target, est: est, fastLoss: false, floored: floored && target == floor);
+}
+
+/// Οι ζυγίσεις που κρίνουν τη «γρήγορη απώλεια» σήμερα: οι [adaptFastWindowDays] τελευταίες μέρες ως και σήμερα, ΧΩΡΙΣ
+/// τις πρώτες [adaptFastSkipDays] μέρες των στόχων (νερά και γλυκογόνο), παλιότερη πρώτη. Ένα μέρος, για να κρίνει
+/// και να δείχνει η κάρτα ακριβώς τις ίδιες ζυγίσεις.
+List<(DateTime, double)> fastLossWeights({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
+  final since = DateTime.tryParse(goals.since);
+  if (since == null) return const [];
+  final to = _day(today);
+  var from = DateTime(to.year, to.month, to.day - adaptFastWindowDays);
+  final firstCounted = DateTime(since.year, since.month, since.day + adaptFastSkipDays);
+  if (from.isBefore(firstCounted)) from = firstCounted;
+  return [
+    for (final w in weights)
+      if (!_day(w.$1).isBefore(from) && !_day(w.$1).isAfter(to)) (_day(w.$1), w.$2),
+  ]..sort((a, b) => a.$1.compareTo(b.$1));
 }
 
 /// Γρήγορη απώλεια: κλίση των 14 τελευταίων ημερών < −1% του βάρους την εβδομάδα (με ≥ 4 ζυγίσεις σε ≥ 10 μέρες).
-/// Μόνο σε «λιγότερο λίπος» και από τη 14η μέρα των στόχων.
+/// Μόνο σε «λιγότερο λίπος», από τη 14η μέρα των στόχων, και χωρίς τις ζυγίσεις της πρώτης εβδομάδας ([fastLossWeights]).
 AdaptProposal? fastLossCheck({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
   if (goals.aim != GoalAim.lose) return null;
   final since = DateTime.tryParse(goals.since);
   if (since == null || daysBetween(since, today) < adaptFastWindowDays) return null;
-  final to = _day(today);
-  final from = to.subtract(const Duration(days: adaptFastWindowDays));
-  final ws = [
-    for (final w in weights)
-      if (!_day(w.$1).isBefore(from) && !_day(w.$1).isAfter(to)) (_day(w.$1), w.$2),
-  ]..sort((a, b) => a.$1.compareTo(b.$1));
+  final ws = fastLossWeights(goals: goals, weights: weights, today: today);
   if (ws.length < 4 || daysBetween(ws.first.$1, ws.last.$1) < 10) return null;
   final slope = weightSlope(ws);
   if (slope == null) return null;
@@ -189,7 +212,11 @@ bool checkInDue({required Goals goals, required DateTime today, String? lastChec
   final since = DateTime.tryParse(goals.since);
   if (since == null) return false;
   final t = _day(today);
-  final dueDay = t.subtract(Duration(days: (t.weekday - since.weekday + 7) % 7));
+  // Ημερολογιακά (Συμβούλιο 2, Σ2). Με «μείον n × 24 ώρες», την εβδομάδα μετά την αλλαγή ώρας του Οκτωβρίου η μέρα ελέγχου
+  // έβγαινε 01:00 αντί για 00:00, και ένας έλεγχος που είχες ήδη απαντήσει ξαναέβγαινε· τον Μάρτιο έβγαινε η προηγούμενη
+  // μέρα στις 23:00 και ο πρώτος έλεγχος χανόταν για μια εβδομάδα.
+  final back = (t.weekday - since.weekday + 7) % 7;
+  final dueDay = DateTime(t.year, t.month, t.day - back);
   if (daysBetween(since, dueDay) < adaptWindowDays) return false;
   final last = lastCheckIn == null ? null : DateTime.tryParse(lastCheckIn);
   return last == null || last.isBefore(dueDay);

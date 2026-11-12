@@ -223,7 +223,9 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
                 '${ratePctText(g.rate)} του βάρους σου × 7.700 ÷ 7'),
           const Hairline(vertical: 12),
           InfoRow(p.same ? 'Ο στόχος μένει' : 'Νέος στόχος', '${thousands(p.target)} kcal'),
-          if (p.floored)
+          // Και όταν ο νέος στόχος δεν είναι ακόμα στο όριο αλλά τα δεδομένα θέλουν κάτω από αυτό (Συμβούλιο 2, μ1): εδώ
+          // γράφεται το όριο, ποτέ «τα δεδομένα λένε» έναν αριθμό κάτω από το όριο ασφαλείας.
+          if (p.floored || k.wantsBelowFloor)
             Text('Δεν κατεβαίνει κάτω από ${thousands(g.male ? kcalFloorMale : kcalFloorFemale)} kcal (όριο ασφαλείας).', style: small)
           else if (wanted != null && (wanted - p.current).abs() > adaptMaxStep)
             Text(
