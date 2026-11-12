@@ -65,7 +65,7 @@ DecimalMark? _evidence(String digits) {
 }
 
 /// Τα ψηφία ενός κελιού (χωρίς «<», «>» και κενά), ή null αν το κελί δεν είναι ένας αριθμός.
-String? _digitsOf(String raw) => _valueShape.firstMatch(raw.replaceAll(' ', ' ').trim())?.group(2);
+String? _digitsOf(String raw) => _valueShape.firstMatch(raw.replaceAll('\u{A0}', ' ').trim())?.group(2);
 
 /// Η υποδιαστολή ενός εγγράφου, από όλους τους αριθμούς του (τιμές και όρια αναφοράς, ό,τι διαβάστηκε). null: κανένας
 /// αριθμός δεν τη δείχνει, ή κάποιοι δείχνουν κόμμα και άλλοι τελεία. Τότε οι διφορούμενοι αριθμοί δεν διαβάζονται.
@@ -91,7 +91,7 @@ DecimalMark? decimalMarkOf(Iterable<String> numbers) {
 ///   άλλο = χιλιάδες (4.500)· χωρίς [mark] null.
 /// - Αριθμός που αντιφάσκει με το [mark] («4.5» σε έγγραφο με κόμμα), δύο αριθμοί, εύρος, γράμματα, κενό: null.
 LabNumber? parseLabNumber(String raw, {DecimalMark? mark}) {
-  final m = _valueShape.firstMatch(raw.replaceAll(' ', ' ').trim());
+  final m = _valueShape.firstMatch(raw.replaceAll('\u{A0}', ' ').trim());
   if (m == null) return null;
   final cmp = m.group(1) ?? '';
   final v = _numberOf(m.group(2)!, mark);

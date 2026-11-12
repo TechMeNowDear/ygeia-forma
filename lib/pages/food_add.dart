@@ -62,7 +62,7 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   }
 }
 
-final _numberSpaces = RegExp(r'[ \u00A0\u202F]');
+final _numberSpaces = RegExp('[ \u{A0}\u{202F}]');
 final _numberChars = RegExp(r'^[0-9.,]+$');
 final _dotThousands = RegExp(r'^[1-9]\d{0,2}(\.\d{3})+$');
 

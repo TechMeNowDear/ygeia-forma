@@ -386,12 +386,12 @@ void main() {
 
     test('τόνος από το πολυτονικό μπλοκ, τόνος χωριστά από το γράμμα, κεφαλαία, σκληρό κενό', () {
       // Πριν: το «ό» ως U+1F79 χανόταν ολόκληρο («γλυκζη») και η γραμμή δεν αναγνωριζόταν.
-      expect(matchTest('Γλυκόζη'), 'glu');
-      expect(matchTest('Γλυκόζη'), 'glu');
+      expect(matchTest('Γλυκ\u{1F79}ζη'), 'glu');
+      expect(matchTest('Γλυκο\u{301}ζη'), 'glu');
       expect(matchTest('ΓΛΥΚΟΖΗ'), 'glu');
-      expect(matchTest('Ολική χοληστερόλη'), 'chol');
+      expect(matchTest('Ολική\u{A0}χοληστερόλη'), 'chol');
       expect(matchTest('ΦΕΡΡΙΤΙΝΗ'), 'ferritin');
-      expect(foldName('άέήίόύώΐΰ'), foldName('άέήίόύώΐΰ'));
+      expect(foldName('\u{1F71}\u{1F73}\u{1F75}\u{1F77}\u{1F79}\u{1F7B}\u{1F7D}\u{1FD3}\u{1FE3}'), foldName('άέήίόύώΐΰ'));
     });
   });
 
@@ -454,7 +454,7 @@ void main() {
       expect(read('105'), (105.0, false, false));
       expect(read('0.125'), (0.125, false, false), reason: 'ομάδα χιλιάδων δεν αρχίζει με 0: σίγουρα δεκαδικός');
       expect(read('1234.567'), (1234.567, false, false));
-      expect(read(' 4,5 '), (4.5, false, false));
+      expect(read('\u{A0}4,5\u{A0}'), (4.5, false, false));
     });
 
     test('χιλιάδες και δεκαδικά μαζί διαβάζονται από το σχήμα τους', () {

@@ -65,8 +65,8 @@ void main() {
         expect(parseNumber(text), isNull, reason: text.length > 20 ? '400 ψηφία' : text);
       }
       // Κενά που βάζουν μερικά πληκτρολόγια και η επικόλληση ανάμεσα στις χιλιάδες.
-      expect(parseNumber('1 250'), 1250);
-      expect(parseNumber('1 250,5'), 1250.5);
+      expect(parseNumber('1\u{A0}250'), 1250);
+      expect(parseNumber('1\u{202F}250,5'), 1250.5);
     });
   });
 
