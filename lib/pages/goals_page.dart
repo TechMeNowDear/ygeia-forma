@@ -538,7 +538,7 @@ class GoalsPage extends StatelessWidget {
         final calc = g.calc;
         final today = now ?? DateTime.now();
         final next = nextCheckDay(g, today);
-        final nextText = sameDay(next, today) ? 'σήμερα, στη Σήμερα' : longDate(next);
+        final nextText = sameDay(next, today) ? 'σήμερα' : longDate(next);
         final lastApplied = g.log.where((l) => l.applied).lastOrNull;
         final adaptCards = _adaptCards(context, g, today, next);
         Widget editRow(String key, String label, String value, VoidCallback onTap) => InkWell(
