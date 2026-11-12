@@ -37,6 +37,8 @@ import androidx.health.services.client.data.ExerciseLapSummary
 import androidx.health.services.client.data.ExerciseState
 import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
+import androidx.health.services.client.data.HeartRateAccuracy
+import androidx.health.services.client.data.SampleDataPoint
 import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
 import kotlinx.coroutines.CompletableDeferred
@@ -603,6 +605,13 @@ class ExerciseService : Service() {
             // Μετά το «Τέλος» (αναμονή της ENDED) καμία δόνηση ορίου (έλεγχος του γ2, NIT 3).
             val alarmOk = !stopping
             for (p in points) {
+                // Τελικός έλεγχος (Συμβούλιο 1, Σ1): πρώτα τι λέει το ίδιο το ρολόι για την τιμή. «Χωρίς επαφή» ή
+                // «αναξιόπιστη» δεν μπαίνει πουθενά (ούτε μέσος/υψηλότερος, ούτε ζώνη, ούτε όριο, ούτε ένδειξη): αν
+                // λείψουν οι καλές τιμές, η οθόνη λέει «δεν μετριούνται» και με όριο δονείται, όπως όταν δεν έρχεται
+                // τίποτα. Οι «χαμηλής ακρίβειας» μένουν όπως πριν και μόνο μετριούνται (HrQuality).
+                val quality = heartQuality(p)
+                Repo.hrQuality.add(quality)
+                if (quality == HrQuality.BAD) continue
                 val bpm = Math.round(p.value).toInt()
                 if (bpm !in 26..249) continue
                 val at = p.getTimeInstant(boot).toEpochMilli().coerceAtMost(now)
@@ -689,6 +698,20 @@ class ExerciseService : Service() {
             }
             Repo.changed()
         }
+    }
+
+    /**
+     * Η ποιότητα μιας τιμής παλμών όπως τη δηλώνει το Health Services (HeartRateAccuracy.SensorStatus). Ρολόι που δεν
+     * δηλώνει τίποτα (accuracy null ή άλλου είδους): [HrQuality.OK], δηλαδή όπως πριν. Ο ίδιος κανόνας με την εφεδρεία
+     * αισθητήρα ([HrSensor]: SENSOR_STATUS_NO_CONTACT / UNRELIABLE δεν γίνονται τιμή).
+     */
+    private fun heartQuality(p: SampleDataPoint<Double>): HrQuality {
+        val status = (p.accuracy as? HeartRateAccuracy)?.sensorStatus ?: return HrQuality.OK
+        return hrQualityOf(
+            noContact = status == HeartRateAccuracy.SensorStatus.NO_CONTACT,
+            unreliable = status == HeartRateAccuracy.SensorStatus.UNRELIABLE,
+            lowAccuracy = status == HeartRateAccuracy.SensorStatus.ACCURACY_LOW,
+        )
     }
 
     /** Τιμή από την εφεδρεία αισθητήρα: ένδειξη και ειδοποίηση (όχι στατιστικά: αυτά από το Health Services). */

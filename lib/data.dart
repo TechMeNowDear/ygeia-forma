@@ -501,7 +501,9 @@ class Dashboard {
             ffm: within(d(e['ffm']), 10, 200),
             bmi: within(d(e['bmi']), 8, 80),
             water: within(d(e['water']), 5, 120),
-            bmr: (e['bmr'] as num?)?.toInt(),
+            // Τελικός έλεγχος (Συμβούλιο 1, μ2): και ο βασικός μεταβολισμός μόνο μέσα σε λογικά όρια (ίδιος κανόνας με
+            // τα υπόλοιπα της ζύγισης)· «0 kcal» ή σφάλμα δεν είναι μέτρηση. 500–5.000 kcal καλύπτει κάθε ενήλικα.
+            bmr: within(d(e['bmr']), 500, 5000)?.round(),
             app: e['app'] is String ? e['app'] as String : '',
           ),
     ]..sort((a, b) => a.time.compareTo(b.time));

@@ -934,6 +934,55 @@ class GapMeter {
     val maxGapSec: Int get() = ((maxGapMs + 500) / 1000).toInt()
 }
 
+/**
+ * Ποιότητα μιας τιμής παλμών, όπως τη δηλώνει το ίδιο το ρολόι (τελικός έλεγχος, Συμβούλιο 1, Σ1). Το Health Services
+ * δίνει με κάθε τιμή την κατάσταση του αισθητήρα (HeartRateAccuracy.SensorStatus): «χωρίς επαφή», «αναξιόπιστη»,
+ * «χαμηλή / μέτρια / υψηλή ακρίβεια». Ως την #99 η εφαρμογή την αγνοούσε και κρατούσε κάθε τιμή 26–249.
+ * - [BAD] (χωρίς επαφή ή αναξιόπιστη): η τιμή ΔΕΝ μπαίνει πουθενά (μέσος, υψηλότερος, ζώνη, όριο, ένδειξη)· αν λείψουν
+ *   οι καλές τιμές, η οθόνη λέει «δεν μετριούνται», όπως όταν δεν έρχεται τίποτα.
+ * - [LOW] (χαμηλή ακρίβεια): μένει όπως πριν, αλλά ΜΕΤΡΙΕΤΑΙ. Δεν πετιέται ακόμα: δεν έχει μετρηθεί στο Galaxy Watch
+ *   Ultra 2 πόσο συχνά τη δηλώνει το ρολόι στα βάρη· αν πεταχτεί στα τυφλά, μπορεί να μείνει η προπόνηση χωρίς παλμούς.
+ * - [OK]: μέτρια ή υψηλή ακρίβεια, ή ρολόι που δεν δηλώνει τίποτα (όπως πριν).
+ */
+enum class HrQuality { OK, LOW, BAD }
+
+/** Από την κατάσταση του αισθητήρα στην απόφαση. Καθαρή συνάρτηση (χωρίς Android), για να ελέγχεται σε JVM. */
+fun hrQualityOf(noContact: Boolean, unreliable: Boolean, lowAccuracy: Boolean): HrQuality = when {
+    noContact || unreliable -> HrQuality.BAD
+    lowAccuracy -> HrQuality.LOW
+    else -> HrQuality.OK
+}
+
+/**
+ * Πόσες τιμές παλμών ήρθαν με κάθε ποιότητα σε μια άσκηση. Πηγαίνει στο κινητό μέσα στο υπάρχον κείμενο «diag»
+ * («5s=1 wake=1 q=5400/120/15»: καλές/χαμηλής ακρίβειας/άχρηστες), για να φανεί στη δοκιμή στη συσκευή τι δηλώνει
+ * πραγματικά το ρολόι. Κανένα νέο πεδίο: το παλιό κινητό το διαβάζει όπως πριν.
+ */
+class HrQualityCount {
+    var ok = 0
+        private set
+    var low = 0
+        private set
+    var bad = 0
+        private set
+
+    val total: Int get() = ok + low + bad
+
+    fun add(q: HrQuality) {
+        when (q) {
+            HrQuality.OK -> ok++
+            HrQuality.LOW -> low++
+            HrQuality.BAD -> bad++
+        }
+    }
+
+    /** «q=5400/120/15», ή κενό αν δεν ήρθε καμία τιμή. */
+    fun text(): String = if (total == 0) "" else "q=$ok/$low/$bad"
+
+    /** Το «diag» της άσκησης μαζί με την ποιότητα (ένα κενό ανάμεσα· ό,τι είναι άδειο παραλείπεται). */
+    fun withDiag(diag: String): String = listOf(diag, text()).filter { it.isNotEmpty() }.joinToString(" ")
+}
+
 /** «1:04», «24:31», «1:02:05». */
 fun clock(sec: Long): String {
     val s = if (sec < 0) 0 else sec
@@ -1094,27 +1143,30 @@ class ZoneAlarm(
             if (bpm >= z.lo + REARM) downOn = false
         }
         if (at - startEl < warmupMs) return Buzz.NONE
-        if (z.up && aboveSince >= 0) {
-            if (!upOn && at - aboveSince >= holdMs) {
+        // Τελικός έλεγχος (Συμβούλιο 1, μ1): και η ΕΠΑΝΑΛΗΨΗ θέλει [holdMs] συνεχώς έξω από τη ζώνη. Πριν: αν οι παλμοί
+        // γύριζαν στη ζώνη χωρίς να «ξαναοπλίσουν» (π.χ. 128–130 με πάνω όριο 130) και 2′ μετά ερχόταν ΜΙΑ τιμή 131,
+        // δονούσε αμέσως, ενώ η οθόνη υπόσχεται «όταν μείνεις πάνω 20″».
+        if (z.up && aboveSince >= 0 && at - aboveSince >= holdMs) {
+            if (!upOn) {
                 upOn = true
                 lastUp = at
                 ups++
                 return Buzz.UP
             }
-            if (upOn && at - lastUp >= repeatMs) {
+            if (at - lastUp >= repeatMs) {
                 lastUp = at
                 ups++
                 return Buzz.UP
             }
         }
-        if (z.down && belowSince >= 0) {
-            if (!downOn && at - belowSince >= lowHoldMs) {
+        if (z.down && belowSince >= 0 && at - belowSince >= lowHoldMs) {
+            if (!downOn) {
                 downOn = true
                 lastDown = at
                 downs++
                 return Buzz.DOWN
             }
-            if (downOn && at - lastDown >= lowRepeatMs) {
+            if (at - lastDown >= lowRepeatMs) {
                 lastDown = at
                 downs++
                 return Buzz.DOWN

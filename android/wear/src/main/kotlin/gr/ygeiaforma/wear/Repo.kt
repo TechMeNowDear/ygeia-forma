@@ -72,6 +72,12 @@ object Repo {
     var hrMode = ""
     /** Κενά στην παράδοση παλμών (ό,τι φτάνει στην εφαρμογή, όχι ό,τι μετρά το ρολόι). */
     var hrGaps = GapMeter()
+
+    /**
+     * Πόσες τιμές παλμών ήρθαν από το Health Services με κάθε ποιότητα σε αυτή την άσκηση (τελικός έλεγχος, Συμβούλιο 1,
+     * Σ1). Οι άχρηστες (χωρίς επαφή, αναξιόπιστες) δεν μπαίνουν πουθενά· οι υπόλοιπες μετριούνται για τη διάγνωση.
+     */
+    var hrQuality = HrQualityCount()
     val alarm = HrAlarm(null)
 
     /** Ζώνη περπατήματος (12/11), από το πρόγραμμα του κινητού· μόνο στο περπάτημα. */
@@ -288,6 +294,7 @@ object Repo {
         hr = null
         hrMode = ""
         hrGaps = GapMeter()
+        hrQuality = HrQualityCount()
         meters = 0.0
         steps = 0
         activeSec = 0

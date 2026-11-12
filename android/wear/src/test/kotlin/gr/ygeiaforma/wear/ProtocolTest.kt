@@ -536,4 +536,77 @@ class ProtocolTest {
         assertEquals("—", pace(10.0, 100))
         assertTrue(JSONObject().put("x", 1).has("x"))
     }
+
+    // ------------------------------------------------------------------ τελικός έλεγχος, Συμβούλιο 1
+
+    /** Σ1: τι γίνεται με μια τιμή παλμών ανάλογα με το τι δηλώνει το ρολόι για αυτήν. */
+    @Test
+    fun hrQualityFromSensorStatus() {
+        assertEquals(HrQuality.BAD, hrQualityOf(noContact = true, unreliable = false, lowAccuracy = false))
+        assertEquals(HrQuality.BAD, hrQualityOf(noContact = false, unreliable = true, lowAccuracy = false))
+        // «Αναξιόπιστη» νικά το «χαμηλή ακρίβεια» (δεν γίνεται ποτέ «απλώς χαμηλή»).
+        assertEquals(HrQuality.BAD, hrQualityOf(noContact = false, unreliable = true, lowAccuracy = true))
+        assertEquals(HrQuality.LOW, hrQualityOf(noContact = false, unreliable = false, lowAccuracy = true))
+        // Μέτρια/υψηλή ακρίβεια, ή ρολόι που δεν δηλώνει τίποτα: όπως πριν.
+        assertEquals(HrQuality.OK, hrQualityOf(noContact = false, unreliable = false, lowAccuracy = false))
+    }
+
+    /** Σ1: η καταμέτρηση πηγαίνει στο κινητό μέσα στο «diag», χωρίς νέο πεδίο και χωρίς να αλλάζει το παλιό κείμενο. */
+    @Test
+    fun hrQualityCountInDiag() {
+        val none = HrQualityCount()
+        assertEquals("", none.text())
+        // Καμία τιμή: το «diag» ακριβώς όπως πριν (το παλιό κινητό και οι παλιές δοκιμές δεν βλέπουν διαφορά).
+        assertEquals("5s=1 wake=0", none.withDiag("5s=1 wake=0"))
+        assertEquals("", none.withDiag(""))
+
+        val q = HrQualityCount()
+        repeat(5400) { q.add(HrQuality.OK) }
+        repeat(120) { q.add(HrQuality.LOW) }
+        repeat(15) { q.add(HrQuality.BAD) }
+        assertEquals(5535, q.total)
+        assertEquals("q=5400/120/15", q.text())
+        assertEquals("5s=1 wake=1 q=5400/120/15", q.withDiag("5s=1 wake=1"))
+        assertEquals("q=5400/120/15", q.withDiag(""))
+        // Το κινητό κρατά ως 40 χαρακτήρες του «diag» (training_store.dart): και η χειρότερη περίπτωση χωρά.
+        val big = HrQualityCount()
+        repeat(99_999) { big.add(HrQuality.OK) }
+        repeat(9_999) { big.add(HrQuality.LOW) }
+        repeat(9_999) { big.add(HrQuality.BAD) }
+        assertTrue(big.withDiag("5s=1 wake=1").length <= 40)
+    }
+
+    /** μ1: και η επανάληψη της δόνησης ζώνης θέλει 20″ συνεχώς πάνω (1′ κάτω), όπως υπόσχεται η οθόνη. */
+    @Test
+    fun zoneAlarmRepeatNeedsHold() {
+        val z = ZoneAlarm()
+        z.start(WalkZone(109, 130), 0)
+        val t0 = 400_000L
+        // 25″ πάνω από το 130: μία δόνηση στα 20″.
+        var ups = 0
+        for (s in 0..24) if (z.feed(133, t0 + s * 1000L) == ZoneAlarm.Buzz.UP) ups++
+        assertEquals(1, ups)
+        // Πίσω στη ζώνη, αλλά όχι 3 παλμούς κάτω από το πάνω όριο (128–130): δεν «ξαναοπλίζει».
+        for (s in 25..144) assertEquals(ZoneAlarm.Buzz.NONE, z.feed(128 + s % 3, t0 + s * 1000L))
+        // 2′05″ μετά τη δόνηση, ΜΙΑ τιμή πάνω από το όριο: όχι δόνηση (πριν από τη διόρθωση: δόνηση αμέσως).
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(131, t0 + 145_000L))
+        assertEquals(ZoneAlarm.Buzz.NONE, z.feed(129, t0 + 146_000L))
+        // Αν όμως μείνει πάνω 20″ συνεχώς, δονείται ξανά (έχουν περάσει τα 2′).
+        for (s in 150..169) assertEquals(ZoneAlarm.Buzz.NONE, z.feed(134, t0 + s * 1000L))
+        assertEquals(ZoneAlarm.Buzz.UP, z.feed(134, t0 + 170_000L))
+        assertEquals(2, z.ups)
+
+        // Το ίδιο προς τα κάτω: 1′ συνεχώς κάτω και για την επανάληψη (5′ μετά).
+        val d = ZoneAlarm()
+        d.start(WalkZone(109, 130, up = true, down = true), 0)
+        assertEquals(ZoneAlarm.Buzz.NONE, d.feed(100, t0))
+        assertEquals(ZoneAlarm.Buzz.DOWN, d.feed(100, t0 + 60_000L))
+        // Γυρίζει στη ζώνη χωρίς να ξαναοπλίσει (109–111 < 109 + 3) και 5′ μετά μία τιμή κάτω: όχι δόνηση.
+        assertEquals(ZoneAlarm.Buzz.NONE, d.feed(110, t0 + 70_000L))
+        assertEquals(ZoneAlarm.Buzz.NONE, d.feed(105, t0 + 365_000L))
+        // Μένει κάτω 1′: δονείται.
+        assertEquals(ZoneAlarm.Buzz.NONE, d.feed(105, t0 + 400_000L))
+        assertEquals(ZoneAlarm.Buzz.DOWN, d.feed(105, t0 + 425_000L))
+        assertEquals(2, d.downs)
+    }
 }

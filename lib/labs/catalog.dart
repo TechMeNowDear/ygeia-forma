@@ -201,10 +201,14 @@ String foldName(String s) {
 }
 
 /// Κανονικοποιημένη μονάδα: πεζά, χωρίς κενά, «u»/«μ» → «µ», «×10^9» → «10^9».
+/// Τελικός έλεγχος (Συμβούλιο 1, Σ3): «gr» αντί για «g» («gr/dL», «mgr/dl»: έτσι γράφουν ελληνικά εργαστήρια) και οι
+/// γραφές του eGFR («1.73m^2», «1,73 m2») γίνονται μία. Πρώτα το «gr/», για να πιάσει μετά και το «ugr/».
 String unitKey(String s) {
   var u = s.trim().toLowerCase().replaceAll(' ', '').replaceAll('μ', 'µ').replaceAll('×', '').replaceAll('x10', '10');
+  u = u.replaceAll('gr/', 'g/');
   u = u.replaceAll('ug/', 'µg/').replaceAll('umol/', 'µmol/').replaceAll('uiu/', 'µiu/').replaceAll('/ul', '/µl');
   u = u.replaceAll('10⁹', '10^9').replaceAll('10¹²', '10^12').replaceAll('10³', '10^3').replaceAll('10⁶', '10^6');
+  u = u.replaceAll('1,73', '1.73').replaceAll('m^2', 'm²').replaceAll('m2', 'm²');
   return u;
 }
 
@@ -222,23 +226,59 @@ final Map<String, String> _aliasIndex = () {
 
 final List<String> _suffixes = [foldName('ορού'), 'serum'];
 
+/// Ως τόσα γράμματα (διπλωμένα) ένα όνομα είναι «σύντομος κωδικός» (TG, Cr, Ca, UA, Fe, K…). Οι σύντομοι κωδικοί δεν
+/// είναι μοναδικοί ανάμεσα στις εξετάσεις: «Tg» γράφεται και η θυρεοσφαιρίνη (ng/mL), «Cr» και το χρώμιο.
+const shortCodeLength = 3;
+
 /// Ποια εξέταση είναι το όνομα που έγραψε το εργαστήριο. Πρώτα όσα έμαθες εσύ για αυτό το εργαστήριο ([learned]:
 /// διπλωμένο όνομα → id), μετά ο κατάλογος. Αν δεν βρεθεί: null (η εφαρμογή ρωτά, δεν μαντεύει).
-String? matchTest(String rawName, {Map<String, String> learned = const {}}) {
+///
+/// [unit] (τελικός έλεγχος, Συμβούλιο 1, Σ3): η μονάδα όπως τη γράφει το εργαστήριο, αν είναι γνωστή. Όταν το όνομα
+/// είναι σύντομος κωδικός ([shortCodeLength]) και η εξέταση του καταλόγου ΔΕΝ δέχεται αυτή τη μονάδα, δεν ταιριάζει
+/// (null: η εφαρμογή ρωτά). Έτσι «Tg» σε ng/mL (θυρεοσφαιρίνη) δεν γίνεται ποτέ «Τριγλυκερίδια». Ένα ολόκληρο όνομα
+/// («Αιμοσφαιρίνη») ταιριάζει και με άγνωστη μονάδα («gr/dL»): τότε ρωτιέται μόνο η μονάδα. Όσα έμαθες εσύ δεν κρίνονται.
+String? matchTest(String rawName, {Map<String, String> learned = const {}, String? unit}) {
   final k = foldName(rawName);
   if (k.isEmpty) return null;
   final l = learned[k];
   if (l != null && labById.containsKey(l)) return l;
-  final hit = _aliasIndex[k];
+  // «Ca++»: έτσι γράφεται το ιονισμένο ασβέστιο (άλλη εξέταση, γύρω στο 1,2 mmol/L) αλλά, σε μερικά εργαστήρια, και το
+  // ολικό. Το δίπλωμα σβήνει τα «+», άρα θα γινόταν «Ca» = ολικό ασβέστιο χωρίς ερώτηση. Εδώ η εφαρμογή ρωτά.
+  if (rawName.contains('++')) return null;
+  final u = unit?.trim() ?? '';
+  String? checked(String? id, String key) {
+    if (id == null || u.isEmpty || key.length > shortCodeLength) return id;
+    return toBase(labById[id]!, 1, u) == null ? null : id;
+  }
+
+  final hit = checked(_aliasIndex[k], k);
   if (hit != null) return hit;
   // Συχνή προσθήκη των εργαστηρίων: «ορού» / «serum» στο τέλος.
   for (final suffix in _suffixes) {
     if (k.endsWith(suffix) && k.length > suffix.length) {
-      final h = _aliasIndex[k.substring(0, k.length - suffix.length)];
+      final short = k.substring(0, k.length - suffix.length);
+      final h = checked(_aliasIndex[short], short);
       if (h != null) return h;
     }
   }
   return null;
+}
+
+/// Το είδος του δείγματος όπως το γράφει το εργαστήριο («Είδος δείγματος: Ορός»), σε τρεις ομάδες: «blood» (ορός,
+/// πλάσμα, ολικό αίμα), «urine» (ούρα, και 24ώρου), «other» (ό,τι άλλο: κόπρανα, σίελος, ΕΝΥ…). null: δεν γράφτηκε.
+/// Τελικός έλεγχος (Συμβούλιο 1, Σ3): ο κατάλογος έχει ΜΟΝΟ εξετάσεις αίματος· «Γλυκόζη», «Κρεατινίνη», «Νάτριο»,
+/// «Ουρικό οξύ», «Λευκωματίνη» μετριούνται και στα ούρα, με το ίδιο όνομα και συχνά την ίδια μονάδα.
+String? specimenKind(String? raw) {
+  if (raw == null) return null;
+  final k = foldName(raw);
+  if (k.isEmpty) return null;
+  bool has(String word) => k.contains(foldName(word));
+  // Πρώτα τα ούρα: «λευκωματίνη ούρων» δεν είναι αίμα, ό,τι άλλο κι αν γράφει η γραμμή.
+  if (has('ούρα') || has('ούρων') || has('urine') || has('urinary')) return 'urine';
+  const blood = ['ορός', 'ορού', 'serum', 'πλάσμα', 'plasma', 'αίμα', 'blood', 'EDTA', 'φλεβικ', 'venous', 'τριχοειδ', 'capillary'];
+  if (blood.any(has)) return 'blood';
+  // Ό,τι δεν αναγνωρίζεται ΔΕΝ θεωρείται αίμα: καλύτερα μια σύγκριση λιγότερη παρά μια λάθος.
+  return 'other';
 }
 
 /// Μέθοδος LDL από το όνομα (υπολογισμένη ή άμεση): άλλη μέθοδος = σύγκριση λιγότερο σίγουρη.

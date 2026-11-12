@@ -68,7 +68,10 @@ object Results {
         // Νέα πεδία: το παλιό κινητό τα αγνοεί.
         if (Repo.hrMode.isNotEmpty() && gapsKnown) o.put("hrDel", Repo.hrGaps.deliveries)
         if (!gapsKnown) o.put("hrRec", 1)
-        if (Repo.diag.isNotEmpty()) o.put("diag", Repo.diag)
+        // Τελικός έλεγχος (Συμβούλιο 1, Σ1): μαζί και πόσες τιμές παλμών ήρθαν καλές / χαμηλής ακρίβειας / άχρηστες
+        // («q=5400/120/15»), μέσα στο ίδιο κείμενο: κανένα νέο πεδίο, το παλιό κινητό το διαβάζει όπως πριν.
+        val diag = Repo.hrQuality.withDiag(Repo.diag)
+        if (diag.isNotEmpty()) o.put("diag", diag)
         Repo.lastErr?.let { o.put("err", it.take(120)) }
         // Το όριο που ίσχυε στην άσκηση (έλεγχος 9/11, V-B-04· 0 = χωρίς όριο). Νέο πεδίο: το παλιό κινητό το αγνοεί.
         o.put("lim", Repo.alarm.limit ?: 0)
