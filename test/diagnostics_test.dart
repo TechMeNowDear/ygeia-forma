@@ -99,6 +99,11 @@ void main() {
     ));
     await t.enterText(find.byKey(const ValueKey('diag-note')), 'Το μεσημεριανό λείπει');
     await t.tap(find.byKey(const ValueKey('diag-make')));
+    // Οι κλήσεις προς το Android (που εδώ δεν υπάρχει) τελειώνουν σε πραγματικό χρόνο, όχι στο ψεύτικο ρολόι της δοκιμής.
+    for (var i = 0; i < 50 && name == null; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await t.pump();
+    }
     await t.pumpAndSettle();
     expect(name, startsWith('ygeia-elegxos-'));
     expect(name, endsWith('.json.gz'));
