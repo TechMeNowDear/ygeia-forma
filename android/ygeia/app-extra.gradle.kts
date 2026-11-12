@@ -58,4 +58,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     // Μόνο για τους ελέγχους Kotlin σε απλό JVM (android/app/src/test): δεν μπαίνει ποτέ στην εφαρμογή.
     testImplementation("junit:junit:4.13.2")
+    // Το org.json του Android είναι «άδειο» στους ελέγχους JVM (κάθε κλήση πετά σφάλμα): το πραγματικό, όπως στο ρολόι
+    // (android/wear/build.gradle.kts, ίδια έκδοση). Χρειάζεται για το FoodRulesTest (τελικός έλεγχος, 13/11).
+    testImplementation("org.json:json:20240303")
 }
