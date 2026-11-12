@@ -166,6 +166,13 @@ class _BarPainter extends CustomPainter {
   bool shouldRepaint(_BarPainter old) => old.bpm != bpm || old.limit != limit || old.c != c;
 }
 
+/// Ο υψηλότερος παλμός όπως τον γράφει η κάρτα (απόφαση 12/11, τελικός έλεγχος μ5). Στα βάρη με «~»: είναι ΜΙΑ στιγμιαία
+/// τιμή του καρπού, και όταν σφίγγεις τη λαβή ο αισθητήρας χάνει την επαφή. Στο περπάτημα (σταθερή κίνηση) σκέτος.
+String hrMaxText(int max, {required bool cardio}) => cardio ? '$max' : '~$max';
+
+/// Η γραμμή κάτω από τους αριθμούς, μόνο στα βάρη (κείμενο εγκεκριμένο 12/11).
+const hrMaxApproxText = 'Υψηλότερος: στιγμιαία τιμή, κατά προσέγγιση.';
+
 /// Παλμοί μιας προπόνησης στη σύνοψη: μέσος, υψηλότερος, γράφημα με το όριο (σχέδιο 5, 8/11).
 /// Έλεγχος 9/11 (V-B-04): κρίνεται ΜΟΝΟ με το όριο που ίσχυε σε αυτή την προπόνηση ([Session.limitUsed]). Χωρίς όριο
 /// τότε, ή παλιά προπόνηση που δεν το κράτησε (πριν από την #90): μόνο οι παλμοί, χωρίς γραμμή ορίου και χωρίς κρίση
@@ -198,11 +205,16 @@ class HrCard extends StatelessWidget {
         const SizedBox(height: 6),
         Wrap(spacing: 18, runSpacing: 4, children: [
           if (h.avg != null) _stat(c, '${h.avg}', 'μέσος'),
-          if (h.max != null) _stat(c, '${h.max}', 'υψηλότερος'),
+          if (h.max != null) _stat(c, hrMaxText(h.max!, cardio: session.isCardio), 'υψηλότερος'),
           // Η τιμή της Προόδου («Παλμοί στο περπάτημα», σταθερό βάδισμα· έλεγχος του fix-accuracy, S8): να βρίσκεται.
           if (session.isCardio && session.steadyHr != null)
             KeyedSubtree(key: const ValueKey('hr-steady'), child: _stat(c, '${session.steadyHr}', 'από το 5′')),
         ]),
+        // Απόφαση 12/11 (τελικός έλεγχος, μ5): στα βάρη ο υψηλότερος είναι μία στιγμιαία τιμή του καρπού. Το λέει η οθόνη.
+        if (h.max != null && !session.isCardio) ...[
+          const SizedBox(height: 4),
+          Text(hrMaxApproxText, key: const ValueKey('hr-max-approx'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textSecondary)),
+        ],
         if (session.hr.length >= 2) ...[
           const SizedBox(height: 10),
           SizedBox(height: 70, child: CustomPaint(painter: _HrChart(session.hr, lim, c))),

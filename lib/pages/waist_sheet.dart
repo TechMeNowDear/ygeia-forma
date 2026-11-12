@@ -129,7 +129,7 @@ class _WaistSheetState extends State<WaistSheet> {
           Text(
             p.female || p.male
                 ? 'Εύρος αναφοράς ${p.female ? 'γυναικών' : 'ανδρών'}: κάτω από ${dec(ref.ok, 0)} cm· από ${dec(ref.high, 0)} cm '
-                    'ο κίνδυνος για την καρδιά είναι υψηλός (ESC 2021).'
+                    'οι οδηγίες συστήνουν μείωση βάρους (ESC 2021).'
                 : 'Εύρος αναφοράς: ανδρών κάτω από 94 cm, γυναικών κάτω από 80 cm (ESC 2021).',
             style: small,
           ),
