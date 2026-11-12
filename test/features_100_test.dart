@@ -43,8 +43,8 @@ void main() {
 
     test('η ώρα σώζεται στις ρυθμίσεις, αλλά δεν μπαίνει στο αντίγραφο', () {
       final p = Prefs.fromJson(const {})..lastExport = now.millisecondsSinceEpoch;
-      expect(Prefs.fromJson(p.toJson()).lastExport, now.millisecondsSinceEpoch);
-      expect(Prefs.fromJson(const {}).toJson().containsKey('lastExport'), isFalse);
+      expect(Prefs.fromJson(jsonDecode(p.toJson()) as Map<String, dynamic>).lastExport, now.millisecondsSinceEpoch);
+      expect((jsonDecode(Prefs.fromJson(const {}).toJson()) as Map).containsKey('lastExport'), isFalse);
       expect(Prefs.fromJson(const {'lastExport': 'χθες'}).lastExport, isNull);
       expect(Prefs.fromJson(const {'lastExport': double.infinity}).lastExport, isNull);
       // Σε νέο κινητό, μετά από επαναφορά, δεν έχει βγει αντίγραφο ΑΠΟ ΑΥΤΟ το κινητό.
