@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/body_trend.dart';
@@ -73,6 +74,11 @@ void main() {
     });
 
     testWidgets('φαίνονται στην οθόνη', (t) async {
+      // Η οθόνη ρωτά τη Samsung Health μόλις ανοίξει: εδώ απαντά «όχι», όπως στις άλλες δοκιμές της.
+      const channel = MethodChannel('ygeia/samsung');
+      final m = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      m.setMockMethodCallHandler(channel, (call) async => '{"ok":false,"kind":"other"}');
+      addTearDown(() => m.setMockMethodCallHandler(channel, null));
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const TiFtaneiScreen()));
       await t.pumpAndSettle();
       expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα 100%');
