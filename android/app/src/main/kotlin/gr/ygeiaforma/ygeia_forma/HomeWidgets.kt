@@ -391,7 +391,8 @@ object HomeWidgets {
             if (a.has("distance")) put("distance", "Απόσταση", dec1(a.optDouble("distance") / 1000), " km")
         }
         val t = Instant.ofEpochMilli(readAt).atZone(zone).toLocalTime()
-        move.put("src", "ρολόι · %02d:%02d".format(t.hour, t.minute)).put("at", readAt).put("day", today.toString())
+        // Locale.ROOT (τελικός έλεγχος, Συμβούλιο 4, W-5): πάντα ψηφία 0–9, σε όποια γλώσσα κι αν είναι το κινητό.
+        move.put("src", "ρολόι · %02d:%02d".format(java.util.Locale.ROOT, t.hour, t.minute)).put("at", readAt).put("day", today.toString())
         kinds.put("move", move)
         writeSnapshot(ctx, snap.toString())
         updateAll(ctx, only = "move")

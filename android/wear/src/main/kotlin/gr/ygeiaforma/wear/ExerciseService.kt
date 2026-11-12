@@ -87,10 +87,6 @@ class ExerciseService : Service() {
         private const val FIRST_HR_LOCK_MS = HrSilence.FIRST_MS + 10_000L
         /** Το πολύ τόσο ξύπνιος ο επεξεργαστής σε ένα διάλειμμα, για τη δόνηση του τέλους του (W2-03). */
         private const val REST_LOCK_MAX_MS = 5 * 60_000L
-        /** Το πολύ τόσο ξύπνιος στο «Τέλος», ώσπου να γραφτεί και να σταλεί το αποτέλεσμα (W2-09). */
-        private const val FINISH_LOCK_MS = 20_000L
-        /** Πόσο περιμένει την τελευταία ενημέρωση («ENDED») του Health Services μετά το «Τέλος» (W2-09). */
-        private const val ENDED_WAIT_MS = 5_000L
         /** Δόνηση ζώνης μόνο για τιμή το πολύ τόσο παλιά (12/11): αλλιώς οι παλμοί έχουν ήδη αλλάξει. */
         private const val ZONE_LATE_MS = 30_000L
 
@@ -136,6 +132,8 @@ class ExerciseService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val client by lazy { HealthServices.getClient(this).exerciseClient }
     private var ticker: Job? = null
+    /** Η έναρξη της άσκησης στο Health Services, όσο δεν έχει απαντήσει (τελικός έλεγχος, Συμβούλιο 4, W-1). */
+    private var startJob: Job? = null
     private var restBuzzedFor = 0L
     private var lastHrSent = 0L
     private var lastLiveSent = 0L
@@ -252,7 +250,7 @@ class ExerciseService : Service() {
         Repo.changed()
         holdUntilFirstHr()
         saveRun(force = true)
-        scope.launch { startExercise(walk, gpsOk) }
+        startJob = scope.launch { startExercise(walk, gpsOk) }
         ticker = scope.launch { tick() }
     }
 
@@ -363,7 +361,7 @@ class ExerciseService : Service() {
         if (action == Recovery.Action.ATTACH) {
             scope.launch { attach() }
         } else {
-            scope.launch { startExercise(walk, walk && Repo.gps) }
+            startJob = scope.launch { startExercise(walk, walk && Repo.gps) }
         }
         saveRun(force = true)
         ticker = scope.launch { tick() }
@@ -797,13 +795,25 @@ class ExerciseService : Service() {
                 scope.launch { Link.sendJson(this@ExerciseService, Paths.LIVE, o) }
             }
             // ✓ του ρολογιού που δεν έφτασαν στο κινητό: ξανά, ανά 10″ (το κινητό αγνοεί όσα έχει ήδη· έλεγχος #2).
+            // Τελικός έλεγχος, Συμβούλιο 4 (W-4): μαζί και οι επαναλήψεις που άλλαξες στο ρολόι — μέσα στο ✓ όταν το κινητό
+            // δεν έχει δει ακόμα το ✓ σου, αλλιώς ως «reps». Ώσπου το κινητό να δείξει τη δική σου τιμή.
             val pend = Repo.pendingTicks
+            val pendReps = Repo.pendingReps
             val ph = Repo.phone
-            if (Repo.runningPhone && ph != null && pend.isNotEmpty() && nowEl - lastPendingSent >= 10_000) {
+            if (Repo.runningPhone && ph != null && (pend.isNotEmpty() || pendReps.isNotEmpty()) && nowEl - lastPendingSent >= 10_000) {
                 lastPendingSent = nowEl
                 for ((i, k) in pend) {
-                    val o = JSONObject().put(Proto.CMD_VERSION, Proto.MAJOR).put("op", "tick").put("i", i).put("s", k).put("sid", ph.id).put("late", true)
-                    ph.items.getOrNull(i)?.sets?.getOrNull(k)?.at?.takeIf { it > 0 }?.let { o.put("at", it) }
+                    val item = ph.items.getOrNull(i) ?: continue
+                    val set = item.sets.getOrNull(k) ?: continue
+                    val o = tickCmd(i, k, set.at, item.ex, set.reps.takeIf { set.trail != null }, late = true)
+                        .put(Proto.CMD_VERSION, Proto.MAJOR).put("sid", ph.id)
+                    scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
+                }
+                for ((i, k) in pendReps) {
+                    val item = ph.items.getOrNull(i) ?: continue
+                    val set = item.sets.getOrNull(k) ?: continue
+                    val o = repsCmd(i, k, item.ex, set.reps, set.at)
+                        .put(Proto.CMD_VERSION, Proto.MAJOR).put("sid", ph.id).put("q", Repo.nextCmdSeq())
                     scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
                 }
             }
@@ -1020,6 +1030,25 @@ class ExerciseService : Service() {
 
     // ------------------------------------------------------------------ τέλος
     /**
+     * Μία κλήση προς το Health Services στο «Τέλος», με όριο χρόνου ([FinishTimes.HS_CALL_MS]· τελικός έλεγχος, Συμβούλιο 4,
+     * W-1). false ΜΟΝΟ αν δεν απάντησε εγκαίρως· μια απάντηση με σφάλμα είναι απάντηση (όπως πριν: συνεχίζουμε). Το ότι
+     * δεν απάντησε γράφεται στο logcat και πάει στο κινητό με το αποτέλεσμα («err»), αν δεν υπάρχει ήδη άλλο σφάλμα.
+     */
+    private suspend fun hsCall(what: String, block: suspend () -> Unit): Boolean = try {
+        val ok = withTimeoutOrNull(FinishTimes.HS_CALL_MS) {
+            block()
+            true
+        } == true
+        if (!ok) {
+            Log.w(TAG, "Health Services ($what): καμία απάντηση σε ${FinishTimes.HS_CALL_MS / 1000}″")
+            if (Repo.lastErr == null) Repo.lastErr = "TimeoutException: Health Services ($what)"
+        }
+        ok
+    } catch (_: Exception) {
+        true
+    }
+
+    /**
      * Τέλος της άσκησης και αποτέλεσμα στο κινητό. [userEnd]: πάτησε «Τέλος» εδώ (σε προπόνηση του κινητού: τέλος και εκεί,
      * V-A-09). [endReason]: τελείωσε από αλλού (V-A-16). Το αποτέλεσμα μπαίνει πρώτα στην αναμονή (σβήνεται μόνο όταν μπει
      * στο Data Layer) και μετά σβήνεται το στιγμιότυπο της άσκησης: σε κάθε στιγμή υπάρχει ένα από τα δύο.
@@ -1030,39 +1059,57 @@ class ExerciseService : Service() {
         releaseFirstHrLock()
         releaseRestLock()
         Repo.unlisten(onRepo)
-        // Ξύπνιος ώσπου να γραφτεί και να σταλεί το αποτέλεσμα (το πολύ 20″), όχι μισό στον ύπνο.
+        // Ξύπνιος ώσπου να γραφτεί και να σταλεί το αποτέλεσμα (το πολύ [FinishTimes.LOCK_MS]), όχι μισό στον ύπνο.
         val finishLock = try {
             getSystemService(PowerManager::class.java)?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ygeia:finish")?.apply {
                 setReferenceCounted(false)
-                acquire(FINISH_LOCK_MS)
+                acquire(FinishTimes.LOCK_MS)
             }
         } catch (_: Exception) {
             null
         }
         val now = System.currentTimeMillis()
         ticker?.cancel()
+        // Τελικός έλεγχος, Συμβούλιο 4 (W-1): μια έναρξη που δεν έχει απαντήσει ακόμα (το «Τέλος» ήρθε στα πρώτα
+        // δευτερόλεπτα) την περιμένουμε λίγο, ώστε ό,τι ξεκίνησε να τελειώσει κανονικά εδώ. Αν δεν απαντήσει, ακυρώνεται·
+        // το «τέλος» παρακάτω κλείνει την άσκηση ακόμα κι αν το Health Services την ξεκινήσει αργότερα (οι κλήσεις
+        // εκτελούνται με τη σειρά). Πριν, μια τέτοια άσκηση έμενε ανοιχτή χωρίς κανέναν να την τελειώσει.
+        val starting = startJob?.takeIf { it.isActive }
+        if (starting != null) {
+            try {
+                withTimeoutOrNull(FinishTimes.HS_CALL_MS) { starting.join() }
+            } catch (_: Exception) {
+            }
+            if (starting.isActive) starting.cancel()
+        }
+        val lateStart = starting != null && starting.isCancelled && !exerciseStarted
         sensor?.stop()
         sensor = null
         if (exerciseStarted) {
             // Ό,τι έχει μετρηθεί και δεν έχει παραδοθεί ακόμα (πακέτα ανά 5″) έρχεται τώρα, πριν από τον λογαριασμό.
+            hsCall("flush") { client.flushAsync().await() }
             try {
-                client.flushAsync().await()
-                delay(400)
+                delay(FinishTimes.FLUSH_SETTLE_MS)
             } catch (_: Exception) {
             }
             // Οι τελευταίες τιμές (ως 150″ σε πακέτα) και ο τελικός χρόνος/απόσταση έρχονται με την ενημέρωση «ENDED»,
             // που μπορεί να φτάσει μετά την απάντηση του «τέλος» (W2-09): την περιμένουμε ως 5″ πριν κλείσει ο ακροατής.
+            // Όχι όμως αν το ίδιο το «τέλος» δεν απάντησε: τότε δεν θα έρθει.
             val wait = if (endReason == null) CompletableDeferred<Unit>().also { ended = it } else null
-            try {
-                client.endExerciseAsync().await()
-            } catch (_: Exception) {
+            val answered = hsCall("end") { client.endExerciseAsync().await() }
+            if (wait != null && answered) {
+                val got = try {
+                    withTimeoutOrNull(FinishTimes.ENDED_WAIT_MS) { wait.await() } != null
+                } catch (_: Exception) {
+                    false
+                }
+                if (!got) Log.w(TAG, "χωρίς ENDED σε ${FinishTimes.ENDED_WAIT_MS / 1000}″")
             }
-            if (wait != null && withTimeoutOrNull(ENDED_WAIT_MS) { wait.await() } == null) Log.w(TAG, "χωρίς ENDED σε ${ENDED_WAIT_MS / 1000}″")
             ended = null
-            try {
-                client.clearUpdateCallbackAsync(callback).await()
-            } catch (_: Exception) {
-            }
+            hsCall("clear") { client.clearUpdateCallbackAsync(callback).await() }
+        } else if (lateStart) {
+            hsCall("end") { client.endExerciseAsync().await() }
+            hsCall("clear") { client.clearUpdateCallbackAsync(callback).await() }
         }
         // Το κενό ως το τέλος, χωρίς όριο (W2-08): ένα λουρί χαλαρό στο τέλος φαίνεται ολόκληρο.
         Repo.hrGaps.close(now)
@@ -1077,19 +1124,34 @@ class ExerciseService : Service() {
             failed = true
             null
         }
-        // «Τέλος» στο ρολόι σε προπόνηση του κινητού: τέλος και εκεί (V-A-09). Μήνυμα τώρα (αν το κινητό ακούει)· και το
-        // «fin» μέσα στο αποτέλεσμα, που μένει ώσπου να το πάρει το κινητό.
-        val sid = result?.second?.optString("sid", "").orEmpty()
-        if (userEnd && wasPhone && sid.isNotEmpty()) {
-            Link.sendJson(this, Paths.CMD, JSONObject().put(Proto.CMD_VERSION, Proto.MAJOR).put("op", "end").put("sid", sid).put("at", now))
-        }
+        // Τελικός έλεγχος, Συμβούλιο 4 (W-2): ΠΡΩΤΑ το αποτέλεσμα στην αναμονή (στον δίσκο του ρολογιού) και μετά
+        // οτιδήποτε περιμένει το κινητό. Πριν, το μήνυμα «end» έφευγε πρώτο· όσο περίμενε απάντηση, το αποτέλεσμα υπήρχε
+        // μόνο στη μνήμη.
         if (result != null) {
             Repo.savePending(this, result.first, result.second)
             Repo.clearRun(this)
-            if (Link.putResult(this, result.first, result.second)) Repo.removePending(this, result.first)
         } else if (!failed) {
             // Τίποτα να σταλεί (π.χ. προπόνηση χωρίς σετ): το στιγμιότυπο δεν χρειάζεται πια.
             Repo.clearRun(this)
+        }
+        // «Τέλος» στο ρολόι σε προπόνηση του κινητού: τέλος και εκεί (V-A-09). Μήνυμα τώρα (αν το κινητό ακούει)· και το
+        // «fin» μέσα στο αποτέλεσμα, που μένει ώσπου να το πάρει το κινητό. Και τα δύο με όριο χρόνου (W-1): ό,τι δεν
+        // προλάβει μένει στην αναμονή και φεύγει στο επόμενο άνοιγμα της εφαρμογής.
+        val sid = result?.second?.optString("sid", "").orEmpty()
+        if (userEnd && wasPhone && sid.isNotEmpty()) {
+            val end = JSONObject().put(Proto.CMD_VERSION, Proto.MAJOR).put("op", "end").put("sid", sid).put("at", now)
+            try {
+                withTimeoutOrNull(FinishTimes.SEND_MS) { Link.sendJson(this@ExerciseService, Paths.CMD, end) }
+            } catch (_: Exception) {
+            }
+        }
+        if (result != null) {
+            val put = try {
+                withTimeoutOrNull(FinishTimes.PUT_MS) { Link.putResult(this@ExerciseService, result.first, result.second) } == true
+            } catch (_: Exception) {
+                false
+            }
+            if (put) Repo.removePending(this, result.first)
         }
         Repo.local = null
         Repo.resetExercise()

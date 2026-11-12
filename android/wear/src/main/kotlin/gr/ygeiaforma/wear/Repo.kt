@@ -234,8 +234,35 @@ object Repo {
         }
 
     /**
+     * Επαναλήψεις που άλλαξες στο ρολόι και το κινητό δεν δείχνει ακόμα (άσκηση, σετ): ξαναστέλνονται ως «reps» μαζί με
+     * τα ✓ που εκκρεμούν (τελικός έλεγχος, Συμβούλιο 4, W-4). Όχι για ✓ του ρολογιού που το κινητό δεν έχει δει: εκεί οι
+     * επαναλήψεις πάνε μέσα στο ίδιο το ✓ ([tickCmd], [pendingTicks]).
+     */
+    val pendingReps: List<Pair<Int, Int>>
+        get() {
+            val p = phone ?: return emptyList()
+            val out = mutableListOf<Pair<Int, Int>>()
+            for ((i, it) in p.items.withIndex()) for ((k, set) in it.sets.withIndex()) {
+                if (set.trail != null && (set.confirmed || !set.done)) out.add(i to k)
+            }
+            return out
+        }
+
+    /**
+     * Αύξων αριθμός («q») για τις εντολές προς το κινητό (έλεγχος γ2, W2-19): ένας για όλη την εφαρμογή (οθόνη και
+     * υπηρεσία), πάντα μεγαλύτερος από τον προηγούμενο, και ποτέ μικρότερος από την ώρα (ώστε να συνεχίζει σωστά και μετά
+     * από νέα εκκίνηση της εφαρμογής). Πριν ήταν μέσα στην οθόνη· τώρα τον χρειάζεται και η υπηρεσία (W-4).
+     */
+    private var cmdSeq = 0L
+    fun nextCmdSeq(now: Long = System.currentTimeMillis()): Long {
+        cmdSeq = maxOf(cmdSeq + 1, now)
+        return cmdSeq
+    }
+
+    /**
      * Νέα κατάσταση από το κινητό. Κρατά κάθε ✓ που έγινε στο ρολόι και δεν έχει φτάσει ακόμα εκεί (όσο κι αν αργήσει,
-     * π.χ. κλειστή εφαρμογή στο κινητό)· ένα ✓ που το κινητό είχε δει και μετά το έβγαλε, βγαίνει κι εδώ.
+     * π.χ. κλειστή εφαρμογή στο κινητό)· ένα ✓ που το κινητό είχε δει και μετά το έβγαλε, βγαίνει κι εδώ. Το ίδιο για τις
+     * επαναλήψεις που άλλαξες στο ρολόι και δεν έφτασαν ακόμα ([keepWatchEdits], W-4).
      */
     fun applyPhone(s: LiveSession?) {
         val prev = phone
@@ -246,10 +273,7 @@ object Repo {
                 if (old.ex != it.ex) continue
                 for ((k, set) in it.sets.withIndex()) {
                     val o = old.sets.getOrNull(k) ?: continue
-                    if (o.done && !set.done && !o.confirmed) {
-                        set.done = true
-                        set.at = o.at
-                    }
+                    keepWatchEdits(o, set)
                 }
                 if (it.rir == null) it.rir = old.rir
             }

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.hardware.display.DisplayManager
 import android.os.Bundle
+import android.util.Log
 import android.view.Display
 import android.view.WindowManager
 import androidx.concurrent.futures.await
@@ -18,6 +19,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /** Η μία οθόνη της εφαρμογής του ρολογιού. Ό,τι μετράει ζει στην [ExerciseService]· εδώ μόνο εικόνα και πατήματα. */
@@ -30,9 +32,8 @@ class WatchActivity : Activity(), WatchView.Actions {
     private var finishArmedUntil = 0L
     private var skipArmedUntil = 0L
     private var visible = false
-    /** Οι εντολές προς το κινητό φεύγουν μία-μία, με τη σειρά, και με αύξοντα αριθμό «q» (έλεγχος γ2, W2-19). */
+    /** Οι εντολές προς το κινητό φεύγουν μία-μία, με τη σειρά, και με αύξοντα αριθμό «q» ([Repo.nextCmdSeq], W2-19). */
     private val cmdLock = Mutex()
-    private var cmdSeq = System.currentTimeMillis()
 
     private val redraw: () -> Unit = {
         // Το κινητό άνοιξε την εφαρμογή πριν φτάσει η προπόνησή του: μπαίνει μόλις φτάσει.
@@ -93,6 +94,16 @@ class WatchActivity : Activity(), WatchView.Actions {
         handle(intent)
     }
 
+    /**
+     * Η στεφάνη (περιστροφή) στέλνει τα γεγονότα της στην προβολή που έχει την εστίαση. Από το Android 9 καμία προβολή
+     * δεν παίρνει εστίαση μόνη της σε συσκευή αφής, και η οθόνη μας δεν τη ζητούσε πουθενά (τελικός έλεγχος, Συμβούλιο 4,
+     * W-6): τη ζητά κάθε φορά που το παράθυρο έρχεται μπροστά.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::view.isInitialized) view.requestFocus()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handle(intent)
@@ -134,7 +145,11 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     /** Στιγμιότυπο άσκησης χωρίς άσκηση στη μνήμη: η εφαρμογή έκλεισε απότομα. Συνέχεια ή μερικό αποτέλεσμα ([Recovery]). */
     private suspend fun recoverIfNeeded() {
-        val o = Repo.readRun(this) ?: return
+        val o = Repo.readRun(this)
+        if (o == null) {
+            endOrphanExercise()
+            return
+        }
         // Το κανονικό αποτέλεσμα αυτής της άσκησης περιμένει ήδη: έχει τελειώσει, όχι «συνέχεια» ούτε μερικό από πάνω (S3).
         val id = Repo.runId(o)
         if (id != null && Repo.hasFinalPending(this, id)) {
@@ -152,6 +167,29 @@ class WatchActivity : Activity(), WatchView.Actions {
         try {
             ExerciseService.recover(this, action)
         } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Χωρίς στιγμιότυπο και χωρίς τίποτα να τρέχει εδώ: αν το Health Services λέει ότι μια ΔΙΚΗ μας άσκηση τρέχει ακόμα,
+     * έμεινε ορφανή και κρατά τους αισθητήρες ανοιχτούς ([shouldEndOrphan], τελικός έλεγχος, Συμβούλιο 4, W-7): τέλος τώρα.
+     * Μία ερώτηση στο Health Services ανά άνοιγμα της εφαρμογής, με όριο χρόνου· ό,τι κι αν γίνει, η εφαρμογή συνεχίζει.
+     */
+    private suspend fun endOrphanExercise() {
+        try {
+            val client = HealthServices.getClient(this).exerciseClient
+            val owned = withTimeoutOrNull(FinishTimes.HS_CALL_MS) {
+                client.getCurrentExerciseInfoAsync().await().exerciseTrackedStatus == ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS
+            } == true
+            val idle = Repo.screen == Repo.Screen.HOME || Repo.screen == Repo.Screen.END
+            if (!shouldEndOrphan(owned, hasSnapshot = false, running = Repo.running != null, local = Repo.local != null, idle = idle)) return
+            Log.w(ExerciseService.TAG, "ορφανή άσκηση στο Health Services: τέλος")
+            withTimeoutOrNull(FinishTimes.HS_CALL_MS) {
+                client.endExerciseAsync().await()
+                true
+            }
+        } catch (e: Exception) {
+            Log.w(ExerciseService.TAG, "ορφανή άσκηση", e)
         }
     }
 
@@ -229,7 +267,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     // ------------------------------------------------------------------ ενέργειες
     private fun cmd(o: JSONObject) {
         val s = Repo.phone ?: return
-        o.put("sid", s.id).put(Proto.CMD_VERSION, Proto.MAJOR).put("q", ++cmdSeq)
+        o.put("sid", s.id).put(Proto.CMD_VERSION, Proto.MAJOR).put("q", Repo.nextCmdSeq())
         scope.launch { cmdLock.withLock { Link.sendJson(this@WatchActivity, Paths.CMD, o) } }
     }
 
@@ -282,10 +320,12 @@ class WatchActivity : Activity(), WatchView.Actions {
         val s = Repo.session ?: return
         val now = System.currentTimeMillis()
         val i = s.idx
-        val si = s.current?.nextSet ?: -1
+        val cur = s.current
+        val si = cur?.nextSet ?: -1
         val next = s.tick(now)
         // Με την ώρα του ✓ εδώ: το κινητό τη γράφει όπως είναι (παλμοί ανά σετ), όχι την ώρα που έφτασε (9/11).
-        if (s.phone && si >= 0) cmd(JSONObject().put("op", "tick").put("i", i).put("s", si).put("at", now))
+        // Και με τις επαναλήψεις, αν τις άλλαξες εδώ (Συμβούλιο 4, W-4): δεν εξαρτώνται από μια εντολή «reps» που ίσως χάθηκε.
+        if (s.phone && cur != null && si >= 0) cmd(tickCmd(i, si, now, cur.ex, cur.sets[si].reps.takeIf { cur.sets[si].trail != null }))
         if (!s.phone) saveRun()
         Repo.screen = when (next) {
             LiveSession.Next.REST -> if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
@@ -319,7 +359,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         val si = it.nextSet
         if (si < 0) return
         val set = it.sets[si]
-        set.reps = (set.reps + delta).coerceIn(0, 99)
+        // Σε προπόνηση του κινητού: με μνήμη του τι είχε το κινητό ([SetT.edit], W-4), ώστε η αλλαγή να μη χαθεί.
+        if (s.phone) set.edit(set.reps + delta) else set.reps = (set.reps + delta).coerceIn(0, 99)
         if (s.phone) cmd(repsCmd(s.idx, si, it.ex, set.reps, 0))
     }
 
@@ -328,7 +369,7 @@ class WatchActivity : Activity(), WatchView.Actions {
         val s = Repo.session ?: return
         val (i, k) = s.lastDone(System.currentTimeMillis()) ?: return
         val set = s.items[i].sets[k]
-        set.reps = (set.reps + delta).coerceIn(0, 99)
+        if (s.phone) set.edit(set.reps + delta) else set.reps = (set.reps + delta).coerceIn(0, 99)
         // Με την άσκηση και την ώρα του σετ (S4): αν στο μεταξύ η άσκηση άλλαξε στο κινητό, η διόρθωση δεν πάει αλλού.
         if (s.phone) cmd(repsCmd(i, k, s.items[i].ex, set.reps, set.at))
         else saveRun()
@@ -433,13 +474,6 @@ private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και σ
  * πρώτα (πόρτα, φανάρι), έχουν ήδη πέσει. Κείμενο προς έγκριση από τον χρήστη.
  */
 const val WALK_FINISH_NOTICE = "Πάτα ξανά «Τέλος» όσο περπατάς ακόμα"
-
-/**
- * Εντολή «επαναλήψεις» προς το κινητό: άσκηση [i], σετ [k], και (νέα πεδία, έλεγχος του γ2, S4) το id της άσκησης [ex]
- * και η ώρα του σετ [at] (αν έγινε), ώστε το κινητό να την αγνοήσει αν δεν ταιριάζουν πια. Το παλιό κινητό τα αγνοεί.
- */
-fun repsCmd(i: Int, k: Int, ex: String, reps: Int, at: Long): JSONObject =
-    JSONObject().put("op", "reps").put("i", i).put("s", k).put("v", reps).put("ex", ex).also { if (at > 0) it.put("at", at) }
 
 /**
  * Το «μπες στην προπόνηση του κινητού» (άνοιγμα από το κινητό) περιμένει μόνο αν δεν τρέχει τίποτα εδώ: αλλιώς σβήνει,

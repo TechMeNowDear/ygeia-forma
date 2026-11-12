@@ -143,6 +143,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     init {
         isFocusable = true
         isFocusableInTouchMode = true
+        // Η οθόνη παίρνει πια την εστίαση για τη στεφάνη (WatchActivity.onWindowFocusChanged, τελικός έλεγχος, Συμβούλιο 4,
+        // W-6): χωρίς το «φωτισμένο» πλαίσιο εστίασης που ζωγραφίζει το Android πάνω σε προβολή με εστίαση.
+        defaultFocusHighlightEnabled = false
     }
 
     override fun onDraw(c: Canvas) {

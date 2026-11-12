@@ -158,7 +158,11 @@ class FoodBridge(
         }
         scanner.startScan()
             .addOnSuccessListener { b ->
-                if (cont.isActive) cont.resume(JSONObject().put("ok", true).put("code", b.rawValue ?: ""))
+                // Τελικός έλεγχος, Συμβούλιο 4 (Β2): ο «σύντομος» κωδικός UPC-E γίνεται ο UPC-A 12 ψηφίων με τον οποίο
+                // είναι γραμμένο το προϊόν στο Open Food Facts ([FoodRules.upceToUpca]). Ό,τι άλλο, όπως ήρθε.
+                val raw = b.rawValue ?: ""
+                val code = if (b.format == Barcode.FORMAT_UPC_E) FoodRules.upceToUpca(raw) ?: raw else raw
+                if (cont.isActive) cont.resume(JSONObject().put("ok", true).put("code", code))
             }
             .addOnCanceledListener {
                 if (cont.isActive) cont.resume(JSONObject().put("ok", false).put("kind", "cancelled"))
@@ -189,16 +193,11 @@ class FoodBridge(
             // άλλαξε τη μορφή των θρεπτικών και είναι ακόμα υπό ανάπτυξη (changelog του API).
             conn.setRequestProperty("User-Agent", "YgeiaForma/0.1 (+https://github.com/TechMeNowDear/ygeia-forma)")
             val status = conn.responseCode
-            if (status == 404) return JSONObject().put("ok", true).put("found", false)
-            if (status !in 200..299) {
-                return JSONObject().put("ok", false).put("kind", "connection").put("message", "HTTP $status")
-            }
-            val body = conn.inputStream.bufferedReader().use { it.readText() }
-            val j = JSONObject(body)
-            if (j.optInt("status", 0) != 1 || !j.has("product")) {
-                return JSONObject().put("ok", true).put("found", false)
-            }
-            return JSONObject().put("ok", true).put("found", true).put("product", j.getJSONObject("product"))
+            // Τελικός έλεγχος, Συμβούλιο 4 (Β5): τι σημαίνει κάθε απάντηση το αποφασίζει η [FoodRules.offReply] (και μια
+            // απάντηση που δεν είναι JSON είναι «δεν έγινε σύνδεση», όχι άγνωστο σφάλμα)· το σώμα διαβάζεται με όριο μεγέθους.
+            if (status == 404 || status !in 200..299) return FoodRules.offReply(status, null)
+            val body = conn.inputStream.use { FoodRules.readCapped(it) }
+            return FoodRules.offReply(status, body)
         } catch (e: java.io.IOException) {
             return JSONObject().put("ok", false).put("kind", "connection").put("message", e.message ?: "")
         } finally {

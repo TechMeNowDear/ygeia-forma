@@ -13,6 +13,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -266,19 +267,30 @@ object Link {
         }
     }
 
-    /** Μήνυμα σε όσα συνδεδεμένα κινητά υπάρχουν. false αν δεν βρέθηκε κανένα. */
+    /** Το πολύ τόσο για ένα μήνυμα προς το κινητό (τελικός έλεγχος, Συμβούλιο 4, W-1). */
+    const val SEND_TIMEOUT_MS = 5_000L
+
+    /**
+     * Μήνυμα σε όσα συνδεδεμένα κινητά υπάρχουν. false αν δεν βρέθηκε κανένα, ή αν οι υπηρεσίες της Google δεν απάντησαν
+     * σε [SEND_TIMEOUT_MS]. Με όριο χρόνου (W-1): οι εντολές της οθόνης φεύγουν μία-μία ([WatchActivity], κλείδωμα)· ένα
+     * μήνυμα που δεν απαντά ποτέ θα κρατούσε πίσω του όλα τα επόμενα.
+     */
     suspend fun send(ctx: Context, path: String, data: ByteArray): Boolean = try {
-        val nodes = Wearable.getNodeClient(ctx.applicationContext).connectedNodes.await()
-        val mc = Wearable.getMessageClient(ctx.applicationContext)
-        var ok = false
-        for (n in nodes) {
-            try {
-                mc.sendMessage(n.id, path, data).await()
-                ok = true
-            } catch (_: Exception) {
+        withTimeoutOrNull(SEND_TIMEOUT_MS) {
+            val nodes = Wearable.getNodeClient(ctx.applicationContext).connectedNodes.await()
+            val mc = Wearable.getMessageClient(ctx.applicationContext)
+            var ok = false
+            for (n in nodes) {
+                try {
+                    mc.sendMessage(n.id, path, data).await()
+                    ok = true
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                }
             }
-        }
-        ok
+            ok
+        } == true
     } catch (_: Exception) {
         false
     }

@@ -12,6 +12,17 @@ import 'program.dart';
 import 'session.dart';
 import 'zone.dart';
 
+/// Διόρθωση επαναλήψεων του ρολογιού που έρχεται μέσα στο αποτέλεσμά του (τελικός έλεγχος, Συμβούλιο 4, W-4): το σετ
+/// είναι ✓ και στις δύο πλευρές, το ρολόι λέει ποιες τιμές είχε το κινητό πριν ([before], το «rb») και το κινητό δείχνει
+/// ακόμα μία από αυτές ([phoneReps]) — δηλαδή η εντολή «reps» δεν έφτασε ποτέ και στο κινητό δεν άλλαξε τίποτα στο
+/// μεταξύ. Μόνο για το ίδιο ✓ (ώρες ως 2″ μακριά, όπως στο «reps»). Αλλιώς null: μένει ό,τι έχει το κινητό.
+int? watchResultReps({required int phoneReps, required int? phoneAt, required int watchReps, required int? watchAt, required Object? before}) {
+  if (before is! List || !before.contains(phoneReps)) return null;
+  if (phoneAt == null || watchAt == null || (phoneAt - watchAt).abs() > 2000) return null;
+  final r = watchReps.clamp(0, 99);
+  return r == phoneReps ? null : r;
+}
+
 /// Ανάγνωση/εγγραφή του training.json (μέσω Kotlin, ατομική εγγραφή· μπαίνει στο κρυπτογραφημένο αντίγραφο) και των
 /// αρχείων παλμών ανά προπόνηση (hr/<id>.json, έλεγχος 9/11, V-A-02).
 abstract class TrainingIO {
@@ -934,7 +945,9 @@ class TrainingStore extends ChangeNotifier {
   }
 
   /// Σετ που πατήθηκαν ✓ στο ρολόι αλλά δεν έφτασαν στο κινητό (π.χ. η εφαρμογή ήταν κλειστή): προστίθενται.
-  /// Ποτέ δεν σβήνει ή αλλάζει ό,τι έχει ήδη γραφτεί στο κινητό.
+  /// Ποτέ δεν σβήνει ή αλλάζει ό,τι έχει ήδη γραφτεί στο κινητό — με μία εξαίρεση (τελικός έλεγχος, Συμβούλιο 4, W-4):
+  /// επαναλήψεις που διόρθωσες στο ρολόι και η διόρθωση δεν έφτασε ποτέ, ενώ στο κινητό δεν άλλαξε τίποτα στο μεταξύ
+  /// ([watchResultReps]).
   void _mergeWatchSets(Session s, Object? items) {
     if (items is! List) return;
     for (var i = 0; i < items.length && i < s.items.length; i++) {
@@ -950,6 +963,11 @@ class TrainingStore extends ChangeNotifier {
       if (w.ex != e.ex || e.skipped) continue;
       for (var k = 0; k < w.log.length && k < e.log.length; k++) {
         final ws = w.log[k], ps = e.log[k];
+        if (ws.done && ps.done) {
+          final r = watchResultReps(phoneReps: ps.reps, phoneAt: ps.at, watchReps: ws.reps, watchAt: ws.at, before: ws.extra['rb']);
+          if (r != null) ps.reps = r;
+          continue;
+        }
         if (!ws.done || ps.done) continue;
         ps
           ..done = true

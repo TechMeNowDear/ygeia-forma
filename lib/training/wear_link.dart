@@ -104,6 +104,17 @@ Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name)
   };
 }
 
+/// Οι επαναλήψεις που κουβαλά ένα ✓ του ρολογιού («r», τελικός έλεγχος, Συμβούλιο 4, W-4), για την άσκηση [ex] του
+/// κινητού: 0–99, ή null αν το ✓ δεν έχει επαναλήψεις (δεν τις άλλαξες στο ρολόι, ή ρολόι παλιότερης έκδοσης), ή αν
+/// αφορούν άλλη άσκηση (στο μεταξύ την άλλαξες στο κινητό).
+int? watchTickReps(Map<String, dynamic> j, String ex) {
+  final r = j['r'];
+  final forEx = j['ex'];
+  if (r is! num || !r.isFinite) return null;
+  if (forEx is String && forEx != ex) return null;
+  return r.toInt().clamp(0, 99);
+}
+
 /// Εντολή από το ρολόι στην προπόνηση του κινητού (✓, ρεζέρβα, επαναλήψεις, άσκηση, διάλειμμα).
 class WatchCmd {
   WatchCmd(this.op, this.j);
@@ -462,6 +473,12 @@ class WearLink with WidgetsBindingObserver {
         // Σετ στο ρολόι σε άσκηση που παραλείφθηκε εδώ (ρολόι παλιότερης έκδοσης, W2-06): έγινε, άρα δεν είναι πια
         // «παράλειψη» — αλλιώς το σετ θα χανόταν στη σύνοψη και στην πρόοδο.
         if (e.skipped) t.skip(e, false);
+        // Τελικός έλεγχος, Συμβούλιο 4 (W-4): το ✓ του ρολογιού κουβαλά και τις επαναλήψεις, όταν τις άλλαξες εκεί («r»).
+        // Πριν έρχονταν μόνο με ξεχωριστή εντολή «reps»· αν εκείνη χανόταν (Bluetooth, κλειστή εφαρμογή) και το ✓ έφτανε
+        // αργότερα, το σετ γραφόταν με τις προγραμματισμένες επαναλήψεις. Μόνο για την ίδια άσκηση («ex», όπως στο «reps»).
+        // Ρολόι παλιότερης έκδοσης δεν στέλνει «r»: όπως πριν.
+        final r = watchTickReps(c.j, e.ex);
+        if (r != null) e.log[c.s].reps = r;
         t.tick(e, c.s, at: (c.j['at'] as num?)?.toInt());
         String? next;
         if (e.complete) {
