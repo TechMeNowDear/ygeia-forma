@@ -3,6 +3,7 @@
 // Όλα τα δεδομένα εδώ είναι φανταστικά (δημόσιο repo).
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
@@ -11,8 +12,10 @@ import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/food/kitchen.dart';
 import 'package:ygeia_forma/food/off.dart';
-import 'package:ygeia_forma/pages/food_add.dart' show parseNumber;
+import 'package:ygeia_forma/pages/food_add.dart'
+    show FoodFormScreen, barcodeUnreadText, parseNumber, servingErrorText, servingRejected;
 import 'package:ygeia_forma/profile.dart';
+import 'package:ygeia_forma/theme.dart';
 
 const _food = <String, Object>{
   'id': 'M1',
@@ -88,6 +91,92 @@ void main() {
         expect((f.id, f.servingGrams), ('M1', null), reason: '$bad');
         expect(f.n.amount(Nk.kcal), 70, reason: 'οι τιμές μένουν');
       }
+    });
+  });
+
+  group('Β3: μήνυμα για τη μερίδα και για barcode που δεν διαβάστηκε (κείμενα εγκρίθηκαν 12/11)', () {
+    test('το πεδίο «Μία μερίδα»: κενό δεκτό, ό,τι άλλο πρέπει να είναι πάνω από 0 και ως 5.000', () {
+      for (final ok in ['', '   ', '30', '0,5', '5000', '5.000', '1.250,5']) {
+        expect(servingRejected(ok), isFalse, reason: '«$ok»');
+      }
+      for (final bad in ['0', '0,0', '5000,1', '5.001', '60000', '3.76,', '1,2,3', ',', '.']) {
+        expect(servingRejected(bad), isTrue, reason: '«$bad»');
+      }
+      expect(servingErrorText(perMl: false), 'Γράψε μερίδα ως 5.000 g, ή άφησέ το κενό.');
+      expect(servingErrorText(perMl: true), 'Γράψε μερίδα ως 5.000 ml, ή άφησέ το κενό.');
+      expect(barcodeUnreadText, 'Δεν διαβάστηκε το barcode. Δοκίμασε ξανά.');
+    });
+
+    testWidgets('μερίδα «0»: η αποθήκευση περιμένει και το πεδίο λέει τι θέλει· με «30» αποθηκεύεται', (t) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(400, 2400);
+      addTearDown(t.view.reset);
+      Food? saved;
+      var popped = false;
+      final draft = FoodDraft(name: 'Κράκερ', values: {Nk.kcal: 450, Nk.protein: 8, Nk.carbs: 60, Nk.fat: 18});
+      await t.pumpWidget(MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => TextButton(
+              onPressed: () async {
+                saved = await Navigator.of(ctx).push<Food>(MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draft)));
+                popped = true;
+              },
+              child: const Text('άνοιξε'),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('άνοιξε'));
+      await t.pumpAndSettle();
+      final serving = find.byKey(const ValueKey('field-serving'));
+      await t.ensureVisible(serving);
+      await t.enterText(serving, '0');
+      await t.pumpAndSettle();
+      expect(find.text(servingErrorText(perMl: false)), findsNothing, reason: 'πριν πατηθεί «Αποθήκευση» δεν ενοχλεί');
+      await t.ensureVisible(find.text('Αποθήκευση'));
+      await t.tap(find.text('Αποθήκευση'));
+      await t.pumpAndSettle();
+      expect(popped, isFalse, reason: 'η φόρμα μένει ανοιχτή');
+      expect(find.text(servingErrorText(perMl: false)), findsOneWidget);
+
+      await t.enterText(serving, '30');
+      await t.pumpAndSettle();
+      expect(find.text(servingErrorText(perMl: false)), findsNothing, reason: 'το μήνυμα φεύγει μόλις διορθωθεί');
+      await t.ensureVisible(find.text('Αποθήκευση'));
+      await t.tap(find.text('Αποθήκευση'));
+      await t.pumpAndSettle();
+      expect(popped, isTrue);
+      expect(saved!.servingGrams, 30);
+    });
+
+    testWidgets('κενή μερίδα: αποθηκεύεται χωρίς μερίδα, όπως πριν', (t) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(400, 2400);
+      addTearDown(t.view.reset);
+      Food? saved;
+      final draft = FoodDraft(name: 'Κράκερ', values: {Nk.kcal: 450, Nk.protein: 8, Nk.carbs: 60, Nk.fat: 18});
+      await t.pumpWidget(MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => TextButton(
+              onPressed: () async {
+                saved = await Navigator.of(ctx).push<Food>(MaterialPageRoute(builder: (_) => FoodFormScreen(draft: draft)));
+              },
+              child: const Text('άνοιξε'),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('άνοιξε'));
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.text('Αποθήκευση'));
+      await t.tap(find.text('Αποθήκευση'));
+      await t.pumpAndSettle();
+      expect(saved, isNotNull);
+      expect(saved!.servingGrams, isNull);
     });
   });
 

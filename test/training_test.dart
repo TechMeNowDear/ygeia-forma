@@ -213,6 +213,24 @@ void main() {
       expect(bad.errors.join(' '), contains('Δευτέρα'));
     });
 
+    test('Β4: τα λεπτά της αερόβιας σε πρόγραμμα που επικολλάς, από 1 ως 600 (κείμενο εγκρίθηκε 12/11)', () {
+      PasteResult paste(Object minutes) => parseProgram(
+          '{"kind":"ygeia-program","workouts":[{"id":"W","name":"Περπάτημα","cardio":{"activity":"walk","minutes":$minutes}}]}', ids);
+      expect((cardioMinMinutes, cardioMaxMinutes), (1, 600));
+      for (final ok in [1, 30, 180, 600]) {
+        expect(paste(ok).ok, isTrue, reason: '$ok');
+      }
+      for (final bad in [0, -5, 601, 100000]) {
+        final r = paste(bad);
+        expect(r.ok, isFalse, reason: '$bad');
+        expect(r.errors.single, 'Περπάτημα: τα λεπτά της αερόβιας πρέπει να είναι από 1 ως 600.', reason: '$bad');
+      }
+      // Αριθμός που δεν στέκει καθόλου («άπειρο»): το πρόγραμμα έχει λάθος μορφή, όχι σφάλμα της εφαρμογής.
+      expect(paste('1e999').errors.single, contains('λάθος μορφή'));
+      // Η προπόνηση με βάρη δεν επηρεάζεται.
+      expect(parseProgram(sampleProgramText, ids).ok, isTrue);
+    });
+
     test('ασφάλεια: μπάρα με ρεζέρβα 2, βάρη που βγαίνουν με τους δίσκους', () {
       final r = parseProgram('{"kind":"ygeia-program","workouts":[{"id":"A","name":"Α","items":[{"ex":"rdl","rir":0,"load":20},{"ex":"db_press","load":10}]}]}', ids);
       expect(r.ok, isTrue);

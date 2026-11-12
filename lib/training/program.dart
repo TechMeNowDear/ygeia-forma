@@ -251,6 +251,9 @@ PasteResult parseProgram(String text, Set<String> known) {
   return PasteResult(p, validate(p, known), _warnings(p));
 }
 
+/// Τα λεπτά μιας αερόβιας προπόνησης σε πρόγραμμα που επικολλάς: από 1 ως 600 (απόφαση 12/11, Συμβούλιο 3, Β4).
+const cardioMinMinutes = 1, cardioMaxMinutes = 600;
+
 /// Λάθη που εμποδίζουν την αποθήκευση.
 List<String> validate(Program p, Set<String> known) {
   final e = <String>[];
@@ -259,6 +262,10 @@ List<String> validate(Program p, Set<String> known) {
   for (final w in p.workouts) {
     if (!ids.add(w.id)) e.add('Δύο προπονήσεις με το ίδιο όνομα «${w.id}».');
     if (!w.isCardio && w.items.isEmpty) e.add('Η «${w.name}» δεν έχει ασκήσεις.');
+    // Πριν δεν ελέγχονταν καθόλου: −5 ή 100.000 λεπτά περνούσαν ως την κάρτα της Σήμερα και το ρολόι.
+    if (w.cardio != null && (w.cardio!.minutes < cardioMinMinutes || w.cardio!.minutes > cardioMaxMinutes)) {
+      e.add('${w.name}: τα λεπτά της αερόβιας πρέπει να είναι από $cardioMinMinutes ως $cardioMaxMinutes.');
+    }
     for (final i in w.items) {
       if (!known.contains(i.ex)) e.add('Άγνωστη άσκηση «${i.ex}» στη «${w.name}».');
       if (i.next != null && !known.contains(i.next)) e.add('Άγνωστη παραλλαγή «${i.next}».');

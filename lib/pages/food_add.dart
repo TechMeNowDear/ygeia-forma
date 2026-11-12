@@ -62,6 +62,9 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   }
 }
 
+/// Ο σαρωτής άνοιξε αλλά αυτό που έδωσε δεν είναι barcode προϊόντος (κείμενο εγκρίθηκε 12/11).
+const barcodeUnreadText = 'Δεν διαβάστηκε το barcode. Δοκίμασε ξανά.';
+
 final _numberSpaces = RegExp('[ \u{A0}\u{202F}]');
 final _numberChars = RegExp(r'^[0-9.,]+$');
 final _dotThousands = RegExp(r'^[1-9]\d{0,2}(\.\d{3})+$');
@@ -89,6 +92,14 @@ double? parseNumber(String s) {
   final v = double.tryParse(t);
   return v == null || !v.isFinite ? null : v;
 }
+
+/// Το πεδίο «Μία μερίδα» δεν γίνεται δεκτό: γράφτηκε κάτι, αλλά δεν είναι ποσότητα πάνω από 0 και ως [maxEntryGrams].
+/// Κενό πεδίο = «χωρίς μερίδα», δεκτό. Τελικός έλεγχος (Συμβούλιο 3, Β3): πριν, μια άκυρη μερίδα απλώς δεν αποθηκευόταν,
+/// χωρίς να το μάθεις· τώρα η αποθήκευση περιμένει και το πεδίο γράφει τι θέλει.
+bool servingRejected(String text) => text.trim().isNotEmpty && validServing(parseNumber(text)) == null;
+
+/// Το μήνυμα κάτω από το πεδίο «Μία μερίδα» (κείμενο εγκρίθηκε 12/11). Στα υγρά η μονάδα του πεδίου είναι ml.
+String servingErrorText({required bool perMl}) => 'Γράψε μερίδα ως 5.000 ${perMl ? 'ml' : 'g'}, ή άφησέ το κενό.';
 
 /// Γραμμάρια στο πεδίο: χωρίς άσκοπα δεκαδικά, αλλά χωρίς να χάνεται το «,5».
 String gramsField(double v) => v == v.roundToDouble() ? '${v.round()}' : dec(v, 1);
@@ -1282,6 +1293,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final values = _values;
     final missing = [for (final f in _fields) if (f.$4 && values[f.$1] == null) f.$1];
     if (_name.text.trim().isEmpty || missing.isNotEmpty || impossibleValues(values).isNotEmpty) return;
+    if (servingRejected(_serving.text)) return;
     final typedSalt = parseNumber(_v[Nk.salt]!.text);
     // Νάτριο σε mg: αν γράφτηκε νάτριο, αυτό· αν το αλάτι έμεινε όπως ήρθε (από νάτριο), το νάτριο της πηγής.
     final sodiumMg = typedSalt == null
@@ -1492,11 +1504,17 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 ),
               const SizedBox(height: 14),
               TextField(
+                key: const ValueKey('field-serving'),
                 controller: _serving,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 // Όπως τα υπόλοιπα πεδία αριθμών της φόρμας (πριν, το μόνο χωρίς φίλτρο: δεχόταν «-», γράμματα από επικόλληση).
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                decoration: deco('Μία μερίδα (προαιρετικό)', suffix: _perMl ? 'ml' : 'g'),
+                onChanged: (_) => setState(() {}),
+                decoration: deco(
+                  'Μία μερίδα (προαιρετικό)',
+                  suffix: _perMl ? 'ml' : 'g',
+                  error: _tried && servingRejected(_serving.text) ? servingErrorText(perMl: _perMl) : null,
+                ),
               ),
               const SizedBox(height: 22),
               FilledButton(
@@ -1566,12 +1584,12 @@ Future<Food?> scanToFood(
     return null;
   }
   final code = (s['code'] is String ? s['code'] as String : '').trim();
-  // Ό,τι δεν είναι barcode προϊόντος (κενό, γράμματα, λάθος μήκος) δεν συνεχίζει (τελικός έλεγχος, Συμβούλιο 3): το ίδιο
-  // μήνυμα με τον σαρωτή που δεν άνοιξε, και τίποτα δεν αποθηκεύεται με άκυρο barcode.
+  // Ό,τι δεν είναι barcode προϊόντος (κενό, γράμματα, λάθος μήκος) δεν συνεχίζει (τελικός έλεγχος, Συμβούλιο 3), και
+  // τίποτα δεν αποθηκεύεται με άκυρο barcode. Δικό του μήνυμα (εγκρίθηκε 12/11): ο σαρωτής άνοιξε, απλώς δεν διάβασε.
   if (scannedBarcode(code) == null) {
     messenger.showSnackBar(const SnackBar(
       duration: Duration(seconds: 8),
-      content: Text('Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν χειροκίνητα.'),
+      content: Text(barcodeUnreadText),
     ));
     return null;
   }
