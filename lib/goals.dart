@@ -31,6 +31,10 @@ const activityLevels = [1.4, 1.5, 1.7];
 /// Ενέργεια ανά κιλό βάρους που χάνεται ή κερδίζεται (προσέγγιση, Hall 2008).
 const kcalPerKg = 7700.0;
 
+/// Κάτω όριο ασφαλείας θερμίδων χωρίς ιατρική παρακολούθηση (Jensen 2013, AHA/ACC/TOS).
+const kcalFloorMale = 1500;
+const kcalFloorFemale = 1200;
+
 /// Πρωτεΐνη ανά κιλό (Morton 2018).
 const proteinPerKg = 1.6;
 
@@ -114,7 +118,7 @@ GoalCalc computeGoals({
   final tdee = bmr * activity;
   final perDay = kg * rate * kcalPerKg / 7;
   final delta = switch (aim) { GoalAim.lose => -perDay, GoalAim.keep => 0.0, GoalAim.gain => perDay };
-  final floor = male ? 1500 : 1200;
+  final floor = male ? kcalFloorMale : kcalFloorFemale;
   var kcal = _round10(tdee + delta);
   var floored = false;
   if (kcal < floor) {
@@ -166,6 +170,9 @@ class Goals {
     this.fishWeek = defaultFishWeek,
     this.kcalSet,
     this.proteinSet,
+    this.kcalAdapt,
+    this.tdeeEst,
+    this.checkIn,
   });
 
   final GoalAim aim;
@@ -196,11 +203,20 @@ class Goals {
   final int? kcalSet;
   final int? proteinSet;
 
+  /// Ο στόχος από την αυτόματη διόρθωση (12/11), όταν πάτησες «Εφάρμοσε». Νικά τον τύπο, όχι τον δικό σου ([kcalSet]).
+  final int? kcalAdapt;
+
+  /// Η τελευταία εκτίμηση πραγματικής κατανάλωσης από τα δεδομένα σου (kcal τη μέρα).
+  final double? tdeeEst;
+
+  /// Ο τελευταίος εβδομαδιαίος έλεγχος («2026-12-07»), εφαρμόστηκε ή όχι.
+  final String? checkIn;
+
   GoalCalc get calc => computeGoals(
       male: male, age: age, heightCm: heightCm, kg: kg, aim: aim, rate: rate, activity: activity, doctor: doctor);
 
   /// Ο στόχος θερμίδων που ισχύει (ο δικός σου, αν τον άλλαξες).
-  int get kcal => kcalSet ?? calc.kcal;
+  int get kcal => kcalSet ?? kcalAdapt ?? calc.kcal;
   int get protein => proteinSet ?? calc.protein;
 
   /// Τα όρια που εξαρτώνται από τις θερμίδες ακολουθούν τον στόχο που ισχύει.
@@ -219,9 +235,13 @@ class Goals {
     int? fishWeek,
     int? kcalSet,
     int? proteinSet,
+    int? kcalAdapt,
+    double? tdeeEst,
+    String? checkIn,
     bool clearKcal = false,
     bool clearProtein = false,
     bool clearBeta = false,
+    bool clearAdapt = false,
   }) =>
       Goals(
         aim: aim,
@@ -240,6 +260,9 @@ class Goals {
         fishWeek: fishWeek ?? this.fishWeek,
         kcalSet: clearKcal ? null : (kcalSet ?? this.kcalSet),
         proteinSet: clearProtein ? null : (proteinSet ?? this.proteinSet),
+        kcalAdapt: clearAdapt ? null : (kcalAdapt ?? this.kcalAdapt),
+        tdeeEst: clearAdapt ? null : (tdeeEst ?? this.tdeeEst),
+        checkIn: checkIn ?? this.checkIn,
       );
 
   Map<String, dynamic> toJson() => {
@@ -260,6 +283,9 @@ class Goals {
         'fish': fishWeek,
         if (kcalSet != null) 'kcal': kcalSet,
         if (proteinSet != null) 'prot': proteinSet,
+        if (kcalAdapt != null) 'ka': kcalAdapt,
+        if (tdeeEst != null) 'te': tdeeEst,
+        if (checkIn != null) 'ci': checkIn,
       };
 
   /// null αν λείπει ή είναι άκυρο κάτι απαραίτητο (τότε η εφαρμογή ζητά ξανά τον οδηγό, αντί να δείξει λάθος αριθμούς).
@@ -291,6 +317,9 @@ class Goals {
     final kcal = i(j['kcal']);
     final prot = i(j['prot']);
     final beta = d(j['beta']);
+    final ka = i(j['ka']);
+    final te = d(j['te']);
+    final ci = j['ci'];
     return Goals(
       aim: aim,
       rate: rate,
@@ -308,6 +337,9 @@ class Goals {
       fishWeek: bounded(j['fish'], defaultFishWeek, 0, 7),
       kcalSet: kcal != null && kcal >= 1000 && kcal <= 6000 ? kcal : null,
       proteinSet: prot != null && prot >= 30 && prot <= 300 ? prot : null,
+      kcalAdapt: ka != null && ka >= 1000 && ka <= 6000 ? ka : null,
+      tdeeEst: te != null && te >= 800 && te <= 8000 ? te : null,
+      checkIn: ci is String && isDayKey(ci) ? ci : null,
     );
   }
 }
