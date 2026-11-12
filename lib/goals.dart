@@ -175,6 +175,7 @@ class Goals {
     this.checkIn,
     this.fastAt,
     this.log = const [],
+    this.docTargets = const DoctorTargets(),
   });
 
   final GoalAim aim;
@@ -220,6 +221,9 @@ class Goals {
   /// Οι εβδομαδιαίοι έλεγχοι με εκτίμηση, παλιότερος πρώτος (για τη σελίδα «Στόχοι»). Το πολύ [adaptLogMax].
   final List<AdaptLog> log;
 
+  /// Οι αριθμοί-στόχοι που έδωσε ο γιατρός (π.χ. LDL < 115), αν τους έγραψες. Μένουν στη διατροφή (απόφαση 12/11).
+  final DoctorTargets docTargets;
+
   GoalCalc get calc => computeGoals(
       male: male, age: age, heightCm: heightCm, kg: kg, aim: aim, rate: rate, activity: activity, doctor: doctor);
 
@@ -248,6 +252,7 @@ class Goals {
     String? checkIn,
     String? fastAt,
     AdaptLog? addLog,
+    DoctorTargets? docTargets,
     bool clearKcal = false,
     bool clearProtein = false,
     bool clearBeta = false,
@@ -281,6 +286,7 @@ class Goals {
                   if (l.day != addLog.day) l,
                 addLog,
               ].reversed.take(adaptLogMax).toList().reversed.toList(),
+        docTargets: docTargets ?? this.docTargets,
       );
 
   Map<String, dynamic> toJson() => {
@@ -306,6 +312,7 @@ class Goals {
         if (checkIn != null) 'ci': checkIn,
         if (fastAt != null) 'fa': fastAt,
         if (log.isNotEmpty) 'log': [for (final l in log) l.toJson()],
+        ...docTargets.toJson(),
       };
 
   /// null αν λείπει ή είναι άκυρο κάτι απαραίτητο (τότε η εφαρμογή ζητά ξανά τον οδηγό, αντί να δείξει λάθος αριθμούς).
@@ -364,11 +371,41 @@ class Goals {
       checkIn: ci is String && isDayKey(ci) ? ci : null,
       fastAt: fa is String && isDayKey(fa) ? fa : null,
       log: rawLog is List ? rawLog.map(AdaptLog.fromJson).whereType<AdaptLog>().take(adaptLogMax).toList() : const [],
+      docTargets: DoctorTargets.fromJson(j),
     );
   }
 }
 
 const adaptLogMax = 26;
+
+/// Στόχοι του γιατρού για τα λιπίδια (mg/dL), όπως τους έγραψε στο χαρτί του. null = δεν έδωσε.
+class DoctorTargets {
+  const DoctorTargets({this.ldlMax, this.hdlMin, this.tgMax});
+  final int? ldlMax, hdlMin, tgMax;
+
+  bool get isEmpty => ldlMax == null && hdlMin == null && tgMax == null;
+
+  /// Όρια για ό,τι γράφεται (mg/dL): έξω από αυτά σχεδόν σίγουρα είναι λάθος πληκτρολόγησης ή άλλη μονάδα.
+  static const ldlRange = (30, 250), hdlRange = (20, 120), tgRange = (50, 500);
+
+  /// «LDL < 115 · HDL > 50 · Τριγλυκερίδια < 150»
+  String get text => [
+        if (ldlMax != null) 'LDL < $ldlMax',
+        if (hdlMin != null) 'HDL > $hdlMin',
+        if (tgMax != null) 'Τριγλυκερίδια < $tgMax',
+      ].join(' · ');
+
+  Map<String, dynamic> toJson() => {
+        if (ldlMax != null) 'ldl': ldlMax,
+        if (hdlMin != null) 'hdl': hdlMin,
+        if (tgMax != null) 'tg': tgMax,
+      };
+
+  static DoctorTargets fromJson(Map j) {
+    int? v(Object? x, (int, int) r) => x is num && x >= r.$1 && x <= r.$2 ? x.toInt() : null;
+    return DoctorTargets(ldlMax: v(j['ldl'], ldlRange), hdlMin: v(j['hdl'], hdlRange), tgMax: v(j['tg'], tgRange));
+  }
+}
 
 /// Ένας εβδομαδιαίος έλεγχος με εκτίμηση: μέρα, πόσο καις, στόχος πριν και μετά, αν τον εφάρμοσες.
 class AdaptLog {

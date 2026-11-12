@@ -71,6 +71,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
     return i < 0 ? 1 : i;
   }();
   late bool? _doctor = _old?.doctor;
+  late DoctorTargets _targets = _old?.docTargets ?? const DoctorTargets();
   final _kg = TextEditingController();
   int _i = 0;
 
@@ -146,6 +147,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
       betaPer100: o?.betaPer100,
       legumesWeek: o?.legumesWeek ?? defaultLegumesWeek,
       fishWeek: o?.fishWeek ?? defaultFishWeek,
+      // Οι στόχοι του γιατρού και το ιστορικό των ελέγχων θερμίδων μένουν· ο μετρητής των 21 ημερών ξεκινά από σήμερα.
+      docTargets: _doctor == true ? _targets : const DoctorTargets(),
+      log: o?.log ?? const [],
     );
     widget.store.setGoals(g);
     if (widget.fromPage) {
@@ -383,8 +387,23 @@ class _GoalsWizardState extends State<GoalsWizard> {
             sub: 'Οι γενικές οδηγίες: κορεσμένα κάτω από 10% των θερμίδων.',
             onTap: () => setState(() => _doctor = false),
           ),
-          const SizedBox(height: 4),
-          const _Note('Οι τιμές των εξετάσεων (LDL, HDL, τριγλυκερίδια) θα μπαίνουν στις «Εξετάσεις», που έρχονται σύντομα.'),
+          if (_doctor == true) ...[
+            const SizedBox(height: 4),
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: NavRow(
+                key: const ValueKey('wizard-doc-targets'),
+                icon: Icons.flag_rounded,
+                color: c.food,
+                title: _targets.isEmpty ? 'Σου έγραψε αριθμούς-στόχους;' : 'Στόχοι του γιατρού',
+                text: _targets.isEmpty ? 'Π.χ. LDL < 115. Προαιρετικά.' : _targets.text,
+                onTap: () async {
+                  final t = await askDoctorTargets(context, _targets);
+                  if (t != null) setState(() => _targets = t);
+                },
+              ),
+            ),
+          ],
         ];
       case _Step.summary:
         final g = _calc!;
@@ -613,6 +632,10 @@ class GoalsPage extends StatelessWidget {
                             () => _editInt(context, 'Όσπρια την εβδομάδα', g.legumesWeek, 0, 7, 'φορές', (v) => g.copyWith(legumesWeek: v))),
                         editRow('goals-fish', 'Ψάρι', '${g.fishWeek} φορές την εβδομάδα',
                             () => _editInt(context, 'Ψάρι την εβδομάδα', g.fishWeek, 0, 7, 'φορές', (v) => g.copyWith(fishWeek: v))),
+                        editRow('goals-doc-targets', 'Στόχοι του γιατρού', g.docTargets.isEmpty ? 'κανένας · γράψε' : g.docTargets.text, () async {
+                          final t = await askDoctorTargets(context, g.docTargets);
+                          if (t != null) store.setGoals(g.copyWith(docTargets: t));
+                        }),
                       ]),
                     ),
                     const SizedBox(height: 8),
@@ -788,6 +811,85 @@ class _NumberDialogState extends State<_NumberDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Άκυρο')),
         FilledButton(key: const ValueKey('number-ok'), onPressed: _ok, child: const Text('Εντάξει')),
+      ],
+    );
+  }
+}
+
+/// Οι στόχοι του γιατρού για τα λιπίδια (σε mg/dL, όπως στο χαρτί του). Κενό = δεν έδωσε.
+Future<DoctorTargets?> askDoctorTargets(BuildContext context, DoctorTargets current) =>
+    showDialog<DoctorTargets>(context: context, builder: (_) => _DoctorTargetsDialog(current: current));
+
+class _DoctorTargetsDialog extends StatefulWidget {
+  const _DoctorTargetsDialog({required this.current});
+  final DoctorTargets current;
+
+  @override
+  State<_DoctorTargetsDialog> createState() => _DoctorTargetsDialogState();
+}
+
+class _DoctorTargetsDialogState extends State<_DoctorTargetsDialog> {
+  late final _ldl = TextEditingController(text: widget.current.ldlMax?.toString() ?? '');
+  late final _hdl = TextEditingController(text: widget.current.hdlMin?.toString() ?? '');
+  late final _tg = TextEditingController(text: widget.current.tgMax?.toString() ?? '');
+  final _err = <String, String?>{};
+
+  @override
+  void dispose() {
+    _ldl.dispose();
+    _hdl.dispose();
+    _tg.dispose();
+    super.dispose();
+  }
+
+  void _ok() {
+    _err.clear();
+    int? read(String key, TextEditingController t, (int, int) r) {
+      final s = t.text.trim();
+      if (s.isEmpty) return null;
+      final v = int.tryParse(s);
+      if (v == null || v < r.$1 || v > r.$2) _err[key] = 'Από ${r.$1} ως ${r.$2} mg/dL.';
+      return v;
+    }
+
+    final ldl = read('ldl', _ldl, DoctorTargets.ldlRange);
+    final hdl = read('hdl', _hdl, DoctorTargets.hdlRange);
+    final tg = read('tg', _tg, DoctorTargets.tgRange);
+    if (_err.isNotEmpty) {
+      setState(() {});
+      return;
+    }
+    Navigator.pop(context, DoctorTargets(ldlMax: ldl, hdlMin: hdl, tgMax: tg));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    Widget field(String key, String label, TextEditingController t) => Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: TextField(
+            key: ValueKey('doc-$key'),
+            controller: t,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(labelText: label, suffixText: 'mg/dL', errorText: _err[key]),
+            onSubmitted: (_) => _ok(),
+          ),
+        );
+    return AlertDialog(
+      title: const Text('Στόχοι του γιατρού'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Όπως τους έγραψε ο γιατρός. Άφησε κενό ό,τι δεν σου έδωσε.',
+              style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
+          field('ldl', 'LDL κάτω από', _ldl),
+          field('hdl', 'HDL πάνω από', _hdl),
+          field('tg', 'Τριγλυκερίδια κάτω από', _tg),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Άκυρο')),
+        FilledButton(key: const ValueKey('doc-ok'), onPressed: _ok, child: const Text('Εντάξει')),
       ],
     );
   }

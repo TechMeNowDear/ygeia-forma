@@ -109,30 +109,28 @@ class CheckInCard extends StatelessWidget {
     };
 
     final hasProposal = (k.kind == CheckKind.proposal || k.kind == CheckKind.fast) && p != null;
+    final apply = FilledButton(
+      key: const ValueKey('checkin-apply'),
+      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: c.foodSolid, foregroundColor: c.onSolid),
+      onPressed: () {
+        store.setGoals(applyCheckIn(k, now));
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('Νέος στόχος: ${thousands(p!.target)} kcal τη μέρα')));
+      },
+      child: const Text('Εφάρμοσε', softWrap: false),
+    );
+    final later = OutlinedButton(
+      key: const ValueKey('checkin-later'),
+      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.textSecondary),
+      onPressed: () => store.setGoals(dismissCheckIn(k, now)),
+      child: const Text('Όχι τώρα', softWrap: false),
+    );
+    // Με μεγάλα γράμματα σε στενή οθόνη τα κουμπιά πάνε το ένα κάτω από το άλλο (ποτέ «Εφάρμοσ/ε»).
     final buttons = hasProposal
-        ? Row(children: [
-            Expanded(
-              child: FilledButton(
-                key: const ValueKey('checkin-apply'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: c.foodSolid, foregroundColor: c.onSolid),
-                onPressed: () {
-                  store.setGoals(applyCheckIn(k, now));
-                  ScaffoldMessenger.maybeOf(context)
-                      ?.showSnackBar(SnackBar(content: Text('Νέος στόχος: ${thousands(p.target)} kcal τη μέρα')));
-                },
-                child: const Text('Εφάρμοσε'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton(
-                key: const ValueKey('checkin-later'),
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.textSecondary),
-                onPressed: () => store.setGoals(dismissCheckIn(k, now)),
-                child: const Text('Όχι τώρα'),
-              ),
-            ),
-          ])
+        ? LayoutBuilder(
+            builder: (context, box) => box.maxWidth / MediaQuery.textScalerOf(context).scale(1) < 250
+                ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [apply, const SizedBox(height: 8), later])
+                : Row(children: [Expanded(child: apply), const SizedBox(width: 10), Expanded(child: later)]),
+          )
         : OutlinedButton(
             key: const ValueKey('checkin-ok'),
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.text),
@@ -221,7 +219,7 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
           step('3 · Άρα καις', '≈ ${_kcal(e.tdee)} kcal',
               '${_kcal(e.meanIntake)} ${slope <= 0 ? '+' : '−'} ${dec(slope.abs(), 2)} × 7.700 ÷ 7'),
           if (g.aim != GoalAim.keep)
-            step('4 · Για ${rateKgText(kg, g.rate)}', '${g.aim == GoalAim.lose ? '−' : '+'} ${thousands(delta)} kcal',
+            step('4 · Για ${dec(kg * g.rate, 2)} kg την εβδομάδα', '${g.aim == GoalAim.lose ? '−' : '+'} ${thousands(delta)} kcal',
                 '${ratePctText(g.rate)} του βάρους σου × 7.700 ÷ 7'),
           const Hairline(vertical: 12),
           InfoRow(p.same ? 'Ο στόχος μένει' : 'Νέος στόχος', '${thousands(p.target)} kcal'),
