@@ -15,6 +15,7 @@ import '../widgets.dart';
 import '../unusual.dart';
 import '../training/training_store.dart';
 import '../training/wear_link.dart';
+import 'checkin_card.dart';
 import 'nutrition.dart';
 import 'oura_today.dart';
 import 'sources_page.dart';
@@ -125,6 +126,8 @@ class TodayPage extends StatelessWidget {
                 weighedKg: weighed?.weight,
                 weighedAt: weighed?.time)
             : null;
+        // Σχέδια 12/11 (A1/A3): ο έλεγχος θερμίδων κάτω από τη ζύγιση (απάντηση χρήστη 12/11). Ακούει μόνο το φαγητό.
+        final checkIn = store.goals == null ? null : CheckInSlot(store: store, food: food, now: now);
         // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
         final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
         final foodCard = prefs.show('food')
@@ -198,6 +201,7 @@ class TodayPage extends StatelessWidget {
           single: [
             ...alerts,
             if (weigh != null) weigh,
+            if (checkIn != null) checkIn,
             if (sleep != null) sleep,
             if (trainingCard != null) trainingCard,
             if (week != null) week,
@@ -207,7 +211,7 @@ class TodayPage extends StatelessWidget {
           ],
           top: alerts,
           // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
-          left: [if (weigh != null) weigh, if (sleep != null) sleep, if (trainingCard != null) trainingCard, if (week != null) week],
+          left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard, if (week != null) week],
           right: [if (foodCard != null) foodCard, ...more, footer],
         );
       },

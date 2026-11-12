@@ -26,6 +26,7 @@ import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
+import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/goals.dart';
 import 'package:ygeia_forma/pages/goals_page.dart';
 import 'package:ygeia_forma/profile.dart';
@@ -54,6 +55,7 @@ import 'package:ygeia_forma/training/training_store.dart';
 import 'package:ygeia_forma/training/wear_link.dart';
 
 import 'sample_data.dart';
+import 'sample_checkin.dart';
 import 'sample_food.dart';
 import 'training_sample.dart';
 
@@ -111,6 +113,7 @@ Future<void> _shot(
   Aigaio? palette,
   bool oura = false,
   bool ouraMissingToday = false,
+  FoodStore? food,
 }) async {
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
@@ -136,7 +139,7 @@ Future<void> _shot(
         themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
         home: trends
             ? Scaffold(body: TrendsPage(store: store, now: when))
-            : Shell(store: store, food: sampleFoodStore(when), initialIndex: tab, initialTab: sub, now: when),
+            : Shell(store: store, food: food ?? sampleFoodStore(when), initialIndex: tab, initialTab: sub, now: when),
       ),
     ),
   );
@@ -2022,6 +2025,57 @@ void main() {
       name: '66_me_weigh_days', size: phone, brightness: Brightness.light, oura: false,
       prepare: withGoals, page: (s) => MePage(store: s, food: sampleFoodStore(now)),
       act: (t) async => t.ensureVisible(find.byKey(const ValueKey('me-goals')))));
+  // Αυτόματη διόρθωση θερμίδων (σχέδια A1–A4, 12/11). Στόχοι από Δευτέρα 16/11· πρώτος έλεγχος Δευτέρα 7/12.
+  final checkDay = DateTime(2026, 12, 7, 8, 20);
+  final fastDay = DateTime(2026, 12, 2, 8, 20);
+  void Function(HealthStore) checkinPrep(DateTime at, {double eat = 2250, double tdee = 2600, Goals? goals}) => (s) {
+        final j = sampleDashboardJson(at)..['body'] = bodyJson(simWeights(at, eat: eat, tdee: tdee));
+        s.data = Dashboard.fromJson(j);
+        s.history = sampleHistory(at, s.data!);
+        s
+          ..setProfile(me)
+          ..setGoals(goals ?? checkinGoals());
+      };
+  testWidgets('Σήμερα · έλεγχος θερμίδων', (t) => _shot(t,
+      name: '68a_today_checkin', size: phone, brightness: Brightness.light, tab: Cat.today, at: checkDay,
+      prepare: checkinPrep(checkDay), food: checkinFood(checkDay)));
+  testWidgets('Σήμερα · έλεγχος θερμίδων · πώς βγήκε', (t) => _shot(t,
+      name: '68b_checkin_how', size: phone, brightness: Brightness.light, tab: Cat.today, at: checkDay,
+      prepare: checkinPrep(checkDay), food: checkinFood(checkDay),
+      act: (t) async => t.tap(find.byKey(const ValueKey('checkin-how')))));
+  testWidgets('Σήμερα · γρήγορη απώλεια', (t) => _shot(t,
+      name: '68c_today_fast_loss', size: phone, brightness: Brightness.light, tab: Cat.today, at: fastDay,
+      prepare: checkinPrep(fastDay, eat: 1600, tdee: 2900), food: checkinFood(fastDay, eat: 1600)));
+  testWidgets('Σήμερα · έλεγχος · λίγα δεδομένα · σκοτεινό', (t) => _shot(t,
+      name: '68d_today_checkin_few_dark', size: phone, brightness: Brightness.dark, tab: Cat.today, at: checkDay,
+      prepare: checkinPrep(checkDay), food: checkinFood(checkDay, skip: {for (var k = 1; k <= 21; k += 2) k})));
+  testWidgets('Σήμερα · έλεγχος · Fold ανοιχτό', (t) => _shot(t,
+      name: '68e_today_checkin_open', size: open, brightness: Brightness.light, tab: Cat.today, at: checkDay,
+      prepare: checkinPrep(checkDay), food: checkinFood(checkDay)));
+  testWidgets('Σήμερα · έλεγχος · 360 · 1,3×', (t) async {
+    t.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+    await _shot(t,
+        name: '68f_today_checkin_360_large', size: const Size(360, 800), brightness: Brightness.light, tab: Cat.today,
+        at: checkDay, prepare: checkinPrep(checkDay), food: checkinFood(checkDay));
+  });
+  testWidgets('Στόχοι · μετά τον έλεγχο', (t) => _page(t,
+      name: '68g_goals_after_checkin', size: phone, brightness: Brightness.light, oura: false,
+      prepare: checkinPrep(checkDay,
+          goals: checkinGoals(kcalAdapt: 2110).copyWith(
+              tdeeEst: 2600,
+              checkIn: '2026-12-07',
+              addLog: const AdaptLog(day: '2026-12-07', tdee: 2600, before: 2250, after: 2110, applied: true))),
+      page: (s) => GoalsPage(store: s, now: DateTime(2026, 12, 8, 18, 40))));
+  testWidgets('Στόχοι · πριν από τον πρώτο έλεγχο', (t) => _page(t,
+      name: '68h_goals_before_checkin', size: phone, brightness: Brightness.light, oura: false,
+      prepare: (s) {
+        final at = DateTime(2026, 11, 30, 18, 40);
+        checkinPrep(at)(s);
+        FoodStore.shared = checkinFood(at, days: 14, skip: {3, 8});
+        addTearDown(() => FoodStore.shared = null);
+      },
+      page: (s) => GoalsPage(store: s, now: DateTime(2026, 11, 30, 18, 40))));
   testWidgets('Ρυθμίσεις · για προχωρημένους', (t) => _page(t,
       name: '67_settings_advanced', size: phone, brightness: Brightness.light, oura: false,
       page: (s) => SettingsPage(store: s, food: sampleFoodStore(now)),

@@ -173,6 +173,8 @@ class Goals {
     this.kcalAdapt,
     this.tdeeEst,
     this.checkIn,
+    this.fastAt,
+    this.log = const [],
   });
 
   final GoalAim aim;
@@ -212,6 +214,12 @@ class Goals {
   /// Ο τελευταίος εβδομαδιαίος έλεγχος («2026-12-07»), εφαρμόστηκε ή όχι.
   final String? checkIn;
 
+  /// Πότε απάντησες τελευταία στην «γρήγορη απώλεια» (μία φορά την εβδομάδα).
+  final String? fastAt;
+
+  /// Οι εβδομαδιαίοι έλεγχοι με εκτίμηση, παλιότερος πρώτος (για τη σελίδα «Στόχοι»). Το πολύ [adaptLogMax].
+  final List<AdaptLog> log;
+
   GoalCalc get calc => computeGoals(
       male: male, age: age, heightCm: heightCm, kg: kg, aim: aim, rate: rate, activity: activity, doctor: doctor);
 
@@ -238,6 +246,8 @@ class Goals {
     int? kcalAdapt,
     double? tdeeEst,
     String? checkIn,
+    String? fastAt,
+    AdaptLog? addLog,
     bool clearKcal = false,
     bool clearProtein = false,
     bool clearBeta = false,
@@ -263,6 +273,14 @@ class Goals {
         kcalAdapt: clearAdapt ? null : (kcalAdapt ?? this.kcalAdapt),
         tdeeEst: clearAdapt ? null : (tdeeEst ?? this.tdeeEst),
         checkIn: checkIn ?? this.checkIn,
+        fastAt: fastAt ?? this.fastAt,
+        log: addLog == null
+            ? log
+            : [
+                for (final l in log)
+                  if (l.day != addLog.day) l,
+                addLog,
+              ].reversed.take(adaptLogMax).toList().reversed.toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -286,6 +304,8 @@ class Goals {
         if (kcalAdapt != null) 'ka': kcalAdapt,
         if (tdeeEst != null) 'te': tdeeEst,
         if (checkIn != null) 'ci': checkIn,
+        if (fastAt != null) 'fa': fastAt,
+        if (log.isNotEmpty) 'log': [for (final l in log) l.toJson()],
       };
 
   /// null αν λείπει ή είναι άκυρο κάτι απαραίτητο (τότε η εφαρμογή ζητά ξανά τον οδηγό, αντί να δείξει λάθος αριθμούς).
@@ -320,6 +340,8 @@ class Goals {
     final ka = i(j['ka']);
     final te = d(j['te']);
     final ci = j['ci'];
+    final fa = j['fa'];
+    final rawLog = j['log'];
     return Goals(
       aim: aim,
       rate: rate,
@@ -340,7 +362,30 @@ class Goals {
       kcalAdapt: ka != null && ka >= 1000 && ka <= 6000 ? ka : null,
       tdeeEst: te != null && te >= 800 && te <= 8000 ? te : null,
       checkIn: ci is String && isDayKey(ci) ? ci : null,
+      fastAt: fa is String && isDayKey(fa) ? fa : null,
+      log: rawLog is List ? rawLog.map(AdaptLog.fromJson).whereType<AdaptLog>().take(adaptLogMax).toList() : const [],
     );
+  }
+}
+
+const adaptLogMax = 26;
+
+/// Ένας εβδομαδιαίος έλεγχος με εκτίμηση: μέρα, πόσο καις, στόχος πριν και μετά, αν τον εφάρμοσες.
+class AdaptLog {
+  const AdaptLog({required this.day, required this.tdee, required this.before, required this.after, required this.applied});
+  final String day;
+  final double tdee;
+  final int before, after;
+  final bool applied;
+
+  Map<String, dynamic> toJson() => {'d': day, 'te': tdee, 'k0': before, 'k1': after, if (applied) 'ap': true};
+
+  static AdaptLog? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final d = j['d'], te = j['te'], k0 = j['k0'], k1 = j['k1'];
+    if (d is! String || !isDayKey(d) || te is! num || k0 is! num || k1 is! num) return null;
+    if (te < 800 || te > 8000 || k0 < 1000 || k0 > 6000 || k1 < 1000 || k1 > 6000) return null;
+    return AdaptLog(day: d, tdee: te.toDouble(), before: k0.toInt(), after: k1.toInt(), applied: j['ap'] == true);
   }
 }
 
