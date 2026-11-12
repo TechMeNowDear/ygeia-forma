@@ -14,6 +14,7 @@ import '../training/training_store.dart';
 import '../widgets.dart';
 import 'appearance.dart';
 import 'devices_page.dart';
+import 'diagnostics_sheet.dart';
 import 'sources_page.dart';
 import 'me_page.dart';
 import 'privacy_page.dart';
@@ -375,6 +376,14 @@ class _DataGroupState extends State<_DataGroup> {
           icon: Icons.upload_rounded,
           title: 'Επαναφορά από αντίγραφο',
           onTap: _busy ? null : _import,
+        ),
+        // Αίτημα χρήστη 12/11: ένα αρχείο με ό,τι γράφτηκε ΚΑΙ ό,τι υπολογίστηκε, για έλεγχο από τον Claude.
+        SettingsRow(
+          key: const ValueKey('settings-diag'),
+          icon: Icons.fact_check_outlined,
+          title: 'Αναφορά για έλεγχο',
+          subtitle: 'Ό,τι γράφτηκε και ό,τι υπολογίστηκε, σε ένα αρχείο',
+          onTap: () => openDiagnostics(context, widget.store, widget.food!),
         ),
       ],
       if (_busy) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: LinearProgressIndicator()),

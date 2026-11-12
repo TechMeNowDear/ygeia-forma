@@ -664,6 +664,13 @@ class GoalsPage extends StatelessWidget {
                     onPressed: () => Navigator.of(context).push(GoalsWizard.route(store, now: now, fromPage: true)),
                     child: const Text('Ξανά ο οδηγός'),
                   ),
+                  const SizedBox(height: 4),
+                  TextButton(
+                    key: const ValueKey('goals-delete'),
+                    style: TextButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.warn),
+                    onPressed: () => _delete(context),
+                    child: const Text('Σβήσε τους στόχους'),
+                  ),
                 ]),
               ),
             ),
@@ -671,6 +678,23 @@ class GoalsPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Σβήσιμο των στόχων (αίτημα 12/11: ό,τι γράφεται σβήνεται). Φαγητό και ζυγίσεις μένουν.
+  Future<void> _delete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Σβήσιμο στόχων;'),
+        content: const Text('Σβήνονται οι στόχοι, οι στόχοι του γιατρού και το ιστορικό των ελέγχων θερμίδων. Το φαγητό και οι '
+            'ζυγίσεις μένουν.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
+          FilledButton(key: const ValueKey('goals-delete-ok'), onPressed: () => Navigator.pop(context, true), child: const Text('Σβήσε')),
+        ],
+      ),
+    );
+    if (ok == true) store.setGoals(null);
   }
 
   /// A4: «Πόσο καις, από τα δεδομένα σου» (μετά τον πρώτο έλεγχο) ή «Πριν από τον πρώτο έλεγχο» (πρόοδος).

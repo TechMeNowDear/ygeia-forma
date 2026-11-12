@@ -96,6 +96,11 @@ class ErrorReporter {
   final Map<String, DateTime> _recent = {};
   final List<Map<String, Object?>> _early = [];
 
+  /// Τα τελευταία σφάλματα αυτής της εκτέλεσης, ΜΟΝΟ στη μνήμη, για την «Αναφορά για έλεγχο» (μπαίνουν και με κλειστή
+  /// την αποστολή· δεν φεύγουν από το κινητό αν δεν τα στείλει ο ίδιος ο χρήστης).
+  final List<Map<String, Object?>> recentErrors = [];
+  static const recentMax = 30;
+
   /// Φάκελος, έκδοση και συσκευή, όταν έρθουν από την πλευρά Android.
   /// Ό,τι σφάλμα έγινε ως τότε μπαίνει τώρα στην ουρά.
   Future<void> configure({required Directory dir, required String release, required Map<String, String> device, bool enabled = true}) async {
@@ -135,7 +140,20 @@ class ErrorReporter {
   /// Κεντρική κλήση. Δεν πετάει ποτέ σφάλμα η ίδια· οι κλήσεις της εφαρμογής δεν την περιμένουν.
   Future<void> report(Object error, StackTrace? stack, {bool handled = true, Map<String, Object?> extra = const {}}) async {
     try {
-      if (!enabled || isNoise(error)) return;
+      if (isNoise(error)) return;
+      recentErrors.add({
+        'at': _clock().toIso8601String(),
+        'type': (error is FlutterErrorDetails ? error.exception : error).runtimeType.toString(),
+        'message': _message(error),
+        'screen': screen,
+        'handled': handled,
+        'frames': [
+          for (final f in parseDartStack(stack?.toString() ?? '').reversed.take(8))
+            '${f['function'] ?? ''} ${f['filename'] ?? ''}:${f['lineno'] ?? ''}',
+        ],
+      });
+      if (recentErrors.length > recentMax) recentErrors.removeAt(0);
+      if (!enabled) return;
       final sig = '${error.runtimeType}:${_firstLine(error.toString())}';
       final now = _clock();
       final last = _recent[sig];
