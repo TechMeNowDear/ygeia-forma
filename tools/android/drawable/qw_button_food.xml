@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widgets «Προπόνηση σήμερα» / «Γρήγορο φαγητό» (13/11). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/qw_food" />
+    <corners android:radius="16dp" />
+</shape>

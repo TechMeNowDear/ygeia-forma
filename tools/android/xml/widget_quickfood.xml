@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget «Γρήγορο φαγητό» (13/11): δύο κουμπιά, «+ Φαγητό» και «Barcode», από 2×1 θέσεις και πάνω. Χωρίς περιοδική
+     ανανέωση, χωρίς οθόνη ρύθμισης, χωρίς δεδομένα (δεν δείχνει τίποτα προσωπικό στην αρχική οθόνη). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="130dp"
+    android:minHeight="56dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="48dp"
+    android:maxResizeWidth="720dp"
+    android:maxResizeHeight="160dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/quick_food_widget"
+    android:previewLayout="@layout/quick_food_widget"
+    android:description="@string/qw_food_description"
+    android:widgetCategory="home_screen" />

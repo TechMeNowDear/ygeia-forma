@@ -77,7 +77,7 @@ object DataRules {
     fun widgetOpenTarget(raw: String?): String? =
         raw?.takeIf { it.length <= 64 && WIDGET_OPEN.matches(it) }
 
-    private val WIDGET_OPEN = Regex("^w:(sleep|move|food|body):(section|today|add|metric):[A-Za-z0-9_.]{0,32}$")
+    private val WIDGET_OPEN = Regex("^w:(sleep|move|food|body|workout):(section|today|add|metric|scan):[A-Za-z0-9_.]{0,32}$")
 
     /** Μέγεθος προεπισκόπησης από extras («ygeia_w/h», για τον έλεγχο στο emulator): μόνο λογικές τιμές σε dp. */
     fun previewDp(v: Int): Double? = v.takeIf { it in 40..1200 }?.toDouble()

@@ -40,6 +40,9 @@ object HomeWidgets {
         MoveWidget::class.java.name to "move",
         FoodWidget::class.java.name to "food",
         BodyWidget::class.java.name to "body",
+        // 13/11: δύο απλά widgets με γράμματα (QuickWidgets.kt), χωρίς ρυθμίσεις εμφάνισης.
+        WorkoutWidget::class.java.name to QuickWidgets.WORKOUT,
+        QuickFoodWidget::class.java.name to QuickWidgets.QUICK_FOOD,
     )
 
     /** Πάτημα σε widget που περιμένει να το πάρει η εφαρμογή (takeOpen). */
@@ -233,6 +236,10 @@ object HomeWidgets {
 
     fun update(ctx: Context, mgr: AppWidgetManager, id: Int) {
         val kind = kindOf(ctx, id) ?: return
+        if (QuickWidgets.handles(kind)) {
+            mgr.updateAppWidget(id, QuickWidgets.views(ctx, id, kind))
+            return
+        }
         val style = style(ctx, id)
         val data = forToday(kindData(ctx, kind))
         val list = sizes(mgr.getAppWidgetOptions(id))
@@ -315,7 +322,7 @@ object HomeWidgets {
         return if (parts.isEmpty()) "$title: χωρίς τιμές ακόμα" else "$title: ${parts.joinToString(", ")}"
     }
 
-    private fun open(ctx: Context, id: Int, part: Int, target: String): PendingIntent {
+    internal fun open(ctx: Context, id: Int, part: Int, target: String): PendingIntent {
         val i = Intent(ctx, MainActivity::class.java).apply {
             // Χωρίς data URI: η Flutter παίρνει κάθε data URI ως σελίδα (deep link) και, χωρίς τέτοια σελίδα, βγάζει
             // σφάλμα (Sentry YGEIA-FORMA-3). Κάθε πάτημα ξεχωρίζει από τον requestCode του PendingIntent.
@@ -441,3 +448,5 @@ class SleepWidget : HomeWidgetProvider()
 class MoveWidget : HomeWidgetProvider()
 class FoodWidget : HomeWidgetProvider()
 class BodyWidget : HomeWidgetProvider()
+class WorkoutWidget : HomeWidgetProvider()
+class QuickFoodWidget : HomeWidgetProvider()

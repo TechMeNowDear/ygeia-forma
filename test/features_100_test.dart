@@ -9,6 +9,7 @@ import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/body_trend.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/history.dart';
+import 'package:ygeia_forma/home_widgets/widget_snapshot.dart';
 import 'package:ygeia_forma/hrv_trend.dart';
 import 'package:ygeia_forma/pages/body.dart';
 import 'package:ygeia_forma/pages/training/hr_widgets.dart';
@@ -20,6 +21,7 @@ import 'package:ygeia_forma/training/zone.dart';
 import 'package:ygeia_forma/widgets.dart';
 
 import 'sample_data.dart';
+import 'sample_food.dart';
 import 'training_sample.dart';
 
 void main() {
@@ -69,6 +71,85 @@ void main() {
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const TiFtaneiScreen()));
       await t.pumpAndSettle();
       expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα 100%');
+    });
+  });
+
+  group('3. Widgets «Προπόνηση σήμερα» και «Γρήγορο φαγητό»', () {
+    test('το στιγμιότυπο έχει όλη την εβδομάδα του προγράμματος με έτοιμα κείμενα', () {
+      final now = DateTime(2026, 11, 20, 18);
+      final t = sampleTraining(now);
+      final w = workoutSnapshot(t, DateTime(2026, 11, 20));
+      expect(w['has'], isTrue);
+      final week = w['week'] as Map;
+      expect(week.keys.toSet(), {'1', '2', '3', '4', '5', '6', '7'});
+      // Παρασκευή = Α (6 ασκήσεις), Δευτέρα = Β (7 ασκήσεις), Τρίτη = περπάτημα 30′.
+      expect(week['5'], {'t': 'Προπόνηση Α', 's': '6 ασκήσεις · περίπου 50′'});
+      expect(week['1'], {'t': 'Προπόνηση Β', 's': '7 ασκήσεις · περίπου 56′'});
+      expect(week['2'], {'t': 'Περπάτημα', 's': '30 λεπτά'});
+      expect(w.containsKey('done'), isFalse);
+      // Τη μέρα που έγινε προπόνηση: «έγινε», με όνομα και διάρκεια.
+      final last = t.sessions.last;
+      final d = workoutSnapshot(t, DateTime(last.start.year, last.start.month, last.start.day));
+      expect(d['done'], dateKey(last.start));
+      expect(d['doneText'], '${last.name} · ${last.end!.difference(last.start).inMinutes}′');
+    });
+
+    test('χωρίς πρόγραμμα: το λέει· μπαίνει στο στιγμιότυπο μόνο όταν η προπόνηση έχει φορτωθεί', () {
+      final now = DateTime(2026, 11, 20, 18);
+      final none = sampleTraining(now, program: false, history: false);
+      expect(workoutSnapshot(none, now), {'has': false, 'week': <String, dynamic>{}});
+      final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(now));
+      final food = sampleFoodStore(now);
+      expect(buildWidgetSnapshot(store, food, now).containsKey('workout'), isFalse);
+      expect(buildWidgetSnapshot(store, food, now, training: sampleTraining(now)).containsKey('workout'), isTrue);
+      expect(buildWidgetSnapshot(store, food, now, training: sampleTraining(now)..ready = false).containsKey('workout'), isFalse);
+    });
+
+    test('manifest και πόροι: δύο νέοι παροχείς, χωρίς περιοδική ανανέωση, χωρίς οθόνη ρύθμισης', () {
+      final dir = Directory.systemTemp.createTempSync('manifest100');
+      final m = File('${dir.path}/AndroidManifest.xml')
+        ..writeAsStringSync('<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+            '    <application\n        android:label="ygeia_forma">\n'
+            '        <activity\n            android:name=".MainActivity"\n            android:exported="true">\n'
+            '        </activity>\n    </application>\n</manifest>\n');
+      for (var i = 0; i < 2; i++) {
+        final r = Process.runSync('python3', ['tools/android/patch_manifest.py', m.path]);
+        expect(r.exitCode, 0, reason: '${r.stdout}${r.stderr}');
+      }
+      final s = m.readAsStringSync();
+      for (final (cls, label, res) in [('WorkoutWidget', 'Προπόνηση σήμερα', 'workout'), ('QuickFoodWidget', 'Γρήγορο φαγητό', 'quickfood')]) {
+        expect(RegExp('android:name="\\.$cls"').allMatches(s).length, 1);
+        expect(s, contains('android:label="$label"'));
+        final xml = File('${dir.path}/res/xml/widget_$res.xml').readAsStringSync();
+        expect(xml, contains('android:updatePeriodMillis="0"'));
+        expect(xml, isNot(contains('android:configure')));
+      }
+      for (final f in ['layout/quick_workout_widget.xml', 'layout/quick_food_widget.xml', 'drawable/qw_bg.xml', 'values/quick_widgets.xml', 'values-night/quick_widgets.xml']) {
+        expect(File('${dir.path}/res/$f').existsSync(), isTrue, reason: f);
+      }
+      dir.deleteSync(recursive: true);
+    });
+
+    test('χρώματα των widgets: αντίθεση γραμμάτων ≥ 4,5:1, ημέρα και νύχτα', () {
+      for (final folder in ['values', 'values-night']) {
+        final x = File('tools/android/$folder/quick_widgets.xml').readAsStringSync();
+        Color c(String name) => Color(0xFF000000 | int.parse(RegExp('name="$name">#([0-9A-Fa-f]{6})<').firstMatch(x)!.group(1)!, radix: 16));
+        for (final (fg, bg) in [('qw_text', 'qw_bg'), ('qw_sub', 'qw_bg'), ('qw_workout', 'qw_bg'), ('qw_on_food', 'qw_food'), ('qw_text', 'qw_plain')]) {
+          expect(Aigaio.contrast(c(fg), c(bg)), greaterThanOrEqualTo(4.5), reason: '$folder: $fg πάνω σε $bg');
+        }
+      }
+    });
+
+    test('τα πατήματα: «+ Φαγητό», «Barcode» (σαρωτής αμέσως) και Άσκηση › Προπόνηση', () {
+      final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/QuickWidgets.kt').readAsStringSync();
+      for (final target in ['w:workout:section:', 'w:food:add:', 'w:food:scan:']) {
+        expect(kt, contains('"$target"'));
+      }
+      final main = File('lib/main.dart').readAsStringSync();
+      expect(main, contains("'workout' => _open(Cat.exercise, ExerciseTab.train)"));
+      expect(main, contains('openAddFood(context, _food, scan: true)'));
+      // Το widget της προπόνησης δεν ξεκινά ποτέ προπόνηση από την αρχική οθόνη (πάτημα κατά λάθος).
+      expect(kt, isNot(contains('start')));
     });
   });
 

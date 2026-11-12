@@ -6,6 +6,7 @@ import '../history.dart';
 import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
+import '../training/training_store.dart';
 import 'widget_style.dart';
 
 // Το στιγμιότυπο που ζωγραφίζουν τα widgets: έτοιμα κείμενα, ένα ανά τιμή, ΜΕ ΤΟΥΣ ΙΔΙΟΥΣ κανόνες με τις οθόνες
@@ -18,7 +19,7 @@ import 'widget_style.dart';
 
 const widgetSnapshotVersion = 1;
 
-Map<String, dynamic> buildWidgetSnapshot(HealthStore store, FoodStore food, DateTime now) {
+Map<String, dynamic> buildWidgetSnapshot(HealthStore store, FoodStore food, DateTime now, {TrainingStore? training}) {
   final today = dayOf(now);
   return {
     'v': widgetSnapshotVersion,
@@ -29,6 +30,31 @@ Map<String, dynamic> buildWidgetSnapshot(HealthStore store, FoodStore food, Date
       WKind.food: _food(food, today),
       WKind.body: _body(store, today),
     },
+    // 13/11: το widget «Προπόνηση σήμερα» (QuickWidgetRules.kt). Νέο κλειδί· τα υπόλοιπα widgets δεν το διαβάζουν.
+    if (training != null && training.ready) 'workout': workoutSnapshot(training, today),
+  };
+}
+
+/// Το widget «Προπόνηση σήμερα» (13/11): ΟΛΗ η εβδομάδα του προγράμματος με έτοιμα κείμενα (1 = Δευτέρα … 7 = Κυριακή,
+/// μόνο οι μέρες με προπόνηση), ώστε το widget να αλλάζει μόνο του στα μεσάνυχτα χωρίς να ξυπνήσει η εφαρμογή. Ίδιοι
+/// κανόνες με την κάρτα «Άσκηση σήμερα» (today_training_card.dart): η μέρα του προγράμματος, και «έγινε» όταν υπάρχει
+/// προπόνηση που ξεκίνησε σήμερα και τελείωσε.
+Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
+  final p = t.program;
+  final done = t.sessions.reversed.where((s) => s.finished && sameDay(s.start, today)).firstOrNull;
+  return {
+    'has': p != null,
+    'week': {
+      if (p != null)
+        for (var d = 1; d <= 7; d++)
+          if (p.workout(p.days[d]) case final w?)
+            '$d': {
+              't': w.cardio?.name ?? w.name,
+              's': w.cardio != null ? '${w.cardio!.minutes} λεπτά' : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes}′',
+            },
+    },
+    if (done != null) 'done': dateKey(today),
+    if (done != null) 'doneText': '${done.name} · ${done.end!.difference(done.start).inMinutes}′',
   };
 }
 

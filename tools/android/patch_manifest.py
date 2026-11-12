@@ -76,7 +76,9 @@ WIDGETS = "\n        <!-- Widgets αρχικής οθόνης (7/11). Η ρύθ�
     f'            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_{res}"/>\n'
     "        </receiver>"
     for cls, label, res in (("SleepWidget", "Ύπνος", "sleep"), ("MoveWidget", "Κίνηση", "move"),
-                            ("FoodWidget", "Φαγητό", "food"), ("BodyWidget", "Σώμα", "body"))
+                            ("FoodWidget", "Φαγητό", "food"), ("BodyWidget", "Σώμα", "body"),
+                            # 13/11: δύο απλά widgets με γράμματα (QuickWidgets.kt), χωρίς οθόνη ρύθμισης.
+                            ("WorkoutWidget", "Προπόνηση σήμερα", "workout"), ("QuickFoodWidget", "Γρήγορο φαγητό", "quickfood"))
 )
 
 BROWSER = (
@@ -125,7 +127,7 @@ xml_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xml")
 xml_dst = os.path.join(os.path.dirname(os.path.abspath(path)), "res", "xml")
 os.makedirs(xml_dst, exist_ok=True)
 for name in ("data_extraction_rules.xml", "backup_rules.xml", "widget_sleep.xml", "widget_move.xml", "widget_food.xml",
-             "widget_body.xml"):
+             "widget_body.xml", "widget_workout.xml", "widget_quickfood.xml"):
     shutil.copyfile(os.path.join(xml_src, name), os.path.join(xml_dst, name))
 # Διατάξεις των widgets (ημέρας και νύχτας).
 for folder in ("layout", "layout-night"):
@@ -133,6 +135,20 @@ for folder in ("layout", "layout-night"):
     os.makedirs(dst, exist_ok=True)
     shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), folder, "home_widget.xml"),
                     os.path.join(dst, "home_widget.xml"))
+
+# Τα δύο απλά widgets (13/11): διατάξεις, σχήματα, χρώματα ημέρας και νύχτας. Δικά τους ονόματα αρχείων (quick_*, qw_*),
+# ώστε να μη γράφουν ποτέ πάνω σε αρχείο που φτιάχνει το «flutter create».
+here = os.path.dirname(os.path.abspath(__file__))
+res = os.path.join(os.path.dirname(os.path.abspath(path)), "res")
+for folder, names in (("layout", ("quick_workout_widget.xml", "quick_food_widget.xml")),
+                      ("drawable", ("qw_bg.xml", "qw_button_food.xml", "qw_button_plain.xml")),
+                      ("values", ("quick_widgets.xml",)), ("values-night", ("quick_widgets.xml",))):
+    os.makedirs(os.path.join(res, folder), exist_ok=True)
+    for name in names:
+        if folder.startswith("values") and os.path.exists(os.path.join(res, folder, name)) and \
+                open(os.path.join(res, folder, name), encoding="utf-8").read() != open(os.path.join(here, folder, name), encoding="utf-8").read():
+            sys.exit("Υπάρχει ήδη άλλο " + folder + "/" + name)
+        shutil.copyfile(os.path.join(here, folder, name), os.path.join(res, folder, name))
 
 BACKUP = ('android:allowBackup="true"', 'android:fullBackupContent="@xml/backup_rules"',
           'android:dataExtractionRules="@xml/data_extraction_rules"')
@@ -162,6 +178,8 @@ for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiafor
                'android:host="ygeia-forma.netlify.app"', 'android:path="/oura/callback"', 'android:autoVerify="true"',
                "<!-- Σύνδεση Oura: άνοιγμα", 'android:name=".WidgetConfigActivity"', 'android:name=".SleepWidget"',
                'android:name=".MoveWidget"', 'android:name=".FoodWidget"', 'android:name=".BodyWidget"',
+               'android:name=".WorkoutWidget"', 'android:name=".QuickFoodWidget"', "@xml/widget_workout",
+               "@xml/widget_quickfood",
                "android.appwidget.action.APPWIDGET_CONFIGURE", "android.permission.VIBRATE",
                "android.permission.POST_NOTIFICATIONS") + BACKUP:
     if needle not in s:

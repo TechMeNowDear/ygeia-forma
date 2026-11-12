@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../data.dart';
 import '../food/food_store.dart';
+import '../training/training_store.dart';
 import 'widget_snapshot.dart';
 import 'widget_style.dart';
 
@@ -19,9 +20,13 @@ final widgetOpenRequest = ValueNotifier<String?>(null);
 /// Στέλνει το στιγμιότυπο στα widgets όταν αλλάζουν τα δεδομένα: με καθυστέρηση 1,5″ (μαζεύει τις αλλαγές μιας
 /// ανάγνωσης) και μόνο αν άλλαξε κάτι. Καμία δουλειά όταν δεν υπάρχει widget (το λέει η Kotlin με «count»).
 class WidgetPublisher {
-  WidgetPublisher(this.store, this.food, {DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  WidgetPublisher(this.store, this.food, {this.training, DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
   final HealthStore store;
   final FoodStore food;
+
+  /// Για το widget «Προπόνηση σήμερα» (13/11).
+  final TrainingStore? training;
+  String? _lastWorkout;
   final DateTime Function() _clock;
   Timer? _timer;
   String? _last;
@@ -29,6 +34,7 @@ class WidgetPublisher {
   void start() {
     store.addListener(_schedule);
     food.addListener(_schedule);
+    training?.addListener(_trainingChanged);
     widgetChannel.setMethodCallHandler((call) async {
       if (call.method == 'open' && call.arguments is String) widgetOpenRequest.value = call.arguments as String;
       return null;
@@ -44,6 +50,18 @@ class WidgetPublisher {
     } catch (_) {}
   }
 
+  /// Η αποθήκη της προπόνησης ειδοποιεί σε κάθε ✓ και κάθε αλλαγή επαναλήψεων. Τα widgets ξαναζωγραφίζονται μόνο όταν
+  /// αλλάζει αυτό που δείχνει το widget (πρόγραμμα, «έγινε σήμερα»), όχι σε κάθε σετ (μπαταρία).
+  void _trainingChanged() {
+    final t = training;
+    if (t == null || !t.ready) return;
+    final now = _clock();
+    final text = jsonEncode(workoutSnapshot(t, DateTime(now.year, now.month, now.day)));
+    if (text == _lastWorkout) return;
+    _lastWorkout = text;
+    _schedule();
+  }
+
   void _schedule() {
     _timer?.cancel();
     _timer = Timer(const Duration(milliseconds: 1500), publish);
@@ -53,7 +71,7 @@ class WidgetPublisher {
     try {
       final n = await widgetChannel.invokeMethod<int>('count') ?? 0;
       if (n == 0) return;
-      final text = jsonEncode(buildWidgetSnapshot(store, food, _clock()));
+      final text = jsonEncode(buildWidgetSnapshot(store, food, _clock(), training: training));
       if (text == _last) return;
       await widgetChannel.invokeMethod('update', text);
       _last = text;
@@ -68,6 +86,7 @@ class WidgetPublisher {
     _timer?.cancel();
     store.removeListener(_schedule);
     food.removeListener(_schedule);
+    training?.removeListener(_trainingChanged);
   }
 }
 

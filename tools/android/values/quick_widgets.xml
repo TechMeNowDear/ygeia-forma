@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widgets «Προπόνηση σήμερα» / «Γρήγορο φαγητό» (13/11): χρώματα ημέρας (θέμα «Αιγαίο» της εφαρμογής).
+     Αντίθεση γραμμάτων ≥ 4,5:1 (ελέγχεται στο test/features_100_test.dart). -->
+<resources>
+    <color name="qw_bg">#FFFFFF</color>
+    <color name="qw_text">#0F172A</color>
+    <color name="qw_sub">#5B6576</color>
+    <color name="qw_workout">#C2410C</color>
+    <color name="qw_food">#15803D</color>
+    <color name="qw_on_food">#FFFFFF</color>
+    <color name="qw_plain">#EEF1F6</color>
+    <string name="qw_workout_description">Η προπόνηση της μέρας. Πάτημα: ανοίγει την Άσκηση.</string>
+    <string name="qw_food_description">Γράψε φαγητό ή σκάναρε barcode με ένα πάτημα.</string>
+</resources>

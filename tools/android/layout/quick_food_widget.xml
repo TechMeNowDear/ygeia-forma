@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget «Γρήγορο φαγητό» (13/11): δύο κουμπιά ίδιου πλάτους, ύψος τουλάχιστον 48 dp. Χρώματα από values/values-night. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/qf_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/qw_bg"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="6dp">
+    <TextView
+        android:id="@+id/qf_add"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@drawable/qw_button_food"
+        android:contentDescription="Προσθήκη φαγητού"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:minHeight="48dp"
+        android:text="+ Φαγητό"
+        android:textColor="@color/qw_on_food"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/qf_scan"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="6dp"
+        android:layout_weight="1"
+        android:background="@drawable/qw_button_plain"
+        android:contentDescription="Σάρωση barcode"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:minHeight="48dp"
+        android:text="Barcode"
+        android:textColor="@color/qw_text"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+</LinearLayout>

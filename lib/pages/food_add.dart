@@ -20,7 +20,7 @@ import 'nutrition.dart';
 // Είσοδοι
 // ---------------------------------------------------------------------------
 
-Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day}) async {
+Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day, bool scan = false}) async {
   // Έλεγχος 9/11 (Χ6): αν δεν διαβάστηκε το ημερολόγιο, ό,τι γραφτεί μπορεί να βγει διπλό.
   if (!food.loaded) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -35,7 +35,7 @@ Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, Date
   await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'Προσθήκη φαγητού'),
-      builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: target),
+      builder: (_) => AddFoodScreen(food: food, meal: meal ?? mealForTime(DateTime.now()), day: target, scanOnOpen: scan),
     ),
   );
 }
@@ -201,8 +201,12 @@ class MealPicker extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class AddFoodScreen extends StatefulWidget {
-  const AddFoodScreen({super.key, required this.food, required this.meal, required this.day, this.clock});
+  const AddFoodScreen({super.key, required this.food, required this.meal, required this.day, this.clock, this.scanOnOpen = false});
   final FoodStore food;
+
+  /// Ανοίγει αμέσως τον σαρωτή barcode (από το widget «Γρήγορο φαγητό», 13/11). Αν ο σαρωτής κλείσει χωρίς αποτέλεσμα,
+  /// μένει η κανονική οθόνη αναζήτησης.
+  final bool scanOnOpen;
   final Meal meal;
   final DateTime day;
 
@@ -228,6 +232,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   void initState() {
     super.initState();
     _openedAt = _now();
+    if (widget.scanOnOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_busy) _scan();
+      });
+    }
   }
 
   /// Η μέρα που διάλεξε ο χρήστης στην ερώτηση «σε ποια μέρα;» (μία φορά για όσο είναι ανοιχτή η οθόνη).

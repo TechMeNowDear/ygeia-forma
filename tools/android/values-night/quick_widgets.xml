@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widgets «Προπόνηση σήμερα» / «Γρήγορο φαγητό» (13/11): χρώματα νύχτας. -->
+<resources>
+    <color name="qw_bg">#141B2D</color>
+    <color name="qw_text">#E8ECF5</color>
+    <color name="qw_sub">#9AA4B8</color>
+    <color name="qw_workout">#F0915A</color>
+    <color name="qw_food">#5CC98A</color>
+    <color name="qw_on_food">#0F172A</color>
+    <color name="qw_plain">#232C42</color>
+</resources>

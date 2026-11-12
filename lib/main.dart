@@ -59,7 +59,7 @@ Future<void> main() async {
   runApp(YgeiaFormaApp(store: store, food: food, wiped: wiped?.show == true ? wiped : null));
   store.start();
   food.start();
-  WidgetPublisher(store, food).start();
+  WidgetPublisher(store, food, training: TrainingStore.main).start();
   // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
   TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
 }
@@ -210,6 +210,8 @@ class _ShellState extends State<Shell> {
             'sleep' => _open(Cat.health, HealthTab.sleep),
             'body' => _open(Cat.health, HealthTab.body),
             'food' => _open(Cat.food, FoodTab.diary),
+            // 13/11: το widget «Προπόνηση σήμερα» ανοίγει την Άσκηση › Προπόνηση (εκεί είναι το «Ξεκίνα»).
+            'workout' => _open(Cat.exercise, ExerciseTab.train),
             _ => _open(Cat.exercise, ExerciseTab.move),
           };
       switch (tap) {
@@ -218,6 +220,10 @@ class _ShellState extends State<Shell> {
         case 'add':
           _open(Cat.food, FoodTab.diary);
           openAddFood(context, _food);
+        // 13/11: το «Barcode» του widget «Γρήγορο φαγητό»: η ίδια οθόνη, με τον σαρωτή ανοιχτό αμέσως.
+        case 'scan':
+          _open(Cat.food, FoodTab.diary);
+          openAddFood(context, _food, scan: true);
         case 'metric' when metricSpecs.containsKey(hero):
           section();
           Navigator.of(context).push(MetricPage.route(widget.store, hero));

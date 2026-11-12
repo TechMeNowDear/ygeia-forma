@@ -22,6 +22,9 @@ class AccuracyRulesTest {
         assertEquals("w:sleep:section:", DataRules.widgetOpenTarget("w:sleep:section:"))
         assertEquals("w:food:add:", DataRules.widgetOpenTarget("w:food:add:"))
         assertEquals("w:body:metric:weight", DataRules.widgetOpenTarget("w:body:metric:weight"))
+        // 13/11: τα δύο νέα widgets («Προπόνηση σήμερα», «Γρήγορο φαγητό»).
+        assertEquals("w:workout:section:", DataRules.widgetOpenTarget("w:workout:section:"))
+        assertEquals("w:food:scan:", DataRules.widgetOpenTarget("w:food:scan:"))
         assertNull(DataRules.widgetOpenTarget(null))
         assertNull(DataRules.widgetOpenTarget("w:sleep:section:x\n"))
         assertNull(DataRules.widgetOpenTarget("w:evil:section:"))

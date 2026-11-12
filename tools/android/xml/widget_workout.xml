@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget «Προπόνηση σήμερα» (13/11): 2 γραμμές κειμένου, από 2×1 θέσεις και πάνω. Χωρίς περιοδική ανανέωση (μπαταρία),
+     χωρίς οθόνη ρύθμισης. Η προεπισκόπηση στη λίστα των widgets είναι η ίδια η διάταξη. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="130dp"
+    android:minHeight="56dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="48dp"
+    android:maxResizeWidth="720dp"
+    android:maxResizeHeight="220dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/quick_workout_widget"
+    android:previewLayout="@layout/quick_workout_widget"
+    android:description="@string/qw_workout_description"
+    android:widgetCategory="home_screen" />
