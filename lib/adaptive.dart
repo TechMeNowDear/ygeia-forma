@@ -18,6 +18,7 @@ library;
 
 import 'dart:math' as math;
 
+import 'format.dart' show daysBetween;
 import 'goals.dart';
 
 const adaptWindowDays = 21;
@@ -100,7 +101,7 @@ enum AdaptStatus { ok, tooEarly, fewIntakeDays, fewWeighIns, implausible }
   ]..sort((a, b) => a.$1.compareTo(b.$1));
 
   if (days.length < adaptMinIntakeDays) return (status: AdaptStatus.fewIntakeDays, est: null);
-  if (ws.length < adaptMinWeighIns || ws.last.$1.difference(ws.first.$1).inDays < adaptMinSpanDays) {
+  if (ws.length < adaptMinWeighIns || daysBetween(ws.first.$1, ws.last.$1) < adaptMinSpanDays) {
     return (status: AdaptStatus.fewWeighIns, est: null);
   }
   final slope = weightSlope(ws);
@@ -166,14 +167,14 @@ AdaptProposal proposeTarget({required Goals goals, required Expenditure est, req
 AdaptProposal? fastLossCheck({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
   if (goals.aim != GoalAim.lose) return null;
   final since = DateTime.tryParse(goals.since);
-  if (since == null || _day(today).difference(since).inDays < adaptFastWindowDays) return null;
+  if (since == null || daysBetween(since, today) < adaptFastWindowDays) return null;
   final to = _day(today);
   final from = to.subtract(const Duration(days: adaptFastWindowDays));
   final ws = [
     for (final w in weights)
       if (!_day(w.$1).isBefore(from) && !_day(w.$1).isAfter(to)) (_day(w.$1), w.$2),
   ]..sort((a, b) => a.$1.compareTo(b.$1));
-  if (ws.length < 4 || ws.last.$1.difference(ws.first.$1).inDays < 10) return null;
+  if (ws.length < 4 || daysBetween(ws.first.$1, ws.last.$1) < 10) return null;
   final slope = weightSlope(ws);
   if (slope == null) return null;
   final kg = ws.last.$2;
@@ -189,7 +190,7 @@ bool checkInDue({required Goals goals, required DateTime today, String? lastChec
   if (since == null) return false;
   final t = _day(today);
   final dueDay = t.subtract(Duration(days: (t.weekday - since.weekday + 7) % 7));
-  if (dueDay.difference(since).inDays < adaptWindowDays) return false;
+  if (daysBetween(since, dueDay) < adaptWindowDays) return false;
   final last = lastCheckIn == null ? null : DateTime.tryParse(lastCheckIn);
   return last == null || last.isBefore(dueDay);
 }

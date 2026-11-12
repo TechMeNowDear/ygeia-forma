@@ -702,7 +702,7 @@ class GoalsPage extends StatelessWidget {
     final c = Aigaio.of(context);
     final small = TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary);
     final title = TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text);
-    final days = DateTime(next.year, next.month, next.day).difference(DateTime(today.year, today.month, today.day)).inDays;
+    final days = daysBetween(today, next);
     final when = days <= 0 ? 'σήμερα' : (days == 1 ? 'αύριο' : 'σε $days μέρες');
     if (g.log.isNotEmpty) {
       return [

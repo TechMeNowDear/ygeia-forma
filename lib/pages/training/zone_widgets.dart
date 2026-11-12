@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data.dart' show HealthStore;
+import '../../format.dart' show daysBetween;
 import '../../reference.dart' show MetricInfo;
 import '../../theme.dart';
 import '../../training/session.dart';
@@ -426,7 +427,7 @@ class TalkTestCard extends StatefulWidget {
     final talk = h.zoneSettings.talk;
     if (talk.any((t) => t[0] == s.id)) return true; // έχει απαντηθεί: φαίνεται η απάντηση
     // Μόνο για πρόσφατα περπατήματα (ανασκόπηση 11/11, N5): όχι για ένα παλιό που άνοιξες τυχαία.
-    if (DateTime.now().difference(s.start).inDays > 14) return false;
+    if (daysBetween(s.start, DateTime.now()) > 14) return false;
     return talk.length < talkAskWalks;
   }
 

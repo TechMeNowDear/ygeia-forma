@@ -8,6 +8,7 @@ import 'data.dart' show BodyMeasurement;
 import 'food/food_model.dart' show Totals;
 import 'food/food_store.dart';
 import 'history.dart' show dateKey;
+import 'format.dart' show daysBetween;
 import 'goals.dart';
 
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -152,7 +153,7 @@ CheckIn? pendingCheckIn({
   }
   if (g.checkIn == dateKey(t)) return null;
   final fa = g.fastAt == null ? null : DateTime.tryParse(g.fastAt!);
-  if (fa != null && t.difference(fa).inDays < 7) return null;
+  if (fa != null && daysBetween(fa, t) < 7) return null;
   final f = fastLossCheck(goals: g, weights: weights, today: t);
   if (f == null) return null;
   final from = DateTime(t.year, t.month, t.day - adaptFastWindowDays);

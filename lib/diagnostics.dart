@@ -22,6 +22,7 @@ import 'error_report.dart';
 import 'food/chol.dart';
 import 'food/food_model.dart';
 import 'food/food_store.dart';
+import 'format.dart' show daysBetween;
 import 'goals.dart';
 import 'history.dart' show dateKey;
 import 'training/training_store.dart';
@@ -322,7 +323,7 @@ Map<String, dynamic> diagnosticsFrom({
   final jumps = <String>[];
   for (var i = 1; i < weights.length; i++) {
     final a = weights[i - 1], b = weights[i];
-    final gap = b.$1.difference(a.$1).inDays;
+    final gap = daysBetween(a.$1, b.$1);
     if (gap > 0 && gap <= 7 && (b.$2 - a.$2).abs() > 1.5 * gap.clamp(1, 2)) jumps.add('${dateKey(a.$1)}→${dateKey(b.$1)}: ${a.$2}→${b.$2}');
   }
   check('weight-jumps', jumps.isEmpty, jumps.isEmpty ? null : jumps.take(10).join('; '));
