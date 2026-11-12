@@ -55,6 +55,7 @@ Future<Map<String, dynamic>> buildDiagnostics({
   required TrainingStore training,
   required DateTime now,
   Map<String, Object?> screen = const {},
+  Map<String, Object?> rest = const {},
   String note = '',
   ErrorReporter? reporter,
 }) async {
@@ -75,6 +76,7 @@ Future<Map<String, dynamic>> buildDiagnostics({
     trainingReadError: training.readError,
     sources: sources,
     screen: screen,
+    rest: rest,
     note: note,
     reporter: reporter,
   );
@@ -91,6 +93,7 @@ Map<String, dynamic> diagnosticsFrom({
   bool trainingReadError = false,
   ({String plan, String? log})? sources,
   Map<String, Object?> screen = const {},
+  Map<String, Object?> rest = const {},
   String note = '',
   ErrorReporter? reporter,
 }) {
@@ -301,7 +304,7 @@ Map<String, dynamic> diagnosticsFrom({
     'settings': store.zoneSettings.toJson(),
     'restHrUsed': store.restHrForZone(now),
     'age': store.profile.ageOn(now),
-    if (z != null) 'zone': {'lo': z.lo, 'hi': z.hi, 'rest': z.rest, 'max': z.max, 'maxMeasured': z.maxMeasured, 'manual': z.manual},
+    if (z != null) 'zone': {'lo': z.lo, 'hi': z.hi, 'rest': z.rest, 'max': z.max, 'maxMeasured': z.maxMeasured, 'manual': z.manual, 'restMeasured': z.restMeasured},
   };
 
   // ---------------------------------------------------------------- checks
@@ -377,6 +380,8 @@ Map<String, dynamic> diagnosticsFrom({
     'release': reporter?.release,
     'device': reporter?.device,
     'screen': screen,
+    // Τέλος διαλείμματος στο κινητό: πόσες φορές χτύπησε και πόσο άργησε (ms), όπως το μέτρησε το ίδιο το κινητό (13/11).
+    'rest': rest,
     'note': note,
     'data': {
       'foodLogSource': foodLog == null ? 'memory-${diagnosticsDays}d' : 'file',

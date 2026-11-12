@@ -257,6 +257,8 @@ class _DataGroupState extends State<_DataGroup> {
       return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}', uri: null);
     }
     final saved = r['name'] is String ? r['name'] as String : name;
+    // Μόνο ένα πλήρες αντίγραφο μετρά ως «τελευταίο αντίγραφο» (13/11).
+    if (!trainingOut && hrMissing == 0) widget.store.markExported(now);
     return (
       // Πλήρες μόνο αν μπήκαν και οι προπονήσεις με τους παλμούς τους.
       ok: !trainingOut && hrMissing == 0,
@@ -373,7 +375,8 @@ class _DataGroupState extends State<_DataGroup> {
           title: 'Εξαγωγή αντιγράφου',
           // Φαγητό, προϊόντα, προπονήσεις και ρυθμίσεις υπάρχουν μόνο σε αυτό το κινητό· η Samsung ξαναδιαβάζεται.
           // Το αρχείο δεν είναι κρυπτογραφημένο: το λέμε (Συμβούλιο 5, Δ6α· κείμενο εγκεκριμένο 13/11).
-          subtitle: 'Ένα αρχείο στις Λήψεις: φαγητό, προϊόντα, προπονήσεις, ρυθμίσεις. Δεν είναι κλειδωμένο: όποιος το ανοίξει, τα διαβάζει.',
+          subtitle: 'Ένα αρχείο στις Λήψεις: φαγητό, προϊόντα, προπονήσεις, ρυθμίσεις. Δεν είναι κλειδωμένο: όποιος το ανοίξει, τα διαβάζει.'
+              '\n${lastBackupText(widget.store.lastExport, DateTime.now())}',
           onTap: _busy ? null : _export,
         ),
         SettingsRow(

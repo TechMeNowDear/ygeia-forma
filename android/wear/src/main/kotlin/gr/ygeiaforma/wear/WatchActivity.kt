@@ -28,6 +28,9 @@ class WatchActivity : Activity(), WatchView.Actions {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var view: WatchView
     private var pending: (() -> Unit)? = null
+    /** Γ3: η εκκίνηση που περιμένει την απάντηση στο «Τρέχει άσκηση σε άλλη εφαρμογή». */
+    private var startHerePending: (() -> Unit)? = null
+    private var checkingOtherApp = false
     private var joinWhenReady = false
     private var finishArmedUntil = 0L
     private var skipArmedUntil = 0L
@@ -264,6 +267,48 @@ class WatchActivity : Activity(), WatchView.Actions {
         p?.invoke()
     }
 
+    /**
+     * Γ3 (13/11): πριν από κάθε εκκίνηση, αν τρέχει άσκηση ΑΛΛΗΣ εφαρμογής, πρώτα ερώτηση (η δική μας εκκίνηση τη
+     * σταματά). Με όριο χρόνου: αν το Health Services δεν απαντήσει, ξεκινά όπως πριν. Δεύτερο πάτημα όσο περιμένει
+     * η απάντηση δεν ξεκινά δεύτερη φορά.
+     */
+    private fun askOtherApp(then: () -> Unit) {
+        if (checkingOtherApp || startHerePending != null) return
+        checkingOtherApp = true
+        scope.launch {
+            val other = try {
+                withTimeoutOrNull(FinishTimes.HS_CALL_MS) {
+                    HealthServices.getClient(this@WatchActivity).exerciseClient.getCurrentExerciseInfoAsync().await().exerciseTrackedStatus ==
+                        ExerciseTrackedStatus.OTHER_APP_IN_PROGRESS
+                }
+            } catch (_: Exception) {
+                null
+            }
+            checkingOtherApp = false
+            if (!OtherAppAsk.ask(other)) {
+                then()
+                return@launch
+            }
+            startHerePending = then
+            view.otherAppAsk = true
+            view.invalidate()
+        }
+    }
+
+    override fun startHere() {
+        val p = startHerePending
+        startHerePending = null
+        view.otherAppAsk = false
+        p?.invoke()
+        view.invalidate()
+    }
+
+    override fun cancelStart() {
+        startHerePending = null
+        view.otherAppAsk = false
+        view.invalidate()
+    }
+
     // ------------------------------------------------------------------ ενέργειες
     private fun cmd(o: JSONObject) {
         val s = Repo.phone ?: return
@@ -288,31 +333,38 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun startWorkout(id: String) {
         val w = Repo.plan?.workout(id) ?: return
         withPermissions(false) {
-            Repo.notice = null
-            Repo.local = LiveSession.fromPlan(w, System.currentTimeMillis())
-            Repo.screen = Repo.Screen.SET
-            ExerciseService.start(this, "strength", false)
-            redraw()
+            askOtherApp {
+                Repo.notice = null
+                Repo.local = LiveSession.fromPlan(w, System.currentTimeMillis())
+                Repo.screen = Repo.Screen.SET
+                ExerciseService.start(this, "strength", false)
+                redraw()
+            }
         }
     }
 
     override fun startWalk() {
         withPermissions(true) {
-            Repo.notice = null
-            Repo.screen = Repo.Screen.WALK
-            ExerciseService.start(this, "walk", false)
-            redraw()
+            askOtherApp {
+                Repo.notice = null
+                Repo.screen = Repo.Screen.WALK
+                ExerciseService.start(this, "walk", false)
+                redraw()
+            }
         }
     }
 
     override fun joinPhone() {
         if (Repo.phone == null) return
         withPermissions(false) {
-            Repo.notice = null
-            val s = Repo.phone
-            Repo.screen = if (s != null && s.restEnd > System.currentTimeMillis()) Repo.Screen.REST else Repo.Screen.SET
-            ExerciseService.start(this, "strength", true)
-            redraw()
+            askOtherApp {
+                // Η προπόνηση του κινητού τελείωσε όσο περίμενε η ερώτηση: τίποτα να μετρηθεί.
+                val s = Repo.phone ?: return@askOtherApp
+                Repo.notice = null
+                Repo.screen = if (s.restEnd > System.currentTimeMillis()) Repo.Screen.REST else Repo.Screen.SET
+                ExerciseService.start(this, "strength", true)
+                redraw()
+            }
         }
     }
 

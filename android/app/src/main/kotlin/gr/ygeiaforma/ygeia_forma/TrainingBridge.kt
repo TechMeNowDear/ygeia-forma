@@ -110,6 +110,8 @@ class TrainingBridge(
                 cancel(activity.applicationContext)
                 result.success(true)
             }
+            // Πόσο άργησε ως τώρα το τέλος του διαλείμματος (13/11), για την «Αναφορά για έλεγχο».
+            "restStats" -> result.success(restStats(activity.applicationContext))
             "buzz" -> {
                 vibrate(activity.applicationContext, longArrayOf(0, 300, 150, 300))
                 result.success(true)
@@ -141,6 +143,30 @@ class TrainingBridge(
 
         /** Το ξυπνητήρι του διαλείμματος που εκκρεμεί, για να ακυρώνεται (Συμβούλιο 5, U-2). */
         private var alarm: AlarmManager.OnAlarmListener? = null
+
+        /** Πότε έπρεπε να χτυπήσει το διάλειμμα που εκκρεμεί (χρόνος από την εκκίνηση) και αν μπήκε ως ξυπνητήρι (13/11). */
+        private var dueElapsed = 0L
+        private var viaAlarm = false
+        private const val STATS_PREFS = "ygeia_rest"
+        private const val STATS_KEY = "late"
+
+        /** Μία ακόμα μέτρηση καθυστέρησης. Σβήνεται με τη «Διαγραφή όλων» (shared_prefs). */
+        private fun noteLate(ctx: Context, lateMs: Long, alarm: Boolean) {
+            try {
+                val sp = ctx.getSharedPreferences(STATS_PREFS, Context.MODE_PRIVATE)
+                val next = TrainingRules.RestLate.decode(sp.getString(STATS_KEY, null)).add(lateMs, alarm)
+                sp.edit().putString(STATS_KEY, next.encode()).apply()
+            } catch (e: Throwable) {
+                ErrorQueue.report(e, "training")
+            }
+        }
+
+        fun restStats(ctx: Context): Map<String, Any> = try {
+            val r = TrainingRules.RestLate.decode(ctx.getSharedPreferences(STATS_PREFS, Context.MODE_PRIVATE).getString(STATS_KEY, null))
+            mapOf("count" to r.count, "avgMs" to r.avgMs, "maxMs" to r.maxMs, "lastMs" to r.lastMs, "over2s" to r.over2s, "alarms" to r.alarms)
+        } catch (e: Throwable) {
+            emptyMap()
+        }
 
         private fun channels(ctx: Context) {
             if (Build.VERSION.SDK_INT < 26) return
@@ -208,6 +234,7 @@ class TrainingBridge(
                     if (pending !== this) return
                     pending = null
                     alarm = null
+                    noteLate(ctx, SystemClock.elapsedRealtime() - dueElapsed, viaAlarm)
                     try {
                         val nm = ctx.getSystemService(NotificationManager::class.java)
                         nm?.cancel(ID_COUNT)
@@ -244,16 +271,16 @@ class TrainingBridge(
          * διεργασία της εφαρμογής. Αν το σύστημα το αρνηθεί, μένει ο παλιός χρονοδιακόπτης.
          */
         private fun arm(ctx: Context, r: Runnable, left: Long) {
+            val trigger = TrainingRules.restTrigger(SystemClock.elapsedRealtime(), left)
+            dueElapsed = trigger
+            viaAlarm = false
             try {
                 val am = ctx.getSystemService(AlarmManager::class.java)
                 if (am != null) {
                     val l = AlarmManager.OnAlarmListener { r.run() }
-                    am.setExact(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                        TrainingRules.restTrigger(SystemClock.elapsedRealtime(), left),
-                        "ygeia:rest", l, handler,
-                    )
+                    am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, "ygeia:rest", l, handler)
                     alarm = l
+                    viaAlarm = true
                     return
                 }
             } catch (e: Throwable) {

@@ -98,6 +98,54 @@ class WatchShotsTest {
         shot("W1d_home_third_workout") { it.chosen = "B" }
     }
 
+    /**
+     * Γ3 (13/11): η ερώτηση πριν σταματήσει άσκηση άλλης εφαρμογής. Και τα δύο κουμπιά έχουν όνομα για το TalkBack,
+     * περιοχή ≥ 40u (≈ 48 dp) που δεν ακουμπά την άλλη, και κάνουν αυτό που γράφουν.
+     */
+    @Test
+    fun otherAppQuestion() {
+        Repo.applyPlan(Plan.parse(planJson))
+        Repo.screen = Repo.Screen.HOME
+        shot("W9_other_app_ask") { it.otherAppAsk = true }
+        val did = mutableListOf<String>()
+        val acts = object : WatchView.Actions by noop {
+            override fun startHere() { did.add("start") }
+            override fun cancelStart() { did.add("cancel") }
+            override fun startWorkout(id: String) { did.add("workout") }
+            override fun startWalk() { did.add("walk") }
+        }
+        val v = WatchView(RuntimeEnvironment.getApplication(), acts)
+        v.otherAppAsk = true
+        val spec = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY)
+        v.measure(spec, spec)
+        v.layout(0, 0, size, size)
+        v.draw(Canvas(Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)))
+        val items = v.a11yItems
+        assertEquals(listOf(OtherAppAsk.TEXT, OtherAppAsk.YES, OtherAppAsk.NO), items.map { it.first })
+        val p = v.accessibilityNodeProvider
+        val yes = android.graphics.Rect()
+        val no = android.graphics.Rect()
+        @Suppress("DEPRECATION")
+        p.createAccessibilityNodeInfo(1)!!.getBoundsInParent(yes)
+        @Suppress("DEPRECATION")
+        p.createAccessibilityNodeInfo(2)!!.getBoundsInParent(no)
+        val u = size / 200f
+        assertFalse("$yes / $no", android.graphics.Rect.intersects(yes, no))
+        assertTrue("$yes", yes.height() >= 40 * u - 1 && yes.width() >= 40 * u - 1)
+        assertTrue("$no", no.height() >= 40 * u - 1 && no.width() >= 40 * u - 1)
+        val t0 = android.os.SystemClock.uptimeMillis()
+        fun tap(x: Float, y: Float) {
+            v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0, android.view.MotionEvent.ACTION_DOWN, x, y, 0))
+            v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0 + 50, android.view.MotionEvent.ACTION_UP, x, y, 0))
+        }
+        // Πάνω στο κείμενο: τίποτα (καμία εκκίνηση από την οθόνη που είναι από κάτω).
+        tap(size / 2f, 60 * u)
+        assertEquals(emptyList<String>(), did)
+        tap(yes.exactCenterX(), yes.exactCenterY())
+        tap(no.exactCenterX(), no.exactCenterY())
+        assertEquals(listOf("start", "cancel"), did)
+    }
+
     private fun shot(name: String, ambient: Boolean = false, prep: (WatchView) -> Unit = {}) {
         val v = WatchView(RuntimeEnvironment.getApplication(), noop)
         v.ambient = ambient
@@ -593,5 +641,20 @@ class WatchShotsTest {
             v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0 + 50, android.view.MotionEvent.ACTION_UP, minus.centerX().toFloat(), y.toFloat(), 0))
         }
         assertEquals(listOf("reps-1", "reps-1", "reps-1"), did)
+        // 13/11 (Δ2): το ✓ πατιέται και 8u πάνω από το σχήμα του, στη μέση: ύψος 40u ≈ 48 dp. Λίγο πιο πάνω, τίποτα.
+        did.clear()
+        val mid = size / 2f
+        fun tap(x: Float, y: Float) {
+            v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0, android.view.MotionEvent.ACTION_DOWN, x, y, 0))
+            v.dispatchTouchEvent(android.view.MotionEvent.obtain(t0, t0 + 50, android.view.MotionEvent.ACTION_UP, x, y, 0))
+        }
+        for (y in listOf(check.top - 7 * u, check.top + 2f, check.bottom - 2f)) tap(mid, y)
+        assertEquals(listOf("tick", "tick", "tick"), did)
+        assertTrue("${check.height()}", check.height() + 8 * u >= 40 * u - 1)
+        tap(mid, check.top - 10 * u)
+        assertEquals(3, did.size)
+        // Στο ίδιο ύψος, μέσα στην περιοχή του «−»: πάντα «−», ποτέ ✓.
+        tap(minus.right - 2f, check.top - 7 * u)
+        assertFalse(did.toString(), did.drop(3).contains("tick"))
     }
 }

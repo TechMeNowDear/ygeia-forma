@@ -114,7 +114,7 @@ class Stepper2 extends StatelessWidget {
   final VoidCallback? onMinus, onPlus;
   final double width;
 
-  /// Μέγεθος κουμπιών −/+ (48 στην προπόνηση: ιδρωμένα χέρια, έλεγχος 8/11 UX-02).
+  /// Μέγεθος κουμπιών −/+ (56 στο τρέχον σετ της προπόνησης: ιδρωμένα χέρια· 13/11, Δ3).
   final double button;
   final String labelMinus, labelPlus;
 
@@ -139,7 +139,7 @@ class Stepper2 extends StatelessWidget {
               width: button,
               height: button,
               decoration: BoxDecoration(border: Border.all(color: c.hairline), borderRadius: BorderRadius.circular(10), color: c.card),
-              child: Icon(i, size: 20, color: f == null ? c.textTertiary : c.text),
+              child: Icon(i, size: button >= 56 ? 26 : 20, color: f == null ? c.textTertiary : c.text),
             ),
           ),
         );

@@ -21,4 +21,15 @@ class TrainingDevice {
       _call('rest', {'endAt': end.millisecondsSinceEpoch, 'title': title, 'text': text, 'doneTitle': doneTitle, 'doneText': doneText});
   static Future<void> restCancel() => _call('restCancel');
   static Future<void> buzz() => _call('buzz');
+
+  /// Πόσο άργησε ως τώρα το «τέλος διαλείμματος» σε αυτό το κινητό (13/11), για την «Αναφορά για έλεγχο».
+  /// Άδειο χωρίς Android ή αν δεν απαντήσει.
+  static Future<Map<String, Object?>> restStats() async {
+    try {
+      final r = await _c.invokeMapMethod<String, Object?>('restStats');
+      return r ?? const {};
+    } catch (_) {
+      return const {};
+    }
+  }
 }

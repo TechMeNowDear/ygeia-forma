@@ -8,6 +8,7 @@ import '../error_report.dart';
 import '../food/food_channel.dart';
 import '../food/food_store.dart';
 import '../theme.dart';
+import '../training/training_device.dart';
 import '../training/training_store.dart';
 
 /// «Αναφορά για έλεγχο» (αίτημα χρήστη 12/11): σημείωση + ένα αρχείο στις Λήψεις, και κοινοποίηση. Τίποτα δεν φεύγει
@@ -63,6 +64,7 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
         now: now,
         note: _note.text.trim(),
         reporter: errors,
+        rest: await TrainingDevice.restStats(),
         screen: {
           'w': mq.size.width.round(),
           'h': mq.size.height.round(),

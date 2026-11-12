@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
+import '../hrv_trend.dart';
 import '../oura/oura_model.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
@@ -441,6 +442,17 @@ class _OuraRestCard extends StatelessWidget {
       ]);
     }
 
+    // 13/11: κάτω από το «συνήθως», ο μέσος όρος 7 νυχτών απέναντι στο δικό σου εύρος (hrv_trend.dart). Μόνο περιγραφή.
+    final trend = hrv == null ? null : hrvTrend(store.history, plan, day);
+    Widget? hrvSub() {
+      final u = usual(hrv);
+      if (trend == null) return u;
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (u != null) ...[u, const SizedBox(height: 3)],
+        Text(hrvTrendText(trend), key: const ValueKey('sleep-hrv-trend'), style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular)),
+      ]);
+    }
+
     Widget row(String metric, String label, String value, {Widget? sub, bool line = true}) => InkWell(
           key: ValueKey('sleep-rest-$metric'),
           onTap: () => Navigator.of(context).push(MetricPage.route(store, metric, now: now)),
@@ -468,7 +480,7 @@ class _OuraRestCard extends StatelessWidget {
             trailing: const [SourceTag(Source.oura), InfoButton(K.hrv)],
           ),
           const SizedBox(height: 4),
-          row(K.hrv, 'HRV', hrv == null ? '—' : '${hrv.value.round()} ms', sub: usual(hrv)),
+          row(K.hrv, 'HRV', hrv == null ? '—' : '${hrv.value.round()} ms', sub: hrvSub()),
           row(K.sleepHr, 'Παλμοί ύπνου', hr == null ? '—' : '${hr.value.round()} bpm', sub: usual(hr)),
           row(K.skinTemp, 'Θερμοκρασία δέρματος', temp == null ? '—' : '${signedDec(temp)} °C',
               sub: Text(ouraTempDeviationLabel, style: TextStyle(fontSize: 13, color: c.textSecondary)), line: false),

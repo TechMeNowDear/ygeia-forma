@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
+import '../../training/hr_quality.dart';
 import '../../training/session.dart';
 import '../../training/wear_link.dart';
 
@@ -243,6 +244,11 @@ class HrCard extends StatelessWidget {
             final (text, warn) = hrGapText(g, session.hrMode, session.hrDel, lim != null);
             return Text(text, key: const ValueKey('hr-gap'), style: TextStyle(fontSize: 12.5, height: 1.35, color: warn ? c.exercise : c.textSecondary));
           }),
+        ],
+        // 13/11: πόσες τιμές ήρθαν με καλή επαφή, όπως τις μέτρησε το ρολόι (μόνο όταν το ρολόι στέλνει καταμέτρηση).
+        if (hrQualityFromDiag(session.watchDiag) case final q?) ...[
+          const SizedBox(height: 6),
+          Text(hrQualityText(q), key: const ValueKey('hr-quality'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textSecondary)),
         ],
         // Έλεγχος του γ2 (S1): με όριο, ρολόι σε «default» (ούτε ανά 5″ ούτε αισθητήρας): η δόνηση μπορεί να άργησε.
         if (lim != null && session.hrMode == 'default') ...[

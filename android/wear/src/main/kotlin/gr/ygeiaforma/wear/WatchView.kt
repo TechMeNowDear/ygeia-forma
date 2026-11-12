@@ -45,7 +45,17 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         fun doneOk()
         /** Διόρθωση των επαναλήψεων του σετ που μόλις έγινε (στο διάλειμμα, RT-13). */
         fun lastReps(delta: Int)
+        /** Η απάντηση στο «Τρέχει άσκηση σε άλλη εφαρμογή» ([otherAppAsk]· 13/11, Γ3): «Ξεκίνα εδώ» / «Άκυρο». */
+        fun startHere() {}
+        fun cancelStart() {}
     }
+
+    /**
+     * Γ3 (13/11): το ρολόι μετρά ΜΙΑ άσκηση τη φορά, για όλες τις εφαρμογές (Health Services). Αν τρέχει άσκηση άλλης
+     * εφαρμογής (π.χ. Samsung Health) και ξεκινήσουμε εδώ, εκείνη σταματά χωρίς να ρωτηθεί ο χρήστης. Γι' αυτό πρώτα
+     * ερώτηση, όπως ζητά η οδηγία του Android («ask the user for confirmation before overriding a previous exercise»).
+     */
+    var otherAppAsk = false
 
     private val orange = Color.parseColor("#EA580C")
     private val green = Color.parseColor("#16A34A")
@@ -183,6 +193,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             drawAlarm(c)
             return
         }
+        if (otherAppAsk) {
+            drawOtherApp(c)
+            return
+        }
         val note = Repo.notice
         if (Repo.openNotice && note != null) {
             Repo.openNotice = false
@@ -297,6 +311,27 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         c.restore()
         say = note
         hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat()), "Κλείσιμο") { noticeOpen = false; invalidate() })
+    }
+
+    /** Γ3: ερώτηση πριν σταματήσει η άσκηση άλλης εφαρμογής. Κείμενα εγκεκριμένα 12/11 ([OtherAppAsk]). */
+    private fun drawOtherApp(c: Canvas) {
+        text.color = Color.WHITE
+        text.textSize = ess(10f) * u
+        text.typeface = Typeface.DEFAULT
+        val w = (150f * u).toInt()
+        val tp = android.text.TextPaint(text).apply { textAlign = Paint.Align.LEFT }
+        val layout = android.text.StaticLayout.Builder.obtain(OtherAppAsk.TEXT, 0, OtherAppAsk.TEXT.length, tp, w)
+            .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER)
+            .setMaxLines(4)
+            .build()
+        c.save()
+        c.translate(cx - w / 2f, 74f * u - layout.height / 2f)
+        layout.draw(c)
+        c.restore()
+        say = OtherAppAsk.TEXT
+        // Περιοχές πατήματος ≥ 40u (≈ 48 dp) που δεν ακουμπούν: «Ξεκίνα εδώ» 110–154u, «Άκυρο» 157–198u.
+        pill(c, OtherAppAsk.YES, 132f, 116f, 32f, orange, Color.WHITE, 13f * fs, padTop = 6f, padBottom = 6f) { actions.startHere() }
+        pill(c, OtherAppAsk.NO, 176f, 68f, 28f, button3, soft, ess(10f), padTop = 5f, padBottom = 8f) { actions.cancelStart() }
     }
 
     // ------------------------------------------------------------------ βοηθητικά
@@ -507,6 +542,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Το ✓ πατιέται από το σχήμα του και κάτω (όχι πάνω από αυτό, όπου είναι τα − / +).
         // (κενό 2u από την περιοχή των − / +, ώστε κανένα σημείο να μην είναι και των δύο).
         pill(c, "✓", 152f, 84f, 32f, green, Color.WHITE, 18f, desc = "Έγινε το σετ", padTop = 0f, padBottom = 0f) { actions.tick() }
+        // 13/11 (Συμβούλιο 5, Δ2): το ✓ πατιέται και 8u πάνω από το σχήμα του, μόνο στη μέση (x 66–134u): εκεί το ύψος
+        // γίνεται 40u ≈ 48 dp. Τα − / + φτάνουν ως x 64u και από 136u, άρα μένει κενό 2u και κανένα σημείο δεν είναι και
+        // των δύο. Χωρίς όνομα: για το TalkBack υπάρχει ήδη το «Έγινε το σετ».
+        hits.add(Hit(RectF(66 * u, 128 * u, 134 * u, 136 * u), "") { actions.tick() })
         if (Repo.notice == null) pill(c, "Τέλος", 182f, 56f, 22f, button3, soft, ess(10f), padTop = 2f, padBottom = 8f) { actions.finishWorkout() }
         else hits.add(Hit(RectF(cx - 30 * u, 170 * u, cx + 30 * u, 198 * u), "Τέλος") { actions.finishWorkout() })
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../body_trend.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
@@ -50,6 +51,7 @@ class BodyPage extends StatelessWidget {
             _LatestCard(
               last: last,
               previous: d?.previousBody,
+              body: body,
               now: d?.readAt ?? DateTime.now(),
               profile: store.profile,
               onProfile: () => Navigator.of(context).push(MePage.route(store)),
@@ -151,8 +153,11 @@ class BodyPage extends StatelessWidget {
 }
 
 class _LatestCard extends StatelessWidget {
-  const _LatestCard({required this.last, required this.previous, required this.now, required this.profile, required this.onProfile});
+  const _LatestCard({required this.last, required this.previous, required this.body, required this.now, required this.profile, required this.onProfile});
   final BodyMeasurement last;
+
+  /// Όλες οι ζυγίσεις (παλιότερη πρώτη), για την τάση σε λίπος και μύες (body_trend.dart).
+  final List<BodyMeasurement> body;
   final BodyMeasurement? previous;
   final DateTime now;
   final Profile profile;
@@ -171,6 +176,16 @@ class _LatestCard extends StatelessWidget {
       final diff = shownDiff(value, before, digits);
       if (diff == 0) return base;
       return '$base  (${signedDec(diff, digits)})';
+    }
+
+    // Η τιμή της τελευταίας ζύγισης· σε παρένθεση η διαφορά των δύο μεσαίων τιμών (3 τελευταίες, 3 πριν), όπως φαίνονται.
+    String trendDiff(double? value, double? Function(BodyMeasurement) f, String unit) {
+      if (value == null) return '—';
+      final t = bodyTrend(body, f);
+      final base = '${dec(value)} $unit';
+      if (t == null) return base;
+      final diff = shownDiff(t.now, t.before, 1);
+      return diff == 0 ? base : '$base  (${signedDec(diff)})';
     }
 
     return AppCard(
@@ -202,14 +217,20 @@ class _LatestCard extends StatelessWidget {
             ),
             const LabelTag('εκτίμηση'),
           ]),
-          if (p != null)
-            Text('Σε παρένθεση η αλλαγή από τις ${dayMonth(p.time)}.', style: TextStyle(color: c.textSecondary, fontSize: 13)),
+          // 13/11 (Α5): στο βάρος η αλλαγή από την προηγούμενη ζύγιση· σε λίπος και μύες η τάση από 3 ζυγίσεις, γιατί
+          // μία εκτίμηση της ζυγαριάς μόνη της ανεβοκατεβαίνει με το νερό (body_trend.dart).
+          if (last.fatPct != null || p != null)
+            Text(
+              bodyTrendNote(previous: p?.weight == null ? null : p!.time, days: bodyCompositionDays(body), date: dayMonth),
+              key: const ValueKey('body-trend-note'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
           const SizedBox(height: 4),
           InfoRow('Βάρος', withDiff(last.weight, p?.weight, 'kg')),
-          InfoRow('Λίπος', withDiff(last.fatPct, p?.fatPct, '%')),
-          InfoRow('Μάζα λίπους', withDiff(last.fatKg, p?.fatKg, 'kg')),
-          InfoRow('Σκελετικοί μύες', withDiff(last.smm, p?.smm, 'kg')),
-          InfoRow('Άλιπη μάζα', withDiff(last.leanMass, p?.leanMass, 'kg')),
+          InfoRow('Λίπος', trendDiff(last.fatPct, (b) => b.fatPct, '%')),
+          InfoRow('Μάζα λίπους', trendDiff(last.fatKg, (b) => b.fatKg, 'kg')),
+          InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg')),
+          InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg')),
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
           // Ένα ύψος για όλα (έλεγχος 8/11, DATA-08): από τα στοιχεία σου· της InBody μόνο αν δεν έχεις δώσει ύψος.
           if (bmiOf(last.weight, profile.heightCm) ?? last.bmi case final bmi?) InfoRow('Δείκτης μάζας σώματος', dec(bmi)),

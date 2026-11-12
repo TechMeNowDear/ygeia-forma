@@ -1057,6 +1057,19 @@ fun hrQualityOf(noContact: Boolean, unreliable: Boolean, lowAccuracy: Boolean): 
  * («5s=1 wake=1 q=5400/120/15»: καλές/χαμηλής ακρίβειας/άχρηστες), για να φανεί στη δοκιμή στη συσκευή τι δηλώνει
  * πραγματικά το ρολόι. Κανένα νέο πεδίο: το παλιό κινητό το διαβάζει όπως πριν.
  */
+/**
+ * Γ3 (13/11): η ερώτηση του ρολογιού πριν ξεκινήσει άσκηση ενώ τρέχει άσκηση άλλης εφαρμογής. Κείμενα εγκεκριμένα 12/11.
+ * [ask]: ρωτά μόνο όταν το Health Services είπε καθαρά «άλλη εφαρμογή»· αν δεν απάντησε (null), ξεκινά όπως πριν, ώστε
+ * μια αργή απάντηση να μη μπλοκάρει ποτέ την προπόνηση.
+ */
+object OtherAppAsk {
+    const val TEXT = "Τρέχει άσκηση σε άλλη εφαρμογή. Αν ξεκινήσεις εδώ, εκείνη σταματά."
+    const val YES = "Ξεκίνα εδώ"
+    const val NO = "Άκυρο"
+
+    fun ask(otherAppInProgress: Boolean?): Boolean = otherAppInProgress == true
+}
+
 class HrQualityCount {
     var ok = 0
         private set

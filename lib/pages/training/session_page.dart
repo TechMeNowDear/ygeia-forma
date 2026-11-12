@@ -482,15 +482,16 @@ class _SessionPageState extends State<SessionPage> {
           ),
         );
     if (isCurrent) {
-      // Τρέχον σετ (σχέδια 9/11, 6β): μόνο οι μετρητές (όχι η τιμή δύο φορές), κουμπιά 48 dp, «Έγινε» από κάτω.
+      // Τρέχον σετ (σχέδια 9/11, 6β): μόνο οι μετρητές (όχι η τιμή δύο φορές), «Έγινε» από κάτω.
+      // 13/11 (Συμβούλιο 5, Δ3): κουμπιά − / + 56 dp (ιδρωμένα χέρια, χωρίς να κοιτάς). Όπου δεν χωρούν οι δύο μετρητές
+      // σε μία σειρά (στενή οθόνη), το Wrap βάζει τις επαναλήψεις από κάτω: ποτέ μικρότερα κουμπιά.
       final steppers = <Widget>[
         if (hasLoad(k))
           Stepper2(
             value: band ? '${(set.load ?? 0).round()}' : loadText,
             leading: band ? BandDots(set.load, size: 14) : null,
-            // Σχέδια 9/11 (6β) και έλεγχος premium (S4): οι δύο μετρητές σε μία σειρά και στο κλειστό Fold.
             width: usesKg(k) || band ? 52 : 80,
-            button: 44,
+            button: 56,
             haptic: true,
             labelMinus: 'Λιγότερο βάρος',
             labelPlus: 'Περισσότερο βάρος',
@@ -500,7 +501,7 @@ class _SessionPageState extends State<SessionPage> {
         Stepper2(
           value: '${set.reps}',
           width: 36,
-          button: 44,
+          button: 56,
           haptic: true,
           labelMinus: 'Λιγότερες',
           labelPlus: 'Περισσότερες',

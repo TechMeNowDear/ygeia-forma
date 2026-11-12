@@ -175,6 +175,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
   late final _lo = TextEditingController(text: '${_z0?.lo ?? ''}');
   late final _hi = TextEditingController(text: '${_z0?.hi ?? ''}');
   late final _max = TextEditingController(text: _s.maxHr == null ? '' : '${_s.maxHr}');
+  late final _rest = TextEditingController(text: _s.restHr == null ? '' : '${_s.restHr}');
   String? _error;
 
   @override
@@ -182,6 +183,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
     _lo.dispose();
     _hi.dispose();
     _max.dispose();
+    _rest.dispose();
     super.dispose();
   }
 
@@ -193,11 +195,16 @@ class _ZoneSheetState extends State<ZoneSheet> {
       setState(() => _error = 'Οι μέγιστοι παλμοί θέλουν αριθμό από 120 ως 230.');
       return;
     }
+    final rest = _rest.text.trim().isEmpty ? null : _int(_rest);
+    if (_rest.text.trim().isNotEmpty && (rest == null || rest < zoneRestMin || rest > zoneRestMax)) {
+      setState(() => _error = 'Οι παλμοί ηρεμίας θέλουν αριθμό από $zoneRestMin ως $zoneRestMax.');
+      return;
+    }
     if (lo == null || hi == null || lo < 60 || hi > 220 || lo >= hi) {
       setState(() => _error = 'Η ζώνη θέλει δύο αριθμούς, από 60 ως 220, με το κάτω μικρότερο από το πάνω.');
       return;
     }
-    var s = _s.copyWith(maxHr: max, clearMax: max == null);
+    var s = _s.copyWith(maxHr: max, clearMax: max == null, restHr: rest, clearRest: rest == null);
     // Αν η ζώνη είναι όπως θα την υπολόγιζε η εφαρμογή με αυτούς τους μέγιστους, μένει «υπολογισμένη» (ακολουθεί τους
     // παλμούς ύπνου)· αλλιώς την όρισες εσύ.
     final calc = computeZone(age: widget.health.profile.ageOn(widget.now), restHr: widget.health.restHrForZone(widget.now), s: s.copyWith(clearManual: true));
@@ -211,7 +218,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
   }
 
   void _reset() {
-    widget.health.setZoneSettings(_s.copyWith(clearManual: true, clearMax: true));
+    widget.health.setZoneSettings(_s.copyWith(clearManual: true, clearMax: true, clearRest: true));
     Navigator.of(context).pop();
   }
 
@@ -229,7 +236,13 @@ class _ZoneSheetState extends State<ZoneSheet> {
           Text('Ζώνη περπατήματος', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
           const SizedBox(height: 8),
           if (z != null) ...[
-            InfoRow('Παλμοί ηρεμίας', z.rest == null ? '— · λίγες νύχτες ακόμα' : '${z.rest} · παλμοί ύπνου, 14 νύχτες'),
+            InfoRow(
+                'Παλμοί ηρεμίας',
+                z.rest == null
+                    ? '— · λίγες νύχτες ακόμα'
+                    : z.restMeasured
+                        ? '${z.rest} · δική σου μέτρηση, ξύπνιος'
+                        : '${z.rest} · παλμοί ύπνου, 14 νύχτες'),
             InfoRow('Μέγιστοι παλμοί', z.max <= 0 ? '—' : '${z.max} · ${z.maxMeasured ? 'από τεστ' : 'εκτίμηση από την ηλικία'}'),
             InfoRow('Μέτρια ένταση', z.rest == null ? '64–76% των μέγιστων' : '40–59%'),
             InfoRow('Ζώνη', '${z.lo}–${z.hi}${z.manual ? ' · δική σου' : ''}'),
@@ -274,6 +287,17 @@ class _ZoneSheetState extends State<ZoneSheet> {
           ),
           const SizedBox(height: 6),
           Text('Μόνο από τεστ ως την εξάντληση. Αν σταμάτησες νωρίτερα (π.χ. από κούραση), δεν είναι οι μέγιστοι.', style: hint),
+          const SizedBox(height: 12),
+          // 13/11: προαιρετικά, οι παλμοί ηρεμίας ξύπνιος, όπως τους ορίζει ο τύπος του Karvonen.
+          TextField(
+            key: const ValueKey('zone-rest'),
+            controller: _rest,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(labelText: 'Παλμοί ηρεμίας ξύπνιος, αν τους μέτρησες'),
+          ),
+          const SizedBox(height: 6),
+          Text('Καθιστός, μετά από 5 λεπτά ηρεμίας, το πρωί. Χωρίς τιμή μετρούν οι παλμοί ύπνου, που είναι λίγο χαμηλότεροι.', style: hint),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.bad)),

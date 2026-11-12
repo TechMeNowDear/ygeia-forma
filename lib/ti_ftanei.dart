@@ -124,6 +124,14 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
                           'Τι διαβάζει η εφαρμογή από το Samsung Health τις τελευταίες $_days μέρες.',
                           style: TextStyle(fontSize: 16, color: c.textSecondary),
                         ),
+                        const SizedBox(height: 6),
+                        // Οι πραγματικές διαστάσεις του παραθύρου (13/11): για να σχεδιάζονται σωστά οι οθόνες στο Fold
+                        // κλειστό και ανοιχτό, που δεν είχαν μετρηθεί ποτέ.
+                        Text(
+                          screenSizeText(MediaQuery.sizeOf(context), MediaQuery.textScalerOf(context).scale(100) / 100),
+                          key: const ValueKey('ti-ftanei-screen'),
+                          style: TextStyle(fontSize: 14.5, color: c.textSecondary),
+                        ),
                         if (widget.otherDeviceNights > 0) ...[
                           const SizedBox(height: 8),
                           Text(
@@ -644,3 +652,7 @@ String countNumber(Object? v) => v is num ? thousands(v) : '${v ?? '—'}';
 String countedIgnoredText(num counted, num ignored, String only) =>
     '${counted == 1 ? 'Μετρά' : 'Μετρούν'} ${thousands(counted)} · ${ignored == 1 ? 'αγνοείται' : 'αγνοούνται'} '
     '${thousands(ignored)} από άλλη πηγή ($only)';
+
+/// «Οθόνη τώρα: 384 × 812 dp · γράμματα 100%» (13/11).
+String screenSizeText(Size size, double textScale) =>
+    'Οθόνη τώρα: ${size.width.round()} × ${size.height.round()} dp · γράμματα ${(textScale * 100).round()}%';

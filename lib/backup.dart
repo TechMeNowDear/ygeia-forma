@@ -146,6 +146,16 @@ BackupContents parseBackup(String text) {
 }
 
 
+/// Η γραμμή κάτω από την «Εξαγωγή αντιγράφου» (13/11): φαγητό, προϊόντα και προπονήσεις υπάρχουν μόνο στο κινητό, άρα
+/// να φαίνεται πόσο παλιό είναι το τελευταίο αντίγραφο. Μετρά ημερολογιακές μέρες. Ώρα στο μέλλον (άλλαξε το ρολόι): «σήμερα».
+String lastBackupText(DateTime? last, DateTime now) {
+  if (last == null) return 'Δεν έχεις βγάλει αντίγραφο ακόμα.';
+  final d = daysBetween(last, now);
+  if (d <= 0) return 'Τελευταίο αντίγραφο: σήμερα.';
+  if (d == 1) return 'Τελευταίο αντίγραφο: χθες.';
+  return 'Τελευταίο αντίγραφο: πριν $d μέρες.';
+}
+
 String entriesText(int n) => countText(n, 'καταχώριση', 'καταχωρίσεις');
 String productsText(int n) => countText(n, 'προϊόν', 'προϊόντα');
 

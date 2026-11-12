@@ -899,6 +899,7 @@ class Prefs {
       this.goals,
       this.zone,
       this.waist,
+      this.lastExport,
       Map<String, int>? monthFails,
       List<String>? staleMonths})
       : plan = plan ?? SourcePlan.samsungOnly,
@@ -946,6 +947,7 @@ class Prefs {
       goals: j['goals'] is Map ? Map<String, dynamic>.from(j['goals'] as Map) : null,
       zone: j['zone'] is Map ? Map<String, dynamic>.from(j['zone'] as Map) : null,
       waist: j['waist'] is List ? List<Object?>.from(j['waist'] as List) : null,
+      lastExport: j['lastExport'] is num && (j['lastExport'] as num).isFinite ? (j['lastExport'] as num).toInt() : null,
       monthFails: {
         if (j['monthFails'] is Map)
           for (final e in (j['monthFails'] as Map).entries)
@@ -972,6 +974,9 @@ class Prefs {
 
   /// Μέση με μεζούρα (12/11, waist.dart): λίγα byte τον χρόνο.
   List<Object?>? waist;
+
+  /// Πότε βγήκε το τελευταίο πλήρες αντίγραφο από αυτό το κινητό (ms από το 1970· 13/11). Δεν μπαίνει στο αντίγραφο.
+  int? lastExport;
 
   /// Έλεγχος 2, C9: ως πού μένει να ξαναδιαβαστεί το Oura πιο πίσω από τις 90 μέρες (μετά από καινούργια βάση).
   String? ouraRefetchTo;
@@ -1086,6 +1091,7 @@ class Prefs {
         if (goals != null) 'goals': goals,
         if (zone != null) 'zone': zone,
         if (waist != null) 'waist': waist,
+        if (lastExport != null) 'lastExport': lastExport,
         if (monthFails.isNotEmpty) 'monthFails': monthFails,
         if (staleMonths.isNotEmpty) 'staleMonths': staleMonths,
       });
@@ -2459,6 +2465,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   /// Μέση με μεζούρα (12/11), παλιότερη πρώτη.
   List<WaistEntry> get waist => waistFromJson(prefs.waist);
+
+  /// Το τελευταίο πλήρες αντίγραφο που βγήκε από αυτό το κινητό (για τη γραμμή «Τελευταίο αντίγραφο» στις Ρυθμίσεις).
+  DateTime? get lastExport {
+    final ms = prefs.lastExport;
+    return ms == null || ms.abs() > 8640000000000000 ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  void markExported(DateTime at) => _changePrefs((p) => p.lastExport = at.millisecondsSinceEpoch);
 
   /// Μία μέτρηση τη μέρα: η νέα αντικαθιστά της ίδιας μέρας.
   void saveWaist(WaistEntry e) => _changePrefs((p) {

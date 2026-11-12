@@ -28,15 +28,23 @@ const talkAskWalks = 3;
 
 int tanakaMax(int age) => (208 - 0.7 * age).round();
 
+/// Όρια για τους παλμούς ηρεμίας που γράφει ο χρήστης.
+const zoneRestMin = 30, zoneRestMax = 120;
+
 /// Ρυθμίσεις του χρήστη (στις ρυθμίσεις της εφαρμογής, κλειδί «zone»).
 class ZoneSettings {
-  const ZoneSettings({this.lo, this.hi, this.maxHr, this.alertHigh = true, this.alertLow = false, this.talk = const []});
+  const ZoneSettings({this.lo, this.hi, this.maxHr, this.restHr, this.alertHigh = true, this.alertLow = false, this.talk = const []});
 
   /// Ζώνη που έγραψε ο χρήστης (αλλιώς ο υπολογισμός).
   final int? lo, hi;
 
   /// Μέγιστοι παλμοί από τεστ ως την εξάντληση (αλλιώς Tanaka).
   final int? maxHr;
+
+  /// Παλμοί ηρεμίας ξύπνιος, μετρημένοι από τον χρήστη (καθιστός, μετά από 5′ ηρεμίας, πρωί), προαιρετικά (13/11).
+  /// Ο τύπος του Karvonen ορίζεται με παλμούς ηρεμίας ξύπνιου· οι παλμοί ύπνου είναι λίγο χαμηλότεροι και δίνουν ζώνη
+  /// λίγους παλμούς πιο κάτω (πόσους, εξαρτάται από τη διαφορά των δύο σε κάθε άνθρωπο). Χωρίς τιμή μένουν οι παλμοί ύπνου, όπως πριν.
+  final int? restHr;
   final bool alertHigh, alertLow;
 
   /// Απαντήσεις στο «τεστ ομιλίας»: id του περπατήματος → «sing» | «talk» | «no».
@@ -44,11 +52,22 @@ class ZoneSettings {
 
   bool get manual => lo != null && hi != null;
 
-  ZoneSettings copyWith({int? lo, int? hi, int? maxHr, bool? alertHigh, bool? alertLow, List<List<String>>? talk, bool clearManual = false, bool clearMax = false}) =>
+  ZoneSettings copyWith(
+          {int? lo,
+          int? hi,
+          int? maxHr,
+          int? restHr,
+          bool? alertHigh,
+          bool? alertLow,
+          List<List<String>>? talk,
+          bool clearManual = false,
+          bool clearMax = false,
+          bool clearRest = false}) =>
       ZoneSettings(
         lo: clearManual ? null : (lo ?? this.lo),
         hi: clearManual ? null : (hi ?? this.hi),
         maxHr: clearMax ? null : (maxHr ?? this.maxHr),
+        restHr: clearRest ? null : (restHr ?? this.restHr),
         alertHigh: alertHigh ?? this.alertHigh,
         alertLow: alertLow ?? this.alertLow,
         talk: talk ?? this.talk,
@@ -58,6 +77,7 @@ class ZoneSettings {
         if (lo != null) 'lo': lo,
         if (hi != null) 'hi': hi,
         if (maxHr != null) 'max': maxHr,
+        if (restHr != null) 'rest': restHr,
         'up': alertHigh,
         'down': alertLow,
         if (talk.isNotEmpty) 'talk': talk,
@@ -73,6 +93,7 @@ class ZoneSettings {
       lo: lo,
       hi: hi,
       maxHr: i(j['max'], 100, 230),
+      restHr: i(j['rest'], zoneRestMin, zoneRestMax),
       alertHigh: j['up'] != false,
       alertLow: j['down'] == true,
       talk: [
@@ -86,13 +107,16 @@ class ZoneSettings {
 
 /// Η ζώνη που ισχύει και από πού βγήκε.
 class Zone {
-  const Zone({required this.lo, required this.hi, this.rest, required this.max, required this.maxMeasured, required this.manual});
+  const Zone({required this.lo, required this.hi, this.rest, required this.max, required this.maxMeasured, required this.manual, this.restMeasured = false});
   final int lo, hi;
 
   /// Παλμοί ηρεμίας που χρησιμοποιήθηκαν (null: δεν υπήρχαν αρκετές νύχτες, ζώνη από το % των μέγιστων).
   final int? rest;
   final int max;
   final bool maxMeasured;
+
+  /// Οι παλμοί ηρεμίας είναι η μέτρηση του χρήστη ξύπνιος (όχι οι παλμοί ύπνου).
+  final bool restMeasured;
 
   /// Τη ζώνη την έγραψε ο χρήστης.
   final bool manual;
@@ -101,8 +125,11 @@ class Zone {
 /// null αν δεν ξέρουμε την ηλικία (και δεν υπάρχουν μέγιστοι από τεστ) ούτε ζώνη του χρήστη.
 Zone? computeZone({int? age, double? restHr, required ZoneSettings s}) {
   final max = s.maxHr ?? (age == null ? null : tanakaMax(age));
+  // Η μέτρηση του χρήστη ξύπνιος, αν υπάρχει, αλλιώς οι παλμοί ύπνου ([restHr]).
+  final own = s.restHr;
+  restHr = own?.toDouble() ?? restHr;
   if (s.manual) {
-    return Zone(lo: s.lo!, hi: s.hi!, rest: restHr?.round(), max: max ?? 0, maxMeasured: s.maxHr != null, manual: true);
+    return Zone(lo: s.lo!, hi: s.hi!, rest: restHr?.round(), max: max ?? 0, maxMeasured: s.maxHr != null, manual: true, restMeasured: own != null);
   }
   if (max == null) return null;
   final rest = restHr == null || restHr < 30 || restHr >= max - 20 ? null : restHr.round();
@@ -116,6 +143,7 @@ Zone? computeZone({int? age, double? restHr, required ZoneSettings s}) {
     max: max,
     maxMeasured: s.maxHr != null,
     manual: false,
+    restMeasured: own != null,
   );
 }
 
