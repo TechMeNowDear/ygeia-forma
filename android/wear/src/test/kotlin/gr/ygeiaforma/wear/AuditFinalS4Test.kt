@@ -125,7 +125,7 @@ class AuditFinalS4Test {
     fun tickCarriesRepsOnlyWhenEditedOnTheWatch() {
         // χωρίς αλλαγή στο ρολόι: ακριβώς τα πεδία που έστελνε πριν (το παλιό κινητό δεν βλέπει καμία διαφορά)
         val plain = tickCmd(2, 1, 7_000, "bench", null)
-        assertEquals(setOf("op", "i", "s", "at"), plain.keySet())
+        assertEquals(setOf("op", "i", "s", "at"), plain.keys().asSequence().toSet())
         assertEquals("tick", plain.getString("op"))
         assertEquals(2, plain.getInt("i"))
         assertEquals(1, plain.getInt("s"))
@@ -141,7 +141,7 @@ class AuditFinalS4Test {
         assertFalse(late.has("at"))
         // η εντολή «reps» δεν άλλαξε μορφή (μεταφέρθηκε μόνο αρχείο)
         val reps = repsCmd(0, 1, "row", 9, 3_000)
-        assertEquals(setOf("op", "i", "s", "v", "ex", "at"), reps.keySet())
+        assertEquals(setOf("op", "i", "s", "v", "ex", "at"), reps.keys().asSequence().toSet())
     }
 
     @Test
@@ -262,7 +262,7 @@ class AuditFinalS4Test {
         assertEquals("[9,10]", log.getJSONObject(0).getJSONArray("rb").toString())
         // σετ χωρίς διόρθωση: ακριβώς όπως πριν (κανένα νέο πεδίο)
         assertFalse(log.getJSONObject(1).has("rb"))
-        assertEquals(setOf("r", "l", "d", "t"), log.getJSONObject(1).keySet())
+        assertEquals(setOf("r", "l", "d", "t"), log.getJSONObject(1).keys().asSequence().toSet())
     }
 
     // ------------------------------------------------------------------ W-1/W-2: «Τέλος»
