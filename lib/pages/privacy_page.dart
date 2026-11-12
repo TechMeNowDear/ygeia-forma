@@ -528,7 +528,7 @@ class _DeleteAllSheetState extends State<DeleteAllSheet> {
                   key: const ValueKey('wipe-confirm'),
                   style: FilledButton.styleFrom(
                     backgroundColor: c.bad,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Aigaio.inkOn(c.bad),
                     minimumSize: const Size.fromHeight(54),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
@@ -677,7 +677,7 @@ class _WipedPageState extends State<WipedPage> {
                     key: const ValueKey('wiped-retry'),
                     style: FilledButton.styleFrom(
                         backgroundColor: c.bad,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Aigaio.inkOn(c.bad),
                         minimumSize: const Size.fromHeight(54),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     onPressed: _retrying

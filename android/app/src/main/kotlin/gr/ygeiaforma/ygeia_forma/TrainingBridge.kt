@@ -2,15 +2,19 @@ package gr.ygeiaforma.ygeia_forma
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -31,7 +35,9 @@ import java.io.File
  * - Το training.json (προγράμματα, προπονήσεις): ατομική εγγραφή, μπαίνει στο κρυπτογραφημένο αντίγραφο.
  * - Οθόνη αναμμένη μόνο όσο είναι ανοιχτή η προπόνηση.
  * - Διάλειμμα: ειδοποίηση με αντίστροφη μέτρηση (φαίνεται και στο ρολόι) και δόνηση στο τέλος.
- *   Χωρίς υπηρεσία παρασκηνίου και χωρίς ξυπνητήρι ακριβείας: ένας χρονοδιακόπτης στη μνήμη, όσο ζει η εφαρμογή.
+ *   Χωρίς υπηρεσία παρασκηνίου και χωρίς καμία νέα άδεια. Το τέλος έρχεται με ξυπνητήρι που καλεί κατευθείαν εδώ
+ *   (OnAlarmListener): ξυπνά το κινητό στην ώρα του και με σβηστή οθόνη, όσο ζει η εφαρμογή (τελικός έλεγχος,
+ *   Συμβούλιο 5, U-2). Πριν ήταν ένας χρονοδιακόπτης στη μνήμη, που με κλειδωμένο κινητό αργούσε.
  */
 class TrainingBridge(
     private val activity: Activity,
@@ -133,6 +139,9 @@ class TrainingBridge(
         private val handler = Handler(Looper.getMainLooper())
         private var pending: Runnable? = null
 
+        /** Το ξυπνητήρι του διαλείμματος που εκκρεμεί, για να ακυρώνεται (Συμβούλιο 5, U-2). */
+        private var alarm: AlarmManager.OnAlarmListener? = null
+
         private fun channels(ctx: Context) {
             if (Build.VERSION.SDK_INT < 26) return
             val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
@@ -193,36 +202,76 @@ class TrainingBridge(
             } catch (e: Throwable) {
                 ErrorQueue.report(e, "training")
             }
-            val r = Runnable {
-                pending = null
-                try {
-                    val nm = ctx.getSystemService(NotificationManager::class.java)
-                    nm?.cancel(ID_COUNT)
-                    if (nm != null && canNotify(ctx)) {
-                        val n = NotificationCompat.Builder(ctx, CH_DONE)
-                            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                            .setContentTitle(doneTitle)
-                            .setContentText(doneText)
-                            .setPriority(NotificationCompat.PRIORITY_HIGH)
-                            .setCategory(NotificationCompat.CATEGORY_ALARM)
-                            .setAutoCancel(true)
-                            .setTimeoutAfter(60_000)
-                            .setContentIntent(openApp(ctx))
-                            .build()
-                        nm.notify(ID_DONE, n)
+            val r = object : Runnable {
+                override fun run() {
+                    // Ένα διάλειμμα που ακυρώθηκε ή αντικαταστάθηκε στο μεταξύ («Συνέχεια», «+30″») δεν χτυπά.
+                    if (pending !== this) return
+                    pending = null
+                    alarm = null
+                    try {
+                        val nm = ctx.getSystemService(NotificationManager::class.java)
+                        nm?.cancel(ID_COUNT)
+                        if (nm != null && canNotify(ctx)) {
+                            val n = NotificationCompat.Builder(ctx, CH_DONE)
+                                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                                .setContentTitle(doneTitle)
+                                .setContentText(doneText)
+                                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                                .setAutoCancel(true)
+                                .setTimeoutAfter(60_000)
+                                .setContentIntent(openApp(ctx))
+                                .build()
+                            nm.notify(ID_DONE, n)
+                        }
+                    } catch (e: Throwable) {
+                        ErrorQueue.report(e, "training")
                     }
-                } catch (e: Throwable) {
-                    ErrorQueue.report(e, "training")
+                    vibrate(ctx, longArrayOf(0, 400, 200, 400, 200, 600))
                 }
-                vibrate(ctx, longArrayOf(0, 400, 200, 400, 200, 600))
             }
             pending = r
+            arm(ctx, r, left)
+        }
+
+        /**
+         * Το «τέλος διαλείμματος» στην ώρα του και με σβηστή οθόνη (τελικός έλεγχος, Συμβούλιο 5, U-2).
+         * Πριν: μόνο Handler.postDelayed. Ο χρόνος του δεν μετρά όσο ο επεξεργαστής κοιμάται, άρα με κλειδωμένο κινητό η
+         * ειδοποίηση και η δόνηση έρχονταν όταν ξυπνούσε το κινητό (το ίδιο σφάλμα είχε βρεθεί στο ρολόι, W2-03).
+         * Τώρα: ξυπνητήρι ακριβείας που ξυπνά το κινητό και καλεί εδώ (OnAlarmListener), με τον χρόνο από την εκκίνηση
+         * του κινητού (δεν το πειράζει μια αλλαγή ώρας στη μέση). Αυτή η μορφή ΔΕΝ θέλει την άδεια «Ξυπνητήρια και
+         * υπενθυμίσεις» (τεκμηρίωση Android 14, «Schedule exact alarms are denied by default»): δουλεύει όσο ζει η
+         * διεργασία της εφαρμογής. Αν το σύστημα το αρνηθεί, μένει ο παλιός χρονοδιακόπτης.
+         */
+        private fun arm(ctx: Context, r: Runnable, left: Long) {
+            try {
+                val am = ctx.getSystemService(AlarmManager::class.java)
+                if (am != null) {
+                    val l = AlarmManager.OnAlarmListener { r.run() }
+                    am.setExact(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        TrainingRules.restTrigger(SystemClock.elapsedRealtime(), left),
+                        "ygeia:rest", l, handler,
+                    )
+                    alarm = l
+                    return
+                }
+            } catch (e: Throwable) {
+                ErrorQueue.report(e, "training")
+            }
             handler.postDelayed(r, left)
         }
 
         fun cancel(ctx: Context) {
             pending?.let { handler.removeCallbacks(it) }
             pending = null
+            alarm?.let { l ->
+                try {
+                    ctx.getSystemService(AlarmManager::class.java)?.cancel(l)
+                } catch (_: Throwable) {
+                }
+            }
+            alarm = null
             try {
                 val nm = ctx.getSystemService(NotificationManager::class.java)
                 nm?.cancel(ID_COUNT)
@@ -231,6 +280,11 @@ class TrainingBridge(
             }
         }
 
+        /**
+         * Δόνηση ως «ξυπνητήρι» (USAGE_ALARM), όπως στο ρολόι (W2-01). Χωρίς αυτό η δόνηση δεν έχει «είδος» και το Android
+         * την αγνοεί όταν η εφαρμογή δεν είναι μπροστά ή η οθόνη είναι σβηστή, και η Εξοικονόμηση μπαταρίας την κόβει:
+         * έμενε μόνο η δόνηση της ειδοποίησης (τελικός έλεγχος, Συμβούλιο 5, U-2).
+         */
         fun vibrate(ctx: Context, pattern: LongArray) {
             try {
                 val v: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
@@ -240,8 +294,13 @@ class TrainingBridge(
                     ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 }
                 if (v == null || !v.hasVibrator()) return
-                if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createWaveform(pattern, -1))
-                else @Suppress("DEPRECATION") v.vibrate(pattern, -1)
+                val effect = VibrationEffect.createWaveform(pattern, -1)
+                if (Build.VERSION.SDK_INT >= 33) {
+                    v.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM))
+                } else {
+                    @Suppress("DEPRECATION")
+                    v.vibrate(effect, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build())
+                }
             } catch (e: Throwable) {
                 ErrorQueue.report(e, "training")
             }

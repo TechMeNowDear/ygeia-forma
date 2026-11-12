@@ -445,6 +445,25 @@ class Aigaio extends ThemeExtension<Aigaio> {
   /// Απαλό φόντο για εικονίδια και «χάπια» (pills).
   Color tint(Color c) => c.withValues(alpha: dark ? 0.18 : 0.12);
 
+  /// Το σκούρο «μελάνι» για γράμματα πάνω σε ανοιχτό γεμάτο χρώμα (το ίδιο με τη λωρίδα του διαλείμματος).
+  static const ink = Color(0xFF0F172A);
+
+  /// Γράμματα και εικονίδια πάνω σε γεμάτο χρώμα [solid]: λευκό ή σκούρο, όποιο έχει μεγαλύτερη αντίθεση (τύπος WCAG).
+  /// Τελικός έλεγχος, Συμβούλιο 5 (U-3): στα σκούρα θέματα τα «good» και «bad» είναι ανοιχτά (φτιαγμένα για κείμενο πάνω
+  /// σε σκούρη κάρτα)· τα λευκά γράμματα πάνω τους («Έγινε», το ✓ του σετ, «Διαγραφή όλων») είχαν αντίθεση 1,3–2,8:1.
+  static Color inkOn(Color solid) {
+    final l = solid.computeLuminance();
+    final withWhite = 1.05 / (l + 0.05);
+    final withInk = (l + 0.05) / (ink.computeLuminance() + 0.05);
+    return withWhite >= withInk ? Colors.white : ink;
+  }
+
+  /// Η αντίθεση δύο χρωμάτων κατά WCAG (1 ως 21), για τους ελέγχους.
+  static double contrast(Color a, Color b) {
+    final la = a.computeLuminance(), lb = b.computeLuminance();
+    return ((la > lb ? la : lb) + 0.05) / ((la > lb ? lb : la) + 0.05);
+  }
+
   @override
   Aigaio copyWith() => this;
 

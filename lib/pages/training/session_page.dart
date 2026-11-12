@@ -467,15 +467,17 @@ class _SessionPageState extends State<SessionPage> {
             key: ValueKey('sess-tick-$i'),
             borderRadius: BorderRadius.circular(12),
             onTap: () => set.done ? t.untick(e, i) : _done(context, s, e, i),
+            // 48 dp (πριν 46): το ελάχιστο για δάχτυλο, όπως τα υπόλοιπα κουμπιά της προπόνησης. Το ✓ πάνω στο πράσινο
+            // με το χρώμα που διαβάζεται σε κάθε θέμα (τελικός έλεγχος, Συμβούλιο 5, U-1 και U-3).
             child: Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: set.done ? c.good : c.card,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: set.done ? c.good : c.hairline, width: set.done ? 2 : 1.5),
               ),
-              child: Icon(Icons.check_rounded, color: set.done ? Colors.white : c.textTertiary),
+              child: Icon(Icons.check_rounded, color: set.done ? Aigaio.inkOn(c.good) : c.textTertiary),
             ),
           ),
         );
@@ -531,7 +533,8 @@ class _SessionPageState extends State<SessionPage> {
                 excludeSemantics: true,
                 child: FilledButton.icon(
                   key: ValueKey('sess-tick-$i'),
-                  style: FilledButton.styleFrom(backgroundColor: c.good, foregroundColor: Colors.white, minimumSize: const Size(120, 48)),
+                  // Γράμματα που διαβάζονται σε κάθε θέμα: στα σκούρα το πράσινο είναι ανοιχτό και το λευκό χανόταν (U-3).
+                  style: FilledButton.styleFrom(backgroundColor: c.good, foregroundColor: Aigaio.inkOn(c.good), minimumSize: const Size(120, 48)),
                   onPressed: () => _done(context, s, e, i),
                   icon: const Icon(Icons.check_rounded),
                   label: const Text('Έγινε', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -993,7 +996,7 @@ class _SummaryPageState extends State<SummaryPage> {
             TextButton(key: const ValueKey('del-cancel'), onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
             FilledButton(
               key: const ValueKey('del-ok'),
-              style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: Colors.white),
+              style: FilledButton.styleFrom(backgroundColor: c.bad, foregroundColor: Aigaio.inkOn(c.bad)),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: const Text('Διαγραφή'),
             ),
