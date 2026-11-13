@@ -150,7 +150,7 @@ void main() {
       expect(counted.firstWhere((b) => b.time.day == 7).weight, 90.2);
       // Η «προηγούμενη» ζύγιση για το «−1,1 kg από …» δεν είναι ποτέ η ξένη.
       final last = body.last;
-      expect(previousCounted(body, last, foreign)!.time, DateTime(2026, 11, 9, 8));
+      expect(previousCounted(countedBody(body), last)!.time, DateTime(2026, 11, 9, 8));
     });
 
     test('Αναφορά: η ξένη ζύγιση δεν μπαίνει στον πίνακα και μετριέται', () {

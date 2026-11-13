@@ -292,7 +292,7 @@ void main() {
       final w = m['weight'] as Map;
       expect(w['v'], '45,0');
       expect(w['cap'], '${shortDayDate(DateTime(2026, 12, 5))} · $widgetPendingCap', reason: 'πριν: «… · −35,7 kg»');
-      expect(w['capShort'], widgetPendingCap);
+      expect(w['capShort'], 'δεν μετρά', reason: 'round 5 (n1 · R5-B-4): «δεν μετρά ακόμα» κοβόταν στη στήλη 1×3');
       expect(w.containsKey('d'), isFalse);
       expect(w.containsKey('r'), isFalse, reason: 'πριν: «κάτω από το εύρος»');
       expect(w['s'], [81.7, 81.5, 81.4, 81.2, 81.0, 80.9, 80.7]);
