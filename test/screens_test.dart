@@ -118,6 +118,8 @@ Future<void> _shot(
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
+  // Round 1 (S12-09 β): το Shell γράφει το FoodStore.shared· να μη μένει για το επόμενο στιγμιότυπο (π.χ. 61a).
+  addTearDown(() => FoodStore.shared = null);
 
   final when = at ?? now;
   final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(when));
@@ -208,6 +210,9 @@ Future<void> _page(
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
+  // Round 1 (S12-09 β): ό,τι FoodStore.shared έμεινε από άλλη δοκιμή δεν ζωγραφίζεται εδώ, και ό,τι έβαλε αυτή φεύγει.
+  FoodStore.shared = null;
+  addTearDown(() => FoodStore.shared = null);
   final store = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(ouraNow));
   store.history = sampleHistory(ouraNow, store.data!);
   if (oura) prepareOura(store);
@@ -681,7 +686,7 @@ void main() {
           size: size,
           brightness: dark ? Brightness.dark : Brightness.light,
           oura: false,
-          page: (s) => MePage(store: s, food: sampleFoodStore(now)));
+          page: (s) => MePage(store: s, food: sampleFoodStore(now), now: now));
     });
   }
   testWidgets('Σελίδα μέτρησης · βάρος · κινητό', (t) => _shot(
@@ -2023,7 +2028,7 @@ void main() {
       }));
   testWidgets('Τα στοιχεία μου · ζυγίσεις και μέση', (t) => _page(t,
       name: '66_me_weigh_days', size: phone, brightness: Brightness.light, oura: false,
-      prepare: withGoals, page: (s) => MePage(store: s, food: sampleFoodStore(now)),
+      prepare: withGoals, page: (s) => MePage(store: s, food: sampleFoodStore(now), now: now),
       act: (t) async => t.ensureVisible(find.byKey(const ValueKey('me-goals')))));
   // Αυτόματη διόρθωση θερμίδων (σχέδια A1–A4, 12/11). Στόχοι από Δευτέρα 16/11. Τελικός έλεγχος, Συμβούλιο 2 (Α2): την 21η
   // μέρα (Δευτέρα 7/12) η κάρτα λέει ότι μαζεύει δεδομένα· η πρώτη εκτίμηση βγαίνει την 28η (Δευτέρα 14/12).

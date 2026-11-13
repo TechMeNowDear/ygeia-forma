@@ -627,11 +627,24 @@ class _OuraRestCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 11),
             decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              // Ετικέτα και τιμή· αν δεν χωρούν, η τιμή πάει ολόκληρη στην επόμενη γραμμή (σχέδια 9/11, 9β).
-              Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, children: [
-                Text(label, style: TextStyle(fontSize: 15, color: c.text)),
-                Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
-              ]),
+              // Ετικέτα και τιμή (σχέδια 9/11, 9β). Round 1 (U1a-4 γ, αίτημα f4 → f5): η τιμή ΠΑΝΤΑ δεξιά. Η ετικέτα σπάει
+              // σε γραμμές αν χρειαστεί και η τιμή μένει στην ίδια γραμμή βάσης· με πολύ μεγάλα γράμματα η τιμή πάει στην
+              // επόμενη γραμμή, δεξιά (καμία λέξη δεν κόβεται). Πριν (Wrap) η τιμή που δεν χωρούσε έπεφτε ΑΡΙΣΤΕΡΑ, ενώ οι
+              // άλλες της ίδιας κάρτας έμεναν δεξιά.
+              if (veryLargeText(context))
+                Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text(label, style: TextStyle(fontSize: 15, color: c.text)),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
+                  ),
+                ])
+              else
+                Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                  Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c.text))),
+                  const SizedBox(width: 12),
+                  Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
+                ]),
               if (sub != null) ...[const SizedBox(height: 3), sub],
             ]),
           ),
@@ -653,7 +666,8 @@ class _OuraRestCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           row(K.hrv, 'HRV', hrv == null ? '—' : '${hrv.value.round()} ms', sub: hrvSub()),
-          row(K.sleepHr, 'Παλμοί ύπνου', hr == null ? '—' : '${hr.value.round()} bpm', sub: usual(hr)),
+          // Round 1 (U1a-7, αίτημα f4 → f5): ίδια λέξη με Καρδιά, Σήμερα, Τάσεις, ⓘ («Παλμοί στον ύπνο», όχι «Παλμοί ύπνου»).
+          row(K.sleepHr, 'Παλμοί στον ύπνο', hr == null ? '—' : '${hr.value.round()} bpm', sub: usual(hr)),
           row(K.skinTemp, 'Θερμοκρασία δέρματος', temp == null ? '—' : '${signedDec(temp)} °C',
               sub: Text(ouraTempDeviationLabel, style: TextStyle(fontSize: 13, color: c.textSecondary)), line: false),
         ],

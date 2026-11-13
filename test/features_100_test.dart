@@ -84,7 +84,9 @@ void main() {
       addTearDown(() => m.setMockMethodCallHandler(channel, null));
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const TiFtaneiScreen()));
       await t.pumpAndSettle();
-      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα 100%');
+      // Round 1 (f4 · U1b-07): στην οθόνη «γράμματα» και «100%» με αδιάσπαστο κενό (δεν χωρίζονται σε δύο γραμμές)·
+      // το screenSizeText (πάνω) μένει με απλό κενό.
+      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα\u00A0100%');
     });
   });
 

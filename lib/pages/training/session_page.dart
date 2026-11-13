@@ -128,8 +128,12 @@ class _SessionPageState extends State<SessionPage> {
     TrainingDevice.restCancel();
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     return ListenableBuilder(
       listenable: t,
       builder: (context, _) {
@@ -1188,8 +1192,12 @@ class _SummaryPageState extends State<SummaryPage> {
     ));
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final t = widget.training;
     final s = widget.session;
     final c = Aigaio.of(context);

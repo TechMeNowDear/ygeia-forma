@@ -983,7 +983,7 @@ class _PageTwo extends StatelessWidget {
     final d = data;
 
     Widget chart(String title, String key, Color color, String Function(double) fmt, double minRange,
-        {double? reference, String? note}) {
+        {double? reference, String? note, List<double>? tickSteps}) {
       final s = d.stat(key);
       final med = s.median;
       // Οξυγόνο με αλλαγή ορισμού της νύχτας: μία μεσαία τιμή για κάθε ορισμό (όχι μία πάνω από την αλλαγή).
@@ -1029,6 +1029,7 @@ class _PageTwo extends StatelessWidget {
               ],
               // Διάστικτη με ετικέτα, ώστε να ξεχωρίζει από τη διακεκομμένη μεσαία τιμή (δεύτερος κλινικός έλεγχος M5).
               reference: reference == null ? null : (reference, '${reference.round()}%', c.textTertiary),
+              tickSteps: tickSteps,
             ),
           if (note != null)
             Padding(
@@ -1063,10 +1064,11 @@ class _PageTwo extends StatelessWidget {
           note: 'Διάστικτη γραμμή: αναφορά 90% (όχι διαγνωστικό όριο). Διακεκομμένη: η μεσαία τιμή'
               '${d.stat(K.spo2Min).periods.length > 1 ? ' κάθε ορισμού της νύχτας (ίδιος αισθητήρας· ορισμοί: σελίδα 3)' : ''}.',
         ),
+        // Round 1 (U1b-09, αίτημα f9 → f4): άξονας σε τέταρτα/μισάωρα/ώρες, όχι 1/2/5 × 10ⁿ λεπτά.
         chart('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, c.sleep, (v) {
           final m = v.round();
           return '${m ~/ 60}:${two(m % 60)}';
-        }, 120),
+        }, 120, tickSteps: minuteTickSteps),
         chart('Βήματα ανά μέρα', K.steps, c.move, (v) => thousands(v), 4000),
         const Spacer(),
         _Footer(data: d, page: 2),

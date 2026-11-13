@@ -866,8 +866,12 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
     return v != null && v >= 80 && v <= 220 && (v >= 100 || _lowOk);
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final v = _value;
     final askLow = v != null && v >= 80 && v < 100;

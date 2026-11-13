@@ -274,8 +274,12 @@ class _ZoneSheetState extends State<ZoneSheet> {
     Navigator.of(context).pop();
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final z = _z0;
     final hint = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);

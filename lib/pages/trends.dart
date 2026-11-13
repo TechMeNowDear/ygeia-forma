@@ -454,6 +454,9 @@ class _MetricDetail extends StatelessWidget {
               format: relative ? (v) => signedDec(v, def.digits) : _axisFormat(def),
               minRange: _minRange(def),
               dateLabel: dayMonth,
+              // Round 1 (U1b-09, αίτημα f9 → f4): διάρκειες σε λεπτά με βήματα τέταρτα/μισάωρα/ώρες («6:00 · 7:00»), όχι
+              // 1/2/5 × 10ⁿ λεπτά («3:20 · 6:40»).
+              tickSteps: def.kind == ValueKind.duration ? minuteTickSteps : null,
               levels: [
                 if (r.previous != null) (r.previousFrom, r.previousEnd, rel(r.previous!), c.textSecondary),
                 if (r.current != null && r.status != TrendStatus.sourceChange) (r.currentFrom, r.end, rel(r.current!), c.text),

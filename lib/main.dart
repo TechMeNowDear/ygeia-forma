@@ -210,6 +210,9 @@ class _ShellState extends State<Shell> {
     final p = req.split(':');
     if (p.length < 3 || p[0] != 'w') return;
     final kind = p[1], tap = p[2], hero = p.length > 3 ? p[3] : '';
+    // Round 1 (integ1): το πάτημα φτάνει από την Kotlin χωρίς να αλλάξει τίποτα στην οθόνη, άρα κανένα καρέ δεν ζητιέται
+    // και η μετάβαση περίμενε το επόμενο τυχαίο καρέ (ένα άγγιγμα, μια ανανέωση). Ζητάμε ένα καρέ, για να γίνει αμέσως.
+    WidgetsBinding.instance.ensureVisualUpdate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -362,7 +365,7 @@ class _ShellState extends State<Shell> {
           ExerciseTheme(
               child: TrainingPage(
                   training: TrainingStore.main, health: store, onOpenTrends: () => _open(Cat.health, HealthTab.trends))),
-          ExerciseTheme(child: ExercisePage(store: store)),
+          ExerciseTheme(child: ExercisePage(store: store, now: widget.now)),
           const ExerciseTheme(child: ExerciseLibraryPage()),
         ],
       ),

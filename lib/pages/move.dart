@@ -12,8 +12,11 @@ import '../history.dart';
 /// Άσκηση › Κίνηση: βήματα, ενεργός χρόνος, θερμίδες, απόσταση, όροφοι.
 /// Οι προπονήσεις (Hevy) θα μπουν εδώ ως δεύτερη καρτέλα, όταν φτιαχτούν.
 class ExercisePage extends StatelessWidget {
-  const ExercisePage({super.key, required this.store});
+  const ExercisePage({super.key, required this.store, this.now});
   final HealthStore store;
+
+  /// Round 1 (S12-09 γ, αίτημα f8): το «τώρα» της σελίδας (στιγμιότυπα, δοκιμές)· χωρίς αυτό το ρολόι της συσκευής.
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +48,7 @@ class ExercisePage extends StatelessWidget {
         final activeCalories = (a['activeCalories'] as num?)?.toDouble();
         final floorsToday = d.valueFor(d.floors, d.readAt)?.value;
         // Οι τιμές της μέρας είναι της μέρας της ανάγνωσης: από αποθηκευμένη ανάγνωση άλλης μέρας, με ημερομηνία (A11).
-        final today = DateTime.now();
+        final today = now ?? DateTime.now();
         // UX U1/U8: η ημερομηνία σε δική της γραμμή («Σάβ 24/10»), ίδια μορφή παντού· ο τίτλος δεν κόβεται.
         String? dated(Object? value) => value == null || sameDay(d.readAt, today) ? null : shortDayDate(d.readAt);
 
@@ -66,7 +69,7 @@ class ExercisePage extends StatelessWidget {
               // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
               CardHeader(
                 icon: Icons.directions_walk_rounded,
-                title: sameDay(d.readAt, DateTime.now()) ? 'Βήματα σήμερα' : 'Βήματα · ${shortDayDate(d.readAt)}',
+                title: sameDay(d.readAt, today) ? 'Βήματα σήμερα' : 'Βήματα · ${shortDayDate(d.readAt)}',
                 color: c.exercise,
                 trailing: InfoButton(K.steps, range: stepsRef),
               ),

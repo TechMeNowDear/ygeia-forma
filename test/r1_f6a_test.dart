@@ -531,7 +531,10 @@ void main() {
     test('το feel της «Αποθήκευσης» γράφεται στην προπόνηση που έκλεισε το ρολόι· και αργότερα', () async {
       var at = now;
       final io = MemoryTrainingIO();
-      final t = TrainingStore(io: io, clock: () => at)..replaceAll(sampleTraining(now).toJson());
+      // `ready`: η αποθήκη όπως στην εφαρμογή, μετά την ανάγνωση του αρχείου (χωρίς αυτό το flush λέει πάντα «όχι»).
+      final t = TrainingStore(io: io, clock: () => at)
+        ..replaceAll(sampleTraining(now).toJson())
+        ..ready = true;
       final s = t.start(t.program!.workout('A')!);
       at = now.add(const Duration(minutes: 5));
       t.tick(s.items.first, 0);
@@ -666,7 +669,10 @@ void main() {
       final t0 = now;
       var at = t0;
       final io = MemoryTrainingIO();
-      final t = TrainingStore(io: io, clock: () => at)..replaceAll(sampleTraining(now).toJson());
+      // `ready`: η αποθήκη όπως στην εφαρμογή, μετά την ανάγνωση του αρχείου (χωρίς αυτό το flush λέει πάντα «όχι»).
+      final t = TrainingStore(io: io, clock: () => at)
+        ..replaceAll(sampleTraining(now).toJson())
+        ..ready = true;
       final s = t.start(t.program!.workout('A')!);
       final items = [for (final e in s.items) jsonDecode(jsonEncode(e.toJson())) as Map<String, dynamic>];
       at = t0.add(const Duration(hours: 4));

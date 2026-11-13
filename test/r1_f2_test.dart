@@ -27,6 +27,7 @@ import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/pages/my_foods.dart';
 import 'package:ygeia_forma/pages/nutrition.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/widgets.dart' show PageHeaderScope;
 
 import 'sample_data.dart';
 import 'sample_food.dart';
@@ -296,7 +297,14 @@ void main() {
 
     testWidgets('U3a-20 χωρίς το Shell: δύο εβδομάδες πίσω → ένα πάτημα → σήμερα', (t) async {
       final food = sampleFoodStore(_now);
-      await _pump(t, Scaffold(body: FoodTheme(child: NutritionPage(food: food, now: _now))));
+      // Όπως στην εφαρμογή: η Διατροφή φαίνεται πάντα μέσα σε κατηγορία (CategoryPage → PageHeaderScope), όπου η γραμμή
+      // «‹ μέρα ›» παίρνει όλο το πλάτος. Χωρίς αυτό η κεφαλίδα της σελίδας βάζει τη γραμμή δίπλα στον τίτλο χωρίς όριο
+      // πλάτους, κάτι που δεν συμβαίνει ποτέ στην εφαρμογή.
+      await _pump(
+          t,
+          Scaffold(
+              body: PageHeaderScope(
+                  header: const SizedBox.shrink(), child: FoodTheme(child: NutritionPage(food: food, now: _now)))));
       food.setDay(DateTime(2026, 10, 30));
       await t.pumpAndSettle();
       expect(t.widget<Text>(find.byKey(const ValueKey('diary-day'))).data, 'Παρ 30/10');
@@ -854,11 +862,14 @@ void main() {
         expect(find.text(v), findsOneWidget, reason: v);
       }
       expect(find.text('330 ml'), findsNothing);
+      // Κάθε φύλλο με δικό του κλειδί: στην ίδια θέση του δέντρου, χωρίς κλειδί, το Flutter κρατά την ΚΑΤΑΣΤΑΣΗ του
+      // προηγούμενου φύλλου (το τρόφιμο διαβάζεται μία φορά, όπως σε κάθε φύλλο που ανοίγει) και θα έδειχνε πάλι το λάδι.
       final milk = _f('L', {Nk.kcal: 46, Nk.fat: 1.5}, name: 'Γάλα (μάρκα)', perMl: true);
-      await _pump(t, Scaffold(body: QuantitySheet(food: store, item: milk, initialGrams: 250, meal: Meal.lunch)));
+      await _pump(t, Scaffold(body: QuantitySheet(key: const ValueKey('milk'), food: store, item: milk, initialGrams: 250, meal: Meal.lunch)));
       expect(find.text('330 ml'), findsOneWidget);
+      expect(find.text('5 ml'), findsNothing);
       final butter = _f('V', {Nk.kcal: 717, Nk.fat: 81}, name: 'Βούτυρο (μάρκα)');
-      await _pump(t, Scaffold(body: QuantitySheet(food: store, item: butter, initialGrams: 10, meal: Meal.lunch)));
+      await _pump(t, Scaffold(body: QuantitySheet(key: const ValueKey('butter'), food: store, item: butter, initialGrams: 10, meal: Meal.lunch)));
       expect(find.text('5 g'), findsOneWidget);
       expect(find.text('200 g'), findsNothing);
     });

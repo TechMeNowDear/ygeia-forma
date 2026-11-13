@@ -1201,12 +1201,27 @@ void main() {
       expect(decodePlanFile(a.planFile.content), backupPlan);
       expect(lastLoggedPlan(a.planFile.log)!.plan, backupPlan);
       expect(a.android.days[dateKey(add(today, -40))], {K.steps: 4000, K.sleepMin: 400}, reason: 'τίποτα δεν σβήνεται από την επαναφορά');
-      // Κινητό με νεότερο σχέδιο (ορίστηκε μετά το αντίγραφο): δεν αλλάζει.
+      // Κινητό με νεότερο σχέδιο (ορίστηκε μετά το αντίγραφο) που ΑΛΛΑΖΕΙ κάτι μέσα στο διάστημα του αντιγράφου (εδώ:
+      // αποσύνδεση του Oura στις −5): δεν αλλάζει, ούτε το αρχείο του.
+      final off = backupPlan.withEra(Source.none, add(today, -5));
+      final c = app(plan: null, planFile: MemoryPlanFile(encodePlanFile(off, today, at: 5000)));
+      await boot(c.store);
+      expect(await c.store.restoreSources((plan: file, log: null)), isFalse);
+      expect(c.store.plan, off);
+      expect(decodePlanFile(c.planFile.content), off);
+      // Round 1 (f3 · S9-7): νεότερο σχέδιο που ΑΡΧΙΖΕΙ μετά από όλες τις εποχές του αντιγράφου (νέο κινητό: «Σύνδεση με
+      // Oura» στις −5, μετά επαναφορά): για το παρελθόν δεν λέει τίποτα, άρα έρχεται από το αντίγραφο (Oura από −20)·
+      // το παρόν του κινητού μένει (Oura από −5, χωρίς νέα «αλλαγή πηγής» αφού είναι το ίδιο δαχτυλίδι) και η ώρα του
+      // σχεδίου μένει του κινητού (5000). Πριν το S9-7 οι νύχτες −20…−6 του Oura γίνονταν νύχτες ρολογιού.
       final newer = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -5));
       final b = app(plan: null, planFile: MemoryPlanFile(encodePlanFile(newer, today, at: 5000)));
       await boot(b.store);
-      expect(await b.store.restoreSources((plan: file, log: null)), isFalse);
-      expect(b.store.plan, newer);
+      expect(await b.store.restoreSources((plan: file, log: null)), isTrue);
+      expect(b.store.plan, backupPlan);
+      expect(b.store.plan.nightSource(add(today, -10)), Source.oura);
+      expect(b.store.plan.nightSource(add(today, -5)), Source.oura);
+      expect(b.store.plan.nightSource(add(today, -21)), Source.watch);
+      expect((jsonDecode(b.planFile.content!) as Map)['at'], 5000);
     });
 });
 

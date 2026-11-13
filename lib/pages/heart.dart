@@ -241,7 +241,8 @@ class HeartPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   if (latest != null)
                     InfoRow(
-                      'Τελευταία μέτρηση, ${sameDay(latest.start, DateTime.now()) ? '' : '${relativeDay(latest.start, DateTime.now()).replaceFirst('Χθες', 'χθες')} '}${hm(latest.start)}',
+                      // Round 1 (S12-09 γ): το «τώρα» της σελίδας, όχι το ρολόι της συσκευής (στιγμιότυπα).
+                      'Τελευταία μέτρηση, ${sameDay(latest.start, now ?? DateTime.now()) ? '' : '${relativeDay(latest.start, now ?? DateTime.now()).replaceFirst('Χθες', 'χθες')} '}${hm(latest.start)}',
                       '${latest.avg.round()} bpm',
                     ),
                   if (today != null && !dayOnly) ...[

@@ -40,8 +40,12 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
     super.dispose();
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final ex = widget.ex;
     final c = Aigaio.of(context);
     final colors = exColorsOf(context);

@@ -19,8 +19,11 @@ import 'my_foods.dart';
 /// οι στόχοι διατροφής (12/11).
 /// Σχέδια 9/11 (10β): εδώ ζουν και «Τα προϊόντα μου» (όλη η λίστα) και «Η κουζίνα μου».
 class MePage extends StatefulWidget {
-  const MePage({super.key, required this.store, this.food});
+  const MePage({super.key, required this.store, this.food, this.now});
   final HealthStore store;
+
+  /// Round 1 (S12-09 γ, αίτημα f8): το «τώρα» της σελίδας (ηλικία, έτη γέννησης· για στιγμιότυπα). Χωρίς αυτό: το ρολόι.
+  final DateTime? now;
 
   /// Χωρίς αυτό: η αποθήκη φαγητού της εφαρμογής ([FoodStore.shared]).
   final FoodStore? food;
@@ -77,7 +80,7 @@ class _MePageState extends State<MePage> {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final now = DateTime.now();
+    final now = widget.now ?? DateTime.now();
     final food = widget.food ?? FoodStore.shared;
     return ListenableBuilder(
       listenable: Listenable.merge([widget.store, if (food != null) food]),

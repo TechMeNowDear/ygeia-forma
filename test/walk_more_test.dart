@@ -139,7 +139,10 @@ void main() {
       expect(find.text('10:00'), findsOneWidget);
       expect(find.byKey(const ValueKey('hrr-drop')), findsOneWidget);
       expect(find.text('−18'), findsOneWidget);
-      expect(find.text('11:45 /km'), findsOneWidget);
+      // Round 1 (f6b · U5-15 / U6-10): η μονάδα πήγε στην ετικέτα («11:45» με «ρυθμός ανά km»· πριν «11:45 /km» / «ρυθμός»).
+      final extra = find.byKey(const ValueKey('walk-extra'));
+      expect(find.descendant(of: extra, matching: find.text('11:45')), findsOneWidget);
+      expect(find.descendant(of: extra, matching: find.text('ρυθμός ανά km')), findsOneWidget);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('hrr-info')), 200, scrollable: find.byType(Scrollable).last);
       await tester.tap(find.byKey(const ValueKey('hrr-info')));
       await tester.pumpAndSettle();

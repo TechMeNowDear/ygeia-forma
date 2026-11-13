@@ -25,8 +25,19 @@ class FoodChannel {
   /// Οι εγγραφές στη βάση μία-μία, με τη σειρά που ζητήθηκαν (έλεγχος 4/11, A8): π.χ. «διαγραφή» και αμέσως
   /// «Αναίρεση» δεν φτάνουν ποτέ ανάποδα (μετά η καταχώριση θα έμενε σβησμένη).
   static Future<Map<String, dynamic>> _writes = Future.value(const {});
+
+  /// Round 1 (integ1): πόσες εγγραφές δεν έχουν τελειώσει ακόμα. Χωρίς καμία σε εξέλιξη, η νέα ξεκινά αμέσως (η σειρά
+  /// μένει ίδια: δεν υπάρχει τίποτα να περιμένει), αντί να «κρεμαστεί» από μια αλυσίδα που έχει ήδη τελειώσει: μια τέτοια
+  /// αλυσίδα από άλλη ζώνη (π.χ. μια προηγούμενη δοκιμή οθόνης) δεν συνεχίζει ποτέ, και η εγγραφή δεν θα γινόταν ποτέ.
+  static var _pendingWrites = 0;
   static Future<Map<String, dynamic>> _write(String method, Map<String, dynamic> args) {
-    final run = _writes.catchError((_) => const <String, dynamic>{}).then((_) => _call(method, args));
+    final run = (_pendingWrites == 0
+            ? _call(method, args)
+            : _writes.catchError((_) => const <String, dynamic>{}).then((_) => _call(method, args)))
+        .whenComplete(() {
+      _pendingWrites--;
+    });
+    _pendingWrites++;
     _writes = run.catchError((_) => const <String, dynamic>{});
     return run;
   }
