@@ -245,8 +245,11 @@ class _LatestCard extends StatelessWidget {
     // ΜΟΝΟ όταν ξεπερνά τη διακύμανση της ζυγαριάς [floor] (round 1, S4-3: πριν γραφόταν κάθε διαφορά, π.χ. «(+0,2)» μύες).
     String trendDiff(double? value, double? Function(BodyMeasurement) f, String unit, double floor) {
       if (value == null) return '—';
-      final t = bodyTrend(body, f);
       final base = withUnit(value, unit);
+      // Round 6 (R6-1): ούτε τάση δίπλα σε ζύγιση που δεν μετρά· η τάση (3 τελευταίες που μετρούν) δεν την περιέχει και θα
+      // διαβαζόταν σαν αλλαγή της τιμής που φαίνεται (π.χ. «Λίπος 25,0%  (+2,0)» μετά από αρρώστια).
+      if (foreign || pending) return base;
+      final t = bodyTrend(body, f);
       if (t == null) return base;
       final diff = shownDiff(t.now, t.before, 1);
       return bodyDiffShown(diff, floor) ? '$base  (${signedDec(diff)})' : base;
