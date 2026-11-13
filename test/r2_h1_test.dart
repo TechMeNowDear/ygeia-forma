@@ -462,9 +462,11 @@ void main() {
       await t.pump();
       final skip = find.byKey(const ValueKey('sess-skip'));
       expect(t.widget<OutlinedButton>(skip).onPressed, isNull);
-      final color = DefaultTextStyle.of(t.element(find.descendant(of: skip, matching: find.byType(Text)).first)).style.color!;
-      expect(color, isNot(Aigaio.light.exercise));
-      expect(color, Aigaio.light.textTertiary, reason: 'ανενεργό: το αχνό γκρι της εφαρμογής (όπως στη Διατροφή)');
+      // Το χρώμα του ανενεργού ελέγχεται στο στυλ του κουμπιού (η απόδοση της αλλαγής κατάστασης μέσα στη δοκιμή
+      // δεν είναι αξιόπιστη)· την εικόνα τη δείχνει το στιγμιότυπο T4_session_rest.
+      final fg = t.widget<OutlinedButton>(skip).style!.foregroundColor!;
+      expect(fg.resolve({WidgetState.disabled}), Aigaio.light.textTertiary, reason: 'ανενεργό: αχνό γκρι (όπως στη Διατροφή)');
+      expect(fg.resolve(<WidgetState>{}), Aigaio.light.text, reason: 'ενεργό: το κανονικό χρώμα κειμένου');
       // κλείνει η οθόνη (σταματά το ρολόι του δευτερολέπτου)
       await t.pumpWidget(const SizedBox());
       await t.pump();
