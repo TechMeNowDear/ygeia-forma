@@ -769,6 +769,12 @@ void main() {
         ..setGoals(checkinGoals());
       final food = FoodStore.preloaded(foods: basicFoods(), now: _check);
       expect(CheckInSlot.pendingFor(s, food, _check)!.kind, CheckKind.unread);
+      // Χωρίς ζυγίσεις στην ανάγνωση και χωρίς σφάλμα (δεν δόθηκε άδεια): καμία κάρτα, ο έλεγχος μένει ανοιχτός.
+      final none = HealthStore()
+        ..data = Dashboard.fromJson({...sampleDashboardJson(_check)}..remove('body'))
+        ..setGoals(checkinGoals());
+      expect(CheckInSlot.pendingFor(none, food, _check), isNull);
+      expect(none.goals!.checkIn, isNull);
     });
 
     testWidgets('S11-8: η κάρτα «δεν διαβάστηκαν» δεν έχει κουμπί', (t) async {

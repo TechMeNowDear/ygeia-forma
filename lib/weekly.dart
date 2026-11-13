@@ -106,7 +106,8 @@ WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime su
       activeDays++;
     }
     final w = p.value(history, K.weight, d);
-    if (w != null) {
+    // Round 1 (S11-2): ζύγιση που μοιάζει ξένη δεν μπαίνει στο «Βάρος μέσα στην εβδομάδα».
+    if (w != null && !foreignWeighIn(history, p, d)) {
       wFirst ??= (d, w);
       wLast = (d, w);
     }

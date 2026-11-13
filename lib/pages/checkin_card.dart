@@ -43,13 +43,17 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
     // Round 1 (f1 · S11-2): ζύγιση που δεν μπορεί να είναι δική σου δεν μπαίνει στον έλεγχο· η κάρτα τη γράφει.
     // Round 1 (f1 · S11-8): αν οι ζυγίσεις δεν διαβάστηκαν τώρα, η κάρτα δεν γράφει «έγιναν 0 ζυγίσεις» και το
     // «Εντάξει» δεν ξοδεύει τον έλεγχο της εβδομάδας: τη μέρα ελέγχου λέει ότι δεν διαβάστηκαν, χωρίς κουμπί.
+    // Χωρίς ζυγίσεις στην ανάγνωση και χωρίς σφάλμα (δεν δόθηκε άδεια): καμία κάρτα· ο έλεγχος μένει ανοιχτός ως να
+    // διαβαστούν (πριν: «έγιναν 0 ζυγίσεις» και το «Εντάξει» ξόδευε τον έλεγχο).
+    final bodyFailed = d.failed.contains('body');
+    if (!d.bodyOk && !bodyFailed) return null;
     final w = guardedWeights(d.body);
     return pendingCheckIn(
       goals: g,
       today: now,
       weights: w.used,
       foreign: w.foreign,
-      weightsRead: d.bodyOk && !d.failed.contains('body'),
+      weightsRead: d.bodyOk && !bodyFailed,
       intake: (from, to) => dailyIntake(food, from, to),
     );
   }

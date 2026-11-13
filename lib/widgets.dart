@@ -32,7 +32,9 @@ class _LazyIndexedStackState extends State<LazyIndexedStack> {
       index: widget.index,
       children: [
         for (var i = 0; i < widget.children.length; i++)
-          _built.contains(i) ? widget.children[i] : const SizedBox.shrink(),
+          // Round 1 (S10-10, αίτημα του f4): η κρυμμένη σελίδα δεν βγάζει καρέ (κύκλος/γραμμή αναμονής, κινήσεις)·
+          // κρατά όμως την κατάστασή της, όπως πριν.
+          _built.contains(i) ? TickerMode(enabled: i == widget.index, child: widget.children[i]) : const SizedBox.shrink(),
       ],
     );
   }

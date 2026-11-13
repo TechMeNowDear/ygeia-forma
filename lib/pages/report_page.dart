@@ -856,9 +856,9 @@ String reportWeighTitle(ReportData d) {
 }
 
 /// Round 1 (U1b-01): το σώμα της σελίδας 1 στο ύψος που μένει, χωρίς να κοπεί τίποτα και χωρίς να γίνει στενή στήλη.
-/// Δοκιμάζει κλίμακες από 1 ως 0,7: σε καθεμία στήνει το περιεχόμενο σε πλάτος «πλάτος ÷ κλίμακα» (άρα λιγότερες
-/// αλλαγές γραμμής) και κρατά την πρώτη που χωρά· το ζωγραφίζει μικρότερο κατά την κλίμακα, ώστε να πιάνει ακριβώς το
-/// πλάτος της σελίδας. Αν ούτε στο 0,7 χωρά, μικραίνει όσο χρειάζεται (όπως το FittedBox πριν).
+/// Αν δεν χωρά όπως είναι, βρίσκει τη μεγαλύτερη κλίμακα που χωρά όταν το περιεχόμενο στήνεται σε πλάτος «πλάτος ÷
+/// κλίμακα» (άρα με λιγότερες αλλαγές γραμμής) και το ζωγραφίζει μικρότερο κατά την κλίμακα, ώστε να πιάνει ακριβώς το
+/// πλάτος της σελίδας. Η κλίμακα δεν είναι ποτέ μικρότερη από του απλού «χωρά» (FittedBox) που υπήρχε πριν.
 class ReportFit extends SingleChildRenderObjectWidget {
   const ReportFit({super.key, super.child});
 
@@ -867,9 +867,6 @@ class ReportFit extends SingleChildRenderObjectWidget {
 }
 
 class RenderReportFit extends RenderProxyBox {
-  /// Οι κλίμακες που δοκιμάζονται, από τη μεγαλύτερη.
-  static const steps = <double>[1, 0.97, 0.94, 0.91, 0.88, 0.85, 0.82, 0.79, 0.76, 0.73, 0.7];
-
   double _scale = 1;
 
   /// Η κλίμακα του τελευταίου στησίματος (1 = όπως είναι).
@@ -882,22 +879,41 @@ class RenderReportFit extends RenderProxyBox {
     final c = child;
     final w = constraints.maxWidth;
     final h = constraints.maxHeight;
-    if (c == null || !w.isFinite) {
+    if (c == null || !w.isFinite || !h.isFinite) {
       _scale = 1;
       if (c != null) c.layout(constraints, parentUsesSize: true);
       size = c == null ? constraints.smallest : constraints.constrain(c.size);
       return;
     }
-    var fits = false;
-    for (final s in steps) {
+    bool fitsAt(double s) {
       c.layout(BoxConstraints.tightFor(width: w / s), parentUsesSize: true);
-      _scale = s;
-      if (!h.isFinite || c.size.height * s <= h + 0.5) {
-        fits = true;
-        break;
+      return c.size.height * s <= h + 0.01;
+    }
+
+    if (fitsAt(1) || c.size.height <= 0) {
+      _scale = 1;
+    } else {
+      // Η κλίμακα του FittedBox στο πλάτος της σελίδας χωρά σίγουρα και σε φαρδύτερο στήσιμο (όχι περισσότερες γραμμές)·
+      // από εκεί ως το 1, η μεγαλύτερη που χωρά (δυαδική αναζήτηση, ακρίβεια ~0,0003).
+      // (κάτω όριο 0,001: με ύψος 0 δεν στήνεται ποτέ σε άπειρο πλάτος).
+      var lo = h / c.size.height, hi = 1.0;
+      if (lo < 0.001) lo = 0.001;
+      for (var i = 0; i < 12; i++) {
+        final mid = (lo + hi) / 2;
+        if (fitsAt(mid)) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      if (fitsAt(lo)) {
+        _scale = lo;
+      } else {
+        // Δεν πρέπει να γίνει ποτέ· για σιγουριά, όπως το FittedBox (στο πλάτος της σελίδας, μικρότερο όσο χρειάζεται).
+        c.layout(BoxConstraints.tightFor(width: w), parentUsesSize: true);
+        _scale = h / c.size.height;
       }
     }
-    if (!fits && c.size.height > 0) _scale = h / c.size.height;
     size = constraints.constrain(Size(w, c.size.height * _scale));
   }
 

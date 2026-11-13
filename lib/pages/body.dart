@@ -354,7 +354,7 @@ const foreignLatestText = 'Αυτή η ζύγιση διαφέρει πολύ α
 /// Ζυγίσεις ως πίνακας (σχέδια 9/11, 9β): οι μονάδες μία φορά επάνω, η χρονιά ως διαχωριστικό («2025»), αριθμοί
 /// με σταθερό πλάτος που μικραίνουν αντί να σπάνε.
 class _WeighTable extends StatelessWidget {
-  const _WeighTable({required this.body, required this.now, this.foreign = const {}});
+  const _WeighTable({required this.body, required this.now, this.foreign = const <BodyMeasurement>{}});
   final List<BodyMeasurement> body;
   final DateTime now;
 

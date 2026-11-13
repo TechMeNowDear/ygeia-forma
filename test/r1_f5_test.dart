@@ -220,10 +220,17 @@ Future<void> _until(bool Function() done, {int tries = 300}) async {
   }
 }
 
-/// Περιμένει να τελειώσουν ανανέωση και ανάγνωση που ξεκίνησαν (π.χ. από την επιστροφή στην εφαρμογή).
+/// Περιμένει να τελειώσουν ανανέωση, ανάγνωση και συμπλήρωση που ξεκίνησαν (π.χ. από την επιστροφή στην εφαρμογή).
 Future<void> _quiet(HealthStore s) async {
   await Future<void>.delayed(const Duration(milliseconds: 30));
-  await _until(() => !s.loading && !s.ouraSyncing);
+  await _until(() => !s.loading && !s.ouraSyncing && !s.backfilling);
+}
+
+/// Τέλος δοκιμής: τίποτα δεν τρέχει πια, και το store φεύγει από τους παρατηρητές της εφαρμογής (οι δοκιμές οθονών
+/// που ακολουθούν στο ίδιο αρχείο δεν πρέπει να το ξυπνήσουν).
+Future<void> _done(HealthStore s) async {
+  await _quiet(s);
+  s.dispose();
 }
 
 void main() {
@@ -483,6 +490,7 @@ void main() {
       expect(a.oura.gets, greaterThan(before));
       expect(a.phone.days[dateKey(today)]?[ouraKeys[K.sleepMin]!], isNotNull);
       expect(a.store.ouraStatus, OuraStatus.ok);
+      await _done(a.store);
     });
 
     test('S5-10: τράβηγμα προς τα κάτω (refresh) = ρητή ενέργεια: διαβάζει το Oura αμέσως', () async {
@@ -495,6 +503,7 @@ void main() {
       await a.store.refresh();
       await _quiet(a.store);
       expect(a.phone.days[dateKey(today)]?[ouraKeys[K.sleepMin]!], isNotNull);
+      await _done(a.store);
     });
 
     test('S5-10: με τη νύχτα παρούσα η επιστροφή κρατά το όριο των 30 λεπτών· η ρητή ενέργεια όχι', () async {
@@ -510,6 +519,7 @@ void main() {
       await a.store.refresh();
       await _quiet(a.store);
       expect(a.oura.gets, greaterThan(g));
+      await _done(a.store);
     });
 
     test('S5-10: φρένο 10″ για διπλό πάτημα· η αναμονή που ζήτησε η Oura (429) ισχύει και στη ρητή ενέργεια', () async {
@@ -537,6 +547,7 @@ void main() {
       await _quiet(a.store);
       expect(a.oura.gets, greaterThan(g2));
       expect(a.store.ouraError, isNull);
+      await _done(a.store);
     });
 
     test('S5-3: «Σύνδεση ξανά» μέσα σε εποχή Oura που τρέχει: οι νύχτες διαβάζονται αμέσως, το σχέδιο δεν αλλάζει', () async {
@@ -556,6 +567,7 @@ void main() {
       expect(a.oura.gets, greaterThanOrEqualTo(4), reason: 'έλεγχος πρόσβασης + sleep, daily_sleep, daily_readiness');
       expect(a.store.plan, plan);
       expect(a.store.ouraStatus, OuraStatus.ok);
+      await _done(a.store);
     });
 
     test('S5-8: αποσύνδεση χωρίς απάντηση της Oura στην ανάκληση → false (τα tokens σβήνονται)· με 200 → true', () async {
@@ -566,9 +578,11 @@ void main() {
       expect(await a.store.disconnectOura(), isFalse);
       expect(a.vault.data.containsKey(vaultTokens), isFalse);
       expect(a.store.ouraHasTokens, isFalse);
+      await _done(a.store);
       final b = _app(at: clock, clock: () => clock);
       await _boot(b.store);
       expect(await b.store.disconnectOura(), isTrue);
+      await _done(b.store);
     });
   });
 
