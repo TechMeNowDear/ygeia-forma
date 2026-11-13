@@ -103,7 +103,8 @@ class ReportData {
   /// διαστήματος (περισσότερες από 6 μέσα σε αυτό)· false = οι τελευταίες (έως 6).
   final bool weighInsSpread;
 
-  /// Round 1 (S11-2): ζυγίσεις του ιστορικού που μοιάζουν ξένες και δεν μπήκαν στον πίνακα.
+  /// Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες και δεν μπήκαν στον πίνακα· round 4 (m1 · R4-A-5): μόνο του
+  /// διαστήματος της αναφοράς ([from]–[to]).
   final int foreignWeighIns;
 
   /// Έλεγχος 3, E2: οι ζυγίσεις του [weighIns] που ΔΕΝ είναι της InBody (παλιές εκδόσεις, πριν από την πρώτη ζύγιση
@@ -246,7 +247,9 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
     plan: p,
     weighInsInPeriod: inPeriod.length,
     weighInsSpread: spread,
-    foreignWeighIns: foreignKeys.length,
+    // Round 4 (m1 · R4-A-5): μόνο όσες είναι μέσα στο διάστημα της αναφοράς (η σημείωση είναι κάτω από τον πίνακά του·
+    // πριν: όλου του ιστορικού, π.χ. «24 ζυγίσεις» αντί για 6 με ένα παιδί στη ζυγαριά δύο φορές τον μήνα).
+    foreignWeighIns: foreignKeys.where((k) => !parseDateKey(k).isBefore(from) && !parseDateKey(k).isAfter(to)).length,
     // Round 3 (k1 · R3-A-3): ζυγίσεις του πίνακα «σε αναμονή»: φαίνονται, με σημάδι και σημείωση.
     pendingWeighIns: {
       for (final w in weighIns)

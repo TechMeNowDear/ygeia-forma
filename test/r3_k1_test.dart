@@ -333,7 +333,8 @@ void main() {
       final card = _weightCard(t);
       expect(card.value, '73,4');
       expect(card.note, pendingWeightNote);
-      expect((card.trend! as TrendPill).text, '−5,6 kg από 4/12');
+      // Round 4 (m1 · R4-A-4): καμία διαφορά από ζύγιση «σε αναμονή» (πριν: «−5,6 kg από 4/12»).
+      expect(card.trend, isNull);
       expect(_widgetWeight(s, now)['v'], '73,4');
     });
 

@@ -47,6 +47,11 @@ abstract final class K {
   /// έκδοση, ίσως από άλλη εφαρμογή (χειροκίνητο βάρος, BIA του ρολογιού): ΠΟΤΕ δεν σβήνεται· από την πρώτη ζύγιση
   /// InBody και μετά απλώς δεν φαίνεται ([SourcePlan.scaleFrom]).
   static const inbody = 'inbody';
+
+  /// Round 4 (m1 · R4-A-2): σημάδι (1) ότι τη μέρα υπάρχουν ζυγίσεις με πολύ διαφορετικό βάρος (δύο άνθρωποι) και καμία
+  /// άλλη ζύγιση ως 6 εβδομάδες γύρω της: δεν ξέρουμε ποια είναι δική σου, η μέρα «σε αναμονή» (weight_guard.dart
+  /// `guardDays`, `unsure`). Δεν είναι μέτρηση και δεν φαίνεται· φεύγει μόνο του με την επόμενη ζύγιση ([bodyRows]).
+  static const weighUnsure = 'weighUnsure';
   static const floors = 'floors';
   /// Υπνάκοι: του ρολογιού ως «napMin» (C1: βραδινό λαγοκοίμισμα, πρωινός και απογευματινός υπνάκος), του Oura ως
   /// «o.napMin». Δεν μετρούν ποτέ στη διάρκεια της νύχτας.
@@ -371,8 +376,9 @@ int sleepDaysIn(Map<String, Map<String, double>> history, DateTime from, DateTim
 /// Τιμές που έρχονται από τις ζυγίσεις.
 const bodyKeys = {K.weight, K.fatPct, K.smm};
 
-/// Όλα τα κλειδιά μιας ζύγισης στο ιστορικό: οι τιμές και το σημάδι της InBody.
-const bodyRowKeys = {K.weight, K.fatPct, K.smm, K.inbody};
+/// Όλα τα κλειδιά μιας ζύγισης στο ιστορικό: οι τιμές, το σημάδι της InBody και (round 4, m1 · R4-A-2) το σημάδι
+/// [K.weighUnsure]: γράφονται και σβήνονται όλα μαζί ([mergeBody], [removeMissingBody]).
+const bodyRowKeys = {K.weight, K.fatPct, K.smm, K.inbody, K.weighUnsure};
 
 /// Έλεγχος 3, E2: η πρώτη μέρα με ζύγιση InBody ([K.inbody]), ΑΝ υπάρχουν και ζυγίσεις χωρίς σημάδι (παλιές εκδόσεις,
 /// ίσως άλλη εφαρμογή). Από εκείνη τη μέρα και μετά φαίνονται μόνο οι ζυγίσεις της InBody, και είναι αλλαγή πηγής για
@@ -409,8 +415,10 @@ Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
         // E2: μόνο ζυγίσεις της InBody φτάνουν εδώ ([Dashboard.body]).
         K.inbody: 1,
       };
+  // Round 4 (m1 · R4-A-2): και το σημάδι [K.weighUnsure] της μέρας (μόνο όταν ισχύει), για να βγάζουν οι Τάσεις, η
+  // «Η εβδομάδα σου» και η αναφορά την ίδια κατάσταση με το Σώμα και τη Σήμερα (trends.dart `weighInStatus`).
   return {
-    for (final g in weighInDays(body)) dateKey(g.day): row(g.pick),
+    for (final g in weighInDays(body)) dateKey(g.day): {...row(g.pick), if (g.unsure) K.weighUnsure: 1},
   };
 }
 
