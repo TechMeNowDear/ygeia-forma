@@ -1,4 +1,4 @@
-import '../body_trend.dart' show shownBody;
+import '../body_trend.dart' show guardBody;
 import '../data.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
@@ -16,7 +16,8 @@ import 'widget_style.dart';
 //
 // Μορφή: {v, at, kinds: {sleep: {src, srcShort?, m: {κλειδί: {l, v, u, cap?, d?, us?, r?, s?}}}}}
 //   srcShort: σύντομη πηγή όταν η κανονική δεν χωρά (round 2, R2-U3-04).
-//   l: όνομα στο κουτάκι, v: τιμή, u: μονάδα, cap: δεύτερη γραμμή όταν είναι η κεντρική τιμή,
+//   l: όνομα στο κουτάκι, v: τιμή, u: μονάδα, cap: δεύτερη γραμμή όταν είναι η κεντρική τιμή (capShort: σύντομη
+//   μορφή της, όταν η κανονική δεν χωρά, π.χ. στη στήλη 1×3),
 //   d: −1/0/1 σε σχέση με τα συνηθισμένα, us: «συνήθως …», r: θέση στο εύρος, s: 7 τιμές για το γράφημα (null = κενό).
 
 const widgetSnapshotVersion = 1;
@@ -65,12 +66,13 @@ Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
 }
 
 Map<String, dynamic> _entry(String label, String value, String unit,
-        {String? cap, int? d, String? usual, String? range, List<double?>? spark}) =>
+        {String? cap, String? capShort, int? d, String? usual, String? range, List<double?>? spark}) =>
     {
       'l': label,
       'v': value,
       'u': unit,
       if (cap != null) 'cap': cap,
+      if (capShort != null) 'capShort': capShort,
       if (d != null) 'd': d,
       if (usual != null) 'us': usual,
       if (range != null) 'r': range,
@@ -210,6 +212,9 @@ double? _kcalOf(FoodStore food, DateTime day) {
   return e.isEmpty ? null : Totals(e).kcal;
 }
 
+/// Round 4 (m1 · R4-A-4): λεζάντα του βάρους στο widget όταν η τελευταία ζύγιση δεν μετρά ακόμα («σε αναμονή»).
+const widgetPendingCap = 'δεν μετρά ακόμα';
+
 /// Σώμα: η τελευταία ζύγιση της InBody που μετρά· το γράφημα = οι 7 τελευταίες μέρες ζύγισης (μία ζύγιση τη μέρα).
 Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final body = store.data?.body ?? const <BodyMeasurement>[];
@@ -222,24 +227,38 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   // «−47,0 kg» για το παιδί στη ζυγαριά, και ζυγίσεις της ίδιας μέρας στο γράφημα. Ζύγιση «σε αναμονή» φαίνεται κανονικά.
   // Round 3 (k1 · R3-A-1): [shownBody] = όπως πριν (οι «σε αναμονή» φαίνονται ως η τελευταία ζύγιση, όπως στη Σήμερα)·
   // το [countedBody] δεν τις έχει πια.
-  final counted = shownBody(body);
-  final days = counted.isEmpty ? body : counted;
+  // Round 4 (m1 · R4-A-4): η τελευταία ζύγιση «σε αναμονή» (π.χ. το παιδί το Σάββατο, ως την επόμενη δική σου ζύγιση)
+  // φαίνεται με «δεν μετρά ακόμα», όπως η Σήμερα, και ΧΩΡΙΣ καμία κρίση ή σύγκριση από αυτήν: ούτε διαφορά, ούτε βέλος,
+  // ούτε θέση στο εύρος βάρους/λίπους, ούτε δείκτης μάζας σώματος (πριν: «−42,6 kg», «κάτω από το εύρος»). Διαφορά και
+  // γράφημα μόνο από ζυγίσεις που μετρούν ([guardBody] `counted`).
+  final guard = guardBody(body);
+  final shown = guard.shown;
+  final days = shown.isEmpty ? body : shown;
   final last = days.last;
-  final prev = days.length >= 2 ? days[days.length - 2] : null;
-  final recent = days.length > 7 ? days.sublist(days.length - 7) : days;
+  final waiting = shown.isEmpty || guard.pending.contains(last);
+  final counted = guard.counted;
+  final at = counted.indexWhere((b) => identical(b, last));
+  final prev = waiting || at < 1 ? null : counted[at - 1];
+  final recent = counted.length > 7 ? counted.sublist(counted.length - 7) : counted;
   List<double?> series(double? Function(BodyMeasurement b) f) =>
       [for (var i = 0; i < 7 - recent.length; i++) null, for (final b in recent) f(b)];
   final p = store.profile;
-  final bmi = bmiOf(last.weight, p.heightCm) ?? last.bmi;
-  final fat = fatRange(p, today);
-  final hw = healthyWeight(p.heightCm);
+  final bmi = waiting ? null : bmiOf(last.weight, p.heightCm) ?? last.bmi;
+  final fat = waiting ? null : fatRange(p, today);
+  final hw = waiting ? null : healthyWeight(p.heightCm);
 
   if (last.weight case final w?) {
     // Round 2 (g4 · R2-D-6): η διαφορά των νούμερων όπως φαίνονται, όπως η Σήμερα (τρίτος έλεγχος F3): 82,24 και 83,36 →
     // «−1,2», όχι «−1,1».
     final dw = prev?.weight == null ? null : shownDiff(w, prev!.weight!, 1);
+    // Round 4 (m1 · R4-A-4): σύντομη λεζάντα για τη στήλη 1×3 (76 dp), όπου η κανονική κοβόταν («Σάβ 2/1 · −0…»): η μέρα
+    // είναι ήδη στην πηγή από πάνω («InBody · Σάβ 2/1»). Πλάτη με την Inter Medium 10,5 sp: «δεν μετρά ακόμα» 87,1 dp
+    // × 0,85 = 74,0 ≤ 76· «−42,6 kg» 45 dp.
     out['weight'] = _entry('Βάρος', dec(w), ' kg',
-        cap: '${shortDayDate(last.time)}${dw == null ? '' : ' · ${signedDec(dw)} kg'}',
+        cap: waiting
+            ? '${shortDayDate(last.time)} · $widgetPendingCap'
+            : '${shortDayDate(last.time)}${dw == null ? '' : ' · ${signedDec(dw)} kg'}',
+        capShort: waiting ? widgetPendingCap : (dw == null ? null : '${signedDec(dw)} kg'),
         d: dw == null ? null : (dw == 0 ? 0 : (dw > 0 ? 1 : -1)),
         range: hw == null ? null : RefRange(low: hw.$1, high: hw.$2, text: '', cite: '').placeText(w),
         spark: series((b) => b.weight));

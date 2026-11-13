@@ -55,7 +55,9 @@ bool _weighed(BodyMeasurement b) => b.weight != null && b.weight!.isFinite;
 /// «81,2 → 38,0 kg». Και το Σώμα (πρώτη μη ξένη) μπορούσε να διαλέξει άλλη ζύγιση από τη διόρθωση θερμίδων όταν δύο
 /// ζυγίσεις της ίδιας μέρας συμφωνούν μεταξύ τους αλλά μόνο η δεύτερη μετρά (86 και 90 kg με τις γύρω στα 91).
 /// [body]: με οποιαδήποτε σειρά (μέσα σε κάθε μέρα ταξινομείται με την ώρα).
-List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatus status})> weighInDays(
+/// Round 4 (m1 · R4-A-2): [unsure] = δύο ζυγίσεις της μέρας με πολύ διαφορετικό βάρος και καμία άλλη ζύγιση ως
+/// [weightGuardHorizon] μέρες: δεν ξέρουμε ποια είναι δική σου, η μέρα «σε αναμονή» ([guardDays]).
+List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatus status, bool unsure})> weighInDays(
     List<BodyMeasurement> body) {
   final byDay = <DateTime, List<BodyMeasurement>>{};
   for (final b in body) {
@@ -73,10 +75,10 @@ List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatu
   final r = guardDays([
     for (final d in judged) (d, [for (final b in byDay[d]!) if (_weighed(b)) b.weight!]),
   ]);
-  final picked = <DateTime, ({BodyMeasurement pick, WeighStatus status})>{};
+  final picked = <DateTime, ({BodyMeasurement pick, WeighStatus status, bool unsure})>{};
   for (var i = 0; i < judged.length; i++) {
     final weighed = [for (final b in byDay[judged[i]]!) if (_weighed(b)) b];
-    picked[judged[i]] = (pick: weighed[r[i].pick], status: r[i].status);
+    picked[judged[i]] = (pick: weighed[r[i].pick], status: r[i].status, unsure: r[i].unsure);
   }
   return [
     for (final d in days)
@@ -85,6 +87,7 @@ List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatu
         all: byDay[d]!,
         pick: picked[d]?.pick ?? byDay[d]!.first,
         status: picked[d]?.status ?? WeighStatus.counted,
+        unsure: picked[d]?.unsure ?? false,
       ),
   ];
 }
@@ -128,7 +131,9 @@ BodyMeasurement? dayWeighIn(List<BodyMeasurement> body, DateTime day) {
     if (g.status != WeighStatus.foreign) shown.add(g.pick);
     for (final b in g.all) {
       if (!_weighed(b)) continue;
-      if (g.status == WeighStatus.foreign || (!identical(b, g.pick) && !weightsAgree(b.weight!, g.pick.weight!))) {
+      // Round 4 (m1 · R4-A-2): μέρα [unsure] (δύο πολύ διαφορετικά βάρη, καμία άλλη ζύγιση κοντά): όλες «σε αναμονή».
+      if (!g.unsure &&
+          (g.status == WeighStatus.foreign || (!identical(b, g.pick) && !weightsAgree(b.weight!, g.pick.weight!)))) {
         foreign.add(b);
       } else if (g.status == WeighStatus.pending) {
         pending.add(b);
@@ -137,6 +142,14 @@ BodyMeasurement? dayWeighIn(List<BodyMeasurement> body, DateTime day) {
   }
   return (foreign: foreign, pending: pending, counted: counted, shown: shown);
 }
+
+/// Round 4 (m1 · R4-A-2): η [b] είναι «σε αναμονή» επειδή την ίδια μέρα υπάρχει κι άλλη ζύγιση με πολύ διαφορετικό
+/// βάρος και καμία άλλη ζύγιση κοντά ([weighInDays] `unsure`): δεν ξέρουμε ποια είναι δική σου. ([pending]: το
+/// [guardBody] `pending`· μόνο σε τέτοια μέρα υπάρχουν δύο ζυγίσεις της ίδιας μέρας «σε αναμονή» που δεν συμφωνούν.)
+bool mixedDayPending(Set<BodyMeasurement> pending, BodyMeasurement b) =>
+    pending.contains(b) &&
+    b.weight != null &&
+    pending.any((o) => !identical(o, b) && o.weight != null && dayOf(o.time) == dayOf(b.time) && !weightsAgree(o.weight!, b.weight!));
 
 /// Οι ζυγίσεις που μοιάζουν ξένες ([guardBody]).
 Set<BodyMeasurement> foreignBody(List<BodyMeasurement> body) => guardBody(body).foreign;

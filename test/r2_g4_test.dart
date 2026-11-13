@@ -300,13 +300,14 @@ void main() {
       expect(pendingLatestText, isNot(contains('οι επόμενες ζυγίσεις')));
     });
 
-    testWidgets('Σώμα: η 14/12 μετά την αρρώστια φαίνεται κανονικά, με τη διαφορά και τη σημείωση «σε αναμονή»', (t) async {
+    testWidgets('Σώμα: η 14/12 μετά την αρρώστια φαίνεται κανονικά, με τη σημείωση «σε αναμονή» (round 4: χωρίς διαφορά)', (t) async {
       final s = HealthStore()..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 12, 14, 9), _body([..._pre, _ill[0]])));
       await _pump(t, BodyPage(store: s, now: DateTime(2026, 12, 14, 9)));
       expect(find.byKey(const ValueKey('body-pending-latest')), findsOneWidget);
       expect(find.byKey(const ValueKey('body-foreign-latest')), findsNothing);
       expect(find.byKey(const ValueKey('body-weighings-foreign')), findsNothing);
-      expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text == '−5,5 kg από 4/12'), hasLength(1));
+      // Round 4 (m1 · R4-A-4): καμία διαφορά από ζύγιση «σε αναμονή» (πριν: «−5,5 kg από 4/12»).
+      expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text == '−5,5 kg από 4/12'), isEmpty);
     });
 
     testWidgets('κάρτα ελέγχου θερμίδων: «ξένη» = πριν και μετά συμφωνούν μεταξύ τους· χωρίς «θα μετρήσει μόλις…»', (t) async {

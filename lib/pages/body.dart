@@ -67,6 +67,7 @@ class BodyPage extends StatelessWidget {
               previous: previousCounted(body, last, foreign),
               foreign: foreign.contains(last),
               pending: guard.pending.contains(last),
+              mixed: mixedDayPending(guard.pending, last),
               body: body,
               now: clock,
               profile: store.profile,
@@ -192,6 +193,7 @@ class _LatestCard extends StatelessWidget {
     required this.onProfile,
     this.foreign = false,
     this.pending = false,
+    this.mixed = false,
   });
   final BodyMeasurement last;
 
@@ -201,6 +203,10 @@ class _LatestCard extends StatelessWidget {
   /// Round 2 (R2-E-2): η τελευταία ζύγιση διαφέρει πολύ από τις προηγούμενες και δεν έχει ακόμα επόμενη ([guardBody]):
   /// φαίνεται κανονικά, με μια γραμμή που λέει πότε θα μετρήσει και στη διόρθωση θερμίδων.
   final bool pending;
+
+  /// Round 4 (m1 · R4-A-2): «σε αναμονή» επειδή την ίδια μέρα υπάρχει κι άλλη πολύ διαφορετική ζύγιση και καμία άλλη
+  /// κοντά ([mixedDayPending]): άλλη εξήγηση ([mixedLatestText]).
+  final bool mixed;
 
   /// Όλες οι ζυγίσεις (παλιότερη πρώτη), για την τάση σε λίπος και μύες (body_trend.dart).
   final List<BodyMeasurement> body;
@@ -220,7 +226,8 @@ class _LatestCard extends StatelessWidget {
     String withDiff(double? value, double? before, String unit, {int digits = 1, bool lowerIsBetter = true}) {
       if (value == null) return '—';
       final base = withUnit(value, unit, digits);
-      if (before == null || foreign) return base;
+      // Round 4 (m1 · R4-A-4): ούτε από ζύγιση «σε αναμονή» (πριν: «(−42,6)» για το παιδί του Σαββάτου).
+      if (before == null || foreign || pending) return base;
       // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2».
       final diff = shownDiff(value, before, digits);
       if (diff == 0) return base;
@@ -262,12 +269,12 @@ class _LatestCard extends StatelessWidget {
           if (pending && !foreign) ...[
             const SizedBox(height: 6),
             Text(
-              pendingLatestText,
+              mixed ? mixedLatestText : pendingLatestText,
               key: const ValueKey('body-pending-latest'),
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
-          if (!foreign && p != null && last.weight != null && p.weight != null && shownDiff(last.weight!, p.weight!, 1) != 0) ...[
+          if (!foreign && !pending && p != null && last.weight != null && p.weight != null && shownDiff(last.weight!, p.weight!, 1) != 0) ...[
             const SizedBox(height: 6),
             // Σχέδια 9/11 (Spec): αλλαγή χωρίς κρίση, σε γκρι.
             Align(
@@ -312,8 +319,9 @@ class _LatestCard extends StatelessWidget {
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
           // 7/11: εύρη αναφοράς με πηγή (λίπος ανά ηλικία και φύλο, υγιές βάρος για το ύψος). Η εξήγηση στο «i».
           const Hairline(vertical: 12),
-          // Round 1 (S11-2): καμία θέση «μέσα/πάνω από το εύρος» για ζύγιση που μοιάζει ξένη.
-          if (!foreign) ..._ranges(context),
+          // Round 1 (S11-2): καμία θέση «μέσα/πάνω από το εύρος» για ζύγιση που μοιάζει ξένη· round 4 (m1 · R4-A-4): ούτε
+          // για ζύγιση «σε αναμονή» (μπορεί να είναι του παιδιού: «κάτω από το εύρος»).
+          if (!foreign && !pending) ..._ranges(context),
           const SizedBox(height: 8),
           Text(
             'Λίπος και μύες είναι εκτιμήσεις της ζυγαριάς· σύγκρινε ζυγίσεις με τις ίδιες συνθήκες.',
@@ -380,6 +388,11 @@ const pendingLatestText = 'Διαφέρει πολύ από τις προηγο�
     '(θερμίδες, Τάσεις, γραφήματα). Αν είναι δική σου, θα μετρήσει μόλις το νέο βάρος φανεί σε 3 μέρες ζύγισης, με '
     'τουλάχιστον 4 μέρες από την πρώτη ως την τελευταία (π.χ. Δευτέρα, Τετάρτη, Παρασκευή). Αν δεν είναι, δεν '
     'χρειάζεται να κάνεις τίποτα: με την επόμενη ζύγισή σου θα σημειωθεί και δεν θα μετρά.';
+
+/// Round 4 (m1 · R4-A-2): κάτω από μια τελευταία ζύγιση «σε αναμονή» επειδή την ίδια μέρα υπάρχει κι άλλη πολύ
+/// διαφορετική ζύγιση και καμία άλλη ζύγιση ως 6 εβδομάδες κοντά (weight_guard.dart `guardDays`).
+const mixedLatestText = 'Την ίδια μέρα υπάρχουν δύο ζυγίσεις με πολύ διαφορετικό βάρος και καμία άλλη για σύγκριση, γι\' '
+    'αυτό δεν μετρά καμία ακόμα. Με την επόμενη ζύγισή σου θα μετρήσει αυτή που ταιριάζει μαζί της.';
 
 /// Ζυγίσεις ως πίνακας (σχέδια 9/11, 9β): οι μονάδες μία φορά επάνω, η χρονιά ως διαχωριστικό («2025»), αριθμοί
 /// με σταθερό πλάτος που μικραίνουν αντί να σπάνε.

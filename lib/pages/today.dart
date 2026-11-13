@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../body_trend.dart' show guardBody, shownBody;
+import '../body_trend.dart' show guardBody, mixedDayPending, shownBody;
 import '../data.dart';
 import '../food/food_store.dart';
 import '../format.dart';
@@ -32,6 +32,10 @@ import 'oxygen_widgets.dart';
 /// Round 3 (k1 · R3-A-1): κάτω από το «Βάρος» όταν η τελευταία ζύγιση είναι «σε αναμονή» (διαφέρει πολύ από τις
 /// προηγούμενες και δεν τη βεβαίωσαν ακόμα επόμενες: weight_guard.dart). Φαίνεται, αλλά δεν μπαίνει σε υπολογισμούς.
 const pendingWeightNote = 'Διαφέρει πολύ από τις προηγούμενες ζυγίσεις· δεν μετρά ακόμα στους υπολογισμούς.';
+
+/// Round 4 (m1 · R4-A-2): δύο πολύ διαφορετικές ζυγίσεις την ίδια μέρα και καμία άλλη ζύγιση κοντά (π.χ. η πρώτη μέρα,
+/// το παιδί πριν από σένα): δεν ξέρουμε ποια είναι δική σου, ως την επόμενη ζύγιση (weight_guard.dart `guardDays`).
+const mixedWeightNote = 'Δύο πολύ διαφορετικές ζυγίσεις την ίδια μέρα· καμία δεν μετρά ακόμα, ως την επόμενη ζύγισή σου.';
 
 /// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
 /// Πώς κοιμήθηκα; Τι έφαγα; Κουνήθηκα; Πού πάει το βάρος μου; Οι ειδοποιήσεις μόνο όταν υπάρχουν.
@@ -275,7 +279,11 @@ class TodayPage extends StatelessWidget {
     final daily = [for (final b in guard.shown) if (b.weight != null) b];
     final last = daily.isEmpty ? null : daily.last;
     final waiting = last != null && guard.pending.contains(last);
-    final prev = daily.length < 2 ? null : daily[daily.length - 2];
+    // Round 4 (m1 · R4-A-4): διαφορά και γράφημα μόνο από ζυγίσεις που μετρούν. Ζύγιση «σε αναμονή» φαίνεται με τη
+    // σημείωση, χωρίς «−42,6 kg από 4/12» (πριν: η διαφορά της ζύγισης του παιδιού από τη δική σου).
+    final counted = [for (final b in guard.counted) if (b.weight != null) b];
+    final at = last == null ? -1 : counted.indexWhere((b) => identical(b, last));
+    final prev = waiting || at < 1 ? null : counted[at - 1];
     Widget? trend;
     if (last?.weight != null && prev?.weight != null) {
       // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2», όχι «−1,1».
@@ -289,7 +297,7 @@ class TodayPage extends StatelessWidget {
         keepLastWords: true,
       );
     }
-    final weights = [for (final b in daily) b.weight!];
+    final weights = [for (final b in counted) b.weight!];
     final recent = weights.length <= 10 ? weights : weights.sublist(weights.length - 10);
     return StatCard(
       icon: Icons.monitor_weight_rounded,
@@ -299,7 +307,7 @@ class TodayPage extends StatelessWidget {
       value: last?.weight == null ? null : dec(last!.weight!),
       unit: 'kg',
       trend: trend,
-      note: waiting ? pendingWeightNote : null,
+      note: waiting ? (mixedDayPending(guard.pending, last!) ? mixedWeightNote : pendingWeightNote) : null,
       // Round 1 (U1a-20): ελάχιστο εύρος 3 kg, όπως στο Σώμα· η αλλαγή 0,5–1 kg από μέρα σε μέρα είναι νερό, όχι τάση.
       chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body, minRange: 3) : null,
       // Round 1 (S11-8, σημείωση του f1): όταν η Samsung δεν έδωσε τις ζυγίσεις αυτή τη φορά, το λέει (όπως το Σώμα)·

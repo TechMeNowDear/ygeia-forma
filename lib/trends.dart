@@ -517,12 +517,17 @@ bool pendingWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, D
     weighInStatus(history, plan, day) == WeighStatus.pending;
 
 /// Round 3 (k1): η κατάσταση ([WeighStatus]) της ζύγισης της μέρας [day] στο ιστορικό· null χωρίς βάρος.
+/// Round 4 (m1 · R4-A-1): ο κανόνας κοιτά ζυγίσεις ως [weightGuardHorizon] μέρες γύρω από τη μέρα (πριν 2 × 14): το
+/// κομμάτι ±[weightGuardHorizon] ημερών δίνει την ίδια κατάσταση με όλο το ιστορικό και με το Σώμα / τη διόρθωση
+/// θερμίδων ([guardDays] στις ζυγίσεις της μέρας, [bodyRows]). Round 4 (R4-A-2): μέρα με το σημάδι [K.weighUnsure] (δύο
+/// πολύ διαφορετικά βάρη, καμία άλλη ζύγιση κοντά): «σε αναμονή», όπως στο Σώμα.
 WeighStatus? weighInStatus(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
   final w = plan.value(history, K.weight, day);
   if (w == null || !w.isFinite) return null;
+  if ((history[dateKey(day)]?[K.weighUnsure] ?? 0) > 0) return WeighStatus.pending;
   final series = <(DateTime, double)>[];
   var at = 0;
-  for (var i = -2 * weightGuardDays; i <= 2 * weightGuardDays; i++) {
+  for (var i = -weightGuardHorizon; i <= weightGuardHorizon; i++) {
     final d = _add(day, i);
     if (i == 0) {
       at = series.length;
