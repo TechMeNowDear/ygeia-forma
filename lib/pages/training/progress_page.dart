@@ -331,14 +331,16 @@ class _WalkCard extends StatelessWidget {
           pill: w.pace.changed
               ? TrendPill(
                   // round1, U6-03: «13:09 → 12:43» = 26 δευτερόλεπτα (η διαφορά των στρογγυλεμένων, όχι 27).
-                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${paceDiffText((w.pace.current!.round() - w.pace.previous!.round()).abs())}',
+                  // Round 3 (k1 · R3-B-1): ο αριθμός μένει με τη μονάδα του ([unitsGlued]): «πιο γρήγορα | 26 δευτερόλεπτα».
+                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${unitsGlued(paceDiffText((w.pace.current!.round() - w.pace.previous!.round()).abs()))}',
                   kind: w.pace.status == TrendStatus.down ? TrendKind.good : TrendKind.neutral)
               : TrendStatusPill(r: w.pace),
         ),
         // Ουδέτερη (έλεγχος 9/11, V-B-08): χωρίς χρώμα και βέλος, με τους παλμούς στο τέλος από κάτω.
         _Row(
           key: const ValueKey('prog-walk-hrr'),
-          label: 'Πτώση παλμών στο 1ο λεπτό',
+          // Round 3 (k1 · R3-B-2): «1ο λεπτό» αδιάσπαστο («Πτώση παλμών στο | 1ο λεπτό», ποτέ «… 1ο | λεπτό»).
+          label: 'Πτώση παλμών στο 1ο\u00A0λεπτό',
           detail: vals(w.hrr, _hrDrop) + (w.hrr.current == null ? '' : ' παλμοί'),
           extra: w.hrr.current == null ? null : hrrEndText(w.hrrEnd),
           pill: w.hrr.changed ? TrendPill(hrrChangeText(w.hrr)) : TrendStatusPill(r: w.hrr),

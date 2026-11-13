@@ -308,7 +308,8 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('prog-walk-hr')), findsOneWidget);
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
-      expect(find.text('Πτώση παλμών στο 1ο λεπτό'), findsOneWidget);
+      // Round 3 (k1 · R3-B-2): «1ο λεπτό» με αδιάσπαστο κενό στη γραμμή της Προόδου.
+      expect(find.text('Πτώση παλμών στο 1ο\u00A0λεπτό'), findsOneWidget);
       expect(find.textContaining('πάνω από 15 λεπτά και με GPS'), findsOneWidget);
       // 6 περπατήματα × 30 λεπτά = 3 ώρες (πριν «3,0 ώρες»).
       expect(find.text('6 → 6 · 3 ώρες'), findsOneWidget);

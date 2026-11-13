@@ -4,6 +4,7 @@
 library;
 
 import 'adaptive.dart';
+import 'body_trend.dart' show weighInDays;
 import 'data.dart' show BodyMeasurement;
 import 'food/food_model.dart' show Totals;
 import 'food/food_store.dart';
@@ -19,29 +20,25 @@ DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 /// - Μετρά η πρώτη ζύγιση της μέρας (η πρωινή, όπως λέει η κάρτα «Σήμερα ζύγιση»).
 /// - Κάθε μέρα κρίνεται με τις πρώτες ζυγίσεις των άλλων ημερών ως [weightGuardDays] μέρες πριν ή μετά. Αν η πρώτη της
 ///   μοιάζει ξένη (π.χ. ζυγίστηκε πρώτα το παιδί) και υπάρχει επόμενη της ίδιας μέρας που μετρά, μετρά εκείνη.
-///   Αν δεν μετρά καμία, η μέρα πάει στο [foreign] με την πρώτη της ζύγιση. Τίποτα δεν σβήνεται: απλώς δεν μετρά.
+///   Αν δεν μετρά καμία, η μέρα πάει στο [foreign] με τη ζύγιση της μέρας ([weighInDays]). Τίποτα δεν σβήνεται: απλώς δεν μετρά.
 /// - Round 2 (g4 · R2-E-2, κανόνας [guardDays]): «ξένη» μόνο όταν οι ζυγίσεις πριν ΚΑΙ μετά συμφωνούν μεταξύ τους και όχι
 ///   μαζί της. Μια ζύγιση που διαφέρει πολύ αλλά δεν έχει ακόμα επόμενη (π.χ. η πρώτη μετά από αρρώστια με −5 kg) είναι «σε
 ///   αναμονή»: δεν μπαίνει ΟΥΤΕ στο [used] (ο έλεγχος θερμίδων την περιμένει) ΟΥΤΕ στο [foreign] (η κάρτα δεν τη λέει
 ///   ξένη)· μετρά μόλις συμφωνήσει μαζί της η επόμενη ζύγιση.
+/// - Round 3 (k1 · R3-C-1): η ζύγιση κάθε μέρας από τον ΙΔΙΟ υπολογισμό με το ιστορικό, το Σώμα, τη Σήμερα και το widget
+///   ([weighInDays], body_trend.dart). Round 3 (k1 · R3-A-1): «μετρά» θέλει πια ζυγίσεις 3 ημερών σε ≥ 4 μέρες όταν το βάρος
+///   άλλαξε απότομα (επισκέπτης Σάββατο και Κυριακή: «σε αναμονή», όχι στο [used]).
 ({List<(DateTime, double)> used, List<(DateTime, double)> foreign}) guardedWeights(Iterable<BodyMeasurement> body) {
-  final byDay = <DateTime, List<double>>{};
-  for (final b in body) {
-    final w = b.weight;
-    if (w == null || !w.isFinite) continue;
-    byDay.putIfAbsent(_day(b.time), () => <double>[]).add(w);
-  }
-  final days = byDay.keys.toList()..sort();
   final used = <(DateTime, double)>[];
   final foreign = <(DateTime, double)>[];
-  final r = guardDays([for (final d in days) (d, byDay[d]!)]);
-  for (var i = 0; i < days.length; i++) {
-    final d = days[i];
-    final status = r[i].status;
-    if (status == WeighStatus.counted) {
-      used.add((d, byDay[d]![r[i].pick]));
-    } else if (status == WeighStatus.foreign) {
-      foreign.add((d, byDay[d]!.first));
+  for (final g in weighInDays(body.toList())) {
+    final w = g.pick.weight;
+    // Μέρα μόνο με ζυγίσεις χωρίς βάρος: δεν κρίνεται, δεν μπαίνει.
+    if (w == null || !w.isFinite) continue;
+    if (g.status == WeighStatus.counted) {
+      used.add((g.day, w));
+    } else if (g.status == WeighStatus.foreign) {
+      foreign.add((g.day, w));
     }
   }
   return (used: used, foreign: foreign);

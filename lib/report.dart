@@ -89,7 +89,12 @@ class ReportData {
     this.weighInsInPeriod = 0,
     this.weighInsSpread = false,
     this.foreignWeighIns = 0,
+    this.pendingWeighIns = const {},
   });
+
+  /// Round 3 (k1 · R3-A-3): οι ζυγίσεις του [weighIns] «σε αναμονή» (διαφέρουν πολύ από τις προηγούμενες και δεν τις
+  /// βεβαίωσαν ακόμα επόμενες: weight_guard.dart). Φαίνονται στον πίνακα με σημάδι· δεν μπαίνουν σε υπολογισμούς.
+  final Set<DateTime> pendingWeighIns;
 
   /// Round 1 (U1b-13): πόσες ζυγίσεις (που μετρούν) έγιναν μέσα στο διάστημα της αναφοράς.
   final int weighInsInPeriod;
@@ -188,7 +193,15 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
     }
     // Μόνο μία πηγή ανά δείκτη: αν άλλαξε μέσα στους 3 μήνες, μετρούν μόνο οι μέρες της νέας.
     final series = planSeries(history, p, key, start, last);
-    stats[key] = ReportStat(values: series.points, trend: trend, source: series.source, since: series.cut);
+    // Round 3 (k1 · R3-C-1/2, R3-A-1): βάρος, λίπος, μύες μόνο από ζυγίσεις που μετρούν ([uncountedWeighIn]), όπως οι
+    // Τάσεις (και η «Διαφορά» της ίδιας γραμμής).
+    final values = def != null && def.sparse
+        ? [
+            for (final v in series.points)
+              if (!uncountedWeighIn(history, p, v.$1)) v,
+          ]
+        : series.points;
+    stats[key] = ReportStat(values: values, trend: trend, source: series.source, since: series.cut);
   }
 
   // Χρονολογική σειρά (M4): ο γιατρός διαβάζει το μοτίβο και τη σχέση με φάρμακα και συμπτώματα.
@@ -234,6 +247,11 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
     weighInsInPeriod: inPeriod.length,
     weighInsSpread: spread,
     foreignWeighIns: foreignKeys.length,
+    // Round 3 (k1 · R3-A-3): ζυγίσεις του πίνακα «σε αναμονή»: φαίνονται, με σημάδι και σημείωση.
+    pendingWeighIns: {
+      for (final w in weighIns)
+        if (pendingWeighIn(history, p, w.$1)) w.$1,
+    },
   );
 }
 

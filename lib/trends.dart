@@ -23,7 +23,8 @@
 ///   ζύγιση μία φορά την εβδομάδα στο τρίμηνο (πριν ~0,5%). Προσομοίωση: /home/claude/scratch/f4/eval_final.py.
 /// - Round 1 (S11-2): ζύγιση που μοιάζει ξένη ([foreignWeighIn], weight_guard.dart) δεν μετρά σε βάρος, λίπος και
 ///   μύες· μένει στο ιστορικό. Round 2 (R2-E-2): «ξένη» μόνο ανάμεσα σε ζυγίσεις που συμφωνούν μεταξύ τους· ζύγιση «σε
-///   αναμονή» (π.χ. η πρώτη μετά από αρρώστια) μετρά.
+///   αναμονή» (π.χ. η πρώτη μετά από αρρώστια) μετρά. Round 3 (k1 · R3-A-1): η «σε αναμονή» δεν μετρά ως να βεβαιωθεί
+///   ([uncountedWeighIn]), όπως στη διόρθωση θερμίδων.
 library;
 
 import 'dart:math' as math;
@@ -496,11 +497,29 @@ DateTime _add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
 /// Round 1 (S11-2): η ζύγιση της μέρας [day] στο ιστορικό μοιάζει ξένη. false χωρίς βάρος.
 /// Round 2 (g4 · R2-E-2): ίδιος κανόνας με το Σώμα και τη διόρθωση θερμίδων ([weighStatusAt], weight_guard.dart): ξένη
 /// μόνο όταν οι ζυγίσεις πριν ΚΑΙ μετά συμφωνούν μεταξύ τους και όχι μαζί της. Ζύγιση «σε αναμονή» (διαφέρει, χωρίς ακόμα
-/// επόμενη) μετρά εδώ, στην αναφορά και στην εβδομάδα (φαίνεται κανονικά). Μία τιμή ανά μέρα (η πρώτη της μέρας, όπως το
-/// ιστορικό)· αρκούν οι μέρες ως 2 × [weightGuardDays] γύρω της (ίδιο αποτέλεσμα με όλο το ιστορικό).
-bool foreignWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
+/// βεβαίωση): round 3 (k1 · R3-A-1) δεν μπαίνει σε υπολογισμούς ([uncountedWeighIn]), φαίνεται σημειωμένη στην αναφορά
+/// ([pendingWeighIn]). Μία τιμή ανά μέρα (η ζύγιση της μέρας του
+/// ιστορικού: round 3, k1 · R3-C-1, η πρώτη της μέρας που μετρά, [bodyRows])· αρκούν οι μέρες ως 2 × [weightGuardDays]
+/// γύρω της (ίδιο αποτέλεσμα με όλο το ιστορικό).
+bool foreignWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) =>
+    weighInStatus(history, plan, day) == WeighStatus.foreign;
+
+/// Round 3 (k1 · R3-A-1): η ζύγιση της μέρας ΔΕΝ μπαίνει σε υπολογισμούς (Τάσεις, Πρόοδος, «Η εβδομάδα σου», αναφορά,
+/// σελίδα μέτρησης): «ξένη» ή «σε αναμονή». Ίδιος κανόνας με τη διόρθωση θερμίδων (`guardedWeights().used`) και τα
+/// γραφήματα του Σώματος ([countedBody]). false χωρίς βάρος.
+bool uncountedWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
+  final s = weighInStatus(history, plan, day);
+  return s != null && s != WeighStatus.counted;
+}
+
+/// Round 3 (k1 · R3-A-3): η ζύγιση της μέρας είναι «σε αναμονή» (φαίνεται σημειωμένη, π.χ. στην αναφορά).
+bool pendingWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) =>
+    weighInStatus(history, plan, day) == WeighStatus.pending;
+
+/// Round 3 (k1): η κατάσταση ([WeighStatus]) της ζύγισης της μέρας [day] στο ιστορικό· null χωρίς βάρος.
+WeighStatus? weighInStatus(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
   final w = plan.value(history, K.weight, day);
-  if (w == null || !w.isFinite) return false;
+  if (w == null || !w.isFinite) return null;
   final series = <(DateTime, double)>[];
   var at = 0;
   for (var i = -2 * weightGuardDays; i <= 2 * weightGuardDays; i++) {
@@ -512,7 +531,7 @@ bool foreignWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, D
       series.add((d, v));
     }
   }
-  return weighStatusAt(series, at) == WeighStatus.foreign;
+  return weighStatusAt(series, at);
 }
 
 /// Round 1 (S4-8): οξυγόνο του ρολογιού σε νύχτα του Oura (μέσα στις ώρες ύπνου του Oura) μετρά μόνο όταν το ρολόι
@@ -540,12 +559,13 @@ TrendResult compareWindows(
   final sp = plan ?? SourcePlan.samsungOnly;
   // Κάθε τιμή ΜΟΝΟ από την πηγή της εκείνη τη μέρα (ένα κλειδί ανά μέρα, δες sources.dart).
   // Round 1 (S11-2): στις ζυγίσεις, μέρα με ζύγιση που μοιάζει ξένη δεν μετρά (ούτε το λίπος ή οι μύες της).
+  // Round 3 (k1 · R3-A-1): ούτε μέρα με ζύγιση «σε αναμονή» ([uncountedWeighIn]).
   List<(DateTime, double)> collect(DateTime from, DateTime to) {
     final out = <(DateTime, double)>[];
     for (var d = from; !d.isAfter(to); d = _add(d, 1)) {
       final v = sp.value(history, def.key, d);
       if (v != null &&
-          !(def.sparse && foreignWeighIn(history, sp, d)) &&
+          !(def.sparse && uncountedWeighIn(history, sp, d)) &&
           (def.key != K.spo2Avg || watchOxygenCovered(history, sp, d))) {
         out.add((d, v));
       }

@@ -475,7 +475,8 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Πίτουρο βρώμης'), findsOneWidget);
       // Round 2 (R2-U1-14, h1): ποιο είναι το πλάνο και ότι δεν φτάνει.
-      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β-γλυκάνες χρειάζονται 55\u00A0g'), findsOneWidget);
+      // Round 3 (k1 · R3-B-3): αδιάσπαστο ενωτικό στο «β‑γλυκάνες».
+      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β\u2011γλυκάνες χρειάζονται 55\u00A0g'), findsOneWidget);
     });
 
     testWidgets('U3b-14 / U3b-28 / U3b-29 / U3b-12: γραμμές που αλλάζουν 48 dp, «το πλάνο σου», «Σβήσε» κόκκινο, χρώμα διατροφής',
