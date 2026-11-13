@@ -30,7 +30,7 @@ import 'sample_food.dart';
 const _inv = Profile(birthYear: 1988, birthMonth: 1, sex: 'm', heightCm: 171);
 
 /// Φανταστικός χρήστης Β: άνδρας 40 ετών, 180 cm (ίδιος με τις άλλες δοκιμές των στόχων).
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 final _now = DateTime(2026, 11, 12, 10);
 final _check = DateTime(2026, 12, 14, 8, 20); // Δευτέρα, 28η μέρα των checkinGoals (από 16/11)
@@ -536,7 +536,7 @@ void main() {
       final g = Goals(
           aim: GoalAim.lose, rate: 0.005, activity: 1.5, doctor: true, since: '2026-11-12', kg: 90, age: 40, heightCm: 180, male: true);
       expect(goalsWithCurrentProfile(g, _me, DateTime(2027, 2, 1)), isNull);
-      const taller = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 181);
+      const taller = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 181);
       final fixed = goalsWithCurrentProfile(g, taller, DateTime(2027, 2, 1))!;
       expect((fixed.heightCm, fixed.age, fixed.since, fixed.kg), (181.0, 40, '2026-11-12', 90.0));
       // Ένας στόχος κάτω από το όριο του νέου φύλου δεν μένει (1.300 ισχύει για γυναίκα, όχι για άνδρα).

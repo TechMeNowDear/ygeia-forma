@@ -45,7 +45,7 @@ import 'sample_data.dart' show sampleDashboardJson, sampleHistory;
 import 'sample_food.dart' show sampleFoodStore;
 import 'training_sample.dart' show sampleTraining;
 
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 HealthStore _sample(DateTime at) {
   final s = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(at));

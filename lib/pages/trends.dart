@@ -441,14 +441,13 @@ class _MetricDetail extends StatelessWidget {
     final c = Aigaio.of(context);
     final def = r.def;
     final style = TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.45);
-    final unitWord = def.sparse ? 'ζυγίσεις' : 'μέρες';
     // Round 7 (R7-U4-4): μετά από αλλαγή πηγής η τιμή «τώρα» είναι μόνο από τις μέρες της νέας πηγής: το διάστημα και
     // το πλήθος από την αλλαγή («9 από 9 μέρες»), όχι «9 από 30», σαν να έλειπαν 21 νύχτες που υπάρχουν.
     final from = r.shownFrom;
     final changedSpan = !sameDay(from, r.currentFrom);
     final len = daysBetween(from, r.end) + 1;
 
-    String count(int n) => def.sparse ? '$n $unitWord' : '$n από $len $unitWord';
+    String count(int n) => trendCountText(n, len, sparse: def.sparse);
     // Round 2 (R2-D-9): τα δύο διαστήματα σε διαφορετικές χρονιές → οι ημερομηνίες με το έτος.
     final years = r.previousFrom.year != r.end.year;
     // Θερμοκρασία καρπού (ρολόι): ΜΟΝΟ διαφορές, ποτέ απόλυτη τιμή (τρίτος έλεγχος F2/C5). Το γράφημα δείχνει κάθε
@@ -481,7 +480,9 @@ class _MetricDetail extends StatelessWidget {
             ),
             if (def.kind != ValueKind.number) ...[
               const SizedBox(height: 4),
-              Text('Άξονας: ώρες:λεπτά', style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+              // R7-U4-14 δ: η ώρα ύπνου είναι ώρα της μέρας (23:00 · 00:00), όχι διάρκεια.
+              Text(def.kind == ValueKind.clock ? 'Άξονας: ώρα της μέρας' : 'Άξονας: ώρες:λεπτά',
+                  style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
             ],
             const SizedBox(height: 10),
           ],
@@ -497,7 +498,7 @@ class _MetricDetail extends StatelessWidget {
                     ? 'Αλλαγή ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα ο ύπνος έρχεται από άλλη πηγή, οπότε η τιμή '
                         'του ρολογιού υπολογίζεται μέσα σε άλλες ώρες ύπνου. Δεν συγκρίνω τιμές από πριν και μετά. Το '
                         'γράφημα δείχνει μόνο τις μέρες από την αλλαγή.'
-                    : 'Αλλαγή πηγής ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα η μέτρηση έρχεται από ${sourceDevice(r.source)}. '
+                    : 'Αλλαγή πηγής ${dayMonth(r.changedOn!)}: από εκείνη τη μέρα η μέτρηση έρχεται από ${r.source == Source.none ? 'καμία συσκευή' : 'το ${sourceDevice(r.source)}'}. '
                         'Δύο συσκευές δεν μετρούν το ίδιο, οπότε δεν συγκρίνω τιμές από πριν και μετά. Το γράφημα δείχνει μόνο '
                         'τις μέρες από την αλλαγή· η σύγκριση ξαναρχίζει όταν μαζευτούν αρκετές μέρες από τη νέα πηγή.',
                 style: style.copyWith(color: c.text),
@@ -645,6 +646,11 @@ Color trendSectionColor(Aigaio c, TrendSection s) => switch (s) {
       TrendSection.move => c.move,
       TrendSection.other => c.energy,
     };
+
+/// R7-U4-14 γ: «Με δεδομένα» με ενικό στο 1: ζυγίσεις μόνο το πλήθος («1 ζύγιση», «3 ζυγίσεις»), αλλιώς από πόσες
+/// μέρες του διαστήματος [len] («9 από 9 μέρες», «1 από 1 μέρα»). Πριν «1 ζυγίσεις».
+String trendCountText(int n, int len, {required bool sparse}) =>
+    sparse ? countText(n, 'ζύγιση', 'ζυγίσεις') : '$n από ${countText(len, 'μέρα', 'μέρες')}';
 
 IconData _sectionIcon(TrendSection s) => switch (s) {
       TrendSection.heart => Icons.favorite_rounded,

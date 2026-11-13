@@ -38,6 +38,21 @@ double? shiftLoad(LoadKind k, double? v, int dir) {
   return list[n];
 }
 
+/// R7-U4-2: «μένει 1 δευτερόλεπτο» / «μένουν 45 δευτερόλεπτα» (ενικός στο 1· πριν «μένουν 1 δευτερόλεπτα»).
+String restLeftText(int secs) => '${secs == 1 ? 'μένει' : 'μένουν'} ${secondsText(secs)}';
+
+/// R7-U4-2: πότε ξαναλέει το TalkBack το διάλειμμα (η λωρίδα είναι «ζωντανή περιοχή»: λέγεται κάθε φορά που αλλάζει η
+/// ετικέτα της). Πριν η ετικέτα άλλαζε κάθε δευτερόλεπτο: 90 ανακοινώσεις σε διάλειμμα 90″. Τώρα: στην αρχή (και όταν
+/// μεγαλώσει, π.χ. «+30″»), όταν περνά κάθε μισό λεπτό (60, 30…) και μία φορά στα 10 τελευταία δευτερόλεπτα. Το τέλος
+/// το λέει η ειδοποίηση «Τέλος διαλείμματος» με τη δόνηση. [last]: τα δευτερόλεπτα της τελευταίας ανακοίνωσης
+/// (null = καμία ακόμα σε αυτό το διάλειμμα).
+bool restSpeaksNow(int? last, int secs) {
+  if (last == null || secs > last) return true;
+  if (secs == last) return false;
+  if (secs <= 10) return last > 10;
+  return (last - 1) ~/ 30 != (secs - 1) ~/ 30;
+}
+
 /// Η προπόνηση σε εξέλιξη: μία άσκηση τη φορά, σετ με ✓, διάλειμμα που ξεκινά μόνο του.
 class SessionPage extends StatefulWidget {
   const SessionPage({super.key, required this.training});
@@ -59,6 +74,10 @@ class _SessionPageState extends State<SessionPage> {
   set _restEnd(DateTime? v) => t.restEnd = v;
   Timer? _timer;
   final _tick = ValueNotifier<int>(0);
+
+  /// R7-U4-2: ποιο διάλειμμα ([_spokenEnd]) και με πόσα δευτερόλεπτα ([_spokenSecs]) ανακοινώθηκε τελευταία στο TalkBack.
+  DateTime? _spokenEnd;
+  int? _spokenSecs;
 
   /// round1, U6-16 / U5-03: η λωρίδα των ασκήσεων και η λίστα ακολουθούν την τρέχουσα άσκηση και το τρέχον σετ (πριν
   /// το επόμενο «Έγινε» γλιστρούσε κάτω από τη λωρίδα του διαλείμματος και το ενεργό chip έμενε εκτός οθόνης).
@@ -968,9 +987,16 @@ class _SessionPageState extends State<SessionPage> {
                 child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             );
+        // R7-U4-2: η ετικέτα της ζωντανής περιοχής αλλάζει μόνο στις στιγμές του [restSpeaksNow]· η ακριβής αντίστροφη
+        // μέτρηση είναι δικό της στοιχείο (λέγεται όταν το αγγίξεις, όχι μόνη της κάθε δευτερόλεπτο).
+        if (_spokenEnd != end || restSpeaksNow(_spokenSecs, secs)) {
+          _spokenEnd = end;
+          _spokenSecs = secs;
+        }
         return Semantics(
+          container: true,
           liveRegion: true,
-          label: 'Διάλειμμα, μένουν $secs δευτερόλεπτα',
+          label: 'Διάλειμμα, ${restLeftText(_spokenSecs ?? secs)}',
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
             // round1, U5-07: στα σκούρα θέματα η λωρίδα δεν ξεχώριζε από το φόντο (1,05–1,10:1)· πορτοκαλί περίγραμμα.
@@ -981,11 +1007,18 @@ class _SessionPageState extends State<SessionPage> {
             ),
             child: Row(children: [
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('ΔΙΑΛΕΙΜΜΑ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: Color(0xFFB8C0CC))),
-                  Text('${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}',
-                      style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white, fontFeatures: [FontFeature.tabularFigures()])),
-                ]),
+                child: Semantics(
+                  key: const ValueKey('rest-left'),
+                  container: true,
+                  label: 'Τώρα ${restLeftText(secs)}',
+                  child: ExcludeSemantics(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('ΔΙΑΛΕΙΜΜΑ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: Color(0xFFB8C0CC))),
+                      Text('${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}',
+                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white, fontFeatures: [FontFeature.tabularFigures()])),
+                    ]),
+                  ),
+                ),
               ),
               b('+30″', () => _restAdd(30), const ValueKey('rest-plus')),
               // R7-U3 Β-Α2: ίδια λέξη με το ρολόι («Πάμε»)· εκεί το «Συνέχεια» είναι του περπατήματος.

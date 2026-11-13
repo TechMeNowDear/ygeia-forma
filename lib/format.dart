@@ -32,6 +32,9 @@ String dayMonth(DateTime d) => '${d.day} ${_monthsShort[d.month - 1]}';
 /// «22 Αυγ 2026»
 String dayMonthYear(DateTime d) => '${d.day} ${_monthsShort[d.month - 1]} ${d.year}';
 
+/// «22 Αυγούστου»: ολόκληρος ο μήνας, για ό,τι διαβάζει το TalkBack (R7-U4-8· το «Αυγ» διαβάζεται ως συντομογραφία).
+String dayMonthLong(DateTime d) => '${d.day} ${_monthsGen[d.month - 1]}';
+
 /// «Σήμερα», «Χθες» ή «Πέμπτη».
 String relativeDay(DateTime d, DateTime now) {
   final diff = daysBetween(d, now);

@@ -602,7 +602,7 @@ class OuraRestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Ετοιμότητα', style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                    const EstimateNote('εκτίμηση του Oura, όχι μέτρηση'),
+                    const EstimateNote('εκτίμηση της Oura, όχι μέτρηση'),
                   ],
                 ),
               ),

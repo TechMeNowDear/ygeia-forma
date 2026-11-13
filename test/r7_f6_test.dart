@@ -26,7 +26,7 @@ import 'sample_data.dart';
 const _p = Profile(birthYear: 1981, birthMonth: 1, sex: 'm', heightCm: 176);
 
 /// Ο άνθρωπος των [checkinGoals]: άνδρας 40 ετών, 180 cm.
-const _p90 = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _p90 = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 final _start = DateTime(2026, 11, 16); // Δευτέρα
 final _mon = DateTime(2026, 12, 14); // Δευτέρα, 28η μέρα: πρώτη μέρα με εκτίμηση

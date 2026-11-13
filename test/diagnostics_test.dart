@@ -19,7 +19,7 @@ import 'sample_food.dart';
 
 // 28η μέρα των στόχων (16/11): η πρώτη μέρα με εκτίμηση (τελικός έλεγχος, Συμβούλιο 2, Α2· την 21η η κάρτα μαζεύει δεδομένα).
 final _at = DateTime(2026, 12, 14, 8, 20);
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 HealthStore _store({List<(DateTime, double)>? weights}) {
   final s = HealthStore()
@@ -53,7 +53,7 @@ void main() {
     expect((calc['chol'] as Map)['fullDayKcal'], 1350);
     expect((calc['chol'] as Map)['daysSaltUnknown'], 0);
     expect((calc['days'] as List).length, 22, reason: '21 μέρες + σήμερα');
-    expect((calc['zone'] as Map)['age'], 40);
+    expect((calc['zone'] as Map)['age'], 41, reason: 'γεννημένος 12/1985: στις 14/12/2026 είναι 41');
     expect(calc['chol'], isNotNull);
     final checks = {for (final c in r['checks'] as List) (c as Map)['id']: c['ok']};
     expect(checks['food-grams'], isTrue);

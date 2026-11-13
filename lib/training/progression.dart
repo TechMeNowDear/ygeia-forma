@@ -212,7 +212,7 @@ String _firstReason(PlanItem item, LoadKind k, double? start, int rirGoal) {
 Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today, {bool caution = false}) {
   final k = item.kind;
   final sets = item.sets, lo = item.lo, hi = item.hi;
-  // Τουλάχιστον 2 ρεζέρβα σε όλες τις ασκήσεις, ως να πει άλλα ο καρδιολόγος: η πίεση ανεβαίνει απότομα
+  // Τουλάχιστον 2 ρεζέρβα σε όλες τις ασκήσεις, ως να πει άλλα ο γιατρός: η πίεση ανεβαίνει απότομα
   // όσο πλησιάζεις την αποτυχία (MacDougall 1985· έλεγχος #2). Το πρόγραμμα μπορεί να ζητά περισσότερη.
   final rirGoal = math.max(item.rir, 2);
   // R7-A6-2: και μια φορά με ενόχληση χωρίς κανένα σετ (σταμάτησες στο 1ο σετ, ή «Παράλειψη» μετά τον πόνο): μετρά.

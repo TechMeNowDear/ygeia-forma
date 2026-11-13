@@ -34,6 +34,11 @@ String reportTrendText(TrendResult? t, MetricDef? def) {
 const reportNotIncludedText = 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού, τεστ άπνοιας και πίεση. Η απουσία τους εδώ δεν '
     'σημαίνει ότι ήταν φυσιολογικά· τα αποτελέσματα είναι στο Samsung Health Monitor.';
 
+/// R7-U4-3: το μήνυμα μετά την αποθήκευση με το όνομα που πήρε ΠΡΑΓΜΑΤΙ το αρχείο ([saved], από το σύστημα: δεύτερο PDF
+/// την ίδια μέρα γίνεται «… (1).pdf»)· αν λείπει (παλιά απάντηση), το όνομα που ζητήθηκε ([asked]).
+String pdfSavedText(String? saved, String asked) =>
+    'Αποθηκεύτηκε στις Λήψεις: ${saved == null || saved.trim().isEmpty ? asked : saved}';
+
 /// Αναφορά για γιατρό: προεπισκόπηση των σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key, required this.store, this.now, this.note = '', this.end});
@@ -54,6 +59,9 @@ class _ReportPageState extends State<ReportPage> {
   final _keys = [for (var i = 0; i < _pageCount; i++) GlobalKey()];
   bool _saving = false;
   String? _uri;
+
+  /// R7-U4-3: το όνομα που πήρε πράγματι το αρχείο στις Λήψεις (το σύστημα βάζει «(1)» αν υπήρχε ήδη ίδιο).
+  String? _savedName;
   String? _error;
 
   /// Σημείωση για τον γιατρό (φάρμακα, κάπνισμα…). Δεν αποθηκεύεται: γράφεται μόνο στο PDF.
@@ -111,6 +119,8 @@ class _ReportPageState extends State<ReportPage> {
         _saving = false;
         if (r['ok'] == true) {
           _uri = r['uri'] as String?;
+          final n = r['name'];
+          _savedName = n is String ? n : null;
         } else {
           _error = r['message']?.toString() ?? 'Άγνωστο σφάλμα';
         }
@@ -258,7 +268,7 @@ class _ReportPageState extends State<ReportPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Αποθηκεύτηκε στις Λήψεις: $_fileName',
+                            pdfSavedText(_savedName, _fileName),
                             style: TextStyle(color: c.text, fontSize: 13.5),
                           ),
                         ),
@@ -370,9 +380,14 @@ class _Header extends StatelessWidget {
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.3),
                   ),
                   const SizedBox(height: 2),
+                  // R7-U4-12: με μεγάλο όνομα (ως 60 χαρακτήρες) δύο γραμμές· το διάστημα είναι αδιάσπαστο και φαίνεται
+                  // πάντα ολόκληρο (πριν μία γραμμή με «…» που έκοβε ποιες 90 μέρες βλέπει ο γιατρός). R7-U4-14 ν: «μέρες»,
+                  // όπως η στήλη «Μέρες» της ίδιας σελίδας.
                   Text(
-                    '${name.isEmpty ? '' : '$name · '}${dayMonth(data.from)} – ${dayMonthYear(data.to)} · $reportDays ημέρες',
-                    maxLines: 1,
+                    '${name.isEmpty ? '' : '$name · '}'
+                    '${'${dayMonth(data.from)} – ${dayMonthYear(data.to)} · $reportDays μέρες'.replaceAll(' ', '\u00A0')}',
+                    key: const ValueKey('report-header-period'),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 10.5, color: c.textSecondary),
                   ),
@@ -528,7 +543,7 @@ class _PageOne extends StatelessWidget {
         child: Text.rich(
           TextSpan(children: [
             TextSpan(text: 'Δεν περιλαμβάνονται: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
-            // Δεύτερος κλινικός έλεγχος M6: και η πίεση (η πρώτη ερώτηση του καρδιολόγου).
+            // Δεύτερος κλινικός έλεγχος M6: και η πίεση (από τις πρώτες ερωτήσεις κάθε γιατρού για την καρδιά).
             // Έλεγχος 9/11 (V-B-02): όχι «δεν έχει πρόσβαση» (η εφαρμογή ζητά τις άδειες)· ό,τι κι αν γίνει με τις
             // άδειες, η πρόταση μένει σωστή.
             const TextSpan(text: reportNotIncludedText),
@@ -539,7 +554,7 @@ class _PageOne extends StatelessWidget {
       _Title('Σύνοψη', top: 10),
       Table(
         // Round 1 (U1b-03): φαρδύτερη η τελευταία στήλη, ώστε «Διαφορά από τους», «Αλλαγή συσκευής», «Αλλαγή ορισμού»
-        // και «Δεν συγκρίνεται (σελ. 3)» να μη σπάνε λέξη-λέξη· οι στήλες 2–3 χωρούν ακόμα την πιο φαρδιά τιμή.
+        // και «Δεν συγκρίνεται (σελίδα 3)» να μη σπάνε λέξη-λέξη· οι στήλες 2–3 χωρούν ακόμα την πιο φαρδιά τιμή.
         columnWidths: const {
           0: FlexColumnWidth(2.9),
           1: FlexColumnWidth(1.1),
@@ -560,7 +575,8 @@ class _PageOne extends StatelessWidget {
               pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
               // Μία λέξη: το «Μέρες με / μέτρηση» έσπαγε στη μέση της λέξης (έλεγχος UX U3).
               pad(Text('Μέρες', style: header)),
-              pad(Text('Διαφορά από τους\n3 προηγ. μήνες', style: header)),
+              // R7-U4-14 μ: χωρίς συντομογραφία, πάλι σε δύο γραμμές (Inter 8,5: 77,5 και 53,2 στιγμές σε στήλη 86,9).
+              pad(Text('Διαφορά από τους\n3 μήνες πριν', style: header)),
             ],
           ),
           for (final r in rows)
@@ -1124,5 +1140,5 @@ String lowestDiffText(ReportStat s) {
   if (s.periods.length > 1) {
     return s.periods.any((p) => p.oldRules) ? 'Ενημερώνεται το ιστορικό' : 'Αλλαγή ορισμού';
   }
-  return 'Δεν συγκρίνεται (σελ. 3)';
+  return 'Δεν συγκρίνεται (σελίδα 3)';
 }

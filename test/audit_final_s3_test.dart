@@ -346,7 +346,7 @@ void main() {
       'themeMode': 'dark',
       'goals': {'k': 2250, 'since': '2026-10-01'},
       'zone': {'lo': 100, 'hi': 125, 'up': true, 'down': true},
-      'me': {'by': 1986, 'bm': 1, 'sex': 'm', 'h': 175, 'wds': [2], 'wad': 2, 'wd': 2},
+      'me': {'by': 1985, 'bm': 12, 'sex': 'm', 'h': 174, 'wds': [2], 'wad': 2, 'wd': 2},
       'waist': [
         {'d': '2026-11-03', 'v': [96.0, 96.5]},
         {'d': '2026-11-10', 'v': [90.0, 90.0]},
@@ -361,7 +361,7 @@ void main() {
       // Πριν, τα τρία παρακάτω γίνονταν του αντιγράφου: παλιός στόχος θερμίδων, παλιά ζώνη, παλιά στοιχεία.
       expect(m['goals'], mine['goals']);
       expect(m['zone'], mine['zone']);
-      expect(m['me'], {'by': 1986, 'bm': 1, 'sex': 'm', 'h': 180, 'wds': [1, 3, 5], 'wad': 5, 'wd': 5},
+      expect(m['me'], {'by': 1985, 'bm': 12, 'sex': 'm', 'h': 180, 'wds': [1, 3, 5], 'wad': 5, 'wd': 5},
           reason: 'του κινητού· ό,τι λείπει (γέννηση, φύλο) από το αντίγραφο');
       expect((m['backfillFrom'], m['layout']), ('2025-11-01', todayLayout));
       expect((m['waist'] as List).map((x) => ((x as Map)['d'], (x['v'] as List).first)), [('2026-11-03', 96.0), ('2026-11-10', 95.0)],
@@ -419,8 +419,8 @@ void main() {
       expect((p.birthYear, p.birthMonth, p.heightCm, p.sex), (null, null, null, 'm'));
       expect(p.weighDays, {3});
       expect(p.waistDay, DateTime.friday);
-      final ok = Profile.fromJson({'by': 1986, 'bm': 1, 'sex': 'm', 'h': 180, 'wds': [1, 3, 5], 'wad': 5});
-      expect((ok.birthYear, ok.heightCm, ok.waistDay), (1986, 180.0, 5));
+      final ok = Profile.fromJson({'by': 1985, 'bm': 12, 'sex': 'm', 'h': 180, 'wds': [1, 3, 5], 'wad': 5});
+      expect((ok.birthYear, ok.heightCm, ok.waistDay), (1985, 180.0, 5));
       expect(ok.weighDays, {1, 3, 5});
     });
   });

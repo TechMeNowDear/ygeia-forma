@@ -451,7 +451,7 @@ void main() {
 
     testWidgets('R3-B-3: «β\u2011γλυκάνες» με αδιάσπαστο ενωτικό στη σημείωση της χοληστερίνης', (t) async {
       final s = HealthStore()
-        ..setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180))
+        ..setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180))
         ..setGoals(checkinGoals().copyWith(betaPer100: 7, branG: 40));
       await _pump(t, GoalsPage(store: s, now: DateTime(2026, 11, 12, 10)));
       expect(find.textContaining('για 3\u00A0g β\u2011γλυκάνες τη μέρα (EFSA)'), findsOneWidget);

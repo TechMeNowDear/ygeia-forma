@@ -298,9 +298,9 @@ void main() {
 
     test('2 νύχτες < 80%: το μήνυμα λέει ποιες (ημερομηνία: τιμή), «μέσα στις τελευταίες 30 μέρες», χωρίς «ενήλικες»', () {
       final last = DateTime(2026, 10, 30);
-      final g = oxygenGuidance({_add(last, -16): 72, _add(last, -6): 74.6, last: 91}, last);
+      final g = oxygenGuidance({_add(last, -16): 71, _add(last, -6): 76.6, last: 91}, last);
       final m = g.messages.single;
-      expect(m, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες (14/10: 72%, 24/10: 74,6%)'));
+      expect(m, contains('σε 2 νύχτες μέσα στις τελευταίες 30 μέρες (14/10: 71%, 24/10: 76,6%)'));
       expect(m, contains('ένα αρνητικό τεστ άπνοιας του ρολογιού δεν αποκλείει πρόβλημα στην αναπνοή στον ύπνο'));  // κλινικός έλεγχος 4, C2/C5
       expect(m, isNot(contains('ενήλικες')));
     });
@@ -320,8 +320,8 @@ void main() {
       for (final n in nights) {
         if (n.spo2Min != null) n.spo2Min = 90;
       }
-      nights[nights.length - 3].spo2Min = 72;
-      nights[nights.length - 9].spo2Min = 74;
+      nights[nights.length - 3].spo2Min = 71;
+      nights[nights.length - 9].spo2Min = 77;
       await _pump(t, TodayPage(store: s, food: sampleFoodStore(_now), open: (_, [__]) {}, openSettings: () {}, now: _now));
       expect(find.byKey(const ValueKey('today-oxygen-auto')), findsOneWidget);
       expect(find.textContaining('Κάτω από 80% σε 2 νύχτες'), findsOneWidget);
@@ -332,7 +332,7 @@ void main() {
       for (final n in s.data!.nights) {
         if (n.spo2Min != null) n.spo2Min = 90;
       }
-      s.data!.nights[s.data!.nights.length - 3].spo2Min = 72;
+      s.data!.nights[s.data!.nights.length - 3].spo2Min = 71;
       await _pump(t, TodayPage(store: s, food: sampleFoodStore(_now), open: (_, [__]) {}, openSettings: () {}, now: _now));
       expect(find.byKey(const ValueKey('today-oxygen-auto')), findsNothing);
     });
@@ -392,7 +392,7 @@ void main() {
 
     testWidgets('C9: η χαμηλότερη μέτρηση δεν έχει σκέτη «—» στη «Διαφορά»', (t) async {
       await pumpReport(t);
-      expect(find.text('Δεν συγκρίνεται (σελ. 3)'), findsOneWidget);
+      expect(find.text('Δεν συγκρίνεται (σελίδα 3)'), findsOneWidget);
     });
 
     test('C9: με αλλαγή ορισμού, ίδια λέξη με το μέσο οξυγόνο', () {

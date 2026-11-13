@@ -48,7 +48,7 @@ Widget _shell(HealthStore store) {
 }
 
 /// Φανταστικός χρήστης: άνδρας 40 ετών, 180 cm.
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 Goals _goals({bool doctor = true, int? kcalSet}) => Goals(
       aim: GoalAim.lose,

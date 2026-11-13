@@ -825,7 +825,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Έλεγχος 13/11, round 7 (R7-U3 Β-Α1): και ο στόχος έντασης «άφησε N», όπως στη γραμμή του στόχου στο κινητό. Πριν
         // στην προπόνηση μόνο με ρολόι δεν φαινόταν πουθενά.
         small(c, "ΣΕΤ ${si + 1}/${it.sets.size} · άφησε ${it.rirTarget}" + if (s.items.size > 1) "  ›" else "", 52f + 12.5f * fs, gray, ess(10f), 140f)
-        sayAdd("${it.name}, σετ ${si + 1} από ${it.sets.size}, άφησε ${it.rirTarget}" + (set?.let { x -> (if (x.label.isNotEmpty()) ", ${x.label}" else "") + ", ${x.reps} επαναλήψεις" } ?: ""))
+        sayAdd("${it.name}, σετ ${si + 1} από ${it.sets.size}, άφησε ${it.rirTarget}" + (set?.let { x -> (if (x.label.isNotEmpty()) ", ${x.label}" else "") + ", ${countText(x.reps, "επανάληψη", "επαναλήψεις")}" } ?: ""))
         // Περιοχή πατήματος 44u ψηλή (U7-08δ· πριν 28u): από τη γραμμή των παλμών ως κάτω από το «ΣΕΤ». Τα − / + αρχίζουν
         // πιο κάτω (από 80u), άρα δεν τέμνονται.
         if (s.items.size > 1) hits.add(Hit(RectF(cx - 75 * u, 26 * u, cx + 75 * u, 70 * u), "Επόμενη άσκηση") { actions.nextExercise() })
@@ -951,7 +951,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             // Μικραίνει αντί να ακουμπά τα − / + (γράμματα 1,3×).
             text.typeface = Typeface.DEFAULT
             fitPlain(c, "έκανες × $reps", 119f, Color.WHITE, 12f * fs, 72f)
-            sayAdd("Έκανες $reps επαναλήψεις")
+            // R7-U4-2: ενικός στο 1 («Έκανες 1 επανάληψη»).
+            sayAdd("Έκανες ${countText(reps, "επανάληψη", "επαναλήψεις")}")
             // Περιοχή πατήματος 40u ψηλή (95–135u, ≈ 48 dp· U7-08δ, πριν 34u): δεν ακουμπά τίποτα πατήσιμο.
             roundKey(c, "−", 46f, 115f, 22f, 44f, 40f, "Έκανες μία λιγότερη") { actions.lastReps(-1) }
             roundKey(c, "+", 154f, 115f, 22f, 44f, 40f, "Έκανες μία παραπάνω") { actions.lastReps(1) }
@@ -1262,7 +1263,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         small(c, "χέρι ακίνητο, μη μιλάς", 64f + 16f * fs, Color.WHITE, ess(10.5f), 150f)
         val left = ((Repo.recoveryUntil - now + 999) / 1000).coerceAtLeast(0)
         t(c, "$left″", 114f, Color.WHITE, 26f, true)
-        sayAdd("Αποκατάσταση. Κάθισε, χέρι ακίνητο, μη μιλάς. Μένουν $left δευτερόλεπτα")
+        sayAdd("Αποκατάσταση. Κάθισε, χέρι ακίνητο, μη μιλάς. ${secondsLeftText(left)}")
         heart(c, 134f, now, 11f)
         pill(c, "Παράλειψη", 168f, 92f, 30f, card, Color.WHITE, 11f * fs, desc = "Παράλειψη της αποκατάστασης") { actions.finishWorkout() }
     }
@@ -1440,6 +1441,9 @@ internal fun nextStrength(ids: List<String>, shownId: String): String? {
 
 /** «1 άσκηση» / «4 ασκήσεις». */
 internal fun countText(n: Int, one: String, many: String): String = if (n == 1) "1 $one" else "$n $many"
+
+/** Για το TalkBack (R7-U4-2): «Μένει 1 δευτερόλεπτο» / «Μένουν 45 δευτερόλεπτα» (πριν «Μένουν 1 δευτερόλεπτα»). */
+internal fun secondsLeftText(n: Long): String = if (n == 1L) "Μένει 1 δευτερόλεπτο" else "Μένουν $n δευτερόλεπτα"
 
 /** «Δεν ξέρω» στη ρεζέρβα (έλεγχος 13/11, round 7, R7-U3-04): καμία απάντηση, όπως στο κινητό. */
 internal const val RIR_UNKNOWN = "Δεν ξέρω"

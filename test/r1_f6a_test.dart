@@ -738,7 +738,7 @@ void main() {
           isTrue);
       final text = t.exportForClaude();
       expect(text, contains('(21/9/2026–16/11/2026)'));
-      expect(text, contains('Περπάτημα: 1 φορές'));
+      expect(text, contains('Περπάτημα: 1 φορά'));
     });
   });
 

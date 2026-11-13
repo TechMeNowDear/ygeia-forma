@@ -278,30 +278,30 @@ void main() {
 
   // ---------------------------------------------------------------------------------------------------------------
   group('S12-04: εύρη αναφοράς με αριθμούς', () {
-    final today = DateTime(2026, 11, 16);
+    final today = DateTime(2027, 11, 16); // ένας χρόνος μετά: ίδιες ηλικίες με επινοημένα έτη
     Profile p(String? sex, int? by) => Profile(birthYear: by, birthMonth: 1, sex: sex, heightCm: 180);
 
     test('λίπος (Gallagher 2000): όρια ανά φύλο και ηλικία, κείμενο με «DXA»', () {
-      final m39 = fatRange(p('m', 1987), today)!;
+      final m39 = fatRange(p('m', 1988), today)!;
       expect((m39.low, m39.high), (8.0, 20.0));
       expect(m39.text, startsWith('8–19,9% για άνδρες 20–39 ετών'));
       expect(m39.text, contains('DXA'));
-      final m40 = fatRange(p('m', 1986), today)!;
+      final m40 = fatRange(p('m', 1987), today)!;
       expect((m40.low, m40.high), (11.0, 22.0));
       expect(m40.text, startsWith('11–21,9% για άνδρες 40–59 ετών'));
-      expect((fatRange(p('m', 1967), today)!.low, fatRange(p('m', 1967), today)!.high), (11.0, 22.0));
-      expect((fatRange(p('m', 1966), today)!.low, fatRange(p('m', 1966), today)!.high), (13.0, 25.0));
-      expect((fatRange(p('f', 1987), today)!.low, fatRange(p('f', 1987), today)!.high), (21.0, 33.0));
-      expect((fatRange(p('f', 1986), today)!.low, fatRange(p('f', 1986), today)!.high), (23.0, 34.0));
-      expect((fatRange(p('f', 1966), today)!.low, fatRange(p('f', 1966), today)!.high), (24.0, 36.0));
-      expect(fatRange(p('m', 2007), today), isNull, reason: '19 ετών');
-      expect(fatRange(p('m', 1946), today), isNull, reason: '80 ετών');
-      expect(fatRange(p(null, 1986), today), isNull);
+      expect((fatRange(p('m', 1968), today)!.low, fatRange(p('m', 1968), today)!.high), (11.0, 22.0));
+      expect((fatRange(p('m', 1967), today)!.low, fatRange(p('m', 1967), today)!.high), (13.0, 25.0));
+      expect((fatRange(p('f', 1988), today)!.low, fatRange(p('f', 1988), today)!.high), (21.0, 33.0));
+      expect((fatRange(p('f', 1987), today)!.low, fatRange(p('f', 1987), today)!.high), (23.0, 34.0));
+      expect((fatRange(p('f', 1967), today)!.low, fatRange(p('f', 1967), today)!.high), (24.0, 36.0));
+      expect(fatRange(p('m', 2008), today), isNull, reason: '19 ετών');
+      expect(fatRange(p('m', 1947), today), isNull, reason: '80 ετών');
+      expect(fatRange(p(null, 1987), today), isNull);
       expect(fatRange(p('m', null), today), isNull);
     });
 
     test('λίπος: θέση και «κοντά στο όριο» (η ζυγαριά δείχνει συνήθως λιγότερο από το DXA, S4-6)', () {
-      final r = fatRange(p('m', 1986), today)!;
+      final r = fatRange(p('m', 1987), today)!;
       expect([r.place(10.9), r.place(11.0), r.place(21.9), r.place(22.0)], [-1, 0, 0, 1]);
       expect(r.placeText(21.4), 'κοντά στο πάνω όριο');
       expect(r.placeText(21.0), 'κοντά στο πάνω όριο');
@@ -312,7 +312,7 @@ void main() {
     });
 
     test('ύπνος (AASM/SRS): 18–60 ετών, «κοντά στο κάτω όριο» ως 30 λεπτά κάτω (S4-5)', () {
-      final s = sleepRange(p('m', 1986), today)!;
+      final s = sleepRange(p('m', 1987), today)!;
       expect(s.low, 420);
       expect([s.place(419), s.place(420)], [-1, 0]);
       expect(s.placeText(400), 'κοντά στο κάτω όριο', reason: '6 ώρες 40 λεπτά μετρημένα ≈ 7 ώρες δηλωμένες (Lauderdale 2008)');
@@ -320,16 +320,16 @@ void main() {
       expect(s.placeText(389), 'κάτω από το εύρος');
       expect(s.placeText(420), 'μέσα στο εύρος');
       expect(s.cite, contains('Lauderdale'));
-      expect(sleepRange(p('m', 2009), today), isNull, reason: '17 ετών');
-      expect(sleepRange(p('m', 1965), today), isNull, reason: '61 ετών');
-      expect(sleepRange(p('m', 2008), today), isNotNull);
-      expect(sleepRange(p('m', 1966), today), isNotNull);
+      expect(sleepRange(p('m', 2010), today), isNull, reason: '17 ετών');
+      expect(sleepRange(p('m', 1966), today), isNull, reason: '61 ετών');
+      expect(sleepRange(p('m', 2009), today), isNotNull);
+      expect(sleepRange(p('m', 1967), today), isNotNull);
       expect(sleepRange(p('m', null), today), isNotNull);
     });
 
     test('βήματα, δείκτης μάζας σώματος, βάρος, αναπνοές, ηλικία', () {
-      expect(stepsRange(p('m', 1967), today)!.low, 8000);
-      expect(stepsRange(p('m', 1966), today)!.low, 6000);
+      expect(stepsRange(p('m', 1968), today)!.low, 8000);
+      expect(stepsRange(p('m', 1967), today)!.low, 6000);
       expect(stepsRange(p('m', null), today)!.low, 8000);
       expect([bmiRange.place(18.4), bmiRange.place(18.5), bmiRange.place(24.9), bmiRange.place(25.0)], [-1, 0, 0, 1]);
       expect(bmiRange.placeText(24.9), 'μέσα στο εύρος', reason: 'χωρίς περιθώριο: ο δείκτης δεν είναι εκτίμηση συσκευής');
@@ -342,8 +342,8 @@ void main() {
       expect(inBodyHeight(81, 25)!, closeTo(180.0, 1e-9));
       expect(inBodyHeight(81, 0), isNull);
       expect([breathRange.place(11.7), breathRange.place(11.8), breathRange.place(19.2), breathRange.place(19.25)], [-1, 0, 0, 1]);
-      expect(const Profile(birthYear: 1986, birthMonth: 11).ageOn(DateTime(2026, 10, 31)), 39);
-      expect(const Profile(birthYear: 1986, birthMonth: 11).ageOn(DateTime(2026, 11, 1)), 40);
+      expect(const Profile(birthYear: 1987, birthMonth: 11).ageOn(DateTime(2027, 10, 31)), 39);
+      expect(const Profile(birthYear: 1987, birthMonth: 11).ageOn(DateTime(2027, 11, 1)), 40);
     });
 
     test('κείμενα «i»: βάρος ίδια ώρα (S4-9), παλμοί ύπνου από μία συσκευή (S4-8), HRV εύρος (S4-2)', () {

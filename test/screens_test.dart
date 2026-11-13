@@ -1667,8 +1667,8 @@ void main() {
           home: ReportPage(
             store: store,
             now: ouraNow,
-            note: ('Φάρμακα: βισοπρολόλη 2,5 mg πρωί. Κάπνισμα 10/μέρα. Ροχαλητό (σύζυγος). Τεστ άπνοιας Samsung 20/10 '
-                    'και 23/10 αρνητικά. Ζαλάδα το πρωί κάποιες μέρες. ' * 3)
+            note: ('Φάρμακα: βισοπρολόλη 2,5 mg πρωί. Κάπνισμα 10/μέρα. Ροχαλητό (σύζυγος). Τεστ άπνοιας Samsung 13/10 '
+                    'και 16/10 αρνητικά. Ζαλάδα το πρωί κάποιες μέρες. ' * 3)
                 .substring(0, 400),
           ),
         ),
@@ -1887,8 +1887,10 @@ void main() {
       ));
 
   // ---------------------------------------------------------------- 12/11: στόχοι, χοληστερίνη, μέση, ζώνη
-  // Φανταστικός χρήστης (δημόσιο repo): άνδρας 40 ετών, 180 cm, 90 kg.
-  const me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+  // Φανταστικός χρήστης (δημόσιο repo, R7-A11-1): άνδρας 47 ετών (γεννημένος 3/1979), 172 cm, 90 kg.
+  const me = Profile(birthYear: 1979, birthMonth: 3, sex: 'm', heightCm: 172);
+  // Ο φανταστικός άνθρωπος των [checkinGoals] (άνδρας 40 ετών, 180 cm), για τα στιγμιότυπα του ελέγχου θερμίδων.
+  const checkinMe = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
   Goals goals() => Goals(
         aim: GoalAim.lose,
         rate: 0.005,
@@ -1896,8 +1898,8 @@ void main() {
         doctor: true,
         since: '2026-11-09',
         kg: 90,
-        age: 40,
-        heightCm: 180,
+        age: 47,
+        heightCm: 172,
         male: true,
         nutsG: 30,
         branG: 40,
@@ -2040,7 +2042,7 @@ void main() {
         s.data = Dashboard.fromJson(j);
         s.history = sampleHistory(at, s.data!);
         s
-          ..setProfile(me)
+          ..setProfile(checkinMe)
           ..setGoals(goals ?? checkinGoals());
       };
   testWidgets('Σήμερα · έλεγχος θερμίδων', (t) => _shot(t,

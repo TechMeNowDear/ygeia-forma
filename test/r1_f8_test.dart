@@ -315,7 +315,7 @@ void main() {
     s.history = sampleHistory(at, s.data!);
     await s.loadPrefs();
     s
-      ..setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180))
+      ..setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180))
       ..setGoals(checkinGoals());
     expect(s.prefsJson()['reportName'], 'Δοκιμή Όνομα', reason: 'το όνομα υπάρχει στις ρυθμίσεις του κινητού');
     final r = diagnosticsFrom(store: s, food: checkinFood(at), now: at);
@@ -558,7 +558,7 @@ void main() {
       'prefs': {
         'themeMode': 'dark',
         'historyVersion': 3,
-        'me': {'by': 1986, 'sex': 'm', 'h': 180, 'wd': 3},
+        'me': {'by': 1985, 'sex': 'm', 'h': 180, 'wd': 3},
         'goals': {
           'v': 1,
           'aim': 'lose',
@@ -621,7 +621,7 @@ void main() {
     expect((g.kcalAdapt, g.tdeeEst), (null, null));
     expect(g.log, isEmpty);
     final me = Profile.fromJson(merged['me']);
-    expect((me.birthYear, me.sex, me.heightCm, me.waistDay), (1986, 'm', 180.0, 3));
+    expect((me.birthYear, me.sex, me.heightCm, me.waistDay), (1985, 'm', 180.0, 3));
     expect(me.weighDays, {3}, reason: 'η μία μέρα ζυγίσματος της παλιάς μορφής («wd»)');
     final waist = waistFromJson(merged['waist']).single;
     expect(waist.day, '2026-11-06');

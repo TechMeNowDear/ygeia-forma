@@ -180,7 +180,7 @@ MetricDef? metricDef(String key) {
   return null;
 }
 
-/// Το όνομα μιας μέτρησης όπως το λέει η πηγή της (π.χ. «Energy Score» → «Ετοιμότητα (εκτίμηση του Oura)»).
+/// Το όνομα μιας μέτρησης όπως το λέει η πηγή της (π.χ. «Energy Score» → «Ετοιμότητα (εκτίμηση της Oura)»). R7-U4-14 στ: «της Oura» (την υπολογίζει η εταιρεία), όπως «της Samsung».
 String metricLabel(MetricDef def, Source s) {
   // Ρολόι: οι βαθμολογίες και τα στάδια είναι εκτιμήσεις της Samsung, όπως και του Oura (κλινικός έλεγχος M2, 4/11).
   if (s != Source.oura) {
@@ -194,11 +194,11 @@ String metricLabel(MetricDef def, Source s) {
     };
   }
   return switch (def.key) {
-    K.energy => 'Ετοιμότητα (εκτίμηση του Oura)',
-    K.sleepScore => 'Βαθμολογία ύπνου (εκτίμηση του Oura)',
+    K.energy => 'Ετοιμότητα (εκτίμηση της Oura)',
+    K.sleepScore => 'Βαθμολογία ύπνου (εκτίμηση της Oura)',
     K.skinTemp => 'Θερμοκρασία δέρματος, απόκλιση',
-    K.deepPct => 'Βαθύς ύπνος (εκτίμηση του Oura)',
-    K.remPct => 'REM (εκτίμηση του Oura)',
+    K.deepPct => 'Βαθύς ύπνος (εκτίμηση της Oura)',
+    K.remPct => 'REM (εκτίμηση της Oura)',
     K.awakeMin => 'Ξύπνιος μέσα στη νύχτα (τουλάχιστον)',
     _ => def.label,
   };

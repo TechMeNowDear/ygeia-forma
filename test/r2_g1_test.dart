@@ -20,7 +20,7 @@ import 'sample_data.dart';
 import 'sample_food.dart';
 
 /// Φανταστικός χρήστης Β: άνδρας 40 ετών, 180 cm (ίδιος με τα checkinGoals: 90 kg, τύπος 2.745, στόχος 2.250).
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 /// Φανταστικός χρήστης Α από Δευτέρα 16/11: άνδρας 38 ετών, 171 cm, 80 kg, −0,5%/εβδ., μέτρια κίνηση (στόχος 2.090).
 Goals _invGoals() => Goals(

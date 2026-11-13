@@ -594,7 +594,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 suffixIcon: q.isEmpty
                     ? null
                     : IconButton(
-                        tooltip: 'Καθαρισμός',
+                        tooltip: 'Καθάρισμα',
                         icon: const Icon(Icons.close_rounded),
                         onPressed: () => setState(_query.clear),
                       ),

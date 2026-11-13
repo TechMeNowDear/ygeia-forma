@@ -121,19 +121,21 @@ class _AppearancePageState extends State<AppearancePage> {
   }
 }
 
-/// Αυτόματο · Ανοιχτό · Σκοτεινό.
+/// Αυτόματο · Φωτεινό · Σκοτεινό.
 class _ModeSwitch extends StatelessWidget {
   const _ModeSwitch({required this.value, required this.onChanged});
   final String value;
   final ValueChanged<String> onChanged;
 
-  static const _options = [('auto', 'Αυτόματο'), ('light', 'Ανοιχτό'), ('dark', 'Σκοτεινό')];
+  // R7-U4-14 η: «Φωτεινό», όπως «φωτεινό θέμα»/«φωτεινά» στην ίδια οθόνη (πριν «Ανοιχτό»).
+  static const _options = [('auto', 'Αυτόματο'), ('light', 'Φωτεινό'), ('dark', 'Σκοτεινό')];
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     return Container(
-      padding: const EdgeInsets.all(4),
+      // R7-U4-10: κάθε επιλογή 48 dp ψηλή (πριν 44)· ίδιο συνολικό ύψος (52).
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: c.background,
         // Round 1 (U4-14 θ): ίδιες γωνίες με τους άλλους επιλογείς (16 έξω, 12 μέσα).
@@ -154,7 +156,7 @@ class _ModeSwitch extends StatelessWidget {
                   onTap: () => onChanged(key),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
-                    height: 44,
+                    height: 48,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: key == value ? c.primary : Colors.transparent,

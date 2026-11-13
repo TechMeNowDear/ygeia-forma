@@ -397,7 +397,7 @@ Future<void> editItem(BuildContext context, PlanItem it) => showModalBottomSheet
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(children: [Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c.text))), w]),
             );
-        // Τουλάχιστον 2 σε όλες, ως να πει άλλα ο καρδιολόγος (έλεγχος #2).
+        // Τουλάχιστον 2 σε όλες, ως να πει άλλα ο γιατρός (έλεγχος #2).
         const minRir = 2;
         return SafeArea(
           child: Padding(

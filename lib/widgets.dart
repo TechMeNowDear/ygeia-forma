@@ -509,7 +509,8 @@ class BigValue extends StatelessWidget {
           ),
           if (unit != null)
             TextSpan(
-              text: ' $unit',
+              // R7-U4-13: «25,4%» κολλητά, όπως σε όλη την εφαρμογή· οι άλλες μονάδες με κενό («82,2 kg»).
+              text: unit == '%' ? '%' : ' $unit',
               style: TextStyle(
                 fontSize: size * 0.48,
                 fontWeight: FontWeight.w600,
@@ -743,7 +744,11 @@ class ScoreRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ring = SizedBox(
+    // R7-U4-8: το TalkBack λέει «84 από 100» (πριν σκέτο «84»)· η ετικέτα ενώνεται με τη λεζάντα και τον τίτλο της κάρτας.
+    final ring = Semantics(
+      label: value == null ? 'χωρίς βαθμολογία' : '${value!.round()} από 100',
+      excludeSemantics: true,
+      child: SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
@@ -771,6 +776,7 @@ class ScoreRing extends StatelessWidget {
           ),
         ),
         ),
+      ),
       ),
     );
     if (caption == null) return ring;
@@ -841,7 +847,11 @@ class Hypnogram extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = night.end.difference(night.start).inSeconds.toDouble();
     if (night.stages.isEmpty || total <= 0) return const SizedBox.shrink();
-    return SizedBox(
+    // R7-U4-8: σύντομη περιγραφή για το TalkBack (πριν: τίποτα).
+    return Semantics(
+      container: true,
+      label: hypnogramLabel(night),
+      child: SizedBox(
       height: height,
       width: double.infinity,
       child: CustomPaint(
@@ -863,6 +873,7 @@ class Hypnogram extends StatelessWidget {
           gapColor: onDark ? Colors.white.withValues(alpha: 0.12) : Aigaio.of(context).sleep.withValues(alpha: 0.12),
           stageColor: Aigaio.of(context).stage,
         ),
+      ),
       ),
     );
   }
@@ -1266,6 +1277,23 @@ const _axisClearPx = 6.0;
   return chartAxis(lo, hi, maxIntervals: n, steps: steps, minStep: minStep, anchor: anchor);
 }
 
+/// R7-U4-5: ποιες τιμές του άξονα ([tickYs], θέσεις σε px) κρύβει η ετικέτα της γραμμής αναφοράς ([refY]). Μόνο η πιο
+/// κοντινή, αν απέχει λιγότερο από 13·[scale], και όποια άλλη θα ακουμπούσε τα γράμματά της (< 9·[scale]). Πριν κρύβονταν
+/// ΟΛΕΣ όσες απείχαν < 13: στο PDF (ύψος 48 px, δύο διαστήματα των 24 px) με άξονα 60–80–100 και αναφορά 90% στη μέση
+/// έμεναν μόνο «60» και «90%», και ο γιατρός δεν ήξερε την κλίμακα.
+Set<int> refHiddenTicks(List<double> tickYs, double? refY, double scale) {
+  if (refY == null || tickYs.isEmpty) return const <int>{};
+  var nearest = 0;
+  for (var i = 1; i < tickYs.length; i++) {
+    if ((tickYs[i] - refY).abs() < (tickYs[nearest] - refY).abs()) nearest = i;
+  }
+  return {
+    if ((tickYs[nearest] - refY).abs() < 13 * scale) nearest,
+    for (var i = 0; i < tickYs.length; i++)
+      if ((tickYs[i] - refY).abs() < 9 * scale) i,
+  };
+}
+
 /// Κενά πολύ μεγαλύτερα από τη συνηθισμένη απόσταση των τιμών (round 1, U1b-10): πάνω από 3 μέρες ΚΑΙ πάνω από το
 /// τριπλάσιο της μεσαίας απόστασης. Εκεί η γραμμή κόβεται· πριν ένα κενό τριών εβδομάδων ζωγραφιζόταν σαν μετρημένη
 /// ευθεία. Δίνει τη μέρα της πρώτης τιμής μετά από κάθε τέτοιο κενό (τιμές παλιότερη πρώτη).
@@ -1289,6 +1317,7 @@ class BarChart extends StatelessWidget {
     this.highlightLast = true,
     this.valueLabel,
     this.color,
+    this.semanticLabel,
   });
 
   final List<double?> values;
@@ -1299,11 +1328,17 @@ class BarChart extends StatelessWidget {
   final String Function(double)? valueLabel;
   final Color? color;
 
+  /// Τι λέει το TalkBack για το γράφημα (R7-U4-8)· χωρίς αυτό η περιγραφή του [barChartSummary].
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final col = color ?? c.primary;
-    return SizedBox(
+    return Semantics(
+      container: true,
+      label: semanticLabel ?? barChartSummary(values, valueLabel ?? (v) => dec(v)),
+      child: SizedBox(
       height: height,
       width: double.infinity,
       child: CustomPaint(
@@ -1321,6 +1356,7 @@ class BarChart extends StatelessWidget {
           card: c.card,
           scale: chartTextScale(context),
         ),
+      ),
       ),
     );
   }
@@ -1442,7 +1478,11 @@ class LineChart extends StatelessWidget {
     this.to,
     this.breaks = const [],
     this.tickSteps,
+    this.semanticLabel,
   });
+
+  /// Τι λέει το TalkBack για το γράφημα (R7-U4-8)· χωρίς αυτό η περιγραφή του [lineChartSummary].
+  final String? semanticLabel;
 
   /// Αλλαγές πηγής ή ορισμού (μέρα, σύντομη ετικέτα, π.χ. «Oura»): η γραμμή και το γέμισμα κόβονται εκεί, και μια
   /// λεπτή κάθετη γραμμή με την ετικέτα δείχνει την αλλαγή (έλεγχος 4, review M1: ποτέ μία γραμμή πάνω από δύο
@@ -1477,7 +1517,11 @@ class LineChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return SizedBox(
+    // R7-U4-8: το γράφημα (ζωγραφιά) με μια σύντομη περιγραφή για το TalkBack· πριν δεν έλεγε τίποτα.
+    return Semantics(
+      container: true,
+      label: semanticLabel ?? lineChartSummary(points, format ?? (v) => dec(v), from: from, to: to),
+      child: SizedBox(
       height: height,
       width: double.infinity,
       child: CustomPaint(
@@ -1500,9 +1544,36 @@ class LineChart extends StatelessWidget {
           scale: chartTextScale(context),
         ),
       ),
+      ),
     );
   }
 }
+
+/// R7-U4-8: σύντομη περιγραφή ενός γραφήματος γραμμής για το TalkBack (WCAG 1.1.1): διάστημα, πόσες τιμές, χαμηλότερη,
+/// υψηλότερη και τελευταία, με τη μορφή αριθμών του γραφήματος ([format]). Τιμές παλιότερη πρώτη.
+String lineChartSummary(List<(DateTime, double)> points, String Function(double) format, {DateTime? from, DateTime? to}) {
+  if (points.isEmpty) return 'Γράφημα χωρίς τιμές';
+  final a = from ?? points.first.$1;
+  final b = to ?? points.last.$1;
+  final span = sameDay(a, b) ? dayMonthLong(a) : 'από ${dayMonthLong(a)} ως ${dayMonthLong(b)}';
+  if (points.length == 1) return 'Γράφημα, $span: μία τιμή, ${format(points.first.$2)}';
+  final vs = [for (final p in points) p.$2];
+  return 'Γράφημα, $span, ${points.length} τιμές: χαμηλότερη ${format(vs.reduce(math.min))}, '
+      'υψηλότερη ${format(vs.reduce(math.max))}, τελευταία ${format(points.last.$2)}';
+}
+
+/// R7-U4-8: το ίδιο για τις ράβδους ανά μέρα ([BarChart]): πόσες μέρες, χαμηλότερη, υψηλότερη και τελευταία τιμή.
+String barChartSummary(List<double?> values, String Function(double) format) {
+  final vs = [for (final v in values) if (v != null) v];
+  final days = values.length == 1 ? '1 ημέρας' : '${values.length} ημερών';
+  if (vs.isEmpty) return 'Γράφημα $days χωρίς τιμές';
+  final last = values.last;
+  return 'Γράφημα $days: χαμηλότερη ${format(vs.reduce(math.min))}, υψηλότερη ${format(vs.reduce(math.max))}, '
+      'τελευταία ${last == null ? 'χωρίς τιμή' : format(last)}';
+}
+
+/// R7-U4-8: το υπνόγραμμα για το TalkBack (οι διάρκειες των φάσεων είναι στο υπόμνημα από κάτω).
+String hypnogramLabel(Night n) => 'Γράφημα: οι φάσεις του ύπνου με τη σειρά, από ${hm(n.start)} ως ${hm(n.end)}';
 
 /// Τα κομμάτια της γραμμής: νέο κομμάτι από την πρώτη τιμή την ή μετά από κάθε [breaks] (τιμές παλιότερη πρώτη).
 List<List<(DateTime, double)>> lineSegments(List<(DateTime, double)> points, List<DateTime> breaks) {
@@ -1593,11 +1664,13 @@ class _LinePainter extends CustomPainter {
       ..color = grid
       ..strokeWidth = 1;
     final refY = reference == null ? null : yOf(reference!.$1);
+    final tickYs = [for (var i = 0; i <= intervals; i++) top + h * (1 - i / intervals)];
+    // Η ετικέτα της γραμμής αναφοράς παίρνει τη θέση της τιμής του άξονα που θα έπεφτε πάνω της (R7-U4-5: μόνο αυτής).
+    final hidden = refHiddenTicks(tickYs, refY, scale);
     for (var i = 0; i <= intervals; i++) {
-      final y = top + h * (1 - i / intervals);
+      final y = tickYs[i];
       canvas.drawLine(Offset(left, y), Offset(left + w, y), gridPaint);
-      // Η ετικέτα της γραμμής αναφοράς παίρνει τη θέση μιας τιμής του άξονα που θα έπεφτε πάνω της.
-      if (refY != null && (refY - y).abs() < 13 * scale) continue;
+      if (hidden.contains(i)) continue;
       _textLeft(canvas, format(minV + step * i), Offset(left + w + 8, y - 7 * scale), text, 11 * scale);
     }
 
@@ -1977,7 +2050,8 @@ class PeriodPicker<T> extends StatelessWidget {
     final c = Aigaio.of(context);
     final twoLines = MediaQuery.textScalerOf(context).scale(10) >= 12.5;
     return Container(
-      padding: const EdgeInsets.all(4),
+      // R7-U4-10: κάθε επιλογή 48 dp ψηλή (πριν 44), όπως οι καρτέλες· το πλαίσιο κρατά το ίδιο συνολικό ύψος (52).
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       // Round 1 (U4-14 θ): ίδιες γωνίες με τις καρτέλες (16 έξω, 12 μέσα).
       decoration: BoxDecoration(color: c.dark ? c.background : c.hairline, borderRadius: BorderRadius.circular(16)),
       child: Row(children: [
@@ -1992,7 +2066,12 @@ class PeriodPicker<T> extends StatelessWidget {
                 button: true,
                 child: Material(
                   color: on ? c.card : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  // R7-U4 B1: στα σκούρα θέματα η επιλογή (κάρτα πάνω στο φόντο, 1,10:1, χωρίς σκιά) φαινόταν μόνο από την
+                  // απόχρωση των γραμμάτων· περίγραμμα 1,5 στο χρώμα της ενότητας (≥ 3:1 με το φόντο, WCAG 1.4.11).
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: on && c.dark ? BorderSide(color: color, width: 1.5) : BorderSide.none,
+                  ),
                   elevation: on && !c.dark ? 1 : 0,
                   shadowColor: const Color(0x220F172A),
                   child: InkWell(
@@ -2000,7 +2079,7 @@ class PeriodPicker<T> extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     onTap: () => onChanged(v),
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44),
+                      constraints: const BoxConstraints(minHeight: 48),
                       child: Center(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),

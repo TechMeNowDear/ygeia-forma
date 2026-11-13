@@ -73,10 +73,10 @@ void main() {
       expect(g.short, contains('30 μέρες'));
     });
 
-    test('K3: ΕΝΑ μήνυμα όταν ισχύουν πολλά (τελευταία νύχτα 72%, 74% και 83% στην ίδια εβδομάδα)', () {
-      final g = oxygenGuidance({day(0): 72, day(2): 74, day(4): 83, day(5): 91}, today);
+    test('K3: ΕΝΑ μήνυμα όταν ισχύουν πολλά (τελευταία νύχτα 71%, 77% και 83% στην ίδια εβδομάδα)', () {
+      final g = oxygenGuidance({day(0): 71, day(2): 77, day(4): 83, day(5): 91}, today);
       expect(g.messages.length, 1);
-      expect(g.messages.single, oxygenVeryLowRepeatText(2, [(day(2), 74.0), (day(0), 72.0)]),
+      expect(g.messages.single, oxygenVeryLowRepeatText(2, [(day(2), 77.0), (day(0), 71.0)]),
           reason: 'το σημαντικότερο: δύο νύχτες κάτω από 80%');
       expect(g.messages.single, isNot(contains('δες αν επαναλαμβάνεται')));
     });
@@ -152,10 +152,10 @@ void main() {
           if (!before) 'o.sleepMin': 420,
         };
       }
-      // Οι νύχτες που ήταν ο λόγος της επίσκεψης, πριν από το Oura.
-      h[dateKey(DateTime(2026, 10, 12))]![K.spo2Min] = 72;
-      h[dateKey(DateTime(2026, 10, 19))]![K.spo2Min] = 74;
-      h[dateKey(DateTime(2026, 10, 25))]![K.spo2Min] = 84.6;
+      // Πολύ χαμηλές νύχτες πριν από το Oura (επινοημένες τιμές): πρέπει να φαίνονται στην αναφορά.
+      h[dateKey(DateTime(2026, 10, 14))]![K.spo2Min] = 71;
+      h[dateKey(DateTime(2026, 10, 21))]![K.spo2Min] = 77;
+      h[dateKey(DateTime(2026, 10, 27))]![K.spo2Min] = 84.7;
       // Δύο νύχτες χωρίς φάσεις: ώρα ύπνου αλλά όχι διάρκεια.
       h[dateKey(DateTime(2026, 10, 1))]!.remove(K.sleepMin);
       h[dateKey(DateTime(2026, 10, 2))]!.remove(K.sleepMin);
@@ -181,9 +181,9 @@ void main() {
       expect(r.stat(K.sleepMin).periods.last.from, ouraFrom);
     });
 
-    test('M4: ζώνες 90/85/80 και νύχτες κάτω από 85% με χρονολογική σειρά (84,6 μετρά)', () {
+    test('M4: ζώνες 90/85/80 και νύχτες κάτω από 85% με χρονολογική σειρά (84,7 μετρά)', () {
       final r = buildReport(history(), now, plan: plan);
-      expect([for (final n in r.oxygenBelow(85)) dateKey(n.$1)], ['2026-10-12', '2026-10-19', '2026-10-25']);
+      expect([for (final n in r.oxygenBelow(85)) dateKey(n.$1)], ['2026-10-14', '2026-10-21', '2026-10-27']);
       expect(r.oxygenBelow(80).length, 2);
       expect(r.lowOxygenNights.first.$1.isBefore(r.lowOxygenNights.last.$1), isTrue, reason: 'χρονολογικά, όχι κατά τιμή');
     });

@@ -158,7 +158,7 @@ class SettingsPage extends StatelessWidget {
                           icon: Icons.palette_outlined,
                           title: 'Εμφάνιση',
                           subtitle: switch (store.prefs.themeMode) {
-                            'light' => 'Πάντα ανοιχτό · ${Aigaio.day(store.prefs.dayTheme).name}',
+                            'light' => 'Πάντα φωτεινό · ${Aigaio.day(store.prefs.dayTheme).name}',
                             'dark' => 'Πάντα σκοτεινό · ${Aigaio.night(store.prefs.nightTheme).name}',
                             _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} · '
                                 'νύχτα ${Aigaio.night(store.prefs.nightTheme).name}',
@@ -204,7 +204,7 @@ class SettingsPage extends StatelessWidget {
                           subtitle: 'Μέτρηση, εκτίμηση, ενδεικτικό',
                           onTap: () => Navigator.of(context).push(DevicesPage.route()),
                         ),
-                        // Σχέδια 12/11 (5δ): το όριο παλμών του γιατρού δεν είναι πια στην Προπόνηση (ο καρδιολόγος δεν έδωσε)·
+                        // Σχέδια 12/11 (5δ): το όριο παλμών του γιατρού δεν είναι πια στην Προπόνηση (συνήθως δεν δίνεται)·
                         // μένει εδώ για όποιον έχει. Αν υπάρχει, φαίνεται ΚΑΙ στην Προπόνηση και νικά τη ζώνη στο ρολόι.
                         ListenableBuilder(
                           listenable: TrainingStore.main,
@@ -419,7 +419,8 @@ class _DataGroupState extends State<_DataGroup> {
         'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
         if (existing > 0)
           existing == 1 ? '1 εγγραφή υπήρχε ήδη και έμεινε όπως ήταν.' : '$existing εγγραφές υπήρχαν ήδη και έμειναν όπως ήταν.',
-        if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
+        // R7-U4-14 π: με το ουσιαστικό, όπως η γραμμή από κάτω («1 εγγραφή υπήρχε ήδη»)· πριν «3 δεν γράφτηκαν».
+        if (failed > 0) '${countText(failed, 'εγγραφή δεν γράφτηκε', 'εγγραφές δεν γράφτηκαν')}· δοκίμασε ξανά.',
         // Round 2 (R2-B-3): «δεν άλλαξαν» μόνο αν δεν άλλαξαν· «μπήκαν αλλά δεν γράφτηκαν» όταν φαίνονται χωρίς να είναι
         // γραμμένες (ίδιο με την κάρτα «Δοκίμασε ξανά» της Σήμερα).
         ...restorePrefsSummary(

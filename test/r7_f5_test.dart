@@ -39,7 +39,7 @@ const _inbody = 'com.inbody2014.inbody';
 
 BodyMeasurement _m(DateTime t, double kg, [double? fat]) => BodyMeasurement(time: t, weight: kg, fatPct: fat, app: _inbody);
 
-/// Ανάγνωση της στιγμής [at] με τις ζυγίσεις [rows] (όπως r6_body_test), ύψος 180 cm, γεννημένος 1/1986.
+/// Ανάγνωση της στιγμής [at] με τις ζυγίσεις [rows] (όπως r6_body_test), ύψος 180 cm, γεννημένος 12/1985 (φανταστικός).
 HealthStore _store(DateTime at, List<BodyMeasurement> rows, {Profile? profile}) {
   final s = HealthStore()
     ..data = Dashboard.fromJson({
@@ -56,7 +56,7 @@ HealthStore _store(DateTime at, List<BodyMeasurement> rows, {Profile? profile}) 
     });
   s.history = sampleHistory(at, s.data!);
   applyRecentRead(s.history, s.data!, plan: SourcePlan.samsungOnly);
-  s.setProfile(profile ?? const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180));
+  s.setProfile(profile ?? const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180));
   return s;
 }
 
@@ -179,7 +179,7 @@ void main() {
 
     testWidgets('μέρα ΜΟΝΟ μέσης (ζύγισμα Δε/Τε): η οδηγία της μέσης', (t) async {
       final now = DateTime(2026, 12, 4, 6, 30);
-      final p = const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180, weighDays: {DateTime.monday, DateTime.wednesday});
+      final p = const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180, weighDays: {DateTime.monday, DateTime.wednesday});
       await _pump(t, _today(_store(now, _ownUpTo(DateTime(2026, 12, 3)), profile: p), now));
       expect(hint(t), waistTodayHint);
       expect(find.textContaining('με τα ίδια ρούχα'), findsNothing);

@@ -91,7 +91,9 @@ class SamsungHealthBridge(
                 val pages = call.argument<List<ByteArray>>("pages") ?: emptyList()
                 val name = call.argument<String>("name") ?: "ygeia-anafora.pdf"
                 val uri = withContext(Dispatchers.IO) { PdfExporter.save(activity, pages, name) }
-                JSONObject().put("ok", true).put("uri", uri.toString())
+                // R7-U4-3: δεύτερο PDF την ίδια μέρα → το σύστημα το ονομάζει «… (1).pdf»· η οθόνη δείχνει το πραγματικό όνομα.
+                val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
+                JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
             }
             "sharePdf", "openPdf" -> {
                 val json = try {

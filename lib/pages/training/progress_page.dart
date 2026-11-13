@@ -160,8 +160,9 @@ String paceDiffText(int s) {
 }
 
 // R7-A6-11: όταν το φορτίο άλλαξε μέσα στην άσκηση, κάθε σετ με το δικό του («4,3 kg × 10 · 2,8 kg × 12»).
+// R7-U4-14 ο: ολόκληρη η λέξη («12, 10, 8 επαναλήψεις»), όπως στη λεπτομέρεια (πριν «επαν.»).
 String _setText(LoadKind k, ExLog e) => !hasLoad(k)
-    ? '${_repsText([for (final s in e.done) s.reps])} επαν.'
+    ? '${_repsText([for (final s in e.done) s.reps])} ${e.done.length == 1 && e.done.first.reps == 1 ? 'επανάληψη' : 'επαναλήψεις'}'
     : e.mixedLoads
         ? e.doneText()
         : '${loadLabel(k, e.endLoad)} × ${_repsText([for (final s in e.done) s.reps])}';
@@ -178,13 +179,15 @@ String _loadDelta(LoadKind k, double d) => switch (k) {
   switch (p.change) {
     case StrengthChange.up:
       if (l > 0) return assist ? ('λιγότερη βοήθεια', TrendKind.good, null) : (_loadDelta(p.kind, l), TrendKind.good, true);
-      return ('$r επαν.', TrendKind.good, true);
+      return (countText(r, 'επανάληψη', 'επαναλήψεις'), TrendKind.good, true);
     case StrengthChange.down:
       if (l < 0) return assist ? ('περισσότερη βοήθεια', TrendKind.bad, null) : (_loadDelta(p.kind, l), TrendKind.bad, false);
-      return ('${-r} επαν.', TrendKind.bad, false);
+      return (countText(-r, 'επανάληψη', 'επαναλήψεις'), TrendKind.bad, false);
     case StrengthChange.mixed:
-      if (assist) return (l > 0 ? 'λιγότερη βοήθεια, λιγότερες επαν.' : 'περισσότερη βοήθεια, περισσότερες επαν.', TrendKind.neutral, null);
-      return (l > 0 ? 'βάρος ↑, επαν. ↓' : 'βάρος ↓, επαν. ↑', TrendKind.neutral, null);
+      if (assist) {
+        return (l > 0 ? 'λιγότερη βοήθεια, λιγότερες επαναλήψεις' : 'περισσότερη βοήθεια, περισσότερες επαναλήψεις', TrendKind.neutral, null);
+      }
+      return (l > 0 ? 'βάρος ↑, επαναλήψεις ↓' : 'βάρος ↓, επαναλήψεις ↑', TrendKind.neutral, null);
     case StrengthChange.same:
       return ('Ίδιο', TrendKind.neutral, null);
   }

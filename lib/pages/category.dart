@@ -201,10 +201,18 @@ class TabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    // R7-U4-10: περιοχή πατήματος 48 dp ψηλή (κανόνας της εφαρμογής, Material)· το «χάπι» μένει 40 dp και τα 4 dp πάνω
+    // και κάτω (διάφανα) πατιούνται κι αυτά. Το εσωτερικό InkWell κερδίζει το πάτημα πάνω στο χάπι (ένα πάτημα, όχι δύο).
     return Semantics(
       selected: selected,
       button: true,
-      child: Material(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Material(
         color: selected ? solid : c.card,
         shape: StadiumBorder(side: BorderSide(color: selected ? solid : c.hairline)),
         child: InkWell(
@@ -226,6 +234,8 @@ class TabChip extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
         ),
       ),
     );

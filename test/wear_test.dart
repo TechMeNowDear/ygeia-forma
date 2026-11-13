@@ -136,7 +136,7 @@ void main() {
       final back = Session.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
       expect(back.steps, 3104);
       expect(back.source, 'watch');
-      expect(t.exportForClaude(), contains('Περπάτημα: 1 φορές, 31 λεπτά, 2.2 km'));
+      expect(t.exportForClaude(), contains('Περπάτημα: 1 φορά, 31 λεπτά, 2,2 km'));
     });
 
     test('παλμοί προπόνησης του κινητού: συμπληρώνονται αν χάθηκαν μηνύματα', () {

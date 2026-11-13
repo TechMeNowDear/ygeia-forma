@@ -73,6 +73,10 @@ class MetricSpec {
   /// με κενό· χωρίς μονάδα τίποτα.
   String get unitSuffix => unit.isEmpty ? '' : (unit == '%' ? '%' : ' $unit');
 
+  /// R7-U4-13: η μονάδα της διαφοράς από το «συνήθως». Ποσοστά σε μονάδες («+0,3 μονάδες»), όπως στις Τάσεις
+  /// ([MetricDef.formatDiff]), ώστε να μη διαβάζεται ως σχετική αλλαγή 0,3%· βαθμολογίες («από 100») χωρίς μονάδα («+3»).
+  String diffSuffix(double d) => unit == '%' ? (d.abs() == 1 ? ' μονάδα' : ' μονάδες') : (unit == 'από 100' ? '' : unitSuffix);
+
   String show(double v) {
     if (format != null) return format!(v);
     // Απόκλιση (Oura, ±λίγοι βαθμοί) με πρόσημο· απόλυτη τιμή καρπού (ρολόι, ~33 °C) ποτέ ως «+33,6» (έλεγχος 8/11, DATA-04).
@@ -94,7 +98,7 @@ const _bodyPeriods = [30, 90, 365];
 
 final metricSpecs = <String, MetricSpec>{
   // Σχέδια 9/11 (2α): «Ύπνος 30 νυχτών ›» από την κάρτα της τελευταίας νύχτας.
-  K.sleepScore: MetricSpec(metric: K.sleepScore, title: 'Βαθμολογία ύπνου', unit: '/100', color: (c) => c.sleep),
+  K.sleepScore: MetricSpec(metric: K.sleepScore, title: 'Βαθμολογία ύπνου', unit: 'από 100', color: (c) => c.sleep),
   // Round 1 (U1b-04, U1a-3): διάρκεια με ολόκληρες λέξεις («6 ώρες 32 λεπτά»)· στον άξονα «6:32» με λεζάντα.
   K.sleepMin: MetricSpec(
     metric: K.sleepMin,
@@ -108,13 +112,13 @@ final metricSpecs = <String, MetricSpec>{
   K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart, minRange: 8),
   K.dayHr: MetricSpec(
       metric: K.dayHr, title: 'Παλμοί ξύπνιος', unit: 'bpm', color: (c) => c.heart, dayComplete: true, minRange: 8),
-  K.energy: MetricSpec(metric: K.energy, title: 'Ετοιμότητα', unit: '/100', color: (c) => c.energy, minRange: 20),
+  K.energy: MetricSpec(metric: K.energy, title: 'Ετοιμότητα', unit: 'από 100', color: (c) => c.energy, minRange: 20),
   K.hrv: MetricSpec(metric: K.hrv, title: 'HRV', unit: 'ms', color: (c) => c.sleep),
-  K.skinTemp: MetricSpec(metric: K.skinTemp, title: 'Θερμοκρασία στον ύπνο', unit: '°C', color: (c) => c.move, digits: 1, signed: true),
+  K.skinTemp: MetricSpec(metric: K.skinTemp, title: 'Θερμοκρασία δέρματος', unit: '°C', color: (c) => c.move, digits: 1, signed: true),
   K.breath: MetricSpec(
     metric: K.breath,
     title: 'Αναπνοές στον ύπνο',
-    unit: '/λεπτό',
+    unit: 'το λεπτό',
     color: (c) => c.sleep,
     digits: 1,
     range: (_, __) => breathRange,
@@ -238,7 +242,7 @@ class _MetricPageState extends State<MetricPage> {
               ? '${sleepVsUsualText(d.round())} · συνήθως ${s.show(base.usual!)}'
               : d == 0
                   ? '$asUsualText · συνήθως ${s.show(base.usual!)}$unit'
-                  : '${signedShown(d, s.digits)}$unit · συνήθως ${s.show(base.usual!)}$unit';
+                  : '${signedShown(d, s.digits)}${s.diffSuffix(d)} · συνήθως ${s.show(base.usual!)}$unit';
         }
         // Round 1 (U1b-11): η μονάδα και στα στατιστικά («Μέσος όρος 39 ms»).
         String withUnit(double v) => '${s.show(v)}${s.unitSuffix}';

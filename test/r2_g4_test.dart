@@ -371,7 +371,7 @@ void main() {
     });
 
     test('widget Σώμα: ίδια τιμή, διαφορά και κρίση εύρους από τη δική σου ζύγιση', () {
-      final s = store()..setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180));
+      final s = store()..setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180));
       final snap = buildWidgetSnapshot(s, sampleFoodStore(now), now);
       final w = (((snap['kinds'] as Map)[WKind.body] as Map)['m'] as Map)['weight'] as Map;
       expect(w['v'], '89,8');

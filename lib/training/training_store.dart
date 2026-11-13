@@ -1505,12 +1505,14 @@ class TrainingStore extends ChangeNotifier {
     if (walks.isNotEmpty) {
       final km = walks.fold<double>(0, (a, s) => a + (s.meters ?? 0)) / 1000;
       final mins = walks.fold<int>(0, (a, s) => a + (s.cardioMinutes ?? 0));
-      b.writeln('Περπάτημα: ${walks.length} φορές, $mins λεπτά${km > 0 ? ', ${km.toStringAsFixed(1)} km' : ''}');
+      // R7-U4-14 θ: ενικός με το 1 και δεκαδικό κόμμα (το κείμενο επικολλάται στη συζήτηση): «1 φορά, 31 λεπτά, 2,2 km».
+      b.writeln('Περπάτημα: ${walks.length == 1 ? '1 φορά' : '${walks.length} φορές'}, ${mins == 1 ? '1 λεπτό' : '$mins λεπτά'}'
+          '${km > 0 ? ', ${km.toStringAsFixed(1).replaceAll('.', ',')} km' : ''}');
     }
     final hrAvgs = [for (final s in list) if (s.hrAvg != null) s.hrAvg!];
     if (hrAvgs.isNotEmpty) b.writeln('Μέσοι παλμοί ανά προπόνηση: ${hrAvgs.join(', ')}');
     final feels = [for (final s in list) if (s.feel != null) s.feel!];
-    if (feels.isNotEmpty) b.writeln('Πώς ένιωσα (1 πολύ εύκολα – 5 πολύ δύσκολα): μέσος ${(feels.reduce((a, c) => a + c) / feels.length).toStringAsFixed(1)}');
+    if (feels.isNotEmpty) b.writeln('Πώς ένιωσα (1 πολύ εύκολα – 5 πολύ δύσκολα): μέσος ${(feels.reduce((a, c) => a + c) / feels.length).toStringAsFixed(1).replaceAll('.', ',')}');
     final hrs = [for (final s in list) if (s.hrMax != null) s.hrMax!];
     if (hrs.isNotEmpty) b.writeln('Υψηλότεροι παλμοί: ${hrs.reduce((a, c) => a > c ? a : c)}');
     final byEx = <String, List<(DateTime, ExLog)>>{};
@@ -1535,7 +1537,7 @@ class TrainingStore extends ChangeNotifier {
         b.write('τελευταία ${_d(withSets.last.$1)}: ${last.mixedLoads ? last.doneText() : last.done.map((s) => s.reps).join(', ')}');
         if (last.rirAnswer != null) b.write(', ρεζέρβα ${last.rirAnswer == 4 ? '4+' : last.rirAnswer}');
       }
-      if (painN > 0) b.write(', ενόχληση $painN φορές (${{for (final l in logs) ...l.$2.pain}.map((x) => painNames[x] ?? x).join(', ')})');
+      if (painN > 0) b.write(', ενόχληση ${painN == 1 ? '1 φορά' : '$painN φορές'} (${{for (final l in logs) ...l.$2.pain}.map((x) => painNames[x] ?? x).join(', ')})');
       b.writeln();
     }
     if (p != null) {

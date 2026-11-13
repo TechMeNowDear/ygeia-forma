@@ -236,7 +236,8 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
-          runSpacing: 8,
+          // R7-U4-10: κάθε TabChip έχει πια 4 dp διάφανα πάνω-κάτω (περιοχή πατήματος 48 dp)· ίδιο ορατό κενό 8 dp.
+          runSpacing: 0,
           children: [
             for (final chip in <Widget>[
             TabChip(label: 'Αργά', selected: _slow, solid: c.exerciseSolid, onTap: () => setState(() => _slow = !_slow)),

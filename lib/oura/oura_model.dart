@@ -224,7 +224,7 @@ class OuraSleep {
         if (endOffsetMin != null && endOffsetMin != offsetMin) 'tz_end': endOffsetMin,
       };
 
-  /// Οι φάσεις ως κομμάτια χρόνου (για το υπνόγραμμα, «εκτίμηση του Oura»).
+  /// Οι φάσεις ως κομμάτια χρόνου (για το υπνόγραμμα, «εκτίμηση της Oura»).
   List<Stage> get stages => ouraStages(phases, start, end);
 }
 

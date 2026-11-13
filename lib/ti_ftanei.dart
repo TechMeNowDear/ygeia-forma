@@ -86,7 +86,7 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Αντιγράφηκε. Επικόλλησέ το στη συζήτηση με το Claude.'),
+        content: Text('Αντιγράφηκε. Επικόλλησέ το στη συζήτηση με τον Claude.'),
       ),
     );
   }
@@ -176,7 +176,7 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
                           const SizedBox(height: 20),
                           OutlinedButton(
                             onPressed: _copyReport,
-                            child: const Text('Αντιγραφή αναφοράς για το Claude'),
+                            child: const Text('Αντιγραφή αναφοράς για τον Claude'),
                           ),
                           const SizedBox(height: 8),
                           Text(

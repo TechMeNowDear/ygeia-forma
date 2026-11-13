@@ -338,7 +338,7 @@ PasteResult parseProgram(String text, Set<String> known) {
     try {
       j = jsonDecode(text.substring(a, b + 1));
     } on FormatException {
-      return PasteResult(null, ['Το πρόγραμμα αντιγράφηκε μισό ή αλλοιωμένο. Αντέγραψέ το ξανά ολόκληρο.'], const []);
+      return PasteResult(null, ['Το πρόγραμμα αντιγράφηκε μισό ή αλλοιωμένο. Αντίγραψέ το ξανά ολόκληρο.'], const []);
     }
   }
   if (j is! Map<String, dynamic> || j['kind'] != 'ygeia-program') {
@@ -488,7 +488,7 @@ List<String> _warnings(Program p) {
   final w = <String>[];
   for (final wo in p.workouts) {
     for (final i in wo.items) {
-      // Ρεζέρβα τουλάχιστον 2 σε όλες τις ασκήσεις, ως να πει άλλα ο καρδιολόγος (έλεγχος #2).
+      // Ρεζέρβα τουλάχιστον 2 σε όλες τις ασκήσεις, ως να πει άλλα ο γιατρός (έλεγχος #2).
       if (i.rir < 2) {
         i.rir = 2;
         w.add(i.kind == LoadKind.bar

@@ -47,7 +47,7 @@ class SourceTag extends StatelessWidget {
       };
 }
 
-/// Μικρή σημείωση «εκτίμηση του Oura» δίπλα σε βαθμολογίες και φάσεις.
+/// Μικρή σημείωση «εκτίμηση της Oura» δίπλα σε βαθμολογίες και φάσεις.
 class EstimateNote extends StatelessWidget {
   const EstimateNote(this.text, {super.key, this.onDark = false});
   final String text;

@@ -101,7 +101,7 @@ Goals _goals2090() => Goals(
       kcalSet: 2090,
     );
 
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
