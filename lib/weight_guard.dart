@@ -24,7 +24,7 @@
 /// Round 2 (g4 · R2-E-2): η διαφορά από τη διάμεσο ΜΟΝΗ της δεν κάνει πια μια ζύγιση «ξένη». Μετά από κενό στις ζυγίσεις
 /// με αληθινή αλλαγή (αρρώστια, −5 kg σε 10 μέρες χωρίς ζύγιση) οι ΔΙΚΕΣ σου ζυγίσεις έβγαιναν «ξένες» για μια εβδομάδα
 /// και η αναφορά για τον γιατρό έλεγε «πιθανόν άλλου ατόμου». Τώρα ([weighStatusAt]) μια ζύγιση που διαφέρει (κανόνας
-/// πάνω, [weightLooksForeign]) είναι:
+/// πάνω, στο [weighStatusAt]) είναι:
 /// - [WeighStatus.foreign] μόνο όταν οι ζυγίσεις ΠΡΙΝ και ΜΕΤΑ από αυτήν (ως [weightGuardDays] μέρες) συμφωνούν μεταξύ
 ///   τους και όχι μαζί της ([weightsAgree]): το παιδί ή ο επισκέπτης ανάμεσα στις δικές σου ζυγίσεις, μία ή λίγες στη σειρά
 ///   (ως [weightGuardDays] μέρες συνολικά, π.χ. ένα Σαββατοκύριακο). Δεν μετρά πουθενά.
@@ -134,20 +134,6 @@ const weightConfirmBigKg = 12.0;
 const weightConfirmBigShare = 0.15;
 const weightConfirmGap = 7;
 
-/// true: η ζύγιση [kg] δεν μπορεί λογικά να είναι του ίδιου ανθρώπου με τις [neighbours] (οι ΑΛΛΕΣ ζυγίσεις του των
-/// γύρω ημερών, σε kg· όχι η ίδια). false και όταν δεν φτάνουν οι άλλες ζυγίσεις για να κριθεί.
-bool weightLooksForeign(double kg, Iterable<double> neighbours) {
-  if (!kg.isFinite) return false;
-  final others = [
-    for (final w in neighbours)
-      if (w.isFinite) w,
-  ]..sort();
-  final n = others.length;
-  if (n < weightGuardMinNeighbours) return false;
-  final median = n.isOdd ? others[n ~/ 2] : (others[n ~/ 2 - 1] + others[n ~/ 2]) / 2;
-  return (kg - median).abs() > math.max(weightGuardKg, weightGuardShare * median);
-}
-
 /// Round 2 (R2-E-2): τι γίνεται με μια ζύγιση (κανόνας στην αρχή του αρχείου).
 enum WeighStatus {
   /// Μετρά παντού.
@@ -163,7 +149,9 @@ enum WeighStatus {
 }
 
 /// Round 2 (R2-E-2): δύο ζυγίσεις μπορεί να είναι του ίδιου ανθρώπου: απέχουν ως [weightGuardKg] kg ή ως το
-/// [weightGuardShare] της μεγαλύτερης (ίδια όρια με το [weightLooksForeign]).
+/// [weightGuardShare] της μεγαλύτερης (ίδια όρια με τη σύγκριση με τη διάμεσο στο [weighStatusAt]).
+/// Round 7 (f5 · A12-7): το παλιό `weightLooksForeign` (η ίδια σύγκριση με τη διάμεσο, χωριστή συνάρτηση) βγήκε: δεν το
+/// καλούσε τίποτα στην εφαρμογή και οι δοκιμές του δεν έλεγχαν τον κανόνα που τρέχει· τώρα ελέγχεται αυτή, στα όριά της.
 bool weightsAgree(double a, double b) => (a - b).abs() <= math.max(weightGuardKg, weightGuardShare * math.max(a, b));
 
 /// Round 2 (R2-E-2): η κατάσταση της ζύγισης [i] της [days] (μία ζύγιση ανά μέρα: η μέρα και τα kg, παλιότερη πρώτη,

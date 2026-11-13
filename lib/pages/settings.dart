@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../backup.dart';
 import '../data.dart';
+import '../error_report.dart' show errors;
 import '../food/food_channel.dart';
 import '../food/food_store.dart';
 import '../format.dart';
@@ -53,6 +54,8 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     now: now,
     sources: sources,
     training: await _trainingForBackup(),
+    // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
+    errorsOff: !errors.enabled,
   );
   final trainingOut = TrainingStore.main.readError;
   final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
@@ -64,7 +67,8 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   final sourcesOut = sources == null && (!store.planReady || store.plan.eras.isNotEmpty);
   final r = await FoodChannel.saveBackup(json, name);
   if (r['ok'] != true || r['uri'] is! String) {
-    return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}', uri: null);
+    // Round 7 (R7-A9-5): ελληνικό μήνυμα από το είδος του σφάλματος, ποτέ το κείμενο της Java.
+    return (ok: false, text: backupSaveFailText(r), uri: null);
   }
   final saved = r['name'] is String ? r['name'] as String : name;
   // Πλήρες μόνο αν μπήκαν οι προπονήσεις με τους παλμούς τους, οι ρυθμίσεις και οι πηγές ύπνου. Μόνο ένα πλήρες
@@ -100,6 +104,22 @@ List<String> restorePrefsSummary(
   if (!ok && !loaded) return const ['Οι ρυθμίσεις δεν άλλαξαν.'];
   return [if (!ok && unsaved) restorePrefsUnsavedText, ...notes];
 }
+
+/// Round 7 (R7-A9-3): τι λέει η σύνοψη της επαναφοράς για τις πηγές ύπνου, για κάθε λόγο χωριστά. Πριν έλεγε «του
+/// κινητού είναι νεότερες» και όταν οι πηγές του κινητού δεν διαβάζονταν ή δεν γράφτηκαν: ακριβώς τότε που οι νύχτες
+/// μένουν χωρίς σωστή πηγή και η επαναφορά πρέπει να ξαναγίνει.
+String sourcesRestoreText(SourcesRestore r) => switch (r) {
+      SourcesRestore.restored => 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
+      SourcesRestore.phoneNewer => 'Οι πηγές ύπνου του κινητού είναι νεότερες και έμειναν.',
+      SourcesRestore.same => 'Οι πηγές ύπνου του κινητού είναι ίδιες με του αντιγράφου.',
+      SourcesRestore.notReady =>
+        'Οι πηγές ύπνου δεν μπήκαν: οι ρυθμίσεις ή οι πηγές του κινητού δεν διαβάζονται ακόμα. Κάνε ξανά την επαναφορά σε λίγο.',
+      SourcesRestore.writeFailed => 'Οι πηγές ύπνου δεν γράφτηκαν στο κινητό. Κάνε ξανά την επαναφορά.',
+      SourcesRestore.invalid => 'Οι πηγές ύπνου του αντιγράφου δεν διαβάζονται· έμειναν του κινητού.',
+    };
+
+/// Round 7 (R7-A11-4): το αντίγραφο είχε κλειστές τις αναφορές σφαλμάτων, και έκλεισαν και εδώ.
+const restoreErrorsClosedText = 'Οι αναφορές σφαλμάτων έμειναν κλειστές, όπως στο αντίγραφο.';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
@@ -335,7 +355,7 @@ class _DataGroupState extends State<_DataGroup> {
     try {
       final r = await FoodChannel.pickBackup();
       if (r['ok'] != true) {
-        if (r['kind'] != 'cancelled') _say('Δεν άνοιξε το αρχείο: ${r['message'] ?? 'άγνωστο σφάλμα'}');
+        if (r['kind'] != 'cancelled') _say(backupOpenFailText(r));
         return;
       }
       BackupContents? parsed;
@@ -373,6 +393,8 @@ class _DataGroupState extends State<_DataGroup> {
         ),
       );
       if (ok != true) return;
+      // Round 7 (R7-A11-4): πρώτα η αντίρρηση στις αναφορές σφαλμάτων (αν το αντίγραφο την είχε), πριν από οτιδήποτε άλλο.
+      final errorsClosed = await restoreErrorsChoice(b, errors);
       final res = await widget.food!.importBackup(b.entries, b.myFoods);
       if (res == null) {
         _say('Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.');
@@ -384,7 +406,7 @@ class _DataGroupState extends State<_DataGroup> {
       final prefsNotes =
           b.prefs.isEmpty || !prefsWereLoaded ? const <String>[] : restoreNotes(widget.store.prefsJson(), b.prefs);
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
-      final sourcesIn = b.sources != null && await widget.store.restoreSources(b.sources!);
+      final sources = b.sources == null ? null : await widget.store.restoreSourcesWhy(b.sources!);
       var trainingIn = 0;
       var trainingWritten = true;
       if (b.training != null) {
@@ -402,12 +424,12 @@ class _DataGroupState extends State<_DataGroup> {
         // γραμμένες (ίδιο με την κάρτα «Δοκίμασε ξανά» της Σήμερα).
         ...restorePrefsSummary(
             ok: prefsOk, loaded: prefsWereLoaded, unsaved: widget.store.prefsSaveError, notes: prefsNotes),
-        if (sourcesIn) 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
+        if (sources != null) sourcesRestoreText(sources),
         if (trainingIn > 0 && trainingWritten)
           countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),
         if (trainingIn > 0 && !trainingWritten) 'Οι προπονήσεις του αντιγράφου δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (b.training != null && TrainingStore.main.mergeProblem != null) TrainingStore.main.mergeProblem!,
-        if (b.sources != null && !sourcesIn) 'Οι πηγές ύπνου του κινητού είναι νεότερες και έμειναν.',
+        if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
     } finally {
       if (mounted) setState(() => _busy = false);

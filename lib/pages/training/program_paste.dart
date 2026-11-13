@@ -64,7 +64,8 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
         icon: Icons.content_paste_rounded,
         color: c.exercise,
         title: _empty ? 'Το πρόχειρο είναι άδειο' : 'Διαβάζω το πρόχειρο…',
-        text: 'Αντίγραφε το πρόγραμμα από τη συζήτηση με τον Claude (όλο το κείμενο) και πάτα «Επικόλληση ξανά».',
+        // R7-U3-13: «Αντίγραψε» (μία ενέργεια), όχι «Αντίγραφε».
+        text: 'Αντίγραψε το πρόγραμμα από τη συζήτηση με τον Claude (όλο το κείμενο) και πάτα «Επικόλληση ξανά».',
       ));
     } else if (!r.ok) {
       body.add(AppCard(
@@ -94,12 +95,22 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(10)),
                   child: Column(children: [
                     Text(dayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
-                    Text(
-                      () {
-                        final w = p.workout(p.days[d]);
-                        return w == null ? '—' : (w.isCardio ? 'Περ.' : w.id);
-                      }(),
-                      style: TextStyle(fontSize: 12, color: c.textSecondary),
+                    // R7-U3-12: όπως η «Η εβδομάδα» της Άσκησης (U5-27): σύντομο ελληνικό όνομα και εικονίδιο για το
+                    // περπάτημα, όχι ο εσωτερικός κωδικός («UA») και «Περ.».
+                    SizedBox(
+                      height: 18,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: () {
+                          final w = p.workout(p.days[d]);
+                          if (w == null) return Text('—', key: ValueKey('paste-week-$d'), style: TextStyle(fontSize: 12, color: c.textSecondary));
+                          if (w.isCardio) {
+                            return Icon(Icons.directions_walk_rounded,
+                                key: ValueKey('paste-week-$d'), size: 15, color: c.textSecondary, semanticLabel: w.cardio!.name);
+                          }
+                          return Text(shortWorkoutName(w), key: ValueKey('paste-week-$d'), maxLines: 1, style: TextStyle(fontSize: 12, color: c.textSecondary));
+                        }(),
+                      ),
                     ),
                   ]),
                 ),

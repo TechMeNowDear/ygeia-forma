@@ -115,7 +115,8 @@ jobs:
           set -o pipefail
           # Όλοι οι έλεγχοι εκτός από τα στιγμιότυπα και τη ζωντανή δοκιμή Sentry, με ώρα Αθήνας
           # (ώστε να πιάνονται λάθη στην αλλαγή ώρας).
-          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test -e oura_sandbox_live_test)
+          # Round 7 (R7-A12-10): και οι δοκιμές σε υποφακέλους του test/ (πριν: μόνο test/*_test.dart).
+          files=$(find test -name '*_test.dart' | LC_ALL=C sort | grep -v -e screens_test -e sentry_live_test -e oura_sandbox_live_test)
           if ! flutter test $files 2>&1 | tee tests.log; then
             grep -E -B2 -A8 "Error:|Expected:|FAILED|failed" tests.log | head -120 > errors.txt || true
             [ -s errors.txt ] || tail -80 tests.log > errors.txt
@@ -128,8 +129,9 @@ jobs:
           n=$(grep -aoE '[0-9]+ tests passed' tests.log | tail -1 | grep -oE '^[0-9]+' || true)
           [ -n "$n" ] || n=$(grep -aoE '\+[0-9]+[^+]*All tests passed' tests.log | tail -1 | grep -oE '[0-9]+' | head -1 || true)
           echo "::notice title=Έλεγχοι::${n:-0} δοκιμές Dart πέρασαν"
-          if [ "${n:-0}" -lt 950 ]; then
-            echo "::error title=Έλεγχοι::Έτρεξαν μόνο ${n:-0} δοκιμές Dart (κατώτατο 950). Λείπουν δοκιμές από το σύνολο;"
+          # Round 7 (R7-A12-10): κατώτατο λίγο κάτω από όσες τρέχουν (#104: ≈ 1.590· πριν 950), ίδιο με το check.yml.
+          if [ "${n:-0}" -lt 1550 ]; then
+            echo "::error title=Έλεγχοι::Έτρεξαν μόνο ${n:-0} δοκιμές Dart (κατώτατο 1550). Λείπουν δοκιμές από το σύνολο;"
             exit 1
           fi
 
@@ -169,8 +171,9 @@ jobs:
             | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
           echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
           # Έλεγχος 13/11 (S12-17): «0 έλεγχοι εντάξει» δεν περνά πια (π.χ. αν το «flutter create» πάψει να βάζει το src/test).
-          if [ "${n:-0}" -lt 40 ]; then
-            echo "::error title=Έλεγχοι Kotlin::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin του κινητού (κατώτατο 40)"
+          # Round 7 (R7-A12-10): λίγο κάτω από όσους υπάρχουν (#104: 73· πριν 40).
+          if [ "${n:-0}" -lt 70 ]; then
+            echo "::error title=Έλεγχοι Kotlin::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin του κινητού (κατώτατο 70)"
             exit 1
           fi
 
@@ -192,12 +195,13 @@ jobs:
             exit 1
           fi
           cd ..
-          # Έλεγχος 13/11 (S12-17): κινητό + ρολόι μαζί (τα αποτελέσματα του κινητού υπάρχουν ήδη από το προηγούμενο βήμα).
-          n=$(find . -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
+          # Round 7 (R7-A12-10): ΜΟΝΟ του ρολογιού (build/wear, εκεί που βγαίνει και το APK του), λίγο κάτω από όσους
+          # υπάρχουν (#104: 133). Πριν μετρούσε κινητό + ρολόι μαζί με κατώτατο 120: το ρολόι μπορούσε να χάσει τα 2/3.
+          n=$(find build/wear -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
             | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
-          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι κινητού και ρολογιού εντάξει"
-          if [ "${n:-0}" -lt 120 ]; then
-            echo "::error title=Ρολόι::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin (κινητό + ρολόι· κατώτατο 120). Έτρεξαν οι έλεγχοι του ρολογιού;"
+          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι ρολογιού εντάξει"
+          if [ "${n:-0}" -lt 128 ]; then
+            echo "::error title=Ρολόι::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin του ρολογιού (κατώτατο 128). Έτρεξαν οι έλεγχοι του ρολογιού;"
             exit 1
           fi
           w=$(ls build/wear/outputs/apk/release/*.apk 2>/dev/null | head -1)
@@ -275,6 +279,9 @@ jobs:
           flutter-version: 3.47.9 # σταθερή έκδοση: μια νέα Flutter δεν αλλάζει σιωπηλά την εφαρμογή
           cache: true
 
+      # Round 7 (R7-A12-10): ΣΚΟΠΙΜΑ χωρίς σύγκριση με αποθηκευμένες εικόνες (goldens): εξαρτώνται από τη γραμματοσειρά
+      # και το Skia του runner και αλλάζουν σε κάθε σχεδιαστική αλλαγή, άρα θα έβγαιναν κόκκινες χωρίς λάθος. Σταματούν
+      # σφάλματα, ξεχειλίσματα και οι έλεγχοι (expect) του screens_test· τις οθόνες τις κοιτάζει άνθρωπος.
       - name: Ζωγράφισμα οθονών
         run: |
           set -o pipefail
@@ -416,7 +423,11 @@ jobs:
             echo "::warning title=Αναβάθμιση::Δεν χτίστηκε η τελευταία έκδοση· η δοκιμή αναβάθμισης παραλείπεται"
           fi
 
+      # Round 7 (R7-A12-10): στο main το tools/perf/upgrade.sh αποτυγχάνει (όχι προειδοποίηση) όταν δεν μπορεί να δοκιμάσει
+      # με δείγμα δεδομένων (χωρίς root, χωρίς sqlite3, δείγμα που δεν μπήκε). Εξαίρεση πάλι το «[skip-upgrade]».
       - name: Άνοιγμα και αναβάθμιση σε emulator
+        env:
+          SKIP_UPGRADE: ${{ contains(github.event.head_commit.message, '[skip-upgrade]') }}
         run: |
           set -o pipefail
           export PATH="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/platform-tools:$PATH"

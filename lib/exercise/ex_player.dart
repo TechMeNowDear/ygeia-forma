@@ -245,9 +245,19 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
               setState(() => _muscles = !_muscles);
               _repaint.value++;
             }),
+            // R7-U3-11: οι οδηγοί φαίνονται μόνο στην κύρια όψη· σε άλλη όψη το chip δεν μένει «αναμμένο», και το πάτημα
+            // γυρίζει στην κύρια όψη με τους οδηγούς (πριν δεν άλλαζε τίποτα στην εικόνα και έμοιαζε χαλασμένο).
             if (ex.anim.guides.isNotEmpty)
-              TabChip(label: 'Οδηγοί', selected: _guides, solid: c.exerciseSolid, onTap: () {
-                setState(() => _guides = !_guides);
+              TabChip(key: const ValueKey('ex-guides'), label: 'Οδηγοί', selected: _guides && nearDefault, solid: c.exerciseSolid, onTap: () {
+                setState(() {
+                  if (nearDefault) {
+                    _guides = !_guides;
+                  } else {
+                    _second = false;
+                    _yaw = ex.yaw;
+                    _guides = true;
+                  }
+                });
                 _repaint.value++;
               }),
             ])

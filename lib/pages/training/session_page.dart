@@ -201,11 +201,14 @@ class _SessionPageState extends State<SessionPage> {
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (v) {
                   if (v == 'swap') _swap(context, e);
+                  if (v == 'pain') _painSheet(context, e);
                   if (v == 'routine' && routine != null) openRoutineSheet(context, routine);
                   if (v == 'notes' && notes.isNotEmpty) openProgramNotesSheet(context, notes);
                 },
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'swap', key: ValueKey('sess-swap'), child: Text('Αλλαγή άσκησης')),
+                  // R7-A6-2: ενόχληση σε οποιοδήποτε σημείο της άσκησης (και αν σταματάς πριν από το τελευταίο σετ).
+                  const PopupMenuItem(value: 'pain', key: ValueKey('sess-pain'), child: Text('Πόνεσε κάπου')),
                   // 13/11: το ζέσταμα και η αποθεραπεία της προπόνησης, αν το πρόγραμμα έχει.
                   if (routine != null) PopupMenuItem(value: 'routine', key: const ValueKey('sess-routine'), child: Text(routineLabel(routine)!)),
                   // round1, S7-11: οι κανόνες του προγράμματος, πάντα ένα πάτημα μακριά μέσα στην προπόνηση.
@@ -465,12 +468,12 @@ class _SessionPageState extends State<SessionPage> {
         break;
       }
     }
-    final hist = t.historyOf(e.ex);
+    // Η τελευταία φορά με σετ (όχι μια «παράλειψη»). R7-A6-11: κάθε σετ με το φορτίο του, όταν άλλαξε μέσα στην άσκηση.
+    final hist = [for (final h in t.historyOf(e.ex)) if (!h.$2.skipped && h.$2.done.isNotEmpty) h];
     String? lastTime;
     if (hist.isNotEmpty) {
       final (d, l) = hist.first;
-      lastTime = 'Τελευταία φορά (${shortDayDate(d)}): '
-          '${hasLoad(k) ? '${loadLabel(k, l.workLoad)} · ' : ''}${l.done.map((x) => x.reps).join(', ')}'
+      lastTime = 'Τελευταία φορά (${shortDayDate(d)}): ${l.doneText()}'
           '${l.rirAnswer == null ? '' : ' · άφησες ${l.rirAnswer == 4 ? '4+' : l.rirAnswer}'}';
     }
     return AppCard(
@@ -499,7 +502,8 @@ class _SessionPageState extends State<SessionPage> {
               TextSpan(children: [
                 TextSpan(text: '${e.sets} σετ × ${e.lo == e.hi ? '${e.lo}' : '${e.lo}–${e.hi}'} · '),
                 TextSpan(text: 'άφησε\u00A0${e.rir}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                TextSpan(text: ' · ξεκούραση ${clock(e.rest)}'),
+                // R7-U3-09: «ξεκούραση 2:00» ποτέ σε δύο γραμμές.
+                TextSpan(text: ' · ξεκούραση\u00A0${clock(e.rest)}'),
               ]),
               key: const ValueKey('sess-plan'),
               style: TextStyle(fontSize: 15, height: 1.4, color: c.text),
@@ -511,6 +515,12 @@ class _SessionPageState extends State<SessionPage> {
         if (_itemNote(s, e) case final note?) ...[
           const SizedBox(height: 4),
           Text(note, key: const ValueKey('sess-item-note'), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
+        ],
+        // R7-A6-7: ένα ✓ = και οι δύο πλευρές (έτσι μετρούν τα σετ, ο χρόνος και τα κιλά).
+        if (perSideExercises.contains(e.ex)) ...[
+          const SizedBox(height: 4),
+          Text('Κάθε σετ: δεξιά και αριστερά, μετά ✓.',
+              key: const ValueKey('sess-per-side'), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
         ],
         if (hasLoad(k) || change != null) ...[
           const SizedBox(height: 10),
@@ -555,13 +565,23 @@ class _SessionPageState extends State<SessionPage> {
           ]),
           const SizedBox(height: 6),
           for (var i = 0; i < e.log.length; i++) _setRow(context, s, e, i, i == current),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: () => t.addSet(e), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Σετ')),
-          ),
-          if (e.complete && e.rirAnswer != null)
+          // R7-A6-2: «Πόνεσε κάπου;» σε κάθε σημείο της άσκησης, όχι μόνο μετά το τελευταίο σετ.
+          Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            TextButton.icon(onPressed: () => t.addSet(e), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Σετ')),
+            TextButton(
+              key: const ValueKey('sess-pain-btn'),
+              style: TextButton.styleFrom(foregroundColor: c.warn, minimumSize: const Size(48, 48)),
+              onPressed: () => _painSheet(context, e),
+              child: const Text('Πόνεσε κάπου;'),
+            ),
+          ]),
+          if ((e.complete && e.rirAnswer != null) || e.pain.isNotEmpty)
             Text(
-              'Άφησες ${e.rirAnswer == 4 ? '4+' : e.rirAnswer}${e.pain.isEmpty ? '' : ' · ενόχληση: ${e.pain.map((p) => painNames[p]).join(', ')}'}',
+              [
+                if (e.complete && e.rirAnswer != null) 'Άφησες ${e.rirAnswer == 4 ? '4+' : e.rirAnswer}',
+                if (e.pain.isNotEmpty) '${e.complete && e.rirAnswer != null ? 'ενόχληση' : 'Ενόχληση'}: ${e.pain.map((p) => painNames[p] ?? p).join(', ')}',
+              ].join(' · '),
+              key: const ValueKey('sess-pain-line'),
               style: TextStyle(fontSize: 13.5, color: e.pain.isEmpty ? c.textSecondary : c.warn),
             ),
         ],
@@ -835,34 +855,7 @@ class _SessionPageState extends State<SessionPage> {
               Text('Πόνεσε κάπου;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
               Text('Μόνο αν ναι.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
               const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final p in painNames.entries)
-                  () {
-                    final on = e.pain.contains(p.key);
-                    return Semantics(
-                      selected: on,
-                      button: true,
-                      child: Material(
-                        color: on ? c.warnBg : c.card,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: on ? c.warnLine : c.hairline, width: on ? 2 : 1.5),
-                        ),
-                        child: InkWell(
-                          key: ValueKey('pain-${p.key}'),
-                          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          onTap: () => set(() => t.togglePain(e, p.key)),
-                          child: Padding(
-                            // round1, U5-12: 48 dp ύψος (πριν 43), εκεί που τα χέρια είναι πιο κουρασμένα.
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                            child: Text(p.value,
-                                style: TextStyle(fontSize: 15, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? c.warn : c.text)),
-                          ),
-                        ),
-                      ),
-                    );
-                  }(),
-              ]),
+              _painChips(ctx, e, set),
               if (e.pain.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Text('Σημειώνεται στη σύνοψη της προπόνησης.', style: TextStyle(fontSize: 13.5, color: c.warn)),
@@ -881,6 +874,76 @@ class _SessionPageState extends State<SessionPage> {
               style: TextButton.styleFrom(foregroundColor: c.textSecondary, minimumSize: const Size.fromHeight(48)),
               onPressed: () => Navigator.of(ctx).pop(-1),
               child: const Text('Δεν ξέρω'),
+            ),
+          ]),
+        );
+      }),
+    );
+  }
+
+  /// Τα σημεία της ενόχλησης (σχέδια 9/11, 6γ: κεχριμπάρι, χωρίς ✓ και χωρίς πράσινο). Στο φύλλο του τελευταίου σετ και
+  /// στο «Πόνεσε κάπου;» ([_painSheet]).
+  Widget _painChips(BuildContext ctx, ExLog e, StateSetter set) {
+    final c = Aigaio.of(ctx);
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final p in painNames.entries)
+        () {
+          final on = e.pain.contains(p.key);
+          return Semantics(
+            selected: on,
+            button: true,
+            child: Material(
+              color: on ? c.warnBg : c.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: on ? c.warnLine : c.hairline, width: on ? 2 : 1.5),
+              ),
+              child: InkWell(
+                key: ValueKey('pain-${p.key}'),
+                customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () => set(() => t.togglePain(e, p.key)),
+                child: Padding(
+                  // round1, U5-12: 48 dp ύψος (πριν 43), εκεί που τα χέρια είναι πιο κουρασμένα.
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  child: Text(p.value,
+                      style: TextStyle(fontSize: 15, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? c.warn : c.text)),
+                ),
+              ),
+            ),
+          );
+        }(),
+    ]);
+  }
+
+  /// R7-A6-2: «Πόνεσε κάπου;» σε οποιοδήποτε σημείο της άσκησης (και αν σταματάς νωρίτερα). Η επόμενη φορά της άσκησης
+  /// βγαίνει πιο ελαφριά ([nextTarget]). Στο ρολόι δεν υπάρχει αυτή η επιλογή.
+  Future<void> _painSheet(BuildContext context, ExLog e) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+        final c = Aigaio.of(ctx);
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Πόνεσε κάπου;', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.25, color: c.text)),
+            const SizedBox(height: 4),
+            Text('${exName(e.ex)}. Αν πονάς, σταμάτα την άσκηση: η επόμενη φορά της βγαίνει πιο ελαφριά.',
+                style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
+            const SizedBox(height: 14),
+            _painChips(ctx, e, set),
+            if (e.pain.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text('Σημειώνεται στη σύνοψη της προπόνησης.', style: TextStyle(fontSize: 13.5, color: c.warn)),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const ValueKey('pain-ok'),
+              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Εντάξει'),
             ),
           ]),
         );
@@ -925,7 +988,8 @@ class _SessionPageState extends State<SessionPage> {
                 ]),
               ),
               b('+30″', () => _restAdd(30), const ValueKey('rest-plus')),
-              b('Συνέχεια', _restStop, const ValueKey('rest-stop')),
+              // R7-U3 Β-Α2: ίδια λέξη με το ρολόι («Πάμε»)· εκεί το «Συνέχεια» είναι του περπατήματος.
+              b('Πάμε', _restStop, const ValueKey('rest-stop')),
             ]),
           ),
         );
@@ -1053,6 +1117,12 @@ class _SessionPageState extends State<SessionPage> {
       if (x.group == base?.group) ids.add(x.id);
     }
     ids.remove(e.ex);
+    // R7-A6-9: ασκήσεις «με προσοχή» (π.χ. βυθίσεις, ώμοι) στο τέλος της λίστας και με την προειδοποίησή τους, όπως στο
+    // «Πρόσθεσε άσκηση» (ex_picker.dart)· πριν φαίνονταν σαν κάθε άλλη, ακόμα και μετά από ενόχληση στον ώμο.
+    final ordered = [
+      for (final id in ids) if (lib.byId(id)?.caution == null) id,
+      for (final id in ids) if (lib.byId(id)?.caution != null) id,
+    ];
     final pick = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -1065,12 +1135,25 @@ class _SessionPageState extends State<SessionPage> {
             child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
               Text('Αντί για ${exName(e.ex)}', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
               const SizedBox(height: 8),
-              for (final id in ids)
+              for (final id in ordered)
                 ListTile(
                   key: ValueKey('swap-$id'),
                   contentPadding: EdgeInsets.zero,
                   title: Text(exName(id)),
-                  subtitle: Text(lib.byId(id)?.equip ?? ''),
+                  subtitle: lib.byId(id)?.caution == null
+                      ? Text(lib.byId(id)?.equip ?? '')
+                      : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(lib.byId(id)?.equip ?? ''),
+                          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(lib.byId(id)?.caution ?? '',
+                                  key: ValueKey('swap-caution-$id'),
+                                  style: TextStyle(fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w600, color: c.warn)),
+                            ),
+                          ]),
+                        ]),
                   trailing: (base?.alt.contains(id) ?? false) ? Text('προτεινόμενη', style: TextStyle(color: c.exercise, fontSize: 12.5)) : null,
                   onTap: () => Navigator.of(ctx).pop(id),
                 ),
@@ -1107,18 +1190,32 @@ class _SessionPageState extends State<SessionPage> {
     // Νωρίτερα από το πρόγραμμα: ερώτηση, για να μη γραφτεί κατά λάθος μισή προπόνηση (η πρόοδος βγαίνει από αυτή).
     final total = s.items.where((e) => !e.skipped).fold<int>(0, (a, e) => a + e.sets);
     if (s.setsDone < total) {
-      final end = await showDialog<bool>(
+      final end = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Τελείωσες νωρίτερα;'),
-          content: Text('Έγιναν ${s.setsDone} από $total σετ. Όσα δεν έγιναν δεν μετράνε στην πρόοδο.'),
+          content: Text('Έγιναν ${s.setsDone} από $total σετ. Όσα δεν έγιναν δεν μετράνε στην πρόοδο. Αν σταμάτησες από πόνο, '
+              'πάτα «Πόνεσα»: η επόμενη φορά της άσκησης βγαίνει πιο ελαφριά.'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Συνέχεια προπόνησης')),
-            TextButton(key: const ValueKey('sess-finish-ok'), onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Τέλος')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop('back'), child: const Text('Συνέχεια προπόνησης')),
+            // R7-A6-2: σταμάτησες από πόνο: να μείνει γραμμένο (πριν δεν έμενε κανένα ίχνος).
+            TextButton(key: const ValueKey('sess-finish-pain'), onPressed: () => Navigator.of(ctx).pop('pain'), child: const Text('Πόνεσα')),
+            TextButton(key: const ValueKey('sess-finish-ok'), onPressed: () => Navigator.of(ctx).pop('end'), child: const Text('Τέλος')),
           ],
         ),
       );
-      if (end != true || !context.mounted) return;
+      if ((end != 'end' && end != 'pain') || !context.mounted) return;
+      if (end == 'pain') {
+        // Η άσκηση που φαίνεται (εκεί σταμάτησες)· αν είναι ήδη τελειωμένη, η πρώτη που δεν τελείωσε και έχει σετ.
+        final shown = _idx >= 0 && _idx < s.items.length ? s.items[_idx] : null;
+        ExLog? painEx = shown != null && !shown.complete ? shown : null;
+        for (final x in s.items) {
+          if (painEx == null && !x.skipped && !x.complete && x.done.isNotEmpty) painEx = x;
+        }
+        painEx ??= shown;
+        if (painEx != null) await _painSheet(context, painEx);
+        if (!context.mounted || t.current?.id != s.id) return;
+      }
     }
     _restStop();
     if (!context.mounted) return;
@@ -1214,12 +1311,22 @@ class _SummaryPageState extends State<SummaryPage> {
     final mins = (s.end ?? (t.current == s && t.isStale(s) ? s.lastActivity : t.now)).difference(s.start).inMinutes;
     final prog = t.program?.workout(s.workout);
 
-    PlanItem itemFor(ExLog e) {
-      PlanItem? base;
+    // R7-A6-4: «Την επόμενη φορά» όπως θα τη δώσει η επόμενη προπόνηση: με τα σετ και το εύρος του προγράμματος (όχι
+    // το κάτω όριο της μέρας, που μπορεί να ήταν χαμηλωμένο), και για μια εναλλακτική ο στόχος της άσκησης του
+    // προγράμματος, που ξαναμπαίνει την επόμενη φορά (εκτός αν είναι η πιο δύσκολη παραλλαγή της, που συνεχίζει).
+    PlanItem? planned(ExLog e) {
       for (final i in prog?.items ?? const <PlanItem>[]) {
-        if (i.ex == e.ex) base = i;
+        if (i.ex == e.ex || i.ex == e.swappedFrom) return i;
       }
-      return PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest, next: base?.next, load: base?.load);
+      return null;
+    }
+
+    PlanItem itemFor(ExLog e) {
+      final p = planned(e);
+      if (p == null) return PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest);
+      if (p.ex == e.ex) return p;
+      if (p.next == e.ex) return PlanItem(ex: e.ex, sets: p.sets, lo: p.lo, hi: p.hi, rir: p.rir, rest: p.rest, note: p.note);
+      return p;
     }
 
     // round1, U5-06: διάρκεια σε λέξεις («60» / «λεπτά», όχι «60′»). U5-10: ένα όνομα για το ίδιο νούμερο («σύνολο»), και
@@ -1227,6 +1334,8 @@ class _SummaryPageState extends State<SummaryPage> {
     final shownMins = s.isCardio ? (s.cardioMinutes ?? mins) : mins;
     final minsLabel = shownMins == 1 ? 'λεπτό' : 'λεπτά';
     final pairs = !s.isCardio && s.volume > 0 && s.items.any((x) => x.kind == LoadKind.dbPair && x.done.isNotEmpty);
+    // R7-A6-7: και στις ασκήσεις μίας πλευράς τη φορά, ένα ✓ = δεξιά και αριστερά.
+    final sides = !s.isCardio && s.volume > 0 && s.items.any((x) => perSideExercises.contains(x.ex) && usesKg(x.kind) && x.done.isNotEmpty);
     final stats0 = AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
@@ -1248,26 +1357,37 @@ class _SummaryPageState extends State<SummaryPage> {
               ]),
             ),
         ]),
-        if (pairs) ...[
+        if (pairs || sides) ...[
           const SizedBox(height: 8),
-          Text('Στα ζευγάρια αλτήρων μετράνε και οι δύο αλτήρες.',
-              key: const ValueKey('sum-pairs'), style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
+          Text(
+              pairs && sides
+                  ? 'Στα ζευγάρια αλτήρων μετράνε και οι δύο αλτήρες, και στις ασκήσεις μίας πλευράς και οι δύο πλευρές.'
+                  : pairs
+                      ? 'Στα ζευγάρια αλτήρων μετράνε και οι δύο αλτήρες.'
+                      : 'Στις ασκήσεις μίας πλευράς μετράνε και οι δύο πλευρές.',
+              key: const ValueKey('sum-pairs'),
+              style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
         ],
       ]),
     );
 
     final next = <Widget>[];
+    final shownNext = <String>{};
     for (final e in s.items) {
-      if (e.skipped || e.done.isEmpty) continue;
-      final history = widget.live ? [(s.start, e), ...t.historyOf(e.ex)] : t.historyOf(e.ex);
+      if (e.done.isEmpty && e.pain.isEmpty) continue;
+      if (e.skipped && e.pain.isEmpty) continue;
       final item = itemFor(e);
-      final tg = nextTarget(item, history, t.now, caution: TrainingStore.isCaution(e.ex));
+      // Μία γραμμή ανά άσκηση της επόμενης φοράς (η άσκηση που άλλαξε και η εναλλακτική της δίνουν την ίδια).
+      if (!shownNext.add(item.ex)) continue;
+      final own = [for (final x in s.items) if (x.ex == item.ex) (s.start, x)];
+      final history = widget.live ? [...own, ...t.historyOf(item.ex)] : t.historyOf(item.ex);
+      final tg = nextTarget(item, history, t.now, caution: TrainingStore.isCaution(item.ex));
       final (col, arrow) = changeLook(context, tg.change);
       next.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
-            Text(exName(e.ex), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
+            Text(exName(item.ex), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
             Text(
               tg.variant != null ? '→ ${exName(tg.variant!)}' : '${targetLine(item, tg)}$arrow',
               style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: col),

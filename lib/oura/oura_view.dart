@@ -52,6 +52,9 @@ NightBaseline? ouraBaseline(Map<String, Map<String, double>> history, SourcePlan
 /// Μέσοι όροι φάσεων (λεπτά) των τελευταίων 7 νυχτών Oura ως τη νύχτα [day].
 class StageAverages {
   const StageAverages({required this.nights, this.deep, this.light, this.rem, this.awake});
+
+  /// Οι νύχτες της εβδομάδας με όλες τις φάσεις (αυτές μπαίνουν στον μέσο όρο). Round 7 (R7-A5-2): οι τέσσερις τιμές
+  /// είναι όλες null ή όλες με τιμή.
   final int nights;
   final int? deep;
   final int? light;
@@ -75,20 +78,22 @@ StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan
   ];
   // Round 1 (S5-5): η νύχτα σε κομμάτια μετρά ΟΛΑ τα κομμάτια της ([OuraNight.counted]), όπως η διάρκεια και τα
   // ποσοστά της ίδιας νύχτας ([ouraRow]). Πριν, μόνο η κύρια περίοδος: στην ίδια οθόνη η νύχτα ήταν 7 ώρες 55 λεπτά
-  // και οι φάσεις της άθροιζαν 4 ώρες 40 λεπτά. Νύχτα με κομμάτι χωρίς την τιμή δεν μπαίνει στον μέσο όρο της.
+  // και οι φάσεις της άθροιζαν 4 ώρες 40 λεπτά.
+  // Round 7 (R7-A5-2): οι τέσσερις φάσεις από τις ΙΔΙΕΣ νύχτες: μετρά μόνο νύχτα όπου κάθε κομμάτι έχει βαθύ, ελαφρύ,
+  // REM και ξύπνιο. Πριν, κάθε φάση είχε τις δικές της νύχτες (η μπάρα δεν ήταν «μια μέση νύχτα») και με μία νύχτα
+  // χωρίς awake_time ο βαθύς έβγαινε ενώ ο ξύπνιος όχι, και η σελίδα έσπαγε στο `stages.awake!`.
+  final complete = [
+    for (final n in recent)
+      if (n.counted.every((x) => x.deep != null && x.light != null && x.rem != null && x.awakeInSleep != null)) n.counted,
+  ];
   int? avg(int? Function(OuraSleep) f) {
-    final v = <int>[];
-    for (final n in recent) {
-      final parts = n.counted;
-      if (parts.any((x) => f(x) == null)) continue;
-      v.add(parts.fold<int>(0, (s, x) => s + f(x)!));
-    }
-    if (v.length < minNightsForAverage) return null;
-    return (v.reduce((a, b) => a + b) / v.length / 60).round();
+    if (complete.length < minNightsForAverage) return null;
+    final sum = complete.fold<int>(0, (s, parts) => s + parts.fold<int>(0, (t, x) => t + f(x)!));
+    return (sum / complete.length / 60).round();
   }
 
   return StageAverages(
-    nights: recent.length,
+    nights: complete.length,
     deep: avg((s) => s.deep),
     light: avg((s) => s.light),
     rem: avg((s) => s.rem),

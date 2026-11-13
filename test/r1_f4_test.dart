@@ -163,9 +163,11 @@ void main() {
       expect(r.weighIns.any((w) => w.$2 == 30.0), isFalse);
     });
 
-    testWidgets('Σώμα: τελευταία ζύγιση ξένη → φαίνεται, με σημείωση, χωρίς «… kg από …»', (t) async {
+    testWidgets('Σώμα: τελευταία ζύγιση ξένη → φαίνεται σημειωμένη, χωρίς «… kg από …»', (t) async {
       // Round 2 (g4 · R2-E-2): τελευταία ξένη ζύγιση = άλλο βάρος την ίδια μέρα με μια δική σου (εδώ 08:00 εσύ, 09:00 το
       // παιδί). Πριν: μόνο το παιδί στις 13/11, που με τον νέο κανόνα (καμία ζύγιση μετά) είναι «σε αναμονή».
+      // Round 7 (f5 · A4-1): πάνω η ζύγιση της μέρας (08:00 90,0), όπως η Σήμερα και το widget· η ξένη 09:00 σε γκρι γραμμή
+      // και στον πίνακα με «*» (πριν: η ξένη 30,0 ως «Τελευταία ζύγιση», με τη σημείωση «διαφέρει πολύ…»).
       final s = HealthStore()
         ..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 11, 13, 20), [
           for (final d in [2, 4, 6, 9, 11]) (DateTime(2026, 11, d, 8), 90.0, 25.0),
@@ -173,7 +175,9 @@ void main() {
           (DateTime(2026, 11, 13, 9), 30.0, 15.0),
         ]));
       await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 13, 21)), size: const Size(400, 4000));
-      expect(find.byKey(const ValueKey('body-foreign-latest')), findsOneWidget);
+      expect(find.byKey(const ValueKey('body-foreign-latest')), findsNothing);
+      expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data, contains('09:00: 30,0 kg'));
+      expect(t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος').value, '90,0 kg');
       expect(find.byKey(const ValueKey('body-weighings-foreign')), findsOneWidget);
       expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text.contains(' kg από ')), isEmpty);
     });

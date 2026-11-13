@@ -215,7 +215,8 @@ void main() {
 
   group('«Άσκηση σήμερα» στη Σήμερα (σχέδια 9/11, 1β)', () {
     final fri = DateTime(2026, 11, 13, 17, 30); // «A» στο δείγμα
-    final tue = DateTime(2026, 11, 10, 17, 30); // περπάτημα
+    // R7-A6-6 (f2): μετά την έναρξη του προγράμματος του δείγματος (13/11)· πριν από αυτήν δεν υπάρχει προπόνηση της μέρας.
+    final tue = DateTime(2026, 11, 17, 17, 30); // περπάτημα
 
     Future<void> card(WidgetTester t, TrainingStore s, DateTime at) async {
       await t.runAsync(() => ExLibrary.load(inline: true));
@@ -232,7 +233,8 @@ void main() {
       await card(t, sampleTraining(fri), fri);
       expect(find.text('Άσκηση σήμερα'), findsOneWidget);
       expect(find.text('Προπόνηση Α'), findsOneWidget);
-      expect(find.textContaining('όριο παλμών\u00A0140'), findsOneWidget); // round1, U6-20: αδιάσπαστο κενό
+      // round1, U6-20 / R7-U1-9 (f2): αδιάσπαστα κενά και ανάμεσα στο «όριο» και στο «παλμών».
+      expect(find.textContaining('όριο\u00A0παλμών\u00A0140'), findsOneWidget);
       expect(find.byKey(const ValueKey('today-train-start')), findsOneWidget);
     });
 

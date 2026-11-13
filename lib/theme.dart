@@ -188,10 +188,13 @@ class Aigaio extends ThemeExtension<Aigaio> {
     foodSolid: Color(0xFF15803D),
     exerciseSolid: Color(0xFFC2410C),
     onSolid: Color(0xFFFFFFFF),
+    // Round 7 (R7-U4-9, WCAG 1.4.11): REM και ξύπνιος ≥ 3:1 με τη λευκή κάρτα (πριν 1,86 και 2,01). Ίδια απόχρωση (μόνο
+    // πιο σκούρα), ο βαθύς πάντα ο πιο σκούρος, το REM πιο σκούρο από τον ελαφρύ ώστε να ξεχωρίζουν και με
+    // δυσχρωματοψία (ΔE00 ≥ 13 ανά ζεύγος· /home/claude/scratch/f7/u49/optimize.py).
     stageDeep: Color(0xFF3B2FB5),
     stageLight: Color(0xFF6F8CF6),
-    stageRem: Color(0xFF6CC9F2),
-    stageAwake: Color(0xFFF4A38A),
+    stageRem: Color(0xFF1681A8),
+    stageAwake: Color(0xFFCB7E66),
   );
 
   /// Πέτρα, λαδί, τερακότα: ήρεμο και φυσικό.
@@ -236,10 +239,11 @@ class Aigaio extends ThemeExtension<Aigaio> {
     foodSolid: Color(0xFF3E7A2E),
     exerciseSolid: Color(0xFFA94C24),
     onSolid: Color(0xFFFFFFFF),
+    // Round 7 (R7-U4-9): ελαφρύς, REM, ξύπνιος ≥ 3:1 με την κάρτα (πριν 2,56 · 1,78 · 2,37), ίδια απόχρωση.
     stageDeep: Color(0xFF31578A),
-    stageLight: Color(0xFF7FA6C8),
-    stageRem: Color(0xFFB5CC6A),
-    stageAwake: Color(0xFFE8946A),
+    stageLight: Color(0xFF6F96B7),
+    stageRem: Color(0xFF6E8218),
+    stageAwake: Color(0xFFCE7D53),
   );
 
   /// Ζεστό λευκό και κοραλλί, κάρτα ύπνου σαν ξημέρωμα: ζωντανό.
@@ -284,10 +288,11 @@ class Aigaio extends ThemeExtension<Aigaio> {
     foodSolid: Color(0xFF1F7A4A),
     exerciseSolid: Color(0xFFC2410C),
     onSolid: Color(0xFFFFFFFF),
+    // Round 7 (R7-U4-9): ελαφρύς, REM, ξύπνιος ≥ 3:1 με την κάρτα (πριν 2,76 · 2,72 · 2,04), ίδια απόχρωση.
     stageDeep: Color(0xFF6A4BD8),
-    stageLight: Color(0xFFA58CF0),
-    stageRem: Color(0xFFE879A6),
-    stageAwake: Color(0xFFF5A524),
+    stageLight: Color(0xFF9B82E5),
+    stageRem: Color(0xFFDC6E9B),
+    stageAwake: Color(0xFFC88409),
   );
 
   // --- Σκοτεινά --------------------------------------------------------------

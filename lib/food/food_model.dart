@@ -46,7 +46,12 @@ abstract final class CholKind {
   static const legumes = 'legumes';
   static const fish = 'fish';
   static const bran = 'bran';
-  static const all = [nuts, legumes, fish, bran];
+
+  /// «Τίποτα»: το προϊόν δεν μετρά (round7, R7-A3-1). Πριν το «Τίποτα» αποθηκευόταν ως «δεν ορίστηκε» (null), οπότε ένα
+  /// «Ψωμί με πίτουρο βρώμης» μετρούσε από το όνομα ως πίτουρο και δεν διορθωνόταν. Νέα τιμή: οι παλιές εκδόσεις την
+  /// διαβάζουν ως null (όπως πριν).
+  static const none = 'none';
+  static const all = [nuts, legumes, fish, bran, none];
 
   /// Μόνο οι γνωστές τιμές· οτιδήποτε άλλο (πειραγμένο αντίγραφο, άγνωστη τιμή) = «δεν ορίστηκε».
   static String? parse(Object? v) => v is String && all.contains(v) ? v : null;
@@ -331,13 +336,47 @@ const typoEntryBigKcal = 500.0;
 const typoFatPer100 = 80.0;
 const typoFatGrams = 100.0;
 
+/// 4. Πυκνό τρόφιμο (από [typoDensePer100] kcal στα 100 g: βρώμη, πίτουρο, ξηροί καρποί, τυρί, ζυμαρικά ή ρύζι ωμά) από
+///    [typoDenseGrams] g και πάνω (round7, R7-A2-3): ένα μηδενικό παραπάνω στη μερίδα των 30–50 g (50 → 500 g βρώμη =
+///    1.845 kcal) περνούσε χωρίς ερώτηση. Η συνηθισμένη μερίδα αυτών είναι 30–100 g.
+const typoDensePer100 = 250.0;
+const typoDenseGrams = 300.0;
+
+/// 5. Πέντε φορές (ή περισσότερο) η ποσότητα της τελευταίας φοράς, όταν δίνει από [typoTimesLastKcal] kcal (round7,
+///    R7-A2-3): 60 → 600 g ψωμί (1.404 kcal), 80 → 800 g τόνος (1.144 kcal). Το όριο θερμίδων αφήνει έξω τα μικρά
+///    (γάλα 30 → 250 ml στον καφέ, 119 kcal).
+const typoTimesLast = 5.0;
+const typoTimesLastKcal = 400.0;
+
 /// Μοιάζει η καταχώριση ([grams] g ή ml του [f]) με λάθος πληκτρολόγησης; Τότε η οθόνη ρωτά μία φορά πριν τη γράψει.
-bool entryLooksLikeTypo(Food f, double grams) {
+/// [lastGrams]: η ποσότητα της τελευταίας φοράς που γράφτηκε αυτό το τρόφιμο (αν υπάρχει).
+bool entryLooksLikeTypo(Food f, double grams, {double? lastGrams}) {
   final kcal = f.n.amount(Nk.kcal) * grams / 100;
   if (kcal >= typoEntryKcal) return true;
   if (grams >= typoEntryBigGrams && kcal > typoEntryBigKcal) return true;
-  return f.n.amount(Nk.fat) >= typoFatPer100 && grams >= typoFatGrams;
+  if (f.n.amount(Nk.fat) >= typoFatPer100 && grams >= typoFatGrams) return true;
+  if (f.n.amount(Nk.kcal) >= typoDensePer100 && grams >= typoDenseGrams) return true;
+  return lastGrams != null && lastGrams > 0 && grams >= typoTimesLast * lastGrams && kcal >= typoTimesLastKcal;
 }
+
+// ---------------------------------------------------------------------------
+// Ξερό ή μαγειρεμένο; (round7, R7-U2-2)
+// ---------------------------------------------------------------------------
+//
+// Την πρώτη φορά που γράφεις «φακές», «ρύζι» ή «μακαρόνια» βγαίνει πρώτη η ξερή/ωμή μορφή (ζυγίζουμε ωμά). Αν ζύγισες το
+// πιάτο σου μαγειρεμένο, 300 g «Φακές (ξερές)» = 981 kcal αντί για 375 (×2,3–2,9). Γι' αυτό ρωτάμε ΜΙΑ φορά ανά τρόφιμο.
+
+/// Ξερά όσπρια, ζυμαρικά, ρύζι και δημητριακά της βάσης έχουν 307–381 kcal στα 100 g· οι μαγειρεμένες μορφές τους
+/// 112–179. Κανένα άλλο τρόφιμο με μαγειρεμένη μορφή δεν φτάνει τις 300.
+const rawCheckKcal = 300.0;
+
+/// Από τόσα γραμμάρια: η συνηθισμένη ξερή μερίδα είναι 50–100 g, το μαγειρεμένο πιάτο 200–400 g.
+const rawCheckGrams = 150.0;
+
+/// Να ρωτήσει η οθόνη «πριν ή μετά το μαγείρεμα;»; Μόνο για ξερή/ωμή μορφή με μαγειρεμένη μορφή στη βάση, από
+/// [rawCheckGrams] g, και μόνο όσο δεν την έχεις γράψει ποτέ ([timesEaten] = 0).
+bool askRawOrCooked(Food f, double grams, {required int timesEaten}) =>
+    f.isRawWithCooked && f.n.amount(Nk.kcal) >= rawCheckKcal && grams >= rawCheckGrams && timesEaten == 0;
 
 /// «1.250» για θερμίδες, «12,5» για γραμμάρια.
 String kcalText(double v) => thousands(v.round());

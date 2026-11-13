@@ -463,12 +463,13 @@ void main() {
         ..setProfile(_me)
         ..setGoals(checkinGoals());
       await _pump(t, GoalsPage(store: s, now: _now));
-      expect(find.textContaining('για 3 g β-γλυκάνες'), findsNothing);
+      expect(find.textContaining('για 3 g β\u2011γλυκάνες'), findsNothing);
       expect(find.text('40 g · γράψε την ετικέτα'), findsOneWidget);
       expect(find.textContaining('το ίδιο δεν ρίχνει την LDL'), findsOneWidget);
       s.setGoals(checkinGoals().copyWith(betaPer100: 7, branG: 45));
       await t.pumpAndSettle();
-      expect(find.text('Πίτουρο βρώμης για 3 g β-γλυκάνες'), findsOneWidget);
+      // R7-U2-12 (f6): αδιάσπαστο ενωτικό και εδώ.
+      expect(find.text('Πίτουρο βρώμης για 3 g β\u2011γλυκάνες'), findsOneWidget);
       expect(find.text('45 g · από την ετικέτα'), findsOneWidget);
       // Ετικέτα με 5,5 g / 100 g: για 3 g χρειάζονται 55 g· τα 40 g δεν φτάνουν και η γραμμή το λέει.
       s.setGoals(checkinGoals().copyWith(betaPer100: 5.5));
@@ -692,16 +693,16 @@ void main() {
 
   // ------------------------------------------------------------------------------------------------ S11-2 φύλακας
   group('S11-2: ζυγίσεις που δεν μπορεί να είναι δικές σου', () {
-    test('weightLooksForeign: πάνω από 5% και πάνω από 4 kg από τη διάμεσο, με τουλάχιστον 3 άλλες ζυγίσεις', () {
-      expect(weightLooksForeign(45, [90, 89.8, 89.6]), isTrue);
-      expect(weightLooksForeign(80, [89.4, 89.3, 89.1]), isTrue);
-      expect(weightLooksForeign(85, [89.4, 89.3, 89.1]), isFalse, reason: '4,3 kg < 5% της διαμέσου (4,465)');
-      expect(weightLooksForeign(85, [90, 90, 90]), isTrue, reason: '5 kg > 4,5');
-      expect(weightLooksForeign(50, [60, 60, 60]), isTrue);
-      expect(weightLooksForeign(56.5, [60, 60, 60]), isFalse, reason: '3,5 kg < 4 kg');
-      expect(weightLooksForeign(45, [90, 89.8]), isFalse, reason: 'δύο γείτονες δεν φτάνουν για να κριθεί');
-      expect(weightLooksForeign(double.nan, [90, 90, 90]), isFalse);
-      expect(weightLooksForeign(45, [90, double.nan, 89.8, double.infinity]), isFalse);
+    // Round 7 (f5 · A12-7): το `weightLooksForeign` βγήκε (δεν το καλούσε η εφαρμογή)· οι ίδιες τιμές στον κανόνα που
+    // τρέχει, [weightsAgree] (τιμή και διάμεσος των γειτόνων· το 5% της μεγαλύτερης = της διαμέσου εδώ). Τα όρια του κανόνα
+    // και «λιγότερες από 3 γύρω ζυγίσεις = δεν κρίνεται»: test/r7_f5_test.dart.
+    test('weightsAgree: πάνω από 5% και πάνω από 4 kg = άλλος άνθρωπος', () {
+      expect(weightsAgree(45, 89.8), isFalse);
+      expect(weightsAgree(80, 89.3), isFalse);
+      expect(weightsAgree(85, 89.3), isTrue, reason: '4,3 kg < 5% της 89,3 (4,465)');
+      expect(weightsAgree(85, 90), isFalse, reason: '5 kg > 4,5');
+      expect(weightsAgree(50, 60), isFalse);
+      expect(weightsAgree(56.5, 60), isTrue, reason: '3,5 kg < 4 kg');
       expect(weightGuardDays, 14);
     });
 

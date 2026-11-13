@@ -13,8 +13,12 @@ import 'food_add.dart';
 /// «Τα προϊόντα μου»: περνάω προϊόντα στη βάση μου χωρίς να τα καταγράψω ως φαγητό
 /// (π.χ. μετά το σούπερ μάρκετ), τα διορθώνω ή τα σβήνω.
 class MyFoodsScreen extends StatefulWidget {
-  const MyFoodsScreen({super.key, required this.food});
+  const MyFoodsScreen({super.key, required this.food, this.pick = false});
   final FoodStore food;
+
+  /// Ανοιχτό από το «+ Φαγητό» (round7, R7-U2-7): πάτημα σε προϊόν = κλείνει η οθόνη και επιστρέφει το προϊόν, για να
+  /// γραφτεί· η διόρθωση και η διαγραφή είναι στο ⋮. Αλλιώς (από «Τα στοιχεία μου») πάτημα = διόρθωση/διαγραφή.
+  final bool pick;
 
   @override
   State<MyFoodsScreen> createState() => _MyFoodsScreenState();
@@ -34,7 +38,15 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Αποθηκεύτηκε: ${f.name}'),
       // Έλεγχος round1 (U3a-18): η ίδια λέξη με το κουμπί («Σάρωση»).
-      action: fromScan ? SnackBarAction(label: 'Σάρωση ξανά', onPressed: _scan) : null,
+      // Round7 (R7-U2-17): το μήνυμα μένει και αφού κλείσει η οθόνη· τότε το «Σάρωση ξανά» δεν κάνει τίποτα (πριν άνοιγε τον
+      // σαρωτή πάνω σε κλειστή οθόνη και έγραφε σφάλμα).
+      action: fromScan
+          ? SnackBarAction(
+              label: 'Σάρωση ξανά',
+              onPressed: () {
+                if (mounted) _scan();
+              })
+          : null,
     ));
   }
 
@@ -121,8 +133,10 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
                 children: [
                   Text(
-                    'Πέρασε εδώ ό,τι αγοράζεις, χωρίς να το καταγράψεις ως φαγητό. '
-                    'Όταν το φας, θα το βρεις πρώτο στην αναζήτηση.',
+                    widget.pick
+                        ? 'Πάτα ένα προϊόν για να το γράψεις. Με το ⋮ το διορθώνεις ή το σβήνεις.'
+                        : 'Πέρασε εδώ ό,τι αγοράζεις, χωρίς να το καταγράψεις ως φαγητό. '
+                            'Όταν το φας, θα το βρεις πρώτο στην αναζήτηση.',
                     style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary),
                   ),
                   const SizedBox(height: 14),
@@ -193,8 +207,15 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                       Material(
                         color: Colors.transparent,
                         child: InkWell(
+                          key: ValueKey('my-food-${f.id}'),
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => _actions(f),
+                          onTap: () {
+                            if (widget.pick) {
+                              Navigator.of(context).pop(f);
+                            } else {
+                              _actions(f);
+                            }
+                          },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                             child: Row(
@@ -225,7 +246,16 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                                     ],
                                   ),
                                 ),
-                                Icon(Icons.more_vert_rounded, color: c.textTertiary),
+                                if (widget.pick) ...[
+                                  IconButton(
+                                    key: ValueKey('my-food-more-${f.id}'),
+                                    tooltip: 'Αλλαγή',
+                                    onPressed: () => _actions(f),
+                                    icon: Icon(Icons.more_vert_rounded, color: c.textSecondary),
+                                  ),
+                                  Icon(Icons.add_circle_outline_rounded, color: c.food, size: 28),
+                                ] else
+                                  Icon(Icons.more_vert_rounded, color: c.textTertiary),
                               ],
                             ),
                           ),

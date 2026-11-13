@@ -109,7 +109,7 @@ class NutritionPage extends StatelessWidget {
         final chol = goals != null && goals.doctor ? CholCard(food: food, goals: goals, day: day, today: today) : null;
         final meals = [
           for (final m in Meal.values)
-            _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day),
+            _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day, today: today),
         ];
 
         return PageFrame(
@@ -244,6 +244,7 @@ class MacroBreakdown extends StatelessWidget {
     final cp = sum > 0 ? (100 * ck / sum).round() : 0;
     final fp = sum > 0 ? (100 * fk / sum).round() : 0;
     final other = sum > 0 ? 100 - pp - cp - fp : 0;
+    final otherText = sum > 0 ? otherEnergyText(t, sum, other) : '';
 
     Widget macro(String label, double g, double kcalPart, Color color) => Expanded(
           child: Padding(
@@ -350,7 +351,7 @@ class MacroBreakdown extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              'Άλλα $other% θερμίδων: ${t.alcohol >= 0.05 ? 'φυτικές ίνες και αλκοόλ' : 'φυτικές ίνες'}.',
+              otherText,
               key: const ValueKey('macro-other'),
               style: TextStyle(fontSize: 12, color: c.textTertiary),
             ),
@@ -358,6 +359,23 @@ class MacroBreakdown extends StatelessWidget {
       ],
     );
   }
+}
+
+/// «Άλλα 3% θερμίδων: φυτικές ίνες.» — τι είναι οι θερμίδες της πηγής που δεν βγαίνουν από πρωτεΐνη, υδατάνθρακες και
+/// λιπαρά ([other] %, από [sum] kcal). Round7 (R7-A2-2): λέει «φυτικές ίνες» (2 kcal/g) και «αλκοόλ» (7 kcal/g) μόνο όταν
+/// υπάρχουν· ό,τι δεν εξηγούν αυτά (π.χ. τα οξέα των τροφίμων, 3 kcal/g στον Κανονισμό ΕΕ 1169/2011, ή οι ειδικοί
+/// συντελεστές ενέργειας της USDA) λέγεται «ό,τι άλλο μετρά η πηγή». Πριν, κοτόπουλο με φέτα (0,1 g ίνες) έγραφε «Άλλα 2%
+/// θερμίδων: φυτικές ίνες».
+String otherEnergyText(Totals t, double sum, int other) {
+  final fiberPct = (100 * 2 * t.fiber / sum).round();
+  final alcoholPct = (100 * 7 * t.alcohol / sum).round();
+  final parts = [
+    if (fiberPct >= 1) 'φυτικές ίνες',
+    if (t.alcohol >= 0.05) 'αλκοόλ',
+  ];
+  if (parts.isEmpty || other - fiberPct - alcoholPct >= 1) parts.add('ό,τι άλλο μετρά η πηγή');
+  final list = parts.length == 1 ? parts.first : '${parts.sublist(0, parts.length - 1).join(', ')} και ${parts.last}';
+  return 'Άλλα $other% θερμίδων: $list.';
 }
 
 /// Η κάρτα της Διατροφής στο «Σήμερα»: τι έφαγα σήμερα και «+ Φαγητό».
@@ -439,13 +457,18 @@ class FoodTodayCard extends StatelessWidget {
 }
 
 class _MealCard extends StatelessWidget {
-  const _MealCard({required this.food, required this.meal, required this.entries, required this.day});
+  const _MealCard({required this.food, required this.meal, required this.entries, required this.day, required this.today});
   final FoodStore food;
   final Meal meal;
   final List<LogEntry> entries;
   final DateTime day;
+  final DateTime today;
 
   DateTime get prevDay => DateTime(day.year, day.month, day.day - 1);
+
+  /// Round7 (R7-U2-8): «χθες» μόνο όταν βλέπεις τη σημερινή μέρα· σε παλιότερη μέρα, η μέρα που αντιγράφεται («Τετ 11/11»).
+  /// Πριν, βλέποντας την Πέμπτη, το κουμπί «Όπως χθες» αντέγραφε την Τετάρτη (προχθές) και έλεγε «χθες».
+  String get _fromLabel => sameDay(day, today) ? 'χθες' : shortDayDate(prevDay);
 
   Future<void> _copyFromPrevious(BuildContext context, DateTime from) async {
     final skipped = food.notCopyable(from, meal);
@@ -455,7 +478,7 @@ class _MealCard extends StatelessWidget {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(
       content: Text(
-        '${mealLabel(meal)}: ${added.length == 1 ? '1 τρόφιμο' : '${added.length} τρόφιμα'} όπως χθες'
+        '${mealLabel(meal)}: ${added.length == 1 ? '1 τρόφιμο' : '${added.length} τρόφιμα'} όπως $_fromLabel'
         // Έλεγχος 9/11 (Μ3): σβησμένα προϊόντα (π.χ. με λάθος τιμές) δεν ξαναγράφονται.
         '${skipped > 0 ? ' (χωρίς ${skipped == 1 ? '1 σβησμένο προϊόν' : '$skipped σβησμένα προϊόντα'})' : ''}',
       ),
@@ -511,7 +534,7 @@ class _MealCard extends StatelessWidget {
                   icon: const Icon(Icons.content_copy_rounded, size: 18),
                   // Με τις τωρινές τιμές, όπως θα γραφτούν (όχι με τα παλιά αντίγραφα).
                   label: Text(
-                      'Όπως χθες · ${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
+                      'Όπως $_fromLabel · ${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
                 ),
             ],
           ),

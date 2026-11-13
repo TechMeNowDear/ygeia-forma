@@ -110,6 +110,12 @@ if pathlib.Path(f'{ROOT}/lib/pages/privacy_page.dart').exists() and 'Διαγρ�
     need('«Διαγραφή όλων των δεδομένων»' in greek, 'Διαγραφή: η εφαρμογή έχει «Διαγραφή όλων των δεδομένων»· η πολιτική πρέπει να τη λέει')
     need('Delete all data' in english, 'Διαγραφή: λείπει από το αγγλικό κείμενο')
 
+# --- «Αναφορά για έλεγχο» (Round 7, R7-A11-2): αρχείο στις Λήψεις με ΟΛΑ τα δεδομένα (και της Oura), που ο χρήστης
+# στέλνει μόνος του. Όσο υπάρχει στον κώδικα, η πολιτική το λέει (στη λίστα των αρχείων και στη «Διαγραφή»). ---
+if pathlib.Path(f'{ROOT}/lib/diagnostics.dart').exists():
+    need('«Αναφορά για έλεγχο»' in greek, 'Αναφορά για έλεγχο: η εφαρμογή φτιάχνει αυτό το αρχείο· η πολιτική πρέπει να το λέει')
+    need('diagnostics' in english, 'Αναφορά για έλεγχο: λείπει από το αγγλικό κείμενο (diagnostics)')
+
 # --- Barcode ---
 extra = read('android/ygeia/app-extra.gradle.kts')
 if 'play-services-code-scanner' in extra:

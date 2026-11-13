@@ -119,6 +119,26 @@ fun keepWatchEdits(old: SetT, set: SetT) {
 }
 
 /**
+ * Η νέα κατάσταση [s] της ΙΔΙΑΣ προπόνησης του κινητού πάνω σε ό,τι ήξερε το ρολόι ([prev]): ανά σετ [keepWatchEdits], η
+ * ρεζέρβα που δόθηκε στο ρολόι (όσο το κινητό δεν έχει δική του), και η ερώτηση ρεζέρβας που περιμένει ακόμα εδώ.
+ * Ίδιος κανόνας όταν έρχεται νέα κατάσταση ([Repo.applyPhone]) και όταν η εφαρμογή ξανανοίγει μετά από απότομο κλείσιμο
+ * (έλεγχος 13/11, round 7, R7-A8-1).
+ */
+fun mergeWatchEdits(prev: LiveSession, s: LiveSession) {
+    for ((i, it) in s.items.withIndex()) {
+        val old = prev.items.getOrNull(i) ?: continue
+        if (old.ex != it.ex) continue
+        for ((k, set) in it.sets.withIndex()) {
+            val o = old.sets.getOrNull(k) ?: continue
+            keepWatchEdits(o, set)
+        }
+        if (it.rir == null) it.rir = old.rir
+    }
+    // Η ερώτηση για ρεζέρβα μένει για την άσκηση που τελείωσε, όχι για όποια δείχνει τώρα το κινητό.
+    if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
+}
+
+/**
  * Εντολή «επαναλήψεις» προς το κινητό: άσκηση [i], σετ [k], και (νέα πεδία, έλεγχος του γ2, S4) το id της άσκησης [ex]
  * και η ώρα του σετ [at] (αν έγινε), ώστε το κινητό να την αγνοήσει αν δεν ταιριάζουν πια. Το παλιό κινητό τα αγνοεί.
  */
@@ -270,7 +290,27 @@ class Plan(
     /** Η προπόνηση μιας μέρας (για να είναι σωστή και αν το κινητό δεν άνοιξε σήμερα). */
     fun forWeekday(weekday: Int): WorkoutT? = if (days.isEmpty()) workout(today) else workout(days[weekday])
 
-    val todayWorkout: WorkoutT? get() = forWeekday(java.time.LocalDate.now().dayOfWeek.value)
+    /**
+     * Η προπόνηση της μέρας [day]: καμία πριν από την έναρξη του προγράμματος ([from]), όπως στο κινητό (Program.forDay·
+     * έλεγχος 13/11, round 7, R7-A6-6, αίτημα του f2). Πριν, το Σάββατο πριν από την έναρξη έγραφε «Σήμερα · <προπόνηση>».
+     * Παλιό κινητό (χωρίς «from»): όπως πριν.
+     */
+    fun forDay(day: java.time.LocalDate): WorkoutT? = if (from != null && day < from) null else forWeekday(day.dayOfWeek.value)
+
+    val todayWorkout: WorkoutT? get() = forDay(java.time.LocalDate.now())
+
+    /**
+     * Το περπάτημα (αερόβια) του προγράμματος τη μέρα που ξεκίνησε μια άσκηση στις [startedAt] (ms), ή null (έλεγχος 13/11,
+     * round 7, R7-A8-6): όχι της μέρας που γράφεται το αποτέλεσμα. Χωρίς ώρα έναρξης: της σημερινής, όπως πριν.
+     */
+    fun walkOn(startedAt: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): WorkoutT? {
+        val w = if (startedAt > 0) forDay(dayOf(startedAt, zone)) else todayWorkout
+        return w?.takeIf { it.isCardio }
+    }
+
+    /** Η μέρα (ημερολογίου) της στιγμής [at] (ms)· χωρίς ώρα ([at] ≤ 0): σήμερα. */
+    fun dayOf(at: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): java.time.LocalDate =
+        if (at > 0) java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate() else java.time.LocalDate.now(zone)
 
     companion object {
         fun parse(text: String): Plan? = try {
@@ -459,6 +499,9 @@ class LiveSession(
      * Ρεζέρβα μετά το τελευταίο σετ· μετά πάει στην επόμενη άσκηση που δεν έχει τελειώσει. Επιστρέφει και ποια άσκηση πήρε
      * την απάντηση: −1 αν καμία δεν περιμένει απάντηση (π.χ. απαντήθηκε ήδη στο κινητό)· τότε δεν γράφεται πουθενά, ποτέ
      * στην άσκηση που δείχνει τώρα (έλεγχος γ2, W2-18).
+     *
+     * Έλεγχος 13/11, round 7 (R7-U3-04): [rir] αρνητικό = «Δεν ξέρω». Η ερώτηση κλείνει, αλλά καμία απάντηση δεν γράφεται
+     * (η ρεζέρβα μένει null, όπως το «Δεν ξέρω» του κινητού): ένας αριθμός «στην τύχη» θα ανέβαζε βάρος.
      */
     fun answer(rir: Int, now: Long): Pair<Next, Int> {
         val i = rirIdx
@@ -467,7 +510,7 @@ class LiveSession(
             return (if (current == null || allDone) Next.END else Next.SET) to -1
         }
         val restSec = items.getOrNull(i)?.rest ?: 0
-        items.getOrNull(i)?.rir = rir
+        items.getOrNull(i)?.rir = rir.takeIf { it >= 0 }
         rirIdx = -1
         return advance(now, restSec) to i
     }
@@ -574,6 +617,48 @@ class LiveSession(
             )
         } catch (_: Exception) {
             null
+        }
+
+        /**
+         * Η προπόνηση του κινητού όπως την ξέρει ΤΟ ΡΟΛΟΪ, για το στιγμιότυπο της άσκησης (έλεγχος 13/11, round 7, R7-A8-1):
+         * ό,τι γράφει το [toState] και, ανά σετ, αν το κινητό το έχει δει («c»: 1, [SetT.confirmed]) και τις τιμές που μπορεί να
+         * δείχνει ακόμα το κινητό («rb», [SetT.trail]). Έτσι τα ✓, οι επαναλήψεις και η ρεζέρβα του ρολογιού που δεν έφτασαν
+         * ακόμα στο κινητό ΔΕΝ χάνονται αν η εφαρμογή του ρολογιού κλείσει απότομα. Νέο πεδίο του run.json («pp»): η παλιά
+         * έκδοση το αγνοεί.
+         */
+        fun phoneWatchState(s: LiveSession): JSONObject {
+            val o = s.toState()
+            val arr = o.getJSONArray("items")
+            for ((i, item) in s.items.withIndex()) {
+                val sets = arr.getJSONObject(i).getJSONArray("sets")
+                for ((k, set) in item.sets.withIndex()) {
+                    val so = sets.getJSONObject(k)
+                    if (set.confirmed) so.put("c", 1)
+                    set.trail?.let { t -> so.put("rb", JSONArray(t.sorted())) }
+                }
+            }
+            return o
+        }
+
+        /** Από το [phoneWatchState]: η προπόνηση του κινητού όπως την ήξερε το ρολόι, ή null αν δεν διαβάζεται. */
+        fun phoneFromWatchState(o: JSONObject): LiveSession? {
+            val s = fromState(o) ?: return null
+            return try {
+                val arr = o.optJSONArray("items") ?: JSONArray()
+                for ((i, item) in s.items.withIndex()) {
+                    val sets = arr.optJSONObject(i)?.optJSONArray("sets") ?: continue
+                    for ((k, set) in item.sets.withIndex()) {
+                        val so = sets.optJSONObject(k) ?: continue
+                        set.confirmed = so.optInt("c", 0) == 1
+                        val rb = so.optJSONArray("rb") ?: continue
+                        val t = (0 until rb.length()).map { rb.optInt(it, -1) }.filter { it in 0..99 }.toSet()
+                        if (t.isNotEmpty()) set.trail = t
+                    }
+                }
+                LiveSession(s.id, s.workout, s.name, s.start, s.items, s.idx, s.restEnd, phone = true, rirIdx = s.rirIdx, restLen = s.restLen)
+            } catch (_: Exception) {
+                null
+            }
         }
 
         /** Η προπόνηση του κινητού ([Paths.SESSION]). null αν δεν τρέχει καμία. */
@@ -976,11 +1061,22 @@ fun withSafety(safety: String, other: String?): String =
 /** Η μεγάλη λέξη της κόκκινης οθόνης. */
 fun alarmHeadline(walk: Boolean, recovery: Boolean): String = if (walk && !recovery) "Κόψε ρυθμό" else "Ξεκουράσου"
 
-/** «» για τωρινή τιμή, αλλιώς « (πριν 40″)» / « (πριν 2′)» για την ειδοποίηση (W2-17). */
-fun ageText(ageMs: Long): String = when {
-    ageMs < 20_000 -> ""
-    ageMs < 60_000 -> " (πριν ${ageMs / 1000}″)"
-    else -> " (πριν ${ageMs / 60_000}′)"
+/** «» για τωρινή τιμή, αλλιώς « (πριν 40 δευτερόλεπτα)» / « (πριν 2 λεπτά)» για την ειδοποίηση (W2-17). */
+fun ageText(ageMs: Long): String = if (ageMs < 20_000) "" else " (πριν ${agoText(ageMs)})"
+
+/**
+ * Πόσο παλιά είναι μια τιμή, σε ολόκληρες λέξεις (έλεγχος 13/11, round 7, R7-U3-08· όπως το κινητό, U5-06): «40
+ * δευτερόλεπτα», «1 λεπτό», «3 λεπτά». Πριν «40″» / «3′».
+ */
+fun agoText(ageMs: Long): String {
+    val ms = maxOf(0L, ageMs)
+    return if (ms < 60_000) {
+        val s = ms / 1000
+        if (s == 1L) "1 δευτερόλεπτο" else "$s δευτερόλεπτα"
+    } else {
+        val m = ms / 60_000
+        if (m == 1L) "1 λεπτό" else "$m λεπτά"
+    }
 }
 
 /**
@@ -1121,6 +1217,14 @@ fun hrQualityOf(noContact: Boolean, unreliable: Boolean, lowAccuracy: Boolean): 
     lowAccuracy -> HrQuality.LOW
     else -> HrQuality.OK
 }
+
+/**
+ * Μια τιμή παλμών από το Health Services που χρησιμοποιείται: όχι «χωρίς επαφή»/«αναξιόπιστη» ([HrQuality.BAD]) και μέσα
+ * στο 26–249. Έλεγχος 13/11, round 7 (R7-A7-2): μόνο μια παράδοση με τουλάχιστον μία τέτοια τιμή μετρά ως «ήρθαν παλμοί»
+ * για το μεγαλύτερο κενό ([GapMeter]). Πριν μετρούσε κάθε παράδοση, και 2 λεπτά χωρίς επαφή (σημεία ανά 5″ χωρίς τιμή)
+ * έβγαιναν «οι παλμοί έφταναν κάθε λίγα δευτερόλεπτα».
+ */
+fun hrValueUsable(q: HrQuality, bpm: Int): Boolean = q != HrQuality.BAD && bpm in 26..249
 
 /**
  * Πόσες τιμές παλμών ήρθαν με κάθε ποιότητα σε μια άσκηση. Πηγαίνει στο κινητό μέσα στο υπάρχον κείμενο «diag»
@@ -1442,24 +1546,56 @@ fun restAlreadyOver(restEnd: Long?, now: Long): Long = if (restEnd != null && re
  * περνούν μόνο κλήση/ξυπνητήρι, σε σίγαση δεν περνά η δόνηση ειδοποίησης). true = η δόνηση ζώνης φτάνει στον καρπό.
  * Η δόνηση του ορίου γιατρού (USAGE_ALARM) δεν κόβεται από κανένα από τα δύο.
  */
-fun zoneBuzzFelt(powerSave: Boolean, ringerSilent: Boolean): Boolean = !powerSave && !ringerSilent
+fun zoneBuzzFelt(powerSave: Boolean, ringerSilent: Boolean, dnd: Boolean = false): Boolean = !powerSave && !ringerSilent && !dnd
 
 /**
  * Η οθόνη του περπατήματος γράφει «χωρίς δόνηση» (S8-02): υπάρχει ζώνη με ανοιχτή δόνηση ([zoneActive]), δεν υπάρχει όριο
  * γιατρού (αλλιώς η ζώνη δεν μιλά έτσι κι αλλιώς), και το ρολόι θα έκοβε τη δόνηση ([zoneBuzzFelt]).
+ *
+ * Έλεγχος 13/11, round 7 (R7-A7-1): και σε «Μην ενοχλείτε» (ή Λειτουργία ύπνου, που το ανοίγει) — [dnd]. Στο AOSP
+ * (ZenModeHelper.applyRestrictions) κάθε τρόπος «Μην ενοχλείτε» βάζει AppOps OP_VIBRATE = IGNORED για τη δόνηση
+ * ειδοποίησης, και στο συνηθισμένο «προτεραιότητα» ο ήχος κουδουνιού ΔΕΝ γίνεται «Σίγαση»: πριν, η δόνηση κοβόταν
+ * σιωπηλά και η οθόνη δεν το έλεγε. Η δόνηση ζώνης μένει δόνηση ειδοποίησης (απόφαση του χρήστη: απαλή, όχι ξυπνητήρι).
  */
-fun zoneMutedNow(zoneActive: Boolean, hasDoctorLimit: Boolean, powerSave: Boolean, ringerSilent: Boolean): Boolean =
-    zoneActive && !hasDoctorLimit && !zoneBuzzFelt(powerSave, ringerSilent)
+fun zoneMutedNow(zoneActive: Boolean, hasDoctorLimit: Boolean, powerSave: Boolean, ringerSilent: Boolean, dnd: Boolean = false): Boolean =
+    zoneActive && !hasDoctorLimit && !zoneBuzzFelt(powerSave, ringerSilent, dnd)
 
 /** Η ετικέτα δίπλα στους παλμούς όσο η δόνηση ζώνης δεν φτάνει (S8-02). Κείμενο προς έγκριση από τον χρήστη. */
 const val ZONE_MUTED_TAG = "χωρίς δόνηση"
 
-/** Το σύντομο μήνυμα με την αιτία, μία φορά όταν εμφανιστεί (S8-02)· null = η δόνηση φτάνει. Κείμενα προς έγκριση. */
-fun zoneMutedNotice(powerSave: Boolean, ringerSilent: Boolean): String? = when {
+/**
+ * Το σύντομο μήνυμα με την αιτία, μία φορά όταν εμφανιστεί (S8-02)· null = η δόνηση φτάνει. Κείμενα προς έγκριση. Πρώτο το
+ * «Μην ενοχλείτε» (R7-A7-1): στη «Μόνο ξυπνητήρια» / «Απόλυτη σιωπή» το Android βάζει ΚΑΙ τον ήχο σε σίγαση, άρα η αιτία
+ * που μετρά είναι εκείνο.
+ */
+fun zoneMutedNotice(powerSave: Boolean, ringerSilent: Boolean, dnd: Boolean = false): String? = when {
+    dnd -> "Μην ενοχλείτε: χωρίς δόνηση ζώνης"
     ringerSilent -> "Σίγαση: χωρίς δόνηση ζώνης"
     powerSave -> "Εξοικονόμηση: χωρίς δόνηση ζώνης"
     else -> null
 }
+
+/**
+ * Από πότε (elapsedRealtime, ms) μετρά η «προθέρμανση» των 5′ της ζώνης μετά από απότομο κλείσιμο (έλεγχος 13/11,
+ * round 7, R7-A7-3): από την αρχή του περπατήματος ([startedAtWall], ώρα), όχι από τη συνέχεια. Πριν ξαναμετρούσε 5′
+ * χωρίς δόνηση στη μέση του περπατήματος. Αν η ώρα του ρολογιού πήγε πίσω (αρχή «στο μέλλον»), από τη συνέχεια.
+ */
+fun zoneWarmupStartEl(nowEl: Long, nowWall: Long, startedAtWall: Long): Long =
+    nowEl - (nowWall - startedAtWall).coerceAtLeast(0L)
+
+/**
+ * Το «Τέλος» μπορεί να πει «Αποθηκεύτηκε» (έλεγχος 13/11, round 7, R7-A8-5): μόνο αν το αποτέλεσμα γράφτηκε στην αναμονή
+ * του ρολογιού ([saved]) ή μπήκε στο Data Layer ([put]). Με γεμάτο χώρο και τα δύο αποτυγχάνουν: τότε όχι.
+ */
+fun endScreenSaved(saved: Boolean, put: Boolean): Boolean = saved || put
+
+/**
+ * «Περιμένω παλμούς» αντί για «δεν μετριούνται» (έλεγχος 13/11, round 7, R7-U3-05): στα πρώτα [HrSilence.FIRST_MS] (30″)
+ * μιας άσκησης ([startedAt], ώρα), όσο δεν έχει έρθει κανένας παλμός σε αυτήν ([bpmAt] πριν από την αρχή, 0 = κανένας) και
+ * πριν κριθεί «δεν έρχονται» ([silent]). Ίδια φράση με το κινητό («Περιμένω παλμούς από το ρολόι…»).
+ */
+fun hrWaiting(silent: Boolean, bpmAt: Long, startedAt: Long, now: Long): Boolean =
+    !silent && startedAt > 0 && bpmAt < startedAt && now - startedAt in 0L until HrSilence.FIRST_MS
 
 /**
  * Άσκηση που ξεχάστηκε ανοιχτή στο ρολόι (έλεγχος 13/11, S8-06). Το κινητό ρωτά «Ξεχασμένη προπόνηση;» μετά από 3 ώρες
@@ -1509,7 +1645,58 @@ object Forgotten {
         Why.WALK_PAUSED -> "Πάτα «Συνέχεια» ή «Τέλος» στο ρολόι."
         Why.WALK_LONG, Why.STRENGTH_IDLE -> "Αν τελείωσες, πάτα «Τέλος» στο ρολόι."
     }
+
+    /**
+     * Το ίδιο στην ΟΘΟΝΗ της εφαρμογής, ολόκληρο σε όλη την οθόνη (έλεγχος 13/11, round 7, R7-U3-07): η ερώτηση στη δική
+     * της γραμμή, χωρίς «στο ρολόι» (το διαβάζεις ήδη εκεί), και πρώτα «κλείσε αυτό»: ένα πάτημα στο μήνυμα το κλείνει (από
+     * κάτω γράφει «πάτα για να κλείσει»), δεν τελειώνει την άσκηση. Κείμενο προς έγκριση από τον χρήστη.
+     */
+    fun screenText(why: Why): String = when (why) {
+        Why.WALK_PAUSED -> "${title(why)}\nΚλείσε αυτό και πάτα «Συνέχεια» ή «Τέλος»."
+        Why.WALK_LONG, Why.STRENGTH_IDLE -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και πάτα «Τέλος»."
+    }
 }
+
+/**
+ * Η τελευταία κίνηση σε μια προπόνηση του κινητού: το πιο πρόσφατο ✓ (με ώρα), αλλιώς η αρχή της. Ίδιος κανόνας με το
+ * κινητό (TrainingStore.lastActivity), για το [phoneStale].
+ */
+fun phoneLastActivity(s: LiveSession): Long {
+    var last = 0L
+    for (item in s.items) for (x in item.sets) if (x.done && x.at > last) last = x.at
+    return if (last > 0L) last else s.start
+}
+
+/**
+ * Προπόνηση του κινητού που μοιάζει ξεχασμένη ανοιχτή (έλεγχος 13/11, round 7, R7-A8-3, αίτημα του f2): η τελευταία κίνηση
+ * πριν από 3 ώρες και πάνω, ίδιο όριο με το κινητό (TrainingStore.staleAfter, [Forgotten.LONG_MS]). Το κινητό πλέον αγνοεί
+ * ✓ και παλμούς του ρολογιού σε τέτοια προπόνηση· γι' αυτό η αρχική του ρολογιού δεν την προτείνει («Παλμοί εδώ») και δεν
+ * κρύβει πια τη σημερινή: πριν, μια προπόνηση που ξεχάστηκε τη Δευτέρα έπαιρνε τα σετ και τους παλμούς της Τρίτης.
+ */
+fun phoneStale(s: LiveSession, now: Long): Boolean = now - phoneLastActivity(s) >= Forgotten.LONG_MS
+
+private val WEEKDAY_NAMES = listOf("Δευτέρα", "Τρίτη", "Τετάρτη", "Πέμπτη", "Παρασκευή", "Σάββατο", "Κυριακή")
+
+/**
+ * «από τις 14:05» (ίδια μέρα), «από χθες», «από Δευτέρα» (μέσα στην εβδομάδα) ή «από 9/11»: από πότε είναι ανοιχτή μια
+ * ξεχασμένη προπόνηση του κινητού ([phoneStale]). Κείμενο προς έγκριση από τον χρήστη.
+ */
+fun staleSinceText(start: Long, now: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String {
+    val d = java.time.Instant.ofEpochMilli(start).atZone(zone)
+    val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    val days = java.time.temporal.ChronoUnit.DAYS.between(d.toLocalDate(), today)
+    return when {
+        days <= 0L -> "από τις %02d:%02d".format(java.util.Locale.ROOT, d.hour, d.minute)
+        days == 1L -> "από χθες"
+        days < 7L -> "από ${WEEKDAY_NAMES[d.dayOfWeek.value - 1]}"
+        else -> "από ${d.dayOfMonth}/${d.monthValue}"
+    }
+}
+
+/** Η σημείωση της αρχικής για ξεχασμένη προπόνηση του κινητού (R7-A8-3), σε δύο γραμμές. Κείμενο προς έγκριση. */
+const val STALE_PHONE_LINE1 = "Ανοιχτή προπόνηση στο κινητό"
+
+fun stalePhoneLine2(start: Long, now: Long): String = "${staleSinceText(start, now)}· κλείσε την εκεί"
 
 /** Μοιάζει ξεχασμένη η άσκηση; ([Forgotten.why]) */
 fun forgottenDue(kind: String?, startedEl: Long, lastUserActionEl: Long, pausedSinceEl: Long, plannedMin: Int, nowEl: Long): Boolean =

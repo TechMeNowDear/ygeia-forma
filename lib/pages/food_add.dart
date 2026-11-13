@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data.dart' show HealthStore;
+import '../food/chol.dart' show branByName;
 import '../food/food_channel.dart';
 import '../food/food_model.dart';
 import '../food/food_search.dart' show FoodSearchResult, plain;
@@ -126,6 +127,27 @@ String quantityErrorText(String text, {required bool perMl}) {
 String typoQuestion(Food f, double grams) {
   final qty = grams >= 1000 && grams == grams.roundToDouble() ? thousands(grams) : gramsField(grams);
   return '$qty ${f.unit} «${f.name}» = ${kcalText(f.n.amount(Nk.kcal) * grams / 100)} kcal σε μία καταχώριση. Είναι σωστό;';
+}
+
+/// Η ερώτηση «Ζύγισες πριν ή μετά το μαγείρεμα;» (round7, R7-U2-2): μία γραμμή για κάθε μορφή, με τις θερμίδες που θα
+/// γράφονταν, π.χ. «300 g ξερές = 981 kcal» και «300 g βρασμένες = 375 kcal».
+String rawOrCookedQuestion(double grams, List<(Food, String)> forms) {
+  final qty = grams >= 1000 && grams == grams.roundToDouble() ? thousands(grams) : gramsField(grams);
+  return [
+    for (final (f, label) in forms) '$qty ${f.unit} ${label.toLowerCase()} = ${kcalText(f.n.amount(Nk.kcal) * grams / 100)} kcal',
+  ].join('\n');
+}
+
+/// Ξηροί καρποί και σπόροι: μετριούνται με τη χούφτα (round7, R7-U2-4).
+bool _nutsPortion(Food f) => f.cat == 'Ξηροί καρποί' || f.cat == 'Σπόροι' || f.cholKind == CholKind.nuts;
+
+/// Η πρώτη ποσότητα για τρόφιμο που δεν έχεις γράψει ποτέ και δεν έχει μερίδα (round7, R7-U2-4). Πριν ήταν πάντα 100 g:
+/// 100 g καρύδια = 709 kcal (το πλάνο λέει 30 g), και 100 g λάδι ενεργοποιούσαν τον δικό τους έλεγχο λάθους.
+/// Λάδι, βούτυρο και ό,τι είναι στα «Λιπαρά»: 10 g (περίπου μία κουταλιά)· ξηροί καρποί και σπόροι: 30 g· τα άλλα 100 g.
+double firstGrams(Food f) {
+  if (f.n.amount(Nk.fat) >= typoFatPer100 || f.cat == 'Λιπαρά') return 10;
+  if (_nutsPortion(f)) return 30;
+  return 100;
 }
 
 /// Η μέρα στην οποία γράφεται ένα φαγητό, όπως τη λέει η οθόνη προσθήκης: «Σήμερα · Παρ 13/11», «Χθες · Πέμ 12/11»,
@@ -362,14 +384,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       builder: (_) => QuantitySheet(
         food: widget.food,
         item: f,
-        initialGrams: widget.food.lastGrams(f.id) ?? f.servingGrams ?? 100,
+        initialGrams: widget.food.lastGrams(f.id) ?? f.servingGrams ?? firstGrams(f),
         meal: _meal,
       ),
     );
     if (r == null || !mounted) return;
     final day = await _targetDay();
     if (day == null || !mounted) return;
-    final e = await widget.food.add(r.food, r.grams, r.meal, on: day);
+    final e = await widget.food.add(r.food, r.grams, r.meal, on: day, now: _now());
     if (!mounted) return;
     if (!widget.food.isSaved(e)) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -532,6 +554,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     // Έλεγχος round1 (U3a-4): με μεγάλα γράμματα το κουτί αναζήτησης και τα γεύματα ψηλώνουν· τα ύψη της μπάρας
     // μεγαλώνουν μαζί τους. Πριν έμεναν 64 + 60 dp και από 1,3× το κουτί έχανε την πάνω και την κάτω γραμμή του.
     final bigger = math.max(0.0, MediaQuery.textScalerOf(context).scale(17) / 17 - 1);
+    // Round7 (R7-U2-9): από 1,3× γράμματα τα γεύματα σε 2 × 2 (όπως στο φύλλο ποσότητας), στην αρχή της λίστας. Στη μία
+    // σειρά της μπάρας μίκραιναν στο μισό για να χωρέσουν, και με γράμματα 2× έμεναν σχεδόν όσο στο 1×.
+    final large = MediaQuery.textScalerOf(context).scale(10) >= 12.5;
+    final mealPicker = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
+    );
 
     return Scaffold(
       backgroundColor: c.background,
@@ -573,16 +602,12 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             ),
           ),
         ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60 + bigger * 30),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: MealPicker(value: _meal, onChanged: (m) => setState(() => _meal = m)),
-            ),
-          ),
-        ),
+        bottom: large
+            ? null
+            : PreferredSize(
+                preferredSize: Size.fromHeight(60 + bigger * 30),
+                child: Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 10), child: mealPicker),
+              ),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -596,6 +621,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               ListView(
                 padding: const EdgeInsets.only(bottom: 40),
                 children: [
+                  if (large) Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: Center(child: mealPicker)),
                   tools,
                   if (q.trim().isEmpty) ...[
                     if (frequent.isNotEmpty) section('Συχνά', frequent),
@@ -630,8 +656,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                           more: true,
                           trailing: TextButton(
                             key: const ValueKey('add-mine-all'),
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                                settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: widget.food))),
+                            // Round7 (R7-U2-7): από εδώ ένα πάτημα στο προϊόν το γράφει (ανοίγει την ποσότητα), όπως στη
+                            // λίστα «Δικά μου»· πριν άνοιγε μόνο διόρθωση/διαγραφή και έπρεπε να γυρίσεις πίσω να το ψάξεις.
+                            onPressed: () async {
+                              final f = await Navigator.of(context).push<Food>(MaterialPageRoute<Food>(
+                                  settings: const RouteSettings(name: 'Τα προϊόντα μου'),
+                                  builder: (_) => MyFoodsScreen(food: widget.food, pick: true)));
+                              if (f != null && mounted) await _pick(f);
+                            },
                             child: Text('Όλα (${allMine.length}) ›'),
                           ),
                         ),
@@ -648,7 +680,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                       child: Text(
                         // Έλεγχος round1 (U3a-18): με τα ονόματα των δύο κουμπιών, όπως και η κάρτα «άλλο τρόφιμο».
-                        'Δεν βρέθηκε «$q» στη βάση. Αν είναι συσκευασμένο, πάτα «Σάρωση» ή «Από ετικέτα». '
+                        // Round7 (R7-U2-14): χωρίς το κενό που αφήνει το πληκτρολόγιο μετά από πρόταση λέξης («σαλάτα »).
+                        'Δεν βρέθηκε «${q.trim()}» στη βάση. Αν είναι συσκευασμένο, πάτα «Σάρωση» ή «Από ετικέτα». '
                         'Αν δεν έχει ετικέτα (π.χ. σπιτικό φαγητό), πρόσθεσε ένα-ένα τα υλικά του.',
                         style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                       ),
@@ -890,15 +923,45 @@ class _QuantitySheetState extends State<QuantitySheet> {
   /// ([entryLooksLikeTypo], π.χ. 2.000 g λάδι αντί για 20) ζητά πρώτα ΜΙΑ επιβεβαίωση, με τις θερμίδες που θα γραφτούν.
   /// Δεν μπλοκάρει τίποτα: με «Ναι, σωστό» γράφεται όπως είναι. Καταχώριση που ανοίγει για αλλαγή και μένει με την ίδια
   /// ποσότητα και το ίδιο τρόφιμο (π.χ. αλλάζει μόνο το γεύμα) δεν ξαναρωτιέται.
+  ///
+  /// Round7 (R7-U2-2): ξερά όσπρια, ρύζι, ζυμαρικά από 150 g, που δεν έχεις γράψει ποτέ ([askRawOrCooked]), ρωτούν πρώτα
+  /// «πριν ή μετά το μαγείρεμα;» με τις θερμίδες της κάθε μορφής· η απάντηση αλλάζει τη μορφή που γράφεται. Αν κράτησες
+  /// την ξερή, δεν ξαναρωτά «Σωστή ποσότητα;» (είδες ήδη τις θερμίδες). Round7 (R7-A2-3): ο έλεγχος λάθους ξέρει και την
+  /// ποσότητα της τελευταίας φοράς.
   Future<void> _submit(double g) async {
     final unchanged = widget.editing && g == widget.initialGrams && _item.id == widget.item.id;
-    if (!unchanged && entryLooksLikeTypo(_item, g)) {
+    var item = _item;
+    var keptRaw = false;
+    if (!unchanged && _states.length > 1 && askRawOrCooked(item, g, timesEaten: widget.food.timesEaten(item.id))) {
+      final raw = _states.first;
+      final rawWord = raw.$2.split(' (').first;
+      final cooked = _states.skip(1).toList();
+      final pick = await showDialog<Food>(
+        context: context,
+        routeSettings: const RouteSettings(name: 'Ξερό ή μαγειρεμένο'),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ζύγισες πριν ή μετά το μαγείρεμα;'),
+          content: Text(rawOrCookedQuestion(g, [(raw.$1, rawWord), ...cooked])),
+          actions: [
+            for (final st in cooked) TextButton(onPressed: () => Navigator.pop(ctx, st.$1), child: Text(st.$2)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, raw.$1), child: Text(rawWord)),
+          ],
+        ),
+      );
+      if (pick == null || !mounted) return;
+      keptRaw = pick.id == item.id;
+      if (!keptRaw) {
+        item = pick;
+        setState(() => _item = pick);
+      }
+    }
+    if (!unchanged && !keptRaw && entryLooksLikeTypo(item, g, lastGrams: widget.food.lastGrams(item.id))) {
       final ok = await showDialog<bool>(
         context: context,
         routeSettings: const RouteSettings(name: 'Έλεγχος ποσότητας'),
         builder: (ctx) => AlertDialog(
           title: const Text('Σωστή ποσότητα;'),
-          content: Text(typoQuestion(_item, g)),
+          content: Text(typoQuestion(item, g)),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Όχι, θα τη διορθώσω')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι, σωστό')),
@@ -907,7 +970,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
       );
       if (ok != true || !mounted) return;
     }
-    Navigator.pop(context, _SheetResult(g, _meal, _item));
+    Navigator.pop(context, _SheetResult(g, _meal, item));
   }
 
   @override
@@ -932,11 +995,14 @@ class _QuantitySheetState extends State<QuantitySheet> {
       // Υγρά ανά 100 ml (έλεγχος 9/11, Μ2): ποτήρι, κουτάκι.
       // Έλεγχος round1 (U3a-13): λάδι, βούτυρο και άλλα σχεδόν καθαρά λίπη μετριούνται με το κουταλάκι και την κουταλιά
       // (5, 10, 15, 30)· πριν το λάδι σε ml είχε «100, 200, 250, 330 ml» (ένα πάτημα = 824 kcal).
+      // Round7 (R7-U2-4): ξηροί καρποί και σπόροι με τη χούφτα (15, 30, 45, 60 g· το πλάνο λέει 30 g)· πριν 50–200 g.
       for (final v in f.n.amount(Nk.fat) >= typoFatPer100
           ? const [5.0, 10.0, 15.0, 30.0]
-          : f.perMl
-              ? const [100.0, 200.0, 250.0, 330.0]
-              : const [50.0, 100.0, 150.0, 200.0])
+          : _nutsPortion(f)
+              ? const [15.0, 30.0, 45.0, 60.0]
+              : f.perMl
+                  ? const [100.0, 200.0, 250.0, 330.0]
+                  : const [50.0, 100.0, 150.0, 200.0])
         ('${v.round()} $unit', v),
     ];
 
@@ -1268,8 +1334,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
   }
 }
 
-/// Κατηγορίες που συνήθως μαγειρεύονται με λάδι ή βούτυρο (υπενθύμιση στην ποσότητα).
-const _oilCats = {'Κρέας', 'Πουλερικά', 'Ψάρια', 'Θαλασσινά', 'Λαχανικά', 'Πατάτες', 'Αυγά'};
+/// Κατηγορίες που συνήθως μαγειρεύονται με λάδι ή βούτυρο (υπενθύμιση στην ποσότητα). Round7 (R7-U2-1): και τα όσπρια
+/// (φακές, φασολάδα, ρεβίθια μαγειρεύονται με ελαιόλαδο· μία κουταλιά = 120–135 kcal που αλλιώς χάνονται).
+const _oilCats = {'Κρέας', 'Πουλερικά', 'Ψάρια', 'Θαλασσινά', 'Λαχανικά', 'Πατάτες', 'Αυγά', 'Όσπρια'};
 
 /// Συμβουλή επιλογής στην ποσότητα, όταν το ίδιο τρόφιμο έχει είδη με μεγάλη διαφορά θερμίδων (έλεγχος 9/11, V-C-13).
 final pickHints = <String, String>{
@@ -1283,6 +1350,8 @@ const _nutritionWords = [
   'σογι', 'σοι', 'soy', 'αμυγδαλ', 'βρωμ', 'καρυδ', 'light', 'λαιτ', 'zero', 'ζιρο', 'διαιτ', 'αλκοολ', 'γλουτεν',
   'πανε', 'μπαρ', 'αλατισμ', 'αναλατ', 'λαδι', 'ελαιολαδ', 'βουτυρ', 'τηγαν', 'ζαχαρ', 'μελι', 'σοκολατ', 'κρεμ',
   'τυρι', 'γαλα', 'σιροπ', 'πρωτειν', 'κακαο', 'σοκολατουχ',
+  // Round7 (R7-U2-6): ροφήματα με γάλα: «φρέντο καπουτσίνο» έβρισκε σκέτο εσπρέσο με απλή γκρι σημείωση.
+  'καπουτσ', 'cappucc', 'kaputs', 'λατε', 'latte',
   // Αγνοημένο «χωρίς» αλλάζει το νόημα («μαρμελάδα χωρίς ζάχαρη» → «με λιγότερη ζάχαρη»).
   'χωρισ', 'without',
 ];
@@ -1465,6 +1534,13 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   bool _tried = false;
   SaltInput _saltMode = SaltInput.salt;
 
+  /// Round7 (R7-U2-3): όταν η «Αποθήκευση» δεν γίνεται, η φόρμα πάει στο πρώτο πεδίο που θέλει διόρθωση και το λέει·
+  /// πριν, με το «Όνομα» έξω από την οθόνη (σάρωση προϊόντος που δεν υπάρχει στο Open Food Facts), δεν φαινόταν τίποτα.
+  final _scroll = ScrollController();
+  final _nameKey = GlobalKey();
+  final _servingKey = GlobalKey();
+  late final Map<String, GlobalKey> _fieldKeys = {for (final f in _fields) f.$1: GlobalKey()};
+
   /// Οι τιμές είναι ανά 100 ml (υγρό) αντί για ανά 100 g (έλεγχος 9/11, Μ2): και για χειροκίνητη ετικέτα.
   late bool _perMl = widget.draft.perMl;
 
@@ -1473,19 +1549,22 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
 
   static String _field(double v) => dec(v, 4).replaceAll(RegExp(r',?0+$'), '');
 
+  // Round7 (R7-U2 Β-1): με τη σειρά της διατροφικής δήλωσης της ΕΕ (Κανονισμός 1169/2011, Παράρτημα XV), όπως είναι
+  // τυπωμένη στη συσκευασία: αντιγράφεται γραμμή-γραμμή, χωρίς πήγαινε-έλα στην ετικέτα.
   static const _fields = <(String, String, String, bool)>[
     (Nk.kcal, 'Ενέργεια', 'kcal', true),
-    (Nk.protein, 'Πρωτεΐνες', 'g', true),
-    (Nk.carbs, 'Υδατάνθρακες', 'g', true),
-    (Nk.sugars, 'εκ των οποίων σάκχαρα', 'g', false),
     (Nk.fat, 'Λιπαρά', 'g', true),
     (Nk.satFat, 'εκ των οποίων κορεσμένα', 'g', false),
+    (Nk.carbs, 'Υδατάνθρακες', 'g', true),
+    (Nk.sugars, 'εκ των οποίων σάκχαρα', 'g', false),
     (Nk.fiber, 'Φυτικές (εδώδιμες) ίνες', 'g', false),
+    (Nk.protein, 'Πρωτεΐνες', 'g', true),
     (Nk.salt, 'Αλάτι', 'g', false),
   ];
 
   @override
   void dispose() {
+    _scroll.dispose();
     _name.dispose();
     _brand.dispose();
     _serving.dispose();
@@ -1505,8 +1584,17 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     setState(() => _tried = true);
     final values = _values;
     final missing = [for (final f in _fields) if (f.$4 && values[f.$1] == null) f.$1];
-    if (_name.text.trim().isEmpty || missing.isNotEmpty || impossibleValues(values).isNotEmpty) return;
-    if (servingRejected(_serving.text)) return;
+    final noName = _name.text.trim().isEmpty;
+    final wrong = impossibleValues(values);
+    if (noName || missing.isNotEmpty || wrong.isNotEmpty) {
+      final firstWrong = [for (final f in _fields) if (wrong.containsKey(f.$1)) f.$1];
+      _showProblem(noName: noName, missing: missing, firstWrong: firstWrong.isEmpty ? null : firstWrong.first);
+      return;
+    }
+    if (servingRejected(_serving.text)) {
+      _showProblem(noName: false, missing: const [], serving: true);
+      return;
+    }
     final typedSalt = parseNumber(_v[Nk.salt]!.text);
     // Νάτριο σε mg: αν γράφτηκε νάτριο, αυτό· αν το αλάτι έμεινε όπως ήρθε (από νάτριο), το νάτριο της πηγής.
     final sodiumMg = typedSalt == null
@@ -1540,6 +1628,33 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       cholKind: _cholKind,
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
+  }
+
+  /// Η «Αποθήκευση» δεν έγινε: μήνυμα με ό,τι λείπει και κύλιση στο πρώτο πεδίο που θέλει διόρθωση (round7, R7-U2-3).
+  void _showProblem({required bool noName, required List<String> missing, String? firstWrong, bool serving = false}) {
+    final labels = {for (final f in _fields) f.$1: f.$2.toLowerCase()};
+    final parts = [if (noName) 'όνομα', for (final k in missing) labels[k]!];
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(parts.isNotEmpty ? 'Συμπλήρωσε: ${parts.join(', ')}.' : 'Διόρθωσε το πεδίο με το κόκκινο μήνυμα.'),
+      ));
+    final key = noName
+        ? _nameKey
+        : missing.isNotEmpty
+            ? _fieldKeys[missing.first]
+            : firstWrong != null
+                ? _fieldKeys[firstWrong]
+                : serving
+                    ? _servingKey
+                    : null;
+    final target = key?.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(target, alignment: 0.2, duration: const Duration(milliseconds: 250));
+    } else if (_scroll.hasClients) {
+      // Το πεδίο είναι τόσο μακριά που η λίστα δεν το έχει φτιάξει ακόμα: όλα τα πεδία που ελέγχονται είναι από πάνω.
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    }
   }
 
   /// Αλλαγή μονάδας αλατιού (ανεξάρτητος έλεγχος του fix-food, 4.1): αν το πεδίο έχει ακόμα την τιμή που ήρθε (π.χ.
@@ -1628,6 +1743,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: ListView(
+            controller: _scroll,
             padding: const EdgeInsets.fromLTRB(18, 4, 18, 40),
             children: [
               if (widget.note != null)
@@ -1637,13 +1753,19 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   decoration: BoxDecoration(color: c.tint(c.primary), borderRadius: BorderRadius.circular(16)),
                   child: Text(widget.note!, style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
                 ),
-              TextField(
-                controller: _name,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: deco('Όνομα', error: _tried && _name.text.trim().isEmpty ? 'Χρειάζεται όνομα' : null),
+              KeyedSubtree(
+                key: _nameKey,
+                child: TextField(
+                  controller: _name,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.next,
+                  // Η επιλογή «μετρά ως» δείχνει τι θα μετρήσει το όνομα (πίτουρο βρώμης· R7-A3-1).
+                  onChanged: (_) => setState(() {}),
+                  decoration: deco('Όνομα', error: _tried && _name.text.trim().isEmpty ? 'Χρειάζεται όνομα' : null),
+                ),
               ),
               const SizedBox(height: 12),
-              TextField(controller: _brand, decoration: deco('Μάρκα (προαιρετικό)')),
+              TextField(controller: _brand, textInputAction: TextInputAction.next, decoration: deco('Μάρκα (προαιρετικό)')),
               if (widget.draft.barcode != null) ...[
                 const SizedBox(height: 8),
                 Text('Barcode ${widget.draft.barcode}', style: TextStyle(color: c.textTertiary, fontSize: 13)),
@@ -1675,25 +1797,30 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                     _setSaltMode,
                     key: const ValueKey('salt-mode'),
                   ),
-                TextField(
-                  key: ValueKey('field-${f.$1}'),
-                  controller: _v[f.$1],
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                  onChanged: (_) => setState(() {}),
-                  decoration: deco(
-                    f.$1 == Nk.salt && _saltMode != SaltInput.salt
-                        ? 'Νάτριο (προαιρετικό)'
-                        : f.$4
-                            ? f.$2
-                            : '${f.$2} (προαιρετικό)',
-                    suffix: f.$1 == Nk.salt && _saltMode == SaltInput.sodiumMg ? 'mg' : f.$3,
-                    error: (f.$1 == Nk.salt && _saltMode != SaltInput.salt && impossible[Nk.salt] != null
-                            ? 'Τόσο νάτριο δεν γίνεται: έλεγξε τον αριθμό και τη μονάδα.'
-                            : impossible[f.$1]) ??
-                        (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
-                    warning: doubtful[f.$1] ?? (f.$1 == Nk.salt ? saltWarning() : null),
-                    info: doubtful[f.$1] == null && f.$1 == Nk.salt && _saltMode != SaltInput.salt,
+                KeyedSubtree(
+                  key: _fieldKeys[f.$1],
+                  child: TextField(
+                    key: ValueKey('field-${f.$1}'),
+                    controller: _v[f.$1],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    // Round7 (R7-U2 Β-1): «Επόμενο» στο πληκτρολόγιο, στο επόμενο πεδίο της ετικέτας.
+                    textInputAction: TextInputAction.next,
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                    onChanged: (_) => setState(() {}),
+                    decoration: deco(
+                      f.$1 == Nk.salt && _saltMode != SaltInput.salt
+                          ? 'Νάτριο (προαιρετικό)'
+                          : f.$4
+                              ? f.$2
+                              : '${f.$2} (προαιρετικό)',
+                      suffix: f.$1 == Nk.salt && _saltMode == SaltInput.sodiumMg ? 'mg' : f.$3,
+                      error: (f.$1 == Nk.salt && _saltMode != SaltInput.salt && impossible[Nk.salt] != null
+                              ? 'Τόσο νάτριο δεν γίνεται: έλεγξε τον αριθμό και τη μονάδα.'
+                              : impossible[f.$1]) ??
+                          (_tried && f.$4 && values[f.$1] == null ? 'Χρειάζεται' : null),
+                      warning: doubtful[f.$1] ?? (f.$1 == Nk.salt ? saltWarning() : null),
+                      info: doubtful[f.$1] == null && f.$1 == Nk.salt && _saltMode != SaltInput.salt,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -1720,32 +1847,37 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
               if (showChol) ...[
                 const SizedBox(height: 14),
                 // Έλεγχος round1 (S2-1 / S1-9): τα δικά σου προϊόντα μετρούν στην κάρτα «Χοληστερίνη» μόνο αν λένε τι είναι.
-                choices<String?>(
+                // Round7 (R7-A3-1): το «Τίποτα» αποθηκεύεται ([CholKind.none]) και κανένα όνομα δεν το αλλάζει. Όσο δεν
+                // διάλεξες, η επιλογή δείχνει τι θα μετρήσει: «Πίτουρο βρώμης» όταν το όνομα αρχίζει έτσι, αλλιώς «Τίποτα».
+                choices<String>(
                   'Στην κάρτα «Χοληστερίνη» μετρά ως:',
                   const [
-                    (null, 'Τίποτα'),
+                    (CholKind.none, 'Τίποτα'),
                     (CholKind.nuts, 'Ξηροί καρποί'),
                     (CholKind.legumes, 'Όσπρια'),
                     (CholKind.fish, 'Ψάρι ή θαλασσινά'),
                     (CholKind.bran, 'Πίτουρο βρώμης'),
                   ],
-                  _cholKind,
+                  _cholKind ?? (branByName(_name.text) ? CholKind.bran : CholKind.none),
                   (v) => setState(() => _cholKind = v),
                   key: const ValueKey('chol-kind'),
                 ),
               ],
               const SizedBox(height: 14),
-              TextField(
-                key: const ValueKey('field-serving'),
-                controller: _serving,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                // Όπως τα υπόλοιπα πεδία αριθμών της φόρμας (πριν, το μόνο χωρίς φίλτρο: δεχόταν «-», γράμματα από επικόλληση).
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                onChanged: (_) => setState(() {}),
-                decoration: deco(
-                  'Μία μερίδα (προαιρετικό)',
-                  suffix: _perMl ? 'ml' : 'g',
-                  error: _tried && servingRejected(_serving.text) ? servingErrorText(perMl: _perMl) : null,
+              KeyedSubtree(
+                key: _servingKey,
+                child: TextField(
+                  key: const ValueKey('field-serving'),
+                  controller: _serving,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  // Όπως τα υπόλοιπα πεδία αριθμών της φόρμας (πριν, το μόνο χωρίς φίλτρο: δεχόταν «-», γράμματα από επικόλληση).
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  onChanged: (_) => setState(() {}),
+                  decoration: deco(
+                    'Μία μερίδα (προαιρετικό)',
+                    suffix: _perMl ? 'ml' : 'g',
+                    error: _tried && servingRejected(_serving.text) ? servingErrorText(perMl: _perMl) : null,
+                  ),
                 ),
               ),
               const SizedBox(height: 22),

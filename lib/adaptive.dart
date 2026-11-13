@@ -15,9 +15,12 @@
 ///   που απλώνονται στα 2/3 του παραθύρου (14 μέρες στις 21). Αλλιώς: «λίγα δεδομένα», καμία πρόταση.
 /// - Τάση βάρους: ευθεία ελαχίστων τετραγώνων στις ζυγίσεις του παραθύρου. Από το πόσο απέχουν οι ζυγίσεις από την ευθεία
 ///   βγαίνει το τυπικό σφάλμα της κλίσης, δηλαδή πόσο σίγουρη είναι η εκτίμηση ([weightFit]).
-/// - Αν η εκτίμηση βγει έξω από 70–140% του τύπου, κάτι λείπει (π.χ. μέρες χωρίς καταγραφή): καμία πρόταση.
-/// - Νέος στόχος = εκτίμηση ± όσο χρειάζεται ο ρυθμός σου, στρογγυλεμένος στα 10, ποτέ κάτω από το όριο ασφαλείας,
-///   και το πολύ ±150 kcal ανά εβδομαδιαίο έλεγχο. Αλλαγή κάτω από 30 kcal: «μένει ίδιος».
+/// - Αν η εκτίμηση βγει έξω από 70–140% του τύπου, κάτι λείπει (π.χ. μέρες χωρίς καταγραφή): καμία πρόταση από την
+///   εκτίμηση. Round 7 (R7-A1-1): κάτω από το 70%, όταν το βάρος πάει καθαρά πιο ψηλά από τον ρυθμό σου, ο στόχος
+///   κατεβαίνει από τη ζυγαριά ([lowLogProposal]).
+/// - Νέος στόχος = εκτίμηση ± όσο χρειάζεται ο ρυθμός σου, στρογγυλεμένος στα 10, ποτέ κάτω από το κάτω όριο (το
+///   λιγότερο που προτείνουν οι οδηγίες AHA/ACC/TOS 2013: 1.500 άνδρες, 1.200 γυναίκες), και το πολύ ±150 kcal ανά
+///   εβδομαδιαίο έλεγχο. Αλλαγή κάτω από 30 kcal: «μένει ίδιος».
 /// - Περιθώριο αβεβαιότητας (Α1): αλλαγή προτείνεται μόνο όταν η διαφορά είναι μεγαλύτερη από [adaptGuardSe] φορές το
 ///   τυπικό σφάλμα της εκτίμησης. Πριν, με 9 ζυγίσεις σε 21 μέρες, η κάρτα πρότεινε αλλαγή στο 84–93% των ελέγχων ενώ η
 ///   σωστή απάντηση ήταν «μένει ίδιος» (προσομοίωση με θόρυβο ζύγισης 0,3–0,6 kg)· με το περιθώριο πέφτει στο 7–9%.
@@ -93,6 +96,10 @@ const adaptAbsurdKcal = 6000.0;
 const adaptAbsurdTimes = 2.5;
 
 double absurdDayKcal(double formulaTdee) => math.max(adaptAbsurdKcal, adaptAbsurdTimes * formulaTdee);
+
+/// Η εκτίμηση γίνεται δεκτή μόνο από [adaptLowShare] ως [adaptHighShare] φορές τον τύπο· έξω από αυτό «κάτι λείπει».
+const adaptLowShare = 0.7;
+const adaptHighShare = 1.4;
 
 /// Πόσα τυπικά σφάλματα πρέπει να ξεπερνά η διαφορά για να προταθεί αλλαγή στόχου.
 const adaptGuardSe = 2.0;
@@ -323,7 +330,7 @@ FoodGap? foodGap({
       seKcal: (fit.se ?? 0.0) * kcalPerKg,
       windowDays: windowDays,
     );
-    if (tdee < 0.7 * formulaTdee || tdee > 1.4 * formulaTdee) {
+    if (tdee < adaptLowShare * formulaTdee || tdee > adaptHighShare * formulaTdee) {
       // Ίσως φταίνε παλιές μέρες με ξεχασμένα γεύματα: δοκιμάζεται και το μικρότερο παράθυρο.
       result = (status: AdaptStatus.implausible, est: est);
       continue;
@@ -385,7 +392,7 @@ AdaptProposal proposeTarget({required Goals goals, required Expenditure est, req
   if (withinNoise) change = 0;
   var target = current + change;
   if (target < floor) target = floor;
-  // «Δεν κατεβαίνει κάτω από το όριο ασφαλείας» μόνο όταν ο νέος στόχος ΕΙΝΑΙ στο όριο (Συμβούλιο 2, μ1). Πριν το έλεγε και
+  // «Δεν κατεβαίνει κάτω από το κάτω όριο» μόνο όταν ο νέος στόχος ΕΙΝΑΙ στο όριο (Συμβούλιο 2, μ1). Πριν το έλεγε και
   // όταν το βήμα των 150 τον άφηνε πολύ πιο πάνω (π.χ. 2.000 → 1.850 με όριο 1.500).
   return AdaptProposal(
     current: current,
@@ -395,6 +402,44 @@ AdaptProposal proposeTarget({required Goals goals, required Expenditure est, req
     floored: floored && target == floor,
     withinNoise: withinNoise,
   );
+}
+
+/// Ο ρυθμός που διάλεξες, σε kg την εβδομάδα για βάρος [kg]: αρνητικός για «λιγότερο λίπος», 0 για «ίδιο βάρος».
+double plannedKgWeek(Goals goals, double kg) => switch (goals.aim) {
+      GoalAim.lose => -kg * goals.rate,
+      GoalAim.keep => 0.0,
+      GoalAim.gain => kg * goals.rate,
+    };
+
+/// Round 7 (R7-A1-1): λίγη καταγραφή, και το βάρος πάει πιο ψηλά από τον ρυθμό σου.
+///
+/// Όταν η εκτίμηση βγαίνει κάτω από το [adaptLowShare] του τύπου, το ημερολόγιο γράφει λιγότερο από όσο τρως (σχεδόν
+/// πάντα). Ως τώρα τότε δεν άλλαζε τίποτα («κάτι λείπει»), όσο κι αν ανέβαινε το βάρος: σε προσομοίωση με 20% ξεχασμένο
+/// φαγητό και κατανάλωση 10% κάτω από τον τύπο, το βάρος ανέβηκε 5 kg σε 16 εβδομάδες με στόχο «λιγότερο λίπος».
+/// Η εκτίμηση εδώ δεν μετρά (δεν είναι αξιόπιστη)· μετρά μόνο η ζυγαριά:
+/// - Η κλίση του βάρους στο παράθυρο, μείον τον ρυθμό σου ([plannedKgWeek]), × 7.700 ÷ 7 = πόσες kcal τη μέρα τρως πάνω
+///   από όσο θέλει ο ρυθμός σου. Πρέπει να ξεπερνά το περιθώριο των ζυγίσεων ([Expenditure.guardKcal], 2 τυπικά
+///   σφάλματα, ίδιο με τον εβδομαδιαίο έλεγχο)· αλλιώς null (μένει το «κάτι λείπει»).
+/// - Ο στόχος κατεβαίνει τόσο, στρογγυλεμένο στα 10, το πολύ [adaptMaxStep]· ποτέ κάτω από το κάτω όριο· κάτω από
+///   [adaptMinStep] καμία αλλαγή. Μόνο προς τα κάτω: με πολύ λίγη καταγραφή, ένας ψηλότερος στόχος δεν θα έφτανε στο πιάτο.
+/// Απόδειξη πρώτα σε Python (αντίγραφο του #104, 120 επαναλήψεις ανά περίπτωση, γιορτές, αρρώστια, διακοπές): με
+/// 10–40% ξεχασμένο φαγητό ο στόχος πάει προς τον σωστό ρυθμό (ως το κάτω όριο)· με σωστή καταγραφή οι προτάσεις είναι
+/// ίδιες με πριν σε κάθε επανάληψη όπου ο παλιός κανόνας δεν έλεγε «κάτι λείπει»· οι άσκοπες αλλαγές όταν δεν χρειάζεται
+/// καμία μένουν 8–12% των ελέγχων (το πολύ +0,1 μονάδα)· η αρχή (16/11, πρώτη εκτίμηση 14/12) ίδια.
+AdaptProposal? lowLogProposal({required Goals goals, required Expenditure est, required double kgNow}) {
+  if (est.tdee >= adaptLowShare * goals.calc.tdee) return null;
+  final excess = (est.slopeKgWeek - plannedKgWeek(goals, kgNow)) * kcalPerKg / 7;
+  if (excess <= est.guardKcal) return null;
+  final current = goals.kcal;
+  final floor = goals.male ? kcalFloorMale : kcalFloorFemale;
+  var target = current - math.min(adaptMaxStep, _round10(excess));
+  var floored = false;
+  if (target < floor) {
+    target = floor;
+    floored = true;
+  }
+  if (current - target < adaptMinStep) return null;
+  return AdaptProposal(current: current, target: target, est: est, fastLoss: false, floored: floored);
 }
 
 /// Το παράθυρο της «γρήγορης απώλειας» σήμερα: από πότε ως και σήμερα. Οι [adaptFastWindowDays] τελευταίες μέρες, ΧΩΡΙΣ

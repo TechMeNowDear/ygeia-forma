@@ -68,8 +68,10 @@ class DashboardReader(
     }
 
     suspend fun read(grantedNames: Set<String>): JSONObject {
-        val now = LocalDateTime.now()
-        val today = now.toLocalDate()
+        // Round 7 (R7-A10-4): μία στιγμή για όλη την ανάγνωση· το «readAt» είναι αυτή (η αρχή), όχι το τέλος.
+        val moment = DataRules.readMoment(System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+        val now = moment.now
+        val today = moment.today
         val from = today.minusDays(DAYS.toLong()).atStartOfDay()
         val o = JSONObject()
 
@@ -84,7 +86,7 @@ class DashboardReader(
         if (has(DataTypes.STEPS)) o.put("steps", safe { steps(from, today.plusDays(1).atStartOfDay()) })
         if (has(DataTypes.FLOORS_CLIMBED)) o.put("floors", safe { floors(from, now) })
         if (has(DataTypes.ACTIVITY_SUMMARY)) {
-            o.put("activity", safe { activity(today) })
+            o.put("activity", safe { activity(today, now) })
             o.put("activityDaily", safe { activityDaily(from, today.plusDays(1).atStartOfDay()) })
         }
         if (has(DataTypes.STEPS)) {
@@ -93,6 +95,8 @@ class DashboardReader(
             o.put("stepsFrom", epochMs(stepsFrom))
         }
         if (has(DataTypes.EXERCISE)) o.put("exercise", safe { exercise(from, now) })
+        // Η γέφυρα και ο RefreshWorker το κρατούν όπως είναι (δεν βάζουν δικό τους, με την ώρα του τέλους).
+        o.put("readAt", moment.ms)
         return o
     }
 
@@ -479,8 +483,9 @@ class DashboardReader(
 
     // ---------- Δραστηριότητα σήμερα ----------
 
-    private suspend fun activity(today: LocalDate): JSONObject {
-        val filter = LocalTimeFilter.of(today.atStartOfDay(), LocalDateTime.now())
+    /** Ως [now], τη στιγμή της ανάγνωσης (R7-A10-4): ποτέ πέρα από τα μεσάνυχτα της μέρας [today]. */
+    private suspend fun activity(today: LocalDate, now: LocalDateTime): JSONObject {
+        val filter = LocalTimeFilter.of(today.atStartOfDay(), now)
         val o = JSONObject()
         tryPut(o, "calories") {
             s.aggregateData(

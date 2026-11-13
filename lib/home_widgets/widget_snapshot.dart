@@ -4,6 +4,7 @@ import '../food/food_model.dart';
 import '../food/food_store.dart';
 import '../format.dart';
 import '../history.dart';
+import '../pages/training/today_training_card.dart' show TodayTrainingCard;
 import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
@@ -40,11 +41,14 @@ Map<String, dynamic> buildWidgetSnapshot(HealthStore store, FoodStore food, Date
 
 /// Το widget «Προπόνηση σήμερα» (13/11): ΟΛΗ η εβδομάδα του προγράμματος με έτοιμα κείμενα (1 = Δευτέρα … 7 = Κυριακή,
 /// μόνο οι μέρες με προπόνηση), ώστε το widget να αλλάζει μόνο του στα μεσάνυχτα χωρίς να ξυπνήσει η εφαρμογή. Ίδιοι
-/// κανόνες με την κάρτα «Άσκηση σήμερα» (today_training_card.dart): η μέρα του προγράμματος, και «έγινε» όταν υπάρχει
-/// προπόνηση που ξεκίνησε σήμερα και τελείωσε.
+/// κανόνες με την κάρτα «Άσκηση σήμερα» (today_training_card.dart): η μέρα του προγράμματος, και «έγινε» όταν τελείωσε
+/// σήμερα η προπόνηση ΤΗΣ ΜΕΡΑΣ ([TodayTrainingCard.doneToday]).
+/// Round 7 (U1-5): πριν «έγινε» = ΟΠΟΙΑ προπόνηση τελείωσε σήμερα: ένα πρωινό περπάτημα σε μέρα βαρών έγραφε όλη τη μέρα
+/// «Έγινε σήμερα · Περπάτημα · 40 λεπτά», ενώ η Σήμερα έλεγε «Ξεκίνα την προπόνηση». Και η διάρκεια περπατήματος είναι
+/// τα ενεργά λεπτά (χωρίς τις παύσεις), όπως στην κάρτα, όχι λήξη − αρχή.
 Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
   final p = t.program;
-  final done = t.sessions.reversed.where((s) => s.finished && sameDay(s.start, today)).firstOrNull;
+  final done = TodayTrainingCard.doneToday(t, today);
   return {
     'has': p != null,
     'week': {
@@ -61,7 +65,8 @@ Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
             },
     },
     if (done != null) 'done': dateKey(today),
-    if (done != null) 'doneText': '${done.name} · ${hoursMinutes(done.end!.difference(done.start).inMinutes)}',
+    if (done != null)
+      'doneText': '${done.name} · ${hoursMinutes(done.isCardio ? (done.cardioMinutes ?? done.duration.inMinutes) : done.duration.inMinutes)}',
   };
 }
 
@@ -129,7 +134,9 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
       range: sleepWeek != null && sr != null ? '${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1)}' : null);
   add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
-  add(K.sleepScore, 'Σκορ', '', (v) => '${v.round()}');
+  // Round 7 (U1-7): «Βαθμολογία», όπως παντού στην εφαρμογή (πριν «Σκορ» μόνο στα widgets). Χωρά στο κουτάκι της στήλης
+  // 1×3 (Inter Medium 9,5 sp: 56,6 dp ≤ 64· με «Μεγάλα» 63,3· στο 1,3 με τη σμίκρυνση ως 85%: 62,5).
+  add(K.sleepScore, 'Βαθμολογία', '', (v) => '${v.round()}');
   add(K.hrv, 'HRV', ' ms', (v) => '${v.round()}');
   add(K.sleepHr, 'Παλμοί', ' bpm', (v) => '${v.round()}');
   add(K.lowHr, 'Χαμηλότεροι', ' bpm', (v) => '${v.round()}');
@@ -178,7 +185,16 @@ Map<String, dynamic> _move(HealthStore store, DateTime today) {
   // 'day': η μέρα των τιμών· άλλη μέρα στο widget = «—» (έλεγχος 8/11, DATA-02, HomeWidgets.forToday).
   // Έλεγχος 9/11 (D2-05c): η μέρα της ΑΝΑΓΝΩΣΗΣ, όχι η σημερινή: τιμές χθεσινής ανάγνωσης (π.χ. άνοιγμα στις 00:05
   // με παλιά μνήμη) δεν φαίνονται σαν σημερινές.
-  return {'src': 'ρολόι · ${hm(d.readAt)}', 'at': d.readAt.millisecondsSinceEpoch, 'day': dateKey(dayOf(d.readAt)), 'm': out};
+  // Round 7 (U1-10): «Samsung · 10:20», όπως η εφαρμογή λέει την πηγή των βημάτων (ρολόι και κινητό μαζί, sources_page)·
+  // πριν «ρολόι», και για βήματα με το κινητό στην τσέπη. Σύντομη μορφή (μόνο η ώρα) για τη στήλη 1×3, όπου
+  // «Samsung · 10:20» (Inter Medium 10 sp: 79,3 dp) δεν χωρά στα 76 dp.
+  return {
+    'src': 'Samsung · ${hm(d.readAt)}',
+    'srcShort': hm(d.readAt),
+    'at': d.readAt.millisecondsSinceEpoch,
+    'day': dateKey(dayOf(d.readAt)),
+    'm': out,
+  };
 }
 
 /// Φαγητό: τα σύνολα της σημερινής μέρας, μόνο από τη βάση τροφίμων.
@@ -189,7 +205,9 @@ Map<String, dynamic> _food(FoodStore food, DateTime today) {
   final series = [for (var i = 6; i >= 0; i--) _kcalOf(food, _minus(today, i))];
   String g(double v) => gramsText(v);
   final out = <String, dynamic>{
-    'kcal': _entry('Θερμίδες', kcalText(t.kcal), ' kcal',
+    // Round 7 (A2-1): οι θερμίδες όπως τις γράφει η εφαρμογή ([Totals.shownKcal]: άθροισμα των στρογγυλεμένων ανά
+    // καταχώριση)· πριν η στρογγύλευση του συνόλου, που έβγαζε π.χ. 1.804 στο widget και 1.803 στη Διατροφή.
+    'kcal': _entry('Θερμίδες', thousands(t.shownKcal), ' kcal',
         cap: entries.isEmpty ? 'τίποτα ακόμα σήμερα' : (meals == 1 ? '1 γεύμα σήμερα' : '$meals γεύματα σήμερα'),
         spark: series),
     'protein': _entry('Πρωτεΐνη', g(t.protein), ' g'),
@@ -209,7 +227,7 @@ Map<String, dynamic> _food(FoodStore food, DateTime today) {
 
 double? _kcalOf(FoodStore food, DateTime day) {
   final e = food.entriesFor(day);
-  return e.isEmpty ? null : Totals(e).kcal;
+  return e.isEmpty ? null : Totals(e).shownKcal.toDouble();
 }
 
 /// Round 4 (m1 · R4-A-4): λεζάντα του βάρους στο widget όταν η τελευταία ζύγιση δεν μετρά ακόμα («σε αναμονή»).
@@ -278,7 +296,8 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   if (last.smm case final v?) out['smm'] = _entry('Μύες', dec(v), ' kg', cap: shortDayDate(last.time), spark: series((b) => b.smm));
   if (last.ffm case final v?) out['ffm'] = _entry('Άλιπη', dec(v), ' kg', cap: shortDayDate(last.time), spark: series((b) => b.ffm));
   if (last.bmr case final v?) out['bmr'] = _entry('Μεταβολισμός', thousands(v), ' kcal', cap: shortDayDate(last.time));
-  if (bmi != null) out['bmi'] = _entry('Δείκτης', dec(bmi), '', cap: shortDayDate(last.time), range: bmiRange.placeText(bmi));
+  // Round 7 (A4-2): κομμένος στο 0,1 ([bmiText]), όπως το Σώμα: ποτέ «25,0» με «μέσα στο εύρος».
+  if (bmi != null) out['bmi'] = _entry('Δείκτης', bmiText(bmi), '', cap: shortDayDate(last.time), range: bmiRange.placeText(bmi));
   if (last.water case final v?) out['water'] = _entry('Νερό', dec(v), ' L', cap: shortDayDate(last.time));
   return {'src': 'InBody · ${shortDayDate(last.time)}', 'm': out};
 }

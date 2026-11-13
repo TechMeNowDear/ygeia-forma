@@ -344,7 +344,8 @@ void main() {
       expect(find.text('Λίγες μέρες για συμπέρασμα'), findsOneWidget);
       expect(find.text('Σταθερό'), findsNothing);
       expect(find.textContaining('χωράει στις συνηθισμένες'), findsNothing);
-      expect(find.text('πριν 58 bpm'), findsOneWidget, reason: 'όχι «συνήθως»: είναι η μεσαία των 4 εβδομάδων');
+      // Round 7 (f5 · U1-11): «4 προηγούμενες: 58 bpm» (πριν «πριν 58 bpm», που διαβαζόταν ως χρόνος).
+      expect(find.text('4 προηγούμενες: 58\u00A0bpm'), findsOneWidget, reason: 'όχι «συνήθως»: είναι η μεσαία των 4 εβδομάδων');
     });
   });
 

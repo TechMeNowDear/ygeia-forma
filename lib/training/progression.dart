@@ -18,7 +18,7 @@ library;
 import 'dart:math' as math;
 
 import '../exercise/ex_names.dart' show exNamesById;
-import '../format.dart' show daysBetween;
+import '../format.dart' show daysBetween, shortDayDate;
 import 'equipment.dart';
 import 'program.dart';
 import 'session.dart';
@@ -39,13 +39,13 @@ enum Change {
   /// Ένα σκαλί κάτω.
   down,
 
-  /// Μετά από διάλειμμα: λίγο πιο ελαφριά.
+  /// Μετά από διάλειμμα: πιο ελαφριά (πόσο, το λέει ο λόγος).
   back,
 
   /// Πιο δύσκολη παραλλαγή.
   variant,
 
-  /// Ενόχληση: τίποτα δεν ανεβαίνει.
+  /// Ενόχληση: ένα σκαλί πιο ελαφριά, ή ίδιο βάρος με λιγότερες επαναλήψεις (R7-A6-3).
   pain,
 
   /// Το μέγιστο του εξοπλισμού.
@@ -159,6 +159,32 @@ int _lowAt(ExLog e, double? load) {
 /// [a] είναι ευκολότερο φορτίο από το [b] (στο λάστιχο βοήθειας: περισσότερη βοήθεια).
 bool _easier(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a > b : a < b;
 
+/// [a] είναι τουλάχιστον τόσο δύσκολο όσο το [b] (με ανοχή δεκαδικών).
+bool _atLeast(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a <= b + 1e-6 : a >= b - 1e-6;
+
+/// R7-A6-1: το φορτίο [load] το έχεις ήδη κάνει. Κρίνεται η πιο πρόσφατη φορά που έγινε σετ με αυτό (ή πιο δύσκολο):
+/// τουλάχιστον ένα τέτοιο σετ με επαναλήψεις στο κάτω όριο εκείνης της μέρας ή πάνω, και χωρίς ενόχληση. Τότε ένα
+/// φορτίο που κατέβασε η εφαρμογή (διάλειμμα, δύο φορές κάτω, απάντηση στο 1ο σετ) ξανανεβαίνει ως εκεί με τους
+/// κανονικούς κανόνες (πάνω όριο, ένα σκαλί τη φορά), όσο μεγάλο κι αν είναι το σκαλί του εξοπλισμού. Αν η πιο πρόσφατη
+/// τέτοια φορά ήταν κάτω από το εύρος (π.χ. δύο φορές κάτω → ένα σκαλί κάτω), όχι: ισχύει ο κανόνας του [stepCeiling].
+bool _lifted(LoadKind k, double load, List<(DateTime, ExLog)> usable) {
+  for (final (_, h) in usable) {
+    final at = [for (final s in h.done) if (s.load != null && _atLeast(k, s.load!, load)) s];
+    if (at.isEmpty) continue;
+    return h.pain.isEmpty && at.any((s) => s.reps >= h.lo);
+  }
+  return false;
+}
+
+/// Ασκήσεις όπου η βιβλιοθήκη λέει «πάντα με ελαφρύ λάστιχο»: δεν προτείνεται ποτέ «ανέβασε εσύ με το +».
+const _noSelfStep = <String>{'band_er', 'face_pull'};
+
+/// R7-A6-1: τι λέμε από την αρχή όταν το επόμενο σκαλί ([up]) δεν μπαίνει ποτέ αυτόματα (π.χ. λάστιχο 20 → 30 lb):
+/// ανεβαίνουν μόνο οι επαναλήψεις, και μετά η αλλαγή είναι δική σου απόφαση.
+String _bigStepNote(PlanItem item, LoadKind k, double up, int ceiling) =>
+    ' Το επόμενο σκαλί, ${_l(k, up)}, είναι πολύ μεγάλο για να μπει μόνο του: εδώ ανεβαίνουν οι επαναλήψεις, ως τις $ceiling. '
+    'Μετά πες μου να το κάνουμε πιο δύσκολο${_noSelfStep.contains(item.ex) ? '' : ', ή ανέβασε εσύ με το «+» όταν νιώθεις έτοιμος'}.';
+
 const _hint = ' Αν είναι πολύ ελαφρύ (θα έβγαζες άνετα τις τριπλάσιες), ανέβασε ένα σκαλί με το «+».';
 
 /// Η συμβουλή «ανέβασέ το εσύ» (S7-22) ταιριάζει: αλτήρες με μεγάλο σκαλί (ως +34%), και όταν «τριπλάσιες» επαναλήψεις
@@ -172,10 +198,13 @@ bool _hintFits(PlanItem item, LoadKind k, double? load, double? up, int rirGoal)
 
 String _firstReason(PlanItem item, LoadKind k, double? start, int rirGoal) {
   if (!hasLoad(k)) return 'Πρώτη φορά: σταμάτα κάθε σετ όταν σου μένουν $rirGoal, όσες επαναλήψεις κι αν βγουν.';
-  if (item.load != null) return 'Πρώτη φορά. Μετά το 1ο σετ θα σε ρωτήσει πώς πήγε, για να βρεθεί το σωστό βάρος.';
-  if (!labelIsLoad(item.ex, k)) return 'Πρώτη φορά: ελαφριά αρχή. Μετά το 1ο σετ θα σε ρωτήσει πώς πήγε και θα προτείνει βάρος.';
   final up = start == null ? null : stepUp(k, start);
-  return 'Πρώτη φορά: ελαφριά αρχή. Μετά το 1ο σετ θα σε ρωτήσει πώς πήγε.${_hintFits(item, k, start, up, rirGoal) ? _hint : ''}';
+  // R7-A6-1: λάστιχα/αλτήρες με σκαλί που δεν μπαίνει ποτέ μόνο του: το λέμε από την πρώτη φορά, όχι μετά από μήνες.
+  final sc = stepCeiling(item.ex, k, start, up, item.lo, item.hi, rirGoal);
+  final note = up != null && !sc.step && !lightOnly.contains(item.ex) ? _bigStepNote(item, k, up, sc.reps) : '';
+  if (item.load != null) return 'Πρώτη φορά. Μετά το 1ο σετ θα σε ρωτήσει πώς πήγε, για να βρεθεί το σωστό βάρος.$note';
+  if (!labelIsLoad(item.ex, k)) return 'Πρώτη φορά: ελαφριά αρχή. Μετά το 1ο σετ θα σε ρωτήσει πώς πήγε και θα προτείνει βάρος.';
+  return 'Πρώτη φορά: ελαφριά αρχή. Μετά το 1ο σετ θα σε ρωτήσει πώς πήγε.${_hintFits(item, k, start, up, rirGoal) ? _hint : ''}$note';
 }
 
 /// [history]: οι προηγούμενες φορές της ίδιας άσκησης, νεότερη πρώτη, με την ημερομηνία τους.
@@ -186,7 +215,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // Τουλάχιστον 2 ρεζέρβα σε όλες τις ασκήσεις, ως να πει άλλα ο καρδιολόγος: η πίεση ανεβαίνει απότομα
   // όσο πλησιάζεις την αποτυχία (MacDougall 1985· έλεγχος #2). Το πρόγραμμα μπορεί να ζητά περισσότερη.
   final rirGoal = math.max(item.rir, 2);
-  final usable = [for (final h in history) if (!h.$2.skipped && h.$2.done.isNotEmpty) h];
+  // R7-A6-2: και μια φορά με ενόχληση χωρίς κανένα σετ (σταμάτησες στο 1ο σετ, ή «Παράλειψη» μετά τον πόνο): μετρά.
+  final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty) h];
 
   if (usable.isEmpty) {
     final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : startLoad(item.ex, k)) : null;
@@ -196,23 +226,14 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final (lastDay, last) = usable.first;
   final done = last.done;
   final endLoad = _endLoad(last);
-  var lastLoad = endLoad ?? (hasLoad(k) ? (item.load ?? startLoad(item.ex, k)) : null);
+  // Χωρίς κανένα σετ (μόνο ενόχληση, R7-A6-2): το φορτίο που είχε ο στόχος εκείνη τη μέρα.
+  final planned = done.isEmpty && last.log.isNotEmpty ? last.log.first.load : null;
+  var lastLoad = endLoad ?? planned ?? (hasLoad(k) ? (item.load ?? startLoad(item.ex, k)) : null);
   // Ανοίγματα με λάστιχο, από πριν το «ανά πλευρά» (π.χ. 20): στο πλησιέστερο που βγαίνει (ελάχιστο 30/πλευρά).
   if (k == LoadKind.bandPair && lastLoad != null) lastLoad = snap(k, lastLoad);
   // Ημερολογιακές μέρες σε UTC (έλεγχος 9/11, RT-17 / V-B-17): πάνω από την αλλαγή ώρας του Μαρτίου, 15 μέρες δεν
   // μετριούνται πια 14 (14 μέρες + 23 ώρες).
   final gap = daysBetween(lastDay, today);
-
-  // Μετά από πάνω από 2 εβδομάδες: περίπου 10% πιο ελαφριά.
-  if (gap > 14 && lastLoad != null && hasLoad(k)) {
-    final v = scaled(k, lastLoad, 0.9);
-    return Target(
-      load: v,
-      reps: _same(sets, lo),
-      change: Change.back,
-      reason: 'Πέρασαν $gap μέρες από την τελευταία φορά: λίγο πιο ελαφριά για αρχή.',
-    );
-  }
 
   // Χωρίς απάντηση δεν ξέρουμε πόσο κοντά στην αποτυχία ήταν: ποτέ περισσότερα κιλά (έλεγχος 8/11).
   final ra = last.rirAnswer;
@@ -224,6 +245,11 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final sc = stepCeiling(item.ex, k, lastLoad, up, lo, hi, rirGoal);
   var ceiling = sc.reps;
   var auto = sc.step;
+  // R7-A6-1: ως ένα φορτίο που έχεις ήδη κάνει, το σκαλί δεν είναι «άγνωστο»: ανεβαίνει στο πάνω όριο, όπως κάθε σκαλί.
+  if (up != null && hasLoad(k) && _lifted(k, up, usable)) {
+    ceiling = hi;
+    auto = true;
+  }
   if (lightOnly.contains(item.ex)) {
     ceiling = hi + plateauExtraReps;
     auto = false;
@@ -238,19 +264,58 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   List<int> asLast() => [for (var i = 0; i < sets; i++) math.max(1, math.min(i < r.length ? r[i] : r.last, ceiling))];
   List<int> plusOne() => [for (var i = 0; i < sets; i++) math.max(1, math.min(ceiling, i < r.length ? r[i] + 1 : r.last))];
 
+  // R7-A6-3: μετά από ενόχληση ποτέ ίδιο ή περισσότερο: ένα σκαλί πιο ελαφριά (στο λάστιχο βοήθειας, περισσότερη
+  // βοήθεια)· όπου δεν υπάρχει πιο ελαφρύ, ίδιο βάρος με 2 επαναλήψεις λιγότερες. Όπως λέει και η βιβλιοθήκη («λιγότερο
+  // βάθος ή λιγότερα κιλά»): στον τενοντοπαθή ώμο το φορτίο ρυθμίζεται από τον πόνο και μειώνεται όταν ο πόνος ανεβαίνει
+  // (Littlewood κ.ά., Int J Rehabil Res 2015;38:95–106· μοντέλο παρακολούθησης του πόνου, Silbernagel κ.ά., Am J Sports
+  // Med 2007;35:897–906). Δεύτερη φορά στη σειρά: πρόταση για εναλλακτική. Ο λόγος γράφει ΠΟΤΕ ήταν η ενόχληση, γιατί
+  // στο μεταξύ μπορεί να έγινε εναλλακτική στη θέση της.
   if (last.pain.isNotEmpty) {
     final where = last.pain.map((p) => painNames[p] ?? p).join(', ');
+    final again = usable.length > 1 && usable[1].$2.pain.isNotEmpty;
+    final base = r.isEmpty ? _same(sets, math.max(1, math.min(lo, last.log.isEmpty ? lo : last.log.first.reps))) : asLast();
+    final down = lastLoad == null || !hasLoad(k) ? null : stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    final String what;
+    final List<int> reps;
+    if (down != null) {
+      reps = base;
+      what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : 'ένα σκαλί πιο ελαφριά, ${_l(k, down)}';
+    } else {
+      reps = [for (final x in base) math.max(1, x - 2)];
+      what = hasLoad(k) ? '${usesKg(k) ? 'ίδια κιλά' : 'ίδιο φορτίο'} με 2 επαναλήψεις λιγότερες' : '2 επαναλήψεις λιγότερες';
+    }
     return Target(
-      load: lastLoad,
-      reps: asLast(),
+      load: down ?? lastLoad,
+      reps: reps,
       change: Change.pain,
-      reason: 'Την προηγούμενη φορά είχες ενόχληση ($where): τίποτα δεν ανεβαίνει. Αν ξανασυμβεί, δοκίμασε εναλλακτική.',
+      reason: '${again ? 'Ενόχληση και τις δύο τελευταίες φορές' : 'Την τελευταία φορά είχες ενόχληση'} ($where, ${shortDayDate(lastDay)}): '
+          '$what, και μικρότερο εύρος κίνησης, χωρίς πόνο. '
+          '${again ? 'Καλύτερα άλλαξέ την με εναλλακτική: ⋮ › «Αλλαγή άσκησης».' : 'Αν ξανασυμβεί, ⋮ › «Αλλαγή άσκησης».'} '
+          'Αν ο πόνος μένει ως την επόμενη μέρα, ρώτα γιατρό ή φυσικοθεραπευτή.',
+    );
+  }
+
+  // Μετά από πάνω από 2 εβδομάδες: περίπου 10% πιο ελαφριά, ποτέ κάτω από το ελαφρύ ξεκίνημα της εφαρμογής
+  // ([startLoad]), και ο λόγος λέει πόσο (R7-A6-1: πριν «λίγο πιο ελαφριά» και για 4,3 → 2,8 kg ή 20 → 10 lb).
+  if (gap > 14 && lastLoad != null && hasLoad(k)) {
+    var v = scaled(k, lastLoad, 0.9);
+    final start = startLoad(item.ex, k);
+    if (start != null && !_easier(k, lastLoad, start) && _easier(k, v, start)) v = start;
+    final same = (v - lastLoad).abs() < 1e-6;
+    return Target(
+      load: v,
+      reps: _same(sets, lo),
+      change: same ? Change.hold : Change.back,
+      reason: same
+          ? 'Πέρασαν $gap μέρες από την τελευταία φορά: ${usesKg(k) ? 'ίδια κιλά' : 'ίδιο φορτίο'} (${_l(k, v)}, ήδη ελαφρύ), ξανά από $lo επαναλήψεις.'
+          : 'Πέρασαν $gap μέρες από την τελευταία φορά: πιο ελαφριά για αρχή, ${_l(k, v)} αντί για ${_l(k, lastLoad)}, από $lo επαναλήψεις.',
     );
   }
 
   // S6-1: με τα σετ και το κάτω όριο που είχε η άσκηση ΕΚΕΙΝΗ τη μέρα (η ίδια άσκηση μπορεί να είναι σε δύο
   // προπονήσεις με άλλα σετ ή εύρος). Το πάνω όριο (πότε ανεβαίνει το βάρος) είναι το σημερινό.
-  final complete = done.length >= last.sets;
+  // R7-A8-4: άσκηση που άλλαξε με εναλλακτική στη μέση: κρίνεται με τα σετ του προγράμματος, όχι «όλα έγιναν».
+  final complete = done.length >= math.max(last.sets, last.plannedSets ?? 0);
   final top = complete && low >= ceiling;
   final inRange = complete && low >= last.lo;
 
@@ -307,7 +372,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
             ? 'Έφτασες στις $ceiling και άφησες όσες ζητά το πρόγραμμα. Σε αυτή την άσκηση μένουμε σε ελαφρύ λάστιχο: κράτα τις $ceiling με πιο αργή κίνηση '
                 '(3 δευτερόλεπτα στην επιστροφή).'
             : 'Έφτασες στις $ceiling και άφησες όσες ζητά το πρόγραμμα. Το επόμενο σκαλί, ${_l(k, up)}, είναι πολύ μεγάλο για να ανέβεις μονομιάς: κράτα τις '
-                '$ceiling με πιο αργή κίνηση (3 δευτερόλεπτα στην επιστροφή) και πες μου να το κάνουμε πιο δύσκολο.',
+                '$ceiling με πιο αργή κίνηση (3 δευτερόλεπτα στην επιστροφή) και πες μου να το κάνουμε πιο δύσκολο'
+                '${_noSelfStep.contains(item.ex) ? '' : ', ή ανέβασε εσύ με το «+» όταν νιώθεις έτοιμος'}.',
       );
     }
     return Target(
@@ -354,8 +420,11 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   if (inRange) {
     final reps = plusOne();
     final b = StringBuffer(hasLoad(k) ? 'Ίδιο βάρος, +1 επανάληψη σε κάθε σετ.' : '+1 επανάληψη σε κάθε σετ.');
-    // S6-12: γιατί οι επαναλήψεις περνούν το πάνω όριο του προγράμματος.
-    if (reps.any((x) => x > hi)) {
+    // S6-12: γιατί οι επαναλήψεις περνούν το πάνω όριο του προγράμματος. R7-A6-1: σκαλί που δεν μπαίνει ποτέ μόνο του:
+    // το λέμε κάθε φορά, και πριν φτάσεις στο πάνω όριο.
+    if (hasLoad(k) && !auto && up != null && !lightOnly.contains(item.ex)) {
+      b.write(_bigStepNote(item, k, up, ceiling));
+    } else if (reps.any((x) => x > hi)) {
       if (!hasLoad(k)) {
         b.write(' Πριν από την πιο δύσκολη παραλλαγή: ως τις $ceiling επαναλήψεις.');
       } else if (auto && up != null) {

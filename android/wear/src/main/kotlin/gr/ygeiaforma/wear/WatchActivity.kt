@@ -135,6 +135,9 @@ class WatchActivity : Activity(), WatchView.Actions {
             // Άσκηση που έμεινε μισή από απότομο κλείσιμο (V-A-03) και αποτελέσματα που δεν έφτασαν ακόμα: τώρα. Μόνο αν
             // δεν τρέχει τίποτα εδώ (αλλιώς θα στελνόταν μισή μια προπόνηση που συνεχίζεται, V-A-14).
             if (Repo.running == null && Repo.local == null) {
+                // R7-A8-5: πρώτα ό,τι δεν γράφτηκε πουθενά στο «Τέλος» (γεμάτος χώρος)· μετά η ανάκτηση βρίσκει το κανονικό
+                // αποτέλεσμα στην αναμονή και σβήνει το στιγμιότυπο που είχε κρατηθεί (S3), αντί να στείλει μερικό.
+                retryUnsaved()
                 recoverIfNeeded()
                 // «Σβήσε» από το κινητό που περιμένει (S1/N1): τα παλιά αποτελέσματα δεν ξαναστέλνονται (σβήνονται μόλις
                 // επιτρέπεται)· όσα έγιναν μετά από αυτό στέλνονται κανονικά.
@@ -199,6 +202,23 @@ class WatchActivity : Activity(), WatchView.Actions {
         } catch (e: Exception) {
             Log.w(ExerciseService.TAG, "ορφανή άσκηση", e)
         }
+    }
+
+    /**
+     * Αποτελέσματα που στο «Τέλος» δεν γράφτηκαν ούτε στην αναμονή ούτε στο Data Layer ([Repo.unsaved], γεμάτος χώρος,
+     * έλεγχος 13/11, round 7, R7-A8-5): ξανά. Όσα γράφτηκαν φεύγουν από τη μνήμη (και το στιγμιότυπο της ίδιας άσκησης, που
+     * είχε κρατηθεί ως εφεδρεία, σβήνεται: δεν γίνεται μερικό πάνω στο κανονικό). Όσα δεν γράφτηκαν ούτε τώρα μένουν, και η
+     * οθόνη του τέλους λέει ξανά «Δεν αποθηκεύτηκε» ([showAgain]: στο άνοιγμα, όχι μετά το «ΟΚ» της ίδιας οθόνης).
+     */
+    private suspend fun retryUnsaved(showAgain: Boolean = true) {
+        for ((id, o) in Repo.unsaved.toList()) {
+            val stored = Repo.savePending(this, id, o) || Link.putResult(this, id, o)
+            if (!stored) continue
+            Repo.unsaved.remove(id)
+            Repo.readRun(this)?.let { run -> if (Repo.runId(run) == id) Repo.clearRun(this) }
+        }
+        Repo.endUnsaved = Repo.unsaved.isNotEmpty()
+        if (showAgain && Repo.endUnsaved && Repo.screen == Repo.Screen.HOME) Repo.screen = Repo.Screen.END
     }
 
     /** Αποτελέσματα που δεν μπήκαν ακόμα στο Data Layer (ένα ανά id): τώρα. */
@@ -360,7 +380,10 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun joinPhone() {
-        if (Repo.phone == null) return
+        val p0 = Repo.phone ?: return
+        // R7-A8-3: όχι σε προπόνηση του κινητού που μοιάζει ξεχασμένη (3 ώρες χωρίς κίνηση): το κινητό αγνοεί πια ό,τι στέλνει
+        // το ρολόι σε αυτήν. Η αρχική δεν τη δείχνει· εδώ για το άνοιγμα από το κινητό.
+        if (phoneStale(p0, System.currentTimeMillis())) return
         withPermissions(false) {
             askOtherApp {
                 // Η προπόνηση του κινητού τελείωσε όσο περίμενε η ερώτηση: τίποτα να μετρηθεί.
@@ -383,7 +406,9 @@ class WatchActivity : Activity(), WatchView.Actions {
         // Με την ώρα του ✓ εδώ: το κινητό τη γράφει όπως είναι (παλμοί ανά σετ), όχι την ώρα που έφτασε (9/11).
         // Και με τις επαναλήψεις, αν τις άλλαξες εδώ (Συμβούλιο 4, W-4): δεν εξαρτώνται από μια εντολή «reps» που ίσως χάθηκε.
         if (s.phone && cur != null && si >= 0) cmd(tickCmd(i, si, now, cur.ex, cur.sets[si].reps.takeIf { cur.sets[si].trail != null }))
-        if (!s.phone) saveRun()
+        // Στιγμιότυπο σε κάθε ✓, και σε προπόνηση του κινητού (έλεγχος 13/11, round 7, R7-A8-1): ένα ✓ που το κινητό δεν έχει
+        // δει ακόμα δεν χάνεται αν η εφαρμογή του ρολογιού κλείσει απότομα πριν φτάσει.
+        saveRun()
         Repo.screen = when (next) {
             LiveSession.Next.REST -> if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             LiveSession.Next.ASK_RIR -> Repo.Screen.RIR
@@ -401,8 +426,11 @@ class WatchActivity : Activity(), WatchView.Actions {
             Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             return
         }
-        if (s.phone) cmd(JSONObject().put("op", "rir").put("i", i).put("v", rir))
-        else saveRun()
+        // «Δεν ξέρω» (R7-U3-04, rir < 0): στο κινητό ΔΕΝ πάει εντολή (εκεί το −1 θα γραφόταν «0», δηλαδή «ως την αποτυχία»)·
+        // η ρεζέρβα μένει χωρίς απάντηση, όπως με το «Δεν ξέρω» του κινητού.
+        if (s.phone && rir >= 0) cmd(JSONObject().put("op", "rir").put("i", i).put("v", rir))
+        // Και σε προπόνηση του κινητού (R7-A8-1): η ρεζέρβα στέλνεται μία φορά· αν χαθεί, πάει με το αποτέλεσμα («ra»).
+        saveRun()
         if (next == LiveSession.Next.END && !s.phone) {
             ExerciseService.stop(this)
             return
@@ -429,7 +457,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         if (s.phone) set.edit(set.reps + delta) else set.reps = (set.reps + delta).coerceIn(0, 99)
         // Με την άσκηση και την ώρα του σετ (S4): αν στο μεταξύ η άσκηση άλλαξε στο κινητό, η διόρθωση δεν πάει αλλού.
         if (s.phone) cmd(repsCmd(i, k, s.items[i].ex, set.reps, set.at))
-        else saveRun()
+        // R7-A8-1: και σε προπόνηση του κινητού (η διόρθωση εκκρεμεί ώσπου να τη δείξει το κινητό).
+        saveRun()
     }
 
     override fun nextExercise() {
@@ -501,10 +530,19 @@ class WatchActivity : Activity(), WatchView.Actions {
                 // S8-08: το στιγμιότυπο σβήνεται μόνο αν το αποτέλεσμα γράφτηκε στην αναμονή (αλλιώς μένει, ως εφεδρεία),
                 // ή μόλις μπει στο Data Layer.
                 val saved = Repo.storeResultThenClear({ Repo.savePending(this, s.id, o) }, { Repo.clearRun(this) })
+                // R7-A8-5: αν δεν γράφτηκε στην αναμονή, μένει στη μνήμη ώσπου να μπει στο Data Layer· ως τότε η οθόνη του
+                // τέλους δεν λέει «Αποθηκεύτηκε».
+                if (!saved) Repo.unsaved[s.id] = o
+                Repo.endUnsaved = !saved
                 scope.launch {
                     if (Link.putResult(this@WatchActivity, s.id, o)) {
                         Repo.removePending(this@WatchActivity, s.id)
-                        if (!saved) Repo.clearRun(this@WatchActivity)
+                        if (!saved) {
+                            Repo.clearRun(this@WatchActivity)
+                            Repo.unsaved.remove(s.id)
+                            Repo.endUnsaved = false
+                            Repo.changed()
+                        }
                     }
                 }
                 Repo.screen = Repo.Screen.END
@@ -525,20 +563,34 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun doneOk() {
         Repo.screen = Repo.Screen.HOME
+        // R7-A8-5: με «Δεν αποθηκεύτηκε», το «ΟΚ» ξαναδοκιμάζει (ίσως άδειασε χώρος στο μεταξύ). Μόνο όσο δεν τρέχει τίποτα.
+        if (Repo.unsaved.isNotEmpty() && Repo.running == null && Repo.local == null) {
+            scope.launch {
+                retryUnsaved(showAgain = false)
+                sendPending()
+                redraw()
+            }
+        }
     }
 }
 
 private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
 private const val FINISH_NOTICE = "Πάτα ξανά «Τέλος»"
 private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και στο κινητό"
-private const val FINISH_HR_ONLY_NOTICE = "Κανένα σετ: στο κινητό μένουν μόνο οι παλμοί"
-private const val FINISH_NOTHING_NOTICE = "Κανένα σετ ούτε παλμοί: δεν αποθηκεύεται"
+/**
+ * Έλεγχος 13/11, round 7 (R7-U3-01): και τα δύο «κανένα σετ» αρχίζουν με την οδηγία, όπως τα άλλα δύο («Πάτα ξανά…»).
+ * Πριν διαβάζονταν σαν αποτέλεσμα («Κανένα σετ: …», «… δεν αποθηκεύεται»): ο χρήστης κατέβαζε τον καρπό και η άσκηση έμενε
+ * ανοιχτή. Κείμενα προς έγκριση από τον χρήστη.
+ */
+private const val FINISH_HR_ONLY_NOTICE = "Πάτα ξανά: στο κινητό μένουν μόνο οι παλμοί"
+private const val FINISH_NOTHING_NOTICE = "Πάτα ξανά: δεν μένει τίποτα"
 
 /**
  * Περπάτημα (έλεγχος γ2, 03-Μ3): η πτώση παλμών στο 1′ μετρά από τους παλμούς ΤΗΣ ΣΤΙΓΜΗΣ του «Τέλος»· αν σταμάτησες
- * πρώτα (πόρτα, φανάρι), έχουν ήδη πέσει. Κείμενο προς έγκριση από τον χρήστη.
+ * πρώτα (πόρτα, φανάρι), έχουν ήδη πέσει. Έλεγχος 13/11, round 7 (R7-U3-06): πιο σύντομο, ώστε να γράφεται με γράμματα
+ * τουλάχιστον 10u (και 1,3× με το μέγεθος του ρολογιού) αντί να μικραίνει στα 8,5u. Κείμενο προς έγκριση από τον χρήστη.
  */
-const val WALK_FINISH_NOTICE = "Πάτα ξανά «Τέλος» όσο περπατάς ακόμα"
+const val WALK_FINISH_NOTICE = "Πάτα ξανά όσο περπατάς"
 
 /**
  * Το «μπες στην προπόνηση του κινητού» (άνοιγμα από το κινητό) περιμένει μόνο αν δεν τρέχει τίποτα εδώ: αλλιώς σβήνει,

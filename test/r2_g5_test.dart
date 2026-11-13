@@ -325,7 +325,8 @@ void main() {
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
       await _pump(t, WorkoutEditorPage(workout: Workout(id: 'a', name: 'Προπόνηση Α', items: [PlanItem(ex: 'db_curl', rest: 90)])),
           size: const Size(400, 900));
-      expect(find.textContaining('3 × 8–12 · ξεκούραση 1:30 · ρεζέρβα 2'), findsOneWidget);
+      // R7-U3-14 (f2): «άφησε», όπως στην προπόνηση (πριν «ρεζέρβα 2»).
+      expect(find.textContaining('3 × 8–12 · ξεκούραση 1:30 · άφησε 2'), findsOneWidget);
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
     });
   });

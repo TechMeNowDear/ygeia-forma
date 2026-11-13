@@ -110,7 +110,8 @@ class CheckIn {
       this.fastIntake,
       this.fastIntakeDays = 0,
       this.fastTarget,
-      this.estTarget});
+      this.estTarget,
+      this.lowLog = false});
   final CheckKind kind;
   final Goals goals;
   final AdaptStatus? status;
@@ -161,6 +162,10 @@ class CheckIn {
   final double? fastTarget;
   final double? estTarget;
 
+  /// Round 7 (R7-A1-1): πρόταση ([CheckKind.proposal]) από τη ζυγαριά, ενώ η εκτίμηση βγήκε πολύ χαμηλή (το ημερολόγιο
+  /// γράφει λιγότερο από όσο τρως): [status] είναι [AdaptStatus.implausible] και το [est] δεν δείχνεται ως «πόσο καις».
+  final bool lowLog;
+
   /// Ο στόχος από τον ρυθμό, πριν από το όριο των ±150 (για το «Πώς βγήκε»).
   int? get wanted {
     final e = est, k = kgNow;
@@ -173,9 +178,9 @@ class CheckIn {
     return ((e.tdee + delta) / 10).round() * 10;
   }
 
-  /// Τα δεδομένα θέλουν στόχο κάτω από το όριο ασφαλείας· ο στόχος δεν φτάνει ποτέ εκεί, όσοι έλεγχοι κι αν γίνουν.
-  /// Το «Πώς βγήκε» γράφει τότε το όριο, όχι «τα δεδομένα λένε 1.210» (Συμβούλιο 2, μ1): ένας αριθμός κάτω από το όριο
-  /// δεν πρέπει να διαβαστεί ως στόχος που έρχεται.
+  /// Τα δεδομένα θέλουν στόχο κάτω από το κάτω όριο (1.500 / 1.200)· ο στόχος δεν φτάνει ποτέ εκεί, όσοι έλεγχοι κι αν
+  /// γίνουν. Το «Πώς βγήκε» γράφει τότε το όριο, όχι «τα δεδομένα λένε 1.210» (Συμβούλιο 2, μ1): ένας αριθμός κάτω από το
+  /// όριο δεν πρέπει να διαβαστεί ως στόχος που έρχεται.
   bool get wantsBelowFloor {
     final w = wanted;
     return w != null && w < (goals.male ? kcalFloorMale : kcalFloorFemale);
@@ -370,6 +375,30 @@ CheckIn? pendingCheckIn({
             foreign: news,
             estTarget: estTarget);
       case AdaptStatus.implausible:
+        // Round 7 (R7-A1-1): εκτίμηση πολύ χαμηλή (λείπει φαγητό από το ημερολόγιο) και βάρος καθαρά πιο ψηλά από τον
+        // ρυθμό σου: ο στόχος κατεβαίνει από τη ζυγαριά ([lowLogProposal]). Όχι λιγότερο από 4 μέρες μετά από αλλαγή (S1-4).
+        final lowEst = r.est;
+        final lowWeights = lowEst == null
+            ? const <(DateTime, double)>[]
+            : [for (final w in weights) if (!w.$1.isBefore(lowEst.from) && !w.$1.isAfter(lowEst.to)) w];
+        final lowKg = lowWeights.isEmpty ? null : lowWeights.last.$2;
+        final lowP = lowEst == null || lowKg == null ? null : lowLogProposal(goals: g, est: lowEst, kgNow: lowKg);
+        final lowChanged = lastChangeDay(g);
+        final lowHeld = lowChanged != null && daysBetween(lowChanged, t) < adaptMinChangeDays;
+        if (lowP != null && !lowHeld) {
+          return CheckIn(
+              kind: CheckKind.proposal,
+              goals: g,
+              status: r.status,
+              est: lowEst,
+              proposal: lowP,
+              kgNow: lowKg,
+              days: days,
+              weighs: weighs,
+              absurd: absurd,
+              foreign: news,
+              lowLog: true);
+        }
         return CheckIn(
             kind: CheckKind.implausible,
             goals: g,
@@ -475,6 +504,19 @@ Goals applyCheckIn(CheckIn c, DateTime today) {
               day: day, tdee: fastLossCap(c.goals).toDouble(), before: p.current, after: p.target, applied: true, fast: true),
         ));
   }
+  // Round 7 (R7-A1-1): πρόταση από τη ζυγαριά με πολύ χαμηλή εκτίμηση. Η εκτίμηση ΔΕΝ κρατιέται (ούτε για το όριο της
+  // «γρήγορης απώλειας» ούτε για τον οδηγό)· η γραμμή του ιστορικού γράφει, όπως στη «γρήγορη απώλεια», το όριο που ίσχυε.
+  if (c.lowLog) {
+    return _markForeignSeen(
+        c,
+        c.goals.copyWith(
+          kcalAdapt: p.target,
+          checkIn: day,
+          clearKcal: true,
+          addLog: AdaptLog(
+              day: day, tdee: fastLossCap(c.goals).toDouble(), before: p.current, after: p.target, applied: true, lowLog: true),
+        ));
+  }
   return _markForeignSeen(
       c,
       c.goals.copyWith(
@@ -495,6 +537,16 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
   if (c.kind == CheckKind.fast) return _markForeignSeen(c, c.goals.copyWith(fastAt: day));
   final p = c.proposal;
   final e = c.est;
+  // Round 7 (R7-A1-1): «Όχι τώρα» σε πρόταση από τη ζυγαριά: γραμμή στο ιστορικό (ο έλεγχος έγινε), χωρίς εκτίμηση.
+  if (c.lowLog && p != null) {
+    return _markForeignSeen(
+        c,
+        c.goals.copyWith(
+          checkIn: day,
+          addLog: AdaptLog(
+              day: day, tdee: fastLossCap(c.goals).toDouble(), before: p.current, after: p.current, applied: false, lowLog: true),
+        ));
+  }
   if (p == null || e == null) return _markForeignSeen(c, c.goals.copyWith(checkIn: day));
   return _markForeignSeen(
       c,
@@ -507,7 +559,11 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
 
 /// Πριν από τον πρώτο έλεγχο (A4): πόσα δεδομένα μαζεύτηκαν ως χθες, μετά την πρώτη εβδομάδα των στόχων (που δεν μετρά:
 /// Συμβούλιο 2, Α2), το πολύ 21 μέρες πίσω. [first]: η πρώτη μέρα ελέγχου με εκτίμηση ([firstEstimateDay]).
-({int intakeDays, int weighIns, DateTime first}) readiness({
+/// Round 7 (R7-A1-2): με τους ίδιους κανόνες με τον έλεγχο. [gap]: το κενό καταγραφής ([foodGap]) ως χθες· οι μέρες
+/// μετρούν από τη μέρα που ξαναρχίζει η καταγραφή (με κενό που κρατά ακόμα: καμία). Μέρες πάνω από το [absurdDayKcal]
+/// δεν μετρούν. Πριν, μετά από 5 μέρες χωρίς φαγητό η κάρτα έγραφε «16 από 14» ενώ ο έλεγχος δεν μπορούσε να βγάλει
+/// εκτίμηση για άλλες 3 εβδομάδες.
+({int intakeDays, int weighIns, DateTime first, FoodGap? gap}) readiness({
   required Goals goals,
   required DateTime today,
   required List<(DateTime, double)> weights,
@@ -515,11 +571,44 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
 }) {
   final start = DateTime.parse(goals.since);
   final firstCounted = DateTime(start.year, start.month, start.day + adaptSkipDays);
-  final to = DateTime(today.year, today.month, today.day - 1);
+  final t = _day(today);
+  final to = DateTime(t.year, t.month, t.day - 1);
   final windowFrom = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1));
-  final since = firstCounted.isAfter(windowFrom) ? firstCounted : windowFrom;
+  var since = firstCounted.isAfter(windowFrom) ? firstCounted : windowFrom;
+  final formula = goals.calc.tdee;
+  // Το κενό ψάχνεται όσο πίσω και στον έλεγχο ([adaptScanDays]), χωρίς την πρώτη εβδομάδα.
+  final scanFrom = DateTime(to.year, to.month, to.day - (adaptScanDays - 1));
+  final wideFrom = scanFrom.isBefore(firstCounted) ? firstCounted : scanFrom;
+  final gap = to.isBefore(wideFrom)
+      ? null
+      : foodGap(intake: intake(wideFrom, to), today: t, formulaTdee: formula, goalKcal: goals.kcal, since: start);
+  if (gap != null) {
+    final restart = gap.restart;
+    // Κενό που κρατά ως χθες: τίποτα δεν μετρά ακόμα για την επόμενη εκτίμηση.
+    final from = restart ?? DateTime(t.year, t.month, t.day);
+    if (from.isAfter(since)) since = from;
+  }
   final full = adaptFullDayShare * goals.kcal;
-  final days = to.isBefore(since) ? 0 : intake(since, to).values.where((v) => v >= full).length;
+  final over = absurdDayKcal(formula);
+  final days = to.isBefore(since) ? 0 : intake(since, to).values.where((v) => v >= full && v <= over).length;
   final ws = weights.where((w) => !w.$1.isBefore(since) && !w.$1.isAfter(to)).length;
-  return (intakeDays: days, weighIns: ws, first: firstEstimateDay(goals));
+  return (intakeDays: days, weighIns: ws, first: firstEstimateDay(goals), gap: gap);
+}
+
+/// Round 7 (R7-A1-2): η μέρα ελέγχου που μπορεί να βγάλει εκτίμηση, μετά από κενό καταγραφής φαγητού. Ο έλεγχος θέλει
+/// [adaptWindowDays] μέρες από τη μέρα που ξαναρχίζει η καταγραφή ως χθες ([estimateExpenditure]: «afterGap»), άρα η
+/// πρώτη μέρα ελέγχου (ίδια μέρα της εβδομάδας με την αρχή) από [FoodGap.restart] + 21 μέρες. Χωρίς κενό, ή αν η [next]
+/// είναι ήδη αργότερα: η [next]. null: το κενό κρατά ως χθες (η εκτίμηση περιμένει να ξαναρχίσει η καταγραφή).
+/// Πριν, η σελίδα «Στόχοι» έγραφε «Πρώτη εκτίμηση: Δευτέρα 21 Δεκεμβρίου» ενώ η Σήμερα έλεγε σωστά 4 Ιανουαρίου.
+DateTime? estimateDayAfterGap(Goals g, DateTime next, FoodGap? gap) {
+  if (gap == null) return next;
+  final restart = gap.restart;
+  if (restart == null) return null;
+  var d = DateTime(restart.year, restart.month, restart.day + adaptWindowDays);
+  if (!d.isAfter(next)) return next;
+  final weekday = DateTime.parse(g.since).weekday;
+  while (d.weekday != weekday) {
+    d = DateTime(d.year, d.month, d.day + 1);
+  }
+  return d;
 }

@@ -36,6 +36,16 @@ class _KitchenScreenState extends State<KitchenScreen> {
     setState(() {});
   }
 
+  /// Round7 (R7-U2-17): το «Αναίρεση» του μηνύματος μένει και αφού κλείσει η οθόνη. Τότε το σκεύος ξαναγράφεται στις
+  /// ρυθμίσεις χωρίς την οθόνη (πριν: setState σε κλειστή οθόνη, σφάλμα στην ουρά σφαλμάτων).
+  void _saveFromSnackBar(HealthStore store) {
+    if (mounted) {
+      _save();
+    } else {
+      store.setKitchen(_k.toJson());
+    }
+  }
+
   Future<void> _editCookware([Cookware? existing]) async {
     final r = await showModalBottomSheet<_CookwareResult>(
       context: context,
@@ -51,13 +61,14 @@ class _KitchenScreenState extends State<KitchenScreen> {
       _k.cookware.remove(existing);
       _save();
       if (!mounted) return;
+      final store = widget.store;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Διαγράφηκε: ${existing.label}'),
         action: SnackBarAction(
           label: 'Αναίρεση',
           onPressed: () {
             _k.cookware.insert(i.clamp(0, _k.cookware.length), existing);
-            _save();
+            _saveFromSnackBar(store);
           },
         ),
       ));

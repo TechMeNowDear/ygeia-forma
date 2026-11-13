@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Widget «Γρήγορο φαγητό» (13/11): δύο κουμπιά ίδιου πλάτους, ύψος τουλάχιστον 48 dp. Χρώματα από values/values-night.
-     Round 1 (U7-17 β): τα γράμματα μικραίνουν ως 12 sp αντί να κόβονται («+ Φαγ…», «Barco…») σε στενό widget. -->
+     Round 1 (U7-17 β): τα γράμματα μικραίνουν ως 12 sp αντί να κόβονται («+ Φαγ…», «Barco…») σε στενό widget.
+     Round 7 (U1-7): «Σάρωση», όπως το κουμπί στο «+ Φαγητό» της εφαρμογής (πριν «Barcode»)· ίδιο πλάτος με το «Barcode»
+     (Inter Bold 15 sp: 61,9 έναντι 61,2 dp) και στενότερο από το «+ Φαγητό» (72,7 dp) δίπλα του, άρα χωρά όπου χωρούσε. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/qf_root"
     android:layout_width="match_parent"
@@ -45,7 +47,7 @@
         android:gravity="center"
         android:maxLines="1"
         android:minHeight="48dp"
-        android:text="Barcode"
+        android:text="Σάρωση"
         android:textColor="@color/qw_text"
         android:textSize="15sp"
         android:textStyle="bold" />

@@ -19,10 +19,11 @@ const ouraScopes = '';
 /// Ο μεσάζων δέχεται μόνο το δικό μας Client ID, απαιτεί PKCE και δεν αποθηκεύει τίποτα. Κενό = απευθείας στην Oura.
 const ouraTokenProxy = 'https://ygeia-forma.netlify.app/api/oura/token';
 
-/// Οι δύο διευθύνσεις επιστροφής μετά τη σύνδεση. Τις πιάνει η OuraCallbackActivity (manifest):
+/// Οι δύο διευθύνσεις από τις οποίες η εφαρμογή δέχεται την επιστροφή μετά τη σύνδεση. Τις πιάνει η
+/// OuraCallbackActivity (manifest):
 /// - https (Android App Link, επαληθευμένο με /.well-known/assetlinks.json στο ygeia-forma.netlify.app). Αν ο browser
 ///   δεν ανοίξει την εφαρμογή, η σελίδα /oura/callback προωθεί το ίδιο query στο ygeiaforma://oura-callback.
-/// - ygeiaforma://oura-callback (custom scheme), εφεδρική.
+/// - ygeiaforma://oura-callback (custom scheme): ΜΟΝΟ ως αυτή η προώθηση από τη σελίδα /oura/callback.
 /// Γίνονται δεκτές ΜΟΝΟ αυτές οι δύο ακριβείς μορφές (δες parseCallback).
 const ouraRedirectHttpsHost = 'ygeia-forma.netlify.app';
 const ouraRedirectHttpsPath = '/oura/callback';
@@ -32,7 +33,9 @@ const ouraRedirectHost = 'oura-callback';
 const ouraRedirectCustom = '$ouraRedirectScheme://$ouraRedirectHost';
 
 /// Η διεύθυνση που δηλώνεται στην Oura και στέλνεται ΙΔΙΑ στη σελίδα σύνδεσης και στην ανταλλαγή κωδικού.
-/// Για custom scheme: `const ouraRedirectUri = ouraRedirectCustom;`
+/// Round 7 (R7-A11-5): ΜΟΝΟ η https. Ο μεσάζων (site/netlify/functions/oura-token.mjs, REDIRECTS· έλεγχος 2, C10) δέχεται
+/// μόνο αυτήν: με το ygeiaforma:// κάθε σύνδεση θα τελείωνε σε «Η Oura δεν δέχτηκε τη σύνδεση». Το ygeiaforma://
+/// χρησιμεύει μόνο ως προώθηση από τη σελίδα /oura/callback (πιο πάνω). Δεν υπάρχει «εναλλακτική μίας γραμμής».
 const ouraRedirectUri = ouraRedirectHttps;
 
 /// Ποιος διακομιστής σύνδεσης της Oura χρησιμοποιείται.

@@ -25,6 +25,10 @@ import 'nutrition.dart' show proteinColor;
   return (label: 'Πάνω από τον στόχο', value: thousands(-diff), over: true);
 }
 
+/// Η τιμή με ένα δεκαδικό, όπως τη γράφει η οθόνη (round7, R7-A3-3/4: η απόφαση «πάνω από το όριο» με τον αριθμό που
+/// φαίνεται).
+double oneDecimal(double v) => double.parse(v.toStringAsFixed(1));
+
 /// Σύνολο ημέρας με τους στόχους (αντικαθιστά τη «Σύνολο ημέρας» όταν υπάρχουν στόχοι).
 class GoalsSummaryCard extends StatelessWidget {
   const GoalsSummaryCard({super.key, required this.totals, required this.goals, required this.today, required this.health});
@@ -42,6 +46,15 @@ class GoalsSummaryCard extends StatelessWidget {
     final protLeft = g.protein - t.protein;
     final fiberLeft = g.fiber - t.fiber;
     final satOver = t.satFat - g.satMax;
+    // Round7 (R7-A3-4): μέρα που τελείωσε, με πλήρη καταγραφή: τα κορεσμένα ως % των θερμίδων που έφαγες, ο κανόνας της
+    // σελίδας «Χοληστερίνη» και των οδηγιών (AHA/ACC 2013, ESC/EAS 2019: % της ενέργειας). Πριν η ίδια μέρα έβγαινε εδώ
+    // «πάνω από το όριο» (γραμμάρια του στόχου) και εκεί κάτω από το 6%, ή ανάποδα. Για τη σημερινή μέρα, που δεν
+    // τελείωσε, μένουν τα γραμμάρια του στόχου (πόσα «χωράνε» ακόμα).
+    final satPctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
+    final satPctOver = satPctDay != null && oneDecimal(satPctDay) > g.satPct;
+    // Round7 (R7-A3-3): κοντά στο όριο (ως 1 g) με ένα δεκαδικό, ώστε ο αριθμός να συμφωνεί με το «πάνω από το όριο»:
+    // 14,3 g γράφονταν «14 g / έως 14 g» μαζί με «0,3 g πάνω από το όριο».
+    final satText = t.satFat >= 10 && satOver.abs() < 1 ? dec(t.satFat, 1) : gramsText(t.satFat);
     return AppCard(
       key: const ValueKey('nutrition-goals'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -88,16 +101,28 @@ class GoalsSummaryCard extends StatelessWidget {
                   : (today ? 'Μένουν ${gramsText(protLeft)} g' : null),
           done: t.count > 0 && protLeft <= 0.5,
         ),
-        GoalBar(
-          // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού («Λιπαρά», «Κορεσμένα λιπαρά»).
-          label: 'Κορεσμένα λιπαρά',
-          value: atLeast(Nk.satFat, '${gramsText(t.satFat)} g'),
-          target: 'έως ${g.satMax} g',
-          fraction: t.satFat / g.satMax,
-          color: satOver > 0.05 ? c.warn : c.heart,
-          note: satOver > 0.05 ? '${gramsText(satOver)} g πάνω από το όριο' : null,
-          warn: satOver > 0.05,
-        ),
+        if (satPctDay != null)
+          GoalBar(
+            key: const ValueKey('goals-sat-pct'),
+            label: 'Κορεσμένα λιπαρά',
+            value: atLeast(Nk.satFat, '${dec(satPctDay, 1)}%'),
+            target: 'έως ${g.satPct}% των θερμίδων',
+            fraction: satPctDay / g.satPct,
+            color: satPctOver ? c.warn : c.heart,
+            note: satPctOver ? 'Πάνω από το ${g.satPct}% των θερμίδων που έφαγες' : null,
+            warn: satPctOver,
+          )
+        else
+          GoalBar(
+            // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού («Λιπαρά», «Κορεσμένα λιπαρά»).
+            label: 'Κορεσμένα λιπαρά',
+            value: atLeast(Nk.satFat, '$satText g'),
+            target: 'έως ${g.satMax} g',
+            fraction: t.satFat / g.satMax,
+            color: satOver > 0.05 ? c.warn : c.heart,
+            note: satOver > 0.05 ? '${gramsText(satOver)} g πάνω από το όριο' : null,
+            warn: satOver > 0.05,
+          ),
         GoalBar(
           label: 'Φυτικές ίνες',
           value: atLeast(Nk.fiber, '${gramsText(t.fiber)} g'),
@@ -111,8 +136,9 @@ class GoalsSummaryCard extends StatelessWidget {
         const Hairline(vertical: 12),
         // U3b-27: η μονάδα και στον στόχο, όπως στις μπάρες από πάνω.
         InfoRow('Λιπαρά', '${gramsText(t.fat)} g / ${g.fatLo}–${g.fatHi} g'),
+        // Round7 (R7-A3-3): με το αλάτι όπως φαίνεται ([saltShown]): «5,0 g» δεν είναι «κάτω από 5 g».
         InfoRow('Αλάτι', '${atLeast(Nk.salt, dec(t.salt, 1))} g / κάτω από ${dec(g.salt, 0)} g',
-            valueColor: t.salt >= g.salt ? c.warn : null),
+            valueColor: saltShown(t.salt) >= g.salt ? c.warn : null),
         InfoRow('Υδατάνθρακες', '${gramsText(t.carbs)} g'),
         InfoRow('Σάκχαρα', '${atLeast(Nk.sugars, gramsText(t.sugars))} g'),
         if (t.alcohol >= 0.05) InfoRow('Αλκοόλ', '${gramsText(t.alcohol)} g'),
@@ -224,21 +250,30 @@ const cholInfo = MetricInfo(
   // φυτική)· μετριέται γιατί είναι στο πλάνο, στη θέση του κρέατος και για τα τριγλυκερίδια.
   // Round 1 (αίτημα f2 → f1, S2-1 / S2-3): οι δύο αλλαγές του κανόνα (chol.dart) λέγονται κι εδώ: οι σπόροι δεν μετρούν
   // ως ξηροί καρποί (το κουκουνάρι μετρά), και τα δικά σου προϊόντα μετρούν όταν πεις τι είναι.
+  // Round7 (R7-A3-8): «βοηθά τα τριγλυκερίδια» έφυγε: κατά τις οδηγίες ESC/EAS 2019 (§7) το ψάρι στη διατροφή δεν αλλάζει
+  // ουσιαστικά τα λιπίδια· τα τριγλυκερίδια τα ρίχνουν κυρίως λιγότερο αλκοόλ και ζάχαρη και το χάσιμο βάρους.
+  // Round7 (R7-A3-7): η διατροφή «portfolio» έχει και φυτικές στερόλες και σόγια (Jenkins 2003)· το λέμε, αφού δεν τις μετράμε.
   what: 'Μετρά τα τρόφιμα που έφαγες και ρίχνουν την LDL («κακή» χοληστερίνη): ξηρούς καρπούς, πίτουρο βρώμης, όσπρια. '
-      'Μετρά και το ψάρι: το ίδιο δεν ρίχνει την LDL, αλλά παίρνει τη θέση του κρέατος και βοηθά τα τριγλυκερίδια. '
+      'Η διατροφή «portfolio» έχει και φυτικές στερόλες και σόγια· η εφαρμογή δεν τις μετρά. '
+      'Μετρά και το ψάρι: μπαίνει στη θέση του κρέατος (λιγότερα κορεσμένα) και το προτείνουν οι οδηγίες για την καρδιά· '
+      'το ίδιο δεν ρίχνει την LDL. Τα τριγλυκερίδια τα ρίχνουν κυρίως λιγότερο αλκοόλ και ζάχαρη και το χάσιμο βάρους '
+      '(ESC/EAS 2019). '
       'Ως ξηροί καρποί μετρούν οι καρποί, π.χ. καρύδια, αμύγδαλα, φιστίκια και κουκουνάρι· οι σπόροι (ηλιόσποροι, '
       'κολοκυθόσποροι) δεν μετρούν. Τα δικά σου προϊόντα μετρούν όταν στη φόρμα τους διαλέξεις τι είναι («Στην κάρτα '
       '«Χοληστερίνη» μετρά ως»).',
   shows: 'Αν κάνεις όσα συμφώνησες: λιγότερα κορεσμένα λιπαρά, περισσότερες φυτικές ίνες, ξηροί καρποί και πίτουρο βρώμης '
       'κάθε μέρα, όσπρια και ψάρι μέσα στην εβδομάδα. Η εφαρμογή δεν προβλέπει τη νέα σου LDL· αυτό το λένε μόνο οι '
       'εξετάσεις.',
-  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC) · φυτικές ίνες 30 g (Reynolds 2019) · 3 g β-γλυκάνες βρώμης τη μέρα '
-      '(EFSA) · ξηροί καρποί περίπου 30 g (Del Gobbo 2015) · όσπρια και φυτικά τρόφιμα μαζί (Jenkins 2003).',
+  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC) · φυτικές ίνες 30 g (Reynolds 2019) · 3 g β\u2011γλυκάνες βρώμης τη μέρα '
+      '(EFSA) · ξηροί καρποί περίπου 30 g (Del Gobbo 2015) · όσπρια ως φυτική πρωτεΐνη (διατροφή «portfolio», '
+      'Chiavaroli 2018).',
   // Τελικός έλεγχος, Συμβούλιο 2 (Α4): ίδιος κανόνας «πλήρους μέρας» με τη διόρθωση θερμίδων, και το αλάτι που λείπει.
   accuracy: 'Οι μέρες με λίγη καταγραφή (κάτω από το 60% του στόχου θερμίδων) δεν μπαίνουν στους μέσους όρους. Αν ένα '
       'τρόφιμο δεν έχει τιμή για κορεσμένα λιπαρά ή ίνες στην πηγή του, το σύνολο είναι «τουλάχιστον» και γράφεται με «≥». '
-      'Μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «αλάτι εντάξει».',
-  cite: 'Eckel 2013 (AHA/ACC) · EFSA 2010/2011 · Reynolds 2019 (Lancet) · Del Gobbo 2015 (AJCN) · Jenkins 2003 (JAMA)',
+      'Μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «αλάτι εντάξει». Το αλάτι μετρά μόνο ό,τι γράφεις: γράψε και το '
+      'αλάτι που βάζεις στο μαγείρεμα και στο πιάτο (τρόφιμο «Αλάτι»).',
+  cite: 'Eckel 2013 (AHA/ACC) · EFSA 2010/2011 · Reynolds 2019 (Lancet) · Del Gobbo 2015 (AJCN) · Jenkins 2003 και 2011 '
+      '(JAMA) · Chiavaroli 2018 (Prog Cardiovasc Dis) · ESC/EAS 2019',
 );
 
 List<(DateTime, CholDay)> _daysOf(FoodStore food, DateTime from, DateTime toExclusive) => [
@@ -258,16 +293,25 @@ class CholCard extends StatelessWidget {
     final c = Aigaio.of(context);
     final g = goals;
     final d = CholDay(food.entriesFor(day));
-    final week = _daysOf(food, weekStart(day), DateTime(day.year, day.month, day.day + 1));
+    final ws = weekStart(day);
+    final week = _daysOf(food, ws, DateTime(day.year, day.month, day.day + 1));
     final legumes = week.where((x) => x.$2.legumes).length;
     final fish = week.where((x) => x.$2.fish).length;
+    // Round7 (R7-A3-6): σε άλλη μέρα από τη σημερινή λέει ποιες μέρες μετρά (από τη Δευτέρα ως εκείνη τη μέρα), όχι «αυτή την
+    // εβδομάδα» (πριν, στην Τετ 18/11 βλέποντας από την Πέμ 26/11, μετρούσε 16–18/11 και έγραφε «αυτή την εβδομάδα»).
+    final weekText = sameDay(day, today)
+        ? 'αυτή την εβδομάδα'
+        : sameDay(ws, day)
+            ? 'Δευτέρα ${dayMonth(day)}'
+            : 'από ${dayMonth(ws)} ως ${dayMonth(day)}';
     return AppCard(
       key: const ValueKey('nutrition-chol'),
       onTap: () => Navigator.of(context).push(CholesterolPage.route(food, g, today)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         CardHeader(
           icon: Icons.favorite_rounded,
-          title: 'Χοληστερίνη · τι τη ρίχνει',
+          // Round7 (R7-U2-15): το «τι τη ρίχνει» πάει ολόκληρο στην επόμενη γραμμή (πριν έσπαγε «τι | τη ρίχνει»).
+          title: 'Χοληστερίνη · τι\u00A0τη\u00A0ρίχνει',
           color: c.heart,
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             const InfoDot(cholInfo),
@@ -275,13 +319,15 @@ class CholCard extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 6),
-        // «Έγινε» με τον αριθμό όπως φαίνεται (U3b-21): 29,6 g γράφονται «30 g / 30 g», άρα και με το σημάδι.
-        if (g.nutsG > 0) CholRow(label: 'Ξηροί καρποί', value: '${d.nutsG.round()} g', target: '${g.nutsG} g', done: d.nutsG.round() >= g.nutsG),
+        // «Έγινε» με τον αριθμό όπως φαίνεται (U3b-21): 29,6 g γράφονται «30 g / 30 g», άρα και με το σημάδι. Ο ίδιος κανόνας
+        // και στη σελίδα «Χοληστερίνη» ([reachedGrams], R7-A3-2).
+        if (g.nutsG > 0)
+          CholRow(label: 'Ξηροί καρποί', value: '${d.nutsG.round()} g', target: '${g.nutsG} g', done: reachedGrams(d.nutsG, g.nutsG)),
         if (g.branG > 0)
-          CholRow(label: 'Πίτουρο βρώμης', value: '${d.branG.round()} g', target: '${g.branG} g', done: d.branG.round() >= g.branG),
+          CholRow(label: 'Πίτουρο βρώμης', value: '${d.branG.round()} g', target: '${g.branG} g', done: reachedGrams(d.branG, g.branG)),
         if (g.legumesWeek > 0)
-          CholRow(label: 'Όσπρια', sub: 'αυτή την εβδομάδα', value: '$legumes', target: '${g.legumesWeek}', done: legumes >= g.legumesWeek),
-        if (g.fishWeek > 0) CholRow(label: 'Ψάρι', sub: 'αυτή την εβδομάδα', value: '$fish', target: '${g.fishWeek}', done: fish >= g.fishWeek),
+          CholRow(label: 'Όσπρια', sub: weekText, value: '$legumes', target: '${g.legumesWeek}', done: legumes >= g.legumesWeek),
+        if (g.fishWeek > 0) CholRow(label: 'Ψάρι', sub: weekText, value: '$fish', target: '${g.fishWeek}', done: fish >= g.fishWeek),
       ]),
     );
   }
@@ -366,6 +412,10 @@ class _CholesterolPageState extends State<CholesterolPage> {
           return (from, CholWeek(_daysOf(widget.food, from, to), goalKcal: g.kcal));
         }(),
     ];
+    // Round7 (R7-A3-5): ο μέσος όρος των 4 εβδομάδων από ΟΛΕΣ τις μέρες με πλήρη καταγραφή, όχι μέσος όρος των εβδομαδιαίων
+    // μέσων (η τρέχουσα εβδομάδα με μία μέρα μετρούσε όσο μια γεμάτη: 1 μέρα στο 12% + 21 στο 5% έβγαιναν «6,8%», ενώ οι
+    // 22 μέρες έχουν 5,3%). Οι μπάρες μένουν μία ανά εβδομάδα.
+    final four = CholWeek([for (final x in weeks) ...x.$2.days], goalKcal: g.kcal);
     const dayLabels = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
     List<double?> perDay(double? Function(CholDay) f) => [
           for (var k = 0; k < 7; k++)
@@ -384,8 +434,8 @@ class _CholesterolPageState extends State<CholesterolPage> {
     // Έλεγχος 13/11 (S2-2): τρόφιμο χωρίς τιμή κορεσμένων λιπαρών (ή ινών) στην πηγή του μετρά 0 g· τότε ο αριθμός είναι
     // «τουλάχιστον» και γράφεται με «≥», όπως υπόσχεται το ⓘ και όπως κάνει ήδη η κάρτα της μέρας.
     // Οι μετρητές είναι του chol.dart ([CholWeek.daysSatUnknown], [CholWeek.daysFiberUnknown]: μέρες με πλήρη καταγραφή).
-    final satUnknown = _four ? weeks.fold<int>(0, (a, x) => a + x.$2.daysSatUnknown) : w.daysSatUnknown;
-    final fiberUnknown = _four ? weeks.fold<int>(0, (a, x) => a + x.$2.daysFiberUnknown) : w.daysFiberUnknown;
+    final satUnknown = _four ? four.daysSatUnknown : w.daysSatUnknown;
+    final fiberUnknown = _four ? four.daysFiberUnknown : w.daysFiberUnknown;
     List<bool> dayFlags(bool Function(CholDay) missing) => [
           for (var k = 0; k < 7; k++) thisWeek.days.any((x) => x.$1.weekday == k + 1 && x.$2.fullFor(g.kcal) && missing(x.$2)),
         ];
@@ -421,7 +471,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       icon: Icons.bar_chart_rounded, title: 'Κορεσμένα λιπαρά, % των θερμίδων', color: c.heart, trailing: const InfoDot(cholInfo)),
                   const SizedBox(height: 4),
                   Text(
-                      _meanText(_four ? _mean(weeks.map((x) => x.$2.satPctMean)) : w.satPctMean, '%', 'έως ${g.satPct}%',
+                      _meanText(_four ? four.satPctMean : w.satPctMean, '%', 'έως ${g.satPct}%',
                           atLeast: satUnknown > 0),
                       style: small),
                   if (satUnknown > 0)
@@ -440,6 +490,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                           over: c.warn,
                           higherIsWorse: true,
                           format: (v) => dec(v),
+                          shownValue: oneDecimal,
                           atLeast: [for (final x in weeks) x.$2.daysSatUnknown > 0],
                         )
                       : MiniBars(
@@ -450,6 +501,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                           over: c.warn,
                           higherIsWorse: true,
                           format: (v) => dec(v),
+                          shownValue: oneDecimal,
                           atLeast: dayFlags((d) => d.satMissing),
                         ),
                 ]),
@@ -460,7 +512,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                   CardHeader(icon: Icons.grass_rounded, title: 'Φυτικές ίνες, g', color: c.good),
                   const SizedBox(height: 4),
                   Text(
-                      _meanText(_four ? _mean(weeks.map((x) => x.$2.fiberMean)) : w.fiberMean, ' g', '${g.fiber} g',
+                      _meanText(_four ? four.fiberMean : w.fiberMean, ' g', '${g.fiber} g',
                           digits: 0, atLeast: fiberUnknown > 0),
                       style: small),
                   if (fiberUnknown > 0)
@@ -539,7 +591,9 @@ class _CholesterolPageState extends State<CholesterolPage> {
               Text(
                 'Μέρες με λίγη καταγραφή (κάτω από ${thousands(fullDayKcalFor(g.kcal).round())} kcal, το 60% του στόχου σου) δεν '
                 'μετρούν στους μέσους όρους. Στους μέσους όρους και στις μέρες, σήμερα δεν μετρά μέχρι να τελειώσει η μέρα· τα '
-                'όσπρια και το ψάρι μετρούν και σήμερα. Όσπρια: μία φορά = 40 g ξερά ή 100 g βρασμένα· ψάρι: 100 g.',
+                // Round7 (R7-A3-9): μία φορά ΤΗ ΜΕΡΑ, όσα κι αν φας (chol.dart, CholDay.legumes / fish).
+                'όσπρια και το ψάρι μετρούν και σήμερα. Όσπρια: μετρά μία φορά κάθε μέρα με τουλάχιστον 40 g ξερά ή 100 g '
+                'βρασμένα· ψάρι: μία φορά κάθε μέρα με τουλάχιστον 100 g.',
                 style: small,
               ),
             ]),
@@ -547,11 +601,6 @@ class _CholesterolPageState extends State<CholesterolPage> {
         ),
       ),
     ));
-  }
-
-  static double? _mean(Iterable<double?> v) {
-    final x = v.whereType<double>().toList();
-    return x.isEmpty ? null : x.reduce((a, b) => a + b) / x.length;
   }
 
   static String _meanText(double? v, String unit, String target, {int digits = 1, bool atLeast = false}) => v == null
@@ -571,9 +620,14 @@ class MiniBars extends StatelessWidget {
     this.over,
     this.higherIsWorse = false,
     this.atLeast,
+    this.shownValue,
   });
   final List<double?> values;
   final List<String> labels;
+
+  /// Η τιμή όπως τη γράφει η ετικέτα της μπάρας ([format]), για το χρώμα «πάνω από τον στόχο» (round7, R7-A3-3): 6,03%
+  /// γράφεται «6,0» και δεν είναι πάνω από το 6%. null = η ακριβής τιμή.
+  final double Function(double)? shownValue;
 
   /// Ποιες μπάρες είναι «τουλάχιστον» (κάποιο τρόφιμο χωρίς τιμή στην πηγή του): η ετικέτα τους γράφεται με «≥» (S2-2).
   final List<bool>? atLeast;
@@ -584,6 +638,8 @@ class MiniBars extends StatelessWidget {
   final String Function(double) format;
 
   static const _h = 96.0;
+
+  bool _beyond(double v) => higherIsWorse ? v > target + 1e-9 : v < target - 1e-9;
 
   @override
   Widget build(BuildContext context) {
@@ -629,7 +685,7 @@ class MiniBars extends StatelessWidget {
                         child: Container(
                           height: v == null ? 0 : math.max(2, y(v)),
                           decoration: BoxDecoration(
-                            color: v != null && over != null && (higherIsWorse ? v > target + 1e-9 : v < target - 1e-9) ? over : color,
+                            color: v != null && over != null && _beyond(shownValue?.call(v) ?? v) ? over : color,
                             borderRadius: BorderRadius.circular(5),
                           ),
                         ),

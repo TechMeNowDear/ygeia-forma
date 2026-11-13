@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'pages/privacy_page.dart' show copySensitive;
 
 import 'format.dart' show thousands;
+import 'history.dart' show dateKey;
 import 'labels.dart';
 import 'samsung.dart';
 import 'theme.dart';
@@ -161,7 +162,7 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
                         ),
                         if (_data != null) ...[
                           const SizedBox(height: gap),
-                          _TodayCard(today: _data!['today'] as Map<String, dynamic>?),
+                          _TodayCard(today: _data!['today'] as Map<String, dynamic>?, readAt: _data!['readAt'] as String?),
                           const SizedBox(height: gap),
                           Wrap(
                             spacing: gap,
@@ -353,16 +354,19 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _TodayCard extends StatelessWidget {
-  const _TodayCard({required this.today});
+  const _TodayCard({required this.today, required this.readAt});
 
   final Map<String, dynamic>? today;
+
+  /// Η ώρα της ανάγνωσης («2026-11-14T10:20»): η μέρα της είναι το «Σήμερα» της κάρτας.
+  final String? readAt;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final steps = (today?['stepsByDay'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
-    final todaySteps = steps.isNotEmpty ? steps.first['value'] : null;
+    final todaySteps = stepsOfReadDay(steps, readAt);
 
     // Κενό ανάμεσα στις στήλες: στα 360 dp το «Θερμίδες που έκαψες» κολλούσε στο «Ενεργές θερμίδες».
     Widget tile(String label, Object? value) => Expanded(
@@ -632,6 +636,18 @@ String _shortDate(String? iso) {
   final d = DateTime.tryParse(iso);
   if (d == null) return iso;
   return '${d.day}/${d.month}';
+}
+
+/// Round 7 (R7-A10-3): τα βήματα της μέρας της ανάγνωσης ([readAt]), ή null («—»). Η Samsung δίνει μόνο μέρες ΜΕ βήματα
+/// (πρώτη η νεότερη): μετά τα μεσάνυχτα ή πριν συγχρονιστεί το πρώτο βήμα της μέρας, η πρώτη είναι η χθεσινή, που πριν
+/// έμπαινε στο «Σήμερα › Βήματα». Χωρίς (αναγνώσιμη) ώρα ανάγνωσης: η σημερινή μέρα.
+Object? stepsOfReadDay(List<Map<String, dynamic>> stepsByDay, String? readAt) {
+  final read = readAt == null ? null : DateTime.tryParse(readAt);
+  final day = dateKey(read ?? DateTime.now());
+  for (final s in stepsByDay) {
+    if (s['date'] == day) return s['value'];
+  }
+  return null;
 }
 
 String _round(Object value) {

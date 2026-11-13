@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../backup.dart' show dbRecoveryRows;
 import '../format.dart';
 import '../history.dart' show dateKey;
 import 'food_channel.dart';
@@ -310,8 +311,17 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final counts = _counts;
     return _index.find(q, boost: {
       ..._preferred,
-      for (final e in counts.entries) e.key: math.min(1.5, e.value * 0.5) + (_preferred[e.key] ?? 0),
+      for (final e in counts.entries) e.key: math.min(1.5, e.value * 0.5) + (_preferred[e.key] ?? 0) + _habitCooked(e.key, e.value, counts),
     });
+  }
+
+  /// Round7 (R7-U2-5): μαγειρεμένη μορφή που έχεις γράψει τουλάχιστον 3 φορές, ενώ την ωμή της ποτέ, παίρνει όσο παίρνει
+  /// η ωμή επειδή «ζυγίζουμε ωμά» ([rawFirstBonus]). Αλλιώς το «κοτόπουλο» έβγαζε πάντα πρώτο το ωμό στήθος (ισοπαλία, και
+  /// νικούσε η σειρά της λίστας), και ένα βιαστικό πάτημα έγραφε 200 g ψητό ως ωμό: 220 αντί για 282 kcal.
+  double _habitCooked(String id, int times, Map<String, int> counts) {
+    if (times < 3) return 0;
+    final raw = byId(id)?.rawId;
+    return raw != null && (counts[raw] ?? 0) == 0 ? rawFirstBonus : 0;
   }
 
   Food? byId(String id) => _byId[id];
@@ -354,14 +364,23 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   static String _newId() =>
       '${DateTime.now().microsecondsSinceEpoch}-${math.Random().nextInt(1 << 20).toRadixString(36)}';
 
-  Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on}) async {
+  /// [now]: για δοκιμές (αλλιώς το ρολόι του κινητού).
+  Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on, DateTime? now}) async {
     final d = dayOf(on ?? day);
-    final now = DateTime.now();
-    // Η ώρα κρατά τη σειρά μέσα στη μέρα· για άλλη μέρα, ώρα «τώρα» πάνω σε εκείνη τη μέρα.
-    final t = DateTime(d.year, d.month, d.day, now.hour, now.minute, now.second, now.millisecond);
-    final e = LogEntry(id: _newId(), day: dateKey(d), meal: meal, food: food, grams: grams, time: t);
+    final e = LogEntry(id: _newId(), day: dateKey(d), meal: meal, food: food, grams: grams, time: entryTime(d, now ?? DateTime.now()));
     await _put(e);
     return e;
+  }
+
+  /// Η ώρα μιας νέας καταχώρισης στη μέρα [d], γραμμένης [now]. Κρατά τη σειρά μέσα στη μέρα· για άλλη μέρα, ώρα «τώρα»
+  /// πάνω σε εκείνη τη μέρα. Round7 (R7-A2-4): εξαίρεση το βραδινό που γράφεται μετά τα μεσάνυχτα (00:00–03:59) στη
+  /// χθεσινή μέρα (η ερώτηση «Σε ποια μέρα;» → «Χθες»): κρατά την πραγματική ώρα. Πριν έπαιρνε «Πέμ 00:20» και έβγαινε
+  /// πρώτο στο «Βράδυ» της Πέμπτης, όχι στα «Πρόσφατα», και η επόμενη ποσότητα ερχόταν από παλιότερη φορά. Η μέρα της
+  /// καταχώρισης είναι πάντα το [d] (τίποτα δεν κρίνει τη μέρα από την ώρα).
+  static DateTime entryTime(DateTime d, DateTime now) {
+    final today = dayOf(now);
+    if (now.hour < 4 && sameDay(d, DateTime(today.year, today.month, today.day - 1))) return now;
+    return DateTime(d.year, d.month, d.day, now.hour, now.minute, now.second, now.millisecond);
   }
 
   /// Οι καταχωρίσεις ενός γεύματος που ξαναγράφονται με το «Όπως χθες»: χωρίς όσα δικά μου προϊόντα σβήστηκαν
@@ -376,8 +395,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<List<LogEntry>> copyMeal(DateTime from, Meal meal, DateTime to, {Meal? into}) async {
     final source = copyable(from, meal);
     final d = dayOf(to);
-    final now = DateTime.now();
-    final base = DateTime(d.year, d.month, d.day, now.hour, now.minute, now.second);
+    final base = entryTime(d, DateTime.now());
     final out = <LogEntry>[
       for (var i = 0; i < source.length; i++)
         LogEntry(
@@ -426,6 +444,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// `false` αν δεν διαγράφηκε (τότε ξαναφαίνεται και βγαίνει μήνυμα).
   Future<bool> remove(LogEntry e) async {
     _entries.remove(e.id);
+    _removedIds.add(e.id);
     notifyListeners();
     if (_offline) return true;
     final r = await FoodChannel.logDelete(e.id);
@@ -446,6 +465,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<bool> deleteMyFood(Food f) async {
     final before = _mine;
     final after = _mine = _mine.where((x) => x.id != f.id).toList();
+    _removedFoodIds.add(f.id);
     _rebuildIndex();
     notifyListeners();
     if (_offline) return true;
@@ -629,6 +649,62 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _rebuildIndex();
     notifyListeners();
     return (e, f, failed, existing);
+  }
+
+  // ---------- Μετά από βλάβη της βάσης (Round 7, R7-A9-1, f4) ----------
+
+  /// Ό,τι έσβησε ο χρήστης σε αυτή τη χρήση της εφαρμογής: μετά από βλάβη δεν ξαναμπαίνει από το παλιό αρχείο.
+  final Set<String> _removedIds = {};
+  final Set<String> _removedFoodIds = {};
+  int? _recoveredAt;
+  bool _recovering = false;
+
+  /// Η βάση βρέθηκε χαλασμένη (ώρα [at], ms) και ξεκίνησε καινούργια: το ημερολόγιο και «Τα προϊόντα μου» ξαναμπαίνουν
+  /// σε αυτήν, σε ΜΙΑ συναλλαγή όπου ό,τι υπάρχει ήδη στη νέα βάση μένει όπως είναι ([FoodChannel.restorePut]): πρώτα
+  /// ό,τι έχει η μνήμη (ό,τι βλέπει ο χρήστης), μετά ό,τι διαβάζεται από το αρχείο που κρατήθηκε ([dbRecoveryRows]).
+  /// Πριν, ξαναγραφόταν μόνο το ιστορικό· το φαγητό χανόταν στο επόμενο άνοιγμα. Μία φορά για κάθε βλάβη (σημειώνεται
+  /// στην πλευρά Android). Απάντηση: πόσα ξαναμπήκαν, ή null αν δεν έγινε τώρα (ξαναδοκιμάζεται στην επόμενη ανανέωση).
+  Future<({int entries, int foods})?> recoverAfterDbReset(int at) async {
+    if (_offline || _recovering || _recoveredAt == at) return null;
+    _recovering = true;
+    try {
+      await waitLoaded();
+      final kept = await FoodChannel.salvageRead(at);
+      if (kept['ok'] != true) return null;
+      int count(Object? v) => v is num && v.isFinite ? v.toInt() : 0;
+      if (kept['done'] == true) {
+        _recoveredAt = at;
+        return (entries: count(kept['entries']), foods: count(kept['foods']));
+      }
+      final rows = dbRecoveryRows(
+        memoryEntries: _entries.values,
+        memoryFoods: _mine,
+        keptEntries: kept['entries'] is List ? kept['entries'] as List : const [],
+        keptFoods: kept['foods'] is List ? kept['foods'] as List : const [],
+        removedEntries: _removedIds,
+        removedFoods: _removedFoodIds,
+      );
+      var entries = 0, foods = 0;
+      if (rows.log.isNotEmpty || rows.foods.isNotEmpty) {
+        final r = await FoodChannel.restorePut(jsonEncode(rows.log), jsonEncode(rows.foods));
+        if (r['ok'] != true) return null;
+        entries = count(r['entries']);
+        foods = count(r['foods']);
+      }
+      await FoodChannel.salvageDone(at, entries, foods);
+      _recoveredAt = at;
+      skippedRows += rows.skipped;
+      // Η οθόνη από τη νέα βάση: και όσα ήρθαν από το αρχείο (π.χ. οι μέρες της εβδομάδας, τα προϊόντα). Όπως στο
+      // [retry]: ένα παλιό «δεν διαβάστηκε» φεύγει, και ξαναμπαίνει αν η ανάγνωση αποτύχει πάλι.
+      if (_basic.isNotEmpty) error = null;
+      await _loadMine();
+      await _loadEntries();
+      _rebuildIndex();
+      notifyListeners();
+      return (entries: entries, foods: foods);
+    } finally {
+      _recovering = false;
+    }
   }
 
   /// Καταχωρίσεις (των τελευταίων 90 ημερών) με αυτό το προϊόν, που έχουν άλλες τιμές από το [f], ή άλλο «μετρά ως»

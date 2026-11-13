@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart' show K;
-import '../oura/oura_view.dart' show atLeast, minNightsForAverage;
+import '../oura/oura_view.dart' show atLeast, glued, minNightsForAverage;
 import '../oxygen_note.dart';
 import '../reference.dart' show stagesInfoKey;
 import '../shown.dart';
@@ -250,27 +250,47 @@ class _LastNightCard extends StatelessWidget {
           ],
           const SizedBox(height: 14),
           // Round 1 (U1a-4α): στήλες στοιχισμένες πάνω (η τρίτη έχει δύο γραμμές και κατέβαζε τις άλλες).
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              clock('Κοιμήθηκες', n.start),
-              clock('Ξύπνησες', n.end),
-              if (n.awakeMinutes > 0)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Ξύπνιος', style: TextStyle(color: c.textSecondary, fontSize: 13)),
-                      // Τα ρολόγια πιάνουν περίπου τον μισό χρόνο που είσαι ξύπνιος (κλινικός έλεγχος H1).
-                      Text(
-                        atLeast(n.awakeMinutes),
-                        style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w700),
-                      ),
-                    ],
+          // Round 7 (R7-U1, «τουλάχιστο|ν»): στο ανοιχτό Fold η στήλη ήταν στενότερη από τη λέξη «τουλάχιστον» και η
+          // Flutter την έκοβε στη μέση. Τώρα «3 λεπτά» με «τουλάχιστον» από κάτω (όπως η κάρτα του Oura), και στήλες μόνο
+          // όταν χωράει κάθε λέξη· αλλιώς γραμμές «ετικέτα … τιμή».
+          LayoutBuilder(builder: (context, box) {
+            // Τα ρολόγια πιάνουν περίπου τον μισό χρόνο που είσαι ξύπνιος (κλινικός έλεγχος H1).
+            final awake = n.awakeMinutes > 0 ? glued(hoursMinutes(n.awakeMinutes)) : null;
+            const atLeastWord = 'τουλάχιστον';
+            const awakeStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
+            final col = box.maxWidth / 3 - 4;
+            final fits = wordsFit(context, ['Κοιμήθηκες', 'Ξύπνησες', if (awake != null) ...['Ξύπνιος', atLeastWord]],
+                    TextStyle(color: c.textSecondary, fontSize: 13), col) &&
+                wordsFit(context, [hm(n.start), hm(n.end)],
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, fontFeatures: tabular), col) &&
+                (awake == null || wordsFit(context, [awake], awakeStyle, col));
+            if (!fits) {
+              return Column(children: [
+                InfoRow('Κοιμήθηκες', hm(n.start)),
+                InfoRow('Ξύπνησες', hm(n.end)),
+                if (awake != null) InfoRow('Ξύπνιος', '$atLeastWord $awake'),
+              ]);
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                clock('Κοιμήθηκες', n.start),
+                clock('Ξύπνησες', n.end),
+                if (awake != null)
+                  Expanded(
+                    key: const ValueKey('sleep-awake'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Ξύπνιος', style: TextStyle(color: c.textSecondary, fontSize: 13)),
+                        Text(awake, style: awakeStyle.copyWith(color: c.text)),
+                        Text(atLeastWord, style: TextStyle(color: c.textSecondary, fontSize: 13)),
+                      ],
+                    ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            );
+          }),
           const SizedBox(height: 16),
           Text('Πώς κύλησε η νύχτα · εκτίμηση της Samsung',
               style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),

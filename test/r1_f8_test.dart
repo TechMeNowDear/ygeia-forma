@@ -659,9 +659,10 @@ void main() {
     test('S12-17: κατώτατο πλήθος δοκιμών (Dart, Kotlin κινητού, Kotlin μαζί με το ρολόι) και στα δύο workflows', () {
       final check = File('.github/workflows/check.yml').readAsStringSync();
       for (final w in [j['build']!, check]) {
-        expect(w, contains(r'if [ "${n:-0}" -lt 950 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 40 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 120 ]; then'));
+        // Round 7 (R7-A12-10, f4): κατώτατα λίγο κάτω από το πλήθος (πριν 950 / 40 / 120 κινητό + ρολόι μαζί).
+        expect(w, contains(r'if [ "${n:-0}" -lt 1550 ]; then'));
+        expect(w, contains(r'if [ "${n:-0}" -lt 70 ]; then'));
+        expect(w, contains(r'if [ "${n:-0}" -lt 128 ]; then'));
         expect(w, contains("grep -aoE '[0-9]+ tests passed' tests.log"));
       }
     });

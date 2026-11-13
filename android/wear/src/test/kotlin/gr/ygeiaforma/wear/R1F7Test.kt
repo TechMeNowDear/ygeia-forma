@@ -534,7 +534,8 @@ class R1F7ViewTest {
           {"id":"walk","name":"Περπάτημα","minutes":30,"cardio":{"activity":"walk","name":"Περπάτημα","minutes":30,"note":"χαλαρά"}}]}
     """.trimIndent()
 
-    private val phoneJson = """{"active":true,"id":"s5","w":"A","name":"Προπόνηση Α","start":1,"idx":0,
+    // Round 7 (R7-A8-3): με αρχή «τώρα»· μια προπόνηση του κινητού με αρχή το 1970 μετρά πια ως ξεχασμένη (όχι «Παλμοί εδώ»).
+    private val phoneJson = """{"active":true,"id":"s5","w":"A","name":"Προπόνηση Α","start":${System.currentTimeMillis()},"idx":0,
         "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"sets":[{"label":"10,3 kg","reps":8},{"label":"10,3 kg","reps":8}]}]}"""
 
     private val noop = object : WatchView.Actions {
@@ -745,10 +746,13 @@ class R1F7ViewTest {
         val late = newView()
         draw(late)
         assertTrue(labels(late).toString(), "Περπάτημα, 45 λεπτά · χαλαρά" in labels(late))
+        // Round 7 (R7-A6-6): πριν από την έναρξη του προγράμματος δεν υπάρχει «σημερινή» προπόνηση (όπως στο κινητό): κανένα
+        // κουμπί «μέρας περπατήματος», μόνο το απλό «Περπάτημα». Τα λεπτά της 1ης εβδομάδας ελέγχονται στο planMinutes.
         Repo.applyPlan(Plan.parse(withPlan("2999-01-01")))
         val early = newView()
         draw(early)
-        assertTrue(labels(early).toString(), "Περπάτημα, 20 λεπτά · χαλαρά" in labels(early))
+        assertFalse(labels(early).toString(), labels(early).any { it.startsWith("Περπάτημα, ") })
+        assertTrue(labels(early).toString(), "Περπάτημα" in labels(early))
     }
 
     // ------------------------------------------------------------------ U7-02
@@ -913,7 +917,7 @@ class R1F7ViewTest {
             Repo.notice = null
             // Αρχική με την «Ελεύθερη άσκηση» του κινητού (μεγάλο όνομα με γράμματα 1,3×).
             Repo.resetExercise()
-            Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s2","w":"_free","name":"Ελεύθερη άσκηση","start":1,"idx":0,"items":[]}"""))
+            Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s2","w":"_free","name":"Ελεύθερη άσκηση","start":$now,"idx":0,"items":[]}"""))
             Repo.screen = Repo.Screen.HOME
             check("αρχική, ελεύθερη άσκηση στο κινητό")
         }
@@ -1017,7 +1021,8 @@ class R1F7ViewTest {
         val rir = newView()
         draw(rir)
         assertNoOverlaps(rir)
-        assertEquals(5, buttons(rir).size)
+        // Round 7 (R7-U3-04): και «Δεν ξέρω» (160–200u).
+        assertEquals(6, buttons(rir).size)
         for ((_, r) in buttons(rir)) assertTrue("$r", r.height() >= min && r.width() >= min)
         assertTrue(bounds(rir, "Τρεις").top >= bounds(rir, "Μία").bottom - 1)
         // Σετ.
@@ -1121,7 +1126,8 @@ class R1F7ViewTest {
         val now = System.currentTimeMillis()
         startWalk(now)
         Repo.zoneAlarm.start(WalkZone(108, 131), Repo.startedEl)
-        val say = "Σίγαση ή εξοικονόμηση ενέργειας: χωρίς δόνηση ζώνης"
+        // Round 7 (R7-A7-1): και «Μην ενοχλείτε».
+        val say = "Σίγαση, Μην ενοχλείτε ή εξοικονόμηση ενέργειας: χωρίς δόνηση ζώνης"
         val plain = newView()
         draw(plain)
         assertFalse(labels(plain).first(), labels(plain).first().contains(say))

@@ -369,11 +369,11 @@ void main() {
       expect(cholKindFromOffTags(['en:canned-chickpeas']), CholKind.legumes);
       expect(cholKindFromOffTags(['en:oat-bran']), CholKind.bran);
       expect(cholKindFromOffTags(['en:peanuts']), CholKind.nuts, reason: 'αράπικα φιστίκια: ξηροί καρποί, όπως στη βάση');
-      // Ό,τι απλώς ΠΕΡΙΕΧΕΙ: τίποτα.
-      expect(cholKindFromOffTags(['en:spreads', 'en:nut-butters', 'en:peanut-butters', 'en:peanuts']), isNull);
-      expect(cholKindFromOffTags(['en:chocolates', 'en:nuts']), isNull);
-      expect(cholKindFromOffTags(['en:breaded-fish', 'en:fishes']), isNull);
-      expect(cholKindFromOffTags(['en:chestnuts', 'en:nuts']), isNull);
+      // Ό,τι απλώς ΠΕΡΙΕΧΕΙ: «Τίποτα» (round7, R7-A3-1: αποθηκεύεται, ώστε να μη μετρά ούτε από το όνομα).
+      expect(cholKindFromOffTags(['en:spreads', 'en:nut-butters', 'en:peanut-butters', 'en:peanuts']), CholKind.none);
+      expect(cholKindFromOffTags(['en:chocolates', 'en:nuts']), CholKind.none);
+      expect(cholKindFromOffTags(['en:breaded-fish', 'en:fishes']), CholKind.none);
+      expect(cholKindFromOffTags(['en:chestnuts', 'en:nuts']), CholKind.none);
       expect(cholKindFromOffTags(['en:yogurts']), isNull);
       expect(cholKindFromOffTags(null), isNull);
       expect(cholKindFromOffTags('en:nuts'), isNull);
@@ -572,16 +572,20 @@ void main() {
       expect(isNuts(withCat(_byId('C15025'), 'Σπόροι')), isTrue);
     });
 
-    test('ξηροί καρποί: ο στόχος 30 g πιάνεται από 30 g, όχι από 29,9', () {
+    // Round7 (R7-A3-2): ο κανόνας της κάρτας (U3b-21, ο αριθμός όπως φαίνεται): 29,9 g γράφονται «30 g», άρα πιάνουν τα 30·
+    // 29,4 g γράφονται «29 g» και όχι.
+    test('ξηροί καρποί: ο στόχος 30 g πιάνεται από ό,τι γράφεται «30 g» (29,9), όχι από 29,4', () {
       final walnuts = foodNamed('Καρύδια');
       final filler = _f('F', {Nk.kcal: 1000, Nk.satFat: 1, Nk.fiber: 1, Nk.salt: 0.1});
       final mon = DateTime(2026, 11, 9), tue = DateTime(2026, 11, 10);
+      final wed = DateTime(2026, 11, 11);
       final w = CholWeek([
         (mon, CholDay([_le(mon, walnuts, 29.9), _le(mon, filler, 100)])),
         (tue, CholDay([_le(tue, walnuts, 30), _le(tue, filler, 100)])),
+        (wed, CholDay([_le(wed, walnuts, 29.4), _le(wed, filler, 100)])),
       ], goalKcal: 1500);
-      expect(w.fullDays, 2);
-      expect(w.daysWithNuts(30), 1);
+      expect(w.fullDays, 3);
+      expect(w.daysWithNuts(30), 2);
       expect(w.daysWithNuts(0), 0);
     });
   });
@@ -592,7 +596,10 @@ void main() {
 
     test('τα όρια', () {
       final z = _f('Z', {Nk.kcal: 400});
-      expect(entryLooksLikeTypo(z, 499), isFalse); // 1.996 kcal
+      // Round7 (R7-A2-3): 499 g τροφίμου 400 kcal/100 g ρωτούν πια από τον κανόνα του πυκνού τροφίμου (≥ 250 kcal, ≥ 300 g)·
+      // το όριο των 2.000 kcal ελέγχεται στο test/r7_f1_test.dart με τρόφιμο 240 kcal/100 g.
+      expect(entryLooksLikeTypo(z, 299), isFalse); // 1.196 kcal
+      expect(entryLooksLikeTypo(z, 499), isTrue); // 1.996 kcal, πυκνό από 300 g
       expect(entryLooksLikeTypo(z, 500), isTrue); // 2.000 kcal
       final y = _f('Y', {Nk.kcal: 50});
       expect(entryLooksLikeTypo(y, 1000), isFalse); // 500 kcal

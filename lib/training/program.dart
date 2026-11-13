@@ -5,6 +5,7 @@ library;
 import 'dart:convert';
 
 import 'equipment.dart';
+import 'set_hr.dart' show perSideExercises, sideSwitchSec;
 
 /// Μία άσκηση μέσα σε προπόνηση.
 class PlanItem {
@@ -133,12 +134,14 @@ class Workout {
 
   bool get isCardio => cardio != null;
 
-  /// Περίπου πόσα λεπτά: σετ × (40″ δουλειά + διάλειμμα) + 2′ στήσιμο ανά άσκηση.
+  /// Περίπου πόσα λεπτά: σετ × (40″ δουλειά + διάλειμμα) + 2′ στήσιμο ανά άσκηση. R7-A6-7: στις ασκήσεις μίας πλευράς
+  /// τη φορά ([perSideExercises]) κάθε σετ είναι δεξιά και αριστερά: 2 × 40″ και η αλλαγή πλευράς.
   int get minutes {
     if (cardio != null) return cardio!.minutes;
-    var s = 0;
+    var s = 0.0;
     for (final i in items) {
-      s += i.sets * (40 + i.rest) + 120;
+      final work = perSideExercises.contains(i.ex) ? 2 * 40 + sideSwitchSec : 40.0;
+      s += i.sets * (work + i.rest) + 120;
     }
     return (s / 60).round();
   }
@@ -230,7 +233,19 @@ class Program {
     return w.copy()..cardio!.minutes = c.minutesInWeek(weekOf(d));
   }
 
+  /// R7-A6-6: η μέρα [d] είναι πριν από την έναρξη του προγράμματος ([from]): καμία προπόνηση του προγράμματος ακόμα.
+  bool notStarted(DateTime d) {
+    final f = from;
+    return f != null && DateTime(d.year, d.month, d.day).isBefore(DateTime(f.year, f.month, f.day));
+  }
+
+  /// «εβδομάδα 2 από 4» της αερόβιας [c] τη μέρα [d]· null πριν από την έναρξη ([notStarted]) ή χωρίς πλάνο.
+  String? planWeekText(Cardio c, DateTime d) => notStarted(d) ? null : c.planWeekText(weekOf(d));
+
+  /// Η προπόνηση της μέρας [d], ή null (ξεκούραση, ή πριν από την έναρξη του προγράμματος, R7-A6-6: πριν, το «ισχύει
+  /// από Δευ 16/11» φαινόταν αλλά το Σάββατο 14/11 η Σήμερα έδειχνε ήδη «Κάτω μέρος 2»).
   Workout? forDay(DateTime d) {
+    if (notStarted(d)) return null;
     final w = workout(days[d.weekday]);
     return w == null ? null : at(w, d);
   }
@@ -318,11 +333,13 @@ PasteResult parseProgram(String text, Set<String> known) {
   if (a < 0 || b <= a) {
     return PasteResult(null, ['Δεν βρέθηκε πρόγραμμα στο κείμενο. Αντέγραψε ολόκληρο το κομμάτι που ξεκινά με «{».'], const []);
   }
-  Object? j;
-  try {
-    j = jsonDecode(text.substring(a, b + 1));
-  } on FormatException {
-    return PasteResult(null, ['Το πρόγραμμα αντιγράφηκε μισό ή αλλοιωμένο. Αντέγραψέ το ξανά ολόκληρο.'], const []);
+  Object? j = programJsonIn(text);
+  if (j == null) {
+    try {
+      j = jsonDecode(text.substring(a, b + 1));
+    } on FormatException {
+      return PasteResult(null, ['Το πρόγραμμα αντιγράφηκε μισό ή αλλοιωμένο. Αντέγραψέ το ξανά ολόκληρο.'], const []);
+    }
   }
   if (j is! Map<String, dynamic> || j['kind'] != 'ygeia-program') {
     return PasteResult(null, ['Το κείμενο δεν είναι πρόγραμμα της εφαρμογής.'], const []);
@@ -334,6 +351,57 @@ PasteResult parseProgram(String text, Set<String> known) {
     return PasteResult(null, ['Το πρόγραμμα έχει λάθος μορφή. Ζήτα από τον Claude να το ξαναβγάλει.'], const []);
   }
   return PasteResult(p, [..._rawProblems(j), ...validate(p, known)], _warnings(p));
+}
+
+/// R7-A6-5: το JSON του προγράμματος μέσα σε όλο το μήνυμα, και όταν το κείμενο γύρω του έχει κι αυτό «{» ή «}» (π.χ.
+/// «από το πρώτο `{` ως το τελευταίο `}`»). Πρώτα το περιεχόμενο ενός ```json … ```, μετά κάθε «{» από αριστερά ως το
+/// «}» που το κλείνει (με τα εισαγωγικά των κειμένων): το πρώτο που διαβάζεται ως πρόγραμμα («kind»: «ygeia-program»).
+/// null αν δεν βρεθεί (τότε ισχύει ο παλιός κανόνας, για το σωστό μήνυμα λάθους).
+Map<String, dynamic>? programJsonIn(String text) {
+  Map<String, dynamic>? tryDecode(String t) {
+    try {
+      final j = jsonDecode(t);
+      return j is Map<String, dynamic> && j['kind'] == 'ygeia-program' ? j : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  final fence = RegExp(r'```(?:json)?\s*\n([\s\S]*?)```').allMatches(text);
+  for (final m in fence) {
+    final j = tryDecode(m.group(1)!.trim());
+    if (j != null) return j;
+  }
+  for (var a = text.indexOf('{'); a >= 0; a = text.indexOf('{', a + 1)) {
+    var depth = 0;
+    var inStr = false, esc = false;
+    for (var i = a; i < text.length; i++) {
+      final ch = text[i];
+      if (inStr) {
+        if (esc) {
+          esc = false;
+        } else if (ch == r'\') {
+          esc = true;
+        } else if (ch == '"') {
+          inStr = false;
+        }
+        continue;
+      }
+      if (ch == '"') {
+        inStr = true;
+      } else if (ch == '{') {
+        depth++;
+      } else if (ch == '}') {
+        depth--;
+        if (depth == 0) {
+          final j = tryDecode(text.substring(a, i + 1));
+          if (j != null) return j;
+          break;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /// Ό,τι το [Program.fromJson] διαβάζει με ανοχή (για τα αποθηκευμένα προγράμματα), αλλά σε πρόγραμμα που επικολλάς είναι
@@ -401,6 +469,8 @@ List<String> validate(Program p, Set<String> known) {
       // Βάρος που δεν είναι αριθμός (π.χ. 1e999 = «άπειρο»): πριν περνούσε, και μετά η αποθήκευση δεν έκανε τίποτα.
       final load = i.load;
       if (load != null && !load.isFinite) e.add('${w.name}: το βάρος στο «${i.ex}» δεν είναι σωστός αριθμός.');
+      // R7-A6-10: αρνητικό βάρος δεν «στρογγυλεύεται» σε κάτι που βγαίνει· είναι λάθος.
+      if (load != null && load.isFinite && load < 0) e.add('${w.name}: το βάρος στο «${i.ex}» δεν μπορεί να είναι αρνητικό.');
     }
   }
   p.days.forEach((d, id) {
@@ -425,10 +495,17 @@ List<String> _warnings(Program p) {
             ? 'Μπάρα χωρίς βραχίονες ασφαλείας: στο «${i.ex}» το «άφησε» έγινε 2.'
             : 'Ρεζέρβα τουλάχιστον 2 (ως να πει άλλα ο γιατρός σου): στο «${i.ex}» έγινε 2.');
       }
-      if (i.load != null && hasLoad(i.kind)) {
+      if (i.load != null && i.load!.isFinite && i.load! >= 0 && hasLoad(i.kind)) {
         final s = snap(i.kind, i.load!);
         if ((s - i.load!).abs() > 1e-6) {
-          w.add('${loadLabel(i.kind, i.load)} δεν βγαίνει με τους δίσκους σου· μπήκε ${loadLabel(i.kind, s)}.');
+          // R7-A6-10: με τις λέξεις του εξοπλισμού (λάστιχα, kettlebell), όχι «δίσκοι» για όλα.
+          final k = i.kind;
+          final what = switch (k) {
+            LoadKind.band || LoadKind.bandPair || LoadKind.bandAssist => '${loadLabel(k, i.load)} δεν βγαίνει με τα λάστιχά σου',
+            LoadKind.kb => 'Δεν υπάρχει kettlebell ${kgText(i.load!)} kg',
+            _ => '${loadLabel(k, i.load)} δεν βγαίνει με τους δίσκους σου',
+          };
+          w.add('$what· στο «${i.ex}» μπήκε ${loadLabel(k, s)}.');
           i.load = s;
         }
       }

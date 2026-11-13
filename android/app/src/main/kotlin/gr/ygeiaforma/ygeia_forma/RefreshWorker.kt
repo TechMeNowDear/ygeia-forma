@@ -28,6 +28,9 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val hour = LocalTime.now().hour
         if (hour < 6) return Result.success()
+        // Round 7 (R7-A9 ΒΕΛΤΙΩΣΗ, f4): μετά από «Διαγραφή όλων» τίποτα δεν διαβάζεται ώσπου ο χρήστης να ξεκινήσει ξανά, ακόμα
+        // κι αν η ακύρωση των εργασιών (DataWipe, cancelAllWork) δεν πρόλαβε να γραφτεί πριν κλείσει η εφαρμογή.
+        if (DataWipe.unfinished(applicationContext) || DataWipe.awaitsStart(applicationContext)) return Result.success()
         ErrorQueue.install(applicationContext) // χωρίς ανοιχτή εφαρμογή δεν έχει γίνει ακόμα
         // Πρόσφατη ανάγνωση (π.χ. η εφαρμογή ήταν ανοιχτή): δεν χρειάζεται άλλη.
         val cache = java.io.File(applicationContext.filesDir, SamsungHealthBridge.DASHBOARD_FILE)
@@ -46,9 +49,10 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             // Round 1 (S1-10 / S3-5): ΟΛΕΣ οι ζυγίσεις, όπως η εφαρμογή (πριν: 30 μέρες). Είναι λίγες εγγραφές (μία-δύο
             // σελίδες), ενώ με 30 μέρες ο έλεγχος θερμίδων (παράθυρο ως 42 μέρες + 1 εβδομάδα) και η οθόνη «Σώμα»
             // έβγαιναν, ώσπου να έρθει η πλήρης ανάγνωση, από μέρος των ζυγίσεων. Το «background» το λέει στη Flutter.
+            // Round 7 (R7-A10-4): το «readAt» είναι του DashboardReader (η αρχή της ανάγνωσης): μια εκτέλεση που αρχίζει
+            // 23:59 και τελειώνει μετά τα μεσάνυχτα δεν δείχνει τα χθεσινά σύνολα ως σημερινά.
             val o = SleepPolicy.reader(applicationContext, store, heartDays = 7).read(names)
                 .put("ok", true)
-                .put("readAt", System.currentTimeMillis())
                 .put("granted", granted.size)
                 .put("total", SamsungHealthBridge.permissions.size)
                 .put("background", true)

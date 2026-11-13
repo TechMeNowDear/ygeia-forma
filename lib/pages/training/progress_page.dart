@@ -159,8 +159,12 @@ String paceDiffText(int s) {
   return s % 60 == 0 ? m : '$m ${secs(s % 60)}';
 }
 
-String _setText(LoadKind k, ExLog e) =>
-    hasLoad(k) ? '${loadLabel(k, e.workLoad)} × ${_repsText([for (final s in e.done) s.reps])}' : '${_repsText([for (final s in e.done) s.reps])} επαν.';
+// R7-A6-11: όταν το φορτίο άλλαξε μέσα στην άσκηση, κάθε σετ με το δικό του («4,3 kg × 10 · 2,8 kg × 12»).
+String _setText(LoadKind k, ExLog e) => !hasLoad(k)
+    ? '${_repsText([for (final s in e.done) s.reps])} επαν.'
+    : e.mixedLoads
+        ? e.doneText()
+        : '${loadLabel(k, e.endLoad)} × ${_repsText([for (final s in e.done) s.reps])}';
 
 String _loadDelta(LoadKind k, double d) => switch (k) {
       LoadKind.band || LoadKind.bandPair => '${d.abs().round()} lb',

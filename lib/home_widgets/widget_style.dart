@@ -31,7 +31,8 @@ const wMetrics = <String, List<WMetric>>{
   WKind.sleep: [
     WMetric('sleepMin', 'Διάρκεια ύπνου'),
     WMetric('energy', 'Ετοιμότητα'),
-    WMetric('sleepScore', 'Σκορ ύπνου'),
+    // Round 7 (U1-7): «Βαθμολογία ύπνου», όπως στις Τάσεις, στην εβδομάδα και στη σελίδα της μέτρησης (πριν «Σκορ ύπνου»).
+    WMetric('sleepScore', 'Βαθμολογία ύπνου'),
     WMetric('hrv', 'HRV'),
     WMetric('sleepHr', 'Παλμοί στον ύπνο'),
     WMetric('lowHr', 'Χαμηλότεροι παλμοί'),

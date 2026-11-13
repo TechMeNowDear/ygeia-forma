@@ -2,6 +2,7 @@
 library;
 
 import 'equipment.dart';
+import 'set_hr.dart' show perSideExercises;
 
 /// Τα κλειδιά που δεν ξέρει αυτή η έκδοση (από νεότερη ή παλιότερη), για να ξαναγραφτούν αυτούσια (έλεγχος 9/11,
 /// V-A-07): μια αποθήκευση δεν σβήνει ποτέ κάτι που δεν καταλαβαίνει.
@@ -51,6 +52,7 @@ class ExLog {
     this.skipped = false,
     this.swappedFrom,
     this.reason,
+    this.plannedSets,
     Map<String, dynamic>? extra,
   })  : log = log ?? [],
         pain = pain ?? [],
@@ -59,7 +61,7 @@ class ExLog {
   /// Κλειδιά άλλης έκδοσης (V-A-07).
   final Map<String, dynamic> extra;
 
-  static const _known = {'ex', 'sets', 'lo', 'hi', 'rir', 'rest', 'log', 'ra', 'pain', 'skip', 'from', 'why'};
+  static const _known = {'ex', 'sets', 'lo', 'hi', 'rir', 'rest', 'log', 'ra', 'pain', 'skip', 'from', 'why', 'ps'};
 
   String ex;
   final int sets, lo, hi, rir, rest;
@@ -75,6 +77,11 @@ class ExLog {
 
   /// Γιατί αυτός ο στόχος (από την πρόοδο), για να φαίνεται.
   String? reason;
+
+  /// R7-A8-4: η άσκηση άλλαξε (⋮ › «Αλλαγή άσκησης») αφού έγιναν κάποια σετ της· κρατήθηκαν μόνο αυτά ([sets] = όσα
+  /// έγιναν) και εδώ τα σετ του προγράμματος, για να κρίνει η πρόοδος ότι «δεν έγιναν όλα». Κλειδί «ps»: νέο,
+  /// προαιρετικό (η παλιά έκδοση το κρατά ως άγνωστο, V-A-07). null = κανονική άσκηση.
+  int? plannedSets;
 
   LoadKind get kind => loadKindOf(ex);
   List<SetLog> get done => [for (final s in log) if (s.done) s];
@@ -94,12 +101,55 @@ class ExLog {
     return v;
   }
 
-  /// Όγκος σε kg (επαναλήψεις × κιλά· στο ζευγάρι αλτήρων μετράνε και οι δύο).
+  /// Το φορτίο του τελευταίου σετ που έγινε (με φορτίο): εκεί που κατέληξε η άσκηση, ό,τι κι αν άλλαξε μέσα της
+  /// (R7-A6-11· ίδιο με την πρόοδο). null χωρίς τέτοιο σετ.
+  double? get endLoad {
+    final d = done;
+    for (var i = d.length - 1; i >= 0; i--) {
+      if (d[i].load != null) return d[i].load;
+    }
+    return null;
+  }
+
+  /// Το φορτίο άλλαξε μέσα στην άσκηση (π.χ. μετά το 1ο σετ): τότε κάθε σετ γράφεται με το δικό του (R7-A6-11).
+  bool get mixedLoads {
+    final d = done;
+    return d.any((s) => s.load != d.first.load);
+  }
+
+  /// Τα σετ που έγιναν, με το φορτίο τους: «4,3 kg · 10, 12», ή «4,3 kg × 10 · 2,8 kg × 12» όταν το φορτίο άλλαξε
+  /// μέσα στην άσκηση (R7-A6-11: πριν όλα με το μεγαλύτερο φορτίο). Χωρίς φορτίο: «10, 12».
+  String doneText() {
+    final d = done;
+    if (!hasLoad(kind)) return d.map((s) => s.reps).join(', ');
+    if (!mixedLoads) return '${loadLabel(kind, d.isEmpty ? null : d.first.load)} · ${d.map((s) => s.reps).join(', ')}';
+    final parts = <String>[];
+    double? cur;
+    var reps = <int>[];
+    void flush() {
+      if (reps.isNotEmpty) parts.add('${loadLabel(kind, cur)} × ${reps.join(', ')}');
+    }
+
+    for (final s in d) {
+      if (reps.isNotEmpty && s.load != cur) {
+        flush();
+        reps = <int>[];
+      }
+      cur = s.load;
+      reps.add(s.reps);
+    }
+    flush();
+    return parts.join(' · ');
+  }
+
+  /// Όγκος σε kg (επαναλήψεις × κιλά· στο ζευγάρι αλτήρων μετράνε και οι δύο). R7-A6-7: στις ασκήσεις μίας πλευράς τη
+  /// φορά ([perSideExercises]) ένα ✓ είναι δεξιά ΚΑΙ αριστερά (έτσι μετρά και ο χρόνος του σετ, set_hr.dart): ×2.
   double get volume {
     if (!usesKg(kind)) return 0;
+    final sides = perSideExercises.contains(ex) ? 2 : 1;
     var v = 0.0;
     for (final s in done) {
-      v += (s.load ?? 0) * s.reps * (kind == LoadKind.dbPair ? 2 : 1);
+      v += (s.load ?? 0) * s.reps * (kind == LoadKind.dbPair ? 2 : 1) * sides;
     }
     return v;
   }
@@ -118,6 +168,7 @@ class ExLog {
         if (skipped) 'skip': 1,
         if (swappedFrom != null) 'from': swappedFrom,
         if (reason != null) 'why': reason,
+        if (plannedSets != null) 'ps': plannedSets,
       };
 
   factory ExLog.fromJson(Map<String, dynamic> j) => ExLog(
@@ -133,6 +184,7 @@ class ExLog {
         skipped: j['skip'] == 1,
         swappedFrom: j['from'] is String ? j['from'] as String : null,
         reason: j['why'] is String ? j['why'] as String : null,
+        plannedSets: j['ps'] is num && (j['ps'] as num).isFinite ? (j['ps'] as num).toInt() : null,
         extra: unknownKeys(j, _known),
       );
 }

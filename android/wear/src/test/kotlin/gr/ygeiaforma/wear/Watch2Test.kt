@@ -85,8 +85,9 @@ class Watch2Test {
         assertTrue(lateAlarmBuzz(120_000, stillOver = true))
         assertFalse(lateAlarmBuzz(120_000, stillOver = false))
         assertEquals("", ageText(5_000))
-        assertEquals(" (πριν 40″)", ageText(40_000))
-        assertEquals(" (πριν 2′)", ageText(130_000))
+        // Round 7 (R7-U3-08): σε ολόκληρες λέξεις, όχι «40″» / «2′».
+        assertEquals(" (πριν 40 δευτερόλεπτα)", ageText(40_000))
+        assertEquals(" (πριν 2 λεπτά)", ageText(130_000))
         assertEquals("Κόψε ρυθμό.", alarmAdvice(walk = true, recovery = false))
         // λεπτό αποκατάστασης: κάθεσαι ήδη· όχι «Κόψε ρυθμό»
         assertEquals("Ξεκουράσου.", alarmAdvice(walk = true, recovery = true))

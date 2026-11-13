@@ -95,11 +95,12 @@
 - Πηγές: ένας πίνακας στο `lib/sources.dart` (μία πηγή ανά μέτρηση, ποτέ ανάμειξη). Από τη μέρα της σύνδεσης ο ύπνος,
   οι παλμοί/HRV/αναπνοές ύπνου, η θερμοκρασία και η ετοιμότητα έρχονται μόνο από το Oura· οξυγόνο, βήματα, παλμοί μέρας
   από το ρολόι· βάρος από την InBody. Οι τιμές του Oura αποθηκεύονται με πρόθεμα `o.` στο ιστορικό.
-- Σύνδεση: OAuth2 με PKCE, χωρίς Client Secret (`lib/oura/`). Ρυθμίσεις σε ένα σημείο: `lib/oura/config.dart`
+- Σύνδεση: OAuth2 με PKCE, χωρίς Client Secret μέσα στην εφαρμογή: το προσθέτει ο μεσάζων στο Netlify (`site/`) (`lib/oura/`). Ρυθμίσεις σε ένα σημείο: `lib/oura/config.dart`
   (`ouraClientId`, `ouraScopes`, `ouraTokenProxy`, `ouraOAuth`). Tokens κρυπτογραφημένα (AES-GCM, Android Keystore) στο `noBackupFilesDir`.
 - Τη μέρα του δαχτυλιδιού: εγγραφή εφαρμογής στο developer portal της Oura (developer.ouraring.com· το παλιό
   cloud.ouraring.com/oauth/applications παραπέμπει εκεί) με Redirect URI `https://ygeia-forma.netlify.app/oura/callback`
-  (App Link· εναλλακτική `ygeiaforma://oura-callback`, αλλαγή μίας γραμμής στο `ouraRedirectUri`) και το Client ID στο
+  (App Link· η μόνη που δέχεται ο μεσάζων: το `ygeiaforma://oura-callback` είναι μόνο προώθηση από τη σελίδα
+  `/oura/callback` όταν ο browser δεν ανοίξει την εφαρμογή, όχι διεύθυνση επιστροφής) και το Client ID στο
   `ouraClientId`. Scope: μία γραμμή, `ouraScopes` (κενό = «daily» στο classic, «extapi:daily» στο v2)· διακομιστής
   σύνδεσης: μία γραμμή, `ouraOAuth` (classic ή v2). Το «scope» της απάντησης δεν ελέγχεται· 401 στον ύπνο μετά από
   ανανέωση = «Λείπει άδεια στην Oura».

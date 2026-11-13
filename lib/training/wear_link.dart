@@ -495,6 +495,10 @@ class WearLink with WidgetsBindingObserver {
   void apply(TrainingStore t, WatchCmd c) {
     final s = t.current;
     if (s == null || (c.sid.isNotEmpty && c.sid != s.id)) return;
+    // R7-A8-3: ξεχασμένη προπόνηση (καμία κίνηση εδώ και [TrainingStore.staleAfter] ως την ώρα της εντολής): ✓, ρεζέρβα,
+    // επαναλήψεις, διάλειμμα από το ρολόι δεν γράφονται μέσα της (π.χ. η σημερινή προπόνηση σε χθεσινή). Ένα ✓ που άργησε
+    // να φτάσει έχει τη δική του ώρα («at») και γράφεται. Το «Τέλος» περνά: κλείνει στο τελευταίο ✓ ([endFromWatch]).
+    if (c.op != 'end' && !t.belongs(s, wearInt(c.j['at']) ?? t.now.millisecondsSinceEpoch)) return;
     switch (c.op) {
       case 'end':
         // «Τέλος» στο ρολόι (V-A-09): τέλος και εδώ, με την ώρα του ρολογιού.
@@ -606,12 +610,17 @@ class HrSummary {
   final int? avg, max;
   final int overSec;
 
+  /// Ως πόσα δευτερόλεπτα ισχύει μία τιμή ως την επόμενη (R7-A7-5): όσο και στον χρόνο ζώνης (zoneTimes στο zone.dart, 15″) και στο
+  /// «Χάθηκαν παλμοί» του ρολογιού. Πριν 60″: μία τιμή πάνω από το όριο και μετά 55″ χωρίς επαφή μετρούσαν 55″ «πάνω».
+  static const overMaxGap = 15;
+
   static int _over(List<List<int>> hr, int limit) {
     var sec = 0;
     for (var i = 0; i < hr.length; i++) {
       if (hr[i][1] < limit) continue;
+      // Η τελευταία τιμή: όσο το διάστημα των ζωντανών παλμών του κινητού (ανά 10″, [TrainingStore.addHr]).
       final next = i + 1 < hr.length ? hr[i + 1][0] : hr[i][0] + 10;
-      sec += (next - hr[i][0]).clamp(0, 60);
+      sec += (next - hr[i][0]).clamp(0, overMaxGap);
     }
     return sec;
   }

@@ -75,6 +75,7 @@ class _TrendsPageState extends State<TrendsPage> {
                 // Round 1 (S4-1): με «Λίγες … για συμπέρασμα» σε κάποια γραμμή, δεν λέμε ότι «ό,τι αλλάζει είναι μέσα στις
                 // διακυμάνσεις σου» (εκεί δεν φάνηκε αν άλλαξε). Round 2 (R2-D-7): ούτε με «Λίγα δεδομένα» / «Αλλαγή πηγής».
                 notCompared: notComparedText(results),
+                rows: results.length,
               );
 
         Widget section(TrendSection s) => _SectionCard(
@@ -227,9 +228,13 @@ class _BackfillCard extends StatelessWidget {
 
 /// Η περίληψη: μόνο ό,τι άλλαξε πραγματικά, το πιο ξεκάθαρο πρώτο.
 class _ChangedCard extends StatelessWidget {
-  const _ChangedCard({required this.changed, required this.period, this.nothingCompared = false, this.notCompared});
+  const _ChangedCard(
+      {required this.changed, required this.period, this.nothingCompared = false, this.notCompared, this.rows = 0});
   final List<TrendResult> changed;
   final TrendPeriod period;
+
+  /// Πόσες γραμμές (μετρήσεις) ελέγχονται μαζί ([chanceNote]).
+  final int rows;
 
   /// Καμία μέτρηση δεν είχε αρκετές μέρες για σύγκριση (όλες «Λίγα δεδομένα» ή αλλαγή πηγής).
   final bool nothingCompared;
@@ -259,11 +264,17 @@ class _ChangedCard extends StatelessWidget {
                 style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
               ),
             )
-          else
+          else ...[
             for (var i = 0; i < changed.length; i++) ...[
               if (i > 0) const Hairline(vertical: 4),
               _ChangeRow(r: changed[i]),
             ],
+            // Round 7 (R7-A5-3): πολλές μετρήσεις μαζί → κάποιο «άλλαξε» βγαίνει και από τύχη. Το λέμε, αντί να το κρύβει
+            // μια διόρθωση που θα έκρυβε και πραγματικές αλλαγές ([chanceNote]).
+            const SizedBox(height: 6),
+            Text(chanceNote(rows),
+                key: const ValueKey('trends-chance-note'), style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4)),
+          ],
         ],
       ),
     );
@@ -431,7 +442,11 @@ class _MetricDetail extends StatelessWidget {
     final def = r.def;
     final style = TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.45);
     final unitWord = def.sparse ? 'ζυγίσεις' : 'μέρες';
-    final len = daysBetween(r.currentFrom, r.end) + 1;
+    // Round 7 (R7-U4-4): μετά από αλλαγή πηγής η τιμή «τώρα» είναι μόνο από τις μέρες της νέας πηγής: το διάστημα και
+    // το πλήθος από την αλλαγή («9 από 9 μέρες»), όχι «9 από 30», σαν να έλειπαν 21 νύχτες που υπάρχουν.
+    final from = r.shownFrom;
+    final changedSpan = !sameDay(from, r.currentFrom);
+    final len = daysBetween(from, r.end) + 1;
 
     String count(int n) => def.sparse ? '$n $unitWord' : '$n από $len $unitWord';
     // Round 2 (R2-D-9): τα δύο διαστήματα σε διαφορετικές χρονιές → οι ημερομηνίες με το έτος.
@@ -498,20 +513,25 @@ class _MetricDetail extends StatelessWidget {
               children: [
                 // Round 2 (R2-D-9): «1 χρόνος» = οι ίδιοι μήνες πέρσι· χωρίς έτος τα δύο διαστήματα έμοιαζαν ίδια.
                 InfoRow(
-                  'Τώρα · ${dateSpanText(r.currentFrom, r.end, withYear: years)}',
+                  '${changedSpan ? 'Από την αλλαγή' : 'Τώρα'} · ${dateSpanText(from, r.end, withYear: years)}',
                   r.current == null ? '—' : (relative ? relativeTempText(r) : def.formatAs(r.current!, r.source)),
                   dot: c.text,
                 ),
-                InfoRow(
-                  'Πριν · ${dateSpanText(r.previousFrom, r.previousEnd, withYear: years)}',
-                  r.previous == null ? '—' : (relative ? 'σημείο σύγκρισης' : def.formatAs(r.previous!, r.source)),
-                  dot: c.textSecondary,
-                ),
-                InfoRow('Με δεδομένα (τώρα)', count(r.nCurrent)),
-                InfoRow('Με δεδομένα (πριν)', count(r.nPrevious)),
+                // Round 7 (R7-U4-4): με αλλαγή πηγής δεν υπάρχει «πριν» που να συγκρίνεται (το λέει το πλαίσιο πιο πάνω)·
+                // πριν: «Πριν —» και «0 από 30 μέρες», ενώ οι μέρες της παλιάς πηγής υπάρχουν.
+                if (r.status != TrendStatus.sourceChange)
+                  InfoRow(
+                    'Πριν · ${dateSpanText(r.previousFrom, r.previousEnd, withYear: years)}',
+                    r.previous == null ? '—' : (relative ? 'σημείο σύγκρισης' : def.formatAs(r.previous!, r.source)),
+                    dot: c.textSecondary,
+                  ),
+                InfoRow(r.status == TrendStatus.sourceChange ? 'Με δεδομένα' : 'Με δεδομένα (τώρα)', count(r.nCurrent)),
+                if (r.status != TrendStatus.sourceChange) InfoRow('Με δεδομένα (πριν)', count(r.nPrevious)),
                 if (r.source != Source.watch) InfoRow('Πηγή', sourceDevice(r.source)),
                 const Hairline(vertical: 8),
-                Text('Οι διακεκομμένες γραμμές στο γράφημα είναι η μεσαία τιμή κάθε περιόδου.', style: style),
+                // Με αλλαγή πηγής το γράφημα δεν έχει διακεκομμένες γραμμές (καμία σύγκριση).
+                if (r.status != TrendStatus.sourceChange)
+                  Text('Οι διακεκομμένες γραμμές στο γράφημα είναι η μεσαία τιμή κάθε περιόδου.', style: style),
                 if (relative) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -680,6 +700,15 @@ String? notComparedText(List<TrendResult> results) {
   return 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει $list, δεν φαίνεται αν άλλαξε κάτι. '
       'Αυτό δεν είναι ιατρικός έλεγχος.';
 }
+
+/// Round 7 (R7-A5-3): η μία πρόταση κάτω από το «Τι άλλαξε» όταν λέει κάτι. Κάθε γραμμή ελέγχεται στο 1% (trends.dart),
+/// αλλά με 16–20 γραμμές μαζί «άλλαξε» χωρίς καμία πραγματική αλλαγή βγαίνει σε ~1 στις 10 περιόδους (προσομοίωση με
+/// την port των Τάσεων, AR(1) με σαββατοκύριακα και κενά: 10% στις 30 μέρες, 10% στους 3 μήνες, 7,5% στον χρόνο·
+/// /home/claude/scratch/f7/a53/holm_sim.py). Η διόρθωση Holm (οικογενειακό 1%) θα το έριχνε στο ~1%, αλλά θα έκρυβε
+/// πραγματικές αλλαγές: +3 bpm παλμοί ύπνου για 30 μέρες φαίνονται 34% → 7,5%, σε 3 μήνες 90% → 70%· HRV −15% σε 3 μήνες
+/// 88% → 56%· ύπνος −30 λεπτά σε 3 μήνες 60% → 25%. Γι' αυτό έμεινε ο έλεγχος ανά γραμμή, με αυτή την προειδοποίηση.
+String chanceNote(int rows) => 'Με ${rows > 0 ? '$rows' : 'πολλές'} μετρήσεις μαζί, περίπου μία φορά στις 10 κάποια γραμμή '
+    'λέει «άλλαξε» από τύχη· αν η αλλαγή φαίνεται και τις επόμενες εβδομάδες, είναι πιο σίγουρη.';
 
 /// UX U2: κανένας δείκτης δεν είχε αρκετές μετρήσεις και στις δύο περιόδους.
 String noComparisonText(TrendPeriod p) => switch (p) {

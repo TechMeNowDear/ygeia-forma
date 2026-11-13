@@ -12,10 +12,8 @@ import android.os.Bundle
 import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -317,73 +315,20 @@ object HomeWidgets {
     }
 
     // ---------------------------------------------------------------- Κίνηση από την ανάγνωση στο παρασκήνιο
-    private fun thousands(v: Long): String {
-        val s = kotlin.math.abs(v).toString().reversed().chunked(3).joinToString(".").reversed()
-        return if (v < 0) "−$s" else s
-    }
-
-    private fun dec1(v: Double): String = String.format(java.util.Locale.ROOT, "%.1f", v).replace('.', ',')
-
     /**
      * Μετά από ανάγνωση στο παρασκήνιο (RefreshWorker): βήματα, θερμίδες, ενεργός χρόνος, απόσταση και όροφοι της
-     * σημερινής μέρας από το νέο βοηθητικό αρχείο, μόνο αν είναι νεότερο από το στιγμιότυπο. Ό,τι δεν βρεθεί μένει.
+     * σημερινής μέρας από το νέο βοηθητικό αρχείο, μόνο αν είναι νεότερο από το στιγμιότυπο. Ο κανόνας (και τι γίνεται σε
+     * νέα μέρα, round 7 · A10-2) στο [WidgetText.moveFromDashboard], για να ελέγχεται σε απλό JVM.
      */
     fun refreshMoveFromDashboard(ctx: Context, dashboard: JSONObject) {
         if (count(ctx) == 0) return
         val snap = snapshot(ctx) ?: return
         val kinds = snap.optJSONObject("kinds") ?: return
-        val move = kinds.optJSONObject("move") ?: JSONObject().put("m", JSONObject())
-        val readAt = dashboard.optLong("readAt", 0L)
-        if (readAt <= move.optLong("at", 0L)) return
-        val m = move.optJSONObject("m") ?: JSONObject().also { move.put("m", it) }
         val zone = ZoneId.systemDefault()
-        val today = LocalDate.now(zone)
-        // Έλεγχος 9/11 (D2-05a): ό,τι ήταν «χθες» στο στιγμιότυπο άλλης μέρας (π.χ. «Παλμοί χθες») δεν ξαναγράφεται εδώ·
-        // δεν μένει με τη σημερινή ημερομηνία.
-        if (move.optString("day", "") != today.toString()) m.remove("dayHr")
-        fun dayOf(ms: Long) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
-        fun perDay(key: String, sum: Boolean): Map<LocalDate, Double> {
-            val out = HashMap<LocalDate, Double>()
-            val arr = dashboard.optJSONArray(key) ?: return out
-            for (i in 0 until arr.length()) {
-                val e = arr.optJSONArray(i) ?: continue
-                if (e.length() < 2) continue
-                val day = dayOf(e.optLong(0))
-                val v = e.optDouble(1)
-                if (v.isNaN()) continue
-                out[day] = if (sum) (out[day] ?: 0.0) + v else v
-            }
-            return out
-        }
-
-        fun put(key: String, label: String, value: String, unit: String) {
-            val e = m.optJSONObject(key) ?: JSONObject()
-            e.put("l", label).put("v", value).put("u", unit)
-            m.put(key, e)
-        }
-        val steps = perDay("steps", sum = false)
-        // Χωρίς βήματα σήμερα ακόμα: όχι τα χθεσινά με σημερινή ώρα.
-        if (steps[today] == null) m.optJSONObject("steps")?.put("v", "—")?.remove("cap")
-        if (perDay("floors", sum = true)[today] == null) m.remove("floors")
-        steps[today]?.let { s ->
-            val e = m.optJSONObject("steps") ?: JSONObject()
-            e.put("l", "Βήματα").put("v", thousands(s.toLong())).put("u", "")
-            val y = steps[today.minusDays(1)]
-            e.put("cap", if (y == null) "βήματα σήμερα" else "χθες ${thousands(y.toLong())}")
-            e.put("s", JSONArray((6 downTo 0).map { steps[today.minusDays(it.toLong())] ?: JSONObject.NULL }))
-            m.put("steps", e)
-        }
-        perDay("floors", sum = true)[today]?.let { put("floors", "Όροφοι", "${it.toLong()}", "") }
-        dashboard.optJSONObject("activity")?.let { a ->
-            if (a.has("activeCalories")) put("activeKcal", "Ενεργές", thousands(a.optDouble("activeCalories").toLong()), " kcal")
-            if (a.has("calories")) put("totalKcal", "Σύνολο", thousands(a.optDouble("calories").toLong()), " kcal")
-            // Round 1 (U7-13): ολόκληρη λέξη, όπως το στιγμιότυπο της εφαρμογής (widget_snapshot.dart).
-            if (a.has("activeMinutes")) put("activeMin", "Ενεργός", "${a.optLong("activeMinutes")}", " λεπτά")
-            if (a.has("distance")) put("distance", "Απόσταση", dec1(a.optDouble("distance") / 1000), " km")
-        }
-        val t = Instant.ofEpochMilli(readAt).atZone(zone).toLocalTime()
-        // Locale.ROOT (τελικός έλεγχος, Συμβούλιο 4, W-5): πάντα ψηφία 0–9, σε όποια γλώσσα κι αν είναι το κινητό.
-        move.put("src", "ρολόι · %02d:%02d".format(java.util.Locale.ROOT, t.hour, t.minute)).put("at", readAt).put("day", today.toString())
+        // Round 7 (f8 · R7-A10-4): η μέρα της ΑΝΑΓΝΩΣΗΣ («readAt» = η αρχή της), όχι η μέρα που τελείωσε: μια εκτέλεση από
+        // τις 23:59 ως μετά τα μεσάνυχτα γράφει τα σύνολα στη μέρα τους, και το widget δείχνει «—» τη νέα μέρα.
+        val readDay = java.time.Instant.ofEpochMilli(dashboard.optLong("readAt", System.currentTimeMillis())).atZone(zone).toLocalDate()
+        val move = WidgetText.moveFromDashboard(kinds.optJSONObject("move"), dashboard, readDay, zone) ?: return
         kinds.put("move", move)
         writeSnapshot(ctx, snap.toString())
         updateAll(ctx, only = "move")

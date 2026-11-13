@@ -120,10 +120,10 @@ void main() {
       expect(t.reps, [8, 8, 8]);
     });
 
-    test('ενόχληση → τίποτα δεν ανεβαίνει', () {
+    test('ενόχληση → ένα σκαλί πιο ελαφριά (R7-A6-3, f2: πριν «τίποτα δεν ανεβαίνει», ίδια κιλά)', () {
       final t = nextTarget(item('db_press'), [(d, log('db_press', 9.3, [12, 12, 12], rir: 3, pain: ['shoulderR']))], now);
       expect(t.change, Change.pain);
-      expect(t.load, 9.3);
+      expect(t.load, 7.8);
       expect(t.reason, contains('δεξιός ώμος'));
     });
 

@@ -111,8 +111,8 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
     final watch = WearLink.main.ready.value
         ? StatusPill(icon: Icons.watch_rounded, text: 'ρολόι έτοιμο', color: c.good)
         : null;
-    // round1, U6-20: «όριο παλμών 140» ποτέ σε δύο γραμμές.
-    final limitText = limit == null ? null : 'όριο παλμών\u00A0$limit';
+    // round1, U6-20 / R7-U1-9: «όριο παλμών 140» ποτέ σε δύο γραμμές (πριν δενόταν μόνο το «παλμών 140»).
+    final limitText = limit == null ? null : 'όριο\u00A0παλμών\u00A0$limit';
 
     // round1, S6-14: ξεχασμένη προπόνηση (ανοιχτή ώρες χωρίς κίνηση): η ίδια κάρτα με την «Προπόνηση», όχι «Συνέχισε».
     if (cur != null && t.isStale(cur)) {
@@ -160,7 +160,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           Text(
             [
               '${cardio.minutes} λεπτά',
-              if (p == null ? null : cardio.planWeekText(p.weekOf(now)) case final wk?) wk,
+              if (p?.planWeekText(cardio, now) case final wk?) wk,
               if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim(),
               if (limitText != null) limitText,
             ].join(' · '),

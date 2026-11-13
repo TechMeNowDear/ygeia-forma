@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'format.dart' show dec;
 import 'oxygen_note.dart' show oxygenNoNoteText, oxygenRangeText, oxygenSourceText;
 import 'history.dart';
 import 'oura/oura_view.dart' show NightBaseline, baselineNights, minNightsForBaseline;
@@ -126,6 +127,20 @@ double? inBodyHeight(double? weight, double? bmi) =>
 /// Δείκτης μάζας σώματος από βάρος και ύψος.
 double? bmiOf(double? weight, double? heightCm) =>
     weight == null || heightCm == null ? null : weight / math.pow(heightCm / 100, 2);
+
+/// Round 7 (A4-2): ο δείκτης όπως γράφεται: ΚΟΜΜΕΝΟΣ στο 0,1, ποτέ στρογγυλεμένος προς τα πάνω, ώστε ο αριθμός να συμφωνεί
+/// με την κρίση του εύρους ([bmiRange]: κάτω από 25). Πριν 24,97 (180 cm, 80,9 kg) γραφόταν «25,0» δίπλα στο «μέσα στο
+/// εύρος» «18,5–24,9». Ίδιος κανόνας με το οξυγόνο (`lowestText`, `spo2AvgText`).
+String bmiText(double bmi) => dec((bmi * 10 + 1e-9).floorToDouble() / 10);
+
+/// Round 7 (A4-2): το βάρος του φυσιολογικού δείκτη σε λέξεις, «60,0–80,9» για 180 cm: τα άκρα είναι οι τιμές της ζυγαριάς
+/// (ανά 0,1 kg) που η εφαρμογή κρίνει «μέσα στο εύρος» ([RefRange.place]: από [lo], κάτω από [hi]). Πριν «59,9–81,0»: τα
+/// 81,0 kg (δείκτης 25,0) έβγαιναν «πάνω από το εύρος» με το 81,0 μέσα στο κείμενο, και τα 59,9 (18,49) «κάτω».
+String healthyWeightText(double lo, double hi) {
+  final from = (lo * 10 - 1e-9).ceil();
+  final to = (hi * 10 - 1e-9).ceil() - 1;
+  return '${dec(from / 10)}–${dec(to / 10)}';
+}
 
 /// Βήματα (Paluch κ.ά. 2022): ο κίνδυνος θανάτου μειώνεται ως περίπου 8.000–10.000 βήματα (κάτω των 60) ή
 /// 6.000–8.000 (60 και πάνω) και μετά σταθεροποιείται. Δεν είναι «ανώτατο»· είναι το σημείο που σταματά το όφελος.

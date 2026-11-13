@@ -42,6 +42,13 @@ class OuraStatusCard extends StatelessWidget {
   static bool _nightDueAndMissing(HealthStore s, DateTime now) =>
       now.hour >= ouraNightDueHour && s.ouraNightFor(dayOf(now))?.main == null;
 
+  /// Round 7 (R7-U1-13): η κάρτα γράφει ήδη τις ώρες του υπνάκου της νύχτας («Χθες βράδυ μόνο υπνάκος …», ίδιοι
+  /// όροι με το `switch` του [build]).
+  static bool showsNapTimes(HealthStore s, DateTime now) =>
+      s.ouraStatus == OuraStatus.missing &&
+      s.ouraMissingNights < 2 &&
+      napTimes(s.ouraNightFor(dayOf(now)), nightOnly: true).isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
@@ -268,18 +275,28 @@ class OuraSleepTodayCard extends StatelessWidget {
       // Η τελευταία νύχτα που ήρθε, ΜΕ την ημερομηνία της (έλεγχος UX U5): ποτέ ως «χθες βράδυ».
       final older = store.lastOuraNight;
       final olderMinutes = older == null || sameDay(older.day, today) ? null : older.nightMinutes;
+      // Round 7 (R7-U1-13): η κάρτα κατάστασης από πάνω ([OuraStatusCard]) λέει ήδη γιατί λείπει η νύχτα και τι να
+      // κάνεις. Εδώ τότε μόνο η τελευταία νύχτα που ήρθε (ή «—»), όχι ξανά «Περιμένει το Oura» / «Μόνο υπνάκος …».
+      final told = reason != null && reason != EmptyNight.notYet && OuraStatusCard.shows(store);
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(
-              reason == null ? 'Δεν υπάρχουν δεδομένα από το δαχτυλίδι' : emptyNightText(reason),
-              style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w700),
+          if (!told)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                reason == null ? 'Δεν υπάρχουν δεδομένα από το δαχτυλίδι' : emptyNightText(reason),
+                style: const TextStyle(color: white, fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+            )
+          else if (olderMinutes == null)
+            const Padding(
+              key: ValueKey('oura-today-no-night'),
+              padding: EdgeInsets.only(top: 10),
+              child: Text('—', style: TextStyle(color: white, fontSize: 42, fontWeight: FontWeight.w800)),
             ),
-          ),
           if (olderMinutes != null) ...[
-            const SizedBox(height: 6),
+            SizedBox(height: told ? 10 : 6),
             Text(
               // Round 1 (U2a-11): η ημερομηνία και η διάρκεια δεν σπάνε σε δύο γραμμές («6 ώρες / 27 λεπτά»).
               'Τελευταία νύχτα που ήρθε: ${glued(shortDayDate(older!.day))}, ${glued(hoursMinutes(olderMinutes))}',
@@ -290,7 +307,9 @@ class OuraSleepTodayCard extends StatelessWidget {
         ],
       );
       // «Μόνο υπνάκος»: οι ώρες του φαίνονται (π.χ. λαγοκοίμισμα που τελείωσε ως τις 22:00).
-      if (reason == EmptyNight.onlyNap && napTimes(night, nightOnly: true).isNotEmpty) {
+      if (reason == EmptyNight.onlyNap &&
+          napTimes(night, nightOnly: true).isNotEmpty &&
+          !(told && OuraStatusCard.showsNapTimes(store, now))) {
         body = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -348,10 +367,14 @@ class OuraSleepTodayCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               // Ένας κανόνας για το «συνήθως» σε όλες τις οθόνες (τρίτος έλεγχος F1).
+              // Round 7 (R7-U1-4): όπως η κάρτα του ρολογιού (today.dart, U1a-14): «… από | ό,τι συνήθως», ποτέ
+              // ορφανό «συνήθως».
               child: TrendPill(
                 sleepVsUsualText(diff),
                 up: diff == 0 ? null : diff > 0,
                 onDark: true,
+                maxLines: 2,
+                keepLastWords: true,
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../home_widgets/widget_bridge.dart';
 import '../home_widgets/widget_style.dart';
+import '../system_texts.dart' show greekSystemTexts;
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -24,6 +25,8 @@ class WidgetConfigApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light, Aigaio.day(null)),
       darkTheme: buildTheme(Brightness.dark, Aigaio.night(null)),
+      // Round 7 (R7-U4-7): ελληνικά κείμενα του Flutter, όπως στην κύρια εφαρμογή.
+      localizationsDelegates: greekSystemTexts,
       home: WidgetConfigPage(bridge: bridge, initial: initial),
       // Έλεγχος 9/11 (E3-08): άγνωστη διαδρομή = καμία αλλαγή, ποτέ σφάλμα.
       onUnknownRoute: (_) => PageRouteBuilder<void>(

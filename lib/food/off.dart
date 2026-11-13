@@ -206,13 +206,16 @@ const _offNotTheFood = {
 /// - κατηγορία που δεν ξέρουμε = null: το προϊόν μετρά όπως πριν (καθόλου), ώσπου να το ορίσεις στη φόρμα.
 /// Τα αράπικα φιστίκια είναι στο Open Food Facts και «όσπρια»· εδώ μετρούν ως ξηροί καρποί, όπως στη βάση.
 /// Ό,τι βγει εδώ φαίνεται στη φόρμα ελέγχου του προϊόντος και αλλάζει με ένα πάτημα.
+/// Round7 (R7-A3-1): ό,τι απλώς τα περιέχει δίνει «Τίποτα» ([CholKind.none]), όχι null· αλλιώς ένα «Πίτουρο βρώμης
+/// κράκερ» (κατηγορία κράκερ) μετρούσε από το όνομα ως πίτουρο. Αν το προϊόν έχει ΚΑΙ κατηγορία πίτουρου βρώμης, μένει
+/// null: το πίτουρο που μπαίνει και στα «δημητριακά πρωινού» το κρίνει το όνομα, και η φόρμα δείχνει τι θα μετρήσει.
 String? cholKindFromOffTags(Object? tags) {
   if (tags is! List) return null;
   final t = {
     for (final x in tags)
       if (x is String) x.trim().toLowerCase(),
   };
-  if (t.any(_offNotTheFood.contains)) return null;
+  if (t.any(_offNotTheFood.contains)) return t.any(_offBranTags.contains) ? null : CholKind.none;
   if (t.any(_offBranTags.contains)) return CholKind.bran;
   if (t.any(_offNutTags.contains)) return CholKind.nuts;
   if (t.any(_offFishTags.contains)) return CholKind.fish;
