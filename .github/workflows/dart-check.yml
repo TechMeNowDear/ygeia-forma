@@ -1,0 +1,179 @@
+# Κλάδος ελέγχου «audit-dart-check»: γρήγορος έλεγχος κατά τον βαθύ έλεγχο (13/11). Τρέχουν η ανάλυση ΟΛΟΥ του κώδικα,
+# ΟΛΕΣ οι δοκιμές Dart, το ζωγράφισμα των οθονών και οι δοκιμές Kotlin κινητού και ρολογιού. Χωρίς emulator, χωρίς
+# δημοσίευση, χωρίς εγγραφή στο repository. Το κλειδί υπογραφής δεν χρησιμοποιείται ΠΟΤΕ εδώ.
+# Το αρχείο αυτό υπάρχει μόνο στον κλάδο ελέγχου. Ο πλήρης έλεγχος (check.yml) δεν τρέχει σε αυτόν τον κλάδο.
+name: Δοκιμές Dart (κλάδος ελέγχου)
+
+on:
+  push:
+    branches: [audit-dart-check]
+
+permissions: {}
+
+concurrency:
+  group: dart-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      TZ: Europe/Athens
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.9 # η ίδια με το check.yml
+          cache: true
+
+      - name: Πακέτα
+        run: |
+          echo "::notice title=Flutter::$(flutter --version | head -1)"
+          flutter pub get
+
+      - name: Ανάλυση όλου του κώδικα (σταματά μόνο σε σφάλματα)
+        run: |
+          set -o pipefail
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log; then
+            msg=$(grep -E " error " analyze.log | head -80 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Ανάλυση κώδικα::$msg"
+            exit 1
+          fi
+          echo "::notice title=Ανάλυση κώδικα::$(tail -1 analyze.log | tr -cd '[:print:]' | tail -c 120)"
+
+      - name: Μεσάζων Oura (node)
+        run: node test/node/oura_token_test.mjs site/netlify/functions/oura-token.mjs
+
+      - name: Πολιτική απορρήτου ↔ κώδικας
+        run: python3 -I tools/ci/check_privacy.py
+
+      - name: Όλες οι δοκιμές Dart (ώρα Αθήνας)
+        run: |
+          set -o pipefail
+          date
+          files=$(ls test/*_test.dart | grep -v -e screens_test -e sentry_live_test -e oura_sandbox_live_test)
+          if ! flutter test $files 2>&1 | tee tests.log; then
+            grep -a -E -B2 -A14 "Error:|Expected:|FAILED|failed|\[E\]" tests.log | head -260 > errors.txt || true
+            [ -s errors.txt ] || tail -80 tests.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Σφάλμα ελέγχων::$msg"
+            exit 1
+          fi
+          echo "::notice title=Έλεγχοι::$(grep -a 'All tests passed' tests.log | tail -1 | tr -cd '[:print:]' | tail -c 120)"
+
+      - name: Οθόνες (ζωγραφίζονται μόνο· τίποτα δεν ανεβαίνει στο repository)
+        run: |
+          set -o pipefail
+          if ! flutter test test/screens_test.dart --update-goldens 2>&1 | tee shots.log; then
+            grep -a -E -B2 -A14 "Error:|Expected:|FAILED|failed|EXCEPTION|\[E\]" shots.log | head -240 > errors.txt || true
+            [ -s errors.txt ] || tail -80 shots.log > errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' errors.txt)
+            echo "::error title=Οθόνες::$msg"
+            exit 1
+          fi
+          echo "::notice title=Οθόνες::$(grep -a 'All tests passed' shots.log | tail -1 | tr -cd '[:print:]' | tail -c 120)"
+
+      - name: Αρχεία καταγραφής
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dart-check-logs
+          path: |
+            analyze.log
+            tests.log
+            shots.log
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Στιγμιότυπα (artifact μόνο, για τον έλεγχο UI)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dart-check-shots
+          path: test/shots/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  kotlin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      TZ: Europe/Athens
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Συμπλήρωση αρχείων Android
+        run: bash tools/ci/prepare_android.sh
+
+      - name: Gradle (μνήμη)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches/modules-2/files-2.1
+            ~/.gradle/caches/modules-2/metadata-*
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-
+      - name: Gradle (κατέβασμα)
+        run: |
+          cd android
+          for i in 1 2 3 4 5; do ./gradlew --version --console=plain >/dev/null 2>&1 && exit 0; echo "Ξαναδοκιμή $i"; sleep $((i * 20)); done
+          ./gradlew --version --console=plain
+
+      - name: Έλεγχοι Kotlin κινητού (και μεταγλώττιση release)
+        run: |
+          set -o pipefail
+          cd android
+          if ! ./gradlew :app:testDebugUnitTest :app:compileReleaseKotlin --console=plain 2>&1 | tee ../kotlin-tests.log; then
+            grep -E -A8 "FAILED|AssertionError|^e: |What went wrong|Unresolved reference" ../kotlin-tests.log | head -140 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -100 ../kotlin-tests.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Έλεγχοι Kotlin::$msg"
+            exit 1
+          fi
+
+      - name: Ρολόι (Wear OS) — έλεγχοι και χτίσιμο
+        run: |
+          set -o pipefail
+          cd android
+          grep -q '":wear"' settings.gradle.kts || echo 'include(":wear")' >> settings.gradle.kts
+          if ! ./gradlew :wear:testDebugUnitTest :wear:assembleRelease --console=plain 2>&1 | tee ../wear.log; then
+            grep -E -A8 "FAILED|AssertionError|^e: |error:|What went wrong|Unresolved reference" ../wear.log | head -140 > ../errors.txt || true
+            [ -s ../errors.txt ] || tail -100 ../wear.log > ../errors.txt
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
+            echo "::error title=Ρολόι::$msg"
+            exit 1
+          fi
+
+      - name: Αρχεία καταγραφής
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kotlin-check-logs
+          path: |
+            kotlin-tests.log
+            wear.log
+          retention-days: 3
+          if-no-files-found: ignore
