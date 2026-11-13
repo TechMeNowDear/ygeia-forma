@@ -8,6 +8,7 @@ import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
+import '../trends.dart' show uncountedWeighIn;
 import '../widgets.dart';
 import 'info_sheet.dart';
 import 'source_widgets.dart';
@@ -150,6 +151,24 @@ final metricSpecs = <String, MetricSpec>{
   ),
 };
 
+/// Round 3 (k1 · R3-C-2): αντίγραφο του ιστορικού όπου οι μέρες [from]–[to] με ζύγιση που δεν μετρά ([uncountedWeighIn]:
+/// ξένη ή σε αναμονή, ίδιος κανόνας με τις Τάσεις, την εβδομάδα και την αναφορά) δεν έχουν τιμές ζύγισης ([bodyKeys]).
+/// Το ιστορικό δεν αλλάζει.
+Map<String, Map<String, double>> _countedWeighInsOnly(
+    Map<String, Map<String, double>> history, SourcePlan plan, DateTime from, DateTime to) {
+  final out = Map<String, Map<String, double>>.of(history);
+  for (var d = dayOf(from); !d.isAfter(to); d = DateTime(d.year, d.month, d.day + 1)) {
+    final k = dateKey(d);
+    final row = history[k];
+    if (row == null || !uncountedWeighIn(history, plan, d)) continue;
+    out[k] = {
+      for (final e in row.entries)
+        if (!bodyKeys.contains(e.key)) e.key: e.value,
+    };
+  }
+  return out;
+}
+
 /// Η σελίδα μιας μέτρησης: τελευταία τιμή, εύρος (αν υπάρχει), γράφημα 7/30/90 ημερών, μικρά στατιστικά, οι τελευταίες
 /// τιμές και η πηγή. Μία πηγή ανά γράφημα (planSeries κόβει στην αλλαγή πηγής).
 class MetricPage extends StatefulWidget {
@@ -182,10 +201,16 @@ class _MetricPageState extends State<MetricPage> {
         final today = dayOf(widget.now ?? DateTime.now());
         final end = s.dayComplete ? DateTime(today.year, today.month, today.day - 1) : today;
         final from = DateTime(end.year, end.month, end.day - _days + 1);
-        final series = planSeries(store.history, store.plan, s.metric, from, end);
+        // Round 3 (k1 · R3-C-2): βάρος, λίπος, μύες με τον φύλακα των Τάσεων ([uncountedWeighIn]): ζύγιση που το Σώμα
+        // λέει ότι «δεν μετρά σε γραφήματα» δεν μπαίνει ούτε εδώ (γράφημα, μέσος όρος, άκρα, «Τελευταίες τιμές»,
+        // «συνήθως»). Πριν: η ζύγιση του παιδιού έριχνε το γράφημα στα 38,0 και τον μέσο όρο κατά 4 kg.
+        final history = bodyKeys.contains(s.metric)
+            ? _countedWeighInsOnly(store.history, store.plan, DateTime(from.year, from.month, from.day - 60), end)
+            : store.history;
+        final series = planSeries(history, store.plan, s.metric, from, end);
         final pts = series.points;
         final last = pts.isEmpty ? null : pts.last;
-        final base = last == null ? null : personalBaseline(store.history, store.plan, s.metric, last.$1);
+        final base = last == null ? null : personalBaseline(history, store.plan, s.metric, last.$1);
         final range = s.range?.call(store.profile, today);
         final vals = [for (final p in pts) p.$2];
         final mean = vals.isEmpty ? null : vals.reduce((a, b) => a + b) / vals.length;

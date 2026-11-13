@@ -26,16 +26,33 @@
 ///   τους και όχι μαζί της ([weightsAgree]): το παιδί ή ο επισκέπτης ανάμεσα στις δικές σου ζυγίσεις, μία ή λίγες στη σειρά
 ///   (ως [weightGuardDays] μέρες συνολικά, π.χ. ένα Σαββατοκύριακο). Δεν μετρά πουθενά.
 /// - [WeighStatus.counted] μόλις η αμέσως επόμενη (ή η αμέσως προηγούμενη) ζύγιση συμφωνεί μαζί της: μία αρκεί, γιατί δύο
-///   ζυγίσεις στη σειρά στο νέο βάρος είναι η αλλαγή του ίδιου ανθρώπου.
+///   ζυγίσεις στη σειρά στο νέο βάρος είναι η αλλαγή του ίδιου ανθρώπου. (Round 3, k1 · R3-A-1: δεν αρκεί πια· βλ. πιο
+///   κάτω, [weightConfirmDays].)
 /// - [WeighStatus.pending] όταν καμία ζύγιση δίπλα της δεν συμφωνεί και δεν είναι ανάμεσα σε ζυγίσεις που συμφωνούν (συνήθως
 ///   η τελευταία, που δεν έχει ακόμα επόμενη): φαίνεται κανονικά σε όλες τις οθόνες και στην αναφορά, και μένει έξω ΜΟΝΟ
-///   από τη διόρθωση θερμίδων, ώσπου να τη βεβαιώσει η επόμενη ζύγιση.
+///   από τη διόρθωση θερμίδων, ώσπου να τη βεβαιώσει η επόμενη ζύγιση. (Round 3, k1 · R3-A-1: έξω από κάθε υπολογισμό·
+///   φαίνεται σημειωμένη.)
 /// Προσομοίωση (/home/claude/scratch/g4/guard2.py, mc.py): με ζύγιση Δευτέρα, Τετάρτη, Παρασκευή (ή κάθε μέρα, ή με 40%
 /// χαμένες ζυγίσεις) και απώλεια ως 2,5% την εβδομάδα, καμία δική σου ζύγιση «ξένη»· «σε αναμονή» ποτέ χωρίς κενά, και με
 /// κενά 1 και 10 στις 7.143 (απώλεια 1,5% και 2,5%), πάντα «μετρά» με την επόμενη. Αρρώστια με −5 kg και 10 μέρες
 /// χωρίς ζύγιση: η πρώτη ζύγιση «σε αναμονή», με τη δεύτερη μετρούν και οι δύο. Παιδί 45 kg ή επισκέπτης 95 kg ανάμεσα στις ζυγίσεις σου: «ξένη».
 /// Με μία ζύγιση τη μέρα, ό,τι δεν μετρά εδώ δεν μετρούσε ούτε με τον κανόνα του γύρου 1: ο νέος κανόνας κρατά έξω
 /// λιγότερες ζυγίσεις, ποτέ περισσότερες.
+///
+/// Round 3 (k1 · R3-A-1): ΔΥΟ ζυγίσεις στη σειρά που συμφωνούν δεν αρκούν πια. Ένας άνθρωπος 4,5–15 kg ελαφρύτερος που
+/// ζυγίστηκε Σάββατο και Κυριακή στο προφίλ σου «μετρούσε» (η Κυριακή «βεβαίωνε» το Σάββατο) και η κάρτα γρήγορης
+/// απώλειας πρότεινε +150 kcal (python του R3-A: 29–30 στις 30 φορές). Τώρα μια ζύγιση που διαφέρει μετρά μόνο όταν το νέο
+/// βάρος φανεί σε ζυγίσεις [weightConfirmDays] διαφορετικών ημερών που απέχουν τουλάχιστον [weightConfirmSpan] μέρες
+/// (πρώτη ως τελευταία), χωρίς ενδιάμεση ζύγιση στο παλιό βάρος· ως τότε «σε αναμονή». Με ζύγιση Δε/Τε/Πα κάθε 4 μέρες
+/// περιέχουν μια δική σου ζύγιση, άρα ο επισκέπτης του Σαββατοκύριακου δεν φτάνει ποτέ να μετρήσει (python, k1: κάρτα
+/// γρήγορης απώλειας 0 στις 30 για 5–15 kg· +150 τη Δευτέρα 1 στις 30, όσο και με τον κανόνα του γύρου 1, από τον θόρυβο
+/// της ζυγαριάς)· μετά από αρρώστια οι δικές σου μετρούν με την 3η ζύγιση (Δε–Τε–Πα: την
+/// Παρασκευή, πριν: την Τετάρτη). Με ζύγιση κάθε μέρα ή Δε/Τε/Πα και απώλεια ως 2,5% την εβδομάδα: καμία «σε αναμονή»,
+/// καμία «ξένη» (python, k1: /home/claude/scratch/k1/mc_own.py). Το όριο: άνθρωπος με βάρος ως ~4 kg από το δικό σου δεν
+/// ξεχωρίζει (ίδιο με πριν).
+/// Round 3 (k1 · R3-A-2): την ίδια μέρα, αν δεν μετρά καμία ζύγιση, η ζύγιση της μέρας είναι η «σε αναμονή» (όχι η «ξένη»)
+/// που είναι πιο κοντά στις γύρω ζυγίσεις, όχι απλώς η πρώτη: μετά από αρρώστια, με το παιδί πρώτο στη ζυγαριά (45 kg) και
+/// εσένα μετά (73,4 kg), η ζύγιση της μέρας είναι η δική σου (πριν: του παιδιού, και η δική σου σημειωνόταν «ξένη»).
 library;
 
 import 'dart:math' as math;
@@ -53,6 +70,13 @@ const weightGuardKg = 4.0;
 
 /// …και πάνω από αυτό το μέρος της διαμέσου (5%).
 const weightGuardShare = 0.05;
+
+/// Round 3 (k1 · R3-A-1): ζύγιση που διαφέρει μετρά όταν το νέο βάρος φανεί σε ζυγίσεις τόσων διαφορετικών ημερών…
+const weightConfirmDays = 3;
+
+/// …που απέχουν τουλάχιστον τόσες μέρες, η πρώτη από την τελευταία. Δική μας επιλογή (όχι από μελέτη): ένα
+/// Σαββατοκύριακο (2 μέρες, 1 μέρα απόσταση) δεν φτάνει ποτέ· η εβδομάδα μετά από μια αρρώστια φτάνει.
+const weightConfirmSpan = 4;
 
 /// true: η ζύγιση [kg] δεν μπορεί λογικά να είναι του ίδιου ανθρώπου με τις [neighbours] (οι ΑΛΛΕΣ ζυγίσεις του των
 /// γύρω ημερών, σε kg· όχι η ίδια). false και όταν δεν φτάνουν οι άλλες ζυγίσεις για να κριθεί.
@@ -73,8 +97,9 @@ enum WeighStatus {
   /// Μετρά παντού.
   counted,
 
-  /// Διαφέρει πολύ, αλλά δεν έχει ακόμα επόμενη ζύγιση που να τη βεβαιώνει ή να τη διαψεύδει: φαίνεται κανονικά· μένει
-  /// έξω μόνο από τη διόρθωση θερμίδων.
+  /// Διαφέρει πολύ, αλλά δεν τη βεβαίωσαν ή διέψευσαν ακόμα οι επόμενες ζυγίσεις: φαίνεται (σημειωμένη) ως η ζύγιση της
+  /// μέρας· round 3 (k1 · R3-A-1): μένει έξω από ΚΑΘΕ υπολογισμό (θερμίδες, Τάσεις, εβδομάδα, γραφήματα, τάση σώματος).
+  /// Πριν (γύρος 2) έμενε έξω μόνο από τη διόρθωση θερμίδων.
   pending,
 
   /// Οι ζυγίσεις πριν και μετά συμφωνούν μεταξύ τους και όχι μαζί της: δεν μετρά πουθενά (φαίνεται σημειωμένη).
@@ -93,12 +118,7 @@ WeighStatus weighStatusAt(List<(DateTime, double)> days, int i) => _weighStatus(
 /// Όπως το [weighStatusAt], με [kg] στη θέση της τιμής της μέρας [i] (για να δοκιμαστεί και άλλη ζύγιση της ίδιας μέρας).
 WeighStatus _weighStatus(List<(DateTime, double)> s, int i, double kg) {
   double at(int j) => j == i ? kg : s[j].$2;
-  final day = s[i].$1;
-  final others = <double>[
-    for (var j = i - 1; j >= 0 && daysBetween(s[j].$1, day) <= weightGuardDays; j--) s[j].$2,
-    for (var j = i + 1; j < s.length && daysBetween(day, s[j].$1) <= weightGuardDays; j++) s[j].$2,
-  ];
-  if (!weightLooksForeign(kg, others)) return WeighStatus.counted;
+  if (!weightLooksForeign(kg, _others(s, i))) return WeighStatus.counted;
   // Το «κομμάτι» της: οι διπλανές ζυγίσεις που συμφωνούν μαζί της, η καθεμία ως [weightGuardDays] μέρες από την επόμενη.
   bool linked(int a, int b) => daysBetween(s[a].$1, s[b].$1) <= weightGuardDays && weightsAgree(at(a), at(b));
   var first = i;
@@ -115,23 +135,46 @@ WeighStatus _weighStatus(List<(DateTime, double)> s, int i, double kg) {
     last++;
     if (daysBetween(s[first].$1, s[last].$1) > weightGuardDays) longRun = true;
   }
+  // Νέο βάρος που κρατά πάνω από [weightGuardDays] μέρες: ο ίδιος άνθρωπος.
+  if (longRun) return WeighStatus.counted;
   // Ξένη: σύντομο κομμάτι ανάμεσα σε δύο ζυγίσεις (αμέσως πριν και αμέσως μετά, κοντά του) που συμφωνούν μεταξύ τους.
-  if (!longRun &&
-      first > 0 &&
+  if (first > 0 &&
       last < s.length - 1 &&
       daysBetween(s[first - 1].$1, s[first].$1) <= weightGuardDays &&
       daysBetween(s[last].$1, s[last + 1].$1) <= weightGuardDays &&
       weightsAgree(at(first - 1), at(last + 1))) {
     return WeighStatus.foreign;
   }
-  return first == last ? WeighStatus.pending : WeighStatus.counted;
+  // Round 3 (k1 · R3-A-1): μετρά μόνο όταν το νέο βάρος φάνηκε σε [weightConfirmDays] μέρες σε [weightConfirmSpan] μέρες
+  // και πάνω (πριν: δύο ζυγίσεις, π.χ. Σάββατο και Κυριακή του επισκέπτη). Μία ζύγιση ανά μέρα στο [s].
+  return last - first + 1 >= weightConfirmDays && daysBetween(s[first].$1, s[last].$1) >= weightConfirmSpan
+      ? WeighStatus.counted
+      : WeighStatus.pending;
+}
+
+/// Οι ζυγίσεις των γύρω ημερών της [i] (ως [weightGuardDays] μέρες πριν ή μετά), χωρίς την ίδια.
+List<double> _others(List<(DateTime, double)> s, int i) {
+  final day = s[i].$1;
+  return [
+    for (var j = i - 1; j >= 0 && daysBetween(s[j].$1, day) <= weightGuardDays; j--) s[j].$2,
+    for (var j = i + 1; j < s.length && daysBetween(day, s[j].$1) <= weightGuardDays; j++) s[j].$2,
+  ];
+}
+
+/// Η διάμεσος (null για άδεια λίστα).
+double? _median(List<double> v) {
+  if (v.isEmpty) return null;
+  final o = [...v]..sort();
+  final n = o.length;
+  return n.isOdd ? o[n ~/ 2] : (o[n ~/ 2 - 1] + o[n ~/ 2]) / 2;
 }
 
 /// Round 2 (R2-E-2): για κάθε μέρα ([days]: η μέρα και ΟΛΕΣ οι ζυγίσεις της σε kg, με τη σειρά που έγιναν, τουλάχιστον
 /// μία· παλιότερη μέρα πρώτη), ποια ζύγιση μετρά ([pick]: θέση στη λίστα της μέρας) και η κατάσταση της μέρας. Μετρά η
 /// πρώτη της μέρας· αν εκείνη δεν μετρά (π.χ. ζυγίστηκε πρώτα το παιδί) και μετρά μια επόμενη της ίδιας μέρας, εκείνη.
-/// Αλλιώς η πρώτη, με την κατάστασή της. Δύο περάσματα: στο δεύτερο οι γύρω μέρες κρίνονται με τη ζύγιση που διάλεξε το
-/// πρώτο (όχι με του παιδιού, αν ζυγίστηκε πρώτο).
+/// Αν δεν μετρά καμία (round 3, k1 · R3-A-2): μια «σε αναμονή» πριν από μια «ξένη», και από αυτές η πιο κοντινή στη
+/// διάμεσο των γύρω ζυγίσεων (σε ισοπαλία η πρώτη)· πριν: πάντα η πρώτη. Δύο περάσματα: στο δεύτερο οι γύρω μέρες
+/// κρίνονται με τη ζύγιση που διάλεξε το πρώτο (όχι με του παιδιού, αν ζυγίστηκε πρώτο).
 List<({int pick, WeighStatus status})> guardDays(List<(DateTime, List<double>)> days) {
   var picks = List<int>.filled(days.length, 0);
   var out = <({int pick, WeighStatus status})>[];
@@ -144,11 +187,22 @@ List<({int pick, WeighStatus status})> guardDays(List<(DateTime, List<double>)> 
 }
 
 ({int pick, WeighStatus status}) _pickDay(List<(DateTime, double)> s, int i, List<double> kgs) {
-  WeighStatus? first;
+  var best = 0;
+  WeighStatus? bestStatus;
+  var bestDistance = 0.0;
+  double? median;
   for (var k = 0; k < kgs.length; k++) {
     final st = _weighStatus(s, i, kgs[k]);
     if (st == WeighStatus.counted) return (pick: k, status: st);
-    first ??= st;
+    final m = median ??= _median(_others(s, i)) ?? kgs[k];
+    final distance = (kgs[k] - m).abs();
+    final rank = st == WeighStatus.pending ? 0 : 1;
+    final bestRank = bestStatus == WeighStatus.pending ? 0 : 1;
+    if (bestStatus == null || rank < bestRank || (rank == bestRank && distance < bestDistance)) {
+      best = k;
+      bestStatus = st;
+      bestDistance = distance;
+    }
   }
-  return (pick: 0, status: first ?? WeighStatus.counted);
+  return (pick: best, status: bestStatus ?? WeighStatus.counted);
 }

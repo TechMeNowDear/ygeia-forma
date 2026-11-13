@@ -103,34 +103,45 @@ void main() {
       final b14 = guardBody(_body(as14));
       expect(b14.foreign, isEmpty);
       expect(b14.pending.single.weight, 75.4);
-      expect(countedBody(_body(as14)).last.weight, 75.4, reason: 'φαίνεται κανονικά (Σώμα, γραφήματα)');
+      // Round 3 (k1 · R3-A-1): φαίνεται ως η τελευταία ζύγιση ([shownBody]), αλλά όχι στα γραφήματα ([countedBody]).
+      expect(shownBody(_body(as14)).last.weight, 75.4, reason: 'φαίνεται (Σήμερα, widget)');
+      expect(countedBody(_body(as14)).last.weight, 80.9);
 
+      // Round 3 (k1 · R3-A-1): δύο ζυγίσεις δεν αρκούν πια (python k1/r2g4_fixtures.py): 14/12 και 16/12 «σε αναμονή»
+      // (ποτέ «ξένες»), μετρούν με την 3η μέρα (18/12, 4 μέρες από την πρώτη). Πριν (γύρος 2): μετρούσαν με τη 16/12.
       final as16 = [..._pre, _ill[0], _ill[1]];
-      expect(_statuses(as16), everyElement(WeighStatus.counted));
+      expect(_statuses(as16), [for (var i = 0; i < _pre.length; i++) WeighStatus.counted, WeighStatus.pending, WeighStatus.pending]);
       final g16 = guardedWeights(_body(as16));
-      expect(g16.foreign, isEmpty, reason: 'πριν: 14/12 και 16/12 «ξένες» ως τη Δευτέρα 21/12');
-      expect(g16.used, as16);
-      expect(guardBody(_body(as16)).pending, isEmpty);
+      expect(g16.foreign, isEmpty, reason: 'πριν (γύρος 1): 14/12 και 16/12 «ξένες» ως τη Δευτέρα 21/12');
+      expect(g16.used, _pre);
+      expect(guardBody(_body(as16)).pending.length, 2);
       final as18 = [..._pre, ..._ill];
       expect(_statuses(as18), everyElement(WeighStatus.counted));
+      expect(guardedWeights(_body(as18)).used, as18);
     });
 
-    test('ίδιο με −4,5 kg (14/12 75,9 → «σε αναμονή», 16/12 75,7 → μετρούν)', () {
+    test('ίδιο με −4,5 kg (14/12 75,9 → «σε αναμονή», 16/12 75,7 → ακόμα «σε αναμονή», 18/12 75,6 → μετρούν)', () {
       final a = [..._pre, (DateTime(2026, 12, 14), 75.9)];
       expect(weighStatusAt(a, a.length - 1), WeighStatus.pending);
       final b = [...a, (DateTime(2026, 12, 16), 75.7)];
-      expect(_statuses(b), everyElement(WeighStatus.counted));
+      // Round 3 (k1 · R3-A-1): πριν «μετρούν» με τη δεύτερη.
+      expect(_statuses(b).sublist(b.length - 2), [WeighStatus.pending, WeighStatus.pending]);
+      final c = [...b, (DateTime(2026, 12, 18), 75.6)];
+      expect(_statuses(c), everyElement(WeighStatus.counted));
     });
 
-    test('Τάσεις και αναφορά: η ζύγιση «σε αναμονή» φαίνεται και μετρά· καμία δεν λείπει', () {
+    test('Τάσεις και αναφορά: η ζύγιση «σε αναμονή» δεν λέγεται ξένη και φαίνεται στην αναφορά (σημειωμένη)', () {
       final h = _hist([..._pre, _ill[0]]);
       final day = DateTime(2026, 12, 14);
       expect(foreignWeighIn(h, SourcePlan.samsungOnly, day), isFalse);
       final tr = computeTrend(trendMetrics.firstWhere((m) => m.key == K.weight), h, day, TrendPeriod.month);
-      expect(tr.points.any((p) => p.$1 == day && p.$2 == 75.4), isTrue);
+      // Round 3 (k1 · R3-A-1): δεν μπαίνει σε υπολογισμούς ως να βεβαιωθεί (πριν (γύρος 2): μέσα στις Τάσεις).
+      expect(tr.points.any((p) => p.$1 == day), isFalse);
       final r = buildReport(h, DateTime(2026, 12, 14, 10));
       expect(r.foreignWeighIns, 0, reason: 'πριν: 1, με «πιθανόν άλλου ατόμου»');
       expect((r.weighIns.first.$1, r.weighIns.first.$2), (day, 75.4), reason: 'πριν: η τελευταία ζύγιση ήταν η 80,9 της 4/12');
+      // Round 3 (k1 · R3-A-3): με σημάδι «χωρίς επιβεβαίωση».
+      expect(r.pendingWeighIns, {day});
     });
   });
 
@@ -161,10 +172,12 @@ void main() {
       expect(guardedWeights(_body(s)).foreign, [(DateTime(2026, 12, 5), 95.0)]);
     });
 
-    test('επισκέπτης Σάββατο και Κυριακή (95,0 · 95,4): η Κυριακή τον «βεβαιώνει», η Δευτέρα σου τον βγάζει', () {
+    test('επισκέπτης Σάββατο και Κυριακή (95,0 · 95,4): «σε αναμονή» ως την Κυριακή, η Δευτέρα σου τον βγάζει', () {
       final w = _sorted([..._reg, (DateTime(2026, 12, 5), 95.0), (DateTime(2026, 12, 6), 95.4)]);
-      // Γνωστό όριο (Αποφάσεις, g4.md): με δύο συμφωνούσες στη σειρά ως την Κυριακή μετρούν (σαν αλλαγή του ίδιου).
-      expect(_statuses(_upTo(w, DateTime(2026, 12, 6))), everyElement(WeighStatus.counted));
+      // Round 3 (k1 · R3-A-1): πριν (γύρος 2) η Κυριακή τον «βεβαίωνε» και μετρούσε στον έλεγχο θερμίδων.
+      final upToSunday = _upTo(w, DateTime(2026, 12, 6));
+      expect(_statuses(upToSunday).sublist(upToSunday.length - 2), [WeighStatus.pending, WeighStatus.pending]);
+      expect(guardedWeights(_body(upToSunday)).used.last, (DateTime(2026, 12, 4), 80.9));
       expect(guardedWeights(_body(_upTo(w, DateTime(2026, 12, 7)))).foreign,
           [(DateTime(2026, 12, 5), 95.0), (DateTime(2026, 12, 6), 95.4)]);
     });
@@ -192,11 +205,12 @@ void main() {
         _m(DateTime(2026, 12, 16, 7, 30), 75.2),
       ];
       final g = guardedWeights(body);
-      expect(g.used.sublist(g.used.length - 2), [(DateTime(2026, 12, 14), 75.4), (DateTime(2026, 12, 16), 75.2)]);
+      // Round 3 (k1 · R3-A-1): δύο μέρες δεν αρκούν· και οι δύο δικές σου «σε αναμονή» (ποτέ «ξένες»), το παιδί ξένο.
+      expect(g.used.last, (DateTime(2026, 12, 4), 80.9));
       expect(g.foreign, isEmpty);
       final b = guardBody(body);
       expect(b.foreign.single.time, DateTime(2026, 12, 16, 7));
-      expect(b.pending, isEmpty, reason: 'με ένα πέρασμα η 14/12 θα έμενε «σε αναμονή» (python)');
+      expect({for (final x in b.pending) x.weight}, {75.4, 75.2});
     });
   });
 
@@ -214,7 +228,7 @@ void main() {
       expect(guardedWeights(body).used.length, 60);
     });
 
-    test('Δε/Τε/Πα με θόρυβο 0,6 kg, απώλεια ως 2,5% την εβδομάδα, 40% χαμένες ζυγίσεις: ποτέ «ξένη»· «σε αναμονή» μετρά με την επόμενη', () {
+    test('Δε/Τε/Πα με θόρυβο 0,6 kg, απώλεια ως 2,5% την εβδομάδα, 40% χαμένες ζυγίσεις: ποτέ «ξένη»· «σε αναμονή» μετρά με τις 2 επόμενες', () {
       // python (mc.py, mc2.py): 0 «ξένες»· κάθε «σε αναμονή» → «μετρά» μόλις έρθει η επόμενη.
       final r = math.Random(20261214);
       var foreign = 0, pending = 0, total = 0;
@@ -234,9 +248,12 @@ void main() {
               if (now == WeighStatus.foreign) foreign++;
               if (now == WeighStatus.pending) {
                 pending++;
-                // Η επόμενη ζύγιση (ως 14 μέρες μετά· 16/11–24/1, χωρίς αλλαγή ώρας) την κάνει «μετρά».
-                if (k + 1 < s.length && s[k + 1].$1.difference(s[k].$1).inDays <= weightGuardDays) {
-                  expect(weighStatusAt(s.sublist(0, k + 2), k), WeighStatus.counted);
+                // Round 3 (k1 · R3-A-1): οι 2 επόμενες ζυγίσεις (καθεμία ως 14 μέρες μετά· 16/11–24/1, χωρίς αλλαγή ώρας) την
+                // κάνουν «μετρά» (python k1/mc_next.py: 8 στις 19 με την 1η, οι άλλες 11 με τη 2η, καμία αργότερα). Πριν: η 1η.
+                if (k + 2 < s.length &&
+                    s[k + 1].$1.difference(s[k].$1).inDays <= weightGuardDays &&
+                    s[k + 2].$1.difference(s[k + 1].$1).inDays <= weightGuardDays) {
+                  expect(weighStatusAt(s.sublist(0, k + 3), k), WeighStatus.counted);
                 }
               }
               if (weighStatusAt(s, k) == WeighStatus.foreign) foreign++;
@@ -276,8 +293,10 @@ void main() {
 
   // ---------------------------------------------------------------------------------------------------------------
   group('R2-E-2: κείμενα', () {
-    test('Σώμα, «σε αναμονή»: μία ζύγιση που συμφωνεί αρκεί', () {
-      expect(pendingLatestText, contains('μόλις συμφωνήσει μαζί της η επόμενη ζύγιση'));
+    test('Σώμα, «σε αναμονή»: 3 μέρες ζύγισης σε 4 μέρες (round 3, k1)', () {
+      // Round 3 (k1 · R3-A-1): μία δεν αρκεί πια· 3 μέρες ζύγισης σε 4 μέρες, έξω από κάθε υπολογισμό.
+      expect(pendingLatestText, contains('3 μέρες ζύγισης, με τουλάχιστον 4 μέρες'));
+      expect(pendingLatestText, contains('(θερμίδες, Τάσεις, γραφήματα)'));
       expect(pendingLatestText, isNot(contains('οι επόμενες ζυγίσεις')));
     });
 

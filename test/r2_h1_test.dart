@@ -359,7 +359,8 @@ void main() {
       await _pump(t, GoalsPage(store: s, now: DateTime(2026, 11, 12, 10)), size: const Size(400, 4000));
       // 3 g ÷ 7 g/100 g = 42,9 g → 45 g (πάνω, ανά 5).
       expect(find.textContaining('γράψε τις β-γλυκάνες'), findsNothing);
-      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β-γλυκάνες χρειάζονται 45\u00A0g'), findsOneWidget);
+      // Round 3 (k1 · R3-B-3): αδιάσπαστο ενωτικό στο «β‑γλυκάνες».
+      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β\u2011γλυκάνες χρειάζονται 45\u00A0g'), findsOneWidget);
       expect(find.textContaining('χρειάζονται 45\u00A0g πίτουρο· το πλάνο σου έχει 40\u00A0g'), findsOneWidget);
       // Χωρίς ετικέτα: όπως πριν.
       s.setGoals(checkinGoals().copyWith(branG: 40));

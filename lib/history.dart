@@ -4,6 +4,7 @@
 /// (νύχτες, παλμοί ημέρας), ώστε τα νούμερα να συμφωνούν παντού.
 library;
 
+import 'body_trend.dart' show dayWeighIn, weighInDays;
 import 'data.dart';
 import 'format.dart';
 import 'heart_day.dart';
@@ -394,22 +395,22 @@ DateTime? scaleFromOf(Map<String, Map<String, double>> history) {
 /// Κλειδί = μέρα («2026-11-10»). Έλεγχος 9/11 (RT-15 / V-A-29): πριν ήταν η τελευταία· μια βραδινή ζύγιση μετά το
 /// φαγητό (+1–2 kg, και άλλο λίπος από το νερό) θα έμπαινε στις τάσεις αντί για την πρωινή. Η πρώτη της μέρας είναι
 /// συνήθως η πρωινή, νηστικός, οι ίδιες συνθήκες κάθε φορά.
+/// Round 3 (k1 · R3-C-1): η ζύγιση της μέρας του φύλακα ([weighInDays], body_trend.dart): η πρώτη της μέρας που ΜΕΤΡΑ,
+/// ίδια με Σήμερα, Σώμα, widget και διόρθωση θερμίδων. Αν ζυγίστηκε πρώτα το παιδί και μετά εσύ, η δική σου (πριν: του
+/// παιδιού, που οι Τάσεις, η «Η εβδομάδα σου» και η αναφορά έδειχναν ως τη ζύγιση της μέρας). Μέρα που καμία ζύγιση δεν
+/// μετρά: η πρώτη της, όπως πριν (το [foreignWeighIn] τη σημειώνει ξένη). Ίδια μορφή, ίδια κλειδιά. Τίποτα δεν χάνεται: το
+/// [mergeBody] ξαναγράφει σε κάθε ανάγνωση μόνο τις τιμές ζύγισης των ημερών που έχουν ζύγιση στη Samsung (όλες, 10
+/// χρόνια), από τις ίδιες τις ζυγίσεις, που μένουν στη Samsung Health· μια μέρα αλλάζει μόνο όταν άλλαξε η ζύγιση της μέρας.
 Map<String, Map<String, double>> bodyRows(List<BodyMeasurement> body) {
-  final first = <String, BodyMeasurement>{};
-  for (final b in body) {
-    final k = dateKey(b.time);
-    final o = first[k];
-    if (o == null || b.time.isBefore(o.time)) first[k] = b;
-  }
-  return {
-    for (final e in first.entries)
-      e.key: {
-        if (e.value.weight != null && e.value.weight!.isFinite) K.weight: e.value.weight!,
-        if (e.value.fatPct != null && e.value.fatPct!.isFinite) K.fatPct: e.value.fatPct!,
-        if (e.value.smm != null && e.value.smm!.isFinite) K.smm: e.value.smm!,
+  Map<String, double> row(BodyMeasurement b) => {
+        if (b.weight != null && b.weight!.isFinite) K.weight: b.weight!,
+        if (b.fatPct != null && b.fatPct!.isFinite) K.fatPct: b.fatPct!,
+        if (b.smm != null && b.smm!.isFinite) K.smm: b.smm!,
         // E2: μόνο ζυγίσεις της InBody φτάνουν εδώ ([Dashboard.body]).
         K.inbody: 1,
-      },
+      };
+  return {
+    for (final g in weighInDays(body)) dateKey(g.day): row(g.pick),
   };
 }
 
@@ -586,11 +587,8 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day,
     }
   }
 
-  // Ζύγιση: η πρώτη της μέρας (ίδιο με το [bodyRows], RT-15).
-  BodyMeasurement? body;
-  for (final b in d.body) {
-    if (sameDay(b.time, day) && (body == null || b.time.isBefore(body.time))) body = b;
-  }
+  // Ζύγιση: η ζύγιση της μέρας, ίδια με το [bodyRows] (RT-15· round 3, k1 · R3-C-1: η πρώτη της μέρας που μετρά).
+  final body = dayWeighIn(d.body, day);
   if (body != null) {
     put(K.weight, body.weight);
     put(K.fatPct, body.fatPct);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../body_trend.dart' show countedBody;
+import '../body_trend.dart' show guardBody, shownBody;
 import '../data.dart';
 import '../food/food_store.dart';
 import '../format.dart';
@@ -28,6 +28,10 @@ import 'training/today_training_card.dart';
 import 'week_card.dart';
 import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
+
+/// Round 3 (k1 · R3-A-1): κάτω από το «Βάρος» όταν η τελευταία ζύγιση είναι «σε αναμονή» (διαφέρει πολύ από τις
+/// προηγούμενες και δεν τη βεβαίωσαν ακόμα επόμενες: weight_guard.dart). Φαίνεται, αλλά δεν μπαίνει σε υπολογισμούς.
+const pendingWeightNote = 'Διαφέρει πολύ από τις προηγούμενες ζυγίσεις· δεν μετρά ακόμα στους υπολογισμούς.';
 
 /// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
 /// Πώς κοιμήθηκα; Τι έφαγα; Κουνήθηκα; Πού πάει το βάρος μου; Οι ειδοποιήσεις μόνο όταν υπάρχουν.
@@ -117,7 +121,14 @@ class TodayPage extends StatelessWidget {
         final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
         // 12/11: ζύγισμα τις μέρες του χρήστη (προεπιλογή Δε · Τε · Πα) και μέση με μεζούρα τη μέρα της. Η κάρτα μένει
         // ώσπου να γίνουν και τα δύο της ημέρας· η ζύγιση έρχεται μόνη της από την InBody.
-        final weighed = d.latestBody != null && sameDay(d.latestBody!.time, now) ? d.latestBody : null;
+        // Round 3 (k1 · R3-B-4): η σημερινή ζύγιση της μέρας ([shownBody]: η πρώτη που μετρά, ή «σε αναμονή»), ίδια με την
+        // κάρτα «Βάρος» και το ιστορικό. Πριν: η τελευταία ζύγιση της μέρας (η βραδινή μετά την προπόνηση, ή του παιδιού μετά
+        // από σένα).
+        final todayWeighIns = [
+          for (final b in shownBody(d.body))
+            if (sameDay(b.time, now)) b,
+        ];
+        final weighed = todayWeighIns.isEmpty ? null : todayWeighIns.last;
         final weighDay = store.profile.weighDays.contains(now.weekday);
         final waistDay = store.profile.waistDay == now.weekday;
         final waistToday = waistDay && store.waist.any((e) => e.day == waistDayKey(now));
@@ -259,8 +270,11 @@ class TodayPage extends StatelessWidget {
     // (η πρώτη της μέρας που μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν (π.χ. του
     // παιδιού μετά από σένα, με «−47,0 kg»), και η διαφορά από την αμέσως προηγούμενη, ακόμα και της ίδιας μέρας. Ζύγιση
     // «σε αναμονή» (διαφέρει πολύ, χωρίς ακόμα επόμενη· weight_guard.dart) φαίνεται κανονικά.
-    final daily = [for (final b in countedBody(d.body)) if (b.weight != null) b];
+    // Round 3 (k1 · R3-A-1): η «σε αναμονή» φαίνεται με τη σημείωση [pendingWeightNote] ([shownBody], [guardBody]).
+    final guard = guardBody(d.body);
+    final daily = [for (final b in guard.shown) if (b.weight != null) b];
     final last = daily.isEmpty ? null : daily.last;
+    final waiting = last != null && guard.pending.contains(last);
     final prev = daily.length < 2 ? null : daily[daily.length - 2];
     Widget? trend;
     if (last?.weight != null && prev?.weight != null) {
@@ -285,6 +299,7 @@ class TodayPage extends StatelessWidget {
       value: last?.weight == null ? null : dec(last!.weight!),
       unit: 'kg',
       trend: trend,
+      note: waiting ? pendingWeightNote : null,
       // Round 1 (U1a-20): ελάχιστο εύρος 3 kg, όπως στο Σώμα· η αλλαγή 0,5–1 kg από μέρα σε μέρα είναι νερό, όχι τάση.
       chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body, minRange: 3) : null,
       // Round 1 (S11-8, σημείωση του f1): όταν η Samsung δεν έδωσε τις ζυγίσεις αυτή τη φορά, το λέει (όπως το Σώμα)·

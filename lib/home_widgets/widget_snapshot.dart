@@ -1,4 +1,4 @@
-import '../body_trend.dart' show countedBody;
+import '../body_trend.dart' show shownBody;
 import '../data.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
@@ -220,7 +220,9 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   // Round 2 (g4 · R2-D-6, R2-D-8): ίδιοι κανόνες με τη Σήμερα και το Σώμα: μία ζύγιση ανά μέρα (η πρώτη της μέρας που
   // μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν, με «κάτω από το εύρος» και
   // «−47,0 kg» για το παιδί στη ζυγαριά, και ζυγίσεις της ίδιας μέρας στο γράφημα. Ζύγιση «σε αναμονή» φαίνεται κανονικά.
-  final counted = countedBody(body);
+  // Round 3 (k1 · R3-A-1): [shownBody] = όπως πριν (οι «σε αναμονή» φαίνονται ως η τελευταία ζύγιση, όπως στη Σήμερα)·
+  // το [countedBody] δεν τις έχει πια.
+  final counted = shownBody(body);
   final days = counted.isEmpty ? body : counted;
   final last = days.last;
   final prev = days.length >= 2 ? days[days.length - 2] : null;

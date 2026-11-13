@@ -791,7 +791,12 @@ class _PageThree extends StatelessWidget {
                           pad(Text(w.$3 == null ? '—' : '${dec(w.$3!)}%', style: cell)),
                           pad(Text(w.$4 == null ? '—' : '${dec(w.$4!)} kg', style: cell)),
                           // Έλεγχος 3, E2: παλιά ζύγιση άλλης πηγής (πριν από την πρώτη της InBody), με την πηγή της.
-                          d.otherWeighIns.contains(w.$1) ? pad(Text('όχι InBody', style: small)) : const SizedBox(),
+                          // Round 3 (k1 · R3-A-3): ζύγιση «σε αναμονή» με σημάδι (εξήγηση στη σημείωση από κάτω).
+                          d.otherWeighIns.contains(w.$1)
+                              ? pad(Text('όχι InBody', style: small))
+                              : d.pendingWeighIns.contains(w.$1)
+                                  ? pad(Text(reportPendingMark, style: small))
+                                  : const SizedBox(),
                         ],
                       ),
                   ],
@@ -802,7 +807,8 @@ class _PageThree extends StatelessWidget {
                 'το νερό, το φαγητό και την άσκηση.'
                 // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες δεν μπαίνουν· ο γιατρός το βλέπει. Round 2 (g4 · R2-E-2): χωρίς
                 // εικασίες για το ποιος ζυγίστηκε («πιθανόν άλλου ατόμου» το έλεγε και για ζυγίσεις του ίδιου μετά από αρρώστια).
-                '${d.foreignWeighIns == 0 ? '' : ' ${d.foreignWeighIns == 1 ? '1 ζύγιση δεν μετρήθηκε' : '${d.foreignWeighIns} ζυγίσεις δεν μετρήθηκαν'} στους υπολογισμούς.'}',
+                '${d.foreignWeighIns == 0 ? '' : ' ${d.foreignWeighIns == 1 ? '1 ζύγιση δεν μετρήθηκε' : '${d.foreignWeighIns} ζυγίσεις δεν μετρήθηκαν'} στους υπολογισμούς.'}'
+                '${reportPendingNote(d.weighIns.where((w) => d.pendingWeighIns.contains(w.$1)).length)}',
                 key: const ValueKey('report-weigh-note'),
                 style: small,
               ),
@@ -857,6 +863,19 @@ class _PageThree extends StatelessWidget {
 }
 
 MetricDef? _def(String key) => metricDef(key);
+
+/// Round 3 (k1 · R3-A-3): το σημάδι μιας ζύγισης «σε αναμονή» στον πίνακα της αναφοράς (weight_guard.dart): η τιμή φαίνεται,
+/// αλλά δεν τη βεβαίωσαν ακόμα επόμενες ζυγίσεις. Ουδέτερο, χωρίς εικασία για το ποιος ζυγίστηκε.
+const reportPendingMark = 'χωρίς επιβεβαίωση';
+
+/// Round 3 (k1 · R3-A-3): η σημείωση κάτω από τον πίνακα για [n] γραμμές «χωρίς επιβεβαίωση» (κενή για 0).
+String reportPendingNote(int n) => n == 0
+    ? ''
+    : n == 1
+        ? ' «Χωρίς επιβεβαίωση»: διαφέρει πολύ από τις προηγούμενες ζυγίσεις και δεν τη βεβαίωσαν ακόμα επόμενες· δεν '
+            'μπήκε στους υπολογισμούς.'
+        : ' «Χωρίς επιβεβαίωση»: διαφέρουν πολύ από τις προηγούμενες ζυγίσεις και δεν τις βεβαίωσαν ακόμα επόμενες· δεν '
+            'μπήκαν στους υπολογισμούς.';
 
 /// Round 1 (U1b-13): ο τίτλος του πίνακα ζυγίσεων λέει ποιες είναι.
 String reportWeighTitle(ReportData d) {

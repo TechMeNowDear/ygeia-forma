@@ -106,8 +106,9 @@ WeekReview buildWeekReview(Map<String, Map<String, double>> history, DateTime su
       activeDays++;
     }
     final w = p.value(history, K.weight, d);
-    // Round 1 (S11-2): ζύγιση που μοιάζει ξένη δεν μπαίνει στο «Βάρος μέσα στην εβδομάδα».
-    if (w != null && !foreignWeighIn(history, p, d)) {
+    // Round 1 (S11-2): ζύγιση που μοιάζει ξένη δεν μπαίνει στο «Βάρος μέσα στην εβδομάδα». Round 3 (k1 · R3-A-1): ούτε
+    // ζύγιση «σε αναμονή» (π.χ. επισκέπτης Σάββατο και Κυριακή, πριν από τη δική σου ζύγιση της Δευτέρας).
+    if (w != null && !uncountedWeighIn(history, p, d)) {
       wFirst ??= (d, w);
       wLast = (d, w);
     }
