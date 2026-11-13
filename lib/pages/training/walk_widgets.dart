@@ -42,7 +42,8 @@ class WalkExtraCard extends StatelessWidget {
         stat(pace == null ? '—' : '${distanceFromSteps(session) ? '≈ ' : ''}${clock(pace)}',
             distanceFromSteps(session) ? 'ρυθμός ανά km (από βήματα)' : 'ρυθμός ανά km'),
         stat(cad == null ? '—' : '$cad', 'βήματα το λεπτό'),
-        stat('$pauses', pauses == 0 ? 'παύσεις' : '${pauses == 1 ? 'παύση' : 'παύσεις'} · ${hoursMinutes(pausedMin)}'),
+        // Round 2 (R2-U2-05): «2 λεπτά» μαζί (στη στήλη των 104 dp έμενε «παύση · 2 | λεπτά»).
+        stat('$pauses', pauses == 0 ? 'παύσεις' : '${pauses == 1 ? 'παύση' : 'παύσεις'} · ${unitsGlued(hoursMinutes(pausedMin))}'),
       ]),
     );
   }

@@ -155,7 +155,7 @@ void main() {
       await _card(t, c, DateTime(2026, 12, 25, 9));
       expect(
           find.textContaining(
-              'γράφτηκαν κατά μέσο όρο 2.090 kcal τη μέρα, 300 λιγότερες από τους στόχους σου αυτές τις μέρες (κατά μέσο όρο '
+              'γράφτηκαν κατά μέσο όρο 2.090\u00A0kcal τη μέρα, 300 λιγότερες από τους στόχους σου αυτές τις μέρες (κατά μέσο όρο '
               '2.390). Αν τα έγραψες όλα, τρως πολύ λίγο: φάε πιο κοντά στον στόχο (2.550). Ο στόχος μένει ίδιος.',
               findRichText: true),
           findsOneWidget);
@@ -205,7 +205,7 @@ void main() {
       expect(find.textContaining('λιγότερες', findRichText: true), findsNothing);
       // Ο στόχος δεν άλλαξε μέσα στο παράθυρο: το κείμενο όπως πριν.
       await _card(t, same(2370, 2700), now);
-      expect(find.textContaining('Τρως κατά μέσο όρο 2.370 kcal, 330 λιγότερες από τον στόχο σου: φάε πιο κοντά στον στόχο.', findRichText: true),
+      expect(find.textContaining('Τρως κατά μέσο όρο 2.370\u00A0kcal, 330 λιγότερες από τον στόχο σου: φάε πιο κοντά στον στόχο.', findRichText: true),
           findsOneWidget);
       // Χωρίς estTarget (παλιά κάρτα): όπως πριν.
       await _card(t, same(2370, null), now);
@@ -214,7 +214,7 @@ void main() {
       await _card(t, same(2100, 2370), now);
       expect(
           find.textContaining(
-              'Τρως κατά μέσο όρο 2.100 kcal, 270 λιγότερες από τους στόχους σου αυτές τις εβδομάδες (κατά μέσο όρο 2.370): φάε πιο '
+              'Τρως κατά μέσο όρο 2.100\u00A0kcal, 270 λιγότερες από τους στόχους σου αυτές τις εβδομάδες (κατά μέσο όρο 2.370): φάε πιο '
               'κοντά στον στόχο.',
               findRichText: true),
           findsOneWidget);

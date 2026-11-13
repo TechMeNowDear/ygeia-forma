@@ -14,7 +14,8 @@ import 'widget_style.dart';
 // (σχέδιο πηγών, «συνήθως», εύρη). Η Kotlin δεν υπολογίζει τίποτα δικό της, εκτός από τα βήματα και την κίνηση της
 // μέρας, που τα ανανεώνει από την ανάγνωση στο παρασκήνιο (HomeWidgets.kt).
 //
-// Μορφή: {v, at, kinds: {sleep: {src, m: {κλειδί: {l, v, u, cap?, d?, us?, r?, s?}}}}}
+// Μορφή: {v, at, kinds: {sleep: {src, srcShort?, m: {κλειδί: {l, v, u, cap?, d?, us?, r?, s?}}}}}
+//   srcShort: σύντομη πηγή όταν η κανονική δεν χωρά (round 2, R2-U3-04).
 //   l: όνομα στο κουτάκι, v: τιμή, u: μονάδα, cap: δεύτερη γραμμή όταν είναι η κεντρική τιμή,
 //   d: −1/0/1 σε σχέση με τα συνηθισμένα, us: «συνήθως …», r: θέση στο εύρος, s: 7 τιμές για το γράφημα (null = κενό).
 
@@ -87,7 +88,9 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   }
   final out = <String, dynamic>{};
   // Round 1 (U7-16): χωρίς νύχτα τις δύο τελευταίες μέρες το widget το λέει (πριν: σκέτο «—» χωρίς εξήγηση).
-  if (day == null) return {'src': 'καμία πρόσφατη νύχτα', 'm': out};
+  // Round 2 (R2-U3-04): και σύντομη μορφή («srcShort», νέο προαιρετικό κλειδί) για τη στήλη 1×3, όπου η κανονική κοβόταν
+  // «καμία πρόσφατη…» και χανόταν ακριβώς η λέξη «νύχτα».
+  if (day == null) return {'src': 'καμία πρόσφατη νύχτα', 'srcShort': 'καμία νύχτα', 'm': out};
   final d0 = day;
   final src = plan.nightSource(d0);
   List<double?> series(String k) => [for (var i = 6; i >= 0; i--) plan.value(h, k, _minus(d0, i))];
@@ -212,7 +215,8 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final body = store.data?.body ?? const <BodyMeasurement>[];
   final out = <String, dynamic>{};
   // Round 1 (U7-16): χωρίς ζύγιση το widget το λέει.
-  if (body.isEmpty) return {'src': 'καμία ζύγιση ακόμα', 'm': out};
+  // Round 2 (R2-U3-04): σύντομη μορφή για τη στήλη 1×3 (πριν «καμία ζύγιση ακ…»).
+  if (body.isEmpty) return {'src': 'καμία ζύγιση ακόμα', 'srcShort': 'καμία ζύγιση', 'm': out};
   // Round 2 (g4 · R2-D-6, R2-D-8): ίδιοι κανόνες με τη Σήμερα και το Σώμα: μία ζύγιση ανά μέρα (η πρώτη της μέρας που
   // μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν, με «κάτω από το εύρος» και
   // «−47,0 kg» για το παιδί στη ζυγαριά, και ζυγίσεις της ίδιας μέρας στο γράφημα. Ζύγιση «σε αναμονή» φαίνεται κανονικά.

@@ -467,6 +467,8 @@ class TrendPill extends StatelessWidget {
               keepLastWords ? text.replaceFirst(RegExp(r' (?=[^ ]*$)'), '\u00A0') : text,
               // Ποτέ κομμένο (σχέδια 9/11): αν δεν χωρά, πάει σε δεύτερη γραμμή.
               maxLines: maxLines < 3 ? 3 : maxLines,
+              // Round 2 (R2-U1-4): σε δύο γραμμές το χάπι αγκαλιάζει τη μεγαλύτερη γραμμή, δεν τεντώνεται ως την άκρη.
+              textWidthBasis: TextWidthBasis.longestLine,
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: color),
             ),
           ),
@@ -1684,8 +1686,6 @@ class _LinePainter extends CustomPainter {
       refTp.paint(canvas, Offset(left + w + 8, refY - refTp.height / 2));
     }
     final last = at(points.last);
-    canvas.drawCircle(last, 6, Paint()..color = card);
-    canvas.drawCircle(last, 4.5, Paint()..color = color);
     // Round 1 (U1a-10, U1b-02): η τελευταία τιμή πάνω σε πλάκα στο χρώμα της κάρτας· κάτω από το σημείο όταν η γραμμή
     // έρχεται από ψηλότερα (αλλιώς την έκοβε), αριστερά του όταν από κάτω δεν χωρά.
     final valueTp = _painter(format(points.last.$2), strongText, 12 * scale, bold: true);
@@ -1694,13 +1694,18 @@ class _LinePainter extends CustomPainter {
     if (points.length > 1 && at(points[points.length - 2]).dy < last.dy - 2) {
       ly = last.dy + 9;
       if (ly + valueTp.height > top + h) {
-        lx = last.dx - 10 - valueTp.width;
+        // Round 2 (R2-U1-8): η πλάκα (δεξιά άκρη στο last.dx − 5) ακουμπά το λευκό περίγραμμα της κουκκίδας (ακτίνα 6)·
+        // πριν έμενε 1 px κενό όπου φαινόταν η γραμμή, σαν τόνος μετά τον αριθμό («82,2′»).
+        lx = last.dx - 8 - valueTp.width;
         ly = last.dy - valueTp.height / 2;
       }
     }
     lx = lx.clamp(0.0, math.max(0.0, size.width - valueTp.width)).toDouble();
     ly = ly.clamp(0.0, math.max(0.0, top + h - valueTp.height)).toDouble();
     _plate(canvas, valueTp, Offset(lx, ly), card);
+    // Η κουκκίδα μετά την πλάκα: μένει πάντα ορατή, και το περίγραμμά της σκεπάζει τη γραμμή ανάμεσα σε αυτήν και την πλάκα.
+    canvas.drawCircle(last, 6, Paint()..color = card);
+    canvas.drawCircle(last, 4.5, Paint()..color = color);
 
     _textLeft(canvas, dateLabel(ranged ? from! : points.first.$1), Offset(left, size.height - bottom + 6 * scale), text,
         11 * scale);

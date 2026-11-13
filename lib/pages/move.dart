@@ -89,8 +89,14 @@ class ExercisePage extends StatelessWidget {
                 ],
               ),
               // 7/11: εύρος με πηγή (Paluch 2022) για τη χθεσινή ολοκληρωμένη μέρα, όχι για τη μισή σημερινή.
+              // Round 2 (R2-U2-08): ΠΡΩΤΑ ποια μέρα κρίνεται και πόσα βήματα είχε, μετά η μπάρα· πριν η ημερομηνία ήταν
+              // σκέτη κάτω από την κρίση και το «Κάτω από το εύρος» διαβαζόταν σαν κρίση για τα σημερινά.
               if (stepsRef != null && fullDay != null) ...[
                 const SizedBox(height: 12),
+                Text(fullDayStepsLabel(fullDay, today),
+                    key: const ValueKey('move-fullday'),
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
+                const SizedBox(height: 4),
                 RangeNote(
                   value: fullDay.value,
                   range: stepsRef,
@@ -98,9 +104,6 @@ class ExercisePage extends StatelessWidget {
                   max: 14000,
                   color: c.exercise,
                 ),
-                const SizedBox(height: 2),
-                Text(shortDayDate(fullDay.day),
-                    style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
               ],
               const SizedBox(height: 16),
               BarChart(
@@ -197,4 +200,13 @@ class ExercisePage extends StatelessWidget {
       },
     );
   }
+}
+
+/// Η μέρα που κρίνει η μπάρα του εύρους στα «Βήματα» (round 2, R2-U2-08): «Χθες, Παρ 23/10 · 3.900 βήματα», ή μόνο η
+/// ημερομηνία όταν η τελευταία ολοκληρωμένη μέρα είναι παλιότερη.
+String fullDayStepsLabel(DayValue day, DateTime today) {
+  final t = dayOf(today);
+  final yesterday = sameDay(day.day, DateTime(t.year, t.month, t.day - 1));
+  final date = shortDayDate(day.day).replaceAll(' ', '\u00A0');
+  return '${yesterday ? 'Χθες, ' : ''}$date · ${thousands(day.value.round())}\u00A0βήματα';
 }

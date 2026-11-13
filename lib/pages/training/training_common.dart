@@ -156,7 +156,8 @@ class Stepper2 extends StatelessWidget {
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (leading != null) ...[leading!, const SizedBox(width: 2)],
+            // Round 2 (R2-U2-10): 4 dp ανάμεσα στην κουκκίδα του λάστιχου και στον αριθμό (πριν 2: «●30» κολλητά).
+            if (leading != null) ...[leading!, const SizedBox(width: 4)],
             Text(value,
                 maxLines: 1,
                 textAlign: TextAlign.center,

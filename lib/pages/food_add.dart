@@ -130,11 +130,13 @@ String typoQuestion(Food f, double grams) {
 
 /// Η μέρα στην οποία γράφεται ένα φαγητό, όπως τη λέει η οθόνη προσθήκης: «Σήμερα · Παρ 13/11», «Χθες · Πέμ 12/11»,
 /// ή για παλιότερη μέρα «Τρί 10/11» (έλεγχος round1, S2-8 / S11-1 / U3a-1: πριν η οθόνη δεν έλεγε πουθενά τη μέρα).
+/// Round 2 (R2-U1-11): η ημερομηνία «Σάβ 24/10» δεν σπάει ποτέ σε δύο γραμμές (με γράμματα 2× έμενε «Σάβ | 24/10»).
 String entryDayLabel(DateTime day, DateTime today) {
   final d = dayOf(day), t = dayOf(today);
-  if (sameDay(d, t)) return 'Σήμερα · ${shortDayDate(d)}';
-  if (sameDay(d, DateTime(t.year, t.month, t.day - 1))) return 'Χθες · ${shortDayDate(d)}';
-  return shortDayDate(d);
+  final date = shortDayDate(d).replaceAll(' ', '\u00A0');
+  if (sameDay(d, t)) return 'Σήμερα · $date';
+  if (sameDay(d, DateTime(t.year, t.month, t.day - 1))) return 'Χθες · $date';
+  return date;
 }
 
 /// Επιλογή γεύματος: 4 ίσα κουμπιά που χωράνε πάντα σε μία γραμμή.
@@ -1242,7 +1244,8 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
                 const SizedBox(height: 18),
                 FilledButton(
-                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                  // Round 2 (R2-U1-12): και 20 dp δεξιά-αριστερά (πριν 0: με γράμματα 2× το κείμενο ακουμπούσε τις άκρες).
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20)),
                   onPressed: g == null ? null : () => _submit(g),
                   // Έλεγχος round1 (U3a-18): αν σπάσει σε δύο γραμμές (μεγάλα γράμματα), μένει στο κέντρο του κουμπιού.
                   child: Text(widget.editing ? 'Αποθήκευση' : 'Προσθήκη στο ${mealLabel(_meal)}', textAlign: TextAlign.center),

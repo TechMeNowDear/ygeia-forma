@@ -306,7 +306,7 @@ void main() {
       expect(find.text('Χάνεις πάνω από 1% του βάρους την εβδομάδα'), findsOneWidget);
       expect(find.textContaining('ασφαλές', findRichText: true), findsNothing);
       expect(find.textContaining('γίνεται πιο δύσκολο να κρατήσεις τους μύες', findRichText: true), findsOneWidget);
-      expect(find.textContaining('γράφτηκαν κατά μέσο όρο 1.400 kcal τη μέρα, 850 λιγότερες από τον στόχο σου (2.250)', findRichText: true),
+      expect(find.textContaining('γράφτηκαν κατά μέσο όρο 1.400\u00A0kcal τη μέρα, 850 λιγότερες από τον στόχο σου (2.250)', findRichText: true),
           findsOneWidget);
       expect(find.byKey(const ValueKey('checkin-apply')), findsNothing);
       expect(find.byKey(const ValueKey('checkin-ok')), findsOneWidget);
@@ -314,12 +314,12 @@ void main() {
       final same = _pending(checkinGoals(), _check, eat: 1400, tdee: 2500)!;
       await _card(t, same, _check);
       expect(find.textContaining('ο στόχος δεν κατεβαίνει όσο χάνεις τόσο γρήγορα', findRichText: true), findsOneWidget);
-      expect(find.textContaining('Τρως κατά μέσο όρο 1.400 kcal, 850 λιγότερες από τον στόχο σου', findRichText: true), findsOneWidget);
+      expect(find.textContaining('Τρως κατά μέσο όρο 1.400\u00A0kcal, 850 λιγότερες από τον στόχο σου', findRichText: true), findsOneWidget);
 
       // U3b-6: δύο δεκαδικά στα kg, ώστε το ποσοστό να βγαίνει από τον αριθμό που φαίνεται (1,16 ÷ 86,5 = 1,34%).
       final fast = _pending(checkinGoals(), DateTime(2026, 12, 4), eat: 2250, tdee: 3550)!;
       await _card(t, fast, DateTime(2026, 12, 4, 9));
-      expect(find.textContaining('−1,16 kg την εβδομάδα (1,3% του βάρους)', findRichText: true), findsOneWidget);
+      expect(find.textContaining('−1,16\u00A0kg την εβδομάδα (1,3% του βάρους)', findRichText: true), findsOneWidget);
       expect(find.byKey(const ValueKey('checkin-apply')), findsOneWidget);
     });
   });
@@ -474,7 +474,8 @@ void main() {
       s.setGoals(checkinGoals().copyWith(betaPer100: 5.5));
       await t.pumpAndSettle();
       expect(find.text('Πίτουρο βρώμης'), findsOneWidget);
-      expect(find.text('40 g · για 3 g β-γλυκάνες: 55 g'), findsOneWidget);
+      // Round 2 (R2-U1-14, h1): ποιο είναι το πλάνο και ότι δεν φτάνει.
+      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β-γλυκάνες χρειάζονται 55\u00A0g'), findsOneWidget);
     });
 
     testWidgets('U3b-14 / U3b-28 / U3b-29 / U3b-12: γραμμές που αλλάζουν 48 dp, «το πλάνο σου», «Σβήσε» κόκκινο, χρώμα διατροφής',
@@ -761,7 +762,7 @@ void main() {
     testWidgets('S11-3: η κάρτα και το «Πώς βγήκε» τη γράφουν', (t) async {
       final c = _pending(checkinGoals(), _check, extra: {DateTime(2026, 12, 2): 19710})!;
       await _card(t, c, _check);
-      expect(find.textContaining('(19.710 kcal) έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε'), findsOneWidget);
+      expect(find.textContaining('(19.710\u00A0kcal) έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε'), findsOneWidget);
       await t.ensureVisible(find.byKey(const ValueKey('checkin-how')));
       await t.tap(find.byKey(const ValueKey('checkin-how')));
       await t.pumpAndSettle();
@@ -829,7 +830,7 @@ void main() {
       expect(find.text('0,5% × 89,2 kg × 7.700 ÷ 7'), findsOneWidget);
       // U3b-5: η διαφορά των αριθμών όπως φαίνονται.
       final shown = (c.est!.tdee / 10).round() * 10;
-      expect(find.textContaining('Ο τύπος έλεγε 2.745: έπεφτε ${thousands(2745 - shown)} kcal ψηλά'), findsOneWidget);
+      expect(find.textContaining('Ο τύπος έλεγε 2.745: έπεφτε ${thousands(2745 - shown)}\u00A0kcal ψηλά'), findsOneWidget);
     });
   });
 

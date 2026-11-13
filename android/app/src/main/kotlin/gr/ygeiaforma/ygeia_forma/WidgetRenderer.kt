@@ -224,6 +224,8 @@ object WidgetRenderer {
                 val tp = paint("Bold", sp(10.5f), muted).apply { letterSpacing = 0.05f }
                 val title = when (kind) { "sleep" -> "ΥΠΝΟΣ"; "move" -> "ΚΙΝΗΣΗ"; "food" -> "ΦΑΓΗΤΟ"; else -> "ΣΩΜΑ" }
                 val src = data?.optString("src", "") ?: ""
+                // Round 2 (R2-U3-04): σύντομη πηγή όταν η κανονική δεν χωρά (στήλη 1×3).
+                val srcShort = data?.optString("srcShort", "") ?: ""
                 val base = y - tp.ascent()
                 var x = left
                 if (showTitle) {
@@ -239,11 +241,15 @@ object WidgetRenderer {
                     if (shape == Shape.COLUMN1 && showTitle) {
                         y = base + dp(3f)
                         val b2 = y - sp2.ascent()
-                        cv.drawText(fit(src, sp2, right - left), left, b2, sp2)
+                        val avail = right - left
+                        val text = WidgetText.sourceText(src, srcShort) { sp2.measureText(it) * WidgetText.MIN_SCALE_SMALL <= avail }
+                        cv.drawText(fit(text, sp2, avail), left, b2, sp2)
                         y = b2 + sp2.descent()
                     } else {
                         val used = if (showTitle) tp.measureText(title) + (x - left) + dp(8f) else 0f
-                        val t = fit(src, sp2, right - left - used)
+                        val avail = right - left - used
+                        val text = WidgetText.sourceText(src, srcShort) { sp2.measureText(it) * WidgetText.MIN_SCALE_SMALL <= avail }
+                        val t = fit(text, sp2, avail)
                         cv.drawText(t, right - sp2.measureText(t), base, sp2)
                         y = base + tp.descent()
                     }
@@ -276,7 +282,7 @@ object WidgetRenderer {
             val room = chipsTop - dp(8f) - y
             if (showSpark && room >= dp(22f)) {
                 val arr = entry(heroKey)?.optJSONArray("s")
-                if (arr != null) spark(arr, left, right, y + dp(4f), min(chipsTop - dp(8f), y + dp(4f) + dp(if (shape == Shape.COLUMN2) 56f else 40f)))
+                if (arr != null) spark(arr, left, right, y + dp(4f), min(chipsTop - dp(8f), y + dp(4f) + dp(if (shape == Shape.COLUMN2) 56f else 40f)), heroKey)
             }
 
             // Κουτάκια
@@ -436,21 +442,15 @@ object WidgetRenderer {
             return y
         }
 
-        fun spark(arr: JSONArray, left: Float, right: Float, top: Float, bottom: Float) {
+        fun spark(arr: JSONArray, left: Float, right: Float, top: Float, bottom: Float, heroKey: String) {
             val vals = (0 until arr.length()).map { if (arr.isNull(it)) null else arr.optDouble(it).toFloat() }
             val real = vals.filterNotNull()
             if (real.isEmpty() || bottom - top < dp(14f)) return
-            val hi = real.max()
-            val lo0 = real.min()
             // Βάση λίγο κάτω από το χαμηλότερο, ώστε να φαίνονται οι διαφορές (π.χ. βάρος 82–84). Round 1 (U7-15): ό,τι
             // μετριέται από το μηδέν (βήματα, θερμίδες, γραμμάρια) από το μηδέν· πριν η μικρότερη ράβδος έβγαινε πάντα
-            // 37,5% της μεγαλύτερης, ό,τι κι αν έλεγαν τα νούμερα (5.400 βήματα έμοιαζαν το 1/3 των 10.200).
-            val zero = kind == "move" || kind == "food"
-            val lo = when {
-                zero && hi > 0f -> 0f
-                hi == lo0 -> lo0 - 1f
-                else -> lo0 - (hi - lo0) * 0.6f
-            }
+            // 37,5% της μεγαλύτερης, ό,τι κι αν έλεγαν τα νούμερα (5.400 βήματα έμοιαζαν το 1/3 των 10.200). Round 2
+            // (R2-U3-05/06): και η διάρκεια ύπνου από το μηδέν· βάρος/λίπος/μύες/παλμοί με ελάχιστο εύρος όπως στο κινητό.
+            val fr = WidgetText.barFractions(vals, WidgetText.zeroBased(kind, heroKey), WidgetText.minSpanFor(heroKey))
             val n = vals.size
             val gap = dp(if (shape == Shape.COLUMN1) 2f else 3f)
             val bw = (right - left - gap * (n - 1)) / n
@@ -462,7 +462,7 @@ object WidgetRenderer {
                     cv.drawRoundRect(RectF(x, bottom - dp(3f), x + bw, bottom), dp(1.5f), dp(1.5f), p)
                     continue
                 }
-                val f = ((v - lo) / (hi - lo)).coerceIn(0.08f, 1f)
+                val f = fr[i] ?: continue
                 p.color = alpha(acc, if (i == n - 1) 1f else 0.5f)
                 cv.drawRoundRect(RectF(x, bottom - (bottom - top) * f, x + bw, bottom), dp(3f), dp(3f), p)
             }

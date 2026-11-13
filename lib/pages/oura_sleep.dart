@@ -746,13 +746,14 @@ class _BreathCard extends StatelessWidget {
             key: const ValueKey('sleep-breath'),
             borderRadius: BorderRadius.circular(10),
             onTap: () => Navigator.of(context).push(MetricPage.route(store, K.breath, now: now)),
-            child: row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${dec(b.value)} το λεπτό', breathNote(), Source.oura),
+            // Round 2 (R2-U1-6): ο αριθμός με τη μονάδα του («14,0 το λεπτό») σε μία γραμμή (πριν «14,0 το | λεπτό»).
+            child: row(b == null ? 'Αναπνοές —' : 'Αναπνοές ${glued('${dec(b.value)} το λεπτό')}', breathNote(), Source.oura),
           ),
           const Hairline(vertical: 2),
           row(
             // Έλεγχος 9/11 (UX3-05): οι ίδιες δύο ετικέτες παντού.
             // Round 1 (U2a-11): η τιμή δεν μένει μόνη της στην επόμενη γραμμή («μέσος όρος / 96%»).
-            gluedAfterComma(rox.avg == null ? '$oxygenAvgLabel —' : '$oxygenAvgLabel ${spo2AvgText(rox.avg!)}%'),
+            gluedValue(rox.avg == null ? '$oxygenAvgLabel —' : '$oxygenAvgLabel ${spo2AvgText(rox.avg!)}%'),
             rox.avg == null
                 ? (windows.mains.containsKey(dateKey(day)) ? ringAvgMissing(store) : 'Χωρίς νύχτα από το δαχτυλίδι')
                 : 'Όλη τη νύχτα',
@@ -761,7 +762,7 @@ class _BreathCard extends StatelessWidget {
           const Hairline(vertical: 2),
           // 7/11: η χαμηλότερη από το ρολόι, μόνο με κάλυψη ≥ 50% του ύπνου του Oura.
           row(
-            gluedAfterComma(rox.min == null ? '$oxygenMinLabel —' : '$oxygenMinLabel ${lowestText(rox.min!)}%'),
+            gluedValue(rox.min == null ? '$oxygenMinLabel —' : '$oxygenMinLabel ${lowestText(rox.min!)}%'),
             windows.mains.containsKey(dateKey(day))
                 ? watchLowText(rox.watch)
                 : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες',

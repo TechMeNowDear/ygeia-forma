@@ -577,13 +577,13 @@ class _SleepCard extends StatelessWidget {
                       Text(hm(n.start), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
                       Expanded(
                         // Χωρίς ποσοστά μίας νύχτας (κλινικός έλεγχος H1): μόνο η μπάρα, ως εκτίμηση.
-                        // Round 1 (U1a-14): μία γραμμή, μικραίνει λίγο αν δεν χωρά (όχι «… της | Samsung»).
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
+                        // Round 2 (R2-U1-1): 8 dp από τις ώρες και ίδιο μέγεθος γραμμάτων παντού· όταν δεν χωρά σπάει σε
+                        // «Φάσεις · εκτίμηση | της Samsung» (οι δύο τελευταίες λέξεις μαζί, U1a-14), δεν μικραίνει.
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            'Φάσεις · εκτίμηση της Samsung',
-                            maxLines: 1,
-                            softWrap: false,
+                            'Φάσεις · εκτίμηση της\u00A0Samsung',
+                            key: const ValueKey('today-stages-label'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
                           ),
