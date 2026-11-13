@@ -248,7 +248,8 @@ class _MetricPageState extends State<MetricPage> {
                   points: pts,
                   color: color,
                   format: s.axis ?? s.show,
-                  dateLabel: dayMonth,
+                  // Round 2 (R2-D-9): «365 μέρες» (και κάθε διάστημα που περνά την Πρωτοχρονιά) με το έτος στις άκρες.
+                  dateLabel: spanDateLabel(series.cut ?? from, end),
                   from: series.cut ?? from,
                   to: end,
                   tickSteps: s.duration ? minuteTickSteps : null,

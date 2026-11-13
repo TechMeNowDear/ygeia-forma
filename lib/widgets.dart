@@ -1207,19 +1207,61 @@ double niceStep(double raw, [List<double>? steps]) {
 /// ([niceStep], τουλάχιστον [minStep]) που περιέχουν το [lo]…[hi], με 2 ως [maxIntervals] διαστήματα (το πιο σφιχτό).
 /// Πριν οι τρεις ετικέτες ήταν στρογγυλεμένες τυχαίες τιμές: «92 · 95 · 97» σε ίσες αποστάσεις, με το «95» στο 94,5.
 /// Επιστρέφει (κάτω τιμή, βήμα, διαστήματα)· πάνω τιμή = κάτω + βήμα × διαστήματα.
-(double, double, int) chartAxis(double lo, double hi, {int maxIntervals = 2, List<double>? steps, double minStep = 0}) {
+/// Round 2 (R2-D-4): με [anchor] η κάτω τιμή είναι πολλαπλάσιο του μικρότερου από βήμα και [anchor], όχι μόνο του βήματος
+/// (διάρκειες σε λεπτά με [anchor] 60: «5:00 · 7:00 · 9:00» με βήμα 2 ώρες, όχι μόνο «4:00 · 6:00 · 8:00»). Χωρίς [anchor]
+/// ό,τι και πριν.
+(double, double, int) chartAxis(double lo, double hi,
+    {int maxIntervals = 2, List<double>? steps, double minStep = 0, double anchor = double.infinity}) {
   if (!(hi > lo)) hi = lo + math.max(minStep, 1.0);
   (double, double, int)? best;
   for (var n = 2; n <= math.max(2, maxIntervals); n++) {
     var step = math.max(niceStep((hi - lo) / n, steps), minStep);
-    var a = (lo / step).floorToDouble() * step;
+    var a = (lo / math.min(step, anchor)).floorToDouble() * math.min(step, anchor);
     for (var i = 0; i < 12 && a + n * step < hi - step * 1e-9; i++) {
       step = math.max(niceStep(step * 1.000001, steps), minStep);
-      a = (lo / step).floorToDouble() * step;
+      a = (lo / math.min(step, anchor)).floorToDouble() * math.min(step, anchor);
     }
     if (best == null || n * step < best.$3 * best.$2 - 1e-9) best = (a, step, n);
   }
   return best!;
+}
+
+/// Πόσο μακριά (px) από την πάνω και την κάτω γραμμή του άξονα μένει κάθε τιμή στον σφιχτό άξονα των διαρκειών
+/// ([lineAxis]): η ακτίνα της κουκκίδας της τελευταίας τιμής.
+const _axisClearPx = 6.0;
+
+/// Ο κάθετος άξονας του [LineChart] για τις τιμές [values] (σημεία, μεσαίες τιμές, γραμμή αναφοράς· ποτέ άδεια) σε
+/// γράφημα ύψους [plotHeight] px: ελάχιστο εύρος [minRange] γύρω από τη μέση, περιθώριο 10% πάνω και κάτω, ποτέ κάτω
+/// από 0 για τιμές ≥ 0, και στρογγυλές τιμές ([chartAxis]: 3 διαστήματα από 72 px και πάνω, αλλιώς 2). Επιστρέφει
+/// (κάτω τιμή, βήμα, διαστήματα).
+/// Round 2 (R2-D-4): με [steps] (διάρκειες σε λεπτά, [minuteTickSteps]) πρώτα ΧΩΡΙΣ το περιθώριο: μαζί με τα βήματα των
+/// ωρών έκανε τον άξονα διπλάσιο (νύχτες 6:30–7:30 σε άξονα 3:00–9:00 στις Τάσεις και στην αναφορά για τον γιατρό, η
+/// γραμμή σχεδόν επίπεδη). Το περιθώριο μπαίνει μόνο όταν κάποια τιμή θα έπεφτε πάνω ή πιο κοντά από [_axisClearPx] σε
+/// πάνω/κάτω γραμμή· οι γραμμές σε ολόκληρες ώρες ([chartAxis] με anchor 60). Τα άλλα γραφήματα όπως πριν.
+(double, double, int) lineAxis(List<double> values,
+    {double minRange = 0, required double plotHeight, List<double>? steps, double minStep = 0}) {
+  final dataLo = values.reduce(math.min), dataHi = values.reduce(math.max);
+  var lo = dataLo, hi = dataHi;
+  final nonNegative = lo >= 0;
+  if (hi - lo < minRange) {
+    final mid = (hi + lo) / 2;
+    lo = mid - minRange / 2;
+    hi = mid + minRange / 2;
+  }
+  final n = plotHeight >= 72 ? 3 : 2;
+  final anchor = steps == null ? double.infinity : 60.0;
+  if (steps != null) {
+    final tight =
+        chartAxis(nonNegative && lo < 0 ? 0.0 : lo, hi, maxIntervals: n, steps: steps, minStep: minStep, anchor: anchor);
+    final span = tight.$2 * tight.$3;
+    final clear = span * _axisClearPx / plotHeight;
+    if (dataLo - tight.$1 >= clear && tight.$1 + span - dataHi >= clear) return tight;
+  }
+  final pad = (hi - lo) * 0.1;
+  lo -= pad;
+  hi += pad;
+  if (nonNegative && lo < 0) lo = 0;
+  return chartAxis(lo, hi, maxIntervals: n, steps: steps, minStep: minStep, anchor: anchor);
 }
 
 /// Κενά πολύ μεγαλύτερα από τη συνηθισμένη απόσταση των τιμών (round 1, U1b-10): πάνω από 3 μέρες ΚΑΙ πάνω από το
@@ -1371,6 +1413,17 @@ class _BarPainter extends CustomPainter {
   bool shouldRepaint(_BarPainter old) => true;
 }
 
+/// Οι ημερομηνίες κάτω από ένα γράφημα που πάει από [from] ως [to] (round 2, R2-D-9): όταν περνά σε άλλη χρονιά, και οι
+/// δύο με το έτος («17 Αυγ 2025 … 13 Νοε 2026»), αλλιώς χωρίς («17 Αυγ … 13 Νοε»). Πριν, το «1 χρόνος» των Τάσεων (15
+/// μήνες) και οι «365 μέρες» έγραφαν «17 Αυγ … 13 Νοε», σαν να ήταν 3 μήνες.
+String Function(DateTime) spanDateLabel(DateTime from, DateTime to) => from.year == to.year ? dayMonth : dayMonthYear;
+
+/// Ένα διάστημα ημερομηνιών «16 Αυγ – 13 Νοε» (round 2, R2-D-9). Με [withYear] (σελίδα με διαστήματα σε δύο χρονιές) και
+/// το έτος: «16 Αυγ – 13 Νοε 2026», «20 Δεκ 2026 – 18 Ιαν 2027».
+String dateSpanText(DateTime from, DateTime to, {bool withYear = false}) => !withYear
+    ? '${dayMonth(from)} – ${dayMonth(to)}'
+    : '${from.year == to.year ? dayMonth(from) : dayMonthYear(from)} – ${dayMonthYear(to)}';
+
 /// Γραμμή στον χρόνο (βάρος, λίπος, παλμοί), με απαλή σκίαση.
 class LineChart extends StatelessWidget {
   const LineChart({
@@ -1410,7 +1463,8 @@ class LineChart extends StatelessWidget {
   /// Ελάχιστο εύρος του κάθετου άξονα, ώστε μικρές διαφορές να μη φαίνονται τεράστιες.
   final double minRange;
 
-  /// Επιτρεπτά βήματα του κάθετου άξονα (π.χ. [minuteTickSteps] για διάρκειες σε λεπτά)· χωρίς αυτά 1, 2 ή 5 × 10ⁿ.
+  /// Επιτρεπτά βήματα του κάθετου άξονα ΓΙΑ ΔΙΑΡΚΕΙΕΣ ΣΕ ΛΕΠΤΑ ([minuteTickSteps]): σφιχτός άξονας σε ολόκληρες ώρες
+  /// ([lineAxis], round 2, R2-D-4). Χωρίς αυτά 1, 2 ή 5 × 10ⁿ.
   final List<double>? tickSteps;
   final List<(DateTime, double)> points;
   final double height;
@@ -1513,26 +1567,14 @@ class _LinePainter extends CustomPainter {
     if (w <= 0 || h <= 0) return;
 
     final refs = [if (reference != null) reference!.$1];
-    final all = [...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs];
-    var minV = all.reduce(math.min);
-    var maxV = all.reduce(math.max);
-    final nonNegative = minV >= 0;
-    if (maxV - minV < minRange) {
-      final mid = (maxV + minV) / 2;
-      minV = mid - minRange / 2;
-      maxV = mid + minRange / 2;
-    }
-    final pad = (maxV - minV) * 0.1;
-    minV -= pad;
-    maxV += pad;
-    if (nonNegative && minV < 0) minV = 0;
+    final all = <double>[...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs];
     // Άξονας σε στρογγυλές τιμές (U1b-09)· με ετικέτες ακέραιων (π.χ. παλμοί) ποτέ βήμα κάτω από 1, αλλιώς δύο γραμμές θα
-    // έγραφαν την ίδια τιμή.
+    // έγραφαν την ίδια τιμή. Round 2 (R2-D-4): ο υπολογισμός στο [lineAxis] (σφιχτός άξονας για τις διάρκειες).
     final integer = format(0.5) == format(1) || format(0.5) == format(0);
     final (axisLo, step, intervals) =
-        chartAxis(minV, maxV, maxIntervals: h >= 72 ? 3 : 2, steps: tickSteps, minStep: integer ? 1 : 0);
-    minV = axisLo;
-    maxV = axisLo + step * intervals;
+        lineAxis(all, minRange: minRange, plotHeight: h, steps: tickSteps, minStep: integer ? 1 : 0);
+    final minV = axisLo;
+    final maxV = axisLo + step * intervals;
 
     final ranged = from != null && to != null;
     final t0 = (ranged ? from! : points.first.$1).millisecondsSinceEpoch.toDouble();

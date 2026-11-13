@@ -127,7 +127,7 @@ class _ProgressPageState extends State<ProgressPage> {
 /// Πτώση παλμών: πόσοι παλμοί (αρνητικό = ανέβηκαν, σπάνιο).
 String _hrDrop(double v) => '${v.round()}';
 
-/// Πτώση παλμών στο 1′ που άλλαξε: ουδέτερα, χωρίς βέλος (έλεγχος 9/11, V-B-08).
+/// Πτώση παλμών στο 1ο λεπτό που άλλαξε: ουδέτερα, χωρίς βέλος (έλεγχος 9/11, V-B-08).
 String hrrChangeText(TrendResult r) {
   // round1, U6-03: η διαφορά των αριθμών όπως φαίνονται («15 → 19» = 4), όχι της ακατέργαστης διαφοράς.
   final d = (r.displayDiff ?? (r.current! - r.previous!)).round();
@@ -150,8 +150,14 @@ String _paceRelText(PaceRel r) => switch (r) {
 
 String _repsText(List<int> reps) => reps.join(', ');
 
-/// «27″» κάτω από το λεπτό, αλλιώς «1′05″».
-String _secs(int s) => s < 60 ? '$s″' : clock(s);
+/// Διαφορά ρυθμού σε ολόκληρες λέξεις (round 2, R2-D-5 = R2-U2-06· πριν «26″» / «1:05»): «26 δευτερόλεπτα»,
+/// «1 δευτερόλεπτο», «1 λεπτό», «1 λεπτό 5 δευτερόλεπτα».
+String paceDiffText(int s) {
+  String secs(int n) => n == 1 ? '1 δευτερόλεπτο' : '$n δευτερόλεπτα';
+  if (s < 60) return secs(s);
+  final m = hoursMinutes(s ~/ 60);
+  return s % 60 == 0 ? m : '$m ${secs(s % 60)}';
+}
 
 String _setText(LoadKind k, ExLog e) =>
     hasLoad(k) ? '${loadLabel(k, e.workLoad)} × ${_repsText([for (final s in e.done) s.reps])}' : '${_repsText([for (final s in e.done) s.reps])} επαν.';
@@ -266,7 +272,7 @@ class _WalkCard extends StatelessWidget {
           // Ίδια λογική με τον έλεγχο 03 (μήνας: 30 μέρες + ~9 για 4 μέρες στην προηγούμενη περίοδο → 5–6 εβδομάδες).
           // round1, U6-08: η επιλογή λέγεται «30 μέρες», όχι «Μήνας».
           _foot(context, '${period == TrendPeriod.month ? 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση των 30 ημερών βγαίνει περίπου 5–6 εβδομάδες μετά το πρώτο. ' : 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση των 3 μηνών βγαίνει περίπου 14 εβδομάδες μετά το πρώτο· στις «30 μέρες» περίπου 5–6 εβδομάδες. '}'
-              'Μετράνε μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS.$_noGpsText'),
+              'Μετράνε μόνο περπατήματα από το ρολόι, πάνω από 15 λεπτά και με GPS.$_noGpsText'),
         ]),
       );
     }
@@ -287,7 +293,6 @@ class _WalkCard extends StatelessWidget {
         ? '${_paceRelText(w.paceRel)}: άλλος ρυθμός, δεν συγκρίνεται'
         : _paceRelText(w.paceRel);
     final win = window;
-    final hours = w.secNow / 3600;
     return AppCard(
       key: const ValueKey('prog-walk'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -325,15 +330,15 @@ class _WalkCard extends StatelessWidget {
           detail: w.pace.previous != null && w.pace.current != null ? '${clock(w.pace.previous!)} → ${paceText(w.pace.current!)}' : vals(w.pace, (v) => paceText(v)),
           pill: w.pace.changed
               ? TrendPill(
-                  // round1, U6-03: «13:09 → 12:43» = 26″ (η διαφορά των στρογγυλεμένων, όχι 27).
-                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${_secs((w.pace.current!.round() - w.pace.previous!.round()).abs())}',
+                  // round1, U6-03: «13:09 → 12:43» = 26 δευτερόλεπτα (η διαφορά των στρογγυλεμένων, όχι 27).
+                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${paceDiffText((w.pace.current!.round() - w.pace.previous!.round()).abs())}',
                   kind: w.pace.status == TrendStatus.down ? TrendKind.good : TrendKind.neutral)
               : TrendStatusPill(r: w.pace),
         ),
         // Ουδέτερη (έλεγχος 9/11, V-B-08): χωρίς χρώμα και βέλος, με τους παλμούς στο τέλος από κάτω.
         _Row(
           key: const ValueKey('prog-walk-hrr'),
-          label: 'Πτώση παλμών στο 1′',
+          label: 'Πτώση παλμών στο 1ο λεπτό',
           detail: vals(w.hrr, _hrDrop) + (w.hrr.current == null ? '' : ' παλμοί'),
           extra: w.hrr.current == null ? null : hrrEndText(w.hrrEnd),
           pill: w.hrr.changed ? TrendPill(hrrChangeText(w.hrr)) : TrendStatusPill(r: w.hrr),
@@ -341,11 +346,12 @@ class _WalkCard extends StatelessWidget {
         _Row(
           key: const ValueKey('prog-walk-count'),
           label: 'Περπατήματα',
-          detail: '${w.countBefore} → ${w.countNow} · ${dec(hours, 1)} ώρες',
+          // Round 2 (R2-U2-06): ενεργός χρόνος των περπατημάτων της περιόδου σε ώρες και λεπτά (πριν «15,0 ώρες»).
+          detail: '${w.countBefore} → ${w.countNow} · ${hoursMinutes((w.secNow / 60).round())}',
           pill: TrendPill(w.countNow == w.countBefore ? 'Ίδιο' : '${w.countNow > w.countBefore ? '+' : '−'}${(w.countNow - w.countBefore).abs()}'),
           line: false,
         ),
-        _foot(context, 'Μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS. ${w.countNow} τώρα, ${w.countBefore} πριν.$_noGpsText'),
+        _foot(context, 'Μόνο περπατήματα από το ρολόι, πάνω από 15 λεπτά και με GPS. ${w.countNow} τώρα, ${w.countBefore} πριν.$_noGpsText'),
       ]),
     );
   }
@@ -443,7 +449,7 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
   // Ουδέτερη, χωρίς βέλος (έλεγχος 9/11, V-B-08), με την ένταση δίπλα.
   if (walk.hrr.changed) {
     final end = hrrEndText(walk.hrrEnd);
-    out.add(('Πτώση παλμών στο 1′: ${walk.hrr.previous!.round()} → ${walk.hrr.current!.round()}${end == null ? '' : ' ($end)'}', TrendKind.neutral, null));
+    out.add(('Πτώση παλμών στο 1ο λεπτό: ${walk.hrr.previous!.round()} → ${walk.hrr.current!.round()}${end == null ? '' : ' ($end)'}', TrendKind.neutral, null));
   }
   for (final p in strength) {
     if (p.change != StrengthChange.up && p.change != StrengthChange.down) continue;
@@ -539,14 +545,14 @@ Future<void> showWalkProgressInfo(BuildContext context) => _sheet(context, 'prog
         'Παλμοί: ο μέσος όρος σε κάθε περπάτημα από το 5ο λεπτό ως το «Τέλος», χωρίς τις παύσεις (τα πρώτα λεπτά οι παλμοί '
             'ακόμα ανεβαίνουν, και θα έκαναν τα σύντομα περπατήματα να μοιάζουν αλλιώς). Το γράφημα έχει μία τιμή για κάθε '
             'περπάτημα· οι διακεκομμένες γραμμές είναι η μεσαία τιμή κάθε περιόδου. Όσο βελτιώνεται η φυσική κατάσταση, η ίδια ταχύτητα θέλει '
-            'λιγότερους παλμούς. Ρυθμός: λεπτά ανά χιλιόμετρο, χωρίς τις παύσεις. Πτώση παλμών στο 1′: πόσο πέφτουν οι παλμοί '
+            'λιγότερους παλμούς. Ρυθμός: λεπτά ανά χιλιόμετρο, χωρίς τις παύσεις. Πτώση παλμών στο 1ο λεπτό: πόσο πέφτουν οι παλμοί '
             'στο πρώτο λεπτό μετά το «Τέλος». Εξαρτάται κυρίως από το πόσο γρήγορα περπάτησες (πιο γρήγορα = μεγαλύτερη πτώση), '
             'γι\' αυτό δεν τη λέω «καλύτερα» ή «χειρότερα»· από κάτω φαίνονται οι παλμοί στο τέλος, για να συγκρίνεις ίδια ένταση.'
       ),
       (
         'Πώς αποφασίζω',
         'Παίρνω μία τιμή για κάθε μέρα με περπάτημα και συγκρίνω τη μεσαία τιμή κάθε περιόδου. Λέω «άλλαξε» μόνο αν η διαφορά '
-            'είναι τουλάχιστον 3 παλμοί (στον ρυθμό 15″ ανά km) και ξεκάθαρα μεγαλύτερη από τη διαφορά που έχουν συνήθως τα '
+            'είναι τουλάχιστον 3 παλμοί (στον ρυθμό 15 δευτερόλεπτα ανά km) και ξεκάθαρα μεγαλύτερη από τη διαφορά που έχουν συνήθως τα '
             'περπατήματά σου μεταξύ τους. Είναι ο ίδιος έλεγχος με τις «Τάσεις». Χρειάζονται τουλάχιστον 4 μέρες με περπάτημα σε κάθε περίοδο.'
       ),
       (

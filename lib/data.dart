@@ -42,6 +42,8 @@ class SleepRecord {
 
   /// Round 1 (S3-8): η απόκλιση ζώνης της ίδιας της εγγραφής σε λεπτά («off» της γέφυρας), αν η Samsung τη δίνει: μόνο
   /// για την ώρα ύπνου/ξυπνήματος που αποθηκεύεται ([wallClock]). null = η ζώνη του κινητού, όπως πριν.
+  /// Round 2 (R2-B-1): μόνο όταν η εγγραφή έγινε σε άλλη ζώνη (ταξίδι, [recordZone])· στο σπίτι null, και τη νύχτα της
+  /// αλλαγής ώρας.
   final int? off;
 
   /// Η διάρκεια όπως τη δίνει η Samsung (DURATION). Δεν ξέρουμε με σιγουριά αν περιέχει τα ξυπνήματα: η Samsung
@@ -98,7 +100,8 @@ class Night {
   late DateTime start;
   late DateTime end;
 
-  /// Round 1 (S3-8): η ζώνη (λεπτά) της εγγραφής όπου αρχίζει και όπου τελειώνει η νύχτα ([SleepRecord.off]).
+  /// Round 1 (S3-8): η ζώνη (λεπτά) της εγγραφής όπου αρχίζει και όπου τελειώνει η νύχτα ([SleepRecord.off]· null στο
+  /// σπίτι, round 2, R2-B-1).
   int? startOff;
   int? endOff;
 
@@ -315,6 +318,19 @@ DateTime wallClock(int ms, Object? offMinutes) {
   return DateTime(u.year, u.month, u.day, u.hour, u.minute, u.second, u.millisecond);
 }
 
+/// Round 2 (R2-B-1): η Samsung δίνει ΜΙΑ ζώνη για όλη την εγγραφή ύπνου (HealthDataPoint.zoneOffset, για αρχή ΚΑΙ
+/// τέλος). Άρα «σπίτι ή ταξίδι» κρίνεται ΜΙΑ φορά για όλη την εγγραφή, όπως στο Oura: αν η ζώνη της είναι ίδια με τη
+/// ζώνη του κινητού στην αρχή ([from]) Ή στο τέλος ([to]) της εγγραφής της Samsung (πριν χωριστεί σε κομμάτια), η
+/// εγγραφή έγινε εδώ → null: η ώρα του κινητού και στις δύο άκρες, ακριβώς όπως στο #100. Έτσι και τη νύχτα της
+/// αλλαγής ώρας (π.χ. 24→25/10: αρχή +3, τέλος +2), όπου πριν η μία άκρη έβγαινε μία ώρα λάθος. Αλλιώς (ταξίδι): η
+/// ίδια ζώνη για αρχή και τέλος. Χωρίς ή με άκυρη ζώνη: null.
+int? recordZone(Object? offMinutes, DateTime from, DateTime to) {
+  if (offMinutes is! num || !offMinutes.isFinite || offMinutes.abs() > 18 * 60) return null;
+  final off = offMinutes.round();
+  if (off == from.timeZoneOffset.inMinutes || off == to.timeZoneOffset.inMinutes) return null;
+  return off;
+}
+
 // ---------------------------------------------------------------------------
 // Όλα τα δεδομένα μιας ανάγνωσης, με τους υπολογισμούς τους
 // ---------------------------------------------------------------------------
@@ -502,9 +518,11 @@ class Dashboard {
                 if (s is List && s.length >= 3 && okTime(s[1]) && okTime(s[2])) Stage(s[0].toString(), t(s[1]), t(s[2])),
             ]..sort((a, b) => a.start.compareTo(b.start));
             final minutes = (e['minutes'] as num?)?.toInt() ?? end.difference(start).inMinutes;
-            final off = e['off'];
-            return SleepRecord(start, end, minutes, (e['score'] as num?)?.toInt(), stages,
-                off: off is num && off.isFinite ? off.round() : null);
+            // Round 2 (R2-B-1): «σπίτι ή ταξίδι» μία φορά για όλη την εγγραφή της Samsung ([recordZone]). «recStart» /
+            // «recEnd» = η εγγραφή πριν χωριστεί σε κομμάτια (πρόσθετα κλειδιά της γέφυρας· χωρίς αυτά, το κομμάτι).
+            final off = recordZone(e['off'], okTime(e['recStart']) ? t(e['recStart']) : start,
+                okTime(e['recEnd']) ? t(e['recEnd']) : end);
+            return SleepRecord(start, end, minutes, (e['score'] as num?)?.toInt(), stages, off: off);
           }(),
     ]..sort((a, b) => a.start.compareTo(b.start));
 
@@ -1460,13 +1478,15 @@ Set<String> applyRecentRead(
   final sleepFrom = !sleepFailed && d.sleepOk && !tooFewNights ? windowFrom : null;
   // Τιμές που μένουν όπως είναι σε αυτή την ανάγνωση (οι παλιές μένουν, οι νέες δεν γράφονται):
   // - ό,τι δεν διαβάστηκε ([keepKeys], S3-1) και οι τιμές από παλμούς όταν οι παλμοί απέτυχαν (A12),
-  // - round 1 (S3-7): οι παλμοί της μέρας όταν ο ύπνος του ρολογιού δεν διαβάστηκε ή ήρθαν πολύ λίγες νύχτες: με μισό
-  //   ύπνο η νύχτα θα μετρούσε ως «ξύπνιος» (οι τιμές ύπνου κρατιούνται ήδη από το [sleepFrom]).
+  // - round 1 (S3-7): οι παλμοί της μέρας όταν ήρθαν πολύ λίγες νύχτες: με μισό ύπνο η νύχτα θα μετρούσε ως «ξύπνιος»
+  //   (οι τιμές ύπνου κρατιούνται ήδη από το [sleepFrom]). Round 2 (R2-B-2): ύπνος του ρολογιού αδιάβαστος → μόνο τις
+  //   μέρες που χρειάζονται νύχτα του ρολογιού ([dropWatchNightDayHeart]), όχι όλη την περίοδο του Oura.
   final keep = <String>{
     ...keepKeys,
     if (heartFailed) ...heartKeys,
-    if (!d.sleepOk || tooFewNights) ...dayHeartKeys,
+    if (tooFewNights) ...dayHeartKeys,
   };
+  if (!d.sleepOk) dropWatchNightDayHeart(rows, plan);
   // Έλεγχος 4 (1_data M2): νύχτα του ρολογιού που τώρα ήρθε χωρίς έγκυρη διάρκεια (χωρίς φάσεις, άγνωστες φάσεις, ή
   // καθόλου): οι αποθηκευμένες τιμές ύπνου της μέρας κρατιούνται κρυφές («nw.*»), όπως στην επανανάγνωση· πριν
   // σβηνόταν η διάρκεια εδώ, ενώ η επανανάγνωση την κρατούσε ως ύπνο.
@@ -2381,6 +2401,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     }
     // Έλεγχος 4 (1_data M2/M3/L1): νύχτες του ρολογιού χωρίς έγκυρη νέα διάρκεια: ΟΛΕΣ οι τιμές ύπνου της μέρας
     // κρυφές («nw.*»), ποτέ σβησμένες· στο κομμάτι «από άλλη συσκευή» και με σημάδι (μετριέται στο «Τι φτάνει»).
+    // Round 2 (R2-B-2): ύπνος του ρολογιού αδιάβαστος: οι παλμοί μέρας μένουν μόνο τις μέρες με νύχτα του ρολογιού.
+    if (!p.sleepOk) dropWatchNightDayHeart(p.rows, plan);
     final archived = !failed && p.sleepOk
         ? archiveSleep(history, p.rows, from: from, to: to, plan: plan, otherDevice: otherDevice)
         : <String>{};
@@ -2394,11 +2416,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       rangeTo: to,
       plan: plan,
       // Round 1 (S3-1): ό,τι δεν διαβάστηκε (κλειστή άδεια ή σφάλμα) μένει όπως είναι· πριν, μια επανανάγνωση με μία
-      // κλειστή άδεια έσβηνε τις τιμές της από ΟΛΟ το ιστορικό. S3-7: με μισό ή αδιάβαστο ύπνο, οι παλμοί μέρας μένουν.
+      // κλειστή άδεια έσβηνε τις τιμές της από ΟΛΟ το ιστορικό. S3-7: με μισό ύπνο οι παλμοί μέρας μένουν (αδιάβαστος
+      // ύπνος: πιο πάνω, μόνο τις μέρες με νύχτα του ρολογιού).
       keepKeys: {
         ...p.keep,
         if (p.heartFailed) ...heartKeys,
-        if (tooFew || !p.sleepOk) ...dayHeartKeys,
+        if (tooFew) ...dayHeartKeys,
       },
       ouraNights: ouraWindows.mains.keys.toSet(),
     ),

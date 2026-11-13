@@ -327,14 +327,21 @@ void main() {
   // ------------------------------------------------------------------------------------------------ S1-4
   group('S1-4: όχι δύο αλλαγές μέσα σε λίγες μέρες', () {
     test('έλεγχος που απαντήθηκε λιγότερο από 4 μέρες πριν από μέρα ελέγχου την καλύπτει', () {
-      final g = checkinGoals();
+      // Γύρος 2 (R2-A-5): μόνο όταν η απάντηση άλλαξε τον στόχο («Εφάρμοσε», γραμμή στο ιστορικό εκείνη τη μέρα). Χωρίς
+      // αλλαγή ισχύει ο κανόνας πριν από το S1-4 (δοκιμή στη r2_g1_test).
+      Goals changedOn(String day) =>
+          checkinGoals().copyWith(addLog: AdaptLog(day: day, tdee: 2600, before: 2250, after: 2100, applied: true));
       final mon = DateTime(2026, 12, 21);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-20'), isFalse);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-18'), isFalse);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-17'), isTrue);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-16'), isTrue);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-14'), isTrue);
-      final answered = g.copyWith(checkIn: '2026-12-20');
+      for (final (day, due) in [
+        ('2026-12-20', false),
+        ('2026-12-18', false),
+        ('2026-12-17', true),
+        ('2026-12-16', true),
+        ('2026-12-14', true),
+      ]) {
+        expect(checkInDue(goals: changedOn(day), today: mon, lastCheckIn: day), due, reason: day);
+      }
+      final answered = changedOn('2026-12-20').copyWith(checkIn: '2026-12-20');
       expect(nextCheckDay(answered, DateTime(2026, 12, 20)), DateTime(2026, 12, 28));
       expect(nextCheckDay(answered, DateTime(2026, 12, 21)), DateTime(2026, 12, 28));
     });
@@ -701,7 +708,9 @@ void main() {
       final base = simWeights(day); // 18/11 … 9/12: 90,0 → 89,0 kg
       final child = [for (final (d, kg) in base) (d, d.day == 9 && d.month == 12 ? 45.0 : kg)];
       final a = guardedWeights(_body(day, child));
-      expect(a.foreign, [(DateTime(2026, 12, 9), 45.0)]);
+      // Round 2 (g4 · R2-E-2): η 45 kg είναι η ΤΕΛΕΥΤΑΙΑ ζύγιση (καμία μετά): «σε αναμονή», όχι ξένη· δεν μετρά στον έλεγχο
+      // θερμίδων ώσπου να κριθεί από την επόμενη (πριν: `foreign == [(9/12, 45)]`).
+      expect(a.foreign, isEmpty);
       expect(a.used.any((x) => x.$1 == DateTime(2026, 12, 9)), isFalse);
       expect(a.used.length, base.length - 1);
       final both = [...base, (DateTime(2026, 12, 9, 7, 0), 80.0)];
@@ -714,18 +723,20 @@ void main() {
     testWidgets('η κάρτα λέει ποια ζύγιση δεν μέτρησε, μία φορά· όχι «γρήγορη απώλεια»', (t) async {
       final day = DateTime(2026, 12, 9);
       final g = checkinGoals().copyWith(checkIn: '2026-12-07');
-      List<(DateTime, double)> child(List<(DateTime, double)> w) => [for (final (d, kg) in w) (d, d.day == 9 && d.month == 12 ? 45.0 : kg)];
+      // Round 2 (g4 · R2-E-2): το παιδί τη Δευτέρα 7/12, ανάμεσα στις ζυγίσεις σου της 4/12 και της 9/12 (που συμφωνούν
+      // μεταξύ τους): ξένη. Πριν ήταν στις 9/12, την τελευταία ζύγιση, που με τον νέο κανόνα είναι «σε αναμονή».
+      List<(DateTime, double)> child(List<(DateTime, double)> w) => [for (final (d, kg) in w) (d, d.day == 7 && d.month == 12 ? 45.0 : kg)];
       final c = _pending(g, day, weights: child)!;
       expect((c.kind, c.proposal), (CheckKind.foreign, null));
-      expect(c.foreign, [(DateTime(2026, 12, 9), 45.0)]);
+      expect(c.foreign, [(DateTime(2026, 12, 7), 45.0)]);
       await _card(t, c, DateTime(2026, 12, 9, 9));
       expect(find.text('Μια ζύγιση δεν μέτρησε'), findsOneWidget);
-      expect(find.textContaining(foreignWeighText([(DateTime(2026, 12, 9), 45.0)])), findsOneWidget);
-      expect(foreignWeighText([(DateTime(2026, 12, 9), 45.0)]),
-          'Η ζύγιση ${shortDayDate(DateTime(2026, 12, 9))} (45,0 kg) διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.');
+      expect(find.textContaining(foreignWeighText([(DateTime(2026, 12, 7), 45.0)])), findsOneWidget);
+      expect(foreignWeighText([(DateTime(2026, 12, 7), 45.0)]),
+          'Η ζύγιση ${shortDayDate(DateTime(2026, 12, 7))} (45,0 kg) διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.');
       final seen = dismissCheckIn(c, day);
-      expect((seen.foreignSeen, seen.kcal, seen.checkIn), ('2026-12-09', 2250, '2026-12-07'));
-      expect(Goals.fromJson(seen.toJson())!.foreignSeen, '2026-12-09');
+      expect((seen.foreignSeen, seen.kcal, seen.checkIn), ('2026-12-07', 2250, '2026-12-07'));
+      expect(Goals.fromJson(seen.toJson())!.foreignSeen, '2026-12-07');
       expect(_pending(seen, DateTime(2026, 12, 10), weights: child), isNull, reason: 'δεν ξαναγράφεται');
     });
 

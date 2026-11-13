@@ -86,6 +86,21 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   );
 }
 
+/// Round 2 (R2-B-3): η επαναφορά μπήκε στη μνήμη, αλλά δεν γράφτηκε στο κινητό (ίδιο με την κάρτα της Σήμερα).
+const restorePrefsUnsavedText =
+    'Οι ρυθμίσεις του αντιγράφου μπήκαν, αλλά δεν γράφτηκαν στο κινητό· πάτα «Δοκίμασε ξανά» στη Σήμερα.';
+
+/// Round 2 (R2-B-3): τι λέει η σύνοψη της επαναφοράς για τις ρυθμίσεις. [ok]: γράφτηκαν (ή το αντίγραφο δεν είχε)·
+/// [loaded]: οι ρυθμίσεις του κινητού είχαν διαβαστεί πριν από την επαναφορά (αλλιώς δεν αλλάζει τίποτα)· [unsaved]:
+/// [HealthStore.prefsSaveError] τη στιγμή της σύνοψης· [notes]: τι από στόχους/ζώνη δεν μπήκε (S9-11). «Δεν άλλαξαν»
+/// μόνο όταν πράγματι δεν άλλαξαν· πριν το έλεγε και όταν μπήκαν στη μνήμη αλλά δεν γράφτηκαν (π.χ. γεμάτος χώρος),
+/// ενώ η κάρτα της Σήμερα έλεγε «τη βλέπεις στην οθόνη».
+List<String> restorePrefsSummary(
+    {required bool ok, required bool loaded, required bool unsaved, required List<String> notes}) {
+  if (!ok && !loaded) return const ['Οι ρυθμίσεις δεν άλλαξαν.'];
+  return [if (!ok && unsaved) restorePrefsUnsavedText, ...notes];
+}
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
   final HealthStore store;
@@ -365,8 +380,9 @@ class _DataGroupState extends State<_DataGroup> {
       }
       final (e, f, failed, existing) = res;
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
+      final prefsWereLoaded = widget.store.prefsLoaded;
       final prefsNotes =
-          b.prefs.isEmpty || !widget.store.prefsLoaded ? const <String>[] : restoreNotes(widget.store.prefsJson(), b.prefs);
+          b.prefs.isEmpty || !prefsWereLoaded ? const <String>[] : restoreNotes(widget.store.prefsJson(), b.prefs);
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       final sourcesIn = b.sources != null && await widget.store.restoreSources(b.sources!);
       var trainingIn = 0;
@@ -382,8 +398,10 @@ class _DataGroupState extends State<_DataGroup> {
         if (existing > 0)
           existing == 1 ? '1 εγγραφή υπήρχε ήδη και έμεινε όπως ήταν.' : '$existing εγγραφές υπήρχαν ήδη και έμειναν όπως ήταν.',
         if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
-        if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
-        if (prefsOk) ...prefsNotes,
+        // Round 2 (R2-B-3): «δεν άλλαξαν» μόνο αν δεν άλλαξαν· «μπήκαν αλλά δεν γράφτηκαν» όταν φαίνονται χωρίς να είναι
+        // γραμμένες (ίδιο με την κάρτα «Δοκίμασε ξανά» της Σήμερα).
+        ...restorePrefsSummary(
+            ok: prefsOk, loaded: prefsWereLoaded, unsaved: widget.store.prefsSaveError, notes: prefsNotes),
         if (sourcesIn) 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
         if (trainingIn > 0 && trainingWritten)
           countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),

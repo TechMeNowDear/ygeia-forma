@@ -18,8 +18,12 @@ DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 /// 13/11, S11-2, κανόνας στο weight_guard.dart). Και οι δύο παλιότερη πρώτη. [body] είναι ήδη μόνο της InBody.
 /// - Μετρά η πρώτη ζύγιση της μέρας (η πρωινή, όπως λέει η κάρτα «Σήμερα ζύγιση»).
 /// - Κάθε μέρα κρίνεται με τις πρώτες ζυγίσεις των άλλων ημερών ως [weightGuardDays] μέρες πριν ή μετά. Αν η πρώτη της
-///   μοιάζει ξένη (π.χ. ζυγίστηκε πρώτα το παιδί) και υπάρχει επόμενη της ίδιας μέρας που δεν μοιάζει, μετρά εκείνη.
-///   Αν όλες μοιάζουν ξένες, η μέρα πάει στο [foreign] με την πρώτη της ζύγιση. Τίποτα δεν σβήνεται: απλώς δεν μετρά.
+///   μοιάζει ξένη (π.χ. ζυγίστηκε πρώτα το παιδί) και υπάρχει επόμενη της ίδιας μέρας που μετρά, μετρά εκείνη.
+///   Αν δεν μετρά καμία, η μέρα πάει στο [foreign] με την πρώτη της ζύγιση. Τίποτα δεν σβήνεται: απλώς δεν μετρά.
+/// - Round 2 (g4 · R2-E-2, κανόνας [guardDays]): «ξένη» μόνο όταν οι ζυγίσεις πριν ΚΑΙ μετά συμφωνούν μεταξύ τους και όχι
+///   μαζί της. Μια ζύγιση που διαφέρει πολύ αλλά δεν έχει ακόμα επόμενη (π.χ. η πρώτη μετά από αρρώστια με −5 kg) είναι «σε
+///   αναμονή»: δεν μπαίνει ΟΥΤΕ στο [used] (ο έλεγχος θερμίδων την περιμένει) ΟΥΤΕ στο [foreign] (η κάρτα δεν τη λέει
+///   ξένη)· μετρά μόλις συμφωνήσει μαζί της η επόμενη ζύγιση.
 ({List<(DateTime, double)> used, List<(DateTime, double)> foreign}) guardedWeights(Iterable<BodyMeasurement> body) {
   final byDay = <DateTime, List<double>>{};
   for (final b in body) {
@@ -30,27 +34,14 @@ DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
   final days = byDay.keys.toList()..sort();
   final used = <(DateTime, double)>[];
   final foreign = <(DateTime, double)>[];
+  final r = guardDays([for (final d in days) (d, byDay[d]!)]);
   for (var i = 0; i < days.length; i++) {
     final d = days[i];
-    final others = <double>[];
-    for (var j = i - 1; j >= 0 && daysBetween(days[j], d) <= weightGuardDays; j--) {
-      others.add(byDay[days[j]]!.first);
-    }
-    for (var j = i + 1; j < days.length && daysBetween(d, days[j]) <= weightGuardDays; j++) {
-      others.add(byDay[days[j]]!.first);
-    }
-    final candidates = byDay[d]!;
-    double? pick;
-    for (final w in candidates) {
-      if (!weightLooksForeign(w, others)) {
-        pick = w;
-        break;
-      }
-    }
-    if (pick == null) {
-      foreign.add((d, candidates.first));
-    } else {
-      used.add((d, pick));
+    final status = r[i].status;
+    if (status == WeighStatus.counted) {
+      used.add((d, byDay[d]![r[i].pick]));
+    } else if (status == WeighStatus.foreign) {
+      foreign.add((d, byDay[d]!.first));
     }
   }
   return (used: used, foreign: foreign);
@@ -120,7 +111,9 @@ class CheckIn {
       this.absurd = const [],
       this.foreign = const [],
       this.fastIntake,
-      this.fastIntakeDays = 0});
+      this.fastIntakeDays = 0,
+      this.fastTarget,
+      this.estTarget});
   final CheckKind kind;
   final Goals goals;
   final AdaptStatus? status;
@@ -160,9 +153,16 @@ class CheckIn {
   final List<(DateTime, double)> foreign;
 
   /// Γρήγορη απώλεια: ο μέσος όρος όσων γράφτηκαν στο ημερολόγιο τις μέρες που κρίθηκαν (kcal τη μέρα), όταν υπάρχουν
-  /// τουλάχιστον [adaptFastMinIntakeDays] γραμμένες μέρες· αλλιώς null. [fastIntakeDays]: πόσες μέρες γράφτηκαν.
+  /// τουλάχιστον [adaptFastMinIntakeDays] γραμμένες μέρες και [adaptFastRecentMinDays] από τις [adaptFastRecentDays]
+  /// τελευταίες (γύρος 2, R2-A-3)· αλλιώς null. [fastIntakeDays]: πόσες μέρες γράφτηκαν.
   final double? fastIntake;
   final int fastIntakeDays;
+
+  /// Γύρος 2 (R2-A-1): ο μέσος όρος των στόχων που ίσχυαν τις ίδιες μέρες ([targetOn]), για να συγκρίνεται το φαγητό κάθε
+  /// μέρας με τον στόχο της. [fastTarget]: για το [fastIntake] (null όταν και αυτό είναι null). [estTarget]: για το
+  /// [Expenditure.meanIntake] του εβδομαδιαίου ελέγχου (μόνο με εκτίμηση).
+  final double? fastTarget;
+  final double? estTarget;
 
   /// Ο στόχος από τον ρυθμό, πριν από το όριο των ±150 (για το «Πώς βγήκε»).
   int? get wanted {
@@ -209,7 +209,9 @@ String fastPeriodText(int? days) => switch (days) {
     };
 
 /// Η επόμενη μέρα ελέγχου (σήμερα, αν εκκρεμεί). Ίδιος κανόνας με το [checkInDue] (έλεγχος 13/11, S1-4): μια μέρα ελέγχου
-/// λιγότερο από [adaptMinChangeDays] μέρες μετά την τελευταία απάντηση δεν μετρά.
+/// λιγότερο από [adaptMinChangeDays] μέρες μετά από απάντηση που άλλαξε τον στόχο δεν μετρά· μετά από απάντηση που δεν
+/// άλλαξε τίποτα, μετρά η επόμενη μέρα ελέγχου (γύρος 2, R2-A-5: πριν, ένα «Εντάξει» την Παρασκευή στο «μαζεύω δεδομένα»
+/// μετέθετε την πρώτη εκτίμηση από τις 14 στις 21 Δεκεμβρίου, ενώ ο οδηγός είχε πει 14).
 DateTime nextCheckDay(Goals g, DateTime today) {
   final t = _day(today);
   if (checkInDue(goals: g, today: t, lastCheckIn: g.checkIn)) return t;
@@ -218,7 +220,13 @@ DateTime nextCheckDay(Goals g, DateTime today) {
   final ci = g.checkIn;
   final last = ci == null ? null : DateTime.tryParse(ci);
   var d = t;
-  while (d.weekday != first.weekday || (last != null && daysBetween(last, d) < adaptMinChangeDays)) {
+  if (last != null) {
+    // Η νωρίτερη μέρα που μπορεί να ξαναβγεί έλεγχος· από εκεί, η πρώτη ίδια μέρα της εβδομάδας με την αρχή.
+    final gap = answerChangedTarget(g, last) ? adaptMinChangeDays : 1;
+    final earliest = DateTime(last.year, last.month, last.day + gap);
+    if (earliest.isAfter(d)) d = earliest;
+  }
+  while (d.weekday != first.weekday) {
     d = DateTime(d.year, d.month, d.day + 1);
   }
   return d;
@@ -227,6 +235,14 @@ DateTime nextCheckDay(Goals g, DateTime today) {
 /// Τόσες γραμμένες μέρες φαγητού (τουλάχιστον) χρειάζεται η «γρήγορη απώλεια» για να πει πόσο τρως (S1-2).
 const adaptFastMinIntakeDays = 4;
 
+/// Γύρος 2 (R2-A-3): και από τις [adaptFastRecentDays] τελευταίες τελειωμένες μέρες, τουλάχιστον [adaptFastRecentMinDays]
+/// γραμμένες. Αυτές οι μέρες κινούν περισσότερο τη ζυγαριά· αν λείπουν (π.χ. αρρώστια χωρίς καταγραφή), το ημερολόγιο
+/// δεν λέει πόσο τρως τώρα, και το +150 δεν προτείνεται από τις παλιότερες μέρες. Προσομοίωση (300 επαναλήψεις): με
+/// αρρώστια 10 ημερών χωρίς καταγραφή τα λάθος +150 πέφτουν από 1,93 σε 0,27 ανά επανάληψη· η αληθινά γρήγορη απώλεια
+/// (1,2% την εβδομάδα, 10% μέρες χωρίς καταγραφή) πιάνεται όπως πριν (κάρτα τη 22η μέρα, +150 στο 99% των επαναλήψεων).
+const adaptFastRecentDays = 7;
+const adaptFastRecentMinDays = 5;
+
 /// Η τελευταία μέρα που άλλαξε ο στόχος από κάρτα (εβδομαδιαίος έλεγχος ή γρήγορη απώλεια με «Εφάρμοσε»). null: ποτέ.
 DateTime? lastChangeDay(Goals g) {
   String? last;
@@ -234,6 +250,30 @@ DateTime? lastChangeDay(Goals g) {
     if (l.applied && (last == null || l.day.compareTo(last) > 0)) last = l.day;
   }
   return last == null ? null : DateTime.tryParse(last);
+}
+
+/// Ο στόχος θερμίδων που ίσχυε τη μέρα [d] (γύρος 2, R2-A-1): το «πριν» της πρώτης αλλαγής από κάρτα («Εφάρμοσε») που
+/// έγινε εκείνη τη μέρα ή αργότερα· αν από τότε δεν άλλαξε, ο τωρινός. Η μέρα της αλλαγής μετρά με τον παλιό στόχο (το
+/// «Εφάρμοσε» πατιέται κάποια ώρα μέσα στη μέρα). Πριν, κάθε μέρα συγκρινόταν με τον ΤΩΡΙΝΟ στόχο: όποιος έτρωγε ακριβώς
+/// τους στόχους του, μετά από δύο «+150» άκουγε «τρως πολύ λίγο» και το επόμενο +150 δεν προτεινόταν.
+int targetOn(Goals g, DateTime d) {
+  final key = dateKey(d);
+  AdaptLog? next;
+  for (final l in g.log) {
+    if (l.applied && l.day.compareTo(key) >= 0 && (next == null || l.day.compareTo(next.day) < 0)) next = l;
+  }
+  return next?.before ?? g.kcal;
+}
+
+/// Ο μέσος όρος του [targetOn] στις [days] (ο τωρινός στόχος, αν δεν υπάρχει καμία μέρα).
+double meanTargetOn(Goals g, Iterable<DateTime> days) {
+  var sum = 0.0;
+  var n = 0;
+  for (final d in days) {
+    sum += targetOn(g, d);
+    n++;
+  }
+  return n == 0 ? g.kcal.toDouble() : sum / n;
 }
 
 /// Τι εκκρεμεί σήμερα (null: τίποτα). Ο εβδομαδιαίος έλεγχος έχει προτεραιότητα· η γρήγορη απώλεια βγαίνει τις άλλες
@@ -270,9 +310,10 @@ CheckIn? pendingCheckIn({
     // Η πρώτη εβδομάδα των στόχων δεν μετρά (Συμβούλιο 2, Α2).
     final firstCounted = DateTime(since.year, since.month, since.day + adaptSkipDays);
     DateTime notBeforeFirst(DateTime d) => d.isBefore(firstCounted) ? firstCounted : d;
-    // Το φαγητό διαβάζεται για το μεγαλύτερο παράθυρο (ως 42 μέρες, Α1)· οι μετρητές της κάρτας «λίγα δεδομένα» αφορούν
-    // τις 3 τελευταίες εβδομάδες, όπως γράφει το κείμενό της.
-    final wideFrom = notBeforeFirst(DateTime(to.year, to.month, to.day - (adaptMaxWindowDays - 1)));
+    // Το φαγητό διαβάζεται για το μεγαλύτερο παράθυρο (ως 42 μέρες, Α1) και 4 μέρες πριν από αυτό, για το κενό καταγραφής
+    // ([adaptScanDays], γύρος 2, R2-A-2)· οι μετρητές της κάρτας «λίγα δεδομένα» αφορούν τις 3 τελευταίες εβδομάδες, όπως
+    // γράφει το κείμενό της.
+    final wideFrom = notBeforeFirst(DateTime(to.year, to.month, to.day - (adaptScanDays - 1)));
     final from = notBeforeFirst(DateTime(to.year, to.month, to.day - (adaptWindowDays - 1)));
     final eaten = intake(wideFrom, to);
     final days =
@@ -311,6 +352,12 @@ CheckIn? pendingCheckIn({
         if ((tooFast && p.change < 0) || held) {
           p = AdaptProposal(current: p.current, target: p.current, est: e, fastLoss: false, floored: false);
         }
+        // R2-A-1: οι στόχοι που ίσχυαν τις μέρες που μπήκαν στον μέσο όρο φαγητού (ίδιο φίλτρο με το estimateExpenditure).
+        final full = adaptFullDayShare * g.kcal;
+        final estTarget = meanTargetOn(g, [
+          for (final x in eaten.entries)
+            if (!x.key.isBefore(e.from) && !x.key.isAfter(e.to) && x.value >= full && x.value <= over) x.key,
+        ]);
         return CheckIn(
             kind: p.same ? CheckKind.same : CheckKind.proposal,
             goals: g,
@@ -323,7 +370,8 @@ CheckIn? pendingCheckIn({
             tooFast: tooFast,
             heldDays: held ? sinceChange : null,
             absurd: absurd,
-            foreign: news);
+            foreign: news,
+            estTarget: estTarget);
       case AdaptStatus.implausible:
         return CheckIn(
             kind: CheckKind.implausible,
@@ -371,14 +419,20 @@ CheckIn? pendingCheckIn({
   // καταχώριση, όχι μόνο όσες περνούν το 60%: εδώ ψάχνουμε ακριβώς το «τρως πολύ λίγο».
   final yesterday = DateTime(t.year, t.month, t.day - 1);
   final diary = yesterday.isBefore(window.$1) ? const <DateTime, double>{} : intake(window.$1, yesterday);
-  final logged = [
-    for (final v in diary.values)
-      if (v <= over) v,
+  final loggedDays = [
+    for (final e in diary.entries)
+      if (e.value <= over) e.key,
   ];
-  final known = logged.length >= adaptFastMinIntakeDays;
+  final logged = [for (final d in loggedDays) diary[d]!];
+  // R2-A-3: γραμμένες και οι περισσότερες από τις τελευταίες μέρες (αλλιώς το ημερολόγιο δεν λέει πόσο τρως τώρα).
+  final recentFrom7 = DateTime(yesterday.year, yesterday.month, yesterday.day - (adaptFastRecentDays - 1));
+  final recent = loggedDays.where((d) => !d.isBefore(recentFrom7)).length;
+  final known = logged.length >= adaptFastMinIntakeDays && recent >= adaptFastRecentMinDays;
   final mean = logged.isEmpty ? null : logged.reduce((a, b) => a + b) / logged.length;
+  // R2-A-1: κάθε μέρα με τον στόχο που ίσχυε εκείνη τη μέρα, όχι με τον τωρινό.
+  final target = meanTargetOn(g, loggedDays);
   AdaptProposal? proposal;
-  if (known && mean != null && mean >= g.kcal - adaptMaxStep) {
+  if (known && mean != null && mean >= target - adaptMaxStep) {
     // Τρως περίπου όσο ο στόχος και χάνεις γρήγορα: πρόταση +150, ως όσα καις. Αν ο στόχος είναι ήδη εκεί, καμία κάρτα·
     // ο εβδομαδιαίος έλεγχος τον διορθώνει από τα δεδομένα.
     proposal = fastLossCheck(goals: g, weights: weights, today: t);
@@ -393,6 +447,7 @@ CheckIn? pendingCheckIn({
       fastDays: daysBetween(window.$1, window.$2),
       fastIntake: known ? mean : null,
       fastIntakeDays: logged.length,
+      fastTarget: known ? target : null,
       foreign: news);
 }
 

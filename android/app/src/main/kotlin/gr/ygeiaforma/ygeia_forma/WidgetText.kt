@@ -52,8 +52,11 @@ object WidgetText {
 
     /**
      * U7-11: η γραμμή «▲ συνήθως 6:58 · 7 νύχτες μέσα στο εύρος». Αν δεν χωρά ολόκληρη ([fits]: με το πολύ
-     * [MIN_SCALE_SMALL] σμίκρυνση), γίνεται δύο γραμμές («συνήθως…» και η κρίση του εύρους)· η κρίση χάνει το «N νύχτες»
-     * αν ούτε έτσι χωρά. Ό,τι δεν χωρά δεν γράφεται· ποτέ «· …», που έκοβε την κρίση στη μέση.
+     * [MIN_SCALE_SMALL] σμίκρυνση), γίνεται δύο γραμμές («συνήθως…» και η κρίση του εύρους). Ό,τι δεν χωρά δεν γράφεται·
+     * ποτέ «· …», που έκοβε την κρίση στη μέση.
+     * Round 2 (R2-D-1): η κρίση γράφεται μόνο ΟΛΟΚΛΗΡΗ, με το «N νύχτες» της. Πριν, σε στενή στήλη έχανε το «7 νύχτες» και
+     * το «κάτω από το εύρος» του μέσου όρου της εβδομάδας καθόταν κάτω από τη χθεσινή νύχτα (π.χ. «7:16 ώρες» … «κάτω από
+     * το εύρος»), σαν κρίση για εκείνη. Καλύτερα τίποτα παρά κρίση χωρίς το τι κρίνει.
      */
     fun usualLines(usual: String?, range: String?, fits: (String) -> Boolean): List<String> {
         val us = usual?.takeIf { it.isNotBlank() }
@@ -64,10 +67,7 @@ object WidgetText {
         if (fits(joined)) return listOf(joined)
         val out = mutableListOf<String>()
         if (us != null && fits(us)) out += us
-        if (r != null) {
-            val short = r.replace(Regex("^\\d+ νύχτ(α|ες) "), "")
-            if (fits(r)) out += r else if (short != r && fits(short)) out += short
-        }
+        if (r != null && fits(r)) out += r
         return out
     }
 
