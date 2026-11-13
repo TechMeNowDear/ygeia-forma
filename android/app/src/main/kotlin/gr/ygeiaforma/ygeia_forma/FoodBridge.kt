@@ -188,8 +188,7 @@ class FoodBridge(
 
     private fun offLookup(code: String): JSONObject {
         require(code.matches(Regex("^[0-9]{8,14}$"))) { "Μη έγκυρο barcode" }
-        val fields = "code,product_name,product_name_el,generic_name_el,brands,quantity,serving_size," +
-            "serving_quantity,nutriments,nutrition_data_per,lang"
+        val fields = FoodRules.OFF_FIELDS
         val url = URL("https://world.openfoodfacts.org/api/v2/product/$code.json?fields=$fields")
         val conn = url.openConnection() as HttpURLConnection
         try {

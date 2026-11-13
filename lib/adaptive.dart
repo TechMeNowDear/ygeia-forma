@@ -28,6 +28,17 @@
 ///   (προσομοίωση με θόρυβο ζύγισης 0,4 kg, 4.000 επαναλήψεις).
 /// - Μέρες: πάντα ημερολογιακές (DateTime(έτος, μήνας, μέρα − n)), ποτέ «μείον n × 24 ώρες»: στην αλλαγή ώρας μια μέρα
 ///   κρατά 23 ή 25 ώρες (Συμβούλιο 2, Σ2: ο απαντημένος έλεγχος ξαναέβγαινε την εβδομάδα μετά την αλλαγή του Οκτωβρίου).
+///
+/// Έλεγχος 13/11 (γύρος 1). Όλοι οι κανόνες αποδείχθηκαν πρώτα με αριθμούς (αντίγραφο σε Python) και μετά γράφτηκαν εδώ:
+/// - Κενό καταγραφής (S1-1, [foodGap]): κανένα παράθυρο δεν περιέχει [adaptGapDays] ή περισσότερες συνεχόμενες μέρες που
+///   δεν μετρούν. Ο μέσος όρος φαγητού βγαίνει μόνο από τις γραμμένες μέρες, η κλίση του βάρους από όλες: με δύο εβδομάδες
+///   διακοπών χωρίς καταγραφή η εκτίμηση έβγαινε 280–510 kcal χαμηλά και ο στόχος κατέβαινε 150–450 kcal για 3–4
+///   εβδομάδες. Τώρα το παράθυρο ξεκινά μετά το κενό· ως τότε η κάρτα το λέει και ο στόχος μένει ίδιος.
+/// - Μέρα με αδύνατα πολλές θερμίδες (S11-3, [absurdDayKcal]): δεν μπαίνει στον μέσο όρο (π.χ. 2000 g αντί για 20 g).
+/// - Γρήγορη απώλεια (S1-2): η πρόταση δεν περνά ποτέ όσα καις ([fastLossCap])· και δεν γίνεται καθόλου όταν το
+///   ημερολόγιο δείχνει ότι τρως πολύ κάτω από τον στόχο (τότε δεν φταίει ο στόχος): αυτό το κρίνει το adaptive_check.dart.
+/// - Απόσταση αλλαγών (S1-4, [adaptMinChangeDays]): έλεγχος που απαντήθηκε λιγότερο από 4 μέρες πριν από μια μέρα
+///   ελέγχου καλύπτει και αυτήν (πριν: δύο βήματα των 150 kcal μέσα σε 24 ώρες, με τα ίδια δεδομένα).
 library;
 
 import 'dart:math' as math;
@@ -52,6 +63,23 @@ const adaptMinSpanDays = 14;
 const adaptFullDayShare = fullDayShare;
 const adaptMaxStep = 150;
 const adaptMinStep = 30;
+
+/// Τόσες συνεχόμενες μέρες που δεν μετρούν (καθόλου ή λίγη καταγραφή) είναι «κενό καταγραφής»: κανένα παράθυρο δεν το
+/// περιέχει (έλεγχος 13/11, S1-1). Ένα Σαββατοκύριακο ή ένα τριήμερο δεν φτάνει· μια εβδομάδα διακοπών ναι.
+const adaptGapDays = 5;
+
+/// Ελάχιστες μέρες ανάμεσα σε δύο αλλαγές του στόχου, και από μια απάντηση ως την επόμενη μέρα ελέγχου (S1-4).
+const adaptMinChangeDays = 4;
+
+/// Μέρα με περισσότερες θερμίδες από αυτό δεν μπαίνει στον μέσο όρο: σχεδόν σίγουρα λάθος ποσότητα (S11-3).
+/// Το μεγαλύτερο από 6.000 kcal και 2,5 φορές όσα καις κατά τον τύπο. Για σύγκριση: η πρόσληψη που αντέχει το πεπτικό
+/// για πολλές μέρες είναι περίπου 2,5 φορές ο ΒΑΣΙΚΟΣ μεταβολισμός (Thurber 2019, Science Advances)· το όριο εδώ είναι
+/// 2,5 φορές η ΣΥΝΟΛΙΚΗ κατανάλωση, δηλαδή πάνω και από αυτό. Μία μέρα μπορεί θεωρητικά να το περάσει (διαγωνισμός
+/// φαγητού)· είναι δική μας επιλογή για λάθη πληκτρολόγησης, όχι ιατρικό όριο. Η μέρα μένει στο ημερολόγιο όπως είναι.
+const adaptAbsurdKcal = 6000.0;
+const adaptAbsurdTimes = 2.5;
+
+double absurdDayKcal(double formulaTdee) => math.max(adaptAbsurdKcal, adaptAbsurdTimes * formulaTdee);
 
 /// Πόσα τυπικά σφάλματα πρέπει να ξεπερνά η διαφορά για να προταθεί αλλαγή στόχου.
 const adaptGuardSe = 2.0;
@@ -139,7 +167,68 @@ class Expenditure {
   double get guardKcal => adaptGuardSe * seKcal;
 }
 
-enum AdaptStatus { ok, tooEarly, fewIntakeDays, fewWeighIns, implausible }
+enum AdaptStatus {
+  ok,
+  tooEarly,
+  fewIntakeDays,
+  fewWeighIns,
+  implausible,
+
+  /// Κενό καταγραφής που κρατά ως και χθες ([foodGap] χωρίς «restart»): καμία εκτίμηση.
+  gapOpen,
+
+  /// Μετά από κενό καταγραφής δεν έχουν μαζευτεί ακόμα [adaptWindowDays] μέρες: καμία εκτίμηση.
+  afterGap,
+}
+
+/// Κενό καταγραφής: από [from] ως και [to] καμία μέρα δεν μετρά. [restart]: η πρώτη μέρα που μετρά μετά το κενό (από
+/// εκεί και πέρα ξαναρχίζει η εκτίμηση)· null όταν το κενό κρατά ως και χθες.
+typedef FoodGap = ({DateTime from, DateTime to, DateTime? restart});
+
+/// Το τελευταίο κενό καταγραφής ως χθες: [adaptGapDays] ή περισσότερες συνεχόμενες μέρες χωρίς φαγητό που μετρά (κάτω
+/// από το 60% του στόχου, καθόλου καταγραφή, ή πάνω από το [absurdDayKcal]). Ψάχνει στις μέρες που μπορεί να πιάσει το
+/// μεγαλύτερο παράθυρο ([adaptMaxWindowDays]), χωρίς την πρώτη εβδομάδα των στόχων. null: κανένα κενό, ή καμία μέρα που
+/// να μετρά (τότε η κάρτα λέει «λίγα δεδομένα», όπως πριν).
+/// Χωρίς [since] το ημερολόγιο θεωρείται ότι αρχίζει στην πρώτη μέρα που μετρά: οι μέρες πριν από αυτήν δεν είναι κενό.
+FoodGap? foodGap({
+  required Map<DateTime, double> intake,
+  required DateTime today,
+  required double formulaTdee,
+  required int goalKcal,
+  DateTime? since,
+}) {
+  final t = _day(today);
+  final to = DateTime(t.year, t.month, t.day - 1);
+  var lo = DateTime(to.year, to.month, to.day - (adaptMaxWindowDays - 1));
+  if (since != null) {
+    final firstCounted = DateTime(since.year, since.month, since.day + adaptSkipDays);
+    if (lo.isBefore(firstCounted)) lo = firstCounted;
+  }
+  final full = adaptFullDayShare * goalKcal;
+  final over = absurdDayKcal(formulaTdee);
+  final counted = <DateTime>{};
+  for (final e in intake.entries) {
+    final d = _day(e.key);
+    if (e.value >= full && e.value <= over && !d.isBefore(lo) && !d.isAfter(to)) counted.add(d);
+  }
+  if (counted.isEmpty) return null;
+  FoodGap? gap;
+  var run = 0;
+  var seen = since != null;
+  var runStart = lo;
+  for (var d = lo; !d.isAfter(to); d = DateTime(d.year, d.month, d.day + 1)) {
+    if (counted.contains(d)) {
+      if (seen && run >= adaptGapDays) gap = (from: runStart, to: DateTime(d.year, d.month, d.day - 1), restart: d);
+      run = 0;
+      seen = true;
+    } else {
+      if (run == 0) runStart = d;
+      run++;
+    }
+  }
+  if (run >= adaptGapDays) return (from: runStart, to: to, restart: null);
+  return gap;
+}
 
 /// [intake]: θερμίδες ανά μέρα (όπως φαίνονται στη Διατροφή). [weights]: ζυγίσεις (μία ανά μέρα). [today]: σήμερα·
 /// το παράθυρο τελειώνει χθες. [formulaTdee]: ο τύπος, για τον έλεγχο λογικής. [goalKcal]: για το «60% του στόχου».
@@ -148,6 +237,9 @@ enum AdaptStatus { ok, tooEarly, fewIntakeDays, fewWeighIns, implausible }
 /// Δοκιμάζει τα παράθυρα του [adaptWindows] από το μεγαλύτερο: επιστρέφει το πρώτο που έχει αρκετά δεδομένα και λογική
 /// εκτίμηση. Αν κανένα, την κατάσταση του μικρότερου (21 μέρες), ώστε η κάρτα να λέει τι λείπει «στις 3 τελευταίες
 /// εβδομάδες». [AdaptStatus.tooEarly]: δεν έχουν περάσει ακόμα 21 μέρες που μετρούν.
+/// Έλεγχος 13/11: κανένα παράθυρο δεν αρχίζει πριν από το τέλος του τελευταίου κενού καταγραφής ([foodGap])·
+/// [AdaptStatus.gapOpen] / [AdaptStatus.afterGap] όταν γι' αυτό δεν χωρά ακόμα παράθυρο 21 ημερών. Μέρες πάνω από το
+/// [absurdDayKcal] δεν μετρούν.
 ({AdaptStatus status, Expenditure? est}) estimateExpenditure({
   required Map<DateTime, double> intake,
   required List<(DateTime, double)> weights,
@@ -160,10 +252,20 @@ enum AdaptStatus { ok, tooEarly, fewIntakeDays, fewWeighIns, implausible }
   final t = _day(today);
   final to = DateTime(t.year, t.month, t.day - 1);
   final firstCounted = since == null ? null : DateTime(since.year, since.month, since.day + adaptSkipDays);
-  final available = firstCounted == null ? adaptMaxWindowDays : daysBetween(firstCounted, to) + 1;
+  var available = firstCounted == null ? adaptMaxWindowDays : daysBetween(firstCounted, to) + 1;
   if (available < adaptWindowDays) return (status: AdaptStatus.tooEarly, est: null);
 
   final full = adaptFullDayShare * goalKcal;
+  final over = absurdDayKcal(formulaTdee);
+  // Κενό καταγραφής (S1-1): το παράθυρο δεν αρχίζει πριν από την πρώτη μέρα που μετρά μετά το κενό.
+  final gap = foodGap(intake: intake, today: t, formulaTdee: formulaTdee, goalKcal: goalKcal, since: since);
+  if (gap != null) {
+    final restart = gap.restart;
+    if (restart == null) return (status: AdaptStatus.gapOpen, est: null);
+    final after = daysBetween(restart, to) + 1;
+    if (after < adaptWindowDays) return (status: AdaptStatus.afterGap, est: null);
+    if (after < available) available = after;
+  }
   ({AdaptStatus status, Expenditure? est}) result = (status: AdaptStatus.fewIntakeDays, est: null);
   for (final windowDays in adaptWindows) {
     if (windowDays > available) continue;
@@ -172,7 +274,7 @@ enum AdaptStatus { ok, tooEarly, fewIntakeDays, fewWeighIns, implausible }
     final need = adaptNeeds(windowDays);
     final days = [
       for (final e in intake.entries)
-        if (inWindow(e.key) && e.value >= full) e.value,
+        if (inWindow(e.key) && e.value >= full && e.value <= over) e.value,
     ];
     final ws = [
       for (final w in weights)
@@ -303,10 +405,11 @@ List<(DateTime, double)> fastLossWeights({required Goals goals, required List<(D
   ]..sort((a, b) => a.$1.compareTo(b.$1));
 }
 
-/// Γρήγορη απώλεια: η κλίση των ζυγίσεων του [fastLossWindow] περνά το −1% του βάρους την εβδομάδα ακόμα και αν της
-/// προστεθεί ένα τυπικό σφάλμα (με ≥ 4 ζυγίσεις σε ≥ 10 μέρες). Μόνο σε «λιγότερο λίπος», από τη 14η μέρα των στόχων.
-/// Στην πράξη η νωρίτερη ειδοποίηση βγαίνει τη 17η–18η μέρα (10 μέρες ζυγίσεων μετά την πρώτη εβδομάδα).
-AdaptProposal? fastLossCheck({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
+/// Γρήγορη απώλεια, η μέτρηση: η κλίση των ζυγίσεων του [fastLossWindow] περνά το −1% του βάρους την εβδομάδα ακόμα και
+/// αν της προστεθεί ένα τυπικό σφάλμα (με ≥ 4 ζυγίσεις σε ≥ 10 μέρες). Μόνο σε «λιγότερο λίπος», από τη 14η μέρα των
+/// στόχων. Στην πράξη η νωρίτερη ειδοποίηση βγαίνει τη 17η–18η μέρα (10 μέρες ζυγίσεων μετά την πρώτη εβδομάδα).
+/// Επιστρέφει την κλίση (kg την εβδομάδα, αρνητική) και το βάρος της τελευταίας ζύγισης· null όταν δεν ισχύει.
+({double slopeKgWeek, double kg})? fastLossSlope({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
   if (goals.aim != GoalAim.lose) return null;
   final since = DateTime.tryParse(goals.since);
   if (since == null || daysBetween(since, today) < adaptFastFromDay) return null;
@@ -319,12 +422,28 @@ AdaptProposal? fastLossCheck({required Goals goals, required List<(DateTime, dou
   // Μια ρηχή ζύγιση (αφυδάτωση) δεν φτάνει πια για να τη βγάλει.
   final cautious = fit.slope + adaptFastGuardSe * (fit.se ?? 0.0);
   if (cautious * 7 >= -adaptFastLossPct * kg) return null;
+  return (slopeKgWeek: fit.slope * 7, kg: kg);
+}
+
+/// Πάνω από εδώ η «γρήγορη απώλεια» δεν ανεβάζει τον στόχο (έλεγχος 13/11, S1-2): όσα καις, από την τελευταία εκτίμηση
+/// με τα δεδομένα σου, αλλιώς από τον τύπο, στα 10. Πριν, το +150 επαναλαμβανόταν κάθε εβδομάδα χωρίς τέλος και ο στόχος
+/// «λιγότερο λίπος» έφτανε πάνω από την κατανάλωση.
+int fastLossCap(Goals goals) => _round10(goals.tdeeEst ?? goals.calc.tdee);
+
+/// Γρήγορη απώλεια, η πρόταση: +[adaptMaxStep] kcal, ποτέ πάνω από το [fastLossCap]. null όταν η [fastLossSlope] δεν
+/// ισχύει ή όταν ο στόχος είναι ήδη εκεί (μένουν λιγότερες από [adaptMinStep] kcal ως το όριο).
+AdaptProposal? fastLossCheck({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
+  if (fastLossSlope(goals: goals, weights: weights, today: today) == null) return null;
   final current = goals.kcal;
-  return AdaptProposal(current: current, target: current + adaptMaxStep, est: null, fastLoss: true, floored: false);
+  final target = math.min(current + adaptMaxStep, fastLossCap(goals));
+  if (target - current < adaptMinStep) return null;
+  return AdaptProposal(current: current, target: target, est: null, fastLoss: true, floored: false);
 }
 
 /// Μέρα εβδομαδιαίου ελέγχου: η μέρα της εβδομάδας που φτιάχτηκαν οι στόχοι, από την 21η μέρα και μετά. Αν χάθηκε
 /// (δεν άνοιξες την εφαρμογή εκείνη τη μέρα), μένει ανοιχτός ως τον επόμενο. Μία φορά για κάθε μέρα ελέγχου.
+/// Έλεγχος 13/11 (S1-4): έλεγχος που απαντήθηκε λιγότερο από [adaptMinChangeDays] μέρες πριν από μια μέρα ελέγχου
+/// καλύπτει και αυτήν. Πριν, απάντηση την Κυριακή και νέα κάρτα τη Δευτέρα έδιναν δύο βήματα (−290 kcal) σε 24 ώρες.
 bool checkInDue({required Goals goals, required DateTime today, String? lastCheckIn}) {
   final since = DateTime.tryParse(goals.since);
   if (since == null) return false;
@@ -336,7 +455,7 @@ bool checkInDue({required Goals goals, required DateTime today, String? lastChec
   final dueDay = DateTime(t.year, t.month, t.day - back);
   if (daysBetween(since, dueDay) < adaptWindowDays) return false;
   final last = lastCheckIn == null ? null : DateTime.tryParse(lastCheckIn);
-  return last == null || last.isBefore(dueDay);
+  return last == null || daysBetween(last, dueDay) >= adaptMinChangeDays;
 }
 
 /// Βοηθητικό για προβολή: «−0,4 kg την εβδομάδα».

@@ -20,6 +20,72 @@ import 'me_page.dart';
 import 'privacy_page.dart';
 import 'training/training_page.dart' show editDoctorLimit;
 
+/// Το κείμενο στο τέλος των Ρυθμίσεων. Έλεγχος 13/11 (U4-8): έγραφε «διαβάζει δεδομένα μόνο όταν την ανοίγεις», ενώ από
+/// τις 2/11 η εφαρμογή διαβάζει το Samsung Health και κάθε 3 ώρες στο παρασκήνιο (RefreshWorker.kt· όχι 00:00–06:00).
+const settingsFooterText = 'Υγεία & Φόρμα · προσωπική έκδοση\n'
+    'Η εφαρμογή διαβάζει το Samsung Health όταν την ανοίγεις και, για να είναι έτοιμη, περίπου κάθε 3 ώρες χωρίς να την '
+    'ανοίξεις (όχι από τα μεσάνυχτα ως τις 6 το πρωί).';
+
+/// Το αποτέλεσμα μιας εξαγωγής αντιγράφου: [ok] μόνο για πλήρες αντίγραφο που γράφτηκε· [text] για τον χρήστη· [uri] το
+/// αρχείο στις Λήψεις, για την «Αποστολή».
+typedef BackupExport = ({bool ok, String text, String? uri});
+
+/// Οι προπονήσεις για το αντίγραφο, με τους παλμούς τους (μόνο αν διαβάστηκαν σωστά).
+Future<Map<String, dynamic>?> _trainingForBackup() async {
+  final t = TrainingStore.main;
+  await t.load();
+  return t.ready && !t.readError ? await t.backupJson() : null;
+}
+
+/// Η εξαγωγή χωρίς μηνύματα. Τη χρησιμοποιούν η γραμμή «Εξαγωγή αντιγράφου» (μήνυμα κάτω), το φύλλο «Διαγραφή όλων»
+/// (μέσα στο φύλλο, έλεγχος του fix-accuracy, M2) και η κάρτα «Αντίγραφο ασφαλείας» της «Σήμερα» (έλεγχος 13/11, S9-3).
+Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
+  final raw = await food.exportRaw();
+  if (raw == null) return (ok: false, text: 'Δεν διαβάστηκαν τα δεδομένα. Δοκίμασε ξανά.', uri: null);
+  final now = DateTime.now();
+  final name = backupFileName(now);
+  final sources = await store.sourcesForBackup();
+  // Οι ρυθμίσεις μπαίνουν μόνο αν έχουν διαβαστεί (αλλιώς θα έμπαιναν οι αρχικές).
+  final json = buildBackup(
+    foodLog: raw.$1,
+    myFoods: raw.$2,
+    prefs: store.prefsLoaded ? store.prefsJson() : const {},
+    now: now,
+    sources: sources,
+    training: await _trainingForBackup(),
+  );
+  final trainingOut = TrainingStore.main.readError;
+  final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
+  // Έλεγχος 13/11 (S9-8): αν οι ρυθμίσεις δεν διαβάστηκαν (ή ισχύουν οι προεπιλογές, γιατί το αρχείο τους χάλασε), το
+  // αρχείο ΔΕΝ έχει «Τα στοιχεία μου», στόχους, ζώνη και μέση· αν το σχέδιο πηγών δεν διαβάζεται, δεν έχει το από πότε
+  // μετρά το Oura. Πριν, έβγαινε πράσινο «Αποθηκεύτηκε» και άνοιγε η «Διαγραφή όλων» με μισό αντίγραφο. (Κινητό που δεν
+  // είχε ποτέ Oura δεν έχει σχέδιο να μπει: εκεί δεν λείπει τίποτα.)
+  final prefsOut = !store.prefsLoaded || store.prefsFromDefaults;
+  final sourcesOut = sources == null && (!store.planReady || store.plan.eras.isNotEmpty);
+  final r = await FoodChannel.saveBackup(json, name);
+  if (r['ok'] != true || r['uri'] is! String) {
+    return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}', uri: null);
+  }
+  final saved = r['name'] is String ? r['name'] as String : name;
+  // Πλήρες μόνο αν μπήκαν οι προπονήσεις με τους παλμούς τους, οι ρυθμίσεις και οι πηγές ύπνου. Μόνο ένα πλήρες
+  // αντίγραφο μετρά ως «τελευταίο αντίγραφο» (13/11).
+  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut;
+  if (complete) store.markExported(now);
+  return (
+    ok: complete,
+    text: 'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
+        // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
+        '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
+        // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
+        '${hrMissing > 0 ? '. ${countText(hrMissing, 'προπόνηση μπήκε χωρίς παλμούς', 'προπονήσεις μπήκαν χωρίς παλμούς')}: τα αρχεία τους δεν διαβάστηκαν.' : ''}'
+        '${prefsOut ? '. Οι ρυθμίσεις (στοιχεία, στόχοι, μέση) δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
+        '${sourcesOut ? '. Οι πηγές ύπνου δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
+        // Έλεγχος 13/11 (S9-3): το αρχείο μένει στις Λήψεις του ίδιου κινητού.
+        '${complete ? '. Στείλ’ το και έξω από το κινητό (π.χ. στο Drive ή με email).' : ''}',
+    uri: r['uri'] as String,
+  );
+}
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
   final HealthStore store;
@@ -155,9 +221,10 @@ class SettingsPage extends StatelessWidget {
                       ]),
                       const SizedBox(height: 20),
                       Text(
-                        'Υγεία & Φόρμα · προσωπική έκδοση\nΗ εφαρμογή διαβάζει δεδομένα μόνο όταν την ανοίγεις.',
+                        settingsFooterText,
+                        key: const ValueKey('settings-footer'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.45),
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                     ],
                   ),
@@ -227,54 +294,10 @@ class _DataGroupState extends State<_DataGroup> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), action: action, duration: const Duration(seconds: 6)));
   }
 
-  /// Οι προπονήσεις για το αντίγραφο, με τους παλμούς τους (μόνο αν διαβάστηκαν σωστά).
-  Future<Map<String, dynamic>?> _training() async {
-    final t = TrainingStore.main;
-    await t.load();
-    return t.ready && !t.readError ? await t.backupJson() : null;
-  }
-
-  /// Η εξαγωγή χωρίς μηνύματα: (πλήρες αντίγραφο γράφτηκε, κείμενο για τον χρήστη, πού). Τη χρησιμοποιούν η γραμμή
-  /// «Εξαγωγή αντιγράφου» (μήνυμα κάτω) και το φύλλο «Διαγραφή όλων» (μέσα στο φύλλο, έλεγχος του fix-accuracy, M2).
-  Future<({bool ok, String text, String? uri})> _exportNow() async {
-    final raw = await widget.food!.exportRaw();
-    if (raw == null) return (ok: false, text: 'Δεν διαβάστηκαν τα δεδομένα. Δοκίμασε ξανά.', uri: null);
-    final now = DateTime.now();
-    final name = backupFileName(now);
-    // Οι ρυθμίσεις μπαίνουν μόνο αν έχουν διαβαστεί (αλλιώς θα έμπαιναν οι αρχικές).
-    final json = buildBackup(
-      foodLog: raw.$1,
-      myFoods: raw.$2,
-      prefs: widget.store.prefsLoaded ? widget.store.prefsJson() : const {},
-      now: now,
-      sources: await widget.store.sourcesForBackup(),
-      training: await _training(),
-    );
-    final trainingOut = TrainingStore.main.readError;
-    final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
-    final r = await FoodChannel.saveBackup(json, name);
-    if (r['ok'] != true || r['uri'] is! String) {
-      return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο: ${r['message'] ?? 'άγνωστο σφάλμα'}', uri: null);
-    }
-    final saved = r['name'] is String ? r['name'] as String : name;
-    // Μόνο ένα πλήρες αντίγραφο μετρά ως «τελευταίο αντίγραφο» (13/11).
-    if (!trainingOut && hrMissing == 0) widget.store.markExported(now);
-    return (
-      // Πλήρες μόνο αν μπήκαν και οι προπονήσεις με τους παλμούς τους.
-      ok: !trainingOut && hrMissing == 0,
-      text: 'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
-          // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
-          '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
-          // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
-          '${hrMissing > 0 ? '. ${countText(hrMissing, 'προπόνηση μπήκε χωρίς παλμούς', 'προπονήσεις μπήκαν χωρίς παλμούς')}: τα αρχεία τους δεν διαβάστηκαν.' : ''}',
-      uri: r['uri'] as String,
-    );
-  }
-
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
-      final r = await _exportNow();
+      final r = await exportBackupNow(widget.store, widget.food!);
       final uri = r.uri;
       _say(r.text, action: uri == null ? null : SnackBarAction(label: 'Αποστολή', onPressed: () => FoodChannel.shareBackup(uri)));
     } finally {
@@ -285,7 +308,7 @@ class _DataGroupState extends State<_DataGroup> {
   /// Για το φύλλο «Διαγραφή όλων»: το αποτέλεσμα γυρίζει στο φύλλο (το SnackBar θα ήταν κάτω από αυτό).
   Future<BackupResult> _exportForWipe() async {
     try {
-      final r = await _exportNow();
+      final r = await exportBackupNow(widget.store, widget.food!);
       return (ok: r.ok, text: r.text);
     } catch (_) {
       return (ok: false, text: 'Δεν αποθηκεύτηκε το αντίγραφο. Δοκίμασε ξανά.');
@@ -341,12 +364,18 @@ class _DataGroupState extends State<_DataGroup> {
         return;
       }
       final (e, f, failed, existing) = res;
+      // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
+      final prefsNotes =
+          b.prefs.isEmpty || !widget.store.prefsLoaded ? const <String>[] : restoreNotes(widget.store.prefsJson(), b.prefs);
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       final sourcesIn = b.sources != null && await widget.store.restoreSources(b.sources!);
       var trainingIn = 0;
+      var trainingWritten = true;
       if (b.training != null) {
         await TrainingStore.main.load();
         trainingIn = TrainingStore.main.mergeBackup(b.training!);
+        // Round 1 (f3 · S9-5): «μπήκαν» λέγεται μόνο αφού γραφτούν στο κινητό (πριν: πριν από την εγγραφή τους).
+        if (trainingIn > 0) trainingWritten = await TrainingStore.main.flush();
       }
       _say([
         'Επαναφορά: ${entriesText(e)} και ${productsText(f)}.',
@@ -354,8 +383,11 @@ class _DataGroupState extends State<_DataGroup> {
           existing == 1 ? '1 εγγραφή υπήρχε ήδη και έμεινε όπως ήταν.' : '$existing εγγραφές υπήρχαν ήδη και έμειναν όπως ήταν.',
         if (failed > 0) '${countText(failed, 'δεν γράφτηκε', 'δεν γράφτηκαν')}· δοκίμασε ξανά.',
         if (!prefsOk) 'Οι ρυθμίσεις δεν άλλαξαν.',
+        if (prefsOk) ...prefsNotes,
         if (sourcesIn) 'Οι πηγές ύπνου μπήκαν από το αντίγραφο.',
-        if (trainingIn > 0) countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),
+        if (trainingIn > 0 && trainingWritten)
+          countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),
+        if (trainingIn > 0 && !trainingWritten) 'Οι προπονήσεις του αντιγράφου δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (b.training != null && TrainingStore.main.mergeProblem != null) TrainingStore.main.mergeProblem!,
         if (b.sources != null && !sourcesIn) 'Οι πηγές ύπνου του κινητού είναι νεότερες και έμειναν.',
       ].join(' '));

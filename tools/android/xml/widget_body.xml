@@ -12,6 +12,7 @@
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/home_widget"
+    android:previewLayout="@layout/qw_preview_body"
     android:configure="gr.ygeiaforma.ygeia_forma.WidgetConfigActivity"
     android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen" />

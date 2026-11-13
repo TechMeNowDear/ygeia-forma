@@ -186,8 +186,10 @@ class ExercisePage extends StatelessWidget {
           title: 'Άσκηση',
           onRefresh: () => store.refresh(),
           single: [stepsCard, ...stats, caloriesNote, floorsCard],
-          left: [stepsCard, floorsCard],
-          right: [...stats, caloriesNote],
+          // round1, U5-25: οι όροφοι δεξιά, κάτω από τα στοιχεία, ώστε οι δύο στήλες να έχουν περίπου ίδιο ύψος (πριν η
+          // δεξιά τελείωνε ~350 dp νωρίτερα).
+          left: [stepsCard],
+          right: [...stats, caloriesNote, floorsCard],
         );
       },
     );

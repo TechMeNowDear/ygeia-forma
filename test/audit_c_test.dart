@@ -358,7 +358,8 @@ void main() {
       expect(j['publish'], contains('needs: sign'));
       expect(j['publish'], contains("if: github.ref == 'refs/heads/main'"));
       expect(j['publish'], contains('gh release create latest'));
-      expect(j['sign'], contains('needs: [build, smoke]'));
+      // Round 1 (f8 · S10-9 / S12-09): και τα στιγμιότυπα («shots») πριν από την υπογραφή.
+      expect(j['sign'], contains('needs: [build, smoke, shots]'));
       expect(j['sign'], contains('secrets.YGEIA_KEYSTORE_B64'));
       expect(j['sign'], contains('tools/ci/sign_apks.sh'));
       expect(j['sign'], contains('if: always()'), reason: 'το αρχείο του κλειδιού σβήνεται πάντα');

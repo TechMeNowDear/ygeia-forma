@@ -161,9 +161,14 @@ void main() {
           },
         ),
       )));
-      expect(find.text(wipeKeepsText), findsOneWidget);
+      // Round 1 (f8 · U4-7): τι ΔΕΝ σβήνεται είναι πια λίστα, μία γραμμή το καθένα, και η σημείωση για το ρολόι από κάτω.
+      for (final line in wipeKeeps) {
+        expect(find.text(line), findsOneWidget);
+      }
+      expect(find.text(wipeWatchNoteText), findsOneWidget);
+      final keeps = [...wipeKeeps, wipeWatchNoteText].join(' ');
       for (final t in ['Samsung Health', 'Λήψεις', 'αντίγραφο της Google', 'ρολόι', 'άδειες', 'αναφορές σφαλμάτων']) {
-        expect(wipeKeepsText, contains(t));
+        expect(keeps, contains(t));
       }
       await tap(tester, 'wipe-understood');
       expect(enabled(tester, 'wipe-confirm'), isFalse, reason: 'ούτε αντίγραφο ούτε «Χωρίς αντίγραφο»');
@@ -209,7 +214,10 @@ void main() {
       )));
       await tap(tester, 'wipe-export');
       expect(enabled(tester, 'wipe-confirm'), isFalse);
-      expect(File('lib/pages/settings.dart').readAsStringSync(), contains('ok: !trainingOut && hrMissing == 0'));
+      // Round 1 (f8 · S9-8): πλήρες μόνο αν μπήκαν ΚΑΙ οι ρυθμίσεις και οι πηγές ύπνου.
+      final settings = File('lib/pages/settings.dart').readAsStringSync();
+      expect(settings, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut;'));
+      expect(settings, contains('ok: complete,'));
     });
 
     testWidgets('δεν ξεκίνησε: το φύλλο λέει τι έγινε (Oura) και τι όχι', (tester) async {
@@ -304,7 +312,8 @@ void main() {
       expect(body.indexOf('runApp(WipeUnfinishedApp('), lessThan(body.indexOf('HealthStore()')));
       expect(body.indexOf('return;\n  }\n  final store = HealthStore();'), greaterThan(0));
       final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/MainActivity.kt').readAsStringSync();
-      expect(kt, contains('if (!DataWipe.unfinished(this)) RefreshWorker.schedule(this)'));
+      // Round 1 (f8 · U4-6): ούτε όσο φαίνεται το «Όλα διαγράφηκαν».
+      expect(kt, contains('if (!DataWipe.unfinished(this) && !DataWipe.awaitsStart(this)) RefreshWorker.schedule(this)'));
       // N3: το κινητό σβήνει ό,τι παλιό «/ygeia/…» έμεινε (π.χ. πρόγραμμα, όριο) όσο περιμένει το ρολόι.
       expect(File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/DataWipe.kt').readAsStringSync(),
           contains('DataRules.writtenBeforeWipe(t, at)'));
@@ -512,7 +521,7 @@ void main() {
       await tester.pumpWidget(_app(Scaffold(body: SingleChildScrollView(child: HrCard(session: w(hr: hr, avg: 104))))));
       expect(find.byKey(const ValueKey('hr-steady')), findsOneWidget);
       expect(find.descendant(of: find.byKey(const ValueKey('hr-steady')), matching: find.text('112')), findsOneWidget);
-      expect(find.text('από το 5′'), findsOneWidget);
+      expect(find.text('από το 5ο λεπτό'), findsOneWidget);
     });
 
     test('Πρόοδος: 3 μήνες από προεπιλογή· κάρτα και ⓘ το λένε', () {
@@ -600,6 +609,8 @@ void main() {
       'readAt': ms(at(20, 0)),
       'granted': 10,
       'total': 10,
+      // Round 1 (S3-7): ο ύπνος «διαβάστηκε» (άδεια λίστα)· χωρίς το κλειδί δεν βγαίνουν παλμοί μέρας.
+      'sleep': <Object>[],
       'heart': [
         for (var t = at(8, 0); t.isBefore(at(16, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 70, 67, 73],
         for (var t = at(18, 0); t.isBefore(at(19, 0)); t = t.add(const Duration(minutes: 4))) [ms(t), ms(t.add(const Duration(minutes: 4))), 130, 127, 133],

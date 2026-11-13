@@ -51,16 +51,17 @@ void main() {
     expect(find.text('Αναίρεση'), findsOneWidget);
   });
 
-  testWidgets('M-10: «Ενημέρωση τώρα» ανενεργό μέσα στο λεπτό, ενεργό μόνο του μετά', (t) async {
+  // Round 1 (S5-10): το φρένο της ρητής ανάγνωσης είναι πια λίγα δευτερόλεπτα (ouraUserGap = 10″), όχι ένα λεπτό.
+  testWidgets('M-10: «Ενημέρωση τώρα» ανενεργό για λίγα δευτερόλεπτα μετά από ανάγνωση, ενεργό μόνο του μετά', (t) async {
     var clock = now;
     final s = store(SourcePlan([SourceEra(Source.oura, DateTime(2026, 11, 6))]), clock: () => clock)
-      ..ouraTriedMs = now.subtract(const Duration(seconds: 30)).millisecondsSinceEpoch;
+      ..ouraTriedMs = now.subtract(const Duration(seconds: 4)).millisecondsSinceEpoch;
     await pump(t, s);
     FilledButton button() => t.widget<FilledButton>(find.ancestor(
         of: find.text('Ενημέρωση τώρα'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
     expect(button().onPressed, isNull);
-    clock = now.add(const Duration(seconds: 31));
-    await t.pump(const Duration(seconds: 31));
+    clock = now.add(const Duration(seconds: 7));
+    await t.pump(const Duration(seconds: 7));
     expect(button().onPressed, isNotNull);
   });
 

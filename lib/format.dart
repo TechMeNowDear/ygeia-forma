@@ -100,23 +100,15 @@ String signedDec(num v, [int digits = 1]) {
   return r > 0 ? '+${dec(r, digits)}' : '−${dec(-r, digits)}';
 }
 
-/// Διαφορά λεπτών: «25 λεπτά περισσότερα», «1 ώρα 5 λεπτά λιγότερα».
-/// Σύντομη διάρκεια για στενές στήλες: 436 → «7 ώρ. 16 λεπ.», 22 → «22 λεπ.», 420 → «7 ώρ.».
-String hoursMinutesShort(int minutes) {
-  if (minutes < 0) return '−${hoursMinutesShort(-minutes)}';
-  final h = minutes ~/ 60;
-  final m = minutes % 60;
-  if (h == 0) return '$m λεπ.';
-  return m == 0 ? '$h ώρ.' : '$h ώρ. $m λεπ.';
-}
+/// Παλιό όνομα της σύντομης διάρκειας («7 ώρ. 16 λεπ.»). Round 1 (U2a-02, U1a-3, U1b-04): ο κανόνας του χρήστη είναι
+/// διάρκειες ΠΑΝΤΑ με ολόκληρες λέξεις, άρα δίνει ό,τι και το [hoursMinutes]: 436 → «7 ώρες 16 λεπτά».
+String hoursMinutesShort(int minutes) => hoursMinutes(minutes);
 
-/// Διάρκεια σε λίστα ή γραμμή (σχέδια 9/11): 83 → «1 ω 23 λ», 425 → «7 ω 05 λ», 45 → «45 λ».
-String hmList(int minutes) {
-  if (minutes < 0) return '−${hmList(-minutes)}';
-  final h = minutes ~/ 60, m = minutes % 60;
-  return h == 0 ? '$m λ' : '$h ω ${two(m)} λ';
-}
+/// Παλιό όνομα της διάρκειας σε λίστα («1 ω 23 λ», σχέδια 9/11). Round 1 (U2a-02, U1a-3, U1b-04): ολόκληρες λέξεις,
+/// όπως το [hoursMinutes]: 83 → «1 ώρα 23 λεπτά», 425 → «7 ώρες 5 λεπτά», 45 → «45 λεπτά», 1 → «1 λεπτό».
+String hmList(int minutes) => hoursMinutes(minutes);
 
+/// Διαφορά λεπτών: «25 λεπτά περισσότερο», «1 ώρα 5 λεπτά λιγότερο».
 String moreLessMinutes(int v) {
   if (v == 0) return 'ίδια διάρκεια';
   return v > 0 ? '${hoursMinutes(v)} περισσότερο' : '${hoursMinutes(-v)} λιγότερο';

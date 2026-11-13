@@ -130,8 +130,11 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(w.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+                // round1, U5-06 / U5-32: διάρκεια σε λέξεις, και όχι «Περπάτημα / Περπάτημα · 30′».
                 Text(
-                  w.isCardio ? '${w.cardio!.name} · ${w.cardio!.minutes}′' : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · ~${w.minutes}′',
+                  w.isCardio
+                      ? [if (w.cardio!.name != w.name) w.cardio!.name, '${w.cardio!.minutes} λεπτά'].join(' · ')
+                      : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά',
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                 ),
                 if (!w.isCardio && w.items.isNotEmpty)
@@ -139,13 +142,37 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
                       maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: c.textSecondary)),
               ]),
             ),
+            // round1, U5-32: ο κάδος δεν σβήνει μια ολόκληρη προπόνηση χωρίς επιστροφή· «Αναίρεση» για 8 δευτερόλεπτα, όπως
+            // στη διαγραφή μιας προπόνησης από το ιστορικό.
             IconButton(
+              key: ValueKey('ed-delete-${w.id}'),
               tooltip: 'Διαγραφή',
               icon: const Icon(Icons.delete_outline_rounded),
-              onPressed: () => setState(() {
-                _p.workouts.remove(w);
-                _p.days.removeWhere((_, v) => v == w.id);
-              }),
+              onPressed: () {
+                final at = _p.workouts.indexOf(w);
+                final days = <int, String>{for (final e in _p.days.entries) if (e.value == w.id) e.key: e.value};
+                setState(() {
+                  _p.workouts.remove(w);
+                  _p.days.removeWhere((_, v) => v == w.id);
+                });
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(
+                    duration: const Duration(seconds: 8),
+                    content: Text('Σβήστηκε: ${w.name}'),
+                    action: SnackBarAction(
+                      key: const ValueKey('ed-undo'),
+                      label: 'Αναίρεση',
+                      onPressed: () {
+                        if (!mounted || _p.workouts.contains(w)) return;
+                        setState(() {
+                          _p.workouts.insert(at >= 0 && at <= _p.workouts.length ? at : _p.workouts.length, w);
+                          _p.days.addAll(days);
+                        });
+                      },
+                    ),
+                  ));
+              },
             ),
           ]),
         ),

@@ -81,7 +81,14 @@ class _WaistSheetState extends State<WaistSheet> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
           textInputAction: TextInputAction.next,
-          decoration: InputDecoration(labelText: label, suffixText: 'cm'),
+          // Έλεγχος 13/11 (U3b-25 / U3b-26): πεδίο με περίγραμμα, όπως στις άλλες φόρμες, και λόγος όταν η τιμή δεν
+          // γίνεται δεκτή (πριν το «985» άφηνε την «Αποθήκευση» γκρίζα χωρίς εξήγηση).
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            labelText: label,
+            suffixText: 'cm',
+            errorText: _t[k].text.trim().isNotEmpty && _v(k) == null ? 'Από 50 ως 200 cm' : null,
+          ),
           onChanged: (_) => setState(() {}),
         ),
       );
@@ -109,8 +116,9 @@ class _WaistSheetState extends State<WaistSheet> {
           ],
           if (values != null)
             InfoRow('Μέση (μέσος όρος)', '${dec(WaistEntry(_day, values).cm)} cm')
-          else
-            Text('Αν διαφέρουν πάνω από 1 cm, ζητά και 3η.', style: small),
+          // U3b-17: η υπόδειξη μόνο όσο δεν έχει ζητηθεί η τρίτη (πριν έμενε κάτω από το πεδίο «3η μέτρηση»).
+          else if (!_third)
+            Text('Αν διαφέρουν πάνω από 1 cm, θα ζητηθεί και τρίτη.', style: small),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(14),
@@ -128,9 +136,10 @@ class _WaistSheetState extends State<WaistSheet> {
           const SizedBox(height: 10),
           Text(
             p.female || p.male
-                ? 'Εύρος αναφοράς ${p.female ? 'γυναικών' : 'ανδρών'}: κάτω από ${dec(ref.ok, 0)} cm· από ${dec(ref.high, 0)} cm '
-                    'οι οδηγίες συστήνουν μείωση βάρους (ESC 2021).'
-                : 'Εύρος αναφοράς: ανδρών κάτω από 94 cm, γυναικών κάτω από 80 cm (ESC 2021).',
+                // U3b-17: αριθμός και μονάδα με αδιάσπαστο κενό, για να μη σπάνε σε δύο γραμμές («102 / cm»).
+                ? 'Εύρος αναφοράς ${p.female ? 'γυναικών' : 'ανδρών'}: κάτω από ${dec(ref.ok, 0)}\u00A0cm· από '
+                    '${dec(ref.high, 0)}\u00A0cm οι οδηγίες συστήνουν μείωση βάρους (ESC 2021).'
+                : 'Εύρος αναφοράς: ανδρών κάτω από 94\u00A0cm, γυναικών κάτω από 80\u00A0cm (ESC 2021).',
             style: small,
           ),
           const SizedBox(height: 16),

@@ -252,18 +252,21 @@ class DashboardReader(
                     },
                 )
             }
+            // Round 1 (S3-8): η ζώνη ώρας της ίδιας της εγγραφής («off», λεπτά): η ώρα ύπνου/ξυπνήματος μένει η ώρα του
+            // τόπου όπου κοιμήθηκες, ακόμα κι αν το ιστορικό ξαναδιαβαστεί με το κινητό σε άλλη ζώνη. Πρόσθετο κλειδί.
+            val off = DataRules.offsetMinutes(p.zoneOffset?.totalSeconds)
             // C2: μία εγγραφή ανά συνεδρία (το κενό ανάμεσα δεν μετρά ποτέ ως ύπνος).
             for (r in DataRules.splitSleep(start, ms(p.endTime) ?: start, duration?.toMinutes(), score, input)) {
                 val stages = JSONArray()
                 for (x in r.stages) stages.put(JSONArray().put(x.stage).put(x.start).put(x.end))
-                out.put(
-                    JSONObject()
-                        .put("start", r.start)
-                        .put("end", r.end)
-                        .put("minutes", r.minutes ?: JSONObject.NULL)
-                        .put("score", r.score ?: JSONObject.NULL)
-                        .put("stages", stages)
-                )
+                val o = JSONObject()
+                    .put("start", r.start)
+                    .put("end", r.end)
+                    .put("minutes", r.minutes ?: JSONObject.NULL)
+                    .put("score", r.score ?: JSONObject.NULL)
+                    .put("stages", stages)
+                if (off != null) o.put("off", off)
+                out.put(o)
             }
         }
         return out
@@ -423,6 +426,9 @@ class DashboardReader(
             val bmr: Int? = p.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE)
             if (bmr != null) o.put("bmr", bmr)
             o.put("app", p.dataSource?.appId ?: "")
+            // Round 1 (S3-8): η ζώνη ώρας της ζύγισης («off», λεπτά): η μέρα και η ώρα της μένουν όπως ζυγίστηκες, και με
+            // το κινητό σε άλλη ζώνη (πριν, μια πρωινή ζύγιση μπορούσε να γραφτεί στην προηγούμενη μέρα). Πρόσθετο κλειδί.
+            DataRules.offsetMinutes(p.zoneOffset?.totalSeconds)?.let { o.put("off", it) }
             out.put(o)
         }
         return out

@@ -39,6 +39,13 @@ class SourcesPage extends StatelessWidget {
           final plan = store.plan;
           final d = store.data;
           final nightSrc = plan.nightSource(today);
+          final unknownPlan = store.planState == PlanState.unknown;
+          // Round 1 (U2b-02): χωρίς πηγή ύπνου (μετά την αποσύνδεση) η γραμμή του Oura ανοίγει τη σελίδα «Oura», όπου
+          // είναι το «Ο ύπνος ξανά από το ρολόι»· πριν άνοιγε τη «Σύνδεση Oura» και η κάρτα έστελνε σε αδιέξοδο.
+          final manage = store.ouraActive || store.ouraHasTokens || nightSrc == Source.none;
+          // Round 1 (U2b-14): «ο ύπνος του ρολογιού δεν διαβάζεται» μόνο όσο πράγματι δεν διαβάζεται (ο ίδιος κανόνας
+          // με τον κώδικα, [SourcePlan.watchSleepCutoff])· μετά το «ξανά από το ρολόι» διαβάζεται.
+          final watchSleepOff = plan.hasOura && plan.watchSleepCutoff(today) != null;
 
           final devices = AppCard(
             child: Column(
@@ -50,18 +57,17 @@ class SourcesPage extends StatelessWidget {
                   icon: Icons.radio_button_unchecked_rounded,
                   name: sourceDevice(Source.oura),
                   status: _ouraStatus(store, today),
-                  action: store.ouraActive || store.ouraHasTokens ? 'Διαχείριση' : 'Σύνδεση',
+                  action: manage ? 'Διαχείριση' : 'Σύνδεση',
                   onTap: () => Navigator.of(context).push(
-                    store.ouraActive || store.ouraHasTokens
-                        ? OuraManagePage.route(store, now: now)
-                        : OuraConnectPage.route(store, now: now),
+                    manage ? OuraManagePage.route(store, now: now) : OuraConnectPage.route(store, now: now),
                   ),
                 ),
                 const Hairline(vertical: 4),
                 _DeviceRow(
                   icon: Icons.watch_rounded,
                   name: sourceDevice(Source.watch),
-                  status: d == null ? 'Μέσω Samsung Health' : 'Μέσω Samsung Health · ${_when(d.readAt, today)}',
+                  // Round 1 (U2b-16): η ώρα είναι το πότε ΔΙΑΒΑΣΕ η εφαρμογή τη Samsung Health (όχι πότε συγχρόνισε το ρολόι).
+                  status: d == null ? 'Μέσω Samsung Health' : 'Μέσω Samsung Health · διαβάστηκε ${_when(d.readAt, today)}',
                 ),
                 const Hairline(vertical: 4),
                 _DeviceRow(
@@ -69,7 +75,8 @@ class SourcesPage extends StatelessWidget {
                   name: sourceDevice(Source.scale),
                   status: d?.latestBody == null
                       ? 'Μέσω Samsung Health'
-                      : 'Μέσω Samsung Health · ${shortDayDate(d!.latestBody!.time)}',
+                      : 'Μέσω Samsung Health · τελευταία ζύγιση '
+                          '${sameDay(d!.latestBody!.time, today) ? 'σήμερα' : shortDayDate(d.latestBody!.time)}',
                 ),
               ],
             ),
@@ -82,20 +89,26 @@ class SourcesPage extends StatelessWidget {
                 const SectionLabel('Ποια συσκευή μετρά τι'),
                 const SizedBox(height: 6),
                 Text(
-                  'Μία συσκευή για κάθε μέτρηση, ποτέ ανάμειξη, ούτε όταν λείπει.'
-                  '${plan.hasOura ? ' Ο ύπνος του ρολογιού δεν διαβάζεται.' : ''}',
+                  // Round 1 (U2b-17): «πηγή» (τα βήματα είναι το σύνολο της Samsung Health: ρολόι ΚΑΙ κινητό).
+                  'Μία πηγή για κάθε μέτρηση, ποτέ ανάμειξη, ούτε όταν λείπει.'
+                  '${watchSleepOff ? ' Ο ύπνος του ρολογιού δεν διαβάζεται.' : ''}',
                   style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                 ),
                 const SizedBox(height: 8),
                 for (final (i, r) in sourceRows.indexed) ...[
                   if (i > 0) const Hairline(vertical: 2),
-                  _TableRow(row: r, source: plan.sourceFor(r.metrics.first, today)),
+                  // Round 1 (U2b-07): χωρίς πηγή ύπνου το οξυγόνο της νύχτας δεν βγαίνει καθόλου («Καμία», όχι «Ρολόι»).
+                  _TableRow(
+                    row: r,
+                    source: r.needsNight && nightSrc == Source.none ? Source.none : plan.sourceFor(r.metrics.first, today),
+                    unknown: unknownPlan,
+                  ),
                 ],
               ],
             ),
           );
 
-          final notUsed = plan.hasOura
+          final notUsed = watchSleepOff
               ? AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -132,10 +145,11 @@ class SourcesPage extends StatelessWidget {
                     children: [
                       const SectionLabel('Αλλαγές πηγής ύπνου'),
                       const SizedBox(height: 6),
+                      // Round 1 (U2b-03): πριν έλεγε «κάθε αλλαγή ισχύει από το βράδυ της μέρας που την έκανες», που δεν
+                      // ισχύει όταν απάντησες «Ναι, μετρά από το δαχτυλίδι» (η νύχτα πριν μετρά από το Oura).
                       Text(
-                        'Κάθε αλλαγή ισχύει από το βράδυ της μέρας που την έκανες· η νύχτα πριν μένει όπως τη μέτρησε η '
-                        'προηγούμενη πηγή. Οι παλιές νύχτες μένουν με την πηγή τους και οι Τάσεις δεν συγκρίνουν ποτέ '
-                        'νύχτες από δύο συσκευές.',
+                        'Κάθε γραμμή δείχνει από ποια νύχτα μετρά κάθε πηγή. Οι παλιές νύχτες μένουν με την πηγή τους και '
+                        'οι Τάσεις δεν συγκρίνουν ποτέ νύχτες από δύο συσκευές.',
                         style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                       const SizedBox(height: 4),
@@ -149,19 +163,31 @@ class SourcesPage extends StatelessWidget {
                 );
 
           // Το σχέδιο πηγών δεν διαβάστηκε: ρητή επιλογή, τίποτα αυτόματο.
-          final unknown = store.planState == PlanState.unknown ? PlanRecoveryCard(store: store) : null;
+          final unknown = unknownPlan ? PlanRecoveryCard(store: store) : null;
 
           final compare = OuraOxygenAccessCard.orNull(store);
 
-          final noSource = nightSrc == Source.none
-              ? EmptyCard(
-                  icon: Icons.bedtime_off_rounded,
-                  color: c.sleep,
-                  title: 'Ο ύπνος δεν έχει πηγή',
-                  text: 'Το Oura αποσυνδέθηκε. Οι νύχτες μένουν κενές ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι '
-                      'στη σελίδα «Oura».',
-                )
-              : null;
+          // Round 1 (U2b-02 / U2b-09): κουμπί προς τη σελίδα «Oura» (ίδια λέξη με τη «Σήμερα»)· και μετά το «Ο ύπνος
+          // ξανά από το ρολόι» η κάρτα λέει ότι η επιλογή έγινε.
+          final noSource = nightSrc != Source.none
+              ? null
+              : store.watchSleepFromTonight
+                  ? EmptyCard(
+                      icon: Icons.bedtime_rounded,
+                      color: c.sleep,
+                      title: 'Από απόψε ο ύπνος από το ρολόι',
+                      text: 'Το Oura αποσυνδέθηκε και διάλεξες το ρολόι: από απόψε ο ύπνος έρχεται από το Galaxy Watch. Η '
+                          'χθεσινή νύχτα μένει κενή.',
+                    )
+                  : EmptyCard(
+                      icon: Icons.bedtime_off_rounded,
+                      color: c.sleep,
+                      title: 'Ο ύπνος δεν έχει πηγή',
+                      text: 'Το Oura αποσυνδέθηκε. Οι νύχτες μένουν κενές ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι, '
+                          'στις «Ρυθμίσεις Oura».',
+                      buttonText: 'Ρυθμίσεις Oura',
+                      onPressed: () => Navigator.of(context).push(OuraManagePage.route(store, now: now)),
+                    );
 
           return LayoutBuilder(
             builder: (context, box) {
@@ -207,22 +233,32 @@ class SourcesPage extends StatelessWidget {
     );
   }
 
-  static String _when(DateTime t, DateTime today) => sameDay(t, today) ? hm(t) : '${relativeDay(t, today)} ${hm(t)}';
+  /// «10:08» (σήμερα), «χθες 22:10», «Πέμπτη 09:15», «4 Νοε 08:00». Round 1 (U2b-16): «χθες» με μικρό (μέσα σε πρόταση).
+  static String _when(DateTime t, DateTime today) {
+    if (sameDay(t, today)) return hm(t);
+    final day = relativeDay(t, today);
+    return '${day == 'Χθες' ? 'χθες' : day} ${hm(t)}';
+  }
 
   static String _ouraStatus(HealthStore s, DateTime today) {
-    if (s.planState == PlanState.unknown) return s.ouraHasTokens ? 'Συνδεδεμένο · διάλεξε πηγή ύπνου πάνω' : 'Διάλεξε πηγή ύπνου πάνω';
+    if (s.planState == PlanState.unknown) {
+      // Round 1 (U2b-05): όταν το ιστορικό δεν έχει διαβαστεί ακόμα, πάνω υπάρχει μόνο «Δοκίμασε ξανά» (τίποτα να διαλέξεις).
+      final what = s.planRecovery == null ? 'πάτα «Δοκίμασε ξανά» πάνω' : 'διάλεξε πηγή ύπνου πάνω';
+      return s.ouraHasTokens ? 'Συνδεδεμένο · $what' : '${what[0].toUpperCase()}${what.substring(1)}';
+    }
     if (!s.ouraConfigured && !s.ouraHasTokens) return 'Η σύνδεση ενεργοποιείται τη μέρα που θα έρθει';
     return switch (s.ouraStatus) {
       OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
       OuraStatus.starting => 'Συνδεδεμένο · ο ύπνος από το Oura από απόψε',
       OuraStatus.startingNow => 'Συνδεδεμένο · ${s.ouraFirstNightText.toLowerCase()}',
       OuraStatus.incomplete => 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά',
-      OuraStatus.disconnected => 'Αποσυνδέθηκε',
+      // Round 1 (U2b-09): μετά το «Ο ύπνος ξανά από το ρολόι».
+      OuraStatus.disconnected => s.watchSleepFromTonight ? 'Αποσυνδέθηκε · από απόψε ο ύπνος από το ρολόι' : 'Αποσυνδέθηκε',
       OuraStatus.reconnect => 'Χρειάζεται νέα σύνδεση',
-      OuraStatus.subscription => 'Η συνδρομή δεν είναι ενεργή',
-      _ => s.ouraLastSync == null
-          ? 'Συνδεδεμένο'
-          : 'Συνδεδεμένο · τελευταίος συγχρονισμός ${_when(s.ouraLastSync!, today)}',
+      // Round 1 (S5-6): το 403 είναι «συνδρομή Ή άδεια».
+      OuraStatus.subscription => 'Η Oura δεν δίνει δεδομένα (συνδρομή ή άδεια)',
+      // Round 1 (U2b-16): «ενημερώθηκε», όπως «Τελευταία ενημέρωση» / «Ενημέρωση τώρα» στη σελίδα «Oura».
+      _ => s.ouraLastSync == null ? 'Συνδεδεμένο' : 'Συνδεδεμένο · ενημερώθηκε ${_when(s.ouraLastSync!, today)}',
     };
   }
 }
@@ -273,30 +309,37 @@ class _DeviceRow extends StatelessWidget {
 }
 
 class _TableRow extends StatelessWidget {
-  const _TableRow({required this.row, required this.source});
+  const _TableRow({required this.row, required this.source, this.unknown = false});
   final SourceRow row;
   final Source source;
+
+  /// Το σχέδιο πηγών δεν διαβάστηκε (U2b-05): η σημείωση στέλνει στην κάρτα πάνω.
+  final bool unknown;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    final title = Text(row.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text));
+    final tag = SourceTag(source, label: samsungTotalMetrics.contains(row.metrics.first) && source != Source.none ? 'Samsung Health' : null);
+    // Round 1 (U2b-15): τίτλος και ετικέτα στην ίδια γραμμή, η σημείωση από κάτω σε ΟΛΟ το πλάτος (πριν η ετικέτα
+    // «Samsung Health» έσπαγε τον τίτλο και έκανε τη σημείωση τέσσερις κοντές γραμμές)· με πολύ μεγάλα γράμματα η
+    // ετικέτα κάτω από τον τίτλο, όπως στο «Τι μετράει κάθε συσκευή».
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
+          if (veryLargeText(context)) ...[
+            title,
+            const SizedBox(height: 4),
+            tag,
+          ] else
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(row.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
-                const SizedBox(height: 2),
-                Text(row.noteFor(source), style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.3)),
-              ],
+              children: [Expanded(child: title), const SizedBox(width: 10), tag],
             ),
-          ),
-          const SizedBox(width: 10),
-          SourceTag(source, label: samsungTotalMetrics.contains(row.metrics.first) ? 'Samsung Health' : null),
+          const SizedBox(height: 2),
+          Text(row.noteFor(source, unknown: unknown), style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.3)),
         ],
       ),
     );

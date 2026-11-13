@@ -156,17 +156,27 @@ object WidgetRenderer {
         val muted: Int
         val chipBg: Int
 
+        /** Χρώμα της γραμμής «συνήθως»: ο τόνος όταν διαβάζεται, αλλιώς τα κύρια γράμματα (round 1, U7-14). */
+        val tone: Int
+
         init {
             val manual = if (s != null && s.has("text")) s.optLong("text").toInt() else null
+            // Τι βλέπει πραγματικά το μάτι: το φόντο ανακατεμένο με μια υποθετική ταπετσαρία κατά τη διαφάνεια.
+            val wallBehind = if (dark) 0xFF1A1A1E.toInt() else 0xFFE9E6E2.toInt()
             val textColor = manual ?: run {
-                // Τι βλέπει πραγματικά το μάτι: το φόντο ανακατεμένο με μια υποθετική ταπετσαρία κατά τη διαφάνεια.
                 val mid = if (gradient) mix(c1, c2, 0.55f) else c1
-                val seen = mix(if (dark) 0xFF1A1A1E.toInt() else 0xFFE9E6E2.toInt(), mid, op)
+                val seen = mix(wallBehind, mid, op)
                 if (lum(seen) > 0.33) 0xFF17141F.toInt() else 0xFFF7F4FF.toInt()
             }
             fg = textColor
             val darkText = lum(textColor) < 0.2
-            muted = alpha(textColor, 0.70f)
+            // Round 1 (U7-14): το γκρι κείμενο (τίτλος, πηγή, ετικέτες) όσο πιο απαλό γίνεται ΧΩΡΙΣ να πέσει κάτω από
+            // 4,5:1, πάνω (c1, τίτλος) και κάτω (c2, κουτάκια)· πριν ήταν πάντα 70% (2,6–4,3:1 σε 4 έτοιμα θέματα).
+            val seenTop = mix(wallBehind, c1, op)
+            val seenBottom = mix(wallBehind, if (gradient) c2 else c1, op)
+            val behind = intArrayOf(seenTop, seenBottom)
+            muted = alpha(textColor, WidgetText.mutedAlpha(textColor, behind))
+            tone = if (WidgetText.toneReadable(acc, behind)) alpha(acc, 0.95f) else textColor
             chipBg = if (darkText) alpha(0xFF17141F.toInt(), 0.07f) else alpha(0xFFFFFFFF.toInt(), 0.09f)
         }
 
@@ -180,11 +190,15 @@ object WidgetRenderer {
             this.color = color
         }
 
-        /** Κείμενο που χωρά στο [maxW]: μικραίνει ως 75% και μετά κόβεται με «…». */
+        /**
+         * Κείμενο που χωρά στο [maxW]: μικραίνει ως 75% (μικρές γραμμές, κάτω από 11 sp: ως 85%, round 1 U7-11· πριν
+         * έπεφταν στα 7,9 sp) και μετά κόβεται με «…».
+         */
         fun fit(text: String, p: Paint, maxW: Float): String {
             if (maxW <= 0) return ""
             val base = p.textSize
-            while (p.measureText(text) > maxW && p.textSize > base * 0.75f) p.textSize -= base * 0.05f
+            val floor = if (base < sp(11f)) WidgetText.MIN_SCALE_SMALL else 0.75f
+            while (p.measureText(text) > maxW && p.textSize > base * floor) p.textSize -= base * 0.05f
             if (p.measureText(text) <= maxW) return text
             var t = text
             while (t.isNotEmpty() && p.measureText("$t…") > maxW) t = t.dropLast(1)
@@ -254,8 +268,8 @@ object WidgetRenderer {
             while (n > 0 && (box.bottom - pad) - chipsHeight(n) - dp(6f) < y + heroMin) n--
             val chipsTop = box.bottom - pad - chipsHeight(n)
 
-            // Κεντρική τιμή
-            y = hero(heroKey, left, right, y, plus)
+            // Κεντρική τιμή (ως πάνω από τα κουτάκια)
+            y = hero(heroKey, left, right, y, plus, chipsTop - dp(4f))
 
             // Γράφημα 7 ημερών, όπου χωρά (≥ 22 dp)
             val showSpark = s?.optBoolean("spark", true) ?: true
@@ -316,8 +330,10 @@ object WidgetRenderer {
             cv.drawRoundRect(box, r, r, p)
             if (glow) {
                 val gr = max(box.width(), box.height()) * 0.7f
+                // Round 1 (U7-14): σε ανοιχτό φόντο η «λάμψη» χαλούσε την πηγή πάνω δεξιά (2,2–3,3:1)· πιο απαλή εκεί.
+                val glowA = if (lum(c1) > 0.08) 0.24f else 0.38f
                 val g = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(box.right, box.top, gr, alpha(acc, 0.38f * op), alpha(acc, 0f), Shader.TileMode.CLAMP)
+                    shader = RadialGradient(box.right, box.top, gr, alpha(acc, glowA * op), alpha(acc, 0f), Shader.TileMode.CLAMP)
                 }
                 cv.save()
                 val path = android.graphics.Path().apply { addRoundRect(box, r, r, android.graphics.Path.Direction.CW) }
@@ -338,8 +354,11 @@ object WidgetRenderer {
 
         fun arrow(dir: Int) = when (dir) { 1 -> "▲"; -1 -> "▼"; else -> "=" }
 
-        /** Μεγάλος αριθμός, μονάδα, λεζάντα και (αν ζητήθηκε) «συνήθως»/εύρος. Επιστρέφει πού τελείωσε. */
-        fun hero(key: String, left: Float, right: Float, top: Float, plus: Boolean): Float {
+        /**
+         * Μεγάλος αριθμός, μονάδα, λεζάντα και (αν ζητήθηκε) «συνήθως»/εύρος. Επιστρέφει πού τελείωσε. Μια δεύτερη γραμμή
+         * «συνήθως»/εύρος μπαίνει μόνο αν τελειώνει πάνω από το [limit] (τα κουτάκια).
+         */
+        fun hero(key: String, left: Float, right: Float, top: Float, plus: Boolean, limit: Float): Float {
             val e = entry(key)
             val value = e?.optString("v", "—") ?: "—"
             val unit = e?.optString("u", "")?.trim() ?: ""
@@ -357,11 +376,17 @@ object WidgetRenderer {
             var y = by + big.descent() * 0.6f
 
             val capP = paint("Medium", sp(10.5f), muted)
-            val cap = e?.optString("cap", "") ?: ""
+            // Round 1 (U7-16): χωρίς καμία τιμή και χωρίς πηγή (νέο widget, μετά από «Διαγραφή όλων») η λεζάντα λέει τι να
+            // κάνεις, όχι μόνο «—». (Χωρίς πρόσφατη νύχτα/ζύγιση η πηγή το λέει ήδη· εκεί το άνοιγμα δεν φέρνει τίποτα.)
+            val empty = metrics().length() == 0 && (data?.optString("src", "") ?: "").isEmpty()
+            val cap = if (empty) WidgetText.OPEN_APP else e?.optString("cap", "") ?: ""
+            val capShort = if (empty) WidgetText.OPEN_APP_SHORT else e?.optString("capShort", "") ?: ""
             if (cap.isNotEmpty()) {
                 y += dp(2f)
                 val b = y - capP.ascent()
-                cv.drawText(fit(cap, capP, right - left), left, b, capP)
+                // U7-12: σε στενή στήλη η σύντομη μορφή αντί για «άνοιξε την ε…».
+                val text = if (capShort.isNotEmpty() && capP.measureText(cap) * WidgetText.MIN_SCALE_SMALL > right - left) capShort else cap
+                cv.drawText(fit(text, capP, right - left), left, b, capP)
                 y = b + capP.descent()
             }
             // Αναλογία θρεπτικών (μόνο Φαγητό, όταν κεντρική τιμή είναι οι θερμίδες)
@@ -389,15 +414,22 @@ object WidgetRenderer {
             }
             val showUsual = s?.optBoolean("usual", true) ?: true
             if (showUsual && e != null) {
-                val parts = mutableListOf<String>()
-                if (e.has("d") && e.has("us")) parts += "${arrow(e.optInt("d"))} ${e.optString("us")}"
-                else if (e.has("us")) parts += e.optString("us")
-                if (e.has("r")) parts += e.optString("r")
-                if (parts.isNotEmpty()) {
+                val us = when {
+                    e.has("d") && e.has("us") -> "${arrow(e.optInt("d"))} ${e.optString("us")}"
+                    e.has("us") -> e.optString("us")
+                    else -> null
+                }
+                val r = if (e.has("r")) e.optString("r") else null
+                val w = right - left
+                // Round 1 (U7-11): σε δύο γραμμές όταν δεν χωρά, ποτέ «· …» που έκοβε την κρίση «μέσα/κάτω από το εύρος».
+                val probe = paint("SemiBold", sp(10.5f), tone)
+                val lines = WidgetText.usualLines(us, r) { probe.measureText(it) * WidgetText.MIN_SCALE_SMALL <= w }
+                for ((i, line) in lines.withIndex()) {
+                    if (i > 0 && y + dp(2f) + capP.descent() - capP.ascent() > limit) break
                     y += dp(2f)
                     val b = y - capP.ascent()
-                    val p2 = paint("SemiBold", sp(10.5f), alpha(acc, 0.95f))
-                    cv.drawText(fit(parts.joinToString(" · "), p2, right - left), left, b, p2)
+                    val p2 = paint("SemiBold", sp(10.5f), tone)
+                    cv.drawText(fit(line, p2, w), left, b, p2)
                     y = b + capP.descent()
                 }
             }
@@ -410,8 +442,15 @@ object WidgetRenderer {
             if (real.isEmpty() || bottom - top < dp(14f)) return
             val hi = real.max()
             val lo0 = real.min()
-            // Βάση λίγο κάτω από το χαμηλότερο, ώστε να φαίνονται οι διαφορές (π.χ. βάρος 82–84).
-            val lo = if (hi == lo0) lo0 - 1f else lo0 - (hi - lo0) * 0.6f
+            // Βάση λίγο κάτω από το χαμηλότερο, ώστε να φαίνονται οι διαφορές (π.χ. βάρος 82–84). Round 1 (U7-15): ό,τι
+            // μετριέται από το μηδέν (βήματα, θερμίδες, γραμμάρια) από το μηδέν· πριν η μικρότερη ράβδος έβγαινε πάντα
+            // 37,5% της μεγαλύτερης, ό,τι κι αν έλεγαν τα νούμερα (5.400 βήματα έμοιαζαν το 1/3 των 10.200).
+            val zero = kind == "move" || kind == "food"
+            val lo = when {
+                zero && hi > 0f -> 0f
+                hi == lo0 -> lo0 - 1f
+                else -> lo0 - (hi - lo0) * 0.6f
+            }
             val n = vals.size
             val gap = dp(if (shape == Shape.COLUMN1) 2f else 3f)
             val bw = (right - left - gap * (n - 1)) / n
@@ -468,11 +507,11 @@ object WidgetRenderer {
 
         fun labelOf(k: String) = when (k) {
             "energy" -> "Ετοιμότητα"; "sleepScore" -> "Σκορ"; "hrv" -> "HRV"; "sleepHr" -> "Παλμοί"; "lowHr" -> "Χαμηλότεροι"
-            "ringSpo2" -> "Οξυγόνο"; "breath" -> "Αναπνοές"; "skinTemp" -> "Θερμοκρ."; "sleepMin" -> "Ύπνος"
+            "ringSpo2" -> "Οξυγόνο"; "breath" -> "Αναπνοές"; "skinTemp" -> "Θερμοκρασία"; "sleepMin" -> "Ύπνος"
             "steps" -> "Βήματα"; "activeKcal" -> "Ενεργές"; "totalKcal" -> "Σύνολο"; "activeMin" -> "Ενεργός"; "floors" -> "Όροφοι"
-            "distance" -> "Απόσταση"; "dayHr" -> "Παλμοί χθες"; "kcal" -> "Θερμίδες"; "protein" -> "Πρωτεΐνη"; "carbs" -> "Υδατ."
+            "distance" -> "Απόσταση"; "dayHr" -> "Παλμοί χθες"; "kcal" -> "Θερμίδες"; "protein" -> "Πρωτεΐνη"; "carbs" -> "Υδατάνθρακες"
             "fat" -> "Λιπαρά"; "fiber" -> "Ίνες"; "salt" -> "Αλάτι"; "sugars" -> "Σάκχαρα"; "weight" -> "Βάρος"; "fatPct" -> "Λίπος"
-            "smm" -> "Μύες"; "ffm" -> "Άλιπη"; "bmr" -> "Μεταβολ."; "bmi" -> "Δείκτης"; "water" -> "Νερό"
+            "smm" -> "Μύες"; "ffm" -> "Άλιπη"; "bmr" -> "Μεταβολισμός"; "bmi" -> "Δείκτης"; "water" -> "Νερό"
             else -> k
         }
 
@@ -505,7 +544,7 @@ object WidgetRenderer {
         when (kind) {
             "sleep" -> {
                 o.put("src", "Oura · Σάβ 7/11")
-                m.put("sleepMin", e("Ύπνος", "7:16", cap = "00:37–08:15", d = 1, us = "συνήθως 6:58", r = "μέσα στο εύρος", s = listOf(6.9, 7.4, 6.5, 7.1, 6.8, 7.6, 7.3)))
+                m.put("sleepMin", e("Ύπνος", "7:16", " ώρες", cap = "00:37–08:15", d = 1, us = "συνήθως 6:58", r = "7 νύχτες μέσα στο εύρος", s = listOf(6.9, 7.4, 6.5, 7.1, 6.8, 7.6, 7.3)))
                 m.put("energy", e("Ετοιμότητα", "71", d = 0, us = "συνήθως 71", s = listOf(68.0, 74.0, 66.0, 70.0, 72.0, 69.0, 71.0)))
                 m.put("sleepScore", e("Σκορ", "84", d = 1, us = "συνήθως 79"))
                 m.put("hrv", e("HRV", "41", " ms", d = 1, us = "συνήθως 39 ms", s = listOf(38.0, 40.0, 35.0, 39.0, 44.0, 39.0, 41.0)))
@@ -513,27 +552,27 @@ object WidgetRenderer {
                 m.put("lowHr", e("Χαμηλότεροι", "53", " bpm"))
                 m.put("ringSpo2", e("Οξυγόνο", "96", "%"))
                 m.put("breath", e("Αναπνοές", "14,0", "", d = 0))
-                m.put("skinTemp", e("Θερμοκρ.", "+0,2", "°"))
+                m.put("skinTemp", e("Θερμοκρασία", "+0,2", "°"))
             }
             "move" -> {
                 o.put("src", "ρολόι · 10:20")
                 m.put("steps", e("Βήματα", "6.389", cap = "χθες 8.012", r = "χθες μέσα στο εύρος", s = listOf(7200.0, 9100.0, 5400.0, 8000.0, 10200.0, 8012.0, 6389.0)))
                 m.put("activeKcal", e("Ενεργές", "288", " kcal")); m.put("totalKcal", e("Σύνολο", "1.930", " kcal"))
-                m.put("activeMin", e("Ενεργός", "34′")); m.put("floors", e("Όροφοι", "6"))
+                m.put("activeMin", e("Ενεργός", "34", " λεπτά")); m.put("floors", e("Όροφοι", "6"))
                 m.put("distance", e("Απόσταση", "4,6", " km")); m.put("dayHr", e("Παλμοί χθες", "72", " bpm"))
             }
             "food" -> {
                 o.put("src", "3 γεύματα")
                 o.put("bar", JSONArray(listOf(248.0, 512.0, 396.0)))
                 m.put("kcal", e("Θερμίδες", "1.240", " kcal", cap = "3 γεύματα σήμερα", s = listOf(1900.0, 2200.0, 2000.0, 1700.0, 2400.0, 2100.0, 1240.0)))
-                m.put("protein", e("Πρωτεΐνη", "62", " g")); m.put("carbs", e("Υδατ.", "128", " g")); m.put("fat", e("Λιπαρά", "44", " g"))
+                m.put("protein", e("Πρωτεΐνη", "62", " g")); m.put("carbs", e("Υδατάνθρακες", "128", " g")); m.put("fat", e("Λιπαρά", "44", " g"))
                 m.put("fiber", e("Ίνες", "17", " g")); m.put("salt", e("Αλάτι", "4,1", " g")); m.put("sugars", e("Σάκχαρα", "38", " g"))
             }
             else -> {
                 o.put("src", "InBody · Παρ 6/11")
                 m.put("weight", e("Βάρος", "82,2", " kg", cap = "Παρ 6/11 · −0,4 kg", d = -1, r = "πάνω από το εύρος", s = listOf(83.9, 83.6, 83.4, 83.1, 82.9, 82.6, 82.2)))
                 m.put("fatPct", e("Λίπος", "25,4", "%")); m.put("smm", e("Μύες", "34,3", " kg")); m.put("ffm", e("Άλιπη", "61,3", " kg"))
-                m.put("bmr", e("Μεταβολ.", "1.695", " kcal")); m.put("bmi", e("Δείκτης", "26,8")); m.put("water", e("Νερό", "44,9", " L"))
+                m.put("bmr", e("Μεταβολισμός", "1.695", " kcal")); m.put("bmi", e("Δείκτης", "26,8")); m.put("water", e("Νερό", "44,9", " L"))
             }
         }
         return o

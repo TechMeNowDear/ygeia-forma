@@ -66,6 +66,11 @@ class TrainingBridge(
                 }
                 result.success(ok)
             }
+            // Το training.json που δεν διαβάζεται μπαίνει στην άκρη (round1, S9-9): μετονομασία, ποτέ σβήσιμο.
+            "bad" -> scope.launch {
+                val name: String? = withContext(Dispatchers.IO) { TrainingRules.setAside(File(activity.filesDir, FILE)) }
+                result.success(name)
+            }
             // Οι παλμοί κάθε προπόνησης σε δικό της αρχείο (V-A-02).
             "hrRead" -> scope.launch {
                 val id = call.argument<String>("id") ?: ""

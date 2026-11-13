@@ -15,11 +15,53 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'info_sheet.dart';
 import 'metric_page.dart';
+import 'oura_pages.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
+import 'sources_page.dart';
 
 /// Ο λόγος που η χθεσινή νύχτα είναι κενή (null = υπάρχει).
 EmptyNight? lastNightReason(HealthStore s, DateTime now) => s.ouraNightReason(dayOf(now), now);
+
+/// Round 1 (U2a-04): η ΜΙΑ ενέργεια για κάθε λόγο κενής νύχτας: (κείμενο κουμπιού, τι κάνει). null = δεν υπάρχει
+/// κάτι να κάνεις. «Ενημέρωση τώρα» = ρητή ανάγνωση (S5-10: χωρίς το όριο των 30 λεπτών), μαζί με τη Samsung.
+(String, VoidCallback)? emptyNightAction(BuildContext context, HealthStore store, EmptyNight? reason, DateTime? now) =>
+    switch (reason) {
+      EmptyNight.reconnect => (
+          'Σύνδεση ξανά',
+          () {
+            Navigator.of(context)
+                .push(store.ouraConfigured ? OuraConnectPage.route(store, now: now) : OuraManagePage.route(store, now: now));
+          },
+        ),
+      EmptyNight.subscription => (
+          'Ρυθμίσεις Oura',
+          () {
+            Navigator.of(context).push(OuraManagePage.route(store, now: now));
+          },
+        ),
+      // Μετά το «Ο ύπνος ξανά από το ρολόι» δεν μένει τίποτα να γίνει (U2b-09).
+      EmptyNight.disconnected when store.watchSleepFromTonight => null,
+      EmptyNight.disconnected => (
+          'Ρυθμίσεις Oura',
+          () {
+            Navigator.of(context).push(OuraManagePage.route(store, now: now));
+          },
+        ),
+      EmptyNight.unknownPlan => (
+          'Διάλεξε πηγή',
+          () {
+            Navigator.of(context).push(SourcesPage.route(store, now: now));
+          },
+        ),
+      EmptyNight.waiting || EmptyNight.notRead || EmptyNight.noRing || EmptyNight.onlyNap => (
+          'Ενημέρωση τώρα',
+          () {
+            store.refresh();
+          },
+        ),
+      _ => null,
+    };
 
 /// Υγεία › Ύπνος όταν ο ύπνος έρχεται από το Oura (ή δεν έχει πηγή μετά την αποσύνδεση).
 class OuraSleepPage extends StatelessWidget {
@@ -37,13 +79,23 @@ class OuraSleepPage extends StatelessWidget {
         ? store.lastOuraNight
         : null;
     final reason = lastNightReason(store, now);
+    // Round 1 (U2a-04): κάθε λόγος με τη μία ενέργειά του (κουμπί).
+    final action = emptyNightAction(context, store, reason, this.now);
 
     final lastCard = last == null
-        ? _EmptyNightCard(reason: reason ?? EmptyNight.noRing, day: today, night: store.ouraNightFor(today))
+        ? _EmptyNightCard(
+            reason: reason ?? EmptyNight.noRing,
+            day: today,
+            night: store.ouraNightFor(today),
+            watchTonight: store.watchSleepFromTonight,
+            action: reason == null ? null : action)
         : _OuraNightCard(
             night: last,
             now: now,
-            reason: sameDay(last.day, today) ? null : reason,
+            // S5-2: πριν από τις 04:00 η νύχτα με τη σημερινή ημερομηνία δεν έχει τελειώσει: δεν «λείπει» τίποτα.
+            reason: sameDay(last.day, today) || reason == EmptyNight.notYet ? null : reason,
+            watchTonight: store.watchSleepFromTonight,
+            action: action,
             todayNight: store.ouraNightFor(today),
             range: sleepRange(store.profile, today),
             readiness: plan.value(store.history, K.energy, last.day),
@@ -105,7 +157,8 @@ class OuraNightsPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TitleRow(
-            header: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep),
+            // Round 1 (U2a-11): το «7 νυχτών» δεν σπάει σε δύο γραμμές.
+            header: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος ${glued('7 νυχτών')}', color: c.sleep),
             trailing: const [LabelTag('εκτίμηση'), InfoButton(stagesInfoKey)],
           ),
           const SizedBox(height: 12),
@@ -123,11 +176,12 @@ class OuraNightsPage extends StatelessWidget {
               (stages.awake!.toDouble(), c.stage('AWAKE')),
             ]),
             const SizedBox(height: 6),
-            InfoRow(stageLabel('DEEP'), hmList(stages.deep!), dot: c.stage('DEEP')),
-            InfoRow(stageLabel('LIGHT'), hmList(stages.light!), dot: c.stage('LIGHT')),
-            InfoRow(stageLabel('REM'), hmList(stages.rem!), dot: c.stage('REM')),
-            // «≥»: τα ξυπνήματα μετριούνται λιγότερα απ' όσα είναι (το «γιατί» στο ⓘ).
-            InfoRow('Ξύπνιος', '≥ ${hmList(stages.awake!)}', dot: c.stage('AWAKE')),
+            // Round 1 (U2a-02): διάρκειες με ολόκληρες λέξεις («1 ώρα 10 λεπτά»), όχι «1 ω 10 λ».
+            InfoRow(stageLabel('DEEP'), hoursMinutes(stages.deep!), dot: c.stage('DEEP')),
+            InfoRow(stageLabel('LIGHT'), hoursMinutes(stages.light!), dot: c.stage('LIGHT')),
+            InfoRow(stageLabel('REM'), hoursMinutes(stages.rem!), dot: c.stage('REM')),
+            // «τουλάχιστον»: τα ξυπνήματα μετριούνται λιγότερα απ' όσα είναι (το «γιατί» στο ⓘ).
+            InfoRow('Ξύπνιος', atLeast(stages.awake!), dot: c.stage('AWAKE')),
           ],
         ],
       ),
@@ -140,13 +194,14 @@ class OuraNightsPage extends StatelessWidget {
           final d = DateTime(today.year, today.month, today.day - i);
           if (plan.nightSource(d) == Source.watch) return null;
           final n = store.ouraNightFor(d);
+          final reason = n?.main != null ? null : store.ouraNightReason(d, now);
+          // S5-2: πριν από τις 04:00 η νύχτα με τη σημερινή ημερομηνία δεν έχει γίνει ακόμα: καμία γραμμή γι' αυτήν.
+          if (reason == EmptyNight.notYet) return null;
           return _NightLine(
             day: d,
             now: now,
             night: n,
-            reason: n?.main != null
-                ? null
-                : store.ouraNightReason(d, now),
+            reason: reason,
           );
         }(),
     ].whereType<Widget>().toList();
@@ -185,36 +240,72 @@ class OuraNightsPage extends StatelessWidget {
 }
 
 class _EmptyNightCard extends StatelessWidget {
-  const _EmptyNightCard({required this.reason, required this.day, this.night});
+  const _EmptyNightCard({required this.reason, required this.day, this.night, this.watchTonight = false, this.action});
   final EmptyNight reason;
   final DateTime day;
 
   /// Για «Μόνο υπνάκος»: οι ώρες του υπνάκου.
   final OuraNight? night;
 
+  /// Μετά την αποσύνδεση διάλεξε ρητά «από απόψε το ρολόι» (U2b-09).
+  final bool watchTonight;
+
+  /// Η μία ενέργεια αυτής της κατάστασης ([emptyNightAction])· null = καμία.
+  final (String, VoidCallback)? action;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    // Round 1 (U2a-03 / U2a-04 / U2a-13): κάθε κείμενο λέει τι ισχύει και τι να κάνεις· χωρίς νύχτα από το δαχτυλίδι
+    // το οξυγόνο της νύχτας ΔΕΝ φαίνεται (πριν: «οξυγόνο από το ρολόι φαίνεται κανονικά»).
     final text = switch (reason) {
       EmptyNight.waiting => 'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ.',
-      EmptyNight.noRing => 'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις. Οξυγόνο από το ρολόι φαίνεται κανονικά στην Καρδιά.',
-      EmptyNight.reconnect => 'Η σύνδεση με το Oura χρειάζεται ανανέωση. Δεν χάνεται τίποτα· οι νύχτες έρχονται μετά.',
-      EmptyNight.subscription => 'Χωρίς ενεργή συνδρομή Oura η εφαρμογή δεν μπορεί να διαβάσει τον ύπνο.',
-      EmptyNight.notRead => 'Δεν έγινε ακόμα ανάγνωση από την Oura. Τράβηξε προς τα κάτω για να ξαναδοκιμάσεις.',
-      EmptyNight.disconnected => 'Οι νύχτες μένουν κενές ώσπου να συνδέσεις ξανά το Oura ή να διαλέξεις το ρολόι (Ρυθμίσεις › Πηγές).',
+      EmptyNight.noRing => 'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις, και το οξυγόνο της νύχτας μένει κενό, γιατί χωρίς νύχτα '
+          'από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες. Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά '
+          'γύρνα εδώ.',
+      EmptyNight.reconnect => 'Το Oura χρειάζεται νέα σύνδεση: πάτα «Σύνδεση ξανά». Δεν χάνεται τίποτα· οι νύχτες έρχονται μετά.',
+      EmptyNight.subscription => 'Η Oura δεν δίνει τον ύπνο: η συνδρομή Oura δεν είναι ενεργή ή λείπει η άδεια για τον ύπνο. '
+          'Έλεγξε τη συνδρομή στην εφαρμογή Oura και μετά άνοιξε τις «Ρυθμίσεις Oura».',
+      EmptyNight.notRead => 'Δεν έγινε ακόμα ανάγνωση από την Oura. Πάτα «Ενημέρωση τώρα» ή τράβηξε προς τα κάτω για να ξαναδοκιμάσεις.',
+      EmptyNight.disconnected => watchTonight
+          ? 'Το Oura αποσυνδέθηκε. Από απόψε ο ύπνος έρχεται από το ρολόι, όπως διάλεξες.'
+          : 'Οι νύχτες μένουν κενές ώσπου να συνδέσεις ξανά το Oura ή να διαλέξεις το ρολόι, στις «Ρυθμίσεις Oura».',
       EmptyNight.onlyNap => 'Το δαχτυλίδι κατέγραψε μόνο υπνάκο, όχι νύχτα'
           '${napTimes(night).isEmpty ? '' : ': ${napTimes(night)}'}. Ο υπνάκος δεν μετρά ως νύχτα.',
-      EmptyNight.unknownPlan => 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Για να μη μπερδευτούν συσκευές, οι νύχτες μένουν κενές '
-          'ώσπου να διαλέξεις στις Ρυθμίσεις › Πηγές.',
+      EmptyNight.unknownPlan => 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Για να μην μπερδευτούν οι συσκευές, οι νύχτες μένουν κενές '
+          'ώσπου να διαλέξεις πηγή.',
+      EmptyNight.notYet => 'Η νύχτα φαίνεται εδώ το πρωί, όταν ξυπνήσεις και συγχρονίσει η εφαρμογή Oura.',
       EmptyNight.notOura => '',
     };
-    return EmptyCard(icon: Icons.bedtime_rounded, color: c.sleep, title: emptyNightText(reason), text: text);
+    return EmptyCard(
+      icon: Icons.bedtime_rounded,
+      color: c.sleep,
+      title: emptyNightText(reason),
+      text: text,
+      buttonText: action?.$1,
+      onPressed: action?.$2,
+    );
   }
 }
 
 class _OuraNightCard extends StatelessWidget {
   const _OuraNightCard(
-      {required this.night, required this.now, this.reason, this.todayNight, this.range, this.readiness, this.onHistory, this.onMetric});
+      {required this.night,
+      required this.now,
+      this.reason,
+      this.watchTonight = false,
+      this.action,
+      this.todayNight,
+      this.range,
+      this.readiness,
+      this.onHistory,
+      this.onMetric});
+
+  /// Μετά την αποσύνδεση διάλεξε ρητά «από απόψε το ρολόι» (U2b-09).
+  final bool watchTonight;
+
+  /// Η μία ενέργεια για τον λόγο που λείπει η χθεσινή νύχτα ([emptyNightAction])· null = καμία.
+  final (String, VoidCallback)? action;
 
   /// Πάτημα σε δαχτυλίδι: οι 30 νύχτες της μέτρησης (έλεγχος premium, S9).
   final void Function(String metric)? onMetric;
@@ -260,16 +351,38 @@ class _OuraNightCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (reason != null) ...[
+            // Round 1 (U2a-06 / U2a-04): ολόκληρη πρόταση για κάθε λόγο (πριν: «… για χθες βράδυ» κολλημένο σε κάθε
+            // τίτλο), κόκκινο μόνο όταν κάτι θέλει διόρθωση (σύνδεση, άδεια/συνδρομή, πηγές), και η μία ενέργεια.
             Text(
-              '${emptyNightText(reason!)} για χθες βράδυ'
-              '${reason == EmptyNight.onlyNap && napTimes(todayNight, nightOnly: true).isNotEmpty ? ' (${napTimes(todayNight, nightOnly: true)})' : ''}. '
-              'Βλέπεις την τελευταία νύχτα που ήρθε.',
-              style: TextStyle(color: c.bad, fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.35),
+              '${lastNightNote(reason!, nap: napTimes(todayNight, nightOnly: true), watchTonight: watchTonight)} '
+              'Κάτω βλέπεις την τελευταία νύχτα που ήρθε.',
+              key: const ValueKey('oura-last-night-note'),
+              style: TextStyle(
+                  color: switch (reason!) {
+                    EmptyNight.reconnect || EmptyNight.subscription || EmptyNight.unknownPlan => c.bad,
+                    EmptyNight.notRead => c.warn,
+                    _ => c.textSecondary,
+                  },
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35),
             ),
-            const SizedBox(height: 10),
+            if (action != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const ValueKey('oura-last-night-action'),
+                  onPressed: action!.$2,
+                  child: Text(action!.$1),
+                ),
+              )
+            else
+              const SizedBox(height: 10),
           ],
           TitleRow(
-            header: CardHeader(icon: Icons.bedtime_rounded, title: 'Τελευταία νύχτα · ${shortDayDate(night.day)}', color: c.sleep),
+            // Round 1 (U2a-11): η ημερομηνία σε δική της γραμμή κάτω από τον τίτλο (πριν έσπαγε: «· Σάβ / 14/11»).
+            header: CardHeader(
+                icon: Icons.bedtime_rounded, title: 'Τελευταία νύχτα', subtitle: shortDayDate(night.day), color: c.sleep),
             trailing: [const SourceTag(Source.oura), InfoButton(K.sleepMin, range: range)],
           ),
           if (night.shortNight && (minutes ?? 0) < 180) ...[
@@ -288,26 +401,55 @@ class _OuraNightCard extends StatelessWidget {
             const SizedBox(height: 14),
             _RingTiles(onTap: onMetric, tiles: [
               if (night.sleepScore != null) (night.sleepScore!.toDouble(), 'Βαθμολογία', 'ύπνου', 'sleep-score'),
-              if (readiness != null) (readiness!, 'Ετοιμότητα', 'για σήμερα', 'sleep-readiness'),
+              // Round 1 (S5-4): «για σήμερα» μόνο όταν η τιμή είναι της σημερινής μέρας· αλλιώς η μέρα της.
+              if (readiness != null)
+                (
+                  readiness!,
+                  'Ετοιμότητα',
+                  sameDay(night.day, now) ? 'για σήμερα' : 'για ${shortDayDate(night.day)}',
+                  'sleep-readiness',
+                ),
             ]),
           ],
           if (minutes != null && range != null) ...[
             const SizedBox(height: 12),
-            RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep, oneNight: true),
+            if (range!.low == null)
+              RangeNote(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep, oneNight: true)
+            else ...[
+              // Round 1 (S4-5): η σύσταση «τουλάχιστον 7 ώρες» βγήκε από ώρες που ΔΗΛΩΝΑΝ οι άνθρωποι· το δαχτυλίδι
+              // μετρά μόνο τον ύπνο, χωρίς τα ξυπνήματα. Η πρόταση δείχνει ύπνο ΚΑΙ χρόνο στο κρεβάτι και δεν γράφει
+              // «κάτω από το εύρος» όταν ο χρόνος στο κρεβάτι φτάνει τη σύσταση ([sleepVsAdvice]).
+              RangeBar(value: minutes.toDouble(), range: range!, min: 180, max: 600, color: c.sleep),
+              const SizedBox(height: 6),
+              Text(
+                sleepVsAdvice(
+                  asleepMin: minutes,
+                  inBedMin: parts.every((p) => p.timeInBed != null)
+                      ? (parts.fold<int>(0, (a, p) => a + p.timeInBed!) / 60).round()
+                      : null,
+                  adviceMin: range!.low!.round(),
+                ),
+                key: const ValueKey('oura-sleep-advice'),
+                style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.35),
+              ),
+            ],
           ],
           const SizedBox(height: 14),
           // Τρεις στήλες όσο χωράει κάθε λέξη· αλλιώς γραμμές «ετικέτα … ώρα» (ποτέ «00:2/6»).
           LayoutBuilder(builder: (context, box) {
             // Σχέδια 9/11 (2α): Κοιμήθηκες · Ξύπνησες · Ξύπνιος (ο χρόνος ξύπνιος ΜΕΣΑ στον ύπνο).
             final awakeSec = parts.every((p) => p.awakeInSleep == null) ? null : parts.fold<int>(0, (a, p) => a + (p.awakeInSleep ?? 0));
+            // Round 1 (S5-1): οι ώρες του τόπου όπου κοιμήθηκες. (U2a-02): «Ξύπνιος 22 λεπτά», όχι «22 λ»· αν η τιμή δεν
+            // χωρά ολόκληρη στη στήλη της, γραμμές «ετικέτα … τιμή» (ποτέ σπασμένη τιμή).
             final items = [
-              ('Κοιμήθηκες', parts.first.onset == null ? '—' : hm(parts.first.onset!)),
-              ('Ξύπνησες', hm(parts.last.end)),
-              ('Ξύπνιος', awakeSec == null ? '—' : hmList((awakeSec / 60).round())),
+              ('Κοιμήθηκες', parts.first.wallOnset == null ? '—' : hm(parts.first.wallOnset!)),
+              ('Ξύπνησες', hm(parts.last.wallEnd)),
+              ('Ξύπνιος', awakeSec == null ? '—' : hoursMinutes((awakeSec / 60).round())),
             ];
             final fits = wordsFit(context, [for (final i in items) i.$1], TextStyle(fontSize: 13, color: c.textSecondary), box.maxWidth / 3 - 4) &&
-                wordsFit(context, const ['00:00'], const TextStyle(fontSize: 20, fontWeight: FontWeight.w700), box.maxWidth / 3 - 4);
-            if (fits) return Row(children: [for (final i in items) clock(i.$1, i.$2)]);
+                wordsFit(context, [for (final i in items) glued(i.$2)],
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, fontFeatures: tabular), box.maxWidth / 3 - 4);
+            if (fits) return Row(children: [for (final i in items) clock(i.$1, glued(i.$2))]);
             return Column(children: [for (final i in items) InfoRow(i.$1, i.$2)]);
           }),
           if (n.stages.isNotEmpty) ...[
@@ -320,37 +462,49 @@ class _OuraNightCard extends StatelessWidget {
             Hypnogram(night: n, height: 64),
             const SizedBox(height: 4),
             Row(children: [
-              Text(hm(n.start), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+              Text(hm(parts.first.wallStart), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
               const Spacer(),
-              Text(hm(n.end), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+              Text(hm(parts.last.wallEnd), style: TextStyle(color: c.textTertiary, fontSize: 11.5)),
+            ]),
+            const SizedBox(height: 6),
+            // Round 1 (U2a-14): υπόμνημα, με τη σειρά των γραμμών από πάνω προς τα κάτω. Μόνο ονόματα, ποτέ λεπτά
+            // μίας νύχτας (κανόνας 2/11).
+            Wrap(key: const ValueKey('oura-hypno-legend'), spacing: 12, runSpacing: 4, children: [
+              for (final name in const ['AWAKE', 'REM', 'LIGHT', 'DEEP'])
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 8, height: 8, decoration: BoxDecoration(color: c.stage(name), shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Text(stageLabel(name), style: TextStyle(color: c.textSecondary, fontSize: 12)),
+                ]),
             ]),
           ],
           if (parts.length > 1) ...[
             const Hairline(vertical: 12),
             for (final x in parts)
-              InfoRow('Κομμάτι ${hm(x.start)}–${hm(x.end)}', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+              InfoRow('Κομμάτι ${hm(x.wallStart)}–${hm(x.wallEnd)}', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+            // Round 1 (U2a-19): χωρίς κουκκίδα, στοιχισμένο με τις γραμμές «Κομμάτι» (με την κουκκίδα έσπαγε σε δύο γραμμές).
             InfoRow(
               'Κενό ανάμεσα (δεν μετρά)',
               hoursMinutes([for (var i = 1; i < parts.length; i++) parts[i].start.difference(parts[i - 1].end).inMinutes].fold(0, (a, b) => a + b)),
-              dot: c.textTertiary,
             ),
           ],
           if (night.naps.isNotEmpty || night.others.isNotEmpty) ...[
             const Hairline(vertical: 12),
             // Υπνάκοι κατά τον κοινό κανόνα με το ρολόι, και περίοδοι που επικαλύπτονται: χωριστά, δεν προστίθενται.
             for (final x in night.naps)
-              InfoRow('Υπνάκος ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+              InfoRow('Υπνάκος ${hm(x.wallStart)}–${hm(x.wallEnd)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
             for (final x in night.others)
-              InfoRow('Άλλος ύπνος ${hm(x.start)}–${hm(x.end)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+              InfoRow('Άλλος ύπνος ${hm(x.wallStart)}–${hm(x.wallEnd)} (χωριστά)', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
           ],
           if (onHistory != null) ...[
-            const Hairline(vertical: 8),
+            // Round 1 (U2a-17): στόχος αφής 48 dp (12 + εικονίδιο 24 + 12)· πριν 40.
+            const Hairline(vertical: 4),
             InkWell(
               key: const ValueKey('sleep-30-nights'),
               onTap: onHistory,
               borderRadius: BorderRadius.circular(10),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(children: [
                   Expanded(child: Text('Ύπνος 30 νυχτών', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.health))),
                   Icon(Icons.chevron_right_rounded, color: c.health),
@@ -396,14 +550,23 @@ class _RingTiles extends StatelessWidget {
           ),
           ),
         );
-    if (big || tiles.length == 1) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(height: 8), tile(tiles[i])],
+    Widget stacked() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(height: 8), tile(tiles[i])],
+        ]);
+    if (big || tiles.length == 1) return stacked();
+    // Round 1 (U2a-09): δίπλα δίπλα μόνο όταν κάθε ετικέτα χωρά ολόκληρη στη στήλη της (ανοιχτό Fold: στήλη 82 dp,
+    // «για σήμερα» έσπαγε σε δύο γραμμές και στα 750 dp οι λέξεις στη μέση)· αλλιώς το ένα κάτω από το άλλο.
+    return LayoutBuilder(builder: (context, box) {
+      // Πλάτος για το κείμενο ενός πλακιδίου: μισό πλάτος μείον κενό (10), περιθώρια (8 + 6), δαχτυλίδι (44) και κενό (8).
+      final slot = (box.maxWidth - 10) / 2 - 8 - 6 - 44 - 8;
+      final fits = wordsFit(context, [for (final t in tiles) t.$2], const TextStyle(fontSize: 13, height: 1.25), slot) &&
+          wordsFit(context, [for (final t in tiles) glued(t.$3)],
+              const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.25), slot);
+      if (!fits) return stacked();
+      return Row(children: [
+        for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(width: 10), Expanded(child: tile(tiles[i]))],
       ]);
-    }
-    return Row(children: [
-      for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(width: 10), Expanded(child: tile(tiles[i]))],
-    ]);
+    });
   }
 }
 
@@ -427,7 +590,11 @@ class _OuraRestCard extends StatelessWidget {
     // Ίδιος κανόνας «συνήθως» με τη Σήμερα και την Καρδιά (τρίτος έλεγχος F1): βέλος + διαφορά, «συνήθως» σε γκρι.
     Widget? usual(NightBaseline? b) {
       if (b == null) return null;
-      if (b.usual == null) return Text('μαθαίνει το συνηθισμένο σου', style: TextStyle(fontSize: 13, color: c.textSecondary));
+      // Round 1 (U2a-15): η ίδια πρόταση με τις «Αναπνοές» της ίδιας οθόνης (λέει τι να περιμένεις).
+      if (b.usual == null) {
+        return Text('Το συνηθισμένο σου βγαίνει μετά από $minNightsForBaseline νύχτες',
+            style: TextStyle(fontSize: 13, color: c.textSecondary));
+      }
       final d = shownDiff(b.value, b.usual!);
       return Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, children: [
         if (d != 0)
@@ -476,7 +643,12 @@ class _OuraRestCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TitleRow(
-            header: CardHeader(icon: Icons.favorite_rounded, title: 'Καρδιά και θερμοκρασία στον ύπνο', color: c.heart),
+            // Round 1 (U2a-07): τιμές παλιότερης νύχτας (η χθεσινή δεν ήρθε ακόμα) με την ημερομηνία τους.
+            header: CardHeader(
+                icon: Icons.favorite_rounded,
+                title: 'Καρδιά και θερμοκρασία στον ύπνο',
+                subtitle: sameDay(day, now) ? null : shortDayDate(day),
+                color: c.heart),
             trailing: const [SourceTag(Source.oura), InfoButton(K.hrv)],
           ),
           const SizedBox(height: 4),
@@ -550,6 +722,8 @@ class _BreathCard extends StatelessWidget {
           CardHeader(
             icon: Icons.air_rounded,
             title: 'Αναπνοή και οξυγόνο τη νύχτα',
+            // Round 1 (U2a-07): τιμές παλιότερης νύχτας με την ημερομηνία τους.
+            subtitle: sameDay(day, now) ? null : shortDayDate(day),
             color: c.sleep,
             trailing: const InfoButton(K.ringSpo2),
           ),
@@ -563,7 +737,8 @@ class _BreathCard extends StatelessWidget {
           const Hairline(vertical: 2),
           row(
             // Έλεγχος 9/11 (UX3-05): οι ίδιες δύο ετικέτες παντού.
-            rox.avg == null ? '$oxygenAvgLabel —' : '$oxygenAvgLabel ${spo2AvgText(rox.avg!)}%',
+            // Round 1 (U2a-11): η τιμή δεν μένει μόνη της στην επόμενη γραμμή («μέσος όρος / 96%»).
+            gluedAfterComma(rox.avg == null ? '$oxygenAvgLabel —' : '$oxygenAvgLabel ${spo2AvgText(rox.avg!)}%'),
             rox.avg == null
                 ? (windows.mains.containsKey(dateKey(day)) ? ringAvgMissing(store) : 'Χωρίς νύχτα από το δαχτυλίδι')
                 : 'Όλη τη νύχτα',
@@ -572,7 +747,7 @@ class _BreathCard extends StatelessWidget {
           const Hairline(vertical: 2),
           // 7/11: η χαμηλότερη από το ρολόι, μόνο με κάλυψη ≥ 50% του ύπνου του Oura.
           row(
-            rox.min == null ? '$oxygenMinLabel —' : '$oxygenMinLabel ${lowestText(rox.min!)}%',
+            gluedAfterComma(rox.min == null ? '$oxygenMinLabel —' : '$oxygenMinLabel ${lowestText(rox.min!)}%'),
             windows.mains.containsKey(dateKey(day))
                 ? watchLowText(rox.watch)
                 : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες',
@@ -625,7 +800,7 @@ class _NightLine extends StatelessWidget {
                           ? '${night!.naps.length == 1 ? 'Υπνάκος' : 'Υπνάκοι'} ${napTimes(night)}'
                           : m == null
                           ? emptyNightText(reason ?? EmptyNight.noRing)
-                          : '${hm(night!.counted.first.onset ?? night!.counted.first.start)} – ${hm(night!.counted.last.end)}'
+                          : '${hm(night!.counted.first.wallOnset ?? night!.counted.first.wallStart)} – ${hm(night!.counted.last.wallEnd)}'
                               '${night!.counted.length > 1 ? ' · ${night!.counted.length} κομμάτια' : ''}',
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontFeatures: tabular),
                     ),
@@ -643,7 +818,8 @@ class _NightLine extends StatelessWidget {
                       style: TextStyle(color: c.text, fontWeight: FontWeight.w700, fontSize: 15, fontFeatures: tabular),
                     ),
                     if (night!.sleepScore != null)
-                      Text('σκορ ${night!.sleepScore}', style: TextStyle(color: c.sleep, fontSize: 13, fontWeight: FontWeight.w600)),
+                      // Round 1 (U2a-15): «βαθμολογία», όπως παντού αλλού.
+                      Text('βαθμολογία ${night!.sleepScore}', style: TextStyle(color: c.sleep, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
             ],

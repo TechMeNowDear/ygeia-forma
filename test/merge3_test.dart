@@ -186,9 +186,9 @@ void main() {
       await pumpReport(t, note, withName: true);
       expectWhole(t, note);
       expect(find.textContaining('20/10 και'), findsWidgets, reason: 'το τέλος της σημείωσης φαίνεται');
-      final box = t.renderObject<RenderBox>(find.byKey(const ValueKey('report-page1-body')));
-      final child = (box as RenderFittedBox).child!;
-      expect(child.size.height, lessThanOrEqualTo(box.size.height + 0.5), reason: 'χωρίς σμίκρυνση');
+      // Round 1 (U1b-01, f4): το σώμα της σελίδας 1 είναι πια [RenderReportFit] (πριν RenderFittedBox).
+      final box = t.renderObject<RenderReportFit>(find.byKey(const ValueKey('report-page1-body')));
+      expect(box.scale, 1.0, reason: 'χωρίς σμίκρυνση');
     });
 
     testWidgets('Χειρότερη περίπτωση: 400 φαρδιοί χαρακτήρες με αλλαγές γραμμής → ολόκληρη, χωρίς υπερχείλιση', (t) async {
@@ -197,8 +197,7 @@ void main() {
       await pumpReport(t, note, withName: true);
       expectWhole(t, note);
       expect(reportNoteText(note), isNot(contains('\n')));
-      final box = t.renderObject<RenderBox>(find.byKey(const ValueKey('report-page1-body'))) as RenderFittedBox;
-      final scale = box.size.height / box.child!.size.height;
+      final scale = t.renderObject<RenderReportFit>(find.byKey(const ValueKey('report-page1-body'))).scale;
       expect(scale, greaterThan(0.85), reason: 'το πολύ λίγη σμίκρυνση, ευανάγνωστο');
     });
 

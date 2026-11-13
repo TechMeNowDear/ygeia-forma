@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart';
+import '../oura/config.dart';
 import '../oura/oura_api.dart';
 import '../oura/oura_store.dart';
 import '../oura/oura_view.dart';
@@ -24,8 +25,22 @@ class OuraStatusCard extends StatelessWidget {
   static bool shows(HealthStore s) => switch (s.ouraStatus) {
         OuraStatus.waiting || OuraStatus.missing || OuraStatus.reconnect || OuraStatus.subscription => true,
         OuraStatus.disconnected || OuraStatus.starting || OuraStatus.startingNow || OuraStatus.incomplete => true,
+        OuraStatus.retry => retryShows(s),
         _ => false,
       };
+
+  /// Round 1 (S5-7 / U2a-04): η ανάγνωση αποτυγχάνει (δίκτυο, 429, διακομιστής, μεσάζων). Κάρτα μόνο όταν αυτό
+  /// αφορά ό,τι βλέπει ο χρήστης: λείπει η χθεσινή νύχτα (από τις 04:00), ή η τελευταία επιτυχημένη ανάγνωση είναι
+  /// παλιότερη από 24 ώρες (ή δεν έγινε ποτέ). Ένα στιγμιαίο σφάλμα με όλα στη θέση τους δεν δείχνει κάρτα.
+  static bool retryShows(HealthStore s) {
+    final now = s.ouraClock();
+    final synced = s.ouraLastSync;
+    final stale = synced == null || now.difference(synced) > const Duration(hours: 24);
+    return stale || _nightDueAndMissing(s, now);
+  }
+
+  static bool _nightDueAndMissing(HealthStore s, DateTime now) =>
+      now.hour >= ouraNightDueHour && s.ouraNightFor(dayOf(now))?.main == null;
 
   @override
   Widget build(BuildContext context) {
@@ -36,34 +51,57 @@ class OuraStatusCard extends StatelessWidget {
     // Σφάλμα με παλιά δεδομένα στην οθόνη: λέμε ως πότε είναι (έλεγχος UX U5· ποτέ «χθες βράδυ» για παλιά νύχτα).
     final synced = store.ouraLastSync;
     final syncedText = synced == null ? '' : ' Ό,τι βλέπεις ήρθε ως τον τελευταίο συγχρονισμό, ${shortDayDate(synced)} ${hm(synced)}.';
-    final (title, text, color, button) = switch (s) {
+    final VoidCallback openManage = () {
+      Navigator.of(context).push(OuraManagePage.route(store, now: now));
+    };
+    final VoidCallback openConnect = () {
+      Navigator.of(context)
+          .push(store.ouraConfigured ? OuraConnectPage.route(store, now: now) : OuraManagePage.route(store, now: now));
+    };
+    // Round 1 (S5-10): το κουμπί της κάρτας διαβάζει ΤΩΡΑ (ρητή ενέργεια: χωρίς το όριο των 30 λεπτών), μαζί με τη
+    // Samsung, ώστε και οι τιμές του ρολογιού να υπολογιστούν με τη νύχτα που ήρθε.
+    final VoidCallback readNow = () {
+      store.refresh();
+    };
+    const readNowLabel = 'Ενημέρωση τώρα';
+    // Round 1 (U2a-03): χωρίς νύχτα από το δαχτυλίδι το οξυγόνο της νύχτας ΔΕΝ φαίνεται (το ρολόι το μετρά μόνο μέσα
+    // στις ώρες ύπνου του δαχτυλιδιού)· πριν, η κάρτα έγραφε «το οξυγόνο από το ρολόι φαίνεται κανονικά».
+    const emptyNight = ' νύχτα μένει κενή στον Ύπνο και στις Τάσεις, και το οξυγόνο της νύχτας μένει κενό, γιατί χωρίς '
+        'νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες.';
+    // Round 1 (U2a-04): και η μία νύχτα που λείπει λέει τι να κάνεις (συνήθως απλώς δεν συγχρόνισε η εφαρμογή Oura).
+    const ifWorn = ' Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά γύρνα εδώ.';
+    final nap = napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true);
+    final (title, text, color, button, action) = switch (s) {
       OuraStatus.waiting => (
           'Περιμένει το Oura',
           'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ.',
           c.sleep,
-          null,
+          readNowLabel,
+          readNow,
         ),
       OuraStatus.missing when missing >= 2 => (
           last == null
               ? 'Το Oura δεν έχει συγχρονιστεί ακόμα'
-              : 'Το Oura δεν έχει συγχρονιστεί από ${relativeDay(last.day, now).toLowerCase() == 'χθες' ? 'χθες' : weekdayFull(last.day)}',
+              : 'Το Oura δεν έχει συγχρονιστεί από ${sinceDayText(last.day, now)}',
           'Λείπουν ${countText(missing, 'νύχτα', 'νύχτες')}. Άνοιξε την εφαρμογή Oura με το δαχτυλίδι κοντά στο κινητό· '
               'οι νύχτες έρχονται μόνες τους μετά.',
           c.move,
-          null,
+          readNowLabel,
+          readNow,
         ),
-      OuraStatus.missing when napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true).isNotEmpty => (
+      OuraStatus.missing when nap.isNotEmpty => (
           'Χθες βράδυ μόνο υπνάκος από το δαχτυλίδι',
-          'Υπνάκος ${napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true)}. Δεν μετρά ως νύχτα: η νύχτα μένει κενή στον Ύπνο και '
-              'στις Τάσεις. Το οξυγόνο από το ρολόι φαίνεται κανονικά.',
+          'Υπνάκος $nap. Δεν μετρά ως νύχτα: η$emptyNight$ifWorn',
           c.textSecondary,
-          null,
+          readNowLabel,
+          readNow,
         ),
       OuraStatus.missing => (
           'Χθες βράδυ χωρίς ύπνο από το δαχτυλίδι',
-          'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις. Το οξυγόνο από το ρολόι φαίνεται κανονικά.',
+          'Η$emptyNight$ifWorn',
           c.textSecondary,
-          null,
+          readNowLabel,
+          readNow,
         ),
       OuraStatus.starting => (
           'Από απόψε ο ύπνος από το Oura',
@@ -71,25 +109,38 @@ class OuraStatusCard extends StatelessWidget {
               'μόνο από το δαχτυλίδι. Φόρεσέ το απόψε.',
           c.sleep,
           null,
+          null,
+        ),
+      // Round 1 (U2a-20): το κείμενο λέει τι κάνει το κουμπί (πριν: «Άνοιξε την εφαρμογή Oura» και κουμπί «Ρυθμίσεις»).
+      OuraStatus.startingNow when store.canWatchLastNight && now.hour >= ouraNightDueHour => (
+          store.ouraFirstNightText,
+          'Το Oura συνδέθηκε. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ. Ο ύπνος έρχεται μόνο '
+              'από το δαχτυλίδι. Δεν το φορούσες; Στις «Ρυθμίσεις Oura» διάλεξε «${store.watchLastNightLabel}».',
+          c.sleep,
+          'Ρυθμίσεις Oura',
+          openManage,
         ),
       OuraStatus.startingNow => (
           store.ouraFirstNightText,
-          'Το Oura συνδέθηκε. ${now.hour < 4 ? 'Όταν ξυπνήσεις, άνοιξε' : 'Άνοιξε'} την εφαρμογή Oura για να συγχρονίσει, '
-              'και μετά γύρνα εδώ. Ο ύπνος έρχεται μόνο από το δαχτυλίδι.',
+          'Το Oura συνδέθηκε. ${now.hour < ouraNightDueHour ? 'Όταν ξυπνήσεις, άνοιξε' : 'Άνοιξε'} την εφαρμογή Oura για να '
+              'συγχρονίσει, και μετά γύρνα εδώ. Ο ύπνος έρχεται μόνο από το δαχτυλίδι.',
           c.sleep,
-          store.canWatchLastNight && now.hour >= 4 ? 'Ρυθμίσεις Oura' : null,
+          null,
+          null,
         ),
       OuraStatus.incomplete => (
           'Η σύνδεση δεν ολοκληρώθηκε',
           'Η σύνδεση με το Oura έμεινε μισή και δεν άλλαξε τίποτα. Δοκίμασε ξανά.',
           c.textSecondary,
           'Σύνδεση με Oura',
+          openConnect,
         ),
       OuraStatus.reconnect when store.ouraError == OuraErrorKind.scopeMissing => (
           'Λείπει άδεια στην Oura',
-          'Η Oura δεν δίνει τον ύπνο με την άδεια που δόθηκε. Σύνδεσε ξανά και τσέκαρε την άδεια για τον ύπνο.',
+          'Η Oura δεν δίνει τον ύπνο με την άδεια που δόθηκε. Σύνδεσε ξανά και άφησε επιλεγμένη την άδεια για τον ύπνο.',
           c.bad,
           'Σύνδεση ξανά',
+          openConnect,
         ),
       OuraStatus.reconnect => (
           'Χρειάζεται νέα σύνδεση με το Oura',
@@ -97,20 +148,43 @@ class OuraStatusCard extends StatelessWidget {
               'έλειψαν έρχονται μετά.$syncedText',
           c.bad,
           'Σύνδεση ξανά',
+          openConnect,
         ),
+      // Round 1 (U2a-04 / S5-6): το 403 είναι «συνδρομή Ή άδεια»· η κάρτα λέει τι να κάνεις και έχει κουμπί (πριν: κανένα).
       OuraStatus.subscription => (
           'Η Oura δεν δίνει νέα δεδομένα',
-          '${ouraErrorText(OuraErrorKind.subscription)}$syncedText',
+          'Η συνδρομή Oura δεν είναι ενεργή ή λείπει η άδεια για τον ύπνο. Έλεγξε τη συνδρομή στην εφαρμογή Oura. Μετά, στις '
+              '«Ρυθμίσεις Oura», πάτα «Ενημέρωση τώρα» ή, αν λείπει η άδεια, «Σύνδεση ξανά».$syncedText',
           c.bad,
+          'Ρυθμίσεις Oura',
+          openManage,
+        ),
+      // Round 1 (U2b-09): μετά το «Ο ύπνος ξανά από το ρολόι» η κάρτα το λέει (πριν: ζητούσε ξανά την ίδια επιλογή).
+      OuraStatus.disconnected when store.watchSleepFromTonight => (
+          'Από απόψε ο ύπνος από το ρολόι',
+          'Το Oura αποσυνδέθηκε και διάλεξες το ρολόι: από απόψε ο ύπνος έρχεται από το Galaxy Watch.'
+              '${store.sleepUnsourced ? ' Η χθεσινή νύχτα μένει κενή.' : ''}',
+          c.textSecondary,
+          null,
           null,
         ),
       OuraStatus.disconnected => (
           'Ο ύπνος δεν έχει πηγή',
-          'Το Oura αποσυνδέθηκε. Οι νύχτες μένουν κενές ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι.',
+          'Το Oura αποσυνδέθηκε. ${store.sleepUnsourced ? 'Οι νύχτες μένουν κενές' : 'Από απόψε οι νύχτες μένουν κενές'} '
+              'ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι.',
           c.textSecondary,
           'Ρυθμίσεις Oura',
+          openManage,
         ),
-      _ => ('', '', c.textSecondary, null),
+      // Round 1 (S5-7 / U2a-04): η ανάγνωση αποτυγχάνει: ο λόγος και ένα κουμπί (πριν: καμία κάρτα).
+      OuraStatus.retry => (
+          _nightDueAndMissing(store, now) ? 'Δεν διαβάστηκε ακόμα από την Oura' : 'Η ανάγνωση από την Oura δεν γίνεται',
+          '${ouraErrorText(store.ouraError ?? OuraErrorKind.network)}$syncedText',
+          c.move,
+          readNowLabel,
+          readNow,
+        ),
+      _ => ('', '', c.textSecondary, null, null),
     };
     return EmptyCard(
       key: ValueKey('oura-status-${s.name}'),
@@ -119,15 +193,26 @@ class OuraStatusCard extends StatelessWidget {
       title: title,
       text: text,
       buttonText: button,
-      onPressed: button == null
-          ? null
-          : () => Navigator.of(context).push(
-                (s == OuraStatus.reconnect || s == OuraStatus.incomplete) && store.ouraConfigured
-                    ? OuraConnectPage.route(store, now: now)
-                    : OuraManagePage.route(store, now: now),
-              ),
+      onPressed: action,
+      // Round 1 (f9 · U2a-21): χωρίς νέα σύνδεση δεν έρχεται τίποτα· η ενέργεια αυτή είναι γεμάτο κουμπί.
+      primary: s == OuraStatus.reconnect,
     );
   }
+}
+
+/// Round 1 (S11-9 / U2a-13): «από χθες», «από την Τρίτη», «από το Σάββατο»· για 7 μέρες και πάνω η ημερομηνία
+/// («από Τετ 4/11»): η σκέτη μέρα της εβδομάδας θα διαβαζόταν ως «από σήμερα» ή «από την περασμένη εβδομάδα».
+String sinceDayText(DateTime d, DateTime now) {
+  final diff = daysBetween(d, now);
+  if (diff == 0) return 'σήμερα';
+  if (diff == 1) return 'χθες';
+  if (diff < 0 || diff >= 7) return shortDayDate(d);
+  final name = weekdayFull(d);
+  return switch (d.weekday) {
+    DateTime.monday => 'τη $name',
+    DateTime.saturday => 'το $name',
+    _ => 'την $name',
+  };
 }
 
 /// Το σχέδιο πηγών δεν διαβάστηκε με σιγουριά (π.χ. χαλασμένο αρχείο): οι νύχτες μένουν κενές, τίποτα δεν
@@ -146,10 +231,12 @@ class PlanUnknownCard extends StatelessWidget {
       icon: Icons.device_unknown_rounded,
       color: c.bad,
       title: 'Δεν διαβάστηκε από πού έρχεται ο ύπνος',
-      text: 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Για να μη μπερδευτούν συσκευές, οι νύχτες μένουν κενές και δεν '
+      text: 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Για να μην μπερδευτούν οι συσκευές, οι νύχτες μένουν κενές και δεν '
           'αποθηκεύεται τίποτα ώσπου να διαλέξεις.',
       buttonText: 'Διάλεξε πηγή',
       onPressed: onOpen,
+      // Round 1 (f9 · U2a-21): η μία ενέργεια της κάρτας, γεμάτο κουμπί.
+      primary: true,
     );
   }
 }
@@ -167,7 +254,9 @@ class OuraSleepTodayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final today = dayOf(now);
+    // Round 1 (S5-2 / U2a-05): η νύχτα της κάρτας «χθες βράδυ». Πριν από τις 04:00, όσο η νύχτα με τη σημερινή
+    // ημερομηνία δεν έχει τελειώσει, είναι η προηγούμενη (όπως λίγο πριν από τα μεσάνυχτα), όχι «Περιμένει το Oura».
+    final today = store.ouraNightDay(now);
     final night = store.ouraNightFor(today);
     final m = night?.main;
     const white = Colors.white;
@@ -192,7 +281,8 @@ class OuraSleepTodayCard extends StatelessWidget {
           if (olderMinutes != null) ...[
             const SizedBox(height: 6),
             Text(
-              'Τελευταία νύχτα που ήρθε: ${shortDayDate(older!.day)} · ${hoursMinutes(olderMinutes)}',
+              // Round 1 (U2a-11): η ημερομηνία και η διάρκεια δεν σπάνε σε δύο γραμμές («6 ώρες / 27 λεπτά»).
+              'Τελευταία νύχτα που ήρθε: ${glued(shortDayDate(older!.day))}, ${glued(hoursMinutes(olderMinutes))}',
               key: const ValueKey('oura-today-older-night'),
               style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600),
             ),
@@ -207,7 +297,7 @@ class OuraSleepTodayCard extends StatelessWidget {
             body,
             const SizedBox(height: 6),
             Text(
-              'Υπνάκος ${napTimes(night, nightOnly: true)} (δεν μετρά ως νύχτα)',
+              'Υπνάκος ${napTimes(night, nightOnly: true)} ${glued('(δεν μετρά ως νύχτα)')}',
               key: const ValueKey('oura-only-nap-times'),
               style: TextStyle(color: soft, fontSize: 13.5, fontWeight: FontWeight.w600),
             ),
@@ -269,7 +359,8 @@ class OuraSleepTodayCard extends StatelessWidget {
           ..._nightRow(context, soft),
           const SizedBox(height: 12),
           Text(
-            'Κοιμήθηκες ${parts.first.onset == null ? '—' : hm(parts.first.onset!)} · ξύπνησες ${hm(parts.last.end)}',
+            // Round 1 (S5-1): οι ώρες του τόπου όπου κοιμήθηκες (ίδιες με του κινητού όταν δεν ταξιδεύεις).
+            'Κοιμήθηκες ${parts.first.wallOnset == null ? '—' : hm(parts.first.wallOnset!)} · ξύπνησες ${hm(parts.last.wallEnd)}',
             key: const ValueKey('oura-today-times'),
             style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500, fontFeatures: tabular),
           ),
@@ -278,7 +369,7 @@ class OuraSleepTodayCard extends StatelessWidget {
             Text(
               [
                 if (night.shortNight && (minutes ?? 0) < 180) shortNightLabel,
-                if (parts.length > 1) 'σε ${parts.length} κομμάτια: ${[for (final p in parts) '${hm(p.start)}–${hm(p.end)}'].join(' και ')} (το κενό δεν μετρά)',
+                if (parts.length > 1) 'σε ${parts.length} κομμάτια: ${[for (final p in parts) '${hm(p.wallStart)}–${hm(p.wallEnd)}'].join(' και ')} (το κενό δεν μετρά)',
               ].join(' · '),
               style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
             ),
@@ -334,7 +425,8 @@ class OuraSleepTodayCard extends StatelessWidget {
 extension on OuraSleepTodayCard {
   /// Ετοιμότητα · HRV · Παλμοί ύπνου της χθεσινής νύχτας (από το Oura), κάτω από τη διάρκεια. Τίποτα αν λείπουν όλα.
   List<Widget> _nightRow(BuildContext context, Color soft) {
-    final day = dayOf(now);
+    // Η ίδια νύχτα με την κάρτα (S5-2: πριν από τις 04:00 η προηγούμενη).
+    final day = store.ouraNightDay(now);
     final plan = store.plan;
     final readiness = plan.value(store.history, K.energy, day);
     final hrv = plan.value(store.history, K.hrv, day);

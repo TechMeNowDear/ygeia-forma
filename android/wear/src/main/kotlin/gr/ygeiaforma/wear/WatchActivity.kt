@@ -159,9 +159,14 @@ class WatchActivity : Activity(), WatchView.Actions {
             Repo.clearRun(this)
             return
         }
+        // Έλεγχος 13/11 (S8-09): με όριο χρόνου, όπως οι άλλες δύο ερωτήσεις προς το Health Services. Πριν, αν εκείνο δεν
+        // απαντούσε, το άνοιγμα έμενε εδώ για πάντα: ούτε ανάκτηση, ούτε αποστολή των αποτελεσμάτων που περιμένουν, ούτε
+        // «Διαγραφή όλων». Χωρίς απάντηση: «δεν είναι δική μας» (ό,τι σώθηκε γράφεται ως μερικό ή συνεχίζει).
         val owned = try {
-            HealthServices.getClient(this).exerciseClient.getCurrentExerciseInfoAsync().await().exerciseTrackedStatus ==
-                ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS
+            val client = HealthServices.getClient(this).exerciseClient
+            withTimeoutOrNull(FinishTimes.HS_CALL_MS) {
+                client.getCurrentExerciseInfoAsync().await().exerciseTrackedStatus == ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS
+            } == true
         } catch (_: Exception) {
             false
         }
@@ -493,9 +498,15 @@ class WatchActivity : Activity(), WatchView.Actions {
             if (s != null && s.setsDone > 0) {
                 val now2 = System.currentTimeMillis()
                 val o = s.resultJson(now2, HrStats(now2)).put("lim", Repo.alarm.limit ?: 0)
-                Repo.savePending(this, s.id, o)
-                Repo.clearRun(this)
-                scope.launch { if (Link.putResult(this@WatchActivity, s.id, o)) Repo.removePending(this@WatchActivity, s.id) }
+                // S8-08: το στιγμιότυπο σβήνεται μόνο αν το αποτέλεσμα γράφτηκε στην αναμονή (αλλιώς μένει, ως εφεδρεία),
+                // ή μόλις μπει στο Data Layer.
+                val saved = Repo.storeResultThenClear({ Repo.savePending(this, s.id, o) }, { Repo.clearRun(this) })
+                scope.launch {
+                    if (Link.putResult(this@WatchActivity, s.id, o)) {
+                        Repo.removePending(this@WatchActivity, s.id)
+                        if (!saved) Repo.clearRun(this@WatchActivity)
+                    }
+                }
                 Repo.screen = Repo.Screen.END
             } else {
                 Repo.clearRun(this)
@@ -520,6 +531,8 @@ class WatchActivity : Activity(), WatchView.Actions {
 private const val SKIP_NOTICE = "Πάτα ξανά: επόμενη άσκηση"
 private const val FINISH_NOTICE = "Πάτα ξανά «Τέλος»"
 private const val FINISH_PHONE_NOTICE = "Πάτα ξανά: τέλος και στο κινητό"
+private const val FINISH_HR_ONLY_NOTICE = "Κανένα σετ: στο κινητό μένουν μόνο οι παλμοί"
+private const val FINISH_NOTHING_NOTICE = "Κανένα σετ ούτε παλμοί: δεν αποθηκεύεται"
 
 /**
  * Περπάτημα (έλεγχος γ2, 03-Μ3): η πτώση παλμών στο 1′ μετρά από τους παλμούς ΤΗΣ ΣΤΙΓΜΗΣ του «Τέλος»· αν σταμάτησες
@@ -537,9 +550,19 @@ fun pendingJoin(flag: Boolean, running: String?, local: Boolean): Boolean = flag
 fun finishNotice(phone: Boolean, setsDone: Int, hasHr: Boolean): String = when {
     !phone -> FINISH_NOTICE
     setsDone > 0 -> FINISH_PHONE_NOTICE
-    hasHr -> "Κανένα σετ: στο κινητό μένουν μόνο οι παλμοί"
-    else -> "Κανένα σετ ούτε παλμοί: δεν αποθηκεύεται"
+    hasHr -> FINISH_HR_ONLY_NOTICE
+    else -> FINISH_NOTHING_NOTICE
 }
+
+/**
+ * Σύντομο μήνυμα των δύο πατημάτων («Πάτα ξανά…», σβήνει μόνο του σε 3″) και όχι μήνυμα της υπηρεσίας (έλεγχος 13/11,
+ * U7-07). Μόνο για αυτά κρύβεται το «Τέλος» στην οθόνη του σετ (ο χρήστης το πατά ήδη δεύτερη φορά)· ένα μήνυμα της
+ * υπηρεσίας (π.χ. «Χωρίς άδεια παλμών: …») ανοίγει ολόκληρο μία φορά και δεν κρύβει πια το «Τέλος» για όλη την προπόνηση.
+ */
+fun isBriefNotice(text: String?): Boolean = text != null && (
+    text == SKIP_NOTICE || text == FINISH_NOTICE || text == FINISH_PHONE_NOTICE || text == FINISH_HR_ONLY_NOTICE ||
+        text == FINISH_NOTHING_NOTICE || text == WALK_FINISH_NOTICE
+    )
 
 /** Η οθόνη είναι στο ambient (αχνή, «πάντα ανοιχτή») ή σβηστή: καμία ανανέωση ανά δευτερόλεπτο (W3-08). */
 fun isAmbientState(state: Int): Boolean =

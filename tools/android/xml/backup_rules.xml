@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Το ίδιο με το data_extraction_rules.xml, για Android 10–11 (A10). Μόνο με κρυπτογράφηση από άκρη σε άκρη (C14, R9).
-     Το όνομα της αναφοράς για τον γιατρό ΔΕΝ είναι στο prefs.json: μένει στο noBackupFilesDir (συγχώνευση 4/11). -->
+     Το όνομα της αναφοράς για τον γιατρό ΔΕΝ είναι στο prefs.json: μένει στο noBackupFilesDir (συγχώνευση 4/11).
+     Έλεγχος 13/11 (S9-10 / S10-3): και η επιλογή «Αναφορές σφαλμάτων» (shared_prefs/errors.xml, ένας διακόπτης). -->
 <full-backup-content>
     <include domain="database" path="ygeia.db" requireFlags="clientSideEncryption" />
     <include domain="database" path="ygeia.db-wal" requireFlags="clientSideEncryption" />
@@ -10,4 +11,5 @@
     <include domain="file" path="oura_nights.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="training.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="hr/" requireFlags="clientSideEncryption" />
+    <include domain="sharedpref" path="errors.xml" requireFlags="clientSideEncryption" />
 </full-backup-content>

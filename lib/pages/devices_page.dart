@@ -96,82 +96,98 @@ class _DevicesPageState extends State<DevicesPage> {
         );
     final body = TextStyle(fontSize: 15, height: 1.5, color: c.text);
 
+    final intro = Text.rich(
+      TextSpan(children: [
+        const TextSpan(text: 'Από εδώ έρχονται οι αριθμοί της εφαρμογής. '),
+        const TextSpan(text: 'Καμία συσκευή δεν είναι ιατρική.', style: TextStyle(fontWeight: FontWeight.w700)),
+      ]),
+      style: TextStyle(fontSize: 15, height: 1.45, color: c.textSecondary),
+    );
+    final legendCard = AppCard(
+      child: Column(children: [
+        legend(_Kind.measured, 'Ο αισθητήρας το μετρά απευθείας.'),
+        legend(_Kind.estimated, 'Η συσκευή το υπολογίζει από άλλα σήματα. Καλό για τάση, όχι για μία μέρα.'),
+        legend(_Kind.indicative, 'Μέτρηση με γνωστά λάθη στον καρπό ή στο δάχτυλο. Δεν κάνει διάγνωση.'),
+      ]),
+    );
+    final oura = device('oura', Icons.circle_outlined, 'Oura Ring 5', 'δαχτυλίδι · ο ύπνος σου', [
+      row('Ώρες ύπνου', 'από κίνηση και παλμούς', _Kind.estimated),
+      row('Φάσεις ύπνου', null, _Kind.estimated),
+      row('Παλμοί και HRV στον ύπνο', null, _Kind.measured),
+      row('Θερμοκρασία δέρματος', 'απόκλιση από τα συνηθισμένα σου', _Kind.measured),
+      row('Οξυγόνο τη νύχτα, μέσος όρος', null, _Kind.indicative),
+      row('Βαθμολογία ύπνου, Ετοιμότητα', 'βαθμολογία της Oura', _Kind.estimated, line: false),
+    ]);
+    final watch = device('watch', Icons.watch_rounded, 'Galaxy Watch Ultra 2', 'ρολόι · μέρα και άσκηση', [
+      row('Βήματα', null, _Kind.measured),
+      row('Παλμοί μέρας και στην άσκηση', 'στα βάρη κατά προσέγγιση', _Kind.measured),
+      row('Απόσταση περπατήματος', 'GPS', _Kind.measured),
+      row('Οξυγόνο τη νύχτα, χαμηλότερη τιμή', null, _Kind.indicative),
+      row('Θερμίδες', 'μεγάλα λάθη, ειδικά στα βάρη· μόνο ως τάση', _Kind.estimated, line: false),
+    ]);
+    final inbody = device('inbody', Icons.monitor_weight_outlined, 'InBody H40', 'ζυγαριά · σώμα', [
+      row('Βάρος', null, _Kind.measured),
+      row('Λίπος, μύες', 'από ασθενές ρεύμα· ζυγίσου με τις ίδιες συνθήκες', _Kind.estimated),
+      row('Βασικός μεταβολισμός', null, _Kind.estimated, line: false),
+    ]);
+    final oxygen = AppCard(
+      key: _keys['oxygen'],
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          IconBadge(Icons.air_rounded, c.health, size: 36),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Οξυγόνο και άπνοια', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+        ]),
+        const SizedBox(height: 10),
+        Text(oxygenAboutText, style: body),
+        const SizedBox(height: 12),
+        // Σημάδια κινδύνου: πάντα ορατά, στο κουτί προσοχής.
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: c.warnBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.warnLine),
+          ),
+          child: Text(oxygenRedFlagText, style: body.copyWith(fontWeight: FontWeight.w600)),
+        ),
+      ]),
+    );
+    Widget column(List<Widget> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (i, w) in items.indexed) ...[if (i > 0) const SizedBox(height: 12), w],
+          ],
+        );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Τι μετράει κάθε συσκευή')),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            // Όλη η σελίδα χτισμένη (όχι ListView): το ⓘ πρέπει να βρίσκει και την τελευταία ενότητα για να πάει εκεί.
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text.rich(
-                  TextSpan(children: [
-                    const TextSpan(text: 'Από εδώ έρχονται οι αριθμοί της εφαρμογής. '),
-                    const TextSpan(text: 'Καμία συσκευή δεν είναι ιατρική.', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ]),
-                  style: TextStyle(fontSize: 15, height: 1.45, color: c.textSecondary),
-                ),
-                const SizedBox(height: 12),
-                AppCard(
-                  child: Column(children: [
-                    legend(_Kind.measured, 'Ο αισθητήρας το μετρά απευθείας.'),
-                    legend(_Kind.estimated, 'Η συσκευή το υπολογίζει από άλλα σήματα. Καλό για τάση, όχι για μία μέρα.'),
-                    legend(_Kind.indicative, 'Μέτρηση με γνωστά λάθη στον καρπό ή στο δάχτυλο. Δεν κάνει διάγνωση.'),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-                device('oura', Icons.circle_outlined, 'Oura Ring 5', 'δαχτυλίδι · ο ύπνος σου', [
-                  row('Ώρες ύπνου', 'από κίνηση και παλμούς', _Kind.estimated),
-                  row('Φάσεις ύπνου', null, _Kind.estimated),
-                  row('Παλμοί και HRV στον ύπνο', null, _Kind.measured),
-                  row('Θερμοκρασία δέρματος', 'απόκλιση από τα συνηθισμένα σου', _Kind.measured),
-                  row('Οξυγόνο τη νύχτα, μέσος όρος', null, _Kind.indicative),
-                  row('Βαθμολογία ύπνου, Ετοιμότητα', 'βαθμολογία της Oura', _Kind.estimated, line: false),
-                ]),
-                const SizedBox(height: 12),
-                device('watch', Icons.watch_rounded, 'Galaxy Watch Ultra 2', 'ρολόι · μέρα και άσκηση', [
-                  row('Βήματα', null, _Kind.measured),
-                  row('Παλμοί μέρας και στην άσκηση', 'στα βάρη κατά προσέγγιση', _Kind.measured),
-                  row('Απόσταση περπατήματος', 'GPS', _Kind.measured),
-                  row('Οξυγόνο τη νύχτα, χαμηλότερη τιμή', null, _Kind.indicative),
-                  row('Θερμίδες', 'μεγάλα λάθη, ειδικά στα βάρη· μόνο ως τάση', _Kind.estimated, line: false),
-                ]),
-                const SizedBox(height: 12),
-                device('inbody', Icons.monitor_weight_outlined, 'InBody H40', 'ζυγαριά · σώμα', [
-                  row('Βάρος', null, _Kind.measured),
-                  row('Λίπος, μύες', 'από ασθενές ρεύμα· ζυγίσου με τις ίδιες συνθήκες', _Kind.estimated),
-                  row('Βασικός μεταβολισμός', null, _Kind.estimated, line: false),
-                ]),
-                const SizedBox(height: 12),
-                AppCard(
-                  key: _keys['oxygen'],
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Row(children: [
-                      IconBadge(Icons.air_rounded, c.health, size: 36),
-                      const SizedBox(width: 12),
-                      Expanded(child: Text('Οξυγόνο και άπνοια', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
-                    ]),
-                    const SizedBox(height: 10),
-                    Text(oxygenAboutText, style: body),
-                    const SizedBox(height: 12),
-                    // Σημάδια κινδύνου: πάντα ορατά, στο κουτί προσοχής.
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: c.warnBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c.warnLine),
-                      ),
-                      child: Text(oxygenRedFlagText, style: body.copyWith(fontWeight: FontWeight.w600)),
-                    ),
-                  ]),
-                ),
-              ]),
+        // Round 1 (U2b-18): στο ανοιχτό Fold δύο στήλες, όπως οι Πηγές και οι σελίδες του Oura (πριν: μία στήλη 640 dp με
+        // μεγάλα περιθώρια). Στο κινητό μία στήλη, με την ίδια σειρά όπως πριν.
+        child: LayoutBuilder(builder: (context, box) {
+          final wide = box.maxWidth >= 760;
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: wide ? 1080 : 640),
+              // Όλη η σελίδα χτισμένη (όχι ListView): το ⓘ πρέπει να βρίσκει και την τελευταία ενότητα για να πάει εκεί.
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(wide ? 28 : 16, 4, wide ? 28 : 16, 32),
+                child: wide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: column([intro, legendCard, oura, oxygen])),
+                          const SizedBox(width: 16),
+                          Expanded(child: column([watch, inbody])),
+                        ],
+                      )
+                    : column([intro, legendCard, oura, watch, inbody, oxygen]),
+              ),
             ),
-          ),
-        ),
+          );
+        }),
       ),
     );
   }

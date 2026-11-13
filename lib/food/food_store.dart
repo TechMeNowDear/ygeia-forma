@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -103,6 +104,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
     try {
+      await _readAll();
+    } finally {
+      // Ό,τι κι αν έγινε, όποιος περιμένει το [waitLoaded] συνεχίζει (και βλέπει αν διαβάστηκε).
+      if (!_firstRead.isCompleted) _firstRead.complete();
+    }
+  }
+
+  Future<void> _readAll() async {
+    try {
       final raw = await rootBundle.loadString('assets/foods/basic_foods.json');
       final j = jsonDecode(raw) as Map<String, dynamic>;
       _basic = [for (final f in j['foods'] as List) Food.fromJson(Map<String, dynamic>.from(f as Map))];
@@ -114,6 +124,22 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _rebuildIndex();
     ready = true;
     notifyListeners();
+  }
+
+  /// Τελείωσε η πρώτη ανάγνωση στο άνοιγμα της εφαρμογής (είτε πέτυχε είτε όχι).
+  final Completer<void> _firstRead = Completer<void>();
+
+  /// Περιμένει να τελειώσει η πρώτη ανάγνωση και λέει αν το ημερολόγιο διαβάστηκε ([loaded]).
+  ///
+  /// Έλεγχος round1 (S2-11): όταν η εφαρμογή ανοίγει από το widget «+ Φαγητό» / «Barcode» χωρίς να τρέχει ήδη, το
+  /// πάτημα φτάνει πριν διαβαστούν η βάση τροφίμων, «Τα προϊόντα μου» και το ημερολόγιο. Πριν, η προσθήκη απλώς δεν
+  /// άνοιγε (με μήνυμα για ένα «Ξαναδοκίμασε» που δεν υπήρχε). Τώρα περιμένει λίγο και ανοίγει μόλις διαβαστούν.
+  /// Αν η ανάγνωση έχει ήδη τελειώσει (ή δεν θα τελειώσει μέσα στο [timeout]), απαντά αμέσως με ό,τι ισχύει.
+  Future<bool> waitLoaded({Duration timeout = const Duration(seconds: 10)}) async {
+    if (!loaded && !_firstRead.isCompleted) {
+      await _firstRead.future.timeout(timeout, onTimeout: () {});
+    }
+    return loaded;
   }
 
   Future<void> _loadMine() async {
@@ -459,6 +485,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _loadDayIfOld(day);
   }
 
+  /// Η μέρα που δείχνει το ημερολόγιο όταν ΔΕΝ είναι η σημερινή ([today])· null όταν δείχνει τη σημερινή.
+  /// Για την κεφαλίδα της Διατροφής (έλεγχος round1, U3a-1): έγραφε πάντα τη σημερινή ημερομηνία, και όταν από κάτω
+  /// φαινόταν άλλη μέρα.
+  DateTime? otherDayShown(DateTime today) => sameDay(day, today) ? null : day;
+
   /// Ποια μέρα (του ημερολογίου) διάλεξα να βλέπω μια παλιότερη μέρα.
   DateTime? _shownOn;
 
@@ -600,10 +631,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return (e, f, failed, existing);
   }
 
-  /// Καταχωρίσεις (των τελευταίων 90 ημερών) με αυτό το προϊόν, που έχουν άλλες τιμές από το [f].
+  /// Καταχωρίσεις (των τελευταίων 90 ημερών) με αυτό το προϊόν, που έχουν άλλες τιμές από το [f], ή άλλο «μετρά ως»
+  /// για την κάρτα «Χοληστερίνη» ([Food.cholKind]· έλεγχος round1, S2-1: αλλιώς, όταν ορίζεις αργότερα ότι το προϊόν
+  /// είναι π.χ. ξηροί καρποί, οι μέρες που το είχες ήδη γράψει θα έμεναν να μη μετρούν, χωρίς τρόπο να διορθωθούν).
   List<LogEntry> entriesWithOldValues(Food f) => [
         for (final e in _entries.values)
-          if (e.food.id == f.id && !_sameNutrients(e.food.n, f.n)) e,
+          if (e.food.id == f.id && (!_sameNutrients(e.food.n, f.n) || e.food.cholKind != f.cholKind)) e,
       ];
 
   static bool _sameNutrients(Nutrients a, Nutrients b) {

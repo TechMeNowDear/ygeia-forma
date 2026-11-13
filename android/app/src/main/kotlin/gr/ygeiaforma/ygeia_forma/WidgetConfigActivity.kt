@@ -32,6 +32,12 @@ class WidgetConfigActivity : FlutterFragmentActivity() {
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
         // Αν κλείσει χωρίς «Προσθήκη», η αρχική οθόνη δεν βάζει το widget.
         setResult(Activity.RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
+        // Έλεγχος 13/11 (S10-1): extras της Flutter από άλλη εφαρμογή (π.χ. «cached_engine_id» που δεν υπάρχει → κλείσιμο
+        // στο άνοιγμα) φεύγουν από το Intent πριν τα διαβάσει η Flutter (λίστα: MainActivity.kt).
+        try {
+            for (k in FlutterLaunchExtras.NAMES) intent?.removeExtra(k)
+        } catch (_: Throwable) {
+        }
         super.onCreate(savedInstanceState)
     }
 

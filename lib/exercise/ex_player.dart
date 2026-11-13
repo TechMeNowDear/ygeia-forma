@@ -44,6 +44,14 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
   final _cache = ExPaintCache();
   Duration? _last;
   double _t = 0, _p = 0;
+
+  /// round1, S7-10: η θέση που ζωγραφίστηκε τελευταία, πόσος χρόνος πέρασε από τότε και πόσο παίζει χωρίς διακοπή.
+  double _painted = -1, _sincePaint = 0, _played = 0;
+
+  /// Ως 30 καρέ το δευτερόλεπτο (όχι 120 της οθόνης), τίποτα όσο η φιγούρα μένει ακίνητη, και παύση μόνη της μετά από
+  /// ένα λεπτό (ξαναρχίζει με το ▶): η σελίδα μένει συχνά ανοιχτή στον πάγκο, με την οθόνη αναμμένη στην προπόνηση.
+  static const _frameSec = 1 / 30;
+  static const _autoPauseSec = 60.0;
   late double _yaw;
   bool _playing = true, _slow = false, _muscles = true, _guides = true, _second = false;
   int _phase = 0;
@@ -87,12 +95,13 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
     }
   }
 
-  /// Πηγαίνει στον χρόνο t· επιστρέφει true αν άλλαξε φάση.
-  bool _seek(double t) {
+  /// Πηγαίνει στον χρόνο t· επιστρέφει true αν άλλαξε φάση. Με [paint] = false η εικόνα δεν ξαναζωγραφίζεται εδώ
+  /// (το αποφασίζει το [_tick]).
+  bool _seek(double t, {bool paint = true}) {
     _t = t;
     final (p, i) = ex.at(_t);
     _p = p;
-    _repaint.value++;
+    if (paint) _paint();
     if (i == _phase) return false;
     _phase = i;
     return true;
@@ -106,12 +115,26 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
     });
   }
 
+  void _paint() {
+    _painted = _p;
+    _sincePaint = 0;
+    _repaint.value++;
+  }
+
   void _tick(Duration now) {
     final dt = _last == null ? 0.0 : (now - _last!).inMicroseconds / 1e6;
     _last = now;
-    if (_seek(_t + dt.clamp(0.0, 0.1) * (_slow ? 0.4 : 1.0))) {
+    _played += dt;
+    final phase = _seek(_t + dt.clamp(0.0, 0.1) * (_slow ? 0.4 : 1.0), paint: false);
+    _sincePaint += dt;
+    if (_p != _painted && _sincePaint >= _frameSec) _paint();
+    if (phase) {
       setState(() {});
       widget.phase?.value = _phase;
+    }
+    if (_played >= _autoPauseSec && _playing) {
+      if (_p != _painted) _paint();
+      _toggle();
     }
   }
 
@@ -119,6 +142,7 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
     setState(() => _playing = !_playing);
     if (_playing) {
       _last = null;
+      _played = 0;
       _ticker.start();
     } else {
       _ticker.stop();

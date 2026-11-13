@@ -142,6 +142,7 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
       sizes: [
         for (final (i, z) in wSizes.indexed)
           ChoiceChip(
+            showCheckmark: false,
             label: Text(z.name),
             selected: _size == i,
             onSelected: (_) => _change(() => _size = i),
@@ -245,6 +246,7 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final m in metrics)
             ChoiceChip(
+              showCheckmark: false,
               label: Text(m.name),
               selected: _s.hero == m.key,
               onSelected: (_) => _change(() => _s.hero = m.key),
@@ -296,7 +298,7 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
             (WTap.metric, 'Τη σελίδα της κεντρικής τιμής'),
             (WTap.today, 'Το «Σήμερα»'),
           ])
-            ChoiceChip(label: Text(l), selected: _s.tap == v, onSelected: (_) => setState(() => _s.tap = v)),
+            ChoiceChip(showCheckmark: false, label: Text(l), selected: _s.tap == v, onSelected: (_) => setState(() => _s.tap = v)),
         ]),
       ]),
     ];
@@ -337,7 +339,7 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
         if (wall) ...[
           const SizedBox(height: 8),
           Text('Τα χρώματα έρχονται από την ταπετσαρία σου και αλλάζουν μαζί με το ανοιχτό ή σκοτεινό θέμα του κινητού.',
-              style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4)),
+              style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4)),
         ],
         if (custom) ...[
           const SizedBox(height: 12),
@@ -370,7 +372,9 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
                 (2, Icons.east_rounded, 'Από αριστερά'),
                 (3, Icons.north_east_rounded, 'Από κάτω αριστερά'),
               ])
+                // Round 1 (U4-9): χωρίς ✓· με εικονίδιο, το Material ζωγράφιζε το ✓ ΠΑΝΩ στο βελάκι της επιλογής.
                 ChoiceChip(
+                  showCheckmark: false,
                   avatar: Icon(icon, size: 18),
                   label: Text(l),
                   selected: _s.direction == i,
@@ -379,15 +383,19 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
             ]),
           ],
         ]),
-      _Group(title: 'Διαφάνεια φόντου', children: [
-        _SliderRow(
-          value: _s.opacity.toDouble(),
-          min: 0,
-          max: 100,
-          text: '${_s.opacity}%',
-          onChanged: (v) => _change(() => _s.opacity = v.round()),
-        ),
-      ]),
+      // Round 1 (U4-5): το «op» του widget είναι ΑΔΙΑΦΑΝΕΙΑ (100 = γεμάτο)· η ετικέτα λέει «Διαφάνεια», άρα δείχνει και
+      // κινεί 100 − op (σύρσιμο προς τα πάνω = πιο διάφανο, όπως στη Samsung). Το αποθηκευμένο «op» δεν αλλάζει νόημα.
+      // Με «Ταπετσαρία» το φόντο έχει σταθερή διαφάνεια (WidgetRenderer), άρα η ρύθμιση κρύβεται.
+      if (!wall)
+        _Group(title: 'Διαφάνεια φόντου', children: [
+          _SliderRow(
+            value: (100 - _s.opacity).toDouble(),
+            min: 0,
+            max: 100,
+            text: '${100 - _s.opacity}%',
+            onChanged: (v) => _change(() => _s.opacity = 100 - v.round()),
+          ),
+        ]),
       _Group(title: 'Γωνίες', children: [
         _SliderRow(
           value: _s.radius.toDouble(),
@@ -400,16 +408,16 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
       _Group(title: 'Γράμματα', children: [
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final (v, l) in const [(0.9, 'Μικρά'), (1.0, 'Κανονικά'), (1.12, 'Μεγάλα')])
-            ChoiceChip(label: Text(l), selected: _s.fontScale == v, onSelected: (_) => _change(() => _s.fontScale = v)),
+            ChoiceChip(showCheckmark: false, label: Text(l), selected: _s.fontScale == v, onSelected: (_) => _change(() => _s.fontScale = v)),
         ]),
         const SizedBox(height: 10),
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final (int? v, l) in const [(null, 'Αυτόματο χρώμα'), (0xFFFFFFFF, 'Ανοιχτά'), (0xFF17141F, 'Σκούρα')])
-            ChoiceChip(label: Text(l), selected: _s.textColor == v, onSelected: (_) => _change(() => _s.textColor = v)),
+            ChoiceChip(showCheckmark: false, label: Text(l), selected: _s.textColor == v, onSelected: (_) => _change(() => _s.textColor = v)),
         ]),
         const SizedBox(height: 6),
         Text('Στο αυτόματο, τα γράμματα γίνονται ανοιχτά ή σκούρα για να διαβάζονται πάντα.',
-            style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4)),
+            style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4)),
       ]),
       _Group(title: 'Λεπτομέρειες', children: [
         _SwitchRow('Λάμψη στη γωνία', _s.glow, (v) => _change(() => _s.glow = v)),
@@ -439,7 +447,7 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Χρώμα: $name', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
+              Text('Χρώμα: $name', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
               const SizedBox(height: 14),
               Wrap(spacing: 12, runSpacing: 12, children: [
                 _Dot(color: null, onTap: () => Navigator.pop(context, -1), label: 'Αυτόματο'),
@@ -502,7 +510,7 @@ Future<Color?> showColorSheet(BuildContext context, String title, Color start) {
               Row(children: [
                 Container(width: 48, height: 48, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.hairline))),
                 const SizedBox(width: 14),
-                Expanded(child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text))),
+                Expanded(child: Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text))),
               ]),
               const SizedBox(height: 14),
               slider('Απόχρωση', hsv.hue, 360, (x) => hsv = hsv.withHue(x),
@@ -512,7 +520,7 @@ Future<Color?> showColorSheet(BuildContext context, String title, Color start) {
               slider('Φωτεινότητα', hsv.value, 1, (x) => hsv = hsv.withValue(x),
                   [hsv.withValue(0).toColor(), hsv.withValue(1).toColor()]),
               FilledButton(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: () => Navigator.pop(context, color),
                 child: const Text('Εντάξει'),
               ),
@@ -575,12 +583,12 @@ class _Preview extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text('Παράδειγμα τιμών: οι δικές σου φαίνονται μόλις ανοίξεις μία φορά την εφαρμογή.',
-                style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+                style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4)),
           ),
         Wrap(spacing: 6, runSpacing: 6, children: sizes),
         const SizedBox(height: 4),
         Text('Το μέγεθος το αλλάζεις στην αρχική οθόνη, με παρατεταμένο πάτημα και σύρσιμο των άκρων.',
-            style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4)),
+            style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4)),
       ],
     );
   }
@@ -602,13 +610,14 @@ class _Group extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Round 1 (U4-14 γ, δ): ίδιος τίτλος κάρτας ([SectionLabel]) και ίδια γκρι εξήγηση με την υπόλοιπη εφαρμογή.
             Row(children: [
-              Expanded(child: Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text))),
+              Expanded(child: SectionLabel(title)),
               if (trailing != null) trailing!,
             ]),
             if (hint != null) ...[
               const SizedBox(height: 2),
-              Text(hint!, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4)),
+              Text(hint!, style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4)),
             ],
             if (children.isNotEmpty) const SizedBox(height: 10),
             ...children,
@@ -713,7 +722,8 @@ class _Swatch extends StatelessWidget {
                   : Container(width: 12, height: 12, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
             ),
             const SizedBox(height: 4),
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.text)),
+            // Round 1 (U4-4): ποτέ κομμένο («Ταπετσαρ…»)· μικραίνει λίγο αν δεν χωρά.
+            FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, softWrap: false, style: TextStyle(fontSize: 12, color: c.text))),
           ]),
         ),
       ),
@@ -739,7 +749,9 @@ class _ColorButton extends StatelessWidget {
         child: Column(children: [
           Container(height: 34, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10))),
           const SizedBox(height: 6),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+          FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label, maxLines: 1, softWrap: false, style: TextStyle(fontSize: 12.5, color: c.textSecondary))),
         ]),
       ),
     );

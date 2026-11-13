@@ -10,6 +10,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.HapticFeedbackConstants
@@ -58,9 +59,19 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     var otherAppAsk = false
 
     private val orange = Color.parseColor("#EA580C")
+
+    /**
+     * Το πορτοκαλί ως ΦΟΝΤΟ κουμπιού με λευκά γράμματα (έλεγχος 13/11, U7-19): λευκό σε #EA580C = 3,56:1, κάτω από το
+     * 4,5:1 που θέλουν γράμματα αυτού του μεγέθους (WCAG 2.1, 1.4.3)· σε #C2410C = 5,18:1. Το [orange] μένει για γράμματα
+     * και δαχτυλίδι πάνω σε μαύρο (5,90:1).
+     */
+    private val orangeFill = Color.parseColor("#C2410C")
     private val green = Color.parseColor("#16A34A")
     private val red = Color.parseColor("#EF4444")
     private val alarmBg = Color.parseColor("#991B1B")
+
+    /** Μικρά γράμματα πάνω στην κόκκινη οθόνη (U7-19): #FECACA σε #991B1B = 5,74:1 (πριν #FCA5A5 = 4,38:1). */
+    private val alarmSoft = Color.parseColor("#FECACA")
     private val gray = Color.parseColor("#9CA3AF")
     private val dim = Color.parseColor("#374151")
     private val card = Color.parseColor("#1F2937")
@@ -103,6 +114,21 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         /** Κρατιέται και αν ξαναφτιαχτεί η οθόνη (π.χ. αλλαγή μεγέθους γραμμάτων), για να μη ξαναβγεί (N3). */
         @JvmStatic
         internal var noHrSeenNow = false
+
+        // Γεωμετρία των μηνυμάτων, σε u (έλεγχος 13/11, U7-02…U7-08). Οι υπολογισμοί: fix/round1/f7.md.
+        /** Μικρότερο μέγεθος γραμμάτων ενός μηνύματος πριν κοπεί με «…» (≈ 10 sp στο Ultra 2). */
+        private const val NOTE_MIN = 8.5f
+        /** Βάση του κάτω μηνύματος (αρχική, ρεζέρβα): μία γραμμή. */
+        private const val NOTE_Y = 186f
+        /** Βάση του κάτω μηνύματος στο σετ όταν χωρά σε μία γραμμή (κάτω από το ✓, που τελειώνει στα 168u). */
+        private const val NOTE_SET_Y = 182f
+        /** Βάση της πρώτης από τις δύο γραμμές μηνύματος στο σετ (το ✓ τελειώνει τότε στα 162u, U7-03). */
+        private const val NOTE_SET_TWO_Y = 171f
+        /** Περπάτημα: η λεζάντα της ζώνης / το μήνυμα, 1,5u πιο κάτω από πριν (U7-02), και το πλάτος της γραμμής. */
+        private const val WALK_NOTE_Y = 136.5f
+        private const val WALK_NOTE_W = 160f
+        /** Διάλειμμα: πλάτος γραμμής στο ύψος του «επόμενο» (το δαχτυλίδι αφήνει 161u· 5u περιθώριο κάθε πλευρά). */
+        private const val REST_LINE_W = 150f
     }
 
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
@@ -126,6 +152,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     /** Ένα κουμπί για το TalkBack ([index] στη σειρά του [a11yItems]): «πάτημα». */
     internal fun a11yClick(index: Int): Boolean {
         val h = a11y.getOrNull(index)?.run ?: return false
+        byTap = true
         h()
         invalidate()
         return true
@@ -133,6 +160,30 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     /** Η προπόνηση που δείχνει η αρχική (μπορεί να αλλάξει με πάτημα στο όνομα). */
     var chosen: String? = null
+
+    /** Χρόνος από την εκκίνηση της συσκευής (ms)· αλλάζει μόνο στις δοκιμές. */
+    internal var clockEl: () -> Long = { SystemClock.elapsedRealtime() }
+
+    /**
+     * Φύλακας πατήματος (έλεγχος 13/11, S8-05): ποια οθόνη ζωγραφίστηκε τελευταία και πότε, αν η αλλαγή της ήρθε από
+     * πάτημα εδώ, και πότε άλλαξε τελευταία ΜΟΝΗ της ([screenAutoChanged], [tapAllowed]). Η αχνή οθόνη (ambient) δεν μετρά.
+     */
+    private var lastKey = ""
+    private var lastDrawEl = -1L
+    private var autoChangedEl = -1L
+    private var byTap = false
+
+    /**
+     * Το μήνυμα μέσα στην οθόνη (U7-06/U7-07): ποιο είδαμε τελευταία και από πότε φαίνεται ([noticeInline])· [shownNote]
+     * είναι αυτό που ζωγραφίζεται τώρα μέσα στην οθόνη (null = κανένα) και [noteTwo] αν πιάνει δύο γραμμές (οθόνη σετ).
+     */
+    private var noteSeen: String? = null
+    private var noteSeenEl = 0L
+    private var shownNote: String? = null
+    private var noteTwo = false
+
+    /** Κείμενα που κόπηκαν με «…» στην τελευταία εικόνα (για τις δοκιμές: κανένα σταθερό κείμενο δεν κόβεται, U7-04). */
+    internal val clipped = mutableListOf<String>()
 
     /**
      * Ambient (αχνή οθόνη «πάντα ανοιχτή», έλεγχος 9/11, W3-08): μαύρο φόντο, μόνο λευκά/γκρι γράμματα χωρίς εξομάλυνση
@@ -160,8 +211,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     override fun onDraw(c: Canvas) {
         hits.clear()
+        clipped.clear()
         say = ""
-        drawScreen(c)
+        markScreen(drawScreen(c))
         // Η πρώτη περιοχή για το TalkBack: τι δείχνει η οθόνη· μετά τα κουμπιά με τη σειρά που ζωγραφίστηκαν.
         val next = buildList {
             if (say.isNotEmpty()) add(Hit(RectF(0f, 0f, width.toFloat(), height * 0.3f), say, null))
@@ -177,34 +229,60 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
     }
 
-    private fun drawScreen(c: Canvas) {
+    /**
+     * S8-05: σημειώνει ποια οθόνη ζωγραφίστηκε ([key], κενό = αχνή οθόνη, δεν μετρά). Αν άλλαξε χωρίς πάτημα εδώ ενώ η
+     * προηγούμενη φαινόταν ως πριν από λίγο, τα πατήματα αγνοούνται για [TAP_GUARD_MS].
+     */
+    private fun markScreen(key: String) {
+        if (key.isEmpty()) return
+        val nowEl = clockEl()
+        if (key != lastKey) {
+            if (screenAutoChanged(lastKey.isNotEmpty(), byTap, nowEl - lastDrawEl)) autoChangedEl = nowEl
+            lastKey = key
+        }
+        lastDrawEl = nowEl
+        byTap = false
+    }
+
+    /** Ζωγραφίζει την οθόνη και επιστρέφει ποια ήταν (για το [markScreen])· κενό για την αχνή οθόνη. */
+    private fun drawScreen(c: Canvas): String {
         u = width / 200f
         cx = width / 2f
         cy = height / 2f
+        shownNote = null
+        noteTwo = false
         val now = System.currentTimeMillis()
         if (ambient) {
             c.drawColor(Color.BLACK)
             drawAmbient(c, now)
-            return
+            return ""
         }
         val alarm = Repo.alarmShown(now)
         c.drawColor(if (alarm) alarmBg else Color.BLACK)
         if (alarm) {
             drawAlarm(c)
-            return
+            return "alarm"
         }
         if (otherAppAsk) {
             drawOtherApp(c)
-            return
+            return "ask"
         }
         val note = Repo.notice
         if (Repo.openNotice && note != null) {
             Repo.openNotice = false
             noticeOpen = true
         }
+        val nowEl = clockEl()
+        if (note != noteSeen) {
+            noteSeen = note
+            noteSeenEl = nowEl
+            // Έλεγχος 13/11 (U7-04/U7-07): μήνυμα της υπηρεσίας που δεν χωρά ολόκληρο στη θέση του (ή, στο σετ, θα έκρυβε
+            // το «Τέλος») ανοίγει ολόκληρο μία φορά, σε όλη την οθόνη, αντί να κοπεί με «…».
+            if (note != null && !isBriefNotice(note) && !fitsInline(note)) noticeOpen = true
+        }
         if (noticeOpen && note != null) {
             drawNotice(c, note)
-            return
+            return "notice"
         }
         noticeOpen = false
         if (Repo.hrSilent == null) noHrSeen = false
@@ -212,12 +290,29 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.screen != Repo.Screen.HOME && Repo.screen != Repo.Screen.END && Repo.screen != Repo.Screen.RECOVER
         ) {
             drawNoHr(c)
-            return
+            return "nohr"
         }
-        // Πάτημα στο μήνυμα: ολόκληρο (π.χ. η αιτία όταν δεν ξεκινά η μέτρηση· 9/11). Πρώτο στη λίστα, ώστε τα
-        // κουμπιά της οθόνης να κερδίζουν όπου ακουμπούν.
-        val noteY = if (Repo.screen == Repo.Screen.WALK) 135f else 186f
-        if (note != null) hits.add(Hit(RectF(cx - 60 * u, (noteY - 10) * u, cx + 60 * u, (noteY + 12) * u), note) { noticeOpen = true; invalidate() })
+        // Το μήνυμα μέσα στην οθόνη: ως [NOTICE_INLINE_MS] από τη στιγμή που φάνηκε (U7-06/U7-07)· μετά δίνει πίσω τη θέση του
+        // (λεζάντα ζώνης στο περπάτημα, «Τέλος» στο σετ). Στο «Αποθηκεύτηκε» γράφεται ολόκληρο από το [drawEnd]· στο λεπτό
+        // αποκατάστασης δεν γράφεται (κάτω είναι η «Παράλειψη»).
+        val slot = Repo.screen != Repo.Screen.END && Repo.screen != Repo.Screen.RECOVER
+        val inNote = note?.takeIf { slot && noticeInline(nowEl - noteSeenEl) }
+        // Φάνηκε όσο έπρεπε: φεύγει οριστικά (δεν ξαναβγαίνει αργότερα κάτω από το «Αποθηκεύτηκε»). Αν το ίδιο κείμενο
+        // ξαναμπεί αργότερα, μετρά ως νέο.
+        if (note != null && slot && inNote == null && Repo.notice == note) {
+            Repo.notice = null
+            noteSeen = null
+        }
+        shownNote = inNote
+        noteTwo = inNote != null && Repo.screen == Repo.Screen.SET && !fitsSetLine(inNote)
+        // Πάτημα στο μήνυμα: ολόκληρο (π.χ. η αιτία όταν δεν ξεκινά η μέτρηση· 9/11). Πρώτο στη λίστα, ώστε τα κουμπιά της
+        // οθόνης να κερδίζουν όπου ακουμπούν· οι περιοχές του δεν τέμνουν κουμπιά (U7-08γ). Στο σετ, το «Πάτα ξανά…» χωρά
+        // πάντα ολόκληρο και στη θέση του είναι το (αόρατο) «Τέλος»: εκεί μόνο για ανάγνωση (TalkBack), όχι δεύτερη
+        // περιοχή πατήματος πάνω στην ίδια θέση.
+        if (inNote != null) {
+            if (Repo.screen == Repo.Screen.SET && isBriefNotice(inNote)) hits.add(Hit(noteHit(), inNote, null))
+            else hits.add(Hit(noteHit(), inNote) { noticeOpen = true; invalidate() })
+        }
         when (Repo.screen) {
             Repo.Screen.HOME -> drawHome(c)
             Repo.Screen.SET -> drawSet(c, now)
@@ -227,42 +322,113 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             Repo.Screen.RECOVER -> drawRecover(c, now)
             Repo.Screen.END -> drawEnd(c)
         }
-        // Στο «Αποθηκεύτηκε» το μήνυμα (π.χ. «σώθηκε ως τις…») γράφεται ολόκληρο μέσα στην οθόνη (drawEnd). Στο
-        // περπάτημα πιο ψηλά, στη θέση του «χωρίς GPS» (κάτω είναι τα κουμπιά, έλεγχος γ2, Μ3/RT-18).
-        if (note != null && Repo.screen == Repo.Screen.WALK) small(c, note, 135f, amber, ess(10f), 160f)
-        else if (note != null && Repo.screen != Repo.Screen.END) noteLines(c, note)
+        // Στο περπάτημα το μήνυμα γράφεται στη θέση της λεζάντας (κάτω είναι τα κουμπιά, έλεγχος γ2, Μ3/RT-18): μικραίνει
+        // ώσπου να χωρέσει (U7-04). Στο διάλειμμα το γράφει το [drawRest], στη θέση του «επόμενο».
+        if (inNote != null) {
+            when (Repo.screen) {
+                Repo.Screen.WALK -> small(c, inNote, WALK_NOTE_Y + (fs - 1f) * 8f, amber, ess(10f), WALK_NOTE_W, NOTE_MIN)
+                Repo.Screen.REST -> {}
+                else -> noteLines(c, inNote)
+            }
+        }
+        return Repo.screen.name
+    }
+
+    /**
+     * Η περιοχή πατήματος του μηνύματος ανά οθόνη, σε θέση που δεν τέμνει κανένα κουμπί (U7-08γ). Περπάτημα: η ζώνη από
+     * τους παλμούς ως πάνω από τα κουμπιά (104–137u· τα κουμπιά πιάνουν από 137u). Διάλειμμα: ανάμεσα στα − / + (ως 135u)
+     * και στα κάτω κουμπιά (από 147u). Σετ: κάτω από το ✓. Αλλού: η κάτω λωρίδα.
+     */
+    private fun noteHit(): RectF = when (Repo.screen) {
+        Repo.Screen.WALK -> RectF(cx - 80 * u, 104 * u, cx + 80 * u, 137 * u)
+        Repo.Screen.REST -> RectF(cx - 80 * u, 135 * u, cx + 80 * u, 147 * u)
+        Repo.Screen.SET -> RectF(cx - 60 * u, (if (noteTwo) 163 else 169) * u, cx + 60 * u, 198 * u)
+        else -> RectF(cx - 60 * u, 177 * u, cx + 60 * u, 198 * u)
+    }
+
+    /** Χωρά το [note] σε μία γραμμή στη θέση του κάτω μηνύματος του σετ, με γράμματα τουλάχιστον 10u; */
+    private fun fitsSetLine(note: String): Boolean {
+        text.typeface = Typeface.DEFAULT
+        text.textSize = 10f * u
+        return text.measureText(note) <= chordAt(NOTE_SET_Y, 10f) * u
+    }
+
+    /**
+     * Χωρά το μήνυμα ολόκληρο μέσα στην οθόνη που φαίνεται τώρα (με το μικρότερο επιτρεπτό μέγεθος, [NOTE_MIN]); Στο σετ
+     * ένα μήνυμα της υπηρεσίας δεν γράφεται ποτέ μέσα (θα έκρυβε το «Τέλος», U7-07): πάντα ολόκληρο, σε όλη την οθόνη.
+     * Στο «Αποθηκεύτηκε» και στο λεπτό αποκατάστασης δεν ανοίγει τίποτα μόνο του.
+     */
+    private fun fitsInline(note: String): Boolean {
+        val maxW = when (Repo.screen) {
+            Repo.Screen.END, Repo.Screen.RECOVER -> return true
+            Repo.Screen.SET -> return false
+            Repo.Screen.WALK -> WALK_NOTE_W
+            Repo.Screen.REST -> REST_LINE_W
+            else -> chordAt(NOTE_Y, NOTE_MIN)
+        }
+        text.typeface = Typeface.DEFAULT
+        text.textSize = NOTE_MIN * u
+        return text.measureText(note) <= maxW * u
     }
 
     private var noticeOpen = false
 
     /**
-     * Μήνυμα κάτω στη στρογγυλή οθόνη, σε ως δύο γραμμές (η κάτω πιο στενή): ολόκληρο το «Πάτα ξανά: τέλος και στο
-     * κινητό» κ.λπ., όχι κομμένο στις άκρες (W3-09). Πάτημα: ολόκληρο, σε όλη την οθόνη.
+     * Μήνυμα κάτω στη στρογγυλή οθόνη: μία γραμμή, ή στο σετ ως δύο (η κάτω πιο στενή): ολόκληρο το «Πάτα ξανά: τέλος και
+     * στο κινητό» κ.λπ., όχι κομμένο στις άκρες (W3-09). Πάτημα: ολόκληρο, σε όλη την οθόνη.
+     *
+     * Έλεγχος 13/11 (U7-03): τα πλάτη βγαίνουν από τη χορδή του κύκλου στο ύψος κάθε γραμμής ([chordAt], 3u από την άκρη),
+     * όχι από σταθερούς αριθμούς (η 2η γραμμή έφτανε ως την άκρη της οθόνης)· οι δύο γραμμές είναι 5u πιο ψηλά (171u και
+     * 182u, με το ✓ να τελειώνει τότε στα 162u) και πάντα με γράμματα ως 10u (με 13u η 2η δεν χωρά σε καμία θέση). Αν μια
+     * γραμμή δεν χωρά, μικραίνουν και οι δύο ως [NOTE_MIN]· μόνο μετά κόβεται με «…».
      */
     private fun noteLines(c: Canvas, note: String) {
-        val sz = ess(10f)
-        text.textSize = sz * u
         text.typeface = Typeface.DEFAULT
-        // Δύο γραμμές μόνο στην οθόνη του σετ (εκεί κάτω είναι μόνο το «Τέλος», που κρύβεται όσο φαίνεται το μήνυμα).
-        if (Repo.screen != Repo.Screen.SET || text.measureText(note) <= 96f * u) {
-            small(c, note, 186f, soft, sz, 100f)
+        val set = Repo.screen == Repo.Screen.SET
+        val y = if (set) NOTE_SET_Y else NOTE_Y
+        // 1) Μία γραμμή, στο μεγαλύτερο μέγεθος (από το μέγεθος του ρολογιού ως 10u) που χωρά.
+        var sz = ess(10f)
+        while (true) {
+            text.textSize = sz * u
+            if (text.measureText(note) <= chordAt(y, sz) * u) {
+                small(c, note, y, soft, sz, chordAt(y, sz), sz)
+                return
+            }
+            if (sz <= 10f) break
+            sz = maxOf(10f, sz - 0.5f)
+        }
+        if (!set) {
+            // Εκτός σετ δεν υπάρχει χώρος για δεύτερη γραμμή: μικραίνει ως το ελάχιστο και, αν χρειαστεί, κόβεται.
+            small(c, note, y, soft, 10f, chordAt(y, 10f), NOTE_MIN)
             return
         }
+        // 2) Δύο γραμμές (μόνο στο σετ· εκεί κάτω είναι μόνο το «Τέλος», που κρύβεται όσο φαίνεται το μήνυμα).
         val words = note.split(' ')
-        var best = 1
-        var bestDiff = Float.MAX_VALUE
-        for (k in 1 until words.size) {
-            val a = text.measureText(words.take(k).joinToString(" "))
-            val b = text.measureText(words.drop(k).joinToString(" "))
-            // η πάνω γραμμή χωρά πιο πολύ (πιο φαρδιά εκεί η οθόνη)
-            val diff = maxOf(a - 120f * u, b - 96f * u)
-            if (diff < bestDiff) {
-                bestDiff = diff
-                best = k
+        sz = 10f
+        while (true) {
+            text.textSize = sz * u
+            val y2 = NOTE_SET_TWO_Y + sz * 1.1f
+            val w1 = minOf(124f, chordAt(NOTE_SET_TWO_Y, sz))
+            val w2 = chordAt(y2, sz)
+            var best = 1
+            var bestDiff = Float.MAX_VALUE
+            for (k in 1 until words.size) {
+                val a = text.measureText(words.take(k).joinToString(" "))
+                val b = text.measureText(words.drop(k).joinToString(" "))
+                // η πάνω γραμμή χωρά πιο πολύ (πιο φαρδιά εκεί η οθόνη)
+                val diff = maxOf(a - w1 * u, b - w2 * u)
+                if (diff < bestDiff) {
+                    bestDiff = diff
+                    best = k
+                }
             }
+            if (bestDiff <= 0f || sz <= NOTE_MIN) {
+                small(c, words.take(best).joinToString(" "), NOTE_SET_TWO_Y, soft, sz, w1, sz)
+                small(c, words.drop(best).joinToString(" "), y2, soft, sz, w2, sz)
+                return
+            }
+            sz = maxOf(NOTE_MIN, sz - 0.5f)
         }
-        small(c, words.take(best).joinToString(" "), 176f, soft, sz, 124f)
-        small(c, words.drop(best).joinToString(" "), 176f + sz * 1.1f, soft, sz, 98f)
     }
 
     /** Ambient: τα βασικά μόνο, λευκό/γκρι σε μαύρο, χωρίς δευτερόλεπτα. Δεν πατιέται τίποτα. */
@@ -310,7 +476,16 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         layout.draw(c)
         c.restore()
         say = note
-        hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat()), "Κλείσιμο") { noticeOpen = false; invalidate() })
+        // Κλείσιμο = διαβάστηκε: το μήνυμα δεν μένει μετά μέσα στην οθόνη (εκεί θα έκρυβε τη λεζάντα ζώνης ή το «Τέλος»,
+        // U7-06/U7-07). Ό,τι πρέπει να φαίνεται μόνιμα έχει δική του ένδειξη («χωρίς GPS», «♥ δεν μετριούνται»).
+        hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat()), "Κλείσιμο") {
+            noticeOpen = false
+            if (Repo.notice == note) {
+                Repo.notice = null
+                noteSeen = null
+            }
+            invalidate()
+        })
     }
 
     /** Γ3: ερώτηση πριν σταματήσει η άσκηση άλλης εφαρμογής. Κείμενα εγκεκριμένα 12/11 ([OtherAppAsk]). */
@@ -330,17 +505,42 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         c.restore()
         say = OtherAppAsk.TEXT
         // Περιοχές πατήματος ≥ 40u (≈ 48 dp) που δεν ακουμπούν: «Ξεκίνα εδώ» 110–154u, «Άκυρο» 157–198u.
-        pill(c, OtherAppAsk.YES, 132f, 116f, 32f, orange, Color.WHITE, 13f * fs, padTop = 6f, padBottom = 6f) { actions.startHere() }
+        pill(c, OtherAppAsk.YES, 132f, 116f, 32f, orangeFill, Color.WHITE, 13f * fs, padTop = 6f, padBottom = 6f) { actions.startHere() }
         pill(c, OtherAppAsk.NO, 176f, 68f, 28f, button3, soft, ess(10f), padTop = 5f, padBottom = 8f) { actions.cancelStart() }
     }
 
     // ------------------------------------------------------------------ βοηθητικά
-    private fun t(c: Canvas, s: String, y: Float, color: Int, size: Float, bold: Boolean = false, maxW: Float = 150f) {
+    /**
+     * Μία κεντραρισμένη γραμμή που χωρά πάντα στο [maxW] (u). Έλεγχος 13/11 (U7-04): πριν κοβόταν με TextUtils.ellipsize,
+     * που στις δοκιμές (Robolectric) ΔΕΝ μετρά το πραγματικό πλάτος: τα στιγμιότυπα έδειχναν ολόκληρο ό,τι στο ρολόι
+     * κοβόταν με «…». Τώρα μετριέται με την ίδια γραμματοσειρά που ζωγραφίζει (στιγμιότυπο = ρολόι): πρώτα μικραίνει ως
+     * το [minSize] (αν δεν δοθεί: ως το 70% του μεγέθους, όχι κάτω από 8,5u) και μόνο αν ούτε τότε χωρά κόβεται με «…».
+     */
+    private fun t(c: Canvas, s: String, y: Float, color: Int, size: Float, bold: Boolean = false, maxW: Float = 150f, minSize: Float = 0f) {
         text.color = color
-        text.textSize = size * u
         text.typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-        val shown = TextUtils.ellipsize(s, text, maxW * u, TextUtils.TruncateAt.END).toString()
-        c.drawText(shown, cx, y * u, text)
+        val floor = minOf(size, if (minSize > 0f) minSize else maxOf(NOTE_MIN, size * 0.7f))
+        var sz = size
+        text.textSize = sz * u
+        while (sz > floor && text.measureText(s) > maxW * u) {
+            sz = maxOf(floor, sz - 0.5f)
+            text.textSize = sz * u
+        }
+        c.drawText(clip(s, maxW * u), cx, y * u, text)
+    }
+
+    /**
+     * Το [s] όπως χωρά σε [maxPx] με τη γραμματοσειρά που έχει τώρα το [text]: ολόκληρο, αλλιώς κομμένο με «…» (μετρημένο
+     * με measureText/breakText, U7-04). Ό,τι κόπηκε σημειώνεται στο [clipped], για τις δοκιμές.
+     */
+    private fun clip(s: String, maxPx: Float): String {
+        if (text.measureText(s) <= maxPx) return s
+        clipped.add(s)
+        val dots = "…"
+        val room = maxPx - text.measureText(dots)
+        if (room <= 0f) return dots
+        val n = text.breakText(s, true, room, null)
+        return s.substring(0, n.coerceIn(0, s.length)).trimEnd() + dots
     }
 
     /** Κείμενο που μικραίνει ώσπου να χωρέσει (π.χ. «πράσινο + μπλε (50 lb)» στη θέση των κιλών). */
@@ -353,10 +553,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             sz -= 1f
             text.textSize = sz * u
         }
-        c.drawText(s, cx, y * u, text)
+        c.drawText(clip(s, maxW * u), cx, y * u, text)
     }
 
-    private fun small(c: Canvas, s: String, y: Float, color: Int, size: Float, maxW: Float) = t(c, s, y, color, size, false, maxW)
+    private fun small(c: Canvas, s: String, y: Float, color: Int, size: Float, maxW: Float, minSize: Float = 0f) =
+        t(c, s, y, color, size, false, maxW, minSize)
 
     private fun pill(
         c: Canvas, label: String, y: Float, w: Float, h: Float, bg: Int, fg: Int, size: Float = 12f,
@@ -373,7 +574,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         hits.add(Hit(RectF(r.left - 6 * u, r.top - padTop * u, r.right + 6 * u, r.bottom + padBottom * u), desc, run))
     }
 
-    private fun pillAt(c: Canvas, label: String, x: Float, y: Float, w: Float, h: Float, bg: Int, fg: Int, size: Float, desc: String = label, run: () -> Unit) {
+    /**
+     * Κουμπί-χάπι σε θέση [x]. Η περιοχή πατήματος είναι λίγο μεγαλύτερη από το σχήμα: 3u δεξιά-αριστερά (έλεγχος 13/11,
+     * U7-08: με 4u οι περιοχές διπλανών κουμπιών έπεφταν η μία πάνω στην άλλη και το κενό ανάμεσα «χαριζόταν» στο
+     * τελευταίο) και [padTop]/[padBottom] πάνω-κάτω.
+     */
+    private fun pillAt(
+        c: Canvas, label: String, x: Float, y: Float, w: Float, h: Float, bg: Int, fg: Int, size: Float, desc: String = label,
+        padTop: Float = 6f, padBottom: Float = 6f, run: () -> Unit,
+    ) {
         val r = RectF((x - w / 2) * u, (y - h / 2) * u, (x + w / 2) * u, (y + h / 2) * u)
         fill.color = bg
         c.drawRoundRect(r, h * u / 2, h * u / 2, fill)
@@ -381,7 +590,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         text.textSize = size * u
         text.typeface = Typeface.DEFAULT_BOLD
         c.drawText(label, r.centerX(), r.centerY() - (text.descent() + text.ascent()) / 2, text)
-        hits.add(Hit(RectF(r.left - 4 * u, r.top - 6 * u, r.right + 4 * u, r.bottom + 6 * u), desc, run))
+        hits.add(Hit(RectF(r.left - 3 * u, r.top - padTop * u, r.right + 3 * u, r.bottom + padBottom * u), desc, run))
     }
 
     /**
@@ -444,21 +653,21 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun drawHome(c: Canvas) {
         val plan = Repo.plan
         val phone = Repo.phone
-        if (Repo.updateNeeded) {
-            // Πρόγραμμα από νεότερη έκδοση του κινητού (V-A-08): δεν διαβάστηκε. Κάτω, εκεί που δεν πέφτει πάνω σε τίποτα.
-            small(c, "Ενημέρωσε την εφαρμογή", 170f, orange, ess(10f), 130f)
-            small(c, "στο ρολόι", 170f + ess(10f) * 1.1f, orange, ess(10f), 90f)
-            sayAdd("Ενημέρωσε την εφαρμογή στο ρολόι")
-        }
+        // Πρόγραμμα από νεότερη έκδοση του κινητού (V-A-08): δεν διαβάστηκε. Έλεγχος 13/11 (S8-03/U7-01): το μήνυμα γράφεται
+        // πια σε θέση που δεν την καλύπτει κανένα κουμπί ([updateNote])· πριν ζωγραφιζόταν κάτω από το τρίτο κουμπί.
+        val upd = Repo.updateNeeded
+        if (upd) sayAdd("Ενημέρωσε την εφαρμογή στο ρολόι")
         if (phone != null && !phone.ended) {
-            small(c, "ΣΤΟ ΚΙΝΗΤΟ", 50f, gray, ess(10f), 120f)
+            // Με «ενημέρωσε»: οι δύο γραμμές του στη θέση της ετικέτας «ΣΤΟ ΚΙΝΗΤΟ» (τα κουμπιά πιάνουν όλο το κάτω μέρος).
+            if (upd) updateNote(c, 36f) else small(c, "ΣΤΟ ΚΙΝΗΤΟ", 50f, gray, ess(10f), 120f)
             t(c, phone.name, 72f, Color.WHITE, 15f * fs, true)
             small(c, "${phone.setsDone} σετ ως τώρα", 90f, gray, ess(10f), 130f)
             sayAdd("Στο κινητό: ${phone.name}, ${phone.setsDone} σετ ως τώρα")
-            pill(c, "Παλμοί εδώ", 118f, 110f, 34f, orange, Color.WHITE, 13f * fs, padBottom = 2f) { actions.joinPhone() }
+            // Περιοχές πατήματος 40u (≈ 48 dp) η καθεμία, με 3u κενό ανάμεσα (U7-08δ): 95–135u και 138–178u.
+            pill(c, "Παλμοί εδώ", 118f, 110f, 34f, orangeFill, Color.WHITE, 13f * fs, padBottom = 0f) { actions.joinPhone() }
             // Και περπάτημα από εδώ, ακόμα κι αν η προπόνηση του κινητού έμεινε ανοιχτή (έλεγχος 9/11, V-A-09). Κουμπί
             // (έλεγχος γ2, W3-09), όχι σκέτο κείμενο.
-            pill(c, "Περπάτημα", 157f, 96f, 30f, button2, Color.WHITE, 11.5f * fs, padTop = 2f) { actions.startWalk() }
+            pill(c, "Περπάτημα", 157f, 96f, 30f, button2, Color.WHITE, 11.5f * fs, padTop = 4f) { actions.startWalk() }
             return
         }
         if (plan != null || Repo.knownLimit != null) {
@@ -466,7 +675,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             val lim = Repo.limitNow()
             // «Σήμερα» μόνο όταν το πρώτο κουμπί είναι η σημερινή· αλλιώς «Άλλη» (N5).
             val isToday = chosen == null || chosen == plan?.todayWorkout?.id
-            if (!Repo.updateNeeded) twoTone(c, if (isToday) "Σήμερα · " else "Άλλη προπόνηση · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
+            if (!upd) twoTone(c, if (isToday) "Σήμερα · " else "Άλλη προπόνηση · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
@@ -474,27 +683,37 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         when {
             plan == null -> {
                 small(c, "ΥΓΕΙΑ & ΦΟΡΜΑ", 56f, gray, ess(10f), 120f)
-                t(c, "Άνοιξε την εφαρμογή", 80f, Color.WHITE, 12f * fs, true)
+                t(c, "Άνοιξε την εφαρμογή", 80f, Color.WHITE, 12f * fs, true, 170f)
                 t(c, "στο κινητό", 80f + 16f * fs, Color.WHITE, 12f * fs, true)
                 sayAdd("Άνοιξε την εφαρμογή στο κινητό")
                 pill(c, "Περπάτημα", 136f, 104f, 34f, card, Color.WHITE, 12f * fs) { actions.startWalk() }
+                // Κάτω από το κουμπί (τελειώνει στα 153u)· όχι όσο φαίνεται άλλο μήνυμα στην ίδια λωρίδα.
+                if (upd && shownNote == null) updateNote(c, 170f)
             }
             today?.isCardio == true && chosen == null -> {
                 // Μέρα περπατήματος: πρώτο το περπάτημα, δεύτερη η προπόνηση με βάρη.
                 val w = strength.firstOrNull()
-                homeButton(c, today.cardio?.name ?: "Περπάτημα", "${today.cardio?.minutes ?: 30} λ${today.cardio?.note?.let { " · $it" } ?: ""}",
-                    44f, orange, Color.WHITE) { actions.startWalk() }
+                // Τα λεπτά της εβδομάδας του προγράμματος που τρέχει ΣΗΜΕΡΑ (S6-11/S11-7), με ολόκληρη τη λέξη (S8-10/U7-09).
+                val mins = today.cardio?.let { walk -> plan?.cardioMinutes(walk) } ?: 30
+                homeButton(c, today.cardio?.name ?: "Περπάτημα", "${countText(mins, "λεπτό", "λεπτά")}${today.cardio?.note?.let { " · $it" } ?: ""}",
+                    44f, orangeFill, Color.WHITE) { actions.startWalk() }
                 if (w != null) homeButton(c, w.name, null, 92f, button2, Color.WHITE) { actions.startWorkout(w.id) }
+                if (upd) updateNote(c, 150f)
             }
             shown != null -> {
                 // Σχέδια 9/11 (7α): δύο ίσα κουμπιά ~48 dp και η άλλη προπόνηση τρίτη, χωρίς κρυφή χειρονομία.
-                homeButton(c, shown.name, "${countText(shown.items.size, "άσκηση", "ασκήσεις")} · ${shown.minutes} λ", 44f, orange, Color.WHITE) {
+                // Διάρκεια με ολόκληρη τη λέξη («50 λεπτά», όχι «50 λ»· έλεγχος 13/11, S8-10/U7-09).
+                homeButton(c, shown.name, "${countText(shown.items.size, "άσκηση", "ασκήσεις")} · ${countText(shown.minutes, "λεπτό", "λεπτά")}", 44f, orangeFill, Color.WHITE) {
                     actions.startWorkout(shown.id)
                 }
                 homeButton(c, "Περπάτημα", null, 92f, button2, Color.WHITE) { actions.startWalk() }
                 val otherId = nextStrength(strength.map { it.id }, shown.id)
                 val other = strength.firstOrNull { it.id == otherId }
-                if (other != null) {
+                if (upd) {
+                    // Στη θέση του τρίτου κουμπιού (S8-03/U7-01): το μήνυμα φαίνεται ολόκληρο· η άλλη προπόνηση ξαναβγαίνει
+                    // μόλις ενημερωθεί η εφαρμογή.
+                    updateNote(c, 150f)
+                } else if (other != null) {
                     // Πάτημα: έρχεται πρώτη (δεν ξεκινά αμέσως· μία απόφαση ανά οθόνη). Η επόμενη στη σειρά του
                     // προγράμματος, κυκλικά: με 3+ προπονήσεις φτάνεις σε όλες (έλεγχος premium, M4).
                     homeButton(c, other.name, null, 138f, button3, soft, h = 36f, w = 116f, size = 11f) { chosen = other.id; invalidate() }
@@ -505,8 +724,20 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                 t(c, "Ξεκούραση", 80f, Color.WHITE, 15f * fs, true)
                 sayAdd("Σήμερα ξεκούραση")
                 pill(c, "Περπάτημα", 124f, 104f, 34f, card, Color.WHITE, 12f * fs) { actions.startWalk() }
+                if (upd && shownNote == null) updateNote(c, 164f)
             }
         }
+    }
+
+    /**
+     * «Ενημέρωσε την εφαρμογή / στο ρολόι» σε δύο γραμμές, η πρώτη με βάση [y] (S8-03/U7-01). Το πλάτος κάθε γραμμής από
+     * τη χορδή του κύκλου στο ύψος της ([chordAt])· αν δεν χωρά (γράμματα 1,3×), μικραίνει.
+     */
+    private fun updateNote(c: Canvas, y: Float) {
+        val sz = ess(10f)
+        val y2 = y + sz * 1.1f
+        small(c, "Ενημέρωσε την εφαρμογή", y, orange, sz, minOf(130f, chordAt(y, sz)), NOTE_MIN)
+        small(c, "στο ρολόι", y2, orange, sz, minOf(90f, chordAt(y2, sz)), NOTE_MIN)
     }
 
     // ------------------------------------------------------------------ Β. σετ
@@ -524,11 +755,13 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         heart(c, 34f, now, 11f)
         val si = it.nextSet.let { n -> if (n < 0) it.sets.size - 1 else n }
         val set = it.sets.getOrNull(si)
-        // Όνομα άσκησης: πάτημα = επόμενη άσκηση (δύο πατήματα).
-        small(c, it.name, 52f, Color.WHITE, 10.5f * fs, 140f)
+        // Όνομα άσκησης: πάτημα = επόμενη άσκηση (δύο πατήματα). Μεγάλο όνομα μικραίνει ως 9u πριν κοπεί (U7-04).
+        small(c, it.name, 52f, Color.WHITE, 10.5f * fs, 140f, 9f)
         small(c, "ΣΕΤ ${si + 1}/${it.sets.size}" + if (s.items.size > 1) "  ›" else "", 52f + 12.5f * fs, gray, ess(10f), 120f)
         sayAdd("${it.name}, σετ ${si + 1} από ${it.sets.size}" + (set?.let { x -> (if (x.label.isNotEmpty()) ", ${x.label}" else "") + ", ${x.reps} επαναλήψεις" } ?: ""))
-        if (s.items.size > 1) hits.add(Hit(RectF(cx - 75 * u, 42 * u, cx + 75 * u, 70 * u), "Επόμενη άσκηση") { actions.nextExercise() })
+        // Περιοχή πατήματος 44u ψηλή (U7-08δ· πριν 28u): από τη γραμμή των παλμών ως κάτω από το «ΣΕΤ». Τα − / + αρχίζουν
+        // πιο κάτω (από 80u), άρα δεν τέμνονται.
+        if (s.items.size > 1) hits.add(Hit(RectF(cx - 75 * u, 26 * u, cx + 75 * u, 70 * u), "Επόμενη άσκηση") { actions.nextExercise() })
         if (set != null) {
             val noLabel = set.label.isEmpty()
             if (!noLabel) fit(c, set.label, 92f, Color.WHITE, 24f, 150f)
@@ -541,13 +774,26 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         // Το ✓ πατιέται από το σχήμα του και κάτω (όχι πάνω από αυτό, όπου είναι τα − / +).
         // (κενό 2u από την περιοχή των − / +, ώστε κανένα σημείο να μην είναι και των δύο).
-        pill(c, "✓", 152f, 84f, 32f, green, Color.WHITE, 18f, desc = "Έγινε το σετ", padTop = 0f, padBottom = 0f) { actions.tick() }
+        // Έλεγχος 13/11 (U7-03): όσο φαίνεται μήνυμα δύο γραμμών, το ✓ τελειώνει 7u πιο πάνω (136–161u αντί 136–168u), ώστε
+        // η πρώτη γραμμή να μην το ακουμπά και η δεύτερη να μη φτάνει στην άκρη του κύκλου. Η πάνω άκρη του δεν αλλάζει.
+        if (noteTwo) pill(c, "✓", 148.5f, 84f, 25f, green, Color.WHITE, 18f, desc = "Έγινε το σετ", padTop = 0f, padBottom = 0f) { actions.tick() }
+        else pill(c, "✓", 152f, 84f, 32f, green, Color.WHITE, 18f, desc = "Έγινε το σετ", padTop = 0f, padBottom = 0f) { actions.tick() }
         // 13/11 (Συμβούλιο 5, Δ2): το ✓ πατιέται και 8u πάνω από το σχήμα του, μόνο στη μέση (x 66–134u): εκεί το ύψος
         // γίνεται 40u ≈ 48 dp. Τα − / + φτάνουν ως x 64u και από 136u, άρα μένει κενό 2u και κανένα σημείο δεν είναι και
         // των δύο. Χωρίς όνομα: για το TalkBack υπάρχει ήδη το «Έγινε το σετ».
         hits.add(Hit(RectF(66 * u, 128 * u, 134 * u, 136 * u), "") { actions.tick() })
-        if (Repo.notice == null) pill(c, "Τέλος", 182f, 56f, 22f, button3, soft, ess(10f), padTop = 2f, padBottom = 8f) { actions.finishWorkout() }
-        else hits.add(Hit(RectF(cx - 30 * u, 170 * u, cx + 30 * u, 198 * u), "Τέλος") { actions.finishWorkout() })
+        endButton(c, 182f, 56f, 22f, 2f)
+    }
+
+    /**
+     * Το «Τέλος» κάτω στην οθόνη του σετ. Κρύβεται μόνο όσο φαίνεται μήνυμα στη θέση του· τότε μένει πατήσιμο (χωρίς σχήμα)
+     * ΜΟΝΟ αν το μήνυμα είναι το δικό του «Πάτα ξανά…» ([isBriefNotice]). Έλεγχος 13/11 (U7-07): πριν, κάθε μήνυμα (και
+     * τα μόνιμα της υπηρεσίας) το έκρυβε για όλη την προπόνηση, και το πάτημα πάνω στο μήνυμα έκανε «Τέλος» αντί να το ανοίξει.
+     */
+    private fun endButton(c: Canvas, y: Float, w: Float, h: Float, padTop: Float) {
+        val n = shownNote
+        if (n == null) pill(c, "Τέλος", y, w, h, button3, soft, ess(10f), padTop = padTop, padBottom = 8f) { actions.finishWorkout() }
+        else if (isBriefNotice(n)) hits.add(Hit(RectF(cx - 30 * u, 170 * u, cx + 30 * u, 198 * u), "Τέλος") { actions.finishWorkout() })
     }
 
     private fun drawPickOnPhone(c: Canvas, now: Long, next: Boolean = false) {
@@ -563,8 +809,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             sayAdd("Διάλεξε άσκηση στο κινητό")
         }
         small(c, if (Repo.bpmFresh(now)) "οι παλμοί ήδη μετράνε" else "περιμένω παλμούς", 140f, gray, ess(10f), 150f)
-        if (Repo.notice == null) pill(c, "Τέλος", 172f, 64f, 26f, button3, soft, ess(10f), padTop = 4f, padBottom = 8f) { actions.finishWorkout() }
-        else hits.add(Hit(RectF(cx - 30 * u, 170 * u, cx + 30 * u, 198 * u), "Τέλος") { actions.finishWorkout() })
+        // Περιοχή πατήματος 40u (≈ 48 dp): 153–193u (U7-08δ· πριν 38u).
+        endButton(c, 172f, 64f, 26f, 6f)
     }
 
     private fun s0(): Int = Repo.session?.setsDone ?: 0
@@ -576,7 +822,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         t(c, "Όλα τα σετ έγιναν", 106f, Color.WHITE, 12f * fs, true)
         small(c, "Τέλος εδώ ή στο κινητό", 106f + 15f * fs, gray, ess(10f), 150f)
         sayAdd("Όλα τα σετ έγιναν. Τέλος εδώ ή στο κινητό")
-        pill(c, "Τέλος", 158f, 88f, 34f, card, Color.WHITE, 12f * fs) { actions.finishWorkout() }
+        // Όσο φαίνεται μήνυμα από κάτω («Πάτα ξανά: τέλος και στο κινητό», ως δύο γραμμές από τα 162u), το κουμπί είναι
+        // λίγο πιο πάνω και πιο κοντό (133–161u), για να μην το ακουμπά· ένα δεύτερο πάτημα στο ίδιο σημείο το βρίσκει.
+        if (shownNote != null) pill(c, "Τέλος", 147f, 88f, 28f, card, Color.WHITE, 12f * fs, padBottom = 2f) { actions.finishWorkout() }
+        else pill(c, "Τέλος", 158f, 88f, 34f, card, Color.WHITE, 12f * fs) { actions.finishWorkout() }
     }
 
     // ------------------------------------------------------------------ ρεζέρβα
@@ -589,9 +838,12 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Δύο σειρές: 0 1 2 / 3 4+ (μεγάλα κουμπιά για τον καρπό· περιοχή ~40u ≈ 48 dp).
         val row1 = listOf(60f, 100f, 140f)
         for (i in 0..2) pillAt(c, labels[i], row1[i], 100f, 34f, 30f, card, Color.WHITE, 14f * fs, descs[i]) { actions.answer(i) }
-        pillAt(c, labels[3], 80f, 138f, 34f, 30f, card, Color.WHITE, 14f * fs, descs[3]) { actions.answer(3) }
-        pillAt(c, labels[4], 120f, 138f, 34f, 30f, card, Color.WHITE, 14f * fs, descs[4]) { actions.answer(4) }
-        small(c, "με καλή τεχνική", 170f, gray, ess(10f), 110f)
+        // Έλεγχος 13/11 (U7-08β): η κάτω σειρά 4u πιο κάτω. Πριν, οι περιοχές πατήματος των δύο σειρών έπεφταν η μία πάνω
+        // στην άλλη (117–121u) και ένα πάτημα λίγο κάτω από το «1» έγραφε «3» ή «4+». Τώρα: 79–121u και 121–163u, και
+        // δεξιά-αριστερά ακριβώς διπλανές (40–80, 80–120, 120–160u).
+        pillAt(c, labels[3], 80f, 142f, 34f, 30f, card, Color.WHITE, 14f * fs, descs[3]) { actions.answer(3) }
+        pillAt(c, labels[4], 120f, 142f, 34f, 30f, card, Color.WHITE, 14f * fs, descs[4]) { actions.answer(4) }
+        small(c, "με καλή τεχνική", 174f, gray, ess(10f), 110f)
     }
 
     // ------------------------------------------------------------------ Γ. διάλειμμα
@@ -619,19 +871,38 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             text.typeface = Typeface.DEFAULT
             fitPlain(c, "έκανες × $reps", 119f, Color.WHITE, 12f * fs, 72f)
             sayAdd("Έκανες $reps επαναλήψεις")
-            roundKey(c, "−", 46f, 115f, 22f, 44f, 34f, "Έκανες μία λιγότερη") { actions.lastReps(-1) }
-            roundKey(c, "+", 154f, 115f, 22f, 44f, 34f, "Έκανες μία παραπάνω") { actions.lastReps(1) }
+            // Περιοχή πατήματος 40u ψηλή (95–135u, ≈ 48 dp· U7-08δ, πριν 34u): δεν ακουμπά τίποτα πατήσιμο.
+            roundKey(c, "−", 46f, 115f, 22f, 44f, 40f, "Έκανες μία λιγότερη") { actions.lastReps(-1) }
+            roundKey(c, "+", 154f, 115f, 22f, 44f, 40f, "Έκανες μία παραπάνω") { actions.lastReps(1) }
         }
         val it = s.current
         val si = it?.nextSet ?: -1
-        if (it != null && si >= 0) {
+        val note = shownNote
+        if (note != null) {
+            // Το μήνυμα στη θέση του «επόμενο» (κάτω είναι τα κουμπιά και το δαχτυλίδι): μικραίνει ώσπου να χωρέσει.
+            small(c, note, 141f, soft, ess(10f), REST_LINE_W, NOTE_MIN)
+        } else if (it != null && si >= 0) {
             val set = it.sets[si]
-            val nextText = "επόμενο: ${if (si == 0) it.name else "σετ ${si + 1}"} · ${set.label.ifEmpty { "" }}${if (set.label.isEmpty()) "" else " "}× ${set.reps}"
-            small(c, nextText, 141f, gray, ess(10f), 160f)
-            sayAdd(nextText)
+            val load = "${set.label}${if (set.label.isEmpty()) "" else " "}× ${set.reps}"
+            if (si == 0) {
+                // Έλεγχος 13/11 (U7-05): πριν από ΝΕΑ άσκηση, το όνομα και τα κιλά × επαναλήψεις σε δύο γραμμές. Σε μία γραμμή
+                // («επόμενο: Κωπηλασία με αλτήρα · 14,3 kg × 11», ≈ 190u) δεν χωρούσαν και κόβονταν ακριβώς τα νούμερα που
+                // χρειάζεσαι για να ετοιμάσεις τα βάρη. Οι γραμμές χωράνε ανάμεσα στα − / + (ως 126u) και στα κουμπιά (από
+                // 155u): 137u και 149u, με γράμματα ως 11,5u και 11u (και με το μέγεθος 1,3× του ρολογιού).
+                small(c, "επόμενο: ${it.name}", 137f, gray, minOf(ess(10f), 11.5f), REST_LINE_W, NOTE_MIN)
+                t(c, load, 149f, Color.WHITE, 11f, true, 140f, NOTE_MIN)
+                sayAdd("επόμενο: ${it.name}, $load")
+            } else {
+                val nextText = "επόμενο: σετ ${si + 1} · $load"
+                small(c, nextText, 141f, gray, ess(10f), REST_LINE_W)
+                sayAdd(nextText)
+            }
         }
-        pillAt(c, "+30″", 76f, 168f, 44f, 26f, card, Color.WHITE, 11f * fs, "Τριάντα δευτερόλεπτα ακόμα") { actions.restPlus() }
-        pillAt(c, "Πάμε", 124f, 168f, 44f, 26f, Color.WHITE, Color.BLACK, 11f * fs, "Τέλος διαλείμματος") { actions.restStop() }
+        // Έλεγχος 13/11 (U7-08α): τα δύο κουμπιά 6u πιο μακριά το ένα από το άλλο (κενό 10u) και περιοχές πατήματος που δεν
+        // τέμνονται (48–98u και 102–152u· πριν 50–102 και 98–150, με το κενό να ανήκει όλο στο «Πάμε»), 40u ψηλές
+        // (147–187u ≈ 48 dp). Η δεξιά γωνία μένει μέσα από το δαχτυλίδι (89,9u < 91,5u).
+        pillAt(c, "+30″", 73f, 168f, 44f, 26f, card, Color.WHITE, 11f * fs, "Τριάντα δευτερόλεπτα ακόμα", padTop = 8f) { actions.restPlus() }
+        pillAt(c, "Πάμε", 127f, 168f, 44f, 26f, Color.WHITE, Color.BLACK, 11f * fs, "Τέλος διαλείμματος", padTop = 8f) { actions.restStop() }
     }
 
     // ------------------------------------------------------------------ Δ. όριο παλμών
@@ -643,11 +914,13 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         t(c, "♥ ${Repo.bpm}", 94f, Color.WHITE, 30f, true)
         // Παλιός αριθμός (δεν έρχονται παλμοί): με την ηλικία του, όχι σαν τωρινός (W2-16).
         val stale = !Repo.bpmFresh(now) && Repo.bpmAt > 0
-        if (stale) small(c, "παλμοί πριν ${clockAgo(now - Repo.bpmAt)}", 108f, Color.parseColor("#FCA5A5"), ess(10f), 140f)
+        if (stale) small(c, "παλμοί πριν ${clockAgo(now - Repo.bpmAt)}", 108f, alarmSoft, ess(10f), 140f)
         t(c, alarmHeadline(walk, rec), 126f, Color.WHITE, 14f * fs, true)
         // Όχι «μέχρι κάτω από 140»: η κόκκινη οθόνη σβήνει λίγο πιο κάτω (W2-16).
         small(c, "όριο γιατρού ${Repo.alarm.limit ?: ""}", 126f + 15f * fs, Color.WHITE, ess(10.5f), 140f)
-        small(c, "πάτα για να κλείσει", 166f + 4f * (fs - 1f) * 10f, Color.parseColor("#FCA5A5"), ess(10f), 120f)
+        // Το πλάτος από τη χορδή του κύκλου σε αυτό το ύψος: με γράμματα 1,3× (βάση 178u) χωράνε 106u, όχι 120u.
+        val closeY = 166f + 4f * (fs - 1f) * 10f
+        small(c, "πάτα για να κλείσει", closeY, alarmSoft, ess(10f), minOf(120f, chordAt(closeY, ess(10f))), NOTE_MIN)
         sayAdd("Πάνω από το όριο. Παλμοί ${Repo.bpm}. ${alarmHeadline(walk, rec)}. Όριο γιατρού ${Repo.alarm.limit ?: ""}")
         hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat()), "Κλείσιμο για ένα λεπτό") { actions.muteAlarm() })
     }
@@ -678,16 +951,20 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             if (!Repo.gps) "χωρίς GPS" else null,
             if (Repo.alarm.limit == null && zone == null) "χωρίς όριο παλμών" else null,
         )
-        if (tags.isNotEmpty() && Repo.notice == null) {
-            // Με μεγάλα γράμματα λίγο πιο κάτω, να μην ακουμπά τη γραμμή της ζώνης.
-            small(c, tags.joinToString(" · "), 135f + (fs - 1f) * 8f, where?.second ?: gray, ess(10f), 160f)
+        // Έλεγχος 13/11 (U7-06): η λεζάντα («πάνω · κόψε λίγο») κρύβεται μόνο όσο φαίνεται μήνυμα στη θέση της (ως 8″), όχι
+        // για όλο το περπάτημα. U7-02: 1,5u πιο κάτω (και η γραμμή της ζώνης 1,5u πιο πάνω), για να μην πέφτει η κουκκίδα
+        // πάνω στους τόνους· με μεγάλα γράμματα λίγο πιο κάτω ακόμα. Αν δεν χωρά (1,3×), μικραίνει.
+        if (tags.isNotEmpty() && shownNote == null) {
+            small(c, tags.joinToString(" · "), WALK_NOTE_Y + (fs - 1f) * 8f, where?.second ?: gray, ess(10f), WALK_NOTE_W, NOTE_MIN)
             sayAdd(tags.joinToString(", "))
         }
-        // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν). ~40 u ≈ 48 dp ύψος.
-        pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 69f, 158f, 60f, 36f, if (Repo.paused) orange else button2, Color.WHITE, 11.5f * fs) {
+        // Παύση/Συνέχεια αριστερά, Τέλος δεξιά (δύο πατήματα, όπως πριν). Έλεγχος 13/11 (U7-02/U7-08γ): 2u πιο κάτω και 2u
+        // πιο κοντά (143–177u), ώστε οι ουρές της λεζάντας να μη φτάνουν στα κουμπιά, και 2u πιο μακριά το ένα από το άλλο.
+        // Περιοχές πατήματος 34–100u και 102–168u (δεν τέμνονται· πριν το κενό ανήκε όλο στο «Τέλος»), 137–183u (46u ≈ 55 dp).
+        pillAt(c, if (Repo.paused) "Συνέχεια" else "Παύση", 67f, 160f, 60f, 34f, if (Repo.paused) orangeFill else button2, Color.WHITE, 11.5f * fs) {
             actions.pauseWalk(!Repo.paused)
         }
-        pillAt(c, "Τέλος", 133f, 158f, 60f, 36f, light, ink, 11.5f * fs, "Τέλος περπατήματος") { actions.finishWorkout() }
+        pillAt(c, "Τέλος", 135f, 160f, 60f, 34f, light, ink, 11.5f * fs, "Τέλος περπατήματος") { actions.finishWorkout() }
     }
 
     /** «♥ 104  όριο 140» και γραμμή ως το όριο· χωρίς παλμούς «♥ —» (κεχριμπάρι με όριο). */
@@ -701,16 +978,27 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             return
         }
         sayAdd(if (fresh) "Παλμοί ${Repo.bpm}" + (lim?.let { ", όριο $it" } ?: "") else "Δεν μετριούνται παλμοί, το όριο δεν σε προσέχει")
+        // Έλεγχος 13/11 (S8-02): το ρολόι είναι σε Σίγαση ή Εξοικονόμηση ενέργειας και θα έκοβε τη δόνηση ζώνης: γράφεται
+        // δίπλα στους παλμούς, στη θέση που με όριο γιατρού γράφεται το «όριο 140» (με όριο η ζώνη δεν μιλά έτσι κι αλλιώς).
+        val muted = lim == null && fresh && Repo.zoneMuted
+        if (muted) sayAdd("Σίγαση ή εξοικονόμηση ενέργειας: χωρίς δόνηση ζώνης")
         val heartC = if (!fresh) amber else if (over) red else salmon
         val num = if (fresh) "${Repo.bpm}" else "—"
-        val tail = if (lim != null) "   όριο $lim" else ""
+        val tail = if (lim != null) "   όριο $lim" else if (muted) "   $ZONE_MUTED_TAG" else ""
         text.textSize = 15f * fs * u
         text.typeface = Typeface.DEFAULT_BOLD
         val wHeart = text.measureText("♥ ")
         val wNum = text.measureText(num)
-        text.textSize = 9.5f * fs * u
+        // Η ουρά μικραίνει αν όλη η γραμμή δεν χωρά σε 172u (μετρημένο· με γράμματα 1,3× χωρά άνετα και τώρα).
+        var tailSize = 9.5f * fs
+        text.textSize = tailSize * u
         text.typeface = Typeface.DEFAULT
-        val wTail = text.measureText(tail)
+        var wTail = text.measureText(tail)
+        while (wHeart + wNum + wTail > 172f * u && tailSize > 8f) {
+            tailSize -= 0.5f
+            text.textSize = tailSize * u
+            wTail = text.measureText(tail)
+        }
         var x = cx - (wHeart + wNum + wTail) / 2
         val old = text.textAlign
         text.textAlign = Paint.Align.LEFT
@@ -722,9 +1010,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         text.color = if (over) red else if (fresh) Color.WHITE else amber
         c.drawText(num, x, y * u, text)
         x += wNum
-        text.textSize = 9.5f * fs * u
+        text.textSize = tailSize * u
         text.typeface = Typeface.DEFAULT
-        text.color = gray
+        text.color = if (muted) amber else gray
         c.drawText(tail, x, y * u, text)
         text.textAlign = old
         if (!fresh) return
@@ -734,7 +1022,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         val w = 100f
         val x0 = cx - w * u / 2
-        val yy = (y + 6) * u
+        // 1,5u πιο πάνω από πριν, όπως η γραμμή της ζώνης (U7-02): το λευκό σημάδι του ορίου τελειώνει στα 127u, πάνω από
+        // τους τόνους της λεζάντας (από ≈ 128u).
+        val yy = (y + 4.5f) * u
         fill.color = dim
         c.drawRoundRect(RectF(x0, yy, x0 + w * u, yy + 3.5f * u), 2 * u, 2 * u, fill)
         val lo = 60f
@@ -758,7 +1048,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     private fun zoneBar(c: Canvas, y: Float, z: WalkZone) {
         val w = 100f
         val x0 = cx - w * u / 2
-        val yy = (y + 6) * u
+        // Έλεγχος 13/11 (U7-02): η γραμμή 1,5u πιο πάνω και η κουκκίδα λίγο μικρότερη (ακτίνα 2,8u αντί 3,2u). Πριν, η
+        // κουκκίδα (ως 127,95u) έπεφτε πάνω στους τόνους της λεζάντας (από ≈ 126,4u). Τώρα: κουκκίδα 120,45–126,05u,
+        // λεζάντα από ≈ 127,9u (βάση 136,5u, γράμματα 10u)· με γράμματα 1,3× από ≈ 127,7u.
+        val yy = (y + 4.5f) * u
         val lo = z.lo - 25f
         val hi = z.hi + 25f
         fun px(v: Float) = x0 + w * u * ((v - lo) / (hi - lo)).coerceIn(0f, 1f)
@@ -767,7 +1060,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         fill.color = zoneGreen
         c.drawRoundRect(RectF(px(z.lo.toFloat()), yy, px(z.hi.toFloat()), yy + 3.5f * u), 2 * u, 2 * u, fill)
         fill.color = if (Repo.bpm > z.hi) amber else Color.WHITE
-        c.drawCircle(px(Repo.bpm.toFloat()), yy + 1.75f * u, 3.2f * u, fill)
+        c.drawCircle(px(Repo.bpm.toFloat()), yy + 1.75f * u, 2.8f * u, fill)
     }
 
     /** Σχέδια 9/11 (7γ): «Δεν έρχονται παλμοί» με όριο γιατρού, σε όλη την οθόνη, με «Εντάξει». */
@@ -829,7 +1122,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             sz -= 0.5f
             text.textSize = sz * u
         }
-        c.drawText(s, cx, y * u, text)
+        c.drawText(clip(s, maxW * u), cx, y * u, text)
     }
 
     /** Δύο χρώματα σε μία κεντραρισμένη γραμμή («Σήμερα · » γκρι + «όριο 140» χρώμα). */
@@ -970,11 +1263,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             }
             MotionEvent.ACTION_UP -> {
                 if (abs(e.x - downX) > 20 * u || abs(e.y - downY) > 20 * u) return true
+                // Έλεγχος 13/11 (S8-05): η οθόνη μόλις άλλαξε μόνη της (π.χ. έληξε το διάλειμμα, άναψε το όριο): το πάτημα
+                // ξεκίνησε για κουμπί της προηγούμενης και δεν εκτελείται σε ό,τι βρέθηκε από κάτω ([tapAllowed]).
+                if (!tapAllowed(clockEl(), autoChangedEl)) return true
                 // Το τελευταίο που ζωγραφίστηκε είναι από πάνω.
                 for (h in hits.asReversed()) {
                     val run = h.run ?: continue
                     if (h.r.contains(e.x, e.y)) {
                         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        byTap = true
                         run()
                         invalidate()
                         return true
@@ -1020,3 +1317,17 @@ internal fun nextStrength(ids: List<String>, shownId: String): String? {
 
 /** «1 άσκηση» / «4 ασκήσεις». */
 internal fun countText(n: Int, one: String, many: String): String = if (n == 1) "1 $one" else "$n $many"
+
+/**
+ * Πόσο πλάτος (σε u· η οθόνη είναι κύκλος με διάμετρο 200u) έχει μια γραμμή κειμένου με βάση [y] και μέγεθος γραμμάτων
+ * [size], αν μείνει [edge] u μέσα από την άκρη (έλεγχος 13/11, U7-03). Το κείμενο πιάνει από 0,86 × μέγεθος πάνω από τη
+ * βάση (τόνοι και ψηλά γράμματα, μετρημένο στα στιγμιότυπα) ως 0,24 × μέγεθος κάτω (ουρές)· μετρά όποια από τις δύο
+ * άκρες είναι πιο μακριά από το κέντρο. 0 αν δεν χωρά καθόλου. Καθαρή συνάρτηση, με δοκιμή.
+ */
+internal fun chordAt(y: Float, size: Float, edge: Float = 3f): Float {
+    val top = y - 0.86f * size
+    val bottom = y + 0.24f * size
+    val d = maxOf(abs(top - 100f), abs(bottom - 100f))
+    val r = 100f - edge
+    return if (d >= r) 0f else 2f * kotlin.math.sqrt(r * r - d * d)
+}

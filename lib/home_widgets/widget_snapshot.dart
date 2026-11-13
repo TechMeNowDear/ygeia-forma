@@ -51,11 +51,14 @@ Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
           if (p.forDay(DateTime(today.year, today.month, today.day + (d - today.weekday) % 7)) case final w?)
             '$d': {
               't': w.cardio?.name ?? w.name,
-              's': w.cardio != null ? '${w.cardio!.minutes} λεπτά' : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes}′',
+              // Round 1 (U7-13): διάρκειες με ολόκληρες λέξεις (πριν «περίπου 50′»).
+              's': w.cardio != null
+                  ? hoursMinutes(w.cardio!.minutes)
+                  : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${hoursMinutes(w.minutes)}',
             },
     },
     if (done != null) 'done': dateKey(today),
-    if (done != null) 'doneText': '${done.name} · ${done.end!.difference(done.start).inMinutes}′',
+    if (done != null) 'doneText': '${done.name} · ${hoursMinutes(done.end!.difference(done.start).inMinutes)}',
   };
 }
 
@@ -82,12 +85,14 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
     if (plan.value(h, K.sleepMin, _minus(today, i)) != null) day = _minus(today, i);
   }
   final out = <String, dynamic>{};
-  if (day == null) return {'m': out};
+  // Round 1 (U7-16): χωρίς νύχτα τις δύο τελευταίες μέρες το widget το λέει (πριν: σκέτο «—» χωρίς εξήγηση).
+  if (day == null) return {'src': 'καμία πρόσφατη νύχτα', 'm': out};
   final d0 = day;
   final src = plan.nightSource(d0);
   List<double?> series(String k) => [for (var i = 6; i >= 0; i--) plan.value(h, k, _minus(d0, i))];
 
-  void add(String key, String label, String unit, String Function(double v) show, {int digits = 0, String? cap, String? range}) {
+  void add(String key, String label, String unit, String Function(double v) show,
+      {int digits = 0, String? cap, String? range, bool unitInUsual = true}) {
     final v = plan.value(h, key, d0);
     if (v == null) return;
     final b = personalBaseline(h, plan, key, d0);
@@ -96,7 +101,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
     if (b?.usual != null) {
       final diff = shownDiff(b!.value, b.usual!, digits);
       dir = diff == 0 ? 0 : (diff > 0 ? 1 : -1);
-      usual = 'συνήθως ${show(b.usual!)}${unit.isEmpty ? '' : unit}';
+      usual = 'συνήθως ${show(b.usual!)}${unit.isEmpty || !unitInUsual ? '' : unit}';
     }
     out[key] = _entry(label, show(v), unit, cap: cap, d: dir, usual: usual, range: range, spark: series(key));
   }
@@ -113,7 +118,8 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
 
   final sleepWeek = week(K.sleepMin), breathWeek = week(K.breath);
   // Στρογγύλεμα πρώτα (έλεγχος 8/11, DATA-03): 419,5 λεπτά → 7:00, όχι 6:00.
-  add(K.sleepMin, 'Ύπνος', '', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
+  // Round 1 (U7-13): «7:16 ώρες» (η μονάδα ως λέξη· στο «συνήθως» χωρίς αυτήν, για να χωρά η γραμμή).
+  add(K.sleepMin, 'Ύπνος', ' ώρες', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}', unitInUsual: false,
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
       range: sleepWeek != null && sr != null ? '${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1)}' : null);
   add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
@@ -127,13 +133,13 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   // Θερμοκρασία: το Oura δίνει απόκλιση (+0,3°), το ρολόι απόλυτη τιμή καρπού (33,6 °C), που δεν δείχνεται ποτέ ως
   // «+33,6°» (έλεγχος 8/11, DATA-04). Από το ρολόι: μόνο η απόκλιση από τα συνηθισμένα, αν υπάρχουν.
   if (src == Source.oura) {
-    add(K.skinTemp, 'Θερμοκρ.', '°', (v) => signedDec(v), digits: 1);
+    add(K.skinTemp, 'Θερμοκρασία', '°', (v) => signedDec(v), digits: 1);
   } else {
     final v = plan.value(h, K.skinTemp, d0);
     final b = personalBaseline(h, plan, K.skinTemp, d0);
     if (v != null && b?.usual != null) {
       final diff = shownDiff(v, b!.usual!, 1);
-      out[K.skinTemp] = _entry('Θερμοκρ.', signedDec(diff), '°', cap: 'απόκλιση καρπού');
+      out[K.skinTemp] = _entry('Θερμοκρασία', signedDec(diff), '°', cap: 'απόκλιση καρπού');
     }
   }
   return {'src': '${src == Source.oura ? 'Oura' : 'ρολόι'} · ${shortDayDate(d0)}', 'm': out};
@@ -158,7 +164,7 @@ Map<String, dynamic> _move(HealthStore store, DateTime today) {
   }
   if (n('activeCalories') case final v?) out['activeKcal'] = _entry('Ενεργές', thousands(v.round()), ' kcal');
   if (n('calories') case final v?) out['totalKcal'] = _entry('Σύνολο', thousands(v.round()), ' kcal');
-  if (n('activeMinutes') case final v?) out['activeMin'] = _entry('Ενεργός', '${v.round()}′', '');
+  if (n('activeMinutes') case final v?) out['activeMin'] = _entry('Ενεργός', '${v.round()}', ' λεπτά');
   if (d.valueFor(d.floors, today)?.value case final v?) out['floors'] = _entry('Όροφοι', '${v.round()}', '');
   if (n('distance') case final v?) out['distance'] = _entry('Απόσταση', dec(v / 1000), ' km');
   final dayHr = store.plan.value(store.history, K.dayHr, _minus(today, 1));
@@ -181,7 +187,7 @@ Map<String, dynamic> _food(FoodStore food, DateTime today) {
         cap: entries.isEmpty ? 'τίποτα ακόμα σήμερα' : (meals == 1 ? '1 γεύμα σήμερα' : '$meals γεύματα σήμερα'),
         spark: series),
     'protein': _entry('Πρωτεΐνη', g(t.protein), ' g'),
-    'carbs': _entry('Υδατ.', g(t.carbs), ' g'),
+    'carbs': _entry('Υδατάνθρακες', g(t.carbs), ' g'),
     'fat': _entry('Λιπαρά', g(t.fat), ' g'),
     'fiber': _entry('Ίνες', g(t.fiber), ' g'),
     'salt': _entry('Αλάτι', dec(t.salt), ' g'),
@@ -204,7 +210,8 @@ double? _kcalOf(FoodStore food, DateTime day) {
 Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final body = store.data?.body ?? const <BodyMeasurement>[];
   final out = <String, dynamic>{};
-  if (body.isEmpty) return {'m': out};
+  // Round 1 (U7-16): χωρίς ζύγιση το widget το λέει.
+  if (body.isEmpty) return {'src': 'καμία ζύγιση ακόμα', 'm': out};
   final last = body.last;
   final prev = body.length >= 2 ? body[body.length - 2] : null;
   final recent = body.length > 7 ? body.sublist(body.length - 7) : body;
@@ -229,7 +236,7 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   }
   if (last.smm case final v?) out['smm'] = _entry('Μύες', dec(v), ' kg', cap: shortDayDate(last.time), spark: series((b) => b.smm));
   if (last.ffm case final v?) out['ffm'] = _entry('Άλιπη', dec(v), ' kg', cap: shortDayDate(last.time), spark: series((b) => b.ffm));
-  if (last.bmr case final v?) out['bmr'] = _entry('Μεταβολ.', thousands(v), ' kcal', cap: shortDayDate(last.time));
+  if (last.bmr case final v?) out['bmr'] = _entry('Μεταβολισμός', thousands(v), ' kcal', cap: shortDayDate(last.time));
   if (bmi != null) out['bmi'] = _entry('Δείκτης', dec(bmi), '', cap: shortDayDate(last.time), range: bmiRange.placeText(bmi));
   if (last.water case final v?) out['water'] = _entry('Νερό', dec(v), ' L', cap: shortDayDate(last.time));
   return {'src': 'InBody · ${shortDayDate(last.time)}', 'm': out};

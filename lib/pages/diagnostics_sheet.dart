@@ -126,7 +126,7 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
         const SizedBox(height: 14),
         FilledButton.icon(
           key: const ValueKey('diag-make'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           onPressed: _busy ? null : _make,
           icon: const Icon(Icons.ios_share_rounded, size: 20),
           label: Text(_busy ? 'Φτιάχνεται…' : 'Φτιάξε και στείλε'),

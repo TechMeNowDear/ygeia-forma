@@ -232,7 +232,7 @@ void main() {
       await card(t, sampleTraining(fri), fri);
       expect(find.text('Άσκηση σήμερα'), findsOneWidget);
       expect(find.text('Προπόνηση Α'), findsOneWidget);
-      expect(find.textContaining('όριο παλμών 140'), findsOneWidget);
+      expect(find.textContaining('όριο παλμών\u00A0140'), findsOneWidget); // round1, U6-20: αδιάσπαστο κενό
       expect(find.byKey(const ValueKey('today-train-start')), findsOneWidget);
     });
 
@@ -319,10 +319,11 @@ void main() {
     });
   });
 
-  test('διάρκεια σε λίστα: «1 ω 23 λ», «7 ω 05 λ», «45 λ»', () {
-    expect(hmList(83), '1 ω 23 λ');
-    expect(hmList(425), '7 ω 05 λ');
-    expect(hmList(45), '45 λ');
+  // Round 1 (U2a-02, U1a-3): διάρκειες πάντα με ολόκληρες λέξεις· το παλιό «1 ω 23 λ» δεν υπάρχει πια.
+  test('διάρκεια σε λίστα: «1 ώρα 23 λεπτά», «7 ώρες 5 λεπτά», «45 λεπτά»', () {
+    expect(hmList(83), '1 ώρα 23 λεπτά');
+    expect(hmList(425), '7 ώρες 5 λεπτά');
+    expect(hmList(45), '45 λεπτά');
   });
 
   group('Φύλλο ποσότητας με μεγάλα γράμματα (σχέδια 9/11, 9α)', () {

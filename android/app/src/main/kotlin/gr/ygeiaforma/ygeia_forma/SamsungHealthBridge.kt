@@ -110,7 +110,17 @@ class SamsungHealthBridge(
                 val json = call.argument<String>("json") ?: "{}"
                 // Το όνομα της αναφοράς μένει μόνο στο κινητό (noBackupFilesDir), έξω από το αντίγραφο Google.
                 val (shared, own) = DataRules.splitDeviceOnlyPrefs(json)
-                val ok = withContext(Dispatchers.IO) { writeDevicePrefs(own) && writeFile(PREFS_FILE, shared) }
+                // Round 1 (S9-5): πρώτα το prefs.json (στόχοι, στοιχεία, ζώνη, μέση) και χωριστά το μικρό ιδιωτικό αρχείο·
+                // πριν, μια αποτυχία στο ιδιωτικό αρχείο άφηνε άγραφες και όλες τις ρυθμίσεις. Αν αποτύχει οποιοδήποτε: «write».
+                val ok = withContext(Dispatchers.IO) {
+                    val main = writeFile(PREFS_FILE, shared)
+                    writeDevicePrefs(own) && main
+                }
+                if (ok) JSONObject().put("ok", true) else JSONObject().put("ok", false).put("kind", "write")
+            }
+            // Round 1 (S3-2 / S9-1): «Ξεκίνα με νέες ρυθμίσεις» μετά από χαλασμένο prefs.json: το αρχείο κρατιέται ως «.bad».
+            "prefsSetAside" -> respond(result) {
+                val ok = withContext(Dispatchers.IO) { setAsidePrefs() }
                 if (ok) JSONObject().put("ok", true) else JSONObject().put("ok", false).put("kind", "write")
             }
             "resolve" -> {
@@ -232,6 +242,9 @@ class SamsungHealthBridge(
         } catch (e: Throwable) {
             return """{"ok":false,"kind":"read"}"""
         }
+        // Round 1 (S3-2 / S9-1): αρχείο που υπάρχει αλλά δεν είναι αντικείμενο JSON (άδειο, κομμένο, «[]») = χαλασμένο.
+        // Η εφαρμογή το λέει στον χρήστη και δεν γράφει τίποτα από πάνω του· το αρχείο μένει στη θέση του ως τότε.
+        if (!DataRules.prefsReadable(shared)) return """{"ok":false,"kind":"corrupt"}"""
         val own = try {
             val f = devicePrefsFile()
             if (f.exists()) f.readText() else null
@@ -242,6 +255,11 @@ class SamsungHealthBridge(
     }
 
     private fun devicePrefsFile() = java.io.File(activity.noBackupFilesDir, DataRules.DEVICE_PREFS_FILE)
+
+    /** Δες [DataRules.setAsideUnreadablePrefs]. Με το ίδιο κλείδωμα με το [writeFile]: ποτέ στη μέση μιας εγγραφής. */
+    @Synchronized
+    private fun setAsidePrefs(): Boolean =
+        DataRules.setAsideUnreadablePrefs(java.io.File(activity.filesDir, PREFS_FILE), System.currentTimeMillis())
 
     /** Τα ιδιωτικά κλειδιά των ρυθμίσεων (ή σβήσιμο του αρχείου όταν δεν υπάρχουν πια). `false` αν απέτυχε. */
     /** Δες [DataRules.splitDeviceOnlyPrefs]: null = μένει όπως είναι (E6), «{}» = σβήνεται, αλλιώς γράφεται. */
@@ -473,8 +491,10 @@ class SamsungHealthBridge(
                 b.build()
             }
             is ReadDataRequest.LocalDateBuilder<*> -> {
+                // Round 1 (S3-4): το τέλος του LocalDateFilter ΔΕΝ περιλαμβάνεται (όπως στο DashboardReader.energy)·
+                // χωρίς το +1 η σημερινή μέρα (π.χ. το σημερινό Energy Score) έμενε έξω από το «Τι φτάνει».
                 val b = (builder as ReadDataRequest.LocalDateBuilder<HealthDataPoint>)
-                    .setLocalDateFilter(LocalDateFilter.of(from.toLocalDate(), to.toLocalDate()))
+                    .setLocalDateFilter(LocalDateFilter.of(from.toLocalDate(), to.toLocalDate().plusDays(1)))
                     .setOrdering(Ordering.DESC)
                     .setPageSize(PAGE_SIZE)
                 if (!token.isNullOrEmpty()) b.setPageToken(token)

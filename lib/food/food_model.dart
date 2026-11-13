@@ -38,6 +38,20 @@ const maxEntryGrams = 5000.0;
 /// [maxEntryGrams]. Οτιδήποτε άλλο (0, αρνητικό, τεράστιο, όχι αριθμός) = «χωρίς μερίδα».
 double? validServing(Object? v) => v is num && v.isFinite && v > 0 && v <= maxEntryGrams ? v.toDouble() : null;
 
+/// Τι μετρά ένα ΔΙΚΟ ΜΟΥ προϊόν στην κάρτα «Χοληστερίνη» (έλεγχος round1, S2-1 / S1-9). Αποθηκεύεται στο προϊόν και
+/// στο αντίγραφο κάθε καταχώρισης με το κλειδί «ck»· προαιρετικό: οι παλιές εκδόσεις το αγνοούν, και προϊόν χωρίς
+/// αυτό μετρά όπως πριν. Τα τρόφιμα της βάσης δεν το έχουν: εκείνα μετρούν από την κατηγορία τους (lib/food/chol.dart).
+abstract final class CholKind {
+  static const nuts = 'nuts';
+  static const legumes = 'legumes';
+  static const fish = 'fish';
+  static const bran = 'bran';
+  static const all = [nuts, legumes, fish, bran];
+
+  /// Μόνο οι γνωστές τιμές· οτιδήποτε άλλο (πειραγμένο αντίγραφο, άγνωστη τιμή) = «δεν ορίστηκε».
+  static String? parse(Object? v) => v is String && all.contains(v) ? v : null;
+}
+
 /// Τιμή θρεπτικού όπως έρχεται από την πηγή.
 class NValue {
   const NValue(this.value, {this.lessThan = false, this.traces = false});
@@ -97,7 +111,11 @@ class Food {
     this.cookedLabel,
     this.cooked = const [],
     this.perMl = false,
+    this.cholKind,
   });
+
+  /// Δικό μου προϊόν: τι μετρά στην κάρτα «Χοληστερίνη» ([CholKind]) ή null (δεν ορίστηκε).
+  final String? cholKind;
 
   /// Οι τιμές είναι ανά 100 ml (υγρό από το Open Food Facts). Αποθηκεύεται, ώστε η διόρθωση αργότερα να λέει ξανά
   /// «ανά 100 ml» και όχι «ανά 100 g» (δεύτερος έλεγχος διατροφής N9).
@@ -154,6 +172,7 @@ class Food {
         rawId: j['rawId'] as String?,
         cookedLabel: j['cookedLabel'] as String?,
         perMl: j['perMl'] == true,
+        cholKind: CholKind.parse(j['ck']),
         cooked: [
           for (final c in (j['cooked'] as List?) ?? const [])
             if (c is Map) ((c['id'] as String), (c['label'] as String)),
@@ -178,6 +197,7 @@ class Food {
         if (cookedLabel != null) 'cookedLabel': cookedLabel,
         if (cooked.isNotEmpty) 'cooked': [for (final c in cooked) {'id': c.$1, 'label': c.$2}],
         if (perMl) 'perMl': true,
+        if (cholKind != null) 'ck': cholKind,
         'n': n.toJson(),
       };
 
@@ -286,9 +306,48 @@ class Totals {
   final Map<String, int> missing = {};
 }
 
+// ---------------------------------------------------------------------------
+// Καταχώριση που μοιάζει με λάθος πληκτρολόγησης (έλεγχος round1, S11-3)
+// ---------------------------------------------------------------------------
+//
+// Ένα «2000» αντί για «20» σε λάδι βάζει 17.000 kcal σε μία μέρα, και η εβδομαδιαία διόρθωση θερμίδων το πιστεύει για
+// εβδομάδες. Γι' αυτό μια καταχώριση που σχεδόν σίγουρα είναι λάθος ζητά ΜΙΑ επιβεβαίωση πριν γραφτεί. Δεν μπλοκάρει
+// τίποτα: με «Ναι, σωστό» γράφεται όπως είναι. Τα όρια είναι δική μας επιλογή (όχι από μελέτη), βαλμένα ώστε μια
+// κανονική μεγάλη μερίδα να μην ρωτιέται ποτέ:
+
+/// 1. Μία καταχώριση με τόσες θερμίδες ή περισσότερες: όσες η «πρόσληψη αναφοράς» ΟΛΗΣ της μέρας για έναν ενήλικα
+///    (2.000 kcal, Κανονισμός ΕΕ 1169/2011, Παράρτημα XIII).
+const typoEntryKcal = 2000.0;
+
+/// 2. Ένα κιλό (ή λίτρο) και πάνω σε μία καταχώριση, όταν δίνει πάνω από [typoEntryBigKcal] θερμίδες: είναι ό,τι βγάζει
+///    ένα μηδενικό παραπάνω στη συνηθισμένη μερίδα των 100–300 g. Το όριο θερμίδων αφήνει έξω νερό, τσάι, καρπούζι,
+///    σαλάτα, που τρώγονται και με το κιλό.
+const typoEntryBigGrams = 1000.0;
+const typoEntryBigKcal = 500.0;
+
+/// 3. Λάδι, βούτυρο και άλλα σχεδόν καθαρά λίπη (από [typoFatPer100] g λιπαρά στα 100): από 100 g και πάνω σε μία
+///    καταχώριση (περίπου 7 κουταλιές της σούπας, 750–900 kcal). Η συνηθισμένη καταχώριση είναι 5–30 g, και ένα
+///    μηδενικό παραπάνω τη φέρνει ακριβώς εδώ (10 → 100).
+const typoFatPer100 = 80.0;
+const typoFatGrams = 100.0;
+
+/// Μοιάζει η καταχώριση ([grams] g ή ml του [f]) με λάθος πληκτρολόγησης; Τότε η οθόνη ρωτά μία φορά πριν τη γράψει.
+bool entryLooksLikeTypo(Food f, double grams) {
+  final kcal = f.n.amount(Nk.kcal) * grams / 100;
+  if (kcal >= typoEntryKcal) return true;
+  if (grams >= typoEntryBigGrams && kcal > typoEntryBigKcal) return true;
+  return f.n.amount(Nk.fat) >= typoFatPer100 && grams >= typoFatGrams;
+}
+
 /// «1.250» για θερμίδες, «12,5» για γραμμάρια.
 String kcalText(double v) => thousands(v.round());
-String gramsText(double v) => v >= 100 ? v.round().toString() : dec(v, v < 10 ? 1 : 0);
+String gramsText(double v) {
+  if (v >= 100) return v.round().toString();
+  if (v >= 10) return dec(v, 0);
+  // Έλεγχος round1 (U3a-14): ακέραια ποσότητα κάτω από 10 χωρίς «,0» («5 g», «0 g»· πριν «5,0 g», «0,0 g»). Το «1,3» μένει.
+  final t = dec(v, 1);
+  return t.endsWith(',0') ? t.substring(0, t.length - 2) : t;
+}
 
 /// Κείμενο τιμής ανά 100 g όπως στην πηγή: «<0,5», «ίχνη», «12,3».
 String nValueText(NValue? v, {int digits = 1}) {

@@ -77,21 +77,26 @@ class WeekCard extends StatelessWidget {
               ),
             ],
           ),
+          // Round 1 (U1b-05): δύο ανά σειρά με ΙΔΙΟ ύψος· μια μονή τελευταία σε όλο το πλάτος (πριν: κουτιά άλλου ύψους
+          // και ένα μόνο του με κενό δίπλα).
           if (highlights.isNotEmpty) ...[
             const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, box) {
-                final w = (box.maxWidth - 10) / 2;
-                return Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final h in highlights)
-                      SizedBox(width: w, child: _Highlight(icon: h.$1, color: h.$2, label: h.$3, value: h.$4)),
-                  ],
-                );
-              },
-            ),
+            for (var i = 0; i < highlights.length; i += 2) ...[
+              if (i > 0) const SizedBox(height: 10),
+              if (i + 1 < highlights.length)
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: _Highlight.of(highlights[i])),
+                      const SizedBox(width: 10),
+                      Expanded(child: _Highlight.of(highlights[i + 1])),
+                    ],
+                  ),
+                )
+              else
+                _Highlight.of(highlights[i]),
+            ],
           ],
           if (shown.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -118,6 +123,8 @@ class WeekCard extends StatelessWidget {
 
 class _Highlight extends StatelessWidget {
   const _Highlight({required this.icon, required this.color, required this.label, required this.value});
+
+  factory _Highlight.of((IconData, Color, String, String) h) => _Highlight(icon: h.$1, color: h.$2, label: h.$3, value: h.$4);
   final IconData icon;
   final Color color;
   final String label;
@@ -165,6 +172,10 @@ class _WeekRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    // Round 1 (U1b-17): με «Λίγα δεδομένα» και λίγες μέρες στην εβδομάδα, «—» αντί για μια μεσαία τιμή που δεν λέει κάτι
+    // (ίδιος κανόνας με τις Τάσεις, F10), και χωρίς «πριν …».
+    final insufficient = t.status == TrendStatus.insufficient;
+    final few = insufficient && t.nCurrent < t.needed;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -182,12 +193,12 @@ class _WeekRow extends StatelessWidget {
                 Text(metricLabel(t.def, t.source), style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 const SizedBox(height: 1),
                 Text(
-                  t.def.formatAs(t.current!, t.source),
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
+                  few ? '—' : t.def.formatAs(t.current!, t.source),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: few ? c.textTertiary : c.text, fontFeatures: tabular),
                 ),
                 // «πριν», όχι «συνήθως»: εδώ είναι η μεσαία τιμή των 4 προηγούμενων εβδομάδων, όχι το «συνήθως» της
                 // εφαρμογής (δεύτερος έλεγχος υπολογισμών C7).
-                if (t.previous != null)
+                if (t.previous != null && !insufficient)
                   Text(
                     'πριν ${t.def.formatAs(t.previous!, t.source)}',
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),

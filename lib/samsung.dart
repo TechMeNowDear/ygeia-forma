@@ -8,9 +8,12 @@ import 'package:flutter/services.dart';
 class SamsungHealth {
   static const _channel = MethodChannel('ygeia/samsung');
 
+  /// [objectOnly]: απάντηση που διαβάζεται ως JSON αλλά ΔΕΝ είναι αντικείμενο (π.χ. «[]», «null») είναι σφάλμα
+  /// («corrupt»), όχι «κενό αντικείμενο» (round 1, S3-2: ένα τέτοιο prefs.json διαβαζόταν ως «καμία ρύθμιση»).
   static Future<Map<String, dynamic>> _call(
     String method, [
     Map<String, dynamic>? args,
+    bool objectOnly = false,
   ]) async {
     try {
       final raw = await _channel.invokeMethod<String>(method, args);
@@ -18,7 +21,8 @@ class SamsungHealth {
         return {'ok': false, 'kind': 'other', 'message': 'Κενή απάντηση'};
       }
       final decoded = jsonDecode(raw);
-      return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+      if (decoded is Map<String, dynamic>) return decoded;
+      return objectOnly ? {'ok': false, 'kind': 'corrupt'} : <String, dynamic>{};
     } on PlatformException catch (e) {
       return {'ok': false, 'kind': 'other', 'message': e.message ?? e.code};
     } on MissingPluginException {
@@ -56,9 +60,13 @@ class SamsungHealth {
 
 
 
-  static Future<Map<String, dynamic>> loadPrefs() => _call('loadPrefs');
+  static Future<Map<String, dynamic>> loadPrefs() => _call('loadPrefs', null, true);
 
   static Future<Map<String, dynamic>> savePrefs(String json) => _call('savePrefs', {'json': json});
+
+  /// Round 1 (S3-2 / S9-1): το χαλασμένο prefs.json μπαίνει στην άκρη ως «prefs.json.bad» (κρατιέται), μόνο όταν το
+  /// ζητήσει ο χρήστης. `ok` true αν μετακινήθηκε ή δεν υπήρχε· αρχείο που διαβάζεται κανονικά δεν μετακινείται.
+  static Future<Map<String, dynamic>> prefsSetAside() => _call('prefsSetAside');
 
   static Future<Map<String, dynamic>> resolve() => _call('resolve');
 

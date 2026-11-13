@@ -1,6 +1,7 @@
 package gr.ygeiaforma.wear
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,8 +12,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
+import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
@@ -78,6 +82,8 @@ class ExerciseService : Service() {
         private const val NOTIF_ID = 41
         private const val ALARM_ID = 42
         private const val OTHER_ID = 43
+        /** Υπενθύμιση για άσκηση που μοιάζει ξεχασμένη (έλεγχος 13/11, S8-06). */
+        private const val FORGOT_ID = 44
         private const val CH_WORKOUT = "workout"
         // Νέο κανάλι (έλεγχος #2): χωρίς δική του δόνηση, για να μη «κόβει» τη δόνηση ξυπνητηριού της εφαρμογής.
         // Οι ρυθμίσεις ενός καναλιού δεν αλλάζουν μετά τη δημιουργία του, γι' αυτό νέο όνομα· το παλιό σβήνεται.
@@ -87,8 +93,10 @@ class ExerciseService : Service() {
         private const val FIRST_HR_LOCK_MS = HrSilence.FIRST_MS + 10_000L
         /** Το πολύ τόσο ξύπνιος ο επεξεργαστής σε ένα διάλειμμα, για τη δόνηση του τέλους του (W2-03). */
         private const val REST_LOCK_MAX_MS = 5 * 60_000L
-        /** Δόνηση ζώνης μόνο για τιμή το πολύ τόσο παλιά (12/11): αλλιώς οι παλμοί έχουν ήδη αλλάξει. */
-        private const val ZONE_LATE_MS = 30_000L
+        /** Το πολύ τόσο ξύπνιος ο επεξεργαστής στο λεπτό αποκατάστασης, για τη δόνηση του τέλους του (S8-01). */
+        private const val RECOVERY_LOCK_MS = HrStats.RECOVERY_MS + 5_000L
+        /** Κάθε πόσο κοιτά αν το ρολόι θα έκοβε τη δόνηση ζώνης (Σίγαση, Εξοικονόμηση ενέργειας· S8-02). */
+        private const val MUTE_CHECK_MS = 5_000L
 
         fun start(ctx: Context, kind: String, phone: Boolean) {
             val i = Intent(ctx, ExerciseService::class.java).setAction(ACTION_START)
@@ -167,6 +175,37 @@ class ExerciseService : Service() {
     private var ongoingActivity: OngoingActivity? = null
     private var ongoingTitle = ""
 
+    /** Ο επεξεργαστής ξύπνιος στο λεπτό αποκατάστασης (ως 70″), για να έρθει στην ώρα της η δόνηση του τέλους (S8-01). */
+    private var recoveryLock: PowerManager.WakeLock? = null
+
+    /** Σίγαση / Εξοικονόμηση ενέργειας (S8-02): πότε κοιτάχτηκε τελευταία, και ποιο μήνυμα έχει ήδη ειπωθεί. */
+    private var lastMuteCheckEl = 0L
+    private var zoneMuteTold: String? = null
+
+    /**
+     * Το τελευταίο «ελαφρύ» μήνυμα που έβαλε η υπηρεσία στην οθόνη (χωρίς δόνηση ζώνης, ξεχασμένη άσκηση): σβήνεται στο
+     * τέλος της άσκησης, για να μη μείνει κάτω από το «Αποθηκεύτηκε» μια ερώτηση που δεν ισχύει πια.
+     */
+    private var softNotice: String? = null
+
+    /**
+     * Ξεχασμένη άσκηση (S8-06): το «αποτύπωμα» των ✓ (αλλάζει σε κάθε ✓, εδώ ή στο κινητό), πότε άλλαξε τελευταία, από
+     * πότε κρατά η παύση (−1 = όχι σε παύση) και πότε έγινε η τελευταία υπενθύμιση. Χρόνοι από την εκκίνηση (elapsedRealtime).
+     */
+    private var actSig = -1
+    private var lastActionEl = 0L
+    private var pausedSinceEl = -1L
+    private var forgotBuzzEl = 0L
+
+    /**
+     * Ξυπνητήρι για τον έλεγχο «χάθηκαν παλμοί» με σβηστή οθόνη (S8-07): ξαναοπλίζεται σε κάθε παράδοση παλμών, μόνο με
+     * όριο γιατρού. Ίδια μορφή με το διάλειμμα του κινητού (TrainingBridge.arm): καλεί κατευθείαν εδώ, χωρίς άδεια
+     * «Ξυπνητήρια και υπενθυμίσεις». [silenceAlarmAt]: για πότε είναι οπλισμένο (0 = όχι).
+     */
+    private val silenceHandler = Handler(Looper.getMainLooper())
+    private val silenceAlarm = AlarmManager.OnAlarmListener { onSilenceAlarm() }
+    private var silenceAlarmAt = 0L
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -191,6 +230,8 @@ class ExerciseService : Service() {
         Repo.unlisten(onRepo)
         releaseRestLock()
         releaseFirstHrLock()
+        releaseRecoveryLock()
+        cancelSilenceAlarm()
         sensor?.stop()
         sensor = null
         ticker?.cancel()
@@ -225,6 +266,13 @@ class ExerciseService : Service() {
         Repo.alarm.limit = Repo.limitNow()
         Repo.alarm.reset()
         silence.reset()
+        // S8-04: διάλειμμα της προπόνησης του κινητού που είχε ήδη λήξει πριν ξεκινήσει η μέτρηση δεν δονείται.
+        restBuzzedFor = restAlreadyOver(Repo.session?.restEnd, now)
+        // S8-06: η «τελευταία κίνηση» μετρά από την αρχή.
+        actSig = activitySignature()
+        lastActionEl = Repo.startedEl
+        pausedSinceEl = -1L
+        forgotBuzzEl = 0L
 
         val walk = kind == "walk"
         // Ζώνη περπατήματος (12/11): μόνο στο περπάτημα, από το πρόγραμμα του κινητού.
@@ -326,6 +374,12 @@ class ExerciseService : Service() {
             return
         }
         silence.reset()
+        // S8-04 / S8-06: όπως στην έναρξη (η παύση που βρέθηκε μετρά από τη συνέχεια).
+        restBuzzedFor = restAlreadyOver(Repo.session?.restEnd, now)
+        actSig = activitySignature()
+        lastActionEl = Repo.startedEl
+        pausedSinceEl = if (Repo.paused) Repo.startedEl else -1L
+        forgotBuzzEl = 0L
         val walk = Repo.running == "walk"
         Repo.zoneAlarm.start(if (walk) Repo.zoneNow() else null, Repo.startedEl)
         val location = walk && Repo.gps && has(this, Manifest.permission.ACCESS_FINE_LOCATION) && locationOn()
@@ -597,6 +651,7 @@ class ExerciseService : Service() {
             val boot = Instant.ofEpochMilli(now - nowEl)
             var buzz = -1
             var buzzEl = 0L
+            val hrElBefore = Repo.bpmEl
             val points = m.getData(DataType.HEART_RATE_BPM)
             // Κάθε παράδοση μετράει (και με την εφεδρεία αισθητήρα): το κενό είναι όσο δεν έφτανε τίποτα (W2-08).
             if (points.isNotEmpty()) Repo.hrGaps.mark(now)
@@ -641,8 +696,11 @@ class ExerciseService : Service() {
                 val age = nowEl - buzzEl
                 val lim = Repo.alarm.limit
                 if (lateAlarmBuzz(age, lim != null && Repo.alarm.lastBpm >= lim)) onAlarm(buzz, age)
-                else Log.i(TAG, "όριο: παλιά τιμή $buzz πριν ${age / 1000}″, οι παλμοί έπεσαν ήδη (χωρίς δόνηση)")
+                // Χωρίς την τιμή των παλμών (έλεγχος 13/11, S10-5): το logcat μπαίνει και στις αναφορές σφάλματος του συστήματος.
+                else Log.i(TAG, "όριο: παλιά τιμή πριν ${age / 1000}″, οι παλμοί έπεσαν ήδη (χωρίς δόνηση)")
             }
+            // S8-07: ήρθε νεότερη τιμή: το ξυπνητήρι του «χάθηκαν παλμοί» πάει πιο πέρα.
+            if (Repo.bpmEl > hrElBefore) armSilenceAlarm(Repo.bpmEl)
             if (points.isNotEmpty()) sendHrToPhone(now)
             // Μετά το «Τέλος» (λεπτό αποκατάστασης) χρόνος, απόσταση και βήματα μένουν όπως ήταν· μόνο οι παλμοί.
             if (Repo.recoveryUntil == 0L) {
@@ -675,6 +733,8 @@ class ExerciseService : Service() {
                     scope.launch { finish() }
                 }
             } else {
+                // S8-06: και από εδώ, όχι μόνο από τον βρόχο του δευτερολέπτου (που σταματά με σβηστή οθόνη).
+                checkForgotten(nowEl)
                 saveRun()
             }
             Repo.changed()
@@ -720,7 +780,10 @@ class ExerciseService : Service() {
             Repo.bpm = bpm
             Repo.bpmAt = at
         }
-        if (atEl > Repo.bpmEl) Repo.bpmEl = atEl
+        if (atEl > Repo.bpmEl) {
+            Repo.bpmEl = atEl
+            armSilenceAlarm(atEl)
+        }
         if (Repo.alarm.feed(bpm, atEl)) onAlarm(bpm, SystemClock.elapsedRealtime() - atEl)
         zoneCheck(bpm, atEl, SystemClock.elapsedRealtime())
         sendHrToPhone(System.currentTimeMillis())
@@ -774,8 +837,9 @@ class ExerciseService : Service() {
             // Για τους χρόνους της ειδοποίησης: μονότονος χρόνος (αν η ώρα του ρολογιού πάει πίσω, δεν «τυφλώνεται», W3-14).
             val nowEl = SystemClock.elapsedRealtime()
             val s = Repo.session
-            // Τέλος διαλείμματος: δόνηση μία φορά (και με σβηστή οθόνη).
-            if (s != null && s.restEnd > 0 && now >= s.restEnd && restBuzzedFor != s.restEnd) {
+            val walk = Repo.running == "walk"
+            // Τέλος διαλείμματος: δόνηση μία φορά (και με σβηστή οθόνη). Ποτέ μέσα σε περπάτημα (S8-04, [restBuzzDue]).
+            if (s != null && restBuzzDue(s.restEnd, now, restBuzzedFor, walk)) {
                 restBuzzedFor = s.restEnd
                 vibrate(longArrayOf(0, 180, 120, 180))
                 if (Repo.screen == Repo.Screen.REST) Repo.screen = Repo.Screen.SET
@@ -787,7 +851,7 @@ class ExerciseService : Service() {
             sendHrToPhone(now)
             // Περπάτημα: ζωντανά στο κινητό (αν είναι ανοιχτή η εφαρμογή εκεί). Χωρίς αναμονή μέσα στον βρόχο.
             // Μόνο όσο το κινητό λέει ότι κοιτάζει (W3-15)· στο παλιό κινητό όπως πριν.
-            if (Repo.running == "walk" && liveDue(now, lastLiveSent, Repo.phoneKnowsWatching, Repo.watchingUntil)) {
+            if (walk && liveDue(now, lastLiveSent, Repo.phoneKnowsWatching, Repo.watchingUntil)) {
                 lastLiveSent = now
                 val o = JSONObject().put("v", Proto.MAJOR).put("kind", "walk").put("start", Repo.startedAt).put("sec", Repo.activeSecNow(now))
                     .put("m", finite(Repo.meters)).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0)
@@ -831,23 +895,22 @@ class ExerciseService : Service() {
             if (sensor != null && !Repo.fastHr()) stopSensor()
             // Ζώνη: σταθεροί παλμοί χωρίς νέα τιμή μετρούν κι αυτοί (όπως το όριο, W2-02).
             if (fresh) zoneCheck(Repo.bpm, nowEl, nowEl, steady = true)
-            // Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2):
-            // στο περπάτημα μετά από 15″, στα βάρη μετά από 45″ (ο καρπός που λυγίζει κόβει συχνά για λίγο). Τρεις
-            // σύντομες, για να μη μοιάζει με το τέλος του διαλείμματος (δύο μεγαλύτερες).
-            // Έλεγχος 9/11 (V-A-04): και όταν δεν ήρθε ΚΑΝΕΝΑΣ παλμός 30″ μετά την αρχή (πριν: καμία δόνηση), με άλλο
-            // μοτίβο (μία μακριά και δύο σύντομες). Μία φορά· ξανά μόνο αν ξαναέρθουν παλμοί και χαθούν.
-            val lostAfter = if (Repo.running == "walk") 15_000L else 45_000L
-            val lastEl = if (Repo.bpmEl > 0) maxOf(Repo.bpmEl, Repo.steadyUntilEl) else 0L
-            if (silence.check(nowEl, Repo.startedEl, lastEl, fresh, Repo.alarm.limit != null, Repo.paused, lostAfter)) {
-                vibrate(if (silence.state == HrSilence.Silence.NEVER) longArrayOf(0, 400, 150, 70, 90, 70) else longArrayOf(0, 70, 90, 70, 90, 70))
+            checkSilence(nowEl, fresh)
+            // S8-02: θα έκοβε τώρα το ρολόι τη δόνηση ζώνης (Σίγαση, Εξοικονόμηση ενέργειας); Η οθόνη το γράφει.
+            if (walk && exerciseStarted && nowEl - lastMuteCheckEl >= MUTE_CHECK_MS) {
+                lastMuteCheckEl = nowEl
+                checkZoneMute()
             }
-            Repo.hrSilent = silence.state
+            // S8-06: άσκηση που μοιάζει ξεχασμένη (μόνο υπενθύμιση).
+            checkForgotten(nowEl)
             // Ήρθε ο πρώτος παλμός ή έγινε ο έλεγχος των 30″: ο επεξεργαστής ξανά ελεύθερος να κοιμηθεί.
             if (firstHrLock != null && (fresh || Repo.bpmAt > 0 || silence.state != null || nowEl - Repo.startedEl >= FIRST_HR_LOCK_MS)) {
                 releaseFirstHrLock()
             }
-            // Τέλος του λεπτού αποκατάστασης.
-            if (Repo.recoveryUntil > 0 && now >= Repo.recoveryUntil) {
+            // Τέλος του λεπτού αποκατάστασης: μία δόνηση (ξυπνητηριού, να μην κόβεται), όπως υπόσχεται το κινητό («ώσπου να
+            // δονηθεί το ρολόι», έλεγχος 13/11, S8-01). Η «Παράλειψη» δεν περνά από εδώ ([stopRequested]): χωρίς δόνηση.
+            if (recoveryEndBuzz(Repo.recoveryUntil, now, skipped = false)) {
+                vibrate(longArrayOf(0, 250, 150, 250))
                 scope.launch { finish() }
                 return
             }
@@ -863,6 +926,153 @@ class ExerciseService : Service() {
         }
     }
 
+    // ------------------------------------------------------------------ «χάθηκαν παλμοί» (V-A-04, S8-07)
+    /**
+     * Με όριο: αν χαθούν οι παλμοί (π.χ. χαλαρό λουρί), μία δόνηση να το ξέρεις, και στα βάρη (έλεγχος #2): στο περπάτημα
+     * μετά από 15″, στα βάρη μετά από 45″ ([lostAfterMs]). Τρεις σύντομες, για να μη μοιάζει με το τέλος του διαλείμματος
+     * (δύο μεγαλύτερες). Έλεγχος 9/11 (V-A-04): και όταν δεν ήρθε ΚΑΝΕΝΑΣ παλμός 30″ μετά την αρχή, με άλλο μοτίβο (μία
+     * μακριά και δύο σύντομες). Μία φορά· ξανά μόνο αν ξαναέρθουν παλμοί και χαθούν.
+     * Τρέχει από τον βρόχο του δευτερολέπτου ΚΑΙ από το ξυπνητήρι ([onSilenceAlarm], έλεγχος 13/11, S8-07).
+     */
+    private fun checkSilence(nowEl: Long, fresh: Boolean) {
+        val lostAfter = lostAfterMs(Repo.running == "walk")
+        val lastEl = if (Repo.bpmEl > 0) maxOf(Repo.bpmEl, Repo.steadyUntilEl) else 0L
+        if (silence.check(nowEl, Repo.startedEl, lastEl, fresh, Repo.alarm.limit != null, Repo.paused, lostAfter)) {
+            vibrate(if (silence.state == HrSilence.Silence.NEVER) longArrayOf(0, 400, 150, 70, 90, 70) else longArrayOf(0, 70, 90, 70, 90, 70))
+        }
+        Repo.hrSilent = silence.state
+    }
+
+    /**
+     * Ξαναοπλίζει το ξυπνητήρι του ελέγχου «χάθηκαν παλμοί» για [silenceWakeAt] μετά την τιμή της στιγμής [fromEl] (S8-07).
+     * Μόνο με όριο γιατρού (χωρίς όριο δεν δονείται τίποτα). Όχι σε κάθε τιμή: μόνο όταν η ώρα πάει τουλάχιστον 3″ πιο
+     * πέρα (μία κλήση ανά παράδοση των 5″). Αν το σύστημα το αρνηθεί, μένει ο έλεγχος του βρόχου, όπως πριν.
+     */
+    private fun armSilenceAlarm(fromEl: Long) {
+        if (stopping || Repo.running == null || Repo.alarm.limit == null) return
+        val at = silenceWakeAt(fromEl, lostAfterMs(Repo.running == "walk"))
+        if (silenceAlarmAt != 0L && at - silenceAlarmAt < 3_000L) return
+        try {
+            val am = getSystemService(AlarmManager::class.java) ?: return
+            am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, "ygeia:silence", silenceAlarm, silenceHandler)
+            silenceAlarmAt = at
+        } catch (e: Exception) {
+            Log.w(TAG, "ξυπνητήρι σιωπής", e)
+        }
+    }
+
+    private fun cancelSilenceAlarm() {
+        silenceAlarmAt = 0L
+        try {
+            getSystemService(AlarmManager::class.java)?.cancel(silenceAlarm)
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Το ξυπνητήρι χτύπησε: δεν ήρθε νεότερη τιμή παλμών από τότε που οπλίστηκε. Ο ίδιος έλεγχος με τον βρόχο. Αν οι παλμοί
+     * μετρούν ακόμα ως «ζωντανοί» (σταθεροί από τον αισθητήρα, ή το ρολόι λέει ότι μετρά), ξανά σε λίγο, ώσπου να κριθεί·
+     * σταματά μόλις κριθεί «χάθηκαν» ή έρθει νέα τιμή (το πολύ λίγες φορές: το «ζωντανοί» κρατά ως 2′).
+     */
+    private fun onSilenceAlarm() {
+        silenceAlarmAt = 0L
+        if (stopping || Repo.running == null || Repo.alarm.limit == null) return
+        val nowEl = SystemClock.elapsedRealtime()
+        checkSilence(nowEl, Repo.hrLive(System.currentTimeMillis()))
+        if (silence.state == null && Repo.bpmEl > 0) armSilenceAlarm(nowEl)
+        Repo.changed()
+    }
+
+    // ------------------------------------------------------------------ Σίγαση / Εξοικονόμηση ενέργειας (S8-02)
+    /**
+     * Η δόνηση ζώνης είναι δόνηση ειδοποίησης (απόφαση του χρήστη: απαλή, όχι ξυπνητήρι)· το Android την κόβει σε Σίγαση
+     * και σε Εξοικονόμηση ενέργειας, χωρίς να το λέει (έλεγχος 13/11, S8-02). Εδώ μόνο ανίχνευση: η οθόνη του περπατήματος
+     * γράφει «χωρίς δόνηση» δίπλα στους παλμούς, και μία φορά ένα σύντομο μήνυμα με την αιτία (όχι πάνω σε μήνυμα «πάτα
+     * ξανά»). Δύο φθηνές ερωτήσεις στο σύστημα ανά [MUTE_CHECK_MS], μόνο σε περπάτημα· ό,τι σφάλμα = «δεν ξέρω» = όχι.
+     */
+    private fun checkZoneMute() {
+        val powerSave = try {
+            getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+        } catch (_: Exception) {
+            false
+        }
+        val silent = try {
+            getSystemService(AudioManager::class.java)?.ringerMode == AudioManager.RINGER_MODE_SILENT
+        } catch (_: Exception) {
+            false
+        }
+        val muted = zoneMutedNow(Repo.zoneAlarm.active, Repo.alarm.limit != null, powerSave, silent)
+        Repo.zoneMuted = muted
+        val told = if (muted) zoneMutedNotice(powerSave, silent) else null
+        if (told == null) {
+            // Η δόνηση φτάνει ξανά: το μήνυμα, αν φαίνεται ακόμα, φεύγει.
+            val was = zoneMuteTold
+            if (was != null && Repo.notice == was) Repo.notice = null
+            zoneMuteTold = null
+        } else if (told != zoneMuteTold && !isBriefNotice(Repo.notice)) {
+            zoneMuteTold = told
+            softNotice = told
+            Repo.notice = told
+        }
+    }
+
+    // ------------------------------------------------------------------ ξεχασμένη άσκηση (S8-06)
+    /** Αλλάζει σε κάθε ✓ (εδώ ή στο κινητό) και σε κάθε αλλαγή άσκησης: «κάτι έγινε» στην προπόνηση. */
+    private fun activitySignature(): Int = Repo.session?.let { it.setsDone * 100 + it.idx } ?: 0
+
+    /** Τα λεπτά του σημερινού περπατήματος στο πρόγραμμα (0 = δεν υπάρχει). */
+    private fun plannedWalkMinutes(): Int {
+        val p = Repo.plan ?: return 0
+        val c = p.todayWorkout?.cardio ?: return 0
+        return p.cardioMinutes(c)
+    }
+
+    /**
+     * Υπενθύμιση όταν η άσκηση μοιάζει ξεχασμένη ([Forgotten]): δόνηση (ξυπνητηριού), ειδοποίηση και το ίδιο μήνυμα στην
+     * οθόνη. Ξανά ανά 30′ όσο ισχύει. ΠΟΤΕ αυτόματο τέλος: αποφασίζει ο χρήστης. Όχι στο λεπτό αποκατάστασης.
+     */
+    private fun checkForgotten(nowEl: Long) {
+        val kind = Repo.running ?: return
+        if (stopping || Repo.recoveryUntil > 0) return
+        val sig = activitySignature()
+        if (sig != actSig) {
+            actSig = sig
+            lastActionEl = nowEl
+        }
+        val why = Forgotten.why(kind, Repo.startedEl, lastActionEl, pausedSinceEl, if (kind == "walk") plannedWalkMinutes() else 0, nowEl)
+        if (why == null) {
+            forgotBuzzEl = 0L
+            return
+        }
+        if (!Forgotten.remindNow(why, forgotBuzzEl, nowEl)) return
+        forgotBuzzEl = nowEl
+        val title = Forgotten.title(why)
+        val text = Forgotten.text(why)
+        // Τέσσερις μέτριες: δεν μοιάζει ούτε με το όριο (τρεις μακριές) ούτε με το τέλος διαλείμματος (δύο).
+        vibrate(longArrayOf(0, 150, 100, 150, 100, 150, 100, 150))
+        // Στο περπάτημα σε μία γραμμή (χωρά)· στα βάρη ολόκληρο, σε όλη την οθόνη (η οθόνη το ανοίγει μόνη της).
+        if (!isBriefNotice(Repo.notice)) {
+            val shown = if (kind == "walk") title else "$title $text"
+            softNotice = shown
+            Repo.notice = shown
+        }
+        try {
+            val pi = PendingIntent.getActivity(this, 3, Intent(this, WatchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE)
+            val n = NotificationCompat.Builder(this, CH_ALARM)
+                .setSmallIcon(R.drawable.ic_heart)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setTimeoutAfter(10 * 60_000L)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(FORGOT_ID, n)
+        } catch (_: Exception) {
+        }
+    }
+
     // ------------------------------------------------------------------ ζώνη περπατήματος (12/11)
     /**
      * Δόνηση ζώνης: καθοδήγηση, όχι ασφάλεια. Απαλή (όχι «ξυπνητήρι»), ποτέ όταν μιλά το όριο του γιατρού, σε παύση ή στο
@@ -872,19 +1082,24 @@ class ExerciseService : Service() {
     private fun zoneCheck(bpm: Int, atEl: Long, nowEl: Long, steady: Boolean = false) {
         val za = Repo.zoneAlarm
         if (za.zone == null) return
-        if (Repo.running != "walk" || Repo.paused || Repo.recoveryUntil > 0 || stopping) {
+        // Οι αποφάσεις είναι καθαρές συναρτήσεις του Protocol.kt, με δοκιμές (έλεγχος 13/11, S12-11)· ίδια συμπεριφορά.
+        val walk = Repo.running == "walk"
+        val recovery = Repo.recoveryUntil > 0
+        if (zoneOnHold(walk, Repo.paused, recovery, stopping)) {
             za.hold()
             return
         }
         // Με όριο γιατρού μιλά μόνο εκείνο (και η οθόνη δεν δείχνει ζώνη· ανασκόπηση 11/11, S7).
-        if (Repo.alarm.limit != null) return
         // Ηλικία της τιμής ΠΡΙΝ αλλάξει η κατάσταση (S5, N2): στο «σταθεροί παλμοί» μετρά η τελευταία πραγματική τιμή,
         // εκτός αν ο αισθητήρας έχει επαφή και ίδια τιμή (τότε είναι τωρινή). Παλιά τιμή: ούτε δόνηση ούτε κρίση.
-        val age = if (steady) (if (Repo.steadyUntilEl > nowEl) 0L else nowEl - Repo.bpmEl) else nowEl - atEl
-        if (age > ZONE_LATE_MS) return
+        val age = zoneValueAgeMs(steady, Repo.steadyUntilEl, Repo.bpmEl, atEl, nowEl)
+        if (!zoneMaySpeak(walk, Repo.paused, recovery, stopping, Repo.alarm.limit != null, age)) return
         val b = if (steady) za.steady(bpm, atEl) else za.feed(bpm, atEl)
         if (b == ZoneAlarm.Buzz.NONE) return
-        Log.i(TAG, "ζώνη: $b στους $bpm")
+        // Χωρίς την τιμή των παλμών (S10-5).
+        Log.i(TAG, "ζώνη: $b")
+        // Δόνηση ειδοποίησης (απόφαση του χρήστη): σε Σίγαση / Εξοικονόμηση ενέργειας το ρολόι την κόβει· τότε η οθόνη
+        // γράφει «χωρίς δόνηση» ([checkZoneMute], S8-02). Η κλήση γίνεται έτσι κι αλλιώς.
         vibrate(if (b == ZoneAlarm.Buzz.UP) longArrayOf(0, 110, 120, 110) else longArrayOf(0, 260), alarm = false)
     }
 
@@ -922,7 +1137,8 @@ class ExerciseService : Service() {
     private fun holdForRest() {
         val s = Repo.session
         val now = System.currentTimeMillis()
-        val end = if (Repo.running != null && s != null && s.restEnd > now) s.restEnd else 0L
+        // Όχι σε περπάτημα (S8-04): το διάλειμμα μιας ανοιχτής προπόνησης του κινητού δεν το αφορά.
+        val end = if (Repo.running != null && Repo.running != "walk" && s != null && s.restEnd > now) s.restEnd else 0L
         // Ίδιο διάλειμμα και ο επεξεργαστής ακόμα ξύπνιος: τίποτα. Αν έληξε (διάλειμμα > 5′ με «+30″»), ξανά (NIT 2).
         if (end == restLockFor && (end == 0L || restLock?.isHeld == true)) return
         releaseRestLock()
@@ -943,6 +1159,33 @@ class ExerciseService : Service() {
         restLockFor = 0
         val l = restLock ?: return
         restLock = null
+        try {
+            if (l.isHeld) l.release()
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Ξύπνιος στο λεπτό αποκατάστασης (έλεγχος 13/11, S8-01): το κινητό λέει «μένεις έτσι ώσπου να δονηθεί το ρολόι», άρα ο
+     * χρήστης ΔΕΝ κοιτά την οθόνη· αν σβήσει, ο βρόχος του δευτερολέπτου σταματά και η δόνηση (και το αποτέλεσμα) θα
+     * αργούσαν. Το πολύ [RECOVERY_LOCK_MS] (70″), μία φορά ανά περπάτημα· αφήνεται στο τέλος ([finish]) και στο [onDestroy].
+     */
+    private fun holdForRecovery() {
+        releaseRecoveryLock()
+        try {
+            val pm = getSystemService(PowerManager::class.java) ?: return
+            recoveryLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ygeia:recovery").apply {
+                setReferenceCounted(false)
+                acquire(RECOVERY_LOCK_MS)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "wakelock recovery", e)
+        }
+    }
+
+    private fun releaseRecoveryLock() {
+        val l = recoveryLock ?: return
+        recoveryLock = null
         try {
             if (l.isHeld) l.release()
         } catch (_: Exception) {
@@ -992,6 +1235,9 @@ class ExerciseService : Service() {
             Repo.cpRunning = !on
         }
         Repo.paused = on
+        // S8-06: από πότε κρατά η παύση (για την υπενθύμιση μετά από 10 λεπτά)· η συνέχεια μετρά ως «κίνηση».
+        pausedSinceEl = if (on) SystemClock.elapsedRealtime() else -1L
+        forgotBuzzEl = 0L
         // Ποιες τιμές μπαίνουν στον μέσο κρίνεται με τον χρόνο κάθε τιμής (W3-11).
         Repo.hr?.let { if (on) it.pause(now) else it.resume(now) }
         if (on) Repo.pauses.add(longArrayOf(now, 0L)) else Repo.pauses.lastOrNull()?.let { if (it[1] == 0L) it[1] = now }
@@ -1020,6 +1266,7 @@ class ExerciseService : Service() {
             }
             Repo.recoveryUntil = now + HrStats.RECOVERY_MS
             Repo.screen = Repo.Screen.RECOVER
+            holdForRecovery()
             vibrate(longArrayOf(0, 120))
             saveRun(force = true)
             Repo.changed()
@@ -1058,6 +1305,8 @@ class ExerciseService : Service() {
         stopping = true
         releaseFirstHrLock()
         releaseRestLock()
+        releaseRecoveryLock()
+        cancelSilenceAlarm()
         Repo.unlisten(onRepo)
         // Ξύπνιος ώσπου να γραφτεί και να σταλεί το αποτέλεσμα (το πολύ [FinishTimes.LOCK_MS]), όχι μισό στον ύπνο.
         val finishLock = try {
@@ -1127,9 +1376,16 @@ class ExerciseService : Service() {
         // Τελικός έλεγχος, Συμβούλιο 4 (W-2): ΠΡΩΤΑ το αποτέλεσμα στην αναμονή (στον δίσκο του ρολογιού) και μετά
         // οτιδήποτε περιμένει το κινητό. Πριν, το μήνυμα «end» έφευγε πρώτο· όσο περίμενε απάντηση, το αποτέλεσμα υπήρχε
         // μόνο στη μνήμη.
+        // Έλεγχος 13/11 (S8-08): το στιγμιότυπο σβήνεται ΜΟΝΟ αν το αποτέλεσμα γράφτηκε πράγματι στην αναμονή. Με γεμάτο
+        // χώρο η εγγραφή αποτυγχάνει· πριν το στιγμιότυπο σβηνόταν έτσι κι αλλιώς και το αποτέλεσμα έμενε μόνο στη μνήμη.
+        var saved = true
         if (result != null) {
-            Repo.savePending(this, result.first, result.second)
-            Repo.clearRun(this)
+            saved = Repo.storeResultThenClear({ Repo.savePending(this, result.first, result.second) }, { Repo.clearRun(this) })
+            if (!saved) {
+                Log.w(TAG, "αναμονή: το αποτέλεσμα δεν γράφτηκε στον δίσκο· το στιγμιότυπο μένει")
+                // Και στη σύνοψη του κινητού, αν το αποτέλεσμα φτάσει τώρα από το Data Layer («err», υπάρχον πεδίο).
+                if (!result.second.has("err")) result.second.put("err", "pending: δεν γράφτηκε")
+            }
         } else if (!failed) {
             // Τίποτα να σταλεί (π.χ. προπόνηση χωρίς σετ): το στιγμιότυπο δεν χρειάζεται πια.
             Repo.clearRun(this)
@@ -1151,10 +1407,17 @@ class ExerciseService : Service() {
             } catch (_: Exception) {
                 false
             }
-            if (put) Repo.removePending(this, result.first)
+            if (put) {
+                Repo.removePending(this, result.first)
+                // S8-08: το αποτέλεσμα είναι πια στο Data Layer· το στιγμιότυπο που κρατήθηκε δεν χρειάζεται άλλο.
+                if (!saved) Repo.clearRun(this)
+            }
         }
         Repo.local = null
         Repo.resetExercise()
+        // Ένα «ελαφρύ» μήνυμα της άσκησης που τελείωσε (χωρίς δόνηση ζώνης, «τρέχει ακόμα;») δεν μένει στο «Αποθηκεύτηκε».
+        val soft = softNotice
+        if (soft != null && Repo.notice == soft) Repo.notice = null
         // Προπόνηση του κινητού: γράφεται εκεί, εδώ πίσω στην αρχή. Δική του: «Αποθηκεύτηκε».
         Repo.screen = when {
             result != null && kind != null && !wasPhone -> Repo.Screen.END
@@ -1162,6 +1425,7 @@ class ExerciseService : Service() {
         }
         Repo.changed()
         getSystemService(NotificationManager::class.java).cancel(ALARM_ID)
+        getSystemService(NotificationManager::class.java).cancel(FORGOT_ID)
         ongoingActivity = null
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         try {

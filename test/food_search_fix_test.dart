@@ -213,7 +213,8 @@ void main() {
 
   group('Νέα τρόφιμα (μόνο ακριβείς αντιστοιχίες CIQUAL 2025 / USDA FDC)', () {
     test('375 τρόφιμα· τα νέα υπάρχουν με την πηγή τους', () {
-      expect(basicFoods().length, 375); // + πίτουρο βρώμης (12/11)
+      // + πίτουρο βρώμης (12/11) + 5 του ελέγχου round1 (ρέγγα × 3, καστανό ρύζι parboiled × 2)
+      expect(basicFoods().length, 380);
       const added = {
         'C26025': 'CIQUAL 2025', 'C26120': 'CIQUAL 2025', 'C26040': 'CIQUAL 2025', 'C6255': 'CIQUAL 2025',
         'C6257': 'CIQUAL 2025', 'C21800': 'CIQUAL 2025', 'C21801': 'CIQUAL 2025', 'C22505': 'CIQUAL 2025',
@@ -394,7 +395,9 @@ void main() {
       expect(find.text('ml'), findsWidgets);
       expect(find.byKey(const ValueKey('ml-note')), findsOneWidget);
       expect(find.textContaining('10 g λάδι'), findsOneWidget);
-      expect(find.text('330 ml'), findsOneWidget);
+      // Έλεγχος round1 (U3a-13): το λάδι μετριέται με το κουταλάκι (5/10/15/30 ml), όχι με ποτήρι ή κουτάκι.
+      expect(find.text('30 ml'), findsOneWidget);
+      expect(find.text('330 ml'), findsNothing);
     });
     testWidgets('Μ4: υπενθύμιση λαδιού και χωρίς ωμή/μαγειρεμένη μορφή (μανιτάρια), όχι στα τηγανητά', (t) async {
       await _pump(t, QuantitySheet(key: const ValueKey('C20010'), food: store, item: _food('C20010'), initialGrams: 200, meal: Meal.lunch));

@@ -26,8 +26,8 @@ class KmSplit {
 
 /// Οι παλμοί χωρίς όσους έπεσαν σε παύση, ταξινομημένοι.
 List<List<int>> activeHr(Session s) {
-  bool paused(int t) => s.pauses.any((p) => t >= p[0] && t <= p[1]);
-  return [for (final p in s.hr) if (!paused(p[0])) p]..sort((a, b) => a[0].compareTo(b[0]));
+  // [αρχή, τέλος): ίδιος κανόνας με το ρολόι και τον χρόνο ζώνης (round1, S12-16).
+  return [for (final p in s.hr) if (!Session.inPause(s.pauses, p[0])) p]..sort((a, b) => a[0].compareTo(b[0]));
 }
 
 int? _mean(List<List<int>> hr, int from, int to) {

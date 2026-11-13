@@ -27,10 +27,19 @@ class MetricSpec {
     this.scale,
     this.periods = const [7, 30, 90],
     this.format,
+    this.axis,
+    this.duration = false,
   });
 
-  /// Δική της μορφή τιμής (π.χ. διάρκεια ύπνου «7 ω 05 λ»).
+  /// Δική της μορφή τιμής (π.χ. διάρκεια ύπνου «7 ώρες 5 λεπτά»).
   final String Function(double v)? format;
+
+  /// Round 1 (U1b-04): σύντομη μορφή για τον άξονα του γραφήματος (π.χ. «7:05», με λεζάντα «ώρες:λεπτά»)· χωρίς αυτήν
+  /// ο άξονας παίρνει το [show].
+  final String Function(double v)? axis;
+
+  /// Η τιμή είναι διάρκεια σε λεπτά (μεγάλη τιμή με λέξεις, διαφορά «… λεπτά λιγότερο από ό,τι συνήθως»).
+  final bool duration;
 
   final String metric;
   final String title;
@@ -75,7 +84,16 @@ const _bodyPeriods = [30, 90, 365];
 final metricSpecs = <String, MetricSpec>{
   // Σχέδια 9/11 (2α): «Ύπνος 30 νυχτών ›» από την κάρτα της τελευταίας νύχτας.
   K.sleepScore: MetricSpec(metric: K.sleepScore, title: 'Βαθμολογία ύπνου', unit: '/100', color: (c) => c.sleep),
-  K.sleepMin: MetricSpec(metric: K.sleepMin, title: 'Διάρκεια ύπνου', unit: '', color: (c) => c.sleep, format: (v) => hmList(v.round())),
+  // Round 1 (U1b-04, U1a-3): διάρκεια με ολόκληρες λέξεις («6 ώρες 32 λεπτά»)· στον άξονα «6:32» με λεζάντα.
+  K.sleepMin: MetricSpec(
+    metric: K.sleepMin,
+    title: 'Διάρκεια ύπνου',
+    unit: '',
+    color: (c) => c.sleep,
+    format: (v) => hoursMinutes(v.round()),
+    axis: (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
+    duration: true,
+  ),
   K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart),
   K.dayHr: MetricSpec(metric: K.dayHr, title: 'Παλμοί ξύπνιος', unit: 'bpm', color: (c) => c.heart, dayComplete: true),
   K.energy: MetricSpec(metric: K.energy, title: 'Ετοιμότητα', unit: '/100', color: (c) => c.energy),
@@ -171,10 +189,15 @@ class _MetricPageState extends State<MetricPage> {
         if (base?.usual != null) {
           final d = shownDiff(base!.value, base.usual!, s.digits);
           final unit = s.unit.isEmpty ? '' : ' ${s.unit}';
-          usual = d == 0
-              ? '$asUsualText · συνήθως ${s.show(base.usual!)}$unit'
-              : '${signedShown(d, s.digits)}$unit · συνήθως ${s.show(base.usual!)}$unit';
+          usual = s.duration
+              // Round 1 (U1b-04): «33 λεπτά λιγότερο από ό,τι συνήθως · συνήθως 7 ώρες 5 λεπτά» (πριν «−33 · …» χωρίς μονάδα).
+              ? '${sleepVsUsualText(d.round())} · συνήθως ${s.show(base.usual!)}'
+              : d == 0
+                  ? '$asUsualText · συνήθως ${s.show(base.usual!)}$unit'
+                  : '${signedShown(d, s.digits)}$unit · συνήθως ${s.show(base.usual!)}$unit';
         }
+        // Round 1 (U1b-11): η μονάδα και στα στατιστικά («Μέσος όρος 39 ms»).
+        String withUnit(double v) => s.unit.isEmpty ? s.show(v) : '${s.show(v)} ${s.unit}';
 
         final head = AppCard(
           child: Column(
@@ -188,7 +211,10 @@ class _MetricPageState extends State<MetricPage> {
                 SourceTag(series.source),
               ]),
               const SizedBox(height: 6),
-              BigValue(last == null ? '—' : s.show(last.$2), unit: s.unit.isEmpty ? null : s.unit, size: 44),
+              if (last != null && s.duration)
+                DurationValue(last.$2.round(), size: 44)
+              else
+                BigValue(last == null ? '—' : s.show(last.$2), unit: s.unit.isEmpty ? null : s.unit, size: 44),
               if (usual != null) ...[
                 const SizedBox(height: 6),
                 Text(usual, style: TextStyle(color: c.textSecondary, fontSize: 14)),
@@ -215,19 +241,36 @@ class _MetricPageState extends State<MetricPage> {
                 keyOf: (d) => 'metric-period-$d',
               ),
               const SizedBox(height: 14),
-              if (pts.length >= 2)
-                LineChart(points: pts, color: color, format: s.show, dateLabel: dayMonth)
-              else
+              // Round 1 (U1b-11): ο άξονας καλύπτει την περίοδο που διαλέχτηκε (ή από την αλλαγή πηγής), όχι μόνο τις μέρες
+              // με τιμή· αλλιώς «30 μέρες» και «3 μήνες» έδειχναν την ίδια εικόνα.
+              if (pts.length >= 2) ...[
+                LineChart(
+                  points: pts,
+                  color: color,
+                  format: s.axis ?? s.show,
+                  dateLabel: dayMonth,
+                  from: series.cut ?? from,
+                  to: end,
+                  tickSteps: s.duration ? minuteTickSteps : null,
+                ),
+                if (s.axis != null) ...[
+                  const SizedBox(height: 4),
+                  Text('Άξονας: ώρες:λεπτά', style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+                ],
+              ] else
                 Text('Λίγες τιμές για γράφημα σε αυτό το διάστημα.', style: TextStyle(color: c.textSecondary)),
               if (series.cut != null) ...[
                 const SizedBox(height: 8),
                 Text('Από ${dayMonth(series.cut!)}: άλλαξε η πηγή, τα παλιότερα δεν μπαίνουν στο ίδιο γράφημα.',
                     style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
               ],
+              // Round 1 (U1b-11): μέσος όρος και άκρα μόνο με 2+ τιμές (με μία, «82,2 · 82,2» δεν λέει τίποτα).
               if (mean != null) ...[
                 const Hairline(vertical: 12),
-                InfoRow('Μέσος όρος', s.show(mean)),
-                InfoRow('Χαμηλότερη · υψηλότερη', '${s.show(lo!)} · ${s.show(hi!)}'),
+                if (vals.length >= 2) ...[
+                  InfoRow('Μέσος όρος', withUnit(mean)),
+                  InfoRow('Χαμηλότερη · υψηλότερη', '${s.show(lo!)} · ${withUnit(hi!)}'),
+                ],
                 InfoRow('Μέρες με τιμή', '${pts.length} από $_days'),
               ],
             ],

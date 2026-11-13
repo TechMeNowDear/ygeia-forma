@@ -118,7 +118,7 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(16)),
             child: Text.rich(
               TextSpan(children: [
                 TextSpan(text: 'Πού το νιώθεις: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
@@ -191,7 +191,8 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
     final cited = [for (final e in _studies.entries) if (ex.tips.any((t) => t.contains(e.key))) e.value];
     final sources = Text(
       [
-        'Η κίνηση είναι υπολογισμένη για ύψος 177 cm. Ο εξοπλισμός είναι σχηματικός· το στήσιμο του δικού σου είναι στο «Στήσιμο».',
+        // round1, S7-04: η φιγούρα είναι γενική (ενήλικας 1,77 m), όχι το σώμα κάποιου χρήστη.
+        'Η φιγούρα είναι ένας ενήλικας ύψους 1,77 m. Ο εξοπλισμός είναι σχηματικός· πώς στήνεται, στο «Στήσιμο».',
         'Τεχνική: NSCA, Essentials of Strength Training and Conditioning, 4η έκδ.',
         if (cited.isNotEmpty) 'Μελέτες: ${cited.join('; ')}.',
       ].join('\n'),
@@ -204,7 +205,8 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(ex.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        // round1, U5-21: ο τίτλος της AppBar είναι πάντα μία γραμμή· μακρύ όνομα μικραίνει αντί να κόβεται με «…».
+        title: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(ex.name, maxLines: 1, softWrap: false)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(22),
           child: Padding(

@@ -105,29 +105,42 @@ class NightPieces<T> {
 }
 
 class _PieceGroup<T> {
-  _PieceGroup(T first, SleepSpan s)
+  _PieceGroup(T first, SleepSpan s, SleepSpan w)
       : parts = [first],
         spans = [s],
+        walls = [w],
         start = s.start,
-        end = s.end;
+        end = s.end,
+        wallStart = w.start,
+        wallEnd = w.end;
   final List<T> parts;
   final List<SleepSpan> spans;
+
+  /// Round 1 (S5-1): τα ίδια κομμάτια στην ώρα «τοίχου» του τόπου όπου κοιμήθηκες (ίδια με τα [spans] όταν δεν δίνεται
+  /// ζώνη). Μόνο για τους κανόνες με ώρα της μέρας· η σειρά και τα κενά μετριούνται πάντα στα [spans].
+  final List<SleepSpan> walls;
   final DateTime start;
   DateTime end;
+  final DateTime wallStart;
+  DateTime wallEnd;
 
-  void add(T p, SleepSpan s) {
+  void add(T p, SleepSpan s, SleepSpan w) {
     parts.add(p);
     spans.add(s);
-    if (s.end.isAfter(end)) end = s.end;
+    walls.add(w);
+    if (s.end.isAfter(end)) {
+      end = s.end;
+      wallEnd = w.end;
+    }
   }
 
   /// Όλα τα λεπτά πραγματικού ύπνου της ομάδας.
   double get totalMinutes => spans.fold<double>(0, (s, x) => s + x.minutes);
 
-  /// Λεπτά ύπνου μέσα στο [from, to): κάθε κομμάτι κατ' αναλογία του χρόνου του που πέφτει μέσα.
+  /// Λεπτά ύπνου μέσα στο [from, to) (ώρα «τοίχου»): κάθε κομμάτι κατ' αναλογία του χρόνου του που πέφτει μέσα.
   double minutesWithin(DateTime from, DateTime to) {
     var sum = 0.0;
-    for (final s in spans) {
+    for (final s in walls) {
       final len = s.end.difference(s.start).inMilliseconds;
       if (len <= 0) {
         // Κομμάτι χωρίς διάρκεια (π.χ. δεδομένα δοκιμής της Oura): μετρά όλο αν η στιγμή του είναι μέσα.
@@ -174,22 +187,29 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
 /// 7. Τα κενά δεν μετρούν ποτέ ως ύπνος· οι υπνάκοι επιστρέφονται χωριστά ανά ημερομηνία ([napDateOf]).
 /// Ημερομηνία νύχτας: η ημερομηνία του παραθύρου της κύριας ομάδας, ή [dateOf] (Oura: το «day» της Oura) αν δοθεί.
 /// [sorted]: τα κομμάτια ταξινομημένα κατά αρχή.
+/// [wall] (round 1, S5-1): το ίδιο κομμάτι στην ώρα «τοίχου» του τόπου όπου κοιμήθηκες (Oura: η ζώνη ώρας της ίδιας
+/// της εγγραφής). Οι κανόνες με ώρα της μέρας (22:00–08:00, 20:00, 06:00, 12:00, 18:00) κρίνονται εκεί, ώστε μια
+/// νύχτα 7 ωρών να μένει νύχτα όπου κι αν βρίσκεται το κινητό όταν τη διαβάζει. Η σειρά, η επικάλυψη, τα κενά (4 ώρες,
+/// 90 λεπτά), τα βήματα και οι αποθηκευμένες αποφάσεις μετριούνται πάντα στον πραγματικό χρόνο ([span]). Χωρίς [wall]
+/// (ρολόι, ή εγγραφή χωρίς ζώνη): η ώρα του κινητού, όπως πάντα.
 ({List<NightPieces<T>> nights, Map<DateTime, List<T>> naps}) groupSleepPieces<T>(
   List<T> sorted,
   SleepSpan Function(T) span, {
   int? Function(DateTime from, DateTime to)? stepsBetween,
   DateTime Function(List<T> parts)? dateOf,
   DateTime? Function(DateTime date)? napLockOf,
+  SleepSpan Function(T)? wall,
 }) {
   // 0. Ομάδες χωρίς κενό.
   final groups = <_PieceGroup<T>>[];
   for (final r in sorted) {
     final s = span(r);
+    final w = wall == null ? s : wall(r);
     final last = groups.isEmpty ? null : groups.last;
     if (last != null && !s.start.isAfter(last.end)) {
-      last.add(r, s);
+      last.add(r, s, w);
     } else {
-      groups.add(_PieceGroup<T>(r, s));
+      groups.add(_PieceGroup<T>(r, s, w));
     }
   }
 
@@ -200,8 +220,8 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
     final g = groups[i];
     DateTime? best;
     var bestMin = 0.0;
-    final last = DateTime(g.end.year, g.end.month, g.end.day + 1);
-    for (var d = dayOf(g.start); !d.isAfter(last); d = DateTime(d.year, d.month, d.day + 1)) {
+    final last = DateTime(g.wallEnd.year, g.wallEnd.month, g.wallEnd.day + 1);
+    for (var d = dayOf(g.wallStart); !d.isAfter(last); d = DateTime(d.year, d.month, d.day + 1)) {
       final w = nightWindow(d);
       final m = g.minutesWithin(w.from, w.to);
       if (m > bestMin) {
@@ -225,7 +245,7 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
   final fallbackOf = <DateTime, int>{};
   for (var i = 0; i < groups.length; i++) {
     if (mainSet.contains(i)) continue;
-    final st = groups[i].start;
+    final st = groups[i].wallStart;
     // Ομάδα του βραδιού (20:00 και μετά) χωρίς κανένα λεπτό στο 22:00–08:00 τελειώνει πριν από τις 22:00: είναι
     // λαγοκοίμισμα και μένει υπνάκος (όπως πριν). Άρα υποψήφιες μόνο όσες αρχίζουν τη μέρα που ξυπνάς, ως τις 12:00.
     if (st.hour >= 12) continue;
@@ -254,7 +274,7 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
     var nightStart = groups[m.value].start;
     for (var j = m.value - 1; j >= 0 && owner[j] == null; j--) {
       final g = groups[j];
-      if (g.start.isBefore(evening) || nightStart.difference(g.end) > maxGap) break;
+      if (g.wallStart.isBefore(evening) || nightStart.difference(g.end) > maxGap) break;
       owner[j] = m.value;
       nightStart = g.start;
     }
@@ -271,7 +291,7 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
       final g = groups[j];
       final gap = g.start.difference(nightEnd);
       final bool joins;
-      if (g.start.isBefore(six)) {
+      if (g.wallStart.isBefore(six)) {
         joins = gap <= maxGap;
       } else if (gap > morningJoinGap) {
         joins = false;
@@ -302,7 +322,7 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
     final o = owner[i];
     if (o == null) {
       final g = groups[i];
-      naps.putIfAbsent(dateOf?.call(g.parts) ?? napDateOf(g.start), () => []).addAll(g.parts);
+      naps.putIfAbsent(dateOf?.call(g.parts) ?? napDateOf(g.wallStart), () => []).addAll(g.parts);
     } else {
       byMain.putIfAbsent(o, () => []).addAll(groups[i].parts);
     }

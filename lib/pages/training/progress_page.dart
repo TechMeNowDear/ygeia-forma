@@ -80,7 +80,8 @@ class _ProgressPageState extends State<ProgressPage> {
         final note = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text('«Άλλαξε» μόνο όταν η διαφορά είναι μεγαλύτερη από τις συνηθισμένες διακυμάνσεις σου· αλλιώς «Σταθερό», '
-              'ή «Λίγες μέρες (ή ζυγίσεις) για συμπέρασμα» όταν δεν φτάνουν για σύγκριση. Είναι ένδειξη, όχι ιατρικός έλεγχος.',
+              'ή «Λίγες μέρες (ή ζυγίσεις) για συμπέρασμα» όταν δεν φτάνουν για σύγκριση, ή «Λίγα δεδομένα» όταν λείπουν μετρήσεις. '
+              'Είναι ένδειξη, όχι ιατρικός έλεγχος.',
               style: TextStyle(fontSize: 12.5, height: 1.45, color: c.textSecondary)),
         );
         return Scaffold(
@@ -128,7 +129,8 @@ String _hrDrop(double v) => '${v.round()}';
 
 /// Πτώση παλμών στο 1′ που άλλαξε: ουδέτερα, χωρίς βέλος (έλεγχος 9/11, V-B-08).
 String hrrChangeText(TrendResult r) {
-  final d = (r.current! - r.previous!).round();
+  // round1, U6-03: η διαφορά των αριθμών όπως φαίνονται («15 → 19» = 4), όχι της ακατέργαστης διαφοράς.
+  final d = (r.displayDiff ?? (r.current! - r.previous!)).round();
   return d > 0 ? 'μεγαλύτερη κατά $d' : 'μικρότερη κατά ${-d}';
 }
 
@@ -199,7 +201,8 @@ class _Row extends StatelessWidget {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(child: Text(label, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text))),
           const SizedBox(width: 8),
-          Flexible(child: Align(alignment: Alignment.topRight, child: pill)),
+          // round1, U6-04: το «χάπι» παίρνει μόνο το πλάτος του· η ετικέτα όλο το υπόλοιπο (πριν μισή κάρτα και σπάσιμο).
+          ConstrainedBox(constraints: const BoxConstraints(maxWidth: 170), child: pill),
         ]),
         const SizedBox(height: 3),
         Text(detail, style: TextStyle(fontSize: 14, height: 1.4, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
@@ -261,14 +264,16 @@ class _WalkCard extends StatelessWidget {
             key: const ValueKey('prog-walk-few'),
           ),
           // Ίδια λογική με τον έλεγχο 03 (μήνας: 30 μέρες + ~9 για 4 μέρες στην προηγούμενη περίοδο → 5–6 εβδομάδες).
-          _foot(context, '${period == TrendPeriod.month ? 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση του μήνα βγαίνει περίπου 5–6 εβδομάδες μετά το πρώτο. ' : 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση των 3 μηνών βγαίνει περίπου 14 εβδομάδες μετά το πρώτο· στον «Μήνα» 5–6 εβδομάδες. '}'
+          // round1, U6-08: η επιλογή λέγεται «30 μέρες», όχι «Μήνας».
+          _foot(context, '${period == TrendPeriod.month ? 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση των 30 ημερών βγαίνει περίπου 5–6 εβδομάδες μετά το πρώτο. ' : 'Με 3 περπατήματα την εβδομάδα, η πρώτη σύγκριση των 3 μηνών βγαίνει περίπου 14 εβδομάδες μετά το πρώτο· στις «30 μέρες» περίπου 5–6 εβδομάδες. '}'
               'Μετράνε μόνο περπατήματα από το ρολόι, πάνω από 15′ και με GPS.$_noGpsText'),
         ]),
       );
     }
     Widget pillFor(TrendResult r, {int? goodness, String Function(double)? fmt}) {
       if (!r.changed) return TrendStatusPill(r: r);
-      final d = r.current! - r.previous!;
+      // round1, U6-03: από τους αριθμούς όπως φαίνονται (112 → 109 = 3, όχι 4).
+      final d = r.displayDiff ?? (r.current! - r.previous!);
       final g = goodness ?? r.goodness;
       final kind = g > 0 ? TrendKind.good : (g < 0 ? TrendKind.bad : TrendKind.neutral);
       return TrendPill(fmt != null ? fmt(d) : '${d.abs().round()} ${r.def.unit}'.trim(), kind: kind, up: d > 0);
@@ -320,7 +325,8 @@ class _WalkCard extends StatelessWidget {
           detail: w.pace.previous != null && w.pace.current != null ? '${clock(w.pace.previous!)} → ${paceText(w.pace.current!)}' : vals(w.pace, (v) => paceText(v)),
           pill: w.pace.changed
               ? TrendPill(
-                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${_secs((w.pace.current! - w.pace.previous!).abs().round())}',
+                  // round1, U6-03: «13:09 → 12:43» = 26″ (η διαφορά των στρογγυλεμένων, όχι 27).
+                  '${w.pace.status == TrendStatus.down ? 'πιο γρήγορα' : 'πιο αργά'} ${_secs((w.pace.current!.round() - w.pace.previous!.round()).abs())}',
                   kind: w.pace.status == TrendStatus.down ? TrendKind.good : TrendKind.neutral)
               : TrendStatusPill(r: w.pace),
         ),
@@ -392,7 +398,12 @@ class _BodyCard extends StatelessWidget {
         for (var i = 0; i < results.length; i++)
           _Row(
             label: metricLabel(results[i].def, results[i].source),
-            detail: results[i].previous == null || results[i].current == null
+            // round1, U6-07: με λίγες μετρήσεις όχι «πριν → τώρα» (διαβαζόταν σαν αλλαγή), όπως και στις «Τάσεις».
+            detail: results[i].status == TrendStatus.insufficient
+                ? (results[i].current != null && results[i].nCurrent >= results[i].needed
+                    ? 'τώρα ${results[i].def.formatAs(results[i].current!, results[i].source)}'
+                    : '—')
+                : results[i].previous == null || results[i].current == null
                 ? (results[i].current == null ? '—' : 'τώρα ${results[i].def.formatAs(results[i].current!, results[i].source)}')
                 : '${results[i].def.formatAs(results[i].previous!, results[i].source)} → ${results[i].def.formatAs(results[i].current!, results[i].source)}',
             pill: TrendStatusPill(r: results[i]),
@@ -421,12 +432,13 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
   final out = <(String, TrendKind, bool?)>[];
   TrendKind k(int g) => g > 0 ? TrendKind.good : (g < 0 ? TrendKind.bad : TrendKind.neutral);
   if (walk.hr.changed) {
-    final d = (walk.hr.current! - walk.hr.previous!).round();
+    final d = (walk.hr.displayDiff ?? (walk.hr.current! - walk.hr.previous!)).round();
     out.add(('Παλμοί στο περπάτημα: ${d < 0 ? 'έπεσαν' : 'ανέβηκαν'} ${d.abs()} (${_paceRelText(walk.paceRel)})', k(walk.hrGoodness), d > 0));
   }
   if (walk.pace.changed) {
     final faster = walk.pace.status == TrendStatus.down;
-    out.add(('Ρυθμός: ${clock(walk.pace.previous!)} → ${paceText(walk.pace.current!)}', faster ? TrendKind.good : TrendKind.neutral, !faster));
+    // round1, U6-12: αδιάσπαστα κενά, ώστε «13:09 → 12:43 /km» να μένει μαζί.
+    out.add(('Ρυθμός: ${clock(walk.pace.previous!)}\u00A0→\u00A0${clock(walk.pace.current!)}\u00A0/km', faster ? TrendKind.good : TrendKind.neutral, !faster));
   }
   // Ουδέτερη, χωρίς βέλος (έλεγχος 9/11, V-B-08), με την ένταση δίπλα.
   if (walk.hrr.changed) {
@@ -443,7 +455,7 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
           ? (p.loadDiff > 0 ? 'λιγότερη βοήθεια' : 'περισσότερη βοήθεια')
           : '${loadLabel(p.kind, p.before.workLoad)} → ${loadLabel(p.kind, p.now.workLoad)}';
     } else {
-      what = '${r > 0 ? '+' : '−'}${r.abs()} επαναλήψεις${hasLoad(p.kind) ? ' με το ίδιο βάρος' : ''}';
+      what = '${r > 0 ? '+' : '−'}${r.abs()}\u00A0επαναλήψεις${hasLoad(p.kind) ? ' με το ίδιο βάρος' : ''}';
     }
     out.add(('${exName(p.ex)}: $what', kind, up));
   }
@@ -525,8 +537,8 @@ Future<void> showWalkProgressInfo(BuildContext context) => _sheet(context, 'prog
       (
         'Τι δείχνει',
         'Παλμοί: ο μέσος όρος σε κάθε περπάτημα από το 5ο λεπτό ως το «Τέλος», χωρίς τις παύσεις (τα πρώτα λεπτά οι παλμοί '
-            'ακόμα ανεβαίνουν, και θα έκαναν τα σύντομα περπατήματα να μοιάζουν αλλιώς). Το γράφημα έχει μία τελεία για κάθε '
-            'περπάτημα. Όσο βελτιώνεται η φυσική κατάσταση, η ίδια ταχύτητα θέλει '
+            'ακόμα ανεβαίνουν, και θα έκαναν τα σύντομα περπατήματα να μοιάζουν αλλιώς). Το γράφημα έχει μία τιμή για κάθε '
+            'περπάτημα· οι διακεκομμένες γραμμές είναι η μεσαία τιμή κάθε περιόδου. Όσο βελτιώνεται η φυσική κατάσταση, η ίδια ταχύτητα θέλει '
             'λιγότερους παλμούς. Ρυθμός: λεπτά ανά χιλιόμετρο, χωρίς τις παύσεις. Πτώση παλμών στο 1′: πόσο πέφτουν οι παλμοί '
             'στο πρώτο λεπτό μετά το «Τέλος». Εξαρτάται κυρίως από το πόσο γρήγορα περπάτησες (πιο γρήγορα = μεγαλύτερη πτώση), '
             'γι\' αυτό δεν τη λέω «καλύτερα» ή «χειρότερα»· από κάτω φαίνονται οι παλμοί στο τέλος, για να συγκρίνεις ίδια ένταση.'
@@ -545,7 +557,7 @@ Future<void> showWalkProgressInfo(BuildContext context) => _sheet(context, 'prog
       (
         'Τι το επηρεάζει',
         'Η ζέστη και οι ανηφόρες ανεβάζουν τους παλμούς στον ίδιο ρυθμό: καλοκαίρι με φθινόπωρο δεν συγκρίνονται καθαρά. '
-            'Το ίδιο κούραση, λίγος ύπνος, καφές, αφυδάτωση και φάρμακα που αλλάζουν τους παλμούς. Για πιο καθαρή σύγκριση, '
+            'Το ίδιο κούραση, λίγος ύπνος, καφές ή τσιγάρο λίγο πριν, αφυδάτωση και φάρμακα που αλλάζουν τους παλμούς. Για πιο καθαρή σύγκριση, '
             'περπάτα όσο γίνεται στην ίδια διαδρομή. Είναι ένδειξη, όχι ιατρικός έλεγχος.'
       ),
       ('Ποια περπατήματα μετράνε', 'Μόνο από το ρολόι, με GPS, με τουλάχιστον 15 λεπτά ενεργό χρόνο και 500 μέτρα.'),

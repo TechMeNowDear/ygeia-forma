@@ -140,8 +140,10 @@ for folder in ("layout", "layout-night"):
 # ώστε να μη γράφουν ποτέ πάνω σε αρχείο που φτιάχνει το «flutter create».
 here = os.path.dirname(os.path.abspath(__file__))
 res = os.path.join(os.path.dirname(os.path.abspath(path)), "res")
-for folder, names in (("layout", ("quick_workout_widget.xml", "quick_food_widget.xml")),
-                      ("drawable", ("qw_bg.xml", "qw_button_food.xml", "qw_button_plain.xml")),
+# Round 1 (f9 · U7-17 ε): και οι προεπισκοπήσεις των τεσσάρων widgets με εικόνα (qw_preview_*).
+for folder, names in (("layout", ("quick_workout_widget.xml", "quick_food_widget.xml", "qw_preview_sleep.xml",
+                                  "qw_preview_move.xml", "qw_preview_food.xml", "qw_preview_body.xml")),
+                      ("drawable", ("qw_bg.xml", "qw_button_food.xml", "qw_button_plain.xml", "qw_preview_bg.xml")),
                       ("values", ("quick_widgets.xml",)), ("values-night", ("quick_widgets.xml",))):
     os.makedirs(os.path.join(res, folder), exist_ok=True)
     for name in names:

@@ -41,9 +41,12 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val granted = store.getGrantedPermissions(SamsungHealthBridge.permissions)
             if (granted.isEmpty()) return Result.success()
             val names = granted.map { it.dataType.name }.toSet()
-            // Μόνο ό,τι χρειάζεται η πρώτη οθόνη (A12, μπαταρία): παλμοί 7 ημερών, ζυγίσεις 30 ημερών. Το ιστορικό
-            // γράφεται μόνο από την πλήρη ανάγνωση της εφαρμογής, ποτέ από αυτό το αρχείο.
-            val o = SleepPolicy.reader(applicationContext, store, heartDays = 7, bodyDays = 30).read(names)
+            // Μόνο ό,τι χρειάζεται η πρώτη οθόνη (A12, μπαταρία): παλμοί 7 ημερών. Το ιστορικό γράφεται μόνο από την πλήρη
+            // ανάγνωση της εφαρμογής, ποτέ από αυτό το αρχείο.
+            // Round 1 (S1-10 / S3-5): ΟΛΕΣ οι ζυγίσεις, όπως η εφαρμογή (πριν: 30 μέρες). Είναι λίγες εγγραφές (μία-δύο
+            // σελίδες), ενώ με 30 μέρες ο έλεγχος θερμίδων (παράθυρο ως 42 μέρες + 1 εβδομάδα) και η οθόνη «Σώμα»
+            // έβγαιναν, ώσπου να έρθει η πλήρης ανάγνωση, από μέρος των ζυγίσεων. Το «background» το λέει στη Flutter.
+            val o = SleepPolicy.reader(applicationContext, store, heartDays = 7).read(names)
                 .put("ok", true)
                 .put("readAt", System.currentTimeMillis())
                 .put("granted", granted.size)

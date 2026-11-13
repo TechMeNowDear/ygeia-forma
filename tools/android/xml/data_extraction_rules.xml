@@ -10,6 +10,9 @@
   Έλεγχος 9/11 (V-A-02): και ο φάκελος hr/ (οι παλμοί κάθε προπόνησης, σε συμπαγή μορφή· ~2,5 MB τον χρόνο αντί για
   ~9,5 MB μέσα στο training.json).
   Το όνομα της αναφοράς για τον γιατρό ΔΕΝ είναι στο prefs.json: η Kotlin το κρατά στο noBackupFilesDir (συγχώνευση 4/11).
+  Έλεγχος 13/11 (S9-10 / S10-3): και η επιλογή «Αναφορές σφαλμάτων» (shared_prefs/errors.xml, ένας διακόπτης, ErrorQueue.kt).
+  Όποιος τις έκλεισε (αντίρρηση, ΓΚΠΔ άρθρο 21) τις έχει κλειστές και στο νέο κινητό ή μετά από επανεγκατάσταση· πριν
+  ξανάνοιγαν σιωπηλά. Κανένα άλλο αρχείο shared_prefs δεν μπαίνει (σημάδι διαγραφής, εμφάνιση widgets, διάλειμμα).
 -->
 <data-extraction-rules>
     <cloud-backup disableIfNoEncryptionCapabilities="true">
@@ -21,6 +24,7 @@
         <include domain="file" path="oura_nights.json" />
         <include domain="file" path="training.json" />
         <include domain="file" path="hr/" />
+        <include domain="sharedpref" path="errors.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="ygeia.db" />
@@ -31,5 +35,6 @@
         <include domain="file" path="oura_nights.json" />
         <include domain="file" path="training.json" />
         <include domain="file" path="hr/" />
+        <include domain="sharedpref" path="errors.xml" />
     </device-transfer>
 </data-extraction-rules>

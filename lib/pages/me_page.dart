@@ -39,7 +39,16 @@ class _MePageState extends State<MePage> {
   void initState() {
     super.initState();
     final h = widget.store.profile.heightCm;
-    _height = TextEditingController(text: h == null ? '' : dec(h));
+    _height = TextEditingController(text: h == null ? '' : _cm(h));
+  }
+
+  /// «180» ή «174,5» (πριν «180,0»: έλεγχος 13/11, U3a-16).
+  static String _cm(double h) => dec(h, h % 1 == 0 ? 0 : 1);
+
+  /// Ύψος από 100 ως 250 cm, ή null.
+  static double? _heightOf(String v) {
+    final h = double.tryParse(v.replaceAll(',', '.').trim());
+    return h != null && h >= 100 && h <= 250 ? h : null;
   }
 
   @override
@@ -60,8 +69,9 @@ class _MePageState extends State<MePage> {
 
   String _goalsText() {
     final g = widget.store.goals;
-    if (g == null) return 'Θερμίδες, πρωτεΐνη, χοληστερίνη · 2 λεπτά';
-    return '${thousands(g.kcal)} kcal · ${g.protein} g πρωτεΐνη${g.doctor ? ' · χοληστερίνη' : ''}';
+    // Έλεγχος round1 (U3a-6): αδιάσπαστο κενό ανάμεσα στον αριθμό και στη λέξη του (πριν έσπαγε σε «· 2» / «λεπτά»).
+    if (g == null) return 'Θερμίδες, πρωτεΐνη, χοληστερίνη · 2\u00A0λεπτά';
+    return '${thousands(g.kcal)}\u00A0kcal · ${g.protein}\u00A0g πρωτεΐνη${g.doctor ? ' · χοληστερίνη' : ''}';
   }
 
   @override
@@ -100,7 +110,9 @@ class _MePageState extends State<MePage> {
                                   key: const ValueKey('me-month'),
                                   isExpanded: true,
                                   initialValue: p.birthMonth,
-                                  decoration: const InputDecoration(labelText: 'Μήνας'),
+                                  // Έλεγχος 13/11 (U3a-16): πεδία με περίγραμμα, όπως στις φόρμες φαγητού (πριν έμοιαζαν με
+                                  // σκέτες λέξεις πάνω σε γραμμή, και η γραμμή τους κολλούσε στη διαχωριστική από κάτω).
+                                  decoration: const InputDecoration(labelText: 'Μήνας', border: _outline),
                                   items: [
                                     for (var m = 1; m <= 12; m++) DropdownMenuItem(value: m, child: Text(monthNames[m - 1], overflow: TextOverflow.ellipsis)),
                                   ],
@@ -113,7 +125,7 @@ class _MePageState extends State<MePage> {
                                   key: const ValueKey('me-year'),
                                   isExpanded: true,
                                   initialValue: p.birthYear,
-                                  decoration: const InputDecoration(labelText: 'Έτος'),
+                                  decoration: const InputDecoration(labelText: 'Έτος', border: _outline),
                                   items: [
                                     for (var y = now.year - 18; y >= 1930; y--) DropdownMenuItem(value: y, child: Text('$y')),
                                   ],
@@ -149,10 +161,23 @@ class _MePageState extends State<MePage> {
                             key: const ValueKey('me-height'),
                             controller: _height,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'Ύψος', suffixText: 'cm'),
+                            // U3a-16: ύψος που δεν γίνεται δεκτό (π.χ. «1,80» ή «300») το λέει το πεδίο· πριν κρατούσε το
+                            // κείμενο και δεν αποθήκευε τίποτα, χωρίς λέξη.
+                            decoration: InputDecoration(
+                              labelText: 'Ύψος',
+                              suffixText: 'cm',
+                              border: _outline,
+                              errorText: _height.text.trim().isNotEmpty && _heightOf(_height.text) == null
+                                  ? 'Γράψε το ύψος σε εκατοστά, από 100 ως 250, π.χ. 180'
+                                  : null,
+                            ),
                             onChanged: (v) {
-                              final h = double.tryParse(v.replaceAll(',', '.').trim());
-                              if (h != null && h >= 100 && h <= 250) _save(p.copyWith(heightCm: h));
+                              final h = _heightOf(v);
+                              if (h != null) {
+                                _save(p.copyWith(heightCm: h));
+                              } else {
+                                setState(() {});
+                              }
                             },
                           ),
                           if (suggested != null && p.heightCm == null) ...[
@@ -161,10 +186,10 @@ class _MePageState extends State<MePage> {
                               alignment: Alignment.centerLeft,
                               child: TextButton(
                                 onPressed: () {
-                                  _height.text = dec(suggested);
+                                  _height.text = _cm(suggested);
                                   _save(p.copyWith(heightCm: suggested));
                                 },
-                                child: Text('Από τη ζυγαριά: ${dec(suggested)} cm'),
+                                child: Text('Από τη ζυγαριά: ${_cm(suggested)} cm'),
                               ),
                             ),
                           ],
@@ -299,7 +324,8 @@ class _MePageState extends State<MePage> {
           color: c.food,
           title: 'Τα προϊόντα μου',
           text: n == 0
-              ? 'Πέρασε ό,τι αγοράζεις, με «Σάρωση» ή από την ετικέτα, χωρίς να το φας.'
+              // Έλεγχος round1 (U3a-18): όπως στο «Τα προϊόντα μου» (πριν «…χωρίς να το φας.»).
+              ? 'Πέρασε ό,τι αγοράζεις, με «Σάρωση» ή από την ετικέτα, χωρίς να το καταγράψεις ως φαγητό.'
               : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · αλλαγή, αντιγραφή, διαγραφή',
           line: true,
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
@@ -318,6 +344,9 @@ class _MePageState extends State<MePage> {
     );
   }
 }
+
+/// Περίγραμμα των πεδίων της σελίδας (U3a-16).
+const _outline = OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)));
 
 class _DayChip extends StatelessWidget {
   const _DayChip({super.key, required this.label, required this.semantics, required this.selected, required this.onTap});
@@ -342,15 +371,18 @@ class _DayChip extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
+          // Έλεγχος 13/11 (U3a-17): ύψος αφής 48, όπως παντού (πριν 44 με το περίγραμμα· 42 στην οθόνη).
           child: SizedBox(
-            height: 44,
+            height: 48,
             child: Center(
               // Μεγάλα γράμματα: η συντομογραφία μικραίνει για να χωρά, ποτέ κομμένη (σχέδια 9/11).
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(label,
                     maxLines: 1,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? c.onSolid : c.text)),
+                    // U3a-2: στο σκούρο «Αιγαίο» το λευκό πάνω στο ανοιχτό πράσινο είχε αντίθεση 2,2:1· τώρα λευκό ή σκούρο,
+                    // όποιο φαίνεται καλύτερα πάνω στο χρώμα της επιλογής.
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: selected ? Aigaio.inkOn(c.body) : c.text)),
               ),
             ),
           ),

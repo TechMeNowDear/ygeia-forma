@@ -154,7 +154,9 @@ class _ReportPageState extends State<ReportPage> {
                   children: [
                     Text(
                       'Οι τελευταίοι 3 μήνες σε τρεις σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
-                      'Μετρήσεις από ρολόι και ζυγαριά, με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση. '
+                      // Round 1 (U1b-08): με το Oura και «δαχτυλίδι», όπως το υποσέλιδο των σελίδων.
+                      '${widget.store.analysisPlan.hasOura ? 'Μετρήσεις από ρολόι, δαχτυλίδι και ζυγαριά' : 'Μετρήσεις από ρολόι και ζυγαριά'}, '
+                      'με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση. '
                       // Κλινικός έλεγχος H2 και M6 (4/11).
                       'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού, τεστ άπνοιας ή μετρήσεις πίεσης· τα αποτελέσματα του Samsung '
                       'Health Monitor τα δείχνεις από εκεί.',
@@ -166,9 +168,11 @@ class _ReportPageState extends State<ReportPage> {
                       controller: _nameField,
                       maxLength: reportNameMax,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
+                      // Round 1 (f9 · U1b-19): πεδίο με περίγραμμα, όπως όλα τα πεδία της εφαρμογής (όχι σκέτη γραμμή).
+                      decoration: InputDecoration(
                         labelText: 'Όνομα στην αναφορά (προαιρετικά)',
                         helperText: 'Μένει μόνο σε αυτό το κινητό.',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       onChanged: (v) => setState(() {
                         _name = v;
@@ -183,7 +187,8 @@ class _ReportPageState extends State<ReportPage> {
                       maxLines: 4,
                       minLines: 1,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                         labelText: 'Σημείωση για τον γιατρό (προαιρετικά)',
                         // Δεύτερος κλινικός έλεγχος M6: φάρμακα, ροχαλητό και τεστ άπνοιας χωράνε και φαίνονται.
                         // Τρίτος κλινικός έλεγχος C11: και οι χαμηλές τιμές που είδες στο Samsung Health.
@@ -457,8 +462,10 @@ class _PageOne extends StatelessWidget {
       if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο (bpm)', K.lowHr, num0, _def(K.lowHr)),
       if (withOura) ('HRV νύχτας, RMSSD, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
       if (withOura) ('Αναπνοές στον ύπνο (ανά λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
-      ('Οξυγόνο στον ύπνο, μέσο νύχτας (%)${withOura ? ', από το ρολόι' : ''}', K.spo2Avg, pct, _def(K.spo2Avg)),
-      if (withOura) ('Οξυγόνο στον ύπνο, μέσο νύχτας από το δαχτυλίδι (%)', K.ringSpo2, pct, _def(K.ringSpo2)),
+      // Round 1 (U1b-08): η συσκευή γράφεται μία φορά, από την ετικέτα της γραμμής (« · Ρολόι», « · Oura»)· πριν
+      // «…, από το ρολόι · Ρολόι». «Μέσος όρος», όχι «μέσο» (U1a-6).
+      ('Οξυγόνο στον ύπνο, μέσος όρος νύχτας (%)', K.spo2Avg, pct, _def(K.spo2Avg)),
+      if (withOura) ('Οξυγόνο στον ύπνο, μέσος όρος νύχτας (%)', K.ringSpo2, pct, _def(K.ringSpo2)),
       // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών C5, κλινικός L2): μεσαία 89,5 → «89,5%», όχι «90%».
       ('Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση νύχτας (%)', K.spo2Min, (v) => '${lowestText(v)}%', null),
       ('Διάρκεια ύπνου, χωρίς τα ξυπνήματα (ώρες:λεπτά)', K.sleepMin, dur, _def(K.sleepMin)),
@@ -529,13 +536,15 @@ class _PageOne extends StatelessWidget {
       ),
       _Title('Σύνοψη', top: 10),
       Table(
+        // Round 1 (U1b-03): φαρδύτερη η τελευταία στήλη, ώστε «Διαφορά από τους», «Αλλαγή συσκευής», «Αλλαγή ορισμού»
+        // και «Δεν συγκρίνεται (σελ. 3)» να μη σπάνε λέξη-λέξη· οι στήλες 2–3 χωρούν ακόμα την πιο φαρδιά τιμή.
         columnWidths: const {
-          0: FlexColumnWidth(3.0),
+          0: FlexColumnWidth(2.9),
           1: FlexColumnWidth(1.1),
-          2: FlexColumnWidth(1.6),
-          3: FlexColumnWidth(1.6),
-          4: FlexColumnWidth(0.8),
-          5: FlexColumnWidth(1.4),
+          2: FlexColumnWidth(1.5),
+          3: FlexColumnWidth(1.5),
+          4: FlexColumnWidth(0.75),
+          5: FlexColumnWidth(1.75),
         },
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
@@ -606,22 +615,17 @@ class _PageOne extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(data: d, page: 1, name: name),
-        // Συγχώνευση 3: το σώμα της σελίδας 1 στο ύψος του A4. Συνήθως χωρά όπως είναι (κλίμακα 1)· με πολύ μεγάλη
-        // σημείωση (400 φαρδιοί χαρακτήρες) μαζί με Oura και δύο ορισμούς οξυγόνου μικραίνει λίγο, αντί να κοπεί η
-        // σημείωση ή να βγει έξω από τη σελίδα.
+        // Συγχώνευση 3: το σώμα της σελίδας 1 στο ύψος του A4, χωρίς να κοπεί ποτέ η σημείωση. Round 1 (U1b-01): με
+        // αλλαγή συσκευής μέσα στις 90 μέρες (διπλές γραμμές) το σώμα δεν χωρούσε και μίκραινε ολόκληρο σε στενή στήλη στη
+        // μέση (περιθώρια 83–93 στιγμές, γράμματα 7,5 στιγμών). Τώρα στήνεται φαρδύτερα και μικραίνει ([ReportFit]): τα
+        // περιθώρια μένουν όσο της κεφαλίδας και αλλάζουν λιγότερες γραμμές. Και 6 στιγμές κενό πάνω από το υποσέλιδο.
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, box) => FittedBox(
-              key: const ValueKey('report-page1-body'),
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                width: box.maxWidth,
-                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: body),
-              ),
-            ),
+          child: ReportFit(
+            key: const ValueKey('report-page1-body'),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: body),
           ),
         ),
+        const SizedBox(height: 6),
         _Footer(data: d, page: 1),
       ],
     );
@@ -737,13 +741,16 @@ class _PageThree extends StatelessWidget {
         ],
         if (minN != avgN) ...[
           const SizedBox(height: 6),
+          // Round 1 (S11-9): ενικός/πληθυντικός («1 νύχτα»)· «μέσος όρος», «χαμηλότερη τιμή» (U1a-6).
           Text(
-            'Μέσο οξυγόνο: $avgN νύχτες· χαμηλότερη μέτρηση: $minN. Η χαμηλότερη λείπει όταν η Samsung δεν δίνει '
-            'αναλυτικές τιμές για τη νύχτα.',
+            'Μέσος όρος οξυγόνου: ${countText(avgN, 'νύχτα', 'νύχτες')}· χαμηλότερη τιμή: ${countText(minN, 'νύχτα', 'νύχτες')}. '
+            'Η χαμηλότερη λείπει όταν η Samsung δεν δίνει αναλυτικές τιμές για τη νύχτα ή όταν το ρολόι μέτρησε λιγότερο από '
+            'τον μισό ύπνο.',
             style: small,
           ),
         ],
-        _Title('Ζυγίσεις (InBody H40)'),
+        // Round 1 (U1b-13): ο τίτλος λέει ποιες ζυγίσεις είναι (πριν: χωρίς λέξη, κάτω από το «90 ημέρες» της κεφαλίδας).
+        _Title(reportWeighTitle(d)),
         if (d.weighIns.isEmpty)
           Text('Δεν υπάρχουν ζυγίσεις.', style: cell)
         else
@@ -784,7 +791,10 @@ class _PageThree extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'Λίπος και μύες: εκτίμηση βιοηλεκτρικής αντίστασης (BIA) της ζυγαριάς InBody H40, όχι DXA. Επηρεάζονται από '
-          'το νερό, το φαγητό και την άσκηση.',
+          'το νερό, το φαγητό και την άσκηση.'
+          // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες δεν μπαίνουν· ο γιατρός το βλέπει.
+          '${d.foreignWeighIns == 0 ? '' : ' ${d.foreignWeighIns == 1 ? 'Δεν μπήκε 1 ζύγιση που διαφέρει' : 'Δεν μπήκαν ${d.foreignWeighIns} ζυγίσεις που διαφέρουν'} πολύ από τις υπόλοιπες (πιθανόν άλλου ατόμου).'}',
+          key: const ValueKey('report-weigh-note'),
           style: small,
         ),
         _Title('Πώς μετρήθηκαν'),
@@ -795,7 +805,9 @@ class _PageThree extends StatelessWidget {
               ? 'Κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
                   'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
                   'Galaxy Watch Ultra 2. Διάρκεια ύπνου: πραγματικός ύπνος, χωρίς τα ξυπνήματα (και στις δύο συσκευές). '
-                  'Οξυγόνο: Galaxy Watch Ultra 2 (αισθητήρας καρπού)· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. '
+                  // Round 1 (S4-8 (3)): και το δαχτυλίδι για το οξυγόνο (η σελίδα 1 έχει γραμμή του).
+                  'Οξυγόνο, μέσος όρος νύχτας: Oura Ring 5 και, σε χωριστή γραμμή, Galaxy Watch Ultra 2 (καρπός, μόνο όταν '
+                  'μέτρησε τουλάχιστον τον μισό ύπνο)· χαμηλότερη μεμονωμένη τιμή: Galaxy Watch Ultra 2, όχι οξυμετρία. '
                   'Βήματα: $samsungTotalLabel. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής: χωριστή γραμμή για '
                   'κάθε συσκευή, ποτέ ανάμειξη ή σύγκριση ανάμεσά τους.'
               : 'Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
@@ -833,6 +845,96 @@ class _PageThree extends StatelessWidget {
 }
 
 MetricDef? _def(String key) => metricDef(key);
+
+/// Round 1 (U1b-13): ο τίτλος του πίνακα ζυγίσεων λέει ποιες είναι.
+String reportWeighTitle(ReportData d) {
+  const base = 'Ζυγίσεις (InBody H40)';
+  final n = d.weighIns.length;
+  if (n == 0) return base;
+  if (d.weighInsSpread) return '$base · $n από τις ${d.weighInsInPeriod} του διαστήματος, από την πρώτη ως την τελευταία';
+  return n == 1 ? '$base · η τελευταία' : '$base · οι $n τελευταίες';
+}
+
+/// Round 1 (U1b-01): το σώμα της σελίδας 1 στο ύψος που μένει, χωρίς να κοπεί τίποτα και χωρίς να γίνει στενή στήλη.
+/// Δοκιμάζει κλίμακες από 1 ως 0,7: σε καθεμία στήνει το περιεχόμενο σε πλάτος «πλάτος ÷ κλίμακα» (άρα λιγότερες
+/// αλλαγές γραμμής) και κρατά την πρώτη που χωρά· το ζωγραφίζει μικρότερο κατά την κλίμακα, ώστε να πιάνει ακριβώς το
+/// πλάτος της σελίδας. Αν ούτε στο 0,7 χωρά, μικραίνει όσο χρειάζεται (όπως το FittedBox πριν).
+class ReportFit extends SingleChildRenderObjectWidget {
+  const ReportFit({super.key, super.child});
+
+  @override
+  RenderReportFit createRenderObject(BuildContext context) => RenderReportFit();
+}
+
+class RenderReportFit extends RenderProxyBox {
+  /// Οι κλίμακες που δοκιμάζονται, από τη μεγαλύτερη.
+  static const steps = <double>[1, 0.97, 0.94, 0.91, 0.88, 0.85, 0.82, 0.79, 0.76, 0.73, 0.7];
+
+  double _scale = 1;
+
+  /// Η κλίμακα του τελευταίου στησίματος (1 = όπως είναι).
+  double get scale => _scale;
+
+  Matrix4 get _transform => Matrix4.diagonal3Values(_scale, _scale, 1);
+
+  @override
+  void performLayout() {
+    final c = child;
+    final w = constraints.maxWidth;
+    final h = constraints.maxHeight;
+    if (c == null || !w.isFinite) {
+      _scale = 1;
+      if (c != null) c.layout(constraints, parentUsesSize: true);
+      size = c == null ? constraints.smallest : constraints.constrain(c.size);
+      return;
+    }
+    var fits = false;
+    for (final s in steps) {
+      c.layout(BoxConstraints.tightFor(width: w / s), parentUsesSize: true);
+      _scale = s;
+      if (!h.isFinite || c.size.height * s <= h + 0.5) {
+        fits = true;
+        break;
+      }
+    }
+    if (!fits && c.size.height > 0) _scale = h / c.size.height;
+    size = constraints.constrain(Size(w, c.size.height * _scale));
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final c = child;
+    if (c == null) return;
+    if (_scale == 1) {
+      layer = null;
+      context.paintChild(c, offset);
+      return;
+    }
+    layer = context.pushTransform(
+      needsCompositing,
+      offset,
+      _transform,
+      (context, offset) => context.paintChild(c, offset),
+      oldLayer: layer is TransformLayer ? layer as TransformLayer? : null,
+    );
+  }
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    transform.multiply(_transform);
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    final c = child;
+    if (c == null) return false;
+    return result.addWithPaintTransform(
+      transform: _transform,
+      position: position,
+      hitTest: (BoxHitTestResult result, Offset position) => c.hitTest(result, position: position),
+    );
+  }
+}
 
 /// Η ετικέτα της κάθετης γραμμής στην αρχή της περιόδου [p] στα γραφήματα: η συσκευή («Oura», «ρολόι») ή, για το
 /// οξυγόνο (ίδιος αισθητήρας), ο νέος ορισμός της νύχτας.
@@ -883,7 +985,8 @@ class _PageTwo extends StatelessWidget {
                         if (p.stat.n > 0)
                           '${reportPeriodDevice(p)} ${i == s.periods.length - 1 ? 'από ${p.from.day}/${p.from.month}' : 'ως ${p.to.day}/${p.to.month}'}',
                     ].join(', ')}'
-                  : title),
+                  // Round 1 (U1b-12): κάθε γράφημα με τη συσκευή του (οι σελίδες τυπώνονται χωριστά).
+                  : '$title · ${metricSourceName(key, s.source)}'),
           if (s.n < 2)
             SizedBox(
               height: 96,
@@ -932,7 +1035,7 @@ class _PageTwo extends StatelessWidget {
           ),
         ),
         chart('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, c.heart, (v) => v.round().toString(), 8),
-        chart('Οξυγόνο στον ύπνο, μέσο ανά νύχτα (%)', K.spo2Avg, c.energy, spo2AvgText, 4),
+        chart('Οξυγόνο στον ύπνο, μέσος όρος ανά νύχτα (%)', K.spo2Avg, c.energy, spo2AvgText, 4),
         chart(
           'Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση ανά νύχτα (%, καρπός)',
           K.spo2Min,

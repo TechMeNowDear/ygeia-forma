@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data.dart';
 import '../format.dart';
+import '../history.dart' show K;
 import '../oura/oura_api.dart';
 import '../oura/oura_store.dart';
 import '../oxygen_note.dart' show oxygenAvgLabel, oxygenMinLabel;
@@ -11,6 +12,7 @@ import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'oxygen_widgets.dart';
+import 'sources_page.dart';
 
 /// Κοινός σκελετός για τις σελίδες του Oura: μία στήλη στο κινητό, δύο σε ανοιχτό Fold.
 class _OuraScaffold extends StatelessWidget {
@@ -121,7 +123,9 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
   bool _opening = false;
 
   /// 04:00–23:59: «Φορούσες το δαχτυλίδι την τελευταία νύχτα;». null = έκλεισε χωρίς απάντηση (τίποτα δεν ανοίγει).
-  Future<bool?> _askLastNight() => showModalBottomSheet<bool>(
+  /// [unsourced] (round 1, U2b-13): η τελευταία νύχτα δεν έχει πηγή (μετά από αποσύνδεση): με «Όχι» μένει ΚΕΝΗ, όχι
+  /// «όπως τη μέτρησε το ρολόι».
+  Future<bool?> _askLastNight({bool unsourced = false}) => showModalBottomSheet<bool>(
         context: context,
         showDragHandle: true,
         routeSettings: const RouteSettings(name: 'Η τελευταία νύχτα'),
@@ -138,8 +142,11 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
                       style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
                   const SizedBox(height: 8),
                   Text(
-                    'Αν ναι, η τελευταία νύχτα μετρά από το δαχτυλίδι. Αν όχι, μένει όπως τη μέτρησε το ρολόι και '
-                    'το δαχτυλίδι μετρά από απόψε.',
+                    unsourced
+                        ? 'Αν ναι, η τελευταία νύχτα μετρά από το δαχτυλίδι. Αν όχι, η τελευταία νύχτα μένει κενή και το '
+                            'δαχτυλίδι μετρά από απόψε.'
+                        : 'Αν ναι, η τελευταία νύχτα μετρά από το δαχτυλίδι. Αν όχι, μένει όπως τη μέτρησε το ρολόι και '
+                            'το δαχτυλίδι μετρά από απόψε.',
                     style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
                   ),
                   const SizedBox(height: 16),
@@ -164,9 +171,12 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
   Future<void> _connect() async {
     // Η πρώτη νύχτα αποφασίζεται εδώ, πριν ανοίξει ο browser, από την ώρα που πατήθηκε το κουμπί.
     final now = widget.store.ouraClock();
+    // Round 1 (S5-3 / U2b-13): σύνδεση ξανά μέσα σε εποχή Oura που τρέχει (π.χ. «Χρειάζεται νέα σύνδεση»): η τελευταία
+    // νύχτα είναι ήδη του Oura, άρα καμία ερώτηση (ό,τι κι αν απαντούσες δεν άλλαζε τίποτα) και «από σήμερα».
+    final src = widget.store.plan.nightSource(dayOf(now));
     var wore = false;
-    if (firstNightChoice(now) == FirstNightChoice.ask) {
-      final a = await _askLastNight();
+    if (src != Source.oura && firstNightChoice(now) == FirstNightChoice.ask) {
+      final a = await _askLastNight(unsourced: src == Source.none);
       if (a == null || !mounted) return;
       wore = a;
     }
@@ -174,7 +184,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
       _opening = true;
       _error = null;
     });
-    final e = await widget.store.beginOuraLogin(from: firstOuraNight(now, woreRing: wore));
+    final e = await widget.store.beginOuraLogin(from: src == Source.oura ? dayOf(now) : firstOuraNight(now, woreRing: wore));
     if (!mounted) return;
     setState(() {
       _opening = false;
@@ -275,6 +285,12 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
           ),
         );
 
+        final clockNow = store.ouraClock();
+        final firstNightLine = store.plan.nightSource(dayOf(clockNow)) == Source.oura
+            ? 'Οι νύχτες του δαχτυλιδιού που έλειψαν έρχονται μόλις συνδεθείς.'
+            : firstNightChoice(clockNow) == FirstNightChoice.today
+                ? 'Η νύχτα που κοιμάσαι τώρα θα μετρά από το δαχτυλίδι.'
+                : 'Πριν ανοίξει η σελίδα της Oura θα σε ρωτήσουμε αν φορούσες το δαχτυλίδι την τελευταία νύχτα.';
         final privacy = AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -287,17 +303,32 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 6),
+              // Round 1 (U2b-13 / U2b-19): «όπως είναι» (όχι «από το ρολόι»: μετά από αποσύνδεση οι νύχτες είναι κενές)·
+              // και η τελευταία πρόταση λέει αυτό που θα γίνει ΤΩΡΑ (πριν: «Μετά τις 04:00 θα σε ρωτήσουμε», όλη τη μέρα).
               Text(
-                'Από την πρώτη νύχτα του δαχτυλιδιού ο ύπνος έρχεται μόνο από αυτό. Οι νύχτες πριν μένουν όπως είναι, '
-                'από το ρολόι. Μετά τις 04:00 θα σε ρωτήσουμε για την τελευταία νύχτα.',
+                'Από την πρώτη νύχτα του δαχτυλιδιού ο ύπνος έρχεται μόνο από αυτό. Οι νύχτες πριν μένουν όπως είναι. '
+                '$firstNightLine',
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
             ],
           ),
         );
 
+        // Round 1 (U2b-10): με άγνωστο σχέδιο πηγών η σύνδεση δεν μπορεί να ολοκληρωθεί (δεν αλλάζει η πηγή): το λέμε
+        // και στέλνουμε στις Πηγές, αντί για «δοκίμασε ξανά σε λίγο» που δεν θα πετύχαινε ποτέ.
+        final unknown = store.planUnknown;
         final status = <Widget>[
-          if (!configured)
+          if (unknown)
+            EmptyCard(
+              key: const ValueKey('oura-plan-first'),
+              icon: Icons.device_unknown_rounded,
+              color: c.bad,
+              title: 'Πρώτα διάλεξε από πού έρχεται ο ύπνος',
+              text: 'Οι ρυθμίσεις πηγών δεν διαβάστηκαν. Διάλεξε πηγή ύπνου στις Πηγές και μετά σύνδεσε το Oura.',
+              buttonText: 'Άνοιξε τις Πηγές',
+              onPressed: () => Navigator.of(context).push(SourcesPage.route(store, now: widget.now)),
+            )
+          else if (!configured)
             EmptyCard(
               icon: Icons.event_rounded,
               color: c.primary,
@@ -323,7 +354,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
             children: [
               FilledButton(
                 key: const ValueKey('oura-connect'),
-                onPressed: !configured || _opening || store.ouraConnecting ? null : _connect,
+                onPressed: !configured || unknown || _opening || store.ouraConnecting ? null : _connect,
                 child: Text(store.ouraConnecting ? 'Συνδέω…' : 'Σύνδεση με Oura'),
               ),
               const SizedBox(height: 4),
@@ -356,15 +387,22 @@ class OuraManagePage extends StatelessWidget {
       );
 
   Future<void> _disconnect(BuildContext context) async {
+    // Round 1 (U2b-11 / U2b-07): η συνέπεια που γράφει ο διάλογος είναι αυτή που θα γίνει. Αν το Oura δεν είχε αρχίσει
+    // ακόμα (σύνδεση με αρχή απόψε) ή ο ύπνος είναι ήδη του ρολογιού, οι νύχτες ΔΕΝ μένουν κενές.
+    final consequence = switch (store.sleepSourceAfterDisconnect) {
+      Source.none => 'Από απόψε οι νύχτες μένουν κενές, και μαζί το οξυγόνο της νύχτας: ο ύπνος δεν περνά μόνος του στο '
+          'ρολόι. Αν το θέλεις, το διαλέγεις μετά ρητά, σε αυτή τη σελίδα.',
+      Source.watch => 'Ο ύπνος συνεχίζει να έρχεται από το ρολόι.',
+      _ => 'Η πηγή του ύπνου δεν αλλάζει.',
+    };
     final ok = await showDialog<bool>(
       context: context,
       routeSettings: const RouteSettings(name: 'Αποσύνδεση Oura'),
       builder: (context) => AlertDialog(
         title: const Text('Αποσύνδεση από το Oura;'),
-        content: const Text(
+        content: Text(
           'Σταματά η ανάγνωση από το Oura και η άδεια ανακαλείται. Ό,τι έχει ήδη έρθει μένει στο κινητό.\n\n'
-          'Από απόψε οι νύχτες μένουν κενές: ο ύπνος δεν περνά μόνος του στο ρολόι. Αν το θέλεις, το διαλέγεις '
-          'μετά ρητά, σε αυτή τη σελίδα.',
+          '$consequence',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
@@ -377,10 +415,14 @@ class OuraManagePage extends StatelessWidget {
     // Αναίρεση έχει νόημα μόνο αν είχε ήδη αρχίσει εποχή Oura (αλλιώς δεν άλλαξε τίποτα που να επιστρέφει).
     final undo = store.ouraEraStarted;
     final messenger = ScaffoldMessenger.of(context);
-    await store.disconnectOura();
+    final revoked = await store.disconnectOura();
     messenger.showSnackBar(SnackBar(
       duration: const Duration(seconds: 8),
-      content: const Text('Αποσυνδέθηκε. Τα δεδομένα που είχαν έρθει μένουν.'),
+      // Round 1 (S5-8): αν η Oura δεν απάντησε στην ανάκληση (π.χ. χωρίς δίκτυο), το λέμε: η άδεια μένει στον λογαριασμό.
+      content: Text(revoked
+          ? 'Αποσυνδέθηκε. Τα δεδομένα που είχαν έρθει μένουν.'
+          : 'Αποσυνδέθηκε από το κινητό. Η Oura δεν απάντησε: αν θέλεις, αφαίρεσε την άδεια της εφαρμογής και από τον '
+              'λογαριασμό σου στην Oura.'),
       // Αναίρεση: η πηγή του ύπνου ξαναγίνεται Oura· για να ξαναδιαβάζει χρειάζεται «Σύνδεση με Oura».
       action: undo ? SnackBarAction(label: 'Αναίρεση', onPressed: () => store.restorePlan(before)) : null,
     ));
@@ -431,7 +473,13 @@ class OuraManagePage extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true) await store.sleepFromWatchAgain();
+    if (ok != true || !context.mounted) return;
+    // Round 1 (U2b-09): λέμε ότι έγινε (ή ότι δεν αποθηκεύτηκε)· πριν, καμία ένδειξη ως την επόμενη μέρα.
+    final messenger = ScaffoldMessenger.of(context);
+    final done = await store.sleepFromWatchAgain();
+    messenger.showSnackBar(SnackBar(
+      content: Text(done ? 'Από απόψε ο ύπνος έρχεται από το ρολόι.' : 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.'),
+    ));
   }
 
   @override
@@ -441,23 +489,52 @@ class OuraManagePage extends StatelessWidget {
       builder: (context, _) {
         final c = Aigaio.of(context);
         final today = dayOf(now ?? DateTime.now());
+        final tomorrow = DateTime(today.year, today.month, today.day + 1);
         final plan = store.plan;
         final status = store.ouraStatus;
         final connected = store.ouraHasTokens;
         final nightsCount = store.ouraNights.where((n) => n.main != null).length;
         final last = store.ouraLastSync;
         final ouraFrom = plan.ouraFrom;
+        // Round 1 (U2b-10): άγνωστο σχέδιο πηγών: καμία ενέργεια εδώ δεν μπορεί να πετύχει πριν διαλέξεις στις Πηγές.
+        final unknown = store.planUnknown;
+        // Round 1 (U2b-09): διάλεξε ήδη «από απόψε το ρολόι».
+        final watchTonight = store.watchSleepFromTonight;
+        final noSourceToday = plan.nightSource(today) == Source.none;
+        // Round 1 (U2b-01): η ανάγνωση γίνεται πράγματι μόνη της μόνο με ζωντανή σύνδεση.
+        final live = connected && store.ouraActive && status != OuraStatus.reconnect;
+        // Ο ύπνος δεν έχει πηγή σήμερα ή (τη μέρα της αποσύνδεσης) από απόψε: εδώ διαλέγεται ρητά το ρολόι.
+        final unsourced =
+            !unknown && !watchTonight && (noSourceToday || (!connected && plan.nightSource(tomorrow) == Source.none));
+        final missingNights = store.ouraMissingNights;
 
         final (title, subtitle, color) = switch (status) {
+          _ when unknown => (
+              'Δεν διαβάστηκε από πού έρχεται ο ύπνος',
+              'Πρώτα διάλεξε πηγή ύπνου στις Πηγές. Ώσπου να διαλέξεις, οι νύχτες μένουν κενές και τίποτα δεν αλλάζει από εδώ.',
+              c.bad,
+            ),
           OuraStatus.reconnect => (
               store.ouraError == OuraErrorKind.scopeMissing ? 'Λείπει άδεια στην Oura' : 'Χρειάζεται νέα σύνδεση',
               ouraErrorText(store.ouraError == OuraErrorKind.scopeMissing ? OuraErrorKind.scopeMissing : OuraErrorKind.reconnect),
               c.bad,
             ),
-          OuraStatus.subscription => ('Η Oura δεν δίνει δεδομένα', ouraErrorText(OuraErrorKind.subscription), c.bad),
+          // Round 1 (S5-6 / U2a-04): και τι να κάνεις (403 = συνδρομή Ή άδεια).
+          OuraStatus.subscription => (
+              'Η Oura δεν δίνει δεδομένα',
+              '${ouraErrorText(OuraErrorKind.subscription)} Έλεγξε τη συνδρομή στην εφαρμογή Oura και πάτα «Ενημέρωση τώρα»· '
+                  'αν λείπει η άδεια, πάτα «Σύνδεση ξανά».',
+              c.bad,
+            ),
+          OuraStatus.disconnected when watchTonight => (
+              'Αποσυνδέθηκε',
+              'Από απόψε ο ύπνος έρχεται από το ρολόι, όπως διάλεξες.${noSourceToday ? ' Η χθεσινή νύχτα μένει κενή.' : ''}',
+              c.textSecondary
+            ),
           OuraStatus.disconnected => (
               'Αποσυνδέθηκε',
-              'Οι νύχτες μένουν κενές ώσπου να συνδέσεις ξανά ή να διαλέξεις το ρολόι.',
+              '${noSourceToday ? 'Οι νύχτες μένουν κενές' : 'Από απόψε οι νύχτες μένουν κενές'} ώσπου να συνδέσεις ξανά ή να '
+                  'διαλέξεις το ρολόι.',
               c.textSecondary
             ),
           OuraStatus.off => connected
@@ -478,6 +555,22 @@ class OuraManagePage extends StatelessWidget {
               'Συνδεδεμένο',
               ouraErrorText(store.ouraError ?? OuraErrorKind.network),
               c.good,
+            ),
+          // Round 1 (U2b-12): όταν λείπει η χθεσινή νύχτα η σελίδα λέει το ίδιο με τη «Σήμερα» (πριν: «δεν χρειάζεται να
+          // κάνεις τίποτα»).
+          OuraStatus.waiting => (
+              'Συνδεδεμένο',
+              'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά πάτα «Ενημέρωση τώρα».',
+              c.sleep,
+            ),
+          OuraStatus.missing => (
+              'Συνδεδεμένο',
+              missingNights >= 2
+                  ? 'Λείπουν ${countText(missingNights, 'νύχτα', 'νύχτες')}. Άνοιξε την εφαρμογή Oura με το δαχτυλίδι κοντά στο '
+                      'κινητό και μετά πάτα «Ενημέρωση τώρα».'
+                  : 'Χθες βράδυ χωρίς ύπνο από το δαχτυλίδι. Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και '
+                      'μετά πάτα «Ενημέρωση τώρα».',
+              c.move,
             ),
           _ => (
               'Συνδεδεμένο',
@@ -524,26 +617,50 @@ class OuraManagePage extends StatelessWidget {
           ),
         );
 
+        final openConnect = store.ouraConfigured ? () => Navigator.of(context).push(OuraConnectPage.route(store, now: now)) : null;
         final actions = <Widget>[
-          if (store.canWatchLastNight)
-            OutlinedButton(
-              key: const ValueKey('oura-watch-last-night'),
-              onPressed: () => _watchLastNight(context),
-              child: Text(store.watchLastNightLabel),
-            ),
-          if (status == OuraStatus.reconnect || status == OuraStatus.disconnected || (!connected && status != OuraStatus.off))
+          if (unknown)
             FilledButton(
-              onPressed: store.ouraConfigured ? () => Navigator.of(context).push(OuraConnectPage.route(store, now: now)) : null,
-              child: const Text('Σύνδεση ξανά'),
+              key: const ValueKey('oura-open-sources'),
+              onPressed: () => Navigator.of(context).push(SourcesPage.route(store, now: now)),
+              child: const Text('Άνοιξε τις Πηγές'),
             )
-          else if (connected && store.ouraActive)
-            _SyncNowButton(store: store),
-          if (store.ouraActive)
-            Text(
-              'Η ενημέρωση γίνεται μόνη της όταν ανοίγεις την εφαρμογή. Αν λείπει η χθεσινή νύχτα, άνοιξε πρώτα '
-              'την εφαρμογή Oura.',
-              style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4),
-            ),
+          else ...[
+            if (store.canWatchLastNight)
+              OutlinedButton(
+                key: const ValueKey('oura-watch-last-night'),
+                onPressed: () => _watchLastNight(context),
+                child: Text(store.watchLastNightLabel),
+              ),
+            if (status == OuraStatus.reconnect || status == OuraStatus.disconnected || (!connected && status != OuraStatus.off))
+              FilledButton(
+                onPressed: openConnect,
+                child: const Text('Σύνδεση ξανά'),
+              )
+            // Round 1 (U2b-11): μετά από αποσύνδεση πριν αρχίσει το Oura η σελίδα έμενε χωρίς κανένα κουμπί.
+            else if (!connected)
+              FilledButton(
+                key: const ValueKey('oura-connect-open'),
+                onPressed: openConnect,
+                child: const Text('Σύνδεση με Oura'),
+              )
+            else if (store.ouraActive)
+              _SyncNowButton(store: store),
+            // Round 1 (S5-6): το 403 μπορεί να είναι άδεια που λείπει: δρόμος για νέα έγκριση αδειών χωρίς «Αποσύνδεση».
+            if (status == OuraStatus.subscription)
+              OutlinedButton(
+                key: const ValueKey('oura-reconnect'),
+                onPressed: openConnect,
+                child: const Text('Σύνδεση ξανά'),
+              ),
+            // Round 1 (U2b-01): μόνο με ζωντανή σύνδεση (πριν φαινόταν και μετά την αποσύνδεση ή με «νέα σύνδεση»).
+            if (live)
+              Text(
+                'Η ενημέρωση γίνεται μόνη της όταν ανοίγεις την εφαρμογή. Αν λείπει η χθεσινή νύχτα, άνοιξε πρώτα '
+                'την εφαρμογή Oura.',
+                style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4),
+              ),
+          ],
         ];
 
         final compare = OuraOxygenAccessCard.orNull(store);
@@ -555,19 +672,26 @@ class OuraManagePage extends StatelessWidget {
               const SectionLabel('Από πού έρχεται τι'),
               const SizedBox(height: 4),
               // Έλεγχος 9/11 (UX3-05): πηγή, όχι «Ναι» δίπλα σε «Όχι · από το ρολόι»· ίδιες ετικέτες με τις Πηγές.
+              // Round 1 (U2b-08): η πραγματική πηγή σήμερα, με τις λέξεις των Πηγών («Oura», «Ρολόι», «Καμία»)· πριν
+              // «Oura · όχι τώρα» και όταν ο ύπνος ήταν του ρολογιού ή χωρίς πηγή.
               for (final r in sourceRows.where((r) => r.group == SourceGroup.night))
-                InfoRow(r.title, store.ouraActive ? 'Oura' : (store.ouraStartsTonight ? 'Oura από απόψε' : 'Oura · όχι τώρα')),
-              const InfoRow(oxygenMinLabel, 'Ρολόι'),
-              const InfoRow('Βήματα', 'Ρολόι'),
+                InfoRow(r.title, store.ouraStartsTonight ? 'Oura από απόψε' : sourceName(plan.sourceFor(r.metrics.first, today))),
+              // Round 1 (U2b-07): χωρίς πηγή ύπνου το ρολόι δεν δίνει οξυγόνο νύχτας (το μετρά μόνο μέσα στις ώρες ύπνου).
+              InfoRow(oxygenMinLabel, sourceName(noSourceToday ? Source.none : Source.watch)),
+              // Round 1 (U2b-06): τα βήματα είναι το σύνολο της Samsung Health (ρολόι και κινητό), όπως στις Πηγές.
+              InfoRow('Βήματα', metricSourceName(K.steps, Source.watch)),
             ],
           ),
         );
 
+        // Round 1 (U2b-01): τη μέρα της αποσύνδεσης όχι ξανά «Αποσύνδεση»· χωρίς tokens μένει μόνο όσο τρέχει εποχή Oura
+        // (ο δρόμος για να σταματήσει το Oura όταν δεν γίνεται νέα σύνδεση).
+        final canDisconnect = connected || (store.ouraActive && status != OuraStatus.disconnected);
         final danger = AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (connected || store.ouraActive) ...[
+              if (canDisconnect) ...[
                 OutlinedButton(
                   key: const ValueKey('oura-disconnect'),
                   style: OutlinedButton.styleFrom(foregroundColor: c.bad),
@@ -580,8 +704,8 @@ class OuraManagePage extends StatelessWidget {
                   style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
                 ),
               ],
-              if (plan.nightSource(today) == Source.none) ...[
-                if (connected || store.ouraActive) const Hairline(vertical: 12),
+              if (unsourced) ...[
+                if (canDisconnect) const Hairline(vertical: 12),
                 OutlinedButton(
                   key: const ValueKey('oura-watch-again'),
                   onPressed: () => _watchAgain(context),
@@ -600,15 +724,17 @@ class OuraManagePage extends StatelessWidget {
         return _OuraScaffold(
           title: 'Oura',
           left: [head, ...actions, if (compare != null) compare],
-          right: [what, danger],
+          // Round 1 (U2b-11): χωρίς περιεχόμενο δεν μένει άδεια κάρτα.
+          right: [what, if (canDisconnect || unsourced) danger],
         );
       },
     );
   }
 }
 
-/// «Ενημέρωση τώρα»: το πολύ μία φορά το λεπτό. Ξαναενεργοποιείται μόνο του με ΕΝΑ χρονόμετρο μίας χρήσης όσο
-/// φαίνεται η σελίδα (κανένα επαναλαμβανόμενο).
+/// «Ενημέρωση τώρα»: διαβάζει πάντα, με φρένο λίγων δευτερολέπτων για διπλά πατήματα ([ouraUserGap], round 1, S5-10·
+/// πριν: ένα λεπτό). Ξαναενεργοποιείται μόνο του με ΕΝΑ χρονόμετρο μίας χρήσης όσο φαίνεται η σελίδα (κανένα
+/// επαναλαμβανόμενο).
 class _SyncNowButton extends StatefulWidget {
   const _SyncNowButton({required this.store});
   final HealthStore store;
@@ -649,8 +775,10 @@ class _SyncNowButtonState extends State<_SyncNowButton> {
     }
     return FilledButton.icon(
       key: const ValueKey('oura-sync-now'),
+      // Round 1 (S5-10): ρητή ανάγνωση μέσα από το refresh(): διαβάζει το Oura τώρα και ξαναϋπολογίζει τις τιμές του
+      // ρολογιού (οξυγόνο νύχτας, παλμοί μέρας) με τη νύχτα που ήρθε.
       onPressed: can ? () async {
-        await store.syncOuraNow();
+        await store.refresh();
         if (mounted) setState(_arm);
       } : null,
       icon: const Icon(Icons.refresh_rounded),

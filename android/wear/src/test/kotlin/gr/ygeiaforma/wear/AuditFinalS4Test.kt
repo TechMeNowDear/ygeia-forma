@@ -123,9 +123,11 @@ class AuditFinalS4Test {
     // ------------------------------------------------------------------ W-4: οι εντολές
     @Test
     fun tickCarriesRepsOnlyWhenEditedOnTheWatch() {
-        // χωρίς αλλαγή στο ρολόι: ακριβώς τα πεδία που έστελνε πριν (το παλιό κινητό δεν βλέπει καμία διαφορά)
+        // χωρίς αλλαγή στο ρολόι: τα πεδία που έστελνε πριν και, από τον έλεγχο 13/11 (S6-10), πάντα το id της άσκησης
+        // («ex»)· το παλιό κινητό το αγνοεί όταν λείπει το «r» (δεν βλέπει καμία διαφορά)
         val plain = tickCmd(2, 1, 7_000, "bench", null)
-        assertEquals(setOf("op", "i", "s", "at"), plain.keys().asSequence().toSet())
+        assertEquals(setOf("op", "i", "s", "ex", "at"), plain.keys().asSequence().toSet())
+        assertFalse(plain.has("r"))
         assertEquals("tick", plain.getString("op"))
         assertEquals(2, plain.getInt("i"))
         assertEquals(1, plain.getInt("s"))

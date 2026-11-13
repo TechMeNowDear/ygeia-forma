@@ -137,11 +137,12 @@ class ExLog {
       );
 }
 
+// round1, U5-12 / U6-21 (f6b): ονομαστική, ως ετικέτες («ενόχληση: αγκώνας»)· τα κλειδιά δεν αλλάζουν (αποθήκευση, ρολόι).
 const painNames = {
-  'shoulderR': 'δεξί ώμο',
-  'shoulderL': 'αριστερό ώμο',
-  'elbow': 'αγκώνα',
-  'wrist': 'καρπό',
+  'shoulderR': 'δεξιός ώμος',
+  'shoulderL': 'αριστερός ώμος',
+  'elbow': 'αγκώνας',
+  'wrist': 'καρπός',
   'back': 'μέση',
   'knee': 'γόνατο',
 };
@@ -235,6 +236,11 @@ class Session {
   /// Η τιμή από τους παλμούς της μνήμης (όταν υπάρχουν), αλλιώς η αποθηκευμένη.
   int? get steadyHr => hrLoaded && hr.isNotEmpty ? (hrSteady = steadyFrom(hr, pauses)) : hrSteady;
 
+  /// «Μέσα σε παύση»: [αρχή, τέλος) σε δευτερόλεπτα, παντού ο ίδιος κανόνας (round1, S12-16). Η τιμή ακριβώς στο
+  /// δευτερόλεπτο που τελειώνει η παύση μετρά ως ενεργός χρόνος, όπως στο ρολόι (Protocol.kt: `sec >= it[0] && sec < it[1]`)
+  /// και στον χρόνο ζώνης ([zoneTimes]). Πριν, οι παλμοί ανά km και το «σταθερό βάδισμα» είχαν κλειστό τέλος.
+  static bool inPause(List<List<int>> pauses, int t) => pauses.any((p) => t >= p[0] && t < p[1]);
+
   /// Υπολογισμός από [samples] ([δευτερόλεπτα από την αρχή, bpm]) και [pauses] ([αρχή, τέλος] σε δευτερόλεπτα).
   static int? steadyFrom(List<List<int>> samples, List<List<int>> pauses) {
     int pausedBefore(int t) {
@@ -249,7 +255,7 @@ class Session {
     var sum = 0, n = 0;
     for (final s in samples) {
       final t = s[0];
-      if (pauses.any((x) => t >= x[0] && t <= x[1])) continue;
+      if (inPause(pauses, t)) continue;
       if (t - pausedBefore(t) < steadyFromSec) continue;
       sum += s[1];
       n++;

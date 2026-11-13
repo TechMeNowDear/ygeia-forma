@@ -45,31 +45,35 @@ class GoalsSummaryCard extends StatelessWidget {
     return AppCard(
       key: const ValueKey('nutrition-goals'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Έλεγχος 13/11 (U3b-10): ο μεγάλος αριθμός παίρνει όσο πλάτος χρειάζεται και το «έφαγες / στόχος» πάει στη δεξιά
+        // άκρη· με μεγάλα γράμματα κατεβαίνει από κάτω, δεν μικραίνει τον αριθμό (πριν μοιράζονταν την κάρτα μισή-μισή).
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(left.label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: left.over ? c.warn : c.textSecondary)),
               BigValue(left.value, unit: 'kcal', size: 44, color: left.over ? c.warn : null),
             ]),
-          ),
-          // Με μεγάλα γράμματα: το «έφαγες / στόχος» σπάει σε γραμμές, δεν βγαίνει έξω από την κάρτα.
-          Flexible(
-            child: InkWell(
-            key: const ValueKey('nutrition-goals-open'),
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => openGoals(context, health),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('έφαγες ${thousands(t.shownKcal)}', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
-                Text('στόχος ${thousands(g.kcal)}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.food, fontFeatures: tabular)),
-              ]),
+            InkWell(
+              key: const ValueKey('nutrition-goals-open'),
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => openGoals(context, health),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('έφαγες ${thousands(t.shownKcal)}',
+                      textAlign: TextAlign.right, style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
+                  Text('στόχος ${thousands(g.kcal)}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.food, fontFeatures: tabular)),
+                ]),
+              ),
             ),
-          ),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 10),
         GoalBar(
           label: 'Πρωτεΐνη',
@@ -80,11 +84,13 @@ class GoalsSummaryCard extends StatelessWidget {
           note: t.count == 0
               ? null
               : protLeft <= 0.5
-                  ? 'Έπιασες τον στόχο ✓'
+                  ? 'Έπιασες τον στόχο'
                   : (today ? 'Μένουν ${gramsText(protLeft)} g' : null),
+          done: t.count > 0 && protLeft <= 0.5,
         ),
         GoalBar(
-          label: 'Κορεσμένα',
+          // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού («Λιπαρά», «Κορεσμένα λιπαρά»).
+          label: 'Κορεσμένα λιπαρά',
           value: atLeast(Nk.satFat, '${gramsText(t.satFat)} g'),
           target: 'έως ${g.satMax} g',
           fraction: t.satFat / g.satMax,
@@ -98,11 +104,14 @@ class GoalsSummaryCard extends StatelessWidget {
           target: '${g.fiber} g',
           fraction: t.fiber / g.fiber,
           color: c.good,
-          note: fiberLeft <= 0.05 && t.count > 0 ? 'Έπιασες τον στόχο ✓' : null,
+          // U3b-21: ίδιο όριο με την πρωτεΐνη (0,5 g): με 29,6 g η μπάρα έγραφε «30 g / 30 g» χωρίς «Έπιασες τον στόχο».
+          note: fiberLeft <= 0.5 && t.count > 0 ? 'Έπιασες τον στόχο' : null,
+          done: fiberLeft <= 0.5 && t.count > 0,
         ),
         const Hairline(vertical: 12),
-        InfoRow('Λίπος', '${gramsText(t.fat)} g / ${g.fatLo}–${g.fatHi}'),
-        InfoRow('Αλάτι', '${atLeast(Nk.salt, dec(t.salt, 1))} g / < ${dec(g.salt, 0)}',
+        // U3b-27: η μονάδα και στον στόχο, όπως στις μπάρες από πάνω.
+        InfoRow('Λιπαρά', '${gramsText(t.fat)} g / ${g.fatLo}–${g.fatHi} g'),
+        InfoRow('Αλάτι', '${atLeast(Nk.salt, dec(t.salt, 1))} g / κάτω από ${dec(g.salt, 0)} g',
             valueColor: t.salt >= g.salt ? c.warn : null),
         InfoRow('Υδατάνθρακες', '${gramsText(t.carbs)} g'),
         InfoRow('Σάκχαρα', '${atLeast(Nk.sugars, gramsText(t.sugars))} g'),
@@ -128,12 +137,17 @@ class GoalBar extends StatelessWidget {
     required this.color,
     this.note,
     this.warn = false,
+    this.done = false,
   });
   final String label, value, target;
   final double fraction;
   final Color color;
   final String? note;
   final bool warn;
+
+  /// Ο στόχος πιάστηκε: μπροστά από τη σημείωση μπαίνει το εικονίδιο «έγινε» (έλεγχος 13/11, U3b-32: το «✓» δεν υπάρχει
+  /// στη γραμματοσειρά της εφαρμογής και στην οθόνη έβγαινε από άλλη ή καθόλου).
+  final bool done;
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +183,12 @@ class GoalBar extends StatelessWidget {
           if (note != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(note!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: warn ? c.warn : c.textSecondary)),
+              child: Row(children: [
+                if (done) ...[Icon(Icons.check_circle_rounded, size: 16, color: c.good), const SizedBox(width: 4)],
+                Expanded(
+                  child: Text(note!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: warn ? c.warn : c.textSecondary)),
+                ),
+              ]),
             ),
         ]),
       ),
@@ -201,15 +220,19 @@ class GoalsCtaCard extends StatelessWidget {
 
 const cholInfo = MetricInfo(
   title: 'Χοληστερίνη · τι τη ρίχνει',
-  what: 'Μετρά τα τρόφιμα που έφαγες και ρίχνουν την LDL («κακή» χοληστερίνη), από τις κατηγορίες της βάσης τροφίμων.',
-  shows: 'Αν κάνεις όσα συμφώνησες: λιγότερα κορεσμένα, περισσότερες φυτικές ίνες, ξηροί καρποί και πίτουρο βρώμης κάθε '
-      'μέρα, όσπρια και ψάρι μέσα στην εβδομάδα. Η εφαρμογή δεν προβλέπει τη νέα σου LDL· αυτό το λένε μόνο οι εξετάσεις.',
-  compare: 'Κορεσμένα έως 6% των θερμίδων (AHA/ACC) · φυτικές ίνες 30 g (Reynolds 2019) · 3 g β-γλυκάνες βρώμης τη μέρα '
+  // Έλεγχος 13/11 (S1-12): το ψάρι δεν είναι τρόφιμο που ρίχνει την LDL (η διατροφή «portfolio» του Jenkins 2003 ήταν
+  // φυτική)· μετριέται γιατί είναι στο πλάνο, στη θέση του κρέατος και για τα τριγλυκερίδια.
+  what: 'Μετρά τα τρόφιμα που έφαγες και ρίχνουν την LDL («κακή» χοληστερίνη): ξηρούς καρπούς, πίτουρο βρώμης, όσπρια. '
+      'Μετρά και το ψάρι: το ίδιο δεν ρίχνει την LDL, αλλά παίρνει τη θέση του κρέατος και βοηθά τα τριγλυκερίδια.',
+  shows: 'Αν κάνεις όσα συμφώνησες: λιγότερα κορεσμένα λιπαρά, περισσότερες φυτικές ίνες, ξηροί καρποί και πίτουρο βρώμης '
+      'κάθε μέρα, όσπρια και ψάρι μέσα στην εβδομάδα. Η εφαρμογή δεν προβλέπει τη νέα σου LDL· αυτό το λένε μόνο οι '
+      'εξετάσεις.',
+  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC) · φυτικές ίνες 30 g (Reynolds 2019) · 3 g β-γλυκάνες βρώμης τη μέρα '
       '(EFSA) · ξηροί καρποί περίπου 30 g (Del Gobbo 2015) · όσπρια και φυτικά τρόφιμα μαζί (Jenkins 2003).',
   // Τελικός έλεγχος, Συμβούλιο 2 (Α4): ίδιος κανόνας «πλήρους μέρας» με τη διόρθωση θερμίδων, και το αλάτι που λείπει.
   accuracy: 'Οι μέρες με λίγη καταγραφή (κάτω από το 60% του στόχου θερμίδων) δεν μπαίνουν στους μέσους όρους. Αν ένα '
-      'τρόφιμο δεν έχει τιμή για κορεσμένα ή ίνες στην πηγή του, το σύνολο είναι «τουλάχιστον». Μέρα με τρόφιμο χωρίς '
-      'τιμή αλατιού δεν μετρά ως «αλάτι εντάξει».',
+      'τρόφιμο δεν έχει τιμή για κορεσμένα λιπαρά ή ίνες στην πηγή του, το σύνολο είναι «τουλάχιστον» και γράφεται με «≥». '
+      'Μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «αλάτι εντάξει».',
   cite: 'Eckel 2013 (AHA/ACC) · EFSA 2010/2011 · Reynolds 2019 (Lancet) · Del Gobbo 2015 (AJCN) · Jenkins 2003 (JAMA)',
 );
 
@@ -247,9 +270,10 @@ class CholCard extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 6),
-        if (g.nutsG > 0) CholRow(label: 'Ξηροί καρποί', value: '${d.nutsG.round()} g', target: '${g.nutsG} g', done: d.nutsG >= g.nutsG - 1e-9),
+        // «Έγινε» με τον αριθμό όπως φαίνεται (U3b-21): 29,6 g γράφονται «30 g / 30 g», άρα και με το σημάδι.
+        if (g.nutsG > 0) CholRow(label: 'Ξηροί καρποί', value: '${d.nutsG.round()} g', target: '${g.nutsG} g', done: d.nutsG.round() >= g.nutsG),
         if (g.branG > 0)
-          CholRow(label: 'Πίτουρο βρώμης', value: '${d.branG.round()} g', target: '${g.branG} g', done: d.branG >= g.branG - 1e-9),
+          CholRow(label: 'Πίτουρο βρώμης', value: '${d.branG.round()} g', target: '${g.branG} g', done: d.branG.round() >= g.branG),
         if (g.legumesWeek > 0)
           CholRow(label: 'Όσπρια', sub: 'αυτή την εβδομάδα', value: '$legumes', target: '${g.legumesWeek}', done: legumes >= g.legumesWeek),
         if (g.fishWeek > 0) CholRow(label: 'Ψάρι', sub: 'αυτή την εβδομάδα', value: '$fish', target: '${g.fishWeek}', done: fish >= g.fishWeek),
@@ -272,23 +296,31 @@ class CholRow extends StatelessWidget {
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
+        // Έλεγχος 13/11 (U3b-9): η τιμή σε δικό της χώρο ως τη δεξιά άκρη της κάρτας (πριν ξεκινούσε από τη μέση και
+        // άφηνε κενό δεξιά, ενώ η ετικέτα έσπαγε σε δύο γραμμές)· η ετικέτα παίρνει τα 3/5.
         child: Row(children: [
           Expanded(
+            flex: 3,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
               if (sub != null) Text(sub!, style: TextStyle(fontSize: 12.5, color: c.textTertiary)),
             ]),
           ),
-          if (done) Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.check_circle_rounded, size: 20, color: c.good)),
-          Flexible(
-            child: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
-                if (target.isNotEmpty) TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
-              ]),
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 14.5, fontFeatures: tabular),
-            ),
+          Expanded(
+            flex: 2,
+            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              if (done) Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.check_circle_rounded, size: 20, color: c.good)),
+              Flexible(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: c.text)),
+                    if (target.isNotEmpty) TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
+                  ]),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 14.5, fontFeatures: tabular),
+                ),
+              ),
+            ]),
           ),
         ]),
       ),
@@ -339,7 +371,23 @@ class _CholesterolPageState extends State<CholesterolPage> {
         ];
     final w = thisWeek;
     final small = TextStyle(fontSize: 13, height: 1.45, color: c.textSecondary);
-    return Scaffold(
+    // Έλεγχος 13/11 (U3b-8): όσπρια και ψάρι μετρούν ΜΑΖΙ με σήμερα, όπως στην κάρτα της Διατροφής (ένα γεύμα που έγινε
+    // έχει γίνει)· πριν η κάρτα έγραφε «3 / 4» και αυτή η σελίδα «2 / 4» την ίδια στιγμή. Οι μέσοι όροι μένουν χωρίς σήμερα.
+    final weekNow = _daysOf(widget.food, ws, DateTime(today.year, today.month, today.day + 1));
+    final legumesNow = weekNow.where((x) => x.$2.legumes).length;
+    final fishNow = weekNow.where((x) => x.$2.fish).length;
+    // Έλεγχος 13/11 (S2-2): τρόφιμο χωρίς τιμή κορεσμένων λιπαρών (ή ινών) στην πηγή του μετρά 0 g· τότε ο αριθμός είναι
+    // «τουλάχιστον» και γράφεται με «≥», όπως υπόσχεται το ⓘ και όπως κάνει ήδη η κάρτα της μέρας.
+    // Οι μετρητές είναι του chol.dart ([CholWeek.daysSatUnknown], [CholWeek.daysFiberUnknown]: μέρες με πλήρη καταγραφή).
+    final satUnknown = _four ? weeks.fold<int>(0, (a, x) => a + x.$2.daysSatUnknown) : w.daysSatUnknown;
+    final fiberUnknown = _four ? weeks.fold<int>(0, (a, x) => a + x.$2.daysFiberUnknown) : w.daysFiberUnknown;
+    List<bool> dayFlags(bool Function(CholDay) missing) => [
+          for (var k = 0; k < 7; k++) thisWeek.days.any((x) => x.$1.weekday == k + 1 && x.$2.fullFor(g.kcal) && missing(x.$2)),
+        ];
+    String daysOf(int n) => w.fullDays == 0 ? '—' : '$n από ${countText(w.fullDays, 'μέρα', 'μέρες')}';
+    // U3b-12: το χρώμα της διατροφής και στον διακόπτη «Αυτή η εβδομάδα / 4 εβδομάδες» (πριν το χρώμα του βάρους).
+    return FoodTheme(
+        child: Scaffold(
       appBar: AppBar(title: const Text('Χοληστερίνη')),
       body: SafeArea(
         child: Center(
@@ -364,9 +412,19 @@ class _CholesterolPageState extends State<CholesterolPage> {
               const SizedBox(height: 12),
               AppCard(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Κορεσμένα, % των θερμίδων', color: c.heart, trailing: const InfoDot(cholInfo)),
+                  CardHeader(
+                      icon: Icons.bar_chart_rounded, title: 'Κορεσμένα λιπαρά, % των θερμίδων', color: c.heart, trailing: const InfoDot(cholInfo)),
                   const SizedBox(height: 4),
-                  Text(_meanText(_four ? _mean(weeks.map((x) => x.$2.satPctMean)) : w.satPctMean, '%', 'έως ${g.satPct}%'), style: small),
+                  Text(
+                      _meanText(_four ? _mean(weeks.map((x) => x.$2.satPctMean)) : w.satPctMean, '%', 'έως ${g.satPct}%',
+                          atLeast: satUnknown > 0),
+                      style: small),
+                  if (satUnknown > 0)
+                    Text(
+                        '${countText(satUnknown, 'μέρα', 'μέρες')} με τρόφιμο χωρίς τιμή κορεσμένων λιπαρών: το πραγματικό ποσοστό '
+                        'είναι ίσο ή μεγαλύτερο («≥»).',
+                        key: const ValueKey('chol-sat-unknown'),
+                        style: small.copyWith(color: c.warn)),
                   const SizedBox(height: 10),
                   _four
                       ? MiniBars(
@@ -377,6 +435,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                           over: c.warn,
                           higherIsWorse: true,
                           format: (v) => dec(v),
+                          atLeast: [for (final x in weeks) x.$2.daysSatUnknown > 0],
                         )
                       : MiniBars(
                           values: perDay((d) => d.satPct),
@@ -386,6 +445,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                           over: c.warn,
                           higherIsWorse: true,
                           format: (v) => dec(v),
+                          atLeast: dayFlags((d) => d.satMissing),
                         ),
                 ]),
               ),
@@ -394,7 +454,16 @@ class _CholesterolPageState extends State<CholesterolPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   CardHeader(icon: Icons.grass_rounded, title: 'Φυτικές ίνες, g', color: c.good),
                   const SizedBox(height: 4),
-                  Text(_meanText(_four ? _mean(weeks.map((x) => x.$2.fiberMean)) : w.fiberMean, ' g', '${g.fiber} g', digits: 0), style: small),
+                  Text(
+                      _meanText(_four ? _mean(weeks.map((x) => x.$2.fiberMean)) : w.fiberMean, ' g', '${g.fiber} g',
+                          digits: 0, atLeast: fiberUnknown > 0),
+                      style: small),
+                  if (fiberUnknown > 0)
+                    Text(
+                        '${countText(fiberUnknown, 'μέρα', 'μέρες')} με τρόφιμο χωρίς τιμή φυτικών ινών: οι πραγματικές είναι ίσες ή '
+                        'περισσότερες («≥»).',
+                        key: const ValueKey('chol-fiber-unknown'),
+                        style: small),
                   const SizedBox(height: 10),
                   _four
                       ? MiniBars(
@@ -403,6 +472,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                           target: g.fiber.toDouble(),
                           color: c.good,
                           format: (v) => v.round().toString(),
+                          atLeast: [for (final x in weeks) x.$2.daysFiberUnknown > 0],
                         )
                       : MiniBars(
                           values: perDay((d) => d.fiber),
@@ -410,6 +480,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                           target: g.fiber.toDouble(),
                           color: c.good,
                           format: (v) => v.round().toString(),
+                          atLeast: dayFlags((d) => d.fiberMissing),
                         ),
                 ]),
               ),
@@ -422,19 +493,30 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       CholRow(
                           label: 'Ξηροί καρποί',
                           sub: 'μέρες με ${g.nutsG} g',
-                          value: '${w.daysWithNuts(g.nutsG)} από ${w.fullDays} μέρες',
+                          value: daysOf(w.daysWithNuts(g.nutsG)),
                           target: '',
                           done: w.fullDays > 0 && w.daysWithNuts(g.nutsG) == w.fullDays),
                     if (g.branG > 0)
                       CholRow(
                           label: 'Πίτουρο βρώμης',
                           sub: 'μέρες με ${g.branG} g',
-                          value: '${w.daysWithBran(g.branG)} από ${w.fullDays} μέρες',
+                          value: daysOf(w.daysWithBran(g.branG)),
                           target: '',
                           done: w.fullDays > 0 && w.daysWithBran(g.branG) == w.fullDays),
                     if (g.legumesWeek > 0)
-                      CholRow(label: 'Όσπρια', value: '${w.legumes}', target: '${g.legumesWeek} φορές', done: w.legumes >= g.legumesWeek),
-                    if (g.fishWeek > 0) CholRow(label: 'Ψάρι', value: '${w.fish}', target: '${g.fishWeek} φορές', done: w.fish >= g.fishWeek),
+                      CholRow(
+                          label: 'Όσπρια',
+                          sub: 'μαζί με σήμερα',
+                          value: '$legumesNow',
+                          target: countText(g.legumesWeek, 'φορά', 'φορές'),
+                          done: legumesNow >= g.legumesWeek),
+                    if (g.fishWeek > 0)
+                      CholRow(
+                          label: 'Ψάρι',
+                          sub: 'μαζί με σήμερα',
+                          value: '$fishNow',
+                          target: countText(g.fishWeek, 'φορά', 'φορές'),
+                          done: fishNow >= g.fishWeek),
                     CholRow(
                         label: 'Αλάτι κάτω από ${dec(g.salt, 0)} g',
                         // Συμβούλιο 2, Α4: μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «εντάξει»· η γραμμή το λέει.
@@ -443,7 +525,7 @@ class _CholesterolPageState extends State<CholesterolPage> {
                             : w.daysSaltUnknown == 1
                                 ? '1 μέρα με τρόφιμο χωρίς τιμή αλατιού'
                                 : '${w.daysSaltUnknown} μέρες με τρόφιμο χωρίς τιμή αλατιού',
-                        value: '${w.daysSaltOk(g.salt)} από ${w.fullDays} μέρες',
+                        value: daysOf(w.daysSaltOk(g.salt)),
                         target: '',
                         done: w.fullDays > 0 && w.daysSaltOk(g.salt) == w.fullDays),
                   ]),
@@ -451,15 +533,15 @@ class _CholesterolPageState extends State<CholesterolPage> {
               const SizedBox(height: 10),
               Text(
                 'Μέρες με λίγη καταγραφή (κάτω από ${thousands(fullDayKcalFor(g.kcal).round())} kcal, το 60% του στόχου σου) δεν '
-                'μετρούν στους μέσους όρους. Σήμερα δεν μετρά μέχρι να τελειώσει η μέρα. Όσπρια: μία φορά = 40 g ξερά ή 100 g '
-                'βρασμένα· ψάρι: 100 g.',
+                'μετρούν στους μέσους όρους. Στους μέσους όρους και στις μέρες, σήμερα δεν μετρά μέχρι να τελειώσει η μέρα· τα '
+                'όσπρια και το ψάρι μετρούν και σήμερα. Όσπρια: μία φορά = 40 g ξερά ή 100 g βρασμένα· ψάρι: 100 g.',
                 style: small,
               ),
             ]),
           ),
         ),
       ),
-    );
+    ));
   }
 
   static double? _mean(Iterable<double?> v) {
@@ -467,8 +549,9 @@ class _CholesterolPageState extends State<CholesterolPage> {
     return x.isEmpty ? null : x.reduce((a, b) => a + b) / x.length;
   }
 
-  static String _meanText(double? v, String unit, String target, {int digits = 1}) =>
-      v == null ? 'Δεν υπάρχει ακόμα ολοκληρωμένη μέρα · στόχος $target' : 'μέσος όρος ${dec(v, digits)}$unit · στόχος $target';
+  static String _meanText(double? v, String unit, String target, {int digits = 1, bool atLeast = false}) => v == null
+      ? 'Δεν υπάρχει ακόμα ολοκληρωμένη μέρα · στόχος $target'
+      : 'μέσος όρος ${atLeast ? '≥ ' : ''}${dec(v, digits)}$unit · στόχος $target';
 }
 
 /// Μικρές μπάρες με γραμμή στόχου. null: μέρα χωρίς αρκετή καταγραφή (κενή).
@@ -482,9 +565,13 @@ class MiniBars extends StatelessWidget {
     required this.format,
     this.over,
     this.higherIsWorse = false,
+    this.atLeast,
   });
   final List<double?> values;
   final List<String> labels;
+
+  /// Ποιες μπάρες είναι «τουλάχιστον» (κάποιο τρόφιμο χωρίς τιμή στην πηγή του): η ετικέτα τους γράφεται με «≥» (S2-2).
+  final List<bool>? atLeast;
   final double target;
   final Color color;
   final Color? over;
@@ -499,7 +586,10 @@ class MiniBars extends StatelessWidget {
     final top = math.max(target * 1.35, values.whereType<double>().fold<double>(0, math.max));
     double y(double v) => top <= 0 ? 0 : (v / top * _h).clamp(0, _h);
     return Semantics(
-      label: [for (var k = 0; k < values.length; k++) '${labels[k]}: ${values[k] == null ? 'χωρίς' : format(values[k]!)}'].join(', '),
+      label: [
+        for (var k = 0; k < values.length; k++)
+          '${labels[k]}: ${values[k] == null ? 'χωρίς' : '${atLeast != null && k < atLeast!.length && atLeast![k] ? 'τουλάχιστον ' : ''}${format(values[k]!)}'}',
+      ].join(', '),
       excludeSemantics: true,
       child: Column(children: [
         SizedBox(
@@ -512,13 +602,22 @@ class MiniBars extends StatelessWidget {
               child: Container(height: 1.5, color: c.textTertiary.withValues(alpha: 0.6)),
             ),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              for (final v in values)
+              for (final (k, v) in values.indexed)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 5),
                     child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
                       if (v != null)
-                        Text(format(v), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: c.textSecondary, fontFeatures: tabular)),
+                        // Με φόντο στο χρώμα της κάρτας (U3b-11): η γραμμή του στόχου περνούσε μέσα από τα ψηφία, ακριβώς
+                        // στις μέρες «σχεδόν στον στόχο».
+                        DecoratedBox(
+                          decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(3)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: Text('${atLeast != null && k < atLeast!.length && atLeast![k] ? '≥' : ''}${format(v)}',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: c.textSecondary, fontFeatures: tabular)),
+                          ),
+                        ),
                       const SizedBox(height: 2),
                       // Με μεγάλα γράμματα η ετικέτα ψηλώνει: η μπάρα μικραίνει, δεν ξεχειλίζει.
                       Flexible(

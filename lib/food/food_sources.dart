@@ -25,13 +25,28 @@ const ciqualInfo = FoodSourceInfo(
   link: 'https://ciqual.anses.fr',
 );
 
+const _usdaDetail = 'Ελληνικά ονόματα από εμάς. Υδατάνθρακες χωρίς τις φυτικές ίνες, όπως στις ετικέτες της ΕΕ. '
+    'Αλάτι = νάτριο × 2,5. Πρωτεΐνη με τον ειδικό συντελεστή κάθε τροφίμου (Jones), όπως τη δίνει η USDA: στους '
+    'κολοκυθόσπορους και το καστανό ρύζι είναι 5–15% χαμηλότερη από ό,τι θα έγραφε μια ετικέτα της ΕΕ.';
+
+/// Έλεγχος round1 (S2-6): η οθόνη «Πηγές και άδειες» γράφει μόνο ό,τι είναι πραγματικά μέσα στη βάση. Όλα τα τρόφιμα
+/// της USDA στη βάση είναι από το SR Legacy (2018)· από τα Foundation Foods δεν υπάρχει κανένα (πριν η οθόνη έγραφε και
+/// αυτά). Η δοκιμή test/r1_f2_test.dart το ελέγχει απέναντι στη βάση: αν μπει ποτέ τρόφιμο Foundation, θα το ζητήσει.
 const usdaInfo = FoodSourceInfo(
   title: 'USDA FoodData Central',
-  version: 'SR Legacy (2018) και Foundation Foods (04/2026)',
+  version: 'SR Legacy (2018)',
   licence: 'Δημόσιο αγαθό (CC0 1.0)',
-  detail: 'Ελληνικά ονόματα από εμάς. Υδατάνθρακες χωρίς τις φυτικές ίνες, όπως στις ετικέτες της ΕΕ. '
-      'Αλάτι = νάτριο × 2,5. Πρωτεΐνη με τον ειδικό συντελεστή κάθε τροφίμου (Jones), όπως τη δίνει η USDA: στους '
-      'κολοκυθόσπορους και το καστανό ρύζι είναι 5–15% χαμηλότερη από ό,τι θα έγραφε μια ετικέτα της ΕΕ.',
+  detail: _usdaDetail,
+  link: 'https://fdc.nal.usda.gov',
+);
+
+/// Για τρόφιμο με πηγή «USDA Foundation» (σήμερα κανένα στη βάση): η δική του έκδοση, ώστε η κάρτα «Πηγή» του να μη
+/// γράφει ποτέ λάθος σύνολο δεδομένων.
+const usdaFoundationInfo = FoodSourceInfo(
+  title: 'USDA FoodData Central',
+  version: 'Foundation Foods (04/2026)',
+  licence: 'Δημόσιο αγαθό (CC0 1.0)',
+  detail: _usdaDetail,
   link: 'https://fdc.nal.usda.gov',
 );
 
@@ -50,6 +65,7 @@ FoodSourceInfo? sourceInfo(String source) => switch (source) {
       'CIQUAL 2025' => ciqualInfo,
       'Open Food Facts' => offInfo,
       'Ετικέτα' => null,
+      'USDA Foundation' => usdaFoundationInfo,
       _ => usdaInfo,
     };
 

@@ -42,9 +42,25 @@ abstract class TrainingIO {
   Future<String?> markHrBad(String id);
 }
 
-class ChannelTrainingIO implements TrainingIO {
+/// Προαιρετικό (round1, S9-9): το training.json που δεν διαβάζεται μπαίνει στην άκρη (μετονομασία, ποτέ σβήσιμο), για
+/// να ξαναρχίσει η αποθήκευση. Χωριστό από το [TrainingIO], ώστε ό,τι το υλοποιεί ήδη να μη χρειάζεται αλλαγή.
+abstract class TrainingBadIO {
+  /// Το νέο όνομα του αρχείου (π.χ. «training.json.bad»), ή null αν δεν έγινε (τότε δεν αλλάζει τίποτα).
+  Future<String?> markBad();
+}
+
+class ChannelTrainingIO implements TrainingIO, TrainingBadIO {
   const ChannelTrainingIO();
   static const channel = MethodChannel('ygeia/training');
+
+  @override
+  Future<String?> markBad() async {
+    try {
+      return await channel.invokeMethod<String>('bad');
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<({String state, String? json})> read() async {
@@ -122,10 +138,22 @@ class ChannelTrainingIO implements TrainingIO {
 }
 
 /// Για δοκιμές: στη μνήμη.
-class MemoryTrainingIO implements TrainingIO {
+class MemoryTrainingIO implements TrainingIO, TrainingBadIO {
   MemoryTrainingIO([this.json]);
   String? json;
   int writes = 0;
+
+  /// Το training.json που μπήκε στην άκρη (S9-9), ή null.
+  String? badJson;
+
+  @override
+  Future<String?> markBad() async {
+    final text = json;
+    if (text == null) return null;
+    badJson = text;
+    json = null;
+    return 'training.json.bad';
+  }
 
   /// Τα αρχεία παλμών (id → κείμενο).
   final Map<String, String> hrFiles = {};
@@ -195,7 +223,29 @@ class TrainingStore extends ChangeNotifier {
 
   /// Το αρχείο είναι από νεότερη έκδοση της εφαρμογής ([fileVersion]): δεν γράφεται τίποτα (V-A-08).
   bool newerFile = false;
+
+  /// Το αρχείο διαβάστηκε αλλά το περιεχόμενό του δεν είναι προπονήσεις (χαλασμένο): όσες φορές κι αν ξανανοίξει η
+  /// εφαρμογή θα βγαίνει το ίδιο. Μόνο τότε προσφέρεται το «Κράτα το στην άκρη» ([setAsideUnreadable], S9-9).
+  bool damaged = false;
   String? saveError;
+
+  /// Το μήνυμα όταν μια αλλαγή δεν γράφεται επειδή το αρχείο δεν διαβάστηκε (S6-5).
+  static const notSavedUnreadable = 'Οι αλλαγές δεν αποθηκεύονται: το αρχείο προπονήσεων δεν διαβάστηκε.';
+
+  /// Έγκυρος παλμός άσκησης: 26…249 (ίδιος κανόνας με το ρολόι, Protocol.kt «bpm <= 25 || bpm >= 250», S12-16).
+  static const hrValidMin = 26, hrValidMax = 249;
+
+  /// Δευτερόλεπτα ανά επανάληψη όταν η βιβλιοθήκη δεν έχει ρυθμό για την άσκηση (S6-8).
+  static const defaultRepSeconds = 4.5;
+
+  /// Πόσο κρατά μία επανάληψη της άσκησης [ex] με τον ρυθμό της βιβλιοθήκης (S6-8), για τους παλμούς ανά σετ.
+  static double repSeconds(String ex) {
+    final c = ExLibrary.loaded?.byId(ex)?.cycle;
+    return c != null && c > 0 ? c : defaultRepSeconds;
+  }
+
+  /// Η βιβλιοθήκη ασκήσεων φόρτωσε (S6-2): όσες οθόνες δείχνουν προπόνηση ξαναζωγραφίζονται («Πώς γίνεται»).
+  void libraryReady() => notifyListeners();
 
   /// Η μορφή του training.json: 2 = οι παλμοί μπορεί να είναι στα αρχεία hr/ (#91). Νεότερη = μόνο ανάγνωση.
   static const fileVersion = 2;
@@ -237,11 +287,22 @@ class TrainingStore extends ChangeNotifier {
   final Set<String> deleted = {};
   Session? current;
 
+  /// Προπονήσεις του κινητού που έκλεισαν με «Σβήσιμο» χωρίς κανένα σετ εδώ ([discard]), για [dropKeep] (round1, U6-01,
+  /// αίτημα του f6b): αν μετά φτάσει το αποτέλεσμα του ρολογιού με σετ ή παλμούς (τα ✓ έμειναν στο ρολόι, π.χ. χωρίς
+  /// Bluetooth), η προπόνηση ξαναμπαίνει αντί να χαθεί. Κλειδί «drop» στο training.json: νέο, προαιρετικό (το παλιό
+  /// κινητό το κρατά ως άγνωστο κλειδί, V-A-07). Ως [dropMax] προπονήσεις.
+  final List<Map<String, dynamic>> _dropped = [];
+  static const dropKeep = Duration(days: 7);
+  static const dropMax = 5;
+
   Future<void>? _loading;
   Future<void> load() => _loading ??= _load();
 
   Future<void> _load() async {
     final r = await _io.read();
+    // Οι σημαίες αλλάζουν ΜΑΖΙ, αφού διαβαστεί το αρχείο (S9-9): σε μια νέα προσπάθεια ([retryLoad]) το `readError` μένει
+    // ως τότε, ώστε καμία εγγραφή να μη γράψει άδειες προπονήσεις πάνω στο αρχείο όσο αυτό διαβάζεται.
+    var error = false, newer = false, broken = false;
     if (r.state == 'ok' && r.json != null) {
       try {
         final j = jsonDecode(r.json!);
@@ -249,17 +310,27 @@ class TrainingStore extends ChangeNotifier {
         final m = Map<String, dynamic>.from(j);
         final v = m['v'];
         if (v is num && v > fileVersion) {
-          newerFile = true;
-          readError = true;
+          newer = true;
+          error = true;
         } else {
           _fromJson(m);
         }
       } catch (_) {
-        readError = true;
+        error = true;
+        broken = true;
+        // Ό,τι πρόλαβε να διαβαστεί από ένα χαλασμένο αρχείο δεν μένει στη μνήμη.
+        _fromJson(const {});
       }
     } else if (r.state == 'error') {
-      readError = true;
+      error = true;
+    } else if (readError) {
+      // Νέα προσπάθεια και το αρχείο δεν υπάρχει πια (μπήκε στην άκρη): άδεια αποθήκη.
+      _fromJson(const {});
     }
+    readError = error;
+    newerFile = newer;
+    damaged = broken;
+    if (!error && saveError == notSavedUnreadable) saveError = null;
     ready = true;
     notifyListeners();
     if (!readError) {
@@ -270,6 +341,25 @@ class TrainingStore extends ChangeNotifier {
       _queue = _queue.then((_) => _purgeDeletedHr());
       if (!_steadyDone) _queue = _queue.then((_) => _migrateSteady());
     }
+  }
+
+  /// «Δοκίμασε ξανά» (round1, S6-5 / S9-9): ξαναδιαβάζει το αρχείο. Μόνο όταν η ανάγνωση είχε αποτύχει: τότε τίποτα δεν
+  /// έχει γραφτεί και τίποτα δεν περιμένει να γραφτεί.
+  Future<void> retryLoad() {
+    if (!readError) return Future.value();
+    return _loading = _load();
+  }
+
+  /// «Κράτα το στην άκρη και συνέχισε» (S9-9): το χαλασμένο training.json μετονομάζεται (δεν σβήνεται, δεν γράφεται ποτέ
+  /// από πάνω) και η αποθήκη ξεκινά άδεια· μετά δουλεύουν ξανά η αποθήκευση, η επαναφορά από αντίγραφο και ό,τι
+  /// περιμένει στο ρολόι. true αν έγινε.
+  Future<bool> setAsideUnreadable() async {
+    final Object io = _io;
+    if (!damaged || io is! TrainingBadIO) return false;
+    final name = await io.markBad();
+    if (name == null) return false;
+    await retryLoad();
+    return !readError;
   }
 
   /// Οι «παλμοί σταθερού βαδίσματος» ([Session.hrSteady]) έχουν σωθεί και για τα παλιά περπατήματα ([_migrateSteady]).
@@ -306,7 +396,7 @@ class TrainingStore extends ChangeNotifier {
     if (changed) save();
   }
 
-  static const _knownTop = {'v', 'hrLimit', 'zone', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone'};
+  static const _knownTop = {'v', 'hrLimit', 'zone', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone', 'drop'};
 
   /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μία χαλασμένη προπόνηση ή πρόγραμμα πάει σε καραντίνα, όχι όλο το
   /// αρχείο σε «δεν διαβάζεται». Τα άγνωστα κλειδιά κρατιούνται (V-A-07).
@@ -346,6 +436,7 @@ class TrainingStore extends ChangeNotifier {
         quarantine.add({'in': 'sessions', 'j': x});
       }
     }
+    _sortByStart();
     current = null;
     if (j['current'] is Map) {
       try {
@@ -357,8 +448,36 @@ class TrainingStore extends ChangeNotifier {
     deleted
       ..clear()
       ..addAll([for (final x in (j['del'] is List ? j['del'] as List : const [])) if (x is String) x]);
+    _dropped
+      ..clear()
+      ..addAll([for (final x in (j['drop'] is List ? j['drop'] as List : const [])) if (x is Map) Map<String, dynamic>.from(x)]);
     _segments.clear();
     _release.clear();
+  }
+
+  /// Οι προπονήσεις με τη σειρά που ξεκίνησαν (S6-15): έτσι τις διαβάζουν το ιστορικό, η «τελευταία φορά» και οι
+  /// στόχοι. Αρχείο που γράφτηκε πριν από τη διόρθωση μπορεί να έχει μία εκτός σειράς· όσες ξεκίνησαν την ίδια στιγμή
+  /// κρατούν τη σειρά που είχαν.
+  void _sortByStart() {
+    var sorted = true;
+    for (var i = 1; i < sessions.length; i++) {
+      if (sessions[i].start.isBefore(sessions[i - 1].start)) sorted = false;
+    }
+    if (sorted) return;
+    final at = {for (var i = 0; i < sessions.length; i++) sessions[i]: i};
+    sessions.sort((a, b) {
+      final c = a.start.compareTo(b.start);
+      return c != 0 ? c : at[a]!.compareTo(at[b]!);
+    });
+  }
+
+  /// Μια τελειωμένη προπόνηση στη θέση της, με τη σειρά της ώρας που ξεκίνησε (S6-15).
+  void _insertByStart(Session s) {
+    var at = sessions.length;
+    while (at > 0 && sessions[at - 1].start.isAfter(s.start)) {
+      at--;
+    }
+    sessions.insert(at, s);
   }
 
   Map<String, dynamic> toJson() => {
@@ -374,6 +493,7 @@ class TrainingStore extends ChangeNotifier {
         if (current != null) 'current': current!.toJson(),
         if (quarantine.isNotEmpty) 'bad': quarantine,
         if (_steadyDone) 'hrsDone': 1,
+        if (_dropped.isNotEmpty) 'drop': _dropped,
       };
 
   Future<void> _queue = Future.value();
@@ -399,6 +519,8 @@ class TrainingStore extends ChangeNotifier {
   /// Κάθε αλλαγή γράφεται αμέσως (με σειρά): αν κλείσει η εφαρμογή στη μέση της προπόνησης, δεν χάνεται σετ. Πολλές
   /// αλλαγές μαζί (π.χ. 7 αποτελέσματα του ρολογιού) γίνονται μία εγγραφή.
   Future<void> save() {
+    // S6-5: με αρχείο που δεν διαβάστηκε τίποτα δεν γράφεται (για να μη χαθεί)· να φαίνεται, όχι σιωπηλά.
+    if (readError) saveError = notSavedUnreadable;
     notifyListeners();
     if (readError) return Future.value();
     _gen++;
@@ -633,10 +755,15 @@ class TrainingStore extends ChangeNotifier {
 
   Target targetFor(PlanItem item) => nextTarget(item, historyOf(item.ex), now, caution: isCaution(item.ex));
 
-  /// Άσκηση με προσοχή στη βιβλιοθήκη. Αν η βιβλιοθήκη δεν έχει φορτώσει ακόμα: ναι, για ασφάλεια.
+  /// Οι ασκήσεις «με προσοχή» της βιβλιοθήκης, για όταν αυτή δεν έχει φορτώσει ακόμα (round1, S6-2 / S7-01). Πριν, χωρίς
+  /// βιβλιοθήκη ΟΛΕΣ μετρούσαν «με προσοχή»: η ίδια προπόνηση έβγαζε άλλους στόχους από τη Σήμερα και άλλους από την
+  /// Άσκηση. Η δοκιμή test/r1_f6a_test.dart ελέγχει ότι ταιριάζει ένα προς ένα με το assets/exercises/exercises.json.
+  static const cautionIds = <String>{'dips', 'overhead_ext', 'shoulder_press'};
+
+  /// Άσκηση με προσοχή στη βιβλιοθήκη (ή, πριν φορτώσει, στο [cautionIds]).
   static bool isCaution(String ex) {
     final lib = ExLibrary.loaded;
-    return lib == null || lib.byId(ex)?.caution != null;
+    return lib == null ? cautionIds.contains(ex) : lib.byId(ex)?.caution != null;
   }
 
   /// Οι προπονήσεις της εβδομάδας (Δευτέρα–Κυριακή) της μέρας [day].
@@ -652,13 +779,51 @@ class TrainingStore extends ChangeNotifier {
     return ExLog(
       ex: item.ex,
       sets: item.sets,
-      lo: item.lo,
+      lo: loFor(item, t),
       hi: item.hi,
       rir: item.rir < 2 ? 2 : item.rir,
       rest: item.rest,
       log: [for (final r in t.reps) SetLog(load: t.load, reps: r)],
       reason: t.reason,
     );
+  }
+
+  /// Το κάτω όριο που γράφεται στην προπόνηση (round1, S6-1): του προγράμματος, ή ο στόχος της μέρας όταν αυτός είναι
+  /// πιο κάτω (π.χ. ίδιο βάρος, 9 επαναλήψεις, σε μέρα με εύρος 10–15). Έτσι όποιος βγάλει τον στόχο του δεν κρίνεται
+  /// την επόμενη φορά «κάτω από το εύρος».
+  static int loFor(PlanItem item, Target t) {
+    var lo = item.lo;
+    for (final r in t.reps) {
+      if (r < lo) lo = r;
+    }
+    return lo;
+  }
+
+  /// Η άσκηση που γίνεται σήμερα στη θέση του [item] (round1, S7-03): αν έχει πιο δύσκολη παραλλαγή ([PlanItem.next])
+  /// και την τελευταία φορά έκανες εκείνη στη θέση της (⋮ › «Αλλαγή άσκησης»), συνεχίζεις με εκείνη· αν γύρισες πίσω,
+  /// με την αρχική. Πριν, η παραλλαγή δεν έμπαινε ποτέ μόνη της και η πρόταση ξαναερχόταν κάθε εβδομάδα.
+  PlanItem itemToday(PlanItem item) {
+    final next = item.next;
+    if (next == null) return item;
+    for (final s in sessions.reversed) {
+      if (!s.finished || s.stopped) continue;
+      for (final e in s.items) {
+        if (e.skipped || e.done.isEmpty) continue;
+        if (e.ex == next && e.swappedFrom == item.ex) {
+          return PlanItem(ex: next, sets: item.sets, lo: item.lo, hi: item.hi, rir: item.rir, rest: item.rest, note: item.note);
+        }
+        if (e.ex == item.ex) return item;
+      }
+    }
+    return item;
+  }
+
+  /// Η άσκηση του προγράμματος όπως μπαίνει στην προπόνηση που ξεκινά ([itemToday]).
+  ExLog _startLog(PlanItem item) {
+    final it = itemToday(item);
+    final e = _logFor(it);
+    if (it.ex != item.ex) e.swappedFrom = item.ex;
+    return e;
   }
 
   // ---------------------------------------------------------------- οθόνη προπόνησης (στη μνήμη· τη βλέπει και το ρολόι)
@@ -727,7 +892,7 @@ class TrainingStore extends ChangeNotifier {
   /// Παλμοί από το ρολόι για την προπόνηση που τρέχει (δείγμα ανά ~10″, αποθήκευση ανά λεπτό).
   void addHr(int bpm, DateTime at, {String? sid}) {
     final s = current;
-    if (s == null || bpm <= 25 || bpm >= 250) return;
+    if (s == null || bpm < hrValidMin || bpm > hrValidMax) return;
     if (sid != null && sid.isNotEmpty && sid != s.id) return;
     final sec = at.difference(s.start).inSeconds;
     if (sec < 0) return;
@@ -796,7 +961,13 @@ class TrainingStore extends ChangeNotifier {
       for (final x in [...sessions, if (current != null) current!]) {
         if (x.id == sid) s = x;
       }
+      // round1, U6-01: προπόνηση που σβήστηκε εδώ χωρίς σετ, ενώ στο ρολόι έγιναν σετ ή μετρήθηκαν παλμοί.
+      s ??= _fromDropped(sid, j, samples);
       if (s == null) return false;
+      // Πρώτα τα σετ του ρολογιού, μετά το τέλος, μετά οι παλμοί (round1, S11-4): αν η προπόνηση έκλεισε στο κινητό
+      // νωρίτερα απ' ό,τι τελείωσε πράγματι στο ρολόι, οι παλμοί της συνέχειας δεν πρέπει να κοπούν ως «μετά το τέλος».
+      _mergeWatchSets(s, j['items']);
+      if (!identical(s, current)) _extendEndFromWatch(s, j['fin']);
       final aligned = alignHr(samples, j['hrT0'], s.start);
       if (s.hrLoaded) {
         mergeHrSegment(s, aligned, watchAvg: hrAvg, watchMax: hrMax);
@@ -808,7 +979,6 @@ class TrainingStore extends ChangeNotifier {
       // Προπόνηση του κινητού που ξεκίνησε πριν από την #90 (χωρίς όριο μέσα): το όριο που είχε το ρολόι.
       s.limit ??= Session.watchLimit(j['lim']);
       _watchHrInfo(s, j);
-      _mergeWatchSets(s, j['items']);
       // «Τέλος» στο ρολόι (V-A-09): τέλος και εδώ, με την ώρα του ρολογιού (αν δεν συνέχισε στο κινητό στο μεταξύ).
       final fin = j['fin'];
       if (fin is num && sid != null) endFromWatch(sid, fin.toInt(), fromResult: true);
@@ -932,6 +1102,28 @@ class TrainingStore extends ChangeNotifier {
     return true;
   }
 
+  /// Προπόνηση του κινητού που έκλεισε ΕΔΩ πριν τελειώσει πράγματι (round1, S11-4): το κινητό έσβησε στη μέση, η
+  /// άσκηση συνεχίστηκε στο ρολόι, και την επομένη πατήθηκε «Τέλος (στις 18:05)» στην «Ξεχασμένη προπόνηση;» πριν φτάσει
+  /// το αποτέλεσμα του ρολογιού. Αν το ρολόι έχει ✓ πάνω από 1′ ΜΕΤΑ το τέλος που γράφτηκε, η προπόνηση συνεχίστηκε εκεί:
+  /// τέλος γίνεται το «Τέλος» του ρολογιού ([fin]) — ή το τελευταίο ✓, αν το [fin] λείπει ή είναι πάνω από
+  /// [staleAfter] μετά από αυτό (ξεχασμένο ρολόι). Ποτέ νωρίτερα από πριν, ποτέ στο μέλλον. Χωρίς τέτοιο ✓ δεν αλλάζει
+  /// τίποτα: το ρολόι απλώς μετρούσε ακόμα (DP-09).
+  void _extendEndFromWatch(Session s, Object? fin) {
+    final end = s.end;
+    if (end == null) return;
+    final last = s.lastActivity.millisecondsSinceEpoch;
+    if (last <= end.millisecondsSinceEpoch + 60000) return;
+    var to = last;
+    if (fin is num && fin.isFinite) {
+      final f = fin.toInt();
+      if (f > last && f - last <= staleAfter.inMilliseconds) to = f;
+    }
+    final n = now.millisecondsSinceEpoch;
+    if (to > n) to = n;
+    if (to <= end.millisecondsSinceEpoch) return;
+    s.end = DateTime.fromMillisecondsSinceEpoch(to);
+  }
+
   /// Ανοιχτή προπόνηση χωρίς καμία κίνηση εδώ και [staleAfter] (V-A-09): «Ξεχασμένη προπόνηση;».
   bool isStale(Session s) => now.difference(s.lastActivity) >= staleAfter;
 
@@ -991,7 +1183,7 @@ class TrainingStore extends ChangeNotifier {
       name: w.name,
       programId: p.id,
       start: now,
-      items: [for (final i in w.items) _logFor(i)],
+      items: [for (final i in w.items) _startLog(i)],
       // Το όριο που ισχύει τώρα μένει μέσα στην προπόνηση (V-B-04): 0 = χωρίς όριο.
       limit: hrLimit ?? 0,
     );
@@ -1096,8 +1288,12 @@ class TrainingStore extends ChangeNotifier {
 
   /// Βαθμονόμηση πρώτης φοράς: μετά το 1ο σετ, πρόταση για τα επόμενα. Επιστρέφει το νέο βάρος ή null.
   double? calibrateAfterFirst(ExLog e, int rir) {
-    final item = itemOf(e);
-    if (item == null || e.log.isEmpty) return null;
+    // round1, U6-02 (f6b): και στην «Ελεύθερη άσκηση», που δεν έχει άσκηση προγράμματος: το εύρος της ίδιας της άσκησης.
+    final base = itemOf(e) ?? PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest);
+    if (e.log.isEmpty) return null;
+    // Άσκηση που μπήκε στη θέση άλλης (εναλλακτική, ή η πιο δύσκολη παραλλαγή, round1 S7-03): με τον δικό της εξοπλισμό,
+    // όχι με του προγράμματος (αλλιώς τα σκαλιά θα ήταν π.χ. λάστιχου σε αλτήρα).
+    final item = base.ex == e.ex ? base : PlanItem(ex: e.ex, sets: e.sets, lo: base.lo, hi: e.hi, rir: e.rir, rest: e.rest);
     final first = e.log.first;
     final v = calibrate(item, first.load, first.reps, rir);
     if (v != null) {
@@ -1126,7 +1322,8 @@ class TrainingStore extends ChangeNotifier {
     final idx = cur.items.indexOf(e);
     if (idx < 0) return;
     final base = itemOf(e);
-    final item = PlanItem(ex: ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest, load: base?.ex == ex ? base?.load : null);
+    // Το εύρος του προγράμματος, όχι το (ίσως χαμηλωμένο για σήμερα) κάτω όριο της άσκησης που φεύγει ([loFor]).
+    final item = PlanItem(ex: ex, sets: e.sets, lo: base?.lo ?? e.lo, hi: e.hi, rir: e.rir, rest: e.rest, load: base?.ex == ex ? base?.load : null);
     final n = _logFor(item)..swappedFrom = e.swappedFrom ?? e.ex;
     cur.items[idx] = n;
     save();
@@ -1136,28 +1333,90 @@ class TrainingStore extends ChangeNotifier {
   /// διάρκεια 20 ωρών (V-A-09).
   void finish({int? feel, DateTime? end}) {
     final s = current;
-    if (s == null) return;
+    if (s == null) {
+      // round1, S6-9: το ρολόι έκλεισε την προπόνηση όσο το κινητό έδειχνε το «Μπράβο, τελείωσες»· η «Αποθήκευση»
+      // έρχεται μετά. Το «Πώς ένιωσες;» που διάλεξες δεν χάνεται: γράφεται στην προπόνηση που μόλις έκλεισε.
+      final w = endedByWatch;
+      if (feel != null && w != null) setFeel(w, feel);
+      return;
+    }
     s
       ..end = end ?? (isStale(s) ? s.lastActivity : now)
       ..feel = feel;
     if (s.hr.isNotEmpty) s.hrAvg = (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round();
-    sessions.add(s);
+    // Στη θέση της με τη σειρά της ώρας (S6-15): μια «ξεχασμένη» προπόνηση που κλείνει μέρες μετά δεν μπαίνει πάνω
+    // από ό,τι έγινε στο μεταξύ (π.χ. περπάτημα από το ρολόι).
+    _insertByStart(s);
     current = null;
     _restEnd = null;
     save();
   }
 
+  /// «Πώς ένιωσες;» για προπόνηση που έχει ήδη τελειώσει (round1, S6-9: «Τέλος» από το ρολόι) ή για την τρέχουσα.
+  /// [feel] 1–5, ή null για να σβηστεί. Για προπόνηση που δεν είναι στην αποθήκη δεν κάνει τίποτα.
+  void setFeel(Session s, int? feel) {
+    if (!identical(s, current) && !sessions.contains(s)) return;
+    s.feel = feel == null ? null : feel.clamp(1, 5);
+    save();
+  }
+
   void discard() {
+    final s = current;
+    if (s != null) _remember(s);
     current = null;
     _restEnd = null;
     save();
+  }
+
+  /// Μια προπόνηση που σβήνεται κρατιέται για λίγο ([_dropped], U6-01). Οι παλιότερες από [dropKeep] φεύγουν.
+  void _remember(Session s) {
+    final n = now.millisecondsSinceEpoch;
+    _dropped
+      ..removeWhere((x) => x['id'] == s.id || n - ((x['dropAt'] as num?)?.toInt() ?? 0) > dropKeep.inMilliseconds)
+      ..add({...s.toJson(), 'dropAt': n});
+    while (_dropped.length > dropMax) {
+      _dropped.removeAt(0);
+    }
+  }
+
+  /// Το αποτέλεσμα του ρολογιού για προπόνηση που σβήστηκε εδώ ([_remember]): αν φέρνει σετ ή παλμούς, η προπόνηση
+  /// ξαναμπαίνει ως τελειωμένη, στη θέση της ώρας της, με τέλος τον τελευταίο παλμό ή το «Τέλος» του ρολογιού (τα σετ
+  /// το μεγαλώνουν μετά, [_extendEndFromWatch]). Χωρίς σετ και χωρίς παλμούς: τίποτα (null).
+  Session? _fromDropped(String? sid, Map<String, dynamic> j, List<List<int>> samples) {
+    if (sid == null) return null;
+    final at = _dropped.indexWhere((x) => x['id'] == sid);
+    if (at < 0) return null;
+    final items = j['items'];
+    final ticks = items is List &&
+        items.any((e) => e is Map && e['log'] is List && (e['log'] as List).any((x) => x is Map && x['d'] == 1));
+    if (!ticks && samples.isEmpty) return null;
+    final Session s;
+    try {
+      s = Session.fromJson(Map<String, dynamic>.from(_dropped[at])..remove('dropAt'));
+    } catch (_) {
+      return null;
+    }
+    _dropped.removeAt(at);
+    final start = s.start.millisecondsSinceEpoch;
+    var end = start;
+    for (final p in alignHr(samples, j['hrT0'], s.start)) {
+      if (start + p[0] * 1000 > end) end = start + p[0] * 1000;
+    }
+    final fin = j['fin'];
+    if (fin is num && fin.isFinite && fin > end && fin - end <= staleAfter.inMilliseconds) end = fin.toInt();
+    final n = now.millisecondsSinceEpoch;
+    s.end = DateTime.fromMillisecondsSinceEpoch(end > n ? (n < start ? start : n) : end);
+    _insertByStart(s);
+    return s;
   }
 
   // ---------------------------------------------------------------- για τον Claude
   /// Σύνοψη για επικόλληση στη συζήτηση: πρόγραμμα, πρόοδος ανά άσκηση, ενοχλήσεις, παλμοί, πώς ένιωσες.
   String exportForClaude({int weeks = 8, Map<String, String> names = const {}}) {
-    final since = now.subtract(Duration(days: weeks * 7));
-    final list = [for (final s in sessions) if (s.finished && s.start.isAfter(since)) s];
+    // Ημερολογιακές μέρες, όχι ώρες (round1, S11-11): 56 × 24 ώρες πάνω από μια αλλαγή ώρας έπεφταν μία ώρα έξω, και
+    // κοντά στα μεσάνυχτα η πρώτη μέρα της σύνοψης έβγαινε λάθος (και οι προπονήσεις της έμεναν απέξω).
+    final since = DateTime(now.year, now.month, now.day - weeks * 7);
+    final list = [for (final s in sessions) if (s.finished && !s.start.isBefore(since)) s];
     final b = StringBuffer();
     final p = program;
     b.writeln('Υγεία & Φόρμα · σύνοψη προπόνησης (${_d(since)}–${_d(now)})');
@@ -1216,7 +1475,11 @@ class TrainingStore extends ChangeNotifier {
     if (readError || !ready) {
       mergeProblem = newerFile
           ? 'Οι προπονήσεις δεν μπήκαν: το αρχείο προπονήσεων του κινητού είναι από νεότερη έκδοση. Ενημέρωσε την εφαρμογή.'
-          : 'Οι προπονήσεις δεν μπήκαν: το αρχείο προπονήσεων του κινητού δεν διαβάζεται, οπότε δεν γράφεται τίποτα.';
+          : damaged
+              // round1, S9-9: η έξοδος υπάρχει πια· να λέγεται εδώ, όχι μόνο στην Άσκηση.
+              ? 'Οι προπονήσεις δεν μπήκαν: το αρχείο προπονήσεων του κινητού δεν διαβάζεται, οπότε δεν γράφεται τίποτα. Στην '
+                  'Άσκηση › Προπόνηση πάτα «Κράτα το στην άκρη και συνέχισε» και κάνε ξανά την επαναφορά.'
+              : 'Οι προπονήσεις δεν μπήκαν: το αρχείο προπονήσεων του κινητού δεν διαβάζεται, οπότε δεν γράφεται τίποτα.';
       return 0;
     }
     final v = j['v'];

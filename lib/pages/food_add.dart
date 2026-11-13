@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data.dart' show HealthStore;
 import '../food/food_channel.dart';
 import '../food/food_model.dart';
 import '../food/food_search.dart' show FoodSearchResult, plain;
@@ -20,14 +21,22 @@ import 'nutrition.dart';
 // Είσοδοι
 // ---------------------------------------------------------------------------
 
+/// Το ημερολόγιο διαβάζεται ακόμα (π.χ. πολύ αργό άνοιγμα): δεν υπάρχει «Ξαναδοκίμασε» να πατηθεί, μόνο αναμονή.
+const diaryStillLoadingText = 'Το ημερολόγιο φαγητού διαβάζεται ακόμα. Δοκίμασε ξανά σε λίγο.';
+
+/// Η ανάγνωση του ημερολογίου απέτυχε: η Διατροφή δείχνει την κάρτα «Πρόβλημα» με το «Ξαναδοκίμασε».
+const diaryNotReadText = 'Δεν διαβάστηκε ακόμα το ημερολόγιο φαγητού. Πάτα «Ξαναδοκίμασε» στη Διατροφή.';
+
 Future<void> openAddFood(BuildContext context, FoodStore food, {Meal? meal, DateTime? day, bool scan = false}) async {
+  final messenger = ScaffoldMessenger.of(context);
   // Έλεγχος 9/11 (Χ6): αν δεν διαβάστηκε το ημερολόγιο, ό,τι γραφτεί μπορεί να βγει διπλό.
-  if (!food.loaded) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Δεν διαβάστηκε ακόμα το ημερολόγιο φαγητού. Πάτα «Ξαναδοκίμασε» στη Διατροφή.'),
-    ));
+  // Έλεγχος round1 (S2-11): στο άνοιγμα από το widget της αρχικής οθόνης το ημερολόγιο μπορεί να διαβάζεται ακόμα·
+  // περιμένουμε να τελειώσει η ανάγνωση και μετά ανοίγουμε (πριν: μήνυμα και τίποτα άλλο).
+  if (!await food.waitLoaded()) {
+    messenger.showSnackBar(SnackBar(content: Text(food.error != null ? diaryNotReadText : diaryStillLoadingText)));
     return;
   }
+  if (!context.mounted) return;
   final shown = food.day;
   food.syncToday();
   // Κάρτα της μέρας που φαινόταν (π.χ. οθόνη ανοιχτή από χθες βράδυ): πάει στη νέα σημερινή μέρα.
@@ -104,6 +113,30 @@ String servingErrorText({required bool perMl}) => 'Γράψε μερίδα ως 
 /// Γραμμάρια στο πεδίο: χωρίς άσκοπα δεκαδικά, αλλά χωρίς να χάνεται το «,5».
 String gramsField(double v) => v == v.roundToDouble() ? '${v.round()}' : dec(v, 1);
 
+/// Το μήνυμα κάτω από την ποσότητα όταν δεν γίνεται δεκτή. Έλεγχος round1 (U3a-12): πάνω από το όριο των 5.000 λέει το
+/// όριο (πριν έλεγε «Γράψε γραμμάρια», ενώ γραμμάρια είχαν γραφτεί).
+String quantityErrorText(String text, {required bool perMl}) {
+  final v = parseNumber(text);
+  if (v != null && v > maxEntryGrams) return 'Ως 5.000 ${perMl ? 'ml' : 'g'} τη φορά';
+  return perMl ? 'Γράψε ml' : 'Γράψε γραμμάρια';
+}
+
+/// Η ερώτηση για ποσότητα που μοιάζει με λάθος πληκτρολόγησης (έλεγχος round1, S11-3): «2.000 g «Ελαιόλαδο εξαιρετικά
+/// παρθένο» = 17.980 kcal σε μία καταχώριση. Είναι σωστό;».
+String typoQuestion(Food f, double grams) {
+  final qty = grams >= 1000 && grams == grams.roundToDouble() ? thousands(grams) : gramsField(grams);
+  return '$qty ${f.unit} «${f.name}» = ${kcalText(f.n.amount(Nk.kcal) * grams / 100)} kcal σε μία καταχώριση. Είναι σωστό;';
+}
+
+/// Η μέρα στην οποία γράφεται ένα φαγητό, όπως τη λέει η οθόνη προσθήκης: «Σήμερα · Παρ 13/11», «Χθες · Πέμ 12/11»,
+/// ή για παλιότερη μέρα «Τρί 10/11» (έλεγχος round1, S2-8 / S11-1 / U3a-1: πριν η οθόνη δεν έλεγε πουθενά τη μέρα).
+String entryDayLabel(DateTime day, DateTime today) {
+  final d = dayOf(day), t = dayOf(today);
+  if (sameDay(d, t)) return 'Σήμερα · ${shortDayDate(d)}';
+  if (sameDay(d, DateTime(t.year, t.month, t.day - 1))) return 'Χθες · ${shortDayDate(d)}';
+  return shortDayDate(d);
+}
+
 /// Επιλογή γεύματος: 4 ίσα κουμπιά που χωράνε πάντα σε μία γραμμή.
 class MealPicker extends StatelessWidget {
   const MealPicker({super.key, required this.value, required this.onChanged, this.grid = false});
@@ -158,41 +191,60 @@ class MealPicker extends StatelessWidget {
         ]);
       });
     }
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.hairline)),
-      child: Row(
-        children: [
-          for (final m in Meal.values)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(m),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: m == value ? c.foodSolid : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      mealLabel(m),
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: m == value ? c.onSolid : c.textSecondary,
+    // Έλεγχος round1 (U3a-8): ΕΝΑ μέγεθος γραμμάτων και για τα τέσσερα γεύματα. Αν το πιο φαρδύ όνομα («Μεσημέρι») δεν
+    // χωρά στο κουμπί του, μικραίνουν όλα μαζί· πριν μίκραινε μόνο εκείνο και φαινόταν πιο μικρό από τα διπλανά του.
+    return LayoutBuilder(builder: (context, box) {
+      const style = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+      final scaler = MediaQuery.textScalerOf(context);
+      final base = DefaultTextStyle.of(context).style;
+      var widest = 0.0;
+      for (final m in Meal.values) {
+        final tp = TextPainter(
+            text: TextSpan(text: mealLabel(m), style: base.merge(style)), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)
+          ..layout();
+        if (tp.width > widest) widest = tp.width;
+        tp.dispose();
+      }
+      // Χώρος κάθε ονόματος: το ένα τέταρτο του πλαισίου, χωρίς τα περιθώρια (4 + 4 του πλαισίου, 4 + 4 του κουμπιού).
+      final room = (box.maxWidth - 8) / 4 - 8;
+      final double fontSize = widest > room && room > 0 ? 14 * (room / widest).clamp(0.5, 1.0).toDouble() : 14.0;
+      return Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.hairline)),
+        child: Row(
+          children: [
+            for (final m in Meal.values)
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChanged(m),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: m == value ? c.foodSolid : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    // Το FittedBox μένει μόνο ως δίχτυ ασφαλείας (διαφορά ενός pixel)· το μέγεθος το ορίζει το [fontSize].
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        mealLabel(m),
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w600,
+                          color: m == value ? c.onSolid : c.textSecondary,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 }
 
@@ -241,6 +293,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
   /// Η μέρα που διάλεξε ο χρήστης στην ερώτηση «σε ποια μέρα;» (μία φορά για όσο είναι ανοιχτή η οθόνη).
   DateTime? _dayChoice;
+
+  /// «Σήμερα» για αυτή την οθόνη: το ρολόι του κινητού. Στις δοκιμές και στα στιγμιότυπα χωρίς ρολόι (όπου δεν γίνεται
+  /// ούτε η ερώτηση «σε ποια μέρα;») είναι η μέρα με την οποία άνοιξε η οθόνη.
+  DateTime _today() => widget.clock == null && !widget.food.followsClock ? dayOf(widget.day) : dayOf(_now());
+
+  /// Η μέρα στην οποία θα γραφτεί ό,τι προστεθεί τώρα (όπως τη δείχνει η γραμμή «Μέρα: …»).
+  DateTime get _writeDay => _dayChoice ?? dayOf(widget.day);
 
   /// Σε ποια μέρα γράφεται το φαγητό (έλεγχος 9/11, Χ11 και RT-14):
   /// - η οθόνη άνοιξε «σήμερα» και στο μεταξύ πέρασαν τα μεσάνυχτα → ρωτά «χθες ή σήμερα;» (πριν πήγαινε σιωπηλά χθες)·
@@ -316,8 +375,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       ));
       return;
     }
+    // Έλεγχος round1 (S2-8 / S11-1): αν δεν γράφτηκε στη σημερινή μέρα, το μήνυμα λέει σε ποια.
+    final today = _today();
+    final where = sameDay(day, today) ? 'Προστέθηκε' : 'Προστέθηκε (${entryDayLabel(day, today)})';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Προστέθηκε: ${r.food.name}, ${gramsText(r.grams)} ${r.food.unit}'),
+      content: Text('$where: ${r.food.name}, ${gramsText(r.grams)} ${r.food.unit}'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),
     ));
     setState(() => _meal = r.meal);
@@ -329,7 +391,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   }
 
   Future<void> _scan() async {
-    final f = await scanToFood(context, widget.food, onBusy: (b) => setState(() => _busy = b));
+    // Έλεγχος round1 (S2-5): αν η οθόνη έκλεισε όσο έψαχνε στο Open Food Facts, δεν γίνεται setState σε κλειστή οθόνη
+    // (πριν: σφάλμα στην αναφορά σφαλμάτων κάθε φορά).
+    final f = await scanToFood(context, widget.food, onBusy: (b) {
+      if (mounted) setState(() => _busy = b);
+    });
     if (f != null && mounted) await _pick(f);
   }
 
@@ -399,30 +465,71 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               ),
           ],
         );
+    // Έλεγχος round1 (U3a-5): αν οι δύο ετικέτες δεν χωρούν ολόκληρες δίπλα δίπλα (μεγάλα γράμματα σε στενή οθόνη), τα
+    // κουμπιά πάνε το ένα κάτω από το άλλο· πριν κόβονταν σε «Σάρω…» και «Από ε…». (U3a-18: ίδιο εικονίδιο για το
+    // «Από ετικέτα» με «Τα προϊόντα μου».)
+    Widget tool(String keyName, String text, IconData icon, VoidCallback? onPressed, {required bool oneLine}) =>
+        OutlinedButton.icon(
+          key: ValueKey(keyName),
+          onPressed: onPressed,
+          icon: Icon(icon, size: 20),
+          label: oneLine ? Text(text, maxLines: 1, overflow: TextOverflow.ellipsis) : Text(text),
+        );
     final tools = Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: LayoutBuilder(builder: (context, box) {
+        // Ο χώρος της ετικέτας σε κάθε μισό κουμπί: χωρίς το εικονίδιο (20), το κενό του (8) και τα περιθώρια του κουμπιού
+        // (16 + 24 στο 1,0×· με μεγαλύτερα γράμματα το Material τα μικραίνει, άρα εδώ μένει πάντα λίγος χώρος παραπάνω).
+        // «Από ετικέτα» με αδιάσπαστο κενό: μετριέται ΟΛΗ η ετικέτα, γιατί στο κουμπί πρέπει να χωρά σε μία γραμμή.
+        final room = (box.maxWidth - 10) / 2 - 68;
+        final sideBySide = wordsFit(
+            context, const ['Σάρωση', 'Από\u00A0ετικέτα'], const TextStyle(fontSize: 15, fontWeight: FontWeight.w600), room);
+        final scan = tool('add-scan', 'Σάρωση', Icons.qr_code_scanner_rounded, _busy ? null : _scan, oneLine: sideBySide);
+        final label = tool('add-label', 'Από ετικέτα', Icons.edit_note_rounded,
+            () => _newFood(draft: FoodDraft(name: q.trim())), oneLine: sideBySide);
+        if (sideBySide) {
+          return Row(children: [Expanded(child: scan), const SizedBox(width: 10), Expanded(child: label)]);
+        }
+        return Column(
+          key: const ValueKey('add-tools-stacked'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [scan, const SizedBox(height: 8), label],
+        );
+      }),
+    );
+
+    // Έλεγχος round1 (S2-8 / S11-1 / U3a-1): η οθόνη λέει ΠΑΝΤΑ σε ποια μέρα γράφει, και έντονα όταν δεν είναι η
+    // σημερινή (πριν, φαγητό μπορούσε να πάει σε άλλη μέρα χωρίς να φαίνεται πουθενά).
+    final writeDay = _writeDay;
+    final otherDay = !sameDay(writeDay, _today());
+    final dayLine = Padding(
+      key: const ValueKey('add-day'),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              key: const ValueKey('add-scan'),
-              onPressed: _busy ? null : _scan,
-              icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-              label: const Text('Σάρωση', maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(Icons.event_rounded, size: 16, color: otherDay ? c.warn : c.textSecondary),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 6),
           Expanded(
-            child: OutlinedButton.icon(
-              key: const ValueKey('add-label'),
-              onPressed: () => _newFood(draft: FoodDraft(name: q.trim())),
-              icon: const Icon(Icons.layers_outlined, size: 20),
-              label: const Text('Από ετικέτα', maxLines: 1, overflow: TextOverflow.ellipsis),
+            child: Text(
+              'Μέρα: ${entryDayLabel(writeDay, _today())}',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: otherDay ? FontWeight.w700 : FontWeight.w500,
+                color: otherDay ? c.warn : c.textSecondary,
+              ),
             ),
           ),
         ],
       ),
     );
+
+    // Έλεγχος round1 (U3a-4): με μεγάλα γράμματα το κουτί αναζήτησης και τα γεύματα ψηλώνουν· τα ύψη της μπάρας
+    // μεγαλώνουν μαζί τους. Πριν έμεναν 64 + 60 dp και από 1,3× το κουτί έχανε την πάνω και την κάτω γραμμή του.
+    final bigger = math.max(0.0, MediaQuery.textScalerOf(context).scale(17) / 17 - 1);
 
     return Scaffold(
       backgroundColor: c.background,
@@ -430,7 +537,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
-        toolbarHeight: 64,
+        toolbarHeight: 64 + bigger * 26,
         // Σχέδια 9/11 (10α): η αναζήτηση σε κουτί, «Σάρωση» και «Από ετικέτα» ως κουμπιά πιο κάτω (όχι εικονίδιο).
         title: Padding(
           padding: const EdgeInsets.only(right: 16),
@@ -465,7 +572,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: Size.fromHeight(60 + bigger * 30),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
             child: ConstrainedBox(
@@ -478,7 +585,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: Stack(
+          // Η γραμμή «Μέρα: …» μένει πάντα στη θέση της, πάνω από τη λίστα που κυλά.
+          child: Column(children: [
+            dayLine,
+            Expanded(
+              child: Stack(
             children: [
               ListView(
                 padding: const EdgeInsets.only(bottom: 40),
@@ -534,7 +645,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                       child: Text(
-                        'Δεν βρέθηκε «$q» στη βάση. Αν είναι συσκευασμένο, σκάναρε το barcode ή γράψε τις τιμές της ετικέτας. '
+                        // Έλεγχος round1 (U3a-18): με τα ονόματα των δύο κουμπιών, όπως και η κάρτα «άλλο τρόφιμο».
+                        'Δεν βρέθηκε «$q» στη βάση. Αν είναι συσκευασμένο, πάτα «Σάρωση» ή «Από ετικέτα». '
                         'Αν δεν έχει ετικέτα (π.χ. σπιτικό φαγητό), πρόσθεσε ένα-ένα τα υλικά του.',
                         style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                       ),
@@ -583,7 +695,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               if (_busy)
                 const Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(minHeight: 3)),
             ],
-          ),
+              ),
+            ),
+          ]),
         ),
       ),
     );
@@ -608,7 +722,6 @@ class _FoodTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final n = food.n;
     final times = store.timesEaten(food.id);
     return InkWell(
       onTap: onTap,
@@ -635,8 +748,7 @@ class _FoodTile extends StatelessWidget {
                     ),
                   const SizedBox(height: 2),
                   Text(
-                    '${kcalText(n.amount(Nk.kcal))} kcal · πρωτεΐνη ${nValueText(n[Nk.protein])} g ανά 100 ${food.unit}'
-                    '${times > 0 ? ' · ${times == 1 ? '1 φορά' : '$times φορές'}' : ''}',
+                    foodTileSubtitle(food, times),
                     style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -655,6 +767,16 @@ class _FoodTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Η δεύτερη γραμμή ενός τροφίμου στις λίστες: «125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 6 φορές». Έλεγχος round1
+/// (U3a-6): ανάμεσα σε κάθε αριθμό και στη λέξη του το κενό δεν σπάει (U+00A0)· πριν, στο τέλος της γραμμής έμενε ο
+/// αριθμός μόνος του («… · 6» / «φορές», «ανά 100» / «g»).
+String foodTileSubtitle(Food food, int times) {
+  const nb = '\u00A0';
+  final n = food.n;
+  final base = '${kcalText(n.amount(Nk.kcal))}${nb}kcal · πρωτεΐνη ${nValueText(n[Nk.protein])}${nb}g ανά 100$nb${food.unit}';
+  return times > 0 ? '$base · ${times == 1 ? '1${nb}φορά' : '$times${nb}φορές'}' : base;
 }
 
 /// Μικρή ετικέτα για τα προϊόντα μου (μάρκα), ώστε να ξεχωρίζουν από τα γενικά.
@@ -726,8 +848,31 @@ class _QuantitySheetState extends State<QuantitySheet> {
   late Food _item = widget.item;
   late final List<(Food, String)> _states = widget.food.statesOf(widget.item);
 
+  // Έλεγχος round1 (U3a-12): το πρώτο άγγιγμα στο πεδίο διαλέγει όλο τον αριθμό, ώστε ό,τι γράψεις να τον αντικαθιστά
+  // (πριν: σβήσιμο ψηφίο-ψηφίο). Το επόμενο άγγιγμα βάζει κανονικά τον δρομέα. Ξανά από την αρχή όταν το πεδίο χάσει
+  // την εστίαση.
+  final _gramsFocus = FocusNode();
+  bool _selectAllOnTap = true;
+
+  void _onGramsFocus() {
+    if (!_gramsFocus.hasFocus) _selectAllOnTap = true;
+  }
+
+  void _onGramsTap() {
+    if (!_selectAllOnTap) return;
+    _selectAllOnTap = false;
+    _grams.selection = TextSelection(baseOffset: 0, extentOffset: _grams.text.length);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _gramsFocus.addListener(_onGramsFocus);
+  }
+
   @override
   void dispose() {
+    _gramsFocus.dispose();
     _grams.dispose();
     super.dispose();
   }
@@ -738,6 +883,30 @@ class _QuantitySheetState extends State<QuantitySheet> {
   }
 
   void _set(double g) => setState(() => _grams.text = gramsField(g));
+
+  /// «Προσθήκη» / «Αποθήκευση». Έλεγχος round1 (S11-3): ποσότητα που μοιάζει με λάθος πληκτρολόγησης
+  /// ([entryLooksLikeTypo], π.χ. 2.000 g λάδι αντί για 20) ζητά πρώτα ΜΙΑ επιβεβαίωση, με τις θερμίδες που θα γραφτούν.
+  /// Δεν μπλοκάρει τίποτα: με «Ναι, σωστό» γράφεται όπως είναι. Καταχώριση που ανοίγει για αλλαγή και μένει με την ίδια
+  /// ποσότητα και το ίδιο τρόφιμο (π.χ. αλλάζει μόνο το γεύμα) δεν ξαναρωτιέται.
+  Future<void> _submit(double g) async {
+    final unchanged = widget.editing && g == widget.initialGrams && _item.id == widget.item.id;
+    if (!unchanged && entryLooksLikeTypo(_item, g)) {
+      final ok = await showDialog<bool>(
+        context: context,
+        routeSettings: const RouteSettings(name: 'Έλεγχος ποσότητας'),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Σωστή ποσότητα;'),
+          content: Text(typoQuestion(_item, g)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Όχι, θα τη διορθώσω')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι, σωστό')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    Navigator.pop(context, _SheetResult(g, _meal, _item));
+  }
 
   @override
   Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
@@ -759,7 +928,14 @@ class _QuantitySheetState extends State<QuantitySheet> {
       if (f.servingGrams != null && f.servingGrams! > 0)
         ('1 μερίδα (${gramsText(f.servingGrams!)} $unit)', f.servingGrams!),
       // Υγρά ανά 100 ml (έλεγχος 9/11, Μ2): ποτήρι, κουτάκι.
-      for (final v in f.perMl ? const [100.0, 200.0, 250.0, 330.0] : const [50.0, 100.0, 150.0, 200.0]) ('${v.round()} $unit', v),
+      // Έλεγχος round1 (U3a-13): λάδι, βούτυρο και άλλα σχεδόν καθαρά λίπη μετριούνται με το κουταλάκι και την κουταλιά
+      // (5, 10, 15, 30)· πριν το λάδι σε ml είχε «100, 200, 250, 330 ml» (ένα πάτημα = 824 kcal).
+      for (final v in f.n.amount(Nk.fat) >= typoFatPer100
+          ? const [5.0, 10.0, 15.0, 30.0]
+          : f.perMl
+              ? const [100.0, 200.0, 250.0, 330.0]
+              : const [50.0, 100.0, 150.0, 200.0])
+        ('${v.round()} $unit', v),
     ];
 
     // Σχέδια 9/11 (9α): από 1,3× γράμματα θρεπτικά 2×2, γεύματα 2×2, «Ζύγισα» σε γραμμές· στο 1,0× μένουν οι 4 στήλες.
@@ -958,6 +1134,8 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     Expanded(
                       child: TextField(
                         controller: _grams,
+                        focusNode: _gramsFocus,
+                        onTap: _onGramsTap,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                         textAlign: TextAlign.center,
@@ -965,7 +1143,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
                         style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                         decoration: InputDecoration(
                           suffixText: unit,
-                          errorText: g == null ? (f.perMl ? 'Γράψε ml' : 'Γράψε γραμμάρια') : null,
+                          // Έλεγχος round1 (U3a-12): η μονάδα πιο μικρή και γκρι, δίπλα στον αριθμό (πριν 26 px έντονη).
+                          suffixStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: c.textSecondary),
+                          errorText: g == null ? quantityErrorText(_grams.text, perMl: f.perMl) : null,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
@@ -989,21 +1169,34 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       child: Text(ch.$1),
                     ),
                   ),
-                Row(children: [
-                  for (final (k, ch) in [
+                () {
+                  final quick = [
                     for (final x in chips)
                       if (!x.$1.startsWith('1 μερίδα')) x
-                  ].asMap().entries.map((e) => (e.key, e.value))) ...[
-                    if (k > 0) const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), padding: const EdgeInsets.symmetric(horizontal: 4), foregroundColor: c.text),
-                        onPressed: () => _set(ch.$2),
-                        child: FittedBox(fit: BoxFit.scaleDown, child: Text(ch.$1, maxLines: 1)),
-                      ),
-                    ),
-                  ],
-                ]),
+                  ];
+                  Widget chip((String, double) ch) => Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), padding: const EdgeInsets.symmetric(horizontal: 4), foregroundColor: c.text),
+                          onPressed: () => _set(ch.$2),
+                          child: FittedBox(fit: BoxFit.scaleDown, child: Text(ch.$1, maxLines: 1)),
+                        ),
+                      );
+                  // Έλεγχος round1 (U3a-8): με μεγάλα γράμματα οι ποσότητες σε 2 × 2 (όπως τα θρεπτικά και τα γεύματα),
+                  // ώστε να έχουν όλες το ίδιο μέγεθος γραμμάτων· σε μία σειρά το «50 g» έβγαινε μεγαλύτερο από το «100 g».
+                  if (large && quick.length == 4) {
+                    return Column(key: const ValueKey('qty-chips-grid'), children: [
+                      Row(children: [chip(quick[0]), const SizedBox(width: 8), chip(quick[1])]),
+                      const SizedBox(height: 8),
+                      Row(children: [chip(quick[2]), const SizedBox(width: 8), chip(quick[3])]),
+                    ]);
+                  }
+                  return Row(children: [
+                    for (var k = 0; k < quick.length; k++) ...[
+                      if (k > 0) const SizedBox(width: 8),
+                      chip(quick[k]),
+                    ],
+                  ]);
+                }(),
                 const SizedBox(height: 16),
                 if (large && !_tilesFit(context))
                   // Πολύ μεγάλα γράμματα (έλεγχος premium, M3): μία γραμμή ανά θρεπτικό, ποτέ σπασμένη λέξη.
@@ -1050,8 +1243,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 const SizedBox(height: 18),
                 FilledButton(
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                  onPressed: g == null ? null : () => Navigator.pop(context, _SheetResult(g, _meal, _item)),
-                  child: Text(widget.editing ? 'Αποθήκευση' : 'Προσθήκη στο ${mealLabel(_meal)}'),
+                  onPressed: g == null ? null : () => _submit(g),
+                  // Έλεγχος round1 (U3a-18): αν σπάσει σε δύο γραμμές (μεγάλα γράμματα), μένει στο κέντρο του κουμπιού.
+                  child: Text(widget.editing ? 'Αποθήκευση' : 'Προσθήκη στο ${mealLabel(_meal)}', textAlign: TextAlign.center),
                 ),
                 if (widget.editing) ...[
                   const SizedBox(height: 8),
@@ -1228,12 +1422,16 @@ class FoodDetailScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class FoodFormScreen extends StatefulWidget {
-  const FoodFormScreen({super.key, required this.draft, this.note, this.existingId});
+  const FoodFormScreen({super.key, required this.draft, this.note, this.existingId, this.cholChoice});
   final FoodDraft draft;
   final String? note;
 
   /// Αν δίνεται, διορθώνουμε υπάρχον προϊόν (κρατά το ίδιο id).
   final String? existingId;
+
+  /// Αν φαίνεται η επιλογή «Στην κάρτα «Χοληστερίνη» μετρά ως» (έλεγχος round1, S2-1 / S1-9). null = μόνο όταν η κάρτα
+  /// υπάρχει (στόχοι με οδηγία γιατρού για τη χοληστερίνη). Ό,τι έχει ήδη το προϊόν κρατιέται και όταν δεν φαίνεται.
+  final bool? cholChoice;
 
   @override
   State<FoodFormScreen> createState() => _FoodFormScreenState();
@@ -1266,6 +1464,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
 
   /// Οι τιμές είναι ανά 100 ml (υγρό) αντί για ανά 100 g (έλεγχος 9/11, Μ2): και για χειροκίνητη ετικέτα.
   late bool _perMl = widget.draft.perMl;
+
+  /// Τι μετρά το προϊόν στην κάρτα «Χοληστερίνη» ([CholKind]) ή null.
+  late String? _cholKind = widget.draft.cholKind;
 
   static String _field(double v) => dec(v, 4).replaceAll(RegExp(r',?0+$'), '');
 
@@ -1333,6 +1534,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
         for (final k in widget.draft.lessThan)
           if (values[k] != null && values[k] == widget.draft.values[k]) k,
       },
+      cholKind: _cholKind,
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }
@@ -1367,6 +1569,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     final impossible = impossibleValues(values);
     final doubtful = doubtfulValues(values);
     final per = _perMl ? '100 ml' : '100 g';
+    final showChol = widget.cholChoice ?? (HealthStore.shared?.goals?.doctor ?? false);
 
     InputDecoration deco(String label, {String? suffix, String? error, String? warning, bool info = false}) => InputDecoration(
           labelText: label,
@@ -1511,6 +1714,23 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                     style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text),
                   ),
                 ),
+              if (showChol) ...[
+                const SizedBox(height: 14),
+                // Έλεγχος round1 (S2-1 / S1-9): τα δικά σου προϊόντα μετρούν στην κάρτα «Χοληστερίνη» μόνο αν λένε τι είναι.
+                choices<String?>(
+                  'Στην κάρτα «Χοληστερίνη» μετρά ως:',
+                  const [
+                    (null, 'Τίποτα'),
+                    (CholKind.nuts, 'Ξηροί καρποί'),
+                    (CholKind.legumes, 'Όσπρια'),
+                    (CholKind.fish, 'Ψάρι ή θαλασσινά'),
+                    (CholKind.bran, 'Πίτουρο βρώμης'),
+                  ],
+                  _cholKind,
+                  (v) => setState(() => _cholKind = v),
+                  key: const ValueKey('chol-kind'),
+                ),
+              ],
               const SizedBox(height: 14),
               TextField(
                 key: const ValueKey('field-serving'),
@@ -1545,13 +1765,22 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
 
 /// Φόρμα νέου τροφίμου· το αποθηκεύει στα προϊόντα μου και το επιστρέφει.
 Future<Food?> createFood(BuildContext context, FoodStore food, {FoodDraft? draft, String? note}) async {
+  final messenger = ScaffoldMessenger.of(context);
   final f = await Navigator.of(context).push<Food>(
     MaterialPageRoute(settings: const RouteSettings(name: 'Νέο τρόφιμο'), builder: (_) => FoodFormScreen(draft: draft ?? FoodDraft(), note: note)),
   );
   if (f == null) return null;
-  await food.saveMyFood(f);
+  // Έλεγχος round1 (S2-4): αν το προϊόν δεν γράφτηκε στο κινητό (π.χ. γεμάτος χώρος), το λέμε και επιστρέφουμε null.
+  // Πριν το αποτέλεσμα αγνοούνταν: έβγαινε «Αποθηκεύτηκε» (ή συνέχιζε στην ποσότητα) για προϊόν που δεν υπήρχε.
+  if (!await food.saveMyFood(f)) {
+    messenger.showSnackBar(SnackBar(content: Text(productNotSavedText(f.name))));
+    return null;
+  }
   return f;
 }
+
+/// Το μήνυμα όταν ένα προϊόν ή μια καταχώριση δεν γράφτηκε στο κινητό (ίδιο κείμενο με τη Διατροφή).
+String productNotSavedText(String name) => 'Δεν αποθηκεύτηκε: $name. Δοκίμασε ξανά.';
 
 /// Σκανάρισμα → αν υπάρχει ήδη στα προϊόντα μου, αυτό· αλλιώς Open Food Facts → έλεγχος με την ετικέτα → αποθήκευση.
 /// [existing]: τι να γίνει όταν το προϊόν υπάρχει ήδη (στην προσθήκη φαγητού απλώς επιστρέφεται).

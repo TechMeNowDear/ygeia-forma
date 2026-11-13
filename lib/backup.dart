@@ -156,6 +156,35 @@ String lastBackupText(DateTime? last, DateTime now) {
   return 'Τελευταίο αντίγραφο: πριν $d μέρες.';
 }
 
+/// Υπενθύμιση αντιγράφου στη «Σήμερα» (έλεγχος 13/11, S9-3): φαγητό, προϊόντα, προπονήσεις και στόχοι υπάρχουν μόνο στο
+/// κινητό, και ως τώρα τίποτα δεν θύμιζε την εξαγωγή. Μετά από τόσες μέρες χωρίς αντίγραφο φαίνεται η κάρτα.
+const backupReminderAfterDays = 7;
+
+/// «Αργότερα»: η κάρτα κρύβεται για τόσες μέρες.
+const backupSnoozeDays = 3;
+
+/// Αν φαίνεται η κάρτα «Αντίγραφο ασφαλείας» στη «Σήμερα». [hasData]: υπάρχει κάτι που έγραψε ο χρήστης και ζει μόνο σε
+/// αυτό το κινητό (φαγητό, προϊόν, προπόνηση, μέτρηση μέσης)· χωρίς αυτό δεν υπάρχει τι να χαθεί. [last]: το τελευταίο
+/// πλήρες αντίγραφο (null = ποτέ). Μετρά ημερολογιακές μέρες, όπως το [lastBackupText]· ώρα στο μέλλον (άλλαξε το
+/// ρολόι) = «σήμερα», όχι υπενθύμιση. [snoozedUntil]: ως πότε είπε «Αργότερα»· μετρά μόνο αν είναι μέσα στις επόμενες
+/// [backupSnoozeDays] μέρες (αν το ρολόι γύρισε πίσω, ένα «αργότερα» μηνών δεν κρύβει την κάρτα για πάντα).
+bool backupReminderDue({required DateTime? last, required bool hasData, required DateTime now, DateTime? snoozedUntil}) {
+  if (!hasData) return false;
+  if (snoozedUntil != null && now.isBefore(snoozedUntil) && daysBetween(now, snoozedUntil) <= backupSnoozeDays) return false;
+  return last == null || daysBetween(last, now) >= backupReminderAfterDays;
+}
+
+/// Ως πότε κρύβεται η κάρτα μετά το «Αργότερα»: η αρχή της μέρας σε [backupSnoozeDays] μέρες (ξαναφαίνεται το πρωί).
+DateTime backupSnoozeUntil(DateTime now) => DateTime(now.year, now.month, now.day + backupSnoozeDays);
+
+/// Το κείμενο της κάρτας: πόσο παλιό είναι το τελευταίο αντίγραφο και τι κινδυνεύει.
+String backupReminderText(DateTime? last, DateTime now) =>
+    '${lastBackupText(last, now)} Το φαγητό, τα προϊόντα σου, οι προπονήσεις και οι στόχοι υπάρχουν μόνο σε αυτό το κινητό.';
+
+/// Το αρχείο μένει στις Λήψεις του ίδιου κινητού: να φύγει και από το κινητό.
+const backupOffPhoneText = 'Μετά στείλ’ το και έξω από το κινητό (π.χ. στο Drive ή με email): αν χαθεί το κινητό, χάνεται '
+    'και το αρχείο στις Λήψεις.';
+
 String entriesText(int n) => countText(n, 'καταχώριση', 'καταχωρίσεις');
 String productsText(int n) => countText(n, 'προϊόν', 'προϊόντα');
 

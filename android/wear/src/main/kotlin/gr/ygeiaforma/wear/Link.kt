@@ -252,10 +252,17 @@ object Link {
         ack(ctx, p)
     }
 
-    /** Διαβάζει ό,τι έχει ήδη στείλει το κινητό (στο άνοιγμα). */
+    /** Το πολύ τόσο για την ανάγνωση στο άνοιγμα (έλεγχος 13/11, S8-09). */
+    const val LOAD_TIMEOUT_MS = 5_000L
+
+    /**
+     * Διαβάζει ό,τι έχει ήδη στείλει το κινητό (στο άνοιγμα). Με όριο χρόνου (S8-09): πίσω από αυτή την ανάγνωση περιμένουν
+     * η ανάκτηση μιας μισής άσκησης και η αποστολή των αποτελεσμάτων· αν οι υπηρεσίες της Google δεν απαντήσουν, το άνοιγμα
+     * συνεχίζει με ό,τι υπάρχει (οι αλλαγές έρχονται έτσι κι αλλιώς και από τον ακροατή).
+     */
     suspend fun load(ctx: Context) {
         try {
-            val buf = Wearable.getDataClient(ctx.applicationContext).dataItems.await()
+            val buf = withTimeoutOrNull(LOAD_TIMEOUT_MS) { Wearable.getDataClient(ctx.applicationContext).dataItems.await() } ?: return
             try {
                 for (item in buf) apply(item)
             } finally {

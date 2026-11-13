@@ -59,11 +59,30 @@ class NutritionPage extends StatelessWidget {
               onPressed: () => food.setDay(DateTime(day.year, day.month, day.day - 1)),
             ),
             Expanded(
-              child: Text(
-                dayLabel,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text),
-              ),
+              child: sameDay(day, today)
+                  ? Text(
+                      dayLabel,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text),
+                    )
+                  // Έλεγχος round1 (U3a-1, U3a-20): όταν το ημερολόγιο δείχνει άλλη μέρα, το λέει έντονα και με την
+                  // ημερομηνία («Χθες · Πέμ 12/11»), και ένα πάτημα γυρίζει στο «Σήμερα» (πριν: ένα πάτημα «›» ανά μέρα).
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          entryDayLabel(day, today),
+                          key: const ValueKey('diary-day'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.warn),
+                        ),
+                        TextButton(
+                          key: const ValueKey('diary-today'),
+                          onPressed: () => food.setDay(today),
+                          child: const Text('Πίσω στο Σήμερα'),
+                        ),
+                      ],
+                    ),
             ),
             _RoundButton(
               icon: Icons.chevron_right_rounded,
@@ -232,18 +251,23 @@ class MacroBreakdown extends StatelessWidget {
             child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(label, maxLines: 1, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+              // Round 1 (f9 · U1a-12): σταθερό ύψος γραμμής ετικέτας· όταν μία ετικέτα μικραίνει («Υδατάνθρ.» στα 750 dp),
+              // οι τρεις τιμές από κάτω μένουν στην ίδια γραμμή.
+              SizedBox(
+                height: MediaQuery.textScalerOf(context).scale(17),
+                child: Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(label, maxLines: 1, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 4),
               // Ο αριθμός και το «g» πάντα μαζί· μικραίνουν αντί να σπάνε (σχέδια 9/11).
@@ -298,25 +322,30 @@ class MacroBreakdown extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         // Πολύ μεγάλα γράμματα: μία γραμμή ανά μακροθρεπτικό («● Πρωτεΐνη …… 68 g»).
-        if (veryLargeText(context))
-          Column(children: [
-            for (final (label, g, part, color) in [
-              ('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
-              ('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
-              ('Λιπαρά', t.fat, fk, fatColor(c)),
-            ])
-              InfoRow(label, '${gramsText(g)} g${percent && sum > 0 ? ' · ${(100 * part / sum).round()}%' : ''}', dot: color),
-          ])
-        else
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            macro('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
-            // UX U7: σύντομα, ίδιο μέγεθος με «Πρωτεΐνη»/«Λιπαρά» (όπως στο φύλλο ποσότητας).
-            macro('Υδατάνθρ.', t.carbs, ck, carbsColor(c)),
-            macro('Λιπαρά', t.fat, fk, fatColor(c)),
-          ],
-        ),
+        // Έλεγχος round1 (U3a-7): το ίδιο και όταν η κάρτα είναι στενή (κάτω από 300 dp: δεξιά στήλη στο ανοιχτό Fold,
+        // κινητό 360 dp). Εκεί οι τρεις στήλες δεν χωρούσαν: το «Υδατάνθρ.» μίκραινε μόνο του, η μεσαία στήλη καθόταν 2 px
+        // πιο ψηλά και το «23% θερμίδων» έσπαγε σε δύο γραμμές.
+        LayoutBuilder(builder: (context, box) {
+          if (box.maxWidth < 300 || veryLargeText(context)) {
+            return Column(key: const ValueKey('macro-rows'), children: [
+              for (final (label, g, part, color) in [
+                ('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
+                ('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
+                ('Λιπαρά', t.fat, fk, fatColor(c)),
+              ])
+                InfoRow(label, '${gramsText(g)} g${percent && sum > 0 ? ' · ${(100 * part / sum).round()}%' : ''}', dot: color),
+            ]);
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              macro('Πρωτεΐνη', t.protein, pk, proteinColor(c)),
+              // UX U7: σύντομα, ίδιο μέγεθος με «Πρωτεΐνη»/«Λιπαρά» (όπως στο φύλλο ποσότητας).
+              macro('Υδατάνθρ.', t.carbs, ck, carbsColor(c)),
+              macro('Λιπαρά', t.fat, fk, fatColor(c)),
+            ],
+          );
+        }),
         if (percent && other >= 1)
           Padding(
             padding: const EdgeInsets.only(top: 8),

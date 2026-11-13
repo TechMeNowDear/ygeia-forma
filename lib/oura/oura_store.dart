@@ -3,6 +3,9 @@
 /// - Διαβάζει ΜΟΝΟ όταν ανοίγει η εφαρμογή ή επιστρέφω σε αυτήν (μαζί με τη Samsung), το πολύ κάθε 30 λεπτά:
 ///   τις τελευταίες 3 μέρες, ό,τι δεν είχε διαβαστεί, και τις νύχτες του Oura των 30 ημερών που λείπουν ακόμα.
 ///   Καμία δουλειά στο παρασκήνιο, καμία συνεχής ανανέωση.
+/// - Round 1 (S5-10): το όριο των 30 λεπτών ισχύει μόνο για τις αυτόματες αναγνώσεις. Ρητή ενέργεια του χρήστη
+///   (τράβηγμα προς τα κάτω, «Ενημέρωση τώρα», κουμπί κάρτας) και επιστροφή στην εφαρμογή όσο περιμένουμε τη νύχτα
+///   διαβάζουν πάντα ([ouraUserGap]: μόνο λίγα δευτερόλεπτα φρένο για διπλά πατήματα· το 429 της Oura γίνεται σεβαστό).
 /// - Γράφει στο ιστορικό ΜΟΝΟ τις μέρες που η «νύχτα» έρχεται από το Oura (δες sources.dart), με τα κλειδιά του.
 /// - Κρατά τις λεπτομέρειες των τελευταίων νυχτών (ώρες, φάσεις, υπνάκοι) για τις οθόνες.
 library;
@@ -104,8 +107,8 @@ enum OuraStatus {
   disconnected,
 }
 
-/// Πόσο περιμένουμε μετά από κάθε αποτέλεσμα (εκτός από τη χειροκίνητη «Ενημέρωση τώρα», που επιτρέπεται
-/// το πολύ μία φορά το λεπτό).
+/// Πόσο περιμένουν οι ΑΥΤΟΜΑΤΕΣ αναγνώσεις μετά από κάθε αποτέλεσμα. Η ρητή ενέργεια του χρήστη δεν περιμένει
+/// (εκτός από το 429 και το [ouraUserGap], round 1, S5-10).
 Duration ouraBackoffFor(OuraErrorKind? k, {Duration? retryAfter}) => switch (k) {
       null => ouraMinInterval,
       OuraErrorKind.reconnect || OuraErrorKind.noRefresh || OuraErrorKind.scopeMissing => const Duration(hours: 6),
@@ -139,7 +142,8 @@ enum FirstNightChoice {
   ask,
 }
 
-FirstNightChoice firstNightChoice(DateTime now) => now.hour < 4 ? FirstNightChoice.today : FirstNightChoice.ask;
+FirstNightChoice firstNightChoice(DateTime now) =>
+    now.hour < ouraNightDueHour ? FirstNightChoice.today : FirstNightChoice.ask;
 
 /// Η πρώτη νύχτα του Oura (η ημερομηνία της είναι το πρωί που τελειώνει). [woreRing]: η απάντηση στην ερώτηση
 /// (04:00–23:59)· χωρίς απάντηση, από απόψε.
@@ -324,11 +328,60 @@ mixin OuraStore on ChangeNotifier {
   /// Ο ύπνος σήμερα δεν έχει πηγή (αποσυνδέθηκε το Oura).
   bool get sleepUnsourced => plan.nightSource(dayOf(ouraClock())) == Source.none;
 
+  /// Round 1 (U2b-09): σήμερα ο ύπνος δεν είναι του ρολογιού, αλλά από απόψε είναι (ρητή επιλογή «Ο ύπνος ξανά από το
+  /// ρολόι» μετά την αποσύνδεση). Οι οθόνες το λένε, αντί να ζητούν ξανά μια επιλογή που έγινε ήδη.
+  bool get watchSleepFromTonight {
+    final today = dayOf(ouraClock());
+    return plan.nightSource(today) != Source.watch &&
+        plan.nightSource(DateTime(today.year, today.month, today.day + 1)) == Source.watch;
+  }
+
+  /// Round 1 (S5-2 / U2a-05): η νύχτα που δείχνεται ως «χθες βράδυ». Κανονικά η νύχτα με τη σημερινή ημερομηνία (το
+  /// πρωί που ξύπνησες). Πριν από τις 04:00, όσο αυτή δεν έχει έρθει (δεν έχει τελειώσει ακόμα), είναι η νύχτα της
+  /// προηγούμενης ημερομηνίας, όπως λίγο πριν από τα μεσάνυχτα· μόνο αν και εκείνη είναι νύχτα του Oura.
+  DateTime ouraNightDay(DateTime now) {
+    final today = dayOf(now);
+    if (now.hour >= ouraNightDueHour || ouraNightFor(today)?.main != null) return today;
+    final prev = DateTime(today.year, today.month, today.day - 1);
+    return plan.nightSource(today) == Source.oura && plan.nightSource(prev) == Source.oura ? prev : today;
+  }
+
+  /// Round 1 (S5-10): το Oura είναι η πηγή σήμερα, η νύχτα με τη σημερινή ημερομηνία «οφείλεται» (από τις 04:00) και
+  /// δεν έχει έρθει. Τότε οι κάρτες λένε «άνοιξε την εφαρμογή Oura και γύρνα εδώ», και η επιστροφή πρέπει να διαβάζει.
+  bool _ouraAwaitsNight(DateTime now) {
+    if (now.hour < ouraNightDueHour) return false;
+    final today = dayOf(now);
+    return plan.nightSource(today) == Source.oura && ouraNightFor(today)?.main == null;
+  }
+
+  /// Η εφαρμογή μόλις άνοιξε ή ο χρήστης μόλις γύρισε σε αυτήν ([markOuraReturn]): η ΠΡΩΤΗ αυτόματη ανάγνωση μετά
+  /// από αυτό διαβάζει χωρίς το όριο των 30 λεπτών, αν περιμένουμε νύχτα (S5-10). Μίας χρήσης.
+  bool _ouraReturned = false;
+
+  /// Round 1 (S5-10): ο χρήστης γύρισε στην εφαρμογή (π.χ. από την εφαρμογή Oura, όπως του ζήτησε η κάρτα «Περιμένει
+  /// το Oura»). Καλείται από το `didChangeAppLifecycleState` του HealthStore, πριν από την ανάγνωση.
+  void markOuraReturn() => _ouraReturned = true;
+
+  /// Round 1 (S5-10): ανάγνωση του Oura στην επιστροφή στην εφαρμογή, χωρίς ανάγνωση της Samsung. `true` αν άλλαξαν οι
+  /// ώρες ύπνου του Oura (ήρθε ή διορθώθηκε νύχτα): τότε ο καλών κάνει πλήρη ανανέωση, ώστε οι τιμές του ρολογιού που
+  /// κρίνονται με τις ώρες ύπνου (οξυγόνο νύχτας, παλμοί μέρας) να ξαναϋπολογιστούν με τη νέα νύχτα.
+  Future<bool> syncOuraOnReturn() async {
+    final before = _ouraWindowsStamp();
+    await syncOura();
+    return _ouraWindowsStamp() != before;
+  }
+
+  String _ouraWindowsStamp() => [
+        for (final r in ouraWindows.ranges) '${r.$1.millisecondsSinceEpoch}-${r.$2.millisecondsSinceEpoch}',
+      ].join(',');
+
   DateTime? get ouraLastSync => ouraSyncedMs == null ? null : DateTime.fromMillisecondsSinceEpoch(ouraSyncedMs!);
 
   Future<void> startOura() async {
     if (_ouraStarted) return;
     _ouraStarted = true;
+    // S5-10: το άνοιγμα της εφαρμογής μετρά όπως η επιστροφή σε αυτήν (η πρώτη ανάγνωση φέρνει τη νύχτα που περιμένουμε).
+    _ouraReturned = true;
     // Προσωρινά αρχεία από εγγραφή που διακόπηκε (μόνο τα δικά μας, στο Android). Δεν περιμένουμε.
     unawaited(ChannelVault.channel.invokeMethod<int>('cleanTmp').then((_) {}, onError: (_) {}));
     _tokensKnown = false;
@@ -366,8 +419,9 @@ mixin OuraStore on ChangeNotifier {
     final src = plan.nightSource(today);
     if (src == Source.none) return OuraStatus.disconnected;
     if (src != Source.oura) return ouraStartsTonight && ouraHasTokens ? OuraStatus.starting : OuraStatus.off;
-    // Αποσυνδέθηκε σήμερα (η σημερινή νύχτα μένει του Oura, από απόψε χωρίς πηγή): όχι «νέα σύνδεση».
-    if (!ouraHasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) == Source.none) {
+    // Αποσυνδέθηκε σήμερα (η σημερινή νύχτα μένει του Oura, από απόψε χωρίς πηγή): όχι «νέα σύνδεση». Round 1
+    // (U2b-01/09): το ίδιο όταν μετά την αποσύνδεση διάλεξε ρητά «από απόψε το ρολόι» ([watchSleepFromTonight]).
+    if (!ouraHasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) != Source.oura) {
       return OuraStatus.disconnected;
     }
     if (!ouraHasTokens ||
@@ -379,7 +433,8 @@ mixin OuraStore on ChangeNotifier {
     if (ouraError == OuraErrorKind.subscription) return OuraStatus.subscription;
     if (ouraError != null) return OuraStatus.retry;
     if (ouraNightFor(today)?.main != null) return OuraStatus.ok;
-    final morning = ouraClock().hour < 12;
+    final hour = ouraClock().hour;
+    final morning = hour < 12;
     final c = ouraConnectedMs;
     // Μέρα της σύνδεσης με πρώτη νύχτα τη σημερινή («Ναι» στην ερώτηση, ως τις 23:59): «περιμένει το Oura» όλη τη
     // μέρα, όχι «χωρίς ύπνο» πριν καν συγχρονίσει η εφαρμογή Oura.
@@ -387,6 +442,9 @@ mixin OuraStore on ChangeNotifier {
         sameDay(DateTime.fromMillisecondsSinceEpoch(c), today)) {
       return OuraStatus.startingNow;
     }
+    // Round 1 (S5-2 / U2a-05): πριν από τις 04:00 η νύχτα με τη σημερινή ημερομηνία δεν έχει τελειώσει (κοιμάσαι ή δεν
+    // έχεις κοιμηθεί ακόμα). Δεν «περιμένουμε» τίποτα: καμία κάρτα «άνοιξε την εφαρμογή Oura» για νύχτα που δεν έγινε.
+    if (hour < ouraNightDueHour) return OuraStatus.ok;
     return morning ? OuraStatus.waiting : OuraStatus.missing;
   }
 
@@ -579,8 +637,10 @@ mixin OuraStore on ChangeNotifier {
       ouraLastScope = ex.scope;
       await savePrefsNow();
       await ouraLink.clearConnecting();
-      // Αν η πρώτη νύχτα είναι η σημερινή, διαβάζεται αμέσως (μπορεί να έχει ήδη έρθει).
-      if (!from.isAfter(today)) unawaited(syncOura(force: true));
+      // Αν η πρώτη νύχτα είναι η σημερινή, διαβάζεται αμέσως (μπορεί να έχει ήδη έρθει). Round 1 (S5-3): το ίδιο όταν
+      // η σύνδεση έγινε ξανά μέσα σε εποχή Oura που τρέχει (π.χ. μετά από «Χρειάζεται νέα σύνδεση»): οι νύχτες που
+      // έλειψαν έρχονται τώρα, όχι στο επόμενο άνοιγμα της εφαρμογής.
+      if (!from.isAfter(today) || plan.nightSource(today) == Source.oura) unawaited(syncOura(force: true));
     } on OuraError catch (e) {
       ouraLoginError = e.kind;
       ouraLoginCode = e.code;
@@ -747,7 +807,9 @@ mixin OuraStore on ChangeNotifier {
   ///   «ξανά από το ρολόι» μένει.
   /// - Αν και αύριο η πηγή θα ήταν το Oura: από απόψε χωρίς πηγή (κενές νύχτες), ώσπου να συνδεθεί ξανά ή να
   ///   διαλέξει ρητά το ρολόι ([sleepFromWatchAgain]). Η χθεσινή νύχτα του Oura μένει.
-  Future<void> disconnectOura() async {
+  /// Round 1 (S5-8): επιστρέφει αν η άδεια ανακλήθηκε και στην Oura (`false` = χωρίς δίκτυο ή η Oura δεν απάντησε· τα
+  /// tokens σβήστηκαν από το κινητό έτσι κι αλλιώς), για να το πει η οθόνη αντί για ένα σκέτο «Αποσυνδέθηκε».
+  Future<bool> disconnectOura() async {
     // Μία τελευταία ανάγνωση πριν από την ανάκληση (έλεγχος 4/11, A3): νύχτες που δεν είχαν διαβαστεί ακόμα (π.χ. η
     // χθεσινή, πριν από το όριο των 30 λεπτών) δεν χάνονται. Με μικρό χρονικό όριο· αν δεν προλάβει, η αποσύνδεση
     // κερδίζει (ό,τι έρθει μετά πετιέται).
@@ -764,7 +826,8 @@ mixin OuraStore on ChangeNotifier {
     } catch (_) {}
     // Έλεγχος 2, C12: σημάδι «αποσυνδέεται» ΠΡΙΝ από την ανάκληση: αν η εφαρμογή κλείσει ανάμεσα στο σβήσιμο των
     // tokens και στην αλλαγή του σχεδίου, η επόμενη εκκίνηση ολοκληρώνει την αποσύνδεση ([_finishMarker]).
-    await ouraLink.disconnect(marker: jsonEncode({'disconnecting': true, 'at': ouraClock().millisecondsSinceEpoch}));
+    final revoked =
+        await ouraLink.disconnect(marker: jsonEncode({'disconnecting': true, 'at': ouraClock().millisecondsSinceEpoch}));
     ouraHasTokens = false;
     ouraError = null;
     ouraTriedMs = null;
@@ -774,6 +837,17 @@ mixin OuraStore on ChangeNotifier {
     if (await _disconnectPlan()) await ouraLink.clearConnecting();
     await savePrefsNow();
     notifyListeners();
+    return revoked;
+  }
+
+  /// Round 1 (U2b-11): η πηγή του ύπνου από απόψε ΑΝ γίνει τώρα αποσύνδεση, με τον ίδιο κανόνα του [_disconnectPlan]
+  /// (φεύγουν οι μελλοντικές εποχές Oura· αν μετά η αυριανή νύχτα θα ήταν του Oura, μένει χωρίς πηγή). Για το κείμενο
+  /// του διαλόγου «Αποσύνδεση», ώστε να γράφει τη συνέπεια που πράγματι θα γίνει.
+  Source get sleepSourceAfterDisconnect {
+    final today = dayOf(ouraClock());
+    final kept = SourcePlan([for (final e in plan.eras) if (!(e.source == Source.oura && e.from.isAfter(today))) e]);
+    final next = kept.nightSource(DateTime(today.year, today.month, today.day + 1));
+    return next == Source.oura ? Source.none : next;
   }
 
   /// Το σχέδιο μετά την αποσύνδεση: φεύγουν οι μελλοντικές εποχές Oura και από απόψε χωρίς πηγή. `false` αν δεν
@@ -793,11 +867,13 @@ mixin OuraStore on ChangeNotifier {
   /// Η σύνδεση χρειάζεται ξανά «Σύνδεση με Oura» (τα tokens έχουν ανακληθεί).
   Future<void> restorePlan(SourcePlan previous) => setPlan(previous);
 
-  /// Ρητή επιλογή: ο ύπνος ξανά από το ρολόι, από απόψε (νέα αλλαγή πηγής).
-  Future<void> sleepFromWatchAgain() async {
+  /// Ρητή επιλογή: ο ύπνος ξανά από το ρολόι, από απόψε (νέα αλλαγή πηγής). Round 1 (U2b-09): `false` αν το σχέδιο
+  /// δεν γράφτηκε (π.χ. άγνωστο σχέδιο πηγών), για να το πει η οθόνη.
+  Future<bool> sleepFromWatchAgain() async {
     final today = dayOf(ouraClock());
-    await setPlan(plan.withEra(Source.watch, DateTime(today.year, today.month, today.day + 1)));
+    final ok = await setPlan(plan.withEra(Source.watch, DateTime(today.year, today.month, today.day + 1)));
     notifyListeners();
+    return ok;
   }
 
   // ---------------------------------------------------------------------------
@@ -806,19 +882,21 @@ mixin OuraStore on ChangeNotifier {
 
   Future<void>? _sync;
 
-  /// Διαβάζει το Oura αν είναι η πηγή του ύπνου και πέρασε αρκετή ώρα (ή [force], το πολύ μία φορά το λεπτό).
+  /// Διαβάζει το Oura αν είναι η πηγή του ύπνου και πέρασε αρκετή ώρα (αυτόματη ανάγνωση: 30 λεπτά).
+  /// [force]: ρητή ενέργεια του χρήστη (τράβηγμα προς τα κάτω, «Ενημέρωση τώρα», κουμπί κάρτας) ή μόλις έγινε σύνδεση:
+  /// διαβάζει πάντα, με μόνο φρένο το [ouraUserGap] και την αναμονή που ζήτησε η Oura (429) (round 1, S5-10).
   /// Μία ανάγνωση τη φορά. [regroup]: και πριν από τα 30 λεπτά, αν η προηγούμενη ανάγνωση αυτής της συνεδρίας
   /// έκρινε ένα πρωινό κενό χωρίς τα βήματα του και τώρα υπάρχουν πιο φρέσκα (έλεγχος 4, 1_data M1).
   Future<void> syncOura({bool force = false, bool regroup = false}) =>
       _sync ??= _syncOnce(force, regroup: regroup).whenComplete(() => _sync = null);
 
-  /// Πόσο μένει ώσπου να επιτρέπεται πάλι «Ενημέρωση τώρα» (μία φορά το λεπτό). Μηδέν = τώρα.
-  /// Μια δοκιμή «στο μέλλον» (το ρολόι πήγε πίσω) δεν μπλοκάρει.
+  /// Πόσο μένει ώσπου να επιτρέπεται πάλι ανάγνωση με ρητή ενέργεια ([ouraUserGap] από την προηγούμενη προσπάθεια·
+  /// round 1, S5-10: πριν, ένα λεπτό). Μηδέν = τώρα. Μια δοκιμή «στο μέλλον» (το ρολόι πήγε πίσω) δεν μπλοκάρει.
   Duration get ouraSyncNowIn {
     final t = ouraTriedMs;
     final ms = ouraClock().millisecondsSinceEpoch;
     if (t == null || t > ms) return Duration.zero;
-    final left = const Duration(minutes: 1).inMilliseconds - (ms - t);
+    final left = ouraUserGap.inMilliseconds - (ms - t);
     return left <= 0 ? Duration.zero : Duration(milliseconds: left);
   }
 
@@ -898,11 +976,24 @@ mixin OuraStore on ChangeNotifier {
     // Χρόνοι από ρολόι που είχε πάει μπροστά: ληγμένοι (αλλιώς η ανάγνωση θα έμενε μπλοκαρισμένη).
     if (tried != null && tried > ms) tried = null;
     if (backoff != null && backoff > ms + ouraMaxBackoff.inMilliseconds) backoff = null;
+    // Η Oura ζήτησε αναμονή (429, Retry-After): γίνεται σεβαστή σε ΚΑΘΕ ανάγνωση, και στη ρητή.
+    final rateWait = ouraError == OuraErrorKind.rateLimited && backoff != null && ms < backoff;
+    // Round 1 (S5-10): «μόλις άνοιξε / γύρισε στην εφαρμογή» ([markOuraReturn]) καταναλώνεται από την πρώτη αυτόματη
+    // ανάγνωση. Αν περιμένουμε νύχτα (η κάρτα ζήτησε «άνοιξε την εφαρμογή Oura και γύρνα εδώ») και το τελευταίο
+    // αποτέλεσμα δεν ζητά ενέργεια στον λογαριασμό (σύνδεση, άδεια, συνδρομή) ούτε είναι δικό μας λάθος ρύθμισης,
+    // διαβάζει όπως η ρητή ενέργεια. Κάθε άλλη αυτόματη ανάγνωση κρατά το όριο των 30 λεπτών και τις αναμονές.
+    final returned = !force && !last && _ouraReturned;
+    if (!force && !last) _ouraReturned = false;
+    final lastError = ouraError;
+    final eager = returned &&
+        _ouraAwaitsNight(now) &&
+        (lastError == null || lastError == OuraErrorKind.network || lastError == OuraErrorKind.rateLimited);
     if (last) {
       // Η τελευταία ανάγνωση πριν από την αποσύνδεση: χωρίς το όριο των 30 λεπτών, αλλά όχι αν η Oura ζήτησε αναμονή.
-      if (ouraError == OuraErrorKind.rateLimited && backoff != null && ms < backoff) return;
-    } else if (force) {
-      if (!ouraCanSyncNow) return;
+      if (rateWait) return;
+    } else if (force || eager) {
+      // Πάντα, με μόνο φρένο λίγα δευτερόλεπτα από την προηγούμενη προσπάθεια (διπλά πατήματα) και το 429.
+      if (rateWait || !ouraCanSyncNow) return;
     } else {
       if (backoff != null && ms < backoff) return;
       final stepsAt = watchStepsReadAt;
@@ -983,7 +1074,8 @@ mixin OuraStore on ChangeNotifier {
     }
   }
 
-  /// «Ενημέρωση τώρα» από τη σελίδα Oura (το πολύ μία φορά το λεπτό).
+  /// «Ενημέρωση τώρα»: ρητή ανάγνωση μόνο του Oura ([ouraUserGap]). Οι οθόνες καλούν το `refresh()` του HealthStore,
+  /// που διαβάζει το Oura με τον ίδιο τρόπο ΚΑΙ ξαναϋπολογίζει τις τιμές του ρολογιού με τη νύχτα που ήρθε.
   Future<void> syncOuraNow() => syncOura(force: true);
 
   /// Οι εγγραφές του αρχείου νυχτών μία-μία (μια παλιότερη δεν γράφει πάνω σε νεότερη).

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget «Γρήγορο φαγητό» (13/11): δύο κουμπιά ίδιου πλάτους, ύψος τουλάχιστον 48 dp. Χρώματα από values/values-night. -->
+<!-- Widget «Γρήγορο φαγητό» (13/11): δύο κουμπιά ίδιου πλάτους, ύψος τουλάχιστον 48 dp. Χρώματα από values/values-night.
+     Round 1 (U7-17 β): τα γράμματα μικραίνουν ως 12 sp αντί να κόβονται («+ Φαγ…», «Barco…») σε στενό widget. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/qf_root"
     android:layout_width="match_parent"
@@ -14,6 +15,10 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:autoSizeMaxTextSize="15sp"
+        android:autoSizeMinTextSize="12sp"
+        android:autoSizeStepGranularity="1sp"
+        android:autoSizeTextType="uniform"
         android:background="@drawable/qw_button_food"
         android:contentDescription="Προσθήκη φαγητού"
         android:ellipsize="end"
@@ -30,6 +35,10 @@
         android:layout_height="match_parent"
         android:layout_marginStart="6dp"
         android:layout_weight="1"
+        android:autoSizeMaxTextSize="15sp"
+        android:autoSizeMinTextSize="12sp"
+        android:autoSizeStepGranularity="1sp"
+        android:autoSizeTextType="uniform"
         android:background="@drawable/qw_button_plain"
         android:contentDescription="Σάρωση barcode"
         android:ellipsize="end"

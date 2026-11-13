@@ -16,6 +16,25 @@ object TrainingRules {
     fun restTrigger(nowElapsed: Long, left: Long): Long = nowElapsed + left.coerceIn(0L, MAX_REST_MS)
 
     /**
+     * Το training.json που δεν διαβάζεται μπαίνει στην άκρη (round1, S9-9): μετονομάζεται σε «training.json.bad» (ή
+     * «training.json.<ώρα>.bad» αν υπάρχει ήδη τέτοιο) και κρατιέται· ποτέ δεν σβήνεται και ποτέ δεν γράφεται από πάνω,
+     * όπως τα αρχεία παλμών ([HrFiles.setAside]). Έτσι η εφαρμογή ξεκινά με άδειες προπονήσεις και μπορεί ξανά να
+     * αποθηκεύει και να κάνει επαναφορά από αντίγραφο. Το νέο όνομα, ή null αν δεν έγινε (τότε τίποτα δεν άλλαξε).
+     * Η «Διαγραφή όλων» το σβήνει μαζί με όλο τον φάκελο· το προσωρινό «.tmp» μιας εγγραφής δεν το αγγίζει κανείς εδώ.
+     */
+    fun setAside(f: java.io.File, now: Long = System.currentTimeMillis()): String? {
+        return try {
+            if (!f.isFile) return null
+            var bad = java.io.File(f.parentFile, f.name + ".bad")
+            if (bad.exists()) bad = java.io.File(f.parentFile, f.name + "." + now + ".bad")
+            if (bad.exists()) return null
+            if (f.renameTo(bad)) bad.name else null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
      * Πόσο άργησε ως τώρα το «τέλος διαλείμματος» σε αυτό το κινητό (13/11): το μετρά το ίδιο το κινητό, κάθε φορά που
      * χτυπά, και μπαίνει στην «Αναφορά για έλεγχο». Έτσι η απόφαση για την άδεια «Ξυπνητήρια και υπενθυμίσεις» βγαίνει από
      * αριθμούς. [count]: πόσες φορές χτύπησε· [sumMs], [maxMs], [lastMs]: καθυστέρηση σε χιλιοστά· [over2s]: πόσες φορές

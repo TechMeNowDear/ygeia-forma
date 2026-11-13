@@ -86,6 +86,12 @@ object Repo {
     fun zoneNow(): WalkZone? = plan?.zone
 
     /**
+     * Η δόνηση ζώνης δεν φτάνει τώρα στον καρπό: το ρολόι είναι σε Σίγαση ή σε Εξοικονόμηση ενέργειας (έλεγχος 13/11,
+     * S8-02, [zoneMutedNow]). Η οθόνη του περπατήματος γράφει «χωρίς δόνηση»· το κρίνει η υπηρεσία ανά λίγα δευτερόλεπτα.
+     */
+    var zoneMuted = false
+
+    /**
      * Χρειάζονται παλμοί χωρίς καθυστέρηση (εφεδρεία αισθητήρα όταν το ρολόι δεν στέλνει ανά 5″): όριο γιατρού, ή
      * δόνηση ζώνης σε περπάτημα. Αλλιώς τίποτα παραπάνω (μπαταρία).
      */
@@ -341,6 +347,7 @@ object Repo {
         restored = false
         alarmMutedEpisode = -1
         zoneAlarm.stop()
+        zoneMuted = false
     }
 
     // ------------------------------------------------------------------ αντίγραφα ασφαλείας
@@ -362,6 +369,17 @@ object Repo {
     /** Αποτέλεσμα που πρέπει να φτάσει στο κινητό· μένει ώσπου να μπει στο Data Layer ([removePending]). */
     fun savePending(ctx: Context, id: String, json: JSONObject): Boolean =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PENDING_PREFIX + id, json.toString()).commit()
+
+    /**
+     * Το στιγμιότυπο της άσκησης σβήνεται ΜΟΝΟ αν το αποτέλεσμα γράφτηκε στην αναμονή (έλεγχος 13/11, S8-08). [save]: η
+     * εγγραφή ([savePending], false π.χ. με γεμάτο χώρο)· [clear]: το σβήσιμο ([clearRun]). Πριν, το στιγμιότυπο σβηνόταν
+     * ό,τι κι αν απαντούσε η εγγραφή: με γεμάτο χώρο το αποτέλεσμα έμενε μόνο στη μνήμη. Επιστρέφει αν γράφτηκε.
+     */
+    fun storeResultThenClear(save: () -> Boolean, clear: () -> Unit): Boolean {
+        val saved = save()
+        if (saved) clear()
+        return saved
+    }
 
     fun removePending(ctx: Context, id: String) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(PENDING_PREFIX + id).commit()
@@ -562,8 +580,10 @@ object Repo {
                 clearRun(ctx)
                 return null
             }
-            if (r != null) savePending(ctx, r.first, r.second)
-            clearRun(ctx)
+            // S8-08: αν το μερικό αποτέλεσμα δεν γράφτηκε στην αναμονή, το στιγμιότυπο μένει (ξαναδοκιμάζεται στο επόμενο
+            // άνοιγμα, με το ίδιο id). Το αποτέλεσμα επιστρέφεται έτσι κι αλλιώς, για να σταλεί τώρα αν γίνεται.
+            if (r != null) storeResultThenClear({ savePending(ctx, r.first, r.second) }, { clearRun(ctx) })
+            else clearRun(ctx)
             return r
         } catch (e: Exception) {
             android.util.Log.e("YgeiaWatch", "finalizeRun", e)

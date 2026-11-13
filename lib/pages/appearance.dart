@@ -106,7 +106,8 @@ class _AppearancePageState extends State<AppearancePage> {
                       Text(
                         'Ισχύει σε αυτή τη συσκευή. Αλλάζουν μόνο τα χρώματα.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: c.textSecondary, fontSize: 13),
+                        // Round 1 (U4-14 δ): ίδιο μέγεθος με κάθε γκρι εξήγηση κάτω από ρύθμιση.
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                     ],
                   ),
@@ -135,7 +136,8 @@ class _ModeSwitch extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: c.background,
-        borderRadius: BorderRadius.circular(15),
+        // Round 1 (U4-14 θ): ίδιες γωνίες με τους άλλους επιλογείς (16 έξω, 12 μέσα).
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.hairline),
       ),
       child: Row(
@@ -194,17 +196,16 @@ class _ThemeGroup extends StatelessWidget {
   final List<Aigaio> themes;
   final Aigaio selected;
 
-  /// Όταν η φωτεινότητα είναι κλειδωμένη στο άλλο: φαίνονται πιο σβηστά, αλλά πατιούνται.
+  /// Όταν η φωτεινότητα είναι κλειδωμένη στο άλλο: οι μικρές εικόνες φαίνονται πιο σβηστές, αλλά πατιούνται.
+  /// Round 1 (U4-11): σβηστή ΜΟΝΟ η εικόνα· τα γράμματα (τίτλος, όνομα, χαρακτήρας) μένουν πλήρη, αλλιώς έπεφταν στο
+  /// 1,9–4,2:1 και αυτό δεν επιτρέπεται για κάτι που πατιέται.
   final bool dimmed;
   final ValueChanged<Aigaio> onPick;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: dimmed ? 0.45 : 1,
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
@@ -214,7 +215,8 @@ class _ThemeGroup extends StatelessWidget {
                 Icon(icon, size: 19, color: c.text),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  // Round 1 (U4-14 γ): ίδιος τίτλος με το [SectionLabel].
+                  child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.2)),
                 ),
                 Text(hint, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textSecondary)),
               ],
@@ -226,22 +228,25 @@ class _ThemeGroup extends StatelessWidget {
             children: [
               for (final (i, t) in themes.indexed) ...[
                 if (i > 0) const SizedBox(width: 10),
-                Expanded(child: _ThemeTile(palette: t, selected: identical(t, selected), onTap: () => onPick(t))),
+                Expanded(
+                    child: _ThemeTile(palette: t, selected: identical(t, selected), dimmed: dimmed, onTap: () => onPick(t))),
               ],
             ],
           ),
         ],
-      ),
     );
   }
 }
 
 /// Ένα θέμα: μικρή εικόνα της οθόνης «Σήμερα» με τα χρώματά του, όνομα και χαρακτήρας.
 class _ThemeTile extends StatelessWidget {
-  const _ThemeTile({required this.palette, required this.selected, required this.onTap});
+  const _ThemeTile({required this.palette, required this.selected, required this.onTap, this.dimmed = false});
   final Aigaio palette;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Σβηστή μόνο η μικρή εικόνα (δες [_ThemeGroup.dimmed]).
+  final bool dimmed;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +289,10 @@ class _ThemeTile extends StatelessWidget {
               children: [
                 Stack(
                   children: [
-                    Container(
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: dimmed ? 0.45 : 1,
+                      child: Container(
                       height: 136,
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
@@ -334,6 +342,7 @@ class _ThemeTile extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
                     ),
                     if (selected)
                       Positioned(
@@ -385,10 +394,12 @@ class _Sample extends StatelessWidget {
   Widget build(BuildContext context) {
     final x = palette;
     final soft = Colors.white.withValues(alpha: 0.8);
+    // Round 1 (U4-3): γράμματα στο χρώμα του κειμένου πάνω στο απαλό χρώμα (το χρώμα σε δικό του απαλό φόντο έπεφτε
+    // στο 4,0–4,4:1 σε Αιγαίο, Ελιά, Αυγή)· το χρώμα του θέματος φαίνεται στο «χάπι».
     Widget chip(String text, Color color) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(color: x.tint(color), borderRadius: BorderRadius.circular(999)),
-          child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+          child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: x.text)),
         );
     return Container(
       padding: const EdgeInsets.all(18),
@@ -405,7 +416,7 @@ class _Sample extends StatelessWidget {
               Expanded(
                 child: Text(
                   'ΔΕΙΓΜΑ',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: x.textSecondary),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: x.textSecondary),
                 ),
               ),
               Text(

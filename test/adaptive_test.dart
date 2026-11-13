@@ -216,12 +216,13 @@ void main() {
     expect(seen[21]!, closeTo(146, 2));
     expect(seen[42]!, closeTo(48, 2));
     expect(seen[42]! < seen[35]! && seen[35]! < seen[28]! && seen[28]! < seen[21]!, isTrue);
-    // Αν οι παλιότερες μέρες δεν έχουν φαγητό γραμμένο, μετρά το μικρότερο παράθυρο που έχει αρκετά.
+    // Αν οι παλιότερες μέρες δεν έχουν φαγητό γραμμένο, το παράθυρο ξεκινά μετά από αυτές. Έλεγχος 13/11 (S1-1): 21 μέρες
+    // χωρίς καμία καταγραφή είναι κενό καταγραφής· πριν μετρούσε το παράθυρο των 28 ημερών, με 7 μέρες χωρίς φαγητό μέσα.
     final t = DateTime(2027, 1, 4);
     final s = _sim(t, days: 49, noise: 0.3);
     final last21 = {for (final e in s.intake.entries) if (!e.key.isBefore(DateTime(2026, 12, 14))) e.key: e.value};
     final r = estimateExpenditure(intake: last21, weights: s.weights, today: t, formulaTdee: 2745, goalKcal: 2250, since: since);
-    expect((r.status, r.est!.windowDays, r.est!.intakeDays), (AdaptStatus.ok, 28, 21), reason: '21 μέρες φαγητό φτάνουν για 28 (θέλει 19), όχι για 35');
+    expect((r.status, r.est!.windowDays, r.est!.intakeDays), (AdaptStatus.ok, 21, 21), reason: 'το παράθυρο ξεκινά μετά το κενό');
   });
 
   test('Α2: η πρώτη εβδομάδα των στόχων δεν μετρά στην εκτίμηση· πρώτη εκτίμηση την 28η μέρα', () {

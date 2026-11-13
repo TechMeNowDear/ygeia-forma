@@ -108,7 +108,7 @@ bool wordsFit(BuildContext context, Iterable<String> texts, TextStyle style, dou
 }
 
 /// Σκελετός κάθε σελίδας: τίτλος, ανανέωση με τράβηγμα, μία στήλη στο κινητό, δύο σε μεγάλη οθόνη.
-/// Κάρτα που βάζει μόνη της το κενό από πάνω (και τίποτα όταν δεν φαίνεται), π.χ. μια θέση που μπορεί να είναι άδεια.
+/// Κάρτα που βάζει μόνη της το κενό από κάτω (και τίποτα όταν δεν φαίνεται), π.χ. μια θέση που μπορεί να είναι άδεια.
 mixin SelfSpaced on Widget {}
 
 class PageFrame extends StatelessWidget {
@@ -160,7 +160,13 @@ class PageFrame extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < items.length; i++) ...[
-                    if (i > 0 && items[i] is! SelfSpaced) SizedBox(height: items[i] is SectionHeader ? 22 : gap),
+                    // Έλεγχος 13/11 (U3b-13): μια θέση [SelfSpaced] βάζει το κενό της από ΚΑΤΩ· έτσι, πρώτη στη στήλη,
+                    // ξεκινά στο ίδιο ύψος με κάθε άλλη πρώτη κάρτα, και άδεια δεν αφήνει κενό.
+                    if (i > 0 && items[i - 1] is! SelfSpaced)
+                      SizedBox(height: items[i] is SectionHeader ? 22 : gap)
+                    // Round 1 (f9, U1a-1): τίτλος ενότητας μετά από θέση: η θέση έδωσε ήδη 14 (κάτω της ή πριν από αυτήν).
+                    else if (i > 0 && items[i] is SectionHeader)
+                      const SizedBox(height: 22.0 - gap),
                     items[i],
                   ],
                 ],
@@ -416,8 +422,13 @@ enum TrendKind { good, bad, neutral }
 
 /// «Χάπι» τάσης: ↑/↓ με χρώμα καλό/κακό/ουδέτερο.
 class TrendPill extends StatelessWidget {
-  const TrendPill(this.text, {super.key, this.kind = TrendKind.neutral, this.up, this.onDark = false, this.maxLines = 1});
+  const TrendPill(this.text,
+      {super.key, this.kind = TrendKind.neutral, this.up, this.onDark = false, this.maxLines = 1, this.keepLastWords = false});
   final String text;
+
+  /// Οι δύο τελευταίες λέξεις μένουν στην ίδια γραμμή (round 1, U1a-14: όχι «… από ό,τι | συνήθως», «−1,1 kg από | 13/8»).
+  /// Αλλάζει μόνο η ζωγραφική (αδιάσπαστο κενό)· το [text] μένει ίδιο.
+  final bool keepLastWords;
 
   /// Γραμμές πριν κοπεί με «…» (2 όπου το κείμενο είναι πρόταση, π.χ. η σύγκριση με το συνηθισμένο).
   final int maxLines;
@@ -439,7 +450,8 @@ class TrendPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: onDark ? Colors.white.withValues(alpha: 0.14) : c.tint(color),
-        borderRadius: BorderRadius.circular(20),
+        // Round 1 (U4-14 j): ίδιο σχήμα με κάθε «χάπι» κατάστασης της εφαρμογής.
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -450,7 +462,7 @@ class TrendPill extends StatelessWidget {
           ],
           Flexible(
             child: Text(
-              text,
+              keepLastWords ? text.replaceFirst(RegExp(r' (?=[^ ]*$)'), '\u00A0') : text,
               // Ποτέ κομμένο (σχέδια 9/11): αν δεν χωρά, πάει σε δεύτερη γραμμή.
               maxLines: maxLines < 3 ? 3 : maxLines,
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: color),
@@ -591,7 +603,15 @@ class StatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CardHeader(icon: icon, title: title, color: color, subtitle: subtitle),
+          // Round 1 (U5-25 β): ίδιο ύψος κεφαλίδας σε κάθε κάρτα (τίτλος μίας ή δύο γραμμών, με ή χωρίς ημερομηνία), ώστε
+          // στις κάρτες δίπλα δίπλα οι τιμές να είναι στην ίδια γραμμή.
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: MediaQuery.textScalerOf(context).scale(38)),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: CardHeader(icon: icon, title: title, color: color, subtitle: subtitle),
+            ),
+          ),
           const SizedBox(height: 14),
           if (value == null) ...[
             Text(
@@ -1071,35 +1091,51 @@ class _MiniBarsPainter extends CustomPainter {
 
 /// Μικρή γραμμή τάσης.
 class Sparkline extends StatelessWidget {
-  const Sparkline({super.key, required this.values, required this.color, this.height = 34});
+  const Sparkline({super.key, required this.values, required this.color, this.height = 34, this.minRange = 0});
   final List<double> values;
   final Color color;
   final double height;
+
+  /// Ελάχιστο εύρος του κάθετου άξονα (στις μονάδες της τιμής), όπως στο [LineChart]: ο φυσιολογικός θόρυβος μιας μέρας
+  /// (π.χ. 0,2 kg στο βάρος) να μη γεμίζει όλο το ύψος και να μοιάζει με μεγάλη αλλαγή (round 1, U1a-20).
+  final double minRange;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: height,
       width: double.infinity,
-      child: CustomPaint(painter: _SparkPainter(values, color)),
+      child: CustomPaint(painter: _SparkPainter(values, color, minRange: minRange)),
     );
   }
 }
 
+/// Τα όρια του κάθετου άξονα ενός μικρού γραφήματος: ελάχιστο εύρος [minRange] γύρω από τη μέση των τιμών.
+(double, double) sparkRange(List<double> values, double minRange) {
+  var lo = values.reduce(math.min);
+  var hi = values.reduce(math.max);
+  if (hi - lo < minRange) {
+    final mid = (hi + lo) / 2;
+    lo = mid - minRange / 2;
+    hi = mid + minRange / 2;
+  }
+  if (hi - lo < 1e-6) {
+    lo -= 1;
+    hi += 1;
+  }
+  return (lo, hi);
+}
+
 class _SparkPainter extends CustomPainter {
-  _SparkPainter(this.values, this.color);
+  _SparkPainter(this.values, this.color, {this.minRange = 0});
   final List<double> values;
   final Color color;
+  final double minRange;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (values.length < 2) return;
-    var lo = values.reduce(math.min);
-    var hi = values.reduce(math.max);
-    if (hi - lo < 1e-6) {
-      lo -= 1;
-      hi += 1;
-    }
+    final (lo, hi) = sparkRange(values, minRange);
     Offset at(int i) => Offset(
           size.width * i / (values.length - 1),
           4 + (size.height - 8) * (1 - (values[i] - lo) / (hi - lo)),
@@ -1141,6 +1177,61 @@ class _SparkPainter extends CustomPainter {
 // Μεγάλα γραφήματα (χωρίς βιβλιοθήκες)
 // ---------------------------------------------------------------------------
 
+/// Μέγεθος γραμμάτων στα γραφήματα: ακολουθεί το μέγεθος γραμμάτων του συστήματος, από 1× ως 1,6× (round 1, U1a-18·
+/// πριν έμενε 10–12 px και με γράμματα 2×). Η αναφορά για γιατρό ζωγραφίζεται χωρίς μεγέθυνση, άρα μένει ίδια.
+double chartTextScale(BuildContext context) =>
+    (MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling).clamp(minScaleFactor: 1, maxScaleFactor: 1.6).scale(10) / 10;
+
+/// Βήματα άξονα για διάρκειες σε λεπτά (τέταρτα, μισάωρα, ώρες).
+const minuteTickSteps = <double>[15, 30, 60, 120, 180, 240, 360];
+
+/// «Στρογγυλό» βήμα άξονα: το μικρότερο 1, 2 ή 5 × 10ⁿ (ή, με [steps], το πρώτο από αυτά) που είναι ≥ [raw].
+double niceStep(double raw, [List<double>? steps]) {
+  if (!raw.isFinite || raw <= 0) return 1;
+  if (steps != null && steps.isNotEmpty) {
+    for (final s in steps) {
+      if (s >= raw) return s;
+    }
+    return (raw / steps.last).ceilToDouble() * steps.last;
+  }
+  final p = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+  for (final m in const [1.0, 2.0, 5.0]) {
+    if (m * p >= raw * (1 - 1e-9)) return m * p;
+  }
+  return 10 * p;
+}
+
+/// Ο κάθετος άξονας ενός γραφήματος (round 1, U1b-09, U1a-19β): γραμμές σε ίσες αποστάσεις και σε «στρογγυλές» τιμές
+/// ([niceStep], τουλάχιστον [minStep]) που περιέχουν το [lo]…[hi], με 2 ως [maxIntervals] διαστήματα (το πιο σφιχτό).
+/// Πριν οι τρεις ετικέτες ήταν στρογγυλεμένες τυχαίες τιμές: «92 · 95 · 97» σε ίσες αποστάσεις, με το «95» στο 94,5.
+/// Επιστρέφει (κάτω τιμή, βήμα, διαστήματα)· πάνω τιμή = κάτω + βήμα × διαστήματα.
+(double, double, int) chartAxis(double lo, double hi, {int maxIntervals = 2, List<double>? steps, double minStep = 0}) {
+  if (!(hi > lo)) hi = lo + math.max(minStep, 1.0);
+  (double, double, int)? best;
+  for (var n = 2; n <= math.max(2, maxIntervals); n++) {
+    var step = math.max(niceStep((hi - lo) / n, steps), minStep);
+    var a = (lo / step).floorToDouble() * step;
+    for (var i = 0; i < 12 && a + n * step < hi - step * 1e-9; i++) {
+      step = math.max(niceStep(step * 1.000001, steps), minStep);
+      a = (lo / step).floorToDouble() * step;
+    }
+    if (best == null || n * step < best.$3 * best.$2 - 1e-9) best = (a, step, n);
+  }
+  return best!;
+}
+
+/// Κενά πολύ μεγαλύτερα από τη συνηθισμένη απόσταση των τιμών (round 1, U1b-10): πάνω από 3 μέρες ΚΑΙ πάνω από το
+/// τριπλάσιο της μεσαίας απόστασης. Εκεί η γραμμή κόβεται· πριν ένα κενό τριών εβδομάδων ζωγραφιζόταν σαν μετρημένη
+/// ευθεία. Δίνει τη μέρα της πρώτης τιμής μετά από κάθε τέτοιο κενό (τιμές παλιότερη πρώτη).
+List<DateTime> longGaps(List<(DateTime, double)> points) {
+  if (points.length < 3) return const [];
+  final gaps = [for (var i = 1; i < points.length; i++) daysBetween(points[i - 1].$1, points[i].$1)];
+  final positive = [for (final g in gaps) if (g > 0) g]..sort();
+  if (positive.isEmpty) return const [];
+  final limit = math.max(3, 3 * positive[positive.length ~/ 2]);
+  return [for (var i = 1; i < points.length; i++) if (gaps[i - 1] > limit) points[i].$1];
+}
+
 /// Ράβδοι ανά μέρα, με γραμμή μέσου όρου.
 class BarChart extends StatelessWidget {
   const BarChart({
@@ -1181,6 +1272,8 @@ class BarChart extends StatelessWidget {
           strongText: c.text,
           line: c.textSecondary,
           valueLabel: valueLabel,
+          card: c.card,
+          scale: chartTextScale(context),
         ),
       ),
     );
@@ -1199,6 +1292,8 @@ class _BarPainter extends CustomPainter {
     required this.strongText,
     required this.line,
     required this.valueLabel,
+    required this.card,
+    this.scale = 1,
   });
 
   final List<double?> values;
@@ -1211,19 +1306,23 @@ class _BarPainter extends CustomPainter {
   final Color strongText;
   final Color line;
   final String Function(double)? valueLabel;
+  final Color card;
+  final double scale;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (values.isEmpty) return;
-    const labelHeight = 20.0;
-    const topPad = 22.0;
+    final labelHeight = 20.0 * scale;
+    final topPad = 22.0 * scale;
     final chartHeight = size.height - labelHeight - topPad;
     final maxV = [...values.whereType<double>(), if (average != null) average!].fold<double>(0, math.max);
-    if (maxV <= 0) return;
+    if (maxV <= 0 || chartHeight <= 0) return;
 
     final slot = size.width / values.length;
     final barWidth = math.min(26.0, slot * 0.62);
     final showEvery = labels.length > 10 ? 2 : 1;
+    TextPainter? strongLabel;
+    var strongAt = Offset.zero;
 
     for (var i = 0; i < values.length; i++) {
       final v = values[i];
@@ -1239,14 +1338,15 @@ class _BarPainter extends CustomPainter {
           Paint()..color = strong ? barStrong : bar,
         );
         if (strong && valueLabel != null) {
-          final tp = _painter(valueLabel!(v), strongText, 12, bold: true);
+          final tp = _painter(valueLabel!(v), strongText, 12 * scale, bold: true);
           final x = (cx - tp.width / 2).clamp(0.0, math.max(0.0, size.width - tp.width)).toDouble();
-          tp.paint(canvas, Offset(x, topPad + chartHeight - h - 18));
+          strongLabel = tp;
+          strongAt = Offset(x, math.max(0.0, topPad + chartHeight - h - 4 - tp.height));
         }
       }
       final fromEnd = values.length - 1 - i;
       if (i < labels.length && fromEnd % showEvery == 0) {
-        _text(canvas, labels[i], Offset(cx, size.height - labelHeight + 4), strong ? strongText : text, 11,
+        _text(canvas, labels[i], Offset(cx, size.height - labelHeight + 4 * scale), strong ? strongText : text, 11 * scale,
             bold: strong);
       }
     }
@@ -1260,6 +1360,9 @@ class _BarPainter extends CustomPainter {
         canvas.drawLine(Offset(x, y), Offset(math.min(x + 3.5, size.width), y), paint);
       }
     }
+    // Round 1 (U1a-10): η τιμή της τελευταίας ράβδου τελευταία, πάνω σε πλάκα στο χρώμα της κάρτας· πριν έπεφτε πάνω
+    // στις γειτονικές ράβδους (όταν η τελευταία νύχτα ήταν μικρότερη) και στη γραμμή του μέσου όρου.
+    if (strongLabel != null) _plate(canvas, strongLabel, strongAt, card);
   }
 
   @override
@@ -1281,11 +1384,12 @@ class LineChart extends StatelessWidget {
     this.from,
     this.to,
     this.breaks = const [],
+    this.tickSteps,
   });
 
   /// Αλλαγές πηγής ή ορισμού (μέρα, σύντομη ετικέτα, π.χ. «Oura»): η γραμμή και το γέμισμα κόβονται εκεί, και μια
   /// λεπτή κάθετη γραμμή με την ετικέτα δείχνει την αλλαγή (έλεγχος 4, review M1: ποτέ μία γραμμή πάνω από δύο
-  /// συσκευές).
+  /// συσκευές). Η γραμμή κόβεται και σε κενό πολύ μεγαλύτερο από τη συνηθισμένη απόσταση των τιμών ([longGaps]).
   final List<(DateTime, String)> breaks;
 
   /// Το διάστημα του οριζόντιου άξονα (π.χ. οι 90 μέρες της αναφοράς), ίδιο για όλα τα γραφήματα μιας σελίδας, ώστε
@@ -1296,12 +1400,16 @@ class LineChart extends StatelessWidget {
   /// Οριζόντιες διακεκομμένες γραμμές ανά διάστημα (π.χ. η μεσαία τιμή κάθε περιόδου στις Τάσεις).
   final List<(DateTime, DateTime, double, Color)> levels;
 
-  /// Γραμμή αναφοράς (τιμή, ετικέτα, χρώμα): ΔΙΑΣΤΙΚΤΗ σε όλο το πλάτος, με την ετικέτα στη δεξιά άκρη, ώστε να
-  /// ξεχωρίζει από τις διακεκομμένες [levels] ακόμα κι όταν πέφτει πάνω τους (δεύτερος κλινικός έλεγχος M5).
+  /// Γραμμή αναφοράς (τιμή, ετικέτα, χρώμα): ΔΙΑΣΤΙΚΤΗ σε όλο το πλάτος, με την ετικέτα στο δεξί περιθώριο (στη θέση
+  /// των τιμών του άξονα), ώστε να ξεχωρίζει από τις διακεκομμένες [levels] (δεύτερος κλινικός έλεγχος M5) και να μην
+  /// κάθεται πάνω στις τιμές (round 1, U1b-02).
   final (double, String, Color)? reference;
 
   /// Ελάχιστο εύρος του κάθετου άξονα, ώστε μικρές διαφορές να μη φαίνονται τεράστιες.
   final double minRange;
+
+  /// Επιτρεπτά βήματα του κάθετου άξονα (π.χ. [minuteTickSteps] για διάρκειες σε λεπτά)· χωρίς αυτά 1, 2 ή 5 × 10ⁿ.
+  final List<double>? tickSteps;
   final List<(DateTime, double)> points;
   final double height;
   final String Function(double)? format;
@@ -1330,6 +1438,8 @@ class LineChart extends StatelessWidget {
           from: from,
           to: to,
           breaks: breaks,
+          tickSteps: tickSteps,
+          scale: chartTextScale(context),
         ),
       ),
     );
@@ -1368,6 +1478,8 @@ class _LinePainter extends CustomPainter {
     this.from,
     this.to,
     this.breaks = const [],
+    this.tickSteps,
+    this.scale = 1,
   });
 
   final List<(DateTime, String)> breaks;
@@ -1384,53 +1496,69 @@ class _LinePainter extends CustomPainter {
   final Color card;
   final String Function(double) format;
   final String Function(DateTime) dateLabel;
+  final List<double>? tickSteps;
+  final double scale;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty) return;
     const left = 4.0;
-    const right = 44.0;
-    const bottom = 22.0;
-    const top = 26.0;
+    final right = 44.0 * scale;
+    final bottom = 22.0 * scale;
+    final top = 26.0 * scale;
     final w = size.width - left - right;
     final h = size.height - bottom - top;
+    if (w <= 0 || h <= 0) return;
 
     final refs = [if (reference != null) reference!.$1];
-    var minV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs].reduce(math.min);
-    var maxV = [...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs].reduce(math.max);
+    final all = [...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs];
+    var minV = all.reduce(math.min);
+    var maxV = all.reduce(math.max);
+    final nonNegative = minV >= 0;
     if (maxV - minV < minRange) {
       final mid = (maxV + minV) / 2;
       minV = mid - minRange / 2;
       maxV = mid + minRange / 2;
     }
-    final pad = (maxV - minV) * 0.2;
+    final pad = (maxV - minV) * 0.1;
     minV -= pad;
     maxV += pad;
+    if (nonNegative && minV < 0) minV = 0;
+    // Άξονας σε στρογγυλές τιμές (U1b-09)· με ετικέτες ακέραιων (π.χ. παλμοί) ποτέ βήμα κάτω από 1, αλλιώς δύο γραμμές θα
+    // έγραφαν την ίδια τιμή.
+    final integer = format(0.5) == format(1) || format(0.5) == format(0);
+    final (axisLo, step, intervals) =
+        chartAxis(minV, maxV, maxIntervals: h >= 72 ? 3 : 2, steps: tickSteps, minStep: integer ? 1 : 0);
+    minV = axisLo;
+    maxV = axisLo + step * intervals;
 
     final ranged = from != null && to != null;
     final t0 = (ranged ? from! : points.first.$1).millisecondsSinceEpoch.toDouble();
     final t1 = (ranged ? to! : points.last.$1).millisecondsSinceEpoch.toDouble();
     final span = math.max(t1 - t0, 1.0);
 
+    double yOf(double v) => top + h * (1 - (v - minV) / (maxV - minV));
     Offset at((DateTime, double) p) {
       final x = points.length == 1 && !ranged ? left + w / 2 : left + w * ((p.$1.millisecondsSinceEpoch - t0) / span);
-      final y = top + h * (1 - (p.$2 - minV) / (maxV - minV));
-      return Offset(x, y);
+      return Offset(x, yOf(p.$2));
     }
 
     final gridPaint = Paint()
       ..color = grid
       ..strokeWidth = 1;
-    for (var i = 0; i <= 2; i++) {
-      final v = minV + (maxV - minV) * i / 2;
-      final y = top + h * (1 - i / 2);
+    final refY = reference == null ? null : yOf(reference!.$1);
+    for (var i = 0; i <= intervals; i++) {
+      final y = top + h * (1 - i / intervals);
       canvas.drawLine(Offset(left, y), Offset(left + w, y), gridPaint);
-      _textLeft(canvas, format(v), Offset(left + w + 8, y - 7), text, 11);
+      // Η ετικέτα της γραμμής αναφοράς παίρνει τη θέση μιας τιμής του άξονα που θα έπεφτε πάνω της.
+      if (refY != null && (refY - y).abs() < 13 * scale) continue;
+      _textLeft(canvas, format(minV + step * i), Offset(left + w + 8, y - 7 * scale), text, 11 * scale);
     }
 
-    // Ένα κομμάτι για κάθε πηγή/ορισμό ([breaks]): ποτέ γραμμή ή γέμισμα πάνω από την αλλαγή.
+    // Ένα κομμάτι για κάθε πηγή/ορισμό ([breaks]) και κάθε μεγάλο κενό ([longGaps]): ποτέ γραμμή ή γέμισμα από πάνω τους.
+    final segments = lineSegments(points, [for (final b in breaks) b.$1, ...longGaps(points)]);
     final path = Path();
-    for (final seg in lineSegments(points, [for (final b in breaks) b.$1])) {
+    for (final seg in segments) {
       final segPath = Path();
       for (var i = 0; i < seg.length; i++) {
         final o = at(seg[i]);
@@ -1466,7 +1594,7 @@ class _LinePainter extends CustomPainter {
       for (var y = top - 4; y < top + h; y += 6) {
         canvas.drawLine(Offset(x, y), Offset(x, math.min(y + 3, top + h)), rule);
       }
-      _textLeft(canvas, label, Offset(x + 3, top - 18), text, 10);
+      _textLeft(canvas, label, Offset(x + 3, top - 18 * scale), text, 10 * scale);
     }
     canvas.drawPath(
       path,
@@ -1477,10 +1605,15 @@ class _LinePainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round
         ..strokeCap = StrokeCap.round,
     );
+    final dot = Paint()..color = color;
     if (points.length <= 31) {
-      final dot = Paint()..color = color;
       for (final p in points) {
         canvas.drawCircle(at(p), 2.5, dot);
+      }
+    } else {
+      // Μια τιμή μόνη της ανάμεσα σε δύο μεγάλα κενά δεν έχει γραμμή: χωρίς κουκκίδα δεν θα φαινόταν (U1b-10).
+      for (final seg in segments) {
+        if (seg.length == 1) canvas.drawCircle(at(seg.first), 2.5, dot);
       }
     }
     for (final l in levels) {
@@ -1496,32 +1629,55 @@ class _LinePainter extends CustomPainter {
         canvas.drawLine(Offset(x, a.dy), Offset(math.min(x + 5, x1), a.dy), dash);
       }
     }
-    if (reference != null) {
-      final (v, label, col) = reference!;
-      final y = top + h * (1 - (v - minV) / (maxV - minV));
-      final dot = Paint()..color = col;
+    if (reference != null && refY != null) {
+      final (_, label, col) = reference!;
+      final refDot = Paint()..color = col;
       for (var x = left; x <= left + w; x += 5) {
-        canvas.drawCircle(Offset(x, y), 1.1, dot);
+        canvas.drawCircle(Offset(x, refY), 1.1, refDot);
       }
-      final tp = _painter(label, col, 10.5, bold: true);
-      tp.paint(canvas, Offset(left + w - tp.width - 2, y - tp.height - 1));
+      // Στο δεξί περιθώριο, όπως οι τιμές του άξονα (U1b-02): πριν καθόταν πάνω στις πιο πρόσφατες τιμές.
+      final refTp = _painter(label, col, 10.5 * scale, bold: true);
+      refTp.paint(canvas, Offset(left + w + 8, refY - refTp.height / 2));
     }
     final last = at(points.last);
     canvas.drawCircle(last, 6, Paint()..color = card);
     canvas.drawCircle(last, 4.5, Paint()..color = color);
-    _text(canvas, format(points.last.$2), Offset(math.min(last.dx, left + w - 16), last.dy - 24), strongText, 12,
-        bold: true);
+    // Round 1 (U1a-10, U1b-02): η τελευταία τιμή πάνω σε πλάκα στο χρώμα της κάρτας· κάτω από το σημείο όταν η γραμμή
+    // έρχεται από ψηλότερα (αλλιώς την έκοβε), αριστερά του όταν από κάτω δεν χωρά.
+    final valueTp = _painter(format(points.last.$2), strongText, 12 * scale, bold: true);
+    var lx = math.min(last.dx, left + w - 16) - valueTp.width / 2;
+    var ly = last.dy - 9 - valueTp.height;
+    if (points.length > 1 && at(points[points.length - 2]).dy < last.dy - 2) {
+      ly = last.dy + 9;
+      if (ly + valueTp.height > top + h) {
+        lx = last.dx - 10 - valueTp.width;
+        ly = last.dy - valueTp.height / 2;
+      }
+    }
+    lx = lx.clamp(0.0, math.max(0.0, size.width - valueTp.width)).toDouble();
+    ly = ly.clamp(0.0, math.max(0.0, top + h - valueTp.height)).toDouble();
+    _plate(canvas, valueTp, Offset(lx, ly), card);
 
-    _textLeft(canvas, dateLabel(ranged ? from! : points.first.$1), Offset(left, size.height - bottom + 6), text, 11);
+    _textLeft(canvas, dateLabel(ranged ? from! : points.first.$1), Offset(left, size.height - bottom + 6 * scale), text,
+        11 * scale);
     if (points.length > 1 || ranged) {
       final label = dateLabel(ranged ? to! : points.last.$1);
-      final tp = _painter(label, text, 11);
-      tp.paint(canvas, Offset(left + w - tp.width, size.height - bottom + 6));
+      final dateTp = _painter(label, text, 11 * scale);
+      dateTp.paint(canvas, Offset(left + w - dateTp.width, size.height - bottom + 6 * scale));
     }
   }
 
   @override
   bool shouldRepaint(_LinePainter old) => true;
+}
+
+/// Ετικέτα πάνω σε μικρή πλάκα στο χρώμα της κάρτας: διαβάζεται ακόμα κι όταν από κάτω της περνά γραμμή ή ράβδος.
+void _plate(Canvas canvas, TextPainter tp, Offset at, Color card) {
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(Rect.fromLTWH(at.dx - 3, at.dy - 1, tp.width + 6, tp.height + 2), const Radius.circular(6)),
+    Paint()..color = card,
+  );
+  tp.paint(canvas, at);
 }
 
 TextPainter _painter(String s, Color color, double size, {bool bold = false}) => TextPainter(
@@ -1557,6 +1713,7 @@ class EmptyCard extends StatelessWidget {
     this.color,
     this.buttonText,
     this.onPressed,
+    this.primary = false,
   });
 
   final String title;
@@ -1565,6 +1722,10 @@ class EmptyCard extends StatelessWidget {
   final Color? color;
   final String? buttonText;
   final VoidCallback? onPressed;
+
+  /// Το κουμπί είναι η ΜΙΑ ενέργεια της κάρτας (π.χ. «Σύνδεση ξανά» σε κάρτα σφάλματος): γεμάτο, όχι περίγραμμα
+  /// (round 1, U2a-21: στο σκοτεινό θέμα το περίγραμμα είχε 1,23:1 και το κουμπί έμοιαζε δευτερεύον).
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
@@ -1576,12 +1737,15 @@ class EmptyCard extends StatelessWidget {
           if (icon != null)
             CardHeader(icon: icon!, title: title, color: color ?? c.primary)
           else
-            Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+            // Round 1 (U4-14 γ): ίδιος τίτλος με κάθε τίτλο μέσα σε κάρτα ([SectionLabel]).
+            SectionLabel(title),
           const SizedBox(height: 10),
           Text(text, style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4)),
           if (buttonText != null && onPressed != null) ...[
             const SizedBox(height: 14),
-            OutlinedButton(onPressed: onPressed, child: Text(buttonText!)),
+            primary
+                ? FilledButton(onPressed: onPressed, child: Text(buttonText!))
+                : OutlinedButton(onPressed: onPressed, child: Text(buttonText!)),
           ],
         ],
       ),
@@ -1644,15 +1808,16 @@ class NavRow extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 64),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
+        // Round 1 (U4-14 β): ίδια μεγέθη με τη γραμμή των Ρυθμίσεων (SettingsRow), που κάνει την ίδια δουλειά.
         child: Row(children: [
-          IconBadge(icon, color, size: 36),
-          const SizedBox(width: 12),
+          IconBadge(icon, color, size: 38),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+              Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
               if (text != null) ...[
                 const SizedBox(height: 2),
-                Text(text!, style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
+                Text(text!, style: TextStyle(fontSize: 13.5, height: 1.35, color: c.textSecondary)),
               ],
             ]),
           ),
@@ -1705,7 +1870,8 @@ class StackedBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(height / 2),
       child: SizedBox(
         height: height,
-        child: Row(children: [
+        // Round 1 (U2a-01): «stretch», αλλιώς τα κομμάτια (ColoredBox χωρίς παιδί) είχαν ύψος 0 και η μπάρα δεν φαινόταν.
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (var i = 0; i < shown.length; i++) ...[
             if (i > 0) const SizedBox(width: 2),
             Expanded(flex: (shown[i].$1 * 100).round().clamp(1, 1 << 30), child: ColoredBox(color: shown[i].$2)),
@@ -1763,7 +1929,8 @@ class PeriodPicker<T> extends StatelessWidget {
     final twoLines = MediaQuery.textScalerOf(context).scale(10) >= 12.5;
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: c.dark ? c.background : c.hairline, borderRadius: BorderRadius.circular(14)),
+      // Round 1 (U4-14 θ): ίδιες γωνίες με τις καρτέλες (16 έξω, 12 μέσα).
+      decoration: BoxDecoration(color: c.dark ? c.background : c.hairline, borderRadius: BorderRadius.circular(16)),
       child: Row(children: [
         for (final v in values)
           Expanded(
@@ -1776,12 +1943,12 @@ class PeriodPicker<T> extends StatelessWidget {
                 button: true,
                 child: Material(
                   color: on ? c.card : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   elevation: on && !c.dark ? 1 : 0,
                   shadowColor: const Color(0x220F172A),
                   child: InkWell(
                     key: keyOf == null ? null : ValueKey(keyOf!(v)),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     onTap: () => onChanged(v),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minHeight: 44),

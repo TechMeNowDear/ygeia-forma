@@ -117,7 +117,10 @@ class HeartPage extends StatelessWidget {
                   (n.date, n.spo2Avg, n.spo2Min),
               ];
         // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4 (παράθυρο Oura / νύχτα ρολογιού, ίδια εποχή).
-        final oxLast = ouraHr ? day : (d.lastNight?.date ?? day);
+        // Round 1 (S4-10): με το Oura, «τελευταία νύχτα» = η πιο πρόσφατη με χαμηλότερη τιμή του ρολογιού ως 2 μέρες πίσω
+        // ([oxygenLastNight]), όπως στον Ύπνο· πριν ήταν πάντα «σήμερα», και μια πολύ χαμηλή τιμή της χθεσινής νύχτας δεν
+        // έβγαινε σημείωση όταν η σημερινή δεν είχε ακόμα τιμή.
+        final oxLast = ouraHr ? oxygenLastNight(store, d, day) : (d.lastNight?.date ?? day);
         final oxGuidance = oxygenGuidance(
           d.spo2MinByNight(oxLast, ouraNights: ouraHr, windows: windows, history: store.history),
           oxLast,
@@ -164,7 +167,8 @@ class HeartPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   if (lastRhr != null) BigValue('${lastRhr.round()}', unit: 'bpm', size: 34),
-                  if (trend != null) ...[const SizedBox(height: 8), trend],
+                  // Round 1 (U1a-5 = U2a-08): το «χάπι» στο πλάτος του κειμένου (πριν τεντωνόταν σε όλη την κάρτα).
+                  if (trend != null) ...[const SizedBox(height: 8), Align(alignment: Alignment.centerLeft, child: trend)],
                   const SizedBox(height: 8),
                   Text(
                     ouraHr
@@ -175,7 +179,8 @@ class HeartPage extends StatelessWidget {
                   ),
                   if (rhrPoints.length >= 2) ...[
                     const SizedBox(height: 14),
-                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.sleep, minRange: 8),
+                    // Round 1 (U1a-5 = U2a-16): ίδια μορφή ημερομηνίας με το γράφημα από κάτω («8 Νοε»).
+                    LineChart(points: rhrPoints, format: (v) => v.round().toString(), color: c.sleep, minRange: 8, dateLabel: dayMonth),
                   ],
                 ],
               ),
@@ -197,7 +202,8 @@ class HeartPage extends StatelessWidget {
                       lead: ouraHr
                           ? 'Μέσος όρος της νύχτας από το Oura· χαμηλότερη μέτρηση από το ρολόι, μόνο όταν μέτρησε '
                               'τουλάχιστον το μισό του ύπνου (ενδεικτική).'
-                          : 'Μέσο ανά νύχτα και η χαμηλότερη μεμονωμένη μέτρηση του ρολογιού (ενδεικτική).'),
+                          // Round 1 (U1a-6): «μέσος όρος», όχι «μέσο»· ένα όνομα για τη χαμηλότερη («τιμή»).
+                          : 'Μέσος όρος κάθε νύχτας και η χαμηλότερη μεμονωμένη τιμή του ρολογιού (ενδεικτική).'),
                   if (ouraHr && store.ouraSpo2 == false) ...[
                     const SizedBox(height: 8),
                     Text(ringAvgMissing(store), style: TextStyle(color: c.textSecondary, fontSize: 13.5)),
@@ -209,7 +215,7 @@ class HeartPage extends StatelessWidget {
                   // οι τιμές, για να μη σπάει η ημερομηνία σε 2 γραμμές στα 360–400 dp.
                   if (oxNights.isNotEmpty)
                     Text(
-                      ouraHr ? 'μέσο (Oura) · χαμηλότερο (ρολόι)' : 'μέσο · χαμηλότερη μέτρηση',
+                      ouraHr ? 'μέσος όρος (Oura) · χαμηλότερη τιμή (ρολόι)' : 'μέσος όρος · χαμηλότερη τιμή',
                       key: const ValueKey('heart-oxygen-columns'),
                       textAlign: TextAlign.right,
                       style: TextStyle(color: c.textTertiary, fontSize: 12.5),
@@ -243,8 +249,9 @@ class HeartPage extends StatelessWidget {
                     InfoRow('Υψηλότεροι σήμερα', '${today.$2.round()} bpm'),
                   ],
                   if (today != null && dayOnly) ...[
-                    InfoRow('Χαμηλότεροι μέρας · ρολόι', '${today.$1.round()} bpm'),
-                    InfoRow('Υψηλότεροι μέρας · ρολόι', '${today.$2.round()} bpm'),
+                    // Round 1 (U1a-7): «της μέρας», όπως η πρόταση από κάτω.
+                    InfoRow('Χαμηλότεροι της μέρας · ρολόι', '${today.$1.round()} bpm'),
+                    InfoRow('Υψηλότεροι της μέρας · ρολόι', '${today.$2.round()} bpm'),
                   ],
                   if (today == null && dayOnly)
                     Text(
@@ -290,10 +297,15 @@ class _AwakeHeartCard extends StatelessWidget {
     }
     final b = last == null ? null : personalBaseline(store.history, plan, K.dayHr, last);
     final pts = planSeries(store.history, plan, K.dayHr, DateTime(day.year, day.month, day.day - 30), DateTime(day.year, day.month, day.day - 1)).points;
+    // Round 1 (U1a-5): η σύγκριση με το «συνήθως» ως «χάπι», όπως στους παλμούς ύπνου (πριν: γκρι πρόταση).
+    Widget? pill;
     String? usual;
     if (b?.usual != null) {
       final d = shownDiff(b!.value, b.usual!);
-      usual = d == 0 ? '$asUsualText · συνήθως ${b.usual!.round()} bpm' : '${signedShown(d)} bpm · συνήθως ${b.usual!.round()} bpm';
+      pill = TrendPill(
+        d == 0 ? '$asUsualText · συνήθως ${b.usual!.round()} bpm' : '${signedShown(d)} bpm · συνήθως ${b.usual!.round()} bpm',
+        up: d == 0 ? null : d > 0,
+      );
     } else if (b != null) {
       usual = 'Το συνηθισμένο σου βγαίνει μετά από 7 μέρες';
     }
@@ -313,10 +325,13 @@ class _AwakeHeartCard extends StatelessWidget {
           const SizedBox(height: 10),
           BigValue(b == null ? '—' : '${b.value.round()}', unit: 'bpm', size: 34),
           const SizedBox(height: 6),
-          Text(
-            usual ?? 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.',
-            style: TextStyle(color: c.textSecondary, fontSize: 13.5),
-          ),
+          if (pill != null)
+            Align(alignment: Alignment.centerLeft, child: pill)
+          else
+            Text(
+              usual ?? 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.',
+              style: TextStyle(color: c.textSecondary, fontSize: 13.5),
+            ),
           if (pts.length >= 2) ...[
             const SizedBox(height: 14),
             LineChart(points: pts, color: c.heart, format: (v) => v.round().toString(), minRange: 8, dateLabel: dayMonth),
