@@ -432,7 +432,7 @@ AdaptProposal? lowLogProposal({required Goals goals, required Expenditure est, r
   if (excess <= est.guardKcal) return null;
   final current = goals.kcal;
   final floor = goals.male ? kcalFloorMale : kcalFloorFemale;
-  var target = current - math.min(adaptMaxStep, _round10(excess));
+  var target = current - math.min<int>(adaptMaxStep, _round10(excess));
   var floored = false;
   if (target < floor) {
     target = floor;
