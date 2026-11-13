@@ -15,13 +15,23 @@
 ///   στους 3 μήνες / στο έτος μπορεί να βγει «άλλαξε» για μια τέτοια αργή, πραγματική μεταβολή (προσομοίωση με δύο
 ///   κλίμακες: 12–22%). Είναι ένδειξη ανά δείκτη, όχι ιατρικός έλεγχος· με 16–19 δείκτες μαζί, κάποιος μπορεί να
 ///   βγει τυχαία.
+/// - Round 1 (S4-1): στις ζυγίσεις (βάρος, λίπος, μύες) η αυτοσυσχέτιση βγαίνει αφού αφαιρεθεί η ΓΡΑΜΜΗ κάθε κομματιού
+///   (όχι μόνο ο μέσος όρος του): μια σταθερή απώλεια 0,45 kg την εβδομάδα με ζύγιση Δευτέρα, Τετάρτη, Παρασκευή
+///   έμοιαζε με «μέρες που μοιάζουν πολύ», και οι Τάσεις έγραφαν «Λίγες ζυγίσεις για συμπέρασμα» στο ~100% των φορών,
+///   ακόμα και για −6 kg σε 3 μήνες. Τώρα φαίνεται στο ~99–100% (μήνας και τρίμηνο). Ψεύτικο «άλλαξε» χωρίς καμία αλλαγή:
+///   ίδιο με πριν όταν ο θόρυβος είναι μέρα με τη μέρα (≤ 1%)· ≤ 1% σε μοντέλο AR(1) με ζύγιση κάθε 2–4 μέρες· ~2–3% με
+///   ζύγιση μία φορά την εβδομάδα στο τρίμηνο (πριν ~0,5%). Προσομοίωση: /home/claude/scratch/f4/eval_final.py.
+/// - Round 1 (S11-2): ζύγιση που μοιάζει ξένη ([weightLooksForeign], weight_guard.dart) δεν μετρά σε βάρος, λίπος και
+///   μύες· μένει στο ιστορικό.
 library;
 
 import 'dart:math' as math;
 
+import 'data.dart' show spo2MinCoverage;
 import 'format.dart';
 import 'history.dart';
 import 'sources.dart';
+import 'weight_guard.dart';
 
 enum TrendSection { heart, sleep, body, move, other }
 
@@ -118,7 +128,8 @@ const trendMetrics = <MetricDef>[
   // «Ξύπνιος, χωρίς βήματα» και «Παλμοί στο περπάτημα» βγήκαν (2/11): δικοί μας ορισμοί, χωρίς επαλήθευση.
   // Η ηρεμία θα έρθει από το Oura (παλμοί ύπνου του δαχτυλιδιού).
   // Ουδέτερο: μεγαλύτερος μέσος όρος ημέρας συνήθως σημαίνει περισσότερη κίνηση, όχι χειρότερη υγεία.
-  MetricDef(key: K.dayHr, label: 'Μέσος όρος ημέρας', section: TrendSection.heart, minDiff: 2, unit: 'bpm', includeToday: false),
+  // Round 1 (U1b-16): ίδιο όνομα με την Καρδιά και τη σελίδα της μέτρησης (πριν «Μέσος όρος ημέρας»).
+  MetricDef(key: K.dayHr, label: 'Παλμοί ξύπνιος', section: TrendSection.heart, minDiff: 2, unit: 'bpm', includeToday: false),
   // Ύπνος
   MetricDef(key: K.sleepMin, label: 'Διάρκεια ύπνου', section: TrendSection.sleep, minDiff: 15, better: 1, kind: ValueKind.duration),
   MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1, partial: true),
@@ -153,7 +164,9 @@ const ouraTrendMetrics = <MetricDef>[
   MetricDef(key: K.lowHr, label: 'Χαμηλότεροι παλμοί στον ύπνο', section: TrendSection.heart, minDiff: 2, unit: 'bpm'),
   MetricDef(key: K.breath, label: 'Αναπνοές στον ύπνο', section: TrendSection.other, minDiff: 0.5, unit: 'το λεπτό', digits: 1),
   // 7/11: ο μέσος όρος οξυγόνου της νύχτας από το Oura (ουδέτερο χρώμα, όπως του ρολογιού).
-  MetricDef(key: K.ringSpo2, label: 'Οξυγόνο στον ύπνο (Oura)', section: TrendSection.other, minDiff: 1, unit: '%'),
+  // Round 1 (U2a-12): ίδιες λέξεις με τις κάρτες («Οξυγόνο τη νύχτα, μέσος όρος») και η συσκευή, ώστε να μη μπερδεύεται
+  // με τη γραμμή του ρολογιού «… μέσος όρος (ρολόι)».
+  MetricDef(key: K.ringSpo2, label: 'Οξυγόνο τη νύχτα, μέσος όρος (Oura)', section: TrendSection.other, minDiff: 1, unit: '%'),
 ];
 
 /// Ο ορισμός μιας μέτρησης (και όσων υπάρχουν μόνο με το Oura).
@@ -339,7 +352,12 @@ const _minBlockPoints = 8;
 /// - Στο [0, 0,95]. null = λιγότερα από 6 ζευγάρια (δεν βγαίνει εκτίμηση).
 /// [blocks]: κομμάτια με τον δικό τους μέσο όρο (π.χ. 30 ημερών), ώστε μια πραγματική αλλαγή επιπέδου να μη
 /// μοιάζει με συσχέτιση· παλιότερη τιμή πρώτη μέσα σε κάθε κομμάτι.
-double? dailyCorrelation(List<List<(DateTime, double)>> blocks) {
+/// [detrend] (round 1, S4-1, ζυγίσεις): από κάθε κομμάτι με 3+ τιμές αφαιρείται η γραμμή ελαχίστων τετραγώνων (όχι μόνο
+/// ο μέσος όρος), ώστε μια σταθερή άνοδος ή πτώση να μη μοιάζει με «μέρες που μοιάζουν». Επειδή αφαιρούνται δύο
+/// παράμετροι ανά κομμάτι, η διόρθωση μικρού δείγματος γίνεται (3 + 4φ)/n αντί για (1 + 4φ)/n: λίγο μεγαλύτερο φ, άρα
+/// λιγότερα «άλλαξε» (συντηρητικά· η αναμενόμενη μεροληψία της εκτίμησης μεγαλώνει περίπου κατά 1/n για κάθε επιπλέον
+/// παράμετρο που αφαιρείται).
+double? dailyCorrelation(List<List<(DateTime, double)>> blocks, {bool detrend = false}) {
   final products = <double>[];
   final gaps = <int>[];
   var den = 0.0;
@@ -347,16 +365,32 @@ double? dailyCorrelation(List<List<(DateTime, double)>> blocks) {
   var used = 0;
   for (final w in blocks) {
     if (w.length < 2) continue;
-    final m = _mean([for (final e in w) e.$2]);
-    for (final e in w) {
-      den += (e.$2 - m) * (e.$2 - m);
+    // Τα υπόλοιπα γύρω από τον μέσο όρο του κομματιού, ή γύρω από τη γραμμή του ([detrend]).
+    final List<double> r;
+    if (detrend && w.length >= 3) {
+      final xs = [for (final e in w) daysBetween(w.first.$1, e.$1).toDouble()];
+      final mx = _mean(xs);
+      final my = _mean([for (final e in w) e.$2]);
+      var sxx = 0.0, sxy = 0.0;
+      for (var i = 0; i < w.length; i++) {
+        sxx += (xs[i] - mx) * (xs[i] - mx);
+        sxy += (xs[i] - mx) * (w[i].$2 - my);
+      }
+      final b = sxx > 0 ? sxy / sxx : 0.0;
+      r = [for (var i = 0; i < w.length; i++) w[i].$2 - my - b * (xs[i] - mx)];
+    } else {
+      final m = _mean([for (final e in w) e.$2]);
+      r = [for (final e in w) e.$2 - m];
+    }
+    for (final x in r) {
+      den += x * x;
     }
     points += w.length;
     used++;
     for (var i = 1; i < w.length; i++) {
       final g = daysBetween(w[i - 1].$1, w[i].$1);
       if (g >= 1 && g <= _maxCorrelationGap) {
-        products.add((w[i - 1].$2 - m) * (w[i].$2 - m));
+        products.add(r[i - 1] * r[i]);
         gaps.add(g);
       }
     }
@@ -383,7 +417,7 @@ double? dailyCorrelation(List<List<(DateTime, double)>> blocks) {
     }
   }
   final n = points / used;
-  return (best + (1 + 4 * best) / n).clamp(0.0, _maxCorrelation);
+  return (best + ((detrend ? 3 : 1) + 4 * best) / n).clamp(0.0, _maxCorrelation);
 }
 
 /// «Πραγματικό» πλήθος ανεξάρτητων τιμών για τις μέρες [days] με αυτοσυσχέτιση [phi] (AR(1)):
@@ -458,6 +492,28 @@ TrendResult computeTrend(
 
 DateTime _add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
 
+/// Round 1 (S11-2): η ζύγιση της μέρας [day] στο ιστορικό μοιάζει ξένη ([weightLooksForeign]): σύγκριση με τις ζυγίσεις
+/// των άλλων ημερών ως [weightGuardDays] μέρες πριν ή μετά (μία ανά μέρα, όπως η διόρθωση θερμίδων). false χωρίς βάρος.
+bool foreignWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
+  final w = plan.value(history, K.weight, day);
+  if (w == null) return false;
+  final others = <double>[
+    for (var i = -weightGuardDays; i <= weightGuardDays; i++)
+      if (i != 0)
+        if (plan.value(history, K.weight, _add(day, i)) case final v?) v,
+  ];
+  return weightLooksForeign(w, others);
+}
+
+/// Round 1 (S4-8): οξυγόνο του ρολογιού σε νύχτα του Oura (μέσα στις ώρες ύπνου του Oura) μετρά μόνο όταν το ρολόι
+/// μέτρησε τουλάχιστον το μισό ύπνο ([spo2MinCoverage]), για τον μέσο όρο όπως και για τη χαμηλότερη. Νύχτα του ρολογιού,
+/// ή παλιά νύχτα χωρίς γραμμένη κάλυψη: μετρά.
+bool watchOxygenCovered(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
+  if (plan.nightSource(day) != Source.oura) return true;
+  final cov = history[dateKey(day)]?[K.spo2Cov];
+  return cov == null || cov >= spo2MinCoverage;
+}
+
 /// Σύγκριση δύο διαστημάτων (με τις άκρες), με τους κανόνες των Τάσεων.
 /// [needed]: πόσες τιμές χρειάζεται κάθε διάστημα.
 TrendResult compareWindows(
@@ -473,11 +529,16 @@ TrendResult compareWindows(
 }) {
   final sp = plan ?? SourcePlan.samsungOnly;
   // Κάθε τιμή ΜΟΝΟ από την πηγή της εκείνη τη μέρα (ένα κλειδί ανά μέρα, δες sources.dart).
+  // Round 1 (S11-2): στις ζυγίσεις, μέρα με ζύγιση που μοιάζει ξένη δεν μετρά (ούτε το λίπος ή οι μύες της).
   List<(DateTime, double)> collect(DateTime from, DateTime to) {
     final out = <(DateTime, double)>[];
     for (var d = from; !d.isAfter(to); d = _add(d, 1)) {
       final v = sp.value(history, def.key, d);
-      if (v != null) out.add((d, v));
+      if (v != null &&
+          !(def.sparse && foreignWeighIn(history, sp, d)) &&
+          (def.key != K.spo2Avg || watchOxygenCovered(history, sp, d))) {
+        out.add((d, v));
+      }
     }
     return out;
   }
@@ -622,7 +683,8 @@ double _correlationFor(
   final full = blocks.where((w) => w.length >= 2).toList();
   final points = full.fold<int>(0, (n, w) => n + w.length);
   if (window > 30 && full.isNotEmpty && points < _minBlockPoints * full.length) blocks = blocksOf(window);
-  return dailyCorrelation(blocks) ?? _fallbackCorrelation;
+  // Round 1 (S4-1): στις ζυγίσεις χωρίς τη γραμμή κάθε κομματιού (μια σταθερή απώλεια δεν είναι «συσχέτιση»).
+  return dailyCorrelation(blocks, detrend: def.sparse) ?? _fallbackCorrelation;
 }
 
 /// Κυκλικός μέσος όρος λεπτών μέσα στο 24ωρο (0–1439), π.χ. 23:50 και 00:10 → 00:00.
@@ -671,8 +733,16 @@ double? usualMean(Iterable<double?> previous) => usualOf(previous);
 
 /// Οι μετρήσεις των Τάσεων για το σχέδιο πηγών: όσο το Oura δεν έχει συνδεθεί, όπως πάντα· μετά, και
 /// οι μετρήσεις που δίνει μόνο το Oura (HRV, αναπνοές, χαμηλότεροι παλμοί).
-List<MetricDef> trendMetricsFor(SourcePlan plan) =>
-    plan.hasOura ? [...trendMetrics, ...ouraTrendMetrics] : trendMetrics;
+/// Round 1 (U2a-12): με το Oura, ο μέσος όρος οξυγόνου του Oura (αυτός που δείχνουν οι κάρτες) μπαίνει ΠΡΙΝ από του
+/// ρολογιού.
+List<MetricDef> trendMetricsFor(SourcePlan plan) {
+  if (!plan.hasOura) return trendMetrics;
+  final ring = [for (final m in ouraTrendMetrics) if (m.key == K.ringSpo2) m];
+  return [
+    for (final m in trendMetrics) ...[if (m.key == K.spo2Avg) ...ring, m],
+    for (final m in ouraTrendMetrics) if (m.key != K.ringSpo2) m,
+  ];
+}
 
 List<TrendResult> computeAllTrends(Map<String, Map<String, double>> history, DateTime today, TrendPeriod period,
         {SourcePlan? plan}) =>

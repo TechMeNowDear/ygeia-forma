@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Widget «Προπόνηση σήμερα» (13/11). Τα κείμενα εδώ φαίνονται μόνο στην προεπισκόπηση· τα αληθινά τα βάζει το
-     QuickWidgets.kt. Χρώματα ημέρας/νύχτας από values και values-night. -->
+     QuickWidgets.kt. Χρώματα ημέρας/νύχτας από values και values-night.
+     Round 1 (U7-17 α): η επικεφαλίδα (qw_head) κρύβεται όταν το widget είναι χαμηλό, ώστε να μη χάνεται η τρίτη γραμμή. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/qw_root"
     android:layout_width="match_parent"
@@ -13,6 +14,7 @@
     android:paddingEnd="16dp"
     android:paddingBottom="8dp">
     <TextView
+        android:id="@+id/qw_head"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ellipsize="end"
@@ -37,7 +39,7 @@
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="6 ασκήσεις · περίπου 55′"
+        android:text="6 ασκήσεις · περίπου 55 λεπτά"
         android:textColor="@color/qw_sub"
         android:textSize="13sp" />
 </LinearLayout>

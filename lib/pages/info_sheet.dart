@@ -25,11 +25,12 @@ class InfoButton extends StatelessWidget {
       label: 'Τι είναι: ${info.title}',
       child: InkResponse(
         key: ValueKey('info-$metric'),
-        radius: 22,
+        radius: 24,
         onTap: () => showMetricInfo(context, info, range: range, device: deviceOf(metric)),
+        // Round 1 (U1a-21): στόχος αφής 48 dp (πριν 44), ίδιο σημάδι 26 dp.
         child: SizedBox(
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           child: Center(
             child: Container(
               width: 26,
@@ -78,7 +79,7 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
       Widget pill(String title, String text, Color color) => Expanded(
             child: Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: c.tint(color), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: c.tint(color), borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -117,10 +118,13 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
                   ),
                 ),
               ],
+              // Round 1 (S4-7): και τα δύο όταν υπάρχουν (πριν, με εύρος δεν φαινόταν ποτέ το «Με τι το συγκρίνεις», π.χ. η
+              // σημείωση των αναπνοών ότι το εύρος μετρήθηκε στον βαθύ ύπνο και η σύγκριση είναι ενδεικτική).
               if (range != null) ...[
                 const SizedBox(height: 14),
                 block('Εύρος αναφοράς', '${_cap(range.text)}. Πηγή: ${range.cite}.'),
-              ] else if (info.compare != null) ...[
+              ],
+              if (info.compare != null) ...[
                 const SizedBox(height: 14),
                 block('Με τι το συγκρίνεις', info.compare!),
               ],
@@ -201,7 +205,14 @@ class RangeBar extends StatelessWidget {
                 width: (b - a) * w,
                 top: 6,
                 height: 6,
-                child: DecoratedBox(decoration: BoxDecoration(color: c.tint(color), borderRadius: BorderRadius.circular(3))),
+                // Round 1 (U1a-16 = U2a-18): η ζώνη ≥ 3:1 απέναντι στη γραμμή σε όλα τα θέματα (υπολογισμός f4/zone.py:
+                // 3,16–5,70)· πριν η απαλή απόχρωση έδινε 1,16:1 και η ζώνη δεν φαινόταν.
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: c.dark ? 0.65 : 0.85),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
               ),
               Positioned(
                 left: v * w - 7,
@@ -260,11 +271,12 @@ class InfoDot extends StatelessWidget {
       button: true,
       label: 'Τι είναι: ${info.title}',
       child: InkResponse(
-        radius: 22,
+        radius: 24,
         onTap: () => showMetricInfo(context, info),
+        // Round 1 (U1a-21): στόχος αφής 48 dp.
         child: SizedBox(
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           child: Center(
             child: Container(
               width: 26,

@@ -43,9 +43,16 @@ String diagnosticsFileName(DateTime now) {
   return 'ygeia-elegxos-${now.year}-${two(now.month)}-${two(now.day)}-${two(now.hour)}${two(now.minute)}.json.gz';
 }
 
+/// Ρυθμίσεις που μένουν ΜΟΝΟ στο κινητό και δεν μπαίνουν σε κανένα αρχείο που φεύγει από αυτό. Έλεγχος 13/11 (S9-6): το
+/// όνομα για την αναφορά γιατρού ([Prefs.reportName]) έμπαινε στην «Αναφορά για έλεγχο», δίπλα σε όλα τα δεδομένα
+/// υγείας, ενώ δεν μπαίνει ούτε στο αντίγραφο ασφαλείας ούτε στο αντίγραφο Google. Το αρχείο μένει χωρίς όνομα.
+const diagnosticsDeviceOnlyPrefs = {'reportName'};
+
 Map<String, dynamic> _withoutSecrets(Map<String, dynamic> m) => {
       for (final e in m.entries)
-        if (!RegExp('token|secret|password|key', caseSensitive: false).hasMatch(e.key)) e.key: e.value,
+        if (!diagnosticsDeviceOnlyPrefs.contains(e.key) &&
+            !RegExp('token|secret|password|key', caseSensitive: false).hasMatch(e.key))
+          e.key: e.value,
     };
 
 /// Η αναφορά. [screen]: μέγεθος οθόνης, γράμματα, θέμα (από τη σελίδα που τη ζητά). [note]: ό,τι έγραψε ο χρήστης.

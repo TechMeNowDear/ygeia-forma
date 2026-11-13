@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../exercise/ex_data.dart';
+import '../../exercise/ex_names.dart';
+import '../../format.dart' show hm, longDate, sameDay, upperGr;
+import '../../reference.dart' show MetricInfo;
 import '../../theme.dart';
 import '../../training/equipment.dart';
 import '../../training/progression.dart';
 import '../../training/program.dart';
+import '../../training/session.dart';
+import '../../training/training_store.dart';
+import '../../widgets.dart' show AppCard, IconBadge;
 
-/// Όνομα άσκησης από τη βιβλιοθήκη (ή το id, αν δεν φορτώθηκε ακόμα).
-String exName(String id) => ExLibrary.loaded?.byId(id)?.name ?? id;
+/// Όνομα άσκησης από τη βιβλιοθήκη· αν αυτή δεν φορτώθηκε ακόμα, από τον σταθερό πίνακα ονομάτων (round1, S6-2 / S7-01:
+/// προπόνηση που ξεκινούσε από τη Σήμερα έδειχνε «db_press» αντί για το όνομα). Το σκέτο id μόνο για άγνωστη άσκηση.
+String exName(String id) => ExLibrary.loaded?.byId(id)?.name ?? exNamesById[id] ?? id;
 
 Map<String, String> exNames() => {for (final e in ExLibrary.loaded?.list ?? const <Ex>[]) e.id: e.name};
 
@@ -43,7 +50,8 @@ String targetLine(PlanItem item, Target t) {
   final a = Aigaio.of(context);
   return switch (c) {
     Change.up || Change.variant => (a.good, ' ↑'),
-    Change.more => (a.good, ' +1'),
+    // round1, U5-26: όχι «10 +1» (διαβαζόταν σαν πράξη)· οι αριθμοί δίπλα έχουν ήδη την επιπλέον επανάληψη.
+    Change.more => (a.good, ' · +1\u00A0επανάληψη'),
     Change.down || Change.back => (a.textSecondary, ' ↓'),
     Change.pain => (a.warn, ''),
     _ => (a.textSecondary, ''),
@@ -155,7 +163,8 @@ class Stepper2 extends StatelessWidget {
             Text(value,
                 maxLines: 1,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
+                // round1, U5-34: στο τρέχον σετ (κουμπιά 56 dp) ο αριθμός που κοιτάς είναι μεγαλύτερος.
+                style: TextStyle(fontSize: button >= 56 ? 24 : 19, fontWeight: FontWeight.w800, color: c.text, fontFeatures: const [FontFeature.tabularFigures()])),
           ]),
         ),
       ),
@@ -244,7 +253,8 @@ Future<void> openRoutineSheet(BuildContext context, Workout w) => showModalBotto
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    SizedBox(width: 26, child: Text('${i + 1}.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.textSecondary))),
+                    // round1, U6-24: χώρος και για «10.» με μεγάλα γράμματα.
+                    SizedBox(width: 32, child: Text('${i + 1}.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.textSecondary))),
                     Expanded(child: Text(steps[i], style: TextStyle(fontSize: 15, height: 1.4, color: c.text))),
                   ]),
                 ),
@@ -259,3 +269,182 @@ Future<void> openRoutineSheet(BuildContext context, Workout w) => showModalBotto
         );
       },
     );
+
+// ---------------------------------------------------------------------------
+// Σημειώσεις του προγράμματος (round1, S7-11 / U6-25)
+// ---------------------------------------------------------------------------
+
+/// Η σημείωση του προγράμματος (κανόνες ασφάλειας, «άφησε», τι κάνεις με πόνο στο στήθος) και της προπόνησης. Πριν
+/// φαινόταν ΜΟΝΟ μία φορά, στην επικόλληση· τώρα είναι πάντα ένα πάτημα μακριά, στην «Προπόνηση» και μέσα στην προπόνηση.
+List<(String, String)> programNotes(Program? p, Workout? w) => [
+      if (p?.note case final n? when n.trim().isNotEmpty) ('Το πρόγραμμα', n.trim()),
+      if (w?.note case final n? when n.trim().isNotEmpty) (w!.name, n.trim()),
+    ];
+
+/// Κουμπί «Σημειώσεις του προγράμματος»· δεν φαίνεται αν δεν υπάρχει καμία.
+class ProgramNotesButton extends StatelessWidget {
+  const ProgramNotesButton(this.program, {super.key, this.workout});
+  final Program? program;
+  final Workout? workout;
+
+  @override
+  Widget build(BuildContext context) {
+    final notes = programNotes(program, workout);
+    if (notes.isEmpty) return const SizedBox.shrink();
+    final c = Aigaio.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: const ValueKey('program-notes'),
+        style: TextButton.styleFrom(foregroundColor: c.exercise, minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 4)),
+        onPressed: () => openProgramNotesSheet(context, notes),
+        icon: const Icon(Icons.info_outline_rounded, size: 20),
+        label: const Text(programNotesLabel, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+const programNotesLabel = 'Σημειώσεις του προγράμματος';
+
+Future<void> openProgramNotesSheet(BuildContext context, List<(String, String)> notes) => showModalBottomSheet<void>(
+      context: context,
+      routeSettings: const RouteSettings(name: programNotesLabel),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(maxWidth: 640),
+      builder: (context) {
+        final c = Aigaio.of(context);
+        return SingleChildScrollView(
+          key: const ValueKey('program-notes-sheet'),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(programNotesLabel, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
+            for (final (title, text) in notes) ...[
+              const SizedBox(height: 14),
+              Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+              const SizedBox(height: 4),
+              Text(text, style: TextStyle(fontSize: 15, height: 1.45, color: c.text)),
+            ],
+          ]),
+        );
+      },
+    );
+
+/// «Άφησε N» (round1, S7-21): η πιο σημαντική οδηγία της προπόνησης, εξηγημένη πριν από το σετ (πριν μόνο μετά το
+/// τελευταίο). Η πρόταση για το λάθος της εκτίμησης: Halperin 2022 (οι άνθρωποι υποεκτιμούν περίπου κατά μία επανάληψη
+/// πόσες τους μένουν).
+const rirInfo = MetricInfo(
+  title: 'Άφησε: πόσες επαναλήψεις σου μένουν',
+  what: 'Σταματάς το σετ όταν νιώθεις ότι θα έβγαζες ακόμα τόσες επαναλήψεις με καλή τεχνική. «Άφησε 3» = σταματάς '
+      'όταν σου μένουν περίπου 3.',
+  shows: 'Όσο πιο κοντά στο όριο, τόσο ανεβαίνει η πίεση· γι’ αυτό δεν φτάνουμε ποτέ ως εκεί. Στο τέλος κάθε άσκησης σε '
+      'ρωτάω πόσες σου έμεναν: από την απάντηση βγαίνει το βάρος της επόμενης φοράς.',
+  accuracy: 'Στην αρχή όλοι το υπολογίζουμε χοντρικά, και συνήθως νομίζουμε ότι μας μένουν λιγότερες απ’ όσες μένουν. '
+      'Με την ώρα γίνεται πιο εύκολο.',
+  cite: 'Halperin κ.ά. 2022 (Sports Med): ακρίβεια στην εκτίμηση των επαναλήψεων ως την αποτυχία.',
+);
+
+/// Σύντομο όνομα προπόνησης για «Η εβδομάδα» (round1, U5-27): από το ελληνικό όνομα, όχι ο εσωτερικός κωδικός
+/// («Πάνω μέρος Α» → «ΠΑ», «Κάτω μέρος Β» → «ΚΒ», «Προπόνηση Β» → «Β», «Πόδια» → «ΠΟ»).
+String shortWorkoutName(Workout w) {
+  final p = w.name.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).toList();
+  if (p.isEmpty) return upperGr(w.id.length <= 2 ? w.id : w.id.substring(0, 2));
+  final last = p.last.length == 1 ? upperGr(p.last) : '';
+  if (p.length >= 3) return upperGr(p.first.substring(0, 1)) + last;
+  if (p.length == 2 && last.isNotEmpty) return last;
+  final n = p.first;
+  return upperGr(n.length < 2 ? n : n.substring(0, 2));
+}
+
+// ---------------------------------------------------------------------------
+// «Ξεχασμένη προπόνηση;» (στην «Προπόνηση» και στη «Σήμερα»)
+// ---------------------------------------------------------------------------
+
+/// «τη Δευτέρα 16 Νοεμβρίου», «το Σάββατο 21 Νοεμβρίου», «την Πέμπτη 12 Νοεμβρίου» (round1, U6-14).
+String onDay(DateTime d) => '${switch (d.weekday) { DateTime.monday => 'τη', DateTime.saturday => 'το', _ => 'την' }} ${longDate(d)}';
+
+/// Ανοιχτή προπόνηση χωρίς κίνηση εδώ και ώρες (έλεγχος 9/11, V-A-09): «Τέλος (στις 19:22)» με το τελευταίο ✓ ως τέλος.
+/// round1, S6-14: η ίδια κάρτα και στη «Σήμερα» (πριν εκεί έγραφε «Συνέχισε την προπόνηση… ξεκίνησες 18:02» σαν να ήταν
+/// σημερινή). U6-01: χωρίς σετ, το «Σβήσιμο» ρωτά πρώτα· και αν υπάρχουν παλμοί ή το ρολόι δεν βρίσκεται τώρα (τα σετ
+/// του μπορεί να μην έχουν έρθει ακόμα), το γεμάτο κουμπί είναι η «Συνέχεια».
+class ForgottenWorkout extends StatelessWidget {
+  const ForgottenWorkout(
+      {super.key,
+      required this.training,
+      required this.session,
+      required this.now,
+      required this.watchReady,
+      required this.onResume,
+      this.keyPrefix = 'train'});
+  final TrainingStore training;
+  final Session session;
+  final DateTime now;
+  final bool watchReady;
+  final VoidCallback onResume;
+
+  /// Πρόθεμα των κλειδιών («train» στην «Προπόνηση», «today» στη «Σήμερα»).
+  final String keyPrefix;
+
+  Future<void> _drop(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Σβήσιμο προπόνησης;'),
+        content: const Text('Δεν έχει κανένα σετ εδώ. Αν έκανες σετ στο ρολόι, πάτα «Συνέχεια» και περίμενε να έρθουν.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
+          TextButton(key: ValueKey('$keyPrefix-forgotten-drop-ok'), onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Σβήσιμο')),
+        ],
+      ),
+    );
+    if (ok == true && identical(training.current, session)) training.discard();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final s = session;
+    final last = s.lastActivity;
+    final when = sameDay(s.start, now) ? 'στις ${hm(s.start)}' : '${onDay(s.start)} στις ${hm(s.start)}';
+    final none = s.setsDone == 0;
+    final waitWatch = none && (s.hr.isNotEmpty || !watchReady);
+    final filled = FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size(0, 48));
+    final plain = TextButton.styleFrom(minimumSize: const Size(0, 48));
+    final resume = waitWatch
+        ? FilledButton(key: ValueKey('$keyPrefix-forgotten-resume'), style: filled, onPressed: onResume, child: const Text('Συνέχεια'))
+        : TextButton(key: ValueKey('$keyPrefix-forgotten-resume'), style: plain, onPressed: onResume, child: const Text('Συνέχεια'));
+    final Widget main;
+    if (!none) {
+      main = FilledButton(
+        key: ValueKey('$keyPrefix-forgotten-end'),
+        style: filled,
+        onPressed: () => training.finish(end: last),
+        child: Text('Τέλος (στις ${hm(last)})'),
+      );
+    } else if (waitWatch) {
+      main = TextButton(key: ValueKey('$keyPrefix-forgotten-drop'), style: plain, onPressed: () => _drop(context), child: const Text('Σβήσιμο'));
+    } else {
+      main = FilledButton(key: ValueKey('$keyPrefix-forgotten-drop'), style: filled, onPressed: () => _drop(context), child: const Text('Σβήσιμο'));
+    }
+    return AppCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          IconBadge(Icons.history_toggle_off_rounded, c.exercise),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Ξεχασμένη προπόνηση;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+        ]),
+        const SizedBox(height: 8),
+        Text(
+          none
+              ? 'Η «${s.name}» που ξεκίνησε $when είναι ακόμα ανοιχτή, χωρίς κανένα σετ.'
+              : 'Η «${s.name}» που ξεκίνησε $when είναι ακόμα ανοιχτή. Τελευταίο σετ στις ${hm(last)}.',
+          style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: waitWatch ? [resume, main] : [main, resume]),
+      ]),
+    );
+  }
+}

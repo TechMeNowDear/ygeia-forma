@@ -42,6 +42,22 @@ for i in 1 2 3; do
   if [ -z "$pid" ]; then echo "Φορά $i: η εφαρμογή δεν τρέχει μετά από 25 s"; ok=0; else echo "Φορά $i: τρέχει (pid $pid)"; fi
 done
 
+# Έλεγχος 13/11 (S10-1): άνοιγμα όπως θα το έκανε ΑΛΛΗ εφαρμογή του κινητού, με extras της Flutter στο Intent. Πρέπει να
+# ανοίγει η κανονική εφαρμογή (κάτω μπάρα), όχι η ρύθμιση widget («route»), και να μην κλείνει («cached_engine_id»,
+# «background_mode» που δεν υπάρχουν). Ό,τι κρασάρισμα γίνει το πιάνει και το crash_check παρακάτω.
+adb shell am force-stop "$PKG"; sleep 2
+timeout 60 adb shell am start -W -n "$ACT" --es route /widget --es cached_engine_id x --es dart_entrypoint x \
+  --es background_mode x > /dev/null
+if ui_wait "Σήμερα" 45 && ui_py find ui.xml "Άσκηση" > /dev/null; then
+  echo "Άνοιγμα με ξένα extras: άνοιξε η κανονική εφαρμογή (Σήμερα, Άσκηση)"
+elif [ -s ui.xml ] && [ "$(ui_py nodes ui.xml)" = 0 ]; then
+  echo "::warning title=Άνοιγμα::Άνοιγμα με ξένα extras: το uiautomator δεν είδε ετικέτες· έλεγχος μόνο για κρασάρισμα"
+else
+  echo "Άνοιγμα με ξένα extras (route, cached_engine_id, dart_entrypoint, background_mode): ΔΕΝ άνοιξε η κανονική εφαρμογή"; ok=0
+fi
+shot "open_extras" > /dev/null || true
+[ -n "$(app_pid)" ] || { echo "Άνοιγμα με ξένα extras: η εφαρμογή δεν τρέχει"; ok=0; }
+
 errq_check "Άνοιγμα" || ok=0
 crash_check "Άνοιγμα" || ok=0
 

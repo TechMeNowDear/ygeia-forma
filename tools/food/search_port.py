@@ -3,6 +3,7 @@
 
 Κρατιέται ΙΔΙΟ με τη Dart: κάθε αλλαγή στο food_search.dart γίνεται και εδώ (και ανάποδα).
 Αρχή κατάταξης (από πάνω προς τα κάτω):
+  0. δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις του ονόματος ή της μάρκας του: πάντα πρώτο (round1, U3a-10)
   1. ακριβές ταίριασμα όλης της αναζήτησης με άλλο όνομα ή με την «κεφαλή» του ονόματος (+4)
   2. ταίριασμα λέξεων: πρώτη λέξη ονόματος 10 · άλλη λέξη 8 · άλλο όνομα 9 · αρχή/ρίζα 7/5/4/3 · κατηγορία 6
   3. τροποποιητές: «σημαδεμένες» παραλλαγές (παστό, αλατισμένο, καπνιστό, μαρινάτο, αποξηραμένο φρούτο) −3
@@ -65,6 +66,7 @@ MARKED = {stem(phonetic(w)) for w in ['παστός','αλατισμένος','�
 MARKED_CAT = {'Αποξηραμένα φρούτα': [phonetic(w) for w in ['ξερά', 'αποξηραμένα']]}
 MARKED_PENALTY = 3.0
 EXACT_BONUS = 4.0
+MINE_FIRST = 7.0
 # Κατηγορίες: «ψάρι» φέρνει τα ψάρια, «κρέας» το κρέας κ.λπ. (χαμηλός βαθμός, κάτω από κάθε λέξη ονόματος).
 CAT_TERMS = {
     'Κρέας': ['κρέας', 'κρέατα'], 'Πουλερικά': ['πουλερικά', 'πουλερικό', 'κρέας'], 'Αλλαντικά': ['αλλαντικά', 'αλλαντικό'],
@@ -130,6 +132,8 @@ class Index:
         self.head = [head_words(f['name']) for f in foods]
         # Ρίζες της πρώτης λέξης κάθε ονόματος: «λέξη που είναι τρόφιμο» (ρύζι, μέλι, ζάχαρη), όχι επίθετο (πράσινο).
         self.food_heads = {stem(ws[0]) for ws in self.name if ws}
+        # Ρίζες των μονολεκτικών άλλων ονομάτων («καλαμάκι», «φραπέ», μάρκες): κι αυτές λένε ποιο τρόφιμο είναι.
+        self.alias_heads = {stem(ws[0]) for phs in self.alias for ws in phs if len(ws) == 1}
         # Για το «ακριβές ταίριασμα όλης της αναζήτησης»: ρίζες ΧΩΡΙΣ τα συνώνυμα (φούρνου ≠ ψητό εδώ).
         self.headbase = [[stem(w, False) for w in ws] for ws in self.head]
         self.abase = [[[stem(w, False) for w in ws] for ws in phs] for phs in self.alias]
@@ -183,6 +187,9 @@ class Index:
         keep = [w for w in q2 if self._matches_any(w, neg)]
         dropped = [w for w in q2 if not self._matches_any(w, neg)]
         if keep and dropped:
+            # round1 (S2-7β): αν έμεινε μόνο τρόπος μαγειρέματος ή κομμάτι και το τρόφιμο δεν υπάρχει («λακέρδα ψητή»):
+            # τίποτα, όχι «όλα τα ψητά».
+            if all(stem(w) in COOKING or w in OPTIONAL for w in keep): return [], [], {}
             r, _ = self._search(' '.join(keep), boost, limit, phon=True, cooked_first=any(stem(w) in COOKING for w in dropped))
             if r:
                 # Οι λέξεις του βήματος 2 δεν υπάρχουν πουθενά στη βάση: δεν είναι τρόφιμο της βάσης.
@@ -190,24 +197,36 @@ class Index:
         # 3. Κάθε λέξη ταιριάζει κάπου, αλλά όχι όλες μαζί: χωρίς μία λέξη (κρατά το καλύτερο ταίριασμα).
         if len(keep) >= 2:
             best = None
-            # Ποτέ χωρίς την ΠΡΩΤΗ λέξη (το ίδιο το τρόφιμο): «σοκολάτα χωρίς ζάχαρη» δεν γίνεται «μούσλι χωρίς ζάχαρη».
-            for k in range(1, len(keep)):
+            # Ποτέ χωρίς την κύρια λέξη (το ίδιο το τρόφιμο): «σοκολάτα χωρίς ζάχαρη» δεν γίνεται «μούσλι χωρίς ζάχαρη».
+            # round1 (S2-7α): κύρια είναι η πρώτη· εκτός αν η πρώτη δεν λέει τρόφιμο («μαύρο ρύζι», «κόκκινες φακές») και
+            # μια επόμενη λέει: τότε κύρια είναι εκείνη.
+            main = 0
+            if not self._is_food_word(keep[0]):
+                later = next((k for k in range(1, len(keep)) if stem(keep[k]) in self.food_heads), 0)
+                if later > 0: main = later
+            for k in range(len(keep)):
+                if k == main: continue
                 rest = keep[:k] + keep[k+1:]
                 r, top = self._search(' '.join(rest), boost, limit, phon=True, cooked_first=stem(keep[k]) in COOKING)
                 if r and (best is None or top > best[1]): best = (r, top, keep[k])
             if best:
                 self.dropped_food = stem(best[2]) in self.food_heads
                 return best[0], [self._show(w) for w in dropped] + [self._show(best[2])], fixed
-            # 3β. Μόνο η πρώτη λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
-            r, _ = self._search(keep[0], boost, limit, phon=True)
+            # 3β. Μόνο η κύρια λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
+            r, _ = self._search(keep[main], boost, limit, phon=True)
             if r:
-                self.dropped_food = any(stem(w) in self.food_heads for w in keep[1:])
-                return r, [self._show(w) for w in dropped] + [self._show(w) for w in keep[1:]], fixed
+                others = [keep[k] for k in range(len(keep)) if k != main]
+                self.dropped_food = any(stem(w) in self.food_heads for w in others)
+                return r, [self._show(w) for w in dropped] + [self._show(w) for w in others], fixed
         return [], [], {}
 
     # ---------- εσωτερικά ----------
     def _show(self, w):
         return self._typed.get(w) or self.vocab.get(w, w)
+
+    def _is_food_word(self, w):
+        ws = stem(w)
+        return ws in self.food_heads or ws in self.alias_heads
 
     def _matches_any(self, w, neg_query):
         for i in range(len(self.foods)):
@@ -309,13 +328,15 @@ class Index:
             if exact: score += EXACT_BONUS
             if self.marked[i] and not any(stem(w) in self.marked[i] or any(m.startswith(w) for m in self.marked[i] if len(w) >= 3) for w in q):
                 score -= MARKED_PENALTY
-            if f.get('source') in ('Open Food Facts', 'Ετικέτα'): score += 1.5
+            mine = f.get('source') in ('Open Food Facts', 'Ετικέτα')
+            if mine: score += 1.5
             if f.get('cooked'): score += 1.2
             if cooked_first and f.get('rawId'): score += 2.5
             score -= len(f['name']) / 60
-            scored.append((score, i))
+            # round1 (U3a-10): δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις (μέσος βαθμός λέξεων >= 7) μπαίνει πρώτο.
+            scored.append((score, i, mine and wavg >= MINE_FIRST))
         if len(q) == 1 and len(q[0]) >= 5 and top <= 2: return [], top
-        scored.sort(key=lambda t: (-t[0], t[1]))
+        scored.sort(key=lambda t: (not t[2], -t[0], t[1]))
         self.last_scored = scored
         return [self.foods[s[1]] for s in scored[:limit]], top
 

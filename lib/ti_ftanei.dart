@@ -7,6 +7,7 @@ import 'format.dart' show thousands;
 import 'labels.dart';
 import 'samsung.dart';
 import 'theme.dart';
+import 'widgets.dart' show AppCard;
 
 /// Βήμα 1 — «Τι φτάνει»: δείχνει τι διαβάζει η εφαρμογή από το Samsung Health,
 /// για να αποφασίσουμε με πραγματικά δεδομένα τι θα χτίσουμε.
@@ -128,7 +129,9 @@ class _TiFtaneiScreenState extends State<TiFtaneiScreen> {
                         // Οι πραγματικές διαστάσεις του παραθύρου (13/11): για να σχεδιάζονται σωστά οι οθόνες στο Fold
                         // κλειστό και ανοιχτό, που δεν είχαν μετρηθεί ποτέ.
                         Text(
-                          screenSizeText(MediaQuery.sizeOf(context), MediaQuery.textScalerOf(context).scale(100) / 100),
+                          // Round 1 (U1b-07): «γράμματα 100%» μένουν μαζί (αδιάσπαστο κενό).
+                          screenSizeText(MediaQuery.sizeOf(context), MediaQuery.textScalerOf(context).scale(100) / 100)
+                              .replaceFirst('γράμματα ', 'γράμματα\u00A0'),
                           key: const ValueKey('ti-ftanei-screen'),
                           style: TextStyle(fontSize: 14.5, color: c.textSecondary),
                         ),
@@ -379,9 +382,10 @@ class _TodayCard extends StatelessWidget {
           ),
         );
 
-    return Card(
+    // Round 1 (U1b-18): η κάρτα της εφαρμογής (ακτίνα 24, χωρίς σκιά και περιθώριο 4 dp), ίδια με την κάρτα κατάστασης.
+    return AppCard(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -390,7 +394,9 @@ class _TodayCard extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text),
             ),
             const SizedBox(height: 12),
+            // Round 1 (U1b-07): οι τρεις αριθμοί στην ίδια γραμμή (πάνω στοίχιση), όσες γραμμές κι αν πιάνει μια ετικέτα.
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 tile('Βήματα', todaySteps),
                 tile('Θερμίδες που έκαψες', today?['totalCalories']),
@@ -400,7 +406,8 @@ class _TodayCard extends StatelessWidget {
             if (steps.length > 1) ...[
               const SizedBox(height: 12),
               Text(
-                'Βήματα 7 ημερών: ${steps.map((s) => '${_shortDate(s['date'] as String?)} ${countNumber(s['value'] is num ? s['value'] : num.tryParse('${s['value']}') ?? s['value'])}').join(' · ')}',
+                // Round 1 (U1b-07): ημερομηνία και τιμή με αδιάσπαστο κενό (όχι «13/11 | 5.931»).
+                'Βήματα 7 ημερών: ${steps.map((s) => '${_shortDate(s['date'] as String?)}\u00A0${countNumber(s['value'] is num ? s['value'] : num.tryParse('${s['value']}') ?? s['value'])}').join(' · ')}',
                 style: TextStyle(color: c.textSecondary),
               ),
             ],
@@ -422,12 +429,14 @@ class _TypeCard extends StatelessWidget {
     final key = type['key'] as String? ?? '';
     final state = type['state'] as String? ?? '';
 
+    // Round 1 (f9 · U4-13): χρώματα ΚΑΤΑΣΤΑΣΗΣ (καλό / προσοχή / κακό, theme.dart), όχι χρώματα ενοτήτων· πριν το
+    // «Έρχεται» ήταν το λαδί του Σώματος (λεβάντα στο Στίβος) και στο Ανάσα «Έρχεται»/«Κενό» είχαν σχεδόν το ίδιο χρώμα.
     final (chipText, chipColor) = switch (state) {
-      'ok' => ('Έρχεται', c.olive),
-      'empty' => ('Κενό', c.wheat),
-      'no_permission' => ('Χωρίς άδεια', c.terracotta),
+      'ok' => ('Έρχεται', c.good),
+      'empty' => ('Κενό', c.warn),
+      'no_permission' => ('Χωρίς άδεια', c.bad),
       'unsupported' => ('Δεν υποστηρίζεται', c.textSecondary),
-      _ => ('Σφάλμα', c.terracotta),
+      _ => ('Σφάλμα', c.bad),
     };
 
     String line;
@@ -450,9 +459,10 @@ class _TypeCard extends StatelessWidget {
     final sources = (type['sources'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final fields = (type['fields'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
 
-    return Card(
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -469,7 +479,7 @@ class _TypeCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: chipColor.withValues(alpha: 0.15),
+                    color: c.tint(chipColor),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -552,7 +562,7 @@ class _FieldRow extends StatelessWidget {
             child: Text(
               seen ? '✓' : '—',
               style: TextStyle(
-                color: seen ? c.olive : c.textSecondary,
+                color: seen ? c.good : c.textSecondary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -583,9 +593,9 @@ class _HrvCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return Card(
+    return AppCard(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -637,9 +647,12 @@ String? filterWarning(Map<String, dynamic> type) {
   if (type['state'] != 'ok' || type['counted'] is! num) return null;
   final count = (type['count'] as num?) ?? 0;
   if ((type['counted'] as num) > 0 || count <= 0) return null;
+  // Round 1 (S11-9): ενικός για το 1 («η 1 ζύγιση είναι», όχι «οι 1 ζυγίσεις είναι»).
   return type['key'] == 'body_composition'
-      ? 'Καμία ζύγιση από την InBody: οι $count ζυγίσεις είναι από άλλες εφαρμογές. Το ιστορικό ζυγίσεων μένει όπως ήταν.'
-      : 'Το φίλτρο ρολογιού δεν βρήκε τίποτα: οι $count εγγραφές είναι από άλλη συσκευή. Το ιστορικό μένει όπως ήταν.';
+      ? 'Καμία ζύγιση από την InBody: ${count == 1 ? 'η 1 ζύγιση είναι από άλλη εφαρμογή' : 'οι $count ζυγίσεις είναι από άλλες εφαρμογές'}. '
+          'Το ιστορικό ζυγίσεων μένει όπως ήταν.'
+      : 'Το φίλτρο ρολογιού δεν βρήκε τίποτα: ${count == 1 ? 'η 1 εγγραφή είναι' : 'οι $count εγγραφές είναι'} από άλλη συσκευή. '
+          'Το ιστορικό μένει όπως ήταν.';
 }
 
 /// UX U9 (τρίτος έλεγχος): απλά ελληνικά, χωρίς «SDK».

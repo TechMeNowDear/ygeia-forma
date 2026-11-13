@@ -39,7 +39,7 @@ class TrainingPage extends StatefulWidget {
 }
 
 class _TrainingPageState extends State<TrainingPage> {
-  late final Future<void> _ready = Future.wait([widget.training.load(), ExLibrary.load()]);
+  late Future<void> _ready = Future.wait([widget.training.load(), ExLibrary.load()]);
   String? _chosen;
 
   TrainingStore get t => widget.training;
@@ -50,6 +50,21 @@ class _TrainingPageState extends State<TrainingPage> {
       future: _ready,
       builder: (context, snap) {
         if (!t.ready || ExLibrary.loaded == null) {
+          // round1, S7-20: αν η φόρτωση απέτυχε, μήνυμα και «Δοκίμασε ξανά», όχι κύκλος που γυρίζει για πάντα.
+          if (snap.hasError && snap.connectionState == ConnectionState.done) {
+            final c = Aigaio.of(context);
+            return PageFrame(title: 'Προπόνηση', onRefresh: () async {}, left: [
+              EmptyCard(
+                key: const ValueKey('train-load-error'),
+                icon: Icons.error_outline_rounded,
+                color: c.bad,
+                title: 'Δεν φόρτωσαν οι ασκήσεις',
+                text: 'Δοκίμασε ξανά. Αν δεν φορτώσουν, κλείσε και άνοιξε ξανά την εφαρμογή.',
+                buttonText: 'Δοκίμασε ξανά',
+                onPressed: () => setState(() => _ready = Future.wait([t.load(), ExLibrary.load()])),
+              ),
+            ]);
+          }
           return PageFrame(title: 'Προπόνηση', onRefresh: () async {}, left: const [
             Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())),
           ]);
@@ -73,14 +88,29 @@ class _TrainingPageState extends State<TrainingPage> {
     final side = <Widget>[];
 
     if (t.readError) {
+      // round1, S6-5 / S9-9: με αρχείο που δεν διαβάστηκε δεν γράφεται τίποτα, άρα δεν προσφέρεται τίποτα που θα χανόταν
+      // (επικόλληση προγράμματος, «Ελεύθερη άσκηση», έναρξη): μόνο τι έγινε και τι μπορείς να κάνεις.
       cards.add(EmptyCard(
+        key: const ValueKey('train-read-error'),
         icon: Icons.error_outline_rounded,
         color: c.bad,
-        title: t.newerFile ? 'Ενημέρωσε την εφαρμογή' : 'Δεν διαβάστηκαν οι προπονήσεις',
+        title: t.newerFile
+            ? 'Ενημέρωσε την εφαρμογή'
+            : t.damaged
+                ? 'Το αρχείο προπονήσεων χάλασε'
+                : 'Δεν διαβάστηκαν οι προπονήσεις',
         text: t.newerFile
             ? 'Οι προπονήσεις γράφτηκαν από νεότερη έκδοση της εφαρμογής. Ως την ενημέρωση δεν γράφεται τίποτα, για να μη χαθεί.'
-            : 'Για να μη χαθεί τίποτα, δεν γράφεται καμία αλλαγή, και ό,τι έγινε στο ρολόι περιμένει εκεί. Κλείσε και άνοιξε ξανά την εφαρμογή.',
+            : t.damaged
+                ? 'Δεν διαβάζεται, όσες φορές κι αν ανοίξει η εφαρμογή, και ως τότε δεν γράφεται καμία προπόνηση. Με το κουμπί, '
+                    'το αρχείο μένει στην άκρη μέσα στο κινητό (δεν σβήνεται) και οι προπονήσεις ξεκινούν από την αρχή. Μετά '
+                    'μπορείς να φέρεις πίσω τις παλιές από αντίγραφο (Ρυθμίσεις › Επαναφορά από αντίγραφο).'
+                : 'Για να μη χαθεί τίποτα, δεν γράφεται καμία αλλαγή, και ό,τι έγινε στο ρολόι περιμένει εκεί.',
+        buttonText: t.newerFile ? null : (t.damaged ? 'Κράτα το στην άκρη και συνέχισε' : 'Δοκίμασε ξανά'),
+        onPressed: t.newerFile ? null : (t.damaged ? () => _setAside(context) : () => t.retryLoad()),
       ));
+      if (t.saveError != null) cards.add(Text(t.saveError!, style: TextStyle(color: c.bad, fontWeight: FontWeight.w600)));
+      return PageFrame(title: 'Προπόνηση', onRefresh: () async {}, left: cards);
     }
     if (t.saveError != null) {
       cards.add(Text(t.saveError!, style: TextStyle(color: c.bad, fontWeight: FontWeight.w600)));
@@ -181,52 +211,14 @@ class _TrainingPageState extends State<TrainingPage> {
 
   /// «Ξεχασμένη προπόνηση;» (έλεγχος 9/11, V-A-09): ανοιχτή χωρίς κίνηση εδώ και 3 ώρες. Ένα πάτημα «Τέλος (στις 19:22)» με
   /// το τελευταίο ✓ ως τέλος· ποτέ διάρκεια 20 ωρών. Χωρίς κανένα σετ: «Σβήσιμο».
-  Widget _forgottenCard(BuildContext context, Session s) {
-    final c = Aigaio.of(context);
-    final last = s.lastActivity;
-    final when = sameDay(s.start, _now) ? 'στις ${hm(s.start)}' : '${longDate(s.start)} στις ${hm(s.start)}';
-    final none = s.setsDone == 0;
-    return AppCard(
-      key: const ValueKey('train-forgotten'),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          IconBadge(Icons.history_toggle_off_rounded, c.exercise),
-          const SizedBox(width: 12),
-          Expanded(child: Text('Ξεχασμένη προπόνηση;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
-        ]),
-        const SizedBox(height: 8),
-        Text(
-          none
-              ? 'Η «${s.name}» που ξεκίνησε $when είναι ακόμα ανοιχτή, χωρίς κανένα σετ.'
-              : 'Η «${s.name}» που ξεκίνησε $when είναι ακόμα ανοιχτή. Τελευταίο σετ στις ${hm(last)}.',
-          style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
-        ),
-        const SizedBox(height: 12),
-        Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          if (none)
-            FilledButton(
-              key: const ValueKey('train-forgotten-drop'),
-              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size(0, 48)),
-              onPressed: () => t.discard(),
-              child: const Text('Σβήσιμο'),
-            )
-          else
-            FilledButton(
-              key: const ValueKey('train-forgotten-end'),
-              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size(0, 48)),
-              onPressed: () => t.finish(end: last),
-              child: Text('Τέλος (στις ${hm(last)})'),
-            ),
-          TextButton(
-            key: const ValueKey('train-forgotten-resume'),
-            style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
-            onPressed: () => _openSession(context),
-            child: const Text('Συνέχεια'),
-          ),
-        ]),
-      ]),
-    );
-  }
+  Widget _forgottenCard(BuildContext context, Session s) => ForgottenWorkout(
+        key: const ValueKey('train-forgotten'),
+        training: t,
+        session: s,
+        now: _now,
+        watchReady: WearLink.main.ready.value,
+        onResume: () => _openSession(context),
+      );
 
   /// «Πρόοδος» (9/11): οι δύο πιο ξεκάθαρες αλλαγές (μόνο από την προπόνηση· το σώμα φαίνεται μέσα στη σελίδα).
   Widget _progressCard(BuildContext context) {
@@ -235,8 +227,9 @@ class _TrainingPageState extends State<TrainingPage> {
     final walk = walkProgress(t.sessions, _now, TrendPeriod.quarter);
     final strength = strengthProgress(t.sessions, _now, TrendPeriod.quarter);
     final top = progressHighlights(walk, strength, const []).take(2).map((e) => e.$1).toList();
+    // round1, U6-12: μία αλλαγή ανά γραμμή (πριν «… · Ρυθμός: 13:09 →» / «12:43 /km»).
     final sub = top.isNotEmpty
-        ? top.join(' · ')
+        ? top.join('\n')
         : (walk.insufficient && strength.isEmpty
             ? 'Η πρώτη σύγκριση μετά από λίγες εβδομάδες προπόνησης και περπατήματος.'
             : 'Καμία ξεκάθαρη αλλαγή τους τελευταίους 3 μήνες.');
@@ -269,7 +262,8 @@ class _TrainingPageState extends State<TrainingPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Ελεύθερη άσκηση', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-            Text('Διαλέγεις τις ασκήσεις τη στιγμή, μία-μία.', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+            // round1, U6-11: σε μία γραμμή και στα 360 dp (πριν «…μία-» / «μία.»).
+            Text('Διαλέγεις ασκήσεις εκείνη την ώρα.', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
           ]),
         ),
         Icon(Icons.chevron_right_rounded, color: c.textSecondary),
@@ -372,6 +366,7 @@ class _TrainingPageState extends State<TrainingPage> {
             key: const ValueKey('train-cardio-line'),
             style: aux),
         RoutineButton(w),
+        ProgramNotesButton(p, workout: w),
         const SizedBox(height: 12),
         Text(
             WearLink.main.ready.value
@@ -384,22 +379,29 @@ class _TrainingPageState extends State<TrainingPage> {
       children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά', style: aux));
       if (w.note != null) children.add(Text(w.note!, style: TextStyle(fontSize: 14, color: c.textSecondary)));
       children.add(RoutineButton(w));
+      // round1, S7-11: η σημείωση του προγράμματος (κανόνες ασφάλειας) ένα πάτημα μακριά.
+      children.add(ProgramNotesButton(p, workout: w));
       final shown = _allItems || w.items.length <= 6 ? w.items : w.items.take(5).toList();
       for (var n = 0; n < shown.length; n++) {
-        final item = shown[n];
+        final plan = shown[n];
+        // round1, S7-03 (f6a): η άσκηση που μπαίνει σήμερα στη θέση (ίσως η πιο δύσκολη παραλλαγή που διάλεξες).
+        final item = t.itemToday(plan);
         final tg = t.targetFor(item);
         final k = item.kind;
-        // Σχέδια 9/11 (6α): «ανεβαίνει» αντί για «↑», σε λέξη· +1 επανάληψη γράφεται στη γραμμή του στόχου.
+        // Σχέδια 9/11 (6α): «ανεβαίνει» αντί για «↑», σε λέξη· +1 επανάληψη γράφεται στη γραμμή του στόχου. Η πιο δύσκολη
+        // παραλλαγή είναι πια πρόταση (S7-03), όχι αυτόματη αλλαγή.
         final (String, Color)? pill = switch (tg.change) {
-          Change.up || Change.variant => ('ανεβαίνει', c.good),
+          Change.up => ('ανεβαίνει', c.good),
+          Change.variant => ('νέα παραλλαγή', c.exercise),
           Change.down || Change.back => ('πιο ελαφρύ', c.textSecondary),
           Change.pain => ('πόνεσε', c.warn),
           _ => null,
         };
-        final reps = repsList(tg.reps);
-        final more = tg.change == Change.more ? ' · +1 επανάληψη' : '';
+        // round1, U6-20: αδιάσπαστα κενά μέσα στους αριθμούς («11,\u00A011,\u00A010», «+1\u00A0επανάληψη»).
+        final reps = repsList(tg.reps).replaceAll(', ', ',\u00A0');
+        final more = tg.change == Change.more ? ' · +1\u00A0επανάληψη' : '';
         children.add(Container(
-          key: ValueKey('train-item-${item.ex}'),
+          key: ValueKey('train-item-${plan.ex}'),
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: n < shown.length - 1 ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -423,8 +425,8 @@ class _TrainingPageState extends State<TrainingPage> {
             ]),
             Text('${item.sets} σετ × ${item.lo == item.hi ? '${item.lo}' : '${item.lo}–${item.hi}'} · άφησε ${item.rir}', style: aux),
             if (isBand(k) && (tg.load ?? 0) > 0)
-              Row(children: [
-                BandDots(tg.load, size: 14),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(padding: const EdgeInsets.only(top: 3), child: BandDots(tg.load, size: 14)),
                 Flexible(child: Text('${bandName(tg.load!)} · $reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular))),
               ])
             else
@@ -503,9 +505,14 @@ class _TrainingPageState extends State<TrainingPage> {
               final day = DateTime(monday.year, monday.month, monday.day + d - 1);
               final w = p.workout(p.days[d]);
               final ds = [for (final s in week) if (s.finished && sameDay(s.start, day)) s];
-              final done = ds.isNotEmpty;
-              // Ό,τι έγινε πράγματι εκείνη τη μέρα (μπορεί να διαφέρει από το πρόγραμμα), με ✓.
-              final doneW = done ? p.workout(ds.last.workout) : null;
+              // round1, S6-13: «✓» μόνο όταν έγινε αυτό που έλεγε η μέρα (βάρη σε μέρα βαρών, περπάτημα σε μέρα
+              // περπατήματος)· ένα πρωινό περπάτημα δεν «κλείνει» τη μέρα των βαρών. Ό,τι άλλο έγινε: μικρή τελεία.
+              // Ό,τι έγινε πράγματι (μπορεί να είναι άλλη προπόνηση βαρών από το πρόγραμμα) δείχνεται με το όνομά της.
+              final match = [for (final s in ds) if (w == null || w.isCardio == s.isCardio) s];
+              final done = match.isNotEmpty;
+              final other = !done && ds.isNotEmpty;
+              final doneW = done ? p.workout(match.last.workout) : null;
+              final shownW = doneW ?? w;
               final isToday = sameDay(day, today);
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -518,13 +525,25 @@ class _TrainingPageState extends State<TrainingPage> {
                 child: Column(children: [
                   Text(dayShort[d]!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.text)),
                   const SizedBox(height: 2),
-                  Text(
-                    done
-                        ? (doneW == null || doneW.isCardio || doneW.id.length > 2 ? '✓' : '${doneW.id} ✓')
-                        : (w == null ? '—' : (w.isCardio ? 'Περ.' : w.id)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: done ? c.good : c.textSecondary, fontWeight: done ? FontWeight.w700 : FontWeight.w500),
+                  // round1, U5-27 / U5-18: σύντομο ελληνικό όνομα αντί για τον εσωτερικό κωδικό («UA»), εικονίδιο για το
+                  // περπάτημα, και ✓ ως εικονίδιο (το γράμμα δεν υπάρχει στη γραμματοσειρά).
+                  SizedBox(
+                    height: 18,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(key: ValueKey('train-week-$d'), mainAxisSize: MainAxisSize.min, children: [
+                        if (shownW == null && !done)
+                          Text('—', style: TextStyle(fontSize: 12, color: c.textSecondary))
+                        else if (shownW != null && shownW.isCardio)
+                          Icon(Icons.directions_walk_rounded, size: 15, color: done ? c.good : c.textSecondary, semanticLabel: 'Περπάτημα')
+                        else if (shownW != null)
+                          Text(shortWorkoutName(shownW),
+                              maxLines: 1,
+                              style: TextStyle(fontSize: 12, color: done ? c.good : c.textSecondary, fontWeight: done ? FontWeight.w700 : FontWeight.w500)),
+                        if (done) Icon(Icons.check_rounded, size: 14, color: c.good, semanticLabel: 'έγινε'),
+                        if (other) ...[const SizedBox(width: 2), Icon(Icons.circle, size: 6, color: c.textSecondary, semanticLabel: 'έγινε άλλη άσκηση')],
+                      ]),
+                    ),
                   ),
                 ]),
               );
@@ -546,10 +565,16 @@ class _TrainingPageState extends State<TrainingPage> {
         ]),
         const SizedBox(height: 4),
         Text(p.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
+        // round1, U6-20: «ισχύει από Παρ\u00A013/11» (όχι διπλό «από», όχι ημερομηνία σε δύο γραμμές).
         Text(
-          'Έκδοση ${p.version} · ${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' · από ${shortDayDate(p.from!)}'}',
+          'Έκδοση ${p.version} · ${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' · ισχύει από ${shortDayDate(p.from!).replaceAll(' ', '\u00A0')}'}',
           style: TextStyle(fontSize: 13.5, color: c.textSecondary),
         ),
+        // round1, S7-11 / U6-25: η σημείωση του προγράμματος (κανόνες ασφάλειας) μένει ορατή μετά την επικόλληση.
+        if (p.note != null && p.note!.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(p.note!.trim(), key: const ValueKey('train-program-note'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+        ],
       ]),
     );
   }
@@ -578,15 +603,18 @@ class _TrainingPageState extends State<TrainingPage> {
       key: const ValueKey('train-last'),
       onTap: () => Navigator.of(context).push(SummaryPage.route(t, s)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // round1, U6-20: η ημερομηνία ως δεύτερη γραμμή (πριν «Τετ» / «11/11» σε δύο γραμμές).
         CardHeader(
           icon: Icons.check_rounded,
-          title: 'Τελευταία φορά · ${shortDayDate(s.start)}',
+          title: 'Τελευταία φορά',
+          subtitle: shortDayDate(s.start),
           color: c.good,
           trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
         ),
         const SizedBox(height: 10),
         Row(children: [
-          stat('${s.duration.inMinutes}', 'λ', 'διάρκεια'),
+          // round1, U5-06 / U6-06: διάρκεια σε λέξη («60 λεπτά», όχι «60 λ»).
+          stat('${s.duration.inMinutes}', s.duration.inMinutes == 1 ? 'λεπτό' : 'λεπτά', 'διάρκεια'),
           stat('${s.setsDone}', '', 'σετ'),
           stat(s.volume > 0 ? thousands(s.volume.round()) : '—', s.volume > 0 ? 'kg' : '', 'σύνολο κιλών'),
         ]),
@@ -609,10 +637,11 @@ class _TrainingPageState extends State<TrainingPage> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${shortDayDate(s.start)} · ${s.name}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
+                    // round1, U5-06 / U5-18: διάρκεια σε λέξεις και «μέσοι παλμοί» αντί για «♥» (λείπει από τη γραμματοσειρά).
                     Text(
                         s.isCardio
-                            ? '${s.cardioMinutes}′${kmValue(s) != null ? ' · ${kmValue(s)} km' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}'
-                            : '${s.duration.inMinutes}′ · ${s.setsDone} σετ${s.volume > 0 ? ' · ${thousands(s.volume.round())} kg' : ''}${s.hrAvg != null ? ' · ♥ ${s.hrAvg}' : ''}',
+                            ? '${hoursMinutes(s.cardioMinutes ?? s.duration.inMinutes)}${kmValue(s) != null ? ' · ${kmValue(s)} km' : ''}${s.hrAvg != null ? ' · μέσοι παλμοί ${s.hrAvg}' : ''}'
+                            : '${hoursMinutes(s.duration.inMinutes)} · ${s.setsDone} σετ${s.volume > 0 ? ' · ${thousands(s.volume.round())} kg' : ''}${s.hrAvg != null ? ' · μέσοι παλμοί ${s.hrAvg}' : ''}',
                         style: TextStyle(fontSize: 13, color: c.textSecondary)),
                   ]),
                 ),
@@ -635,10 +664,11 @@ class _TrainingPageState extends State<TrainingPage> {
     final acked = link.watchLimit.value;
     final (String, Color, IconData)? watch = hr == null
         ? (acked != null && acked != 'null'
-            ? ('Το ρολόι έχει ακόμα όριο $acked: άνοιξε την εφαρμογή στο ρολόι για να το σβήσει.', c.exercise, Icons.watch_rounded)
+            ? ('Το ρολόι έχει ακόμα όριο $acked: άνοιξε την εφαρμογή στο ρολόι για να το σβήσει.', c.warn, Icons.watch_rounded)
             : null)
         : acked == '$hr'
-            ? ('Στο ρολόι ✓ όριο $hr', c.good, Icons.watch_rounded)
+            // round1, U5-18 / U6-05: το «✓» ως γράμμα έλειπε από τη γραμματοσειρά· εικονίδιο και λέξεις.
+            ? ('Το ρολόι έχει το όριο $hr', c.good, Icons.check_circle_rounded)
             : sent
                 ? ('Στάλθηκε· θα επιβεβαιωθεί μόλις ανοίξεις την εφαρμογή στο ρολόι (ή την ενημερώσεις εκεί).', c.textSecondary, Icons.watch_rounded)
                 : link.ready.value
@@ -738,6 +768,26 @@ class _TrainingPageState extends State<TrainingPage> {
 
   void _openSession(BuildContext context) => Navigator.of(context).push(SessionPage.route(t));
 
+  /// round1, S9-9: «Κράτα το στην άκρη και συνέχισε», με επιβεβαίωση. Το αρχείο μετονομάζεται, δεν σβήνεται.
+  Future<void> _setAside(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Στην άκρη το αρχείο;'),
+        content: const Text('Οι προπονήσεις και το πρόγραμμα ξεκινούν από την αρχή. Το χαλασμένο αρχείο μένει στο κινητό. '
+            'Τις παλιές προπονήσεις τις φέρνεις πίσω από αντίγραφο, αν έχεις.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
+          FilledButton(key: const ValueKey('train-set-aside-ok'), onPressed: () => Navigator.pop(context, true), child: const Text('Ναι, συνέχισε')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final done = await t.setAsideUnreadable();
+    if (done || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Δεν έγινε. Κλείσε και άνοιξε ξανά την εφαρμογή.')));
+  }
+
   Future<void> _export(BuildContext context) async {
     await copySensitive(t.exportForClaude(names: exNames()));
     if (!context.mounted) return;
@@ -816,8 +866,12 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
     return v != null && v >= 80 && v <= 220 && (v >= 100 || _lowOk);
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final v = _value;
     final askLow = v != null && v >= 80 && v < 100;
@@ -832,7 +886,7 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
             // Έλεγχος 9/11 (V-B-05, V-B-06): όχι απόλυτη υπόσχεση· πρώτα πώς νιώθεις· μία σταθερή πρόταση για β-αναστολέα
             // (ESC 2020, Pelliccia κ.ά.). Οι λεπτομέρειες πίσω από το ⓘ, για να μη γεμίζει το φύλλο.
             Text('Αν σου δώσει αριθμό, γράψ’ τον εδώ. Όσο το ρολόι μετρά άσκηση (βάρη ή περπάτημα), δονείται όταν οι παλμοί '
-                'φτάσουν ή ξεπεράσουν τον αριθμό για περίπου 5″.',
+                'φτάσουν ή ξεπεράσουν τον αριθμό για περίπου 5 δευτερόλεπτα.',
                 style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
             const SizedBox(height: 10),
             Container(

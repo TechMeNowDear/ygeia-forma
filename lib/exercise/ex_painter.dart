@@ -31,6 +31,25 @@ class ExColors {
           figure: const Color(0xFF1E293B), far: const Color(0xFF94A3B8), stage: const Color(0xFFEEF2F7),
           floor: const Color(0xFFD6DCE6), accent: accent, good: good, labelBg: const Color(0xD9FFFFFF), dark: false);
 
+  /// round1, S7-09: ίδια χρώματα = ίδιο αντικείμενο για το [ExPainter.shouldRepaint]· αλλιώς κάθε πλήκτρο στην αναζήτηση
+  /// των «Ασκήσεων» ξαναζωγράφιζε όλες τις μικρές εικόνες (το [ExColors.of] φτιάχνει νέο αντικείμενο σε κάθε build).
+  @override
+  bool operator ==(Object o) =>
+      o is ExColors &&
+      o.dark == dark &&
+      o.figure == figure &&
+      o.far == far &&
+      o.stage == stage &&
+      o.floor == floor &&
+      o.accent == accent &&
+      o.good == good &&
+      o.labelBg == labelBg &&
+      o.primary == primary &&
+      o.secondary == secondary;
+
+  @override
+  int get hashCode => Object.hash(figure, far, stage, floor, accent, good, labelBg, primary, secondary, dark);
+
   Color equip(Color c) {
     if (!dark) return c;
     final l = c.computeLuminance();

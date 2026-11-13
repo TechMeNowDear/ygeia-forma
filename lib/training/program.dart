@@ -204,6 +204,10 @@ class Program {
   int version;
   DateTime? savedAt;
 
+  /// Κλειδιά του «days» που δεν είναι μέρα (round1, S6-6), όπως γράφτηκαν: για το μήνυμα της επικόλλησης. Πριν, μια
+  /// μέρα με άγνωστο όνομα γινόταν σιωπηλά «ξεκούραση». Δεν αποθηκεύονται.
+  List<String> badDays = const [];
+
   Workout? workout(String? id) {
     for (final w in workouts) {
       if (w.id == id) return w;
@@ -249,11 +253,16 @@ class Program {
 
   factory Program.fromJson(Map<String, dynamic> j) {
     final days = <int, String>{};
+    final bad = <String>[];
     final d = j['days'];
     if (d is Map) {
       d.forEach((k, v) {
         final n = int.tryParse('$k') ?? _dayKey('$k');
-        if (n != null && n >= 1 && n <= 7 && v is String && v.isNotEmpty) days[n] = v;
+        if (n == null || n < 1 || n > 7) {
+          bad.add('$k');
+        } else if (v is String && v.isNotEmpty) {
+          days[n] = v;
+        }
       });
     }
     return Program(
@@ -266,19 +275,31 @@ class Program {
       author: j['author'] as String? ?? 'user',
       version: (j['version'] as num?)?.toInt() ?? 1,
       savedAt: j['savedAt'] is num ? DateTime.fromMillisecondsSinceEpoch((j['savedAt'] as num).toInt()) : null,
-    );
+    )..badDays = bad;
   }
 }
 
 String _day(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-/// Αγγλικά/ελληνικά ονόματα ημερών στο JSON («fri», «Πα»).
+/// Αγγλικά/ελληνικά ονόματα ημερών στο JSON: «fri», «Friday», «Fri.», «Πα», «Παρ», «Παρασκευή» (round1, S6-6: και τα
+/// ολόκληρα ονόματα, πεζά ή κεφαλαία, με ή χωρίς τόνο· πριν μόνο οι συντομογραφίες).
 int? _dayKey(String k) {
   const m = {
     'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6, 'sun': 7,
+    'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6, 'sunday': 7,
+    'tues': 2, 'thur': 4, 'thurs': 4,
     'δε': 1, 'τρ': 2, 'τε': 3, 'πε': 4, 'πα': 5, 'σα': 6, 'κυ': 7,
+    'δευ': 1, 'τρι': 2, 'τετ': 3, 'πεμ': 4, 'παρ': 5, 'σαβ': 6, 'κυρ': 7,
+    'δευτερα': 1, 'τριτη': 2, 'τεταρτη': 3, 'πεμπτη': 4, 'παρασκευη': 5, 'σαββατο': 6, 'κυριακη': 7,
   };
-  return m[k.toLowerCase().trim()];
+  const plain = {'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω'};
+  var s = k.toLowerCase().trim();
+  if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+  final b = StringBuffer();
+  for (final ch in s.split('')) {
+    b.write(plain[ch] ?? ch);
+  }
+  return m[b.toString()];
 }
 
 /// Αποτέλεσμα επικόλλησης: το πρόγραμμα ή τι φταίει (απλά ελληνικά).
@@ -312,7 +333,28 @@ PasteResult parseProgram(String text, Set<String> known) {
   } catch (_) {
     return PasteResult(null, ['Το πρόγραμμα έχει λάθος μορφή. Ζήτα από τον Claude να το ξαναβγάλει.'], const []);
   }
-  return PasteResult(p, validate(p, known), _warnings(p));
+  return PasteResult(p, [..._rawProblems(j), ...validate(p, known)], _warnings(p));
+}
+
+/// Ό,τι το [Program.fromJson] διαβάζει με ανοχή (για τα αποθηκευμένα προγράμματα), αλλά σε πρόγραμμα που επικολλάς είναι
+/// λάθος και πρέπει να λέγεται (round1, S6-6): «reps» που δεν είναι [από, ως] ή ένας αριθμός (π.χ. "10-15" ή
+/// [10, 12, 15]) γινόταν σιωπηλά 8–12.
+List<String> _rawProblems(Map<String, dynamic> j) {
+  final e = <String>[];
+  final ws = j['workouts'];
+  if (ws is! List) return e;
+  for (final w in ws) {
+    if (w is! Map) continue;
+    final items = w['items'];
+    if (items is! List) continue;
+    for (final i in items) {
+      if (i is! Map) continue;
+      final r = i['reps'];
+      if (r == null || r is num || (r is List && r.length == 2 && r[0] is num && r[1] is num)) continue;
+      e.add('${w['name'] ?? w['id']}: οι επαναλήψεις στο «${i['ex']}» γράφονται [από, ως], π.χ. [8, 12].');
+    }
+  }
+  return e;
 }
 
 /// Τα λεπτά μιας αερόβιας προπόνησης σε πρόγραμμα που επικολλάς: από 1 ως 600 (απόφαση 12/11, Συμβούλιο 3, Β4).
@@ -354,11 +396,20 @@ List<String> validate(Program p, Set<String> known) {
       if (i.sets < 1 || i.sets > 10) e.add('${w.name}: τα σετ πρέπει να είναι 1–10.');
       if (i.lo < 1 || i.hi < i.lo || i.hi > 50) e.add('${w.name}: λάθος εύρος επαναλήψεων ${i.lo}–${i.hi}.');
       if (i.rest < 0 || i.rest > 600) e.add('${w.name}: το διάλειμμα πρέπει να είναι έως 10 λεπτά.');
+      // round1, S6-6: η ερώτηση της ρεζέρβας φτάνει ως «4+»· με στόχο πάνω από 4 το βάρος δεν θα ανέβαινε ποτέ.
+      if (i.rir > 4) e.add('${w.name}: το «άφησε» (πόσες επαναλήψεις να περισσεύουν) πρέπει να είναι από 2 ως 4.');
+      // Βάρος που δεν είναι αριθμός (π.χ. 1e999 = «άπειρο»): πριν περνούσε, και μετά η αποθήκευση δεν έκανε τίποτα.
+      final load = i.load;
+      if (load != null && !load.isFinite) e.add('${w.name}: το βάρος στο «${i.ex}» δεν είναι σωστός αριθμός.');
     }
   }
   p.days.forEach((d, id) {
     if (p.workout(id) == null) e.add('Η ${weekdayLong[d]} δείχνει σε προπόνηση που δεν υπάρχει («$id»).');
   });
+  // round1, S6-6: μέρα με άγνωστο όνομα δεν γίνεται σιωπηλά «ξεκούραση».
+  for (final k in p.badDays) {
+    e.add('Δεν κατάλαβα τη μέρα «$k». Γράψε mon, tue, wed, thu, fri, sat, sun ή 1–7.');
+  }
   return e;
 }
 
@@ -371,7 +422,7 @@ List<String> _warnings(Program p) {
       if (i.rir < 2) {
         i.rir = 2;
         w.add(i.kind == LoadKind.bar
-            ? 'Μπάρα χωρίς βραχίονες ασφαλείας: η ρεζέρβα στο «${i.ex}» έγινε 2.'
+            ? 'Μπάρα χωρίς βραχίονες ασφαλείας: στο «${i.ex}» το «άφησε» έγινε 2.'
             : 'Ρεζέρβα τουλάχιστον 2 (ως να πει άλλα ο γιατρός σου): στο «${i.ex}» έγινε 2.');
       }
       if (i.load != null && hasLoad(i.kind)) {

@@ -14,6 +14,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 
+/**
+ * Έλεγχος 13/11 (S10-1): τα extras που διαβάζει η Flutter από το Intent με το οποίο ανοίγει μια οθόνη της (διαδρομή,
+ * έτοιμη μηχανή, σημείο εισόδου Dart, φόντο…· FlutterActivityLaunchConfigs). Η MainActivity και η WidgetConfigActivity
+ * είναι «exported», άρα μια άλλη εφαρμογή του κινητού μπορούσε να ανοίξει την εφαρμογή στη ρύθμιση widget
+ * («route» = «/widget»: καμία ανάγνωση, καμία σελίδα) ή να τη ρίξει στο άνοιγμα («cached_engine_id» που δεν υπάρχει).
+ * Η εφαρμογή δεν χρησιμοποιεί κανένα από αυτά: σβήνονται από το Intent πριν τα δει η Flutter.
+ */
+object FlutterLaunchExtras {
+    val NAMES = listOf(
+        "route",
+        "cached_engine_id",
+        "cached_engine_group_id",
+        "dart_entrypoint",
+        "dart_entrypoint_args",
+        "background_mode",
+        "destroy_engine_with_activity",
+        "enable_state_restoration",
+    )
+}
+
 // FragmentActivity: το χρειάζονται υπηρεσίες της Google (π.χ. σαρωτής barcode) για να ανοίγουν τις δικές τους οθόνες.
 class MainActivity : FlutterFragmentActivity() {
     // Ζει όσο ζει η οθόνη. Στο παρασκήνιο τρέχει μόνο η ανανέωση ανά 3 ώρες (RefreshWorker).
@@ -45,11 +65,20 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // «Διαγραφή όλων» που ξεκίνησε: τελειώνει εδώ, πριν ξεκινήσει η Flutter (έλεγχος του fix-accuracy, M4).
         DataWipe.finishIfNeeded(this)
+        // S10-1: ό,τι extra της Flutter έβαλε άλλη εφαρμογή στο Intent φεύγει πριν το διαβάσει η Flutter.
+        try {
+            for (k in FlutterLaunchExtras.NAMES) intent?.removeExtra(k)
+        } catch (_: Throwable) {
+        }
         super.onCreate(savedInstanceState)
         // Τα δεδομένα υγείας δεν φαίνονται στη μικρογραφία των «πρόσφατων εφαρμογών» (Συμβούλιο 5, Δ5, έγκριση 13/11).
         // Μόνο εκεί: τα στιγμιότυπα οθόνης που παίρνει ο χρήστης συνεχίζουν να δουλεύουν (όχι FLAG_SECURE).
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
     }
+
+    // S10-1: η κανονική εφαρμογή ανοίγει πάντα στην αρχική διαδρομή· η ρύθμιση widget («/widget») μόνο από τη δική της
+    // οθόνη (WidgetConfigActivity), ποτέ από extra «route» άλλης εφαρμογής.
+    override fun getInitialRoute(): String = "/"
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -112,7 +141,9 @@ class MainActivity : FlutterFragmentActivity() {
         // Ανανέωση κάθε 3 ώρες στο παρασκήνιο (δες RefreshWorker). Δεν αποτρέπει το άνοιγμα αν αποτύχει.
         try {
             // N2: με διαγραφή που δεν τελείωσε, καμία ανανέωση στο παρασκήνιο (θα έγραφε αρχεία πριν το σβήσιμο).
-            if (!DataWipe.unfinished(this)) RefreshWorker.schedule(this)
+            // Έλεγχος 13/11 (U4-6): ούτε όσο φαίνεται το «Όλα διαγράφηκαν»· ξεκινά όταν ο χρήστης φύγει από εκεί
+            // (DataWipe, «wipeSeen»). Αλλιώς μία ώρα μετά τη διαγραφή το κινητό είχε ξανά δεδομένα του Samsung Health.
+            if (!DataWipe.unfinished(this) && !DataWipe.awaitsStart(this)) RefreshWorker.schedule(this)
         } catch (e: Throwable) {
             ErrorQueue.report(e, "background")
         }

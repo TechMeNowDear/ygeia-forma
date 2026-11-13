@@ -16,6 +16,14 @@ object FoodRules {
     const val OFF_MAX_BYTES = 2 * 1024 * 1024
 
     /**
+     * Τα πεδία που ζητάμε από το Open Food Facts για ένα προϊόν. Έλεγχος round1 (S2-1 / S1-9): και οι κατηγορίες του
+     * («categories_tags»), ώστε ένα σαρωμένο προϊόν να μετρά στην κάρτα «Χοληστερίνη» ως ξηροί καρποί, όσπρια ή ψάρι
+     * (lib/food/off.dart, cholKindFromOffTags). Τα υπόλοιπα πεδία όπως πριν.
+     */
+    const val OFF_FIELDS = "code,product_name,product_name_el,generic_name_el,brands,quantity,serving_size," +
+        "serving_quantity,nutriments,nutrition_data_per,lang,categories_tags"
+
+    /**
      * Το ψηφίο ελέγχου GTIN για το [body] (τα ψηφία χωρίς το ψηφίο ελέγχου): από δεξιά, βάρη 3, 1, 3, 1…· το ψηφίο είναι
      * όσο λείπει ως το επόμενο πολλαπλάσιο του 10. null αν το [body] δεν είναι μόνο ψηφία.
      */

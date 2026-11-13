@@ -9,7 +9,9 @@
 ///   την κύρια περίοδο (long_sleep με τον περισσότερο ύπνο, αλλιώς η μεγαλύτερη). «Σύντομη νύχτα»: κάτω από 3 ώρες.
 ///   Οι «rest» (λάθος ανίχνευση που απέρριψε ο χρήστης) και «deleted» αγνοούνται.
 /// - Η μέρα κάθε νύχτας είναι το «day» της Oura (της μεγαλύτερης περιόδου: το πρωί που ξύπνησες).
-/// - Οι ώρες έρχονται με τη ζώνη ώρας τους (π.χ. +02:00) και δείχνονται στην ώρα του κινητού.
+/// - Οι ώρες έρχονται με τη ζώνη ώρας τους (π.χ. +02:00). Round 1 (S5-1): η ζώνη κρατιέται ([OuraSleep.offsetMin])·
+///   «νύχτα ή υπνάκος» κρίνεται και οι ώρες δείχνονται στην ώρα του τόπου όπου κοιμήθηκες ([OuraSleep.wallStart]),
+///   όχι στη ζώνη που έχει το κινητό όταν διαβάζει. Εγγραφή στη ζώνη του κινητού ή χωρίς ζώνη: όπως πάντα.
 library;
 
 import 'dart:convert';
@@ -31,6 +33,25 @@ DateTime? _time(Object? v) {
   } catch (_) {
     return null;
   }
+}
+
+/// Round 1 (S5-1): η ζώνη ώρας στο τέλος μιας ώρας ISO 8601 («…+02:00», «…-0800»), σε λεπτά ανατολικά του UTC.
+/// Χωρίς ζώνη ή «Z» (UTC χωρίς τόπο): null, δηλαδή «άγνωστη» (ισχύει η ώρα του κινητού, όπως πριν).
+int? _isoOffset(Object? v) {
+  if (v is! String) return null;
+  final m = RegExp(r'([+-])(\d{2}):?(\d{2})$').firstMatch(v);
+  if (m == null) return null;
+  final minutes = int.parse(m.group(2)!) * 60 + int.parse(m.group(3)!);
+  return _offsetOk(m.group(1) == '-' ? -minutes : minutes);
+}
+
+/// Μόνο ζώνες που υπάρχουν (−12:00 … +14:00)· ό,τι άλλο = άγνωστη.
+int? _offsetOk(Object? v) => v is num && v.isFinite && v >= -12 * 60 && v <= 14 * 60 ? v.round() : null;
+
+/// Η στιγμή [t] ως ώρα «τοίχου» σε ζώνη [offsetMin] λεπτά ανατολικά του UTC: τοπική ώρα με τα ίδια ψηφία.
+DateTime _wallAt(DateTime t, int offsetMin) {
+  final u = t.toUtc().add(Duration(minutes: offsetMin));
+  return DateTime(u.year, u.month, u.day, u.hour, u.minute, u.second, u.millisecond);
 }
 
 DateTime? _day(Object? v) {
@@ -65,7 +86,29 @@ class OuraSleep {
     this.avgBreath,
     this.phases,
     this.readinessTemp,
+    this.offsetMin,
+    this.endOffsetMin,
   });
+
+  /// Round 1 (S5-1): η ζώνη ώρας της ίδιας της εγγραφής, σε λεπτά ανατολικά του UTC (π.χ. «+02:00» → 120), όπως τη
+  /// δίνει η Oura στο bedtime_start ([offsetMin]) και στο bedtime_end ([endOffsetMin]· διαφέρουν μόνο τη νύχτα της
+  /// αλλαγής ώρας). null = δεν δόθηκε (παλιά αποθηκευμένη νύχτα, δεδομένα δοκιμών): ισχύει η ώρα του κινητού.
+  final int? offsetMin;
+  final int? endOffsetMin;
+
+  /// Η εγγραφή έγινε σε άλλη ζώνη από αυτή που έχει ΤΩΡΑ το κινητό για εκείνη τη στιγμή (ταξίδι). Μόνο τότε οι ώρες
+  /// «τοίχου» διαφέρουν από τις ώρες του κινητού· αλλιώς όλα μένουν ακριβώς όπως πριν (και στην αλλαγή ώρας).
+  bool get _abroad => offsetMin != null && start.timeZoneOffset.inMinutes != offsetMin;
+
+  /// Η ώρα του τόπου όπου κοιμήθηκες: για «νύχτα ή υπνάκος», για «Κοιμήθηκες / Ξύπνησες» και για την ώρα ύπνου που
+  /// αποθηκεύεται. Οι απόλυτες στιγμές ([start], [end]) μένουν για τη σειρά, τα κενά και τις ώρες ύπνου που βλέπει το
+  /// ρολόι (οξυγόνο, παλμοί).
+  DateTime get wallStart => _abroad ? _wallAt(start, offsetMin!) : start;
+  DateTime get wallEnd => _abroad ? _wallAt(end, endOffsetMin ?? offsetMin!) : end;
+  DateTime? get wallOnset {
+    final o = onset;
+    return o == null ? null : (_abroad ? _wallAt(o, offsetMin!) : o);
+  }
 
   /// readiness.temperature_deviation μέσα στην περίοδο (όταν λείπει από το daily_readiness).
   final double? readinessTemp;
@@ -149,6 +192,9 @@ class OuraSleep {
       // Πρώτα το «sleep_phase_5_min»· αν λείπει, το «app_sleep_phase_5_min» (ίδια κωδικοποίηση).
       phases: _str(j['sleep_phase_5_min']) ?? _str(j['app_sleep_phase_5_min']),
       readinessTemp: j['readiness'] is Map ? _dbl((j['readiness'] as Map)['temperature_deviation']) : null,
+      // Από την Oura: η ζώνη μέσα στην ίδια την ώρα. Από το δικό μας αρχείο (ώρες σε UTC): τα «tz» / «tz_end».
+      offsetMin: _offsetOk(j['tz']) ?? _isoOffset(j['bedtime_start']),
+      endOffsetMin: _offsetOk(j['tz_end']) ?? _isoOffset(j['bedtime_end']),
     );
   }
 
@@ -173,6 +219,9 @@ class OuraSleep {
         if (avgBreath != null) 'average_breath': avgBreath,
         if (phases != null) 'sleep_phase_5_min': phases,
         if (readinessTemp != null) 'readiness': {'temperature_deviation': readinessTemp},
+        // Round 1 (S5-1), πρόσθετα κλειδιά: παλιός κώδικας τα αγνοεί· παλιό αρχείο χωρίς αυτά = ώρα κινητού.
+        if (offsetMin != null) 'tz': offsetMin,
+        if (endOffsetMin != null && endOffsetMin != offsetMin) 'tz_end': endOffsetMin,
       };
 
   /// Οι φάσεις ως κομμάτια χρόνου (για το υπνόγραμμα, «εκτίμηση του Oura»).
@@ -382,6 +431,8 @@ List<OuraNight> groupOura(List<OuraSleep> sleeps, Map<String, OuraDaily> dailies
   final grouped = groupSleepPieces<OuraSleep>(
     periods,
     (s) => (start: s.start, end: s.end, minutes: mins(s)),
+    // S5-1: «νύχτα ή υπνάκος» στην ώρα του τόπου όπου κοιμήθηκες (η ζώνη της ίδιας της εγγραφής).
+    wall: (s) => (start: s.wallStart, end: s.wallEnd, minutes: mins(s)),
     dateOf: (parts) => parts.reduce((a, b) => mins(b) > mins(a) ? b : a).day,
     stepsBetween: stepsBetween,
     napLockOf: (date) {
@@ -475,9 +526,10 @@ Map<String, double> ouraRow(OuraNight n) {
     final parts = n.counted;
     int? sum(int? Function(OuraSleep) f) => parts.any((x) => f(x) == null) ? null : parts.fold<int>(0, (s, x) => s + f(x)!);
     put(K.sleepMin, m.total == null ? null : parts.fold<int>(0, (s, x) => s + (x.total ?? 0)) / 60);
-    final onset = parts.first.onset;
+    // S5-1: ώρα ύπνου και ξυπνήματος στην ώρα του τόπου όπου κοιμήθηκες.
+    final onset = parts.first.wallOnset;
     if (onset != null) put(K.bedtime, minutesFromSix(onset));
-    put(K.wake, minutesFromSix(parts.last.end));
+    put(K.wake, minutesFromSix(parts.last.wallEnd));
     // Ποσοστό του ύπνου (χωρίς τον χρόνο ξύπνιος), όπως στην εφαρμογή Oura (έλεγχος υπολογισμών F6, 4/11).
     final deep = sum((x) => x.deep), light = sum((x) => x.light), rem = sum((x) => x.rem);
     if (deep != null && light != null && rem != null) {

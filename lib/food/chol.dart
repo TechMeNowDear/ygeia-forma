@@ -3,11 +3,16 @@
 /// δίνουν): ο στόχος σε γραμμάρια πίτουρου βγαίνει από την ετικέτα του προϊόντος σου.
 ///
 /// Κανόνες (όλοι εδώ, ένα μέρος):
-/// - Ξηροί καρποί: γραμμάρια της κατηγορίας «Ξηροί καρποί» (όχι οι σπόροι).
+/// - Ξηροί καρποί: γραμμάρια της κατηγορίας «Ξηροί καρποί» της βάσης (καρποί δέντρων και αράπικα φιστίκια, όπως στη
+///   διατροφή «portfolio»), ΟΧΙ οι σπόροι: οι ηλιόσποροι και οι κολοκυθόσποροι δεν μετρούν, το κουκουνάρι μετρά
+///   ([_seedIds], [_treeNutIds]· έλεγχος round1, S2-3).
 /// - Πίτουρο βρώμης: το τρόφιμο της βάσης (CIQUAL 9640) ή προϊόν σου που λέγεται «πίτουρο βρώμης».
 /// - Όσπρια: μία «φορά» = μέρα με τουλάχιστον 40 g ξερά, ή το ίσο σε μαγειρεμένα (100 g βρασμένα ή κονσέρβα· τα
 ///   όσπρια φουσκώνουν περίπου 2,5 φορές).
 /// - Ψάρι: μία «φορά» = μέρα με τουλάχιστον 100 g ψάρι ή θαλασσινά.
+/// - Τα ΔΙΚΑ ΣΟΥ προϊόντα (barcode, ετικέτα) μετρούν με ό,τι λέει το προϊόν ([Food.cholKind]: ξηροί καρποί, όσπρια, ψάρι,
+///   πίτουρο βρώμης· έλεγχος round1, S2-1 / S1-9). Πριν δεν μετρούσαν ποτέ: 30 g δικά σου καρύδια έβγαιναν «0 g / 30 g».
+///   Όταν το προϊόν λέει τι είναι, ισχύει ΜΟΝΟ αυτό (ούτε η κατηγορία ούτε το όνομα).
 library;
 
 import '../goals.dart' show fullDayShare;
@@ -18,13 +23,30 @@ const legumesDryMinG = 40.0;
 const legumesCookedFactor = 2.5;
 const fishMinG = 100.0;
 
+/// Δικό σου προϊόν οσπρίων: κάτω από τόσες kcal ανά 100 g είναι μαγειρεμένο (βρασμένο, κονσέρβα, βάζο) και μετρά
+/// διά 2,5· από εκεί και πάνω είναι ξερό. Στη βάση τα ξερά όσπρια έχουν 301–350 kcal και τα βρασμένα ή της κονσέρβας
+/// 112–148: το όριο είναι στη μέση, μακριά και από τα δύο.
+const legumesDryMinKcal = 250.0;
+
+/// Σπόροι που είναι (ή ήταν ως το #100) στην κατηγορία «Ξηροί καρποί» της βάσης: ηλιόσποροι (και το παλιό τους id),
+/// κολοκυθόσποροι. Δεν μετρούν ως ξηροί καρποί: η μείωση της LDL έχει δειχθεί για καρπούς δέντρων και αράπικα φιστίκια
+/// (Del Gobbo 2015, Am J Clin Nutr· Jenkins 2003, JAMA), όχι για σπόρους. Με το id, ώστε να ισχύει και για παλιές
+/// καταχωρίσεις που κρατούν την παλιά κατηγορία.
+const _seedIds = {'C15011', 'C15045', 'U170557', 'U169415', 'U170562'};
+
+/// Καρπός δέντρου που η βάση είχε ως το #100 στους «Σπόρους»: κουκουνάρι.
+const _treeNutIds = {'C15025'};
+
 /// Από πόσες θερμίδες και πάνω μια μέρα έχει «πλήρη καταγραφή» και μπαίνει στους μέσους όρους: το 60% του στόχου
 /// θερμίδων, ο ίδιος κανόνας με τη διόρθωση θερμίδων (τελικός έλεγχος, Συμβούλιο 2, Α4). Πριν ήταν σταθερές 1.200 kcal.
 double fullDayKcalFor(int goalKcal) => fullDayShare * goalKcal;
 
+/// Πεζά, χωρίς τόνους, και το τελικό «ς» ως «σ». Έλεγχος round1 (S12-12): το `toLowerCase` της Dart δεν ξέρει το τελικό
+/// σίγμα, οπότε ένα προϊόν γραμμένο με κεφαλαία («ΠΙΤΟΥΡΟ ΒΡΩΜΗΣ», συχνό στο Open Food Facts) έβγαινε «…βρωμησ» και δεν
+/// αναγνωριζόταν ως πίτουρο βρώμης.
 String _plain(String s) {
-  const from = 'άέήίόύώϊϋΐΰ';
-  const to = 'αεηιουωιυιυ';
+  const from = 'άέήίόύώϊϋΐΰς';
+  const to = 'αεηιουωιυιυσ';
   final b = StringBuffer();
   for (final ch in s.toLowerCase().split('')) {
     final k = from.indexOf(ch);
@@ -33,13 +55,23 @@ String _plain(String s) {
   return b.toString();
 }
 
-bool isBran(Food f) => f.id == branFoodId || _plain(f.name).contains('πιτουρο βρωμης');
-bool isNuts(Food f) => f.cat == 'Ξηροί καρποί';
-bool isLegumes(Food f) => f.cat == 'Όσπρια';
-bool isFish(Food f) => f.cat == 'Ψάρια' || f.cat == 'Θαλασσινά';
+// Αν το προϊόν λέει τι είναι ([Food.cholKind]), ισχύει μόνο αυτό· αλλιώς η κατηγορία της βάσης (και το όνομα, για το πίτουρο).
+bool isBran(Food f) => f.cholKind != null
+    ? f.cholKind == CholKind.bran
+    : f.id == branFoodId || _plain(f.name).contains('πιτουρο βρωμησ'); // = _plain('πίτουρο βρώμης')
+bool isNuts(Food f) => f.cholKind != null
+    ? f.cholKind == CholKind.nuts
+    : !_seedIds.contains(f.id) && (f.cat == 'Ξηροί καρποί' || _treeNutIds.contains(f.id));
+bool isLegumes(Food f) => f.cholKind != null ? f.cholKind == CholKind.legumes : f.cat == 'Όσπρια';
+bool isFish(Food f) => f.cholKind != null ? f.cholKind == CholKind.fish : f.cat == 'Ψάρια' || f.cat == 'Θαλασσινά';
 
-/// Μαγειρεμένα όσπρια (βρασμένα, κονσέρβα): ζυγίζουν περίπου 2,5 φορές τα ξερά.
-bool _cookedLegumes(Food f) => f.rawId != null || _plain(f.name).contains('κονσερβα') || _plain(f.name).contains('βρασμεν');
+/// Μαγειρεμένα όσπρια (βρασμένα, κονσέρβα): ζυγίζουν περίπου 2,5 φορές τα ξερά. Δικό σου προϊόν οσπρίων: και όταν οι
+/// θερμίδες του δείχνουν μαγειρεμένο ([legumesDryMinKcal]), ό,τι όνομα κι αν του έδωσες.
+bool _cookedLegumes(Food f) =>
+    f.rawId != null ||
+    _plain(f.name).contains('κονσερβα') ||
+    _plain(f.name).contains('βρασμεν') ||
+    (f.cholKind == CholKind.legumes && f.n.has(Nk.kcal) && f.n.amount(Nk.kcal) < legumesDryMinKcal);
 
 class CholDay {
   CholDay(Iterable<LogEntry> entries) {
@@ -104,6 +136,14 @@ class CholWeek {
 
   double? get satPctMean => _mean(_full.map((d) => d.satPct));
   double? get fiberMean => _mean(_full.map((d) => d.fiber));
+
+  /// Μέρες με πλήρη καταγραφή όπου κάποιο τρόφιμο δεν έχει τιμή κορεσμένων στην πηγή του. Εκείνο το τρόφιμο μετρά 0 g,
+  /// άρα αν είναι πάνω από 0 ο [satPctMean] είναι «τουλάχιστον»: το πραγματικό ποσοστό είναι ίσο ή μεγαλύτερο (έλεγχος
+  /// round1, S2-2· πριν ο μέσος όρος φαινόταν σαν ακριβής, και μπορούσε να δείχνει «κάτω από το όριο» ενώ δεν ήταν).
+  int get daysSatUnknown => _full.where((d) => d.satMissing).length;
+
+  /// Το ίδιο για τις φυτικές ίνες: ο [fiberMean] είναι τότε «τουλάχιστον».
+  int get daysFiberUnknown => _full.where((d) => d.fiberMissing).length;
 
   int daysWithNuts(int target) => _full.where((d) => target > 0 && d.nutsG >= target - 1e-9).length;
   int daysWithBran(int target) => _full.where((d) => target > 0 && d.branG >= target - 1e-9).length;

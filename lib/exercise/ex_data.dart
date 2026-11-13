@@ -26,13 +26,25 @@ class ExLibrary {
   static ExLibrary? get loaded => _cache;
 
   /// Φορτώνει μία φορά. Η ανάλυση του JSON γίνεται σε άλλο isolate, για να μην κολλήσει η οθόνη.
+  /// round1, S7-08: `cache: false`: το κείμενο (~0,8 MB στη μνήμη) δεν μένει στην κρυφή μνήμη του bundle για πάντα·
+  /// κρατιούνται μόνο τα αναλυμένα δεδομένα. S7-20: αν η φόρτωση αποτύχει, η επόμενη κλήση ξαναδοκιμάζει (πριν έμενε η
+  /// αποτυχία ως το κλείσιμο της εφαρμογής και η «Προπόνηση» γύριζε για πάντα).
   static Future<ExLibrary> load({AssetBundle? bundle, bool inline = false}) {
     if (_cache != null) return Future.value(_cache);
-    return _loading ??= () async {
-      final text = await (bundle ?? rootBundle).loadString('assets/exercises/exercises.json');
-      final json = inline ? jsonDecode(text) as Map<String, dynamic> : await compute(_decode, text);
-      return _cache = ExLibrary.fromJson(json);
-    }();
+    final pending = _loading;
+    if (pending != null) return pending;
+    final f = _read(bundle, inline);
+    _loading = f;
+    f.then<void>((_) {}, onError: (Object _) {
+      if (identical(_loading, f)) _loading = null;
+    });
+    return f;
+  }
+
+  static Future<ExLibrary> _read(AssetBundle? bundle, bool inline) async {
+    final text = await (bundle ?? rootBundle).loadString('assets/exercises/exercises.json', cache: false);
+    final json = inline ? jsonDecode(text) as Map<String, dynamic> : await compute(_decode, text);
+    return _cache = ExLibrary.fromJson(json);
   }
 
   static Map<String, dynamic> _decode(String s) => jsonDecode(s) as Map<String, dynamic>;

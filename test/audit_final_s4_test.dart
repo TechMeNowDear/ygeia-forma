@@ -65,14 +65,16 @@ void main() {
       expect(e.log[0].reps, planned);
     });
 
-    test('✓ με «r» για άλλη άσκηση: το ✓ γράφεται, οι επαναλήψεις όχι', () {
+    // Round 1 (f6a · S6-10): ✓ για άλλη άσκηση (η θέση άλλαξε στο κινητό στο μεταξύ) δεν γράφεται καθόλου· πριν
+    // γραφόταν το ✓ χωρίς τις επαναλήψεις.
+    test('✓ με «r» για άλλη άσκηση: δεν γράφεται τίποτα', () {
       final t = sampleTraining(now);
       final s = t.start(t.program!.workout('A')!);
       final link = WearLink()..attachForTest(t);
       final e = s.items[0];
       final planned = e.log[0].reps;
       link.apply(t, WatchCmd('tick', {'op': 'tick', 'i': 0, 's': 0, 'r': 3, 'ex': 'άλλη', 'sid': s.id}));
-      expect(e.log[0].done, isTrue);
+      expect(e.log[0].done, isFalse);
       expect(e.log[0].reps, planned);
     });
 

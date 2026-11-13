@@ -13,6 +13,7 @@
 Όταν προστεθεί νέο είδος δεδομένων ή νέα υπηρεσία, ο έλεγχος σταματά το χτίσιμο ώσπου να γραφτεί στην πολιτική.
 Χρήση: python3 -I tools/ci/check_privacy.py   (από τη ρίζα του repository)
 """
+import os
 import re
 import sys
 
@@ -76,6 +77,13 @@ for t in sorted({t for block in lists for t in re.findall(r'DataTypes\.(\w+)', b
         errors.append(f'Samsung: νέο είδος δεδομένων {t}· γράψ\' το στην πολιτική και στη λίστα SAMSUNG του {sys.argv[0]}')
     else:
         need(SAMSUNG[t] in greek, f'Samsung: η εφαρμογή ζητά {t}, αλλά η πολιτική δεν λέει «{SAMSUNG[t]}»')
+
+# --- Ανάγνωση στο παρασκήνιο (έλεγχος 13/11, U4-8): όσο υπάρχει ο RefreshWorker, η πολιτική λέει ότι η εφαρμογή διαβάζει
+# το Samsung Health και χωρίς να είναι ανοιχτή. ---
+worker = 'android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/RefreshWorker.kt'
+if os.path.exists(f'{ROOT}/{worker}') and 'PeriodicWorkRequestBuilder<RefreshWorker>' in read(worker):
+    need('στο παρασκήνιο' in greek, 'Samsung: η εφαρμογή διαβάζει και στο παρασκήνιο (RefreshWorker)· η πολιτική πρέπει να το λέει')
+    need('in the background' in english, 'Samsung: η ανάγνωση στο παρασκήνιο λείπει από το αγγλικό κείμενο')
 
 # --- Μεσάζων Oura ---
 proxy = grab(r"const ouraTokenProxy = '([^']*)';", cfg, 'το ouraTokenProxy στο lib/oura/config.dart')

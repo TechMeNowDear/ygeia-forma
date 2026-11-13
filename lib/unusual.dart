@@ -138,7 +138,7 @@ UnusualResult checkUnusual(Map<String, Map<String, double>> history, DateTime da
 
 /// Κλινικός έλεγχος 4 (C1): το χρώμα του «+N» στους παλμούς ύπνου (Καρδιά, Σήμερα) το αποφασίζει ο ίδιος κανόνας με
 /// το «Εκτός συνηθισμένου». Κόκκινο μόνο όταν οι παλμοί της νύχτας [night] ξεφεύγουν (τουλάχιστον 3 bpm ΚΑΙ 2 τυπικές
-/// διακυμάνσεις σου)· αλλιώς ουδέτερο γκρι. Ένα +3 μόνο του είναι συχνά τυχαίο (αλκοόλ, ζέστη, αργό φαγητό).
+/// διακυμάνσεις σου)· αλλιώς ουδέτερο γκρι. Ένα +3 μόνο του είναι συχνά τυχαίο (αλκοόλ, ζέστη, φαγητό αργά το βράδυ).
 bool sleepHrOff(Map<String, Map<String, double>> history, DateTime night, {SourcePlan? plan}) =>
     checkUnusual(history, DateTime(night.year, night.month, night.day), checkPrevious: false, plan: plan)
         .signals

@@ -11,6 +11,7 @@ import '../format.dart';
 import '../history.dart';
 import '../sources.dart';
 import '../trends.dart' show usualMinNights, usualNights, usualOf;
+import 'config.dart';
 import 'oura_model.dart';
 
 /// Ελάχιστες νύχτες για μέσο όρο ή «συνηθισμένο».
@@ -70,10 +71,18 @@ StageAverages ouraStageAverages(List<OuraNight> nights, DateTime day, SourcePlan
           n.day.isAfter(DateTime(day.year, day.month, day.day - 7)) &&
           plan.nightSource(n.day) == Source.oura &&
           n.main != null)
-        n.main!,
+        n,
   ];
+  // Round 1 (S5-5): η νύχτα σε κομμάτια μετρά ΟΛΑ τα κομμάτια της ([OuraNight.counted]), όπως η διάρκεια και τα
+  // ποσοστά της ίδιας νύχτας ([ouraRow]). Πριν, μόνο η κύρια περίοδος: στην ίδια οθόνη η νύχτα ήταν 7 ώρες 55 λεπτά
+  // και οι φάσεις της άθροιζαν 4 ώρες 40 λεπτά. Νύχτα με κομμάτι χωρίς την τιμή δεν μπαίνει στον μέσο όρο της.
   int? avg(int? Function(OuraSleep) f) {
-    final v = [for (final s in recent) if (f(s) != null) f(s)!];
+    final v = <int>[];
+    for (final n in recent) {
+      final parts = n.counted;
+      if (parts.any((x) => f(x) == null)) continue;
+      v.add(parts.fold<int>(0, (s, x) => s + f(x)!));
+    }
     if (v.length < minNightsForAverage) return null;
     return (v.reduce((a, b) => a + b) / v.length / 60).round();
   }
@@ -97,10 +106,11 @@ String napTimes(OuraNight? n, {bool nightOnly = false}) {
   final d = n.day;
   final from = DateTime(d.year, d.month, d.day - 1, 18);
   final to = DateTime(d.year, d.month, d.day, 12);
+  // Round 1 (S5-1): οι ώρες του τόπου όπου κοιμήθηκες ([OuraSleep.wallStart]).
   return [
     for (final x in n.naps)
-      if (!nightOnly || (x.start.isBefore(to) && x.end.isAfter(from)))
-        '${hm(x.start)}–${hm(x.end)}${x.totalMinutes == null ? '' : ' · ${hoursMinutes(x.totalMinutes!)}'}',
+      if (!nightOnly || (x.wallStart.isBefore(to) && x.wallEnd.isAfter(from)))
+        '${hm(x.wallStart)}–${hm(x.wallEnd)}${x.totalMinutes == null ? '' : ' · ${hoursMinutes(x.totalMinutes!)}'}',
   ].join(', ');
 }
 
@@ -135,6 +145,10 @@ enum EmptyNight {
 
   /// Δεν διαβάστηκε από πού έρχεται ο ύπνος (χαλασμένες ρυθμίσεις πηγών): κενό ώσπου να διαλέξεις.
   unknownPlan,
+
+  /// Round 1 (S5-2 / U2a-05): πριν από τις 04:00, η νύχτα με τη σημερινή ημερομηνία δεν έχει τελειώσει ακόμα. Δεν
+  /// λείπει τίποτα και δεν υπάρχει τίποτα να κάνεις.
+  notYet,
 }
 
 String emptyNightText(EmptyNight r) => switch (r) {
@@ -147,6 +161,7 @@ String emptyNightText(EmptyNight r) => switch (r) {
       EmptyNight.disconnected => 'Το Oura δεν είναι συνδεδεμένο',
       EmptyNight.onlyNap => 'Μόνο υπνάκος από το δαχτυλίδι',
       EmptyNight.unknownPlan => 'Δεν διαβάστηκε από πού έρχεται ο ύπνος',
+      EmptyNight.notYet => 'Η αποψινή νύχτα θα φανεί το πρωί',
     };
 
 /// Ο λόγος που η νύχτα [day] είναι κενή (null = δεν είναι κενή).
@@ -165,16 +180,29 @@ EmptyNight? emptyNightReason({
   if (src == Source.none) return planUnknown ? EmptyNight.unknownPlan : EmptyNight.disconnected;
   if (src != Source.oura) return null;
   if (night?.main != null) return null;
-  // Η Oura έδωσε μόνο υπνάκο για αυτή τη μέρα: το λέμε (όχι «δεν υπάρχουν δεδομένα»).
-  if (night != null && night.onlyNap) return EmptyNight.onlyNap;
   final today = dayOf(now);
   final isToday = sameDay(day, today);
+  // Round 1 (S5-2 / U2a-05): πριν από τις 04:00 η νύχτα με τη σημερινή ημερομηνία δεν έχει τελειώσει (κοιμάσαι ή δεν
+  // έχεις κοιμηθεί ακόμα): ούτε «περιμένει το Oura» ούτε «μόνο υπνάκος» (ένας απογευματινός υπνάκος μετά τις 18:00
+  // έχει ήδη τη σημερινή ημερομηνία). Ίδιο όριο με το `firstNightChoice`.
+  if (isToday && now.hour < ouraNightDueHour) return EmptyNight.notYet;
+  // Η Oura έδωσε μόνο υπνάκο για αυτή τη μέρα: το λέμε (όχι «δεν υπάρχουν δεδομένα»).
+  if (night != null && night.onlyNap) return EmptyNight.onlyNap;
   // Έλεγχος 2, C12: νύχτα που διαβάστηκε ΗΔΗ μετά το πρωί της και δεν είχε δεδομένα: «δεν υπάρχουν δεδομένα από το
   // δαχτυλίδι», όποια κι αν είναι η σύνδεση τώρα (μετά από αποσύνδεση ή χαμένα tokens δεν έγινε «πρόβλημα σύνδεσης»).
   final readAfter = synced != null && !synced.isBefore(DateTime(day.year, day.month, day.day, 4));
-  if (readAfter && !(isToday && now.hour < 12)) return EmptyNight.noRing;
-  // Αποσυνδέθηκε (από απόψε χωρίς πηγή): όχι «νέα σύνδεση».
-  if (!hasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) == Source.none) {
+  if (readAfter && !(isToday && now.hour < 12)) {
+    // Round 1 (S5-7): η ΤΕΛΕΥΤΑΙΑ προσπάθεια ανάγνωσης απέτυχε προσωρινά (δίκτυο, 429, διακομιστής, μεσάζων) και η
+    // νύχτα είναι μέσα στις μέρες που ξαναδιαβάζονται κάθε φορά: δεν ξέρουμε αν ήρθε στο μεταξύ. «Δεν διαβάστηκε
+    // ακόμα», όχι «δεν υπάρχουν δεδομένα από το δαχτυλίδι».
+    final temporary =
+        error != null && error != 'reconnect' && error != 'noRefresh' && error != 'scopeMissing' && error != 'subscription';
+    final rereadDays = daysBetween(day, today);
+    if (temporary && hasTokens && rereadDays >= 0 && rereadDays < ouraRecentDays) return EmptyNight.notRead;
+    return EmptyNight.noRing;
+  }
+  // Αποσυνδέθηκε (από απόψε χωρίς πηγή, ή με ρητή επιλογή από το ρολόι): όχι «νέα σύνδεση».
+  if (!hasTokens && plan.nightSource(DateTime(today.year, today.month, today.day + 1)) != Source.oura) {
     return EmptyNight.disconnected;
   }
   // Και «noRefresh» θέλει νέα σύνδεση.
@@ -250,8 +278,67 @@ class CompareRow {
   return (nights: both.length, meanDiff: mean.round(), splitNights: both.where((r) => r.watchParts > 1).length);
 }
 
+/// Round 1 (U2a-11): μια τιμή («Σάβ 14/11», «6 ώρες 27 λεπτά») δεν σπάει ποτέ σε δύο γραμμές: τα κενά της γίνονται
+/// αδιάσπαστα.
+String glued(String s) => s.replaceAll(' ', '\u00A0');
+
+/// Το ίδιο για ετικέτα με τιμή στο τέλος («Οξυγόνο τη νύχτα, μέσος όρος 96%»): ό,τι ακολουθεί το κόμμα μένει μαζί, άρα
+/// η γραμμή σπάει μόνο μετά το κόμμα και η τιμή δεν μένει ποτέ μόνη της.
+String gluedAfterComma(String s) {
+  final i = s.indexOf(', ');
+  return i < 0 ? s : '${s.substring(0, i + 2)}${glued(s.substring(i + 2))}';
+}
+
+/// Round 1 (U2a-06): γιατί λείπει η χθεσινή νύχτα, σε ολόκληρη πρόταση με ό,τι χρειάζεται να κάνεις (η σελίδα «Ύπνος»
+/// τη δείχνει πάνω από την τελευταία νύχτα που ήρθε). [nap]: οι ώρες του υπνάκου, για το «μόνο υπνάκος».
+/// [watchTonight]: μετά την αποσύνδεση διάλεξε ρητά «από απόψε το ρολόι».
+String lastNightNote(EmptyNight r, {String nap = '', bool watchTonight = false}) => switch (r) {
+      EmptyNight.waiting =>
+        'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ.',
+      EmptyNight.noRing =>
+        'Χθες βράδυ δεν ήρθε ύπνος από το δαχτυλίδι. Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει.',
+      EmptyNight.reconnect => 'Η χθεσινή νύχτα δεν διαβάστηκε: το Oura χρειάζεται νέα σύνδεση.',
+      EmptyNight.subscription =>
+        'Η χθεσινή νύχτα δεν διαβάστηκε: η Oura δεν δίνει δεδομένα (η συνδρομή δεν είναι ενεργή ή λείπει η άδεια).',
+      EmptyNight.notRead => 'Η χθεσινή νύχτα δεν διαβάστηκε ακόμα από την Oura.',
+      EmptyNight.disconnected => watchTonight
+          ? 'Το Oura αποσυνδέθηκε. Από απόψε ο ύπνος έρχεται από το ρολόι, όπως διάλεξες.'
+          : 'Το Oura αποσυνδέθηκε. Οι νύχτες μένουν κενές ώσπου να το συνδέσεις ξανά ή να διαλέξεις το ρολόι.',
+      EmptyNight.onlyNap =>
+        'Χθες βράδυ το δαχτυλίδι κατέγραψε μόνο υπνάκο${nap.isEmpty ? '' : ' ($nap)'}. Ο υπνάκος δεν μετρά ως νύχτα.',
+      EmptyNight.unknownPlan => 'Δεν διαβάστηκε από πού έρχεται ο ύπνος. Διάλεξε πηγή για να συνεχίσουν οι νύχτες.',
+      EmptyNight.notYet || EmptyNight.notOura => '',
+    };
+
 /// Λεπτά → «τουλάχιστον 28 λεπτά».
 String atLeast(int minutes) => 'τουλάχιστον ${hoursMinutes(minutes)}';
+
+/// Round 1 (S4-5): η μία νύχτα του δαχτυλιδιού απέναντι στη σύσταση «τουλάχιστον 7 ώρες» ([adviceMin], από το
+/// reference.dart). Η σύσταση (AASM και Sleep Research Society· Watson κ.ά., Sleep 2015) στηρίζεται σχεδόν μόνο σε
+/// ώρες ύπνου που ΔΗΛΩΝΑΝ οι ίδιοι οι άνθρωποι· σε μέτρηση με συσκευή οι ίδιοι άνθρωποι βγαίνουν κατά μέσο όρο 0,8 ώρες
+/// κάτω (6,0 μετρημένες έναντι 6,8 δηλωμένων· Lauderdale κ.ά., Epidemiology 2008). Γι' αυτό:
+/// - ύπνος (χωρίς τα ξυπνήματα) ≥ σύσταση: το λέμε·
+/// - ύπνος κάτω από τη σύσταση αλλά χρόνος στο κρεβάτι ≥ σύσταση (ή άγνωστος): ΚΑΜΙΑ ετυμηγορία «κάτω από το εύρος»·
+///   δείχνονται και τα δύο νούμερα και από πού βγήκε η σύσταση·
+/// - και ο χρόνος στο κρεβάτι κάτω από τη σύσταση: «λιγότερο από τη σύσταση» (αληθές με κάθε τρόπο μέτρησης).
+/// Πάντα «μία νύχτα» και «μετρά ο μέσος όρος πολλών νυχτών» (έλεγχος 9/11).
+String sleepVsAdvice({required int asleepMin, required int? inBedMin, required int adviceMin}) {
+  final asleep = hoursMinutes(asleepMin);
+  final advice = hoursMinutes(adviceMin);
+  const tail = ' Μετρά ο μέσος όρος πολλών νυχτών.';
+  const basis = 'βασίζεται σε ώρες που δηλώνουν οι ίδιοι οι άνθρωποι· οι συσκευές μετρούν συνήθως λιγότερο.';
+  if (asleepMin >= adviceMin) {
+    return 'Μία νύχτα: ύπνος $asleep, όσο ζητά η σύσταση για ενήλικες (τουλάχιστον $advice).$tail';
+  }
+  if (inBedMin == null) {
+    return 'Μία νύχτα: ύπνος $asleep. Η σύσταση για ενήλικες (τουλάχιστον $advice) $basis$tail';
+  }
+  final bed = hoursMinutes(inBedMin);
+  if (inBedMin >= adviceMin) {
+    return 'Μία νύχτα: ύπνος $asleep, στο κρεβάτι $bed. Η σύσταση για ενήλικες (τουλάχιστον $advice) $basis$tail';
+  }
+  return 'Μία νύχτα: ύπνος $asleep, στο κρεβάτι $bed: λιγότερο από τη σύσταση για ενήλικες (τουλάχιστον $advice).$tail';
+}
 
 /// Κλειδιά του ιστορικού που διαβάζει η σελίδα (για να φαίνεται ρητά ότι είναι μόνο του Oura).
 const ouraScreenMetrics = [K.hrv, K.sleepHr, K.lowHr, K.breath, K.skinTemp, K.energy, K.sleepScore];

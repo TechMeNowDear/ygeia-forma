@@ -1,6 +1,8 @@
 package gr.ygeiaforma.ygeia_forma
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.view.View
 import android.widget.RemoteViews
 import java.time.LocalDate
 
@@ -23,6 +25,11 @@ object QuickWidgets {
                 val (title, sub) = QuickWidgetRules.workoutLines(HomeWidgets.snapshot(ctx)?.optJSONObject("workout"), LocalDate.now())
                 setTextViewText(R.id.qw_title, title)
                 setTextViewText(R.id.qw_sub, sub)
+                // Round 1 (U7-17 α): σε χαμηλό widget (ή με μεγάλα γράμματα) η σταθερή επικεφαλίδα «ΠΡΟΠΟΝΗΣΗ ΣΗΜΕΡΑ» φεύγει,
+                // ώστε να χωρά η χρήσιμη τρίτη γραμμή («6 ασκήσεις · …», «Αύριο: …»).
+                val maxH = AppWidgetManager.getInstance(ctx).getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
+                val roomy = QuickWidgetRules.workoutHeadFits(maxH, ctx.resources.configuration.fontScale)
+                setViewVisibility(R.id.qw_head, if (roomy) View.VISIBLE else View.GONE)
                 setContentDescription(R.id.qw_root, listOf("Προπόνηση σήμερα", title, sub).filter { it.isNotEmpty() }.joinToString(". "))
                 // Ανοίγει την Άσκηση › Προπόνηση (εκεί είναι το «Ξεκίνα»): ένα πάτημα στην αρχική οθόνη δεν ξεκινά προπόνηση κατά λάθος.
                 setOnClickPendingIntent(R.id.qw_root, HomeWidgets.open(ctx, id, 0, "w:workout:section:"))

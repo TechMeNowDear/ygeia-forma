@@ -33,7 +33,8 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
   void _saved(Food f, {bool fromScan = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Αποθηκεύτηκε: ${f.name}'),
-      action: fromScan ? SnackBarAction(label: 'Σκάναρε άλλο', onPressed: _scan) : null,
+      // Έλεγχος round1 (U3a-18): η ίδια λέξη με το κουμπί («Σάρωση»).
+      action: fromScan ? SnackBarAction(label: 'Σάρωση ξανά', onPressed: _scan) : null,
     ));
   }
 
@@ -205,14 +206,17 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                                       Text(f.name,
                                           style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text)),
                                       const SizedBox(height: 3),
-                                      Row(
+                                      // Wrap: αν η μάρκα και οι θερμίδες δεν χωρούν δίπλα δίπλα (μεγάλα γράμματα), οι θερμίδες
+                                      // πάνε στην από κάτω γραμμή αντί να κοπούν.
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 2,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
-                                          if (f.brand != null) ...[
-                                            Flexible(child: MineBadge(text: f.brand!)),
-                                            const SizedBox(width: 8),
-                                          ],
+                                          if (f.brand != null) MineBadge(text: f.brand!),
                                           Text(
-                                            '${kcalText(f.n.amount(Nk.kcal))} kcal/100 ${f.unit}'
+                                            // Έλεγχος round1 (U3a-18): «ανά 100 g», όπως σε κάθε άλλη λίστα.
+                                            '${kcalText(f.n.amount(Nk.kcal))} kcal ανά 100 ${f.unit}'
                                             '${f.barcode != null ? ' · barcode' : ''}',
                                             style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                                           ),
@@ -241,11 +245,17 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
 /// Διόρθωση ενός δικού μου προϊόντος (και, αν θέλει ο χρήστης, των μερών που το έχει ήδη γράψει).
 /// Κοινό για «Τα προϊόντα μου» και το «Δικά μου» του «+ Φαγητό» (σχέδια 9/11).
 Future<Food?> editMyFood(BuildContext context, FoodStore food, Food f, {String? note}) async {
+  final messenger = ScaffoldMessenger.of(context);
   final edited = await Navigator.of(context).push<Food>(
     MaterialPageRoute(settings: const RouteSettings(name: 'Διόρθωση προϊόντος'), builder: (_) => FoodFormScreen(draft: draftFromFood(f), existingId: f.id, note: note)),
   );
   if (edited == null) return null;
-  if (!await food.saveMyFood(edited)) return edited;
+  // Έλεγχος round1 (S2-4): αν η διόρθωση δεν γράφτηκε στο κινητό (π.χ. γεμάτος χώρος), το λέμε εδώ και επιστρέφουμε
+  // null· πριν έβγαινε «Αποθηκεύτηκε» ενώ το προϊόν είχε μείνει όπως ήταν.
+  if (!await food.saveMyFood(edited)) {
+    messenger.showSnackBar(SnackBar(content: Text(productNotSavedText(edited.name))));
+    return null;
+  }
   // Διόρθωση τιμών: προσφέρεται να διορθωθούν και οι μέρες που το έχω ήδη γράψει.
   final old = food.entriesWithOldValues(edited);
   if (old.isNotEmpty && context.mounted) {
@@ -253,9 +263,10 @@ Future<Food?> editMyFood(BuildContext context, FoodStore food, Food f, {String? 
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Και στις μέρες που το έγραψες;'),
+        // «στοιχεία»: οι τιμές της ετικέτας ή το «μετρά ως» της κάρτας «Χοληστερίνη» (έλεγχος round1, S2-1).
         content: Text(
           'Το «${edited.name}» υπάρχει σε ${countText(old.length, 'καταχώριση', 'καταχωρίσεις')} των τελευταίων '
-          '${FoodStore.historyDays} ημερών με τις παλιές τιμές. Να πάρουν τις νέες; Τα γραμμάρια μένουν ίδια.',
+          '${FoodStore.historyDays} ημερών με τα παλιά στοιχεία. Να πάρουν τα νέα; Τα γραμμάρια μένουν ίδια.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Όχι, μόνο από εδώ και πέρα')),

@@ -70,7 +70,7 @@ class _PickerState extends State<_Picker> {
               Row(children: [
                 Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
                 const SizedBox(width: 4),
-                Flexible(child: Text('Σταδιακά, χωρίς πόνο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.exercise))),
+                Flexible(child: Text('Σταδιακά, χωρίς πόνο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.warn))),
               ]),
           ]),
           trailing: inIt ? Icon(Icons.check_circle_rounded, color: c.good) : Icon(Icons.add_circle_outline_rounded, color: c.exercise),
@@ -98,7 +98,8 @@ class _PickerState extends State<_Picker> {
                 onChanged: (_) => setState(() {}),
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Αναζήτηση: π.χ. στήθος, αλτήρες, κοιλιακοί',
+                  // round1, U6-23: χωρά στο στενό κινητό (πριν «…αλτήρες, κο…»).
+                  hintText: 'Αναζήτηση: π.χ. στήθος, λάστιχο',
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: _q.text.isEmpty
                       ? null

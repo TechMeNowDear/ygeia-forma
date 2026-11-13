@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -23,12 +25,57 @@ const zoneInfo = MetricInfo(
   down: 'Κάτω από τη ζώνη: ελαφριά κίνηση. Μετρά κι αυτή, αλλά όχι στα λεπτά μέτριας άσκησης.',
   compare: 'Η «ζώνη καύσης λίπους» υπάρχει (εκεί καις περισσότερο λίπος ανά λεπτό), αλλά δεν αλλάζει πόσο λίπος χάνεις: μετρά '
       'πόση άσκηση κάνεις συνολικά και τι τρως. Για τη χοληστερίνη και την HDL μετρά επίσης η συνολική ποσότητα άσκησης.',
-  accuracy: 'Οι μέγιστοι παλμοί βγαίνουν από την ηλικία (208 − 0,7 × ηλικία) και σε έναν άνθρωπο μπορεί να διαφέρουν ±10. Γι’ αυτό, '
-      'τα πρώτα περπατήματα έλεγξε τη ζώνη με το «τεστ ομιλίας». Οι παλμοί ηρεμίας είναι η μεσαία τιμή των παλμών ύπνου των '
-      '14 τελευταίων νυχτών. Οι παλμοί καρπού στο περπάτημα είναι αρκετά ακριβείς.',
-  cite: 'ACSM Guidelines (μέτρια ένταση 40–59%) · Tanaka 2001 · Π.Ο.Υ. 2020 · Achten & Jeukendrup 2002 · Venables 2005 · '
-      'Kraus 2002 (NEJM) · Kodama 2007 · Persinger 2004 (τεστ ομιλίας)',
+  // round1, S6-4: το ±10 είναι μία τυπική απόκλιση (Tanaka 2001: SD ~10 παλμοί), δηλαδή περίπου 1 στους 3 ανθρώπους
+  // απέχει περισσότερο και περίπου 1 στους 20 πάνω από 20. Ο τύπος βγήκε από υγιείς, χωρίς κάπνισμα και φάρμακα· το
+  // κάπνισμα αλλάζει τους παλμούς ηρεμίας και τους μέγιστους (Papathanasiou 2013). Γενικό κείμενο, για κάθε χρήστη.
+  accuracy: 'Οι μέγιστοι παλμοί βγαίνουν από την ηλικία (208 − 0,7 × ηλικία). Είναι εκτίμηση: σε 1 στους 3 ανθρώπους οι '
+      'πραγματικοί διαφέρουν πάνω από 10 παλμούς, και σε περίπου 1 στους 20 πάνω από 20. Ο τύπος βγήκε από υγιείς ανθρώπους '
+      'που δεν κάπνιζαν και δεν έπαιρναν φάρμακα· το κάπνισμα και φάρμακα που αλλάζουν τους παλμούς (π.χ. β-αναστολείς) '
+      'μετακινούν τη ζώνη. Γι’ αυτό, τα πρώτα περπατήματα έλεγξε τη ζώνη με το «τεστ ομιλίας»: στο πάνω όριο μιλάς με '
+      'προτάσεις αλλά δεν τραγουδάς. Οι παλμοί ηρεμίας είναι η μεσαία τιμή των παλμών ύπνου των 14 τελευταίων νυχτών. '
+      'Οι παλμοί καρπού στο περπάτημα είναι αρκετά ακριβείς.',
+  cite: 'ACSM Guidelines (μέτρια ένταση 40–59%) · Tanaka 2001 · Papathanasiou 2013 (κάπνισμα) · Π.Ο.Υ. 2020 · '
+      'Achten & Jeukendrup 2002 · Venables 2005 · Kraus 2002 (NEJM) · Kodama 2007 · Persinger 2004 (τεστ ομιλίας)',
 );
+
+/// Με όριο γιατρού το ρολόι δονείται μόνο σε εκείνο (round1, U5-28· ExerciseService.zoneMaySpeak).
+String zoneLimitText(int limit) => 'Έχεις όριο γιατρού ($limit): το ρολόι δονείται μόνο σε εκείνο. Οι δονήσεις της ζώνης είναι κλειστές.';
+
+/// Οι δονήσεις της ζώνης σε λέξεις (round1, U5-06), από τις ίδιες σταθερές με το ρολόι.
+const zoneHighText = 'Δύο σύντομες δονήσεις όταν μείνεις πάνω $zoneHoldSec δευτερόλεπτα. Ξανά μετά από ${zoneRepeatSec ~/ 60} λεπτά, '
+    'αν δεν κατέβεις. Όχι τα πρώτα ${zoneWarmupSec ~/ 60} λεπτά.';
+const zoneLowText = 'Μία δόνηση όταν μείνεις κάτω 1 λεπτό. Ξανά μετά από 5 λεπτά.';
+
+/// «Τεστ ομιλίας» (round1, S6-3): η απάντηση λέει κάτι για το πάνω όριο μόνο αν οι παλμοί πέρασαν αρκετή ώρα κοντά του
+/// (Persinger 2004: το τεστ κρίνει την ένταση στην οποία δίνεται η απάντηση). «Κοντά» = από [talkNearBelow] κάτω ως
+/// [talkNearAbove] πάνω από το όριο, για τουλάχιστον [talkNearMinSec] (οι παλμοί σταθεροποιούνται σε 2–3 λεπτά σταθερής
+/// έντασης). Και η ζώνη απομακρύνεται το πολύ [talkMaxDrift] από τον υπολογισμό, όσες απαντήσεις κι αν δοθούν: περίπου
+/// όσο μετακινεί τη ζώνη (59% του αποθέματος) ένα λάθος δύο τυπικών αποκλίσεων στους μέγιστους (Tanaka 2001, SD ~10).
+const talkNearBelow = 7, talkNearAbove = 5, talkNearMinSec = 180, talkMaxDrift = 10;
+
+/// Δευτερόλεπτα ενεργού χρόνου κοντά στο πάνω όριο [hi] και πάνω από αυτό το «κοντά». Χωρίς παλμούς: 0 και 0.
+({int near, int above}) talkSeconds(Session s, int hi) {
+  if (s.hr.isEmpty) return (near: 0, above: 0);
+  final t = zoneTimes(s.hr, s.pauses, hi - talkNearBelow, hi + talkNearAbove, endSec: s.end?.difference(s.start).inSeconds);
+  return (near: t.inZone, above: t.above);
+}
+
+/// Η ζώνη που προτείνεται μετά την απάντηση [answer] για ένα περπάτημα με ζώνη [walkLo]–[walkHi], ή null (καμία πρόταση).
+/// [baseLo]/[baseHi]: η ζώνη του υπολογισμού (χωρίς αλλαγές του χρήστη)· χωρίς αυτήν, η ζώνη του περπατήματος.
+(int, int)? talkProposal(
+    {required String answer, required int walkLo, required int walkHi, int? baseLo, int? baseHi, required int nearSec, required int aboveSec}) {
+  final shift = talkShift(answer);
+  if (shift == 0 || nearSec < talkNearMinSec) return null;
+  // «Λαχάνιαζα» σε περπάτημα που ήταν κυρίως πάνω από τη ζώνη: αυτό ακριβώς περιμένει μια σωστή ζώνη.
+  if (shift < 0 && aboveSec > nearSec) return null;
+  final bLo = baseLo ?? walkLo, bHi = baseHi ?? walkHi;
+  final up = math.min(bLo + talkMaxDrift - walkLo, bHi + talkMaxDrift - walkHi);
+  final down = math.max(bLo - talkMaxDrift - walkLo, bHi - talkMaxDrift - walkHi);
+  if (up < down) return null;
+  final d = math.max(down, math.min(up, shift));
+  if (d == 0) return null;
+  return (walkLo + d, walkHi + d);
+}
 
 /// Η κάρτα της ζώνης στην Προπόνηση (σχέδια 12/11, 4α).
 class ZoneCard extends StatelessWidget {
@@ -89,25 +136,27 @@ class ZoneCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text('Τη ζώνη την όρισες εσύ.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
             ],
+            // round1, U5-28: με όριο γιατρού το ρολόι δεν δονείται για τη ζώνη (ExerciseService: zoneMaySpeak)· ο διακόπτης
+            // δεν δείχνει «ανοιχτό» κάτι που δεν γίνεται.
             if (training.hrLimit != null) ...[
               const SizedBox(height: 8),
-              Text('Υπάρχει όριο γιατρού ${training.hrLimit}: στο ρολόι νικά εκείνο.',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.warn)),
+              Text(zoneLimitText(training.hrLimit!),
+                  key: const ValueKey('zone-doctor-limit'), style: TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600, color: c.warn)),
             ],
             const Hairline(vertical: 12),
             Row(children: [
-              Expanded(child: Text('Δόνηση όταν την ξεπερνάς', style: TextStyle(fontSize: 15, color: c.text))),
+              Expanded(child: Text('Δόνηση όταν την ξεπερνάς', style: TextStyle(fontSize: 15, color: training.hrLimit == null ? c.text : c.textSecondary))),
               Switch(
                 key: const ValueKey('zone-alert-high'),
-                value: s.alertHigh,
-                onChanged: (v) => health.setZoneSettings(s.copyWith(alertHigh: v)),
+                value: s.alertHigh && training.hrLimit == null,
+                onChanged: training.hrLimit != null ? null : (v) => health.setZoneSettings(s.copyWith(alertHigh: v)),
               ),
             ]),
             const SizedBox(height: 4),
             OutlinedButton(
               key: const ValueKey('zone-edit'),
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.exercise),
-              onPressed: () => openZoneSheet(context, health, now),
+              onPressed: () => openZoneSheet(context, health, now, limit: training.hrLimit),
               child: const Text('Αλλαγή'),
             ),
           ]),
@@ -149,21 +198,24 @@ class _ZoneBar extends StatelessWidget {
   }
 }
 
-Future<void> openZoneSheet(BuildContext context, HealthStore health, DateTime now) => showModalBottomSheet<void>(
+Future<void> openZoneSheet(BuildContext context, HealthStore health, DateTime now, {int? limit}) => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
       routeSettings: const RouteSettings(name: 'Ζώνη περπατήματος'),
       constraints: const BoxConstraints(maxWidth: 640),
-      builder: (_) => ZoneSheet(health: health, now: now),
+      builder: (_) => ZoneSheet(health: health, now: now, limit: limit),
     );
 
 /// Φύλλο «Ζώνη περπατήματος» (σχέδια 12/11, 4β): πώς υπολογίστηκε, αλλαγή, δονήσεις.
 class ZoneSheet extends StatefulWidget {
-  const ZoneSheet({super.key, required this.health, required this.now});
+  const ZoneSheet({super.key, required this.health, required this.now, this.limit});
   final HealthStore health;
   final DateTime now;
+
+  /// Το όριο γιατρού, αν υπάρχει: τότε οι δονήσεις της ζώνης είναι κλειστές στο ρολόι (U5-28).
+  final int? limit;
 
   @override
   State<ZoneSheet> createState() => _ZoneSheetState();
@@ -222,12 +274,16 @@ class _ZoneSheetState extends State<ZoneSheet> {
     Navigator.of(context).pop();
   }
 
+  // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
+  // χωρίς αυτό διακόπτες και δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ExerciseTheme(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final z = _z0;
     final hint = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
-    final head = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .3, color: c.textSecondary);
+    final head = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
@@ -250,7 +306,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
             Text(
                 z.rest == null
                     ? 'Χωρίς αρκετές νύχτες παλμών ύπνου η ζώνη βγαίνει από τους μέγιστους παλμούς.'
-                    : 'ηρεμία + 40% και + 59% της διαφοράς «μέγιστοι − ηρεμία» (Karvonen).',
+                    : 'Ηρεμία + 40% και + 59% της διαφοράς «μέγιστοι − ηρεμία» (τύπος Karvonen).',
                 style: hint),
           ],
           const SizedBox(height: 18),
@@ -263,7 +319,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
                 controller: _lo,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(labelText: 'Κάτω'),
+                decoration: const InputDecoration(labelText: 'Κάτω', suffixText: 'παλμοί', border: OutlineInputBorder()),
               ),
             ),
             const SizedBox(width: 12),
@@ -273,7 +329,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
                 controller: _hi,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(labelText: 'Πάνω'),
+                decoration: const InputDecoration(labelText: 'Πάνω', suffixText: 'παλμοί', border: OutlineInputBorder()),
               ),
             ),
           ]),
@@ -283,7 +339,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
             controller: _max,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'Μέγιστοι παλμοί, αν τους ξέρεις'),
+            decoration: const InputDecoration(labelText: 'Μέγιστοι παλμοί, αν τους ξέρεις', border: OutlineInputBorder()),
           ),
           const SizedBox(height: 6),
           Text('Μόνο από τεστ ως την εξάντληση. Αν σταμάτησες νωρίτερα (π.χ. από κούραση), δεν είναι οι μέγιστοι.', style: hint),
@@ -294,7 +350,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
             controller: _rest,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'Παλμοί ηρεμίας ξύπνιος, αν τους μέτρησες'),
+            decoration: const InputDecoration(labelText: 'Παλμοί ηρεμίας ξύπνιος, αν τους μέτρησες', border: OutlineInputBorder()),
           ),
           const SizedBox(height: 6),
           Text('Καθιστός, μετά από 5 λεπτά ηρεμίας, το πρωί. Χωρίς τιμή μετρούν οι παλμοί ύπνου, που είναι λίγο χαμηλότεροι.', style: hint),
@@ -304,23 +360,30 @@ class _ZoneSheetState extends State<ZoneSheet> {
           ],
           const SizedBox(height: 18),
           Text('ΔΟΝΗΣΗ ΣΤΟ ΡΟΛΟΪ', style: head),
+          if (widget.limit != null) ...[
+            const SizedBox(height: 6),
+            Text(zoneLimitText(widget.limit!), style: TextStyle(fontSize: 13.5, height: 1.4, fontWeight: FontWeight.w600, color: c.warn)),
+          ],
+          // round1, U5-06: διάρκειες σε λέξεις· οι χρόνοι από τις σταθερές του zone.dart (ίδιοι με το ρολόι, S12-16).
           SwitchListTile(
             key: const ValueKey('zone-sheet-high'),
             contentPadding: EdgeInsets.zero,
             title: const Text('Πάνω από τη ζώνη'),
-            subtitle: const Text('Δύο σύντομες δονήσεις όταν μείνεις πάνω ${zoneHoldSec}″. Ξανά μετά από 2′, αν δεν κατέβεις. '
-                'Όχι τα πρώτα 5 λεπτά.'),
-            value: _s.alertHigh,
-            onChanged: (v) => setState(() => _s = _s.copyWith(alertHigh: v)),
+            subtitle: Text(zoneHighText),
+            value: _s.alertHigh && widget.limit == null,
+            onChanged: widget.limit != null ? null : (v) => setState(() => _s = _s.copyWith(alertHigh: v)),
           ),
           SwitchListTile(
             key: const ValueKey('zone-sheet-low'),
             contentPadding: EdgeInsets.zero,
             title: const Text('Κάτω από τη ζώνη'),
-            subtitle: const Text('Μία δόνηση όταν μείνεις κάτω 1′. Ξανά μετά από 5′.'),
-            value: _s.alertLow,
-            onChanged: (v) => setState(() => _s = _s.copyWith(alertLow: v)),
+            subtitle: const Text(zoneLowText),
+            value: _s.alertLow && widget.limit == null,
+            onChanged: widget.limit != null ? null : (v) => setState(() => _s = _s.copyWith(alertLow: v)),
           ),
+          // Ό,τι δείχνει και το ρολόι (f7, S8-02): σε Σίγαση ή Εξοικονόμηση ενέργειας η δόνηση της ζώνης δεν φτάνει.
+          Text('Σε Σίγαση ή Εξοικονόμηση ενέργειας το ρολόι δεν δονείται για τη ζώνη· η οθόνη του γράφει «χωρίς δόνηση».',
+              style: hint),
           const SizedBox(height: 12),
           FilledButton(
             key: const ValueKey('zone-save'),
@@ -369,8 +432,12 @@ class WeekMovementCard extends StatelessWidget {
           style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary),
         ),
         const SizedBox(height: 4),
-        Text('Βάρη: ${w.strengthDays == 1 ? '1 μέρα' : '${w.strengthDays} μέρες'}${w.strengthDays >= 2 ? ' ✓' : ''}',
-            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.text)),
+        // round1, U5-18: το «✓» ως γράμμα δεν υπάρχει στη γραμματοσειρά της εφαρμογής· εικονίδιο.
+        Row(key: const ValueKey('week-strength'), children: [
+          Text('Βάρη: ${w.strengthDays == 1 ? '1 μέρα' : '${w.strengthDays} μέρες'}',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.text)),
+          if (w.strengthDays >= 2) ...[const SizedBox(width: 4), Icon(Icons.check_rounded, size: 16, color: c.good)],
+        ]),
         if (w.unmeasuredWalks > 0)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -452,6 +519,9 @@ class TalkTestCard extends StatefulWidget {
     if (talk.any((t) => t[0] == s.id)) return true; // έχει απαντηθεί: φαίνεται η απάντηση
     // Μόνο για πρόσφατα περπατήματα (ανασκόπηση 11/11, N5): όχι για ένα παλιό που άνοιξες τυχαία.
     if (daysBetween(s.start, DateTime.now()) > 14) return false;
+    // round1, S6-3: χρειάζονται οι παλμοί του περπατήματος (φορτώνονται για τη σύνοψη) για να ξέρουμε αν έφτασε κοντά στο
+    // πάνω όριο. Χωρίς παλμούς καμία ερώτηση.
+    if (!s.hrLoaded || s.hr.isEmpty) return false;
     return talk.length < talkAskWalks;
   }
 
@@ -470,20 +540,27 @@ class _TalkTestCardState extends State<TalkTestCard> {
     final talk = [for (final t in s.talk) if (t[0] != widget.session.id) t, [widget.session.id, a]];
     h.setZoneSettings(s.copyWith(talk: talk));
     final shift = talkShift(a);
-    final z = h.zoneOn(DateTime.now());
+    final now = DateTime.now();
+    final z = h.zoneOn(now);
     // Ανασκόπηση 11/11 (S2): η πρόταση βγαίνει από τη ζώνη ΑΥΤΟΥ του περπατήματος, όχι από την τωρινή, ώστε δεύτερο
     // πάτημα να μη μετακινεί τη ζώνη ξανά. Ίδια απάντηση ή ζώνη ήδη εκεί: καμία ερώτηση.
     final wLo = widget.session.zoneLo, wHi = widget.session.zoneHi;
     if (shift == 0 || before == a || z == null || wLo == null || wHi == null || !mounted) return;
-    final lo = wLo + shift, hi = wHi + shift;
+    // round1, S6-3: μόνο αν οι παλμοί έμειναν κοντά στο πάνω όριο, και το πολύ ±10 από τη ζώνη του υπολογισμού.
+    final secs = talkSeconds(widget.session, wHi);
+    final base = computeZone(age: h.profile.ageOn(now), restHr: h.restHrForZone(now), s: s.copyWith(clearManual: true));
+    final next = talkProposal(
+        answer: a, walkLo: wLo, walkHi: wHi, baseLo: base?.lo, baseHi: base?.hi, nearSec: secs.near, aboveSec: secs.above);
+    if (next == null) return;
+    final (lo, hi) = next;
     if (z.lo == lo && z.hi == hi) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Να γίνει η ζώνη $lo–$hi;'),
         content: Text(shift > 0
-            ? 'Αφού μπορούσες και να τραγουδήσεις, η ζώνη σου μάλλον είναι λίγο πιο πάνω.'
-            : 'Αφού λαχάνιαζες, η ζώνη σου μάλλον είναι λίγο πιο κάτω.'),
+            ? 'Αφού κοντά στους $wHi παλμούς μπορούσες και να τραγουδήσεις, η ζώνη σου μάλλον είναι λίγο πιο πάνω.'
+            : 'Αφού κοντά στους $wHi παλμούς λαχάνιαζες, η ζώνη σου μάλλον είναι λίγο πιο κάτω.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Όχι')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι')),
@@ -506,10 +583,20 @@ class _TalkTestCardState extends State<TalkTestCard> {
       ('talk', 'Ναι, με προτάσεις'),
       ('no', 'Όχι, λαχάνιαζα'),
     ];
+    final hi = widget.session.zoneHi!;
+    // round1, S6-3: χωρίς αρκετή ώρα κοντά στο πάνω όριο η ερώτηση δεν έχει νόημα· μόνο μία ήρεμη γραμμή.
+    if (answered == null && talkSeconds(widget.session, hi).near < talkNearMinSec) {
+      return AppCard(
+        key: const ValueKey('talk-test-not-near'),
+        child: Text('Τεστ ομιλίας: σε αυτό το περπάτημα οι παλμοί δεν έμειναν κοντά στο πάνω όριο ($hi) για ${talkNearMinSec ~/ 60} λεπτά. '
+            'Η ερώτηση έρχεται σε περπάτημα που φτάνει εκεί.',
+            style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+      );
+    }
     return AppCard(
       key: const ValueKey('talk-test'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Στο πάνω όριο, μπορούσες να μιλάς με προτάσεις;',
+        Text('Όταν οι παλμοί ήταν κοντά στους $hi, μπορούσες να μιλάς με προτάσεις;',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
         const SizedBox(height: 4),
         Text('Ερώτηση μόνο στα $talkAskWalks πρώτα περπατήματα.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
@@ -529,7 +616,8 @@ class _TalkTestCardState extends State<TalkTestCard> {
           ),
           const SizedBox(height: 8),
         ],
-        Text('Πρώτο → πρόταση να ανέβει η ζώνη κατά 5. Τρίτο → να κατέβει κατά 5. Μεσαίο → μένει. Αποφασίζεις εσύ.',
+        Text('Πρώτο → πρόταση να ανέβει η ζώνη κατά 5. Τρίτο → να κατέβει κατά 5. Μεσαίο → μένει. Όχι πάνω από 10 μακριά '
+            'από τον υπολογισμό. Αποφασίζεις εσύ.',
             style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textSecondary)),
       ]),
     );

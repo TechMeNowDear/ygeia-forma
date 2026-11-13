@@ -110,17 +110,32 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
       for (final w in p.workouts) {
         body.add(AppCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('${upperGr(w.name)} · ~${w.minutes}′', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+            // round1, U6-25: διάρκειες σε λέξεις, και η σημείωση της προπόνησης ορατή πριν την αποθήκευση.
+            Text(upperGr('${w.name} · περίπου ${w.minutes} λεπτά'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+            if (w.note != null && w.note!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(w.note!.trim(), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
+              ),
             if (w.isCardio)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('${w.cardio!.name} ${w.cardio!.minutes}′${w.cardio!.note == null ? '' : ' · ${w.cardio!.note}'}', style: TextStyle(fontSize: 15, color: c.text)),
+                child: Text('${w.cardio!.name} · ${w.cardio!.minutes} λεπτά${w.cardio!.note == null ? '' : ' · ${w.cardio!.note}'}', style: TextStyle(fontSize: 15, color: c.text)),
               ),
             // 13/11: τι άλλο φέρνει το πρόγραμμα, για να το δεις πριν το αποθηκεύσεις.
             if (w.cardio != null && w.cardio!.plan.isNotEmpty)
               Text('Ανά εβδομάδα: ${w.cardio!.plan.join(' · ')} λεπτά', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+            // round1, U6-25: τα βήματα διαβάζονται πριν την αποθήκευση (πριν φαινόταν μόνο το πλήθος τους).
             if (routineLabel(w) case final r?)
-              Text('$r: ${countText(w.warmup.length + w.cooldown.length, 'βήμα', 'βήματα')}', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: ValueKey('paste-routine-${w.id}'),
+                  style: TextButton.styleFrom(foregroundColor: c.exercise, minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 4)),
+                  onPressed: () => openRoutineSheet(context, w),
+                  child: Text('$r: ${countText(w.warmup.length + w.cooldown.length, 'βήμα', 'βήματα')} ›'),
+                ),
+              ),
             for (final i in w.items)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -130,7 +145,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
                     Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text)),
                     Text(
-                      '${repsRange(i)} · ${restText(i.rest)}${hasLoad(i.kind) && i.load != null ? ' · ${loadLabel(i.kind, i.load)}' : ''}',
+                      '${repsRange(i)} · ξεκούραση ${clock(i.rest)}${hasLoad(i.kind) && i.load != null ? ' · ${loadLabel(i.kind, i.load)}' : ''}',
                       style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                     ),
                   ]),

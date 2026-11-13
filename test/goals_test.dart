@@ -154,7 +154,7 @@ void main() {
       expect(ratePctText(0.0025), '0,25%');
       expect(ratePctText(0.005), '0,5%');
       expect(ratePctText(0.0075), '0,75%');
-      expect(rateKgText(90, 0.005), '0,5 kg την εβδομάδα');
+      expect(rateKgText(90, 0.005), '0,45 kg την εβδομάδα'); // έλεγχος 13/11 (S1-8 / U3b-1): δύο δεκαδικά
       expect(missingForGoals(age: 40, sex: 'm', heightCm: 180, kg: null), ['βάρος']);
     });
   });
@@ -467,11 +467,12 @@ void main() {
       expect(t.widget<FilledButton>(find.byKey(const ValueKey('waist-save'))).onPressed, isNull);
       await t.enterText(find.byKey(const ValueKey('waist-2')), '99');
       await t.pumpAndSettle();
-      expect(find.text('98,5 cm'), findsOneWidget);
+      // Έλεγχος 13/11 (S1-13): 98 · 99 · 100 απέχουν το ίδιο· μετρά η μεσαία (πριν 98,5, το χαμηλό ζευγάρι).
+      expect(find.text('99,0 cm'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('waist-save')));
       await t.pumpAndSettle();
       expect(store.waist.single.day, '2026-11-12');
-      expect(store.waist.single.cm, 98.5);
+      expect(store.waist.single.cm, 99.0);
     });
   });
 }

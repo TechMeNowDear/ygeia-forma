@@ -18,20 +18,31 @@ class WalkExtraCard extends StatelessWidget {
     final c = Aigaio.of(context);
     final pace = paceSecPerKm(session), cad = cadence(session);
     final paused = pausedSec(session);
+    // round1, U5-15 / U6-10: ο αριθμός μικραίνει αν δεν χωρά (πριν «13:21 /km» ακουμπούσε στο «103»), κενό ανάμεσα στις
+    // στήλες, και η μονάδα στην ετικέτα. U5-06: διάρκεια των παύσεων σε λέξεις.
     Widget stat(String v, String l) => Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(v, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
-            Text(l, style: TextStyle(fontSize: 13, color: c.textSecondary)),
-          ]),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(v, maxLines: 1, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
+              ),
+              Text(l, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+            ]),
+          ),
         );
+    final pauses = session.pauses.length;
+    final pausedMin = (paused / 60).ceil();
     return AppCard(
       key: const ValueKey('walk-extra'),
-      child: Row(children: [
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Χωρίς GPS ο ρυθμός βγαίνει από τα βήματα: «≈», όχι ακρίβεια δευτερολέπτου (έλεγχος 9/11, RT-12).
-        stat(pace == null ? '—' : '${distanceFromSteps(session) ? '≈ ' : ''}${paceText(pace)}',
-            distanceFromSteps(session) ? 'ρυθμός (από βήματα)' : 'ρυθμός'),
-        stat(cad == null ? '—' : '$cad', 'βήματα / λεπτό'),
-        stat(session.pauses.isEmpty ? '0' : '${session.pauses.length} · ${(paused / 60).ceil()}′', 'παύσεις'),
+        stat(pace == null ? '—' : '${distanceFromSteps(session) ? '≈ ' : ''}${clock(pace)}',
+            distanceFromSteps(session) ? 'ρυθμός ανά km (από βήματα)' : 'ρυθμός ανά km'),
+        stat(cad == null ? '—' : '$cad', 'βήματα το λεπτό'),
+        stat('$pauses', pauses == 0 ? 'παύσεις' : '${pauses == 1 ? 'παύση' : 'παύσεις'} · ${hoursMinutes(pausedMin)}'),
       ]),
     );
   }
@@ -102,7 +113,7 @@ class RecoveryCard extends StatelessWidget {
       key: const ValueKey('walk-hrr'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: Text('Πτώση παλμών στο 1′', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
+          Expanded(child: Text('Πτώση παλμών στο 1ο λεπτό', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
           IconButton(
             key: const ValueKey('hrr-info'),
             tooltip: 'Τι σημαίνει και πώς μετριέται',
@@ -167,8 +178,8 @@ Future<void> showRecoveryInfo(BuildContext context) {
               p('Μόνο σε σύγκριση με τον εαυτό σου, σε περπατήματα παρόμοιας έντασης (παρόμοιοι παλμοί στο τέλος) και με τον ίδιο '
                   'τρόπο κάθε φορά (καθιστός· η στάση αλλάζει το αποτέλεσμα). Από φορά σε φορά αλλάζει αρκετά, οπότε μία μέτρηση '
                   'μόνη της δεν λέει πολλά. Τα όρια που διαβάζεις σε άρθρα (π.χ. «κάτω από 12») προέρχονται από νοσοκομειακά τεστ '
-                  'μέγιστης προσπάθειας και δεν ισχύουν εδώ. Επηρεάζεται και από τη ζέστη, την κούραση, τον καφέ και φάρμακα που '
-                  'επηρεάζουν τους παλμούς.'),
+                  'μέγιστης προσπάθειας και δεν ισχύουν εδώ. Επηρεάζεται και από τη ζέστη, την κούραση, τον καφέ ή το τσιγάρο λίγο '
+                  'πριν, και φάρμακα που επηρεάζουν τους παλμούς.'),
               h('Πότε δεν μετριέται'),
               p('Αν πατήσεις «Παράλειψη», αν ήσουν σε παύση όταν πάτησες «Τέλος», ή αν δεν υπήρχαν αρκετές μετρήσεις παλμών '
                   '(λιγότερες από 5 σε κάποιο από τα δύο διαστήματα). Τότε δεν γράφεται αριθμός.'),

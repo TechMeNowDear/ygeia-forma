@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../format.dart' show hoursMinutes;
 import '../../theme.dart';
 import '../../training/hr_quality.dart';
 import '../../training/session.dart';
 import '../../training/wear_link.dart';
+import '../../widgets.dart' show AppCard;
 
 /// Ζωντανοί παλμοί από το ρολόι, με γραμμή ως το όριο του γιατρού (σχέδιο 3, 8/11).
 class HrBar extends StatelessWidget {
@@ -146,13 +148,22 @@ class _BarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const lo = 60.0;
     final hi = limit + 20.0;
-    double x(num v) => ((v - lo) / (hi - lo)).clamp(0.0, 1.0) * size.width;
+    double f(num v) => ((v - lo) / (hi - lo)).clamp(0.0, 1.0);
+    double x(num v) => f(v) * size.width;
     final r = RRect.fromRectAndRadius(Rect.fromLTWH(0, 2, size.width, 6), const Radius.circular(3));
+    // round1, U5-29: τα χρώματα δεμένα στο όριο: ήρεμα ως 15 κάτω από αυτό, κεχριμπάρι στα τελευταία 15, κόκκινο από το
+    // όριο και πάνω (πριν κιτρίνιζε και πορτοκάλιζε όλη η ζώνη περπατήματος και το 139 έμοιαζε με το 140).
+    final stops = [0.0, 0.30, f(limit - 15), f(limit - 2), f(limit), 1.0];
+    for (var i = 1; i < stops.length; i++) {
+      if (stops[i] < stops[i - 1]) stops[i] = stops[i - 1];
+    }
     canvas.drawRRect(
       r,
       Paint()
-        ..shader = const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF34D399), Color(0xFFFBBF24), Color(0xFFF97316), Color(0xFFEF4444)])
-            .createShader(r.outerRect),
+        ..shader = LinearGradient(
+          colors: const [Color(0xFF60A5FA), Color(0xFF34D399), Color(0xFF34D399), Color(0xFFFBBF24), Color(0xFFEF4444), Color(0xFFEF4444)],
+          stops: stops,
+        ).createShader(r.outerRect),
     );
     // Το όριο του γιατρού: λευκή γραμμή με περίγραμμα.
     final lx = x(limit);
@@ -189,9 +200,8 @@ class HrCard extends StatelessWidget {
     final h = HrSummary(session, lim);
     final mins = (h.overSec / 60).ceil();
     const which = 'το όριο';
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(20)),
+    // round1, U5-14: ίδια κάρτα με τις διπλανές (περίγραμμα, γωνία, περιθώριο).
+    return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Expanded(child: Text('Παλμοί', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text))),
@@ -209,7 +219,7 @@ class HrCard extends StatelessWidget {
           if (h.max != null) _stat(c, hrMaxText(h.max!, cardio: session.isCardio), 'υψηλότερος'),
           // Η τιμή της Προόδου («Παλμοί στο περπάτημα», σταθερό βάδισμα· έλεγχος του fix-accuracy, S8): να βρίσκεται.
           if (session.isCardio && session.steadyHr != null)
-            KeyedSubtree(key: const ValueKey('hr-steady'), child: _stat(c, '${session.steadyHr}', 'από το 5′')),
+            KeyedSubtree(key: const ValueKey('hr-steady'), child: _stat(c, '${session.steadyHr}', 'από το 5ο λεπτό')),
         ]),
         // Απόφαση 12/11 (τελικός έλεγχος, μ5): στα βάρη ο υψηλότερος είναι μία στιγμιαία τιμή του καρπού. Το λέει η οθόνη.
         if (h.max != null && !session.isCardio) ...[
@@ -219,12 +229,21 @@ class HrCard extends StatelessWidget {
         if (session.hr.length >= 2) ...[
           const SizedBox(height: 10),
           SizedBox(height: 70, child: CustomPaint(painter: _HrChart(session.hr, lim, c))),
+          // round1, U5-17: ο άξονας του χρόνου (από την αρχή ως την τελευταία τιμή).
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 30),
+            child: Row(children: [
+              Text('αρχή', style: TextStyle(fontSize: 11, color: c.textTertiary)),
+              const Spacer(),
+              Text(hoursMinutes(((session.hr.last[0] - session.hr.first[0]) / 60).round()), style: TextStyle(fontSize: 11, color: c.textTertiary)),
+            ]),
+          ),
         ],
         if (lim != null) ...[
           const SizedBox(height: 8),
           Text(
             h.overSec > 0
-                ? 'Πάνω από $which ($lim) για περίπου $mins′.'
+                ? 'Πάνω από $which ($lim) για περίπου ${hoursMinutes(mins)}.'
                 : (h.max != null && h.max! >= lim)
                     ? 'Έφτασες στιγμιαία $which ($lim).'
                     // Ο καρπός μετρά λιγότερο όσο δυναμώνει η προσπάθεια (Boudreaux 2018· έλεγχος #2).
@@ -242,7 +261,8 @@ class HrCard extends StatelessWidget {
           // Πόσο γρήγορα έφταναν οι παλμοί από το ρολόι (8/11): μέτρο για το πόσο μπορεί να αργήσει η ειδοποίηση.
           Builder(builder: (context) {
             final (text, warn) = hrGapText(g, session.hrMode, session.hrDel, lim != null);
-            return Text(text, key: const ValueKey('hr-gap'), style: TextStyle(fontSize: 12.5, height: 1.35, color: warn ? c.exercise : c.textSecondary));
+            // round1, U5-23: προειδοποίηση στο χρώμα της «προσοχής», όχι της κατηγορίας.
+            return Text(text, key: const ValueKey('hr-gap'), style: TextStyle(fontSize: 12.5, height: 1.35, color: warn ? c.warn : c.textSecondary));
           }),
         ],
         // 13/11: πόσες τιμές ήρθαν με καλή επαφή, όπως τις μέτρησε το ρολόι (μόνο όταν το ρολόι στέλνει καταμέτρηση).
@@ -253,7 +273,7 @@ class HrCard extends StatelessWidget {
         // Έλεγχος του γ2 (S1): με όριο, ρολόι σε «default» (ούτε ανά 5″ ούτε αισθητήρας): η δόνηση μπορεί να άργησε.
         if (lim != null && session.hrMode == 'default') ...[
           const SizedBox(height: 4),
-          Text(slowAlarmText, key: const ValueKey('hr-slow'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.exercise)),
+          Text(slowAlarmText, key: const ValueKey('hr-slow'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.warn)),
         ],
         // Έλεγχος γ2 (W2-14): γιατί σταμάτησε η μέτρηση στο ρολόι (για τη δοκιμή στη συσκευή), όχι μια γενική φράση.
         if (session.watchErr case final e?) ...[
@@ -284,12 +304,16 @@ const slowAlarmText = 'Με σβηστή οθόνη η δόνηση του ορ�
   if (deliveries != null && deliveries < 3) {
     return (deliveries <= 1 ? 'Οι παλμοί ήρθαν όλοι μαζί, μία φορά.$late' : 'Οι παλμοί ήρθαν όλοι μαζί, σε $deliveries φορές.$late', true);
   }
+  // round1, U5-06: διάρκειες σε λέξεις.
   if (gap <= 12) {
-    return ('Οι παλμοί έφταναν κάθε λίγα δευτερόλεπτα (μεγαλύτερο κενό $gap″)${mode == 'sensor' ? ', απευθείας από τον αισθητήρα' : ''}.', false);
+    return ('Οι παλμοί έφταναν κάθε λίγα δευτερόλεπτα (μεγαλύτερο κενό ${secondsText(gap)})${mode == 'sensor' ? ', απευθείας από τον αισθητήρα' : ''}.', false);
   }
-  final t = gap < 120 ? '$gap″' : '${(gap / 60).round()}′';
+  final t = gap < 120 ? secondsText(gap) : hoursMinutes((gap / 60).round());
   return (hasLimit ? 'Μεγαλύτερο κενό στους παλμούς: $t. Τόσο μπορεί να άργησε η ειδοποίηση.' : 'Οι παλμοί έλειπαν έως $t.', true);
 }
+
+/// «1 δευτερόλεπτο», «8 δευτερόλεπτα».
+String secondsText(int s) => s == 1 ? '1 δευτερόλεπτο' : '$s δευτερόλεπτα';
 
 class _HrChart extends CustomPainter {
   _HrChart(this.hr, this.limit, this.c);
@@ -307,14 +331,31 @@ class _HrChart extends CustomPainter {
     }
     if (hi - lo < 20) hi = lo + 20;
     final t0 = hr.first[0].toDouble(), t1 = math.max(hr.last[0].toDouble(), t0 + 1);
-    Offset at(List<int> p) => Offset((p[0] - t0) / (t1 - t0) * size.width, size.height - (p[1] - lo) / (hi - lo) * size.height);
-    if (limit != null) {
-      final y = size.height - (limit! - lo) / (hi - lo) * size.height;
+    // round1, U5-17: 30 dp δεξιά για τις τιμές του άξονα (πάνω, κάτω, και το όριο στο ύψος της κόκκινης γραμμής).
+    const gutter = 30.0;
+    final w = math.max(1.0, size.width - gutter);
+    double yOf(num v) => size.height - (v - lo) / (hi - lo) * size.height;
+    Offset at(List<int> p) => Offset((p[0] - t0) / (t1 - t0) * w, yOf(p[1]));
+    void label(String text, double y, Color color) {
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: TextStyle(fontFamily: fontFamily, fontSize: 11, color: color)),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: gutter);
+      tp.paint(canvas, Offset(size.width - tp.width, (y - tp.height / 2).clamp(0.0, math.max(0.0, size.height - tp.height))));
+      tp.dispose();
+    }
+
+    final yLim = limit == null ? null : yOf(limit!);
+    if (yLim == null || yLim > 12) label('${hi.round()}', 0, c.textTertiary);
+    if (yLim == null || size.height - yLim > 12) label('${lo.round()}', size.height, c.textTertiary);
+    if (yLim != null) {
+      label('${limit!}', yLim, c.bad);
       final dash = Paint()
         ..color = c.bad
         ..strokeWidth = 1.2;
-      for (double x = 0; x < size.width; x += 8) {
-        canvas.drawLine(Offset(x, y), Offset(math.min(x + 4, size.width), y), dash);
+      for (double x = 0; x < w; x += 8) {
+        canvas.drawLine(Offset(x, yLim), Offset(math.min(x + 4, w), yLim), dash);
       }
     }
     final path = Path()..moveTo(at(hr.first).dx, at(hr.first).dy);
@@ -362,12 +403,13 @@ Future<void> showHrInfo(BuildContext context, {bool cardio = false}) {
                   'Αν το ρολόι δεν ήταν σε προπόνηση (π.χ. δεν πάτησες «Παλμοί εδώ»), δεν υπάρχουν παλμοί για εκείνη την ώρα.'),
               if (!cardio) ...[
                 h('Παλμοί στο σετ'),
-                p('Ο μέσος όρος των παλμών στα τελευταία 30 δευτερόλεπτα ως τη στιγμή που πάτησες ✓. '
+                p('Ο μέσος όρος των παλμών στα τελευταία 30 δευτερόλεπτα ως τη στιγμή που πάτησες «Έγινε». '
                     'Ίδιο παράθυρο για κάθε σετ, ώστε τα σετ να συγκρίνονται μεταξύ τους.'),
                 h('Παλμοί στο διάλειμμα'),
                 // Έλεγχος 9/11 (03-Χ1, 04-L6): μέσος όρος των τελευταίων 10″ (όχι το ελάχιστο, που δείχνει πιο χαμηλά)·
                 // η πτώση εξαρτάται από τη διάρκεια του διαλείμματος και το σετ.
-                p('Οι παλμοί λίγο πριν ξεκινήσεις το επόμενο σετ (ο μέσος όρος των τελευταίων 10 δευτερολέπτων του διαλείμματος). '
+                p('Οι παλμοί λίγο πριν ξεκινήσεις το επόμενο σετ (ο μέσος όρος των τελευταίων 10 δευτερολέπτων του διαλείμματος· '
+                    'η αρχή του επόμενου σετ υπολογίζεται από τις επαναλήψεις του). '
                     'Το πόσο πέφτουν εξαρτάται από το πόσο κράτησε το διάλειμμα και πόσο βαρύ ήταν το σετ. Στο τελευταίο σετ '
                     'δεν υπάρχει διάλειμμα.'),
                 h('Παλμοί της άσκησης (πάνω δεξιά)'),

@@ -526,7 +526,8 @@ void main() {
         ),
       );
       expect(find.textContaining('τελευταίο συγχρονισμό, Τετ 11/11 10:08'), findsOneWidget);
-      expect(find.text('Τελευταία νύχτα που ήρθε: Τετ 11/11 · 7 ώρες 16 λεπτά'), findsOneWidget);
+      // Round 1 (U2a-11): ημερομηνία και διάρκεια με αδιάσπαστα κενά (δεν σπάνε σε δύο γραμμές) και κόμμα ανάμεσα.
+      expect(find.text('Τελευταία νύχτα που ήρθε: Τετ\u00A011/11, 7\u00A0ώρες\u00A016\u00A0λεπτά'), findsOneWidget);
       expect(find.text('Η Oura δεν δίνει νέα δεδομένα'), findsOneWidget);
     });
 

@@ -152,7 +152,7 @@ Zone? computeZone({int? age, double? restHr, required ZoneSettings s}) {
 ({int below, int inZone, int above, int measured}) zoneTimes(List<List<int>> samples, List<List<int>> pauses, int lo, int hi,
     {int maxGap = 15, int? endSec}) {
   var below = 0, inZone = 0, above = 0;
-  bool paused(int t) => pauses.any((p) => t >= p[0] && t < p[1]);
+  bool paused(int t) => Session.inPause(pauses, t);
   for (var k = 0; k < samples.length; k++) {
     final t0 = samples[k][0];
     // Μετά το «Τέλος» (λεπτό αποκατάστασης) δεν μετρά.

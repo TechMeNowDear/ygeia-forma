@@ -31,6 +31,16 @@ RingOxygen ringOxygen(HealthStore store, Dashboard? d, DateTime day, SleepWindow
       d?.watchSpo2(day, windows),
     );
 
+/// Round 1 (S4-10): η «τελευταία νύχτα» για τις σημειώσεις οξυγόνου όσο ο ύπνος είναι του Oura: η πιο πρόσφατη από
+/// [day] και την προηγούμενη που έχει χαμηλότερη τιμή του ρολογιού (με αρκετή κάλυψη). Χωρίς καμία: [day]. Ίδια σε
+/// Καρδιά, Σήμερα και Ύπνο, ώστε μια πολύ χαμηλή τιμή της χθεσινής νύχτας να φαίνεται και πριν έρθει η σημερινή.
+DateTime oxygenLastNight(HealthStore store, Dashboard d, DateTime day) {
+  final today = dayOf(day);
+  final mins = d.spo2MinByNight(today, ouraNights: true, windows: store.ouraWindows, history: store.history);
+  final yesterday = DateTime(today.year, today.month, today.day - 1);
+  return !mins.containsKey(today) && mins.containsKey(yesterday) ? yesterday : today;
+}
+
 /// Όταν λείπει ο μέσος όρος του Oura.
 String ringAvgMissing(HealthStore store) => store.ouraSpo2 == false
     ? 'Ο μέσος όρος θέλει μία νέα σύνδεση με το Oura (Ρυθμίσεις › Πηγές)'
@@ -162,7 +172,7 @@ class OxygenNotes extends StatelessWidget {
         for (final m in guidance.messages) ...[
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: c.tint(c.move), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: c.tint(c.move), borderRadius: BorderRadius.circular(16)),
             child: Text(m, style: style),
           ),
           const SizedBox(height: 8),

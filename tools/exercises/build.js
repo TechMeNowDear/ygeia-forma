@@ -61,6 +61,25 @@ const MNAME = {
 };
 const mlist = l => (l || []).map(x => { const [id, note] = Array.isArray(x) ? x : [x]; if (!MNAME[id]) throw new Error('μυς ' + id); return [id, MNAME[id], note || '']; });
 const GROUPS = ['chest', 'arms', 'abs', 'back', 'shoulders', 'legs'];
+// Έλεγχοι κειμένου (round1, S7-04/-06/-07/-17/-20/-23): ό,τι βλέπει ο χρήστης στην εφαρμογή.
+function checkTexts(id, t) {
+  // Η εφαρμογή διαβάζει ex.tempo.first: άδειος ρυθμός = σφάλμα στην οθόνη της άσκησης (S7-20).
+  if (!Array.isArray(t.tempo) || t.tempo.length === 0) throw new Error(id + ': άδειος ρυθμός (tempo)');
+  const all = [t.name, t.equip, t.feel, t.caution || '', ...(t.setup || []), ...(t.steps || []), ...(t.mistakes || []), ...(t.tips || []),
+    ...(t.cues || []).map((c) => c[0]), ...t.tempo.map((p) => p[3])].join('\n');
+  // Αναφορές σε φωτογραφίες/ενότητες που δεν υπάρχουν στην εφαρμογή (S7-07).
+  if (/Φ\d\d|\(\d{1,2}(\.\d)?\)/.test(all)) throw new Error(id + ': αναφορά σε φωτογραφία ή ενότητα που δεν υπάρχει στην εφαρμογή');
+  // Κανένα προσωπικό στοιχείο υγείας στο δημόσιο αρχείο (S7-04): γενική διατύπωση για όλους.
+  if (/ιστορικ|τενοντίτιδ|ώμους σου|ώμων σου|για σένα/i.test(all)) throw new Error(id + ': προσωπική αναφορά στο κείμενο');
+  // Η φάση της ανάσας δένεται με την κίνηση, ποτέ «ανάσα» μόνο στο διάλειμμα της επανάληψης (S7-06).
+  if (t.tempo.some((p) => p[3] === 'Ανάσα')) throw new Error(id + ': φάση «Ανάσα» χωρίς κίνηση');
+  if (!t.tempo.some((p) => /εισπνοή|εκπνοή/.test(p[3]))) throw new Error(id + ': καμία φάση δεν λέει πότε εισπνοή/εκπνοή');
+  // Αλτήρες με βιδωτά «αστεράκια»: ο έλεγχος πριν από κάθε σετ (S7-17).
+  if (/αλτήρ/i.test(t.equip) && !(t.setup || []).join(' ').includes('αστεράκια')) throw new Error(id + ': λείπει ο έλεγχος για τα αστεράκια');
+  // Λάστιχο: ίδια απόσταση κάθε φορά, αλλιώς τα lb δεν συγκρίνονται (S7-23).
+  if (t.equip.startsWith('Λάστιχ') && ![...(t.setup || []), ...(t.steps || [])].join(' ').includes('σημάδι')) throw new Error(id + ': λείπει το σημάδι απόστασης για το λάστιχο');
+}
+// h: το ύψος της φιγούρας σε cm (engine.js, H), όχι κάποιου ανθρώπου.
 const out = { v: 1, h: 177, n: N, ex: [] };
 const ids = new Set();
 for (const ex of EXS) {
@@ -71,6 +90,7 @@ for (const ex of EXS) {
   // Έλεγχος 8/11 (ιατρικό συμβούλιο MED-09): κάθε άσκηση λέει πώς αναπνέεις (όχι κράτημα της ανάσας).
   if (!process.env.DRAFT && !/ανάσα|αναπνο|εκπνοή/i.test([...(text.tips || []), ...(text.cues || []).map((c) => (Array.isArray(c) ? c[0] : c))].join(' ')))
     throw new Error(ex.id + ': λείπει οδηγία για την αναπνοή');
+  if (!process.env.DRAFT) checkTexts(ex.id, text);
   for (const c of text.cues || []) for (const i of c[1]) if (i < 0 || i >= text.tempo.length) throw new Error(ex.id + ': φάση ' + i);
   out.ex.push({ ...text, primary: mlist(text.primary), secondary: mlist(text.secondary), anim: sample(ex) });
 }

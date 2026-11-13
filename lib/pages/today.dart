@@ -15,9 +15,11 @@ import '../widgets.dart';
 import '../unusual.dart';
 import '../training/training_store.dart';
 import '../training/wear_link.dart';
+import 'backup_reminder_card.dart';
 import 'checkin_card.dart';
 import 'nutrition.dart';
 import 'oura_today.dart';
+import 'prefs_notice.dart';
 import 'sources_page.dart';
 import 'unusual_card.dart';
 import 'waist_sheet.dart';
@@ -86,7 +88,7 @@ class TodayPage extends StatelessWidget {
             title: greeting(now),
             action: action,
             onRefresh: () => store.refresh(),
-            left: [_ConnectCard(store: store)],
+            left: [if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store), _ConnectCard(store: store)],
           );
         }
 
@@ -94,7 +96,9 @@ class TodayPage extends StatelessWidget {
         // Από τη σύνδεση του Oura η «νύχτα» (ύπνος, παλμοί και θερμοκρασία ύπνου, ετοιμότητα) έρχεται μόνο από αυτό.
         final ouraNight = store.plan.nightSource(now) != Source.watch;
         final openSleep = () => open(Cat.health, HealthTab.sleep);
-        final sleep = !prefs.show('sleep')
+        // Round 1 (U1a-11): με άγνωστο σχέδιο πηγών η κάρτα «Δεν διαβάστηκε από πού έρχεται ο ύπνος» (πάνω, με το κουμπί)
+        // τα λέει όλα· η κάρτα ύπνου από κάτω επαναλάμβανε την ίδια φράση και έγραφε «Oura» για άγνωστη πηγή.
+        final sleep = !prefs.show('sleep') || PlanUnknownCard.shows(store)
             ? null
             : ouraNight
                 ? OuraSleepTodayCard(store: store, now: now, onTap: openSleep)
@@ -146,9 +150,11 @@ class TodayPage extends StatelessWidget {
         // πατήματα μακριά. Όχι για μία μόνο νύχτα.
         // Έλεγχος 3, E5: όλες οι 30 νύχτες από το ιστορικό (ίδιος αισθητήρας), πέρα από τη σύνδεση του Oura και το
         // όριο της επανάγνωσης· χωρίς «since».
-        final oxGuidance = ouraNight
+        // Round 1 (S4-10, f4): «τελευταία νύχτα» = η πιο πρόσφατη με χαμηλότερη τιμή του ρολογιού (σήμερα ή χθες), όπως Καρδιά/Ύπνος.
+        final oxNight = ouraNight ? oxygenLastNight(store, d, now) : null;
+        final oxGuidance = oxNight != null
             ? oxygenGuidance(
-                d.spo2MinByNight(now, ouraNights: true, windows: store.ouraWindows, history: store.history), now,
+                d.spo2MinByNight(oxNight, ouraNights: true, windows: store.ouraWindows, history: store.history), oxNight,
                 today: now)
             : (d.lastNight == null
                 ? null
@@ -169,7 +175,9 @@ class TodayPage extends StatelessWidget {
 
         // Μόνο κινητό (απόφαση 10/11): το τράβηγμα ανανεώνει και στο ανοιχτό Fold· φαίνεται μόνο «Ενημέρωση 18:40»
         // (σχέδια 9/11, 1α/1γ· έλεγχος premium, S8).
-        final updated = 'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now)} '}${hm(d.readAt)}';
+        // Round 1 (U1a-7): «Ενημέρωση χθες 18:40» (πεζό στη μέση της φράσης, όπως «Τελευταία μέτρηση, χθες 22:10»).
+        final updated =
+            'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now).replaceFirst('Χθες', 'χθες')} '}${hm(d.readAt)}';
         final footer = Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(
@@ -181,7 +189,11 @@ class TodayPage extends StatelessWidget {
         );
 
         final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
+        // Έλεγχος 13/11 (S9-3): υπενθύμιση αντιγράφου, χαμηλά (ποτέ πάνω από τα δεδομένα υγείας)· αν δεν χρειάζεται, τίποτα.
+        final backupReminder = BackupReminderSlot(store: store, food: food, training: training, now: now);
         final alerts = [
+          // Round 1 (f3 · S3-2/S9-1, S9-5): οι ρυθμίσεις δεν διαβάζονται ή η τελευταία αλλαγή τους δεν γράφτηκε.
+          if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store),
           if (dbNotice != null) dbNotice,
           if (ouraState != null) ouraState,
           if (error != null) error,
@@ -198,21 +210,25 @@ class TodayPage extends StatelessWidget {
           title: greeting(now),
           action: action,
           onRefresh: () => store.refresh(),
+          // Round 1 (U1a-13): η «Η εβδομάδα σου» (≈ 980 dp, Κυριακή βράδυ και Δευτέρα) κάτω από τη Διατροφή και τα
+          // Βήματα/Βάρος· πριν, τη Δευτέρα το «+ Φαγητό» ήταν τρεις οθόνες πιο κάτω. Στο ανοιχτό Fold ήταν ήδη τελευταία.
           single: [
             ...alerts,
             if (weigh != null) weigh,
             if (checkIn != null) checkIn,
             if (sleep != null) sleep,
             if (trainingCard != null) trainingCard,
-            if (week != null) week,
             if (foodCard != null) foodCard,
-            ...more,
+            ...pairUp(pair),
+            if (week != null) week,
+            if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
+            backupReminder,
             footer,
           ],
           top: alerts,
           // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
           left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard, if (week != null) week],
-          right: [if (foodCard != null) foodCard, ...more, footer],
+          right: [if (foodCard != null) foodCard, ...more, backupReminder, footer],
         );
       },
     );
@@ -250,6 +266,7 @@ class TodayPage extends StatelessWidget {
         // Ουδέτερο χρώμα: χωρίς στόχο (μετά τον γιατρό) ούτε η πτώση ούτε η άνοδος είναι «καλή» ή «κακή».
         kind: TrendKind.neutral,
         maxLines: 2,
+        keepLastWords: true,
       );
     }
     final weights = [for (final b in d.body) if (b.weight != null) b.weight!];
@@ -262,8 +279,13 @@ class TodayPage extends StatelessWidget {
       value: last?.weight == null ? null : dec(last!.weight!),
       unit: 'kg',
       trend: trend,
-      chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body) : null,
-      empty: 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ σε λίγα λεπτά.',
+      // Round 1 (U1a-20): ελάχιστο εύρος 3 kg, όπως στο Σώμα· η αλλαγή 0,5–1 kg από μέρα σε μέρα είναι νερό, όχι τάση.
+      chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body, minRange: 3) : null,
+      // Round 1 (S11-8, σημείωση του f1): όταν η Samsung δεν έδωσε τις ζυγίσεις αυτή τη φορά, το λέει (όπως το Σώμα)·
+      // πριν έγραφε «Ζυγίσου στην InBody» και για ζύγιση που υπάρχει αλλά δεν διαβάστηκε.
+      empty: d.failed.contains('body')
+          ? 'Οι ζυγίσεις δεν διαβάστηκαν τώρα. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.'
+          : 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ σε λίγα λεπτά.',
       onTap: onTap,
     );
   }
@@ -279,7 +301,7 @@ class TodayPage extends StatelessWidget {
       value: e?.value.round().toString(),
       unit: 'από 100',
       note: e == null ? null : '${relativeDay(e.day, d.readAt)} · εκτίμηση της Samsung',
-      chart: recent.length >= 2 ? Sparkline(values: [for (final v in recent) v.value], color: c.energy) : null,
+      chart: recent.length >= 2 ? Sparkline(values: [for (final v in recent) v.value], color: c.energy, minRange: 20) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
@@ -315,7 +337,8 @@ class TodayPage extends StatelessWidget {
       value: hr?.round().toString(),
       unit: 'bpm',
       trend: trend,
-      chart: last7.length >= 2 ? Sparkline(values: [for (final n in last7) n.sleepingHr!], color: c.heart) : null,
+      // Ελάχιστο εύρος 8 bpm, όπως στα γραφήματα της Καρδιάς (U1a-20).
+      chart: last7.length >= 2 ? Sparkline(values: [for (final n in last7) n.sleepingHr!], color: c.heart, minRange: 8) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
     );
@@ -337,7 +360,8 @@ class TodayPage extends StatelessWidget {
       title: 'Οξυγόνο στον ύπνο',
       value: rox.avg == null ? null : spo2AvgText(rox.avg!),
       unit: '%',
-      trend: rox.min == null ? null : TrendPill('Χαμηλότερο ${lowestText(rox.min!)}% · ρολόι'),
+      // Round 1 (U1a-6): ένα όνομα παντού για τη χαμηλότερη μεμονωμένη τιμή.
+      trend: rox.min == null ? null : TrendPill('Χαμηλότερη τιμή ${lowestText(rox.min!)}% · ρολόι'),
       note: rox.isEmpty ? null : (g.short ?? (rox.avg == null ? ringAvgMissing(store) : 'Μέσος όρος · Oura')),
       empty: auto && g.short != null
           ? g.short
@@ -380,7 +404,7 @@ class TodayPage extends StatelessWidget {
       unit: '%',
       trend: min == null
           ? null
-          : TrendPill('Χαμηλότερη μέτρηση ${lowestText(min)}% · ενδεικτικό'),
+          : TrendPill('Χαμηλότερη τιμή ${lowestText(min)}% · ενδεικτικό'),
       note: g?.short,
       empty: auto && g?.short != null ? g!.short : 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
@@ -498,6 +522,7 @@ class _SleepCard extends StatelessWidget {
                       up: diff == 0 ? null : diff > 0,
                       onDark: true,
                       maxLines: 2,
+                      keepLastWords: true,
                     ),
                   ),
                 ],
@@ -546,10 +571,16 @@ class _SleepCard extends StatelessWidget {
                       Text(hm(n.start), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
                       Expanded(
                         // Χωρίς ποσοστά μίας νύχτας (κλινικός έλεγχος H1): μόνο η μπάρα, ως εκτίμηση.
-                        child: Text(
-                          'Φάσεις · εκτίμηση της Samsung',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        // Round 1 (U1a-14): μία γραμμή, μικραίνει λίγο αν δεν χωρά (όχι «… της | Samsung»).
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Φάσεις · εκτίμηση της Samsung',
+                            maxLines: 1,
+                            softWrap: false,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                       Text(hm(n.end), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
@@ -635,6 +666,7 @@ class _ErrorCard extends StatelessWidget {
       text: '${errorText(kind)} Βλέπεις τα τελευταία δεδομένα που διάβασα.',
       buttonText: 'Δοκίμασε ξανά',
       onPressed: () => store.refresh(),
+      primary: true,
     );
   }
 }
@@ -697,7 +729,7 @@ class _WeighCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: c.tint(c.body),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppCard.radius),
         border: Border.all(color: c.body.withValues(alpha: 0.25)),
       ),
       child: Column(
@@ -725,9 +757,15 @@ class _WeighCard extends StatelessWidget {
           if (waistDay && !waistDone)
             Padding(
               padding: const EdgeInsets.only(top: 14),
-              child: FilledButton.icon(
+              // Round 1 (U1a-22): περίγραμμα, όπως το «+ Γράψε τη μέση» του Σώματος· ένα γεμάτο κουμπί ανά οθόνη
+              // (μέρα ζύγισης + προπόνησης: το «Ξεκίνα την προπόνηση»).
+              child: OutlinedButton.icon(
                 key: const ValueKey('today-waist'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: c.body, foregroundColor: c.dark ? const Color(0xFF14200A) : Colors.white),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  foregroundColor: c.body,
+                  side: BorderSide(color: c.body.withValues(alpha: 0.5), width: 1.5),
+                ),
                 onPressed: () => openWaistSheet(context, store, now: now),
                 icon: const Icon(Icons.straighten_rounded, size: 20),
                 label: const Text('Γράψε τη μέση'),
@@ -759,7 +797,7 @@ class _TrainingSlot extends StatelessWidget with SelfSpaced {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: training,
         builder: (context, _) => TodayTrainingCard.shows(training, now)
-            ? Padding(padding: const EdgeInsets.only(top: PageFrame.gap), child: TodayTrainingCard(training: training, now: now))
+            ? Padding(padding: const EdgeInsets.only(bottom: PageFrame.gap), child: TodayTrainingCard(training: training, now: now))
             : const SizedBox.shrink(key: ValueKey('today-training-none')),
       );
 }

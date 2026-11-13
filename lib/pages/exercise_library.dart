@@ -19,7 +19,7 @@ class ExerciseLibraryPage extends StatefulWidget {
 class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
   final _query = TextEditingController();
   String? _group;
-  late final Future<ExLibrary> _lib = ExLibrary.load();
+  late Future<ExLibrary> _lib = ExLibrary.load();
 
   @override
   void dispose() {
@@ -48,7 +48,16 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
           onRefresh: () async {},
           left: [
             if (snap.hasError)
-              EmptyCard(icon: Icons.error_outline_rounded, color: Aigaio.of(context).bad, title: 'Δεν φόρτωσαν οι ασκήσεις', text: 'Κλείσε και άνοιξε ξανά την εφαρμογή.')
+              // round1, S7-20: η αποτυχία δεν μένει για πάντα· «Δοκίμασε ξανά» ξαναδιαβάζει.
+              EmptyCard(
+                key: const ValueKey('ex-load-error'),
+                icon: Icons.error_outline_rounded,
+                color: Aigaio.of(context).bad,
+                title: 'Δεν φόρτωσαν οι ασκήσεις',
+                text: 'Δοκίμασε ξανά. Αν δεν φορτώσουν, κλείσε και άνοιξε ξανά την εφαρμογή.',
+                buttonText: 'Δοκίμασε ξανά',
+                onPressed: () => setState(() => _lib = ExLibrary.load()),
+              )
             else
               const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())),
           ],
@@ -73,7 +82,8 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
       onChanged: (_) => setState(() {}),
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
-        hintText: 'Αναζήτηση: π.χ. στήθος, αλτήρες, κοιλιακοί',
+        // round1, U5-22: χωρά και στα 360 dp (πριν κοβόταν με «…»).
+        hintText: 'Αναζήτηση: π.χ. στήθος, λάστιχο',
         prefixIcon: const Icon(Icons.search_rounded),
         suffixIcon: q.isEmpty
             ? null
@@ -119,9 +129,10 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
     return PageFrame(
       title: 'Ασκήσεις',
       onRefresh: () async {},
-      top: [search, chips],
+      // round1, U5-24: η σημείωση σε όλο το πλάτος κάτω από τις ομάδες, ώστε οι δύο στήλες να ξεκινούν στο ίδιο ύψος.
+      top: [search, chips, note],
       single: [search, chips, note, if (sections.isEmpty) empty, ...sections],
-      left: [note, if (sections.isEmpty) empty, ...sections.take(half)],
+      left: [if (sections.isEmpty) empty, ...sections.take(half)],
       right: sections.length > 1 ? sections.skip(half).toList() : const [],
     );
   }
@@ -190,7 +201,8 @@ class _Row extends StatelessWidget {
                       Icon(Icons.warning_amber_rounded, size: 16, color: c.warn),
                       const SizedBox(width: 4),
                       Flexible(
-                        child: Text('Σταδιακά, χωρίς πόνο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.exercise)),
+                        // round1, U5-23: προειδοποίηση στο χρώμα της «προσοχής», όπως το εικονίδιο.
+                        child: Text('Σταδιακά, χωρίς πόνο', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.warn)),
                       ),
                     ]),
                   ],

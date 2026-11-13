@@ -430,7 +430,8 @@ void main() {
     List<String> top(String q, int n) => [for (final f in store.search(q).take(n)) f.name];
 
     test('Πλήθος τροφίμων: 323 + 23 ψάρια, θαλασσινά και κεφίρ (έλεγχος 8/11, FOOD-02)', () {
-      expect(basicFoods().length, 375); // + 24 τρόφιμα του ελέγχου 9/11 (fix-food) + πίτουρο βρώμης (12/11)
+      // + 24 τρόφιμα του ελέγχου 9/11 (fix-food) + πίτουρο βρώμης (12/11) + 5 του ελέγχου round1 (ρέγγα × 3, καστανό ρύζι parboiled × 2)
+      expect(basicFoods().length, 380);
     });
 
     test('N1: «κοτόπουλο ψητό» → ψητό στήθος· «κοτόπουλο φούρνου» → ολόκληρο', () {
@@ -593,7 +594,7 @@ void main() {
       final cards = t.widgetList<StatCard>(find.byType(StatCard)).toList();
       expect(cards.firstWhere((c) => c.title.startsWith('Παλμοί στον ύπνο')).value, hr);
       final todayTemp = cards.firstWhere((c) => c.title.startsWith('Θερμοκρασία καρπού')).value;
-      final todayLow = t.widgetList<TrendPill>(find.byType(TrendPill)).firstWhere((p) => p.text.startsWith('Χαμηλότερη μέτρηση')).text;
+      final todayLow = t.widgetList<TrendPill>(find.byType(TrendPill)).firstWhere((p) => p.text.startsWith('Χαμηλότερη τιμή')).text; // round 1 (U1a-6): «τιμή», ένα όνομα παντού
       expect(todayLow, contains(low));
       expect(t.widgetList<DurationValue>(find.byType(DurationValue)).first.minutes, n.minutes);
 

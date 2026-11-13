@@ -7,8 +7,9 @@
 /// - Ρυθμός: ποσοστό του βάρους την εβδομάδα × 7.700 kcal/kg ÷ 7 (Hall 2008: προσέγγιση· Helms 2014: 0,5–1% για να
 ///   μένουν οι μύες· αύξηση 0,25–0,5%, Iraki 2019).
 /// - Κάτω όριο: 1.500 kcal άνδρες, 1.200 γυναίκες (Jensen 2013, AHA/ACC/TOS).
-/// - Πρωτεΐνη 1,6 g/kg (Morton 2018, BJSM)· λίπος 25–35% (EFSA 2010)· κορεσμένα έως 6% όταν ο γιατρός ζητά μείωση LDL
-///   (Eckel 2013, AHA/ACC: 5–6%), αλλιώς κάτω από 10% (ΠΟΥ)· φυτικές ίνες 30 g (Reynolds 2019)· αλάτι κάτω από 5 g (ΠΟΥ).
+/// - Πρωτεΐνη 1,6 g/kg (Morton 2018, BJSM)· λίπος 25–35% (δική μας επιλογή μέσα στο εύρος 20–35% της EFSA 2010: έλεγχος
+///   13/11, S1-12)· κορεσμένα έως 6% όταν ο γιατρός ζητά μείωση LDL (Eckel 2013, AHA/ACC: 5–6%), αλλιώς κάτω από 10%
+///   (ΠΟΥ)· φυτικές ίνες 30 g (Reynolds 2019)· αλάτι κάτω από 5 g (ΠΟΥ).
 ///
 /// Οι στόχοι αποθηκεύονται ΜΕ τους αριθμούς τους (και τα στοιχεία από τα οποία βγήκαν), ώστε η οθόνη «Πώς
 /// υπολογίστηκε» να λέει ακριβώς τι ίσχυε και οι στόχοι να μην αλλάζουν σιωπηλά με κάθε ζύγιση.
@@ -16,6 +17,7 @@ library;
 
 import 'dart:math' as math;
 
+import 'format.dart' show dec;
 import 'waist.dart' show isDayKey;
 
 /// Τι θέλει ο χρήστης πρώτα.
@@ -179,6 +181,7 @@ class Goals {
     this.tdeeEst,
     this.checkIn,
     this.fastAt,
+    this.foreignSeen,
     this.log = const [],
     this.docTargets = const DoctorTargets(),
   });
@@ -223,7 +226,11 @@ class Goals {
   /// Πότε απάντησες τελευταία στην «γρήγορη απώλεια» (μία φορά την εβδομάδα).
   final String? fastAt;
 
-  /// Οι εβδομαδιαίοι έλεγχοι με εκτίμηση, παλιότερος πρώτος (για τη σελίδα «Στόχοι»). Το πολύ [adaptLogMax].
+  /// Η μέρα της τελευταίας «ξένης» ζύγισης που είδες στην κάρτα ελέγχου (έλεγχος 13/11, S11-2): η κάρτα δεν την ξαναγράφει.
+  final String? foreignSeen;
+
+  /// Οι εβδομαδιαίοι έλεγχοι με εκτίμηση και τα βήματα «γρήγορης απώλειας» που εφάρμοσες ([AdaptLog.fast]), παλιότερος
+  /// πρώτος (για τη σελίδα «Στόχοι»). Το πολύ [adaptLogMax].
   final List<AdaptLog> log;
 
   /// Οι αριθμοί-στόχοι που έδωσε ο γιατρός (π.χ. LDL < 115), αν τους έγραψες. Μένουν στη διατροφή (απόφαση 12/11).
@@ -244,6 +251,42 @@ class Goals {
   int get fiber => calc.fiber;
   double get salt => calc.salt;
 
+  /// Υδατάνθρακες «ό,τι μένει» με λίπος στο 30%, για τον στόχο θερμίδων που ισχύει (μόνο για ενημέρωση, όχι στόχος).
+  int get carbsEst => math.max(0, ((kcal - protein * 4 - kcal * 0.30) / 4).round());
+
+  /// Οι ίδιοι στόχοι με διορθωμένα στοιχεία από «Τα στοιχεία μου» (έλεγχος 13/11, S11-12): αλλάζουν μόνο το φύλο, η
+  /// ηλικία και το ύψος του τύπου. Βάρος, ρυθμός, αρχή, ιστορικό και ο στόχος από τα δεδομένα σου μένουν· ένας στόχος
+  /// (δικός σου ή από τα δεδομένα) που πέφτει κάτω από το όριο ασφαλείας του νέου φύλου δεν ισχύει πια.
+  Goals withProfile({required bool male, required int age, required double heightCm}) {
+    final floor = male ? kcalFloorMale : kcalFloorFemale;
+    final own = kcalSet, adapt = kcalAdapt;
+    return Goals(
+      aim: aim,
+      rate: rate,
+      activity: activity,
+      doctor: doctor,
+      since: since,
+      kg: kg,
+      age: age,
+      heightCm: heightCm,
+      male: male,
+      nutsG: nutsG,
+      branG: branG,
+      betaPer100: betaPer100,
+      legumesWeek: legumesWeek,
+      fishWeek: fishWeek,
+      kcalSet: own != null && own >= floor ? own : null,
+      proteinSet: proteinSet,
+      kcalAdapt: adapt != null && adapt >= floor ? adapt : null,
+      tdeeEst: tdeeEst,
+      checkIn: checkIn,
+      fastAt: fastAt,
+      foreignSeen: foreignSeen,
+      log: log,
+      docTargets: docTargets,
+    );
+  }
+
   Goals copyWith({
     int? nutsG,
     int? branG,
@@ -256,6 +299,7 @@ class Goals {
     double? tdeeEst,
     String? checkIn,
     String? fastAt,
+    String? foreignSeen,
     AdaptLog? addLog,
     DoctorTargets? docTargets,
     bool clearKcal = false,
@@ -284,6 +328,7 @@ class Goals {
         tdeeEst: clearAdapt ? null : (tdeeEst ?? this.tdeeEst),
         checkIn: checkIn ?? this.checkIn,
         fastAt: fastAt ?? this.fastAt,
+        foreignSeen: foreignSeen ?? this.foreignSeen,
         log: addLog == null
             ? log
             : [
@@ -316,6 +361,7 @@ class Goals {
         if (tdeeEst != null) 'te': tdeeEst,
         if (checkIn != null) 'ci': checkIn,
         if (fastAt != null) 'fa': fastAt,
+        if (foreignSeen != null) 'fw': foreignSeen,
         if (log.isNotEmpty) 'log': [for (final l in log) l.toJson()],
         ...docTargets.toJson(),
       };
@@ -323,8 +369,11 @@ class Goals {
   /// null αν λείπει ή είναι άκυρο κάτι απαραίτητο (τότε η εφαρμογή ζητά ξανά τον οδηγό, αντί να δείξει λάθος αριθμούς).
   static Goals? fromJson(Object? j) {
     if (j is! Map) return null;
-    double? d(Object? v) => v is num ? v.toDouble() : null;
-    int? i(Object? v) => v is num ? v.toInt() : null;
+    // Έλεγχος 13/11 (S1-7): «1e999» σε πειραγμένο ή χαλασμένο αντίγραφο γίνεται «άπειρο» και το toInt() πετά σφάλμα· οι
+    // στόχοι διαβάζονται σε κάθε οθόνη. Ό,τι δεν είναι πεπερασμένος αριθμός διαβάζεται σαν να λείπει (ίδιος κανόνας με το
+    // Profile.fromJson).
+    double? d(Object? v) => v is num && v.isFinite ? v.toDouble() : null;
+    int? i(Object? v) => v is num && v.isFinite ? v.toInt() : null;
     GoalAim? aim;
     for (final a in GoalAim.values) {
       if (a.name == j['aim']) aim = a;
@@ -362,6 +411,7 @@ class Goals {
     final te = d(j['te']);
     final ci = j['ci'];
     final fa = j['fa'];
+    final fw = j['fw'];
     final rawLog = j['log'];
     return Goals(
       aim: aim,
@@ -384,6 +434,7 @@ class Goals {
       tdeeEst: te != null && te >= 800 && te <= 8000 ? te : null,
       checkIn: ci is String && isDayKey(ci) ? ci : null,
       fastAt: fa is String && isDayKey(fa) ? fa : null,
+      foreignSeen: fw is String && isDayKey(fw) ? fw : null,
       log: rawLog is List ? rawLog.map(AdaptLog.fromJson).whereType<AdaptLog>().take(adaptLogMax).toList() : const [],
       docTargets: DoctorTargets.fromJson(j),
     );
@@ -422,29 +473,40 @@ class DoctorTargets {
 }
 
 /// Ένας εβδομαδιαίος έλεγχος με εκτίμηση: μέρα, πόσο καις, στόχος πριν και μετά, αν τον εφάρμοσες.
+/// Με [fast]: βήμα της κάρτας «γρήγορη απώλεια» που εφάρμοσες (έλεγχος 13/11, S1-3 / S1-6). Τότε δεν υπάρχει εκτίμηση
+/// εκείνης της μέρας: το [tdee] είναι το πάνω όριο που ίσχυε (η τελευταία εκτίμηση, αλλιώς ο τύπος) και δεν δείχνεται ως
+/// «πόσο καις»· γράφεται για να διαβάζει τη γραμμή και μια παλιότερη έκδοση της εφαρμογής.
 class AdaptLog {
-  const AdaptLog({required this.day, required this.tdee, required this.before, required this.after, required this.applied});
+  const AdaptLog({
+    required this.day,
+    required this.tdee,
+    required this.before,
+    required this.after,
+    required this.applied,
+    this.fast = false,
+  });
   final String day;
   final double tdee;
   final int before, after;
   final bool applied;
+  final bool fast;
 
-  Map<String, dynamic> toJson() => {'d': day, 'te': tdee, 'k0': before, 'k1': after, if (applied) 'ap': true};
+  Map<String, dynamic> toJson() =>
+      {'d': day, 'te': tdee, 'k0': before, 'k1': after, if (applied) 'ap': true, if (fast) 'f': true};
 
   static AdaptLog? fromJson(Object? j) {
     if (j is! Map) return null;
     final d = j['d'], te = j['te'], k0 = j['k0'], k1 = j['k1'];
     if (d is! String || !isDayKey(d) || te is! num || k0 is! num || k1 is! num) return null;
     if (te < 800 || te > 8000 || k0 < 1000 || k0 > 6000 || k1 < 1000 || k1 > 6000) return null;
-    return AdaptLog(day: d, tdee: te.toDouble(), before: k0.toInt(), after: k1.toInt(), applied: j['ap'] == true);
+    return AdaptLog(
+        day: d, tdee: te.toDouble(), before: k0.toInt(), after: k1.toInt(), applied: j['ap'] == true, fast: j['f'] == true);
   }
 }
 
-/// «0,4 kg την εβδομάδα» για έναν ρυθμό και βάρος.
-String rateKgText(double kg, double rate) {
-  final v = (kg * rate * 10).round() / 10;
-  return '${v.toStringAsFixed(1).replaceAll('.', ',')} kg την εβδομάδα';
-}
+/// «0,45 kg την εβδομάδα» για έναν ρυθμό και βάρος. Με δύο δεκαδικά (έλεγχος 13/11, S1-8 / U3b-1): με ένα, τα 0,45 kg
+/// γράφονταν «0,5 kg» δίπλα σε θερμίδες που βγαίνουν από 0,45, και οι τρεις ρυθμοί έμοιαζαν άνισοι (0,2 · 0,5 · 0,7).
+String rateKgText(double kg, double rate) => '${dec(kg * rate, 2)} kg την εβδομάδα';
 
 /// «0,5%»
 String ratePctText(double rate) {

@@ -69,7 +69,17 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
             }
             "wipeStatus" -> result.success(status(activity))
             "wipeWatch" -> scope.launch { result.success(syncWatch(activity)) }
-            "wipeSeen" -> result.success(prefs(activity).edit().putBoolean(SEEN, true).commit())
+            "wipeSeen" -> {
+                val ok = prefs(activity).edit().putBoolean(SEEN, true).commit()
+                // Έλεγχος 13/11 (U4-6): ο χρήστης έφυγε από το «Όλα διαγράφηκαν»: τώρα ξεκινά και η ανανέωση στο
+                // παρασκήνιο (η MainActivity δεν την ξεκίνησε όσο φαινόταν εκείνη η οθόνη).
+                try {
+                    if (ok && !unfinished(activity)) RefreshWorker.schedule(activity)
+                } catch (e: Throwable) {
+                    ErrorQueue.report(e, "background")
+                }
+                result.success(ok)
+            }
             "wipeRetry" -> scope.launch {
                 val failed = withContext(Dispatchers.IO) { wipeLocal(activity) }
                 if (failed == 0) {
@@ -136,6 +146,17 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
         /** Διαγραφή που δεν τελείωσε: τίποτα στο παρασκήνιο ώσπου να τελειώσει (N2). */
         fun unfinished(ctx: Context): Boolean = try {
             prefs(ctx).getString(STAGE, null) == DELETING
+        } catch (_: Throwable) {
+            false
+        }
+
+        /**
+         * Έλεγχος 13/11 (U4-6): έγινε «Διαγραφή όλων» και ο χρήστης δεν έχει φύγει ακόμα από το «Όλα διαγράφηκαν» (δεν
+         * πάτησε «Ξεκίνα από την αρχή» ή «Επαναφορά από αντίγραφο»). Ως τότε τίποτα δεν διαβάζεται, ούτε στο παρασκήνιο.
+         */
+        fun awaitsStart(ctx: Context): Boolean = try {
+            val p = prefs(ctx)
+            WipeRules.awaitsStart(p.getLong(AT, 0L), p.getBoolean(SEEN, true))
         } catch (_: Throwable) {
             false
         }
@@ -315,4 +336,10 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
             }
         }
     }
+}
+
+/** Κανόνες της διαγραφής χωρίς Android (ελέγχονται σε απλό JVM). */
+object WipeRules {
+    /** [at]: πότε έγινε η «Διαγραφή όλων» (0 = ποτέ). [seen]: ο χρήστης έφυγε από το «Όλα διαγράφηκαν». */
+    fun awaitsStart(at: Long, seen: Boolean): Boolean = at > 0L && !seen
 }

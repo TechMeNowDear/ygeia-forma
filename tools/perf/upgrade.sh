@@ -11,10 +11,16 @@
 # 2. Δείγμα δεδομένων (ΣΥΝΘΕΤΙΚΟ, όχι αληθινά δεδομένα): training.json με όριο παλμών 137 και μία προπόνηση, στη
 #    μορφή της #89. Μπαίνει με root, όπως θα το είχε γράψει η εφαρμογή.
 # 3. Άνοιγμα της παλιάς: πρέπει να δείχνει «137 bpm» στην Άσκηση (αλλιώς το δείγμα δεν είναι έγκυρο: προειδοποίηση).
+# 3β. (έλεγχος 13/11, S12-10) Πρόσθετο δείγμα για όσα δεν σπέρνονταν ποτέ: ρυθμίσεις με «Τα στοιχεία μου», στόχους, ζώνη
+#    και μέση (prefs.json), δύο καταχωρίσεις στο ημερολόγιο φαγητού (χθες) και μία μέρα ιστορικού. Η παλιά ανοίγει ξανά,
+#    για να τα διαβάσει και να τα ξαναγράψει όπως στο κινητό.
 # 4. «adb install -r» της νέας ΧΩΡΙΣ απεγκατάσταση.
 # 5. Η νέα πρέπει: να ανοίγει (πρώτη οθόνη, όχι μονόχρωμη), να δείχνει «137 bpm» και ΟΧΙ «Δεν διαβάστηκαν οι
 #    προπονήσεις», να κρατά όλα τα αρχεία της παλιάς, το training.json να διαβάζεται και να έχει ακόμα το δείγμα, και
-#    να μην υπάρχει κανένα σφάλμα Dart/Kotlin στην ουρά ή κρασάρισμα.
+#    να μην υπάρχει κανένα σφάλμα Dart/Kotlin στην ουρά ή κρασάρισμα. Και το πρόσθετο δείγμα (3β): οι ρυθμίσεις, το
+#    ημερολόγιο φαγητού και η μέρα ιστορικού ΤΙΜΗ ΠΡΟΣ ΤΙΜΗ όπως ήταν πριν (νέα πρόσθετα κλειδιά επιτρέπονται), και ο
+#    στόχος θερμίδων του δείγματος στην οθόνη της Διατροφής (αν τον έδειχνε και η παλιά). Πριν, ο έλεγχος «κανένα
+#    αρχείο δεν χάθηκε» σύγκρινε μόνο ΟΝΟΜΑΤΑ αρχείων: μια έκδοση που δεν διάβαζε πια τους στόχους περνούσε πράσινη.
 set -u
 . "$(dirname "$0")/ui.sh"
 OLD="$1"
@@ -124,6 +130,125 @@ if [ "$seeded" = 1 ]; then
   adb shell am force-stop "$PKG"
 fi
 
+# 3β. Πρόσθετο δείγμα (συνθετικό): ρυθμίσεις, ημερολόγιο φαγητού, ιστορικό. Μπαίνει ΜΕΤΑ τους παραπάνω ελέγχους της
+#     παλιάς, ώστε εκείνοι να τρέχουν όπως πάντα. Οι καταχωρίσεις φαγητού μπαίνουν στη χθεσινή μέρα (η σημερινή οθόνη της
+#     Διατροφής μένει όπως ήταν για τους ελέγχους με το «Φαγητό»).
+# check_more: το πρόσθετο δείγμα όπως είναι ΤΩΡΑ στο κινητό. 0 = κάθε τιμή του υπάρχει και είναι ίδια.
+check_more() {
+  adb shell "cat $D/files/prefs.json" 2> /dev/null | tr -d '\r' > prefs_now.json
+  adb shell "sqlite3 $DB < /data/local/tmp/seed_check.sql" 2> /dev/null | tr -d '\r' > db_now.txt
+  python3 -I -c '
+import json, sys
+exp = json.load(open("seed_expect.json", encoding="utf-8"))
+def within(a, b):
+    # Κάθε τιμή του a υπάρχει ίδια στο b· το b μπορεί να έχει ΚΑΙ νέα κλειδιά (οι αλλαγές μορφής είναι μόνο πρόσθετες).
+    if isinstance(a, dict):
+        return isinstance(b, dict) and all(k in b and within(v, b[k]) for k, v in a.items())
+    if isinstance(a, list):
+        return isinstance(b, list) and len(a) == len(b) and all(within(x, y) for x, y in zip(a, b))
+    return isinstance(a, bool) == isinstance(b, bool) and a == b
+bad = []
+try:
+    now = json.load(open("prefs_now.json", encoding="utf-8"))
+except Exception:
+    now = None
+for k, v in exp["prefs"].items():
+    if not (isinstance(now, dict) and within(v, now.get(k))):
+        bad.append("prefs.json: " + k)
+try:
+    lines = [l for l in open("db_now.txt", encoding="utf-8").read().splitlines() if l.strip()]
+    food = [json.loads(l) for l in lines if not l.startswith("DAY")]
+    day = [json.loads(l[3:]) for l in lines if l.startswith("DAY")]
+except Exception:
+    food, day = [], []
+if not within(exp["food"], food):
+    bad.append("ημερολόγιο φαγητού (food_log)")
+if not (len(day) == 1 and within(exp["hist"], day[0])):
+    bad.append("ιστορικό (days)")
+if bad:
+    print("  δεν είναι όπως μπήκαν: " + ", ".join(bad))
+    sys.exit(1)
+'
+}
+goal_ui() { ui_tap "Διατροφή" && sleep 3 && ui_find_scroll "στόχος 2.250" 3; }
+
+more_seeded=0
+goal_ui_old=0
+if errq_root && [ -n "$(adb shell 'command -v sqlite3' | tr -d '\r')" ] && [ "$(adb shell "test -f $DB && echo y" | tr -d '\r')" = y ]; then
+  adb shell am force-stop "$PKG"
+  d0=$(adb shell date +%F | tr -d '\r')
+  ms=$(( $(adb shell date +%s | tr -d '\r') * 1000 ))
+  adb shell "cat $D/files/prefs.json" 2> /dev/null | tr -d '\r' > prefs_old.json
+  if python3 -I -c '
+import datetime, json, sys
+d0 = datetime.date.fromisoformat(sys.argv[1])
+ms = int(sys.argv[2])
+day = lambda n: (d0 - datetime.timedelta(days=n)).isoformat()
+# Ό,τι έγραψε ήδη η παλιά έκδοση στις ρυθμίσεις μένει· προστίθενται τα κλειδιά του δείγματος.
+try:
+    prefs = json.load(open("prefs_old.json", encoding="utf-8"))
+    if not isinstance(prefs, dict):
+        prefs = {}
+except Exception:
+    prefs = {}
+# Χωρίς έτος γέννησης στα «στοιχεία μου»: με ηλικία η Άσκηση θα έδειχνε ζώνη περπατήματος, και για 40 ετών το πάνω όριό
+# της είναι 137 bpm, ίδιο με το όριο του δείγματος («137 bpm»): ο έλεγχος του ορίου θα περνούσε και χωρίς το όριο.
+seed = {
+    "me": {"sex": "m", "h": 175, "wds": [1, 3, 5], "wad": 1, "wd": 1},
+    "goals": {"v": 1, "aim": "lose", "rate": 0.005, "pal": 1.5, "doc": True, "since": day(10), "kg": 80, "age": 40,
+              "h": 175, "m": True, "nuts": 30, "bran": 40, "leg": 3, "fish": 2, "kcal": 2250},
+    "zone": {"up": True, "down": False},
+    "waist": [{"d": day(8), "v": [92.5, 92.0]}],
+}
+prefs.update(seed)
+json.dump(prefs, open("seed_prefs.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+food = {"id": "ci-seed-meal", "name": "Γεύμα δοκιμής αναβάθμισης", "cat": "", "source": "Ετικέτα",
+        "n": {"kcal": 150, "protein": 10, "carbs": 15, "fat": 5}}
+rows = [{"id": "ci-seed-log-%d" % i, "day": day(1), "meal": meal, "food": food, "grams": grams,
+         "time": ms - 86400000 + i * 60000}
+        for i, (meal, grams) in enumerate([("lunch", 200), ("dinner", 150)], 1)]
+hist = {"steps": 7654}
+q = lambda t: chr(39) + t.replace(chr(39), chr(39) * 2) + chr(39)
+enc = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+with open("seed_more.sql", "w", encoding="utf-8") as f:
+    for r in rows:
+        f.write("INSERT OR REPLACE INTO food_log(id, day, json, updated) VALUES(%s, %s, %s, %d);\n" % (q(r["id"]), q(r["day"]), q(enc(r)), ms))
+    f.write("INSERT OR REPLACE INTO days(date, json, updated) VALUES(%s, %s, %d);\n" % (q(day(40)), q(enc(hist)), ms))
+with open("seed_check.sql", "w", encoding="utf-8") as f:
+    f.write("SELECT json FROM food_log WHERE id LIKE %s ORDER BY id;\n" % q("ci-seed-log-%"))
+    f.write("SELECT %s || json FROM days WHERE date = %s;\n" % (q("DAY"), q(day(40))))
+json.dump({"prefs": seed, "food": rows, "hist": hist}, open("seed_expect.json", "w", encoding="utf-8"), ensure_ascii=False)
+' "$d0" "$ms"; then
+    uid=$(adb shell stat -c %u "$D" | tr -d '\r')
+    adb push seed_prefs.json /data/local/tmp/seed_prefs.json > /dev/null
+    adb push seed_more.sql /data/local/tmp/seed_more.sql > /dev/null
+    adb push seed_check.sql /data/local/tmp/seed_check.sql > /dev/null
+    if adb shell "cp /data/local/tmp/seed_prefs.json $D/files/prefs.json && chown $uid:$uid $D/files/prefs.json && chmod 600 $D/files/prefs.json && restorecon $D/files/prefs.json" \
+      && adb shell "sqlite3 $DB < /data/local/tmp/seed_more.sql && chown -R $uid:$uid $D/databases && restorecon -R $D/databases"; then
+      more_seeded=1
+    fi
+    adb shell rm -f /data/local/tmp/seed_prefs.json /data/local/tmp/seed_more.sql
+  fi
+  if [ "$more_seeded" = 1 ]; then
+    # Η παλιά ανοίγει με το πρόσθετο δείγμα (το διαβάζει, ίσως ξαναγράφει τις ρυθμίσεις), όπως στο κινητό πριν από την αναβάθμιση.
+    launch
+    ui_wait "Σήμερα" 60 > /dev/null || true
+    # Ο στόχος του δείγματος στην οθόνη: απαιτείται από τη νέα ΜΟΝΟ αν τον δείχνει και η παλιά (ίδιος έλεγχος, ίδια οθόνη).
+    if goal_ui; then goal_ui_old=1; echo "Παλιά έκδοση: δείχνει τον στόχο του δείγματος (στόχος 2.250)"; else echo "Παλιά έκδοση: δεν φάνηκε «στόχος 2.250» στη Διατροφή· στη νέα ελέγχονται μόνο τα αρχεία"; fi
+    sleep 3
+    adb shell am force-stop "$PKG"
+    if check_more; then
+      echo "Παλιά έκδοση: κρατά το πρόσθετο δείγμα (ρυθμίσεις, ημερολόγιο φαγητού, ιστορικό)"
+    else
+      # Το δείγμα δεν έμεινε όπως μπήκε ήδη στην ΠΑΛΙΑ έκδοση: δεν είναι σφάλμα της νέας. Δεν συγκρίνεται (να φανεί).
+      more_seeded=0
+      echo "::warning title=Αναβάθμιση::Η παλιά έκδοση δεν κράτησε το πρόσθετο δείγμα όπως μπήκε· ενημέρωσε το 3β του tools/perf/upgrade.sh"
+    fi
+  else
+    echo "::warning title=Αναβάθμιση::Δεν μπήκε το πρόσθετο δείγμα (ρυθμίσεις, ημερολόγιο φαγητού, ιστορικό)· ελέγχονται μόνο προπονήσεις και προϊόν"
+  fi
+fi
+
 # Τι αρχεία έχει η παλιά (ονόματα μόνο).
 list_files() { adb shell "cd $D && find files databases shared_prefs no_backup -type f 2>/dev/null | grep -v '^files/errq/'" | tr -d '\r' | LC_ALL=C sort; }
 if errq_root; then list_files > files_before.txt; echo "Αρχεία της παλιάς: $(wc -l < files_before.txt)"; fi
@@ -162,6 +287,15 @@ if [ "$food_seeded" = 1 ]; then
   fi
   shot "upgrade_new_food" > /dev/null || true
 fi
+# Πρόσθετο δείγμα (3β): η νέα έκδοση ΔΙΑΒΑΖΕΙ τους αποθηκευμένους στόχους (τους δείχνει), όπως η παλιά. Δύο προσπάθειες.
+if [ "$more_seeded" = 1 ] && [ "$goal_ui_old" = 1 ]; then
+  if goal_ui || goal_ui; then
+    echo "Νέα έκδοση: δείχνει τον στόχο θερμίδων της παλιάς (στόχος 2.250)"
+  else
+    fail "η νέα έκδοση δεν δείχνει τον στόχο θερμίδων που είχε η παλιά («στόχος 2.250» στη Διατροφή)"; echo "  (στην οθόνη: $(labels))"
+  fi
+  shot "upgrade_new_goals" > /dev/null || true
+fi
 sleep 5
 [ -n "$(app_pid)" ] || fail "η νέα έκδοση δεν τρέχει μετά το άνοιγμα"
 
@@ -189,8 +323,17 @@ else:
 '; then echo "training.json μετά την αναβάθμιση: διαβάζεται, έχει το δείγμα και τους παλμούς του"; else fail "το training.json μετά την αναβάθμιση δεν έχει το δείγμα ή τους παλμούς του"; fi
   fi
 fi
+if [ "$more_seeded" = 1 ]; then
+  if check_more; then
+    echo "Νέα έκδοση: ρυθμίσεις (στοιχεία, στόχοι, ζώνη, μέση), ημερολόγιο φαγητού και ιστορικό του δείγματος όπως ήταν"
+  else
+    fail "μετά την αναβάθμιση άλλαξαν ή χάθηκαν δεδομένα του δείγματος (ρυθμίσεις, ημερολόγιο φαγητού ή ιστορικό)"
+  fi
+fi
+adb shell rm -f /data/local/tmp/seed_check.sql > /dev/null 2>&1 || true
 errq_check "Αναβάθμιση" || ok=0
 crash_check "Αναβάθμιση" || ok=0
 
-[ "$ok" = 1 ] && echo "Αναβάθμιση: εντάξει" && exit 0
+# Τι δοκιμάστηκε πράγματι (η γραμμή φαίνεται στη σημείωση του workflow): ένα «εντάξει» χωρίς δείγμα δεν λέει τίποτα.
+[ "$ok" = 1 ] && echo "Αναβάθμιση: εντάξει (δείγμα: προπονήσεις $seeded · προϊόν $food_seeded · ρυθμίσεις, ημερολόγιο, ιστορικό $more_seeded · στόχος στην οθόνη $goal_ui_old)" && exit 0
 exit 1

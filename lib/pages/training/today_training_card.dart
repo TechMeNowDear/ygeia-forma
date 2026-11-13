@@ -41,10 +41,23 @@ class TodayTrainingCard extends StatefulWidget {
     return l;
   }
 
-  /// Η τελευταία προπόνηση (ή περπάτημα) που τελείωσε σήμερα.
+  /// Η τελευταία προπόνηση που τελείωσε σήμερα ΚΑΙ είναι αυτή της μέρας (round1, S6-13): σε μέρα βαρών προπόνηση βαρών,
+  /// σε μέρα περπατήματος περπάτημα. Πριν, ένα πρωινό περπάτημα έκρυβε από τη «Σήμερα» την προπόνηση βαρών της μέρας.
+  /// Χωρίς πρόγραμμα για σήμερα (ξεκούραση): ό,τι έγινε.
   static Session? doneToday(TrainingStore t, DateTime now) {
+    final w = t.program?.forDay(now);
     for (final s in t.sessions.reversed) {
-      if (s.finished && sameDay(s.start, now)) return s;
+      if (s.finished && sameDay(s.start, now) && (w == null || w.isCardio == s.isCardio)) return s;
+    }
+    return null;
+  }
+
+  /// Ό,τι άλλο τελείωσε σήμερα, έξω από την προπόνηση της μέρας (για τη γραμμή «Έγινε σήμερα και: …»).
+  static Session? otherToday(TrainingStore t, DateTime now) {
+    final w = t.program?.forDay(now);
+    if (w == null) return null;
+    for (final s in t.sessions.reversed) {
+      if (s.finished && sameDay(s.start, now) && w.isCardio != s.isCardio) return s;
     }
     return null;
   }
@@ -60,9 +73,18 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
   static String _name(String id) => exNamesById[id] ?? ExLibrary.loaded?.byId(id)?.name ?? id;
 
   void _start(Workout w) {
+    _library();
     t.start(w);
     WearLink.main.openWatch();
     Navigator.of(context).push(SessionPage.route(t));
+  }
+
+  /// round1, S6-2 / S7-01: η Σήμερα δεν φορτώνει τη βιβλιοθήκη ασκήσεων (S5), αλλά η οθόνη της προπόνησης τη θέλει για το
+  /// «Πώς γίνεται» και την «Αλλαγή άσκησης». Φορτώνεται τώρα, χωρίς να περιμένει κανείς· μόλις έρθει, η οθόνη της
+  /// προπόνησης ξαναζωγραφίζεται. Τα ονόματα και οι στόχοι δεν την περιμένουν (ex_names.dart, TrainingStore.cautionIds).
+  void _library() {
+    if (ExLibrary.loaded != null) return;
+    ExLibrary.load().then((_) => t.libraryReady(), onError: (Object _) {});
   }
 
   @override
@@ -89,8 +111,24 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
     final watch = WearLink.main.ready.value
         ? StatusPill(icon: Icons.watch_rounded, text: 'ρολόι έτοιμο', color: c.good)
         : null;
-    final limitText = limit == null ? null : 'όριο παλμών $limit';
+    // round1, U6-20: «όριο παλμών 140» ποτέ σε δύο γραμμές.
+    final limitText = limit == null ? null : 'όριο παλμών\u00A0$limit';
 
+    // round1, S6-14: ξεχασμένη προπόνηση (ανοιχτή ώρες χωρίς κίνηση): η ίδια κάρτα με την «Προπόνηση», όχι «Συνέχισε».
+    if (cur != null && t.isStale(cur)) {
+      return ForgottenWorkout(
+        key: const ValueKey('today-training'),
+        training: t,
+        session: cur,
+        now: now,
+        watchReady: WearLink.main.ready.value,
+        keyPrefix: 'today',
+        onResume: () {
+          _library();
+          Navigator.of(context).push(SessionPage.route(t));
+        },
+      );
+    }
     if (cur != null) {
       return _frame(
         context,
@@ -98,9 +136,14 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         children: [
           _title(context, cur.name),
           const SizedBox(height: 4),
-          Text('${cur.setsDone} σετ ως τώρα · ξεκίνησες ${hm(cur.start)}', style: _aux(c)),
+          // Με την ημέρα όταν δεν ξεκίνησε σήμερα (S6-14).
+          Text('${cur.setsDone} σετ ως τώρα · ξεκίνησες ${sameDay(cur.start, now) ? '' : '${shortDayDate(cur.start)} '}${hm(cur.start)}',
+              style: _aux(c)),
           const SizedBox(height: 16),
-          _button(context, 'Συνέχισε την προπόνηση', () => Navigator.of(context).push(SessionPage.route(t)), key: 'today-train-resume'),
+          _button(context, 'Συνέχισε την προπόνηση', () {
+            _library();
+            Navigator.of(context).push(SessionPage.route(t));
+          }, key: 'today-train-resume'),
         ],
       );
     }
@@ -123,6 +166,9 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
             ].join(' · '),
             style: _aux(c),
           ),
+          // round1, U6-24: το ζέσταμα/η αποθεραπεία και στη «Σήμερα», στον δρόμο προς την προπόνηση.
+          RoutineButton(w),
+          if (_otherLine(c, now) case final o?) o,
           const SizedBox(height: 16),
           Container(
             key: const ValueKey('today-train-walk-hint'),
@@ -162,6 +208,8 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           [countText(w.items.length, 'άσκηση', 'ασκήσεις'), 'περίπου ${w.minutes} λεπτά', if (limitText != null) limitText].join(' · '),
           style: _aux(c),
         ),
+        RoutineButton(w),
+        if (_otherLine(c, now) case final o?) o,
         if (list.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text.rich(
@@ -185,6 +233,22 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
   }
 
   static String _lowerFirst(String s) => s.isEmpty ? s : s[0].toLowerCase() + s.substring(1);
+
+  /// «Έγινε σήμερα και: Περπάτημα · 25 λεπτά» (S6-13), όταν έγινε κάτι άλλο από την προπόνηση της μέρας.
+  Widget? _otherLine(Aigaio c, DateTime now) {
+    final o = TodayTrainingCard.otherToday(t, now);
+    if (o == null) return null;
+    final mins = o.isCardio ? (o.cardioMinutes ?? o.duration.inMinutes) : o.duration.inMinutes;
+    return Padding(
+      key: const ValueKey('today-training-other'),
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(children: [
+        Icon(Icons.check_rounded, size: 16, color: c.good),
+        const SizedBox(width: 4),
+        Expanded(child: Text('Έγινε σήμερα και: ${o.name} · ${hoursMinutes(mins)}', style: _aux(c))),
+      ]),
+    );
+  }
 
   TextStyle _aux(Aigaio c) => TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
 
@@ -321,12 +385,15 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           ]),
         );
     final max = s.hrMax;
-    final used = s.limitUsed ?? limit;
+    // round1, U6-28: ίδια διατύπωση με τη σύνοψη (απόφαση 12/11, μ5): «Υψηλότερος παλμός ~132» στα βάρη, και ποτέ «κάτω από
+    // το όριο» ως βεβαίωση (ο καρπός στα βάρη συχνά μετρά πιο χαμηλά). Κρίνεται μόνο με το όριο εκείνης της προπόνησης.
+    final used = s.limitUsed;
     final hrLine = max == null
         ? null
         : used == null
-            ? 'Μέγιστοι παλμοί $max'
-            : 'Μέγιστοι παλμοί $max · ${max >= used ? 'πάνω' : 'κάτω'} από το όριο $used';
+            ? 'Υψηλότερος παλμός ${hrMaxText(max, cardio: s.isCardio)}'
+            : 'Υψηλότερος παλμός ${hrMaxText(max, cardio: s.isCardio)} · '
+                '${max >= used ? 'έφτασε το όριο $used' : 'το ρολόι δεν έδειξε πάνω από το όριο $used'}';
     return _frame(
       context,
       icon: s.isCardio ? Icons.directions_walk_rounded : Icons.fitness_center_rounded,
@@ -336,11 +403,12 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         const SizedBox(height: 10),
         Row(children: [
           if (s.isCardio) ...[
-            stat('${s.cardioMinutes ?? s.duration.inMinutes}', 'λ', 'διάρκεια'),
+            // round1, U6-06: «λεπτά», όχι «λ».
+            stat('${s.cardioMinutes ?? s.duration.inMinutes}', (s.cardioMinutes ?? s.duration.inMinutes) == 1 ? 'λεπτό' : 'λεπτά', 'διάρκεια'),
             stat(s.meters == null ? '—' : dec(s.meters! / 1000, 2), s.meters == null ? '' : 'km', 'απόσταση'),
             stat(s.hrAvg == null ? '—' : '${s.hrAvg}', s.hrAvg == null ? '' : 'bpm', 'μέσοι παλμοί'),
           ] else ...[
-            stat('${s.duration.inMinutes}', 'λ', 'διάρκεια'),
+            stat('${s.duration.inMinutes}', s.duration.inMinutes == 1 ? 'λεπτό' : 'λεπτά', 'διάρκεια'),
             stat('${s.setsDone}', '', 'σετ'),
             stat(s.volume > 0 ? thousands(s.volume.round()) : '—', s.volume > 0 ? 'kg' : '', 'σύνολο κιλών'),
           ],

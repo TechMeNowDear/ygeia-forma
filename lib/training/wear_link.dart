@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../exercise/ex_data.dart';
+import '../exercise/ex_names.dart';
 import 'equipment.dart';
 import 'program.dart';
 import 'session.dart';
@@ -16,13 +17,16 @@ import 'training_store.dart';
 /// Καθαρή συνάρτηση, για να ελέγχεται. Μορφή: android/wear/…/Protocol.kt (Plan).
 Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(String) name) {
   final p = t.program;
-  Map<String, dynamic> item(PlanItem i) {
+  Map<String, dynamic> item(PlanItem planned) {
+    // round1, S7-03: η άσκηση που γίνεται σήμερα σε αυτή τη θέση (ίσως η πιο δύσκολη παραλλαγή), όπως στο κινητό.
+    final i = t.itemToday(planned);
     final tg = t.targetFor(i);
     return {
       'ex': i.ex,
       'name': name(i.ex),
       'rest': i.rest,
-      'lo': i.lo,
+      // round1, S6-1: το κάτω όριο της μέρας, όπως το γράφει και το κινητό στην προπόνηση ([TrainingStore.loFor]).
+      'lo': TrainingStore.loFor(i, tg),
       'hi': i.hi,
       'rir': i.rir < 2 ? 2 : i.rir,
       'sets': [
@@ -47,6 +51,10 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     // Οι μέρες, για να βρίσκει το ρολόι μόνο του τη σημερινή (και αν το κινητό δεν άνοιξε σήμερα).
     if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},
     'day': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+    // round1, S6-11 / S11-7 (συμβόλαιο με το ρολόι, CROSS.md): η έναρξη του προγράμματος και, μέσα στο «cardio», τα λεπτά
+    // κάθε εβδομάδας. Έτσι το ρολόι βρίσκει μόνο του τα λεπτά της εβδομάδας που τρέχει, κι αν το κινητό δεν άνοιξε από
+    // τότε που άλλαξε η εβδομάδα. Νέα πεδία: το παλιό ρολόι τα αγνοεί και κρατά το «minutes».
+    if (p?.from != null) 'from': ymd(p!.from!),
     'workouts': [
       // 13/11: στην αερόβια με πλάνο ανά εβδομάδα, τα λεπτά της εβδομάδας που τρέχει (Program.at).
       for (final w in [for (final x in p?.workouts ?? const <Workout>[]) p!.at(x, now)])
@@ -55,12 +63,26 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
           'name': w.name,
           'minutes': w.minutes,
           if (w.cardio != null)
-            'cardio': {'activity': w.cardio!.activity, 'name': w.cardio!.name, 'minutes': w.cardio!.minutes, if (w.cardio!.note != null) 'note': w.cardio!.note},
+            'cardio': {
+              'activity': w.cardio!.activity,
+              'name': w.cardio!.name,
+              'minutes': w.cardio!.minutes,
+              if (w.cardio!.note != null) 'note': w.cardio!.note,
+              if (w.cardio!.plan.isNotEmpty) 'plan': w.cardio!.plan,
+            },
           'items': [for (final i in w.items) item(i)],
         },
     ],
   };
 }
+
+/// «2026-11-16»: η μέρα όπως γράφεται στο πρόγραμμα προς το ρολόι.
+String ymd(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Το όνομα μιας άσκησης για το ρολόι και τις ειδοποιήσεις (round1, S6-2 / S7-01): από τη βιβλιοθήκη· αν αυτή δεν έχει
+/// φορτώσει ακόμα (η εφαρμογή ανοίγει στη Σήμερα), από τον σταθερό πίνακα ονομάτων. Ποτέ το σκέτο id («db_press»), εκτός
+/// αν η άσκηση είναι άγνωστη και στα δύο.
+String watchExName(String id) => ExLibrary.loaded?.byId(id)?.name ?? exNamesById[id] ?? id;
 
 /// Η προπόνηση που τρέχει στο κινητό, για το ρολόι (Protocol.kt: LiveSession.parsePhone).
 Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name) {
@@ -232,8 +254,24 @@ class WearLink with WidgetsBindingObserver {
     _watchTimer?.cancel();
     _watchTimer = null;
     // Ανά 45″ μόνο όσο τρέχει περπάτημα στο ρολόι (NIT 8)· στο άνοιγμα μία φορά, για να ξεκινήσουν τα «ζωντανά».
-    if (on) _watchTimer = Timer.periodic(watchingEvery, (_) => liveFresh() ? sendWatching(watchingTtl) : null);
+    if (on) {
+      _watchTimer = Timer.periodic(watchingEvery, (_) {
+        if (liveFresh()) sendWatching(watchingTtl);
+        _publishIfNewDay();
+      });
+    }
     sendWatching(on ? watchingTtl : Duration.zero);
+  }
+
+  /// Η μέρα του προγράμματος που στάλθηκε τελευταία στο ρολόι.
+  String? _planDay;
+
+  /// round1, S6-11 / S11-7: η εφαρμογή έμεινε μπροστά και άλλαξε η μέρα (ίσως και η εβδομάδα του πλάνου περπατήματος):
+  /// το πρόγραμμα ξαναστέλνεται με τη σημερινή μέρα και τα λεπτά της. Μία σύγκριση ημερομηνίας ανά [watchingEvery].
+  void _publishIfNewDay() {
+    final t = _t;
+    if (t == null || _planDay == null) return;
+    if (ymd(t.now) != _planDay) _publish();
   }
 
   DateTime? _watchingSent;
@@ -336,18 +374,21 @@ class WearLink with WidgetsBindingObserver {
     return t.flush();
   }
 
-  String _name(String id) => ExLibrary.loaded?.byId(id)?.name ?? id;
+  String _name(String id) => watchExName(id);
 
   /// Στέλνει πρόγραμμα/προπόνηση μόνο όταν αλλάζουν (σύγκριση κειμένου).
   void _publish() {
     final t = _t;
     // Χωρίς κανένα ρολόι με την εφαρμογή μας: τίποτα (ούτε κλήσεις στις υπηρεσίες της Google). Με ρολόι που δεν είναι
     // κοντά τώρα: γράφεται, και φτάνει μόλις συνδεθούν (έλεγχος 9/11, V-A-06· πριν: δεν γραφόταν καθόλου).
-    if (t == null || !t.ready || !(ready.value || _known)) return;
+    // round1, S9-9: με αρχείο προπονήσεων που δεν διαβάστηκε, η αποθήκη είναι άδεια· ένα άδειο πρόγραμμα (και «χωρίς όριο
+    // παλμών») δεν πρέπει να σβήσει ό,τι έχει το ρολόι. Στέλνεται μόλις διαβαστεί ξανά.
+    if (t == null || !t.ready || t.readError || !(ready.value || _known)) return;
     try {
       final plan = jsonEncode(watchPlan(t, t.now, _name));
       if (plan != _lastPlan) {
         _lastPlan = plan;
+        _planDay = ymd(t.now);
         // Το όριο παλμών άλλαξε: να φτάσει αμέσως, όχι όποτε βολέψει το σύστημα.
         final safety = '${t.hrLimit}';
         final urgent = safety != _lastSafety;
@@ -481,6 +522,11 @@ class WearLink with WidgetsBindingObserver {
     final e = s.items[c.i];
     switch (c.op) {
       case 'tick':
+        // round1, S6-10 (συμβόλαιο με το ρολόι, CROSS.md): το ✓ λέει για ποια άσκηση είναι («ex»). Αν στο μεταξύ η άσκηση
+        // αυτής της θέσης άλλαξε στο κινητό (εναλλακτική), ένα ✓ που άργησε δεν γράφεται σε άλλη άσκηση: ένα σετ που δεν
+        // έγινε δεν μπαίνει στο ιστορικό. Ρολόι παλιότερης έκδοσης δεν στέλνει πάντα «ex»: όπως πριν.
+        final forEx = c.j['ex'];
+        if (forEx is String && forEx != e.ex) return;
         if (c.s < 0 || c.s >= e.log.length || e.log[c.s].done) return;
         // Σετ στο ρολόι σε άσκηση που παραλείφθηκε εδώ (ρολόι παλιότερης έκδοσης, W2-06): έγινε, άρα δεν είναι πια
         // «παράλειψη» — αλλιώς το σετ θα χανόταν στη σύνοψη και στην πρόοδο.

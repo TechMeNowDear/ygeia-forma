@@ -56,21 +56,33 @@ Future<void> main() async {
   final food = FoodStore();
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
   await store.loadPrefs();
-  runApp(YgeiaFormaApp(store: store, food: food, wiped: wiped?.show == true ? wiped : null));
-  store.start();
-  food.start();
-  WidgetPublisher(store, food, training: TrainingStore.main).start();
-  // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
-  TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
+  void startStores() {
+    store.start();
+    food.start();
+    WidgetPublisher(store, food, training: TrainingStore.main).start();
+    // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
+    TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
+  }
+
+  // Έλεγχος 13/11 (U4-6): όσο φαίνεται το «Όλα διαγράφηκαν», τίποτα δεν διαβάζεται και τίποτα δεν πάει στα widgets. Πριν,
+  // οι αναγνώσεις ξεκινούσαν πίσω από εκείνη την οθόνη (οι άδειες του Samsung Health μένουν μετά τη διαγραφή), και ύπνος,
+  // βήματα και ζυγίσεις ήταν ξανά στο κινητό ενώ η οθόνη έλεγε «όπως την πρώτη μέρα». Ξεκινούν όταν ο χρήστης πατήσει
+  // «Ξεκίνα από την αρχή» ή «Επαναφορά από αντίγραφο» (το ίδιο και η ανανέωση στο παρασκήνιο: DataWipe.kt, «wipeSeen»).
+  final showWiped = wiped?.show == true;
+  runApp(YgeiaFormaApp(store: store, food: food, wiped: showWiped ? wiped : null, onLeaveWiped: showWiped ? startStores : null));
+  if (!showWiped) startStores();
 }
 
 class YgeiaFormaApp extends StatefulWidget {
-  const YgeiaFormaApp({super.key, required this.store, required this.food, this.wiped});
+  const YgeiaFormaApp({super.key, required this.store, required this.food, this.wiped, this.onLeaveWiped});
   final HealthStore store;
   final FoodStore food;
 
   /// Μόλις έγινε «Διαγραφή όλων»: πρώτα η οθόνη «Όλα διαγράφηκαν».
   final WipeStatus? wiped;
+
+  /// Καλείται μία φορά, όταν ο χρήστης φύγει από το «Όλα διαγράφηκαν»: τότε ξεκινούν οι αναγνώσεις (U4-6).
+  final VoidCallback? onLeaveWiped;
 
   @override
   State<YgeiaFormaApp> createState() => _YgeiaFormaAppState();
@@ -84,6 +96,8 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
 
   void _leaveWiped({bool restore = false}) {
     markWipeSeen();
+    // Μία φορά: η οθόνη «Όλα διαγράφηκαν» δεν ξαναφαίνεται μετά από αυτό (το _wiped γίνεται null).
+    if (_wiped != null) widget.onLeaveWiped?.call();
     setState(() => _wiped = null);
     if (!restore) return;
     // «Επαναφορά από αντίγραφο»: οι Ρυθμίσεις, όπου είναι η επαναφορά (ΤΑ ΔΕΔΟΜΕΝΑ ΜΟΥ).
@@ -122,18 +136,6 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
     );
   }
 }
-
-/// Άγνωστη διαδρομή → τίποτα καινούργιο: μια σελίδα που κλείνει αμέσως και αφήνει την οθόνη όπως ήταν.
-Route<void> unknownRoute(RouteSettings settings) => PageRouteBuilder<void>(
-      settings: const RouteSettings(name: 'άγνωστη διαδρομή'),
-      opaque: false,
-      pageBuilder: (context, _, __) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) Navigator.of(context).maybePop();
-        });
-        return const SizedBox.shrink();
-      },
-    );
 
 class _Dest {
   const _Dest(this.icon, this.selectedIcon, this.label, this.cat);
@@ -186,6 +188,11 @@ class _ShellState extends State<Shell> {
   late final _foodTab = ValueNotifier(0);
   late final _exerciseTab = ValueNotifier(widget.initialIndex == Cat.exercise ? widget.initialTab : 0);
 
+  /// Έλεγχος 13/11 (S10-4): οι τέσσερις κύριες σελίδες μπαίνουν σε άλλη θέση του δέντρου στη στενή διάταξη (σώμα του
+  /// Scaffold) και στη φαρδιά (μέσα σε Row, δίπλα στην πλαϊνή μπάρα). Χωρίς κλειδί, το άνοιγμα ή το κλείσιμο του Fold τις
+  /// έχτιζε από την αρχή: χανόταν η θέση κύλισης, η περίοδος των Τάσεων, η αναζήτηση ασκήσεων. Με GlobalKey μετακινούνται.
+  final _stackKey = GlobalKey();
+
   // Για την αναφορά σφαλμάτων: σε ποια κατηγορία και καρτέλα είμαι.
   static const _catNames = ['Σήμερα', 'Υγεία', 'Διατροφή', 'Άσκηση'];
   static const _healthTabs = ['Ύπνος', 'Καρδιά', 'Σώμα', 'Τάσεις'];
@@ -203,6 +210,9 @@ class _ShellState extends State<Shell> {
     final p = req.split(':');
     if (p.length < 3 || p[0] != 'w') return;
     final kind = p[1], tap = p[2], hero = p.length > 3 ? p[3] : '';
+    // Round 1 (integ1): το πάτημα φτάνει από την Kotlin χωρίς να αλλάξει τίποτα στην οθόνη, άρα κανένα καρέ δεν ζητιέται
+    // και η μετάβαση περίμενε το επόμενο τυχαίο καρέ (ένα άγγιγμα, μια ανανέωση). Ζητάμε ένα καρέ, για να γίνει αμέσως.
+    WidgetsBinding.instance.ensureVisualUpdate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -217,12 +227,16 @@ class _ShellState extends State<Shell> {
       switch (tap) {
         case 'today':
           _open(Cat.today);
+        // Έλεγχος round1 (S2-8 / S11-1): από την αρχική οθόνη το φαγητό γράφεται ΠΑΝΤΑ στη σημερινή μέρα. Το ημερολόγιο
+        // γυρίζει πρώτα στο «Σήμερα» (πριν, αν είχε μείνει π.χ. στο «Χθες», το φαγητό πήγαινε σιωπηλά εκεί).
         case 'add':
           _open(Cat.food, FoodTab.diary);
+          _food.setDay(widget.now ?? DateTime.now());
           openAddFood(context, _food);
         // 13/11: το «Barcode» του widget «Γρήγορο φαγητό»: η ίδια οθόνη, με τον σαρωτή ανοιχτό αμέσως.
         case 'scan':
           _open(Cat.food, FoodTab.diary);
+          _food.setDay(widget.now ?? DateTime.now());
           openAddFood(context, _food, scan: true);
         case 'metric' when metricSpecs.containsKey(hero):
           section();
@@ -318,21 +332,26 @@ class _ShellState extends State<Shell> {
         pages: [
           SleepPage(store: store, now: widget.now),
           HeartPage(store: store, now: widget.now, onOpenSleep: () => _healthTab.value = HealthTab.sleep),
-          BodyPage(store: store),
+          BodyPage(store: store, now: widget.now),
           TrendsPage(store: store, now: widget.now),
         ],
       ),
-      CategoryPage(
-        title: 'Διατροφή',
-        color: c.food,
-        solid: c.foodSolid,
-        tab: _foodTab,
-        now: widget.now,
-        tabs: _foodTabs,
-        pages: [
-          // Οθόνες φαγητού: κουμπιά στο χρώμα της Διατροφής, σε κάθε θέμα.
-          FoodTheme(child: NutritionPage(food: _food, health: widget.store, now: widget.now)),
-        ],
+      // Έλεγχος round1 (U3a-1): η κεφαλίδα γράφει τη μέρα που δείχνει το ημερολόγιο, όταν δεν είναι η σημερινή (πριν
+      // έγραφε πάντα τη σημερινή ημερομηνία, ενώ από κάτω φαινόταν άλλη μέρα).
+      ListenableBuilder(
+        listenable: _food,
+        builder: (context, _) => CategoryPage(
+          title: 'Διατροφή',
+          color: c.food,
+          solid: c.foodSolid,
+          tab: _foodTab,
+          now: _food.otherDayShown(widget.now ?? DateTime.now()) ?? widget.now,
+          tabs: _foodTabs,
+          pages: [
+            // Οθόνες φαγητού: κουμπιά στο χρώμα της Διατροφής, σε κάθε θέμα.
+            FoodTheme(child: NutritionPage(food: _food, health: widget.store, now: widget.now)),
+          ],
+        ),
       ),
       CategoryPage(
         title: 'Άσκηση',
@@ -342,9 +361,12 @@ class _ShellState extends State<Shell> {
         now: widget.now,
         tabs: _exerciseTabs,
         pages: [
-          TrainingPage(training: TrainingStore.main, health: store, onOpenTrends: () => _open(Cat.health, HealthTab.trends)),
-          ExercisePage(store: store),
-          const ExerciseLibraryPage(),
+          // Round 1 (f9 · U5-30): κουμπιά, διακόπτες και επιλογές στο χρώμα της Άσκησης (όπως η Διατροφή), όχι μπλε.
+          ExerciseTheme(
+              child: TrainingPage(
+                  training: TrainingStore.main, health: store, onOpenTrends: () => _open(Cat.health, HealthTab.trends))),
+          ExerciseTheme(child: ExercisePage(store: store, now: widget.now)),
+          const ExerciseTheme(child: ExerciseLibraryPage()),
         ],
       ),
     ];
@@ -367,7 +389,7 @@ class _ShellState extends State<Shell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 600;
-        final content = LazyIndexedStack(index: _index, children: pages);
+        final content = LazyIndexedStack(key: _stackKey, index: _index, children: pages);
 
         if (wide) {
           return Scaffold(

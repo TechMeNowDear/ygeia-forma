@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/body_trend.dart';
 import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/format.dart' show hoursMinutes;
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/home_widgets/widget_snapshot.dart';
 import 'package:ygeia_forma/hrv_trend.dart';
@@ -63,7 +64,9 @@ void main() {
 
     test('σημειώνεται μόνο όταν το αντίγραφο βγήκε ολόκληρο', () {
       final src = File('lib/pages/settings.dart').readAsStringSync();
-      expect(src, contains('if (!trainingOut && hrMissing == 0) widget.store.markExported(now);'));
+      // Round 1 (f8 · S9-8): «ολόκληρο» = προπονήσεις με παλμούς, ρυθμίσεις και πηγές ύπνου.
+      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut;'));
+      expect(src, contains('if (complete) store.markExported(now);'));
     });
   });
 
@@ -81,7 +84,9 @@ void main() {
       addTearDown(() => m.setMockMethodCallHandler(channel, null));
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const TiFtaneiScreen()));
       await t.pumpAndSettle();
-      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα 100%');
+      // Round 1 (f4 · U1b-07): στην οθόνη «γράμματα» και «100%» με αδιάσπαστο κενό (δεν χωρίζονται σε δύο γραμμές)·
+      // το screenSizeText (πάνω) μένει με απλό κενό.
+      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα\u00A0100%');
     });
   });
 
@@ -94,15 +99,15 @@ void main() {
       final week = w['week'] as Map;
       expect(week.keys.toSet(), {'1', '2', '3', '4', '5', '6', '7'});
       // Παρασκευή = Α (6 ασκήσεις), Δευτέρα = Β (7 ασκήσεις), Τρίτη = περπάτημα 30′.
-      expect(week['5'], {'t': 'Προπόνηση Α', 's': '6 ασκήσεις · περίπου 50′'});
-      expect(week['1'], {'t': 'Προπόνηση Β', 's': '7 ασκήσεις · περίπου 56′'});
+      expect(week['5'], {'t': 'Προπόνηση Α', 's': '6 ασκήσεις · περίπου 50 λεπτά'}); // round 1 (U7-13): ολόκληρες λέξεις
+      expect(week['1'], {'t': 'Προπόνηση Β', 's': '7 ασκήσεις · περίπου 56 λεπτά'});
       expect(week['2'], {'t': 'Περπάτημα', 's': '30 λεπτά'});
       expect(w.containsKey('done'), isFalse);
       // Τη μέρα που έγινε προπόνηση: «έγινε», με όνομα και διάρκεια.
       final last = t.sessions.last;
       final d = workoutSnapshot(t, DateTime(last.start.year, last.start.month, last.start.day));
       expect(d['done'], dateKey(last.start));
-      expect(d['doneText'], '${last.name} · ${last.end!.difference(last.start).inMinutes}′');
+      expect(d['doneText'], '${last.name} · ${hoursMinutes(last.end!.difference(last.start).inMinutes)}');
     });
 
     test('χωρίς πρόγραμμα: το λέει· μπαίνει στο στιγμιότυπο μόνο όταν η προπόνηση έχει φορτωθεί', () {
@@ -273,14 +278,15 @@ void main() {
       expect((t.from, t.to), (DateTime(2026, 11, 2, 8), DateTime(2026, 11, 6, 8)));
     });
 
-    test('λιγότερες από 6 μέρες ζύγισης: καμία αλλαγή· ζυγίσεις της ίδιας μέρας μετρούν μία (η τελευταία)', () {
+    // Round 1 (S4-4, f4): μετρά η ΠΡΩΤΗ ζύγιση της μέρας (όπως ιστορικό, Τάσεις, αναφορά, θερμίδες)· πριν η τελευταία.
+    test('λιγότερες από 6 μέρες ζύγισης: καμία αλλαγή· ζυγίσεις της ίδιας μέρας μετρούν μία (η πρώτη)', () {
       final five = [m(2, 27.9), m(4, 27.5), m(6, 27.0), m(9, 26.6), m(11, 26.4)];
       expect(bodyTrend(five, (b) => b.fatPct), isNull);
       // Τρεις ζυγίσεις το ίδιο πρωί δεν κάνουν 6 μέρες.
       final sameDay = [...five, m(11, 26.0, hour: 9), m(11, 25.0, hour: 10)];
       expect(bodyCompositionDays(sameDay), 5);
       expect(bodyTrend(sameDay, (b) => b.fatPct), isNull);
-      expect(bodyDaily(sameDay, (b) => b.fatPct).last, (DateTime(2026, 11, 11, 10), 25.0));
+      expect(bodyDaily(sameDay, (b) => b.fatPct).last, (DateTime(2026, 11, 11, 8), 26.4));
       // Ζύγιση χωρίς λίπος δεν μετρά στο λίπος.
       expect(bodyCompositionDays([...five, m(13, null)]), 5);
       // Κάθε μέτρηση με τις δικές της μέρες.
@@ -290,7 +296,8 @@ void main() {
     test('η γραμμή λέει τι συγκρίνεται, ή πόσες ζυγίσεις λείπουν', () {
       String d(DateTime t) => '${t.day}/${t.month}';
       expect(bodyTrendNote(previous: DateTime(2026, 11, 11), days: 6, date: d),
-          'Στο βάρος, σε παρένθεση η αλλαγή από τις 11/11. Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν.');
+          'Στο βάρος, σε παρένθεση η αλλαγή από τις 11/11. Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν· '
+          'σε παρένθεση μόνο αλλαγή μεγαλύτερη από τη διακύμανση της ζυγαριάς.');
       expect(bodyTrendNote(previous: null, days: 1, date: d),
           'Η αλλαγή σε λίπος και μύες φαίνεται μετά από 6 μέρες ζύγισης (έχεις 1): μία ζύγιση μόνη της ανεβοκατεβαίνει με το νερό.');
     });
@@ -305,9 +312,12 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('body-trend-note'))).data, contains('οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν'));
       String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
       // Δείγμα: λίπος 27,9 · 27,5 · 27,0 | 26,6 · 26,3 · 25,4 → μεσαίες 27,5 και 26,3 → −1,2 (από την προηγούμενη θα ήταν −0,9).
-      expect(row('Λίπος'), '25,4 %  (−1,2)');
+      // Round 1 (S4-3, f4): −1,2 είναι μέσα στη διακύμανση της ζυγαριάς (όριο 1,5 μονάδες) → χωρίς παρένθεση· «%» χωρίς
+      // κενό (U1a-7). Πριν: '25,4 %  (−1,2)'.
+      expect(row('Λίπος'), '25,4%');
       // Σκελετικοί μύες 34,3 · 34,2 · 34,4 | 34,5 · 34,6 · 34,3 → 34,3 και 34,5 → +0,2 (από την προηγούμενη θα ήταν −0,3).
-      expect(row('Σκελετικοί μύες'), '34,3 kg  (+0,2)');
+      // Round 1 (S4-3): +0,2 kg κάτω από το όριο 1 kg → χωρίς παρένθεση (πριν '34,3 kg  (+0,2)').
+      expect(row('Σκελετικοί μύες'), '34,3 kg');
       // Το βάρος μένει η αλλαγή από την προηγούμενη ζύγιση (83,3 → 82,2).
       expect(row('Βάρος'), '82,2 kg  (−1,1)');
     });
@@ -353,19 +363,20 @@ void main() {
           for (var i = 7; i < 7 + base; i++) dateKey(back(i)): {'o.hrv': i.isEven ? a : b},
         };
 
-    test('μέσα, κάτω και πάνω από το δικό σου εύρος (σε λογάριθμο, μισή τυπική απόκλιση)', () {
+    // Round 1 (S4-2, f4): εύρος = μέσος ± ΜΙΑ τυπική απόκλιση (πριν μισή), «συνηθισμένο σου εύρος» (πριν «δικό σου»).
+    test('μέσα, κάτω και πάνω από το συνηθισμένο σου εύρος (σε λογάριθμο, μία τυπική απόκλιση)', () {
       final within = hrvTrend(hist(week: 40), plan, today)!;
       expect(within.band, HrvBand.within);
       expect((within.weekNights, within.baseNights), (7, 60));
       // Με το χέρι: ln 36 και ln 44 εναλλάξ → μέσος = ln √(36·44), SD ≈ |ln 44 − ln 36| / 2 (με n−1 λίγο πάνω).
       final m = (math.log(36) + math.log(44)) / 2;
       final sd = math.sqrt(60 * math.pow((math.log(44) - math.log(36)) / 2, 2) / 59);
-      expect(within.lowMs, closeTo(math.exp(m - 0.5 * sd), 1e-9));
-      expect(within.highMs, closeTo(math.exp(m + 0.5 * sd), 1e-9));
+      expect(within.lowMs, closeTo(math.exp(m - sd), 1e-9));
+      expect(within.highMs, closeTo(math.exp(m + sd), 1e-9));
       expect(within.weekMs, closeTo(40, 1e-9));
-      expect(hrvTrendText(within), '7 νύχτες: 40 ms, μέσα στο δικό σου εύρος (38–42)');
+      expect(hrvTrendText(within), '7 νύχτες: 40 ms, μέσα στο συνηθισμένο σου εύρος (36–44)');
       expect(hrvTrend(hist(week: 33), plan, today)!.band, HrvBand.below);
-      expect(hrvTrendText(hrvTrend(hist(week: 33), plan, today)!), '7 νύχτες: 33 ms, κάτω από το δικό σου εύρος (38–42)');
+      expect(hrvTrendText(hrvTrend(hist(week: 33), plan, today)!), '7 νύχτες: 33 ms, κάτω από το συνηθισμένο σου εύρος (36–44)');
       expect(hrvTrend(hist(week: 47), plan, today)!.band, HrvBand.above);
     });
 

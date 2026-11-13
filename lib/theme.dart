@@ -9,6 +9,10 @@ import 'package:flutter/material.dart';
 /// Αλλάζουν μόνο τα χρώματα· η διάταξη και η γραμματοσειρά μένουν ίδιες.
 /// Κανόνες: κάθε κείμενο ≥ 4,5:1 αντίθεση, και κάθε μέτρηση κρατά τη σημασία της σε όλα τα θέματα
 /// (π.χ. βαθύς ύπνος πάντα το πιο σκούρο/έντονο, «ξύπνιος» πάντα ζεστό χρώμα).
+/// Round 1 (U4-3, U1b-06, U6-13, U1a-17): το 4,5:1 ισχύει και για χρωματιστό κείμενο πάνω στο δικό του απαλό φόντο
+/// ([tint] πάνω σε κάρτα: «+ Φαγητό», τα «χάπια» τάσης, «Στήσιμο:»). Γι' αυτό λίγο πιο σκούρα, ίδια απόχρωση: Αιγαίο
+/// good/food/exercise, Ελιά food, Αυγή good/exercise/primary· στα σκούρα Αιγαίο primary, Στίβος/Ανάσα textSecondary.
+/// Τα γεμάτα χρώματα (`*Solid`) δεν άλλαξαν. Υπολογισμός WCAG 2.x για τα 6 θέματα: δοκιμή test/r1_f9_test.dart.
 class Aigaio extends ThemeExtension<Aigaio> {
   const Aigaio._({
     required this.id,
@@ -161,7 +165,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     body: Color(0xFF557427),
     move: Color(0xFF8A6508),
     energy: Color(0xFF1D5BD8),
-    good: Color(0xFF3F7D20),
+    good: Color(0xFF3C771F),
     bad: Color(0xFFB42318),
     warn: Color(0xFF8A4B06),
     warnBg: Color(0xFFFEF3DC),
@@ -178,8 +182,8 @@ class Aigaio extends ThemeExtension<Aigaio> {
     nightBottom: Color(0xFF2A3C96),
     ring: Color(0xFFFFFFFF),
     health: Color(0xFF1D5BD8),
-    food: Color(0xFF15803D),
-    exercise: Color(0xFFC2410C),
+    food: Color(0xFF14793A),
+    exercise: Color(0xFFBA3E0C),
     healthSolid: Color(0xFF1D5BD8),
     foodSolid: Color(0xFF15803D),
     exerciseSolid: Color(0xFFC2410C),
@@ -226,7 +230,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     nightBottom: Color(0xFF3A5566),
     ring: Color(0xFFD2E3A0),
     health: Color(0xFF2F5D7C),
-    food: Color(0xFF3E7A2E),
+    food: Color(0xFF3D772D),
     exercise: Color(0xFFA94C24),
     healthSolid: Color(0xFF2F5D7C),
     foodSolid: Color(0xFF3E7A2E),
@@ -250,14 +254,14 @@ class Aigaio extends ThemeExtension<Aigaio> {
     text: Color(0xFF2B1B17),
     textSecondary: Color(0xFF6E5A53),
     textTertiary: Color(0xFF816E69), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
-    primary: Color(0xFFC2410C),
+    primary: Color(0xFFBA3E0C),
     onPrimary: Color(0xFFFFFFFF),
     sleep: Color(0xFF5B3FC4),
     heart: Color(0xFFB33B0C),
     body: Color(0xFF0F766E),
     move: Color(0xFF8C5A0B),
     energy: Color(0xFF1D4ED8),
-    good: Color(0xFF15803D),
+    good: Color(0xFF14793A),
     bad: Color(0xFFB42318),
     warn: Color(0xFF8A4B06),
     warnBg: Color(0xFFFEF3DC),
@@ -275,7 +279,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     ring: Color(0xFFFFC36B),
     health: Color(0xFF5B3FC4),
     food: Color(0xFF1F7A4A),
-    exercise: Color(0xFFC2410C),
+    exercise: Color(0xFFBA3E0C),
     healthSolid: Color(0xFF5B3FC4),
     foodSolid: Color(0xFF1F7A4A),
     exerciseSolid: Color(0xFFC2410C),
@@ -299,7 +303,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     text: Color(0xFFE8ECF5),
     textSecondary: Color(0xFF9AA4B8),
     textTertiary: Color(0xFF79839B), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
-    primary: Color(0xFF4C8DFF),
+    primary: Color(0xFF619BFF),
     onPrimary: Color(0xFF04122E),
     sleep: Color(0xFF8C9CFF),
     heart: Color(0xFFF08A63),
@@ -329,7 +333,8 @@ class Aigaio extends ThemeExtension<Aigaio> {
     foodSolid: Color(0xFF15803D),
     exerciseSolid: Color(0xFFC2410C),
     onSolid: Color(0xFFFFFFFF),
-    stageDeep: Color(0xFF3B2FB5),
+    // Round 1 (U4-12, U2a-10): το #3B2FB5 του φωτεινού είχε 1,85:1 στη σκούρα κάρτα· ίδια απόχρωση, ≥ 3:1, πάντα η πιο σκούρα φάση.
+    stageDeep: Color(0xFF5F54D3),
     stageLight: Color(0xFF6F8CF6),
     stageRem: Color(0xFF6CC9F2),
     stageAwake: Color(0xFFF4A38A),
@@ -345,7 +350,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     card: Color(0xFF16181C),
     hairline: Color(0xFF24272D),
     text: Color(0xFFF2F4F0),
-    textSecondary: Color(0xFF9BA19A),
+    textSecondary: Color(0xFFA2A8A1),
     textTertiary: Color(0xFF7E827D), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFFC8F04A),
     onPrimary: Color(0xFF0B0C0E),
@@ -393,7 +398,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     card: Color(0xFF0D2124),
     hairline: Color(0xFF183337),
     text: Color(0xFFE6F2F1),
-    textSecondary: Color(0xFF93ADAA),
+    textSecondary: Color(0xFF9AB3B0),
     textTertiary: Color(0xFF738B88), // ≥4,5:1 σε κάρτα και φόντο (έλεγχος 1/11)
     primary: Color(0xFF5EEAD4),
     onPrimary: Color(0xFF04201C),
@@ -499,6 +504,13 @@ ThemeData _build(Aigaio c) {
     onSurface: c.text,
     surfaceContainerHighest: c.background,
     outline: c.hairline,
+    // Round 1 (U4-1, U3a-11, U7-21): οι επιλεγμένες ετικέτες (ChoiceChip), τα SegmentedButton και τα «−/+» γεμίζουν με το
+    // secondaryContainer· χωρίς αυτό έπαιρναν το secondary (= χρώμα του «Σώματος», λαδί δίπλα στα μπλε κουμπιά). Τώρα ίδιο
+    // με την επιλογή του «Φωτεινό/Σκοτεινό» (κύριο χρώμα, onPrimary από πάνω, ≥ 4,5:1 σε όλα τα θέματα).
+    secondaryContainer: c.primary,
+    onSecondaryContainer: c.onPrimary,
+    // Το περίγραμμα των μη επιλεγμένων ετικετών: λεπτή γραμμή όπως όλα τα περιγράμματα (πριν: το χρώμα του κειμένου).
+    outlineVariant: c.hairline,
   );
   final base = ThemeData(
     useMaterial3: true,
@@ -525,7 +537,13 @@ ThemeData _build(Aigaio c) {
       iconTheme: IconThemeData(color: c.text),
     ),
     bottomSheetTheme: BottomSheetThemeData(backgroundColor: c.card, surfaceTintColor: Colors.transparent),
-    dialogTheme: DialogThemeData(backgroundColor: c.card, surfaceTintColor: Colors.transparent),
+    // Round 1 (U5-31, U2b-20): οι τίτλοι των διαλόγων ήταν 24 px κανονικά (προεπιλογή Material)· τώρα όπως οι τίτλοι των φύλλων.
+    dialogTheme: DialogThemeData(
+      backgroundColor: c.card,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 20, height: 1.25, fontWeight: FontWeight.w800, color: c.text),
+      contentTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 15, height: 1.4, color: c.textSecondary),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
@@ -548,8 +566,13 @@ ThemeData _build(Aigaio c) {
         textStyle: const TextStyle(fontFamily: fontFamily, fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
+    // Round 1 (U4-2, U5-05): ο ΚΛΕΙΣΤΟΣ διακόπτης δεν φαινόταν (κουκκίδα/ράγα 1,1–1,4:1, WCAG 1.4.11 θέλει 3:1). Τώρα
+    // κουκκίδα και περίγραμμα στο textTertiary (≥ 4,5:1 σε κάρτα και φόντο σε όλα τα θέματα)· ο ανοιχτός μένει ίδιος.
     switchTheme: SwitchThemeData(
-      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      trackOutlineColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) || s.contains(WidgetState.disabled) ? Colors.transparent : c.textTertiary),
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) || s.contains(WidgetState.disabled) ? null : c.textTertiary),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: c.primary),
     dividerTheme: DividerThemeData(color: c.hairline, thickness: 1, space: 1),
@@ -563,6 +586,38 @@ ThemeData _build(Aigaio c) {
   );
 }
 
+/// Οθόνες μιας κατηγορίας: κουμπιά, επιλογές και πεδία στο χρώμα της ([solid] γεμάτο, [text] για γράμματα).
+ThemeData _categoryTheme(ThemeData t, Aigaio c, {required Color solid, required Color text}) => t.copyWith(
+      colorScheme: t.colorScheme.copyWith(
+        primary: solid,
+        onPrimary: c.onSolid,
+        secondary: solid,
+        onSecondary: c.onSolid,
+        // Round 1 (U4-1, U3a-11): το copyWith κρατούσε το secondaryContainer του βασικού θέματος, άρα οι επιλεγμένες
+        // ετικέτες και τα «−/+» της Διατροφής έμεναν στο χρώμα του «Σώματος».
+        secondaryContainer: solid,
+        onSecondaryContainer: c.onSolid,
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: (t.textButtonTheme.style ?? const ButtonStyle()).copyWith(
+          foregroundColor: WidgetStatePropertyAll(text),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: (t.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
+          foregroundColor: WidgetStatePropertyAll(text),
+        ),
+      ),
+      // Round 1 (U3a-15): η ετικέτα πεδίου με το «μάτι» πάνω της και ο κέρσορας έπαιρναν το γεμάτο χρώμα (σκούρο Αιγαίο:
+      // #15803D σε #0B1020 = 3,8:1)· τώρα το χρώμα κειμένου της κατηγορίας (≥ 4,5:1). Στις άλλες καταστάσεις (και στο
+      // λάθος, κόκκινο) μένει η προεπιλογή.
+      inputDecorationTheme: t.inputDecorationTheme.copyWith(
+        floatingLabelStyle: WidgetStateTextStyle.resolveWith((s) => TextStyle(
+            color: s.contains(WidgetState.focused) && !s.contains(WidgetState.error) ? text : null)),
+      ),
+      textSelectionTheme: t.textSelectionTheme.copyWith(cursorColor: text),
+    );
+
 /// Οθόνες της Διατροφής: τα κουμπιά και οι επιλογές στο χρώμα της κατηγορίας.
 class FoodTheme extends StatelessWidget {
   const FoodTheme({super.key, required this.child});
@@ -570,28 +625,20 @@ class FoodTheme extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
     final c = Aigaio.of(context);
-    return Theme(
-      data: t.copyWith(
-        colorScheme: t.colorScheme.copyWith(
-          primary: c.foodSolid,
-          onPrimary: c.onSolid,
-          secondary: c.foodSolid,
-          onSecondary: c.onSolid,
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: (t.textButtonTheme.style ?? const ButtonStyle()).copyWith(
-            foregroundColor: WidgetStatePropertyAll(c.food),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: (t.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
-            foregroundColor: WidgetStatePropertyAll(c.food),
-          ),
-        ),
-      ),
-      child: child,
-    );
+    return Theme(data: _categoryTheme(Theme.of(context), c, solid: c.foodSolid, text: c.food), child: child);
+  }
+}
+
+/// Οθόνες της Άσκησης (round 1, U5-30): όπως η [FoodTheme], στο πορτοκαλί της Άσκησης· αλλιώς διακόπτες και
+/// δευτερεύοντα κουμπιά έβγαιναν μπλε δίπλα στα πορτοκαλί.
+class ExerciseTheme extends StatelessWidget {
+  const ExerciseTheme({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return Theme(data: _categoryTheme(Theme.of(context), c, solid: c.exerciseSolid, text: c.exercise), child: child);
   }
 }

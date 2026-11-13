@@ -2,7 +2,7 @@
 // σύνδεση, αποσύνδεση και αναίρεση, «ξανά από το ρολόι», σειρά ανάγνωσης, όρια συχνότητας, και οι περιπτώσεις
 // του ελέγχου: ρυθμίσεις που δεν διαβάστηκαν (B1), αποσύνδεση την ώρα ανάγνωσης (S5), πρώτη νύχτα (S3, S-D),
 // σφάλμα μετά από επανεκκίνηση (S-A), αποσύνδεση μετά από «ρολόι» (S-B), επαναφορά σχεδίου (S-E, M-1/2/3).
-// Σταθερό ρολόι: σήμερα στις 15:00 (εκτός αν μια δοκιμή ορίζει άλλη ώρα).
+// Σταθερό ρολόι: Σάββατο 14/11/2026 στις 15:00 (εκτός αν μια δοκιμή ορίζει άλλη ώρα).
 import 'dart:async';
 import 'dart:convert';
 
@@ -60,6 +60,13 @@ class FakeAndroid {
           savedPrefs.add(j);
           if (prefsMode == 'ok' || prefsMode == 'corrupt') {
             prefs = j;
+          }
+          return '{"ok":true}';
+        // Round 1 (S3-2 / S9-1): «Ξεκίνα με νέες ρυθμίσεις»: το χαλασμένο αρχείο στην άκρη, η επόμενη ανάγνωση βρίσκει κενό.
+        case 'prefsSetAside':
+          if (prefsMode == 'corrupt') {
+            prefsMode = 'ok';
+            prefs = {};
           }
           return '{"ok":true}';
         case 'loadDays':
@@ -171,8 +178,11 @@ class GatedPlanFile extends MemoryPlanFile {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final real = DateTime.now();
-  final now = DateTime(real.year, real.month, real.day, 15);
+  // Round 1 (S12-15): σταθερή ημερομηνία (Σάββατο 14/11/2026 15:00, η ίδια με τα στιγμιότυπα), όχι το ρολόι του
+  // μηχανήματος. Πριν («σήμερα στις 15:00») το δείγμα άλλαζε σχήμα τις μέρες γύρω από την αλλαγή ώρας (29/3–27/4/2027: οι
+  // «n × 24 ώρες» πριν από τα μεσάνυχτα πέφτουν στις 23:00 της προηγούμενης μέρας) και το «σήμερα» μπορούσε να αλλάξει
+  // στη μέση του αρχείου (εκκίνηση λίγο πριν από τα μεσάνυχτα).
+  final now = DateTime(2026, 11, 14, 15);
   final today = dayOf(now);
   final ouraStart = add(today, -3);
 
@@ -204,7 +214,9 @@ void main() {
       ..planFile = pf
       ..ouraNightsFile = nf
       ..ouraClock = (clock ?? () => t)
-      ..ouraLink = OuraLink(vault: v, send: o.send, clientId: 'CID', tokenEndpoint: 'https://api.ouraring.com/oauth/token');
+      // S12-15: και η σύνδεση με το ρολόι της δοκιμής (πριν: το ρολόι του μηχανήματος· με σταθερή ημερομηνία τα tokens
+      // του δείγματος θα έμοιαζαν ληγμένα και κάθε ανάγνωση θα έκανε πρώτα ανανέωση).
+      ..ouraLink = OuraLink(vault: v, send: o.send, clock: () => t, clientId: 'CID', tokenEndpoint: 'https://api.ouraring.com/oauth/token');
     return (store: store, android: and, oura: o, vault: v, planFile: pf, nights: nf);
   }
 
@@ -243,9 +255,18 @@ void main() {
       await boot(a.store);
       expect(a.store.planState, PlanState.ok);
       expect(a.store.plan.ouraFrom, ouraStart);
+      // Round 1 (S3-2 / S9-1): το χαλασμένο αρχείο ρυθμίσεων ΔΕΝ γράφεται πια από πάνω με προεπιλογές (εκεί είναι στόχοι,
+      // στοιχεία, ζώνη, μέση). Ως τη ρητή επιλογή του χρήστη δεν γράφεται τίποτα· μετά, όπως πριν.
+      expect(a.store.prefsCorrupt, isTrue);
+      expect(a.store.prefsLoaded, isFalse);
+      expect(a.android.savedPrefs, isEmpty, reason: 'καμία προεπιλογή πάνω στο χαλασμένο αρχείο');
+      expect(a.android.saveDaysCalls, 0, reason: 'χωρίς ρυθμίσεις δεν γράφεται ιστορικό');
+      expect(await a.store.startFreshPrefs(), isTrue);
+      expect(a.store.prefsCorrupt, isFalse);
+      await a.store.refresh();
       expect(a.android.savedPrefs, isNotEmpty);
       expect(SourcePlan.fromJson(a.android.savedPrefs.last['sources']).ouraFrom, ouraStart,
-          reason: 'οι προεπιλογές γράφτηκαν ΜΑΖΙ με το σχέδιο');
+          reason: 'οι νέες ρυθμίσεις γράφτηκαν ΜΑΖΙ με το σχέδιο');
       // Καμία τιμή νύχτας του ρολογιού για νύχτα του Oura στο ιστορικό.
       for (var d = ouraStart; !d.isAfter(today); d = add(d, 1)) {
         final row = a.android.days[dateKey(d)] ?? const {};
@@ -268,6 +289,11 @@ void main() {
       expect(a.android.savedPrefs, isEmpty, reason: 'οι προεπιλογές δεν γράφονται πάνω στις ρυθμίσεις');
       expect(a.oura.gets, 0);
       expect(a.store.data!.nights, isEmpty);
+      // Round 1 (S3-2 / S9-1): πρώτα η ρητή επιλογή για τις ρυθμίσεις (το χαλασμένο αρχείο στην άκρη)· ως τότε ούτε το
+      // σχέδιο πηγών αλλάζει.
+      expect(await a.store.recoverPlan(SourcePlan([SourceEra(Source.oura, ouraStart)])), isFalse);
+      expect(await a.store.startFreshPrefs(), isTrue);
+      expect(a.android.savedPrefs, isEmpty, reason: 'οι νέες ρυθμίσεις γράφονται όταν γίνει γνωστό το σχέδιο πηγών');
       // Ρητή επιλογή του χρήστη: γράφεται το αρχείο και ξαναρχίζουν οι εγγραφές.
       expect(await a.store.recoverPlan(SourcePlan([SourceEra(Source.oura, ouraStart)])), isTrue);
       expect(a.store.planState, PlanState.ok);
@@ -602,7 +628,8 @@ void main() {
       expect(a.store.plan.ouraFrom, today);
       expect(a.store.ouraStatus, OuraStatus.startingNow);
       expect(a.store.ouraFirstNightText, 'Η νύχτα που κοιμάσαι τώρα μετρά από το δαχτυλίδι');
-      expect(a.store.ouraNightReason(today, at), EmptyNight.waiting);
+      // Round 1 (S5-2 / U2a-05): στις 02:00 η νύχτα δεν έχει τελειώσει: «θα φανεί το πρωί», όχι «περιμένει το Oura».
+      expect(a.store.ouraNightReason(today, at), EmptyNight.notYet);
       expect(a.store.ouraEraStarted, isTrue, reason: 'M-12: «Αναίρεση» μετά από αποσύνδεση');
     });
 
@@ -1174,12 +1201,27 @@ void main() {
       expect(decodePlanFile(a.planFile.content), backupPlan);
       expect(lastLoggedPlan(a.planFile.log)!.plan, backupPlan);
       expect(a.android.days[dateKey(add(today, -40))], {K.steps: 4000, K.sleepMin: 400}, reason: 'τίποτα δεν σβήνεται από την επαναφορά');
-      // Κινητό με νεότερο σχέδιο (ορίστηκε μετά το αντίγραφο): δεν αλλάζει.
+      // Κινητό με νεότερο σχέδιο (ορίστηκε μετά το αντίγραφο) που ΑΛΛΑΖΕΙ κάτι μέσα στο διάστημα του αντιγράφου (εδώ:
+      // αποσύνδεση του Oura στις −5): δεν αλλάζει, ούτε το αρχείο του.
+      final off = backupPlan.withEra(Source.none, add(today, -5));
+      final c = app(plan: null, planFile: MemoryPlanFile(encodePlanFile(off, today, at: 5000)));
+      await boot(c.store);
+      expect(await c.store.restoreSources((plan: file, log: null)), isFalse);
+      expect(c.store.plan, off);
+      expect(decodePlanFile(c.planFile.content), off);
+      // Round 1 (f3 · S9-7): νεότερο σχέδιο που ΑΡΧΙΖΕΙ μετά από όλες τις εποχές του αντιγράφου (νέο κινητό: «Σύνδεση με
+      // Oura» στις −5, μετά επαναφορά): για το παρελθόν δεν λέει τίποτα, άρα έρχεται από το αντίγραφο (Oura από −20)·
+      // το παρόν του κινητού μένει (Oura από −5, χωρίς νέα «αλλαγή πηγής» αφού είναι το ίδιο δαχτυλίδι) και η ώρα του
+      // σχεδίου μένει του κινητού (5000). Πριν το S9-7 οι νύχτες −20…−6 του Oura γίνονταν νύχτες ρολογιού.
       final newer = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -5));
       final b = app(plan: null, planFile: MemoryPlanFile(encodePlanFile(newer, today, at: 5000)));
       await boot(b.store);
-      expect(await b.store.restoreSources((plan: file, log: null)), isFalse);
-      expect(b.store.plan, newer);
+      expect(await b.store.restoreSources((plan: file, log: null)), isTrue);
+      expect(b.store.plan, backupPlan);
+      expect(b.store.plan.nightSource(add(today, -10)), Source.oura);
+      expect(b.store.plan.nightSource(add(today, -5)), Source.oura);
+      expect(b.store.plan.nightSource(add(today, -21)), Source.watch);
+      expect((jsonDecode(b.planFile.content!) as Map)['at'], 5000);
     });
 });
 

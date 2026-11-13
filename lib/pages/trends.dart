@@ -45,11 +45,15 @@ class _TrendsPageState extends State<TrendsPage> {
           onChanged: (p) => setState(() => _period = p),
         );
 
-        final progress = store.backfillVisible || store.rereading || store.prefs.staleMonths.isNotEmpty
+        // Round 1 (S10-10): η γραμμή που κινείται και το «Φέρνω…» μόνο όσο ΠΡΑΓΜΑΤΙΚΑ διαβάζεται κάτι· με μόνο τη
+        // σημείωση για τους μήνες με τον παλιό ορισμό, κάρτα χωρίς κίνηση (πριν: γραμμή χωρίς τέλος σε κάθε άνοιγμα).
+        final reading = store.backfillVisible || store.rereading;
+        final progress = reading || store.prefs.staleMonths.isNotEmpty
             ? _BackfillCard(
                 reached: store.backfillReached,
                 rereadFrom: store.rereadBoundary,
                 stale: store.prefs.staleMonths,
+                reading: reading,
               )
             : null;
 
@@ -68,6 +72,9 @@ class _TrendsPageState extends State<TrendsPage> {
                 // Έλεγχος 9/11 (V-B-01): και όσα δεν είχαν αρκετές ανεξάρτητες μέρες δεν συγκρίθηκαν πραγματικά.
                 nothingCompared: results.every(
                     (r) => r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange || r.inconclusive),
+                // Round 1 (S4-1): με «Λίγες … για συμπέρασμα» σε κάποια γραμμή, δεν λέμε ότι «ό,τι αλλάζει είναι μέσα στις
+                // διακυμάνσεις σου» (εκεί δεν φάνηκε αν άλλαξε).
+                someInconclusive: results.any((r) => r.inconclusive),
               );
 
         Widget section(TrendSection s) => _SectionCard(
@@ -77,14 +84,21 @@ class _TrendsPageState extends State<TrendsPage> {
               onToggle: _toggle,
             );
 
-        final left = <Widget>[
-          selector,
-          if (progress != null) progress,
+        // Round 1 (U1b-14): στο ανοιχτό Fold ο επιλογέας περιόδου (για όλη τη σελίδα) και η πρόοδος σε όλο το πλάτος, και
+        // οι στήλες πιο ισορροπημένες· στο κινητό η ίδια σειρά με πριν.
+        final top = <Widget>[selector, if (progress != null) progress];
+        final left = <Widget>[summary, section(TrendSection.sleep)];
+        final right = <Widget>[
+          section(TrendSection.heart),
+          section(TrendSection.body),
+          section(TrendSection.move),
+          section(TrendSection.other),
+        ];
+        final single = <Widget>[
+          ...top,
           summary,
           section(TrendSection.heart),
           section(TrendSection.sleep),
-        ];
-        final right = <Widget>[
           section(TrendSection.body),
           section(TrendSection.move),
           section(TrendSection.other),
@@ -108,8 +122,10 @@ class _TrendsPageState extends State<TrendsPage> {
           title: 'Τάσεις',
           subtitle: 'Συγκρίνω ${periodExplanation(_period)}. Κάθε τιμή είναι η μεσαία της περιόδου.',
           onRefresh: () => store.refresh(),
+          top: top,
           left: left,
           right: right,
+          single: single,
         );
       },
     );
@@ -138,7 +154,10 @@ class _PeriodSelector extends StatelessWidget {
 }
 
 class _BackfillCard extends StatelessWidget {
-  const _BackfillCard({required this.reached, this.rereadFrom, this.stale = const []});
+  const _BackfillCard({required this.reached, this.rereadFrom, this.stale = const [], this.reading = true});
+
+  /// Round 1 (S10-10): διαβάζεται τώρα ιστορικό (συμπλήρωση ή επανανάγνωση). false: μόνο η σημείωση για τους μήνες.
+  final bool reading;
 
   /// Ως πού έχει φτάσει (null = μόλις ξεκίνησε).
   final DateTime? reached;
@@ -153,6 +172,19 @@ class _BackfillCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final r = reached;
+    if (!reading) {
+      return AppCard(
+        key: const ValueKey('trends-stale-months'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CardHeader(icon: Icons.history_rounded, title: 'Μήνες με παλιό υπολογισμό ύπνου', color: c.primary),
+            const SizedBox(height: 10),
+            Text(staleMonthsNote(stale), style: TextStyle(color: c.text, fontSize: 13, height: 1.4)),
+          ],
+        ),
+      );
+    }
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -195,12 +227,15 @@ class _BackfillCard extends StatelessWidget {
 
 /// Η περίληψη: μόνο ό,τι άλλαξε πραγματικά, το πιο ξεκάθαρο πρώτο.
 class _ChangedCard extends StatelessWidget {
-  const _ChangedCard({required this.changed, required this.period, this.nothingCompared = false});
+  const _ChangedCard({required this.changed, required this.period, this.nothingCompared = false, this.someInconclusive = false});
   final List<TrendResult> changed;
   final TrendPeriod period;
 
   /// Καμία μέτρηση δεν είχε αρκετές μέρες για σύγκριση (όλες «Λίγα δεδομένα» ή αλλαγή πηγής).
   final bool nothingCompared;
+
+  /// Round 1 (S4-1): κάποια γραμμή γράφει «Λίγες … για συμπέρασμα».
+  final bool someInconclusive;
 
   @override
   Widget build(BuildContext context) {
@@ -217,9 +252,11 @@ class _ChangedCard extends StatelessWidget {
               child: Text(
                 nothingCompared
                     ? noComparisonText(period)
-                    // Κλινικός έλεγχος M7 (4/11): όχι «ουσιαστικά», που διαβάζεται ως «κλινικά».
-                    : 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
-                        'διακυμάνσεις σου. Αυτό δεν είναι ιατρικός έλεγχος.',
+                    : someInconclusive
+                        ? someInconclusiveText
+                        // Κλινικός έλεγχος M7 (4/11): όχι «ουσιαστικά», που διαβάζεται ως «κλινικά».
+                        : 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
+                            'διακυμάνσεις σου. Αυτό δεν είναι ιατρικός έλεγχος.',
                 style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
               ),
             )
@@ -332,40 +369,47 @@ class _MetricRow extends StatelessWidget {
           key: ValueKey('trend-${r.def.key}'),
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
+          // Round 1 (U1b-15): το όνομα σε δική του γραμμή, σε όλο το πλάτος (πριν μοιραζόταν τη γραμμή με το «χάπι» και
+          // έσπαγε σε «… στον / ύπνο»)· από κάτω η τιμή αριστερά, το «χάπι» και το βελάκι δεξιά.
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, color: c.textSecondary)),
-                      const SizedBox(height: 2),
-                      Text(
-                        value,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
-                          fontFeatures: tabular,
-                        ),
+                Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, color: c.textSecondary)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            value,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
+                              fontFeatures: tabular,
+                            ),
+                          ),
+                          if (relative)
+                            Text(
+                              'σε σχέση με πριν · όχι θερμοκρασία σώματος',
+                              style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                            ),
+                        ],
                       ),
-                      if (relative)
-                        Text(
-                          'σε σχέση με πριν · όχι θερμοκρασία σώματος',
-                          style: TextStyle(fontSize: 12.5, color: c.textTertiary),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TrendStatusPill(r: r),
-                const SizedBox(width: 4),
-                Icon(
-                  expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                  size: 20,
-                  color: c.textTertiary,
+                    ),
+                    const SizedBox(width: 8),
+                    TrendStatusPill(r: r),
+                    const SizedBox(width: 4),
+                    Icon(
+                      expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      size: 20,
+                      color: c.textTertiary,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -410,11 +454,18 @@ class _MetricDetail extends StatelessWidget {
               format: relative ? (v) => signedDec(v, def.digits) : _axisFormat(def),
               minRange: _minRange(def),
               dateLabel: dayMonth,
+              // Round 1 (U1b-09, αίτημα f9 → f4): διάρκειες σε λεπτά με βήματα τέταρτα/μισάωρα/ώρες («6:00 · 7:00»), όχι
+              // 1/2/5 × 10ⁿ λεπτά («3:20 · 6:40»).
+              tickSteps: def.kind == ValueKind.duration ? minuteTickSteps : null,
               levels: [
                 if (r.previous != null) (r.previousFrom, r.previousEnd, rel(r.previous!), c.textSecondary),
                 if (r.current != null && r.status != TrendStatus.sourceChange) (r.currentFrom, r.end, rel(r.current!), c.text),
               ],
             ),
+            if (def.kind != ValueKind.number) ...[
+              const SizedBox(height: 4),
+              Text('Άξονας: ώρες:λεπτά', style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+            ],
             const SizedBox(height: 10),
           ],
           if (r.status == TrendStatus.sourceChange) ...[
@@ -547,9 +598,10 @@ String _explain(TrendResult r) {
 
 String Function(double) _axisFormat(MetricDef def) => switch (def.kind) {
       ValueKind.clock => clockFromSix,
+      // Round 1 (U1b-04): άξονας διάρκειας πάντα «ώρες:λεπτά» (με λεζάντα κάτω από το γράφημα), ποτέ «12′».
       ValueKind.duration => (v) {
           final m = v.round();
-          return m >= 60 ? '${m ~/ 60}:${two(m % 60)}' : '$m′';
+          return '${m ~/ 60}:${two(m % 60)}';
         },
       ValueKind.number => (v) => dec(v, def.digits),
     };
@@ -591,6 +643,11 @@ String relativeTempText(TrendResult r) => r.current == null ||
         r.status == TrendStatus.sourceChange
     ? '—'
     : '${signedDec(shownDiff(r.current!, r.previous!, r.def.digits), r.def.digits)} ${r.def.unit}';
+
+/// Round 1 (S4-1): τίποτα δεν «άλλαξε», αλλά κάποια γραμμή δεν είχε αρκετές ανεξάρτητες μετρήσεις: όχι «ό,τι αλλάζει είναι
+/// μέσα στις διακυμάνσεις σου» (για εκείνες τις γραμμές δεν φάνηκε).
+const someInconclusiveText = 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει «Λίγες μέρες για συμπέρασμα» ή «Λίγες '
+    'ζυγίσεις για συμπέρασμα», οι μετρήσεις δεν φτάνουν για να φανεί αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.';
 
 /// UX U2: κανένας δείκτης δεν είχε αρκετές μετρήσεις και στις δύο περιόδους.
 String noComparisonText(TrendPeriod p) => switch (p) {

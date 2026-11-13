@@ -448,6 +448,21 @@ bool sleepReadFailed(Map<String, dynamic> r) => sleepReadKeys.any((k) => _failed
 /// Το ίδιο όταν απέτυχαν οι ασκήσεις: χωρίς αυτές οι παλμοί της άσκησης θα μετρούσαν ως «ξύπνιος» (έλεγχος 8/11, DATA-06).
 bool heartReadFailed(Map<String, dynamic> r) => _failed(r, 'heart') || _failed(r, 'exercise');
 
+/// Round 1 (S3-1, ΚΡΙΣΙΜΟ): οι τιμές του ιστορικού που ΔΕΝ αλλάζουν σε αυτή την ανάγνωση, επειδή το είδος από το οποίο
+/// βγαίνουν δεν διαβάστηκε. «Δεν διαβάστηκε» = το κλειδί ΛΕΙΠΕΙ από την απάντηση της γέφυρας (η άδειά του στη Samsung
+/// Health είναι κλειστή: το DashboardReader δεν το βάζει καθόλου) ή γύρισε σφάλμα. Ποτέ «δεν υπάρχουν δεδομένα»: αυτό
+/// είναι μόνο η άδεια λίστα. Πριν, μία κλειστή άδεια (π.χ. «Παλμοί») έσβηνε σιωπηλά τους αποθηκευμένους παλμούς ύπνου
+/// 30 ημερών, και όλου του ιστορικού σε μια επανανάγνωση.
+/// - παλμοί («heart»): όλες οι τιμές από παλμούς ([heartKeys])· μόνο ασκήσεις («exercise»): οι παλμοί της μέρας
+///   ([dayHeartKeys], χωρίς τις ασκήσεις ο ορισμός τους αλλάζει, DATA-06),
+/// - οξυγόνο («spo2»): [spo2Keys], - θερμοκρασία δέρματος («skinTemp»): [K.skinTemp].
+/// Ο ίδιος ο ύπνος («sleep») έχει τον δικό του κανόνα ([Dashboard.sleepOk]: χωρίς λίστα δεν αντικαθίσταται τίποτα).
+Set<String> notReadKeys(Map<String, dynamic> r) => {
+      if (r['heart'] is! List) ...heartKeys else if (r['exercise'] is! List) ...dayHeartKeys,
+      if (r['spo2'] is! List) ...spo2Keys,
+      if (r['skinTemp'] is! List) K.skinTemp,
+    };
+
 /// «2026-10-24»
 String dateKey(DateTime d) => '${d.year}-${two(d.month)}-${two(d.day)}';
 
@@ -516,8 +531,10 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day,
       put(K.remPct, night.stagePct('REM'));
       put(K.awakeMin, night.stageMinutes['AWAKE'] ?? 0);
     }
-    put(K.bedtime, minutesFromSix(night.start));
-    put(K.wake, minutesFromSix(night.end));
+    // Round 1 (S3-8): η ώρα του τόπου όπου κοιμήθηκες (η ζώνη της ίδιας της εγγραφής, όταν η Samsung τη δίνει), όχι η
+    // ζώνη που έχει ΤΩΡΑ το κινητό: αλλιώς μια ανάγνωση σε ταξίδι ξανάγραφε 30 νύχτες δύο ώρες νωρίτερα.
+    put(K.bedtime, minutesFromSix(wallClock(night.start.millisecondsSinceEpoch, night.startOff)));
+    put(K.wake, minutesFromSix(wallClock(night.end.millisecondsSinceEpoch, night.endOff)));
     put(K.sleepHr, night.sleepingHr);
     put(K.spo2Avg, night.spo2Avg);
     put(K.spo2Min, night.spo2Min);
@@ -530,7 +547,12 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day,
   // αρχίζει το βράδυ), όχι από το «αν συνδέθηκε ποτέ το Oura». Με το ρολόι και στις δύο: όπως πάντα.
   final next = DateTime(day.year, day.month, day.day + 1);
   final planned = p.nightSource(day) != Source.watch || p.nightSource(next) != Source.watch;
-  final h = planned ? _heartWithPlan(d, day, p, windows, appRanges) : d.heartForDay(day, appRanges: appRanges);
+  // Round 1 (S3-7): χωρίς διαβασμένο ύπνο του ρολογιού (σφάλμα ή κλειστή άδεια) δεν βγαίνουν παλμοί μέρας: αλλιώς η
+  // νύχτα θα μετρούσε ως «ξύπνιος» και ως «ηρεμία», και οι χαμηλότερες αυτές τιμές θα έγραφαν πάνω στις σωστές. Το
+  // [_heartWithPlan] έχει τον ίδιο έλεγχο· οι αποθηκευμένες τιμές μένουν (δεν είναι τιμές ύπνου, δεν σβήνονται).
+  final h = planned
+      ? _heartWithPlan(d, day, p, windows, appRanges)
+      : (d.sleepOk ? d.heartForDay(day, appRanges: appRanges) : null);
   if (h != null) {
     // Υπολογίζονται και κρατιούνται (για αργότερα), αλλά δεν φαίνονται πια: δικοί μας ορισμοί χωρίς επαλήθευση.
     put(K.restHr, h.resting.value);

@@ -26,7 +26,7 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
           final c = pendingFor(store, food, now);
           if (c == null) return const SizedBox.shrink(key: ValueKey('today-checkin-none'));
           return Padding(
-            padding: const EdgeInsets.only(top: PageFrame.gap),
+            padding: const EdgeInsets.only(bottom: PageFrame.gap),
             child: CheckInCard(check: c, store: store, now: now),
           );
         },
@@ -36,10 +36,24 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
     final g = store.goals;
     final d = store.data;
     if (g == null || d == null || !food.loaded) return null;
+    // Round 1 (f3 · S1-10): όσο φαίνεται το αντίγραφο του παρασκηνίου ([Dashboard.background]: όχι πλήρης ανάγνωση·
+    // από παλιότερη έκδοση, ζυγίσεις μόνο 30 ημερών) η κάρτα περιμένει την πλήρη ανάγνωση της εφαρμογής. Πριν, στο
+    // άνοιγμα έβγαινε από μέρος των ζυγίσεων και μπορούσε να δείξει άλλη πρόταση από αυτήν λίγα δευτερόλεπτα μετά.
+    if (d.background) return null;
+    // Round 1 (f1 · S11-2): ζύγιση που δεν μπορεί να είναι δική σου δεν μπαίνει στον έλεγχο· η κάρτα τη γράφει.
+    // Round 1 (f1 · S11-8): αν οι ζυγίσεις δεν διαβάστηκαν τώρα, η κάρτα δεν γράφει «έγιναν 0 ζυγίσεις» και το
+    // «Εντάξει» δεν ξοδεύει τον έλεγχο της εβδομάδας: τη μέρα ελέγχου λέει ότι δεν διαβάστηκαν, χωρίς κουμπί.
+    // Χωρίς ζυγίσεις στην ανάγνωση και χωρίς σφάλμα (δεν δόθηκε άδεια): καμία κάρτα· ο έλεγχος μένει ανοιχτός ως να
+    // διαβαστούν (πριν: «έγιναν 0 ζυγίσεις» και το «Εντάξει» ξόδευε τον έλεγχο).
+    final bodyFailed = d.failed.contains('body');
+    if (!d.bodyOk && !bodyFailed) return null;
+    final w = guardedWeights(d.body);
     return pendingCheckIn(
       goals: g,
       today: now,
-      weights: dailyWeights(d.body),
+      weights: w.used,
+      foreign: w.foreign,
+      weightsRead: d.bodyOk && !bodyFailed,
       intake: (from, to) => dailyIntake(food, from, to),
     );
   }
@@ -47,6 +61,52 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
 
 String _kcal(num v) => thousands((v / 10).round() * 10);
 String _signed(int v) => v == 0 ? '0' : '${v > 0 ? '+' : '−'}${thousands(v.abs())}';
+
+/// «1,3%» για την απώλεια την εβδομάδα. Κοντά στο όριο γράφει δύο δεκαδικά («1,02%»), ώστε να μη διαβάζεται «1,0% …
+/// πάνω από 1%» (έλεγχος 13/11, S1-14).
+String lossPctText(double pct) {
+  final one = dec(pct);
+  if (one != '1,0') return '$one%';
+  final two = dec(pct, 2);
+  return two == '1,00' ? 'λίγο πάνω από 1%' : '$two%';
+}
+
+/// «Η ζύγιση Τετ 9/12 (45,0 kg) διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.» (S11-2)
+String foreignWeighText(List<(DateTime, double)> foreign) {
+  final items = [for (final (d, kg) in foreign) '${shortDayDate(d)} (${dec(kg)} kg)'].join(' · ');
+  return foreign.length == 1
+      ? 'Η ζύγιση $items διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.'
+      : 'Οι ζυγίσεις $items διαφέρουν πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησαν.';
+}
+
+/// «Η μέρα Τετ 2/12 (19.710 kcal) έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε. …» (S11-3)
+String absurdDaysText(List<(DateTime, double)> days) {
+  final items = [for (final (d, kcal) in days) '${shortDayDate(d)} (${thousands(kcal)} kcal)'].join(' · ');
+  return days.length == 1
+      ? 'Η μέρα $items έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε. Αν είναι λάθος ποσότητα, διόρθωσέ τη στη Διατροφή.'
+      : 'Οι μέρες $items έχουν πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησαν. Αν είναι λάθος ποσότητες, διόρθωσέ τες '
+          'στη Διατροφή.';
+}
+
+/// Το κείμενο της κάρτας «λίγα δεδομένα» (έλεγχος 13/11: S1-14, S11-9, U3b-4, U3b-16). Ενικός και πληθυντικός σωστά·
+/// όταν οι ζυγίσεις φτάνουν σε αριθμό αλλά είναι μαζεμένες σε λίγες μέρες, το λέει (πριν: «έγιναν 9· χρειάζονται 6»).
+String fewDataText(AdaptStatus? status, {required int days, required int weighs}) {
+  if (status == AdaptStatus.fewWeighIns) {
+    if (weighs >= adaptMinWeighIns) {
+      return 'Οι $weighs ζυγίσεις των 3 τελευταίων εβδομάδων είναι μαζεμένες σε λίγες μέρες· η πρώτη και η τελευταία πρέπει '
+          'να απέχουν τουλάχιστον 2 εβδομάδες.';
+    }
+    final had = weighs == 0
+        ? 'δεν έγινε καμία ζύγιση'
+        : (weighs == 1 ? 'έγινε 1 ζύγιση' : 'έγιναν $weighs ζυγίσεις');
+    return 'Στις 3 τελευταίες εβδομάδες $had· χρειάζονται τουλάχιστον $adaptMinWeighIns, απλωμένες σε τουλάχιστον 2 εβδομάδες.';
+  }
+  final had = days == 0
+      ? 'δεν μετρά καμία μέρα με φαγητό'
+      : (days == 1 ? 'μετρά 1 μέρα με φαγητό' : 'μετράνε $days μέρες με φαγητό');
+  return 'Στις 3 τελευταίες εβδομάδες $had· χρειάζονται τουλάχιστον $adaptMinIntakeDays. '
+      'Μέρες με λιγότερο από το 60% του στόχου δεν μετράνε: συνήθως κάτι δεν γράφτηκε.';
+}
 
 /// A1 (εβδομαδιαίος έλεγχος) και A3 (γρήγορη απώλεια).
 class CheckInCard extends StatelessWidget {
@@ -68,30 +128,33 @@ class CheckInCard extends StatelessWidget {
     final bold = TextStyle(fontWeight: FontWeight.w700, color: c.text);
     final small = TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary);
 
+    final next = 'Ξανά ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday.';
+    // Έλεγχος 13/11 (S1-12): όχι «πιο γρήγορα από το ασφαλές». Το Helms 2014 λέει 0,5–1% την εβδομάδα «για να κρατιούνται
+    // οι μύες», όχι ότι πιο γρήγορα είναι επικίνδυνο· ο τίτλος λέει μόνο αυτό που μετρήθηκε.
     final title = switch (k.kind) {
-      CheckKind.fast => 'Χάνεις πιο γρήγορα από το ασφαλές',
+      CheckKind.fast => 'Χάνεις πάνω από 1% του βάρους την εβδομάδα',
       CheckKind.fewData => 'Έλεγχος θερμίδων: λίγα δεδομένα',
       CheckKind.gathering => 'Έλεγχος θερμίδων: μαζεύω δεδομένα',
       CheckKind.implausible => 'Έλεγχος θερμίδων: κάτι λείπει',
+      CheckKind.gap => 'Έλεγχος θερμίδων: κενό στο φαγητό',
+      CheckKind.foreign => k.foreign.length == 1 ? 'Μια ζύγιση δεν μέτρησε' : 'Κάποιες ζυγίσεις δεν μέτρησαν',
+      CheckKind.unread => 'Έλεγχος θερμίδων: οι ζυγίσεις δεν διαβάστηκαν',
       _ => 'Έλεγχος θερμίδων · κάθε $weekday',
     };
 
     final Widget text = switch (k.kind) {
       CheckKind.proposal || CheckKind.same => Text.rich(TextSpan(style: body, children: [
-          TextSpan(text: 'Από ${k.est!.intakeDays} μέρες φαγητό και ${k.est!.weighIns} ζυγίσεις, '),
+          TextSpan(text: 'Από ${k.est!.intakeDays} μέρες με φαγητό και ${k.est!.weighIns} ζυγίσεις, '),
           TextSpan(text: 'καις περίπου ${_kcal(k.est!.tdee)} kcal', style: bold),
           // Συμβούλιο 2, Α1: «όχι Χ που υπολόγισε ο τύπος» μόνο όταν η διαφορά ξεπερνά το περιθώριο των ζυγίσεων.
+          // U3b-27: ο τύπος με τον ίδιο αριθμό που γράφουν ο οδηγός και το «Πώς υπολογίστηκε» (2.745, όχι 2.750).
           TextSpan(
               text: (k.est!.tdee - g.calc.tdee).abs() < 30
                   ? ' τη μέρα, όσο υπολόγισε και ο τύπος.'
                   : (k.est!.tdee - g.calc.tdee).abs() <= k.est!.guardKcal
-                      ? ' τη μέρα, κοντά στον τύπο (${_kcal(g.calc.tdee)}).'
-                      : ' τη μέρα, όχι ${_kcal(g.calc.tdee)} που υπολόγισε ο τύπος.'),
-          if (k.kind == CheckKind.same)
-            TextSpan(
-                text: p != null && p.withinNoise
-                    ? ' Η διαφορά από τον στόχο σου είναι μέσα στο φυσιολογικό εύρος των ζυγίσεων: μένει ίδιος.'
-                    : ' Ο στόχος σου ταιριάζει: μένει ίδιος.'),
+                      ? ' τη μέρα, κοντά στον τύπο (${thousands(g.calc.tdee)}).'
+                      : ' τη μέρα, όχι ${thousands(g.calc.tdee)} που υπολόγισε ο τύπος.'),
+          if (k.kind == CheckKind.same) TextSpan(text: _sameText(k)),
         ])),
       // Συμβούλιο 2, Α2: την 21η μέρα δεν βγαίνει ακόμα εκτίμηση, γιατί η πρώτη εβδομάδα δεν μετρά.
       CheckKind.gathering => Text(
@@ -99,28 +162,41 @@ class CheckInCard extends StatelessWidget {
           'Η πρώτη εκτίμηση βγαίνει ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday, με 3 εβδομάδες δεδομένα. '
           'Ο στόχος μένει ίδιος.',
           style: body),
-      CheckKind.fewData => Text(
-          [
-            k.status == AdaptStatus.fewWeighIns
-                ? 'Στις 3 τελευταίες εβδομάδες έγιναν ${k.weighs} ζυγίσεις· χρειάζονται τουλάχιστον $adaptMinWeighIns, σε 2 εβδομάδες.'
-                : 'Στις 3 τελευταίες εβδομάδες μετράνε ${k.days} μέρες φαγητό· χρειάζονται τουλάχιστον $adaptMinIntakeDays. '
-                    'Μέρες με λιγότερο από το 60% του στόχου δεν μετράνε: συνήθως κάτι δεν γράφτηκε.',
-            'Ο στόχος μένει ίδιος. Ξανά ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday.',
-          ].join(' '),
+      CheckKind.fewData =>
+        Text('${fewDataText(k.status, days: k.days, weighs: k.weighs)} Ο στόχος μένει ίδιος. $next', style: body),
+      // Έλεγχος 13/11 (S1-1): κενό καταγραφής. Ο μέσος όρος φαγητού βγαίνει μόνο από τις γραμμένες μέρες και η αλλαγή
+      // βάρους από όλες· με μέρες στη σειρά χωρίς φαγητό η εκτίμηση δεν είναι σωστή, άρα δεν βγαίνει.
+      CheckKind.gap => Text(_gapText(k, next), style: body),
+      CheckKind.foreign => Text(
+          '${foreignWeighText(k.foreign)} Δεν μπήκε στον έλεγχο θερμίδων. Αν δεν είναι δική σου, δεν χρειάζεται να κάνεις '
+          'τίποτα. Αν είναι δική σου, θα μετρήσει μόλις συμφωνήσουν μαζί της και οι επόμενες ζυγίσεις.',
+          style: body),
+      CheckKind.unread => Text(
+          'Η Samsung Health δεν έδωσε τώρα τις ζυγίσεις σου, άρα ο έλεγχος δεν μπορεί να γίνει. Τράβηξε τη Σήμερα προς τα '
+          'κάτω για νέα ανάγνωση: η κάρτα θα βγει μόλις διαβαστούν. Ο στόχος μένει ίδιος.',
           style: body),
       CheckKind.implausible => Text(
-          'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)} kcal, πολύ μακριά από τον τύπο (${_kcal(g.calc.tdee)}). '
+          'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)} kcal, πολύ μακριά από τον τύπο (${thousands(g.calc.tdee)}). '
           'Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Ο στόχος μένει ίδιος.',
           style: body),
       CheckKind.fast => Text.rich(TextSpan(style: body, children: [
           TextSpan(text: '${fastPeriodText(k.fastDays)}: '),
+          // Δύο δεκαδικά στα kg, ώστε το ποσοστό δίπλα να βγαίνει από τον αριθμό που φαίνεται (U3b-6).
           TextSpan(
-              text: '−${dec((k.fastSlope ?? 0).abs())} kg την εβδομάδα'
-                  '${k.kgNow == null || k.fastSlope == null ? '' : ' (${dec((k.fastSlope!.abs() / k.kgNow! * 100))}% του βάρους)'}',
+              text: '−${dec((k.fastSlope ?? 0).abs(), 2)} kg την εβδομάδα'
+                  '${k.kgNow == null || k.fastSlope == null ? '' : ' (${lossPctText(k.fastSlope!.abs() / k.kgNow! * 100)} του βάρους)'}',
               style: bold),
-          const TextSpan(text: '. Πάνω από 1% την εβδομάδα χάνονται και μύες.'),
+          const TextSpan(text: '. Πάνω από 1% την εβδομάδα γίνεται πιο δύσκολο να κρατήσεις τους μύες.'),
+          // Έλεγχος 13/11 (S1-2): χωρίς πρόταση, γιατί το ημερολόγιο δείχνει ότι τρως πολύ κάτω από τον στόχο (ή δεν
+          // δείχνει πόσο τρως). Τότε δεν φταίει ο στόχος: ανεβάζοντάς τον δεν αλλάζει τίποτα.
+          if (p == null) TextSpan(text: _fastNoProposalText(k)),
         ])),
     };
+    // Ό,τι δεν μέτρησε γράφεται κάτω από το κείμενο της κάρτας, με απλά λόγια (S11-2, S11-3).
+    final notes = [
+      if (k.kind != CheckKind.foreign && k.foreign.isNotEmpty) foreignWeighText(k.foreign),
+      if (k.absurd.isNotEmpty) absurdDaysText(k.absurd),
+    ];
 
     final hasProposal = (k.kind == CheckKind.proposal || k.kind == CheckKind.fast) && p != null;
     final apply = FilledButton(
@@ -139,18 +215,20 @@ class CheckInCard extends StatelessWidget {
       child: const Text('Όχι τώρα', softWrap: false),
     );
     // Με μεγάλα γράμματα σε στενή οθόνη τα κουμπιά πάνε το ένα κάτω από το άλλο (ποτέ «Εφάρμοσ/ε»).
-    final buttons = hasProposal
-        ? LayoutBuilder(
-            builder: (context, box) => box.maxWidth / MediaQuery.textScalerOf(context).scale(1) < 250
-                ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [apply, const SizedBox(height: 8), later])
-                : Row(children: [Expanded(child: apply), const SizedBox(width: 10), Expanded(child: later)]),
-          )
-        : OutlinedButton(
-            key: const ValueKey('checkin-ok'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.text),
-            onPressed: () => store.setGoals(dismissCheckIn(k, now)),
-            child: const Text('Εντάξει'),
-          );
+    final Widget? buttons = k.kind == CheckKind.unread
+        ? null
+        : hasProposal
+            ? LayoutBuilder(
+                builder: (context, box) => box.maxWidth / MediaQuery.textScalerOf(context).scale(1) < 250
+                    ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [apply, const SizedBox(height: 8), later])
+                    : Row(children: [Expanded(child: apply), const SizedBox(width: 10), Expanded(child: later)]),
+              )
+            : OutlinedButton(
+                key: const ValueKey('checkin-ok'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.text),
+                onPressed: () => store.setGoals(dismissCheckIn(k, now)),
+                child: const Text('Εντάξει'),
+              );
 
     return Container(
       key: const ValueKey('today-checkin'),
@@ -168,18 +246,20 @@ class CheckInCard extends StatelessWidget {
         ]),
         const SizedBox(height: 10),
         text,
+        for (final note in notes)
+          Padding(padding: const EdgeInsets.only(top: 8), child: Text(note, style: small)),
         if (hasProposal) ...[
           const SizedBox(height: 12),
+          // Η μονάδα μένει δίπλα στον αριθμό και όταν η γραμμή σπάει (U3b-7): «Νέος στόχος 2.100 kcal» / «−150 από 2.250».
           Wrap(crossAxisAlignment: WrapCrossAlignment.end, spacing: 10, runSpacing: 4, children: [
             Text(k.kind == CheckKind.fast ? 'Πρόταση' : 'Νέος στόχος', style: small),
-            BigValue(thousands(p.target), key: const ValueKey('checkin-target'), size: 34),
-            Text('kcal · ${_signed(p.change)} από ${thousands(p.current)}', style: small),
+            BigValue(thousands(p.target), unit: 'kcal', key: const ValueKey('checkin-target'), size: 34),
+            Text('${_signed(p.change)} από ${thousands(p.current)}', style: small),
           ]),
           if (g.kcalSet != null) Text('Αντικαθιστά τον δικό σου στόχο (${thousands(g.kcalSet!)}).', style: small),
           if (p.floored) Text('Δεν κατεβαίνει κάτω από το όριο ασφαλείας.', style: small),
         ],
-        const SizedBox(height: 14),
-        buttons,
+        if (buttons != null) ...[const SizedBox(height: 14), buttons],
         if (k.kind == CheckKind.proposal || k.kind == CheckKind.same)
           TextButton(
             key: const ValueKey('checkin-how'),
@@ -190,6 +270,60 @@ class CheckInCard extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// Το τέλος του κειμένου όταν ο στόχος μένει ίδιος: γιατί μένει.
+String _sameText(CheckIn k) {
+  final p = k.proposal, e = k.est;
+  if (k.tooFast) {
+    // S1-3: ο στόχος δεν κατεβαίνει όσο χάνεις πάνω από 1% την εβδομάδα. Αν το ημερολόγιο δείχνει και γιατί, το λέει.
+    const fast = ' Χάνεις όμως πάνω από 1% του βάρους την εβδομάδα: ο στόχος δεν κατεβαίνει όσο χάνεις τόσο γρήγορα.';
+    if (p == null || e == null) return fast;
+    final eaten = (e.meanIntake / 10).round() * 10;
+    final under = p.current - eaten;
+    if (under <= adaptMaxStep) return fast;
+    return '$fast Τρως κατά μέσο όρο ${thousands(eaten)} kcal, ${thousands(under)} λιγότερες από τον στόχο σου: φάε πιο '
+        'κοντά στον στόχο.';
+  }
+  final held = k.heldDays;
+  if (held != null) {
+    // S1-4: όχι δεύτερη αλλαγή μέσα σε λίγες μέρες.
+    final ago = held <= 0 ? 'σήμερα' : (held == 1 ? 'χθες' : 'πριν από $held μέρες');
+    return ' Ο στόχος άλλαξε $ago: δεν αλλάζει ξανά τόσο σύντομα. Ο επόμενος έλεγχος συνεχίζει.';
+  }
+  if (p != null && p.withinNoise) {
+    return ' Η διαφορά από τον στόχο σου είναι μέσα στο φυσιολογικό εύρος των ζυγίσεων: μένει ίδιος.';
+  }
+  return ' Ο στόχος σου ταιριάζει: μένει ίδιος.';
+}
+
+/// Γρήγορη απώλεια χωρίς πρόταση (S1-2): τι δείχνει το ημερολόγιο φαγητού.
+String _fastNoProposalText(CheckIn k) {
+  final g = k.goals;
+  final mean = k.fastIntake;
+  if (mean == null) {
+    return ' Δεν έχει γραφτεί αρκετό φαγητό αυτές τις μέρες για να φανεί πόσο τρως. Αν τρως λιγότερο από τον στόχο σου '
+        '(${thousands(g.kcal)} kcal), φάε πιο κοντά σε αυτόν. Ο στόχος μένει ίδιος.';
+  }
+  final eaten = (mean / 10).round() * 10;
+  return ' Στο ημερολόγιο φαγητού γράφτηκαν κατά μέσο όρο ${thousands(eaten)} kcal τη μέρα, ${thousands(g.kcal - eaten)} '
+      'λιγότερες από τον στόχο σου (${thousands(g.kcal)}). Αν τα έγραψες όλα, τρως πολύ λίγο: φάε πιο κοντά στον στόχο. '
+      'Ο στόχος μένει ίδιος.';
+}
+
+/// Κενό καταγραφής (S1-1): ανοιχτό ακόμα, ή κλειστό με την εκτίμηση να ξαναρχίζει.
+String _gapText(CheckIn k, String next) {
+  final gap = k.gap;
+  if (gap == null) return 'Λείπουν μέρες φαγητού στη σειρά, άρα η εκτίμηση δεν θα ήταν σωστή. Ο στόχος μένει ίδιος. $next';
+  final restart = gap.restart;
+  if (restart == null) {
+    final n = daysBetween(gap.from, gap.to) + 1;
+    return 'Από ${dayMonth(gap.from)} δεν έχει γραφτεί φαγητό που να μετρά (${countText(n, 'μέρα', 'μέρες')} στη σειρά). Με '
+        'τέτοιο κενό η εκτίμηση δεν θα ήταν σωστή, άρα δεν βγαίνει. Ο στόχος μένει ίδιος. $next';
+  }
+  return 'Από ${dayMonth(gap.from)} ως ${dayMonth(gap.to)} δεν γράφτηκε φαγητό που να μετρά. Με τέτοιο κενό η εκτίμηση δεν θα '
+      'ήταν σωστή: ξαναρχίζει με τις μέρες από ${dayMonth(restart)} και μετά, και θέλει 3 εβδομάδες δεδομένα. Ο στόχος '
+      'μένει ίδιος. $next';
 }
 
 /// A2: «Πώς βγήκε ο νέος στόχος», βήμα βήμα, με τα δικά σου νούμερα.
@@ -208,14 +342,19 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
       final c = Aigaio.of(context);
       final small = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
       final slope = e.slopeKgWeek;
-      final missed = e.windowDays - e.intakeDays;
+      // Μέρες με πάρα πολλές θερμίδες (S11-3) γράφονται χωριστά από τις μέρες με λίγη ή καθόλου καταγραφή.
+      final tooMuch = k.absurd.length;
+      final missed = e.windowDays - e.intakeDays - tooMuch;
       // Το περιθώριο των ζυγίσεων (Συμβούλιο 2, Α1), στρογγυλεμένο στα 10· κάτω από 10 kcal δεν γράφεται.
       final guard = (e.guardKcal / 10).round() * 10;
       final kg = k.kgNow ?? g.kg;
       final delta = (kg * g.rate * kcalPerKg / 7).round();
       final wanted = k.wanted;
       final formula = g.calc.tdee;
-      final off = (e.tdee - formula).round();
+      final rawOff = e.tdee - formula;
+      // Η διαφορά που γράφεται είναι η διαφορά των δύο αριθμών όπως φαίνονται (εκτίμηση στα 10, τύπος όπως στο «Πώς
+      // υπολογίστηκε»): πριν «2.750» και «2.580» στην οθόνη και «έπεφτε 160 ψηλά» από κάτω (έλεγχος 13/11, U3b-5, U3b-27).
+      final off = (e.tdee / 10).round() * 10 - formula.round();
       Widget step(String label, String value, String note) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [InfoRow(label, value), Text(note, style: small)]),
@@ -228,21 +367,30 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
           const SizedBox(height: 4),
           Text('${dayMonth(e.from)} – ${dayMonth(e.to)} · ${e.windowDays} μέρες', style: small),
           const SizedBox(height: 10),
-          step('1 · Έφαγες κατά μέσο όρο', '${_kcal(e.meanIntake)} kcal',
-              'από ${e.intakeDays} μέρες${missed > 0 ? '· $missed μέρες με λίγη ή καθόλου καταγραφή δεν μέτρησαν' : ''}'),
-          step('2 · Το βάρος σου άλλαξε', '${slope < 0 ? '−' : (slope > 0 ? '+' : '')}${dec(slope.abs(), 2)} kg / εβδ.',
+          step(
+              '1 · Έφαγες κατά μέσο όρο',
+              '${_kcal(e.meanIntake)} kcal',
+              'από ${e.intakeDays} μέρες'
+                  '${missed > 0 ? '· ${countText(missed, 'μέρα', 'μέρες')} με λίγη ή καθόλου καταγραφή δεν ${missed == 1 ? 'μέτρησε' : 'μέτρησαν'}' : ''}'
+                  '${tooMuch > 0 ? '· ${countText(tooMuch, 'μέρα', 'μέρες')} με πάρα πολλές θερμίδες δεν ${tooMuch == 1 ? 'μέτρησε' : 'μέτρησαν'}' : ''}'),
+          step('2 · Αλλαγή βάρους την εβδομάδα', '${slope < 0 ? '−' : (slope > 0 ? '+' : '')}${dec(slope.abs(), 2)} kg',
               'ευθεία από ${e.weighIns} ζυγίσεις (τα νερά μιας μέρας τη μετακινούν λίγο)'),
           step('3 · Άρα καις', '≈ ${_kcal(e.tdee)} kcal',
               '${_kcal(e.meanIntake)} ${slope <= 0 ? '+' : '−'} ${dec(slope.abs(), 2)} × 7.700 ÷ 7'
                   '${guard >= 10 ? '. Οι ζυγίσεις αφήνουν περιθώριο ±${thousands(guard)} kcal' : ''}'),
           if (g.aim != GoalAim.keep)
-            step('4 · Για ${dec(kg * g.rate, 2)} kg την εβδομάδα', '${g.aim == GoalAim.lose ? '−' : '+'} ${thousands(delta)} kcal',
-                '${ratePctText(g.rate)} του βάρους σου × 7.700 ÷ 7'),
+            // Με το βάρος γραμμένο, ώστε ο αριθμός να ξαναβγαίνει από όσα φαίνονται (U3b-20): 0,5% × 89,2 × 7.700 ÷ 7 = 491.
+            step('4 · Για ${dec(kg * g.rate, 2)} kg την εβδομάδα', '${g.aim == GoalAim.lose ? '−' : '+'}${thousands(delta)} kcal',
+                '${ratePctText(g.rate)} × ${dec(kg)} kg × 7.700 ÷ 7'),
           const Hairline(vertical: 12),
           InfoRow(p.same ? 'Ο στόχος μένει' : 'Νέος στόχος', '${thousands(p.target)} kcal'),
           // Πρώτα το περιθώριο των ζυγίσεων (Συμβούλιο 2, Α1): αν ο στόχος έμεινε γι' αυτό, αυτός είναι ο λόγος που γράφεται.
           // Χωρίς αριθμό διαφοράς, ώστε να μη φανεί ποτέ στόχος κάτω από το όριο ασφαλείας (μ1).
-          if (p.withinNoise)
+          if (k.tooFast)
+            Text('Χάνεις πάνω από 1% του βάρους την εβδομάδα: ο στόχος δεν κατεβαίνει όσο χάνεις τόσο γρήγορα.', style: small)
+          else if (k.heldDays != null)
+            Text('Ο στόχος άλλαξε πριν από λίγες μέρες: δεν αλλάζει ξανά τόσο σύντομα.', style: small)
+          else if (p.withinNoise)
             Text(
                 'Η διαφορά από τον στόχο σου είναι μέσα στο φυσιολογικό εύρος των ζυγίσεων'
                 '${guard >= 10 ? ' (±${thousands(guard)} kcal)' : ''}: δεν αξίζει αλλαγή. Με περισσότερες ζυγίσεις το εύρος μικραίνει.',
@@ -264,9 +412,9 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
             decoration: BoxDecoration(color: c.tint(c.food), borderRadius: BorderRadius.circular(16)),
             child: Text(
               // «Έπεφτε Χ χαμηλά» μόνο όταν η διαφορά από τον τύπο ξεπερνά και το περιθώριο των ζυγίσεων (Α1).
-              off.abs() < 100 || off.abs() <= e.guardKcal
-                  ? 'Ο τύπος ήταν κοντά (${_kcal(formula)}). Η διαφορά είναι μέσα στο λάθος μιας εκτίμησης.'
-                  : 'Ο τύπος έλεγε ${_kcal(formula)}: έπεφτε ${thousands(((off.abs()) / 10).round() * 10)} kcal '
+              rawOff.abs() < 100 || rawOff.abs() <= e.guardKcal
+                  ? 'Ο τύπος ήταν κοντά (${thousands(formula)}). Η διαφορά είναι μέσα στο λάθος μιας εκτίμησης.'
+                  : 'Ο τύπος έλεγε ${thousands(formula)}: έπεφτε ${thousands(off.abs())} kcal '
                       '${off > 0 ? 'χαμηλά' : 'ψηλά'}. Γι’ αυτό μετράνε τα δικά σου δεδομένα.',
               style: TextStyle(fontSize: 14, height: 1.45, color: c.text),
             ),

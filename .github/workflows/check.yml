@@ -93,7 +93,15 @@ jobs:
             echo "::error title=Σφάλμα ελέγχων::$msg"
             exit 1
           fi
-          echo "::notice title=Έλεγχοι::$(grep -a 'All tests passed' tests.log | tail -1 | tr -cd '[:print:]' | tail -c 120)"
+          # Έλεγχος 13/11 (S12-17): «πράσινο» μόνο αν έτρεξαν πράγματι οι δοκιμές (ίδιο όριο με το android.yml). Η Flutter
+          # γράφει στο τέλος «N tests passed» (GitHub Actions) ή «+N: All tests passed!».
+          n=$(grep -aoE '[0-9]+ tests passed' tests.log | tail -1 | grep -oE '^[0-9]+' || true)
+          [ -n "$n" ] || n=$(grep -aoE '\+[0-9]+[^+]*All tests passed' tests.log | tail -1 | grep -oE '[0-9]+' | head -1 || true)
+          echo "::notice title=Έλεγχοι::${n:-0} δοκιμές Dart πέρασαν"
+          if [ "${n:-0}" -lt 950 ]; then
+            echo "::error title=Έλεγχοι::Έτρεξαν μόνο ${n:-0} δοκιμές Dart (κατώτατο 950). Λείπουν δοκιμές από το σύνολο;"
+            exit 1
+          fi
 
       - name: Χτίσιμο APK (release χωρίς κλειδί, μόνο για έλεγχο)
         run: |
@@ -121,6 +129,11 @@ jobs:
           n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
             | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
           echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
+          # Έλεγχος 13/11 (S12-17): «0 έλεγχοι εντάξει» δεν περνά πια (π.χ. αν το «flutter create» πάψει να βάζει το src/test).
+          if [ "${n:-0}" -lt 40 ]; then
+            echo "::error title=Έλεγχοι Kotlin::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin του κινητού (κατώτατο 40)"
+            exit 1
+          fi
 
       # Ρολόι (8/11): χωριστή εφαρμογή Wear OS στο android/wear. Μπαίνει στο settings μόνο εδώ, για να μην αγγίζει το χτίσιμο του κινητού.
       - name: Ρολόι (Wear OS) — έλεγχοι και χτίσιμο
@@ -133,6 +146,14 @@ jobs:
             [ -s ../errors.txt ] || tail -100 ../wear.log > ../errors.txt
             msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' ../errors.txt)
             echo "::error title=Ρολόι::$msg"
+            exit 1
+          fi
+          # Έλεγχος 13/11 (S12-17): κινητό + ρολόι μαζί (τα αποτελέσματα του κινητού υπάρχουν ήδη από το προηγούμενο βήμα).
+          n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
+            | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
+          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι κινητού και ρολογιού εντάξει"
+          if [ "${n:-0}" -lt 120 ]; then
+            echo "::error title=Ρολόι::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin (κινητό + ρολόι· κατώτατο 120). Έτρεξαν οι έλεγχοι του ρολογιού;"
             exit 1
           fi
           ls -l ../build/wear/outputs/apk/release/ || true

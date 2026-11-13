@@ -124,7 +124,7 @@ void main() {
       final t = nextTarget(item('db_press'), [(d, log('db_press', 9.3, [12, 12, 12], rir: 3, pain: ['shoulderR']))], now);
       expect(t.change, Change.pain);
       expect(t.load, 9.3);
-      expect(t.reason, contains('δεξί ώμο'));
+      expect(t.reason, contains('δεξιός ώμος'));
     });
 
     test('διάλειμμα πάνω από 2 εβδομάδες → περίπου 10% κάτω', () {
@@ -174,8 +174,13 @@ void main() {
       expect(t2.load, 16);
     });
 
-    test('σώμα: στο πάνω όριο → πιο δύσκολη παραλλαγή', () {
-      final t = nextTarget(item('pushup_bench', lo: 10, hi: 15, next: 'pushup_handles'), [(d, log('pushup_bench', null, [15, 15, 15], rir: 2, lo: 10, hi: 15))], now);
+    // Round 1 (f6a · S7-03): η παραλλαγή είναι μεγάλο σκαλί (πάτωμα ≈ +39% του βάρους που σηκώνεις, Ebben 2011)· πρώτα
+    // 5 επαναλήψεις πάνω από το εύρος (πριν: στο πάνω όριο, 15).
+    test('σώμα: 5 επαναλήψεις πάνω από το εύρος → πρόταση για πιο δύσκολη παραλλαγή', () {
+      final at15 = nextTarget(item('pushup_bench', lo: 10, hi: 15, next: 'pushup_handles'), [(d, log('pushup_bench', null, [15, 15, 15], rir: 2, lo: 10, hi: 15))], now);
+      expect(at15.change, Change.more);
+      expect(at15.reps, [16, 16, 16]);
+      final t = nextTarget(item('pushup_bench', lo: 10, hi: 15, next: 'pushup_handles'), [(d, log('pushup_bench', null, [20, 20, 20], rir: 2, lo: 10, hi: 15))], now);
       expect(t.change, Change.variant);
       expect(t.variant, 'pushup_handles');
     });

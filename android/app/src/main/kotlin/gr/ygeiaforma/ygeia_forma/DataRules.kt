@@ -277,6 +277,44 @@ object DataRules {
         return o.toString()
     }
 
+    /**
+     * Round 1 (S3-2 / S9-1): το prefs.json διαβάζεται ως ρυθμίσεις μόνο αν είναι αντικείμενο JSON. Άδειο αρχείο, κομμένο
+     * κείμενο, «[]» ή «null» = χαλασμένο: η Flutter τότε ΔΕΝ ξεκινά από προεπιλογές και δεν γράφει τίποτα από πάνω του
+     * (πριν: οι προεπιλογές έσβηναν στόχους, «Τα στοιχεία μου», ζώνη και μετρήσεις μέσης, χωρίς αντίγραφο).
+     */
+    fun prefsReadable(text: String): Boolean = parseObject(text) != null
+
+    /**
+     * Το χαλασμένο αρχείο ρυθμίσεων στην άκρη, ΜΟΝΟ όταν το ζητήσει ο χρήστης («Ξεκίνα με νέες ρυθμίσεις»): μετονομάζεται
+     * σε «prefs.json.bad» (ή «prefs.json.<ώρα>.bad» αν υπάρχει ήδη) και κρατιέται· ποτέ δεν σβήνεται και ποτέ δεν γράφεται
+     * από πάνω (όπως το HrFiles.setAside). Αρχείο που διαβάζεται κανονικά, ή που δεν μπόρεσε να διαβαστεί τώρα, ΔΕΝ
+     * μετακινείται (false). true όταν μετακινήθηκε ή όταν δεν υπάρχει αρχείο.
+     */
+    fun setAsideUnreadablePrefs(f: File, now: Long): Boolean {
+        if (!f.exists()) return true
+        val text = try {
+            f.readText()
+        } catch (_: Throwable) {
+            return false
+        }
+        if (prefsReadable(text)) return false
+        var bad = File(f.parentFile, "${f.name}.bad")
+        if (bad.exists()) bad = File(f.parentFile, "${f.name}.$now.bad")
+        return try {
+            f.renameTo(bad)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
+     * Round 1 (S3-8): η απόκλιση ζώνης μιας εγγραφής της Samsung σε λεπτά (π.χ. +120 για Αθήνα τον χειμώνα), όπως
+     * μπαίνει στο JSON («off»). null όταν η Samsung δεν τη δίνει ή είναι έξω από τα όρια ζωνών (±18 ώρες): τότε η
+     * Flutter χρησιμοποιεί τη ζώνη του κινητού, όπως πριν.
+     */
+    fun offsetMinutes(totalSeconds: Int?): Int? =
+        totalSeconds?.takeIf { it in -18 * 3600..18 * 3600 }?.let { it / 60 }
+
     private fun parseObject(json: String): JsonObject? = try {
         val e = JsonParser.parseString(json)
         if (e.isJsonObject) e.asJsonObject else null

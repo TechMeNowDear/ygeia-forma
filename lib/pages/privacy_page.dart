@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import '../data.dart';
 import '../error_report.dart';
 import '../format.dart' show upperGr;
+import '../nav.dart' show unknownRoute;
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -27,10 +28,34 @@ const wipeDeletes = <String>[
   'Ρυθμίσεις και η σύνδεση με το Oura',
 ];
 
-/// Τι ΔΕΝ σβήνεται, και πότε σβήνει το ρολόι. Μόνο ό,τι ισχύει (έλεγχος του fix-accuracy, M4/S5/N7).
-const wipeKeepsText = 'Μένουν: ό,τι έχουν το Samsung Health και το Oura στις δικές τους εφαρμογές, οι άδειες που έδωσες '
-    'στο Samsung Health, αρχεία που έβγαλες στις Λήψεις (αντίγραφα, PDF), το αντίγραφο της Google και η επιλογή για τις '
-    'αναφορές σφαλμάτων. Το ρολόι σβήνεται όταν ανοίξεις την εφαρμογή του (όχι στη μέση άσκησης).';
+/// Τι ΔΕΝ σβήνεται. Μόνο ό,τι ισχύει (έλεγχος του fix-accuracy, M4/S5/N7). Έλεγχος 13/11 (U4-7): μία γραμμή το καθένα,
+/// όπως το «Σβήνονται» (πριν: μία πυκνή γκρι παράγραφος)· και το αντίγραφο της Google με εξήγηση, γιατί είναι το μόνο
+/// από αυτά που μπορεί να φέρει πίσω όσα σβήστηκαν: το Android το ξαναβάζει όταν εγκατασταθεί ξανά η εφαρμογή, και
+/// κρατά μόνο το τελευταίο (developer.android.com › Auto Backup).
+const wipeKeeps = <String>[
+  'Ό,τι έχουν το Samsung Health και το Oura στις δικές τους εφαρμογές',
+  'Οι άδειες που έδωσες στο Samsung Health',
+  'Αρχεία που έβγαλες στις Λήψεις (αντίγραφα, PDF)',
+  'Το αυτόματο αντίγραφο της Google: αν απεγκαταστήσεις και ξαναβάλεις την εφαρμογή, μπορεί να φέρει πίσω όσα σβήστηκαν. '
+      'Κλείνει από τις Ρυθμίσεις Android › Google › Αντίγραφα ασφαλείας',
+  'Η επιλογή σου για τις αναφορές σφαλμάτων',
+];
+
+/// Πότε σβήνει το ρολόι (κάτω από τη λίστα [wipeKeeps]).
+const wipeWatchNoteText = 'Το ρολόι σβήνεται όταν ανοίξεις την εφαρμογή του (όχι στη μέση άσκησης).';
+
+/// «Όλα διαγράφηκαν», έλεγχος 13/11 (U4-6): οι άδειες του Samsung Health μένουν, άρα μόλις ο χρήστης ξεκινήσει η
+/// εφαρμογή ξαναδιαβάζει από εκεί. Ως τότε δεν διαβάζει τίποτα (main.dart, DataWipe.kt).
+const wipedRereadText = 'Οι άδειες του Samsung Health έμειναν: μόλις ξεκινήσεις, η εφαρμογή ξαναδιαβάζει από εκεί ύπνο, '
+    'βήματα και ζυγίσεις. Για να μη διαβάσει, κλείσε πρώτα τις άδειες μέσα στο Samsung Health.';
+
+/// Πόσο κάτω μπαίνει η κουκκίδα (7 dp) μιας γραμμής λίστας, ώστε να είναι στο μέσο της πρώτης γραμμής: ύψος γραμμής
+/// 1,4 × το μέγεθος των γραμμάτων όπως φαίνονται ([scaledFontSize], με τη μεγέθυνση του κινητού). Έλεγχος 13/11
+/// (U4-10): ήταν σταθερά 7 dp, και με γράμματα 2× η κουκκίδα έμενε στην κορυφή της γραμμής.
+double wipeBulletTop(double scaledFontSize) {
+  final top = scaledFontSize * 1.4 / 2 - 3.5;
+  return top < 0 ? 0.0 : top;
+}
 
 /// Η διαγραφή δεν ξεκίνησε στο κινητό (η Kotlin δεν έγραψε καν το σημάδι της): τίποτα δεν σβήστηκε εδώ ή στο ρολόι.
 String wipeNotStartedText({required bool ouraClosed}) =>
@@ -209,9 +234,9 @@ class SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+        padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
         child: Text(upperGr(text),
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .3, color: Aigaio.of(context).textSecondary)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: Aigaio.of(context).textSecondary)),
       );
 }
 
@@ -427,6 +452,18 @@ class _DeleteAllSheetState extends State<DeleteAllSheet> {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final backup = _backup;
+    final scaler = MediaQuery.textScalerOf(context);
+    Widget bullet(String t, Color dot, double size) => Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: EdgeInsets.only(top: wipeBulletTop(scaler.scale(size))),
+              child: Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(t, style: TextStyle(fontSize: size, height: 1.4, color: c.text))),
+          ]),
+        );
     return PopScope(
       canPop: !_working,
       child: SafeArea(
@@ -457,31 +494,28 @@ class _DeleteAllSheetState extends State<DeleteAllSheet> {
                 const SizedBox(height: 16),
                 Text('Σβήνονται από αυτό το κινητό και το ρολόι:',
                     style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
-                for (final t in wipeDeletes)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 7),
-                        child: Container(width: 7, height: 7, decoration: BoxDecoration(color: c.bad, shape: BoxShape.circle)),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(t, style: TextStyle(fontSize: 15.5, height: 1.4, color: c.text))),
-                    ]),
-                  ),
+                for (final t in wipeDeletes) bullet(t, c.bad, 15.5),
                 const SizedBox(height: 16),
                 Container(
                   key: const ValueKey('wipe-keeps'),
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(12)),
-                  child: Text(wipeKeepsText, style: TextStyle(fontSize: 13.5, height: 1.45, color: c.textSecondary)),
+                  decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(16)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Text('Δεν σβήνονται:', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.text)),
+                    for (final t in wipeKeeps) bullet(t, c.textTertiary, 14.5),
+                    const SizedBox(height: 10),
+                    Text(wipeWatchNoteText, style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+                  ]),
                 ),
                 if (widget.export != null) ...[
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     key: const ValueKey('wipe-export'),
                     style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                        minimumSize: const Size.fromHeight(52),
+                        // Έλεγχος 13/11 (U4-10): με μεγάλα γράμματα το κείμενο γίνεται δύο γραμμές και ακουμπούσε το περίγραμμα.
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     onPressed: _working ? null : _export,
                     icon: _exporting
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
@@ -529,7 +563,7 @@ class _DeleteAllSheetState extends State<DeleteAllSheet> {
                   style: FilledButton.styleFrom(
                     backgroundColor: c.bad,
                     foregroundColor: Aigaio.inkOn(c.bad),
-                    minimumSize: const Size.fromHeight(54),
+                    minimumSize: const Size.fromHeight(52),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   onPressed: _ok && _backupDecided && !_working ? _wipe : null,
@@ -655,6 +689,13 @@ class _WipedPageState extends State<WipedPage> {
                           'τις δικές τους εφαρμογές.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+                      if (done) ...[
+                        const SizedBox(height: 10),
+                        Text(wipedRereadText,
+                            key: const ValueKey('wiped-reread'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+                      ],
                     ]),
                   ),
                 ),
@@ -662,7 +703,7 @@ class _WipedPageState extends State<WipedPage> {
                   FilledButton(
                     key: const ValueKey('wiped-start'),
                     style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(54), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                        minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     onPressed: widget.onStart,
                     child: const Text('Ξεκίνα από την αρχή', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
@@ -670,7 +711,9 @@ class _WipedPageState extends State<WipedPage> {
                   TextButton(
                     key: const ValueKey('wiped-restore'),
                     onPressed: widget.onRestore,
-                    child: const Text('Επαναφορά από αντίγραφο', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                    // Έλεγχος 13/11 (U4-10): με μεγάλα γράμματα γίνεται δύο γραμμές· στο κέντρο, όπως το κουμπί από πάνω.
+                    child: const Text('Επαναφορά από αντίγραφο',
+                        textAlign: TextAlign.center, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
                   ),
                 ] else
                   FilledButton(
@@ -678,7 +721,7 @@ class _WipedPageState extends State<WipedPage> {
                     style: FilledButton.styleFrom(
                         backgroundColor: c.bad,
                         foregroundColor: Aigaio.inkOn(c.bad),
-                        minimumSize: const Size.fromHeight(54),
+                        minimumSize: const Size.fromHeight(52),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     onPressed: _retrying
                         ? null
@@ -710,5 +753,8 @@ class WipeUnfinishedApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         home: WipedPage(status: status, onStart: () {}, onRestore: () {}),
+        // Έλεγχος 13/11 (S10-7, Sentry YGEIA-FORMA-3): όπως στα άλλα δύο MaterialApp, μια άγνωστη διαδρομή από την
+        // πλατφόρμα δεν ρίχνει ποτέ την οθόνη όπου ο χρήστης προσπαθεί να τελειώσει μια διαγραφή.
+        onUnknownRoute: unknownRoute,
       );
 }

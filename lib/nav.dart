@@ -1,3 +1,20 @@
+import 'package:flutter/widgets.dart';
+
+/// Άγνωστη διαδρομή → τίποτα καινούργιο: μια σελίδα που κλείνει αμέσως και αφήνει την οθόνη όπως ήταν.
+/// Έλεγχος 13/11 (S10-7): εδώ (όχι στο main.dart), ώστε να τη χρησιμοποιεί και το «Η διαγραφή δεν τελείωσε»
+/// (WipeUnfinishedApp στο privacy_page.dart), το μόνο MaterialApp της εφαρμογής που δεν είχε καμία. Το main.dart την
+/// εξάγει όπως πριν (export 'nav.dart').
+Route<void> unknownRoute(RouteSettings settings) => PageRouteBuilder<void>(
+      settings: const RouteSettings(name: 'άγνωστη διαδρομή'),
+      opaque: false,
+      pageBuilder: (context, _, __) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) Navigator.of(context).maybePop();
+        });
+        return const SizedBox.shrink();
+      },
+    );
+
 /// Οι τέσσερις προορισμοί της μπάρας. Η σειρά είναι και ο αριθμός τους (Shell.initialIndex).
 class Cat {
   static const today = 0;

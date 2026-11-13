@@ -20,6 +20,11 @@ class KitchenScreen extends StatefulWidget {
 class _KitchenScreenState extends State<KitchenScreen> {
   late final Kitchen _k = Kitchen.fromJson(widget.store.prefs.kitchen);
 
+  /// Αριθμός που γράφτηκε («Χωρητικότητα», «Μέγιστο βάρος») και δεν έχει αποθηκευτεί ακόμα. Έλεγχος round1 (S2-10 /
+  /// U3a-19): ο αριθμός αποθηκευόταν μόνο με το «Τέλος» του πληκτρολογίου ή με άγγιγμα έξω από το πεδίο· αν έβγαινες με
+  /// το «πίσω» του κινητού, χανόταν. Τώρα αποθηκεύεται και όταν κλείνει η οθόνη ([PopScope] στο build).
+  bool _unsaved = false;
+
   void _save() {
     if (!widget.store.setKitchen(_k.toJson())) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -27,6 +32,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
       ));
       return;
     }
+    _unsaved = false;
     setState(() {});
   }
 
@@ -84,25 +90,26 @@ class _KitchenScreenState extends State<KitchenScreen> {
           ],
         );
 
-    Widget numberField(String label, String suffix, double? value, ValueChanged<double?> onChanged) => SizedBox(
-          width: 170,
-          child: TextFormField(
-            initialValue: value == null ? '' : gramsTextPlain(value),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-            decoration: InputDecoration(
-              labelText: label,
-              suffixText: suffix,
-              isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onChanged: (t) => onChanged(parseNumber(t)),
-            onEditingComplete: _save,
-            onTapOutside: (_) {
-              FocusScope.of(context).unfocus();
-              _save();
-            },
+    // (Το πεδίο πιάνει όλο το πλάτος της κάρτας, όπως πάντα· ένα «πλάτος 170» που υπήρχε εδώ δεν είχε αποτέλεσμα.)
+    Widget numberField(String label, String suffix, double? value, ValueChanged<double?> onChanged) => TextFormField(
+          initialValue: value == null ? '' : gramsTextPlain(value),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          decoration: InputDecoration(
+            labelText: label,
+            suffixText: suffix,
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          onChanged: (t) {
+            onChanged(parseNumber(t));
+            _unsaved = true;
+          },
+          onEditingComplete: _save,
+          onTapOutside: (_) {
+            FocusScope.of(context).unfocus();
+            _save();
+          },
         );
 
     List<Widget> deviceDetails(String key) => switch (key) {
@@ -149,7 +156,15 @@ class _KitchenScreenState extends State<KitchenScreen> {
           _ => const [],
         };
 
-    return Scaffold(
+    // Κλείσιμο της οθόνης με οποιονδήποτε τρόπο (βελάκι, «πίσω» του κινητού): ό,τι αριθμός γράφτηκε αποθηκεύεται.
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && _unsaved) {
+          _unsaved = false;
+          widget.store.setKitchen(_k.toJson());
+        }
+      },
+      child: Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(backgroundColor: c.background, surfaceTintColor: Colors.transparent, title: const Text('Η κουζίνα μου')),
       body: Center(
@@ -222,6 +237,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

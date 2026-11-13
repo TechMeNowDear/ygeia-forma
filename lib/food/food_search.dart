@@ -286,6 +286,7 @@ class FoodSearchResult {
 /// (261 kcal) τον ίδιο βαθμό με το φρέσκο (68 kcal), και «καφές» έβρισκε «καφέ ρύζι».
 ///
 /// Κατάταξη (έλεγχος 9/11, Υ2), από το πιο ισχυρό στο πιο αδύναμο:
+/// 0. δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις του ονόματος ή της μάρκας του: πάντα πρώτο (round1, U3a-10)·
 /// 1. όλη η αναζήτηση είναι ακριβώς ένα άλλο όνομα ή η κεφαλή του ονόματος (+4)·
 /// 2. κάθε λέξη: πρώτη λέξη ονόματος 10, άλλη λέξη 8, άλλο όνομα 9, αρχή/ρίζα 7–2, κατηγορία 6·
 /// 3. τροποποιητές: παστό/αλατισμένο/καπνιστό/μαρινάτο/αποξηραμένο φρούτο −3 όταν δεν ζητήθηκε, ωμό με μαγειρεμένες
@@ -317,6 +318,11 @@ class FoodIndex {
     _catStem = [for (final phrases in _cat) [for (final ws in phrases) [for (final w in ws) stem(w)]]];
     _headBase = [for (final ws in _head) [for (final w in ws) stem(w, synonyms: false)]];
     _foodHeads = {for (final ws in _name) if (ws.isNotEmpty) stem(ws.first)};
+    _aliasHeads = {
+      for (final phrases in _alias)
+        for (final ws in phrases)
+          if (ws.length == 1) stem(ws.first),
+    };
     _markedOf = [
       for (var i = 0; i < foods.length; i++)
         {
@@ -356,6 +362,15 @@ class FoodIndex {
 
   /// Ρίζες της πρώτης λέξης κάθε ονόματος: «λέξη που είναι τρόφιμο» (ρύζι, μέλι, ζάχαρη, χοιρινό).
   late final Set<String> _foodHeads;
+
+  /// Ρίζες των μονολεκτικών άλλων ονομάτων («καλαμάκι», «φραπέ», μάρκες): κι αυτές λένε ποιο τρόφιμο είναι.
+  late final Set<String> _aliasHeads;
+
+  /// Λέει η λέξη ποιο τρόφιμο είναι; (πρώτη λέξη ονόματος ή μονολεκτικό άλλο όνομα· όχι επίθετο όπως «μαύρο», «βραστό»)
+  bool _isFoodWord(String w) {
+    final ws = stem(w);
+    return _foodHeads.contains(ws) || _aliasHeads.contains(ws);
+  }
 
   /// Λέξεις (6+ γράμματα) των ονομάτων σε φωνητική μορφή → όπως γράφονται, για τη διόρθωση ενός γράμματος.
   late final Map<String, String> _vocab;
@@ -410,6 +425,10 @@ class FoodIndex {
     final keep = [for (final w in q2) if (_matchesAny(w, neg)) w];
     final dropped = [for (final w in q2) if (!_matchesAny(w, neg)) w];
     if (keep.isNotEmpty && dropped.isNotEmpty) {
+      // Έλεγχος round1 (S2-7β): αν ό,τι έμεινε είναι μόνο τρόπος μαγειρέματος ή κομμάτι («ψητή», «φιλέτο») και το ίδιο
+      // το τρόφιμο δεν υπάρχει στη βάση («λακέρδα ψητή»), δεν βρέθηκε τίποτα. Πριν έβγαιναν ΟΛΑ τα ψητά (πρώτη η
+      // χοιρινή μπριζόλα) με μια γκρι σημείωση, σαν να ήταν απάντηση.
+      if (keep.every((w) => _cooking.contains(stem(w)) || _optional.contains(w))) return FoodSearchResult.empty;
       final (r2, _) = _search(keep.join(' '),
           boost: boost, limit: limit, isPhonetic: true, cookedFirst: dropped.any((w) => _cooking.contains(stem(w))));
       if (r2.isNotEmpty) {
@@ -421,11 +440,20 @@ class FoodIndex {
     }
     // 3. Χωρίς μία λέξη — ποτέ χωρίς την ΠΡΩΤΗ (το ίδιο το τρόφιμο): «σοκολάτα χωρίς ζάχαρη» δεν γίνεται «μούσλι χωρίς
     // ζάχαρη», «ψωμί χωρίς αλάτι» δεν γίνεται «ρύζι χωρίς αλάτι» (ανεξάρτητος έλεγχος του fix-food, 3.1).
+    // Έλεγχος round1 (S2-7α): κύρια λέξη είναι η πρώτη· εκτός αν η πρώτη ΔΕΝ λέει τρόφιμο (επίθετο: «μαύρο ρύζι»,
+    // «κόκκινες φακές», «βραστό χταπόδι») και μια επόμενη λέει: τότε κύρια είναι εκείνη. Πριν, το «μαύρο ρύζι» πετούσε
+    // το ρύζι και έδειχνε μαυρομάτικα, πιπέρι και σοκολάτα.
     if (keep.length >= 2) {
+      var main = 0;
+      if (!_isFoodWord(keep.first)) {
+        final later = keep.indexWhere((w) => _foodHeads.contains(stem(w)), 1);
+        if (later > 0) main = later;
+      }
       List<Food>? best;
       var bestTop = double.negativeInfinity;
       String? left;
-      for (var k = 1; k < keep.length; k++) {
+      for (var k = 0; k < keep.length; k++) {
+        if (k == main) continue;
         final rest = [...keep.sublist(0, k), ...keep.sublist(k + 1)];
         final (r3, top) = _search(rest.join(' '),
             boost: boost, limit: limit, isPhonetic: true, cookedFirst: _cooking.contains(stem(keep[k])));
@@ -442,14 +470,15 @@ class FoodIndex {
             corrected: corrected,
             droppedFood: _foodHeads.contains(stem(left)));
       }
-      // 3β. Μόνο η πρώτη λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
-      final (r4, _) = _search(keep.first, boost: boost, limit: limit, isPhonetic: true);
+      // 3β. Μόνο η κύρια λέξη (το τρόφιμο), χωρίς τους προσδιορισμούς.
+      final (r4, _) = _search(keep[main], boost: boost, limit: limit, isPhonetic: true);
       if (r4.isNotEmpty) {
+        final others = [for (var k = 0; k < keep.length; k++) if (k != main) keep[k]];
         return FoodSearchResult(r4,
-            ignored: [for (final w in dropped) show(w), for (final w in keep.skip(1)) show(w)],
-            kept: [show(keep.first)],
+            ignored: [for (final w in dropped) show(w), for (final w in others) show(w)],
+            kept: [show(keep[main])],
             corrected: corrected,
-            droppedFood: keep.skip(1).any((w) => _foodHeads.contains(stem(w))));
+            droppedFood: others.any((w) => _foodHeads.contains(stem(w))));
       }
     }
     return FoodSearchResult.empty;
@@ -508,6 +537,11 @@ class FoodIndex {
 
   /// Ο βαθμός του «κομματιού λέξης» (5+ γράμματα μέσα σε άλλη λέξη): χωρίς προτιμήσεις ως εκεί.
   static const _partOfWord = 2.0;
+
+  /// Από αυτόν τον μέσο βαθμό λέξεων και πάνω ένα δικό μου προϊόν μπαίνει πρώτο: κάθε λέξη της αναζήτησης είναι (ή
+  /// αρχίζει) η πρώτη λέξη του ονόματός του (10 ή 7), άλλη ολόκληρη λέξη του (8) ή η μάρκα του (9). Όχι όταν ταιριάζει
+  /// μόνο κομμάτι λέξης, συστατικό μετά από «με» ή η κατηγορία.
+  static const _mineFirst = 7.0;
 
   /// Πόσο ταιριάζει μία λέξη της αναζήτησης στο τρόφιμο [i]. [phrases]/[catPhrases]: ποια άλλα ονόματα και
   /// κατηγορίες μετρούν· null = μόνο τα μονολεκτικά (για το «ταιριάζει κάπου;»).
@@ -619,7 +653,8 @@ class FoodIndex {
     final neg = q.contains(_negation);
     if (required.isEmpty) required.addAll(q);
 
-    final scored = <(double, int)>[];
+    // (βαθμός, θέση στη λίστα, δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις)
+    final scored = <(double, int, bool)>[];
     var top = double.negativeInfinity;
     for (var i = 0; i < foods.length; i++) {
       var score = 0.0;
@@ -667,14 +702,19 @@ class FoodIndex {
       if (f.isRawWithCooked) score += 1.2; // ζυγίζω ωμά: η ωμή μορφή πριν από τη μαγειρεμένη
       if (cookedFirst && f.rawId != null) score += 2.5;
       score -= f.name.length / 60; // τα πιο σύντομα ονόματα λίγο πιο πάνω
-      scored.add((score, i));
+      // Έλεγχος round1 (U3a-10): ένα δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις του ονόματος ή της μάρκας του
+      // ([_mineFirst]) μπαίνει ΠΡΩΤΟ, πάνω από τα γενικά τρόφιμα. Πριν, το +1,5 δεν έφτανε: στο «γιαούρτι» το δικό μου
+      // γιαούρτι έβγαινε 7ο, κάτω από πέντε γενικά (που παίρνουν +4 από το άλλο τους όνομα), ενώ η οθόνη «Τα προϊόντα
+      // μου» υπόσχεται «θα το βρεις πρώτο στην αναζήτηση».
+      scored.add((score, i, f.isMine && words >= _mineFirst));
     }
     // Μία ολόκληρη λέξη 5+ γραμμάτων που βρίσκεται μόνο ΜΕΣΑ σε άλλη λέξη (π.χ. «σαλάτα» → «Φρουτοσαλάτα»):
     // κανένα αποτέλεσμα, όχι ένα άσχετο τρόφιμο που μοιάζει με απάντηση (δεύτερος έλεγχος διατροφής N5). Η κάρτα
     // «Δεν βρέθηκε» προτείνει barcode ή υλικά ένα-ένα.
     if (q.length == 1 && q.first.length >= 5 && top <= 2) return (const <Food>[], top);
-    // Σε ισοπαλία, η σειρά της λίστας (σταθερή σε κάθε κινητό).
+    // Πρώτα τα δικά μου που ταιριάζουν καλά· μετά ο βαθμός· σε ισοπαλία, η σειρά της λίστας (σταθερή σε κάθε κινητό).
     scored.sort((a, b) {
+      if (a.$3 != b.$3) return a.$3 ? -1 : 1;
       final c = b.$1.compareTo(a.$1);
       return c != 0 ? c : a.$2.compareTo(b.$2);
     });

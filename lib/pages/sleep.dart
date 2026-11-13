@@ -96,7 +96,9 @@ class SleepPage extends StatelessWidget {
                 children: [
                   CardHeader(icon: Icons.bar_chart_rounded, title: 'Διάρκεια · 14 νύχτες', color: c.sleep),
                   const SizedBox(height: 14),
+                  // Round 1 (U1a-4β): οι δύο τιμές στην ίδια γραμμή βάσης, ακόμα κι όταν η μία ετικέτα πιάνει δύο γραμμές.
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Expanded(
                         child: _Summary(
@@ -196,9 +198,11 @@ class _LastNightCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Round 1 (U1a-8α): η ημερομηνία ως υπότιτλος (πριν έσπαγε ο τίτλος «… · Σάβ | 14/11»).
           CardHeader(
             icon: Icons.bedtime_rounded,
-            title: 'Τελευταία νύχτα · ${shortDayDate(n.date)}',
+            title: 'Τελευταία νύχτα',
+            subtitle: shortDayDate(n.date),
             color: c.sleep,
           ),
           const SizedBox(height: 14),
@@ -214,7 +218,9 @@ class _LastNightCard extends StatelessWidget {
                   color: c.sleep,
                   track: c.tint(c.sleep),
                   textColor: c.text,
-                  caption: 'σκορ · εκτίμηση',
+                  // Round 1 (U1a-7): «βαθμολογία», όπως σε κάθε άλλη οθόνη (όχι «σκορ»)· σε δύο γραμμές, ώστε με μεγάλα
+                  // γράμματα η λεζάντα να μη γίνεται φαρδύτερη από τη στήλη.
+                  caption: 'βαθμολογία\nεκτίμηση',
                 ),
             ],
           ),
@@ -243,7 +249,9 @@ class _LastNightCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
+          // Round 1 (U1a-4α): στήλες στοιχισμένες πάνω (η τρίτη έχει δύο γραμμές και κατέβαζε τις άλλες).
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               clock('Κοιμήθηκες', n.start),
               clock('Ξύπνησες', n.end),
@@ -346,10 +354,11 @@ class _WatchStagesCard extends StatelessWidget {
           else ...[
             StackedBar(parts: [for (final k in ['DEEP', 'LIGHT', 'REM', 'AWAKE']) (avg(k).toDouble(), c.stage(k))]),
             const SizedBox(height: 6),
-            InfoRow(stageLabel('DEEP'), hmList(avg('DEEP')), dot: c.stage('DEEP')),
-            InfoRow(stageLabel('LIGHT'), hmList(avg('LIGHT')), dot: c.stage('LIGHT')),
-            InfoRow(stageLabel('REM'), hmList(avg('REM')), dot: c.stage('REM')),
-            InfoRow('Ξύπνιος', '≥ ${hmList(avg('AWAKE'))}', dot: c.stage('AWAKE')),
+            // Round 1 (U1a-3): διάρκειες με ολόκληρες λέξεις· ο χρόνος ξύπνιος «τουλάχιστον», όπως παντού.
+            InfoRow(stageLabel('DEEP'), hoursMinutes(avg('DEEP')), dot: c.stage('DEEP')),
+            InfoRow(stageLabel('LIGHT'), hoursMinutes(avg('LIGHT')), dot: c.stage('LIGHT')),
+            InfoRow(stageLabel('REM'), hoursMinutes(avg('REM')), dot: c.stage('REM')),
+            InfoRow('Ξύπνιος', atLeast(avg('AWAKE')), dot: c.stage('AWAKE')),
           ],
         ],
       ),
@@ -442,7 +451,7 @@ class _NightRow extends StatelessWidget {
                     Text(note, style: TextStyle(color: c.textSecondary, fontSize: 12.5)),
                   if (night.score != null)
                     Text(
-                      'σκορ ${night.score}',
+                      'βαθμολογία ${night.score}',
                       style: TextStyle(color: c.sleep, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                 ],

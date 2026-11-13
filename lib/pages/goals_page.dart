@@ -30,8 +30,10 @@ const goalsInfo = MetricInfo(
       'φεύγουν κυρίως νερά. Μετά από άλλες 3 εβδομάδες με ζυγίσεις και καταγραφή φαγητού φαίνεται πόσες θερμίδες καις '
       'πραγματικά, και κάθε εβδομάδα η εφαρμογή ελέγχει τον στόχο. Προτείνει διόρθωση (το πολύ 150 kcal τη φορά) μόνο όταν '
       'η διαφορά ξεπερνά το φυσιολογικό εύρος των ζυγίσεων. Αλλάζει μόνο όταν πατήσεις «Εφάρμοσε».',
-  compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018) · λίπος 25–35% των θερμίδων (EFSA) · κορεσμένα έως 6% όταν ο γιατρός ζητά να '
-      'πέσει η LDL (AHA/ACC), αλλιώς κάτω από 10% (Π.Ο.Υ.) · φυτικές ίνες 30 g (Reynolds 2019) · αλάτι κάτω από 5 g (Π.Ο.Υ.).',
+  // Έλεγχος 13/11 (S1-12): η EFSA δίνει εύρος 20–35% για τα λιπαρά· το κάτω όριο 25% είναι δική μας επιλογή μέσα σε αυτό.
+  compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018) · λιπαρά 25–35% των θερμίδων (μέσα στο εύρος 20–35% της EFSA) · κορεσμένα '
+      'λιπαρά έως 6% όταν ο γιατρός ζητά να πέσει η LDL (AHA/ACC), αλλιώς κάτω από 10% (Π.Ο.Υ.) · φυτικές ίνες 30 g '
+      '(Reynolds 2019) · αλάτι κάτω από 5 g (Π.Ο.Υ.).',
   accuracy: 'Οι τύποι για τις θερμίδες πέφτουν συχνά 10–15% έξω σε έναν άνθρωπο. Γι’ αυτό η εφαρμογή τους διορθώνει με τα '
       'δικά σου δεδομένα. Ό,τι πει ο γιατρός σου υπερισχύει.',
   cite: 'Mifflin 1990 · FAO/WHO/UNU 2004 · Hall 2008 · Helms 2014 · Jensen 2013 (AHA/ACC/TOS) · Morton 2018 · EFSA 2010 · '
@@ -58,6 +60,18 @@ class GoalsWizard extends StatefulWidget {
 }
 
 enum _Step { data, aim, rate, activity, doctor, summary }
+
+/// Βάρος όπως γράφεται: ως 3 ψηφία και, αν θέλεις, κόμμα ή τελεία με 1–2 δεκαδικά.
+final _kgPattern = RegExp(r'^\d{1,3}(?:[.,]\d{1,2})?$');
+
+/// Μια εκτίμηση «πόσο καις» από τα δεδομένα θεωρείται πρόσφατη ως 6 εβδομάδες (όσο και το μεγαλύτερο παράθυρο).
+const _freshEstimateDays = 42;
+
+/// «τη Δευτέρα 14 Δεκεμβρίου», «το Σάββατο 12 Δεκεμβρίου».
+String _onDay(DateTime d) => '${const ['τη', 'την', 'την', 'την', 'την', 'το', 'την'][d.weekday - 1]} ${longDate(d)}';
+
+/// «180» ή «174,5» (ύψος σε cm).
+String _cm(double h) => dec(h, h % 1 == 0 ? 0 : 1);
 
 class _GoalsWizardState extends State<GoalsWizard> {
   late final Goals? _old = widget.store.goals;
@@ -100,10 +114,97 @@ class _GoalsWizardState extends State<GoalsWizard> {
         GoalAim.keep => 0,
       };
 
+  /// Η τελευταία ζύγιση της ζυγαριάς που μετρά: η πρώτη της πιο πρόσφατης μέρας (η πρωινή), χωρίς ζυγίσεις που δεν
+  /// μπορεί να είναι δικές σου (έλεγχος 13/11, S11-2: ζύγιση παιδιού 45 kg προσυμπλήρωνε τον οδηγό και έβγαζε στόχους για
+  /// 45 κιλά).
+  ({double kg, DateTime day})? _scale() {
+    final d = widget.store.data;
+    if (d == null) return null;
+    // Μόνο βάρη που δέχονται οι στόχοι (30–300 kg, όπως και το πεδίο)· αλλιώς αποθηκεύονταν στόχοι που δεν ξαναδιαβάζονται.
+    final used = [for (final w in dailyWeights(d.body)) if (w.$2 >= 30 && w.$2 <= 300) w];
+    if (used.isEmpty) return null;
+    return (kg: used.last.$2, day: used.last.$1);
+  }
+
+  /// Το βάρος που γράφτηκε με το χέρι: null αν το πεδίο είναι κενό ή δεν είναι βάρος από 30 ως 300 kg («82,5» ή «82.5»).
+  double? get _typedKg {
+    final text = _kg.text.trim();
+    if (!_kgPattern.hasMatch(text)) return null;
+    final v = double.tryParse(text.replaceAll(',', '.'));
+    return v != null && v >= 30 && v <= 300 ? v : null;
+  }
+
+  /// Γράφτηκε κάτι στο πεδίο που δεν είναι βάρος (π.χ. «825» αντί για «82,5»). Έλεγχος 13/11 (S11-10 / U3b-25): πριν, ο
+  /// οδηγός το αγνοούσε χωρίς λέξη και υπολόγιζε με τη ζύγιση της ζυγαριάς· τώρα το πεδίο το λέει και περιμένει.
+  bool get _kgInvalid => _kg.text.trim().isNotEmpty && _typedKg == null;
+
   double? get _weight {
-    final typed = double.tryParse(_kg.text.replaceAll(',', '.').trim());
-    if (typed != null && typed >= 30 && typed <= 300) return typed;
-    return widget.store.latestWeight()?.kg;
+    if (_kgInvalid) return null;
+    return _typedKg ?? _scale()?.kg;
+  }
+
+  /// Η τελευταία εκτίμηση «πόσο καις» από τα δεδομένα σου, αν είναι πρόσφατη (ως [_freshEstimateDays] μέρες).
+  double? get _freshTdee {
+    final o = _old;
+    final te = o?.tdeeEst;
+    if (o == null || te == null) return null;
+    AdaptLog? last;
+    for (final l in o.log) {
+      if (!l.fast) last = l;
+    }
+    final day = last == null ? null : DateTime.tryParse(last.day);
+    if (day == null) return null;
+    final age = daysBetween(day, _now);
+    return age >= 0 && age <= _freshEstimateDays ? te : null;
+  }
+
+  /// Οι στόχοι που θα αποθηκευτούν με όσα έχουν απαντηθεί ως τώρα (null όσο λείπει κάτι). Η σύνοψη δείχνει ακριβώς αυτούς.
+  ///
+  /// Έλεγχος 13/11 (S1-11). Πριν, το «Ξανά ο οδηγός» πετούσε σιωπηλά τον στόχο και την εκτίμηση από τα δεδομένα σου και
+  /// γύριζε στον τύπο για 4 εβδομάδες (π.χ. από 1.800 σε 2.060 kcal για κάποιον που καίει 2.250). Τώρα, όταν υπάρχει
+  /// πρόσφατη εκτίμηση, ο νέος στόχος βγαίνει από αυτήν (εκτίμηση ± ο ρυθμός που διάλεξες, ποτέ κάτω από το όριο
+  /// ασφαλείας)· και αν ο σκοπός («λιγότερο λίπος» κ.λπ.) δεν άλλαξε, ο εβδομαδιαίος έλεγχος συνεχίζει στις ίδιες μέρες.
+  /// Αν άλλαξε ο σκοπός, η αρχή είναι σήμερα: η πρώτη εβδομάδα (νερά) πάλι δεν μετρά.
+  Goals? _draft() {
+    final p = widget.store.profile;
+    final calc = _calc;
+    final age = p.ageOn(_now), h = p.heightCm, kg = _weight;
+    if (calc == null || age == null || h == null || kg == null) return null;
+    final o = _old;
+    final te = _freshTdee;
+    // Οι παλιοί στόχοι, μόνο όταν ο έλεγχος συνεχίζει στις ίδιες μέρες (πρόσφατη εκτίμηση και ίδιος σκοπός).
+    final same = te != null && o != null && o.aim == _aim ? o : null;
+    final floor = p.male ? kcalFloorMale : kcalFloorFemale;
+    int? adapt;
+    if (te != null) {
+      final v = ((te + calc.delta) / 10).round() * 10;
+      adapt = v < floor ? floor : v;
+    }
+    return Goals(
+      aim: _aim,
+      rate: _rateValue,
+      activity: activityLevels[_activity],
+      doctor: _doctor == true,
+      since: same?.since ?? '${_now.year}-${two(_now.month)}-${two(_now.day)}',
+      kg: kg,
+      age: age,
+      heightCm: h,
+      male: p.male,
+      // Ό,τι είχες αλλάξει στη χοληστερίνη μένει· οι θερμίδες/πρωτεΐνη ξαναϋπολογίζονται.
+      nutsG: o?.nutsG ?? defaultNutsG,
+      branG: o?.branG ?? defaultBranG,
+      betaPer100: o?.betaPer100,
+      legumesWeek: o?.legumesWeek ?? defaultLegumesWeek,
+      fishWeek: o?.fishWeek ?? defaultFishWeek,
+      kcalAdapt: adapt,
+      tdeeEst: te,
+      checkIn: same?.checkIn,
+      fastAt: same?.fastAt,
+      foreignSeen: o?.foreignSeen,
+      // Οι στόχοι του γιατρού και το ιστορικό των ελέγχων θερμίδων μένουν.
+      docTargets: _doctor == true ? _targets : const DoctorTargets(),
+      log: o?.log ?? const [],
+    );
   }
 
   GoalCalc? get _calc {
@@ -130,29 +231,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
   }
 
   void _save() {
-    final p = widget.store.profile;
-    final age = p.ageOn(_now)!;
-    final o = _old;
-    final g = Goals(
-      aim: _aim,
-      rate: _rateValue,
-      activity: activityLevels[_activity],
-      doctor: _doctor == true,
-      since: '${_now.year}-${two(_now.month)}-${two(_now.day)}',
-      kg: _weight!,
-      age: age,
-      heightCm: p.heightCm!,
-      male: p.male,
-      // Ό,τι είχες αλλάξει στη χοληστερίνη μένει· οι θερμίδες/πρωτεΐνη ξαναϋπολογίζονται.
-      nutsG: o?.nutsG ?? defaultNutsG,
-      branG: o?.branG ?? defaultBranG,
-      betaPer100: o?.betaPer100,
-      legumesWeek: o?.legumesWeek ?? defaultLegumesWeek,
-      fishWeek: o?.fishWeek ?? defaultFishWeek,
-      // Οι στόχοι του γιατρού και το ιστορικό των ελέγχων θερμίδων μένουν· ο μετρητής των 21 ημερών ξεκινά από σήμερα.
-      docTargets: _doctor == true ? _targets : const DoctorTargets(),
-      log: o?.log ?? const [],
-    );
+    final g = _draft();
+    if (g == null) return;
     widget.store.setGoals(g);
     if (widget.fromPage) {
       Navigator.of(context).pop();
@@ -164,7 +244,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    return ListenableBuilder(
+    // U3b-12: το χρώμα της διατροφής και στο «Αργότερα», όπως στις άλλες οθόνες φαγητού (πριν μπλε δίπλα σε πράσινα).
+    return FoodTheme(
+        child: ListenableBuilder(
       listenable: widget.store,
       builder: (context, _) {
         final steps = _steps;
@@ -236,7 +318,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
           ),
         );
       },
-    );
+    ));
   }
 
   Widget _q(BuildContext context, String q, String sub) {
@@ -255,8 +337,10 @@ class _GoalsWizardState extends State<GoalsWizard> {
     switch (step) {
       case _Step.data:
         final age = p.ageOn(_now);
-        final w = widget.store.latestWeight();
-        final missing = missingForGoals(age: age, sex: p.sex, heightCm: p.heightCm, kg: _weight);
+        final w = _scale();
+        final missingProfile = age == null || p.heightCm == null || (p.sex != 'm' && p.sex != 'f');
+        // Βάρος που γράφτηκε λάθος δεν είναι «λείπει βάρος»: το λέει το ίδιο το πεδίο.
+        final missing = missingForGoals(age: age, sex: p.sex, heightCm: p.heightCm, kg: _kgInvalid ? 1.0 : _weight);
         return [
           _q(context, 'Πρώτα, τα στοιχεία σου', 'Από «Τα στοιχεία μου» και τη ζυγαριά. Άλλαξε ό,τι δεν είναι σωστό.'),
           AppCard(
@@ -264,30 +348,33 @@ class _GoalsWizardState extends State<GoalsWizard> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               InfoRow('Ηλικία', age == null ? '—' : '$age ετών'),
               InfoRow('Φύλο', p.male ? 'Άνδρας' : (p.female ? 'Γυναίκα' : '—')),
-              InfoRow('Ύψος', p.heightCm == null ? '—' : '${dec(p.heightCm!, p.heightCm! % 1 == 0 ? 0 : 1)} cm'),
+              InfoRow('Ύψος', p.heightCm == null ? '—' : '${_cm(p.heightCm!)} cm'),
               InfoRow('Βάρος', w == null ? '—' : '${dec(w.kg)} kg · ζυγαριά ${shortDayDate(w.day)}'),
             ]),
           ),
           const SizedBox(height: 12),
-          if (age == null || p.heightCm == null || (p.sex != 'm' && p.sex != 'f'))
-            OutlinedButton(
-              key: const ValueKey('wizard-me'),
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              onPressed: () async {
-                await Navigator.of(context).push(MePage.route(widget.store));
-                if (mounted) setState(() {});
-              },
-              child: const Text('Συμπλήρωσε τα στοιχεία μου'),
-            ),
-          const SizedBox(height: 12),
+          // Πάντα εδώ (U3b-15): η οθόνη λέει «άλλαξε ό,τι δεν είναι σωστό», άρα δίνει και τον τρόπο.
+          OutlinedButton(
+            key: const ValueKey('wizard-me'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: () async {
+              await Navigator.of(context).push(MePage.route(widget.store));
+              if (mounted) setState(() {});
+            },
+            child: Text(missingProfile ? 'Συμπλήρωσε τα στοιχεία μου' : 'Άλλαξε τα στοιχεία μου'),
+          ),
+          const SizedBox(height: 16),
           TextField(
             key: const ValueKey('wizard-kg'),
             controller: _kg,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
             decoration: InputDecoration(
-              labelText: w == null ? 'Βάρος (kg)' : 'Άλλο βάρος (kg), αν η ζύγιση είναι παλιά',
-              helperText: w == null ? 'Δεν βρήκα ζύγιση· γράψε το βάρος σου ή ζυγίσου πρώτα.' : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              labelText: w == null ? 'Βάρος' : 'Άλλο βάρος',
+              suffixText: 'kg',
+              helperText: w == null ? 'Δεν βρήκα ζύγιση· γράψε το βάρος σου ή ζυγίσου πρώτα.' : 'Μόνο αν η ζύγιση είναι παλιά.',
+              errorText: _kgInvalid ? 'Γράψε το βάρος από 30 ως 300 kg, π.χ. 82,5' : null,
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -301,6 +388,10 @@ class _GoalsWizardState extends State<GoalsWizard> {
           ],
         ];
       case _Step.aim:
+        // «Προτείνεται» στο «λιγότερο λίπος» μόνο με δείκτη μάζας σώματος 25 και πάνω (U3b-23): για κανέναν άλλον δεν το
+        // στηρίζουν οι τύποι.
+        final kgNow = _weight, cm = p.heightCm;
+        final bmi = kgNow == null || cm == null || cm <= 0 ? null : kgNow / ((cm / 100) * (cm / 100));
         return [
           _q(context, 'Τι θέλεις πρώτα;', 'Αλλάζει μόνο τις θερμίδες. Η πρωτεΐνη μένει ίδια, τα κορεσμένα ίδιο ποσοστό.'),
           _Opt(
@@ -308,7 +399,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
             on: _aim == GoalAim.lose,
             title: 'Λιγότερο λίπος, κρατώντας τους μύες',
             sub: 'Μικρό έλλειμμα θερμίδων, αρκετή πρωτεΐνη, βάρη. Κατάλληλο όταν το λίπος είναι κυρίως στην κοιλιά.',
-            recommended: true,
+            recommended: bmi != null && bmi >= 25,
             onTap: () => setState(() {
               _aim = GoalAim.lose;
               _rate = 1;
@@ -352,8 +443,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
           const SizedBox(height: 4),
           _Note(
             _aim == GoalAim.lose
-                ? 'Ποτέ κάτω από ${p.female ? '1.200' : '1.500'} kcal. Αν χάνεις πάνω από 1% την εβδομάδα για 2 εβδομάδες, '
-                    'ανέβασε τις θερμίδες από τη σελίδα «Στόχοι».'
+                ? 'Ποτέ κάτω από ${p.female ? '1.200' : '1.500'} kcal. Αν χάνεις πάνω από 1% του βάρους την εβδομάδα, η '
+                    'Σήμερα θα σου το πει.'
                 : 'Αύξηση 0,25–0,5% την εβδομάδα για όσους ξεκινούν βάρη (Iraki 2019).',
           ),
         ];
@@ -409,41 +500,69 @@ class _GoalsWizardState extends State<GoalsWizard> {
         ];
       case _Step.summary:
         final g = _calc!;
+        // Ό,τι δείχνει η σύνοψη είναι ακριβώς ό,τι θα αποθηκευτεί ([_draft]).
+        final d = _draft()!;
         final per = g.delta.abs().round();
+        final te = d.kcalAdapt == null ? null : d.tdeeEst;
+        final fromData = te != null;
+        final burn = te != null ? thousands((te / 10).round() * 10) : thousands(g.tdee);
+        final floor = d.male ? kcalFloorMale : kcalFloorFemale;
+        final floored = te != null ? ((te + g.delta) / 10).round() * 10 < floor : g.floored;
+        final sinceDay = DateTime.parse(d.since);
+        final weekday = weekdayNames[sinceDay.weekday - 1];
+        final continues = !sameDay(sinceDay, _now);
+        final small = TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular);
         return [
-          _q(context, 'Οι στόχοι σου', 'Κάθε αριθμός αλλάζει αργότερα από τη σελίδα «Στόχοι».'),
+          // U3b-14: μόνο όσα αλλάζουν πραγματικά από τη σελίδα «Στόχοι».
+          _q(context, 'Οι στόχοι σου', 'Θερμίδες, πρωτεΐνη και τους στόχους της χοληστερίνης τους αλλάζεις αργότερα από τη σελίδα «Στόχοι».'),
           AppCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Θερμίδες τη μέρα', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
               const SizedBox(height: 4),
-              BigValue(thousands(g.kcal), unit: 'kcal', size: 44),
+              BigValue(thousands(d.kcal), unit: 'kcal', size: 44),
               const SizedBox(height: 6),
               Text(
                 _aim == GoalAim.keep
-                    ? 'όσες καις, περίπου ${thousands(g.tdee)}'
-                    : 'καις περίπου ${thousands(g.tdee)} · ${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(_weight!, _rateValue)}',
-                style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular),
+                    ? 'όσες καις, περίπου $burn'
+                    : 'καις περίπου $burn · ${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
+                style: small,
               ),
-              if (g.floored)
+              // S1-11: ο στόχος βγαίνει από την πρόσφατη εκτίμηση με τα δεδομένα σου, και η οθόνη το λέει.
+              if (fromData)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Από τα δεδομένα σου, όχι από τον τύπο (ο τύπος θα έδινε ${thousands(g.kcal)} kcal).',
+                      key: const ValueKey('wizard-from-data'), style: small),
+                ),
+              if (floored)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text('Ανέβηκε στο κάτω όριο ασφαλείας (${thousands(g.kcal)} kcal).',
+                  child: Text('Ανέβηκε στο κάτω όριο ασφαλείας (${thousands(d.kcal)} kcal).',
                       style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.warn)),
                 ),
               const Hairline(vertical: 12),
-              InfoRow('Πρωτεΐνη', '${g.protein} g'),
-              InfoRow('Λίπος', '${g.fatLo}–${g.fatHi} g'),
-              InfoRow('Κορεσμένα', 'έως ${g.satMax} g · ${g.satPct}%'),
-              InfoRow('Φυτικές ίνες', '${g.fiber} g ή περισσότερες'),
-              InfoRow('Αλάτι', 'κάτω από ${dec(g.salt, 0)} g'),
-              InfoRow('Υδατάνθρακες', 'ό,τι μένει · ~${g.carbsEst} g'),
+              InfoRow('Πρωτεΐνη', '${d.protein} g'),
+              InfoRow('Λιπαρά', '${d.fatLo}–${d.fatHi} g'),
+              InfoRow('Κορεσμένα λιπαρά', 'έως ${d.satMax} g · ${d.satPct}%'),
+              InfoRow('Φυτικές ίνες', '${d.fiber} g ή περισσότερες'),
+              InfoRow('Αλάτι', 'κάτω από ${dec(d.salt, 0)} g'),
+              InfoRow('Υδατάνθρακες', 'ό,τι μένει · ~${d.carbsEst} g'),
+              const Hairline(vertical: 12),
+              // U3b-23: με τι υπολογίστηκαν, για να φανεί ένα λάθος βάρος πριν από την αποθήκευση.
+              InfoRow('Υπολογίστηκαν με', '${dec(d.kg)} kg · ${activityText(d.activity).toLowerCase()}'),
             ]),
           ),
           const SizedBox(height: 12),
-          _Note(
-              'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, από '
-              '${longDate(DateTime(_now.year, _now.month, _now.day + 21))} θα φαίνεται πόσες θερμίδες καις πραγματικά. Τότε, και '
-              'μετά κάθε ${weekdayNames[_now.weekday - 1]}, η Σήμερα θα σου προτείνει διόρθωση του στόχου.'),
+          // S1-5 / S11-6 / U3b-2: η πρώτη εκτίμηση βγαίνει την 28η μέρα (η πρώτη εβδομάδα δεν μετρά), όχι την 21η που
+          // έγραφε εδώ· και διόρθωση προτείνεται μόνο όταν χρειάζεται.
+          _Note(continues
+              ? 'Ο έλεγχος θερμίδων συνεχίζει όπως πριν: κάθε $weekday η Σήμερα ελέγχει τον στόχο με τις ζυγίσεις και το '
+                  'φαγητό σου και προτείνει διόρθωση μόνο αν χρειάζεται.'
+              : 'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, ${_onDay(firstEstimateDay(d))} θα '
+                  'φανεί πόσες θερμίδες καις πραγματικά (η πρώτη εβδομάδα δεν μετρά). Από τότε, κάθε $weekday, η Σήμερα ελέγχει '
+                  'τον στόχο και προτείνει διόρθωση μόνο αν χρειάζεται.'),
+          const SizedBox(height: 8),
+          const _Note('Αρχική εκτίμηση από τύπους, όχι ιατρική οδηγία. Ό,τι πει ο γιατρός σου υπερισχύει.'),
         ];
     }
   }
@@ -496,8 +615,9 @@ class _Opt extends StatelessWidget {
                       if (recommended)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: c.tint(c.food), borderRadius: BorderRadius.circular(999)),
-                          child: Text('Προτείνεται', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.food)),
+                          // Γεμάτο χρώμα με τα γράμματα των γεμάτων κουμπιών (U3b-18): πριν 3,7:1 πάνω στην επιλεγμένη κάρτα.
+                          decoration: BoxDecoration(color: c.foodSolid, borderRadius: BorderRadius.circular(999)),
+                          child: Text('Προτείνεται', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.onSolid)),
                         ),
                     ]),
                     const SizedBox(height: 4),
@@ -526,6 +646,28 @@ class _Note extends StatelessWidget {
 
 // ---------------------------------------------------------------------------------------------------- σελίδα
 
+/// «άνδρας, 45 ετών, 180 cm»
+String _who(bool male, int age, double heightCm) => '${male ? 'άνδρας' : 'γυναίκα'}, $age ετών, ${_cm(heightCm)} cm';
+
+/// Έλεγχος 13/11 (S11-12). Οι στόχοι κρατούν το φύλο, την ηλικία και το ύψος με τα οποία υπολογίστηκαν. Αν τα διόρθωσες
+/// μετά στο «Τα στοιχεία μου», η σελίδα «Στόχοι» το λέει ήρεμα και προσφέρει «Υπολόγισε ξανά»· τίποτα δεν αλλάζει μόνο του.
+/// Επιστρέφει τους στόχους με τα τωρινά στοιχεία όταν διαφέρουν, αλλιώς null. Η ηλικία αλλάζει και μόνη της με τα
+/// γενέθλια: «διαφέρει» μόνο όταν δεν ταιριάζει με καμία μέρα από την αρχή των στόχων ως σήμερα.
+Goals? goalsWithCurrentProfile(Goals g, Profile p, DateTime today) {
+  final since = DateTime.tryParse(g.since);
+  final h = p.heightCm;
+  if (since == null || h == null || (!p.male && !p.female)) return null;
+  final atStart = p.ageOn(since), now = p.ageOn(today);
+  if (atStart == null || now == null) return null;
+  final lo = atStart < now ? atStart : now;
+  final hi = atStart < now ? now : atStart;
+  final ageDiffers = g.age < lo || g.age > hi;
+  if (p.male == g.male && (h - g.heightCm).abs() < 0.05 && !ageDiffers) return null;
+  final age = ageDiffers ? atStart : g.age;
+  if (age < 18 || age > 110) return null;
+  return g.withProfile(male: p.male, age: age, heightCm: h);
+}
+
 /// Σελίδα «Στόχοι» (σχέδια 12/11, 2α).
 class GoalsPage extends StatelessWidget {
   const GoalsPage({super.key, required this.store, this.now});
@@ -537,7 +679,9 @@ class GoalsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
+    // U3b-12: το ίδιο χρώμα διατροφής σε κουμπιά, πεδία και παράθυρα, όπως στις άλλες οθόνες φαγητού (πριν: πράσινο και μπλε).
+    return FoodTheme(
+        child: ListenableBuilder(
       listenable: store,
       builder: (context, _) {
         final c = Aigaio.of(context);
@@ -558,132 +702,223 @@ class GoalsPage extends StatelessWidget {
         }
         final calc = g.calc;
         final today = now ?? DateTime.now();
-        // Πριν από την πρώτη εκτίμηση, «Πρώτος έλεγχος» είναι η μέρα που θα βγει (28η μέρα· Συμβούλιο 2, Α2), όχι η 21η,
-        // που η κάρτα της Σήμερα λέει μόνο ότι μαζεύει δεδομένα.
+        // «Έχει βγει εκτίμηση»: υπάρχει έλεγχος με εκτίμηση από την αρχή ΑΥΤΩΝ των στόχων και μετά. Ως τότε η σελίδα γράφει
+        // τη μέρα που θα βγει η εκτίμηση (28η μέρα· Συμβούλιο 2, Α2), όχι την 21η, που η κάρτα της Σήμερα λέει μόνο ότι
+        // μαζεύει δεδομένα. Έλεγχος 13/11: (α) «εκτίμηση», όχι «έλεγχος» (U3b-3: «Πρώτος έλεγχος» έμενε και αφού είχαν ήδη
+        // βγει και απαντηθεί κάρτες «Έλεγχος θερμίδων…»)· (β) ισχύει και μετά το «Ξανά ο οδηγός», όπου το παλιό ιστορικό
+        // μένει αλλά ο μετρητής ξαναρχίζει (S1-11)· (γ) ένα βήμα «γρήγορης απώλειας» στο ιστορικό δεν είναι εκτίμηση.
+        final estimated = g.log.any((l) => !l.fast && l.day.compareTo(g.since) >= 0);
+        final hadEstimate = g.log.any((l) => !l.fast);
         final due = nextCheckDay(g, today);
         final firstEstimate = firstEstimateDay(g);
-        final next = g.log.isEmpty && due.isBefore(firstEstimate) ? firstEstimate : due;
+        final next = !estimated && due.isBefore(firstEstimate) ? firstEstimate : due;
         final nextText = sameDay(next, today) ? 'σήμερα' : longDate(next);
+        final nextLabel = estimated ? 'Επόμενος έλεγχος' : (hadEstimate ? 'Επόμενη εκτίμηση' : 'Πρώτη εκτίμηση');
         final lastApplied = g.log.where((l) => l.applied).lastOrNull;
-        final adaptCards = _adaptCards(context, g, today, next);
+        final adaptCards = _adaptCards(context, g, today, next, estimated: estimated, nextLabel: nextLabel);
+        final small = TextStyle(fontSize: 13.5, color: c.textSecondary);
+        // U3b-14: ό,τι αλλάζει έχει ύψος αφής 48 και ένα μικρό μολύβι· οι γραμμές που δεν αλλάζουν μένουν σκέτες.
         Widget editRow(String key, String label, String value, VoidCallback onTap) => InkWell(
               key: ValueKey(key),
               onTap: onTap,
-              child: InfoRow(label, value),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(children: [
+                  Expanded(child: InfoRow(label, value)),
+                  const SizedBox(width: 6),
+                  Icon(Icons.edit_rounded, size: 16, color: c.textTertiary),
+                ]),
+              ),
             );
+        // S11-12: τα στοιχεία άλλαξαν μετά τους στόχους; (null: όχι)
+        final fixed = goalsWithCurrentProfile(g, p, today);
+        // Πίτουρο: «για 3 g β-γλυκάνες» γράφεται μόνο όταν τα γραμμάρια βγαίνουν από την ετικέτα και φτάνουν (U3b-19, S1-12).
+        final beta = g.betaPer100;
+        final branNeed = beta == null ? null : branGramsFor(beta);
+        final branCovers = branNeed != null && g.branG >= branNeed;
+
+        final top = <Widget>[
+          AppCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              CardHeader(icon: Icons.restaurant_rounded, title: 'Θερμίδες τη μέρα', color: c.food, trailing: const InfoDot(goalsInfo)),
+              const SizedBox(height: 8),
+              InkWell(
+                key: const ValueKey('goals-kcal'),
+                onTap: () => _editKcal(context, g),
+                child: Row(children: [
+                  Flexible(child: BigValue(thousands(g.kcal), unit: 'kcal', size: 44)),
+                  const SizedBox(width: 8),
+                  Icon(Icons.edit_rounded, size: 18, color: c.textTertiary),
+                ]),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                [
+                  aimText(g.aim),
+                  if (g.aim != GoalAim.keep) '${rateWord(g.aim, g.rate)} · ${rateKgText(g.kg, g.rate)}',
+                ].join(' · '),
+                style: small,
+              ),
+              if (g.kcalSet != null)
+                Text('Τον άλλαξες εσύ (ο υπολογισμός λέει ${thousands(calc.kcal)}).', style: small)
+              // S1-6: μετά από «Εφάρμοσε» στη «γρήγορη απώλεια» η σελίδα έγραφε «Από τον τύπο» για τύπο + 150.
+              else if (g.kcalAdapt != null && lastApplied != null && lastApplied.fast && lastApplied.after == g.kcalAdapt)
+                Text(
+                    'Ανέβηκε από ${thousands(lastApplied.before)} σε ${thousands(lastApplied.after)} (${_dm(lastApplied.day)}), '
+                    'γιατί έχανες βάρος πολύ γρήγορα',
+                    style: small)
+              else if (g.kcalAdapt != null)
+                Text('Από τα δεδομένα σου${lastApplied == null ? '' : ', ${_dm(lastApplied.day)}'}', style: small)
+              else if (estimated)
+                Text('Από τον τύπο· τα δεδομένα σου δεν ζήτησαν αλλαγή', style: small)
+              else
+                Text('Από τον τύπο, ως την πρώτη εκτίμηση από τα δεδομένα σου', style: small),
+              Text('$nextLabel: $nextText', key: const ValueKey('goals-next-check'), style: small),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                key: const ValueKey('goals-how'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.food),
+                onPressed: () => showHowCalculated(context, g),
+                child: const Text('Πώς υπολογίστηκε'),
+              ),
+            ]),
+          ),
+          if (fixed != null) ...[
+            const SizedBox(height: 12),
+            AppCard(
+              key: const ValueKey('goals-profile-changed'),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('Τα στοιχεία σου άλλαξαν μετά τους στόχους', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
+                const SizedBox(height: 4),
+                Text(
+                    'Οι στόχοι υπολογίστηκαν με: ${_who(g.male, g.age, g.heightCm)}. Στα στοιχεία σου τώρα: '
+                    '${_who(fixed.male, fixed.age, fixed.heightCm)}. Οι αριθμοί δεν αλλάζουν μόνοι τους.',
+                    style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  key: const ValueKey('goals-recompute'),
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.food),
+                  onPressed: () => store.setGoals(fixed),
+                  child: const Text('Υπολόγισε ξανά'),
+                ),
+              ]),
+            ),
+          ],
+          for (final card in adaptCards) ...[const SizedBox(height: 12), card],
+        ];
+        final mid = <Widget>[
+          AppCard(
+            padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              editRow('goals-protein', 'Πρωτεΐνη', '${g.protein} g${g.proteinSet != null ? ' · δική σου' : ''}', () => _editProtein(context, g)),
+              // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού και στη διατροφική δήλωση («Λιπαρά», «Κορεσμένα λιπαρά»).
+              InfoRow('Λιπαρά', '${g.fatLo}–${g.fatHi} g'),
+              InfoRow('Κορεσμένα λιπαρά', 'έως ${g.satMax} g · ${g.satPct}%'),
+              InfoRow('Φυτικές ίνες', '${g.fiber} g ή περισσότερες'),
+              InfoRow('Αλάτι', 'κάτω από ${dec(g.salt, 0)} g'),
+              const InfoRow('Υδατάνθρακες', 'ό,τι μένει'),
+            ]),
+          ),
+          if (g.doctor) ...[
+            // U3b-28: οι αριθμοί εδώ είναι το πλάνο σου (προεπιλογές που αλλάζεις), όχι αριθμοί που έγραψε ο γιατρός.
+            const GroupLabel('Χοληστερίνη · το πλάνο σου'),
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                editRow('goals-nuts', 'Ξηροί καρποί', '${g.nutsG} g τη μέρα',
+                    () => _editInt(context, 'Ξηροί καρποί τη μέρα', g.nutsG, 0, 100, 'g', (v) => g.copyWith(nutsG: v))),
+                editRow(
+                    'goals-bran',
+                    branCovers ? 'Πίτουρο βρώμης για 3 g β-γλυκάνες' : 'Πίτουρο βρώμης',
+                    branCovers
+                        ? '${g.branG} g · από την ετικέτα'
+                        : (branNeed == null ? '${g.branG} g · γράψε την ετικέτα' : '${g.branG} g · για 3 g β-γλυκάνες: $branNeed g'),
+                    () => _editBran(context, g)),
+                editRow('goals-legumes', 'Όσπρια', '${countText(g.legumesWeek, 'φορά', 'φορές')} την εβδομάδα',
+                    () => _editInt(context, 'Όσπρια την εβδομάδα', g.legumesWeek, 0, 7, 'φορές', (v) => g.copyWith(legumesWeek: v))),
+                editRow('goals-fish', 'Ψάρι', '${countText(g.fishWeek, 'φορά', 'φορές')} την εβδομάδα',
+                    () => _editInt(context, 'Ψάρι την εβδομάδα', g.fishWeek, 0, 7, 'φορές', (v) => g.copyWith(fishWeek: v))),
+                editRow('goals-doc-targets', 'Στόχοι του γιατρού', g.docTargets.isEmpty ? 'κανένας · γράψε' : g.docTargets.text, () async {
+                  final t = await askDoctorTargets(context, g.docTargets);
+                  if (t != null) store.setGoals(g.copyWith(docTargets: t));
+                }),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            // S1-12: το ψάρι δεν είναι τρόφιμο που ρίχνει την LDL (η διατροφή «portfolio» του Jenkins 2003 ήταν φυτική)· και
+            // ποια ψάρια (EFSA 2015: ξιφίας και τόνος έχουν τον περισσότερο υδράργυρο).
+            Text(
+              'Από το πλάνο σου. '
+              '${branCovers ? 'Τα γραμμάρια του πίτουρου βγήκαν από τις β-γλυκάνες που γράφει η συσκευασία σου (EFSA: 3 g τη μέρα).' : 'Για το πίτουρο, γράψε τις β-γλυκάνες που έχει η συσκευασία σου: βγαίνουν τα γραμμάρια για 3 g τη μέρα (EFSA).'} '
+              'Το ψάρι μπαίνει γιατί παίρνει τη θέση του κρέατος και για τα τριγλυκερίδια· το ίδιο δεν ρίχνει την LDL. Κυρίως μικρά '
+              'λιπαρά ψάρια (σαρδέλα, γαύρος, σκουμπρί)· ξιφίας και τόνος όχι συχνά, γιατί έχουν περισσότερο υδράργυρο (EFSA 2015).',
+              style: TextStyle(fontSize: 13, height: 1.45, color: c.textSecondary),
+            ),
+          ],
+          const GroupLabel('Ζύγισμα'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: NavRow(
+              key: const ValueKey('goals-weigh'),
+              icon: Icons.monitor_weight_rounded,
+              color: c.body,
+              title: 'Μέρες: ${_weighDays(p)}, πρωί',
+              text: 'Μέση με μεζούρα: ${weekdayNames[p.waistDay - 1]}',
+              onTap: () => Navigator.of(context).push(MePage.route(store)),
+            ),
+          ),
+        ];
+        final bottom = <Widget>[
+          OutlinedButton(
+            key: const ValueKey('goals-wizard'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: () => Navigator.of(context).push(GoalsWizard.route(store, now: now, fromPage: true)),
+            child: const Text('Ξανά ο οδηγός'),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            key: const ValueKey('goals-delete'),
+            // Κόκκινο, όπως κάθε άλλο σβήσιμο της εφαρμογής (U3b-29).
+            style: TextButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.bad),
+            onPressed: () => _delete(context),
+            child: const Text('Σβήσε τους στόχους'),
+          ),
+        ];
         return Scaffold(
           appBar: AppBar(title: const Text('Στόχοι')),
           body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-                  AppCard(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      CardHeader(icon: Icons.restaurant_rounded, title: 'Θερμίδες τη μέρα', color: c.food, trailing: const InfoDot(goalsInfo)),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        key: const ValueKey('goals-kcal'),
-                        onTap: () => _editKcal(context, g),
-                        child: BigValue(thousands(g.kcal), unit: 'kcal', size: 44),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        [
-                          aimText(g.aim),
-                          if (g.aim != GoalAim.keep) '${rateWord(g.aim, g.rate)} · ${rateKgText(g.kg, g.rate)}',
-                        ].join(' · '),
-                        style: TextStyle(fontSize: 13.5, color: c.textSecondary),
-                      ),
-                      if (g.kcalSet != null)
-                        Text('Τον άλλαξες εσύ (ο υπολογισμός λέει ${thousands(calc.kcal)}).', style: TextStyle(fontSize: 13.5, color: c.textSecondary))
-                      else if (g.kcalAdapt != null && lastApplied != null)
-                        Text('Από τα δεδομένα σου, ${_dm(lastApplied.day)}', style: TextStyle(fontSize: 13.5, color: c.textSecondary))
-                      else
-                        Text('Από τον τύπο, ως τον πρώτο έλεγχο με τα δεδομένα σου', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
-                      Text('${g.log.isEmpty ? 'Πρώτος' : 'Επόμενος'} έλεγχος: $nextText',
-                          key: const ValueKey('goals-next-check'), style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+            // U3b-30: σε φαρδιά οθόνη (ανοιχτό Fold) δύο στήλες, όπως η Διατροφή και η Σήμερα· ποτέ μία τεντωμένη.
+            child: LayoutBuilder(builder: (context, box) {
+              final wide = box.maxWidth >= 700;
+              return Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: wide ? 1080 : 640),
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
+                    if (wide)
+                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [...top, const SizedBox(height: 16), ...bottom]),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: mid)),
+                      ])
+                    else ...[
+                      ...top,
                       const SizedBox(height: 12),
-                      OutlinedButton(
-                        key: const ValueKey('goals-how'),
-                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.food),
-                        onPressed: () => showHowCalculated(context, g),
-                        child: const Text('Πώς υπολογίστηκε'),
-                      ),
-                    ]),
-                  ),
-                  for (final card in adaptCards) ...[const SizedBox(height: 12), card],
-                  const SizedBox(height: 12),
-                  AppCard(
-                    padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      editRow('goals-protein', 'Πρωτεΐνη', '${g.protein} g${g.proteinSet != null ? ' · δική σου' : ''}', () => _editProtein(context, g)),
-                      InfoRow('Λίπος', '${g.fatLo}–${g.fatHi} g'),
-                      InfoRow('Κορεσμένα', 'έως ${g.satMax} g · ${g.satPct}%'),
-                      InfoRow('Φυτικές ίνες', '${g.fiber} g+'),
-                      InfoRow('Αλάτι', 'κάτω από ${dec(g.salt, 0)} g'),
-                      const InfoRow('Υδατάνθρακες', 'ό,τι μένει'),
-                    ]),
-                  ),
-                  if (g.doctor) ...[
-                    const GroupLabel('Χοληστερίνη · από τον γιατρό'),
-                    AppCard(
-                      padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                        editRow('goals-nuts', 'Ξηροί καρποί', '${g.nutsG} g τη μέρα',
-                            () => _editInt(context, 'Ξηροί καρποί τη μέρα', g.nutsG, 0, 100, 'g', (v) => g.copyWith(nutsG: v))),
-                        editRow('goals-bran', 'Πίτουρο βρώμης για 3 g β-γλυκάνες',
-                            '${g.branG} g${g.betaPer100 == null ? '' : ' · από την ετικέτα'}', () => _editBran(context, g)),
-                        editRow('goals-legumes', 'Όσπρια', '${g.legumesWeek} φορές την εβδομάδα',
-                            () => _editInt(context, 'Όσπρια την εβδομάδα', g.legumesWeek, 0, 7, 'φορές', (v) => g.copyWith(legumesWeek: v))),
-                        editRow('goals-fish', 'Ψάρι', '${g.fishWeek} φορές την εβδομάδα',
-                            () => _editInt(context, 'Ψάρι την εβδομάδα', g.fishWeek, 0, 7, 'φορές', (v) => g.copyWith(fishWeek: v))),
-                        editRow('goals-doc-targets', 'Στόχοι του γιατρού', g.docTargets.isEmpty ? 'κανένας · γράψε' : g.docTargets.text, () async {
-                          final t = await askDoctorTargets(context, g.docTargets);
-                          if (t != null) store.setGoals(g.copyWith(docTargets: t));
-                        }),
-                      ]),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Από το πλάνο σου. Τα γραμμάρια του πίτουρου βγαίνουν από τις β-γλυκάνες που γράφει η συσκευασία του δικού σου '
-                      'προϊόντος (EFSA: 3 g τη μέρα). Το ψάρι μπαίνει γιατί παίρνει τη θέση του κρέατος και για τα τριγλυκερίδια.',
-                      style: TextStyle(fontSize: 13, height: 1.45, color: c.textSecondary),
-                    ),
-                  ],
-                  const GroupLabel('Ζύγισμα'),
-                  AppCard(
-                    padding: EdgeInsets.zero,
-                    child: NavRow(
-                      key: const ValueKey('goals-weigh'),
-                      icon: Icons.monitor_weight_rounded,
-                      color: c.body,
-                      title: 'Μέρες: ${_weighDays(p)}, πρωί',
-                      text: 'Μέση με μεζούρα: ${weekdayNames[p.waistDay - 1]}',
-                      onTap: () => Navigator.of(context).push(MePage.route(store)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    key: const ValueKey('goals-wizard'),
-                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                    onPressed: () => Navigator.of(context).push(GoalsWizard.route(store, now: now, fromPage: true)),
-                    child: const Text('Ξανά ο οδηγός'),
-                  ),
-                  const SizedBox(height: 4),
-                  TextButton(
-                    key: const ValueKey('goals-delete'),
-                    style: TextButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.warn),
-                    onPressed: () => _delete(context),
-                    child: const Text('Σβήσε τους στόχους'),
-                  ),
-                ]),
-              ),
-            ),
+                      ...mid,
+                      const SizedBox(height: 16),
+                      ...bottom,
+                    ],
+                  ]),
+                ),
+              );
+            }),
           ),
         );
       },
-    );
+    ));
   }
 
   /// Σβήσιμο των στόχων (αίτημα 12/11: ό,τι γράφεται σβήνεται). Φαγητό και ζυγίσεις μένουν.
@@ -703,54 +938,64 @@ class GoalsPage extends StatelessWidget {
     if (ok == true) store.setGoals(null);
   }
 
-  /// A4: «Πόσο καις, από τα δεδομένα σου» (μετά τον πρώτο έλεγχο) ή «Πριν από τον πρώτο έλεγχο» (πρόοδος).
-  List<Widget> _adaptCards(BuildContext context, Goals g, DateTime today, DateTime next) {
+  /// A4: «Πριν από την πρώτη εκτίμηση» (πρόοδος, όσο δεν έχει βγει εκτίμηση για αυτούς τους στόχους) και το ιστορικό
+  /// «Πόσες kcal καις τη μέρα, από τα δεδομένα σου» (όταν υπάρχει). Έλεγχος 13/11: U3b-3, U3b-31, S1-6, S1-11.
+  List<Widget> _adaptCards(BuildContext context, Goals g, DateTime today, DateTime next,
+      {required bool estimated, required String nextLabel}) {
     final c = Aigaio.of(context);
     final small = TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary);
     final title = TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text);
     final days = daysBetween(today, next);
     final when = days <= 0 ? 'σήμερα' : (days == 1 ? 'αύριο' : 'σε $days μέρες');
-    if (g.log.isNotEmpty) {
-      return [
-        AppCard(
-          key: const ValueKey('goals-adapt-log'),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Πόσο καις, από τα δεδομένα σου', style: title),
-            const SizedBox(height: 4),
-            InfoRow('Τύπος (αρχή, ${_dm(g.since)})', thousands((g.calc.tdee / 10).round() * 10)),
-            for (final l in g.log.reversed.take(6).toList().reversed)
-              InfoRow(
-                'Έλεγχος ${_dm(l.day)}',
-                '${thousands((l.tdee / 10).round() * 10)} · '
-                    '${l.applied ? 'στόχος ${thousands(l.before)} → ${thousands(l.after)}' : 'στόχος έμεινε ${thousands(l.before)}'}',
-              ),
-            InfoRow('Επόμενος έλεγχος', when),
-          ]),
-        ),
-      ];
-    }
+    final cards = <Widget>[];
     final food = FoodStore.shared;
     final d = store.data;
-    if (food == null || !food.loaded || d == null) return const [];
-    final r = readiness(goals: g, today: today, weights: dailyWeights(d.body), intake: (a, b) => dailyIntake(food, a, b));
-    return [
-      AppCard(
+    if (!estimated && food != null && food.loaded && d != null) {
+      final r = readiness(goals: g, today: today, weights: dailyWeights(d.body), intake: (a, b) => dailyIntake(food, a, b));
+      cards.add(AppCard(
         key: const ValueKey('goals-adapt-ready'),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Πριν από τον πρώτο έλεγχο', style: title),
+          Text(nextLabel == 'Πρώτη εκτίμηση' ? 'Πριν από την πρώτη εκτίμηση' : 'Πριν από την επόμενη εκτίμηση', style: title),
           const SizedBox(height: 2),
-          Text('Μετά την πρώτη εβδομάδα, στις 3 τελευταίες, ως χθες:', style: small),
+          Text('Τι έχει μαζευτεί ως χθες (η πρώτη εβδομάδα δεν μετρά):', style: small),
           InfoRow('Μέρες με φαγητό', '${r.intakeDays} από $adaptMinIntakeDays'),
           InfoRow('Ζυγίσεις', '${r.weighIns} από $adaptMinWeighIns'),
-          InfoRow('Έλεγχος', when),
+          InfoRow(nextLabel, when),
           const SizedBox(height: 4),
           Text(
               'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά. Μετράνε μέρες με τουλάχιστον το 60% του στόχου γραμμένο· '
               'οι ζυγίσεις έρχονται μόνες τους από την InBody.',
               style: small),
         ]),
-      ),
-    ];
+      ));
+    }
+    if (g.log.isNotEmpty) {
+      cards.add(AppCard(
+        key: const ValueKey('goals-adapt-log'),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Πόσες kcal καις τη μέρα, από τα δεδομένα σου', style: title),
+          const SizedBox(height: 4),
+          // U3b-27: ο τύπος με τον ίδιο αριθμό που γράφει το «Πώς υπολογίστηκε».
+          InfoRow('Τύπος (αρχή, ${_dm(g.since)})', '${thousands(g.calc.tdee)} kcal'),
+          for (final l in g.log.reversed.take(6).toList().reversed) ...[
+            // Ένα βήμα «γρήγορης απώλειας» δεν έχει εκτίμηση: γράφεται μόνο η αλλαγή του στόχου (S1-3 / S1-6).
+            if (l.fast)
+              InfoRow('Γρήγορη απώλεια ${_dm(l.day)}', 'στόχος ${thousands(l.before)} → ${thousands(l.after)}')
+            else ...[
+              InfoRow('Έλεγχος ${_dm(l.day)}', '${thousands((l.tdee / 10).round() * 10)} kcal'),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                    l.applied ? 'στόχος ${thousands(l.before)} → ${thousands(l.after)}' : 'ο στόχος έμεινε ${thousands(l.before)}',
+                    style: small),
+              ),
+            ],
+          ],
+          if (estimated) InfoRow('Επόμενος έλεγχος', when),
+        ]),
+      ));
+    }
+    return cards;
   }
 
   Future<void> _editInt(BuildContext context, String title, int current, int min, int max, String unit, Goals Function(int) apply) async {
@@ -813,7 +1058,7 @@ class _NumberDialogState extends State<_NumberDialog> {
   void _ok() {
     final v = int.tryParse(_t.text.trim());
     if (v == null || v < widget.min || v > widget.max) {
-      setState(() => _err = 'Από ${widget.min} ως ${widget.max}.');
+      setState(() => _err = 'Από ${thousands(widget.min)} ως ${thousands(widget.max)} ${widget.unit}.');
       return;
     }
     Navigator.pop(context, v);
@@ -830,7 +1075,8 @@ class _NumberDialogState extends State<_NumberDialog> {
           autofocus: true,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(suffixText: widget.unit, errorText: _err),
+          decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), suffixText: widget.unit, errorText: _err),
           onSubmitted: (_) => _ok(),
         ),
         if (widget.resetText != null) ...[
@@ -905,7 +1151,11 @@ class _DoctorTargetsDialogState extends State<_DoctorTargetsDialog> {
             controller: t,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(labelText: label, suffixText: 'mg/dL', errorText: _err[key]),
+            decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelText: label,
+                suffixText: 'mg/dL',
+                errorText: _err[key]),
             onSubmitted: (_) => _ok(),
           ),
         );
@@ -965,7 +1215,8 @@ class _BranDialogState extends State<_BranDialog> {
           controller: _beta,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-          decoration: const InputDecoration(labelText: 'β-γλυκάνες ανά 100 g', suffixText: 'g'),
+          decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), labelText: 'β-γλυκάνες ανά 100 g', suffixText: 'g'),
           onChanged: (_) => setState(() {
             final g = _b == null ? null : branGramsFor(_b!);
             if (g != null) _grams.text = '$g';
@@ -982,7 +1233,8 @@ class _BranDialogState extends State<_BranDialog> {
           controller: _grams,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(labelText: 'Πίτουρο τη μέρα', suffixText: 'g'),
+          decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), labelText: 'Πίτουρο τη μέρα', suffixText: 'g'),
         ),
       ]),
       actions: [
@@ -1022,17 +1274,21 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
           Text('Πώς υπολογίστηκαν οι θερμίδες', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
           const SizedBox(height: 10),
           InfoRow('1 · Σε πλήρη ξεκούραση', '${n(calc.bmr)} kcal'),
-          Text('Mifflin-St Jeor: 10 × ${dec(g.kg)} + 6,25 × ${dec(g.heightCm, g.heightCm % 1 == 0 ? 0 : 1)} − 5 × ${g.age} $sex', style: small),
+          // U3b-24: με λέξεις, για να φαίνεται τι είναι κάθε αριθμός.
+          Text('Τύπος Mifflin-St Jeor: 10 × βάρος ${dec(g.kg)} + 6,25 × ύψος ${_cm(g.heightCm)} − 5 × ηλικία ${g.age} $sex', style: small),
           const SizedBox(height: 6),
           InfoRow('2 · Με την κίνησή σου (× ${dec(g.activity)})', '${n(calc.tdee)} kcal'),
           Text('«${activityText(g.activity)}». Είναι εκτίμηση: σε κάθε άνθρωπο πέφτει ως και 10–15% έξω.', style: small),
           if (g.aim != GoalAim.keep) ...[
             const SizedBox(height: 6),
             InfoRow('3 · Για ${rateKgText(g.kg, g.rate)}', '${calc.delta < 0 ? '−' : '+'}${n(calc.delta.abs())} kcal'),
-            Text('${dec(g.kg * g.rate, 2)} kg × 7.700 kcal ÷ 7 μέρες', style: small),
+            // S1-8: με το ποσοστό και το βάρος, ώστε ο αριθμός να ξαναβγαίνει ακριβώς (0,75% × 82,0 × 7.700 ÷ 7 = 677·
+            // πριν «0,61 kg × 7.700 ÷ 7», που δίνει 671).
+            Text('${ratePctText(g.rate)} του βάρους: ${ratePctText(g.rate)} × ${dec(g.kg)} kg × 7.700 kcal ÷ 7 μέρες', style: small),
           ],
           const Hairline(vertical: 12),
-          InfoRow('Στόχος', '${thousands(calc.kcal)} kcal'),
+          // U3b-24: όταν ισχύει άλλος στόχος (δικός σου ή από τα δεδομένα), αυτή η γραμμή είναι «από τον τύπο».
+          InfoRow(g.kcalSet != null || g.kcalAdapt != null ? 'Στόχος από τον τύπο' : 'Στόχος', '${thousands(calc.kcal)} kcal'),
           if (calc.floored) Text('Ανέβηκε στο κάτω όριο ασφαλείας.', style: small),
           if (g.kcalSet != null) Text('Ισχύει ο δικός σου: ${thousands(g.kcalSet!)} kcal.', style: small),
           if (g.kcalSet == null && g.kcalAdapt != null)

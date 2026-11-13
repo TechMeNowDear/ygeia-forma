@@ -4,7 +4,6 @@ library;
 
 import 'dart:math' as math;
 
-import 'data.dart' show spo2MinCoverage;
 import 'format.dart';
 import 'history.dart';
 import 'sources.dart';
@@ -87,7 +86,20 @@ class ReportData {
     required this.weighIns,
     this.plan,
     this.otherWeighIns = const {},
+    this.weighInsInPeriod = 0,
+    this.weighInsSpread = false,
+    this.foreignWeighIns = 0,
   });
+
+  /// Round 1 (U1b-13): πόσες ζυγίσεις (που μετρούν) έγιναν μέσα στο διάστημα της αναφοράς.
+  final int weighInsInPeriod;
+
+  /// Round 1 (U1b-13): true = οι γραμμές του [weighIns] είναι απλωμένες από την πρώτη ως την τελευταία ζύγιση του
+  /// διαστήματος (περισσότερες από 6 μέσα σε αυτό)· false = οι τελευταίες (έως 6).
+  final bool weighInsSpread;
+
+  /// Round 1 (S11-2): ζυγίσεις του ιστορικού που μοιάζουν ξένες και δεν μπήκαν στον πίνακα.
+  final int foreignWeighIns;
 
   /// Έλεγχος 3, E2: οι ζυγίσεις του [weighIns] που ΔΕΝ είναι της InBody (παλιές εκδόσεις, πριν από την πρώτη ζύγιση
   /// InBody): φαίνονται με την πηγή τους («όχι InBody»), ποτέ ως ζυγίσεις της InBody.
@@ -96,7 +108,8 @@ class ReportData {
   /// Οι πηγές (για τη σημείωση «Πώς μετρήθηκαν»).
   final SourcePlan? plan;
 
-  /// Οι τελευταίες ζυγίσεις (έως 6, όποτε κι αν έγιναν), η νεότερη πρώτη: (μέρα, βάρος, λίπος %, μύες).
+  /// Έως 6 ζυγίσεις, η νεότερη πρώτη: (μέρα, βάρος, λίπος %, μύες). Με περισσότερες από 6 μέσα στο διάστημα, απλωμένες
+  /// από την πρώτη ως την τελευταία ([weighInsSpread])· αλλιώς οι τελευταίες, όποτε κι αν έγιναν.
   final List<(DateTime, double?, double?, double?)> weighIns;
 
   final DateTime from;
@@ -184,9 +197,20 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
       if (v.$2 < 90) v,
   ];
 
-  final weighDays = history.keys.where((k) => p.value(history, K.weight, parseDateKey(k)) != null).toList()..sort();
+  // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες δεν μπαίνουν (μετριούνται, για τη σημείωση).
+  final allWeighDays = history.keys.where((k) => p.value(history, K.weight, parseDateKey(k)) != null).toList()..sort();
+  final foreignKeys = {for (final k in allWeighDays) if (foreignWeighIn(history, p, parseDateKey(k))) k};
+  final weighDays = [for (final k in allWeighDays) if (!foreignKeys.contains(k)) k];
+  // Round 1 (U1b-13): με ζύγιση κάθε 2–3 μέρες οι 6 τελευταίες ήταν μόνο οι 2 τελευταίες εβδομάδες, και η αλλαγή των 3
+  // μηνών δεν φαινόταν πουθενά. Με περισσότερες από 6 μέσα στο διάστημα: η πρώτη, η τελευταία και 4 ανάμεσα.
+  final inPeriod = [
+    for (final k in weighDays)
+      if (!parseDateKey(k).isBefore(from) && !parseDateKey(k).isAfter(to)) k,
+  ];
+  final spread = inPeriod.length > 6;
+  final picked = spread ? spreadPick(inPeriod, 6) : weighDays.reversed.take(6).toList().reversed.toList();
   final weighIns = [
-    for (final k in weighDays.reversed.take(6))
+    for (final k in picked.reversed)
       (
         parseDateKey(k),
         p.value(history, K.weight, parseDateKey(k)),
@@ -207,7 +231,17 @@ ReportData buildReport(Map<String, Map<String, double>> history, DateTime now, {
         if (SourcePlan.isOtherWeighIn(history, w.$1)) w.$1,
     },
     plan: p,
+    weighInsInPeriod: inPeriod.length,
+    weighInsSpread: spread,
+    foreignWeighIns: foreignKeys.length,
   );
+}
+
+/// Round 1 (U1b-13): [n] στοιχεία της [v] (ταξινομημένης), η πρώτη, η τελευταία και ανάμεσα σε ίσες αποστάσεις.
+/// Με λιγότερα από [n], όλα.
+List<T> spreadPick<T>(List<T> v, int n) {
+  if (v.length <= n || n < 2) return v.length <= n ? List<T>.of(v) : [v.last];
+  return [for (var i = 0; i < n; i++) v[(i * (v.length - 1) / (n - 1)).round()]];
 }
 
 /// Οξυγόνο: όλες οι 90 μέρες του ρολογιού (ίδιος αισθητήρας), και ένα κομμάτι για κάθε ορισμό της νύχτας (αλλαγή
@@ -224,14 +258,9 @@ ReportStat _sensorStat(
   // Έλεγχος #2 (D2-01): ίδιος κανόνας με την εφαρμογή για τη χαμηλότερη: σε νύχτα του Oura μόνο όταν το ρολόι
   // μέτρησε τουλάχιστον το μισό ύπνο ([spo2MinCoverage]). Παλιές μέρες χωρίς κάλυψη γραμμένη: όπως ήταν. Ο μέσος όρος
   // του ρολογιού μένει όλες τις 90 μέρες (K1), με ετικέτα «ρολόι»· του δαχτυλιδιού έχει δική του γραμμή.
-  bool keep(DateTime d) {
-    if (p.nightSource(d) != Source.oura) return true;
-    if (key == K.spo2Min) {
-      final cov = history[dateKey(d)]?[K.spo2Cov];
-      return cov == null || cov >= spo2MinCoverage;
-    }
-    return true;
-  }
+  // Round 1 (S4-8 (4)): ο ίδιος κανόνας κάλυψης και για τον μέσο όρο του ρολογιού σε νύχτα του Oura ([watchOxygenCovered]):
+  // ένας «μέσος όρος» από το 10% του ύπνου δεν είναι μέσος όρος της νύχτας.
+  bool keep(DateTime d) => watchOxygenCovered(history, p, d);
 
   final values = <(DateTime, double)>[];
   for (var d = start; !d.isAfter(last); d = add(d, 1)) {

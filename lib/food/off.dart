@@ -22,8 +22,13 @@ class FoodDraft {
     this.saltFromSodium = false,
     this.sodiumMg,
     Set<String>? lessThan,
+    this.cholKind,
   })  : values = values ?? {},
         lessThan = lessThan ?? {};
+
+  /// Τι μετρά το προϊόν στην κάρτα «Χοληστερίνη» ([CholKind]) ή null. Από τις κατηγορίες του Open Food Facts όταν
+  /// σαρώνεται ([cholKindFromOffTags]), από το ίδιο το προϊόν όταν διορθώνεται· το αλλάζεις στη φόρμα.
+  final String? cholKind;
 
   /// Πεδία που η πηγή δίνει ως «<x» (π.χ. «αλάτι <0,01»): μένουν «<x» αν δεν τα αλλάξεις (έλεγχος 9/11, Χ5).
   final Set<String> lessThan;
@@ -158,7 +163,61 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
     saltFromSodium: saltFromSodium,
     sodiumMg: sodiumMg,
     lessThan: lessThan,
+    cholKind: cholKindFromOffTags(p['categories_tags']),
   );
+}
+
+// Κατηγορίες του Open Food Facts (πεδίο «categories_tags», αγγλικά ονόματα της ταξινομίας του) για το ΙΔΙΟ το τρόφιμο.
+const _offNutTags = {
+  'en:nuts', 'en:mixed-nuts', 'en:almonds', 'en:walnuts', 'en:walnut-kernels', 'en:hazelnuts', 'en:pistachios',
+  'en:cashew-nuts', 'en:pecan-nuts', 'en:brazil-nuts', 'en:macadamia-nuts', 'en:pine-nuts', 'en:peanuts',
+};
+const _offFishTags = {
+  'en:fishes', 'en:canned-fishes', 'en:frozen-fishes', 'en:smoked-fishes', 'en:fatty-fishes', 'en:fish-fillets',
+  'en:tunas', 'en:canned-tunas', 'en:sardines', 'en:canned-sardines', 'en:salmons', 'en:smoked-salmons',
+  'en:mackerels', 'en:canned-mackerels', 'en:anchovies', 'en:herrings', 'en:cods', 'en:crustaceans', 'en:shrimps',
+  'en:prawns', 'en:mollusks', 'en:molluscs', 'en:cephalopods', 'en:mussels', 'en:squids', 'en:octopuses',
+};
+const _offLegumeTags = {
+  'en:pulses', 'en:canned-pulses', 'en:canned-legumes', 'en:legume-seeds', 'en:lentils', 'en:green-lentils',
+  'en:red-lentils', 'en:canned-lentils', 'en:chickpeas', 'en:canned-chickpeas', 'en:common-beans',
+  'en:canned-common-beans', 'en:white-beans', 'en:red-beans', 'en:kidney-beans', 'en:black-beans', 'en:split-peas',
+  'en:broad-beans',
+};
+const _offBranTags = {'en:oat-bran', 'en:oat-brans'};
+
+/// Προϊόντα που απλώς ΠΕΡΙΕΧΟΥΝ ξηρούς καρπούς, όσπρια ή ψάρι (άλειμμα, ρόφημα, σοκολάτα, μπάρα, έτοιμο φαγητό, σαλάτα,
+/// σούπα, πανέ, σουρίμι, λάδι, αλεύρι…) ή δεν είναι από αυτά που ρίχνουν την LDL (κάστανα): δεν μετρούν μόνα τους.
+const _offNotTheFood = {
+  'en:spreads', 'en:sweet-spreads', 'en:nut-butters', 'en:peanut-butters', 'en:oilseed-purees', 'en:hummus',
+  'en:beverages', 'en:plant-based-beverages', 'en:plant-based-milk-alternatives', 'en:milk-substitutes',
+  'en:chocolates', 'en:confectioneries', 'en:sweet-snacks', 'en:bars', 'en:cereal-bars', 'en:biscuits-and-cakes',
+  'en:desserts', 'en:ice-creams', 'en:breakfast-cereals', 'en:mueslis', 'en:breads', 'en:crackers', 'en:pastas',
+  'en:flours', 'en:vegetable-oils', 'en:nut-oils', 'en:fish-oils', 'en:dietary-supplements', 'en:meals',
+  'en:prepared-meals', 'en:soups', 'en:sauces', 'en:salads', 'en:prepared-salads', 'en:sandwiches', 'en:pizzas',
+  'en:breaded-products', 'en:breaded-fish', 'en:fish-fingers', 'en:surimi', 'en:fish-eggs', 'en:taramasalata',
+  'en:meat-analogues', 'en:tofu', 'en:chestnuts',
+};
+
+/// Τι μετρά ένα προϊόν του Open Food Facts στην κάρτα «Χοληστερίνη», από τις κατηγορίες του («categories_tags»): μία
+/// τιμή του [CholKind] ή null (έλεγχος round1, S2-1 / S1-9). Προσεκτικά, για να μη μετρήσει κάτι που δεν είναι:
+/// - μόνο όταν το προϊόν είναι το ΙΔΙΟ το τρόφιμο (σκέτοι ξηροί καρποί, όσπρια ξερά ή σε κονσέρβα, ψάρι ή θαλασσινά,
+///   πίτουρο βρώμης)· ό,τι απλώς τα περιέχει ([_offNotTheFood]) δεν μετρά·
+/// - κατηγορία που δεν ξέρουμε = null: το προϊόν μετρά όπως πριν (καθόλου), ώσπου να το ορίσεις στη φόρμα.
+/// Τα αράπικα φιστίκια είναι στο Open Food Facts και «όσπρια»· εδώ μετρούν ως ξηροί καρποί, όπως στη βάση.
+/// Ό,τι βγει εδώ φαίνεται στη φόρμα ελέγχου του προϊόντος και αλλάζει με ένα πάτημα.
+String? cholKindFromOffTags(Object? tags) {
+  if (tags is! List) return null;
+  final t = {
+    for (final x in tags)
+      if (x is String) x.trim().toLowerCase(),
+  };
+  if (t.any(_offNotTheFood.contains)) return null;
+  if (t.any(_offBranTags.contains)) return CholKind.bran;
+  if (t.any(_offNutTags.contains)) return CholKind.nuts;
+  if (t.any(_offFishTags.contains)) return CholKind.fish;
+  if (t.any(_offLegumeTags.contains)) return CholKind.legumes;
+  return null;
 }
 
 /// «330 ml», «1 L», «75cl», «1,5 l», «1 λίτρο», «1 λτ», «1 litre» → υγρό (έλεγχος 9/11, Μ2: πριν δεν έπιανε τα
@@ -253,6 +312,7 @@ FoodDraft draftFromFood(Food f) => FoodDraft(
       saltFromSodium: f.n.has(Nk.sodium),
       sodiumMg: f.n[Nk.sodium]?.value,
       lessThan: {for (final e in f.n.values.entries) if (e.value.lessThan) e.key},
+      cholKind: f.cholKind,
     );
 
 const _formKeys = {Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fat, Nk.satFat, Nk.fiber, Nk.salt};
@@ -270,6 +330,7 @@ Food foodFromDraft(FoodDraft d, String id) => Food(
       servingGrams: d.servingGrams,
       servingLabel: d.servingLabel,
       perMl: d.perMl,
+      cholKind: d.cholKind,
       n: Nutrients({
         for (final e in d.values.entries) e.key: NValue(e.value, lessThan: d.lessThan.contains(e.key)),
         if (d.alcohol != null) Nk.alcohol: NValue(d.alcohol!),

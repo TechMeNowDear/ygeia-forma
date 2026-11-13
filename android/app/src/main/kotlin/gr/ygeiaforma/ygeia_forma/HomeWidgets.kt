@@ -191,26 +191,9 @@ object HomeWidgets {
     /**
      * Έλεγχος 8/11 (DATA-02): τιμές «σήμερα» (κίνηση, φαγητό) άλλης μέρας δεν φαίνονται σαν σημερινές.
      * Μένουν τα ονόματα και το γράφημα, οι τιμές γίνονται «—» ώσπου να ανοίξει η εφαρμογή ή να διαβαστούν ξανά.
+     * Round 1 (U7-12): ο κανόνας είναι στο [WidgetText.forToday] (ελέγχεται σε JVM).
      */
-    fun forToday(data: JSONObject?, today: LocalDate = LocalDate.now()): JSONObject? {
-        val day = data?.optString("day", "") ?: return null
-        if (day.isEmpty() || day == today.toString()) return data
-        val c = JSONObject(data.toString())
-        val m = c.optJSONObject("m") ?: return c
-        for (k in m.keys().asSequence().toList()) {
-            m.optJSONObject(k)?.apply {
-                put("v", "—")
-                put("u", "")
-                remove("cap")
-                remove("d")
-                remove("us")
-                remove("r")
-            }
-        }
-        c.remove("bar")
-        c.put("src", "νέα μέρα · άνοιξε την εφαρμογή")
-        return c
-    }
+    fun forToday(data: JSONObject?, today: LocalDate = LocalDate.now()): JSONObject? = WidgetText.forToday(data, today)
 
     fun ensureMidnight(ctx: Context) = scheduleMidnight(ctx)
 
@@ -394,7 +377,8 @@ object HomeWidgets {
         dashboard.optJSONObject("activity")?.let { a ->
             if (a.has("activeCalories")) put("activeKcal", "Ενεργές", thousands(a.optDouble("activeCalories").toLong()), " kcal")
             if (a.has("calories")) put("totalKcal", "Σύνολο", thousands(a.optDouble("calories").toLong()), " kcal")
-            if (a.has("activeMinutes")) put("activeMin", "Ενεργός", "${a.optLong("activeMinutes")}′", "")
+            // Round 1 (U7-13): ολόκληρη λέξη, όπως το στιγμιότυπο της εφαρμογής (widget_snapshot.dart).
+            if (a.has("activeMinutes")) put("activeMin", "Ενεργός", "${a.optLong("activeMinutes")}", " λεπτά")
             if (a.has("distance")) put("distance", "Απόσταση", dec1(a.optDouble("distance") / 1000), " km")
         }
         val t = Instant.ofEpochMilli(readAt).atZone(zone).toLocalTime()

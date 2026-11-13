@@ -16,8 +16,11 @@ import 'waist_sheet.dart';
 import '../waist.dart';
 
 class BodyPage extends StatelessWidget {
-  const BodyPage({super.key, required this.store});
+  const BodyPage({super.key, required this.store, this.now});
   final HealthStore store;
+
+  /// Για τα στιγμιότυπα δοκιμών (αλλιώς η ώρα του κινητού).
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +31,12 @@ class BodyPage extends StatelessWidget {
         final d = store.data;
         final body = d?.body ?? const <BodyMeasurement>[];
         final last = d?.latestBody;
+        // Round 1 (S3-3): «Σήμερα/Χθες» σε σχέση με ΤΩΡΑ, όχι με την ώρα της τελευταίας ανάγνωσης (με παλιά ανάγνωση
+        // η χθεσινή ζύγιση έγραφε «Σήμερα 07:10»).
+        final clock = now ?? DateTime.now();
+        // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες: δεν μετρούν σε γραφήματα και τάσεις· φαίνονται σημειωμένες.
+        final foreign = foreignBody(body);
+        final counted = [for (final b in body) if (!foreign.contains(b)) b];
 
         final skinNights = (d?.nights ?? const <Night>[]).where((n) => n.skinTemp != null).toList();
         final skinBase = d?.skinTempBaseline;
@@ -50,41 +59,47 @@ class BodyPage extends StatelessWidget {
           else
             _LatestCard(
               last: last,
-              previous: d?.previousBody,
+              previous: previousCounted(body, last, foreign),
+              foreign: foreign.contains(last),
               body: body,
-              now: d?.readAt ?? DateTime.now(),
+              now: clock,
               profile: store.profile,
               onProfile: () => Navigator.of(context).push(MePage.route(store)),
             ),
-          if (body.where((b) => b.weight != null).length >= 2)
+          // Round 1 (U1a-20): ελάχιστο εύρος άξονα 3 (kg ή μονάδες λίπους): η συνηθισμένη διακύμανση μιας μέρας (0,5–1 kg,
+          // reference.dart) να μη γεμίζει το γράφημα και να μοιάζει με μεγάλη αλλαγή (πριν 1).
+          if (counted.where((b) => b.weight != null).length >= 2)
             _chartCard(
               context,
               K.weight,
               'Βάρος (kg)',
-              [for (final b in body) if (b.weight != null) (b.time, b.weight!)],
+              [for (final b in counted) if (b.weight != null) (b.time, b.weight!)],
               c.body,
+              clock,
             ),
           _WaistCard(store: store),
-          if (body.where((b) => b.fatPct != null).length >= 2)
+          if (counted.where((b) => b.fatPct != null).length >= 2)
             _chartCard(
               context,
               K.fatPct,
               'Λίπος (%)',
-              [for (final b in body) if (b.fatPct != null) (b.time, b.fatPct!)],
+              [for (final b in counted) if (b.fatPct != null) (b.time, b.fatPct!)],
               c.heart,
+              clock,
             ),
         ];
 
         final bodyMore = <Widget>[
-          if (body.where((b) => b.smm != null).length >= 2)
+          if (counted.where((b) => b.smm != null).length >= 2)
             _chartCard(
               context,
               K.smm,
               'Σκελετικοί μύες (kg)',
-              [for (final b in body) if (b.smm != null) (b.time, b.smm!)],
+              [for (final b in counted) if (b.smm != null) (b.time, b.smm!)],
               c.energy,
+              clock,
             ),
-          if (body.isNotEmpty) _WeighTable(body: body.reversed.take(12).toList(), now: d?.readAt ?? DateTime.now()),
+          if (body.isNotEmpty) _WeighTable(body: body.reversed.take(12).toList(), now: clock, foreign: foreign),
           // Θερμοκρασία καρπού: μόνο ως απόκλιση από το «συνήθως» (τρίτος έλεγχος F2/C5), ποτέ βαθμοί (33,6 °C διαβαζόταν ως
           // υποθερμία). Το «συνήθως» είναι η μεσαία τιμή των 14 προηγούμενων νυχτών (όχι «μέσος όρος»).
           if (skinNights.length >= 2)
@@ -131,10 +146,12 @@ class BodyPage extends StatelessWidget {
     );
   }
 
-  Widget _chartCard(BuildContext context, String metric, String title, List<(DateTime, double)> points, Color color) {
+  Widget _chartCard(BuildContext context, String metric, String title, List<(DateTime, double)> points, Color color, DateTime clock) {
     return AppCard(
       key: ValueKey('body-$metric'),
-      onTap: () => Navigator.of(context).push(MetricPage.route(store, metric)),
+      // Round 1 (U1b-21): η σελίδα της μέτρησης με το ίδιο ρολόι (πριν: πάντα η ώρα του κινητού, και το στιγμιότυπο έδειχνε
+      // «Λίγες τιμές για γράφημα»).
+      onTap: () => Navigator.of(context).push(MetricPage.route(store, metric, now: clock)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -145,16 +162,34 @@ class BodyPage extends StatelessWidget {
             trailing: Icon(Icons.chevron_right_rounded, color: Aigaio.of(context).textTertiary),
           ),
           const SizedBox(height: 12),
-          LineChart(points: points, color: color, format: (v) => dec(v), dateLabel: dayMonth),
+          LineChart(points: points, color: color, format: (v) => dec(v), minRange: 3, dateLabel: yearAwareLabel(points)),
         ],
       ),
     );
   }
 }
 
+/// Round 1 (U1a-19α): όταν το γράφημα περνά σε άλλη χρονιά, οι ημερομηνίες της παλιάς χρονιάς γράφουν και το έτος
+/// («28 Δεκ 2025 … 24 Οκτ»), ώστε να μη μοιάζει ότι ο χρόνος πάει πίσω.
+String Function(DateTime) yearAwareLabel(List<(DateTime, double)> points) {
+  final year = points.isEmpty ? null : points.last.$1.year;
+  return (d) => year == null || d.year == year ? dayMonth(d) : dayMonthYear(d);
+}
+
 class _LatestCard extends StatelessWidget {
-  const _LatestCard({required this.last, required this.previous, required this.body, required this.now, required this.profile, required this.onProfile});
+  const _LatestCard({
+    required this.last,
+    required this.previous,
+    required this.body,
+    required this.now,
+    required this.profile,
+    required this.onProfile,
+    this.foreign = false,
+  });
   final BodyMeasurement last;
+
+  /// Round 1 (S11-2): η τελευταία ζύγιση μοιάζει ξένη ([foreignBody]): φαίνεται, αλλά δεν μετρά.
+  final bool foreign;
 
   /// Όλες οι ζυγίσεις (παλιότερη πρώτη), για την τάση σε λίπος και μύες (body_trend.dart).
   final List<BodyMeasurement> body;
@@ -168,24 +203,28 @@ class _LatestCard extends StatelessWidget {
     final c = Aigaio.of(context);
     final p = previous;
 
+    // Round 1 (U1a-7): «25,4%» χωρίς κενό, όπως παντού στην εφαρμογή· «82,2 kg» με κενό.
+    String withUnit(double value, String unit, [int digits = 1]) => unit == '%' ? '${dec(value, digits)}%' : '${dec(value, digits)} $unit';
+
     String withDiff(double? value, double? before, String unit, {int digits = 1, bool lowerIsBetter = true}) {
       if (value == null) return '—';
-      final base = '${dec(value, digits)} $unit';
-      if (before == null) return base;
+      final base = withUnit(value, unit, digits);
+      if (before == null || foreign) return base;
       // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2».
       final diff = shownDiff(value, before, digits);
       if (diff == 0) return base;
       return '$base  (${signedDec(diff, digits)})';
     }
 
-    // Η τιμή της τελευταίας ζύγισης· σε παρένθεση η διαφορά των δύο μεσαίων τιμών (3 τελευταίες, 3 πριν), όπως φαίνονται.
-    String trendDiff(double? value, double? Function(BodyMeasurement) f, String unit) {
+    // Η τιμή της τελευταίας ζύγισης· σε παρένθεση η διαφορά των δύο μεσαίων τιμών (3 τελευταίες, 3 πριν), όπως φαίνονται,
+    // ΜΟΝΟ όταν ξεπερνά τη διακύμανση της ζυγαριάς [floor] (round 1, S4-3: πριν γραφόταν κάθε διαφορά, π.χ. «(+0,2)» μύες).
+    String trendDiff(double? value, double? Function(BodyMeasurement) f, String unit, double floor) {
       if (value == null) return '—';
       final t = bodyTrend(body, f);
-      final base = '${dec(value)} $unit';
+      final base = withUnit(value, unit);
       if (t == null) return base;
       final diff = shownDiff(t.now, t.before, 1);
-      return diff == 0 ? base : '$base  (${signedDec(diff)})';
+      return bodyDiffShown(diff, floor) ? '$base  (${signedDec(diff)})' : base;
     }
 
     return AppCard(
@@ -201,7 +240,15 @@ class _LatestCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           BigValue(last.weight == null ? '—' : dec(last.weight!), unit: 'kg', size: 44),
-          if (p != null && last.weight != null && p.weight != null && shownDiff(last.weight!, p.weight!, 1) != 0) ...[
+          if (foreign) ...[
+            const SizedBox(height: 6),
+            Text(
+              foreignLatestText,
+              key: const ValueKey('body-foreign-latest'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
+          if (!foreign && p != null && last.weight != null && p.weight != null && shownDiff(last.weight!, p.weight!, 1) != 0) ...[
             const SizedBox(height: 6),
             // Σχέδια 9/11 (Spec): αλλαγή χωρίς κρίση, σε γκρι.
             Align(
@@ -227,10 +274,10 @@ class _LatestCard extends StatelessWidget {
             ),
           const SizedBox(height: 4),
           InfoRow('Βάρος', withDiff(last.weight, p?.weight, 'kg')),
-          InfoRow('Λίπος', trendDiff(last.fatPct, (b) => b.fatPct, '%')),
-          InfoRow('Μάζα λίπους', trendDiff(last.fatKg, (b) => b.fatKg, 'kg')),
-          InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg')),
-          InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg')),
+          InfoRow('Λίπος', trendDiff(last.fatPct, (b) => b.fatPct, '%', bodyFloorFatPct)),
+          InfoRow('Μάζα λίπους', trendDiff(last.fatKg, (b) => b.fatKg, 'kg', bodyFloorKg)),
+          InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg', bodyFloorKg)),
+          InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg', bodyFloorKg)),
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
           // Ένα ύψος για όλα (έλεγχος 8/11, DATA-08): από τα στοιχεία σου· της InBody μόνο αν δεν έχεις δώσει ύψος.
           if (bmiOf(last.weight, profile.heightCm) ?? last.bmi case final bmi?) InfoRow('Δείκτης μάζας σώματος', dec(bmi)),
@@ -246,7 +293,8 @@ class _LatestCard extends StatelessWidget {
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
           // 7/11: εύρη αναφοράς με πηγή (λίπος ανά ηλικία και φύλο, υγιές βάρος για το ύψος). Η εξήγηση στο «i».
           const Hairline(vertical: 12),
-          ..._ranges(context),
+          // Round 1 (S11-2): καμία θέση «μέσα/πάνω από το εύρος» για ζύγιση που μοιάζει ξένη.
+          if (!foreign) ..._ranges(context),
           const SizedBox(height: 8),
           Text(
             'Λίπος και μύες είναι εκτιμήσεις της ζυγαριάς· σύγκρινε ζυγίσεις με τις ίδιες συνθήκες.',
@@ -265,7 +313,8 @@ class _LatestCard extends StatelessWidget {
     final out = <Widget>[];
     if (last.fatPct != null && fat != null) {
       out.addAll([
-        Row(children: [Expanded(child: Text('Λίπος', style: label)), const InfoButton(K.fatPct)]),
+        // Round 1 (S4-6): το «i» δίπλα στην κρίση δείχνει και το εύρος με την πηγή του (Gallagher 2000).
+        Row(children: [Expanded(child: Text('Λίπος', style: label)), InfoButton(K.fatPct, range: fat)]),
         RangeNote(value: last.fatPct!, range: fat, min: 5, max: 40, color: c.body),
         const SizedBox(height: 12),
       ]);
@@ -297,23 +346,36 @@ class _LatestCard extends StatelessWidget {
   }
 }
 
+/// Round 1 (S11-2): κάτω από μια τελευταία ζύγιση που μοιάζει ξένη (ίδια λογική με την κάρτα ελέγχου θερμίδων).
+const foreignLatestText = 'Αυτή η ζύγιση διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μετρά σε γραφήματα, τάσεις και '
+    'θερμίδες. Αν δεν είναι δική σου, δεν χρειάζεται να κάνεις τίποτα. Αν είναι δική σου, θα μετρήσει μόλις συμφωνήσουν '
+    'μαζί της και οι επόμενες ζυγίσεις.';
+
 /// Ζυγίσεις ως πίνακας (σχέδια 9/11, 9β): οι μονάδες μία φορά επάνω, η χρονιά ως διαχωριστικό («2025»), αριθμοί
 /// με σταθερό πλάτος που μικραίνουν αντί να σπάνε.
 class _WeighTable extends StatelessWidget {
-  const _WeighTable({required this.body, required this.now});
+  const _WeighTable({required this.body, required this.now, this.foreign = const <BodyMeasurement>{}});
   final List<BodyMeasurement> body;
   final DateTime now;
+
+  /// Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες: στη λίστα, σε γκρι, με σημείωση από κάτω.
+  final Set<BodyMeasurement> foreign;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final head = TextStyle(fontSize: 13, height: 1.25, color: c.textSecondary);
     final numStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular);
+    final greyStyle = numStyle.copyWith(color: c.textTertiary);
+    // Round 1 (U1a-9): κενό 8 dp αριστερά κάθε στήλης, ώστε οι επικεφαλίδες να μην κολλούν («ΒάροςΛίπος») σε μεγάλα γράμματα.
     Widget cell(String s, TextStyle st, {TextAlign align = TextAlign.right}) => Expanded(
           flex: 3,
-          child: Align(
-            alignment: align == TextAlign.right ? Alignment.centerRight : Alignment.centerLeft,
-            child: FittedBox(fit: BoxFit.scaleDown, child: Text(s, maxLines: 2, textAlign: align, style: st)),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Align(
+              alignment: align == TextAlign.right ? Alignment.centerRight : Alignment.centerLeft,
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(s, maxLines: 2, textAlign: align, style: st)),
+            ),
           ),
         );
     final rows = <Widget>[];
@@ -328,7 +390,10 @@ class _WeighTable extends StatelessWidget {
           child: Text('${b.time.year}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textSecondary)),
         ));
       }
-      final date = i == 0 && b.time.year == now.year ? shortDayDate(b.time) : '${b.time.day}/${b.time.month}';
+      // Round 1 (U1a-9): ίδια μορφή σε όλες τις γραμμές («24/10»)· με την ημέρα της εβδομάδας η πρώτη μίκραινε στο
+      // 60–70% σε μεγάλα γράμματα (η κάρτα πάνω λέει ήδη «Σήμερα 16:13»).
+      final date = '${b.time.day}/${b.time.month}';
+      final st = foreign.contains(b) ? greyStyle : numStyle;
       rows.add(Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: i < body.length - 1 ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
@@ -338,15 +403,16 @@ class _WeighTable extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(date, maxLines: 1, style: numStyle),
+              child: Text(foreign.contains(b) ? '$date *' : date, maxLines: 1, style: st),
             ),
           ),
-          cell(b.weight == null ? '—' : dec(b.weight!), numStyle),
-          cell(b.fatPct == null ? '—' : dec(b.fatPct!), numStyle),
-          cell(b.smm == null ? '—' : dec(b.smm!), numStyle),
+          cell(b.weight == null ? '—' : dec(b.weight!), st),
+          cell(b.fatPct == null ? '—' : dec(b.fatPct!), st),
+          cell(b.smm == null ? '—' : dec(b.smm!), st),
         ]),
       ));
     }
+    final marked = body.any(foreign.contains);
     return AppCard(
       key: const ValueKey('body-weighings'),
       child: Column(
@@ -363,6 +429,14 @@ class _WeighTable extends StatelessWidget {
           const SizedBox(height: 4),
           Divider(height: 1, color: c.hairline),
           ...rows,
+          if (marked) ...[
+            const SizedBox(height: 8),
+            Text(
+              '* Διαφέρει πολύ από τις άλλες σου ζυγίσεις: δεν μετρά σε γραφήματα, τάσεις και θερμίδες.',
+              key: const ValueKey('body-weighings-foreign'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
         ],
       ),
     );
@@ -407,7 +481,12 @@ class _WaistCard extends StatelessWidget {
             Text('Εύρος αναφοράς: κάτω από ${dec(ref.ok, 0)} cm (ESC 2021)', style: small),
           if (list.length >= 2) ...[
             const SizedBox(height: 12),
-            LineChart(points: [for (final e in list) (day(e.day), e.cm)], color: c.body, format: (v) => dec(v), dateLabel: dayMonth),
+            LineChart(
+              points: [for (final e in list) (day(e.day), e.cm)],
+              color: c.body,
+              format: (v) => dec(v),
+              dateLabel: yearAwareLabel([for (final e in list) (day(e.day), e.cm)]),
+            ),
           ],
         ],
         const SizedBox(height: 12),

@@ -299,7 +299,7 @@ void main() {
       s.hrGap = 95;
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: SummaryPage(training: t, session: s, key: UniqueKey())));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Μεγαλύτερο κενό στους παλμούς: 95″'), findsOneWidget);
+      expect(find.textContaining('Μεγαλύτερο κενό στους παλμούς: 95 δευτερόλεπτα'), findsOneWidget);
     });
 
     testWidgets('παλμοί που σταμάτησαν να έρχονται: πορτοκαλί μήνυμα, όχι κενό', (tester) async {

@@ -130,23 +130,33 @@ class _SegmentTabsState extends State<SegmentTabs> {
       final fits = need <= box.maxWidth;
       Widget seg(int k) {
         final sel = k == widget.selected;
+        // Round 1 (U1a-21): στόχος αφής 48 dp σε όλο το ύψος της μπάρας (πριν 40, με 4 dp «νεκρά» πάνω και κάτω)· το
+        // χάπι μένει 40 dp, ίδια εμφάνιση.
         return Semantics(
           selected: sel,
           button: true,
           child: Material(
-            color: sel ? widget.solid : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            type: MaterialType.transparency,
             child: InkWell(
               key: ValueKey('tab-${widget.tabs[k]}'),
               borderRadius: BorderRadius.circular(12),
               onTap: () => widget.onTap(k),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 40),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: SegmentTabs.pad, vertical: 6),
-                  child: Center(
-                    widthFactor: 1,
-                    child: Text(widget.tabs[k], maxLines: 1, softWrap: false, style: _style(sel, c)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: sel ? widget.solid : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: SegmentTabs.pad, vertical: 6),
+                      child: Center(
+                        widthFactor: 1,
+                        child: Text(widget.tabs[k], maxLines: 1, softWrap: false, style: _style(sel, c)),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -162,7 +172,7 @@ class _SegmentTabsState extends State<SegmentTabs> {
           : Row(mainAxisSize: MainAxisSize.min, children: [for (var k = 0; k < widget.tabs.length; k++) seg(k)]);
       return Container(
         key: const ValueKey('segment-tabs'),
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(color: c.dark ? c.card : c.hairline, borderRadius: BorderRadius.circular(16)),
         child: fits
             ? row
