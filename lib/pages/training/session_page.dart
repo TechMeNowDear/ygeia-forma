@@ -946,7 +946,12 @@ class _SessionPageState extends State<SessionPage> {
         flex: 5,
         child: OutlinedButton(
           key: const ValueKey('sess-skip'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), padding: pad, foregroundColor: c.text),
+          style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              padding: pad,
+              foregroundColor: c.text,
+              // R2-U2-01: ανενεργή (με γραμμένα σετ) σε αχνό γκρι, όπως στη Διατροφή· ποτέ πιο «ζωντανή» από την ενεργή.
+              disabledForegroundColor: c.textTertiary),
           onPressed: e.done.isNotEmpty ? null : () => t.skip(e, !e.skipped),
           child: FittedBox(fit: BoxFit.scaleDown, child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false)),
         ),

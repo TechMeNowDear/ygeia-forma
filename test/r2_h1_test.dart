@@ -459,11 +459,12 @@ void main() {
       await t.pump();
       await t.tap(find.byKey(const ValueKey('sess-tick-0')));
       await t.pump();
+      await t.pump();
       final skip = find.byKey(const ValueKey('sess-skip'));
       expect(t.widget<OutlinedButton>(skip).onPressed, isNull);
       final color = DefaultTextStyle.of(t.element(find.descendant(of: skip, matching: find.byType(Text)).first)).style.color!;
       expect(color, isNot(Aigaio.light.exercise));
-      expect(color.a, lessThan(0.5), reason: 'ανενεργό: διαφανές γκρι του Material');
+      expect(color, Aigaio.light.textTertiary, reason: 'ανενεργό: το αχνό γκρι της εφαρμογής (όπως στη Διατροφή)');
       // κλείνει η οθόνη (σταματά το ρολόι του δευτερολέπτου)
       await t.pumpWidget(const SizedBox());
       await t.pump();

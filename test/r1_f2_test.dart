@@ -284,7 +284,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.descendant(of: page, matching: find.text('Τετάρτη 11 Νοεμβρίου')), findsOneWidget);
       expect(find.descendant(of: page, matching: find.text('Παρασκευή 13 Νοεμβρίου')), findsNothing);
-      expect(t.widget<Text>(find.byKey(const ValueKey('diary-day'))).data, 'Τετ 11/11');
+      expect(t.widget<Text>(find.byKey(const ValueKey('diary-day'))).data, 'Τετ\u00A011/11'); // R2-U1-11 (h1): μέρα και ημερομηνία κολλητά
 
       final back = find.byKey(const ValueKey('diary-today'));
       await t.ensureVisible(back);
@@ -307,7 +307,7 @@ void main() {
                   header: const SizedBox.shrink(), child: FoodTheme(child: NutritionPage(food: food, now: _now)))));
       food.setDay(DateTime(2026, 10, 30));
       await t.pumpAndSettle();
-      expect(t.widget<Text>(find.byKey(const ValueKey('diary-day'))).data, 'Παρ 30/10');
+      expect(t.widget<Text>(find.byKey(const ValueKey('diary-day'))).data, 'Παρ\u00A030/10'); // R2-U1-11 (h1)
       expect(find.text('Πίσω στο Σήμερα'), findsOneWidget);
       await t.ensureVisible(find.byKey(const ValueKey('diary-today')));
       await t.tap(find.byKey(const ValueKey('diary-today')));
