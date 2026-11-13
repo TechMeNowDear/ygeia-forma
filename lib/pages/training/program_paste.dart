@@ -64,7 +64,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
         icon: Icons.content_paste_rounded,
         color: c.exercise,
         title: _empty ? 'Το πρόχειρο είναι άδειο' : 'Διαβάζω το πρόχειρο…',
-        // R7-U3-13: «Αντίγραψε» (μία ενέργεια), όχι «Αντίγραφε».
+        // R7-U3-13: «Αντίγραψε» (μία ενέργεια, προστακτική αορίστου).
         text: 'Αντίγραψε το πρόγραμμα από τη συζήτηση με τον Claude (όλο το κείμενο) και πάτα «Επικόλληση ξανά».',
       ));
     } else if (!r.ok) {

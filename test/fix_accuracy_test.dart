@@ -707,7 +707,11 @@ void main() {
     final snap = buildWidgetSnapshot(store, sampleFoodStore(read), DateTime(2026, 11, 7, 0, 5));
     expect(((snap['kinds'] as Map)[WKind.move] as Map)['day'], '2026-11-06');
     final kt = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/HomeWidgets.kt').readAsStringSync();
-    expect(kt, contains('m.remove("dayHr")'));
+    // Round 7 (f5 · R7-A10-2): η ανανέωση στο παρασκήνιο είναι πια στο WidgetText.moveFromDashboard: σε άλλη μέρα ξεκινά
+    // από κενό (άρα ούτε τα χθεσινά «Παλμοί χθες» της προηγούμενης μέρας)· δοκιμή συμπεριφοράς: R7F5Test.kt.
+    final text = File('android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma/WidgetText.kt').readAsStringSync();
+    expect(text, contains('old.optString("day", "") == today.toString()) JSONObject(old.toString()) else JSONObject()'));
+    expect(kt, contains('WidgetText.moveFromDashboard('));
     expect(kt, contains('HomeWidgets.ensureMidnight(context)'));
     expect(kt, contains('Intent.ACTION_TIMEZONE_CHANGED'));
   });

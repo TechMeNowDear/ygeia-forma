@@ -331,7 +331,7 @@ class PasteResult {
 PasteResult parseProgram(String text, Set<String> known) {
   final a = text.indexOf('{'), b = text.lastIndexOf('}');
   if (a < 0 || b <= a) {
-    return PasteResult(null, ['Δεν βρέθηκε πρόγραμμα στο κείμενο. Αντέγραψε ολόκληρο το κομμάτι που ξεκινά με «{».'], const []);
+    return PasteResult(null, ['Δεν βρέθηκε πρόγραμμα στο κείμενο. Αντίγραψε ολόκληρο το κομμάτι που ξεκινά με «{».'], const []);
   }
   Object? j = programJsonIn(text);
   if (j == null) {

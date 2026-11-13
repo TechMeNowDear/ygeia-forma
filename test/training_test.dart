@@ -262,7 +262,8 @@ void main() {
       expect(press.log.first.load, 10.3); // 12, 12, 12 την προηγούμενη φορά
       expect(press.reason, contains('ανέβα'));
       final push = s.items.firstWhere((e) => e.ex == 'band_pushdown');
-      expect(push.reason, contains('ενόχληση'));
+      // Round 7 (f2 · R7-A6-3): μετά από ενόχληση ένα σκαλί πιο ελαφριά· η πρόταση μπορεί να αρχίζει με «Ενόχληση…».
+      expect(push.reason!.toLowerCase(), contains('ενόχληση'));
       for (var i = 0; i < 3; i++) {
         t2.tick(press, i);
       }
