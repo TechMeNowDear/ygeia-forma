@@ -255,8 +255,9 @@ class DashboardReader(
             // Round 1 (S3-8): η ζώνη ώρας της ίδιας της εγγραφής («off», λεπτά): η ώρα ύπνου/ξυπνήματος μένει η ώρα του
             // τόπου όπου κοιμήθηκες, ακόμα κι αν το ιστορικό ξαναδιαβαστεί με το κινητό σε άλλη ζώνη. Πρόσθετο κλειδί.
             val off = DataRules.offsetMinutes(p.zoneOffset?.totalSeconds)
+            val recEnd = ms(p.endTime) ?: start
             // C2: μία εγγραφή ανά συνεδρία (το κενό ανάμεσα δεν μετρά ποτέ ως ύπνος).
-            for (r in DataRules.splitSleep(start, ms(p.endTime) ?: start, duration?.toMinutes(), score, input)) {
+            for (r in DataRules.splitSleep(start, recEnd, duration?.toMinutes(), score, input)) {
                 val stages = JSONArray()
                 for (x in r.stages) stages.put(JSONArray().put(x.stage).put(x.start).put(x.end))
                 val o = JSONObject()
@@ -265,7 +266,12 @@ class DashboardReader(
                     .put("minutes", r.minutes ?: JSONObject.NULL)
                     .put("score", r.score ?: JSONObject.NULL)
                     .put("stages", stages)
-                if (off != null) o.put("off", off)
+                if (off != null) {
+                    o.put("off", off)
+                    // Round 2 (R2-B-1): η ΜΙΑ ζώνη της Samsung ισχύει για όλη την εγγραφή· η Flutter κρίνει «σπίτι ή ταξίδι»
+                    // μία φορά, με την αρχή και το τέλος της εγγραφής πριν χωριστεί σε κομμάτια. Πρόσθετα κλειδιά.
+                    o.put("recStart", start).put("recEnd", recEnd)
+                }
                 out.put(o)
             }
         }

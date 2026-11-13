@@ -620,13 +620,16 @@ class _SessionPageState extends State<SessionPage> {
               ),
             ),
           ]);
+      // Round 2 (R2-U2-10): ίδιο πλάτος τιμής στους δύο μετρητές, ώστε τα «+» και οι λέξεις «κιλά» / «επαναλήψεις» να
+      // στοιχίζονται όταν ο ένας είναι κάτω από τον άλλο (πριν 60 και 44: 16 dp μετατόπιση).
+      final valueWidth = usesKg(k) || band ? 60.0 : 88.0;
       final steppers = <Widget>[
         if (hasLoad(k))
           named(
             Stepper2(
               value: band ? '${(set.load ?? 0).round()}' : loadText,
               leading: band ? BandDots(set.load, size: 14) : null,
-              width: usesKg(k) || band ? 60 : 88,
+              width: valueWidth,
               button: 56,
               haptic: true,
               labelMinus: 'Λιγότερο βάρος',
@@ -639,7 +642,7 @@ class _SessionPageState extends State<SessionPage> {
         named(
           Stepper2(
             value: '${set.reps}',
-            width: 44,
+            width: hasLoad(k) ? valueWidth : 44.0,
             button: 56,
             haptic: true,
             labelMinus: 'Λιγότερες',
@@ -943,7 +946,12 @@ class _SessionPageState extends State<SessionPage> {
         flex: 5,
         child: OutlinedButton(
           key: const ValueKey('sess-skip'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), padding: pad, foregroundColor: c.text),
+          style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              padding: pad,
+              foregroundColor: c.text,
+              // R2-U2-01: ανενεργή (με γραμμένα σετ) σε αχνό γκρι, όπως στη Διατροφή· ποτέ πιο «ζωντανή» από την ενεργή.
+              disabledForegroundColor: c.textTertiary),
           onPressed: e.done.isNotEmpty ? null : () => t.skip(e, !e.skipped),
           child: FittedBox(fit: BoxFit.scaleDown, child: Text(e.skipped ? 'Αναίρεση' : 'Παράλειψη', maxLines: 1, softWrap: false)),
         ),
@@ -1475,7 +1483,8 @@ class _ExerciseCard extends StatelessWidget {
           decoration: line ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
           child: Row(children: [
             SizedBox(width: 40, child: cells[0]),
-            Expanded(child: cells[1]),
+            // Round 2 (R2-U2-02): 8 dp ανάμεσα στη μεσαία στήλη και στους παλμούς (πριν «…επαναλήψεις♥ στο σετ»).
+            Expanded(child: showHr ? Padding(padding: const EdgeInsets.only(right: 8), child: cells[1]) : cells[1]),
             if (showHr) ...[SizedBox(width: 66, child: cells[2]), const SizedBox(width: 8), SizedBox(width: 84, child: cells[3])],
           ]),
         );
@@ -1499,7 +1508,11 @@ class _ExerciseCard extends StatelessWidget {
         else ...[
           row([
             Text('σετ', style: head),
-            FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(headText, maxLines: 1, softWrap: false, style: head)),
+            FittedBox(
+                key: ValueKey('sum-head-${e.ex}'),
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(headText, maxLines: 1, softWrap: false, style: head)),
             _HeartLabel('στο σετ', style: head, color: c.textSecondary),
             _HeartLabel('διάλειμμα', style: head, color: c.textSecondary),
           ]),

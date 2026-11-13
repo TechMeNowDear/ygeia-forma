@@ -65,6 +65,10 @@ String hoursMinutes(int minutes) {
   return '${_hours(h)} ${_minutes(m)}';
 }
 
+/// Round 2 (R2-U2-05): ο αριθμός μένει με τη μονάδα του όταν η γραμμή σπάει («2 λεπτά», «1 ώρα 5 λεπτά» → το πολύ
+/// «1 ώρα | 5 λεπτά»): αδιάσπαστο κενό ΜΟΝΟ μετά από ψηφίο, ποτέ σε ολόκληρη φράση.
+String unitsGlued(String s) => s.replaceAllMapped(RegExp(r'(\d) '), (m) => '${m[1]}\u00A0');
+
 /// Χωριστά ο αριθμός και η λέξη, για μεγάλα νούμερα: [('6', 'ώρες'), ('12', 'λεπτά')].
 List<(String, String)> hoursMinutesParts(int minutes) {
   final h = minutes ~/ 60;

@@ -586,6 +586,11 @@ ThemeData _build(Aigaio c) {
   );
 }
 
+/// Χρώμα γραμμάτων κουμπιού κατηγορίας: [text] όταν είναι ενεργό, τίποτα (→ προεπιλογή Material) όταν είναι ανενεργό
+/// (round 2, R2-U2-01).
+WidgetStateProperty<Color?> categoryForeground(Color text) =>
+    WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.disabled) ? null : text);
+
 /// Οθόνες μιας κατηγορίας: κουμπιά, επιλογές και πεδία στο χρώμα της ([solid] γεμάτο, [text] για γράμματα).
 ThemeData _categoryTheme(ThemeData t, Aigaio c, {required Color solid, required Color text}) => t.copyWith(
       colorScheme: t.colorScheme.copyWith(
@@ -598,14 +603,17 @@ ThemeData _categoryTheme(ThemeData t, Aigaio c, {required Color solid, required 
         secondaryContainer: solid,
         onSecondaryContainer: c.onSolid,
       ),
+      // Round 2 (R2-U2-01): ΜΟΝΟ τα ενεργά κουμπιά στο χρώμα της κατηγορίας. Με `WidgetStatePropertyAll` και το
+      // ανενεργό («Παράλειψη» με γραμμένα σετ) έβγαινε πορτοκαλί, πιο «ζωντανό» από το ενεργό· null → το γκρι του
+      // Material για ανενεργό (onSurface 38%), όπως έξω από τις κατηγορίες.
       textButtonTheme: TextButtonThemeData(
         style: (t.textButtonTheme.style ?? const ButtonStyle()).copyWith(
-          foregroundColor: WidgetStatePropertyAll(text),
+          foregroundColor: categoryForeground(text),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: (t.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
-          foregroundColor: WidgetStatePropertyAll(text),
+          foregroundColor: categoryForeground(text),
         ),
       ),
       // Round 1 (U3a-15): η ετικέτα πεδίου με το «μάτι» πάνω της και ο κέρσορας έπαιρναν το γεμάτο χρώμα (σκούρο Αιγαίο:

@@ -46,7 +46,7 @@ class R1F9Test {
         assertNull(WidgetText.forToday(null, today))
     }
 
-    /** U7-11: η κρίση «μέσα/κάτω από το εύρος» δεν κόβεται ποτέ με «…»· δύο γραμμές ή χωρίς το «N νύχτες». */
+    /** U7-11: η κρίση «μέσα/κάτω από το εύρος» δεν κόβεται ποτέ με «…»· δύο γραμμές. Round 2 (R2-D-1): ποτέ χωρίς το «N νύχτες». */
     @Test
     fun usualLinesNeverCutTheVerdict() {
         val us = "▲ συνήθως 6:58"
@@ -55,12 +55,12 @@ class R1F9Test {
         fun fitsIn(w: Int): (String) -> Boolean = { it.length <= w }
         assertEquals(listOf("$us · $r"), WidgetText.usualLines(us, r, fitsIn(60)))
         assertEquals(listOf(us, r), WidgetText.usualLines(us, r, fitsIn(r.length)))
-        assertEquals(listOf(us, "μέσα στο εύρος"), WidgetText.usualLines(us, r, fitsIn(us.length)))
+        assertEquals(listOf(us), WidgetText.usualLines(us, r, fitsIn(us.length)))
         // Ό,τι δεν χωρά ούτε μόνο του δεν γράφεται (όχι «· …»).
-        assertEquals(listOf("μέσα στο εύρος"), WidgetText.usualLines("▲ συνήθως 7 ώρες 10 λεπτά", r, fitsIn(14)))
+        assertEquals(emptyList<String>(), WidgetText.usualLines("▲ συνήθως 7 ώρες 10 λεπτά", r, fitsIn(14)))
         assertEquals(emptyList<String>(), WidgetText.usualLines(us, r, fitsIn(3)))
         // Μία νύχτα (ενικός) και κρίση χωρίς νύχτες.
-        assertEquals(listOf("κάτω από το εύρος"), WidgetText.usualLines(null, "1 νύχτα κάτω από το εύρος", fitsIn(17)))
+        assertEquals(emptyList<String>(), WidgetText.usualLines(null, "1 νύχτα κάτω από το εύρος", fitsIn(17)))
         assertEquals(listOf("χθες μέσα στο εύρος"), WidgetText.usualLines(null, "χθες μέσα στο εύρος", fitsIn(30)))
         assertEquals(emptyList<String>(), WidgetText.usualLines(null, "", fitsIn(30)))
         for (w in 1..60) {

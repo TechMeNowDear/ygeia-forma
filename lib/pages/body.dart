@@ -35,8 +35,12 @@ class BodyPage extends StatelessWidget {
         // η χθεσινή ζύγιση έγραφε «Σήμερα 07:10»).
         final clock = now ?? DateTime.now();
         // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες: δεν μετρούν σε γραφήματα και τάσεις· φαίνονται σημειωμένες.
-        final foreign = foreignBody(body);
-        final counted = [for (final b in body) if (!foreign.contains(b)) b];
+        // Round 2 (g4 · R2-E-2): ζύγιση «σε αναμονή» (διαφέρει πολύ, χωρίς ακόμα επόμενη) φαίνεται και μετρά κανονικά εδώ.
+        final guard = guardBody(body);
+        final foreign = guard.foreign;
+        // Round 2 (g4 · R2-D-8): τα γραφήματα με μία ζύγιση ανά μέρα, την πρώτη που μετρά ([countedBody]), όπως η τάση, το
+        // ιστορικό, οι Τάσεις και η σελίδα της μέτρησης (πριν: κάθε ζύγιση, και η βραδινή μετά την προπόνηση ζιγκ-ζαγκ).
+        final daily = countedBody(body, foreign);
 
         final skinNights = (d?.nights ?? const <Night>[]).where((n) => n.skinTemp != null).toList();
         final skinBase = d?.skinTempBaseline;
@@ -61,6 +65,7 @@ class BodyPage extends StatelessWidget {
               last: last,
               previous: previousCounted(body, last, foreign),
               foreign: foreign.contains(last),
+              pending: guard.pending.contains(last),
               body: body,
               now: clock,
               profile: store.profile,
@@ -68,34 +73,34 @@ class BodyPage extends StatelessWidget {
             ),
           // Round 1 (U1a-20): ελάχιστο εύρος άξονα 3 (kg ή μονάδες λίπους): η συνηθισμένη διακύμανση μιας μέρας (0,5–1 kg,
           // reference.dart) να μη γεμίζει το γράφημα και να μοιάζει με μεγάλη αλλαγή (πριν 1).
-          if (counted.where((b) => b.weight != null).length >= 2)
+          if (daily.where((b) => b.weight != null).length >= 2)
             _chartCard(
               context,
               K.weight,
               'Βάρος (kg)',
-              [for (final b in counted) if (b.weight != null) (b.time, b.weight!)],
+              [for (final b in daily) if (b.weight != null) (b.time, b.weight!)],
               c.body,
               clock,
             ),
           _WaistCard(store: store),
-          if (counted.where((b) => b.fatPct != null).length >= 2)
+          if (daily.where((b) => b.fatPct != null).length >= 2)
             _chartCard(
               context,
               K.fatPct,
               'Λίπος (%)',
-              [for (final b in counted) if (b.fatPct != null) (b.time, b.fatPct!)],
+              [for (final b in daily) if (b.fatPct != null) (b.time, b.fatPct!)],
               c.heart,
               clock,
             ),
         ];
 
         final bodyMore = <Widget>[
-          if (counted.where((b) => b.smm != null).length >= 2)
+          if (daily.where((b) => b.smm != null).length >= 2)
             _chartCard(
               context,
               K.smm,
               'Σκελετικοί μύες (kg)',
-              [for (final b in counted) if (b.smm != null) (b.time, b.smm!)],
+              [for (final b in daily) if (b.smm != null) (b.time, b.smm!)],
               c.energy,
               clock,
             ),
@@ -185,11 +190,16 @@ class _LatestCard extends StatelessWidget {
     required this.profile,
     required this.onProfile,
     this.foreign = false,
+    this.pending = false,
   });
   final BodyMeasurement last;
 
   /// Round 1 (S11-2): η τελευταία ζύγιση μοιάζει ξένη ([foreignBody]): φαίνεται, αλλά δεν μετρά.
   final bool foreign;
+
+  /// Round 2 (R2-E-2): η τελευταία ζύγιση διαφέρει πολύ από τις προηγούμενες και δεν έχει ακόμα επόμενη ([guardBody]):
+  /// φαίνεται κανονικά, με μια γραμμή που λέει πότε θα μετρήσει και στη διόρθωση θερμίδων.
+  final bool pending;
 
   /// Όλες οι ζυγίσεις (παλιότερη πρώτη), για την τάση σε λίπος και μύες (body_trend.dart).
   final List<BodyMeasurement> body;
@@ -245,6 +255,14 @@ class _LatestCard extends StatelessWidget {
             Text(
               foreignLatestText,
               key: const ValueKey('body-foreign-latest'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
+          if (pending && !foreign) ...[
+            const SizedBox(height: 6),
+            Text(
+              pendingLatestText,
+              key: const ValueKey('body-pending-latest'),
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
@@ -347,9 +365,17 @@ class _LatestCard extends StatelessWidget {
 }
 
 /// Round 1 (S11-2): κάτω από μια τελευταία ζύγιση που μοιάζει ξένη (ίδια λογική με την κάρτα ελέγχου θερμίδων).
+/// Round 2 (g4 · R2-E-2): τελευταία ξένη ζύγιση γίνεται μόνο όταν την ίδια μέρα υπάρχει άλλη ζύγιση με πολύ διαφορετικό
+/// βάρος που μετρά (π.χ. το παιδί ζυγίστηκε μετά από σένα). Η υπόσχεση «θα μετρήσει μόλις συμφωνήσουν…» βγήκε: για ξένη
+/// ζύγιση δεν ισχύει (οι γύρω ζυγίσεις ήδη δεν συμφωνούν μαζί της).
 const foreignLatestText = 'Αυτή η ζύγιση διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μετρά σε γραφήματα, τάσεις και '
-    'θερμίδες. Αν δεν είναι δική σου, δεν χρειάζεται να κάνεις τίποτα. Αν είναι δική σου, θα μετρήσει μόλις συμφωνήσουν '
-    'μαζί της και οι επόμενες ζυγίσεις.';
+    'θερμίδες. Αν δεν είναι δική σου, δεν χρειάζεται να κάνεις τίποτα.';
+
+/// Round 2 (g4 · R2-E-2): κάτω από μια τελευταία ζύγιση «σε αναμονή» (weight_guard.dart, `WeighStatus.pending`). Μία
+/// ζύγιση που συμφωνεί μαζί της αρκεί για να μετρήσει· αν η επόμενη συμφωνεί με τις παλιότερες, γίνεται «ξένη».
+const pendingLatestText = 'Διαφέρει πολύ από τις προηγούμενες ζυγίσεις σου, γι\' αυτό δεν μπαίνει ακόμα στον έλεγχο '
+    'θερμίδων. Αν είναι δική σου, θα μετρήσει και εκεί μόλις συμφωνήσει μαζί της η επόμενη ζύγιση. Αν δεν είναι, δεν '
+    'χρειάζεται να κάνεις τίποτα: με την επόμενη ζύγισή σου θα σημειωθεί και δεν θα μετρά.';
 
 /// Ζυγίσεις ως πίνακας (σχέδια 9/11, 9β): οι μονάδες μία φορά επάνω, η χρονιά ως διαχωριστικό («2025»), αριθμοί
 /// με σταθερό πλάτος που μικραίνουν αντί να σπάνε.

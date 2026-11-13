@@ -73,8 +73,8 @@ class _TrendsPageState extends State<TrendsPage> {
                 nothingCompared: results.every(
                     (r) => r.status == TrendStatus.insufficient || r.status == TrendStatus.sourceChange || r.inconclusive),
                 // Round 1 (S4-1): με «Λίγες … για συμπέρασμα» σε κάποια γραμμή, δεν λέμε ότι «ό,τι αλλάζει είναι μέσα στις
-                // διακυμάνσεις σου» (εκεί δεν φάνηκε αν άλλαξε).
-                someInconclusive: results.any((r) => r.inconclusive),
+                // διακυμάνσεις σου» (εκεί δεν φάνηκε αν άλλαξε). Round 2 (R2-D-7): ούτε με «Λίγα δεδομένα» / «Αλλαγή πηγής».
+                notCompared: notComparedText(results),
               );
 
         Widget section(TrendSection s) => _SectionCard(
@@ -227,15 +227,15 @@ class _BackfillCard extends StatelessWidget {
 
 /// Η περίληψη: μόνο ό,τι άλλαξε πραγματικά, το πιο ξεκάθαρο πρώτο.
 class _ChangedCard extends StatelessWidget {
-  const _ChangedCard({required this.changed, required this.period, this.nothingCompared = false, this.someInconclusive = false});
+  const _ChangedCard({required this.changed, required this.period, this.nothingCompared = false, this.notCompared});
   final List<TrendResult> changed;
   final TrendPeriod period;
 
   /// Καμία μέτρηση δεν είχε αρκετές μέρες για σύγκριση (όλες «Λίγα δεδομένα» ή αλλαγή πηγής).
   final bool nothingCompared;
 
-  /// Round 1 (S4-1): κάποια γραμμή γράφει «Λίγες … για συμπέρασμα».
-  final bool someInconclusive;
+  /// Round 1 (S4-1), round 2 (R2-D-7): κάποιες γραμμές δεν συγκρίθηκαν ([notComparedText])· null όταν συγκρίθηκαν όλες.
+  final String? notCompared;
 
   @override
   Widget build(BuildContext context) {
@@ -252,10 +252,9 @@ class _ChangedCard extends StatelessWidget {
               child: Text(
                 nothingCompared
                     ? noComparisonText(period)
-                    : someInconclusive
-                        ? someInconclusiveText
+                    : notCompared ??
                         // Κλινικός έλεγχος M7 (4/11): όχι «ουσιαστικά», που διαβάζεται ως «κλινικά».
-                        : 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
+                        'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Ό,τι αλλάζει είναι μέσα στις συνηθισμένες μέρα-με-μέρα '
                             'διακυμάνσεις σου. Αυτό δεν είναι ιατρικός έλεγχος.',
                 style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
               ),
@@ -435,6 +434,8 @@ class _MetricDetail extends StatelessWidget {
     final len = daysBetween(r.currentFrom, r.end) + 1;
 
     String count(int n) => def.sparse ? '$n $unitWord' : '$n από $len $unitWord';
+    // Round 2 (R2-D-9): τα δύο διαστήματα σε διαφορετικές χρονιές → οι ημερομηνίες με το έτος.
+    final years = r.previousFrom.year != r.end.year;
     // Θερμοκρασία καρπού (ρολόι): ΜΟΝΟ διαφορές, ποτέ απόλυτη τιμή (τρίτος έλεγχος F2/C5). Το γράφημα δείχνει κάθε
     // νύχτα σε σχέση με τη μεσαία τιμή του «πριν» (ή του «τώρα», αν δεν υπάρχει «πριν»).
     final relative = relativeTemp(r);
@@ -453,7 +454,8 @@ class _MetricDetail extends StatelessWidget {
               color: color,
               format: relative ? (v) => signedDec(v, def.digits) : _axisFormat(def),
               minRange: _minRange(def),
-              dateLabel: dayMonth,
+              // Round 2 (R2-D-9): το «1 χρόνος» (15 μήνες) με το έτος στις άκρες.
+              dateLabel: spanDateLabel(r.points.first.$1, r.points.last.$1),
               // Round 1 (U1b-09, αίτημα f9 → f4): διάρκειες σε λεπτά με βήματα τέταρτα/μισάωρα/ώρες («6:00 · 7:00»), όχι
               // 1/2/5 × 10ⁿ λεπτά («3:20 · 6:40»).
               tickSteps: def.kind == ValueKind.duration ? minuteTickSteps : null,
@@ -494,13 +496,14 @@ class _MetricDetail extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Round 2 (R2-D-9): «1 χρόνος» = οι ίδιοι μήνες πέρσι· χωρίς έτος τα δύο διαστήματα έμοιαζαν ίδια.
                 InfoRow(
-                  'Τώρα · ${dayMonth(r.currentFrom)} – ${dayMonth(r.end)}',
+                  'Τώρα · ${dateSpanText(r.currentFrom, r.end, withYear: years)}',
                   r.current == null ? '—' : (relative ? relativeTempText(r) : def.formatAs(r.current!, r.source)),
                   dot: c.text,
                 ),
                 InfoRow(
-                  'Πριν · ${dayMonth(r.previousFrom)} – ${dayMonth(r.previousEnd)}',
+                  'Πριν · ${dateSpanText(r.previousFrom, r.previousEnd, withYear: years)}',
                   r.previous == null ? '—' : (relative ? 'σημείο σύγκρισης' : def.formatAs(r.previous!, r.source)),
                   dot: c.textSecondary,
                 ),
@@ -648,6 +651,35 @@ String relativeTempText(TrendResult r) => r.current == null ||
 /// μέσα στις διακυμάνσεις σου» (για εκείνες τις γραμμές δεν φάνηκε).
 const someInconclusiveText = 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει «Λίγες μέρες για συμπέρασμα» ή «Λίγες '
     'ζυγίσεις για συμπέρασμα», οι μετρήσεις δεν φτάνουν για να φανεί αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.';
+
+/// Round 2 (R2-D-7): η ετικέτα («χάπι», [TrendStatusPill]) μιας γραμμής που ΔΕΝ συγκρίθηκε· null όταν συγκρίθηκε.
+String? notComparedLabel(TrendResult r) {
+  if (r.status == TrendStatus.insufficient) return 'Λίγα δεδομένα';
+  if (r.status == TrendStatus.sourceChange) {
+    if (r.rereading) return 'Ενημερώνεται το ιστορικό';
+    return definitionMetrics.contains(r.def.key) ? 'Αλλαγή ορισμού' : 'Αλλαγή πηγής';
+  }
+  if (r.inconclusive) return inconclusiveText(r.def);
+  return null;
+}
+
+/// Round 2 (R2-D-7): τίποτα δεν «άλλαξε», αλλά κάποιες γραμμές ΔΕΝ συγκρίθηκαν. Τότε η σύνοψη δεν λέει «ό,τι αλλάζει είναι
+/// μέσα στις συνηθισμένες διακυμάνσεις σου» (για εκείνες δεν φάνηκε· π.χ. οι μετρήσεις του Oura τον πρώτο μήνα, «Λίγα
+/// δεδομένα»), αλλά ονομάζει τις ετικέτες τους όπως φαίνονται. Μόνο «Λίγες … για συμπέρασμα»: το κείμενο του γύρου 1
+/// ([someInconclusiveText]). null όταν συγκρίθηκαν όλες.
+String? notComparedText(List<TrendResult> results) {
+  final labels = <String>[];
+  for (final r in results) {
+    final l = notComparedLabel(r);
+    if (l != null && !labels.contains(l)) labels.add(l);
+  }
+  if (labels.isEmpty) return null;
+  if (results.every((r) => r.inconclusive || notComparedLabel(r) == null)) return someInconclusiveText;
+  final quoted = [for (final l in labels) '«$l»'];
+  final list = quoted.length == 1 ? quoted.single : '${quoted.sublist(0, quoted.length - 1).join(', ')} ή ${quoted.last}';
+  return 'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει $list, δεν φαίνεται αν άλλαξε κάτι. '
+      'Αυτό δεν είναι ιατρικός έλεγχος.';
+}
 
 /// UX U2: κανένας δείκτης δεν είχε αρκετές μετρήσεις και στις δύο περιόδους.
 String noComparisonText(TrendPeriod p) => switch (p) {

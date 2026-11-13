@@ -24,12 +24,9 @@ Set<String> exIds() => {for (final e in ExLibrary.loaded?.list ?? const <Ex>[]) 
 /// «3 × 8–12», ή «3 × 10» όταν lo = hi.
 String repsRange(PlanItem i) => '${i.sets} × ${i.lo == i.hi ? '${i.lo}' : '${i.lo}–${i.hi}'}';
 
-/// «2′», «1′30″», «45″».
-String restText(int s) {
-  if (s < 60) return '$s″';
-  final m = s ~/ 60, r = s % 60;
-  return r == 0 ? '$m′' : '$m′$r″';
-}
+/// «1:30», «0:45», «2:00»: λεπτά:δευτερόλεπτα, όπως η αντίστροφη μέτρηση του διαλείμματος και η «ξεκούραση 1:30» της
+/// προπόνησης (round 2, R2-D-5: πριν «1′30″», «45″» στον επεξεργαστή προγράμματος).
+String restText(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
 
 /// «3 × 9», ή «10, 10, 9» όταν διαφέρουν.
 String repsList(List<int> r) {
@@ -159,7 +156,8 @@ class Stepper2 extends StatelessWidget {
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (leading != null) ...[leading!, const SizedBox(width: 2)],
+            // Round 2 (R2-U2-10): 4 dp ανάμεσα στην κουκκίδα του λάστιχου και στον αριθμό (πριν 2: «●30» κολλητά).
+            if (leading != null) ...[leading!, const SizedBox(width: 4)],
             Text(value,
                 maxLines: 1,
                 textAlign: TextAlign.center,

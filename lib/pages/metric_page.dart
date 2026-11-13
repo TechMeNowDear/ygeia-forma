@@ -29,7 +29,12 @@ class MetricSpec {
     this.format,
     this.axis,
     this.duration = false,
+    this.minRange = 1,
   });
+
+  /// Round 2 (R2-U1-9): ελάχιστο εύρος του άξονα, ίδιο με το γράφημα από όπου ανοίγει η σελίδα (Σώμα 3 kg / 3 %, Καρδιά
+  /// 8 bpm, Σήμερα «Ετοιμότητα» 20), ώστε η ίδια αλλαγή να μη φαίνεται διπλάσια ένα πάτημα μετά.
+  final double minRange;
 
   /// Δική της μορφή τιμής (π.χ. διάρκεια ύπνου «7 ώρες 5 λεπτά»).
   final String Function(double v)? format;
@@ -94,9 +99,10 @@ final metricSpecs = <String, MetricSpec>{
     axis: (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}',
     duration: true,
   ),
-  K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart),
-  K.dayHr: MetricSpec(metric: K.dayHr, title: 'Παλμοί ξύπνιος', unit: 'bpm', color: (c) => c.heart, dayComplete: true),
-  K.energy: MetricSpec(metric: K.energy, title: 'Ετοιμότητα', unit: '/100', color: (c) => c.energy),
+  K.sleepHr: MetricSpec(metric: K.sleepHr, title: 'Παλμοί στον ύπνο', unit: 'bpm', color: (c) => c.heart, minRange: 8),
+  K.dayHr: MetricSpec(
+      metric: K.dayHr, title: 'Παλμοί ξύπνιος', unit: 'bpm', color: (c) => c.heart, dayComplete: true, minRange: 8),
+  K.energy: MetricSpec(metric: K.energy, title: 'Ετοιμότητα', unit: '/100', color: (c) => c.energy, minRange: 20),
   K.hrv: MetricSpec(metric: K.hrv, title: 'HRV', unit: 'ms', color: (c) => c.sleep),
   K.skinTemp: MetricSpec(metric: K.skinTemp, title: 'Θερμοκρασία στον ύπνο', unit: '°C', color: (c) => c.move, digits: 1, signed: true),
   K.breath: MetricSpec(
@@ -117,6 +123,7 @@ final metricSpecs = <String, MetricSpec>{
     range: _weightRange,
     scale: (r) => (r.low! - 15, r.high! + 25),
     periods: _bodyPeriods,
+    minRange: 3,
   ),
   K.fatPct: MetricSpec(
     metric: K.fatPct,
@@ -127,8 +134,10 @@ final metricSpecs = <String, MetricSpec>{
     range: fatRange,
     scale: (_) => (5, 40),
     periods: _bodyPeriods,
+    minRange: 3,
   ),
-  K.smm: MetricSpec(metric: K.smm, title: 'Σκελετικοί μύες', unit: 'kg', color: (c) => c.body, digits: 1, periods: _bodyPeriods),
+  K.smm: MetricSpec(
+      metric: K.smm, title: 'Σκελετικοί μύες', unit: 'kg', color: (c) => c.body, digits: 1, periods: _bodyPeriods, minRange: 3),
   K.steps: MetricSpec(
     metric: K.steps,
     title: 'Βήματα',
@@ -248,10 +257,12 @@ class _MetricPageState extends State<MetricPage> {
                   points: pts,
                   color: color,
                   format: s.axis ?? s.show,
-                  dateLabel: dayMonth,
+                  // Round 2 (R2-D-9): «365 μέρες» (και κάθε διάστημα που περνά την Πρωτοχρονιά) με το έτος στις άκρες.
+                  dateLabel: spanDateLabel(series.cut ?? from, end),
                   from: series.cut ?? from,
                   to: end,
                   tickSteps: s.duration ? minuteTickSteps : null,
+                  minRange: s.minRange,
                 ),
                 if (s.axis != null) ...[
                   const SizedBox(height: 4),

@@ -1,3 +1,4 @@
+import '../body_trend.dart' show countedBody;
 import '../data.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
@@ -13,7 +14,8 @@ import 'widget_style.dart';
 // (σχέδιο πηγών, «συνήθως», εύρη). Η Kotlin δεν υπολογίζει τίποτα δικό της, εκτός από τα βήματα και την κίνηση της
 // μέρας, που τα ανανεώνει από την ανάγνωση στο παρασκήνιο (HomeWidgets.kt).
 //
-// Μορφή: {v, at, kinds: {sleep: {src, m: {κλειδί: {l, v, u, cap?, d?, us?, r?, s?}}}}}
+// Μορφή: {v, at, kinds: {sleep: {src, srcShort?, m: {κλειδί: {l, v, u, cap?, d?, us?, r?, s?}}}}}
+//   srcShort: σύντομη πηγή όταν η κανονική δεν χωρά (round 2, R2-U3-04).
 //   l: όνομα στο κουτάκι, v: τιμή, u: μονάδα, cap: δεύτερη γραμμή όταν είναι η κεντρική τιμή,
 //   d: −1/0/1 σε σχέση με τα συνηθισμένα, us: «συνήθως …», r: θέση στο εύρος, s: 7 τιμές για το γράφημα (null = κενό).
 
@@ -86,7 +88,9 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   }
   final out = <String, dynamic>{};
   // Round 1 (U7-16): χωρίς νύχτα τις δύο τελευταίες μέρες το widget το λέει (πριν: σκέτο «—» χωρίς εξήγηση).
-  if (day == null) return {'src': 'καμία πρόσφατη νύχτα', 'm': out};
+  // Round 2 (R2-U3-04): και σύντομη μορφή («srcShort», νέο προαιρετικό κλειδί) για τη στήλη 1×3, όπου η κανονική κοβόταν
+  // «καμία πρόσφατη…» και χανόταν ακριβώς η λέξη «νύχτα».
+  if (day == null) return {'src': 'καμία πρόσφατη νύχτα', 'srcShort': 'καμία νύχτα', 'm': out};
   final d0 = day;
   final src = plan.nightSource(d0);
   List<double?> series(String k) => [for (var i = 6; i >= 0; i--) plan.value(h, k, _minus(d0, i))];
@@ -206,15 +210,21 @@ double? _kcalOf(FoodStore food, DateTime day) {
   return e.isEmpty ? null : Totals(e).kcal;
 }
 
-/// Σώμα: η τελευταία ζύγιση της InBody· το γράφημα = οι 7 τελευταίες ζυγίσεις (μία την εβδομάδα).
+/// Σώμα: η τελευταία ζύγιση της InBody που μετρά· το γράφημα = οι 7 τελευταίες μέρες ζύγισης (μία ζύγιση τη μέρα).
 Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final body = store.data?.body ?? const <BodyMeasurement>[];
   final out = <String, dynamic>{};
   // Round 1 (U7-16): χωρίς ζύγιση το widget το λέει.
-  if (body.isEmpty) return {'src': 'καμία ζύγιση ακόμα', 'm': out};
-  final last = body.last;
-  final prev = body.length >= 2 ? body[body.length - 2] : null;
-  final recent = body.length > 7 ? body.sublist(body.length - 7) : body;
+  // Round 2 (R2-U3-04): σύντομη μορφή για τη στήλη 1×3 (πριν «καμία ζύγιση ακ…»).
+  if (body.isEmpty) return {'src': 'καμία ζύγιση ακόμα', 'srcShort': 'καμία ζύγιση', 'm': out};
+  // Round 2 (g4 · R2-D-6, R2-D-8): ίδιοι κανόνες με τη Σήμερα και το Σώμα: μία ζύγιση ανά μέρα (η πρώτη της μέρας που
+  // μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν, με «κάτω από το εύρος» και
+  // «−47,0 kg» για το παιδί στη ζυγαριά, και ζυγίσεις της ίδιας μέρας στο γράφημα. Ζύγιση «σε αναμονή» φαίνεται κανονικά.
+  final counted = countedBody(body);
+  final days = counted.isEmpty ? body : counted;
+  final last = days.last;
+  final prev = days.length >= 2 ? days[days.length - 2] : null;
+  final recent = days.length > 7 ? days.sublist(days.length - 7) : days;
   List<double?> series(double? Function(BodyMeasurement b) f) =>
       [for (var i = 0; i < 7 - recent.length; i++) null, for (final b in recent) f(b)];
   final p = store.profile;
@@ -223,10 +233,12 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final hw = healthyWeight(p.heightCm);
 
   if (last.weight case final w?) {
-    final dw = prev?.weight == null ? null : w - prev!.weight!;
+    // Round 2 (g4 · R2-D-6): η διαφορά των νούμερων όπως φαίνονται, όπως η Σήμερα (τρίτος έλεγχος F3): 82,24 και 83,36 →
+    // «−1,2», όχι «−1,1».
+    final dw = prev?.weight == null ? null : shownDiff(w, prev!.weight!, 1);
     out['weight'] = _entry('Βάρος', dec(w), ' kg',
         cap: '${shortDayDate(last.time)}${dw == null ? '' : ' · ${signedDec(dw)} kg'}',
-        d: dw == null ? null : (shownDiff(w, prev!.weight!, 1) == 0 ? 0 : (dw > 0 ? 1 : -1)),
+        d: dw == null ? null : (dw == 0 ? 0 : (dw > 0 ? 1 : -1)),
         range: hw == null ? null : RefRange(low: hw.$1, high: hw.$2, text: '', cite: '').placeText(w),
         spark: series((b) => b.weight));
   }

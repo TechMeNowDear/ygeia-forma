@@ -52,8 +52,11 @@ object WidgetText {
 
     /**
      * U7-11: η γραμμή «▲ συνήθως 6:58 · 7 νύχτες μέσα στο εύρος». Αν δεν χωρά ολόκληρη ([fits]: με το πολύ
-     * [MIN_SCALE_SMALL] σμίκρυνση), γίνεται δύο γραμμές («συνήθως…» και η κρίση του εύρους)· η κρίση χάνει το «N νύχτες»
-     * αν ούτε έτσι χωρά. Ό,τι δεν χωρά δεν γράφεται· ποτέ «· …», που έκοβε την κρίση στη μέση.
+     * [MIN_SCALE_SMALL] σμίκρυνση), γίνεται δύο γραμμές («συνήθως…» και η κρίση του εύρους). Ό,τι δεν χωρά δεν γράφεται·
+     * ποτέ «· …», που έκοβε την κρίση στη μέση.
+     * Round 2 (R2-D-1): η κρίση γράφεται μόνο ΟΛΟΚΛΗΡΗ, με το «N νύχτες» της. Πριν, σε στενή στήλη έχανε το «7 νύχτες» και
+     * το «κάτω από το εύρος» του μέσου όρου της εβδομάδας καθόταν κάτω από τη χθεσινή νύχτα (π.χ. «7:16 ώρες» … «κάτω από
+     * το εύρος»), σαν κρίση για εκείνη. Καλύτερα τίποτα παρά κρίση χωρίς το τι κρίνει.
      */
     fun usualLines(usual: String?, range: String?, fits: (String) -> Boolean): List<String> {
         val us = usual?.takeIf { it.isNotBlank() }
@@ -64,11 +67,56 @@ object WidgetText {
         if (fits(joined)) return listOf(joined)
         val out = mutableListOf<String>()
         if (us != null && fits(us)) out += us
-        if (r != null) {
-            val short = r.replace(Regex("^\\d+ νύχτ(α|ες) "), "")
-            if (fits(r)) out += r else if (short != r && fits(short)) out += short
-        }
+        if (r != null && fits(r)) out += r
         return out
+    }
+
+    /**
+     * Round 2 (R2-U3-04): η πηγή του widget. Όταν η κανονική ([src]) δεν χωρά ούτε με τη μικρότερη επιτρεπτή σμίκρυνση
+     * ([fits], π.χ. «καμία πρόσφατη νύχτα» στη στήλη 1×3), η σύντομη ([short], «καμία νύχτα»)· ποτέ «καμία πρόσφατη…».
+     */
+    fun sourceText(src: String, short: String?, fits: (String) -> Boolean): String =
+        if (short.isNullOrEmpty() || fits(src)) src else short
+
+    /**
+     * Round 2 (R2-U3-06): ποσότητες που μετριούνται από το μηδέν (βήματα, θερμίδες, γραμμάρια, ΚΑΙ η διάρκεια ύπνου):
+     * ράβδοι από το μηδέν, ώστε η αναλογία των υψών να είναι η αναλογία των τιμών (6,5 ώρες = 86% των 7,6, όχι 38%).
+     */
+    fun zeroBased(kind: String, heroKey: String): Boolean = kind == "move" || kind == "food" || heroKey == "sleepMin"
+
+    /**
+     * Round 2 (R2-U3-05): ελάχιστο εύρος των ράβδων, ίδιο με τα γραφήματα του κινητού (Σήμερα/Σώμα: βάρος, λίπος, μύες
+     * 3· παλμοί 8· ετοιμότητα 20), ώστε ο θόρυβος της ζυγαριάς (±0,2 kg) να μη μοιάζει με άλματα. 0 = χωρίς ελάχιστο.
+     */
+    fun minSpanFor(heroKey: String): Float = when (heroKey) {
+        "weight", "smm", "ffm", "fatPct" -> 3f
+        "sleepHr", "lowHr", "dayHr" -> 8f
+        "energy" -> 20f
+        else -> 0f
+    }
+
+    /**
+     * Το ύψος κάθε ράβδου του γραφήματος 7 ημερών ως κλάσμα του ύψους του (0,08–1· null = χωρίς τιμή). [zero]: από το
+     * μηδέν. Αλλιώς βάση λίγο κάτω από το χαμηλότερο (όπως πριν: η χαμηλότερη ράβδος 37,5% της ψηλότερης), αλλά με εύρος
+     * τουλάχιστον [minSpan] γύρω από τη μέση των τιμών (όπως το `sparkRange` του κινητού).
+     */
+    fun barFractions(vals: List<Float?>, zero: Boolean, minSpan: Float): List<Float?> {
+        val real = vals.filterNotNull()
+        if (real.isEmpty()) return vals.map { null }
+        var hi = real.max()
+        var lo0 = real.min()
+        val lo: Float
+        if (zero && hi > 0f) {
+            lo = 0f
+        } else {
+            if (hi - lo0 < minSpan) {
+                val mid = (hi + lo0) / 2f
+                lo0 = mid - minSpan / 2f
+                hi = mid + minSpan / 2f
+            }
+            lo = if (hi == lo0) lo0 - 1f else lo0 - (hi - lo0) * 0.6f
+        }
+        return vals.map { v -> if (v == null) null else ((v - lo) / (hi - lo)).coerceIn(0.08f, 1f) }
     }
 
     // ---------------------------------------------------------------- χρώματα (ARGB σε Int)

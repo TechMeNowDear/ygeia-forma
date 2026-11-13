@@ -265,7 +265,13 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
     final c = Aigaio.of(context);
     return FilledButton(
       key: ValueKey(key),
-      style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
+      // Round 2 (R2-U2-09): και 10 dp πάνω-κάτω· με γράμματα 2× το κείμενο σε δύο γραμμές ακουμπούσε τις άκρες. Στο 1×
+      // το ύψος μένει 52 (16 + 20 < 52).
+      style: FilledButton.styleFrom(
+          backgroundColor: c.exerciseSolid,
+          foregroundColor: c.onSolid,
+          minimumSize: const Size.fromHeight(52),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
       onPressed: onTap,
       child: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
     );

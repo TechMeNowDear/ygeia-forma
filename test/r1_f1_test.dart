@@ -306,7 +306,7 @@ void main() {
       expect(find.text('Χάνεις πάνω από 1% του βάρους την εβδομάδα'), findsOneWidget);
       expect(find.textContaining('ασφαλές', findRichText: true), findsNothing);
       expect(find.textContaining('γίνεται πιο δύσκολο να κρατήσεις τους μύες', findRichText: true), findsOneWidget);
-      expect(find.textContaining('γράφτηκαν κατά μέσο όρο 1.400 kcal τη μέρα, 850 λιγότερες από τον στόχο σου (2.250)', findRichText: true),
+      expect(find.textContaining('γράφτηκαν κατά μέσο όρο 1.400\u00A0kcal τη μέρα, 850 λιγότερες από τον στόχο σου (2.250)', findRichText: true),
           findsOneWidget);
       expect(find.byKey(const ValueKey('checkin-apply')), findsNothing);
       expect(find.byKey(const ValueKey('checkin-ok')), findsOneWidget);
@@ -314,12 +314,12 @@ void main() {
       final same = _pending(checkinGoals(), _check, eat: 1400, tdee: 2500)!;
       await _card(t, same, _check);
       expect(find.textContaining('ο στόχος δεν κατεβαίνει όσο χάνεις τόσο γρήγορα', findRichText: true), findsOneWidget);
-      expect(find.textContaining('Τρως κατά μέσο όρο 1.400 kcal, 850 λιγότερες από τον στόχο σου', findRichText: true), findsOneWidget);
+      expect(find.textContaining('Τρως κατά μέσο όρο 1.400\u00A0kcal, 850 λιγότερες από τον στόχο σου', findRichText: true), findsOneWidget);
 
       // U3b-6: δύο δεκαδικά στα kg, ώστε το ποσοστό να βγαίνει από τον αριθμό που φαίνεται (1,16 ÷ 86,5 = 1,34%).
       final fast = _pending(checkinGoals(), DateTime(2026, 12, 4), eat: 2250, tdee: 3550)!;
       await _card(t, fast, DateTime(2026, 12, 4, 9));
-      expect(find.textContaining('−1,16 kg την εβδομάδα (1,3% του βάρους)', findRichText: true), findsOneWidget);
+      expect(find.textContaining('−1,16\u00A0kg την εβδομάδα (1,3% του βάρους)', findRichText: true), findsOneWidget);
       expect(find.byKey(const ValueKey('checkin-apply')), findsOneWidget);
     });
   });
@@ -327,14 +327,21 @@ void main() {
   // ------------------------------------------------------------------------------------------------ S1-4
   group('S1-4: όχι δύο αλλαγές μέσα σε λίγες μέρες', () {
     test('έλεγχος που απαντήθηκε λιγότερο από 4 μέρες πριν από μέρα ελέγχου την καλύπτει', () {
-      final g = checkinGoals();
+      // Γύρος 2 (R2-A-5): μόνο όταν η απάντηση άλλαξε τον στόχο («Εφάρμοσε», γραμμή στο ιστορικό εκείνη τη μέρα). Χωρίς
+      // αλλαγή ισχύει ο κανόνας πριν από το S1-4 (δοκιμή στη r2_g1_test).
+      Goals changedOn(String day) =>
+          checkinGoals().copyWith(addLog: AdaptLog(day: day, tdee: 2600, before: 2250, after: 2100, applied: true));
       final mon = DateTime(2026, 12, 21);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-20'), isFalse);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-18'), isFalse);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-17'), isTrue);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-16'), isTrue);
-      expect(checkInDue(goals: g, today: mon, lastCheckIn: '2026-12-14'), isTrue);
-      final answered = g.copyWith(checkIn: '2026-12-20');
+      for (final (day, due) in [
+        ('2026-12-20', false),
+        ('2026-12-18', false),
+        ('2026-12-17', true),
+        ('2026-12-16', true),
+        ('2026-12-14', true),
+      ]) {
+        expect(checkInDue(goals: changedOn(day), today: mon, lastCheckIn: day), due, reason: day);
+      }
+      final answered = changedOn('2026-12-20').copyWith(checkIn: '2026-12-20');
       expect(nextCheckDay(answered, DateTime(2026, 12, 20)), DateTime(2026, 12, 28));
       expect(nextCheckDay(answered, DateTime(2026, 12, 21)), DateTime(2026, 12, 28));
     });
@@ -467,7 +474,8 @@ void main() {
       s.setGoals(checkinGoals().copyWith(betaPer100: 5.5));
       await t.pumpAndSettle();
       expect(find.text('Πίτουρο βρώμης'), findsOneWidget);
-      expect(find.text('40 g · για 3 g β-γλυκάνες: 55 g'), findsOneWidget);
+      // Round 2 (R2-U1-14, h1): ποιο είναι το πλάνο και ότι δεν φτάνει.
+      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β-γλυκάνες χρειάζονται 55\u00A0g'), findsOneWidget);
     });
 
     testWidgets('U3b-14 / U3b-28 / U3b-29 / U3b-12: γραμμές που αλλάζουν 48 dp, «το πλάνο σου», «Σβήσε» κόκκινο, χρώμα διατροφής',
@@ -701,7 +709,9 @@ void main() {
       final base = simWeights(day); // 18/11 … 9/12: 90,0 → 89,0 kg
       final child = [for (final (d, kg) in base) (d, d.day == 9 && d.month == 12 ? 45.0 : kg)];
       final a = guardedWeights(_body(day, child));
-      expect(a.foreign, [(DateTime(2026, 12, 9), 45.0)]);
+      // Round 2 (g4 · R2-E-2): η 45 kg είναι η ΤΕΛΕΥΤΑΙΑ ζύγιση (καμία μετά): «σε αναμονή», όχι ξένη· δεν μετρά στον έλεγχο
+      // θερμίδων ώσπου να κριθεί από την επόμενη (πριν: `foreign == [(9/12, 45)]`).
+      expect(a.foreign, isEmpty);
       expect(a.used.any((x) => x.$1 == DateTime(2026, 12, 9)), isFalse);
       expect(a.used.length, base.length - 1);
       final both = [...base, (DateTime(2026, 12, 9, 7, 0), 80.0)];
@@ -714,18 +724,20 @@ void main() {
     testWidgets('η κάρτα λέει ποια ζύγιση δεν μέτρησε, μία φορά· όχι «γρήγορη απώλεια»', (t) async {
       final day = DateTime(2026, 12, 9);
       final g = checkinGoals().copyWith(checkIn: '2026-12-07');
-      List<(DateTime, double)> child(List<(DateTime, double)> w) => [for (final (d, kg) in w) (d, d.day == 9 && d.month == 12 ? 45.0 : kg)];
+      // Round 2 (g4 · R2-E-2): το παιδί τη Δευτέρα 7/12, ανάμεσα στις ζυγίσεις σου της 4/12 και της 9/12 (που συμφωνούν
+      // μεταξύ τους): ξένη. Πριν ήταν στις 9/12, την τελευταία ζύγιση, που με τον νέο κανόνα είναι «σε αναμονή».
+      List<(DateTime, double)> child(List<(DateTime, double)> w) => [for (final (d, kg) in w) (d, d.day == 7 && d.month == 12 ? 45.0 : kg)];
       final c = _pending(g, day, weights: child)!;
       expect((c.kind, c.proposal), (CheckKind.foreign, null));
-      expect(c.foreign, [(DateTime(2026, 12, 9), 45.0)]);
+      expect(c.foreign, [(DateTime(2026, 12, 7), 45.0)]);
       await _card(t, c, DateTime(2026, 12, 9, 9));
       expect(find.text('Μια ζύγιση δεν μέτρησε'), findsOneWidget);
-      expect(find.textContaining(foreignWeighText([(DateTime(2026, 12, 9), 45.0)])), findsOneWidget);
-      expect(foreignWeighText([(DateTime(2026, 12, 9), 45.0)]),
-          'Η ζύγιση ${shortDayDate(DateTime(2026, 12, 9))} (45,0 kg) διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.');
+      expect(find.textContaining(foreignWeighText([(DateTime(2026, 12, 7), 45.0)])), findsOneWidget);
+      expect(foreignWeighText([(DateTime(2026, 12, 7), 45.0)]),
+          'Η ζύγιση ${shortDayDate(DateTime(2026, 12, 7))} (45,0 kg) διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.');
       final seen = dismissCheckIn(c, day);
-      expect((seen.foreignSeen, seen.kcal, seen.checkIn), ('2026-12-09', 2250, '2026-12-07'));
-      expect(Goals.fromJson(seen.toJson())!.foreignSeen, '2026-12-09');
+      expect((seen.foreignSeen, seen.kcal, seen.checkIn), ('2026-12-07', 2250, '2026-12-07'));
+      expect(Goals.fromJson(seen.toJson())!.foreignSeen, '2026-12-07');
       expect(_pending(seen, DateTime(2026, 12, 10), weights: child), isNull, reason: 'δεν ξαναγράφεται');
     });
 
@@ -750,7 +762,7 @@ void main() {
     testWidgets('S11-3: η κάρτα και το «Πώς βγήκε» τη γράφουν', (t) async {
       final c = _pending(checkinGoals(), _check, extra: {DateTime(2026, 12, 2): 19710})!;
       await _card(t, c, _check);
-      expect(find.textContaining('(19.710 kcal) έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε'), findsOneWidget);
+      expect(find.textContaining('(19.710\u00A0kcal) έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε'), findsOneWidget);
       await t.ensureVisible(find.byKey(const ValueKey('checkin-how')));
       await t.tap(find.byKey(const ValueKey('checkin-how')));
       await t.pumpAndSettle();
@@ -818,7 +830,7 @@ void main() {
       expect(find.text('0,5% × 89,2 kg × 7.700 ÷ 7'), findsOneWidget);
       // U3b-5: η διαφορά των αριθμών όπως φαίνονται.
       final shown = (c.est!.tdee / 10).round() * 10;
-      expect(find.textContaining('Ο τύπος έλεγε 2.745: έπεφτε ${thousands(2745 - shown)} kcal ψηλά'), findsOneWidget);
+      expect(find.textContaining('Ο τύπος έλεγε 2.745: έπεφτε ${thousands(2745 - shown)}\u00A0kcal ψηλά'), findsOneWidget);
     });
   });
 

@@ -96,6 +96,20 @@ bool dayHeartNeedsMissingWindow(SourcePlan plan, SleepWindows windows, DateTime 
   return false;
 }
 
+/// Round 2 (R2-B-2): ο ύπνος του ρολογιού δεν διαβάστηκε (σφάλμα, ή κλειστή άδεια «Ύπνος» στη Samsung Health). Οι παλμοί
+/// της μέρας δεν γράφονται (οι αποθηκευμένοι μένουν, S3-7) ΜΟΝΟ τις μέρες που τους κρίνει νύχτα του ρολογιού (η νύχτα
+/// της μέρας ή της επόμενης, [_heartWithPlan]). Τις μέρες με νύχτες μόνο του Oura ο ύπνος του ρολογιού δεν χρειάζεται:
+/// γράφονται κανονικά (πριν, με την άδεια «Ύπνος» κλειστή, πάγωναν για όλη την περίοδο του Oura).
+void dropWatchNightDayHeart(Map<String, Map<String, double>> rows, SourcePlan plan) {
+  for (final e in rows.entries) {
+    final day = parseDateKey(e.key);
+    if (plan.nightSource(day) == Source.watch ||
+        plan.nightSource(DateTime(day.year, day.month, day.day + 1)) == Source.watch) {
+      e.value.removeWhere((k, _) => dayHeartKeys.contains(k));
+    }
+  }
+}
+
 /// Οξυγόνο της νύχτας (πάντα του ρολογιού).
 const spo2Keys = {K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov};
 
@@ -532,7 +546,8 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day,
       put(K.awakeMin, night.stageMinutes['AWAKE'] ?? 0);
     }
     // Round 1 (S3-8): η ώρα του τόπου όπου κοιμήθηκες (η ζώνη της ίδιας της εγγραφής, όταν η Samsung τη δίνει), όχι η
-    // ζώνη που έχει ΤΩΡΑ το κινητό: αλλιώς μια ανάγνωση σε ταξίδι ξανάγραφε 30 νύχτες δύο ώρες νωρίτερα.
+    // ζώνη που έχει ΤΩΡΑ το κινητό: αλλιώς μια ανάγνωση σε ταξίδι ξανάγραφε 30 νύχτες δύο ώρες νωρίτερα. Round 2
+    // (R2-B-1): «ταξίδι» κρίνεται μία φορά ανά εγγραφή ([recordZone])· στο σπίτι η ώρα του κινητού και στις δύο άκρες.
     put(K.bedtime, minutesFromSix(wallClock(night.start.millisecondsSinceEpoch, night.startOff)));
     put(K.wake, minutesFromSix(wallClock(night.end.millisecondsSinceEpoch, night.endOff)));
     put(K.sleepHr, night.sleepingHr);

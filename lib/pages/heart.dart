@@ -303,8 +303,10 @@ class _AwakeHeartCard extends StatelessWidget {
     String? usual;
     if (b?.usual != null) {
       final d = shownDiff(b!.value, b.usual!);
+      // Round 2 (R2-U1-10): ίδια γραφή με το χάπι των παλμών ύπνου στην ίδια σελίδα («+2 bpm · συνήθως 59», «Όπως
+      // συνήθως»)· πριν «−2 bpm · συνήθως 74 bpm» και «Όπως συνήθως · συνήθως 74 bpm».
       pill = TrendPill(
-        d == 0 ? '$asUsualText · συνήθως ${b.usual!.round()} bpm' : '${signedShown(d)} bpm · συνήθως ${b.usual!.round()} bpm',
+        d == 0 ? asUsualText : '${signedShown(d)} bpm · συνήθως ${b.usual!.round()}',
         up: d == 0 ? null : d > 0,
       );
     } else if (b != null) {

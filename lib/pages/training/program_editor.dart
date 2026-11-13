@@ -253,7 +253,8 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
   }
 
   String _line(PlanItem i) {
-    final parts = [repsRange(i), restText(i.rest), 'ρεζέρβα ${i.rir}'];
+    // Round 2 (R2-D-5): «ξεκούραση 1:30», όπως στην προπόνηση και στην επικόλληση (πριν «1′30″»).
+    final parts = [repsRange(i), 'ξεκούραση ${restText(i.rest)}', 'ρεζέρβα ${i.rir}'];
     if (hasLoad(i.kind)) parts.add(i.load == null ? 'βάρος: αυτόματα' : loadLabel(i.kind, i.load));
     return parts.join(' · ');
   }
@@ -302,8 +303,10 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
                 ] else
                   Row(children: [
                     Expanded(child: Text('Διάρκεια', style: TextStyle(fontSize: 15, color: c.text))),
+                    // Round 2 (R2-D-5): «30 λεπτά» με ολόκληρη λέξη (πριν «30′»)· φαρδύτερη τιμή, όπως το «Αρχικό βάρος».
                     Stepper2(
-                      value: '${cd.minutes}′',
+                      value: cd.minutes == 1 ? '1 λεπτό' : '${cd.minutes} λεπτά',
+                      width: 96,
                       onMinus: cardioMinutesMinus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesMinus(cd.minutes)!),
                       onPlus: cardioMinutesPlus(cd.minutes) == null ? null : () => setState(() => cd.minutes = cardioMinutesPlus(cd.minutes)!),
                     ),

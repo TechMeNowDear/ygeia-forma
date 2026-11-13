@@ -164,10 +164,13 @@ void main() {
     });
 
     testWidgets('Σώμα: τελευταία ζύγιση ξένη → φαίνεται, με σημείωση, χωρίς «… kg από …»', (t) async {
+      // Round 2 (g4 · R2-E-2): τελευταία ξένη ζύγιση = άλλο βάρος την ίδια μέρα με μια δική σου (εδώ 08:00 εσύ, 09:00 το
+      // παιδί). Πριν: μόνο το παιδί στις 13/11, που με τον νέο κανόνα (καμία ζύγιση μετά) είναι «σε αναμονή».
       final s = HealthStore()
         ..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 11, 13, 20), [
           for (final d in [2, 4, 6, 9, 11]) (DateTime(2026, 11, d, 8), 90.0, 25.0),
-          (DateTime(2026, 11, 13, 8), 30.0, 15.0),
+          (DateTime(2026, 11, 13, 8), 90.0, 25.0),
+          (DateTime(2026, 11, 13, 9), 30.0, 15.0),
         ]));
       await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 13, 21)), size: const Size(400, 4000));
       expect(find.byKey(const ValueKey('body-foreign-latest')), findsOneWidget);
@@ -236,14 +239,15 @@ void main() {
       expect(bodyDaily(body, (b) => b.fatPct).every((e) => e.$1.hour == 8), isTrue);
     });
 
-    test('S4-3: όριο θορύβου 1,5 μονάδες λίπους και 1 kg (McLester 2020)', () {
-      expect(bodyFloorFatPct, 1.5);
-      expect(bodyFloorKg, 1.0);
-      expect(bodyDiffShown(1.4, bodyFloorFatPct), isFalse);
-      expect(bodyDiffShown(1.5, bodyFloorFatPct), isTrue);
+    // Round 2 (g4 · R2-D-2): όρια στο πάνω άκρο του θορύβου της μελέτης (πριν 1,5 / 1,0).
+    test('S4-3: όριο θορύβου 2 μονάδες λίπους και 1,7 kg (McLester 2020)', () {
+      expect(bodyFloorFatPct, 2.0);
+      expect(bodyFloorKg, 1.7);
+      expect(bodyDiffShown(1.9, bodyFloorFatPct), isFalse);
+      expect(bodyDiffShown(2.0, bodyFloorFatPct), isTrue);
       expect(bodyDiffShown(-2.1, bodyFloorFatPct), isTrue);
-      expect(bodyDiffShown(0.9, bodyFloorKg), isFalse);
-      expect(bodyDiffShown(-1.0, bodyFloorKg), isTrue);
+      expect(bodyDiffShown(1.6, bodyFloorKg), isFalse);
+      expect(bodyDiffShown(-1.7, bodyFloorKg), isTrue);
       expect(bodyDiffShown(0, 0), isFalse);
     });
 

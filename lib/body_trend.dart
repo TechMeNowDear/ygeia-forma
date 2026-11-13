@@ -8,15 +8,16 @@
 /// - Μία ζύγιση ανά μέρα, η ΠΡΩΤΗ της μέρας (round 1, S4-4 = S3-6 = S11-13): ίδιος κανόνας με το ιστορικό, τις Τάσεις,
 ///   την αναφορά και τη διόρθωση θερμίδων (RT-15). Η πρωινή ζύγιση, νηστικός, είναι συγκρίσιμη από μέρα σε μέρα· μια
 ///   βραδινή μετά από φαγητό ή άσκηση αλλάζει βάρος και εκτίμηση λίπους (Kyle 2004). Πριν μετρούσε η τελευταία της μέρας.
-/// - Ζύγιση που μοιάζει ξένη (round 1, S11-2: [weightLooksForeign], ίδιος κανόνας με τη διόρθωση θερμίδων) δεν μετρά·
-///   μένει στη λίστα των ζυγίσεων, σημειωμένη. Αν η πρώτη της μέρας μοιάζει ξένη, μετρά η επόμενη της ίδιας μέρας.
+/// - Ζύγιση που μοιάζει ξένη (round 1, S11-2· round 2, R2-E-2: [guardBody], ίδιος κανόνας με τη διόρθωση θερμίδων) δεν
+///   μετρά· μένει στη λίστα των ζυγίσεων, σημειωμένη. Αν η πρώτη της μέρας μοιάζει ξένη, μετρά η επόμενη της ίδιας μέρας.
+///   Ζύγιση «σε αναμονή» (διαφέρει πολύ, χωρίς ακόμα επόμενη) μετρά κανονικά εδώ.
 /// - Με λιγότερες από 6 μέρες ζύγισης: καμία αλλαγή (ούτε «περίπου»).
 /// - Το «3» είναι δική μας επιλογή (ο μικρότερος αριθμός που έχει μεσαία τιμή)· δεν βγαίνει από μελέτη.
 /// - Round 1 (S4-3): η διαφορά γράφεται μόνο όταν ξεπερνά τον θόρυβο της ζυγαριάς ([bodyFloorFatPct], [bodyFloorKg]).
 library;
 
 import 'data.dart';
-import 'format.dart' show daysBetween, dayOf;
+import 'format.dart' show dayOf, dec;
 import 'history.dart' show dateKey;
 import 'weight_guard.dart';
 
@@ -25,39 +26,58 @@ const bodyTrendGroup = 3;
 /// Round 1 (S4-3): η μικρότερη διαφορά της τάσης (μεσαία 3 τελευταίων − μεσαία 3 πριν) που γράφεται. Πηγή: McLester κ.ά.,
 /// J Clin Densitom 2020 (67 ενήλικες, InBody 230/720/770, δύο μετρήσεις με 24–72 ώρες διαφορά): τυπικό σφάλμα μέτρησης
 /// 0,77–0,99 μονάδες στο % λίπους, 0,54–0,87 kg στη μάζα λίπους, 0,58–0,84 kg στην άλιπη μάζα. Σε προσομοίωση χωρίς
-/// καμία αλλαγή, το 95% των διαφορών «3 με 3» είναι κάτω από ~1,8 × σφάλμα: 1,4–1,8 μονάδες λίπους και 1,0–1,6 kg.
-/// Τα όρια είναι στο κάτω άκρο αυτού του εύρους (αλλιώς θα κρυβόταν και αληθινή αλλαγή). Για τους σκελετικούς μύες δεν
-/// υπάρχει δημοσιευμένο σφάλμα: ίδιο όριο με την άλιπη μάζα (είναι μέρος της), ώστε ο θόρυβος να μη διαβάζεται «χάνω
-/// μύες». Για την H40 δεν υπάρχει καμία μελέτη.
-const bodyFloorFatPct = 1.5;
-const bodyFloorKg = 1.0;
+/// καμία αλλαγή, το 95% των διαφορών «3 με 3» είναι κάτω από ~1,86 × σφάλμα (διαφορά δύο μεσαίων τιμών από 3: τυπική
+/// απόκλιση 0,947 × σφάλμα): 1,4–1,8 μονάδες λίπους και 1,0–1,6 kg.
+/// Round 2 (g4 · R2-D-2): τα όρια μπήκαν στο ΠΑΝΩ άκρο αυτού του εύρους (2 μονάδες, 1,7 kg). Με το κάτω άκρο (1,5 / 1,0
+/// του γύρου 1), χωρίς καμία αλλαγή, η παρένθεση έβγαινε στο 12% (λίπος %) και στο 23–25% (kg) των συγκρίσεων με το
+/// μεγαλύτερο σφάλμα της μελέτης, ενώ η σημείωση λέει «μόνο αλλαγή μεγαλύτερη από τη διακύμανση». Τώρα ≤ 3,8% και ≤ 4,6%
+/// (προσομοίωση με τη στρογγυλοποίηση της οθόνης: /home/claude/scratch/g4/floor_sim.py). Οι τιμές της μελέτης είναι από
+/// εργαστήριο, σε ελεγχόμενες συνθήκες· στο σπίτι, με την H40, το σφάλμα είναι μάλλον μεγαλύτερο. Το τίμημα: αληθινή
+/// αλλαγή 1–1,5 kg σε μια εβδομάδα συνήθως δεν φαίνεται (δεν ξεχωρίζει από τον θόρυβο της ζυγαριάς ούτως ή άλλως).
+/// Για τους σκελετικούς μύες δεν υπάρχει δημοσιευμένο σφάλμα: ίδιο όριο με την άλιπη μάζα (είναι μέρος της), ώστε ο
+/// θόρυβος να μη διαβάζεται «χάνω μύες». Για την H40 δεν υπάρχει καμία μελέτη.
+const bodyFloorFatPct = 2.0;
+const bodyFloorKg = 1.7;
 
 /// true όταν η διαφορά [diff] (όπως φαίνεται) είναι τουλάχιστον [floor]: μόνο τότε γράφεται σε παρένθεση.
 bool bodyDiffShown(double diff, double floor) => diff != 0 && diff.abs() >= floor - 1e-9;
 
-/// Round 1 (S11-2): οι ζυγίσεις που μοιάζουν ξένες. Κάθε ζύγιση με βάρος συγκρίνεται με την πρώτη ζύγιση κάθε ΑΛΛΗΣ
-/// μέρας ως [weightGuardDays] μέρες πριν ή μετά (ίδιοι «γείτονες» με το `guardedWeights` της διόρθωσης θερμίδων).
+/// Round 2 (g4 · R2-E-2): οι ζυγίσεις που μοιάζουν ξένες ([foreign]: δεν μετρούν πουθενά, φαίνονται σημειωμένες) και
+/// όσες περιμένουν την επόμενη ζύγιση ([pending]: φαίνονται και μετρούν κανονικά εδώ· μένουν έξω μόνο από τη διόρθωση
+/// θερμίδων). Ίδιος κανόνας με το `guardedWeights` της διόρθωσης θερμίδων ([guardDays], weight_guard.dart): κάθε μέρα
+/// κρίνεται με τη ζύγιση της που μετρά. Οι άλλες ζυγίσεις της ίδιας μέρας: ξένες όταν δεν συμφωνούν μαζί της
+/// ([weightsAgree]: δύο διαφορετικά βάρη την ίδια μέρα, π.χ. το παιδί μετά από σένα), αλλιώς ίδια κατάσταση με τη μέρα.
 /// [body]: παλιότερη πρώτη. Ζυγίσεις χωρίς βάρος δεν κρίνονται.
-Set<BodyMeasurement> foreignBody(List<BodyMeasurement> body) {
-  final first = <DateTime, double>{};
+({Set<BodyMeasurement> foreign, Set<BodyMeasurement> pending}) guardBody(List<BodyMeasurement> body) {
+  final byDay = <DateTime, List<BodyMeasurement>>{};
   for (final b in body) {
     final w = b.weight;
     if (w == null || !w.isFinite) continue;
-    first.putIfAbsent(dayOf(b.time), () => w);
+    byDay.putIfAbsent(dayOf(b.time), () => <BodyMeasurement>[]).add(b);
   }
-  final out = Set<BodyMeasurement>.identity();
-  for (final b in body) {
-    final w = b.weight;
-    if (w == null || !w.isFinite) continue;
-    final day = dayOf(b.time);
-    final others = <double>[
-      for (final e in first.entries)
-        if (e.key != day && daysBetween(e.key, day).abs() <= weightGuardDays) e.value,
-    ];
-    if (weightLooksForeign(w, others)) out.add(b);
+  final days = byDay.keys.toList()..sort();
+  final r = guardDays([
+    for (final d in days) (d, [for (final b in byDay[d]!) b.weight!]),
+  ]);
+  final foreign = Set<BodyMeasurement>.identity();
+  final pending = Set<BodyMeasurement>.identity();
+  for (var i = 0; i < days.length; i++) {
+    final list = byDay[days[i]]!;
+    final status = r[i].status;
+    final chosen = list[r[i].pick];
+    for (final b in list) {
+      if (status == WeighStatus.foreign || (!identical(b, chosen) && !weightsAgree(b.weight!, chosen.weight!))) {
+        foreign.add(b);
+      } else if (status == WeighStatus.pending) {
+        pending.add(b);
+      }
+    }
   }
-  return out;
+  return (foreign: foreign, pending: pending);
 }
+
+/// Οι ζυγίσεις που μοιάζουν ξένες ([guardBody]).
+Set<BodyMeasurement> foreignBody(List<BodyMeasurement> body) => guardBody(body).foreign;
 
 /// Η ζύγιση που μετρά για κάθε μέρα: η πρώτη της μέρας που δεν μοιάζει ξένη. Παλιότερη πρώτη.
 List<BodyMeasurement> countedBody(List<BodyMeasurement> body, [Set<BodyMeasurement>? foreign]) {
@@ -114,8 +134,11 @@ BodyMeasurement? previousCounted(List<BodyMeasurement> body, BodyMeasurement las
 String bodyTrendNote({required DateTime? previous, required int days, required String Function(DateTime) date}) {
   final weight = previous == null ? '' : 'Στο βάρος, σε παρένθεση η αλλαγή από τις ${date(previous)}. ';
   if (days >= 2 * bodyTrendGroup) {
-    return '${weight}Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν· σε παρένθεση μόνο αλλαγή '
-        'μεγαλύτερη από τη διακύμανση της ζυγαριάς.';
+    // Round 2 (g4 · R2-D-2): τα όρια γραμμένα με τους αριθμούς τους ([bodyFloorFatPct], [bodyFloorKg]), ώστε να ξέρεις
+    // γιατί συνήθως δεν φαίνεται παρένθεση από εβδομάδα σε εβδομάδα.
+    return '${weight}Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν. Σε παρένθεση μόνο αλλαγή από '
+        '${dec(bodyFloorFatPct, 0)} μονάδες στο λίπος ή ${dec(bodyFloorKg)} kg και πάνω: μικρότερη χάνεται στη διακύμανση '
+        'της ζυγαριάς.';
   }
   return '${weight}Η αλλαγή σε λίπος και μύες φαίνεται μετά από 6 μέρες ζύγισης (έχεις $days): μία ζύγιση μόνη της ανεβοκατεβαίνει με το νερό.';
 }

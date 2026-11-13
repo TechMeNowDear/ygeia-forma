@@ -262,8 +262,11 @@ class _TrainingPageState extends State<TrainingPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Ελεύθερη άσκηση', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-            // round1, U6-11: σε μία γραμμή και στα 360 dp (πριν «…μία-» / «μία.»).
-            Text('Διαλέγεις ασκήσεις εκείνη την ώρα.', style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+            // round1, U6-11: σε μία γραμμή και στα 360 dp (πριν «…μία-» / «μία.»). Round 2 (R2-U2-04): το «…εκείνη την ώρα.»
+            // (234 dp με Inter 13,5) δεν χωρούσε στα ≈ 224 dp του 360 και άφηνε «ώρα.» μόνη της· τώρα 196 dp, και οι δύο
+            // τελευταίες λέξεις μαζί αν ποτέ σπάσει (στενή στήλη, μεγάλα γράμματα).
+            Text('Διαλέγεις ασκήσεις επί\u00A0τόπου.',
+                key: const ValueKey('train-free-sub'), style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
           ]),
         ),
         Icon(Icons.chevron_right_rounded, color: c.textSecondary),
@@ -564,17 +567,25 @@ class _TrainingPageState extends State<TrainingPage> {
           _programMenu(context, p, key: 'train-program-more', picks: false),
         ]),
         const SizedBox(height: 4),
-        Text(p.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
-        // round1, U6-20: «ισχύει από Παρ\u00A013/11» (όχι διπλό «από», όχι ημερομηνία σε δύο γραμμές).
-        Text(
-          'Έκδοση ${p.version} · ${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' · ισχύει από ${shortDayDate(p.from!).replaceAll(' ', '\u00A0')}'}',
-          style: TextStyle(fontSize: 13.5, color: c.textSecondary),
+        // Round 2 (R2-U2-03): η κάρτα έχει 4 dp δεξιά μόνο για το ⋮· τα κείμενα από κάτω παίρνουν άλλα 12, ώστε να έχουν
+        // 16 dp και από τις δύο πλευρές (πριν η σημείωση έφτανε 8 dp από την άκρη).
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(p.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
+            // round1, U6-20: «ισχύει από Παρ\u00A013/11» (όχι διπλό «από», όχι ημερομηνία σε δύο γραμμές).
+            Text(
+              'Έκδοση ${p.version} · ${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' · ισχύει από ${shortDayDate(p.from!).replaceAll(' ', '\u00A0')}'}',
+              style: TextStyle(fontSize: 13.5, color: c.textSecondary),
+            ),
+            // round1, S7-11 / U6-25: η σημείωση του προγράμματος (κανόνες ασφάλειας) μένει ορατή μετά την επικόλληση.
+            if (p.note != null && p.note!.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(p.note!.trim(),
+                  key: const ValueKey('train-program-note'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+            ],
+          ]),
         ),
-        // round1, S7-11 / U6-25: η σημείωση του προγράμματος (κανόνες ασφάλειας) μένει ορατή μετά την επικόλληση.
-        if (p.note != null && p.note!.trim().isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(p.note!.trim(), key: const ValueKey('train-program-note'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
-        ],
       ]),
     );
   }
@@ -638,11 +649,7 @@ class _TrainingPageState extends State<TrainingPage> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${shortDayDate(s.start)} · ${s.name}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                     // round1, U5-06 / U5-18: διάρκεια σε λέξεις και «μέσοι παλμοί» αντί για «♥» (λείπει από τη γραμματοσειρά).
-                    Text(
-                        s.isCardio
-                            ? '${hoursMinutes(s.cardioMinutes ?? s.duration.inMinutes)}${kmValue(s) != null ? ' · ${kmValue(s)} km' : ''}${s.hrAvg != null ? ' · μέσοι παλμοί ${s.hrAvg}' : ''}'
-                            : '${hoursMinutes(s.duration.inMinutes)} · ${s.setsDone} σετ${s.volume > 0 ? ' · ${thousands(s.volume.round())} kg' : ''}${s.hrAvg != null ? ' · μέσοι παλμοί ${s.hrAvg}' : ''}',
-                        style: TextStyle(fontSize: 13, color: c.textSecondary)),
+                    Text(recentWorkoutLine(s), style: TextStyle(fontSize: 13, color: c.textSecondary)),
                   ]),
                 ),
                 Icon(Icons.chevron_right_rounded, color: c.textTertiary),
@@ -956,4 +963,18 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
       ),
     );
   }
+}
+
+/// Η δεύτερη γραμμή μιας προπόνησης στις «Τελευταίες προπονήσεις». Round 2 (R2-U2-11): η διάρκεια σε λεπτά, όπως η
+/// κάρτα «Τελευταία φορά» και η σύνοψη δίπλα της (πριν «1 ώρα» εδώ και «60 λεπτά» εκεί για την ίδια προπόνηση)· κάθε
+/// αριθμός μένει με τη μονάδα του όταν η γραμμή σπάει.
+String recentWorkoutLine(Session s) {
+  final hr = s.hrAvg != null ? ' · μέσοι παλμοί\u00A0${s.hrAvg}' : '';
+  if (s.isCardio) {
+    final km = kmValue(s);
+    return '${countText(s.cardioMinutes ?? s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')}'
+        '${km != null ? ' · $km\u00A0km' : ''}$hr';
+  }
+  return '${countText(s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')} · ${s.setsDone}\u00A0σετ'
+      '${s.volume > 0 ? ' · ${thousands(s.volume.round())}\u00A0kg' : ''}$hr';
 }

@@ -179,7 +179,9 @@ class _ReportPageState extends State<ReportPage> {
                         _uri = null;
                       }),
                     ),
-                    const SizedBox(height: 8),
+                    // Round 2 (R2-U1-13): 16, γιατί η ετικέτα του πεδίου με περίγραμμα ανεβαίνει ≈ 8 dp πάνω από το κουτί·
+                    // με 8 ακουμπούσε τη βοηθητική γραμμή «Μένει μόνο σε αυτό το κινητό.» του πρώτου πεδίου.
+                    const SizedBox(height: 16),
                     TextField(
                       key: const ValueKey('report-note'),
                       controller: _noteField,
@@ -678,166 +680,176 @@ class _PageThree extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(data: d, page: 3, name: name),
-        // Δεύτερος κλινικός έλεγχος M4: ζώνες 90/85/80%, νύχτες κάτω από 85% με χρονολογική σειρά, αναφορά με SD.
-        _Title('Χαμηλότερη μεμονωμένη μέτρηση οξυγόνου ανά νύχτα (ρολόι, καρπός)'),
-        Text(
-          'Μία τιμή ανά νύχτα από τον αισθητήρα του καρπού: όχι ιατρική οξυμετρία, όχι δείκτης αποκορεσμών (ODI), όχι '
-          // Τρίτος κλινικός έλεγχος C6: όπως το λέει η περίληψη της πηγής (όχι «οξύμετρο δαχτύλου»), με την ηλικία.
-          'χρόνος κάτω από 90% (T90). Αναφορά: σε 350 υγιή άτομα (1 μηνός–85 ετών, ιατρικό οξύμετρο σε εργαστήριο ύπνου, '
-          'χωρίς τα σφάλματα κίνησης) το ελάχιστο της νύχτας ήταν 90,4% ± 3,1% (Gries & Brooks, Chest 1996)· στους άνω '
-          'των 60 οι τιμές ήταν χαμηλότερες. Δεν συγκρίνεται με τους προηγούμενους μήνες (μία ακραία τιμή ανά νύχτα)· '
-          // Έλεγχος 9/11 (V-B-13): το εύρος που έχει ελεγχθεί η ακρίβεια του ρολογιού.
-          'μετρούν οι νύχτες κάτω από 90, 85 και 80%. $oxygenRangeText',
-          style: TextStyle(fontSize: 9.5, color: c.text, height: 1.4),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Νύχτες με μέτρηση: $minN · κάτω από 90%: ${d.lowOxygenNights.length} · κάτω από 85%: ${below85.length} · '
-          'κάτω από 80%: ${d.oxygenBelow(80).length}.',
-          key: const ValueKey('report-oxygen-counts'),
-          style: cell,
-        ),
-        const SizedBox(height: 4),
-        // Τρίτος κλινικός έλεγχος (F6): ΟΛΕΣ οι νύχτες κάτω από 80% των 90 ημερών, με ημερομηνία, πάντα (ποτέ κρυμμένες
-        // στο «και N ακόμα»).
-        if (below80.isNotEmpty) ...[
-          Text(
-            'Νύχτες κάτω από 80% (όλες): ${[for (final n in below80) '${dmy(n.$1)}: ${lowestText(n.$2)}%'].join(' · ')}',
-            key: const ValueKey('report-oxygen-below80'),
-            style: bold,
-          ),
-          const SizedBox(height: 4),
-        ],
-        if (below85.isEmpty)
-          Text('Καμία νύχτα κάτω από 85%.', style: cell)
-        else ...[
-          Text('Νύχτες κάτω από 85%:', style: cell),
-          const SizedBox(height: 2),
-          Wrap(
-            key: const ValueKey('report-oxygen-below85'),
-            spacing: 14,
-            runSpacing: 2,
-            children: [
-              // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών F16): 84,6 → «84,6%».
-              for (final n in listed85) Text('${dmy(n.$1)}: ${lowestText(n.$2)}%', style: bold),
-              if (below85.length > listed85.length)
-                Text('και ${below85.length - listed85.length} ακόμα (γράφημα, σελίδα 2)', style: cell),
-            ],
-          ),
-        ],
-        if (periods.length > 1) ...[
-          const SizedBox(height: 6),
-          // Δεύτερος κλινικός έλεγχος K1: ίδιος αισθητήρας, άλλος ορισμός της νύχτας· όλες οι νύχτες φαίνονται.
-          Text(
-            '${[
-              for (final (i, p) in periods.indexed)
-                i == 0
-                    ? 'Ως ${p.to.day}/${p.to.month} η νύχτα ορίζεται από ${definition(p)}'
-                    : 'από ${p.from.day}/${p.from.month} από ${definition(p)}',
-            ].join('· ')}. Ο αισθητήρας οξυγόνου είναι ο ίδιος (καρπός).',
-            key: const ValueKey('report-oxygen-definition'),
-            style: small,
-          ),
-        ],
-        if (minN != avgN) ...[
-          const SizedBox(height: 6),
-          // Round 1 (S11-9): ενικός/πληθυντικός («1 νύχτα»)· «μέσος όρος», «χαμηλότερη τιμή» (U1a-6).
-          Text(
-            'Μέσος όρος οξυγόνου: ${countText(avgN, 'νύχτα', 'νύχτες')}· χαμηλότερη τιμή: ${countText(minN, 'νύχτα', 'νύχτες')}. '
-            'Η χαμηλότερη λείπει όταν η Samsung δεν δίνει αναλυτικές τιμές για τη νύχτα ή όταν το ρολόι μέτρησε λιγότερο από '
-            'τον μισό ύπνο.',
-            style: small,
-          ),
-        ],
-        // Round 1 (U1b-13): ο τίτλος λέει ποιες ζυγίσεις είναι (πριν: χωρίς λέξη, κάτω από το «90 ημέρες» της κεφαλίδας).
-        _Title(reportWeighTitle(d)),
-        if (d.weighIns.isEmpty)
-          Text('Δεν υπάρχουν ζυγίσεις.', style: cell)
-        else
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(1.6),
-              1: FlexColumnWidth(1.2),
-              2: FlexColumnWidth(1.6),
-              3: FlexColumnWidth(2.0),
-              4: FlexColumnWidth(1.6),
-            },
-            border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
-            children: [
-              TableRow(
-                decoration: BoxDecoration(color: c.background),
-                children: [
-                  pad(Text('Ημερομηνία', style: header)),
-                  pad(Text('Βάρος (kg)', style: header)),
-                  // Κλινικός έλεγχος M5 (4/11).
-                  pad(Text('Λίπος (BIA, εκτίμηση)', style: header)),
-                  pad(Text('Σκελετικοί μύες (BIA, εκτίμηση)', style: header)),
-                  const SizedBox(),
-                ],
+        // Round 2 (R2-CI-1): όπως η σελίδα 1, το σώμα στο ύψος του A4 ([ReportFit]): με πολλές νύχτες κάτω από 80% (όλες
+        // γράφονται πάντα, F6), αλλαγή ορισμού της νύχτας και σημειώσεις, η σελίδα ξεχείλιζε και το κάτω μέρος κοβόταν.
+        Expanded(
+          child: ReportFit(
+            key: const ValueKey('report-page3-body'),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              // Δεύτερος κλινικός έλεγχος M4: ζώνες 90/85/80%, νύχτες κάτω από 85% με χρονολογική σειρά, αναφορά με SD.
+              _Title('Χαμηλότερη μεμονωμένη μέτρηση οξυγόνου ανά νύχτα (ρολόι, καρπός)'),
+              Text(
+                'Μία τιμή ανά νύχτα από τον αισθητήρα του καρπού: όχι ιατρική οξυμετρία, όχι δείκτης αποκορεσμών (ODI), όχι '
+                // Τρίτος κλινικός έλεγχος C6: όπως το λέει η περίληψη της πηγής (όχι «οξύμετρο δαχτύλου»), με την ηλικία.
+                'χρόνος κάτω από 90% (T90). Αναφορά: σε 350 υγιή άτομα (1 μηνός–85 ετών, ιατρικό οξύμετρο σε εργαστήριο ύπνου, '
+                'χωρίς τα σφάλματα κίνησης) το ελάχιστο της νύχτας ήταν 90,4% ± 3,1% (Gries & Brooks, Chest 1996)· στους άνω '
+                'των 60 οι τιμές ήταν χαμηλότερες. Δεν συγκρίνεται με τους προηγούμενους μήνες (μία ακραία τιμή ανά νύχτα)· '
+                // Έλεγχος 9/11 (V-B-13): το εύρος που έχει ελεγχθεί η ακρίβεια του ρολογιού.
+                'μετρούν οι νύχτες κάτω από 90, 85 και 80%. $oxygenRangeText',
+                style: TextStyle(fontSize: 9.5, color: c.text, height: 1.4),
               ),
-              for (final w in d.weighIns)
-                TableRow(
+              const SizedBox(height: 6),
+              Text(
+                'Νύχτες με μέτρηση: $minN · κάτω από 90%: ${d.lowOxygenNights.length} · κάτω από 85%: ${below85.length} · '
+                'κάτω από 80%: ${d.oxygenBelow(80).length}.',
+                key: const ValueKey('report-oxygen-counts'),
+                style: cell,
+              ),
+              const SizedBox(height: 4),
+              // Τρίτος κλινικός έλεγχος (F6): ΟΛΕΣ οι νύχτες κάτω από 80% των 90 ημερών, με ημερομηνία, πάντα (ποτέ κρυμμένες
+              // στο «και N ακόμα»).
+              if (below80.isNotEmpty) ...[
+                Text(
+                  'Νύχτες κάτω από 80% (όλες): ${[for (final n in below80) '${dmy(n.$1)}: ${lowestText(n.$2)}%'].join(' · ')}',
+                  key: const ValueKey('report-oxygen-below80'),
+                  style: bold,
+                ),
+                const SizedBox(height: 4),
+              ],
+              if (below85.isEmpty)
+                Text('Καμία νύχτα κάτω από 85%.', style: cell)
+              else ...[
+                Text('Νύχτες κάτω από 85%:', style: cell),
+                const SizedBox(height: 2),
+                Wrap(
+                  key: const ValueKey('report-oxygen-below85'),
+                  spacing: 14,
+                  runSpacing: 2,
                   children: [
-                    pad(Text(dayMonthYear(w.$1), style: cell)),
-                    pad(Text(w.$2 == null ? '—' : '${dec(w.$2!)} kg', style: bold)),
-                    pad(Text(w.$3 == null ? '—' : '${dec(w.$3!)}%', style: cell)),
-                    pad(Text(w.$4 == null ? '—' : '${dec(w.$4!)} kg', style: cell)),
-                    // Έλεγχος 3, E2: παλιά ζύγιση άλλης πηγής (πριν από την πρώτη της InBody), με την πηγή της.
-                    d.otherWeighIns.contains(w.$1) ? pad(Text('όχι InBody', style: small)) : const SizedBox(),
+                    // Ποτέ στρογγυλοποίηση προς τα πάνω (έλεγχος υπολογισμών F16): 84,6 → «84,6%».
+                    for (final n in listed85) Text('${dmy(n.$1)}: ${lowestText(n.$2)}%', style: bold),
+                    if (below85.length > listed85.length)
+                      Text('και ${below85.length - listed85.length} ακόμα (γράφημα, σελίδα 2)', style: cell),
                   ],
                 ),
-            ],
+              ],
+              if (periods.length > 1) ...[
+                const SizedBox(height: 6),
+                // Δεύτερος κλινικός έλεγχος K1: ίδιος αισθητήρας, άλλος ορισμός της νύχτας· όλες οι νύχτες φαίνονται.
+                Text(
+                  '${[
+                    for (final (i, p) in periods.indexed)
+                      i == 0
+                          ? 'Ως ${p.to.day}/${p.to.month} η νύχτα ορίζεται από ${definition(p)}'
+                          : 'από ${p.from.day}/${p.from.month} από ${definition(p)}',
+                  ].join('· ')}. Ο αισθητήρας οξυγόνου είναι ο ίδιος (καρπός).',
+                  key: const ValueKey('report-oxygen-definition'),
+                  style: small,
+                ),
+              ],
+              if (minN != avgN) ...[
+                const SizedBox(height: 6),
+                // Round 1 (S11-9): ενικός/πληθυντικός («1 νύχτα»)· «μέσος όρος», «χαμηλότερη τιμή» (U1a-6).
+                Text(
+                  'Μέσος όρος οξυγόνου: ${countText(avgN, 'νύχτα', 'νύχτες')}· χαμηλότερη τιμή: ${countText(minN, 'νύχτα', 'νύχτες')}. '
+                  'Η χαμηλότερη λείπει όταν η Samsung δεν δίνει αναλυτικές τιμές για τη νύχτα ή όταν το ρολόι μέτρησε λιγότερο από '
+                  'τον μισό ύπνο.',
+                  style: small,
+                ),
+              ],
+              // Round 1 (U1b-13): ο τίτλος λέει ποιες ζυγίσεις είναι (πριν: χωρίς λέξη, κάτω από το «90 ημέρες» της κεφαλίδας).
+              _Title(reportWeighTitle(d)),
+              if (d.weighIns.isEmpty)
+                Text('Δεν υπάρχουν ζυγίσεις.', style: cell)
+              else
+                Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(1.6),
+                    1: FlexColumnWidth(1.2),
+                    2: FlexColumnWidth(1.6),
+                    3: FlexColumnWidth(2.0),
+                    4: FlexColumnWidth(1.6),
+                  },
+                  border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.8)),
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(color: c.background),
+                      children: [
+                        pad(Text('Ημερομηνία', style: header)),
+                        pad(Text('Βάρος (kg)', style: header)),
+                        // Κλινικός έλεγχος M5 (4/11).
+                        pad(Text('Λίπος (BIA, εκτίμηση)', style: header)),
+                        pad(Text('Σκελετικοί μύες (BIA, εκτίμηση)', style: header)),
+                        const SizedBox(),
+                      ],
+                    ),
+                    for (final w in d.weighIns)
+                      TableRow(
+                        children: [
+                          pad(Text(dayMonthYear(w.$1), style: cell)),
+                          pad(Text(w.$2 == null ? '—' : '${dec(w.$2!)} kg', style: bold)),
+                          pad(Text(w.$3 == null ? '—' : '${dec(w.$3!)}%', style: cell)),
+                          pad(Text(w.$4 == null ? '—' : '${dec(w.$4!)} kg', style: cell)),
+                          // Έλεγχος 3, E2: παλιά ζύγιση άλλης πηγής (πριν από την πρώτη της InBody), με την πηγή της.
+                          d.otherWeighIns.contains(w.$1) ? pad(Text('όχι InBody', style: small)) : const SizedBox(),
+                        ],
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 6),
+              Text(
+                'Λίπος και μύες: εκτίμηση βιοηλεκτρικής αντίστασης (BIA) της ζυγαριάς InBody H40, όχι DXA. Επηρεάζονται από '
+                'το νερό, το φαγητό και την άσκηση.'
+                // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες δεν μπαίνουν· ο γιατρός το βλέπει. Round 2 (g4 · R2-E-2): χωρίς
+                // εικασίες για το ποιος ζυγίστηκε («πιθανόν άλλου ατόμου» το έλεγε και για ζυγίσεις του ίδιου μετά από αρρώστια).
+                '${d.foreignWeighIns == 0 ? '' : ' ${d.foreignWeighIns == 1 ? '1 ζύγιση δεν μετρήθηκε' : '${d.foreignWeighIns} ζυγίσεις δεν μετρήθηκαν'} στους υπολογισμούς.'}',
+                key: const ValueKey('report-weigh-note'),
+                style: small,
+              ),
+              _Title('Πώς μετρήθηκαν'),
+              Text(
+                // Ένας ορισμός διάρκειας ύπνου παντού (έλεγχος 4/11): πραγματικός ύπνος, χωρίς τα ξυπνήματα. Βήματα: το σύνολο
+                // της Samsung Health, όχι «μόνο ρολόι» (A2).
+                withOura
+                    ? 'Κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
+                        'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
+                        'Galaxy Watch Ultra 2. Διάρκεια ύπνου: πραγματικός ύπνος, χωρίς τα ξυπνήματα (και στις δύο συσκευές). '
+                        // Round 1 (S4-8 (3)): και το δαχτυλίδι για το οξυγόνο (η σελίδα 1 έχει γραμμή του).
+                        'Οξυγόνο, μέσος όρος νύχτας: Oura Ring 5 και, σε χωριστή γραμμή, Galaxy Watch Ultra 2 (καρπός, μόνο όταν '
+                        'μέτρησε τουλάχιστον τον μισό ύπνο)· χαμηλότερη μεμονωμένη τιμή: Galaxy Watch Ultra 2, όχι οξυμετρία. '
+                        'Βήματα: $samsungTotalLabel. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής: χωριστή γραμμή για '
+                        'κάθε συσκευή, ποτέ ανάμειξη ή σύγκριση ανάμεσά τους.'
+                    : 'Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
+                        'αισθητήρας καρπού· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. Διάρκεια ύπνου: πραγματικός ύπνος '
+                        'από τις φάσεις της Samsung, χωρίς τα ξυπνήματα. Βήματα: $samsungTotalLabel. Χωρίς HRV και παλμούς '
+                        'ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
+                style: small,
+              ),
+              if (stale.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                // Τρίτος έλεγχος F4: μήνες με τον παλιό ορισμό του ύπνου (όπως στις Τάσεις)· ο γιατρός το βλέπει κι εδώ.
+                Text(staleMonthsNote(stale), key: const ValueKey('report-stale-months'), style: small),
+              ],
+              if (d.nightsWithoutStages > 0) ...[
+                const SizedBox(height: 6),
+                // Δεύτερος έλεγχος υπολογισμών C10: η διάρκεια μετρά μόνο νύχτες με φάσεις· το λέμε, με πόσες λείπουν.
+                Text(
+                  'Νύχτες χωρίς φάσεις δεν μετρούν στη διάρκεια ύπνου (${countText(d.nightsWithoutStages, 'νύχτα', 'νύχτες')}).',
+                  key: const ValueKey('report-unstaged'),
+                  style: small,
+                ),
+              ],
+              const SizedBox(height: 6),
+              Text(
+                // Κλινικός έλεγχος H4 (4/11).
+                'Παλμοί στον ύπνο = μέσος όρος όλου του ύπνου, όχι παλμοί ηρεμίας σε εγρήγορση.'
+                '${withOura ? ' HRV = RMSSD, μέσος όρος της νύχτας από το Oura· δεν συγκρίνεται με τιμές Holter 24ώρου.' : ''}',
+                style: small,
+              ),
+            ]),
           ),
+        ),
         const SizedBox(height: 6),
-        Text(
-          'Λίπος και μύες: εκτίμηση βιοηλεκτρικής αντίστασης (BIA) της ζυγαριάς InBody H40, όχι DXA. Επηρεάζονται από '
-          'το νερό, το φαγητό και την άσκηση.'
-          // Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες δεν μπαίνουν· ο γιατρός το βλέπει.
-          '${d.foreignWeighIns == 0 ? '' : ' ${d.foreignWeighIns == 1 ? 'Δεν μπήκε 1 ζύγιση που διαφέρει' : 'Δεν μπήκαν ${d.foreignWeighIns} ζυγίσεις που διαφέρουν'} πολύ από τις υπόλοιπες (πιθανόν άλλου ατόμου).'}',
-          key: const ValueKey('report-weigh-note'),
-          style: small,
-        ),
-        _Title('Πώς μετρήθηκαν'),
-        Text(
-          // Ένας ορισμός διάρκειας ύπνου παντού (έλεγχος 4/11): πραγματικός ύπνος, χωρίς τα ξυπνήματα. Βήματα: το σύνολο
-          // της Samsung Health, όχι «μόνο ρολόι» (A2).
-          withOura
-              ? 'Κάθε δείκτης από μία συσκευή, ποτέ ανάμειξη. Ύπνος, παλμοί ύπνου, HRV, αναπνοές: '
-                  'Oura Ring 5 (δάχτυλο) από ${plan.ouraFrom!.day}/${plan.ouraFrom!.month}/${plan.ouraFrom!.year}· πριν, '
-                  'Galaxy Watch Ultra 2. Διάρκεια ύπνου: πραγματικός ύπνος, χωρίς τα ξυπνήματα (και στις δύο συσκευές). '
-                  // Round 1 (S4-8 (3)): και το δαχτυλίδι για το οξυγόνο (η σελίδα 1 έχει γραμμή του).
-                  'Οξυγόνο, μέσος όρος νύχτας: Oura Ring 5 και, σε χωριστή γραμμή, Galaxy Watch Ultra 2 (καρπός, μόνο όταν '
-                  'μέτρησε τουλάχιστον τον μισό ύπνο)· χαμηλότερη μεμονωμένη τιμή: Galaxy Watch Ultra 2, όχι οξυμετρία. '
-                  'Βήματα: $samsungTotalLabel. Ζυγίσεις: InBody H40. Μετά από αλλαγή συσκευής: χωριστή γραμμή για '
-                  'κάθε συσκευή, ποτέ ανάμειξη ή σύγκριση ανάμεσά τους.'
-              : 'Galaxy Watch Ultra 2 (καρπός) και ζυγαριά InBody H40, μέσω Samsung Health. Οξυγόνο: '
-                  'αισθητήρας καρπού· «χαμηλότερη μεμονωμένη μέτρηση», όχι οξυμετρία. Διάρκεια ύπνου: πραγματικός ύπνος '
-                  'από τις φάσεις της Samsung, χωρίς τα ξυπνήματα. Βήματα: $samsungTotalLabel. Χωρίς HRV και παλμούς '
-                  'ηρεμίας: η Samsung δεν τα δίνει σε άλλες εφαρμογές.',
-          style: small,
-        ),
-        if (stale.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          // Τρίτος έλεγχος F4: μήνες με τον παλιό ορισμό του ύπνου (όπως στις Τάσεις)· ο γιατρός το βλέπει κι εδώ.
-          Text(staleMonthsNote(stale), key: const ValueKey('report-stale-months'), style: small),
-        ],
-        if (d.nightsWithoutStages > 0) ...[
-          const SizedBox(height: 6),
-          // Δεύτερος έλεγχος υπολογισμών C10: η διάρκεια μετρά μόνο νύχτες με φάσεις· το λέμε, με πόσες λείπουν.
-          Text(
-            'Νύχτες χωρίς φάσεις δεν μετρούν στη διάρκεια ύπνου (${countText(d.nightsWithoutStages, 'νύχτα', 'νύχτες')}).',
-            key: const ValueKey('report-unstaged'),
-            style: small,
-          ),
-        ],
-        const SizedBox(height: 6),
-        Text(
-          // Κλινικός έλεγχος H4 (4/11).
-          'Παλμοί στον ύπνο = μέσος όρος όλου του ύπνου, όχι παλμοί ηρεμίας σε εγρήγορση.'
-          '${withOura ? ' HRV = RMSSD, μέσος όρος της νύχτας από το Oura· δεν συγκρίνεται με τιμές Holter 24ώρου.' : ''}',
-          style: small,
-        ),
-        const Spacer(),
         _Footer(data: d, page: 3),
       ],
     );
@@ -1044,33 +1056,42 @@ class _PageTwo extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(data: d, page: 2, name: name),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            'Μία τιμή ανά νύχτα ή μέρα. Γκρι διακεκομμένη: η μεσαία τιμή του διαστήματος.',
-            style: TextStyle(fontSize: 8.8, color: c.textSecondary),
+        // Round 2 (R2-CI-1): το σώμα στο ύψος του A4 ([ReportFit], όπως η σελίδα 1)· με αλλαγές συσκευής/ορισμού οι τίτλοι
+        // και οι σημειώσεις των γραφημάτων μακραίνουν, και ποτέ δεν πρέπει να κοπεί γράφημα της αναφοράς για τον γιατρό.
+        Expanded(
+          child: ReportFit(
+            key: const ValueKey('report-page2-body'),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Μία τιμή ανά νύχτα ή μέρα. Γκρι διακεκομμένη: η μεσαία τιμή του διαστήματος.',
+                  style: TextStyle(fontSize: 8.8, color: c.textSecondary),
+                ),
+              ),
+              chart('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, c.heart, (v) => v.round().toString(), 8),
+              chart('Οξυγόνο στον ύπνο, μέσος όρος ανά νύχτα (%)', K.spo2Avg, c.energy, spo2AvgText, 4),
+              chart(
+                'Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση ανά νύχτα (%, καρπός)',
+                K.spo2Min,
+                c.energy,
+                lowestText,
+                8,
+                reference: 90,
+                // Κλινικός έλεγχος H6 και M5: γκρι διάστικτη γραμμή αναφοράς, όχι κόκκινο «όριο».
+                note: 'Διάστικτη γραμμή: αναφορά 90% (όχι διαγνωστικό όριο). Διακεκομμένη: η μεσαία τιμή'
+                    '${d.stat(K.spo2Min).periods.length > 1 ? ' κάθε ορισμού της νύχτας (ίδιος αισθητήρας· ορισμοί: σελίδα 3)' : ''}.',
+              ),
+              // Round 1 (U1b-09, αίτημα f9 → f4): άξονας σε τέταρτα/μισάωρα/ώρες, όχι 1/2/5 × 10ⁿ λεπτά.
+              chart('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, c.sleep, (v) {
+                final m = v.round();
+                return '${m ~/ 60}:${two(m % 60)}';
+              }, 120, tickSteps: minuteTickSteps),
+              chart('Βήματα ανά μέρα', K.steps, c.move, (v) => thousands(v), 4000),
+            ]),
           ),
         ),
-        chart('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, c.heart, (v) => v.round().toString(), 8),
-        chart('Οξυγόνο στον ύπνο, μέσος όρος ανά νύχτα (%)', K.spo2Avg, c.energy, spo2AvgText, 4),
-        chart(
-          'Οξυγόνο, χαμηλότερη μεμονωμένη μέτρηση ανά νύχτα (%, καρπός)',
-          K.spo2Min,
-          c.energy,
-          lowestText,
-          8,
-          reference: 90,
-          // Κλινικός έλεγχος H6 και M5: γκρι διάστικτη γραμμή αναφοράς, όχι κόκκινο «όριο».
-          note: 'Διάστικτη γραμμή: αναφορά 90% (όχι διαγνωστικό όριο). Διακεκομμένη: η μεσαία τιμή'
-              '${d.stat(K.spo2Min).periods.length > 1 ? ' κάθε ορισμού της νύχτας (ίδιος αισθητήρας· ορισμοί: σελίδα 3)' : ''}.',
-        ),
-        // Round 1 (U1b-09, αίτημα f9 → f4): άξονας σε τέταρτα/μισάωρα/ώρες, όχι 1/2/5 × 10ⁿ λεπτά.
-        chart('Διάρκεια ύπνου (ώρες:λεπτά)', K.sleepMin, c.sleep, (v) {
-          final m = v.round();
-          return '${m ~/ 60}:${two(m % 60)}';
-        }, 120, tickSteps: minuteTickSteps),
-        chart('Βήματα ανά μέρα', K.steps, c.move, (v) => thousands(v), 4000),
-        const Spacer(),
+        const SizedBox(height: 6),
         _Footer(data: d, page: 2),
       ],
     );

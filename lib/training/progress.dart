@@ -29,7 +29,7 @@ const _kHr = 'pw.hr', _kPace = 'pw.pace', _kHrr = 'pw.hrr', _kHrrEnd = 'pw.hrrEn
 const walkHrDef = MetricDef(key: _kHr, label: 'Παλμοί στο περπάτημα', section: TrendSection.move, minDiff: 3, unit: 'bpm');
 const walkPaceDef = MetricDef(key: _kPace, label: 'Ρυθμός', section: TrendSection.move, minDiff: 15, better: -1);
 /// Ουδέτερη (`better: 0`): μεγαλύτερη πτώση βγαίνει και μόνο από πιο γρήγορο βάδισμα (Buchheit 2014· Mann 2014).
-const walkHrrDef = MetricDef(key: _kHrr, label: 'Πτώση παλμών στο 1′', section: TrendSection.move, minDiff: 3, unit: 'bpm');
+const walkHrrDef = MetricDef(key: _kHrr, label: 'Πτώση παλμών στο 1ο λεπτό', section: TrendSection.move, minDiff: 3, unit: 'bpm');
 
 /// Οι παλμοί τη στιγμή του «Τέλος» (από την ίδια μέτρηση): δείχνουν την ένταση, για να διαβάζεται η πτώση.
 const walkHrrEndDef = MetricDef(key: _kHrrEnd, label: 'Παλμοί στο τέλος', section: TrendSection.move, minDiff: 3, unit: 'bpm');

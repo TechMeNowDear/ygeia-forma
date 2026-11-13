@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../body_trend.dart' show countedBody;
 import '../data.dart';
 import '../food/food_store.dart';
 import '../format.dart';
@@ -254,8 +255,13 @@ class TodayPage extends StatelessWidget {
 
   Widget _weightCard(BuildContext context, Dashboard d, VoidCallback onTap) {
     final c = Aigaio.of(context);
-    final last = d.latestBody;
-    final prev = d.previousBody;
+    // Round 2 (g4 · R2-D-6, R2-D-8): ίδιοι κανόνες με το Σώμα, τις Τάσεις και τη διόρθωση θερμίδων: μία ζύγιση ανά μέρα
+    // (η πρώτη της μέρας που μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν (π.χ. του
+    // παιδιού μετά από σένα, με «−47,0 kg»), και η διαφορά από την αμέσως προηγούμενη, ακόμα και της ίδιας μέρας. Ζύγιση
+    // «σε αναμονή» (διαφέρει πολύ, χωρίς ακόμα επόμενη· weight_guard.dart) φαίνεται κανονικά.
+    final daily = [for (final b in countedBody(d.body)) if (b.weight != null) b];
+    final last = daily.isEmpty ? null : daily.last;
+    final prev = daily.length < 2 ? null : daily[daily.length - 2];
     Widget? trend;
     if (last?.weight != null && prev?.weight != null) {
       // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2», όχι «−1,1».
@@ -269,7 +275,7 @@ class TodayPage extends StatelessWidget {
         keepLastWords: true,
       );
     }
-    final weights = [for (final b in d.body) if (b.weight != null) b.weight!];
+    final weights = [for (final b in daily) b.weight!];
     final recent = weights.length <= 10 ? weights : weights.sublist(weights.length - 10);
     return StatCard(
       icon: Icons.monitor_weight_rounded,
@@ -571,13 +577,13 @@ class _SleepCard extends StatelessWidget {
                       Text(hm(n.start), style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600, fontFeatures: tabular)),
                       Expanded(
                         // Χωρίς ποσοστά μίας νύχτας (κλινικός έλεγχος H1): μόνο η μπάρα, ως εκτίμηση.
-                        // Round 1 (U1a-14): μία γραμμή, μικραίνει λίγο αν δεν χωρά (όχι «… της | Samsung»).
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
+                        // Round 2 (R2-U1-1): 8 dp από τις ώρες και ίδιο μέγεθος γραμμάτων παντού· όταν δεν χωρά σπάει σε
+                        // «Φάσεις · εκτίμηση | της Samsung» (οι δύο τελευταίες λέξεις μαζί, U1a-14), δεν μικραίνει.
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            'Φάσεις · εκτίμηση της Samsung',
-                            maxLines: 1,
-                            softWrap: false,
+                            'Φάσεις · εκτίμηση της\u00A0Samsung',
+                            key: const ValueKey('today-stages-label'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
                           ),
@@ -759,15 +765,18 @@ class _WeighCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 14),
               // Round 1 (U1a-22): περίγραμμα, όπως το «+ Γράψε τη μέση» του Σώματος· ένα γεμάτο κουμπί ανά οθόνη
               // (μέρα ζύγισης + προπόνησης: το «Ξεκίνα την προπόνηση»).
+              // Round 2 (R2-D-3): η κάρτα κάθεται στο φόντο της σελίδας, όχι σε κάρτα: γράμματα στο χρώμα του Σώματος πάνω
+              // στο απαλό του φόντο έβγαιναν 4,0–4,4:1 στα φωτεινά θέματα. Γράμματα στο χρώμα κειμένου (≥ 11:1)· περίγραμμα
+              // και εικονίδιο μένουν στο χρώμα του Σώματος (≥ 3:1, WCAG 1.4.11).
               child: OutlinedButton.icon(
                 key: const ValueKey('today-waist'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
-                  foregroundColor: c.body,
+                  foregroundColor: c.text,
                   side: BorderSide(color: c.body.withValues(alpha: 0.5), width: 1.5),
                 ),
                 onPressed: () => openWaistSheet(context, store, now: now),
-                icon: const Icon(Icons.straighten_rounded, size: 20),
+                icon: Icon(Icons.straighten_rounded, size: 20, color: c.body),
                 label: const Text('Γράψε τη μέση'),
               ),
             ),
@@ -775,7 +784,8 @@ class _WeighCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
+                // Round 2 (R2-D-3): ίδιο φόντο· το κύριο χρώμα της «Αυγής» έβγαινε 4,45:1. Χρώμα κειμένου σε όλα τα θέματα.
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40), foregroundColor: c.text),
                 onPressed: () => showMetricInfo(context, metricInfos[K.weight]!),
                 child: const Text('Πώς ζυγίζομαι σωστά'),
               ),

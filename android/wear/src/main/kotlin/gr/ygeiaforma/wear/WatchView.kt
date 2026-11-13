@@ -186,6 +186,12 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     internal val clipped = mutableListOf<String>()
 
     /**
+     * Μόνο για τις δοκιμές (round 2, R2-U3-01/03): κάθε γραμμή που έγραψε το [t] στην τελευταία εικόνα → το μέγεθος (u) με το
+     * οποίο ζωγραφίστηκε. Στο ρολόι μένει null: καμία δουλειά και καμία δέσμευση μνήμης ανά εικόνα.
+     */
+    internal var drawnSizes: MutableMap<String, Float>? = null
+
+    /**
      * Ambient (αχνή οθόνη «πάντα ανοιχτή», έλεγχος 9/11, W3-08): μαύρο φόντο, μόνο λευκά/γκρι γράμματα χωρίς εξομάλυνση
      * (οθόνες με λίγα bit), καθόλου γεμάτα σχήματα ή κουμπιά, χρόνος σε λεπτά (ανανέωση μία φορά το λεπτό).
      */
@@ -212,6 +218,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     override fun onDraw(c: Canvas) {
         hits.clear()
         clipped.clear()
+        drawnSizes?.clear()
         say = ""
         markScreen(drawScreen(c))
         // Η πρώτη περιοχή για το TalkBack: τι δείχνει η οθόνη· μετά τα κουμπιά με τη σειρά που ζωγραφίστηκαν.
@@ -402,7 +409,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             small(c, note, y, soft, 10f, chordAt(y, 10f), NOTE_MIN)
             return
         }
-        // 2) Δύο γραμμές (μόνο στο σετ· εκεί κάτω είναι μόνο το «Τέλος», που κρύβεται όσο φαίνεται το μήνυμα).
+        // 2) Δύο γραμμές (μόνο στο σετ· εκεί κάτω είναι μόνο το «Τέλος», που κρύβεται όσο φαίνεται το μήνυμα). Πού σπάει:
+        // [twoLineSplit] (round 2, R2-U3-03: μετά το «:» όταν χωρά, όχι μία λέξη μόνη της στη 2η γραμμή).
         val words = note.split(' ')
         sz = 10f
         while (true) {
@@ -410,19 +418,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             val y2 = NOTE_SET_TWO_Y + sz * 1.1f
             val w1 = minOf(124f, chordAt(NOTE_SET_TWO_Y, sz))
             val w2 = chordAt(y2, sz)
-            var best = 1
-            var bestDiff = Float.MAX_VALUE
-            for (k in 1 until words.size) {
-                val a = text.measureText(words.take(k).joinToString(" "))
-                val b = text.measureText(words.drop(k).joinToString(" "))
-                // η πάνω γραμμή χωρά πιο πολύ (πιο φαρδιά εκεί η οθόνη)
-                val diff = maxOf(a - w1 * u, b - w2 * u)
-                if (diff < bestDiff) {
-                    bestDiff = diff
-                    best = k
-                }
-            }
-            if (bestDiff <= 0f || sz <= NOTE_MIN) {
+            val (best, fits) = twoLineSplit(words, { s -> text.measureText(s) / u }, w1, w2)
+            if (fits || sz <= NOTE_MIN) {
                 small(c, words.take(best).joinToString(" "), NOTE_SET_TWO_Y, soft, sz, w1, sz)
                 small(c, words.drop(best).joinToString(" "), y2, soft, sz, w2, sz)
                 return
@@ -460,7 +457,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
     }
 
-    /** Ολόκληρο το μήνυμα, σε πολλές γραμμές· πάτημα οπουδήποτε κλείνει. */
+    /**
+     * Ολόκληρο το μήνυμα, σε πολλές γραμμές· πάτημα οπουδήποτε κλείνει.
+     *
+     * Έλεγχος 13/11, round 2 (R2-U3-02): κάτω γράφει πια «πάτα για να κλείσει», ίδια φράση, θέση και μέγεθος με την κόκκινη
+     * οθόνη του ορίου ([closeHint]). Πριν δεν έλεγε πώς κλείνει, και στο σετ ανοίγει έτσι ΚΑΘΕ μήνυμα της υπηρεσίας (π.χ.
+     * «Τρέχει ακόμα η προπόνηση; … πάτα «Τέλος»», με το «Τέλος» κρυμμένο από πίσω): ο χρήστης έψαχνε κουμπί ή έσερνε προς
+     * τα δεξιά (= «Πίσω» του ρολογιού, έξω από την εφαρμογή). Το κείμενο μένει στη μέση· μόνο αν είναι τόσο μακρύ που θα
+     * έφτανε στη φράση, ανεβαίνει όσο χρειάζεται (3u κενό πάνω από τους τόνους της).
+     */
     private fun drawNotice(c: Canvas, note: String) {
         text.color = Color.WHITE
         text.textSize = ess(10f) * u
@@ -471,10 +476,12 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER)
             .setMaxLines(9)
             .build()
+        val bottom = (closeY() - 0.86f * ess(10f) - 3f) * u
         c.save()
-        c.translate(cx - w / 2f, cy - layout.height / 2f)
+        c.translate(cx - w / 2f, minOf(cy - layout.height / 2f, bottom - layout.height))
         layout.draw(c)
         c.restore()
+        closeHint(c, gray)
         say = note
         // Κλείσιμο = διαβάστηκε: το μήνυμα δεν μένει μετά μέσα στην οθόνη (εκεί θα έκρυβε τη λεζάντα ζώνης ή το «Τέλος»,
         // U7-06/U7-07). Ό,τι πρέπει να φαίνεται μόνιμα έχει δική του ένδειξη («χωρίς GPS», «♥ δεν μετριούνται»).
@@ -526,6 +533,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             sz = maxOf(floor, sz - 0.5f)
             text.textSize = sz * u
         }
+        drawnSizes?.put(s, sz)
         c.drawText(clip(s, maxW * u), cx, y * u, text)
     }
 
@@ -732,12 +740,25 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     /**
      * «Ενημέρωσε την εφαρμογή / στο ρολόι» σε δύο γραμμές, η πρώτη με βάση [y] (S8-03/U7-01). Το πλάτος κάθε γραμμής από
      * τη χορδή του κύκλου στο ύψος της ([chordAt])· αν δεν χωρά (γράμματα 1,3×), μικραίνει.
+     *
+     * Έλεγχος 13/11, round 2 (R2-U3-01): ΕΝΑ μέγεθος για τις δύο γραμμές της ίδιας φράσης, όπως στο [noteLines]. Πριν, κάθε
+     * γραμμή μίκραινε χωριστά στο [t]: με γράμματα 1,3× η πρώτη έπεφτε στα ≈ 11,5u (στη θέση 36u ≈ 10,5u) και η δεύτερη
+     * έμενε 13u. Τώρα μικραίνουν μαζί ως το μεγαλύτερο μέγεθος (βήμα 0,5u, ως [NOTE_MIN]) που χωρούν ΚΑΙ οι δύο.
      */
     private fun updateNote(c: Canvas, y: Float) {
-        val sz = ess(10f)
+        val l1 = "Ενημέρωσε την εφαρμογή"
+        val l2 = "στο ρολόι"
+        text.typeface = Typeface.DEFAULT
+        fun fits(s: Float): Boolean {
+            text.textSize = s * u
+            return text.measureText(l1) <= minOf(130f, chordAt(y, s)) * u &&
+                text.measureText(l2) <= minOf(90f, chordAt(y + s * 1.1f, s)) * u
+        }
+        var sz = ess(10f)
+        while (sz > NOTE_MIN && !fits(sz)) sz = maxOf(NOTE_MIN, sz - 0.5f)
         val y2 = y + sz * 1.1f
-        small(c, "Ενημέρωσε την εφαρμογή", y, orange, sz, minOf(130f, chordAt(y, sz)), NOTE_MIN)
-        small(c, "στο ρολόι", y2, orange, sz, minOf(90f, chordAt(y2, sz)), NOTE_MIN)
+        small(c, l1, y, orange, sz, minOf(130f, chordAt(y, sz)), sz)
+        small(c, l2, y2, orange, sz, minOf(90f, chordAt(y2, sz)), sz)
     }
 
     // ------------------------------------------------------------------ Β. σετ
@@ -918,11 +939,22 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         t(c, alarmHeadline(walk, rec), 126f, Color.WHITE, 14f * fs, true)
         // Όχι «μέχρι κάτω από 140»: η κόκκινη οθόνη σβήνει λίγο πιο κάτω (W2-16).
         small(c, "όριο γιατρού ${Repo.alarm.limit ?: ""}", 126f + 15f * fs, Color.WHITE, ess(10.5f), 140f)
-        // Το πλάτος από τη χορδή του κύκλου σε αυτό το ύψος: με γράμματα 1,3× (βάση 178u) χωράνε 106u, όχι 120u.
-        val closeY = 166f + 4f * (fs - 1f) * 10f
-        small(c, "πάτα για να κλείσει", closeY, alarmSoft, ess(10f), minOf(120f, chordAt(closeY, ess(10f))), NOTE_MIN)
+        closeHint(c, alarmSoft)
         sayAdd("Πάνω από το όριο. Παλμοί ${Repo.bpm}. ${alarmHeadline(walk, rec)}. Όριο γιατρού ${Repo.alarm.limit ?: ""}")
         hits.add(Hit(RectF(0f, 0f, width.toFloat(), height.toFloat()), "Κλείσιμο για ένα λεπτό") { actions.muteAlarm() })
+    }
+
+    /** Βάση (u) του «πάτα για να κλείσει»: 166u, με γράμματα 1,3× 178u. */
+    private fun closeY(): Float = 166f + 4f * (fs - 1f) * 10f
+
+    /**
+     * «πάτα για να κλείσει» κάτω στην οθόνη: ίδια φράση, θέση και μέγεθος στην κόκκινη οθόνη του ορίου ([color] #FECACA) και
+     * στο μήνυμα σε όλη την οθόνη ([drawNotice], γκρι σε μαύρο· R2-U3-02). Το πλάτος από τη χορδή του κύκλου σε αυτό το
+     * ύψος: με γράμματα 1,3× (βάση 178u) χωράνε 106u, όχι 120u· αν δεν χωρά, μικραίνει ως [NOTE_MIN].
+     */
+    private fun closeHint(c: Canvas, color: Int) {
+        val y = closeY()
+        small(c, "πάτα για να κλείσει", y, color, ess(10f), minOf(120f, chordAt(y, ess(10f))), NOTE_MIN)
     }
 
     /** «40″» / «3′» για «παλμοί πριν …». */
@@ -1330,4 +1362,40 @@ internal fun chordAt(y: Float, size: Float, edge: Float = 3f): Float {
     val d = maxOf(abs(top - 100f), abs(bottom - 100f))
     val r = 100f - edge
     return if (d >= r) 0f else 2f * kotlin.math.sqrt(r * r - d * d)
+}
+
+/**
+ * Πού σπάει ένα μήνυμα σε δύο γραμμές (έλεγχος 13/11, round 2, R2-U3-03). [words]: οι λέξεις· [widthOf]: το πλάτος ενός
+ * κειμένου, στις ίδιες μονάδες με τα [w1] / [w2] (πλάτος της πάνω / της κάτω γραμμής). Επιστρέφει πόσες λέξεις πάνε στην
+ * πάνω γραμμή (≥ 1) και αν χωράνε και οι δύο γραμμές.
+ * - Από τα σπασίματα που χωράνε, πρώτα αυτό που η πάνω γραμμή τελειώνει σε «:» («Πάτα ξανά:» / «επόμενη άσκηση»)· αλλιώς
+ *   το πιο ισορροπημένο (κάθε γραμμή γεμίζει περίπου το ίδιο ποσοστό του πλάτους της). Πριν, προτιμούσε αυτό που άφηνε την
+ *   πιο μικρή 2η γραμμή: «Πάτα ξανά: επόμενη» / «άσκηση» (μία λέξη μόνη της).
+ * - Αν δεν χωρά κανένα: αυτό που ξεπερνά λιγότερο (όπως πριν), για να μικρύνουν τα γράμματα και να ξαναδοκιμαστεί.
+ * Καθαρή συνάρτηση, με δοκιμή.
+ */
+internal fun twoLineSplit(words: List<String>, widthOf: (String) -> Float, w1: Float, w2: Float): Pair<Int, Boolean> {
+    var nearest = 1
+    var nearestOver = Float.MAX_VALUE
+    var pick = -1
+    var pickColon = false
+    var pickBalance = Float.MAX_VALUE
+    for (k in 1 until words.size) {
+        val a = widthOf(words.subList(0, k).joinToString(" "))
+        val b = widthOf(words.subList(k, words.size).joinToString(" "))
+        val over = maxOf(a - w1, b - w2)
+        if (over < nearestOver) {
+            nearestOver = over
+            nearest = k
+        }
+        if (over > 0f) continue
+        val colon = words[k - 1].endsWith(':')
+        val balance = abs(a / maxOf(w1, 1f) - b / maxOf(w2, 1f))
+        if (pick < 0 || (colon && !pickColon) || (colon == pickColon && balance < pickBalance)) {
+            pick = k
+            pickColon = colon
+            pickBalance = balance
+        }
+    }
+    return if (pick > 0) pick to true else nearest to false
 }

@@ -280,28 +280,29 @@ class _MePageState extends State<MePage> {
                     // Έλεγχος premium (S6): όχι σταθερό κείμενο («Oura / Ρολόι / InBody») που θα έλεγε ψέματα χωρίς Oura·
                     // οι πηγές όπως ισχύουν τώρα είναι στη σελίδα «Πηγές».
                     const GroupLabel('Από πού έρχεται κάθε μέτρηση'),
+                    // Round 2 (R2-U1-7 = U3a-3): μία κάρτα με δύο γραμμές και μία διαχωριστική, όπως η «Διατροφή» (πριν:
+                    // δύο κάρτες κολλημένες, με τη γραμμή της πρώτης στο κάτω της άκρο).
                     AppCard(
                       padding: EdgeInsets.zero,
-                      child: NavRow(
-                        key: const ValueKey('me-sources'),
-                        icon: Icons.hub_outlined,
-                        color: c.health,
-                        title: 'Πηγές',
-                        text: 'Ποια συσκευή δίνει κάθε μέτρηση, από πότε',
-                        line: true,
-                        onTap: () => Navigator.of(context).push(SourcesPage.route(widget.store)),
-                      ),
-                    ),
-                    AppCard(
-                      padding: EdgeInsets.zero,
-                      child: NavRow(
-                        key: const ValueKey('me-devices'),
-                        icon: Icons.layers_rounded,
-                        color: c.health,
-                        title: 'Τι μετράει κάθε συσκευή',
-                        text: 'Μέτρηση, εκτίμηση, ενδεικτικό',
-                        onTap: () => Navigator.of(context).push(DevicesPage.route()),
-                      ),
+                      child: Column(children: [
+                        NavRow(
+                          key: const ValueKey('me-sources'),
+                          icon: Icons.hub_outlined,
+                          color: c.health,
+                          title: 'Πηγές',
+                          text: 'Ποια συσκευή δίνει κάθε μέτρηση, από πότε',
+                          line: true,
+                          onTap: () => Navigator.of(context).push(SourcesPage.route(widget.store)),
+                        ),
+                        NavRow(
+                          key: const ValueKey('me-devices'),
+                          icon: Icons.layers_rounded,
+                          color: c.health,
+                          title: 'Τι μετράει κάθε συσκευή',
+                          text: 'Μέτρηση, εκτίμηση, ενδεικτικό',
+                          onTap: () => Navigator.of(context).push(DevicesPage.route()),
+                        ),
+                      ]),
                     ),
                   ],
                 ),

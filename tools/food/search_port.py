@@ -250,15 +250,18 @@ class Index:
             if alt and at > bestTop: best, bestTop = alt, at
         return best
 
-    def _word_score(self, i, w, ws, wp, phrases, catphr, neg_query):
+    def _word_score(self, i, w, ws, wp, phrases, catphr, neg_query, prefix_of_food_word=True):
         # phrases/catphr = None: μόνο τα μονολεκτικά άλλα ονόματα και κατηγορίες (για «ταιριάζει κάπου;»)
+        # round2 (R2-A-4): prefix_of_food_word=False: μια λέξη που είναι ήδη τρόφιμο («μέλι») δεν ταιριάζει ως αρχή άλλης,
+        # μεγαλύτερης λέξης («Μελιτζανοσαλάτα»)· η ίδια λέξη σε άλλη μορφή (ίδια ρίζα) ταιριάζει κανονικά.
+        prefix_ok = prefix_of_food_word or not self._is_food_word(w)
         best = 0.0
         N = self.name[i]
         for k, nw in enumerate(N):
             first = k == 0; s = 0.0
             if nw == w: s = 10 if first else 8
             elif homonym(w, nw): s = 0
-            elif nw.startswith(w): s = 7 if first else 5
+            elif prefix_ok and nw.startswith(w): s = 7 if first else 5
             elif len(ws) >= 3 and self.nstem[i][k] == ws: s = 7 if first else 5
             elif wp is not None and self.nstem[i][k] == wp: s = 4 if first else 3
             elif len(w) >= 5 and w in nw: s = 2
@@ -334,7 +337,13 @@ class Index:
             if cooked_first and f.get('rawId'): score += 2.5
             score -= len(f['name']) / 60
             # round1 (U3a-10): δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις (μέσος βαθμός λέξεων >= 7) μπαίνει πρώτο.
-            scored.append((score, i, mine and wavg >= MINE_FIRST))
+            # round2 (R2-A-4): όχι όταν μια λέξη-τρόφιμο της αναζήτησης («μέλι») είναι μόνο η αρχή άλλης λέξης του ονόματος
+            # («Μελιτζανοσαλάτα»): τότε πρώτο βγαίνει το ίδιο το τρόφιμο.
+            first_mine = mine and wavg >= MINE_FIRST
+            if first_mine:
+                whole = sum(self._word_score(i, w, stem(w), pluralstem(w), phr, cph, neg, False) for w in q)
+                first_mine = whole / max(1, counted) >= MINE_FIRST
+            scored.append((score, i, first_mine))
         if len(q) == 1 and len(q[0]) >= 5 and top <= 2: return [], top
         scored.sort(key=lambda t: (not t[2], -t[0], t[1]))
         self.last_scored = scored

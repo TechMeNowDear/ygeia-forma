@@ -21,8 +21,9 @@
 ///   ακόμα και για −6 kg σε 3 μήνες. Τώρα φαίνεται στο ~99–100% (μήνας και τρίμηνο). Ψεύτικο «άλλαξε» χωρίς καμία αλλαγή:
 ///   ίδιο με πριν όταν ο θόρυβος είναι μέρα με τη μέρα (≤ 1%)· ≤ 1% σε μοντέλο AR(1) με ζύγιση κάθε 2–4 μέρες· ~2–3% με
 ///   ζύγιση μία φορά την εβδομάδα στο τρίμηνο (πριν ~0,5%). Προσομοίωση: /home/claude/scratch/f4/eval_final.py.
-/// - Round 1 (S11-2): ζύγιση που μοιάζει ξένη ([weightLooksForeign], weight_guard.dart) δεν μετρά σε βάρος, λίπος και
-///   μύες· μένει στο ιστορικό.
+/// - Round 1 (S11-2): ζύγιση που μοιάζει ξένη ([foreignWeighIn], weight_guard.dart) δεν μετρά σε βάρος, λίπος και
+///   μύες· μένει στο ιστορικό. Round 2 (R2-E-2): «ξένη» μόνο ανάμεσα σε ζυγίσεις που συμφωνούν μεταξύ τους· ζύγιση «σε
+///   αναμονή» (π.χ. η πρώτη μετά από αρρώστια) μετρά.
 library;
 
 import 'dart:math' as math;
@@ -492,17 +493,26 @@ TrendResult computeTrend(
 
 DateTime _add(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
 
-/// Round 1 (S11-2): η ζύγιση της μέρας [day] στο ιστορικό μοιάζει ξένη ([weightLooksForeign]): σύγκριση με τις ζυγίσεις
-/// των άλλων ημερών ως [weightGuardDays] μέρες πριν ή μετά (μία ανά μέρα, όπως η διόρθωση θερμίδων). false χωρίς βάρος.
+/// Round 1 (S11-2): η ζύγιση της μέρας [day] στο ιστορικό μοιάζει ξένη. false χωρίς βάρος.
+/// Round 2 (g4 · R2-E-2): ίδιος κανόνας με το Σώμα και τη διόρθωση θερμίδων ([weighStatusAt], weight_guard.dart): ξένη
+/// μόνο όταν οι ζυγίσεις πριν ΚΑΙ μετά συμφωνούν μεταξύ τους και όχι μαζί της. Ζύγιση «σε αναμονή» (διαφέρει, χωρίς ακόμα
+/// επόμενη) μετρά εδώ, στην αναφορά και στην εβδομάδα (φαίνεται κανονικά). Μία τιμή ανά μέρα (η πρώτη της μέρας, όπως το
+/// ιστορικό)· αρκούν οι μέρες ως 2 × [weightGuardDays] γύρω της (ίδιο αποτέλεσμα με όλο το ιστορικό).
 bool foreignWeighIn(Map<String, Map<String, double>> history, SourcePlan plan, DateTime day) {
   final w = plan.value(history, K.weight, day);
-  if (w == null) return false;
-  final others = <double>[
-    for (var i = -weightGuardDays; i <= weightGuardDays; i++)
-      if (i != 0)
-        if (plan.value(history, K.weight, _add(day, i)) case final v?) v,
-  ];
-  return weightLooksForeign(w, others);
+  if (w == null || !w.isFinite) return false;
+  final series = <(DateTime, double)>[];
+  var at = 0;
+  for (var i = -2 * weightGuardDays; i <= 2 * weightGuardDays; i++) {
+    final d = _add(day, i);
+    if (i == 0) {
+      at = series.length;
+      series.add((d, w));
+    } else if (plan.value(history, K.weight, d) case final v? when v.isFinite) {
+      series.add((d, v));
+    }
+  }
+  return weighStatusAt(series, at) == WeighStatus.foreign;
 }
 
 /// Round 1 (S4-8): οξυγόνο του ρολογιού σε νύχτα του Oura (μέσα στις ώρες ύπνου του Oura) μετρά μόνο όταν το ρολόι

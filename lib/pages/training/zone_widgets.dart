@@ -350,10 +350,15 @@ class _ZoneSheetState extends State<ZoneSheet> {
             controller: _rest,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'Παλμοί ηρεμίας ξύπνιος, αν τους μέτρησες', border: OutlineInputBorder()),
+            // Round 2 (R2-U2-07): σύντομη ετικέτα (187 dp με Inter 16)· η ολόκληρη (334 dp) δεν χωρούσε στο πεδίο με
+            // περίγραμμα (328 dp στα 400, 288 στα 360) και κοβόταν «…αν τους μέτ…». Η συνθήκη πήγε στη γραμμή από κάτω.
+            decoration: const InputDecoration(labelText: 'Παλμοί ηρεμίας ξύπνιος', border: OutlineInputBorder()),
           ),
           const SizedBox(height: 6),
-          Text('Καθιστός, μετά από 5 λεπτά ηρεμίας, το πρωί. Χωρίς τιμή μετρούν οι παλμοί ύπνου, που είναι λίγο χαμηλότεροι.', style: hint),
+          Text(
+              'Αν τους μέτρησες: καθιστός, μετά από 5 λεπτά ηρεμίας, το πρωί. Χωρίς τιμή μετρούν οι παλμοί ύπνου, που είναι λίγο '
+              'χαμηλότεροι.',
+              style: hint),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.bad)),

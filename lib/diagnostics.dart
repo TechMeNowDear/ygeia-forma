@@ -219,7 +219,8 @@ Map<String, dynamic> diagnosticsFrom({
     final ready = readiness(goals: g, today: today, weights: weights, intake: intake);
     final to = DateTime(today.year, today.month, today.day - 1);
     final windowFrom = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1));
-    final wideFrom = DateTime(to.year, to.month, to.day - (adaptMaxWindowDays - 1));
+    // Γύρος 2 (g1 · R2-A-2): όσο πίσω ψάχνει το κενό καταγραφής, όπως ο έλεγχος της Σήμερα.
+    final wideFrom = DateTime(to.year, to.month, to.day - (adaptScanDays - 1));
     final since = DateTime.tryParse(g.since);
     // Η εκτίμηση ΤΩΡΑ (όποια μέρα κι αν είναι), για έλεγχο· στην εφαρμογή φαίνεται μόνο τη μέρα ελέγχου. Με τους ίδιους
     // κανόνες (Συμβούλιο 2, Α1–Α2): χωρίς την πρώτη εβδομάδα των στόχων, στο μεγαλύτερο παράθυρο που έχει αρκετά δεδομένα.

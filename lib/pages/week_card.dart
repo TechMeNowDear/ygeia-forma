@@ -140,15 +140,16 @@ class _Highlight extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            // Round 2 (R2-U1-2): το εικονίδιο στην πρώτη γραμμή, όσες γραμμές κι αν πάρει η ετικέτα.
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   label,
-                  // 3 γραμμές: «Καλύτερη βαθμολογία ύπνου (εκτίμηση)» σε μισό πλάτος 360–400 dp δεν χωρά σε 2.
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  // Round 2 (R2-U1-2): ποτέ κομμένη («(εκτιμ…» στο ανοιχτό Fold, όπου η πλακέτα έχει ≈ 104 dp και θέλει
+                  // 4 γραμμές)· η σειρά με τις δύο πλακέτες είναι IntrinsicHeight, άρα μένουν ίσες.
                   style: TextStyle(fontSize: 12.5, height: 1.2, fontWeight: FontWeight.w600, color: c.textSecondary),
                 ),
               ),
