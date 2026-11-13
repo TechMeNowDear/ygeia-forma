@@ -215,6 +215,12 @@ double? _kcalOf(FoodStore food, DateTime day) {
 /// Round 4 (m1 · R4-A-4): λεζάντα του βάρους στο widget όταν η τελευταία ζύγιση δεν μετρά ακόμα («σε αναμονή»).
 const widgetPendingCap = 'δεν μετρά ακόμα';
 
+/// Round 5 (n1 · R5-B-4): η σύντομη μορφή της για τη στήλη 1×3 (`capShort`). Το «δεν μετρά ακόμα» (Inter Medium 10,5 sp:
+/// 87,1 dp) κοβόταν σε «δεν μετρά ακ…» με «Μεγάλα» γράμματα (× 1,12 × 0,85 = 82,9 > 76 dp) ή με «Σκιά» (στήλη 92 − 2 × 4
+/// − 2 × 8 = 68 dp· × 0,85 = 74,0 > 68). «δεν μετρά» = 51,7 dp: χωρά ΧΩΡΙΣ σμίκρυνση σε κάθε ρύθμιση (× 1,12 = 57,9 ≤ 68·
+/// και στο ανώτατο 1,3 που δέχεται ο renderer: 67,3 ≤ 68). Πλάτη: /home/claude/scratch/n1-r5/width.py (η Inter του repo).
+const widgetPendingCapShort = 'δεν μετρά';
+
 /// Σώμα: η τελευταία ζύγιση της InBody που μετρά· το γράφημα = οι 7 τελευταίες μέρες ζύγισης (μία ζύγιση τη μέρα).
 Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final body = store.data?.body ?? const <BodyMeasurement>[];
@@ -252,13 +258,15 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
     // «−1,2», όχι «−1,1».
     final dw = prev?.weight == null ? null : shownDiff(w, prev!.weight!, 1);
     // Round 4 (m1 · R4-A-4): σύντομη λεζάντα για τη στήλη 1×3 (76 dp), όπου η κανονική κοβόταν («Σάβ 2/1 · −0…»): η μέρα
-    // είναι ήδη στην πηγή από πάνω («InBody · Σάβ 2/1»). Πλάτη με την Inter Medium 10,5 sp: «δεν μετρά ακόμα» 87,1 dp
-    // × 0,85 = 74,0 ≤ 76· «−42,6 kg» 45 dp.
+    // είναι ήδη στην πηγή από πάνω («InBody · Σάβ 2/1»). Πλάτη με την Inter Medium 10,5 sp: «−42,6 kg» 45 dp. Round 5
+    // (n1 · R5-B-4): για ζύγιση που δεν μετρά ακόμα [widgetPendingCapShort] (χωρά και με «Μεγάλα» και «Σκιά»)· η κανονική
+    // λεζάντα μένει ίδια στις φαρδιές μορφές (2×2, 2×4, 4×2: η μακρύτερη, «Παρ 30/10 · …», 166,2 × 0,85 = 141,3 ≤ 150 dp
+    // με «Μεγάλα» και «Σκιά»).
     out['weight'] = _entry('Βάρος', dec(w), ' kg',
         cap: waiting
             ? '${shortDayDate(last.time)} · $widgetPendingCap'
             : '${shortDayDate(last.time)}${dw == null ? '' : ' · ${signedDec(dw)} kg'}',
-        capShort: waiting ? widgetPendingCap : (dw == null ? null : '${signedDec(dw)} kg'),
+        capShort: waiting ? widgetPendingCapShort : (dw == null ? null : '${signedDec(dw)} kg'),
         d: dw == null ? null : (dw == 0 ? 0 : (dw > 0 ? 1 : -1)),
         range: hw == null ? null : RefRange(low: hw.$1, high: hw.$2, text: '', cite: '').placeText(w),
         spark: series((b) => b.weight));

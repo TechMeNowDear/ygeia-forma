@@ -64,7 +64,8 @@ class BodyPage extends StatelessWidget {
           else
             _LatestCard(
               last: last,
-              previous: previousCounted(body, last, foreign),
+              // Round 5 (n1 · R5-B-1): η προηγούμενη που ΜΕΤΡΑ, από προηγούμενη μέρα (όπως η Σήμερα και το widget).
+              previous: previousCounted(guard.counted, last),
               foreign: foreign.contains(last),
               pending: guard.pending.contains(last),
               mixed: mixedDayPending(guard.pending, last),
@@ -218,7 +219,13 @@ class _LatestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final p = previous;
+    // Round 5 (n1 · R5-B-2): για ζύγιση που δεν μετρά καμία «προηγούμενη»: ούτε διαφορά, ούτε η σημείωση «σε παρένθεση η
+    // αλλαγή από τις …» (πριν έμενε, χωρίς παρένθεση από κάτω).
+    final p = foreign || pending ? null : previous;
+    // Round 5 (n1 · R5-B-2): ούτε δείκτης μάζας σώματος από ζύγιση που δεν μετρά (π.χ. 45,0 kg με το δικό σου ύψος: 13,9),
+    // όπως το widget και η Σήμερα. Ένα ύψος για όλα (έλεγχος 8/11, DATA-08): από τα στοιχεία σου· της InBody μόνο αν δεν
+    // έχεις δώσει ύψος.
+    final bmi = foreign || pending ? null : bmiOf(last.weight, profile.heightCm) ?? last.bmi;
 
     // Round 1 (U1a-7): «25,4%» χωρίς κενό, όπως παντού στην εφαρμογή· «82,2 kg» με κενό.
     String withUnit(double value, String unit, [int digits = 1]) => unit == '%' ? '${dec(value, digits)}%' : '${dec(value, digits)} $unit';
@@ -305,8 +312,7 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg', bodyFloorKg)),
           InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg', bodyFloorKg)),
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
-          // Ένα ύψος για όλα (έλεγχος 8/11, DATA-08): από τα στοιχεία σου· της InBody μόνο αν δεν έχεις δώσει ύψος.
-          if (bmiOf(last.weight, profile.heightCm) ?? last.bmi case final bmi?) InfoRow('Δείκτης μάζας σώματος', dec(bmi)),
+          if (bmi != null) InfoRow('Δείκτης μάζας σώματος', dec(bmi)),
           if (inBodyHeight(last.weight, last.bmi) case final h? when profile.heightCm != null && (h - profile.heightCm!).abs() >= 1)
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 6),

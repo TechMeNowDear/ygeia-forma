@@ -72,7 +72,7 @@ List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatu
     for (final d in days)
       if (byDay[d]!.any(_weighed)) d,
   ];
-  final r = guardDays([
+  final r = _guardDaysOnce([
     for (final d in judged) (d, [for (final b in byDay[d]!) if (_weighed(b)) b.weight!]),
   ]);
   final picked = <DateTime, ({BodyMeasurement pick, WeighStatus status, bool unsure})>{};
@@ -90,6 +90,48 @@ List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatu
         unsure: picked[d]?.unsure ?? false,
       ),
   ];
+}
+
+/// Round 5 (n1 · R5-B, απόδοση): ο φύλακας ([guardDays]) τρέχει ΜΙΑ φορά για κάθε νέα είσοδο. Το Σώμα τον καλούσε 6 φορές
+/// σε κάθε σχεδίαση ([guardBody], 4 × [bodyTrend], [bodyCompositionDays]), η Σήμερα 3, το ιστορικό μία για κάθε μέρα με
+/// δύο ζυγίσεις ([dayWeighIn]): ίδια είσοδος κάθε φορά. Κρατιέται το τελευταίο αποτέλεσμα μαζί με ΟΛΗ την είσοδό του
+/// (κάθε μέρα και κάθε βάρος της, με τη σειρά τους) και επιστρέφεται μόνο όταν η νέα είσοδος είναι ίδια, τιμή προς τιμή.
+/// Σωστό χωρίς όρους: το [guardDays] βλέπει μόνο την είσοδό του (κανένα ρολόι, καμία κοινή μεταβλητή: weight_guard.dart),
+/// άρα ίδια είσοδος = ίδιο αποτέλεσμα· η κρατημένη είσοδος είναι δική μας λίστα που δεν δίνεται πουθενά (κανείς δεν την
+/// αλλάζει), και το αποτέλεσμα (εγγραφές, αμετάβλητες) διαβάζεται μόνο από το [weighInDays]. Όποια αλλαγή σε ζύγιση
+/// φτάνει στον φύλακα (νέα, σβησμένη, άλλο βάρος, άλλη μέρα, άλλη σειρά μέσα στη μέρα) αλλάζει την είσοδο → νέος
+/// υπολογισμός. Ό,τι δεν τη φτάνει (π.χ. λίπος, ώρα χωρίς αλλαγή σειράς) δεν αλλάζει το αποτέλεσμα του φύλακα, και το
+/// [weighInDays] παίρνει πάντα τις ζυγίσεις (pick, all) από τη σημερινή λίστα. Κόστος του ελέγχου: μία σύγκριση ανά
+/// ζύγιση (ο φύλακας: ως ~85 ταξινομήσεις ανά μέρα).
+List<(DateTime, List<double>)>? _guardIn;
+List<({int pick, WeighStatus status, bool unsure})> _guardOut = const [];
+
+/// Πόσες φορές υπολογίστηκε πραγματικά ο φύλακας από το [weighInDays] (για τις δοκιμές: μία σχεδίαση του Σώματος = μία).
+int guardDaysRuns = 0;
+
+List<({int pick, WeighStatus status, bool unsure})> _guardDaysOnce(List<(DateTime, List<double>)> days) {
+  final before = _guardIn;
+  if (before != null && _sameGuardInput(before, days)) return _guardOut;
+  final out = guardDays(days);
+  _guardIn = days;
+  _guardOut = out;
+  guardDaysRuns++;
+  return out;
+}
+
+/// Ίδια είσοδος του φύλακα: ίδιες μέρες και ίδια βάρη, με την ίδια σειρά. Τα βάρη με `compareTo` (όχι `==`): ξεχωρίζει
+/// και το −0,0 από το 0,0, άρα «ίδιο» = ίδιος αριθμός για κάθε πράξη του φύλακα· οι μέρες με `==` (ίδια στιγμή, ίδια ζώνη).
+bool _sameGuardInput(List<(DateTime, List<double>)> a, List<(DateTime, List<double>)> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    final (dayA, kgA) = a[i];
+    final (dayB, kgB) = b[i];
+    if (dayA != dayB || kgA.length != kgB.length) return false;
+    for (var k = 0; k < kgA.length; k++) {
+      if (kgA[k].compareTo(kgB[k]) != 0) return false;
+    }
+  }
+  return true;
 }
 
 /// Round 3 (k1 · R3-C-1): η ζύγιση της μέρας [day] ([weighInDays]), ή null χωρίς ζύγιση εκείνη τη μέρα. Με μία ζύγιση
@@ -195,11 +237,14 @@ BodyTrend? bodyTrend(List<BodyMeasurement> body, double? Function(BodyMeasuremen
 /// Πόσες μέρες ζύγισης έχουν σύσταση σώματος (λίπος).
 int bodyCompositionDays(List<BodyMeasurement> body) => bodyDaily(body, (b) => b.fatPct).length;
 
-/// Round 1 (S11-2): η προηγούμενη ζύγιση με βάρος που μετρά (όχι ξένη), πριν από την [last]· για το «−1,1 kg από 13/8».
-BodyMeasurement? previousCounted(List<BodyMeasurement> body, BodyMeasurement last, Set<BodyMeasurement> foreign) {
-  for (final b in body.reversed) {
-    if (identical(b, last) || foreign.contains(b) || b.weight == null || !b.time.isBefore(last.time)) continue;
-    return b;
+/// Round 1 (S11-2): η προηγούμενη ζύγιση με βάρος που μετρά, πριν από την [last]· για το «−1,1 kg από 13/8».
+/// Round 5 (n1 · R5-B-1): από τις ζυγίσεις που ΜΕΤΡΟΥΝ ([counted] = [guardBody] `counted`, μία ανά μέρα, παλιότερη πρώτη),
+/// η τελευταία με βάρος από ΠΡΟΗΓΟΥΜΕΝΗ μέρα της [last]: ίδιος κανόνας με τη Σήμερα και το widget. Πριν: όποια ζύγιση
+/// δεν ήταν «ξένη», και μια «σε αναμονή» 16 μέρες πριν έδινε στο Σώμα «+43,0 kg από 26/12» (η Σήμερα: «−1,7 kg από 18/12»).
+BodyMeasurement? previousCounted(List<BodyMeasurement> counted, BodyMeasurement last) {
+  final day = dayOf(last.time);
+  for (final b in counted.reversed) {
+    if (_weighed(b) && dayOf(b.time).isBefore(day)) return b;
   }
   return null;
 }
