@@ -40,7 +40,15 @@ class TrainingPage extends StatefulWidget {
 
 class _TrainingPageState extends State<TrainingPage> {
   late Future<void> _ready = Future.wait([widget.training.load(), ExLibrary.load()]);
-  String? _chosen;
+  /// Η προπόνηση που διάλεξες από το ⋮ για σήμερα, και ποια μέρα. R8-U3-05: ισχύει μόνο εκείνη τη μέρα και ως να ξεκινήσει
+  /// η προπόνηση· πριν έμενε και τις επόμενες μέρες (όσο ζούσε η εφαρμογή), χωρίς καμία ένδειξη.
+  (String, DateTime)? _chosen;
+
+  /// Η επιλογή σου, αν ισχύει σήμερα.
+  String? get _chosenToday {
+    final ch = _chosen;
+    return ch != null && sameDay(ch.$2, _now) ? ch.$1 : null;
+  }
 
   TrainingStore get t => widget.training;
 
@@ -136,9 +144,10 @@ class _TrainingPageState extends State<TrainingPage> {
       if (cur == null) cards.add(_freeCard(context));
     } else {
       // 13/11: και η προπόνηση που διάλεξες με το χέρι παίρνει τα λεπτά της εβδομάδας (πλάνο περπατήματος).
-      final picked = _chosen == null ? null : p.workout(_chosen);
-      final w = _chosen == null ? p.forDay(today) : (picked == null ? null : p.at(picked, today));
-      cards.add(_todayCard(context, p, w, today));
+      final chosen = _chosenToday;
+      final picked = chosen == null ? null : p.workout(chosen);
+      final w = chosen == null ? p.forDay(today) : (picked == null ? null : p.at(picked, today));
+      cards.add(_todayCard(context, p, w, today, chosen: chosen != null));
       final strengthDone = [for (final x in t.sessions.reversed) if (x.finished && !x.isCardio) x];
       final lastStrength = strengthDone.isEmpty ? null : strengthDone.first;
       if (lastStrength != null) cards.add(_lastCard(context, lastStrength));
@@ -217,7 +226,11 @@ class _TrainingPageState extends State<TrainingPage> {
         session: s,
         now: _now,
         watchReady: WearLink.main.ready.value,
-        onResume: () => _openSession(context),
+        // R8-A8-3: όπως το «Ξεκίνα»: ανοίγει και η εφαρμογή στο ρολόι, για να «μπει» ξανά στην προπόνηση.
+        onResume: () {
+          WearLink.main.openWatch();
+          _openSession(context);
+        },
       );
 
   /// «Πρόοδος» (9/11): οι δύο πιο ξεκάθαρες αλλαγές (μόνο από την προπόνηση· το σώμα φαίνεται μέσα στη σελίδα).
@@ -334,7 +347,7 @@ class _TrainingPageState extends State<TrainingPage> {
           case 'export':
             _export(context);
           default:
-            if (v.startsWith('pick:')) setState(() => _chosen = v.substring(5));
+            if (v.startsWith('pick:')) setState(() => _chosen = (v.substring(5), _now));
         }
       },
       itemBuilder: (_) => [
@@ -350,12 +363,25 @@ class _TrainingPageState extends State<TrainingPage> {
 
   bool _allItems = false;
 
-  Widget _todayCard(BuildContext context, Program p, Workout? w, DateTime today) {
+  Widget _todayCard(BuildContext context, Program p, Workout? w, DateTime today, {bool chosen = false}) {
     final c = Aigaio.of(context);
     final dayName = weekdayLong[today.weekday]!;
     final children = <Widget>[];
     final title = TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: c.text);
     final aux = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
+    // R8-U3-05: να φαίνεται ότι η σημερινή είναι επιλογή σου, με επιστροφή στο πρόγραμμα με ένα πάτημα.
+    if (chosen) {
+      // Wrap: με μεγάλα γράμματα το κουμπί πάει από κάτω, ποτέ ξεχείλισμα.
+      children.add(Wrap(key: const ValueKey('train-chosen'), spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text('Τη διάλεξες εσύ για σήμερα.', style: aux),
+        TextButton(
+          key: const ValueKey('train-chosen-reset'),
+          style: TextButton.styleFrom(foregroundColor: c.exercise, minimumSize: const Size(0, 44)),
+          onPressed: () => setState(() => _chosen = null),
+          child: const Text('Πίσω στο πρόγραμμα'),
+        ),
+      ]));
+    }
     if (w == null && p.notStarted(today)) {
       // R7-A6-6: πριν από την έναρξη του προγράμματος καμία προπόνηση του (πριν: το Σάββατο έδειχνε ήδη «Κάτω μέρος 2»).
       final f = p.from!;
@@ -724,6 +750,8 @@ class _TrainingPageState extends State<TrainingPage> {
   Future<void> _editHrLimit(BuildContext context) => editDoctorLimit(context, t);
 
   Future<void> _start(BuildContext context, Workout w) async {
+    // R8-U3-05: η επιλογή από το ⋮ τελειώνει με την προπόνηση που ξεκινά.
+    setState(() => _chosen = null);
     t.start(w);
     // Ανοίγει και η εφαρμογή στο ρολόι (παλμοί, ✓ στον καρπό), αν υπάρχει.
     WearLink.main.openWatch();
@@ -821,7 +849,7 @@ const hrLimitBetaBlockerText = 'Αν παίρνεις β-αναστολέα, τ�
 /// «Πότε δεν έρχεται δόνηση» (ⓘ της φόρμας ορίου): τι κάνει το ρολόι και τι το κινητό, χωριστά.
 const hrLimitMoreText = 'Το ρολόι δονείται μόνο όσο μετρά άσκηση: περπάτημα ή προπόνηση που ξεκίνησε στο ρολόι, ή «Παλμοί εδώ» '
     'στην προπόνηση του κινητού.\n'
-    '• Στο ρολόι: αν δεν μετρά παλμούς (χαλαρό λουρί, λείπει η άδεια παλμών του ρολογιού), δονείται μία φορά για να το '
+    '• Στο ρολόι: αν δεν μετρά παλμούς (χαλαρό λουράκι, λείπει η άδεια παλμών του ρολογιού), δονείται μία φορά για να το '
     'ξέρεις (μία μακριά και δύο σύντομες· τρεις σύντομες αν χάθηκαν στη μέση). Πάνω από το όριο: τρεις μακριές.\n'
     '• Στο κινητό: αν δεν φτάνουν παλμοί (ρολόι μακριά ή χωρίς «Παλμοί εδώ»), το γράφει στην οθόνη της προπόνησης. Αν το '
     'ρολόι δεν μετρά άσκηση, δεν έρχεται καμία δόνηση.\n'

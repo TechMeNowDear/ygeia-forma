@@ -205,12 +205,16 @@ object WidgetRenderer {
         /**
          * Κείμενο που χωρά στο [maxW]: μικραίνει ως 75% (μικρές γραμμές, κάτω από 11 sp: ως 85%, round 1 U7-11· πριν
          * έπεφταν στα 7,9 sp) και μετά κόβεται με «…».
+         * Round 8 (R8-U1-7): βήματα από το αρχικό μέγεθος ([WidgetText.shrinkScale]), ποτέ κάτω από το όριο (πριν 80%).
          */
         fun fit(text: String, p: Paint, maxW: Float): String {
             if (maxW <= 0) return ""
             val base = p.textSize
             val floor = if (base < sp(11f)) WidgetText.MIN_SCALE_SMALL else 0.75f
-            while (p.measureText(text) > maxW && p.textSize > base * floor) p.textSize -= base * 0.05f
+            for (k in 1..WidgetText.shrinkSteps(floor)) {
+                if (p.measureText(text) <= maxW) break
+                p.textSize = base * WidgetText.shrinkScale(k)
+            }
             if (p.measureText(text) <= maxW) return text
             var t = text
             while (t.isNotEmpty() && p.measureText("$t…") > maxW) t = t.dropLast(1)
@@ -384,13 +388,18 @@ object WidgetRenderer {
             val big = paint("ExtraBold", sp(bigSize()), fg).apply { letterSpacing = -0.03f }
             val up = paint("SemiBold", sp(bigSize() * 0.42f), muted)
             // Μικραίνει μαζί με τη μονάδα ώστε να χωρούν και τα δύο.
-            val unitW = if (unit.isEmpty()) 0f else up.measureText(" $unit")
+            // Round 8 (R8-U1-3): «96%» κολλητά, όπως η εφαρμογή ([WidgetText.unitText])· R8-U1-7: ως 60%, χωρίς άθροιση λάθους.
+            val unitStr = WidgetText.unitText(unit)
+            val unitW = if (unit.isEmpty()) 0f else up.measureText(unitStr)
             val base = big.textSize
-            while (big.measureText(value) + unitW > maxW && big.textSize > base * 0.6f) big.textSize -= base * 0.05f
+            for (k in 1..WidgetText.shrinkSteps(0.6f)) {
+                if (big.measureText(value) + unitW <= maxW) break
+                big.textSize = base * WidgetText.shrinkScale(k)
+            }
             val vText = fit(value, big, maxW - unitW)
             val by = top - big.ascent() * 0.92f
             cv.drawText(vText, left, by, big)
-            if (unit.isNotEmpty() && unitW + big.measureText(vText) <= maxW) cv.drawText(" $unit", left + big.measureText(vText), by, up)
+            if (unit.isNotEmpty() && unitW + big.measureText(vText) <= maxW) cv.drawText(unitStr, left + big.measureText(vText), by, up)
             var y = by + big.descent() * 0.6f
 
             val capP = paint("Medium", sp(10.5f), muted)
@@ -508,7 +517,8 @@ object WidgetRenderer {
                 val a = if (showUsual && e != null && e.has("d")) " " + arrow(e.optInt("d")) else ""
                 val vb = lb + lp.descent() + dp(1f) - vp.ascent()
                 val avail = cw - ip * 2
-                val tail = (if (u.isEmpty()) "" else " $u") + a
+                // Round 8 (R8-U1-3): «25,4%» κολλητά, όπως η εφαρμογή.
+                val tail = WidgetText.unitText(u) + a
                 val vt = fit(v, vp, avail - up.measureText(tail))
                 cv.drawText(vt, x + ip, vb, vp)
                 if (tail.isNotEmpty() && vp.measureText(vt) + up.measureText(tail) <= avail) {

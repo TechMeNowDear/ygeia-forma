@@ -274,10 +274,17 @@ String loadLabel(LoadKind k, double? v) {
     case LoadKind.bandAssist:
       return (v ?? 0) <= 0 ? 'χωρίς βοήθεια' : 'βοήθεια: ${bandText(v!)}';
     case LoadKind.plate:
-      return (v ?? 0) <= 0 ? 'χωρίς δίσκο' : 'δίσκος ${kgText(v!)} kg';
+      return (v ?? 0) <= 0 ? 'χωρίς δίσκο' : _plateText(v!);
     default:
       return '${kgText(v ?? 0)} kg';
   }
+}
+
+/// Δίσκος που κρατάς: «δίσκος 2,5 kg», ή «δίσκοι 1,25 + 0,5 kg» όταν το βάρος βγαίνει από δύο (R8-A6-4: πριν «δίσκος
+/// 1,75 kg», ένας δίσκος που δεν υπάρχει).
+String _plateText(double w) {
+  final p = platesPerSide(LoadKind.plate, w);
+  return p == null || p.length < 2 ? 'δίσκος ${kgText(w)} kg' : 'δίσκοι ${p.map(kgText).join(' + ')} kg';
 }
 
 /// Δίσκοι ανά πλευρά/άκρη για ένα βάρος (μεγαλύτεροι πρώτα). null αν δεν βγαίνει.
@@ -296,7 +303,8 @@ List<double>? platesPerSide(LoadKind k, double v) {
       base = handleKg;
     case LoadKind.horn:
     case LoadKind.plate:
-      return _platesFor(v, k == LoadKind.horn ? platesEach : 1, k == LoadKind.plate ? 2 : 99);
+      // R8-A6-4: στο στήθος έως δύο δίσκοι, και δύο ίδιοι (υπάρχουν 4 από κάθε βάρος, όπως στο [available]): 1 kg = 0,5 + 0,5.
+      return _platesFor(v, k == LoadKind.horn ? platesEach : 2, k == LoadKind.plate ? 2 : 99);
     default:
       return null;
   }
@@ -355,7 +363,10 @@ String setupText(LoadKind k, double? v) {
     case LoadKind.bandAssist:
       return w <= 0 ? 'χωρίς λάστιχο βοήθειας' : 'λάστιχο βοήθειας ${bandText(w)}';
     case LoadKind.plate:
-      return w <= 0 ? 'χωρίς βάρος' : 'δίσκος ${kgText(w)} kg';
+      if (w <= 0) return 'χωρίς βάρος';
+      // R8-A6-4: 1,75 kg δεν είναι ένας δίσκος: «δύο δίσκοι μαζί: 1,25 + 0,5 kg» (πριν «δίσκος 1,75 kg»).
+      final p = platesPerSide(k, w);
+      return p == null || p.length < 2 ? 'δίσκος ${kgText(w)} kg' : 'δύο δίσκοι μαζί: ${p.map(kgText).join(' + ')} kg';
     case LoadKind.bodyweight:
       return 'με το βάρος του σώματος';
   }

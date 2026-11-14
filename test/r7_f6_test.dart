@@ -351,7 +351,7 @@ void main() {
       await _pump(t, GoalsPage(store: store(checkinGoals().copyWith(checkIn: '2026-12-14')), now: at));
       expect(find.text('Πρώτη εκτίμηση: Δευτέρα 21 Δεκεμβρίου'), findsOneWidget);
       expect(find.text('21 από 14'), findsOneWidget);
-      expect(find.text('Ο έλεγχος στις 14/12 δεν έβγαλε εκτίμηση· η κάρτα της Σήμερα έγραψε τι έλειπε.'), findsOneWidget);
+      expect(find.text('Ο έλεγχος στις 14/12 δεν έβγαλε εκτίμηση· η κάρτα της Σήμερα έγραψε γιατί.'), findsOneWidget);
       expect(find.byKey(const ValueKey('goals-adapt-gap')), findsNothing);
     });
   });

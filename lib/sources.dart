@@ -456,6 +456,19 @@ class SourcePlan {
     return null;
   }
 
+  /// Round 8 (R8-A5-1): η ΤΕΛΕΥΤΑΙΑ αλλαγή πηγής μέσα στο (after, until]. Με δύο αλλαγές μέσα στο διάστημα (π.χ.
+  /// ρολόι → Oura → ξανά ρολόι) οι τιμές «από την αλλαγή» είναι μόνο της τελευταίας εποχής, όπως στο [segmentStart] και
+  /// στο [planSeries]· από την πρώτη αλλαγή θα ανακατεύονταν δαχτυλίδι και ρολόι. null = καμία αλλαγή.
+  DateTime? lastChangeWithin(String metric, DateTime after, DateTime until) {
+    final a = dayOf(after);
+    final b = dayOf(until);
+    DateTime? last;
+    for (final c in changeDates(metric)) {
+      if (c.isAfter(a) && !c.isAfter(b) && (last == null || c.isAfter(last))) last = c;
+    }
+    return last;
+  }
+
   /// Η πρώτη νύχτα μιας εποχής Oura: αν το ρολόι είχε ήδη γράψει νύχτα εκείνη τη μέρα (σύνδεση το πρωί με
   /// «μετρά από το δαχτυλίδι»), οι τιμές του μένουν στο ιστορικό — κρυφές, μόνο για τη «Σύγκριση πηγών» και
   /// για την αναίρεση «Η τελευταία νύχτα από το ρολόι». Ποτέ δεν σβήνονται.

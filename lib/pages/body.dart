@@ -68,6 +68,18 @@ class BodyPage extends StatelessWidget {
               title: 'Οι ζυγίσεις δεν διαβάστηκαν τώρα',
               text: 'Η Samsung δεν τις έδωσε αυτή τη φορά. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.',
             )
+          // Round 8 (R8-A4-3): η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή (κανένα «body» στην ανάγνωση,
+          // κανένα σφάλμα): πριν «Δεν υπάρχει ζύγιση · Ζυγίσου στην InBody», ενώ η ζύγιση δεν μπορούσε να φτάσει.
+          else if (last == null && bodyNotPermitted(d))
+            EmptyCard(
+              icon: Icons.monitor_weight_rounded,
+              color: c.body,
+              title: bodyNoPermissionTitle,
+              text: bodyNoPermissionText,
+              buttonText: 'Άδειες Samsung Health',
+              onPressed: () => store.refresh(askPermissions: true),
+              primary: true,
+            )
           else if (last == null)
             EmptyCard(
               icon: Icons.monitor_weight_rounded,
@@ -280,7 +292,9 @@ class _LatestCard extends StatelessWidget {
         children: [
           CardHeader(
             icon: Icons.monitor_weight_rounded,
-            title: 'Τελευταία ζύγιση',
+            // Round 8 (R8-U4-10): με δεύτερη ζύγιση της ίδιας μέρας ([later], η βραδινή) η κάρτα δείχνει τη ζύγιση ΤΗΣ ΜΕΡΑΣ
+            // (την πρώτη), όχι την τελευταία: πριν «Τελευταία ζύγιση · 07:15» πάνω από το «Και 20:30: 82,1 kg».
+            title: later != null ? 'Ζύγιση της μέρας' : 'Τελευταία ζύγιση',
             subtitle: '${relativeDay(last.time, now)} ${hm(last.time)}',
             color: c.body,
             trailing: const InfoButton(K.weight),
@@ -316,7 +330,7 @@ class _LatestCard extends StatelessWidget {
             // Σχέδια 9/11 (Spec): αλλαγή χωρίς κρίση, σε γκρι.
             Align(
               alignment: Alignment.centerLeft,
-              child: TrendPill('${signedDec(shownDiff(last.weight!, p.weight!, 1))} kg από ${p.time.day}/${p.time.month}'),
+              child: TrendPill('${signedDec(shownDiff(last.weight!, p.weight!, 1))} kg από ${_dayNum(p.time)}'),
             ),
           ],
           const SizedBox(height: 14),
@@ -331,7 +345,9 @@ class _LatestCard extends StatelessWidget {
           // μία εκτίμηση της ζυγαριάς μόνη της ανεβοκατεβαίνει με το νερό (body_trend.dart).
           if (last.fatPct != null || p != null)
             Text(
-              bodyTrendNote(previous: p?.weight == null ? null : p!.time, days: bodyCompositionDays(body), date: dayMonth),
+              // Round 8 (A4 Β2 / U4 Β4): η ίδια μέρα με την ίδια μορφή στο χάπι και στη σημείωση («από 13/8», όπως η Σήμερα και
+              // το widget)· πριν «από 13/8» στο χάπι και «από τις 13 Αυγ.» από κάτω.
+              bodyTrendNote(previous: p?.weight == null ? null : p!.time, days: bodyCompositionDays(body), date: _dayNum),
               key: const ValueKey('body-trend-note'),
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
@@ -341,7 +357,9 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Μάζα λίπους', trendDiff(last.fatKg, (b) => b.fatKg, 'kg', bodyFloorKg)),
           InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg', bodyFloorKg)),
           InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg', bodyFloorKg)),
-          if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
+          // Round 8 (R8-A4-2): χωρίς το «±10%», που δεν είχε πηγή και δεν ισχύει για κάθε άνθρωπο (Frankenfield κ.ά., J Am
+          // Diet Assoc 2005: ακόμα και η καλύτερη εξίσωση βγαίνει μέσα στο ±10% μόνο στους περισσότερους, όχι σε όλους).
+          if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση)', '${thousands(last.bmr!)} kcal'),
           // Round 7 (A4-2): κομμένος στο 0,1 ([bmiText]): ποτέ «25,0» δίπλα σε «μέσα στο εύρος».
           if (bmi != null) InfoRow('Δείκτης μάζας σώματος', bmiText(bmi)),
           if (inBodyHeight(last.weight, last.bmi) case final h? when profile.heightCm != null && (h - profile.heightCm!).abs() >= 1)
@@ -361,7 +379,10 @@ class _LatestCard extends StatelessWidget {
           if (!foreign && !pending) ..._ranges(context),
           const SizedBox(height: 8),
           Text(
-            'Λίπος και μύες είναι εκτιμήσεις της ζυγαριάς· σύγκρινε ζυγίσεις με τις ίδιες συνθήκες.',
+            // Round 8 (R8-A4-2): ο μεταβολισμός της ζυγαριάς είναι άλλη εκτίμηση από αυτήν των Στόχων (Mifflin-St Jeor,
+            // goals_page.dart «Πώς υπολογίστηκαν οι θερμίδες»): το λέει, για να μη μοιάζει λάθος η διαφορά.
+            last.bmr != null ? bodyEstimatesBmrText : 'Λίπος και μύες είναι εκτιμήσεις της ζυγαριάς· σύγκρινε ζυγίσεις με τις ίδιες συνθήκες.',
+            key: const ValueKey('body-estimates-note'),
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
           ),
         ],
@@ -411,6 +432,13 @@ class _LatestCard extends StatelessWidget {
     return out;
   }
 }
+
+/// Round 8 (A4 Β2 / U4 Β4): «13/8», η μορφή της μέρας σε όλη την κάρτα (χάπι, σημείωση), όπως Σήμερα και widget.
+String _dayNum(DateTime d) => '${d.day}/${d.month}';
+
+/// Round 8 (R8-A4-2): η σημείωση κάτω από τη σύσταση σώματος όταν η ζυγαριά δίνει και βασικό μεταβολισμό.
+const bodyEstimatesBmrText = 'Λίπος, μύες και βασικός μεταβολισμός είναι εκτιμήσεις της ζυγαριάς· σύγκρινε ζυγίσεις με τις '
+    'ίδιες συνθήκες. Οι Στόχοι υπολογίζουν τον μεταβολισμό με άλλο τύπο (Mifflin-St Jeor), γι\' αυτό ο αριθμός τους μπορεί να διαφέρει.';
 
 /// Round 7 (A4-1): κάτω από τη ζύγιση της μέρας, όταν την ίδια μέρα έγινε και άλλη, αργότερα (π.χ. το βράδυ).
 String laterWeighInText(BodyMeasurement b) => 'Και ${hm(b.time)}: ${dec(b.weight!)} kg· μετρά μία ζύγιση τη μέρα, η πρώτη.';

@@ -217,9 +217,21 @@ class _MetricPageState extends State<MetricPage> {
             ? _countedWeighInsOnly(store.history, store.plan, DateTime(from.year, from.month, from.day - 60), end)
             : store.history;
         final series = planSeries(history, store.plan, s.metric, from, end);
-        final pts = series.points;
+        final raw = series.points;
+        final rawLast = raw.isEmpty ? null : raw.last;
+        final base = rawLast == null ? null : personalBaseline(history, store.plan, s.metric, rawLast.$1);
+        // Round 8 (R8-U4-2): θερμοκρασία καρπού (ρολόι): ΜΟΝΟ η απόκλιση από το «συνήθως» σου, όπως η Σήμερα, το Σώμα, οι
+        // Τάσεις και το widget (κλινικός έλεγχος L5, τρίτος έλεγχος F2/C5)· ποτέ βαθμοί (το «33,6 °C» διαβαζόταν ως
+        // υποθερμία). Κάθε νύχτα σε σχέση με το «συνήθως» της τελευταίας νύχτας (0 στο γράφημα), όπως στο Σώμα. Χωρίς
+        // «συνήθως» (λιγότερες από 7 νύχτες) καμία τιμή, όπως η Σήμερα.
+        final wrist = s.metric == K.skinTemp && series.source != Source.oura;
+        final wristRef = wrist ? base?.usual : null;
+        final List<(DateTime, double)> pts = !wrist
+            ? raw
+            : wristRef == null
+                ? const <(DateTime, double)>[]
+                : [for (final p in raw) (p.$1, shownDiff(p.$2, wristRef, s.digits))];
         final last = pts.isEmpty ? null : pts.last;
-        final base = last == null ? null : personalBaseline(history, store.plan, s.metric, last.$1);
         final range = s.range?.call(store.profile, today);
         final vals = [for (final p in pts) p.$2];
         final mean = vals.isEmpty ? null : vals.reduce((a, b) => a + b) / vals.length;
@@ -234,6 +246,8 @@ class _MetricPageState extends State<MetricPage> {
         final ouraTemp = s.metric == K.skinTemp && series.source == Source.oura;
         if (ouraTemp && last != null) {
           usual = ouraTempDeviationLabel;
+        } else if (wrist) {
+          if (rawLast != null) usual = wristRef == null ? wristLearningText : wristDeviationText;
         } else if (base?.usual != null) {
           final d = shownDiff(base!.value, base.usual!, s.digits);
           final unit = s.unitSuffix;
@@ -241,7 +255,9 @@ class _MetricPageState extends State<MetricPage> {
               // Round 1 (U1b-04): «33 λεπτά λιγότερο από ό,τι συνήθως · συνήθως 7 ώρες 5 λεπτά» (πριν «−33 · …» χωρίς μονάδα).
               ? '${sleepVsUsualText(d.round())} · συνήθως ${s.show(base.usual!)}'
               : d == 0
-                  ? '$asUsualText · συνήθως ${s.show(base.usual!)}$unit'
+                  // Round 8 (R8-U4-12): «Όπως συνήθως (59 bpm)», όπως ο Ύπνος του Oura (πριν «Όπως συνήθως · συνήθως 59 bpm»,
+                  // το λάθος που η Καρδιά διόρθωσε στο R2-U1-10).
+                  ? '$asUsualText (${s.show(base.usual!)}$unit)'
                   : '${signedShown(d, s.digits)}${s.diffSuffix(d)} · συνήθως ${s.show(base.usual!)}$unit';
         }
         // Round 1 (U1b-11): η μονάδα και στα στατιστικά («Μέσος όρος 39 ms»).
@@ -253,7 +269,7 @@ class _MetricPageState extends State<MetricPage> {
             children: [
               Row(children: [
                 Expanded(
-                  child: Text(last == null ? 'Καμία τιμή' : shortDayDate(last.$1),
+                  child: Text(rawLast == null ? 'Καμία τιμή' : shortDayDate(rawLast.$1),
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontWeight: FontWeight.w600)),
                 ),
                 SourceTag(series.source),
@@ -307,6 +323,10 @@ class _MetricPageState extends State<MetricPage> {
                   const SizedBox(height: 4),
                   Text('Άξονας: ώρες:λεπτά', style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
                 ],
+                if (wrist) ...[
+                  const SizedBox(height: 4),
+                  Text(wristChartNote, style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+                ],
               ] else
                 Text('Λίγες τιμές για γράφημα σε αυτό το διάστημα.', style: TextStyle(color: c.textSecondary)),
               if (series.cut != null) ...[
@@ -321,7 +341,9 @@ class _MetricPageState extends State<MetricPage> {
                   InfoRow('Μέσος όρος', withUnit(mean)),
                   InfoRow('Χαμηλότερη · υψηλότερη', '${s.show(lo!)} · ${withUnit(hi!)}'),
                 ],
-                InfoRow('Μέρες με τιμή', '${pts.length} από $_days'),
+                // Round 8 (R8-U4-8): μετά από αλλαγή πηγής, από πόσες μέρες ΑΠΟ ΤΗΝ ΑΛΛΑΓΗ (όπως οι Τάσεις, R7-U4-4)· πριν
+                // «9 από 30», σαν να έλειπαν νύχτες που υπάρχουν από την άλλη πηγή.
+                InfoRow('Μέρες με τιμή', '${pts.length} από ${countText(metricShownDays(series.cut, end, _days), 'μέρα', 'μέρες')}'),
               ],
             ],
           ),
@@ -376,3 +398,12 @@ class _MetricPageState extends State<MetricPage> {
     );
   }
 }
+
+/// Round 8 (R8-U4-2): η θερμοκρασία καρπού (ρολόι) στη σελίδα της: ίδια κείμενα με την κάρτα της Σήμερα.
+const wristDeviationText = 'Απόκλιση από τα συνηθισμένα σου';
+const wristLearningText = 'Μαθαίνει το συνηθισμένο σου (7 νύχτες).';
+const wristChartNote = 'Κάθε νύχτα σε σχέση με το συνηθισμένο σου (0 στο γράφημα). Δεν είναι θερμοκρασία σώματος.';
+
+/// Round 8 (R8-U4-8): πόσες μέρες καλύπτει το γράφημα της σελίδας μέτρησης: από την αλλαγή πηγής ([cut]) ως το [end],
+/// ή όλη η περίοδος ([days]) χωρίς αλλαγή.
+int metricShownDays(DateTime? cut, DateTime end, int days) => cut == null ? days : daysBetween(cut, end) + 1;

@@ -220,7 +220,8 @@ void main() {
     // python: 11 δικές σου τιμές, 80,7–82,0, μέσος όρος 81,3545 → 81,4.
     expect(_row(t, 'Χαμηλότερη · υψηλότερη'), '80,7 · 82,0 kg');
     expect(_row(t, 'Μέσος όρος'), '81,4 kg');
-    expect(_row(t, 'Μέρες με τιμή'), '11 από 90');
+    // Round 8 (R8-U4-8): «από 90 μέρες», όπως οι Τάσεις («9 από 9 μέρες»).
+    expect(_row(t, 'Μέρες με τιμή'), '11 από 90 μέρες');
     await _pump(t, MetricPage(store: s, spec: metricSpecs[K.fatPct]!, now: now));
     expect([for (final p in t.widget<LineChart>(find.byType(LineChart)).points) p.$2], everyElement(27.0));
     expect(find.textContaining('18,0'), findsNothing);

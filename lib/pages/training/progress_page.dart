@@ -466,9 +466,11 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
     final r = p.repsDiff;
     final String what;
     if (p.loadDiff.abs() > 1e-6) {
+      // R8-A6-2 / R8-U3-09: το φορτίο που κατέληξε κάθε φορά ([ExLog.endLoad]), ίδιο με την κρίση ([ExProgress.loadDiff]).
+      // Πριν το μεγαλύτερο: «6,8 kg → 6,8 kg» με πράσινο βέλος, όταν μετά το 1ο σετ το βάρος είχε κατέβει.
       what = p.kind == LoadKind.bandAssist
           ? (p.loadDiff > 0 ? 'λιγότερη βοήθεια' : 'περισσότερη βοήθεια')
-          : '${loadLabel(p.kind, p.before.workLoad)} → ${loadLabel(p.kind, p.now.workLoad)}';
+          : '${loadLabel(p.kind, p.before.endLoad)} → ${loadLabel(p.kind, p.now.endLoad)}';
     } else {
       what = '${r > 0 ? '+' : '−'}${r.abs()}\u00A0επαναλήψεις${hasLoad(p.kind) ? ' με το ίδιο βάρος' : ''}';
     }

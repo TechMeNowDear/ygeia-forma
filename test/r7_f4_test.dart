@@ -482,9 +482,10 @@ void main() {
         final y = File(f).readAsStringSync();
         expect(y, isNot(contains('ls test/*_test.dart')), reason: f);
         expect(y, contains("find test -name '*_test.dart'"), reason: f);
-        expect(y, contains('-lt 1550'), reason: f);
-        expect(y, contains('-lt 70'), reason: f);
-        expect(y, contains('-lt 128'), reason: f);
+        // Round 8 (R8-A12-2): ≈ 3% κάτω από το #105 (1.832 / 85 / 167)· πριν 1550 / 70 / 128 (15–23% κάτω).
+        expect(y, contains('-lt 1777'), reason: f);
+        expect(y, contains('-lt 82'), reason: f);
+        expect(y, contains('-lt 162'), reason: f);
         expect(y, isNot(contains('-lt 950')), reason: f);
       }
       // Κάθε αρχείο δοκιμών είναι κάτω από το test/ (το «find» τα βρίσκει όλα).

@@ -35,19 +35,25 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
   }
 
   void _saved(Food f, {bool fromScan = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Αποθηκεύτηκε: ${f.name}'),
-      // Έλεγχος round1 (U3a-18): η ίδια λέξη με το κουμπί («Σάρωση»).
-      // Round7 (R7-U2-17): το μήνυμα μένει και αφού κλείσει η οθόνη· τότε το «Σάρωση ξανά» δεν κάνει τίποτα (πριν άνοιγε τον
-      // σαρωτή πάνω σε κλειστή οθόνη και έγραφε σφάλμα).
-      action: fromScan
-          ? SnackBarAction(
-              label: 'Σάρωση ξανά',
-              onPressed: () {
-                if (mounted) _scan();
-              })
-          : null,
-    ));
+    // Round8 (R8-U2-1): κλείνει το προηγούμενο μήνυμα και κλείνει μόνο του (με κουμπί, από το Flutter 3.38, έμενε για πάντα
+    // και τα επόμενα περίμεναν πίσω του).
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('Αποθηκεύτηκε: ${f.name}'),
+        persist: false,
+        duration: undoSnackBarDuration,
+        // Έλεγχος round1 (U3a-18): η ίδια λέξη με το κουμπί («Σάρωση»).
+        // Round7 (R7-U2-17): το μήνυμα μένει και αφού κλείσει η οθόνη· τότε το «Σάρωση ξανά» δεν κάνει τίποτα (πριν άνοιγε
+        // τον σαρωτή πάνω σε κλειστή οθόνη και έγραφε σφάλμα).
+        action: fromScan
+            ? SnackBarAction(
+                label: 'Σάρωση ξανά',
+                onPressed: () {
+                  if (mounted) _scan();
+                })
+            : null,
+      ));
   }
 
   Future<void> _scan() async {
@@ -57,15 +63,25 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
       onBusy: (b) {
         if (mounted) setState(() => _busy = b);
       },
-      existing: (e) async {
-        if (!mounted) return null;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Το έχεις ήδη: ${e.name}. Αν θες, διόρθωσέ το.')),
-        );
-        return _edit(e, note: 'Αυτό το προϊόν το έχεις ήδη περάσει.');
-      },
+      // Round8 (R8-U2-8): ανοιχτό από το «+ Φαγητό» (για γράψιμο): προϊόν που έχεις ήδη επιστρέφεται όπως είναι, για να
+      // γραφτεί· όχι «Διόρθωση προϊόντος».
+      existing: widget.pick
+          ? null
+          : (e) async {
+              if (!mounted) return null;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Το έχεις ήδη: ${e.name}. Αν θες, διόρθωσέ το.')),
+              );
+              return _edit(e, note: 'Αυτό το προϊόν το έχεις ήδη περάσει.');
+            },
     );
-    if (f != null && mounted) _saved(f, fromScan: true);
+    if (f == null || !mounted) return;
+    // Round8 (R8-U2-8): για γράψιμο, η οθόνη κλείνει με το προϊόν και ανοίγει η ποσότητα (όπως το πάτημα σε προϊόν).
+    if (widget.pick) {
+      Navigator.of(context).pop(f);
+      return;
+    }
+    _saved(f, fromScan: true);
   }
 
   /// Όλα τα προϊόντα σε απλό κείμενο, για έλεγχο (π.χ. επικόλληση σε ένα μήνυμα ή σημείωση).
@@ -96,7 +112,13 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
 
   Future<void> _manual() async {
     final f = await createFood(context, widget.food);
-    if (f != null && mounted) _saved(f);
+    if (f == null || !mounted) return;
+    // Round8 (R8-U2-8): για γράψιμο, το νέο προϊόν γράφεται αμέσως (ανοίγει η ποσότητα).
+    if (widget.pick) {
+      Navigator.of(context).pop(f);
+      return;
+    }
+    _saved(f);
   }
 
   Future<Food?> _edit(Food f, {String? note}) => editMyFood(context, widget.food, f, note: note);
@@ -134,7 +156,8 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                 children: [
                   Text(
                     widget.pick
-                        ? 'Πάτα ένα προϊόν για να το γράψεις. Με το ⋮ το διορθώνεις ή το σβήνεις.'
+                        // Round8 (R8-A6-6): λέξεις αντί για «⋮», που δεν υπάρχει στη γραμματοσειρά (έβγαινε κενό).
+                        ? 'Πάτα ένα προϊόν για να το γράψεις. Με τις τρεις τελείες δίπλα του το διορθώνεις ή το σβήνεις.'
                         : 'Πέρασε εδώ ό,τι αγοράζεις, χωρίς να το καταγράψεις ως φαγητό. '
                             'Όταν το φας, θα το βρεις πρώτο στην αναζήτηση.',
                     style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary),
@@ -317,10 +340,15 @@ Future<Food?> editMyFood(BuildContext context, FoodStore food, Food f, {String? 
 
 Future<void> _deleteMyFood(BuildContext context, FoodStore food, Food f) async {
   if (!await food.deleteMyFood(f) || !context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text('Διαγράφηκε: ${f.name}'),
-    action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.saveMyFood(f)),
-  ));
+  // Round8 (R8-U2-1): κλείνει το προηγούμενο μήνυμα και κλείνει μόνο του.
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text('Διαγράφηκε: ${f.name}'),
+      persist: false,
+      duration: undoSnackBarDuration,
+      action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.saveMyFood(f)),
+    ));
 }
 
 /// ⋮ ενός δικού μου προϊόντος: διόρθωση, όλες οι τιμές, διαγραφή.

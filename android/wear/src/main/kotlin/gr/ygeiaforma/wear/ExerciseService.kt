@@ -250,12 +250,10 @@ class ExerciseService : Service() {
     // ------------------------------------------------------------------ έναρξη
     private fun begin(kind: String, phone: Boolean) {
         if (Repo.running != null) {
-            // Ήδη τρέχει: απλώς ενημερώνει τον τρόπο (π.χ. η προπόνηση του κινητού βρήκε το ρολόι). Όχι όμως σε
-            // περπάτημα: αλλιώς το περπάτημα θα τελείωνε μαζί με την προπόνηση του κινητού (DP-10).
-            if (Repo.running != "walk") {
-                Repo.runningPhone = phone
-                if (phone && Repo.runningSid == null) Repo.runningSid = Repo.phone?.id
-            }
+            // Ήδη τρέχει: μόνο η προπόνηση του κινητού που βρήκε το ρολόι σε προπόνηση με βάρη αλλάζει τον τρόπο. Όχι σε
+            // περπάτημα (DP-10), και ποτέ όσο η άσκηση κλείνει ή «όχι του κινητού» πάνω σε προπόνηση του κινητού (έλεγχος
+            // 14/11, round 8, R8-A8-1: αλλιώς το αποτέλεσμα των παλμών της δεν γραφόταν ποτέ).
+            Repo.joinWhileRunning(kind, phone, stopping)
             return
         }
         // Άσκηση που έμεινε από απότομο κλείσιμο και δεν ελέγχθηκε ακόμα: πρώτα γράφεται ως μερική (ένα αποτέλεσμα).
@@ -1072,13 +1070,18 @@ class ExerciseService : Service() {
         if (!Forgotten.remindNow(why, forgotBuzzEl, nowEl)) return
         forgotBuzzEl = nowEl
         val title = Forgotten.title(why)
-        val text = Forgotten.text(why)
+        // Round 8 (R8-U3-03): από κάτω η ερώτηση ρεζέρβας (εκεί δεν υπάρχει «Τέλος»)· η απάντηση τελειώνει κιόλας την
+        // προπόνηση όταν είναι του ρολογιού και όλες οι ασκήσεις έγιναν (WatchActivity.answer). Και στην ειδοποίηση.
+        val onRir = Repo.screen == Repo.Screen.RIR
+        val rirEnds = Repo.session?.let { !it.phone && it.allDone } == true
+        val text = Forgotten.text(why, onRir, rirEnds)
         // Τέσσερις μέτριες: δεν μοιάζει ούτε με το όριο (τρεις μακριές) ούτε με το τέλος διαλείμματος (δύο).
         vibrate(longArrayOf(0, 150, 100, 150, 100, 150, 100, 150))
         // Στο περπάτημα σε μία γραμμή (χωρά)· στα βάρη ολόκληρο, σε όλη την οθόνη (η οθόνη το ανοίγει μόνη της), με το
-        // κείμενο της οθόνης (R7-U3-07: χωρίς «στο ρολόι», πρώτα «κλείσε αυτό»).
+        // κείμενο της οθόνης (R7-U3-07: χωρίς «στο ρολόι», πρώτα «κλείσε αυτό»). Round 8 (R8-U3-03): στην ερώτηση ρεζέρβας
+        // λέει «απάντησε στην ερώτηση»· αν η απάντηση τελειώνει κιόλας την προπόνηση, μόνο αυτό.
         if (!isBriefNotice(Repo.notice)) {
-            val shown = if (kind == "walk") title else Forgotten.screenText(why)
+            val shown = if (kind == "walk") title else Forgotten.screenText(why, onRir, rirEnds)
             softNotice = shown
             Repo.notice = shown
         }

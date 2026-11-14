@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.time.LocalDate
 
 /**
  * Η οθόνη ρύθμισης widget (7/11): ανοίγει όταν βάζεις widget στην αρχική οθόνη και με παρατεταμένο πάτημα › Ρυθμίσεις.
@@ -86,11 +87,12 @@ class WidgetConfigActivity : FlutterFragmentActivity() {
                     scope.launch {
                         val png = try {
                             withContext(Dispatchers.Default) {
-                                val data = if (HomeWidgets.hasData(this@WidgetConfigActivity, k)) {
-                                    HomeWidgets.kindData(this@WidgetConfigActivity, k)
-                                } else {
-                                    WidgetRenderer.sample(k)
-                                }
+                                // Round 8 (R8-A10-2): ό,τι θα δείξει το widget, με τον κανόνα της μέρας (HomeWidgets.update):
+                                // χθεσινά βήματα/φαγητό = «—», όχι σαν σημερινά.
+                                val data = WidgetText.previewData(
+                                    HomeWidgets.kindData(this@WidgetConfigActivity, k),
+                                    LocalDate.now(),
+                                ) { WidgetRenderer.sample(k) }
                                 val bmp = WidgetRenderer.render(this@WidgetConfigActivity, k, style, data, w, h, dark)
                                 val out = ByteArrayOutputStream()
                                 bmp.compress(Bitmap.CompressFormat.PNG, 100, out)

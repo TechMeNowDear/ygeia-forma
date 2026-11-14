@@ -136,6 +136,11 @@ fun mergeWatchEdits(prev: LiveSession, s: LiveSession) {
     }
     // Η ερώτηση για ρεζέρβα μένει για την άσκηση που τελείωσε, όχι για όποια δείχνει τώρα το κινητό.
     if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
+    // R8-U3-01: όσες ρωτήθηκαν δεν ξαναρωτιούνται· η ερώτηση του 1ου σετ μένει ανοιχτή μόνο όσο το κινητό τη θέλει ακόμα
+    // («f» στην ίδια άσκηση). Απαντήθηκε στο κινητό (χωρίς «f»): κλείνει εδώ, χωρίς αποστολή.
+    s.firstAsked.addAll(prev.firstAsked)
+    val fi = prev.firstIdx
+    if (fi >= 0 && s.items.getOrNull(fi)?.let { it.first && it.ex == prev.items.getOrNull(fi)?.ex } == true) s.firstIdx = fi
 }
 
 /**
@@ -161,6 +166,15 @@ fun tickCmd(i: Int, k: Int, at: Long, ex: String, reps: Int?, late: Boolean = fa
         if (reps != null) it.put("r", reps)
         if (late) it.put("late", true)
     }
+
+/**
+ * Εντολή «απάντηση στο Πρώτο σετ» προς το κινητό (έλεγχος 14/11, round 8, R8-U3-01, συμβόλαιο με το κινητό στο CROSS.md):
+ * άσκηση [i] και [ex] όπως στο «tick», σετ 0, η ώρα του ✓ του 1ου σετ [at] (για τον ίδιο έλεγχο «ανήκει στην προπόνηση»)
+ * και [v] 0–4 όπως τα κουμπιά της ρεζέρβας, ή −1 για «Δεν ξέρω» (εκεί το κινητό δεν αλλάζει τίποτα). Το sid / pv / q τα
+ * βάζει ο αποστολέας, όπως σε κάθε εντολή. Κινητό παλιότερης έκδοσης: άγνωστη εντολή, δεν κάνει τίποτα.
+ */
+fun rir1Cmd(i: Int, ex: String, at: Long, v: Int): JSONObject =
+    JSONObject().put("op", "rir1").put("i", i).put("s", 0).put("ex", ex).put("v", v.coerceIn(-1, 4)).also { if (at > 0) it.put("at", at) }
 
 /**
  * Τα όρια χρόνου του «Τέλος» (τελικός έλεγχος, Συμβούλιο 4, W-1/W-2). Κάθε κλήση προς το Health Services και προς το
@@ -204,6 +218,11 @@ class ItemT(
     var rir: Int? = null,
     /** Παραλείφθηκε στο κινητό («skip»: 1, έλεγχος γ2, W2-06): το ρολόι δεν πηγαίνει εκεί. */
     val skipped: Boolean = false,
+    /**
+     * Μόνο σε προπόνηση του κινητού («f»: 1, έλεγχος 14/11, round 8, R8-U3-01): εκκρεμεί η ερώτηση «Πρώτο σετ: πόσες ακόμα;»
+     * αυτής της άσκησης (πρώτη φορά, ελαφριά αρχή). Λείπει = όχι (παλιό κινητό, ή απαντήθηκε).
+     */
+    val first: Boolean = false,
 ) {
     val complete: Boolean get() = sets.all { it.done }
 
@@ -378,6 +397,8 @@ internal fun itemOf(o: JSONObject): ItemT {
         }.toMutableList(),
         rir = if (o.has("ra") && !o.isNull("ra")) o.getInt("ra") else null,
         skipped = o.optInt("skip", 0) == 1,
+        // R8-U3-01: «f»: 1 (ή true) από το κινητό.
+        first = o.optInt("f", 0) == 1 || o.optBoolean("f", false),
     )
 }
 
@@ -425,6 +446,11 @@ class LiveSession(
      * είναι της άσκησης που τελείωσε, όχι της επόμενης (που δείχνει πια το [idx]). 0 = άγνωστο.
      */
     var restLen: Long = 0,
+    /**
+     * Μόνο για [phone]: πότε πατήθηκε «Συνέχεια» στην «Ξεχασμένη προπόνηση;» του κινητού (ms, «res» του [Paths.SESSION]·
+     * 0 = ποτέ ή παλιό κινητό). Μετρά ως κίνηση στο [phoneLastActivity] (έλεγχος 14/11, round 8, R8-A8-3, αίτημα του f2).
+     */
+    val res: Long = 0,
 ) {
     val current: ItemT? get() = items.getOrNull(idx)
 
@@ -433,6 +459,38 @@ class LiveSession(
      * όχι πια — η οθόνη του ρολογιού την αφήνει (έλεγχος γ2, W2-18).
      */
     val rirPending: Boolean get() = rirIdx >= 0 && items.getOrNull(rirIdx)?.rir == null
+
+    /**
+     * Έλεγχος 14/11, round 8 (R8-U3-01), μόνο σε προπόνηση του κινητού: η άσκηση (θέση) που περιμένει εδώ απάντηση στο
+     * «Πρώτο σετ: πόσες ακόμα;» (−1 = καμία), και οι ασκήσεις (id) για τις οποίες ρωτήθηκε ήδη σε αυτή την προπόνηση: ποτέ
+     * δεύτερη φορά (κρατιούνται και στο στιγμιότυπο, «fa»).
+     */
+    var firstIdx: Int = -1
+    val firstAsked: MutableSet<String> = mutableSetOf()
+
+    /** Η ερώτηση του 1ου σετ είναι ανοιχτή εδώ και το κινητό τη θέλει ακόμα («f»). */
+    val firstPending: Boolean get() = firstIdx >= 0 && items.getOrNull(firstIdx)?.first == true
+
+    /**
+     * Μετά το ✓ του σετ [k] της άσκησης [i] σε αυτό το ρολόι ([tick] έδωσε [next]): ανοίγει η ερώτηση του 1ου σετ, αν είναι
+     * προπόνηση του κινητού, το σετ είναι το 1ο, το κινητό τη ζητά («f») και δεν ρωτήθηκε ήδη. Μόνο όταν ακολουθεί
+     * διάλειμμα (μένουν σετ): το διάλειμμα τρέχει κανονικά από κάτω. true αν άνοιξε.
+     */
+    fun askFirst(i: Int, k: Int, next: Next): Boolean {
+        val it = items.getOrNull(i) ?: return false
+        if (!phone || k != 0 || !it.first || next != Next.REST || it.ex in firstAsked) return false
+        firstIdx = i
+        firstAsked.add(it.ex)
+        return true
+    }
+
+    /** Η απάντηση κλείνει την ερώτηση του 1ου σετ. Η θέση της άσκησης για την εντολή, ή −1 αν δεν περίμενε τίποτα. */
+    fun answerFirst(): Int {
+        val pending = firstPending
+        val i = firstIdx
+        firstIdx = -1
+        return if (pending) i else -1
+    }
 
     /** Όλες οι ασκήσεις τελείωσαν (ή παραλείφθηκαν στο κινητό). */
     val allDone: Boolean get() = items.all { it.finished }
@@ -637,6 +695,10 @@ class LiveSession(
                     set.trail?.let { t -> so.put("rb", JSONArray(t.sorted())) }
                 }
             }
+            // R8-A8-3: και η «Συνέχεια» του κινητού (νέο, προαιρετικό πεδίο).
+            if (s.res > 0) o.put("res", s.res)
+            // R8-U3-01: οι ασκήσεις που ρωτήθηκαν ήδη για το 1ο σετ (νέο, προαιρετικό πεδίο): ούτε μετά από επανεκκίνηση ξανά.
+            if (s.firstAsked.isNotEmpty()) o.put("fa", JSONArray(s.firstAsked.sorted()))
             return o
         }
 
@@ -655,7 +717,12 @@ class LiveSession(
                         if (t.isNotEmpty()) set.trail = t
                     }
                 }
-                LiveSession(s.id, s.workout, s.name, s.start, s.items, s.idx, s.restEnd, phone = true, rirIdx = s.rirIdx, restLen = s.restLen)
+                LiveSession(
+                    s.id, s.workout, s.name, s.start, s.items, s.idx, s.restEnd, phone = true, rirIdx = s.rirIdx, restLen = s.restLen,
+                    res = o.optLong("res", 0),
+                ).also { p ->
+                    o.optJSONArray("fa")?.let { a -> for (k in 0 until a.length()) a.optString(k, "").takeIf { it.isNotEmpty() }?.let { p.firstAsked.add(it) } }
+                }
             } catch (_: Exception) {
                 null
             }
@@ -677,6 +744,8 @@ class LiveSession(
                     idx = j.optInt("idx", 0),
                     restEnd = j.optLong("restEnd", 0),
                     phone = true,
+                    // R8-A8-3: «Συνέχεια» στην «Ξεχασμένη προπόνηση;» του κινητού (νέο, προαιρετικό· παλιό κινητό: 0).
+                    res = j.optLong("res", 0),
                 )
             }
         } catch (_: Exception) {
@@ -1640,31 +1709,48 @@ object Forgotten {
         Why.STRENGTH_IDLE -> "Τρέχει ακόμα η προπόνηση;"
     }
 
-    /** Τι να κάνεις (δεύτερη γραμμή της ειδοποίησης). */
-    fun text(why: Why): String = when (why) {
+    /**
+     * Τι να κάνεις (δεύτερη γραμμή της ειδοποίησης). Round 8 (R8-U3-03): πάνω από την ερώτηση ρεζέρβας ([onRir], [rirEnds])
+     * το ίδιο με το [screenText]: εκεί δεν υπάρχει «Τέλος».
+     */
+    fun text(why: Why, onRir: Boolean = false, rirEnds: Boolean = false): String = when (why) {
         Why.WALK_PAUSED -> "Πάτα «Συνέχεια» ή «Τέλος» στο ρολόι."
-        Why.WALK_LONG, Why.STRENGTH_IDLE -> "Αν τελείωσες, πάτα «Τέλος» στο ρολόι."
+        Why.WALK_LONG, Why.STRENGTH_IDLE -> when {
+            !onRir -> "Αν τελείωσες, πάτα «Τέλος» στο ρολόι."
+            rirEnds -> "Αν τελείωσες, απάντησε στην ερώτηση στο ρολόι."
+            else -> "Αν τελείωσες, απάντησε στην ερώτηση και πάτα «Τέλος» στο ρολόι."
+        }
     }
 
     /**
      * Το ίδιο στην ΟΘΟΝΗ της εφαρμογής, ολόκληρο σε όλη την οθόνη (έλεγχος 13/11, round 7, R7-U3-07): η ερώτηση στη δική
      * της γραμμή, χωρίς «στο ρολόι» (το διαβάζεις ήδη εκεί), και πρώτα «κλείσε αυτό»: ένα πάτημα στο μήνυμα το κλείνει (από
      * κάτω γράφει «πάτα για να κλείσει»), δεν τελειώνει την άσκηση. Κείμενο προς έγκριση από τον χρήστη.
+     *
+     * Έλεγχος 14/11, round 8 (R8-U3-03): όταν από κάτω είναι η ερώτηση ρεζέρβας ([onRir]), εκεί ΔΕΝ υπάρχει «Τέλος»· η
+     * προπόνηση προχωρά μόνο με απάντηση. [rirEnds]: η απάντηση την τελειώνει κιόλας (προπόνηση του ρολογιού, όλες οι
+     * ασκήσεις έγιναν: [WatchActivity.answer]) — αλλιώς μετά την απάντηση φαίνεται το «Τέλος».
      */
-    fun screenText(why: Why): String = when (why) {
+    fun screenText(why: Why, onRir: Boolean = false, rirEnds: Boolean = false): String = when (why) {
         Why.WALK_PAUSED -> "${title(why)}\nΚλείσε αυτό και πάτα «Συνέχεια» ή «Τέλος»."
-        Why.WALK_LONG, Why.STRENGTH_IDLE -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και πάτα «Τέλος»."
+        Why.WALK_LONG, Why.STRENGTH_IDLE -> when {
+            !onRir -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και πάτα «Τέλος»."
+            rirEnds -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και απάντησε στην ερώτηση."
+            else -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό, απάντησε στην ερώτηση και πάτα «Τέλος»."
+        }
     }
 }
 
 /**
  * Η τελευταία κίνηση σε μια προπόνηση του κινητού: το πιο πρόσφατο ✓ (με ώρα), αλλιώς η αρχή της. Ίδιος κανόνας με το
- * κινητό (TrainingStore.lastActivity), για το [phoneStale].
+ * κινητό (Session.lastActivity), για το [phoneStale]. Έλεγχος 14/11, round 8 (R8-A8-3, αίτημα του f2): και η «Συνέχεια»
+ * στην «Ξεχασμένη προπόνηση;» του κινητού ([LiveSession.res]), αν είναι πιο πρόσφατη: πριν, μετά τη «Συνέχεια» το ρολόι
+ * έγραφε «κλείσε την εκεί» και δεν πρότεινε «Παλμοί εδώ» ως το πρώτο ✓ στο κινητό. Όπως το κινητό: max(αρχή, ✓, «res»).
  */
 fun phoneLastActivity(s: LiveSession): Long {
-    var last = 0L
+    var last = s.start
     for (item in s.items) for (x in item.sets) if (x.done && x.at > last) last = x.at
-    return if (last > 0L) last else s.start
+    return maxOf(last, s.res)
 }
 
 /**
@@ -1697,6 +1783,35 @@ fun staleSinceText(start: Long, now: Long, zone: java.time.ZoneId = java.time.Zo
 const val STALE_PHONE_LINE1 = "Ανοιχτή προπόνηση στο κινητό"
 
 fun stalePhoneLine2(start: Long, now: Long): String = "${staleSinceText(start, now)}· κλείσε την εκεί"
+
+/**
+ * Το «μπες στην προπόνηση του κινητού» (άνοιγμα από το κινητό, [flag]) γίνεται ΤΩΡΑ; Έλεγχος 14/11, round 8 (R8-A8-6): μόνο
+ * αφού διαβαστεί η τωρινή κατάσταση του κινητού σε αυτό το άνοιγμα ([loaded], Link.load), και μόνο σε προπόνηση που δεν
+ * έκλεισε και δεν μοιάζει ξεχασμένη ([phoneStale]). Πριν, το αίτημα κρινόταν με ό,τι είχε μείνει στη μνήμη από παλιότερα
+ * (μια προπόνηση που είχε κλείσει στο κινητό χωρίς να το μάθει το ρολόι) και σβηνόταν: η νέα προπόνηση έμενε χωρίς παλμούς
+ * από το ρολόι. Όσο δεν ισχύουν αυτά, το αίτημα ΜΕΝΕΙ (ώσπου να φτάσει η νέα προπόνηση· σβήνει μόνο αν ξεκινήσει κάτι εδώ,
+ * [pendingJoin]).
+ */
+fun joinNow(flag: Boolean, loaded: Boolean, phone: LiveSession?, now: Long): Boolean =
+    flag && loaded && phone != null && !phone.ended && !phoneStale(phone, now)
+
+/**
+ * Έναρξη ([kind], [fromPhone]) ενώ τρέχει ήδη άσκηση ([running]): δεκτή ΜΟΝΟ η περίπτωση για την οποία υπάρχει, δηλαδή η
+ * προπόνηση του κινητού βρίσκει το ρολόι σε προπόνηση με βάρη («strength» + κινητό), και ποτέ όσο η άσκηση κλείνει
+ * ([stopping]) ή σε περπάτημα (DP-10). Έλεγχος 14/11, round 8 (R8-A8-1): πριν, κάθε έναρξη (και «Περπάτημα» ή μια προπόνηση
+ * του ρολογιού από την αρχική, όσο έκλεινε η μέτρηση μιας προπόνησης του κινητού) έγραφε «όχι του κινητού» και το
+ * αποτέλεσμα των παλμών της δεν γραφόταν ποτέ.
+ */
+fun joinAllowedWhileRunning(running: String?, kind: String, fromPhone: Boolean, stopping: Boolean): Boolean =
+    running != null && running != "walk" && kind == "strength" && fromPhone && !stopping
+
+/**
+ * Η «άλλη προπόνηση» που διάλεξες στην αρχική (τρίτο κουμπί, [chosen]) ισχύει μόνο τη μέρα που τη διάλεξες ([chosenDay]).
+ * Έλεγχος 14/11, round 8 (R8-U3-06): πριν έμενε όσο ζούσε η εφαρμογή, και τις επόμενες μέρες το πρώτο κουμπί ήταν η χθεσινή
+ * επιλογή (σε μέρα περπατήματος χανόταν και η αρχική του περπατήματος).
+ */
+fun chosenToday(chosen: String?, chosenDay: java.time.LocalDate?, today: java.time.LocalDate): String? =
+    if (chosen != null && chosenDay == today) chosen else null
 
 /** Μοιάζει ξεχασμένη η άσκηση; ([Forgotten.why]) */
 fun forgottenDue(kind: String?, startedEl: Long, lastUserActionEl: Long, pausedSinceEl: Long, plannedMin: Int, nowEl: Long): Boolean =

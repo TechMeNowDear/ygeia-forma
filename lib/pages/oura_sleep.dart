@@ -158,7 +158,13 @@ class OuraNightsPage extends StatelessWidget {
         children: [
           TitleRow(
             // Round 1 (U2a-11): το «7 νυχτών» δεν σπάει σε δύο γραμμές.
-            header: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος ${glued('7 νυχτών')}', color: c.sleep),
+            header: CardHeader(
+              icon: Icons.layers_rounded,
+              title: 'Φάσεις · μέσος όρος ${glued('7 νυχτών')}',
+              // Round 8 (R8-U4-1): από πόσες νύχτες, όταν δεν είναι και οι 7 (ίδιο με το ρολόι).
+              subtitle: stages.deep == null ? null : stagesFromText(stages.nights),
+              color: c.sleep,
+            ),
             trailing: const [LabelTag('εκτίμηση'), InfoButton(stagesInfoKey)],
           ),
           const SizedBox(height: 12),

@@ -252,7 +252,11 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
               showCheckmark: false,
               label: Text(m.name),
               selected: _s.hero == m.key,
-              onSelected: (_) => _change(() => _s.hero = m.key),
+              onSelected: (_) => _change(() {
+                _s.hero = m.key;
+                // Round 8 (R8-U1-6): «Τη σελίδα της κεντρικής τιμής» μόνο για τιμή που έχει σελίδα.
+                if (_s.tap == WTap.metric && !wMetricPages.contains(m.key)) _s.tap = WTap.section;
+              }),
             ),
         ]),
       ]),
@@ -298,7 +302,8 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
           for (final (v, l) in [
             if (_s.kind == WKind.food) (WTap.add, 'Προσθήκη φαγητού'),
             (WTap.section, 'Την ενότητα'),
-            (WTap.metric, 'Τη σελίδα της κεντρικής τιμής'),
+            // Round 8 (R8-U1-6): μόνο όταν η κεντρική τιμή έχει δική της σελίδα (πριν και για το Φαγητό, χωρίς σελίδα).
+            if (wMetricPages.contains(_s.hero)) (WTap.metric, 'Τη σελίδα της κεντρικής τιμής'),
             (WTap.today, 'Το «Σήμερα»'),
           ])
             ChoiceChip(showCheckmark: false, label: Text(l), selected: _s.tap == v, onSelected: (_) => setState(() => _s.tap = v)),
@@ -661,12 +666,14 @@ class _ValueRow extends StatelessWidget {
             Semantics(
               button: true,
               label: 'Χρώμα για $name',
+              // Round 8 (R8-U1-8): στόχος αφής 48 dp (πριν 44) και περίγραμμα που φαίνεται (textTertiary ≥ 4,5:1 σε κάρτα,
+              // όλα τα θέματα· πριν hairline 1,2:1, WCAG 1.4.11).
               child: InkResponse(
                 onTap: onColor,
-                radius: 22,
+                radius: 24,
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: 48,
+                  height: 48,
                   child: Center(
                     child: Container(
                       width: 24,
@@ -674,7 +681,7 @@ class _ValueRow extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: color == null ? null : Color(color!),
-                        border: Border.all(color: c.hairline, width: 2),
+                        border: Border.all(color: c.textTertiary, width: 2),
                       ),
                       child: color == null ? Icon(Icons.auto_awesome_rounded, size: 13, color: c.textSecondary) : null,
                     ),
@@ -774,14 +781,15 @@ class _Dot extends StatelessWidget {
     return Semantics(
       button: true,
       label: label ?? 'Χρώμα',
+      // Round 8 (R8-U1-8): 48 dp (πριν 44) και περίγραμμα που φαίνεται (και γύρω από το λευκό σε λευκό φύλλο).
       child: InkResponse(
         onTap: onTap,
         radius: 26,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color, border: Border.all(color: c.hairline, width: 2)),
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color, border: Border.all(color: c.textTertiary, width: 2)),
             child: color == null ? Icon(icon ?? Icons.auto_awesome_rounded, size: 20, color: c.textSecondary) : null,
           ),
           if (label != null) Text(label!, style: TextStyle(fontSize: 11.5, color: c.textSecondary)),

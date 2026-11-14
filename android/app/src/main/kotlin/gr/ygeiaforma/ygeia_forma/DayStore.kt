@@ -26,7 +26,10 @@ class DayStore private constructor(context: Context) :
                 instance ?: DayStore(context.applicationContext).also { instance = it }
             }
 
-        /** Σημάδι «η βάση χάλασε, κρατήθηκε αντίγραφο» (ώρα σε ms), ώσπου να το δει ο χρήστης. Όχι στο αντίγραφο Google. */
+        /**
+         * Σημάδι «η βάση χάλασε, κρατήθηκε αντίγραφο» (ώρα σε ms). Όχι στο αντίγραφο Google. Round 8 (R8-A9-2): μένει και
+         * όταν ο χρήστης κλείσει την κάρτα ([markSeen]), ώσπου να το αντικαταστήσει νέα βλάβη ή να γίνει «Διαγραφή όλων».
+         */
         internal fun marker(context: Context) = java.io.File(context.noBackupFilesDir, "db_corrupt")
 
         fun corruptAt(context: Context): Long? = try {
@@ -35,48 +38,72 @@ class DayStore private constructor(context: Context) :
             null
         }
 
-        fun clearCorrupt(context: Context) {
+        /**
+         * Round 8 (R8-A9-2, f4): «Εντάξει» στην κάρτα της βλάβης [at] κρύβει ΜΟΝΟ την κάρτα. Το σημάδι [marker] μένει, ώστε
+         * η επαναφορά του φαγητού και η νέα ανάγνωση του ιστορικού να ξαναδοκιμάζονται ώσπου να γίνουν. Πριν το «Εντάξει»
+         * έσβηνε το σημάδι: αν η πρώτη προσπάθεια είχε αποτύχει (π.χ. γεμάτος χώρος), δεν ξαναγινόταν ποτέ.
+         * Όλα αυτά σβήνονται με τη «Διαγραφή όλων» (noBackupFilesDir).
+         */
+        private fun seenMarker(context: Context) = java.io.File(context.noBackupFilesDir, "db_corrupt_seen")
+
+        fun markSeen(context: Context, at: Long) {
             try {
-                marker(context).delete()
+                seenMarker(context).writeText(at.toString())
             } catch (_: Throwable) {
             }
         }
 
-        /** Round 7 (R7-A9-1): ότι το φαγητό ξαναμπήκε μετά από τη βλάβη («ώρα καταχωρίσεις προϊόντα», [DbSalvage]). */
+        /** Αν η κάρτα της βλάβης [at] έκλεισε ήδη. */
+        fun seen(context: Context, at: Long): Boolean = DbSalvage.isSeen(readOrNull(seenMarker(context)), at)
+
+        /** Round 7 (R7-A9-1): ότι το φαγητό ξαναμπήκε μετά από τη βλάβη ([DbSalvage.doneText]). */
         private fun salvagedMarker(context: Context) = java.io.File(context.noBackupFilesDir, "db_salvaged")
+
+        /** Round 8 (R8-A9-3): ό,τι σβήστηκε μετά από τη βλάβη, ώσπου να τελειώσει η επαναφορά ([DbSalvage.removedLine]). */
+        private fun removedFile(context: Context) = java.io.File(context.noBackupFilesDir, "salvage_removed")
+
+        private fun readOrNull(f: java.io.File): String? = try {
+            f.takeIf { it.exists() }?.readText()
+        } catch (_: Throwable) {
+            null
+        }
 
         /**
          * Round 7 (R7-A9-1, f4): μετά από βλάβη, οι γραμμές του ημερολογίου φαγητού και των «Τα προϊόντα μου» που
          * διαβάζονται από το αρχείο που κρατήθηκε για τη βλάβη [at] ([KeepCorruptDb]). Διαβάζεται ένα ΑΝΤΙΓΡΑΦΟ του (με
          * το -wal/-journal του, στα κανονικά ονόματα), ώστε το κρατημένο να μην αλλάζει ποτέ· με χειριστή βλάβης που δεν
-         * σβήνει τίποτα. Ό,τι δεν διαβάζεται παραλείπεται: ένα χαλασμένο σημείο σταματά την ανάγνωση από την αρχή, και τότε
-         * διαβάζεται και από το τέλος. Τίποτα δεν γράφεται εδώ· τις γράφει η Flutter με την «restorePut». «done»: έγινε ήδη.
+         * σβήνει τίποτα. Τίποτα δεν γράφεται εδώ· τις γράφει η Flutter με την «restorePut». «done»: έγινε ήδη.
+         * Round 8 (R8-A9-1, f4): η ανάγνωση γίνεται σε μικρά κομμάτια ([DbSalvage.read]): μια χαλασμένη σελίδα χάνει μόνο
+         * τις δικές της γραμμές (πριν, στο Android, δεν διαβαζόταν ΤΙΠΟΤΑ από τον πίνακα). «complete»: διαβάστηκαν όλα·
+         * «lost»: σημεία που δεν διαβάστηκαν. R8-A9-3: όσα σβήστηκαν μετά από τη βλάβη δεν ξαναμπαίνουν.
          */
         fun salvageRead(context: Context, at: Long): JSONObject {
             val out = JSONObject().put("ok", true)
-            val done = DbSalvage.parseDone(
-                try {
-                    salvagedMarker(context).takeIf { it.exists() }?.readText()
-                } catch (_: Throwable) {
-                    null
-                },
-                at,
-            )
+            val done = DbSalvage.parseDone(readOrNull(salvagedMarker(context)), at)
             if (done != null) return out.put("done", true).put("entries", done.first).put("foods", done.second)
+            val removed = DbSalvage.parseRemoved(readOrNull(removedFile(context)), at)
             val log = JSONArray()
             val foods = JSONArray()
             var skipped = 0
+            var lost = 0
+            var complete = true
             val work = java.io.File(context.noBackupFilesDir, "salvage")
             try {
                 work.deleteRecursively()
                 val copy = DbSalvage.copyKept(java.io.File(context.noBackupFilesDir, "corrupt"), work, at)
                 out.put("found", copy != null)
                 val db = copy?.let { openKept(it) }
-                if (copy != null && db == null) out.put("unreadable", true)
+                if (copy != null && db == null) {
+                    out.put("unreadable", true)
+                    complete = false
+                }
                 if (db != null) {
                     try {
-                        skipped += readRows(db, "food_log", log)
-                        skipped += readRows(db, "my_foods", foods)
+                        val a = DbSalvage.read(sqlRows(db, "food_log"), removed.first, log)
+                        val b = DbSalvage.read(sqlRows(db, "my_foods"), removed.second, foods)
+                        skipped += a.skipped + b.skipped
+                        lost += a.lost + b.lost
+                        if (!a.complete || !b.complete) complete = false
                     } finally {
                         try {
                             db.close()
@@ -87,12 +114,40 @@ class DayStore private constructor(context: Context) :
             } finally {
                 work.deleteRecursively()
             }
-            return out.put("entries", log).put("foods", foods).put("skipped", skipped)
+            return out.put("entries", log).put("foods", foods).put("skipped", skipped).put("lost", lost)
+                .put("complete", complete)
         }
 
-        /** Σημειώνει ότι το φαγητό της βλάβης [at] ξαναμπήκε ([entries] καταχωρίσεις, [foods] προϊόντα). */
-        fun salvageDone(context: Context, at: Long, entries: Int, foods: Int) {
-            salvagedMarker(context).writeText(DbSalvage.doneText(at, entries, foods))
+        /**
+         * Σημειώνει ότι το φαγητό της βλάβης [at] ξαναμπήκε ([entries] καταχωρίσεις, [foods] προϊόντα), με τον κανόνα
+         * ανάγνωσης ([DbSalvage.RULES]) και αν διαβάστηκαν όλα ([complete]): μια ανάγνωση που δεν διάβασε όλα
+         * ξαναγίνεται με έναν επόμενο, καλύτερο κανόνα (R8-A9-1).
+         */
+        fun salvageDone(context: Context, at: Long, entries: Int, foods: Int, complete: Boolean) {
+            salvagedMarker(context).writeText(DbSalvage.doneText(at, entries, foods, complete))
+            // Διαβάστηκαν όλα: δεν θα ξαναδιαβαστεί ποτέ, άρα οι διαγραφές που κρατήθηκαν γι' αυτό δεν χρειάζονται πια.
+            if (complete) {
+                try {
+                    removedFile(context).delete()
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        /**
+         * Round 8 (R8-A9-3, f4): μια καταχώριση ([kind] 'e') ή ένα προϊόν ('f') σβήστηκε. Όσο υπάρχει βλάβη της οποίας το
+         * αρχείο μπορεί ακόμα να ξαναδιαβαστεί, το [id] γράφεται εδώ, ώστε να μην ξαναμπεί από το κρατημένο αρχείο ούτε σε
+         * επόμενο άνοιγμα (πριν το κρατούσε μόνο η μνήμη της Flutter: αν η εφαρμογή έκλεινε πριν την επαναφορά, ο μουσακάς
+         * που έσβησες ξαναγύριζε). Χωρίς βλάβη: μόνο ένας έλεγχος ύπαρξης αρχείου.
+         */
+        fun noteRemoved(context: Context, kind: Char, id: String) {
+            try {
+                val at = corruptAt(context) ?: return
+                if (DbSalvage.finished(readOrNull(salvagedMarker(context)), at)) return
+                val line = DbSalvage.removedLine(at, kind, id) ?: return
+                removedFile(context).appendText(line)
+            } catch (_: Throwable) {
+            }
         }
 
         private fun openKept(f: java.io.File): SQLiteDatabase? {
@@ -107,30 +162,17 @@ class DayStore private constructor(context: Context) :
             return null
         }
 
-        /** Οι γραμμές του [table] (σταθερό όνομα, όχι τιμή χρήστη) στο [out], μία φορά η καθεμία. Πόσες δεν ήταν JSON. */
-        private fun readRows(db: SQLiteDatabase, table: String, out: JSONArray): Int {
-            val seen = HashSet<String>()
-            var skipped = 0
-            for (order in listOf("ASC", "DESC")) {
-                try {
-                    db.rawQuery("SELECT id, json FROM $table ORDER BY rowid $order", null).use { c ->
-                        while (c.moveToNext()) {
-                            val id = c.getString(0) ?: continue
-                            if (!seen.add(id)) continue
-                            try {
-                                out.put(JSONObject(c.getString(1)))
-                            } catch (_: Throwable) {
-                                skipped++
-                            }
-                        }
-                    }
-                    // Διαβάστηκε όλος ο πίνακας: δεν χρειάζεται και από το τέλος.
-                    return skipped
-                } catch (_: Throwable) {
-                    // Χαλασμένο σημείο: ό,τι διαβάστηκε μένει· η επόμενη φορά διαβάζει από το τέλος.
-                }
+        /**
+         * Round 8 (R8-A9-1): οι γραμμές του [table] (σταθερό όνομα, όχι τιμή χρήστη) με rowid από ένα όριο και μετά, το πολύ
+         * τόσες: ένα ΜΙΚΡΟ ερώτημα κάθε φορά. Οι αριθμοί μπαίνουν ως κείμενο στο SQL (είναι δικοί μας Long, όχι τιμές χρήστη),
+         * ώστε η σύγκριση με το rowid να είναι αριθμητική και να χρησιμοποιεί το δέντρο του πίνακα.
+         */
+        private fun sqlRows(db: SQLiteDatabase, table: String) = DbSalvage.RowSource { from, limit ->
+            db.rawQuery("SELECT rowid, id, json FROM $table WHERE rowid >= $from ORDER BY rowid LIMIT $limit", null).use { c ->
+                val rows = ArrayList<DbSalvage.Row>()
+                while (c.moveToNext()) rows.add(DbSalvage.Row(c.getLong(0), c.getString(1), c.getString(2)))
+                rows
             }
-            return skipped
         }
     }
 
@@ -351,15 +393,186 @@ object DbSalvage {
         return File(work, DB)
     }
 
-    /** Το σημάδι «έγινε»: ώρα της βλάβης, καταχωρίσεις και προϊόντα που ξαναμπήκαν. */
-    fun doneText(at: Long, entries: Int, foods: Int): String = "$at $entries $foods"
+    /**
+     * Round 8 (R8-A9-1, f4): ο κανόνας ανάγνωσης του κρατημένου αρχείου. 1 = #105: ένας δρομέας για όλο τον πίνακα· στο
+     * Android ο δρομέας μετρά πρώτα ΟΛΕΣ τις γραμμές (SQLiteCursor.fillWindow με countAllRows), άρα μία χαλασμένη σελίδα,
+     * όπου κι αν ήταν, έκανε την ανάγνωση να μη δώσει καμία γραμμή. 2 = σε μικρά κομμάτια ([read]).
+     */
+    const val RULES = 2
 
-    /** (καταχωρίσεις, προϊόντα) αν το σημάδι είναι για τη βλάβη [at]· αλλιώς (άλλη βλάβη, χαλασμένο, κανένα) null. */
+    /** Γραμμές ανά ερώτημα: λίγες, ώστε ένα ερώτημα να αγγίζει μόνο λίγες σελίδες του πίνακα. */
+    const val CHUNK = 64
+
+    /** Όριο ερωτημάτων ανά πίνακα (≈ 3 εκατομμύρια γραμμές): μια παθολογική βλάβη δεν κρατά τη βάση απασχολημένη ώρες. */
+    const val MAX_QUERIES = 50_000
+
+    /**
+     * Το σημάδι «έγινε»: ώρα της βλάβης, καταχωρίσεις και προϊόντα που ξαναμπήκαν, κανόνας ανάγνωσης ([RULES]) και αν
+     * διαβάστηκαν όλα (1) ή όχι (0).
+     */
+    fun doneText(at: Long, entries: Int, foods: Int, complete: Boolean): String =
+        "$at $entries $foods $RULES ${if (complete) 1 else 0}"
+
+    /**
+     * (καταχωρίσεις, προϊόντα) αν η επαναφορά της βλάβης [at] έγινε και δεν χρειάζεται να ξαναγίνει· αλλιώς (άλλη βλάβη,
+     * χαλασμένο, κανένα) null. Round 8 (R8-A9-1): το σημάδι του #105 («ώρα καταχωρίσεις προϊόντα», κανόνας 1) δεν μετρά:
+     * εκείνη η ανάγνωση μπορεί να μη διάβασε τίποτα από το αρχείο, άρα ξαναγίνεται μία φορά (το «restorePut» δεν γράφει
+     * δεύτερη φορά ό,τι υπάρχει ήδη). Μια ανάγνωση που δεν διάβασε όλα ξαναγίνεται όταν ο κανόνας γίνει νεότερος.
+     */
     fun parseDone(text: String?, at: Long): Pair<Int, Int>? {
         val p = text?.trim()?.split(' ') ?: return null
-        if (p.size != 3 || p[0].toLongOrNull() != at) return null
+        if (p.size != 5 || p[0].toLongOrNull() != at) return null
         val entries = p[1].toIntOrNull() ?: return null
         val foods = p[2].toIntOrNull() ?: return null
+        val rules = p[3].toIntOrNull() ?: return null
+        val complete = when (p[4]) {
+            "1" -> true
+            "0" -> false
+            else -> return null
+        }
+        if (!complete && rules < RULES) return null
         return entries to foods
+    }
+
+    /** Η ανάγνωση της βλάβης [at] τελείωσε με ΟΛΑ (δεν θα ξαναγίνει ποτέ, με κανέναν κανόνα). */
+    fun finished(text: String?, at: Long): Boolean {
+        val p = text?.trim()?.split(' ') ?: return false
+        return p.size == 5 && p[0].toLongOrNull() == at && p[3].toIntOrNull() != null && p[4] == "1"
+    }
+
+    /** Round 8 (R8-A9-2): η κάρτα της βλάβης [at] έκλεισε ([text]: το περιεχόμενο του σημαδιού «έκλεισε»). */
+    fun isSeen(text: String?, at: Long): Boolean = text?.trim()?.toLongOrNull() == at
+
+    /**
+     * Round 8 (R8-A9-3): μία γραμμή «ώρα είδος id» για ό,τι σβήστηκε μετά από τη βλάβη [at] ([kind] 'e' καταχώριση, 'f'
+     * προϊόν). null για id που δεν γράφεται σωστά σε μία γραμμή (κενό ή με αλλαγή γραμμής).
+     */
+    fun removedLine(at: Long, kind: Char, id: String): String? =
+        if (id.isEmpty() || id.contains('\n') || id.contains('\r') || (kind != 'e' && kind != 'f')) null else "$at $kind $id\n"
+
+    /**
+     * (καταχωρίσεις, προϊόντα) που σβήστηκαν μετά από τη βλάβη [at]. Μόνο ολόκληρες γραμμές (με «\n» στο τέλος): μια
+     * γραμμή που κόπηκε στη μέση της εγγραφής δεν εξαιρεί λάθος id. Γραμμές άλλης βλάβης αγνοούνται.
+     */
+    fun parseRemoved(text: String?, at: Long): Pair<Set<String>, Set<String>> {
+        val entries = HashSet<String>()
+        val foods = HashSet<String>()
+        if (text != null) {
+            val lines = text.split('\n')
+            // Το τελευταίο κομμάτι δεν έχει «\n» μετά: είναι κενό ή μισή γραμμή.
+            for (line in lines.dropLast(1)) {
+                val p = line.split(' ', limit = 3)
+                if (p.size != 3 || p[0].toLongOrNull() != at || p[2].isEmpty()) continue
+                when (p[1]) {
+                    "e" -> entries.add(p[2])
+                    "f" -> foods.add(p[2])
+                }
+            }
+        }
+        return entries to foods
+    }
+
+    /** Μία γραμμή του πίνακα όπως διαβάστηκε. */
+    class Row(val rowid: Long, val id: String?, val json: String?)
+
+    /**
+     * Οι γραμμές με rowid ≥ [from], με σειρά rowid, το πολύ [limit]. Πετά αν το ερώτημα συναντήσει χαλασμένη σελίδα.
+     * «≥» και όχι «>»: η SQLite ψάχνει τη σελίδα του ίδιου του ορίου, άρα ένα όριο ακριβώς μετά από μια χαλασμένη σελίδα
+     * διαβάζει από την επόμενη (με «>» θα κατέβαινε στη χαλασμένη και θα χανόταν και η πρώτη γραμμή μετά από αυτήν).
+     */
+    fun interface RowSource {
+        fun rows(from: Long, limit: Int): List<Row>
+    }
+
+    /**
+     * [skipped]: γραμμές που δεν διαβάστηκαν σωστά (χωρίς id ή όχι JSON)· [lost]: σημεία του πίνακα που δεν διαβάστηκαν·
+     * [complete]: διαβάστηκαν όλα τα σημεία του πίνακα.
+     */
+    data class Read(val skipped: Int, val lost: Int, val complete: Boolean)
+
+    /**
+     * Round 8 (R8-A9-1, f4): διαβάζει όλο τον πίνακα σε κομμάτια των [chunk] γραμμών (σειρά rowid), ώστε μια χαλασμένη
+     * σελίδα να χάνει μόνο τις δικές της γραμμές. Σε σφάλμα: μία-μία ως το χαλασμένο σημείο· μετά βρίσκει το πρώτο όριο
+     * από όπου ξαναδιαβάζεται (διπλάσια βήματα, μετά δυαδική αναζήτηση) και συνεχίζει. Κάθε id μία φορά στο [out], όχι
+     * όσα είναι στο [removed]. Οι πίνακες της εφαρμογής δεν ορίζουν ποτέ rowid: η SQLite δίνει 1, 2, … (αρχή: rowid ≥ 0).
+     */
+    fun read(source: RowSource, removed: Set<String>, out: JSONArray, chunk: Int = CHUNK, maxQueries: Int = MAX_QUERIES): Read {
+        val seen = HashSet<String>()
+        var skipped = 0
+        var lost = 0
+        var queries = 0
+        var from = 0L
+
+        fun ask(start: Long, limit: Int): List<Row>? {
+            queries++
+            return try {
+                source.rows(start, limit)
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
+        fun take(r: Row) {
+            val id = r.id
+            if (id == null) {
+                skipped++
+                return
+            }
+            if (id in removed || !seen.add(id)) return
+            try {
+                out.put(JSONObject(r.json ?: ""))
+            } catch (_: Throwable) {
+                skipped++
+            }
+        }
+
+        // Το επόμενο όριο μετά από τη γραμμή [rowid]: πάντα μπροστά (και σε χαλασμένη σελίδα με rowid εκτός σειράς).
+        fun next(rowid: Long): Long = maxOf(if (rowid == Long.MAX_VALUE) rowid else rowid + 1, if (from == Long.MAX_VALUE) from else from + 1)
+
+        while (queries < maxQueries) {
+            val rows = ask(from, chunk)
+            if (rows != null) {
+                for (r in rows) take(r)
+                if (rows.size < chunk) return Read(skipped, lost, lost == 0)
+                from = next(rows.last().rowid)
+                continue
+            }
+            // Χαλασμένο σημείο μέσα στις επόμενες γραμμές: μία-μία ως αυτό.
+            var bad = false
+            for (i in 0 until chunk) {
+                val one = ask(from, 1)
+                if (one == null) {
+                    bad = true
+                    break
+                }
+                if (one.isEmpty()) return Read(skipped, lost, lost == 0)
+                take(one[0])
+                from = next(one[0].rowid)
+            }
+            if (!bad) continue
+            // Η γραμμή στο [from] δεν διαβάζεται: το πρώτο όριο x > from από όπου διαβάζεται το «rowid ≥ x».
+            lost++
+            var fail = from
+            var ok = Long.MAX_VALUE
+            var step = 1L
+            while (true) {
+                if (queries >= maxQueries) return Read(skipped, lost, false)
+                val x = if (step >= Long.MAX_VALUE - from) Long.MAX_VALUE else from + step
+                if (ask(x, 1) != null) {
+                    ok = x
+                    break
+                }
+                // Τίποτα δεν διαβάζεται ως το τέλος.
+                if (x == Long.MAX_VALUE) return Read(skipped, lost, false)
+                fail = x
+                step = if (step >= Long.MAX_VALUE / 2) Long.MAX_VALUE else step * 2
+            }
+            while (ok - fail > 1 && queries < maxQueries) {
+                val m = fail + (ok - fail) / 2
+                if (ask(m, 1) != null) ok = m else fail = m
+            }
+            from = ok
+        }
+        return Read(skipped, lost, false)
     }
 }

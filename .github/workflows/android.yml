@@ -130,8 +130,9 @@ jobs:
           [ -n "$n" ] || n=$(grep -aoE '\+[0-9]+[^+]*All tests passed' tests.log | tail -1 | grep -oE '[0-9]+' | head -1 || true)
           echo "::notice title=Έλεγχοι::${n:-0} δοκιμές Dart πέρασαν"
           # Round 7 (R7-A12-10): κατώτατο λίγο κάτω από όσες τρέχουν (#104: ≈ 1.590· πριν 950), ίδιο με το check.yml.
-          if [ "${n:-0}" -lt 1550 ]; then
-            echo "::error title=Έλεγχοι::Έτρεξαν μόνο ${n:-0} δοκιμές Dart (κατώτατο 1550). Λείπουν δοκιμές από το σύνολο;"
+          # Round 8 (R8-A12-2): ≈ 3% κάτω από το #105 (1.832).
+          if [ "${n:-0}" -lt 1777 ]; then
+            echo "::error title=Έλεγχοι::Έτρεξαν μόνο ${n:-0} δοκιμές Dart (κατώτατο 1777). Λείπουν δοκιμές από το σύνολο;"
             exit 1
           fi
 
@@ -167,13 +168,18 @@ jobs:
             exit 1
           fi
           # Η Flutter βάζει το build του app στο ../build/app.
-          n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
-            | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
-          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει"
+          # Round 8 (R8-A12-2): όσοι ΕΤΡΕΞΑΝ = tests − skipped (ένα @Ignore δεν μετρά ως «εντάξει»)· και όχι λιγότεροι από τα
+          # @Test του κώδικα (περιθώριο 2 για ένα assume): μια κλάση που δεν τρέχει πια (λάθος import, abstract, μετονομασία)
+          # φαίνεται αμέσως.
+          n=$(find .. -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*>' {} + 2>/dev/null \
+            | awk '{t=0; s=0; if (match($0, /tests="[0-9]+"/)) t=substr($0, RSTART+7, RLENGTH-8); if (match($0, /skipped="[0-9]+"/)) s=substr($0, RSTART+9, RLENGTH-10); r+=t-s} END {print r+0}' || true)
+          want=$(grep -rhE '^\s*@Test\b' app/src/test | wc -l || true)
+          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι εντάξει (στον κώδικα: ${want:-0} @Test)"
           # Έλεγχος 13/11 (S12-17): «0 έλεγχοι εντάξει» δεν περνά πια (π.χ. αν το «flutter create» πάψει να βάζει το src/test).
           # Round 7 (R7-A12-10): λίγο κάτω από όσους υπάρχουν (#104: 73· πριν 40).
-          if [ "${n:-0}" -lt 70 ]; then
-            echo "::error title=Έλεγχοι Kotlin::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin του κινητού (κατώτατο 70)"
+          # Round 8 (R8-A12-2): κατώτατο ≈ 3% κάτω από το #105 (85).
+          if [ "${n:-0}" -lt 82 ] || [ $(( ${n:-0} + 2 )) -lt "${want:-0}" ]; then
+            echo "::error title=Έλεγχοι Kotlin::Έτρεξαν ${n:-0} έλεγχοι Kotlin του κινητού, ενώ ο κώδικας έχει ${want:-0} @Test (κατώτατο 82). Δεν έτρεξε κάποια κλάση ή μπήκε @Ignore;"
             exit 1
           fi
 
@@ -197,11 +203,14 @@ jobs:
           cd ..
           # Round 7 (R7-A12-10): ΜΟΝΟ του ρολογιού (build/wear, εκεί που βγαίνει και το APK του), λίγο κάτω από όσους
           # υπάρχουν (#104: 133). Πριν μετρούσε κινητό + ρολόι μαζί με κατώτατο 120: το ρολόι μπορούσε να χάσει τα 2/3.
-          n=$(find build/wear -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*tests="[0-9]*"' {} + 2>/dev/null \
-            | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}' || true)
-          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι ρολογιού εντάξει"
-          if [ "${n:-0}" -lt 128 ]; then
-            echo "::error title=Ρολόι::Έτρεξαν μόνο ${n:-0} έλεγχοι Kotlin του ρολογιού (κατώτατο 128). Έτρεξαν οι έλεγχοι του ρολογιού;"
+          # Round 8 (R8-A12-2): όπως στο κινητό, tests − skipped και όχι λιγότεροι από τα @Test του κώδικα· κατώτατο ≈ 3% κάτω
+          # από το #105 (167).
+          n=$(find build/wear -path '*test-results/testDebugUnitTest/*' -name '*.xml' -exec grep -ho '<testsuite [^>]*>' {} + 2>/dev/null \
+            | awk '{t=0; s=0; if (match($0, /tests="[0-9]+"/)) t=substr($0, RSTART+7, RLENGTH-8); if (match($0, /skipped="[0-9]+"/)) s=substr($0, RSTART+9, RLENGTH-10); r+=t-s} END {print r+0}' || true)
+          want=$(grep -rhE '^\s*@Test\b' android/wear/src/test | wc -l || true)
+          echo "::notice title=Έλεγχοι Kotlin::${n:-0} έλεγχοι ρολογιού εντάξει (στον κώδικα: ${want:-0} @Test)"
+          if [ "${n:-0}" -lt 162 ] || [ $(( ${n:-0} + 2 )) -lt "${want:-0}" ]; then
+            echo "::error title=Ρολόι::Έτρεξαν ${n:-0} έλεγχοι Kotlin του ρολογιού, ενώ ο κώδικας έχει ${want:-0} @Test (κατώτατο 162). Έτρεξαν οι έλεγχοι του ρολογιού;"
             exit 1
           fi
           w=$(ls build/wear/outputs/apk/release/*.apk 2>/dev/null | head -1)

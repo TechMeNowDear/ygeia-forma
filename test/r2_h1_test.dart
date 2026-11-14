@@ -602,9 +602,12 @@ void main() {
       expect((kinds[WKind.sleep] as Map)['srcShort'], 'καμία νύχτα');
       expect((kinds[WKind.body] as Map)['src'], 'καμία ζύγιση ακόμα');
       expect((kinds[WKind.body] as Map)['srcShort'], 'καμία ζύγιση');
-      // Με τιμές: κανένα νέο κλειδί.
+      // Με τιμές: round 8 (R8-U1-4) σύντομη πηγή = μόνο η μέρα της νύχτας (πριν κανένα «srcShort»: στη στήλη 1×3 με
+      // «Μεγάλα» γράμματα ή «Σκιά» η πηγή κοβόταν).
       final full = buildWidgetSnapshot(_sample(now), sampleFoodStore(now), now)['kinds'] as Map;
-      expect((full[WKind.sleep] as Map).containsKey('srcShort'), isFalse);
+      final sleep = full[WKind.sleep] as Map;
+      expect(sleep['srcShort'], (sleep['src'] as String).split(' · ').last);
+      expect(sleep['srcShort'], matches(RegExp(r'^\S+ \d{1,2}/\d{1,2}$')));
     });
 
     testWidgets('η σύντομη χωρά στη στήλη των 76 dp (92 − 2 × 8) με Inter Medium 10 sp· η κανονική όχι ούτε στα 85%', (t) async {

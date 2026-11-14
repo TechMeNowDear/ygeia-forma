@@ -165,15 +165,17 @@ class _GoalsWizardState extends State<GoalsWizard> {
   /// Οι στόχοι που θα αποθηκευτούν με όσα έχουν απαντηθεί ως τώρα (null όσο λείπει κάτι). Η σύνοψη δείχνει ακριβώς αυτούς.
   ///
   /// Έλεγχος 13/11 (S1-11). Πριν, το «Ξανά ο οδηγός» πετούσε σιωπηλά τον στόχο και την εκτίμηση από τα δεδομένα σου και
-  /// γύριζε στον τύπο για 4 εβδομάδες (π.χ. από 1.800 σε 2.060 kcal για κάποιον που καίει 2.250). Τώρα, όταν υπάρχει
-  /// πρόσφατη εκτίμηση, ο νέος στόχος βγαίνει από αυτήν (εκτίμηση ± ο ρυθμός που διάλεξες, ποτέ κάτω από το κάτω όριο
-  /// των οδηγιών)· και αν ο σκοπός («λιγότερο λίπος» κ.λπ.) δεν άλλαξε, ο εβδομαδιαίος έλεγχος συνεχίζει στις ίδιες μέρες.
+  /// γύριζε στον τύπο για 4 εβδομάδες (π.χ. από 1.800 σε 2.060 kcal για κάποιον που καίει 2.250). Τώρα ο στόχος από τα
+  /// δεδομένα σου μένει (round 8: με τον κανόνα του [keptKcalAdapt])· και αν ο σκοπός («λιγότερο λίπος» κ.λπ.) δεν
+  /// άλλαξε, ο εβδομαδιαίος έλεγχος συνεχίζει στις ίδιες μέρες.
   /// Αν άλλαξε ο σκοπός, η αρχή είναι σήμερα: η πρώτη εβδομάδα (νερά) πάλι δεν μετρά.
   /// Round 7 (R7-A1-3): με ίδιο σκοπό ο έλεγχος συνεχίζει και ΠΡΙΝ από την πρώτη εκτίμηση, όσο οι στόχοι είναι
   /// πρόσφατοι (αρχή ως [_freshEstimateDays] μέρες πριν). Πριν, μια αλλαγή μόνο της κίνησης στις 2/12 ξανάρχιζε τα πάντα:
   /// οι μέρες 23/11–1/12 χάνονταν, μια δεύτερη «πρώτη εβδομάδα» δεν μετρούσε και η πρώτη εκτίμηση πήγαινε από τις 14/12 στις
   /// 30/12 (όπως ήδη κάνει το «Υπολόγισε ξανά» για αλλαγή στοιχείων, που κρατά την αρχή). Με παλιούς στόχους χωρίς πρόσφατη
   /// εκτίμηση (π.χ. μετά από μεγάλη διακοπή) η αρχή είναι σήμερα, όπως πριν.
+  /// Round 8 (R8-A1-1, R8-A1-2): ο στόχος θερμίδων ΔΕΝ βγαίνει πια από την αποθηκευμένη εκτίμηση ([keptKcalAdapt]): η
+  /// διόρθωση που ισχύει μένει και αλλάζει μόνο όσο αλλάζει ο τύπος με τις νέες απαντήσεις.
   Goals? _draft() {
     final p = widget.store.profile;
     final calc = _calc;
@@ -186,12 +188,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
     final oldSince = o == null ? null : DateTime.tryParse(o.since);
     final recent = oldSince != null && daysBetween(oldSince, _now) <= _freshEstimateDays;
     final same = o != null && o.aim == _aim && (te != null || recent) ? o : null;
-    final floor = p.male ? kcalFloorMale : kcalFloorFemale;
-    int? adapt;
-    if (te != null) {
-      final v = ((te + calc.delta) / 10).round() * 10;
-      adapt = v < floor ? floor : v;
-    }
+    final kept = keptKcalAdapt(old: o, calc: calc, male: p.male, age: age, heightCm: h);
     return Goals(
       aim: _aim,
       rate: _rateValue,
@@ -208,7 +205,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
       betaPer100: o?.betaPer100,
       legumesWeek: o?.legumesWeek ?? defaultLegumesWeek,
       fishWeek: o?.fishWeek ?? defaultFishWeek,
-      kcalAdapt: adapt,
+      kcalAdapt: kept?.kcal,
       tdeeEst: te,
       checkIn: same?.checkIn,
       fastAt: same?.fastAt,
@@ -517,12 +514,14 @@ class _GoalsWizardState extends State<GoalsWizard> {
         final g = _calc!;
         // Ό,τι δείχνει η σύνοψη είναι ακριβώς ό,τι θα αποθηκευτεί ([_draft]).
         final d = _draft()!;
+        final o = _old;
         final per = g.delta.abs().round();
-        final te = d.kcalAdapt == null ? null : d.tdeeEst;
-        final fromData = te != null;
-        final burn = te != null ? thousands((te / 10).round() * 10) : thousands(g.tdee);
-        final floor = d.male ? kcalFloorMale : kcalFloorFemale;
-        final floored = te != null ? ((te + g.delta) / 10).round() * 10 < floor : g.floored;
+        // R8-A1-1 / R8-A1-2: ο στόχος από τα δεδομένα σου μένει ([keptKcalAdapt]). Η σύνοψη γράφει τον τύπο ως τύπο, ότι
+        // μένει η διόρθωση, και πόσο αλλάζει ο στόχος που ισχύει (πριν: «καις περίπου» την παλιά εκτίμηση, και καμία λέξη
+        // όταν ο στόχος άλλαζε 150–610 kcal).
+        final kept = keptKcalAdapt(old: o, calc: g, male: d.male, age: d.age, heightCm: d.heightCm);
+        final fromData = kept != null;
+        final floored = kept != null ? kept.floored : g.floored;
         final sinceDay = DateTime.parse(d.since);
         final weekday = weekdayNames[sinceDay.weekday - 1];
         // R7-A1-3: «συνεχίζει όπως πριν» μόνο όταν έχει ήδη γίνει έλεγχος με αυτούς τους στόχους· αλλιώς η μέρα της πρώτης
@@ -530,7 +529,13 @@ class _GoalsWizardState extends State<GoalsWizard> {
         final checked = d.log.any((l) => !l.fast && l.day.compareTo(d.since) >= 0);
         final continues = !sameDay(sinceDay, _now) && checked;
         final firstEst = firstEstimateDay(d);
-        final estDay = dayOf(_now).isAfter(firstEst) ? nextCheckDay(d, _now) : firstEst;
+        // R8-A1-4: μετά από κενό στο φαγητό η εκτίμηση θέλει 3 εβδομάδες αφού ξαναρχίσει η καταγραφή, όπως στη Σήμερα και
+        // στη σελίδα «Στόχοι» ([estimateDayAfterGap]). Πριν, η σύνοψη έγραφε τη μέρα χωρίς το κενό (14/12 αντί για 28/12).
+        final foodStore = FoodStore.shared;
+        final gap = !continues && foodStore != null && foodStore.loaded
+            ? readiness(goals: d, today: _now, weights: const [], intake: (a, b) => dailyIntake(foodStore, a, b)).gap
+            : null;
+        final estDay = estimateDayAfterGap(d, dayOf(_now).isAfter(firstEst) ? nextCheckDay(d, _now) : firstEst, gap);
         final small = TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular);
         return [
           // U3b-14: μόνο όσα αλλάζουν πραγματικά από τη σελίδα «Στόχοι».
@@ -543,16 +548,27 @@ class _GoalsWizardState extends State<GoalsWizard> {
               const SizedBox(height: 6),
               Text(
                 _aim == GoalAim.keep
-                    ? 'όσες καις, περίπου $burn'
-                    : 'καις περίπου $burn · ${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
+                    ? (fromData ? 'όσες καις κατά τον τύπο, περίπου ${thousands(g.tdee)}' : 'όσες καις, περίπου ${thousands(g.tdee)}')
+                    : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} · '
+                        '${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
                 style: small,
               ),
-              // S1-11: ο στόχος βγαίνει από την πρόσφατη εκτίμηση με τα δεδομένα σου, και η οθόνη το λέει.
+              // S1-11 / R8-A1-2: ο στόχος από τα δεδομένα σου μένει, και η οθόνη το λέει.
               if (fromData)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text('Από τα δεδομένα σου, όχι από τον τύπο (ο τύπος θα έδινε ${thousands(g.kcal)} kcal).',
-                      key: const ValueKey('wizard-from-data'), style: small),
+                  child: Text(
+                      'Από τα δεδομένα σου, όχι από τον τύπο: μένει η διόρθωση που εφάρμοσες στη Σήμερα (ο τύπος μόνος θα '
+                      'έδινε ${thousands(g.kcal)} kcal).',
+                      key: const ValueKey('wizard-from-data'),
+                      style: small),
+                ),
+              // R8-A1-1: όταν αλλάζει ο στόχος που ισχύει, η σύνοψη το λέει πριν από την αποθήκευση.
+              if (o != null && d.kcal != o.kcal)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Ο στόχος αλλάζει από ${thousands(o.kcal)} σε ${thousands(d.kcal)} kcal.',
+                      key: const ValueKey('wizard-change'), style: small),
                 ),
               if (floored)
                 Padding(
@@ -579,14 +595,48 @@ class _GoalsWizardState extends State<GoalsWizard> {
           _Note(continues
               ? 'Ο έλεγχος θερμίδων συνεχίζει όπως πριν: κάθε $weekday η Σήμερα ελέγχει τον στόχο με τις ζυγίσεις και το '
                   'φαγητό σου και προτείνει διόρθωση μόνο αν χρειάζεται.'
-              : 'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, ${_onDay(estDay)} θα '
-                  'φανεί πόσες θερμίδες καις πραγματικά (η πρώτη εβδομάδα δεν μετρά). Από τότε, κάθε $weekday, η Σήμερα ελέγχει '
-                  'τον στόχο και προτείνει διόρθωση μόνο αν χρειάζεται.'),
+              : estDay == null
+                  // R8-A1-4: κενό στο φαγητό που κρατά ως χθες.
+                  ? 'Από ${dayMonth(gap!.from)} δεν έχει γραφτεί φαγητό που να μετρά. 3 εβδομάδες αφού ξαναρχίσει η '
+                      'καταγραφή, με ζυγίσεις τις μέρες σου (${_weighDays(p)}), θα φανεί πόσες θερμίδες καις πραγματικά. Από '
+                      'τότε, κάθε $weekday, η Σήμερα ελέγχει τον στόχο και προτείνει διόρθωση μόνο αν χρειάζεται.'
+                  : 'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, ${_onDay(estDay)} θα '
+                      'φανεί πόσες θερμίδες καις πραγματικά '
+                      '(${gap == null ? 'η πρώτη εβδομάδα δεν μετρά' : 'η πρώτη εβδομάδα και το κενό στο φαγητό δεν μετράνε'}). '
+                      'Από τότε, κάθε $weekday, η Σήμερα ελέγχει τον στόχο και προτείνει διόρθωση μόνο αν χρειάζεται.'),
           const SizedBox(height: 8),
           const _Note('Αρχική εκτίμηση από τύπους, όχι ιατρική οδηγία. Ό,τι πει ο γιατρός σου υπερισχύει.'),
         ];
     }
   }
+}
+
+/// Round 8 (R8-A1-1, R8-A1-2): ο στόχος από τα δεδομένα σου ([Goals.kcalAdapt]) μετά από «Ξανά ο οδηγός»· null: ισχύει
+/// ο τύπος. [calc]: ο τύπος με τις νέες απαντήσεις· [male], [age], [heightCm]: τα στοιχεία σου τώρα.
+///
+/// Η διόρθωση που ισχύει (εβδομαδιαίος έλεγχος, μείωση από τη ζυγαριά, +150 της γρήγορης απώλειας: πάντα με «Εφάρμοσε»)
+/// μένει· αλλάζει μόνο όσο αλλάζει ο τύπος με όσα απαντάς στον οδηγό (βάρος, κίνηση, σκοπός, ρυθμός), στα 10, ποτέ κάτω
+/// από το κάτω όριο. Ίδιες απαντήσεις, ίδιος στόχος. Φύλο, ηλικία και ύψος δεν τον μετακινούν (όπως στο «Υπολόγισε
+/// ξανά», [Goals.withProfile]): η διόρθωση βγήκε από όσα καις στην πράξη, που δεν αλλάζουν με τα γενέθλια ή με μια
+/// διόρθωση του ύψους. Ο οδηγός δεν κάνει ποτέ μόνος του βήμα «από τα δεδομένα»: αυτό το κάνει μόνο ο εβδομαδιαίος
+/// έλεγχος, το πολύ 150 kcal τη φορά και μόνο πέρα από το εύρος των ζυγίσεων· και μια εκτίμηση που δεν εφάρμοσες («Όχι
+/// τώρα», «μέσα στο εύρος») δεν εφαρμόζεται ποτέ. Πριν (S1-11), ο οδηγός έβαζε στόχο «τελευταία εκτίμηση ± ρυθμός», όποια
+/// κι αν ήταν: μετά από «Όχι τώρα» σε μια πρόταση −150 ο στόχος έπεφτε 610 kcal μονομιάς, και η μείωση από τη ζυγαριά ή
+/// το +150 της γρήγορης απώλειας (χωρίς εκτίμηση) χάνονταν σιωπηλά.
+({int kcal, bool floored})? keptKcalAdapt(
+    {required Goals? old, required GoalCalc calc, required bool male, required int age, required double heightCm}) {
+  final o = old;
+  if (o == null) return null;
+  final ka = o.kcalAdapt;
+  if (ka == null) return null;
+  // Ο παλιός τύπος με τα στοιχεία σου τώρα και τις παλιές απαντήσεις, πριν από το στρογγύλεμα και το κάτω όριο: η
+  // διαφορά είναι ακριβώς αυτή των απαντήσεων.
+  final before = computeGoals(
+      male: male, age: age, heightCm: heightCm, kg: o.kg, aim: o.aim, rate: o.rate, activity: o.activity, doctor: o.doctor);
+  final shift = (calc.tdee + calc.delta) - (before.tdee + before.delta);
+  final v = ka + (shift / 10).round() * 10;
+  final floor = male ? kcalFloorMale : kcalFloorFemale;
+  return v < floor ? (kcal: floor, floored: true) : (kcal: v, floored: false);
 }
 
 /// «7/12» από «2026-12-07».
@@ -746,6 +796,8 @@ class GoalsPage extends StatelessWidget {
         final nextLabel = estimated ? 'Επόμενος έλεγχος' : (hadEstimate ? 'Επόμενη εκτίμηση' : 'Πρώτη εκτίμηση');
         final lastApplied = g.log.where((l) => l.applied).lastOrNull;
         final lastCheck = g.log.where((l) => !l.fast).lastOrNull;
+        // R8-A1-2: αλλαγή από κάρτα («Εφάρμοσε») μετά την αρχή αυτών των στόχων.
+        final appliedSince = g.log.where((l) => l.applied && l.day.compareTo(g.since) >= 0).lastOrNull;
         final adaptCards = _adaptCards(context, g, today, next, ready: ready, estimated: estimated, nextLabel: nextLabel);
         final small = TextStyle(fontSize: 13.5, color: c.textSecondary);
         // U3b-14: ό,τι αλλάζει έχει ύψος αφής 48 και ένα μικρό μολύβι· οι γραμμές που δεν αλλάζουν μένουν σκέτες.
@@ -809,6 +861,10 @@ class GoalsPage extends StatelessWidget {
               // R7-A1-1: «Όχι τώρα» στην πρόταση από τη ζυγαριά δεν είναι «τα δεδομένα δεν ζήτησαν αλλαγή».
               else if (lastCheck != null && lastCheck.lowLog && !lastCheck.applied && lastCheck.day.compareTo(g.since) >= 0)
                 Text('Από τον τύπο· δεν εφάρμοσες τη μείωση που πρότεινε η ζυγαριά (${_dm(lastCheck.day)})', style: small)
+              // R8-A1-2: ο στόχος είχε αλλάξει από κάρτα, αλλά η διόρθωση δεν ισχύει πια (π.χ. κάτω από το κάτω όριο μετά από
+              // αλλαγή στα στοιχεία σου): όχι «τα δεδομένα σου δεν ζήτησαν αλλαγή».
+              else if (appliedSince != null)
+                Text('Από τον τύπο· η διόρθωση της ${_dm(appliedSince.day)} δεν ισχύει πια', style: small)
               else if (estimated)
                 Text('Από τον τύπο· τα δεδομένα σου δεν ζήτησαν αλλαγή', style: small)
               else
@@ -995,7 +1051,7 @@ class GoalsPage extends StatelessWidget {
   /// A4: «Πριν από την πρώτη εκτίμηση» (πρόοδος, όσο δεν έχει βγει εκτίμηση για αυτούς τους στόχους) και το ιστορικό
   /// «Πόσες kcal καις τη μέρα, από τα δεδομένα σου» (όταν υπάρχει). Έλεγχος 13/11: U3b-3, U3b-31, S1-6, S1-11.
   List<Widget> _adaptCards(BuildContext context, Goals g, DateTime today, DateTime? next,
-      {required ({int intakeDays, int weighIns, DateTime first, FoodGap? gap})? ready,
+      {required ({int intakeDays, int weighIns, int weighSpan, DateTime first, FoodGap? gap})? ready,
       required bool estimated,
       required String nextLabel}) {
     final c = Aigaio.of(context);
@@ -1021,6 +1077,10 @@ class GoalsPage extends StatelessWidget {
           Text('Τι έχει μαζευτεί ως χθες:', style: small),
           InfoRow('Μέρες με φαγητό', '${r.intakeDays} από $adaptMinIntakeDays'),
           InfoRow('Ζυγίσεις', '${r.weighIns} από $adaptMinWeighIns'),
+          // R8-A1-6: αρκετές ζυγίσεις, αλλά μαζεμένες σε λίγες μέρες: ο έλεγχος θέλει και 2 εβδομάδες από την πρώτη ως την
+          // τελευταία (όπως λέει και η κάρτα «λίγα δεδομένα»). Πριν, «8 από 6» έμοιαζε έτοιμο.
+          if (r.weighIns >= adaptMinWeighIns && r.weighSpan < adaptMinSpanDays)
+            InfoRow('Ζυγίσεις απλωμένες σε', '${r.weighSpan} από $adaptMinSpanDays μέρες', key: const ValueKey('goals-adapt-span')),
           InfoRow(nextLabel, when),
           if (gap != null) ...[
             const SizedBox(height: 4),
@@ -1035,7 +1095,8 @@ class GoalsPage extends StatelessWidget {
           ],
           if (missed) ...[
             const SizedBox(height: 4),
-            Text('Ο έλεγχος στις ${_dm(g.checkIn!)} δεν έβγαλε εκτίμηση· η κάρτα της Σήμερα έγραψε τι έλειπε.',
+            // R8-A1-3: «γιατί», όχι «τι έλειπε»: μια εκτίμηση πολύ ψηλά δεν οφείλεται σε κάτι που λείπει.
+            Text('Ο έλεγχος στις ${_dm(g.checkIn!)} δεν έβγαλε εκτίμηση· η κάρτα της Σήμερα έγραψε γιατί.',
                 key: const ValueKey('goals-adapt-missed'), style: small),
           ],
           const SizedBox(height: 4),
@@ -1052,8 +1113,9 @@ class GoalsPage extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Πόσες kcal καις τη μέρα, από τα δεδομένα σου', style: title),
           const SizedBox(height: 4),
-          // U3b-27: ο τύπος με τον ίδιο αριθμό που γράφει το «Πώς υπολογίστηκε».
-          InfoRow('Τύπος (αρχή, ${_dm(g.since)})', '${thousands(g.calc.tdee)} kcal'),
+          // U3b-27: ο τύπος με τον ίδιο αριθμό που γράφει το «Πώς υπολογίστηκε». R8-A1-7: με το βάρος του τύπου, όχι
+          // «αρχή»: μετά από «Ξανά ο οδηγός» με άλλο βάρος ή κίνηση η αρχή μένει, ο αριθμός όμως είναι ο νέος τύπος.
+          InfoRow('Τύπος (με ${dec(g.kg)} kg)', '${thousands(g.calc.tdee)} kcal'),
           for (final l in g.log.reversed.take(6).toList().reversed) ...[
             // Ένα βήμα «γρήγορης απώλειας» δεν έχει εκτίμηση: γράφεται μόνο η αλλαγή του στόχου (S1-3 / S1-6).
             if (l.fast)

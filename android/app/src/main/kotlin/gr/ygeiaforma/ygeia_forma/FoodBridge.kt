@@ -50,7 +50,11 @@ class FoodBridge(
             }
             "logDelete" -> respondDb(result) {
                 val id = call.argument<String>("id") ?: ""
-                withContext(DbQueue.dispatcher) { store.logDelete(id) }
+                withContext(DbQueue.dispatcher) {
+                    store.logDelete(id)
+                    // Round 8 (R8-A9-3, f4): μετά από βλάβη, ό,τι σβήνεις δεν ξαναμπαίνει από το κρατημένο αρχείο.
+                    DayStore.noteRemoved(activity.applicationContext, 'e', id)
+                }
                 JSONObject().put("ok", true)
             }
             "myFoods" -> respondDb(result) {
@@ -65,7 +69,11 @@ class FoodBridge(
                 JSONObject().put("ok", true)
             }
             "myFoodDelete" -> respondDb(result) {
-                withContext(DbQueue.dispatcher) { store.myFoodDelete(call.argument<String>("id") ?: "") }
+                val id = call.argument<String>("id") ?: ""
+                withContext(DbQueue.dispatcher) {
+                    store.myFoodDelete(id)
+                    DayStore.noteRemoved(activity.applicationContext, 'f', id)
+                }
                 JSONObject().put("ok", true)
             }
             // Τελικός έλεγχος, Συμβούλιο 4 (Γ1): επαναφορά από αντίγραφο σε ΜΙΑ συναλλαγή ([DayStore.restoreFood]). Ό,τι
@@ -87,7 +95,9 @@ class FoodBridge(
                 require(at > 0L) { "Λείπει η ώρα της βλάβης" }
                 val entries = (call.argument<Any>("entries") as? Number)?.toInt() ?: 0
                 val foods = (call.argument<Any>("foods") as? Number)?.toInt() ?: 0
-                withContext(DbQueue.dispatcher) { DayStore.salvageDone(activity.applicationContext, at, entries, foods) }
+                // Round 8 (R8-A9-1): αν διαβάστηκαν όλα· χωρίς την τιμή, «όχι» (ξαναδιαβάζεται με νεότερο κανόνα).
+                val complete = call.argument<Any>("complete") == true
+                withContext(DbQueue.dispatcher) { DayStore.salvageDone(activity.applicationContext, at, entries, foods, complete) }
                 JSONObject().put("ok", true)
             }
             "saveBackup" -> respond(result) {

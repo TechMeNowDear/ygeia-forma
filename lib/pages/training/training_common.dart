@@ -404,15 +404,22 @@ class ForgottenWorkout extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final s = session;
-    final last = s.lastActivity;
+    // R8-A8-3: το τελευταίο ✓ (όχι μια παλιότερη «Συνέχεια»): εκεί τελειώνει η ξεχασμένη.
+    final last = s.lastTick;
     final when = sameDay(s.start, now) ? 'στις ${hm(s.start)}' : '${onDay(s.start)} στις ${hm(s.start)}';
     final none = s.setsDone == 0;
     final waitWatch = none && (s.hr.isNotEmpty || !watchReady);
     final filled = FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size(0, 48));
     final plain = TextButton.styleFrom(minimumSize: const Size(0, 48));
+    // R8-A8-3: η «Συνέχεια» κάνει την προπόνηση ξανά ενεργή από τώρα (και για το ρολόι), όχι μόνο ανοίγει την οθόνη.
+    void resumeNow() {
+      training.resume(s);
+      onResume();
+    }
+
     final resume = waitWatch
-        ? FilledButton(key: ValueKey('$keyPrefix-forgotten-resume'), style: filled, onPressed: onResume, child: const Text('Συνέχεια'))
-        : TextButton(key: ValueKey('$keyPrefix-forgotten-resume'), style: plain, onPressed: onResume, child: const Text('Συνέχεια'));
+        ? FilledButton(key: ValueKey('$keyPrefix-forgotten-resume'), style: filled, onPressed: resumeNow, child: const Text('Συνέχεια'))
+        : TextButton(key: ValueKey('$keyPrefix-forgotten-resume'), style: plain, onPressed: resumeNow, child: const Text('Συνέχεια'));
     final Widget main;
     if (!none) {
       main = FilledButton(

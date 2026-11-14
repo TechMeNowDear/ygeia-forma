@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data.dart' show HealthStore;
-import '../../format.dart' show daysBetween;
+import '../../format.dart' show countText, daysBetween;
 import '../../reference.dart' show MetricInfo;
 import '../../theme.dart';
 import '../../training/session.dart';
@@ -40,13 +40,19 @@ const zoneInfo = MetricInfo(
       'Achten & Jeukendrup 2002 · Venables 2005 · Kraus 2002 (NEJM) · Kodama 2007 · Persinger 2004 (τεστ ομιλίας)',
 );
 
+/// R8-A7-2: η ζώνη χωρίς παλμούς ηρεμίας (64–76% των μέγιστων): από πού βγήκαν οι μέγιστοι, και τι την κάνει προσωπική.
+String zoneProvisionalText(Zone z) => '${z.maxMeasured ? 'Προσωρινά από τους μέγιστους παλμούς σου (64–76%)' : 'Προσωρινά από την ηλικία (64–76% των μέγιστων)'}. '
+    'Με 7 νύχτες παλμών ύπνου, ή με τους παλμούς ηρεμίας σου ξύπνιος στην «Αλλαγή», γίνεται πιο προσωπική.';
+
 /// Με όριο γιατρού το ρολόι δονείται μόνο σε εκείνο (round1, U5-28· ExerciseService.zoneMaySpeak).
 String zoneLimitText(int limit) => 'Έχεις όριο γιατρού ($limit): το ρολόι δονείται μόνο σε εκείνο. Οι δονήσεις της ζώνης είναι κλειστές.';
 
 /// Οι δονήσεις της ζώνης σε λέξεις (round1, U5-06), από τις ίδιες σταθερές με το ρολόι.
 const zoneHighText = 'Δύο σύντομες δονήσεις όταν μείνεις πάνω $zoneHoldSec δευτερόλεπτα. Ξανά μετά από ${zoneRepeatSec ~/ 60} λεπτά, '
     'αν δεν κατέβεις. Όχι τα πρώτα ${zoneWarmupSec ~/ 60} λεπτά.';
-const zoneLowText = 'Μία δόνηση όταν μείνεις κάτω 1 λεπτό. Ξανά μετά από 5 λεπτά.';
+// R8-A7-4: και κάτω από τη ζώνη, καμία δόνηση τα πρώτα 5 λεπτά (Protocol.kt ZoneAlarm: η προθέρμανση πριν από τους δύο
+// ελέγχους)· πριν το κείμενο υποσχόταν δόνηση στο 1ο λεπτό.
+const zoneLowText = 'Μία δόνηση όταν μείνεις κάτω 1 λεπτό. Ξανά μετά από 5 λεπτά. Όχι τα πρώτα ${zoneWarmupSec ~/ 60} λεπτά.';
 
 /// «Τεστ ομιλίας» (round1, S6-3): η απάντηση λέει κάτι για το πάνω όριο μόνο αν οι παλμοί πέρασαν αρκετή ώρα κοντά του
 /// (Persinger 2004: το τεστ κρίνει την ένταση στην οποία δίνεται η απάντηση). «Κοντά» = από [talkNearBelow] κάτω ως
@@ -131,8 +137,9 @@ class ZoneCard extends StatelessWidget {
               ]),
             ] else if (!z.manual) ...[
               const SizedBox(height: 8),
-              Text('Προσωρινά από την ηλικία (64–76% των μέγιστων)· με 7 νύχτες παλμών ύπνου γίνεται πιο προσωπική.',
-                  style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary)),
+              // R8-A7-2: με μέγιστους από τεστ, όχι «από την ηλικία»· και η δική σου μέτρηση ηρεμίας ξύπνιος κάνει τη ζώνη
+              // προσωπική αμέσως (zone.dart: computeZone).
+              Text(zoneProvisionalText(z), key: const ValueKey('zone-provisional'), style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary)),
             ],
             if (z.manual) ...[
               const SizedBox(height: 8),
@@ -284,6 +291,13 @@ class _ZoneSheetState extends State<ZoneSheet> {
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final z = _z0;
+    final h = widget.health;
+    // R8-A7-1 / R8-U3-04: από πόσες νύχτες βγήκαν οι παλμοί ηρεμίας (7–14), όχι πάντα «14».
+    final nights = h.restHrNights(widget.now);
+    // R8-A7-3: με ζώνη που όρισες εσύ, όχι ο τύπος Karvonen (δεν βγάζει αυτή τη ζώνη) αλλά τι θα έδινε ο υπολογισμός.
+    final calc = z != null && z.manual
+        ? computeZone(age: h.profile.ageOn(widget.now), restHr: h.restHrForZone(widget.now), s: h.zoneSettings.copyWith(clearManual: true))
+        : null;
     final hint = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
     final head = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary);
     return Padding(
@@ -300,15 +314,18 @@ class _ZoneSheetState extends State<ZoneSheet> {
                     ? '— · λίγες νύχτες ακόμα'
                     : z.restMeasured
                         ? '${z.rest} · δική σου μέτρηση, ξύπνιος'
-                        : '${z.rest} · παλμοί ύπνου, 14 νύχτες'),
+                        : '${z.rest} · παλμοί ύπνου, ${nights > 0 ? countText(nights, 'νύχτα', 'νύχτες') : 'τελευταίες νύχτες'}'),
             InfoRow('Μέγιστοι παλμοί', z.max <= 0 ? '—' : '${z.max} · ${z.maxMeasured ? 'από τεστ' : 'εκτίμηση από την ηλικία'}'),
-            InfoRow('Μέτρια ένταση', z.rest == null ? '64–76% των μέγιστων' : '40–59%'),
+            if (!z.manual) InfoRow('Μέτρια ένταση', z.rest == null ? '64–76% των μέγιστων' : '40–59%'),
             InfoRow('Ζώνη', '${z.lo}–${z.hi}${z.manual ? ' · δική σου' : ''}'),
             const SizedBox(height: 4),
             Text(
-                z.rest == null
-                    ? 'Χωρίς αρκετές νύχτες παλμών ύπνου η ζώνη βγαίνει από τους μέγιστους παλμούς.'
-                    : 'Ηρεμία + 40% και + 59% της διαφοράς «μέγιστοι − ηρεμία» (τύπος Karvonen).',
+                z.manual
+                    ? 'Τη ζώνη την όρισες εσύ.${calc == null ? '' : ' Ο υπολογισμός θα έδινε ${calc.lo}–${calc.hi}.'}'
+                    : z.rest == null
+                        ? 'Χωρίς αρκετές νύχτες παλμών ύπνου η ζώνη βγαίνει από τους μέγιστους παλμούς.'
+                        : 'Ηρεμία + 40% και + 59% της διαφοράς «μέγιστοι − ηρεμία» (τύπος Karvonen).',
+                key: const ValueKey('zone-sheet-how'),
                 style: hint),
           ],
           const SizedBox(height: 18),
@@ -515,6 +532,15 @@ class ZoneTimeCard extends StatelessWidget {
   }
 }
 
+/// R8-A7-5: πόσο ακόμα ρωτά το «τεστ ομιλίας». Πριν: «Ερώτηση μόνο στα 3 πρώτα περπατήματα», ενώ μετρούν οι απαντήσεις
+/// ([answers]), όχι τα περπατήματα (η ερώτηση έρχεται μόνο σε περπάτημα που έμεινε κοντά στο πάνω όριο).
+String talkLeftText(int answers, {required bool answered}) {
+  final left = talkAskWalks - answers;
+  final base = 'Η ερώτηση έρχεται ώσπου να απαντήσεις $talkAskWalks φορές';
+  if (answered || left <= 0) return '$base.';
+  return '$base· ${left == 1 ? 'απομένει 1' : 'απομένουν $left'}.';
+}
+
 /// «Τεστ ομιλίας» στα πρώτα περπατήματα (σχέδια 12/11, 4ε): η απάντηση φέρνει πρόταση, ποτέ αλλαγή χωρίς «Ναι».
 class TalkTestCard extends StatefulWidget {
   const TalkTestCard({super.key, required this.session, required this.health});
@@ -608,7 +634,9 @@ class _TalkTestCardState extends State<TalkTestCard> {
         Text('Όταν οι παλμοί ήταν κοντά στους $hi, μπορούσες να μιλάς με προτάσεις;',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
         const SizedBox(height: 4),
-        Text('Ερώτηση μόνο στα $talkAskWalks πρώτα περπατήματα.', style: TextStyle(fontSize: 13, color: c.textSecondary)),
+        // R8-A7-5: η ερώτηση μετρά απαντήσεις, όχι περπατήματα ([TalkTestCard.shows]: λιγότερες από $talkAskWalks).
+        Text(talkLeftText(s.talk.length, answered: answered != null),
+            key: const ValueKey('talk-left'), style: TextStyle(fontSize: 13, color: c.textSecondary)),
         const SizedBox(height: 12),
         for (final (k, label) in options) ...[
           OutlinedButton(

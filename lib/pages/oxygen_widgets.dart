@@ -218,7 +218,8 @@ class _OxygenAboutState extends State<OxygenAbout> {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             key: const ValueKey('oxygen-about-toggle'),
-            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4), visualDensity: VisualDensity.compact),
+            // Round 8 (R8-U4-7): χωρίς `VisualDensity.compact` (έδινε στόχο αφής 40 dp)· 48 dp όπως κάθε κουμπί της εφαρμογής.
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
             onPressed: () => setState(() => _open = !_open),
             icon: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 20),
             label: Text(_open ? 'Λιγότερα' : 'Τι σημαίνει'),

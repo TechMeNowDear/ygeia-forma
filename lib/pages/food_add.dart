@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data.dart' show HealthStore;
-import '../food/chol.dart' show branByName;
+import '../food/chol.dart' show branByName, isBran;
 import '../food/food_channel.dart';
 import '../food/food_model.dart';
 import '../food/food_search.dart' show FoodSearchResult, plain;
@@ -13,6 +13,7 @@ import '../food/food_store.dart';
 import '../food/off.dart';
 import '../food/weigh_hints.dart';
 import '../format.dart';
+import '../goals.dart' show defaultBranG;
 import '../theme.dart';
 import '../widgets.dart';
 import 'my_foods.dart';
@@ -63,14 +64,25 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   if (r == null) return;
   if (r.delete) {
     if (!await food.remove(e)) return;
-    messenger.showSnackBar(SnackBar(
-      content: Text('Διαγράφηκε: ${e.food.name}'),
-      action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.restore(e)),
-    ));
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('Διαγράφηκε: ${e.food.name}'),
+        persist: false,
+        duration: undoSnackBarDuration,
+        action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.restore(e)),
+      ));
   } else {
     await food.update(e.copyWith(grams: r.grams, meal: r.meal, food: r.food.id == e.food.id ? null : r.food));
   }
 }
+
+/// Πόσο μένει ένα μήνυμα με «Αναίρεση» (round8, R8-U2-1). Από το Flutter 3.38 ένα SnackBar με κουμπί δεν κλείνει ποτέ
+/// μόνο του, εκτός αν έχει `persist: false` (docs.flutter.dev, «SnackBar with action no longer auto-dismisses»)· και ο
+/// ScaffoldMessenger δείχνει ένα μήνυμα τη φορά, τα άλλα περιμένουν. Έτσι το «Αναίρεση» μετά από δεύτερο φαγητό
+/// έσβηνε το ΠΡΩΤΟ (το μήνυμα του δεύτερου περίμενε πίσω από το πρώτο). Τώρα κάθε τέτοιο μήνυμα κλείνει το προηγούμενο
+/// (`hideCurrentSnackBar`) και κλείνει μόνο του μετά από αυτό το διάστημα.
+const undoSnackBarDuration = Duration(seconds: 6);
 
 /// Ο σαρωτής άνοιξε αλλά αυτό που έδωσε δεν είναι barcode προϊόντος (κείμενο εγκρίθηκε 12/11).
 const barcodeUnreadText = 'Δεν διαβάστηκε το barcode. Δοκίμασε ξανά.';
@@ -126,6 +138,10 @@ String quantityErrorText(String text, {required bool perMl}) {
 /// παρθένο» = 17.980 kcal σε μία καταχώριση. Είναι σωστό;».
 String typoQuestion(Food f, double grams) {
   final qty = grams >= 1000 && grams == grams.roundToDouble() ? thousands(grams) : gramsField(grams);
+  // Round8 (R8-U2-7): το αλάτι έχει 0 kcal· η ερώτηση λέει πόσο αλάτι θα γραφτεί («100 g «Αλάτι» = 97,8 g αλάτι …»).
+  if (f.n.amount(Nk.salt) >= typoSaltPer100) {
+    return '$qty ${f.unit} «${f.name}» = ${dec(f.n.amount(Nk.salt) * grams / 100, 1)} g αλάτι σε μία καταχώριση. Είναι σωστό;';
+  }
   return '$qty ${f.unit} «${f.name}» = ${kcalText(f.n.amount(Nk.kcal) * grams / 100)} kcal σε μία καταχώριση. Είναι σωστό;';
 }
 
@@ -141,12 +157,28 @@ String rawOrCookedQuestion(double grams, List<(Food, String)> forms) {
 /// Ξηροί καρποί και σπόροι: μετριούνται με τη χούφτα (round7, R7-U2-4).
 bool _nutsPortion(Food f) => f.cat == 'Ξηροί καρποί' || f.cat == 'Σπόροι' || f.cholKind == CholKind.nuts;
 
+/// Αλάτι (από [typoSaltPer100] g στα 100) και μπαχαρικά: μετριούνται με την πρέζα και το κουταλάκι (round8, R8-U2-7).
+bool _pinchPortion(Food f) => f.n.amount(Nk.salt) >= typoSaltPer100 || f.cat == 'Καρυκεύματα';
+
+/// Οι νιφάδες βρώμης της βάσης (CIQUAL 32140).
+const oatFlakesId = 'C32140';
+
+/// Πίτουρο βρώμης και νιφάδες βρώμης: η μερίδα του πλάνου, 40 g (round8, R8-U2 Β1).
+bool _oatPortion(Food f) => isBran(f) || f.id == oatFlakesId;
+
 /// Η πρώτη ποσότητα για τρόφιμο που δεν έχεις γράψει ποτέ και δεν έχει μερίδα (round7, R7-U2-4). Πριν ήταν πάντα 100 g:
 /// 100 g καρύδια = 709 kcal (το πλάνο λέει 30 g), και 100 g λάδι ενεργοποιούσαν τον δικό τους έλεγχο λάθους.
-/// Λάδι, βούτυρο και ό,τι είναι στα «Λιπαρά»: 10 g (περίπου μία κουταλιά)· ξηροί καρποί και σπόροι: 30 g· τα άλλα 100 g.
-double firstGrams(Food f) {
-  if (f.n.amount(Nk.fat) >= typoFatPer100 || f.cat == 'Λιπαρά') return 10;
+/// Λάδι, βούτυρο, μαγιονέζα, μαργαρίνη, ελιές: 10 g (περίπου μία κουταλιά)· ξηροί καρποί και σπόροι: 30 g· τα άλλα 100 g.
+/// Round8: ταχίνι, φυστικοβούτυρο, πραλίνα 15 g (μία κουταλιά· [isSpoonFood], R8-A2-1)· αλάτι και μπαχαρικά 2 g
+/// (R8-U2-7· πριν 100 g αλάτι)· πίτουρο βρώμης η ποσότητα του πλάνου σου ([branG], αλλιώς 40 g) και νιφάδες βρώμης 40 g
+/// (R8-U2 Β1).
+double firstGrams(Food f, {int? branG}) {
+  if (_pinchPortion(f)) return 2;
+  if (isSpoonFood(f)) return f.cat == 'Αλείμματα' ? 15 : 10;
+  if (isOlives(f)) return 10;
   if (_nutsPortion(f)) return 30;
+  if (isBran(f)) return (branG != null && branG > 0 ? branG : defaultBranG).toDouble();
+  if (f.id == oatFlakesId) return 40;
   return 100;
 }
 
@@ -232,33 +264,48 @@ class MealPicker extends StatelessWidget {
       // Χώρος κάθε ονόματος: το ένα τέταρτο του πλαισίου, χωρίς τα περιθώρια (4 + 4 του πλαισίου, 4 + 4 του κουμπιού).
       final room = (box.maxWidth - 8) / 4 - 8;
       final double fontSize = widest > room && room > 0 ? 14 * (room / widest).clamp(0.5, 1.0).toDouble() : 14.0;
+      // Round8 (R8-U2-6): κάθε γεύμα πατιέται σε ύψος τουλάχιστον 48 dp (4 + 40 + 4: το πάνω και κάτω περιθώριο του
+      // πλαισίου ανήκει πια στο κουμπί) και το TalkBack λέει ποιο είναι επιλεγμένο. Πριν η περιοχή αφής ήταν 38 dp και
+      // ένα πάτημα στο περιθώριο των 4 dp χανόταν.
       return Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.hairline)),
         child: Row(
           children: [
             for (final m in Meal.values)
               Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onChanged(m),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: m == value ? c.foodSolid : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    // Το FittedBox μένει μόνο ως δίχτυ ασφαλείας (διαφορά ενός pixel)· το μέγεθος το ορίζει το [fontSize].
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        mealLabel(m),
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w600,
-                          color: m == value ? c.onSolid : c.textSecondary,
+                child: MergeSemantics(
+                  child: Semantics(
+                    button: true,
+                    selected: m == value,
+                    child: GestureDetector(
+                      key: ValueKey('meal-bar-${m.name}'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onChanged(m),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          constraints: const BoxConstraints(minHeight: 40),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: m == value ? c.foodSolid : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          // Το FittedBox μένει μόνο ως δίχτυ ασφαλείας (διαφορά ενός pixel)· το μέγεθος το ορίζει το [fontSize].
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              mealLabel(m),
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w600,
+                                color: m == value ? c.onSolid : c.textSecondary,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -384,7 +431,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       builder: (_) => QuantitySheet(
         food: widget.food,
         item: f,
-        initialGrams: widget.food.lastGrams(f.id) ?? f.servingGrams ?? firstGrams(f),
+        initialGrams:
+            widget.food.lastGrams(f.id) ?? f.servingGrams ?? firstGrams(f, branG: HealthStore.shared?.goals?.branG),
         meal: _meal,
       ),
     );
@@ -402,10 +450,15 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     // Έλεγχος round1 (S2-8 / S11-1): αν δεν γράφτηκε στη σημερινή μέρα, το μήνυμα λέει σε ποια.
     final today = _today();
     final where = sameDay(day, today) ? 'Προστέθηκε' : 'Προστέθηκε (${entryDayLabel(day, today)})';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$where: ${r.food.name}, ${gramsText(r.grams)} ${r.food.unit}'),
-      action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),
-    ));
+    // Round8 (R8-U2-1): το μήνυμα του προηγούμενου φαγητού κλείνει, ώστε το «Αναίρεση» να είναι ΠΑΝΤΑ του τελευταίου.
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('$where: ${r.food.name}, ${gramsText(r.grams)} ${r.food.unit}'),
+        persist: false,
+        duration: undoSnackBarDuration,
+        action: SnackBarAction(label: 'Αναίρεση', onPressed: () => widget.food.remove(e)),
+      ));
     setState(() => _meal = r.meal);
   }
 
@@ -605,7 +658,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         bottom: large
             ? null
             : PreferredSize(
-                preferredSize: Size.fromHeight(60 + bigger * 30),
+                // Round8 (R8-U2-6): 64 (πριν 60): τα γεύματα πατιούνται σε 48 dp, μέσα σε πλαίσιο 50 dp.
+                preferredSize: Size.fromHeight(64 + bigger * 30),
                 child: Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 10), child: mealPicker),
               ),
       ),
@@ -988,6 +1042,11 @@ class _QuantitySheetState extends State<QuantitySheet> {
     final g = _value;
     final unit = f.unit;
     double tot(String k) => g == null ? 0 : f.n.amount(k) * g / 100;
+    // Round8 (R8-U2-7): στο αλάτι (0 kcal, 0 g πρωτεΐνη, υδατάνθρακες, λιπαρά) το τέταρτο πλακίδιο λέει πόσο αλάτι γράφεται.
+    final saltTile = f.n.amount(Nk.salt) >= typoSaltPer100;
+    final lastLabel = saltTile ? 'Αλάτι' : 'Λιπαρά';
+    final lastValue = saltTile ? '${dec(tot(Nk.salt), 1)} g' : '${gramsText(tot(Nk.fat))} g';
+    final lastColor = saltTile ? c.textTertiary : fatColor(c);
 
     final chips = <(String, double)>[
       if (f.servingGrams != null && f.servingGrams! > 0)
@@ -996,13 +1055,22 @@ class _QuantitySheetState extends State<QuantitySheet> {
       // Έλεγχος round1 (U3a-13): λάδι, βούτυρο και άλλα σχεδόν καθαρά λίπη μετριούνται με το κουταλάκι και την κουταλιά
       // (5, 10, 15, 30)· πριν το λάδι σε ml είχε «100, 200, 250, 330 ml» (ένα πάτημα = 824 kcal).
       // Round7 (R7-U2-4): ξηροί καρποί και σπόροι με τη χούφτα (15, 30, 45, 60 g· το πλάνο λέει 30 g)· πριν 50–200 g.
-      for (final v in f.n.amount(Nk.fat) >= typoFatPer100
-          ? const [5.0, 10.0, 15.0, 30.0]
-          : _nutsPortion(f)
-              ? const [15.0, 30.0, 45.0, 60.0]
-              : f.perMl
-                  ? const [100.0, 200.0, 250.0, 330.0]
-                  : const [50.0, 100.0, 150.0, 200.0])
+      // Round8: ο ίδιος κανόνας με την πρώτη ποσότητα ([firstGrams]): ό,τι μετριέται με το κουτάλι ([isSpoonFood]:
+      // και μαγιονέζα, μαργαρίνη, ταχίνι, φυστικοβούτυρο) 5–30 g (R8-A2-1)· ελιές 10–50 g· αλάτι και μπαχαρικά 1–5 g
+      // (R8-U2-7)· πίτουρο και νιφάδες βρώμης 20–50 g (R8-U2 Β1).
+      for (final v in _pinchPortion(f)
+          ? const [1.0, 2.0, 3.0, 5.0]
+          : isSpoonFood(f)
+              ? const [5.0, 10.0, 15.0, 30.0]
+              : isOlives(f)
+                  ? const [10.0, 20.0, 30.0, 50.0]
+                  : _nutsPortion(f)
+                      ? const [15.0, 30.0, 45.0, 60.0]
+                      : _oatPortion(f)
+                          ? const [20.0, 30.0, 40.0, 50.0]
+                          : f.perMl
+                              ? const [100.0, 200.0, 250.0, 330.0]
+                              : const [50.0, 100.0, 150.0, 200.0])
         ('${v.round()} $unit', v),
     ];
 
@@ -1098,17 +1166,25 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       for (final st in _states) ...[
                         () {
                           final on = st.$1.id == widget.food.currentOf(f).id;
+                          // Round8 (R8-U2-5): κάθετο περιθώριο 10 dp. Με μεγάλα γράμματα το Material μηδενίζει το δικό
+                          // του, και όταν το κείμενο έσπαγε σε δύο γραμμές («Ξερές (πριν το βράσιμο)») ακουμπούσε το περίγραμμα.
+                          const pad = EdgeInsets.symmetric(horizontal: 16, vertical: 10);
                           return SizedBox(
                             width: double.infinity,
                             child: on
                                 ? FilledButton.icon(
-                                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), alignment: Alignment.centerLeft),
+                                    style: FilledButton.styleFrom(
+                                        minimumSize: const Size.fromHeight(48), alignment: Alignment.centerLeft, padding: pad),
                                     onPressed: () {},
                                     icon: const Icon(Icons.check_rounded),
                                     label: Text(st.$2),
                                   )
                                 : OutlinedButton(
-                                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), alignment: Alignment.centerLeft, foregroundColor: c.text),
+                                    style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size.fromHeight(48),
+                                        alignment: Alignment.centerLeft,
+                                        foregroundColor: c.text,
+                                        padding: pad),
                                     onPressed: () => setState(() => _item = st.$1),
                                     child: Text(st.$2),
                                   ),
@@ -1276,7 +1352,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       InfoRow('kcal', kcalText(tot(Nk.kcal)), dot: c.primary),
                       InfoRow('Πρωτεΐνη', '${gramsText(tot(Nk.protein))} g', dot: proteinColor(c)),
                       InfoRow('Υδατάνθρακες', '${gramsText(tot(Nk.carbs))} g', dot: carbsColor(c)),
-                      InfoRow('Λιπαρά', '${gramsText(tot(Nk.fat))} g', dot: fatColor(c)),
+                      InfoRow(lastLabel, lastValue, dot: lastColor),
                     ]),
                   )
                 else if (large)
@@ -1290,7 +1366,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     Row(children: [
                       tile('Υδατάνθρακες', '${gramsText(tot(Nk.carbs))} g', carbsColor(c)),
                       const SizedBox(width: 8),
-                      tile('Λιπαρά', '${gramsText(tot(Nk.fat))} g', fatColor(c)),
+                      tile(lastLabel, lastValue, lastColor),
                     ]),
                   ])
                 else
@@ -1302,7 +1378,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       stat('kcal', kcalText(tot(Nk.kcal)), c.primary),
                       stat('Πρωτεΐνη', '${gramsText(tot(Nk.protein))} g', proteinColor(c)),
                       stat('Υδατάνθρ.', '${gramsText(tot(Nk.carbs))} g', carbsColor(c)),
-                      stat('Λιπαρά', '${gramsText(tot(Nk.fat))} g', fatColor(c)),
+                      stat(lastLabel, lastValue, lastColor),
                     ],
                   ),
                 ),
@@ -1392,18 +1468,20 @@ class FoodDetailScreen extends StatelessWidget {
     ('kcal', 'Ενέργεια', 'kcal', 0),
     ('protein', 'Πρωτεΐνη', 'g', 1),
     ('carbs', 'Υδατάνθρακες', 'g', 1),
-    ('sugars', '  από τα οποία σάκχαρα', 'g', 1),
+    // Round8 (R8-U2-9): «εκ των οποίων», όπως η φόρμα της ετικέτας και η διατροφική δήλωση της ΕΕ.
+    ('sugars', '  εκ των οποίων σάκχαρα', 'g', 1),
     ('fiber', 'Φυτικές ίνες', 'g', 1),
     // «Λιπαρά», όπως στη διατροφική δήλωση της ΕΕ (έλεγχος 9/11, Χ10).
     ('fat', 'Λιπαρά', 'g', 1),
-    ('satFat', '  από τα οποία κορεσμένα', 'g', 1),
+    ('satFat', '  εκ των οποίων κορεσμένα', 'g', 1),
     ('monoFat', '  μονοακόρεστα', 'g', 1),
     ('polyFat', '  πολυακόρεστα', 'g', 1),
     ('salt', 'Αλάτι', 'g', 2),
     ('sodium', 'Νάτριο', 'mg', 0),
     ('alcohol', 'Αλκοόλ', 'g', 1),
     ('polyols', 'Πολυόλες (γλυκαντικά)', 'g', 1),
-    ('cholesterol', 'Χοληστερόλη', 'mg', 0),
+    // Round8 (R8-U2-9): «Χοληστερίνη», η λέξη της υπόλοιπης εφαρμογής.
+    ('cholesterol', 'Χοληστερίνη', 'mg', 0),
     ('water', 'Νερό', 'g', 1),
     ('calcium', 'Ασβέστιο', 'mg', 0),
     ('iron', 'Σίδηρος', 'mg', 1),
@@ -1934,6 +2012,8 @@ Future<Food?> scanToFood(
     final detail = (s['detail'] as String?) ?? '';
     messenger.showSnackBar(SnackBar(
       duration: const Duration(seconds: 8),
+      // Round8 (R8-U2-1): με κουμπί («Λεπτομέρειες») το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+      persist: false,
       content: Text(kind == 'unavailable'
           ? 'Ο σαρωτής κατεβαίνει από το Google Play. Δοκίμασε ξανά σε λίγο, με σύνδεση στο ίντερνετ.'
           : 'Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν χειροκίνητα.'),

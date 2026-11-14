@@ -3,6 +3,7 @@
 /// ο χρήστης με την ετικέτα πριν αποθηκευτούν.
 library;
 
+import 'chol.dart' show branByName;
 import 'food_model.dart';
 import 'food_search.dart' show plain;
 
@@ -147,8 +148,9 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
   final alcoholVol = _per100(_num(n['alcohol_100g']) ?? _num(n['alcohol']));
   final polyols = _per100(_num(n['polyols_100g']));
   final erythritol = _per100(_num(n['erythritol_100g']));
+  final name = pick(['product_name_el', 'generic_name_el', 'product_name']) ?? '';
   return FoodDraft(
-    name: pick(['product_name_el', 'generic_name_el', 'product_name']) ?? '',
+    name: name,
     brand: brand,
     barcode: barcode,
     // Μερίδα μόνο αν γίνεται να γραφτεί ως ποσότητα (πάνω από 0, ως 5.000): αλλιώς «χωρίς μερίδα».
@@ -163,7 +165,7 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
     saltFromSodium: saltFromSodium,
     sodiumMg: sodiumMg,
     lessThan: lessThan,
-    cholKind: cholKindFromOffTags(p['categories_tags']),
+    cholKind: cholKindFromOffTags(p['categories_tags'], name: name),
   );
 }
 
@@ -186,6 +188,9 @@ const _offLegumeTags = {
 };
 const _offBranTags = {'en:oat-bran', 'en:oat-brans'};
 
+/// Κατηγορίες του [_offNotTheFood] όπου μπαίνει και το σκέτο πίτουρο βρώμης (round8, R8-A3-1).
+const _offBranHomes = {'en:breakfast-cereals', 'en:flours'};
+
 /// Προϊόντα που απλώς ΠΕΡΙΕΧΟΥΝ ξηρούς καρπούς, όσπρια ή ψάρι (άλειμμα, ρόφημα, σοκολάτα, μπάρα, έτοιμο φαγητό, σαλάτα,
 /// σούπα, πανέ, σουρίμι, λάδι, αλεύρι…) ή δεν είναι από αυτά που ρίχνουν την LDL (κάστανα): δεν μετρούν μόνα τους.
 const _offNotTheFood = {
@@ -207,15 +212,21 @@ const _offNotTheFood = {
 /// Τα αράπικα φιστίκια είναι στο Open Food Facts και «όσπρια»· εδώ μετρούν ως ξηροί καρποί, όπως στη βάση.
 /// Ό,τι βγει εδώ φαίνεται στη φόρμα ελέγχου του προϊόντος και αλλάζει με ένα πάτημα.
 /// Round7 (R7-A3-1): ό,τι απλώς τα περιέχει δίνει «Τίποτα» ([CholKind.none]), όχι null· αλλιώς ένα «Πίτουρο βρώμης
-/// κράκερ» (κατηγορία κράκερ) μετρούσε από το όνομα ως πίτουρο. Αν το προϊόν έχει ΚΑΙ κατηγορία πίτουρου βρώμης, μένει
-/// null: το πίτουρο που μπαίνει και στα «δημητριακά πρωινού» το κρίνει το όνομα, και η φόρμα δείχνει τι θα μετρήσει.
-String? cholKindFromOffTags(Object? tags) {
+/// κράκερ» (κατηγορία κράκερ) μετρούσε από το όνομα ως πίτουρο.
+/// Round8 (R8-A3-1): το σκέτο πίτουρο βρώμης μπαίνει συχνά ΚΑΙ στα «δημητριακά πρωινού» ή στα «αλεύρια» ([_offBranHomes]),
+/// και ελληνικό πίτουρο (π.χ. «Πίτυρο Βρώμης …», μόνο με «Breakfast cereals») έβγαινε «Τίποτα»: 0 g στην κάρτα κάθε μέρα.
+/// Τώρα: αν οι μόνες «όχι το ίδιο το τρόφιμο» κατηγορίες είναι αυτές οι δύο, και το προϊόν έχει κατηγορία πίτουρου βρώμης
+/// ή το όνομά του ([name]) αρχίζει «πίτουρο/πίτυρο βρώμης» ([branByName]), μετρά ως πίτουρο. Μπάρες, μπισκότα, κράκερ,
+/// ψωμιά και μούσλι μένουν «Τίποτα», και με κατηγορία πίτουρου.
+String? cholKindFromOffTags(Object? tags, {String? name}) {
   if (tags is! List) return null;
   final t = {
     for (final x in tags)
       if (x is String) x.trim().toLowerCase(),
   };
-  if (t.any(_offNotTheFood.contains)) return t.any(_offBranTags.contains) ? null : CholKind.none;
+  final bran = t.any(_offBranTags.contains) || (name != null && branByName(name));
+  final notTheFood = t.where(_offNotTheFood.contains).toSet();
+  if (notTheFood.isNotEmpty) return bran && notTheFood.every(_offBranHomes.contains) ? CholKind.bran : CholKind.none;
   if (t.any(_offBranTags.contains)) return CholKind.bran;
   if (t.any(_offNutTags.contains)) return CholKind.nuts;
   if (t.any(_offFishTags.contains)) return CholKind.fish;

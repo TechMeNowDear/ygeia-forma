@@ -1,4 +1,4 @@
-import '../body_trend.dart' show guardBody;
+import '../body_trend.dart' show bodyNotPermitted, guardBody;
 import '../data.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
@@ -155,7 +155,8 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
       out[K.skinTemp] = _entry('Θερμοκρασία', signedDec(diff), '°', cap: 'απόκλιση καρπού');
     }
   }
-  return {'src': '${src == Source.oura ? 'Oura' : 'ρολόι'} · ${shortDayDate(d0)}', 'm': out};
+  // Round 8 (R8-U1-4): σύντομη πηγή για τη στήλη 1×3, όπως το Σώμα.
+  return {'src': '${src == Source.oura ? 'Oura' : 'ρολόι'} · ${shortDayDate(d0)}', 'srcShort': shortDayDate(d0), 'm': out};
 }
 
 /// Κίνηση: η σημερινή μέρα ως τώρα (δεν συγκρίνεται με τα συνηθισμένα: δεν έχει τελειώσει).
@@ -197,25 +198,48 @@ Map<String, dynamic> _move(HealthStore store, DateTime today) {
   };
 }
 
+/// Round 8 (R8-A2-3): το widget «Φαγητό» όταν το ημερολόγιο δεν διαβάστηκε (ή διαβάζεται ακόμα): «—» σε κάθε τιμή, με
+/// λεζάντα που λέει γιατί, ΠΟΤΕ «0 kcal · τίποτα ακόμα σήμερα». Η λεζάντα μπαίνει σε κάθε τιμή, ώστε να φαίνεται όποια κι
+/// αν είναι η κεντρική (με το «+» η πηγή δεν ζωγραφίζεται). Ίδιο κείμενο ενέργειας με την Kotlin (WidgetText.OPEN_APP).
+const widgetFoodNotReadSrc = 'δεν διαβάστηκε';
+const widgetFoodNotReadSrcShort = 'πρόβλημα';
+const widgetFoodLoading = 'διαβάζεται…';
+
 /// Φαγητό: τα σύνολα της σημερινής μέρας, μόνο από τη βάση τροφίμων.
 Map<String, dynamic> _food(FoodStore food, DateTime today) {
+  if (!food.loaded) {
+    final failed = food.error != null;
+    return {
+      'day': dateKey(today),
+      'src': failed ? widgetFoodNotReadSrc : widgetFoodLoading,
+      if (failed) 'srcShort': widgetFoodNotReadSrcShort,
+      'm': {
+        for (final m in wMetrics[WKind.food]!)
+          m.key: _entry(_foodLabels[m.key] ?? m.name, '—', '',
+              cap: failed ? 'άνοιξε την εφαρμογή' : widgetFoodLoading, capShort: failed ? 'άνοιξέ με' : null),
+      },
+    };
+  }
   final entries = food.entriesFor(today);
   final t = Totals(entries);
   final meals = {for (final e in entries) e.meal}.length;
   final series = [for (var i = 6; i >= 0; i--) _kcalOf(food, _minus(today, i))];
   String g(double v) => gramsText(v);
+  // Round 8 (R8-A2-2): «≥» όταν κάποιο τρόφιμο της μέρας δεν έχει τιμή γι' αυτό το θρεπτικό, όπως η Διατροφή
+  // (nutrition_goals.dart `atLeast`: «≥ 8,5 g»). Πριν το widget έγραφε σκέτο «8,5», σαν ακριβές σύνολο.
+  String atLeast(String key, String v) => (t.missing[key] ?? 0) > 0 ? '≥ $v' : v;
   final out = <String, dynamic>{
     // Round 7 (A2-1): οι θερμίδες όπως τις γράφει η εφαρμογή ([Totals.shownKcal]: άθροισμα των στρογγυλεμένων ανά
     // καταχώριση)· πριν η στρογγύλευση του συνόλου, που έβγαζε π.χ. 1.804 στο widget και 1.803 στη Διατροφή.
     'kcal': _entry('Θερμίδες', thousands(t.shownKcal), ' kcal',
         cap: entries.isEmpty ? 'τίποτα ακόμα σήμερα' : (meals == 1 ? '1 γεύμα σήμερα' : '$meals γεύματα σήμερα'),
         spark: series),
-    'protein': _entry('Πρωτεΐνη', g(t.protein), ' g'),
-    'carbs': _entry('Υδατάνθρακες', g(t.carbs), ' g'),
-    'fat': _entry('Λιπαρά', g(t.fat), ' g'),
-    'fiber': _entry('Ίνες', g(t.fiber), ' g'),
-    'salt': _entry('Αλάτι', dec(t.salt), ' g'),
-    'sugars': _entry('Σάκχαρα', g(t.sugars), ' g'),
+    'protein': _entry(_foodLabels['protein']!, g(t.protein), ' g'),
+    'carbs': _entry(_foodLabels['carbs']!, g(t.carbs), ' g'),
+    'fat': _entry(_foodLabels['fat']!, g(t.fat), ' g'),
+    'fiber': _entry(_foodLabels['fiber']!, atLeast(Nk.fiber, g(t.fiber)), ' g'),
+    'salt': _entry(_foodLabels['salt']!, atLeast(Nk.salt, dec(t.salt)), ' g'),
+    'sugars': _entry(_foodLabels['sugars']!, atLeast(Nk.sugars, g(t.sugars)), ' g'),
   };
   return {
     'day': dateKey(today),
@@ -224,6 +248,17 @@ Map<String, dynamic> _food(FoodStore food, DateTime today) {
     'm': out,
   };
 }
+
+/// Τα ονόματα στα κουτάκια του widget «Φαγητό» (σύντομα· η ρύθμιση έχει τα πλήρη, [wMetrics]).
+const _foodLabels = {
+  'kcal': 'Θερμίδες',
+  'protein': 'Πρωτεΐνη',
+  'carbs': 'Υδατάνθρακες',
+  'fat': 'Λιπαρά',
+  'fiber': 'Ίνες',
+  'salt': 'Αλάτι',
+  'sugars': 'Σάκχαρα',
+};
 
 double? _kcalOf(FoodStore food, DateTime day) {
   final e = food.entriesFor(day);
@@ -245,6 +280,8 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   final out = <String, dynamic>{};
   // Round 1 (U7-16): χωρίς ζύγιση το widget το λέει.
   // Round 2 (R2-U3-04): σύντομη μορφή για τη στήλη 1×3 (πριν «καμία ζύγιση ακ…»).
+  // Round 8 (R8-A4-3): χωρίς την άδεια «Σύσταση σώματος» το λέει (πριν «καμία ζύγιση ακόμα», ενώ ζυγιζόσουν).
+  if (body.isEmpty && bodyNotPermitted(store.data)) return {'src': 'χωρίς άδεια ζυγίσεων', 'srcShort': 'χωρίς άδεια', 'm': out};
   if (body.isEmpty) return {'src': 'καμία ζύγιση ακόμα', 'srcShort': 'καμία ζύγιση', 'm': out};
   // Round 2 (g4 · R2-D-6, R2-D-8): ίδιοι κανόνες με τη Σήμερα και το Σώμα: μία ζύγιση ανά μέρα (η πρώτη της μέρας που
   // μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν, με «κάτω από το εύρος» και
@@ -297,7 +334,14 @@ Map<String, dynamic> _body(HealthStore store, DateTime today) {
   if (last.ffm case final v?) out['ffm'] = _entry('Άλιπη', dec(v), ' kg', cap: shortDayDate(last.time), spark: series((b) => b.ffm));
   if (last.bmr case final v?) out['bmr'] = _entry('Μεταβολισμός', thousands(v), ' kcal', cap: shortDayDate(last.time));
   // Round 7 (A4-2): κομμένος στο 0,1 ([bmiText]), όπως το Σώμα: ποτέ «25,0» με «μέσα στο εύρος».
-  if (bmi != null) out['bmi'] = _entry('Δείκτης', bmiText(bmi), '', cap: shortDayDate(last.time), range: bmiRange.placeText(bmi));
+  // Round 8 (R8-A4-1): και η κρίση από τον αριθμό που φαίνεται ([bmiShown]): 160 cm, 64,0 kg έδινε «25,0 · μέσα στο εύρος»
+  // δίπλα σε «Βάρος … πάνω από το εύρος».
+  if (bmi != null) {
+    out['bmi'] = _entry('Δείκτης', bmiText(bmi), '', cap: shortDayDate(last.time), range: bmiRange.placeText(bmiShown(bmi)));
+  }
   if (last.water case final v?) out['water'] = _entry('Νερό', dec(v), ' L', cap: shortDayDate(last.time));
-  return {'src': 'InBody · ${shortDayDate(last.time)}', 'm': out};
+  // Round 8 (R8-U1-4): σύντομη πηγή (μόνο η μέρα) για τη στήλη 1×3: με «Μεγάλα» γράμματα ή «Σκιά» το «InBody · Τετ 18/11»
+  // (Inter Medium 10 sp: 80,5–89,4 dp) κοβόταν, και εκεί είναι η ΜΟΝΗ ημερομηνία της ζύγισης («Πέμ 28/12» 48 dp: χωρά
+  // σε κάθε ρύθμιση, ×1,3 = 62,4 ≤ 68).
+  return {'src': 'InBody · ${shortDayDate(last.time)}', 'srcShort': shortDayDate(last.time), 'm': out};
 }

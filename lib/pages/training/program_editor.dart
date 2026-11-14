@@ -169,6 +169,8 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
                   ..hideCurrentSnackBar()
                   ..showSnackBar(SnackBar(
                     duration: const Duration(seconds: 8),
+                    // Round8 (R8-U2-1, f1): με «Αναίρεση» το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+                    persist: false,
                     content: Text('Σβήστηκε: ${w.name}'),
                     action: SnackBarAction(
                       key: const ValueKey('ed-undo'),

@@ -1,6 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../body_trend.dart' show guardBody, mixedDayPending, shownBody;
+import '../body_trend.dart' show bodyNoPermissionShort, bodyNotPermitted, guardBody, mixedDayPending, shownBody;
 import '../data.dart';
 import '../food/food_store.dart';
 import '../format.dart';
@@ -51,6 +53,7 @@ class TodayPage extends StatelessWidget {
     required this.openSettings,
     this.now,
     this.training,
+    this.clock,
   });
 
   /// Για την κάρτα «Άσκηση σήμερα» (χωρίς αυτό: [TrainingStore.main]).
@@ -66,213 +69,225 @@ class TodayPage extends StatelessWidget {
   /// Για τα στιγμιότυπα δοκιμών· στην εφαρμογή είναι πάντα «τώρα».
   final DateTime? now;
 
+  /// Round 8 (R8-U1-5): το ρολόι όταν δεν δίνεται [now] (για τις δοκιμές της αλλαγής μέρας)· στην εφαρμογή [DateTime.now].
+  final DateTime Function()? clock;
+
   @override
   Widget build(BuildContext context) {
     final training = this.training ?? TrainingStore.main;
-    return ListenableBuilder(
-      // Το ζωντανό περπάτημα το ακούει μόνο η κάρτα «Άσκηση σήμερα» (όχι όλη η σελίδα σε κάθε μήνυμα του ρολογιού).
-      // Η αποθήκη προπονήσεων αλλάζει σε κάθε σετ: την ακούει μόνο η θέση της κάρτας (όχι όλη η σελίδα).
-      listenable: Listenable.merge([store, WearLink.main.ready]),
-      builder: (context, _) {
-        final c = Aigaio.of(context);
-        final d = store.data;
-        final now = this.now ?? DateTime.now();
-        final prefs = store.prefs;
+    final clock = this.clock ?? DateTime.now;
+    // Round 8 (R8-U1-5): η σελίδα ξαναχτίζεται και στα μεσάνυχτα και στην επιστροφή στην εφαρμογή σε άλλη μέρα, όχι μόνο
+    // όταν αλλάζουν τα δεδομένα. Πριν, από 23:57 ως 00:02 (επιστροφή < 5′ από την ανάγνωση: καμία νέα ανάγνωση) έμενε
+    // «Σάββατο · Καλησπέρα», η «Διατροφή · σήμερα» με τα σύνολα του Σαββάτου και το «+ Φαγητό» έγραφε στο Σάββατο.
+    return _DayClock(
+      clock: clock,
+      enabled: now == null,
+      builder: (context) => ListenableBuilder(
+        // Το ζωντανό περπάτημα το ακούει μόνο η κάρτα «Άσκηση σήμερα» (όχι όλη η σελίδα σε κάθε μήνυμα του ρολογιού).
+        // Η αποθήκη προπονήσεων αλλάζει σε κάθε σετ: την ακούει μόνο η θέση της κάρτας (όχι όλη η σελίδα).
+        listenable: Listenable.merge([store, WearLink.main.ready]),
+        builder: (context, _) {
+          final c = Aigaio.of(context);
+          final d = store.data;
+          final now = this.now ?? clock();
+          final prefs = store.prefs;
 
-        final settingsButton = IconButton(
-          tooltip: 'Ρυθμίσεις',
-          onPressed: openSettings,
-          style: IconButton.styleFrom(
-            backgroundColor: c.card,
-            foregroundColor: c.text,
-            fixedSize: const Size(46, 46),
-            side: BorderSide(color: c.hairline),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          ),
-          icon: const Icon(Icons.tune_rounded, size: 20),
-        );
-        // Στη μεγάλη οθόνη οι Ρυθμίσεις είναι κάτω στην πλευρική μπάρα.
-        final action = MediaQuery.sizeOf(context).width >= 600 ? null : settingsButton;
+          final settingsButton = IconButton(
+            tooltip: 'Ρυθμίσεις',
+            onPressed: openSettings,
+            style: IconButton.styleFrom(
+              backgroundColor: c.card,
+              foregroundColor: c.text,
+              fixedSize: const Size(46, 46),
+              side: BorderSide(color: c.hairline),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            icon: const Icon(Icons.tune_rounded, size: 20),
+          );
+          // Στη μεγάλη οθόνη οι Ρυθμίσεις είναι κάτω στην πλευρική μπάρα.
+          final action = MediaQuery.sizeOf(context).width >= 600 ? null : settingsButton;
 
-        // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
-        final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
-        // Round 7 (U1-12): η κάρτα λέει «σήμερα»: ανοίγει το ημερολόγιο στη ΣΗΜΕΡΙΝΗ μέρα, όπως το πάτημα στο widget
-        // (main.dart, S2-8/S11-1). Πριν άνοιγε τη μέρα που είχε μείνει ανοιχτή (π.χ. τη χθεσινή), και το «+ Φαγητό» της
-        // Διατροφής έγραφε εκεί.
-        final foodCard = prefs.show('food')
-            ? FoodTodayCard(
-                food: food,
-                now: now,
-                goals: store.goals,
-                onOpen: () {
-                  food.setDay(this.now ?? DateTime.now());
-                  open(Cat.food, FoodTab.diary);
-                })
-            : null;
+          // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
+          final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
+          // Round 7 (U1-12): η κάρτα λέει «σήμερα»: ανοίγει το ημερολόγιο στη ΣΗΜΕΡΙΝΗ μέρα, όπως το πάτημα στο widget
+          // (main.dart, S2-8/S11-1). Πριν άνοιγε τη μέρα που είχε μείνει ανοιχτή (π.χ. τη χθεσινή), και το «+ Φαγητό» της
+          // Διατροφής έγραφε εκεί.
+          final foodCard = prefs.show('food')
+              ? FoodTodayCard(
+                  food: food,
+                  now: now,
+                  goals: store.goals,
+                  onOpen: () {
+                    food.setDay(this.now ?? clock());
+                    open(Cat.food, FoodTab.diary);
+                  })
+              : null;
 
-        if (d == null || !d.hasAnyPermission) {
-          // Round 7 (U1-14): χωρίς άδεια της Samsung Health (πρώτο άνοιγμα, ή άδειες που αφαίρεσε μια ενημέρωση) μένουν η
-          // προπόνηση της μέρας και το «+ Φαγητό»: δεν εξαρτώνται από τη Samsung (training.json, βάση τροφίμων).
+          if (d == null || !d.hasAnyPermission) {
+            // Round 7 (U1-14): χωρίς άδεια της Samsung Health (πρώτο άνοιγμα, ή άδειες που αφαίρεσε μια ενημέρωση) μένουν η
+            // προπόνηση της μέρας και το «+ Φαγητό»: δεν εξαρτώνται από τη Samsung (training.json, βάση τροφίμων).
+            return PageFrame(
+              eyebrow: longDate(now),
+              title: greeting(now),
+              action: action,
+              onRefresh: () => store.refresh(),
+              left: [
+                if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store),
+                _ConnectCard(store: store),
+                if (trainingCard != null) trainingCard,
+                if (foodCard != null) foodCard,
+              ],
+            );
+          }
+
+          final error = store.error != null ? _ErrorCard(store: store) : null;
+          // Από τη σύνδεση του Oura η «νύχτα» (ύπνος, παλμοί και θερμοκρασία ύπνου, ετοιμότητα) έρχεται μόνο από αυτό.
+          final ouraNight = store.plan.nightSource(now) != Source.watch;
+          final openSleep = () => open(Cat.health, HealthTab.sleep);
+          // Round 1 (U1a-11): με άγνωστο σχέδιο πηγών η κάρτα «Δεν διαβάστηκε από πού έρχεται ο ύπνος» (πάνω, με το κουμπί)
+          // τα λέει όλα· η κάρτα ύπνου από κάτω επαναλάμβανε την ίδια φράση και έγραφε «Oura» για άγνωστη πηγή.
+          final sleep = !prefs.show('sleep') || PlanUnknownCard.shows(store)
+              ? null
+              : ouraNight
+                  ? OuraSleepTodayCard(store: store, now: now, onTap: openSleep)
+                  : _SleepCard(data: d, now: now, onTap: openSleep);
+          // Σχέδια 9/11 (1α): Ετοιμότητα, HRV και παλμοί ύπνου είναι πια μία σειρά μέσα στην κάρτα του Ύπνου (όχι
+          // χωριστή κάρτα)· η πλήρης κάρτα, με θερμοκρασία και «συνήθως», είναι στην Υγεία › Ύπνος.
+          final ouraState = PlanUnknownCard.shows(store)
+              ? PlanUnknownCard(onOpen: () => Navigator.of(context).push(SourcesPage.route(store, now: this.now)))
+              : OuraStatusCard.shows(store)
+                  ? OuraStatusCard(store: store, now: now)
+                  : null;
+          final review = prefs.show('week') ? currentWeekReview(store.history, now, plan: store.analysisPlan) : null;
+          final week = review == null ? null : WeekCard(review: review);
+          final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.analysisPlan) : null;
+          final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
+          // 12/11: ζύγισμα τις μέρες του χρήστη (προεπιλογή Δε · Τε · Πα) και μέση με μεζούρα τη μέρα της. Η κάρτα μένει
+          // ώσπου να γίνουν και τα δύο της ημέρας· η ζύγιση έρχεται μόνη της από την InBody.
+          // Round 3 (k1 · R3-B-4): η σημερινή ζύγιση της μέρας ([shownBody]: η πρώτη που μετρά, ή «σε αναμονή»), ίδια με την
+          // κάρτα «Βάρος» και το ιστορικό. Πριν: η τελευταία ζύγιση της μέρας (η βραδινή μετά την προπόνηση, ή του παιδιού μετά
+          // από σένα).
+          final todayWeighIns = [
+            for (final b in shownBody(d.body))
+              if (sameDay(b.time, now)) b,
+          ];
+          final weighed = todayWeighIns.isEmpty ? null : todayWeighIns.last;
+          final weighDay = store.profile.weighDays.contains(now.weekday);
+          final waistDay = store.profile.waistDay == now.weekday;
+          final waistToday = waistDay && store.waist.any((e) => e.day == waistDayKey(now));
+          final weigh = (weighDay && weighed == null) || (waistDay && !waistToday)
+              ? _WeighCard(
+                  store: store,
+                  now: now,
+                  weighDay: weighDay,
+                  waistDay: waistDay,
+                  waistDone: waistToday,
+                  weighedKg: weighed?.weight,
+                  weighedAt: weighed?.time,
+                  noPermission: bodyNotPermitted(d))
+              : null;
+          // Σχέδια 12/11 (A1/A3): ο έλεγχος θερμίδων κάτω από τη ζύγιση (απάντηση χρήστη 12/11). Ακούει μόνο το φαγητό.
+          final checkIn = store.goals == null ? null : CheckInSlot(store: store, food: food, now: now);
+
+          final pair = <Widget>[
+            if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
+            if (prefs.show('weight')) _weightCard(context, d, now, () => open(Cat.health, HealthTab.body)),
+          ];
+
+          // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
+          // «Καρδιά και θερμοκρασία στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
+          // Οξυγόνο: η σημείωση υπολογίζεται εδώ, γιατί η κάρτα εμφανίζεται ΜΟΝΗ της (και κλειστή στις Ρυθμίσεις) όταν το
+          // χαμηλό επαναλαμβάνεται (τρίτος κλινικός έλεγχος C3/F5): αλλιώς η σύσταση «πες το στον γιατρό σου» ήταν δύο
+          // πατήματα μακριά. Όχι για μία μόνο νύχτα.
+          // Έλεγχος 3, E5: όλες οι 30 νύχτες από το ιστορικό (ίδιος αισθητήρας), πέρα από τη σύνδεση του Oura και το
+          // όριο της επανάγνωσης· χωρίς «since».
+          // Round 1 (S4-10, f4): «τελευταία νύχτα» = η πιο πρόσφατη με χαμηλότερη τιμή του ρολογιού (σήμερα ή χθες), όπως Καρδιά/Ύπνος.
+          final oxNight = ouraNight ? oxygenLastNight(store, d, now) : null;
+          final oxGuidance = oxNight != null
+              ? oxygenGuidance(
+                  d.spo2MinByNight(oxNight, ouraNights: true, windows: store.ouraWindows, history: store.history), oxNight,
+                  today: now)
+              : (d.lastNight == null
+                  ? null
+                  : oxygenGuidance(
+                      d.spo2MinByNight(d.lastNight!.date, history: store.history), d.lastNight!.date, today: now));
+          final oxAuto = !prefs.show('spo2') && oxGuidance != null && (oxGuidance.veryLowRepeated || oxGuidance.repeated);
+          Widget oxCard() => ouraNight
+              ? _watchSpo2Card(context, d, now, store.ouraWindows, oxGuidance!, () => open(Cat.health, HealthTab.heart),
+                  auto: oxAuto)
+              : _spo2Card(context, d, now, oxGuidance, () => open(Cat.health, HealthTab.heart), auto: oxAuto);
+          final extras = <Widget>[
+            if (!ouraNight && prefs.show('energy')) _energyCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
+            if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
+            if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
+            if (prefs.show('spo2')) oxCard(),
+            if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
+          ];
+
+          // Μόνο κινητό (απόφαση 10/11): το τράβηγμα ανανεώνει και στο ανοιχτό Fold· φαίνεται μόνο «Ενημέρωση 18:40»
+          // (σχέδια 9/11, 1α/1γ· έλεγχος premium, S8).
+          // Round 1 (U1a-7): «Ενημέρωση χθες 18:40» (πεζό στη μέση της φράσης, όπως «Τελευταία μέτρηση, χθες 22:10»).
+          final updated =
+              'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now).replaceFirst('Χθες', 'χθες')} '}${hm(d.readAt)}';
+          final footer = Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              updated,
+              key: const ValueKey('today-updated'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: c.textTertiary, fontSize: 12.5),
+            ),
+          );
+
+          final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
+          // Έλεγχος 13/11 (S9-3): υπενθύμιση αντιγράφου, χαμηλά (ποτέ πάνω από τα δεδομένα υγείας)· αν δεν χρειάζεται, τίποτα.
+          final backupReminder = BackupReminderSlot(store: store, food: food, training: training, now: now);
+          final alerts = [
+            // Round 1 (f3 · S3-2/S9-1, S9-5): οι ρυθμίσεις δεν διαβάζονται ή η τελευταία αλλαγή τους δεν γράφτηκε.
+            if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store),
+            if (dbNotice != null) dbNotice,
+            if (ouraState != null) ouraState,
+            if (error != null) error,
+            if (unusual != null) unusual,
+            if (oxAuto) KeyedSubtree(key: const ValueKey('today-oxygen-auto'), child: oxCard()),
+          ];
+
           return PageFrame(
             eyebrow: longDate(now),
             title: greeting(now),
             action: action,
             onRefresh: () => store.refresh(),
-            left: [
-              if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store),
-              _ConnectCard(store: store),
+            // Round 1 (U1a-13): η «Η εβδομάδα σου» (≈ 980 dp, Κυριακή βράδυ και Δευτέρα) κάτω από τη Διατροφή και τα
+            // Βήματα/Βάρος· πριν, τη Δευτέρα το «+ Φαγητό» ήταν τρεις οθόνες πιο κάτω. Στο ανοιχτό Fold ήταν ήδη τελευταία.
+            single: [
+              ...alerts,
+              if (weigh != null) weigh,
+              if (checkIn != null) checkIn,
+              if (sleep != null) sleep,
               if (trainingCard != null) trainingCard,
               if (foodCard != null) foodCard,
+              ...pairUp(pair),
+              if (week != null) week,
+              if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
+              backupReminder,
+              footer,
+            ],
+            top: alerts,
+            // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
+            // Round 7 (U1-1): η «Η εβδομάδα σου» (≈ 1.000 dp) στη ΔΕΞΙΑ στήλη, μετά τα Βήματα/Βάρος, όπως στο κινητό. Αριστερά
+            // (ζύγιση + ύπνος + άσκηση ≈ 870 dp) έκανε τη στήλη ~1.900 dp με ~560 δεξιά: τρύπα ~1.300 dp τη Δευτέρα.
+            left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard],
+            right: [
+              if (foodCard != null) foodCard,
+              ...pairUp(pair),
+              if (week != null) week,
+              if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
+              backupReminder,
+              footer,
             ],
           );
-        }
-
-        final error = store.error != null ? _ErrorCard(store: store) : null;
-        // Από τη σύνδεση του Oura η «νύχτα» (ύπνος, παλμοί και θερμοκρασία ύπνου, ετοιμότητα) έρχεται μόνο από αυτό.
-        final ouraNight = store.plan.nightSource(now) != Source.watch;
-        final openSleep = () => open(Cat.health, HealthTab.sleep);
-        // Round 1 (U1a-11): με άγνωστο σχέδιο πηγών η κάρτα «Δεν διαβάστηκε από πού έρχεται ο ύπνος» (πάνω, με το κουμπί)
-        // τα λέει όλα· η κάρτα ύπνου από κάτω επαναλάμβανε την ίδια φράση και έγραφε «Oura» για άγνωστη πηγή.
-        final sleep = !prefs.show('sleep') || PlanUnknownCard.shows(store)
-            ? null
-            : ouraNight
-                ? OuraSleepTodayCard(store: store, now: now, onTap: openSleep)
-                : _SleepCard(data: d, onTap: openSleep);
-        // Σχέδια 9/11 (1α): Ετοιμότητα, HRV και παλμοί ύπνου είναι πια μία σειρά μέσα στην κάρτα του Ύπνου (όχι
-        // χωριστή κάρτα)· η πλήρης κάρτα, με θερμοκρασία και «συνήθως», είναι στην Υγεία › Ύπνος.
-        final ouraState = PlanUnknownCard.shows(store)
-            ? PlanUnknownCard(onOpen: () => Navigator.of(context).push(SourcesPage.route(store, now: this.now)))
-            : OuraStatusCard.shows(store)
-                ? OuraStatusCard(store: store, now: now)
-                : null;
-        final review = prefs.show('week') ? currentWeekReview(store.history, now, plan: store.analysisPlan) : null;
-        final week = review == null ? null : WeekCard(review: review);
-        final unusualResult = prefs.show('unusual') ? checkUnusual(store.history, dayOf(now), plan: store.analysisPlan) : null;
-        final unusual = unusualResult != null && unusualResult.show ? UnusualCard(result: unusualResult) : null;
-        // 12/11: ζύγισμα τις μέρες του χρήστη (προεπιλογή Δε · Τε · Πα) και μέση με μεζούρα τη μέρα της. Η κάρτα μένει
-        // ώσπου να γίνουν και τα δύο της ημέρας· η ζύγιση έρχεται μόνη της από την InBody.
-        // Round 3 (k1 · R3-B-4): η σημερινή ζύγιση της μέρας ([shownBody]: η πρώτη που μετρά, ή «σε αναμονή»), ίδια με την
-        // κάρτα «Βάρος» και το ιστορικό. Πριν: η τελευταία ζύγιση της μέρας (η βραδινή μετά την προπόνηση, ή του παιδιού μετά
-        // από σένα).
-        final todayWeighIns = [
-          for (final b in shownBody(d.body))
-            if (sameDay(b.time, now)) b,
-        ];
-        final weighed = todayWeighIns.isEmpty ? null : todayWeighIns.last;
-        final weighDay = store.profile.weighDays.contains(now.weekday);
-        final waistDay = store.profile.waistDay == now.weekday;
-        final waistToday = waistDay && store.waist.any((e) => e.day == waistDayKey(now));
-        final weigh = (weighDay && weighed == null) || (waistDay && !waistToday)
-            ? _WeighCard(
-                store: store,
-                now: now,
-                weighDay: weighDay,
-                waistDay: waistDay,
-                waistDone: waistToday,
-                weighedKg: weighed?.weight,
-                weighedAt: weighed?.time)
-            : null;
-        // Σχέδια 12/11 (A1/A3): ο έλεγχος θερμίδων κάτω από τη ζύγιση (απάντηση χρήστη 12/11). Ακούει μόνο το φαγητό.
-        final checkIn = store.goals == null ? null : CheckInSlot(store: store, food: food, now: now);
-
-        final pair = <Widget>[
-          if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
-          if (prefs.show('weight')) _weightCard(context, d, now, () => open(Cat.health, HealthTab.body)),
-        ];
-
-        // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
-        // «Καρδιά και θερμοκρασία στον ύπνο»), και οι παλμοί/θερμοκρασία ύπνου είναι μόνο στην ίδια κάρτα. Το οξυγόνο μένει του ρολογιού.
-        // Οξυγόνο: η σημείωση υπολογίζεται εδώ, γιατί η κάρτα εμφανίζεται ΜΟΝΗ της (και κλειστή στις Ρυθμίσεις) όταν το
-        // χαμηλό επαναλαμβάνεται (τρίτος κλινικός έλεγχος C3/F5): αλλιώς η σύσταση «πες το στον γιατρό σου» ήταν δύο
-        // πατήματα μακριά. Όχι για μία μόνο νύχτα.
-        // Έλεγχος 3, E5: όλες οι 30 νύχτες από το ιστορικό (ίδιος αισθητήρας), πέρα από τη σύνδεση του Oura και το
-        // όριο της επανάγνωσης· χωρίς «since».
-        // Round 1 (S4-10, f4): «τελευταία νύχτα» = η πιο πρόσφατη με χαμηλότερη τιμή του ρολογιού (σήμερα ή χθες), όπως Καρδιά/Ύπνος.
-        final oxNight = ouraNight ? oxygenLastNight(store, d, now) : null;
-        final oxGuidance = oxNight != null
-            ? oxygenGuidance(
-                d.spo2MinByNight(oxNight, ouraNights: true, windows: store.ouraWindows, history: store.history), oxNight,
-                today: now)
-            : (d.lastNight == null
-                ? null
-                : oxygenGuidance(
-                    d.spo2MinByNight(d.lastNight!.date, history: store.history), d.lastNight!.date, today: now));
-        final oxAuto = !prefs.show('spo2') && oxGuidance != null && (oxGuidance.veryLowRepeated || oxGuidance.repeated);
-        Widget oxCard() => ouraNight
-            ? _watchSpo2Card(context, d, now, store.ouraWindows, oxGuidance!, () => open(Cat.health, HealthTab.heart),
-                auto: oxAuto)
-            : _spo2Card(context, d, now, oxGuidance, () => open(Cat.health, HealthTab.heart), auto: oxAuto);
-        final extras = <Widget>[
-          if (!ouraNight && prefs.show('energy')) _energyCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
-          if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
-          if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
-          if (prefs.show('spo2')) oxCard(),
-          if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
-        ];
-
-        // Μόνο κινητό (απόφαση 10/11): το τράβηγμα ανανεώνει και στο ανοιχτό Fold· φαίνεται μόνο «Ενημέρωση 18:40»
-        // (σχέδια 9/11, 1α/1γ· έλεγχος premium, S8).
-        // Round 1 (U1a-7): «Ενημέρωση χθες 18:40» (πεζό στη μέση της φράσης, όπως «Τελευταία μέτρηση, χθες 22:10»).
-        final updated =
-            'Ενημέρωση ${sameDay(d.readAt, now) ? '' : '${relativeDay(d.readAt, now).replaceFirst('Χθες', 'χθες')} '}${hm(d.readAt)}';
-        final footer = Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            updated,
-            key: const ValueKey('today-updated'),
-            textAlign: TextAlign.center,
-            style: TextStyle(color: c.textTertiary, fontSize: 12.5),
-          ),
-        );
-
-        final dbNotice = store.dbCorruptAt == null ? null : _DatabaseCard(store: store);
-        // Έλεγχος 13/11 (S9-3): υπενθύμιση αντιγράφου, χαμηλά (ποτέ πάνω από τα δεδομένα υγείας)· αν δεν χρειάζεται, τίποτα.
-        final backupReminder = BackupReminderSlot(store: store, food: food, training: training, now: now);
-        final alerts = [
-          // Round 1 (f3 · S3-2/S9-1, S9-5): οι ρυθμίσεις δεν διαβάζονται ή η τελευταία αλλαγή τους δεν γράφτηκε.
-          if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store),
-          if (dbNotice != null) dbNotice,
-          if (ouraState != null) ouraState,
-          if (error != null) error,
-          if (unusual != null) unusual,
-          if (oxAuto) KeyedSubtree(key: const ValueKey('today-oxygen-auto'), child: oxCard()),
-        ];
-
-        return PageFrame(
-          eyebrow: longDate(now),
-          title: greeting(now),
-          action: action,
-          onRefresh: () => store.refresh(),
-          // Round 1 (U1a-13): η «Η εβδομάδα σου» (≈ 980 dp, Κυριακή βράδυ και Δευτέρα) κάτω από τη Διατροφή και τα
-          // Βήματα/Βάρος· πριν, τη Δευτέρα το «+ Φαγητό» ήταν τρεις οθόνες πιο κάτω. Στο ανοιχτό Fold ήταν ήδη τελευταία.
-          single: [
-            ...alerts,
-            if (weigh != null) weigh,
-            if (checkIn != null) checkIn,
-            if (sleep != null) sleep,
-            if (trainingCard != null) trainingCard,
-            if (foodCard != null) foodCard,
-            ...pairUp(pair),
-            if (week != null) week,
-            if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
-            backupReminder,
-            footer,
-          ],
-          top: alerts,
-          // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
-          // Round 7 (U1-1): η «Η εβδομάδα σου» (≈ 1.000 dp) στη ΔΕΞΙΑ στήλη, μετά τα Βήματα/Βάρος, όπως στο κινητό. Αριστερά
-          // (ζύγιση + ύπνος + άσκηση ≈ 870 dp) έκανε τη στήλη ~1.900 dp με ~560 δεξιά: τρύπα ~1.300 dp τη Δευτέρα.
-          left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard],
-          right: [
-            if (foodCard != null) foodCard,
-            ...pairUp(pair),
-            if (week != null) week,
-            if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
-            backupReminder,
-            footer,
-          ],
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -340,9 +355,12 @@ class TodayPage extends StatelessWidget {
       chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body, minRange: 3) : null,
       // Round 1 (S11-8, σημείωση του f1): όταν η Samsung δεν έδωσε τις ζυγίσεις αυτή τη φορά, το λέει (όπως το Σώμα)·
       // πριν έγραφε «Ζυγίσου στην InBody» και για ζύγιση που υπάρχει αλλά δεν διαβάστηκε.
+      // Round 8 (R8-A4-3): και όταν η άδεια «Σύσταση σώματος» είναι κλειστή (πριν: «Ζυγίσου στην InBody» όλη μέρα).
       empty: d.failed.contains('body')
           ? 'Οι ζυγίσεις δεν διαβάστηκαν τώρα. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.'
-          : 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ σε λίγα λεπτά.',
+          : bodyNotPermitted(d)
+              ? bodyNoPermissionShort
+              : 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ σε λίγα λεπτά.',
       onTap: onTap,
     );
   }
@@ -493,9 +511,14 @@ class TodayPage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SleepCard extends StatelessWidget {
-  const _SleepCard({required this.data, required this.onTap});
+  const _SleepCard({required this.data, required this.now, required this.onTap});
 
   final Dashboard data;
+
+  /// Round 8 (R8-U1-1): «χθες βράδυ» / «ξύπνημα χθες» σε σχέση με ΤΩΡΑ, όπως το Βάρος και το Energy Score (R7-U1-2).
+  /// Πριν σε σχέση με την ώρα της ανάγνωσης: με χθεσινή ανάγνωση (δεν έγινε ακόμα νέα) η νύχτα Πέμ→Παρ έγραφε το
+  /// Σάββατο «χθες βράδυ».
+  final DateTime now;
   final VoidCallback onTap;
 
   @override
@@ -546,7 +569,7 @@ class _SleepCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Ύπνος · ${_nightLabel(n.date, data.readAt)}',
+                        'Ύπνος · ${_nightLabel(n.date, now)}',
                         style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -617,7 +640,8 @@ class _SleepCard extends StatelessWidget {
                         children: [
                           for (final (i, k) in stages.indexed) ...[
                             if (i > 0) const SizedBox(width: 2),
-                            Expanded(flex: n.stageMinutes[k]!, child: ColoredBox(color: c.stage(k))),
+                            // Round 8 (R8-U1-2): χρώματα για τη σκούρα κάρτα (≥ 3:1), όχι της λευκής κάρτας.
+                            Expanded(flex: n.stageMinutes[k]!, child: ColoredBox(color: c.stageOnNight(k))),
                           ],
                         ],
                       ),
@@ -754,10 +778,21 @@ class _DatabaseCard extends StatelessWidget {
 /// σημειώνεται μόνη της όταν έρθει από την InBody· η μέση γράφεται από το κουμπί. Χωρίς ειδοποίηση· μόνο κάρτα.
 class _WeighCard extends StatelessWidget {
   const _WeighCard(
-      {required this.store, required this.now, required this.weighDay, required this.waistDay, this.waistDone = false, this.weighedKg, this.weighedAt});
+      {required this.store,
+      required this.now,
+      required this.weighDay,
+      required this.waistDay,
+      this.waistDone = false,
+      this.weighedKg,
+      this.weighedAt,
+      this.noPermission = false});
   final HealthStore store;
   final DateTime now;
   final bool weighDay, waistDay;
+
+  /// Round 8 (R8-A4-3): η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή: η ζύγιση δεν μπορεί να φτάσει, άρα
+  /// δεν θα σημειωθεί μόνη της· η κάρτα το λέει κάτω από τη «Ζύγιση InBody».
+  final bool noPermission;
 
   /// Η μέση της ημέρας γράφτηκε (η κάρτα μένει ως να έρθει η ζύγιση· ανασκόπηση 11/11, S3).
   final bool waistDone;
@@ -817,6 +852,16 @@ class _WeighCard extends StatelessWidget {
           if (weighDay)
             item(weighed, weighed && weighedKg != null ? 'Ζύγιση InBody · ${dec(weighedKg!)} kg' : 'Ζύγιση InBody',
                 trailing: weighed ? hm(weighedAt!) : null),
+          if (weighDay && !weighed && noPermission)
+            Padding(
+              padding: const EdgeInsets.only(left: 34, top: 4),
+              child: Text(
+                bodyNoPermissionShort,
+                key: const ValueKey('today-weigh-no-permission'),
+                // Το φόντο της κάρτας είναι το απαλό του Σώματος (R2-D-3): χρώμα κειμένου, όχι χρωματιστό.
+                style: TextStyle(fontSize: 13.5, height: 1.35, color: c.text),
+              ),
+            ),
           if (waistDay) item(waistDone, 'Μέση με μεζούρα'),
           if (waistDay && !waistDone)
             Padding(
@@ -871,4 +916,68 @@ class _TrainingSlot extends StatelessWidget with SelfSpaced {
             ? Padding(padding: const EdgeInsets.only(bottom: PageFrame.gap), child: TodayTrainingCard(training: training, now: now))
             : const SizedBox.shrink(key: ValueKey('today-training-none')),
       );
+}
+
+/// Round 8 (R8-U1-5): ξαναχτίζει τη «Σήμερα» όταν αλλάζει η μέρα: ένα χρονόμετρο ως 1″ μετά τα επόμενα μεσάνυχτα (όσο
+/// η εφαρμογή είναι μπροστά· ακυρώνεται στο παρασκήνιο) και ένας έλεγχος σε κάθε επιστροφή στην εφαρμογή. Τίποτα
+/// συνεχές: μία αφύπνιση τη μέρα το πολύ. [enabled]: όχι στα στιγμιότυπα (σταθερή ώρα).
+class _DayClock extends StatefulWidget {
+  const _DayClock({required this.clock, required this.enabled, required this.builder});
+  final DateTime Function() clock;
+  final bool enabled;
+  final WidgetBuilder builder;
+
+  @override
+  State<_DayClock> createState() => _DayClockState();
+}
+
+class _DayClockState extends State<_DayClock> with WidgetsBindingObserver {
+  Timer? _timer;
+  late DateTime _day;
+
+  @override
+  void initState() {
+    super.initState();
+    _day = dayOf(widget.clock());
+    if (widget.enabled) {
+      WidgetsBinding.instance.addObserver(this);
+      _arm();
+    }
+  }
+
+  void _arm() {
+    _timer?.cancel();
+    final now = widget.clock();
+    final next = DateTime(now.year, now.month, now.day + 1);
+    _timer = Timer(next.difference(now) + const Duration(seconds: 1), _check);
+  }
+
+  /// Αν άλλαξε η μέρα, νέο χτίσιμο (με το νέο «τώρα»)· και νέο χρονόμετρο για τα επόμενα μεσάνυχτα.
+  void _check() {
+    if (!mounted) return;
+    final day = dayOf(widget.clock());
+    if (day != _day) setState(() => _day = day);
+    _arm();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.enabled) return;
+    if (state == AppLifecycleState.resumed) {
+      _check();
+    } else if (state == AppLifecycleState.paused) {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
 }

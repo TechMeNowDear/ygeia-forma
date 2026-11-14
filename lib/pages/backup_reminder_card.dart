@@ -112,6 +112,8 @@ class _BackupReminderCardState extends State<BackupReminderCard> {
     messenger?.showSnackBar(SnackBar(
       content: Text(r.text),
       duration: const Duration(seconds: 6),
+      // Round8 (R8-U2-1, f1): με κουμπί («Αποστολή») το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+      persist: false,
       action: uri == null ? null : SnackBarAction(label: 'Αποστολή', onPressed: () => share(uri)),
     ));
     // Πλήρες αντίγραφο: κατευθείαν το φύλλο κοινοποίησης του Android, για να φύγει το αρχείο και από το κινητό.

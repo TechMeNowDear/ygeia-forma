@@ -268,14 +268,22 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
 Widget? _progress(BuildContext context, Ex ex) {
   final t = TrainingStore.main;
   if (!t.ready) return null;
-  final hist = t.historyOf(ex.id).reversed.toList();
-  if (hist.isEmpty) return null;
+  final all = t.historyOf(ex.id);
+  // R8-A6-1 / R8-U3-08: μόνο οι φορές με σετ, όπως η «Τελευταία φορά» της προπόνησης (session_page). Πριν, μια
+  // «Παράλειψη» ή ένα «Τελείωσες νωρίτερα» γραφόταν «0 kg» και η γραμμή του γραφήματος βουτούσε στο μηδέν.
+  final hist = [for (final h in all.reversed) if (!h.$2.skipped && h.$2.done.isNotEmpty) h];
+  // Η ενόχληση της πιο πρόσφατης φοράς μετρά και χωρίς σετ (σταμάτησες από πόνο).
+  final lastPain = all.isNotEmpty && all.first.$2.pain.isNotEmpty;
+  if (hist.isEmpty && !lastPain) return null;
   final c = Aigaio.of(context);
   final k = loadKindOf(ex.id);
   final byLoad = hasLoad(k);
-  double val((DateTime, ExLog) h) => byLoad ? (h.$2.workLoad ?? 0) : h.$2.done.fold<int>(0, (m, s) => s.reps > m ? s.reps : m).toDouble();
-  final pts = [for (final h in hist) (h.$1, val(h))];
-  final last = hist.last;
+  // R8-A6-1: το φορτίο που ΚΑΤΕΛΗΞΕ η άσκηση ([ExLog.endLoad]), όπως η πρόοδος (R7-A6-11)· όχι το μεγαλύτερο.
+  double? val((DateTime, ExLog) h) => byLoad ? h.$2.endLoad : h.$2.done.fold<int>(0, (m, s) => s.reps > m ? s.reps : m).toDouble();
+  final pts = [
+    for (final h in hist)
+      if (val(h) case final v?) (h.$1, v),
+  ];
   return AppCard(
     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
@@ -287,12 +295,9 @@ Widget? _progress(BuildContext context, Ex ex) {
         LineChart(points: pts, height: 140, color: c.exercise, format: (v) => byLoad ? loadLabel(k, v) : '${v.round()}'),
       ],
       const SizedBox(height: 6),
-      for (final h in hist.reversed.take(5))
-        InfoRow(
-          shortDayDate(h.$1),
-          '${byLoad ? '${loadLabel(k, h.$2.workLoad)} · ' : ''}${h.$2.done.map((s) => s.reps).join(', ')}',
-        ),
-      if (last.$2.pain.isNotEmpty)
+      // R8-A6-1: κάθε σετ με το φορτίο του, όταν άλλαξε μέσα στην άσκηση («6,8 kg × 8 · 5,3 kg × 10»), όπως η προπόνηση.
+      for (final h in hist.reversed.take(5)) InfoRow(shortDayDate(h.$1), h.$2.doneText()),
+      if (lastPain)
         Text('Τελευταία φορά: ενόχληση', style: TextStyle(fontSize: 13, color: c.warn)),
     ]),
   );

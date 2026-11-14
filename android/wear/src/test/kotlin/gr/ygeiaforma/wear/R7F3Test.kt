@@ -497,7 +497,8 @@ class R7F3Test {
         assertEquals("Τρέχει ακόμα η προπόνηση;\nΑν τελείωσες: κλείσε αυτό και πάτα «Τέλος».", Forgotten.screenText(Forgotten.Why.STRENGTH_IDLE))
         // Η ειδοποίηση μένει όπως ήταν (εκεί το «στο ρολόι» λέει πού).
         assertEquals("Αν τελείωσες, πάτα «Τέλος» στο ρολόι.", Forgotten.text(Forgotten.Why.STRENGTH_IDLE))
-        assertTrue(source("ExerciseService.kt").contains("val shown = if (kind == \"walk\") title else Forgotten.screenText(why)"))
+        // Round 8 (R8-U3-03): με το αν από κάτω είναι η ερώτηση ρεζέρβας (εκεί δεν υπάρχει «Τέλος»).
+        assertTrue(source("ExerciseService.kt").contains("val shown = if (kind == \"walk\") title else Forgotten.screenText(why, onRir, rirEnds)"))
     }
 
     // ------------------------------------------------------------------ R7-U3-08

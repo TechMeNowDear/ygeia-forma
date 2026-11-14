@@ -423,11 +423,11 @@ void main() {
 
   // ---------------------------------------------------------------- R7-A11-1
   // Ο ίδιος ο έλεγχος τρέχει στο CI (tools/ci/check_privacy.py, check.yml και android.yml): αποτυγχάνει σε φράσεις που
-  // παρουσιάζουν δεδομένα δοκιμής ως πραγματικά ή λένε ιατρικό ιστορικό, και σε αποτυπώματα πραγματικών τιμών.
+  // παρουσιάζουν δεδομένα δοκιμής ως πραγματικά ή λένε ιατρικό ιστορικό. R8-A11-1: χωρίς «αποτυπώματα» τιμών (αντιστρέφονταν).
   test('R7-A11-1: ο έλεγχος του δημόσιου repository υπάρχει και δεν γράφει τις τιμές ανοιχτά', () {
     final py = File('tools/ci/check_privacy.py').readAsStringSync();
     expect(py, contains('R7-A11-1'));
-    expect(py, contains('OWNER_PRINTS'));
+    expect(py, isNot(contains('OWNER_PRINTS')));
     expect(py, contains('OWNER_PHRASES'));
     expect(py, contains("for base in ('lib', 'test', 'android/app/src', 'android/wear/src', 'tools', 'assets/exercises')"));
   });

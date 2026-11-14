@@ -165,8 +165,18 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         return true
     }
 
-    /** Η προπόνηση που δείχνει η αρχική (μπορεί να αλλάξει με πάτημα στο όνομα). */
+    /**
+     * Η προπόνηση που δείχνει η αρχική (μπορεί να αλλάξει με πάτημα στο όνομα). Ισχύει μόνο τη μέρα που διαλέχτηκε
+     * ([chosenDay], [chosenToday]· έλεγχος 14/11, round 8, R8-U3-06).
+     */
     var chosen: String? = null
+        set(v) {
+            field = v
+            chosenDay = if (v == null) null else java.time.LocalDate.now()
+        }
+
+    /** Η μέρα που διαλέχτηκε το [chosen] (αλλάζει μόνο με αυτό· εδώ και στις δοκιμές). */
+    internal var chosenDay: java.time.LocalDate? = null
 
     /** Χρόνος από την εκκίνηση της συσκευής (ms)· αλλάζει μόνο στις δοκιμές. */
     internal var clockEl: () -> Long = { SystemClock.elapsedRealtime() }
@@ -678,6 +688,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     // ------------------------------------------------------------------ Α. έναρξη
     private fun drawHome(c: Canvas) {
+        // Έλεγχος 14/11, round 8 (R8-A8-1): μια προπόνηση με βάρη κλείνει ακόμα (το κινητό την τελείωσε, το ρολόι γράφει
+        // τους παλμούς της): όχι η αρχική με κουμπιά έναρξης ως τότε (λίγα δευτερόλεπτα).
+        if (Repo.running != null && Repo.running != "walk" && Repo.session == null) return drawClosing(c)
         val plan = Repo.plan
         val phone = Repo.phone
         // Πρόγραμμα από νεότερη έκδοση του κινητού (V-A-08): δεν διαβάστηκε. Έλεγχος 13/11 (S8-03/U7-01): το μήνυμα γράφεται
@@ -704,26 +717,34 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
-        val shown = plan?.workout(chosen) ?: today?.takeIf { !it.isCardio } ?: strength.firstOrNull()
+        // R8-U3-06: η επιλογή του τρίτου κουμπιού μόνο τη μέρα που έγινε.
+        val pick = chosenToday(chosen, chosenDay, java.time.LocalDate.now())
+        val shown = plan?.workout(pick) ?: today?.takeIf { !it.isCardio } ?: strength.firstOrNull()
         if (plan != null || Repo.knownLimit != null) {
             // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11)· και χωρίς πρόγραμμα, το τελευταίο που ήρθε (V-A-06).
             val lim = Repo.limitNow()
             // «Σήμερα» μόνο όταν το πρώτο κουμπί είναι η σημερινή (ή δεν φαίνεται καμία προπόνηση)· αλλιώς «Άλλη» (N5). Round 7
             // (R7-A6-6): και σε μέρα χωρίς προπόνηση (π.χ. πριν από την έναρξη του προγράμματος), όπου πρώτη μπαίνει μια άλλη.
-            val notToday = shown != null && (if (chosen == null) today == null else chosen != today?.id)
+            val notToday = shown != null && (if (pick == null) today == null else pick != today?.id)
             if (!upd) twoTone(c, if (!notToday) "Σήμερα · " else "Άλλη προπόνηση · ", if (lim != null) "όριο $lim" else "χωρίς όριο", 33f, if (lim != null) salmon else gray, 10.5f * fs)
         }
         when {
             plan == null -> {
                 small(c, "ΥΓΕΙΑ & ΦΟΡΜΑ", 56f, gray, ess(10f), 120f)
-                t(c, "Άνοιξε την εφαρμογή", 80f, Color.WHITE, 12f * fs, true, 170f)
-                t(c, "στο κινητό", 80f + 16f * fs, Color.WHITE, 12f * fs, true)
-                sayAdd("Άνοιξε την εφαρμογή στο κινητό")
+                if (staleLine2 != null) {
+                    // R8-A8-4: η ξεχασμένη προπόνηση του κινητού φαίνεται και εδώ (το TalkBack τη λέει ήδη), στη θέση του
+                    // «Άνοιξε την εφαρμογή στο κινητό»: λέει ήδη τι να κάνεις στο κινητό. Κάτω από το κουμπί δεν χωρά ολόκληρη.
+                    staleNote(c, staleLine2, 80f)
+                } else {
+                    t(c, "Άνοιξε την εφαρμογή", 80f, Color.WHITE, 12f * fs, true, 170f)
+                    t(c, "στο κινητό", 80f + 16f * fs, Color.WHITE, 12f * fs, true)
+                    sayAdd("Άνοιξε την εφαρμογή στο κινητό")
+                }
                 pill(c, "Περπάτημα", 136f, 104f, 34f, card, Color.WHITE, 12f * fs) { actions.startWalk() }
                 // Κάτω από το κουμπί (τελειώνει στα 153u)· όχι όσο φαίνεται άλλο μήνυμα στην ίδια λωρίδα.
                 if (upd && shownNote == null) updateNote(c, 170f)
             }
-            today?.isCardio == true && chosen == null -> {
+            today?.isCardio == true && pick == null -> {
                 // Μέρα περπατήματος: πρώτο το περπάτημα, δεύτερη η προπόνηση με βάρη.
                 val w = strength.firstOrNull()
                 // Τα λεπτά της εβδομάδας του προγράμματος που τρέχει ΣΗΜΕΡΑ (S6-11/S11-7), με ολόκληρη τη λέξη (S8-10/U7-09).
@@ -768,9 +789,22 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                 t(c, "Ξεκούραση", 80f, Color.WHITE, 15f * fs, true)
                 sayAdd("Σήμερα ξεκούραση")
                 pill(c, "Περπάτημα", 124f, 104f, 34f, card, Color.WHITE, 12f * fs) { actions.startWalk() }
-                if (upd && shownNote == null) updateNote(c, 164f)
+                // R8-A8-4: και η ξεχασμένη προπόνηση του κινητού, στην ίδια θέση με το «ενημέρωσε» (όχι μαζί με άλλο μήνυμα).
+                if (shownNote == null) {
+                    if (upd) updateNote(c, 164f) else if (staleLine2 != null) staleNote(c, staleLine2, 164f)
+                }
             }
         }
+    }
+
+    /**
+     * Έλεγχος 14/11, round 8 (R8-A8-1): η προπόνηση κλείνει ακόμα (αποτέλεσμα, Health Services· συνήθως 1–2″, το πολύ
+     * ≈ 17″). Χωρίς κουμπιά: μια έναρξη εδώ θα έσβηνε το αποτέλεσμα των παλμών της. Κείμενα προς έγκριση από τον χρήστη.
+     */
+    private fun drawClosing(c: Canvas) {
+        t(c, CLOSING_TITLE, 92f, Color.WHITE, 14f * fs, true)
+        small(c, CLOSING_SUB, 92f + 17f * fs, gray, ess(10f), 150f)
+        sayAdd("$CLOSING_TITLE. $CLOSING_SUB")
     }
 
     /**
@@ -801,8 +835,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
      * «Ανοιχτή προπόνηση στο κινητό / από Δευτέρα· κλείσε την εκεί» (R7-A8-3) στη θέση του τρίτου κουμπιού της αρχικής,
      * όπως το «ενημέρωσε» ([updateNote]): δύο γραμμές με ένα μέγεθος, ως 140u η καθεμία.
      */
-    private fun staleNote(c: Canvas, line2: String) {
-        updateNote(c, 150f, STALE_PHONE_LINE1, line2, 140f, 140f)
+    private fun staleNote(c: Canvas, line2: String, y: Float = 150f) {
+        updateNote(c, y, STALE_PHONE_LINE1, line2, 140f, 140f)
     }
 
     // ------------------------------------------------------------------ Β. σετ
@@ -911,10 +945,13 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // στη θέση του «Δεν ξέρω») και τα κουμπιά 28u ψηλά (πριν 30u).
         val y1 = 43f
         val y2 = y1 + 15f * fs
-        t(c, "Πόσες ακόμα", y1, Color.WHITE, 12f * fs, true)
-        t(c, "θα έβγαζες;", y2, Color.WHITE, 12f * fs, true)
+        // Round 8 (R8-U3-01): μετά το 1ο σετ άσκησης «πρώτης φοράς» της προπόνησης του κινητού, ίδια κουμπιά με τίτλο
+        // «Πρώτο σετ: / πόσες ακόμα;» (η 1η γραμμή στενότερη από το «Πόσες ακόμα», η 2η στη φαρδύτερη θέση).
+        val first = Repo.session?.firstPending == true
+        t(c, if (first) FIRST_SET_LINE1 else "Πόσες ακόμα", y1, Color.WHITE, 12f * fs, true)
+        t(c, if (first) FIRST_SET_LINE2 else "θα έβγαζες;", y2, Color.WHITE, 12f * fs, true)
         small(c, "με καλή τεχνική", y2 + 12.5f * fs, gray, ess(10f), 120f)
-        sayAdd("Πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;")
+        sayAdd(if (first) FIRST_SET_SAY else "Πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;")
         val labels = listOf("0", "1", "2", "3", "4+")
         val descs = listOf("Καμία", "Μία", "Δύο", "Τρεις", "Τέσσερις ή περισσότερες")
         // Δύο σειρές: 0 1 2 / 3 4+ (μεγάλα κουμπιά για τον καρπό· περιοχή 40u ≈ 48 dp).
@@ -1262,7 +1299,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         t(c, "Κάθισε", 64f, Color.WHITE, 15f * fs, true)
         small(c, "χέρι ακίνητο, μη μιλάς", 64f + 16f * fs, Color.WHITE, ess(10.5f), 150f)
         val left = ((Repo.recoveryUntil - now + 999) / 1000).coerceAtLeast(0)
-        t(c, "$left″", 114f, Color.WHITE, 26f, true)
+        // Round 8 (R8-U3 Β2): ίδια μορφή με την αντίστροφη μέτρηση του διαλείμματος («0:47», [clock]), όχι «47″».
+        t(c, clock(left), 114f, Color.WHITE, 26f, true)
         sayAdd("Αποκατάσταση. Κάθισε, χέρι ακίνητο, μη μιλάς. ${secondsLeftText(left)}")
         heart(c, 134f, now, 11f)
         pill(c, "Παράλειψη", 168f, 92f, 30f, card, Color.WHITE, 11f * fs, desc = "Παράλειψη της αποκατάστασης") { actions.finishWorkout() }
@@ -1457,6 +1495,15 @@ internal const val ZONE_MUTED_SAY = "Σίγαση, Μην ενοχλείτε ή 
 /** Η οθόνη του τέλους όταν το αποτέλεσμα δεν γράφτηκε πουθενά ([Repo.endUnsaved], R7-A8-5). Κείμενα προς έγκριση. */
 internal const val UNSAVED_TITLE = "Δεν αποθηκεύτηκε"
 internal const val UNSAVED_TEXT = "Μάλλον γέμισε ο χώρος του ρολογιού. Άδειασε λίγο χώρο και άνοιξε ξανά την εφαρμογή."
+
+/** «Πρώτο σετ: πόσες ακόμα;» στην οθόνη της ρεζέρβας (R8-U3-01), σε δύο γραμμές, και για το TalkBack. Κείμενα προς έγκριση. */
+internal const val FIRST_SET_LINE1 = "Πρώτο σετ:"
+internal const val FIRST_SET_LINE2 = "πόσες ακόμα;"
+internal const val FIRST_SET_SAY = "Πρώτο σετ: πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;"
+
+/** Η προπόνηση κλείνει ακόμα, αντί για την αρχική (R8-A8-1). Κείμενα προς έγκριση. */
+internal const val CLOSING_TITLE = "Αποθηκεύεται"
+internal const val CLOSING_SUB = "μία στιγμή"
 
 /**
  * Πόσο πλάτος (σε u· η οθόνη είναι κύκλος με διάμετρο 200u) έχει μια γραμμή κειμένου με βάση [y] και μέγεθος γραμμάτων

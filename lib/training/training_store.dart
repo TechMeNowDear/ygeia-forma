@@ -1142,6 +1142,14 @@ class TrainingStore extends ChangeNotifier {
   /// «Ξεχασμένη προπόνηση;» (εκεί το «Συνέχισε» δέχεται κάθε ✓).
   bool belongs(Session s, int atMs) => atMs - s.lastActivity.millisecondsSinceEpoch < staleAfter.inMilliseconds;
 
+  /// R8-A8-3: «Συνέχεια» στην «Ξεχασμένη προπόνηση;»: η προπόνηση ξαναγίνεται ενεργή από τώρα ([Session.resumedAt]), και
+  /// για το ρολόι (παλμοί, ✓, ρεζέρβα γράφονται ξανά μέσα της, [belongs]). Πριν, ως το πρώτο ✓ στο κινητό, όλα πετιούνταν.
+  void resume(Session s) {
+    if (!identical(current, s)) return;
+    s.resumedAt = now.millisecondsSinceEpoch;
+    save();
+  }
+
   static void _watchHrInfo(Session s, Map<String, dynamic> j) {
     if (j['hrMode'] is String) s.hrMode = j['hrMode'] as String;
     if (j['hrGap'] is num) s.hrGap = (j['hrGap'] as num).toInt();
@@ -1150,6 +1158,10 @@ class TrainingStore extends ChangeNotifier {
     if (j['err'] is String) s.watchErr = (j['err'] as String).length > 120 ? (j['err'] as String).substring(0, 120) : j['err'] as String;
     if (j['diag'] is String) s.watchDiag = (j['diag'] as String).length > 40 ? (j['diag'] as String).substring(0, 40) : j['diag'] as String;
   }
+
+  /// R8-A8-2: στο αποτέλεσμα «hr» το ρολόι σημειώνει με «c»: 1 τα ✓ που το κινητό είχε ήδη δει (ρολόι από τον γύρο 8·
+  /// το παλιό δεν το στέλνει, και τότε όπως πριν).
+  static bool _phoneSaw(SetLog ws) => ws.extra['c'] == 1 || ws.extra['c'] == true;
 
   /// Σετ που πατήθηκαν ✓ στο ρολόι αλλά δεν έφτασαν στο κινητό (π.χ. η εφαρμογή ήταν κλειστή): προστίθενται.
   /// Ποτέ δεν σβήνει ή αλλάζει ό,τι έχει ήδη γραφτεί στο κινητό — με μία εξαίρεση (τελικός έλεγχος, Συμβούλιο 4, W-4):
@@ -1177,7 +1189,7 @@ class TrainingStore extends ChangeNotifier {
       if (w == null || w.ex != e.ex || e.skipped) continue;
       for (var k = 0; k < w.log.length && k < e.log.length; k++) {
         final a = w.log[k].at;
-        if (w.log[k].done && !e.log[k].done && a != null) ats.add(a);
+        if (w.log[k].done && !e.log[k].done && !_phoneSaw(w.log[k]) && a != null) ats.add(a);
       }
     }
     ats.sort();
@@ -1200,6 +1212,9 @@ class TrainingStore extends ChangeNotifier {
           continue;
         }
         if (!ws.done || ps.done) continue;
+        // R8-A8-2: ✓ που το κινητό είχε ήδη δει («c»: το ρολόι το έχει «επιβεβαιωμένο») και δεν το έχει πια: το έσβησες
+        // εδώ και το ρολόι δεν έμαθε την αναίρεση (π.χ. χωρίς Bluetooth). Δεν ξαναμπαίνει.
+        if (_phoneSaw(ws)) continue;
         final at = ws.at;
         if (at != null && at >= cutoff) continue;
         ps
@@ -1334,12 +1349,8 @@ class TrainingStore extends ChangeNotifier {
 
   /// Βαθμονόμηση πρώτης φοράς: μετά το 1ο σετ, πρόταση για τα επόμενα. Επιστρέφει το νέο βάρος ή null.
   double? calibrateAfterFirst(ExLog e, int rir) {
-    // round1, U6-02 (f6b): και στην «Ελεύθερη άσκηση», που δεν έχει άσκηση προγράμματος: το εύρος της ίδιας της άσκησης.
-    final base = itemOf(e) ?? PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest);
     if (e.log.isEmpty) return null;
-    // Άσκηση που μπήκε στη θέση άλλης (εναλλακτική, ή η πιο δύσκολη παραλλαγή, round1 S7-03): με τον δικό της εξοπλισμό,
-    // όχι με του προγράμματος (αλλιώς τα σκαλιά θα ήταν π.χ. λάστιχου σε αλτήρα).
-    final item = base.ex == e.ex ? base : PlanItem(ex: e.ex, sets: e.sets, lo: base.lo, hi: e.hi, rir: e.rir, rest: e.rest);
+    final item = _calibrationItem(e);
     final first = e.log.first;
     final v = calibrate(item, first.load, first.reps, rir);
     if (v != null) {
@@ -1349,6 +1360,53 @@ class TrainingStore extends ChangeNotifier {
       save();
     }
     return v;
+  }
+
+  /// Η άσκηση του προγράμματος με την οποία κρίνεται το 1ο σετ ([calibrateAfterFirst], [firstSetNote]).
+  PlanItem _calibrationItem(ExLog e) {
+    // round1, U6-02 (f6b): και στην «Ελεύθερη άσκηση», που δεν έχει άσκηση προγράμματος: το εύρος της ίδιας της άσκησης.
+    final base = itemOf(e) ?? PlanItem(ex: e.ex, sets: e.sets, lo: e.lo, hi: e.hi, rir: e.rir, rest: e.rest);
+    // Άσκηση που μπήκε στη θέση άλλης (εναλλακτική, ή η πιο δύσκολη παραλλαγή, round1 S7-03): με τον δικό της εξοπλισμό,
+    // όχι με του προγράμματος (αλλιώς τα σκαλιά θα ήταν π.χ. λάστιχου σε αλτήρα).
+    return base.ex == e.ex ? base : PlanItem(ex: e.ex, sets: e.sets, lo: base.lo, hi: e.hi, rir: e.rir, rest: e.rest);
+  }
+
+  /// R8-A6-5: το μήνυμα όταν το «4+» του 1ου σετ δεν αλλάζει το βάρος ([calibrateNote]), ή null.
+  String? firstSetNote(ExLog e, int rir) {
+    if (e.log.isEmpty) return null;
+    final first = e.log.first;
+    return calibrateNote(_calibrationItem(e), first.load, first.reps, rir);
+  }
+
+  /// R8-U3-01: το 1ο σετ μιας άσκησης «πρώτης φοράς» έγινε ✓ στο ρολόι (όχι στο κινητό, όπου ρωτά αμέσως): η οθόνη της
+  /// προπόνησης, αν είναι ανοιχτή, κάνει την ίδια ερώτηση «Πρώτο σετ: πόσες ακόμα θα έβγαζες;». Μόνο στη μνήμη.
+  ExLog? firstAsk;
+
+  /// Ίδιος κανόνας με την ερώτηση του κινητού (session_page `_done`): η ερώτηση εκκρεμεί ([firstPending]) και το [i]
+  /// είναι το 1ο σετ ενώ κανένα σετ δεν έχει γίνει.
+  bool asksFirstSet(ExLog e, int i) => i == 0 && e.done.isEmpty && firstPending(e);
+
+  /// R8-U3-01 (συμβόλαιο με το ρολόι, «f» στο /ygeia/session): η ερώτηση «Πρώτο σετ: πόσες ακόμα θα έβγαζες;» εκκρεμεί
+  /// για την [e]: πρώτη φορά, με φορτίο, πάνω από ένα σετ, δεν απαντήθηκε σε αυτή την προπόνηση, δεν παραλείφθηκε, και
+  /// κανένα σετ μετά το 1ο δεν έχει γίνει (τότε η βαθμονόμηση δεν έχει πια νόημα).
+  bool firstPending(ExLog e) {
+    if (e.firstAnswer != null || e.skipped || !hasLoad(e.kind) || e.sets <= 1 || e.log.isEmpty || e.log.first.load == null) return false;
+    for (var k = 1; k < e.log.length; k++) {
+      if (e.log[k].done) return false;
+    }
+    return isFirstTime(e.ex);
+  }
+
+  /// R8-U3-01: η απάντηση στο «Πρώτο σετ», από όποια συσκευή έρθει πρώτη: [rir] 0–4 (βαθμονόμηση, [calibrateAfterFirst]) ή
+  /// −1 για «Δεν ξέρω» (καμία αλλαγή). Μόνο όσο η ερώτηση εκκρεμεί: μια δεύτερη απάντηση δεν αλλάζει τίποτα ([applied]
+  /// false). [load]: το νέο φορτίο των επόμενων σετ, ή null αν δεν άλλαξε.
+  ({bool applied, double? load}) answerFirst(ExLog e, int rir) {
+    if (!firstPending(e)) return (applied: false, load: null);
+    final a = rir < 0 ? -1 : rir.clamp(0, 4);
+    e.firstAnswer = a;
+    final v = a < 0 ? null : calibrateAfterFirst(e, a);
+    save();
+    return (applied: true, load: v);
   }
 
   void togglePain(ExLog e, String part) {
