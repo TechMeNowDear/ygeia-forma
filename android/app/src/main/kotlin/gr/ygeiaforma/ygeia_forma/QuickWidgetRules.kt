@@ -17,10 +17,11 @@ object QuickWidgetRules {
     private val DAYS = listOf("Δευτέρα", "Τρίτη", "Τετάρτη", "Πέμπτη", "Παρασκευή", "Σάββατο", "Κυριακή")
 
     /**
-     * Round 1 (U7-17 α): χωρά η επικεφαλίδα πάνω από τις δύο γραμμές; Τρεις γραμμές (11 + 17 + 13 sp) με 8 dp πάνω-κάτω
-     * θέλουν ≈ 72 dp στο κανονικό μέγεθος γραμμάτων· με περιθώριο, 76 dp × [fontScale]. Ύψος άγνωστο (0): ναι.
+     * Round 1 (U7-17 α): χωρά η επικεφαλίδα πάνω από τις δύο γραμμές; 14/11: τρεις γραμμές 13 + 19 + 15 sp (πριν 11 + 17
+     * + 13) με 8 dp πάνω-κάτω θέλουν ≈ 80 dp στο κανονικό μέγεθος γραμμάτων· με περιθώριο, 86 dp × [fontScale]. Ύψος
+     * άγνωστο (0): ναι.
      */
-    fun workoutHeadFits(maxHeightDp: Int, fontScale: Float): Boolean = maxHeightDp <= 0 || maxHeightDp >= 76f * fontScale
+    fun workoutHeadFits(maxHeightDp: Int, fontScale: Float): Boolean = maxHeightDp <= 0 || maxHeightDp >= 86f * fontScale
 
     /** (τίτλος, δεύτερη γραμμή). */
     fun workoutLines(w: JSONObject?, today: LocalDate): Pair<String, String> {

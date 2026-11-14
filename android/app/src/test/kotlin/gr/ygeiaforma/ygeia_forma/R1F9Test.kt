@@ -115,11 +115,12 @@ class R1F9Test {
     /** U7-17 α: η επικεφαλίδα «ΠΡΟΠΟΝΗΣΗ ΣΗΜΕΡΑ» μόνο όταν χωρούν τρεις γραμμές. */
     @Test
     fun workoutHead() {
+        // 14/11: μεγαλύτερα γράμματα (13 / 19 / 15 sp) → θέλει 86 dp (πριν 76).
         assertTrue(QuickWidgetRules.workoutHeadFits(0, 1f))
-        assertTrue(QuickWidgetRules.workoutHeadFits(80, 1f))
-        assertTrue(QuickWidgetRules.workoutHeadFits(76, 1f))
-        assertFalse(QuickWidgetRules.workoutHeadFits(72, 1f))
-        assertFalse(QuickWidgetRules.workoutHeadFits(80, 1.3f))
-        assertTrue(QuickWidgetRules.workoutHeadFits(100, 1.3f))
+        assertTrue(QuickWidgetRules.workoutHeadFits(90, 1f))
+        assertTrue(QuickWidgetRules.workoutHeadFits(86, 1f))
+        assertFalse(QuickWidgetRules.workoutHeadFits(80, 1f))
+        assertFalse(QuickWidgetRules.workoutHeadFits(100, 1.3f))
+        assertTrue(QuickWidgetRules.workoutHeadFits(112, 1.3f))
     }
 }
