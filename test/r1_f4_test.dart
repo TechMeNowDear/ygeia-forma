@@ -179,7 +179,10 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data, contains('09:00: 30,0 kg'));
       expect(t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος').value, '90,0 kg  (0)'); // R9-A4-3: και το 0
       expect(find.byKey(const ValueKey('body-weighings-foreign')), findsOneWidget);
-      expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text.contains(' kg από ')), isEmpty);
+      // R9-A4-3: η ζύγιση της μέρας (90,0) μετρά και είναι ίδια με την προηγούμενη → «0 kg από …»· καμία διαφορά από την
+      // ξένη 30,0 (θα ήταν «−60 kg»).
+      final pills = t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text.contains(' kg από ')).toList();
+      expect(pills.map((p) => p.text), everyElement(startsWith('0 kg από ')));
     });
   });
 
