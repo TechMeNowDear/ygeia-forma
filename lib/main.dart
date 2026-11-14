@@ -11,6 +11,7 @@ import 'pages/training/training_page.dart';
 import 'heart_day.dart' show appExerciseRanges;
 import 'training/training_store.dart';
 import 'training/wear_link.dart';
+import 'training/walk_stats.dart' show strideFor;
 import 'training/zone.dart';
 import 'pages/body.dart';
 import 'pages/category.dart';
@@ -287,6 +288,9 @@ class _ShellState extends State<Shell> {
     final z = widget.store.zoneOn(widget.now ?? DateTime.now());
     final s = widget.store.zoneSettings;
     t.setZone(z == null ? null : WalkZone(z.lo, z.hi, up: s.alertHigh, down: s.alertLow));
+    // 14/11: μήκος βήματος για την απόσταση χωρίς GPS (από τα περπατήματα με GPS, αλλιώς από το ύψος).
+    final p = widget.store.profile;
+    t.setStride(strideFor(t.sessions, heightCm: p.heightCm, sex: p.sex));
   }
 
   @override

@@ -278,7 +278,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val now = System.currentTimeMillis()
         if (ambient) {
             c.drawColor(Color.BLACK)
-            drawAmbient(c, now)
+            if (kmFlashOn(now)) drawKmFlash(c) else drawAmbient(c, now)
             return ""
         }
         val alarm = Repo.alarmShown(now)
@@ -286,6 +286,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         if (alarm) {
             drawAlarm(c)
             return "alarm"
+        }
+        // 14/11: κάθε χιλιόμετρο, 2″ πράσινη οθόνη «Πρώτο χιλιόμετρο» (με δόνηση και φωνή από την υπηρεσία).
+        if (kmFlashOn(now)) {
+            drawKmFlash(c)
+            return "km"
         }
         if (otherAppAsk) {
             drawOtherApp(c)
@@ -451,15 +456,18 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val dimText = Color.parseColor("#8A8A8A")
         when {
             Repo.running == "walk" -> {
-                small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 56f, dimText, 9f, 120f)
+                // 14/11 (αίτημα χρήστη): ίδια διάταξη με τη φωτεινή οθόνη (χρόνος, απόσταση και βήματα, παλμοί), σε αχνά
+                // χρώματα και χωρίς κουμπιά. Ο χρόνος σε λεπτά, σε ΜΙΑ γραμμή («7 λεπτά»): πριν ο αριθμός με τη λέξη από
+                // κάτω διαβαζόταν «1 km». Χωρίς δευτερόλεπτα: η αχνή οθόνη ανανεώνεται όταν έρχονται παλμοί (~5″).
+                small(c, if (Repo.paused) "ΠΑΥΣΗ" else "ΠΕΡΠΑΤΗΜΑ", 33f, dimText, 9.5f, 120f)
                 val sec = Repo.activeSecNow(now).let { if (it > 0) it else (now - Repo.startedAt) / 1000 }
-                // Έλεγχος 13/11, round 7 (R7-U3-08): ο αριθμός μεγάλος και η λέξη από κάτω («24» / «λεπτά»), όπως το
-                // κινητό (U5-06), όχι «24′».
                 val min = (sec / 60).toInt()
-                t(c, "$min", 98f, light, 30f, true)
-                small(c, if (min == 1) "λεπτό" else "λεπτά", 111f, dimText, 11f, 120f)
-                if (Repo.meters > 0) small(c, "${km(Repo.meters)} km", 128f, light, 11f, 150f)
-                Repo.alarm.limit?.let { small(c, "όριο παλμών $it", 147f, dimText, 9f, 130f) }
+                numberWord(c, "$min", if (min == 1) "λεπτό" else "λεπτά", 78f, light, dimText)
+                text.typeface = Typeface.DEFAULT_BOLD
+                fitPlain(c, walkLine(Repo.shown(), Repo.steps), 98f, light, 10.5f, 150f)
+                val fresh = Repo.hrLive(now)
+                t(c, if (fresh) "♥ ${Repo.bpm}" else "♥ —", 121f, if (fresh) light else dimText, 15f, true)
+                Repo.alarm.limit?.let { small(c, "όριο παλμών $it", 140f, dimText, 9f, 130f) }
             }
             Repo.session != null && Repo.running != null -> {
                 val s = Repo.session!!
@@ -536,6 +544,49 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Περιοχές πατήματος ≥ 40u (≈ 48 dp) που δεν ακουμπούν: «Ξεκίνα εδώ» 110–154u, «Άκυρο» 157–198u.
         pill(c, OtherAppAsk.YES, 132f, 116f, 32f, orangeFill, Color.WHITE, 13f * fs, padTop = 6f, padBottom = 6f) { actions.startHere() }
         pill(c, OtherAppAsk.NO, 176f, 68f, 28f, button3, soft, ess(10f), padTop = 5f, padBottom = 8f) { actions.cancelStart() }
+    }
+
+    // ------------------------------------------------------------------ 14/11: χιλιόμετρα
+    private fun kmFlashOn(now: Long): Boolean = Repo.running == "walk" && Repo.kmFlashN > 0 && now < Repo.kmFlashUntil
+
+    /** Πράσινη οθόνη για 2″: «Πρώτο χιλιόμετρο» και, από κάτω, ο χρόνος ως εκεί. */
+    private fun drawKmFlash(c: Canvas) {
+        c.drawColor(green)
+        val title = kmTitle(Repo.kmFlashN)
+        // Δύο γραμμές («Πρώτο» / «χιλιόμετρο»), μεγάλα γράμματα· «Χιλιόμετρο 21» μετά το 20ό.
+        val parts = title.split(" χιλιόμετρο")
+        if (parts.size == 2 && parts[1].isEmpty()) {
+            t(c, parts[0], 96f, Color.WHITE, 22f * fs, true, 170f)
+            t(c, "χιλιόμετρο", 96f + 22f * fs, Color.WHITE, 15f * fs, false, 170f)
+        } else {
+            t(c, title, 104f, Color.WHITE, 20f * fs, true, 170f)
+        }
+        sayAdd(title)
+    }
+
+    /** Μεγάλος αριθμός και μικρή λέξη στην ίδια γραμμή, κεντραρισμένα («7 λεπτά»). */
+    private fun numberWord(c: Canvas, num: String, word: String, y: Float, colorNum: Int, colorWord: Int) {
+        val old = text.textAlign
+        text.textAlign = Paint.Align.LEFT
+        text.typeface = Typeface.DEFAULT_BOLD
+        text.textSize = 30f * u
+        val wN = text.measureText(num)
+        text.typeface = Typeface.DEFAULT
+        text.textSize = 13f * u
+        val wW = text.measureText(" $word")
+        val x = cx - (wN + wW) / 2
+        text.typeface = Typeface.DEFAULT_BOLD
+        text.textSize = 30f * u
+        text.color = colorNum
+        c.drawText(num, x, y * u, text)
+        text.typeface = Typeface.DEFAULT
+        text.textSize = 13f * u
+        text.color = colorWord
+        c.drawText(" $word", x + wN, y * u, text)
+        text.textAlign = old
+        drawnSizes?.put(num, 30f)
+        drawnSizes?.put(word, 13f)
+        sayAdd("$num $word")
     }
 
     // ------------------------------------------------------------------ βοηθητικά
@@ -1074,7 +1125,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Ο χρόνος προχωρά κάθε δευτερόλεπτο από το σημείο ελέγχου του Health Services (W3-12).
         val sec = Repo.activeSecNow(now).let { if (it > 0 || Repo.cpWall > 0) it else (now - Repo.startedAt) / 1000 }
         fit(c, clock(sec), 78f, if (Repo.paused) gray else Color.WHITE, 40f * fs, 150f)
-        val dist = if (Repo.meters > 0) "${km(Repo.meters)} km · ${pace(Repo.meters, sec)}" else if (Repo.steps > 0) "${Repo.steps} βήματα" else "—"
+        // 14/11 (αίτημα χρήστη): απόσταση ΚΑΙ βήματα μαζί· χωρίς GPS η απόσταση από τα βήματα, με «≈».
+        val dist = walkLine(Repo.shown(), Repo.steps)
         text.typeface = Typeface.DEFAULT_BOLD
         fitPlain(c, dist, 96f, Color.WHITE, 10.5f * fs, 150f)
         walkHeart(c, 117f, now)

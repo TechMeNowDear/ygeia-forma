@@ -17,6 +17,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+/** Πόσο περιμένει το ρολόι την απάντηση του κινητού στο «πες το» (14/11) πριν μιλήσει το ίδιο. */
+const val SAY_WAIT_MS = 2_500L
+
+/** Η απάντηση του κινητού στο «πες το»: (id, ok) ή null. Καθαρή συνάρτηση, με δοκιμές. */
+fun sayReply(text: String): Pair<String, Boolean>? = try {
+    val o = JSONObject(text)
+    val id = o.optStringOrNull("id")
+    if (id == null) null else id to o.optBoolean("ok", false)
+} catch (_: Exception) {
+    null
+}
+
 /**
  * Σύνδεση με το κινητό (Wear Data Layer). Ακούει αλλαγές μόνο όσο είναι ανοιχτή η οθόνη ή τρέχει άσκηση
  * ([attach]/[detach] με μετρητή)· αλλιώς δεν κάνει τίποτα στο παρασκήνιο.
@@ -36,6 +48,11 @@ object Link {
 
     /** «Κοιτάζω» από το κινητό (W3-15): ως πότε, και ότι το κινητό το ξέρει (μένει, για τις επόμενες φορές). */
     private val messages = MessageClient.OnMessageReceivedListener { e: MessageEvent ->
+        // 14/11: η απάντηση του κινητού στο «πες το» ([askPhoneToSay]).
+        if (e.path == Paths.SAID) {
+            sayReply(String(e.data, Charsets.UTF_8))?.let { (id, ok) -> sayWaits.remove(id)?.complete(ok) }
+            return@OnMessageReceivedListener
+        }
         if (e.path != Paths.WATCHING) return@OnMessageReceivedListener
         val ttl = watchingTtl(String(e.data, Charsets.UTF_8))
         Repo.watchingUntil = if (ttl > 0) System.currentTimeMillis() + ttl else 0L
@@ -303,6 +320,28 @@ object Link {
     }
 
     suspend fun sendJson(ctx: Context, path: String, o: JSONObject): Boolean = send(ctx, path, o.toString().toByteArray(Charsets.UTF_8))
+
+    private val sayWaits = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.CompletableDeferred<Boolean>>()
+    private var sayNext = 0L
+
+    /**
+     * Ζητά από το κινητό να πει τη φράση (14/11, [Voice]). true μόνο αν το κινητό απάντησε «το λέω» μέσα σε [SAY_WAIT_MS]
+     * (έχει ακουστικά). Το «until» λέει στο κινητό να μην τη πει αργότερα (τότε θα την έχει πει ήδη το ρολόι).
+     */
+    suspend fun askPhoneToSay(ctx: Context, el: String, en: String): Boolean {
+        if (users == 0) return false // δεν ακούμε απαντήσεις: μιλά το ρολόι
+        val id = "s${System.currentTimeMillis()}-${sayNext++}"
+        val wait = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        sayWaits[id] = wait
+        try {
+            val o = JSONObject().put("v", 1).put("id", id).put("el", el).put("en", en)
+                .put("until", System.currentTimeMillis() + SAY_WAIT_MS)
+            // Όλο μαζί (αποστολή και απάντηση) το πολύ [SAY_WAIT_MS]: κινητό μακριά → μιλά αμέσως το ρολόι.
+            return withTimeoutOrNull(SAY_WAIT_MS) { sendJson(ctx, Paths.SAY, o) && wait.await() } == true
+        } finally {
+            sayWaits.remove(id)
+        }
+    }
 
     /** Αποτέλεσμα για το κινητό: μένει στο ρολόι ώσπου να το πάρει το κινητό (και ας είναι μακριά τώρα). */
     suspend fun putResult(ctx: Context, id: String, json: JSONObject): Boolean = try {

@@ -376,12 +376,12 @@ class R7F3Test {
         // Η ώρα του ρολογιού πήγε πίσω (αρχή «στο μέλλον»): από τη συνέχεια, ποτέ πιο πέρα.
         assertEquals(nowEl, zoneWarmupStartEl(nowEl, t0 - 1_000, t0))
         // Ζώνη 107–130, 20′ μετά την αρχή, παλμοί 140 από τη συνέχεια: δόνηση στα 20″ (όχι 5′ μετά).
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(107, 130), zoneWarmupStartEl(nowEl, nowWall, t0))
         for (k in 0..19) assertEquals("$k″", none, z.feed(140, nowEl + k * 1000L))
         assertEquals(up, z.feed(140, nowEl + 20_000))
         // Με αρχή τη στιγμή της συνέχειας (πριν από τη διόρθωση): τίποτα για 5′.
-        val before = ZoneAlarm()
+        val before = ZoneAlarm(holdMs = 20_000L)
         before.start(WalkZone(107, 130), nowEl)
         assertEquals(none, before.feed(140, nowEl))
         assertEquals(none, before.feed(140, nowEl + 20_000))
@@ -395,7 +395,7 @@ class R7F3Test {
     /** Παλιότερη τιμή από την άλλη πηγή, ΜΕΣΑ στη ζώνη: αγνοείται (δεν μηδενίζει τα 20″ πάνω). */
     @Test
     fun zoneAlarmIgnoresAnOlderValueFromTheOtherSource() {
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(108, 131), 0)
         assertEquals(none, z.feed(140, 400_000))
         assertEquals(none, z.feed(140, 415_000))
@@ -409,13 +409,13 @@ class R7F3Test {
     @Test
     fun zoneAlarmRepeatsExactlyOnTheirIntervals() {
         val s = 400_000L
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(108, 131), 0)
         for (k in 0..19) assertEquals("$k″", none, z.feed(140, s + k * 1000L))
         assertEquals(up, z.feed(140, s + 20_000))
         for (k in 21..139) assertEquals("$k″", none, z.feed(140, s + k * 1000L))
         assertEquals(up, z.feed(140, s + 140_000))
-        val d = ZoneAlarm()
+        val d = ZoneAlarm(holdMs = 20_000L)
         d.start(WalkZone(108, 131, up = true, down = true), 0)
         assertEquals(none, d.feed(100, s))
         assertEquals(none, d.feed(100, s + 50_000))
@@ -843,7 +843,7 @@ class R7F3ViewTest {
     fun noPrimeMarkDurationsOnTheWatch() {
         val now = System.currentTimeMillis()
         val prime = Regex("\\d+′")
-        // Ambient περπάτημα: ο αριθμός και από κάτω η λέξη.
+        // Ambient περπάτημα: ο αριθμός και η λέξη (από 14/11 στην ίδια γραμμή, «24 λεπτά»).
         startWalk(now)
         val walk = newView(ambient = true)
         draw(walk, "R7_W10_walk_ambient")

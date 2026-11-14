@@ -204,7 +204,7 @@ class ProtocolTest {
 
     @Test
     fun zoneAlarmUp() {
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(108, 131), 0)
         // Τα πρώτα 5′ τίποτα, όσο ψηλά κι αν είναι.
         for (t in 0..290 step 10) assertEquals(ZoneAlarm.Buzz.NONE, z.feed(150, t * 1000L))
@@ -227,7 +227,7 @@ class ProtocolTest {
 
     @Test
     fun zoneAlarmShortHillAndOrder() {
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(108, 131), 0)
         val t0 = 600_000L
         // Ανηφόρα 15″: καμία δόνηση.
@@ -240,7 +240,7 @@ class ProtocolTest {
         // Σταθεροί παλμοί χωρίς νέα τιμή (αισθητήρας που στέλνει αλλαγές): μετρούν.
         assertEquals(ZoneAlarm.Buzz.UP, z.steady(140, t0 + 51_000))
         // Παύση: οι 20″ ξαναρχίζουν.
-        val y = ZoneAlarm()
+        val y = ZoneAlarm(holdMs = 20_000L)
         y.start(WalkZone(108, 131), 0)
         y.feed(140, t0)
         y.hold()
@@ -250,10 +250,10 @@ class ProtocolTest {
 
     @Test
     fun zoneAlarmDownOnlyWhenOn() {
-        val off = ZoneAlarm()
+        val off = ZoneAlarm(holdMs = 20_000L)
         off.start(WalkZone(108, 131), 0)
         for (t in 0..20) assertEquals(ZoneAlarm.Buzz.NONE, off.feed(95, 400_000L + t * 10_000L))
-        val on = ZoneAlarm()
+        val on = ZoneAlarm(holdMs = 20_000L)
         on.start(WalkZone(108, 131, up = true, down = true), 0)
         val t0 = 400_000L
         assertEquals(ZoneAlarm.Buzz.NONE, on.feed(100, t0))
@@ -262,12 +262,12 @@ class ProtocolTest {
         assertEquals(ZoneAlarm.Buzz.NONE, on.feed(100, t0 + 200_000))
         assertEquals(ZoneAlarm.Buzz.DOWN, on.feed(100, t0 + 361_000))
         // Χωρίς ζώνη: τίποτα.
-        val none = ZoneAlarm()
+        val none = ZoneAlarm(holdMs = 20_000L)
         none.start(null, 0)
         assertFalse(none.active)
         assertEquals(ZoneAlarm.Buzz.NONE, none.feed(200, 900_000))
         // Ζώνη με κλειστές και τις δύο δονήσεις: δεν χρειάζεται αισθητήρας.
-        val quiet = ZoneAlarm()
+        val quiet = ZoneAlarm(holdMs = 20_000L)
         quiet.start(WalkZone(108, 131, up = false, down = false), 0)
         assertFalse(quiet.active)
     }
@@ -579,7 +579,7 @@ class ProtocolTest {
     /** μ1: και η επανάληψη της δόνησης ζώνης θέλει 20″ συνεχώς πάνω (1′ κάτω), όπως υπόσχεται η οθόνη. */
     @Test
     fun zoneAlarmRepeatNeedsHold() {
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(109, 130), 0)
         val t0 = 400_000L
         // 25″ πάνω από το 130: μία δόνηση στα 20″.
@@ -597,7 +597,7 @@ class ProtocolTest {
         assertEquals(2, z.ups)
 
         // Το ίδιο προς τα κάτω: 1′ συνεχώς κάτω και για την επανάληψη (5′ μετά).
-        val d = ZoneAlarm()
+        val d = ZoneAlarm(holdMs = 20_000L)
         d.start(WalkZone(109, 130, up = true, down = true), 0)
         assertEquals(ZoneAlarm.Buzz.NONE, d.feed(100, t0))
         assertEquals(ZoneAlarm.Buzz.DOWN, d.feed(100, t0 + 60_000L))

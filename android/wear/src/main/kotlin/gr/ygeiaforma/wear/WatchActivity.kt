@@ -32,6 +32,9 @@ class WatchActivity : Activity(), WatchView.Actions {
     private var startHerePending: (() -> Unit)? = null
     private var checkingOtherApp = false
     private var joinWhenReady = false
+
+    /** Άνοιγμα από το tile «Περπάτημα» (14/11): ξεκινά περπάτημα μόλις διαβαστεί η κατάσταση ([onStart]). */
+    private var walkFromTile = false
     /**
      * Η κατάσταση του κινητού διαβάστηκε σε αυτό το άνοιγμα ([Link.load] στο [onStart]· έλεγχος 14/11, round 8, R8-A8-6).
      * Ως τότε (π.χ. άνοιγμα από το κινητό ενώ η εφαρμογή ήταν στο παρασκήνιο, χωρίς σύνδεση) η μνήμη μπορεί να έχει μια
@@ -102,7 +105,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         Repo.dropOldKeys(this)
         view = WatchView(this, this)
         setContentView(view)
-        handle(intent)
+        // Μετά από αναδημιουργία (ίδιο intent) όχι ξανά «ξεκίνα περπάτημα» από το tile.
+        handle(intent, fresh = savedInstanceState == null)
     }
 
     /**
@@ -123,9 +127,13 @@ class WatchActivity : Activity(), WatchView.Actions {
         redraw()
     }
 
-    /** Άνοιγμα από το κινητό («Ξεκίνα» εκεί): μπαίνει στην προπόνηση του κινητού με παλμούς. */
-    private fun handle(i: Intent?) {
+    /** Άνοιγμα από το κινητό («Ξεκίνα» εκεί): μπαίνει στην προπόνηση του κινητού με παλμούς. Από το tile: περπάτημα. */
+    private fun handle(i: Intent?, fresh: Boolean = true) {
         if (i?.data?.host == "session") joinWhenReady = true
+        if (i?.getStringExtra(WalkTileService.EXTRA_START) == WalkTileService.START_WALK) {
+            i.removeExtra(WalkTileService.EXTRA_START)
+            if (fresh) walkFromTile = true
+        }
     }
 
     override fun onStart() {
@@ -155,6 +163,11 @@ class WatchActivity : Activity(), WatchView.Actions {
                 Link.tryWipe(this@WatchActivity)
             }
             redraw()
+            // 14/11: «Περπάτημα» από το tile: ένα πάτημα, χωρίς δεύτερο στην αρχική. Όχι αν τρέχει ήδη κάτι.
+            if (walkFromTile) {
+                walkFromTile = false
+                if (Repo.running == null) startWalk()
+            }
         }
         view.post(tickRunnable)
     }

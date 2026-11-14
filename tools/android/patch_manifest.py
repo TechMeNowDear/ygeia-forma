@@ -81,6 +81,26 @@ WIDGETS = "\n        <!-- Widgets αρχικής οθόνης (7/11). Η ρύθ�
                             ("WorkoutWidget", "Προπόνηση σήμερα", "workout"), ("QuickFoodWidget", "Γρήγορο φαγητό", "quickfood"))
 )
 
+# Φωνή του ρολογιού από το κινητό (14/11, SayService.kt): ξυπνά ΜΟΝΟ με το μήνυμα «/ygeia/say» του ρολογιού (στην
+# άσκηση), για να ακουστεί το «Πρώτο χιλιόμετρο» στα ακουστικά του κινητού, μέσα στη μουσική.
+SAY = (
+    "\n        <!-- Φωνή του ρολογιού στα ακουστικά του κινητού (14/11). Μόνο με μήνυμα του ρολογιού στην άσκηση. -->\n"
+    "        <service\n"
+    '            android:name=".SayService"\n'
+    '            android:exported="true">\n'
+    "            <intent-filter>\n"
+    '                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"/>\n'
+    '                <data android:scheme="wear" android:host="*" android:path="/ygeia/say"/>\n'
+    "            </intent-filter>\n"
+    "        </service>"
+)
+TTS_QUERY = (
+    "\n        <!-- Φωνή (14/11): το Android 11+ θέλει να δηλωθεί ότι ψάχνουμε μηχανή φωνής (TextToSpeech). -->\n"
+    "        <intent>\n"
+    '            <action android:name="android.intent.action.TTS_SERVICE"/>\n'
+    "        </intent>"
+)
+
 BROWSER = (
     "\n        <!-- Σύνδεση Oura: άνοιγμα της σελίδας σύνδεσης στον browser. -->\n"
     "        <intent>\n"
@@ -116,11 +136,17 @@ if ".OuraCallbackActivity" not in s:
 if ".WidgetConfigActivity" not in s:
     s = s.replace("</application>", WIDGETS.lstrip("\n") + "\n    </application>", 1)
 
+if ".SayService" not in s:
+    s = s.replace("</application>", SAY.lstrip("\n") + "\n    </application>", 1)
+
 if "<!-- Σύνδεση Oura: άνοιγμα" not in s:
     if "<queries>" in s:
         s = s.replace("<queries>", "<queries>" + BROWSER, 1)
     else:
         s = s.replace("</manifest>", "    <queries>" + BROWSER + "\n    </queries>\n</manifest>", 1)
+
+if "android.intent.action.TTS_SERVICE" not in s:
+    s = s.replace("<queries>", "<queries>" + TTS_QUERY, 1)
 
 # Τα αρχεία των κανόνων (το res/ το φτιάχνει το «flutter create» και δεν το κρατάμε στο repository).
 xml_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xml")

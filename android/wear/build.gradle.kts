@@ -71,6 +71,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
     // Ένδειξη «άσκηση σε εξέλιξη» στην πρόσοψη του ρολογιού.
     implementation("androidx.wear:wear-ongoing:1.0.0")
+    // Tile «Περπάτημα» (14/11): επίσημη βιβλιοθήκη των tiles· δεν τρέχει τίποτα στο παρασκήνιο.
+    implementation("androidx.wear.tiles:tiles:1.4.1")
+    implementation("androidx.wear.protolayout:protolayout:1.2.1")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

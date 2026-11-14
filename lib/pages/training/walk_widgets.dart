@@ -40,7 +40,7 @@ class WalkExtraCard extends StatelessWidget {
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Χωρίς GPS ο ρυθμός βγαίνει από τα βήματα: «≈», όχι ακρίβεια δευτερολέπτου (έλεγχος 9/11, RT-12).
         stat(pace == null ? '—' : '${distanceFromSteps(session) ? '≈ ' : ''}${clock(pace)}',
-            distanceFromSteps(session) ? 'ρυθμός ανά km (από βήματα)' : 'ρυθμός ανά km'),
+            distanceFromSteps(session) && pace != null ? 'ρυθμός ανά km (από βήματα)' : 'ρυθμός ανά km'),
         stat(cad == null ? '—' : '$cad', 'βήματα το λεπτό'),
         // Round 2 (R2-U2-05): «2 λεπτά» μαζί (στη στήλη των 104 dp έμενε «παύση · 2 | λεπτά»).
         stat('$pauses', pauses == 0 ? 'παύσεις' : '${pauses == 1 ? 'παύση' : 'παύσεις'} ·\u00A0${unitsGlued(hoursMinutes(pausedMin))}'),

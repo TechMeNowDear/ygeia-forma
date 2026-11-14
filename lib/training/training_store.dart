@@ -278,6 +278,14 @@ class TrainingStore extends ChangeNotifier {
   /// περνά εδώ ([setZone]), ώστε να υπάρχει και πριν διαβαστεί το ιστορικό και να φτάνει στο ρολόι με το πρόγραμμα.
   WalkZone? zone;
 
+  /// Φωνή στην άσκηση από το ρολόι (14/11, Ρυθμίσεις): «Πρώτο χιλιόμετρο», «Εκτός εύρους», «Επόμενο σετ». Ανοιχτή από
+  /// προεπιλογή (αίτημα χρήστη). Στέλνεται στο ρολόι με το πρόγραμμα.
+  bool voice = true;
+
+  /// Το μήκος του βήματος (m) για την απόσταση χωρίς GPS (14/11, [strideFor]): από τα περπατήματα με GPS, αλλιώς από το
+  /// ύψος. Το υπολογίζει η εφαρμογή ([setStride]) και πάει στο ρολόι με το πρόγραμμα.
+  double? stride;
+
   /// Όλες οι εκδόσεις όλων των προγραμμάτων (η πιο πρόσφατη στο τέλος).
   final List<Program> programs = [];
   String? activeId;
@@ -396,7 +404,9 @@ class TrainingStore extends ChangeNotifier {
     if (changed) save();
   }
 
-  static const _knownTop = {'v', 'hrLimit', 'zone', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone', 'drop'};
+  static const _knownTop = {
+    'v', 'hrLimit', 'zone', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone', 'drop', 'voice', 'stride',
+  };
 
   /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μία χαλασμένη προπόνηση ή πρόγραμμα πάει σε καραντίνα, όχι όλο το
   /// αρχείο σε «δεν διαβάζεται». Τα άγνωστα κλειδιά κρατιούνται (V-A-07).
@@ -412,6 +422,9 @@ class TrainingStore extends ChangeNotifier {
     if (hl != null && hl is! num) _extra['hrLimit'] = hl;
     zone = WalkZone.fromJson(j['zone']);
     if (j['zone'] != null && zone == null) _extra['zone'] = j['zone'];
+    voice = j['voice'] != false;
+    final st = j['stride'];
+    stride = st is num && st >= 0.4 && st <= 1.2 ? st.toDouble() : null;
     quarantine
       ..clear()
       ..addAll([
@@ -485,6 +498,8 @@ class TrainingStore extends ChangeNotifier {
         'v': fileVersion,
         if (hrLimit != null) 'hrLimit': hrLimit,
         if (zone != null) 'zone': zone!.toJson(),
+        if (!voice) 'voice': false,
+        if (stride != null) 'stride': stride,
         'programs': [for (final p in programs) p.toJson()],
         if (activeId != null) 'active': activeId,
         // Οι παλμοί κάθε τελειωμένης προπόνησης στο δικό της αρχείο, μόλις γραφτεί αυτό· ως τότε μέσα (καμία απώλεια).
@@ -712,6 +727,21 @@ class TrainingStore extends ChangeNotifier {
   void setZone(WalkZone? z) {
     if (z == zone) return;
     zone = z;
+    save();
+  }
+
+  /// Φωνή στην άσκηση (14/11): γράφεται και πάει στο ρολόι.
+  void setVoice(bool on) {
+    if (on == voice) return;
+    voice = on;
+    save();
+  }
+
+  /// Μήκος βήματος (14/11): γράφεται (και πάει στο ρολόι) μόνο αν άλλαξε πάνω από 1 cm (όχι σε κάθε άνοιγμα).
+  void setStride(double? m) {
+    final v = m == null ? null : (m * 100).round() / 100;
+    if (v == stride || (v != null && stride != null && (v - stride!).abs() < 0.01)) return;
+    stride = v;
     save();
   }
 
@@ -1042,6 +1072,9 @@ class TrainingStore extends ChangeNotifier {
       final sec = watchSec ?? end.difference(start).inSeconds;
       s.cardioMinutes = (sec / 60).round();
       s.meters = (cardio['m'] as num?)?.toDouble();
+      // 14/11: η απόσταση από τα βήματα (ρολόι από #114). Παλιό ρολόι: τίποτα.
+      final mest = cardio['mest'];
+      s.metersEst = mest is num && mest.isFinite && mest > 0 ? mest.toDouble() : null;
       s.steps = (cardio['steps'] as num?)?.toInt();
       // 9/11: ενεργός χρόνος, GPS, χιλιόμετρα, παύσεις, πτώση παλμών στο 1′ (ρολόι από #89).
       s.cardioSec = watchSec;

@@ -7,7 +7,7 @@ import '../../theme.dart';
 import '../privacy_page.dart' show copySensitive;
 import '../../data.dart' show HealthStore;
 import '../../training/equipment.dart';
-import '../../training/walk_stats.dart' show kmValue;
+import '../../training/walk_stats.dart' show kmValue, liveMeters, kmText;
 import '../../training/progress.dart';
 import '../../trends.dart' show TrendPeriod;
 import '../../training/program.dart';
@@ -756,7 +756,9 @@ class _TrainingPageState extends State<TrainingPage> {
   Widget _walkCard(BuildContext context, Map<String, dynamic> l) {
     final c = Aigaio.of(context);
     final sec = (l['sec'] as num?)?.toInt() ?? 0;
-    final m = (l['m'] as num?)?.toDouble() ?? 0;
+    // 14/11: GPS, αλλιώς από τα βήματα με «≈» (ίδιος κανόνας με το ρολόι και τη σύνοψη).
+    final d = liveMeters(l);
+    final m = d?.meters ?? 0;
     final steps = (l['steps'] as num?)?.toInt() ?? 0;
     final bpm = (l['bpm'] as num?)?.toInt() ?? 0;
     final time = clock(sec);
@@ -784,7 +786,7 @@ class _TrainingPageState extends State<TrainingPage> {
         // (έλεγχος γ2, W2-15· όπως η κάρτα της Σήμερα).
         else if (t.hrLimit != null && sec >= hrWaitSeconds)
           ...[HrStale(limit: t.hrLimit), const SizedBox(height: 10)],
-        Row(children: [stat(time, 'χρόνος'), stat(m > 0 ? (m / 1000).toStringAsFixed(2).replaceAll('.', ',') : '—', 'km')]),
+        Row(children: [stat(time, 'χρόνος'), stat(d == null ? '—' : '${d.approx ? '≈ ' : ''}${kmText(m)}', 'km')]),
         const SizedBox(height: 8),
         Row(children: [stat(pace(), 'ρυθμός'), stat(steps > 0 ? thousands(steps) : '—', 'βήματα')]),
         const SizedBox(height: 6),

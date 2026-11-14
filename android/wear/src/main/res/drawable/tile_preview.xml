@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Προεπισκόπηση του tile «Περπάτημα» στη λίστα των tiles (14/11): μαύρος κύκλος με πορτοκαλί κουμπί. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp" android:height="192dp" android:viewportWidth="192" android:viewportHeight="192">
+    <path android:fillColor="#FF000000" android:pathData="M96,0A96,96 0 1,1 96,192A96,96 0 1,1 96,0Z" />
+    <path android:fillColor="#FFC2410C" android:pathData="M48,74h96a22,22 0 0 1 0,44h-96a22,22 0 0 1 0,-44z" />
+    <path android:fillColor="#FF9CA3AF" android:pathData="M70,52h52v6h-52z" />
+</vector>
