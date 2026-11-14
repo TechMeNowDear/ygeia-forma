@@ -202,7 +202,7 @@ class Device1411Test {
         assertTrue(link.contains("if (nearbyOnly && !n.isNearby) continue"))
         val voice = source("Voice.kt")
         // Ακουστικά στο ρολόι → το ρολόι· αλλιώς ρωτά το κινητό· αλλιώς το ηχείο του ρολογιού. Η μουσική χαμηλώνει.
-        assertTrue(voice.contains("if (headsetHere() || !askPhone) {"))
+        assertTrue(voice.contains("val headset = headsetHere()") && voice.contains("if (headset || !askPhone) {"))
         assertTrue(voice.contains("if (phone) phoneCount++ else speakHere(p)"))
         assertTrue(voice.contains("AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK"))
         // Round 14: η σύνδεση ακούει την απάντηση όσο περιμένει· η φωνή κλείνει μόνη της όταν δεν την κρατά η άσκηση.
