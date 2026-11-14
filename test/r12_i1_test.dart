@@ -186,6 +186,9 @@ void main() {
       expect(legumesByName(_mine('MK3', 'Αλεύρι από κουκιά', {Nk.kcal: 340})), isFalse, reason: '«αλεύρι»: όχι ξερό όσπριο');
       expect(legumesByName(_mine('MK4', 'Ζυμαρικά από κουκιά', {Nk.kcal: 350})), isFalse, reason: 'ζυμαρικό (R10-B1-3)');
       expect(legumesByName(_mine('MK5', 'Πραλίνα φουντουκιού', {Nk.kcal: 549})), isFalse, reason: 'λέξη που δεν αρχίζει «κουκι»');
+      // R13-E1-1: μόνο «κουκί/κουκιά»· όχι λέξεις που απλώς αρχίζουν από «κουκι».
+      expect(legumesByName(_mine('MK6', 'Κουκίδες σοκολάτας', {Nk.kcal: 500})), isFalse, reason: 'κουκίδες ≠ κουκιά');
+      expect(legumesByName(_mine('MK7', 'Κουκί ξερό', {Nk.kcal: 305})), isTrue, reason: 'ενικός');
       // Η βάση: από την κατηγορία, όπως πριν.
       final base = basicFoods().firstWhere((f) => f.id == 'C20518');
       expect((base.cat, isLegumes(base)), ('Όσπρια', true));
