@@ -90,7 +90,7 @@ int? cadence(Session s) {
   return null;
 }
 
-({double meters, bool approx})? shownMeters(Session s) => s.isCardio ? pickMeters(s.meters ?? 0, s.metersEst ?? 0, s.gps) : null;
+({double meters, bool approx})? shownMeters(Session s) => pickMeters(s.meters ?? 0, s.metersEst ?? 0, s.gps);
 
 /// Ο ίδιος κανόνας για τα «ζωντανά» του ρολογιού («m», «mest», «gps»).
 ({double meters, bool approx})? liveMeters(Map<String, dynamic> l) =>
