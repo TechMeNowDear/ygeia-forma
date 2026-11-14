@@ -2082,14 +2082,16 @@ object Say {
 }
 
 /**
- * Η γραμμή κάτω από τον χρόνο στο περπάτημα (14/11, αίτημα χρήστη): απόσταση ΚΑΙ βήματα μαζί, π.χ. «2,18 km · 2.840 βήματα»,
- * χωρίς GPS «≈ 0,58 km · 812 βήματα». [shown] από το [shownDistance].
+ * Οι δύο γραμμές κάτω από τον χρόνο στο περπάτημα (αιτήματα χρήστη 14/11): πρώτα απόσταση και ρυθμός («2,18 km · 11:15 /km»,
+ * χωρίς GPS «≈ 0,58 km · 12:12 /km»: ο ρυθμός βγαίνει από την ίδια απόσταση, άρα κι αυτός «≈»), από κάτω τα βήματα
+ * («2.840 βήματα»). Πριν από 10 m μόνο τα βήματα, στην πρώτη γραμμή. [shown] από το [shownDistance], [sec] ο ενεργός χρόνος.
  */
-fun walkLine(shown: Pair<Double, Boolean>, steps: Long): String {
+fun walkLines(shown: Pair<Double, Boolean>, steps: Long, sec: Long): Pair<String, String?> {
     val (m, approx) = shown
-    val d = if (m >= 10) "${if (approx) "≈ " else ""}${km(m)} km" else null
+    val p = pace(m, sec)
+    val d = if (m >= 10) "${if (approx) "≈ " else ""}${km(m)} km${if (p != "—") " · $p" else ""}" else null
     val st = if (steps > 0) "${thousandsEl(steps)} ${if (steps == 1L) "βήμα" else "βήματα"}" else null
-    return listOfNotNull(d, st).joinToString(" · ").ifEmpty { "—" }
+    return if (d != null) d to st else (st ?: "—") to null
 }
 
 /** «2.840» (τελεία στις χιλιάδες, όπως στο κινητό). */

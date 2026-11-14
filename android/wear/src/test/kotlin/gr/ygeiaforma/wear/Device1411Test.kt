@@ -70,11 +70,14 @@ class Device1411Test {
 
     @Test
     fun walkLineShowsDistanceAndSteps() {
-        assertEquals("≈ 0,58 km · 812 βήματα", walkLine(584.64 to true, 812))
-        assertEquals("2,18 km · 2.900 βήματα", walkLine(2180.0 to false, 2900))
-        assertEquals("812 βήματα", walkLine(0.0 to false, 812))
-        assertEquals("1 βήμα", walkLine(0.0 to false, 1))
-        assertEquals("—", walkLine(0.0 to false, 0))
+        // Απόσταση και ρυθμός (αίτημα χρήστη 14/11, μετά το round 14), από κάτω τα βήματα.
+        assertEquals("≈ 0,58 km · 12:12 /km" to "812 βήματα", walkLines(584.64 to true, 812, 428))
+        assertEquals("2,18 km · 11:15 /km" to "2.900 βήματα", walkLines(2180.0 to false, 2900, 1471))
+        // Λιγότερο από 50 m: χωρίς ρυθμό (θα ήταν θόρυβος).
+        assertEquals("≈ 0,04 km" to "60 βήματα", walkLines(40.0 to true, 60, 30))
+        assertEquals("812 βήματα" to null, walkLines(0.0 to false, 812, 428))
+        assertEquals("1 βήμα" to null, walkLines(0.0 to false, 1, 1))
+        assertEquals("—" to null, walkLines(0.0 to false, 0, 0))
         assertEquals("12.345", thousandsEl(12_345))
     }
 
