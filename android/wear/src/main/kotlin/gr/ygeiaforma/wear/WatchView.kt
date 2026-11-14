@@ -945,10 +945,13 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // στη θέση του «Δεν ξέρω») και τα κουμπιά 28u ψηλά (πριν 30u).
         val y1 = 43f
         val y2 = y1 + 15f * fs
-        t(c, "Πόσες ακόμα", y1, Color.WHITE, 12f * fs, true)
-        t(c, "θα έβγαζες;", y2, Color.WHITE, 12f * fs, true)
+        // Round 8 (R8-U3-01): μετά το 1ο σετ άσκησης «πρώτης φοράς» της προπόνησης του κινητού, ίδια κουμπιά με τίτλο
+        // «Πρώτο σετ: / πόσες ακόμα;» (η 1η γραμμή στενότερη από το «Πόσες ακόμα», η 2η στη φαρδύτερη θέση).
+        val first = Repo.session?.firstPending == true
+        t(c, if (first) FIRST_SET_LINE1 else "Πόσες ακόμα", y1, Color.WHITE, 12f * fs, true)
+        t(c, if (first) FIRST_SET_LINE2 else "θα έβγαζες;", y2, Color.WHITE, 12f * fs, true)
         small(c, "με καλή τεχνική", y2 + 12.5f * fs, gray, ess(10f), 120f)
-        sayAdd("Πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;")
+        sayAdd(if (first) FIRST_SET_SAY else "Πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;")
         val labels = listOf("0", "1", "2", "3", "4+")
         val descs = listOf("Καμία", "Μία", "Δύο", "Τρεις", "Τέσσερις ή περισσότερες")
         // Δύο σειρές: 0 1 2 / 3 4+ (μεγάλα κουμπιά για τον καρπό· περιοχή 40u ≈ 48 dp).
@@ -1492,6 +1495,11 @@ internal const val ZONE_MUTED_SAY = "Σίγαση, Μην ενοχλείτε ή 
 /** Η οθόνη του τέλους όταν το αποτέλεσμα δεν γράφτηκε πουθενά ([Repo.endUnsaved], R7-A8-5). Κείμενα προς έγκριση. */
 internal const val UNSAVED_TITLE = "Δεν αποθηκεύτηκε"
 internal const val UNSAVED_TEXT = "Μάλλον γέμισε ο χώρος του ρολογιού. Άδειασε λίγο χώρο και άνοιξε ξανά την εφαρμογή."
+
+/** «Πρώτο σετ: πόσες ακόμα;» στην οθόνη της ρεζέρβας (R8-U3-01), σε δύο γραμμές, και για το TalkBack. Κείμενα προς έγκριση. */
+internal const val FIRST_SET_LINE1 = "Πρώτο σετ:"
+internal const val FIRST_SET_LINE2 = "πόσες ακόμα;"
+internal const val FIRST_SET_SAY = "Πρώτο σετ: πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;"
 
 /** Η προπόνηση κλείνει ακόμα, αντί για την αρχική (R8-A8-1). Κείμενα προς έγκριση. */
 internal const val CLOSING_TITLE = "Αποθηκεύεται"

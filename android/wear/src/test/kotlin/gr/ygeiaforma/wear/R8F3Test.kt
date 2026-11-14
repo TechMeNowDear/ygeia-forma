@@ -246,6 +246,145 @@ class R8F3Test {
         assertEquals(0L, LiveSession.phoneFromWatchState(LiveSession.phoneWatchState(old))!!.res)
     }
 
+    // ------------------------------------------------------------------ R8-U3-01 (ρολόι)
+    /** Η ίδια προπόνηση του κινητού με «f»: 1 στην άσκηση (εκκρεμεί η ερώτηση του 1ου σετ). */
+    private fun withFirst(json: String): String =
+        JSONObject(json).also { it.getJSONArray("items").getJSONObject(0).put("f", 1) }.toString()
+
+    /** ✓ του 1ου σετ στο ρολόι, σε άσκηση με «f»: η ερώτηση ανοίγει· χωρίς «f», σε άλλο σετ ή χωρίς κινητό: όχι. */
+    @Test
+    fun firstSetQuestionOpensOnlyForTheFirstSetOfAFlaggedExercise() {
+        Repo.applyPhone(LiveSession.parsePhone(withFirst(phoneJson("sA", t0, set(10), set(10), set(10)))))
+        runningPhone("sA")
+        val p = Repo.phone!!
+        assertTrue(p.items[0].first)
+        assertFalse(p.firstPending)
+        // Το διάλειμμα ξεκινά όπως μετά από κάθε ✓.
+        assertEquals(LiveSession.Next.REST, p.tick(t0 + 60_000))
+        assertTrue(p.restEnd > t0 + 60_000)
+        assertTrue(p.askFirst(0, 0, LiveSession.Next.REST))
+        assertEquals(0, p.firstIdx)
+        assertTrue(p.firstPending)
+        assertFalse(p.rirPending)
+        // Το 2ο σετ: καμία ερώτηση· και η ίδια άσκηση δεν ξαναρωτιέται.
+        assertFalse(p.askFirst(0, 1, LiveSession.Next.REST))
+        assertFalse(p.askFirst(0, 0, LiveSession.Next.REST))
+        // Χωρίς «f» (παλιό κινητό, ή όχι «πρώτη φορά»): όπως πριν.
+        clean()
+        Repo.applyPhone(LiveSession.parsePhone(phoneJson("sB", t0, set(10), set(10))))
+        val plain = Repo.phone!!
+        assertFalse(plain.items[0].first)
+        assertEquals(LiveSession.Next.REST, plain.tick(t0 + 60_000))
+        assertFalse(plain.askFirst(0, 0, LiveSession.Next.REST))
+        assertEquals(-1, plain.firstIdx)
+        // Τελευταίο σετ (ακολουθεί η ρεζέρβα της άσκησης): όχι η ερώτηση του 1ου σετ.
+        assertFalse(LiveSession.parsePhone(withFirst(phoneJson("sC", t0, set(10))))!!.askFirst(0, 0, LiveSession.Next.ASK_RIR))
+        // Προπόνηση του ρολογιού (χωρίς κινητό): ποτέ, ακόμα κι αν η άσκηση είχε «f».
+        val own = LiveSession("w1", "A", "Α", t0, listOf(ItemT("db_press", "Π", 90, 8, 12, 2, mutableListOf(SetT(10.3, "10,3 kg", 8), SetT(10.3, "10,3 kg", 8)), first = true)))
+        assertEquals(LiveSession.Next.REST, own.tick(t0 + 1_000))
+        assertFalse(own.askFirst(0, 0, LiveSession.Next.REST))
+        // Το «f» διαβάζεται και ως true.
+        val asTrue = JSONObject(phoneJson("sD", t0, set(10), set(10))).also { it.getJSONArray("items").getJSONObject(0).put("f", true) }.toString()
+        assertTrue(LiveSession.parsePhone(asTrue)!!.items[0].first)
+        // Η οθόνη: ✓ → ερώτηση (ρεζέρβα με τίτλο «Πρώτο σετ»), η απάντηση → «rir1».
+        val act = source("WatchActivity.kt")
+        assertTrue(act.contains("val askFirst = si >= 0 && s.askFirst(i, si, next)"))
+        assertTrue(act.contains("Repo.screen = if (askFirst) Repo.Screen.RIR else when (next) {"))
+        assertTrue(act.contains("if (s.phone && item != null) cmd(rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, rir))"))
+    }
+
+    /** Η απάντηση: η εντολή «rir1» ακριβώς όπως τη δέχεται το κινητό (CROSS.md), και η ρεζέρβα της άσκησης δεν αλλάζει. */
+    @Test
+    fun firstSetAnswerSendsRir1() {
+        val c = rir1Cmd(2, "db_press", t0 + 60_000, 3)
+        assertEquals(setOf("op", "i", "s", "ex", "v", "at"), c.keys().asSequence().toSet())
+        assertEquals("rir1", c.getString("op"))
+        assertEquals(2, c.getInt("i"))
+        assertEquals(0, c.getInt("s"))
+        assertEquals("db_press", c.getString("ex"))
+        assertEquals(3, c.getInt("v"))
+        assertEquals(t0 + 60_000, c.getLong("at"))
+        // «Δεν ξέρω» = −1· χωρίς ώρα ✓: χωρίς «at» (το κινητό κρίνει με το «τώρα»)· ποτέ πάνω από 4.
+        val unknown = rir1Cmd(0, "db_row", 0L, -1)
+        assertEquals(-1, unknown.getInt("v"))
+        assertFalse(unknown.has("at"))
+        assertEquals(4, rir1Cmd(0, "db_row", 0L, 7).getInt("v"))
+        // Η ροή της οθόνης: η απάντηση κλείνει την ερώτηση και δίνει τη θέση της άσκησης.
+        Repo.applyPhone(LiveSession.parsePhone(withFirst(phoneJson("sA", t0, set(10), set(10)))))
+        runningPhone("sA")
+        val p = Repo.phone!!
+        p.tick(t0 + 60_000)
+        assertTrue(p.askFirst(0, 0, LiveSession.Next.REST))
+        assertEquals(0, p.answerFirst())
+        assertEquals(-1, p.firstIdx)
+        assertFalse(p.firstPending)
+        assertEquals(-1, p.answerFirst())
+        assertNull(p.items[0].rir)
+        assertFalse(p.rirPending)
+        val sent = rir1Cmd(0, p.items[0].ex, p.items[0].sets[0].at, 2)
+        assertEquals(t0 + 60_000, sent.getLong("at"))
+        assertEquals("db_press", sent.getString("ex"))
+    }
+
+    /** Το κινητό απάντησε πρώτο (νέα κατάσταση χωρίς «f»): η ερώτηση κλείνει εδώ χωρίς αποστολή· με «f» ακόμα, μένει. */
+    @Test
+    fun firstSetQuestionClosesWhenThePhoneAnswered() {
+        Repo.applyPhone(LiveSession.parsePhone(withFirst(phoneJson("sA", t0, set(10), set(10), set(10)))))
+        runningPhone("sA")
+        Repo.phone!!.tick(t0 + 60_000)
+        assertTrue(Repo.phone!!.askFirst(0, 0, LiveSession.Next.REST))
+        // Το κινητό είδε το ✓ αλλά δεν απαντήθηκε ακόμα: «f» ακόμα → η ερώτηση μένει ανοιχτή.
+        Repo.applyPhone(LiveSession.parsePhone(withFirst(phoneJson("sA", t0, set(10, done = true, at = t0 + 60_000), set(10), set(10)))))
+        assertTrue(Repo.phone!!.firstPending)
+        assertEquals(0, Repo.phone!!.firstIdx)
+        // Απαντήθηκε στο κινητό: χωρίς «f».
+        Repo.applyPhone(LiveSession.parsePhone(phoneJson("sA", t0, set(10, done = true, at = t0 + 60_000), set(10), set(10))))
+        val n = Repo.phone!!
+        assertFalse(n.firstPending)
+        assertEquals(-1, n.firstIdx)
+        assertEquals(-1, n.answerFirst())
+        assertTrue("db_press" in n.firstAsked)
+        // Η οθόνη το κλείνει μόνη της (όπως τη ρεζέρβα που απαντήθηκε στο κινητό).
+        assertTrue(source("WatchActivity.kt").contains("else if (s.phone && !s.rirPending && !s.firstPending) Repo.screen ="))
+    }
+
+    /** Ποτέ δεύτερη φορά: ούτε με νέο ✓ του 1ου σετ, ούτε μετά από απότομο κλείσιμο της εφαρμογής του ρολογιού. */
+    @Test
+    fun firstSetQuestionIsNeverAskedTwice() {
+        val phone = withFirst(phoneJson("sA", t0, set(10), set(10), set(10)))
+        Repo.applyPhone(LiveSession.parsePhone(phone))
+        runningPhone("sA")
+        val p = Repo.phone!!
+        p.tick(t0 + 60_000)
+        assertTrue(p.askFirst(0, 0, LiveSession.Next.REST))
+        assertEquals(0, p.answerFirst())
+        // Το κινητό είδε το ✓, μετά το 1ο σετ βγήκε εκεί (χωρίς απάντηση, «f» ακόμα) και ξαναγίνεται ✓ στο ρολόι: καμία νέα ερώτηση.
+        Repo.applyPhone(LiveSession.parsePhone(withFirst(phoneJson("sA", t0, set(10, done = true, at = t0 + 60_000), set(10), set(10)))))
+        Repo.applyPhone(LiveSession.parsePhone(phone))
+        val again = Repo.phone!!
+        assertEquals(0, again.items[0].nextSet)
+        assertEquals(LiveSession.Next.REST, again.tick(t0 + 120_000))
+        assertFalse(again.askFirst(0, 0, LiveSession.Next.REST))
+        // Στιγμιότυπο → απότομο κλείσιμο → συνέχεια: «fa» κρατά ότι ρωτήθηκε.
+        val snap = Repo.captureRun(t0 + 130_000)!!
+        assertEquals("[\"db_press\"]", snap.getJSONObject("pp").getJSONArray("fa").toString())
+        val text = snap.toString()
+        Repo.phone = null
+        Repo.lastPhone = null
+        Repo.resetExercise()
+        Repo.applyPhone(LiveSession.parsePhone(phone))
+        assertTrue(Repo.restoreRun(JSONObject(text), t0 + 140_000, 9_000_000))
+        val back = Repo.phone!!
+        assertTrue(back.firstAsked.toString(), "db_press" in back.firstAsked)
+        assertFalse(back.firstPending)
+        back.items[0].sets[0].done = false
+        assertEquals(LiveSession.Next.REST, back.tick(t0 + 150_000))
+        assertFalse(back.askFirst(0, 0, LiveSession.Next.REST))
+        // Στιγμιότυπο χωρίς «fa» (έκδοση ως #105): τίποτα δεν αλλάζει.
+        assertTrue(LiveSession.phoneFromWatchState(LiveSession.phoneWatchState(LiveSession.parsePhone(phone)!!))!!.firstAsked.isEmpty())
+        assertFalse(LiveSession.phoneWatchState(LiveSession.parsePhone(phone)!!).has("fa"))
+    }
+
     // ------------------------------------------------------------------ R8-U3-03
     /** Η υπενθύμιση «Τρέχει ακόμα η προπόνηση;» πάνω από την ερώτηση ρεζέρβας (εκεί δεν υπάρχει «Τέλος»). */
     @Test
@@ -582,6 +721,58 @@ class R8F3ViewTest {
         // Χωρίς επιλογή: καμία μέρα.
         w.chosen = null
         assertNull(w.chosenDay)
+    }
+
+    // ------------------------------------------------------------------ R8-U3-01 (ρολόι)
+    /** «Πρώτο σετ: / πόσες ακόμα;» στην οθόνη της ρεζέρβας: ίδια κουμπιά (και «Δεν ξέρω»), ολόκληρο και με γράμματα 1,3×. */
+    @Test
+    fun firstSetQuestionScreen() {
+        val now = System.currentTimeMillis()
+        val did = mutableListOf<Int>()
+        val acts = object : WatchView.Actions by noop {
+            override fun answer(rir: Int) {
+                did.add(rir)
+            }
+        }
+        for (scale in listOf(1f, 1.3f)) {
+            RuntimeEnvironment.setFontScale(scale)
+            Repo.applyPhone(
+                LiveSession.parsePhone(
+                    """{"active":true,"id":"s9","w":"A","name":"Προπόνηση Α","start":$now,"idx":0,
+                        "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"f":1,"sets":[{"load":10.3,"label":"10,3 kg","reps":8},{"load":10.3,"label":"10,3 kg","reps":8}]}]}""",
+                ),
+            )
+            Repo.running = "strength"
+            Repo.runningPhone = true
+            Repo.runningSid = "s9"
+            Repo.startedAt = now - 60_000
+            Repo.bpm = 118
+            Repo.bpmAt = now
+            val p = Repo.phone!!
+            assertEquals(LiveSession.Next.REST, p.tick(now))
+            assertTrue(p.askFirst(0, 0, LiveSession.Next.REST))
+            Repo.screen = Repo.Screen.RIR
+            val v = newView(acts)
+            val bmp = draw(v, if (scale == 1f) "R8_W4d_first_set" else "R8_W4e_first_set_font13")
+            assertEquals(FIRST_SET_SAY, labels(v).first())
+            assertTrue(v.drawnSizes.toString(), FIRST_SET_LINE1 in v.drawnSizes!! && FIRST_SET_LINE2 in v.drawnSizes!!)
+            assertFalse(v.drawnSizes.toString(), "Πόσες ακόμα" in v.drawnSizes!!)
+            assertTrue(labels(v).toString(), RIR_UNKNOWN in labels(v))
+            assertEquals(6, buttons(v).size)
+            assertTrue(v.clipped.toString(), v.clipped.isEmpty())
+            assertTrue("${maxRadius(bmp)}", maxRadius(bmp) <= 98.5f)
+            assertNoOverlaps(v)
+            assertTrue(v.a11yClick(labels(v).indexOf(RIR_UNKNOWN)))
+            // Η κανονική ρεζέρβα (χωρίς ερώτηση 1ου σετ): ο παλιός τίτλος.
+            p.answerFirst()
+            val plain = newView(acts)
+            draw(plain)
+            assertTrue(plain.drawnSizes.toString(), "Πόσες ακόμα" in plain.drawnSizes!! && "θα έβγαζες;" in plain.drawnSizes!!)
+            Repo.applyPhone(null)
+            Repo.lastPhone = null
+            Repo.resetExercise()
+        }
+        assertEquals(listOf(-1, -1), did)
     }
 
     // ------------------------------------------------------------------ R8-U3 Β2

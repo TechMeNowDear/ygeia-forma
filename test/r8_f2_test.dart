@@ -417,6 +417,9 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(s.items.first.log.first.done, isTrue);
       expect(find.text('Πρώτο σετ: πόσες ακόμα θα έβγαζες;'), findsOneWidget);
+      // Το φύλλο ανοίγει σε post-frame callback: η κίνησή του ξεκινά στο επόμενο καρέ.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.byKey(const ValueKey('rir-0')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('rir-ok')));

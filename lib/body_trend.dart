@@ -275,6 +275,6 @@ bool bodyNotPermitted(Dashboard? d) => d != null && d.hasAnyPermission && !d.bod
 /// ζύγιση έγινε αλλά δεν μπορούσε να φτάσει). Η διαδρομή υπάρχει: Ρυθμίσεις › «Άδειες Samsung Health» (settings.dart).
 const bodyNoPermissionTitle = 'Δεν έχει δοθεί άδεια για τις ζυγίσεις';
 const bodyNoPermissionText = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή, γι\' αυτό οι ζυγίσεις της '
-    'InBody δεν φτάνουν εδώ. Άνοιξέ τη από τις «Άδειες Samsung Health».';
-const bodyNoPermissionShort = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή· άνοιξέ τη από Ρυθμίσεις › '
+    'InBody δεν φτάνουν εδώ. Άνοιξέ την από τις «Άδειες Samsung Health».';
+const bodyNoPermissionShort = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή· άνοιξέ την από Ρυθμίσεις › '
     'Άδειες Samsung Health.';

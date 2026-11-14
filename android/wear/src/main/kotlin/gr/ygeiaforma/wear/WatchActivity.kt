@@ -264,9 +264,10 @@ class WatchActivity : Activity(), WatchView.Actions {
         val s = Repo.session
         when (Repo.screen) {
             Repo.Screen.REST -> if (s == null || s.restEnd <= now) Repo.screen = if (s == null) Repo.Screen.HOME else Repo.Screen.SET
-            // Η ρεζέρβα απαντήθηκε στο κινητό: η ερώτηση φεύγει κι από εδώ (W2-18).
+            // Η ρεζέρβα απαντήθηκε στο κινητό: η ερώτηση φεύγει κι από εδώ (W2-18). Το ίδιο το «Πρώτο σετ» (R8-U3-01): το
+            // κινητό δεν το ζητά πια («f») → κλείνει χωρίς αποστολή.
             Repo.Screen.RIR -> if (s == null) Repo.screen = Repo.Screen.HOME
-                else if (s.phone && !s.rirPending) Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
+                else if (s.phone && !s.rirPending && !s.firstPending) Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             Repo.Screen.SET -> if (s == null && Repo.running == null) Repo.screen = Repo.Screen.HOME
                 else if (s != null && s.phone && s.restEnd > now) Repo.screen = Repo.Screen.REST
             Repo.Screen.HOME, Repo.Screen.WALK -> if (Repo.running == "walk") Repo.screen = if (Repo.recoveryUntil > 0) Repo.Screen.RECOVER else Repo.Screen.WALK
@@ -434,10 +435,13 @@ class WatchActivity : Activity(), WatchView.Actions {
         // Με την ώρα του ✓ εδώ: το κινητό τη γράφει όπως είναι (παλμοί ανά σετ), όχι την ώρα που έφτασε (9/11).
         // Και με τις επαναλήψεις, αν τις άλλαξες εδώ (Συμβούλιο 4, W-4): δεν εξαρτώνται από μια εντολή «reps» που ίσως χάθηκε.
         if (s.phone && cur != null && si >= 0) cmd(tickCmd(i, si, now, cur.ex, cur.sets[si].reps.takeIf { cur.sets[si].trail != null }))
+        // Round 8 (R8-U3-01): 1ο σετ άσκησης «πρώτης φοράς» της προπόνησης του κινητού («f»): «Πρώτο σετ: πόσες ακόμα;» εδώ,
+        // όπως στο κινητό (πριν η βαθμονόμηση χανόταν για πάντα με ✓ στο ρολόι). Το διάλειμμα τρέχει από κάτω.
+        val askFirst = si >= 0 && s.askFirst(i, si, next)
         // Στιγμιότυπο σε κάθε ✓, και σε προπόνηση του κινητού (έλεγχος 13/11, round 7, R7-A8-1): ένα ✓ που το κινητό δεν έχει
         // δει ακόμα δεν χάνεται αν η εφαρμογή του ρολογιού κλείσει απότομα πριν φτάσει.
         saveRun()
-        Repo.screen = when (next) {
+        Repo.screen = if (askFirst) Repo.Screen.RIR else when (next) {
             LiveSession.Next.REST -> if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             LiveSession.Next.ASK_RIR -> Repo.Screen.RIR
             LiveSession.Next.SET -> Repo.Screen.SET
@@ -448,6 +452,16 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun answer(rir: Int) {
         val s = Repo.session ?: return
         val now = System.currentTimeMillis()
+        // Round 8 (R8-U3-01): πρώτα η ερώτηση του 1ου σετ, αν είναι ανοιχτή: η απάντηση (και το «Δεν ξέρω» = −1) πάει στο
+        // κινητό ως «rir1», που βαθμονομεί τα επόμενα σετ. Η ρεζέρβα της άσκησης δεν αλλάζει. Μετά: το διάλειμμα (τρέχει ήδη).
+        if (s.firstIdx >= 0) {
+            val fi = s.answerFirst()
+            val item = s.items.getOrNull(fi)
+            if (s.phone && item != null) cmd(rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, rir))
+            saveRun()
+            Repo.screen = if (s.rirPending) Repo.Screen.RIR else if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
+            return
+        }
         val (next, i) = s.answer(rir, now)
         if (i < 0) {
             // Καμία άσκηση δεν περιμένει απάντηση (π.χ. απαντήθηκε στο κινητό): δεν γράφεται πουθενά (W2-18).

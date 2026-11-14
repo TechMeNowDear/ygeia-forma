@@ -136,6 +136,11 @@ fun mergeWatchEdits(prev: LiveSession, s: LiveSession) {
     }
     // Η ερώτηση για ρεζέρβα μένει για την άσκηση που τελείωσε, όχι για όποια δείχνει τώρα το κινητό.
     if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
+    // R8-U3-01: όσες ρωτήθηκαν δεν ξαναρωτιούνται· η ερώτηση του 1ου σετ μένει ανοιχτή μόνο όσο το κινητό τη θέλει ακόμα
+    // («f» στην ίδια άσκηση). Απαντήθηκε στο κινητό (χωρίς «f»): κλείνει εδώ, χωρίς αποστολή.
+    s.firstAsked.addAll(prev.firstAsked)
+    val fi = prev.firstIdx
+    if (fi >= 0 && s.items.getOrNull(fi)?.let { it.first && it.ex == prev.items.getOrNull(fi)?.ex } == true) s.firstIdx = fi
 }
 
 /**
@@ -161,6 +166,15 @@ fun tickCmd(i: Int, k: Int, at: Long, ex: String, reps: Int?, late: Boolean = fa
         if (reps != null) it.put("r", reps)
         if (late) it.put("late", true)
     }
+
+/**
+ * Εντολή «απάντηση στο Πρώτο σετ» προς το κινητό (έλεγχος 14/11, round 8, R8-U3-01, συμβόλαιο με το κινητό στο CROSS.md):
+ * άσκηση [i] και [ex] όπως στο «tick», σετ 0, η ώρα του ✓ του 1ου σετ [at] (για τον ίδιο έλεγχο «ανήκει στην προπόνηση»)
+ * και [v] 0–4 όπως τα κουμπιά της ρεζέρβας, ή −1 για «Δεν ξέρω» (εκεί το κινητό δεν αλλάζει τίποτα). Το sid / pv / q τα
+ * βάζει ο αποστολέας, όπως σε κάθε εντολή. Κινητό παλιότερης έκδοσης: άγνωστη εντολή, δεν κάνει τίποτα.
+ */
+fun rir1Cmd(i: Int, ex: String, at: Long, v: Int): JSONObject =
+    JSONObject().put("op", "rir1").put("i", i).put("s", 0).put("ex", ex).put("v", v.coerceIn(-1, 4)).also { if (at > 0) it.put("at", at) }
 
 /**
  * Τα όρια χρόνου του «Τέλος» (τελικός έλεγχος, Συμβούλιο 4, W-1/W-2). Κάθε κλήση προς το Health Services και προς το
@@ -204,6 +218,11 @@ class ItemT(
     var rir: Int? = null,
     /** Παραλείφθηκε στο κινητό («skip»: 1, έλεγχος γ2, W2-06): το ρολόι δεν πηγαίνει εκεί. */
     val skipped: Boolean = false,
+    /**
+     * Μόνο σε προπόνηση του κινητού («f»: 1, έλεγχος 14/11, round 8, R8-U3-01): εκκρεμεί η ερώτηση «Πρώτο σετ: πόσες ακόμα;»
+     * αυτής της άσκησης (πρώτη φορά, ελαφριά αρχή). Λείπει = όχι (παλιό κινητό, ή απαντήθηκε).
+     */
+    val first: Boolean = false,
 ) {
     val complete: Boolean get() = sets.all { it.done }
 
@@ -378,6 +397,8 @@ internal fun itemOf(o: JSONObject): ItemT {
         }.toMutableList(),
         rir = if (o.has("ra") && !o.isNull("ra")) o.getInt("ra") else null,
         skipped = o.optInt("skip", 0) == 1,
+        // R8-U3-01: «f»: 1 (ή true) από το κινητό.
+        first = o.optInt("f", 0) == 1 || o.optBoolean("f", false),
     )
 }
 
@@ -438,6 +459,38 @@ class LiveSession(
      * όχι πια — η οθόνη του ρολογιού την αφήνει (έλεγχος γ2, W2-18).
      */
     val rirPending: Boolean get() = rirIdx >= 0 && items.getOrNull(rirIdx)?.rir == null
+
+    /**
+     * Έλεγχος 14/11, round 8 (R8-U3-01), μόνο σε προπόνηση του κινητού: η άσκηση (θέση) που περιμένει εδώ απάντηση στο
+     * «Πρώτο σετ: πόσες ακόμα;» (−1 = καμία), και οι ασκήσεις (id) για τις οποίες ρωτήθηκε ήδη σε αυτή την προπόνηση: ποτέ
+     * δεύτερη φορά (κρατιούνται και στο στιγμιότυπο, «fa»).
+     */
+    var firstIdx: Int = -1
+    val firstAsked: MutableSet<String> = mutableSetOf()
+
+    /** Η ερώτηση του 1ου σετ είναι ανοιχτή εδώ και το κινητό τη θέλει ακόμα («f»). */
+    val firstPending: Boolean get() = firstIdx >= 0 && items.getOrNull(firstIdx)?.first == true
+
+    /**
+     * Μετά το ✓ του σετ [k] της άσκησης [i] σε αυτό το ρολόι ([tick] έδωσε [next]): ανοίγει η ερώτηση του 1ου σετ, αν είναι
+     * προπόνηση του κινητού, το σετ είναι το 1ο, το κινητό τη ζητά («f») και δεν ρωτήθηκε ήδη. Μόνο όταν ακολουθεί
+     * διάλειμμα (μένουν σετ): το διάλειμμα τρέχει κανονικά από κάτω. true αν άνοιξε.
+     */
+    fun askFirst(i: Int, k: Int, next: Next): Boolean {
+        val it = items.getOrNull(i) ?: return false
+        if (!phone || k != 0 || !it.first || next != Next.REST || it.ex in firstAsked) return false
+        firstIdx = i
+        firstAsked.add(it.ex)
+        return true
+    }
+
+    /** Η απάντηση κλείνει την ερώτηση του 1ου σετ. Η θέση της άσκησης για την εντολή, ή −1 αν δεν περίμενε τίποτα. */
+    fun answerFirst(): Int {
+        val pending = firstPending
+        val i = firstIdx
+        firstIdx = -1
+        return if (pending) i else -1
+    }
 
     /** Όλες οι ασκήσεις τελείωσαν (ή παραλείφθηκαν στο κινητό). */
     val allDone: Boolean get() = items.all { it.finished }
@@ -644,6 +697,8 @@ class LiveSession(
             }
             // R8-A8-3: και η «Συνέχεια» του κινητού (νέο, προαιρετικό πεδίο).
             if (s.res > 0) o.put("res", s.res)
+            // R8-U3-01: οι ασκήσεις που ρωτήθηκαν ήδη για το 1ο σετ (νέο, προαιρετικό πεδίο): ούτε μετά από επανεκκίνηση ξανά.
+            if (s.firstAsked.isNotEmpty()) o.put("fa", JSONArray(s.firstAsked.sorted()))
             return o
         }
 
@@ -665,7 +720,9 @@ class LiveSession(
                 LiveSession(
                     s.id, s.workout, s.name, s.start, s.items, s.idx, s.restEnd, phone = true, rirIdx = s.rirIdx, restLen = s.restLen,
                     res = o.optLong("res", 0),
-                )
+                ).also { p ->
+                    o.optJSONArray("fa")?.let { a -> for (k in 0 until a.length()) a.optString(k, "").takeIf { it.isNotEmpty() }?.let { p.firstAsked.add(it) } }
+                }
             } catch (_: Exception) {
                 null
             }
