@@ -49,6 +49,18 @@ object WidgetText {
      */
     fun chipWithUnit(valueW: Float, unitW: Float, avail: Float): Boolean = unitW > 0f && valueW + unitW <= avail
 
+    /** Σύντομο όνομα κουτιού όταν το κανονικό δεν χωρά (14/11, με τα μεγαλύτερα γράμματα)· null = δεν χρειάζεται. */
+    fun shortLabel(key: String): String? = when (key) {
+        "carbs" -> "Υδατ/κες"
+        "bmr" -> "BMR"
+        "skinTemp" -> "Θερμ. καρπού"
+        "lowHr" -> "Χαμηλοί"
+        "dayHr" -> "Παλμοί"
+        "activeKcal" -> "Ενεργές"
+        "totalKcal" -> "Σύνολο"
+        else -> null
+    }
+
     /** Το βήμα της σμίκρυνσης κειμένου στο widget (5% του αρχικού μεγέθους). */
     const val SHRINK_STEP = 0.05f
 

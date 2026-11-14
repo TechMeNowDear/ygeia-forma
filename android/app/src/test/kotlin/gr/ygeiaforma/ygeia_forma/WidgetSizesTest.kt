@@ -28,9 +28,16 @@ class WidgetSizesTest {
     @Test
     fun fewerBoxes() {
         assertEquals(3, WidgetRenderer.maxValues(WidgetRenderer.Shape.COLUMN1))
-        assertEquals(4, WidgetRenderer.maxValues(WidgetRenderer.Shape.COLUMN2))
+        assertEquals(6, WidgetRenderer.maxValues(WidgetRenderer.Shape.COLUMN2))
         assertEquals(2, WidgetRenderer.maxValues(WidgetRenderer.Shape.SMALL))
         assertEquals(4, WidgetRenderer.maxValues(WidgetRenderer.Shape.WIDE))
+    }
+
+    @Test
+    fun shortNamesInsteadOfCutWords() {
+        assertEquals("Υδατ/κες", WidgetText.shortLabel("carbs"))
+        assertEquals("BMR", WidgetText.shortLabel("bmr"))
+        assertEquals(null, WidgetText.shortLabel("protein"))
     }
 
     @Test

@@ -36,10 +36,13 @@ object WidgetRenderer {
         else -> Shape.SMALL
     }
 
-    /** Το πολύ τόσα κουτάκια τιμών (14/11: λιγότερα, με μεγαλύτερα γράμματα· πριν 5 / 6 / 4 / 4). */
+    /**
+     * Το πολύ τόσα κουτάκια τιμών (14/11: λιγότερα, με μεγαλύτερα γράμματα· πριν 5 / 6 / 4 / 4). Η ψηλή στήλη κρατά 6:
+     * εκεί χωρούν και μεγάλα (αλλιώς έμενε κενό στη μέση)· όσα δεν χωρούν σε ένα μέγεθος φεύγουν μόνα τους ([draw]).
+     */
     fun maxValues(shape: Shape) = when (shape) {
         Shape.COLUMN1 -> 3
-        Shape.COLUMN2 -> 4
+        Shape.COLUMN2 -> 6
         Shape.WIDE -> 4
         Shape.SMALL -> 2
     }
@@ -508,7 +511,9 @@ object WidgetRenderer {
                 val e = entry(k)
                 val ip = dp(6f)
                 // Round 9 (R9-U1-4): σύντομο όνομα («ls») όταν το κανονικό δεν χωρά ούτε μικρότερο (π.χ. «Energy Score»).
-                val label = WidgetText.chipLabel(e?.optString("l") ?: labelOf(k), e?.optString("ls")) {
+                // 14/11: και σύντομα ονόματα εδώ για όσα δεν στέλνει η εφαρμογή («Υδατ/κες», «BMR»), αντί για «Υδατάνθρ…».
+                val short = e?.optString("ls")?.takeIf { it.isNotEmpty() } ?: WidgetText.shortLabel(k)
+                val label = WidgetText.chipLabel(e?.optString("l") ?: labelOf(k), short) {
                     lp.measureText(it) * WidgetText.MIN_SCALE_SMALL <= cw - ip * 2
                 }
                 val lb = y + dp(5f) - lp.ascent()
