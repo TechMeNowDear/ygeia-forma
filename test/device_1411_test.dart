@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/pages/training/hr_widgets.dart';
 import 'package:ygeia_forma/pages/training/training_page.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/data.dart' show todayCards;
 import 'package:ygeia_forma/pages/settings.dart' show voiceSettingText;
 import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/training_store.dart';
@@ -236,6 +237,26 @@ void main() {
       expect(voiceSettingText, contains('«Εκτός εύρους»'));
       final settings = File('lib/pages/settings.dart').readAsStringSync();
       expect(settings, contains("key: const ValueKey('settings-voice-switch')"));
+    });
+  });
+
+  group('7. Σήμερα: Κίνηση, Καρδιά, Σώμα πριν από τη Διατροφή (αίτημα χρήστη 14/11)', () {
+    test('νέες κάρτες, ανοιχτές από προεπιλογή', () {
+      final keys = [for (final c in todayCards) c.key];
+      for (final k in ['exweek', 'awake', 'fat']) {
+        expect(keys, contains(k));
+        expect(todayCards.firstWhere((c) => c.key == k).defaultOn, isTrue);
+      }
+    });
+    test('η σειρά: Κίνηση, Καρδιά, Σώμα, Διατροφή', () {
+      final src = File('lib/pages/today.dart').readAsStringSync();
+      final i = src.indexOf("...section('Κίνηση', move),");
+      final j = src.indexOf("...section('Καρδιά', heart),");
+      final k = src.indexOf("...section('Σώμα', body),");
+      final f = src.indexOf("if (foodCard != null) ...[const SectionHeader('Διατροφή'), foodCard],");
+      expect(i > 0 && i < j && j < k && k < f, isTrue);
+      // Παλμοί ξύπνιος: μόνο ολοκληρωμένη μέρα (όπως στην Καρδιά), με το «συνήθως».
+      expect(src, contains("title: datedTitle('Παλμοί ξύπνιος', last, now),"));
     });
   });
 }
