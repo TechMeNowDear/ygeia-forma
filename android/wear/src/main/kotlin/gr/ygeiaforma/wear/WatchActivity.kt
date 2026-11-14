@@ -35,6 +35,12 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     /** Άνοιγμα από το tile «Περπάτημα» (14/11): ξεκινά περπάτημα μόλις διαβαστεί η κατάσταση ([onStart]). */
     private var walkFromTile = false
+
+    /** «Δοκιμή φωνής» από το κινητό (15/11, [VoiceTest]): ξεκινά μόλις διαβαστεί η κατάσταση. */
+    private var voiceTestPending = false
+
+    /** Ως τότε η οθόνη μένει αναμμένη (αντίστροφη μέτρηση και φράση της δοκιμής· σβηστή οθόνη = άλλη συμπεριφορά ήχου). */
+    private var voiceTestUntil = 0L
     /**
      * Η κατάσταση του κινητού διαβάστηκε σε αυτό το άνοιγμα ([Link.load] στο [onStart]· έλεγχος 14/11, round 8, R8-A8-6).
      * Ως τότε (π.χ. άνοιγμα από το κινητό ενώ η εφαρμογή ήταν στο παρασκήνιο, χωρίς σύνδεση) η μνήμη μπορεί να έχει μια
@@ -122,6 +128,11 @@ class WatchActivity : Activity(), WatchView.Actions {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handle(intent)
+        // Η εφαρμογή ήταν ήδη μπροστά (δεν θα έρθει [onStart]): η δοκιμή φωνής ξεκινά εδώ.
+        if (visible && loaded && voiceTestPending) {
+            voiceTestPending = false
+            startVoiceTest()
+        }
         // Η εφαρμογή ήταν ήδη ανοιχτή: η προπόνηση του κινητού έχει ήδη έρθει, οπότε μπαίνει τώρα (όχι με την επόμενη
         // αλλαγή του κινητού, έλεγχος γ2, W2-23).
         redraw()
@@ -130,6 +141,7 @@ class WatchActivity : Activity(), WatchView.Actions {
     /** Άνοιγμα από το κινητό («Ξεκίνα» εκεί): μπαίνει στην προπόνηση του κινητού με παλμούς. Από το tile: περπάτημα. */
     private fun handle(i: Intent?, fresh: Boolean = true) {
         if (i?.data?.host == "session") joinWhenReady = true
+        if (i?.data?.host == "voicetest" && fresh) voiceTestPending = true
         if (i?.getStringExtra(WalkTileService.EXTRA_START) == WalkTileService.START_WALK) {
             i.removeExtra(WalkTileService.EXTRA_START)
             if (fresh) walkFromTile = true
@@ -167,6 +179,10 @@ class WatchActivity : Activity(), WatchView.Actions {
             if (walkFromTile) {
                 walkFromTile = false
                 if (Repo.running == null) startWalk()
+            }
+            if (voiceTestPending) {
+                voiceTestPending = false
+                startVoiceTest()
             }
         }
         view.post(tickRunnable)
@@ -289,8 +305,73 @@ class WatchActivity : Activity(), WatchView.Actions {
         }
         // Οθόνη αναμμένη μόνο στο διάλειμμα (για να φαίνεται η αντίστροφη μέτρηση)· αλλιώς σβήνει κανονικά.
         // Και στο λεπτό αποκατάστασης (αντίστροφη μέτρηση, 9/11).
-        if (Repo.screen == Repo.Screen.REST || Repo.screen == Repo.Screen.RECOVER) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Και όσο τρέχει η «Δοκιμή φωνής» (15/11).
+        if (Repo.screen == Repo.Screen.REST || Repo.screen == Repo.Screen.RECOVER || System.currentTimeMillis() < voiceTestUntil) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    // ------------------------------------------------------------------ δοκιμή φωνής
+    /**
+     * «Δοκιμή φωνής» (αίτημα χρήστη 15/11, [VoiceTest]): αντίστροφη μέτρηση [VoiceTest.DELAY_MS] (ώστε ο χρήστης να βγει
+     * στην αρχική του κινητού), μετά «Δοκιμή φωνής» με τον ίδιο δρόμο με το περπάτημα ([Voice.say]), και σε
+     * [VoiceTest.SETTLE_MS] πού ακούστηκε: στην οθόνη και στο κινητό. Όχι όσο τρέχει άσκηση (εκεί η φωνή είναι της άσκησης).
+     */
+    private fun startVoiceTest() {
+        if (Repo.running != null) {
+            Link.voiceTestDone(this, System.currentTimeMillis(), VoiceTest.BUSY)
+            showVoiceTest(VoiceTest.BUSY)
+            return
+        }
+        val voice = Voice.shared(this)
+        voice.start()
+        val end = System.currentTimeMillis() + VoiceTest.DELAY_MS
+        voiceTestUntil = end + VoiceTest.SETTLE_MS + 2_000L
+        syncScreen()
+        Repo.openNotice = true
+        val tick = object : Runnable {
+            override fun run() {
+                val left = ((end - System.currentTimeMillis() + 999) / 1000).toInt()
+                if (left > 0) {
+                    Repo.notice = VoiceTest.countdown(left)
+                    view.invalidate()
+                    voiceTestHandler.postDelayed(this, 1000)
+                    return
+                }
+                if (Repo.running != null) {
+                    Link.voiceTestDone(this@WatchActivity, System.currentTimeMillis(), VoiceTest.BUSY)
+                    showVoiceTest(VoiceTest.BUSY)
+                    return
+                }
+                var route: VoiceRoute? = null
+                voice.forgetFocus()
+                voice.say(Say.TEST, askPhone = Repo.plan?.voiceKnown == true) { route = it }
+                voiceTestHandler.postDelayed({
+                    val code = VoiceTest.code(route, voice.status, if (route == VoiceRoute.PHONE) null else voice.focusOk, voice.mediaMuted())
+                    Link.voiceTestDone(this@WatchActivity, System.currentTimeMillis(), code)
+                    showVoiceTest(code)
+                    // Η φωνή κλείνει μόνη της· όχι αν στο μεταξύ ξεκίνησε άσκηση (εκείνη την κρατά).
+                    if (Repo.running == null) voice.stopLater()
+                }, VoiceTest.SETTLE_MS)
+            }
+        }
+        tick.run()
+    }
+
+    /**
+     * Όχι το `view.postDelayed`: εκείνο δεν τρέχει αν η οθόνη φύγει στο μεταξύ, και τότε η φωνή θα έμενε ανοιχτή
+     * ([Voice.start] χωρίς [Voice.stopLater]). Αυτός τρέχει πάντα, και η φωνή κλείνει πάντα.
+     */
+    private val voiceTestHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun showVoiceTest(code: String) {
+        voiceTestUntil = 0L
+        syncScreen()
+        Repo.notice = VoiceTest.result(code)
+        Repo.openNotice = true
+        view.invalidate()
     }
 
     // ------------------------------------------------------------------ άδειες

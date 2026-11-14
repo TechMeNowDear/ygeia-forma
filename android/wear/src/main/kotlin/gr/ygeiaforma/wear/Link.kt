@@ -238,10 +238,13 @@ object Link {
      * καμία επανάληψη από εδώ. Γράφεται μόνο όταν αλλάζει (όχι σε κάθε άνοιγμα).
      */
     fun ack(ctx: Context, p: Plan) {
-        val slow = ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE).getBoolean(SLOW, false)
-        val text = ackJson(p.hrLimit, p.at, slow).toString()
-        val key = "${p.hrLimit ?: 0}/${p.at}/$slow"
         val sp = ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE)
+        val slow = sp.getBoolean(SLOW, false)
+        val vtAt = sp.getLong(VT_AT, 0L)
+        val vt = if (vtAt > 0) vtAt to (sp.getString(VT_CODE, null) ?: VoiceTest.SPEAKER) else null
+        val text = ackJson(p.hrLimit, p.at, slow, vt).toString()
+        // «/vt»: ρολόι που ξέρει τη «Δοκιμή φωνής» ξαναγράφει μία φορά την κατάστασή του, με το «vtok».
+        val key = "${p.hrLimit ?: 0}/${p.at}/$slow/vt$vtAt"
         if (sp.getString(ACKED, null) == key) return
         try {
             val req = PutDataMapRequest.create(Paths.STATE).apply {
@@ -255,10 +258,22 @@ object Link {
     }
 
     /** Τι λέει το ρολόι για τον εαυτό του: το όριο που ισχύει (0 = χωρίς), από ποιο πρόγραμμα, ποια μορφή ξέρει. */
-    fun ackJson(limit: Int?, planAt: Long, slow: Boolean = false): JSONObject =
-        JSONObject().put("v", Proto.MAJOR).put("lim", limit ?: 0).put("planAt", planAt).also { if (slow) it.put("slow", 1) }
+    fun ackJson(limit: Int?, planAt: Long, slow: Boolean = false, vt: Pair<Long, String>? = null): JSONObject =
+        JSONObject().put("v", Proto.MAJOR).put("lim", limit ?: 0).put("planAt", planAt).put("vtok", 1).also {
+            if (slow) it.put("slow", 1)
+            // «Δοκιμή φωνής» (15/11): πότε και πού ακούστηκε, για τη γραμμή κάτω από το κουμπί στο κινητό.
+            if (vt != null) it.put("vt", JSONObject().put("at", vt.first).put("w", vt.second))
+        }
 
     private const val SLOW = "slow"
+    private const val VT_AT = "vt_at"
+    private const val VT_CODE = "vt_w"
+
+    /** Το αποτέλεσμα της «Δοκιμής φωνής» πάει στο κινητό ([ack], DataItem: φτάνει και αν ανοίξει αργότερα). */
+    fun voiceTestDone(ctx: Context, at: Long, code: String) {
+        ctx.getSharedPreferences("ygeia_watch", Context.MODE_PRIVATE).edit().putLong(VT_AT, at).putString(VT_CODE, code).apply()
+        ack(ctx, Repo.plan ?: Plan(Repo.knownLimit, null, null, emptyList(), 0))
+    }
 
     /**
      * Το ρολόι έμαθε (στην αρχή μιας άσκησης) αν στέλνει παλμούς αργά με σβηστή οθόνη (έλεγχος του γ2, S1): κρατιέται και

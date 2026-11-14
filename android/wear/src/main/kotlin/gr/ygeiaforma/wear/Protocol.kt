@@ -2074,11 +2074,62 @@ object Say {
     val END = "Τέλος" to "Done"
     val NEXT_SET = "Επόμενο σετ" to "Next set"
     val LIMIT = "Πάνω από το όριο" to "Above your limit"
+    val TEST = "Δοκιμή φωνής" to "Voice test"
     fun km(n: Int) = kmTitle(n) to kmSpeechEn(n)
 
     /** Μετά το λεπτό αποκατάστασης: πόσο έπεσαν οι παλμοί (μόνο αν έπεσαν). */
     fun recovery(drop: Int): Pair<String, String>? =
         if (drop <= 0) null else "Οι παλμοί σου έπεσαν κατά $drop" to "Your heart rate dropped by $drop"
+}
+
+/** Πού πήγε μια φράση ([Voice.say]): ακουστικά του ρολογιού, κινητό (στα ακουστικά του), ηχείο του ρολογιού. */
+enum class VoiceRoute { WATCH_HEADSET, PHONE, WATCH }
+
+/**
+ * «Δοκιμή φωνής» (αίτημα χρήστη 15/11): το κουμπί στις Ρυθμίσεις του κινητού ανοίγει την εφαρμογή εδώ
+ * («ygeiaforma-wear://voicetest»)· σε [DELAY_MS] το ρολόι λέει «Δοκιμή φωνής» με τον ΙΔΙΟ δρόμο με το περπάτημα, ενώ ο
+ * χρήστης έχει βγει στην αρχική του κινητού (εφαρμογή κινητού κλειστή, όπως στο περπάτημα· Android 17). Μετά από
+ * [SETTLE_MS] κρίνει πού ακούστηκε και το στέλνει στο κινητό με το «/ygeia/wstate» («vt»). Κωδικοί ίδιοι με το κινητό
+ * (lib/pages/settings.dart: voiceTestText).
+ */
+object VoiceTest {
+    const val DELAY_MS = 10_000L
+    const val SETTLE_MS = 5_000L
+    const val HEADSET = "wh"
+    const val PHONE = "ph"
+    const val SPEAKER = "ws"
+    const val NO_VOICE = "nv"
+    const val REFUSED = "mu"
+    const val MUTED = "m0"
+    const val BUSY = "bz"
+
+    /**
+     * Το αποτέλεσμα. [status] της φωνής του ρολογιού («none»: δεν υπάρχει), [focusOk]: το σύστημα του ρολογιού επέτρεψε
+     * να μιλήσει, [muted]: ένταση πολυμέσων στο μηδέν. Καθαρή, με δοκιμές.
+     */
+    fun code(route: VoiceRoute?, status: String, focusOk: Boolean?, muted: Boolean): String = when {
+        route == VoiceRoute.PHONE -> PHONE
+        status == "none" -> NO_VOICE
+        focusOk == false -> REFUSED
+        muted -> MUTED
+        route == VoiceRoute.WATCH_HEADSET -> HEADSET
+        else -> SPEAKER
+    }
+
+    /** Η αντίστροφη μέτρηση στο ρολόι, σε ολόκληρες λέξεις. */
+    fun countdown(sec: Int): String =
+        "Δοκιμή φωνής σε $sec ${if (sec == 1) "δευτερόλεπτο" else "δευτερόλεπτα"}. Στο κινητό πάτα το κουμπί της αρχικής οθόνης."
+
+    /** Τι γράφει το ρολόι μετά. */
+    fun result(code: String): String = when (code) {
+        HEADSET -> "Ακούστηκε στα ακουστικά του ρολογιού."
+        PHONE -> "Ακούστηκε από το κινητό, στα ακουστικά του."
+        NO_VOICE -> "Δεν βρέθηκε φωνή στο ρολόι."
+        REFUSED -> "Το ρολόι δεν πήρε άδεια να μιλήσει."
+        MUTED -> "Η ένταση πολυμέσων του ρολογιού είναι στο μηδέν."
+        BUSY -> "Τρέχει άσκηση: η δοκιμή φωνής μετά το τέλος της."
+        else -> "Ακούστηκε από το ηχείο του ρολογιού."
+    }
 }
 
 /**

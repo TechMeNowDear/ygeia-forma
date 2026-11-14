@@ -124,6 +124,7 @@ class WearBridge(
             "watchState" -> scope.launch { result.success(watchState()) }
             "ackResult" -> scope.launch { result.success(ack(call.argument<String>("path") ?: "")) }
             "openWatch" -> scope.launch { result.success(openWatch()) }
+            "voiceTest" -> scope.launch { result.success(openWatch("voicetest")) }
             "watching" -> scope.launch { result.success(watching(call.argument<String>("json") ?: "{}")) }
             else -> result.notImplemented()
         }
@@ -247,13 +248,16 @@ class WearBridge(
         false
     }
 
-    /** Ανοίγει την εφαρμογή στο ρολόι, στην προπόνηση που μόλις ξεκίνησε στο κινητό. */
-    private suspend fun openWatch(): Boolean = try {
+    /**
+     * Ανοίγει την εφαρμογή στο ρολόι: στην προπόνηση που μόλις ξεκίνησε στο κινητό («session»), ή για τη «Δοκιμή φωνής»
+     * («voicetest», 15/11: εκεί το ρολόι μετρά 10″ και λέει τη φράση με τον δρόμο του περπατήματος).
+     */
+    private suspend fun openWatch(host: String = "session"): Boolean = try {
         val cap = Wearable.getCapabilityClient(ctx).getCapability(CAPABILITY, CapabilityClient.FILTER_REACHABLE).await()
         val helper = RemoteActivityHelper(ctx)
         val intent = Intent(Intent.ACTION_VIEW)
             .addCategory(Intent.CATEGORY_BROWSABLE)
-            .setData(Uri.parse("ygeiaforma-wear://session"))
+            .setData(Uri.parse("ygeiaforma-wear://$host"))
         var ok = false
         for (n in cap.nodes) {
             try {

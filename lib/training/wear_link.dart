@@ -204,6 +204,12 @@ class WearLink with WidgetsBindingObserver {
   /// Το ρολόι έστειλε αποτέλεσμα νεότερης μορφής (V-A-08): «Ενημέρωσε την εφαρμογή στο κινητό»· περιμένει εκεί.
   final watchNewer = ValueNotifier<bool>(false);
 
+  /// «Δοκιμή φωνής» (15/11): το ρολόι την ξέρει (έκδοση 119 και μετά· «vtok» στο «/ygeia/wstate»).
+  final watchVoiceTest = ValueNotifier<bool>(false);
+
+  /// Η τελευταία «Δοκιμή φωνής»: πότε, και πού ακούστηκε (κωδικός του ρολογιού, [voiceTestText]).
+  final voiceTest = ValueNotifier<({DateTime at, String code})?>(null);
+
   /// Υπάρχει (γνωστό) ρολόι με την εφαρμογή, κι ας μην είναι κοντά τώρα: το πρόγραμμα/όριο γράφεται και φτάνει μόλις
   /// συνδεθούν (DataItem). Χωρίς κανένα ρολόι: καμία κλήση.
   bool _known = false;
@@ -343,6 +349,11 @@ class WearLink with WidgetsBindingObserver {
       if (lim == null) return;
       watchSlow.value = j['slow'] == 1;
       watchLimit.value = lim > 0 ? '$lim' : 'null';
+      watchVoiceTest.value = j['vtok'] == 1;
+      final vt = j['vt'];
+      if (vt is Map && vt['at'] is num && vt['w'] is String) {
+        voiceTest.value = (at: DateTime.fromMillisecondsSinceEpoch((vt['at'] as num).toInt()), code: vt['w'] as String);
+      }
     } catch (_) {}
   }
 
@@ -445,6 +456,16 @@ class WearLink with WidgetsBindingObserver {
     if (!ready.value) return false;
     try {
       return await _m.invokeMethod<bool>('openWatch') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// «Δοκιμή φωνής» (15/11): ανοίγει την εφαρμογή στο ρολόι, που σε 10″ λέει «Δοκιμή φωνής» όπως στο περπάτημα.
+  Future<bool> startVoiceTest() async {
+    if (!ready.value || !watchVoiceTest.value) return false;
+    try {
+      return await _m.invokeMethod<bool>('voiceTest') ?? false;
     } catch (_) {
       return false;
     }
