@@ -1499,7 +1499,8 @@ class _SummaryPageState extends State<SummaryPage> {
           for (final (v, l) in s.isCardio
               ? [
                   ('$shownMins', minsLabel),
-                  (kmValue(s) ?? '—', distanceFromSteps(s) ? 'km (από βήματα)' : 'km'),
+                  // 14/11: «από βήματα» μόνο δίπλα σε αριθμό· «—» με «km (από βήματα)» έλεγε ότι κάτι βγήκε από τα βήματα.
+                  (kmValue(s) ?? '—', distanceFromSteps(s) && kmValue(s) != null ? 'km (από βήματα)' : 'km'),
                   (s.steps == null ? '—' : thousands(s.steps!), 'βήματα'),
                 ]
               : [('$shownMins', minsLabel), ('${s.setsDone}', 'σετ'), (s.volume > 0 ? thousands(s.volume.round()) : '—', 'kg σύνολο')])
