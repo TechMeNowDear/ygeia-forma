@@ -268,7 +268,11 @@ class HrCard extends StatelessWidget {
           const SizedBox(height: 6),
           // Πόσο γρήγορα έφταναν οι παλμοί από το ρολόι (8/11): μέτρο για το πόσο μπορεί να αργήσει η ειδοποίηση.
           Builder(builder: (context) {
-            final (text, warn) = hrGapText(g, session.hrMode, session.hrDel, lim != null);
+            // 14/11: στο περπάτημα (ρολόι από την αρχή ως το «Τέλος») κρίνεται από τις ίδιες τις τιμές ([hrSampleGap]).
+            final sg = session.isCardio && lim == null
+                ? hrSampleGap(hr, session.pauses, endSec: cut != null ? null : session.end?.difference(session.start).inSeconds)
+                : null;
+            final (text, warn) = hrGapText(g, session.hrMode, session.hrDel, lim != null, sampleGap: sg);
             // round1, U5-23: προειδοποίηση στο χρώμα της «προσοχής», όχι της κατηγορίας.
             return Text(text, key: const ValueKey('hr-gap'), style: TextStyle(fontSize: 12.5, height: 1.35, color: warn ? c.warn : c.textSecondary));
           }),
@@ -307,10 +311,20 @@ const slowAlarmText = 'Με σβηστή οθόνη η δόνηση του ορ�
 /// [deliveries]: πόσες φορές ήρθαν (ρολόι από γ2· null = παλιό ρολόι), [hasLimit]: είχε όριο. Επιστρέφει (κείμενο,
 /// προειδοποίηση). Όλο το περπάτημα σε μία-δύο φορές δεν είναι «κάθε λίγα δευτερόλεπτα»· χωρίς όριο δεν υπάρχει
 /// ειδοποίηση που «άργησε».
-(String, bool) hrGapText(int gap, String? mode, int? deliveries, bool hasLimit) {
+///
+/// Δοκιμή στις συσκευές 14/11: το [gap] είναι το κενό ανάμεσα στις ΠΑΡΑΔΟΣΕΙΣ του ρολογιού (πότε έφτασαν), όχι στις
+/// τιμές. Σε περπάτημα 7 λεπτών με τιμή σχεδόν κάθε δευτερόλεπτο (μεγαλύτερο κενό 4″) η σύνοψη έγραφε σε κεχριμπάρι
+/// «Οι παλμοί έλειπαν έως 22 δευτερόλεπτα», που δεν ήταν αλήθεια. Χωρίς όριο μετρά μόνο αν λείπουν τιμές: με
+/// [sampleGap] (το κενό στις ίδιες τις τιμές, [hrSampleGap]) η γραμμή κρίνεται από αυτό. Με όριο μένει το [gap]: τότε
+/// μετρά πόσο μπορεί να άργησε η ειδοποίηση.
+(String, bool) hrGapText(int gap, String? mode, int? deliveries, bool hasLimit, {int? sampleGap}) {
   final late = hasLimit ? ' Η ειδοποίηση μπορεί να άργησε.' : '';
   if (deliveries != null && deliveries < 3) {
     return (deliveries <= 1 ? 'Οι παλμοί ήρθαν όλοι μαζί, μία φορά.$late' : 'Οι παλμοί ήρθαν όλοι μαζί, σε $deliveries φορές.$late', true);
+  }
+  if (!hasLimit && sampleGap != null) {
+    if (sampleGap <= 12) return ('Οι παλμοί μετρήθηκαν συνεχώς (μεγαλύτερο κενό ${secondsText(sampleGap)}).', false);
+    return ('Οι παλμοί έλειπαν έως ${sampleGap < 120 ? secondsText(sampleGap) : hoursMinutes((sampleGap / 60).round())}.', true);
   }
   // round1, U5-06: διάρκειες σε λέξεις.
   if (gap <= 12) {
@@ -318,6 +332,30 @@ const slowAlarmText = 'Με σβηστή οθόνη η δόνηση του ορ�
   }
   final t = gap < 120 ? secondsText(gap) : hoursMinutes((gap / 60).round());
   return (hasLimit ? 'Μεγαλύτερο κενό στους παλμούς: $t. Τόσο μπορεί να άργησε η ειδοποίηση.' : 'Οι παλμοί έλειπαν έως $t.', true);
+}
+
+/// Το μεγαλύτερο κενό (″) στις τιμές παλμών [hr] ([δευτερόλεπτα από την αρχή, bpm]): από την αρχή ως την πρώτη τιμή,
+/// ανάμεσα στις τιμές, και από την τελευταία ως το [endSec] (αν είναι γνωστό), χωρίς τον χρόνο των [pauses]. null χωρίς
+/// τιμές (δοκιμή στις συσκευές 14/11· βλ. [hrGapText]).
+int? hrSampleGap(List<List<int>> hr, List<List<int>> pauses, {int? endSec}) {
+  if (hr.isEmpty) return null;
+  final times = [for (final p in hr) p[0]]..sort();
+  int span(int a, int b) {
+    var d = b - a;
+    for (final x in pauses) {
+      final lo = a > x[0] ? a : x[0], hi = b < x[1] ? b : x[1];
+      if (hi > lo) d -= hi - lo;
+    }
+    return d;
+  }
+
+  var prev = 0, gap = 0;
+  for (final t in [...times, if (endSec != null && endSec > times.last) endSec]) {
+    final d = span(prev, t);
+    if (d > gap) gap = d;
+    prev = t;
+  }
+  return gap;
 }
 
 /// «1 δευτερόλεπτο», «8 δευτερόλεπτα».
