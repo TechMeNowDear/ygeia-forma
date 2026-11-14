@@ -352,6 +352,8 @@ class WatchShotsTest {
         Repo.kmFlashN = 1
         Repo.kmFlashUntil = System.currentTimeMillis() + 60_000
         shot("W10c_walk_km_flash")
+        // Round 14: στην αχνή οθόνη πράσινα γράμματα σε μαύρο (όχι ολόκληρη πράσινη οθόνη).
+        shot("W10g_walk_km_flash_ambient", ambient = true)
         RuntimeEnvironment.setFontScale(1.3f)
         Repo.kmFlashN = 13
         shot("W10f_walk_km_flash13_font13")

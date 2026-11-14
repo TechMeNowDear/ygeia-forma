@@ -107,10 +107,10 @@ void main() {
   });
 
   group('5. κείμενα ζώνης και φωνής ίδια με το ρολόι', () {
-    test('φωνή και στις δύο μεριές, «Πάλι στη ζώνη» μετά από 10″, όχι πιο συχνά από 1 λεπτό', () {
+    test('φωνή και στις δύο μεριές, «Πάλι στη ζώνη» μετά από 10″, το πολύ μία φορά το λεπτό', () {
       expect(zoneGapSec, 60);
       expect(zoneBackSec, 10);
-      expect(zoneHighText, contains('ποτέ πιο συχνά από 1 λεπτό'));
+      expect(zoneHighText, contains('το πολύ μία φορά το λεπτό'));
       expect(zoneLowText, contains('«Εκτός εύρους»'));
       expect(zoneVoiceText, contains('«Πάλι στη ζώνη» όταν ξαναμπείς για 10 δευτερόλεπτα'));
       expect(zoneVoiceText, contains('«Φωνή στην άσκηση»'));
