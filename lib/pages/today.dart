@@ -138,10 +138,12 @@ class TodayPage extends StatelessWidget {
                 _ConnectCard(store: store),
                 if (trainingCard != null) trainingCard,
                 // Round 14 (D12): κι αυτή είναι μόνο από τις προπονήσεις της εφαρμογής, όχι από τη Samsung.
+                // IntrinsicHeight: κάρτα με γράφημα κάτω (Spacer) μόνη της σε όλο το πλάτος.
                 if (prefs.show('exweek'))
                   ListenableBuilder(
                     listenable: training,
-                    builder: (context, _) => _exerciseWeekCard(context, training, now, () => open(Cat.exercise, ExerciseTab.train)),
+                    builder: (context, _) =>
+                        IntrinsicHeight(child: _exerciseWeekCard(context, training, now, () => open(Cat.exercise, ExerciseTab.train))),
                   ),
                 if (foodCard != null) foodCard,
               ],
@@ -251,7 +253,8 @@ class TodayPage extends StatelessWidget {
               : [
                   SectionHeader(title),
                   ...pairUp(cards.length.isOdd ? cards.sublist(0, cards.length - 1) : cards),
-                  if (cards.length.isOdd) cards.last,
+                  // IntrinsicHeight: οι κάρτες με γράφημα κάτω (Spacer) θέλουν ύψος, όπως μέσα στο [CardPair].
+                  if (cards.length.isOdd) IntrinsicHeight(child: cards.last),
                 ];
 
           // Μόνο κινητό (απόφαση 10/11): το τράβηγμα ανανεώνει και στο ανοιχτό Fold· φαίνεται μόνο «Ενημέρωση 18:40»

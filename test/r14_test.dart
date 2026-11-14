@@ -127,7 +127,7 @@ void main() {
     final src = File('lib/pages/today.dart').readAsStringSync();
     test('κάθε κάρτα στην ενότητά της, όχι «Επίσης»· η μόνη σε όλο το πλάτος', () {
       expect(src, isNot(contains("section('Επίσης'")));
-      expect(src, contains('if (cards.length.isOdd) cards.last,'));
+      expect(src, contains('if (cards.length.isOdd) IntrinsicHeight(child: cards.last),'));
       expect(todayCards.firstWhere((c) => c.key == 'awake').label, contains('τελευταίας ολόκληρης μέρας'));
     });
     test('Άσκηση: μόνο αφού διαβαστούν οι προπονήσεις· και χωρίς την άδεια της Samsung', () {
