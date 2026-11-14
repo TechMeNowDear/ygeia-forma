@@ -572,6 +572,10 @@ class TalkTestCard extends StatefulWidget {
     // round1, S6-3: χρειάζονται οι παλμοί του περπατήματος (φορτώνονται για τη σύνοψη) για να ξέρουμε αν έφτασε κοντά στο
     // πάνω όριο. Χωρίς παλμούς καμία ερώτηση.
     if (!s.hrLoaded || s.hr.isEmpty) return false;
+    // Δοκιμή στις συσκευές 14/11 (απόφαση χρήστη): χωρίς αρκετή ώρα κοντά στο πάνω άκρο της ζώνης δεν υπάρχει ερώτηση,
+    // και η κάρτα δεν φαίνεται καθόλου. Πριν έμενε μια γκρι κάρτα που εξηγούσε γιατί δεν ήρθε η ερώτηση, σε κάθε ήρεμο
+    // περπάτημα: θόρυβος στη σύνοψη.
+    if (talkSeconds(s, s.zoneHi!).near < talkNearMinSec) return false;
     return talk.length < talkAskWalks;
   }
 
@@ -634,17 +638,6 @@ class _TalkTestCardState extends State<TalkTestCard> {
       ('no', 'Όχι, λαχάνιαζα'),
     ];
     final hi = widget.session.zoneHi!;
-    // round1, S6-3: χωρίς αρκετή ώρα κοντά στο πάνω όριο η ερώτηση δεν έχει νόημα· μόνο μία ήρεμη γραμμή.
-    if (answered == null && talkSeconds(widget.session, hi).near < talkNearMinSec) {
-      return AppCard(
-        key: const ValueKey('talk-test-not-near'),
-        // 14/11: «πάνω άκρο της ζώνης», όχι «πάνω όριο»: το ρολόι λέει «χωρίς όριο» για το όριο του γιατρού, και τα δύο
-        // μαζί έμοιαζαν να λένε το αντίθετο.
-        child: Text('Τεστ ομιλίας: σε αυτό το περπάτημα οι παλμοί δεν έμειναν κοντά στο πάνω άκρο της ζώνης ($hi) για ${talkNearMinSec ~/ 60} λεπτά. '
-            'Η ερώτηση έρχεται σε περπάτημα που φτάνει εκεί.',
-            style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
-      );
-    }
     return AppCard(
       key: const ValueKey('talk-test'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

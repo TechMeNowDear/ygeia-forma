@@ -3,6 +3,7 @@
 // 2. «Οι παλμοί έλειπαν έως 22 δευτερόλεπτα» (κεχριμπάρι) ενώ υπήρχε τιμή σχεδόν κάθε δευτερόλεπτο: τα 22″ ήταν το κενό
 //    ανάμεσα στις παραδόσεις του ρολογιού. Χωρίς όριο κρίνεται από τις ίδιες τις τιμές.
 // 3. «πάνω όριο (134)» στο τεστ ομιλίας, ενώ το ρολόι λέει «χωρίς όριο» → «πάνω άκρο της ζώνης».
+// 4. Η κάρτα του τεστ ομιλίας χωρίς ερώτηση κρύβεται (απόφαση χρήστη 14/11).
 // Συνθετικά δεδομένα (όχι του χρήστη).
 import 'dart:io';
 
@@ -132,7 +133,16 @@ void main() {
       final src = File('lib/pages/training/zone_widgets.dart').readAsStringSync();
       final strings = RegExp(r"'[^'\n]*'").allMatches(src).map((m) => m.group(0)!).join('\n');
       expect(strings, isNot(contains('πάνω όριο')));
-      expect(strings, contains('κοντά στο πάνω άκρο της ζώνης'));
+      expect(strings, contains('Στο πάνω άκρο της ζώνης μιλάς με προτάσεις'));
+    });
+  });
+
+  group('4. τεστ ομιλίας: καμία κάρτα όταν δεν υπάρχει ερώτηση (απόφαση χρήστη 14/11)', () {
+    test('η κάρτα «δεν έμειναν κοντά…» δεν υπάρχει πια· το shows() το κρίνει', () {
+      final src = File('lib/pages/training/zone_widgets.dart').readAsStringSync();
+      expect(src, isNot(contains('talk-test-not-near')));
+      expect(src, isNot(contains('Η ερώτηση έρχεται σε περπάτημα που φτάνει εκεί')));
+      expect(src, contains('if (talkSeconds(s, s.zoneHi!).near < talkNearMinSec) return false;'));
     });
   });
 }
