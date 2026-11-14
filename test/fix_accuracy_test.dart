@@ -637,6 +637,11 @@ void main() {
     expect(kmValue(c(gps: false, m: 2310, steps: 3000)), '≈ 2,31');
     expect(kmValue(c(gps: false, m: 0, steps: 0)), isNull);
     expect(distanceFromSteps(c(gps: false, m: 2310)), isTrue);
+    // Δοκιμή στις συσκευές 14/11: μέσα στο σπίτι, GPS ανοιχτό χωρίς σήμα, 812 βήματα, 0 m: «—», όχι «0,00».
+    expect(kmValue(c(gps: true, m: 0, steps: 812)), isNull);
+    expect(kmValue(c(gps: true, m: 6, steps: 812)), isNull);
+    expect(kmValue(c(gps: false, m: 0, steps: 812)), isNull);
+    expect(kmValue(c(gps: true, m: 10)), '0,01');
   });
 
   // ------------------------------------------------------------ V-B-13 / UX3-05 / V-D-05 / V-D-30: οξυγόνο
