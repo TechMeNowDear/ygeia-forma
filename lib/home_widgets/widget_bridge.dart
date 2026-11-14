@@ -71,10 +71,14 @@ class WidgetPublisher {
     try {
       final n = await widgetChannel.invokeMethod<int>('count') ?? 0;
       if (n == 0) return;
-      final text = jsonEncode(buildWidgetSnapshot(store, food, _clock(), training: training));
-      if (text == _last) return;
-      await widgetChannel.invokeMethod('update', text);
-      _last = text;
+      final snap = buildWidgetSnapshot(store, food, _clock(), training: training);
+      // Round 7 (A10-1): η σύγκριση ΧΩΡΙΣ το «at» (η ώρα της δημοσίευσης, που δεν τη διαβάζει κανείς): αλλιώς δεν ήταν ποτέ
+      // ίδιο και κάθε ειδοποίηση (μέρα στο ημερολόγιο φαγητού, «διαβάζω…», κάθε κομμάτι του ιστορικού) ξαναζωγράφιζε όλα
+      // τα widgets. Το «at» μένει στο στιγμιότυπο (ίδια μορφή).
+      final key = jsonEncode({...snap}..remove('at'));
+      if (key == _last) return;
+      await widgetChannel.invokeMethod('update', jsonEncode(snap));
+      _last = key;
     } on MissingPluginException {
       // Τεστ ή πλατφόρμα χωρίς widgets.
     } catch (e, st) {

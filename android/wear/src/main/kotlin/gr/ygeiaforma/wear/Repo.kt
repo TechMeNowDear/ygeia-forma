@@ -26,6 +26,11 @@ object Repo {
      * που δεν έφτασαν πάνε στο κινητό μέσα στο αποτέλεσμα («items»), ακόμα κι αν το κινητό έκλεισε πρώτο την προπόνηση.
      */
     var lastPhone: LiveSession? = null
+        set(v) {
+            field = v
+            // «Ξέχνα την τελευταία» ξεχνά και την προηγούμενή της ([endedPhone], R7-A8-2)· η εφαρμογή γράφει εδώ μόνο προπονήσεις.
+            if (v == null) endedPhone = null
+        }
 
     /**
      * Το τελευταίο όριο παλμών που ήρθε από το κινητό (μένει και μετά από επανεκκίνηση, έλεγχος 9/11, V-A-06): ισχύει και
@@ -180,6 +185,16 @@ object Repo {
     /** Μήνυμα για τον χρήστη (π.χ. λείπει άδεια), ή null. */
     var notice: String? = null
 
+    /**
+     * Αποτελέσματα που στο «Τέλος» δεν γράφτηκαν ΟΥΤΕ στην αναμονή ΟΥΤΕ στο Data Layer (γεμάτος χώρος· έλεγχος 13/11, round 7,
+     * R7-A8-5): id → JSON. Μόνο στη μνήμη· ξαναδοκιμάζονται σε κάθε άνοιγμα της εφαρμογής (WatchActivity), πριν από την
+     * ανάκτηση του στιγμιότυπου (που κρατήθηκε ως εφεδρεία, S8-08).
+     */
+    val unsaved = LinkedHashMap<String, JSONObject>()
+
+    /** Το τελευταίο «Τέλος» (ή ένα παλιότερο) δεν γράφτηκε πουθενά: η οθόνη του τέλους λέει «Δεν αποθηκεύτηκε». */
+    var endUnsaved = false
+
     /** Το μήνυμα να ανοίξει ολόκληρο σε όλη την οθόνη (μήνυμα ασφάλειας, S1)· η οθόνη το σβήνει μόλις το δείξει. */
     var openNotice = false
 
@@ -273,27 +288,60 @@ object Repo {
     fun applyPhone(s: LiveSession?) {
         val prev = phone
         s?.items?.forEach { it.sets.forEach { set -> if (set.done) set.confirmed = true } }
-        if (s != null && prev != null && prev.id == s.id) {
-            for ((i, it) in s.items.withIndex()) {
-                val old = prev.items.getOrNull(i) ?: continue
-                if (old.ex != it.ex) continue
-                for ((k, set) in it.sets.withIndex()) {
-                    val o = old.sets.getOrNull(k) ?: continue
-                    keepWatchEdits(o, set)
-                }
-                if (it.rir == null) it.rir = old.rir
-            }
-            // Η ερώτηση για ρεζέρβα μένει για την άσκηση που τελείωσε, όχι για όποια δείχνει τώρα το κινητό.
-            if (prev.rirIdx >= 0 && s.items.getOrNull(prev.rirIdx)?.rir == null) s.rirIdx = prev.rirIdx
-        }
+        // Ό,τι ήξερε το ρολόι για την ΙΔΙΑ προπόνηση: η προηγούμενη κατάσταση, ή (μετά από απότομο κλείσιμο, πριν φτάσει
+        // ξανά η κατάσταση του κινητού) αυτή που ξαναστήθηκε από το στιγμιότυπο ([restorePhone], R7-A8-1).
+        val base = if (s == null) null else prev?.takeIf { it.id == s.id } ?: listOfNotNull(lastPhone, endedPhone).firstOrNull { it.id == s.id }
+        if (s != null && base != null) mergeWatchEdits(base, s)
         if (s != null) s.restLen = phoneRestLen(prev?.takeIf { it.id == s.id }, s, System.currentTimeMillis())
         phone = s
         if (s != null) {
+            // Έλεγχος 13/11, round 7 (R7-A8-2): η προηγούμενη προπόνηση του κινητού (με τα ✓ του ρολογιού που δεν έφτασαν)
+            // δεν χάνεται όταν φτάνει μαζί η επόμενη: την κρατά το [endedPhone] για το αποτέλεσμα των παλμών της.
+            keepEnded(lastPhone, s.id)
             lastPhoneId = s.id
             lastPhone = s
         }
         if (s == null && prev != null) prev.ended = true
         syncedAt = System.currentTimeMillis()
+    }
+
+    /**
+     * Η προπόνηση του κινητού που μόλις αντικαταστάθηκε από ΑΛΛΗ (έλεγχος 13/11, round 7, R7-A8-2). Πριν, το [lastPhone]
+     * γραφόταν από πάνω από την επόμενη: αν το ρολόι μάθαινε ότι η Α τελείωσε μαζί με την έναρξη της Β (Bluetooth, ύπνος
+     * του επεξεργαστή), το αποτέλεσμα των παλμών της Α έφευγε χωρίς σετ, και τα ✓ / η ρεζέρβα του ρολογιού χάνονταν.
+     */
+    var endedPhone: LiveSession? = null
+
+    /** [old] φεύγει από το [lastPhone] για την [newId]: κρατιέται, εκτός αν πάνω του ήταν ήδη αυτή που μετράει τώρα. */
+    private fun keepEnded(old: LiveSession?, newId: String) {
+        if (old == null || old.id == newId) return
+        val kept = endedPhone
+        if (kept != null && kept.id == runningSid && old.id != runningSid) return
+        endedPhone = old
+    }
+
+    /** Η προπόνηση του κινητού [id] όπως την ξέρει το ρολόι: η τωρινή, η τελευταία ή αυτή που μόλις αντικαταστάθηκε. */
+    fun phoneById(id: String?): LiveSession? =
+        if (id.isNullOrEmpty()) null else listOfNotNull(phone, lastPhone, endedPhone).firstOrNull { it.id == id }
+
+    /**
+     * Η προπόνηση του κινητού όπως την ήξερε το ρολόι πριν κλείσει απότομα ([LiveSession.phoneWatchState], R7-A8-1). Αν το
+     * κινητό έχει ήδη στείλει την ίδια, μπαίνουν πάνω της ό,τι δεν είχε φτάσει εκεί ([mergeWatchEdits]): τα ✓ ξαναστέλνονται
+     * και πάνε και στο αποτέλεσμα. Αλλιώς (τελείωσε, ή ξεκίνησε άλλη στο μεταξύ) κρατιέται ως η τελευταία ή η προηγούμενη.
+     */
+    fun restorePhone(w: LiveSession) {
+        val known = listOfNotNull(phone, lastPhone).firstOrNull { it.id == w.id }
+        if (known != null) {
+            mergeWatchEdits(w, known)
+            return
+        }
+        val lp = lastPhone
+        if (lp == null) {
+            lastPhone = w
+            lastPhoneId = w.id
+        } else {
+            endedPhone = w
+        }
     }
 
     /**
@@ -438,6 +486,8 @@ object Repo {
         hr?.let { o.put("hr", it.toState()) }
         local?.let { o.put("local", it.toState()) }
         runningSid?.let { o.put("sid", it) }
+        // R7-A8-1: σε προπόνηση του κινητού και ό,τι ξέρει το ρολόι γι' αυτήν (✓, επαναλήψεις, ρεζέρβα που δεν έφτασαν ακόμα).
+        if (runningPhone) phoneById(runningSid)?.let { o.put("pp", LiveSession.phoneWatchState(it)) }
         return o
     }
 
@@ -469,6 +519,8 @@ object Repo {
         alarm.limit = if (o.has("lim")) o.getInt("lim") else null
         alarm.reset()
         o.optJSONObject("local")?.let { local = LiveSession.fromState(it) }
+        // R7-A8-1: τα ✓ / οι επαναλήψεις / η ρεζέρβα του ρολογιού στην προπόνηση του κινητού που δεν είχαν φτάσει εκεί.
+        if (runningPhone) o.optJSONObject("pp")?.let { LiveSession.phoneFromWatchState(it) }?.takeIf { it.id == runningSid }?.let { restorePhone(it) }
         restored = true
         true
     } catch (_: Exception) {

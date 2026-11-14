@@ -30,7 +30,6 @@ class BodyPage extends StatelessWidget {
         final c = Aigaio.of(context);
         final d = store.data;
         final body = d?.body ?? const <BodyMeasurement>[];
-        final last = d?.latestBody;
         // Round 1 (S3-3): «Σήμερα/Χθες» σε σχέση με ΤΩΡΑ, όχι με την ώρα της τελευταίας ανάγνωσης (με παλιά ανάγνωση
         // η χθεσινή ζύγιση έγραφε «Σήμερα 07:10»).
         final clock = now ?? DateTime.now();
@@ -38,6 +37,21 @@ class BodyPage extends StatelessWidget {
         // Round 2 (g4 · R2-E-2): ζύγιση «σε αναμονή» (διαφέρει πολύ, χωρίς ακόμα επόμενη) φαίνεται και μετρά κανονικά εδώ.
         final guard = guardBody(body);
         final foreign = guard.foreign;
+        // Round 7 (A4-1): η ΖΥΓΙΣΗ ΤΗΣ ΜΕΡΑΣ ([guardBody] `shown`: η πρώτη της μέρας που μετρά, ή «σε αναμονή»), ίδια με τη
+        // Σήμερα, το widget, τις Τάσεις, την αναφορά και τη διόρθωση θερμίδων. Πριν: η χρονικά τελευταία ζύγιση, και μια
+        // βραδινή ζύγιση μετά από φαγητό/άσκηση (82,1 μετά την πρωινή 80,7) έδειχνε εδώ «+1,2 kg», δείκτη 25,3 και «Πάνω από
+        // το εύρος», ενώ η Σήμερα και το widget 80,7, «−0,2 kg» και «μέσα στο εύρος», και «Λίπος 27,6%  (+2,0)» με τάση από
+        // τις πρωινές που δεν την περιέχει (κανόνας R6-1). Μόνο αν δεν φαίνεται καμία (όλες ξένες): η τελευταία, σημειωμένη.
+        final last = guard.shown.isEmpty ? d?.latestBody : guard.shown.last;
+        final lastPending = last != null && guard.pending.contains(last);
+        // Η επόμενη ζύγιση της ίδιας μέρας, αν υπάρχει (π.χ. η βραδινή): φαίνεται σε μια γκρι γραμμή, χωρίς διαφορά, δείκτη,
+        // εύρος ή τάση. Όχι όταν η ζύγιση της μέρας δεν μετρά (εκεί λέει ήδη γιατί).
+        final later = last == null || foreign.contains(last) || lastPending
+            ? null
+            : [
+                for (final b in body)
+                  if (b.weight != null && dayOf(b.time) == dayOf(last.time) && b.time.isAfter(last.time)) b,
+              ].lastOrNull;
         // Round 2 (g4 · R2-D-8): τα γραφήματα με μία ζύγιση ανά μέρα, την πρώτη που μετρά ([countedBody]), όπως η τάση, το
         // ιστορικό, οι Τάσεις και η σελίδα της μέτρησης (πριν: κάθε ζύγιση, και η βραδινή μετά την προπόνηση ζιγκ-ζαγκ).
         // Round 3 (k1 · R3-C-1): η ζύγιση της μέρας του φύλακα, ίδια με το ιστορικό ([weighInDays]).
@@ -67,8 +81,9 @@ class BodyPage extends StatelessWidget {
               // Round 5 (n1 · R5-B-1): η προηγούμενη που ΜΕΤΡΑ, από προηγούμενη μέρα (όπως η Σήμερα και το widget).
               previous: previousCounted(guard.counted, last),
               foreign: foreign.contains(last),
-              pending: guard.pending.contains(last),
+              pending: lastPending,
               mixed: mixedDayPending(guard.pending, last),
+              later: later,
               body: body,
               now: clock,
               profile: store.profile,
@@ -195,8 +210,12 @@ class _LatestCard extends StatelessWidget {
     this.foreign = false,
     this.pending = false,
     this.mixed = false,
+    this.later,
   });
   final BodyMeasurement last;
+
+  /// Round 7 (A4-1): μια επόμενη ζύγιση της ίδιας μέρας (η τελευταία), που δεν μετρά: μετρά η ζύγιση της μέρας ([last]).
+  final BodyMeasurement? later;
 
   /// Round 1 (S11-2): η τελευταία ζύγιση μοιάζει ξένη ([foreignBody]): φαίνεται, αλλά δεν μετρά.
   final bool foreign;
@@ -268,6 +287,14 @@ class _LatestCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           BigValue(last.weight == null ? '—' : dec(last.weight!), unit: 'kg', size: 44),
+          if (later != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              laterWeighInText(later!),
+              key: const ValueKey('body-later-weighin'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
           if (foreign) ...[
             const SizedBox(height: 6),
             Text(
@@ -315,7 +342,8 @@ class _LatestCard extends StatelessWidget {
           InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg', bodyFloorKg)),
           InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg', bodyFloorKg)),
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση, ±10%)', '${thousands(last.bmr!)} kcal'),
-          if (bmi != null) InfoRow('Δείκτης μάζας σώματος', dec(bmi)),
+          // Round 7 (A4-2): κομμένος στο 0,1 ([bmiText]): ποτέ «25,0» δίπλα σε «μέσα στο εύρος».
+          if (bmi != null) InfoRow('Δείκτης μάζας σώματος', bmiText(bmi)),
           if (inBodyHeight(last.weight, last.bmi) case final h? when profile.heightCm != null && (h - profile.heightCm!).abs() >= 1)
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 6),
@@ -360,7 +388,9 @@ class _LatestCard extends StatelessWidget {
       final r = RefRange(
         low: lo,
         high: hi,
-        text: 'φυσιολογικός δείκτης για το ύψος σου: ${dec(lo)}–${dec(hi)} kg',
+        // Round 7 (A4-2): τα άκρα που κρίνονται «μέσα» («60,0–80,9 kg» για 180 cm· πριν «59,9–81,0», και τα 81,0 kg «Πάνω
+        // από το εύρος»).
+        text: 'φυσιολογικός δείκτης για το ύψος σου: ${healthyWeightText(lo, hi)} kg',
         cite: bmiRange.cite,
       );
       out.addAll([
@@ -381,6 +411,9 @@ class _LatestCard extends StatelessWidget {
     return out;
   }
 }
+
+/// Round 7 (A4-1): κάτω από τη ζύγιση της μέρας, όταν την ίδια μέρα έγινε και άλλη, αργότερα (π.χ. το βράδυ).
+String laterWeighInText(BodyMeasurement b) => 'Και ${hm(b.time)}: ${dec(b.weight!)} kg· μετρά μία ζύγιση τη μέρα, η πρώτη.';
 
 /// Round 1 (S11-2): κάτω από μια τελευταία ζύγιση που μοιάζει ξένη (ίδια λογική με την κάρτα ελέγχου θερμίδων).
 /// Round 2 (g4 · R2-E-2): τελευταία ξένη ζύγιση γίνεται μόνο όταν την ίδια μέρα υπάρχει άλλη ζύγιση με πολύ διαφορετικό
@@ -537,6 +570,9 @@ class _WaistCard extends StatelessWidget {
               points: [for (final e in list) (day(e.day), e.cm)],
               color: c.body,
               format: (v) => dec(v),
+              // Round 7 (A4 · B2): ελάχιστο εύρος άξονα 3 cm, όπως βάρος και λίπος: αλλαγή 1 cm (όσο διαφέρουν δύο μετρήσεις
+              // της ίδιας μέρας, [waistSpreadCm]) γέμιζε όλο το γράφημα.
+              minRange: 3,
               dateLabel: yearAwareLabel([for (final e in list) (day(e.day), e.cm)]),
             ),
           ],

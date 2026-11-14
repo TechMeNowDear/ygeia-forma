@@ -315,7 +315,7 @@ void main() {
     s.history = sampleHistory(at, s.data!);
     await s.loadPrefs();
     s
-      ..setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180))
+      ..setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180))
       ..setGoals(checkinGoals());
     expect(s.prefsJson()['reportName'], 'Δοκιμή Όνομα', reason: 'το όνομα υπάρχει στις ρυθμίσεις του κινητού');
     final r = diagnosticsFrom(store: s, food: checkinFood(at), now: at);
@@ -558,7 +558,7 @@ void main() {
       'prefs': {
         'themeMode': 'dark',
         'historyVersion': 3,
-        'me': {'by': 1986, 'sex': 'm', 'h': 180, 'wd': 3},
+        'me': {'by': 1985, 'sex': 'm', 'h': 180, 'wd': 3},
         'goals': {
           'v': 1,
           'aim': 'lose',
@@ -621,7 +621,7 @@ void main() {
     expect((g.kcalAdapt, g.tdeeEst), (null, null));
     expect(g.log, isEmpty);
     final me = Profile.fromJson(merged['me']);
-    expect((me.birthYear, me.sex, me.heightCm, me.waistDay), (1986, 'm', 180.0, 3));
+    expect((me.birthYear, me.sex, me.heightCm, me.waistDay), (1985, 'm', 180.0, 3));
     expect(me.weighDays, {3}, reason: 'η μία μέρα ζυγίσματος της παλιάς μορφής («wd»)');
     final waist = waistFromJson(merged['waist']).single;
     expect(waist.day, '2026-11-06');
@@ -659,9 +659,10 @@ void main() {
     test('S12-17: κατώτατο πλήθος δοκιμών (Dart, Kotlin κινητού, Kotlin μαζί με το ρολόι) και στα δύο workflows', () {
       final check = File('.github/workflows/check.yml').readAsStringSync();
       for (final w in [j['build']!, check]) {
-        expect(w, contains(r'if [ "${n:-0}" -lt 950 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 40 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 120 ]; then'));
+        // Round 7 (R7-A12-10, f4): κατώτατα λίγο κάτω από το πλήθος (πριν 950 / 40 / 120 κινητό + ρολόι μαζί).
+        expect(w, contains(r'if [ "${n:-0}" -lt 1550 ]; then'));
+        expect(w, contains(r'if [ "${n:-0}" -lt 70 ]; then'));
+        expect(w, contains(r'if [ "${n:-0}" -lt 128 ]; then'));
         expect(w, contains("grep -aoE '[0-9]+ tests passed' tests.log"));
       }
     });

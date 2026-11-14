@@ -19,7 +19,7 @@ import 'sample_data.dart';
 // δεδομένα· η πρώτη εκτίμηση βγαίνει την 28η.
 final _day21 = DateTime(2026, 12, 7, 8, 20); // Δευτέρα, 21 μέρες μετά τις 16/11
 final _check = DateTime(2026, 12, 14, 8, 20); // Δευτέρα, 28 μέρες μετά τις 16/11: η πρώτη μέρα με εκτίμηση
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 CheckIn? _pending(Goals g, DateTime today, {double eat = 2250, double tdee = 2600, Set<int> skip = const {}, int weighs = 99}) {
   final food = checkinFood(today, eat: eat, skip: skip);

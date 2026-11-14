@@ -116,7 +116,7 @@ class _DevicesPageState extends State<DevicesPage> {
       row('Παλμοί και HRV στον ύπνο', null, _Kind.measured),
       row('Θερμοκρασία δέρματος', 'απόκλιση από τα συνηθισμένα σου', _Kind.measured),
       row('Οξυγόνο τη νύχτα, μέσος όρος', null, _Kind.indicative),
-      row('Βαθμολογία ύπνου, Ετοιμότητα', 'βαθμολογία της Oura', _Kind.estimated, line: false),
+      row('Βαθμολογία ύπνου, ετοιμότητα', 'βαθμολογία της Oura', _Kind.estimated, line: false),
     ]);
     final watch = device('watch', Icons.watch_rounded, 'Galaxy Watch Ultra 2', 'ρολόι · μέρα και άσκηση', [
       row('Βήματα', null, _Kind.measured),

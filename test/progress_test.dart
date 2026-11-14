@@ -163,7 +163,7 @@ void main() {
     test('ίδιο βάρος, λιγότερες επαναλήψεις: πτώση (φαίνεται)', () {
       expect(r['hammer_curl']!.change, StrengthChange.down);
       expect(r['hammer_curl']!.repsDiff, -6);
-      expect(strengthPill(r['hammer_curl']!), ('6 επαν.', TrendKind.bad, false));
+      expect(strengthPill(r['hammer_curl']!), ('6 επαναλήψεις', TrendKind.bad, false));
     });
 
     // Έλεγχος 9/11 (V-B-12): πριν «μικτό». 12 → 14 kg με 9, 9, 8 (κάτω όριο 8) είναι η κανονική πρόοδος του προγράμματος.

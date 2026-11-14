@@ -284,7 +284,7 @@ void main() {
       for (final (d, kg) in _own.where((x) => !x.$1.isAfter(DateTime(2026, 12, 4)))) _m(DateTime(d.year, d.month, d.day, 7, 15), kg, fat: 27.0),
       _m(DateTime(2026, 12, 5, 10), 45.0, fat: 15.0),
     ]);
-    HealthStore store() => _store(now, rows)..setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180));
+    HealthStore store() => _store(now, rows)..setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180));
 
     test('widget: τιμή με «δεν μετρά ακόμα», χωρίς βέλος, εύρος, δείκτη μάζας σώματος· γράφημα μόνο από όσες μετρούν', () {
       expect(guardBody(rows).pending.single.weight, 45.0);

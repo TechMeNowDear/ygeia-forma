@@ -110,6 +110,12 @@ if pathlib.Path(f'{ROOT}/lib/pages/privacy_page.dart').exists() and 'Διαγρ�
     need('«Διαγραφή όλων των δεδομένων»' in greek, 'Διαγραφή: η εφαρμογή έχει «Διαγραφή όλων των δεδομένων»· η πολιτική πρέπει να τη λέει')
     need('Delete all data' in english, 'Διαγραφή: λείπει από το αγγλικό κείμενο')
 
+# --- «Αναφορά για έλεγχο» (Round 7, R7-A11-2): αρχείο στις Λήψεις με ΟΛΑ τα δεδομένα (και της Oura), που ο χρήστης
+# στέλνει μόνος του. Όσο υπάρχει στον κώδικα, η πολιτική το λέει (στη λίστα των αρχείων και στη «Διαγραφή»). ---
+if pathlib.Path(f'{ROOT}/lib/diagnostics.dart').exists():
+    need('«Αναφορά για έλεγχο»' in greek, 'Αναφορά για έλεγχο: η εφαρμογή φτιάχνει αυτό το αρχείο· η πολιτική πρέπει να το λέει')
+    need('diagnostics' in english, 'Αναφορά για έλεγχο: λείπει από το αγγλικό κείμενο (diagnostics)')
+
 # --- Barcode ---
 extra = read('android/ygeia/app-extra.gradle.kts')
 if 'play-services-code-scanner' in extra:
@@ -161,6 +167,96 @@ for base in ('lib', 'android/app/src/main', 'android/wear/src/main'):
                     errors.append(f'Νέα υπηρεσία στο {base}/…/{fn}: {host} — γράψ\' τη στην πολιτική και στη λίστα KNOWN_HOSTS')
                 else:
                     need(KNOWN_HOSTS[known[0]] in greek, f'{host}: η πολιτική πρέπει να αναφέρει {KNOWN_HOSTS[known[0]]}')
+
+# --- Δημόσιο repository: κανένα πραγματικό δεδομένο υγείας ή στοιχείο του ιδιοκτήτη (round 7, R7-A11-1) ---
+# Σχόλια και δοκιμές περιγράφουν κανόνες, ποτέ ένα πρόσωπο, και οι τιμές των δοκιμών είναι επινοημένες. Οι φράσεις
+# παρακάτω έλεγαν ότι μια νύχτα/μια βόλτα ήταν «πραγματική» ή έλεγαν το ιατρικό ιστορικό του ιδιοκτήτη. Οι ίδιες οι
+# πραγματικές τιμές ΔΕΝ γράφονται εδώ (αλλιώς αυτό το αρχείο θα τις ξαναδημοσίευε): ελέγχονται ως αποτύπωμα SHA-256.
+# Είναι μόνο τιμές που ήδη υπάρχουν στο δημόσιο ιστορικό του git (δεν προσθέτουν τίποτα νέο). Το αποτύπωμα ενός μικρού
+# αριθμού βρίσκεται με δοκιμές: σκοπός είναι να μη γράφονται ξανά ανοιχτά στο repository, όχι να είναι μυστικές.
+import hashlib
+
+
+def _print(kind, value):
+    return hashlib.sha256(f'ygeia-forma/R7-A11-1|{kind}|{value}'.encode()).hexdigest()[:20]
+
+
+OWNER_PRINTS = {
+    'by': {'38bafc149377b0cc5c63'},                              # έτος γέννησης
+    'h': {'21f38547313768c70ae3', 'f0357eab4f6ecf97ce36'},       # ύψος (και η παλιότερη τιμή του)
+    'spo2': {'81cc66be27666709036a', 'cd2172d5438115c98087'},    # τα δύο πραγματικά ελάχιστα οξυγόνου (μαζί)
+    'dated': {'c86e877f2d9933f16296', 'eb3ff6a4735fa824336a'},   # «η/μ: τιμή%» των δύο νυχτών
+}
+OWNER_PHRASES = [
+    (r'ιδιοκτήτ', '«ιδιοκτήτης»: σχόλια και δοκιμές περιγράφουν κανόνες, όχι ένα πρόσωπο'),
+    (r'λόγος της επίσκεψης', 'ιατρικό ιστορικό («λόγος της επίσκεψης»)'),
+    (r'επίσκεψη στον', 'ιατρικό ιστορικό («επίσκεψη στον …»)'),
+    (r'καρδιολόγ', 'ιατρικό ιστορικό («καρδιολόγος»): γράψε «γιατρός» και τον κανόνα'),
+    (r'πραγματικ(?:ή|ές) νύχτ', 'δεδομένα δοκιμής ως «πραγματική νύχτα»'),
+    (r'νύχτα του χρήστη|του χρήστη \(\d{1,2}:\d\d', 'δεδομένα δοκιμής ως «του χρήστη» (νύχτα, ώρες)'),
+    (r'πραγματική σημείωση', 'δεδομένα δοκιμής ως «πραγματική σημείωση»'),
+]
+SELF = os.path.normpath('tools/ci/check_privacy.py')
+TEXT_EXT = ('.dart', '.kt', '.kts', '.java', '.py', '.js', '.mjs', '.sh', '.xml', '.json', '.yml', '.yaml', '.md', '.txt')
+CODE_EXT = ('.dart', '.kt')
+_num = re.compile(r'(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)(?![\w])')
+_pct = re.compile(r'(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)\s?%')
+_oxygen = re.compile(r'spo2|oxygen|οξυγόν', re.IGNORECASE)
+_by = re.compile(r'(?:birthYear\s*:\s*|["\']by["\']\s*:\s*)(\d{4})\b')
+_height = re.compile(r'(?:heightCm\s*:\s*|["\']h["\']\s*:\s*)(\d{2,3}(?:\.\d+)?)\b')
+_dated = re.compile(r'(\d{1,2}/\d{1,2}): (\d{2,3}(?:,\d+)?)%')
+
+
+def _norm(tok):
+    try:
+        x = float(tok.replace(',', '.'))
+    except ValueError:
+        return tok
+    return str(int(x)) if x == int(x) else f'{x:g}'
+
+
+def _scan_owner(rel, text):
+    code = rel.endswith(CODE_EXT) and not rel.startswith('tools/')
+    spo2_file = set()
+    for no, line in enumerate(text.split('\n'), 1):
+        where = f'{rel}:{no}'
+        for pat, why in OWNER_PHRASES:
+            if re.search(pat, line, re.IGNORECASE):
+                errors.append(f'Δημόσιο repo: {where}: {why} (R7-A11-1)')
+        if not code:
+            continue
+        for y in _by.findall(line):
+            if _print('by', y) in OWNER_PRINTS['by']:
+                errors.append(f'Δημόσιο repo: {where}: πραγματικό έτος γέννησης του ιδιοκτήτη· βάλε επινοημένο (R7-A11-1)')
+        for v in _height.findall(line):
+            if _print('h', _norm(v)) in OWNER_PRINTS['h']:
+                errors.append(f'Δημόσιο repo: {where}: πραγματικό ύψος του ιδιοκτήτη· βάλε επινοημένο (R7-A11-1)')
+        for d, v in _dated.findall(line):
+            if _print('dated', f'{d}:{_norm(v)}') in OWNER_PRINTS['dated']:
+                errors.append(f'Δημόσιο repo: {where}: πραγματική νύχτα (μέρα και οξυγόνο) του ιδιοκτήτη (R7-A11-1)')
+        # Οξυγόνο: γραμμή που μιλά για οξυγόνο (ή αριθμοί με «%»), όχι κάθε λίστα αριθμών (π.χ. δείγμα ετοιμότητας).
+        oxygen = bool(_oxygen.search(line))
+        prints = {_print('spo2', _norm(t)) for t in (_num.findall(line) if oxygen else _pct.findall(line))}
+        if OWNER_PRINTS['spo2'] <= prints:
+            errors.append(f'Δημόσιο repo: {where}: τα δύο πραγματικά ελάχιστα οξυγόνου μαζί· βάλε επινοημένα (R7-A11-1)')
+        if oxygen:
+            spo2_file |= prints & OWNER_PRINTS['spo2']
+    if code and OWNER_PRINTS['spo2'] <= spo2_file:
+        errors.append(f'Δημόσιο repo: {rel}: τα δύο πραγματικά ελάχιστα οξυγόνου στο ίδιο αρχείο· βάλε επινοημένα (R7-A11-1)')
+
+
+for base in ('lib', 'test', 'android/app/src', 'android/wear/src', 'tools', 'assets/exercises'):
+    for dirpath, dirs, files in os.walk(f'{ROOT}/{base}'):
+        dirs[:] = [d for d in dirs if d not in ('build', 'out', '.gradle', 'node_modules')]
+        for fn in files:
+            if not fn.endswith(TEXT_EXT):
+                continue
+            path = os.path.join(dirpath, fn)
+            rel = os.path.normpath(os.path.relpath(path, ROOT)).replace(os.sep, '/')
+            if rel == SELF.replace(os.sep, '/'):
+                continue
+            with open(path, encoding='utf-8', errors='replace') as f:
+                _scan_owner(rel, f.read())
 
 # --- Γενικά ---
 need(re.search(r'Τελευταία ενημέρωση: \d{1,2} \w+ 20\d\d', page), 'Λείπει η «Τελευταία ενημέρωση: …»')

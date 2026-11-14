@@ -41,9 +41,12 @@ class InfoButton extends StatelessWidget {
                 color: c.card,
               ),
               alignment: Alignment.center,
-              child: Text('i',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
+              // R7-U4-11: το «i» μόνο φαίνεται· το TalkBack λέει «Τι είναι: …» (πριν «Τι είναι: HRV, i»). Το πάτημα μένει.
+              child: ExcludeSemantics(
+                child: Text('i',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
+              ),
             ),
           ),
         ),
@@ -283,8 +286,11 @@ class InfoDot extends StatelessWidget {
               height: 26,
               decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.hairline), color: c.card),
               alignment: Alignment.center,
-              child: Text('i',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
+              // R7-U4-11: όπως στο [InfoButton], χωρίς «i» στην ετικέτα του TalkBack.
+              child: ExcludeSemantics(
+                child: Text('i',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
+              ),
             ),
           ),
         ),

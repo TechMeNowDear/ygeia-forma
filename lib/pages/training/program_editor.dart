@@ -137,7 +137,13 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
                 // round1, U5-06 / U5-32: διάρκεια σε λέξεις, και όχι «Περπάτημα / Περπάτημα · 30′».
                 Text(
                   w.isCardio
-                      ? [if (w.cardio!.name != w.name) w.cardio!.name, '${w.cardio!.minutes} λεπτά'].join(' · ')
+                      // R7-U3-15: με πλάνο ανά εβδομάδα, το εύρος του πλάνου (πριν «30 λεπτά» και την 4η εβδομάδα των 45).
+                      ? [
+                          if (w.cardio!.name != w.name) w.cardio!.name,
+                          w.cardio!.plan.isEmpty
+                              ? '${w.cardio!.minutes} λεπτά'
+                              : '${w.cardio!.plan.first} → ${w.cardio!.plan.last} λεπτά (ανά εβδομάδα)',
+                        ].join(' · ')
                       : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά',
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                 ),
@@ -254,7 +260,8 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
 
   String _line(PlanItem i) {
     // Round 2 (R2-D-5): «ξεκούραση 1:30», όπως στην προπόνηση και στην επικόλληση (πριν «1′30″»).
-    final parts = [repsRange(i), 'ξεκούραση ${restText(i.rest)}', 'ρεζέρβα ${i.rir}'];
+    // R7-U3-14: «άφησε 3», η ίδια λέξη με την προπόνηση και την Άσκηση (πριν «ρεζέρβα 3» μόνο εδώ).
+    final parts = [repsRange(i), 'ξεκούραση ${restText(i.rest)}', 'άφησε ${i.rir}'];
     if (hasLoad(i.kind)) parts.add(i.load == null ? 'βάρος: αυτόματα' : loadLabel(i.kind, i.load));
     return parts.join(' · ');
   }
@@ -390,7 +397,7 @@ Future<void> editItem(BuildContext context, PlanItem it) => showModalBottomSheet
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(children: [Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c.text))), w]),
             );
-        // Τουλάχιστον 2 σε όλες, ως να πει άλλα ο καρδιολόγος (έλεγχος #2).
+        // Τουλάχιστον 2 σε όλες, ως να πει άλλα ο γιατρός (έλεγχος #2).
         const minRir = 2;
         return SafeArea(
           child: Padding(
@@ -402,7 +409,7 @@ Future<void> editItem(BuildContext context, PlanItem it) => showModalBottomSheet
               row('Επαναλήψεις από', Stepper2(value: '${it.lo}', onMinus: it.lo > 1 ? () => set(() => it.lo--) : null, onPlus: it.lo < it.hi ? () => set(() => it.lo++) : null)),
               row('έως', Stepper2(value: '${it.hi}', onMinus: it.hi > it.lo ? () => set(() => it.hi--) : null, onPlus: it.hi < 50 ? () => set(() => it.hi++) : null)),
               row('Διάλειμμα', Stepper2(value: restText(it.rest), width: 72, onMinus: it.rest >= 15 ? () => set(() => it.rest -= 15) : null, onPlus: it.rest < 600 ? () => set(() => it.rest += 15) : null)),
-              row('Ρεζέρβα (επαναλήψεις)', Stepper2(value: '${it.rir}', onMinus: it.rir > minRir ? () => set(() => it.rir--) : null, onPlus: it.rir < 4 ? () => set(() => it.rir++) : null)),
+              row('Άφησε (επαναλήψεις)', Stepper2(value: '${it.rir}', onMinus: it.rir > minRir ? () => set(() => it.rir--) : null, onPlus: it.rir < 4 ? () => set(() => it.rir++) : null)),
               if (hasLoad(k))
                 row(
                   'Αρχικό βάρος',
@@ -466,7 +473,20 @@ Future<String?> pickExercise(BuildContext context) => showModalBottomSheet<Strin
                         ListTile(
                           key: ValueKey('pick-${e.id}'),
                           title: Text(e.name),
-                          subtitle: Text(e.equip),
+                          // R7-A6-9: η προειδοποίηση των ασκήσεων «με προσοχή», όπως στο «Πρόσθεσε άσκηση» (ex_picker.dart).
+                          subtitle: e.caution == null
+                              ? Text(e.equip)
+                              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text(e.equip),
+                                  Row(children: [
+                                    Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text('Σταδιακά, χωρίς πόνο',
+                                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.warn)),
+                                    ),
+                                  ]),
+                                ]),
                           onTap: () => Navigator.of(ctx).pop(e.id),
                         ),
                     ],

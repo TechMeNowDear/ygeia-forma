@@ -28,6 +28,19 @@ NEW="$2"
 D="/data/data/$PKG"
 ok=1
 fail() { echo "ΑΠΟΤΥΧΙΑ: $*"; ok=0; }
+# Round 7 (R7-A12-10): στο main (η έκδοση που πάει στο κινητό) ό,τι εμποδίζει τη δοκιμή να δοκιμάσει με δείγμα δεδομένων
+# (χωρίς root, χωρίς sqlite3, δείγμα που δεν μπήκε ή δεν κρατήθηκε) είναι ΑΠΟΤΥΧΙΑ. Πριν ήταν προειδοποίηση και η
+# αναβάθμιση «περνούσε» έχοντας ελέγξει μόνο ότι η εφαρμογή ανοίγει. Σε άλλους κλάδους μένει προειδοποίηση. Εξαίρεση: commit
+# με «[skip-upgrade]» στο μήνυμα (SKIP_UPGRADE=true από το android.yml), όπως όταν δεν χτίζεται η παλιά έκδοση.
+strict=0
+if [ "${GITHUB_REF:-}" = "refs/heads/main" ] && [ "${SKIP_UPGRADE:-false}" != "true" ]; then strict=1; fi
+weak() {
+  if [ "$strict" = 1 ]; then
+    fail "$1 (στο main η δοκιμή αναβάθμισης γίνεται μόνο πλήρης· αν δεν γίνεται, commit με [skip-upgrade] στο μήνυμα)"
+  else
+    echo "::warning title=Αναβάθμιση::$1"
+  fi
+}
 labels() { tr '>' '\n' < ui.xml 2> /dev/null | grep -o 'text="[^"]*"\|content-desc="[^"]*"' | grep -v '=""' | head -25 | tr '\n' ' '; echo; }
 food_mine() { # Το προϊόν-δείγμα στα «δικά μου» (παλιά: Διατροφή › Τα δικά μου· από τα σχέδια 9/11: «+ Φαγητό» › Δικά μου)
   ui_tap "Διατροφή" || { echo "  (δεν βρέθηκε «Διατροφή»)"; return 1; }
@@ -54,7 +67,7 @@ food_mine() { # Το προϊόν-δείγμα στα «δικά μου» (πα�
 }
 
 if ! errq_root; then
-  echo "::warning title=Αναβάθμιση::Χωρίς root στον emulator: η δοκιμή αναβάθμισης γίνεται χωρίς δείγμα δεδομένων"
+  weak "Χωρίς root στον emulator: η δοκιμή αναβάθμισης γίνεται χωρίς δείγμα δεδομένων"
 fi
 
 # 1. Παλιά έκδοση, καθαρή.
@@ -81,6 +94,7 @@ JSON
   adb shell "mkdir -p $D/files && cp /data/local/tmp/seed_training.json $D/files/training.json && chown -R $uid:$uid $D/files && chmod 600 $D/files/training.json && restorecon -R $D/files" \
     && seeded=1
   adb shell rm -f /data/local/tmp/seed_training.json
+  [ "$seeded" = 1 ] || weak "Δεν μπήκε το δείγμα προπονήσεων (training.json) στην παλιά έκδοση"
 fi
 
 # 2β. Δείγμα στη βάση (έλεγχος 9/11, S-11): ένα «προϊόν μου» στον πίνακα my_foods, για να δοκιμάζεται και η αναβάθμιση της
@@ -89,9 +103,9 @@ food_seeded=0
 DB="$D/databases/ygeia.db"
 if errq_root; then
   if [ -z "$(adb shell 'command -v sqlite3' | tr -d '\r')" ]; then
-    echo "::warning title=Αναβάθμιση::Ο emulator δεν έχει sqlite3· η βάση δοκιμάζεται χωρίς γραμμές"
+    weak "Ο emulator δεν έχει sqlite3· η βάση δοκιμάζεται χωρίς γραμμές"
   elif [ "$(adb shell "test -f $DB && echo y" | tr -d '\r')" != y ]; then
-    echo "::warning title=Αναβάθμιση::Η παλιά έκδοση δεν έφτιαξε ακόμα τη βάση· η βάση δοκιμάζεται χωρίς γραμμές"
+    weak "Η παλιά έκδοση δεν έφτιαξε ακόμα τη βάση· η βάση δοκιμάζεται χωρίς γραμμές"
   else
     ms=$(( $(date +%s) * 1000 ))
     cat > seed_food.sql <<SQL
@@ -242,10 +256,10 @@ json.dump({"prefs": seed, "food": rows, "hist": hist}, open("seed_expect.json", 
     else
       # Το δείγμα δεν έμεινε όπως μπήκε ήδη στην ΠΑΛΙΑ έκδοση: δεν είναι σφάλμα της νέας. Δεν συγκρίνεται (να φανεί).
       more_seeded=0
-      echo "::warning title=Αναβάθμιση::Η παλιά έκδοση δεν κράτησε το πρόσθετο δείγμα όπως μπήκε· ενημέρωσε το 3β του tools/perf/upgrade.sh"
+      weak "Η παλιά έκδοση δεν κράτησε το πρόσθετο δείγμα όπως μπήκε· ενημέρωσε το 3β του tools/perf/upgrade.sh"
     fi
   else
-    echo "::warning title=Αναβάθμιση::Δεν μπήκε το πρόσθετο δείγμα (ρυθμίσεις, ημερολόγιο φαγητού, ιστορικό)· ελέγχονται μόνο προπονήσεις και προϊόν"
+    weak "Δεν μπήκε το πρόσθετο δείγμα (ρυθμίσεις, ημερολόγιο φαγητού, ιστορικό)· ελέγχονται μόνο προπονήσεις και προϊόν"
   fi
 fi
 

@@ -15,6 +15,7 @@ import '../data.dart';
 import '../error_report.dart';
 import '../format.dart' show upperGr;
 import '../nav.dart' show unknownRoute;
+import '../system_texts.dart' show greekSystemTexts;
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -35,7 +36,8 @@ const wipeDeletes = <String>[
 const wipeKeeps = <String>[
   'Ό,τι έχουν το Samsung Health και το Oura στις δικές τους εφαρμογές',
   'Οι άδειες που έδωσες στο Samsung Health',
-  'Αρχεία που έβγαλες στις Λήψεις (αντίγραφα, PDF)',
+  // Round 7 (R7-A11-2): και η «Αναφορά για έλεγχο» (αρχείο στις Λήψεις με όλα τα δεδομένα).
+  'Αρχεία που έβγαλες στις Λήψεις (αντίγραφα, PDF, αναφορές για έλεγχο)',
   'Το αυτόματο αντίγραφο της Google: αν απεγκαταστήσεις και ξαναβάλεις την εφαρμογή, μπορεί να φέρει πίσω όσα σβήστηκαν. '
       'Κλείνει από τις Ρυθμίσεις Android › Google › Αντίγραφα ασφαλείας',
   'Η επιλογή σου για τις αναφορές σφαλμάτων',
@@ -67,7 +69,7 @@ const wipeNoBackupText = 'Χωρίς αντίγραφο: όσα υπάρχουν
 
 /// Η Oura δεν απάντησε στην ανάκληση (π.χ. χωρίς ίντερνετ): τα tokens σβήστηκαν μόνο από το κινητό (S4).
 const wipeOuraNotRevokedText = 'Η πρόσβαση στο Oura δεν ακυρώθηκε στην Oura (ίσως δεν είχες ίντερνετ). '
-    'Ακύρωσέ τη από την εφαρμογή Oura.';
+    'Ακύρωσέ την από την εφαρμογή Oura.';
 
 const wipeWatchDoneText = 'Ρολόι: σβήστηκε.';
 const wipeWatchWaitingText = 'Ρολόι: περιμένει. Σβήνεται μόλις συνδεθεί και ανοίξεις την εφαρμογή του.';
@@ -752,6 +754,8 @@ class WipeUnfinishedApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
+        // Round 7 (R7-U4-7): ελληνικά κείμενα του Flutter, όπως στην κύρια εφαρμογή.
+        localizationsDelegates: greekSystemTexts,
         home: WipedPage(status: status, onStart: () {}, onRestore: () {}),
         // Έλεγχος 13/11 (S10-7, Sentry YGEIA-FORMA-3): όπως στα άλλα δύο MaterialApp, μια άγνωστη διαδρομή από την
         // πλατφόρμα δεν ρίχνει ποτέ την οθόνη όπου ο χρήστης προσπαθεί να τελειώσει μια διαγραφή.

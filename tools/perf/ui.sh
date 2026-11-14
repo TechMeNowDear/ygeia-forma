@@ -24,11 +24,27 @@ ui_dump() {
   return 1
 }
 
+# sys_anr_wait: αν η οθόνη (ui.xml) δείχνει «… isn't responding» ΑΛΛΗΣ διεργασίας (π.χ. System UI του emulator), πατά
+# «Wait», τυπώνει προειδοποίηση με την αιτία από το logcat και επιστρέφει 0. Για τη δική μας εφαρμογή: 1 (ui.py anr).
+sys_anr_wait() {
+  local who xy
+  who=$(ui_py anr ui.xml) || return 1
+  echo "::warning title=Emulator::Παράθυρο «$who isn't responding» πάνω από την εφαρμογή· πατήθηκε «Wait»"
+  adb logcat -d 2> /dev/null | grep -a -A5 "ANR in " | grep -a -v "^--$" | tail -6 | sed 's/^/    /'
+  xy=$(ui_py find ui.xml "Wait") && adb shell input tap $xy
+  sleep 2
+  return 0
+}
+
 # ui_wait "κείμενο" [δευτερόλεπτα]: περιμένει να φανεί στοιχείο που περιέχει το κείμενο. 0 = φάνηκε.
+# Ένα παράθυρο «isn't responding» άλλης διεργασίας κλείνεται με «Wait» (sys_anr_wait) και ο χρόνος συνεχίζει να μετρά.
 ui_wait() {
   local want="$1" end=$(( $(date +%s) + ${2:-40} ))
   while :; do
-    if ui_dump && ui_py find ui.xml "$want" > /dev/null; then return 0; fi
+    if ui_dump; then
+      ui_py find ui.xml "$want" > /dev/null && return 0
+      sys_anr_wait
+    fi
     [ "$(date +%s)" -ge "$end" ] && return 1
     sleep 3
   done

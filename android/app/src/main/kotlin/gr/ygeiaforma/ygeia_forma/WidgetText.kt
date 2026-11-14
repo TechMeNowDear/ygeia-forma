@@ -1,7 +1,10 @@
 package gr.ygeiaforma.ygeia_forma
 
+import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Κανόνες κειμένου και χρωμάτων των widgets της αρχικής οθόνης (round 1, U7-11 … U7-16). Καθαρές συναρτήσεις (χωρίς
@@ -47,6 +50,8 @@ object WidgetText {
         }
         c.remove("bar")
         c.put("src", NEW_DAY)
+        // Round 7 (U1-10): η σύντομη πηγή («10:20») είναι της παλιάς μέρας.
+        c.remove("srcShort")
         return c
     }
 
@@ -158,4 +163,93 @@ object WidgetText {
 
     /** U7-14: το χρώμα τόνου (95%) για τη γραμμή «συνήθως» μόνο όταν διαβάζεται σε όλα τα [backgrounds]. */
     fun toneReadable(tone: Int, backgrounds: IntArray): Boolean = backgrounds.all { contrast(over(tone, it, 0.95f), it) >= 4.5 }
+
+    /** Πόσο από τη «λάμψη» μένει, από την πλήρη προς καμία. */
+    val GLOW_STEPS = floatArrayOf(1f, 0.75f, 0.5f, 0.25f, 0f)
+
+    /**
+     * Round 7 (U1-6): η διαφάνεια της «λάμψης» (κέντρο: η πάνω δεξιά γωνία, εκεί που γράφεται η πηγή «Oura · Σάβ 7/11» και,
+     * στη στήλη 1×3, ο τίτλος). [full]: η διαφάνεια του σχεδίου. Μικραίνει ([GLOW_STEPS]) ώσπου τα πλήρη γράμματα [text]
+     * πάνω στη λάμψη ([acc] πάνω στο [top], το φόντο όπως φαίνεται πάνω στην ταπετσαρία) να διαβάζονται όσο και χωρίς
+     * αυτήν, ως 4,5:1. Πριν η πηγή καθόταν πάνω στη λάμψη στο 2,7–4,4:1 σε 5 από τα 6 έτοιμα θέματα.
+     */
+    fun glowAlpha(text: Int, acc: Int, top: Int, full: Float): Float {
+        val target = minOf(4.5, contrast(text, top))
+        for (k in GLOW_STEPS) {
+            val a = full * k
+            if (contrast(text, over(acc, top, a)) >= target - 1e-9) return a
+        }
+        return 0f
+    }
+
+    private fun thousands(v: Long): String {
+        val s = kotlin.math.abs(v).toString().reversed().chunked(3).joinToString(".").reversed()
+        return if (v < 0) "−$s" else s
+    }
+
+    private fun dec1(v: Double): String = String.format(java.util.Locale.ROOT, "%.1f", v).replace('.', ',')
+
+    /**
+     * Μετά από ανάγνωση στο παρασκήνιο (RefreshWorker → HomeWidgets): το νέο «move» του στιγμιοτύπου από το βοηθητικό
+     * αρχείο της ανάγνωσης ([dashboard]: readAt, steps/floors [[ms, τιμή]…], activity), ή null όταν η ανάγνωση δεν είναι
+     * νεότερη από το [old]. Βήματα, θερμίδες, ενεργός χρόνος, απόσταση και όροφοι της μέρας [today].
+     * Ίδια μέρα με το [old]: ό,τι δεν βρεθεί μένει (είναι της ίδιας μέρας). Round 7 (A10-2): ΝΕΑ μέρα: από την αρχή, χωρίς
+     * τίποτα από το [old]. Πριν έμεναν η κρίση «χθες κάτω από το εύρος» (της ΠΡΟΧΘΕΣΙΝΗΣ μέρας, δίπλα στα χθεσινά βήματα), το
+     * γράφημα της προηγούμενης μέρας και θερμίδες/ενεργός χρόνος/απόσταση της χθεσινής, με τη σημερινή ημερομηνία. Η κρίση
+     * του εύρους ξαναγράφεται μόνο από την εφαρμογή (το όριο εξαρτάται από την ηλικία).
+     */
+    fun moveFromDashboard(old: JSONObject?, dashboard: JSONObject, today: LocalDate, zone: ZoneId): JSONObject? {
+        val readAt = dashboard.optLong("readAt", 0L)
+        if (readAt <= (old?.optLong("at", 0L) ?: 0L)) return null
+        val move = if (old != null && old.optString("day", "") == today.toString()) JSONObject(old.toString()) else JSONObject()
+        val m = move.optJSONObject("m") ?: JSONObject().also { move.put("m", it) }
+        fun dayOf(ms: Long) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+        fun perDay(key: String, sum: Boolean): Map<LocalDate, Double> {
+            val out = HashMap<LocalDate, Double>()
+            val arr = dashboard.optJSONArray(key) ?: return out
+            for (i in 0 until arr.length()) {
+                val e = arr.optJSONArray(i) ?: continue
+                if (e.length() < 2) continue
+                val day = dayOf(e.optLong(0))
+                val v = e.optDouble(1)
+                if (v.isNaN()) continue
+                out[day] = if (sum) (out[day] ?: 0.0) + v else v
+            }
+            return out
+        }
+
+        fun put(key: String, label: String, value: String, unit: String) {
+            val e = m.optJSONObject(key) ?: JSONObject()
+            e.put("l", label).put("v", value).put("u", unit)
+            m.put(key, e)
+        }
+        val steps = perDay("steps", sum = false)
+        // Χωρίς βήματα σήμερα ακόμα: όχι τα χθεσινά με σημερινή ώρα.
+        if (steps[today] == null) m.optJSONObject("steps")?.put("v", "—")?.remove("cap")
+        val floors = perDay("floors", sum = true)
+        if (floors[today] == null) m.remove("floors")
+        steps[today]?.let { s ->
+            val e = m.optJSONObject("steps") ?: JSONObject()
+            e.put("l", "Βήματα").put("v", thousands(Math.round(s))).put("u", "")
+            val y = steps[today.minusDays(1)]
+            e.put("cap", if (y == null) "βήματα σήμερα" else "χθες ${thousands(Math.round(y))}")
+            e.put("s", JSONArray((6 downTo 0).map { steps[today.minusDays(it.toLong())] ?: JSONObject.NULL }))
+            m.put("steps", e)
+        }
+        floors[today]?.let { put("floors", "Όροφοι", "${Math.round(it)}", "") }
+        // Στρογγύλευση όπως η εφαρμογή (widget_snapshot.dart: `round()`)· πριν `toLong()` έκοβε (287,6 → 287 αντί για 288).
+        dashboard.optJSONObject("activity")?.let { a ->
+            if (a.has("activeCalories")) put("activeKcal", "Ενεργές", thousands(Math.round(a.optDouble("activeCalories"))), " kcal")
+            if (a.has("calories")) put("totalKcal", "Σύνολο", thousands(Math.round(a.optDouble("calories"))), " kcal")
+            // Round 1 (U7-13): ολόκληρη λέξη, όπως το στιγμιότυπο της εφαρμογής (widget_snapshot.dart).
+            if (a.has("activeMinutes")) put("activeMin", "Ενεργός", "${a.optLong("activeMinutes")}", " λεπτά")
+            if (a.has("distance")) put("distance", "Απόσταση", dec1(a.optDouble("distance") / 1000), " km")
+        }
+        val t = Instant.ofEpochMilli(readAt).atZone(zone).toLocalTime()
+        // Locale.ROOT (τελικός έλεγχος, Συμβούλιο 4, W-5): πάντα ψηφία 0–9, σε όποια γλώσσα κι αν είναι το κινητό.
+        // Round 7 (U1-10): «Samsung · 10:20» και σύντομη «10:20» για τη στήλη 1×3, όπως η εφαρμογή (widget_snapshot.dart).
+        val hm = "%02d:%02d".format(java.util.Locale.ROOT, t.hour, t.minute)
+        move.put("src", "Samsung · $hm").put("srcShort", hm).put("at", readAt).put("day", today.toString())
+        return move
+    }
 }

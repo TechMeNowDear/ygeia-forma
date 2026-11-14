@@ -75,13 +75,36 @@ class FoodBridge(
                 val (entries, products) = withContext(DbQueue.dispatcher) { store.restoreFood(rows.log, rows.foods) }
                 JSONObject().put("ok", true).put("entries", entries).put("foods", products)
             }
+            // Round 7 (R7-A9-1, f4): μετά από βλάβη της βάσης, ό,τι διαβάζεται από το αρχείο που κρατήθηκε
+            // ([DayStore.salvageRead], μόνο ανάγνωση), και το σημάδι ότι ξαναμπήκε ([DayStore.salvageDone]).
+            "salvageRead" -> respondDb(result) {
+                val at = (call.argument<Any>("at") as? Number)?.toLong() ?: 0L
+                require(at > 0L) { "Λείπει η ώρα της βλάβης" }
+                withContext(DbQueue.dispatcher) { DayStore.salvageRead(activity.applicationContext, at) }
+            }
+            "salvageDone" -> respondDb(result) {
+                val at = (call.argument<Any>("at") as? Number)?.toLong() ?: 0L
+                require(at > 0L) { "Λείπει η ώρα της βλάβης" }
+                val entries = (call.argument<Any>("entries") as? Number)?.toInt() ?: 0
+                val foods = (call.argument<Any>("foods") as? Number)?.toInt() ?: 0
+                withContext(DbQueue.dispatcher) { DayStore.salvageDone(activity.applicationContext, at, entries, foods) }
+                JSONObject().put("ok", true)
+            }
             "saveBackup" -> respond(result) {
                 val json = call.argument<String>("json") ?: ""
                 val name = call.argument<String>("name") ?: "ygeia-antigrafo.json"
                 require(json.isNotEmpty()) { "Κενό αντίγραφο" }
-                val uri = withContext(Dispatchers.IO) { BackupFiles.save(activity, json, name) }
-                val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
-                JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
+                // Round 7 (R7-A9-5, f4): γεμάτος χώρος → «kind: full» (ελληνικό μήνυμα στη Flutter, όχι το κείμενο της Java).
+                try {
+                    val uri = withContext(Dispatchers.IO) { BackupFiles.save(activity, json, name) }
+                    val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
+                    JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    val kind = BackupRules.failKind(e)
+                    if (kind == "other") throw e
+                    JSONObject().put("ok", false).put("kind", kind)
+                }
             }
             "shareBackup" -> respondMain(result) {
                 BackupFiles.share(activity, android.net.Uri.parse(call.argument<String>("uri") ?: ""))
@@ -95,8 +118,16 @@ class FoodBridge(
                 if (uri == null) {
                     JSONObject().put("ok", false).put("kind", "cancelled").put("message", "Ακυρώθηκε")
                 } else {
-                    val text = withContext(Dispatchers.IO) { BackupFiles.read(activity, uri) }
-                    JSONObject().put("ok", true).put("json", text)
+                    // Round 7 (R7-A9-5, f4): κομμένο/χαλασμένο ή πολύ μεγάλο αρχείο → «kind» για ελληνικό μήνυμα.
+                    try {
+                        val text = withContext(Dispatchers.IO) { BackupFiles.read(activity, uri) }
+                        JSONObject().put("ok", true).put("json", text)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        val kind = BackupRules.failKind(e)
+                        if (kind == "other") throw e
+                        JSONObject().put("ok", false).put("kind", kind)
+                    }
                 }
             }
             "scanBarcode" -> respondMain(result) { scan() }

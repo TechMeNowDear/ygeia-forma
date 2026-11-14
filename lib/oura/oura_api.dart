@@ -266,7 +266,7 @@ String ouraErrorText(OuraErrorKind k) => switch (k) {
       OuraErrorKind.stale => 'Η σύνδεση άργησε. Πάτα ξανά «Σύνδεση με Oura».',
       OuraErrorKind.incomplete => 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά.',
       OuraErrorKind.notConfigured => 'Η εγγραφή στην Oura γίνεται τη μέρα που θα έρθει το δαχτυλίδι.',
-      OuraErrorKind.noBrowser => 'Δεν άνοιξε ο browser του κινητού.',
+      OuraErrorKind.noBrowser => 'Δεν άνοιξε το πρόγραμμα περιήγησης (π.χ. Chrome) του κινητού.',
       OuraErrorKind.proxyNotConfigured =>
         'Ο μεσάζων δεν έχει ρυθμιστεί (λείπει το μυστικό της εφαρμογής στο Netlify). Δεν άλλαξε τίποτα· θα ξαναδοκιμάσει σε μία ώρα.',
       OuraErrorKind.proxyRejected =>

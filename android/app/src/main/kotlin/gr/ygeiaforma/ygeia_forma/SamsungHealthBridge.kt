@@ -91,7 +91,9 @@ class SamsungHealthBridge(
                 val pages = call.argument<List<ByteArray>>("pages") ?: emptyList()
                 val name = call.argument<String>("name") ?: "ygeia-anafora.pdf"
                 val uri = withContext(Dispatchers.IO) { PdfExporter.save(activity, pages, name) }
-                JSONObject().put("ok", true).put("uri", uri.toString())
+                // R7-U4-3: δεύτερο PDF την ίδια μέρα → το σύστημα το ονομάζει «… (1).pdf»· η οθόνη δείχνει το πραγματικό όνομα.
+                val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
+                JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
             }
             "sharePdf", "openPdf" -> {
                 val json = try {
@@ -221,9 +223,9 @@ class SamsungHealthBridge(
         val s = store()
         val granted = s.getGrantedPermissions(permissions)
         val names = granted.map { it.dataType.name }.toSet()
+        // Round 7 (R7-A10-4): το «readAt» το βάζει ο DashboardReader (η αρχή της ανάγνωσης)· όχι εδώ, με την ώρα του τέλους.
         val o = SleepPolicy.reader(activity, s).read(names)
             .put("ok", true)
-            .put("readAt", System.currentTimeMillis())
             .put("granted", granted.size)
             .put("total", permissions.size)
         // Το JSON (μερικά MB) φτιάχνεται μία φορά, εκτός main thread (όλο το dashboard() τρέχει εκτός, A9).
@@ -346,10 +348,13 @@ class SamsungHealthBridge(
             types.put(o)
         }
 
+        // Round 7 (R7-A10-3): βήματα και θερμίδες της κάρτας «Σήμερα» για ΤΗ ΜΕΡΑ του «readAt» (ως αυτή τη στιγμή), όχι για
+        // όποια μέρα είναι όταν φτάσει η κάθε ερώτηση· η Flutter δείχνει στα «Βήματα» μόνο την τιμή αυτής της μέρας.
+        val day = to.toLocalDate()
         val today = JSONObject()
         if (DataTypes.STEPS.name in grantedNames) {
             try {
-                today.put("stepsByDay", dailySteps(s, 7))
+                today.put("stepsByDay", dailySteps(s, 7, day))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -359,10 +364,10 @@ class SamsungHealthBridge(
             today.put("stepsError", JSONObject().put("kind", "no_permission"))
         }
         if (DataTypes.ACTIVITY_SUMMARY.name in grantedNames) {
-            putToday(s, today, "totalCalories", DataType.ActivitySummaryType.TOTAL_CALORIES_BURNED)
-            putToday(s, today, "activeCalories", DataType.ActivitySummaryType.TOTAL_ACTIVE_CALORIES_BURNED)
-            putToday(s, today, "activeTime", DataType.ActivitySummaryType.TOTAL_ACTIVE_TIME)
-            putToday(s, today, "distance", DataType.ActivitySummaryType.TOTAL_DISTANCE)
+            putToday(s, today, "totalCalories", DataType.ActivitySummaryType.TOTAL_CALORIES_BURNED, day, to)
+            putToday(s, today, "activeCalories", DataType.ActivitySummaryType.TOTAL_ACTIVE_CALORIES_BURNED, day, to)
+            putToday(s, today, "activeTime", DataType.ActivitySummaryType.TOTAL_ACTIVE_TIME, day, to)
+            putToday(s, today, "distance", DataType.ActivitySummaryType.TOTAL_DISTANCE, day, to)
         }
 
         return JSONObject()
@@ -504,8 +509,7 @@ class SamsungHealthBridge(
         }
     }
 
-    private suspend fun dailySteps(s: HealthDataStore, days: Int): JSONArray {
-        val today = LocalDate.now()
+    private suspend fun dailySteps(s: HealthDataStore, days: Int, today: LocalDate): JSONArray {
         val request = DataType.StepsType.TOTAL.requestBuilder
             .setLocalTimeFilterWithGroup(
                 LocalTimeFilter.of(
@@ -532,10 +536,12 @@ class SamsungHealthBridge(
         target: JSONObject,
         key: String,
         op: AggregateOperation<T, AggregateRequest.LocalTimeBuilder<T>>,
+        day: LocalDate,
+        until: LocalDateTime,
     ) {
         try {
             val request = op.requestBuilder
-                .setLocalTimeFilter(LocalTimeFilter.of(LocalDate.now().atStartOfDay(), LocalDateTime.now()))
+                .setLocalTimeFilter(LocalTimeFilter.of(day.atStartOfDay(), until))
                 .build()
             val value = s.aggregateData(request).dataList.firstOrNull()?.value
             target.put(key, describe(value) ?: JSONObject.NULL)

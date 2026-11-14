@@ -172,7 +172,9 @@ class ExProgress {
   /// Διαφορά βάρους (θετική = πιο βαρύ· στο λάστιχο βοήθειας, λιγότερη βοήθεια = πιο δύσκολο).
   double get loadDiff {
     if (!hasLoad(kind)) return 0;
-    final a = before.workLoad, b = now.workLoad;
+    // R7-A6-11: το φορτίο που ΚΑΤΕΛΗΞΕ κάθε φορά ([ExLog.endLoad], όπως η πρόοδος), όχι το μεγαλύτερο: αν μετά το 1ο σετ
+    // το βάρος κατέβηκε, η άσκηση «έγινε» με το ελαφρύτερο.
+    final a = before.endLoad, b = now.endLoad;
     if (a == null || b == null) return 0;
     // Στρογγυλεμένο στα εκατοστά (11,3 − 9,3 = 2,0000000000000018 στους δεκαδικούς του υπολογιστή).
     return ((kind == LoadKind.bandAssist ? a - b : b - a) * 100).round() / 100;

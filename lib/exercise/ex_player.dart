@@ -236,7 +236,8 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
-          runSpacing: 8,
+          // R7-U4-10: κάθε TabChip έχει πια 4 dp διάφανα πάνω-κάτω (περιοχή πατήματος 48 dp)· ίδιο ορατό κενό 8 dp.
+          runSpacing: 0,
           children: [
             for (final chip in <Widget>[
             TabChip(label: 'Αργά', selected: _slow, solid: c.exerciseSolid, onTap: () => setState(() => _slow = !_slow)),
@@ -245,9 +246,19 @@ class _ExPlayerState extends State<ExPlayer> with SingleTickerProviderStateMixin
               setState(() => _muscles = !_muscles);
               _repaint.value++;
             }),
+            // R7-U3-11: οι οδηγοί φαίνονται μόνο στην κύρια όψη· σε άλλη όψη το chip δεν μένει «αναμμένο», και το πάτημα
+            // γυρίζει στην κύρια όψη με τους οδηγούς (πριν δεν άλλαζε τίποτα στην εικόνα και έμοιαζε χαλασμένο).
             if (ex.anim.guides.isNotEmpty)
-              TabChip(label: 'Οδηγοί', selected: _guides, solid: c.exerciseSolid, onTap: () {
-                setState(() => _guides = !_guides);
+              TabChip(key: const ValueKey('ex-guides'), label: 'Οδηγοί', selected: _guides && nearDefault, solid: c.exerciseSolid, onTap: () {
+                setState(() {
+                  if (nearDefault) {
+                    _guides = !_guides;
+                  } else {
+                    _second = false;
+                    _yaw = ex.yaw;
+                    _guides = true;
+                  }
+                });
                 _repaint.value++;
               }),
             ])

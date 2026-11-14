@@ -37,6 +37,9 @@ const pendingWeightNote = 'Διαφέρει πολύ από τις προηγο�
 /// το παιδί πριν από σένα): δεν ξέρουμε ποια είναι δική σου, ως την επόμενη ζύγιση (weight_guard.dart `guardDays`).
 const mixedWeightNote = 'Δύο πολύ διαφορετικές ζυγίσεις την ίδια μέρα· καμία δεν μετρά ακόμα, ως την επόμενη ζύγισή σου.';
 
+/// Round 7 (U1-3): η οδηγία της κάρτας «Σήμερα μέση» όταν μένει μόνο η μέση (από το φύλλο «Μέση», waist_sheet.dart).
+const waistTodayHint = 'Όρθιος, κοιλιά χαλαρή, στο τέλος της εκπνοής· η μεζούρα στο δέρμα.';
+
 /// Η αρχική οθόνη: τα σημαντικά από κάθε κατηγορία, μία ερώτηση ανά κάρτα.
 /// Πώς κοιμήθηκα; Τι έφαγα; Κουνήθηκα; Πού πάει το βάρος μου; Οι ειδοποιήσεις μόνο όταν υπάρχουν.
 class TodayPage extends StatelessWidget {
@@ -91,13 +94,36 @@ class TodayPage extends StatelessWidget {
         // Στη μεγάλη οθόνη οι Ρυθμίσεις είναι κάτω στην πλευρική μπάρα.
         final action = MediaQuery.sizeOf(context).width >= 600 ? null : settingsButton;
 
+        // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
+        final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
+        // Round 7 (U1-12): η κάρτα λέει «σήμερα»: ανοίγει το ημερολόγιο στη ΣΗΜΕΡΙΝΗ μέρα, όπως το πάτημα στο widget
+        // (main.dart, S2-8/S11-1). Πριν άνοιγε τη μέρα που είχε μείνει ανοιχτή (π.χ. τη χθεσινή), και το «+ Φαγητό» της
+        // Διατροφής έγραφε εκεί.
+        final foodCard = prefs.show('food')
+            ? FoodTodayCard(
+                food: food,
+                now: now,
+                goals: store.goals,
+                onOpen: () {
+                  food.setDay(this.now ?? DateTime.now());
+                  open(Cat.food, FoodTab.diary);
+                })
+            : null;
+
         if (d == null || !d.hasAnyPermission) {
+          // Round 7 (U1-14): χωρίς άδεια της Samsung Health (πρώτο άνοιγμα, ή άδειες που αφαίρεσε μια ενημέρωση) μένουν η
+          // προπόνηση της μέρας και το «+ Φαγητό»: δεν εξαρτώνται από τη Samsung (training.json, βάση τροφίμων).
           return PageFrame(
             eyebrow: longDate(now),
             title: greeting(now),
             action: action,
             onRefresh: () => store.refresh(),
-            left: [if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store), _ConnectCard(store: store)],
+            left: [
+              if (PrefsNoticeCard.shows(store)) PrefsNoticeCard(store: store),
+              _ConnectCard(store: store),
+              if (trainingCard != null) trainingCard,
+              if (foodCard != null) foodCard,
+            ],
           );
         }
 
@@ -148,15 +174,10 @@ class TodayPage extends StatelessWidget {
             : null;
         // Σχέδια 12/11 (A1/A3): ο έλεγχος θερμίδων κάτω από τη ζύγιση (απάντηση χρήστη 12/11). Ακούει μόνο το φαγητό.
         final checkIn = store.goals == null ? null : CheckInSlot(store: store, food: food, now: now);
-        // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
-        final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
-        final foodCard = prefs.show('food')
-            ? FoodTodayCard(food: food, now: now, goals: store.goals, onOpen: () => open(Cat.food, FoodTab.diary))
-            : null;
 
         final pair = <Widget>[
           if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
-          if (prefs.show('weight')) _weightCard(context, d, () => open(Cat.health, HealthTab.body)),
+          if (prefs.show('weight')) _weightCard(context, d, now, () => open(Cat.health, HealthTab.body)),
         ];
 
         // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
@@ -182,7 +203,7 @@ class TodayPage extends StatelessWidget {
                 auto: oxAuto)
             : _spo2Card(context, d, now, oxGuidance, () => open(Cat.health, HealthTab.heart), auto: oxAuto);
         final extras = <Widget>[
-          if (!ouraNight && prefs.show('energy')) _energyCard(context, d, () => open(Cat.health, HealthTab.heart)),
+          if (!ouraNight && prefs.show('energy')) _energyCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
           if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
           if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
           if (prefs.show('spo2')) oxCard(),
@@ -216,10 +237,6 @@ class TodayPage extends StatelessWidget {
           if (unusual != null) unusual,
           if (oxAuto) KeyedSubtree(key: const ValueKey('today-oxygen-auto'), child: oxCard()),
         ];
-        final more = [
-          ...pairUp(pair),
-          if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
-        ];
 
         return PageFrame(
           eyebrow: longDate(now),
@@ -243,8 +260,17 @@ class TodayPage extends StatelessWidget {
           ],
           top: alerts,
           // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
-          left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard, if (week != null) week],
-          right: [if (foodCard != null) foodCard, ...more, backupReminder, footer],
+          // Round 7 (U1-1): η «Η εβδομάδα σου» (≈ 1.000 dp) στη ΔΕΞΙΑ στήλη, μετά τα Βήματα/Βάρος, όπως στο κινητό. Αριστερά
+          // (ζύγιση + ύπνος + άσκηση ≈ 870 dp) έκανε τη στήλη ~1.900 dp με ~560 δεξιά: τρύπα ~1.300 dp τη Δευτέρα.
+          left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard],
+          right: [
+            if (foodCard != null) foodCard,
+            ...pairUp(pair),
+            if (week != null) week,
+            if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
+            backupReminder,
+            footer,
+          ],
         );
       },
     );
@@ -268,7 +294,7 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _weightCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _weightCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     // Round 2 (g4 · R2-D-6, R2-D-8): ίδιοι κανόνες με το Σώμα, τις Τάσεις και τη διόρθωση θερμίδων: μία ζύγιση ανά μέρα
     // (η πρώτη της μέρας που μετρά) και καμία «ξένη» ([countedBody]). Πριν: η τελευταία ζύγιση, όποια κι αν ήταν (π.χ. του
@@ -302,8 +328,10 @@ class TodayPage extends StatelessWidget {
     return StatCard(
       icon: Icons.monitor_weight_rounded,
       color: c.body,
-      // Αν η τελευταία ζύγιση δεν είναι σημερινή, λέει πότε έγινε.
-      title: last == null || sameDay(last.time, d.readAt) ? 'Βάρος' : 'Βάρος · ${relativeDay(last.time, d.readAt)}',
+      // Αν η τελευταία ζύγιση δεν είναι σημερινή, λέει πότε έγινε. Round 7 (U1-2): σε σχέση με ΤΩΡΑ, όχι με την ώρα της
+      // ανάγνωσης (με παλιά ανάγνωση η προχθεσινή ζύγιση έγραφε «Χθες»), και με την ίδια μορφή με τις άλλες κάρτες
+      // («Βάρος · Δευ 16/11», όπως «Βήματα · Τρί 17/11»· πριν «Βάρος · Χθες» / «· Παρασκευή» / «· 13 Νοε»).
+      title: datedTitle('Βάρος', last?.time, now),
       value: last?.weight == null ? null : dec(last!.weight!),
       unit: 'kg',
       trend: trend,
@@ -319,7 +347,7 @@ class TodayPage extends StatelessWidget {
     );
   }
 
-  Widget _energyCard(BuildContext context, Dashboard d, VoidCallback onTap) {
+  Widget _energyCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
     final c = Aigaio.of(context);
     final e = d.latestEnergy;
     final recent = d.energy.length <= 7 ? d.energy : d.energy.sublist(d.energy.length - 7);
@@ -329,7 +357,8 @@ class TodayPage extends StatelessWidget {
       title: 'Energy Score',
       value: e?.value.round().toString(),
       unit: 'από 100',
-      note: e == null ? null : '${relativeDay(e.day, d.readAt)} · εκτίμηση της Samsung',
+      // Round 7 (U1-2): η μέρα σε σχέση με τώρα, όχι με την ώρα της ανάγνωσης.
+      note: e == null ? null : '${relativeDay(e.day, now)} · εκτίμηση της Samsung',
       chart: recent.length >= 2 ? Sparkline(values: [for (final v in recent) v.value], color: c.energy, minRange: 20) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
@@ -643,7 +672,8 @@ class _ConnectCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        // Round 7 (U1-14): ίδιες γωνίες με τις άλλες κάρτες (πριν 28).
+        borderRadius: BorderRadius.circular(AppCard.radius),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -712,8 +742,8 @@ class _DatabaseCard extends StatelessWidget {
       icon: Icons.storage_rounded,
       color: c.bad,
       title: 'Η βάση χάλασε· κράτησα αντίγραφο',
-      text: 'Ξεκίνησε καινούργια βάση και το παλιό αρχείο κρατήθηκε στο κινητό. Το ιστορικό ξαναδιαβάζεται από τη '
-          'Samsung Health. Το ημερολόγιο φαγητού επανέρχεται από το αντίγραφό σου (Ρυθμίσεις › Αντίγραφο ασφαλείας).',
+      // Round 7 (R7-A9-1/2, f4): η σωστή διαδρομή, τα προϊόντα, και πόσα ξαναμπήκαν από το αρχείο που κρατήθηκε.
+      text: databaseNoticeText(store.dbRecovered),
       buttonText: 'Εντάξει',
       onPressed: () => store.dismissDatabaseNotice(),
     );
@@ -775,8 +805,13 @@ class _WeighCard extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 8),
+          // Round 7 (U1-3): η οδηγία της ζύγισης μόνο όσο μένει η ζύγιση· όταν μένει μόνο η μέση, η οδηγία της μέσης
+          // (φύλλο «Μέση»: η μεζούρα στο δέρμα, όχι «με τα ίδια ρούχα»).
           Text(
-            'Το πρωί, μετά την τουαλέτα, πριν φας ή πιεις, με τα ίδια ρούχα.',
+            weighDay && !weighed
+                ? 'Το πρωί, μετά την τουαλέτα, πριν φας ή πιεις, με τα ίδια ρούχα.'
+                : waistTodayHint,
+            key: const ValueKey('today-weigh-hint'),
             style: TextStyle(fontSize: 14, height: 1.4, color: c.text),
           ),
           if (weighDay)
@@ -791,12 +826,15 @@ class _WeighCard extends StatelessWidget {
               // Round 2 (R2-D-3): η κάρτα κάθεται στο φόντο της σελίδας, όχι σε κάρτα: γράμματα στο χρώμα του Σώματος πάνω
               // στο απαλό του φόντο έβγαιναν 4,0–4,4:1 στα φωτεινά θέματα. Γράμματα στο χρώμα κειμένου (≥ 11:1)· περίγραμμα
               // και εικονίδιο μένουν στο χρώμα του Σώματος (≥ 3:1, WCAG 1.4.11).
+              // Round 7 (U1-8): περίγραμμα στο ΠΛΗΡΕΣ χρώμα του Σώματος: με 50% διαφάνεια έβγαινε 1,86–1,99:1 στα φωτεινά
+              // θέματα και 2,69–3,05:1 στα σκοτεινά· τώρα 4,01–4,40:1 και 6,33–7,55:1 (WCAG 2.x, όλα τα θέματα:
+              // /home/claude/scratch/f5r7/border.py).
               child: OutlinedButton.icon(
                 key: const ValueKey('today-waist'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                   foregroundColor: c.text,
-                  side: BorderSide(color: c.body.withValues(alpha: 0.5), width: 1.5),
+                  side: BorderSide(color: c.body, width: 1.5),
                 ),
                 onPressed: () => openWaistSheet(context, store, now: now),
                 icon: Icon(Icons.straighten_rounded, size: 20, color: c.body),

@@ -70,6 +70,9 @@ const _freshEstimateDays = 42;
 /// «τη Δευτέρα 14 Δεκεμβρίου», «το Σάββατο 12 Δεκεμβρίου».
 String _onDay(DateTime d) => '${const ['τη', 'την', 'την', 'την', 'την', 'το', 'την'][d.weekday - 1]} ${longDate(d)}';
 
+/// Round 7 (R7-U2-12): «β‑γλυκάνες» με αδιάσπαστο ενωτικό (U+2011), ώστε να μη σπάει «β- | γλυκάνες» στο τέλος της γραμμής.
+const _betaGlucans = 'β\u2011γλυκάνες';
+
 /// «180» ή «174,5» (ύψος σε cm).
 String _cm(double h) => dec(h, h % 1 == 0 ? 0 : 1);
 
@@ -149,8 +152,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
     final te = o?.tdeeEst;
     if (o == null || te == null) return null;
     AdaptLog? last;
+    // Μόνο έλεγχοι με εκτίμηση: ένα βήμα «γρήγορης απώλειας» ή μια πρόταση από τη ζυγαριά (R7-A1-1) δεν την ανανεώνουν.
     for (final l in o.log) {
-      if (!l.fast) last = l;
+      if (!l.fast && !l.lowLog) last = l;
     }
     final day = last == null ? null : DateTime.tryParse(last.day);
     if (day == null) return null;
@@ -162,9 +166,14 @@ class _GoalsWizardState extends State<GoalsWizard> {
   ///
   /// Έλεγχος 13/11 (S1-11). Πριν, το «Ξανά ο οδηγός» πετούσε σιωπηλά τον στόχο και την εκτίμηση από τα δεδομένα σου και
   /// γύριζε στον τύπο για 4 εβδομάδες (π.χ. από 1.800 σε 2.060 kcal για κάποιον που καίει 2.250). Τώρα, όταν υπάρχει
-  /// πρόσφατη εκτίμηση, ο νέος στόχος βγαίνει από αυτήν (εκτίμηση ± ο ρυθμός που διάλεξες, ποτέ κάτω από το όριο
-  /// ασφαλείας)· και αν ο σκοπός («λιγότερο λίπος» κ.λπ.) δεν άλλαξε, ο εβδομαδιαίος έλεγχος συνεχίζει στις ίδιες μέρες.
+  /// πρόσφατη εκτίμηση, ο νέος στόχος βγαίνει από αυτήν (εκτίμηση ± ο ρυθμός που διάλεξες, ποτέ κάτω από το κάτω όριο
+  /// των οδηγιών)· και αν ο σκοπός («λιγότερο λίπος» κ.λπ.) δεν άλλαξε, ο εβδομαδιαίος έλεγχος συνεχίζει στις ίδιες μέρες.
   /// Αν άλλαξε ο σκοπός, η αρχή είναι σήμερα: η πρώτη εβδομάδα (νερά) πάλι δεν μετρά.
+  /// Round 7 (R7-A1-3): με ίδιο σκοπό ο έλεγχος συνεχίζει και ΠΡΙΝ από την πρώτη εκτίμηση, όσο οι στόχοι είναι
+  /// πρόσφατοι (αρχή ως [_freshEstimateDays] μέρες πριν). Πριν, μια αλλαγή μόνο της κίνησης στις 2/12 ξανάρχιζε τα πάντα:
+  /// οι μέρες 23/11–1/12 χάνονταν, μια δεύτερη «πρώτη εβδομάδα» δεν μετρούσε και η πρώτη εκτίμηση πήγαινε από τις 14/12 στις
+  /// 30/12 (όπως ήδη κάνει το «Υπολόγισε ξανά» για αλλαγή στοιχείων, που κρατά την αρχή). Με παλιούς στόχους χωρίς πρόσφατη
+  /// εκτίμηση (π.χ. μετά από μεγάλη διακοπή) η αρχή είναι σήμερα, όπως πριν.
   Goals? _draft() {
     final p = widget.store.profile;
     final calc = _calc;
@@ -172,8 +181,11 @@ class _GoalsWizardState extends State<GoalsWizard> {
     if (calc == null || age == null || h == null || kg == null) return null;
     final o = _old;
     final te = _freshTdee;
-    // Οι παλιοί στόχοι, μόνο όταν ο έλεγχος συνεχίζει στις ίδιες μέρες (πρόσφατη εκτίμηση και ίδιος σκοπός).
-    final same = te != null && o != null && o.aim == _aim ? o : null;
+    // Οι παλιοί στόχοι, μόνο όταν ο έλεγχος συνεχίζει στις ίδιες μέρες: ίδιος σκοπός, και πρόσφατη εκτίμηση ή πρόσφατη
+    // αρχή (R7-A1-3).
+    final oldSince = o == null ? null : DateTime.tryParse(o.since);
+    final recent = oldSince != null && daysBetween(oldSince, _now) <= _freshEstimateDays;
+    final same = o != null && o.aim == _aim && (te != null || recent) ? o : null;
     final floor = p.male ? kcalFloorMale : kcalFloorFemale;
     int? adapt;
     if (te != null) {
@@ -435,7 +447,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
               k: 'rate-$k',
               on: _rate == k,
               title: '${words[k]} · ${rateKgText(kg, list[k])}',
-              sub: '${ratePctText(list[k])} του βάρους · περίπου ${(kg * list[k] * kcalPerKg / 7 / 10).round() * 10} kcal '
+              // R7-U2-10: ο ίδιος αριθμός με τη σύνοψη και το «Πώς υπολογίστηκε» (495, όχι 500 εδώ και −495 στην επόμενη οθόνη).
+              sub: '${ratePctText(list[k])} του βάρους · περίπου ${(kg * list[k] * kcalPerKg / 7).round()} kcal '
                   '${_aim == GoalAim.lose ? 'λιγότερες' : 'περισσότερες'} τη μέρα',
               recommended: k == rec,
               onTap: () => setState(() => _rate = k),
@@ -443,8 +456,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
           const SizedBox(height: 4),
           _Note(
             _aim == GoalAim.lose
-                ? 'Ποτέ κάτω από ${p.female ? '1.200' : '1.500'} kcal. Αν χάνεις πάνω από 1% του βάρους την εβδομάδα, η '
-                    'Σήμερα θα σου το πει.'
+                // R7-A1-4: το κάτω όριο με τα λόγια της οδηγίας (AHA/ACC/TOS 2013).
+                ? 'Ποτέ κάτω από ${p.female ? '1.200' : '1.500'} kcal, ${floorWhy(!p.female)}. Αν χάνεις πάνω από 1% του '
+                    'βάρους την εβδομάδα, η Σήμερα θα σου το πει.'
                 : 'Αύξηση 0,25–0,5% την εβδομάδα για όσους ξεκινούν βάρη (Iraki 2019).',
           ),
         ];
@@ -469,8 +483,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
             k: 'doc-yes',
             on: _doctor == true,
             title: 'Ναι',
-            sub: 'Κορεσμένα έως 6% των θερμίδων, φυτικές ίνες 30 g, αλάτι κάτω από 5 g. Ανοίγει η κάρτα «Χοληστερίνη», με τους '
-                'ξηρούς καρπούς, το πίτουρο βρώμης, τα όσπρια και το ψάρι.',
+            // R7-U2-11: μόνο ό,τι αλλάζει με το «Ναι». Ίνες 30 g και αλάτι κάτω από 5 g ισχύουν για όλους (goals.dart).
+            sub: 'Κορεσμένα έως 6% των θερμίδων (αντί για 10%). Ανοίγει η κάρτα «Χοληστερίνη», με τους ξηρούς καρπούς, το '
+                'πίτουρο βρώμης, τα όσπρια και το ψάρι.',
             onTap: () => setState(() => _doctor = true),
           ),
           _Opt(
@@ -510,7 +525,12 @@ class _GoalsWizardState extends State<GoalsWizard> {
         final floored = te != null ? ((te + g.delta) / 10).round() * 10 < floor : g.floored;
         final sinceDay = DateTime.parse(d.since);
         final weekday = weekdayNames[sinceDay.weekday - 1];
-        final continues = !sameDay(sinceDay, _now);
+        // R7-A1-3: «συνεχίζει όπως πριν» μόνο όταν έχει ήδη γίνει έλεγχος με αυτούς τους στόχους· αλλιώς η μέρα της πρώτης
+        // εκτίμησης (και όταν η αρχή μένει ίδια: π.χ. αλλαγή μόνο της κίνησης στις 2/12 → 14/12, όχι 30/12).
+        final checked = d.log.any((l) => !l.fast && l.day.compareTo(d.since) >= 0);
+        final continues = !sameDay(sinceDay, _now) && checked;
+        final firstEst = firstEstimateDay(d);
+        final estDay = dayOf(_now).isAfter(firstEst) ? nextCheckDay(d, _now) : firstEst;
         final small = TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular);
         return [
           // U3b-14: μόνο όσα αλλάζουν πραγματικά από τη σελίδα «Στόχοι».
@@ -537,7 +557,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
               if (floored)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text('Ανέβηκε στο κάτω όριο ασφαλείας (${thousands(d.kcal)} kcal).',
+                  // R7-A1-4: με τα λόγια της οδηγίας (AHA/ACC/TOS 2013).
+                  child: Text('Ανέβηκε στις ${thousands(d.kcal)} kcal, ${floorWhy(d.male)}.',
                       style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.warn)),
                 ),
               const Hairline(vertical: 12),
@@ -558,7 +579,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
           _Note(continues
               ? 'Ο έλεγχος θερμίδων συνεχίζει όπως πριν: κάθε $weekday η Σήμερα ελέγχει τον στόχο με τις ζυγίσεις και το '
                   'φαγητό σου και προτείνει διόρθωση μόνο αν χρειάζεται.'
-              : 'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, ${_onDay(firstEstimateDay(d))} θα '
+              : 'Με ζυγίσεις τις μέρες σου (${_weighDays(p)}) και φαγητό σχεδόν κάθε μέρα, ${_onDay(estDay)} θα '
                   'φανεί πόσες θερμίδες καις πραγματικά (η πρώτη εβδομάδα δεν μετρά). Από τότε, κάθε $weekday, η Σήμερα ελέγχει '
                   'τον στόχο και προτείνει διόρθωση μόνο αν χρειάζεται.'),
           const SizedBox(height: 8),
@@ -711,11 +732,21 @@ class GoalsPage extends StatelessWidget {
         final hadEstimate = g.log.any((l) => !l.fast);
         final due = nextCheckDay(g, today);
         final firstEstimate = firstEstimateDay(g);
-        final next = !estimated && due.isBefore(firstEstimate) ? firstEstimate : due;
-        final nextText = sameDay(next, today) ? 'σήμερα' : longDate(next);
+        // Round 7 (R7-A1-2): πριν από την εκτίμηση, με τους ίδιους κανόνες με τον έλεγχο της Σήμερα: μετά από κενό
+        // καταγραφής φαγητού η εκτίμηση θέλει 3 εβδομάδες από τη μέρα που ξαναρχίζει η καταγραφή ([estimateDayAfterGap]).
+        final foodStore = FoodStore.shared;
+        final data = store.data;
+        final ready = !estimated && foodStore != null && foodStore.loaded && data != null
+            ? readiness(goals: g, today: today, weights: dailyWeights(data.body), intake: (a, b) => dailyIntake(foodStore, a, b))
+            : null;
+        final next = estimateDayAfterGap(g, !estimated && due.isBefore(firstEstimate) ? firstEstimate : due, ready?.gap);
+        final nextText = next == null
+            ? '3 εβδομάδες αφού ξαναρχίσει η καταγραφή φαγητού'
+            : (sameDay(next, today) ? 'σήμερα' : longDate(next));
         final nextLabel = estimated ? 'Επόμενος έλεγχος' : (hadEstimate ? 'Επόμενη εκτίμηση' : 'Πρώτη εκτίμηση');
         final lastApplied = g.log.where((l) => l.applied).lastOrNull;
-        final adaptCards = _adaptCards(context, g, today, next, estimated: estimated, nextLabel: nextLabel);
+        final lastCheck = g.log.where((l) => !l.fast).lastOrNull;
+        final adaptCards = _adaptCards(context, g, today, next, ready: ready, estimated: estimated, nextLabel: nextLabel);
         final small = TextStyle(fontSize: 13.5, color: c.textSecondary);
         // U3b-14: ό,τι αλλάζει έχει ύψος αφής 48 και ένα μικρό μολύβι· οι γραμμές που δεν αλλάζουν μένουν σκέτες.
         Widget editRow(String key, String label, String value, VoidCallback onTap) => InkWell(
@@ -732,7 +763,7 @@ class GoalsPage extends StatelessWidget {
             );
         // S11-12: τα στοιχεία άλλαξαν μετά τους στόχους; (null: όχι)
         final fixed = goalsWithCurrentProfile(g, p, today);
-        // Πίτουρο: «για 3 g β-γλυκάνες» γράφεται μόνο όταν τα γραμμάρια βγαίνουν από την ετικέτα και φτάνουν (U3b-19, S1-12).
+        // Πίτουρο: «για 3 g β‑γλυκάνες» γράφεται μόνο όταν τα γραμμάρια βγαίνουν από την ετικέτα και φτάνουν (U3b-19, S1-12).
         final beta = g.betaPer100;
         final branNeed = beta == null ? null : branGramsFor(beta);
         final branCovers = branNeed != null && g.branG >= branNeed;
@@ -767,8 +798,17 @@ class GoalsPage extends StatelessWidget {
                     'Ανέβηκε από ${thousands(lastApplied.before)} σε ${thousands(lastApplied.after)} (${_dm(lastApplied.day)}), '
                     'γιατί έχανες βάρος πολύ γρήγορα',
                     style: small)
+              // R7-A1-1: κατέβηκε από τη ζυγαριά, όταν με όσα γράφτηκαν η εκτίμηση έβγαινε πολύ χαμηλή.
+              else if (g.kcalAdapt != null && lastApplied != null && lastApplied.lowLog && lastApplied.after == g.kcalAdapt)
+                Text(
+                    'Κατέβηκε από ${thousands(lastApplied.before)} σε ${thousands(lastApplied.after)} (${_dm(lastApplied.day)}), '
+                    'γιατί το βάρος σου πήγαινε πιο ψηλά από τον στόχο',
+                    style: small)
               else if (g.kcalAdapt != null)
                 Text('Από τα δεδομένα σου${lastApplied == null ? '' : ', ${_dm(lastApplied.day)}'}', style: small)
+              // R7-A1-1: «Όχι τώρα» στην πρόταση από τη ζυγαριά δεν είναι «τα δεδομένα δεν ζήτησαν αλλαγή».
+              else if (lastCheck != null && lastCheck.lowLog && !lastCheck.applied && lastCheck.day.compareTo(g.since) >= 0)
+                Text('Από τον τύπο· δεν εφάρμοσες τη μείωση που πρότεινε η ζυγαριά (${_dm(lastCheck.day)})', style: small)
               else if (estimated)
                 Text('Από τον τύπο· τα δεδομένα σου δεν ζήτησαν αλλαγή', style: small)
               else
@@ -806,8 +846,9 @@ class GoalsPage extends StatelessWidget {
           ],
           for (final card in adaptCards) ...[const SizedBox(height: 12), card],
         ];
-        final mid = <Widget>[
-          AppCard(
+        // R7-U2-16: η κάρτα θρεπτικών χωριστά, ώστε στο ανοιχτό Fold να πηγαίνει στην αριστερή στήλη (κάτω από τις θερμίδες)
+        // και η δεξιά να έχει Χοληστερίνη, Ζύγισμα και τα κουμπιά στο τέλος, όπως στο κινητό.
+        final nutrients = AppCard(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               editRow('goals-protein', 'Πρωτεΐνη', '${g.protein} g${g.proteinSet != null ? ' · δική σου' : ''}', () => _editProtein(context, g)),
@@ -818,7 +859,8 @@ class GoalsPage extends StatelessWidget {
               InfoRow('Αλάτι', 'κάτω από ${dec(g.salt, 0)} g'),
               const InfoRow('Υδατάνθρακες', 'ό,τι μένει'),
             ]),
-          ),
+          );
+        final mid = <Widget>[
           if (g.doctor) ...[
             // U3b-28: οι αριθμοί εδώ είναι το πλάνο σου (προεπιλογές που αλλάζεις), όχι αριθμοί που έγραψε ο γιατρός.
             const GroupLabel('Χοληστερίνη · το πλάνο σου'),
@@ -829,7 +871,7 @@ class GoalsPage extends StatelessWidget {
                     () => _editInt(context, 'Ξηροί καρποί τη μέρα', g.nutsG, 0, 100, 'g', (v) => g.copyWith(nutsG: v))),
                 editRow(
                     'goals-bran',
-                    branCovers ? 'Πίτουρο βρώμης για 3 g β-γλυκάνες' : 'Πίτουρο βρώμης',
+                    branCovers ? 'Πίτουρο βρώμης για 3 g $_betaGlucans' : 'Πίτουρο βρώμης',
                     branCovers
                         ? '${g.branG} g · από την ετικέτα'
                         // Round 2 (R2-U1-14): ποιο είναι το πλάνο και ότι δεν φτάνει τα 3 g (πριν «40 g · για 3 g …: 45 g»).
@@ -851,11 +893,13 @@ class GoalsPage extends StatelessWidget {
             const SizedBox(height: 8),
             // S1-12: το ψάρι δεν είναι τρόφιμο που ρίχνει την LDL (η διατροφή «portfolio» του Jenkins 2003 ήταν φυτική)· και
             // ποια ψάρια (EFSA 2015: ξιφίας και τόνος έχουν τον περισσότερο υδράργυρο).
-            // Round 2 (R2-U1-14): τρεις περιπτώσεις· με ετικέτα που δεν φτάνει, όχι «γράψε τις β-γλυκάνες» (τις έγραψε ήδη).
+            // Round 2 (R2-U1-14): τρεις περιπτώσεις· με ετικέτα που δεν φτάνει, όχι «γράψε τις β‑γλυκάνες» (τις έγραψε ήδη).
+            // R7-U2-12: «β‑γλυκάνες» πάντα με αδιάσπαστο ενωτικό ([_betaGlucans]), ποτέ «β-» στο τέλος της γραμμής.
             Text(
               'Από το πλάνο σου. '
-              '${branCovers ? 'Τα γραμμάρια του πίτουρου βγήκαν από τις β-γλυκάνες που γράφει η συσκευασία σου (EFSA: 3 g τη μέρα).' : branNeed != null ? 'Με τη συσκευασία σου, για 3\u00A0g β\u2011γλυκάνες τη μέρα (EFSA) χρειάζονται $branNeed\u00A0g πίτουρο· το πλάνο σου έχει ${g.branG}\u00A0g. Για να τα φτάνεις, πάτησε τη γραμμή «Πίτουρο βρώμης».' : 'Για το πίτουρο, γράψε τις β-γλυκάνες που έχει η συσκευασία σου: βγαίνουν τα γραμμάρια για 3 g τη μέρα (EFSA).'} '
-              'Το ψάρι μπαίνει γιατί παίρνει τη θέση του κρέατος και για τα τριγλυκερίδια· το ίδιο δεν ρίχνει την LDL. Κυρίως μικρά '
+              '${branCovers ? 'Τα γραμμάρια του πίτουρου βγήκαν από τις $_betaGlucans που γράφει η συσκευασία σου (EFSA: 3 g τη μέρα).' : branNeed != null ? 'Με τη συσκευασία σου, για 3\u00A0g β\u2011γλυκάνες τη μέρα (EFSA) χρειάζονται $branNeed\u00A0g πίτουρο· το πλάνο σου έχει ${g.branG}\u00A0g. Για να τα φτάνεις, πάτησε τη γραμμή «Πίτουρο βρώμης».' : 'Για το πίτουρο, γράψε τις $_betaGlucans που έχει η συσκευασία σου: βγαίνουν τα γραμμάρια για 3 g τη μέρα (EFSA).'} '
+              // Round7 (R7-A3-8, f1): όχι «για τα τριγλυκερίδια»: το ψάρι στη διατροφή δεν τα αλλάζει ουσιαστικά (ESC/EAS 2019).
+              'Το ψάρι μπαίνει γιατί παίρνει τη θέση του κρέατος (λιγότερα κορεσμένα)· το ίδιο δεν ρίχνει την LDL. Κυρίως μικρά '
               'λιπαρά ψάρια (σαρδέλα, γαύρος, σκουμπρί)· ξιφίας και τόνος όχι συχνά, γιατί έχουν περισσότερο υδράργυρο (EFSA 2015).',
               style: TextStyle(fontSize: 13, height: 1.45, color: c.textSecondary),
             ),
@@ -904,14 +948,19 @@ class GoalsPage extends StatelessWidget {
                         Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [...top, const SizedBox(height: 16), ...bottom]),
+                              children: [...top, const SizedBox(height: 12), nutrients]),
                         ),
                         const SizedBox(width: 16),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: mid)),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [...mid, const SizedBox(height: 16), ...bottom]),
+                        ),
                       ])
                     else ...[
                       ...top,
                       const SizedBox(height: 12),
+                      nutrients,
                       ...mid,
                       const SizedBox(height: 16),
                       ...bottom,
@@ -945,27 +994,50 @@ class GoalsPage extends StatelessWidget {
 
   /// A4: «Πριν από την πρώτη εκτίμηση» (πρόοδος, όσο δεν έχει βγει εκτίμηση για αυτούς τους στόχους) και το ιστορικό
   /// «Πόσες kcal καις τη μέρα, από τα δεδομένα σου» (όταν υπάρχει). Έλεγχος 13/11: U3b-3, U3b-31, S1-6, S1-11.
-  List<Widget> _adaptCards(BuildContext context, Goals g, DateTime today, DateTime next,
-      {required bool estimated, required String nextLabel}) {
+  List<Widget> _adaptCards(BuildContext context, Goals g, DateTime today, DateTime? next,
+      {required ({int intakeDays, int weighIns, DateTime first, FoodGap? gap})? ready,
+      required bool estimated,
+      required String nextLabel}) {
     final c = Aigaio.of(context);
     final small = TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary);
     final title = TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text);
-    final days = daysBetween(today, next);
-    final when = days <= 0 ? 'σήμερα' : (days == 1 ? 'αύριο' : 'σε $days μέρες');
+    final days = next == null ? null : daysBetween(today, next);
+    final when = days == null ? 'μετά το κενό' : (days <= 0 ? 'σήμερα' : (days == 1 ? 'αύριο' : 'σε $days μέρες'));
     final cards = <Widget>[];
-    final food = FoodStore.shared;
-    final d = store.data;
-    if (!estimated && food != null && food.loaded && d != null) {
-      final r = readiness(goals: g, today: today, weights: dailyWeights(d.body), intake: (a, b) => dailyIntake(food, a, b));
+    final r = ready;
+    if (r != null) {
+      final gap = r.gap;
+      final restart = gap?.restart;
+      // R7-A1-2: έλεγχος που έγινε (από την 28η μέρα) χωρίς να βγει εκτίμηση, π.χ. «κάτι λείπει»: η κάρτα το λέει, αντί να
+      // δείχνει «όλα έτοιμα» και την επόμενη μέρα σαν σίγουρη.
+      final ci = g.checkIn == null ? null : DateTime.tryParse(g.checkIn!);
+      final missed = gap == null && ci != null && !ci.isBefore(firstEstimateDay(g));
       cards.add(AppCard(
         key: const ValueKey('goals-adapt-ready'),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(nextLabel == 'Πρώτη εκτίμηση' ? 'Πριν από την πρώτη εκτίμηση' : 'Πριν από την επόμενη εκτίμηση', style: title),
           const SizedBox(height: 2),
-          Text('Τι έχει μαζευτεί ως χθες (η πρώτη εβδομάδα δεν μετρά):', style: small),
+          // R7-U2-18: «η πρώτη εβδομάδα δεν μετρά» μία φορά, στο κείμενο κάτω.
+          Text('Τι έχει μαζευτεί ως χθες:', style: small),
           InfoRow('Μέρες με φαγητό', '${r.intakeDays} από $adaptMinIntakeDays'),
           InfoRow('Ζυγίσεις', '${r.weighIns} από $adaptMinWeighIns'),
           InfoRow(nextLabel, when),
+          if (gap != null) ...[
+            const SizedBox(height: 4),
+            Text(
+                restart == null
+                    ? 'Από ${dayMonth(gap.from)} δεν έχει γραφτεί φαγητό που να μετρά. Η εκτίμηση ξαναρχίζει από τη μέρα που θα '
+                        'ξαναγράψεις φαγητό και θέλει 3 εβδομάδες.'
+                    : 'Από ${dayMonth(gap.from)} ως ${dayMonth(gap.to)} δεν γράφτηκε φαγητό που να μετρά: μετράνε οι μέρες από '
+                        '${dayMonth(restart)} και μετά, και η εκτίμηση θέλει 3 εβδομάδες.',
+                key: const ValueKey('goals-adapt-gap'),
+                style: small),
+          ],
+          if (missed) ...[
+            const SizedBox(height: 4),
+            Text('Ο έλεγχος στις ${_dm(g.checkIn!)} δεν έβγαλε εκτίμηση· η κάρτα της Σήμερα έγραψε τι έλειπε.',
+                key: const ValueKey('goals-adapt-missed'), style: small),
+          ],
           const SizedBox(height: 4),
           Text(
               'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά. Μετράνε μέρες με τουλάχιστον το 60% του στόχου γραμμένο· '
@@ -987,7 +1059,8 @@ class GoalsPage extends StatelessWidget {
             if (l.fast)
               InfoRow('Γρήγορη απώλεια ${_dm(l.day)}', 'στόχος ${thousands(l.before)} → ${thousands(l.after)}')
             else ...[
-              InfoRow('Έλεγχος ${_dm(l.day)}', '${thousands((l.tdee / 10).round() * 10)} kcal'),
+              // R7-A1-1: έλεγχος με πολύ χαμηλή εκτίμηση (λείπει φαγητό): κανένα «πόσο καις», μόνο τι έγινε με τον στόχο.
+              InfoRow('Έλεγχος ${_dm(l.day)}', l.lowLog ? 'λείπει φαγητό' : '${thousands((l.tdee / 10).round() * 10)} kcal'),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -1195,6 +1268,9 @@ class _BranDialogState extends State<_BranDialog> {
   late final _beta = TextEditingController(text: widget.goals.betaPer100 == null ? '' : dec(widget.goals.betaPer100!));
   late final _grams = TextEditingController(text: '${widget.goals.branG}');
 
+  /// Round7 (R7-U2-13, f1): άκυρα γραμμάρια λένε τι θέλουν (πριν το «Εντάξει» απλώς δεν έκανε τίποτα).
+  String? _gramsErr;
+
   @override
   void dispose() {
     _beta.dispose();
@@ -1212,7 +1288,7 @@ class _BranDialogState extends State<_BranDialog> {
     return AlertDialog(
       title: const Text('Πίτουρο βρώμης'),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Γράψε τις β-γλυκάνες ανά 100 g από τη συσκευασία σου. Βγαίνουν τα γραμμάρια για 3 g τη μέρα (EFSA).',
+        Text('Γράψε τις $_betaGlucans ανά 100 g από τη συσκευασία σου. Βγαίνουν τα γραμμάρια για 3 g τη μέρα (EFSA).',
             style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary)),
         const SizedBox(height: 10),
         TextField(
@@ -1221,7 +1297,7 @@ class _BranDialogState extends State<_BranDialog> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
           decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), labelText: 'β-γλυκάνες ανά 100 g', suffixText: 'g'),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), labelText: '$_betaGlucans ανά 100 g', suffixText: 'g'),
           onChanged: (_) => setState(() {
             final g = _b == null ? null : branGramsFor(_b!);
             if (g != null) _grams.text = '$g';
@@ -1230,7 +1306,7 @@ class _BranDialogState extends State<_BranDialog> {
         if (b != null && fromLabel == null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text('Δεν μοιάζει σωστό (από 0 ως 40 g).', style: TextStyle(fontSize: 13, color: c.bad)),
+            child: Text('Δεν μοιάζει σωστό (πάνω από 0 και ως 40 g).', style: TextStyle(fontSize: 13, color: c.bad)),
           ),
         const SizedBox(height: 10),
         TextField(
@@ -1239,7 +1315,10 @@ class _BranDialogState extends State<_BranDialog> {
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), labelText: 'Πίτουρο τη μέρα', suffixText: 'g'),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              labelText: 'Πίτουρο τη μέρα',
+              suffixText: 'g',
+              errorText: _gramsErr),
         ),
       ]),
       actions: [
@@ -1248,7 +1327,10 @@ class _BranDialogState extends State<_BranDialog> {
           key: const ValueKey('bran-ok'),
           onPressed: () {
             final g = int.tryParse(_grams.text.trim());
-            if (g == null || g < 0 || g > 150) return;
+            if (g == null || g < 0 || g > 150) {
+              setState(() => _gramsErr = 'Από 0 ως 150 g.');
+              return;
+            }
             Navigator.pop(context, (g, fromLabel == null ? null : b));
           },
           child: const Text('Εντάξει'),
@@ -1294,7 +1376,8 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
           const Hairline(vertical: 12),
           // U3b-24: όταν ισχύει άλλος στόχος (δικός σου ή από τα δεδομένα), αυτή η γραμμή είναι «από τον τύπο».
           InfoRow(g.kcalSet != null || g.kcalAdapt != null ? 'Στόχος από τον τύπο' : 'Στόχος', '${thousands(calc.kcal)} kcal'),
-          if (calc.floored) Text('Ανέβηκε στο κάτω όριο ασφαλείας.', style: small),
+          // R7-A1-4: με τα λόγια της οδηγίας (AHA/ACC/TOS 2013: 1.500–1.800 άνδρες, 1.200–1.500 γυναίκες).
+          if (calc.floored) Text('Ανέβηκε στις ${thousands(calc.kcal)} kcal, ${floorWhy(g.male)}.', style: small),
           if (g.kcalSet != null) Text('Ισχύει ο δικός σου: ${thousands(g.kcalSet!)} kcal.', style: small),
           if (g.kcalSet == null && g.kcalAdapt != null)
             Text('Ισχύει ο στόχος από τα δεδομένα σου: ${thousands(g.kcalAdapt!)} kcal.', style: small),

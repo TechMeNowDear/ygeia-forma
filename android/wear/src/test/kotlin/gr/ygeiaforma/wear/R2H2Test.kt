@@ -90,7 +90,8 @@ class R2H2ViewTest {
           {"id":"walk","name":"Περπάτημα","minutes":30,"cardio":{"activity":"walk","name":"Περπάτημα","minutes":30,"note":"χαλαρά"}}]}
     """.trimIndent()
 
-    private val phoneJson = """{"active":true,"id":"s5","w":"A","name":"Προπόνηση Α","start":1,"idx":0,
+    // Round 7 (R7-A8-3): με αρχή «τώρα»· μια προπόνηση του κινητού με αρχή το 1970 μετρά πια ως ξεχασμένη.
+    private val phoneJson = """{"active":true,"id":"s5","w":"A","name":"Προπόνηση Α","start":${System.currentTimeMillis()},"idx":0,
         "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"sets":[{"label":"10,3 kg","reps":8},{"label":"10,3 kg","reps":8}]}]}"""
 
     private val noop = object : WatchView.Actions {
@@ -299,8 +300,9 @@ class R2H2ViewTest {
         val expect = listOf(
             "Πάτα ξανά: επόμενη άσκηση" to ("Πάτα ξανά:" to "επόμενη άσκηση"),
             finishNotice(true, 2, true) to ("Πάτα ξανά:" to "τέλος και στο κινητό"),
-            finishNotice(true, 0, true) to ("Κανένα σετ: στο κινητό" to "μένουν μόνο οι παλμοί"),
-            finishNotice(true, 0, false) to ("Κανένα σετ ούτε παλμοί:" to "δεν αποθηκεύεται"),
+            // Round 7 (R7-U3-01): η οδηγία πρώτη («Πάτα ξανά: …»).
+            finishNotice(true, 0, true) to ("Πάτα ξανά: στο κινητό" to "μένουν μόνο οι παλμοί"),
+            finishNotice(true, 0, false) to ("Πάτα ξανά:" to "δεν μένει τίποτα"),
         )
         for (scale in listOf(1f, 1.3f)) {
             reset()

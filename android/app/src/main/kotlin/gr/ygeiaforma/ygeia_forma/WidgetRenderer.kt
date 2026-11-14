@@ -159,6 +159,9 @@ object WidgetRenderer {
         /** Χρώμα της γραμμής «συνήθως»: ο τόνος όταν διαβάζεται, αλλιώς τα κύρια γράμματα (round 1, U7-14). */
         val tone: Int
 
+        /** Round 7 (U1-6): η διαφάνεια της «λάμψης» στο κέντρο της (πάνω δεξιά), μετά τον έλεγχο αντίθεσης· 0 = καμία. */
+        val glowAlpha: Float
+
         init {
             val manual = if (s != null && s.has("text")) s.optLong("text").toInt() else null
             // Τι βλέπει πραγματικά το μάτι: το φόντο ανακατεμένο με μια υποθετική ταπετσαρία κατά τη διαφάνεια.
@@ -174,8 +177,17 @@ object WidgetRenderer {
             // 4,5:1, πάνω (c1, τίτλος) και κάτω (c2, κουτάκια)· πριν ήταν πάντα 70% (2,6–4,3:1 σε 4 έτοιμα θέματα).
             val seenTop = mix(wallBehind, c1, op)
             val seenBottom = mix(wallBehind, if (gradient) c2 else c1, op)
+            // Round 7 (U1-6): η πηγή (και ο τίτλος στη στήλη 1×3) κάθεται πάνω στη «λάμψη» της πάνω δεξιάς γωνίας. Πριν το γκρι
+            // μετρούσε μόνο πάνω σε c1/c2 και η πηγή έπεφτε στο 2,7–4,4:1 σε 5 από τα 6 έτοιμα θέματα. Τώρα η λάμψη μικραίνει
+            // όσο χρειάζεται για τα πλήρη γράμματα ([WidgetText.glowAlpha]) και το γκρι μετρά ΚΑΙ πάνω στη λάμψη, στο κέντρο
+            // της (το πιο φωτεινό σημείο: η πηγή απέχει ≥ 11 dp, άρα ≤ 0,95 της έντασης): ≥ 4,5:1 όπου το επιτρέπει το φόντο.
+            // Μετρήσεις για όλα τα θέματα: /home/claude/scratch/f5r7/glow.py.
+            val glowFull = (if (lum(c1) > 0.08) 0.24f else 0.38f) * op
+            glowAlpha = if (glow) WidgetText.glowAlpha(textColor, acc, seenTop, glowFull) else 0f
             val behind = intArrayOf(seenTop, seenBottom)
-            muted = alpha(textColor, WidgetText.mutedAlpha(textColor, behind))
+            val behindSource = if (glowAlpha > 0f) behind + WidgetText.over(acc, seenTop, glowAlpha) else behind
+            muted = alpha(textColor, WidgetText.mutedAlpha(textColor, behindSource))
+            // Η γραμμή «συνήθως» είναι κάτω από την κεντρική τιμή, όχι πάνω στη λάμψη: όπως πριν.
             tone = if (WidgetText.toneReadable(acc, behind)) alpha(acc, 0.95f) else textColor
             chipBg = if (darkText) alpha(0xFF17141F.toInt(), 0.07f) else alpha(0xFFFFFFFF.toInt(), 0.09f)
         }
@@ -334,12 +346,12 @@ object WidgetRenderer {
                 p.color = alpha(c1, op)
             }
             cv.drawRoundRect(box, r, r, p)
-            if (glow) {
+            if (glow && glowAlpha > 0f) {
                 val gr = max(box.width(), box.height()) * 0.7f
                 // Round 1 (U7-14): σε ανοιχτό φόντο η «λάμψη» χαλούσε την πηγή πάνω δεξιά (2,2–3,3:1)· πιο απαλή εκεί.
-                val glowA = if (lum(c1) > 0.08) 0.24f else 0.38f
+                // Round 7 (U1-6): η διαφάνεια από το [glowAlpha] (μικραίνει ώστε να διαβάζεται η πηγή).
                 val g = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(box.right, box.top, gr, alpha(acc, glowA * op), alpha(acc, 0f), Shader.TileMode.CLAMP)
+                    shader = RadialGradient(box.right, box.top, gr, alpha(acc, glowAlpha), alpha(acc, 0f), Shader.TileMode.CLAMP)
                 }
                 cv.save()
                 val path = android.graphics.Path().apply { addRoundRect(box, r, r, android.graphics.Path.Direction.CW) }
@@ -506,7 +518,7 @@ object WidgetRenderer {
         }
 
         fun labelOf(k: String) = when (k) {
-            "energy" -> "Ετοιμότητα"; "sleepScore" -> "Σκορ"; "hrv" -> "HRV"; "sleepHr" -> "Παλμοί"; "lowHr" -> "Χαμηλότεροι"
+            "energy" -> "Ετοιμότητα"; "sleepScore" -> "Βαθμολογία"; "hrv" -> "HRV"; "sleepHr" -> "Παλμοί"; "lowHr" -> "Χαμηλότεροι"
             "ringSpo2" -> "Οξυγόνο"; "breath" -> "Αναπνοές"; "skinTemp" -> "Θερμοκρασία"; "sleepMin" -> "Ύπνος"
             "steps" -> "Βήματα"; "activeKcal" -> "Ενεργές"; "totalKcal" -> "Σύνολο"; "activeMin" -> "Ενεργός"; "floors" -> "Όροφοι"
             "distance" -> "Απόσταση"; "dayHr" -> "Παλμοί χθες"; "kcal" -> "Θερμίδες"; "protein" -> "Πρωτεΐνη"; "carbs" -> "Υδατάνθρακες"
@@ -546,7 +558,7 @@ object WidgetRenderer {
                 o.put("src", "Oura · Σάβ 7/11")
                 m.put("sleepMin", e("Ύπνος", "7:16", " ώρες", cap = "00:37–08:15", d = 1, us = "συνήθως 6:58", r = "7 νύχτες μέσα στο εύρος", s = listOf(6.9, 7.4, 6.5, 7.1, 6.8, 7.6, 7.3)))
                 m.put("energy", e("Ετοιμότητα", "71", d = 0, us = "συνήθως 71", s = listOf(68.0, 74.0, 66.0, 70.0, 72.0, 69.0, 71.0)))
-                m.put("sleepScore", e("Σκορ", "84", d = 1, us = "συνήθως 79"))
+                m.put("sleepScore", e("Βαθμολογία", "84", d = 1, us = "συνήθως 79"))
                 m.put("hrv", e("HRV", "41", " ms", d = 1, us = "συνήθως 39 ms", s = listOf(38.0, 40.0, 35.0, 39.0, 44.0, 39.0, 41.0)))
                 m.put("sleepHr", e("Παλμοί", "60", " bpm", d = 1, us = "συνήθως 59 bpm"))
                 m.put("lowHr", e("Χαμηλότεροι", "53", " bpm"))
@@ -555,7 +567,7 @@ object WidgetRenderer {
                 m.put("skinTemp", e("Θερμοκρασία", "+0,2", "°"))
             }
             "move" -> {
-                o.put("src", "ρολόι · 10:20")
+                o.put("src", "Samsung · 10:20").put("srcShort", "10:20")
                 m.put("steps", e("Βήματα", "6.389", cap = "χθες 8.012", r = "χθες μέσα στο εύρος", s = listOf(7200.0, 9100.0, 5400.0, 8000.0, 10200.0, 8012.0, 6389.0)))
                 m.put("activeKcal", e("Ενεργές", "288", " kcal")); m.put("totalKcal", e("Σύνολο", "1.930", " kcal"))
                 m.put("activeMin", e("Ενεργός", "34", " λεπτά")); m.put("floors", e("Όροφοι", "6"))

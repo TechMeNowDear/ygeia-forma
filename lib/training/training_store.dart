@@ -894,6 +894,8 @@ class TrainingStore extends ChangeNotifier {
     final s = current;
     if (s == null || bpm < hrValidMin || bpm > hrValidMax) return;
     if (sid != null && sid.isNotEmpty && sid != s.id) return;
+    // R7-A8-3: παλμοί ώρες μετά την τελευταία κίνηση (ρολόι που «μπήκε» σε ξεχασμένη προπόνηση) δεν είναι δικοί της.
+    if (!belongs(s, at.millisecondsSinceEpoch)) return;
     final sec = at.difference(s.start).inSeconds;
     if (sec < 0) return;
     if (s.hr.isEmpty || sec - s.hr.last[0] >= 10) {
@@ -968,7 +970,9 @@ class TrainingStore extends ChangeNotifier {
       // νωρίτερα απ' ό,τι τελείωσε πράγματι στο ρολόι, οι παλμοί της συνέχειας δεν πρέπει να κοπούν ως «μετά το τέλος».
       _mergeWatchSets(s, j['items']);
       if (!identical(s, current)) _extendEndFromWatch(s, j['fin']);
-      final aligned = alignHr(samples, j['hrT0'], s.start);
+      // R7-A8-3: όπως τα ✓ ([_mergeWatchSets]), όχι παλμοί [staleAfter] ή περισσότερο μετά την τελευταία κίνηση.
+      final upTo = (s.lastActivity.millisecondsSinceEpoch + staleAfter.inMilliseconds - s.start.millisecondsSinceEpoch) ~/ 1000;
+      final aligned = [for (final p in alignHr(samples, j['hrT0'], s.start)) if (p[0] < upTo) p];
       if (s.hrLoaded) {
         mergeHrSegment(s, aligned, watchAvg: hrAvg, watchMax: hrMax);
       } else {
@@ -1096,7 +1100,11 @@ class TrainingStore extends ChangeNotifier {
     }
     final lo = s.start.millisecondsSinceEpoch;
     final n = now.millisecondsSinceEpoch;
-    final end = at < lo ? lo : (at > n ? (n < lo ? lo : n) : at);
+    // R7-A8-3: «Τέλος» στο ρολόι ώρες μετά την τελευταία κίνηση (ξεχασμένη προπόνηση): τέλος στο τελευταίο ✓, όπως το
+    // [finish] και η «Ξεχασμένη προπόνηση;», ποτέ διάρκεια 25 ωρών.
+    final last = s.lastActivity.millisecondsSinceEpoch;
+    final t = belongs(s, at) ? at : last;
+    final end = t < lo ? lo : (t > n ? (n < lo ? lo : n) : t);
     finish(end: DateTime.fromMillisecondsSinceEpoch(end));
     endedByWatch = s;
     return true;
@@ -1127,6 +1135,13 @@ class TrainingStore extends ChangeNotifier {
   /// Ανοιχτή προπόνηση χωρίς καμία κίνηση εδώ και [staleAfter] (V-A-09): «Ξεχασμένη προπόνηση;».
   bool isStale(Session s) => now.difference(s.lastActivity) >= staleAfter;
 
+  /// R7-A8-3: κάτι από το ρολόι τη στιγμή [atMs] (✓, παλμός, εντολή) ανήκει στην ανοιχτή προπόνηση [s] μόνο αν απέχει
+  /// λιγότερο από [staleAfter] από την τελευταία της κίνηση (αρχή ή ✓). Αλλιώς είναι από άλλη μέρα (π.χ. την επομένη, σε
+  /// ρολόι που «μπήκε» σε ξεχασμένη προπόνηση): δεν γράφεται μέσα της και δεν την κάνει πάλι «ενεργή». Ένα ✓ του
+  /// ρολογιού που άργησε να φτάσει (ίδια ώρα με τα υπόλοιπα) γράφεται κανονικά. Από το κινητό αποφασίζει ο χρήστης στην
+  /// «Ξεχασμένη προπόνηση;» (εκεί το «Συνέχισε» δέχεται κάθε ✓).
+  bool belongs(Session s, int atMs) => atMs - s.lastActivity.millisecondsSinceEpoch < staleAfter.inMilliseconds;
+
   static void _watchHrInfo(Session s, Map<String, dynamic> j) {
     if (j['hrMode'] is String) s.hrMode = j['hrMode'] as String;
     if (j['hrGap'] is num) s.hrGap = (j['hrGap'] as num).toInt();
@@ -1142,15 +1157,39 @@ class TrainingStore extends ChangeNotifier {
   /// ([watchResultReps]).
   void _mergeWatchSets(Session s, Object? items) {
     if (items is! List) return;
-    for (var i = 0; i < items.length && i < s.items.length; i++) {
+    final n = items.length < s.items.length ? items.length : s.items.length;
+    final parsed = List<ExLog?>.filled(n, null);
+    for (var i = 0; i < n; i++) {
       final raw = items[i];
       if (raw is! Map) continue;
-      final ExLog w;
       try {
-        w = ExLog.fromJson(raw.cast<String, dynamic>());
+        parsed[i] = ExLog.fromJson(raw.cast<String, dynamic>());
       } catch (_) {
         continue;
       }
+    }
+    // R7-A8-3: τα ✓ του ρολογιού με τη σειρά της ώρας· όποιο απέχει [staleAfter] ή περισσότερο από την προηγούμενη
+    // κίνηση της προπόνησης (και ό,τι ακολουθεί) είναι άλλης μέρας ([belongs]) και δεν γράφεται εδώ.
+    final ats = <int>[];
+    for (var i = 0; i < n; i++) {
+      final w = parsed[i];
+      final e = s.items[i];
+      if (w == null || w.ex != e.ex || e.skipped) continue;
+      for (var k = 0; k < w.log.length && k < e.log.length; k++) {
+        final a = w.log[k].at;
+        if (w.log[k].done && !e.log[k].done && a != null) ats.add(a);
+      }
+    }
+    ats.sort();
+    var ref = s.lastActivity.millisecondsSinceEpoch;
+    for (final a in ats) {
+      if (a - ref >= staleAfter.inMilliseconds) break;
+      if (a > ref) ref = a;
+    }
+    final cutoff = ref + staleAfter.inMilliseconds;
+    for (var i = 0; i < n; i++) {
+      final w = parsed[i];
+      if (w == null) continue;
       final e = s.items[i];
       if (w.ex != e.ex || e.skipped) continue;
       for (var k = 0; k < w.log.length && k < e.log.length; k++) {
@@ -1161,10 +1200,12 @@ class TrainingStore extends ChangeNotifier {
           continue;
         }
         if (!ws.done || ps.done) continue;
+        final at = ws.at;
+        if (at != null && at >= cutoff) continue;
         ps
           ..done = true
           ..reps = ws.reps
-          ..at = ws.at;
+          ..at = at;
         if (ws.load != null) ps.load = ws.load;
       }
       if (e.rirAnswer == null && w.rirAnswer != null && e.complete) e.rirAnswer = w.rirAnswer!.clamp(0, 4);
@@ -1245,7 +1286,9 @@ class TrainingStore extends ChangeNotifier {
   /// round2, R2-E-1: ίδιος κανόνας με τον στόχο ([nextTarget]: όχι παραλειμμένη, τουλάχιστον ένα σετ). Πριν μετρούσε
   /// και μια προπόνηση χωρίς σετ (π.χ. «Τέλος» στο ρολόι με παλμούς αλλά χωρίς ✓) ή με την άσκηση παραλειμμένη: ο
   /// στόχος έλεγε «πρώτη φορά, θα σε ρωτήσει πώς πήγε» και η ερώτηση δεν ερχόταν ποτέ.
-  bool isFirstTime(String ex) => !historyOf(ex).any((h) => !h.$2.skipped && h.$2.done.isNotEmpty);
+  /// R7-A6-2: και μια φορά με ενόχληση (ίσως χωρίς κανένα σετ) μετρά: μετά από πόνο δεν ρωτάμε για «βαθμονόμηση» προς τα
+  /// πάνω, ο στόχος βγαίνει από τον κανόνα της ενόχλησης.
+  bool isFirstTime(String ex) => !historyOf(ex).any((h) => (!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty);
 
   /// ✓ σε ένα σετ. [at]: η ώρα του ✓ στο ρολόι (ms), αν ήρθε από εκεί· κρατιέται μόνο αν είναι μέσα στην προπόνηση
   /// (από την αρχή της ως τώρα + 1′, για μικρές διαφορές ρολογιού), αλλιώς η ώρα του κινητού (9/11).
@@ -1329,6 +1372,29 @@ class TrainingStore extends ChangeNotifier {
     final item = PlanItem(ex: ex, sets: e.sets, lo: base?.lo ?? e.lo, hi: e.hi, rir: e.rir, rest: e.rest, load: base?.ex == ex ? base?.load : null);
     final n = _logFor(item)..swappedFrom = e.swappedFrom ?? e.ex;
     cur.items[idx] = n;
+    // R7-A8-4: ό,τι έγινε ήδη (σετ με ✓, ενόχληση) δεν χάνεται. Η άσκηση που φεύγει μένει στην προπόνηση με μόνο τα σετ
+    // που έγιναν, ΣΤΟ ΤΕΛΟΣ (οι θέσεις των άλλων ασκήσεων δεν αλλάζουν: τα ✓ του ρολογιού πάνε με τη θέση), και κρατά τα
+    // σετ του προγράμματος ([ExLog.plannedSets]) ώστε η πρόοδος να ξέρει ότι δεν έγιναν όλα. Ενόχληση χωρίς κανένα σετ:
+    // μένει ως «παράλειψη» με την ενόχληση, που μετρά στον επόμενο στόχο.
+    final done = e.done;
+    if (done.isNotEmpty || e.pain.isNotEmpty) {
+      cur.items.add(ExLog(
+        ex: e.ex,
+        sets: done.isEmpty ? e.sets : done.length,
+        lo: e.lo,
+        hi: e.hi,
+        rir: e.rir,
+        rest: e.rest,
+        log: done.isEmpty ? e.log : done,
+        rirAnswer: e.rirAnswer,
+        pain: [...e.pain],
+        skipped: done.isEmpty,
+        swappedFrom: e.swappedFrom,
+        reason: e.reason,
+        plannedSets: done.isEmpty ? null : e.sets,
+        extra: {...e.extra},
+      ));
+    }
     save();
   }
 
@@ -1439,31 +1505,39 @@ class TrainingStore extends ChangeNotifier {
     if (walks.isNotEmpty) {
       final km = walks.fold<double>(0, (a, s) => a + (s.meters ?? 0)) / 1000;
       final mins = walks.fold<int>(0, (a, s) => a + (s.cardioMinutes ?? 0));
-      b.writeln('Περπάτημα: ${walks.length} φορές, $mins λεπτά${km > 0 ? ', ${km.toStringAsFixed(1)} km' : ''}');
+      // R7-U4-14 θ: ενικός με το 1 και δεκαδικό κόμμα (το κείμενο επικολλάται στη συζήτηση): «1 φορά, 31 λεπτά, 2,2 km».
+      b.writeln('Περπάτημα: ${walks.length == 1 ? '1 φορά' : '${walks.length} φορές'}, ${mins == 1 ? '1 λεπτό' : '$mins λεπτά'}'
+          '${km > 0 ? ', ${km.toStringAsFixed(1).replaceAll('.', ',')} km' : ''}');
     }
     final hrAvgs = [for (final s in list) if (s.hrAvg != null) s.hrAvg!];
     if (hrAvgs.isNotEmpty) b.writeln('Μέσοι παλμοί ανά προπόνηση: ${hrAvgs.join(', ')}');
     final feels = [for (final s in list) if (s.feel != null) s.feel!];
-    if (feels.isNotEmpty) b.writeln('Πώς ένιωσα (1 πολύ εύκολα – 5 πολύ δύσκολα): μέσος ${(feels.reduce((a, c) => a + c) / feels.length).toStringAsFixed(1)}');
+    if (feels.isNotEmpty) b.writeln('Πώς ένιωσα (1 πολύ εύκολα – 5 πολύ δύσκολα): μέσος ${(feels.reduce((a, c) => a + c) / feels.length).toStringAsFixed(1).replaceAll('.', ',')}');
     final hrs = [for (final s in list) if (s.hrMax != null) s.hrMax!];
     if (hrs.isNotEmpty) b.writeln('Υψηλότεροι παλμοί: ${hrs.reduce((a, c) => a > c ? a : c)}');
     final byEx = <String, List<(DateTime, ExLog)>>{};
     for (final s in list) {
       for (final e in s.items) {
-        if (!e.skipped && e.done.isNotEmpty) (byEx[e.ex] ??= []).add((s.start, e));
+        // R7-A6-2: και η ενόχληση χωρίς κανένα σετ (σταμάτησες από πόνο) μετρά.
+        if ((!e.skipped && e.done.isNotEmpty) || e.pain.isNotEmpty) (byEx[e.ex] ??= []).add((s.start, e));
       }
     }
     for (final entry in byEx.entries) {
       final logs = entry.value;
-      final first = logs.first.$2, last = logs.last.$2;
+      final withSets = [for (final l in logs) if (l.$2.done.isNotEmpty) l];
       final k = loadKindOf(entry.key);
-      final reps = last.done.map((s) => s.reps).join(', ');
       final painN = logs.where((l) => l.$2.pain.isNotEmpty).length;
       b.write('- ${names[entry.key] ?? entry.key} [${entry.key}]: ${logs.length}×, ');
-      if (hasLoad(k)) b.write('${loadLabel(k, first.workLoad)} → ${loadLabel(k, last.workLoad)}, ');
-      b.write('τελευταία ${_d(logs.last.$1)}: $reps');
-      if (last.rirAnswer != null) b.write(', ρεζέρβα ${last.rirAnswer == 4 ? '4+' : last.rirAnswer}');
-      if (painN > 0) b.write(', ενόχληση $painN φορές (${{for (final l in logs) ...l.$2.pain}.map((x) => painNames[x] ?? x).join(', ')})');
+      if (withSets.isEmpty) {
+        b.write('κανένα σετ');
+      } else {
+        final first = withSets.first.$2, last = withSets.last.$2;
+        // R7-A6-11: το φορτίο που κατέληξε κάθε φορά (όπως η πρόοδος), και κάθε σετ με το δικό του όταν άλλαξε μέσα στην άσκηση.
+        if (hasLoad(k)) b.write('${loadLabel(k, first.endLoad)} → ${loadLabel(k, last.endLoad)}, ');
+        b.write('τελευταία ${_d(withSets.last.$1)}: ${last.mixedLoads ? last.doneText() : last.done.map((s) => s.reps).join(', ')}');
+        if (last.rirAnswer != null) b.write(', ρεζέρβα ${last.rirAnswer == 4 ? '4+' : last.rirAnswer}');
+      }
+      if (painN > 0) b.write(', ενόχληση ${painN == 1 ? '1 φορά' : '$painN φορές'} (${{for (final l in logs) ...l.$2.pain}.map((x) => painNames[x] ?? x).join(', ')})');
       b.writeln();
     }
     if (p != null) {

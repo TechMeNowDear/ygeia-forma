@@ -13,6 +13,17 @@ import '../training/training_store.dart';
 
 /// «Αναφορά για έλεγχο» (αίτημα χρήστη 12/11): σημείωση + ένα αρχείο στις Λήψεις, και κοινοποίηση. Τίποτα δεν φεύγει
 /// μόνο του από το κινητό.
+///
+/// Round 7 (R7-A11-2): τα κείμενα λένε την αλήθεια για το αρχείο: έχει ΟΛΑ τα δεδομένα (και του Oura), μένει στις Λήψεις
+/// χωρίς κλείδωμα, και όποιος το λάβει (π.χ. μια υπηρεσία AI) τα βλέπει. Το ίδιο λέει η πολιτική απορρήτου.
+const diagnosticsIntroText = 'Ένα αρχείο με ό,τι έχεις γράψει και ό,τι διάβασε και υπολόγισε η εφαρμογή: φαγητό, '
+    'ζυγίσεις, μέση, ύπνο και παλμούς (και του Oura), βήματα, στόχους, διόρθωση θερμίδων, ζώνη, προπονήσεις, και '
+    'αυτόματους ελέγχους για λάθη. Στείλ’ το σε όποιον θα το ελέγξει, π.χ. στη συζήτηση με τον Claude.';
+
+const diagnosticsPrivacyText = 'Έχει όλα τα δεδομένα υγείας σου και μένει στις Λήψεις χωρίς κλείδωμα: όποιος το ανοίξει, '
+    'τα διαβάζει. Η εφαρμογή δεν το στέλνει πουθενά μόνη της· αν το στείλεις σε μια υπηρεσία AI (π.χ. τον Claude), '
+    'εκείνη βλέπει όλα όσα έχει, και τα δεδομένα του Oura. Δεν έχει κωδικούς ή κλειδιά σύνδεσης.';
+
 Future<void> openDiagnostics(BuildContext context, HealthStore store, FoodStore food) => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -86,7 +97,10 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
         });
         if (widget.save == null) await FoodChannel.shareBackup(_uri!);
       } else {
-        setState(() => _result = 'Δεν αποθηκεύτηκε: ${r['message'] ?? 'άγνωστο σφάλμα'}. Δοκίμασε ξανά.');
+        // Round 7 (R7-A9-5): ελληνικό μήνυμα από το είδος του σφάλματος, ποτέ το κείμενο της Java.
+        setState(() => _result = r['kind'] == 'full'
+            ? 'Δεν αποθηκεύτηκε: δεν χωράει στο κινητό. Ελευθέρωσε χώρο και δοκίμασε ξανά.'
+            : 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.');
       }
     } catch (e, s) {
       errors.report(e, s);
@@ -106,10 +120,8 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('Αναφορά για έλεγχο', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
         const SizedBox(height: 8),
-        Text(
-            'Ένα αρχείο με ό,τι έχεις γράψει και ό,τι υπολόγισε η εφαρμογή από αυτό: φαγητό, ζυγίσεις, στόχοι, διόρθωση '
-            'θερμίδων, ζώνη, προπονήσεις, και αυτόματους ελέγχους για λάθη. Στείλ’ το στη συζήτηση με τον Claude για έλεγχο.',
-            style: body),
+        // Round 7 (R7-A11-2): όλα όσα έχει πράγματι το αρχείο (και ύπνος/παλμοί του Oura, βήματα, μέση: diagnostics.dart).
+        Text(diagnosticsIntroText, key: const ValueKey('diag-intro'), style: body),
         const SizedBox(height: 14),
         TextField(
           key: const ValueKey('diag-note'),
@@ -141,10 +153,7 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
             ),
         ],
         const SizedBox(height: 12),
-        Text(
-            'Έχει όλα τα δεδομένα υγείας σου. Στείλ’ το μόνο εκεί που θέλεις να το δει κάποιος· η εφαρμογή δεν το ανεβάζει '
-            'πουθενά μόνη της. Δεν έχει κωδικούς ή κλειδιά σύνδεσης.',
-            style: small),
+        Text(diagnosticsPrivacyText, key: const ValueKey('diag-privacy'), style: small),
       ]),
     );
   }

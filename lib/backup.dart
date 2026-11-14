@@ -9,6 +9,7 @@ library;
 
 import 'dart:convert';
 
+import 'error_report.dart' show ErrorReporter;
 import 'food/food_model.dart';
 import 'format.dart';
 import 'plan_file.dart';
@@ -20,6 +21,9 @@ const backupVersion = 1;
 /// Οι ρυθμίσεις που μπαίνουν στο αντίγραφο (όχι η πρόοδος του ιστορικού, που είναι τεχνική).
 const backupPrefKeys = ['cards', 'kitchen', 'themeMode', 'dayTheme', 'nightTheme', 'me', 'goals', 'zone', 'waist'];
 
+/// [errorsOff]: Round 7 (R7-A11-4) ο χρήστης έχει κλειστές τις «Αναφορές σφαλμάτων» (αντίρρηση, ΓΚΠΔ άρθρο 21). Μπαίνει
+/// στο αρχείο (πρόσθετο κλειδί «errorsOff», μόνο όταν είναι κλειστές), ώστε η επαναφορά σε νέο κινητό να τις κρατά
+/// κλειστές, όπως ήδη το αντίγραφο της Google. Παλιά αντίγραφα χωρίς το κλειδί: ο διακόπτης δεν αλλάζει.
 String buildBackup({
   required List<Map<String, dynamic>> foodLog,
   required List<Map<String, dynamic>> myFoods,
@@ -27,6 +31,7 @@ String buildBackup({
   required DateTime now,
   ({String plan, String? log})? sources,
   Map<String, dynamic>? training,
+  bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
   return jsonEncode({
@@ -43,12 +48,17 @@ String buildBackup({
     if (sources != null) 'sources': {'plan': sources.plan, if (sources.log != null) 'log': sources.log},
     // Προπονήσεις και προγράμματα (έλεγχος 8/11, TRN-17): υπάρχουν μόνο στο κινητό.
     if (training != null) 'training': training,
+    if (errorsOff) 'errorsOff': true,
   });
 }
 
 /// Ό,τι βρέθηκε σε ένα αρχείο αντιγράφου, ελεγμένο.
 class BackupContents {
-  BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped, {this.sources, this.training});
+  BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped,
+      {this.sources, this.training, this.errorsOff = false});
+
+  /// Round 7 (R7-A11-4): στο κινητό του αντιγράφου οι «Αναφορές σφαλμάτων» ήταν κλειστές.
+  final bool errorsOff;
 
   /// Οι προπονήσεις (όπως το training.json), αν υπήρχαν.
   final Map<String, dynamic>? training;
@@ -79,6 +89,72 @@ const backupMaxGrams = 100000.0;
 /// Τιμές θρεπτικών που η εφαρμογή δεν γράφει ποτέ: αρνητικές ή μη πεπερασμένες (1e999 στο JSON γίνεται «άπειρο»).
 bool _badNutrients(Food f) => f.n.values.values.any((v) => !v.value.isFinite || v.value < 0);
 
+/// Καταχώριση που η εφαρμογή θα μπορούσε να έχει γράψει (για την επαναφορά από αρχείο: αντίγραφο ή, R7-A9-1, το
+/// αρχείο της χαλασμένης βάσης). Υπαρκτή μέρα, ποσότητα πεπερασμένη ως [backupMaxGrams], θρεπτικά ≥ 0 και πεπερασμένα.
+bool restorableEntry(LogEntry le) =>
+    le.id.isNotEmpty && isDayKey(le.day) && le.grams > 0 && le.grams <= backupMaxGrams && !_badNutrients(le.food);
+
+/// Προϊόν που η εφαρμογή θα μπορούσε να έχει γράψει: με id, όνομα και θρεπτικά ≥ 0 και πεπερασμένα.
+bool restorableFood(Food f) => f.id.isNotEmpty && f.name.trim().isNotEmpty && !_badNutrients(f);
+
+/// Round 7 (R7-A9-1): τι ξαναμπαίνει στη νέα βάση μετά από βλάβη (μία κλήση «restorePut», όπου ό,τι υπάρχει ήδη στη
+/// νέα βάση μένει όπως είναι). Πρώτα ό,τι έχει η μνήμη ([memoryEntries], [memoryFoods]: όπως τα βλέπει ο χρήστης), μετά
+/// ό,τι διαβάστηκε από το αρχείο που κρατήθηκε ([keptEntries], [keptFoods]: JSON όπως στη βάση) και δεν είναι ήδη από
+/// τη μνήμη. Από το αρχείο ΔΕΝ ξαναμπαίνει ό,τι έσβησε ο χρήστης σε αυτή τη χρήση της εφαρμογής ([removedEntries],
+/// [removedFoods]): μετά τη βλάβη το σβήσιμο έγινε μόνο στη μνήμη. Ό,τι δεν διαβάζεται ή δεν θα το έγραφε ποτέ η
+/// εφαρμογή ([restorableEntry], [restorableFood]) παραλείπεται και μετριέται ([skipped]).
+({List<Map<String, Object?>> log, List<Map<String, Object?>> foods, int skipped}) dbRecoveryRows({
+  required Iterable<LogEntry> memoryEntries,
+  required Iterable<Food> memoryFoods,
+  required List<Object?> keptEntries,
+  required List<Object?> keptFoods,
+  Set<String> removedEntries = const {},
+  Set<String> removedFoods = const {},
+}) {
+  var skipped = 0;
+  final log = <Map<String, Object?>>[];
+  final logIds = <String>{};
+  for (final e in memoryEntries) {
+    if (logIds.add(e.id)) log.add(e.toJson());
+  }
+  for (final raw in keptEntries) {
+    LogEntry le;
+    try {
+      le = LogEntry.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (_) {
+      skipped++;
+      continue;
+    }
+    if (!restorableEntry(le)) {
+      skipped++;
+      continue;
+    }
+    if (removedEntries.contains(le.id) || !logIds.add(le.id)) continue;
+    log.add(le.toJson());
+  }
+  final foods = <Map<String, Object?>>[];
+  final foodIds = <String>{};
+  for (final f in memoryFoods) {
+    if (foodIds.add(f.id)) foods.add(f.toJson());
+  }
+  for (final raw in keptFoods) {
+    Food f;
+    try {
+      f = Food.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (_) {
+      skipped++;
+      continue;
+    }
+    if (!restorableFood(f)) {
+      skipped++;
+      continue;
+    }
+    if (removedFoods.contains(f.id) || !foodIds.add(f.id)) continue;
+    foods.add(f.toJson());
+  }
+  return (log: log, foods: foods, skipped: skipped);
+}
+
 BackupContents parseBackup(String text) {
   Object? j;
   try {
@@ -107,8 +183,7 @@ BackupContents parseBackup(String text) {
   for (final e in (j['foodLog'] is List ? j['foodLog'] as List : const [])) {
     try {
       final le = LogEntry.fromJson(Map<String, dynamic>.from(e as Map));
-      if (le.id.isEmpty || !isDayKey(le.day) || !(le.grams > 0) || !(le.grams <= backupMaxGrams)) throw const FormatException();
-      if (_badNutrients(le.food) || !entryIds.add(le.id)) throw const FormatException();
+      if (!restorableEntry(le) || !entryIds.add(le.id)) throw const FormatException();
       entries.add(le);
     } catch (_) {
       skipped++;
@@ -119,8 +194,7 @@ BackupContents parseBackup(String text) {
   for (final f in (j['myFoods'] is List ? j['myFoods'] as List : const [])) {
     try {
       final food = Food.fromJson(Map<String, dynamic>.from(f as Map));
-      if (food.id.isEmpty || food.name.trim().isEmpty) throw const FormatException();
-      if (_badNutrients(food) || !foodIds.add(food.id)) throw const FormatException();
+      if (!restorableFood(food) || !foodIds.add(food.id)) throw const FormatException();
       foods.add(food);
     } catch (_) {
       skipped++;
@@ -142,8 +216,34 @@ BackupContents parseBackup(String text) {
     skipped,
     sources: plan == null ? null : (plan: plan, log: (src as Map)['log'] is String ? src['log'] as String : null),
     training: j['training'] is Map ? Map<String, dynamic>.from(j['training'] as Map) : null,
+    errorsOff: j['errorsOff'] == true,
   );
 }
+
+/// Round 7 (R7-A11-4): αντίγραφο από κινητό με κλειστές «Αναφορές σφαλμάτων»: κλείνουν και εδώ, πριν από οτιδήποτε
+/// άλλο της επαναφοράς. Δεν ανοίγει ποτέ τίποτα (ένα αντίγραφο με ανοιχτές δεν αλλάζει τον διακόπτη). `true` αν
+/// έκλεισαν τώρα.
+Future<bool> restoreErrorsChoice(BackupContents b, ErrorReporter r) async {
+  if (!b.errorsOff || !r.enabled) return false;
+  return r.setEnabled(false);
+}
+
+/// Round 7 (R7-A9-5): το μήνυμα όταν το αντίγραφο δεν αποθηκεύτηκε. Από το είδος του σφάλματος («kind» της πλευράς
+/// Android: «full» = γεμάτος χώρος), ποτέ το αγγλικό κείμενο της Java (πριν: «write failed: ENOSPC …»).
+String backupSaveFailText(Map<String, dynamic> r) => switch (r['kind']) {
+      'full' => 'Δεν αποθηκεύτηκε το αντίγραφο: δεν χωράει στο κινητό. Ελευθέρωσε χώρο και δοκίμασε ξανά.',
+      _ => 'Δεν αποθηκεύτηκε το αντίγραφο. Δοκίμασε ξανά.',
+    };
+
+/// Round 7 (R7-A9-5): το μήνυμα όταν το αρχείο που διάλεξες δεν διαβάστηκε. «damaged» = κομμένο ή χαλασμένο συμπιεσμένο
+/// αρχείο (π.χ. κατέβηκε μισό από το Drive), «too_big» = πάνω από το όριο ανάγνωσης (πριν: «Unexpected end of ZLIB
+/// input stream»). Τίποτα δεν άλλαξε στο κινητό: η ανάγνωση σταματά πριν από την επαναφορά.
+String backupOpenFailText(Map<String, dynamic> r) => switch (r['kind']) {
+      'damaged' => 'Το αρχείο είναι κομμένο ή χαλασμένο, οπότε δεν άλλαξε τίποτα. Πάρε ξανά το αντίγραφο '
+          '(π.χ. κατέβασέ το ξανά) και δοκίμασε πάλι.',
+      'too_big' => 'Το αρχείο είναι πολύ μεγάλο για αντίγραφο της εφαρμογής, οπότε δεν άλλαξε τίποτα.',
+      _ => 'Δεν άνοιξε το αρχείο, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.',
+    };
 
 
 /// Η γραμμή κάτω από την «Εξαγωγή αντιγράφου» (13/11): φαγητό, προϊόντα και προπονήσεις υπάρχουν μόνο στο κινητό, άρα

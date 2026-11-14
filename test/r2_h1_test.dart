@@ -45,7 +45,7 @@ import 'sample_data.dart' show sampleDashboardJson, sampleHistory;
 import 'sample_food.dart' show sampleFoodStore;
 import 'training_sample.dart' show sampleTraining;
 
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 HealthStore _sample(DateTime at) {
   final s = HealthStore()..data = Dashboard.fromJson(sampleDashboardJson(at));
@@ -358,14 +358,15 @@ void main() {
         ..setGoals(checkinGoals().copyWith(betaPer100: 7, branG: 40));
       await _pump(t, GoalsPage(store: s, now: DateTime(2026, 11, 12, 10)), size: const Size(400, 4000));
       // 3 g ÷ 7 g/100 g = 42,9 g → 45 g (πάνω, ανά 5).
-      expect(find.textContaining('γράψε τις β-γλυκάνες'), findsNothing);
+      expect(find.textContaining('γράψε τις β\u2011γλυκάνες'), findsNothing);
       // Round 3 (k1 · R3-B-3): αδιάσπαστο ενωτικό στο «β‑γλυκάνες».
       expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β\u2011γλυκάνες χρειάζονται 45\u00A0g'), findsOneWidget);
       expect(find.textContaining('χρειάζονται 45\u00A0g πίτουρο· το πλάνο σου έχει 40\u00A0g'), findsOneWidget);
       // Χωρίς ετικέτα: όπως πριν.
       s.setGoals(checkinGoals().copyWith(branG: 40));
       await t.pumpAndSettle();
-      expect(find.textContaining('γράψε τις β-γλυκάνες'), findsOneWidget);
+      // R7-U2-12 (f6): αδιάσπαστο ενωτικό και σε αυτό το κείμενο.
+      expect(find.textContaining('γράψε τις β\u2011γλυκάνες'), findsOneWidget);
       // Ετικέτα που φτάνει: όπως πριν.
       s.setGoals(checkinGoals().copyWith(betaPer100: 7, branG: 45));
       await t.pumpAndSettle();

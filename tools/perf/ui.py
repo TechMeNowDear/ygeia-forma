@@ -8,6 +8,9 @@
                                                          τυπώνει το ποσοστό του πιο συχνού χρώματος και πόσα χρώματα·
                                                          έξοδος 1 αν η οθόνη είναι σχεδόν μονόχρωμη (κενή / γκρι / μόνο
                                                          η οθόνη εκκίνησης)
+  python3 -I tools/perf/ui.py anr <ui.xml>             → αν η οθόνη δείχνει παράθυρο «… isn't responding» ΑΛΛΗΣ
+                                                         διεργασίας (π.χ. «System UI»): τυπώνει το όνομά της, έξοδος 0·
+                                                         αλλιώς (ή αν είναι η δική μας εφαρμογή) έξοδος 1
 """
 import struct
 import sys
@@ -58,6 +61,26 @@ def nodes(path):
     return 0
 
 
+# Γύρος 7: στον emulator του CI το «System UI isn't responding» βγαίνει μερικές φορές αμέσως μετά την εκκίνηση, πάνω από
+# όλα, και το uiautomator βλέπει μόνο αυτό (3 αποτυχίες στη σειρά, ενώ η ίδια έκδοση πέρασε σε άλλο runner). Δεν είναι
+# της εφαρμογής: ο έλεγχος πατά «Wait» και συνεχίζει, με προειδοποίηση. Αν το παράθυρο είναι για τη ΔΙΚΗ μας εφαρμογή
+# (το όνομά της ή το πακέτο), ΔΕΝ το αγγίζει: ο έλεγχος αποτυγχάνει κανονικά.
+OWN = ('Υγεία', 'Φόρμα', 'ygeia', 'ygeiaforma')
+
+
+def anr(path):
+    for n in _nodes(path):
+        t = (n.get('text') or '').strip()
+        for tail in (" isn't responding", ' δεν αποκρίνεται'):
+            if t.endswith(tail):
+                who = t[:-len(tail)].strip()
+                if any(o.lower() in who.lower() for o in OWN):
+                    return 1
+                print(who)
+                return 0
+    return 1
+
+
 def screen(path, limit=0.97):
     data = open(path, 'rb').read()
     if len(data) < 16:
@@ -91,4 +114,6 @@ if __name__ == '__main__':
         sys.exit(nodes(sys.argv[2]))
     if cmd == 'screen':
         sys.exit(screen(sys.argv[2]))
+    if cmd == 'anr':
+        sys.exit(anr(sys.argv[2]))
     sys.exit(2)

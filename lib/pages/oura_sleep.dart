@@ -164,7 +164,7 @@ class OuraNightsPage extends StatelessWidget {
           const SizedBox(height: 12),
           if (stages.deep == null)
             Text(
-              'Χρειάζονται τουλάχιστον $minNightsForAverage νύχτες με το δαχτυλίδι μέσα σε μία εβδομάδα '
+              'Χρειάζονται τουλάχιστον $minNightsForAverage νύχτες με φάσεις από το δαχτυλίδι μέσα σε μία εβδομάδα '
               '(τώρα ${countText(stages.nights, 'νύχτα', 'νύχτες')}).',
               style: TextStyle(color: c.textSecondary, fontSize: 14, height: 1.4),
             )
@@ -334,7 +334,7 @@ class _OuraNightCard extends StatelessWidget {
     // Νύχτα σε κομμάτια (ως 4 ώρες κενό): μετρούν όλα μαζί, το κενό όχι (δεύτερος γύρος ελέγχου, U12).
     final parts = night.counted;
     final minutes = night.nightMinutes;
-    Widget clock(String label, String v) => Expanded(
+    Widget clock(String label, String v, {String? note}) => Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -343,6 +343,7 @@ class _OuraNightCard extends StatelessWidget {
                 v,
                 style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w700, fontFeatures: tabular),
               ),
+              if (note != null) Text(note, key: const ValueKey('oura-awake-note'), style: TextStyle(color: c.textSecondary, fontSize: 13)),
             ],
           ),
         );
@@ -441,16 +442,28 @@ class _OuraNightCard extends StatelessWidget {
             final awakeSec = parts.every((p) => p.awakeInSleep == null) ? null : parts.fold<int>(0, (a, p) => a + (p.awakeInSleep ?? 0));
             // Round 1 (S5-1): οι ώρες του τόπου όπου κοιμήθηκες. (U2a-02): «Ξύπνιος 22 λεπτά», όχι «22 λ»· αν η τιμή δεν
             // χωρά ολόκληρη στη στήλη της, γραμμές «ετικέτα … τιμή» (ποτέ σπασμένη τιμή).
+            // Round 7 (R7-A5-4): «τουλάχιστον», όπως ο κανόνας 2/11 (oura_view.dart), η κάρτα του ρολογιού και οι φάσεις
+            // 7 νυχτών: το δαχτυλίδι μετρά τα ξυπνήματα λιγότερα απ' όσα είναι (Herberger κ.ά., Sci Rep 2025: ο ύπνος
+            // +11,7 λεπτά κατά μέσο όρο έναντι πολυυπνογραφίας). Στις στήλες «22 λεπτά» με «τουλάχιστον» από κάτω (οι
+            // τρεις τιμές μένουν στην ίδια γραμμή)· στις γραμμές «τουλάχιστον 22 λεπτά».
+            final awakeMin = awakeSec == null ? null : (awakeSec / 60).round();
             final items = [
               ('Κοιμήθηκες', parts.first.wallOnset == null ? '—' : hm(parts.first.wallOnset!)),
               ('Ξύπνησες', hm(parts.last.wallEnd)),
-              ('Ξύπνιος', awakeSec == null ? '—' : hoursMinutes((awakeSec / 60).round())),
+              ('Ξύπνιος', awakeMin == null ? '—' : hoursMinutes(awakeMin)),
             ];
-            final fits = wordsFit(context, [for (final i in items) i.$1], TextStyle(fontSize: 13, color: c.textSecondary), box.maxWidth / 3 - 4) &&
+            const atLeastWord = 'τουλάχιστον';
+            final fits = wordsFit(context, [for (final i in items) i.$1, atLeastWord], TextStyle(fontSize: 13, color: c.textSecondary), box.maxWidth / 3 - 4) &&
                 wordsFit(context, [for (final i in items) glued(i.$2)],
                     const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, fontFeatures: tabular), box.maxWidth / 3 - 4);
-            if (fits) return Row(children: [for (final i in items) clock(i.$1, glued(i.$2))]);
-            return Column(children: [for (final i in items) InfoRow(i.$1, i.$2)]);
+            if (fits) {
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                for (final i in items) clock(i.$1, glued(i.$2), note: i.$1 == 'Ξύπνιος' && awakeMin != null ? atLeastWord : null),
+              ]);
+            }
+            return Column(children: [
+              for (final i in items) InfoRow(i.$1, i.$1 == 'Ξύπνιος' && awakeMin != null ? '$atLeastWord ${glued(i.$2)}' : i.$2),
+            ]);
           }),
           if (n.stages.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -698,9 +711,22 @@ class _BreathCard extends StatelessWidget {
       today: now,
     );
 
+    // Round 7 (R7-U4-6): με πολύ μεγάλα γράμματα η ετικέτα πηγής πάει κάτω από τον τίτλο (όπως το [TitleRow])· δεξιά
+    // κρατούσε ~90 dp και η στήλη κειμένου έκοβε λέξεις στη μέση («14,0 το λεπτ | ό», «χαμ | ηλότερη»).
     Widget row(String title, String sub, Source s) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
+          child: veryLargeText(context)
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
+                    const SizedBox(height: 4),
+                    SourceTag(s),
+                    const SizedBox(height: 4),
+                    Text(sub, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.3)),
+                  ],
+                )
+              : Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(

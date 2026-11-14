@@ -48,7 +48,7 @@ Widget _shell(HealthStore store) {
 }
 
 /// Φανταστικός χρήστης: άνδρας 40 ετών, 180 cm.
-const _me = Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180);
+const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 Goals _goals({bool doctor = true, int? kcalSet}) => Goals(
       aim: GoalAim.lose,
@@ -397,7 +397,8 @@ void main() {
       expect(find.descendant(of: find.byKey(const ValueKey('nutrition-goals')), matching: find.text('Μένουν')), findsOneWidget);
       expect(find.text('Πρωτεΐνη'), findsWidgets);
       expect(find.byKey(const ValueKey('nutrition-chol')), findsOneWidget);
-      await t.tap(find.text('Χοληστερίνη · τι τη ρίχνει'));
+      // Round7 (R7-U2-15): «τι τη ρίχνει» με αδιάσπαστα κενά, για να μη σπάει σε «τι | τη ρίχνει».
+      await t.tap(find.text('Χοληστερίνη · τι\u00A0τη\u00A0ρίχνει'));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('chol-range')), findsOneWidget);
       await t.tap(find.text('4 εβδομάδες'));

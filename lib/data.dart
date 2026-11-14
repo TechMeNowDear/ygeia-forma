@@ -1541,6 +1541,32 @@ Set<String> applyRecentRead(
   return changed;
 }
 
+/// Round 7 (R7-A9-3): τι έγινε με τις πηγές ύπνου ενός αντιγράφου ([HealthStore.restoreSourcesWhy]).
+/// [restored]: μπήκαν· [phoneNewer]: το κινητό έχει νεότερες (ή ήδη ό,τι έχει το αντίγραφο)· [same]: ίδιες με του
+/// αντιγράφου· [notReady]: οι ρυθμίσεις ή οι πηγές του κινητού δεν διαβάζονται ακόμα· [writeFailed]: δεν γράφτηκαν στο
+/// κινητό· [invalid]: του αντιγράφου δεν διαβάζονται.
+enum SourcesRestore { restored, phoneNewer, same, notReady, writeFailed, invalid }
+
+/// Round 7 (R7-A9-1, R7-A9-2): το κείμενο της κάρτας «Η βάση χάλασε» στη Σήμερα. [recovered]: πόσα ξαναμπήκαν στη νέα
+/// βάση από τη μνήμη και από το αρχείο που κρατήθηκε (null = δεν έγινε ακόμα ή δεν έγινε). Η διαδρομή είναι η
+/// πραγματική των Ρυθμίσεων (πριν έγραφε «Ρυθμίσεις › Αντίγραφο ασφαλείας», που δεν υπάρχει) και λέει και τα προϊόντα,
+/// που είναι στην ίδια βάση.
+String databaseNoticeText(({int entries, int foods})? recovered) {
+  const start = 'Ξεκίνησε καινούργια βάση και το παλιό αρχείο κρατήθηκε στο κινητό. Το ιστορικό ξαναδιαβάζεται από τη '
+      'Samsung Health.';
+  const path = '(Ρυθμίσεις › Τα δεδομένα μου › Επαναφορά από αντίγραφο)';
+  if (recovered == null || recovered.entries + recovered.foods <= 0) {
+    return '$start Το ημερολόγιο φαγητού και τα προϊόντα σου επανέρχονται από το αντίγραφό σου $path.';
+  }
+  final what = [
+    if (recovered.entries > 0) countText(recovered.entries, 'καταχώριση φαγητού', 'καταχωρίσεις φαγητού'),
+    if (recovered.foods > 0) countText(recovered.foods, 'προϊόν', 'προϊόντα'),
+  ].join(' και ');
+  final one = recovered.entries + recovered.foods == 1;
+  return '$start ${one ? 'Ξαναμπήκε' : 'Ξαναμπήκαν'} $what. Αν λείπει κάτι, βάλ’ το από το αντίγραφό σου $path: '
+      'μπαίνουν μόνο όσα λείπουν.';
+}
+
 // ---------------------------------------------------------------------------
 // Η κατάσταση της εφαρμογής: διαβάζει όταν ανοίγει και όταν επιστρέφω σε αυτήν. Στο παρασκήνιο μόνο
 // ο RefreshWorker (Android) ανανεώνει κάθε 3 ώρες το βοηθητικό αρχείο· το ιστορικό γράφεται εδώ.
@@ -2119,8 +2145,37 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Η βάση βρέθηκε χαλασμένη (ώρα, ms) και κρατήθηκε αντίγραφο (A7): κάρτα στη Σήμερα ώσπου να την κλείσει ο χρήστης.
   int? dbCorruptAt;
 
+  /// Round 7 (R7-A9-1): το ημερολόγιο φαγητού και «Τα προϊόντα μου» ζουν στην ίδια βάση. Μετά από βλάβη ξαναμπαίνουν
+  /// στη νέα βάση ό,τι έχει η μνήμη και ό,τι διαβάζεται από το αρχείο που κρατήθηκε ([FoodStore.recoverAfterDbReset],
+  /// το δίνει το main.dart). Απάντηση: πόσα ξαναμπήκαν, ή null αν δεν έγινε τώρα (ξαναδοκιμάζεται στην επόμενη ανανέωση).
+  Future<({int entries, int foods})?> Function(int at)? onDatabaseReset;
+
+  /// Πόσα ξαναμπήκαν στη νέα βάση μετά από βλάβη (για την κάρτα· null = τίποτα ακόμα).
+  ({int entries, int foods})? dbRecovered;
+
+  /// Η βλάβη για την οποία ζητήθηκε ήδη η επαναφορά του φαγητού σε αυτή τη χρήση της εφαρμογής.
+  int? _foodRecoveryAt;
+  bool _disposed = false;
+
+  void _recoverFood(int at) {
+    final hook = onDatabaseReset;
+    if (hook == null || _foodRecoveryAt == at) return;
+    _foodRecoveryAt = at;
+    hook(at).then((r) {
+      if (r == null) {
+        if (_foodRecoveryAt == at) _foodRecoveryAt = null;
+        return;
+      }
+      dbRecovered = r;
+      if (dbCorruptAt == at && !_disposed) notifyListeners();
+    }, onError: (Object _) {
+      if (_foodRecoveryAt == at) _foodRecoveryAt = null;
+    });
+  }
+
   /// Χαλασμένη βάση: ξεκίνησε καινούργια (το παλιό αρχείο κρατήθηκε). Το ιστορικό ξαναδιαβάζεται από τη Samsung από
-  /// την αρχή (μία φορά για κάθε βλάβη)· το ημερολόγιο φαγητού επανέρχεται από το αντίγραφο ασφαλείας.
+  /// την αρχή (μία φορά για κάθε βλάβη)· το ημερολόγιο φαγητού και τα προϊόντα ξαναμπαίνουν από τη μνήμη και από το
+  /// αρχείο που κρατήθηκε (R7-A9-1, [onDatabaseReset]), και ό,τι λείπει ακόμα από το αντίγραφο ασφαλείας.
   ///
   /// Έλεγχος 2, C9: και το Oura ξαναδιαβάζεται από την αρχή της πρώτης εποχής του (90 μέρες με την κανονική ανάγνωση,
   /// και πιο πίσω ανά 90 μέρες, [OuraStore.ouraOlderRange]). [midSession]: η βλάβη βρέθηκε ενώ η εφαρμογή ήταν ανοιχτή·
@@ -2130,6 +2185,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     final at = r['ok'] == true && r['corrupt'] is num ? (r['corrupt'] as num).toInt() : null;
     if (at == null && midSession) return;
     dbCorruptAt = at;
+    // R7-A9-1: φαγητό και προϊόντα στη νέα βάση (χωρίς να περιμένει η πρώτη οθόνη· μία φορά για κάθε βλάβη).
+    if (at != null) _recoverFood(at);
     if (at == null || !_prefsLoaded || prefs.dbReset == at) return;
     final today = dayOf(ouraClock());
     prefs
@@ -2140,6 +2197,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..gapTo = null
       ..recentTo = null
       ..dbReset = at;
+    _backfillEpoch++;
     if (_plan.hasOura || prefs.plan.hasOura) {
       prefs
         ..ouraSyncedTo = null
@@ -2157,6 +2215,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// «Εντάξει» στην κάρτα της χαλασμένης βάσης.
   Future<void> dismissDatabaseNotice() async {
     dbCorruptAt = null;
+    dbRecovered = null;
     notifyListeners();
     await SamsungHealth.dbStatusSeen();
   }
@@ -2254,6 +2313,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     prefs.backfillFrom = null;
     prefs.emptyFrom = null;
     prefs.emptyChecked = null;
+    _backfillEpoch++;
     prefs.rereadVersion = historyRulesVersion;
     prefs.monthFails.clear();
     prefs.staleMonths.clear();
@@ -2294,7 +2354,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     if (!rereading) return null;
     final f = prefs.backfillFrom;
     // Πριν από το πρώτο κομμάτι: μόνο οι μέρες της κανονικής ανάγνωσης (30 μέρες) έχουν τους νέους κανόνες.
-    if (f == null) return addDays(dayOf(DateTime.now()), -(recentSummaryDays - 1));
+    // Round 7 (R7-A12-11): το ρολόι της αποθήκης ([ouraClock], στην εφαρμογή = DateTime.now), όπως η [_backfill].
+    if (f == null) return addDays(dayOf(ouraClock()), -(recentSummaryDays - 1));
     return parseDateKey(f);
   }
 
@@ -2351,6 +2412,12 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Αποτυχίες της συμπλήρωσης σε αυτή τη χρήση της εφαρμογής (η ανάγνωση δεν έγινε καθόλου). Μετά από 3, δεν
   /// ξαναδιαβάζουμε σε κάθε ανανέωση (μπαταρία). Οι αποτυχίες ανά μήνα είναι αποθηκευμένες ([Prefs.monthFails]).
   int _backfillFails = 0;
+
+  /// Round 7 (R7-A9-4): αυξάνεται όπου η πρόοδος της συμπλήρωσης ξεκινά από την αρχή ([_checkDatabase],
+  /// [_upgradeHistory], [restoreSources]). Μια συμπλήρωση που τρέχει ήδη το βλέπει μετά από κάθε κομμάτι και σταματά
+  /// χωρίς να ξαναγράψει την παλιά της θέση: πριν, το «ξαναδιάβασε από την αρχή» της επαναφοράς μπορούσε να χαθεί, και
+  /// οι μέρες στη μέση έμεναν χωρίς οξυγόνο νύχτας / παλμούς μέρας.
+  int _backfillEpoch = 0;
 
   /// Κομμάτια με «άλλη συσκευή» μετά τον πρώτο ύπνο ρολογιού που απέτυχαν ήδη μία φορά σε αυτό το άνοιγμα (έλεγχος 4).
   final Set<String> _nonWatchRetried = {};
@@ -2449,7 +2516,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   bool get backfillVisible {
     if (!backfilling) return false;
     final r = backfillReached;
-    return _fillingGap || r == null || r.isAfter(addDays(dayOf(DateTime.now()), -455));
+    return _fillingGap || r == null || r.isAfter(addDays(dayOf(ouraClock()), -455));
   }
 
   /// Συμπληρώνει το ιστορικό, μόνο όσο η εφαρμογή είναι ανοιχτή· αν κλείσει, συνεχίζει την επόμενη φορά.
@@ -2463,7 +2530,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // E3: όσο το φίλτρο ρολογιού δεν βρίσκει τίποτα στις 30 μέρες (όπου περιμένουμε ρολόι), κανένα κομμάτι ιστορικού:
     // εκεί ένα άδειο αποτέλεσμα γίνεται δεκτό ως «χωρίς ρολόι» και θα έκρυβε όλο τον παλιό ύπνο.
     if (_recentFilterEmpty) return;
-    final today = dayOf(DateTime.now());
+    // Round 7 (R7-A12-11): το ρολόι της αποθήκης ([ouraClock]· στην εφαρμογή = DateTime.now). Πριν, εδώ ήταν πάντα το
+    // ρολόι του μηχανήματος, ενώ οι δοκιμές έδιναν δικό τους «τώρα»: μια δοκιμή που περνούσε τα μεσάνυχτα έβγαινε κόκκινη.
+    final today = dayOf(ouraClock());
+    // R7-A9-4: αν στο μεταξύ η πρόοδος ξεκινήσει από την αρχή, αυτή η συμπλήρωση σταματά (δες [_backfillEpoch]).
+    final epoch = _backfillEpoch;
     // Το πρώτο κομμάτι φτάνει ως τη μέρα −7 (η −6 και μετά ξαναγράφονται σε κάθε ανανέωση).
     final start = addDays(today, -(_recentDays - 1));
     final oldest = addDays(today, -historyDays);
@@ -2495,6 +2566,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
           var from = addDays(g, -30);
           if (from.isBefore(gapFrom)) from = gapFrom;
           if (await _readChunk(from, g) == null) return;
+          if (epoch != _backfillEpoch) return;
           g = from;
           prefs.gapTo = dateKey(g);
           await _savePrefs();
@@ -2517,6 +2589,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         if (from.isBefore(oldest)) from = oldest;
         final empty = await _readChunk(from, cursor);
         if (empty == null) break;
+        if (epoch != _backfillEpoch) return;
         if (empty) {
           emptyStart ??= cursor;
           emptyMonths++;
@@ -2537,7 +2610,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         backfillReached = cursor;
         notifyListeners();
       }
-      if (!cursor.isAfter(oldest)) await _finishReread();
+      if (!cursor.isAfter(oldest) && epoch == _backfillEpoch) await _finishReread();
     } catch (_) {
       // Ξανά στην επόμενη ανανέωση (ως 3 φορές σε αυτή τη χρήση της εφαρμογής).
       _backfillFails++;
@@ -2622,10 +2695,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Round 1 (S9-2): όταν το σχέδιο που μπήκε έχει Oura, το Oura ξαναδιαβάζεται από την αρχή του (90 μέρες με την
   /// κανονική ανάγνωση και πιο πίσω ανά 90, [OuraStore.ouraOlderRange]), όπως μετά από καινούργια βάση (C9): το
   /// ημερήσιο ιστορικό δεν είναι στο αντίγραφο, και πριν οι νύχτες του Oura παλιότερες από 90 μέρες δεν ξαναζητούνταν ποτέ.
-  Future<bool> restoreSources(({String plan, String? log}) s) async {
-    if (!_prefsLoaded || planState != PlanState.ok) return false;
+  Future<bool> restoreSources(({String plan, String? log}) s) async =>
+      await restoreSourcesWhy(s) == SourcesRestore.restored;
+
+  /// Round 7 (R7-A9-3): ό,τι το [restoreSources], με τον λόγο όταν δεν μπήκαν (για τη σύνοψη της επαναφοράς). Πριν, η
+  /// σύνοψη έλεγε «του κινητού είναι νεότερες» για κάθε λόγο, και όταν οι πηγές του κινητού δεν διαβάζονταν ή δεν
+  /// γράφτηκαν (ακριβώς τότε που χρειάζονται του αντιγράφου).
+  Future<SourcesRestore> restoreSourcesWhy(({String plan, String? log}) s) async {
+    if (!_prefsLoaded || planState != PlanState.ok) return SourcesRestore.notReady;
     final fromBackup = decodePlanFile(s.plan);
-    if (fromBackup == null) return false;
+    if (fromBackup == null) return SourcesRestore.invalid;
     final backupAt = _atOf(s.plan) ?? 0;
     final neverSet = _plan.eras.isEmpty && _planAt == null;
     final SourcePlan p;
@@ -2636,7 +2715,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     } else {
       // Το κινητό έχει νεότερο σχέδιο: μόνο το παρελθόν που δεν ξέρει (S9-7), με την ώρα του δικού του σχεδίου.
       final merged = planWithPast(_plan, fromBackup);
-      if (merged == null || merged == _plan) return false;
+      if (merged == null || merged == _plan) return fromBackup == _plan ? SourcesRestore.same : SourcesRestore.phoneNewer;
       p = merged;
       at = _planAt ?? backupAt;
     }
@@ -2653,7 +2732,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       await _appendLog(p, at);
       return true;
     });
-    if (!ok) return false;
+    if (!ok) return SourcesRestore.writeFailed;
     final before = prefs.plan;
     prefs.plan = p;
     prefs.planAt = at;
@@ -2668,6 +2747,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         ..backfillFrom = null
         ..emptyFrom = null
         ..emptyChecked = null;
+      _backfillEpoch++;
     }
     // Round 1 (S9-2): οι ίδιες δύο γραμμές με την καινούργια βάση (C9, [_checkDatabase]). Αν δεν υπάρχει τίποτα πιο
     // πίσω από τις 90 μέρες, το [OuraStore.ouraOlderRange] το σβήνει μόνο του στην πρώτη ανάγνωση.
@@ -2678,7 +2758,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     }
     notifyListeners();
     if (!await _savePrefs()) await _savePrefs();
-    return true;
+    return SourcesRestore.restored;
   }
 
   /// Επαναφορά ρυθμίσεων από αντίγραφο: κουζίνα, κάρτες, εμφάνιση. Η πρόοδος του ιστορικού μένει.
@@ -2821,6 +2901,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
 
   @override
   void dispose() {
+    _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     disposeOura();
     super.dispose();

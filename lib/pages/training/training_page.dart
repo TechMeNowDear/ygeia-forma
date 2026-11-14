@@ -356,7 +356,13 @@ class _TrainingPageState extends State<TrainingPage> {
     final children = <Widget>[];
     final title = TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: c.text);
     final aux = TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary);
-    if (w == null) {
+    if (w == null && p.notStarted(today)) {
+      // R7-A6-6: πριν από την έναρξη του προγράμματος καμία προπόνηση του (πριν: το Σάββατο έδειχνε ήδη «Κάτω μέρος 2»).
+      final f = p.from!;
+      children.add(Text('Το πρόγραμμα ξεκινά ${onDay(f)}',
+          key: const ValueKey('train-not-started'), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)));
+      children.add(Text('Ως τότε, αν θες, διάλεξε προπόνηση από τις τρεις τελείες, πάνω δεξιά.', style: TextStyle(fontSize: 14, color: c.textSecondary)));
+    } else if (w == null) {
       children.add(Text('$dayName: ξεκούραση', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)));
       children.add(Text('Αν θες, διάλεξε προπόνηση από τις τρεις τελείες, πάνω δεξιά.', style: TextStyle(fontSize: 14, color: c.textSecondary)));
     } else if (w.isCardio) {
@@ -364,7 +370,7 @@ class _TrainingPageState extends State<TrainingPage> {
       children.addAll([
         FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(cardio.name, maxLines: 1, style: title)),
         Text(
-            ['${cardio.minutes} λεπτά', if (cardio.planWeekText(p.weekOf(today)) case final wk?) wk, if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()]
+            ['${cardio.minutes} λεπτά', if (p.planWeekText(cardio, today) case final wk?) wk, if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()]
                 .join(' · '),
             key: const ValueKey('train-cardio-line'),
             style: aux),

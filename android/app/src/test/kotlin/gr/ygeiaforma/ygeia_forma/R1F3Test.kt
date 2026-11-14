@@ -54,7 +54,7 @@ class R1F3Test {
     fun readablePrefsAreNeverSetAside() {
         val root = Files.createTempDirectory("ygeia-prefs").toFile()
         val f = File(root, "prefs.json")
-        val text = """{"goals":{"v":1,"kcal":2250},"me":{"by":1986}}"""
+        val text = """{"goals":{"v":1,"kcal":2250},"me":{"by":1985}}"""
         f.writeText(text)
         assertFalse("αρχείο που διαβάζεται δεν μετακινείται ποτέ", DataRules.setAsideUnreadablePrefs(f, 7L))
         assertEquals(text, f.readText())

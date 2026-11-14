@@ -69,7 +69,7 @@ object BackupFiles {
                 val n = input.read(buf)
                 if (n < 0) break
                 total += n
-                if (total > limit) throw IllegalStateException("Πολύ μεγάλο αρχείο")
+                if (total > limit) throw BackupRules.TooBig()
                 out.write(buf, 0, n)
             }
             out.toByteArray()
@@ -84,5 +84,36 @@ object BackupFiles {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(send, "Αποστολή αντιγράφου"))
+    }
+}
+
+/**
+ * Round 7 (R7-A9-5, f4): τι είδους σφάλμα είναι ένα σφάλμα αποθήκευσης/ανάγνωσης αντιγράφου, για το ελληνικό μήνυμα
+ * της Flutter (backup.dart). Πριν, η οθόνη έδειχνε το αγγλικό κείμενο της Java («Unexpected end of ZLIB input stream»,
+ * «write failed: ENOSPC (No space left on device)»). Χωρίς Android: ελέγχεται σε απλό JVM.
+ */
+object BackupRules {
+    /** Το αρχείο ξεπερνά το όριο ανάγνωσης ([BackupFiles.read]). */
+    class TooBig : java.io.IOException("Πολύ μεγάλο αρχείο")
+
+    /**
+     * «damaged»: κομμένο ή χαλασμένο συμπιεσμένο αρχείο (EOFException, ZipException: π.χ. μισό κατέβασμα από το Drive)·
+     * «full»: δεν υπάρχει χώρος (ENOSPC, ή η βάση του συστήματος γεμάτη)· «too_big»· αλλιώς «other» (άγνωστο: πηγαίνει
+     * στις αναφορές σφαλμάτων όπως πριν).
+     */
+    fun failKind(e: Throwable): String {
+        var c: Throwable? = e
+        var depth = 0
+        while (c != null && depth < 8) {
+            when {
+                c is TooBig -> return "too_big"
+                c is java.io.EOFException || c is java.util.zip.ZipException -> return "damaged"
+                c.javaClass.simpleName == "SQLiteFullException" -> return "full"
+                (c.message ?: "").let { it.contains("ENOSPC") || it.contains("No space left", ignoreCase = true) } -> return "full"
+            }
+            c = c.cause
+            depth++
+        }
+        return "other"
     }
 }

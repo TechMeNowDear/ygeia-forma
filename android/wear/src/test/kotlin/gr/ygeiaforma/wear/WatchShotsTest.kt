@@ -353,7 +353,8 @@ class WatchShotsTest {
         Repo.notice = null
 
         Repo.screen = Repo.Screen.HOME
-        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s1","w":"A","name":"Προπόνηση Α","start":1,"idx":1,
+        // Round 7 (R7-A8-3): αρχή «τώρα» (με αρχή το 1970 θα ήταν ξεχασμένη και η αρχική δεν θα έδειχνε «Παλμοί εδώ»).
+        Repo.applyPhone(LiveSession.parsePhone("""{"active":true,"id":"s1","w":"A","name":"Προπόνηση Α","start":$now,"idx":1,
             "items":[{"ex":"db_press","name":"Πιεστικό","rest":90,"sets":[{"label":"10,3 kg","reps":8,"done":true}]}]}"""))
         shot("W9_home_phone")
         RuntimeEnvironment.setFontScale(1.3f)

@@ -3,7 +3,10 @@ package gr.ygeiaforma.ygeia_forma
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.File
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 /**
  * Κανόνες δεδομένων χωρίς τύπους Android ή του Samsung SDK, ώστε να ελέγχονται σε απλό JVM (android/app/src/test).
@@ -314,6 +317,22 @@ object DataRules {
      */
     fun offsetMinutes(totalSeconds: Int?): Int? =
         totalSeconds?.takeIf { it in -18 * 3600..18 * 3600 }?.let { it / 60 }
+
+    /** Η στιγμή μιας ανάγνωσης: [ms] (γίνεται το «readAt») και η ίδια στιγμή σε τοπική ώρα ([now]). */
+    data class ReadMoment(val ms: Long, val now: LocalDateTime) {
+        /** Η μέρα για την οποία είναι τα «σημερινά» σύνολα της ανάγνωσης. */
+        val today: LocalDate get() = now.toLocalDate()
+    }
+
+    /**
+     * Round 7 (R7-A10-4): η στιγμή μιας ανάγνωσης, ΜΙΑ φορά, στην αρχή της. Από αυτήν βγαίνουν και το «readAt» και τα
+     * όρια της σημερινής μέρας (δραστηριότητα, βήματα, παλμοί ως «τώρα»). Πριν, το «readAt» ήταν η ώρα του ΤΕΛΟΥΣ: μια
+     * ανάγνωση που άρχιζε 23:59:55 και τελείωνε 00:00:04 έδειχνε τα σύνολα της προηγούμενης μέρας ως σημερινά (και στα
+     * widgets). Από τα ms προς την τοπική ώρα, όχι ανάποδα: την ώρα που επαναλαμβάνεται στην αλλαγή ώρας (τελευταία
+     * Κυριακή του Οκτωβρίου, 03:00–04:00) η τοπική ώρα δεν δίνει μία μόνο στιγμή.
+     */
+    fun readMoment(ms: Long, zone: ZoneId): ReadMoment =
+        ReadMoment(ms, LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), zone))
 
     private fun parseObject(json: String): JsonObject? = try {
         val e = JsonParser.parseString(json)

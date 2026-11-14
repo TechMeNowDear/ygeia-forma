@@ -29,7 +29,7 @@ List<List<Object>> seq(DateTime start, List<(String, int)> parts) {
 
 /// Νύχτα-δείγμα Δευ 2 → Τρ 3/11 (ρολόι): δύο κομμάτια της Samsung, φάσεις όπως τις δείχνει η εφαρμογή
 /// (#65): βαθύς 8, ελαφρύς 271, REM 51, ξύπνιος 47· κενό 02:40–03:50. Samsung «Πραγματικός ύπνος» 5ω29.
-List<Map<String, dynamic>> ownerNight() => [
+List<Map<String, dynamic>> twoPieceNight() => [
       {
         'start': ms(t(2, 23, 43)),
         'end': ms(t(3, 2, 40)),
@@ -53,7 +53,7 @@ void main() {
   group('C1: η νύχτα δεν εξαρτάται από βήματα', () {
     Map<String, dynamic> read({required DateTime readAt, required int gapSteps, required DateTime stepsFrom}) => {
           'readAt': ms(readAt),
-          'sleep': ownerNight(),
+          'sleep': twoPieceNight(),
           'stepsMin': [
             if (gapSteps > 0) [ms(t(3, 3, 10)), gapSteps],
           ],
@@ -128,7 +128,7 @@ void main() {
       expect(soon.napMinutes, 0);
     });
 
-    // Συντονιστής (4/11): η Κυριακή 25/10 του χρήστη (05:55–09:50, 10:53–13:14, 0 βήματα, παλμοί ύπνου) ΔΕΝ ήταν
+    // Συντονιστής (4/11): μια Κυριακή με ύπνο 05:55–09:50 και 10:53–13:14 (0 βήματα, παλμοί ύπνου) ΔΕΝ είχε
     // ξύπνημα. Πρωινό κομμάτι: ίδια νύχτα αν κενό ≤ 90′ ΚΑΙ (χωρίς βήματα ανά λεπτό Ή ≤ 30 βήματα)· αλλιώς υπνάκος.
     Map<String, dynamic> morning(List<Map<String, dynamic>> sleep, {List<List<num>> steps = const [], DateTime? stepsFrom}) => {
           'readAt': ms(DateTime(2026, 10, 26, 15)),
@@ -200,7 +200,7 @@ void main() {
     test('Η ανάγνωση 30 ημερών ξαναγράφει τον ύπνο όλων των ημερών (όχι μόνο των 7 με βήματα)', () {
       final d = Dashboard.fromJson({
         'readAt': ms(DateTime(2026, 11, 20, 12)),
-        'sleep': ownerNight(),
+        'sleep': twoPieceNight(),
         'stepsMin': <List<num>>[],
         'stepsFrom': ms(DateTime(2026, 11, 13)),
       });
@@ -251,7 +251,7 @@ void main() {
     });
 
     test('Κομμάτι χωρίς φάσεις μέσα σε νύχτα με φάσεις: μετρούν τα κομμάτια με φάσεις, σημείωση «μερικώς»', () {
-      final sleep = ownerNight();
+      final sleep = twoPieceNight();
       sleep[0] = {...sleep[0], 'stages': <Object>[]};
       final d = Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': sleep});
       final n = d.nights.single;
@@ -262,7 +262,7 @@ void main() {
       expect(summarizeDay(d, DateTime(2026, 11, 3)).containsKey(K.sleepMin), isFalse);
       expect(n.fullDuration, isFalse);
       // Όλη με φάσεις: όχι «μερικώς».
-      expect(Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': ownerNight()}).nights.single.partial, isFalse);
+      expect(Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': twoPieceNight()}).nights.single.partial, isFalse);
     });
   });
 
@@ -529,14 +529,14 @@ void main() {
 
   group('C13: σελίδα ύπνου', () {
     test('Νύχτα χωρίς φάσεις: κενή στήλη, «—» και «χωρίς φάσεις»· μερικώς: διάρκεια και σημείωση', () {
-      final staged = Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': ownerNight()}).nights.single;
+      final staged = Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': twoPieceNight()}).nights.single;
       final unstaged = Dashboard.fromJson({
         'readAt': ms(t(3, 12, 0)),
         'sleep': [
-          for (final r in ownerNight()) {...r, 'stages': <Object>[]},
+          for (final r in twoPieceNight()) {...r, 'stages': <Object>[]},
         ],
       }).nights.single;
-      final partialSleep = ownerNight();
+      final partialSleep = twoPieceNight();
       partialSleep[0] = {...partialSleep[0], 'stages': <Object>[]};
       final partial = Dashboard.fromJson({'readAt': ms(t(3, 12, 0)), 'sleep': partialSleep}).nights.single;
       expect(sleepBarHours(staged), 5.5);

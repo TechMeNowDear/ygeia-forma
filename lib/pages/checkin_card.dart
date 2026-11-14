@@ -108,6 +108,28 @@ String fewDataText(AdaptStatus? status, {required int days, required int weighs}
       'Μέρες με λιγότερο από το 60% του στόχου δεν μετράνε: συνήθως κάτι δεν γράφτηκε.';
 }
 
+/// Round 7 (R7-A1-1): το κείμενο της πρότασης από τη ζυγαριά ([CheckIn.lowLog]). Τι έκανε το βάρος, τι ζητά ο ρυθμός
+/// σου, και με απλά λόγια, χωρίς κατηγορία, ότι μάλλον λείπει φαγητό από το ημερολόγιο. Κανένα «καις …»: η εκτίμηση από
+/// το ημερολόγιο δεν μέτρησε. «Τις 3 τελευταίες εβδομάδες το βάρος σου ανέβαινε 0,30 kg την εβδομάδα, ενώ ο στόχος σου
+/// είναι να πέφτει 0,48 kg την εβδομάδα. …»
+String lowLogText(CheckIn k) {
+  final e = k.est!;
+  final g = k.goals;
+  final kg = k.kgNow ?? g.kg;
+  final s = e.slopeKgWeek;
+  final moved = s >= 0.005
+      ? 'ανέβαινε ${dec(s, 2)}\u00A0kg την εβδομάδα'
+      : (s <= -0.005 ? 'έπεφτε μόνο ${dec(-s, 2)}\u00A0kg την εβδομάδα' : 'έμενε σχεδόν ίδιο');
+  final plan = switch (g.aim) {
+    GoalAim.lose => 'να πέφτει ${dec(kg * g.rate, 2)}\u00A0kg την εβδομάδα',
+    GoalAim.keep => 'να μένει ίδιο',
+    GoalAim.gain => 'να ανεβαίνει ${dec(kg * g.rate, 2)}\u00A0kg την εβδομάδα',
+  };
+  return 'Τις ${e.windowDays ~/ 7} τελευταίες εβδομάδες το βάρος σου $moved, ενώ ο στόχος σου είναι $plan. Με όσα '
+      'γράφτηκαν στο ημερολόγιο, η ζυγαριά θα έπρεπε να δείχνει λιγότερα: μάλλον λείπουν κάποια γεύματα, σνακ ή ποτά, '
+      'κάτι που συμβαίνει σχεδόν σε όλους. Ο στόχος κατεβαίνει με βάση τη ζυγαριά.';
+}
+
 /// A1 (εβδομαδιαίος έλεγχος) και A3 (γρήγορη απώλεια).
 class CheckInCard extends StatelessWidget {
   const CheckInCard({super.key, required this.check, required this.store, required this.now});
@@ -143,6 +165,9 @@ class CheckInCard extends StatelessWidget {
     };
 
     final Widget text = switch (k.kind) {
+      // Round 7 (R7-A1-1): η πρόταση βγήκε από τη ζυγαριά, γιατί με όσα γράφτηκαν η εκτίμηση ήταν πολύ χαμηλή. Δεν
+      // γράφεται «καις …»: εκείνος ο αριθμός δεν είναι αξιόπιστος.
+      CheckKind.proposal when k.lowLog => Text(lowLogText(k), style: body),
       CheckKind.proposal || CheckKind.same => Text.rich(TextSpan(style: body, children: [
           TextSpan(text: 'Από ${k.est!.intakeDays} μέρες με φαγητό και ${k.est!.weighIns} ζυγίσεις, '),
           TextSpan(text: 'καις περίπου ${_kcal(k.est!.tdee)}\u00A0kcal', style: bold),
@@ -263,10 +288,14 @@ class CheckInCard extends StatelessWidget {
             Text('${_signed(p.change)} από ${thousands(p.current)}', style: small),
           ]),
           if (g.kcalSet != null) Text('Αντικαθιστά τον δικό σου στόχο (${thousands(g.kcalSet!)}).', style: small),
-          if (p.floored) Text('Δεν κατεβαίνει κάτω από το όριο ασφαλείας.', style: small),
+          // R7-A1-4: με τα λόγια της οδηγίας (AHA/ACC/TOS 2013).
+          if (p.floored)
+            Text('Δεν κατεβαίνει κάτω από ${thousands(g.male ? kcalFloorMale : kcalFloorFemale)}\u00A0kcal, ${floorWhy(g.male)}.',
+                style: small),
         ],
         if (buttons != null) ...[const SizedBox(height: 14), buttons],
-        if (k.kind == CheckKind.proposal || k.kind == CheckKind.same)
+        // R7-A1-1: η πρόταση από τη ζυγαριά εξηγείται ολόκληρη στην κάρτα· το «Πώς βγήκε» θα έδειχνε την εκτίμηση που δεν μέτρησε.
+        if ((k.kind == CheckKind.proposal || k.kind == CheckKind.same) && !k.lowLog)
           TextButton(
             key: const ValueKey('checkin-how'),
             style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44), foregroundColor: c.food),
@@ -408,7 +437,7 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
           const Hairline(vertical: 12),
           InfoRow(p.same ? 'Ο στόχος μένει' : 'Νέος στόχος', '${thousands(p.target)} kcal'),
           // Πρώτα το περιθώριο των ζυγίσεων (Συμβούλιο 2, Α1): αν ο στόχος έμεινε γι' αυτό, αυτός είναι ο λόγος που γράφεται.
-          // Χωρίς αριθμό διαφοράς, ώστε να μη φανεί ποτέ στόχος κάτω από το όριο ασφαλείας (μ1).
+          // Χωρίς αριθμό διαφοράς, ώστε να μη φανεί ποτέ στόχος κάτω από το κάτω όριο (μ1).
           if (k.tooFast)
             Text('Χάνεις πάνω από 1% του βάρους την εβδομάδα: ο στόχος δεν κατεβαίνει όσο χάνεις τόσο γρήγορα.', style: small)
           else if (k.heldDays != null)
@@ -419,9 +448,10 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
                 '${guard >= 10 ? ' (±${thousands(guard)}\u00A0kcal)' : ''}: δεν αξίζει αλλαγή. Με περισσότερες ζυγίσεις το εύρος μικραίνει.',
                 style: small)
           // Και όταν ο νέος στόχος δεν είναι ακόμα στο όριο αλλά τα δεδομένα θέλουν κάτω από αυτό (Συμβούλιο 2, μ1): εδώ
-          // γράφεται το όριο, ποτέ «τα δεδομένα λένε» έναν αριθμό κάτω από το όριο ασφαλείας.
+          // γράφεται το όριο, ποτέ «τα δεδομένα λένε» έναν αριθμό κάτω από το κάτω όριο. R7-A1-4: με τα λόγια της οδηγίας.
           else if (p.floored || k.wantsBelowFloor)
-            Text('Δεν κατεβαίνει κάτω από ${thousands(g.male ? kcalFloorMale : kcalFloorFemale)}\u00A0kcal (όριο ασφαλείας).', style: small)
+            Text('Δεν κατεβαίνει κάτω από ${thousands(g.male ? kcalFloorMale : kcalFloorFemale)}\u00A0kcal: ${floorWhy(g.male)}.',
+                style: small)
           else if (wanted != null && (wanted - p.current).abs() > adaptMaxStep)
             Text(
                 'Τα δεδομένα λένε ${thousands(wanted)}. Ο στόχος αλλάζει το πολύ $adaptMaxStep\u00A0kcal τη φορά, ώστε μια εβδομάδα με '

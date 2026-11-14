@@ -37,7 +37,9 @@ object Results {
                 hr.recovery()?.let { (e, m) -> cardio.put("hrr", JSONObject().put("e", e).put("m", m)) }
                 // Η ζώνη που ίσχυε στο περπάτημα (12/11). Νέο πεδίο: το παλιό κινητό το αγνοεί.
                 Repo.zoneAlarm.zone?.let { cardio.put("zone", it.toJson()) }
-                val w = Repo.plan?.todayWorkout?.takeIf { it.isCardio }
+                // Το περπάτημα του προγράμματος της μέρας που ΞΕΚΙΝΗΣΕ (έλεγχος 13/11, round 7, R7-A8-6), όχι της μέρας που
+                // γράφεται το αποτέλεσμα (μετά τα μεσάνυχτα, ή μερικό που γράφεται μέρες μετά).
+                val w = Repo.plan?.walkOn(Repo.startedAt)
                 id to LiveSession(id, w?.id ?: "walk", w?.name ?: "Περπάτημα", Repo.startedAt, emptyList()).resultJson(end, hr, cardio)
             }
             local != null && local.setsDone > 0 -> local.id to local.resultJson(end0, hr)
@@ -46,7 +48,8 @@ object Results {
                 // κάποιο ✓, το συμπληρώνει (έλεγχος 8/11) — και όταν το κινητό έκλεισε πρώτο την προπόνηση (V-A-12).
                 val sid = Repo.runningSid ?: Repo.phone?.id ?: Repo.lastPhoneId
                 if (sid.isNullOrEmpty()) return null
-                val src = listOfNotNull(Repo.phone, Repo.lastPhone).firstOrNull { it.id == sid }
+                // Και όταν στο μεταξύ το κινητό ξεκίνησε άλλη προπόνηση ([Repo.endedPhone], έλεγχος 13/11, round 7, R7-A8-2).
+                val src = Repo.phoneById(sid)
                 val items = src?.resultJson(end0, hr)?.optJSONArray("items")
                 val id = "hr$sid-${Repo.startedAt}"
                 val o = JSONObject().put("v", 1).put("kind", "hr").put("sid", sid).put("id", id)

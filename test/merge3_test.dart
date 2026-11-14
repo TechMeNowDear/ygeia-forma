@@ -178,14 +178,14 @@ void main() {
       expect(t.getRect(find.text('Πώς διαβάζεται').first).bottom, lessThan(footer.top));
     }
 
-    testWidgets('Πραγματική σημείωση 400 χαρακτήρων: ολόκληρη, και η σελίδα 1 χωρά όπως είναι (κλίμακα 1)', (t) async {
-      final note = ('Φάρμακα: βισοπρολόλη 2,5 mg πρωί. Κάπνισμα 10/μέρα. Ροχαλητό (σύζυγος). Τεστ άπνοιας Samsung 20/10 '
-              'και 23/10 αρνητικά. Ζαλάδα το πρωί κάποιες μέρες. ' * 3)
+    testWidgets('Ρεαλιστική (επινοημένη) σημείωση 400 χαρακτήρων: ολόκληρη, και η σελίδα 1 χωρά όπως είναι (κλίμακα 1)', (t) async {
+      final note = ('Φάρμακα: βισοπρολόλη 2,5 mg πρωί. Κάπνισμα 10/μέρα. Ροχαλητό (σύζυγος). Τεστ άπνοιας Samsung 13/10 '
+              'και 16/10 αρνητικά. Ζαλάδα το πρωί κάποιες μέρες. ' * 3)
           .substring(0, 400);
       expect(note.length, reportNoteMax);
       await pumpReport(t, note, withName: true);
       expectWhole(t, note);
-      expect(find.textContaining('20/10 και'), findsWidgets, reason: 'το τέλος της σημείωσης φαίνεται');
+      expect(find.textContaining('13/10 και'), findsWidgets, reason: 'το τέλος της σημείωσης φαίνεται');
       // Round 1 (U1b-01, f4): το σώμα της σελίδας 1 είναι πια [RenderReportFit] (πριν RenderFittedBox).
       final box = t.renderObject<RenderReportFit>(find.byKey(const ValueKey('report-page1-body')));
       expect(box.scale, 1.0, reason: 'χωρίς σμίκρυνση');

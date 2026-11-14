@@ -25,6 +25,7 @@ import 'pages/today.dart';
 import 'pages/trends.dart';
 import 'pages/widget_config_page.dart';
 import 'plan_file.dart' show PlanState;
+import 'system_texts.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -54,6 +55,8 @@ Future<void> main() async {
   final store = HealthStore();
   HealthStore.shared = store;
   final food = FoodStore();
+  // Round 7 (R7-A9-1): μετά από βλάβη της βάσης ξαναμπαίνουν και το φαγητό και τα προϊόντα, όχι μόνο το ιστορικό.
+  store.onDatabaseReset = food.recoverAfterDbReset;
   // Πρώτα οι ρυθμίσεις (λίγα ms), ώστε η πρώτη οθόνη να έχει ήδη το θέμα που διάλεξα.
   await store.loadPrefs();
   void startStores() {
@@ -125,6 +128,8 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
           themeAnimationDuration: const Duration(milliseconds: 220),
           navigatorObservers: [errors.observer],
           navigatorKey: _nav,
+          // Round 7 (R7-U4-7): «Αντιγραφή/Επικόλληση», «Πίσω», «Άδειες λογισμικού» κ.λπ. στα ελληνικά (system_texts.dart).
+          localizationsDelegates: greekSystemTexts,
           home: _wiped == null
               ? _home
               : WipedPage(status: _wiped!, onStart: _leaveWiped, onRestore: () => _leaveWiped(restore: true)),

@@ -36,7 +36,7 @@ HealthStore _store(DateTime now, List<BodyMeasurement> rows) {
   final s = HealthStore()..data = Dashboard.fromJson(_json(now, rows));
   s.history = sampleHistory(now, s.data!);
   applyRecentRead(s.history, s.data!, plan: _plan);
-  s.setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180));
+  s.setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180));
   return s;
 }
 
@@ -111,12 +111,19 @@ void main() {
       expect(countedBody(rows).any((b) => b.weight == 85.4), isFalse);
     });
 
-    testWidgets('Πα 4/12 20:00: «Βάρος 85,4 kg» χωρίς διαφορά και δείκτη (πριν: δείκτης 26,4 και «… από τις 2 Δεκ.»)', (t) async {
+    // Round 7 (f5 · A4-1): το Σώμα δείχνει τη ΖΥΓΙΣΗ ΤΗΣ ΜΕΡΑΣ (07:15 80,7), όπως η Σήμερα, το widget και οι Τάσεις, με
+    // διαφορά, δείκτη και εύρη· η βραδινή σε μια γκρι γραμμή και στον πίνακα με «*». Πριν (R6-2): «Βάρος 85,4 kg» ως
+    // «Τελευταία ζύγιση», χωρίς διαφορά και δείκτη, ενώ η Σήμερα και το widget έλεγαν 80,7.
+    testWidgets('Πα 4/12 20:00: «Βάρος 80,7 kg  (−0,2)» και δείκτης 24,9· η βραδινή 85,4 μόνο ως γκρι γραμμή', (t) async {
       final now = DateTime(2026, 12, 4, 20);
       await _pump(t, BodyPage(store: _store(now, rows), now: now));
-      expect(_row(t, 'Βάρος'), '85,4 kg');
-      expect(_row(t, 'Δείκτης μάζας σώματος'), isNull); // 85,4 / 1,8² = 26,36
-      expect(_note(t), isNot(contains('σε παρένθεση η αλλαγή από')));
+      expect(_row(t, 'Βάρος'), '80,7 kg  (−0,2)');
+      expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9'); // 80,7 / 1,8² = 24,907 (πριν: κανένας, από την 85,4)
+      expect(_row(t, 'Λίπος'), '29,0%  (+2,0)');
+      expect(_note(t), contains('σε παρένθεση η αλλαγή από τις 2 Δεκ.'));
+      expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data,
+          'Και 19:30: 85,4 kg· μετρά μία ζύγιση τη μέρα, η πρώτη.');
+      expect(find.byKey(const ValueKey('body-weighings-foreign')), findsOneWidget);
     });
   });
 }

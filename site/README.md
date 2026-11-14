@@ -34,7 +34,10 @@
 
 Τι κάνει ο μεσάζων:
 - δέχεται μόνο POST για το δικό μας Client ID
-- στην ανταλλαγή κωδικού απαιτεί PKCE (`code_verifier`) και μία από τις δύο δηλωμένες διευθύνσεις επιστροφής
+- στην ανταλλαγή κωδικού απαιτεί PKCE (`code_verifier`) και ΜΟΝΟ τη διεύθυνση επιστροφής
+  `https://ygeia-forma.netlify.app/oura/callback` (`REDIRECTS`· έλεγχος 2, C10). Το `ygeiaforma://oura-callback` δεν
+  γίνεται δεκτό εδώ: είναι μόνο η προώθηση της σελίδας `/oura/callback` προς την εφαρμογή. Η εφαρμογή στέλνει πάντα την
+  https (`ouraRedirectUri` στο `lib/oura/config.dart`).
 - προσθέτει το secret και προωθεί το αίτημα στην Oura μία φορά
 - επιστρέφει την απάντηση της Oura χωρίς cache
 

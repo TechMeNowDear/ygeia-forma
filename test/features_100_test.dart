@@ -10,7 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/body_trend.dart';
 import 'package:ygeia_forma/data.dart';
-import 'package:ygeia_forma/format.dart' show hoursMinutes;
 import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/home_widgets/widget_snapshot.dart';
 import 'package:ygeia_forma/hrv_trend.dart';
@@ -99,15 +98,19 @@ void main() {
       final week = w['week'] as Map;
       expect(week.keys.toSet(), {'1', '2', '3', '4', '5', '6', '7'});
       // Παρασκευή = Α (6 ασκήσεις), Δευτέρα = Β (7 ασκήσεις), Τρίτη = περπάτημα 30′.
-      expect(week['5'], {'t': 'Προπόνηση Α', 's': '6 ασκήσεις · περίπου 50 λεπτά'}); // round 1 (U7-13): ολόκληρες λέξεις
+      // R7-A6-7 (f2): η κωπηλασία με αλτήρα γίνεται δεξιά και αριστερά σε κάθε σετ (+2′15″): 50 → 53 λεπτά.
+      expect(week['5'], {'t': 'Προπόνηση Α', 's': '6 ασκήσεις · περίπου 53 λεπτά'}); // round 1 (U7-13): ολόκληρες λέξεις
       expect(week['1'], {'t': 'Προπόνηση Β', 's': '7 ασκήσεις · περίπου 56 λεπτά'});
       expect(week['2'], {'t': 'Περπάτημα', 's': '30 λεπτά'});
       expect(w.containsKey('done'), isFalse);
-      // Τη μέρα που έγινε προπόνηση: «έγινε», με όνομα και διάρκεια.
+      // Round 7 (f5 · U1-5): «έγινε» μόνο για την προπόνηση ΤΗΣ ΜΕΡΑΣ, όπως η κάρτα «Άσκηση σήμερα» (πριν: όποια
+      // προπόνηση τελείωσε σήμερα). Η τελευταία του δείγματος (Α, βάρη) έγινε Τετάρτη, μέρα περπατήματος: το widget λέει
+      // ακόμα το περπάτημα της μέρας. «Έγινε» με όνομα και διάρκεια: test/r7_f5_test.dart.
       final last = t.sessions.last;
       final d = workoutSnapshot(t, DateTime(last.start.year, last.start.month, last.start.day));
-      expect(d['done'], dateKey(last.start));
-      expect(d['doneText'], '${last.name} · ${hoursMinutes(last.end!.difference(last.start).inMinutes)}');
+      expect(last.start.weekday, DateTime.wednesday);
+      expect(d.containsKey('done'), isFalse);
+      expect(d.containsKey('doneText'), isFalse);
     });
 
     test('χωρίς πρόγραμμα: το λέει· μπαίνει στο στιγμιότυπο μόνο όταν η προπόνηση έχει φορτωθεί', () {
@@ -207,8 +210,10 @@ void main() {
       expect(p.forDay(DateTime(2026, 12, 1))!.cardio!.minutes, 30);
       expect(p.forDay(DateTime(2026, 12, 8))!.cardio!.minutes, 35);
       expect(p.forDay(DateTime(2027, 3, 2))!.cardio!.minutes, 35);
-      // Πριν από την έναρξη: η πρώτη εβδομάδα. Η αλλαγή ώρας (29/3/2027) δεν μετακινεί την εβδομάδα.
-      expect(p.forDay(DateTime(2026, 11, 10))!.cardio!.minutes, 20);
+      // Πριν από την έναρξη: καμία προπόνηση της μέρας (R7-A6-6, f2)· αν τη διαλέξεις, η πρώτη εβδομάδα. Η αλλαγή ώρας
+      // (29/3/2027) δεν μετακινεί την εβδομάδα.
+      expect(p.forDay(DateTime(2026, 11, 10)), isNull);
+      expect(p.at(p.workout('walk')!, DateTime(2026, 11, 10)).cardio!.minutes, 20);
       expect((p.weekOf(DateTime(2026, 11, 22, 23, 59)), p.weekOf(DateTime(2026, 11, 23, 0, 1))), (0, 1));
       // Το αποθηκευμένο πρόγραμμα δεν αλλάζει: το «at» δίνει αντίγραφο.
       expect(p.workout('walk')!.cardio!.minutes, 30);

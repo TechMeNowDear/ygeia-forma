@@ -332,7 +332,13 @@ class _AwakeHeartCard extends StatelessWidget {
             Align(alignment: Alignment.centerLeft, child: pill)
           else
             Text(
-              usual ?? 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.',
+              // Round 7 (R7-A5-5): με τον ύπνο από το ρολόι οι παλμοί ξύπνιος βγαίνουν από τον ύπνο του ρολογιού
+              // (history.dart › summarizeDay), όχι από το δαχτυλίδι· 6 ώρες = [minMinutesForDayValue] (heart_day.dart).
+              usual ??
+                  (plan.nightSource(DateTime(day.year, day.month, day.day - 1)) == Source.watch
+                      ? 'Βγαίνει για μέρες με αρκετές μετρήσεις του ρολογιού (τουλάχιστον 6 ώρες).'
+                      : 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.'),
+              key: const ValueKey('heart-awake-note'),
               style: TextStyle(color: c.textSecondary, fontSize: 13.5),
             ),
           if (pts.length >= 2) ...[

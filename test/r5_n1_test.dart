@@ -57,7 +57,7 @@ HealthStore _store(DateTime now, List<BodyMeasurement> rows) {
   final s = HealthStore()..data = Dashboard.fromJson(_json(now, rows));
   s.history = sampleHistory(now, s.data!);
   applyRecentRead(s.history, s.data!, plan: _plan);
-  s.setProfile(const Profile(birthYear: 1986, birthMonth: 1, sex: 'm', heightCm: 180));
+  s.setProfile(const Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180));
   return s;
 }
 

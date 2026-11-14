@@ -130,7 +130,7 @@ const sourceRows = <SourceRow>[
     ouraNote: 'Μόνο Oura· μέσοι όροι όλης της νύχτας',
   ),
   SourceRow(
-    title: 'Θερμοκρασία στον ύπνο',
+    title: 'Θερμοκρασία δέρματος',
     group: SourceGroup.night,
     metrics: [K.skinTemp],
     watchNote: 'Θερμοκρασία καρπού',
