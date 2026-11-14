@@ -921,6 +921,45 @@ void main() {
     });
   });
 
+  group('Sentry YGEIA-FORMA-2: έλεγχος πρόσβασης στη σύνδεση', () {
+    final now = DateTime(2026, 11, 7, 9);
+    final t = OuraTokens(access: 'A', refresh: 'R', expiresAt: now.add(const Duration(days: 1)).millisecondsSinceEpoch);
+
+    test('Ένα 401 αμέσως μετά την ανταλλαγή, μετά 200: η σύνδεση περνά (μία νέα προσπάθεια μετά από 2″)', () async {
+      final statuses = [401, 200];
+      final waits = <Duration>[];
+      final http = FakeHttp((m, u, h, f) => OuraResponse(statuses.removeAt(0), '{"data":[]}'));
+      final l = OuraLink(vault: MemoryVault(), send: http.send, clock: () => now, clientId: 'CID', wait: (d) async => waits.add(d));
+      await l.verifyAccess(t);
+      expect(http.calls, hasLength(2));
+      expect(http.calls.every((c) => c.$2.path.endsWith('daily_sleep')), isTrue);
+      expect(waits, [OuraLink.verifyRetryDelay]);
+      expect(OuraLink.verifyRetryDelay, const Duration(seconds: 2));
+    });
+
+    test('Δύο φορές 401: «Λείπει άδεια» (αληθινό πρόβλημα άδειας), μόνο δύο κλήσεις', () async {
+      final http = FakeHttp((m, u, h, f) => const OuraResponse(401, '{}'));
+      final l = OuraLink(vault: MemoryVault(), send: http.send, clock: () => now, clientId: 'CID', wait: (_) async {});
+      await expectLater(l.verifyAccess(t), throwsA(isA<OuraError>().having((e) => e.kind, 'kind', OuraErrorKind.scopeMissing)));
+      expect(http.calls, hasLength(2));
+    });
+
+    test('200 με την πρώτη ή 403: καμία αναμονή, μία κλήση', () async {
+      for (final st in [200, 403]) {
+        var waited = false;
+        final http = FakeHttp((m, u, h, f) => OuraResponse(st, '{"data":[]}'));
+        final l = OuraLink(vault: MemoryVault(), send: http.send, clock: () => now, clientId: 'CID', wait: (_) async => waited = true);
+        try {
+          await l.verifyAccess(t);
+        } on OuraError {
+          // 403: αναμενόμενο σφάλμα (συνδρομή)· εδώ μετράμε μόνο τις κλήσεις.
+        }
+        expect(http.calls, hasLength(1), reason: '$st');
+        expect(waited, isFalse, reason: '$st');
+      }
+    });
+  });
+
   group('Σύνδεση με το ιστορικό', () {
     test('mergeOura: γράφει μόνο μέρες με πηγή Oura, μόνο κλειδιά «o.*», σβήνει ό,τι δεν ήρθε πια', () {
       final plan = SourcePlan.samsungOnly.withEra(Source.oura, DateTime(2026, 10, 24));
