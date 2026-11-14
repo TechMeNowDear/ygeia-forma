@@ -246,6 +246,7 @@ class Session {
     this.note,
     List<List<int>>? hr,
     this.meters,
+    this.metersEst,
     this.steps,
     this.source,
     this.hrMode,
@@ -403,6 +404,10 @@ class Session {
   double? meters;
   int? steps;
 
+  /// Η απόσταση από τα βήματα (βήματα × μήκος βήματος, m), από το ρολόι (14/11): για περπάτημα χωρίς GPS (μέσα στο
+  /// σπίτι). Φαίνεται με «≈» μόνο όταν το GPS δεν μέτρησε ([shownMeters]) και δεν μετρά ποτέ στην Πρόοδο.
+  double? metersEst;
+
   /// «watch» αν έγινε μόνο στο ρολόι.
   String? source;
 
@@ -468,7 +473,7 @@ class Session {
   static const _known = {
     'id', 'w', 'name', 'prog', 'start', 'end', 'items', 'feel', 'hrAvg', 'hrMax', 'cmin', 'note', 'hr', 'hrf', 'm', 'steps', 'src',
     'hrm', 'hrg', 'hrd', 'werr', 'wdg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs', 'zlo', 'zhi', 'zt',
-    'res',
+    'res', 'mest',
   };
 
   /// [hrInline]: οι παλμοί μέσα (όπως ως #90)· αλλιώς μόνο πόσοι είναι («hrf»), γιατί είναι στο δικό τους αρχείο.
@@ -491,6 +496,7 @@ class Session {
       if (hrInline && hrLoaded && hr.isNotEmpty) 'hr': hr,
       if ((!hrInline || !hrLoaded) && n > 0) 'hrf': n,
       if (meters != null) 'm': meters,
+      if (metersEst != null) 'mest': metersEst,
       if (steps != null) 'steps': steps,
       if (source != null) 'src': source,
       if (hrMode != null) 'hrm': hrMode,
@@ -562,6 +568,7 @@ class Session {
       note: note,
       hr: hr,
       meters: opt<num>('m')?.toDouble(),
+      metersEst: opt<num>('mest')?.toDouble(),
       steps: optInt('steps'),
       source: opt<String>('src'),
       hrMode: opt<String>('hrm'),

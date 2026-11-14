@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../exercise/ex_data.dart';
 import '../../exercise/ex_names.dart';
 import '../../format.dart';
+import '../../training/walk_stats.dart' show kmValue, liveMeters, kmText;
 import '../../theme.dart';
 import '../../training/program.dart';
 import '../../training/session.dart';
@@ -317,7 +318,9 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
   Widget _live(BuildContext context, Map<String, dynamic> l, int? limit) {
     final c = Aigaio.of(context);
     final sec = (l['sec'] as num?)?.toInt() ?? 0;
-    final m = (l['m'] as num?)?.toDouble() ?? 0;
+    // 14/11: GPS, αλλιώς από τα βήματα με «≈» (ίδιος κανόνας με το ρολόι και τη σύνοψη).
+    final d = liveMeters(l);
+    final m = d?.meters ?? 0;
     final bpm = (l['bpm'] as num?)?.toInt() ?? 0;
     final paused = l['paused'] == true;
     return _frame(
@@ -338,7 +341,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           ),
           const SizedBox(width: 12),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(m > 0 ? '${dec(m / 1000, 2)} km' : '—',
+            Text(d == null ? '—' : '${d.approx ? '≈ ' : ''}${kmText(m)} km',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
             Text(m < 50 || sec <= 0 ? '' : paceText(sec / (m / 1000)),
                 style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular)),
@@ -435,7 +438,8 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           if (s.isCardio) ...[
             // round1, U6-06: «λεπτά», όχι «λ».
             stat('${s.cardioMinutes ?? s.duration.inMinutes}', (s.cardioMinutes ?? s.duration.inMinutes) == 1 ? 'λεπτό' : 'λεπτά', 'διάρκεια'),
-            stat(s.meters == null ? '—' : dec(s.meters! / 1000, 2), s.meters == null ? '' : 'km', 'απόσταση'),
+            // 14/11: όχι «0,00 km» όταν δεν μετρήθηκε απόσταση· από τα βήματα με «≈» ([kmValue]).
+            stat(kmValue(s) ?? '—', kmValue(s) == null ? '' : 'km', 'απόσταση'),
             stat(s.hrAvg == null ? '—' : '${s.hrAvg}', s.hrAvg == null ? '' : 'bpm', 'μέσοι παλμοί'),
           ] else ...[
             stat('${s.duration.inMinutes}', s.duration.inMinutes == 1 ? 'λεπτό' : 'λεπτά', 'διάρκεια'),

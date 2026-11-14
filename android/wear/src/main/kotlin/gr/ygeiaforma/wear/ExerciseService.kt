@@ -903,6 +903,7 @@ class ExerciseService : Service() {
                     .put("paused", Repo.paused).put("rec", Repo.recoveryUntil > 0)
                 // 14/11: και η απόσταση από τα βήματα, για την κάρτα του κινητού χωρίς GPS.
                 estMeters(Repo.steps, Repo.stride).takeIf { it >= 10 }?.let { o.put("mest", Math.round(it)) }
+                o.put("gps", Repo.gps)
                 scope.launch { Link.sendJson(this@ExerciseService, Paths.LIVE, o) }
             }
             // ✓ του ρολογιού που δεν έφτασαν στο κινητό: ξανά, ανά 10″ (το κινητό αγνοεί όσα έχει ήδη· έλεγχος #2).

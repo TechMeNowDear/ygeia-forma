@@ -65,11 +65,12 @@ List<KmSplit> walkSplits(Session s) {
   return out;
 }
 
-/// Ρυθμός (δευτερόλεπτα ανά km), από ενεργό χρόνο και απόσταση· null αν λείπουν ή η απόσταση < 100 m.
+/// Ρυθμός (δευτερόλεπτα ανά km), από ενεργό χρόνο και την απόσταση που δείχνουμε ([shownMeters]: GPS, αλλιώς από τα
+/// βήματα με «≈»)· null αν λείπουν ή η απόσταση < 100 m.
 int? paceSecPerKm(Session s) {
-  final m = s.meters, t = s.cardioSec ?? (s.cardioMinutes == null ? null : s.cardioMinutes! * 60);
-  if (m == null || t == null || m < 100 || t <= 0) return null;
-  return (t / (m / 1000)).round();
+  final d = shownMeters(s), t = s.cardioSec ?? (s.cardioMinutes == null ? null : s.cardioMinutes! * 60);
+  if (d == null || t == null || d.meters < 100 || t <= 0) return null;
+  return (t / (d.meters / 1000)).round();
 }
 
 /// Βήματα ανά λεπτό (ενεργός χρόνος)· null αν λείπουν.
@@ -79,18 +80,57 @@ int? cadence(Session s) {
   return (st / (t / 60)).round();
 }
 
-/// Χωρίς GPS (έλεγχος 9/11, RT-12): η απόσταση βγαίνει από τα βήματα, άρα «≈».
-bool distanceFromSteps(Session s) => s.isCardio && s.gps == false;
+/// Η απόσταση που δείχνουμε (m) και αν είναι εκτίμηση από τα βήματα («≈»), ή null αν δεν μετρήθηκε. Ίδιος κανόνας με
+/// το ρολόι (Protocol.kt: shownDistance, 14/11): του GPS όταν μέτρησε (τουλάχιστον 10 m και τουλάχιστον η μισή της
+/// εκτίμησης από τα βήματα), αλλιώς η εκτίμηση ([Session.metersEst]: βήματα × μήκος βήματος). Χωρίς GPS (κλειστή
+/// τοποθεσία) την απόσταση τη βγάζει το ρολόι από τα βήματα: κι αυτή «≈».
+({double meters, bool approx})? pickMeters(double m, double est, bool? gps) {
+  if (m >= 10 && (gps == false || est < 10 || m >= est * 0.5)) return (meters: m, approx: gps == false);
+  if (est >= 10) return (meters: est, approx: true);
+  return null;
+}
 
-/// Απόσταση σε km για τις οθόνες: «2,31», «≈ 2,31» χωρίς GPS, «—» όταν δεν μετρήθηκε απόσταση (RT-18: πριν «0,00»).
-/// Δοκιμή στις συσκευές 14/11: περπάτημα μέσα στο σπίτι, GPS ανοιχτό αλλά χωρίς σήμα, 812 βήματα και 0 m: η σύνοψη
-/// έγραφε «0,00 km», σαν να μην περπάτησες, ενώ η κάρτα την ώρα του περπατήματος έγραφε «—». Κάτω από 10 m η απόσταση
-/// δεν μετρήθηκε (ή είναι θόρυβος του GPS): «—» παντού.
+({double meters, bool approx})? shownMeters(Session s) => s.isCardio ? pickMeters(s.meters ?? 0, s.metersEst ?? 0, s.gps) : null;
+
+/// Ο ίδιος κανόνας για τα «ζωντανά» του ρολογιού («m», «mest», «gps»).
+({double meters, bool approx})? liveMeters(Map<String, dynamic> l) =>
+    pickMeters((l['m'] as num?)?.toDouble() ?? 0, (l['mest'] as num?)?.toDouble() ?? 0, l['gps'] is bool ? l['gps'] as bool : null);
+
+/// Η απόσταση βγήκε από τα βήματα (έλεγχος 9/11, RT-12· 14/11 και μέσα στο σπίτι με GPS χωρίς σήμα): «≈».
+bool distanceFromSteps(Session s) => s.isCardio && (shownMeters(s)?.approx ?? s.gps == false);
+
+/// «2,31» από μέτρα.
+String kmText(double meters) => (meters / 1000).toStringAsFixed(2).replaceAll('.', ',');
+
+/// Απόσταση σε km για τις οθόνες: «2,31», «≈ 2,31» από τα βήματα, «—» (null) όταν δεν μετρήθηκε απόσταση (RT-18: πριν
+/// «0,00»). Δοκιμή στις συσκευές 14/11: μέσα στο σπίτι, GPS ανοιχτό χωρίς σήμα, 812 βήματα και 0 m: η σύνοψη έγραφε
+/// «0,00 km», σαν να μην περπάτησες. Τώρα: «≈» από τα βήματα (ρολόι από #114), αλλιώς «—».
 String? kmValue(Session s) {
-  final m = s.meters;
-  if (m == null || m < 10) return null;
-  final v = (m / 1000).toStringAsFixed(2).replaceAll('.', ',');
-  return distanceFromSteps(s) ? '≈ $v' : v;
+  final d = shownMeters(s);
+  if (d == null) return null;
+  return d.approx ? '≈ ${kmText(d.meters)}' : kmText(d.meters);
+}
+
+/// Το μήκος του βήματος (m) για την απόσταση χωρίς GPS (14/11): από τα δικά σου περπατήματα με GPS (μέτρα ÷ βήματα,
+/// τα τελευταία ως 5 με τουλάχιστον 500 m και 500 βήματα), αλλιώς από το ύψος: περίπου 0,415 × ύψος στους άνδρες και
+/// 0,413 στις γυναίκες (πρόχειρος κανόνας με απόκλιση ±10%· γι' αυτό φαίνεται με «≈»). null χωρίς τίποτα από τα δύο.
+double? strideFor(List<Session> sessions, {double? heightCm, String? sex}) {
+  var m = 0.0, st = 0;
+  var n = 0;
+  for (final s in sessions.reversed) {
+    if (n >= 5) break;
+    if (!s.isCardio || !s.finished || s.gps != true || (s.activity ?? 'walk') != 'walk') continue;
+    final mm = s.meters ?? 0, ss = s.steps ?? 0;
+    if (mm < 500 || ss < 500) continue;
+    final r = mm / ss;
+    if (r < 0.4 || r > 1.2) continue; // GPS που «πήδηξε» ή βήματα που δεν μετρήθηκαν
+    m += mm;
+    st += ss;
+    n++;
+  }
+  if (st > 0) return m / st;
+  if (heightCm == null || heightCm < 120 || heightCm > 230) return null;
+  return heightCm / 100 * (sex == 'f' ? 0.413 : 0.415);
 }
 /// Ο ρυθμός γράφεται με το [paceText] του format.dart («11:15 /km»).
 

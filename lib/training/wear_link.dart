@@ -47,6 +47,9 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     if (t.hrLimit != null) 'hrLimit': t.hrLimit,
     // Ζώνη περπατήματος (12/11). Νέο πεδίο: το παλιό ρολόι το αγνοεί. Το όριο γιατρού, αν υπάρχει, νικά στο ρολόι.
     if (t.zone != null) 'zone': t.zone!.toJson(),
+    // 14/11: φωνή στην άσκηση και μήκος βήματος (απόσταση χωρίς GPS). Νέα πεδία: το παλιό ρολόι τα αγνοεί.
+    'voice': t.voice,
+    if (t.stride != null) 'stride': t.stride,
     if (p?.forDay(now) != null) 'today': p!.forDay(now)!.id,
     // Οι μέρες, για να βρίσκει το ρολόι μόνο του τη σημερινή (και αν το κινητό δεν άνοιξε σήμερα).
     if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},

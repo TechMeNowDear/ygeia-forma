@@ -128,6 +128,10 @@ String restoreNotReadText({required bool errorsClosed}) => errorsClosed
         'Δοκίμασε ξανά.'
     : 'Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.';
 
+/// Η εξήγηση κάτω από τη «Φωνή στην άσκηση» (14/11).
+const voiceSettingText = 'Από το ρολόι: κάθε χιλιόμετρο, «Εκτός εύρους», παύση, επόμενο σετ. Στα ακουστικά σου '
+    '(του κινητού ή του ρολογιού), αλλιώς από το ρολόι· η μουσική χαμηλώνει για λίγο.';
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
   final HealthStore store;
@@ -186,6 +190,27 @@ class SettingsPage extends StatelessWidget {
                           title: 'Κάρτες της «Σήμερα»',
                           subtitle: 'Τι εμφανίζεται',
                           onTap: () => push('Κάρτες της Σήμερα', (_) => TodayCardsPage(store: store)),
+                        ),
+                        // 14/11 (αίτημα χρήστη): φωνή από το ρολόι στην άσκηση. Ανοιχτή από προεπιλογή· κλείνει εδώ (π.χ. σε
+                        // σύσκεψη). Πάει στο ρολόι με το πρόγραμμα.
+                        ListenableBuilder(
+                          listenable: TrainingStore.main,
+                          builder: (context, _) {
+                            final t = TrainingStore.main;
+                            final ready = t.ready && !t.readError;
+                            return SettingsRow(
+                              key: const ValueKey('settings-voice'),
+                              icon: Icons.record_voice_over_outlined,
+                              title: 'Φωνή στην άσκηση',
+                              subtitle: voiceSettingText,
+                              trailing: Switch(
+                                key: const ValueKey('settings-voice-switch'),
+                                value: ready && t.voice,
+                                onChanged: ready ? t.setVoice : null,
+                              ),
+                              onTap: ready ? () => t.setVoice(!t.voice) : null,
+                            );
+                          },
                         ),
                       ]),
                       const SettingsSection('Απόρρητο'),

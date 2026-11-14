@@ -46,7 +46,8 @@ class R1F7Test {
         val service = source("ExerciseService.kt")
         val at = service.indexOf("if (recoveryEndBuzz(Repo.recoveryUntil, now, skipped = false)) {")
         assertTrue(at > 0)
-        val branch = service.substring(at, at + 220)
+        // 14/11: πριν από το «τέλος» και η φωνή «Οι παλμοί σου έπεσαν …» (γι' αυτό πιο μεγάλο κομμάτι).
+        val branch = service.substring(at, at + 520)
         assertTrue(branch, branch.contains("vibrate(longArrayOf(0, 250, 150, 250))"))
         assertTrue(branch, branch.indexOf("vibrate(") < branch.indexOf("finish()"))
     }

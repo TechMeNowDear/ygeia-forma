@@ -12,8 +12,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/pages/training/hr_widgets.dart';
 import 'package:ygeia_forma/pages/training/training_page.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/pages/settings.dart' show voiceSettingText;
 import 'package:ygeia_forma/training/session.dart';
+import 'package:ygeia_forma/training/training_store.dart';
 import 'package:ygeia_forma/training/walk_stats.dart';
+import 'package:ygeia_forma/training/wear_link.dart' show watchPlan;
+import 'package:ygeia_forma/training/zone.dart' show zoneHoldSec;
 
 Session _walk({
   required List<List<int>> hr,
@@ -24,6 +28,7 @@ Session _walk({
   int? hrGap,
   int? hrDel,
   int? lim,
+  double? est,
 }) =>
     Session(
       id: 'w1',
@@ -35,6 +40,7 @@ Session _walk({
       cardioMinutes: 7,
       cardioSec: 428,
       meters: meters,
+      metersEst: est,
       steps: steps,
       gps: gps,
       hr: hr,
@@ -143,6 +149,93 @@ void main() {
       expect(src, isNot(contains('talk-test-not-near')));
       expect(src, isNot(contains('Η ερώτηση έρχεται σε περπάτημα που φτάνει εκεί')));
       expect(src, contains('if (talkSeconds(s, s.zoneHi!).near < talkNearMinSec) return false;'));
+    });
+  });
+
+  group('5. απόσταση από τα βήματα (ρολόι από #114)', () {
+    test('μέσα στο σπίτι: «≈» από τα βήματα· έξω: GPS· ίδιος κανόνας με το ρολόι', () {
+      // 812 βήματα × 0,72 ≈ 584 m, GPS ανοιχτό χωρίς σήμα.
+      final indoor = _walk(hr: const [], meters: 0, steps: 812, est: 584);
+      expect(kmValue(indoor), '≈ 0,58');
+      expect(distanceFromSteps(indoor), isTrue);
+      // Ρυθμός από την εκτίμηση: 428″ για 0,584 km ≈ 733″/km, με «≈» (distanceFromSteps).
+      expect(paceSecPerKm(indoor), (428 / 0.584).round());
+      // Έξω: GPS 2.180 m, εκτίμηση 2.088: το GPS, χωρίς «≈».
+      final out = _walk(hr: const [], meters: 2180, steps: 2900, est: 2088);
+      expect(kmValue(out), '2,18');
+      expect(distanceFromSteps(out), isFalse);
+      // Θόρυβος του GPS (6 m): η εκτίμηση.
+      expect(kmValue(_walk(hr: const [], meters: 6, steps: 812, est: 584)), '≈ 0,58');
+      // GPS που έπιασε αργά (200 από 2.088): η εκτίμηση.
+      expect(kmValue(_walk(hr: const [], meters: 200, steps: 2900, est: 2088)), '≈ 2,09');
+      // Παλιό ρολόι (χωρίς «mest»): «—».
+      expect(kmValue(_walk(hr: const [], meters: 0, steps: 812)), isNull);
+      // Ποτέ στην Πρόοδο (μόνο GPS ≥ 500 m).
+      expect(indoor.toJson()['mest'], 584);
+      expect(Session.fromJson(indoor.toJson()).metersEst, 584);
+    });
+
+    test('ζωντανά: ίδιος κανόνας', () {
+      expect(liveMeters({'m': 0, 'mest': 584, 'gps': true}), (meters: 584.0, approx: true));
+      expect(liveMeters({'m': 2180, 'mest': 2088, 'gps': true}), (meters: 2180.0, approx: false));
+      expect(liveMeters({'m': 0}), isNull);
+      expect(liveMeters({'m': 1500, 'gps': false}), (meters: 1500.0, approx: true));
+    });
+
+    test('μήκος βήματος: από τα περπατήματα με GPS, αλλιώς από το ύψος', () {
+      Session w(int day, {double m = 2000, int steps = 2800, bool gps = true}) => Session(
+          id: 'w$day', workout: 'walk', name: 'Π', programId: '', start: DateTime(2026, 11, day, 18), end: DateTime(2026, 11, day, 18, 30),
+          cardioMinutes: 30, meters: m, steps: steps, gps: gps);
+      // Δύο περπατήματα με GPS: (2.000 + 2.100) / (2.800 + 2.900).
+      expect(strideFor([w(1), w(2, m: 2100, steps: 2900)], heightCm: 180, sex: 'm'), closeTo(4100 / 5700, 1e-9));
+      // Χωρίς GPS (ή πολύ μικρό): από το ύψος, 1,80 × 0,415.
+      expect(strideFor([w(1, gps: false), w(2, m: 300)], heightCm: 180, sex: 'm'), closeTo(0.747, 1e-9));
+      expect(strideFor(const [], heightCm: 170, sex: 'f'), closeTo(1.70 * 0.413, 1e-9));
+      expect(strideFor(const []), isNull);
+      // GPS που «πήδηξε» (1,5 m το βήμα): αγνοείται.
+      expect(strideFor([w(1, m: 4200, steps: 2800)], heightCm: 180, sex: 'm'), closeTo(0.747, 1e-9));
+    });
+
+    test('πρόγραμμα προς το ρολόι: φωνή και μήκος βήματος· γράφονται στο αρχείο', () async {
+      final t = TrainingStore(io: MemoryTrainingIO(), clock: () => DateTime(2026, 11, 14, 17))..ready = true;
+      var plan = watchPlan(t, DateTime(2026, 11, 14, 17), (x) => x);
+      expect(plan['voice'], isTrue);
+      expect(plan.containsKey('stride'), isFalse);
+      t.setVoice(false);
+      t.setStride(0.7234);
+      plan = watchPlan(t, DateTime(2026, 11, 14, 17), (x) => x);
+      expect(plan['voice'], isFalse);
+      expect(plan['stride'], 0.72);
+      final j = t.toJson();
+      expect(j['voice'], isFalse);
+      expect(j['stride'], 0.72);
+      final back = TrainingStore(io: MemoryTrainingIO(), clock: () => DateTime(2026, 11, 14, 17))..replaceAll(j);
+      expect(back.voice, isFalse);
+      expect(back.stride, 0.72);
+      // Μικρή αλλαγή (κάτω από 1 cm): δεν ξαναγράφεται.
+      t.setStride(0.7249);
+      expect(t.stride, 0.72);
+    });
+
+    test('αποτέλεσμα του ρολογιού: «mest»', () {
+      final t = TrainingStore(io: MemoryTrainingIO(), clock: () => DateTime(2026, 11, 14, 17))..ready = true;
+      final start = DateTime(2026, 11, 14, 16, 11).millisecondsSinceEpoch;
+      t.importWatch({
+        'v': 1, 'kind': 'cardio', 'id': 'walk$start', 'w': 'walk', 'name': 'Περπάτημα', 'start': start, 'end': start + 428000,
+        'cardio': {'activity': 'walk', 'sec': 428, 'm': 0.0, 'steps': 812, 'gps': true, 'mest': 584},
+      });
+      final s = t.sessions.single;
+      expect(s.metersEst, 584);
+      expect(kmValue(s), '≈ 0,58');
+    });
+  });
+
+  group('6. ζώνη και φωνή', () {
+    test('5 δευτερόλεπτα· διακόπτης φωνής στις Ρυθμίσεις', () {
+      expect(zoneHoldSec, 5);
+      expect(voiceSettingText, contains('«Εκτός εύρους»'));
+      final settings = File('lib/pages/settings.dart').readAsStringSync();
+      expect(settings, contains("key: const ValueKey('settings-voice-switch')"));
     });
   });
 }
