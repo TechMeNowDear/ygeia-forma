@@ -304,7 +304,8 @@ bool legumesByName(Food f) {
   ];
   bool has(List<String> stems) => words.any((w) => stems.any(w.startsWith));
   if (has(_dryNot) || has(_pastaNames) || has(const ['pasta'])) return false;
-  return has(const ['κουκι']);
+  // Round13 (R13-E1-1): μόνο οι λέξεις «κουκί/κουκιά», όχι κάθε λέξη που αρχίζει από «κουκι» («Κουκίδες σοκολάτας»).
+  return words.any((w) => w == 'κουκι' || w == 'κουκια');
 }
 
 // Κατηγορίες του Open Food Facts (πεδίο «categories_tags», αγγλικά ονόματα της ταξινομίας του) για το ΙΔΙΟ το τρόφιμο.

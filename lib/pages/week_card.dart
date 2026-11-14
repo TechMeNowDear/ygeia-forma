@@ -65,6 +65,7 @@ class WeekCard extends StatelessWidget {
       // στη λέξη. Τώρα, όταν δεν χωρούν, μία στήλη, όπως στο κινητό (και πάνω από 1,3× τα «χάπια» κάτω από τις τιμές).
       child: LayoutBuilder(builder: (context, box) {
         final wide = box.maxWidth >= 600;
+        final stackPills = MediaQuery.textScalerOf(context).scale(10) > 10.05;
         final valueCol = ((box.maxWidth - 24) / 2 - 26) / 2 - 2;
         final wideRows = box.maxWidth >= 520 &&
             wordsFit(context, [for (final t in shown) metricLabel(t.def, t.source)], const TextStyle(fontSize: 14), valueCol) &&
@@ -146,9 +147,12 @@ class WeekCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _WeekRow(t: shown[i])),
+                    // Round 13 (R13-E1-2): ο έλεγχος [wideRows] υποθέτει ότι το «χάπι» παίρνει το πολύ τη μισή γραμμή· τα άλλα
+                    // «χάπια» («45 λεπτά αργότερα», «Αλλαγή πηγής») δεν στενεύουν, οπότε από 1,1× η στήλη της τιμής έμενε
+                    // στενότερη και το «προηγούμενες:» κοβόταν. Πάνω από 1× το «χάπι» πάει κάτω από την τιμή.
+                    Expanded(child: _WeekRow(t: shown[i], forceStack: stackPills)),
                     const SizedBox(width: 24),
-                    Expanded(child: i + 1 < shown.length ? _WeekRow(t: shown[i + 1]) : const SizedBox()),
+                    Expanded(child: i + 1 < shown.length ? _WeekRow(t: shown[i + 1], forceStack: stackPills) : const SizedBox()),
                   ],
                 ),
               ],
@@ -222,8 +226,11 @@ class _Highlight extends StatelessWidget {
 }
 
 class _WeekRow extends StatelessWidget {
-  const _WeekRow({required this.t});
+  const _WeekRow({required this.t, this.forceStack = false});
   final TrendResult t;
+
+  /// Round 13 (R13-E1-2): στις δύο στήλες του ανοιχτού Fold το «χάπι» κάτω από την τιμή ήδη πάνω από 1×.
+  final bool forceStack;
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +245,7 @@ class _WeekRow extends StatelessWidget {
     // «προηγούμενες:» (Inter 12,5 στα 2×: ~181 dp) και το «13 λεπτά» (έντονα 16, ~147 dp) κόβονταν μέσα στη λέξη. Ως 1,3× η
     // στενότερη στήλη του κινητού (360 dp, «Λίγες μέρες…»: ~133 dp) χωρά το «προηγούμενες:» (~121 dp)· στο ανοιχτό Fold, όπου
     // δεν χωρά δίπλα στο «χάπι», οι γραμμές πάνε σε μία στήλη ([WeekCard]).
-    final stacked = MediaQuery.textScalerOf(context).scale(10) > 13.01;
+    final stacked = forceStack || MediaQuery.textScalerOf(context).scale(10) > 13.01;
     final Widget pill = t.inconclusive ? TrendPill(inconclusiveText(t.def), maxLines: 2) : TrendStatusPill(r: t);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
