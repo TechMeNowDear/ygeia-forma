@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../sources.dart';
 import '../ti_ftanei.dart';
 import '../training/training_store.dart';
+import '../training/wear_link.dart' show WearLink, ymd;
 import '../widgets.dart';
 import 'appearance.dart';
 import 'devices_page.dart';
@@ -128,6 +129,41 @@ String restoreNotReadText({required bool errorsClosed}) => errorsClosed
         'Δοκίμασε ξανά.'
     : 'Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.';
 
+/// «Δοκιμή φωνής» (αίτημα χρήστη 15/11): πού ακούστηκε, από τον κωδικό του ρολογιού (android/wear/…/Protocol.kt:
+/// VoiceTest). Χωρίς κωδικό που να ξέρουμε: το ηχείο του ρολογιού (ό,τι κάνει το ρολόι όταν δεν το λέει αλλού).
+String voiceTestText(String code) => switch (code) {
+      'wh' => 'στα ακουστικά του ρολογιού',
+      'ph' => 'στα ακουστικά του κινητού',
+      'nv' => 'πουθενά: δεν βρέθηκε φωνή στο ρολόι',
+      'mu' => 'πουθενά: το ρολόι δεν πήρε άδεια να μιλήσει',
+      'm0' => 'πουθενά: η ένταση πολυμέσων του ρολογιού είναι στο μηδέν',
+      'bz' => 'δεν έγινε: έτρεχε άσκηση στο ρολόι',
+      _ => 'από το ηχείο του ρολογιού',
+    };
+
+/// Η γραμμή κάτω από το «Δοκιμή φωνής»: γιατί δεν πατιέται, ή τι έγινε την τελευταία φορά, ή τι κάνει.
+String voiceTestSubtitle({
+  required bool voiceOn,
+  required bool watchNear,
+  required bool watchKnows,
+  required ({DateTime at, String code})? last,
+  required DateTime now,
+}) {
+  if (!voiceOn) return 'Άνοιξε πρώτα τη «Φωνή στην άσκηση».';
+  if (!watchNear) return 'Χρειάζεται το ρολόι κοντά, με την εφαρμογή.';
+  if (!watchKnows) return 'Άνοιξε μία φορά την εφαρμογή στο ρολόι (χρειάζεται την έκδοση 119 ή νεότερη).';
+  if (last != null) {
+    final at = last.at;
+    final when = ymd(at) == ymd(now) ? hm(at) : '${at.day}/${at.month} ${hm(at)}';
+    return 'Τελευταία δοκιμή $when: ${voiceTestText(last.code)}.';
+  }
+  return 'Το ρολόι λέει «Δοκιμή φωνής» όπως στο περπάτημα, για να ακούσεις από πού βγαίνει.';
+}
+
+/// Μόλις πατηθεί: τι κάνει τώρα ο χρήστης. Η εφαρμογή του κινητού πρέπει να είναι κλειστή, όπως στο περπάτημα.
+const voiceTestGoText = 'Πάτα τώρα το κουμπί της αρχικής οθόνης. Σε 10 δευτερόλεπτα θα ακούσεις «Δοκιμή φωνής». '
+    'Μετά άνοιξε ξανά την εφαρμογή: εδώ θα γράφει από πού ακούστηκε.';
+
 /// Η εξήγηση κάτω από τη «Φωνή στην άσκηση» (14/11).
 // Round 14 (U9): πιο σύντομο (πριν 5 γραμμές στα 400 dp), και το «ρολόι» μία φορά, με ένα νόημα.
 const voiceSettingText = 'Κάθε χιλιόμετρο, «Εκτός εύρους», παύση, επόμενο σετ. Στα ακουστικά σου, αλλιώς στο ηχείο του '
@@ -210,6 +246,48 @@ class SettingsPage extends StatelessWidget {
                                 onChanged: ready ? t.setVoice : null,
                               ),
                               onTap: ready ? () => t.setVoice(!t.voice) : null,
+                            );
+                          },
+                        ),
+                        // 15/11 (αίτημα χρήστη): «Δοκιμή φωνής». Το ρολόι λέει τη φράση με τον δρόμο του περπατήματος ενώ η
+                        // εφαρμογή εδώ είναι κλειστή (όπως στο περπάτημα· με την εφαρμογή ανοιχτή θα έβγαινε πάντα στα
+                        // ακουστικά του κινητού και η δοκιμή θα έλεγε ψέματα). Το αποτέλεσμα έρχεται από το ρολόι.
+                        ListenableBuilder(
+                          listenable: Listenable.merge([
+                            TrainingStore.main,
+                            WearLink.main.ready,
+                            WearLink.main.watchVoiceTest,
+                            WearLink.main.voiceTest,
+                          ]),
+                          builder: (context, _) {
+                            final t = TrainingStore.main;
+                            final w = WearLink.main;
+                            final voiceOn = t.ready && !t.readError && t.voice;
+                            final can = voiceOn && w.ready.value && w.watchVoiceTest.value;
+                            return SettingsRow(
+                              key: const ValueKey('settings-voice-test'),
+                              icon: Icons.hearing_outlined,
+                              title: 'Δοκιμή φωνής',
+                              subtitle: voiceTestSubtitle(
+                                voiceOn: voiceOn,
+                                watchNear: w.ready.value,
+                                watchKnows: w.watchVoiceTest.value,
+                                last: w.voiceTest.value,
+                                now: DateTime.now(),
+                              ),
+                              onTap: can
+                                  ? () async {
+                                      final messenger = ScaffoldMessenger.of(context);
+                                      final ok = await w.startVoiceTest();
+                                      messenger.showSnackBar(SnackBar(
+                                        content: Text(ok
+                                            ? voiceTestGoText
+                                            : 'Δεν βρέθηκε το ρολόι. Άνοιξε την εφαρμογή στο ρολόι και ξαναδοκίμασε.'),
+                                        persist: false,
+                                        duration: const Duration(seconds: 10),
+                                      ));
+                                    }
+                                  : null,
                             );
                           },
                         ),

@@ -98,6 +98,26 @@ class WatchShotsTest {
         shot("W1d_home_third_workout") { it.chosen = "B" }
     }
 
+    /** «Δοκιμή φωνής» (15/11): η αντίστροφη μέτρηση και το αποτέλεσμα, σε όλη την οθόνη, ολόκληρα (και με γράμματα 1,3×). */
+    @Test
+    fun voiceTestScreens() {
+        Repo.applyPlan(Plan.parse(planJson))
+        Repo.screen = Repo.Screen.HOME
+        Repo.notice = VoiceTest.countdown(7)
+        Repo.openNotice = true
+        shot("W12a_voice_test_countdown")
+        Repo.notice = VoiceTest.result(VoiceTest.SPEAKER)
+        Repo.openNotice = true
+        shot("W12b_voice_test_result")
+        RuntimeEnvironment.setFontScale(1.3f)
+        Repo.notice = VoiceTest.countdown(10)
+        Repo.openNotice = true
+        shot("W12c_voice_test_countdown_font13")
+        RuntimeEnvironment.setFontScale(1f)
+        Repo.notice = null
+        Repo.openNotice = false
+    }
+
     /**
      * Γ3 (13/11): η ερώτηση πριν σταματήσει άσκηση άλλης εφαρμογής. Και τα δύο κουμπιά έχουν όνομα για το TalkBack,
      * περιοχή ≥ 40u (≈ 48 dp) που δεν ακουμπά την άλλη, και κάνουν αυτό που γράφουν.

@@ -130,10 +130,31 @@ class Voice private constructor(private val ctx: Context) {
         }
     }
 
-    /** Λέει τη φράση [p] (ελληνικά, αγγλικά) εκεί που θα την ακούσεις. [askPhone]: το κινητό ξέρει να απαντά. */
-    fun say(p: Pair<String, String>, askPhone: Boolean) {
-        if (headsetHere() || !askPhone) {
+    /** Το σύστημα του ρολογιού επέτρεψε την τελευταία φορά να χαμηλώσει η μουσική και να μιλήσει (null: δεν ζητήθηκε). */
+    var focusOk: Boolean? = null
+        private set
+
+    /** Πριν από τη «Δοκιμή φωνής»: να κριθεί μόνο η δική της φράση. */
+    fun forgetFocus() {
+        focusOk = null
+    }
+
+    /** Ένταση πολυμέσων του ρολογιού στο μηδέν (τότε η φωνή εδώ δεν ακούγεται). */
+    fun mediaMuted(): Boolean = try {
+        am?.getStreamVolume(AudioManager.STREAM_MUSIC) == 0
+    } catch (_: Exception) {
+        false
+    }
+
+    /**
+     * Λέει τη φράση [p] (ελληνικά, αγγλικά) εκεί που θα την ακούσεις. [askPhone]: το κινητό ξέρει να απαντά. [onRoute]: πού
+     * πήγε (για τη «Δοκιμή φωνής», [VoiceTest]).
+     */
+    fun say(p: Pair<String, String>, askPhone: Boolean, onRoute: ((VoiceRoute) -> Unit)? = null) {
+        val headset = headsetHere()
+        if (headset || !askPhone) {
             speakHere(p)
+            onRoute?.invoke(if (headset) VoiceRoute.WATCH_HEADSET else VoiceRoute.WATCH)
             return
         }
         scope.launch {
@@ -147,6 +168,7 @@ class Voice private constructor(private val ctx: Context) {
                 Link.detach(ctx)
             }
             if (phone) phoneCount++ else speakHere(p)
+            onRoute?.invoke(if (phone) VoiceRoute.PHONE else VoiceRoute.WATCH)
         }
     }
 
@@ -238,9 +260,10 @@ class Voice private constructor(private val ctx: Context) {
         val a = am ?: return
         val r = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK).setAudioAttributes(attrs).build()
         focus = r
-        try {
-            a.requestAudioFocus(r)
+        focusOk = try {
+            a.requestAudioFocus(r) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         } catch (_: Exception) {
+            null
         }
     }
 

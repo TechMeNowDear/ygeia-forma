@@ -44,12 +44,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Άνοιγμα από το κινητό όταν ξεκινά προπόνηση εκεί. -->
+            <!-- Άνοιγμα από το κινητό όταν ξεκινά προπόνηση εκεί, και για τη «Δοκιμή φωνής» (15/11). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="ygeiaforma-wear" android:host="session" />
+                <data android:scheme="ygeiaforma-wear" android:host="voicetest" />
             </intent-filter>
         </activity>
 
