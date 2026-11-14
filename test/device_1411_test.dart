@@ -253,10 +253,10 @@ void main() {
       final i = src.indexOf("...section('Κίνηση', move),");
       final j = src.indexOf("...section('Καρδιά', heart),");
       final k = src.indexOf("...section('Σώμα', body),");
-      final f = src.indexOf("if (foodCard != null) ...[const SectionHeader('Διατροφή'), foodCard],");
+      final f = src.indexOf('if (foodCard != null) foodCard,', k);
       expect(i > 0 && i < j && j < k && k < f, isTrue);
-      // Παλμοί ξύπνιος: μόνο ολοκληρωμένη μέρα (όπως στην Καρδιά), με το «συνήθως».
-      expect(src, contains("title: datedTitle('Παλμοί ξύπνιος', last, now),"));
+      // Παλμοί ξύπνιος: μόνο ολοκληρωμένη μέρα (όπως στην Καρδιά), με τη μέρα σε δική της γραμμή.
+      expect(src, contains("subtitle: last == null ? null : shortDayDate(last),"));
     });
   });
 }
