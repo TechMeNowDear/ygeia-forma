@@ -105,7 +105,7 @@ class _SessionPageState extends State<SessionPage> {
     super.initState();
     final s = t.current;
     if (s != null) {
-      final i = s.items.indexWhere((e) => !e.skipped && !e.complete);
+      final i = s.items.indexWhere((e) => !e.skipped && !e.rowsDone);
       t.setFocusQuiet(i < 0 ? (s.items.isEmpty ? 0 : s.items.length - 1) : i);
     }
     TrainingDevice.keepOn(true);
@@ -244,7 +244,7 @@ class _SessionPageState extends State<SessionPage> {
               final wide = k.maxWidth >= 720;
               final ex = _exerciseCard(context, s, e);
               // round1, U6-24: το ζέσταμα πριν από το 1ο σετ και η αποθεραπεία μετά το τελευταίο, πάνω από την άσκηση.
-              final allDone = s.items.every((x) => x.skipped || x.complete);
+              final allDone = s.items.every((x) => x.skipped || x.rowsDone);
               final routineRow = routine == null
                   ? null
                   : s.setsDone == 0 && routine.warmup.isNotEmpty
@@ -404,8 +404,10 @@ class _SessionPageState extends State<SessionPage> {
       final e = s.items[i];
       final on = i == _idx;
       final done = e.done.length;
-      final status = e.skipped ? '—' : '$done/${e.sets}';
-      final finished = e.complete || e.skipped;
+      // R9-U3-08: με το «+ Σετ» μετρούν και οι γραμμές που πρόσθεσες («3/4», όχι πράσινο «3/3» με ένα σετ ακόμα).
+      final rows = e.log.length > e.sets ? e.log.length : e.sets;
+      final status = e.skipped ? '—' : '$done/$rows';
+      final finished = e.rowsDone || e.skipped;
       return Padding(
         key: _chipKeys.putIfAbsent(i, () => GlobalKey()),
         padding: vertical ? const EdgeInsets.only(bottom: 8) : const EdgeInsets.only(right: 8),
@@ -427,7 +429,7 @@ class _SessionPageState extends State<SessionPage> {
                 else
                   Text(exName(e.ex), style: TextStyle(fontSize: 14, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: finished && !on ? c.textSecondary : c.text)),
                 const SizedBox(width: 8),
-                Text(status, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: e.complete ? c.good : c.textSecondary)),
+                Text(status, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: e.rowsDone ? c.good : c.textSecondary)),
               ]),
             ),
           ),
@@ -829,14 +831,16 @@ class _SessionPageState extends State<SessionPage> {
       if (rir != null) _calibrate(context, e, rir);
     }
     if (gone()) return;
-    if (e.complete) {
+    // R9-U3-08: η άσκηση τελειώνει όταν γίνουν ΟΛΕΣ οι γραμμές, και όσες πρόσθεσε το «+ Σετ» ([ExLog.rowsDone]), όπως
+    // στο ρολόι: πριν, το ✓ του 3ου από 4 σετ ρωτούσε «Τελευταίο σετ» και πήγαινε στην επόμενη άσκηση.
+    if (e.rowsDone) {
       if (e.rirAnswer == null) {
         final rir = await _ask(context, first: false, e: e);
         if (gone()) return;
         if (rir != null && rir >= 0) t.answer(e, rir);
       }
       if (gone()) return;
-      final next = s.items.indexWhere((x) => !x.skipped && !x.complete);
+      final next = s.items.indexWhere((x) => !x.skipped && !x.rowsDone);
       if (next >= 0) {
         setState(() => _idx = next);
         _rest(e, exName(s.items[next].ex));
@@ -1096,7 +1100,7 @@ class _SessionPageState extends State<SessionPage> {
   Widget _actions(BuildContext context, Session s, ExLog e) {
     final c = Aigaio.of(context);
     // round1, U5-08: όταν όλες οι ασκήσεις έγιναν (και με άλλη σειρά), το κουμπί λέει «Τέλος προπόνησης».
-    final allDone = s.items.every((x) => x.skipped || x.complete);
+    final allDone = s.items.every((x) => x.skipped || x.rowsDone);
     final last = (allDone && !s.isFree) || _idx >= s.items.length - 1;
     // Μικρό εσωτερικό περιθώριο: στο στενό κινητό οι λέξεις χωράνε σε μία γραμμή.
     const pad = EdgeInsets.symmetric(horizontal: 6);
@@ -1284,13 +1288,17 @@ class _SessionPageState extends State<SessionPage> {
       return;
     }
     // Νωρίτερα από το πρόγραμμα: ερώτηση, για να μη γραφτεί κατά λάθος μισή προπόνηση (η πρόοδος βγαίνει από αυτή).
-    final total = s.items.where((e) => !e.skipped).fold<int>(0, (a, e) => a + e.sets);
-    if (s.setsDone < total) {
+    // R9-A6-5: ανά άσκηση, όχι με το σύνολο: ένα «+ Σετ» σε άλλη άσκηση δεν «καλύπτει» ένα σετ που λείπει. Μετρούν και οι
+    // γραμμές που πρόσθεσες και δεν έγιναν ([ExLog.rowsDone], R9-U3-08): χωρίς αυτές δεν έγινε η ερώτηση «Τελευταίο σετ».
+    final open = s.items.where((e) => !e.skipped && !e.rowsDone);
+    final total = s.items.where((e) => !e.skipped).fold<int>(0, (a, e) => a + (e.log.length > e.sets ? e.log.length : e.sets));
+    final did = s.items.where((e) => !e.skipped).fold<int>(0, (a, e) => a + e.done.length);
+    if (open.isNotEmpty) {
       final end = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Τελείωσες νωρίτερα;'),
-          content: Text('Έγιναν ${s.setsDone} από $total σετ. Όσα δεν έγιναν δεν μετράνε στην πρόοδο. Αν σταμάτησες από πόνο, '
+          content: Text('Έγιναν $did από $total σετ. Όσα δεν έγιναν δεν μετράνε στην πρόοδο. Αν σταμάτησες από πόνο, '
               'πάτα «Πόνεσα»: η επόμενη φορά της άσκησης βγαίνει πιο ελαφριά.'),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop('back'), child: const Text('Συνέχεια προπόνησης')),
@@ -1304,9 +1312,9 @@ class _SessionPageState extends State<SessionPage> {
       if (end == 'pain') {
         // Η άσκηση που φαίνεται (εκεί σταμάτησες)· αν είναι ήδη τελειωμένη, η πρώτη που δεν τελείωσε και έχει σετ.
         final shown = _idx >= 0 && _idx < s.items.length ? s.items[_idx] : null;
-        ExLog? painEx = shown != null && !shown.complete ? shown : null;
+        ExLog? painEx = shown != null && !shown.rowsDone ? shown : null;
         for (final x in s.items) {
-          if (painEx == null && !x.skipped && !x.complete && x.done.isNotEmpty) painEx = x;
+          if (painEx == null && !x.skipped && !x.rowsDone && x.done.isNotEmpty) painEx = x;
         }
         painEx ??= shown;
         if (painEx != null) await _painSheet(context, painEx);
@@ -1406,7 +1414,9 @@ class _SummaryPageState extends State<SummaryPage> {
     final c = Aigaio.of(context);
     // Με το ρολόι της αποθήκης (όχι της συσκευής), για να ταιριάζει με την αρχή της προπόνησης.
     // Ξεχασμένη προπόνηση: η διάρκεια ως το τελευταίο ✓, όπως θα γραφτεί με την «Αποθήκευση» (όχι 20 ώρες).
-    final mins = (s.end ?? (t.current == s && t.isStale(s) ? s.lastActivity : t.now)).difference(s.start).inMinutes;
+    // R9-A8-1: ο ίδιος κανόνας με το [TrainingStore.finish]: από το τελευταίο ✓ ([Session.lastTick]), όχι τη «Συνέχεια».
+    final stale = t.current == s && t.now.difference(s.lastTick) >= TrainingStore.staleAfter;
+    final mins = (s.end ?? (stale ? s.lastTick : t.now)).difference(s.start).inMinutes;
     final prog = t.program?.workout(s.workout);
 
     // R7-A6-4: «Την επόμενη φορά» όπως θα τη δώσει η επόμενη προπόνηση: με τα σετ και το εύρος του προγράμματος (όχι
@@ -1479,6 +1489,10 @@ class _SummaryPageState extends State<SummaryPage> {
       if (!shownNext.add(item.ex)) continue;
       final own = [for (final x in s.items) if (x.ex == item.ex) (s.start, x)];
       final history = widget.live ? [...own, ...t.historyOf(item.ex)] : t.historyOf(item.ex);
+      // R9-A6-8: σε σύνοψη παλιότερης προπόνησης, αν η άσκηση έγινε και αργότερα, ο στόχος «Την επόμενη φορά» βγαίνει
+      // από εκείνες τις μεταγενέστερες φορές και δεν αντιστοιχεί σε αυτή τη σύνοψη: δεν δείχνεται (ο σημερινός στόχος
+      // φαίνεται στην Άσκηση). Αν αυτή είναι η τελευταία φορά της άσκησης, ο στόχος είναι πράγματι ο επόμενος.
+      if (!widget.live && history.any((h) => h.$1.isAfter(s.start))) continue;
       final tg = nextTarget(item, history, t.now, caution: TrainingStore.isCaution(item.ex));
       final (col, arrow) = changeLook(context, tg.change);
       next.add(Padding(
@@ -1599,7 +1613,7 @@ class _SummaryPageState extends State<SummaryPage> {
       appBar: AppBar(
         title: Text(widget.live
             // round1, U5-11: ο χρήστης πάτησε ο ίδιος «Τέλος»· όχι «σταμάτησε», που μοιάζει με σφάλμα.
-            ? (s.items.every((e) => e.skipped || e.complete) ? 'Μπράβο, τελείωσες' : 'Τέλος προπόνησης')
+            ? (s.items.every((e) => e.skipped || e.rowsDone) ? 'Μπράβο, τελείωσες' : 'Τέλος προπόνησης')
             : '${shortDayDate(s.start)} · ${s.name}'),
         automaticallyImplyLeading: !widget.live,
       ),

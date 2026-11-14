@@ -140,7 +140,10 @@ void main() {
       expect((first.proposal!.current, first.proposal!.target), (2090, 2090));
     });
 
-    testWidgets('ο οδηγός στις 16/11: 2.090 kcal, 130 g, έως 14 g, πρώτη εκτίμηση «τη Δευτέρα 14 Δεκεμβρίου»', (t) async {
+    // Round 9 (R9-A1-3): ο οδηγός με τα επίπεδα της FAO/WHO/UNU 2004. «Μέτρια» 1,65: 1.683,75 × 1,65 = 2.778,19 − 440 →
+    // 2.340 (πριν, με 1,5: 2.090)· «Λίγη» 1,53: 2.576,14 − 440 → 2.140 (πριν, με 1,4: 1.920). Οι αποθηκευμένοι στόχοι
+    // ([_invGoals], 1,5) δεν αλλάζουν.
+    testWidgets('ο οδηγός στις 16/11: 2.340 kcal, 130 g, έως 15,6 g, πρώτη εκτίμηση «τη Δευτέρα 14 Δεκεμβρίου»', (t) async {
       final store = HealthStore()..setProfile(_inv);
       await _pump(t, GoalsWizard(store: store, now: DateTime(2026, 11, 16, 9)));
       await t.enterText(find.byKey(const ValueKey('wizard-kg')), '80');
@@ -153,9 +156,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
-      expect(find.text('2.090 kcal', findRichText: true), findsOneWidget);
+      expect(find.text('2.340 kcal', findRichText: true), findsOneWidget);
       expect(find.text('130 g'), findsOneWidget);
-      expect(find.text('έως 14 g · 6%'), findsOneWidget);
+      // Round 9 (R9-A3-2): το ακριβές όριο, 2.340 × 6% ÷ 9 = 15,6 → «έως 15,6 g».
+      expect(find.text('έως 15,6 g · 6%'), findsOneWidget);
       expect(find.text('80,0 kg · μέτρια κίνηση'), findsOneWidget);
       // S1-5 / S11-6 / U3b-2: η πρώτη εκτίμηση την 28η μέρα, όχι την 21η.
       expect(find.textContaining('τη Δευτέρα 14 Δεκεμβρίου'), findsOneWidget);
@@ -164,11 +168,11 @@ void main() {
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       final g = store.goals!;
-      expect((g.kcal, g.protein, g.satMax, g.since, g.kcalAdapt), (2090, 130, 14, '2026-11-16', null));
+      expect((g.kcal, g.protein, g.satMax, g.since, g.kcalAdapt, g.activity), (2340, 130, 16, '2026-11-16', null, 1.65));
       expect(firstEstimateDay(g), DateTime(2026, 12, 14));
     });
 
-    testWidgets('ο οδηγός με «Λίγη κίνηση»: 1.920 kcal, έως 13 g', (t) async {
+    testWidgets('ο οδηγός με «Λίγη κίνηση»: 2.140 kcal, έως 14,3 g', (t) async {
       final store = HealthStore()..setProfile(_inv);
       await _pump(t, GoalsWizard(store: store, now: DateTime(2026, 11, 16, 9)));
       await t.enterText(find.byKey(const ValueKey('wizard-kg')), '80');
@@ -185,8 +189,9 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
-      expect(find.text('1.920 kcal', findRichText: true), findsOneWidget);
-      expect(find.text('έως 13 g · 6%'), findsOneWidget);
+      expect(find.text('2.140 kcal', findRichText: true), findsOneWidget);
+      // Round 9 (R9-A3-2): 2.140 × 6% ÷ 9 = 14,27 → «έως 14,3 g».
+      expect(find.text('έως 14,3 g · 6%'), findsOneWidget);
       expect(find.text('80,0 kg · λίγη κίνηση'), findsOneWidget);
     });
   });
@@ -399,17 +404,18 @@ void main() {
         await t.tap(find.byKey(const ValueKey('wizard-next')));
         await t.pumpAndSettle();
       }
-      // Round 8 (R8-A1-1): η διόρθωση που ισχύει μένει και αλλάζει μόνο όσο ο τύπος. Τύπος πριν (92 kg): 2.775 − 506 =
-      // 2.269· τώρα (90 kg): 2.745 − 495 = 2.250· διαφορά −19 → −20: 1.800 → 1.780 (πριν 1.760 από «εκτίμηση − ρυθμός»).
-      expect(find.text('1.780 kcal', findRichText: true), findsOneWidget);
+      // Round 8 (R8-A1-1): η διόρθωση που ισχύει μένει και αλλάζει μόνο όσο ο τύπος. Round 9 (R9-A1-1): ίδιες απαντήσεις,
+      // ίδιος στόχος· το βάρος (92 → 90 kg) δεν τη μετακινεί, γιατί η εκτίμηση το μέτρησε ήδη (πριν: −20, 1.800 → 1.780).
+      expect(find.text('1.800 kcal', findRichText: true), findsOneWidget);
       expect(find.byKey(const ValueKey('wizard-from-data')), findsOneWidget);
-      expect(find.textContaining('ο τύπος μόνος θα έδινε 2.250 kcal'), findsOneWidget);
-      expect(find.text('Ο στόχος αλλάζει από 1.800 σε 1.780 kcal.'), findsOneWidget);
+      // R9-A1-3: ο τύπος με «Μέτρια» = 1,65: 1.830 × 1,65 = 3.019,5 − 495 → 2.520· η διόρθωση μένει (ίδια απάντηση).
+      expect(find.textContaining('ο τύπος μόνος θα έδινε 2.520 kcal'), findsOneWidget);
+      expect(find.byKey(const ValueKey('wizard-change')), findsNothing);
       expect(find.textContaining('Ο έλεγχος θερμίδων συνεχίζει όπως πριν'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       final g = store.goals!;
-      expect((g.kcal, g.kcalAdapt, g.tdeeEst, g.since, g.checkIn, g.kg), (1780, 1780, 2250.0, '2026-10-12', '2026-11-09', 90.0));
+      expect((g.kcal, g.kcalAdapt, g.tdeeEst, g.since, g.checkIn, g.kg), (1800, 1800, 2250.0, '2026-10-12', '2026-11-09', 90.0));
       expect(g.log.length, 1);
       // Μετά τον οδηγό: η σελίδα «Στόχοι» λέει την επόμενη Δευτέρα ελέγχου (16/11), όχι «πρώτη εκτίμηση».
       expect(find.text('Επόμενος έλεγχος: Δευτέρα 16 Νοεμβρίου'), findsOneWidget);
@@ -446,9 +452,10 @@ void main() {
         await t.pumpAndSettle();
       }
       final g = store.goals!;
-      // Round 8 (R8-A1-1): η διόρθωση μένει (1.800 − 2.269 του τύπου πριν = −469)· «ίδιο βάρος» με 90 kg: 2.745 − 469 →
-      // 2.280 (πριν 2.250 από την εκτίμηση).
-      expect((g.aim, g.since, g.checkIn, g.kcal), (GoalAim.keep, '2026-11-12', null, 2280));
+      // Round 8 (R8-A1-1): η διόρθωση μένει· αλλάζει μόνο όσο ο τύπος με τις νέες απαντήσεις. Round 9 (R9-A1-1): με το ίδιο
+      // βάρος (90 kg) και στις δύο πλευρές, «ίδιο βάρος» αντί για −0,5%: +495 → +500, 1.800 → 2.300 (πριν 2.280, με τον
+      // παλιό τύπο στα 92 kg).
+      expect((g.aim, g.since, g.checkIn, g.kcal), (GoalAim.keep, '2026-11-12', null, 2300));
       expect(find.text('Επόμενη εκτίμηση: Πέμπτη 10 Δεκεμβρίου'), findsOneWidget);
     });
 
@@ -623,7 +630,8 @@ void main() {
       expect(await recommended('90'), 1, reason: '90 kg, 180 cm: 27,8');
     });
 
-    testWidgets('S12-06: «Πολλή κίνηση» και «Γρήγορα» αποθηκεύονται ως 1,7 και 0,75% (2.370 kcal)', (t) async {
+    // Round 9 (R9-A1-3): «Πολλή» = 1,76: 1.830 × 1,76 = 3.220,8 − 742,5 = 2.478,3 → 2.480 (πριν, με 1,7: 2.370).
+    testWidgets('S12-06: «Πολλή κίνηση» και «Γρήγορα» αποθηκεύονται ως 1,76 και 0,75% (2.480 kcal)', (t) async {
       final store = HealthStore()..setProfile(_me);
       await _pump(t, GoalsWizard(store: store, now: _now));
       await t.enterText(find.byKey(const ValueKey('wizard-kg')), '90');
@@ -647,7 +655,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       final g = store.goals!;
-      expect((g.activity, g.rate, g.kcal), (1.7, 0.0075, 2370));
+      expect((g.activity, g.rate, g.kcal), (1.76, 0.0075, 2480));
     });
   });
 
@@ -1002,7 +1010,7 @@ void main() {
       expect((under.kcal, under.floored), (1500, true));
       expect(loseRates, [0.0025, 0.005, 0.0075]);
       expect(gainRates, [0.0025, 0.005]);
-      expect(activityLevels, [1.4, 1.5, 1.7]);
+      expect(activityLevels, [1.53, 1.65, 1.76]); // R9-A1-3 (FAO/WHO/UNU 2004)
       final own = checkinGoals(kcalSet: 2100);
       expect((own.fatLo, own.fatHi, own.satMax), (58, 82, 14));
     });

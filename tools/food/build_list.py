@@ -69,6 +69,13 @@ for line in open(listfile, encoding="utf-8"):
             problems.append(f"ΑΠΟΚΛΙΣΗ {entry['id']} {name}: πηγή {k:.0f} kcal, από μακρο {ck:.0f}")
     for key in ("protein", "carbs", "fat"):
         if key not in n: problems.append(f"ΛΕΙΠΕΙ {key} {entry['id']} {name}")
+    # Round9 (R9-A2-1): το μέρος δεν γίνεται μεγαλύτερο από το όλον (σάκχαρα ⊂ υδατάνθρακες, κορεσμένα ⊂ λιπαρά). Πριν
+    # κανένας έλεγχος δεν το έπιανε και το «Κανένα πρόβλημα» περνούσε με σάκχαρα 7,9 g σε υδατάνθρακες 7,3 g. Μόνο με
+    # αριθμούς: «ίχνη» ή «<x» δεν είναι αριθμός της πηγής (CIQUAL αβοκάντο: υδατάνθρακες «ίχνη», σάκχαρα 0,4 g).
+    for part, whole in (("sugars", "carbs"), ("satFat", "fat")):
+        pv, wv = n.get(part), n.get(whole)
+        if isinstance(pv, (int, float)) and isinstance(wv, (int, float)) and pv > wv + 0.05:
+            problems.append(f"ΜΕΡΟΣ > ΟΛΟΝ {entry['id']} {name}: {part} {pv:g} > {whole} {wv:g}")
     foods.append(entry)
 
 # Ζευγάρια ωμό → μαγειρεμένο

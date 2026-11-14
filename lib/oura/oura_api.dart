@@ -735,7 +735,7 @@ class OuraLink {
       }
     }
     if (gen != _gen) throw const OuraError(OuraErrorKind.reconnect);
-    var res = await _getWith(url, t!.access);
+    var res = await _getWith(url, t.access);
     if (res.status == 401) {
       t = await refresh();
       if (t == null || gen != _gen) throw const OuraError(OuraErrorKind.reconnect);

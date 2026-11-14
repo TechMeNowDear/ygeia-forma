@@ -425,7 +425,7 @@ Future<void> editItem(BuildContext context, PlanItem it) => showModalBottomSheet
               if (hasLoad(k))
                 Text('«Αυτόματα»: ξεκινά ελαφριά και το βρίσκει από τις απαντήσεις σου. Μετά την πρώτη φορά, το βάρος το ορίζει η πρόοδος.',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
-              if (k == LoadKind.bar) Text('Μπάρα χωρίς βραχίονες ασφαλείας: ρεζέρβα τουλάχιστον 2.', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+              if (k == LoadKind.bar) Text('Μπάρα χωρίς βραχίονες ασφαλείας: άφησε τουλάχιστον 2.', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
               const SizedBox(height: 12),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(48)),

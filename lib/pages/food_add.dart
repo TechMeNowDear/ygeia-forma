@@ -154,6 +154,21 @@ String rawOrCookedQuestion(double grams, List<(Food, String)> forms) {
   ].join('\n');
 }
 
+/// Η γραμμή κάτω από τα «Ζύγισα:» του φύλλου ποσότητας. Round9 (R9-U2-2): «οι τιμές είναι για τη μορφή «Στον ατμό»», σωστό
+/// σε κάθε μορφή της βάσης (πριν «για στον ατμό», «για φούρνου», «για ψητός», «για βρασμένοι»). Round9 (R9-A2-3): δικό σου
+/// ξερό προϊόν (ζυμαρικό, ρύζι, όσπριο): οι τιμές του είναι για το ξερό, όπως γράφει η συσκευασία.
+String stateNote(Food f) {
+  if (f.rawId == null) {
+    return f.isMine
+        ? 'Οι τιμές είναι για το ξερό προϊόν, όπως στη συσκευασία: βάρος πριν το μαγείρεμα.'
+        : 'Βάρος πριν το μαγείρεμα (το πιο ακριβές).';
+  }
+  final label = f.cookedLabel ?? 'Μαγειρεμένο';
+  final l = label.toLowerCase();
+  final oil = l.contains('τηγαν') && !l.contains('χωρίς') ? ', μαζί με το λάδι που ρούφηξε' : '';
+  return 'Βάρος μετά το μαγείρεμα· οι τιμές είναι για τη μορφή «$label»$oil.';
+}
+
 /// Ξηροί καρποί και σπόροι: μετριούνται με τη χούφτα (round7, R7-U2-4).
 bool _nutsPortion(Food f) => f.cat == 'Ξηροί καρποί' || f.cat == 'Σπόροι' || f.cholKind == CholKind.nuts;
 
@@ -172,15 +187,28 @@ bool _oatPortion(Food f) => isBran(f) || f.id == oatFlakesId;
 /// Round8: ταχίνι, φυστικοβούτυρο, πραλίνα 15 g (μία κουταλιά· [isSpoonFood], R8-A2-1)· αλάτι και μπαχαρικά 2 g
 /// (R8-U2-7· πριν 100 g αλάτι)· πίτουρο βρώμης η ποσότητα του πλάνου σου ([branG], αλλιώς 40 g) και νιφάδες βρώμης 40 g
 /// (R8-U2 Β1).
+/// Round9 (R9-A2-2): δικό μου προϊόν του κουταλιού ([Food.spoon]) που δεν είναι σχεδόν καθαρό λίπος (ταχίνι, φυστικοβούτυρο,
+/// μαργαρίνη, μαγιονέζα) 15 g (μία κουταλιά), όπως τα αλείμματα της βάσης.
 double firstGrams(Food f, {int? branG}) {
   if (_pinchPortion(f)) return 2;
-  if (isSpoonFood(f)) return f.cat == 'Αλείμματα' ? 15 : 10;
+  if (isSpoonFood(f)) return f.cat == 'Αλείμματα' || (f.spoon && f.n.amount(Nk.fat) < typoFatPer100) ? 15 : 10;
   if (isOlives(f)) return 10;
   if (_nutsPortion(f)) return 30;
   if (isBran(f)) return (branG != null && branG > 0 ? branG : defaultBranG).toDouble();
   if (f.id == oatFlakesId) return 40;
   return 100;
 }
+
+/// Η μερίδα της συσκευασίας ως πρώτη ποσότητα (round9, R9-A2-2): όχι για τρόφιμο του κουταλιού με «μερίδα» από
+/// [typoFatGrams] g και πάνω (το Open Food Facts δίνει συχνά «100 g» για ταχίνι: 673 kcal με ένα «Προσθήκη»)· τότε η πρώτη
+/// ποσότητα του κουταλιού ([firstGrams]). Το κουμπί «1 μερίδα» μένει, και τα 100 g ρωτούν «Σωστή ποσότητα;».
+double? startServing(Food f) {
+  final s = f.servingGrams;
+  return s != null && isSpoonFood(f) && s >= typoFatGrams ? null : s;
+}
+
+/// Το μήνυμα όταν πατάς ένα δικό σου προϊόν που μόλις σβήστηκε (round9, R9-U2-4).
+String productGoneText(String name) => 'Το «$name» σβήστηκε από τα προϊόντα σου.';
 
 /// Η μέρα στην οποία γράφεται ένα φαγητό, όπως τη λέει η οθόνη προσθήκης: «Σήμερα · Παρ 13/11», «Χθες · Πέμ 12/11»,
 /// ή για παλιότερη μέρα «Τρί 10/11» (έλεγχος round1, S2-8 / S11-1 / U3a-1: πριν η οθόνη δεν έλεγε πουθενά τη μέρα).
@@ -421,7 +449,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     super.dispose();
   }
 
-  Future<void> _pick(Food f) async {
+  Future<void> _pick(Food picked) async {
+    // Round9 (R9-U2-4): η ΤΩΡΙΝΗ μορφή του τροφίμου (π.χ. μετά από «Διόρθωση» ενός δικού σου προϊόντος από το ⋮)· πριν
+    // γραφόταν το αντικείμενο της λίστας, με τις παλιές τιμές. Προϊόν που σβήστηκε στο μεταξύ δεν γράφεται.
+    final f = widget.food.pickable(picked);
+    if (f == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(productGoneText(picked.name))));
+      return;
+    }
     final r = await showModalBottomSheet<_SheetResult>(
       context: context,
       routeSettings: const RouteSettings(name: 'Ποσότητα'),
@@ -432,7 +467,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         food: widget.food,
         item: f,
         initialGrams:
-            widget.food.lastGrams(f.id) ?? f.servingGrams ?? firstGrams(f, branG: HealthStore.shared?.goals?.branG),
+            widget.food.lastGrams(f.id) ?? startServing(f) ?? firstGrams(f, branG: HealthStore.shared?.goals?.branG),
         meal: _meal,
       ),
     );
@@ -476,8 +511,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     if (f != null && mounted) await _pick(f);
   }
 
+  // Round9 (R9-U2-4): η οθόνη ακολουθεί το ημερολόγιο και τα προϊόντα σου: μετά από «Διόρθωση» ή «Διαγραφή» από το ⋮, ή
+  // «Αναίρεση», οι λίστες δείχνουν αμέσως ό,τι ισχύει (πριν έμεναν οι παλιές τιμές και το σβησμένο προϊόν).
   @override
-  Widget build(BuildContext context) => FoodTheme(child: Builder(builder: _build));
+  Widget build(BuildContext context) =>
+      FoodTheme(child: ListenableBuilder(listenable: widget.food, builder: (context, _) => _build(context)));
 
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
@@ -860,12 +898,13 @@ class _FoodTile extends StatelessWidget {
 
 /// Η δεύτερη γραμμή ενός τροφίμου στις λίστες: «125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 6 φορές». Έλεγχος round1
 /// (U3a-6): ανάμεσα σε κάθε αριθμό και στη λέξη του το κενό δεν σπάει (U+00A0)· πριν, στο τέλος της γραμμής έμενε ο
-/// αριθμός μόνος του («… · 6» / «φορές», «ανά 100» / «g»).
+/// αριθμός μόνος του («… · 6» / «φορές», «ανά 100» / «g»). Round9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α): και πριν από κάθε «·», ώστε η
+/// γραμμή να μην τελειώνει ποτέ σε «·» («… ανά 100 g ·» / «6 φορές»).
 String foodTileSubtitle(Food food, int times) {
   const nb = '\u00A0';
   final n = food.n;
-  final base = '${kcalText(n.amount(Nk.kcal))}${nb}kcal · πρωτεΐνη ${nValueText(n[Nk.protein])}${nb}g ανά 100$nb${food.unit}';
-  return times > 0 ? '$base · ${times == 1 ? '1${nb}φορά' : '$times${nb}φορές'}' : base;
+  final base = '${kcalText(n.amount(Nk.kcal))}${nb}kcal$nb· πρωτεΐνη ${nValueText(n[Nk.protein])}${nb}g ανά 100$nb${food.unit}';
+  return times > 0 ? '$base$nb· ${times == 1 ? '1${nb}φορά' : '$times${nb}φορές'}' : base;
 }
 
 /// Μικρή ετικέτα για τα προϊόντα μου (μάρκα), ώστε να ξεχωρίζουν από τα γενικά.
@@ -986,7 +1025,10 @@ class _QuantitySheetState extends State<QuantitySheet> {
     final unchanged = widget.editing && g == widget.initialGrams && _item.id == widget.item.id;
     var item = _item;
     var keptRaw = false;
-    if (!unchanged && _states.length > 1 && askRawOrCooked(item, g, timesEaten: widget.food.timesEaten(item.id))) {
+    if (!unchanged &&
+        _states.length > 1 &&
+        askRawOrCooked(item, g,
+            timesEaten: widget.food.timesEaten(item.id), dryMine: item.isMine && dryStapleRawId(item) != null)) {
       final raw = _states.first;
       final rawWord = raw.$2.split(' (').first;
       final cooked = _states.skip(1).toList();
@@ -1047,6 +1089,11 @@ class _QuantitySheetState extends State<QuantitySheet> {
     final lastLabel = saltTile ? 'Αλάτι' : 'Λιπαρά';
     final lastValue = saltTile ? '${dec(tot(Nk.salt), 1)} g' : '${gramsText(tot(Nk.fat))} g';
     final lastColor = saltTile ? c.textTertiary : fatColor(c);
+    // Round9 (R9-U2-3): τα «−»/«+» με την κλίμακα του τροφίμου, όπως τα κουμπιά ποσότητας: αλάτι και μπαχαρικά ανά 1 g
+    // (από 0,5 g), ό,τι μετριέται με το κουτάλι ανά 5 g, τα άλλα ανά 10 g. Πριν ήταν πάντα 10 g: «+» στα 2 g αλάτι έδινε
+    // 12 g (και την ερώτηση «Σωστή ποσότητα;»), «+» στα 10 g λάδι 20 g.
+    final step = _pinchPortion(f) ? 1.0 : (isSpoonFood(f) ? 5.0 : 10.0);
+    final minStep = _pinchPortion(f) ? 0.5 : 1.0;
 
     final chips = <(String, double)>[
       if (f.servingGrams != null && f.servingGrams! > 0)
@@ -1211,10 +1258,8 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    f.rawId == null
-                        ? 'Βάρος πριν το μαγείρεμα (το πιο ακριβές).'
-                        : 'Βάρος μετά το μαγείρεμα· οι τιμές είναι για ${(f.cookedLabel ?? 'μαγειρεμένο').toLowerCase()}'
-                            '${(f.cookedLabel ?? '').toLowerCase().contains('τηγαν') && !(f.cookedLabel ?? '').toLowerCase().contains('χωρίς') ? ', μαζί με το λάδι που ρούφηξε' : ''}.',
+                    stateNote(f),
+                    key: const ValueKey('state-note'),
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary),
                   ),
                 ],
@@ -1271,7 +1316,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   children: [
                     IconButton.filledTonal(
                       tooltip: 'Λιγότερο',
-                      onPressed: g == null ? null : () => _set((g - 10).clamp(1, 5000).toDouble()),
+                      onPressed: g == null ? null : () => _set((g - step).clamp(minStep, maxEntryGrams).toDouble()),
                       icon: const Icon(Icons.remove_rounded),
                     ),
                     const SizedBox(width: 10),
@@ -1297,7 +1342,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     const SizedBox(width: 10),
                     IconButton.filledTonal(
                       tooltip: 'Περισσότερο',
-                      onPressed: g == null ? null : () => _set((g + 10).clamp(1, 5000).toDouble()),
+                      onPressed: g == null ? null : () => _set((g + step).clamp(minStep, maxEntryGrams).toDouble()),
                       icon: const Icon(Icons.add_rounded),
                     ),
                   ],
@@ -1625,6 +1670,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   /// Τι μετρά το προϊόν στην κάρτα «Χοληστερίνη» ([CholKind]) ή null.
   late String? _cholKind = widget.draft.cholKind;
 
+  /// Round9 (R9-A2-2): μετριέται με το κουτάλι, ή null όσο δεν το διάλεξες (τότε από το όνομα, [spoonByName]).
+  late bool? _spoon = widget.draft.spoon;
+
   static String _field(double v) => dec(v, 4).replaceAll(RegExp(r',?0+$'), '');
 
   // Round7 (R7-U2 Β-1): με τη σειρά της διατροφικής δήλωσης της ΕΕ (Κανονισμός 1169/2011, Παράρτημα XV), όπως είναι
@@ -1704,6 +1752,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
           if (values[k] != null && values[k] == widget.draft.values[k]) k,
       },
       cholKind: _cholKind,
+      spoon: _spoon ?? spoonByName(_name.text),
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }
@@ -1939,6 +1988,19 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   _cholKind ?? (branByName(_name.text) ? CholKind.bran : CholKind.none),
                   (v) => setState(() => _cholKind = v),
                   key: const ValueKey('chol-kind'),
+                ),
+              ],
+              // Round9 (R9-A2-2): ταχίνι, φυστικοβούτυρο, μαργαρίνη, μαγιονέζα ανοίγουν με μία κουταλιά (όχι με τη «μερίδα» των
+              // 100 g του Open Food Facts) και έχουν τα κουμπιά 5–30 g. Από τις κατηγορίες του Open Food Facts ή το όνομα· το
+              // αλλάζεις εδώ. Όχι για σχεδόν καθαρά λίπη (από 80 g λιπαρά): εκείνα μετριούνται πάντα με το κουτάλι.
+              if ((values[Nk.fat] ?? 0) < typoFatPer100) ...[
+                const SizedBox(height: 14),
+                choices<bool>(
+                  'Μετριέται με το κουτάλι (π.χ. ταχίνι, μαργαρίνη);',
+                  const [(false, 'Όχι'), (true, 'Ναι')],
+                  _spoon ?? spoonByName(_name.text),
+                  (v) => setState(() => _spoon = v),
+                  key: const ValueKey('spoon-kind'),
                 ),
               ],
               const SizedBox(height: 14),

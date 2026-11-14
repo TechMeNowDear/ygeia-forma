@@ -306,18 +306,19 @@ void main() {
 
     const base = {Nk.kcal: 1500.0, Nk.protein: 60.0, Nk.carbs: 150.0, Nk.fat: 50.0, Nk.fiber: 20.0, Nk.sugars: 30.0};
 
-    testWidgets('κορεσμένα 14,3 g (όριο 14 g): «14,3 g» με «0,3 g πάνω»', (t) async {
+    // Round 9 (R9-A3-2): το όριο είναι το ακριβές 2.090 × 6% ÷ 9 = 13,93 → «έως 13,9 g» (πριν στρογγυλεμένο «έως 14 g»).
+    testWidgets('κορεσμένα 14,3 g (όριο 13,9 g): «14,3 g» με «0,4 g πάνω»', (t) async {
       await card(t, {...base, Nk.satFat: 14.3, Nk.salt: 3});
-      expect(find.text('14,3 g / έως 14 g', findRichText: true), findsOneWidget);
-      expect(find.text('0,3 g πάνω από το όριο'), findsOneWidget);
-      expect(find.text('14 g / έως 14 g', findRichText: true), findsNothing);
+      expect(find.text('14,3 g / έως 13,9 g', findRichText: true), findsOneWidget);
+      expect(find.text('0,4 g πάνω από το όριο'), findsOneWidget);
+      expect(find.text('14 g / έως 13,9 g', findRichText: true), findsNothing);
     });
     testWidgets('κορεσμένα 13,6 g: «13,6 g», χωρίς προειδοποίηση· 20 g: «20 g»', (t) async {
       await card(t, {...base, Nk.satFat: 13.6, Nk.salt: 3});
-      expect(find.text('13,6 g / έως 14 g', findRichText: true), findsOneWidget);
+      expect(find.text('13,6 g / έως 13,9 g', findRichText: true), findsOneWidget);
       expect(find.textContaining('πάνω από το όριο'), findsNothing);
       await card(t, {...base, Nk.satFat: 20, Nk.salt: 3});
-      expect(find.text('20 g / έως 14 g', findRichText: true), findsOneWidget);
+      expect(find.text('20 g / έως 13,9 g', findRichText: true), findsOneWidget);
     });
     testWidgets('αλάτι 4,96 g: γράφεται «5,0 g» και ΔΕΝ είναι «κάτω από 5 g»', (t) async {
       await card(t, {...base, Nk.satFat: 10, Nk.salt: 4.96});
@@ -385,13 +386,14 @@ void main() {
     testWidgets('σήμερα (η μέρα δεν τελείωσε): τα γραμμάρια του στόχου, όπως πριν', (t) async {
       await card(t, 2600, 16, today: true);
       expect(find.byKey(const ValueKey('goals-sat-pct')), findsNothing);
-      expect(find.text('16 g / έως 14 g', findRichText: true), findsOneWidget);
-      expect(find.text('2 g πάνω από το όριο'), findsOneWidget);
+      // Round 9 (R9-A3-2): όριο 13,9 g (ακριβές), 16 − 13,9 = 2,1.
+      expect(find.text('16 g / έως 13,9 g', findRichText: true), findsOneWidget);
+      expect(find.text('2,1 g πάνω από το όριο'), findsOneWidget);
     });
     testWidgets('μέρα με λίγη καταγραφή (1.000 kcal < 1.254): γραμμάρια, όπως η σελίδα που δεν τη μετρά', (t) async {
       await card(t, 1000, 9, today: false);
       expect(find.byKey(const ValueKey('goals-sat-pct')), findsNothing);
-      expect(find.text('9 g / έως 14 g', findRichText: true), findsOneWidget);
+      expect(find.text('9 g / έως 13,9 g', findRichText: true), findsOneWidget);
     });
   });
 
@@ -722,7 +724,7 @@ void main() {
       await _pumpHost(t, (ctx) => Navigator.of(ctx).push<void>(MaterialPageRoute(builder: (_) => KitchenScreen(store: store))));
       await t.tap(find.text('άνοιξε'));
       await t.pumpAndSettle();
-      final item = find.text('Κατσαρόλα · Μάρκα Τ');
+      final item = find.text('Κατσαρόλα · Μάρκα Τ');
       await t.ensureVisible(item);
       await t.tap(item);
       await t.pumpAndSettle();

@@ -334,6 +334,34 @@ object DataRules {
     fun readMoment(ms: Long, zone: ZoneId): ReadMoment =
         ReadMoment(ms, LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), zone))
 
+    /**
+     * Round 9 (R9-A4-4): μια τιμή float της Samsung (βάρος, λίπος, δείκτης μάζας σώματος…) ως double ΜΕ τον αριθμό που
+     * έγραψε η ζυγαριά: ο δεκαδικός με τα λιγότερα δεκαδικά ψηφία (ως 6) που δίνει το ίδιο float (26,9f → 26,9), όχι η
+     * ακριβής δυαδική τιμή του (26.899999618530273). Πριν, ο δείκτης 26,9 της InBody φαινόταν «26,8» (κομμένος στο 0,1,
+     * reference.dart `bmiShown`) και 180 cm με 89,1 kg «27,4» αντί για 27,5. Με αριθμητική, όχι με Float.toString (που στο
+     * JDK 17 / Android δεν δίνει πάντα τον συντομότερο). null για NaN ή άπειρο (το JSONObject δεν τα δέχεται).
+     */
+    fun floatJson(v: Float?): Double? {
+        if (v == null || !v.isFinite()) return null
+        val d = v.toDouble()
+        var scale = 1.0
+        for (p in 0..6) {
+            val r = Math.round(d * scale) / scale
+            if (r.toFloat() == v) return r
+            scale *= 10.0
+        }
+        return d
+    }
+
+    /**
+     * Round 9 (R9-A10-1): ο στόχος ενός πατήματος widget από το Intent με το οποίο ξεκίνησε η MainActivity, ΜΟΝΟ σε νέο
+     * άνοιγμα. Όταν το Android την ξαναφτιάχνει (π.χ. κλείσιμο της διεργασίας στο παρασκήνιο και επιστροφή από τα
+     * Πρόσφατα: [restored] = υπάρχει αποθηκευμένη κατάσταση, [fromHistory] = FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY), δίνει
+     * ξανά το ΑΡΧΙΚΟ Intent· πριν, ο σαρωτής barcode ή η σελίδα μιας μέτρησης ξανάνοιγαν μόνα τους.
+     */
+    fun launchOpenTarget(raw: String?, restored: Boolean, fromHistory: Boolean): String? =
+        if (restored || fromHistory) null else widgetOpenTarget(raw)
+
     private fun parseObject(json: String): JsonObject? = try {
         val e = JsonParser.parseString(json)
         if (e.isJsonObject) e.asJsonObject else null

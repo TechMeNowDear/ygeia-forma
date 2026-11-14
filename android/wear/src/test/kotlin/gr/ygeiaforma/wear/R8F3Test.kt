@@ -290,7 +290,9 @@ class R8F3Test {
         val act = source("WatchActivity.kt")
         assertTrue(act.contains("val askFirst = si >= 0 && s.askFirst(i, si, next)"))
         assertTrue(act.contains("Repo.screen = if (askFirst) Repo.Screen.RIR else when (next) {"))
-        assertTrue(act.contains("if (s.phone && item != null) cmd(rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, rir))"))
+        // Round 9 (R9-A12-2): η απόφαση στο LiveSession.answerAny (δοκιμή συμπεριφοράς στο R9F3Test)· η οθόνη στέλνει ό,τι δίνει.
+        assertTrue(act.contains("val a = s.answerAny(rir, now)"))
+        assertTrue(act.contains("a.rir1?.let { cmd(it) }"))
     }
 
     /** Η απάντηση: η εντολή «rir1» ακριβώς όπως τη δέχεται το κινητό (CROSS.md), και η ρεζέρβα της άσκησης δεν αλλάζει. */

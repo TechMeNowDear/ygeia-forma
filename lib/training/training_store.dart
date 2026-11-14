@@ -928,9 +928,12 @@ class TrainingStore extends ChangeNotifier {
       ..addAll(sorted)
       ..sort((a, b) => a[0].compareTo(b[0]));
     final end = s.end;
+    var cut = false;
     if (end != null) {
       final last = end.difference(s.start).inSeconds + 60;
+      final n0 = s.hr.length;
       s.hr.removeWhere((p) => p[0] > last);
+      cut = s.hr.length < n0;
     }
     s.hrInFile = false;
     s.hrRev++;
@@ -940,9 +943,12 @@ class TrainingStore extends ChangeNotifier {
       sum += p[1];
       if (p[1] > max) max = p[1];
     }
-    s.hrAvg = other.isEmpty && watchAvg != null ? watchAvg : (sum / s.hr.length).round();
-    // Ο υψηλότερος μόνο ανεβαίνει (και του ρολογιού, όπως τον μέτρησε εκείνο).
-    s.hrMax = [max, s.hrMax ?? 0, watchMax ?? 0].reduce((a, b) => a > b ? a : b);
+    // R9-A8-2: ο μέσος και ο υψηλότερος του ρολογιού είναι όλης της μέτρησης· αν κόπηκαν τιμές μετά το τέλος (ξεχασμένη
+    // προπόνηση, το ρολόι μετρούσε ώρες ακόμα), είναι και αυτών: τότε μόνο από τις τιμές που έμειναν (πριν: μέσος 85 της
+    // καθημερινότητας για προπόνηση με 114).
+    s.hrAvg = other.isEmpty && watchAvg != null && !cut ? watchAvg : (sum / s.hr.length).round();
+    // Ο υψηλότερος μόνο ανεβαίνει (και του ρολογιού, όπως τον μέτρησε εκείνο) — εκτός αν κόπηκαν τιμές (R9-A8-2).
+    s.hrMax = cut ? max : [max, s.hrMax ?? 0, watchMax ?? 0].reduce((a, b) => a > b ? a : b);
   }
 
   /// Ό,τι έγινε μόνο στο ρολόι (προπόνηση, περπάτημα) ή οι παλμοί μιας προπόνησης του κινητού. true αν άλλαξε κάτι.
@@ -1024,6 +1030,10 @@ class TrainingStore extends ChangeNotifier {
       partial: partial,
     );
     if (s.stopped) s.note = 'Σταμάτησε: «Σταμάτησα» στο ρολόι';
+    // R9-A8-3: η απάντηση «Πρώτο σετ» του ρολογιού («fr»), όπου δεν υπάρχει ήδη («fa»).
+    for (final e in s.items) {
+      e.firstAnswer ??= watchFirstAnswer(e);
+    }
     _watchHrInfo(s, j);
     if (cardio != null) {
       // Ρολόι παλιότερης έκδοσης έστελνε 0 όταν το Health Services δεν έδωσε χρόνο (έλεγχος γ2, W2-11): τότε από τις ώρες.
@@ -1101,9 +1111,10 @@ class TrainingStore extends ChangeNotifier {
     final lo = s.start.millisecondsSinceEpoch;
     final n = now.millisecondsSinceEpoch;
     // R7-A8-3: «Τέλος» στο ρολόι ώρες μετά την τελευταία κίνηση (ξεχασμένη προπόνηση): τέλος στο τελευταίο ✓, όπως το
-    // [finish] και η «Ξεχασμένη προπόνηση;», ποτέ διάρκεια 25 ωρών.
-    final last = s.lastActivity.millisecondsSinceEpoch;
-    final t = belongs(s, at) ? at : last;
+    // [finish] και η «Ξεχασμένη προπόνηση;», ποτέ διάρκεια 25 ωρών. R9-A8-1: το τελευταίο ✓ ([Session.lastTick]), όχι η
+    // «Συνέχεια» ([Session.resumedAt]): αυτή κρατά την προπόνηση ανοιχτή, αλλά δεν είναι κίνηση μέσα της.
+    final last = s.lastTick.millisecondsSinceEpoch;
+    final t = at - last < staleAfter.inMilliseconds ? at : last;
     final end = t < lo ? lo : (t > n ? (n < lo ? lo : n) : t);
     finish(end: DateTime.fromMillisecondsSinceEpoch(end));
     endedByWatch = s;
@@ -1119,7 +1130,9 @@ class TrainingStore extends ChangeNotifier {
   void _extendEndFromWatch(Session s, Object? fin) {
     final end = s.end;
     if (end == null) return;
-    final last = s.lastActivity.millisecondsSinceEpoch;
+    // R9-A8-1: μόνο ✓ ([Session.lastTick]) μεταφέρει το τέλος· η «Συνέχεια» μόνη της όχι (πριν: «Τέλος (στις 19:00)» και
+    // μετά το αποτέλεσμα του ρολογιού → τέλος την ώρα της «Συνέχειας», την επομένη).
+    final last = s.lastTick.millisecondsSinceEpoch;
     if (last <= end.millisecondsSinceEpoch + 60000) return;
     var to = last;
     if (fin is num && fin.isFinite) {
@@ -1162,6 +1175,16 @@ class TrainingStore extends ChangeNotifier {
   /// R8-A8-2: στο αποτέλεσμα «hr» το ρολόι σημειώνει με «c»: 1 τα ✓ που το κινητό είχε ήδη δει (ρολόι από τον γύρο 8·
   /// το παλιό δεν το στέλνει, και τότε όπως πριν).
   static bool _phoneSaw(SetLog ws) => ws.extra['c'] == 1 || ws.extra['c'] == true;
+
+  /// R9-A8-3 (συμβόλαιο με το ρολόι, f3, CROSS.md): η απάντηση του ρολογιού στο «Πρώτο σετ» μέσα στο αποτέλεσμα («fr» στην
+  /// άσκηση: 0–4, −1 = «Δεν ξέρω»), αντίγραφο της εντολής «rir1» για όταν εκείνη χάθηκε (κινητό που δεν άκουγε). null αν
+  /// λείπει ή δεν είναι αριθμός. Ρολόι παλιότερης έκδοσης δεν το στέλνει: όπως πριν.
+  static int? watchFirstAnswer(ExLog w) {
+    final v = w.extra['fr'];
+    if (v is! num || !v.isFinite) return null;
+    final a = v.toInt();
+    return a < 0 ? -1 : (a > 4 ? 4 : a);
+  }
 
   /// Σετ που πατήθηκαν ✓ στο ρολόι αλλά δεν έφτασαν στο κινητό (π.χ. η εφαρμογή ήταν κλειστή): προστίθενται.
   /// Ποτέ δεν σβήνει ή αλλάζει ό,τι έχει ήδη γραφτεί στο κινητό — με μία εξαίρεση (τελικός έλεγχος, Συμβούλιο 4, W-4):
@@ -1224,11 +1247,43 @@ class TrainingStore extends ChangeNotifier {
         if (ws.load != null) ps.load = ws.load;
       }
       if (e.rirAnswer == null && w.rirAnswer != null && e.complete) e.rirAnswer = w.rirAnswer!.clamp(0, 4);
+      // R9-A8-3: η απάντηση «Πρώτο σετ» του ρολογιού, αν η «rir1» δεν έφτασε. Η πρώτη απάντηση κερδίζει: μόνο αν εδώ δεν
+      // υπάρχει καμία (ίδιο αποτέλεσμα ξανά: τίποτα). Αν η ερώτηση εκκρεμεί ακόμα, όπως η «rir1» (βάρος για τα επόμενα
+      // σετ)· αλλιώς μόνο για το αρχείο (τη διαβάζει η πρόοδος, R9-A6-4).
+      final fr = watchFirstAnswer(w);
+      if (fr != null && e.firstAnswer == null) {
+        if (firstPending(e)) {
+          answerFirst(e, fr);
+        } else {
+          e.firstAnswer = fr;
+        }
+      }
     }
+  }
+
+  /// R9-U3-06: η προπόνηση που διάλεξες από τις τρεις τελείες της «Άσκησης» για σήμερα (id) και ποια μέρα. Μόνο στη μνήμη,
+  /// όχι στο αρχείο: ισχύει μόνο εκείνη τη μέρα και ως να ξεκινήσει μια προπόνηση (R8-U3-05). Εδώ, και όχι στη σελίδα, για
+  /// να λέει (και να ξεκινά) την ίδια προπόνηση και η κάρτα «Άσκηση σήμερα» της Σήμερα.
+  (String, DateTime)? _chosen;
+
+  /// Η προπόνηση που διάλεξες για τη μέρα [day] (id), αν η επιλογή είναι εκείνης της μέρας.
+  String? chosenOn(DateTime day) {
+    final ch = _chosen;
+    if (ch == null) return null;
+    final d = ch.$2;
+    return d.year == day.year && d.month == day.month && d.day == day.day ? ch.$1 : null;
+  }
+
+  /// Διαλέγει ([id]) ή καθαρίζει (null) την προπόνηση της μέρας [day]· μόνο στη μνήμη.
+  void choose(String? id, DateTime day) {
+    _chosen = id == null ? null : (id, day);
+    notifyListeners();
   }
 
   Session start(Workout w) {
     final p = program!;
+    // R8-U3-05 / R9-U3-06: η επιλογή «για σήμερα» τελειώνει με την προπόνηση που ξεκινά.
+    _chosen = null;
     endedByWatch = null;
     discardedByWatch = false;
     _focus = 0;
@@ -1457,7 +1512,8 @@ class TrainingStore extends ChangeNotifier {
   }
 
   /// Τέλος της προπόνησης. Χωρίς [end]: τώρα — εκτός αν είναι «ξεχασμένη» ([isStale]): τότε στο τελευταίο ✓, ποτέ
-  /// διάρκεια 20 ωρών (V-A-09).
+  /// διάρκεια 20 ωρών (V-A-09). R9-A8-1: «ξεχασμένη» εδώ μετρά από το τελευταίο ✓ ([Session.lastTick]), όχι από τη
+  /// «Συνέχεια»: «Συνέχεια» στις 08:00 χωρίς κανένα ✓ μετά, και «Τέλος» στις 09:00, δεν δίνει διάρκεια 14 ωρών.
   void finish({int? feel, DateTime? end}) {
     final s = current;
     if (s == null) {
@@ -1468,8 +1524,19 @@ class TrainingStore extends ChangeNotifier {
       return;
     }
     s
-      ..end = end ?? (isStale(s) ? s.lastActivity : now)
+      ..end = end ?? (now.difference(s.lastTick) >= staleAfter ? s.lastTick : now)
       ..feel = feel;
+    // R9-A8-2: οι παλμοί μετά το τέλος (+1′, ο ίδιος κανόνας με το [mergeHrSegment], DP-09) δεν είναι της προπόνησης:
+    // ξεχασμένη προπόνηση με το ρολόι να μετρά ώρες ακόμα έδινε μέσο (και υψηλότερο) της καθημερινότητας. Κόβονται, και
+    // ο υψηλότερος ξαναβγαίνει από όσες έμειναν.
+    final keep = s.end!.difference(s.start).inSeconds + 60;
+    final n0 = s.hr.length;
+    s.hr.removeWhere((p) => p[0] > keep);
+    if (s.hr.length < n0) {
+      s.hrRev++;
+      s.hrInFile = false;
+      s.hrMax = s.hr.isEmpty ? null : s.hr.fold<int>(0, (m, p) => p[1] > m ? p[1] : m);
+    }
     if (s.hr.isNotEmpty) s.hrAvg = (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round();
     // Στη θέση της με τη σειρά της ώρας (S6-15): μια «ξεχασμένη» προπόνηση που κλείνει μέρες μετά δεν μπαίνει πάνω
     // από ό,τι έγινε στο μεταξύ (π.χ. περπάτημα από το ρολόι).

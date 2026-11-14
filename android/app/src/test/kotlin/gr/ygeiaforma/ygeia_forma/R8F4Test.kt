@@ -124,7 +124,7 @@ class R8F4Test {
         val rows = listOf(
             DbSalvage.Row(1, "E1", "{\"id\":\"E1\"}"),
             DbSalvage.Row(2, "E2", "{\"id\":\"E2\"}"), // σβήστηκε μετά από τη βλάβη
-            DbSalvage.Row(3, "E1", "{\"id\":\"E1\",\"grams\":999}"), // ίδιο id: μετρά η πρώτη
+            DbSalvage.Row(3, "E1", "{\"id\":\"E1\",\"grams\":999}"), // ίδιο id: μετρά η νεότερη (R9-A9-2)
             DbSalvage.Row(4, null, "{\"id\":\"E4\"}"), // χωρίς id
             DbSalvage.Row(5, "E5", "όχι JSON"),
             DbSalvage.Row(6, "E6", "{\"id\":\"E6\"}"),
@@ -133,21 +133,24 @@ class R8F4Test {
         val out = JSONArray()
         val r = DbSalvage.read(source, setOf("E2"), out)
         assertEquals(listOf("E1", "E6"), ids(out))
-        assertFalse(out.getJSONObject(0).has("grams"))
+        // Round 9 (R9-A9-2): η γραμμή με το μεγαλύτερο rowid (η διόρθωση του χρήστη), όχι η πρώτη.
+        assertEquals(999, out.getJSONObject(0).getInt("grams"))
         assertEquals(DbSalvage.Read(skipped = 2, lost = 0, complete = true), r)
     }
 
     @Test
     fun doneMarkerKeepsTheRulesAndWhetherAllWasRead() {
         val at = 1_731_500_000_000L
-        assertEquals(2, DbSalvage.RULES)
-        assertEquals("$at 120 3 2 1", DbSalvage.doneText(at, 120, 3, complete = true))
-        assertEquals("$at 120 3 2 0", DbSalvage.doneText(at, 120, 3, complete = false))
+        // Round 9 (f4): κανόνας 3 (R9-A9-1/2/4).
+        assertEquals(3, DbSalvage.RULES)
+        assertEquals("$at 120 3 3 1", DbSalvage.doneText(at, 120, 3, complete = true))
+        assertEquals("$at 120 3 3 0", DbSalvage.doneText(at, 120, 3, complete = false))
         // Με τον τωρινό κανόνα: έγινε (και όταν δεν διαβάστηκαν όλα· δεν ξαναδιαβάζεται κάθε φορά).
-        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 2 1", at))
-        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 2 0", at))
+        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 3 1", at))
+        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 3 0", at))
         // Παλιότερος κανόνας: ξαναδιαβάζεται μόνο αν τότε δεν διαβάστηκαν όλα.
         assertNull(DbSalvage.parseDone("$at 120 3 1 0", at))
+        assertNull(DbSalvage.parseDone("$at 120 3 2 0", at))
         assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 1 1", at))
         // Το σημάδι του #105 («ώρα καταχωρίσεις προϊόντα»): ξαναδιαβάζεται μία φορά.
         assertNull(DbSalvage.parseDone("$at 0 0", at))

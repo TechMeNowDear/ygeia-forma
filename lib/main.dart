@@ -393,7 +393,8 @@ class _ShellState extends State<Shell> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 600;
+        // Round 9 (R9-U1-3): και αρκετό ύψος ([useSideBar]): όχι πλαϊνή μπάρα στο κλειστό Fold σε οριζόντια θέση.
+        final wide = useSideBar(constraints.biggest);
         final content = LazyIndexedStack(key: _stackKey, index: _index, children: pages);
 
         if (wide) {

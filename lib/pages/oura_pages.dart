@@ -14,6 +14,13 @@ import '../widgets.dart';
 import 'oxygen_widgets.dart';
 import 'sources_page.dart';
 
+/// Round 9 (R9-A11-2 = R9-U4-9, f4): η κάρτα «Μένουν στο κινητό σου» της σύνδεσης. Πριν η κάρτα υποσχόταν ότι δεν πάνε
+/// ποτέ σε AI ή σε άλλους, ενώ η ίδια η εφαρμογή φτιάχνει αρχεία με δεδομένα του Oura που στέλνει ο χρήστης (PDF για τον γιατρό,
+/// «Αναφορά για έλεγχο», π.χ. σε συζήτηση με AI). Ίδιο νόημα με τον ιστότοπο και την πολιτική απορρήτου (R7-A11-2).
+const ouraConnectPrivacyText = 'Τα δεδομένα έρχονται κατευθείαν από την Oura στο κινητό. Η εφαρμογή δεν τα δίνει ποτέ '
+    'σε άλλους και δεν τα στέλνει σε AI· μπαίνουν μόνο σε αρχεία που φτιάχνεις και στέλνεις εσύ. Χρειάζεται ενεργή '
+    'συνδρομή Oura.';
+
 /// Κοινός σκελετός για τις σελίδες του Oura: μία στήλη στο κινητό, δύο σε ανοιχτό Fold.
 class _OuraScaffold extends StatelessWidget {
   const _OuraScaffold({required this.title, required this.left, this.right = const [], this.bottom});
@@ -298,8 +305,7 @@ class _OuraConnectPageState extends State<OuraConnectPage> {
               const SectionLabel('Μένουν στο κινητό σου'),
               const SizedBox(height: 6),
               Text(
-                'Τα δεδομένα έρχονται κατευθείαν από την Oura στο κινητό. Δεν δίνονται ποτέ σε AI ή σε άλλους. '
-                'Χρειάζεται ενεργή συνδρομή Oura.',
+                ouraConnectPrivacyText,
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 6),

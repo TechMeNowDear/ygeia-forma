@@ -389,7 +389,10 @@ class ExerciseService : Service() {
         // R7-A7-3: η προθέρμανση των 5′ και οι «3 ώρες» από την ΑΡΧΗ της άσκησης, όχι από τη συνέχεια.
         originEl = zoneWarmupStartEl(Repo.startedEl, now, Repo.startedAt)
         val walk = Repo.running == "walk"
+        // R9-A7-2: η ζώνη που ίσχυε, από το στιγμιότυπο ([Repo.restoreRun]): μένει αν δεν υπάρχει (ακόμα) πρόγραμμα στο ρολόι.
+        val keptZone = Repo.zoneAlarm.zone
         Repo.zoneAlarm.start(if (walk) Repo.zoneNow() else null, originEl)
+        if (walk && Repo.zoneAlarm.zone == null) Repo.zoneAlarm.zone = resumeZone(Repo.plan, keptZone)
         val location = walk && Repo.gps && has(this, Manifest.permission.ACCESS_FINE_LOCATION) && locationOn()
         var type = 0
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
@@ -819,7 +822,8 @@ class ExerciseService : Service() {
             val n = NotificationCompat.Builder(this, CH_ALARM)
                 .setSmallIcon(R.drawable.ic_heart)
                 .setContentTitle(text)
-                .setContentText("Ό,τι μετρήθηκε σώθηκε. Το όριο παλμών δεν σε προσέχει πια.")
+                // R9-U3-09: για το όριο μόνο με όριο γιατρού· σε περπάτημα με δόνηση ζώνης, ότι σταμάτησε η δόνηση.
+                .setContentText(endedElsewhereText(Repo.alarm.limit != null, Repo.running == "walk" && Repo.zoneAlarm.active))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setContentIntent(pi)
@@ -874,8 +878,10 @@ class ExerciseService : Service() {
             // δεν έχει δει ακόμα το ✓ σου, αλλιώς ως «reps». Ώσπου το κινητό να δείξει τη δική σου τιμή.
             val pend = Repo.pendingTicks
             val pendReps = Repo.pendingReps
+            // Round 9 (R9-A8-3): και η απάντηση στο «Πρώτο σετ» («rir1»), ώσπου η κατάσταση του κινητού να μην τη ζητά πια.
+            val pendFirst = Repo.pendingFirst
             val ph = Repo.phone
-            if (Repo.runningPhone && ph != null && (pend.isNotEmpty() || pendReps.isNotEmpty()) && nowEl - lastPendingSent >= 10_000) {
+            if (Repo.runningPhone && ph != null && (pend.isNotEmpty() || pendReps.isNotEmpty() || pendFirst.isNotEmpty()) && nowEl - lastPendingSent >= 10_000) {
                 lastPendingSent = nowEl
                 for ((i, k) in pend) {
                     val item = ph.items.getOrNull(i) ?: continue
@@ -888,6 +894,12 @@ class ExerciseService : Service() {
                     val item = ph.items.getOrNull(i) ?: continue
                     val set = item.sets.getOrNull(k) ?: continue
                     val o = repsCmd(i, k, item.ex, set.reps, set.at)
+                        .put(Proto.CMD_VERSION, Proto.MAJOR).put("sid", ph.id).put("q", Repo.nextCmdSeq())
+                    scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
+                }
+                for ((i, ex, v) in pendFirst) {
+                    val at = ph.items.getOrNull(i)?.sets?.getOrNull(0)?.at ?: 0L
+                    val o = rir1Cmd(i, ex, at, v)
                         .put(Proto.CMD_VERSION, Proto.MAJOR).put("sid", ph.id).put("q", Repo.nextCmdSeq())
                     scope.launch { Link.sendJson(this@ExerciseService, Paths.CMD, o) }
                 }

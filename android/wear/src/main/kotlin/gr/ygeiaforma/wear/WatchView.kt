@@ -720,6 +720,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // R8-U3-06: η επιλογή του τρίτου κουμπιού μόνο τη μέρα που έγινε.
         val pick = chosenToday(chosen, chosenDay, java.time.LocalDate.now())
         val shown = plan?.workout(pick) ?: today?.takeIf { !it.isCardio } ?: strength.firstOrNull()
+        // Η κεφαλίδα «Σήμερα · όριο …» γράφεται (round 9, R9-U3-01: τότε η μέρα ξεκούρασης δεν ξαναγράφει «ΣΗΜΕΡΑ» από κάτω).
+        val header = !upd && (plan != null || Repo.knownLimit != null)
         if (plan != null || Repo.knownLimit != null) {
             // Το όριο που ισχύει, πριν ξεκινήσεις (έλεγχος 8/11)· και χωρίς πρόγραμμα, το τελευταίο που ήρθε (V-A-06).
             val lim = Repo.limitNow()
@@ -785,7 +787,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
                 }
             }
             else -> {
-                small(c, "ΣΗΜΕΡΑ", 56f, gray, ess(10f), 120f)
+                // R9-U3-01: η ετικέτα μόνο όταν δεν γράφτηκε η κεφαλίδα «Σήμερα · …» (π.χ. με «Ενημέρωσε»)· πριν: «Σήμερα» δύο φορές.
+                if (!header) small(c, "ΣΗΜΕΡΑ", 56f, gray, ess(10f), 120f)
                 t(c, "Ξεκούραση", 80f, Color.WHITE, 15f * fs, true)
                 sayAdd("Σήμερα ξεκούραση")
                 pill(c, "Περπάτημα", 124f, 104f, 34f, card, Color.WHITE, 12f * fs) { actions.startWalk() }
@@ -1106,9 +1109,11 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val fresh = Repo.hrLive(now)
         val lim = Repo.alarm.limit
         val over = fresh && lim != null && Repo.bpm >= lim
-        if (!fresh && Repo.running != null && lim == null) {
-            // R7-U3-05: στα πρώτα 30″ πριν από τον πρώτο παλμό «περιμένω παλμούς», όπως στο σετ και στο κινητό.
-            val waiting = hrWaiting(Repo.hrSilent != null, Repo.bpmAt, Repo.startedAt, now)
+        // R7-U3-05: στα πρώτα 30″ πριν από τον πρώτο παλμό «περιμένω παλμούς», όπως στο σετ και στο κινητό. Round 9 (R9-U3-02):
+        // και ΜΕ όριο γιατρού, όπως στο σετ ([heart]): πριν, εκεί έγραφε κεχριμπάρι «♥ —» και «το όριο δεν σε προσέχει» σε
+        // κάθε έναρξη. Μετά τα 30″ (ίδια στιγμή με τη δόνηση και με το κινητό) όπως πριν.
+        val waiting = !fresh && Repo.running != null && hrWaiting(Repo.hrSilent != null, Repo.bpmAt, Repo.startedAt, now)
+        if (!fresh && Repo.running != null && (lim == null || waiting)) {
             t(c, if (waiting) HR_WAIT_TEXT else "♥ δεν μετριούνται", y, gray, ess(10f), true)
             sayAdd(if (waiting) "Περιμένω παλμούς" else "Δεν μετριούνται παλμοί")
             return
@@ -1265,7 +1270,9 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
 
     /** Δύο χρώματα σε μία κεντραρισμένη γραμμή («Σήμερα · » γκρι + «όριο 140» χρώμα). */
     private fun twoTone(c: Canvas, a: String, b: String, y: Float, colorB: Int, size0: Float) {
-        // Μικραίνει ώσπου να χωρά στον κύκλο (π.χ. «Άλλη προπόνηση · όριο 140» με γράμματα 1,3×).
+        // Μικραίνει ώσπου να χωρά στον κύκλο (π.χ. «Άλλη προπόνηση · όριο 140» με γράμματα 1,3×). Έλεγχος 14/11, round 9
+        // (R9-U3-10): στη χορδή του κύκλου στο ύψος της γραμμής ([chordAt], 3u από την άκρη, ο κανόνας U7-03), όχι σε σταθερά
+        // 136u: στη θέση 33u η χορδή είναι ≈ 120u και η «Άλλη προπόνηση · χωρίς όριο» έβγαινε έξω από τον κύκλο. Ως [NOTE_MIN].
         var size = size0
         var wa: Float
         var wb: Float
@@ -1275,9 +1282,10 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             wa = text.measureText(a)
             text.typeface = Typeface.DEFAULT_BOLD
             wb = text.measureText(b)
-            if (wa + wb <= 136f * u || size <= 8f) break
-            size -= 0.5f
+            if (wa + wb <= minOf(136f, chordAt(y, size)) * u || size <= NOTE_MIN) break
+            size = maxOf(NOTE_MIN, size - 0.5f)
         }
+        drawnSizes?.put(a + b, size)
         val old = text.textAlign
         text.textAlign = Paint.Align.LEFT
         val x = cx - (wa + wb) / 2

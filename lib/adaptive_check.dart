@@ -259,11 +259,22 @@ DateTime? lastChangeDay(Goals g) {
 /// έγινε εκείνη τη μέρα ή αργότερα· αν από τότε δεν άλλαξε, ο τωρινός. Η μέρα της αλλαγής μετρά με τον παλιό στόχο (το
 /// «Εφάρμοσε» πατιέται κάποια ώρα μέσα στη μέρα). Πριν, κάθε μέρα συγκρινόταν με τον ΤΩΡΙΝΟ στόχο: όποιος έτρωγε ακριβώς
 /// τους στόχους του, μετά από δύο «+150» άκουγε «τρως πολύ λίγο» και το επόμενο +150 δεν προτεινόταν.
+/// Round 9 (R9-A1-2 / R9-A12-4): από το [Goals.hist], όπου γράφεται ΚΑΘΕ αλλαγή του στόχου (κάρτα, δικός σου στόχος,
+/// «από τον υπολογισμό», «Ξανά ο οδηγός», «Υπολόγισε ξανά»), όχι μόνο από το «Εφάρμοσε»: πριν, μετά από έναν δικό σου
+/// στόχο 2.000 οι προηγούμενες μέρες κρίνονταν με το 2.000 αντί για τον στόχο τους, και το [log] κρατά μόνο τους
+/// [adaptLogMax] τελευταίους ελέγχους. Όσο το [Goals.hist] είναι άδειο (στόχοι από παλιότερη έκδοση), οι αλλαγές από
+/// κάρτα του [Goals.log], όπως πριν. Μέρες πριν από την αρχή των στόχων δεν ξεχωρίζουν εδώ (η Διατροφή: [beforeGoals]).
 int targetOn(Goals g, DateTime d) {
   final key = dateKey(d);
-  AdaptLog? next;
-  for (final l in g.log) {
-    if (l.applied && l.day.compareTo(key) >= 0 && (next == null || l.day.compareTo(next.day) < 0)) next = l;
+  final changes = g.hist.isNotEmpty
+      ? g.hist
+      : [
+          for (final l in g.log)
+            if (l.applied) TargetChange(day: l.day, before: l.before, after: l.after),
+        ];
+  TargetChange? next;
+  for (final c in changes) {
+    if (c.day.compareTo(key) >= 0 && (next == null || c.day.compareTo(next.day) < 0)) next = c;
   }
   return next?.before ?? g.kcal;
 }
@@ -500,7 +511,10 @@ Goals _markForeignSeen(CheckIn c, Goals g) {
 
 /// «Εφάρμοσε»: ο νέος στόχος ισχύει από τώρα. Αντικαθιστά και τον δικό σου αριθμό, αν είχες γράψει (το ζήτησες εσύ).
 /// Και το βήμα της «γρήγορης απώλειας» γράφεται πια στο ιστορικό ([AdaptLog.fast]· έλεγχος 13/11, S1-3 / S1-6).
-Goals applyCheckIn(CheckIn c, DateTime today) {
+/// Round 9 (R9-A1-2): και στο ιστορικό του στόχου ([Goals.recordChangeFrom]), όπως κάθε άλλη αλλαγή.
+Goals applyCheckIn(CheckIn c, DateTime today) => _applied(c, today).recordChangeFrom(c.goals, today);
+
+Goals _applied(CheckIn c, DateTime today) {
   final day = dateKey(today);
   final p = c.proposal!;
   if (c.kind == CheckKind.fast) {

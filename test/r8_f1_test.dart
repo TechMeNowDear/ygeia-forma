@@ -486,7 +486,8 @@ void main() {
       expect(value, findsOneWidget);
       expect(t.getTopRight(value).dx, closeTo(t.getTopRight(bar).dx, 1));
     });
-    testWidgets('360 dp με γράμματα 1,3×: «13 g / έως 14 g» στη δεξιά άκρη', (t) async {
+    // Round 9 (R9-A3-2): όριο 13,9 g (ακριβές)· 13 g είναι 0,9 g από αυτό, άρα γράφονται με ένα δεκαδικό (R7-A3-3).
+    testWidgets('360 dp με γράμματα 1,3×: «13,0 g / έως 13,9 g» στη δεξιά άκρη', (t) async {
       final f = _f('G', {Nk.kcal: 1500, Nk.satFat: 13, Nk.protein: 60, Nk.carbs: 150, Nk.fat: 50, Nk.fiber: 20, Nk.sugars: 30, Nk.salt: 3});
       await _pump(
           t,
@@ -496,7 +497,7 @@ void main() {
           size: const Size(360, 1200),
           textScale: 1.3);
       expect(t.takeException(), isNull);
-      final value = find.text('13 g / έως 14 g', findRichText: true);
+      final value = find.text('13,0 g / έως 13,9 g', findRichText: true);
       final bar = find.ancestor(of: value, matching: find.byType(GoalBar));
       expect(t.getTopRight(value).dx, closeTo(t.getTopRight(bar).dx, 1));
     });
@@ -671,7 +672,7 @@ void main() {
     await _pumpHost(t, (ctx) => Navigator.of(ctx).push<void>(MaterialPageRoute(builder: (_) => KitchenScreen(store: store))));
     await t.tap(find.text('άνοιξε'));
     await t.pumpAndSettle();
-    final pot = find.text('Κατσαρόλα · Μάρκα Τ');
+    final pot = find.text('Κατσαρόλα · Μάρκα Τ');
     await t.ensureVisible(pot);
     await t.tap(pot);
     await t.pumpAndSettle();
@@ -684,7 +685,7 @@ void main() {
     // Νέα «Η κουζίνα μου» χωρίς την κατσαρόλα· τσεκάρεις φριτέζα αέρος.
     await t.tap(find.text('άνοιξε'));
     await t.pumpAndSettle();
-    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsNothing);
+    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsNothing);
     final fryer = find.text('Φριτέζα αέρος (air fryer)');
     await t.ensureVisible(fryer);
     await t.tap(fryer);
@@ -698,8 +699,8 @@ void main() {
     expect(k.has('airFryer'), isTrue);
     expect(k.cookware.map((c) => c.id), ['x1']);
     // Η ανοιχτή οθόνη τη δείχνει, και η επόμενη αλλαγή της δεν τη σβήνει.
-    await t.ensureVisible(find.text('Κατσαρόλα · Μάρκα Τ'));
-    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsOneWidget);
+    await t.ensureVisible(find.text('Κατσαρόλα · Μάρκα Τ'));
+    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsOneWidget);
     final kettle = find.text('Βραστήρας');
     await t.ensureVisible(kettle);
     await t.tap(kettle);

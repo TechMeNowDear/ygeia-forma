@@ -80,10 +80,25 @@ const talkNearBelow = 7, talkNearAbove = 5, talkNearMinSec = 180, talkMaxDrift =
   final up = math.min(bLo + talkMaxDrift - walkLo, bHi + talkMaxDrift - walkHi);
   final down = math.max(bLo - talkMaxDrift - walkLo, bHi - talkMaxDrift - walkHi);
   if (up < down) return null;
-  final d = math.max(down, math.min(up, shift));
-  if (d == 0) return null;
+  // R9-A7-1: ποτέ αντίθετα από την απάντηση. Πριν, όταν η ζώνη του περπατήματος ήταν ήδη πάνω από τον υπολογισμό + 10,
+  // το «τραγουδούσα» έδινε πρόταση πιο ΚΑΤΩ (το όριο των ±10 έσπρωχνε πίσω), με κείμενο «μάλλον είναι λίγο πιο πάνω».
+  final int d;
+  if (shift > 0) {
+    d = math.min(shift, up);
+    if (d <= 0) return null;
+  } else {
+    d = math.max(shift, down);
+    if (d >= 0) return null;
+  }
   return (walkLo + d, walkHi + d);
 }
+
+/// R9-A7-1: η πρόταση [lo]–[hi] μετακινεί την ΤΩΡΙΝΗ ζώνη [zLo]–[zHi] προς την κατεύθυνση της απάντησης ([shift] > 0:
+/// πιο πάνω, < 0: πιο κάτω), και κανένα όριο ανάποδα. Η πρόταση βγαίνει από τη ζώνη του περπατήματος, που μπορεί να
+/// διαφέρει από την τωρινή (π.χ. προσωρινή 115–137 και μετά, με τις νύχτες ύπνου, 108–131): «λαχάνιαζα» δεν πρέπει ποτέ
+/// να ανεβάζει τη ζώνη που ισχύει, ούτε «τραγουδούσα» να την κατεβάζει.
+bool talkMovesZone(int shift, int lo, int hi, int zLo, int zHi) =>
+    shift > 0 ? lo > zLo && hi >= zHi : shift < 0 && lo < zLo && hi <= zHi;
 
 /// Η κάρτα της ζώνης στην Προπόνηση (σχέδια 12/11, 4α).
 class ZoneCard extends StatelessWidget {
@@ -588,7 +603,7 @@ class _TalkTestCardState extends State<TalkTestCard> {
         answer: a, walkLo: wLo, walkHi: wHi, baseLo: base?.lo, baseHi: base?.hi, nearSec: secs.near, aboveSec: secs.above);
     if (next == null) return;
     final (lo, hi) = next;
-    if (z.lo == lo && z.hi == hi) return;
+    if (!talkMovesZone(shift, lo, hi, z.lo, z.hi)) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

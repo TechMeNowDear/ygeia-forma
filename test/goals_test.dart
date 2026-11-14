@@ -314,7 +314,9 @@ void main() {
   });
 
   group('Οθόνες', () {
-    testWidgets('ο οδηγός: βάρος με το χέρι, γιατρός «Ναι» → 2.250 kcal και η σελίδα «Στόχοι»', (t) async {
+    // Round 9 (R9-A1-3): «Μέτρια» κίνηση = 1,65 (FAO/WHO/UNU 2004): 1.830 × 1,65 = 3.019,5 − 495 = 2.524,5 → 2.520·
+    // κορεσμένα 2.520 × 6% ÷ 9 = 16,8 g (πριν, με 1,5: 2.250 και 15 g).
+    testWidgets('ο οδηγός: βάρος με το χέρι, γιατρός «Ναι» → 2.520 kcal και η σελίδα «Στόχοι»', (t) async {
       final store = HealthStore()..setProfile(_me);
       await _pump(t, Builder(builder: (context) => Scaffold(body: Center(child: FilledButton(
         key: const ValueKey('open'),
@@ -340,12 +342,12 @@ void main() {
       await t.tap(find.byKey(const ValueKey('opt-doc-yes')));
       await t.pumpAndSettle();
       await next();
-      expect(find.text('2.250 kcal', findRichText: true), findsOneWidget);
-      expect(find.text('έως 15 g · 6%'), findsOneWidget);
+      expect(find.text('2.520 kcal', findRichText: true), findsOneWidget);
+      expect(find.text('έως 16,8 g · 6%'), findsOneWidget);
       await next();
       expect(find.byType(GoalsPage), findsOneWidget);
       final g = store.goals!;
-      expect((g.kcal, g.protein, g.doctor, g.kg, g.since), (2250, 145, true, 90.0, '2026-11-12'));
+      expect((g.kcal, g.protein, g.doctor, g.kg, g.since, g.activity), (2520, 145, true, 90.0, '2026-11-12', 1.65));
       expect(find.byKey(const ValueKey('goals-bran')), findsOneWidget);
       expect(t.takeException(), isNull);
     });

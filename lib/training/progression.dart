@@ -140,23 +140,14 @@ String _l(LoadKind k, double? v) => loadLabel(k, v);
 /// R8-A6-3: τα σετ που κρίνονται για την πρόοδο: όσα έγιναν, ως τα σετ του προγράμματος εκείνης της μέρας ([ExLog.sets],
 /// ή [ExLog.plannedSets] μετά από αλλαγή άσκησης). Ένα σετ παραπάνω με το «+ Σετ» μένει στο ιστορικό και στον όγκο, αλλά
 /// δεν κρίνεται: πριν, ένα τρίτο σετ με 13 μετά από 15, 15 έκανε το «κάτω όριο» 13 (καμία αύξηση, για πάντα), και ένα
-/// σετ των 5 δύο φορές κατέβαζε το βάρος. Η ρεζέρβα που απαντάς αφορά ήδη το τελευταίο σετ του προγράμματος.
-List<SetLog> _judged(ExLog e) {
-  final d = e.done;
-  final n = math.max(e.sets, e.plannedSets ?? 0);
-  return n > 0 && d.length > n ? d.sublist(0, n) : d;
-}
+/// σετ των 5 δύο φορές κατέβαζε το βάρος. Η ρεζέρβα που απαντάς μετά την τελευταία γραμμή: [_rirOf] (R9-U3-08).
+/// R9-A6-2: ο κανόνας ζει στο [ExLog.judged], ίδιος για την «Πρόοδο» (progress.dart).
+List<SetLog> _judged(ExLog e) => e.judged;
 
 /// Το φορτίο με το οποίο ΤΕΛΕΙΩΣΕ η άσκηση: του τελευταίου σετ που έγινε. Όχι το μεγαλύτερο ([ExLog.workLoad]): αν μετά
 /// το 1ο σετ το βάρος κατέβηκε (βαθμονόμηση, S6-7) ή ανέβηκε, η επόμενη φορά ξεκινά από εκεί που κατέληξες.
-/// R8-A6-3: από τα σετ που κρίνονται ([_judged]).
-double? _endLoad(ExLog e) {
-  final d = _judged(e);
-  for (var i = d.length - 1; i >= 0; i--) {
-    if (d[i].load != null) return d[i].load;
-  }
-  return null;
-}
+/// R8-A6-3: από τα σετ που κρίνονται ([_judged])· R9-A6-2: το ίδιο [ExLog.endLoad] με την «Πρόοδο».
+double? _endLoad(ExLog e) => e.endLoad;
 
 /// Οι λιγότερες επαναλήψεις στα σετ που έγιναν με το φορτίο [load] (τα σετ με άλλο φορτίο δεν κρίνονται).
 /// R8-A6-3: μόνο τα σετ του προγράμματος ([_judged]).
@@ -171,6 +162,20 @@ int _lowAt(ExLog e, double? load) {
 /// [a] είναι ευκολότερο φορτίο από το [b] (στο λάστιχο βοήθειας: περισσότερη βοήθεια).
 bool _easier(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a > b : a < b;
 
+/// R9-U3-08: η ερώτηση «Τελευταίο σετ: πόσες ακόμα;» γίνεται μετά την ΤΕΛΕΥΤΑΙΑ γραμμή (όπως στο ρολόι), που μπορεί να
+/// είναι σετ παραπάνω («+ Σετ»)· κρίνονται όμως τα σετ του προγράμματος ([_judged]). Σετ παραπάνω με ίδιο ή βαρύτερο
+/// φορτίο, και πιο κουρασμένος: η ρεζέρβα εκεί είναι το πολύ όση στο τελευταίο σετ του προγράμματος, άρα μετρά. Σετ
+/// παραπάνω πιο ελαφρύ: ένα «άφησα 3» εκεί δεν λέει πόσες έμεναν στα βαρύτερα, άρα δεν μετρά για αύξηση (σαν να μην
+/// απαντήθηκε). Απάντηση 0 ή 1 μετρά πάντα (κανόνας ασφαλείας).
+int? _rirOf(ExLog e) {
+  final ra = e.rirAnswer;
+  if (ra == null || ra < 2) return ra;
+  final d = e.done;
+  if (d.length <= _judged(e).length) return ra;
+  final end = _endLoad(e), extra = d.last.load;
+  return end != null && extra != null && _easier(e.kind, extra, end) ? null : ra;
+}
+
 /// [a] είναι τουλάχιστον τόσο δύσκολο όσο το [b] (με ανοχή δεκαδικών).
 bool _atLeast(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a <= b + 1e-6 : a >= b - 1e-6;
 
@@ -179,11 +184,19 @@ bool _atLeast(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a <=
 /// φορτίο που κατέβασε η εφαρμογή (διάλειμμα, δύο φορές κάτω, απάντηση στο 1ο σετ) ξανανεβαίνει ως εκεί με τους
 /// κανονικούς κανόνες (πάνω όριο, ένα σκαλί τη φορά), όσο μεγάλο κι αν είναι το σκαλί του εξοπλισμού. Αν η πιο πρόσφατη
 /// τέτοια φορά ήταν κάτω από το εύρος (π.χ. δύο φορές κάτω → ένα σκαλί κάτω), όχι: ισχύει ο κανόνας του [stepCeiling].
+/// R9-A6-4: ούτε σετ που είπες ότι έγινε σχεδόν ως την εξάντληση (απάντηση 0 ή 1): το 1ο σετ με τέτοια απάντηση στο
+/// «Πρώτο σετ» ([ExLog.firstAnswer]), και τα σετ με το τελικό φορτίο όταν τόσο ήταν το «άφησες» στο τέλος
+/// ([ExLog.rirAnswer]). Αυτό το φορτίο η ίδια η εφαρμογή το έκρινε πολύ βαρύ (κανόνας ρεζέρβας ≥ 2, MacDougall 1985):
+/// ξαναμπαίνει με τον κανόνα του [stepCeiling], όχι «το έχεις ήδη κάνει». Χωρίς απάντηση: όπως πριν.
 bool _lifted(LoadKind k, double load, List<(DateTime, ExLog)> usable) {
+  bool near(int? a) => a != null && a >= 0 && a < 2;
   for (final (_, h) in usable) {
     final at = [for (final s in _judged(h)) if (s.load != null && _atLeast(k, s.load!, load)) s];
     if (at.isEmpty) continue;
-    return h.pain.isEmpty && at.any((s) => s.reps >= h.lo);
+    final first = h.log.isEmpty ? null : h.log.first;
+    final end = _endLoad(h);
+    bool counts(SetLog s) => s.reps >= h.lo && !(near(h.firstAnswer) && identical(s, first)) && !(near(h.rirAnswer) && s.load == end);
+    return h.pain.isEmpty && at.any(counts);
   }
   return false;
 }
@@ -198,6 +211,20 @@ String _bigStepNote(PlanItem item, LoadKind k, double up, int ceiling) =>
     'Μετά πες μου να το κάνουμε πιο δύσκολο${_noSelfStep.contains(item.ex) ? '' : ', ή ανέβασε εσύ με το «+» όταν νιώθεις έτοιμος'}.';
 
 const _hint = ' Αν είναι πολύ ελαφρύ (θα έβγαζες άνετα τις τριπλάσιες), ανέβασε ένα σκαλί με το «+».';
+
+/// R9-A6-10: η συμβουλή όταν το «4+» επαναλαμβάνεται (δύο φορές στη σειρά, [_easy]).
+const _hintTwice = ' Άφησες 4+ και τις δύο τελευταίες φορές: αν είναι πολύ ελαφρύ, ανέβασε εσύ ένα σκαλί με το «+».';
+
+/// R9-A6-10: η φορά [h] έγινε όλη (τα σετ του προγράμματος) μέσα στο εύρος της, χωρίς ενόχληση, και άφησες «4+».
+bool _easy(ExLog h) {
+  final d = _judged(h);
+  return _rirOf(h) == 4 &&
+      h.pain.isEmpty &&
+      !h.skipped &&
+      d.isNotEmpty &&
+      d.length >= math.max(h.sets, h.plannedSets ?? 0) &&
+      _lowAt(h, _endLoad(h)) >= h.lo;
+}
 
 /// Η συμβουλή «ανέβασέ το εσύ» (S7-22) ταιριάζει: αλτήρες με μεγάλο σκαλί (ως +34%), και όταν «τριπλάσιες» επαναλήψεις
 /// φτάνουν πράγματι για το σκαλί ([repsBeforeStep] χωρίς τη ρεζέρβα: ratio × (30 + lo + ρεζέρβα) − 30).
@@ -249,7 +276,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final gap = daysBetween(lastDay, today);
 
   // Χωρίς απάντηση δεν ξέρουμε πόσο κοντά στην αποτυχία ήταν: ποτέ περισσότερα κιλά (έλεγχος 8/11).
-  final ra = last.rirAnswer;
+  final ra = _rirOf(last);
   final rirOk = ra != null && ra >= rirGoal;
   final strict = k == LoadKind.bar || caution;
   final up = lastLoad == null ? null : stepUp(k, lastLoad);
@@ -449,8 +476,26 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     }
     // S7-22: «4+» σημαίνει «τουλάχιστον 4»· αν ήταν πολύ περισσότερες, το ξέρεις μόνο εσύ. Όχι αν το βαρύτερο
     // δοκιμάστηκε ήδη και γύρισες πίσω.
-    if (ra == 4 && rirGoal < 4 && !strict && _hintFits(item, k, lastLoad, up, rirGoal) && !usable.any((h) => _endLoad(h.$2) == up)) {
+    final tried = usable.any((h) => _endLoad(h.$2) == up);
+    if (ra == 4 && rirGoal < 4 && !strict && _hintFits(item, k, lastLoad, up, rirGoal) && !tried) {
       b.write(_hint);
+    } else if (ra == 4 &&
+        rirGoal < 4 &&
+        !caution &&
+        auto &&
+        up != null &&
+        hasLoad(k) &&
+        k != LoadKind.bandAssist &&
+        !lightOnly.contains(item.ex) &&
+        !_noSelfStep.contains(item.ex) &&
+        !tried &&
+        usable.length > 1 &&
+        _easy(usable[1].$2)) {
+      // R9-A6-10: «4+» και τις δύο τελευταίες φορές, σε κάθε άσκηση με φορτίο (και μπάρα, kettlebell, κέρατο, hip thrust,
+      // όπου η συμβουλή S7-22 δεν έβγαινε ποτέ): η εφαρμογή ανεβαίνει μόνο +1 επανάληψη τη φορά, ενώ η ρεζέρβα δείχνει
+      // ένταση κάτω από αυτή του προγράμματος (αρχάριοι: 60–70% του μέγιστου για 8–12, ACSM 2009). Μόνο πρόταση, ένα
+      // σκαλί, απόφαση του χρήστη· όχι σε άσκηση προσοχής, ούτε όταν το βαρύτερο δοκιμάστηκε και γύρισες πίσω.
+      b.write(_hintTwice);
     }
     return Target(load: lastLoad, reps: reps, change: Change.more, reason: b.toString());
   }
@@ -495,12 +540,37 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     }
   }
 
+  // R9-A6-9: κάτω από το εύρος ΚΑΙ ως την εξάντληση (άφησες 0 ή 1): το φορτίο είναι βαρύ για αυτό το εύρος. Ένα σκαλί
+  // πιο ελαφριά αμέσως, όπως μετά το 1ο σετ της πρώτης φοράς ([calibrate], S6-7), και όχι «ίδιο βάρος, περισσότερες»
+  // (πριν: 9,3 kg × 8, 7, 6 με «0» → 9,3 kg × 8, 8, 8). Ρεζέρβα ≥ 2: η πίεση ανεβαίνει απότομα κοντά στην εξάντληση
+  // (MacDougall κ.ά., J Appl Physiol 1985;58:785–90). Όπου δεν υπάρχει πιο ελαφρύ (ή άσκηση σώματος): ίδια, με την οδηγία.
+  if (done.isNotEmpty && ra != null && ra < 2 && low < last.lo) {
+    final down = lastLoad != null && hasLoad(k) ? stepDown(k, lastLoad, allowZero: k == LoadKind.plate) : null;
+    final said = ra == 0 ? 'Δεν άφησες καμία' : 'Άφησες $ra';
+    const stop = 'σταμάτα το σετ όταν σου μένουν 2: η πίεση ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση.';
+    if (down != null) {
+      final what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : 'ένα σκαλί πιο ελαφριά, ${_l(k, down)}';
+      return Target(
+        load: down,
+        reps: _same(sets, lo),
+        change: Change.down,
+        reason: '$said και δεν βγήκαν οι ${last.lo}: $what, από $lo επαναλήψεις, και $stop',
+      );
+    }
+    return Target(
+      load: lastLoad,
+      reps: asLast(),
+      change: Change.hold,
+      reason: '$said και δεν βγήκαν οι ${last.lo}: ${hasLoad(k) ? 'ίδιο βάρος, ' : ''}όχι περισσότερες επαναλήψεις, και $stop',
+    );
+  }
+
   // Κάτω από το εύρος δύο φορές στη σειρά με το ίδιο βάρος → ένα σκαλί κάτω. Μόνο από σετ που έγιναν.
   var streak = 0;
   for (final (_, h) in usable) {
     final hl = _endLoad(h);
     final hlow = _lowAt(h, hl);
-    final hr = h.rirAnswer;
+    final hr = _rirOf(h);
     final fine = hlow >= h.lo || (hr != null && hr >= rirGoal && hlow >= h.lo - closeReps);
     if (fine || hl != endLoad) break;
     streak++;
@@ -562,7 +632,14 @@ String? calibrateNote(PlanItem item, double? load, int reps, int rirAnswer) {
   final up = stepUp(k, load);
   if (up == null) return '$stays: είναι το μεγαλύτερο που βγαίνει με τον εξοπλισμό.';
   if (reps < item.lo) return '$stays: πρώτα περισσότερες επαναλήψεις με αυτό.';
+  final plus = _noSelfStep.contains(item.ex) ? '' : ' Αν είναι πολύ ελαφρύ, πάτα «+» στο βάρος.';
+  // R9-A6-1: σκαλί που δεν μπαίνει ποτέ μόνο του (λάστιχο 20 → 30 lb, +50%): το ίδιο που λέει ο στόχος της πρώτης φοράς
+  // ([_firstReason] / [_bigStepNote]), όχι «θέλει πρώτα περισσότερες επαναλήψεις», που υπόσχεται αύξηση που δεν έρχεται.
+  final sc = stepCeiling(item.ex, k, load, up, item.lo, item.hi, math.max(item.rir, 2));
+  if (!sc.step) {
+    return '$stays: το επόμενο σκαλί, ${_l(k, up)}, είναι πολύ μεγάλο για να μπει μόνο του· εδώ ανεβαίνουν οι επαναλήψεις, '
+        'ως τις ${sc.reps}.$plus';
+  }
   // Εδώ μόνο αλτήρες και λάστιχα του πάνω μέρους ([labelIsLoad]): το σκαλί θέλει πρώτα περισσότερες επαναλήψεις.
-  return '$stays: το επόμενο σκαλί, ${_l(k, up)}, θέλει πρώτα περισσότερες επαναλήψεις με αυτό.'
-      '${_noSelfStep.contains(item.ex) ? '' : ' Αν είναι πολύ ελαφρύ, πάτα «+» στο βάρος.'}';
+  return '$stays: το επόμενο σκαλί, ${_l(k, up)}, θέλει πρώτα περισσότερες επαναλήψεις με αυτό.$plus';
 }

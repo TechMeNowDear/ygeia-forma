@@ -117,10 +117,16 @@ class Food {
     this.cooked = const [],
     this.perMl = false,
     this.cholKind,
+    this.spoon = false,
   });
 
   /// Δικό μου προϊόν: τι μετρά στην κάρτα «Χοληστερίνη» ([CholKind]) ή null (δεν ορίστηκε).
   final String? cholKind;
+
+  /// Round9 (R9-A2-2): δικό μου προϊόν που μετριέται με το κουτάλι (ταχίνι, φυστικοβούτυρο, μαργαρίνη, μαγιονέζα), από τις
+  /// κατηγορίες του Open Food Facts ή από τη φόρμα ([isSpoonFood]). Κλειδί «sp» (νέο, προαιρετικό: οι παλιές εκδόσεις το
+  /// αγνοούν, και χωρίς αυτό το προϊόν μένει όπως πριν). Τα τρόφιμα της βάσης δεν το έχουν: εκείνα από την κατηγορία τους.
+  final bool spoon;
 
   /// Οι τιμές είναι ανά 100 ml (υγρό από το Open Food Facts). Αποθηκεύεται, ώστε η διόρθωση αργότερα να λέει ξανά
   /// «ανά 100 ml» και όχι «ανά 100 g» (δεύτερος έλεγχος διατροφής N9).
@@ -178,6 +184,7 @@ class Food {
         cookedLabel: j['cookedLabel'] as String?,
         perMl: j['perMl'] == true,
         cholKind: CholKind.parse(j['ck']),
+        spoon: j['sp'] == true,
         cooked: [
           for (final c in (j['cooked'] as List?) ?? const [])
             if (c is Map) ((c['id'] as String), (c['label'] as String)),
@@ -203,6 +210,7 @@ class Food {
         if (cooked.isNotEmpty) 'cooked': [for (final c in cooked) {'id': c.$1, 'label': c.$2}],
         if (perMl) 'perMl': true,
         if (cholKind != null) 'ck': cholKind,
+        if (spoon) 'sp': true,
         'n': n.toJson(),
       };
 
@@ -361,8 +369,10 @@ const typoSaltGrams = 10.0;
 /// πυκνά αλείμματα (ταχίνι, φυστικοβούτυρο, πραλίνα: από [spoonSpreadKcal] kcal στα 100 g· όχι το χούμους). Ένας
 /// κανόνας για την πρώτη ποσότητα, τα κουμπιά ποσότητας (5, 10, 15, 30 g) και τον κανόνα 3 του ελέγχου λάθους: πριν η
 /// μαγιονέζα άνοιγε με 10 g αλλά με κουμπιά 50–200 g (ένα πάτημα «100 g» = 692 kcal, χωρίς ερώτηση), και το ταχίνι
-/// άνοιγε με 100 g (631 kcal).
+/// άνοιγε με 100 g (631 kcal). Round9 (R9-A2-2): και τα δικά μου προϊόντα που το λένε ([Food.spoon]: σαρωμένο ταχίνι,
+/// φυστικοβούτυρο, μαργαρίνη, μαγιονέζα), που πριν έμεναν έξω όταν είχαν λιγότερα από 80 g λιπαρά.
 bool isSpoonFood(Food f) =>
+    f.spoon ||
     f.n.amount(Nk.fat) >= typoFatPer100 ||
     (f.cat == 'Λιπαρά' && !isOlives(f)) ||
     (f.cat == 'Αλείμματα' && f.n.amount(Nk.kcal) >= spoonSpreadKcal);
@@ -401,9 +411,10 @@ const rawCheckKcal = 300.0;
 const rawCheckGrams = 150.0;
 
 /// Να ρωτήσει η οθόνη «πριν ή μετά το μαγείρεμα;»; Μόνο για ξερή/ωμή μορφή με μαγειρεμένη μορφή στη βάση, από
-/// [rawCheckGrams] g, και μόνο όσο δεν την έχεις γράψει ποτέ ([timesEaten] = 0).
-bool askRawOrCooked(Food f, double grams, {required int timesEaten}) =>
-    f.isRawWithCooked && f.n.amount(Nk.kcal) >= rawCheckKcal && grams >= rawCheckGrams && timesEaten == 0;
+/// [rawCheckGrams] g, και μόνο όσο δεν την έχεις γράψει ποτέ ([timesEaten] = 0). Round9 (R9-A2-3): [dryMine] = δικό μου
+/// ξερό προϊόν (ζυμαρικό, ρύζι, όσπριο) που έχει βρασμένη μορφή στη βάση (off.dart, `dryStapleRawId`).
+bool askRawOrCooked(Food f, double grams, {required int timesEaten, bool dryMine = false}) =>
+    (f.isRawWithCooked || dryMine) && f.n.amount(Nk.kcal) >= rawCheckKcal && grams >= rawCheckGrams && timesEaten == 0;
 
 /// «1.250» για θερμίδες, «12,5» για γραμμάρια.
 String kcalText(double v) => thousands(v.round());

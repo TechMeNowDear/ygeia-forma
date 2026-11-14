@@ -101,9 +101,11 @@
   cloud.ouraring.com/oauth/applications παραπέμπει εκεί) με Redirect URI `https://ygeia-forma.netlify.app/oura/callback`
   (App Link· η μόνη που δέχεται ο μεσάζων: το `ygeiaforma://oura-callback` είναι μόνο προώθηση από τη σελίδα
   `/oura/callback` όταν ο browser δεν ανοίξει την εφαρμογή, όχι διεύθυνση επιστροφής) και το Client ID στο
-  `ouraClientId`. Scope: μία γραμμή, `ouraScopes` (κενό = «daily» στο classic, «extapi:daily» στο v2)· διακομιστής
-  σύνδεσης: μία γραμμή, `ouraOAuth` (classic ή v2). Το «scope» της απάντησης δεν ελέγχεται· 401 στον ύπνο μετά από
-  ανανέωση = «Λείπει άδεια στην Oura».
+  `ouraClientId`. Scope: μία γραμμή, `ouraScopes` (κενό = «daily spo2» στο portal και στο classic, «extapi:daily» στο
+  v2)· στο portal της Oura να είναι τσεκαρισμένα ΚΑΙ τα δύο (daily, spo2), αλλιώς δεν έρχεται ποτέ το οξυγόνο της
+  νύχτας. Διακομιστής σύνδεσης: μία γραμμή, `ouraOAuth` (portal = προεπιλογή, classic ή v2). Το «scope» της απάντησης
+  κρίνει μόνο αν δόθηκε το οξυγόνο (spo2)· την πρόσβαση στον ύπνο την κρίνουν τα 401/403 (401 στον ύπνο μετά από
+  ανανέωση = «Λείπει άδεια στην Oura»).
 - Το manifest (από το `flutter create`) συμπληρώνεται από το `tools/android/patch_manifest.py`: μικρή οθόνη
   `OuraCallbackActivity` για την επιστροφή και `<queries>` για browser. Η MainActivity δεν αλλάζει.
 - Το σχέδιο πηγών έχει δικό του αρχείο (`sources.json`, `lib/plan_file.dart`), ανεξάρτητο από τις ρυθμίσεις.

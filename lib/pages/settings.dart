@@ -185,7 +185,7 @@ class SettingsPage extends StatelessWidget {
                           icon: Icons.grid_view_rounded,
                           title: 'Κάρτες της «Σήμερα»',
                           subtitle: 'Τι εμφανίζεται',
-                          onTap: () => push('Κάρτες της Σήμερα', (_) => _TodayCardsPage(store: store)),
+                          onTap: () => push('Κάρτες της Σήμερα', (_) => TodayCardsPage(store: store)),
                         ),
                       ]),
                       const SettingsSection('Απόρρητο'),
@@ -280,9 +280,25 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
+/// Round 9 (R9-U4-8, f4): οι κάρτες της «Σήμερα» που με το Oura δεν εμφανίζονται ποτέ (today.dart: `!ouraNight && …`):
+/// Energy Score (τη θέση του παίρνει η ετοιμότητα του Oura), παλμοί και θερμοκρασία ύπνου. Οι διακόπτες τους δεν
+/// έκαναν τίποτα· τώρα δεν φαίνονται και η σελίδα λέει πού είναι αυτά ([todayCardsOuraNote]).
+const ouraHiddenTodayCards = {'energy', 'rhr', 'skin'};
+
+/// Οι κάρτες με διακόπτη στη σελίδα «Κάρτες της Σήμερα», για τη νύχτα του [now] ([plan]: από πού έρχεται η νύχτα).
+List<TodayCard> todayCardsToChoose(SourcePlan plan, DateTime now) {
+  final oura = plan.nightSource(now) != Source.watch;
+  return [for (final c in todayCards) if (!oura || !ouraHiddenTodayCards.contains(c.key)) c];
+}
+
+/// Τι λέει η σελίδα με το Oura, στη θέση των τριών διακοπτών. Η κάρτα «Ύπνος της νύχτας» έχει «Ετοιμότητα · HRV ·
+/// Παλμοί ύπνου» (oura_today.dart)· η θερμοκρασία είναι στην Υγεία › Ύπνος.
+const todayCardsOuraNote = 'Με το Oura, η ετοιμότητα και οι παλμοί ύπνου φαίνονται μέσα στην κάρτα «Ύπνος της '
+    'νύχτας» και η θερμοκρασία στην Υγεία › Ύπνος.';
+
 /// «Κάρτες της Σήμερα»: τι εμφανίζεται (πριν: κάρτα με διακόπτες μέσα στις Ρυθμίσεις).
-class _TodayCardsPage extends StatelessWidget {
-  const _TodayCardsPage({required this.store});
+class TodayCardsPage extends StatelessWidget {
+  const TodayCardsPage({super.key, required this.store});
   final HealthStore store;
 
   @override
@@ -292,7 +308,9 @@ class _TodayCardsPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Κάρτες της «Σήμερα»'), backgroundColor: c.background, surfaceTintColor: Colors.transparent),
       body: ListenableBuilder(
         listenable: store,
-        builder: (context, _) => ListView(padding: EdgeInsets.fromLTRB(16, 4, 16, 32 + MediaQuery.paddingOf(context).bottom), children: [
+        builder: (context, _) {
+          final shown = todayCardsToChoose(store.plan, DateTime.now());
+          return ListView(padding: EdgeInsets.fromLTRB(16, 4, 16, 32 + MediaQuery.paddingOf(context).bottom), children: [
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 680),
@@ -301,18 +319,26 @@ class _TodayCardsPage extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text('Τα δεδομένα διαβάζονται όλα· εδώ διαλέγεις μόνο τι εμφανίζεται.',
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4)),
-                  for (final card in todayCards)
+                  for (final card in shown)
                     SwitchListTile(
                       contentPadding: const EdgeInsets.only(right: 4),
                       title: Text(card.label),
                       value: store.prefs.show(card.key),
                       onChanged: (on) => store.setCard(card.key, on),
                     ),
+                  if (shown.length < todayCards.length)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 6, 10, 6),
+                      child: Text(todayCardsOuraNote,
+                          key: const ValueKey('today-cards-oura-note'),
+                          style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4)),
+                    ),
                 ]),
               ),
             ),
           ),
-        ]),
+        ]);
+        },
       ),
     );
   }

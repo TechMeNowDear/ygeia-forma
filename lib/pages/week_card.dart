@@ -53,70 +53,102 @@ class WeekCard extends StatelessWidget {
     final shown = r.items.where((t) => t.current != null).toList();
 
     return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconBadge(Icons.calendar_month_rounded, c.primary, size: 38),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      // Round 9 (R9-U1-2): στο ανοιχτό Fold η κάρτα είναι κάτω από τις δύο στήλες, σε όλο το πλάτος (today.dart): εκεί
+      // (≥ 600 dp) οι πλακέτες σε μία σειρά και οι γραμμές σε δύο στήλες (~320 dp η καθεμία), ποτέ τεντωμένες.
+      child: LayoutBuilder(builder: (context, box) {
+        final wide = box.maxWidth >= 600;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                IconBadge(Icons.calendar_month_rounded, c.primary, size: 38),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Η εβδομάδα σου',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.2),
+                      ),
+                      Text(
+                        '$range · σε σύγκριση με τις 4 προηγούμενες εβδομάδες',
+                        style: TextStyle(fontSize: 13, color: c.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            // Round 1 (U1b-05): δύο ανά σειρά με ΙΔΙΟ ύψος· μια μονή τελευταία σε όλο το πλάτος (πριν: κουτιά άλλου ύψους
+            // και ένα μόνο του με κενό δίπλα).
+            // Round 9 (R9-U1-2): σε φαρδιά κάρτα όλες σε μία σειρά, με θέσεις για 4 (ίδιο πλάτος, όσες κι αν είναι).
+            if (highlights.isNotEmpty && wide) ...[
+              const SizedBox(height: 14),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Η εβδομάδα σου',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.2),
-                    ),
-                    Text(
-                      '$range · σε σύγκριση με τις 4 προηγούμενες εβδομάδες',
-                      style: TextStyle(fontSize: 13, color: c.textSecondary),
-                    ),
+                    for (var i = 0; i < 4; i++) ...[
+                      if (i > 0) const SizedBox(width: 10),
+                      Expanded(child: i < highlights.length ? _Highlight.of(highlights[i]) : const SizedBox()),
+                    ],
                   ],
                 ),
               ),
+            ] else if (highlights.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              for (var i = 0; i < highlights.length; i += 2) ...[
+                if (i > 0) const SizedBox(height: 10),
+                if (i + 1 < highlights.length)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _Highlight.of(highlights[i])),
+                        const SizedBox(width: 10),
+                        Expanded(child: _Highlight.of(highlights[i + 1])),
+                      ],
+                    ),
+                  )
+                else
+                  _Highlight.of(highlights[i]),
+              ],
             ],
-          ),
-          // Round 1 (U1b-05): δύο ανά σειρά με ΙΔΙΟ ύψος· μια μονή τελευταία σε όλο το πλάτος (πριν: κουτιά άλλου ύψους
-          // και ένα μόνο του με κενό δίπλα).
-          if (highlights.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            for (var i = 0; i < highlights.length; i += 2) ...[
-              if (i > 0) const SizedBox(height: 10),
-              if (i + 1 < highlights.length)
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: _Highlight.of(highlights[i])),
-                      const SizedBox(width: 10),
-                      Expanded(child: _Highlight.of(highlights[i + 1])),
-                    ],
-                  ),
-                )
-              else
-                _Highlight.of(highlights[i]),
+            if (shown.isNotEmpty && wide) ...[
+              const SizedBox(height: 10),
+              for (var i = 0; i < shown.length; i += 2) ...[
+                if (i > 0) const Hairline(vertical: 0),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _WeekRow(t: shown[i])),
+                    const SizedBox(width: 24),
+                    Expanded(child: i + 1 < shown.length ? _WeekRow(t: shown[i + 1]) : const SizedBox()),
+                  ],
+                ),
+              ],
+            ] else if (shown.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (var i = 0; i < shown.length; i++) ...[
+                if (i > 0) const Hairline(vertical: 0),
+                _WeekRow(t: shown[i]),
+              ],
             ],
+            const SizedBox(height: 8),
+            Text(
+              // Δεύτερος έλεγχος υπολογισμών C1: με 7 μέρες ο έλεγχος σπάνια βλέπει αλλαγή· «Σταθερό» δεν σημαίνει «χωράει».
+              'Μεσαία τιμή της εβδομάδας. «Σταθερό»: δεν φαίνεται καθαρή αλλαγή· μία εβδομάδα σπάνια αρκεί για να φανεί.'
+              '${r.items.any((t) => t.current != null && t.inconclusive) ? ' «Λίγες μέρες για συμπέρασμα»: οι μέρες μοιάζουν πολύ μεταξύ τους και δεν φτάνουν για σύγκριση.' : ''}'
+              '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα και στον ενεργό χρόνο, γιατί δεν έχει τελειώσει.' : ''}'
+              // Έλεγχος υπολογισμών F17: δύο ζυγίσεις μιας εβδομάδας απέχουν συχνά 0,5–1 kg μόνο από το νερό.
+              '${r.weightFirst != null && r.weightLast != null && r.weightFirst!.$1 != r.weightLast!.$1 ? ' Το βάρος αλλάζει 0,5–1 kg από μέρα σε μέρα με το νερό και το φαγητό· μία εβδομάδα δεν δείχνει τάση.' : ''}',
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textTertiary),
+            ),
           ],
-          if (shown.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            for (var i = 0; i < shown.length; i++) ...[
-              if (i > 0) const Hairline(vertical: 0),
-              _WeekRow(t: shown[i]),
-            ],
-          ],
-          const SizedBox(height: 8),
-          Text(
-            // Δεύτερος έλεγχος υπολογισμών C1: με 7 μέρες ο έλεγχος σπάνια βλέπει αλλαγή· «Σταθερό» δεν σημαίνει «χωράει».
-            'Μεσαία τιμή της εβδομάδας. «Σταθερό»: δεν φαίνεται καθαρή αλλαγή· μία εβδομάδα σπάνια αρκεί για να φανεί.'
-            '${r.items.any((t) => t.current != null && t.inconclusive) ? ' «Λίγες μέρες για συμπέρασμα»: οι μέρες μοιάζουν πολύ μεταξύ τους και δεν φτάνουν για σύγκριση.' : ''}'
-            '${r.items.any((t) => t.end.isBefore(r.sunday)) ? ' Η σημερινή μέρα δεν μετράει στα βήματα και στον ενεργό χρόνο, γιατί δεν έχει τελειώσει.' : ''}'
-            // Έλεγχος υπολογισμών F17: δύο ζυγίσεις μιας εβδομάδας απέχουν συχνά 0,5–1 kg μόνο από το νερό.
-            '${r.weightFirst != null && r.weightLast != null && r.weightFirst!.$1 != r.weightLast!.$1 ? ' Το βάρος αλλάζει 0,5–1 kg από μέρα σε μέρα με το νερό και το φαγητό· μία εβδομάδα δεν δείχνει τάση.' : ''}',
-            style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textTertiary),
-          ),
-        ],
-      ),
+        );
+      }),
     );
   }
 }

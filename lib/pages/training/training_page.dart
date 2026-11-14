@@ -40,15 +40,10 @@ class TrainingPage extends StatefulWidget {
 
 class _TrainingPageState extends State<TrainingPage> {
   late Future<void> _ready = Future.wait([widget.training.load(), ExLibrary.load()]);
-  /// Η προπόνηση που διάλεξες από το ⋮ για σήμερα, και ποια μέρα. R8-U3-05: ισχύει μόνο εκείνη τη μέρα και ως να ξεκινήσει
-  /// η προπόνηση· πριν έμενε και τις επόμενες μέρες (όσο ζούσε η εφαρμογή), χωρίς καμία ένδειξη.
-  (String, DateTime)? _chosen;
 
-  /// Η επιλογή σου, αν ισχύει σήμερα.
-  String? get _chosenToday {
-    final ch = _chosen;
-    return ch != null && sameDay(ch.$2, _now) ? ch.$1 : null;
-  }
+  /// Η προπόνηση που διάλεξες από το ⋮ για σήμερα. R8-U3-05: ισχύει μόνο εκείνη τη μέρα και ως να ξεκινήσει η προπόνηση.
+  /// R9-U3-06: κρατιέται στην αποθήκη ([TrainingStore.chosenOn]), ώστε η «Σήμερα» να λέει την ίδια.
+  String? get _chosenToday => t.chosenOn(_now);
 
   TrainingStore get t => widget.training;
 
@@ -347,7 +342,7 @@ class _TrainingPageState extends State<TrainingPage> {
           case 'export':
             _export(context);
           default:
-            if (v.startsWith('pick:')) setState(() => _chosen = (v.substring(5), _now));
+            if (v.startsWith('pick:')) setState(() => t.choose(v.substring(5), _now));
         }
       },
       itemBuilder: (_) => [
@@ -377,7 +372,7 @@ class _TrainingPageState extends State<TrainingPage> {
         TextButton(
           key: const ValueKey('train-chosen-reset'),
           style: TextButton.styleFrom(foregroundColor: c.exercise, minimumSize: const Size(0, 44)),
-          onPressed: () => setState(() => _chosen = null),
+          onPressed: () => setState(() => t.choose(null, _now)),
           child: const Text('Πίσω στο πρόγραμμα'),
         ),
       ]));
@@ -494,7 +489,7 @@ class _TrainingPageState extends State<TrainingPage> {
       children.add(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(Icons.directions_walk_rounded, size: 18, color: c.textSecondary),
         const SizedBox(width: 6),
-        Expanded(child: Text('Για περπάτημα: στο ρολόι πάτα «Περπάτημα».', style: aux)),
+        Expanded(child: Text('Για περπάτημα: στο ρολόι πάτα\u00A0«Περπάτημα».', style: aux)),
       ]));
     }
     return AppCard(
@@ -513,19 +508,6 @@ class _TrainingPageState extends State<TrainingPage> {
     );
   }
 
-  /// Ποιοι δίσκοι στους αλτήρες/μπάρα στην αρχή (από την πρώτη άσκηση κάθε οργάνου).
-  String? _setupHint(Workout w) {
-    final seen = <String>{};
-    final parts = <String>[];
-    for (final i in w.items) {
-      final k = i.kind;
-      final tool = switch (k) { LoadKind.dbPair || LoadKind.db => 'db', LoadKind.bar => 'bar', LoadKind.kb => 'kb', LoadKind.bandPair => 'bands', _ => '' };
-      if (tool.isEmpty || !seen.add(tool)) continue;
-      parts.add(setupText(k, t.targetFor(i).load));
-    }
-    return parts.isEmpty ? null : 'Στήσιμο: ${parts.join(' · ')}.';
-  }
-
   Widget _weekCard(BuildContext context, Program p, DateTime today) {
     final c = Aigaio.of(context);
     final monday = DateTime(today.year, today.month, today.day - (today.weekday - 1));
@@ -538,7 +520,8 @@ class _TrainingPageState extends State<TrainingPage> {
           for (var d = 1; d <= 7; d++)
             Expanded(child: () {
               final day = DateTime(monday.year, monday.month, monday.day + d - 1);
-              final w = p.workout(p.days[d]);
+              // R9-A6-6: πριν από την έναρξη του προγράμματος καμία προπόνηση του, όπως η κάρτα «Σήμερα» ([Program.forDay]).
+              final w = p.notStarted(day) ? null : p.workout(p.days[d]);
               final ds = [for (final s in week) if (s.finished && sameDay(s.start, day)) s];
               // round1, S6-13: «✓» μόνο όταν έγινε αυτό που έλεγε η μέρα (βάρη σε μέρα βαρών, περπάτημα σε μέρα
               // περπατήματος)· ένα πρωινό περπάτημα δεν «κλείνει» τη μέρα των βαρών. Ό,τι άλλο έγινε: μικρή τελεία.
@@ -750,8 +733,7 @@ class _TrainingPageState extends State<TrainingPage> {
   Future<void> _editHrLimit(BuildContext context) => editDoctorLimit(context, t);
 
   Future<void> _start(BuildContext context, Workout w) async {
-    // R8-U3-05: η επιλογή από το ⋮ τελειώνει με την προπόνηση που ξεκινά.
-    setState(() => _chosen = null);
+    // R8-U3-05 / R9-U3-06: η επιλογή από το ⋮ τελειώνει με την προπόνηση που ξεκινά ([TrainingStore.start]).
     t.start(w);
     // Ανοίγει και η εφαρμογή στο ρολόι (παλμοί, ✓ στον καρπό), αν υπάρχει.
     WearLink.main.openWatch();
@@ -834,10 +816,6 @@ class _TrainingPageState extends State<TrainingPage> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Αντιγράφηκε. Επικόλλησέ το στη συζήτηση με τον Claude.')));
   }
-}
-
-extension on String {
-  String ifEmpty(String other) => isEmpty ? other : this;
 }
 
 /// Η σταθερή πρόταση για τα φάρμακα στη φόρμα ορίου (έλεγχος 9/11, V-B-06· ESC 2020, Pelliccia κ.ά., Eur Heart J 2021:

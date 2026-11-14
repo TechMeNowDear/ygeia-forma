@@ -62,7 +62,15 @@ class MainActivity : FlutterFragmentActivity() {
 
     private var wear: WearBridge? = null
 
+    // Round 9 (R9-A10-1): η οθόνη ξαναφτιάχνεται από το Android (αποθηκευμένη κατάσταση ή άνοιγμα από τα Πρόσφατα μετά
+    // από κλείσιμο της διεργασίας) με το ΑΡΧΙΚΟ Intent: τότε το πάτημα widget που την είχε ανοίξει δεν ξαναγίνεται.
+    // Ορίζεται πριν από το super.onCreate, γιατί από εκεί μέσα καλείται το configureFlutterEngine.
+    private var restored = false
+    private var fromHistory = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        restored = savedInstanceState != null
+        fromHistory = ((intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
         // «Διαγραφή όλων» που ξεκίνησε: τελειώνει εδώ, πριν ξεκινήσει η Flutter (έλεγχος του fix-accuracy, M4).
         DataWipe.finishIfNeeded(this)
         // S10-1: ό,τι extra της Flutter έβαλε άλλη εφαρμογή στο Intent φεύγει πριν το διαβάσει η Flutter.
@@ -90,7 +98,12 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        DataRules.widgetOpenTarget(intent?.getStringExtra(HomeWidgets.EXTRA_OPEN))?.let { HomeWidgets.pendingOpen = it }
+        // Round 9 (R9-A10-1): μόνο σε νέο άνοιγμα (όχι όταν το Android ξαναφτιάχνει την οθόνη με το αρχικό Intent).
+        DataRules.launchOpenTarget(
+            intent?.getStringExtra(HomeWidgets.EXTRA_OPEN),
+            restored = restored,
+            fromHistory = fromHistory,
+        )?.let { HomeWidgets.pendingOpen = it }
         widgets = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ygeia/widgets").also { ch ->
             ch.setMethodCallHandler { call, result ->
                 when (call.method) {

@@ -125,6 +125,7 @@ class PageFrame extends StatelessWidget {
     this.right = const [],
     this.single,
     this.top = const [],
+    this.bottom = const [],
   });
 
   final String title;
@@ -139,6 +140,10 @@ class PageFrame extends StatelessWidget {
 
   /// Σε δύο στήλες: πάνω από τις στήλες, σε όλο το πλάτος (π.χ. ειδοποίηση).
   final List<Widget> top;
+
+  /// Round 9 (R9-U1-2): σε δύο στήλες: κάτω από τις στήλες, σε όλο το πλάτος (π.χ. «Η εβδομάδα σου», ≈ 1.000 dp ψηλή
+  /// σε στήλη, που άφηνε τρύπα ~750 dp στην άλλη). Σε μία στήλη: στο τέλος (όταν δεν δίνεται [single]).
+  final List<Widget> bottom;
 
   static const gap = 14.0;
 
@@ -236,9 +241,10 @@ class PageFrame extends StatelessWidget {
                         Expanded(child: column(right)),
                       ],
                     ),
+                    if (bottom.isNotEmpty) ...[const SizedBox(height: gap), column(bottom)],
                   ],
                 )
-              : column(single ?? [...top, ...left, ...right]);
+              : column(single ?? [...top, ...left, ...right, ...bottom]);
 
           return RefreshIndicator(
             onRefresh: onRefresh,
@@ -459,7 +465,10 @@ class TrendPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (up != null) ...[
-            Icon(up! ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 13, color: color),
+            // Round 9 (R9-U4-3): όταν το κείμενο δεν έχει πρόσημο (Τάσεις «2.449», Πρόοδος «5 kg»), η κατεύθυνση υπάρχει
+            // μόνο στο βελάκι· χωρίς ετικέτα το TalkBack έλεγε «Βήματα, 4.522, 2.449». Με πρόσημο («+2 bpm · …») όχι διπλά.
+            Icon(up! ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                size: 13, color: color, semanticLabel: trendPillDirectionLabel(text, up!)),
             const SizedBox(width: 3),
           ],
           Flexible(
@@ -477,6 +486,11 @@ class TrendPill extends StatelessWidget {
     );
   }
 }
+
+/// Round 9 (R9-U4-3): τι λέει το TalkBack για το βελάκι του [TrendPill]: «αύξηση» / «μείωση» όταν το [text] δεν έχει
+/// πρόσημο (WCAG 1.1.1: πληροφορία μόνο σε εικόνα θέλει κείμενο)· null (σιωπή) όταν το πρόσημο είναι ήδη στο κείμενο.
+String? trendPillDirectionLabel(String text, bool up) =>
+    RegExp(r'^\s*[+\-−]').hasMatch(text) ? null : (up ? 'αύξηση' : 'μείωση');
 
 /// Μεγάλος αριθμός με μικρή μονάδα δίπλα.
 class BigValue extends StatelessWidget {
@@ -1623,6 +1637,79 @@ List<List<(DateTime, double)>> lineSegments(List<(DateTime, double)> points, Lis
   return out;
 }
 
+/// Round 9 (R9-U4-1): πού μπαίνει (πάνω αριστερή γωνία του κειμένου) η πλάκα με την τελευταία τιμή του [LineChart].
+/// [last]/[prev]: τα δύο τελευταία σημεία (px)· [lines]: τα κομμάτια της γραμμής όπως ζωγραφίζονται ([lineSegments])·
+/// [label]: το μέγεθος του κειμένου· [plot]: το πλαίσιο του γραφήματος· [width]: το πλάτος του καμβά.
+/// - Η γραμμή δεν έρχεται από ψηλότερα: πάνω από το σημείο (όπως πριν).
+/// - Έρχεται από ψηλότερα: κάτω από το σημείο, όταν χωρά (όπως πριν).
+/// - Αλλιώς (συνήθως: το βάρος πέφτει και η τελευταία ζύγιση είναι η χαμηλότερη): η πιο κοντινή θέση όπου η πλάκα δεν
+///   σκεπάζει καμία γραμμή, ψάχνοντας με βήμα 2 px πάνω από το σημείο (όλο και ψηλότερα) και αριστερά του, κάτω από την
+///   ευθεία που φτάνει σε αυτό (όλο και πιο αριστερά). Πριν η πλάκα έμπαινε αριστερά, στο ύψος του σημείου, ακριβώς πάνω
+///   στο τελευταίο τμήμα: η γραμμή φαινόταν να σταματά στην προηγούμενη ζύγιση (83,3) και η κουκκίδα 82,2 έμενε μόνη.
+///   Αν καμία θέση δεν είναι ελεύθερη (πολύ μικρό γράφημα), η θέση του γύρου 2 (R2-U1-8: δίπλα στο λευκό περίγραμμα της
+///   κουκκίδας).
+Offset lastValueLabelAt({
+  required Offset last,
+  Offset? prev,
+  required List<List<Offset>> lines,
+  required Size label,
+  required Rect plot,
+  required double width,
+}) {
+  final tw = label.width, th = label.height;
+  Offset fit(double x, double y) => Offset(
+        x.clamp(0.0, math.max(0.0, width - tw)).toDouble(),
+        y.clamp(0.0, math.max(0.0, plot.bottom - th)).toDouble(),
+      );
+  final cx = math.min(last.dx, plot.right - 16) - tw / 2;
+  if (prev == null || prev.dy >= last.dy - 2) return fit(cx, last.dy - 9 - th);
+  if (last.dy + 9 + th <= plot.bottom) return fit(cx, last.dy + 9);
+  // Η πλάκα ([_plate]: 3 px δεξιά-αριστερά, 1 px πάνω-κάτω) και μισό πάχος γραμμής γύρω της.
+  bool clear(Offset o) {
+    final r = Rect.fromLTWH(o.dx - 4.5, o.dy - 2.5, tw + 9, th + 5);
+    for (final l in lines) {
+      for (var i = 1; i < l.length; i++) {
+        if (segmentHitsRect(l[i - 1], l[i], r)) return false;
+      }
+    }
+    return true;
+  }
+
+  final belowLine = math.min(last.dy + 2, plot.bottom - th);
+  final far = math.max(plot.width, plot.height);
+  for (var d = 0.0; d <= far; d += 2) {
+    final up = fit(cx, last.dy - 9 - th - d);
+    if (clear(up)) return up;
+    final x = last.dx - 8 - tw - d;
+    if (x >= plot.left) {
+      final side = fit(x, belowLine);
+      if (clear(side)) return side;
+    }
+  }
+  return fit(last.dx - 8 - tw, last.dy - th / 2);
+}
+
+/// Round 9 (R9-U4-1): αν το ευθύγραμμο τμήμα [a]–[b] περνά από το ορθογώνιο [r] (αποκοπή Liang–Barsky).
+bool segmentHitsRect(Offset a, Offset b, Rect r) {
+  final dx = b.dx - a.dx, dy = b.dy - a.dy;
+  var t0 = 0.0, t1 = 1.0;
+  for (final (p, q) in [(-dx, a.dx - r.left), (dx, r.right - a.dx), (-dy, a.dy - r.top), (dy, r.bottom - a.dy)]) {
+    if (p == 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    final t = q / p;
+    if (p < 0) {
+      if (t > t1) return false;
+      if (t > t0) t0 = t;
+    } else {
+      if (t < t0) return false;
+      if (t < t1) t1 = t;
+    }
+  }
+  return t0 <= t1;
+}
+
 class _LinePainter extends CustomPainter {
   _LinePainter({
     required this.levels,
@@ -1792,22 +1879,18 @@ class _LinePainter extends CustomPainter {
     }
     final last = at(points.last);
     // Round 1 (U1a-10, U1b-02): η τελευταία τιμή πάνω σε πλάκα στο χρώμα της κάρτας· κάτω από το σημείο όταν η γραμμή
-    // έρχεται από ψηλότερα (αλλιώς την έκοβε), αριστερά του όταν από κάτω δεν χωρά.
+    // έρχεται από ψηλότερα (αλλιώς την έκοβε). Round 9 (R9-U4-1): όταν από κάτω δεν χωρά, εκεί που δεν σκεπάζει τη γραμμή
+    // ([lastValueLabelAt]).
     final valueTp = _painter(format(points.last.$2), strongText, 12 * scale, bold: true);
-    var lx = math.min(last.dx, left + w - 16) - valueTp.width / 2;
-    var ly = last.dy - 9 - valueTp.height;
-    if (points.length > 1 && at(points[points.length - 2]).dy < last.dy - 2) {
-      ly = last.dy + 9;
-      if (ly + valueTp.height > top + h) {
-        // Round 2 (R2-U1-8): η πλάκα (δεξιά άκρη στο last.dx − 5) ακουμπά το λευκό περίγραμμα της κουκκίδας (ακτίνα 6)·
-        // πριν έμενε 1 px κενό όπου φαινόταν η γραμμή, σαν τόνος μετά τον αριθμό («82,2′»).
-        lx = last.dx - 8 - valueTp.width;
-        ly = last.dy - valueTp.height / 2;
-      }
-    }
-    lx = lx.clamp(0.0, math.max(0.0, size.width - valueTp.width)).toDouble();
-    ly = ly.clamp(0.0, math.max(0.0, top + h - valueTp.height)).toDouble();
-    _plate(canvas, valueTp, Offset(lx, ly), card);
+    final labelAt = lastValueLabelAt(
+      last: last,
+      prev: points.length > 1 ? at(points[points.length - 2]) : null,
+      lines: [for (final seg in segments) [for (final p in seg) at(p)]],
+      label: Size(valueTp.width, valueTp.height),
+      plot: Rect.fromLTWH(left, top, w, h),
+      width: size.width,
+    );
+    _plate(canvas, valueTp, labelAt, card);
     // Η κουκκίδα μετά την πλάκα: μένει πάντα ορατή, και το περίγραμμά της σκεπάζει τη γραμμή ανάμεσα σε αυτήν και την πλάκα.
     canvas.drawCircle(last, 6, Paint()..color = card);
     canvas.drawCircle(last, 4.5, Paint()..color = color);

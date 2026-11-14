@@ -304,7 +304,9 @@ void main() {
       expect(some, contains('Επαναφορά από αντίγραφο'));
       expect(databaseNoticeText((entries: 1, foods: 0)), contains('Ξαναμπήκε 1 καταχώριση φαγητού.'));
       expect(databaseNoticeText((entries: 0, foods: 1)), contains('Ξαναμπήκε 1 προϊόν.'));
-      expect(File('lib/pages/today.dart').readAsStringSync(), contains('databaseNoticeText(store.dbRecovered)'));
+      // Round 9 (R9-A9-B1): η κάρτα λέει και όταν κάτι δεν διαβάστηκε.
+      expect(File('lib/pages/today.dart').readAsStringSync(),
+          contains('databaseNoticeText(store.dbRecovered, partial: store.dbPartial)'));
     });
   });
 
@@ -483,10 +485,11 @@ void main() {
         expect(y, isNot(contains('ls test/*_test.dart')), reason: f);
         expect(y, contains("find test -name '*_test.dart'"), reason: f);
         // Round 8 (R8-A12-2): ≈ 3% κάτω από το #105 (1.832 / 85 / 167)· πριν 1550 / 70 / 128 (15–23% κάτω).
-        expect(y, contains('-lt 1777'), reason: f);
-        expect(y, contains('-lt 82'), reason: f);
-        expect(y, contains('-lt 162'), reason: f);
-        expect(y, isNot(contains('-lt 950')), reason: f);
+        // Round 9 (R9-A12-1): το ύψος των τριών κατώτατων το ελέγχει το r8_f4_test (κοντά στις τωρινές δοκιμές).
+        expect(RegExp(r'-lt \d+ \]').allMatches(y).length, 3, reason: f);
+        for (final old in ['-lt 950 ', '-lt 1550 ', '-lt 1777 ', '-lt 82 ', '-lt 162 ']) {
+          expect(y, isNot(contains(old)), reason: '$f: $old');
+        }
       }
       // Κάθε αρχείο δοκιμών είναι κάτω από το test/ (το «find» τα βρίσκει όλα).
       final tests = Directory('test').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('_test.dart'));

@@ -58,24 +58,33 @@ class GoalsSummaryCard extends StatelessWidget {
     // η Κυριακή με 2.100 kcal (κάτω από τον στόχο της) γραφόταν «Πάνω από τον στόχο 90».
     final day = this.day;
     final kcalGoal = today || day == null ? g.kcal : targetOn(g, day);
-    final satMax = (kcalGoal * g.satPct / 100 / 9).round(); // όπως το Goals.satMax
+    // Round9 (R9-A3-2): το όριο σε γραμμάρια ακριβές, με ένα δεκαδικό ([satLimitShown]: 2.160 kcal × 6% = «έως 14,4 g»)· πριν
+    // στρογγυλευόταν στο γραμμάριο («έως 14 g») και 14,3 g σήμερα έβγαιναν «0,3 g πάνω από το όριο», ενώ είναι 5,96%.
+    // Η απόφαση με τους αριθμούς όπως φαίνονται (ένα δεκαδικό, R7-A3-3).
+    final satLimit = satLimitShown(kcalGoal, g.satPct);
     final fatLo = (kcalGoal * 0.25 / 9).round(), fatHi = (kcalGoal * 0.35 / 9).round(); // όπως τα Goals.fatLo/fatHi
     final left = kcalLeft(t.shownKcal, kcalGoal, today: today);
     String atLeast(String key, String text) => (t.missing[key] ?? 0) > 0 ? '≥ $text' : text;
     final protLeft = g.protein - t.protein;
     final fiberLeft = g.fiber - t.fiber;
-    final satOver = t.satFat - satMax;
+    final satOver = oneDecimal(oneDecimal(t.satFat) - satLimit);
     // Round7 (R7-A3-4): μέρα που τελείωσε, με πλήρη καταγραφή: τα κορεσμένα ως % των θερμίδων που έφαγες, ο κανόνας της
     // σελίδας «Χοληστερίνη» και των οδηγιών (AHA/ACC 2013, ESC/EAS 2019: % της ενέργειας). Πριν η ίδια μέρα έβγαινε εδώ
     // «πάνω από το όριο» (γραμμάρια του στόχου) και εκεί κάτω από το 6%, ή ανάποδα. Για τη σημερινή μέρα, που δεν
     // τελείωσε, μένουν τα γραμμάρια του στόχου (πόσα «χωράνε» ακόμα).
-    final satPctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(kcalGoal) ? t.satFat * 9 / t.kcal * 100 : null;
+    // Round9 (R9-U2-1): «πλήρης μέρα» με τον στόχο που ισχύει ΤΩΡΑ (60% του [Goals.kcal]), ο ίδιος κανόνας με τη σελίδα
+    // «Χοληστερίνη» ([CholWeek]) και τη διόρθωση θερμίδων (adaptive_check.dart: adaptFullDayShare × g.kcal), όπως λέει και
+    // το κείμενο «το 60% του στόχου σου». Πριν, μετά από ένα «Εφάρμοσε», η ίδια μέρα ήταν «πλήρης» στη μία οθόνη και όχι
+    // στην άλλη (εντάξει εδώ, πάνω από το 6% εκεί). Οι θερμίδες και τα όρια της μέρας μένουν με τον στόχο εκείνης της
+    // μέρας ([targetOn], R8-A1-5).
+    final satPctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
     // Round8 (R8-A3-3): χωρίς οδηγία γιατρού ο κανόνας είναι του ΠΟΥ, «λιγότερο από 10%» (WHO, Healthy diet fact sheet,
     // 2020): το 10,0% δεν είναι εντάξει, και ο στόχος γράφεται «κάτω από 10%» όπως στον οδηγό. Με οδηγία γιατρού μένει
-    // «έως 6%» (AHA/ACC 2013: 5–6%).
-    final satStrict = g.satPct >= 10;
+    // «έως 6%» (AHA/ACC 2013: 5–6%). Round9 (R9-A1-4 / R9-U2-5): ο ίδιος κανόνας και στη σημερινή μπάρα γραμμαρίων.
+    final satStrict = satStrictPct(g.satPct);
     final satPctShown = satPctDay == null ? null : oneDecimal(satPctDay);
     final satPctOver = satPctShown != null && (satStrict ? satPctShown >= g.satPct : satPctShown > g.satPct);
+    final satGramsOver = t.count > 0 && (satStrict ? satOver >= 0 : satOver > 0);
     // Round7 (R7-A3-3): κοντά στο όριο (ως 1 g) με ένα δεκαδικό, ώστε ο αριθμός να συμφωνεί με το «πάνω από το όριο»:
     // 14,3 g γράφονταν «14 g / έως 14 g» μαζί με «0,3 g πάνω από το όριο».
     final satText = t.satFat >= 10 && satOver.abs() < 1 ? dec(t.satFat, 1) : gramsText(t.satFat);
@@ -135,7 +144,7 @@ class GoalsSummaryCard extends StatelessWidget {
             color: satPctOver ? c.warn : c.heart,
             note: !satPctOver
                 ? null
-                : satPctShown! > g.satPct
+                : satPctShown > g.satPct
                     ? 'Πάνω από το ${g.satPct}% των θερμίδων που έφαγες'
                     : 'Στο ${g.satPct}% των θερμίδων που έφαγες· ο στόχος είναι κάτω από ${g.satPct}%',
             warn: satPctOver,
@@ -145,11 +154,15 @@ class GoalsSummaryCard extends StatelessWidget {
             // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού («Λιπαρά», «Κορεσμένα λιπαρά»).
             label: 'Κορεσμένα λιπαρά',
             value: atLeast(Nk.satFat, '$satText g'),
-            target: 'έως $satMax g',
-            fraction: t.satFat / satMax,
-            color: satOver > 0.05 ? c.warn : c.heart,
-            note: satOver > 0.05 ? '${gramsText(satOver)} g πάνω από το όριο' : null,
-            warn: satOver > 0.05,
+            target: satLimitText(kcalGoal, g.satPct),
+            fraction: t.satFat / satLimit,
+            color: satGramsOver ? c.warn : c.heart,
+            note: !satGramsOver
+                ? null
+                : satOver > 0
+                    ? '${gramsText(satOver)} g πάνω από το όριο'
+                    : 'Στο όριο· ο στόχος είναι ${satLimitText(kcalGoal, g.satPct)}',
+            warn: satGramsOver,
           ),
         GoalBar(
           label: 'Φυτικές ίνες',
@@ -213,8 +226,9 @@ class GoalBar extends StatelessWidget {
       TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: warn ? c.warn : c.text)),
       TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
     ]);
+    // Round9 (R9-U2-6): «στόχος …» για το TalkBack· πριν διάβαζε «13 g από έως 14 g».
     return Semantics(
-      label: '$label: $value από $target${note == null ? '' : '. $note'}',
+      label: '$label: $value, στόχος $target${note == null ? '' : '. $note'}',
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.only(top: 10),
@@ -362,6 +376,12 @@ class CholCard extends StatelessWidget {
         : sameDay(ws, day)
             ? 'Δευτέρα ${dayMonth(day)}'
             : 'από ${dayMonth(ws)} ως ${dayMonth(day)}';
+    // Round9 (R9-U2-6): για το TalkBack ολόκληρος ο μήνας («16 Νοεμβρίου»· το «Νοε» διαβάζεται ως συντομογραφία, R7-U4-8).
+    final weekSpoken = sameDay(day, today)
+        ? null
+        : sameDay(ws, day)
+            ? 'Δευτέρα ${dayMonthLong(day)}'
+            : 'από ${dayMonthLong(ws)} ως ${dayMonthLong(day)}';
     return AppCard(
       key: const ValueKey('nutrition-chol'),
       onTap: () => Navigator.of(context).push(CholesterolPage.route(food, g, today)),
@@ -384,24 +404,37 @@ class CholCard extends StatelessWidget {
         if (g.branG > 0)
           CholRow(label: 'Πίτουρο βρώμης', value: '${d.branG.round()} g', target: '${g.branG} g', done: reachedGrams(d.branG, g.branG)),
         if (g.legumesWeek > 0)
-          CholRow(label: 'Όσπρια', sub: weekText, value: '$legumes', target: '${g.legumesWeek}', done: legumes >= g.legumesWeek),
-        if (g.fishWeek > 0) CholRow(label: 'Ψάρι', sub: weekText, value: '$fish', target: '${g.fishWeek}', done: fish >= g.fishWeek),
+          CholRow(
+              label: 'Όσπρια',
+              sub: weekText,
+              subSemantics: weekSpoken,
+              value: '$legumes',
+              target: '${g.legumesWeek}',
+              done: legumes >= g.legumesWeek),
+        if (g.fishWeek > 0)
+          CholRow(
+              label: 'Ψάρι', sub: weekText, subSemantics: weekSpoken, value: '$fish', target: '${g.fishWeek}', done: fish >= g.fishWeek),
       ]),
     );
   }
 }
 
 class CholRow extends StatelessWidget {
-  const CholRow({super.key, required this.label, required this.value, required this.target, required this.done, this.sub});
+  const CholRow(
+      {super.key, required this.label, required this.value, required this.target, required this.done, this.sub, this.subSemantics});
   final String label, value, target;
   final String? sub;
+
+  /// Το [sub] όπως το διαβάζει το TalkBack, όταν διαφέρει από το γραμμένο (ολόκληρος ο μήνας· round9, R9-U2-6).
+  final String? subSemantics;
   final bool done;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
+    final spoken = subSemantics ?? sub;
     return Semantics(
-      label: '$label${sub == null ? '' : ', $sub'}: $value${target.isEmpty ? '' : ' από $target'}${done ? ', έγινε' : ''}',
+      label: '$label${spoken == null ? '' : ', $spoken'}: $value${target.isEmpty ? '' : ' από $target'}${done ? ', έγινε' : ''}',
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
@@ -475,6 +508,9 @@ class _CholesterolPageState extends State<CholesterolPage> {
     // 22 μέρες έχουν 5,3%). Οι μπάρες μένουν μία ανά εβδομάδα.
     final four = CholWeek([for (final x in weeks) ...x.$2.days], goalKcal: g.kcal);
     const dayLabels = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ'];
+    // Round9 (R9-U2-6): για το TalkBack ολόκληρες λέξεις («Δευτέρα 16 Νοεμβρίου», «εβδομάδα από 2 Νοεμβρίου»).
+    final daySpoken = [for (var k = 0; k < 7; k++) longDate(DateTime(ws.year, ws.month, ws.day + k))];
+    final weekSpoken = [for (final x in weeks) 'εβδομάδα από ${dayMonthLong(x.$1)}'];
     List<double?> perDay(double? Function(CholDay) f) => [
           for (var k = 0; k < 7; k++)
             () {
@@ -543,6 +579,8 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       ? MiniBars(
                           values: [for (final x in weeks) x.$2.satPctMean],
                           labels: [for (final x in weeks) dayMonth(x.$1)],
+                          semanticLabels: weekSpoken,
+                          semanticUnit: ' τοις εκατό',
                           target: g.satPct.toDouble(),
                           color: c.heart,
                           over: c.warn,
@@ -554,6 +592,8 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       : MiniBars(
                           values: perDay((d) => d.satPct),
                           labels: dayLabels,
+                          semanticLabels: daySpoken,
+                          semanticUnit: ' τοις εκατό',
                           target: g.satPct.toDouble(),
                           color: c.heart,
                           over: c.warn,
@@ -584,6 +624,8 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       ? MiniBars(
                           values: [for (final x in weeks) x.$2.fiberMean],
                           labels: [for (final x in weeks) dayMonth(x.$1)],
+                          semanticLabels: weekSpoken,
+                          semanticUnit: ' γραμμάρια',
                           target: g.fiber.toDouble(),
                           color: c.good,
                           format: (v) => v.round().toString(),
@@ -592,6 +634,8 @@ class _CholesterolPageState extends State<CholesterolPage> {
                       : MiniBars(
                           values: perDay((d) => d.fiber),
                           labels: dayLabels,
+                          semanticLabels: daySpoken,
+                          semanticUnit: ' γραμμάρια',
                           target: g.fiber.toDouble(),
                           color: c.good,
                           format: (v) => v.round().toString(),
@@ -679,9 +723,17 @@ class MiniBars extends StatelessWidget {
     this.higherIsWorse = false,
     this.atLeast,
     this.shownValue,
+    this.semanticLabels,
+    this.semanticUnit = '',
   });
   final List<double?> values;
   final List<String> labels;
+
+  /// Round9 (R9-U2-6): οι [labels] όπως τις διαβάζει το TalkBack («Δευτέρα 16 Νοεμβρίου» αντί για «Δε»), και η μονάδα
+  /// μετά από κάθε τιμή («τοις εκατό», «γραμμάρια»). Πριν διάβαζε «Δε: 10,2, Τρ: 7,1…», και το «πάνω από τον στόχο»
+  /// φαινόταν μόνο με το χρώμα.
+  final List<String>? semanticLabels;
+  final String semanticUnit;
 
   /// Η τιμή όπως τη γράφει η ετικέτα της μπάρας ([format]), για το χρώμα «πάνω από τον στόχο» (round7, R7-A3-3): 6,03%
   /// γράφεται «6,0» και δεν είναι πάνω από το 6%. null = η ακριβής τιμή.
@@ -704,11 +756,19 @@ class MiniBars extends StatelessWidget {
     final c = Aigaio.of(context);
     final top = math.max(target * 1.35, values.whereType<double>().fold<double>(0, math.max));
     double y(double v) => top <= 0 ? 0 : (v / top * _h).clamp(0, _h);
+    String spoken(int k) {
+      final v = values[k];
+      final name = semanticLabels != null && k < semanticLabels!.length ? semanticLabels![k] : labels[k];
+      if (v == null) return '$name: χωρίς';
+      final least = atLeast != null && k < atLeast!.length && atLeast![k] ? 'τουλάχιστον ' : '';
+      final beyond = over != null && _beyond(shownValue?.call(v) ?? v)
+          ? (higherIsWorse ? ', πάνω από τον στόχο' : ', κάτω από τον στόχο')
+          : '';
+      return '$name: $least${format(v)}$semanticUnit$beyond';
+    }
+
     return Semantics(
-      label: [
-        for (var k = 0; k < values.length; k++)
-          '${labels[k]}: ${values[k] == null ? 'χωρίς' : '${atLeast != null && k < atLeast!.length && atLeast![k] ? 'τουλάχιστον ' : ''}${format(values[k]!)}'}',
-      ].join(', '),
+      label: [for (var k = 0; k < values.length; k++) spoken(k)].join('; '),
       excludeSemantics: true,
       child: Column(children: [
         SizedBox(

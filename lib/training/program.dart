@@ -4,6 +4,8 @@ library;
 
 import 'dart:convert';
 
+import '../exercise/ex_names.dart' show exNamesById;
+
 import 'equipment.dart';
 import 'set_hr.dart' show perSideExercises, sideSwitchSec;
 
@@ -327,7 +329,7 @@ class PasteResult {
 }
 
 /// Διαβάζει κείμενο που επικολλήθηκε (μπορεί να έχει γύρω του κείμενο ή ```json).
-/// [known]: τα ids της βιβλιοθήκης, [names]: id → όνομα (για τα μηνύματα).
+/// [known]: τα ids της βιβλιοθήκης. Στα μηνύματα, το ελληνικό όνομα της άσκησης ([_exName], R9-A6-7).
 PasteResult parseProgram(String text, Set<String> known) {
   final a = text.indexOf('{'), b = text.lastIndexOf('}');
   if (a < 0 || b <= a) {
@@ -419,7 +421,8 @@ List<String> _rawProblems(Map<String, dynamic> j) {
       if (i is! Map) continue;
       final r = i['reps'];
       if (r == null || r is num || (r is List && r.length == 2 && r[0] is num && r[1] is num)) continue;
-      e.add('${w['name'] ?? w['id']}: οι επαναλήψεις στο «${i['ex']}» γράφονται [από, ως], π.χ. [8, 12].');
+      final ex = i['ex'];
+      e.add('${w['name'] ?? w['id']}: οι επαναλήψεις στο «${ex is String ? _exName(ex) : ex}» γράφονται [από, ως], π.χ. [8, 12].');
     }
   }
   return e;
@@ -434,6 +437,10 @@ const cardioMinMinutes = 1, cardioMaxMinutes = 600;
 int? cardioMinutesPlus(int minutes) =>
     minutes < cardioMaxMinutes ? (minutes + 5 > cardioMaxMinutes ? cardioMaxMinutes : minutes + 5) : null;
 int? cardioMinutesMinus(int minutes) => minutes > 5 ? minutes - 5 : null;
+
+/// R9-A6-7 / R9-U3-05: το ελληνικό όνομα της άσκησης στα μηνύματα της επικόλλησης (όπως στη λίστα της ίδιας οθόνης),
+/// όχι ο κωδικός της («db_press»). Ο κωδικός μένει μόνο όταν η άσκηση είναι άγνωστη.
+String _exName(String id) => exNamesById[id] ?? id;
 
 /// Λάθη που εμποδίζουν την αποθήκευση.
 List<String> validate(Program p, Set<String> known) {
@@ -468,9 +475,9 @@ List<String> validate(Program p, Set<String> known) {
       if (i.rir > 4) e.add('${w.name}: το «άφησε» (πόσες επαναλήψεις να περισσεύουν) πρέπει να είναι από 2 ως 4.');
       // Βάρος που δεν είναι αριθμός (π.χ. 1e999 = «άπειρο»): πριν περνούσε, και μετά η αποθήκευση δεν έκανε τίποτα.
       final load = i.load;
-      if (load != null && !load.isFinite) e.add('${w.name}: το βάρος στο «${i.ex}» δεν είναι σωστός αριθμός.');
+      if (load != null && !load.isFinite) e.add('${w.name}: το βάρος στο «${_exName(i.ex)}» δεν είναι σωστός αριθμός.');
       // R7-A6-10: αρνητικό βάρος δεν «στρογγυλεύεται» σε κάτι που βγαίνει· είναι λάθος.
-      if (load != null && load.isFinite && load < 0) e.add('${w.name}: το βάρος στο «${i.ex}» δεν μπορεί να είναι αρνητικό.');
+      if (load != null && load.isFinite && load < 0) e.add('${w.name}: το βάρος στο «${_exName(i.ex)}» δεν μπορεί να είναι αρνητικό.');
     }
   }
   p.days.forEach((d, id) {
@@ -492,8 +499,8 @@ List<String> _warnings(Program p) {
       if (i.rir < 2) {
         i.rir = 2;
         w.add(i.kind == LoadKind.bar
-            ? 'Μπάρα χωρίς βραχίονες ασφαλείας: στο «${i.ex}» το «άφησε» έγινε 2.'
-            : 'Ρεζέρβα τουλάχιστον 2 (ως να πει άλλα ο γιατρός σου): στο «${i.ex}» έγινε 2.');
+            ? 'Μπάρα χωρίς βραχίονες ασφαλείας: στο «${_exName(i.ex)}» το «άφησε» έγινε 2.'
+            : 'Άφησε τουλάχιστον 2 (ως να πει άλλα ο γιατρός σου): στο «${_exName(i.ex)}» έγινε 2.');
       }
       if (i.load != null && i.load!.isFinite && i.load! >= 0 && hasLoad(i.kind)) {
         final s = snap(i.kind, i.load!);
@@ -505,7 +512,7 @@ List<String> _warnings(Program p) {
             LoadKind.kb => 'Δεν υπάρχει kettlebell ${kgText(i.load!)} kg',
             _ => '${loadLabel(k, i.load)} δεν βγαίνει με τους δίσκους σου',
           };
-          w.add('$what· στο «${i.ex}» μπήκε ${loadLabel(k, s)}.');
+          w.add('$what· στο «${_exName(i.ex)}» μπήκε ${loadLabel(k, s)}.');
           i.load = s;
         }
       }

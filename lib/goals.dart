@@ -3,7 +3,7 @@
 /// Ο οδηγός ρωτά: στόχο, ρυθμό, κίνηση, αν ο γιατρός ζήτησε να πέσει η LDL. Οι αριθμοί βγαίνουν ΜΟΝΟ από τους τύπους
 /// με πηγή (καμία «εκτίμηση» από AI):
 /// - Ξεκούραση: Mifflin-St Jeor (Mifflin 1990, AJCN).
-/// - Κίνηση: επίπεδα σωματικής δραστηριότητας 1,4 / 1,5 / 1,7 (FAO/WHO/UNU 2004).
+/// - Κίνηση: επίπεδα σωματικής δραστηριότητας 1,53 / 1,65 / 1,76 (FAO/WHO/UNU 2004, κεφ. 5· [activityLevels]).
 /// - Ρυθμός: ποσοστό του βάρους την εβδομάδα × 7.700 kcal/kg ÷ 7 (Hall 2008: προσέγγιση· Helms 2014: 0,5–1% για να
 ///   μένουν οι μύες· αύξηση 0,25–0,5%, Iraki 2019).
 /// - Κάτω όριο: 1.500 kcal άνδρες, 1.200 γυναίκες: το λιγότερο που προτείνουν οι οδηγίες (Jensen 2013, AHA/ACC/TOS).
@@ -17,7 +17,7 @@ library;
 
 import 'dart:math' as math;
 
-import 'format.dart' show dec;
+import 'format.dart' show dec, two;
 import 'waist.dart' show isDayKey;
 
 /// Τι θέλει ο χρήστης πρώτα.
@@ -27,8 +27,43 @@ enum GoalAim { lose, keep, gain }
 const loseRates = [0.0025, 0.005, 0.0075];
 const gainRates = [0.0025, 0.005];
 
-/// Κίνηση: επίπεδο σωματικής δραστηριότητας (FAO/WHO/UNU 2004).
-const activityLevels = [1.4, 1.5, 1.7];
+/// Κίνηση: επίπεδο σωματικής δραστηριότητας (PAL) για «Λίγο», «Μέτρια», «Πολύ». Round 9 (R9-A1-3, απόφαση της
+/// 14/11/2026), από FAO/WHO/UNU 2004, Human energy requirements, κεφ. 5:
+/// - «Λίγο» (γραφείο, λίγο περπάτημα, χωρίς προπόνηση) 1,53: το παράδειγμα «καθιστική ή ελαφριά δραστηριότητα» του
+///   Πίνακα 5.1 (8 ώρες καθιστή δουλειά γραφείου, δουλειές του σπιτιού, ελαφριά αναψυχή).
+/// - «Μέτρια» (γραφείο και 3–4 προπονήσεις ή περπατήματα την εβδομάδα) 1,65: η πηγή δεν δίνει παράδειγμα· παρεμβολή από
+///   την §5.3.2: μία ώρα μέτρια ή έντονη άσκηση ΚΑΘΕ μέρα ανεβάζει το PAL από 1,55 σε 1,75, άρα 3–4 φορές την εβδομάδα
+///   περίπου τα μισά (1,55 + 0,10 ≈ 1,65).
+/// - «Πολύ» (δουλειά στο πόδι, ή άσκηση σχεδόν κάθε μέρα) 1,76: το παράδειγμα «δραστήρια ή μέτρια δραστήρια» του
+///   Πίνακα 5.1 (8 ώρες όρθια δουλειά, περπάτημα και μία ώρα αερόβια άσκηση)· ίδιο με το 1,75 της §5.3.2.
+/// Πριν: 1,4 / 1,5 / 1,7, πιο χαμηλά από τα παραδείγματα της ίδιας πηγής για τις ίδιες περιγραφές (το «Μέτρια» κάτω από
+/// τον υπάλληλο γραφείου που δεν γυμνάζεται: στόχος ~170–260 kcal χαμηλά). Αποθηκευμένοι στόχοι κρατούν το επίπεδό τους
+/// (οι αριθμοί δεν αλλάζουν σιωπηλά)· με «Ξανά ο οδηγός» η ίδια απάντηση παίρνει το νέο ([activityAnswer]).
+const activityLevels = [1.53, 1.65, 1.76];
+
+/// Round 9 (R9-A1-3): τα επίπεδα ως τις 14/11/2026, με την ίδια σειρά απαντήσεων («Λίγο», «Μέτρια», «Πολύ»).
+const legacyActivityLevels = [1.4, 1.5, 1.7];
+
+/// Round 9 (R9-A1-3): η απάντηση (0 «Λίγο», 1 «Μέτρια», 2 «Πολύ») ενός αποθηκευμένου επιπέδου, και με τα παλιά
+/// ([legacyActivityLevels]). null: επίπεδο που δεν βγήκε από τον οδηγό.
+int? activityAnswer(double pal) {
+  final i = activityLevels.indexOf(pal);
+  if (i >= 0) return i;
+  final j = legacyActivityLevels.indexOf(pal);
+  return j >= 0 ? j : null;
+}
+
+/// Round 9 (R9-A1-3): το επίπεδο της ίδιας απάντησης με τα τωρινά [activityLevels] (1,5 → 1,65)· άλλο επίπεδο μένει ίδιο.
+double currentActivityLevel(double pal) {
+  final i = activityAnswer(pal);
+  return i == null ? pal : activityLevels[i];
+}
+
+/// «1,65», «1,5»: το επίπεδο όπως γράφεται στις οθόνες, με όσα δεκαδικά έχει (ως 2).
+String palText(double pal) {
+  final s = dec(pal, 2);
+  return s.endsWith('0') ? dec(pal, 1) : s;
+}
 
 /// Ενέργεια ανά κιλό βάρους που χάνεται ή κερδίζεται (προσέγγιση, Hall 2008).
 const kcalPerKg = 7700.0;
@@ -61,6 +96,7 @@ const betaGlucanTarget = 3.0;
 
 class GoalCalc {
   const GoalCalc({
+    required this.kg,
     required this.bmr,
     required this.tdee,
     required this.delta,
@@ -75,6 +111,9 @@ class GoalCalc {
     required this.salt,
     required this.carbsEst,
   });
+
+  /// Το βάρος με το οποίο υπολογίστηκε (round 9, R9-A1-1: για το [keptKcalAdapt]).
+  final double kg;
 
   /// Σε πλήρη ξεκούραση (Mifflin-St Jeor), kcal.
   final double bmr;
@@ -140,6 +179,7 @@ GoalCalc computeGoals({
   final satPct = doctor ? 6 : 10;
   final protein = _round5(proteinPerKg * kg);
   return GoalCalc(
+    kg: kg,
     bmr: bmr,
     tdee: tdee,
     delta: delta,
@@ -189,6 +229,7 @@ class Goals {
     this.foreignSeen,
     this.log = const [],
     this.docTargets = const DoctorTargets(),
+    this.hist = const [],
   });
 
   final GoalAim aim;
@@ -241,6 +282,13 @@ class Goals {
   /// Οι αριθμοί-στόχοι που έδωσε ο γιατρός (π.χ. LDL < 115), αν τους έγραψες. Μένουν στη διατροφή (απόφαση 12/11).
   final DoctorTargets docTargets;
 
+  /// Round 9 (R9-A1-2): κάθε αλλαγή του στόχου θερμίδων που ισχύει ([kcal]), παλιότερη πρώτη, μία γραμμή ανά μέρα, το
+  /// πολύ [targetHistMax]: από κάρτα («Εφάρμοσε»), «Θερμίδες τη μέρα» (δικός σου ή «από τον υπολογισμό»), «Ξανά ο οδηγός»
+  /// και «Υπολόγισε ξανά» ([recordChangeFrom]). Από εδώ το [targetOn] ξέρει ποιος στόχος ίσχυε κάθε μέρα. Χωριστά από το
+  /// [log]: ένας δικός σου στόχος δεν είναι «αλλαγή από κάρτα» (δεν κρατά πίσω τον εβδομαδιαίο έλεγχο για 4 μέρες), και
+  /// το [log] κρατά μόνο τους [adaptLogMax] τελευταίους ελέγχους.
+  final List<TargetChange> hist;
+
   GoalCalc get calc => computeGoals(
       male: male, age: age, heightCm: heightCm, kg: kg, aim: aim, rate: rate, activity: activity, doctor: doctor);
 
@@ -289,7 +337,22 @@ class Goals {
       foreignSeen: foreignSeen,
       log: log,
       docTargets: docTargets,
+      hist: hist,
     );
+  }
+
+  /// Round 9 (R9-A1-2): οι ίδιοι στόχοι, με την αλλαγή του στόχου θερμίδων από τους [old] γραμμένη στο [hist] με μέρα
+  /// [today] ([addTargetChange]). Το ιστορικό είναι πάντα των [old]. Χωρίς [old] (πρώτοι στόχοι) ή αν ο στόχος δεν
+  /// άλλαξε, τίποτα νέο. Κάθε αλλαγή του στόχου που ισχύει περνά από εδώ πριν αποθηκευτεί.
+  Goals recordChangeFrom(Goals? old, DateTime today) {
+    final o = old;
+    if (o == null) return this;
+    final before = o.kcal, after = kcal;
+    final day = '${today.year}-${two(today.month)}-${two(today.day)}';
+    return copyWith(
+        hist: before == after
+            ? o.hist
+            : addTargetChange(o.hist, o.log, TargetChange(day: day, before: before, after: after)));
   }
 
   Goals copyWith({
@@ -307,6 +370,7 @@ class Goals {
     String? foreignSeen,
     AdaptLog? addLog,
     DoctorTargets? docTargets,
+    List<TargetChange>? hist,
     bool clearKcal = false,
     bool clearProtein = false,
     bool clearBeta = false,
@@ -342,6 +406,7 @@ class Goals {
                 addLog,
               ].reversed.take(adaptLogMax).toList().reversed.toList(),
         docTargets: docTargets ?? this.docTargets,
+        hist: hist ?? this.hist,
       );
 
   Map<String, dynamic> toJson() => {
@@ -369,6 +434,8 @@ class Goals {
         if (foreignSeen != null) 'fw': foreignSeen,
         if (log.isNotEmpty) 'log': [for (final l in log) l.toJson()],
         ...docTargets.toJson(),
+        // R9-A1-2: προσθετικό κλειδί· μια παλιότερη έκδοση το αγνοεί.
+        if (hist.isNotEmpty) 'th': [for (final h in hist) h.toJson()],
       };
 
   /// null αν λείπει ή είναι άκυρο κάτι απαραίτητο (τότε η εφαρμογή ζητά ξανά τον οδηγό, αντί να δείξει λάθος αριθμούς).
@@ -418,6 +485,10 @@ class Goals {
     final fa = j['fa'];
     final fw = j['fw'];
     final rawLog = j['log'];
+    final rawHist = j['th'];
+    // R9-A1-2: χωρίς το κλειδί (στόχοι από παλιότερη έκδοση), άδειο. Άκυρες γραμμές δεν διαβάζονται· από μεγαλύτερη λίστα
+    // (μόνο πειραγμένο αντίγραφο) μένουν οι πιο πρόσφατες.
+    final hist = rawHist is List ? rawHist.map(TargetChange.fromJson).whereType<TargetChange>().toList() : <TargetChange>[];
     return Goals(
       aim: aim,
       rate: rate,
@@ -442,11 +513,57 @@ class Goals {
       foreignSeen: fw is String && isDayKey(fw) ? fw : null,
       log: rawLog is List ? rawLog.map(AdaptLog.fromJson).whereType<AdaptLog>().take(adaptLogMax).toList() : const [],
       docTargets: DoctorTargets.fromJson(j),
+      hist: hist.length > targetHistMax ? hist.sublist(hist.length - targetHistMax) : hist,
     );
   }
 }
 
 const adaptLogMax = 26;
+
+/// Round 9 (R9-A1-2): το πολύ τόσες γραμμές στο [Goals.hist]. Μία ανά μέρα ([addTargetChange]): με μία αλλαγή την
+/// εβδομάδα φτάνουν για περίπου 7½ χρόνια (περίπου 40 bytes η καθεμία).
+const targetHistMax = 400;
+
+/// Round 9 (R9-A1-2): μια αλλαγή του στόχου θερμίδων που ισχύει: μέρα, στόχος πριν και μετά.
+class TargetChange {
+  const TargetChange({required this.day, required this.before, required this.after});
+  final String day;
+  final int before, after;
+
+  Map<String, dynamic> toJson() => {'d': day, 'k0': before, 'k1': after};
+
+  static TargetChange? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final d = j['d'], k0 = j['k0'], k1 = j['k1'];
+    if (d is! String || !isDayKey(d) || k0 is! num || k1 is! num) return null;
+    // Ευρύτερα όρια από το [AdaptLog]: και ο στόχος από τον τύπο ενός πολύ βαρύ ανθρώπου με πολλή κίνηση γράφεται.
+    if (k0 < 500 || k0 > 20000 || k1 < 500 || k1 > 20000) return null;
+    return TargetChange(day: d, before: k0.toInt(), after: k1.toInt());
+  }
+}
+
+/// Round 9 (R9-A1-2): το [hist] με την αλλαγή [c] στο τέλος.
+/// - Άδειο [hist] (στόχοι από παλιότερη έκδοση): ξεκινά με τις αλλαγές από κάρτα του [log] («Εφάρμοσε»), τις ίδιες που
+///   διάβαζε ως τότε το [targetOn], ώστε το ιστορικό να είναι πλήρες από εκεί και πέρα.
+/// - Δεύτερη αλλαγή την ίδια μέρα: μία γραμμή (ο στόχος στην αρχή της μέρας → ο τελευταίος). Μένει και όταν ο στόχος
+///   γύρισε εκεί που ήταν (π.χ. 2.250 → 2.250): λέει σωστά τον στόχο εκείνης της μέρας, και το ιστορικό δεν ξαναγίνεται
+///   άδειο (αλλιώς θα διαβαζόταν ξανά σαν στόχοι παλιότερης έκδοσης, από το [log]).
+/// - Το πολύ [targetHistMax] γραμμές: φεύγουν οι παλιότερες.
+List<TargetChange> addTargetChange(List<TargetChange> hist, List<AdaptLog> log, TargetChange c) {
+  final out = hist.isNotEmpty
+      ? [...hist]
+      : [
+          for (final l in log)
+            if (l.applied) TargetChange(day: l.day, before: l.before, after: l.after),
+        ];
+  if (out.isNotEmpty && out.last.day == c.day) {
+    final first = out.removeLast();
+    out.add(TargetChange(day: c.day, before: first.before, after: c.after));
+  } else {
+    out.add(c);
+  }
+  return out.length > targetHistMax ? out.sublist(out.length - targetHistMax) : out;
+}
 
 /// Στόχοι του γιατρού για τα λιπίδια (mg/dL), όπως τους έγραψε στο χαρτί του. null = δεν έδωσε.
 class DoctorTargets {
@@ -538,7 +655,12 @@ String aimText(GoalAim a) => switch (a) {
       GoalAim.gain => 'Περισσότεροι μύες',
     };
 
-String activityText(double pal) => pal <= 1.45 ? 'Λίγη κίνηση' : (pal <= 1.6 ? 'Μέτρια κίνηση' : 'Πολλή κίνηση');
+/// Round 9 (R9-A1-3): η απάντηση του οδηγού ([activityAnswer]: και τα παλιά 1,4 / 1,5 / 1,7 λέγονται όπως τα είχες
+/// διαλέξει)· άλλο επίπεδο, με τα μέσα ανάμεσα στα τωρινά (1,59 και 1,705).
+String activityText(double pal) {
+  final i = activityAnswer(pal) ?? (pal < 1.59 ? 0 : (pal < 1.705 ? 1 : 2));
+  return const ['Λίγη κίνηση', 'Μέτρια κίνηση', 'Πολλή κίνηση'][i];
+}
 
 String rateWord(GoalAim aim, double rate) {
   if (aim == GoalAim.keep) return '';

@@ -20,7 +20,8 @@ import 'sample_data.dart';
 
 /// Ο φανταστικός άνθρωπος των [checkinGoals] (ίδιος με τις άλλες δοκιμές): άνδρας, 180 cm, 40 ετών ως τον Νοέμβριο και
 /// 41 από τον Δεκέμβριο του 2026. Οι στόχοι (16/11, 40 ετών, 90 kg, μέτρια κίνηση): τύπος 1.830 × 1,5 = 2.745, −495 για 0,5%
-/// την εβδομάδα → 2.250. Ο οδηγός τον Δεκέμβριο (41 ετών): 1.825 × 1,5 = 2.737,5 − 495 = 2.242,5 → 2.240.
+/// την εβδομάδα → 2.250. Ο οδηγός τον Δεκέμβριο (41 ετών), με «Μέτρια» = 1,65 από τον γύρο 9 (R9-A1-3, FAO/WHO/UNU 2004):
+/// 1.825 × 1,65 = 3.011,25 − 495 = 2.516,25 → 2.520 (πριν, με 1,5: 2.240). Οι αποθηκευμένοι στόχοι (1,5) δεν αλλάζουν.
 const _p = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
 final _start = DateTime(2026, 11, 16); // Δευτέρα
@@ -141,32 +142,33 @@ void main() {
       expect(keptKcalAdapt(old: checkinGoals(kcalAdapt: 2100), calc: older, male: true, age: 41, heightCm: 182), (kcal: 2100, floored: false));
     });
 
-    testWidgets('«Όχι τώρα» σε πρόταση −150 (εκτίμηση 2.100), ξανά ο οδηγός: μόνο ο τύπος (2.240), όχι 1.610', (t) async {
+    testWidgets('«Όχι τώρα» σε πρόταση −150 (εκτίμηση 2.100), ξανά ο οδηγός: μόνο ο τύπος (2.520), όχι 1.610', (t) async {
       final old = checkinGoals().copyWith(
           tdeeEst: 2100,
           checkIn: '2026-12-14',
           addLog: const AdaptLog(day: '2026-12-14', tdee: 2100, before: 2250, after: 2250, applied: false));
       final store = await _rerun(t, old, DateTime(2026, 12, 16, 9));
-      // Αλλάζουν μόνο τα γενέθλια (41 ετών): ο τύπος 2.240· η εκτίμηση που δεν εφαρμόστηκε δεν μπαίνει (πριν: 2.100 − 495 → 1.610).
-      expect(find.text('2.240 kcal', findRichText: true), findsOneWidget);
+      // Ο τύπος με τα γενέθλια (41 ετών) και το νέο «Μέτρια» (1,65): 2.520· η εκτίμηση που δεν εφαρμόστηκε δεν μπαίνει (πριν:
+      // 2.100 − 495 → 1.610).
+      expect(find.text('2.520 kcal', findRichText: true), findsOneWidget);
       expect(find.byKey(const ValueKey('wizard-from-data')), findsNothing);
-      expect(find.text('Ο στόχος αλλάζει από 2.250 σε 2.240 kcal.'), findsOneWidget);
+      expect(find.text('Ο στόχος αλλάζει από 2.250 σε 2.520 kcal.'), findsOneWidget);
       expect(find.textContaining('συνεχίζει όπως πριν'), findsOneWidget);
       await _next(t);
       final g = store.goals!;
-      expect((g.kcal, g.kcalAdapt, g.tdeeEst, g.since, g.checkIn), (2240, null, 2100.0, '2026-11-16', '2026-12-14'));
+      expect((g.kcal, g.kcalAdapt, g.tdeeEst, g.since, g.checkIn), (2520, null, 2100.0, '2026-11-16', '2026-12-14'));
     });
 
-    testWidgets('«Εντάξει» στο «μέσα στο εύρος των ζυγίσεων» (εκτίμηση 2.600): ξανά ο οδηγός → ο τύπος 2.240 (πριν: 2.110)',
+    testWidgets('«Εντάξει» στο «μέσα στο εύρος των ζυγίσεων» (εκτίμηση 2.600): ξανά ο οδηγός → ο τύπος 2.520 (πριν: 2.110)',
         (t) async {
       final old = checkinGoals().copyWith(
           tdeeEst: 2600,
           checkIn: '2026-12-14',
           addLog: const AdaptLog(day: '2026-12-14', tdee: 2600, before: 2250, after: 2250, applied: false));
       final store = await _rerun(t, old, DateTime(2026, 12, 16, 9));
-      expect(find.text('2.240 kcal', findRichText: true), findsOneWidget);
+      expect(find.text('2.520 kcal', findRichText: true), findsOneWidget);
       await _next(t);
-      expect((store.goals!.kcal, store.goals!.kcalAdapt), (2240, null));
+      expect((store.goals!.kcal, store.goals!.kcalAdapt), (2520, null));
     });
 
     testWidgets('μετά από −150 με όριο (εκτίμηση 2.000): ξανά ο οδηγός μόνο για τον γιατρό → μένει 2.100 (πριν: 1.510)',
@@ -180,10 +182,11 @@ void main() {
       expect(find.byKey(const ValueKey('wizard-from-data')), findsOneWidget);
       expect(
           find.text('Από τα δεδομένα σου, όχι από τον τύπο: μένει η διόρθωση που εφάρμοσες στη Σήμερα (ο τύπος μόνος θα '
-              'έδινε 2.240 kcal).'),
+              'έδινε 2.520 kcal).'),
           findsOneWidget);
-      // Τα γενέθλια αλλάζουν τον τύπο (2.737,5), όχι τη διόρθωση από τα δεδομένα.
-      expect(find.text('καις περίπου 2.738 κατά τον τύπο · −495 για 0,45 kg την εβδομάδα'), findsOneWidget);
+      // Τα γενέθλια και τα νέα επίπεδα (R9-A1-3: ίδια απάντηση «Μέτρια», 1,5 → 1,65) αλλάζουν τον τύπο (1.825 × 1,65 =
+      // 3.011,25), όχι τη διόρθωση από τα δεδομένα.
+      expect(find.text('καις περίπου 3.011 κατά τον τύπο · −495 για 0,45 kg την εβδομάδα'), findsOneWidget);
       expect(find.byKey(const ValueKey('wizard-change')), findsNothing);
       await _next(t);
       final g = store.goals!;
@@ -205,17 +208,18 @@ void main() {
       expect(find.textContaining('δεν ζήτησαν αλλαγή'), findsNothing);
     });
 
-    // Λίγη κίνηση στα 41: 1.825 × 1,4 − 495 = 2.060· σε σχέση με 1.825 × 1,5 − 495 = 2.242,5: −182,5 → −180.
-    testWidgets('μείωση από τη ζυγαριά, ξανά ο οδηγός με «Λίγη» κίνηση: η διόρθωση μένει, −180 του τύπου → 1.920', (t) async {
+    // Λίγη κίνηση στα 41 (R9-A1-3: 1,53): 1.825 × 1,53 − 495 = 2.297,25 → 2.300· σε σχέση με την ίδια απάντηση «Μέτρια»
+    // στα νέα επίπεδα (1,65: 2.516,25): −219 → −220 (πριν, 1,4 έναντι 1,5: −180 → 1.920).
+    testWidgets('μείωση από τη ζυγαριά, ξανά ο οδηγός με «Λίγη» κίνηση: η διόρθωση μένει, −220 του τύπου → 1.880', (t) async {
       final old = checkinGoals(kcalAdapt: 2100).copyWith(
           checkIn: '2026-12-14',
           addLog: const AdaptLog(day: '2026-12-14', tdee: 2750, before: 2250, after: 2100, applied: true, lowLog: true));
       final store = await _rerun(t, old, DateTime(2026, 12, 16, 9), activity: 0);
-      expect(find.text('1.920 kcal', findRichText: true), findsOneWidget);
-      expect(find.text('Ο στόχος αλλάζει από 2.100 σε 1.920 kcal.'), findsOneWidget);
-      expect(find.textContaining('ο τύπος μόνος θα έδινε 2.060 kcal'), findsOneWidget);
+      expect(find.text('1.880 kcal', findRichText: true), findsOneWidget);
+      expect(find.text('Ο στόχος αλλάζει από 2.100 σε 1.880 kcal.'), findsOneWidget);
+      expect(find.textContaining('ο τύπος μόνος θα έδινε 2.300 kcal'), findsOneWidget);
       await _next(t);
-      expect((store.goals!.kcal, store.goals!.activity), (1920, 1.4));
+      expect((store.goals!.kcal, store.goals!.activity), (1880, 1.53));
     });
 
     testWidgets('+150 της γρήγορης απώλειας (2.250 → 2.400): ξανά ο οδηγός χωρίς αλλαγές → μένει 2.400 (πριν: 2.250)', (t) async {

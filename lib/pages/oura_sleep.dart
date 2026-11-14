@@ -711,9 +711,19 @@ class _BreathCard extends StatelessWidget {
     final rox = ringOxygen(store, store.data, day, windows);
     // Σημειώσεις για χαμηλό οξυγόνο (B7) με τις τιμές του ορισμού A4: ρολόι μέσα στις ώρες ύπνου του Oura· όλες οι 30
     // νύχτες, και πριν από τη σύνδεση (έλεγχος 3, E5: ίδιος αισθητήρας, όπως η αναφορά).
+    // Round 9 (R9-A5-2): η «τελευταία νύχτα» της σημείωσης με τον ίδιο κανόνα με την Καρδιά και τη Σήμερα
+    // ([oxygenLastNight]: σήμερα ή χθες, η πιο πρόσφατη με χαμηλότερη τιμή του ρολογιού) όσο η νύχτα της κάρτας είναι η
+    // σημερινή ή η χθεσινή. Πριν: πάντα η νύχτα της κάρτας, και μια πολύ χαμηλή τιμή της χθεσινής νύχτας (το ρολόι δεν
+    // μέτρησε απόψε) φαινόταν στην Καρδιά και στη Σήμερα αλλά όχι εδώ. Με παλιότερη νύχτα (το Oura δεν συγχρονίστηκε),
+    // η νύχτα της κάρτας, όπως πριν.
+    final dash = store.data;
+    final today = dayOf(now);
+    final oxLast = dash != null && !day.isBefore(DateTime(today.year, today.month, today.day - 1))
+        ? oxygenLastNight(store, dash, now)
+        : day;
     final g = oxygenGuidance(
-      store.data?.spo2MinByNight(day, ouraNights: true, windows: windows, history: store.history) ?? const {},
-      day,
+      dash?.spo2MinByNight(oxLast, ouraNights: true, windows: windows, history: store.history) ?? const {},
+      oxLast,
       today: now,
     );
 

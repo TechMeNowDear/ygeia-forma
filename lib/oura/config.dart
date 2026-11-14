@@ -9,9 +9,10 @@ library;
 /// Το Client ID της εφαρμογής μας στην Oura. Κενό = η σύνδεση δεν έχει ενεργοποιηθεί ακόμα.
 const ouraClientId = 'af0dbf14-b534-4187-8d6b-6cc0cc6f41a1';
 
-/// Τα δικαιώματα (scope) που ζητάμε, σε ΜΙΑ γραμμή. Κενό = η προεπιλογή του [ouraOAuth] («daily» στο classic,
-/// «extapi:daily» στο v2). Αν το νέο portal δείχνει άλλα κουτάκια, π.χ. `'daily sleep'` ή `'extapi:daily'`.
-/// Την απόφαση για το αν φτάνουν την παίρνουν ΜΟΝΟ τα 401/403 των δεδομένων (το «scope» της απάντησης δεν ελέγχεται).
+/// Τα δικαιώματα (scope) που ζητάμε, σε ΜΙΑ γραμμή. Κενό = η προεπιλογή του [ouraOAuth] («daily spo2» στο portal και
+/// στο classic, «extapi:daily» στο v2): στο portal της Oura να είναι τσεκαρισμένα ΚΑΙ τα δύο. Αν το νέο portal δείχνει
+/// άλλα κουτάκια, π.χ. `'daily sleep'` ή `'extapi:daily'`. Round 9 (R9-A11-3): το «scope» της απάντησης κρίνει μόνο αν
+/// δόθηκε το οξυγόνο ([OuraTokens.parseResponse]: «spo2»)· την πρόσβαση στον ύπνο την κρίνουν τα 401/403 των δεδομένων.
 const ouraScopes = '';
 
 /// Ο μεσάζων για την ανταλλαγή κωδικού και την ανανέωση: Netlify Function στο site/netlify/functions/oura-token.mjs.

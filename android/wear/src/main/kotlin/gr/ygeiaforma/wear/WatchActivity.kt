@@ -454,15 +454,17 @@ class WatchActivity : Activity(), WatchView.Actions {
         val now = System.currentTimeMillis()
         // Round 8 (R8-U3-01): πρώτα η ερώτηση του 1ου σετ, αν είναι ανοιχτή: η απάντηση (και το «Δεν ξέρω» = −1) πάει στο
         // κινητό ως «rir1», που βαθμονομεί τα επόμενα σετ. Η ρεζέρβα της άσκησης δεν αλλάζει. Μετά: το διάλειμμα (τρέχει ήδη).
-        if (s.firstIdx >= 0) {
-            val fi = s.answerFirst()
-            val item = s.items.getOrNull(fi)
-            if (s.phone && item != null) cmd(rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, rir))
+        // Round 9 (R9-A12-2): η απόφαση στο [LiveSession.answerAny] (κλείνει την ερώτηση, με δοκιμή συμπεριφοράς)· R9-A8-3: η
+        // απάντηση κρατιέται και η υπηρεσία ξαναστέλνει την «rir1» ώσπου το κινητό να μην τη ζητά πια.
+        val a = s.answerAny(rir, now)
+        if (a.first) {
+            a.rir1?.let { cmd(it) }
             saveRun()
             Repo.screen = if (s.rirPending) Repo.Screen.RIR else if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET
             return
         }
-        val (next, i) = s.answer(rir, now)
+        val next = a.next
+        val i = a.i
         if (i < 0) {
             // Καμία άσκηση δεν περιμένει απάντηση (π.χ. απαντήθηκε στο κινητό): δεν γράφεται πουθενά (W2-18).
             Repo.screen = if (s.restEnd > now) Repo.Screen.REST else Repo.Screen.SET

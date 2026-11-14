@@ -30,6 +30,15 @@ object HomeWidgets {
     const val SNAPSHOT = "widget_data.json"
     const val EXTRA_OPEN = "ygeia_open"
 
+    /**
+     * Round 9 (R9-A10-2): πώς ανοίγει την εφαρμογή ένα πάτημα widget. Με CLEAR_TOP (όπως η ειδοποίηση διαλείμματος,
+     * TrainingBridge): ό,τι είναι ανοιχτό πάνω από την υπάρχουσα MainActivity (σαρωτής barcode, επιλογέας αρχείου, PDF,
+     * άδειες της Samsung) κλείνει και το πάτημα πάει σε ΑΥΤΗ (onNewIntent). Πριν, με μόνο SINGLE_TOP, το Android άνοιγε
+     * ΔΕΥΤΕΡΗ MainActivity με δεύτερη μηχανή Flutter: δύο αντίγραφα των ρυθμίσεων στη μνήμη, που έσβηναν το ένα τις
+     * αλλαγές του άλλου (π.χ. μια μέτρηση μέσης ή έναν νέο στόχο θερμίδων).
+     */
+    const val OPEN_FLAGS = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
     /** Μεσάνυχτα: ξαναζωγραφίζονται τα widgets με τον κανόνα της ημέρας (καμία ανάγνωση δεδομένων). */
     const val ACTION_DAY = "gr.ygeiaforma.widgets.DAY"
 
@@ -309,7 +318,7 @@ object HomeWidgets {
             // σφάλμα (Sentry YGEIA-FORMA-3). Κάθε πάτημα ξεχωρίζει από τον requestCode του PendingIntent.
             action = "gr.ygeiaforma.WIDGET_OPEN.$id.$part"
             putExtra(EXTRA_OPEN, target)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = OPEN_FLAGS
         }
         return PendingIntent.getActivity(ctx, id * 2 + part, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }

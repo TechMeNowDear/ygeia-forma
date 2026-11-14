@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../data.dart';
+import '../error_report.dart' show errors;
 import '../format.dart';
 import '../history.dart';
 import '../oxygen_note.dart' show lowestText, oxygenRangeText;
@@ -38,6 +39,12 @@ const reportNotIncludedText = 'ΗΚΓ, ειδοποιήσεις ακανόνισ
 /// την ίδια μέρα γίνεται «… (1).pdf»)· αν λείπει (παλιά απάντηση), το όνομα που ζητήθηκε ([asked]).
 String pdfSavedText(String? saved, String asked) =>
     'Αποθηκεύτηκε στις Λήψεις: ${saved == null || saved.trim().isEmpty ? asked : saved}';
+
+/// Round 9 (R9-U4-4, f4): το μήνυμα όταν το PDF δεν αποθηκεύτηκε, από το είδος του σφάλματος ([r]: η απάντηση της
+/// γέφυρας), ποτέ το κείμενο της Java («java.io.IOException: …»)· όπως το αντίγραφο και η «Αναφορά για έλεγχο» (R7-A9-5).
+String pdfSaveFailText(Map<String, dynamic>? r) => r?['kind'] == 'full'
+    ? 'Δεν αποθηκεύτηκε: δεν χωράει στο κινητό. Ελευθέρωσε χώρο και δοκίμασε ξανά.'
+    : 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.';
 
 /// Αναφορά για γιατρό: προεπισκόπηση των σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
@@ -122,14 +129,16 @@ class _ReportPageState extends State<ReportPage> {
           final n = r['name'];
           _savedName = n is String ? n : null;
         } else {
-          _error = r['message']?.toString() ?? 'Άγνωστο σφάλμα';
+          _error = pdfSaveFailText(r);
         }
       });
-    } catch (e) {
+    } catch (e, s) {
+      // Το κείμενο του σφάλματος δεν φαίνεται πια στην οθόνη: πηγαίνει στις αναφορές σφαλμάτων (R9-U4-4).
+      errors.report(e, s);
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString();
+        _error = pdfSaveFailText(null);
       });
     }
   }
@@ -257,7 +266,7 @@ class _ReportPageState extends State<ReportPage> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text('Δεν αποθηκεύτηκε: $_error', style: TextStyle(color: c.bad, fontSize: 13.5)),
+                    child: Text(_error!, style: TextStyle(color: c.bad, fontSize: 13.5)),
                   ),
                 if (_uri != null) ...[
                   Padding(

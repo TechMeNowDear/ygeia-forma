@@ -45,12 +45,42 @@ object WidgetText {
     /**
      * Round 8 (R8-U1-3): η μονάδα μετά τον αριθμό, όπως στην εφαρμογή: «96%», «25,4%» κολλητά (BigValue, R7-U4-13), όλες οι
      * άλλες με κενό («82,2 kg»). Πριν το widget έγραφε «96 %».
+     * Round 9 (R9-U1-5): και το σκέτο «°» κολλητά («+0,2°», όπως η γραμμή «συνήθως +0,1°» του ίδιου widget)· κενό μόνο πριν
+     * από το «°C» (SI Brochure, 9η έκδ., §5.4.3). Πριν «+0,2 °».
      */
     fun unitText(unit: String): String = when {
         unit.isEmpty() -> ""
-        unit == "%" -> unit
+        unit == "%" || unit == "°" -> unit
         else -> " $unit"
     }
+
+    /**
+     * Round 9 (R9-A12-3): τι γράφει ο WidgetRenderer για μια τιμή με μονάδα (κεντρική τιμή και κουτάκια): ο αριθμός και,
+     * χωριστά (άλλα γράμματα), η μονάδα όπως τη γράφει το [unitText]. Το στιγμιότυπο έχει μονάδες με κενό μπροστά
+     * («␣kg», widget_snapshot.dart): κόβεται πρώτα.
+     */
+    fun valueParts(value: String, unit: String): Pair<String, String> = value to unitText(unit.trim())
+
+    /**
+     * Round 9 (R9-A12-3): το μέγεθος γραμμάτων με το οποίο ένα κείμενο χωρά στο [maxW], με βήματα του [SHRINK_STEP] από το
+     * [base] ([shrinkScale]) και ποτέ κάτω από το [floor] ([shrinkSteps]). [width]: το πλάτος του κειμένου σε ένα μέγεθος.
+     * Αν δεν χωρά ούτε στο [floor], το [floor] (ο renderer μετά το κόβει με «…»). Ο κανόνας του `fit` και της κεντρικής
+     * τιμής του WidgetRenderer, εδώ ώστε να ελέγχεται σε απλό JVM (πριν ο έλεγχος είχε δικό του αντίγραφο του βρόχου).
+     */
+    fun fitSize(base: Float, floor: Float, maxW: Float, width: (Float) -> Float): Float {
+        val steps = shrinkSteps(floor)
+        for (k in 0 until steps) {
+            val size = base * shrinkScale(k)
+            if (width(size) <= maxW) return size
+        }
+        return base * shrinkScale(steps)
+    }
+
+    /**
+     * Round 9 (R9-U1-4): το όνομα ενός κουτιού: το κανονικό ([label]) αν χωρά ([fits]), αλλιώς το σύντομο ([short], π.χ.
+     * «Energy» για το «Energy Score» στη στήλη 1×3). Όπως το [sourceText].
+     */
+    fun chipLabel(label: String, short: String?, fits: (String) -> Boolean): String = sourceText(label, short, fits)
 
     /**
      * Τιμές «σήμερα» (κίνηση, φαγητό) άλλης μέρας δεν φαίνονται σαν σημερινές (έλεγχος 8/11, DATA-02): μένουν τα ονόματα

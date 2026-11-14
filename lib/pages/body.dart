@@ -57,6 +57,9 @@ class BodyPage extends StatelessWidget {
         // Round 3 (k1 · R3-C-1): η ζύγιση της μέρας του φύλακα, ίδια με το ιστορικό ([weighInDays]).
         final daily = guard.counted;
 
+        // Οι 12 πιο πρόσφατες ζυγίσεις του πίνακα «Ζυγίσεις», νεότερη πρώτη.
+        final tableRows = body.reversed.take(12).toList();
+
         final skinNights = (d?.nights ?? const <Night>[]).where((n) => n.skinTemp != null).toList();
         final skinBase = d?.skinTempBaseline;
 
@@ -134,7 +137,14 @@ class BodyPage extends StatelessWidget {
               c.energy,
               clock,
             ),
-          if (body.isNotEmpty) _WeighTable(body: body.reversed.take(12).toList(), now: clock, foreign: foreign),
+          if (body.isNotEmpty)
+            _WeighTable(
+              body: tableRows,
+              now: clock,
+              foreign: foreign,
+              // Round 9 (R9-U4-7): η δεύτερη ζύγιση μιας μέρας (π.χ. η βραδινή), που δεν μετρά, σε γκρι με την ώρα της.
+              other: otherWeighIns(tableRows, shown: guard.shown, foreign: foreign, pending: guard.pending),
+            ),
           // Θερμοκρασία καρπού: μόνο ως απόκλιση από το «συνήθως» (τρίτος έλεγχος F2/C5), ποτέ βαθμοί (33,6 °C διαβαζόταν ως
           // υποθερμία). Το «συνήθως» είναι η μεσαία τιμή των 14 προηγούμενων νυχτών (όχι «μέσος όρος»).
           if (skinNights.length >= 2)
@@ -267,8 +277,9 @@ class _LatestCard extends StatelessWidget {
       // Round 4 (m1 · R4-A-4): ούτε από ζύγιση «σε αναμονή» (πριν: «(−42,6)» για το παιδί του Σαββάτου).
       if (before == null || foreign || pending) return base;
       // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2».
+      // Round 9 (R9-A4-3): και το 0 («82,2 kg  (0)»), όπως η Σήμερα («0 kg από 18/11») και το widget: η σημείωση από πάνω
+      // λέει «σε παρένθεση η αλλαγή από τις …», και πριν, με ίδιο βάρος, δεν φαινόταν καμία.
       final diff = shownDiff(value, before, digits);
-      if (diff == 0) return base;
       return '$base  (${signedDec(diff, digits)})';
     }
 
@@ -325,7 +336,8 @@ class _LatestCard extends StatelessWidget {
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
-          if (!foreign && !pending && p != null && last.weight != null && p.weight != null && shownDiff(last.weight!, p.weight!, 1) != 0) ...[
+          // Round 9 (R9-A4-3): και με διαφορά 0 («0 kg από 18/11»), όπως η Σήμερα.
+          if (!foreign && !pending && p != null && last.weight != null && p.weight != null) ...[
             const SizedBox(height: 6),
             // Σχέδια 9/11 (Spec): αλλαγή χωρίς κρίση, σε γκρι.
             Align(
@@ -433,6 +445,10 @@ class _LatestCard extends StatelessWidget {
   }
 }
 
+/// Round 9 (R9-A4-2): η μέρα της πρώτης μέτρησης μέσης στη γραμμή «−4,0 cm από …»: με έτος όταν είναι άλλης χρονιάς από
+/// την τελευταία ([last]), όπως το [yearAwareLabel] των γραφημάτων.
+String waistFromLabel(DateTime first, DateTime last) => first.year == last.year ? dayMonth(first) : dayMonthYear(first);
+
 /// Round 8 (A4 Β2 / U4 Β4): «13/8», η μορφή της μέρας σε όλη την κάρτα (χάπι, σημείωση), όπως Σήμερα και widget.
 String _dayNum(DateTime d) => '${d.day}/${d.month}';
 
@@ -467,12 +483,22 @@ const mixedLatestText = 'Την ίδια μέρα υπάρχουν δύο ζυγ
 /// Ζυγίσεις ως πίνακας (σχέδια 9/11, 9β): οι μονάδες μία φορά επάνω, η χρονιά ως διαχωριστικό («2025»), αριθμοί
 /// με σταθερό πλάτος που μικραίνουν αντί να σπάνε.
 class _WeighTable extends StatelessWidget {
-  const _WeighTable({required this.body, required this.now, this.foreign = const <BodyMeasurement>{}});
+  const _WeighTable({
+    required this.body,
+    required this.now,
+    this.foreign = const <BodyMeasurement>{},
+    this.other = const <BodyMeasurement>{},
+  });
   final List<BodyMeasurement> body;
   final DateTime now;
 
   /// Round 1 (S11-2): ζυγίσεις που μοιάζουν ξένες: στη λίστα, σε γκρι, με σημείωση από κάτω.
   final Set<BodyMeasurement> foreign;
+
+  /// Round 9 (R9-U4-7): άλλη ζύγιση μιας μέρας όπου μετρά ήδη μία ([otherWeighIns]): σε γκρι, με την ώρα της, και σημείωση.
+  /// Πριν φαινόταν σαν κανονική («4/12 · 82,1» πάνω από «4/12 · 80,7»), ενώ η κάρτα από πάνω, τα γραφήματα και οι Τάσεις
+  /// μετρούν την πρώτη (80,7).
+  final Set<BodyMeasurement> other;
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +532,8 @@ class _WeighTable extends StatelessWidget {
       // Round 1 (U1a-9): ίδια μορφή σε όλες τις γραμμές («24/10»)· με την ημέρα της εβδομάδας η πρώτη μίκραινε στο
       // 60–70% σε μεγάλα γράμματα (η κάρτα πάνω λέει ήδη «Σήμερα 16:13»).
       final date = '${b.time.day}/${b.time.month}';
-      final st = foreign.contains(b) ? greyStyle : numStyle;
+      final isOther = !foreign.contains(b) && other.contains(b);
+      final st = foreign.contains(b) || isOther ? greyStyle : numStyle;
       rows.add(Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: i < body.length - 1 ? BoxDecoration(border: Border(bottom: BorderSide(color: c.hairline))) : null,
@@ -516,7 +543,7 @@ class _WeighTable extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(foreign.contains(b) ? '$date *' : date, maxLines: 1, style: st),
+              child: Text(foreign.contains(b) ? '$date *' : (isOther ? '$date ${hm(b.time)}' : date), maxLines: 1, style: st),
             ),
           ),
           cell(b.weight == null ? '—' : dec(b.weight!), st),
@@ -526,6 +553,7 @@ class _WeighTable extends StatelessWidget {
       ));
     }
     final marked = body.any(foreign.contains);
+    final markedOther = body.any((b) => !foreign.contains(b) && other.contains(b));
     return AppCard(
       key: const ValueKey('body-weighings'),
       child: Column(
@@ -550,10 +578,40 @@ class _WeighTable extends StatelessWidget {
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
           ],
+          if (markedOther) ...[
+            const SizedBox(height: 8),
+            Text(
+              weighTableOtherText,
+              key: const ValueKey('body-weighings-other'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
         ],
       ),
     );
   }
+}
+
+/// Round 9 (R9-U4-7): κάτω από τον πίνακα «Ζυγίσεις» όταν φαίνεται άλλη ζύγιση μιας μέρας που δεν μετρά ([otherWeighIns]).
+const weighTableOtherText = 'Με ώρα, σε γκρι: άλλη ζύγιση της ίδιας μέρας, που δεν μετρά (μετρά μία ζύγιση τη μέρα).';
+
+/// Round 9 (R9-U4-7): από τις [rows] του πίνακα, όσες ΔΕΝ μετρούν επειδή την ίδια μέρα μετρά άλλη ζύγιση (η ζύγιση της
+/// μέρας, [shown] του [guardBody]): π.χ. η βραδινή μετά την πρωινή. Όχι οι ξένες ([foreign], έχουν δικό τους σημάδι) ούτε
+/// οι «σε αναμονή» ([pending]: όλη η μέρα περιμένει, το λέει η κάρτα από πάνω), ούτε ζυγίσεις χωρίς βάρος.
+Set<BodyMeasurement> otherWeighIns(
+  Iterable<BodyMeasurement> rows, {
+  required List<BodyMeasurement> shown,
+  required Set<BodyMeasurement> foreign,
+  required Set<BodyMeasurement> pending,
+}) {
+  final pick = <DateTime, BodyMeasurement>{for (final s in shown) dayOf(s.time): s};
+  final out = Set<BodyMeasurement>.identity();
+  for (final b in rows) {
+    if (b.weight == null || foreign.contains(b) || pending.contains(b)) continue;
+    final p = pick[dayOf(b.time)];
+    if (p != null && !identical(p, b)) out.add(b);
+  }
+  return out;
 }
 
 /// Μέση με μεζούρα (σχέδια 12/11): η τελευταία τιμή, η αλλαγή από την πρώτη, το εύρος αναφοράς (ESC 2021) και η πορεία.
@@ -586,7 +644,9 @@ class _WaistCard extends StatelessWidget {
           Text(
             [
               dayMonthYear(day(last.day)),
-              if (first != null) '${signedDec(shownDiff(last.cm, first.cm, 1))} cm από ${dayMonth(day(first.day))}',
+              // Round 9 (R9-A4-2): η πρώτη μέτρηση με το έτος της όταν είναι άλλης χρονιάς («−4,0 cm από 16 Νοε 2026» δίπλα
+              // σε «20 Νοε 2027»)· πριν «από 16 Νοε», που διαβαζόταν σαν πριν από 4 μέρες.
+              if (first != null) '${signedDec(shownDiff(last.cm, first.cm, 1))} cm από ${waistFromLabel(day(first.day), day(last.day))}',
             ].join(' · '),
             style: small,
           ),

@@ -75,7 +75,8 @@ class _TrendsPageState extends State<TrendsPage> {
                 // Round 1 (S4-1): με «Λίγες … για συμπέρασμα» σε κάποια γραμμή, δεν λέμε ότι «ό,τι αλλάζει είναι μέσα στις
                 // διακυμάνσεις σου» (εκεί δεν φάνηκε αν άλλαξε). Round 2 (R2-D-7): ούτε με «Λίγα δεδομένα» / «Αλλαγή πηγής».
                 notCompared: notComparedText(results),
-                rows: results.length,
+                // Round 9 (R9-A5-1 = R9-U4-5): μόνο οι γραμμές που πέρασαν πράγματι από τον έλεγχο ([testedRows]).
+                rows: testedRows(results),
               );
 
         Widget section(TrendSection s) => _SectionCard(
@@ -233,7 +234,7 @@ class _ChangedCard extends StatelessWidget {
   final List<TrendResult> changed;
   final TrendPeriod period;
 
-  /// Πόσες γραμμές (μετρήσεις) ελέγχονται μαζί ([chanceNote]).
+  /// Πόσες γραμμές (μετρήσεις) ελέγχθηκαν μαζί ([testedRows], [chanceNote]).
   final int rows;
 
   /// Καμία μέτρηση δεν είχε αρκετές μέρες για σύγκριση (όλες «Λίγα δεδομένα» ή αλλαγή πηγής).
@@ -477,6 +478,9 @@ class _MetricDetail extends StatelessWidget {
               // Round 1 (U1b-09, αίτημα f9 → f4): διάρκειες σε λεπτά με βήματα τέταρτα/μισάωρα/ώρες («6:00 · 7:00»), όχι
               // 1/2/5 × 10ⁿ λεπτά («3:20 · 6:40»).
               tickSteps: def.kind == ValueKind.duration ? minuteTickSteps : null,
+              // Round 9 (R9-U4-2): το TalkBack με λέξεις («6 ώρες 12 λεπτά»), όχι με τη μορφή του άξονα («6:12»)· η
+              // θερμοκρασία καρπού ως διαφορά με τη μονάδα της («+0,4 °C»).
+              semanticLabel: trendChartLabel(r, [for (final p in r.points) (p.$1, rel(p.$2))]),
               levels: [
                 if (r.previous != null) (r.previousFrom, r.previousEnd, rel(r.previous!), c.textSecondary),
                 if (r.current != null && r.status != TrendStatus.sourceChange) (r.currentFrom, r.end, rel(r.current!), c.text),
@@ -634,6 +638,15 @@ String Function(double) _axisFormat(MetricDef def) => switch (def.kind) {
       ValueKind.number => (v) => dec(v, def.digits),
     };
 
+/// Round 9 (R9-U4-2): η περιγραφή του γραφήματος μιας γραμμής για το TalkBack ([lineChartSummary]) με τα [points] όπως
+/// ζωγραφίζονται: διάρκειες με λέξεις («6 ώρες 12 λεπτά», ποτέ «6:12» σαν ώρα της μέρας), θερμοκρασία καρπού ως διαφορά
+/// με τη μονάδα της. null για τα υπόλοιπα (η περιγραφή με τη μορφή του άξονα, π.χ. «23:15» για την ώρα ύπνου).
+String? trendChartLabel(TrendResult r, List<(DateTime, double)> points) {
+  if (relativeTemp(r)) return lineChartSummary(points, (v) => '${signedDec(v, r.def.digits)} ${r.def.unit}');
+  if (r.def.kind == ValueKind.duration) return lineChartSummary(points, (v) => hoursMinutes(v.round()));
+  return null;
+}
+
 double _minRange(MetricDef def) => switch (def.key) {
       K.sleepMin => 120,
       K.bedtime => 120,
@@ -723,8 +736,31 @@ String? notComparedText(List<TrendResult> results) {
 /// /home/claude/scratch/f7/a53/holm_sim.py). Η διόρθωση Holm (οικογενειακό 1%) θα το έριχνε στο ~1%, αλλά θα έκρυβε
 /// πραγματικές αλλαγές: +3 bpm παλμοί ύπνου για 30 μέρες φαίνονται 34% → 7,5%, σε 3 μήνες 90% → 70%· HRV −15% σε 3 μήνες
 /// 88% → 56%· ύπνος −30 λεπτά σε 3 μήνες 60% → 25%. Γι' αυτό έμεινε ο έλεγχος ανά γραμμή, με αυτή την προειδοποίηση.
-String chanceNote(int rows) => 'Με ${rows > 0 ? '$rows' : 'πολλές'} μετρήσεις μαζί, περίπου μία φορά στις 10 κάποια γραμμή '
-    'λέει «άλλαξε» από τύχη· αν η αλλαγή φαίνεται και τις επόμενες εβδομάδες, είναι πιο σίγουρη.';
+/// Round 9 (R9-A5-1 = R9-U4-5): [rows] = οι γραμμές που ΠΡΑΓΜΑΤΙΚΑ ελέγχθηκαν ([testedRows]) και η πιθανότητα ανάλογη με
+/// αυτές ([chanceOneIn]). Πριν: «Με 20 μετρήσεις μαζί … μία φορά στις 10» όταν συγκρίθηκαν μόνο τα «Βήματα».
+String chanceNote(int rows) => rows <= 1
+    ? 'Ο έλεγχος λέει «άλλαξε» από τύχη περίπου μία φορά στις 100· αν η αλλαγή φαίνεται και τις επόμενες εβδομάδες, '
+        'είναι πιο σίγουρη.'
+    : 'Με $rows μετρήσεις μαζί, περίπου μία φορά στις ${chanceOneIn(rows)} κάποια γραμμή λέει «άλλαξε» από τύχη· αν η '
+        'αλλαγή φαίνεται και τις επόμενες εβδομάδες, είναι πιο σίγουρη.';
+
+/// Round 9 (R9-A5-1 = R9-U4-5): οι γραμμές που πέρασαν από τον έλεγχο του 1% (trends.dart): «άλλαξε», «Σταθερό» και
+/// «Λίγες … για συμπέρασμα» (κι αυτές ελέγχθηκαν, με μεγάλη κρίσιμη τιμή, και θα μπορούσαν να πουν «άλλαξε»). Όχι
+/// «Λίγα δεδομένα», «Αλλαγή πηγής/ορισμού», «Ενημερώνεται το ιστορικό»: εκεί δεν έγινε έλεγχος, άρα ούτε «άλλαξε» από τύχη.
+int testedRows(List<TrendResult> results) => results
+    .where((r) => r.status == TrendStatus.up || r.status == TrendStatus.down || r.status == TrendStatus.stable)
+    .length;
+
+/// Round 9 (R9-A5-1): «περίπου μία φορά στις N» για [tested] γραμμές μαζί, όταν τίποτα δεν άλλαξε πραγματικά: 1 − (1 − p)^k,
+/// με p ανά γραμμή ανάμεσα στο ~0,55% της προσομοίωσης (19 γραμμές → 10%, holm_sim.py του R7-A5-3) και στο 1% του ελέγχου.
+/// 1 γραμμή: 0,5–1% → 100· 2–3: 1,1–3% → 50· 4–9: 2,2–8,6% → 20· 10 και πάνω: 5,4–18% (προσομοίωση 16–20: ~10%) → 10.
+int chanceOneIn(int tested) => tested <= 1
+    ? 100
+    : tested <= 3
+        ? 50
+        : tested <= 9
+            ? 20
+            : 10;
 
 /// UX U2: κανένας δείκτης δεν είχε αρκετές μετρήσεις και στις δύο περιόδους.
 String noComparisonText(TrendPeriod p) => switch (p) {

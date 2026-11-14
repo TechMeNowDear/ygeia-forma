@@ -253,7 +253,9 @@ void main() {
       await _pump(t, TrendsPage(store: s, now: now), size: const Size(400, 4000));
       final note = find.byKey(const ValueKey('trends-chance-note'));
       expect(note, findsOneWidget);
-      expect(t.widget<Text>(note).data, chanceNote(trendMetrics.length));
+      // Round 9 (R9-A5-1 = R9-U4-5): μόνο οι παλμοί ύπνου ελέγχθηκαν (οι άλλες 15 γραμμές «Λίγα δεδομένα»): η πρόταση για 1
+      // ελεγμένη γραμμή, όχι για τις 16 της λίστας (πριν: «Με 16 μετρήσεις μαζί … μία φορά στις 10»).
+      expect(t.widget<Text>(note).data, chanceNote(1));
       expect(trendMetrics.length, 16);
     });
 
