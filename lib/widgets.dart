@@ -1648,6 +1648,9 @@ List<List<(DateTime, double)>> lineSegments(List<(DateTime, double)> points, Lis
 ///   στο τελευταίο τμήμα: η γραμμή φαινόταν να σταματά στην προηγούμενη ζύγιση (83,3) και η κουκκίδα 82,2 έμενε μόνη.
 ///   Αν καμία θέση δεν είναι ελεύθερη (πολύ μικρό γράφημα), η θέση του γύρου 2 (R2-U1-8: δίπλα στο λευκό περίγραμμα της
 ///   κουκκίδας).
+/// Round 10 (R10-B2-2 = R10-B3-2/-3): ποτέ μέσα στη στήλη των τιμών του άξονα (αρχίζει στο plot.right + 8): η δεξιά άκρη
+/// της πλάκας το πολύ στο plot.right + 2, άρα το κείμενο τελειώνει τουλάχιστον 9 px πριν από αυτές. Πριν, με μεγάλα
+/// γράμματα, η πλάκα σκέπαζε την αρχή τους («6.000») ή κολλούσε σε αυτές («82,285,0» στο Σώμα, 2×).
 Offset lastValueLabelAt({
   required Offset last,
   Offset? prev,
@@ -1661,7 +1664,7 @@ Offset lastValueLabelAt({
         x.clamp(0.0, math.max(0.0, width - tw)).toDouble(),
         y.clamp(0.0, math.max(0.0, plot.bottom - th)).toDouble(),
       );
-  final cx = math.min(last.dx, plot.right - 16) - tw / 2;
+  final cx = math.min(math.min(last.dx, plot.right - 16) - tw / 2, plot.right - 1 - tw);
   if (prev == null || prev.dy >= last.dy - 2) return fit(cx, last.dy - 9 - th);
   if (last.dy + 9 + th <= plot.bottom) return fit(cx, last.dy + 9);
   // Η πλάκα ([_plate]: 3 px δεξιά-αριστερά, 1 px πάνω-κάτω) και μισό πάχος γραμμής γύρω της.

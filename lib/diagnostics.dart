@@ -26,6 +26,7 @@ import 'food/off.dart' show impossibleValues;
 import 'format.dart' show daysBetween;
 import 'goals.dart';
 import 'history.dart' show dateKey;
+import 'pages/nutrition_goals.dart' show beforeGoals;
 import 'training/training_store.dart';
 
 const diagnosticsVersion = 1;
@@ -171,7 +172,9 @@ Map<String, dynamic> diagnosticsFrom({
         'floored': c.floored,
         'protein': c.protein,
         'fat': [c.fatLo, c.fatHi],
-        'satMax': c.satMax,
+        // Round10 (R10-B1-2 / R10-B7-3): το όριο κορεσμένων όπως το γράφουν οι οθόνες ([satLimitShown], ένα δεκαδικό:
+        // 2.340 kcal × 6% = 15,6 g)· πριν στρογγυλεμένο στο γραμμάριο (16), άλλο από αυτό που έβλεπε ο χρήστης.
+        'satMax': satLimitShown(c.kcal, c.satPct),
         'satPct': c.satPct,
         'fiber': c.fiber,
         'salt': c.salt,
@@ -182,7 +185,7 @@ Map<String, dynamic> diagnosticsFrom({
         'source': g.kcalSet != null ? 'user' : (g.kcalAdapt != null ? 'adaptive' : 'formula'),
         'protein': g.protein,
         'fat': [g.fatLo, g.fatHi],
-        'satMax': g.satMax,
+        'satMax': satLimitShown(g.kcal, g.satPct),
       },
     };
   }
@@ -195,6 +198,11 @@ Map<String, dynamic> diagnosticsFrom({
     final t = Totals(entries);
     final ch = CholDay(entries);
     cholDays.add((day, ch));
+    // Round10 (R10-B1-2 / R10-B7-3): ο στόχος και το όριο κορεσμένων της μέρας όπως τα γράφει η Διατροφή
+    // (GoalsSummaryCard): σήμερα ο τωρινός στόχος, μέρα που πέρασε ο στόχος που ίσχυε τότε ([targetOn], R9-A1-2), μέρα πριν
+    // από τους στόχους κανένας ([beforeGoals]: εκεί η Διατροφή γράφει μόνο «Σύνολο ημέρας»). Πριν, κάθε μέρα είχε τον
+    // ΤΩΡΙΝΟ στόχο. Το «countsForAdaptive» μένει με τον τωρινό στόχο, όπως η διόρθωση θερμίδων.
+    final goalKcal = g == null || beforeGoals(g, day) ? null : (day == today ? g.kcal : targetOn(g, day));
     days.add({
       'd': dateKey(day),
       'entries': entries.length,
@@ -211,7 +219,8 @@ Map<String, dynamic> diagnosticsFrom({
       if (t.missing.isNotEmpty) 'missing': t.missing,
       if (ch.satPct != null) 'satPct': _r(ch.satPct!, 1),
       'chol': {'nutsG': _r(ch.nutsG, 0), 'branG': _r(ch.branG, 0), 'legumesDryG': _r(ch.legumesDryG, 0), 'fishG': _r(ch.fishG, 0)},
-      if (g != null) 'goalKcal': g.kcal,
+      if (goalKcal != null) 'goalKcal': goalKcal,
+      if (goalKcal != null && g != null) 'satLimit': satLimitShown(goalKcal, g.satPct),
       if (g != null) 'countsForAdaptive': t.kcal >= adaptFullDayShare * g.kcal,
     });
   }

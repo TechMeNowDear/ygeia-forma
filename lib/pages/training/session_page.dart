@@ -593,7 +593,24 @@ class _SessionPageState extends State<SessionPage> {
           for (var i = 0; i < e.log.length; i++) _setRow(context, s, e, i, i == current),
           // R7-A6-2: «Πόνεσε κάπου;» σε κάθε σημείο της άσκησης, όχι μόνο μετά το τελευταίο σετ.
           Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            TextButton.icon(onPressed: () => t.addSet(e), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Σετ')),
+            // R10-B4-1: «− Σετ» μόνο για γραμμή του «+ Σετ» που δεν έγινε ([ExLog.canRemoveRow]): αλλιώς η άσκηση έμενε
+            // ανοιχτή και η ερώτηση «Τελευταίο σετ» δεν ερχόταν ποτέ (καμία αύξηση βάρους εκείνη τη φορά).
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              TextButton.icon(onPressed: () => t.addSet(e), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Σετ')),
+              if (e.canRemoveRow)
+                Semantics(
+                  button: true,
+                  label: 'Αφαίρεση σετ ${e.log.length}',
+                  onTap: () => _removeSet(context, s, e),
+                  excludeSemantics: true,
+                  child: TextButton.icon(
+                    key: const ValueKey('sess-remove-set'),
+                    onPressed: () => _removeSet(context, s, e),
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                    label: const Text('Σετ'),
+                  ),
+                ),
+            ]),
             TextButton(
               key: const ValueKey('sess-pain-btn'),
               style: TextButton.styleFrom(foregroundColor: c.warn, minimumSize: const Size(48, 48)),
@@ -787,10 +804,10 @@ class _SessionPageState extends State<SessionPage> {
   /// Ανοιχτό φύλλο «πόσες ακόμα θα έβγαζες;» (R8-U3-01): η ερώτηση για ✓ του ρολογιού περιμένει να κλείσει.
   bool _asking = false;
 
-  Future<int?> _ask(BuildContext context, {required bool first, ExLog? e, ExLog? firstOf}) async {
+  Future<int?> _ask(BuildContext context, {required bool first, ExLog? e, ExLog? firstOf, String? about}) async {
     _asking = true;
     try {
-      return await _askRir(context, first: first, e: e, firstOf: firstOf);
+      return await _askRir(context, first: first, e: e, firstOf: firstOf, about: about);
     } finally {
       _asking = false;
     }
@@ -834,30 +851,48 @@ class _SessionPageState extends State<SessionPage> {
     // R9-U3-08: η άσκηση τελειώνει όταν γίνουν ΟΛΕΣ οι γραμμές, και όσες πρόσθεσε το «+ Σετ» ([ExLog.rowsDone]), όπως
     // στο ρολόι: πριν, το ✓ του 3ου από 4 σετ ρωτούσε «Τελευταίο σετ» και πήγαινε στην επόμενη άσκηση.
     if (e.rowsDone) {
-      if (e.rirAnswer == null) {
-        final rir = await _ask(context, first: false, e: e);
-        if (gone()) return;
-        if (rir != null && rir >= 0) t.answer(e, rir);
-      }
-      if (gone()) return;
-      final next = s.items.indexWhere((x) => !x.skipped && !x.rowsDone);
-      if (next >= 0) {
-        setState(() => _idx = next);
-        _rest(e, exName(s.items[next].ex));
-      } else if (s.isFree) {
-        // Ελεύθερη: η επόμενη άσκηση δεν έχει διαλεχτεί ακόμα· το διάλειμμα μετρά κανονικά.
-        _rest(e, 'νέα άσκηση');
-      }
+      await _exerciseDone(context, s, e);
     } else {
       _rest(e, '${exName(e.ex)} · σετ ${e.done.length + 1}');
     }
+  }
+
+  /// Η άσκηση τελείωσε ([ExLog.rowsDone]): η ερώτηση «Τελευταίο σετ» (αν δεν απαντήθηκε) και η επόμενη άσκηση με το
+  /// διάλειμμα. R10-B4-1: και όταν τελειώνει επειδή βγήκε η γραμμή του «+ Σετ» που δεν έγινε ([keepRest]): το διάλειμμα
+  /// που ήδη μετρά από το τελευταίο ✓ δεν ξεκινά από την αρχή· αλλάζει μόνο το «Επόμενο».
+  Future<void> _exerciseDone(BuildContext context, Session s, ExLog e, {bool keepRest = false}) async {
+    bool gone() => !context.mounted || t.current?.id != s.id;
+    if (e.rirAnswer == null) {
+      final rir = await _ask(context, first: false, e: e);
+      if (gone()) return;
+      if (rir != null && rir >= 0) t.answer(e, rir);
+    }
+    if (gone()) return;
+    final next = s.items.indexWhere((x) => !x.skipped && !x.rowsDone);
+    if (next >= 0) setState(() => _idx = next);
+    // Ελεύθερη: η επόμενη άσκηση δεν έχει διαλεχτεί ακόμα· το διάλειμμα μετρά κανονικά.
+    final label = next >= 0 ? exName(s.items[next].ex) : (s.isFree ? 'νέα άσκηση' : null);
+    if (label == null) return;
+    if (!keepRest) {
+      _rest(e, label);
+    } else if (_restEnd case final end?) {
+      TrainingDevice.rest(end, title: 'Διάλειμμα', text: 'Επόμενο: $label', doneTitle: 'Τέλος διαλείμματος', doneText: 'Επόμενο: $label');
+    }
+  }
+
+  /// R10-B4-1: «− Σετ»: βγαίνει η γραμμή του «+ Σετ» που δεν έγινε· αν έτσι η άσκηση τελείωσε, ό,τι και με το ✓ του
+  /// τελευταίου σετ ([_exerciseDone]).
+  Future<void> _removeSet(BuildContext context, Session s, ExLog e) async {
+    if (!t.removeSet(e)) return;
+    if (e.rowsDone) await _exerciseDone(context, s, e, keepRest: true);
   }
 
   /// «Πόσες ακόμα θα έβγαζες;» (0–4+). Στο τέλος της άσκησης και ενοχλήσεις.
   /// Δεν κλείνει κατά λάθος (έλεγχος 8/11): ή απάντηση ή «Δεν ξέρω» (−1, και τότε δεν ανεβαίνει τίποτα).
   /// R8-U3-01: [firstOf] = η άσκηση της ερώτησης του 1ου σετ· αν απαντηθεί στο ρολόι όσο το φύλλο είναι ανοιχτό (ή πάψει
   /// να εκκρεμεί), το φύλλο κλείνει μόνο του χωρίς απάντηση (null): ισχύει η απάντηση του ρολογιού.
-  Future<int?> _askRir(BuildContext context, {required bool first, ExLog? e, ExLog? firstOf}) {
+  /// R10-B4-1: [about] = το όνομα της άσκησης, όταν η ερώτηση γίνεται στο «Τέλος» και όχι πάνω στην άσκηση.
+  Future<int?> _askRir(BuildContext context, {required bool first, ExLog? e, ExLog? firstOf, String? about}) {
     var pick = -1;
     var closing = false;
     return showModalBottomSheet<int>(
@@ -883,10 +918,15 @@ class _SessionPageState extends State<SessionPage> {
         },
         child: StatefulBuilder(builder: (ctx, set) {
         final c = Aigaio.of(ctx);
+        final head = about;
         // Με μεγάλα γράμματα το φύλλο κυλά (ποτέ ξεχείλισμα).
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (head != null) ...[
+              Text(head, key: const ValueKey('rir-about'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.exercise)),
+              const SizedBox(height: 2),
+            ],
             Text(first ? 'Πρώτο σετ: πόσες ακόμα θα έβγαζες;' : 'Τελευταίο σετ: πόσες ακόμα θα έβγαζες;',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.25, color: c.text)),
             const SizedBox(height: 4),
@@ -1320,6 +1360,15 @@ class _SessionPageState extends State<SessionPage> {
         if (painEx != null) await _painSheet(context, painEx);
         if (!context.mounted || t.current?.id != s.id) return;
       }
+      // R10-B4-1 / R10-B7-4: άσκηση με όλα τα σετ του προγράμματος αλλά με γραμμή του «+ Σετ» που δεν έγινε: η ερώτηση
+      // «Τελευταίο σετ» δεν είχε έρθει (έρχεται με την τελευταία γραμμή). Χωρίς αυτήν η επόμενη φορά δεν ανεβαίνει
+      // τίποτα· γίνεται τώρα, για το τελευταίο σετ που έγινε.
+      for (final x in [...s.items]) {
+        if (x.skipped || !x.complete || x.rowsDone || x.rirAnswer != null) continue;
+        final rir = await _ask(context, first: false, e: x, about: exName(x.ex));
+        if (!context.mounted || t.current?.id != s.id) return;
+        if (rir != null && rir >= 0) t.answer(x, rir);
+      }
     }
     _restStop();
     if (!context.mounted) return;
@@ -1518,7 +1567,9 @@ class _SummaryPageState extends State<SummaryPage> {
       for (var k = 0; k < s.items.length; k++)
         _ExerciseCard(e: s.items[k], hr: withHr ? perEx[k] : null, showHr: withHr, key: ValueKey('sum-ex-$k')),
     ];
-    final hrCard = s.hrMax == null && !s.hasHr ? null : HrCard(session: s);
+    // R10-B4-4: ξεχασμένη, πριν από την «Αποθήκευση»: οι παλμοί ως το τέλος που θα γραφτεί (το τελευταίο ✓, όπως η διάρκεια
+    // πιο πάνω και το [TrainingStore.finish]), όχι και το βράδυ/πρωί που ακολούθησε.
+    final hrCard = s.hrMax == null && !s.hasHr ? null : HrCard(session: s, hrEnd: stale ? s.lastTick : null);
 
     // round1, S6-9 (f6a): προπόνηση που έκλεισε σήμερα από το ρολόι (ή περπάτημα): το «Πώς ένιωσες;» απαντιέται και εδώ, και
     // γράφεται αμέσως (t.setFeel). Παλιότερες: μόνο για ανάγνωση.

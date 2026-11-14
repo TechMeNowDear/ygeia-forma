@@ -30,6 +30,7 @@ class FoodDraft {
 
   /// Round9 (R9-A2-2): μετριέται με το κουτάλι ([Food.spoon]). Από τις κατηγορίες του Open Food Facts όταν σαρώνεται
   /// ([spoonFromOffTags]), από το ίδιο το προϊόν όταν διορθώνεται· null = δεν ξέρουμε (η φόρμα προτείνει από το όνομα).
+  /// Round10 (R10-B1-1): false = διάλεξες «Όχι» ([Food.spoonNo]), και μένει «Όχι» σε κάθε «Διόρθωση».
   final bool? spoon;
 
   /// Τι μετρά το προϊόν στην κάρτα «Χοληστερίνη» ([CholKind]) ή null. Από τις κατηγορίες του Open Food Facts όταν
@@ -198,15 +199,18 @@ bool? spoonFromOffTags(Object? tags, {double? kcal}) {
 
 /// Η πρώτη λέξη του ονόματος λέει τρόφιμο του κουταλιού: «Ταχίνι …», «Φυστικοβούτυρο …», «Μαργαρίνη …», «Μαγιονέζα …»,
 /// «Πραλίνα …», «Βούτυρο …» (πεζά/κεφαλαία και τόνοι δεν μετράνε). Μόνο η ΠΡΩΤΗ λέξη: «Μπισκότα με ταχίνι» δεν είναι.
+/// Round10 (R10-B1-1): οι ελληνικές λέξεις ΟΛΟΚΛΗΡΕΣ· πριν αρκούσε να αρχίζει έτσι η λέξη, και το «Βουτυρόγαλα» ή τα
+/// «Βουτυρομπισκότα» έβγαιναν «Ναι» (ανοίγαν με 15 g, και κάθε ποσότητα από 100 g ρωτούσε «Σωστή ποσότητα;»).
 bool spoonByName(String name) {
   final first = plain(name).split(RegExp(r'[^a-z0-9α-ω]+')).firstWhere((w) => w.isNotEmpty, orElse: () => '');
-  return first.isNotEmpty && _spoonNames.any(first.startsWith);
+  return first.isNotEmpty && (_spoonWords.contains(first) || _spoonLatin.any(first.startsWith));
 }
 
-/// Ολόκληρες λέξεις (όχι «ταχινόπιτα», «πραλινέ» σοκολάτα, «βουτυράκια» μπισκότα).
-const _spoonNames = [
-  'ταχινι', 'φυστικοβουτυρο', 'πραλινα', 'μαργαρινη', 'μαγιονεζα', 'βουτυρο', 'tahini', 'margarin', 'mayonn',
-];
+/// Ολόκληρες λέξεις (όχι «ταχινόπιτα», «πραλινέ» σοκολάτα, «βουτυράκια» μπισκότα, «βουτυρόγαλα», «βουτυρομπισκότα»).
+const _spoonWords = {'ταχινι', 'φυστικοβουτυρο', 'πραλινα', 'μαργαρινη', 'μαγιονεζα', 'βουτυρο'};
+
+/// Λατινικά: η αρχή της λέξης (tahini, margarine/margarina, mayonnaise/mayonesa).
+const _spoonLatin = ['tahini', 'margarin', 'mayonn'];
 
 // ---------------------------------------------------------------------------
 // Ξερό ή μαγειρεμένο, για τα δικά μου προϊόντα (round9, R9-A2-3)
@@ -242,13 +246,21 @@ String? dryStapleRawId(Food f) {
   ];
   bool has(List<String> stems) => words.any((w) => stems.any(w.startsWith));
   if (has(_dryNot)) return null;
-  if (has(const ['φακεσ', 'φακη', 'lentil', 'lenticch', 'lentej'])) return 'C20359';
-  if (has(const ['ρεβυθ', 'ρεβιθ', 'chickpea', 'garbanzo'])) return 'C20516';
-  if (has(const ['φαβα', 'σπαστ'])) return 'C20515';
-  if (has(const ['μαυρομ'])) return 'U173758';
-  if (has(const ['γιγαντ', 'ελεφαντ'])) return 'U174252';
-  if (has(const ['φασολ'])) return 'C20501';
   final whole = has(const ['ολικ', 'κασταν', 'whole', 'integral', 'brown', 'complet']);
+  // Round10 (R10-B1-3): ζυμαρικό ΑΠΟ όσπρια («Fusilli κόκκινες φακές», «Πένες από ρεβίθι», «Lentil pasta») είναι ζυμαρικό:
+  // ξερή και βρασμένη μορφή τα μακαρόνια της βάσης. Πριν η λέξη «φακές» έδινε «Φακές (ξερές)» και η «Βρασμένες» ήταν οι
+  // φακές της βάσης: ζυγισμένο βρασμένο μετρούσε «Όσπρια» (και 125 αντί για 167 kcal στα 100 g), ζυγισμένο ξερό όχι (στο
+  // Open Food Facts είναι «Pastas»: «Τίποτα»). Το ζυμαρικό φουσκώνει όπως τα μακαρόνια (×2,2 στη βάση, οι φακές ×2,6), άρα
+  // οι θερμίδες των βρασμένων μακαρονιών είναι πιο κοντά (και όχι λιγότερες). Μόνο όταν το ίδιο το προϊόν λέει «Όσπρια»
+  // (το διάλεξες στη φόρμα) μένουν οι μορφές των οσπρίων, ώστε ξερό και βρασμένο να μετρούν το ίδιο στην κάρτα.
+  final pasta = (has(_pastaNames) || has(const ['pasta'])) && f.cholKind != CholKind.legumes;
+  String legume(String id) => pasta ? (whole ? 'C9870' : 'C9810') : id;
+  if (has(const ['φακεσ', 'φακη', 'lentil', 'lenticch', 'lentej'])) return legume('C20359');
+  if (has(const ['ρεβυθ', 'ρεβιθ', 'chickpea', 'garbanzo'])) return legume('C20516');
+  if (has(const ['φαβα', 'σπαστ'])) return legume('C20515');
+  if (has(const ['μαυρομ'])) return legume('U173758');
+  if (has(const ['γιγαντ', 'ελεφαντ'])) return legume('U174252');
+  if (has(const ['φασολ'])) return legume('C20501');
   if (has(const ['ρυζι', 'rice', 'riso', 'riz', 'arroz'])) {
     if (has(const ['μπασματι', 'basmati'])) return 'C9119';
     final parboiled = has(const ['parboil']);
@@ -444,7 +456,9 @@ FoodDraft draftFromFood(Food f) => FoodDraft(
       lessThan: {for (final e in f.n.values.entries) if (e.value.lessThan) e.key},
       cholKind: f.cholKind,
       // Προϊόν χωρίς «sp» (και όσα αποθηκεύτηκαν πριν υπάρξει): η φόρμα προτείνει από το όνομα ([spoonByName]).
-      spoon: f.spoon ? true : null,
+      // Round10 (R10-B1-1): το «Όχι» που διάλεξες μένει «Όχι» ([Food.spoonNo]· πριν η «Διόρθωση» ξαναπρότεινε «Ναι» από το
+      // όνομα, και η αποθήκευση το έγραφε σιωπηλά).
+      spoon: f.spoon ? true : (f.spoonNo ? false : null),
     );
 
 const _formKeys = {Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fat, Nk.satFat, Nk.fiber, Nk.salt};
@@ -464,6 +478,7 @@ Food foodFromDraft(FoodDraft d, String id) => Food(
       perMl: d.perMl,
       cholKind: d.cholKind,
       spoon: d.spoon ?? false,
+      spoonNo: d.spoon == false,
       n: Nutrients({
         for (final e in d.values.entries) e.key: NValue(e.value, lessThan: d.lessThan.contains(e.key)),
         if (d.alcohol != null) Nk.alcohol: NValue(d.alcohol!),

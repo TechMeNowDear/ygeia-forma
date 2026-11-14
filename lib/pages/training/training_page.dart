@@ -391,8 +391,9 @@ class _TrainingPageState extends State<TrainingPage> {
       children.addAll([
         FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(cardio.name, maxLines: 1, style: title)),
         Text(
-            ['${cardio.minutes} λεπτά', if (p.planWeekText(cardio, today) case final wk?) wk, if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()]
-                .join(' · '),
+            // Round 10 (R10-B8-B1): ίδιος κανόνας με την κάρτα της Σήμερα (αδιάσπαστο κενό πριν από το «·» και στο «30 λεπτά»).
+            ['${cardio.minutes}\u00A0λεπτά', if (p.planWeekText(cardio, today) case final wk?) wk, if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()]
+                .join('\u00A0· '),
             key: const ValueKey('train-cardio-line'),
             style: aux),
         RoutineButton(w),

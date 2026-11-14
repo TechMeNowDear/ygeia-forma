@@ -188,16 +188,26 @@ bool _oatPortion(Food f) => isBran(f) || f.id == oatFlakesId;
 /// (R8-U2-7· πριν 100 g αλάτι)· πίτουρο βρώμης η ποσότητα του πλάνου σου ([branG], αλλιώς 40 g) και νιφάδες βρώμης 40 g
 /// (R8-U2 Β1).
 /// Round9 (R9-A2-2): δικό μου προϊόν του κουταλιού ([Food.spoon]) που δεν είναι σχεδόν καθαρό λίπος (ταχίνι, φυστικοβούτυρο,
-/// μαργαρίνη, μαγιονέζα) 15 g (μία κουταλιά), όπως τα αλείμματα της βάσης.
+/// πραλίνα) 15 g (μία κουταλιά), όπως τα αλείμματα της βάσης.
+/// Round10 (R10-B1-4): η σαρωμένη μαργαρίνη ή μαγιονέζα 10 g, όπως η μαργαρίνη και η μαγιονέζα της βάσης (κατηγορία
+/// «Λιπαρά»)· πριν 15 g (+5 g μαγιονέζα ≈ +35 kcal). Άλειμμα = από [_spreadSolidsPer100] g πρωτεΐνη και υδατάνθρακες στα 100.
 double firstGrams(Food f, {int? branG}) {
   if (_pinchPortion(f)) return 2;
-  if (isSpoonFood(f)) return f.cat == 'Αλείμματα' || (f.spoon && f.n.amount(Nk.fat) < typoFatPer100) ? 15 : 10;
+  if (isSpoonFood(f)) return f.cat == 'Αλείμματα' || (f.spoon && f.n.amount(Nk.fat) < typoFatPer100 && _spreadLike(f)) ? 15 : 10;
   if (isOlives(f)) return 10;
   if (_nutsPortion(f)) return 30;
   if (isBran(f)) return (branG != null && branG > 0 ? branG : defaultBranG).toDouble();
   if (f.id == oatFlakesId) return 40;
   return 100;
 }
+
+/// Round10 (R10-B1-4): άλειμμα (ταχίνι, φυστικοβούτυρο, πραλίνα) και όχι λίπος (μαργαρίνη, μαγιονέζα, βούτυρο), από τη
+/// σύσταση: στη βάση τα «Αλείμματα» του κουταλιού έχουν 34–63 g πρωτεΐνη και υδατάνθρακες στα 100 g (ταχίνι 34,
+/// φυστικοβούτυρο 43, πραλίνα 63) και τα «Λιπαρά» 0,4–10 (μαργαρίνη 0,4, βούτυρο 1,3, μαγιονέζα 4,7, μαγιονέζα light
+/// 9,9). Το όριο είναι ανάμεσα, μακριά και από τα δύο.
+const _spreadSolidsPer100 = 20.0;
+
+bool _spreadLike(Food f) => f.n.amount(Nk.protein) + f.n.amount(Nk.carbs) >= _spreadSolidsPer100;
 
 /// Η μερίδα της συσκευασίας ως πρώτη ποσότητα (round9, R9-A2-2): όχι για τρόφιμο του κουταλιού με «μερίδα» από
 /// [typoFatGrams] g και πάνω (το Open Food Facts δίνει συχνά «100 g» για ταχίνι: 673 kcal με ένα «Προσθήκη»)· τότε η πρώτη
@@ -1752,7 +1762,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
           if (values[k] != null && values[k] == widget.draft.values[k]) k,
       },
       cholKind: _cholKind,
-      spoon: _spoon ?? spoonByName(_name.text),
+      // Round10 (R10-B1-1): «Όχι» αποθηκεύεται μόνο όταν το διάλεξες (ή το είχε ήδη το προϊόν)· όσο δεν το άγγιξες, «Ναι» από
+      // το όνομα, αλλιώς τίποτα, όπως πριν.
+      spoon: _spoon ?? (spoonByName(_name.text) ? true : null),
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }

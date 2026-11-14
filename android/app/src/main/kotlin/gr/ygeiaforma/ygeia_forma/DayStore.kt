@@ -441,8 +441,10 @@ object DbSalvage {
      * 3 = round 9 (f4): κεφαλίδα κομμένου αρχείου ([fixPageCount], R9-A9-1), η νεότερη γραμμή κάθε id (R9-A9-2), και
      * καμία καλή σελίδα ανάμεσα σε δύο χαλασμένες περιοχές δεν χάνεται (R9-A9-4). Μια ανάγνωση με κανόνα 2 που δεν
      * διάβασε όλα ξαναγίνεται μία φορά.
+     * 4 = round 10 (R10-B6-1, g4): και όταν η χαλασμένη περιοχή φτάνει ως το τέλος του πίνακα (κομμένο αρχείο), οι καλές
+     * σελίδες ανάμεσα διαβάζονται ([read], βήμα 3). Μια ανάγνωση με κανόνα 3 που δεν διάβασε όλα ξαναγίνεται μία φορά.
      */
-    const val RULES = 3
+    const val RULES = 4
 
     /** Γραμμές ανά ερώτημα: λίγες, ώστε ένα ερώτημα να αγγίζει μόνο λίγες σελίδες του πίνακα. */
     const val CHUNK = 64
@@ -621,6 +623,9 @@ object DbSalvage {
      *   σημείο που διαβάζεται και δυαδική αναζήτηση για το όριό του, και μετά ([BACKFILL]) ένα-ένα όσα rowid πήδηξαν τα
      *   βήματα, ώστε να βρεθεί το ΠΡΩΤΟ σημείο που διαβάζεται. Πριν, μια καλή σελίδα ανάμεσα σε δύο χαλασμένες περιοχές
      *   χανόταν όταν ένα βήμα έπεφτε στη δεύτερη.
+     * - R10-B6-1 (round 10, g4): το ίδιο ένα-ένα και όταν ΚΑΝΕΝΑ βήμα δεν διαβάζεται ως το Long.MAX_VALUE (χαλασμένη
+     *   περιοχή ως το τέλος του πίνακα, π.χ. κομμένο αρχείο). Πριν τελείωνε εκεί και χάνονταν οι καλές σελίδες ανάμεσα.
+     *   Κόστος: το πολύ ≈ [GAP] + 64 + [BACKFILL] ερωτήματα στο τέλος του πίνακα (ελεγμένο σε πραγματική SQLite 3.53).
      */
     fun read(source: RowSource, removed: Set<String>, out: JSONArray, chunk: Int = CHUNK, maxQueries: Int = MAX_QUERIES): Read {
         // id → (rowid, γραμμή· null αν δεν διαβάζεται), με τη σειρά που πρωτοβρέθηκε κάθε id.
@@ -713,19 +718,24 @@ object DbSalvage {
             // (2) Πιο πέρα: διπλάσια βήματα ως ένα σημείο που διαβάζεται, μετά δυαδική αναζήτηση για το όριό του.
             var fail = plus(start, GAP.toLong())
             var ok = Long.MAX_VALUE
+            var found = false
             var step = 2L * GAP
             while (true) {
                 if (queries >= maxQueries) return done(false)
                 val x = plus(start, step)
                 if (ask(x, 1) != null) {
                     ok = x
+                    found = true
                     break
                 }
-                if (x == Long.MAX_VALUE) return done(false)
+                // Round 10 (R10-B6-1, g4): κανένα βήμα δεν διαβάζεται ως το τέλος (το δεξιότερο φύλλο χαλασμένο ή κομμένο:
+                // ένα όριο μετά από όλες τις γραμμές κατεβαίνει σε αυτό). Δεν τελειώνει εδώ: οι καλές σελίδες ανάμεσα
+                // (συχνά οι ΝΕΟΤΕΡΕΣ γραμμές, σε σελίδες που ελευθερώθηκαν νωρίτερα στο αρχείο) βρίσκονται ένα-ένα στο (3).
+                if (x == Long.MAX_VALUE) break
                 fail = x
                 step = if (step >= Long.MAX_VALUE / 2) Long.MAX_VALUE else step * 2
             }
-            while (ok - fail > 1 && queries < maxQueries) {
+            while (found && ok - fail > 1 && queries < maxQueries) {
                 val m = fail + (ok - fail) / 2
                 if (ask(m, 1) != null) ok = m else fail = m
             }
@@ -742,6 +752,8 @@ object DbSalvage {
                     break
                 }
             }
+            // Τίποτα δεν διαβάζεται ως το τέλος (ούτε βήμα ούτε ένα-ένα): τελείωσε, χωρίς να διαβαστούν όλα.
+            if (far < 0 && !found) return done(false)
             from = if (far >= 0) far else ok
         }
         return done(false)

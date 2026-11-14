@@ -190,14 +190,22 @@ const hrMaxApproxText = 'Υψηλότερος: στιγμιαία τιμή, κα
 /// τότε, ή παλιά προπόνηση που δεν το κράτησε (πριν από την #90): μόνο οι παλμοί, χωρίς γραμμή ορίου και χωρίς κρίση
 /// (ποτέ αναδρομικά με το σημερινό όριο).
 class HrCard extends StatelessWidget {
-  const HrCard({super.key, required this.session});
+  const HrCard({super.key, required this.session, this.hrEnd});
   final Session session;
+
+  /// R10-B4-4: το τέλος με το οποίο θα γραφτεί η προπόνηση, όταν δεν έχει γραφτεί ακόμα (ξεχασμένη, πριν από την
+  /// «Αποθήκευση»): μέσος, υψηλότερος και γράφημα μόνο ως εκεί + 1′ ([Session.hrUpTo]), όπως θα τα κρατήσει το «Τέλος».
+  /// null: όλοι οι παλμοί της προπόνησης, όπως πριν.
+  final DateTime? hrEnd;
 
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final lim = session.limitUsed;
-    final h = HrSummary(session, lim);
+    final end = hrEnd;
+    final cut = end == null ? null : session.hrUpTo(end);
+    final hr = cut?.hr ?? session.hr;
+    final h = cut == null ? HrSummary(session, lim) : HrSummary.values(hr, cut.avg, cut.max, lim);
     final mins = (h.overSec / 60).ceil();
     const which = 'το όριο';
     // round1, U5-14: ίδια κάρτα με τις διπλανές (περίγραμμα, γωνία, περιθώριο).
@@ -226,16 +234,16 @@ class HrCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(hrMaxApproxText, key: const ValueKey('hr-max-approx'), style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textSecondary)),
         ],
-        if (session.hr.length >= 2) ...[
+        if (hr.length >= 2) ...[
           const SizedBox(height: 10),
-          SizedBox(height: 70, child: CustomPaint(painter: _HrChart(session.hr, lim, c))),
+          SizedBox(height: 70, child: CustomPaint(painter: _HrChart(hr, lim, c))),
           // round1, U5-17: ο άξονας του χρόνου (από την αρχή ως την τελευταία τιμή).
           Padding(
             padding: const EdgeInsets.only(top: 2, right: 30),
             child: Row(children: [
               Text('αρχή', style: TextStyle(fontSize: 11, color: c.textTertiary)),
               const Spacer(),
-              Text(hoursMinutes(((session.hr.last[0] - session.hr.first[0]) / 60).round()), style: TextStyle(fontSize: 11, color: c.textTertiary)),
+              Text(hoursMinutes(((hr.last[0] - hr.first[0]) / 60).round()), style: TextStyle(fontSize: 11, color: c.textTertiary)),
             ]),
           ),
         ],

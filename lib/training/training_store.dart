@@ -1397,6 +1397,15 @@ class TrainingStore extends ChangeNotifier {
     save();
   }
 
+  /// R10-B4-1: «− Σετ»: βγάζει την τελευταία γραμμή, μόνο αν την πρόσθεσε το «+ Σετ» και δεν έγινε ([ExLog.canRemoveRow]).
+  /// Ποτέ σετ του προγράμματος ή σετ με ✓. Το ρολόι παίρνει τη νέα κατάσταση με την αποθήκευση. true αν βγήκε.
+  bool removeSet(ExLog e) {
+    if (!e.canRemoveRow) return false;
+    e.log.removeLast();
+    save();
+    return true;
+  }
+
   void answer(ExLog e, int rir) {
     e.rirAnswer = rir;
     save();
@@ -1505,6 +1514,9 @@ class TrainingStore extends ChangeNotifier {
         swappedFrom: e.swappedFrom,
         reason: e.reason,
         plannedSets: done.isEmpty ? null : e.sets,
+        // R10 (σημείωση του B5): η απάντηση στο «Πρώτο σετ» μένει με το 1ο σετ που έγινε (το διαβάζει η πρόοδος, R9-A6-4·
+        // «fa» είναι πεδίο, όχι μέσα στο [ExLog.extra]). Μόνο αν το 1ο σετ είναι μέσα στα σετ που κρατήθηκαν.
+        firstAnswer: e.log.isNotEmpty && e.log.first.done ? e.firstAnswer : null,
         extra: {...e.extra},
       ));
     }
@@ -1529,15 +1541,17 @@ class TrainingStore extends ChangeNotifier {
     // R9-A8-2: οι παλμοί μετά το τέλος (+1′, ο ίδιος κανόνας με το [mergeHrSegment], DP-09) δεν είναι της προπόνησης:
     // ξεχασμένη προπόνηση με το ρολόι να μετρά ώρες ακόμα έδινε μέσο (και υψηλότερο) της καθημερινότητας. Κόβονται, και
     // ο υψηλότερος ξαναβγαίνει από όσες έμειναν.
-    final keep = s.end!.difference(s.start).inSeconds + 60;
-    final n0 = s.hr.length;
-    s.hr.removeWhere((p) => p[0] > keep);
-    if (s.hr.length < n0) {
+    // R10-B4-4: ο κανόνας ζει στο [Session.hrUpTo], ίδιος με τη σύνοψη πριν από την «Αποθήκευση».
+    final cut = s.hrUpTo(s.end!);
+    if (cut.hr.length < s.hr.length) {
+      s.hr
+        ..clear()
+        ..addAll(cut.hr);
       s.hrRev++;
       s.hrInFile = false;
-      s.hrMax = s.hr.isEmpty ? null : s.hr.fold<int>(0, (m, p) => p[1] > m ? p[1] : m);
+      s.hrMax = cut.max;
     }
-    if (s.hr.isNotEmpty) s.hrAvg = (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round();
+    if (s.hr.isNotEmpty) s.hrAvg = cut.avg;
     // Στη θέση της με τη σειρά της ώρας (S6-15): μια «ξεχασμένη» προπόνηση που κλείνει μέρες μετά δεν μπαίνει πάνω
     // από ό,τι έγινε στο μεταξύ (π.χ. περπάτημα από το ρολόι).
     _insertByStart(s);

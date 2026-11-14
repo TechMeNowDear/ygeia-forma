@@ -39,6 +39,15 @@ object HomeWidgets {
      */
     const val OPEN_FLAGS = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
 
+    /**
+     * Round 10 (R10-B2-1): η αρχή του action του πατήματος ([open]). ΑΛΛΑΞΕ από «gr.ygeiaforma.WIDGET_OPEN.» (ως το #108):
+     * το Android ταιριάζει ένα PendingIntent με action/component/requestCode και ΟΧΙ με τις σημαίες του Intent, και με
+     * FLAG_UPDATE_CURRENT κρατά το ΥΠΑΡΧΟΝ (αλλάζει μόνο τα extras). Τα widgets που ήταν ήδη στην αρχική οθόνη θα κρατούσαν
+     * έτσι τις παλιές σημαίες χωρίς CLEAR_TOP ως την επανεκκίνηση του κινητού. Με νέο action φτιάχνεται νέο PendingIntent
+     * με τις σημερινές σημαίες. Η MainActivity διαβάζει μόνο το extra ([EXTRA_OPEN]), όχι το action.
+     */
+    const val OPEN_ACTION = "gr.ygeiaforma.WIDGET_OPEN2."
+
     /** Μεσάνυχτα: ξαναζωγραφίζονται τα widgets με τον κανόνα της ημέρας (καμία ανάγνωση δεδομένων). */
     const val ACTION_DAY = "gr.ygeiaforma.widgets.DAY"
 
@@ -316,7 +325,7 @@ object HomeWidgets {
         val i = Intent(ctx, MainActivity::class.java).apply {
             // Χωρίς data URI: η Flutter παίρνει κάθε data URI ως σελίδα (deep link) και, χωρίς τέτοια σελίδα, βγάζει
             // σφάλμα (Sentry YGEIA-FORMA-3). Κάθε πάτημα ξεχωρίζει από τον requestCode του PendingIntent.
-            action = "gr.ygeiaforma.WIDGET_OPEN.$id.$part"
+            action = "$OPEN_ACTION$id.$part"
             putExtra(EXTRA_OPEN, target)
             flags = OPEN_FLAGS
         }

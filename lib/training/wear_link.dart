@@ -638,6 +638,10 @@ class HrSummary {
       : avg = s.hrAvg ?? (s.hr.isEmpty ? null : (s.hr.fold<int>(0, (a, p) => a + p[1]) / s.hr.length).round()),
         max = s.hrMax,
         overSec = limit == null ? 0 : _over(s.hr, limit);
+
+  /// R10-B4-4: από παλμούς που κόπηκαν ήδη στο τέλος ([Session.hrUpTo]), με τον μέσο και τον υψηλότερό τους.
+  HrSummary.values(List<List<int>> hr, this.avg, this.max, int? limit) : overSec = limit == null ? 0 : _over(hr, limit);
+
   final int? avg, max;
   final int overSec;
 

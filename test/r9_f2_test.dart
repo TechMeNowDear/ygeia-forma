@@ -327,13 +327,14 @@ void main() {
   group('R9-A6-9: κάτω από το εύρος ΚΑΙ ως την εξάντληση: ένα σκαλί πιο ελαφριά', () {
     final press = it('db_press', sets: 3, lo: 8, hi: 12);
 
-    test('πιεστικό 9,3 kg × 8, 7, 6 με «0» → 7,8 kg από 8, με την οδηγία για τα 2', () {
+    // R10-B4-5: η οδηγία λέει όσες ζητά το πρόγραμμα («άφησε 3» εδώ), όχι πάντα 2.
+    test('πιεστικό 9,3 kg × 8, 7, 6 με «0» → 7,8 kg από 8, με την οδηγία για τα 3 του προγράμματος', () {
       final tg = nextTarget(press, [(ago(3), done('db_press', 9.3, [8, 7, 6], ra: 0, lo: 8, hi: 12))], now);
       expect(tg.change, Change.down);
       expect(tg.load, 7.8);
       expect(tg.reps, [8, 8, 8]);
       expect(tg.reason, contains('Δεν άφησες καμία'));
-      expect(tg.reason, contains('σταμάτα το σετ όταν σου μένουν 2'));
+      expect(tg.reason, contains('σταμάτα το σετ όταν σου μένουν 3'));
     });
 
     test('μπάρα (RDL) 15 kg × 8, 7, 7 με «1» → 14,5 kg', () {
