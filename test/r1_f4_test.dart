@@ -177,7 +177,7 @@ void main() {
       await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 13, 21)), size: const Size(400, 4000));
       expect(find.byKey(const ValueKey('body-foreign-latest')), findsNothing);
       expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data, contains('09:00: 30,0 kg'));
-      expect(t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος').value, '90,0 kg');
+      expect(t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος').value, '90,0 kg  (0)'); // R9-A4-3: και το 0
       expect(find.byKey(const ValueKey('body-weighings-foreign')), findsOneWidget);
       expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text.contains(' kg από ')), isEmpty);
     });

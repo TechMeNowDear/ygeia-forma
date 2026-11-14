@@ -239,7 +239,7 @@ List<Stage> ouraStages(String? phases, DateTime start, DateTime end) {
   void close(DateTime t) {
     if (cur == null) return;
     final e = t.isAfter(end) ? end : t;
-    if (e.isAfter(curStart)) out.add(Stage(cur!, curStart, e));
+    if (e.isAfter(curStart)) out.add(Stage(cur, curStart, e));
   }
 
   for (var i = 0; i < phases.length; i++) {

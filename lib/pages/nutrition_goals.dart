@@ -144,7 +144,7 @@ class GoalsSummaryCard extends StatelessWidget {
             color: satPctOver ? c.warn : c.heart,
             note: !satPctOver
                 ? null
-                : satPctShown! > g.satPct
+                : satPctShown > g.satPct
                     ? 'Πάνω από το ${g.satPct}% των θερμίδων που έφαγες'
                     : 'Στο ${g.satPct}% των θερμίδων που έφαγες· ο στόχος είναι κάτω από ${g.satPct}%',
             warn: satPctOver,

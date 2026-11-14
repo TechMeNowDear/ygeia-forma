@@ -351,7 +351,7 @@ class TodayPage extends StatelessWidget {
       value: last?.weight == null ? null : dec(last!.weight!),
       unit: 'kg',
       trend: trend,
-      note: waiting ? (mixedDayPending(guard.pending, last!) ? mixedWeightNote : pendingWeightNote) : null,
+      note: waiting ? (mixedDayPending(guard.pending, last) ? mixedWeightNote : pendingWeightNote) : null,
       // Round 1 (U1a-20): ελάχιστο εύρος 3 kg, όπως στο Σώμα· η αλλαγή 0,5–1 kg από μέρα σε μέρα είναι νερό, όχι τάση.
       chart: recent.length >= 2 ? Sparkline(values: recent, color: c.body, minRange: 3) : null,
       // Round 1 (S11-8, σημείωση του f1): όταν η Samsung δεν έδωσε τις ζυγίσεις αυτή τη φορά, το λέει (όπως το Σώμα)·

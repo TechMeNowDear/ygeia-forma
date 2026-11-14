@@ -16,7 +16,6 @@ import 'package:ygeia_forma/pages/training/session_page.dart';
 import 'package:ygeia_forma/pages/training/training_page.dart';
 import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/training/hr_file.dart';
-import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/training_store.dart';
 import 'package:ygeia_forma/training/wear_link.dart';
 
@@ -745,7 +744,8 @@ void main() {
       expect(s.hrLoaded, isTrue);
       expect(s.hr.length, 1201);
       expect(find.byKey(const ValueKey('summary-partial')), findsOneWidget);
-      expect(find.textContaining('έκλεισε πριν το «Τέλος»'), findsOneWidget);
+      // Round 9 (R9-A7-3): το λέει και η κάρτα «Πτώση παλμών στο 1ο λεπτό» («Δεν μετρήθηκε: …»).
+      expect(find.textContaining('Γράφτηκε ως τις 13:20: η εφαρμογή του ρολογιού έκλεισε πριν το «Τέλος»'), findsOneWidget);
     });
   });
 

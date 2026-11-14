@@ -508,19 +508,6 @@ class _TrainingPageState extends State<TrainingPage> {
     );
   }
 
-  /// Ποιοι δίσκοι στους αλτήρες/μπάρα στην αρχή (από την πρώτη άσκηση κάθε οργάνου).
-  String? _setupHint(Workout w) {
-    final seen = <String>{};
-    final parts = <String>[];
-    for (final i in w.items) {
-      final k = i.kind;
-      final tool = switch (k) { LoadKind.dbPair || LoadKind.db => 'db', LoadKind.bar => 'bar', LoadKind.kb => 'kb', LoadKind.bandPair => 'bands', _ => '' };
-      if (tool.isEmpty || !seen.add(tool)) continue;
-      parts.add(setupText(k, t.targetFor(i).load));
-    }
-    return parts.isEmpty ? null : 'Στήσιμο: ${parts.join(' · ')}.';
-  }
-
   Widget _weekCard(BuildContext context, Program p, DateTime today) {
     final c = Aigaio.of(context);
     final monday = DateTime(today.year, today.month, today.day - (today.weekday - 1));
@@ -829,10 +816,6 @@ class _TrainingPageState extends State<TrainingPage> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Αντιγράφηκε. Επικόλλησέ το στη συζήτηση με τον Claude.')));
   }
-}
-
-extension on String {
-  String ifEmpty(String other) => isEmpty ? other : this;
 }
 
 /// Η σταθερή πρόταση για τα φάρμακα στη φόρμα ορίου (έλεγχος 9/11, V-B-06· ESC 2020, Pelliccia κ.ά., Eur Heart J 2021:
