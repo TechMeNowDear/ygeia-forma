@@ -1136,15 +1136,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Ο χρόνος προχωρά κάθε δευτερόλεπτο από το σημείο ελέγχου του Health Services (W3-12).
         val sec = Repo.activeSecNow(now).let { if (it > 0 || Repo.cpWall > 0) it else (now - Repo.startedAt) / 1000 }
         // 14/11 (αιτήματα χρήστη): χρόνος, από κάτω απόσταση και ρυθμός, και μετά τα βήματα. Ο χρόνος λίγο μικρότερος (34
-        // από 40) για να χωρέσει η γραμμή του ρυθμού. Οι παλμοί, η ζώνη και η λεζάντα μένουν όπου ήταν (U7-02)· με μεγάλα
-        // γράμματα οι δύο γραμμές λίγο πιο κάτω (μετρημένο στα στιγμιότυπα W7g/W7p).
+        // από 40) για να χωρέσει η γραμμή του ρυθμού. Οι παλμοί, η ζώνη και η λεζάντα μένουν όπου ήταν (U7-02). Με μεγάλα
+        // γράμματα η καρδιά ψηλώνει ως τα ≈ 100u: οι δύο γραμμές λίγο πιο πάνω και τα βήματα ως 1,15× (μετρημένο στα W7g/W7p).
         fit(c, clock(sec), 70f, if (Repo.paused) gray else Color.WHITE, 34f * fs, 150f)
         val (line1, line2) = walkLines(Repo.shown(), Repo.steps, sec)
         text.typeface = Typeface.DEFAULT_BOLD
-        fitPlain(c, line1, 85f + (fs - 1f) * 5f, Color.WHITE, 10.5f * fs, 150f)
+        fitPlain(c, line1, 85f - (fs - 1f) * 1.7f, Color.WHITE, 10.5f * fs, 150f)
         if (line2 != null) {
             text.typeface = Typeface.DEFAULT
-            fitPlain(c, line2, 98f + (fs - 1f) * 8f, soft, 9.5f * fs, 140f)
+            fitPlain(c, line2, 98f - (fs - 1f) * 5f, soft, 9.5f * minOf(fs, 1.15f), 140f)
         }
         walkHeart(c, 117f, now)
         sayAdd("${if (Repo.paused) "Παύση" else "Περπάτημα"}, ${clock(sec)}, $line1${line2?.let { ", $it" } ?: ""}")
