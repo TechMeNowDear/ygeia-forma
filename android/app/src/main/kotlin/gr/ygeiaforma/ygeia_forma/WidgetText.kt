@@ -32,6 +32,14 @@ object WidgetText {
     const val SHRINK_STEP = 0.05f
 
     /**
+     * Round 11 (R11-C4-2): το action του πατήματος ενός widget ([HomeWidgets.open]): «gr.ygeiaforma.WIDGET_OPEN2.<id>.<μέρος>»
+     * ([HomeWidgets.OPEN_ACTION], R10-B2-1). Εδώ, σε καθαρό Kotlin, ώστε η δοκιμή να ελέγχει αυτό που χτίζει το open() και
+     * όχι μόνο τη σταθερά: με το παλιό «gr.ygeiaforma.WIDGET_OPEN.<id>.<μέρος>» τα widgets που ήταν ήδη στην αρχική οθόνη
+     * θα κρατούσαν τα παλιά PendingIntent χωρίς CLEAR_TOP.
+     */
+    fun openAction(id: Int, part: Int): String = "${HomeWidgets.OPEN_ACTION}$id.$part"
+
+    /**
      * Round 8 (R8-U1-7): πόσα βήματα των [SHRINK_STEP] χωρούν ως το [floor] (0,85 → 3, 0,75 → 5, 0,6 → 8). Πριν ο
      * WidgetRenderer αφαιρούσε το `base * 0,05` ξανά και ξανά σε float και, επειδή μετά από 3 βήματα το μέγεθος έμενε λίγο
      * ΠΑΝΩ από το `base * 0,85`, έκανε και 4ο: 80% (10,5 sp → 8,4 αντί για το ελάχιστο 8,9 του U7-11)· στην κεντρική

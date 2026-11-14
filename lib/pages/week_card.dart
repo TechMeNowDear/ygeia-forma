@@ -230,8 +230,11 @@ class _WeekRow extends StatelessWidget {
               children: [
                 Text(metricLabel(t.def, t.source), style: TextStyle(fontSize: 14, color: c.textSecondary)),
                 const SizedBox(height: 1),
+                // Round 11 (R11-C2-1): ο αριθμός με τη μονάδα του ([unitsGlued], R2-U2-05)· στο ανοιχτό Fold (δύο στήλες γραμμών
+                // από τα 520 dp, R10-B8-1) η στήλη με το «Λίγες μέρες για συμπέρασμα» έχει ~121 dp και η τιμή έσπαγε
+                // «7 ώρες 13» / «λεπτά». Τώρα το πολύ «7 ώρες» / «13 λεπτά».
                 Text(
-                  few ? '—' : t.def.formatAs(t.current!, t.source),
+                  few ? '—' : unitsGlued(t.def.formatAs(t.current!, t.source)),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: few ? c.textTertiary : c.text, fontFeatures: tabular),
                 ),
                 // «πριν», όχι «συνήθως»: εδώ είναι η μεσαία τιμή των 4 προηγούμενων εβδομάδων, όχι το «συνήθως» της

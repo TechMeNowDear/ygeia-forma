@@ -724,7 +724,7 @@ void main() {
       await _pumpHost(t, (ctx) => Navigator.of(ctx).push<void>(MaterialPageRoute(builder: (_) => KitchenScreen(store: store))));
       await t.tap(find.text('άνοιξε'));
       await t.pumpAndSettle();
-      final item = find.text('Κατσαρόλα · Μάρκα Τ');
+      final item = find.text('Κατσαρόλα · Μάρκα Τ');
       await t.ensureVisible(item);
       await t.tap(item);
       await t.pumpAndSettle();

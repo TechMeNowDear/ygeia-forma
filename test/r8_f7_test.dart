@@ -256,8 +256,10 @@ void main() {
     expect(sleep.needed, 5);
     expect(sleep.current, 436.0);
     await _pump(t, SingleChildScrollView(child: WeekCard(review: w)));
-    // Πριν: «7 ώρες 16 λεπτά» (η μία νύχτα του Oura) κάτω από «Μεσαία τιμή της εβδομάδας».
+    // Πριν: «7 ώρες 16 λεπτά» (η μία νύχτα του Oura) κάτω από «Μεσαία τιμή της εβδομάδας». Round 11 (R11-C2-1): η τιμή
+    // γράφεται πλέον με αδιάσπαστο κενό ανάμεσα σε αριθμό και μονάδα (unitsGlued)· και οι δύο μορφές δεν πρέπει να φαίνονται.
     expect(find.text('7 ώρες 16 λεπτά'), findsNothing);
+    expect(find.text('7\u00A0ώρες 16\u00A0λεπτά'), findsNothing);
     expect(find.text('—'), findsOneWidget);
   });
 

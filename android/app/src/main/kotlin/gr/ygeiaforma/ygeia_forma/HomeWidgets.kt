@@ -325,7 +325,7 @@ object HomeWidgets {
         val i = Intent(ctx, MainActivity::class.java).apply {
             // Χωρίς data URI: η Flutter παίρνει κάθε data URI ως σελίδα (deep link) και, χωρίς τέτοια σελίδα, βγάζει
             // σφάλμα (Sentry YGEIA-FORMA-3). Κάθε πάτημα ξεχωρίζει από τον requestCode του PendingIntent.
-            action = "$OPEN_ACTION$id.$part"
+            action = WidgetText.openAction(id, part)
             putExtra(EXTRA_OPEN, target)
             flags = OPEN_FLAGS
         }

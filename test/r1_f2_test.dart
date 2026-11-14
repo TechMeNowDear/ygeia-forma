@@ -803,10 +803,10 @@ void main() {
 
     test('U3a-6: ο αριθμός δεν χωρίζεται από τη λέξη του', () {
       final f = _f('S', {Nk.kcal: 125, Nk.protein: 10.1});
-      // Round 9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α): αδιάσπαστο κενό και πριν από κάθε «·».
-      expect(foodTileSubtitle(f, 6), '125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 6 φορές');
-      expect(foodTileSubtitle(f, 1), '125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 1 φορά');
-      expect(foodTileSubtitle(f, 0), '125 kcal · πρωτεΐνη 10,1 g ανά 100 g');
+      // Round 9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α) / Round 11 (R11-C2-3): κανονικό κενό πριν από κάθε «·» και αδιάσπαστο μετά ([dotJoin]).
+      expect(foodTileSubtitle(f, 6), '125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 6 φορές');
+      expect(foodTileSubtitle(f, 1), '125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 1 φορά');
+      expect(foodTileSubtitle(f, 0), '125 kcal · πρωτεΐνη 10,1 g ανά 100 g');
     });
 
     testWidgets('U3a-7: στενή κάρτα (κάτω από 300 dp): μία γραμμή ανά μακροθρεπτικό', (t) async {

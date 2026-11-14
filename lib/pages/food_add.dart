@@ -908,13 +908,14 @@ class _FoodTile extends StatelessWidget {
 
 /// Η δεύτερη γραμμή ενός τροφίμου στις λίστες: «125 kcal · πρωτεΐνη 10,1 g ανά 100 g · 6 φορές». Έλεγχος round1
 /// (U3a-6): ανάμεσα σε κάθε αριθμό και στη λέξη του το κενό δεν σπάει (U+00A0)· πριν, στο τέλος της γραμμής έμενε ο
-/// αριθμός μόνος του («… · 6» / «φορές», «ανά 100» / «g»). Round9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α): και πριν από κάθε «·», ώστε η
-/// γραμμή να μην τελειώνει ποτέ σε «·» («… ανά 100 g ·» / «6 φορές»).
+/// αριθμός μόνος του («… · 6» / «φορές», «ανά 100» / «g»). Round 11 (R11-C2-3): το «·» με τον κανόνα [dotJoin]
+/// (κανονικό κενό πριν, αδιάσπαστο μετά), ώστε η γραμμή να μην τελειώνει ποτέ σε «·»: «… ανά 100 g» / «· 6 φορές».
+/// Πριν (R9-U2 ΒΕΛΤΙΩΣΗ-Α) το αδιάσπαστο ήταν πριν από το «·», και η γραμμή έσπαγε «… ανά 100 g ·» / «6 φορές».
 String foodTileSubtitle(Food food, int times) {
   const nb = '\u00A0';
   final n = food.n;
-  final base = '${kcalText(n.amount(Nk.kcal))}${nb}kcal$nb· πρωτεΐνη ${nValueText(n[Nk.protein])}${nb}g ανά 100$nb${food.unit}';
-  return times > 0 ? '$base$nb· ${times == 1 ? '1${nb}φορά' : '$times${nb}φορές'}' : base;
+  final base = '${kcalText(n.amount(Nk.kcal))}${nb}kcal${dotJoin}πρωτεΐνη ${nValueText(n[Nk.protein])}${nb}g ανά 100$nb${food.unit}';
+  return times > 0 ? '$base$dotJoin${times == 1 ? '1${nb}φορά' : '$times${nb}φορές'}' : base;
 }
 
 /// Μικρή ετικέτα για τα προϊόντα μου (μάρκα), ώστε να ξεχωρίζουν από τα γενικά.
@@ -1716,6 +1717,17 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
           if (parseNumber(e.value.text) case final v?) e.key: e.key == Nk.salt ? saltFromInput(v, _saltMode) : v,
       };
 
+  /// Round11 (R11-C1-3): το προϊόν, όπως είναι γραμμένο τώρα στη φόρμα, μετρά «Όσπρια» από το όνομα ([legumesByName]):
+  /// ξερό όσπριο (όνομα και θερμίδες), όχι ανά 100 ml.
+  bool _legumesByName(Map<String, double> values) => legumesByName(Food(
+        id: widget.existingId ?? '',
+        name: _name.text.trim(),
+        cat: myFoodsCategory,
+        source: widget.draft.fromOff ? 'Open Food Facts' : 'Ετικέτα',
+        perMl: _perMl,
+        n: Nutrients({if (values[Nk.kcal] case final k?) Nk.kcal: NValue(k)}),
+      ));
+
   void _save() {
     setState(() => _tried = true);
     final values = _values;
@@ -1988,6 +2000,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 // Έλεγχος round1 (S2-1 / S1-9): τα δικά σου προϊόντα μετρούν στην κάρτα «Χοληστερίνη» μόνο αν λένε τι είναι.
                 // Round7 (R7-A3-1): το «Τίποτα» αποθηκεύεται ([CholKind.none]) και κανένα όνομα δεν το αλλάζει. Όσο δεν
                 // διάλεξες, η επιλογή δείχνει τι θα μετρήσει: «Πίτουρο βρώμης» όταν το όνομα αρχίζει έτσι, αλλιώς «Τίποτα».
+                // Round11 (R11-C1-3): και «Όσπρια» για ξερό όσπριο από το όνομα ([legumesByName], ο κανόνας της κάρτας).
                 choices<String>(
                   'Στην κάρτα «Χοληστερίνη» μετρά ως:',
                   const [
@@ -1997,7 +2010,10 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                     (CholKind.fish, 'Ψάρι ή θαλασσινά'),
                     (CholKind.bran, 'Πίτουρο βρώμης'),
                   ],
-                  _cholKind ?? (branByName(_name.text) ? CholKind.bran : CholKind.none),
+                  _cholKind ??
+                      (branByName(_name.text)
+                          ? CholKind.bran
+                          : (_legumesByName(values) ? CholKind.legumes : CholKind.none)),
                   (v) => setState(() => _cholKind = v),
                   key: const ValueKey('chol-kind'),
                 ),

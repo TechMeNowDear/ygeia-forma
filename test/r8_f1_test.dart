@@ -672,7 +672,7 @@ void main() {
     await _pumpHost(t, (ctx) => Navigator.of(ctx).push<void>(MaterialPageRoute(builder: (_) => KitchenScreen(store: store))));
     await t.tap(find.text('άνοιξε'));
     await t.pumpAndSettle();
-    final pot = find.text('Κατσαρόλα · Μάρκα Τ');
+    final pot = find.text('Κατσαρόλα · Μάρκα Τ');
     await t.ensureVisible(pot);
     await t.tap(pot);
     await t.pumpAndSettle();
@@ -685,7 +685,7 @@ void main() {
     // Νέα «Η κουζίνα μου» χωρίς την κατσαρόλα· τσεκάρεις φριτέζα αέρος.
     await t.tap(find.text('άνοιξε'));
     await t.pumpAndSettle();
-    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsNothing);
+    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsNothing);
     final fryer = find.text('Φριτέζα αέρος (air fryer)');
     await t.ensureVisible(fryer);
     await t.tap(fryer);
@@ -699,8 +699,8 @@ void main() {
     expect(k.has('airFryer'), isTrue);
     expect(k.cookware.map((c) => c.id), ['x1']);
     // Η ανοιχτή οθόνη τη δείχνει, και η επόμενη αλλαγή της δεν τη σβήνει.
-    await t.ensureVisible(find.text('Κατσαρόλα · Μάρκα Τ'));
-    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsOneWidget);
+    await t.ensureVisible(find.text('Κατσαρόλα · Μάρκα Τ'));
+    expect(find.text('Κατσαρόλα · Μάρκα Τ'), findsOneWidget);
     final kettle = find.text('Βραστήρας');
     await t.ensureVisible(kettle);
     await t.tap(kettle);

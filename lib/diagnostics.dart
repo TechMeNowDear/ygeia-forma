@@ -26,7 +26,7 @@ import 'food/off.dart' show impossibleValues;
 import 'format.dart' show daysBetween;
 import 'goals.dart';
 import 'history.dart' show dateKey;
-import 'pages/nutrition_goals.dart' show beforeGoals;
+import 'pages/nutrition_goals.dart' show beforeGoals, satVerdict;
 import 'training/training_store.dart';
 
 const diagnosticsVersion = 1;
@@ -192,6 +192,10 @@ Map<String, dynamic> diagnosticsFrom({
 
   final days = <Map<String, dynamic>>[];
   final cholDays = <(DateTime, CholDay)>[];
+  // Round11 (R11-C1-1): η πρώτη μέρα που μετρά στη διόρθωση θερμίδων (η πρώτη εβδομάδα των στόχων δεν μετρά,
+  // [adaptSkipDays]· όπως estimateExpenditure / pendingCheckIn). null χωρίς στόχους ή με άκυρο «since»: καμία κάτω άκρη.
+  final adaptSince = g == null ? null : DateTime.tryParse(g.since);
+  final adaptFirst = adaptSince == null ? null : DateTime(adaptSince.year, adaptSince.month, adaptSince.day + adaptSkipDays);
   for (var day = from; !day.isAfter(today); day = DateTime(day.year, day.month, day.day + 1)) {
     final entries = food.entriesFor(day);
     if (entries.isEmpty) continue;
@@ -201,8 +205,14 @@ Map<String, dynamic> diagnosticsFrom({
     // Round10 (R10-B1-2 / R10-B7-3): ο στόχος και το όριο κορεσμένων της μέρας όπως τα γράφει η Διατροφή
     // (GoalsSummaryCard): σήμερα ο τωρινός στόχος, μέρα που πέρασε ο στόχος που ίσχυε τότε ([targetOn], R9-A1-2), μέρα πριν
     // από τους στόχους κανένας ([beforeGoals]: εκεί η Διατροφή γράφει μόνο «Σύνολο ημέρας»). Πριν, κάθε μέρα είχε τον
-    // ΤΩΡΙΝΟ στόχο. Το «countsForAdaptive» μένει με τον τωρινό στόχο, όπως η διόρθωση θερμίδων.
+    // ΤΩΡΙΝΟ στόχο.
     final goalKcal = g == null || beforeGoals(g, day) ? null : (day == today ? g.kcal : targetOn(g, day));
+    // Round11 (R11-C1-2): η μπάρα «Κορεσμένα λιπαρά» της Διατροφής κρίνει μέρα που τελείωσε με πλήρη καταγραφή με το % των
+    // θερμίδων που έφαγες, όχι με τα γραμμάρια του στόχου: το «sat» λέει ποιον κανόνα εφάρμοσε η οθόνη και τι έκρινε
+    // ([satVerdict], η ίδια συνάρτηση με την κάρτα). Πριν η αναφορά έδινε για ΚΑΘΕ μέρα το «satLimit» (γραμμάρια) σαν όριο
+    // της οθόνης, και σε τέτοιες μέρες (2.000 kcal, 14,0 g: οθόνη 6,3% «πάνω από το 6%») έβγαινε η ανάποδη ετυμηγορία.
+    // Το «satLimit» μένει μόνο για τις μέρες που η οθόνη κρίνει με γραμμάρια.
+    final sat = goalKcal == null || g == null ? null : satVerdict(t, g, today: day == today, day: day);
     days.add({
       'd': dateKey(day),
       'entries': entries.length,
@@ -220,8 +230,22 @@ Map<String, dynamic> diagnosticsFrom({
       if (ch.satPct != null) 'satPct': _r(ch.satPct!, 1),
       'chol': {'nutsG': _r(ch.nutsG, 0), 'branG': _r(ch.branG, 0), 'legumesDryG': _r(ch.legumesDryG, 0), 'fishG': _r(ch.fishG, 0)},
       if (goalKcal != null) 'goalKcal': goalKcal,
-      if (goalKcal != null && g != null) 'satLimit': satLimitShown(goalKcal, g.satPct),
-      if (g != null) 'countsForAdaptive': t.kcal >= adaptFullDayShare * g.kcal,
+      if (sat != null && sat.pctDay == null) 'satLimit': sat.limitG,
+      if (sat != null && g != null)
+        'sat': sat.pctDay != null
+            ? {'rule': 'pct', 'shown': _r(sat.pctDay!, 1), 'limitPct': g.satPct, 'over': sat.over}
+            : {'rule': 'g', 'shown': _r(t.satFat, 1), 'limit': sat.limitG, 'over': sat.over},
+      // Round11 (R11-C1-1): ο κανόνας της διόρθωσης θερμίδων για ΜΙΑ μέρα (adaptive.dart: estimateExpenditure, foodGap·
+      // adaptive_check.dart: pendingCheckIn): από την 8η μέρα των στόχων ως χθες (η σημερινή δεν έχει τελειώσει), με
+      // θερμίδες από το 60% του τωρινού στόχου ως το [absurdDayKcal]. Πριν έλεγχε μόνο το 60%, και η αναφορά έγραφε «μετρά»
+      // για μέρες πριν από τους στόχους, για την πρώτη εβδομάδα, για σήμερα και για μέρες με αδύνατα πολλές θερμίδες, ενώ
+      // το «adaptive.readiness» (σωστά) δεν τις μετρούσε. Αν η μέρα πέφτει στο παράθυρο που κρίθηκε ή μετά από κενό
+      // καταγραφής φαίνεται στο «adaptive».
+      if (g != null)
+        'countsForAdaptive': day.isBefore(today) &&
+            (adaptFirst == null || !day.isBefore(adaptFirst)) &&
+            t.kcal >= adaptFullDayShare * g.kcal &&
+            t.kcal <= absurdDayKcal(g.calc.tdee),
     });
   }
 
