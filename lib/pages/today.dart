@@ -18,6 +18,7 @@ import '../widgets.dart';
 import '../unusual.dart';
 import '../training/training_store.dart';
 import '../training/wear_link.dart';
+import '../training/zone.dart' show weekMovement;
 import 'backup_reminder_card.dart';
 import 'checkin_card.dart';
 import 'nutrition.dart';
@@ -190,9 +191,20 @@ class TodayPage extends StatelessWidget {
           // Σχέδια 12/11 (A1/A3): ο έλεγχος θερμίδων κάτω από τη ζύγιση (απάντηση χρήστη 12/11). Ακούει μόνο το φαγητό.
           final checkIn = store.goals == null ? null : CheckInSlot(store: store, food: food, now: now);
 
-          final pair = <Widget>[
+          // 14/11 (αίτημα χρήστη: «από κάθε κατηγορία λίγο πιο πολλά, με μια ματιά»): τρεις ενότητες με δύο κάρτες η καθεμία,
+          // πριν από τη Διατροφή. Κίνηση: βήματα και λεπτά άσκησης της εβδομάδας. Καρδιά: παλμοί ξύπνιος (χθες, ολόκληρη μέρα)
+          // και οξυγόνο της νύχτας. Σώμα: βάρος και λίπος (InBody).
+          final move = <Widget>[
             if (prefs.show('steps')) _stepsCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
+            if (prefs.show('exweek'))
+              ListenableBuilder(
+                listenable: training,
+                builder: (context, _) => _exerciseWeekCard(context, training, now, () => open(Cat.exercise, ExerciseTab.train)),
+              ),
+          ];
+          final body = <Widget>[
             if (prefs.show('weight')) _weightCard(context, d, now, () => open(Cat.health, HealthTab.body)),
+            if (prefs.show('fat')) _fatCard(context, d, now, () => open(Cat.health, HealthTab.body)),
           ];
 
           // Με το Oura: το Energy Score της Samsung δεν φαίνεται (τη θέση του παίρνει η ετοιμότητα του Oura στην
@@ -217,13 +229,17 @@ class TodayPage extends StatelessWidget {
               ? _watchSpo2Card(context, d, now, store.ouraWindows, oxGuidance!, () => open(Cat.health, HealthTab.heart),
                   auto: oxAuto)
               : _spo2Card(context, d, now, oxGuidance, () => open(Cat.health, HealthTab.heart), auto: oxAuto);
+          final heart = <Widget>[
+            if (prefs.show('awake')) _awakeCard(context, now, () => open(Cat.health, HealthTab.heart)),
+            if (prefs.show('spo2')) oxCard(),
+          ];
           final extras = <Widget>[
             if (!ouraNight && prefs.show('energy')) _energyCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
             if (!ouraNight && prefs.show('rhr')) _restingCard(context, d, now, () => open(Cat.health, HealthTab.heart)),
             if (prefs.show('calories')) _caloriesCard(context, d, now, () => open(Cat.exercise, ExerciseTab.move)),
-            if (prefs.show('spo2')) oxCard(),
             if (!ouraNight && prefs.show('skin')) _skinCard(context, d, now, () => open(Cat.health, HealthTab.body)),
           ];
+          List<Widget> section(String title, List<Widget> cards) => cards.isEmpty ? const [] : [SectionHeader(title), ...pairUp(cards)];
 
           // Μόνο κινητό (απόφαση 10/11): το τράβηγμα ανανεώνει και στο ανοιχτό Fold· φαίνεται μόνο «Ενημέρωση 18:40»
           // (σχέδια 9/11, 1α/1γ· έλεγχος premium, S8).
@@ -260,16 +276,20 @@ class TodayPage extends StatelessWidget {
             onRefresh: () => store.refresh(),
             // Round 1 (U1a-13): η «Η εβδομάδα σου» (≈ 980 dp, Κυριακή βράδυ και Δευτέρα) κάτω από τη Διατροφή και τα
             // Βήματα/Βάρος· πριν, τη Δευτέρα το «+ Φαγητό» ήταν τρεις οθόνες πιο κάτω. Στο ανοιχτό Fold ήταν ήδη τελευταία.
+            // 14/11: η Διατροφή μετά από Κίνηση, Καρδιά και Σώμα (αίτημα χρήστη).
             single: [
               ...alerts,
               if (weigh != null) weigh,
               if (checkIn != null) checkIn,
               if (sleep != null) sleep,
               if (trainingCard != null) trainingCard,
+              ...section('Κίνηση', move),
+              ...section('Καρδιά', heart),
+              ...section('Σώμα', body),
+              // Χωρίς επικεφαλίδα: η κάρτα γράφει ήδη «Διατροφή · σήμερα».
               if (foodCard != null) foodCard,
-              ...pairUp(pair),
               if (week != null) week,
-              if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
+              ...section('Επίσης', extras),
               backupReminder,
               footer,
             ],
@@ -278,11 +298,19 @@ class TodayPage extends StatelessWidget {
             // Round 7 (U1-1): η «Η εβδομάδα σου» (≈ 1.000 dp) όχι αριστερά: έκανε τη στήλη ~1.900 dp με ~560 δεξιά.
             // Round 9 (R9-U1-2): ούτε δεξιά: εκεί άφηνε τρύπα ~750 dp αριστερά (στιγμιότυπο 68e, Δευτέρα του ελέγχου θερμίδων).
             // Κάτω από τις δύο στήλες, σε όλο το πλάτος, με τις γραμμές της σε δύο στήλες ([WeekCard]), και μετά η «Ενημέρωση».
-            left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard],
+            // 14/11: αριστερά ύπνος, άσκηση, Κίνηση, Καρδιά· δεξιά Σώμα, Διατροφή, «Επίσης».
+            left: [
+              if (weigh != null) weigh,
+              if (checkIn != null) checkIn,
+              if (sleep != null) sleep,
+              if (trainingCard != null) trainingCard,
+              ...section('Κίνηση', move),
+              ...section('Καρδιά', heart),
+            ],
             right: [
+              ...section('Σώμα', body),
               if (foodCard != null) foodCard,
-              ...pairUp(pair),
-              if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
+              ...section('Επίσης', extras),
               backupReminder,
             ],
             bottom: [if (week != null) week, footer],
@@ -362,6 +390,88 @@ class TodayPage extends StatelessWidget {
           : bodyNotPermitted(d)
               ? bodyNoPermissionShort
               : 'Ζυγίσου στην InBody. Η μέτρηση φτάνει εδώ σε λίγα λεπτά.',
+      onTap: onTap,
+    );
+  }
+
+  /// Άσκηση της εβδομάδας (14/11): λεπτά μέτριας άσκησης από τα περπατήματα (στη ζώνη ή πιο πάνω) από τα 150 του Π.Ο.Υ.,
+  /// και μέρες με βάρη. Ίδιος υπολογισμός με την κάρτα «Αυτή η εβδομάδα» της Άσκησης ([weekMovement]).
+  Widget _exerciseWeekCard(BuildContext context, TrainingStore training, DateTime now, VoidCallback onTap) {
+    final c = Aigaio.of(context);
+    final w = weekMovement(training.sessions, now);
+    return StatCard(
+      key: const ValueKey('today-exweek'),
+      icon: Icons.timer_outlined,
+      color: c.exercise,
+      // Σύντομος τίτλος και η εβδομάδα από κάτω (στη μισή κάρτα των 360 dp ο «Άσκηση εβδομάδας» έπιανε δύο γραμμές).
+      title: 'Άσκηση',
+      subtitle: 'αυτή η εβδομάδα',
+      value: '${w.moderateMin}',
+      unit: 'από 150 λεπτά',
+      note: 'Βάρη: ${w.strengthDays == 1 ? '1 μέρα' : '${w.strengthDays} μέρες'}',
+      chart: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(value: (w.moderateMin / 150).clamp(0.0, 1.0), minHeight: 8, color: c.exercise, backgroundColor: c.hairline),
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  /// Παλμοί ξύπνιος (14/11): της τελευταίας ΟΛΟΚΛΗΡΩΜΕΝΗΣ μέρας (συνήθως χθες· η σημερινή δεν μετρά), με το «συνήθως», όπως
+  /// στην Καρδιά ([_AwakeHeartCard] του heart.dart).
+  Widget _awakeCard(BuildContext context, DateTime now, VoidCallback onTap) {
+    final c = Aigaio.of(context);
+    final plan = store.plan;
+    final day = DateTime(now.year, now.month, now.day);
+    DateTime? last;
+    for (var i = 1; i <= 3 && last == null; i++) {
+      final x = DateTime(day.year, day.month, day.day - i);
+      if (plan.value(store.history, K.dayHr, x) != null) last = x;
+    }
+    final b = last == null ? null : personalBaseline(store.history, plan, K.dayHr, last);
+    final pts = planSeries(store.history, plan, K.dayHr, DateTime(day.year, day.month, day.day - 7), DateTime(day.year, day.month, day.day - 1)).points;
+    Widget? trend;
+    if (b?.usual != null) {
+      final dd = shownDiff(b!.value, b.usual!);
+      trend = TrendPill(dd == 0 ? asUsualText : '${signedShown(dd)} ·\u00A0συνήθως ${b.usual!.round()}', up: dd == 0 ? null : dd > 0);
+    }
+    return StatCard(
+      key: const ValueKey('today-awake'),
+      icon: Icons.favorite_border_rounded,
+      color: c.heart,
+      // Η μέρα σε δική της γραμμή (UX U1): «Παλμοί ξύπνιος · Παρ 13/11» έπιανε τρεις γραμμές στη μισή κάρτα.
+      title: 'Παλμοί ξύπνιος',
+      subtitle: last == null ? null : shortDayDate(last),
+      value: b?.value.round().toString(),
+      unit: 'bpm',
+      trend: trend,
+      chart: pts.length >= 2 ? Sparkline(values: [for (final p in pts) p.$2], color: c.heart, minRange: 8) : null,
+      empty: 'Έρχεται μετά από μια ολόκληρη μέρα με το ρολόι.',
+      onTap: onTap,
+    );
+  }
+
+  /// Λίπος σώματος (14/11): η τελευταία ζύγιση που μετρά (ίδιοι κανόνες με το Βάρος: [guardBody]), με τους μύες από κάτω.
+  /// Χωρίς «καλό/κακό»: η αλλαγή κάτω από 2 μονάδες είναι θόρυβος της ζυγαριάς (McLester 2020, όπως στο Σώμα).
+  Widget _fatCard(BuildContext context, Dashboard d, DateTime now, VoidCallback onTap) {
+    final c = Aigaio.of(context);
+    final counted = [for (final b in guardBody(d.body).counted) if (b.fatPct != null) b];
+    final last = counted.isEmpty ? null : counted.last;
+    final recent = counted.length <= 10 ? counted : counted.sublist(counted.length - 10);
+    return StatCard(
+      key: const ValueKey('today-fat'),
+      icon: Icons.pie_chart_outline_rounded,
+      color: c.body,
+      title: 'Λίπος',
+      subtitle: last == null || sameDay(last.time, now) ? null : shortDayDate(last.time),
+      value: last == null ? null : dec(last.fatPct!),
+      unit: '%',
+      note: last?.smm == null ? null : 'Μύες ${dec(last!.smm!)} kg',
+      chart: recent.length >= 2 ? Sparkline(values: [for (final b in recent) b.fatPct!], color: c.body, minRange: 4) : null,
+      empty: bodyNotPermitted(d) ? bodyNoPermissionShort : 'Έρχεται με την επόμενη ζύγιση στην InBody.',
       onTap: onTap,
     );
   }
