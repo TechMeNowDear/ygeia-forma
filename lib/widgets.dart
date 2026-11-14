@@ -2080,7 +2080,10 @@ class PeriodPicker<T> extends StatelessWidget {
                     onTap: () => onChanged(v),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minHeight: 48),
+                      // heightFactor 1: όσο ψηλό χρειάζεται (≥ 48), όχι όσο ο χώρος που δίνει ο γονιός (σε πλαίσιο με
+                      // σταθερό ύψος ο επιλογέας τεντωνόταν σε όλη την οθόνη).
                       child: Center(
+                        heightFactor: 1,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                           child: twoLines
