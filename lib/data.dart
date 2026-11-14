@@ -912,7 +912,7 @@ const todayCards = <TodayCard>[
   TodayCard('steps', 'Βήματα', true),
   // 14/11 (αίτημα χρήστη): λίγο περισσότερα από κάθε κατηγορία στη Σήμερα.
   TodayCard('exweek', 'Άσκηση της εβδομάδας (λεπτά μέτριας άσκησης)', true),
-  TodayCard('awake', 'Παλμοί ξύπνιος (της προηγούμενης μέρας)', true),
+  TodayCard('awake', 'Παλμοί ξύπνιος (της τελευταίας ολόκληρης μέρας)', true),
   TodayCard('weight', 'Βάρος', true),
   TodayCard('fat', 'Λίπος και μύες (InBody)', true),
   TodayCard('energy', 'Energy Score', false),

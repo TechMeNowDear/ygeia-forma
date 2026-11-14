@@ -40,9 +40,10 @@ int? _mean(List<List<int>> hr, int from, int to) {
   return n < minSamples ? null : (sum / n).round();
 }
 
-/// Ο πίνακας ανά km· κενός χωρίς GPS ή χωρίς ολόκληρο χιλιόμετρο.
+/// Ο πίνακας ανά km· κενός χωρίς GPS ή χωρίς ολόκληρο χιλιόμετρο, και όταν η απόσταση που δείχνουμε είναι από τα βήματα
+/// (round 14, D1: αλλιώς κάτω από «≈ 2,50 km» ερχόταν πίνακας με τα μέτρα του GPS).
 List<KmSplit> walkSplits(Session s) {
-  if (s.gps != true || s.splits.isEmpty) return const [];
+  if (s.gps != true || s.splits.isEmpty || shownMeters(s)?.approx != false) return const [];
   final hr = activeHr(s);
   final out = <KmSplit>[];
   var prevActive = 0, prevWall = 0;
@@ -80,13 +81,18 @@ int? cadence(Session s) {
   return (st / (t / 60)).round();
 }
 
-/// Η απόσταση που δείχνουμε (m) και αν είναι εκτίμηση από τα βήματα («≈»), ή null αν δεν μετρήθηκε. Ίδιος κανόνας με
-/// το ρολόι (Protocol.kt: shownDistance, 14/11): του GPS όταν μέτρησε (τουλάχιστον 10 m και τουλάχιστον η μισή της
-/// εκτίμησης από τα βήματα), αλλιώς η εκτίμηση ([Session.metersEst]: βήματα × μήκος βήματος). Χωρίς GPS (κλειστή
-/// τοποθεσία) την απόσταση τη βγάζει το ρολόι από τα βήματα: κι αυτή «≈».
+/// Η απόσταση που δείχνουμε (m) και αν είναι εκτίμηση από τα βήματα («≈»), ή null αν δεν μετρήθηκε. Το κινητό δείχνει
+/// ό,τι έδειξε το ρολόι (round 14): το ρολόι διαλέγει GPS ή βήματα με υστέρηση (Protocol.kt: useEstimate) και από το #116
+/// στέλνει την εκτίμηση ([Session.metersEst], «mest») ΜΟΝΟ όταν έδειξε αυτήν. Τα ρολόγια #114/#115 τη στέλνουν πάντα: τότε
+/// το GPS κερδίζει όταν δίνει τουλάχιστον το 80% της εκτίμησης (το ίδιο όριο με το ρολόι). Χωρίς GPS (κλειστή τοποθεσία)
+/// την απόσταση τη βγάζει το ρολόι από τα βήματα: κι αυτή «≈».
 ({double meters, bool approx})? pickMeters(double m, double est, bool? gps) {
-  if (m >= 10 && (gps == false || est < 10 || m >= est * 0.5)) return (meters: m, approx: gps == false);
-  if (est >= 10) return (meters: est, approx: true);
+  if (gps == false) {
+    if (m >= 10) return (meters: m, approx: true);
+    return est >= 10 ? (meters: est, approx: true) : null;
+  }
+  if (est >= 10 && !(m >= 10 && m >= est * 0.8)) return (meters: est, approx: true);
+  if (m >= 10) return (meters: m, approx: false);
   return null;
 }
 
@@ -113,7 +119,7 @@ String? kmValue(Session s) {
 
 /// Το μήκος του βήματος (m) για την απόσταση χωρίς GPS (14/11): από τα δικά σου περπατήματα με GPS (μέτρα ÷ βήματα,
 /// τα τελευταία ως 5 με τουλάχιστον 500 m και 500 βήματα), αλλιώς από το ύψος: περίπου 0,415 × ύψος στους άνδρες και
-/// 0,413 στις γυναίκες (πρόχειρος κανόνας με απόκλιση ±10%· γι' αυτό φαίνεται με «≈»). null χωρίς τίποτα από τα δύο.
+/// 0,413 στις γυναίκες (πρόχειρος κανόνας· γι' αυτό φαίνεται με «≈»). null χωρίς τίποτα από τα δύο.
 double? strideFor(List<Session> sessions, {double? heightCm, String? sex}) {
   var m = 0.0, st = 0;
   var n = 0;

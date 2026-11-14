@@ -264,7 +264,9 @@ class HrCard extends StatelessWidget {
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: h.overSec > 0 ? c.bad : c.text),
           ),
         ],
-        if (session.hrGap case final g?) ...[
+        // Round 14 (D8): στο περπάτημα χωρίς όριο η γραμμή κρίνεται από τις τιμές· όσο δεν έχουν διαβαστεί από το αρχείο
+        // τους, τίποτα (πριν αναβόσβηνε το ψεύτικο «Οι παλμοί έλειπαν έως 22 δευτερόλεπτα» σε κάθε άνοιγμα).
+        if (session.hrGap case final g? when !(session.isCardio && lim == null && !session.hrLoaded)) ...[
           const SizedBox(height: 6),
           // Πόσο γρήγορα έφταναν οι παλμοί από το ρολόι (8/11): μέτρο για το πόσο μπορεί να αργήσει η ειδοποίηση.
           Builder(builder: (context) {

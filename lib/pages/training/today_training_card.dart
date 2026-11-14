@@ -343,7 +343,8 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(d == null ? '—' : '${d.approx ? '≈ ' : ''}${kmText(m)} km',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular)),
-            Text(m < 50 || sec <= 0 ? '' : paceText(sec / (m / 1000)),
+            // Round 14 (D9/U8): ρυθμός από απόσταση με «≈» → κι αυτός «≈», όπως στη σύνοψη.
+            Text(m < 50 || sec <= 0 ? '' : '${d!.approx ? '≈ ' : ''}${paceText(sec / (m / 1000))}',
                 style: TextStyle(fontSize: 13, color: c.textSecondary, fontFeatures: tabular)),
           ]),
         ]),

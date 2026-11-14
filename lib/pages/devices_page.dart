@@ -122,6 +122,8 @@ class _DevicesPageState extends State<DevicesPage> {
       row('Βήματα', null, _Kind.measured),
       row('Παλμοί μέρας και στην άσκηση', 'στα βάρη κατά προσέγγιση', _Kind.measured),
       row('Απόσταση περπατήματος', 'GPS', _Kind.measured),
+      // Round 14 (D11): χωρίς GPS (ή μέσα στο σπίτι) η απόσταση βγαίνει από τα βήματα, με «≈».
+      row('Απόσταση χωρίς GPS', 'από τα βήματα, με «≈»', _Kind.estimated),
       row('Οξυγόνο τη νύχτα, χαμηλότερη τιμή', null, _Kind.indicative),
       row('Θερμίδες', 'μεγάλα λάθη, ειδικά στα βάρη· μόνο ως τάση', _Kind.estimated, line: false),
     ]);

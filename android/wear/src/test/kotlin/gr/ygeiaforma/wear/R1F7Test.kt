@@ -318,7 +318,7 @@ class R1F7Test {
 
     @Test
     fun zoneAlarmFirstBuzzExactlyAfterWarmup() {
-        val z = ZoneAlarm(holdMs = 20_000L)
+        val z = ZoneAlarm(holdMs = 20_000L, upGapMs = 0L, backHoldMs = 0L)
         z.start(WalkZone(108, 131), 0)
         for (t in 0..299) assertEquals("$t″", none, z.feed(150, t * 1000L))
         assertEquals(up, z.feed(150, 300_000))
@@ -331,7 +331,7 @@ class R1F7Test {
     fun zoneAlarmRearmNeedsThreeBelowTop() {
         val t0 = 400_000L
         fun after(dip: Int): List<ZoneAlarm.Buzz> {
-            val z = ZoneAlarm(holdMs = 20_000L)
+            val z = ZoneAlarm(holdMs = 20_000L, upGapMs = 0L, backHoldMs = 0L)
             z.start(WalkZone(108, 131), 0)
             for (k in 0..19) assertEquals(none, z.feed(140, t0 + k * 1000L))
             assertEquals(up, z.feed(140, t0 + 20_000))
@@ -351,14 +351,14 @@ class R1F7Test {
     @Test
     fun zoneAlarmBoundsAreInsideTheZone() {
         val t0 = 400_000L
-        val z = ZoneAlarm(holdMs = 20_000L)
+        val z = ZoneAlarm(holdMs = 20_000L, upGapMs = 0L, backHoldMs = 0L)
         z.start(WalkZone(108, 131, up = true, down = true), 0)
         // Ακριβώς στο πάνω όριο: μέσα στη ζώνη.
         for (k in 0..60) assertEquals(none, z.feed(131, t0 + k * 1000L))
         // Ένας παλμός πάνω: 20″.
         for (k in 61..80) assertEquals("$k", none, z.feed(132, t0 + k * 1000L))
         assertEquals(up, z.feed(132, t0 + 81_000))
-        val d = ZoneAlarm(holdMs = 20_000L)
+        val d = ZoneAlarm(holdMs = 20_000L, upGapMs = 0L, backHoldMs = 0L)
         d.start(WalkZone(108, 131, up = true, down = true), 0)
         // Ακριβώς στο κάτω όριο: μέσα στη ζώνη.
         for (k in 0..120) assertEquals(none, d.feed(108, t0 + k * 1000L))

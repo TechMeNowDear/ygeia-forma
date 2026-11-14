@@ -84,8 +84,6 @@ class WalkTileService : TileService() {
             .addContent(text("Υγεία & Φόρμα", 13f, GRAY))
             .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(10f)).build())
             .addContent(button)
-            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(8f)).build())
-            .addContent(text("ένα πάτημα και ξεκινά", 12f, GRAY))
             .build()
         return LayoutElementBuilders.Box.Builder()
             .setWidth(expand())

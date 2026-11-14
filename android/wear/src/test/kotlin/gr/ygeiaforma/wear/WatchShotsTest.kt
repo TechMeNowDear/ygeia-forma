@@ -346,6 +346,7 @@ class WatchShotsTest {
         Repo.meters = 0.0
         Repo.steps = 812
         Repo.stride = 0.72
+        Repo.updateDistanceSource()
         shot("W10d_walk_indoor_steps")
         shot("W10e_walk_indoor_ambient", ambient = true)
         Repo.kmFlashN = 1
@@ -358,6 +359,7 @@ class WatchShotsTest {
         Repo.kmFlashN = 0
         Repo.kmFlashUntil = 0
         Repo.stride = null
+        Repo.useEst = null
         Repo.meters = keepM
         Repo.steps = keepS
 

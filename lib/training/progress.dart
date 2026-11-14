@@ -17,6 +17,7 @@ import '../history.dart' show dateKey;
 import '../trends.dart';
 import 'equipment.dart';
 import 'session.dart';
+import 'walk_stats.dart' show shownMeters;
 
 const walkMinSec = 15 * 60;
 const walkNeeded = 4;
@@ -42,7 +43,9 @@ bool countsAsWalk(Session s) =>
     (s.activity ?? 'walk') == 'walk' &&
     s.gps == true &&
     (s.cardioSec ?? 0) >= walkMinSec &&
-    (s.meters ?? 0) >= 500;
+    (s.meters ?? 0) >= 500 &&
+    // Round 14 (D1): όχι όταν η απόσταση που δείξαμε ήταν από τα βήματα (GPS που δεν έπιασε σωστά).
+    shownMeters(s)?.approx == false;
 
 /// Παλμοί του περπατήματος για σύγκριση: «σταθερό βάδισμα», από το 5′ ως το «Τέλος», χωρίς παύσεις ([Session.steadyHr]·
 /// έλεγχος 9/11, V-B-11). Όχι ο μέσος όλου του περπατήματος (εξαρτάται από τη διάρκεια, λόγω των πρώτων λεπτών), και
