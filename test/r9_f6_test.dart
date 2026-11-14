@@ -196,7 +196,7 @@ void main() {
         await _pump(t, GoalsPage(key: ValueKey(pal), store: s, now: DateTime(2026, 11, 20, 9)));
         await t.tap(find.byKey(const ValueKey('goals-how')));
         await t.pumpAndSettle();
-        expect(find.text('2 · Με την κίνησή σου (× $shown)'), findsOneWidget);
+        expect(find.text('2 ·\u00A0Με την κίνησή σου (× $shown)'), findsOneWidget);
         expect(find.text(tdee), findsOneWidget);
         expect(find.textContaining('«Μέτρια κίνηση»'), findsOneWidget);
         Navigator.of(t.element(find.text('Πώς υπολογίστηκαν οι θερμίδες'))).pop();
@@ -497,7 +497,7 @@ void main() {
     for (final (slope, shown) in [(-0.004, '0 kg'), (0.004, '0 kg'), (-0.25, '−0,25 kg'), (0.3, '+0,30 kg')]) {
       testWidgets('$slope kg την εβδομάδα → «$shown»', (t) async {
         await how(t, slope);
-        expect(find.text('2 · Αλλαγή βάρους την εβδομάδα'), findsOneWidget);
+        expect(find.text('2 ·\u00A0Αλλαγή βάρους την εβδομάδα'), findsOneWidget);
         expect(find.text(shown), findsOneWidget);
         expect(find.text('−0,00 kg'), findsNothing);
         expect(find.text('+0,00 kg'), findsNothing);

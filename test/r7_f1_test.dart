@@ -409,12 +409,12 @@ void main() {
       ];
       final store = FoodStore.preloaded(foods: [a, b], entries: entries, now: tue);
       await _pump(t, CholesterolPage(food: store, goals: _goals2090(), today: tue), size: const Size(400, 3000));
-      expect(find.text('μέσος όρος 12,0% · στόχος έως 6%'), findsOneWidget);
+      expect(find.text('μέσος όρος 12,0% ·\u00A0στόχος έως 6%'), findsOneWidget);
       expect(find.textContaining('μετρά μία φορά κάθε μέρα με τουλάχιστον 40 g ξερά'), findsOneWidget);
       await t.tap(find.text('4 εβδομάδες'));
       await t.pumpAndSettle();
-      expect(find.text('μέσος όρος 5,3% · στόχος έως 6%'), findsOneWidget);
-      expect(find.text('μέσος όρος 23 g · στόχος 30 g'), findsOneWidget);
+      expect(find.text('μέσος όρος 5,3% ·\u00A0στόχος έως 6%'), findsOneWidget);
+      expect(find.text('μέσος όρος 23 g ·\u00A0στόχος 30 g'), findsOneWidget);
     });
   });
 
@@ -636,7 +636,7 @@ void main() {
         _le(wed, _byId('C20385'), 150, hour: 20, meal: Meal.dinner),
       ], now: _yesterday);
       await page(t, food);
-      expect(find.textContaining('Όπως Τετ 11/11 · '), findsOneWidget);
+      expect(find.textContaining('Όπως Τετ 11/11 ·\u00A0'), findsOneWidget);
       expect(find.textContaining('Όπως χθες'), findsNothing);
       final copy = find.byKey(const ValueKey('copy-dinner'));
       await t.ensureVisible(copy);
@@ -649,7 +649,7 @@ void main() {
       final food = FoodStore.preloaded(
           foods: basicFoods(), entries: [_le(_yesterday, _byId('C26039'), 80, hour: 20, meal: Meal.dinner)], now: _now);
       await page(t, food);
-      expect(find.textContaining('Όπως χθες · '), findsOneWidget);
+      expect(find.textContaining('Όπως χθες ·\u00A0'), findsOneWidget);
     });
   });
 
@@ -676,7 +676,7 @@ void main() {
                   child: CholCard(food: FoodStore.preloaded(foods: basicFoods(), now: _now), goals: _goals2090(), day: _today, today: _today))),
           size: const Size(360, 1600),
           textScale: 1.3);
-      expect(find.text('Χοληστερίνη · τι τη ρίχνει'), findsOneWidget);
+      expect(find.text('Χοληστερίνη ·\u00A0τι τη ρίχνει'), findsOneWidget);
     });
   });
 

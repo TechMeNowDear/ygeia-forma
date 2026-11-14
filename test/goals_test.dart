@@ -343,7 +343,7 @@ void main() {
       await t.pumpAndSettle();
       await next();
       expect(find.text('2.520 kcal', findRichText: true), findsOneWidget);
-      expect(find.text('έως 16,8 g · 6%'), findsOneWidget);
+      expect(find.text('έως 16,8 g ·\u00A06%'), findsOneWidget);
       await next();
       expect(find.byType(GoalsPage), findsOneWidget);
       final g = store.goals!;
@@ -400,7 +400,7 @@ void main() {
       expect(find.text('Πρωτεΐνη'), findsWidgets);
       expect(find.byKey(const ValueKey('nutrition-chol')), findsOneWidget);
       // Round7 (R7-U2-15): «τι τη ρίχνει» με αδιάσπαστα κενά, για να μη σπάει σε «τι | τη ρίχνει».
-      await t.tap(find.text('Χοληστερίνη · τι\u00A0τη\u00A0ρίχνει'));
+      await t.tap(find.text('Χοληστερίνη ·\u00A0τι\u00A0τη\u00A0ρίχνει'));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('chol-range')), findsOneWidget);
       await t.tap(find.text('4 εβδομάδες'));

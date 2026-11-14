@@ -314,7 +314,7 @@ void main() {
       final store = sampleTraining(now);
       await page(t, store);
       expect(find.textContaining('δονείται αν το ξεπεράσεις'), findsNothing);
-      expect(find.textContaining('140 bpm · δόνηση στο ρολόι όσο μετρά άσκηση'), findsOneWidget);
+      expect(find.textContaining('140 bpm ·\u00A0δόνηση στο ρολόι όσο μετρά άσκηση'), findsOneWidget);
       expect(find.textContaining('Το ρολόι δεν βρέθηκε τώρα'), findsOneWidget);
       WearLink.main.ready.value = true;
       WearLink.main.sentLimit.value = '140';
@@ -445,7 +445,7 @@ void main() {
       final drop = tester.widget<Text>(find.byKey(const ValueKey('hrr-drop')));
       expect(drop.data, '−18');
       expect(drop.style!.color, isNot(c.good));
-      expect(find.text('παλμοί · 112 → 94'), findsOneWidget);
+      expect(find.text('παλμοί ·\u00A0112 → 94'), findsOneWidget);
       expect(find.textContaining('παρόμοιας έντασης'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('hrr-info')));
       await tester.pumpAndSettle();

@@ -32,13 +32,13 @@ const goalsInfo = MetricInfo(
       'πραγματικά, και κάθε εβδομάδα η εφαρμογή ελέγχει τον στόχο. Προτείνει διόρθωση (το πολύ 150 kcal τη φορά) μόνο όταν '
       'η διαφορά ξεπερνά το φυσιολογικό εύρος των ζυγίσεων. Αλλάζει μόνο όταν πατήσεις «Εφάρμοσε».',
   // Έλεγχος 13/11 (S1-12): η EFSA δίνει εύρος 20–35% για τα λιπαρά· το κάτω όριο 25% είναι δική μας επιλογή μέσα σε αυτό.
-  compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018) · λιπαρά 25–35% των θερμίδων (μέσα στο εύρος 20–35% της EFSA) · κορεσμένα '
-      'λιπαρά έως 6% όταν ο γιατρός ζητά να πέσει η LDL (AHA/ACC), αλλιώς κάτω από 10% (Π.Ο.Υ.) · φυτικές ίνες 30 g '
-      '(Reynolds 2019) · αλάτι κάτω από 5 g (Π.Ο.Υ.).',
+  compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018) ·\u00A0λιπαρά 25–35% των θερμίδων (μέσα στο εύρος 20–35% της EFSA) ·\u00A0κορεσμένα '
+      'λιπαρά έως 6% όταν ο γιατρός ζητά να πέσει η LDL (AHA/ACC), αλλιώς κάτω από 10% (Π.Ο.Υ.) ·\u00A0φυτικές ίνες 30 g '
+      '(Reynolds 2019) ·\u00A0αλάτι κάτω από 5 g (Π.Ο.Υ.).',
   accuracy: 'Οι τύποι για τις θερμίδες πέφτουν συχνά 10–15% έξω σε έναν άνθρωπο. Γι’ αυτό η εφαρμογή τους διορθώνει με τα '
       'δικά σου δεδομένα. Ό,τι πει ο γιατρός σου υπερισχύει.',
-  cite: 'Mifflin 1990 · FAO/WHO/UNU 2004 · Hall 2008 · Helms 2014 · Jensen 2013 (AHA/ACC/TOS) · Morton 2018 · EFSA 2010 · '
-      'Eckel 2013 · Reynolds 2019 · Π.Ο.Υ. 2012',
+  cite: 'Mifflin 1990 ·\u00A0FAO/WHO/UNU 2004 ·\u00A0Hall 2008 ·\u00A0Helms 2014 ·\u00A0Jensen 2013 (AHA/ACC/TOS) ·\u00A0Morton 2018 ·\u00A0EFSA 2010 ·\u00A0'
+      'Eckel 2013 ·\u00A0Reynolds 2019 ·\u00A0Π.Ο.Υ. 2012',
 );
 
 // ---------------------------------------------------------------------------------------------------- οδηγός
@@ -276,7 +276,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
           },
           child: Scaffold(
             appBar: AppBar(
-              title: Text('Στόχοι διατροφής · ${_i + 1} από ${steps.length}', style: TextStyle(fontSize: 15, color: c.textSecondary)),
+              title: Text('Στόχοι διατροφής ·\u00A0${_i + 1} από ${steps.length}', style: TextStyle(fontSize: 15, color: c.textSecondary)),
               actions: [
                 TextButton(
                   key: const ValueKey('wizard-later'),
@@ -365,7 +365,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
               InfoRow('Ηλικία', age == null ? '—' : '$age ετών'),
               InfoRow('Φύλο', p.male ? 'Άνδρας' : (p.female ? 'Γυναίκα' : '—')),
               InfoRow('Ύψος', p.heightCm == null ? '—' : '${_cm(p.heightCm!)} cm'),
-              InfoRow('Βάρος', w == null ? '—' : '${dec(w.kg)} kg · ζυγαριά ${shortDayDate(w.day)}'),
+              InfoRow('Βάρος', w == null ? '—' : '${dec(w.kg)} kg ·\u00A0ζυγαριά ${shortDayDate(w.day)}'),
             ]),
           ),
           const SizedBox(height: 12),
@@ -450,9 +450,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
             _Opt(
               k: 'rate-$k',
               on: _rate == k,
-              title: '${words[k]} · ${rateKgText(kg, list[k])}',
+              title: '${words[k]} ·\u00A0${rateKgText(kg, list[k])}',
               // R7-U2-10: ο ίδιος αριθμός με τη σύνοψη και το «Πώς υπολογίστηκε» (495, όχι 500 εδώ και −495 στην επόμενη οθόνη).
-              sub: '${ratePctText(list[k])} του βάρους · περίπου ${(kg * list[k] * kcalPerKg / 7).round()} kcal '
+              sub: '${ratePctText(list[k])} του βάρους ·\u00A0περίπου ${(kg * list[k] * kcalPerKg / 7).round()} kcal '
                   '${_aim == GoalAim.lose ? 'λιγότερες' : 'περισσότερες'} τη μέρα',
               recommended: k == rec,
               onTap: () => setState(() => _rate = k),
@@ -562,7 +562,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
               Text(
                 _aim == GoalAim.keep
                     ? (fromData ? 'όσες καις κατά τον τύπο, περίπου ${thousands(g.tdee)}' : 'όσες καις, περίπου ${thousands(g.tdee)}')
-                    : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} · '
+                    : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} ·\u00A0'
                         '${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
                 style: small,
               ),
@@ -594,13 +594,13 @@ class _GoalsWizardState extends State<GoalsWizard> {
               InfoRow('Πρωτεΐνη', '${d.protein} g'),
               InfoRow('Λιπαρά', '${d.fatLo}–${d.fatHi} g'),
               // R9-A1-4 / R9-A3-2 (f1): ακριβές όριο, «κάτω από» για το 10% του ΠΟΥ, όπως στη Διατροφή.
-              InfoRow('Κορεσμένα λιπαρά', '${satLimitText(d.kcal, d.satPct)} · ${d.satPct}%'),
+              InfoRow('Κορεσμένα λιπαρά', '${satLimitText(d.kcal, d.satPct)} ·\u00A0${d.satPct}%'),
               InfoRow('Φυτικές ίνες', '${d.fiber} g ή περισσότερες'),
               InfoRow('Αλάτι', 'κάτω από ${dec(d.salt, 0)} g'),
-              InfoRow('Υδατάνθρακες', 'ό,τι μένει · ~${d.carbsEst} g'),
+              InfoRow('Υδατάνθρακες', 'ό,τι μένει ·\u00A0~${d.carbsEst} g'),
               const Hairline(vertical: 12),
               // U3b-23: με τι υπολογίστηκαν, για να φανεί ένα λάθος βάρος πριν από την αποθήκευση.
-              InfoRow('Υπολογίστηκαν με', '${dec(d.kg)} kg · ${activityText(d.activity).toLowerCase()}'),
+              InfoRow('Υπολογίστηκαν με', '${dec(d.kg)} kg ·\u00A0${activityText(d.activity).toLowerCase()}'),
             ]),
           ),
           const SizedBox(height: 12),
@@ -679,7 +679,7 @@ String _dm(String day) {
   return '${d.day}/${d.month}';
 }
 
-String _weighDays(Profile p) => (p.weighDays.toList()..sort()).map((d) => weekdayChips[d - 1]).join(' · ');
+String _weighDays(Profile p) => (p.weighDays.toList()..sort()).map((d) => weekdayChips[d - 1]).join(' ·\u00A0');
 
 class _Opt extends StatelessWidget {
   const _Opt({required this.k, required this.on, required this.title, required this.sub, required this.onTap, this.recommended = false});
@@ -872,8 +872,8 @@ class GoalsPage extends StatelessWidget {
               Text(
                 [
                   aimText(g.aim),
-                  if (g.aim != GoalAim.keep) '${rateWord(g.aim, g.rate)} · ${rateKgText(g.kg, g.rate)}',
-                ].join(' · '),
+                  if (g.aim != GoalAim.keep) '${rateWord(g.aim, g.rate)} ·\u00A0${rateKgText(g.kg, g.rate)}',
+                ].join(' ·\u00A0'),
                 style: small,
               ),
               if (g.kcalSet != null)
@@ -942,10 +942,10 @@ class GoalsPage extends StatelessWidget {
         final nutrients = AppCard(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              editRow('goals-protein', 'Πρωτεΐνη', '${g.protein} g${g.proteinSet != null ? ' · δική σου' : ''}', () => _editProtein(context, g)),
+              editRow('goals-protein', 'Πρωτεΐνη', '${g.protein} g${g.proteinSet != null ? ' ·\u00A0δική σου' : ''}', () => _editProtein(context, g)),
               // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού και στη διατροφική δήλωση («Λιπαρά», «Κορεσμένα λιπαρά»).
               InfoRow('Λιπαρά', '${g.fatLo}–${g.fatHi} g'),
-              InfoRow('Κορεσμένα λιπαρά', '${satLimitText(g.kcal, g.satPct)} · ${g.satPct}%'),
+              InfoRow('Κορεσμένα λιπαρά', '${satLimitText(g.kcal, g.satPct)} ·\u00A0${g.satPct}%'),
               InfoRow('Φυτικές ίνες', '${g.fiber} g ή περισσότερες'),
               InfoRow('Αλάτι', 'κάτω από ${dec(g.salt, 0)} g'),
               const InfoRow('Υδατάνθρακες', 'ό,τι μένει'),
@@ -954,7 +954,7 @@ class GoalsPage extends StatelessWidget {
         final mid = <Widget>[
           if (g.doctor) ...[
             // U3b-28: οι αριθμοί εδώ είναι το πλάνο σου (προεπιλογές που αλλάζεις), όχι αριθμοί που έγραψε ο γιατρός.
-            const GroupLabel('Χοληστερίνη · το πλάνο σου'),
+            const GroupLabel('Χοληστερίνη ·\u00A0το πλάνο σου'),
             AppCard(
               padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -964,18 +964,18 @@ class GoalsPage extends StatelessWidget {
                     'goals-bran',
                     branCovers ? 'Πίτουρο βρώμης για 3 g $_betaGlucans' : 'Πίτουρο βρώμης',
                     branCovers
-                        ? '${g.branG} g · από την ετικέτα'
+                        ? '${g.branG} g ·\u00A0από την ετικέτα'
                         // Round 2 (R2-U1-14): ποιο είναι το πλάνο και ότι δεν φτάνει τα 3 g (πριν «40 g · για 3 g …: 45 g»).
                         : (branNeed == null
-                            ? '${g.branG} g · γράψε την ετικέτα'
+                            ? '${g.branG} g ·\u00A0γράψε την ετικέτα'
                             // Round 3 (k1 · R3-B-3): αδιάσπαστο ενωτικό (U+2011) στο «β‑γλυκάνες».
-                            : '${g.branG}\u00A0g τη μέρα · για 3\u00A0g β\u2011γλυκάνες χρειάζονται $branNeed\u00A0g'),
+                            : '${g.branG}\u00A0g τη μέρα ·\u00A0για 3\u00A0g β\u2011γλυκάνες χρειάζονται $branNeed\u00A0g'),
                     () => _editBran(context, g)),
                 editRow('goals-legumes', 'Όσπρια', '${countText(g.legumesWeek, 'φορά', 'φορές')} την εβδομάδα',
                     () => _editInt(context, 'Όσπρια την εβδομάδα', g.legumesWeek, 0, 7, 'φορές', (v) => g.copyWith(legumesWeek: v))),
                 editRow('goals-fish', 'Ψάρι', '${countText(g.fishWeek, 'φορά', 'φορές')} την εβδομάδα',
                     () => _editInt(context, 'Ψάρι την εβδομάδα', g.fishWeek, 0, 7, 'φορές', (v) => g.copyWith(fishWeek: v))),
-                editRow('goals-doc-targets', 'Στόχοι του γιατρού', g.docTargets.isEmpty ? 'κανένας · γράψε' : g.docTargets.text, () async {
+                editRow('goals-doc-targets', 'Στόχοι του γιατρού', g.docTargets.isEmpty ? 'κανένας ·\u00A0γράψε' : g.docTargets.text, () async {
                   final t = await askDoctorTargets(context, g.docTargets);
                   if (t != null) store.setGoals(g.copyWith(docTargets: t));
                 }),
@@ -1460,16 +1460,16 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Πώς υπολογίστηκαν οι θερμίδες', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
           const SizedBox(height: 10),
-          InfoRow('1 · Σε πλήρη ξεκούραση', '${n(calc.bmr)} kcal'),
+          InfoRow('1 ·\u00A0Σε πλήρη ξεκούραση', '${n(calc.bmr)} kcal'),
           // U3b-24: με λέξεις, για να φαίνεται τι είναι κάθε αριθμός.
           Text('Τύπος Mifflin-St Jeor: 10 × βάρος ${dec(g.kg)} + 6,25 × ύψος ${_cm(g.heightCm)} − 5 × ηλικία ${g.age} $sex', style: small),
           const SizedBox(height: 6),
           // R9-A1-3: με δύο δεκαδικά όταν τα έχει (× 1,65· με ένα θα έγραφε «× 1,6» δίπλα σε αριθμό από το 1,65).
-          InfoRow('2 · Με την κίνησή σου (× ${palText(g.activity)})', '${n(calc.tdee)} kcal'),
+          InfoRow('2 ·\u00A0Με την κίνησή σου (× ${palText(g.activity)})', '${n(calc.tdee)} kcal'),
           Text('«${activityText(g.activity)}». Είναι εκτίμηση: σε κάθε άνθρωπο πέφτει ως και 10–15% έξω.', style: small),
           if (g.aim != GoalAim.keep) ...[
             const SizedBox(height: 6),
-            InfoRow('3 · Για ${rateKgText(g.kg, g.rate)}', '${calc.delta < 0 ? '−' : '+'}${n(calc.delta.abs())} kcal'),
+            InfoRow('3 ·\u00A0Για ${rateKgText(g.kg, g.rate)}', '${calc.delta < 0 ? '−' : '+'}${n(calc.delta.abs())} kcal'),
             // S1-8: με το ποσοστό και το βάρος, ώστε ο αριθμός να ξαναβγαίνει ακριβώς (0,75% × 82,0 × 7.700 ÷ 7 = 677·
             // πριν «0,61 kg × 7.700 ÷ 7», που δίνει 671).
             Text('${ratePctText(g.rate)} του βάρους: ${ratePctText(g.rate)} × ${dec(g.kg)} kg × 7.700 kcal ÷ 7 μέρες', style: small),
@@ -1499,7 +1499,7 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
             ]),
           ),
           const SizedBox(height: 12),
-          Text('Πηγές: Mifflin 1990 · FAO/WHO/UNU 2004 · Hall 2008 · Jensen 2013 (AHA/ACC/TOS)', style: small),
+          Text('Πηγές: Mifflin 1990 ·\u00A0FAO/WHO/UNU 2004 ·\u00A0Hall 2008 ·\u00A0Jensen 2013 (AHA/ACC/TOS)', style: small),
         ]),
       );
     },

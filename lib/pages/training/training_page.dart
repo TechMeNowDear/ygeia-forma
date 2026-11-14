@@ -199,7 +199,7 @@ class _TrainingPageState extends State<TrainingPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${s.name} σε εξέλιξη', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
-            Text('Από ${sameDay(s.start, _now) ? '' : '${shortDayDate(s.start)} '}${hm(s.start)} · ${s.setsDone} σετ',
+            Text('Από ${sameDay(s.start, _now) ? '' : '${shortDayDate(s.start)} '}${hm(s.start)} ·\u00A0${s.setsDone} σετ',
                 style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
           ]),
         ),
@@ -433,7 +433,7 @@ class _TrainingPageState extends State<TrainingPage> {
         };
         // round1, U6-20: αδιάσπαστα κενά μέσα στους αριθμούς («11,\u00A011,\u00A010», «+1\u00A0επανάληψη»).
         final reps = repsList(tg.reps).replaceAll(', ', ',\u00A0');
-        final more = tg.change == Change.more ? ' · +1\u00A0επανάληψη' : '';
+        final more = tg.change == Change.more ? ' ·\u00A0+1\u00A0επανάληψη' : '';
         children.add(Container(
           key: ValueKey('train-item-${plan.ex}'),
           padding: const EdgeInsets.symmetric(vertical: 11),
@@ -457,14 +457,14 @@ class _TrainingPageState extends State<TrainingPage> {
                 ),
               ],
             ]),
-            Text('${item.sets} σετ × ${item.lo == item.hi ? '${item.lo}' : '${item.lo}–${item.hi}'} · άφησε ${item.rir}', style: aux),
+            Text('${item.sets} σετ × ${item.lo == item.hi ? '${item.lo}' : '${item.lo}–${item.hi}'} ·\u00A0άφησε ${item.rir}', style: aux),
             if (isBand(k) && (tg.load ?? 0) > 0)
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Padding(padding: const EdgeInsets.only(top: 3), child: BandDots(tg.load, size: 14)),
-                Flexible(child: Text('${bandName(tg.load!)} · $reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular))),
+                Flexible(child: Text('${bandName(tg.load!)} ·\u00A0$reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular))),
               ])
             else
-              Text('${hasLoad(k) ? '${loadLabel(k, tg.load)} · ' : ''}$reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular)),
+              Text('${hasLoad(k) ? '${loadLabel(k, tg.load)} ·\u00A0' : ''}$reps$more', style: TextStyle(fontSize: 14, color: c.text, fontFeatures: tabular)),
           ]),
         ));
       }
@@ -594,7 +594,7 @@ class _TrainingPageState extends State<TrainingPage> {
             Text(p.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.text)),
             // round1, U6-20: «ισχύει από Παρ\u00A013/11» (όχι διπλό «από», όχι ημερομηνία σε δύο γραμμές).
             Text(
-              'Έκδοση ${p.version} · ${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' · ισχύει από ${shortDayDate(p.from!).replaceAll(' ', '\u00A0')}'}',
+              'Έκδοση ${p.version} ·\u00A0${p.author == 'claude' ? 'από τον Claude' : 'δικό σου'}${p.from == null ? '' : ' ·\u00A0ισχύει από ${shortDayDate(p.from!).replaceAll(' ', '\u00A0')}'}',
               style: TextStyle(fontSize: 13.5, color: c.textSecondary),
             ),
             // round1, S7-11 / U6-25: η σημείωση του προγράμματος (κανόνες ασφάλειας) μένει ορατή μετά την επικόλληση.
@@ -666,7 +666,7 @@ class _TrainingPageState extends State<TrainingPage> {
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${shortDayDate(s.start)} · ${s.name}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
+                    Text('${shortDayDate(s.start)} ·\u00A0${s.name}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                     // round1, U5-06 / U5-18: διάρκεια σε λέξεις και «μέσοι παλμοί» αντί για «♥» (λείπει από τη γραμματοσειρά).
                     Text(recentWorkoutLine(s), style: TextStyle(fontSize: 13, color: c.textSecondary)),
                   ]),
@@ -709,7 +709,7 @@ class _TrainingPageState extends State<TrainingPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Όριο παλμών από τον γιατρό', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text)),
-            Text(hr != null ? '$hr bpm · δόνηση στο ρολόι όσο μετρά άσκηση' : 'Κανένα. Πάτα αν σου δώσει ο γιατρός.',
+            Text(hr != null ? '$hr bpm ·\u00A0δόνηση στο ρολόι όσο μετρά άσκηση' : 'Κανένα. Πάτα αν σου δώσει ο γιατρός.',
                 style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
             // Έλεγχος του γ2 (S1): το ρολόι στέλνει παλμούς αργά με σβηστή οθόνη· να το ξέρεις πριν από την άσκηση.
             if (hr != null && link.watchSlow.value)
@@ -772,10 +772,10 @@ class _TrainingPageState extends State<TrainingPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(
             l['rec'] == true
-                ? 'ΠΕΡΠΑΤΗΜΑ · ΛΕΠΤΟ ΑΠΟΚΑΤΑΣΤΑΣΗΣ'
+                ? 'ΠΕΡΠΑΤΗΜΑ ·\u00A0ΛΕΠΤΟ ΑΠΟΚΑΤΑΣΤΑΣΗΣ'
                 : l['paused'] == true
-                    ? 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΣΕ ΠΑΥΣΗ'
-                    : 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΖΩΝΤΑΝΑ',
+                    ? 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ ·\u00A0ΣΕ ΠΑΥΣΗ'
+                    : 'ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ ·\u00A0ΖΩΝΤΑΝΑ',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: l['paused'] == true ? c.exercise : c.textSecondary)),
         const SizedBox(height: 8),
         if (bpm > 0)
@@ -985,12 +985,12 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
 /// κάρτα «Τελευταία φορά» και η σύνοψη δίπλα της (πριν «1 ώρα» εδώ και «60 λεπτά» εκεί για την ίδια προπόνηση)· κάθε
 /// αριθμός μένει με τη μονάδα του όταν η γραμμή σπάει.
 String recentWorkoutLine(Session s) {
-  final hr = s.hrAvg != null ? ' · μέσοι παλμοί\u00A0${s.hrAvg}' : '';
+  final hr = s.hrAvg != null ? ' ·\u00A0μέσοι παλμοί\u00A0${s.hrAvg}' : '';
   if (s.isCardio) {
     final km = kmValue(s);
     return '${countText(s.cardioMinutes ?? s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')}'
-        '${km != null ? ' · $km\u00A0km' : ''}$hr';
+        '${km != null ? ' ·\u00A0$km\u00A0km' : ''}$hr';
   }
-  return '${countText(s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')} · ${s.setsDone}\u00A0σετ'
-      '${s.volume > 0 ? ' · ${thousands(s.volume.round())}\u00A0kg' : ''}$hr';
+  return '${countText(s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')} ·\u00A0${s.setsDone}\u00A0σετ'
+      '${s.volume > 0 ? ' ·\u00A0${thousands(s.volume.round())}\u00A0kg' : ''}$hr';
 }

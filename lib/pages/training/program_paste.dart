@@ -81,7 +81,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(p.name, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: c.text)),
           Text(
-            '${p.author == 'claude' ? 'Από τον Claude' : 'Πρόγραμμα'}${p.from == null ? '' : ' · ισχύει από ${p.from!.day}/${p.from!.month}'}',
+            '${p.author == 'claude' ? 'Από τον Claude' : 'Πρόγραμμα'}${p.from == null ? '' : ' ·\u00A0ισχύει από ${p.from!.day}/${p.from!.month}'}',
             style: TextStyle(fontSize: 13.5, color: c.textSecondary),
           ),
           if (p.note != null) ...[const SizedBox(height: 6), Text(p.note!, style: TextStyle(fontSize: 14.5, height: 1.4, color: c.text))],
@@ -122,7 +122,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
         body.add(AppCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             // round1, U6-25: διάρκειες σε λέξεις, και η σημείωση της προπόνησης ορατή πριν την αποθήκευση.
-            Text(upperGr('${w.name} · περίπου ${w.minutes} λεπτά'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
+            Text(upperGr('${w.name} ·\u00A0περίπου ${w.minutes}\u00A0λεπτά'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .6, color: c.textSecondary)),
             if (w.note != null && w.note!.trim().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -131,11 +131,11 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
             if (w.isCardio)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('${w.cardio!.name} · ${w.cardio!.minutes} λεπτά${w.cardio!.note == null ? '' : ' · ${w.cardio!.note}'}', style: TextStyle(fontSize: 15, color: c.text)),
+                child: Text('${w.cardio!.name} ·\u00A0${w.cardio!.minutes}\u00A0λεπτά${w.cardio!.note == null ? '' : ' ·\u00A0${w.cardio!.note}'}', style: TextStyle(fontSize: 15, color: c.text)),
               ),
             // 13/11: τι άλλο φέρνει το πρόγραμμα, για να το δεις πριν το αποθηκεύσεις.
             if (w.cardio != null && w.cardio!.plan.isNotEmpty)
-              Text('Ανά εβδομάδα: ${w.cardio!.plan.join(' · ')} λεπτά', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+              Text('Ανά εβδομάδα: ${w.cardio!.plan.join(' ·\u00A0')}\u00A0λεπτά', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
             // round1, U6-25: τα βήματα διαβάζονται πριν την αποθήκευση (πριν φαινόταν μόνο το πλήθος τους).
             if (routineLabel(w) case final r?)
               Align(
@@ -156,7 +156,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
                     Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text)),
                     Text(
-                      '${repsRange(i)} · ξεκούραση ${clock(i.rest)}${hasLoad(i.kind) && i.load != null ? ' · ${loadLabel(i.kind, i.load)}' : ''}',
+                      '${repsRange(i)} ·\u00A0ξεκούραση ${clock(i.rest)}${hasLoad(i.kind) && i.load != null ? ' ·\u00A0${loadLabel(i.kind, i.load)}' : ''}',
                       style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                     ),
                   ]),

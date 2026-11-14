@@ -127,8 +127,8 @@ void main() {
       expect(find.text('Η πρόοδός σου'), findsOneWidget);
       final rows = [for (final r in t.widgetList<InfoRow>(find.byType(InfoRow))) (r.label, r.value)];
       expect(rows, [
-        (shortDayDate(c), '6,8 kg × 8 · 5,3 kg × 10'),
-        (shortDayDate(a), '4,3 kg · 10, 10'),
+        (shortDayDate(c), '6,8 kg × 8 ·\u00A05,3 kg × 10'),
+        (shortDayDate(a), '4,3 kg ·\u00A010, 10'),
       ]);
       expect(rows.any((r) => r.$2.startsWith('0 kg')), isFalse);
       final chart = t.widget<LineChart>(find.byType(LineChart));
@@ -342,7 +342,7 @@ void main() {
       expect((z.lo, z.hi, z.rest, z.max), (106, 129, 58, 179));
       await _pump(t, Scaffold(body: ZoneSheet(health: h, now: when)), size: const Size(400, 3000));
       final rest = t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Παλμοί ηρεμίας').value;
-      expect(rest, '58 · παλμοί ύπνου, 9 νύχτες');
+      expect(rest, '58 ·\u00A0παλμοί ύπνου, 9 νύχτες');
       expect(find.textContaining('τύπος Karvonen'), findsOneWidget);
     });
 

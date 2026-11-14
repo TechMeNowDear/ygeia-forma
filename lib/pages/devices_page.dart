@@ -110,7 +110,7 @@ class _DevicesPageState extends State<DevicesPage> {
         legend(_Kind.indicative, 'Μέτρηση με γνωστά λάθη στον καρπό ή στο δάχτυλο. Δεν κάνει διάγνωση.'),
       ]),
     );
-    final oura = device('oura', Icons.circle_outlined, 'Oura Ring 5', 'δαχτυλίδι · ο ύπνος σου', [
+    final oura = device('oura', Icons.circle_outlined, 'Oura Ring 5', 'δαχτυλίδι ·\u00A0ο ύπνος σου', [
       row('Ώρες ύπνου', 'από κίνηση και παλμούς', _Kind.estimated),
       row('Φάσεις ύπνου', null, _Kind.estimated),
       row('Παλμοί και HRV στον ύπνο', null, _Kind.measured),
@@ -118,14 +118,14 @@ class _DevicesPageState extends State<DevicesPage> {
       row('Οξυγόνο τη νύχτα, μέσος όρος', null, _Kind.indicative),
       row('Βαθμολογία ύπνου, ετοιμότητα', 'βαθμολογία της Oura', _Kind.estimated, line: false),
     ]);
-    final watch = device('watch', Icons.watch_rounded, 'Galaxy Watch Ultra 2', 'ρολόι · μέρα και άσκηση', [
+    final watch = device('watch', Icons.watch_rounded, 'Galaxy Watch Ultra 2', 'ρολόι ·\u00A0μέρα και άσκηση', [
       row('Βήματα', null, _Kind.measured),
       row('Παλμοί μέρας και στην άσκηση', 'στα βάρη κατά προσέγγιση', _Kind.measured),
       row('Απόσταση περπατήματος', 'GPS', _Kind.measured),
       row('Οξυγόνο τη νύχτα, χαμηλότερη τιμή', null, _Kind.indicative),
       row('Θερμίδες', 'μεγάλα λάθη, ειδικά στα βάρη· μόνο ως τάση', _Kind.estimated, line: false),
     ]);
-    final inbody = device('inbody', Icons.monitor_weight_outlined, 'InBody H40', 'ζυγαριά · σώμα', [
+    final inbody = device('inbody', Icons.monitor_weight_outlined, 'InBody H40', 'ζυγαριά ·\u00A0σώμα', [
       row('Βάρος', null, _Kind.measured),
       row('Λίπος, μύες', 'από ασθενές ρεύμα· ζυγίσου με τις ίδιες συνθήκες', _Kind.estimated),
       row('Βασικός μεταβολισμός', null, _Kind.estimated, line: false),

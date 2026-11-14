@@ -30,6 +30,6 @@ HrQualityCounts? hrQualityFromDiag(String? diag) {
 String hrQualityText(HrQualityCounts q) {
   if (q.low == 0 && q.bad == 0) return 'Μετρήσεις ρολογιού: ${thousands(q.ok)}, όλες με καλή επαφή.';
   return 'Μετρήσεις ρολογιού: ${thousands(q.ok)} με καλή επαφή'
-      '${q.low > 0 ? ' · ${thousands(q.low)} χαμηλής ακρίβειας' : ''}'
-      '${q.bad > 0 ? ' · ${thousands(q.bad)} χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν)' : ''}.';
+      '${q.low > 0 ? ' ·\u00A0${thousands(q.low)} χαμηλής ακρίβειας' : ''}'
+      '${q.bad > 0 ? ' ·\u00A0${thousands(q.bad)} χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν)' : ''}.';
 }

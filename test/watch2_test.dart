@@ -112,7 +112,7 @@ void main() {
       addTearDown(() => WearLink.main.live.value = null);
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: TrainingPage(training: t, now: now))));
       await tester.pump();
-      expect(find.text('ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ · ΖΩΝΤΑΝΑ'), findsOneWidget);
+      expect(find.text('ΠΕΡΠΑΤΗΜΑ ΣΤΟ ΡΟΛΟΪ ·\u00A0ΖΩΝΤΑΝΑ'), findsOneWidget);
       expect(find.byType(HrStale), findsOneWidget);
       expect(find.byKey(const ValueKey('hr-limit-off')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());

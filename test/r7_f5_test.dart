@@ -148,13 +148,13 @@ void main() {
     testWidgets('Τετ 18/11 07:10 με αποθηκευμένη ανάγνωση Τρί 23:40: «Βάρος · Δευ 16/11» (πριν «Βάρος · Χθες»)', (t) async {
       final now = DateTime(2026, 11, 18, 7, 10);
       await _pump(t, _today(_store(DateTime(2026, 11, 17, 23, 40), rows), now));
-      expect(_weightCard(t).title, 'Βάρος · Δευ 16/11');
+      expect(_weightCard(t).title, 'Βάρος ·\u00A0Δευ 16/11');
     });
 
     testWidgets('Τρί 17/11 09:00: «Βάρος · Δευ 16/11» (πριν «Βάρος · Χθες»)· σημερινή ζύγιση: σκέτο «Βάρος»', (t) async {
       final now = DateTime(2026, 11, 17, 9);
       await _pump(t, _today(_store(now, rows), now));
-      expect(_weightCard(t).title, 'Βάρος · Δευ 16/11');
+      expect(_weightCard(t).title, 'Βάρος ·\u00A0Δευ 16/11');
       final mon = DateTime(2026, 11, 16, 9);
       await _pump(t, _today(_store(mon, rows), mon));
       expect(_weightCard(t).title, 'Βάρος');
@@ -384,7 +384,7 @@ void main() {
       expect(_row(t, 'Βάρος'), '80,7 kg  (−0,2)');
       expect(_row(t, 'Λίπος'), '29,0%  (+2,0)', reason: 'πριν «27,6%  (+2,0)»: τάση δίπλα σε τιμή που δεν μετρά');
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9', reason: 'πριν 25,3');
-      expect(find.text('Μέσα στο εύρος · φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget,
+      expect(find.text('Μέσα στο εύρος ·\u00A0φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget,
           reason: 'πριν «Πάνω από το εύρος»');
       expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data,
           'Και 20:30: 82,1 kg· μετρά μία ζύγιση τη μέρα, η πρώτη.');
@@ -431,7 +431,7 @@ void main() {
       final s = _store(now, _ownUpTo(now));
       await _pump(t, BodyPage(store: s, now: now));
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9', reason: 'πριν «25,0»');
-      expect(find.text('Μέσα στο εύρος · φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget);
+      expect(find.text('Μέσα στο εύρος ·\u00A0φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget);
       final m = _widgetBody(s, now);
       expect((m['bmi'] as Map)['v'], '24,9');
       expect((m['bmi'] as Map)['r'], 'μέσα στο εύρος');
@@ -442,7 +442,7 @@ void main() {
       final s = _store(now, [..._ownUpTo(DateTime(2026, 12, 3)), _m(DateTime(2026, 12, 4, 7, 15), 81.0, 29.0)]);
       await _pump(t, BodyPage(store: s, now: now));
       expect(_row(t, 'Δείκτης μάζας σώματος'), '25,0');
-      expect(find.text('Πάνω από το εύρος · φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget);
+      expect(find.text('Πάνω από το εύρος ·\u00A0φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget);
     });
   });
 

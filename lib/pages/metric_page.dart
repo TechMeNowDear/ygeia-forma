@@ -254,12 +254,13 @@ class _MetricPageState extends State<MetricPage> {
           final unit = s.unitSuffix;
           usual = s.duration
               // Round 1 (U1b-04): «33 λεπτά λιγότερο από ό,τι συνήθως · συνήθως 7 ώρες 5 λεπτά» (πριν «−33 · …» χωρίς μονάδα).
-              ? '${sleepVsUsualText(d.round())} · συνήθως ${s.show(base.usual!)}'
+              // Round 12 (R12-D2-5): «·» με τον κανόνα [dotJoin] και ο αριθμός με τη λέξη του ([unitsGlued]).
+              ? unitsGlued('${sleepVsUsualText(d.round())} ·\u00A0συνήθως ${s.show(base.usual!)}')
               : d == 0
                   // Round 8 (R8-U4-12): «Όπως συνήθως (59 bpm)», όπως ο Ύπνος του Oura (πριν «Όπως συνήθως · συνήθως 59 bpm»,
                   // το λάθος που η Καρδιά διόρθωσε στο R2-U1-10).
                   ? '$asUsualText (${s.show(base.usual!)}$unit)'
-                  : '${signedShown(d, s.digits)}${s.diffSuffix(d)} · συνήθως ${s.show(base.usual!)}$unit';
+                  : '${signedShown(d, s.digits)}${s.diffSuffix(d)} ·\u00A0συνήθως ${s.show(base.usual!)}$unit';
         }
         // Round 1 (U1b-11): η μονάδα και στα στατιστικά («Μέσος όρος 39 ms»).
         String withUnit(double v) => '${s.show(v)}${s.unitSuffix}';
@@ -348,7 +349,7 @@ class _MetricPageState extends State<MetricPage> {
                 const Hairline(vertical: 12),
                 if (vals.length >= 2) ...[
                   InfoRow('Μέσος όρος', withUnit(mean)),
-                  InfoRow('Χαμηλότερη · υψηλότερη', '${s.show(lo!)} · ${withUnit(hi!)}'),
+                  InfoRow('Χαμηλότερη ·\u00A0υψηλότερη', s.duration ? unitsGlued('${s.show(lo!)} ·\u00A0${withUnit(hi!)}') : '${s.show(lo!)} ·\u00A0${withUnit(hi!)}'),
                 ],
                 // Round 8 (R8-U4-8): μετά από αλλαγή πηγής, από πόσες μέρες ΑΠΟ ΤΗΝ ΑΛΛΑΓΗ (όπως οι Τάσεις, R7-U4-4)· πριν
                 // «9 από 30», σαν να έλειπαν νύχτες που υπάρχουν από την άλλη πηγή.

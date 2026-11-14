@@ -383,8 +383,8 @@ class _Header extends StatelessWidget {
                   Text(
                     switch (page) {
                       1 => 'Αναφορά υγείας',
-                      2 => 'Αναφορά υγείας · γραφήματα',
-                      _ => 'Αναφορά υγείας · οξυγόνο και ζυγίσεις',
+                      2 => 'Αναφορά υγείας ·\u00A0γραφήματα',
+                      _ => 'Αναφορά υγείας ·\u00A0οξυγόνο και ζυγίσεις',
                     },
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.3),
                   ),
@@ -393,8 +393,8 @@ class _Header extends StatelessWidget {
                   // πάντα ολόκληρο (πριν μία γραμμή με «…» που έκοβε ποιες 90 μέρες βλέπει ο γιατρός). R7-U4-14 ν: «μέρες»,
                   // όπως η στήλη «Μέρες» της ίδιας σελίδας.
                   Text(
-                    '${name.isEmpty ? '' : '$name · '}'
-                    '${'${dayMonth(data.from)} – ${dayMonthYear(data.to)} · $reportDays μέρες'.replaceAll(' ', '\u00A0')}',
+                    '${name.isEmpty ? '' : '$name ·\u00A0'}'
+                    '${'${dayMonth(data.from)} – ${dayMonthYear(data.to)} ·\u00A0$reportDays μέρες'.replaceAll(' ', '\u00A0')}',
                     key: const ValueKey('report-header-period'),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -436,7 +436,7 @@ class _Footer extends StatelessWidget {
           ),
         ),
         Text(
-          'Δημιουργήθηκε ${t.day}/${t.month}/${t.year} · σελίδα $page από $_pageCount',
+          'Δημιουργήθηκε ${t.day}/${t.month}/${t.year} ·\u00A0σελίδα $page από $_pageCount',
           style: TextStyle(fontSize: 8, color: c.textTertiary),
         ),
       ],
@@ -506,7 +506,7 @@ class _PageOne extends StatelessWidget {
       // Αλλαγή συσκευής μέσα στις 90 μέρες (έλεγχος 4, C3): η συσκευή γράφεται σε κάθε γραμμή περιόδου.
       if (s.periods.isNotEmpty && reportDeviceKeys.contains(r.$2)) return r.$1;
       final since = s.since == null ? '' : ', από ${s.since!.day}/${s.since!.month}';
-      return '${r.$1} · ${metricSourceName(r.$2, s.source)}$since';
+      return '${r.$1} ·\u00A0${metricSourceName(r.$2, s.source)}$since';
     }
 
     // Οξυγόνο με αλλαγή ορισμού της νύχτας: μία γραμμή για κάθε ορισμό (δεύτερος κλινικός έλεγχος K1), όλες οι 90 μέρες.
@@ -578,7 +578,7 @@ class _PageOne extends StatelessWidget {
           TableRow(
             decoration: BoxDecoration(color: c.background),
             children: [
-              pad(Text('Δείκτης · πηγή', style: header)),
+              pad(Text('Δείκτης ·\u00A0πηγή', style: header)),
               pad(Text('Μεσαία τιμή', style: header)),
               pad(Text('Συνήθως\n(8 στις 10 μέρες)', style: header)),
               pad(Text('Χαμηλότερη –\nυψηλότερη', style: header)),
@@ -662,7 +662,7 @@ class _PageOne extends StatelessWidget {
 /// Η σημείωση όπως μπαίνει στο PDF: ολόκληρη. Οι αλλαγές γραμμής γίνονται « · » (μία σημείωση 400 χαρακτήρων με
 /// 30 σύντομες γραμμές θα έπιανε μισή σελίδα), τα διπλά κενά ένα.
 String reportNoteText(String note) =>
-    note.trim().replaceAll(RegExp(r'\s*\n\s*'), ' · ').replaceAll(RegExp(r'[ \t]+'), ' ');
+    note.trim().replaceAll(RegExp(r'\s*\n\s*'), ' ·\u00A0').replaceAll(RegExp(r'[ \t]+'), ' ');
 
 // --- Σελίδα 3: οξυγόνο και ζυγίσεις ---
 
@@ -725,7 +725,7 @@ class _PageThree extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Νύχτες με μέτρηση: $minN · κάτω από 90%: ${d.lowOxygenNights.length} · κάτω από 85%: ${below85.length} · '
+                'Νύχτες με μέτρηση: $minN ·\u00A0κάτω από 90%: ${d.lowOxygenNights.length} ·\u00A0κάτω από 85%: ${below85.length} ·\u00A0'
                 'κάτω από 80%: ${d.oxygenBelow(80).length}.',
                 key: const ValueKey('report-oxygen-counts'),
                 style: cell,
@@ -735,7 +735,7 @@ class _PageThree extends StatelessWidget {
               // στο «και N ακόμα»).
               if (below80.isNotEmpty) ...[
                 Text(
-                  'Νύχτες κάτω από 80% (όλες): ${[for (final n in below80) '${dmy(n.$1)}: ${lowestText(n.$2)}%'].join(' · ')}',
+                  'Νύχτες κάτω από 80% (όλες): ${[for (final n in below80) '${dmy(n.$1)}: ${lowestText(n.$2)}%'].join(' ·\u00A0')}',
                   key: const ValueKey('report-oxygen-below80'),
                   style: bold,
                 ),
@@ -907,8 +907,8 @@ String reportWeighTitle(ReportData d) {
   const base = 'Ζυγίσεις (InBody H40)';
   final n = d.weighIns.length;
   if (n == 0) return base;
-  if (d.weighInsSpread) return '$base · $n από τις ${d.weighInsInPeriod} του διαστήματος, από την πρώτη ως την τελευταία';
-  return n == 1 ? '$base · η τελευταία' : '$base · οι $n τελευταίες';
+  if (d.weighInsSpread) return '$base ·\u00A0$n από τις ${d.weighInsInPeriod} του διαστήματος, από την πρώτη ως την τελευταία';
+  return n == 1 ? '$base ·\u00A0η τελευταία' : '$base ·\u00A0οι $n τελευταίες';
 }
 
 /// Round 1 (U1b-01): το σώμα της σελίδας 1 στο ύψος που μένει, χωρίς να κοπεί τίποτα και χωρίς να γίνει στενή στήλη.
@@ -1049,16 +1049,16 @@ class _PageTwo extends StatelessWidget {
         children: [
           // Κομμένη σειρά (αλλαγή συσκευής): το λέει ο τίτλος, γιατί ο άξονας είναι πια οι ίδιες 90 μέρες για όλα (F6).
           _Title(s.since != null
-              ? '$title · μόνο ${metricSourceName(key, s.source)}, από ${s.since!.day}/${s.since!.month}'
+              ? '$title ·\u00A0μόνο ${metricSourceName(key, s.source)}, από ${s.since!.day}/${s.since!.month}'
               // Αλλαγή συσκευής (έλεγχος 4, C3): κάθε κομμάτι με τη δική του μεσαία τιμή, γραμμένο στον τίτλο.
               : reportDeviceKeys.contains(key) && parts.isNotEmpty
-                  ? '$title · ${[
+                  ? '$title ·\u00A0${[
                       for (final (i, p) in s.periods.indexed)
                         if (p.stat.n > 0)
                           '${reportPeriodDevice(p)} ${i == s.periods.length - 1 ? 'από ${p.from.day}/${p.from.month}' : 'ως ${p.to.day}/${p.to.month}'}',
                     ].join(', ')}'
                   // Round 1 (U1b-12): κάθε γράφημα με τη συσκευή του (οι σελίδες τυπώνονται χωριστά).
-                  : '$title · ${metricSourceName(key, s.source)}'),
+                  : '$title ·\u00A0${metricSourceName(key, s.source)}'),
           if (s.n < 2)
             SizedBox(
               height: 96,

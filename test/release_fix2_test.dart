@@ -65,13 +65,13 @@ void main() {
       expect(row.containsKey(K.spo2Min), isFalse);
       final h = sampleHistory(now, d);
       expect(buildReport(h, now).stat(K.sleepMin).values.any((v) => sameDay(v.$1, day)), isFalse, reason: 'ούτε στο PDF');
-      expect(napOnlyText(d.napTimes[day]!), 'Υπνάκος 15:00–21:00 · 5 ώρες 40 λεπτά');
+      expect(napOnlyText(d.napTimes[day]!), 'Υπνάκος 15:00–21:00 ·\u00A05\u00A0ώρες 40\u00A0λεπτά');
       expect(
         napOnlyText([
           (DateTime(2026, 1, 1, 13), DateTime(2026, 1, 1, 14), 55),
           (DateTime(2026, 1, 1, 16), DateTime(2026, 1, 1, 17, 30), 80),
         ]),
-        'Υπνάκοι 13:00–14:00, 16:00–17:30 · 2 ώρες 15 λεπτά',
+        'Υπνάκοι 13:00–14:00, 16:00–17:30 ·\u00A02\u00A0ώρες 15\u00A0λεπτά',
       );
     });
 
@@ -86,7 +86,7 @@ void main() {
       await t.pumpAndSettle();
       final row = find.byKey(ValueKey('nap-only-${day.year}-${day.month}-${day.day}'));
       expect(row, findsOneWidget);
-      expect(find.descendant(of: row, matching: find.text('Υπνάκος 15:00–21:00 · 5 ώρες 40 λεπτά')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text('Υπνάκος 15:00–21:00 ·\u00A05\u00A0ώρες 40\u00A0λεπτά')), findsOneWidget);
       expect(find.descendant(of: row, matching: find.text('Μόνο υπνάκος')), findsOneWidget);
       expect(find.descendant(of: row, matching: find.textContaining('σκορ')), findsNothing);
       expect(find.textContaining('χωρίς ύπνο'), findsNothing);
@@ -145,7 +145,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Νύχτα προς νύχτα'), findsOneWidget);
       expect(find.byKey(const ValueKey('sleep-stages')), findsOneWidget);
-      expect(find.text('Υπνάκος 15:00–21:00 · 5 ώρες 40 λεπτά'), findsOneWidget);
+      expect(find.text('Υπνάκος 15:00–21:00 ·\u00A05\u00A0ώρες 40\u00A0λεπτά'), findsOneWidget);
       expect(find.text('Μόνο υπνάκος'), findsOneWidget);
       expect(find.textContaining('χωρίς ύπνο'), findsNothing);
     });

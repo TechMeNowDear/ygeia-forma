@@ -884,7 +884,7 @@ void main() {
         ..hrMax = 137
         ..hr.addAll([for (var i = 0; i < 360; i++) [i * 10, 95 + (i % 18) * 2 + (i ~/ 40)]]),
       act: (t) async {
-        final f = find.textContaining('11/11 · Προπόνηση Α');
+        final f = find.textContaining('11/11 ·\u00A0Προπόνηση Α');
         await t.ensureVisible(f);
         await t.pumpAndSettle();
         await t.tap(f);
@@ -916,7 +916,7 @@ void main() {
   }
 
   Future<void> openOld(WidgetTester t) async {
-    final f = find.textContaining('11/11 · Προπόνηση Α');
+    final f = find.textContaining('11/11 ·\u00A0Προπόνηση Α');
     await t.ensureVisible(f);
     await t.pumpAndSettle();
     await t.tap(f);
@@ -981,7 +981,7 @@ void main() {
   }
 
   Future<void> openWalk(WidgetTester t) async {
-    final f = find.textContaining('12/11 · Περπάτημα');
+    final f = find.textContaining('12/11 ·\u00A0Περπάτημα');
     await t.ensureVisible(f);
     await t.pumpAndSettle();
     await t.tap(f);

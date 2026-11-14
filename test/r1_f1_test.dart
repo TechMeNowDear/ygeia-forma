@@ -159,8 +159,8 @@ void main() {
       expect(find.text('2.340 kcal', findRichText: true), findsOneWidget);
       expect(find.text('130 g'), findsOneWidget);
       // Round 9 (R9-A3-2): το ακριβές όριο, 2.340 × 6% ÷ 9 = 15,6 → «έως 15,6 g».
-      expect(find.text('έως 15,6 g · 6%'), findsOneWidget);
-      expect(find.text('80,0 kg · μέτρια κίνηση'), findsOneWidget);
+      expect(find.text('έως 15,6 g ·\u00A06%'), findsOneWidget);
+      expect(find.text('80,0 kg ·\u00A0μέτρια κίνηση'), findsOneWidget);
       // S1-5 / S11-6 / U3b-2: η πρώτη εκτίμηση την 28η μέρα, όχι την 21η.
       expect(find.textContaining('τη Δευτέρα 14 Δεκεμβρίου'), findsOneWidget);
       expect(find.textContaining('7 Δεκεμβρίου'), findsNothing);
@@ -191,8 +191,8 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('2.140 kcal', findRichText: true), findsOneWidget);
       // Round 9 (R9-A3-2): 2.140 × 6% ÷ 9 = 14,27 → «έως 14,3 g».
-      expect(find.text('έως 14,3 g · 6%'), findsOneWidget);
-      expect(find.text('80,0 kg · λίγη κίνηση'), findsOneWidget);
+      expect(find.text('έως 14,3 g ·\u00A06%'), findsOneWidget);
+      expect(find.text('80,0 kg ·\u00A0λίγη κίνηση'), findsOneWidget);
     });
   });
 
@@ -475,20 +475,20 @@ void main() {
         ..setGoals(checkinGoals());
       await _pump(t, GoalsPage(store: s, now: _now));
       expect(find.textContaining('για 3 g β\u2011γλυκάνες'), findsNothing);
-      expect(find.text('40 g · γράψε την ετικέτα'), findsOneWidget);
+      expect(find.text('40 g ·\u00A0γράψε την ετικέτα'), findsOneWidget);
       expect(find.textContaining('το ίδιο δεν ρίχνει την LDL'), findsOneWidget);
       s.setGoals(checkinGoals().copyWith(betaPer100: 7, branG: 45));
       await t.pumpAndSettle();
       // R7-U2-12 (f6): αδιάσπαστο ενωτικό και εδώ.
       expect(find.text('Πίτουρο βρώμης για 3 g β\u2011γλυκάνες'), findsOneWidget);
-      expect(find.text('45 g · από την ετικέτα'), findsOneWidget);
+      expect(find.text('45 g ·\u00A0από την ετικέτα'), findsOneWidget);
       // Ετικέτα με 5,5 g / 100 g: για 3 g χρειάζονται 55 g· τα 40 g δεν φτάνουν και η γραμμή το λέει.
       s.setGoals(checkinGoals().copyWith(betaPer100: 5.5));
       await t.pumpAndSettle();
       expect(find.text('Πίτουρο βρώμης'), findsOneWidget);
       // Round 2 (R2-U1-14, h1): ποιο είναι το πλάνο και ότι δεν φτάνει.
       // Round 3 (k1 · R3-B-3): αδιάσπαστο ενωτικό στο «β‑γλυκάνες».
-      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β\u2011γλυκάνες χρειάζονται 55\u00A0g'), findsOneWidget);
+      expect(find.text('40\u00A0g τη μέρα ·\u00A0για 3\u00A0g β\u2011γλυκάνες χρειάζονται 55\u00A0g'), findsOneWidget);
     });
 
     testWidgets('U3b-14 / U3b-28 / U3b-29 / U3b-12: γραμμές που αλλάζουν 48 dp, «το πλάνο σου», «Σβήσε» κόκκινο, χρώμα διατροφής',
@@ -500,7 +500,7 @@ void main() {
       for (final k in ['goals-protein', 'goals-nuts', 'goals-bran', 'goals-legumes', 'goals-fish', 'goals-doc-targets']) {
         expect(t.getSize(find.byKey(ValueKey(k))).height, greaterThanOrEqualTo(48), reason: k);
       }
-      expect(find.text(upperGr('Χοληστερίνη · το πλάνο σου')), findsOneWidget);
+      expect(find.text(upperGr('Χοληστερίνη ·\u00A0το πλάνο σου')), findsOneWidget);
       // S11-9 / U3b-4: «1 φορά», όχι «1 φορές».
       expect(find.text('1 φορά την εβδομάδα'), findsOneWidget);
       expect(find.text('Λιπαρά'), findsOneWidget);
@@ -573,7 +573,7 @@ void main() {
         ..data = Dashboard.fromJson({...sampleDashboardJson(_now), 'body': bodyJson([(DateTime(2026, 11, 10, 7, 30), 84.0)])})
         ..setProfile(_me);
       await _pump(t, GoalsWizard(store: store, now: _now));
-      expect(find.textContaining('84,0 kg · ζυγαριά'), findsOneWidget);
+      expect(find.textContaining('84,0 kg ·\u00A0ζυγαριά'), findsOneWidget);
       // U3b-15: το κουμπί για τα στοιχεία είναι πάντα εκεί.
       expect(find.text('Άλλαξε τα στοιχεία μου'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('wizard-kg')), '825');
@@ -591,7 +591,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
-      expect(find.text('78,5 kg · μέτρια κίνηση'), findsOneWidget);
+      expect(find.text('78,5 kg ·\u00A0μέτρια κίνηση'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       expect(store.goals!.kg, 78.5);
@@ -611,7 +611,7 @@ void main() {
         })
         ..setProfile(_me);
       await _pump(t, GoalsWizard(store: store, now: _now));
-      expect(find.textContaining('89,5 kg · ζυγαριά'), findsOneWidget);
+      expect(find.textContaining('89,5 kg ·\u00A0ζυγαριά'), findsOneWidget);
       expect(find.textContaining('45,0 kg'), findsNothing);
     });
 
@@ -690,7 +690,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('goals-how')));
       await t.pumpAndSettle();
       // 0,75% × 80 × 7.700 ÷ 7 = 660
-      expect(find.text('3 · Για 0,60 kg την εβδομάδα'), findsOneWidget);
+      expect(find.text('3 ·\u00A0Για 0,60 kg την εβδομάδα'), findsOneWidget);
       expect(find.text('−660 kcal'), findsOneWidget);
       expect(find.text('0,75% του βάρους: 0,75% × 80,0 kg × 7.700 kcal ÷ 7 μέρες'), findsOneWidget);
       expect(find.text('Τύπος Mifflin-St Jeor: 10 × βάρος 80,0 + 6,25 × ύψος 171 − 5 × ηλικία 38 + 5'), findsOneWidget);
@@ -836,10 +836,10 @@ void main() {
       await t.tap(find.byKey(const ValueKey('checkin-how')));
       await t.pumpAndSettle();
       expect(find.text('από 20 μέρες· 1 μέρα με λίγη ή καθόλου καταγραφή δεν μέτρησε'), findsOneWidget);
-      expect(find.text('2 · Αλλαγή βάρους την εβδομάδα'), findsOneWidget);
+      expect(find.text('2 ·\u00A0Αλλαγή βάρους την εβδομάδα'), findsOneWidget);
       expect(find.textContaining('εβδ.'), findsNothing);
       // 89,2 × 0,5% × 7.700 ÷ 7 = 490,6 → 491
-      expect(find.text('4 · Για 0,45 kg την εβδομάδα'), findsOneWidget);
+      expect(find.text('4 ·\u00A0Για 0,45 kg την εβδομάδα'), findsOneWidget);
       expect(find.text('−491 kcal'), findsOneWidget);
       expect(find.text('0,5% × 89,2 kg × 7.700 ÷ 7'), findsOneWidget);
       // U3b-5: η διαφορά των αριθμών όπως φαίνονται.

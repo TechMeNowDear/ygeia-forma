@@ -148,7 +148,7 @@ class ExLog {
   String doneText() {
     final d = done;
     if (!hasLoad(kind)) return d.map((s) => s.reps).join(', ');
-    if (!mixedLoads) return '${loadLabel(kind, d.isEmpty ? null : d.first.load)} · ${d.map((s) => s.reps).join(', ')}';
+    if (!mixedLoads) return '${loadLabel(kind, d.isEmpty ? null : d.first.load)} ·\u00A0${d.map((s) => s.reps).join(', ')}';
     final parts = <String>[];
     double? cur;
     var reps = <int>[];
@@ -165,7 +165,7 @@ class ExLog {
       reps.add(s.reps);
     }
     flush();
-    return parts.join(' · ');
+    return parts.join(' ·\u00A0');
   }
 
   /// Όγκος σε kg (επαναλήψεις × κιλά· στο ζευγάρι αλτήρων μετράνε και οι δύο). R7-A6-7: στις ασκήσεις μίας πλευράς τη

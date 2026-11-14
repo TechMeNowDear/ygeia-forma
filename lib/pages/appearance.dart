@@ -422,7 +422,7 @@ class _Sample extends StatelessWidget {
                 ),
               ),
               Text(
-                '${x.name} · ${x.dark ? 'σκοτεινό' : 'φωτεινό'}',
+                '${x.name} ·\u00A0${x.dark ? 'σκοτεινό' : 'φωτεινό'}',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: x.textSecondary),
               ),
             ],

@@ -248,9 +248,9 @@ class _SessionPageState extends State<SessionPage> {
               final routineRow = routine == null
                   ? null
                   : s.setsDone == 0 && routine.warmup.isNotEmpty
-                      ? _routineRow(context, routine, 'Πρώτα ζέσταμα · ${countText(routine.warmup.length, 'βήμα', 'βήματα')}')
+                      ? _routineRow(context, routine, 'Πρώτα ζέσταμα ·\u00A0${countText(routine.warmup.length, 'βήμα', 'βήματα')}')
                       : allDone && routine.cooldown.isNotEmpty
-                          ? _routineRow(context, routine, 'Αποθεραπεία · ${countText(routine.cooldown.length, 'βήμα', 'βήματα')}')
+                          ? _routineRow(context, routine, 'Αποθεραπεία ·\u00A0${countText(routine.cooldown.length, 'βήμα', 'βήματα')}')
                           : null;
               final card = routineRow == null ? ex : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [routineRow, const SizedBox(height: 8), ex]);
               final rest = _restEnd == null ? null : _restBar(context, s);
@@ -499,7 +499,7 @@ class _SessionPageState extends State<SessionPage> {
     if (hist.isNotEmpty) {
       final (d, l) = hist.first;
       lastTime = 'Τελευταία φορά (${shortDayDate(d)}): ${l.doneText()}'
-          '${l.rirAnswer == null ? '' : ' · άφησες ${l.rirAnswer == 4 ? '4+' : l.rirAnswer}'}';
+          '${l.rirAnswer == null ? '' : ' ·\u00A0άφησες ${l.rirAnswer == 4 ? '4+' : l.rirAnswer}'}';
     }
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -525,10 +525,10 @@ class _SessionPageState extends State<SessionPage> {
           Expanded(
             child: Text.rich(
               TextSpan(children: [
-                TextSpan(text: '${e.sets} σετ × ${e.lo == e.hi ? '${e.lo}' : '${e.lo}–${e.hi}'} · '),
+                TextSpan(text: '${e.sets} σετ × ${e.lo == e.hi ? '${e.lo}' : '${e.lo}–${e.hi}'} ·\u00A0'),
                 TextSpan(text: 'άφησε\u00A0${e.rir}', style: const TextStyle(fontWeight: FontWeight.w700)),
                 // R7-U3-09: «ξεκούραση 2:00» ποτέ σε δύο γραμμές.
-                TextSpan(text: ' · ξεκούραση\u00A0${clock(e.rest)}'),
+                TextSpan(text: ' ·\u00A0ξεκούραση\u00A0${clock(e.rest)}'),
               ]),
               key: const ValueKey('sess-plan'),
               style: TextStyle(fontSize: 15, height: 1.4, color: c.text),
@@ -623,7 +623,7 @@ class _SessionPageState extends State<SessionPage> {
               [
                 if (e.complete && e.rirAnswer != null) 'Άφησες ${e.rirAnswer == 4 ? '4+' : e.rirAnswer}',
                 if (e.pain.isNotEmpty) '${e.complete && e.rirAnswer != null ? 'ενόχληση' : 'Ενόχληση'}: ${e.pain.map((p) => painNames[p] ?? p).join(', ')}',
-              ].join(' · '),
+              ].join(' ·\u00A0'),
               key: const ValueKey('sess-pain-line'),
               style: TextStyle(fontSize: 13.5, color: e.pain.isEmpty ? c.textSecondary : c.warn),
             ),
@@ -1665,7 +1665,7 @@ class _SummaryPageState extends State<SummaryPage> {
         title: Text(widget.live
             // round1, U5-11: ο χρήστης πάτησε ο ίδιος «Τέλος»· όχι «σταμάτησε», που μοιάζει με σφάλμα.
             ? (s.items.every((e) => e.skipped || e.rowsDone) ? 'Μπράβο, τελείωσες' : 'Τέλος προπόνησης')
-            : '${shortDayDate(s.start)} · ${s.name}'),
+            : '${shortDayDate(s.start)} ·\u00A0${s.name}'),
         automaticallyImplyLeading: !widget.live,
       ),
       body: SafeArea(

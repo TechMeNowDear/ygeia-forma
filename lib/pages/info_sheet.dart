@@ -257,7 +257,7 @@ class RangeNote extends StatelessWidget {
       children: [
         RangeBar(value: value, range: range, min: min, max: max, color: color),
         const SizedBox(height: 6),
-        Text('${oneNight ? 'Μία νύχτα: ${range.placeText(value)}' : _cap(range.placeText(value))} · ${range.text}'
+        Text('${oneNight ? 'Μία νύχτα: ${range.placeText(value)}' : _cap(range.placeText(value))} ·\u00A0${range.text}'
             '${oneNight ? '. Μετρά ο μέσος όρος πολλών νυχτών.' : ''}',
             style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.35)),
       ],

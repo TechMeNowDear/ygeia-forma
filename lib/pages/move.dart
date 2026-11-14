@@ -69,7 +69,7 @@ class ExercisePage extends StatelessWidget {
               // Από αποθηκευμένη ανάγνωση άλλης μέρας: το λέει, να μη μοιάζει με τα σημερινά.
               CardHeader(
                 icon: Icons.directions_walk_rounded,
-                title: sameDay(d.readAt, today) ? 'Βήματα σήμερα' : 'Βήματα · ${shortDayDate(d.readAt)}',
+                title: sameDay(d.readAt, today) ? 'Βήματα σήμερα' : 'Βήματα ·\u00A0${shortDayDate(d.readAt)}',
                 color: c.exercise,
                 trailing: InfoButton(K.steps, range: stepsRef),
               ),
@@ -117,7 +117,7 @@ class ExercisePage extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   // UX U8: η γραμμή είναι το «συνήθως» (μεσαία τιμή), όχι μέσος όρος.
-                  '14 ημέρες · η διακεκομμένη γραμμή είναι το «συνήθως» σου (η μεσαία τιμή των 14 προηγούμενων ημερών)',
+                  '14 ημέρες ·\u00A0η διακεκομμένη γραμμή είναι το «συνήθως» σου (η μεσαία τιμή των 14 προηγούμενων ημερών)',
                   style: TextStyle(color: c.textSecondary, fontSize: 12.5),
                 ),
               ],
@@ -143,7 +143,7 @@ class ExercisePage extends StatelessWidget {
             subtitle: dated(calories),
             value: calories == null ? null : thousands(calories),
             unit: 'kcal',
-            note: 'Εκτίμηση ρολογιού · ${activeCalories == null ? 'μαζί με τον βασικό μεταβολισμό' : 'από κίνηση ${thousands(activeCalories)} kcal'}',
+            note: 'Εκτίμηση ρολογιού ·\u00A0${activeCalories == null ? 'μαζί με τον βασικό μεταβολισμό' : 'από κίνηση ${thousands(activeCalories)} kcal'}',
           ),
           StatCard(
             icon: Icons.straighten_rounded,
@@ -208,5 +208,5 @@ String fullDayStepsLabel(DayValue day, DateTime today) {
   final t = dayOf(today);
   final yesterday = sameDay(day.day, DateTime(t.year, t.month, t.day - 1));
   final date = shortDayDate(day.day).replaceAll(' ', '\u00A0');
-  return '${yesterday ? 'Χθες, ' : ''}$date · ${thousands(day.value.round())}\u00A0βήματα';
+  return '${yesterday ? 'Χθες, ' : ''}$date ·\u00A0${thousands(day.value.round())}\u00A0βήματα';
 }

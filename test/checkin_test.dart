@@ -223,7 +223,7 @@ void main() {
       final s = _store(_check);
       await _today(t, s, checkinFood(_check), _check);
       expect(find.byKey(const ValueKey('today-checkin')), findsOneWidget);
-      expect(find.text('Έλεγχος θερμίδων · κάθε\u00A0Δευτέρα'), findsOneWidget);
+      expect(find.text('Έλεγχος θερμίδων ·\u00A0κάθε\u00A0Δευτέρα'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('checkin-how')));
       await t.pumpAndSettle();
       expect(find.text('Πώς βγήκε ο νέος στόχος'), findsOneWidget);

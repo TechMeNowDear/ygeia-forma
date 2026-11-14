@@ -265,15 +265,15 @@ void main() {
       await t.tap(row);
       await t.pumpAndSettle();
       // 30 μέρες: 15/10–13/11 και 15/9–14/10 (ίδια χρονιά).
-      expect(find.text('Τώρα · 15 Οκτ – 13 Νοε'), findsOneWidget);
-      expect(find.text('Πριν · 15 Σεπ – 14 Οκτ'), findsOneWidget);
+      expect(find.text('Τώρα ·\u00A015 Οκτ – 13 Νοε'), findsOneWidget);
+      expect(find.text('Πριν ·\u00A015 Σεπ – 14 Οκτ'), findsOneWidget);
       final year = find.byKey(const ValueKey('period-year'));
       await t.ensureVisible(year);
       await t.tap(year);
       await t.pumpAndSettle();
       // 1 χρόνος: οι τελευταίοι 90 μέρες (16/8–13/11/2026) με τις ίδιες πέρσι (17/8–14/11/2025).
-      expect(find.text('Τώρα · 16 Αυγ – 13 Νοε 2026'), findsOneWidget);
-      expect(find.text('Πριν · 17 Αυγ – 14 Νοε 2025'), findsOneWidget);
+      expect(find.text('Τώρα ·\u00A016 Αυγ – 13 Νοε 2026'), findsOneWidget);
+      expect(find.text('Πριν ·\u00A017 Αυγ – 14 Νοε 2025'), findsOneWidget);
     });
   });
 
@@ -312,7 +312,7 @@ void main() {
       expect(find.text('Πτώση παλμών στο 1ο\u00A0λεπτό'), findsOneWidget);
       expect(find.textContaining('πάνω από 15 λεπτά και με GPS'), findsOneWidget);
       // 6 περπατήματα × 30 λεπτά = 3 ώρες (πριν «3,0 ώρες»).
-      expect(find.text('6 → 6 · 3 ώρες'), findsOneWidget);
+      expect(find.text('6 → 6 ·\u00A03\u00A0ώρες'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('prog-walk-info')));
       await t.pumpAndSettle();
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
@@ -326,7 +326,7 @@ void main() {
       await _pump(t, WorkoutEditorPage(workout: Workout(id: 'a', name: 'Προπόνηση Α', items: [PlanItem(ex: 'db_curl', rest: 90)])),
           size: const Size(400, 900));
       // R7-U3-14 (f2): «άφησε», όπως στην προπόνηση (πριν «ρεζέρβα 2»).
-      expect(find.textContaining('3 × 8–12 · ξεκούραση 1:30 · άφησε 2'), findsOneWidget);
+      expect(find.textContaining('3 × 8–12 ·\u00A0ξεκούραση 1:30 ·\u00A0άφησε 2'), findsOneWidget);
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
     });
   });

@@ -186,7 +186,7 @@ void main() {
           findsOneWidget);
       // Τα γενέθλια και τα νέα επίπεδα (R9-A1-3: ίδια απάντηση «Μέτρια», 1,5 → 1,65) αλλάζουν τον τύπο (1.825 × 1,65 =
       // 3.011,25), όχι τη διόρθωση από τα δεδομένα.
-      expect(find.text('καις περίπου 3.011 κατά τον τύπο · −495 για 0,45 kg την εβδομάδα'), findsOneWidget);
+      expect(find.text('καις περίπου 3.011 κατά τον τύπο ·\u00A0−495 για 0,45 kg την εβδομάδα'), findsOneWidget);
       expect(find.byKey(const ValueKey('wizard-change')), findsNothing);
       await _next(t);
       final g = store.goals!;

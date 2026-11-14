@@ -153,7 +153,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           _title(context, cur.name),
           const SizedBox(height: 4),
           // Με την ημέρα όταν δεν ξεκίνησε σήμερα (S6-14).
-          Text('${cur.setsDone} σετ ως τώρα · ξεκίνησες ${sameDay(cur.start, now) ? '' : '${shortDayDate(cur.start)} '}${hm(cur.start)}',
+          Text('${cur.setsDone} σετ ως τώρα ·\u00A0ξεκίνησες ${sameDay(cur.start, now) ? '' : '${shortDayDate(cur.start)} '}${hm(cur.start)}',
               style: _aux(c)),
           const SizedBox(height: 16),
           _button(context, 'Συνέχισε την προπόνηση', () {
@@ -267,7 +267,9 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
       child: Row(children: [
         Icon(Icons.check_rounded, size: 16, color: c.good),
         const SizedBox(width: 4),
-        Expanded(child: Text('Έγινε σήμερα και: ${o.name} · ${hoursMinutes(mins)}', style: _aux(c))),
+        // Round 12 (R12-D2-4): όπως οι δύο γραμμές πιο πάνω στην ίδια κάρτα: «·» με τον κανόνα [dotJoin] και ο αριθμός με τη
+        // λέξη του ([unitsGlued]). Πριν, στα 360 dp: «… Περπάτημα · 1 ώρα 5» / «λεπτά».
+        Expanded(child: Text('Έγινε σήμερα και: ${o.name}$dotJoin${unitsGlued(hoursMinutes(mins))}', style: _aux(c))),
       ]),
     );
   }
@@ -320,7 +322,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
     final paused = l['paused'] == true;
     return _frame(
       context,
-      title: paused ? 'Περπάτημα · σε παύση' : 'Περπάτημα · τώρα',
+      title: paused ? 'Περπάτημα ·\u00A0σε παύση' : 'Περπάτημα ·\u00A0τώρα',
       icon: Icons.directions_walk_rounded,
       trailing: paused ? null : StatusPill(icon: Icons.circle, text: 'ζωντανά', color: c.exercise, iconSize: 8),
       children: [
@@ -420,7 +422,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         ? null
         : used == null
             ? 'Υψηλότερος παλμός ${hrMaxText(max, cardio: s.isCardio)}'
-            : 'Υψηλότερος παλμός ${hrMaxText(max, cardio: s.isCardio)} · '
+            : 'Υψηλότερος παλμός ${hrMaxText(max, cardio: s.isCardio)} ·\u00A0'
                 '${max >= used ? 'έφτασε το όριο $used' : 'το ρολόι δεν έδειξε πάνω από το όριο $used'}';
     return _frame(
       context,

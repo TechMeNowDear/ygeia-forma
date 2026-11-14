@@ -160,7 +160,7 @@ class OuraNightsPage extends StatelessWidget {
             // Round 1 (U2a-11): το «7 νυχτών» δεν σπάει σε δύο γραμμές.
             header: CardHeader(
               icon: Icons.layers_rounded,
-              title: 'Φάσεις · μέσος όρος ${glued('7 νυχτών')}',
+              title: 'Φάσεις ·\u00A0μέσος όρος ${glued('7 νυχτών')}',
               // Round 8 (R8-U4-1): από πόσες νύχτες, όταν δεν είναι και οι 7 (ίδιο με το ρολόι).
               subtitle: stages.deep == null ? null : stagesFromText(stages.nights),
               color: c.sleep,
@@ -768,7 +768,7 @@ class _BreathCard extends StatelessWidget {
       // Τρίτος έλεγχος F1: «Όπως συνήθως» μόνο για διαφορά 0 (πριν: ως ±0,9, που φαινόταν ως διαφορά).
       final d = shownDiff(b.value, b.usual!, 1);
       if (d == 0) return '$asUsualText (${dec(b.usual!)})';
-      return '${signedShown(d, 1)} · συνήθως ${dec(b.usual!)}';
+      return '${signedShown(d, 1)} ·\u00A0συνήθως ${dec(b.usual!)}';
     }
 
     return AppCard(
@@ -858,7 +858,7 @@ class _NightLine extends StatelessWidget {
                           : m == null
                           ? emptyNightText(reason ?? EmptyNight.noRing)
                           : '${hm(night!.counted.first.wallOnset ?? night!.counted.first.wallStart)} – ${hm(night!.counted.last.wallEnd)}'
-                              '${night!.counted.length > 1 ? ' · ${night!.counted.length} κομμάτια' : ''}',
+                              '${night!.counted.length > 1 ? ' ·\u00A0${night!.counted.length} κομμάτια' : ''}',
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontFeatures: tabular),
                     ),
                   ],

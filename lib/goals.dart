@@ -580,7 +580,7 @@ class DoctorTargets {
         if (ldlMax != null) 'LDL < $ldlMax',
         if (hdlMin != null) 'HDL > $hdlMin',
         if (tgMax != null) 'Τριγλυκερίδια < $tgMax',
-      ].join(' · ');
+      ].join(' ·\u00A0');
 
   Map<String, dynamic> toJson() => {
         if (ldlMax != null) 'ldl': ldlMax,

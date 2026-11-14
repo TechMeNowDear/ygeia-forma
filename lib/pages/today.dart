@@ -377,7 +377,7 @@ class TodayPage extends StatelessWidget {
       value: e?.value.round().toString(),
       unit: 'από 100',
       // Round 7 (U1-2): η μέρα σε σχέση με τώρα, όχι με την ώρα της ανάγνωσης.
-      note: e == null ? null : '${relativeDay(e.day, now)} · εκτίμηση της Samsung',
+      note: e == null ? null : '${relativeDay(e.day, now)} ·\u00A0εκτίμηση της Samsung',
       chart: recent.length >= 2 ? Sparkline(values: [for (final v in recent) v.value], color: c.energy, minRange: 20) : null,
       empty: 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
@@ -396,7 +396,7 @@ class TodayPage extends StatelessWidget {
       trend = diff == 0
           ? const TrendPill(asUsualText)
           : TrendPill(
-              '${signedShown(diff)} · συνήθως ${base.round()}',
+              '${signedShown(diff)} ·\u00A0συνήθως ${base.round()}',
               up: diff > 0,
               // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4). Κόκκινο μόνο με τον κανόνα του «Εκτός
               // συνηθισμένου» (κλινικός έλεγχος 4, C1)· αλλιώς γκρι.
@@ -438,8 +438,8 @@ class TodayPage extends StatelessWidget {
       value: rox.avg == null ? null : spo2AvgText(rox.avg!),
       unit: '%',
       // Round 1 (U1a-6): ένα όνομα παντού για τη χαμηλότερη μεμονωμένη τιμή.
-      trend: rox.min == null ? null : TrendPill('Χαμηλότερη τιμή ${lowestText(rox.min!)}% · ρολόι'),
-      note: rox.isEmpty ? null : (g.short ?? (rox.avg == null ? ringAvgMissing(store) : 'Μέσος όρος · Oura')),
+      trend: rox.min == null ? null : TrendPill('Χαμηλότερη τιμή ${lowestText(rox.min!)}% ·\u00A0ρολόι'),
+      note: rox.isEmpty ? null : (g.short ?? (rox.avg == null ? ringAvgMissing(store) : 'Μέσος όρος ·\u00A0Oura')),
       empty: auto && g.short != null
           ? g.short
           : noWindow
@@ -462,7 +462,7 @@ class TodayPage extends StatelessWidget {
       title: datedTitle('Θερμίδες', total == null ? null : d.readAt, now),
       value: total == null ? null : thousands(total),
       unit: 'kcal',
-      note: active == null ? 'Εκτίμηση ρολογιού' : 'Εκτίμηση ρολογιού · από κίνηση ${thousands(active)} kcal',
+      note: active == null ? 'Εκτίμηση ρολογιού' : 'Εκτίμηση ρολογιού ·\u00A0από κίνηση ${thousands(active)} kcal',
       trend: (minutes != null && minutes > 0) ? TrendPill('Ενεργός ${hoursMinutes(minutes)}') : null,
       onTap: onTap,
     );
@@ -481,7 +481,7 @@ class TodayPage extends StatelessWidget {
       unit: '%',
       trend: min == null
           ? null
-          : TrendPill('Χαμηλότερη τιμή ${lowestText(min)}% · ενδεικτικό'),
+          : TrendPill('Χαμηλότερη τιμή ${lowestText(min)}% ·\u00A0ενδεικτικό'),
       note: g?.short,
       empty: auto && g?.short != null ? g!.short : 'Έρχεται μετά από έναν ύπνο με το ρολόι.',
       onTap: onTap,
@@ -570,7 +570,7 @@ class _SleepCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Ύπνος · ${sleepNightLabel(n.date, now)}',
+                        'Ύπνος ·\u00A0${sleepNightLabel(n.date, now)}',
                         style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -659,7 +659,7 @@ class _SleepCard extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            'Φάσεις · εκτίμηση της\u00A0Samsung',
+                            'Φάσεις ·\u00A0εκτίμηση της\u00A0Samsung',
                             key: const ValueKey('today-stages-label'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600),
@@ -856,8 +856,10 @@ class _WeighCard extends StatelessWidget {
             key: const ValueKey('today-weigh-hint'),
             style: TextStyle(fontSize: 14, height: 1.4, color: c.text),
           ),
+          // Round 12 (R12-D2-5): «·» με τον κανόνα [dotJoin] και ο αριθμός με τη μονάδα του· πριν, στα 360 dp με γράμματα 2×:
+          // «Ζύγιση InBody ·» / «82,2 kg» (η γραμμή τελείωνε σε «·»).
           if (weighDay)
-            item(weighed, weighed && weighedKg != null ? 'Ζύγιση InBody · ${dec(weighedKg!)} kg' : 'Ζύγιση InBody',
+            item(weighed, weighed && weighedKg != null ? 'Ζύγιση InBody$dotJoin${dec(weighedKg!)}\u00A0kg' : 'Ζύγιση InBody',
                 trailing: weighed ? hm(weighedAt!) : null),
           if (weighDay && !weighed && noPermission)
             Padding(

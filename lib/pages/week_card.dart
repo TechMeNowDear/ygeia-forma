@@ -28,10 +28,10 @@ class WeekCard extends StatelessWidget {
           c.sleep,
           'Καλύτερη βαθμολογία ύπνου (εκτίμηση)',
           // Η νύχτα έχει την ημερομηνία του πρωινού: «Τρί→Τετ» = η νύχτα από Τρίτη προς Τετάρτη.
-          '${_weekday(DateTime(r.bestNight!.year, r.bestNight!.month, r.bestNight!.day - 1))}→${_weekday(r.bestNight!)} · ${r.bestNightScore!.round()}',
+          '${_weekday(DateTime(r.bestNight!.year, r.bestNight!.month, r.bestNight!.day - 1))}→${_weekday(r.bestNight!)} ·\u00A0${r.bestNightScore!.round()}',
         ),
       if (r.mostSteps != null)
-        (Icons.directions_walk_rounded, c.move, 'Περισσότερα βήματα', '${_weekday(r.mostSteps!)} · ${thousands(r.mostStepsValue!)}'),
+        (Icons.directions_walk_rounded, c.move, 'Περισσότερα βήματα', '${_weekday(r.mostSteps!)} ·\u00A0${thousands(r.mostStepsValue!)}'),
       if (r.activeTotal != null)
         (
           Icons.timer_rounded,
@@ -46,7 +46,7 @@ class WeekCard extends StatelessWidget {
           r.weightFirst != null && r.weightFirst!.$1 != r.weightLast!.$1 ? 'Βάρος μέσα στην εβδομάδα' : 'Ζύγιση',
           r.weightFirst != null && r.weightFirst!.$1 != r.weightLast!.$1
               ? '${dec(r.weightFirst!.$2)} → ${dec(r.weightLast!.$2)} kg'
-              : '${dec(r.weightLast!.$2)} kg · ${_weekday(r.weightLast!.$1)}',
+              : '${dec(r.weightLast!.$2)} kg ·\u00A0${_weekday(r.weightLast!.$1)}',
         ),
     ];
 
@@ -58,9 +58,28 @@ class WeekCard extends StatelessWidget {
       // Round 10 (R10-B8-1 = R10-B2-B1): οι γραμμές σε δύο στήλες ήδη από 520 dp. Στο ανοιχτό Fold όρθιο (750 dp, με την
       // πλαϊνή μπάρα) η κάρτα έχει 560 dp μέσα: με το 600 έμενε μία στήλη γραμμών 560 dp, με το «Σταθερό» ~450 dp μακριά από
       // το όνομα. Τώρα δύο στήλες των 268 dp (όσο σχεδόν η στήλη ενός κινητού 360 dp)· οι πλακέτες μένουν δύο-δύο ως τα 600.
+      // Round 12 (R12-D2-1 (b)): δύο στήλες γραμμών μόνο όταν κάθε λέξη τους χωρά στη στενότερη στήλη τιμής: το μισό μιας
+      // γραμμής δίπλα στο «Λίγες μέρες για συμπέρασμα», ((πλάτος − 24) ÷ 2 − 26) ÷ 2 (121 dp στο ανοιχτό Fold, 560 dp μέσα
+      // στην κάρτα), με τα γράμματα όπως θα ζωγραφιστούν ([wordsFit]). Πριν, μόνο «από 520 dp»: στο ανοιχτό Fold από ~1,7×
+      // το «13 λεπτά» (έντονα 16, ~147 dp στα 2×) και από ~1,3× το «προηγούμενες:» (12,5, ~121 dp στο 1,3×) κόβονταν μέσα
+      // στη λέξη. Τώρα, όταν δεν χωρούν, μία στήλη, όπως στο κινητό (και πάνω από 1,3× τα «χάπια» κάτω από τις τιμές).
       child: LayoutBuilder(builder: (context, box) {
         final wide = box.maxWidth >= 600;
-        final wideRows = box.maxWidth >= 520;
+        final valueCol = ((box.maxWidth - 24) / 2 - 26) / 2 - 2;
+        final wideRows = box.maxWidth >= 520 &&
+            wordsFit(context, [for (final t in shown) metricLabel(t.def, t.source)], const TextStyle(fontSize: 14), valueCol) &&
+            wordsFit(
+              context,
+              [for (final t in shown) unitsGlued(t.def.formatAs(t.current!, t.source))],
+              const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFeatures: tabular),
+              valueCol,
+            ) &&
+            wordsFit(
+              context,
+              ['4 προηγούμενες:', for (final t in shown) if (t.previous != null) unitsGlued(t.def.formatAs(t.previous!, t.source))],
+              const TextStyle(fontSize: 12.5, fontFeatures: tabular),
+              valueCol,
+            );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -77,7 +96,7 @@ class WeekCard extends StatelessWidget {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.2),
                       ),
                       Text(
-                        '$range · σε σύγκριση με τις 4 προηγούμενες εβδομάδες',
+                        '$range ·\u00A0σε σύγκριση με τις 4 προηγούμενες εβδομάδες',
                         style: TextStyle(fontSize: 13, color: c.textSecondary),
                       ),
                     ],
@@ -214,6 +233,13 @@ class _WeekRow extends StatelessWidget {
     final insufficient = t.status == TrendStatus.insufficient;
     // Round 8 (R8-A5-3): και με «Αλλαγή πηγής» (π.χ. 1 νύχτα του Oura σε εβδομάδα του ρολογιού), όπως οι Τάσεις.
     final few = (insufficient || t.status == TrendStatus.sourceChange) && t.nCurrent < t.needed;
+    // Round 12 (R12-D2-1): με γράμματα πάνω από 1,3× το «χάπι» πάει κάτω από την τιμή, όχι δίπλα. Δίπλα του η στήλη της τιμής
+    // στένευε τόσο (κινητό 360 dp, 2×: ~143 dp· με «Λίγες μέρες για συμπέρασμα» το μισό της γραμμής) ώστε η λέξη
+    // «προηγούμενες:» (Inter 12,5 στα 2×: ~181 dp) και το «13 λεπτά» (έντονα 16, ~147 dp) κόβονταν μέσα στη λέξη. Ως 1,3× η
+    // στενότερη στήλη του κινητού (360 dp, «Λίγες μέρες…»: ~133 dp) χωρά το «προηγούμενες:» (~121 dp)· στο ανοιχτό Fold, όπου
+    // δεν χωρά δίπλα στο «χάπι», οι γραμμές πάνε σε μία στήλη ([WeekCard]).
+    final stacked = MediaQuery.textScalerOf(context).scale(10) > 13.01;
+    final Widget pill = t.inconclusive ? TrendPill(inconclusiveText(t.def), maxLines: 2) : TrendStatusPill(r: t);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -241,20 +267,23 @@ class _WeekRow extends StatelessWidget {
                 // εφαρμογής (δεύτερος έλεγχος υπολογισμών C7).
                 // Round 7 (U1-11): «4 προηγούμενες: 7 ώρες 26 λεπτά» (πριν «πριν 7 ώρες 26 λεπτά», που διαβάζεται «πριν από 7
                 // ώρες», και «πριν 23:40» = «πριν από τις 23:40»)· ο υπότιτλος λέει «σε σύγκριση με τις 4 προηγούμενες
-                // εβδομάδες». Η τιμή με αδιάσπαστα κενά: αν δεν χωρά, σπάει μετά την άνω και κάτω τελεία, όχι μέσα στην τιμή.
+                // εβδομάδες».
+                // Round 12 (R12-D2-1): ο κανόνας της τιμής από πάνω ([unitsGlued]: ο αριθμός με τη μονάδα του, όχι ΟΛΑ τα κενά
+                // αδιάσπαστα). Πριν, το «7 ώρες 26 λεπτά» ήταν ένα κομμάτι 131 dp (1,3×) σε στήλη 121 dp και κοβόταν μέσα στη
+                // λέξη («… λε» / «πτά»)· τώρα το πολύ «7 ώρες» / «26 λεπτά».
                 if (t.previous != null && !insufficient)
                   Text(
-                    '4 προηγούμενες: ${t.def.formatAs(t.previous!, t.source).replaceAll(' ', '\u00A0')}',
+                    '4 προηγούμενες: ${unitsGlued(t.def.formatAs(t.previous!, t.source))}',
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
                   ),
+                if (stacked) Padding(padding: const EdgeInsets.only(top: 6), child: pill),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          if (t.inconclusive)
-            Flexible(child: TrendPill(inconclusiveText(t.def), maxLines: 2))
-          else
-            TrendStatusPill(r: t),
+          if (!stacked) ...[
+            const SizedBox(width: 8),
+            if (t.inconclusive) Flexible(child: pill) else pill,
+          ],
         ],
       ),
     );

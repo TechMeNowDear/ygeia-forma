@@ -13,7 +13,7 @@ void main() {
     final g = checkinGoals().copyWith(docTargets: const DoctorTargets(ldlMax: 110, hdlMin: 45, tgMax: 140));
     final back = Goals.fromJson(g.toJson())!;
     expect((back.docTargets.ldlMax, back.docTargets.hdlMin, back.docTargets.tgMax), (110, 45, 140));
-    expect(back.docTargets.text, 'LDL < 110 · HDL > 45 · Τριγλυκερίδια < 140');
+    expect(back.docTargets.text, 'LDL < 110 ·\u00A0HDL > 45 ·\u00A0Τριγλυκερίδια < 140');
     expect(Goals.fromJson({...g.toJson(), 'ldl': 3})!.docTargets.ldlMax, isNull, reason: '3 = mmol/L, όχι mg/dL');
     expect(checkinGoals().docTargets.isEmpty, isTrue);
     expect(checkinGoals().toJson().containsKey('ldl'), isFalse);
@@ -39,6 +39,6 @@ void main() {
     await t.tap(find.byKey(const ValueKey('doc-ok')));
     await t.pumpAndSettle();
     expect((s.goals!.docTargets.ldlMax, s.goals!.docTargets.hdlMin, s.goals!.docTargets.tgMax), (110, null, 140));
-    expect(find.text('LDL < 110 · Τριγλυκερίδια < 140'), findsOneWidget);
+    expect(find.text('LDL < 110 ·\u00A0Τριγλυκερίδια < 140'), findsOneWidget);
   });
 }

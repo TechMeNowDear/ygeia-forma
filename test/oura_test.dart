@@ -298,7 +298,7 @@ void main() {
       final row = ouraRow(n);
       expect(row[ouraKeys[K.sleepMin]], 145);
       expect(row.containsKey(ouraKeys[K.napMin]), isFalse, reason: 'δεν μετριέται και ως υπνάκος');
-      expect(shortNightLabel, 'Σύντομη νύχτα · κάτω από 3 ώρες');
+      expect(shortNightLabel, 'Σύντομη νύχτα ·\u00A0κάτω από 3\u00A0ώρες');
     });
 
     test('long_sleep + απογευματινό «sleep»: κύρια η long_sleep, το «sleep» υπνάκος', () {
@@ -366,14 +366,14 @@ void main() {
       final doze = only([rec('sleep', at(2, 20, 0), at(2, 21, 40))]);
       expect(doze.main, isNull);
       expect(doze.onlyNap, isTrue);
-      expect(napTimes(doze), '20:00–21:40 · 1 ώρα 35 λεπτά');
+      expect(napTimes(doze), '20:00–21:40 ·\u00A01\u00A0ώρα 35\u00A0λεπτά');
       expect(napTimes(null), '');
     });
 
     test('M-3: «χθες βράδυ» δεν δείχνει ποτέ απογευματινό υπνάκο της ίδιας μέρας', () {
       final n = only([rec('sleep', at(2, 20, 0), at(2, 21, 40)), rec('sleep', at(3, 14, 0), at(3, 14, 40))]);
       expect(n.onlyNap, isTrue);
-      expect(napTimes(n, nightOnly: true), '20:00–21:40 · 1 ώρα 35 λεπτά');
+      expect(napTimes(n, nightOnly: true), '20:00–21:40 ·\u00A01\u00A0ώρα 35\u00A0λεπτά');
       expect(napTimes(n), contains('14:00–14:40'));
       final afternoon = only([rec('sleep', at(3, 13, 0), at(3, 13, 40))]);
       expect(napTimes(afternoon, nightOnly: true), '');

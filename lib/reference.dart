@@ -247,7 +247,7 @@ final metricInfos = <String, MetricInfo>{
     // Έλεγχος 9/11 (04-L5): ισχύει και για τις νύχτες του ρολογιού, άρα «η συσκευή», όχι «το δαχτυλίδι».
     accuracy: 'Καλή κατά μέσο όρο (περίπου 10 λεπτά παραπάνω), αλλά σε μία νύχτα η συσκευή μπορεί να απέχει και πάνω '
         'από μία ώρα. Ο μέσος όρος της εβδομάδας είναι πιο σίγουρος από μία νύχτα.',
-    cite: 'Watson κ.ά., Sleep 2015 · Herberger κ.ά., Scientific Reports 2025',
+    cite: 'Watson κ.ά., Sleep 2015 ·\u00A0Herberger κ.ά., Scientific Reports 2025',
   ),
   K.energy: const MetricInfo(
     title: 'Ετοιμότητα',
@@ -301,7 +301,7 @@ final metricInfos = <String, MetricInfo>{
         '10% των διαφορών ανάμεσα στους ανθρώπους.',
     accuracy: 'Δαχτυλίδι: σε μικρή μελέτη (13 άτομα), οι παλμοί ηρεμίας της νύχτας απείχαν κατά μέσο όρο περίπου 2% από το '
         'ΗΚΓ (Oura Gen3 και Gen4· για το Ring 5 δεν υπάρχει μελέτη). Ρολόι: καλό στην ηρεμία, λιγότερο καλό όταν κινείσαι.',
-    cite: 'Quer κ.ά., PLOS ONE 2020 · Dial κ.ά. 2025 · Bent κ.ά., npj Digit Med 2020',
+    cite: 'Quer κ.ά., PLOS ONE 2020 ·\u00A0Dial κ.ά. 2025 ·\u00A0Bent κ.ά., npj Digit Med 2020',
   ),
   K.dayHr: const MetricInfo(
     title: 'Παλμοί ξύπνιος',

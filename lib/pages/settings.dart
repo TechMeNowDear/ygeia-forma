@@ -23,7 +23,7 @@ import 'training/training_page.dart' show editDoctorLimit;
 
 /// Το κείμενο στο τέλος των Ρυθμίσεων. Έλεγχος 13/11 (U4-8): έγραφε «διαβάζει δεδομένα μόνο όταν την ανοίγεις», ενώ από
 /// τις 2/11 η εφαρμογή διαβάζει το Samsung Health και κάθε 3 ώρες στο παρασκήνιο (RefreshWorker.kt· όχι 00:00–06:00).
-const settingsFooterText = 'Υγεία & Φόρμα · προσωπική έκδοση\n'
+const settingsFooterText = 'Υγεία & Φόρμα ·\u00A0προσωπική έκδοση\n'
     'Η εφαρμογή διαβάζει το Samsung Health όταν την ανοίγεις και, για να είναι έτοιμη, περίπου κάθε 3 ώρες χωρίς να την '
     'ανοίξεις (όχι από τα μεσάνυχτα ως τις 6 το πρωί).';
 
@@ -77,7 +77,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   if (complete) store.markExported(now);
   return (
     ok: complete,
-    text: 'Αποθηκεύτηκε στις Λήψεις: $saved · ${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
+    text: 'Αποθηκεύτηκε στις Λήψεις: $saved ·\u00A0${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
         // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
         '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
         // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
@@ -165,9 +165,9 @@ class SettingsPage extends StatelessWidget {
                           icon: Icons.palette_outlined,
                           title: 'Εμφάνιση',
                           subtitle: switch (store.prefs.themeMode) {
-                            'light' => 'Πάντα φωτεινό · ${Aigaio.day(store.prefs.dayTheme).name}',
-                            'dark' => 'Πάντα σκοτεινό · ${Aigaio.night(store.prefs.nightTheme).name}',
-                            _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} · '
+                            'light' => 'Πάντα φωτεινό ·\u00A0${Aigaio.day(store.prefs.dayTheme).name}',
+                            'dark' => 'Πάντα σκοτεινό ·\u00A0${Aigaio.night(store.prefs.nightTheme).name}',
+                            _ => 'Μέρα ${Aigaio.day(store.prefs.dayTheme).name} ·\u00A0'
                                 'νύχτα ${Aigaio.night(store.prefs.nightTheme).name}',
                           },
                           onTap: () => push('Εμφάνιση', (_) => AppearancePage(store: store)),
@@ -177,7 +177,7 @@ class SettingsPage extends StatelessWidget {
                           icon: Icons.person_outline_rounded,
                           title: 'Τα στοιχεία μου',
                           // Σχέδιο Settings + premium: η κουζίνα και τα προϊόντα μου είναι πια μέσα στα «Τα στοιχεία μου».
-                          subtitle: 'Ηλικία, ύψος, ζυγίσεις, στόχοι · η κουζίνα μου · τα προϊόντα μου',
+                          subtitle: 'Ηλικία, ύψος, ζυγίσεις, στόχοι ·\u00A0η κουζίνα μου ·\u00A0τα προϊόντα μου',
                           onTap: () => Navigator.of(context).push(MePage.route(store)),
                         ),
                         SettingsRow(
@@ -199,8 +199,8 @@ class SettingsPage extends StatelessWidget {
                           icon: Icons.link_rounded,
                           color: c.textSecondary,
                           title: 'Πηγές',
-                          subtitle: 'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} · '
-                              'βήματα: Samsung Health · βάρος: InBody',
+                          subtitle: 'Ύπνος: ${sourceDevice(store.plan.nightSource(DateTime.now()))} ·\u00A0'
+                              'βήματα: Samsung Health ·\u00A0βάρος: InBody',
                           onTap: () => Navigator.of(context).push(SourcesPage.route(store)),
                         ),
                         SettingsRow(
@@ -222,7 +222,7 @@ class SettingsPage extends StatelessWidget {
                               icon: Icons.favorite_border_rounded,
                               color: c.textSecondary,
                               title: 'Όριο παλμών από γιατρό',
-                              subtitle: hr == null ? 'Κανένα · μόνο αν σου έδωσε γιατρός' : '$hr bpm · δόνηση στο ρολόι σε κάθε άσκηση',
+                              subtitle: hr == null ? 'Κανένα ·\u00A0μόνο αν σου έδωσε γιατρός' : '$hr bpm ·\u00A0δόνηση στο ρολόι σε κάθε άσκηση',
                               onTap: () async {
                                 await TrainingStore.main.load();
                                 if (context.mounted) await editDoctorLimit(context, TrainingStore.main);
@@ -249,7 +249,7 @@ class SettingsPage extends StatelessWidget {
                           title: 'Άδειες Samsung Health',
                           subtitle: d == null
                               ? '—'
-                              : '${d.granted} από ${d.total} · ανάγνωση ${relativeDay(d.readAt, DateTime.now())} ${hm(d.readAt)}',
+                              : '${d.granted} από ${d.total} ·\u00A0ανάγνωση ${relativeDay(d.readAt, DateTime.now())} ${hm(d.readAt)}',
                           onTap: () => store.refresh(askPermissions: true),
                         ),
                         SettingsRow(

@@ -118,7 +118,7 @@ class NutritionPage extends StatelessWidget {
         ];
 
         return PageFrame(
-          eyebrow: dayLabel == 'Σήμερα' || dayLabel == 'Χθες' ? '$dayLabel · ${longDate(day)}' : longDate(day),
+          eyebrow: dayLabel == 'Σήμερα' || dayLabel == 'Χθες' ? '$dayLabel ·\u00A0${longDate(day)}' : longDate(day),
           title: 'Διατροφή',
           action: switcher,
           onRefresh: () async {},
@@ -339,7 +339,7 @@ class MacroBreakdown extends StatelessWidget {
                 ('Υδατάνθρακες', t.carbs, ck, carbsColor(c)),
                 ('Λιπαρά', t.fat, fk, fatColor(c)),
               ])
-                InfoRow(label, '${gramsText(g)} g${percent && sum > 0 ? ' · ${(100 * part / sum).round()}%' : ''}', dot: color),
+                InfoRow(label, '${gramsText(g)} g${percent && sum > 0 ? ' ·\u00A0${(100 * part / sum).round()}%' : ''}', dot: color),
             ]);
           }
           return Row(
@@ -409,7 +409,7 @@ class FoodTodayCard extends StatelessWidget {
             children: [
               CardHeader(
                 icon: Icons.restaurant_rounded,
-                title: 'Διατροφή · σήμερα',
+                title: 'Διατροφή ·\u00A0σήμερα',
                 color: c.food,
                 trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
               ),
@@ -427,7 +427,7 @@ class FoodTodayCard extends StatelessWidget {
                   return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(left.label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: left.over ? c.warn : c.textSecondary)),
                     BigValue(left.value, unit: 'kcal', size: 40, color: left.over ? c.warn : null),
-                    Text('έφαγες ${thousands(t.shownKcal)} · στόχος ${thousands(goals!.kcal)}',
+                    Text('έφαγες ${thousands(t.shownKcal)} ·\u00A0στόχος ${thousands(goals!.kcal)}',
                         style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
                   ]);
                 }(),
@@ -549,7 +549,7 @@ class _MealCard extends StatelessWidget {
                   icon: const Icon(Icons.content_copy_rounded, size: 18),
                   // Με τις τωρινές τιμές, όπως θα γραφτούν (όχι με τα παλιά αντίγραφα).
                   label: Text(
-                      'Όπως $_fromLabel · ${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
+                      'Όπως $_fromLabel ·\u00A0${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
                 ),
             ],
           ),
@@ -589,7 +589,7 @@ class _EntryRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${gramsText(e.grams)} ${e.food.unit} · πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
+                    '${gramsText(e.grams)} ${e.food.unit} ·\u00A0πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],

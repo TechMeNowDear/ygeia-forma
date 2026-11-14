@@ -128,13 +128,13 @@ void main() {
 
     testWidgets('Σάβ 14/11 07:30 με τη χθεσινή ανάγνωση: «ξύπνημα χθες» (πριν «χθες βράδυ»)', (t) async {
       await _pump(t, _today(_store(read, const []), now: DateTime(2026, 11, 14, 7, 30)));
-      expect(find.text('Ύπνος · ξύπνημα χθες'), findsOneWidget);
-      expect(find.text('Ύπνος · χθες βράδυ'), findsNothing);
+      expect(find.text('Ύπνος ·\u00A0ξύπνημα χθες'), findsOneWidget);
+      expect(find.text('Ύπνος ·\u00A0χθες βράδυ'), findsNothing);
     });
 
     testWidgets('Παρ 13/11 23:00: «χθες βράδυ»', (t) async {
       await _pump(t, _today(_store(read, const []), now: DateTime(2026, 11, 13, 23)));
-      expect(find.text('Ύπνος · χθες βράδυ'), findsOneWidget);
+      expect(find.text('Ύπνος ·\u00A0χθες βράδυ'), findsOneWidget);
     });
   });
 

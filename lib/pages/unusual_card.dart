@@ -45,7 +45,7 @@ class _UnusualCardState extends State<UnusualCard> {
                       style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.2),
                     ),
                     Text(
-                      r.previousDayOff ? 'Σήμερα το πρωί · και χθες' : 'Σήμερα το πρωί',
+                      r.previousDayOff ? 'Σήμερα το πρωί ·\u00A0και χθες' : 'Σήμερα το πρωί',
                       style: TextStyle(fontSize: 13, color: c.textSecondary),
                     ),
                   ],
@@ -143,8 +143,8 @@ class _SignalRow extends StatelessWidget {
                 ),
                 Text(
                   deviation
-                      ? '${oura ? ouraTempDeviationLabel : 'απόκλιση από το συνηθισμένο σου'} · όχι θερμοκρασία σώματος'
-                      : 'συνήθως ${def.format(s.usual)}${oura ? ' · Oura' : ''}',
+                      ? '${oura ? ouraTempDeviationLabel : 'απόκλιση από το συνηθισμένο σου'} ·\u00A0όχι θερμοκρασία σώματος'
+                      : 'συνήθως ${def.format(s.usual)}${oura ? ' ·\u00A0Oura' : ''}',
                   style: TextStyle(fontSize: 12.5, color: c.textTertiary, fontFeatures: tabular),
                 ),
               ],

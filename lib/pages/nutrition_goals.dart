@@ -336,7 +336,7 @@ class GoalsCtaCard extends StatelessWidget {
 // ---------------------------------------------------------------------------------------------------- χοληστερίνη
 
 const cholInfo = MetricInfo(
-  title: 'Χοληστερίνη · τι τη ρίχνει',
+  title: 'Χοληστερίνη ·\u00A0τι τη ρίχνει',
   // Έλεγχος 13/11 (S1-12): το ψάρι δεν είναι τρόφιμο που ρίχνει την LDL (η διατροφή «portfolio» του Jenkins 2003 ήταν
   // φυτική)· μετριέται γιατί είναι στο πλάνο, στη θέση του κρέατος και για τα τριγλυκερίδια.
   // Round 1 (αίτημα f2 → f1, S2-1 / S2-3): οι δύο αλλαγές του κανόνα (chol.dart) λέγονται κι εδώ: οι σπόροι δεν μετρούν
@@ -358,16 +358,16 @@ const cholInfo = MetricInfo(
   shows: 'Αν κάνεις όσα συμφώνησες: λιγότερα κορεσμένα λιπαρά, περισσότερες φυτικές ίνες, ξηροί καρποί και πίτουρο βρώμης '
       'κάθε μέρα, όσπρια και ψάρι μέσα στην εβδομάδα. Η εφαρμογή δεν προβλέπει τη νέα σου LDL· αυτό το λένε μόνο οι '
       'εξετάσεις.',
-  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC) · φυτικές ίνες 30 g (Reynolds 2019) · 3 g β\u2011γλυκάνες βρώμης τη μέρα '
-      '(EFSA) · ξηροί καρποί περίπου 30 g (Del Gobbo 2015) · όσπρια ως φυτική πρωτεΐνη (διατροφή «portfolio», '
+  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC) ·\u00A0φυτικές ίνες 30 g (Reynolds 2019) ·\u00A03 g β\u2011γλυκάνες βρώμης τη μέρα '
+      '(EFSA) ·\u00A0ξηροί καρποί περίπου 30 g (Del Gobbo 2015) ·\u00A0όσπρια ως φυτική πρωτεΐνη (διατροφή «portfolio», '
       'Chiavaroli 2018).',
   // Τελικός έλεγχος, Συμβούλιο 2 (Α4): ίδιος κανόνας «πλήρους μέρας» με τη διόρθωση θερμίδων, και το αλάτι που λείπει.
   accuracy: 'Οι μέρες με λίγη καταγραφή (κάτω από το 60% του στόχου θερμίδων) δεν μπαίνουν στους μέσους όρους. Αν ένα '
       'τρόφιμο δεν έχει τιμή για κορεσμένα λιπαρά ή ίνες στην πηγή του, το σύνολο είναι «τουλάχιστον» και γράφεται με «≥». '
       'Μέρα με τρόφιμο χωρίς τιμή αλατιού δεν μετρά ως «αλάτι εντάξει». Το αλάτι μετρά μόνο ό,τι γράφεις: γράψε και το '
       'αλάτι που βάζεις στο μαγείρεμα και στο πιάτο (τρόφιμο «Αλάτι»).',
-  cite: 'Eckel 2013 (AHA/ACC) · EFSA 2010/2011 · Reynolds 2019 (Lancet) · Del Gobbo 2015 (AJCN) · Jenkins 2003 και 2011 '
-      '(JAMA) · Chiavaroli 2018 (Prog Cardiovasc Dis) · ESC/EAS 2019',
+  cite: 'Eckel 2013 (AHA/ACC) ·\u00A0EFSA 2010/2011 ·\u00A0Reynolds 2019 (Lancet) ·\u00A0Del Gobbo 2015 (AJCN) ·\u00A0Jenkins 2003 και 2011 '
+      '(JAMA) ·\u00A0Chiavaroli 2018 (Prog Cardiovasc Dis) ·\u00A0ESC/EAS 2019',
 );
 
 List<(DateTime, CholDay)> _daysOf(FoodStore food, DateTime from, DateTime toExclusive) => [
@@ -411,7 +411,7 @@ class CholCard extends StatelessWidget {
         CardHeader(
           icon: Icons.favorite_rounded,
           // Round7 (R7-U2-15): το «τι τη ρίχνει» πάει ολόκληρο στην επόμενη γραμμή (πριν έσπαγε «τι | τη ρίχνει»).
-          title: 'Χοληστερίνη · τι\u00A0τη\u00A0ρίχνει',
+          title: 'Χοληστερίνη ·\u00A0τι\u00A0τη\u00A0ρίχνει',
           color: c.heart,
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             const InfoDot(cholInfo),
@@ -728,8 +728,8 @@ class _CholesterolPageState extends State<CholesterolPage> {
   }
 
   static String _meanText(double? v, String unit, String target, {int digits = 1, bool atLeast = false}) => v == null
-      ? 'Δεν υπάρχει ακόμα ολοκληρωμένη μέρα · στόχος $target'
-      : 'μέσος όρος ${atLeast ? '≥ ' : ''}${dec(v, digits)}$unit · στόχος $target';
+      ? 'Δεν υπάρχει ακόμα ολοκληρωμένη μέρα ·\u00A0στόχος $target'
+      : 'μέσος όρος ${atLeast ? '≥ ' : ''}${dec(v, digits)}$unit ·\u00A0στόχος $target';
 }
 
 /// Μικρές μπάρες με γραμμή στόχου. null: μέρα χωρίς αρκετή καταγραφή (κενή).

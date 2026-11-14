@@ -73,7 +73,7 @@ String lossPctText(double pct) {
 
 /// «Η ζύγιση Τετ 9/12 (45,0 kg) διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.» (S11-2)
 String foreignWeighText(List<(DateTime, double)> foreign) {
-  final items = [for (final (d, kg) in foreign) '${shortDayDate(d)} (${dec(kg)} kg)'].join(' · ');
+  final items = [for (final (d, kg) in foreign) '${shortDayDate(d)} (${dec(kg)} kg)'].join(' ·\u00A0');
   return foreign.length == 1
       ? 'Η ζύγιση $items διαφέρει πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησε.'
       : 'Οι ζυγίσεις $items διαφέρουν πολύ από τις άλλες σου ζυγίσεις και δεν μέτρησαν.';
@@ -81,7 +81,7 @@ String foreignWeighText(List<(DateTime, double)> foreign) {
 
 /// «Η μέρα Τετ 2/12 (19.710 kcal) έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε. …» (S11-3)
 String absurdDaysText(List<(DateTime, double)> days) {
-  final items = [for (final (d, kcal) in days) '${shortDayDate(d)} (${thousands(kcal)}\u00A0kcal)'].join(' · ');
+  final items = [for (final (d, kcal) in days) '${shortDayDate(d)} (${thousands(kcal)}\u00A0kcal)'].join(' ·\u00A0');
   return days.length == 1
       ? 'Η μέρα $items έχει πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησε. Αν είναι λάθος ποσότητα, διόρθωσέ τη στη Διατροφή.'
       : 'Οι μέρες $items έχουν πάρα πολλές θερμίδες για μία μέρα και δεν μέτρησαν. Αν είναι λάθος ποσότητες, διόρθωσέ τες '
@@ -190,7 +190,7 @@ class CheckInCard extends StatelessWidget {
       CheckKind.gap => 'Έλεγχος θερμίδων: κενό στο φαγητό',
       CheckKind.foreign => k.foreign.length == 1 ? 'Μια ζύγιση δεν μέτρησε' : 'Κάποιες ζυγίσεις δεν μέτρησαν',
       CheckKind.unread => 'Έλεγχος θερμίδων: οι ζυγίσεις δεν διαβάστηκαν',
-      _ => 'Έλεγχος θερμίδων · κάθε\u00A0$weekday',
+      _ => 'Έλεγχος θερμίδων ·\u00A0κάθε\u00A0$weekday',
     };
 
     final Widget text = switch (k.kind) {
@@ -447,23 +447,23 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
           Text(p.same ? 'Πώς βγήκε' : 'Πώς βγήκε ο νέος στόχος',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.text)),
           const SizedBox(height: 4),
-          Text('${dayMonth(e.from)} – ${dayMonth(e.to)} · ${e.windowDays} μέρες', style: small),
+          Text('${dayMonth(e.from)} – ${dayMonth(e.to)} ·\u00A0${e.windowDays} μέρες', style: small),
           const SizedBox(height: 10),
           step(
-              '1 · Έφαγες κατά μέσο όρο',
+              '1 ·\u00A0Έφαγες κατά μέσο όρο',
               '${_kcal(e.meanIntake)} kcal',
               'από ${e.intakeDays} μέρες'
                   '${missed > 0 ? '· ${countText(missed, 'μέρα', 'μέρες')} με λίγη ή καθόλου καταγραφή δεν ${missed == 1 ? 'μέτρησε' : 'μέτρησαν'}' : ''}'
                   '${tooMuch > 0 ? '· ${countText(tooMuch, 'μέρα', 'μέρες')} με πάρα πολλές θερμίδες δεν ${tooMuch == 1 ? 'μέτρησε' : 'μέτρησαν'}' : ''}'),
           // R9-A1-5: με το πρόσημο του αριθμού όπως γράφεται ([signedDec]): −0,004 είναι «0 kg», ποτέ «−0,00 kg».
-          step('2 · Αλλαγή βάρους την εβδομάδα', '${signedDec(slope, 2)} kg',
+          step('2 ·\u00A0Αλλαγή βάρους την εβδομάδα', '${signedDec(slope, 2)} kg',
               'ευθεία από ${e.weighIns} ζυγίσεις (τα νερά μιας μέρας τη μετακινούν λίγο)'),
-          step('3 · Άρα καις', '≈ ${_kcal(e.tdee)} kcal',
+          step('3 ·\u00A0Άρα καις', '≈ ${_kcal(e.tdee)} kcal',
               '${_kcal(e.meanIntake)} ${slope <= 0 ? '+' : '−'} ${dec(slope.abs(), 2)} × 7.700 ÷ 7'
                   '${guard >= 10 ? '. Οι ζυγίσεις αφήνουν περιθώριο ±${thousands(guard)}\u00A0kcal' : ''}'),
           if (g.aim != GoalAim.keep)
             // Με το βάρος γραμμένο, ώστε ο αριθμός να ξαναβγαίνει από όσα φαίνονται (U3b-20): 0,5% × 89,2 × 7.700 ÷ 7 = 491.
-            step('4 · Για ${dec(kg * g.rate, 2)} kg την εβδομάδα', '${g.aim == GoalAim.lose ? '−' : '+'}${thousands(delta)} kcal',
+            step('4 ·\u00A0Για ${dec(kg * g.rate, 2)} kg την εβδομάδα', '${g.aim == GoalAim.lose ? '−' : '+'}${thousands(delta)} kcal',
                 '${ratePctText(g.rate)} × ${dec(kg)} kg × 7.700 ÷ 7'),
           const Hairline(vertical: 12),
           InfoRow(p.same ? 'Ο στόχος μένει' : 'Νέος στόχος', '${thousands(p.target)} kcal'),

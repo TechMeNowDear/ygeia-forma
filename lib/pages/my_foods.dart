@@ -261,7 +261,7 @@ class _MyFoodsScreenState extends State<MyFoodsScreen> {
                                           Text(
                                             // Έλεγχος round1 (U3a-18): «ανά 100 g», όπως σε κάθε άλλη λίστα.
                                             '${kcalText(f.n.amount(Nk.kcal))} kcal ανά 100 ${f.unit}'
-                                            '${f.barcode != null ? ' · barcode' : ''}',
+                                            '${f.barcode != null ? ' ·\u00A0barcode' : ''}',
                                             style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                                           ),
                                         ],

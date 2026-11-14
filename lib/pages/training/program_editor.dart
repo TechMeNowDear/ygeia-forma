@@ -135,16 +135,18 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(w.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
                 // round1, U5-06 / U5-32: διάρκεια σε λέξεις, και όχι «Περπάτημα / Περπάτημα · 30′».
+                // Round 12 (R12-D2-3): ο κανόνας της Άσκησης (training_page, R11-C2-2): «·» με τον κανόνα [dotJoin] και ο
+                // αριθμός με τη λέξη του. Πριν, με μεγάλα γράμματα: «6 ασκήσεις · περίπου 53» / «λεπτά» ή «6 ασκήσεις ·» / ….
                 Text(
                   w.isCardio
                       // R7-U3-15: με πλάνο ανά εβδομάδα, το εύρος του πλάνου (πριν «30 λεπτά» και την 4η εβδομάδα των 45).
                       ? [
                           if (w.cardio!.name != w.name) w.cardio!.name,
                           w.cardio!.plan.isEmpty
-                              ? '${w.cardio!.minutes} λεπτά'
-                              : '${w.cardio!.plan.first} → ${w.cardio!.plan.last} λεπτά (ανά εβδομάδα)',
-                        ].join(' · ')
-                      : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά',
+                              ? '${w.cardio!.minutes}\u00A0λεπτά'
+                              : '${unitsGlued('${w.cardio!.plan.first} → ${w.cardio!.plan.last} λεπτά')} (ανά εβδομάδα)',
+                        ].join(dotJoin)
+                      : '${countText(w.items.length, 'άσκηση', 'ασκήσεις')}${dotJoin}περίπου ${w.minutes}\u00A0λεπτά',
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                 ),
                 if (!w.isCardio && w.items.isNotEmpty)
@@ -265,7 +267,7 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
     // R7-U3-14: «άφησε 3», η ίδια λέξη με την προπόνηση και την Άσκηση (πριν «ρεζέρβα 3» μόνο εδώ).
     final parts = [repsRange(i), 'ξεκούραση ${restText(i.rest)}', 'άφησε ${i.rir}'];
     if (hasLoad(i.kind)) parts.add(i.load == null ? 'βάρος: αυτόματα' : loadLabel(i.kind, i.load));
-    return parts.join(' · ');
+    return parts.join(' ·\u00A0');
   }
 
   // Round 1 (U5-30, αίτημα f9 → f6b): η σελίδα/το φύλλο ανοίγει με push, έξω από το ExerciseTheme της κατηγορίας·
@@ -295,7 +297,7 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
                 const SizedBox(height: 14),
                 // 13/11: με πλάνο ανά εβδομάδα, τα λεπτά τα δίνει το πλάνο· το «− / +» γυρίζει όταν το βγάλεις.
                 if (cd.plan.isNotEmpty) ...[
-                  Text('Διάρκεια ανά εβδομάδα: ${cd.plan.join(' · ')} λεπτά',
+                  Text('Διάρκεια ανά εβδομάδα: ${cd.plan.join(' ·\u00A0')}\u00A0λεπτά',
                       key: const ValueKey('ed-cardio-plan'), style: TextStyle(fontSize: 15, height: 1.4, color: c.text)),
                   Align(
                     alignment: Alignment.centerLeft,

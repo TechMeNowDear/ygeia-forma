@@ -80,7 +80,7 @@ class SleepPage extends StatelessWidget {
         return PageFrame(
           title: 'Ύπνος',
           // Έλεγχος UX U6: τα διαστήματα της σελίδας γραμμένα μία φορά, ίδια σε κάθε κάρτα.
-          subtitle: 'Η τελευταία νύχτα · μέσοι όροι 7 νυχτών · γράφημα 14 νυχτών',
+          subtitle: 'Η τελευταία νύχτα ·\u00A0μέσοι όροι 7 νυχτών ·\u00A0γράφημα 14 νυχτών',
           onRefresh: () => store.refresh(),
           left: [
             _LastNightCard(
@@ -94,7 +94,7 @@ class SleepPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Διάρκεια · 14 νύχτες', color: c.sleep),
+                  CardHeader(icon: Icons.bar_chart_rounded, title: 'Διάρκεια ·\u00A014 νύχτες', color: c.sleep),
                   const SizedBox(height: 14),
                   // Round 1 (U1a-4β): οι δύο τιμές στην ίδια γραμμή βάσης, ακόμα κι όταν η μία ετικέτα πιάνει δύο γραμμές.
                   Row(
@@ -135,7 +135,7 @@ class SleepPage extends StatelessWidget {
             _ConsistencyCard(nights: last14),
           ],
           right: [
-            const SectionHeader('Νύχτα προς νύχτα · 14 νύχτες'),
+            const SectionHeader('Νύχτα προς νύχτα ·\u00A014 νύχτες'),
             for (final t in timeline.reversed)
               t.$2 == null
                   ? _NapOnlyRow(day: t.$1, naps: d.napTimes[t.$1]!, now: d.readAt)
@@ -294,7 +294,7 @@ class _LastNightCard extends StatelessWidget {
             );
           }),
           const SizedBox(height: 16),
-          Text('Πώς κύλησε η νύχτα · εκτίμηση της Samsung',
+          Text('Πώς κύλησε η νύχτα ·\u00A0εκτίμηση της Samsung',
               style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Hypnogram(night: n, height: 64),
@@ -310,7 +310,7 @@ class _LastNightCard extends StatelessWidget {
           const Hairline(vertical: 14),
           if (n.sleepingHr != null) InfoRow('Παλμοί στον ύπνο', '${n.sleepingHr!.round()} bpm', dot: c.heart),
           if (n.spo2Avg != null) InfoRow(oxygenAvgLabel, '${spo2AvgText(n.spo2Avg!)}%', dot: c.sleep),
-          if (n.spo2Min != null) InfoRow(oxygenMinLabel, '${lowestText(n.spo2Min!)}% · ενδεικτικό', dot: c.sleep),
+          if (n.spo2Min != null) InfoRow(oxygenMinLabel, '${lowestText(n.spo2Min!)}% ·\u00A0ενδεικτικό', dot: c.sleep),
           if (n.spo2Avg != null || n.spo2Min != null) ...[
             const SizedBox(height: 6),
             // Τρίτος κλινικός έλεγχος C2/F5: και εδώ το κείμενο για το τεστ άπνοιας (μία γραμμή κλειστό, όπως στην Καρδιά).
@@ -324,7 +324,7 @@ class _LastNightCard extends StatelessWidget {
           if (n.parts.length > 1 && n.parts.any((p) => p.score != null))
             InfoRow(
               'Βαθμολογία Samsung ανά κομμάτι',
-              [for (final p in n.parts) p.score?.toString() ?? '—'].join(' · '),
+              [for (final p in n.parts) p.score?.toString() ?? '—'].join(' ·\u00A0'),
               dot: c.textTertiary,
             ),
           if (n.estimatedMinutes > 0)
@@ -365,7 +365,7 @@ class _WatchStagesCard extends StatelessWidget {
           TitleRow(
             header: CardHeader(
               icon: Icons.layers_rounded,
-              title: 'Φάσεις · μέσος όρος 7 νυχτών',
+              title: 'Φάσεις ·\u00A0μέσος όρος 7 νυχτών',
               // Round 8 (R8-U4-1): από πόσες νύχτες βγαίνει ο μέσος όρος, όταν δεν είναι και οι 7.
               subtitle: enough ? stagesFromText(staged.length) : null,
               color: c.sleep,
@@ -425,7 +425,7 @@ class _ConsistencyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CardHeader(icon: Icons.schedule_rounded, title: 'Ωράριο · 14 νύχτες', color: c.sleep),
+          CardHeader(icon: Icons.schedule_rounded, title: 'Ωράριο ·\u00A014 νύχτες', color: c.sleep),
           const SizedBox(height: 8),
           InfoRow('Συνήθως κοιμάσαι', _clock(bedAvg)),
           InfoRow('Συνήθως ξυπνάς', _clock(wakeAvg)),
@@ -536,8 +536,8 @@ const napOnlyLabel = 'Μόνο υπνάκος';
 /// «Υπνάκος 15:00–21:00 · 5 ώρες 40 λεπτά» (πολλοί: «Υπνάκοι 13:00–14:00, 16:00–17:00 · σύνολο»).
 String napOnlyText(List<(DateTime, DateTime, int)> naps) {
   final total = naps.fold<int>(0, (s, x) => s + x.$3);
-  return '${naps.length == 1 ? 'Υπνάκος' : 'Υπνάκοι'} ${[for (final x in naps) '${hm(x.$1)}–${hm(x.$2)}'].join(', ')} · '
-      '${hoursMinutes(total)}';
+  return '${naps.length == 1 ? 'Υπνάκος' : 'Υπνάκοι'} ${[for (final x in naps) '${hm(x.$1)}–${hm(x.$2)}'].join(', ')} ·\u00A0'
+      '${unitsGlued(hoursMinutes(total))}';
 }
 
 /// Οι μέρες από το [from] με υπνάκο του ρολογιού και χωρίς νύχτα, μόνο όπου ο ύπνος είναι του ρολογιού (τρέχουσα

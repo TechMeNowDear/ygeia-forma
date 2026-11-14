@@ -73,8 +73,8 @@ class _MePageState extends State<MePage> {
   String _goalsText() {
     final g = widget.store.goals;
     // Έλεγχος round1 (U3a-6): αδιάσπαστο κενό ανάμεσα στον αριθμό και στη λέξη του (πριν έσπαγε σε «· 2» / «λεπτά»).
-    if (g == null) return 'Θερμίδες, πρωτεΐνη, χοληστερίνη · 2\u00A0λεπτά';
-    return '${thousands(g.kcal)}\u00A0kcal · ${g.protein}\u00A0g πρωτεΐνη${g.doctor ? ' · χοληστερίνη' : ''}';
+    if (g == null) return 'Θερμίδες, πρωτεΐνη, χοληστερίνη ·\u00A02\u00A0λεπτά';
+    return '${thousands(g.kcal)}\u00A0kcal ·\u00A0${g.protein}\u00A0g πρωτεΐνη${g.doctor ? ' ·\u00A0χοληστερίνη' : ''}';
   }
 
   @override
@@ -330,7 +330,7 @@ class _MePageState extends State<MePage> {
           text: n == 0
               // Έλεγχος round1 (U3a-18): όπως στο «Τα προϊόντα μου» (πριν «…χωρίς να το φας.»).
               ? 'Πέρασε ό,τι αγοράζεις, με «Σάρωση» ή από την ετικέτα, χωρίς να το καταγράψεις ως φαγητό.'
-              : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} · αλλαγή, αντιγραφή, διαγραφή',
+              : '${n == 1 ? '1 προϊόν' : '$n προϊόντα'} ·\u00A0αλλαγή, αντιγραφή, διαγραφή',
           line: true,
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
               settings: const RouteSettings(name: 'Τα προϊόντα μου'), builder: (_) => MyFoodsScreen(food: food))),
@@ -340,7 +340,7 @@ class _MePageState extends State<MePage> {
           icon: Icons.soup_kitchen_outlined,
           color: c.food,
           title: 'Η κουζίνα μου',
-          text: '${countText(k.devices.length, 'συσκευή', 'συσκευές')} · ${countText(k.cookware.length, 'σκεύος', 'σκεύη')} · για τις συνταγές, όταν έρθουν',
+          text: '${countText(k.devices.length, 'συσκευή', 'συσκευές')} ·\u00A0${countText(k.cookware.length, 'σκεύος', 'σκεύη')} ·\u00A0για τις συνταγές, όταν έρθουν',
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
               settings: const RouteSettings(name: 'Η κουζίνα μου'), builder: (_) => KitchenScreen(store: widget.store))),
         ),
