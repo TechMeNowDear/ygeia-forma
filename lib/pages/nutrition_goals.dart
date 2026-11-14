@@ -37,6 +37,26 @@ bool beforeGoals(Goals g, DateTime day) {
   return since != null && dayOf(day).isBefore(dayOf(since));
 }
 
+/// Round11 (R11-C1-2): η απόφαση της μπάρας «Κορεσμένα λιπαρά» της Διατροφής, ΜΙΑ συνάρτηση για την κάρτα
+/// ([GoalsSummaryCard]) και για την «Αναφορά για έλεγχο» (diagnostics.dart), ώστε να μη διαφέρουν. [today]: η μέρα που
+/// φαίνεται είναι σήμερα· [day]: η μέρα (για μέρα που πέρασε, ο στόχος θερμίδων που ίσχυε τότε, [targetOn]).
+/// - [pctDay] ≠ null: μέρα που τελείωσε με πλήρη καταγραφή· η μπάρα κρίνει τα κορεσμένα ως % των θερμίδων που έφαγες
+///   (R7-A3-4, R9-U2-1).
+/// - αλλιώς (σήμερα, ή λίγη καταγραφή): γραμμάρια, με όριο [limitG] (R9-A3-2) και [overG] = πόσα πάνω από αυτό (ένα
+///   δεκαδικό, R7-A3-3).
+/// [over]: η μπάρα γράφει «πάνω από το όριο» ή «στο όριο» (προειδοποίηση), με τον κανόνα που ισχύει εκείνη τη μέρα.
+({double? pctDay, double limitG, double overG, bool over}) satVerdict(Totals t, Goals g, {required bool today, DateTime? day}) {
+  final kcalGoal = today || day == null ? g.kcal : targetOn(g, day);
+  final limitG = satLimitShown(kcalGoal, g.satPct);
+  final overG = oneDecimal(oneDecimal(t.satFat) - limitG);
+  final pctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
+  final strict = satStrictPct(g.satPct);
+  final over = pctDay != null
+      ? (strict ? oneDecimal(pctDay) >= g.satPct : oneDecimal(pctDay) > g.satPct)
+      : t.count > 0 && (strict ? overG >= 0 : overG > 0);
+  return (pctDay: pctDay, limitG: limitG, overG: overG, over: over);
+}
+
 /// Σύνολο ημέρας με τους στόχους (αντικαθιστά τη «Σύνολο ημέρας» όταν υπάρχουν στόχοι).
 class GoalsSummaryCard extends StatelessWidget {
   const GoalsSummaryCard(
@@ -60,14 +80,16 @@ class GoalsSummaryCard extends StatelessWidget {
     final kcalGoal = today || day == null ? g.kcal : targetOn(g, day);
     // Round9 (R9-A3-2): το όριο σε γραμμάρια ακριβές, με ένα δεκαδικό ([satLimitShown]: 2.160 kcal × 6% = «έως 14,4 g»)· πριν
     // στρογγυλευόταν στο γραμμάριο («έως 14 g») και 14,3 g σήμερα έβγαιναν «0,3 g πάνω από το όριο», ενώ είναι 5,96%.
-    // Η απόφαση με τους αριθμούς όπως φαίνονται (ένα δεκαδικό, R7-A3-3).
-    final satLimit = satLimitShown(kcalGoal, g.satPct);
+    // Η απόφαση με τους αριθμούς όπως φαίνονται (ένα δεκαδικό, R7-A3-3). Round11 (R11-C1-2): η απόφαση στο [satVerdict],
+    // την ίδια συνάρτηση που καλεί η «Αναφορά για έλεγχο».
+    final sat = satVerdict(t, g, today: today, day: day);
+    final satLimit = sat.limitG;
     final fatLo = (kcalGoal * 0.25 / 9).round(), fatHi = (kcalGoal * 0.35 / 9).round(); // όπως τα Goals.fatLo/fatHi
     final left = kcalLeft(t.shownKcal, kcalGoal, today: today);
     String atLeast(String key, String text) => (t.missing[key] ?? 0) > 0 ? '≥ $text' : text;
     final protLeft = g.protein - t.protein;
     final fiberLeft = g.fiber - t.fiber;
-    final satOver = oneDecimal(oneDecimal(t.satFat) - satLimit);
+    final satOver = sat.overG;
     // Round7 (R7-A3-4): μέρα που τελείωσε, με πλήρη καταγραφή: τα κορεσμένα ως % των θερμίδων που έφαγες, ο κανόνας της
     // σελίδας «Χοληστερίνη» και των οδηγιών (AHA/ACC 2013, ESC/EAS 2019: % της ενέργειας). Πριν η ίδια μέρα έβγαινε εδώ
     // «πάνω από το όριο» (γραμμάρια του στόχου) και εκεί κάτω από το 6%, ή ανάποδα. Για τη σημερινή μέρα, που δεν
@@ -77,14 +99,14 @@ class GoalsSummaryCard extends StatelessWidget {
     // το κείμενο «το 60% του στόχου σου». Πριν, μετά από ένα «Εφάρμοσε», η ίδια μέρα ήταν «πλήρης» στη μία οθόνη και όχι
     // στην άλλη (εντάξει εδώ, πάνω από το 6% εκεί). Οι θερμίδες και τα όρια της μέρας μένουν με τον στόχο εκείνης της
     // μέρας ([targetOn], R8-A1-5).
-    final satPctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
+    final satPctDay = sat.pctDay;
     // Round8 (R8-A3-3): χωρίς οδηγία γιατρού ο κανόνας είναι του ΠΟΥ, «λιγότερο από 10%» (WHO, Healthy diet fact sheet,
     // 2020): το 10,0% δεν είναι εντάξει, και ο στόχος γράφεται «κάτω από 10%» όπως στον οδηγό. Με οδηγία γιατρού μένει
     // «έως 6%» (AHA/ACC 2013: 5–6%). Round9 (R9-A1-4 / R9-U2-5): ο ίδιος κανόνας και στη σημερινή μπάρα γραμμαρίων.
     final satStrict = satStrictPct(g.satPct);
     final satPctShown = satPctDay == null ? null : oneDecimal(satPctDay);
-    final satPctOver = satPctShown != null && (satStrict ? satPctShown >= g.satPct : satPctShown > g.satPct);
-    final satGramsOver = t.count > 0 && (satStrict ? satOver >= 0 : satOver > 0);
+    final satPctOver = satPctShown != null && sat.over;
+    final satGramsOver = satPctShown == null && sat.over;
     // Round7 (R7-A3-3): κοντά στο όριο (ως 1 g) με ένα δεκαδικό, ώστε ο αριθμός να συμφωνεί με το «πάνω από το όριο»:
     // 14,3 g γράφονταν «14 g / έως 14 g» μαζί με «0,3 g πάνω από το όριο».
     final satText = t.satFat >= 10 && satOver.abs() < 1 ? dec(t.satFat, 1) : gramsText(t.satFat);

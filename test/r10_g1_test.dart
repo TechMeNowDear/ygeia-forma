@@ -216,10 +216,13 @@ void main() {
       expect(days.keys.toList(), ['2026-11-14', '2026-11-16', '2026-11-23', '2026-11-25', '2026-11-27', '2026-11-28']);
       // 14/11 πριν από τους στόχους· ως και τη μέρα της αλλαγής (25/11) 2.250· 26–27/11 2.340· σήμερα ο τωρινός 2.160.
       expect([for (final d in days.keys) key(d, 'goalKcal')], [null, 2250, 2250, 2250, 2340, 2160]);
-      // kcal × 6% ÷ 9: 2.250 → 15,0· 2.340 → 15,6· 2.160 → 14,4 (όπως «έως 15,6 g» στη Διατροφή, όχι 16).
-      expect([for (final d in days.keys) key(d, 'satLimit')], [null, 15.0, 15.0, 15.0, 15.6, 14.4]);
-      // Το «μετρά στη διόρθωση θερμίδων» μένει με τον τωρινό στόχο (60% × 2.160 = 1.296 ≤ 1.800), όπως η διόρθωση.
-      expect([for (final d in days.keys) key(d, 'countsForAdaptive')], [true, true, true, true, true, true]);
+      // kcal × 6% ÷ 9: 2.160 → 14,4 σήμερα (όπως «έως 14,4 g» στη Διατροφή, όχι 14). Round11 (R11-C1-2): οι μέρες που
+      // πέρασαν με 1.800 ≥ 60% × 2.160 κρίνονται στη Διατροφή με το % των θερμίδων, άρα χωρίς «satLimit» (γραμμάρια)·
+      // το όριο σε γραμμάρια μιας μέρας που πέρασε (2.250 → 15,0· 2.340 → 15,6) στο r11_h1_test.dart.
+      expect([for (final d in days.keys) key(d, 'satLimit')], [null, null, null, null, null, 14.4]);
+      // Round11 (R11-C1-1): ο κανόνας της διόρθωσης θερμίδων: όχι πριν από την 8η μέρα των στόχων (23/11), όχι σήμερα·
+      // 60% × 2.160 = 1.296 ≤ 1.800 ≤ 6.862,5. Πριν: true για όλες (μόνο το 60%).
+      expect([for (final d in days.keys) key(d, 'countsForAdaptive')], [false, false, true, true, true, false]);
       final goals = calc['goals'] as Map;
       expect((goals['inForce'] as Map)['kcal'], 2160);
       expect((goals['inForce'] as Map)['satMax'], 14.4, reason: 'πριν (2.160 × 6% ÷ 9).round() = 14');

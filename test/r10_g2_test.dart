@@ -365,7 +365,7 @@ void main() {
   });
 
   // ------------------------------------------------------------------ R10-B8-B1
-  group('R10-B8-B1: «Άσκηση σήμερα»: αδιάσπαστο κενό πριν από κάθε «·» και στα λεπτά (όπως τα τρόφιμα)', () {
+  group('R10-B8-B1 / R11-C2-3: «Άσκηση σήμερα»: αδιάσπαστο κενό μετά από κάθε «·» και στα λεπτά (όπως τα τρόφιμα)', () {
     Future<void> card(WidgetTester t, DateTime at) async {
       await t.runAsync(() => ExLibrary.load(inline: true));
       await _pump(t, SingleChildScrollView(child: TodayTrainingCard(training: sampleTraining(at), now: at)),
@@ -374,14 +374,14 @@ void main() {
 
     testWidgets('μέρα βαρών (Παρασκευή 13/11)', (t) async {
       await card(t, DateTime(2026, 11, 13, 17, 30));
-      expect(find.textContaining('\u00A0· περίπου '), findsOneWidget);
-      expect(find.textContaining(RegExp('περίπου \\d+\u00A0λεπτά\u00A0· όριο\u00A0παλμών\u00A0140')), findsOneWidget);
+      expect(find.textContaining(' ·\u00A0περίπου '), findsOneWidget);
+      expect(find.textContaining(RegExp('περίπου \\d+\u00A0λεπτά ·\u00A0όριο\u00A0παλμών\u00A0140')), findsOneWidget);
     });
 
     testWidgets('μέρα περπατήματος (Τρίτη 17/11)', (t) async {
       await card(t, DateTime(2026, 11, 17, 17, 30));
-      expect(find.textContaining('30\u00A0λεπτά\u00A0· '), findsOneWidget);
-      expect(find.textContaining('\u00A0· όριο\u00A0παλμών\u00A0140'), findsOneWidget);
+      expect(find.textContaining('30\u00A0λεπτά ·\u00A0'), findsOneWidget);
+      expect(find.textContaining(' ·\u00A0όριο\u00A0παλμών\u00A0140'), findsOneWidget);
     });
   });
 }

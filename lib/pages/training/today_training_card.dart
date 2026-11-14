@@ -174,15 +174,15 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           _title(context, cardio.name),
           if (chosenLine != null) chosenLine,
           const SizedBox(height: 4),
-          // Round 10 (R10-B8-B1): ο κανόνας του R9 για τα τρόφιμα (foodTileSubtitle): αδιάσπαστο κενό πριν από κάθε «·» (το
-          // «·» μένει με την προηγούμενη λέξη, όπως η άνω τελεία· ποτέ στην αρχή γραμμής) και ο αριθμός με τη λέξη του.
+          // Round 10 (R10-B8-B1): ο αριθμός με τη λέξη του. Round 11 (R11-C2-3): το «·» με τον κανόνα [dotJoin] (όπως τα
+          // τρόφιμα, foodTileSubtitle): η γραμμή δεν τελειώνει ποτέ σε «·»· αν σπάσει, το «·» πάει στην αρχή της επόμενης.
           Text(
             [
               '${cardio.minutes}\u00A0λεπτά',
               if (p?.planWeekText(cardio, now) case final wk?) wk,
               if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim(),
               if (limitText != null) limitText,
-            ].join('\u00A0· '),
+            ].join(dotJoin),
             style: _aux(c),
           ),
           // round1, U6-24: το ζέσταμα/η αποθεραπεία και στη «Σήμερα», στον δρόμο προς την προπόνηση.
@@ -225,9 +225,9 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         if (chosenLine != null) chosenLine,
         const SizedBox(height: 4),
         Text(
-          // Round 10 (R10-B8-B1): όπως η γραμμή του περπατήματος πιο πάνω.
+          // Round 10 (R10-B8-B1) / Round 11 (R11-C2-3): όπως η γραμμή του περπατήματος πιο πάνω ([dotJoin]).
           [countText(w.items.length, 'άσκηση', 'ασκήσεις'), 'περίπου ${w.minutes}\u00A0λεπτά', if (limitText != null) limitText]
-              .join('\u00A0· '),
+              .join(dotJoin),
           style: _aux(c),
         ),
         RoutineButton(w),

@@ -22,6 +22,7 @@ library;
 import '../format.dart' show dec;
 import '../goals.dart' show fullDayShare;
 import 'food_model.dart';
+import 'off.dart' show legumesByName;
 
 const branFoodId = 'C9640';
 const legumesDryMinG = 40.0;
@@ -73,12 +74,15 @@ bool branByName(String name) {
 /// = _plain('πίτουρο βρώμης'), _plain('πίτυρο βρώμης').
 const _branNames = ['πιτουρο βρωμησ', 'πιτυρο βρωμησ'];
 
-// Αν το προϊόν λέει τι είναι ([Food.cholKind]), ισχύει μόνο αυτό· αλλιώς η κατηγορία της βάσης (και το όνομα, για το πίτουρο).
+// Αν το προϊόν λέει τι είναι ([Food.cholKind]), ισχύει μόνο αυτό· αλλιώς η κατηγορία της βάσης (και το όνομα, για το πίτουρο
+// και, από τον γύρο 11, για τα δικά σου ξερά όσπρια).
 bool isBran(Food f) => f.cholKind != null ? f.cholKind == CholKind.bran : f.id == branFoodId || branByName(f.name);
 bool isNuts(Food f) => f.cholKind != null
     ? f.cholKind == CholKind.nuts
     : !_seedIds.contains(f.id) && (f.cat == 'Ξηροί καρποί' || _treeNutIds.contains(f.id));
-bool isLegumes(Food f) => f.cholKind != null ? f.cholKind == CholKind.legumes : f.cat == 'Όσπρια';
+// Round11 (R11-C1-3): και δικό σου ξερό όσπριο χωρίς «μετρά ως», από το όνομα ([legumesByName]), όπως το πίτουρο· ώστε
+// ζυγισμένο ξερό και ζυγισμένο «Βρασμένες» (η βρασμένη μορφή της βάσης) να μετρούν το ίδιο.
+bool isLegumes(Food f) => f.cholKind != null ? f.cholKind == CholKind.legumes : f.cat == 'Όσπρια' || legumesByName(f);
 bool isFish(Food f) => f.cholKind != null ? f.cholKind == CholKind.fish : f.cat == 'Ψάρια' || f.cat == 'Θαλασσινά';
 
 /// Μαγειρεμένα όσπρια (βρασμένα, κονσέρβα): ζυγίζουν περίπου 2,5 φορές τα ξερά. Δικό σου προϊόν οσπρίων: και όταν οι

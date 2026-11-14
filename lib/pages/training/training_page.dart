@@ -391,9 +391,10 @@ class _TrainingPageState extends State<TrainingPage> {
       children.addAll([
         FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(cardio.name, maxLines: 1, style: title)),
         Text(
-            // Round 10 (R10-B8-B1): ίδιος κανόνας με την κάρτα της Σήμερα (αδιάσπαστο κενό πριν από το «·» και στο «30 λεπτά»).
+            // Round 10 (R10-B8-B1): ίδιος κανόνας με την κάρτα της Σήμερα (αδιάσπαστο κενό στο «30 λεπτά»). Round 11 (R11-C2-3):
+            // το «·» με τον κανόνα [dotJoin]: η γραμμή δεν τελειώνει ποτέ σε «·».
             ['${cardio.minutes}\u00A0λεπτά', if (p.planWeekText(cardio, today) case final wk?) wk, if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim()]
-                .join('\u00A0· '),
+                .join(dotJoin),
             key: const ValueKey('train-cardio-line'),
             style: aux),
         RoutineButton(w),
@@ -407,7 +408,9 @@ class _TrainingPageState extends State<TrainingPage> {
       ]);
     } else {
       children.add(FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(w.name, maxLines: 1, style: title)));
-      children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')} · περίπου ${w.minutes} λεπτά', style: aux));
+      // Round 11 (R11-C2-2): όπως η γραμμή του περπατήματος και η κάρτα της Σήμερα: «·» με τον κανόνα [dotJoin] και ο
+      // αριθμός με τη λέξη του (πριν, με μεγάλα γράμματα: «6 ασκήσεις · περίπου 55» / «λεπτά»).
+      children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')}${dotJoin}περίπου ${w.minutes}\u00A0λεπτά', style: aux));
       if (w.note != null) children.add(Text(w.note!, style: TextStyle(fontSize: 14, color: c.textSecondary)));
       children.add(RoutineButton(w));
       // round1, S7-11: η σημείωση του προγράμματος (κανόνες ασφάλειας) ένα πάτημα μακριά.
