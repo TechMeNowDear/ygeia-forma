@@ -155,6 +155,19 @@ object Repo {
     var activeSec = 0L
     var gps = false
 
+    /** Το μήκος βήματος (m) της άσκησης που τρέχει, από το πρόγραμμα στην αρχή (14/11)· null: καμία εκτίμηση. */
+    var stride: Double? = null
+
+    /** Η απόσταση της οθόνης και αν είναι εκτίμηση από τα βήματα ([shownDistance], 14/11). */
+    fun shown(): Pair<Double, Boolean> = shownDistance(meters, gps, steps, stride)
+
+    /** Το τελευταίο χιλιόμετρο που ειπώθηκε (14/11): κάθε χιλιόμετρο μία φορά. */
+    var kmDone = 0
+
+    /** Πράσινη οθόνη «Πρώτο χιλιόμετρο» ως πότε (ms) και για ποιο (14/11). */
+    var kmFlashUntil = 0L
+    var kmFlashN = 0
+
     /**
      * Σημείο ελέγχου του Health Services για τον ενεργό χρόνο (W3-12): ο χρόνος στην οθόνη προχωρά κάθε δευτερόλεπτο,
      * όχι μόνο όταν έρχεται ενημέρωση. [cpWall] = 0: δεν ήρθε ακόμα.
@@ -396,6 +409,10 @@ object Repo {
         hrQuality = HrQualityCount()
         meters = 0.0
         steps = 0
+        stride = null
+        kmDone = 0
+        kmFlashUntil = 0
+        kmFlashN = 0
         activeSec = 0
         cpActiveMs = 0
         cpWall = 0
@@ -503,6 +520,9 @@ object Repo {
             .put("sec", activeSecNow(now)).put("cpA", cpActiveMs).put("cpW", cpWall).put("cpR", cpRunning)
             .put("m", finite(meters)).put("steps", steps).put("gps", gps).put("paused", paused).put("pz", pz)
             .put("split", split.toState()).put("endAt", endAt).put("recUntil", recoveryUntil).put("hrMode", hrMode)
+            // 14/11: ποιο χιλιόμετρο ειπώθηκε (να μην ξαναειπωθεί μετά από συνέχεια) και το μήκος βήματος της άσκησης.
+            .put("kmD", kmDone)
+        stride?.let { o.put("stride", it) }
         alarm.limit?.let { o.put("lim", it) }
         // Έλεγχος 14/11, round 9 (R9-A7-2): και η ζώνη του περπατήματος (νέο, προαιρετικό πεδίο του run.json), όπως το όριο:
         // ένα μερικό αποτέλεσμα γράφεται με τη ζώνη που ίσχυε, όχι με όποια έχει το κινητό τη μέρα της εισαγωγής.
@@ -534,6 +554,8 @@ object Repo {
         meters = o.optDouble("m", 0.0).takeIf { it.isFinite() } ?: 0.0
         steps = o.optLong("steps", 0)
         gps = o.optBoolean("gps", false)
+        kmDone = o.optInt("kmD", 0)
+        stride = strideOrNull(o.optDouble("stride", Double.NaN))
         paused = o.optBoolean("paused", false)
         o.optJSONArray("pz")?.let { a -> for (i in 0 until a.length()) a.optJSONArray(i)?.let { pauses.add(longArrayOf(it.getLong(0), it.getLong(1))) } }
         split = o.optJSONObject("split")?.let { SplitTracker.fromState(it, start) } ?: SplitTracker(start)

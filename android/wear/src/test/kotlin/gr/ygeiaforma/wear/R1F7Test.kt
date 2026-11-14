@@ -317,7 +317,7 @@ class R1F7Test {
 
     @Test
     fun zoneAlarmFirstBuzzExactlyAfterWarmup() {
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(108, 131), 0)
         for (t in 0..299) assertEquals("$t″", none, z.feed(150, t * 1000L))
         assertEquals(up, z.feed(150, 300_000))
@@ -330,11 +330,12 @@ class R1F7Test {
     fun zoneAlarmRearmNeedsThreeBelowTop() {
         val t0 = 400_000L
         fun after(dip: Int): List<ZoneAlarm.Buzz> {
-            val z = ZoneAlarm()
+            val z = ZoneAlarm(holdMs = 20_000L)
             z.start(WalkZone(108, 131), 0)
             for (k in 0..19) assertEquals(none, z.feed(140, t0 + k * 1000L))
             assertEquals(up, z.feed(140, t0 + 20_000))
-            assertEquals(none, z.feed(dip, t0 + 21_000))
+            // 14/11: γύρισμα 3 παλμούς κάτω από το πάνω όριο μετά από δόνηση = «Πάλι στη ζώνη» (μόνο φωνή).
+            assertEquals(if (dip <= 131 - ZoneAlarm.REARM) ZoneAlarm.Buzz.BACK else none, z.feed(dip, t0 + 21_000))
             return (22..42).map { k -> z.feed(140, t0 + k * 1000L) }
         }
         // 129 = μόνο 2 κάτω από το πάνω όριο: δεν ξαναοπλίζει, και δεν πέρασαν 2 λεπτά → καμία δόνηση.
@@ -349,14 +350,14 @@ class R1F7Test {
     @Test
     fun zoneAlarmBoundsAreInsideTheZone() {
         val t0 = 400_000L
-        val z = ZoneAlarm()
+        val z = ZoneAlarm(holdMs = 20_000L)
         z.start(WalkZone(108, 131, up = true, down = true), 0)
         // Ακριβώς στο πάνω όριο: μέσα στη ζώνη.
         for (k in 0..60) assertEquals(none, z.feed(131, t0 + k * 1000L))
         // Ένας παλμός πάνω: 20″.
         for (k in 61..80) assertEquals("$k", none, z.feed(132, t0 + k * 1000L))
         assertEquals(up, z.feed(132, t0 + 81_000))
-        val d = ZoneAlarm()
+        val d = ZoneAlarm(holdMs = 20_000L)
         d.start(WalkZone(108, 131, up = true, down = true), 0)
         // Ακριβώς στο κάτω όριο: μέσα στη ζώνη.
         for (k in 0..120) assertEquals(none, d.feed(108, t0 + k * 1000L))

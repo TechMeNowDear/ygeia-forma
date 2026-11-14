@@ -340,6 +340,26 @@ class WatchShotsTest {
         Repo.alarm.limit = 140
         shot("W10_walk_ambient", ambient = true)
         Repo.alarm.limit = null
+        // 14/11: μέσα στο σπίτι (GPS χωρίς σήμα): απόσταση από τα βήματα, με «≈»· και η πράσινη οθόνη του χιλιομέτρου.
+        val keepM = Repo.meters
+        val keepS = Repo.steps
+        Repo.meters = 0.0
+        Repo.steps = 812
+        Repo.stride = 0.72
+        shot("W10d_walk_indoor_steps")
+        shot("W10e_walk_indoor_ambient", ambient = true)
+        Repo.kmFlashN = 1
+        Repo.kmFlashUntil = System.currentTimeMillis() + 60_000
+        shot("W10c_walk_km_flash")
+        RuntimeEnvironment.setFontScale(1.3f)
+        Repo.kmFlashN = 13
+        shot("W10f_walk_km_flash13_font13")
+        RuntimeEnvironment.setFontScale(1f)
+        Repo.kmFlashN = 0
+        Repo.kmFlashUntil = 0
+        Repo.stride = null
+        Repo.meters = keepM
+        Repo.steps = keepS
 
         Repo.resetExercise()
         Repo.screen = Repo.Screen.END

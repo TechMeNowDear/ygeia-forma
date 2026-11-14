@@ -43,6 +43,13 @@ object Paths {
      * (ξανά ανά ~45″), το ρολόι στέλνει «ζωντανά» το περπάτημα· `ttl` 0 = έκλεισε. Νέο path: το παλιό ρολόι το αγνοεί.
      */
     const val WATCHING = "/ygeia/watching"
+    /**
+     * Ρολόι → κινητό (μήνυμα, 14/11): «πες το» `{"v":1,"id":…,"el":…,"en":…,"until": ms}`. Το κινητό το λέει μόνο αν έχει
+     * ακουστικά (εκεί ακούς τη μουσική) και απαντά αμέσως με [SAID] `{"id":…,"ok":true|false}`· αλλιώς το λέει το ρολόι.
+     * Νέα paths: το παλιό κινητό δεν απαντά, και τότε μιλά το ρολόι.
+     */
+    const val SAY = "/ygeia/say"
+    const val SAID = "/ygeia/said"
     const val KEY = "json"
 
     /** Δυνατότητα που δηλώνει η εφαρμογή του ρολογιού (res/values/wear.xml), για να τη βρίσκει το κινητό. */
@@ -298,6 +305,13 @@ class Plan(
     val zone: WalkZone? = null,
     /** Η μέρα έναρξης του προγράμματος («from», έλεγχος 13/11, S6-11)· παλιό κινητό: null. */
     val from: java.time.LocalDate? = null,
+    /** Φωνή στην άσκηση (14/11, Ρυθμίσεις του κινητού). Παλιό κινητό: ανοιχτή. */
+    val voice: Boolean = true,
+    /**
+     * Το μήκος του βήματός σου σε μέτρα (14/11): από τα περπατήματα με GPS, αλλιώς από το ύψος. Για την απόσταση χωρίς GPS
+     * ([shownDistance]). Παλιό κινητό: null, καμία εκτίμηση.
+     */
+    val stride: Double? = null,
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
 
@@ -348,6 +362,8 @@ class Plan(
                 } ?: emptyMap(),
                 zone = WalkZone.parse(j.optJSONObject("zone")),
                 from = dayOrNull(j.optStringOrNull("from")),
+                voice = j.optBoolean("voice", true),
+                stride = strideOrNull(j.optDouble("stride", Double.NaN)),
             )
         } catch (_: Exception) {
             null
@@ -1478,7 +1494,7 @@ object WipeRule {
 /**
  * Δόνηση ζώνης περπατήματος (σχέδια 12/11). Καθοδήγηση, όχι ασφάλεια: απαλή δόνηση, όχι ξυπνητήρι, και ποτέ όταν μιλά το
  * όριο του γιατρού ([HrAlarm], το ελέγχει η υπηρεσία).
- * - Πάνω: όταν οι παλμοί μείνουν πάνω από τη ζώνη [holdMs] (20″, όχι μια ανηφόρα). Ξανά κάθε [repeatMs] (2′) όσο μένουν
+ * - Πάνω: όταν οι παλμοί μείνουν πάνω από τη ζώνη [holdMs] (5″ από 14/11, απόφαση χρήστη· πριν 20″). Ξανά κάθε [repeatMs] (2′) όσο μένουν
  *   πάνω· ξαναοπλίζεται όταν πέσουν [REARM] παλμούς κάτω από το πάνω όριο.
  * - Κάτω (αν είναι ανοιχτή): όταν μείνουν κάτω από τη ζώνη [lowHoldMs] (1′), ξανά κάθε [lowRepeatMs] (5′).
  * - Τίποτα τα πρώτα [warmupMs] (5′): οι παλμοί ακόμα ανεβαίνουν.
@@ -1486,12 +1502,14 @@ object WipeRule {
  */
 class ZoneAlarm(
     private val warmupMs: Long = 5 * 60_000L,
-    private val holdMs: Long = 20_000L,
+    // Απόφαση χρήστη 14/11: 5″ πάνω από τη ζώνη (πριν 20″), με δόνηση και φωνή «Εκτός εύρους».
+    private val holdMs: Long = ZONE_HOLD_MS,
     private val repeatMs: Long = 120_000L,
     private val lowHoldMs: Long = 60_000L,
     private val lowRepeatMs: Long = 300_000L,
 ) {
-    enum class Buzz { NONE, UP, DOWN }
+    /** [BACK]: γύρισε στη ζώνη μετά από δόνηση (μόνο φωνή «Πάλι στη ζώνη», καμία δόνηση· 14/11). */
+    enum class Buzz { NONE, UP, DOWN, BACK }
 
     /** Αλλαγή ζώνης στη μέση (νέο πρόγραμμα από το κινητό): η κρίση ξεκινά από την αρχή, όχι η προθέρμανση. */
     var zone: WalkZone? = null
@@ -1551,17 +1569,24 @@ class ZoneAlarm(
     private fun step(bpm: Int, at: Long): Buzz {
         val z = zone ?: return Buzz.NONE
         if (bpm <= 0) return Buzz.NONE
+        var back = false
         if (bpm > z.hi) {
             if (aboveSince < 0) aboveSince = at
         } else {
             aboveSince = -1
-            if (bpm <= z.hi - REARM) upOn = false
+            if (bpm <= z.hi - REARM && upOn) {
+                upOn = false
+                back = true
+            }
         }
         if (bpm < z.lo) {
             if (belowSince < 0) belowSince = at
         } else {
             belowSince = -1
-            if (bpm >= z.lo + REARM) downOn = false
+            if (bpm >= z.lo + REARM && downOn) {
+                downOn = false
+                back = true
+            }
         }
         if (at - startEl < warmupMs) return Buzz.NONE
         // Τελικός έλεγχος (Συμβούλιο 1, μ1): και η ΕΠΑΝΑΛΗΨΗ θέλει [holdMs] συνεχώς έξω από τη ζώνη. Πριν: αν οι παλμοί
@@ -1593,7 +1618,7 @@ class ZoneAlarm(
                 return Buzz.DOWN
             }
         }
-        return Buzz.NONE
+        return if (back) Buzz.BACK else Buzz.NONE
     }
 
     private fun clear() {
@@ -1610,6 +1635,9 @@ class ZoneAlarm(
         const val REARM = 3
     }
 }
+
+/** Πόσο πρέπει να μείνουν οι παλμοί πάνω από τη ζώνη για δόνηση και «Εκτός εύρους» (απόφαση χρήστη 14/11· πριν 20″). */
+const val ZONE_HOLD_MS = 5_000L
 
 // ------------------------------------------------------------------ έλεγχος 13/11 (round 1): αποφάσεις της υπηρεσίας
 // Καθαρές συναρτήσεις (χωρίς Android), για να ελέγχονται σε JVM (S12-11). Η συμπεριφορά δεν άλλαξε· μεταφέρθηκε εδώ.
@@ -1940,3 +1968,83 @@ fun endedElsewhereText(hasLimit: Boolean, zoneBuzz: Boolean): String = when {
  * χωρίς πρόγραμμα (δεν διαβάστηκε ακόμα), η ζώνη που ίσχυε, από το στιγμιότυπο ([kept]), αντί για καμία ζώνη.
  */
 fun resumeZone(plan: Plan?, kept: WalkZone?): WalkZone? = if (plan != null) plan.zone else kept
+
+
+// ------------------------------------------------------------------ 14/11: απόσταση χωρίς GPS, χιλιόμετρα, φωνή
+/** Πόσο μένει πράσινη η οθόνη στο κάθε χιλιόμετρο (14/11). */
+const val KM_FLASH_MS = 2_000L
+
+/** Μήκος βήματος από το κινητό: μόνο λογικές τιμές (0,40–1,20 m), αλλιώς καμία εκτίμηση. */
+fun strideOrNull(v: Double): Double? = if (v.isFinite() && v in 0.40..1.20) v else null
+
+/**
+ * Η απόσταση της οθόνης (μέτρα) και αν είναι εκτίμηση («≈»). Του GPS όταν μέτρησε: τουλάχιστον 10 m και τουλάχιστον η
+ * μισή της εκτίμησης από τα βήματα (μέσα στο σπίτι το GPS δίνει 0 ή λίγα μέτρα θορύβου). Αλλιώς βήματα × [stride].
+ * Χωρίς GPS (κλειστή τοποθεσία) το Health Services δίνει απόσταση από τα βήματα: κι αυτή «≈». Ίδιος κανόνας με το
+ * κινητό (walk_stats.dart: shownMeters).
+ */
+fun shownDistance(meters: Double, gps: Boolean, steps: Long, stride: Double?): Pair<Double, Boolean> {
+    val m = if (meters.isFinite() && meters > 0) meters else 0.0
+    val est = if (stride != null && steps > 0) steps * stride else 0.0
+    if (m >= 10 && (!gps || est < 10 || m >= est * 0.5)) return m to !gps
+    if (est >= 10) return est to true
+    return 0.0 to !gps
+}
+
+/** Η εκτίμηση από τα βήματα (μέτρα), για το αποτέλεσμα («mest»)· 0 χωρίς μήκος βήματος. */
+fun estMeters(steps: Long, stride: Double?): Double = if (stride != null && steps > 0) steps * stride else 0.0
+
+private val KM_EL = arrayOf(
+    "Πρώτο", "Δεύτερο", "Τρίτο", "Τέταρτο", "Πέμπτο", "Έκτο", "Έβδομο", "Όγδοο", "Ένατο", "Δέκατο",
+    "Ενδέκατο", "Δωδέκατο", "Δέκατο τρίτο", "Δέκατο τέταρτο", "Δέκατο πέμπτο", "Δέκατο έκτο", "Δέκατο έβδομο",
+    "Δέκατο όγδοο", "Δέκατο ένατο", "Εικοστό",
+)
+private val KM_EN = arrayOf(
+    "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth",
+    "Eleventh", "Twelfth", "Thirteenth", "Fourteenth", "Fifteenth", "Sixteenth", "Seventeenth", "Eighteenth",
+    "Nineteenth", "Twentieth",
+)
+
+/** «Πρώτο χιλιόμετρο» … «Εικοστό χιλιόμετρο», μετά «Χιλιόμετρο 21». */
+fun kmTitle(n: Int): String = if (n in 1..KM_EL.size) "${KM_EL[n - 1]} χιλιόμετρο" else "Χιλιόμετρο $n"
+
+/** Το ίδιο στα αγγλικά, για ρολόι χωρίς ελληνική φωνή. */
+fun kmSpeechEn(n: Int): String = if (n in 1..KM_EN.size) "${KM_EN[n - 1]} kilometer" else "Kilometer $n"
+
+/** Πόσα ολόκληρα χιλιόμετρα πέρασαν που δεν έχουν ειπωθεί: το επόμενο να ειπωθεί, ή 0. Ποτέ προς τα πίσω. */
+fun kmToAnnounce(shownMeters: Double, announced: Int): Int {
+    val k = (shownMeters / 1000.0).toInt()
+    return if (k > announced) k else 0
+}
+
+/** Οι φράσεις της φωνής: (ελληνικά, αγγλικά). Μιλά στα ελληνικά αν το ρολόι/κινητό έχει ελληνική φωνή. */
+object Say {
+    val START = "Ξεκινάμε" to "Let's go"
+    val PAUSE = "Παύση" to "Paused"
+    val RESUME = "Συνέχεια" to "Resuming"
+    val OFF_RANGE = "Εκτός εύρους" to "Off range"
+    val BACK = "Πάλι στη ζώνη" to "Back in range"
+    val END_RECOVER = "Τέλος. Κάθισε για ένα λεπτό" to "Done. Sit down for one minute"
+    val END = "Τέλος" to "Done"
+    val NEXT_SET = "Επόμενο σετ" to "Next set"
+    val LIMIT = "Πάνω από το όριο" to "Above your limit"
+    fun km(n: Int) = kmTitle(n) to kmSpeechEn(n)
+
+    /** Μετά το λεπτό αποκατάστασης: πόσο έπεσαν οι παλμοί (μόνο αν έπεσαν). */
+    fun recovery(drop: Int): Pair<String, String>? =
+        if (drop <= 0) null else "Οι παλμοί σου έπεσαν $drop" to "Your heart rate dropped by $drop"
+}
+
+/**
+ * Η γραμμή κάτω από τον χρόνο στο περπάτημα (14/11, αίτημα χρήστη): απόσταση ΚΑΙ βήματα μαζί, π.χ. «2,18 km · 2.840 βήματα»,
+ * χωρίς GPS «≈ 0,58 km · 812 βήματα». [shown] από το [shownDistance].
+ */
+fun walkLine(shown: Pair<Double, Boolean>, steps: Long): String {
+    val (m, approx) = shown
+    val d = if (m >= 10) "${if (approx) "≈ " else ""}${km(m)} km" else null
+    val st = if (steps > 0) "${thousandsEl(steps)} ${if (steps == 1L) "βήμα" else "βήματα"}" else null
+    return listOfNotNull(d, st).joinToString(" · ").ifEmpty { "—" }
+}
+
+/** «2.840» (τελεία στις χιλιάδες, όπως στο κινητό). */
+fun thousandsEl(n: Long): String = "%,d".format(java.util.Locale.ROOT, n).replace(',', '.')

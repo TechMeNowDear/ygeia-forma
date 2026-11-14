@@ -17,6 +17,13 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Φωνή στην άσκηση (14/11): το Android 11+ θέλει να δηλωθεί ότι ψάχνουμε μηχανή φωνής (TextToSpeech). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
@@ -50,5 +57,20 @@
             android:name=".ExerciseService"
             android:exported="false"
             android:foregroundServiceType="health|location" />
+
+        <!-- Tile «Περπάτημα» (14/11): ένα σύρσιμο από την πρόσοψη, ένα πάτημα, και ξεκινά περπάτημα. -->
+        <service
+            android:name=".WalkTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher"
+            android:label="Περπάτημα"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview" />
+        </service>
     </application>
 </manifest>
