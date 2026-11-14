@@ -136,7 +136,7 @@ class HeartPage extends StatelessWidget {
           trend = diff == 0
               ? const TrendPill(asUsualText)
               : TrendPill(
-                  '${signedShown(diff)} bpm · συνήθως ${base.round()}',
+                  '${signedShown(diff)} bpm ·\u00A0συνήθως ${base.round()}',
                   up: diff > 0,
                   // Η πτώση είναι ουδέτερη, όχι «καλή» (κλινικός έλεγχος M4): μπορεί να είναι φάρμακο ή κρύο δωμάτιο.
                   // Κόκκινο μόνο με τον κανόνα του «Εκτός συνηθισμένου» (κλινικός έλεγχος 4, C1)· αλλιώς γκρι.
@@ -215,7 +215,7 @@ class HeartPage extends StatelessWidget {
                   // οι τιμές, για να μη σπάει η ημερομηνία σε 2 γραμμές στα 360–400 dp.
                   if (oxNights.isNotEmpty)
                     Text(
-                      ouraHr ? 'μέσος όρος (Oura) · χαμηλότερη τιμή (ρολόι)' : 'μέσος όρος · χαμηλότερη τιμή',
+                      ouraHr ? 'μέσος όρος (Oura) ·\u00A0χαμηλότερη τιμή (ρολόι)' : 'μέσος όρος ·\u00A0χαμηλότερη τιμή',
                       key: const ValueKey('heart-oxygen-columns'),
                       textAlign: TextAlign.right,
                       style: TextStyle(color: c.textTertiary, fontSize: 12.5),
@@ -224,7 +224,7 @@ class HeartPage extends StatelessWidget {
                     InfoRow(
                       shortDayDate(n.$1),
                       // Χωρίς «(ενδεικτικό)» σε κάθε γραμμή (το λέει το κείμενο πάνω): στα 400 dp η ημερομηνία έσπαγε σε 2 γραμμές.
-                      '${n.$2 == null ? '—' : '${spo2AvgText(n.$2!)}%'} · ${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
+                      '${n.$2 == null ? '—' : '${spo2AvgText(n.$2!)}%'} ·\u00A0${n.$3 == null ? '—' : '${lowestText(n.$3!)}%'}',
                     ),
                   const SizedBox(height: 10),
                   OxygenNotes(guidance: oxGuidance),
@@ -251,8 +251,8 @@ class HeartPage extends StatelessWidget {
                   ],
                   if (today != null && dayOnly) ...[
                     // Round 1 (U1a-7): «της μέρας», όπως η πρόταση από κάτω.
-                    InfoRow('Χαμηλότεροι της μέρας · ρολόι', '${today.$1.round()} bpm'),
-                    InfoRow('Υψηλότεροι της μέρας · ρολόι', '${today.$2.round()} bpm'),
+                    InfoRow('Χαμηλότεροι της μέρας ·\u00A0ρολόι', '${today.$1.round()} bpm'),
+                    InfoRow('Υψηλότεροι της μέρας ·\u00A0ρολόι', '${today.$2.round()} bpm'),
                   ],
                   if (today == null && dayOnly)
                     Text(
@@ -311,7 +311,7 @@ class _AwakeHeartCard extends StatelessWidget {
       // Round 2 (R2-U1-10): ίδια γραφή με το χάπι των παλμών ύπνου στην ίδια σελίδα («+2 bpm · συνήθως 59», «Όπως
       // συνήθως»)· πριν «−2 bpm · συνήθως 74 bpm» και «Όπως συνήθως · συνήθως 74 bpm».
       pill = TrendPill(
-        d == 0 ? asUsualText : '${signedShown(d)} bpm · συνήθως ${b.usual!.round()}',
+        d == 0 ? asUsualText : '${signedShown(d)} bpm ·\u00A0συνήθως ${b.usual!.round()}',
         up: d == 0 ? null : d > 0,
       );
     } else if (b != null) {

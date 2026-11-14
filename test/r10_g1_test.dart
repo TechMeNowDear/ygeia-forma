@@ -399,7 +399,7 @@ void main() {
     ]);
     await _pump(t, CholesterolPage(food: food, goals: g, today: DateTime(2026, 12, 17)), size: const Size(400, 3000));
     // 60% × 2.100 = 1.260 ≤ 1.300: πλήρης μέρα· 13 × 9 / 1.300 = 9,0%. Με τον στόχο της μέρας (1.350) δεν θα μετρούσε.
-    expect(find.text('μέσος όρος 9,0% · στόχος έως 6%'), findsOneWidget);
+    expect(find.text('μέσος όρος 9,0% ·\u00A0στόχος έως 6%'), findsOneWidget);
     expect(find.textContaining('κάτω από 1.260 kcal'), findsOneWidget);
   });
 }

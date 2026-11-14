@@ -135,7 +135,7 @@ void main() {
       expect(find.byType(AddFoodScreen), findsOneWidget);
       expect(t.widget<AddFoodScreen>(find.byType(AddFoodScreen)).day, _today, reason: 'πριν: η μέρα που είχε μείνει (χθες)');
       expect(food.day, _today);
-      expect(find.descendant(of: find.byKey(const ValueKey('add-day')), matching: find.text('Μέρα: Σήμερα · Παρ\u00A013/11')),
+      expect(find.descendant(of: find.byKey(const ValueKey('add-day')), matching: find.text('Μέρα: Σήμερα ·\u00A0Παρ\u00A013/11')),
           findsOneWidget);
     });
 
@@ -236,17 +236,17 @@ void main() {
   // -------------------------------------------------------------------------------------------------------------------
   group('U3a-1 / U3a-20: η μέρα φαίνεται παντού, και ένα πάτημα γυρίζει στο «Σήμερα»', () {
     test('entryDayLabel', () {
-      expect(entryDayLabel(_today, _now), 'Σήμερα · Παρ\u00A013/11');
-      expect(entryDayLabel(_yesterday, _now), 'Χθες · Πέμ\u00A012/11');
+      expect(entryDayLabel(_today, _now), 'Σήμερα ·\u00A0Παρ\u00A013/11');
+      expect(entryDayLabel(_yesterday, _now), 'Χθες ·\u00A0Πέμ\u00A012/11');
       expect(entryDayLabel(DateTime(2026, 11, 10), _now), 'Τρί\u00A010/11');
       // αλλαγή μήνα: 31/10/2026 είναι Σάββατο
-      expect(entryDayLabel(DateTime(2026, 10, 31, 23, 59), DateTime(2026, 11, 1, 0, 5)), 'Χθες · Σάβ\u00A031/10');
+      expect(entryDayLabel(DateTime(2026, 10, 31, 23, 59), DateTime(2026, 11, 1, 0, 5)), 'Χθες ·\u00A0Σάβ\u00A031/10');
     });
 
     testWidgets('οθόνη προσθήκης για χθες: «Μέρα: Χθες · Πέμ 12/11» και το «Προστέθηκε» λέει τη μέρα', (t) async {
       final food = sampleFoodStore(_now);
       await _pump(t, AddFoodScreen(food: food, meal: Meal.snack, day: _yesterday, clock: () => _now));
-      final line = find.descendant(of: find.byKey(const ValueKey('add-day')), matching: find.text('Μέρα: Χθες · Πέμ\u00A012/11'));
+      final line = find.descendant(of: find.byKey(const ValueKey('add-day')), matching: find.text('Μέρα: Χθες ·\u00A0Πέμ\u00A012/11'));
       expect(line, findsOneWidget);
       expect(t.widget<Text>(line).style!.fontWeight, FontWeight.w700, reason: 'έντονο όταν δεν είναι η σημερινή');
 
@@ -258,14 +258,14 @@ void main() {
       await t.ensureVisible(add);
       await t.tap(add);
       await t.pumpAndSettle();
-      expect(find.textContaining('Προστέθηκε (Χθες · Πέμ\u00A012/11): Μπανάνα'), findsOneWidget);
+      expect(find.textContaining('Προστέθηκε (Χθες ·\u00A0Πέμ\u00A012/11): Μπανάνα'), findsOneWidget);
       expect(food.entriesFor(_yesterday).where((e) => e.food.name == 'Μπανάνα').length, 2,
           reason: 'η χθεσινή του δείγματος και η νέα');
     });
 
     testWidgets('οθόνη προσθήκης για σήμερα: «Μέρα: Σήμερα · Παρ 13/11», όχι έντονο', (t) async {
       await _pump(t, AddFoodScreen(food: sampleFoodStore(_now), meal: Meal.snack, day: _today, clock: () => _now));
-      final line = find.descendant(of: find.byKey(const ValueKey('add-day')), matching: find.text('Μέρα: Σήμερα · Παρ\u00A013/11'));
+      final line = find.descendant(of: find.byKey(const ValueKey('add-day')), matching: find.text('Μέρα: Σήμερα ·\u00A0Παρ\u00A013/11'));
       expect(line, findsOneWidget);
       expect(t.widget<Text>(line).style!.fontWeight, FontWeight.w500);
     });
@@ -906,7 +906,7 @@ void main() {
       await _pump(t, MePage(store: HealthStore(), food: FoodStore.preloaded(foods: basicFoods(), now: _now)),
           size: const Size(400, 3000));
       expect(find.text('Πέρασε ό,τι αγοράζεις, με «Σάρωση» ή από την ετικέτα, χωρίς να το καταγράψεις ως φαγητό.'), findsOneWidget);
-      expect(find.text('Θερμίδες, πρωτεΐνη, χοληστερίνη · 2 λεπτά'), findsOneWidget, reason: 'U3a-6');
+      expect(find.text('Θερμίδες, πρωτεΐνη, χοληστερίνη ·\u00A02 λεπτά'), findsOneWidget, reason: 'U3a-6');
     });
 
     testWidgets('S2-10 / U3a-19: η κουζίνα κρατά τον αριθμό και όταν βγαίνεις με το «πίσω»', (t) async {

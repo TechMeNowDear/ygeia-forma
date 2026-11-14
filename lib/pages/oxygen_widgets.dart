@@ -51,7 +51,7 @@ String watchLowText(NightOxygen? ox) {
   if (ox == null) return 'Χωρίς μετρήσεις του ρολογιού μέσα στον ύπνο';
   final pct = ox.cov == null ? null : (ox.cov! * 100).round();
   if (!spo2MinShown(ox.cov)) return 'Λίγη κάλυψη: το ρολόι μέτρησε το $pct% του ύπνου';
-  final below = ox.below90 == null ? '' : ' · κάτω από 90%: ${hoursMinutes(ox.below90!.round())} (ενδεικτικό)';
+  final below = ox.below90 == null ? '' : ' ·\u00A0κάτω από 90%: ${unitsGlued(hoursMinutes(ox.below90!.round()))} (ενδεικτικό)';
   return '${pct == null ? '' : 'Μέτρησε το $pct% του ύπνου'}$below';
 }
 

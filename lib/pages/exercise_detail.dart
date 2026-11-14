@@ -217,7 +217,7 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('${ex.groupName} · ${ex.equip}', style: TextStyle(fontSize: 14, color: c.textSecondary)),
+              child: Text('${ex.groupName} ·\u00A0${ex.equip}', style: TextStyle(fontSize: 14, color: c.textSecondary)),
             ),
           ),
         ),

@@ -218,7 +218,7 @@ void main() {
     expect([for (final p in t.widget<LineChart>(find.byType(LineChart)).points) p.$2].contains(38.0), isFalse);
     expect(find.textContaining('38,0'), findsNothing);
     // python: 11 δικές σου τιμές, 80,7–82,0, μέσος όρος 81,3545 → 81,4.
-    expect(_row(t, 'Χαμηλότερη · υψηλότερη'), '80,7 · 82,0 kg');
+    expect(_row(t, 'Χαμηλότερη ·\u00A0υψηλότερη'), '80,7 ·\u00A082,0 kg');
     expect(_row(t, 'Μέσος όρος'), '81,4 kg');
     // Round 8 (R8-U4-8): «από 90 μέρες», όπως οι Τάσεις («9 από 9 μέρες»).
     expect(_row(t, 'Μέρες με τιμή'), '11 από 90 μέρες');
@@ -238,7 +238,7 @@ void main() {
       await _pump(t, TodayPage(store: s, food: sampleFoodStore(now), open: (_, [__]) {}, openSettings: () {}, now: now));
       final weigh = find.byKey(const ValueKey('today-weigh'));
       expect(weigh, findsOneWidget, reason: 'Παρασκευή: μέρα μέσης');
-      expect(find.descendant(of: weigh, matching: find.textContaining('80,9 kg')), findsOneWidget);
+      expect(find.descendant(of: weigh, matching: find.textContaining('80,9\u00A0kg')), findsOneWidget); // R12-D2-5: «80,9 kg» αδιάσπαστο
       expect(find.descendant(of: weigh, matching: find.textContaining('82,1')), findsNothing);
       expect(_weightCard(t).value, '80,9');
       expect(fri.weekday, DateTime.friday);
@@ -249,7 +249,7 @@ void main() {
       final s = _store(now, _sorted([...earlier, _m(DateTime(2026, 12, 4, 7, 10), 80.9), _m(DateTime(2026, 12, 4, 7, 30), 34.6)]));
       await _pump(t, TodayPage(store: s, food: sampleFoodStore(now), open: (_, [__]) {}, openSettings: () {}, now: now));
       final weigh = find.byKey(const ValueKey('today-weigh'));
-      expect(find.descendant(of: weigh, matching: find.textContaining('80,9 kg')), findsOneWidget);
+      expect(find.descendant(of: weigh, matching: find.textContaining('80,9\u00A0kg')), findsOneWidget); // R12-D2-5: «80,9 kg» αδιάσπαστο
       expect(find.descendant(of: weigh, matching: find.textContaining('34,6')), findsNothing);
       expect(_weightCard(t).value, '80,9');
       expect(_weightCard(t).note, isNull);

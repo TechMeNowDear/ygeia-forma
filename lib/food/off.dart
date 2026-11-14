@@ -289,7 +289,23 @@ const _dryLegumeIds = {'C20359', 'C20516', 'C20515', 'U173758', 'U174252', 'C205
 /// ίδιο ζυγισμένο «Βρασμένες» (η βρασμένη μορφή της βάσης, κατηγορία «Όσπρια») μετρούσε: ίδιο προϊόν, ίδια ποσότητα, άλλη
 /// απάντηση. Μόνο ξερό (από [rawCheckKcal] kcal): μια κονσέρβα χωρίς «μετρά ως» μένει όπως πριν, γιατί από το όνομα δεν
 /// ξέρουμε πάντα ότι είναι μαγειρεμένη (θα μετρούσε σαν ξερή, 2,5 φορές περισσότερο).
-bool legumesByName(Food f) => _dryLegumeIds.contains(dryStapleRawId(f));
+///
+/// Round12 (R12-D1-1): και τα ξερά κουκιά («Κουκιά ξερά Χ», 301 kcal), που η βάση έχει μόνο ξερά («Κουκιά (ξερά)», C20518,
+/// κατηγορία «Όσπρια», χωρίς βρασμένη μορφή, άρα όχι στο [dryStapleRawId]): πριν, 80 g από τη βάση μετρούσαν «Όσπρια» και
+/// τα ίδια 80 g από δικό σου προϊόν όχι. Ίδιοι φραγμοί: δικό σου, όχι υγρό, από [rawCheckKcal] kcal (τα φρέσκα ή
+/// κατεψυγμένα κουκιά, 60–90 kcal, μένουν έξω, R9-A3-1), όχι «αλεύρι/σνακ…» ([_dryNot]), όχι ζυμαρικό από όσπρια (R10-B1-3).
+bool legumesByName(Food f) {
+  final raw = dryStapleRawId(f);
+  if (_dryLegumeIds.contains(raw)) return true;
+  if (raw != null || !f.isMine || f.perMl || f.n.amount(Nk.kcal) < rawCheckKcal) return false;
+  final words = [
+    for (final w in plain(f.name).split(RegExp(r'[^a-z0-9α-ω]+')))
+      if (w.isNotEmpty) w,
+  ];
+  bool has(List<String> stems) => words.any((w) => stems.any(w.startsWith));
+  if (has(_dryNot) || has(_pastaNames) || has(const ['pasta'])) return false;
+  return has(const ['κουκι']);
+}
 
 // Κατηγορίες του Open Food Facts (πεδίο «categories_tags», αγγλικά ονόματα της ταξινομίας του) για το ΙΔΙΟ το τρόφιμο.
 const _offNutTags = {

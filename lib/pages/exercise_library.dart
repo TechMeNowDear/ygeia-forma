@@ -74,7 +74,7 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
     for (final g in exGroups.keys) {
       final list = [for (final e in shown) if (e.group == g) e];
       if (list.isEmpty) continue;
-      sections.add(_Section(title: '${exGroups[g]} · ${list.length}', list: list, lib: lib));
+      sections.add(_Section(title: '${exGroups[g]} ·\u00A0${list.length}', list: list, lib: lib));
     }
     final search = TextField(
       key: const ValueKey('ex-search'),
@@ -192,7 +192,7 @@ class _Row extends StatelessWidget {
                   Text(ex.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, height: 1.25)),
                   const SizedBox(height: 2),
                   Text(
-                    '${ex.equip} · ${ex.primary.map((m) => m.name.toLowerCase()).join(', ')}',
+                    '${ex.equip} ·\u00A0${ex.primary.map((m) => m.name.toLowerCase()).join(', ')}',
                     style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.3),
                   ),
                   if (ex.caution != null) ...[

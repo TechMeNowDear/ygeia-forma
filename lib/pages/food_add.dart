@@ -226,8 +226,8 @@ String productGoneText(String name) => 'Το «$name» σβήστηκε από �
 String entryDayLabel(DateTime day, DateTime today) {
   final d = dayOf(day), t = dayOf(today);
   final date = shortDayDate(d).replaceAll(' ', '\u00A0');
-  if (sameDay(d, t)) return 'Σήμερα · $date';
-  if (sameDay(d, DateTime(t.year, t.month, t.day - 1))) return 'Χθες · $date';
+  if (sameDay(d, t)) return 'Σήμερα ·\u00A0$date';
+  if (sameDay(d, DateTime(t.year, t.month, t.day - 1))) return 'Χθες ·\u00A0$date';
   return date;
 }
 
@@ -1210,7 +1210,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
-                      '${f.brand != null ? '${f.brand} · ' : ''}${kcalText(f.n.amount(Nk.kcal))} kcal ανά 100 $unit · ${f.source} ›',
+                      '${f.brand != null ? '${f.brand} ·\u00A0' : ''}${kcalText(f.n.amount(Nk.kcal))} kcal ανά 100 $unit ·\u00A0${f.source} ›',
                       style: TextStyle(fontSize: 13.5, color: c.primary),
                     ),
                   ),

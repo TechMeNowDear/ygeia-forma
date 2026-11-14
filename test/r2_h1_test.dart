@@ -187,7 +187,7 @@ void main() {
             to: DateTime(2026, 12, 13)),
       );
       await _pump(t, Scaffold(body: SingleChildScrollView(child: CheckInCard(check: same, store: HealthStore(), now: DateTime(2026, 12, 14, 9)))));
-      expect(find.text('Έλεγχος θερμίδων · κάθε\u00A0Δευτέρα'), findsOneWidget);
+      expect(find.text('Έλεγχος θερμίδων ·\u00A0κάθε\u00A0Δευτέρα'), findsOneWidget);
       final all2 = _texts(t, find.byKey(const ValueKey('today-checkin'))).join('\n');
       expect(all2, contains('καις περίπου 2.600\u00A0kcal'));
       expect(noSplit.hasMatch(all2), isFalse, reason: all2);
@@ -328,14 +328,14 @@ void main() {
           find.descendant(of: find.byKey(const ValueKey('heart-awake')), matching: find.byType(TrendPill)));
       expect(pills, isNotEmpty);
       for (final p in pills) {
-        expect(p.text, matches(RegExp(r'^(Όπως συνήθως|[+−]\d+ bpm · συνήθως \d+)$')), reason: p.text);
+        expect(p.text, matches(RegExp(r'^(Όπως συνήθως|[+−]\d+ bpm ·\u00A0συνήθως \d+)$')), reason: p.text);
       }
     });
 
     test('R2-U1-11: η ημερομηνία της μέρας προσθήκης δεν σπάει', () {
       final now = DateTime(2026, 10, 24, 12);
-      expect(entryDayLabel(DateTime(2026, 10, 24), now), 'Σήμερα · Σάβ\u00A024/10');
-      expect(entryDayLabel(DateTime(2026, 10, 23), now), 'Χθες · Παρ\u00A023/10');
+      expect(entryDayLabel(DateTime(2026, 10, 24), now), 'Σήμερα ·\u00A0Σάβ\u00A024/10');
+      expect(entryDayLabel(DateTime(2026, 10, 23), now), 'Χθες ·\u00A0Παρ\u00A023/10');
       expect(entryDayLabel(DateTime(2026, 10, 20), now), 'Τρί\u00A020/10');
     });
 
@@ -362,7 +362,7 @@ void main() {
       // 3 g ÷ 7 g/100 g = 42,9 g → 45 g (πάνω, ανά 5).
       expect(find.textContaining('γράψε τις β\u2011γλυκάνες'), findsNothing);
       // Round 3 (k1 · R3-B-3): αδιάσπαστο ενωτικό στο «β‑γλυκάνες».
-      expect(find.text('40\u00A0g τη μέρα · για 3\u00A0g β\u2011γλυκάνες χρειάζονται 45\u00A0g'), findsOneWidget);
+      expect(find.text('40\u00A0g τη μέρα ·\u00A0για 3\u00A0g β\u2011γλυκάνες χρειάζονται 45\u00A0g'), findsOneWidget);
       expect(find.textContaining('χρειάζονται 45\u00A0g πίτουρο· το πλάνο σου έχει 40\u00A0g'), findsOneWidget);
       // Χωρίς ετικέτα: όπως πριν.
       s.setGoals(checkinGoals().copyWith(branG: 40));
@@ -372,7 +372,7 @@ void main() {
       // Ετικέτα που φτάνει: όπως πριν.
       s.setGoals(checkinGoals().copyWith(betaPer100: 7, branG: 45));
       await t.pumpAndSettle();
-      expect(find.text('45 g · από την ετικέτα'), findsOneWidget);
+      expect(find.text('45 g ·\u00A0από την ετικέτα'), findsOneWidget);
       expect(find.textContaining('χρειάζονται 45'), findsNothing);
     });
   });
@@ -544,8 +544,8 @@ void main() {
 
     test('R2-U2-08: η μέρα που κρίνει η μπάρα των βημάτων, με τα βήματά της', () {
       final day = DayValue(DateTime(2026, 10, 23), 3900);
-      expect(fullDayStepsLabel(day, DateTime(2026, 10, 24, 10)), 'Χθες, Παρ\u00A023/10 · 3.900\u00A0βήματα');
-      expect(fullDayStepsLabel(day, DateTime(2026, 10, 26, 10)), 'Παρ\u00A023/10 · 3.900\u00A0βήματα');
+      expect(fullDayStepsLabel(day, DateTime(2026, 10, 24, 10)), 'Χθες, Παρ\u00A023/10 ·\u00A03.900\u00A0βήματα');
+      expect(fullDayStepsLabel(day, DateTime(2026, 10, 26, 10)), 'Παρ\u00A023/10 ·\u00A03.900\u00A0βήματα');
     });
 
     testWidgets('R2-U2-08: η ετικέτα της μέρας ΠΑΝΩ από την μπάρα του εύρους', (t) async {
@@ -554,7 +554,7 @@ void main() {
       await _pump(t, ExercisePage(store: s, now: now), size: const Size(400, 3000));
       final label = find.byKey(const ValueKey('move-fullday'));
       expect(label, findsOneWidget);
-      expect(t.widget<Text>(label).data, startsWith('Χθες, Πέμ\u00A012/11 · '));
+      expect(t.widget<Text>(label).data, startsWith('Χθες, Πέμ\u00A012/11 ·\u00A0'));
       expect(t.getRect(label).bottom, lessThanOrEqualTo(t.getRect(find.byType(RangeNote).first).top));
     });
 
@@ -576,7 +576,7 @@ void main() {
       final strength = Session(
           id: 'a', workout: 'A', name: 'Προπόνηση Α', programId: 'p', start: start, end: start.add(const Duration(minutes: 60)), hrAvg: 118);
       final line = recentWorkoutLine(strength);
-      expect(line, startsWith('60\u00A0λεπτά · 0\u00A0σετ'));
+      expect(line, startsWith('60\u00A0λεπτά ·\u00A00\u00A0σετ'));
       expect(line, endsWith('μέσοι παλμοί\u00A0118'));
       expect(line, isNot(contains('ώρα')));
       final walk = Session(

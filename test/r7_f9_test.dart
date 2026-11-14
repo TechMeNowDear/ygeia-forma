@@ -392,7 +392,7 @@ void main() {
       expect(f, findsNWidgets(3));
       for (var i = 0; i < 3; i++) {
         final text = t.widget<Text>(f.at(i)).data!;
-        expect(text, startsWith('$name · '));
+        expect(text, startsWith('$name ·\u00A0'));
         expect(text, endsWith('90 μέρες'));
         // Inter 10,5: όνομα + « ·» 367,9 στιγμές, διάστημα 161,3· διαθέσιμα 440,8 → δύο γραμμές (python, fontTools).
         expect(t.renderObject<RenderParagraph>(f.at(i)).didExceedMaxLines, isFalse, reason: 'πριν: «… 14 Νοε 20…»');

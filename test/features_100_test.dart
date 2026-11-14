@@ -71,8 +71,8 @@ void main() {
 
   group('2. Διαστάσεις οθόνης στο «Τι φτάνει»', () {
     test('πλάτος × ύψος σε dp και μέγεθος γραμμάτων', () {
-      expect(screenSizeText(const Size(411.4, 914.3), 1), 'Οθόνη τώρα: 411 × 914 dp · γράμματα 100%');
-      expect(screenSizeText(const Size(882, 968), 1.3), 'Οθόνη τώρα: 882 × 968 dp · γράμματα 130%');
+      expect(screenSizeText(const Size(411.4, 914.3), 1), 'Οθόνη τώρα: 411 × 914 dp ·\u00A0γράμματα 100%');
+      expect(screenSizeText(const Size(882, 968), 1.3), 'Οθόνη τώρα: 882 × 968 dp ·\u00A0γράμματα 130%');
     });
 
     testWidgets('φαίνονται στην οθόνη', (t) async {
@@ -85,7 +85,7 @@ void main() {
       await t.pumpAndSettle();
       // Round 1 (f4 · U1b-07): στην οθόνη «γράμματα» και «100%» με αδιάσπαστο κενό (δεν χωρίζονται σε δύο γραμμές)·
       // το screenSizeText (πάνω) μένει με απλό κενό.
-      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp · γράμματα\u00A0100%');
+      expect(t.widget<Text>(find.byKey(const ValueKey('ti-ftanei-screen'))).data, 'Οθόνη τώρα: 800 × 600 dp ·\u00A0γράμματα\u00A0100%');
     });
   });
 
@@ -432,9 +432,9 @@ void main() {
 
     test('κείμενο με χιλιάδες· γράφει μόνο ό,τι υπάρχει', () {
       expect(hrQualityText(const HrQualityCounts(5400, 120, 15)),
-          'Μετρήσεις ρολογιού: 5.400 με καλή επαφή · 120 χαμηλής ακρίβειας · 15 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).');
+          'Μετρήσεις ρολογιού: 5.400 με καλή επαφή ·\u00A0120 χαμηλής ακρίβειας ·\u00A015 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).');
       expect(hrQualityText(const HrQualityCounts(900, 0, 0)), 'Μετρήσεις ρολογιού: 900, όλες με καλή επαφή.');
-      expect(hrQualityText(const HrQualityCounts(900, 0, 4)), 'Μετρήσεις ρολογιού: 900 με καλή επαφή · 4 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).');
+      expect(hrQualityText(const HrQualityCounts(900, 0, 4)), 'Μετρήσεις ρολογιού: 900 με καλή επαφή ·\u00A04 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).');
     });
 
     testWidgets('η κάρτα παλμών το δείχνει μόνο όταν το ρολόι έστειλε καταμέτρηση', (tester) async {

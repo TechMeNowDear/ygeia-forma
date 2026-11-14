@@ -105,8 +105,8 @@ void main() {
       expect(find.text('Αλλαγή συσκευής'), findsNWidgets(4), reason: 'μία ανά δείκτη, στη γραμμή του Oura (και η ώρα ξυπνήματος)');
       expect(find.textContaining('Oura, από 6/11'), findsNothing, reason: 'πριν: μόνο οι νύχτες του Oura');
       // Σελίδα 2: μία μεσαία τιμή για κάθε συσκευή, γραμμένη στον τίτλο.
-      expect(find.text('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm) · ρολόι ως 5/11, Oura από 6/11'), findsOneWidget);
-      expect(find.text('Διάρκεια ύπνου (ώρες:λεπτά) · ρολόι ως 5/11, Oura από 6/11'), findsOneWidget);
+      expect(find.text('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm) ·\u00A0ρολόι ως 5/11, Oura από 6/11'), findsOneWidget);
+      expect(find.text('Διάρκεια ύπνου (ώρες:λεπτά) ·\u00A0ρολόι ως 5/11, Oura από 6/11'), findsOneWidget);
     });
   });
 
@@ -135,7 +135,7 @@ void main() {
     }
 
     TrendPill heartPill(WidgetTester t) =>
-        t.widgetList<TrendPill>(find.byType(TrendPill)).firstWhere((p) => p.text.contains('bpm · συνήθως'));
+        t.widgetList<TrendPill>(find.byType(TrendPill)).firstWhere((p) => p.text.contains('bpm ·\u00A0συνήθως'));
     TrendPill todayPill(WidgetTester t) =>
         t.widgetList<StatCard>(find.byType(StatCard)).firstWhere((c) => c.title.startsWith('Παλμοί στον ύπνο')).trend! as TrendPill;
 

@@ -39,7 +39,7 @@ String repsList(List<int> r) {
 String targetLine(PlanItem item, Target t) {
   final k = item.kind;
   final reps = repsList(t.reps);
-  return hasLoad(k) ? '${loadLabel(k, t.load)} · $reps' : reps;
+  return hasLoad(k) ? '${loadLabel(k, t.load)} ·\u00A0$reps' : reps;
 }
 
 /// Χρώμα και βελάκι της αλλαγής.
@@ -48,7 +48,7 @@ String targetLine(PlanItem item, Target t) {
   return switch (c) {
     Change.up || Change.variant => (a.good, ' ↑'),
     // round1, U5-26: όχι «10 +1» (διαβαζόταν σαν πράξη)· οι αριθμοί δίπλα έχουν ήδη την επιπλέον επανάληψη.
-    Change.more => (a.good, ' · +1\u00A0επανάληψη'),
+    Change.more => (a.good, ' ·\u00A0+1\u00A0επανάληψη'),
     Change.down || Change.back => (a.textSecondary, ' ↓'),
     Change.pain => (a.warn, ''),
     _ => (a.textSecondary, ''),
@@ -97,7 +97,7 @@ String bandName(double lb) {
   // Αδιάσπαστο κενό: «30 lb» ποτέ σε δύο γραμμές.
   if (names == null || names.isEmpty) return '${lb.round()}\u00A0lb';
   final t = names.map((n) => bandNames[n]).join(' + ');
-  return '${t[0].toUpperCase()}${t.substring(1)} λάστιχο · ${lb.round()}\u00A0lb';
+  return '${t[0].toUpperCase()}${t.substring(1)} λάστιχο ·\u00A0${lb.round()}\u00A0lb';
 }
 
 class Stepper2 extends StatelessWidget {

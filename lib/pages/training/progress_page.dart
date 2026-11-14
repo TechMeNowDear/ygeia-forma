@@ -308,7 +308,7 @@ class _WalkCard extends StatelessWidget {
           key: const ValueKey('prog-walk-hr'),
           label: 'Παλμοί στο περπάτημα',
           detail: vals(w.hr, (v) => '${v.round()}') + (w.hr.current == null ? '' : ' bpm'),
-          extra: hrExtra.isEmpty ? 'από το 5ο λεπτό ως το «Τέλος»' : 'από το 5ο λεπτό · $hrExtra',
+          extra: hrExtra.isEmpty ? 'από το 5ο λεπτό ως το «Τέλος»' : 'από το 5ο λεπτό ·\u00A0$hrExtra',
           pill: pillFor(w.hr, goodness: w.hrGoodness),
         ),
         // Μία τιμή ανά περπάτημα (V-B-10): φαίνεται η πορεία, όχι μόνο δύο μεσαίες τιμές.
@@ -356,7 +356,7 @@ class _WalkCard extends StatelessWidget {
           key: const ValueKey('prog-walk-count'),
           label: 'Περπατήματα',
           // Round 2 (R2-U2-06): ενεργός χρόνος των περπατημάτων της περιόδου σε ώρες και λεπτά (πριν «15,0 ώρες»).
-          detail: '${w.countBefore} → ${w.countNow} · ${hoursMinutes((w.secNow / 60).round())}',
+          detail: '${w.countBefore} → ${w.countNow} ·\u00A0${unitsGlued(hoursMinutes((w.secNow / 60).round()))}',
           pill: TrendPill(w.countNow == w.countBefore ? 'Ίδιο' : '${w.countNow > w.countBefore ? '+' : '−'}${(w.countNow - w.countBefore).abs()}'),
           line: false,
         ),
@@ -414,13 +414,14 @@ class _BodyCard extends StatelessWidget {
           _Row(
             label: metricLabel(results[i].def, results[i].source),
             // round1, U6-07: με λίγες μετρήσεις όχι «πριν → τώρα» (διαβαζόταν σαν αλλαγή), όπως και στις «Τάσεις».
+            // Round 12 (R12-D2-2): ο αριθμός με τη μονάδα του ([_glued]): πριν «… → 7 ώρες 13» / «λεπτά».
             detail: results[i].status == TrendStatus.insufficient
                 ? (results[i].current != null && results[i].nCurrent >= results[i].needed
-                    ? 'τώρα ${results[i].def.formatAs(results[i].current!, results[i].source)}'
+                    ? 'τώρα ${_glued(results[i], results[i].current!)}'
                     : '—')
                 : results[i].previous == null || results[i].current == null
-                ? (results[i].current == null ? '—' : 'τώρα ${results[i].def.formatAs(results[i].current!, results[i].source)}')
-                : '${results[i].def.formatAs(results[i].previous!, results[i].source)} → ${results[i].def.formatAs(results[i].current!, results[i].source)}',
+                ? (results[i].current == null ? '—' : 'τώρα ${_glued(results[i], results[i].current!)}')
+                : '${_glued(results[i], results[i].previous!)} → ${_glued(results[i], results[i].current!)}',
             pill: TrendStatusPill(r: results[i]),
             line: i < results.length - 1,
           ),
@@ -478,10 +479,14 @@ List<(String, TrendKind, bool?)> progressHighlights(WalkProgress walk, List<ExPr
   }
   for (final r in body) {
     if (!r.changed) continue;
-    out.add(('${metricLabel(r.def, r.source)}: ${r.def.formatAs(r.previous!, r.source)} → ${r.def.formatAs(r.current!, r.source)}', k(r.goodness), r.status == TrendStatus.up));
+    out.add(('${metricLabel(r.def, r.source)}: ${_glued(r, r.previous!)} → ${_glued(r, r.current!)}', k(r.goodness), r.status == TrendStatus.up));
   }
   return out;
 }
+
+/// Round 12 (R12-D2-2): η τιμή μιας μέτρησης όπως στις «Τάσεις», με τον αριθμό κολλημένο στη μονάδα του ([unitsGlued],
+/// R2-U2-05): αν η γραμμή σπάσει, το πολύ «7 ώρες» / «13 λεπτά», ποτέ «7 ώρες 13» / «λεπτά».
+String _glued(TrendResult r, double v) => unitsGlued(r.def.formatAs(v, r.source));
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.walk, required this.strength, required this.body});

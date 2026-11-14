@@ -442,8 +442,8 @@ void main() {
     ]);
     expect(mixed.mixedLoads, isTrue);
     expect(mixed.endLoad, 2.8);
-    expect(mixed.doneText(), '4,3 kg × 10 · 2,8 kg × 12');
-    expect(done('db_curl', 2.8, [12, 12]).doneText(), '2,8 kg · 12, 12');
+    expect(mixed.doneText(), '4,3 kg × 10 ·\u00A02,8 kg × 12');
+    expect(done('db_curl', 2.8, [12, 12]).doneText(), '2,8 kg ·\u00A012, 12');
     final p = ExProgress(ex: 'db_curl', kind: LoadKind.dbPair, beforeDay: ago(10), before: done('db_curl', 2.8, [12, 12]), nowDay: ago(3), now: mixed);
     expect(p.loadDiff, 0, reason: 'τελείωσε με 2,8 kg και τις δύο φορές (με το μεγαλύτερο θα έβγαινε +1,5)');
   });
@@ -474,8 +474,8 @@ void main() {
     t.answer(e, 4);
     await _pump(tester, SummaryPage(training: t, session: s, live: true), size: const Size(400, 2400));
     // 15, 15 με «4+» στο πάνω όριο (15) → κέρατο 3 → 3,5 kg (+0,5), ξανά από το κάτω όριο του ΠΡΟΓΡΑΜΜΑΤΟΣ (10)
-    expect(find.textContaining('3,5 kg · 2 × 10'), findsOneWidget);
-    expect(find.textContaining('3,5 kg · 2 × 9'), findsNothing);
+    expect(find.textContaining('3,5 kg ·\u00A02 × 10'), findsOneWidget);
+    expect(find.textContaining('3,5 kg ·\u00A02 × 9'), findsNothing);
     t.finish();
     final real = t.targetFor(t.program!.workout('LA')!.items.single);
     expect(real.load, 3.5);
@@ -570,7 +570,8 @@ void main() {
       await tester.runAsync(() => ExLibrary.load(inline: true));
       final t = TrainingStore(io: MemoryTrainingIO(), clock: () => DateTime(2026, 11, 14, 10))..ready = true;
       await _pump(tester, ProgramEditorPage(training: t, program: parseProgram(_v2, ids).program!), size: const Size(400, 2400));
-      expect(find.textContaining('30 → 45 λεπτά'), findsOneWidget);
+      // Round 12 (R12-D2-3): ο αριθμός με τη λέξη του ([unitsGlued]): «30 →» / «45 λεπτά» αν σπάσει η γραμμή.
+      expect(find.textContaining('30\u00A0→ 45\u00A0λεπτά'), findsOneWidget);
     });
 
     testWidgets('U1-9: «όριο παλμών 140» με αδιάσπαστα κενά και στις δύο θέσεις', (tester) async {

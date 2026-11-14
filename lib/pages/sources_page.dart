@@ -67,7 +67,7 @@ class SourcesPage extends StatelessWidget {
                   icon: Icons.watch_rounded,
                   name: sourceDevice(Source.watch),
                   // Round 1 (U2b-16): η ώρα είναι το πότε ΔΙΑΒΑΣΕ η εφαρμογή τη Samsung Health (όχι πότε συγχρόνισε το ρολόι).
-                  status: d == null ? 'Μέσω Samsung Health' : 'Μέσω Samsung Health · διαβάστηκε ${_when(d.readAt, today)}',
+                  status: d == null ? 'Μέσω Samsung Health' : 'Μέσω Samsung Health ·\u00A0διαβάστηκε ${_when(d.readAt, today)}',
                 ),
                 const Hairline(vertical: 4),
                 _DeviceRow(
@@ -75,7 +75,7 @@ class SourcesPage extends StatelessWidget {
                   name: sourceDevice(Source.scale),
                   status: d?.latestBody == null
                       ? 'Μέσω Samsung Health'
-                      : 'Μέσω Samsung Health · τελευταία ζύγιση '
+                      : 'Μέσω Samsung Health ·\u00A0τελευταία ζύγιση '
                           '${sameDay(d!.latestBody!.time, today) ? 'σήμερα' : shortDayDate(d.latestBody!.time)}',
                 ),
               ],
@@ -244,21 +244,21 @@ class SourcesPage extends StatelessWidget {
     if (s.planState == PlanState.unknown) {
       // Round 1 (U2b-05): όταν το ιστορικό δεν έχει διαβαστεί ακόμα, πάνω υπάρχει μόνο «Δοκίμασε ξανά» (τίποτα να διαλέξεις).
       final what = s.planRecovery == null ? 'πάτα «Δοκίμασε ξανά» πάνω' : 'διάλεξε πηγή ύπνου πάνω';
-      return s.ouraHasTokens ? 'Συνδεδεμένο · $what' : '${what[0].toUpperCase()}${what.substring(1)}';
+      return s.ouraHasTokens ? 'Συνδεδεμένο ·\u00A0$what' : '${what[0].toUpperCase()}${what.substring(1)}';
     }
     if (!s.ouraConfigured && !s.ouraHasTokens) return 'Η σύνδεση ενεργοποιείται τη μέρα που θα έρθει';
     return switch (s.ouraStatus) {
       OuraStatus.off => s.ouraHasTokens ? 'Συνδεδεμένο' : 'Δεν έχει συνδεθεί',
-      OuraStatus.starting => 'Συνδεδεμένο · ο ύπνος από το Oura από απόψε',
-      OuraStatus.startingNow => 'Συνδεδεμένο · ${s.ouraFirstNightText.toLowerCase()}',
+      OuraStatus.starting => 'Συνδεδεμένο ·\u00A0ο ύπνος από το Oura από απόψε',
+      OuraStatus.startingNow => 'Συνδεδεμένο ·\u00A0${s.ouraFirstNightText.toLowerCase()}',
       OuraStatus.incomplete => 'Η σύνδεση δεν ολοκληρώθηκε· δοκίμασε ξανά',
       // Round 1 (U2b-09): μετά το «Ο ύπνος ξανά από το ρολόι».
-      OuraStatus.disconnected => s.watchSleepFromTonight ? 'Αποσυνδέθηκε · από απόψε ο ύπνος από το ρολόι' : 'Αποσυνδέθηκε',
+      OuraStatus.disconnected => s.watchSleepFromTonight ? 'Αποσυνδέθηκε ·\u00A0από απόψε ο ύπνος από το ρολόι' : 'Αποσυνδέθηκε',
       OuraStatus.reconnect => 'Χρειάζεται νέα σύνδεση',
       // Round 1 (S5-6): το 403 είναι «συνδρομή Ή άδεια».
       OuraStatus.subscription => 'Η Oura δεν δίνει δεδομένα (συνδρομή ή άδεια)',
       // Round 1 (U2b-16): «ενημερώθηκε», όπως «Τελευταία ενημέρωση» / «Ενημέρωση τώρα» στη σελίδα «Oura».
-      _ => s.ouraLastSync == null ? 'Συνδεδεμένο' : 'Συνδεδεμένο · ενημερώθηκε ${_when(s.ouraLastSync!, today)}',
+      _ => s.ouraLastSync == null ? 'Συνδεδεμένο' : 'Συνδεδεμένο ·\u00A0ενημερώθηκε ${_when(s.ouraLastSync!, today)}',
     };
   }
 }

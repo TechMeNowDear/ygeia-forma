@@ -177,7 +177,7 @@ void main() {
         ..saveWaist(const WaistEntry('2026-11-16', [100.0, 100.0]))
         ..saveWaist(const WaistEntry('2027-11-20', [96.0, 96.0]));
       await _pump(t, BodyPage(store: s, now: now));
-      expect(find.text('20 Νοε 2027 · −4,0 cm από 16 Νοε 2026'), findsOneWidget);
+      expect(find.text('20 Νοε 2027 ·\u00A0−4,0 cm από 16 Νοε 2026'), findsOneWidget);
     });
 
     testWidgets('ίδια χρονιά: χωρίς έτος, όπως πριν', (t) async {
@@ -186,7 +186,7 @@ void main() {
         ..saveWaist(const WaistEntry('2026-10-23', [100.0, 100.0]))
         ..saveWaist(const WaistEntry('2026-11-06', [99.0, 99.0]));
       await _pump(t, BodyPage(store: s, now: now));
-      expect(find.text('6 Νοε 2026 · −1,0 cm από 23 Οκτ'), findsOneWidget);
+      expect(find.text('6 Νοε 2026 ·\u00A0−1,0 cm από 23 Οκτ'), findsOneWidget);
     });
   });
 
@@ -287,13 +287,13 @@ void main() {
 
     testWidgets('ρολόι, νύχτα Τετ 11/11, τώρα Σάβ 14/11: «Ύπνος · ξύπνημα Τετ 11/11» (πριν «ξύπνημα τετάρτη»)', (t) async {
       await _pump(t, _today(_store(DateTime(2026, 11, 11, 22), const []), DateTime(2026, 11, 14, 9)));
-      expect(find.text('Ύπνος · ξύπνημα Τετ 11/11'), findsOneWidget);
+      expect(find.text('Ύπνος ·\u00A0ξύπνημα Τετ 11/11'), findsOneWidget);
       expect(find.textContaining('ξύπνημα τετάρτη'), findsNothing);
     });
 
     testWidgets('ρολόι, νύχτα Τρί 3/11: «Ύπνος · ξύπνημα Τρί 3/11» (πριν «ξύπνημα 3 νοε»)', (t) async {
       await _pump(t, _today(_store(DateTime(2026, 11, 3, 22), const []), DateTime(2026, 11, 14, 9)));
-      expect(find.text('Ύπνος · ξύπνημα Τρί 3/11'), findsOneWidget);
+      expect(find.text('Ύπνος ·\u00A0ξύπνημα Τρί 3/11'), findsOneWidget);
       expect(find.textContaining('ξύπνημα 3 νοε'), findsNothing);
     });
 
@@ -302,14 +302,14 @@ void main() {
       final s = _ouraStore(at, missing: {DateTime(2026, 11, 15)});
       expect(s.ouraNightDay(at), DateTime(2026, 11, 14));
       await _pump(t, SingleChildScrollView(child: OuraSleepTodayCard(store: s, now: at, onTap: () {})));
-      expect(find.text('Ύπνος · ξύπνημα χθες'), findsOneWidget);
-      expect(find.text('Ύπνος · χθες βράδυ'), findsNothing);
+      expect(find.text('Ύπνος ·\u00A0ξύπνημα χθες'), findsOneWidget);
+      expect(find.text('Ύπνος ·\u00A0χθες βράδυ'), findsNothing);
     });
 
     testWidgets('Oura, Σάβ 14/11 09:00: «χθες βράδυ», όπως πριν', (t) async {
       final at = DateTime(2026, 11, 14, 9);
       await _pump(t, SingleChildScrollView(child: OuraSleepTodayCard(store: _ouraStore(at), now: at, onTap: () {})));
-      expect(find.text('Ύπνος · χθες βράδυ'), findsOneWidget);
+      expect(find.text('Ύπνος ·\u00A0χθες βράδυ'), findsOneWidget);
     });
   });
 

@@ -90,8 +90,8 @@ void main() {
       }
       s.history[dateKey(day)] = {'o.sleepHr': 60, 'o.hrv': 41, 'o.skinTemp': 0.3};
       await _pump(t, SingleChildScrollView(child: OuraRestCard(store: s, now: DateTime(2026, 11, 14, 10), onTap: () {})));
-      expect(find.text('+1 · συνήθως 59'), findsOneWidget);
-      expect(find.text('+2 · συνήθως 39'), findsOneWidget);
+      expect(find.text('+1 ·\u00A0συνήθως 59'), findsOneWidget);
+      expect(find.text('+2 ·\u00A0συνήθως 39'), findsOneWidget);
       expect(find.text('όπως συνήθως'), findsNothing);
       // F2: ίδια ετικέτα θερμοκρασίας με το «Εκτός συνηθισμένου».
       expect(find.text(ouraTempDeviationLabel), findsOneWidget);
@@ -203,8 +203,8 @@ void main() {
 
     testWidgets('Τάσεις (ρολόι): η θερμοκρασία καρπού μόνο ως αλλαγή, ποτέ «35,2 °C»', (t) async {
       await _pump(t, TrendsPage(store: _sample(), now: _now), size: const Size(400, 4000));
-      expect(find.textContaining(RegExp(r'3\d,\d °C')), findsNothing);
-      expect(find.text('σε σχέση με πριν · όχι θερμοκρασία σώματος'), findsWidgets);
+      expect(find.textContaining(RegExp(r'3\d,\d[ \u00A0]°C')), findsNothing);
+      expect(find.text('σε σχέση με πριν ·\u00A0όχι θερμοκρασία σώματος'), findsWidgets);
     });
 
     test('Τάσεις: χωρίς σύγκριση (λίγα δεδομένα) η θερμοκρασία καρπού είναι «—», όχι «0 °C»', () {
@@ -220,7 +220,7 @@ void main() {
       final s = _sample();
       await _pump(t, BodyPage(store: s), size: const Size(400, 4000));
       expect(find.textContaining('μέσος όρος σου'), findsNothing);
-      expect(find.textContaining(RegExp(r'3\d,\d °C')), findsNothing);
+      expect(find.textContaining(RegExp(r'3\d,\d[ \u00A0]°C')), findsNothing);
       final chart = t.widget<LineChart>(find.descendant(of: find.byKey(const ValueKey('body-skin')), matching: find.byType(LineChart)));
       expect(chart.points.every((p) => p.$2.abs() < 5), isTrue, reason: 'αποκλίσεις, όχι ~35 °C');
     });
@@ -234,7 +234,7 @@ void main() {
       nights.last.sleepingHr = null;
       final shown = nights.lastWhere((n) => n.sleepingHr != null);
       await _pump(t, HeartPage(store: s, now: _now), size: const Size(400, 3000));
-      expect(find.text('Παλμοί στον ύπνο · ${shortDayDate(shown.date)}'), findsOneWidget);
+      expect(find.text('Παλμοί στον ύπνο ·\u00A0${shortDayDate(shown.date)}'), findsOneWidget);
     });
 
     test('Μέσο οξυγόνο: ποτέ στρογγυλοποίηση προς τα πάνω στο 90%', () {
@@ -539,8 +539,8 @@ void main() {
       expect(unsupportedText, isNot(contains('SDK')));
       expect(countNumber(1965), '1.965');
       expect(countNumber(1965.4), '1.965');
-      expect(countedIgnoredText(3, 1, 'μόνο ρολόι'), 'Μετρούν 3 · αγνοείται 1 από άλλη πηγή (μόνο ρολόι)');
-      expect(countedIgnoredText(1965, 2, 'μόνο InBody'), 'Μετρούν 1.965 · αγνοούνται 2 από άλλη πηγή (μόνο InBody)');
+      expect(countedIgnoredText(3, 1, 'μόνο ρολόι'), 'Μετρούν 3 ·\u00A0αγνοείται 1 από άλλη πηγή (μόνο ρολόι)');
+      expect(countedIgnoredText(1965, 2, 'μόνο InBody'), 'Μετρούν 1.965 ·\u00A0αγνοούνται 2 από άλλη πηγή (μόνο InBody)');
     });
 
     test('U3: μία φράση για το κενό που ίσως ήταν ύπνος', () {
@@ -603,7 +603,7 @@ void main() {
       expect(t.widgetList<BigValue>(find.byType(BigValue)).first.value, hr);
       expect(find.byKey(const ValueKey('heart-oxygen-columns')), findsOneWidget);
       final heartRow = t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == shortDayDate(n.date));
-      expect(heartRow.value, endsWith('· $low'));
+      expect(heartRow.value, endsWith('·\u00A0$low'));
 
       // Ύπνος
       await _pump(t, SleepPage(store: s, now: _now), size: const Size(400, 3200));

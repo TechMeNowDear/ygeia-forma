@@ -43,7 +43,7 @@ class WalkExtraCard extends StatelessWidget {
             distanceFromSteps(session) ? 'ρυθμός ανά km (από βήματα)' : 'ρυθμός ανά km'),
         stat(cad == null ? '—' : '$cad', 'βήματα το λεπτό'),
         // Round 2 (R2-U2-05): «2 λεπτά» μαζί (στη στήλη των 104 dp έμενε «παύση · 2 | λεπτά»).
-        stat('$pauses', pauses == 0 ? 'παύσεις' : '${pauses == 1 ? 'παύση' : 'παύσεις'} · ${unitsGlued(hoursMinutes(pausedMin))}'),
+        stat('$pauses', pauses == 0 ? 'παύσεις' : '${pauses == 1 ? 'παύση' : 'παύσεις'} ·\u00A0${unitsGlued(hoursMinutes(pausedMin))}'),
       ]),
     );
   }
@@ -127,7 +127,7 @@ class RecoveryCard extends StatelessWidget {
             Text(e - m >= 0 ? '−${e - m}' : '+${m - e}',
                 key: const ValueKey('hrr-drop'), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: c.text)),
             const SizedBox(width: 8),
-            Flexible(child: Text('παλμοί · $e → $m', key: const ValueKey('hrr-values'), style: TextStyle(fontSize: 15, color: c.text))),
+            Flexible(child: Text('παλμοί ·\u00A0$e → $m', key: const ValueKey('hrr-values'), style: TextStyle(fontSize: 15, color: c.text))),
           ])
         else
           // R9-A7-3: μερικό περπάτημα (η εφαρμογή του ρολογιού έκλεισε πριν το «Τέλος»): η αιτία είναι αυτή, όχι κάποια

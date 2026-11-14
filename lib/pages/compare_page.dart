@@ -124,7 +124,7 @@ class ComparePage extends StatelessWidget {
                 Text(
                   until == null || !plan.compareActive(today)
                       ? 'Η σύγκριση έκλεισε.'
-                      : 'Μόνο για έλεγχο · κλείνει μόνη της ${shortDayDate(until)}',
+                      : 'Μόνο για έλεγχο ·\u00A0κλείνει μόνη της ${shortDayDate(until)}',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.text),
                 ),
                 const SizedBox(height: 6),

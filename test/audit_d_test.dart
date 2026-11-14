@@ -86,7 +86,7 @@ void main() {
       expect(g.measuredNights, 3);
       expect(g.messages.single, contains('σε 3 από τις 3 νύχτες με μέτρηση'));
       expect(g.messages.single, isNot(contains('όλες τις νύχτες')));
-      expect(g.short, 'Κάτω από 85% σε 3 από 3 νύχτες · δες την Καρδιά');
+      expect(g.short, 'Κάτω από 85% σε 3 από 3 νύχτες ·\u00A0δες την Καρδιά');
     });
 
     test('M1: τρεις νύχτες στο 87% δεν βγάζουν σημείωση (όριο 85%, όχι 88%)', () {
@@ -222,7 +222,7 @@ void main() {
 
       await t.enterText(find.byKey(const ValueKey('report-name')), 'Γιάννης Π.');
       await t.pump();
-      expect(find.textContaining('Γιάννης Π. · '), findsNWidgets(3), reason: 'σε κάθε σελίδα');
+      expect(find.textContaining('Γιάννης Π. ·\u00A0'), findsNWidgets(3), reason: 'σε κάθε σελίδα');
       await t.pumpWidget(const SizedBox());
       expect(store.prefs.reportName, 'Γιάννης Π.');
       expect(store.prefs.toJson(), contains('reportName'));
@@ -486,7 +486,7 @@ void main() {
       final s = sample();
       expect(s.data!.lastNight!.score, isNull, reason: 'η τελευταία νύχτα του δείγματος είναι σε δύο κομμάτια');
       await _pump(t, SleepPage(store: s, now: now), size: const Size(400, 3000));
-      expect(find.text('Η τελευταία νύχτα · μέσοι όροι 7 νυχτών · γράφημα 14 νυχτών'), findsOneWidget);
+      expect(find.text('Η τελευταία νύχτα ·\u00A0μέσοι όροι 7 νυχτών ·\u00A0γράφημα 14 νυχτών'), findsOneWidget);
       expect(find.byType(ScoreRing), findsNothing);
       expect(find.textContaining('Μέσος όρος εβδομάδας'), findsNothing);
     });

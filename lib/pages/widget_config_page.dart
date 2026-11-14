@@ -203,7 +203,7 @@ class _WidgetConfigPageState extends State<WidgetConfigPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Widget · ${WKind.title(_s.kind)}'),
+          title: Text('Widget ·\u00A0${WKind.title(_s.kind)}'),
           leading: IconButton(
             tooltip: 'Άκυρο',
             icon: const Icon(Icons.close_rounded),
@@ -668,7 +668,7 @@ class _ValueRow extends StatelessWidget {
                 Expanded(
                   child: Text.rich(TextSpan(children: [
                     TextSpan(text: name, style: TextStyle(fontSize: 15, color: c.text)),
-                    if (on && !shown) TextSpan(text: '  · δεν χωρά', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+                    if (on && !shown) TextSpan(text: '  ·\u00A0δεν χωρά', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
                   ])),
                 ),
               ]),

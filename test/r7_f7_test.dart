@@ -392,7 +392,7 @@ void main() {
       await t.ensureVisible(row);
       await t.tap(row);
       await t.pumpAndSettle();
-      expect(find.text('Από την αλλαγή · 6 Νοε – 14 Νοε'), findsOneWidget);
+      expect(find.text('Από την αλλαγή ·\u00A06 Νοε – 14 Νοε'), findsOneWidget);
       final rows = t.widgetList<InfoRow>(find.byType(InfoRow)).toList();
       expect(rows.singleWhere((r) => r.label == 'Με δεδομένα').value, '9 από 9 μέρες');
       expect(rows.where((r) => r.label.startsWith('Πριν ·')), isEmpty);

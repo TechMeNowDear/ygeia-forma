@@ -384,7 +384,7 @@ class OuraSleepTodayCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             // Round 1 (S5-1): οι ώρες του τόπου όπου κοιμήθηκες (ίδιες με του κινητού όταν δεν ταξιδεύεις).
-            'Κοιμήθηκες ${parts.first.wallOnset == null ? '—' : hm(parts.first.wallOnset!)} · ξύπνησες ${hm(parts.last.wallEnd)}',
+            'Κοιμήθηκες ${parts.first.wallOnset == null ? '—' : hm(parts.first.wallOnset!)} ·\u00A0ξύπνησες ${hm(parts.last.wallEnd)}',
             key: const ValueKey('oura-today-times'),
             style: TextStyle(color: soft, fontSize: 13, fontWeight: FontWeight.w500, fontFeatures: tabular),
           ),
@@ -394,7 +394,7 @@ class OuraSleepTodayCard extends StatelessWidget {
               [
                 if (night.shortNight && (minutes ?? 0) < 180) shortNightLabel,
                 if (parts.length > 1) 'σε ${parts.length} κομμάτια: ${[for (final p in parts) '${hm(p.wallStart)}–${hm(p.wallEnd)}'].join(' και ')} (το κενό δεν μετρά)',
-              ].join(' · '),
+              ].join(' ·\u00A0'),
               style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
             ),
           ],
@@ -431,7 +431,7 @@ class OuraSleepTodayCard extends StatelessWidget {
                     Expanded(
                       // Round 9 (R9-U1-7): σε σχέση με ΤΩΡΑ, όπως η κάρτα του ρολογιού: 00:00–04:00 η νύχτα της χθεσινής
                       // ημερομηνίας ([OuraStore.ouraNightDay]) είναι «ξύπνημα χθες», όχι «χθες βράδυ».
-                      child: Text('Ύπνος · ${sleepNightLabel(today, now)}',
+                      child: Text('Ύπνος ·\u00A0${sleepNightLabel(today, now)}',
                           style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                     const SourceTag(Source.oura, onDark: true),
@@ -556,7 +556,7 @@ class OuraRestCard extends StatelessWidget {
       if (b.usual == null) return 'μαθαίνει';
       final d = shownDiff(b.value, b.usual!);
       if (d == 0) return 'όπως συνήθως';
-      return '${signedShown(d)} · συνήθως ${b.usual!.round()}';
+      return '${signedShown(d)} ·\u00A0συνήθως ${b.usual!.round()}';
     }
 
     Widget cell(String label, String value, String unit, String sub) => Expanded(

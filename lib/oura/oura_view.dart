@@ -119,12 +119,12 @@ String napTimes(OuraNight? n, {bool nightOnly = false}) {
   return [
     for (final x in n.naps)
       if (!nightOnly || (x.wallStart.isBefore(to) && x.wallEnd.isAfter(from)))
-        '${hm(x.wallStart)}–${hm(x.wallEnd)}${x.totalMinutes == null ? '' : ' · ${hoursMinutes(x.totalMinutes!)}'}',
+        '${hm(x.wallStart)}–${hm(x.wallEnd)}${x.totalMinutes == null ? '' : ' ·\u00A0${unitsGlued(hoursMinutes(x.totalMinutes!))}'}',
   ].join(', ');
 }
 
 /// Η νύχτα (όλα τα κομμάτια που μετρούν) είναι κάτω από 3 ώρες.
-const shortNightLabel = 'Σύντομη νύχτα · κάτω από 3 ώρες';
+const shortNightLabel = 'Σύντομη νύχτα ·\u00A0κάτω από 3\u00A0ώρες';
 
 /// Γιατί μια νύχτα δεν έχει ύπνο.
 enum EmptyNight {

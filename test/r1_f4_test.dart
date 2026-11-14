@@ -399,7 +399,7 @@ void main() {
       expect(r.weighIns.length, 6);
       expect(r.weighIns.first.$1, to);
       expect(r.weighIns.last.$1, _add(to, -89));
-      expect(reportWeighTitle(r), 'Ζυγίσεις (InBody H40) · 6 από τις 90 του διαστήματος, από την πρώτη ως την τελευταία');
+      expect(reportWeighTitle(r), 'Ζυγίσεις (InBody H40) ·\u00A06 από τις 90 του διαστήματος, από την πρώτη ως την τελευταία');
       expect(spreadPick([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 6), [1, 3, 5, 6, 8, 10]);
       expect(spreadPick([1, 2, 3], 6), [1, 2, 3]);
     });
@@ -412,7 +412,7 @@ void main() {
       final r = buildReport(h, DateTime(2026, 11, 13, 10));
       expect(r.weighInsSpread, isFalse);
       expect(r.weighIns.length, 6);
-      expect(reportWeighTitle(r), 'Ζυγίσεις (InBody H40) · οι 6 τελευταίες');
+      expect(reportWeighTitle(r), 'Ζυγίσεις (InBody H40) ·\u00A0οι 6 τελευταίες');
     });
 
     testWidgets('U1b-01: το σώμα της σελίδας στήνεται φαρδύτερα και μικραίνει, χωρίς στενή στήλη', (t) async {
@@ -501,7 +501,7 @@ void main() {
         };
       await _pump(t, MetricPage(store: s, spec: metricSpecs[K.sleepMin]!, now: DateTime(2026, 11, 13, 10)), size: const Size(400, 2400));
       // συνήθως 425 (7 ώρες 5 λεπτά), χθες 392 → 33 λεπτά λιγότερο.
-      expect(find.text('33 λεπτά λιγότερο από ό,τι συνήθως · συνήθως 7 ώρες 5 λεπτά'), findsOneWidget);
+      expect(find.text('33\u00A0λεπτά λιγότερο από ό,τι συνήθως ·\u00A0συνήθως 7\u00A0ώρες 5\u00A0λεπτά'), findsOneWidget);
       final texts = [for (final w in t.widgetList<Text>(find.byType(Text))) w.data ?? w.textSpan?.toPlainText() ?? ''];
       expect(texts.where((x) => RegExp(r'\d (ω|λ)(\s|$)').hasMatch(x)), isEmpty, reason: 'ποτέ «ω/λ»');
       expect(find.text('Άξονας: ώρες:λεπτά'), findsOneWidget);
@@ -518,7 +518,7 @@ void main() {
       await _pump(t, MetricPage(store: three, spec: metricSpecs[K.sleepHr]!, now: DateTime(2026, 11, 13, 10)));
       String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
       expect(row('Μέσος όρος'), '60 bpm');
-      expect(row('Χαμηλότερη · υψηλότερη'), '58 · 62 bpm');
+      expect(row('Χαμηλότερη ·\u00A0υψηλότερη'), '58 ·\u00A062 bpm');
       final one = HealthStore()..history = {dateKey(day): {K.sleepHr: 62.0}};
       await _pump(t, MetricPage(store: one, spec: metricSpecs[K.sleepHr]!, now: DateTime(2026, 11, 13, 10)));
       expect(t.widgetList<InfoRow>(find.byType(InfoRow)).where((r) => r.label == 'Μέσος όρος'), isEmpty);

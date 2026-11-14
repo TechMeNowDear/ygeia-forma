@@ -18,7 +18,7 @@ class FoodSourceInfo {
 
 const ciqualInfo = FoodSourceInfo(
   title: 'CIQUAL 2025 (ANSES)',
-  version: 'Πίνακας Ciqual 2025, ενημέρωση 19/11/2025 · doi:10.57745/RDMHWY',
+  version: 'Πίνακας Ciqual 2025, ενημέρωση 19/11/2025 ·\u00A0doi:10.57745/RDMHWY',
   licence: 'Licence Ouverte / Etalab 2.0',
   detail: 'Ελληνικά ονόματα από εμάς. Αλάτι = νάτριο × 2,5 (κανόνας ΕΕ). Πρωτεΐνη N × 6,25, όπως στις ετικέτες της ΕΕ '
       'και στις θερμίδες της ίδιας της CIQUAL (στα φυτικά λίγο πάνω από την «πραγματική», στο κρέας ίδια).',
@@ -73,5 +73,5 @@ FoodSourceInfo? sourceInfo(String source) => switch (source) {
 String sourceSentence(String source) {
   final s = sourceInfo(source);
   if (s == null) return 'Από την ετικέτα του προϊόντος, όπως την πέρασες.';
-  return '${s.title} · ${s.version} · ${s.licence}. ${s.detail}';
+  return '${s.title} ·\u00A0${s.version} ·\u00A0${s.licence}. ${s.detail}';
 }

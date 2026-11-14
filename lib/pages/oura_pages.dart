@@ -583,7 +583,7 @@ class OuraManagePage extends StatelessWidget {
             ),
           _ => (
               'Συνδεδεμένο',
-              '${ouraFrom == null ? '' : 'Από τη νύχτα προς ${shortDayDate(ouraFrom)} · '}δεν χρειάζεται να κάνεις τίποτα',
+              '${ouraFrom == null ? '' : 'Από τη νύχτα προς ${shortDayDate(ouraFrom)} ·\u00A0'}δεν χρειάζεται να κάνεις τίποτα',
               c.good,
             ),
         };

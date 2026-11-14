@@ -653,7 +653,7 @@ class _WaistCard extends StatelessWidget {
               // Round 9 (R9-A4-2): η πρώτη μέτρηση με το έτος της όταν είναι άλλης χρονιάς («−4,0 cm από 16 Νοε 2026» δίπλα
               // σε «20 Νοε 2027»)· πριν «από 16 Νοε», που διαβαζόταν σαν πριν από 4 μέρες.
               if (first != null) '${signedDec(shownDiff(last.cm, first.cm, 1))} cm από ${waistFromLabel(day(first.day), day(last.day))}',
-            ].join(' · '),
+            ].join(' ·\u00A0'),
             style: small,
           ),
           if (p.male || p.female)

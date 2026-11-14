@@ -371,6 +371,12 @@ class _MetricRow extends StatelessWidget {
         : relative
             ? relativeTempText(r)
             : r.def.formatAs(r.current!, r.source);
+    final valueStyle = TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.w700,
+      color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
+      fontFeatures: tabular,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -398,18 +404,15 @@ class _MetricRow extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              value,
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
-                                fontFeatures: tabular,
-                              ),
+                            // Round 12 (R12-D2-2): ο αριθμός με τη μονάδα του ([gluedIfFits], R2-U2-05), όπως η «Η εβδομάδα
+                            // σου» (R11-C2-1) και η γραμμή «από … σε …» ([changeRowText]). Πριν, στο κινητό 400 dp με γράμματα
+                            // 2×: «7 ώρες 13» / «λεπτά». Αν το «13 λεπτά» δεν χωρά ολόκληρο στη στήλη (360 dp, 2×), όπως πριν.
+                            LayoutBuilder(
+                              builder: (context, box) => Text(gluedIfFits(context, value, valueStyle, box.maxWidth), style: valueStyle),
                             ),
                             if (relative)
                               Text(
-                                'σε σχέση με πριν · όχι θερμοκρασία σώματος',
+                                'σε σχέση με πριν ·\u00A0όχι θερμοκρασία σώματος',
                                 style: TextStyle(fontSize: 12.5, color: c.textTertiary),
                               ),
                           ],
@@ -521,17 +524,18 @@ class _MetricDetail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Round 2 (R2-D-9): «1 χρόνος» = οι ίδιοι μήνες πέρσι· χωρίς έτος τα δύο διαστήματα έμοιαζαν ίδια.
+                // Round 12 (R12-D2-2): οι τιμές με τον αριθμό κολλημένο στη μονάδα του ([unitsGlued]).
                 InfoRow(
-                  '${changedSpan ? 'Από την αλλαγή' : 'Τώρα'} · ${dateSpanText(from, r.end, withYear: years)}',
-                  r.current == null ? '—' : (relative ? relativeTempText(r) : def.formatAs(r.current!, r.source)),
+                  '${changedSpan ? 'Από την αλλαγή' : 'Τώρα'} ·\u00A0${dateSpanText(from, r.end, withYear: years)}',
+                  r.current == null ? '—' : unitsGlued(relative ? relativeTempText(r) : def.formatAs(r.current!, r.source)),
                   dot: c.text,
                 ),
                 // Round 7 (R7-U4-4): με αλλαγή πηγής δεν υπάρχει «πριν» που να συγκρίνεται (το λέει το πλαίσιο πιο πάνω)·
                 // πριν: «Πριν —» και «0 από 30 μέρες», ενώ οι μέρες της παλιάς πηγής υπάρχουν.
                 if (r.status != TrendStatus.sourceChange)
                   InfoRow(
-                    'Πριν · ${dateSpanText(r.previousFrom, r.previousEnd, withYear: years)}',
-                    r.previous == null ? '—' : (relative ? 'σημείο σύγκρισης' : def.formatAs(r.previous!, r.source)),
+                    'Πριν ·\u00A0${dateSpanText(r.previousFrom, r.previousEnd, withYear: years)}',
+                    r.previous == null ? '—' : (relative ? 'σημείο σύγκρισης' : unitsGlued(def.formatAs(r.previous!, r.source))),
                     dot: c.textSecondary,
                   ),
                 InfoRow(r.status == TrendStatus.sourceChange ? 'Με δεδομένα' : 'Με δεδομένα (τώρα)', count(r.nCurrent)),
@@ -700,7 +704,7 @@ String relativeTempText(TrendResult r) => r.current == null ||
 /// Η γραμμή κάτω από το όνομα στο «Τι άλλαξε»: «από 6 ώρες 51 λεπτά σε 7 ώρες 32 λεπτά». Round 8 (R8-U4-3): ο αριθμός
 /// μένει με τη μονάδα του ([unitsGlued]) όταν η γραμμή σπάει· πριν «… σε 7 | ώρες 32 λεπτά».
 String changeRowText(TrendResult r) => relativeTemp(r)
-    ? '${unitsGlued(relativeTempText(r))} σε σχέση με πριν · όχι θερμοκρασία σώματος'
+    ? '${unitsGlued(relativeTempText(r))} σε σχέση με πριν ·\u00A0όχι θερμοκρασία σώματος'
     : 'από ${unitsGlued(r.def.formatAs(r.previous!, r.source))} σε ${unitsGlued(r.def.formatAs(r.current!, r.source))}';
 
 /// Round 1 (S4-1): τίποτα δεν «άλλαξε», αλλά κάποια γραμμή δεν είχε αρκετές ανεξάρτητες μετρήσεις: όχι «ό,τι αλλάζει είναι

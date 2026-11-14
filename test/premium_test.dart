@@ -508,7 +508,7 @@ void main() {
     final store = HealthStore();
     store.prefs.kitchen = {'devices': ['oven'], 'cookware': <Object>[], 'seed': 2};
     await _pump(t, MePage(store: store, food: sampleFoodStore(_now)));
-    expect(find.textContaining('1 συσκευή · 0 σκεύη'), findsOneWidget);
+    expect(find.textContaining('1 συσκευή ·\u00A00 σκεύη'), findsOneWidget);
     expect(find.textContaining('1 συσκευές'), findsNothing);
   });
 

@@ -411,7 +411,7 @@ class _TodayCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 // Round 1 (U1b-07): ημερομηνία και τιμή με αδιάσπαστο κενό (όχι «13/11 | 5.931»).
-                'Βήματα 7 ημερών: ${steps.map((s) => '${_shortDate(s['date'] as String?)}\u00A0${countNumber(s['value'] is num ? s['value'] : num.tryParse('${s['value']}') ?? s['value'])}').join(' · ')}',
+                'Βήματα 7 ημερών: ${steps.map((s) => '${_shortDate(s['date'] as String?)}\u00A0${countNumber(s['value'] is num ? s['value'] : num.tryParse('${s['value']}') ?? s['value'])}').join(' ·\u00A0')}',
                 style: TextStyle(color: c.textSecondary),
               ),
             ],
@@ -447,7 +447,7 @@ class _TypeCard extends StatelessWidget {
     switch (state) {
       case 'ok':
         final capped = type['capped'] == true ? '+' : '';
-        line = '${countNumber(type['count'])}$capped εγγραφές · τελευταία ${_formatDateTime(type['latest'] as String?)}';
+        line = '${countNumber(type['count'])}$capped εγγραφές ·\u00A0τελευταία ${_formatDateTime(type['latest'] as String?)}';
       case 'empty':
         line = 'Καμία εγγραφή τις τελευταίες ${type['days'] ?? 30} μέρες.';
       case 'no_permission':
@@ -516,9 +516,9 @@ class _TypeCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Από: ${appLabel(s['app'] as String? ?? '')}'
-                  '${(s['device'] as String? ?? '').isNotEmpty ? ' · ${s['device']}' : ''}'
-                  ' · ${countNumber(s['count'])}'
-                  '${s['counts'] == false ? ' · δεν μετρά' : ''}',
+                  '${(s['device'] as String? ?? '').isNotEmpty ? ' ·\u00A0${s['device']}' : ''}'
+                  ' ·\u00A0${countNumber(s['count'])}'
+                  '${s['counts'] == false ? ' ·\u00A0δεν μετρά' : ''}',
                   style: TextStyle(color: c.textSecondary, fontSize: 13),
                 ),
               ),
@@ -679,9 +679,9 @@ String countNumber(Object? v) => v is num ? thousands(v) : '${v ?? '—'}';
 
 /// «Μετρούν 3 · αγνοείται 1 από άλλη πηγή (μόνο ρολόι)»: ενικός για το 1 (UX U9: όχι «αγνοούνται 1»).
 String countedIgnoredText(num counted, num ignored, String only) =>
-    '${counted == 1 ? 'Μετρά' : 'Μετρούν'} ${thousands(counted)} · ${ignored == 1 ? 'αγνοείται' : 'αγνοούνται'} '
+    '${counted == 1 ? 'Μετρά' : 'Μετρούν'} ${thousands(counted)} ·\u00A0${ignored == 1 ? 'αγνοείται' : 'αγνοούνται'} '
     '${thousands(ignored)} από άλλη πηγή ($only)';
 
 /// «Οθόνη τώρα: 384 × 812 dp · γράμματα 100%» (13/11).
 String screenSizeText(Size size, double textScale) =>
-    'Οθόνη τώρα: ${size.width.round()} × ${size.height.round()} dp · γράμματα ${(textScale * 100).round()}%';
+    'Οθόνη τώρα: ${size.width.round()} × ${size.height.round()} dp ·\u00A0γράμματα ${(textScale * 100).round()}%';

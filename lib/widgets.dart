@@ -109,6 +109,17 @@ bool wordsFit(BuildContext context, Iterable<String> texts, TextStyle style, dou
   return true;
 }
 
+/// Round 12 (R12-D2-1 / R12-D2-2): ο αριθμός με τη μονάδα του ([unitsGlued], R2-U2-05: «7 ώρες» / «13 λεπτά», ποτέ «7 ώρες
+/// 13» / «λεπτά») όταν κάθε κολλημένο κομμάτι χωρά στο [width]· αλλιώς το [s] όπως είναι. Ένα αδιάσπαστο κομμάτι φαρδύτερο
+/// από τη στήλη το Flutter το κόβει μέσα στη λέξη («13 λεπ» / «τά»), που είναι χειρότερο από έναν αριθμό μόνο του στη
+/// γραμμή: π.χ. «13 λεπτά» με έντονα 17 και ψηφία ίσου πλάτους στα 2× είναι ~156 dp, ενώ η στήλη της τιμής στις «Τάσεις»
+/// ενός κινητού 360 dp έχει ~137 dp.
+String gluedIfFits(BuildContext context, String s, TextStyle style, double width) {
+  final glued = unitsGlued(s);
+  if (glued == s || !width.isFinite) return glued;
+  return wordsFit(context, [glued], style, width) ? glued : s;
+}
+
 /// Σκελετός κάθε σελίδας: τίτλος, ανανέωση με τράβηγμα, μία στήλη στο κινητό, δύο σε μεγάλη οθόνη.
 /// Κάρτα που βάζει μόνη της το κενό από κάτω (και τίποτα όταν δεν φαίνεται), π.χ. μια θέση που μπορεί να είναι άδεια.
 mixin SelfSpaced on Widget {}
@@ -1077,7 +1088,7 @@ class StageLegend extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  pct == null ? stageLabel(name) : '${stageLabel(name)} · $pct%',
+                  pct == null ? stageLabel(name) : '${stageLabel(name)} ·\u00A0$pct%',
                   style: TextStyle(color: sub, fontSize: 12.5, fontWeight: FontWeight.w500),
                 ),
                 Text(

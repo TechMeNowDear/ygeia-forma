@@ -381,7 +381,7 @@ void main() {
       expect(find.text(wristChartNote), findsOneWidget);
       // 14 × 0 και +0,2: μέσος όρος 0,013 → «0»· χαμηλότερη 0, υψηλότερη +0,2.
       expect(_row(t, 'Μέσος όρος'), '0 °C');
-      expect(_row(t, 'Χαμηλότερη · υψηλότερη'), '0 · +0,2 °C');
+      expect(_row(t, 'Χαμηλότερη ·\u00A0υψηλότερη'), '0 ·\u00A0+0,2 °C');
       expect(_row(t, shortDayDate(day)), '+0,2 °C');
       expect(find.textContaining('33,'), findsNothing);
     });
@@ -409,7 +409,7 @@ void main() {
         'από 6 ώρες 51 λεπτά σε 7 ώρες 32 λεπτά');
     expect(changeRowText(_trend(K.sleepHr, previous: 55, current: 62)), 'από 55 bpm σε 62 bpm');
     expect(changeRowText(_trend(K.skinTemp, previous: 33.5, current: 34.0)),
-        '+0,5 °C σε σχέση με πριν · όχι θερμοκρασία σώματος');
+        '+0,5 °C σε σχέση με πριν ·\u00A0όχι θερμοκρασία σώματος');
   });
 
   // ------------------------------------------------------------------ R8-U4-6
@@ -510,7 +510,7 @@ void main() {
       };
     await _pump(t, MetricPage(store: s, spec: metricSpecs[K.sleepHr]!, now: DateTime(2026, 11, 13, 10)));
     expect(find.text('Όπως συνήθως (59 bpm)'), findsOneWidget);
-    expect(find.textContaining('συνήθως · συνήθως'), findsNothing);
+    expect(find.textContaining('συνήθως ·\u00A0συνήθως'), findsNothing);
   });
 
   // ------------------------------------------------------------------ U4 Β2

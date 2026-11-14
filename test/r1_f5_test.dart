@@ -823,7 +823,7 @@ void main() {
       expect(find.textContaining('το ρολόι μετρά το οξυγόνο της νύχτας μόνο μέσα στις ώρες ύπνου'), findsOneWidget);
       expect(find.textContaining('από το βράδυ της μέρας που την έκανες'), findsNothing);
       expect(find.textContaining('Μία πηγή για κάθε μέτρηση'), findsOneWidget);
-      expect(find.textContaining('Μέσω Samsung Health · διαβάστηκε'), findsOneWidget);
+      expect(find.textContaining('Μέσω Samsung Health ·\u00A0διαβάστηκε'), findsOneWidget);
     });
 
     testWidgets('U2b-14: μετά το «ξανά από το ρολόι» οι Πηγές δεν λένε «δεν διαβάζεται»· με Oura το λένε', (t) async {

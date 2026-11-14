@@ -546,7 +546,7 @@ void main() {
                 ..setProfile(_me)
                 ..setGoals(_goals(kcal: 2120, doctor: false)),
               now: _now));
-      expect(find.text('κάτω από 23,6 g · 10%'), findsOneWidget);
+      expect(find.text('κάτω από 23,6 g ·\u00A010%'), findsOneWidget);
       expect(find.textContaining('έως 24 g'), findsNothing);
       await _pump(
           t,
@@ -556,7 +556,7 @@ void main() {
                 ..setProfile(_me)
                 ..setGoals(_goals(kcal: 2160)),
               now: _now));
-      expect(find.text('έως 14,4 g · 6%'), findsOneWidget);
+      expect(find.text('έως 14,4 g ·\u00A06%'), findsOneWidget);
     });
   });
 
