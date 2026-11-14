@@ -36,10 +36,12 @@ object WidgetRenderer {
         else -> Shape.SMALL
     }
 
+    /** Το πολύ τόσα κουτάκια τιμών (14/11: λιγότερα, με μεγαλύτερα γράμματα· πριν 5 / 6 / 4 / 4). */
     fun maxValues(shape: Shape) = when (shape) {
-        Shape.COLUMN1 -> 5
-        Shape.COLUMN2 -> 6
-        else -> 4
+        Shape.COLUMN1 -> 3
+        Shape.COLUMN2 -> 4
+        Shape.WIDE -> 4
+        Shape.SMALL -> 2
     }
 
     /** Αν φαίνεται το «+» (Φαγητό, όχι στη στενή στήλη). Η HomeWidgets βάζει εκεί την περιοχή πατήματος. */
@@ -210,7 +212,7 @@ object WidgetRenderer {
         fun fit(text: String, p: Paint, maxW: Float): String {
             if (maxW <= 0) return ""
             val base = p.textSize
-            val floor = if (base < sp(11f)) WidgetText.MIN_SCALE_SMALL else 0.75f
+            val floor = if (base < sp(WidgetText.SMALL_LINE_SP)) WidgetText.MIN_SCALE_SMALL else 0.75f
             // Round 9 (R9-A12-3): ο κανόνας της σμίκρυνσης στο WidgetText.fitSize (ελέγχεται σε απλό JVM, R9F5Test).
             p.textSize = WidgetText.fitSize(base, floor, maxW) { size ->
                 p.textSize = size
@@ -238,7 +240,7 @@ object WidgetRenderer {
             val showSrc = (s?.optBoolean("src", true) ?: true) && !plus
             val showDot = s?.optBoolean("dot", true) ?: true
             if (showTitle || showSrc) {
-                val tp = paint("Bold", sp(10.5f), muted).apply { letterSpacing = 0.05f }
+                val tp = paint("Bold", sp(WidgetText.TITLE_SP), muted).apply { letterSpacing = 0.04f }
                 val title = when (kind) { "sleep" -> "ΥΠΝΟΣ"; "move" -> "ΚΙΝΗΣΗ"; "food" -> "ΦΑΓΗΤΟ"; else -> "ΣΩΜΑ" }
                 val src = data?.optString("src", "") ?: ""
                 // Round 2 (R2-U3-04): σύντομη πηγή όταν η κανονική δεν χωρά (στήλη 1×3).
@@ -247,14 +249,14 @@ object WidgetRenderer {
                 var x = left
                 if (showTitle) {
                     if (showDot) {
-                        cv.drawCircle(x + dp(3.5f), base + tp.ascent() / 2.6f, dp(3.5f), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = acc })
-                        x += dp(11f)
+                        cv.drawCircle(x + dp(4f), base + tp.ascent() / 2.6f, dp(4f), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = acc })
+                        x += dp(13f)
                     }
                     val t = fit(title, tp, right - x)
                     cv.drawText(t, x, base, tp)
                 }
                 if (showSrc && src.isNotEmpty()) {
-                    val sp2 = paint("Medium", sp(10f), muted)
+                    val sp2 = paint("Medium", sp(WidgetText.SOURCE_SP), muted)
                     if (shape == Shape.COLUMN1 && showTitle) {
                         y = base + dp(3f)
                         val b2 = y - sp2.ascent()
@@ -282,11 +284,11 @@ object WidgetRenderer {
             val wanted = if (!showVals) emptyList() else valueKeys().filter { it != heroKey }
             val maxN = maxValues(shape)
             val cols = when (shape) { Shape.COLUMN1 -> 1; Shape.WIDE -> 4; else -> 2 }
-            val chipH = sp(13f) + sp(11f) + dp(9f)
-            val gap = dp(4f)
+            val chipH = sp(WidgetText.CHIP_VALUE_SP) + sp(WidgetText.CHIP_LABEL_SP) + dp(11f)
+            val gap = dp(5f)
             var n = min(wanted.size, maxN)
             // Χρόνος για την κεντρική τιμή: τουλάχιστον ~1 γραμμή μεγάλου αριθμού + λεζάντα.
-            val heroMin = sp(bigSize()) + sp(12f)
+            val heroMin = sp(bigSize()) + sp(WidgetText.CAPTION_SP + 1f)
             fun chipsHeight(k: Int) = if (k == 0) 0f else ((k + cols - 1) / cols) * chipH + ((k + cols - 1) / cols - 1) * gap
             while (n > 0 && (box.bottom - pad) - chipsHeight(n) - dp(6f) < y + heroMin) n--
             val chipsTop = box.bottom - pad - chipsHeight(n)
@@ -403,7 +405,7 @@ object WidgetRenderer {
             if (unitStr.isNotEmpty() && unitW + big.measureText(vText) <= maxW) cv.drawText(unitStr, left + big.measureText(vText), by, up)
             var y = by + big.descent() * 0.6f
 
-            val capP = paint("Medium", sp(10.5f), muted)
+            val capP = paint("Medium", sp(WidgetText.CAPTION_SP), muted)
             // Round 1 (U7-16): χωρίς καμία τιμή και χωρίς πηγή (νέο widget, μετά από «Διαγραφή όλων») η λεζάντα λέει τι να
             // κάνεις, όχι μόνο «—». (Χωρίς πρόσφατη νύχτα/ζύγιση η πηγή το λέει ήδη· εκεί το άνοιγμα δεν φέρνει τίποτα.)
             val empty = metrics().length() == 0 && (data?.optString("src", "") ?: "").isEmpty()
@@ -450,13 +452,13 @@ object WidgetRenderer {
                 val r = if (e.has("r")) e.optString("r") else null
                 val w = right - left
                 // Round 1 (U7-11): σε δύο γραμμές όταν δεν χωρά, ποτέ «· …» που έκοβε την κρίση «μέσα/κάτω από το εύρος».
-                val probe = paint("SemiBold", sp(10.5f), tone)
+                val probe = paint("SemiBold", sp(WidgetText.CAPTION_SP), tone)
                 val lines = WidgetText.usualLines(us, r) { probe.measureText(it) * WidgetText.MIN_SCALE_SMALL <= w }
                 for ((i, line) in lines.withIndex()) {
                     if (i > 0 && y + dp(2f) + capP.descent() - capP.ascent() > limit) break
                     y += dp(2f)
                     val b = y - capP.ascent()
-                    val p2 = paint("SemiBold", sp(10.5f), tone)
+                    val p2 = paint("SemiBold", sp(WidgetText.CAPTION_SP), tone)
                     cv.drawText(fit(line, p2, w), left, b, p2)
                     y = b + capP.descent()
                 }
@@ -502,33 +504,33 @@ object WidgetRenderer {
                 cv.drawRoundRect(RectF(x, y, x + cw, y + chipH), r, r, bg)
                 // Round 9 (R9-A12-3): νέα γράμματα σε κάθε κουτί. Πριν ήταν κοινά, και το `fit` ενός μεγάλου ονόματος
                 // (π.χ. «Μεταβολισμός») άφηνε μικρότερα γράμματα στα επόμενα κουτιά, που μίκραιναν ξανά κάτω από το όριο.
-                val lp = paint("Medium", sp(9.5f), muted)
+                val lp = paint("Medium", sp(WidgetText.CHIP_LABEL_SP), muted)
                 val e = entry(k)
                 val ip = dp(6f)
                 // Round 9 (R9-U1-4): σύντομο όνομα («ls») όταν το κανονικό δεν χωρά ούτε μικρότερο (π.χ. «Energy Score»).
                 val label = WidgetText.chipLabel(e?.optString("l") ?: labelOf(k), e?.optString("ls")) {
                     lp.measureText(it) * WidgetText.MIN_SCALE_SMALL <= cw - ip * 2
                 }
-                val lb = y + dp(4f) - lp.ascent()
+                val lb = y + dp(5f) - lp.ascent()
                 cv.drawText(fit(label, lp, cw - ip * 2), x + ip, lb, lp)
                 val color = when {
                     colors != null && colors.has(k) -> colors.optLong(k).toInt()
                     i == 0 -> acc
                     else -> fg
                 }
-                val vp = paint("ExtraBold", sp(13f), color)
-                val up = paint("SemiBold", sp(9f), muted)
+                val vp = paint("ExtraBold", sp(WidgetText.CHIP_VALUE_SP), color)
+                val up = paint("SemiBold", sp(WidgetText.CHIP_UNIT_SP), muted)
                 // Round 8 (R8-U1-3): «25,4%» κολλητά, όπως η εφαρμογή· round 9 (R9-A12-3): από το WidgetText.valueParts.
                 val (v, unitStr) = WidgetText.valueParts(e?.optString("v", "—") ?: "—", e?.optString("u", "") ?: "")
                 val a = if (showUsual && e != null && e.has("d")) " " + arrow(e.optInt("d")) else ""
                 val vb = lb + lp.descent() + dp(1f) - vp.ascent()
                 val avail = cw - ip * 2
                 val tail = unitStr + a
-                val vt = fit(v, vp, avail - up.measureText(tail))
+                // 14/11: ο αριθμός πρώτα, στο πλήρες μέγεθος· η μονάδα (και το βελάκι) μόνο αν χωρά δίπλα του.
+                val withTail = WidgetText.chipWithUnit(vp.measureText(v), up.measureText(tail), avail)
+                val vt = if (withTail) v else fit(v, vp, avail)
                 cv.drawText(vt, x + ip, vb, vp)
-                if (tail.isNotEmpty() && vp.measureText(vt) + up.measureText(tail) <= avail) {
-                    cv.drawText(tail, x + ip + vp.measureText(vt), vb, up)
-                }
+                if (withTail) cv.drawText(tail, x + ip + vp.measureText(vt), vb, up)
             }
         }
 
