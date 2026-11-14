@@ -471,7 +471,7 @@ class _MetricDetail extends StatelessWidget {
               height: 150,
               points: [for (final p in r.points) (p.$1, rel(p.$2))],
               color: color,
-              format: relative ? (v) => signedDec(v, def.digits) : _axisFormat(def),
+              format: trendChartFormat(r),
               minRange: _minRange(def),
               // Round 2 (R2-D-9): το «1 χρόνος» (15 μήνες) με το έτος στις άκρες.
               dateLabel: spanDateLabel(r.points.first.$1, r.points.last.$1),
@@ -638,11 +638,18 @@ String Function(double) _axisFormat(MetricDef def) => switch (def.kind) {
       ValueKind.number => (v) => dec(v, def.digits),
     };
 
+/// Round 10 (R10-B3-1): η μορφή των αριθμών του γραφήματος μιας γραμμής (άξονας και πλάκα της τελευταίας τιμής). Η
+/// θερμοκρασία είναι πάντα απόκλιση (του καρπού από το «πριν» σου, του Oura από το συνηθισμένο του): με πρόσημο, «+0,3» /
+/// «−0,2», όπως η τιμή της γραμμής («+0,3 °C»). Πριν, μόνο του ρολογιού· του Oura έγραφε «0,3» και «-0,2».
+String Function(double) trendChartFormat(TrendResult r) =>
+    r.def.key == K.skinTemp ? (v) => signedDec(v, r.def.digits) : _axisFormat(r.def);
+
 /// Round 9 (R9-U4-2): η περιγραφή του γραφήματος μιας γραμμής για το TalkBack ([lineChartSummary]) με τα [points] όπως
-/// ζωγραφίζονται: διάρκειες με λέξεις («6 ώρες 12 λεπτά», ποτέ «6:12» σαν ώρα της μέρας), θερμοκρασία καρπού ως διαφορά
-/// με τη μονάδα της. null για τα υπόλοιπα (η περιγραφή με τη μορφή του άξονα, π.χ. «23:15» για την ώρα ύπνου).
+/// ζωγραφίζονται: διάρκειες με λέξεις («6 ώρες 12 λεπτά», ποτέ «6:12» σαν ώρα της μέρας), θερμοκρασία ως διαφορά με τη
+/// μονάδα της (round 10, R10-B3-1: και του Oura, όχι μόνο του καρπού). null για τα υπόλοιπα (η περιγραφή με τη μορφή του
+/// άξονα, π.χ. «23:15» για την ώρα ύπνου).
 String? trendChartLabel(TrendResult r, List<(DateTime, double)> points) {
-  if (relativeTemp(r)) return lineChartSummary(points, (v) => '${signedDec(v, r.def.digits)} ${r.def.unit}');
+  if (r.def.key == K.skinTemp) return lineChartSummary(points, (v) => '${signedDec(v, r.def.digits)} ${r.def.unit}');
   if (r.def.kind == ValueKind.duration) return lineChartSummary(points, (v) => hoursMinutes(v.round()));
   return null;
 }

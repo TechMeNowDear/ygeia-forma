@@ -176,6 +176,18 @@ int? _rirOf(ExLog e) {
   return end != null && extra != null && _easier(e.kind, extra, end) ? null : ra;
 }
 
+/// R10-B4-2: η απάντηση δεν μετρά επειδή ήταν για ένα σετ παραπάνω πιο ελαφρύ ([_rirOf] = null ενώ υπάρχει απάντηση):
+/// ο λόγος του στόχου το λέει (πριν: «δεν ξέρουμε πόσες άφησες… πες μετά το τελευταίο σετ», ενώ απάντησες ακριβώς εκεί,
+/// και η ίδια οδηγία ερχόταν κάθε φορά). null όταν απλώς δεν απαντήθηκε.
+String? _extraAnswer(ExLog e) {
+  final a = e.rirAnswer;
+  if (a == null || _rirOf(e) != null) return null;
+  return '«άφησες ${a == 4 ? '4+' : a}» ήταν για το σετ παραπάνω, που έγινε πιο ελαφρύ';
+}
+
+/// R10-B4-2: τι κάνεις για να μετρά η απάντηση, μετά το [_extraAnswer].
+const _extraHow = 'Για να μετρά η απάντηση, κάνε και το σετ παραπάνω με το ίδιο φορτίο, ή μην το κάνεις.';
+
 /// [a] είναι τουλάχιστον τόσο δύσκολο όσο το [b] (με ανοχή δεκαδικών).
 bool _atLeast(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a <= b + 1e-6 : a >= b - 1e-6;
 
@@ -278,6 +290,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // Χωρίς απάντηση δεν ξέρουμε πόσο κοντά στην αποτυχία ήταν: ποτέ περισσότερα κιλά (έλεγχος 8/11).
   final ra = _rirOf(last);
   final rirOk = ra != null && ra >= rirGoal;
+  final extraNote = _extraAnswer(last);
   final strict = k == LoadKind.bar || caution;
   final up = lastLoad == null ? null : stepUp(k, lastLoad);
 
@@ -366,10 +379,12 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       load: lastLoad,
       reps: asLast(),
       change: Change.hold,
+      // R10-B4-5: όσες ζητά το πρόγραμμα ([rirGoal], τουλάχιστον 2), όχι πάντα 2: με «άφησε 3» η οδηγία «όταν σου μένουν 2»
+      // οδηγούσε την επόμενη φορά στο «λιγότερες από 3» και σε στάσιμη πρόοδο.
       reason: k == LoadKind.bar
-          ? 'Μπάρα χωρίς βραχίονες ασφαλείας: άφησες $ra. Ίδια κιλά, και άφηνε 2 ή περισσότερες.'
+          ? 'Μπάρα χωρίς βραχίονες ασφαλείας: άφησες $ra. Ίδια κιλά, και άφηνε $rirGoal ή περισσότερες.'
           // Έλεγχος 9/11 (V-B-07, AHA 2023): με ρεζέρβα 2 η πίεση ανεβαίνει λιγότερο, όχι «δεν ανεβαίνει».
-          : 'Άφησες $ra. ${usesKg(k) ? 'Ίδια κιλά' : 'Ίδιο φορτίο'}, και σταμάτα το σετ όταν σου μένουν 2: η πίεση '
+          : 'Άφησες $ra. ${usesKg(k) ? 'Ίδια κιλά' : 'Ίδιο φορτίο'}, και σταμάτα το σετ όταν σου μένουν $rirGoal: η πίεση '
               'ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση· πόση ένταση σου επιτρέπεται, το λέει ο γιατρός.',
     );
   }
@@ -433,7 +448,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       reps: asLast(),
       change: Change.hold,
       reason: ra == null
-          ? 'Έφτασες στις $ceiling, αλλά δεν ξέρουμε πόσες άφησες: ίδια, και πες μετά το τελευταίο σετ.'
+          ? (extraNote != null
+              ? 'Έφτασες στις $ceiling, αλλά το $extraNote: ίδια. $_extraHow'
+              : 'Έφτασες στις $ceiling, αλλά δεν ξέρουμε πόσες άφησες: ίδια, και πες μετά το τελευταίο σετ.')
           : 'Έφτασες στις $ceiling, αλλά άφησες ${ra == 4 ? '4+' : ra}, λιγότερες από $rirGoal: ίδια μία φορά ακόμα, να γίνει πιο άνετα.',
     );
   }
@@ -454,7 +471,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       load: lastLoad,
       reps: asLast(),
       change: Change.hold,
-      reason: 'Δεν ξέρουμε πόσες άφησες. Σε αυτή την άσκηση δεν ανεβαίνει τίποτα χωρίς απάντηση: ίδια.',
+      reason: extraNote != null
+          ? 'Το $extraNote. Σε αυτή την άσκηση δεν ανεβαίνει τίποτα χωρίς απάντηση: ίδια. $_extraHow'
+          : 'Δεν ξέρουμε πόσες άφησες. Σε αυτή την άσκηση δεν ανεβαίνει τίποτα χωρίς απάντηση: ίδια.',
     );
   }
 
@@ -547,7 +566,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   if (done.isNotEmpty && ra != null && ra < 2 && low < last.lo) {
     final down = lastLoad != null && hasLoad(k) ? stepDown(k, lastLoad, allowZero: k == LoadKind.plate) : null;
     final said = ra == 0 ? 'Δεν άφησες καμία' : 'Άφησες $ra';
-    const stop = 'σταμάτα το σετ όταν σου μένουν 2: η πίεση ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση.';
+    // R10-B4-5: όσες ζητά το πρόγραμμα ([rirGoal]), όπως κρίνεται και η επόμενη φορά (όχι πάντα 2).
+    final stop = 'σταμάτα το σετ όταν σου μένουν $rirGoal: η πίεση ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση.';
     if (down != null) {
       final what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : 'ένα σκαλί πιο ελαφριά, ${_l(k, down)}';
       return Target(

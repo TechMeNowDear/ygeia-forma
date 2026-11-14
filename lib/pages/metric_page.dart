@@ -187,7 +187,8 @@ class MetricPage extends StatefulWidget {
   final DateTime? now;
 
   static Route<void> route(HealthStore store, String metric, {DateTime? now}) => MaterialPageRoute<void>(
-        settings: RouteSettings(name: 'Μέτρηση · ${metricSpecs[metric]!.title}'),
+        settings: RouteSettings(
+            name: 'Μέτρηση · ${metricPageTitle(metricSpecs[metric]!, store.plan.sourceFor(metric, dayOf(now ?? DateTime.now())))}'),
         builder: (_) => MetricPage(store: store, spec: metricSpecs[metric]!, now: now),
       );
 
@@ -320,7 +321,12 @@ class _MetricPageState extends State<MetricPage> {
                   minRange: s.minRange,
                   // Round 9 (R9-U4-2): το TalkBack με τη μορφή της τιμής («6 ώρες 12 λεπτά»), όχι του άξονα («6:12», που
                   // ακούγεται σαν ώρα της μέρας· η λεζάντα «Άξονας: ώρες:λεπτά» δεν διαβάζεται μαζί).
-                  semanticLabel: s.axis == null ? null : lineChartSummary(pts, s.show, from: series.cut ?? from, to: end),
+                  // Round 10 (R10-B3-1): η θερμοκρασία (απόκλιση, καρπού ή Oura) με τη μονάδα της («+0,3 °C»), όπως οι Τάσεις.
+                  semanticLabel: s.axis != null
+                      ? lineChartSummary(pts, s.show, from: series.cut ?? from, to: end)
+                      : s.metric == K.skinTemp
+                          ? lineChartSummary(pts, withUnit, from: series.cut ?? from, to: end)
+                          : null,
                 ),
                 if (s.axis != null) ...[
                   const SizedBox(height: 4),
@@ -367,8 +373,13 @@ class _MetricPageState extends State<MetricPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(s.title),
-            actions: [InfoButton(s.metric, range: range), const SizedBox(width: 4)],
+            title: Text(metricPageTitle(s, series.source)),
+            actions: [
+              // Round 10 (R10-B2-3): το «i» της ετοιμότητας μιλά για τη βαθμολογία της Oura· για το Energy Score της Samsung
+              // (νύχτα του ρολογιού) δεν δείχνεται, όπως στην κάρτα της Σήμερα.
+              if (s.metric != K.energy || series.source == Source.oura) InfoButton(s.metric, range: range),
+              const SizedBox(width: 4),
+            ],
           ),
           body: SafeArea(
             child: LayoutBuilder(builder: (context, k) {
@@ -401,6 +412,10 @@ class _MetricPageState extends State<MetricPage> {
     );
   }
 }
+
+/// Round 10 (R10-B2-3): ο τίτλος της σελίδας μιας μέτρησης με το όνομα της πηγής της, όπως η Σήμερα, οι Τάσεις και το
+/// widget που την ανοίγει: «Ετοιμότητα» του Oura, «Energy Score» της Samsung (νύχτα του ρολογιού). Πριν πάντα «Ετοιμότητα».
+String metricPageTitle(MetricSpec s, Source source) => s.metric == K.energy && source != Source.oura ? 'Energy Score' : s.title;
 
 /// Round 8 (R8-U4-2): η θερμοκρασία καρπού (ρολόι) στη σελίδα της: ίδια κείμενα με την κάρτα της Σήμερα.
 const wristDeviationText = 'Απόκλιση από τα συνηθισμένα σου';

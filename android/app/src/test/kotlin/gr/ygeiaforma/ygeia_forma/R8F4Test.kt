@@ -106,7 +106,9 @@ class R8F4Test {
         val r = DbSalvage.read(t.source, emptySet(), out)
         assertEquals(0, out.length())
         assertFalse(r.complete)
-        assertTrue("λίγα ερωτήματα: ${t.queries}", t.queries < 200)
+        // Round 10 (R10-B6-1, g4): χαλασμένο ως το τέλος → και τα BACKFILL rowid ένα-ένα (μια καλή σελίδα ανάμεσα δεν
+        // φαίνεται αλλιώς)· πριν < 200. Τελειώνει πάντα: 2 + GAP + 64 βήματα + BACKFILL = 8.322 το πολύ.
+        assertTrue("ερωτήματα: ${t.queries}", t.queries <= 2 + DbSalvage.GAP + 64 + DbSalvage.BACKFILL)
     }
 
     @Test
@@ -141,13 +143,13 @@ class R8F4Test {
     @Test
     fun doneMarkerKeepsTheRulesAndWhetherAllWasRead() {
         val at = 1_731_500_000_000L
-        // Round 9 (f4): κανόνας 3 (R9-A9-1/2/4).
-        assertEquals(3, DbSalvage.RULES)
-        assertEquals("$at 120 3 3 1", DbSalvage.doneText(at, 120, 3, complete = true))
-        assertEquals("$at 120 3 3 0", DbSalvage.doneText(at, 120, 3, complete = false))
+        // Round 9 (f4): κανόνας 3 (R9-A9-1/2/4). Round 10 (R10-B6-1, g4): κανόνας 4.
+        assertEquals(4, DbSalvage.RULES)
+        assertEquals("$at 120 3 4 1", DbSalvage.doneText(at, 120, 3, complete = true))
+        assertEquals("$at 120 3 4 0", DbSalvage.doneText(at, 120, 3, complete = false))
         // Με τον τωρινό κανόνα: έγινε (και όταν δεν διαβάστηκαν όλα· δεν ξαναδιαβάζεται κάθε φορά).
-        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 3 1", at))
-        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 3 0", at))
+        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 4 1", at))
+        assertEquals(120 to 3, DbSalvage.parseDone("$at 120 3 4 0", at))
         // Παλιότερος κανόνας: ξαναδιαβάζεται μόνο αν τότε δεν διαβάστηκαν όλα.
         assertNull(DbSalvage.parseDone("$at 120 3 1 0", at))
         assertNull(DbSalvage.parseDone("$at 120 3 2 0", at))

@@ -62,6 +62,14 @@ class BodyPage extends StatelessWidget {
 
         final skinNights = (d?.nights ?? const <Night>[]).where((n) => n.skinTemp != null).toList();
         final skinBase = d?.skinTempBaseline;
+        // Οι 30 τελευταίες νύχτες ως απόκλιση από το «συνήθως». Round 10 (R10-B3-1, δίδυμο): και για το TalkBack, με τη
+        // μονάδα («+0,3 °C»), όπως οι Τάσεις και η σελίδα της μέτρησης (πριν «+0,3» χωρίς «°C»).
+        final skinPoints = skinBase == null
+            ? const <(DateTime, double)>[]
+            : [
+                for (final n in skinNights.length <= 30 ? skinNights : skinNights.sublist(skinNights.length - 30))
+                  (n.date, shownDiff(n.skinTemp!, skinBase, 1)),
+              ];
 
         final left = <Widget>[
           if (last == null && d != null && d.failed.contains('body'))
@@ -166,11 +174,9 @@ class BodyPage extends StatelessWidget {
                   if (skinBase != null) ...[
                     const SizedBox(height: 12),
                     LineChart(
-                      points: [
-                        for (final n in skinNights.length <= 30 ? skinNights : skinNights.sublist(skinNights.length - 30))
-                          (n.date, shownDiff(n.skinTemp!, skinBase, 1)),
-                      ],
+                      points: skinPoints,
                       format: (v) => signedDec(v),
+                      semanticLabel: lineChartSummary(skinPoints, (v) => '${signedDec(v)} °C'),
                       color: c.move,
                       dateLabel: dayMonth,
                     ),

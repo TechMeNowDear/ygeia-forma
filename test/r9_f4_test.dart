@@ -229,7 +229,8 @@ void main() {
       expect(ouraConnectPrivacyText, isNot(contains('Δεν δίνονται ποτέ')));
       expect(ouraConnectPrivacyText, contains('δεν τα στέλνει σε AI'));
       expect(ouraConnectPrivacyText, contains('μπαίνουν μόνο σε αρχεία που φτιάχνεις και στέλνεις εσύ'));
-      expect(ouraConnectPrivacyText, contains('Χρειάζεται ενεργή συνδρομή Oura.'));
+      // Round 10 (R10-B8-2): «συνδρομή Oura.» με αδιάσπαστο κενό (χωρίς ορφανό «Oura.» στα 400 dp).
+      expect(ouraConnectPrivacyText, contains('Χρειάζεται ενεργή συνδρομή\u00A0Oura.'));
       // Το ίδιο λάθος υπόσχεσης πουθενά στην εφαρμογή (σάρωση κειμένου: η υπόσχεση είναι κείμενο, όχι λογική).
       for (final f in Directory('lib').listSync(recursive: true).whereType<File>()) {
         if (!f.path.endsWith('.dart')) continue;

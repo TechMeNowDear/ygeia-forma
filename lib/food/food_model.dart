@@ -118,6 +118,7 @@ class Food {
     this.perMl = false,
     this.cholKind,
     this.spoon = false,
+    this.spoonNo = false,
   });
 
   /// Δικό μου προϊόν: τι μετρά στην κάρτα «Χοληστερίνη» ([CholKind]) ή null (δεν ορίστηκε).
@@ -127,6 +128,10 @@ class Food {
   /// κατηγορίες του Open Food Facts ή από τη φόρμα ([isSpoonFood]). Κλειδί «sp» (νέο, προαιρετικό: οι παλιές εκδόσεις το
   /// αγνοούν, και χωρίς αυτό το προϊόν μένει όπως πριν). Τα τρόφιμα της βάσης δεν το έχουν: εκείνα από την κατηγορία τους.
   final bool spoon;
+
+  /// Round10 (R10-B1-1): στο «Μετριέται με το κουτάλι;» της φόρμας διάλεξες «Όχι»: «sp»: false (οι παλιές εκδόσεις το
+  /// διαβάζουν όπως πριν, «όχι»). Έτσι η «Διόρθωση» δείχνει ξανά «Όχι» και δεν το ξαναπροτείνει από το όνομα.
+  final bool spoonNo;
 
   /// Οι τιμές είναι ανά 100 ml (υγρό από το Open Food Facts). Αποθηκεύεται, ώστε η διόρθωση αργότερα να λέει ξανά
   /// «ανά 100 ml» και όχι «ανά 100 g» (δεύτερος έλεγχος διατροφής N9).
@@ -185,6 +190,7 @@ class Food {
         perMl: j['perMl'] == true,
         cholKind: CholKind.parse(j['ck']),
         spoon: j['sp'] == true,
+        spoonNo: j['sp'] == false,
         cooked: [
           for (final c in (j['cooked'] as List?) ?? const [])
             if (c is Map) ((c['id'] as String), (c['label'] as String)),
@@ -210,7 +216,7 @@ class Food {
         if (cooked.isNotEmpty) 'cooked': [for (final c in cooked) {'id': c.$1, 'label': c.$2}],
         if (perMl) 'perMl': true,
         if (cholKind != null) 'ck': cholKind,
-        if (spoon) 'sp': true,
+        if (spoon || spoonNo) 'sp': spoon,
         'n': n.toJson(),
       };
 

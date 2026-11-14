@@ -98,6 +98,10 @@ class ExLog {
   /// «Τελευταίο σετ», η επόμενη άσκηση και το πράσινο «έγινε». Η πρόοδος κρίνει με τα [judged].
   bool get rowsDone => complete && log.every((x) => x.done);
 
+  /// R10-B4-1: η τελευταία γραμμή είναι του «+ Σετ» (πάνω από τα σετ του προγράμματος, [sets]) και δεν έγινε: βγαίνει
+  /// με το «− Σετ» ([TrainingStore.removeSet]). Πριν δεν έβγαινε με κανέναν τρόπο και κρατούσε την άσκηση ανοιχτή.
+  bool get canRemoveRow => log.length > sets && !log.last.done;
+
   /// Το «κύριο» φορτίο: το μεγαλύτερο από τα σετ που έγιναν (για λάστιχο βοήθειας, το μικρότερο).
   double? get workLoad {
     double? v;
@@ -357,6 +361,21 @@ class Session {
       }
     }
     return DateTime.fromMillisecondsSinceEpoch(t);
+  }
+
+  /// R9-A8-2 / R10-B4-4: οι παλμοί ως το [end] + 1′ (ό,τι ήρθε μετά δεν είναι της προπόνησης, DP-09) με τον μέσο και τον
+  /// υψηλότερό τους. Ένας κανόνας για το «Τέλος» ([TrainingStore.finish]) και για τη σύνοψη της ξεχασμένης προπόνησης πριν
+  /// από την «Αποθήκευση» (πριν η σύνοψη έδειχνε μέσο από όλο το βράδυ και γραφόταν άλλος). Όταν δεν κόβεται τίποτα, ο
+  /// υψηλότερος μένει ο αποθηκευμένος ([hrMax]· ίσως του ρολογιού)· χωρίς τιμές, ο μέσος μένει ο αποθηκευμένος ([hrAvg]).
+  ({List<List<int>> hr, int? avg, int? max}) hrUpTo(DateTime end) {
+    final keep = end.difference(start).inSeconds + 60;
+    final kept = [for (final p in hr) if (p[0] <= keep) p];
+    final cut = kept.length < hr.length;
+    return (
+      hr: kept,
+      avg: kept.isEmpty ? hrAvg : (kept.fold<int>(0, (a, p) => a + p[1]) / kept.length).round(),
+      max: !cut ? hrMax : (kept.isEmpty ? null : kept.fold<int>(0, (m, p) => p[1] > m ? p[1] : m)),
+    );
   }
 
   /// R8-A8-3: πότε πατήθηκε «Συνέχεια» στην «Ξεχασμένη προπόνηση;» (ms), ή null. Κλειδί «res»: νέο, προαιρετικό (η παλιά

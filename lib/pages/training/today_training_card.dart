@@ -53,8 +53,10 @@ class TodayTrainingCard extends StatefulWidget {
   /// Η τελευταία προπόνηση που τελείωσε σήμερα ΚΑΙ είναι αυτή της μέρας (round1, S6-13): σε μέρα βαρών προπόνηση βαρών,
   /// σε μέρα περπατήματος περπάτημα. Πριν, ένα πρωινό περπάτημα έκρυβε από τη «Σήμερα» την προπόνηση βαρών της μέρας.
   /// Χωρίς πρόγραμμα για σήμερα (ξεκούραση): ό,τι έγινε.
+  /// R10-B4-3: «της μέρας» είναι και αυτή που διάλεξες για σήμερα ([chosenWorkout]): ένα περπάτημα που διάλεξες σε μέρα
+  /// βαρών και έγινε στο ρολόι (που δεν καθαρίζει την επιλογή) είναι η σημερινή «έγινε», όχι «Έγινε σήμερα και».
   static Session? doneToday(TrainingStore t, DateTime now) {
-    final w = t.program?.forDay(now);
+    final w = chosenWorkout(t, now) ?? t.program?.forDay(now);
     for (final s in t.sessions.reversed) {
       if (s.finished && sameDay(s.start, now) && (w == null || w.isCardio == s.isCardio)) return s;
     }
@@ -63,7 +65,7 @@ class TodayTrainingCard extends StatefulWidget {
 
   /// Ό,τι άλλο τελείωσε σήμερα, έξω από την προπόνηση της μέρας (για τη γραμμή «Έγινε σήμερα και: …»).
   static Session? otherToday(TrainingStore t, DateTime now) {
-    final w = t.program?.forDay(now);
+    final w = chosenWorkout(t, now) ?? t.program?.forDay(now);
     if (w == null) return null;
     for (final s in t.sessions.reversed) {
       if (s.finished && sameDay(s.start, now) && w.isCardio != s.isCardio) return s;
@@ -172,13 +174,15 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           _title(context, cardio.name),
           if (chosenLine != null) chosenLine,
           const SizedBox(height: 4),
+          // Round 10 (R10-B8-B1): ο κανόνας του R9 για τα τρόφιμα (foodTileSubtitle): αδιάσπαστο κενό πριν από κάθε «·» (το
+          // «·» μένει με την προηγούμενη λέξη, όπως η άνω τελεία· ποτέ στην αρχή γραμμής) και ο αριθμός με τη λέξη του.
           Text(
             [
-              '${cardio.minutes} λεπτά',
+              '${cardio.minutes}\u00A0λεπτά',
               if (p?.planWeekText(cardio, now) case final wk?) wk,
               if (cardio.note != null && cardio.note!.trim().isNotEmpty) cardio.note!.trim(),
               if (limitText != null) limitText,
-            ].join(' · '),
+            ].join('\u00A0· '),
             style: _aux(c),
           ),
           // round1, U6-24: το ζέσταμα/η αποθεραπεία και στη «Σήμερα», στον δρόμο προς την προπόνηση.
@@ -221,7 +225,9 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         if (chosenLine != null) chosenLine,
         const SizedBox(height: 4),
         Text(
-          [countText(w.items.length, 'άσκηση', 'ασκήσεις'), 'περίπου ${w.minutes} λεπτά', if (limitText != null) limitText].join(' · '),
+          // Round 10 (R10-B8-B1): όπως η γραμμή του περπατήματος πιο πάνω.
+          [countText(w.items.length, 'άσκηση', 'ασκήσεις'), 'περίπου ${w.minutes}\u00A0λεπτά', if (limitText != null) limitText]
+              .join('\u00A0· '),
           style: _aux(c),
         ),
         RoutineButton(w),

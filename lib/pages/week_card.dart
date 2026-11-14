@@ -55,8 +55,12 @@ class WeekCard extends StatelessWidget {
     return AppCard(
       // Round 9 (R9-U1-2): στο ανοιχτό Fold η κάρτα είναι κάτω από τις δύο στήλες, σε όλο το πλάτος (today.dart): εκεί
       // (≥ 600 dp) οι πλακέτες σε μία σειρά και οι γραμμές σε δύο στήλες (~320 dp η καθεμία), ποτέ τεντωμένες.
+      // Round 10 (R10-B8-1 = R10-B2-B1): οι γραμμές σε δύο στήλες ήδη από 520 dp. Στο ανοιχτό Fold όρθιο (750 dp, με την
+      // πλαϊνή μπάρα) η κάρτα έχει 560 dp μέσα: με το 600 έμενε μία στήλη γραμμών 560 dp, με το «Σταθερό» ~450 dp μακριά από
+      // το όνομα. Τώρα δύο στήλες των 268 dp (όσο σχεδόν η στήλη ενός κινητού 360 dp)· οι πλακέτες μένουν δύο-δύο ως τα 600.
       child: LayoutBuilder(builder: (context, box) {
         final wide = box.maxWidth >= 600;
+        final wideRows = box.maxWidth >= 520;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -116,7 +120,7 @@ class WeekCard extends StatelessWidget {
                   _Highlight.of(highlights[i]),
               ],
             ],
-            if (shown.isNotEmpty && wide) ...[
+            if (shown.isNotEmpty && wideRows) ...[
               const SizedBox(height: 10),
               for (var i = 0; i < shown.length; i += 2) ...[
                 if (i > 0) const Hairline(vertical: 0),
