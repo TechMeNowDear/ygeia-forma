@@ -96,6 +96,9 @@ Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name)
     'w': s.workout,
     'name': s.name,
     'start': s.start.millisecondsSinceEpoch,
+    // R8-A8-3: «Συνέχεια» στην «Ξεχασμένη προπόνηση;» (ms): το ρολόι δεν την κρίνει πια «ξεχασμένη». Νέο πεδίο: το παλιό
+    // ρολόι το αγνοεί.
+    if (s.resumedAt != null) 'res': s.resumedAt,
     'idx': t.focus.clamp(0, s.items.isEmpty ? 0 : s.items.length - 1),
     'restEnd': t.restEnd?.millisecondsSinceEpoch ?? 0,
     'items': [
@@ -110,6 +113,9 @@ Map<String, dynamic> watchSession(TrainingStore t, String Function(String) name)
           if (e.rirAnswer != null) 'ra': e.rirAnswer,
           // Παραλείφθηκε εδώ (έλεγχος γ2, W2-06): το ρολόι δεν πηγαίνει εκεί. Νέο πεδίο: το παλιό ρολόι το αγνοεί.
           if (e.skipped) 'skip': 1,
+          // R8-U3-01 (συμβόλαιο με το ρολόι, f3): η ερώτηση «Πρώτο σετ: πόσες ακόμα;» εκκρεμεί για αυτή την άσκηση· το ρολόι
+          // τη ρωτά μετά το ✓ του 1ου σετ και στέλνει «rir1». Φεύγει μόλις απαντηθεί (από όποια συσκευή). Νέο πεδίο.
+          if (t.firstPending(e)) 'f': 1,
           'sets': [
             for (final x in e.log)
               {
@@ -206,6 +212,9 @@ class WearLink with WidgetsBindingObserver {
   StreamSubscription<dynamic>? _sub;
   String? _lastPlan;
   String? _lastSafety;
+
+  /// R8-A8-5: το περιεχόμενο του προγράμματος που στάλθηκε (χωρίς τη μέρα): όταν αλλάζει, στέλνεται «urgent».
+  String? _lastContent;
   String? _lastSession;
   bool _started = false;
 
@@ -385,19 +394,26 @@ class WearLink with WidgetsBindingObserver {
     // παλμών») δεν πρέπει να σβήσει ό,τι έχει το ρολόι. Στέλνεται μόλις διαβαστεί ξανά.
     if (t == null || !t.ready || t.readError || !(ready.value || _known)) return;
     try {
-      final plan = jsonEncode(watchPlan(t, t.now, _name));
+      final planMap = watchPlan(t, t.now, _name);
+      final plan = jsonEncode(planMap);
       if (plan != _lastPlan) {
         _lastPlan = plan;
         _planDay = ymd(t.now);
         // Το όριο παλμών άλλαξε: να φτάσει αμέσως, όχι όποτε βολέψει το σύστημα.
         final safety = '${t.hrLimit}';
-        final urgent = safety != _lastSafety;
+        // R8-A8-5: και κάθε αλλαγή του περιεχομένου (ζώνη, δονήσεις της ζώνης, πρόγραμμα, στόχοι): χωρίς «urgent» το
+        // σύστημα μπορεί να το καθυστερήσει ως 30 λεπτά (Android Developers, Data Layer: «Set DataItem priority»). Μόνο το
+        // ίδιο περιεχόμενο ξανά (επιστροφή στην εφαρμογή, άλλη μέρα χωρίς άλλη αλλαγή) μένει χωρίς βιασύνη.
+        final content = jsonEncode({...planMap}..remove('day'));
+        final urgent = safety != _lastSafety || content != _lastContent;
         _lastSafety = safety;
+        _lastContent = content;
         void failed() {
           // Δεν στάλθηκε: ξανά με την επόμενη αλλαγή ή επιστροφή στην εφαρμογή (όχι «Στέλνεται…» για πάντα).
           if (_lastPlan == plan) {
             _lastPlan = null;
             _lastSafety = null;
+            _lastContent = null;
           }
         }
 
@@ -541,6 +557,10 @@ class WearLink with WidgetsBindingObserver {
         // Ρολόι παλιότερης έκδοσης δεν στέλνει «r»: όπως πριν.
         final r = watchTickReps(c.j, e.ex);
         if (r != null) e.log[c.s].reps = r;
+        // R8-U3-01: 1ο σετ άσκησης «πρώτης φοράς» από το ρολόι: η ερώτηση «Πρώτο σετ: πόσες ακόμα θα έβγαζες;» έρχεται
+        // στην οθόνη της προπόνησης του κινητού (πριν: μόνο με ✓ στο κινητό, και η βαθμονόμηση χανόταν για πάντα). Όχι για
+        // ✓ που ξαναστάλθηκε αργότερα («late»): τα επόμενα σετ μπορεί να έχουν ήδη γίνει.
+        if (c.j['late'] != true && t.asksFirstSet(e, c.s)) t.firstAsk = e;
         t.tick(e, c.s, at: wearInt(c.j['at']));
         String? next;
         if (e.complete) {
@@ -561,6 +581,15 @@ class WearLink with WidgetsBindingObserver {
           t.restEnd = end;
           TrainingDevice.rest(end, title: 'Διάλειμμα', text: 'Επόμενο: $next', doneTitle: 'Τέλος διαλείμματος', doneText: 'Επόμενο: $next');
         }
+      case 'rir1':
+        // R8-U3-01 (συμβόλαιο με το ρολόι, f3): η απάντηση του ρολογιού στο «Πρώτο σετ: πόσες ακόμα;» («v» 0–4, −1 =
+        // «Δεν ξέρω»). Ίδιοι έλεγχοι με το ✓ (προπόνηση «sid», θέση «i», άσκηση «ex»), και μόνο όσο η ερώτηση εκκρεμεί: η
+        // πρώτη απάντηση (κινητό ή ρολόι) κερδίζει, μια δεύτερη αγνοείται. Η νέα κατάσταση (χωρίς «f», με τα νέα κιλά)
+        // φεύγει για το ρολόι με την αποθήκευση. Κινητό παλιότερης έκδοσης: άγνωστη εντολή, δεν κάνει τίποτα.
+        final forEx = c.j['ex'];
+        if (forEx is String && forEx != e.ex) return;
+        final v = wearInt(c.v);
+        if (v != null) t.answerFirst(e, v);
       case 'rir':
         // Μόνο για άσκηση που τελείωσε και δεν έχει ήδη απάντηση (να μη γραφτεί σε λάθος άσκηση).
         final v = wearInt(c.v);

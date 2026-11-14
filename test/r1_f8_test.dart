@@ -660,9 +660,10 @@ void main() {
       final check = File('.github/workflows/check.yml').readAsStringSync();
       for (final w in [j['build']!, check]) {
         // Round 7 (R7-A12-10, f4): κατώτατα λίγο κάτω από το πλήθος (πριν 950 / 40 / 120 κινητό + ρολόι μαζί).
-        expect(w, contains(r'if [ "${n:-0}" -lt 1550 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 70 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 128 ]; then'));
+        // Round 8 (R8-A12-2, f4): ≈ 3% κάτω από το #105 (1.832 / 85 / 167) και το Kotlin όχι λιγότερα από τα @Test του κώδικα.
+        expect(w, contains(r'if [ "${n:-0}" -lt 1777 ]; then'));
+        expect(w, contains(r'if [ "${n:-0}" -lt 82 ] || [ $(( ${n:-0} + 2 )) -lt "${want:-0}" ]; then'));
+        expect(w, contains(r'if [ "${n:-0}" -lt 162 ] || [ $(( ${n:-0} + 2 )) -lt "${want:-0}" ]; then'));
         expect(w, contains("grep -aoE '[0-9]+ tests passed' tests.log"));
       }
     });

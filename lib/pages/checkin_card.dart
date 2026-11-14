@@ -130,6 +130,32 @@ String lowLogText(CheckIn k) {
       'κάτι που συμβαίνει σχεδόν σε όλους. Ο στόχος κατεβαίνει με βάση τη ζυγαριά.';
 }
 
+/// «τη Δευτέρα 28 Δεκεμβρίου», «το Σάββατο 26 Δεκεμβρίου».
+String _onDay(DateTime d) => '${const ['τη', 'την', 'την', 'την', 'την', 'το', 'την'][d.weekday - 1]} ${longDate(d)}';
+
+/// Round 8 (R8-A1-4): το κείμενο της κάρτας «μαζεύω δεδομένα» ([CheckKind.gathering]). Χωρίς κενό στο φαγητό η πρώτη
+/// εκτίμηση βγαίνει την επόμενη μέρα ελέγχου ([firstEstimateDay])· με κενό, 3 εβδομάδες αφού ξαναρχίσει η καταγραφή
+/// ([estimateDayAfterGap]), όπως τη βγάζει ο έλεγχος και τη γράφει η σελίδα «Στόχοι». Πριν, η κάρτα έγραφε «την επόμενη
+/// Δευτέρα» ενώ η πρώτη εκτίμηση έβγαινε δύο εβδομάδες αργότερα.
+String gatheringText(CheckIn k) {
+  final g = k.goals;
+  final weekday = weekdayNames[DateTime.parse(g.since).weekday - 1];
+  const skip = 'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά, και η εκτίμηση θα έβγαινε πιο ψηλή από την αληθινή.';
+  final gap = k.gap;
+  if (gap == null) {
+    return '$skip Η πρώτη εκτίμηση βγαίνει ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday, με 3 εβδομάδες '
+        'δεδομένα. Ο στόχος μένει ίδιος.';
+  }
+  final restart = gap.restart;
+  final day = estimateDayAfterGap(g, firstEstimateDay(g), gap);
+  if (restart == null || day == null) {
+    return '$skip Από ${dayMonth(gap.from)} δεν έχει γραφτεί φαγητό που να μετρά: η πρώτη εκτίμηση βγαίνει 3 εβδομάδες αφού '
+        'ξαναρχίσει η καταγραφή. Ο στόχος μένει ίδιος.';
+  }
+  return '$skip Από ${dayMonth(gap.from)} ως ${dayMonth(gap.to)} δεν γράφτηκε φαγητό που να μετρά, άρα η εκτίμηση θέλει 3 '
+      'εβδομάδες από ${dayMonth(restart)}: η πρώτη βγαίνει ${_onDay(day)}. Ο στόχος μένει ίδιος.';
+}
+
 /// A1 (εβδομαδιαίος έλεγχος) και A3 (γρήγορη απώλεια).
 class CheckInCard extends StatelessWidget {
   const CheckInCard({super.key, required this.check, required this.store, required this.now});
@@ -151,13 +177,16 @@ class CheckInCard extends StatelessWidget {
     final small = TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary);
 
     final next = 'Ξανά ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday.';
+    // Round 8 (R8-A1-3): εκτίμηση πολύ ΨΗΛΑ (πάνω από το [adaptHighShare] του τύπου). Γεύματα που δεν γράφτηκαν τη ρίχνουν
+    // (μέσος όρος φαγητού − αλλαγή βάρους), δεν την ανεβάζουν· άρα εδώ φταίνε άλλα και η κάρτα τα λέει.
+    final high = k.kind == CheckKind.implausible && k.est != null && k.est!.tdee > adaptHighShare * g.calc.tdee;
     // Έλεγχος 13/11 (S1-12): όχι «πιο γρήγορα από το ασφαλές». Το Helms 2014 λέει 0,5–1% την εβδομάδα «για να κρατιούνται
     // οι μύες», όχι ότι πιο γρήγορα είναι επικίνδυνο· ο τίτλος λέει μόνο αυτό που μετρήθηκε.
     final title = switch (k.kind) {
       CheckKind.fast => 'Χάνεις πάνω από 1% του βάρους την εβδομάδα',
       CheckKind.fewData => 'Έλεγχος θερμίδων: λίγα δεδομένα',
       CheckKind.gathering => 'Έλεγχος θερμίδων: μαζεύω δεδομένα',
-      CheckKind.implausible => 'Έλεγχος θερμίδων: κάτι λείπει',
+      CheckKind.implausible => high ? 'Έλεγχος θερμίδων: κάτι δεν ταιριάζει' : 'Έλεγχος θερμίδων: κάτι λείπει',
       CheckKind.gap => 'Έλεγχος θερμίδων: κενό στο φαγητό',
       CheckKind.foreign => k.foreign.length == 1 ? 'Μια ζύγιση δεν μέτρησε' : 'Κάποιες ζυγίσεις δεν μέτρησαν',
       CheckKind.unread => 'Έλεγχος θερμίδων: οι ζυγίσεις δεν διαβάστηκαν',
@@ -182,11 +211,7 @@ class CheckInCard extends StatelessWidget {
           if (k.kind == CheckKind.same) TextSpan(text: _sameText(k)),
         ])),
       // Συμβούλιο 2, Α2: την 21η μέρα δεν βγαίνει ακόμα εκτίμηση, γιατί η πρώτη εβδομάδα δεν μετρά.
-      CheckKind.gathering => Text(
-          'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά, και η εκτίμηση θα έβγαινε πιο ψηλή από την αληθινή. '
-          'Η πρώτη εκτίμηση βγαίνει ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday, με 3 εβδομάδες δεδομένα. '
-          'Ο στόχος μένει ίδιος.',
-          style: body),
+      CheckKind.gathering => Text(gatheringText(k), style: body),
       CheckKind.fewData =>
         Text('${fewDataText(k.status, days: k.days, weighs: k.weighs)} Ο στόχος μένει ίδιος. $next', style: body),
       // Έλεγχος 13/11 (S1-1): κενό καταγραφής. Ο μέσος όρος φαγητού βγαίνει μόνο από τις γραμμένες μέρες και η αλλαγή
@@ -207,8 +232,13 @@ class CheckInCard extends StatelessWidget {
           'κάτω για νέα ανάγνωση: η κάρτα θα βγει μόλις διαβαστούν. Ο στόχος μένει ίδιος.',
           style: body),
       CheckKind.implausible => Text(
-          'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ μακριά από τον τύπο (${thousands(g.calc.tdee)}). '
-          'Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Ο στόχος μένει ίδιος.',
+          high
+              ? 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ πιο ψηλά από τον τύπο '
+                  '(${thousands(g.calc.tdee)}). Συνήθως φταίνε ποσότητες γραμμένες μεγαλύτερες από όσο έφαγες (π.χ. '
+                  'μαγειρεμένο φαγητό γραμμένο σαν ωμό, ή κάτι γραμμένο δύο φορές) ή νερά που έφυγαν γρήγορα (π.χ. σε '
+                  'αρρώστια). Ο στόχος μένει ίδιος.'
+              : 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ μακριά από τον τύπο (${thousands(g.calc.tdee)}). '
+                  'Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Ο στόχος μένει ίδιος.',
           style: body),
       CheckKind.fast => Text.rich(TextSpan(style: body, children: [
           TextSpan(text: '${fastPeriodText(k.fastDays)}: '),

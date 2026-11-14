@@ -42,8 +42,11 @@ class InfoButton extends StatelessWidget {
               ),
               alignment: Alignment.center,
               // R7-U4-11: το «i» μόνο φαίνεται· το TalkBack λέει «Τι είναι: …» (πριν «Τι είναι: HRV, i»). Το πάτημα μένει.
+              // Round 8 (R8-U4-6): το «i» είναι σήμα, όχι κείμενο: δεν μεγαλώνει με τα γράμματα του κινητού (στο 2× ήταν 28 px
+              // μέσα σε κύκλο 26 και κοβόταν). Ο στόχος αφής μένει 48 dp.
               child: ExcludeSemantics(
                 child: Text('i',
+                    textScaler: TextScaler.noScaling,
                     style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
               ),
@@ -287,8 +290,10 @@ class InfoDot extends StatelessWidget {
               decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.hairline), color: c.card),
               alignment: Alignment.center,
               // R7-U4-11: όπως στο [InfoButton], χωρίς «i» στην ετικέτα του TalkBack.
+              // Round 8 (R8-U4-6): όπως στο [InfoButton], το «i» δεν μεγαλώνει με τα γράμματα (κοβόταν μέσα στον κύκλο).
               child: ExcludeSemantics(
                 child: Text('i',
+                    textScaler: TextScaler.noScaling,
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: c.textSecondary)),
               ),
             ),

@@ -423,7 +423,8 @@ void main() {
 
     test('η σημείωση λέει τα όρια με τους αριθμούς τους', () {
       final note = bodyTrendNote(previous: null, days: 6, date: (d) => '${d.day}/${d.month}');
-      expect(note, contains('2 μονάδες στο λίπος ή 1,7 kg και πάνω'));
+      // Round 8 (R8-U4-3): αριθμός και μονάδα με αδιάσπαστο κενό.
+      expect(note, contains('2\u00A0μονάδες στο λίπος ή 1,7\u00A0kg και πάνω'));
       expect(note, contains('διακύμανση της ζυγαριάς'));
     });
   });

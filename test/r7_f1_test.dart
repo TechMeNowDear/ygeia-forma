@@ -226,7 +226,8 @@ void main() {
     test('Open Food Facts: ό,τι απλώς περιέχει → «Τίποτα»· με κατηγορία πίτουρου → κρίνει το όνομα', () {
       expect(cholKindFromOffTags(['en:breads']), CholKind.none);
       expect(cholKindFromOffTags(['en:crackers', 'en:cereals-and-their-products']), CholKind.none);
-      expect(cholKindFromOffTags(['en:breakfast-cereals', 'en:oat-bran']), isNull);
+      // Round8 (R8-A3-1): σκέτο πίτουρο που μπαίνει και στα «δημητριακά πρωινού» μετρά ως πίτουρο (πριν null).
+      expect(cholKindFromOffTags(['en:breakfast-cereals', 'en:oat-bran']), CholKind.bran);
       expect(cholKindFromOffTags(['en:oat-bran']), CholKind.bran);
       expect(cholKindFromOffTags(['en:yogurts']), isNull);
     });

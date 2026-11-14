@@ -51,6 +51,7 @@ object Results {
                 // Και όταν στο μεταξύ το κινητό ξεκίνησε άλλη προπόνηση ([Repo.endedPhone], έλεγχος 13/11, round 7, R7-A8-2).
                 val src = Repo.phoneById(sid)
                 val items = src?.resultJson(end0, hr)?.optJSONArray("items")
+                if (items != null && src != null) markConfirmed(items, src)
                 val id = "hr$sid-${Repo.startedAt}"
                 val o = JSONObject().put("v", 1).put("kind", "hr").put("sid", sid).put("id", id)
                 hr.writeTo(o)
@@ -81,5 +82,21 @@ object Results {
         if (partialAt != null) o.put("partial", 1)
         if (endReason != null) o.put("endR", endReason)
         return result
+    }
+
+    /**
+     * Έλεγχος 14/11, round 8 (R8-A8-2): στο αποτέλεσμα των παλμών μιας προπόνησης του κινητού ([items], ίδια σειρά με τα
+     * [LiveSession.items] και τα σετ τους, από το [LiveSession.resultJson]), «c»: 1 σε κάθε ✓ που το κινητό είχε ήδη δει
+     * ([SetT.confirmed]). Έτσι το κινητό ξέρει ότι ένα τέτοιο ✓ που δεν έχει πια το έβγαλε ο χρήστης εκεί (και το ρολόι δεν
+     * πρόλαβε να το μάθει), και δεν το ξαναβάζει· συμπληρώνει μόνο τα ✓ που έγιναν στο ρολόι και δεν τα είδε ποτέ. Ίδιος
+     * κανόνας με το [keepWatchEdits]. Νέο, προαιρετικό πεδίο: το παλιό κινητό το αγνοεί.
+     */
+    internal fun markConfirmed(items: JSONArray, s: LiveSession) {
+        for ((i, item) in s.items.withIndex()) {
+            val log = items.optJSONObject(i)?.optJSONArray("log") ?: continue
+            for ((k, set) in item.sets.withIndex()) {
+                if (set.done && set.confirmed) log.optJSONObject(k)?.put("c", 1)
+            }
+        }
     }
 }

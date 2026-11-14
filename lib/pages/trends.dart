@@ -303,9 +303,7 @@ class _ChangeRow extends StatelessWidget {
                 Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
                 const SizedBox(height: 2),
                 Text(
-                  relativeTemp(r)
-                      ? '${relativeTempText(r)} σε σχέση με πριν · όχι θερμοκρασία σώματος'
-                      : 'από ${r.def.formatAs(r.previous!, r.source)} σε ${r.def.formatAs(r.current!, r.source)}',
+                  changeRowText(r),
                   style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular),
                 ),
               ],
@@ -375,53 +373,59 @@ class _MetricRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          key: ValueKey('trend-${r.def.key}'),
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          // Round 1 (U1b-15): το όνομα σε δική του γραμμή, σε όλο το πλάτος (πριν μοιραζόταν τη γραμμή με το «χάπι» και
-          // έσπαγε σε «… στον / ύπνο»)· από κάτω η τιμή αριστερά, το «χάπι» και το βελάκι δεξιά.
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, color: c.textSecondary)),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            value,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
-                              fontFeatures: tabular,
-                            ),
-                          ),
-                          if (relative)
+        // Round 8 (R8-U4-9): το TalkBack λέει αν η γραμμή είναι ανοιχτή ή κλειστή (WCAG 4.1.2)· το βελάκι είναι μόνο εικόνα.
+        Semantics(
+          container: true,
+          button: true,
+          expanded: expanded,
+          child: InkWell(
+            key: ValueKey('trend-${r.def.key}'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            // Round 1 (U1b-15): το όνομα σε δική του γραμμή, σε όλο το πλάτος (πριν μοιραζόταν τη γραμμή με το «χάπι» και
+            // έσπαγε σε «… στον / ύπνο»)· από κάτω η τιμή αριστερά, το «χάπι» και το βελάκι δεξιά.
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(metricLabel(r.def, r.source), style: TextStyle(fontSize: 15, color: c.textSecondary)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              'σε σχέση με πριν · όχι θερμοκρασία σώματος',
-                              style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                              value,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: r.current == null || few || value == '—' ? c.textTertiary : c.text,
+                                fontFeatures: tabular,
+                              ),
                             ),
-                        ],
+                            if (relative)
+                              Text(
+                                'σε σχέση με πριν · όχι θερμοκρασία σώματος',
+                                style: TextStyle(fontSize: 12.5, color: c.textTertiary),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    TrendStatusPill(r: r),
-                    const SizedBox(width: 4),
-                    Icon(
-                      expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                      size: 20,
-                      color: c.textTertiary,
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 8),
+                      TrendStatusPill(r: r),
+                      const SizedBox(width: 4),
+                      Icon(
+                        expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                        size: 20,
+                        color: c.textTertiary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -672,6 +676,12 @@ String relativeTempText(TrendResult r) => r.current == null ||
         r.status == TrendStatus.sourceChange
     ? '—'
     : '${signedDec(shownDiff(r.current!, r.previous!, r.def.digits), r.def.digits)} ${r.def.unit}';
+
+/// Η γραμμή κάτω από το όνομα στο «Τι άλλαξε»: «από 6 ώρες 51 λεπτά σε 7 ώρες 32 λεπτά». Round 8 (R8-U4-3): ο αριθμός
+/// μένει με τη μονάδα του ([unitsGlued]) όταν η γραμμή σπάει· πριν «… σε 7 | ώρες 32 λεπτά».
+String changeRowText(TrendResult r) => relativeTemp(r)
+    ? '${unitsGlued(relativeTempText(r))} σε σχέση με πριν · όχι θερμοκρασία σώματος'
+    : 'από ${unitsGlued(r.def.formatAs(r.previous!, r.source))} σε ${unitsGlued(r.def.formatAs(r.current!, r.source))}';
 
 /// Round 1 (S4-1): τίποτα δεν «άλλαξε», αλλά κάποια γραμμή δεν είχε αρκετές ανεξάρτητες μετρήσεις: όχι «ό,τι αλλάζει είναι
 /// μέσα στις διακυμάνσεις σου» (για εκείνες τις γραμμές δεν φάνηκε).

@@ -418,6 +418,8 @@ class OuraManagePage extends StatelessWidget {
     final revoked = await store.disconnectOura();
     messenger.showSnackBar(SnackBar(
       duration: const Duration(seconds: 8),
+      // Round8 (R8-U2-1, f1): με «Αναίρεση» το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+      persist: false,
       // Round 1 (S5-8): αν η Oura δεν απάντησε στην ανάκληση (π.χ. χωρίς δίκτυο), το λέμε: η άδεια μένει στον λογαριασμό.
       content: Text(revoked
           ? 'Αποσυνδέθηκε. Τα δεδομένα που είχαν έρθει μένουν.'

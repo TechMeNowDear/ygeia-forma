@@ -55,8 +55,9 @@ class FoodChannel {
   /// διαβάζονται από το αρχείο που κρατήθηκε για τη βλάβη [at] (μόνο ανάγνωση· το αρχείο δεν αλλάζει). «done»: έγινε
   /// ήδη (με το πόσα ξαναμπήκαν τότε). [salvageDone]: σημειώνει ότι έγινε, με το πόσα ξαναμπήκαν.
   static Future<Map<String, dynamic>> salvageRead(int at) => _call('salvageRead', {'at': at});
-  static Future<Map<String, dynamic>> salvageDone(int at, int entries, int foods) =>
-      _write('salvageDone', {'at': at, 'entries': entries, 'foods': foods});
+  /// Round 8 (R8-A9-1, f4): [complete] = διαβάστηκε όλο το αρχείο (αλλιώς ξαναδιαβάζεται με νεότερο κανόνα ανάγνωσης).
+  static Future<Map<String, dynamic>> salvageDone(int at, int entries, int foods, {required bool complete}) =>
+      _write('salvageDone', {'at': at, 'entries': entries, 'foods': foods, 'complete': complete});
   static Future<Map<String, dynamic>> scanBarcode() => _call('scanBarcode');
   static Future<Map<String, dynamic>> saveBackup(String json, String name) =>
       _call('saveBackup', {'json': json, 'name': name});

@@ -125,6 +125,8 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         keyPrefix: 'today',
         onResume: () {
           _library();
+          // R8-A8-3: ανοίγει και η εφαρμογή στο ρολόι, για να «μπει» ξανά στην προπόνηση.
+          WearLink.main.openWatch();
           Navigator.of(context).push(SessionPage.route(t));
         },
       );

@@ -120,9 +120,12 @@ Map<String, dynamic> diagnosticsFrom({
           'total': d.total,
           'failed': d.failed.toList(),
           'bodyOk': d.bodyOk,
+          // Round 8 (R8-A11-3): οι ζυγίσεις των τελευταίων [diagnosticsDays] ημερών, όπως όλα τα άλλα της Samsung και της
+          // Oura (και όπως λέει η πολιτική απορρήτου)· πριν έμπαινε ένας ολόκληρος χρόνος. Κάθε υπολογισμός της αναφοράς
+          // κοιτά ως 46 μέρες πίσω ([adaptScanDays]).
           'body': [
             for (final b in d.body)
-              if (!b.time.isBefore(DateTime(today.year - 1, today.month, today.day)))
+              if (!b.time.isBefore(from))
                 {
                   't': _iso(b.time),
                   if (b.weight != null) 'kg': b.weight,
@@ -291,6 +294,9 @@ Map<String, dynamic> diagnosticsFrom({
   if (g != null && g.doctor) {
     final ws = weekStart(today);
     final week = CholWeek([for (final c in cholDays) if (!c.$1.isBefore(ws) && c.$1.isBefore(today)) c], goalKcal: g.kcal);
+    // Round 8 (R8-A3-2): όσπρια και ψάρι ΜΑΖΙ με σήμερα, όπως η κάρτα και η σελίδα «Χοληστερίνη» (U3b-8: ένα γεύμα που
+    // έγινε έχει γίνει)· οι μέσοι όροι μένουν χωρίς σήμερα. Πριν η αναφορά έγραφε «2» εκεί που η οθόνη έδειχνε «3 / 4».
+    final weekNow = [for (final c in cholDays) if (!c.$1.isBefore(ws) && !c.$1.isAfter(today)) c];
     chol = {
       'weekStart': dateKey(ws),
       'fullDays': week.fullDays,
@@ -301,8 +307,8 @@ Map<String, dynamic> diagnosticsFrom({
       'daysSaltOk': week.daysSaltOk(g.salt),
       'daysSaltUnknown': week.daysSaltUnknown,
       'fullDayKcal': fullDayKcalFor(g.kcal).round(),
-      'legumes': week.legumes,
-      'fish': week.fish,
+      'legumes': weekNow.where((c) => c.$2.legumes).length,
+      'fish': weekNow.where((c) => c.$2.fish).length,
       'targets': {'nutsG': g.nutsG, 'branG': g.branG, 'legumesWeek': g.legumesWeek, 'fishWeek': g.fishWeek, 'doctor': g.docTargets.toJson()},
     };
   }
@@ -367,6 +373,8 @@ Map<String, dynamic> diagnosticsFrom({
   final jumps = <String>[];
   for (var i = 1; i < weights.length; i++) {
     final a = weights[i - 1], b = weights[i];
+    // R8-A11-3: μόνο μέσα στις μέρες της αναφοράς (το κείμενο του ελέγχου γράφει τις δύο ζυγίσεις).
+    if (a.$1.isBefore(from)) continue;
     final gap = daysBetween(a.$1, b.$1);
     if (gap > 0 && gap <= 7 && (b.$2 - a.$2).abs() > 1.5 * gap.clamp(1, 2)) jumps.add('${dateKey(a.$1)}→${dateKey(b.$1)}: ${a.$2}→${b.$2}');
   }

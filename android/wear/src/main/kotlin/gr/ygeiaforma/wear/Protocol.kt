@@ -425,6 +425,11 @@ class LiveSession(
      * είναι της άσκησης που τελείωσε, όχι της επόμενης (που δείχνει πια το [idx]). 0 = άγνωστο.
      */
     var restLen: Long = 0,
+    /**
+     * Μόνο για [phone]: πότε πατήθηκε «Συνέχεια» στην «Ξεχασμένη προπόνηση;» του κινητού (ms, «res» του [Paths.SESSION]·
+     * 0 = ποτέ ή παλιό κινητό). Μετρά ως κίνηση στο [phoneLastActivity] (έλεγχος 14/11, round 8, R8-A8-3, αίτημα του f2).
+     */
+    val res: Long = 0,
 ) {
     val current: ItemT? get() = items.getOrNull(idx)
 
@@ -637,6 +642,8 @@ class LiveSession(
                     set.trail?.let { t -> so.put("rb", JSONArray(t.sorted())) }
                 }
             }
+            // R8-A8-3: και η «Συνέχεια» του κινητού (νέο, προαιρετικό πεδίο).
+            if (s.res > 0) o.put("res", s.res)
             return o
         }
 
@@ -655,7 +662,10 @@ class LiveSession(
                         if (t.isNotEmpty()) set.trail = t
                     }
                 }
-                LiveSession(s.id, s.workout, s.name, s.start, s.items, s.idx, s.restEnd, phone = true, rirIdx = s.rirIdx, restLen = s.restLen)
+                LiveSession(
+                    s.id, s.workout, s.name, s.start, s.items, s.idx, s.restEnd, phone = true, rirIdx = s.rirIdx, restLen = s.restLen,
+                    res = o.optLong("res", 0),
+                )
             } catch (_: Exception) {
                 null
             }
@@ -677,6 +687,8 @@ class LiveSession(
                     idx = j.optInt("idx", 0),
                     restEnd = j.optLong("restEnd", 0),
                     phone = true,
+                    // R8-A8-3: «Συνέχεια» στην «Ξεχασμένη προπόνηση;» του κινητού (νέο, προαιρετικό· παλιό κινητό: 0).
+                    res = j.optLong("res", 0),
                 )
             }
         } catch (_: Exception) {
@@ -1640,31 +1652,48 @@ object Forgotten {
         Why.STRENGTH_IDLE -> "Τρέχει ακόμα η προπόνηση;"
     }
 
-    /** Τι να κάνεις (δεύτερη γραμμή της ειδοποίησης). */
-    fun text(why: Why): String = when (why) {
+    /**
+     * Τι να κάνεις (δεύτερη γραμμή της ειδοποίησης). Round 8 (R8-U3-03): πάνω από την ερώτηση ρεζέρβας ([onRir], [rirEnds])
+     * το ίδιο με το [screenText]: εκεί δεν υπάρχει «Τέλος».
+     */
+    fun text(why: Why, onRir: Boolean = false, rirEnds: Boolean = false): String = when (why) {
         Why.WALK_PAUSED -> "Πάτα «Συνέχεια» ή «Τέλος» στο ρολόι."
-        Why.WALK_LONG, Why.STRENGTH_IDLE -> "Αν τελείωσες, πάτα «Τέλος» στο ρολόι."
+        Why.WALK_LONG, Why.STRENGTH_IDLE -> when {
+            !onRir -> "Αν τελείωσες, πάτα «Τέλος» στο ρολόι."
+            rirEnds -> "Αν τελείωσες, απάντησε στην ερώτηση στο ρολόι."
+            else -> "Αν τελείωσες, απάντησε στην ερώτηση και πάτα «Τέλος» στο ρολόι."
+        }
     }
 
     /**
      * Το ίδιο στην ΟΘΟΝΗ της εφαρμογής, ολόκληρο σε όλη την οθόνη (έλεγχος 13/11, round 7, R7-U3-07): η ερώτηση στη δική
      * της γραμμή, χωρίς «στο ρολόι» (το διαβάζεις ήδη εκεί), και πρώτα «κλείσε αυτό»: ένα πάτημα στο μήνυμα το κλείνει (από
      * κάτω γράφει «πάτα για να κλείσει»), δεν τελειώνει την άσκηση. Κείμενο προς έγκριση από τον χρήστη.
+     *
+     * Έλεγχος 14/11, round 8 (R8-U3-03): όταν από κάτω είναι η ερώτηση ρεζέρβας ([onRir]), εκεί ΔΕΝ υπάρχει «Τέλος»· η
+     * προπόνηση προχωρά μόνο με απάντηση. [rirEnds]: η απάντηση την τελειώνει κιόλας (προπόνηση του ρολογιού, όλες οι
+     * ασκήσεις έγιναν: [WatchActivity.answer]) — αλλιώς μετά την απάντηση φαίνεται το «Τέλος».
      */
-    fun screenText(why: Why): String = when (why) {
+    fun screenText(why: Why, onRir: Boolean = false, rirEnds: Boolean = false): String = when (why) {
         Why.WALK_PAUSED -> "${title(why)}\nΚλείσε αυτό και πάτα «Συνέχεια» ή «Τέλος»."
-        Why.WALK_LONG, Why.STRENGTH_IDLE -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και πάτα «Τέλος»."
+        Why.WALK_LONG, Why.STRENGTH_IDLE -> when {
+            !onRir -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και πάτα «Τέλος»."
+            rirEnds -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό και απάντησε στην ερώτηση."
+            else -> "${title(why)}\nΑν τελείωσες: κλείσε αυτό, απάντησε στην ερώτηση και πάτα «Τέλος»."
+        }
     }
 }
 
 /**
  * Η τελευταία κίνηση σε μια προπόνηση του κινητού: το πιο πρόσφατο ✓ (με ώρα), αλλιώς η αρχή της. Ίδιος κανόνας με το
- * κινητό (TrainingStore.lastActivity), για το [phoneStale].
+ * κινητό (Session.lastActivity), για το [phoneStale]. Έλεγχος 14/11, round 8 (R8-A8-3, αίτημα του f2): και η «Συνέχεια»
+ * στην «Ξεχασμένη προπόνηση;» του κινητού ([LiveSession.res]), αν είναι πιο πρόσφατη: πριν, μετά τη «Συνέχεια» το ρολόι
+ * έγραφε «κλείσε την εκεί» και δεν πρότεινε «Παλμοί εδώ» ως το πρώτο ✓ στο κινητό. Όπως το κινητό: max(αρχή, ✓, «res»).
  */
 fun phoneLastActivity(s: LiveSession): Long {
-    var last = 0L
+    var last = s.start
     for (item in s.items) for (x in item.sets) if (x.done && x.at > last) last = x.at
-    return if (last > 0L) last else s.start
+    return maxOf(last, s.res)
 }
 
 /**
@@ -1697,6 +1726,35 @@ fun staleSinceText(start: Long, now: Long, zone: java.time.ZoneId = java.time.Zo
 const val STALE_PHONE_LINE1 = "Ανοιχτή προπόνηση στο κινητό"
 
 fun stalePhoneLine2(start: Long, now: Long): String = "${staleSinceText(start, now)}· κλείσε την εκεί"
+
+/**
+ * Το «μπες στην προπόνηση του κινητού» (άνοιγμα από το κινητό, [flag]) γίνεται ΤΩΡΑ; Έλεγχος 14/11, round 8 (R8-A8-6): μόνο
+ * αφού διαβαστεί η τωρινή κατάσταση του κινητού σε αυτό το άνοιγμα ([loaded], Link.load), και μόνο σε προπόνηση που δεν
+ * έκλεισε και δεν μοιάζει ξεχασμένη ([phoneStale]). Πριν, το αίτημα κρινόταν με ό,τι είχε μείνει στη μνήμη από παλιότερα
+ * (μια προπόνηση που είχε κλείσει στο κινητό χωρίς να το μάθει το ρολόι) και σβηνόταν: η νέα προπόνηση έμενε χωρίς παλμούς
+ * από το ρολόι. Όσο δεν ισχύουν αυτά, το αίτημα ΜΕΝΕΙ (ώσπου να φτάσει η νέα προπόνηση· σβήνει μόνο αν ξεκινήσει κάτι εδώ,
+ * [pendingJoin]).
+ */
+fun joinNow(flag: Boolean, loaded: Boolean, phone: LiveSession?, now: Long): Boolean =
+    flag && loaded && phone != null && !phone.ended && !phoneStale(phone, now)
+
+/**
+ * Έναρξη ([kind], [fromPhone]) ενώ τρέχει ήδη άσκηση ([running]): δεκτή ΜΟΝΟ η περίπτωση για την οποία υπάρχει, δηλαδή η
+ * προπόνηση του κινητού βρίσκει το ρολόι σε προπόνηση με βάρη («strength» + κινητό), και ποτέ όσο η άσκηση κλείνει
+ * ([stopping]) ή σε περπάτημα (DP-10). Έλεγχος 14/11, round 8 (R8-A8-1): πριν, κάθε έναρξη (και «Περπάτημα» ή μια προπόνηση
+ * του ρολογιού από την αρχική, όσο έκλεινε η μέτρηση μιας προπόνησης του κινητού) έγραφε «όχι του κινητού» και το
+ * αποτέλεσμα των παλμών της δεν γραφόταν ποτέ.
+ */
+fun joinAllowedWhileRunning(running: String?, kind: String, fromPhone: Boolean, stopping: Boolean): Boolean =
+    running != null && running != "walk" && kind == "strength" && fromPhone && !stopping
+
+/**
+ * Η «άλλη προπόνηση» που διάλεξες στην αρχική (τρίτο κουμπί, [chosen]) ισχύει μόνο τη μέρα που τη διάλεξες ([chosenDay]).
+ * Έλεγχος 14/11, round 8 (R8-U3-06): πριν έμενε όσο ζούσε η εφαρμογή, και τις επόμενες μέρες το πρώτο κουμπί ήταν η χθεσινή
+ * επιλογή (σε μέρα περπατήματος χανόταν και η αρχική του περπατήματος).
+ */
+fun chosenToday(chosen: String?, chosenDay: java.time.LocalDate?, today: java.time.LocalDate): String? =
+    if (chosen != null && chosenDay == today) chosen else null
 
 /** Μοιάζει ξεχασμένη η άσκηση; ([Forgotten.why]) */
 fun forgottenDue(kind: String?, startedEl: Long, lastUserActionEl: Long, pausedSinceEl: Long, plannedMin: Int, nowEl: Long): Boolean =

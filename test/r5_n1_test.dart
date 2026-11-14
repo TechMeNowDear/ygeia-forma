@@ -219,7 +219,8 @@ void main() {
       await _pump(t, BodyPage(store: _store(now, _illness([])), now: now));
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9'); // 80,7 / 1,8² = 24,907
       expect(_row(t, 'Βάρος'), '80,7 kg  (−0,2)');
-      expect(_note(t), contains('Στο βάρος, σε παρένθεση η αλλαγή από τις 2 Δεκ.'));
+      // Round 8 (A4 Β2 / U4 Β4): ίδια μορφή μέρας με το χάπι («2/12»· πριν «2 Δεκ.»).
+      expect(_note(t), contains('Στο βάρος, σε παρένθεση η αλλαγή από τις 2/12.'));
     });
   });
 
@@ -253,7 +254,8 @@ void main() {
       final pills = [for (final p in t.widgetList<TrendPill>(find.byType(TrendPill))) if (p.text.contains(' kg από ')) p.text];
       expect(pills, ['−0,8 kg από 18/12']);
       expect(_row(t, 'Βάρος'), '78,9 kg  (−0,8)', reason: 'πριν: «78,9 kg  (−15,8)»');
-      expect(_note(t), contains('σε παρένθεση η αλλαγή από τις 18 Δεκ.'));
+      // Round 8 (A4 Β2 / U4 Β4): ίδια μορφή μέρας με το χάπι («18/12»· πριν «18 Δεκ.»).
+      expect(_note(t), contains('σε παρένθεση η αλλαγή από τις 18/12.'));
       await _pump(t, TodayPage(store: s, food: sampleFoodStore(now), open: (_, [__]) {}, openSettings: () {}, now: now));
       final card = t.widgetList<StatCard>(find.byType(StatCard)).firstWhere((c) => c.icon == Icons.monitor_weight_rounded);
       expect((card.trend! as TrendPill).text, '−0,8 kg από 18/12');

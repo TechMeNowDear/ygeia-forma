@@ -53,6 +53,7 @@ class ExLog {
     this.swappedFrom,
     this.reason,
     this.plannedSets,
+    this.firstAnswer,
     Map<String, dynamic>? extra,
   })  : log = log ?? [],
         pain = pain ?? [],
@@ -61,7 +62,7 @@ class ExLog {
   /// Κλειδιά άλλης έκδοσης (V-A-07).
   final Map<String, dynamic> extra;
 
-  static const _known = {'ex', 'sets', 'lo', 'hi', 'rir', 'rest', 'log', 'ra', 'pain', 'skip', 'from', 'why', 'ps'};
+  static const _known = {'ex', 'sets', 'lo', 'hi', 'rir', 'rest', 'log', 'ra', 'pain', 'skip', 'from', 'why', 'ps', 'fa'};
 
   String ex;
   final int sets, lo, hi, rir, rest;
@@ -82,6 +83,11 @@ class ExLog {
   /// έγιναν) και εδώ τα σετ του προγράμματος, για να κρίνει η πρόοδος ότι «δεν έγιναν όλα». Κλειδί «ps»: νέο,
   /// προαιρετικό (η παλιά έκδοση το κρατά ως άγνωστο, V-A-07). null = κανονική άσκηση.
   int? plannedSets;
+
+  /// R8-U3-01: η απάντηση στο «Πρώτο σετ: πόσες ακόμα θα έβγαζες;» (0–4, −1 = «Δεν ξέρω»), από το κινητό ή το ρολόι·
+  /// null = δεν απαντήθηκε. Μία φορά ανά άσκηση και προπόνηση: η πρώτη απάντηση κερδίζει. Κλειδί «fa»: νέο, προαιρετικό
+  /// (η παλιά έκδοση το κρατά ως άγνωστο, V-A-07).
+  int? firstAnswer;
 
   LoadKind get kind => loadKindOf(ex);
   List<SetLog> get done => [for (final s in log) if (s.done) s];
@@ -169,6 +175,7 @@ class ExLog {
         if (swappedFrom != null) 'from': swappedFrom,
         if (reason != null) 'why': reason,
         if (plannedSets != null) 'ps': plannedSets,
+        if (firstAnswer != null) 'fa': firstAnswer,
       };
 
   factory ExLog.fromJson(Map<String, dynamic> j) => ExLog(
@@ -185,6 +192,7 @@ class ExLog {
         swappedFrom: j['from'] is String ? j['from'] as String : null,
         reason: j['why'] is String ? j['why'] as String : null,
         plannedSets: j['ps'] is num && (j['ps'] as num).isFinite ? (j['ps'] as num).toInt() : null,
+        firstAnswer: j['fa'] is num && (j['fa'] as num).isFinite ? (j['fa'] as num).toInt() : null,
         extra: unknownKeys(j, _known),
       );
 }
@@ -317,7 +325,15 @@ class Session {
 
   /// Η τελευταία κίνηση στην προπόνηση: το τελευταίο ✓ (ή η αρχή, αν δεν έγινε κανένα). Για την «ξεχασμένη» προπόνηση
   /// (έλεγχος 9/11, V-A-09): το τέλος της δεν είναι «τώρα», 20 ώρες μετά.
+  /// R8-A8-3: και η «Συνέχεια» στην «Ξεχασμένη προπόνηση;» ([resumedAt]), αν είναι πιο πρόσφατη.
   DateTime get lastActivity {
+    final t = lastTick.millisecondsSinceEpoch;
+    final r = resumedAt;
+    return r != null && r > t ? DateTime.fromMillisecondsSinceEpoch(r) : DateTime.fromMillisecondsSinceEpoch(t);
+  }
+
+  /// Το τελευταίο ✓ (ή η αρχή, αν δεν έγινε κανένα), χωρίς τη «Συνέχεια»: η ώρα του «Τέλος (στις …)» της ξεχασμένης.
+  DateTime get lastTick {
     var t = start.millisecondsSinceEpoch;
     for (final e in items) {
       for (final x in e.log) {
@@ -326,6 +342,10 @@ class Session {
     }
     return DateTime.fromMillisecondsSinceEpoch(t);
   }
+
+  /// R8-A8-3: πότε πατήθηκε «Συνέχεια» στην «Ξεχασμένη προπόνηση;» (ms), ή null. Κλειδί «res»: νέο, προαιρετικό (η παλιά
+  /// έκδοση το κρατά ως άγνωστο κλειδί, V-A-07)· πηγαίνει και στο ρολόι, που κρίνει με αυτό την «ξεχασμένη».
+  int? resumedAt;
 
   final String id;
   final String workout;
@@ -413,6 +433,7 @@ class Session {
   static const _known = {
     'id', 'w', 'name', 'prog', 'start', 'end', 'items', 'feel', 'hrAvg', 'hrMax', 'cmin', 'note', 'hr', 'hrf', 'm', 'steps', 'src',
     'hrm', 'hrg', 'hrd', 'werr', 'wdg', 'stop', 'csec', 'gps', 'act', 'km', 'pz', 'hrrE', 'hrr1', 'lim', 'part', 'hrbad', 'hrs', 'zlo', 'zhi', 'zt',
+    'res',
   };
 
   /// [hrInline]: οι παλμοί μέσα (όπως ως #90)· αλλιώς μόνο πόσοι είναι («hrf»), γιατί είναι στο δικό τους αρχείο.
@@ -456,6 +477,7 @@ class Session {
       if (partial) 'part': 1,
       if (hrBad != null) 'hrbad': hrBad,
       if (steadyHr case final v?) 'hrs': v,
+      if (resumedAt != null) 'res': resumedAt,
     };
   }
 
@@ -535,6 +557,13 @@ class Session {
       extra['zt'] = zt;
     }
     s.hrSteady = optInt('hrs');
+    // Ώρα που δεν χωρά σε ημερομηνία: μένει αυτούσια στο [extra], χωρίς να μετρά.
+    final res = optInt('res');
+    if (res != null && res.abs() > 8640000000000000) {
+      extra['res'] = j['res'];
+    } else {
+      s.resumedAt = res;
+    }
     // Οι παλμοί στο δικό τους αρχείο (V-A-02): δεν φορτώνονται τώρα.
     if (hr.isEmpty && hrf > 0) {
       s.hrLoaded = false;

@@ -176,7 +176,8 @@ class _WeekRow extends StatelessWidget {
     // Round 1 (U1b-17): με «Λίγα δεδομένα» και λίγες μέρες στην εβδομάδα, «—» αντί για μια μεσαία τιμή που δεν λέει κάτι
     // (ίδιος κανόνας με τις Τάσεις, F10), και χωρίς «πριν …».
     final insufficient = t.status == TrendStatus.insufficient;
-    final few = insufficient && t.nCurrent < t.needed;
+    // Round 8 (R8-A5-3): και με «Αλλαγή πηγής» (π.χ. 1 νύχτα του Oura σε εβδομάδα του ρολογιού), όπως οι Τάσεις.
+    final few = (insufficient || t.status == TrendStatus.sourceChange) && t.nCurrent < t.needed;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(

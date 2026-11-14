@@ -399,15 +399,17 @@ void main() {
         await t.tap(find.byKey(const ValueKey('wizard-next')));
         await t.pumpAndSettle();
       }
-      // 2.250 − 90 × 0,5% × 7.700 ÷ 7 = 1.755 → 1.760· ο τύπος θα έδινε 2.250.
-      expect(find.text('1.760 kcal', findRichText: true), findsOneWidget);
+      // Round 8 (R8-A1-1): η διόρθωση που ισχύει μένει και αλλάζει μόνο όσο ο τύπος. Τύπος πριν (92 kg): 2.775 − 506 =
+      // 2.269· τώρα (90 kg): 2.745 − 495 = 2.250· διαφορά −19 → −20: 1.800 → 1.780 (πριν 1.760 από «εκτίμηση − ρυθμός»).
+      expect(find.text('1.780 kcal', findRichText: true), findsOneWidget);
       expect(find.byKey(const ValueKey('wizard-from-data')), findsOneWidget);
-      expect(find.textContaining('ο τύπος θα έδινε 2.250 kcal'), findsOneWidget);
+      expect(find.textContaining('ο τύπος μόνος θα έδινε 2.250 kcal'), findsOneWidget);
+      expect(find.text('Ο στόχος αλλάζει από 1.800 σε 1.780 kcal.'), findsOneWidget);
       expect(find.textContaining('Ο έλεγχος θερμίδων συνεχίζει όπως πριν'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       final g = store.goals!;
-      expect((g.kcal, g.kcalAdapt, g.tdeeEst, g.since, g.checkIn, g.kg), (1760, 1760, 2250.0, '2026-10-12', '2026-11-09', 90.0));
+      expect((g.kcal, g.kcalAdapt, g.tdeeEst, g.since, g.checkIn, g.kg), (1780, 1780, 2250.0, '2026-10-12', '2026-11-09', 90.0));
       expect(g.log.length, 1);
       // Μετά τον οδηγό: η σελίδα «Στόχοι» λέει την επόμενη Δευτέρα ελέγχου (16/11), όχι «πρώτη εκτίμηση».
       expect(find.text('Επόμενος έλεγχος: Δευτέρα 16 Νοεμβρίου'), findsOneWidget);
@@ -444,7 +446,9 @@ void main() {
         await t.pumpAndSettle();
       }
       final g = store.goals!;
-      expect((g.aim, g.since, g.checkIn, g.kcal), (GoalAim.keep, '2026-11-12', null, 2250));
+      // Round 8 (R8-A1-1): η διόρθωση μένει (1.800 − 2.269 του τύπου πριν = −469)· «ίδιο βάρος» με 90 kg: 2.745 − 469 →
+      // 2.280 (πριν 2.250 από την εκτίμηση).
+      expect((g.aim, g.since, g.checkIn, g.kcal), (GoalAim.keep, '2026-11-12', null, 2280));
       expect(find.text('Επόμενη εκτίμηση: Πέμπτη 10 Δεκεμβρίου'), findsOneWidget);
     });
 

@@ -339,7 +339,16 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     // Όσπρια: «Ξερές/Ξερά» είναι πιο κατανοητό από «Ωμό». Μόνο όταν η κατάσταση στην παρένθεση λέει «ξερ…»
     // (όχι το «Κρεμμύδι ξερό», που είναι είδος κρεμμυδιού), και στο γένος του ονόματος: «Φακές (ξερές)» → «Ξερές».
     final dry = RegExp(r'\((ξερ[^\s,)]*)').firstMatch(raw.name)?.group(1);
-    final rawLabel = dry != null ? '${dry[0].toUpperCase()}${dry.substring(1)} (πριν το βράσιμο)' : 'Ωμό';
+    // Round8 (R8-A2-4 / R8-U2-2): και το «ωμ…» στο γένος και τον αριθμό του ονόματος, όπου κι αν είναι μέσα στην παρένθεση:
+    // «Μακαρόνια (ξηρά, ωμά)» → «Ωμά», «Κινόα (ωμή)» → «Ωμή», «Κιμάς … (ωμός)» → «Ωμός». Πριν ήταν πάντα «Ωμό», δίπλα σε
+    // «Βρασμένα»/«Βρασμένη» (και στην ερώτηση «300 g ωμό = …»).
+    final rawWord = RegExp(r'\((?:[^)]*[\s,])?(ωμ[^\s,)]*)').firstMatch(raw.name)?.group(1);
+    String cap(String w) => '${w[0].toUpperCase()}${w.substring(1)}';
+    final rawLabel = dry != null
+        ? '${cap(dry)} (πριν το βράσιμο)'
+        : rawWord != null
+            ? cap(rawWord)
+            : 'Ωμό';
     return [
       (same(raw), rawLabel),
       for (final c in raw.cooked)
@@ -659,6 +668,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   int? _recoveredAt;
   bool _recovering = false;
 
+  /// Round 8 (R8-A9-3, f4): η επαναφορά έγινε αλλά το σημάδι «έγινε» δεν γράφτηκε· η επόμενη προσπάθεια γράφει ΜΟΝΟ το
+  /// σημάδι (δεν ξαναδιαβάζει το αρχείο, που θα ξανάβαζε ό,τι σβήστηκε στο μεταξύ).
+  ({int at, int entries, int foods, bool complete})? _unmarked;
+
   /// Η βάση βρέθηκε χαλασμένη (ώρα [at], ms) και ξεκίνησε καινούργια: το ημερολόγιο και «Τα προϊόντα μου» ξαναμπαίνουν
   /// σε αυτήν, σε ΜΙΑ συναλλαγή όπου ό,τι υπάρχει ήδη στη νέα βάση μένει όπως είναι ([FoodChannel.restorePut]): πρώτα
   /// ό,τι έχει η μνήμη (ό,τι βλέπει ο χρήστης), μετά ό,τι διαβάζεται από το αρχείο που κρατήθηκε ([dbRecoveryRows]).
@@ -668,6 +681,14 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     if (_offline || _recovering || _recoveredAt == at) return null;
     _recovering = true;
     try {
+      final u = _unmarked;
+      if (u != null && u.at == at) {
+        final m = await FoodChannel.salvageDone(at, u.entries, u.foods, complete: u.complete);
+        if (m['ok'] != true) return null;
+        _unmarked = null;
+        _recoveredAt = at;
+        return (entries: u.entries, foods: u.foods);
+      }
       await waitLoaded();
       final kept = await FoodChannel.salvageRead(at);
       if (kept['ok'] != true) return null;
@@ -691,8 +712,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         entries = count(r['entries']);
         foods = count(r['foods']);
       }
-      await FoodChannel.salvageDone(at, entries, foods);
-      _recoveredAt = at;
+      // Round 8 (R8-A9-1/3, f4): αν διαβάστηκε όλο το αρχείο (αλλιώς η πλευρά Android το ξαναδιαβάζει με νεότερο κανόνα).
+      // Το σημάδι ελέγχεται: χωρίς αυτό, το επόμενο άνοιγμα θα ξαναδιάβαζε το αρχείο· τότε ξαναδοκιμάζεται μόνο το σημάδι.
+      final complete = kept['complete'] == true;
+      final marked = await FoodChannel.salvageDone(at, entries, foods, complete: complete);
+      if (marked['ok'] == true) {
+        _recoveredAt = at;
+      } else {
+        _unmarked = (at: at, entries: entries, foods: foods, complete: complete);
+      }
       skippedRows += rows.skipped;
       // Η οθόνη από τη νέα βάση: και όσα ήρθαν από το αρχείο (π.χ. οι μέρες της εβδομάδας, τα προϊόντα). Όπως στο
       // [retry]: ένα παλιό «δεν διαβάστηκε» φεύγει, και ξαναμπαίνει αν η ανάγνωση αποτύχει πάλι.
@@ -701,7 +729,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       await _loadEntries();
       _rebuildIndex();
       notifyListeners();
-      return (entries: entries, foods: foods);
+      return marked['ok'] == true ? (entries: entries, foods: foods) : null;
     } finally {
       _recovering = false;
     }

@@ -59,6 +59,7 @@ class Aigaio extends ThemeExtension<Aigaio> {
     required this.stageLight,
     required this.stageRem,
     required this.stageAwake,
+    this.nightStages = const {},
   });
 
   /// Σταθερό κλειδί για την αποθήκευση («elia»).
@@ -145,6 +146,15 @@ class Aigaio extends ThemeExtension<Aigaio> {
         _ => textTertiary,
       };
 
+  /// Round 8 (R8-U1-2, WCAG 1.4.11): οι φάσεις πάνω στη ΣΚΟΥΡΑ νυχτερινή κάρτα ([nightTop] → [nightBottom]: η μπάρα
+  /// φάσεων του Ύπνου στη «Σήμερα»). Τα [stage] είναι φτιαγμένα για την κάρτα του θέματος (στα φωτεινά, λευκή)· πάνω
+  /// στη νυχτερινή κάρτα το REM έπεφτε στο 2,17:1 και ο βαθύς στο 1,03:1. Εδώ, όπου χρειάζεται, ίδια απόχρωση πιο
+  /// ανοιχτή: κάθε φάση ≥ 3:1 με το [nightTop] ΚΑΙ με το [nightBottom], ο βαθύς πάντα ο πιο σκούρος, κάθε ζεύγος
+  /// ΔE00 ≥ 14 (/home/claude/scratch/f5r8/stage.py· έλεγχος: test/r8_f5_test.dart).
+  final Map<String, Color> nightStages;
+
+  Color stageOnNight(String name) => nightStages[name] ?? stage(name);
+
   // --- Φωτεινά ---------------------------------------------------------------
 
   static const light = Aigaio._(
@@ -195,6 +205,12 @@ class Aigaio extends ThemeExtension<Aigaio> {
     stageLight: Color(0xFF6F8CF6),
     stageRem: Color(0xFF1681A8),
     stageAwake: Color(0xFFCB7E66),
+    nightStages: {
+      'DEEP': Color(0xFF9088E0),
+      'LIGHT': Color(0xFFA9BEFF),
+      'REM': Color(0xFF6CC9F2),
+      'AWAKE': Color(0xFFF4A38A),
+    },
   );
 
   /// Πέτρα, λαδί, τερακότα: ήρεμο και φυσικό.
@@ -244,6 +260,12 @@ class Aigaio extends ThemeExtension<Aigaio> {
     stageLight: Color(0xFF6F96B7),
     stageRem: Color(0xFF6E8218),
     stageAwake: Color(0xFFCE7D53),
+    nightStages: {
+      'DEEP': Color(0xFF82A4D2),
+      'LIGHT': Color(0xFFB9D2E6),
+      'REM': Color(0xFFB5CC6A),
+      'AWAKE': Color(0xFFE8946A),
+    },
   );
 
   /// Ζεστό λευκό και κοραλλί, κάρτα ύπνου σαν ξημέρωμα: ζωντανό.
@@ -293,6 +315,12 @@ class Aigaio extends ThemeExtension<Aigaio> {
     stageLight: Color(0xFF9B82E5),
     stageRem: Color(0xFFDC6E9B),
     stageAwake: Color(0xFFC88409),
+    nightStages: {
+      'DEEP': Color(0xFFA592E7),
+      'LIGHT': Color(0xFFD3C6F7),
+      'REM': Color(0xFFEE8DB4),
+      'AWAKE': Color(0xFFF5A524),
+    },
   );
 
   // --- Σκοτεινά --------------------------------------------------------------
@@ -343,6 +371,10 @@ class Aigaio extends ThemeExtension<Aigaio> {
     stageLight: Color(0xFF6F8CF6),
     stageRem: Color(0xFF6CC9F2),
     stageAwake: Color(0xFFF4A38A),
+    nightStages: {
+      'DEEP': Color(0xFF786EDA),
+      'LIGHT': Color(0xFFA9BEFF),
+    },
   );
 
   /// Σχεδόν μαύρο με κίτρινο-λάιμ: αθλητικό.
@@ -439,6 +471,9 @@ class Aigaio extends ThemeExtension<Aigaio> {
     stageLight: Color(0xFF7FC8E8),
     stageRem: Color(0xFF5EEAD4),
     stageAwake: Color(0xFFFDBA74),
+    nightStages: {
+      'DEEP': Color(0xFF7095F3),
+    },
   );
 
   static const dayThemes = [light, elia, avgi];

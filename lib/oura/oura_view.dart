@@ -20,6 +20,10 @@ const minNightsForAverage = 4;
 const minNightsForBaseline = usualMinNights;
 const baselineNights = usualNights;
 
+/// Round 8 (R8-U4-1): «από 5 νύχτες» κάτω από τον τίτλο «Φάσεις · μέσος όρος 7 νυχτών» (ρολόι και Oura), όταν ο μέσος όρος
+/// δεν βγαίνει και από τις 7 νύχτες· null με 7.
+String? stagesFromText(int nights) => nights >= 7 ? null : 'από ${countText(nights, 'νύχτα', 'νύχτες')}';
+
 /// Η τιμή μιας νύχτας μπροστά στο συνηθισμένο σου (μεσαία τιμή των προηγούμενων 14 νυχτών Oura, [usualOf]).
 class NightBaseline {
   const NightBaseline(this.value, this.usual, this.count);
@@ -192,7 +196,10 @@ EmptyNight? emptyNightReason({
   // έχει ήδη τη σημερινή ημερομηνία). Ίδιο όριο με το `firstNightChoice`.
   if (isToday && now.hour < ouraNightDueHour) return EmptyNight.notYet;
   // Η Oura έδωσε μόνο υπνάκο για αυτή τη μέρα: το λέμε (όχι «δεν υπάρχουν δεδομένα»).
-  if (night != null && night.onlyNap) return EmptyNight.onlyNap;
+  // Round 8 (R8-A5-6): όχι το πρωί της ίδιας μέρας (ως τις 12:00): ένας βραδινός υπνάκος μπορεί να έχει ήδη διαβαστεί πριν
+  // συγχρονίσει η εφαρμογή Oura τη νύχτα. Τότε ο ίδιος δρόμος με τη νύχτα που λείπει («Περιμένει το Oura»), όπως η
+  // κατάσταση της Σήμερα (`ouraStatus`)· πριν, ο Ύπνος έλεγε οριστικά «κατέγραψε μόνο υπνάκο».
+  if (night != null && night.onlyNap && !(isToday && now.hour < 12)) return EmptyNight.onlyNap;
   // Έλεγχος 2, C12: νύχτα που διαβάστηκε ΗΔΗ μετά το πρωί της και δεν είχε δεδομένα: «δεν υπάρχουν δεδομένα από το
   // δαχτυλίδι», όποια κι αν είναι η σύνδεση τώρα (μετά από αποσύνδεση ή χαμένα tokens δεν έγινε «πρόβλημα σύνδεσης»).
   final readAfter = synced != null && !synced.isBefore(DateTime(day.year, day.month, day.day, 4));

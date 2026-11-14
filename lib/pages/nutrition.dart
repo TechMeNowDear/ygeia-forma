@@ -102,8 +102,9 @@ class NutritionPage extends StatelessWidget {
         }
 
         final goals = health?.goals;
-        final summary = goals != null
-            ? GoalsSummaryCard(totals: totals, goals: goals, today: sameDay(day, today), health: health!)
+        // Round8 (R8-A1-5): μέρα που πέρασε με τον στόχο που ίσχυε τότε ([day])· μέρα πριν από τους στόχους, το απλό σύνολο.
+        final summary = goals != null && !beforeGoals(goals, day)
+            ? GoalsSummaryCard(totals: totals, goals: goals, today: sameDay(day, today), health: health!, day: day)
             : _SummaryCard(totals: totals);
         final cta = goals == null && health != null ? GoalsCtaCard(health: health!) : null;
         final chol = goals != null && goals.doctor ? CholCard(food: food, goals: goals, day: day, today: today) : null;
@@ -409,7 +410,14 @@ class FoodTodayCard extends StatelessWidget {
                 trailing: Icon(Icons.chevron_right_rounded, color: c.textTertiary),
               ),
               const SizedBox(height: 12),
-              if (goals != null) ...[
+              // Round 8 (R8-A2-3, f5): το ημερολόγιο δεν διαβάστηκε (ή διαβάζεται ακόμα): ποτέ «Μένουν 2.090 kcal · έφαγες 0».
+              if (!food.loaded)
+                Text(
+                  food.error != null ? diaryNotReadText : 'Διαβάζεται το ημερολόγιο φαγητού…',
+                  key: const ValueKey('today-food-not-read'),
+                  style: TextStyle(fontSize: 15, color: c.textSecondary),
+                )
+              else if (goals != null) ...[
                 () {
                   final left = kcalLeft(t.shownKcal, goals!.kcal, today: true);
                   return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -482,6 +490,9 @@ class _MealCard extends StatelessWidget {
         // Έλεγχος 9/11 (Μ3): σβησμένα προϊόντα (π.χ. με λάθος τιμές) δεν ξαναγράφονται.
         '${skipped > 0 ? ' (χωρίς ${skipped == 1 ? '1 σβησμένο προϊόν' : '$skipped σβησμένα προϊόντα'})' : ''}',
       ),
+      // Round8 (R8-U2-1): με «Αναίρεση» το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+      persist: false,
+      duration: undoSnackBarDuration,
       action: SnackBarAction(
         label: 'Αναίρεση',
         onPressed: () async {

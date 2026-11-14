@@ -332,7 +332,8 @@ const typoEntryBigKcal = 500.0;
 
 /// 3. Λάδι, βούτυρο και άλλα σχεδόν καθαρά λίπη (από [typoFatPer100] g λιπαρά στα 100): από 100 g και πάνω σε μία
 ///    καταχώριση (περίπου 7 κουταλιές της σούπας, 750–900 kcal). Η συνηθισμένη καταχώριση είναι 5–30 g, και ένα
-///    μηδενικό παραπάνω τη φέρνει ακριβώς εδώ (10 → 100).
+///    μηδενικό παραπάνω τη φέρνει ακριβώς εδώ (10 → 100). Round8 (R8-A2-1): και για κάθε τρόφιμο του κουταλιού
+///    ([isSpoonFood]: μαγιονέζα, μαργαρίνη, ταχίνι, φυστικοβούτυρο).
 const typoFatPer100 = 80.0;
 const typoFatGrams = 100.0;
 
@@ -348,14 +349,40 @@ const typoDenseGrams = 300.0;
 const typoTimesLast = 5.0;
 const typoTimesLastKcal = 400.0;
 
+/// 6. Αλάτι (round8, R8-U2-7): τρόφιμο με τουλάχιστον [typoSaltPer100] g αλάτι στα 100 (το ίδιο το αλάτι, κύβοι ζωμού)
+///    με [typoSaltGrams] g αλάτι και πάνω σε μία καταχώριση: το διπλάσιο του ορίου όλης της μέρας (λιγότερο από 5 g, ΠΟΥ
+///    2012). Το αλάτι έχει 0 kcal, οπότε κανένας κανόνας θερμίδων δεν έπιανε τα 100 g αντί για 1. Μόνο για τέτοια
+///    τρόφιμα: παστά ψάρια και αντζούγιες (12–14 g στα 100) τρώγονται και με 100 g.
+const typoSaltPer100 = 50.0;
+const typoSaltGrams = 10.0;
+
+/// Round8 (R8-A2-1 / R8-U2-3): τρόφιμα που μετριούνται με το κουτάλι. Σχεδόν καθαρά λίπη (από [typoFatPer100] g
+/// λιπαρά στα 100), ό,τι είναι στην κατηγορία «Λιπαρά» της βάσης εκτός από τις ελιές (μαγιονέζα, μαργαρίνη), και τα
+/// πυκνά αλείμματα (ταχίνι, φυστικοβούτυρο, πραλίνα: από [spoonSpreadKcal] kcal στα 100 g· όχι το χούμους). Ένας
+/// κανόνας για την πρώτη ποσότητα, τα κουμπιά ποσότητας (5, 10, 15, 30 g) και τον κανόνα 3 του ελέγχου λάθους: πριν η
+/// μαγιονέζα άνοιγε με 10 g αλλά με κουμπιά 50–200 g (ένα πάτημα «100 g» = 692 kcal, χωρίς ερώτηση), και το ταχίνι
+/// άνοιγε με 100 g (631 kcal).
+bool isSpoonFood(Food f) =>
+    f.n.amount(Nk.fat) >= typoFatPer100 ||
+    (f.cat == 'Λιπαρά' && !isOlives(f)) ||
+    (f.cat == 'Αλείμματα' && f.n.amount(Nk.kcal) >= spoonSpreadKcal);
+
+const spoonSpreadKcal = 500.0;
+
+/// Ελιές της βάσης (κατηγορία «Λιπαρά»): μετριούνται με το κομμάτι, όχι με το κουτάλι, και 100 g ελιές είναι κανονική
+/// ποσότητα (164–349 kcal).
+bool isOlives(Food f) => f.cat == 'Λιπαρά' && f.name.toLowerCase().startsWith('ελιές');
+
 /// Μοιάζει η καταχώριση ([grams] g ή ml του [f]) με λάθος πληκτρολόγησης; Τότε η οθόνη ρωτά μία φορά πριν τη γράψει.
 /// [lastGrams]: η ποσότητα της τελευταίας φοράς που γράφτηκε αυτό το τρόφιμο (αν υπάρχει).
 bool entryLooksLikeTypo(Food f, double grams, {double? lastGrams}) {
   final kcal = f.n.amount(Nk.kcal) * grams / 100;
   if (kcal >= typoEntryKcal) return true;
   if (grams >= typoEntryBigGrams && kcal > typoEntryBigKcal) return true;
-  if (f.n.amount(Nk.fat) >= typoFatPer100 && grams >= typoFatGrams) return true;
+  // Κανόνας 3 και για ό,τι άλλο μετριέται με το κουτάλι (round8, R8-A2-1): 10 → 100 g μαγιονέζα, 15 → 150 g ταχίνι.
+  if (isSpoonFood(f) && grams >= typoFatGrams) return true;
   if (f.n.amount(Nk.kcal) >= typoDensePer100 && grams >= typoDenseGrams) return true;
+  if (f.n.amount(Nk.salt) >= typoSaltPer100 && f.n.amount(Nk.salt) * grams / 100 >= typoSaltGrams) return true;
   return lastGrams != null && lastGrams > 0 && grams >= typoTimesLast * lastGrams && kcal >= typoTimesLastKcal;
 }
 

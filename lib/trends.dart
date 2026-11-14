@@ -589,8 +589,10 @@ TrendResult compareWindows(
 
   // Η σύγκριση δεν περνά ποτέ πάνω από αλλαγή πηγής: αν η πηγή άλλαξε από την αρχή του παλιότερου
   // διαστήματος ως το τέλος του νεότερου, δεν συγκρίνεται. Το γράφημα δείχνει μόνο τη νέα πηγή.
+  // Round 8 (R8-A5-1): με δύο αλλαγές μέσα στο διάστημα, από την ΤΕΛΕΥΤΑΙΑ (τιμή, γράφημα και «Αλλαγή πηγής …» μόνο
+  // της τρέχουσας πηγής)· πριν, από την πρώτη, και η γραμμή ανακάτευε νύχτες του Oura και του ρολογιού.
   final earliest = previousFrom.isBefore(currentFrom) ? previousFrom : currentFrom;
-  final change = sp.changeWithin(def.key, earliest, end);
+  final change = sp.lastChangeWithin(def.key, earliest, end);
   if (change != null) {
     final pts = collect(change, end);
     final c = [for (final e in pts) if (!e.$1.isBefore(currentFrom)) e.$2];

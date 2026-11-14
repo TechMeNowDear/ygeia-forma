@@ -5,6 +5,7 @@ import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.roundToInt
 
 /**
  * Κανόνες κειμένου και χρωμάτων των widgets της αρχικής οθόνης (round 1, U7-11 … U7-16). Καθαρές συναρτήσεις (χωρίς
@@ -26,6 +27,30 @@ object WidgetText {
      * που δεν διαβάζονται). Το ίδιο όριο έχει και ο WidgetRenderer στο `fit`.
      */
     const val MIN_SCALE_SMALL = 0.85f
+
+    /** Το βήμα της σμίκρυνσης κειμένου στο widget (5% του αρχικού μεγέθους). */
+    const val SHRINK_STEP = 0.05f
+
+    /**
+     * Round 8 (R8-U1-7): πόσα βήματα των [SHRINK_STEP] χωρούν ως το [floor] (0,85 → 3, 0,75 → 5, 0,6 → 8). Πριν ο
+     * WidgetRenderer αφαιρούσε το `base * 0,05` ξανά και ξανά σε float και, επειδή μετά από 3 βήματα το μέγεθος έμενε λίγο
+     * ΠΑΝΩ από το `base * 0,85`, έκανε και 4ο: 80% (10,5 sp → 8,4 αντί για το ελάχιστο 8,9 του U7-11)· στην κεντρική
+     * τιμή 55% αντί για 60%.
+     */
+    fun shrinkSteps(floor: Float): Int = ((1f - floor) / SHRINK_STEP).roundToInt()
+
+    /** Round 8 (R8-U1-7): το μέγεθος στο βήμα [k] ως κλάσμα του αρχικού, υπολογισμένο κάθε φορά από την αρχή (χωρίς άθροιση λάθους). */
+    fun shrinkScale(k: Int): Float = 1f - SHRINK_STEP * k
+
+    /**
+     * Round 8 (R8-U1-3): η μονάδα μετά τον αριθμό, όπως στην εφαρμογή: «96%», «25,4%» κολλητά (BigValue, R7-U4-13), όλες οι
+     * άλλες με κενό («82,2 kg»). Πριν το widget έγραφε «96 %».
+     */
+    fun unitText(unit: String): String = when {
+        unit.isEmpty() -> ""
+        unit == "%" -> unit
+        else -> " $unit"
+    }
 
     /**
      * Τιμές «σήμερα» (κίνηση, φαγητό) άλλης μέρας δεν φαίνονται σαν σημερινές (έλεγχος 8/11, DATA-02): μένουν τα ονόματα
@@ -53,6 +78,17 @@ object WidgetText {
         // Round 7 (U1-10): η σύντομη πηγή («10:20») είναι της παλιάς μέρας.
         c.remove("srcShort")
         return c
+    }
+
+    /**
+     * Round 8 (R8-A10-2): τι ζωγραφίζει η προεπισκόπηση της οθόνης ρύθμισης: ό,τι θα δείξει το ίδιο το widget, δηλαδή οι
+     * τιμές του στιγμιοτύπου ΜΕ τον κανόνα της μέρας ([forToday]: χθεσινά βήματα/φαγητό = «—»)· χωρίς καμία τιμή, το
+     * παράδειγμα ([sample]). Πριν η προεπισκόπηση έδειχνε τα χθεσινά 12.000 βήματα σαν σημερινά (χωρίς «Παράδειγμα τιμών»),
+     * ενώ το widget έδειχνε «—».
+     */
+    fun previewData(stored: JSONObject?, today: LocalDate, sample: () -> JSONObject): JSONObject {
+        val has = (stored?.optJSONObject("m")?.length() ?: 0) > 0
+        return if (has) forToday(stored, today) ?: sample() else sample()
     }
 
     /**

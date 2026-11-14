@@ -137,10 +137,21 @@ List<int> _same(int sets, int r) => List.filled(sets, r);
 
 String _l(LoadKind k, double? v) => loadLabel(k, v);
 
+/// R8-A6-3: τα σετ που κρίνονται για την πρόοδο: όσα έγιναν, ως τα σετ του προγράμματος εκείνης της μέρας ([ExLog.sets],
+/// ή [ExLog.plannedSets] μετά από αλλαγή άσκησης). Ένα σετ παραπάνω με το «+ Σετ» μένει στο ιστορικό και στον όγκο, αλλά
+/// δεν κρίνεται: πριν, ένα τρίτο σετ με 13 μετά από 15, 15 έκανε το «κάτω όριο» 13 (καμία αύξηση, για πάντα), και ένα
+/// σετ των 5 δύο φορές κατέβαζε το βάρος. Η ρεζέρβα που απαντάς αφορά ήδη το τελευταίο σετ του προγράμματος.
+List<SetLog> _judged(ExLog e) {
+  final d = e.done;
+  final n = math.max(e.sets, e.plannedSets ?? 0);
+  return n > 0 && d.length > n ? d.sublist(0, n) : d;
+}
+
 /// Το φορτίο με το οποίο ΤΕΛΕΙΩΣΕ η άσκηση: του τελευταίου σετ που έγινε. Όχι το μεγαλύτερο ([ExLog.workLoad]): αν μετά
 /// το 1ο σετ το βάρος κατέβηκε (βαθμονόμηση, S6-7) ή ανέβηκε, η επόμενη φορά ξεκινά από εκεί που κατέληξες.
+/// R8-A6-3: από τα σετ που κρίνονται ([_judged]).
 double? _endLoad(ExLog e) {
-  final d = e.done;
+  final d = _judged(e);
   for (var i = d.length - 1; i >= 0; i--) {
     if (d[i].load != null) return d[i].load;
   }
@@ -148,9 +159,10 @@ double? _endLoad(ExLog e) {
 }
 
 /// Οι λιγότερες επαναλήψεις στα σετ που έγιναν με το φορτίο [load] (τα σετ με άλλο φορτίο δεν κρίνονται).
+/// R8-A6-3: μόνο τα σετ του προγράμματος ([_judged]).
 int _lowAt(ExLog e, double? load) {
   int? low;
-  for (final s in e.done) {
+  for (final s in _judged(e)) {
     if (s.load == load && (low == null || s.reps < low)) low = s.reps;
   }
   return low ?? 0;
@@ -169,7 +181,7 @@ bool _atLeast(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a <=
 /// τέτοια φορά ήταν κάτω από το εύρος (π.χ. δύο φορές κάτω → ένα σκαλί κάτω), όχι: ισχύει ο κανόνας του [stepCeiling].
 bool _lifted(LoadKind k, double load, List<(DateTime, ExLog)> usable) {
   for (final (_, h) in usable) {
-    final at = [for (final s in h.done) if (s.load != null && _atLeast(k, s.load!, load)) s];
+    final at = [for (final s in _judged(h)) if (s.load != null && _atLeast(k, s.load!, load)) s];
     if (at.isEmpty) continue;
     return h.pain.isEmpty && at.any((s) => s.reps >= h.lo);
   }
@@ -224,7 +236,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   }
 
   final (lastDay, last) = usable.first;
-  final done = last.done;
+  // R8-A6-3: κρίνονται τα σετ του προγράμματος, όχι ένα σετ παραπάνω («+ Σετ»).
+  final done = _judged(last);
   final endLoad = _endLoad(last);
   // Χωρίς κανένα σετ (μόνο ενόχληση, R7-A6-2): το φορτίο που είχε ο στόχος εκείνη τη μέρα.
   final planned = done.isEmpty && last.log.isNotEmpty ? last.log.first.load : null;
@@ -284,13 +297,14 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       reps = [for (final x in base) math.max(1, x - 2)];
       what = hasLoad(k) ? '${usesKg(k) ? 'ίδια κιλά' : 'ίδιο φορτίο'} με 2 επαναλήψεις λιγότερες' : '2 επαναλήψεις λιγότερες';
     }
+    // R8-A6-6: «τρεις τελείες, πάνω δεξιά» σε λέξεις: το «⋮» δεν υπάρχει στη γραμματοσειρά (Inter) και έβγαινε κενό.
     return Target(
       load: down ?? lastLoad,
       reps: reps,
       change: Change.pain,
       reason: '${again ? 'Ενόχληση και τις δύο τελευταίες φορές' : 'Την τελευταία φορά είχες ενόχληση'} ($where, ${shortDayDate(lastDay)}): '
           '$what, και μικρότερο εύρος κίνησης, χωρίς πόνο. '
-          '${again ? 'Καλύτερα άλλαξέ την με εναλλακτική: ⋮ › «Αλλαγή άσκησης».' : 'Αν ξανασυμβεί, ⋮ › «Αλλαγή άσκησης».'} '
+          '${again ? 'Καλύτερα άλλαξέ την με εναλλακτική: τρεις τελείες, πάνω δεξιά › «Αλλαγή άσκησης».' : 'Αν ξανασυμβεί, τρεις τελείες, πάνω δεξιά › «Αλλαγή άσκησης».'} '
           'Αν ο πόνος μένει ως την επόμενη μέρα, ρώτα γιατρό ή φυσικοθεραπευτή.',
     );
   }
@@ -344,7 +358,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
           change: Change.variant,
           variant: next,
           reason: 'Έφτασες $sets × $ceiling και άφησες όσες ζητά το πρόγραμμα. Η πιο δύσκολη παραλλαγή είναι «${exNamesById[next] ?? next}»: όταν θες να τη '
-              'δοκιμάσεις, στην προπόνηση πάτα ⋮ › «Αλλαγή άσκησης». Από εκεί και πέρα μπαίνει αυτή.',
+              'δοκιμάσεις, στην προπόνηση πάτα τις τρεις τελείες, πάνω δεξιά › «Αλλαγή άσκησης». Από εκεί και πέρα μπαίνει αυτή.',
         );
       }
       return Target(
@@ -534,4 +548,21 @@ double? calibrate(PlanItem item, double? load, int reps, int rirAnswer) {
     if (!c.step || reps + (rirAnswer - g) < c.reps) return null;
   }
   return up;
+}
+
+/// R8-A6-5: τι λέγεται μετά το 1ο σετ όταν η απάντηση είναι «4+» αλλά το βάρος ΔΕΝ αλλάζει ([calibrate] = null). Πριν δεν
+/// λεγόταν τίποτα, ενώ το φύλλο μόλις είχε πει «Από αυτό βρίσκεται το σωστό βάρος για τα επόμενα σετ»: στις 9 από τις 15
+/// ασκήσεις με βάρος του προγράμματος το «4+» δεν αλλάζει τίποτα (μεγάλα σκαλιά αλτήρων και λάστιχων, S6-12/S7-02).
+/// null όταν δεν χρειάζεται μήνυμα (άλλη απάντηση, ή το βάρος αλλάζει και το λέει το «Τα επόμενα σετ: …»).
+String? calibrateNote(PlanItem item, double? load, int reps, int rirAnswer) {
+  final k = item.kind;
+  if (rirAnswer < 4 || load == null || !hasLoad(k) || calibrate(item, load, reps, rirAnswer) != null) return null;
+  final stays = 'Τα επόμενα σετ μένουν ${_l(k, load)}';
+  if (lightOnly.contains(item.ex)) return '$stays: σε αυτή την άσκηση το λάστιχο μένει ελαφρύ.';
+  final up = stepUp(k, load);
+  if (up == null) return '$stays: είναι το μεγαλύτερο που βγαίνει με τον εξοπλισμό.';
+  if (reps < item.lo) return '$stays: πρώτα περισσότερες επαναλήψεις με αυτό.';
+  // Εδώ μόνο αλτήρες και λάστιχα του πάνω μέρους ([labelIsLoad]): το σκαλί θέλει πρώτα περισσότερες επαναλήψεις.
+  return '$stays: το επόμενο σκαλί, ${_l(k, up)}, θέλει πρώτα περισσότερες επαναλήψεις με αυτό.'
+      '${_noSelfStep.contains(item.ex) ? '' : ' Αν είναι πολύ ελαφρύ, πάτα «+» στο βάρος.'}';
 }

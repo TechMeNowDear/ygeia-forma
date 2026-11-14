@@ -156,14 +156,20 @@ void main() {
       expect(find.textContaining('+0,3'), findsNothing);
     });
 
-    testWidgets('Ρολόι (απόλυτη θερμοκρασία καρπού): το «συνήθως» μένει', (t) async {
+    // Round 8 (R8-U4-2): η δοκιμή του round 7 κλείδωνε το «+0,2 °C · συνήθως 33,4 °C» και το μεγάλο «33,6 °C», δηλαδή
+    // απόλυτη θερμοκρασία καρπού, που ο κλινικός κανόνας L5/F2 απαγορεύει (Σήμερα, Σώμα, Τάσεις, widget δείχνουν μόνο
+    // απόκλιση). Τώρα η σελίδα δείχνει μόνο την απόκλιση.
+    testWidgets('Ρολόι (θερμοκρασία καρπού): μόνο η απόκλιση από τα συνηθισμένα, ποτέ βαθμοί', (t) async {
       final s = HealthStore()
         ..history = {
           for (var i = 1; i <= 14; i++) dateKey(_add(day, -i)): {K.skinTemp: 33.4},
           dateKey(day): {K.skinTemp: 33.6},
         };
       await _pump(t, MetricPage(store: s, spec: metricSpecs[K.skinTemp]!, now: now));
-      expect(find.text('+0,2 °C · συνήθως 33,4 °C'), findsOneWidget);
+      expect(t.widget<BigValue>(find.byType(BigValue)).value, '+0,2');
+      expect(find.text(wristDeviationText), findsOneWidget);
+      expect(find.textContaining('33,4'), findsNothing);
+      expect(find.textContaining('33,6'), findsNothing);
       expect(find.text(ouraTempDeviationLabel), findsNothing);
     });
   });

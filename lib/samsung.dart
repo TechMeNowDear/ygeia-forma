@@ -75,9 +75,10 @@ class SamsungHealth {
 
   static Future<Map<String, dynamic>> loadDays() => _call('loadDays');
 
-  /// Αν η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ms ή null}.
+  /// Αν η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ms ή null, "seen": η κάρτα έκλεισε}.
   static Future<Map<String, dynamic>> dbStatus() => _call('dbStatus');
-  static Future<Map<String, dynamic>> dbStatusSeen() => _call('dbStatusSeen');
+  /// Round 8 (R8-A9-2): η κάρτα της βλάβης [at] έκλεισε («seen» στο dbStatus)· το σημάδι της βλάβης ΔΕΝ σβήνεται.
+  static Future<Map<String, dynamic>> dbStatusSeen([int? at]) => _call('dbStatusSeen', at == null ? null : {'at': at});
 
   /// Σελίδες PNG (A4) → PDF στις Λήψεις. Επιστρέφει `uri`.
   static Future<Map<String, dynamic>> savePdf(List<Uint8List> pages, String name) =>

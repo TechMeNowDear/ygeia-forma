@@ -256,12 +256,12 @@ void main() {
       final cooked = foodNamed('Μακαρόνια (βρασμένα, χωρίς αλάτι)');
       final a = [for (final x in s.statesOf(raw)) x.$2];
       final b = [for (final x in s.statesOf(cooked)) x.$2];
-      expect(a, ['Ωμό', 'Βρασμένα']);
+      expect(a, ['Ωμά', 'Βρασμένα'], reason: 'round8 R8-A2-4: «ωμά» στο γένος του ονόματος «(ξηρά, ωμά)»');
       expect(b, a);
     });
     test('Πατάτα: ωμή, βραστή, φούρνου', () {
       final p = foodNamed('Πατάτα (ωμή, ξεφλουδισμένη)');
-      expect([for (final x in s.statesOf(p)) x.$2], ['Ωμό', 'Βραστή', 'Φούρνου']);
+      expect([for (final x in s.statesOf(p)) x.$2], ['Ωμή', 'Βραστή', 'Φούρνου'], reason: 'round8 R8-A2-4: «(ωμή, …)»');
     });
     test('Όσπρια: «Ξερές» στο γένος του ονόματος· το «Κρεμμύδι ξερό» είναι ωμό', () {
       expect(s.statesOf(foodNamed('Φακές (ξερές)')).first.$2, 'Ξερές (πριν το βράσιμο)');

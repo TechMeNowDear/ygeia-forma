@@ -391,7 +391,8 @@ void main() {
       WearLink.main.hr.value = (120, s.start.add(const Duration(minutes: 1)));
       await t.pump();
       await t.pump();
-      expect(find.textContaining('Σφίξε λίγο το λουρί'), findsOneWidget);
+      // R8-U3-Β1 (f2): μία λέξη σε όλο το κινητό, «λουράκι».
+      expect(find.textContaining('Σφίξε λίγο το λουράκι'), findsOneWidget);
       await t.pumpWidget(const SizedBox());
     });
 

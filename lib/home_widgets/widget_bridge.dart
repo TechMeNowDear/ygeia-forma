@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import '../data.dart';
 import '../food/food_store.dart';
@@ -19,7 +20,11 @@ final widgetOpenRequest = ValueNotifier<String?>(null);
 
 /// Στέλνει το στιγμιότυπο στα widgets όταν αλλάζουν τα δεδομένα: με καθυστέρηση 1,5″ (μαζεύει τις αλλαγές μιας
 /// ανάγνωσης) και μόνο αν άλλαξε κάτι. Καμία δουλειά όταν δεν υπάρχει widget (το λέει η Kotlin με «count»).
-class WidgetPublisher {
+/// Round 8 (R8-A10-1): και σε κάθε επιστροφή στην εφαρμογή. Πριν, ένα widget που μπήκε ενώ η εφαρμογή ήταν ζωντανή στη
+/// μνήμη έμενε «άνοιξε την εφαρμογή» ακόμα κι αφού την άνοιγες: στην επιστροφή < 5′ από την ανάγνωση καμία αποθήκη δεν
+/// ειδοποιούσε, και στο ξεκίνημα (χωρίς widget, «count» 0) δεν είχε γραφτεί τίποτα. Κόστος: ένα «count» και, μόνο αν
+/// άλλαξε κάτι, μία ζωγραφική (η σύγκριση του R7-A10-1).
+class WidgetPublisher with WidgetsBindingObserver {
   WidgetPublisher(this.store, this.food, {this.training, DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
   final HealthStore store;
   final FoodStore food;
@@ -32,6 +37,7 @@ class WidgetPublisher {
   String? _last;
 
   void start() {
+    WidgetsBinding.instance.addObserver(this);
     store.addListener(_schedule);
     food.addListener(_schedule);
     training?.addListener(_trainingChanged);
@@ -86,7 +92,13 @@ class WidgetPublisher {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _schedule();
+  }
+
   void stop() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     store.removeListener(_schedule);
     food.removeListener(_schedule);

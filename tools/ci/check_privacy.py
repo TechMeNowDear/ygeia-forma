@@ -170,23 +170,10 @@ for base in ('lib', 'android/app/src/main', 'android/wear/src/main'):
 
 # --- Δημόσιο repository: κανένα πραγματικό δεδομένο υγείας ή στοιχείο του ιδιοκτήτη (round 7, R7-A11-1) ---
 # Σχόλια και δοκιμές περιγράφουν κανόνες, ποτέ ένα πρόσωπο, και οι τιμές των δοκιμών είναι επινοημένες. Οι φράσεις
-# παρακάτω έλεγαν ότι μια νύχτα/μια βόλτα ήταν «πραγματική» ή έλεγαν το ιατρικό ιστορικό του ιδιοκτήτη. Οι ίδιες οι
-# πραγματικές τιμές ΔΕΝ γράφονται εδώ (αλλιώς αυτό το αρχείο θα τις ξαναδημοσίευε): ελέγχονται ως αποτύπωμα SHA-256.
-# Είναι μόνο τιμές που ήδη υπάρχουν στο δημόσιο ιστορικό του git (δεν προσθέτουν τίποτα νέο). Το αποτύπωμα ενός μικρού
-# αριθμού βρίσκεται με δοκιμές: σκοπός είναι να μη γράφονται ξανά ανοιχτά στο repository, όχι να είναι μυστικές.
-import hashlib
-
-
-def _print(kind, value):
-    return hashlib.sha256(f'ygeia-forma/R7-A11-1|{kind}|{value}'.encode()).hexdigest()[:20]
-
-
-OWNER_PRINTS = {
-    'by': {'38bafc149377b0cc5c63'},                              # έτος γέννησης
-    'h': {'21f38547313768c70ae3', 'f0357eab4f6ecf97ce36'},       # ύψος (και η παλιότερη τιμή του)
-    'spo2': {'81cc66be27666709036a', 'cd2172d5438115c98087'},    # τα δύο πραγματικά ελάχιστα οξυγόνου (μαζί)
-    'dated': {'c86e877f2d9933f16296', 'eb3ff6a4735fa824336a'},   # «η/μ: τιμή%» των δύο νυχτών
-}
+# παρακάτω έλεγαν ότι μια νύχτα/μια βόλτα ήταν «πραγματική» ή έλεγαν το ιατρικό ιστορικό του ιδιοκτήτη.
+# Round 8 (R8-A11-1): ΚΑΜΙΑ πραγματική τιμή εδώ, ούτε ως «αποτύπωμα». Ο γύρος 7 έλεγχε συγκεκριμένες τιμές με SHA-256
+# και δημόσιο «αλάτι»· για λίγες χιλιάδες δυνατές τιμές (έτος, ύψος, οξυγόνο) το αποτύπωμα αντιστρέφεται σε κλάσματα του
+# δευτερολέπτου, άρα το αρχείο ξαναδημοσίευε τις τιμές, μάλιστα με ετικέτα. Μένουν μόνο οι φράσεις.
 OWNER_PHRASES = [
     (r'ιδιοκτήτ', '«ιδιοκτήτης»: σχόλια και δοκιμές περιγράφουν κανόνες, όχι ένα πρόσωπο'),
     (r'λόγος της επίσκεψης', 'ιατρικό ιστορικό («λόγος της επίσκεψης»)'),
@@ -198,51 +185,13 @@ OWNER_PHRASES = [
 ]
 SELF = os.path.normpath('tools/ci/check_privacy.py')
 TEXT_EXT = ('.dart', '.kt', '.kts', '.java', '.py', '.js', '.mjs', '.sh', '.xml', '.json', '.yml', '.yaml', '.md', '.txt')
-CODE_EXT = ('.dart', '.kt')
-_num = re.compile(r'(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)(?![\w])')
-_pct = re.compile(r'(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)\s?%')
-_oxygen = re.compile(r'spo2|oxygen|οξυγόν', re.IGNORECASE)
-_by = re.compile(r'(?:birthYear\s*:\s*|["\']by["\']\s*:\s*)(\d{4})\b')
-_height = re.compile(r'(?:heightCm\s*:\s*|["\']h["\']\s*:\s*)(\d{2,3}(?:\.\d+)?)\b')
-_dated = re.compile(r'(\d{1,2}/\d{1,2}): (\d{2,3}(?:,\d+)?)%')
-
-
-def _norm(tok):
-    try:
-        x = float(tok.replace(',', '.'))
-    except ValueError:
-        return tok
-    return str(int(x)) if x == int(x) else f'{x:g}'
 
 
 def _scan_owner(rel, text):
-    code = rel.endswith(CODE_EXT) and not rel.startswith('tools/')
-    spo2_file = set()
     for no, line in enumerate(text.split('\n'), 1):
-        where = f'{rel}:{no}'
         for pat, why in OWNER_PHRASES:
             if re.search(pat, line, re.IGNORECASE):
-                errors.append(f'Δημόσιο repo: {where}: {why} (R7-A11-1)')
-        if not code:
-            continue
-        for y in _by.findall(line):
-            if _print('by', y) in OWNER_PRINTS['by']:
-                errors.append(f'Δημόσιο repo: {where}: πραγματικό έτος γέννησης του ιδιοκτήτη· βάλε επινοημένο (R7-A11-1)')
-        for v in _height.findall(line):
-            if _print('h', _norm(v)) in OWNER_PRINTS['h']:
-                errors.append(f'Δημόσιο repo: {where}: πραγματικό ύψος του ιδιοκτήτη· βάλε επινοημένο (R7-A11-1)')
-        for d, v in _dated.findall(line):
-            if _print('dated', f'{d}:{_norm(v)}') in OWNER_PRINTS['dated']:
-                errors.append(f'Δημόσιο repo: {where}: πραγματική νύχτα (μέρα και οξυγόνο) του ιδιοκτήτη (R7-A11-1)')
-        # Οξυγόνο: γραμμή που μιλά για οξυγόνο (ή αριθμοί με «%»), όχι κάθε λίστα αριθμών (π.χ. δείγμα ετοιμότητας).
-        oxygen = bool(_oxygen.search(line))
-        prints = {_print('spo2', _norm(t)) for t in (_num.findall(line) if oxygen else _pct.findall(line))}
-        if OWNER_PRINTS['spo2'] <= prints:
-            errors.append(f'Δημόσιο repo: {where}: τα δύο πραγματικά ελάχιστα οξυγόνου μαζί· βάλε επινοημένα (R7-A11-1)')
-        if oxygen:
-            spo2_file |= prints & OWNER_PRINTS['spo2']
-    if code and OWNER_PRINTS['spo2'] <= spo2_file:
-        errors.append(f'Δημόσιο repo: {rel}: τα δύο πραγματικά ελάχιστα οξυγόνου στο ίδιο αρχείο· βάλε επινοημένα (R7-A11-1)')
+                errors.append(f'Δημόσιο repo: {rel}:{no}: {why} (R7-A11-1)')
 
 
 for base in ('lib', 'test', 'android/app/src', 'android/wear/src', 'tools', 'assets/exercises'):
@@ -260,6 +209,24 @@ for base in ('lib', 'test', 'android/app/src', 'android/wear/src', 'tools', 'ass
 
 # --- Γενικά ---
 need(re.search(r'Τελευταία ενημέρωση: \d{1,2} \w+ 20\d\d', page), 'Λείπει η «Τελευταία ενημέρωση: …»')
+
+# --- Ημερομηνία της πολιτικής (round 8, R8-A11-5) ---
+# Η πολιτική υπόσχεται «αυτή η σελίδα ενημερώνεται πρώτα, με νέα ημερομηνία». Ο γύρος 7 άλλαξε το κείμενο και άφησε την
+# παλιά ημερομηνία. Το tools/ci/privacy_stamp.txt κρατά το αποτύπωμα (SHA-256) της σελίδας χωρίς τη γραμμή της ημερομηνίας
+# και την ημερομηνία της: κάθε αλλαγή στη σελίδα σταματά το χτίσιμο ώσπου να μπει νέα ημερομηνία και νέο αποτύπωμα.
+# (Χωρίς git και ώρες: δεν αποτυγχάνει ποτέ επειδή ένα commit έγινε μετά τα μεσάνυχτα ή μπήκε στο main άλλη μέρα.)
+import hashlib
+
+_date = re.search(r'Τελευταία ενημέρωση: ([^<]*)<', page)
+_shown = _date.group(1).strip() if _date else ''
+_body = re.sub(r'Τελευταία ενημέρωση: [^<]*<', 'Τελευταία ενημέρωση: <', page)
+_now = hashlib.sha256(_body.encode('utf-8')).hexdigest()
+_stamp_path = f'{ROOT}/tools/ci/privacy_stamp.txt'
+_stamp = open(_stamp_path, encoding='utf-8').read().split(maxsplit=1) if os.path.exists(_stamp_path) else []
+if len(_stamp) != 2 or _stamp[0] != _now or _stamp[1].strip() != _shown:
+    errors.append('Η πολιτική απορρήτου άλλαξε (ή άλλαξε η ημερομηνία της) χωρίς να ενημερωθεί το tools/ci/privacy_stamp.txt. '
+                  'Αν άλλαξε το κείμενο, βάλε πρώτα στη σελίδα «Τελευταία ενημέρωση:» τη μέρα της αλλαγής· μετά γράψε στο '
+                  f'tools/ci/privacy_stamp.txt τη γραμμή: {_now} {_shown}')
 need('dpa.gr' in page, 'Λείπει η Αρχή Προστασίας Δεδομένων (δικαίωμα καταγγελίας)')
 need('Επικοινωνία' in greek, 'Λείπει η ενότητα «Επικοινωνία»')
 

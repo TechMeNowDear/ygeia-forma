@@ -826,17 +826,22 @@ class OuraLink {
   /// Κερδίζει κάθε αίτημα που τρέχει: νέα γενιά αμέσως, και ό,τι ανανέωση έτρεχε δεν αποθηκεύεται.
   /// [marker]: στη θέση του σημαδιού «συνδέεται» γράφεται αυτό («αποσυνδέεται», C12), ώστε μια διακοπή στη μέση να
   /// ολοκληρωθεί στην επόμενη εκκίνηση.
-  /// Επιστρέφει αν η πρόσβαση ακυρώθηκε και στην Oura (true και όταν δεν υπήρχαν tokens)· «Διαγραφή όλων» το λέει
-  /// αν όχι (έλεγχος του fix-accuracy, S4).
+  /// Επιστρέφει αν η πρόσβαση ακυρώθηκε και στην Oura (true και όταν δεν υπήρχαν tokens· false όταν δεν διαβάστηκαν,
+  /// R8-A11-4)· «Διαγραφή όλων» το λέει αν όχι (έλεγχος του fix-accuracy, S4).
   Future<bool> disconnect({String? marker}) async {
     // ΠΡΩΤΑ το σημάδι «συνδέεται»: ένα σημάδι που θα έμενε χωρίς tokens θα αναιρούσε στην εκκίνηση μια σύνδεση που
     // είχε χρησιμοποιηθεί.
     await vault.delete(vaultConnecting);
     if (marker != null) await vault.save(vaultConnecting, marker);
     OuraTokens? t;
+    // Round 8 (R8-A11-4): «δεν υπάρχουν tokens» ≠ «δεν ξέρουμε» (το Keystore δεν απάντησε). Στο δεύτερο η πρόσβαση ΔΕΝ
+    // ακυρώθηκε στην Oura: απάντηση false, ώστε η οθόνη να πει «ακύρωσέ την από την εφαρμογή Oura». Πριν έλεγε «ακυρώθηκε».
+    var unknown = false;
     try {
       t = _loaded ? _tokens : OuraTokens.fromJson(await vault.load(vaultTokens));
-    } catch (_) {}
+    } catch (_) {
+      unknown = true;
+    }
     final running = _refreshing;
     _gen++;
     _tokens = null;
@@ -848,7 +853,7 @@ class OuraLink {
         t = await running.timeout(const Duration(seconds: 30)) ?? t;
       } catch (_) {}
     }
-    final revoked = t == null || await _revoke(t);
+    final revoked = t == null ? !unknown : await _revoke(t);
     _tokens = null;
     _loaded = true;
     _unsaved = false;

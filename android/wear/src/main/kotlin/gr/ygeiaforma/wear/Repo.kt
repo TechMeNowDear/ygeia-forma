@@ -325,6 +325,19 @@ object Repo {
         if (id.isNullOrEmpty()) null else listOfNotNull(phone, lastPhone, endedPhone).firstOrNull { it.id == id }
 
     /**
+     * Έναρξη ([kind], [fromPhone]) ενώ τρέχει ήδη άσκηση ([ExerciseService], έλεγχος 14/11, round 8, R8-A8-1): η προπόνηση
+     * του κινητού βρήκε το ρολόι σε προπόνηση με βάρη → μετρά πλέον και γι' αυτήν. Οτιδήποτε άλλο ([joinAllowedWhileRunning]:
+     * περπάτημα, προπόνηση του ρολογιού, ή η άσκηση κλείνει ήδη, [stopping]) αγνοείται: ΠΟΤΕ «όχι του κινητού» πάνω σε
+     * προπόνηση του κινητού, ώστε το αποτέλεσμα των παλμών της να γραφτεί. true αν δέχτηκε.
+     */
+    fun joinWhileRunning(kind: String, fromPhone: Boolean, stopping: Boolean): Boolean {
+        if (!joinAllowedWhileRunning(running, kind, fromPhone, stopping)) return false
+        runningPhone = true
+        if (runningSid == null) runningSid = phone?.id
+        return true
+    }
+
+    /**
      * Η προπόνηση του κινητού όπως την ήξερε το ρολόι πριν κλείσει απότομα ([LiveSession.phoneWatchState], R7-A8-1). Αν το
      * κινητό έχει ήδη στείλει την ίδια, μπαίνουν πάνω της ό,τι δεν είχε φτάσει εκεί ([mergeWatchEdits]): τα ✓ ξαναστέλνονται
      * και πάνε και στο αποτέλεσμα. Αλλιώς (τελείωσε, ή ξεκίνησε άλλη στο μεταξύ) κρατιέται ως η τελευταία ή η προηγούμενη.

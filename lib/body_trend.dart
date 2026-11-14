@@ -250,14 +250,31 @@ BodyMeasurement? previousCounted(List<BodyMeasurement> counted, BodyMeasurement 
 }
 
 /// Η γραμμή κάτω από τον τίτλο «Σύσταση σώματος». [previous]: η προηγούμενη ζύγιση (για το βάρος), αν υπάρχει.
+/// Round 8 (R8-U4-3): ο αριθμός μένει με τη μονάδα του όταν σπάει η γραμμή (αδιάσπαστο κενό, όπως [unitsGlued]): πριν
+/// «…από τις 13 ⏎ Αυγ.», «1,7 ⏎ kg».
 String bodyTrendNote({required DateTime? previous, required int days, required String Function(DateTime) date}) {
-  final weight = previous == null ? '' : 'Στο βάρος, σε παρένθεση η αλλαγή από τις ${date(previous)}. ';
+  final weight = previous == null ? '' : 'Στο βάρος, σε παρένθεση η αλλαγή από τις ${date(previous).replaceAll(' ', '\u00A0')}. ';
   if (days >= 2 * bodyTrendGroup) {
     // Round 2 (g4 · R2-D-2): τα όρια γραμμένα με τους αριθμούς τους ([bodyFloorFatPct], [bodyFloorKg]), ώστε να ξέρεις
     // γιατί συνήθως δεν φαίνεται παρένθεση από εβδομάδα σε εβδομάδα.
     return '${weight}Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν. Σε παρένθεση μόνο αλλαγή από '
-        '${dec(bodyFloorFatPct, 0)} μονάδες στο λίπος ή ${dec(bodyFloorKg)} kg και πάνω: μικρότερη χάνεται στη διακύμανση '
-        'της ζυγαριάς.';
+        '${dec(bodyFloorFatPct, 0)}\u00A0μονάδες στο λίπος ή ${dec(bodyFloorKg)}\u00A0kg και πάνω: μικρότερη χάνεται στη '
+        'διακύμανση της ζυγαριάς.';
   }
-  return '${weight}Η αλλαγή σε λίπος και μύες φαίνεται μετά από 6 μέρες ζύγισης (έχεις $days): μία ζύγιση μόνη της ανεβοκατεβαίνει με το νερό.';
+  return '${weight}Η αλλαγή σε λίπος και μύες φαίνεται μετά από 6\u00A0μέρες ζύγισης (έχεις $days): μία ζύγιση μόνη της '
+      'ανεβοκατεβαίνει με το νερό.';
 }
+
+/// Round 8 (R8-A4-3): η ανάγνωση δεν έφερε ζυγίσεις επειδή η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή
+/// (DashboardReader.kt: χωρίς άδεια ΚΑΝΕΝΑ κλειδί «body»· με σφάλμα, «body» με «error» → [Dashboard.failed]). Ίδιος
+/// κανόνας με την κάρτα ελέγχου θερμίδων (checkin_card.dart: `!d.bodyOk && !bodyFailed`). Χωρίς καμία άδεια: false
+/// (εκεί η «Σήμερα» δείχνει τη «Σύνδεση με Samsung Health»).
+bool bodyNotPermitted(Dashboard? d) => d != null && d.hasAnyPermission && !d.bodyOk && !d.failed.contains('body');
+
+/// Round 8 (R8-A4-3): τι λένε Σώμα, Σήμερα και widget όταν λείπει αυτή η άδεια (πριν: «Ζυγίσου στην InBody», ενώ η
+/// ζύγιση έγινε αλλά δεν μπορούσε να φτάσει). Η διαδρομή υπάρχει: Ρυθμίσεις › «Άδειες Samsung Health» (settings.dart).
+const bodyNoPermissionTitle = 'Δεν έχει δοθεί άδεια για τις ζυγίσεις';
+const bodyNoPermissionText = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή, γι\' αυτό οι ζυγίσεις της '
+    'InBody δεν φτάνουν εδώ. Άνοιξέ τη από τις «Άδειες Samsung Health».';
+const bodyNoPermissionShort = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή· άνοιξέ τη από Ρυθμίσεις › '
+    'Άδειες Samsung Health.';

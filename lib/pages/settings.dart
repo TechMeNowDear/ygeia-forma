@@ -121,6 +121,13 @@ String sourcesRestoreText(SourcesRestore r) => switch (r) {
 /// Round 7 (R7-A11-4): το αντίγραφο είχε κλειστές τις αναφορές σφαλμάτων, και έκλεισαν και εδώ.
 const restoreErrorsClosedText = 'Οι αναφορές σφαλμάτων έμειναν κλειστές, όπως στο αντίγραφο.';
 
+/// Round 8 (R8-U4-5): η επαναφορά σταμάτησε γιατί δεν διαβάστηκε τι υπάρχει ήδη στο κινητό. Αν όμως πρόλαβαν να κλείσουν
+/// οι αναφορές σφαλμάτων ([errorsClosed], γίνεται πρώτο), το λέει· πριν έλεγε «δεν άλλαξε τίποτα» και τότε.
+String restoreNotReadText({required bool errorsClosed}) => errorsClosed
+    ? 'Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό. Οι αναφορές σφαλμάτων έκλεισαν, όπως στο αντίγραφο· τίποτα άλλο δεν άλλαξε. '
+        'Δοκίμασε ξανά.'
+    : 'Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.';
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.store, this.food});
   final HealthStore store;
@@ -326,7 +333,9 @@ class _DataGroupState extends State<_DataGroup> {
 
   void _say(String text, {SnackBarAction? action}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), action: action, duration: const Duration(seconds: 6)));
+    // Round8 (R8-U2-1, f1): με κουμπί («Αποστολή») το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(text), action: action, persist: false, duration: const Duration(seconds: 6)));
   }
 
   Future<void> _export() async {
@@ -397,7 +406,7 @@ class _DataGroupState extends State<_DataGroup> {
       final errorsClosed = await restoreErrorsChoice(b, errors);
       final res = await widget.food!.importBackup(b.entries, b.myFoods);
       if (res == null) {
-        _say('Δεν διαβάστηκε τι υπάρχει ήδη στο κινητό, οπότε δεν άλλαξε τίποτα. Δοκίμασε ξανά.');
+        _say(restoreNotReadText(errorsClosed: errorsClosed));
         return;
       }
       final (e, f, failed, existing) = res;

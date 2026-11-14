@@ -645,27 +645,37 @@ class StatCard extends StatelessWidget {
 
 /// Γραμμή «όνομα ........ τιμή».
 class InfoRow extends StatelessWidget {
-  const InfoRow(this.label, this.value, {super.key, this.valueColor, this.dot});
+  const InfoRow(this.label, this.value, {super.key, this.valueColor, this.dot, this.dotBorder});
   final String label;
   final String value;
   final Color? valueColor;
   final Color? dot;
 
+  /// Round 8 (U4 Β2): περίγραμμα της κουκκίδας, για απαλό χρώμα που μόνο του δεν φαίνεται πάνω στην κάρτα.
+  final Color? dotBorder;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final valueText = Text(
-      value,
-      style: TextStyle(
-        color: valueColor ?? c.text,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        fontFeatures: tabular,
-      ),
+    final valueStyle = TextStyle(
+      color: valueColor ?? c.text,
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+      fontFeatures: tabular,
     );
+    final valueText = Text(value, style: valueStyle);
     final dotW = dot == null
         ? null
-        : Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 10), decoration: BoxDecoration(color: dot, shape: BoxShape.circle));
+        : Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: dot,
+              shape: BoxShape.circle,
+              border: dotBorder == null ? null : Border.all(color: dotBorder!, width: 1.5),
+            ),
+          );
     // Σχέδια 9/11 (9β): αν μια λέξη της ετικέτας δεν χωρά δίπλα στην τιμή, η τιμή πάει ολόκληρη στην από κάτω
     // γραμμή, δεξιά· ποτέ σπασμένη λέξη («Σκελετικο/ί») ή σπασμένος αριθμός.
     final labelStyle = TextStyle(color: c.textSecondary, fontSize: 15);
@@ -688,7 +698,17 @@ class InfoRow extends StatelessWidget {
               if (dotW != null) dotW,
               Expanded(child: Text(label, style: labelStyle)),
             ]),
-            Align(alignment: Alignment.centerRight, child: valueText),
+            // Round 8 (R8-U4-11): τιμή φαρδύτερη από τη γραμμή (μεγάλα γράμματα) τυλίγεται· κάθε γραμμή της δεξιά, όπως οι
+            // διπλανές τιμές (πριν, το τυλιγμένο κείμενο έπιανε όλο το πλάτος και οι γραμμές του έπεφταν αριστερά).
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                style: valueStyle,
+                textAlign: TextAlign.right,
+                textWidthBasis: TextWidthBasis.longestLine,
+              ),
+            ),
           ]),
         );
       }
@@ -871,6 +891,9 @@ class Hypnogram extends StatelessWidget {
               (g.$1.difference(night.start).inSeconds / total, g.$2.difference(night.start).inSeconds / total),
           ],
           gapColor: onDark ? Colors.white.withValues(alpha: 0.12) : Aigaio.of(context).sleep.withValues(alpha: 0.12),
+          // Round 8 (U4 Β2): περίγραμμα στο χρώμα του ύπνου (≥ 5:1 με την κάρτα σε κάθε θέμα)· το απαλό γέμισμα μόνο του
+          // είχε 1,2–1,5:1 και η ζώνη «ίσως ύπνος» δεν φαινόταν (WCAG 1.4.11 ζητά 3:1).
+          gapBorder: onDark ? Colors.white.withValues(alpha: 0.6) : Aigaio.of(context).sleep,
           stageColor: Aigaio.of(context).stage,
         ),
       ),
@@ -882,7 +905,10 @@ class Hypnogram extends StatelessWidget {
 /// Υπνόγραμμα: κάθε φάση στη γραμμή της, ενωμένες με λεπτές κάθετες, όπως στα εργαστήρια ύπνου.
 class _HypnoPainter extends CustomPainter {
   _HypnoPainter(this.parts, this.guide, this.connector,
-      {required this.stageColor, this.gaps = const [], this.gapColor = const Color(0x00000000)});
+      {required this.stageColor,
+      this.gaps = const [],
+      this.gapColor = const Color(0x00000000),
+      this.gapBorder = const Color(0x00000000)});
   final Color Function(String) stageColor;
   final List<(double, double, String)> parts;
   final Color guide;
@@ -891,6 +917,7 @@ class _HypnoPainter extends CustomPainter {
   /// Κενά της Samsung που μετρήθηκαν ως ύπνος (εκτίμηση, χωρίς φάσεις): απαλή ζώνη σε όλο το ύψος.
   final List<(double, double)> gaps;
   final Color gapColor;
+  final Color gapBorder;
 
   // Από πάνω προς τα κάτω: ξύπνιος, REM, ελαφρύς, βαθύς.
   static const _rows = ['AWAKE', 'REM', 'LIGHT', 'DEEP'];
@@ -905,9 +932,14 @@ class _HypnoPainter extends CustomPainter {
       final left = a.clamp(0.0, 1.0) * size.width;
       final right = b.clamp(0.0, 1.0) * size.width;
       if (right - left < 1) continue;
+      final zone = RRect.fromRectAndRadius(Rect.fromLTRB(left, 0, right, size.height), const Radius.circular(6));
+      canvas.drawRRect(zone, Paint()..color = gapColor);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTRB(left, 0, right, size.height), const Radius.circular(6)),
-        Paint()..color = gapColor,
+        zone.deflate(0.75),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = gapBorder,
       );
     }
 

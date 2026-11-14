@@ -114,6 +114,14 @@ class WTap {
   static const add = 'add';
 }
 
+/// Round 8 (R8-U1-6): οι κεντρικές τιμές που έχουν δική τους σελίδα μέτρησης: τα κλειδιά του `metricSpecs`
+/// (pages/metric_page.dart· το main.dart ανοίγει τη σελίδα μόνο γι' αυτά, αλλιώς την ενότητα). Εδώ ως σταθερά, γιατί η
+/// οθόνη ρύθμισης δεν φορτώνει τις σελίδες· ότι ταυτίζονται το ελέγχει το test/r8_f5_test.dart. Μόνο γι' αυτές
+/// προσφέρεται το «Τη σελίδα της κεντρικής τιμής» (πριν και για το Φαγητό, που δεν έχει, και άνοιγε σιωπηλά την ενότητα).
+const wMetricPages = <String>{
+  'sleepMin', 'sleepScore', 'sleepHr', 'dayHr', 'energy', 'hrv', 'skinTemp', 'breath', 'steps', 'weight', 'fatPct', 'smm',
+};
+
 /// Οι ρυθμίσεις ενός widget. Αποθηκεύονται στην Kotlin ανά widget (SharedPreferences «home_widgets»).
 class WidgetStyle {
   WidgetStyle({
@@ -257,6 +265,8 @@ class WidgetStyle {
     s.showUsual = b('usual', true);
     if (const [WTap.section, WTap.today, WTap.metric, WTap.add].contains(j['tap'])) s.tap = j['tap'] as String;
     if (s.kind != WKind.food && s.tap == WTap.add) s.tap = WTap.section;
+    // Round 8 (R8-U1-6): κεντρική τιμή χωρίς σελίδα: το πάτημα ανοίγει ήδη την ενότητα (main.dart)· το λέει και η ρύθμιση.
+    if (s.tap == WTap.metric && !wMetricPages.contains(s.hero)) s.tap = WTap.section;
     return s;
   }
 }

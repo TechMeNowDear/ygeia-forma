@@ -140,7 +140,8 @@ class CheckIn {
   /// δεν προτείνεται νέα αλλαγή τώρα. null: δεν ισχύει.
   final int? heldDays;
 
-  /// Το κενό καταγραφής φαγητού ([CheckKind.gap]).
+  /// Το κενό καταγραφής φαγητού ([CheckKind.gap]· και στο [CheckKind.gathering], για τη μέρα της πρώτης εκτίμησης:
+  /// R8-A1-4).
   final FoodGap? gap;
 
   /// Μέρες του παραθύρου με αδύνατα πολλές θερμίδες, που δεν μπήκαν στον μέσο όρο (S11-3), με τις θερμίδες τους.
@@ -409,7 +410,16 @@ CheckIn? pendingCheckIn({
             absurd: absurd,
             foreign: news);
       case AdaptStatus.tooEarly:
-        return CheckIn(kind: CheckKind.gathering, goals: g, status: r.status, days: days, weighs: weighs, foreign: news);
+        // Round 8 (R8-A1-4): και το κενό καταγραφής ως χθες. Μετά από κενό η πρώτη εκτίμηση δεν βγαίνει την επόμενη μέρα
+        // ελέγχου αλλά 3 εβδομάδες αφού ξαναρχίσει η καταγραφή ([estimateDayAfterGap]): η κάρτα το γράφει.
+        return CheckIn(
+            kind: CheckKind.gathering,
+            goals: g,
+            status: r.status,
+            days: days,
+            weighs: weighs,
+            gap: foodGap(intake: eaten, today: t, formulaTdee: g.calc.tdee, goalKcal: g.kcal, since: since),
+            foreign: news);
       case AdaptStatus.gapOpen:
       case AdaptStatus.afterGap:
         return CheckIn(
@@ -563,7 +573,10 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
 /// μετρούν από τη μέρα που ξαναρχίζει η καταγραφή (με κενό που κρατά ακόμα: καμία). Μέρες πάνω από το [absurdDayKcal]
 /// δεν μετρούν. Πριν, μετά από 5 μέρες χωρίς φαγητό η κάρτα έγραφε «16 από 14» ενώ ο έλεγχος δεν μπορούσε να βγάλει
 /// εκτίμηση για άλλες 3 εβδομάδες.
-({int intakeDays, int weighIns, DateTime first, FoodGap? gap}) readiness({
+/// Round 8 (R8-A1-6): [weighSpan] = πόσες μέρες απέχουν η πρώτη και η τελευταία από αυτές τις ζυγίσεις (0 με λιγότερες
+/// από 2). Ο έλεγχος θέλει και τουλάχιστον [adaptMinSpanDays] ([estimateExpenditure]): πριν, η κάρτα έγραφε «Ζυγίσεις 8
+/// από 6» για 8 ζυγίσεις μιας εβδομάδας, και ο έλεγχος έλεγε μετά «μαζεμένες σε λίγες μέρες».
+({int intakeDays, int weighIns, int weighSpan, DateTime first, FoodGap? gap}) readiness({
   required Goals goals,
   required DateTime today,
   required List<(DateTime, double)> weights,
@@ -591,8 +604,17 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
   final full = adaptFullDayShare * goals.kcal;
   final over = absurdDayKcal(formula);
   final days = to.isBefore(since) ? 0 : intake(since, to).values.where((v) => v >= full && v <= over).length;
-  final ws = weights.where((w) => !w.$1.isBefore(since) && !w.$1.isAfter(to)).length;
-  return (intakeDays: days, weighIns: ws, first: firstEstimateDay(goals), gap: gap);
+  final wDays = [for (final w in weights) if (!w.$1.isBefore(since) && !w.$1.isAfter(to)) w.$1];
+  var span = 0;
+  if (wDays.length >= 2) {
+    var lo = wDays.first, hi = wDays.first;
+    for (final d in wDays) {
+      if (d.isBefore(lo)) lo = d;
+      if (d.isAfter(hi)) hi = d;
+    }
+    span = daysBetween(lo, hi);
+  }
+  return (intakeDays: days, weighIns: wDays.length, weighSpan: span, first: firstEstimateDay(goals), gap: gap);
 }
 
 /// Round 7 (R7-A1-2): η μέρα ελέγχου που μπορεί να βγάλει εκτίμηση, μετά από κενό καταγραφής φαγητού. Ο έλεγχος θέλει

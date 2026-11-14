@@ -32,6 +32,12 @@ class WatchActivity : Activity(), WatchView.Actions {
     private var startHerePending: (() -> Unit)? = null
     private var checkingOtherApp = false
     private var joinWhenReady = false
+    /**
+     * Η κατάσταση του κινητού διαβάστηκε σε αυτό το άνοιγμα ([Link.load] στο [onStart]· έλεγχος 14/11, round 8, R8-A8-6).
+     * Ως τότε (π.χ. άνοιγμα από το κινητό ενώ η εφαρμογή ήταν στο παρασκήνιο, χωρίς σύνδεση) η μνήμη μπορεί να έχει μια
+     * προπόνηση του κινητού που έχει κλείσει εκεί: το «μπες» περιμένει ([joinNow]).
+     */
+    private var loaded = false
     private var finishArmedUntil = 0L
     private var skipArmedUntil = 0L
     private var visible = false
@@ -42,7 +48,9 @@ class WatchActivity : Activity(), WatchView.Actions {
         // Το κινητό άνοιξε την εφαρμογή πριν φτάσει η προπόνησή του: μπαίνει μόλις φτάσει.
         // Τρέχει ήδη κάτι εδώ (π.χ. περπάτημα): το «μπες» του κινητού δεν περιμένει για αργότερα (W2-23).
         joinWhenReady = pendingJoin(joinWhenReady, Repo.running, Repo.local != null)
-        if (joinWhenReady && Repo.phone != null) {
+        // R8-A8-6: μόνο με την τωρινή κατάσταση του κινητού και σε προπόνηση που ισχύει· αλλιώς το αίτημα μένει ώσπου να
+        // φτάσει (πριν σβηνόταν πριν από τον έλεγχο της «ξεχασμένης» και η νέα προπόνηση έμενε χωρίς παλμούς από εδώ).
+        if (joinNow(joinWhenReady, loaded, Repo.phone, System.currentTimeMillis())) {
             joinWhenReady = false
             joinPhone()
         }
@@ -132,6 +140,8 @@ class WatchActivity : Activity(), WatchView.Actions {
         checkAmbient()
         scope.launch {
             Link.load(this@WatchActivity)
+            // R8-A8-6: από εδώ και πέρα το «μπες» του κινητού κρίνεται με την κατάσταση που μόλις διαβάστηκε (στο τέλος, [redraw]).
+            loaded = true
             // Άσκηση που έμεινε μισή από απότομο κλείσιμο (V-A-03) και αποτελέσματα που δεν έφτασαν ακόμα: τώρα. Μόνο αν
             // δεν τρέχει τίποτα εδώ (αλλιώς θα στελνόταν μισή μια προπόνηση που συνεχίζεται, V-A-14).
             if (Repo.running == null && Repo.local == null) {
@@ -231,6 +241,8 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun onStop() {
         visible = false
+        // R8-A8-6: χωρίς οθόνη (και χωρίς άσκηση) το ρολόι δεν ακούει πια το κινητό: στο επόμενο άνοιγμα ξαναδιαβάζεται.
+        loaded = false
         try {
             getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displays)
         } catch (_: Exception) {
@@ -355,13 +367,24 @@ class WatchActivity : Activity(), WatchView.Actions {
         scope.launch(Dispatchers.IO) { Repo.writeRun(this@WatchActivity, o.toString(), gen) }
     }
 
+    /**
+     * Έλεγχος 14/11, round 8 (R8-A8-1): καμία νέα έναρξη από την αρχική όσο τρέχει (ή κλείνει ακόμα) μια άσκηση εδώ: πριν, ένα
+     * πάτημα στην αρχική που φαινόταν όσο έκλεινε η μέτρηση μιας προπόνησης του κινητού έσβηνε το αποτέλεσμα των παλμών της
+     * και ακύρωνε και τη νέα έναρξη. Ελέγχεται και ξανά μετά την ερώτηση στο Health Services (μπορεί να άλλαξε στο μεταξύ).
+     */
+    private fun busy(): Boolean = Repo.running != null
+
     override fun startWorkout(id: String) {
+        if (busy()) return
         val w = Repo.plan?.workout(id) ?: return
         withPermissions(false) {
             askOtherApp {
+                if (busy()) return@askOtherApp
                 Repo.notice = null
                 Repo.local = LiveSession.fromPlan(w, System.currentTimeMillis())
                 Repo.screen = Repo.Screen.SET
+                // R8-U3-06: η «άλλη προπόνηση» της αρχικής ήταν για αυτή την έναρξη· μετά η αρχική δείχνει πάλι τη σημερινή.
+                view.chosen = null
                 ExerciseService.start(this, "strength", false)
                 redraw()
             }
@@ -369,8 +392,10 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun startWalk() {
+        if (busy()) return
         withPermissions(true) {
             askOtherApp {
+                if (busy()) return@askOtherApp
                 Repo.notice = null
                 Repo.screen = Repo.Screen.WALK
                 ExerciseService.start(this, "walk", false)
@@ -380,12 +405,15 @@ class WatchActivity : Activity(), WatchView.Actions {
     }
 
     override fun joinPhone() {
+        // R8-A8-1: όχι όσο τρέχει ή κλείνει ακόμα μια άσκηση εδώ ([busy]).
+        if (busy()) return
         val p0 = Repo.phone ?: return
         // R7-A8-3: όχι σε προπόνηση του κινητού που μοιάζει ξεχασμένη (3 ώρες χωρίς κίνηση): το κινητό αγνοεί πια ό,τι στέλνει
         // το ρολόι σε αυτήν. Η αρχική δεν τη δείχνει· εδώ για το άνοιγμα από το κινητό.
         if (phoneStale(p0, System.currentTimeMillis())) return
         withPermissions(false) {
             askOtherApp {
+                if (busy()) return@askOtherApp
                 // Η προπόνηση του κινητού τελείωσε όσο περίμενε η ερώτηση: τίποτα να μετρηθεί.
                 val s = Repo.phone ?: return@askOtherApp
                 Repo.notice = null
@@ -563,6 +591,8 @@ class WatchActivity : Activity(), WatchView.Actions {
 
     override fun doneOk() {
         Repo.screen = Repo.Screen.HOME
+        // R8-U3-06: μετά από μια άσκηση η αρχική δείχνει τη σημερινή, όχι την «άλλη προπόνηση» που είχες διαλέξει.
+        view.chosen = null
         // R7-A8-5: με «Δεν αποθηκεύτηκε», το «ΟΚ» ξαναδοκιμάζει (ίσως άδειασε χώρος στο μεταξύ). Μόνο όσο δεν τρέχει τίποτα.
         if (Repo.unsaved.isNotEmpty() && Repo.running == null && Repo.local == null) {
             scope.launch {

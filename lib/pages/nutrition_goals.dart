@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../adaptive_check.dart' show targetOn;
 import '../data.dart';
 import '../food/chol.dart';
 import '../food/food_model.dart';
@@ -29,29 +30,52 @@ import 'nutrition.dart' show proteinColor;
 /// φαίνεται).
 double oneDecimal(double v) => double.parse(v.toStringAsFixed(1));
 
+/// Η μέρα [day] είναι πριν από τους στόχους (πριν από το «since» τους): τότε η Διατροφή δείχνει το απλό «Σύνολο ημέρας»,
+/// όχι «πάνω/κάτω από τον στόχο» με έναν στόχο που δεν υπήρχε (round8, R8-A1-5).
+bool beforeGoals(Goals g, DateTime day) {
+  final since = DateTime.tryParse(g.since);
+  return since != null && dayOf(day).isBefore(dayOf(since));
+}
+
 /// Σύνολο ημέρας με τους στόχους (αντικαθιστά τη «Σύνολο ημέρας» όταν υπάρχουν στόχοι).
 class GoalsSummaryCard extends StatelessWidget {
-  const GoalsSummaryCard({super.key, required this.totals, required this.goals, required this.today, required this.health});
+  const GoalsSummaryCard(
+      {super.key, required this.totals, required this.goals, required this.today, required this.health, this.day});
   final Totals totals;
   final Goals goals;
   final bool today;
   final HealthStore health;
 
+  /// Η μέρα που φαίνεται (για μέρα που πέρασε: ο στόχος που ίσχυε εκείνη τη μέρα).
+  final DateTime? day;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final t = totals, g = goals;
-    final left = kcalLeft(t.shownKcal, g.kcal, today: today);
+    // Round8 (R8-A1-5): μέρα που πέρασε κρίνεται με τον στόχο θερμίδων που ίσχυε ΕΚΕΙΝΗ τη μέρα ([targetOn], ο ίδιος κανόνας
+    // με τον εβδομαδιαίο έλεγχο), και τα όρια λιπαρών/κορεσμένων από αυτόν. Πριν, μετά από ένα «Εφάρμοσε» 2.160 → 2.010,
+    // η Κυριακή με 2.100 kcal (κάτω από τον στόχο της) γραφόταν «Πάνω από τον στόχο 90».
+    final day = this.day;
+    final kcalGoal = today || day == null ? g.kcal : targetOn(g, day);
+    final satMax = (kcalGoal * g.satPct / 100 / 9).round(); // όπως το Goals.satMax
+    final fatLo = (kcalGoal * 0.25 / 9).round(), fatHi = (kcalGoal * 0.35 / 9).round(); // όπως τα Goals.fatLo/fatHi
+    final left = kcalLeft(t.shownKcal, kcalGoal, today: today);
     String atLeast(String key, String text) => (t.missing[key] ?? 0) > 0 ? '≥ $text' : text;
     final protLeft = g.protein - t.protein;
     final fiberLeft = g.fiber - t.fiber;
-    final satOver = t.satFat - g.satMax;
+    final satOver = t.satFat - satMax;
     // Round7 (R7-A3-4): μέρα που τελείωσε, με πλήρη καταγραφή: τα κορεσμένα ως % των θερμίδων που έφαγες, ο κανόνας της
     // σελίδας «Χοληστερίνη» και των οδηγιών (AHA/ACC 2013, ESC/EAS 2019: % της ενέργειας). Πριν η ίδια μέρα έβγαινε εδώ
     // «πάνω από το όριο» (γραμμάρια του στόχου) και εκεί κάτω από το 6%, ή ανάποδα. Για τη σημερινή μέρα, που δεν
     // τελείωσε, μένουν τα γραμμάρια του στόχου (πόσα «χωράνε» ακόμα).
-    final satPctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
-    final satPctOver = satPctDay != null && oneDecimal(satPctDay) > g.satPct;
+    final satPctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(kcalGoal) ? t.satFat * 9 / t.kcal * 100 : null;
+    // Round8 (R8-A3-3): χωρίς οδηγία γιατρού ο κανόνας είναι του ΠΟΥ, «λιγότερο από 10%» (WHO, Healthy diet fact sheet,
+    // 2020): το 10,0% δεν είναι εντάξει, και ο στόχος γράφεται «κάτω από 10%» όπως στον οδηγό. Με οδηγία γιατρού μένει
+    // «έως 6%» (AHA/ACC 2013: 5–6%).
+    final satStrict = g.satPct >= 10;
+    final satPctShown = satPctDay == null ? null : oneDecimal(satPctDay);
+    final satPctOver = satPctShown != null && (satStrict ? satPctShown >= g.satPct : satPctShown > g.satPct);
     // Round7 (R7-A3-3): κοντά στο όριο (ως 1 g) με ένα δεκαδικό, ώστε ο αριθμός να συμφωνεί με το «πάνω από το όριο»:
     // 14,3 g γράφονταν «14 g / έως 14 g» μαζί με «0,3 g πάνω από το όριο».
     final satText = t.satFat >= 10 && satOver.abs() < 1 ? dec(t.satFat, 1) : gramsText(t.satFat);
@@ -79,7 +103,7 @@ class GoalsSummaryCard extends StatelessWidget {
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text('έφαγες ${thousands(t.shownKcal)}',
                       textAlign: TextAlign.right, style: TextStyle(fontSize: 13.5, color: c.textSecondary, fontFeatures: tabular)),
-                  Text('στόχος ${thousands(g.kcal)}',
+                  Text('στόχος ${thousands(kcalGoal)}',
                       textAlign: TextAlign.right,
                       style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.food, fontFeatures: tabular)),
                 ]),
@@ -106,10 +130,14 @@ class GoalsSummaryCard extends StatelessWidget {
             key: const ValueKey('goals-sat-pct'),
             label: 'Κορεσμένα λιπαρά',
             value: atLeast(Nk.satFat, '${dec(satPctDay, 1)}%'),
-            target: 'έως ${g.satPct}% των θερμίδων',
+            target: '${satStrict ? 'κάτω από' : 'έως'} ${g.satPct}% των θερμίδων',
             fraction: satPctDay / g.satPct,
             color: satPctOver ? c.warn : c.heart,
-            note: satPctOver ? 'Πάνω από το ${g.satPct}% των θερμίδων που έφαγες' : null,
+            note: !satPctOver
+                ? null
+                : satPctShown! > g.satPct
+                    ? 'Πάνω από το ${g.satPct}% των θερμίδων που έφαγες'
+                    : 'Στο ${g.satPct}% των θερμίδων που έφαγες· ο στόχος είναι κάτω από ${g.satPct}%',
             warn: satPctOver,
           )
         else
@@ -117,8 +145,8 @@ class GoalsSummaryCard extends StatelessWidget {
             // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού («Λιπαρά», «Κορεσμένα λιπαρά»).
             label: 'Κορεσμένα λιπαρά',
             value: atLeast(Nk.satFat, '$satText g'),
-            target: 'έως ${g.satMax} g',
-            fraction: t.satFat / g.satMax,
+            target: 'έως $satMax g',
+            fraction: t.satFat / satMax,
             color: satOver > 0.05 ? c.warn : c.heart,
             note: satOver > 0.05 ? '${gramsText(satOver)} g πάνω από το όριο' : null,
             warn: satOver > 0.05,
@@ -135,7 +163,7 @@ class GoalsSummaryCard extends StatelessWidget {
         ),
         const Hairline(vertical: 12),
         // U3b-27: η μονάδα και στον στόχο, όπως στις μπάρες από πάνω.
-        InfoRow('Λιπαρά', '${gramsText(t.fat)} g / ${g.fatLo}–${g.fatHi} g'),
+        InfoRow('Λιπαρά', '${gramsText(t.fat)} g / $fatLo–$fatHi g'),
         // Round7 (R7-A3-3): με το αλάτι όπως φαίνεται ([saltShown]): «5,0 g» δεν είναι «κάτω από 5 g».
         InfoRow('Αλάτι', '${atLeast(Nk.salt, dec(t.salt, 1))} g / κάτω από ${dec(g.salt, 0)} g',
             valueColor: saltShown(t.salt) >= g.salt ? c.warn : null),
@@ -179,22 +207,49 @@ class GoalBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final f = fraction.isFinite ? fraction.clamp(0.0, 1.0) : 0.0;
+    final labelStyle = TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text);
+    const valueStyle = TextStyle(fontSize: 14.5, fontFeatures: tabular);
+    final valueSpan = TextSpan(children: [
+      TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: warn ? c.warn : c.text)),
+      TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
+    ]);
     return Semantics(
       label: '$label: $value από $target${note == null ? '' : '. $note'}',
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, children: [
-            Text(label, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.text)),
-            Text.rich(
-              TextSpan(children: [
-                TextSpan(text: value, style: TextStyle(fontWeight: FontWeight.w700, color: warn ? c.warn : c.text)),
-                TextSpan(text: ' / $target', style: TextStyle(color: c.textSecondary)),
-              ]),
-              style: const TextStyle(fontSize: 14.5, fontFeatures: tabular),
-            ),
-          ]),
+          // Round8 (R8-U2-4): η τιμή πάντα στη δεξιά άκρη. Αν ετικέτα και τιμή δεν χωρούν σε μία γραμμή, η τιμή πάει από
+          // κάτω, δεξιά· πριν (Wrap με spaceBetween) έπεφτε αριστερά, κάτω από την ετικέτα (π.χ. «7,2% / έως 6% των
+          // θερμίδων» μιας μέρας που τελείωσε, ή «13 g / έως 14 g» στα 360 dp με μεγάλα γράμματα).
+          LayoutBuilder(builder: (context, box) {
+            final scaler = MediaQuery.textScalerOf(context);
+            final base = DefaultTextStyle.of(context).style;
+            double width(InlineSpan span) {
+              final tp = TextPainter(text: span, textDirection: TextDirection.ltr, textScaler: scaler, maxLines: 1)..layout();
+              final w = tp.width;
+              tp.dispose();
+              return w;
+            }
+
+            final labelText = Text(label, style: labelStyle);
+            final valueText = Text.rich(valueSpan, style: valueStyle, textAlign: TextAlign.right);
+            final oneLine = width(TextSpan(text: label, style: base.merge(labelStyle))) +
+                    8 +
+                    width(TextSpan(style: base.merge(valueStyle), children: [valueSpan])) <=
+                box.maxWidth;
+            if (oneLine) {
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: labelText),
+                const SizedBox(width: 8),
+                valueText,
+              ]);
+            }
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              labelText,
+              Align(alignment: Alignment.centerRight, child: valueText),
+            ]);
+          }),
           const SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(5),
@@ -253,11 +308,14 @@ const cholInfo = MetricInfo(
   // Round7 (R7-A3-8): «βοηθά τα τριγλυκερίδια» έφυγε: κατά τις οδηγίες ESC/EAS 2019 (§7) το ψάρι στη διατροφή δεν αλλάζει
   // ουσιαστικά τα λιπίδια· τα τριγλυκερίδια τα ρίχνουν κυρίως λιγότερο αλκοόλ και ζάχαρη και το χάσιμο βάρους.
   // Round7 (R7-A3-7): η διατροφή «portfolio» έχει και φυτικές στερόλες και σόγια (Jenkins 2003)· το λέμε, αφού δεν τις μετράμε.
+  // Round8 (R8-A3-4): τα τριγλυκερίδια με τη σειρά του πίνακα 7 των ESC/EAS 2019 (Mach 2020, Eur Heart J 41:111): λιγότερο
+  // αλκοόλ +++ (>10%)· τακτική άσκηση, λιγότεροι υδατάνθρακες, λιγότερα σάκχαρα ++ (5–10%)· χάσιμο βάρους + (<5%). Πριν
+  // το χάσιμο βάρους ήταν στα «κυρίως» και η άσκηση έλειπε.
   what: 'Μετρά τα τρόφιμα που έφαγες και ρίχνουν την LDL («κακή» χοληστερίνη): ξηρούς καρπούς, πίτουρο βρώμης, όσπρια. '
       'Η διατροφή «portfolio» έχει και φυτικές στερόλες και σόγια· η εφαρμογή δεν τις μετρά. '
       'Μετρά και το ψάρι: μπαίνει στη θέση του κρέατος (λιγότερα κορεσμένα) και το προτείνουν οι οδηγίες για την καρδιά· '
-      'το ίδιο δεν ρίχνει την LDL. Τα τριγλυκερίδια τα ρίχνουν κυρίως λιγότερο αλκοόλ και ζάχαρη και το χάσιμο βάρους '
-      '(ESC/EAS 2019). '
+      'το ίδιο δεν ρίχνει την LDL. Τα τριγλυκερίδια τα ρίχνουν κυρίως λιγότερο αλκοόλ, η τακτική άσκηση και λιγότεροι '
+      'υδατάνθρακες (ιδίως ζάχαρη)· βοηθά και το χάσιμο βάρους (ESC/EAS 2019). '
       'Ως ξηροί καρποί μετρούν οι καρποί, π.χ. καρύδια, αμύγδαλα, φιστίκια και κουκουνάρι· οι σπόροι (ηλιόσποροι, '
       'κολοκυθόσποροι) δεν μετρούν. Τα δικά σου προϊόντα μετρούν όταν στη φόρμα τους διαλέξεις τι είναι («Στην κάρτα '
       '«Χοληστερίνη» μετρά ως»).',

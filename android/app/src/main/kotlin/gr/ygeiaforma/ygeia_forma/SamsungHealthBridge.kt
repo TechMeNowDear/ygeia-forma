@@ -78,13 +78,23 @@ class SamsungHealthBridge(
                 withContext(DbQueue.dispatcher) { dayStore.clear() }
                 JSONObject().put("ok", true)
             }
-            // Η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ώρα σε ms ή null}.
+            // Η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ώρα σε ms ή null, "seen": αν η
+            // κάρτα της έκλεισε}. Round 8 (R8-A9-2, f4): το σημάδι της βλάβης μένει και μετά το «Εντάξει».
             "dbStatus" -> respondDb(result) {
-                val at = withContext(DbQueue.dispatcher) { DayStore.corruptAt(activity.applicationContext) }
-                JSONObject().put("ok", true).put("corrupt", at ?: JSONObject.NULL)
+                val ctx = activity.applicationContext
+                val (at, seen) = withContext(DbQueue.dispatcher) {
+                    val a = DayStore.corruptAt(ctx)
+                    a to (a != null && DayStore.seen(ctx, a))
+                }
+                JSONObject().put("ok", true).put("corrupt", at ?: JSONObject.NULL).put("seen", seen)
             }
+            // R8-A9-2: «Εντάξει» = η κάρτα της βλάβης «at» έκλεισε. Δεν σβήνει το σημάδι της βλάβης (η επαναφορά συνεχίζει).
             "dbStatusSeen" -> respondDb(result) {
-                withContext(DbQueue.dispatcher) { DayStore.clearCorrupt(activity.applicationContext) }
+                val ctx = activity.applicationContext
+                val asked = (call.argument<Any>("at") as? Number)?.toLong()
+                withContext(DbQueue.dispatcher) {
+                    (asked ?: DayStore.corruptAt(ctx))?.let { DayStore.markSeen(ctx, it) }
+                }
                 JSONObject().put("ok", true)
             }
             "savePdf" -> respond(result) {

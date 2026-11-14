@@ -317,21 +317,30 @@ class PrivacyGroup extends StatelessWidget {
     return SettingsGroup(key: const ValueKey('settings-privacy'), children: [
       ValueListenableBuilder<bool>(
         valueListenable: r.sending,
-        builder: (context, on, _) => SettingsRow(
-          icon: Icons.shield_outlined,
-          title: 'Αναφορές σφαλμάτων',
-          subtitle: on ? errorsOnText : errorsOffText,
-          trailing: Switch(
-            key: const ValueKey('privacy-errors'),
-            value: on,
-            onChanged: (v) async {
-              final ok = await r.setEnabled(v);
-              if (!ok && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Η επιλογή δεν αποθηκεύτηκε. Δοκίμασε ξανά.')));
-              }
-            },
-          ),
-        ),
+        builder: (context, on, _) {
+          Future<void> toggle(bool v) async {
+            final ok = await r.setEnabled(v);
+            if (!ok && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Η επιλογή δεν αποθηκεύτηκε. Δοκίμασε ξανά.')));
+            }
+          }
+
+          // Round 8 (R8-U4-4): ο διακόπτης με όνομα για το TalkBack («Αναφορές σφαλμάτων», όχι σκέτο «διακόπτης») και όλη η
+          // γραμμή πατιέται, όπως το SwitchListTile των «Κάρτες της Σήμερα» (WCAG 4.1.2).
+          return MergeSemantics(
+            child: SettingsRow(
+              icon: Icons.shield_outlined,
+              title: 'Αναφορές σφαλμάτων',
+              subtitle: on ? errorsOnText : errorsOffText,
+              onTap: () => toggle(!on),
+              trailing: Switch(
+                key: const ValueKey('privacy-errors'),
+                value: on,
+                onChanged: toggle,
+              ),
+            ),
+          );
+        },
       ),
       const SettingsRow(
         key: ValueKey('privacy-policy'),

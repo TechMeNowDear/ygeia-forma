@@ -185,6 +185,8 @@ class _SessionPageState extends State<SessionPage> {
           );
         }
         final c = Aigaio.of(context);
+        // R8-U3-01: ✓ του 1ου σετ «πρώτης φοράς» στο ρολόι: η ερώτηση έρχεται εδώ, μόλις ζωγραφιστεί η σελίδα.
+        if (t.firstAsk != null && !_asking) WidgetsBinding.instance.addPostFrameCallback((_) => _firstFromWatch(s));
         // «Ελεύθερη άσκηση» χωρίς ασκήσεις ακόμα: μόνο «Πρόσθεσε άσκηση».
         if (s.items.isEmpty) return _emptyFree(context, s);
         if (_idx >= s.items.length || _idx < 0) t.setFocusQuiet(s.items.length - 1);
@@ -313,7 +315,9 @@ class _SessionPageState extends State<SessionPage> {
           // Ήρθαν παλμοί σε αυτή την προπόνηση (όχι σε κάποια παλιότερη) και σταμάτησαν.
           final lost = last != null && (s == null || !last.$2.isBefore(s.start));
           final limit = t.hrLimit;
-          if (limit == null) return last != null ? Padding(padding: pad, child: const HrStale()) : const SizedBox.shrink();
+          // R8-U3-02: χωρίς όριο, το «Σφίξε λίγο το λουράκι» μόνο αν ήρθαν παλμοί σε ΑΥΤΗ την προπόνηση και σταμάτησαν
+          // (πριν και με παλμούς από ένα πρωινό περπάτημα, πριν ακόμα έρθει ο πρώτος παλμός της προπόνησης).
+          if (limit == null) return lost ? Padding(padding: pad, child: const HrStale()) : const SizedBox.shrink();
           if (!lost && w.ready.value && s != null && now.difference(s.start).inSeconds < hrWaitSeconds) {
             return Padding(padding: pad, child: const HrWaiting());
           }
@@ -538,7 +542,8 @@ class _SessionPageState extends State<SessionPage> {
         // R7-A6-7: ένα ✓ = και οι δύο πλευρές (έτσι μετρούν τα σετ, ο χρόνος και τα κιλά).
         if (perSideExercises.contains(e.ex)) ...[
           const SizedBox(height: 4),
-          Text('Κάθε σετ: δεξιά και αριστερά, μετά ✓.',
+          // R8-A6-6: «Έγινε» (το κουμπί) αντί για «✓», που δεν υπάρχει στη γραμματοσειρά (Inter) και έβγαινε κενό.
+          Text('Κάθε σετ: δεξιά και αριστερά, μετά «Έγινε».',
               key: const ValueKey('sess-per-side'), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
         ],
         if (hasLoad(k) || change != null) ...[
@@ -715,9 +720,10 @@ class _SessionPageState extends State<SessionPage> {
           const SizedBox(height: 10),
           // «✓ Έγινε» πάντα δεξιά, το όνομα του λάστιχου αριστερά (με πολύ μεγάλα γράμματα το ένα κάτω από το άλλο).
           () {
+            // R8-U3-07: η κουκκίδα στην 1η γραμμή του ονόματος όταν αυτό σπάει (όπως στη training_page), όχι στη μέση.
             final label = band
-                ? Row(mainAxisSize: MainAxisSize.min, children: [
-                    BandDots(set.load, size: 14),
+                ? Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Padding(padding: const EdgeInsets.only(top: 2), child: BandDots(set.load, size: 14)),
                     Flexible(child: Text(bandName(set.load ?? 0), style: TextStyle(fontSize: 13.5, color: c.textSecondary))),
                   ])
                 : const SizedBox.shrink();
@@ -776,25 +782,56 @@ class _SessionPageState extends State<SessionPage> {
     );
   }
 
+  /// Ανοιχτό φύλλο «πόσες ακόμα θα έβγαζες;» (R8-U3-01): η ερώτηση για ✓ του ρολογιού περιμένει να κλείσει.
+  bool _asking = false;
+
+  Future<int?> _ask(BuildContext context, {required bool first, ExLog? e, ExLog? firstOf}) async {
+    _asking = true;
+    try {
+      return await _askRir(context, first: first, e: e, firstOf: firstOf);
+    } finally {
+      _asking = false;
+    }
+  }
+
+  /// Η απάντηση στο «Πρώτο σετ: πόσες ακόμα θα έβγαζες;» ([rir] 0–4, −1 = «Δεν ξέρω»): βάρος για τα επόμενα σετ, και τι
+  /// άλλαξε (ή γιατί όχι). R8-U3-01: μόνο αν δεν απάντησε ήδη το ρολόι (η πρώτη απάντηση κερδίζει).
+  void _calibrate(BuildContext context, ExLog e, int rir) {
+    final r = t.answerFirst(e, rir);
+    if (!r.applied || rir < 0) return;
+    final v = r.load;
+    // R8-A6-5: και όταν το «4+» δεν αλλάζει το βάρος (μεγάλο σκαλί), να λέγεται γιατί· πριν: τίποτα.
+    final text = v != null ? 'Τα επόμενα σετ: ${loadLabel(e.kind, v)}.' : t.firstSetNote(e, rir);
+    if (text != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// R8-U3-01: το 1ο σετ μιας άσκησης «πρώτης φοράς» έγινε ✓ στο ρολόι ([TrainingStore.firstAsk]): η ίδια ερώτηση με το ✓
+  /// του κινητού, όσο δεν έχει γίνει στο μεταξύ άλλο σετ της άσκησης (τότε τα επόμενα σετ δεν περιμένουν πια τη βαθμονόμηση).
+  Future<void> _firstFromWatch(Session s) async {
+    final e = t.firstAsk;
+    if (e == null || _asking || !mounted) return;
+    t.firstAsk = null;
+    if (t.current?.id != s.id || !s.items.contains(e) || !t.firstPending(e) || !e.log.first.done) return;
+    final rir = await _ask(context, first: true, firstOf: e);
+    if (!mounted || t.current?.id != s.id) return;
+    if (rir != null) _calibrate(context, e, rir);
+  }
+
   Future<void> _done(BuildContext context, Session s, ExLog e, int i) async {
+    final first = t.asksFirstSet(e, i);
     t.tick(e, i);
     HapticFeedback.lightImpact();
-    final first = i == 0 && t.isFirstTime(e.ex) && hasLoad(e.kind) && e.done.length == 1 && e.sets > 1;
     bool gone() => !context.mounted || t.current?.id != s.id;
     if (first) {
-      final rir = await _askRir(context, first: true);
+      final rir = await _ask(context, first: true, firstOf: e);
       if (gone()) return;
-      if (rir != null && rir >= 0) {
-        final v = t.calibrateAfterFirst(e, rir);
-        if (v != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Τα επόμενα σετ: ${loadLabel(e.kind, v)}.')));
-        }
-      }
+      // «Δεν ξέρω» (−1) μετρά κι αυτό ως απάντηση (R8-U3-01: η ερώτηση δεν ξαναγίνεται, ούτε στο ρολόι).
+      if (rir != null) _calibrate(context, e, rir);
     }
     if (gone()) return;
     if (e.complete) {
       if (e.rirAnswer == null) {
-        final rir = await _askRir(context, first: false, e: e);
+        final rir = await _ask(context, first: false, e: e);
         if (gone()) return;
         if (rir != null && rir >= 0) t.answer(e, rir);
       }
@@ -814,8 +851,11 @@ class _SessionPageState extends State<SessionPage> {
 
   /// «Πόσες ακόμα θα έβγαζες;» (0–4+). Στο τέλος της άσκησης και ενοχλήσεις.
   /// Δεν κλείνει κατά λάθος (έλεγχος 8/11): ή απάντηση ή «Δεν ξέρω» (−1, και τότε δεν ανεβαίνει τίποτα).
-  Future<int?> _askRir(BuildContext context, {required bool first, ExLog? e}) {
+  /// R8-U3-01: [firstOf] = η άσκηση της ερώτησης του 1ου σετ· αν απαντηθεί στο ρολόι όσο το φύλλο είναι ανοιχτό (ή πάψει
+  /// να εκκρεμεί), το φύλλο κλείνει μόνο του χωρίς απάντηση (null): ισχύει η απάντηση του ρολογιού.
+  Future<int?> _askRir(BuildContext context, {required bool first, ExLog? e, ExLog? firstOf}) {
     var pick = -1;
+    var closing = false;
     return showModalBottomSheet<int>(
       context: context,
       isDismissible: false,
@@ -823,7 +863,21 @@ class _SessionPageState extends State<SessionPage> {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+      builder: (ctx) => ListenableBuilder(
+        listenable: t,
+        builder: (ctx, child) {
+          final f = firstOf;
+          if (f != null && !closing && !t.firstPending(f)) {
+            closing = true;
+            final route = ModalRoute.of(ctx);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // Μόνο αν το φύλλο είναι ακόμα το πάνω πάνω (ποτέ η σελίδα της προπόνησης από κάτω).
+              if (ctx.mounted && route != null && route.isCurrent) Navigator.of(ctx).pop();
+            });
+          }
+          return child!;
+        },
+        child: StatefulBuilder(builder: (ctx, set) {
         final c = Aigaio.of(ctx);
         // Με μεγάλα γράμματα το φύλλο κυλά (ποτέ ξεχείλισμα).
         return SingleChildScrollView(
@@ -884,19 +938,28 @@ class _SessionPageState extends State<SessionPage> {
             FilledButton(
               key: const ValueKey('rir-ok'),
               style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
-              onPressed: pick < 0 ? null : () => Navigator.of(ctx).pop(pick),
+              onPressed: pick < 0
+                  ? null
+                  : () {
+                      closing = true;
+                      Navigator.of(ctx).pop(pick);
+                    },
               child: const Text('Συνέχεια'),
             ),
             const SizedBox(height: 4),
             TextButton(
               key: const ValueKey('rir-unknown'),
               style: TextButton.styleFrom(foregroundColor: c.textSecondary, minimumSize: const Size.fromHeight(48)),
-              onPressed: () => Navigator.of(ctx).pop(-1),
+              onPressed: () {
+                closing = true;
+                Navigator.of(ctx).pop(-1);
+              },
               child: const Text('Δεν ξέρω'),
             ),
           ]),
         );
       }),
+      ),
     );
   }
 
@@ -1325,6 +1388,8 @@ class _SummaryPageState extends State<SummaryPage> {
     if (gone == null) return;
     messenger.showSnackBar(SnackBar(
       duration: const Duration(seconds: 8),
+      // Round8 (R8-U2-1, f1): με «Αναίρεση» το μήνυμα δεν θα έκλεινε ποτέ μόνο του (Flutter ≥ 3.38).
+      persist: false,
       content: Text('Διαγράφηκε: ${gone.isCardio ? 'περπάτημα' : gone.name} ${shortDayDate(gone.start)}'),
       action: SnackBarAction(label: 'Αναίρεση', onPressed: () => t.undoDelete(gone)),
     ));

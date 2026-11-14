@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data.dart';
 import '../format.dart';
 import '../history.dart' show K;
-import '../oura/oura_view.dart' show atLeast, glued, minNightsForAverage;
+import '../oura/oura_view.dart' show atLeast, glued, minNightsForAverage, stagesFromText;
 import '../oxygen_note.dart';
 import '../reference.dart' show stagesInfoKey;
 import '../shown.dart';
@@ -108,7 +108,9 @@ class SleepPage extends StatelessWidget {
                       ),
                       Expanded(
                         child: _Summary(
-                          label: scored == week.length ? 'Μέση βαθμολογία 7 νυχτών' : 'Μέση βαθμολογία 7 νυχτών (από ${countText(scored, 'νύχτα', 'νύχτες')})',
+                          // Round 8 (R8-U4-1): ίδιος κανόνας με τη διάρκεια δίπλα (από 7)· πριν, με 6 νύχτες στην εβδομάδα
+                          // όλες με βαθμολογία, η ετικέτα έλεγε «7 νυχτών» χωρίς «(από 6 νύχτες)».
+                          label: scored == 7 ? 'Μέση βαθμολογία 7 νυχτών' : 'Μέση βαθμολογία 7 νυχτών (από ${countText(scored, 'νύχτα', 'νύχτες')})',
                           value: scoreAvg == null ? '—' : '${scoreAvg.round()} από 100',
                         ),
                       ),
@@ -326,9 +328,12 @@ class _LastNightCard extends StatelessWidget {
               dot: c.textTertiary,
             ),
           if (n.estimatedMinutes > 0)
-            InfoRow('Ίσως ύπνος χωρίς καταγραφή (δεν μετρά)', hoursMinutes(n.estimatedMinutes), dot: c.tint(c.sleep)),
+            // Round 8 (U4 Β2): η κουκκίδα με περίγραμμα στο χρώμα του ύπνου, όπως η ζώνη στο υπνόγραμμα (το απαλό γέμισμα
+            // μόνο του είχε αντίθεση 1,2:1 με την κάρτα και δεν φαινόταν).
+            InfoRow('Ίσως ύπνος χωρίς καταγραφή (δεν μετρά)', hoursMinutes(n.estimatedMinutes),
+                dot: c.tint(c.sleep), dotBorder: c.sleep),
           if (n.spanMinutes > n.minutes)
-            InfoRow('Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)', hoursMinutes(n.spanMinutes), dot: c.textTertiary),
+            InfoRow(spanLabel(n), hoursMinutes(n.spanMinutes), dot: c.textTertiary),
           if (n.betweenMinutes > 0)
             InfoRow('Κενό ανάμεσα στα κομμάτια (δεν μετρά)', hoursMinutes(n.betweenMinutes), dot: c.textTertiary),
           if (n.napMinutes > 0) InfoRow('Υπνάκος ή χωριστός ύπνος (δεν μετρά)', hoursMinutes(n.napMinutes), dot: c.textTertiary),
@@ -349,10 +354,7 @@ class _WatchStagesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
-    final staged = [
-      for (final n in nights)
-        if (stageOrder.any((k) => (n.stageMinutes[k] ?? 0) > 0)) n,
-    ];
+    final staged = watchStageNights(nights);
     int avg(String k) => (staged.fold<int>(0, (s, n) => s + (n.stageMinutes[k] ?? 0)) / staged.length).round();
     final enough = staged.length >= minNightsForAverage;
     return AppCard(
@@ -361,13 +363,19 @@ class _WatchStagesCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TitleRow(
-            header: CardHeader(icon: Icons.layers_rounded, title: 'Φάσεις · μέσος όρος 7 νυχτών', color: c.sleep),
+            header: CardHeader(
+              icon: Icons.layers_rounded,
+              title: 'Φάσεις · μέσος όρος 7 νυχτών',
+              // Round 8 (R8-U4-1): από πόσες νύχτες βγαίνει ο μέσος όρος, όταν δεν είναι και οι 7.
+              subtitle: enough ? stagesFromText(staged.length) : null,
+              color: c.sleep,
+            ),
             trailing: const [LabelTag('εκτίμηση'), InfoButton(stagesInfoKey)],
           ),
           const SizedBox(height: 12),
           if (!enough)
             Text(
-              'Χρειάζονται τουλάχιστον $minNightsForAverage νύχτες με στάδια μέσα σε μία εβδομάδα '
+              'Χρειάζονται τουλάχιστον $minNightsForAverage νύχτες με φάσεις σε όλη τη νύχτα μέσα σε μία εβδομάδα '
               '(τώρα ${countText(staged.length, 'νύχτα', 'νύχτες')}).',
               style: TextStyle(color: c.textSecondary, fontSize: 14, height: 1.4),
             )
@@ -558,3 +566,18 @@ String nightRowDuration(Night n) => n.staged ? hoursMinutes(n.minutes) : '—';
 
 /// C13: η σημείωση κάτω από τη διάρκεια («χωρίς φάσεις» / «μερικώς χωρίς φάσεις»), null αν δεν χρειάζεται.
 String? nightRowNote(Night n) => !n.staged ? 'χωρίς φάσεις' : (n.partial ? 'μερικώς χωρίς φάσεις' : null);
+
+/// Round 8 (R8-A5-2): οι νύχτες που μπαίνουν στις «Φάσεις · μέσος όρος 7 νυχτών» του ρολογιού: μόνο ολόκληρες νύχτες με
+/// φάσεις ([Night.fullDuration]), όπως ο μέσος όρος διάρκειας της ίδιας σελίδας και οι φάσεις του Oura (R7-A5-2). Πριν
+/// μετρούσε και νύχτα «μερικώς χωρίς φάσεις» με τις φάσεις μόνο του ενός κομματιού, και ο μέσος όρος έπεφτε (ελαφρύς
+/// 3 ώρες 36 λεπτά αντί για 4 ώρες).
+List<Night> watchStageNights(List<Night> nights) => [
+      for (final n in nights)
+        if (n.fullDuration && stageOrder.any((k) => (n.stageMinutes[k] ?? 0) > 0)) n,
+    ];
+
+/// Round 8 (R8-A5-4): η ετικέτα της γραμμής με το [Night.spanMinutes] (άθροισμα αρχή→τέλος κάθε κομματιού, με τα
+/// ξυπνήματα). Σε νύχτα σε κομμάτια ΔΕΝ είναι «από τον ύπνο ως το ξύπνημα»: τα κενά ανάμεσα λείπουν (φαίνονται στη γραμμή
+/// από κάτω). Πριν, νύχτα 01:20–08:40 με κενό 1 ώρα 35 λεπτά έγραφε «Από τον ύπνο ως το ξύπνημα … 5 ώρες 45 λεπτά».
+String spanLabel(Night n) =>
+    n.parts.length > 1 ? 'Μέσα στα κομμάτια (με τα ξυπνήματα)' : 'Από τον ύπνο ως το ξύπνημα (με τα ξυπνήματα)';

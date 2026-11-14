@@ -21,7 +21,7 @@ import 'plan_file.dart';
 import 'samsung.dart';
 import 'sleep_gaps.dart';
 import 'sources.dart';
-import 'trends.dart' show usualMean, usualOf;
+import 'trends.dart' show usualMean, usualMinNights, usualNights, usualOf;
 
 // ---------------------------------------------------------------------------
 // Μοντέλα
@@ -2157,6 +2157,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   int? _foodRecoveryAt;
   bool _disposed = false;
 
+  /// Round 8 (R8-A9-2): η βλάβη της οποίας την κάρτα έκλεισε ο χρήστης σε αυτή τη χρήση (ώσπου να το γράψει το Android).
+  int? _dbSeenAt;
+
   void _recoverFood(int at) {
     final hook = onDatabaseReset;
     if (hook == null || _foodRecoveryAt == at) return;
@@ -2184,7 +2187,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     final r = await SamsungHealth.dbStatus();
     final at = r['ok'] == true && r['corrupt'] is num ? (r['corrupt'] as num).toInt() : null;
     if (at == null && midSession) return;
-    dbCorruptAt = at;
+    // Round 8 (R8-A9-2, f4): το «Εντάξει» κρύβει μόνο την κάρτα· το σημάδι της βλάβης μένει, ώστε η επαναφορά του
+    // φαγητού και η νέα ανάγνωση του ιστορικού (π.χ. αν οι ρυθμίσεις διαβαστούν αργότερα) να ξαναδοκιμάζονται ώσπου να
+    // γίνουν. Πριν το «Εντάξει» έσβηνε το σημάδι και μια αποτυχημένη πρώτη προσπάθεια δεν ξαναγινόταν ποτέ.
+    final seen = at != null && (r['seen'] == true || _dbSeenAt == at);
+    dbCorruptAt = seen ? null : at;
     // R7-A9-1: φαγητό και προϊόντα στη νέα βάση (χωρίς να περιμένει η πρώτη οθόνη· μία φορά για κάθε βλάβη).
     if (at != null) _recoverFood(at);
     if (at == null || !_prefsLoaded || prefs.dbReset == at) return;
@@ -2212,12 +2219,14 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     }
   }
 
-  /// «Εντάξει» στην κάρτα της χαλασμένης βάσης.
+  /// «Εντάξει» στην κάρτα της χαλασμένης βάσης: κρύβει την κάρτα (R8-A9-2: η επαναφορά συνεχίζει ώσπου να γίνει).
   Future<void> dismissDatabaseNotice() async {
+    final at = dbCorruptAt;
+    if (at != null) _dbSeenAt = at;
     dbCorruptAt = null;
     dbRecovered = null;
     notifyListeners();
-    await SamsungHealth.dbStatusSeen();
+    await SamsungHealth.dbStatusSeen(at);
   }
 
   // ---------- Ιστορικό ----------
@@ -2840,7 +2849,16 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   Zone? zoneOn(DateTime now) => computeZone(age: profile.ageOn(now), restHr: restHrForZone(now), s: zoneSettings);
 
   /// Η μεσαία τιμή των παλμών ύπνου των 14 τελευταίων νυχτών (τουλάχιστον 7), από την πηγή του ύπνου κάθε νύχτας.
-  double? restHrForZone(DateTime now) {
+  double? restHrForZone(DateTime now) => usualOf(_restHrValues(now));
+
+  /// R8-A7-1 (f2): από πόσες νύχτες βγήκε το [restHrForZone] (ως 14), για το φύλλο της ζώνης («παλμοί ύπνου, 9 νύχτες»·
+  /// πριν έγραφε πάντα «14 νύχτες»). 0 όταν δεν υπάρχουν αρκετές.
+  int restHrNights(DateTime now) {
+    final n = _restHrValues(now).whereType<double>().length;
+    return n < usualMinNights ? 0 : (n > usualNights ? usualNights : n);
+  }
+
+  List<double?> _restHrValues(DateTime now) {
     final p = analysisPlan;
     final day = dayOf(now);
     final values = <double?>[];
@@ -2852,7 +2870,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       if (from != null && d.isBefore(from)) continue;
       values.add(p.value(history, K.sleepHr, d));
     }
-    return usualOf(values);
+    return values;
   }
 
   /// Το πιο πρόσφατο βάρος (kg) και η μέρα του, από τη ζυγαριά.

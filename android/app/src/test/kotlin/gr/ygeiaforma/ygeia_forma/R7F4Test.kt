@@ -42,13 +42,16 @@ class R7F4Test {
     @Test
     fun doneMarkerIsPerCorruption() {
         val at = 1_731_500_000_000L
-        assertEquals("$at 120 3", DbSalvage.doneText(at, 120, 3))
-        assertEquals(120 to 3, DbSalvage.parseDone(DbSalvage.doneText(at, 120, 3), at))
-        assertEquals(0 to 0, DbSalvage.parseDone("$at 0 0\n", at))
-        assertNull(DbSalvage.parseDone(DbSalvage.doneText(at, 1, 1), at + 1))
+        // Round 8 (R8-A9-1): το σημάδι γράφει και τον κανόνα ανάγνωσης και αν διαβάστηκαν όλα.
+        assertEquals("$at 120 3 ${DbSalvage.RULES} 1", DbSalvage.doneText(at, 120, 3, complete = true))
+        assertEquals(120 to 3, DbSalvage.parseDone(DbSalvage.doneText(at, 120, 3, complete = true), at))
+        assertEquals(0 to 0, DbSalvage.parseDone("$at 0 0 ${DbSalvage.RULES} 1\n", at))
+        // Το σημάδι του #105 («ώρα 0 0») δεν μετρά πια: εκείνη η ανάγνωση μπορεί να μη διάβασε τίποτα (R8-A9-1).
+        assertNull(DbSalvage.parseDone("$at 0 0\n", at))
+        assertNull(DbSalvage.parseDone(DbSalvage.doneText(at, 1, 1, complete = true), at + 1))
         assertNull(DbSalvage.parseDone(null, at))
         assertNull(DbSalvage.parseDone("", at))
-        assertNull(DbSalvage.parseDone("$at x 1", at))
+        assertNull(DbSalvage.parseDone("$at x 1 ${DbSalvage.RULES} 1", at))
         assertNull(DbSalvage.parseDone("$at 1", at))
     }
 

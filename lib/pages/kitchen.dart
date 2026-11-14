@@ -6,7 +6,7 @@ import '../food/kitchen.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'food_add.dart' show parseNumber;
+import 'food_add.dart' show parseNumber, undoSnackBarDuration;
 
 /// «Η κουζίνα μου»: τι συσκευές και σκεύη έχω. Οι συνταγές θα χρησιμοποιούν μόνο αυτά.
 class KitchenScreen extends StatefulWidget {
@@ -18,7 +18,50 @@ class KitchenScreen extends StatefulWidget {
 }
 
 class _KitchenScreenState extends State<KitchenScreen> {
-  late final Kitchen _k = Kitchen.fromJson(widget.store.prefs.kitchen);
+  late Kitchen _k = Kitchen.fromJson(widget.store.prefs.kitchen);
+
+  /// Η κουζίνα όπως την έγραψε τελευταία αυτή η οθόνη στις ρυθμίσεις (round8, R8-U2-10). Αν οι ρυθμίσεις έχουν άλλη
+  /// (π.χ. «Αναίρεση» από μήνυμα μιας οθόνης που έκλεισε), η οθόνη τη διαβάζει ξανά· αλλιώς η επόμενη αλλαγή της θα έγραφε
+  /// από πάνω την παλιά της λίστα.
+  Map<String, dynamic>? _written;
+
+  /// Αυξάνει όταν η κουζίνα ξαναδιαβάζεται: τα πεδία αριθμών ξαναφτιάχνονται με τις νέες τιμές.
+  int _reloads = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _written = widget.store.prefs.kitchen;
+    widget.store.addListener(_onStore);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStore);
+    super.dispose();
+  }
+
+  void _onStore() {
+    final now = widget.store.prefs.kitchen;
+    if (!mounted || identical(now, _written)) return;
+    _written = now;
+    setState(() {
+      _k = Kitchen.fromJson(now);
+      _unsaved = false;
+      _reloads++;
+    });
+  }
+
+  /// Γράφει το [k] στις ρυθμίσεις· `false` αν δεν έχουν φορτώσει ακόμα.
+  bool _write(Kitchen k) {
+    final m = k.toJson();
+    final before = _written;
+    // Πριν από το setKitchen: ειδοποιεί αμέσως, και το [_onStore] δεν πρέπει να το πάρει για αλλαγή από αλλού.
+    _written = m;
+    if (widget.store.setKitchen(m)) return true;
+    _written = before;
+    return false;
+  }
 
   /// Αριθμός που γράφτηκε («Χωρητικότητα», «Μέγιστο βάρος») και δεν έχει αποθηκευτεί ακόμα. Έλεγχος round1 (S2-10 /
   /// U3a-19): ο αριθμός αποθηκευόταν μόνο με το «Τέλος» του πληκτρολογίου ή με άγγιγμα έξω από το πεδίο· αν έβγαινες με
@@ -26,7 +69,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
   bool _unsaved = false;
 
   void _save() {
-    if (!widget.store.setKitchen(_k.toJson())) {
+    if (!_write(_k)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Οι ρυθμίσεις δεν έχουν φορτώσει ακόμα. Βγες και ξαναμπές σε λίγο.'),
       ));
@@ -38,12 +81,19 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
   /// Round7 (R7-U2-17): το «Αναίρεση» του μηνύματος μένει και αφού κλείσει η οθόνη. Τότε το σκεύος ξαναγράφεται στις
   /// ρυθμίσεις χωρίς την οθόνη (πριν: setState σε κλειστή οθόνη, σφάλμα στην ουρά σφαλμάτων).
-  void _saveFromSnackBar(HealthStore store) {
+  /// Round8 (R8-U2-10): με κλειστή οθόνη, το σκεύος μπαίνει στις ΤΩΡΙΝΕΣ ρυθμίσεις, όχι στη λίστα της οθόνης που έκλεισε:
+  /// στο μεταξύ μια νέα «Η κουζίνα μου» μπορεί να άλλαξε κάτι (π.χ. τσέκαρε φριτέζα αέρα), που αλλιώς σβηνόταν.
+  void _undoDelete(HealthStore store, Cookware existing, int at) {
     if (mounted) {
+      if (_k.cookware.any((x) => x.id == existing.id)) return;
+      _k.cookware.insert(at.clamp(0, _k.cookware.length), existing);
       _save();
-    } else {
-      store.setKitchen(_k.toJson());
+      return;
     }
+    final now = Kitchen.fromJson(store.prefs.kitchen);
+    if (now.cookware.any((x) => x.id == existing.id)) return;
+    now.cookware.insert(at.clamp(0, now.cookware.length), existing);
+    store.setKitchen(now.toJson());
   }
 
   Future<void> _editCookware([Cookware? existing]) async {
@@ -62,16 +112,15 @@ class _KitchenScreenState extends State<KitchenScreen> {
       _save();
       if (!mounted) return;
       final store = widget.store;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Διαγράφηκε: ${existing.label}'),
-        action: SnackBarAction(
-          label: 'Αναίρεση',
-          onPressed: () {
-            _k.cookware.insert(i.clamp(0, _k.cookware.length), existing);
-            _saveFromSnackBar(store);
-          },
-        ),
-      ));
+      // Round8 (R8-U2-1): κλείνει το προηγούμενο μήνυμα και κλείνει μόνο του.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Διαγράφηκε: ${existing.label}'),
+          persist: false,
+          duration: undoSnackBarDuration,
+          action: SnackBarAction(label: 'Αναίρεση', onPressed: () => _undoDelete(store, existing, i)),
+        ));
       return;
     }
     final c = r.cookware!;
@@ -172,7 +221,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (didPop && _unsaved) {
           _unsaved = false;
-          widget.store.setKitchen(_k.toJson());
+          _write(_k);
         }
       },
       child: Scaffold(
@@ -182,6 +231,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 680),
           child: ListView(
+            // Round8 (R8-U2-10): νέα πεδία όταν η κουζίνα ξαναδιαβάστηκε ([_onStore]): το TextFormField κρατά αλλιώς την
+            // παλιά του τιμή.
+            key: ValueKey('kitchen-$_reloads'),
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
             children: [
               Text(
