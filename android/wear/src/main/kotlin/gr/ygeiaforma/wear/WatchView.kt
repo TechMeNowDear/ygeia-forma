@@ -278,7 +278,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val now = System.currentTimeMillis()
         if (ambient) {
             c.drawColor(Color.BLACK)
-            if (kmFlashOn(now)) drawKmFlash(c) else drawAmbient(c, now)
+            if (kmFlashOn(now)) drawKmFlash(c, now) else drawAmbient(c, now)
             return ""
         }
         val alarm = Repo.alarmShown(now)
@@ -289,7 +289,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         }
         // 14/11: κάθε χιλιόμετρο, 2″ πράσινη οθόνη «Πρώτο χιλιόμετρο» (με δόνηση και φωνή από την υπηρεσία).
         if (kmFlashOn(now)) {
-            drawKmFlash(c)
+            drawKmFlash(c, now)
             return "km"
         }
         if (otherAppAsk) {
@@ -549,19 +549,24 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     // ------------------------------------------------------------------ 14/11: χιλιόμετρα
     private fun kmFlashOn(now: Long): Boolean = Repo.running == "walk" && Repo.kmFlashN > 0 && now < Repo.kmFlashUntil
 
-    /** Πράσινη οθόνη για 2″: «Πρώτο χιλιόμετρο» και, από κάτω, ο χρόνος ως εκεί. */
-    private fun drawKmFlash(c: Canvas) {
-        c.drawColor(green)
+    /**
+     * Πράσινη οθόνη για 2″: «Πρώτο χιλιόμετρο». Στην αχνή οθόνη (ambient) πράσινα γράμματα σε μαύρο (round 14, W12: όχι
+     * ολόκληρη φωτεινή οθόνη εκεί), και ξαναζωγραφίζει στο τέλος των 2″, αλλιώς θα έμενε ως το επόμενο λεπτό.
+     */
+    private fun drawKmFlash(c: Canvas, now: Long) {
+        val ink = if (ambient) green else Color.WHITE
+        if (!ambient) c.drawColor(green)
         val title = kmTitle(Repo.kmFlashN)
         // Δύο γραμμές («Πρώτο» / «χιλιόμετρο»), μεγάλα γράμματα· «Χιλιόμετρο 21» μετά το 20ό.
         val parts = title.split(" χιλιόμετρο")
         if (parts.size == 2 && parts[1].isEmpty()) {
-            t(c, parts[0], 96f, Color.WHITE, 22f * fs, true, 170f)
-            t(c, "χιλιόμετρο", 96f + 22f * fs, Color.WHITE, 15f * fs, false, 170f)
+            t(c, parts[0], 96f, ink, 22f * fs, true, 170f)
+            t(c, "χιλιόμετρο", 96f + 22f * fs, ink, 15f * fs, false, 170f)
         } else {
-            t(c, title, 104f, Color.WHITE, 20f * fs, true, 170f)
+            t(c, title, 104f, ink, 20f * fs, true, 170f)
         }
         sayAdd(title)
+        postInvalidateDelayed((Repo.kmFlashUntil - now).coerceIn(0L, KM_FLASH_MS) + 50L)
     }
 
     /** Μεγάλος αριθμός και μικρή λέξη στην ίδια γραμμή, κεντραρισμένα («7 λεπτά»). */

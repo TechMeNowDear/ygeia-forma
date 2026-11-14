@@ -158,8 +158,19 @@ object Repo {
     /** Το μήκος βήματος (m) της άσκησης που τρέχει, από το πρόγραμμα στην αρχή (14/11)· null: καμία εκτίμηση. */
     var stride: Double? = null
 
+    /** Η απόσταση από τα βήματα και όχι από το GPS ([useEstimate], με υστέρηση· round 14). null: δεν κρίθηκε ακόμα. */
+    var useEst: Boolean? = null
+
+    /** Κρίνει ξανά την πηγή της απόστασης με τις τωρινές τιμές (σε κάθε ενημέρωση της άσκησης). */
+    fun updateDistanceSource() {
+        useEst = useEstimate(meters, gps, estMeters(steps, stride), useEst)
+    }
+
     /** Η απόσταση της οθόνης και αν είναι εκτίμηση από τα βήματα ([shownDistance], 14/11). */
-    fun shown(): Pair<Double, Boolean> = shownDistance(meters, gps, steps, stride)
+    fun shown(): Pair<Double, Boolean> = shownDistance(meters, gps, steps, stride, useEst == true)
+
+    /** Η εκτίμηση από τα βήματα για το κινητό («mest»): μόνο όταν η οθόνη δείχνει αυτήν (το κινητό δείχνει ό,τι το ρολόι). */
+    fun estForPhone(): Double? = if (useEst == true) estMeters(steps, stride).takeIf { it >= 10 } else null
 
     /** Το τελευταίο χιλιόμετρο που ειπώθηκε (14/11): κάθε χιλιόμετρο μία φορά. */
     var kmDone = 0
@@ -410,6 +421,7 @@ object Repo {
         meters = 0.0
         steps = 0
         stride = null
+        useEst = null
         kmDone = 0
         kmFlashUntil = 0
         kmFlashN = 0
@@ -523,6 +535,7 @@ object Repo {
             // 14/11: ποιο χιλιόμετρο ειπώθηκε (να μην ξαναειπωθεί μετά από συνέχεια) και το μήκος βήματος της άσκησης.
             .put("kmD", kmDone)
         stride?.let { o.put("stride", it) }
+        useEst?.let { o.put("useEst", it) }
         alarm.limit?.let { o.put("lim", it) }
         // Έλεγχος 14/11, round 9 (R9-A7-2): και η ζώνη του περπατήματος (νέο, προαιρετικό πεδίο του run.json), όπως το όριο:
         // ένα μερικό αποτέλεσμα γράφεται με τη ζώνη που ίσχυε, όχι με όποια έχει το κινητό τη μέρα της εισαγωγής.
@@ -556,6 +569,7 @@ object Repo {
         gps = o.optBoolean("gps", false)
         kmDone = o.optInt("kmD", 0)
         stride = strideOrNull(o.optDouble("stride", Double.NaN))
+        useEst = if (o.has("useEst")) o.optBoolean("useEst") else null
         paused = o.optBoolean("paused", false)
         o.optJSONArray("pz")?.let { a -> for (i in 0 until a.length()) a.optJSONArray(i)?.let { pauses.add(longArrayOf(it.getLong(0), it.getLong(1))) } }
         split = o.optJSONObject("split")?.let { SplitTracker.fromState(it, start) } ?: SplitTracker(start)

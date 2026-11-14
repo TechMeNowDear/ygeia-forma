@@ -37,7 +37,8 @@ object Results {
                 hr.recovery()?.let { (e, m) -> cardio.put("hrr", JSONObject().put("e", e).put("m", m)) }
                 // 14/11: η απόσταση από τα βήματα (βήματα × μήκος βήματος), για περπάτημα χωρίς GPS. Νέο πεδίο: το παλιό
                 // κινητό το αγνοεί. Το κινητό διαλέγει ποια δείχνει με τον ίδιο κανόνα ([shownDistance]).
-                estMeters(Repo.steps, Repo.stride).takeIf { it >= 10 }?.let { cardio.put("mest", Math.round(it)) }
+                // Round 14: μόνο όταν η απόσταση που έδειχνε το ρολόι ήταν από τα βήματα ([Repo.estForPhone]).
+                Repo.estForPhone()?.let { cardio.put("mest", Math.round(it)) }
                 // Η ζώνη που ίσχυε στο περπάτημα (12/11). Νέο πεδίο: το παλιό κινητό το αγνοεί.
                 Repo.zoneAlarm.zone?.let { cardio.put("zone", it.toJson()) }
                 // Το περπάτημα του προγράμματος της μέρας που ΞΕΚΙΝΗΣΕ (έλεγχος 13/11, round 7, R7-A8-6), όχι της μέρας που

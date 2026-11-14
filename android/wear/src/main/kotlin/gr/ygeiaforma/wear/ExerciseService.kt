@@ -181,11 +181,17 @@ class ExerciseService : Service() {
     /** Φωνή στην άσκηση (14/11, [Voice]). */
     private val voice: Voice get() = Voice.shared(this)
 
-    /** Λέει τη φράση, αν η φωνή είναι ανοιχτή στις Ρυθμίσεις του κινητού ([Plan.voice]). */
+    /**
+     * Λέει τη φράση, αν η φωνή είναι ανοιχτή στις Ρυθμίσεις του κινητού ([Plan.voice]). Το κινητό ρωτιέται μόνο αν ξέρει να
+     * απαντά ([Plan.voiceKnown]).
+     */
     private fun speak(p: Pair<String, String>?) {
         if (p == null || Repo.plan?.voice == false) return
-        voice.say(p)
+        voice.say(p, askPhone = Repo.plan?.voiceKnown == true)
     }
+
+    /** Το λεπτό αποκατάστασης τελείωσε κανονικά: το [finish] λέει πόσο έπεσαν οι παλμοί, με όλες τις τιμές μέσα. */
+    private var recoveryDone = false
 
     /**
      * Κάθε ολόκληρο χιλιόμετρο (14/11): μικρή δόνηση, πράσινη οθόνη 2″ με «Πρώτο χιλιόμετρο» και φωνή. Με την απόσταση της
@@ -200,6 +206,8 @@ class ExerciseService : Service() {
         Repo.kmFlashUntil = now + KM_FLASH_MS
         vibrate(longArrayOf(0, 90), alarm = false)
         speak(Say.km(k))
+        // Round 14 (W11): στον δίσκο αμέσως, ώστε μετά από απότομο κλείσιμο να μην ξαναπεί το ίδιο χιλιόμετρο.
+        saveRun(force = true)
     }
 
     /** Σίγαση / Εξοικονόμηση ενέργειας (S8-02): πότε κοιτάχτηκε τελευταία, και ποιο μήνυμα έχει ήδη ειπωθεί. */
@@ -310,10 +318,11 @@ class ExerciseService : Service() {
         // GPS μόνο με άδεια ΚΑΙ με την τοποθεσία του ρολογιού ανοιχτή (αλλιώς το Health Services αρνείται την άσκηση).
         val location = walk && has(this, Manifest.permission.ACCESS_FINE_LOCATION) && locationOn()
         Repo.gps = location
-        // 14/11: μήκος βήματος για την απόσταση χωρίς GPS, και η φωνή έτοιμη από την αρχή.
+        // 14/11: μήκος βήματος για την απόσταση χωρίς GPS, και η φωνή έτοιμη από την αρχή του περπατήματος. Στα βάρη ξεκινά
+        // μόνο όταν χρειαστεί (λίγες φράσεις· round 14, W13: όχι μηχανή φωνής ανοιχτή μία ώρα).
         Repo.stride = if (walk) Repo.plan?.stride else null
-        if (Repo.plan?.voice != false) voice.start()
-        if (walk) speak(Say.START)
+        recoveryDone = false
+        if (walk && Repo.plan?.voice != false) voice.start()
         var type = 0
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
         if (location) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
@@ -321,12 +330,15 @@ class ExerciseService : Service() {
         val gpsOk = startForegroundOrWithoutGps(n, type, location)
         if (gpsOk == null) {
             Repo.notice = "Δεν ξεκίνησε η μέτρηση: λείπει άδεια."
+            if (walk) voice.stop()
             Repo.resetExercise()
             Repo.changed()
             stopSelf()
             return
         }
         Repo.gps = gpsOk
+        // Round 14 (W9): «Ξεκινάμε» μόνο αφού ξεκίνησε πράγματι η μέτρηση (όχι πριν από μια άρνηση άδειας).
+        if (walk) speak(Say.START)
         Repo.hrGaps.start(now)
         Repo.listen(onRepo)
         Repo.changed()
@@ -762,6 +774,7 @@ class ExerciseService : Service() {
                     }
                 }
                 m.getData(DataType.STEPS_TOTAL)?.let { Repo.steps = it.total }
+                Repo.updateDistanceSource()
                 checkKm(now)
             }
             if (update.exerciseStateInfo.state.isEnded) ended?.complete(Unit)
@@ -902,7 +915,7 @@ class ExerciseService : Service() {
                     .put("m", finite(Repo.meters)).put("steps", Repo.steps).put("bpm", if (Repo.bpmFresh(now)) Repo.bpm else 0)
                     .put("paused", Repo.paused).put("rec", Repo.recoveryUntil > 0)
                 // 14/11: και η απόσταση από τα βήματα, για την κάρτα του κινητού χωρίς GPS.
-                estMeters(Repo.steps, Repo.stride).takeIf { it >= 10 }?.let { o.put("mest", Math.round(it)) }
+                Repo.estForPhone()?.let { o.put("mest", Math.round(it)) }
                 o.put("gps", Repo.gps)
                 scope.launch { Link.sendJson(this@ExerciseService, Paths.LIVE, o) }
             }
@@ -967,8 +980,9 @@ class ExerciseService : Service() {
             // δονηθεί το ρολόι», έλεγχος 13/11, S8-01). Η «Παράλειψη» δεν περνά από εδώ ([stopRequested]): χωρίς δόνηση.
             if (recoveryEndBuzz(Repo.recoveryUntil, now, skipped = false)) {
                 vibrate(longArrayOf(0, 250, 150, 250))
-                // 14/11: πόσο έπεσαν οι παλμοί στο λεπτό (ίδιος υπολογισμός με το κινητό, [HrStats.recovery]).
-                speak(Repo.hr?.recovery()?.let { (e, m) -> Say.recovery(e - m) })
+                // 14/11: πόσο έπεσαν οι παλμοί στο λεπτό· το λέει το [finish] αφού έρθουν και οι τελευταίες τιμές (round 14,
+                // W8: αλλιώς ο αριθμός μπορούσε να διαφέρει από αυτόν που δείχνει μετά το κινητό).
+                recoveryDone = true
                 scope.launch { finish() }
                 return
             }
@@ -1389,7 +1403,7 @@ class ExerciseService : Service() {
     private suspend fun finish(userEnd: Boolean = false, endReason: Int? = null) {
         if (stopping) return
         stopping = true
-        // Η φωνή κλείνει λίγο αργότερα: να προλάβει την τελευταία φράση (π.χ. «Οι παλμοί σου έπεσαν 18»).
+        // Η φωνή κλείνει λίγο αργότερα: να προλάβει την τελευταία φράση (π.χ. «Οι παλμοί σου έπεσαν κατά 18»).
         voice.stopLater()
         releaseFirstHrLock()
         releaseRestLock()
@@ -1448,6 +1462,9 @@ class ExerciseService : Service() {
             hsCall("end") { client.endExerciseAsync().await() }
             hsCall("clear") { client.clearUpdateCallbackAsync(callback).await() }
         }
+        // 14/11: πόσο έπεσαν οι παλμοί στο λεπτό αποκατάστασης (ίδιος υπολογισμός με το κινητό, [HrStats.recovery]).
+        if (recoveryDone) speak(Repo.hr?.recovery()?.let { (e, m) -> Say.recovery(e - m) })
+        recoveryDone = false
         // Το κενό ως το τέλος, χωρίς όριο (W2-08): ένα λουρί χαλαρό στο τέλος φαίνεται ολόκληρο.
         Repo.hrGaps.close(now)
         val kind = Repo.running

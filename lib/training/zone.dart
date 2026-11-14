@@ -24,6 +24,11 @@ const zoneWarmupSec = 5 * 60;
 const zoneHoldSec = 5;
 const zoneRepeatSec = 120;
 
+/// Round 14: νέο «Εκτός εύρους» το νωρίτερο 1 λεπτό μετά το προηγούμενο, και «Πάλι στη ζώνη» αφού μείνεις μέσα 10″.
+/// Ίδιες σταθερές με το ρολόι (Protocol.kt: ZONE_GAP_MS, ZONE_BACK_MS).
+const zoneGapSec = 60;
+const zoneBackSec = 10;
+
 /// Ερώτηση «τεστ ομιλίας» μόνο στα πρώτα περπατήματα.
 const talkAskWalks = 3;
 

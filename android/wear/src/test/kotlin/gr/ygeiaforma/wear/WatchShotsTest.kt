@@ -346,11 +346,14 @@ class WatchShotsTest {
         Repo.meters = 0.0
         Repo.steps = 812
         Repo.stride = 0.72
+        Repo.updateDistanceSource()
         shot("W10d_walk_indoor_steps")
         shot("W10e_walk_indoor_ambient", ambient = true)
         Repo.kmFlashN = 1
         Repo.kmFlashUntil = System.currentTimeMillis() + 60_000
         shot("W10c_walk_km_flash")
+        // Round 14: στην αχνή οθόνη πράσινα γράμματα σε μαύρο (όχι ολόκληρη πράσινη οθόνη).
+        shot("W10g_walk_km_flash_ambient", ambient = true)
         RuntimeEnvironment.setFontScale(1.3f)
         Repo.kmFlashN = 13
         shot("W10f_walk_km_flash13_font13")
@@ -358,6 +361,7 @@ class WatchShotsTest {
         Repo.kmFlashN = 0
         Repo.kmFlashUntil = 0
         Repo.stride = null
+        Repo.useEst = null
         Repo.meters = keepM
         Repo.steps = keepS
 

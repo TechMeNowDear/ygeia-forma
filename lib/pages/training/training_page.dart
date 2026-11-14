@@ -762,7 +762,8 @@ class _TrainingPageState extends State<TrainingPage> {
     final steps = (l['steps'] as num?)?.toInt() ?? 0;
     final bpm = (l['bpm'] as num?)?.toInt() ?? 0;
     final time = clock(sec);
-    String pace() => m < 50 || sec <= 0 ? '—' : paceText(sec / (m / 1000));
+    // Round 14 (D9/U8): ρυθμός από απόσταση με «≈» → κι αυτός «≈», όπως στη σύνοψη.
+    String pace() => m < 50 || sec <= 0 ? '—' : '${d!.approx ? '≈ ' : ''}${paceText(sec / (m / 1000))}';
 
     Widget stat(String v, String label) => Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

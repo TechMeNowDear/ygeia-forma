@@ -47,12 +47,18 @@ String zoneProvisionalText(Zone z) => '${z.maxMeasured ? 'Προσωρινά α�
 /// Με όριο γιατρού το ρολόι δονείται μόνο σε εκείνο (round1, U5-28· ExerciseService.zoneMaySpeak).
 String zoneLimitText(int limit) => 'Έχεις όριο γιατρού ($limit): το ρολόι δονείται μόνο σε εκείνο. Οι δονήσεις της ζώνης είναι κλειστές.';
 
-/// Οι δονήσεις της ζώνης σε λέξεις (round1, U5-06), από τις ίδιες σταθερές με το ρολόι.
+/// Οι δονήσεις της ζώνης σε λέξεις (round1, U5-06), από τις ίδιες σταθερές με το ρολόι. Round 14 (D10/U7): και η φωνή, με
+/// τις ίδιες φράσεις και στις δύο μεριές (το ρολόι λέει «Εκτός εύρους» και κάτω από τη ζώνη) και «Πάλι στη ζώνη».
 const zoneHighText = 'Δύο σύντομες δονήσεις και «Εκτός εύρους» όταν μείνεις πάνω $zoneHoldSec δευτερόλεπτα. Ξανά μετά από '
-    '${zoneRepeatSec ~/ 60} λεπτά, αν δεν κατέβεις. Όχι τα πρώτα ${zoneWarmupSec ~/ 60} λεπτά.';
+    '${zoneRepeatSec ~/ 60} λεπτά, αν δεν κατέβεις· το πολύ μία φορά το λεπτό. Όχι τα πρώτα ${zoneWarmupSec ~/ 60} λεπτά.';
 // R8-A7-4: και κάτω από τη ζώνη, καμία δόνηση τα πρώτα 5 λεπτά (Protocol.kt ZoneAlarm: η προθέρμανση πριν από τους δύο
 // ελέγχους)· πριν το κείμενο υποσχόταν δόνηση στο 1ο λεπτό.
-const zoneLowText = 'Μία δόνηση όταν μείνεις κάτω 1 λεπτό. Ξανά μετά από 5 λεπτά. Όχι τα πρώτα ${zoneWarmupSec ~/ 60} λεπτά.';
+const zoneLowText = 'Μία δόνηση και «Εκτός εύρους» όταν μείνεις κάτω 1 λεπτό. Ξανά μετά από 5 λεπτά. Όχι τα πρώτα '
+    '${zoneWarmupSec ~/ 60} λεπτά.';
+
+/// Κάτω από τους δύο διακόπτες της ζώνης (round 14, U7): πότε ακούγονται οι φράσεις.
+const zoneVoiceText = '«Πάλι στη ζώνη» όταν ξαναμπείς για $zoneBackSec δευτερόλεπτα. Οι φράσεις ακούγονται όταν είναι '
+    'ανοιχτή η «Φωνή στην άσκηση» στις Ρυθμίσεις.';
 
 /// «Τεστ ομιλίας» (round1, S6-3): η απάντηση λέει κάτι για το πάνω όριο μόνο αν οι παλμοί πέρασαν αρκετή ώρα κοντά του
 /// (Persinger 2004: το τεστ κρίνει την ένταση στην οποία δίνεται η απάντηση). «Κοντά» = από [talkNearBelow] κάτω ως
@@ -398,7 +404,7 @@ class _ZoneSheetState extends State<ZoneSheet> {
             Text(_error!, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.bad)),
           ],
           const SizedBox(height: 18),
-          Text('ΔΟΝΗΣΗ ΣΤΟ ΡΟΛΟΪ', style: head),
+          Text('ΔΟΝΗΣΗ ΚΑΙ ΦΩΝΗ ΣΤΟ ΡΟΛΟΪ', style: head),
           if (widget.limit != null) ...[
             const SizedBox(height: 6),
             Text(zoneLimitText(widget.limit!), style: TextStyle(fontSize: 13.5, height: 1.4, fontWeight: FontWeight.w600, color: c.warn)),
@@ -420,6 +426,9 @@ class _ZoneSheetState extends State<ZoneSheet> {
             value: _s.alertLow && widget.limit == null,
             onChanged: widget.limit != null ? null : (v) => setState(() => _s = _s.copyWith(alertLow: v)),
           ),
+          if (widget.limit == null)
+            Text(zoneVoiceText, key: const ValueKey('zone-sheet-voice'), style: TextStyle(fontSize: 13, height: 1.4, color: c.textSecondary)),
+          const SizedBox(height: 6),
           // Ό,τι δείχνει και το ρολόι (f7, S8-02): σε Σίγαση, Μην ενοχλείτε ή Εξοικονόμηση ενέργειας η δόνηση της ζώνης
           // δεν φτάνει (R7-A7-1, f3: το ρολόι ανιχνεύει πια και το «Μην ενοχλείτε»). Β-Β7: το «χωρίς δόνηση» δεν σπάει.
           Text('Σε Σίγαση, Μην ενοχλείτε (και Λειτουργία ύπνου) ή Εξοικονόμηση ενέργειας το ρολόι δεν δονείται για τη ζώνη· '

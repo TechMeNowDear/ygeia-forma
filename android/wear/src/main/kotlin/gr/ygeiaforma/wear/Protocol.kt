@@ -312,6 +312,11 @@ class Plan(
      * ([shownDistance]). Παλιό κινητό: null, καμία εκτίμηση.
      */
     val stride: Double? = null,
+    /**
+     * Το κινητό έστειλε το «voice» (round 14, W1): άρα έχει την υπηρεσία που λέει φράσεις και απαντά. Παλιό κινητό: false,
+     * το ρολόι δεν το ρωτά (δεν θα απαντούσε ποτέ και κάθε φράση θα αργούσε 2,5″).
+     */
+    val voiceKnown: Boolean = false,
 ) {
     fun workout(id: String?): WorkoutT? = workouts.firstOrNull { it.id == id }
 
@@ -364,6 +369,7 @@ class Plan(
                 from = dayOrNull(j.optStringOrNull("from")),
                 voice = j.optBoolean("voice", true),
                 stride = strideOrNull(j.optDouble("stride", Double.NaN)),
+                voiceKnown = j.has("voice"),
             )
         } catch (_: Exception) {
             null
@@ -1504,6 +1510,13 @@ class ZoneAlarm(
     private val warmupMs: Long = 5 * 60_000L,
     // Απόφαση χρήστη 14/11: 5″ πάνω από τη ζώνη (πριν 20″), με δόνηση και φωνή «Εκτός εύρους».
     private val holdMs: Long = ZONE_HOLD_MS,
+    /**
+     * Round 14 (W7/U6): νέα δόνηση «Εκτός εύρους» το νωρίτερο τόσο μετά την προηγούμενη, και μετά από «Πάλι στη ζώνη». Με τα
+     * 5″ και παλμούς που πάνε 136↔131 γύρω από το 134, χωρίς αυτό ερχόταν δόνηση και φωνή κάθε 6–10″ πάνω στη μουσική.
+     */
+    private val upGapMs: Long = ZONE_GAP_MS,
+    /** Round 14 (W6/W7): «Πάλι στη ζώνη» μόνο αφού μείνεις ΜΕΣΑ στη ζώνη τόσο (όχι μια τιμή, όχι κάτω από τη ζώνη). */
+    private val backHoldMs: Long = ZONE_BACK_MS,
     private val repeatMs: Long = 120_000L,
     private val lowHoldMs: Long = 60_000L,
     private val lowRepeatMs: Long = 300_000L,
@@ -1536,6 +1549,9 @@ class ZoneAlarm(
     private var downOn = false
     private var lastUp = 0L
     private var lastDown = 0L
+    /** Μετά από δόνηση που ξαναοπλίστηκε: περιμένει «Πάλι στη ζώνη» ([backFrom]: από πότε μέσα στη ζώνη, −1 όχι). */
+    private var backDue = false
+    private var backFrom = -1L
 
     fun start(z: WalkZone?, startEl: Long) {
         zone = z
@@ -1554,6 +1570,7 @@ class ZoneAlarm(
     fun hold() {
         aboveSince = -1
         belowSince = -1
+        backFrom = -1
     }
 
     /** Νέα τιμή [bpm] τη στιγμή [at]. Παλιότερες από την τελευταία αγνοούνται (δύο πηγές: Health Services, αισθητήρας). */
@@ -1569,14 +1586,13 @@ class ZoneAlarm(
     private fun step(bpm: Int, at: Long): Buzz {
         val z = zone ?: return Buzz.NONE
         if (bpm <= 0) return Buzz.NONE
-        var back = false
         if (bpm > z.hi) {
             if (aboveSince < 0) aboveSince = at
         } else {
             aboveSince = -1
             if (bpm <= z.hi - REARM && upOn) {
                 upOn = false
-                back = true
+                backDue = true
             }
         }
         if (bpm < z.lo) {
@@ -1585,40 +1601,51 @@ class ZoneAlarm(
             belowSince = -1
             if (bpm >= z.lo + REARM && downOn) {
                 downOn = false
-                back = true
+                backDue = true
             }
         }
+        // «Πάλι στη ζώνη» μετρά μόνο μέσα στη ζώνη (round 14, W6: όχι μετά από παύση στους 95 με ζώνη 116–134).
+        if (bpm < z.lo || bpm > z.hi) backFrom = -1 else if (backDue && backFrom < 0) backFrom = at
         if (at - startEl < warmupMs) return Buzz.NONE
         // Τελικός έλεγχος (Συμβούλιο 1, μ1): και η ΕΠΑΝΑΛΗΨΗ θέλει [holdMs] συνεχώς έξω από τη ζώνη. Πριν: αν οι παλμοί
         // γύριζαν στη ζώνη χωρίς να «ξαναοπλίσουν» (π.χ. 128–130 με πάνω όριο 130) και 2′ μετά ερχόταν ΜΙΑ τιμή 131,
         // δονούσε αμέσως, ενώ η οθόνη υπόσχεται «όταν μείνεις πάνω 20″».
         if (z.up && aboveSince >= 0 && at - aboveSince >= holdMs) {
-            if (!upOn) {
+            if (!upOn && (ups == 0 || at - lastUp >= upGapMs)) {
                 upOn = true
                 lastUp = at
                 ups++
+                backDue = false
+                backFrom = -1
                 return Buzz.UP
             }
-            if (at - lastUp >= repeatMs) {
+            if (upOn && at - lastUp >= repeatMs) {
                 lastUp = at
                 ups++
                 return Buzz.UP
             }
         }
         if (z.down && belowSince >= 0 && at - belowSince >= lowHoldMs) {
-            if (!downOn) {
+            if (!downOn && (downs == 0 || at - lastDown >= upGapMs)) {
                 downOn = true
                 lastDown = at
                 downs++
+                backDue = false
+                backFrom = -1
                 return Buzz.DOWN
             }
-            if (at - lastDown >= lowRepeatMs) {
+            if (downOn && at - lastDown >= lowRepeatMs) {
                 lastDown = at
                 downs++
                 return Buzz.DOWN
             }
         }
-        return if (back) Buzz.BACK else Buzz.NONE
+        if (backDue && backFrom >= 0 && at - backFrom >= backHoldMs) {
+            backDue = false
+            backFrom = -1
+            return Buzz.BACK
+        }
+        return Buzz.NONE
     }
 
     private fun clear() {
@@ -1629,6 +1656,8 @@ class ZoneAlarm(
         downOn = false
         lastUp = 0
         lastDown = 0
+        backDue = false
+        backFrom = -1
     }
 
     companion object {
@@ -1638,6 +1667,12 @@ class ZoneAlarm(
 
 /** Πόσο πρέπει να μείνουν οι παλμοί πάνω από τη ζώνη για δόνηση και «Εκτός εύρους» (απόφαση χρήστη 14/11· πριν 20″). */
 const val ZONE_HOLD_MS = 5_000L
+
+/** Το λιγότερο ανάμεσα σε δύο «Εκτός εύρους» (round 14). */
+const val ZONE_GAP_MS = 60_000L
+
+/** «Πάλι στη ζώνη» αφού μείνεις μέσα τόσο (round 14). */
+const val ZONE_BACK_MS = 10_000L
 
 // ------------------------------------------------------------------ έλεγχος 13/11 (round 1): αποφάσεις της υπηρεσίας
 // Καθαρές συναρτήσεις (χωρίς Android), για να ελέγχονται σε JVM (S12-11). Η συμπεριφορά δεν άλλαξε· μεταφέρθηκε εδώ.
@@ -1978,17 +2013,28 @@ const val KM_FLASH_MS = 2_000L
 fun strideOrNull(v: Double): Double? = if (v.isFinite() && v in 0.40..1.20) v else null
 
 /**
- * Η απόσταση της οθόνης (μέτρα) και αν είναι εκτίμηση («≈»). Του GPS όταν μέτρησε: τουλάχιστον 10 m και τουλάχιστον η
- * μισή της εκτίμησης από τα βήματα (μέσα στο σπίτι το GPS δίνει 0 ή λίγα μέτρα θορύβου). Αλλιώς βήματα × [stride].
- * Χωρίς GPS (κλειστή τοποθεσία) το Health Services δίνει απόσταση από τα βήματα: κι αυτή «≈». Ίδιος κανόνας με το
- * κινητό (walk_stats.dart: shownMeters).
+ * Από τα βήματα (true) ή από το GPS (false) η απόσταση της οθόνης (14/11· round 14, W10: με υστέρηση). Το GPS κερδίζει όταν
+ * δίνει τουλάχιστον το 80% της εκτίμησης από τα βήματα και μένει όσο δίνει τουλάχιστον το 50%· έτσι η απόσταση δεν
+ * πηγαίνει πέρα-δώθε όταν το GPS είναι κοντά στο όριο. Μέσα στο σπίτι το GPS δίνει 0 ή λίγα μέτρα θορύβου. Κλειστή
+ * τοποθεσία (όχι GPS): πάντα του Health Services (απόσταση από τα βήματα του ρολογιού). [prev]: η προηγούμενη επιλογή.
  */
-fun shownDistance(meters: Double, gps: Boolean, steps: Long, stride: Double?): Pair<Double, Boolean> {
+fun useEstimate(meters: Double, gps: Boolean, est: Double, prev: Boolean?): Boolean {
+    if (!gps || est < 10) return false
     val m = if (meters.isFinite() && meters > 0) meters else 0.0
-    val est = if (stride != null && steps > 0) steps * stride else 0.0
-    if (m >= 10 && (!gps || est < 10 || m >= est * 0.5)) return m to !gps
-    if (est >= 10) return est to true
-    return 0.0 to !gps
+    if (m < 10) return true
+    val ratio = m / est
+    return if (prev == false) ratio < 0.5 else ratio < 0.8
+}
+
+/**
+ * Η απόσταση της οθόνης (μέτρα) και αν είναι εκτίμηση («≈»). [useEst] από το [useEstimate]. Το κινητό δείχνει ό,τι
+ * έδειξε το ρολόι: το «mest» φεύγει ΜΟΝΟ όταν η απόσταση είναι από τα βήματα (walk_stats.dart: pickMeters).
+ */
+fun shownDistance(meters: Double, gps: Boolean, steps: Long, stride: Double?, useEst: Boolean): Pair<Double, Boolean> {
+    val est = estMeters(steps, stride)
+    if (useEst && est >= 10) return est to true
+    val m = if (meters.isFinite() && meters > 0) meters else 0.0
+    return if (m >= 10) m to !gps else 0.0 to !gps
 }
 
 /** Η εκτίμηση από τα βήματα (μέτρα), για το αποτέλεσμα («mest»)· 0 χωρίς μήκος βήματος. */
@@ -2032,7 +2078,7 @@ object Say {
 
     /** Μετά το λεπτό αποκατάστασης: πόσο έπεσαν οι παλμοί (μόνο αν έπεσαν). */
     fun recovery(drop: Int): Pair<String, String>? =
-        if (drop <= 0) null else "Οι παλμοί σου έπεσαν $drop" to "Your heart rate dropped by $drop"
+        if (drop <= 0) null else "Οι παλμοί σου έπεσαν κατά $drop" to "Your heart rate dropped by $drop"
 }
 
 /**

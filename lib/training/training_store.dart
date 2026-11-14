@@ -10,6 +10,7 @@ import 'hr_file.dart';
 import 'progression.dart';
 import 'program.dart';
 import 'session.dart';
+import 'walk_stats.dart' show shownMeters;
 import 'zone.dart';
 
 /// Διόρθωση επαναλήψεων του ρολογιού που έρχεται μέσα στο αποτέλεσμά του (τελικός έλεγχος, Συμβούλιο 4, W-4): το σετ
@@ -1675,11 +1676,14 @@ class TrainingStore extends ChangeNotifier {
     final walks = [for (final s in list) if (s.isCardio) s];
     b.writeln('Προπονήσεις με βάρη: ${list.length - walks.length}');
     if (walks.isNotEmpty) {
-      final km = walks.fold<double>(0, (a, s) => a + (s.meters ?? 0)) / 1000;
+      // Round 14 (D3): η απόσταση που δείχνουν οι οθόνες ([shownMeters]), με «≈» αν μέρος της είναι από τα βήματα.
+      final shown = [for (final s in walks) shownMeters(s)].whereType<({double meters, bool approx})>();
+      final km = shown.fold<double>(0, (a, d) => a + d.meters) / 1000;
+      final approx = shown.any((d) => d.approx);
       final mins = walks.fold<int>(0, (a, s) => a + (s.cardioMinutes ?? 0));
       // R7-U4-14 θ: ενικός με το 1 και δεκαδικό κόμμα (το κείμενο επικολλάται στη συζήτηση): «1 φορά, 31 λεπτά, 2,2 km».
       b.writeln('Περπάτημα: ${walks.length == 1 ? '1 φορά' : '${walks.length} φορές'}, ${mins == 1 ? '1 λεπτό' : '$mins λεπτά'}'
-          '${km > 0 ? ', ${km.toStringAsFixed(1).replaceAll('.', ',')} km' : ''}');
+          '${km > 0 ? ', ${approx ? '≈ ' : ''}${km.toStringAsFixed(1).replaceAll('.', ',')} km' : ''}');
     }
     final hrAvgs = [for (final s in list) if (s.hrAvg != null) s.hrAvg!];
     if (hrAvgs.isNotEmpty) b.writeln('Μέσοι παλμοί ανά προπόνηση: ${hrAvgs.join(', ')}');
@@ -1758,6 +1762,8 @@ class TrainingStore extends ChangeNotifier {
       if (have.add('${p.id}#${p.version}')) programs.add(p);
     }
     activeId ??= other.activeId;
+    // Round 14 (P8): φωνή κλειστή στο αντίγραφο → κλειστή και εδώ (δεν ξαναμιλά το ρολόι μετά από επαναφορά).
+    if (!other.voice) voice = false;
     // Ό,τι σβήστηκε (εδώ ή στο αντίγραφο) μένει σβησμένο.
     deleted.addAll(other.deleted);
     sessions.removeWhere((x) => deleted.contains(x.id));

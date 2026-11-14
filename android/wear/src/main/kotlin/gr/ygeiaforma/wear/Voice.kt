@@ -23,12 +23,14 @@ import java.util.Locale
  *
  * Πού ακούγεται (ο χρήστης ακούει Spotify συνήθως από το κινητό, μερικές φορές από το ρολόι):
  * 1. Ακουστικά συνδεδεμένα στο ρολόι → από το ρολόι (στα ακουστικά).
- * 2. Αλλιώς ρωτά το κινητό ([Link.askPhoneToSay]): αν εκείνο έχει ακουστικά, το λέει εκεί (μέσα στη μουσική).
+ * 2. Αλλιώς ρωτά το κινητό ([Link.askPhoneToSay]), μόνο κοντινό και μόνο αν το κινητό ξέρει να απαντά ([Plan.voiceKnown]):
+ *    αν εκείνο έχει ακουστικά και του επιτρέπεται να χαμηλώσει τη μουσική, το λέει εκεί (μέσα στη μουσική).
  * 3. Αλλιώς (κανένα ακουστικό, ή το κινητό δεν απάντησε) → από το ηχείο του ρολογιού.
  * Η μουσική χαμηλώνει για όσο μιλά (audio focus «may duck») και μετά επανέρχεται· δεν σταματά.
  *
- * Μόνο όσο τρέχει άσκηση ([start] από την υπηρεσία, [stopLater] στο τέλος, ώστε να προλάβει να πει την τελευταία φράση)·
- * τίποτα στο παρασκήνιο αλλιώς. Μία για όλη τη διεργασία ([shared]): η υπηρεσία κλείνει πριν τελειώσει η τελευταία φράση.
+ * Μόνο όσο τρέχει άσκηση ([start] από την υπηρεσία στο περπάτημα, [stopLater] στο τέλος, ώστε να προλάβει να πει την
+ * τελευταία φράση)· τίποτα στο παρασκήνιο αλλιώς. Μία για όλη τη διεργασία ([shared]): η υπηρεσία κλείνει πριν τελειώσει
+ * η τελευταία φράση.
  */
 class Voice private constructor(private val ctx: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -39,6 +41,12 @@ class Voice private constructor(private val ctx: Context) {
     private var greek = false
     private var pending: Pair<String, String>? = null
     private var focus: AudioFocusRequest? = null
+
+    /** Φράσεις που μιλάνε ή περιμένουν στη σειρά (round 14, W5): η μουσική ξανανεβαίνει μετά την ΤΕΛΕΥΤΑΙΑ. */
+    private var speaking = 0
+
+    /** Η υπηρεσία κρατά τη φωνή ανοιχτή (περπάτημα, από το [start] ως το [stopLater])· αλλιώς κλείνει μόνη της ([idleStop]). */
+    private var held = false
     private val am: AudioManager? = ctx.getSystemService(AudioManager::class.java)
 
     /** Για τον έλεγχο στη συσκευή: «el», «en», «none» (δεν υπάρχει φωνή στο ρολόι), «init», «off». */
@@ -56,9 +64,16 @@ class Voice private constructor(private val ctx: Context) {
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
 
-    /** Ετοιμάζει τη φωνή του ρολογιού από την αρχή της άσκησης (για να μην αργήσει η πρώτη φράση). */
-    fun start() {
-        main.removeCallbacks(stopRunnable)
+    /**
+     * Ετοιμάζει τη φωνή του ρολογιού (στην αρχή του περπατήματος, για να μην αργήσει η πρώτη φράση). [cancelStop]: ακυρώνει
+     * το κλείσιμο που έχει προγραμματίσει το [stopLater] (νέα άσκηση)· ένα ξεκίνημα για μία φράση ([speakHere]) δεν το
+     * ακυρώνει (round 14, W4: αλλιώς η φωνή έμενε ανοιχτή μετά την άσκηση).
+     */
+    fun start(cancelStop: Boolean = true) {
+        if (cancelStop) {
+            held = true
+            main.removeCallbacks(stopRunnable)
+        }
         if (tts != null) return
         status = "init"
         tts = try {
@@ -71,11 +86,12 @@ class Voice private constructor(private val ctx: Context) {
     }
 
     private fun onInit(st: Int) {
-        val t = tts ?: return
+        // Round 14 (W14): χωρίς μηχανή φωνής το ERROR έρχεται μέσα στον κατασκευαστή, πριν γραφτεί το [tts].
         if (st != TextToSpeech.SUCCESS) {
             status = "none"
             return
         }
+        val t = tts ?: return
         try {
             greek = setLocale(t, Locale("el", "GR"))
             if (!greek && !setLocale(t, Locale.UK) && !setLocale(t, Locale.US)) {
@@ -89,10 +105,12 @@ class Voice private constructor(private val ctx: Context) {
             t.setAudioAttributes(attrs)
             t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
-                override fun onDone(utteranceId: String?) = releaseFocus()
+                override fun onDone(utteranceId: String?) = finished()
 
                 @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) = releaseFocus()
+                override fun onError(utteranceId: String?) = finished()
+
+                override fun onError(utteranceId: String?, errorCode: Int) = finished()
             })
             ready = true
             status = if (greek) "el" else "en"
@@ -104,28 +122,52 @@ class Voice private constructor(private val ctx: Context) {
         }
     }
 
-    /** Λέει τη φράση [p] (ελληνικά, αγγλικά) εκεί που θα την ακούσεις. */
-    fun say(p: Pair<String, String>) {
-        if (headsetHere()) {
+    /** Μία φράση τελείωσε (ή απέτυχε): η μουσική ξανανεβαίνει μόνο αν δεν περιμένει άλλη. Από νήμα του συστήματος. */
+    private fun finished() {
+        main.post {
+            if (speaking > 0) speaking--
+            if (speaking == 0) releaseFocus()
+        }
+    }
+
+    /** Λέει τη φράση [p] (ελληνικά, αγγλικά) εκεί που θα την ακούσεις. [askPhone]: το κινητό ξέρει να απαντά. */
+    fun say(p: Pair<String, String>, askPhone: Boolean) {
+        if (headsetHere() || !askPhone) {
             speakHere(p)
             return
         }
         scope.launch {
+            // Round 14 (W3/P6): η σύνδεση ακούει την απάντηση του κινητού ως το τέλος, ακόμα κι αν η άσκηση κλείσει στο μεταξύ.
+            Link.attach(ctx)
             val phone = try {
                 Link.askPhoneToSay(ctx, p.first, p.second)
             } catch (_: Exception) {
                 false
+            } finally {
+                Link.detach(ctx)
             }
             if (phone) phoneCount++ else speakHere(p)
         }
     }
 
+    /**
+     * Χωρίς την υπηρεσία να την κρατά ([held]), η φωνή κλείνει [IDLE_MS] μετά την τελευταία φράση (round 14, W4: π.χ. μια
+     * φράση από το ρολόι αφού το κινητό δεν απάντησε, ή «Επόμενο σετ» στα βάρη). Ποτέ ανοιχτή στο παρασκήνιο.
+     */
+    private fun idleStop() {
+        if (held) return
+        main.removeCallbacks(stopRunnable)
+        main.postDelayed(stopRunnable, IDLE_MS)
+    }
+
     private fun speakHere(p: Pair<String, String>) {
+        idleStop()
         val t = tts
         if (t == null) {
-            // Η φωνή δεν ξεκίνησε ακόμα (π.χ. «Επόμενο σετ» πριν από κάθε άλλη φράση): ξεκινά τώρα και τη λέει μόλις ετοιμαστεί.
-            start()
+            // Η φωνή δεν ξεκίνησε ακόμα (π.χ. «Επόμενο σετ» στα βάρη, ή συνέχεια μετά από απότομο κλείσιμο): ξεκινά τώρα και
+            // τη λέει μόλις ετοιμαστεί, χωρίς να ακυρώσει ένα κλείσιμο που έχει ήδη προγραμματιστεί.
             pending = p
+            start(cancelStop = false)
             return
         }
         if (!ready) {
@@ -133,23 +175,48 @@ class Voice private constructor(private val ctx: Context) {
             return
         }
         try {
-            requestFocus()
-            t.speak(if (greek) p.first else p.second, TextToSpeech.QUEUE_ADD, Bundle(), "y${SystemClock.elapsedRealtime()}")
+            if (speaking == 0) requestFocus()
+            speaking++
+            val r = t.speak(if (greek) p.first else p.second, TextToSpeech.QUEUE_ADD, Bundle(), "y${SystemClock.elapsedRealtime()}")
+            if (r == TextToSpeech.ERROR) {
+                // Round 14 (W5): η μηχανή φωνής «πέθανε»· χωρίς αυτό η μουσική έμενε χαμηλωμένη και οι επόμενες φράσεις χάνονταν.
+                speaking--
+                if (speaking == 0) releaseFocus()
+                restartWith(p)
+                return
+            }
             localCount++
         } catch (e: Exception) {
             Log.w(TAG, "speak", e)
-            releaseFocus()
+            if (speaking > 0) speaking--
+            if (speaking == 0) releaseFocus()
         }
+    }
+
+    /** Ξανά από την αρχή η μηχανή φωνής, και η φράση [p] μόλις ετοιμαστεί (μία φορά). */
+    private fun restartWith(p: Pair<String, String>) {
+        shutdownEngine()
+        pending = p
+        start(cancelStop = false)
     }
 
     /** Κλείνει τη φωνή σε [ms] (να προλάβει να πει την τελευταία φράση), εκτός αν ξεκινήσει νέα άσκηση στο μεταξύ. */
     fun stopLater(ms: Long = 8_000L) {
+        held = false
         main.removeCallbacks(stopRunnable)
         main.postDelayed(stopRunnable, ms)
     }
 
     fun stop() {
+        held = false
         main.removeCallbacks(stopRunnable)
+        shutdownEngine()
+        pending = null
+        if (status != "none") status = "off"
+    }
+
+    private fun shutdownEngine() {
+        speaking = 0
         releaseFocus()
         try {
             tts?.stop()
@@ -158,8 +225,6 @@ class Voice private constructor(private val ctx: Context) {
         }
         tts = null
         ready = false
-        pending = null
-        if (status != "none") status = "off"
     }
 
     /** Ακουστικά ή ηχείο Bluetooth συνδεδεμένα στο ρολόι. */
@@ -200,6 +265,9 @@ class Voice private constructor(private val ctx: Context) {
         const val VOICE_RATE = 0.92f
         const val VOICE_PITCH = 0.95f
 
+        /** Πόσο μένει ανοιχτή η φωνή μετά την τελευταία φράση, όταν δεν την κρατά η υπηρεσία. */
+        const val IDLE_MS = 15_000L
+
         val HEADSET_TYPES = setOf(
             AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
             AudioDeviceInfo.TYPE_BLE_HEADSET,
@@ -215,13 +283,19 @@ class Voice private constructor(private val ctx: Context) {
             false
         }
 
-        /** Γυναικεία φωνή, αν η μηχανή του συστήματος έχει και τη δηλώνει στο όνομα ([femaleVoiceName]). */
+        /**
+         * Γυναικεία φωνή, αν η μηχανή του συστήματος έχει και τη δηλώνει στο όνομα ([femaleVoiceName]). Μόνο φωνές που
+         * είναι ήδη στο ρολόι (round 14: όχι «δεν έχει κατέβει», που θα αποτύγχανε σε κάθε φράση).
+         */
         private fun pickVoice(t: TextToSpeech, lang: String) {
             try {
                 val voices = t.voices ?: return
-                val name = femaleVoiceName(voices.filter { it.locale.language == lang && !it.isNetworkConnectionRequired }.map { it.name })
-                    ?: return
-                voices.firstOrNull { it.name == name }?.let { t.voice = it }
+                val usable = voices.filter {
+                    it.locale.language == lang && !it.isNetworkConnectionRequired &&
+                        !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+                }
+                val name = femaleVoiceName(usable.map { it.name }) ?: return
+                usable.firstOrNull { it.name == name }?.let { t.voice = it }
             } catch (_: Exception) {
             }
         }
@@ -231,7 +305,7 @@ class Voice private constructor(private val ctx: Context) {
 /**
  * Το όνομα μιας γυναικείας φωνής από τα ονόματα που δίνει η μηχανή, ή null (μένει η φωνή του συστήματος). Η μηχανή δεν
  * λέει το φύλο· κάποιες το γράφουν στο όνομα: «female», ή «…SMTf00» της Samsung (f = γυναικεία, m = ανδρική). Καθαρή
- * συνάρτηση, με δοκιμές. Ίδια με του κινητού (PhoneVoice.kt).
+ * συνάρτηση, με δοκιμές. Ίδια με του κινητού (SayService.kt).
  */
 fun femaleVoiceName(names: List<String>): String? {
     val sorted = names.sorted()
