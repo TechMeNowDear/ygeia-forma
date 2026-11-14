@@ -141,6 +141,8 @@ fun mergeWatchEdits(prev: LiveSession, s: LiveSession) {
     s.firstAsked.addAll(prev.firstAsked)
     val fi = prev.firstIdx
     if (fi >= 0 && s.items.getOrNull(fi)?.let { it.first && it.ex == prev.items.getOrNull(fi)?.ex } == true) s.firstIdx = fi
+    // Round 9 (R9-A8-3): και οι απαντήσεις στο «Πρώτο σετ» που δόθηκαν εδώ (για την επανάληψη και για το αποτέλεσμα).
+    for ((ex, v) in prev.firstAns) if (ex !in s.firstAns) s.firstAns[ex] = v
 }
 
 /**
@@ -468,6 +470,13 @@ class LiveSession(
     var firstIdx: Int = -1
     val firstAsked: MutableSet<String> = mutableSetOf()
 
+    /**
+     * Έλεγχος 14/11, round 9 (R9-A8-3), μόνο σε προπόνηση του κινητού: η απάντηση που δόθηκε ΕΔΩ στο «Πρώτο σετ» ανά άσκηση
+     * (id → 0–4, ή −1 για «Δεν ξέρω»). Ξαναστέλνεται ως «rir1» όσο το κινητό τη ζητά ακόμα ([firstResends]) και πάει και στο
+     * αποτέλεσμα των παλμών («fr»). Κρατιέται και στο στιγμιότυπο («fr» του «pp»).
+     */
+    val firstAns: MutableMap<String, Int> = mutableMapOf()
+
     /** Η ερώτηση του 1ου σετ είναι ανοιχτή εδώ και το κινητό τη θέλει ακόμα («f»). */
     val firstPending: Boolean get() = firstIdx >= 0 && items.getOrNull(firstIdx)?.first == true
 
@@ -490,6 +499,42 @@ class LiveSession(
         val i = firstIdx
         firstIdx = -1
         return if (pending) i else -1
+    }
+
+    /**
+     * Έλεγχος 14/11, round 9 (R9-A12-2): ένα πάτημα στην οθόνη της ρεζέρβας ([rir] 0–4, −1 = «Δεν ξέρω»), όπως το κρίνει η
+     * οθόνη ([WatchActivity.answer]). Πρώτα η ερώτηση «Πρώτο σετ», αν είναι ανοιχτή ([firstIdx] ≥ 0): την ΚΛΕΙΝΕΙ
+     * ([answerFirst]) και, σε προπόνηση του κινητού που τη ζητά ακόμα, δίνει την εντολή «rir1» και κρατά την απάντηση
+     * ([firstAns], R9-A8-3). Η ρεζέρβα της άσκησης δεν αλλάζει. Αλλιώς: η ρεζέρβα της άσκησης ([answer]).
+     */
+    fun answerAny(rir: Int, now: Long): AnswerResult {
+        if (firstIdx >= 0) {
+            val fi = answerFirst()
+            val item = items.getOrNull(fi)
+            if (!phone || item == null) return AnswerResult(true, null, null, fi)
+            val v = rir.coerceIn(-1, 4)
+            firstAns[item.ex] = v
+            return AnswerResult(true, rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, v), null, fi)
+        }
+        val (next, i) = answer(rir, now)
+        return AnswerResult(false, null, next, i)
+    }
+
+    /**
+     * Έλεγχος 14/11, round 9 (R9-A8-3): οι απαντήσεις στο «Πρώτο σετ» που δόθηκαν εδώ ([firstAns]) και το κινητό ΔΕΝ έχει
+     * πάρει ακόμα: η κατάστασή του ζητά ακόμα την ερώτηση («f») ενώ έχει ήδη το ✓ του 1ου σετ (πριν από αυτό πρώτα ξαναστέλνεται
+     * το ✓, με τις επαναλήψεις του). Ως (θέση, id άσκησης, απάντηση), για να ξανασταλούν ως «rir1» ([rir1Cmd]). Το κινητό
+     * κρατά μόνο την πρώτη απάντηση («η πρώτη κερδίζει»): μια δεύτερη δεν αλλάζει τίποτα. Μόλις τη δεχτεί, χωρίς «f» → τίποτα.
+     */
+    fun firstResends(): List<Triple<Int, String, Int>> {
+        if (!phone) return emptyList()
+        val out = mutableListOf<Triple<Int, String, Int>>()
+        for ((i, it) in items.withIndex()) {
+            val v = firstAns[it.ex] ?: continue
+            val s0 = it.sets.getOrNull(0) ?: continue
+            if (it.first && s0.done && s0.confirmed) out.add(Triple(i, it.ex, v))
+        }
+        return out
     }
 
     /** Όλες οι ασκήσεις τελείωσαν (ή παραλείφθηκαν στο κινητό). */
@@ -637,6 +682,9 @@ class LiveSession(
                 .put("ex", it.ex).put("sets", it.sets.size).put("lo", it.lo).put("hi", it.hi)
                 .put("rir", it.rirTarget).put("rest", it.rest).put("log", log)
             it.rir?.let { r -> o.put("ra", r) }
+            // Round 9 (R9-A8-3): η απάντηση του ρολογιού στο «Πρώτο σετ» (0–4, −1 = «Δεν ξέρω»), αντίγραφο της «rir1» για την
+            // περίπτωση που εκείνη δεν έφτασε ποτέ (όπως το «ra» για τη ρεζέρβα). Νέο πεδίο: το παλιό κινητό το αγνοεί.
+            firstAns[it.ex]?.let { v -> o.put("fr", v) }
             arr.put(o)
         }
         return JSONObject()
@@ -699,6 +747,8 @@ class LiveSession(
             if (s.res > 0) o.put("res", s.res)
             // R8-U3-01: οι ασκήσεις που ρωτήθηκαν ήδη για το 1ο σετ (νέο, προαιρετικό πεδίο): ούτε μετά από επανεκκίνηση ξανά.
             if (s.firstAsked.isNotEmpty()) o.put("fa", JSONArray(s.firstAsked.sorted()))
+            // R9-A8-3: και οι απαντήσεις που δόθηκαν εδώ (νέο, προαιρετικό πεδίο): ξαναστέλνονται και μετά από επανεκκίνηση.
+            if (s.firstAns.isNotEmpty()) o.put("fr", JSONObject().also { m -> for ((ex, v) in s.firstAns) m.put(ex, v) })
             return o
         }
 
@@ -722,6 +772,13 @@ class LiveSession(
                     res = o.optLong("res", 0),
                 ).also { p ->
                     o.optJSONArray("fa")?.let { a -> for (k in 0 until a.length()) a.optString(k, "").takeIf { it.isNotEmpty() }?.let { p.firstAsked.add(it) } }
+                    // R9-A8-3: στιγμιότυπο χωρίς «fr» (έκδοση ως #107): καμία απάντηση. Μόνο τιμές −1…4.
+                    o.optJSONObject("fr")?.let { m ->
+                        for (ex in m.keys().asSequence()) {
+                            val v = m.optInt(ex, Int.MIN_VALUE)
+                            if (ex.isNotEmpty() && v in -1..4) p.firstAns[ex] = v
+                        }
+                    }
                 }
             } catch (_: Exception) {
                 null
@@ -1846,3 +1903,32 @@ const val NOTICE_INLINE_MS = 8_000L
  * προπόνηση. Τώρα μένει [NOTICE_INLINE_MS] από τη στιγμή που φάνηκε ([ageMs]) και μετά δίνει πίσω τη θέση του.
  */
 fun noticeInline(ageMs: Long): Boolean = ageMs < NOTICE_INLINE_MS
+
+// ------------------------------------------------------------------ έλεγχος 14/11 (round 9)
+
+/**
+ * Τι έκανε ένα πάτημα στην οθόνη της ρεζέρβας ([LiveSession.answerAny], R9-A12-2). [first]: απαντήθηκε η ερώτηση «Πρώτο
+ * σετ» (όχι η ρεζέρβα της άσκησης)· [rir1]: η εντολή «rir1» προς το κινητό, ή null (προπόνηση του ρολογιού, ή το κινητό
+ * δεν τη ζητά πια)· [next]: μετά τη ρεζέρβα της άσκησης, τι ακολουθεί (null για το «Πρώτο σετ»)· [i]: η άσκηση που πήρε
+ * την απάντηση, ή −1.
+ */
+class AnswerResult(val first: Boolean, val rir1: JSONObject?, val next: LiveSession.Next?, val i: Int)
+
+/**
+ * Η 2η γραμμή της ειδοποίησης «Η άσκηση σταμάτησε …» (άλλη εφαρμογή, χάθηκε άδεια· έλεγχος 14/11, round 9, R9-U3-09). Μιλά
+ * για το όριο ΜΟΝΟ όταν υπάρχει όριο γιατρού ([hasLimit]), όπως κάθε άλλο κείμενο του ορίου στο ρολόι· σε περπάτημα με
+ * ανοιχτή δόνηση ζώνης ([zoneBuzz], χωρίς όριο) λέει ότι σταμάτησε η δόνηση της ζώνης. Πριν έλεγε «Το όριο παλμών δεν σε
+ * προσέχει πια» και σε χρήστη χωρίς όριο. Κείμενα προς έγκριση από τον χρήστη.
+ */
+fun endedElsewhereText(hasLimit: Boolean, zoneBuzz: Boolean): String = when {
+    hasLimit -> "Ό,τι μετρήθηκε σώθηκε. Το όριο παλμών δεν σε προσέχει πια."
+    zoneBuzz -> "Ό,τι μετρήθηκε σώθηκε. Η δόνηση της ζώνης σταμάτησε."
+    else -> "Ό,τι μετρήθηκε σώθηκε."
+}
+
+/**
+ * Η ζώνη ενός περπατήματος που ΣΥΝΕΧΙΖΕΙ μετά από απότομο κλείσιμο της εφαρμογής (έλεγχος 14/11, round 9, R9-A7-2): με
+ * πρόγραμμα στο ρολόι ([plan]), η ζώνη του (ίδιος κανόνας με ένα νέο πρόγραμμα στη μέση του περπατήματος, [Repo.applyPlan])·
+ * χωρίς πρόγραμμα (δεν διαβάστηκε ακόμα), η ζώνη που ίσχυε, από το στιγμιότυπο ([kept]), αντί για καμία ζώνη.
+ */
+fun resumeZone(plan: Plan?, kept: WalkZone?): WalkZone? = if (plan != null) plan.zone else kept

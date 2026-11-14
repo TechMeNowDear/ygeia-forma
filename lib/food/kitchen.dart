@@ -55,7 +55,8 @@ class Cookware {
         if (size != null) cookwareSizeLabel(kind, size!).toLowerCase(),
         if (brand != null && brand!.isNotEmpty) brand!,
         if (note != null && note!.isNotEmpty) note!,
-      ].join(' · ');
+        // Round9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α): αδιάσπαστο κενό πριν από το «·»: η γραμμή δεν τελειώνει σε «·» («… μεσαίο ·» / «Tefal»).
+      ].join('\u00A0· ');
 
   factory Cookware.fromJson(Map<String, dynamic> j) => Cookware(
         id: j['id'] as String,

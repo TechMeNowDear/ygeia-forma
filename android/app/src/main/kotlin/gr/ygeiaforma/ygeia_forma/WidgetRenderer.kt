@@ -211,9 +211,10 @@ object WidgetRenderer {
             if (maxW <= 0) return ""
             val base = p.textSize
             val floor = if (base < sp(11f)) WidgetText.MIN_SCALE_SMALL else 0.75f
-            for (k in 1..WidgetText.shrinkSteps(floor)) {
-                if (p.measureText(text) <= maxW) break
-                p.textSize = base * WidgetText.shrinkScale(k)
+            // Round 9 (R9-A12-3): ο κανόνας της σμίκρυνσης στο WidgetText.fitSize (ελέγχεται σε απλό JVM, R9F5Test).
+            p.textSize = WidgetText.fitSize(base, floor, maxW) { size ->
+                p.textSize = size
+                p.measureText(text)
             }
             if (p.measureText(text) <= maxW) return text
             var t = text
@@ -382,24 +383,24 @@ object WidgetRenderer {
          */
         fun hero(key: String, left: Float, right: Float, top: Float, plus: Boolean, limit: Float): Float {
             val e = entry(key)
-            val value = e?.optString("v", "—") ?: "—"
-            val unit = e?.optString("u", "")?.trim() ?: ""
+            // Round 8 (R8-U1-3): «96%» κολλητά, όπως η εφαρμογή· round 9 (R9-A12-3): αριθμός και μονάδα από το
+            // WidgetText.valueParts (ελέγχεται σε JVM), και «+0,2°» κολλητά (R9-U1-5).
+            val (value, unitStr) = WidgetText.valueParts(e?.optString("v", "—") ?: "—", e?.optString("u", "") ?: "")
             val maxW = right - left - (if (plus) dp(38f) else 0f)
             val big = paint("ExtraBold", sp(bigSize()), fg).apply { letterSpacing = -0.03f }
             val up = paint("SemiBold", sp(bigSize() * 0.42f), muted)
-            // Μικραίνει μαζί με τη μονάδα ώστε να χωρούν και τα δύο.
-            // Round 8 (R8-U1-3): «96%» κολλητά, όπως η εφαρμογή ([WidgetText.unitText])· R8-U1-7: ως 60%, χωρίς άθροιση λάθους.
-            val unitStr = WidgetText.unitText(unit)
-            val unitW = if (unit.isEmpty()) 0f else up.measureText(unitStr)
+            // Μικραίνει μαζί με τη μονάδα ώστε να χωρούν και τα δύο. R8-U1-7: ως 60%, χωρίς άθροιση λάθους· round 9
+            // (R9-A12-3): ο κανόνας στο WidgetText.fitSize.
+            val unitW = if (unitStr.isEmpty()) 0f else up.measureText(unitStr)
             val base = big.textSize
-            for (k in 1..WidgetText.shrinkSteps(0.6f)) {
-                if (big.measureText(value) + unitW <= maxW) break
-                big.textSize = base * WidgetText.shrinkScale(k)
+            big.textSize = WidgetText.fitSize(base, 0.6f, maxW) { size ->
+                big.textSize = size
+                big.measureText(value) + unitW
             }
             val vText = fit(value, big, maxW - unitW)
             val by = top - big.ascent() * 0.92f
             cv.drawText(vText, left, by, big)
-            if (unit.isNotEmpty() && unitW + big.measureText(vText) <= maxW) cv.drawText(unitStr, left + big.measureText(vText), by, up)
+            if (unitStr.isNotEmpty() && unitW + big.measureText(vText) <= maxW) cv.drawText(unitStr, left + big.measureText(vText), by, up)
             var y = by + big.descent() * 0.6f
 
             val capP = paint("Medium", sp(10.5f), muted)
@@ -495,14 +496,19 @@ object WidgetRenderer {
             val cw = (right - left - gap * (cols - 1)) / cols
             val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = chipBg }
             val r = max(dp(4f), radius * 0.42f)
-            val lp = paint("Medium", sp(9.5f), muted)
             for ((i, k) in keys.withIndex()) {
                 val x = left + (i % cols) * (cw + gap)
                 val y = top + (i / cols) * (chipH + gap)
                 cv.drawRoundRect(RectF(x, y, x + cw, y + chipH), r, r, bg)
+                // Round 9 (R9-A12-3): νέα γράμματα σε κάθε κουτί. Πριν ήταν κοινά, και το `fit` ενός μεγάλου ονόματος
+                // (π.χ. «Μεταβολισμός») άφηνε μικρότερα γράμματα στα επόμενα κουτιά, που μίκραιναν ξανά κάτω από το όριο.
+                val lp = paint("Medium", sp(9.5f), muted)
                 val e = entry(k)
-                val label = e?.optString("l") ?: labelOf(k)
                 val ip = dp(6f)
+                // Round 9 (R9-U1-4): σύντομο όνομα («ls») όταν το κανονικό δεν χωρά ούτε μικρότερο (π.χ. «Energy Score»).
+                val label = WidgetText.chipLabel(e?.optString("l") ?: labelOf(k), e?.optString("ls")) {
+                    lp.measureText(it) * WidgetText.MIN_SCALE_SMALL <= cw - ip * 2
+                }
                 val lb = y + dp(4f) - lp.ascent()
                 cv.drawText(fit(label, lp, cw - ip * 2), x + ip, lb, lp)
                 val color = when {
@@ -512,13 +518,12 @@ object WidgetRenderer {
                 }
                 val vp = paint("ExtraBold", sp(13f), color)
                 val up = paint("SemiBold", sp(9f), muted)
-                val v = e?.optString("v", "—") ?: "—"
-                val u = e?.optString("u", "")?.trim() ?: ""
+                // Round 8 (R8-U1-3): «25,4%» κολλητά, όπως η εφαρμογή· round 9 (R9-A12-3): από το WidgetText.valueParts.
+                val (v, unitStr) = WidgetText.valueParts(e?.optString("v", "—") ?: "—", e?.optString("u", "") ?: "")
                 val a = if (showUsual && e != null && e.has("d")) " " + arrow(e.optInt("d")) else ""
                 val vb = lb + lp.descent() + dp(1f) - vp.ascent()
                 val avail = cw - ip * 2
-                // Round 8 (R8-U1-3): «25,4%» κολλητά, όπως η εφαρμογή.
-                val tail = WidgetText.unitText(u) + a
+                val tail = unitStr + a
                 val vt = fit(v, vp, avail - up.measureText(tail))
                 cv.drawText(vt, x + ip, vb, vp)
                 if (tail.isNotEmpty() && vp.measureText(vt) + up.measureText(tail) <= avail) {

@@ -318,6 +318,9 @@ class _MetricPageState extends State<MetricPage> {
                   to: end,
                   tickSteps: s.duration ? minuteTickSteps : null,
                   minRange: s.minRange,
+                  // Round 9 (R9-U4-2): το TalkBack με τη μορφή της τιμής («6 ώρες 12 λεπτά»), όχι του άξονα («6:12», που
+                  // ακούγεται σαν ώρα της μέρας· η λεζάντα «Άξονας: ώρες:λεπτά» δεν διαβάζεται μαζί).
+                  semanticLabel: s.axis == null ? null : lineChartSummary(pts, s.show, from: series.cut ?? from, to: end),
                 ),
                 if (s.axis != null) ...[
                   const SizedBox(height: 4),

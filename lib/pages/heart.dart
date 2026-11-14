@@ -256,8 +256,13 @@ class HeartPage extends StatelessWidget {
                   ],
                   if (today == null && dayOnly)
                     Text(
-                      'Οι χαμηλότεροι και υψηλότεροι της μέρας φαίνονται όταν έρθει η νύχτα από το δαχτυλίδι, για να μη '
-                      'μετρήσουν παλμοί του ύπνου.',
+                      // Round 9 (R9-A5-4): χωρίς πηγή ύπνου (αποσύνδεση του Oura) καμία νύχτα δαχτυλιδιού δεν θα έρθει·
+                      // πριν η σελίδα υποσχόταν τιμές «όταν έρθει η νύχτα από το δαχτυλίδι».
+                      store.plan.nightSource(readDay) == Source.none
+                          ? heartNoSleepSourceRangeText
+                          : 'Οι χαμηλότεροι και υψηλότεροι της μέρας φαίνονται όταν έρθει η νύχτα από το δαχτυλίδι, για να μη '
+                              'μετρήσουν παλμοί του ύπνου.',
+                      key: const ValueKey('heart-day-range-note'),
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                     ),
                   if (latest == null && today == null && !dayOnly)
@@ -332,12 +337,7 @@ class _AwakeHeartCard extends StatelessWidget {
             Align(alignment: Alignment.centerLeft, child: pill)
           else
             Text(
-              // Round 7 (R7-A5-5): με τον ύπνο από το ρολόι οι παλμοί ξύπνιος βγαίνουν από τον ύπνο του ρολογιού
-              // (history.dart › summarizeDay), όχι από το δαχτυλίδι· 6 ώρες = [minMinutesForDayValue] (heart_day.dart).
-              usual ??
-                  (plan.nightSource(DateTime(day.year, day.month, day.day - 1)) == Source.watch
-                      ? 'Βγαίνει για μέρες με αρκετές μετρήσεις του ρολογιού (τουλάχιστον 6 ώρες).'
-                      : 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.'),
+              usual ?? awakeHeartNote(plan, day),
               key: const ValueKey('heart-awake-note'),
               style: TextStyle(color: c.textSecondary, fontSize: 13.5),
             ),
@@ -349,4 +349,25 @@ class _AwakeHeartCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Round 9 (R9-A5-4): «Τελευταίες μετρήσεις» όταν ο ύπνος δεν έχει πηγή (το Oura αποσυνδέθηκε χωρίς να διαλεχτεί το
+/// ρολόι): χωρίς ώρες ύπνου δεν ξεχωρίζει ο ύπνος από τη μέρα ([_heartWithPlan] στο history.dart: τίποτα για Source.none).
+const heartNoSleepSourceRangeText = 'Χωρίς πηγή ύπνου δεν ξεχωρίζει ο ύπνος από τη μέρα, οπότε οι χαμηλότεροι και '
+    'υψηλότεροι της μέρας δεν φαίνονται. Η πηγή του ύπνου αλλάζει στις «Ρυθμίσεις Oura».';
+
+/// Round 9 (R9-A5-4): το ίδιο για τους «Παλμούς ξύπνιος».
+const heartNoSleepSourceAwakeText =
+    'Χωρίς πηγή ύπνου δεν ξεχωρίζει ο ύπνος από τη μέρα, οπότε δεν βγαίνει. Η πηγή του ύπνου αλλάζει στις «Ρυθμίσεις Oura».';
+
+/// Η σημείωση των «Παλμών ξύπνιος» χωρίς τιμή. Round 7 (R7-A5-5): με τον ύπνο από το ρολόι οι παλμοί ξύπνιος βγαίνουν από
+/// τον ύπνο του ρολογιού (history.dart › summarizeDay), όχι από το δαχτυλίδι· 6 ώρες = [minMinutesForDayValue]
+/// (heart_day.dart). Round 9 (R9-A5-4): με τον ύπνο σήμερα χωρίς πηγή, καμία υπόσχεση «από το δαχτυλίδι»· και τη
+/// μέρα που ο ύπνος ξαναγυρίζει στο ρολόι (χθες χωρίς πηγή ή Oura), το ρολόι.
+String awakeHeartNote(SourcePlan plan, DateTime day) {
+  final now = plan.nightSource(day);
+  if (now == Source.none) return heartNoSleepSourceAwakeText;
+  return now == Source.watch || plan.nightSource(DateTime(day.year, day.month, day.day - 1)) == Source.watch
+      ? 'Βγαίνει για μέρες με αρκετές μετρήσεις του ρολογιού (τουλάχιστον 6 ώρες).'
+      : 'Βγαίνει για μέρες με νύχτα από το δαχτυλίδι και αρκετές μετρήσεις του ρολογιού.';
 }

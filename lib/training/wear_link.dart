@@ -563,8 +563,10 @@ class WearLink with WidgetsBindingObserver {
         if (c.j['late'] != true && t.asksFirstSet(e, c.s)) t.firstAsk = e;
         t.tick(e, c.s, at: wearInt(c.j['at']));
         String? next;
-        if (e.complete) {
-          final n = s.items.indexWhere((x) => !x.skipped && !x.complete);
+        // R9-U3-08: όπως η οθόνη του κινητού και το ρολόι: η άσκηση τελείωσε όταν γίνουν όλες οι γραμμές, και όσες
+        // πρόσθεσε το «+ Σετ» ([ExLog.rowsDone]). Πριν, το ✓ του 3ου από 4 σετ πήγαινε το κινητό στην επόμενη άσκηση.
+        if (e.rowsDone) {
+          final n = s.items.indexWhere((x) => !x.skipped && !x.rowsDone);
           if (n >= 0) {
             if (c.j['late'] != true) t.focus = n;
             next = _name(s.items[n].ex);

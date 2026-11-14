@@ -14,6 +14,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'oura_pages.dart';
 import 'source_widgets.dart';
+import 'today.dart' show sleepNightLabel;
 
 /// Κάρτες κατάστασης στην κορυφή της Σήμερα, μόνο όταν ισχύουν (States mockup). Φεύγουν μόνες τους.
 class OuraStatusCard extends StatelessWidget {
@@ -428,7 +429,10 @@ class OuraSleepTodayCard extends StatelessWidget {
                     Icon(Icons.bedtime_rounded, size: 18, color: soft),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text('Ύπνος · χθες βράδυ', style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600)),
+                      // Round 9 (R9-U1-7): σε σχέση με ΤΩΡΑ, όπως η κάρτα του ρολογιού: 00:00–04:00 η νύχτα της χθεσινής
+                      // ημερομηνίας ([OuraStore.ouraNightDay]) είναι «ξύπνημα χθες», όχι «χθες βράδυ».
+                      child: Text('Ύπνος · ${sleepNightLabel(today, now)}',
+                          style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                     const SourceTag(Source.oura, onDark: true),
                     const SizedBox(width: 4),

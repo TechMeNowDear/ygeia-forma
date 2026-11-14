@@ -107,7 +107,11 @@ class NutritionPage extends StatelessWidget {
             ? GoalsSummaryCard(totals: totals, goals: goals, today: sameDay(day, today), health: health!, day: day)
             : _SummaryCard(totals: totals);
         final cta = goals == null && health != null ? GoalsCtaCard(health: health!) : null;
-        final chol = goals != null && goals.doctor ? CholCard(food: food, goals: goals, day: day, today: today) : null;
+        // Round9 (R9-A3-4): ούτε η κάρτα «Χοληστερίνη» σε μέρα πριν από τους στόχους (το πλάνο δεν υπήρχε ακόμα), όπως το
+        // «Σύνολο ημέρας» από πάνω.
+        final chol = goals != null && goals.doctor && !beforeGoals(goals, day)
+            ? CholCard(food: food, goals: goals, day: day, today: today)
+            : null;
         final meals = [
           for (final m in Meal.values)
             _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day, today: today),
@@ -616,8 +620,9 @@ class _SourcesNote extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Text(
+          // Round9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α): ο σύνδεσμος σε μία γραμμή (πριν έμενε «άδειες ›» μόνο του στα 400 dp).
           'Τιμές από CIQUAL 2025 (ANSES), USDA FoodData Central, Open Food Facts και ό,τι πέρασες από ετικέτες. '
-          'Πηγές και άδειες ›',
+          'Πηγές\u00A0και\u00A0άδειες\u00A0›',
           style: TextStyle(fontSize: 12, height: 1.4, color: color),
         ),
       ),

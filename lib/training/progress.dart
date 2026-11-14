@@ -156,8 +156,9 @@ class ExProgress {
   final DateTime beforeDay, nowDay;
   final ExLog before, now;
 
-  List<int> get repsBefore => [for (final s in before.done) s.reps];
-  List<int> get repsNow => [for (final s in now.done) s.reps];
+  // R9-A6-2: τα σετ που κρίνονται ([ExLog.judged]), όπως η πρόοδος της εφαρμογής: όχι ένα σετ παραπάνω («+ Σετ»).
+  List<int> get repsBefore => [for (final s in before.judged) s.reps];
+  List<int> get repsNow => [for (final s in now.judged) s.reps];
 
   /// Διαφορά επαναλήψεων στα κοινά σετ (αν έγιναν 2 σετ τη μία φορά και 3 την άλλη, συγκρίνονται τα 2 πρώτα).
   int get repsDiff {

@@ -270,6 +270,14 @@ object Repo {
         }
 
     /**
+     * Απαντήσεις στο «Πρώτο σετ» που δόθηκαν στο ρολόι και το κινητό ακόμα ζητά (έλεγχος 14/11, round 9, R9-A8-3): (θέση,
+     * άσκηση, απάντηση), για να ξανασταλούν ως «rir1» μαζί με τα ✓ που εκκρεμούν ([LiveSession.firstResends]). Πριν, η «rir1»
+     * έφευγε μία φορά: αν το κινητό δεν άκουγε εκείνη τη στιγμή, η βαθμονόμηση των επόμενων σετ χανόταν.
+     */
+    val pendingFirst: List<Triple<Int, String, Int>>
+        get() = phone?.firstResends() ?: emptyList()
+
+    /**
      * Αύξων αριθμός («q») για τις εντολές προς το κινητό (έλεγχος γ2, W2-19): ένας για όλη την εφαρμογή (οθόνη και
      * υπηρεσία), πάντα μεγαλύτερος από τον προηγούμενο, και ποτέ μικρότερος από την ώρα (ώστε να συνεχίζει σωστά και μετά
      * από νέα εκκίνηση της εφαρμογής). Πριν ήταν μέσα στην οθόνη· τώρα τον χρειάζεται και η υπηρεσία (W-4).
@@ -496,6 +504,9 @@ object Repo {
             .put("m", finite(meters)).put("steps", steps).put("gps", gps).put("paused", paused).put("pz", pz)
             .put("split", split.toState()).put("endAt", endAt).put("recUntil", recoveryUntil).put("hrMode", hrMode)
         alarm.limit?.let { o.put("lim", it) }
+        // Έλεγχος 14/11, round 9 (R9-A7-2): και η ζώνη του περπατήματος (νέο, προαιρετικό πεδίο του run.json), όπως το όριο:
+        // ένα μερικό αποτέλεσμα γράφεται με τη ζώνη που ίσχυε, όχι με όποια έχει το κινητό τη μέρα της εισαγωγής.
+        zoneAlarm.zone?.let { o.put("zone", it.toJson()) }
         hr?.let { o.put("hr", it.toState()) }
         local?.let { o.put("local", it.toState()) }
         runningSid?.let { o.put("sid", it) }
@@ -531,6 +542,8 @@ object Repo {
         hrMode = o.optString("hrMode", "")
         alarm.limit = if (o.has("lim")) o.getInt("lim") else null
         alarm.reset()
+        // R9-A7-2: η ζώνη που ίσχυε στο περπάτημα ([captureRun]). Στιγμιότυπο χωρίς «zone» (έκδοση ως #107): καμία, όπως πριν.
+        if (running == "walk") zoneAlarm.zone = WalkZone.parse(o.optJSONObject("zone"))
         o.optJSONObject("local")?.let { local = LiveSession.fromState(it) }
         // R7-A8-1: τα ✓ / οι επαναλήψεις / η ρεζέρβα του ρολογιού στην προπόνηση του κινητού που δεν είχαν φτάσει εκεί.
         if (runningPhone) o.optJSONObject("pp")?.let { LiveSession.phoneFromWatchState(it) }?.takeIf { it.id == runningSid }?.let { restorePhone(it) }

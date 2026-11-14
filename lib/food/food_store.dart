@@ -11,7 +11,7 @@ import '../history.dart' show dateKey;
 import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
-import 'off.dart' show normalizeBarcode;
+import 'off.dart' show dryStapleRawId, normalizeBarcode;
 import 'replaced_foods.dart';
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
@@ -286,6 +286,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Για την οθόνη: η μορφή που θα γραφτεί αν το ξαναδιαλέξω (π.χ. το «Όπως χθες»).
   Food currentOf(Food f) => _current(f);
 
+  /// Round9 (R9-U2-4): ό,τι γράφεται όταν πατάς ένα τρόφιμο σε λίστα που φτιάχτηκε πριν από λίγο: η ΤΩΡΙΝΗ μορφή του (π.χ.
+  /// μετά από «Διόρθωση» ενός δικού μου προϊόντος), ή null αν στο μεταξύ σβήστηκε. Πριν, το «+ Φαγητό» έγραφε το
+  /// αντικείμενο της παλιάς λίστας: ένα γιαούρτι που διορθώθηκε από 730 σε 73 kcal γραφόταν με 730.
+  Food? pickable(Food f) => _gone(f) ? null : _current(f);
+
   /// Το πιο συνηθισμένο είδος, όταν όλα ταιριάζουν το ίδιο στην αναζήτηση (π.χ. «γάλα» → 1,5%).
   // C2013: «χυμός» → πρώτα ο χυμός πορτοκάλι, όχι ο χυμός λεμονιού (έλεγχος διατροφής M7, 4/11).
   // Δεύτερος έλεγχος διατροφής (N2, N4): «κοτόπουλο» → πρώτα το στήθος χωρίς πέτσα (όχι το μπούτι με πέτσα, το πιο
@@ -331,8 +336,17 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   ///
   /// Οι μορφές βγαίνουν από τη βάση (το αντίγραφο μιας καταχώρισης δεν κρατά τη λίστα τους)· η μορφή
   /// που είναι ήδη η καταχώριση μένει το δικό της αντίγραφο, με τις τιμές της.
+  ///
+  /// Round9 (R9-A2-3): δικό μου ξερό προϊόν (ζυμαρικό, ρύζι, όσπριο· [dryStapleRawId]): το ίδιο το προϊόν ως ξερή μορφή, με
+  /// την ετικέτα της ξερής μορφής της βάσης («Ωμά», «Ξερές (πριν το βράσιμο)»), και οι βρασμένες μορφές ΤΗΣ ΒΑΣΗΣ.
   List<(Food, String)> statesOf(Food f) {
     final cur = byId(_idNow(f.id)) ?? f;
+    final dryId = dryStapleRawId(cur);
+    if (dryId != null) {
+      final base = byId(dryId);
+      final forms = base == null ? const <(Food, String)>[] : statesOf(base);
+      return forms.length < 2 ? const [] : [(f, forms.first.$2), ...forms.skip(1)];
+    }
     final raw = cur.rawId != null ? byId(cur.rawId!) : (cur.isRawWithCooked ? cur : null);
     if (raw == null) return const [];
     Food same(Food x) => x.id == f.id ? f : x;
@@ -523,10 +537,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? _shownOn;
 
   /// Μέρα πριν από τις 90 που φορτώνονται στο άνοιγμα: φορτώνεται τώρα, ώστε να μη φαίνεται άδεια.
+  /// Round9 (R9-A3-3): μαζί και οι μέρες της εβδομάδας της ως εκείνη (από τη Δευτέρα): η κάρτα «Χοληστερίνη» μετρά όσπρια
+  /// και ψάρι από τη Δευτέρα, και με μόνο τη μέρα που άνοιξες έγραφε «Όσπρια 0 / 4» για εβδομάδα με 2 φορές (και ο αριθμός
+  /// άλλαζε ανάλογα με το ποιες μέρες είχες ανοίξει). Ό,τι είναι ήδη στη μνήμη μένει όπως είναι.
   Future<void> _loadDayIfOld(DateTime d) async {
     final from = _loadedFrom;
-    if (_offline || from == null || !d.isBefore(from)) return;
-    final r = await FoodChannel.logRange(dateKey(d), dateKey(DateTime(d.year, d.month, d.day + 1)));
+    final monday = DateTime(d.year, d.month, d.day - (d.weekday - 1));
+    if (_offline || from == null || !monday.isBefore(from)) return;
+    final to = d.isBefore(from) ? DateTime(d.year, d.month, d.day + 1) : from;
+    final r = await FoodChannel.logRange(dateKey(monday), dateKey(to));
     if (r['ok'] != true || r['entries'] is! List) return;
     for (final e in r['entries'] as List) {
       if (e is! Map) continue;

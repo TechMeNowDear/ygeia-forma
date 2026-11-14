@@ -24,8 +24,13 @@ class FoodDraft {
     this.sodiumMg,
     Set<String>? lessThan,
     this.cholKind,
+    this.spoon,
   })  : values = values ?? {},
         lessThan = lessThan ?? {};
+
+  /// Round9 (R9-A2-2): μετριέται με το κουτάλι ([Food.spoon]). Από τις κατηγορίες του Open Food Facts όταν σαρώνεται
+  /// ([spoonFromOffTags]), από το ίδιο το προϊόν όταν διορθώνεται· null = δεν ξέρουμε (η φόρμα προτείνει από το όνομα).
+  final bool? spoon;
 
   /// Τι μετρά το προϊόν στην κάρτα «Χοληστερίνη» ([CholKind]) ή null. Από τις κατηγορίες του Open Food Facts όταν
   /// σαρώνεται ([cholKindFromOffTags]), από το ίδιο το προϊόν όταν διορθώνεται· το αλλάζεις στη φόρμα.
@@ -166,7 +171,100 @@ FoodDraft draftFromOff(String barcode, Map<String, dynamic> p) {
     sodiumMg: sodiumMg,
     lessThan: lessThan,
     cholKind: cholKindFromOffTags(p['categories_tags'], name: name),
+    spoon: spoonFromOffTags(p['categories_tags'], kcal: values[Nk.kcal]),
   );
+}
+
+// Round9 (R9-A2-2): κατηγορίες του Open Food Facts για ό,τι μετριέται με το κουτάλι, με τον κανόνα της βάσης ([isSpoonFood]):
+// λίπη και λάδια, βούτυρο, μαργαρίνη, μαγιονέζα πάντα (όπως η κατηγορία «Λιπαρά»)· αλείμματα από [spoonSpreadKcal] kcal
+// στα 100 g (ταχίνι, φυστικοβούτυρο, πραλίνα, όπως τα «Αλείμματα»· όχι μαρμελάδα, μέλι, χούμους).
+const _offSpoonFatTags = {'en:fats', 'en:spreadable-fats', 'en:margarines', 'en:butters', 'en:mayonnaises'};
+const _offSpreadTags = {'en:spreads', 'en:sweet-spreads', 'en:plant-based-spreads', 'en:oilseed-purees', 'en:nut-butters'};
+
+/// Μετριέται με το κουτάλι, από τις κατηγορίες του Open Food Facts ([tags]) και τις θερμίδες ανά 100 g ([kcal]): true, ή
+/// null όταν οι κατηγορίες δεν το λένε (τότε η φόρμα προτείνει από το όνομα, [spoonByName]). Πριν, ένα σαρωμένο ταχίνι
+/// («Τα προϊόντα μου», λιπαρά 60 g) άνοιγε με τη μερίδα του Open Food Facts (100 g = 673 kcal) χωρίς καμία ερώτηση, ενώ
+/// το ταχίνι της βάσης ανοίγει με 15 g (R8-A2-1).
+bool? spoonFromOffTags(Object? tags, {double? kcal}) {
+  if (tags is! List) return null;
+  final t = {
+    for (final x in tags)
+      if (x is String) x.trim().toLowerCase(),
+  };
+  if (t.any(_offSpoonFatTags.contains)) return true;
+  if (t.any(_offSpreadTags.contains) && (kcal ?? 0) >= spoonSpreadKcal) return true;
+  return null;
+}
+
+/// Η πρώτη λέξη του ονόματος λέει τρόφιμο του κουταλιού: «Ταχίνι …», «Φυστικοβούτυρο …», «Μαργαρίνη …», «Μαγιονέζα …»,
+/// «Πραλίνα …», «Βούτυρο …» (πεζά/κεφαλαία και τόνοι δεν μετράνε). Μόνο η ΠΡΩΤΗ λέξη: «Μπισκότα με ταχίνι» δεν είναι.
+bool spoonByName(String name) {
+  final first = plain(name).split(RegExp(r'[^a-z0-9α-ω]+')).firstWhere((w) => w.isNotEmpty, orElse: () => '');
+  return first.isNotEmpty && _spoonNames.any(first.startsWith);
+}
+
+/// Ολόκληρες λέξεις (όχι «ταχινόπιτα», «πραλινέ» σοκολάτα, «βουτυράκια» μπισκότα).
+const _spoonNames = [
+  'ταχινι', 'φυστικοβουτυρο', 'πραλινα', 'μαργαρινη', 'μαγιονεζα', 'βουτυρο', 'tahini', 'margarin', 'mayonn',
+];
+
+// ---------------------------------------------------------------------------
+// Ξερό ή μαγειρεμένο, για τα δικά μου προϊόντα (round9, R9-A2-3)
+// ---------------------------------------------------------------------------
+
+/// Λέξεις που λένε ότι το προϊόν δεν βράζεται σαν ζυμαρικό, ρύζι ή όσπριο (αλεύρι, γκοφρέτες, μπάρες, γάλα, σούπα…).
+const _dryNot = [
+  'αλευρ', 'γκοφρετ', 'κρακερ', 'μπαρα', 'μπαρεσ', 'νιφαδ', 'φουσκωτ', 'γαλα', 'ροφημ', 'σουπ', 'σαλατ', 'μπισκοτ',
+  'σνακ', 'πατατακ', 'κριτσιν', 'τραχαν', 'πουρε', 'κεικ', 'flour', 'farin', 'cracker', 'cake', 'wafer', 'flake',
+  'puff', 'chip', 'snack', 'milk', 'drink', 'soup', 'salad', 'cereal', 'noodle',
+];
+
+const _pastaNames = [
+  'μακαρον', 'σπαγγετ', 'σπαγετ', 'πεννε', 'πενεσ', 'φουζιλ', 'βιδεσ', 'ταλιατελ', 'λινγκουιν', 'λιγκουιν', 'ριγκατον',
+  'φαρφαλ', 'φιογκακ', 'ζυμαρικ', 'κοφτο', 'φιδε', 'λαζαν', 'spaghett', 'penne', 'fusill', 'linguin', 'tagliatell',
+  'farfall', 'rigaton', 'macaroni', 'lasagn', 'fettuccin', 'pappardell', 'tortiglion', 'conchigli', 'orecchiett',
+  'bucatin', 'vermicell',
+];
+
+/// Δικό μου προϊόν (barcode ή ετικέτα) που είναι ξερό ζυμαρικό, ρύζι, όσπριο, κινόα, πλιγούρι ή κουσκούς: το id της
+/// ξερής μορφής της βάσης που του αντιστοιχεί (ολικής → «Μακαρόνια ολικής άλεσης», καστανό parboiled → «Ρύζι καστανό
+/// parboiled», φακές → «Φακές (ξερές)»…), αλλιώς null. Από το όνομα (ελληνικά ή λατινικά, χωρίς τόνους), και μόνο για ξερό
+/// προϊόν: από [rawCheckKcal] kcal στα 100 g (οι κονσέρβες και τα έτοιμα έχουν 70–180).
+///
+/// Round9 (R9-A2-3): η ερώτηση «Ζύγισες πριν ή μετά το μαγείρεμα;» (R7-U2-2) και τα «Ζύγισα:» ίσχυαν μόνο για τη βάση· ένα
+/// σαρωμένο σπαγγέτι ολικής (336 kcal) με 250 g ΒΡΑΣΜΕΝΑ έγραφε 840 kcal αντί για ~448, χωρίς ερώτηση. Τώρα η δεύτερη
+/// επιλογή είναι η βρασμένη μορφή της ΒΑΣΗΣ (οι αριθμοί πάντα από βάση, ποτέ υπολογισμένοι από εμάς).
+String? dryStapleRawId(Food f) {
+  if (!f.isMine || f.perMl || f.n.amount(Nk.kcal) < rawCheckKcal) return null;
+  final words = [
+    for (final w in plain(f.name).split(RegExp(r'[^a-z0-9α-ω]+')))
+      if (w.isNotEmpty) w,
+  ];
+  bool has(List<String> stems) => words.any((w) => stems.any(w.startsWith));
+  if (has(_dryNot)) return null;
+  if (has(const ['φακεσ', 'φακη', 'lentil', 'lenticch', 'lentej'])) return 'C20359';
+  if (has(const ['ρεβυθ', 'ρεβιθ', 'chickpea', 'garbanzo'])) return 'C20516';
+  if (has(const ['φαβα', 'σπαστ'])) return 'C20515';
+  if (has(const ['μαυρομ'])) return 'U173758';
+  if (has(const ['γιγαντ', 'ελεφαντ'])) return 'U174252';
+  if (has(const ['φασολ'])) return 'C20501';
+  final whole = has(const ['ολικ', 'κασταν', 'whole', 'integral', 'brown', 'complet']);
+  if (has(const ['ρυζι', 'rice', 'riso', 'riz', 'arroz'])) {
+    if (has(const ['μπασματι', 'basmati'])) return 'C9119';
+    final parboiled = has(const ['parboil']);
+    if (whole) return parboiled ? 'U168876' : 'C9102';
+    return parboiled ? 'C9101' : 'C9100';
+  }
+  if (has(const ['κινοα', 'quinoa'])) return 'C9340';
+  if (has(const ['πλιγουρ', 'bulgur', 'boulgour'])) return 'C9690';
+  if (has(const ['κουσκουσ', 'couscous'])) return 'C9681';
+  if (has(const ['κριθαρακ', 'orzo'])) return 'C9810-1';
+  if (has(const ['χυλοπιτ'])) return 'C9821';
+  if (has(_pastaNames)) {
+    if (has(const ['αυγ', 'egg', 'uova', 'uovo'])) return 'C9821';
+    return whole ? 'C9870' : 'C9810';
+  }
+  return null;
 }
 
 // Κατηγορίες του Open Food Facts (πεδίο «categories_tags», αγγλικά ονόματα της ταξινομίας του) για το ΙΔΙΟ το τρόφιμο.
@@ -180,11 +278,26 @@ const _offFishTags = {
   'en:mackerels', 'en:canned-mackerels', 'en:anchovies', 'en:herrings', 'en:cods', 'en:crustaceans', 'en:shrimps',
   'en:prawns', 'en:mollusks', 'en:molluscs', 'en:cephalopods', 'en:mussels', 'en:squids', 'en:octopuses',
 };
+/// Round9 (R9-A3-1): χωρίς τα «en:canned-legumes», «en:legume-seeds» και «en:broad-beans»: στην ταξινομία του Open Food
+/// Facts περιέχουν και πράσινα λαχανικά (φασολάκια και αρακά κονσέρβα, φρέσκα/κατεψυγμένα κουκιά, φύτρες), και μια
+/// κονσέρβα φασολάκια μετρούσε «Όσπρια». Όσπρια είναι μόνο οι καρποί που συγκομίζονται ξεροί (FAO 2016, «Definitions of
+/// legumes and pulses»), όπως στη βάση, όπου φασολάκια και αρακάς είναι «Λαχανικά». Τα ξερά/κονσέρβα όσπρια που
+/// βρίσκονταν μόνο κάτω από εκείνες τις κατηγορίες μπαίνουν με το όνομά τους.
 const _offLegumeTags = {
-  'en:pulses', 'en:canned-pulses', 'en:canned-legumes', 'en:legume-seeds', 'en:lentils', 'en:green-lentils',
-  'en:red-lentils', 'en:canned-lentils', 'en:chickpeas', 'en:canned-chickpeas', 'en:common-beans',
-  'en:canned-common-beans', 'en:white-beans', 'en:red-beans', 'en:kidney-beans', 'en:black-beans', 'en:split-peas',
-  'en:broad-beans',
+  'en:pulses', 'en:canned-pulses', 'en:lentils', 'en:green-lentils', 'en:red-lentils', 'en:canned-lentils',
+  'en:canned-seasoned-lentils', 'en:chickpeas', 'en:canned-chickpeas', 'en:common-beans', 'en:canned-common-beans',
+  'en:white-beans', 'en:red-beans', 'en:kidney-beans', 'en:black-beans', 'en:split-peas', 'en:dried-broad-beans',
+  'en:canned-butter-beans', 'en:canned-scarlet-runner-beans', 'en:dried-soy-beans',
+};
+
+/// Round9 (R9-A3-1): πράσινα λαχανικά, φύτρες και ό,τι άλλο δεν είναι όσπριο, ακόμα κι όταν το Open Food Facts τα βάζει
+/// κάτω από τα «όσπρια» (π.χ. τα χιονομπίζελα και οι φύτρες μουνγκ είναι στα «en:pulses», οι φύτρες φακής στα «en:lentils»):
+/// «Τίποτα».
+const _offGreenVeg = {
+  'en:green-beans', 'en:green-peas', 'en:fresh-legumes', 'en:snow-peas', 'en:cooked-snow-peas',
+  'en:snow-peas-boiled-in-water', 'en:sprouts', 'en:lentil-sprouts', 'en:sprouted-mung-beans', 'en:alfalfa-seeds',
+  'en:tonka-beans', 'en:edamame', 'en:fresh-broad-beans', 'en:frozen-broad-beans', 'en:canned-broad-beans',
+  'en:cooked-broad-beans',
 };
 const _offBranTags = {'en:oat-bran', 'en:oat-brans'};
 
@@ -202,6 +315,8 @@ const _offNotTheFood = {
   'en:prepared-meals', 'en:soups', 'en:sauces', 'en:salads', 'en:prepared-salads', 'en:sandwiches', 'en:pizzas',
   'en:breaded-products', 'en:breaded-fish', 'en:fish-fingers', 'en:surimi', 'en:fish-eggs', 'en:taramasalata',
   'en:meat-analogues', 'en:tofu', 'en:chestnuts',
+  // Round9 (R9-A3-1): πανέ ψάρια/θαλασσινά που στο Open Food Facts δεν έχουν γονέα το «en:breaded-fish».
+  'en:breaded-fried-european-plaice', 'en:breaded-lemon-sole', 'en:breaded-scampi',
 };
 
 /// Τι μετρά ένα προϊόν του Open Food Facts στην κάρτα «Χοληστερίνη», από τις κατηγορίες του («categories_tags»): μία
@@ -230,6 +345,7 @@ String? cholKindFromOffTags(Object? tags, {String? name}) {
   if (t.any(_offBranTags.contains)) return CholKind.bran;
   if (t.any(_offNutTags.contains)) return CholKind.nuts;
   if (t.any(_offFishTags.contains)) return CholKind.fish;
+  if (t.any(_offGreenVeg.contains)) return CholKind.none;
   if (t.any(_offLegumeTags.contains)) return CholKind.legumes;
   return null;
 }
@@ -327,6 +443,8 @@ FoodDraft draftFromFood(Food f) => FoodDraft(
       sodiumMg: f.n[Nk.sodium]?.value,
       lessThan: {for (final e in f.n.values.entries) if (e.value.lessThan) e.key},
       cholKind: f.cholKind,
+      // Προϊόν χωρίς «sp» (και όσα αποθηκεύτηκαν πριν υπάρξει): η φόρμα προτείνει από το όνομα ([spoonByName]).
+      spoon: f.spoon ? true : null,
     );
 
 const _formKeys = {Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fat, Nk.satFat, Nk.fiber, Nk.salt};
@@ -345,6 +463,7 @@ Food foodFromDraft(FoodDraft d, String id) => Food(
       servingLabel: d.servingLabel,
       perMl: d.perMl,
       cholKind: d.cholKind,
+      spoon: d.spoon ?? false,
       n: Nutrients({
         for (final e in d.values.entries) e.key: NValue(e.value, lessThan: d.lessThan.contains(e.key)),
         if (d.alcohol != null) Nk.alcohol: NValue(d.alcohol!),

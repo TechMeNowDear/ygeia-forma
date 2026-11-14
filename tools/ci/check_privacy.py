@@ -116,6 +116,17 @@ if pathlib.Path(f'{ROOT}/lib/diagnostics.dart').exists():
     need('«Αναφορά για έλεγχο»' in greek, 'Αναφορά για έλεγχο: η εφαρμογή φτιάχνει αυτό το αρχείο· η πολιτική πρέπει να το λέει')
     need('diagnostics' in english, 'Αναφορά για έλεγχο: λείπει από το αγγλικό κείμενο (diagnostics)')
 
+# --- Η «Αναφορά για γιατρό» (PDF) με δεδομένα της Oura (Round 9, R9-A11-1) ---
+# Η πολιτική έλεγε ότι τα δεδομένα της Oura μπαίνουν «μόνο» στην «Αναφορά για έλεγχο», ενώ το PDF για τον γιατρό έχει
+# ύπνο, HRV, παλμούς, αναπνοές και οξυγόνο του Oura (lib/report.dart, reportKeysFor). Όσο το κάνει ο κώδικας, η ενότητα
+# «Oura» της πολιτικής το λέει, και το αγγλικό κείμενο λέει ότι το PDF έχει δεδομένα της Oura.
+if re.search(r'reportKeysFor\(SourcePlan plan\)\s*=>\s*plan\.hasOura', read('lib/report.dart')):
+    oura_gr = grab(r'<h3>Oura</h3>(.*?)<h3>', greek, 'η ενότητα «Oura» της πολιτικής', re.S)
+    need('«Αναφορά για γιατρό»' in oura_gr,
+         'Oura: τα δεδομένα της μπαίνουν και στην «Αναφορά για γιατρό» (PDF)· η ενότητα «Oura» της πολιτικής πρέπει να το λέει')
+    need(re.search(r'doctor PDFs[^.]*Oura', english),
+         'Oura: λείπει από το αγγλικό κείμενο ότι το PDF για τον γιατρό έχει δεδομένα της Oura («doctor PDFs … Oura»)')
+
 # --- Barcode ---
 extra = read('android/ygeia/app-extra.gradle.kts')
 if 'play-services-code-scanner' in extra:

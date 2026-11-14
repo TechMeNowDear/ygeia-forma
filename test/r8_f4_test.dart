@@ -270,7 +270,8 @@ void main() {
       final seen = bridge.substring(bridge.indexOf('"dbStatusSeen" -> respondDb(result)'));
       expect(seen.substring(0, seen.indexOf('JSONObject().put("ok", true)')), contains('DayStore.markSeen('));
       expect(bridge, isNot(contains('clearCorrupt')));
-      expect(bridge, contains('.put("seen", seen)'));
+      // Round 9 (R9-A12-2): η απάντηση από καθαρή συνάρτηση, που ελέγχεται με τιμές (R9F4Test.kt).
+      expect(bridge, contains('DbSalvage.status('));
       expect(File('$dir/DayStore.kt').readAsStringSync(), isNot(contains('marker(context).delete()')));
     });
   });
@@ -458,16 +459,37 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------------------------------------------
-  group('R8-A12-2: τα κατώτατα του CI κοντά στις δοκιμές', () {
-    test('Dart, Kotlin κινητού και ρολογιού ≈ 3% κάτω από το #105· το Kotlin μετρά όσες έτρεξαν', () {
+  group('R8-A12-2 / R9-A12-1: τα κατώτατα του CI κοντά στις δοκιμές', () {
+    // Round 9 (R9-A12-1): πριν η δοκιμή ζητούσε κατώτατο ΟΧΙ πάνω από τα πλήθη του #105 (1.832 / 85 / 167): όποιος το
+    // ανέβαζε κοκκίνιζε, και ≈ 220 δοκιμές Dart μπορούσαν να πάψουν να τρέχουν χωρίς να το δει κανείς. Τώρα: όχι κάτω από
+    // το #107 − 4%, όχι πάνω από όσες υπάρχουν ΤΩΡΑ στο repo, και (Dart, που δεν έχει άλλο έλεγχο) όχι πολύ πίσω από αυτές.
+    test('κατώτατα ≈ 3% κάτω από το #107, όχι πάνω από τις τωρινές δοκιμές· το Kotlin μετρά όσες έτρεξαν', () {
+      const skip = ['screens_test', 'sentry_live_test', 'oura_sandbox_live_test'];
+      final decl = RegExp(r'^\s*(test|testWidgets)\(', multiLine: true);
+      var dart = 0;
+      for (final f in Directory('test').listSync(recursive: true).whereType<File>()) {
+        if (!f.path.endsWith('_test.dart') || skip.any((n) => f.path.contains(n))) continue;
+        dart += decl.allMatches(f.readAsStringSync()).length;
+      }
+      int kotlin(String dir) {
+        var n = 0;
+        for (final f in Directory(dir).listSync(recursive: true).whereType<File>()) {
+          if (f.path.endsWith('.kt')) n += RegExp(r'^\s*@Test\b', multiLine: true).allMatches(f.readAsStringSync()).length;
+        }
+        return n;
+      }
+
+      final phone = kotlin('android/app/src/test'), watch = kotlin('android/wear/src/test');
+      // #107 (e8e3eba): 1.997 δοκιμές Dart έτρεξαν· 99 @Test κινητού, 186 ρολογιού.
+      bool near(int x, int at107, int now) => x >= 0.96 * at107 && x <= now;
       for (final f in ['.github/workflows/check.yml', '.github/workflows/android.yml']) {
         final y = File(f).readAsStringSync();
         final floors = [for (final m in RegExp(r'-lt (\d+) \]').allMatches(y)) int.parse(m.group(1)!)];
-        // #105: 1.832 δοκιμές Dart, 85 Kotlin κινητού, 167 ρολογιού.
-        for (final (count, name) in [(1832, 'Dart'), (85, 'κινητό'), (167, 'ρολόι')]) {
-          expect(floors.any((x) => x >= 0.96 * count && x <= count), isTrue, reason: '$f: $name');
-        }
-        expect(floors.any((x) => x < 0.9 * 85), isFalse, reason: '$f: κανένα παλιό, χαμηλό κατώτατο');
+        expect(floors.any((x) => near(x, 1997, dart) && x >= 0.8 * dart), isTrue,
+            reason: '$f: Dart (δηλωμένες τώρα $dart: αν προστέθηκαν πολλές, ανέβασε το κατώτατο)');
+        expect(floors.any((x) => near(x, 99, phone)), isTrue, reason: '$f: κινητό (@Test τώρα $phone)');
+        expect(floors.any((x) => near(x, 186, watch)), isTrue, reason: '$f: ρολόι (@Test τώρα $watch)');
+        expect(floors.any((x) => x < 0.9 * 99), isFalse, reason: '$f: κανένα παλιό, χαμηλό κατώτατο');
         expect('skipped="[0-9]+"'.allMatches(y).length, 2, reason: '$f: tests − skipped, κινητό και ρολόι');
         expect(r"grep -rhE '^\s*@Test\b'".allMatches(y).length, 2, reason: f);
       }

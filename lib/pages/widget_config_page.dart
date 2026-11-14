@@ -619,10 +619,14 @@ class _Group extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Round 1 (U4-14 γ, δ): ίδιος τίτλος κάρτας ([SectionLabel]) και ίδια γκρι εξήγηση με την υπόλοιπη εφαρμογή.
-            Row(children: [
-              Expanded(child: SectionLabel(title)),
-              if (trailing != null) trailing!,
-            ]),
+            // Round 9 (R9-U1-6): τίτλος και διακόπτης ένας κόμβος για το TalkBack («Τιμές στα κουτάκια, διακόπτης, ενεργό»,
+            // όχι σκέτο «διακόπτης»), όπως στις Ρυθμίσεις (privacy_page.dart, R8-U4-4· WCAG 4.1.2).
+            MergeSemantics(
+              child: Row(children: [
+                Expanded(child: SectionLabel(title)),
+                if (trailing != null) trailing!,
+              ]),
+            ),
             if (hint != null) ...[
               const SizedBox(height: 2),
               Text(hint!, style: TextStyle(fontSize: 13.5, color: c.textSecondary, height: 1.4)),
@@ -655,12 +659,20 @@ class _ValueRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(children: [
-          Checkbox(value: on, onChanged: (_) => onToggle()),
+          // Round 9 (R9-U1-6): κουτάκι και όνομα ένας κόμβος για το TalkBack («Ετοιμότητα, πλαίσιο ελέγχου, επιλεγμένο»,
+          // όχι σκέτο «πλαίσιο ελέγχου»)· το κουμπί χρώματος μένει χωριστό, με δικό του όνομα.
           Expanded(
-            child: Text.rich(TextSpan(children: [
-              TextSpan(text: name, style: TextStyle(fontSize: 15, color: c.text)),
-              if (on && !shown) TextSpan(text: '  · δεν χωρά', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
-            ])),
+            child: MergeSemantics(
+              child: Row(children: [
+                Checkbox(value: on, onChanged: (_) => onToggle()),
+                Expanded(
+                  child: Text.rich(TextSpan(children: [
+                    TextSpan(text: name, style: TextStyle(fontSize: 15, color: c.text)),
+                    if (on && !shown) TextSpan(text: '  · δεν χωρά', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+                  ])),
+                ),
+              ]),
+            ),
           ),
           if (on)
             Semantics(

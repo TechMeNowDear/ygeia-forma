@@ -17,8 +17,8 @@ import 'widget_style.dart';
 //
 // Μορφή: {v, at, kinds: {sleep: {src, srcShort?, m: {κλειδί: {l, v, u, cap?, d?, us?, r?, s?}}}}}
 //   srcShort: σύντομη πηγή όταν η κανονική δεν χωρά (round 2, R2-U3-04).
-//   l: όνομα στο κουτάκι, v: τιμή, u: μονάδα, cap: δεύτερη γραμμή όταν είναι η κεντρική τιμή (capShort: σύντομη
-//   μορφή της, όταν η κανονική δεν χωρά, π.χ. στη στήλη 1×3),
+//   l: όνομα στο κουτάκι (ls: σύντομο, όταν το κανονικό δεν χωρά· round 9, R9-U1-4), v: τιμή, u: μονάδα, cap: δεύτερη
+//   γραμμή όταν είναι η κεντρική τιμή (capShort: σύντομη μορφή της, όταν η κανονική δεν χωρά, π.χ. στη στήλη 1×3),
 //   d: −1/0/1 σε σχέση με τα συνηθισμένα, us: «συνήθως …», r: θέση στο εύρος, s: 7 τιμές για το γράφημα (null = κενό).
 
 const widgetSnapshotVersion = 1;
@@ -71,9 +71,10 @@ Map<String, dynamic> workoutSnapshot(TrainingStore t, DateTime today) {
 }
 
 Map<String, dynamic> _entry(String label, String value, String unit,
-        {String? cap, String? capShort, int? d, String? usual, String? range, List<double?>? spark}) =>
+        {String? labelShort, String? cap, String? capShort, int? d, String? usual, String? range, List<double?>? spark}) =>
     {
       'l': label,
+      if (labelShort != null) 'ls': labelShort,
       'v': value,
       'u': unit,
       if (cap != null) 'cap': cap,
@@ -103,7 +104,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   List<double?> series(String k) => [for (var i = 6; i >= 0; i--) plan.value(h, k, _minus(d0, i))];
 
   void add(String key, String label, String unit, String Function(double v) show,
-      {int digits = 0, String? cap, String? range, bool unitInUsual = true}) {
+      {int digits = 0, String? cap, String? range, bool unitInUsual = true, String? labelShort}) {
     final v = plan.value(h, key, d0);
     if (v == null) return;
     final b = personalBaseline(h, plan, key, d0);
@@ -114,7 +115,8 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
       dir = diff == 0 ? 0 : (diff > 0 ? 1 : -1);
       usual = 'συνήθως ${show(b.usual!)}${unit.isEmpty || !unitInUsual ? '' : unit}';
     }
-    out[key] = _entry(label, show(v), unit, cap: cap, d: dir, usual: usual, range: range, spark: series(key));
+    out[key] = _entry(label, show(v), unit,
+        labelShort: labelShort, cap: cap, d: dir, usual: usual, range: range, spark: series(key));
   }
 
   final bed = plan.value(h, K.bedtime, d0), wake = plan.value(h, K.wake, d0);
@@ -133,7 +135,11 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   add(K.sleepMin, 'Ύπνος', ' ώρες', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}', unitInUsual: false,
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
       range: sleepWeek != null && sr != null ? '${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1)}' : null);
-  add(K.energy, 'Ετοιμότητα', '', (v) => '${v.round()}');
+  // Round 9 (R9-U1-4): το όνομα της πηγής της νύχτας, όπως η εφαρμογή: «Ετοιμότητα» του Oura, «Energy Score» της Samsung
+  // (Σήμερα, Τάσεις, «Εκτός συνηθισμένου»)· πριν πάντα «Ετοιμότητα», και για το Energy Score του ρολογιού. Στη στενή στήλη
+  // 1×3 το «Energy Score» (Inter Medium 9,5 sp: 60,8 dp· με «Μεγάλα» γράμματα 68,1) γίνεται «Energy» αν δεν χωρά.
+  add(K.energy, src == Source.oura ? 'Ετοιμότητα' : 'Energy Score', '', (v) => '${v.round()}',
+      labelShort: src == Source.oura ? null : 'Energy');
   // Round 7 (U1-7): «Βαθμολογία», όπως παντού στην εφαρμογή (πριν «Σκορ» μόνο στα widgets). Χωρά στο κουτάκι της στήλης
   // 1×3 (Inter Medium 9,5 sp: 56,6 dp ≤ 64· με «Μεγάλα» 63,3· στο 1,3 με τη σμίκρυνση ως 85%: 62,5).
   add(K.sleepScore, 'Βαθμολογία', '', (v) => '${v.round()}');

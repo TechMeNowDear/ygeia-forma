@@ -30,7 +30,8 @@ class WMetric {
 const wMetrics = <String, List<WMetric>>{
   WKind.sleep: [
     WMetric('sleepMin', 'Διάρκεια ύπνου'),
-    WMetric('energy', 'Ετοιμότητα'),
+    // Round 9 (R9-U1-4): με το Oura «Ετοιμότητα», με το ρολόι το «Energy Score» της Samsung (widget_snapshot.dart).
+    WMetric('energy', 'Ετοιμότητα / Energy Score'),
     // Round 7 (U1-7): «Βαθμολογία ύπνου», όπως στις Τάσεις, στην εβδομάδα και στη σελίδα της μέτρησης (πριν «Σκορ ύπνου»).
     WMetric('sleepScore', 'Βαθμολογία ύπνου'),
     WMetric('hrv', 'HRV'),

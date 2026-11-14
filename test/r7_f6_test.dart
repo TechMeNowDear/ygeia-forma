@@ -393,8 +393,8 @@ void main() {
       expect(find.textContaining('30 Δεκεμβρίου'), findsNothing);
       await _next(t);
       final g = store.goals!;
-      // 1.840 × 1,4 = 2.576 − 528 = 2.048 → 2.050.
-      expect((g.since, g.activity, g.kcal, g.checkIn), ('2026-11-16', 1.4, 2050, null));
+      // Round 9 (R9-A1-3): «Λίγο» = 1,53: 1.840 × 1,53 = 2.815,2 − 528 = 2.287,2 → 2.290 (πριν, με 1,4: 2.050).
+      expect((g.since, g.activity, g.kcal, g.checkIn), ('2026-11-16', 1.53, 2290, null));
       expect(firstEstimateDay(g), DateTime(2026, 12, 14));
     });
 

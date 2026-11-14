@@ -549,7 +549,11 @@ Map<String, double> summarizeDay(Dashboard d, DateTime day,
     // Ποσοστά επί του πραγματικού ύπνου (βαθύς + ελαφρύς + REM), όπως στο Oura· ο χρόνος ξύπνιος χωριστά σε λεπτά
     // (έλεγχος 4/11, B4: πριν, ποσοστά επί του χρόνου μαζί με τα ξυπνήματα).
     final staged = ['DEEP', 'LIGHT', 'REM', 'AWAKE'].fold<int>(0, (s, k) => s + (night!.stageMinutes[k] ?? 0));
-    if (staged > 0) {
+    // Round 9 (R9-A5-3): μόνο ολόκληρη νύχτα με φάσεις ([Night.fullDuration]), ίδιος κανόνας με τη διάρκεια πιο πάνω και
+    // με τις «Φάσεις» της σελίδας Ύπνου (R8-A5-2, [watchStageNights]). Νύχτα «μερικώς χωρίς φάσεις» έδινε τα ποσοστά και
+    // τον ξύπνιο ΜΟΝΟ του κομματιού με φάσεις (π.χ. ξύπνιος 5 λεπτά για όλη τη νύχτα) στις Τάσεις, την εβδομάδα και την
+    // αναφορά. Ισχύει για τις νύχτες που ξαναδιαβάζονται από εδώ και πέρα (χωρίς νέα πλήρη επανανάγνωση).
+    if (staged > 0 && night.fullDuration) {
       put(K.deepPct, night.stagePct('DEEP'));
       put(K.remPct, night.stagePct('REM'));
       put(K.awakeMin, night.stageMinutes['AWAKE'] ?? 0);

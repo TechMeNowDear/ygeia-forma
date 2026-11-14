@@ -19,6 +19,7 @@
 /// - Αλάτι «κάτω από 5 g»: με το αλάτι όπως φαίνεται, με ένα δεκαδικό ([saltShown]· round7, R7-A3-3).
 library;
 
+import '../format.dart' show dec;
 import '../goals.dart' show fullDayShare;
 import 'food_model.dart';
 
@@ -136,6 +137,24 @@ bool reachedGrams(double g, int target) => target > 0 && g.round() >= target;
 /// Το αλάτι όπως φαίνεται, με ένα δεκαδικό (round7, R7-A3-3): 4,96 g γράφονται «5,0 g», άρα ΔΕΝ είναι «κάτω από 5 g».
 /// Πριν η οθόνη έγραφε «5,0 g / κάτω από 5 g» χωρίς προειδοποίηση και η εβδομάδα το μετρούσε «εντάξει».
 double saltShown(double salt) => double.parse(salt.toStringAsFixed(1));
+
+/// Round9 (R9-A3-2): το όριο κορεσμένων σε γραμμάρια για στόχο [kcal] θερμίδων και [satPct] % των θερμίδων, ακριβές
+/// (kcal × % ÷ 9 kcal/g) και με ένα δεκαδικό, όπως γράφεται. Πριν στρογγυλευόταν στο γραμμάριο (2.160 kcal × 6% = 14,4 g
+/// → «έως 14 g») και η ίδια μέρα έβγαινε «0,3 g πάνω από το όριο» το βράδυ και «6,0%, εντάξει» το πρωί.
+double satLimitShown(int kcal, int satPct) => double.parse((kcal * satPct / 900).toStringAsFixed(1));
+
+/// Ο στόχος κορεσμένων είναι αυστηρός («λιγότερο από»): 10% χωρίς οδηγία γιατρού (ΠΟΥ, Healthy diet fact sheet 2020:
+/// «less than 10% of total energy intake»)· με οδηγία γιατρού «έως 6%» (AHA/ACC, Eckel 2013: 5–6%). Round8 (R8-A3-3).
+bool satStrictPct(int satPct) => satPct >= 10;
+
+/// Round9 (R9-A3-2 / R9-A1-4 / R9-U2-5): το όριο όπως το γράφουν η Διατροφή, η σελίδα «Στόχοι» και ο οδηγός: «έως 14,4 g»
+/// με οδηγία γιατρού, «κάτω από 23,6 g» χωρίς (πριν «έως 24 g» και στα δύο, ενώ ο κανόνας του ΠΟΥ είναι «κάτω από»).
+/// Ακέραιο όριο χωρίς δεκαδικό («έως 15 g»).
+String satLimitText(int kcal, int satPct) {
+  final v = satLimitShown(kcal, satPct);
+  final n = v == v.roundToDouble() ? '${v.round()}' : dec(v, 1);
+  return '${satStrictPct(satPct) ? 'κάτω από' : 'έως'} $n g';
+}
 
 /// Η εβδομάδα Δευτέρα–Κυριακή της [day].
 DateTime weekStart(DateTime day) => DateTime(day.year, day.month, day.day - (day.weekday - 1));

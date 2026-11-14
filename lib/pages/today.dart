@@ -104,8 +104,9 @@ class TodayPage extends StatelessWidget {
             ),
             icon: const Icon(Icons.tune_rounded, size: 20),
           );
-          // Στη μεγάλη οθόνη οι Ρυθμίσεις είναι κάτω στην πλευρική μπάρα.
-          final action = MediaQuery.sizeOf(context).width >= 600 ? null : settingsButton;
+          // Στη μεγάλη οθόνη οι Ρυθμίσεις είναι κάτω στην πλευρική μπάρα. Round 9 (R9-U1-3): ο ίδιος κανόνας με το main.dart
+          // ([useSideBar]: και ύψος), ώστε στο κλειστό Fold σε οριζόντια θέση (κάτω μπάρα) το κουμπί να μένει εδώ.
+          final action = useSideBar(MediaQuery.sizeOf(context)) ? null : settingsButton;
 
           // Σχέδια 9/11 (1β): «Άσκηση σήμερα» αμέσως μετά τον Ύπνο· ξεκούραση ή χωρίς πρόγραμμα: καμία κάρτα.
           final Widget? trainingCard = prefs.show('training') ? _TrainingSlot(training: training, now: now) : null;
@@ -274,17 +275,17 @@ class TodayPage extends StatelessWidget {
             ],
             top: alerts,
             // Fold ανοιχτό (σχέδια 9/11, 1γ): ρητά αριστερά Ύπνος + Άσκηση, δεξιά Διατροφή + Βήματα/Βάρος.
-            // Round 7 (U1-1): η «Η εβδομάδα σου» (≈ 1.000 dp) στη ΔΕΞΙΑ στήλη, μετά τα Βήματα/Βάρος, όπως στο κινητό. Αριστερά
-            // (ζύγιση + ύπνος + άσκηση ≈ 870 dp) έκανε τη στήλη ~1.900 dp με ~560 δεξιά: τρύπα ~1.300 dp τη Δευτέρα.
+            // Round 7 (U1-1): η «Η εβδομάδα σου» (≈ 1.000 dp) όχι αριστερά: έκανε τη στήλη ~1.900 dp με ~560 δεξιά.
+            // Round 9 (R9-U1-2): ούτε δεξιά: εκεί άφηνε τρύπα ~750 dp αριστερά (στιγμιότυπο 68e, Δευτέρα του ελέγχου θερμίδων).
+            // Κάτω από τις δύο στήλες, σε όλο το πλάτος, με τις γραμμές της σε δύο στήλες ([WeekCard]), και μετά η «Ενημέρωση».
             left: [if (weigh != null) weigh, if (checkIn != null) checkIn, if (sleep != null) sleep, if (trainingCard != null) trainingCard],
             right: [
               if (foodCard != null) foodCard,
               ...pairUp(pair),
-              if (week != null) week,
               if (extras.isNotEmpty) ...[const SectionHeader('Επίσης'), ...pairUp(extras)],
               backupReminder,
-              footer,
             ],
+            bottom: [if (week != null) week, footer],
           );
         },
       ),
@@ -569,7 +570,7 @@ class _SleepCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Ύπνος · ${_nightLabel(n.date, now)}',
+                        'Ύπνος · ${sleepNightLabel(n.date, now)}',
                         style: TextStyle(color: soft, fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -676,11 +677,17 @@ class _SleepCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _nightLabel(DateTime wakeDay, DateTime now) {
-    if (sameDay(wakeDay, now)) return 'χθες βράδυ';
-    return 'ξύπνημα ${relativeDay(wakeDay, now).toLowerCase()}';
-  }
+/// Η νύχτα στον τίτλο της κάρτας ύπνου της Σήμερα («Ύπνος · …»), σε σχέση με ΤΩΡΑ ([now]· R8-U1-1). [wakeDay]: η μέρα
+/// της νύχτας (το πρωί που ξύπνησες). Η ίδια συνάρτηση για το ρολόι και το Oura (oura_today.dart).
+/// Round 9 (R9-U1-1): για παλιότερη νύχτα η μέρα όπως στις άλλες κάρτες («ξύπνημα Τετ 11/11», [shortDayDate]), όχι με πεζά
+/// («ξύπνημα τετάρτη», «ξύπνημα 3 νοε»). Round 9 (R9-U1-7): και το Oura μετά τα μεσάνυχτα («ξύπνημα χθες» για τη νύχτα
+/// της χθεσινής ημερομηνίας, όχι «χθες βράδυ»).
+String sleepNightLabel(DateTime wakeDay, DateTime now) {
+  if (sameDay(wakeDay, now)) return 'χθες βράδυ';
+  if (daysBetween(wakeDay, now) == 1) return 'ξύπνημα χθες';
+  return 'ξύπνημα ${shortDayDate(wakeDay)}';
 }
 
 // ---------------------------------------------------------------------------
@@ -767,7 +774,7 @@ class _DatabaseCard extends StatelessWidget {
       color: c.bad,
       title: 'Η βάση χάλασε· κράτησα αντίγραφο',
       // Round 7 (R7-A9-1/2, f4): η σωστή διαδρομή, τα προϊόντα, και πόσα ξαναμπήκαν από το αρχείο που κρατήθηκε.
-      text: databaseNoticeText(store.dbRecovered),
+      text: databaseNoticeText(store.dbRecovered, partial: store.dbPartial),
       buttonText: 'Εντάξει',
       onPressed: () => store.dismissDatabaseNotice(),
     );

@@ -29,7 +29,16 @@ class TodayTrainingCard extends StatefulWidget {
     if (!t.ready) return false;
     if (liveWalk() != null || t.current != null) return true;
     if (doneToday(t, now) != null) return true;
-    return t.program?.forDay(now) != null;
+    return chosenWorkout(t, now) != null || t.program?.forDay(now) != null;
+  }
+
+  /// R9-U3-06: η προπόνηση που διάλεξες για σήμερα από τις τρεις τελείες της «Άσκησης» ([TrainingStore.chosenOn]), με
+  /// τα λεπτά της εβδομάδας ([Program.at]), ή null. Ίδια με την «Άσκηση»: πριν η Σήμερα έλεγε (και ξεκινούσε) την άλλη.
+  static Workout? chosenWorkout(TrainingStore t, DateTime now) {
+    final p = t.program;
+    final id = t.chosenOn(now);
+    final w = p == null || id == null ? null : p.workout(id);
+    return w == null ? null : p!.at(w, now);
   }
 
   /// Περπάτημα που τρέχει τώρα στο ρολόι (ήρθε μήνυμα τα τελευταία 30″), όπως στην Άσκηση.
@@ -106,7 +115,10 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
     final done = cur == null ? TodayTrainingCard.doneToday(t, now) : null;
     if (done != null) return _done(context, done, limit);
     final p = t.program;
-    final w = cur != null ? (p?.workout(cur.workout)) : p?.forDay(now);
+    final chosen = cur == null ? TodayTrainingCard.chosenWorkout(t, now) : null;
+    final w = cur != null ? (p?.workout(cur.workout)) : (chosen ?? p?.forDay(now));
+    // R9-U3-06: όπως η «Άσκηση» (R8-U3-05): να φαίνεται ότι η σημερινή είναι επιλογή σου.
+    final chosenLine = chosen == null ? null : Text('Τη διάλεξες εσύ για σήμερα.', key: const ValueKey('today-train-chosen'), style: _aux(c));
 
     final watch = WearLink.main.ready.value
         ? StatusPill(icon: Icons.watch_rounded, text: 'ρολόι έτοιμο', color: c.good)
@@ -158,6 +170,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         trailing: watch,
         children: [
           _title(context, cardio.name),
+          if (chosenLine != null) chosenLine,
           const SizedBox(height: 4),
           Text(
             [
@@ -205,6 +218,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
       trailing: watch,
       children: [
         _title(context, w.name),
+        if (chosenLine != null) chosenLine,
         const SizedBox(height: 4),
         Text(
           [countText(w.items.length, 'άσκηση', 'ασκήσεις'), 'περίπου ${w.minutes} λεπτά', if (limitText != null) limitText].join(' · '),
@@ -228,7 +242,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(Icons.directions_walk_rounded, size: 18, color: c.textSecondary),
           const SizedBox(width: 6),
-          Expanded(child: Text('Για περπάτημα: στο ρολόι πάτα «Περπάτημα».', style: _aux(c))),
+          Expanded(child: Text('Για περπάτημα: στο ρολόι πάτα\u00A0«Περπάτημα».', style: _aux(c))),
         ]),
       ],
     );

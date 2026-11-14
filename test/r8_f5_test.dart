@@ -267,7 +267,7 @@ void main() {
 
     testWidgets('U1-8: η κουκκίδα χρώματος είναι 48 × 48 dp με περίγραμμα που φαίνεται', (t) async {
       await config(t, WKind.sleep);
-      final dot = find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Χρώμα για Ετοιμότητα');
+      final dot = find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Χρώμα για Ετοιμότητα / Energy Score');
       expect(dot, findsOneWidget);
       expect(t.getSize(dot), const Size(48, 48));
       final circle = t.widget<Container>(find.descendant(of: dot, matching: find.byType(Container)).first);

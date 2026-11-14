@@ -1551,11 +1551,17 @@ enum SourcesRestore { restored, phoneNewer, same, notReady, writeFailed, invalid
 /// βάση από τη μνήμη και από το αρχείο που κρατήθηκε (null = δεν έγινε ακόμα ή δεν έγινε). Η διαδρομή είναι η
 /// πραγματική των Ρυθμίσεων (πριν έγραφε «Ρυθμίσεις › Αντίγραφο ασφαλείας», που δεν υπάρχει) και λέει και τα προϊόντα,
 /// που είναι στην ίδια βάση.
-String databaseNoticeText(({int entries, int foods})? recovered) {
+/// Round 9 (R9-A9-B1, f4): [partial] = η εφαρμογή ΞΕΡΕΙ ότι κάτι από το παλιό αρχείο δεν διαβάστηκε (σελίδες ή γραμμές
+/// χαλασμένες, αρχείο που δεν ανοίγει· [HealthStore.dbPartial])· τότε το λέει καθαρά, όχι «αν λείπει κάτι».
+String databaseNoticeText(({int entries, int foods})? recovered, {bool partial = false}) {
   const start = 'Ξεκίνησε καινούργια βάση και το παλιό αρχείο κρατήθηκε στο κινητό. Το ιστορικό ξαναδιαβάζεται από τη '
       'Samsung Health.';
   const path = '(Ρυθμίσεις › Τα δεδομένα μου › Επαναφορά από αντίγραφο)';
   if (recovered == null || recovered.entries + recovered.foods <= 0) {
+    if (partial) {
+      return '$start Το παλιό αρχείο δεν διαβάστηκε όλο: ό,τι λείπει από το ημερολόγιο φαγητού και τα προϊόντα σου, '
+          'βάλ’ το από το αντίγραφό σου $path. Μπαίνουν μόνο όσα λείπουν.';
+    }
     return '$start Το ημερολόγιο φαγητού και τα προϊόντα σου επανέρχονται από το αντίγραφό σου $path.';
   }
   final what = [
@@ -1563,6 +1569,10 @@ String databaseNoticeText(({int entries, int foods})? recovered) {
     if (recovered.foods > 0) countText(recovered.foods, 'προϊόν', 'προϊόντα'),
   ].join(' και ');
   final one = recovered.entries + recovered.foods == 1;
+  if (partial) {
+    return '$start ${one ? 'Ξαναμπήκε' : 'Ξαναμπήκαν'} $what, αλλά το παλιό αρχείο δεν διαβάστηκε όλο. Ό,τι λείπει '
+        'ακόμα, βάλ’ το από το αντίγραφό σου $path: μπαίνουν μόνο όσα λείπουν.';
+  }
   return '$start ${one ? 'Ξαναμπήκε' : 'Ξαναμπήκαν'} $what. Αν λείπει κάτι, βάλ’ το από το αντίγραφό σου $path: '
       'μπαίνουν μόνο όσα λείπουν.';
 }
@@ -2153,6 +2163,10 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Πόσα ξαναμπήκαν στη νέα βάση μετά από βλάβη (για την κάρτα· null = τίποτα ακόμα).
   ({int entries, int foods})? dbRecovered;
 
+  /// Round 9 (R9-A9-B1, f4): η επαναφορά μετά από τη βλάβη έγινε, αλλά κάτι από το παλιό αρχείο δεν διαβάστηκε
+  /// (από την πλευρά Android, «dbStatus» → «partial»)· η κάρτα το λέει ([databaseNoticeText]).
+  bool dbPartial = false;
+
   /// Η βλάβη για την οποία ζητήθηκε ήδη η επαναφορά του φαγητού σε αυτή τη χρήση της εφαρμογής.
   int? _foodRecoveryAt;
   bool _disposed = false;
@@ -2171,9 +2185,20 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       }
       dbRecovered = r;
       if (dbCorruptAt == at && !_disposed) notifyListeners();
+      // R9-A9-B1: το σημάδι «έγινε» μόλις γράφτηκε· αν δεν διαβάστηκαν όλα, η κάρτα το λέει από τώρα (όχι στο επόμενο άνοιγμα).
+      _readDbPartial(at);
     }, onError: (Object _) {
       if (_foodRecoveryAt == at) _foodRecoveryAt = null;
     });
+  }
+
+  Future<void> _readDbPartial(int at) async {
+    final s = await SamsungHealth.dbStatus();
+    if (_disposed || s['ok'] != true || s['corrupt'] != at) return;
+    final partial = s['partial'] == true;
+    if (partial == dbPartial) return;
+    dbPartial = partial;
+    if (dbCorruptAt == at) notifyListeners();
   }
 
   /// Χαλασμένη βάση: ξεκίνησε καινούργια (το παλιό αρχείο κρατήθηκε). Το ιστορικό ξαναδιαβάζεται από τη Samsung από
@@ -2192,6 +2217,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     // γίνουν. Πριν το «Εντάξει» έσβηνε το σημάδι και μια αποτυχημένη πρώτη προσπάθεια δεν ξαναγινόταν ποτέ.
     final seen = at != null && (r['seen'] == true || _dbSeenAt == at);
     dbCorruptAt = seen ? null : at;
+    dbPartial = at != null && r['partial'] == true;
     // R7-A9-1: φαγητό και προϊόντα στη νέα βάση (χωρίς να περιμένει η πρώτη οθόνη· μία φορά για κάθε βλάβη).
     if (at != null) _recoverFood(at);
     if (at == null || !_prefsLoaded || prefs.dbReset == at) return;
@@ -2225,6 +2251,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     if (at != null) _dbSeenAt = at;
     dbCorruptAt = null;
     dbRecovered = null;
+    dbPartial = false;
     notifyListeners();
     await SamsungHealth.dbStatusSeen(at);
   }

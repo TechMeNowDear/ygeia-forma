@@ -79,14 +79,11 @@ class SamsungHealthBridge(
                 JSONObject().put("ok", true)
             }
             // Η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ώρα σε ms ή null, "seen": αν η
-            // κάρτα της έκλεισε}. Round 8 (R8-A9-2, f4): το σημάδι της βλάβης μένει και μετά το «Εντάξει».
+            // κάρτα της έκλεισε, "partial": αν η επαναφορά δεν διάβασε όλα}. Round 8 (R8-A9-2, f4): το σημάδι της βλάβης
+            // μένει και μετά το «Εντάξει». Round 9 (R9-A12-2, f4): η απάντηση από καθαρή συνάρτηση ([DbSalvage.status]).
             "dbStatus" -> respondDb(result) {
-                val ctx = activity.applicationContext
-                val (at, seen) = withContext(DbQueue.dispatcher) {
-                    val a = DayStore.corruptAt(ctx)
-                    a to (a != null && DayStore.seen(ctx, a))
-                }
-                JSONObject().put("ok", true).put("corrupt", at ?: JSONObject.NULL).put("seen", seen)
+                val dir = activity.applicationContext.noBackupFilesDir
+                withContext(DbQueue.dispatcher) { DbSalvage.status(dir) }
             }
             // R8-A9-2: «Εντάξει» = η κάρτα της βλάβης «at» έκλεισε. Δεν σβήνει το σημάδι της βλάβης (η επαναφορά συνεχίζει).
             "dbStatusSeen" -> respondDb(result) {
@@ -100,10 +97,19 @@ class SamsungHealthBridge(
             "savePdf" -> respond(result) {
                 val pages = call.argument<List<ByteArray>>("pages") ?: emptyList()
                 val name = call.argument<String>("name") ?: "ygeia-anafora.pdf"
-                val uri = withContext(Dispatchers.IO) { PdfExporter.save(activity, pages, name) }
-                // R7-U4-3: δεύτερο PDF την ίδια μέρα → το σύστημα το ονομάζει «… (1).pdf»· η οθόνη δείχνει το πραγματικό όνομα.
-                val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
-                JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
+                // Round 9 (R9-U4-4, f4): γεμάτος χώρος → «kind: full» (ελληνικό μήνυμα στη Flutter, όχι το κείμενο της
+                // Java), όπως το αντίγραφο (R7-A9-5). Κάθε άλλο σφάλμα πηγαίνει στις αναφορές σφαλμάτων όπως πριν.
+                try {
+                    val uri = withContext(Dispatchers.IO) { PdfExporter.save(activity, pages, name) }
+                    // R7-U4-3: δεύτερο PDF την ίδια μέρα → το σύστημα το ονομάζει «… (1).pdf»· η οθόνη δείχνει το πραγματικό όνομα.
+                    val shown = withContext(Dispatchers.IO) { BackupFiles.displayName(activity, uri) } ?: name
+                    JSONObject().put("ok", true).put("uri", uri.toString()).put("name", shown)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    val kind = BackupRules.failKind(e)
+                    if (kind == "other") throw e
+                    JSONObject().put("ok", false).put("kind", kind)
+                }
             }
             "sharePdf", "openPdf" -> {
                 val json = try {

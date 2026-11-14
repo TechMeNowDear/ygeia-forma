@@ -455,7 +455,8 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
               'από ${e.intakeDays} μέρες'
                   '${missed > 0 ? '· ${countText(missed, 'μέρα', 'μέρες')} με λίγη ή καθόλου καταγραφή δεν ${missed == 1 ? 'μέτρησε' : 'μέτρησαν'}' : ''}'
                   '${tooMuch > 0 ? '· ${countText(tooMuch, 'μέρα', 'μέρες')} με πάρα πολλές θερμίδες δεν ${tooMuch == 1 ? 'μέτρησε' : 'μέτρησαν'}' : ''}'),
-          step('2 · Αλλαγή βάρους την εβδομάδα', '${slope < 0 ? '−' : (slope > 0 ? '+' : '')}${dec(slope.abs(), 2)} kg',
+          // R9-A1-5: με το πρόσημο του αριθμού όπως γράφεται ([signedDec]): −0,004 είναι «0 kg», ποτέ «−0,00 kg».
+          step('2 · Αλλαγή βάρους την εβδομάδα', '${signedDec(slope, 2)} kg',
               'ευθεία από ${e.weighIns} ζυγίσεις (τα νερά μιας μέρας τη μετακινούν λίγο)'),
           step('3 · Άρα καις', '≈ ${_kcal(e.tdee)} kcal',
               '${_kcal(e.meanIntake)} ${slope <= 0 ? '+' : '−'} ${dec(slope.abs(), 2)} × 7.700 ÷ 7'

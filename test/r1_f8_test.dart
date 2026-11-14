@@ -661,9 +661,14 @@ void main() {
       for (final w in [j['build']!, check]) {
         // Round 7 (R7-A12-10, f4): κατώτατα λίγο κάτω από το πλήθος (πριν 950 / 40 / 120 κινητό + ρολόι μαζί).
         // Round 8 (R8-A12-2, f4): ≈ 3% κάτω από το #105 (1.832 / 85 / 167) και το Kotlin όχι λιγότερα από τα @Test του κώδικα.
-        expect(w, contains(r'if [ "${n:-0}" -lt 1777 ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 82 ] || [ $(( ${n:-0} + 2 )) -lt "${want:-0}" ]; then'));
-        expect(w, contains(r'if [ "${n:-0}" -lt 162 ] || [ $(( ${n:-0} + 2 )) -lt "${want:-0}" ]; then'));
+        // Round 9 (R9-A12-1, f4): το ύψος τους το ελέγχει το r8_f4_test (κοντά στις τωρινές δοκιμές, χωρίς σταθερό
+        // πλήθος παλιάς έκδοσης)· εδώ μόνο η μορφή: Dart μόνο κατώτατο, Kotlin κινητού και ρολογιού και «όχι λιγότερα από τα @Test».
+        expect(RegExp(r'if \[ "\$\{n:-0\}" -lt \d+ \]; then').allMatches(w).length, 1);
+        expect(
+            RegExp(r'if \[ "\$\{n:-0\}" -lt \d+ \] \|\| \[ \$\(\( \$\{n:-0\} \+ 2 \)\) -lt "\$\{want:-0\}" \]; then')
+                .allMatches(w)
+                .length,
+            2);
         expect(w, contains("grep -aoE '[0-9]+ tests passed' tests.log"));
       }
     });

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../adaptive.dart';
 import '../adaptive_check.dart';
 import '../data.dart';
+import '../food/chol.dart' show satLimitText;
 import '../food/food_store.dart';
 import '../format.dart';
 import '../goals.dart';
@@ -85,9 +86,10 @@ class _GoalsWizardState extends State<GoalsWizard> {
     final i = (o.aim == GoalAim.lose ? loseRates : gainRates).indexOf(o.rate);
     return i < 0 ? (o.aim == GoalAim.lose ? 1 : 0) : i;
   }();
+  // R9-A1-3: και στόχοι με τα παλιά επίπεδα (1,4 / 1,5 / 1,7) ανοίγουν στην απάντηση που είχες δώσει.
   late int _activity = () {
-    final i = activityLevels.indexOf(_old?.activity ?? 1.5);
-    return i < 0 ? 1 : i;
+    final a = _old?.activity;
+    return (a == null ? null : activityAnswer(a)) ?? 1;
   }();
   late bool? _doctor = _old?.doctor;
   late DoctorTargets _targets = _old?.docTargets ?? const DoctorTargets();
@@ -188,7 +190,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
     final oldSince = o == null ? null : DateTime.tryParse(o.since);
     final recent = oldSince != null && daysBetween(oldSince, _now) <= _freshEstimateDays;
     final same = o != null && o.aim == _aim && (te != null || recent) ? o : null;
-    final kept = keptKcalAdapt(old: o, calc: calc, male: p.male, age: age, heightCm: h);
+    final kept = keptKcalAdapt(
+        old: o, calc: calc, male: p.male, age: age, heightCm: h, oldActivity: o == null ? null : currentActivityLevel(o.activity));
     return Goals(
       aim: _aim,
       rate: _rateValue,
@@ -213,6 +216,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
       // Οι στόχοι του γιατρού και το ιστορικό των ελέγχων θερμίδων μένουν.
       docTargets: _doctor == true ? _targets : const DoctorTargets(),
       log: o?.log ?? const [],
+      // R9-A1-2: και το ιστορικό του στόχου (η αλλαγή γράφεται στο [_save]).
+      hist: o?.hist ?? const [],
     );
   }
 
@@ -242,7 +247,9 @@ class _GoalsWizardState extends State<GoalsWizard> {
   void _save() {
     final g = _draft();
     if (g == null) return;
-    widget.store.setGoals(g);
+    // R9-A1-2: αν άλλαξε ο στόχος που ισχύει, η αλλαγή γράφεται με τη μέρα της, ώστε οι μέρες πριν από αυτήν να κρίνονται
+    // στη Διατροφή και στους ελέγχους με τον στόχο που ίσχυε τότε ([targetOn]).
+    widget.store.setGoals(g.recordChangeFrom(_old, _now));
     if (widget.fromPage) {
       Navigator.of(context).pop();
     } else {
@@ -519,7 +526,13 @@ class _GoalsWizardState extends State<GoalsWizard> {
         // R8-A1-1 / R8-A1-2: ο στόχος από τα δεδομένα σου μένει ([keptKcalAdapt]). Η σύνοψη γράφει τον τύπο ως τύπο, ότι
         // μένει η διόρθωση, και πόσο αλλάζει ο στόχος που ισχύει (πριν: «καις περίπου» την παλιά εκτίμηση, και καμία λέξη
         // όταν ο στόχος άλλαζε 150–610 kcal).
-        final kept = keptKcalAdapt(old: o, calc: g, male: d.male, age: d.age, heightCm: d.heightCm);
+        final kept = keptKcalAdapt(
+            old: o,
+            calc: g,
+            male: d.male,
+            age: d.age,
+            heightCm: d.heightCm,
+            oldActivity: o == null ? null : currentActivityLevel(o.activity));
         final fromData = kept != null;
         final floored = kept != null ? kept.floored : g.floored;
         final sinceDay = DateTime.parse(d.since);
@@ -580,7 +593,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
               const Hairline(vertical: 12),
               InfoRow('Πρωτεΐνη', '${d.protein} g'),
               InfoRow('Λιπαρά', '${d.fatLo}–${d.fatHi} g'),
-              InfoRow('Κορεσμένα λιπαρά', 'έως ${d.satMax} g · ${d.satPct}%'),
+              // R9-A1-4 / R9-A3-2 (f1): ακριβές όριο, «κάτω από» για το 10% του ΠΟΥ, όπως στη Διατροφή.
+              InfoRow('Κορεσμένα λιπαρά', '${satLimitText(d.kcal, d.satPct)} · ${d.satPct}%'),
               InfoRow('Φυτικές ίνες', '${d.fiber} g ή περισσότερες'),
               InfoRow('Αλάτι', 'κάτω από ${dec(d.salt, 0)} g'),
               InfoRow('Υδατάνθρακες', 'ό,τι μένει · ~${d.carbsEst} g'),
@@ -615,24 +629,44 @@ class _GoalsWizardState extends State<GoalsWizard> {
 /// ο τύπος. [calc]: ο τύπος με τις νέες απαντήσεις· [male], [age], [heightCm]: τα στοιχεία σου τώρα.
 ///
 /// Η διόρθωση που ισχύει (εβδομαδιαίος έλεγχος, μείωση από τη ζυγαριά, +150 της γρήγορης απώλειας: πάντα με «Εφάρμοσε»)
-/// μένει· αλλάζει μόνο όσο αλλάζει ο τύπος με όσα απαντάς στον οδηγό (βάρος, κίνηση, σκοπός, ρυθμός), στα 10, ποτέ κάτω
+/// μένει· αλλάζει μόνο όσο αλλάζει ο τύπος με όσα απαντάς στον οδηγό (κίνηση, σκοπός, ρυθμός), στα 10, ποτέ κάτω
 /// από το κάτω όριο. Ίδιες απαντήσεις, ίδιος στόχος. Φύλο, ηλικία και ύψος δεν τον μετακινούν (όπως στο «Υπολόγισε
 /// ξανά», [Goals.withProfile]): η διόρθωση βγήκε από όσα καις στην πράξη, που δεν αλλάζουν με τα γενέθλια ή με μια
-/// διόρθωση του ύψους. Ο οδηγός δεν κάνει ποτέ μόνος του βήμα «από τα δεδομένα»: αυτό το κάνει μόνο ο εβδομαδιαίος
+/// διόρθωση του ύψους. Round 9 (R9-A1-1): ούτε το βάρος. Ο παλιός και ο νέος τύπος υπολογίζονται με το ΙΔΙΟ βάρος (του
+/// [calc], δηλαδή το τωρινό): η διόρθωση βγήκε από εκτιμήσεις με το βάρος της ώρας τους (εκτίμηση + ρυθμός με το τότε
+/// βάρος), άρα η απώλεια από τον προηγούμενο οδηγό μετρήθηκε ήδη. Πριν, με το βάρος του παλιού οδηγού, το «Ξανά ο
+/// οδηγός» μόνο για την ερώτηση του γιατρού, 6 κιλά αργότερα, κατέβαζε τον στόχο 60 kcal (2.010 → 1.950) δεύτερη φορά.
+/// Ο οδηγός δεν κάνει ποτέ μόνος του βήμα «από τα δεδομένα»: αυτό το κάνει μόνο ο εβδομαδιαίος
 /// έλεγχος, το πολύ 150 kcal τη φορά και μόνο πέρα από το εύρος των ζυγίσεων· και μια εκτίμηση που δεν εφάρμοσες («Όχι
 /// τώρα», «μέσα στο εύρος») δεν εφαρμόζεται ποτέ. Πριν (S1-11), ο οδηγός έβαζε στόχο «τελευταία εκτίμηση ± ρυθμός», όποια
 /// κι αν ήταν: μετά από «Όχι τώρα» σε μια πρόταση −150 ο στόχος έπεφτε 610 kcal μονομιάς, και η μείωση από τη ζυγαριά ή
 /// το +150 της γρήγορης απώλειας (χωρίς εκτίμηση) χάνονταν σιωπηλά.
+///
+/// Round 9 (R9-A1-3): [oldActivity] = η παλιά απάντηση «κίνηση» με τα τωρινά επίπεδα ([currentActivityLevel]: στόχοι με
+/// το παλιό 1,5 → 1,65)· χωρίς αυτό, το αποθηκευμένο επίπεδο. Ο οδηγός το δίνει πάντα: η αλλαγή των επιπέδων δεν είναι
+/// αλλαγή απάντησης, και η διόρθωση από τα δεδομένα μέτρησε ήδη όσα καις στην πράξη (ίδια απάντηση, ίδιος στόχος).
 ({int kcal, bool floored})? keptKcalAdapt(
-    {required Goals? old, required GoalCalc calc, required bool male, required int age, required double heightCm}) {
+    {required Goals? old,
+    required GoalCalc calc,
+    required bool male,
+    required int age,
+    required double heightCm,
+    double? oldActivity}) {
   final o = old;
   if (o == null) return null;
   final ka = o.kcalAdapt;
   if (ka == null) return null;
-  // Ο παλιός τύπος με τα στοιχεία σου τώρα και τις παλιές απαντήσεις, πριν από το στρογγύλεμα και το κάτω όριο: η
-  // διαφορά είναι ακριβώς αυτή των απαντήσεων.
+  // Ο παλιός τύπος με τα στοιχεία σου τώρα (και το βάρος του [calc]: R9-A1-1) και τις παλιές απαντήσεις, πριν από το
+  // στρογγύλεμα και το κάτω όριο: η διαφορά είναι ακριβώς αυτή των απαντήσεων.
   final before = computeGoals(
-      male: male, age: age, heightCm: heightCm, kg: o.kg, aim: o.aim, rate: o.rate, activity: o.activity, doctor: o.doctor);
+      male: male,
+      age: age,
+      heightCm: heightCm,
+      kg: calc.kg,
+      aim: o.aim,
+      rate: o.rate,
+      activity: oldActivity ?? o.activity,
+      doctor: o.doctor);
   final shift = (calc.tdee + calc.delta) - (before.tdee + before.delta);
   final v = ka + (shift / 10).round() * 10;
   final floor = male ? kcalFloorMale : kcalFloorFemale;
@@ -894,7 +928,8 @@ class GoalsPage extends StatelessWidget {
                 OutlinedButton(
                   key: const ValueKey('goals-recompute'),
                   style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: c.food),
-                  onPressed: () => store.setGoals(fixed),
+                  // R9-A1-2: η αλλαγή του στόχου γράφεται με τη μέρα της ([targetOn]).
+                  onPressed: () => store.setGoals(fixed.recordChangeFrom(g, today)),
                   child: const Text('Υπολόγισε ξανά'),
                 ),
               ]),
@@ -910,7 +945,7 @@ class GoalsPage extends StatelessWidget {
               editRow('goals-protein', 'Πρωτεΐνη', '${g.protein} g${g.proteinSet != null ? ' · δική σου' : ''}', () => _editProtein(context, g)),
               // U3a-9: ένας όρος παντού, όπως στις οθόνες φαγητού και στη διατροφική δήλωση («Λιπαρά», «Κορεσμένα λιπαρά»).
               InfoRow('Λιπαρά', '${g.fatLo}–${g.fatHi} g'),
-              InfoRow('Κορεσμένα λιπαρά', 'έως ${g.satMax} g · ${g.satPct}%'),
+              InfoRow('Κορεσμένα λιπαρά', '${satLimitText(g.kcal, g.satPct)} · ${g.satPct}%'),
               InfoRow('Φυτικές ίνες', '${g.fiber} g ή περισσότερες'),
               InfoRow('Αλάτι', 'κάτω από ${dec(g.salt, 0)} g'),
               const InfoRow('Υδατάνθρακες', 'ό,τι μένει'),
@@ -1149,7 +1184,10 @@ class GoalsPage extends StatelessWidget {
             ? 'Από τα δεδομένα σου (${thousands(g.kcalAdapt!)})'
             : 'Από τον υπολογισμό (${thousands(g.calc.kcal)})');
     if (v == null) return;
-    store.setGoals(v < 0 ? g.copyWith(clearKcal: true) : g.copyWith(kcalSet: v));
+    // R9-A1-2: ο δικός σου στόχος (ή η επιστροφή στον υπολογισμό) γράφεται με τη μέρα του, ώστε οι μέρες πριν από αυτόν
+    // να κρίνονται με τον στόχο που ίσχυε τότε ([targetOn]).
+    final next = v < 0 ? g.copyWith(clearKcal: true) : g.copyWith(kcalSet: v);
+    store.setGoals(next.recordChangeFrom(g, now ?? DateTime.now()));
   }
 
   Future<void> _editProtein(BuildContext context, Goals g) async {
@@ -1426,7 +1464,8 @@ Future<void> showHowCalculated(BuildContext context, Goals g) {
           // U3b-24: με λέξεις, για να φαίνεται τι είναι κάθε αριθμός.
           Text('Τύπος Mifflin-St Jeor: 10 × βάρος ${dec(g.kg)} + 6,25 × ύψος ${_cm(g.heightCm)} − 5 × ηλικία ${g.age} $sex', style: small),
           const SizedBox(height: 6),
-          InfoRow('2 · Με την κίνησή σου (× ${dec(g.activity)})', '${n(calc.tdee)} kcal'),
+          // R9-A1-3: με δύο δεκαδικά όταν τα έχει (× 1,65· με ένα θα έγραφε «× 1,6» δίπλα σε αριθμό από το 1,65).
+          InfoRow('2 · Με την κίνησή σου (× ${palText(g.activity)})', '${n(calc.tdee)} kcal'),
           Text('«${activityText(g.activity)}». Είναι εκτίμηση: σε κάθε άνθρωπο πέφτει ως και 10–15% έξω.', style: small),
           if (g.aim != GoalAim.keep) ...[
             const SizedBox(height: 6),

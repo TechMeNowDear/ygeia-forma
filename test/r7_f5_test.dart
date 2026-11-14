@@ -119,13 +119,17 @@ void main() {
     // Δευτέρα: η κάρτα της εβδομάδας φαίνεται (reviewWeekSunday).
     final mon = DateTime(2026, 11, 16, 9);
 
-    testWidgets('U1-1: ανοιχτό Fold (860 dp): στη δεξιά στήλη, μαζί με τη Διατροφή (πριν αριστερά, τρύπα ~1.300 dp)', (t) async {
+    // Round 9 (R9-U1-2): ούτε στη δεξιά στήλη (τρύπα ~750 dp αριστερά, στιγμιότυπο 68e): κάτω από τις δύο στήλες, σε όλο
+    // το πλάτος. Η παλιά προσδοκία («ίδια στήλη με τη Διατροφή», dx > 430) κλείδωνε τη διάταξη με την τρύπα.
+    testWidgets('U1-1 / R9-U1-2: ανοιχτό Fold (860 dp): κάτω από τις δύο στήλες, σε όλο το πλάτος (πριν αριστερά ή δεξιά)',
+        (t) async {
       await _pump(t, _today(_store(mon, _ownUpTo(mon)), mon), size: const Size(860, 4000));
       expect(find.byType(WeekCard), findsOneWidget);
-      final week = t.getTopLeft(find.byType(WeekCard)).dx;
-      final food = t.getTopLeft(find.byType(FoodTodayCard)).dx;
-      expect(week, food, reason: 'ίδια στήλη με τη Διατροφή');
-      expect(week, greaterThan(430), reason: 'δεξιά στήλη');
+      final week = t.getRect(find.byType(WeekCard));
+      final food = t.getRect(find.byType(FoodTodayCard));
+      expect(week.left, lessThan(food.left), reason: 'ξεκινά από την αριστερή στήλη');
+      expect(week.right, closeTo(food.right, 1), reason: 'ως το δεξί άκρο της δεξιάς στήλης');
+      expect(week.top, greaterThan(food.bottom));
     });
 
     testWidgets('U1-11: «4 προηγούμενες: …», ποτέ «πριν 7 ώρες…» / «πριν 23:40»', (t) async {

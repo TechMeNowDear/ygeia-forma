@@ -1049,7 +1049,10 @@ void main() {
   testWidgets('Σήμερα · μέρα περπατήματος', (t) async {
     WearLink.main.ready.value = true;
     addTearDown(() => WearLink.main.ready.value = false);
-    await todayShot(t, 'TT5_today_walk_day', const Size(400, 1900), at: DateTime(2026, 11, 10, 17, 30));
+    // R9-U3-03: Τρίτη 17/11, μέρα περπατήματος ΜΕΤΑ την έναρξη του δείγματος-προγράμματος (από 13/11). Πριν Τρίτη 10/11,
+    // πριν από την έναρξη: η κάρτα δεν εμφανιζόταν καθόλου (R7-A6-6) και το στιγμιότυπο δεν έδειχνε τίποτα από αυτήν.
+    await todayShot(t, 'TT5_today_walk_day', const Size(400, 1900), at: DateTime(2026, 11, 17, 17, 30));
+    expect(find.byKey(const ValueKey('today-train-walk-hint')), findsOneWidget);
   });
   testWidgets('Σήμερα · περπάτημα ζωντανά', (t) async {
     liveWalk(104);

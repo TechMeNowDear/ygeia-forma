@@ -571,7 +571,8 @@ class DashboardReader(
     private fun ms(i: java.time.Instant?): Long? = i?.toEpochMilli()
 
     private fun putFloat(o: JSONObject, key: String, v: Float?) {
-        if (v != null && !v.isNaN()) o.put(key, v.toDouble())
+        // Round 9 (R9-A4-4): ο δεκαδικός που έγραψε η ζυγαριά (26,9), όχι η δυαδική τιμή του float (26,8999996…).
+        DataRules.floatJson(v)?.let { o.put(key, it) }
     }
 
     private suspend fun tryPut(o: JSONObject, key: String, block: suspend () -> Any?) {
