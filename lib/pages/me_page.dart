@@ -12,6 +12,7 @@ import '../widgets.dart';
 import 'devices_page.dart';
 import 'dishes.dart';
 import 'recipes.dart' show FoodLikesScreen;
+import 'week.dart' show WeekPlanScreen;
 import 'goals_page.dart';
 import 'sources_page.dart';
 import 'kitchen.dart';
@@ -336,6 +337,18 @@ class _MePageState extends State<MePage> {
               : '${countText(dn, 'φαγητό', 'φαγητά')} ·\u00A0αλλαγή, διαγραφή',
           line: true,
           onTap: () => Navigator.of(context).push(DishesScreen.route(food)),
+        ),
+        // Πρόγραμμα εβδομάδας (15/11).
+        NavRow(
+          key: const ValueKey('mine-week'),
+          icon: Icons.event_note_rounded,
+          color: c.food,
+          title: 'Πρόγραμμα εβδομάδας',
+          text: food.week == null
+              ? 'Τι θα φας κάθε μέρα, από τη βιβλιοθήκη των φαγητών σου.'
+              : 'Από ${shortDayDate(food.week!.start)} ως ${shortDayDate(food.week!.end)}',
+          line: true,
+          onTap: () => Navigator.of(context).push(WeekPlanScreen.route(food)),
         ),
         // «Τι μου αρέσει» (15/11): για τις συνταγές από AI.
         NavRow(

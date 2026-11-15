@@ -15,6 +15,7 @@ import 'food_search.dart';
 import 'off.dart' show dryStapleRawId, normalizeBarcode;
 import 'recipe.dart' show FoodLikes;
 import 'replaced_foods.dart';
+import 'week.dart' show WeekPlan;
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
 /// Όλα τοπικά στο κινητό. Δίκτυο μόνο για το barcode (Open Food Facts).
@@ -29,9 +30,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     List<Dish> dishes = const [],
     DishIO? dishIO,
     FoodLikes likes = const FoodLikes(),
+    WeekPlan? week,
     DateTime? now,
   }) : _offline = true {
     _likes = likes;
+    _week = week;
     _basic = foods;
     _mine = mine;
     _mineRead = true;
@@ -725,6 +728,27 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return false;
   }
 
+  /// Το πρόγραμμα εβδομάδας (15/11): στο ίδιο αρχείο με τα φαγητά (κλειδί «week»). null: δεν υπάρχει.
+  WeekPlan? _week;
+  WeekPlan? get week => _week;
+
+  /// Νέο ή αλλαγμένο πρόγραμμα (null: σβήσιμο). `false` αν δεν γράφτηκε (τότε μένει όπως ήταν).
+  Future<bool> saveWeek(WeekPlan? w) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final before = _week;
+    _week = w;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (identical(_week, w)) _week = before;
+    saveError = 'Δεν αποθηκεύτηκε: Πρόγραμμα εβδομάδας. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
   /// Τα φαγητά μου: όσα έγραψες πιο πρόσφατα πρώτα.
   List<Dish> get dishes => _dishes;
 
@@ -746,6 +770,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _dishes = const [];
       _badDishRows = const [];
       _likes = const FoodLikes();
+      _week = null;
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -773,6 +798,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _dishes = const [];
       _badDishRows = const [];
       _likes = const FoodLikes();
+      _week = null;
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -793,6 +819,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _dishes = dishesInOrder(ok);
     _badDishRows = bad;
     _likes = FoodLikes.fromJson((j as Map)['likes']);
+    _week = WeekPlan.fromJson(j['week']);
     skippedRows += bad.length;
     _dishesRead = true;
     dishesNote = _dishesNewer ? dishesNewerText : null;
@@ -802,6 +829,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         'v': dishesFileVersion,
         'dishes': [for (final d in list) d.toJson(), ..._badDishRows],
         if (!_likes.isEmpty) 'likes': _likes.toJson(),
+        if (_week != null) 'week': _week!.toJson(),
       });
 
   Future<bool> _writeDishes(List<Dish> after, String what) async {
@@ -825,6 +853,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Νέο ή αλλαγμένο φαγητό (ίδιο id = αλλαγή).
   Future<bool> saveDish(Dish d) =>
       _writeDishes(dishesInOrder([d, for (final x in _dishes) if (x.id != d.id) x]), d.name);
+
+  /// Πολλά νέα ή αλλαγμένα φαγητά μαζί (βιβλιοθήκη), σε μία εγγραφή: ή όλα ή κανένα.
+  Future<bool> saveDishes(List<Dish> changed) {
+    final ids = {for (final d in changed) d.id};
+    return _writeDishes(
+      dishesInOrder([...changed, for (final x in _dishes) if (!ids.contains(x.id)) x]),
+      changed.length == 1 ? changed.first.name : '${changed.length} φαγητά',
+    );
+  }
 
   /// Διαγραφή φαγητού. Ό,τι έχεις ήδη γράψει από αυτό μένει όπως είναι στο ημερολόγιο.
   Future<bool> deleteDish(Dish d) => _writeDishes([for (final x in _dishes) if (x.id != d.id) x], d.name);

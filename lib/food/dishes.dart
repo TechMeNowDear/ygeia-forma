@@ -233,6 +233,27 @@ class Dish {
   }
 }
 
+/// Το φαγητό [d] με την τιμή [value] στο κλειδί [key] των επιπλέον στοιχείων ([Dish.extra]: συνταγή, βιβλιοθήκη), ή χωρίς
+/// το κλειδί αν [value] είναι null. Όλα τα άλλα μένουν όπως είναι.
+Dish withExtra(Dish d, String key, Object? value) => Dish(
+      id: d.id,
+      name: d.name,
+      kind: d.kind,
+      items: d.items,
+      servings: d.servings,
+      batch: d.batch,
+      lastPlate: d.lastPlate,
+      lastQty: d.lastQty,
+      created: d.created,
+      used: d.used,
+      uses: d.uses,
+      extra: {
+        for (final e in d.extra.entries)
+          if (e.key != key) e.key: e.value,
+        if (value != null) key: value,
+      },
+    );
+
 /// Το σημάδι μιας καταχώρισης που γράφτηκε ως υλικό φαγητού (κλειδί «dish» στην καταχώριση· οι παλιές εκδόσεις το
 /// αγνοούν και τη δείχνουν ως απλό τρόφιμο, με τα ίδια γραμμάρια και τις ίδιες θερμίδες).
 class DishTag {

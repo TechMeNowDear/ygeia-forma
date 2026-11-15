@@ -14,6 +14,7 @@ import '../widgets.dart';
 import 'dishes.dart';
 import 'food_add.dart';
 import 'nutrition_goals.dart';
+import 'week.dart' show PlanDayCard;
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
 Color proteinColor(Aigaio c) => c.sleep;
@@ -137,6 +138,7 @@ class NutritionPage extends StatelessWidget {
             summary,
             if (cta != null) cta,
             if (chol != null) chol,
+            PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             ...meals,
             _SourcesNote(color: c.textTertiary),
           ],
@@ -152,6 +154,7 @@ class NutritionPage extends StatelessWidget {
               ),
             // UX U11: στο tablet/PC τα γεύματα αριστερά και η σύνοψη δεξιά. Το «+ Φαγητό» είναι κάτω δεξιά· η δεξιά στήλη
             // είναι κοντή, οπότε δεν κάθεται πάνω στις θερμίδες ενός φαγητού (πριν κάλυπτε το «375» του μεσημεριανού).
+            PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             ...meals,
           ],
           right: [

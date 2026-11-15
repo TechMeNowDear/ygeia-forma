@@ -114,24 +114,7 @@ class Recipe {
 Recipe? recipeOf(Dish d) => Recipe.fromJson(d.extra['recipe']);
 
 /// Το φαγητό [d] με τη συνταγή [r] (ή χωρίς, αν null).
-Dish withRecipe(Dish d, Recipe? r) => Dish(
-      id: d.id,
-      name: d.name,
-      kind: d.kind,
-      items: d.items,
-      servings: d.servings,
-      batch: d.batch,
-      lastPlate: d.lastPlate,
-      lastQty: d.lastQty,
-      created: d.created,
-      used: d.used,
-      uses: d.uses,
-      extra: {
-        for (final e in d.extra.entries)
-          if (e.key != 'recipe') e.key: e.value,
-        if (r != null) 'recipe': r.toJson(),
-      },
-    );
+Dish withRecipe(Dish d, Recipe? r) => withExtra(d, 'recipe', r?.toJson());
 
 // ---------------------------------------------------------------------------
 // Η επικόλληση
@@ -236,6 +219,12 @@ RecipeParse parseRecipe(String text) {
           'από τον βοηθό να τη γράψει ξανά στη μορφή των οδηγιών.'
     ]);
   }
+  return parseRecipeObject(j);
+}
+
+/// Μία συνταγή από ένα αντικείμενο JSON (της επικόλλησης μίας συνταγής ή ενός φαγητού της βιβλιοθήκης). [needSteps]:
+/// χωρίς βήματα δεν γίνεται δεκτή (φαγητό χωρίς μαγείρεμα, π.χ. φρούτο με φρυγανιά, δεν χρειάζεται βήματα).
+RecipeParse parseRecipeObject(Map<String, dynamic> j, {bool needSteps = true}) {
   final errors = <String>[];
   final name = j['name'] is String ? _cut(j['name'] as String, maxDishNameLength) : '';
   if (name.isEmpty) errors.add('Η συνταγή δεν έχει όνομα.');
@@ -243,8 +232,28 @@ RecipeParse parseRecipe(String text) {
   final sv = j['servings'];
   final servings = sv is num && sv.isFinite && sv >= 1 && sv <= maxDishServings ? sv.round() : (kind == DishKind.plate ? 1 : 0);
   if (kind == DishKind.portions && servings < 1) errors.add('Λείπει πόσες μερίδες βγάζει («servings», 1–$maxDishServings).');
+  final items = parsePastedItems(j['items'] is List ? j['items'] as List : const [], errors);
+  if (items.isEmpty && errors.isEmpty) errors.add('Η συνταγή δεν έχει υλικά.');
+  if (items.length > maxDishItems) errors.add('Πολλά υλικά (${items.length}): το πολύ $maxDishItems.');
+  final recipe = Recipe.fromJson({...j, 'min': j['minutes'] ?? j['min']}) ?? const Recipe();
+  if (needSteps && recipe.steps.isEmpty) errors.add('Η συνταγή δεν έχει βήματα.');
+  return RecipeParse(
+    errors.isEmpty
+        ? PastedRecipe(
+            name: name,
+            kind: kind,
+            servings: kind == DishKind.plate ? 1 : (servings < 1 ? 1 : servings),
+            items: items,
+            recipe: recipe,
+          )
+        : null,
+    errors,
+  );
+}
+
+/// Τα υλικά όπως ήρθαν (id, όνομα, γραμμάρια). Ό,τι δεν στέκει γράφεται στο [errors] και δεν μπαίνει.
+List<PastedItem> parsePastedItems(List rawItems, List<String> errors) {
   final items = <PastedItem>[];
-  final rawItems = j['items'] is List ? j['items'] as List : const [];
   for (var k = 0; k < rawItems.length; k++) {
     final x = rawItems[k];
     if (x is! Map) {
@@ -264,22 +273,7 @@ RecipeParse parseRecipe(String text) {
     }
     items.add(PastedItem(id: id, name: n.isEmpty ? id! : n, amount: roundAmount(g.toDouble())));
   }
-  if (items.isEmpty && errors.isEmpty) errors.add('Η συνταγή δεν έχει υλικά.');
-  if (items.length > maxDishItems) errors.add('Πολλά υλικά (${items.length}): το πολύ $maxDishItems.');
-  final recipe = Recipe.fromJson({...j, 'min': j['minutes'] ?? j['min']}) ?? const Recipe();
-  if (recipe.steps.isEmpty) errors.add('Η συνταγή δεν έχει βήματα.');
-  return RecipeParse(
-    errors.isEmpty
-        ? PastedRecipe(
-            name: name,
-            kind: kind,
-            servings: kind == DishKind.plate ? 1 : (servings < 1 ? 1 : servings),
-            items: items,
-            recipe: recipe,
-          )
-        : null,
-    errors,
-  );
+  return items;
 }
 
 /// Πώς αντιστοιχίστηκε ένα υλικό στη βάση.
@@ -426,18 +420,27 @@ String recipePrompt({
   b
     ..writeln()
     ..writeln('ΤΡΟΦΙΜΑ (id όνομα), ανά κατηγορία:');
-  final byCat = <String, List<Food>>{};
-  // Μόνο ωμές μορφές: οι συνταγές ζυγίζονται ωμές. Έξω οι μαγειρεμένες μορφές ωμών τροφίμων (π.χ. «Φακές (βρασμένες)»,
-  // που η βάση τις συνδέει με τις ξερές) και όσα δε μου αρέσουν.
-  final cookedIds = {for (final f in foods) for (final c in f.cooked) c.$1};
-  for (final f in foods) {
-    if (f.rawId != null || cookedIds.contains(f.id) || likes.dislike.contains(f.id)) continue;
-    byCat.putIfAbsent(f.cat.isEmpty ? 'Άλλα' : f.cat, () => []).add(f);
-  }
-  for (final e in byCat.entries) {
-    b.writeln('${e.key}: ${[for (final f in e.value) '${f.id} ${f.name}${f.perMl ? ' (ml)' : ''}'].join('; ')}');
+  for (final line in rawFoodLines(foods, likes)) {
+    b.writeln(line);
   }
   return b.toString();
+}
+
+/// Τα τρόφιμα για τις οδηγίες, μία γραμμή ανά κατηγορία («Κατηγορία: id όνομα; …»). Μόνο ωμές μορφές: οι συνταγές
+/// ζυγίζονται ωμές. Έξω οι μαγειρεμένες μορφές ωμών τροφίμων (π.χ. «Φακές (βρασμένες)», που η βάση τις συνδέει με τις
+/// ξερές) και όσα δε μου αρέσουν. [cooked]: αντί για τις ωμές, ΜΟΝΟ οι μαγειρεμένες μορφές (για φαγητά από παραγγελία).
+List<String> rawFoodLines(List<Food> foods, FoodLikes likes, {bool cooked = false}) {
+  final byCat = <String, List<Food>>{};
+  final cookedIds = {for (final f in foods) for (final c in f.cooked) c.$1};
+  for (final f in foods) {
+    if (likes.dislike.contains(f.id)) continue;
+    final isCooked = f.rawId != null || cookedIds.contains(f.id);
+    if (isCooked != cooked) continue;
+    byCat.putIfAbsent(f.cat.isEmpty ? 'Άλλα' : f.cat, () => []).add(f);
+  }
+  return [
+    for (final e in byCat.entries) '${e.key}: ${[for (final f in e.value) '${f.id} ${f.name}${f.perMl ? ' (ml)' : ''}'].join('; ')}',
+  ];
 }
 
 /// Αναζήτηση υλικού από το όνομα, όταν το id του βοηθού δεν υπάρχει: ταιριάζει αν όλες οι λέξεις του ονόματος είναι στο
