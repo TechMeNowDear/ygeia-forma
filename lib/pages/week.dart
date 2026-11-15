@@ -195,6 +195,8 @@ class SlotRow extends StatelessWidget {
       SlotState.open => (mealIcon(s.meal), c.food),
     };
     final done = state != SlotState.open;
+    // Μέρα που δεν ήρθε ακόμα: μόνο αλλαγή φαγητού (τίποτα δεν γράφεται στο ημερολόγιο του μέλλοντος).
+    final future = dayOf(plan.dayAt(day)).isAfter(dayOf(now));
     return Padding(
       key: ValueKey('slot-$day-$index'),
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -228,7 +230,7 @@ class SlotRow extends StatelessWidget {
                 child: Text(hint, key: ValueKey('slot-hint-$day-$index'),
                     style: TextStyle(fontSize: 14, height: 1.35, fontWeight: FontWeight.w600, color: c.text)),
               ),
-            if (state == SlotState.open && d != null)
+            if (state == SlotState.open && d != null && !future)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: FilledButton.tonalIcon(
@@ -267,8 +269,8 @@ class SlotRow extends StatelessWidget {
             if (info?.order != null) const PopupMenuItem(value: 'order', child: Text('Τι να ζητήσεις όταν το παραγγέλνεις')),
             if (state == SlotState.open) ...[
               const PopupMenuItem(value: 'change', child: Text('Άλλαξέ το')),
-              const PopupMenuItem(value: 'other', child: Text('Έφαγα κάτι άλλο')),
-              const PopupMenuItem(value: 'skip', child: Text('Δεν το έφαγα')),
+              if (!future) const PopupMenuItem(value: 'other', child: Text('Έφαγα κάτι άλλο')),
+              if (!future) const PopupMenuItem(value: 'skip', child: Text('Δεν το έφαγα')),
             ],
             if (state == SlotState.ate) const PopupMenuItem(value: 'undo', child: Text('Αναίρεση: σβήνεται από το ημερολόγιο')),
             if (state == SlotState.skip || state == SlotState.other) const PopupMenuItem(value: 'reopen', child: Text('Ξανά στο πρόγραμμα')),

@@ -414,6 +414,9 @@ void main() {
       expect(find.byKey(const ValueKey('week-day-0')), findsOneWidget);
       expect(find.byKey(const ValueKey('week-day-1')), findsOneWidget);
       expect(find.textContaining('Σήμερα'), findsWidgets);
+      // Αύριο: χωρίς «Το έφαγα» (τίποτα στο ημερολόγιο του μέλλοντος).
+      expect(find.byKey(const ValueKey('slot-ate-0-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('slot-ate-1-0')), findsNothing);
       await t.tap(find.byKey(const ValueKey('slot-lock-0-0')));
       await t.pumpAndSettle();
       expect(s.week!.days[0][0].locked, isTrue);
