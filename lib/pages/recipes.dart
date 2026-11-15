@@ -138,6 +138,7 @@ class _RecipeStartSheetState extends State<RecipeStartSheet> {
                   labelText: 'Τι θέλεις;',
                   floatingLabelBehavior: FloatingLabelBehavior.always,
                   hintText: 'π.χ. κοτόπουλο με λαχανικά στον ατμό, για 2 μέρες, ως 30 λεπτά',
+                  hintStyle: TextStyle(color: c.textTertiary),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
@@ -416,6 +417,7 @@ class _RecipePreviewScreenState extends State<RecipePreviewScreen> {
             key: ValueKey('recipe-kind-${k.name}'),
             avatar: Icon(dishIcon(k), size: 18),
             label: Text(dishKindLabel(k)),
+            showCheckmark: false,
             selected: _kind == k,
             onSelected: (_) => setState(() => _kind = k),
           ),
@@ -1028,6 +1030,7 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
                 },
                 decoration: InputDecoration(
                   hintText: 'π.χ. πόσο χρόνο έχεις για μαγείρεμα, τι τρόπο μαγειρέματος προτιμάς, τι αποφεύγεις.',
+                  hintStyle: TextStyle(color: c.textTertiary),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
