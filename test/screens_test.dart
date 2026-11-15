@@ -548,7 +548,7 @@ void main() {
 
   testWidgets('Φαγητά · «+ Φαγητό» με τα φαγητά μου', (t) async {
     final food = dishStore(now);
-    await _shot(t, name: '70_add_food_dishes', size: phone, brightness: Brightness.light, tab: Cat.food, food: food, act: (t) async {
+    await _shot(t, name: 'dish1_add_food', size: phone, brightness: Brightness.light, tab: Cat.food, food: food, act: (t) async {
       await t.tap(find.text('Φαγητό'));
     });
   });
@@ -559,12 +559,12 @@ void main() {
     final plate = food.dishById('D-plate')!;
     await food.logDish(plate, dishAmounts(plate), meal: Meal.dinner, qty: 455, on: DateTime(now.year, now.month, now.day), now: now);
     await food.add(basicFoods().firstWhere((x) => x.id == 'C22000'), 50, Meal.lunch, now: now);
-    await _shot(t, name: '71_diary_dishes', size: phone, brightness: Brightness.light, tab: Cat.food, food: food);
+    await _shot(t, name: 'dish2_diary', size: phone, brightness: Brightness.light, tab: Cat.food, food: food);
   });
   for (final (name, kind, dark) in [
-    ('72_dish_log_pot', 'D-pot', false),
-    ('73_dish_log_plate', 'D-plate', false),
-    ('74_dish_log_portions', 'D-burgers', true),
+    ('dish3_log_pot', 'D-pot', false),
+    ('dish4_log_plate', 'D-plate', false),
+    ('dish5_log_portions', 'D-burgers', true),
   ]) {
     testWidgets('Φαγητά · καταγραφή · $name', (t) async {
       final food = dishStore(now);
@@ -597,7 +597,7 @@ void main() {
     final pot = food.dishById('D-pot')!;
     await _page(
       t,
-      name: '75_dish_log_new_cooking',
+      name: 'dish6_log_new_cooking',
       size: const Size(400, 1400),
       brightness: Brightness.light,
       oura: false,
@@ -624,8 +624,8 @@ void main() {
     );
   });
   for (final (name, id, size) in [
-    ('76_dish_edit_pot', 'D-pot', const Size(400, 1900)),
-    ('77_dish_edit_portions_360', 'D-burgers', const Size(360, 1900)),
+    ('dish7_edit_pot', 'D-pot', const Size(400, 1900)),
+    ('dish8_edit_portions_360', 'D-burgers', const Size(360, 1900)),
   ]) {
     testWidgets('Φαγητά · αλλαγή φαγητού · $name', (t) async {
       final food = dishStore(now);
@@ -641,7 +641,7 @@ void main() {
   }
   testWidgets('Φαγητά · όλα τα φαγητά μου', (t) async {
     final food = dishStore(now);
-    await _page(t, name: '78_dishes_list', size: const Size(400, 1100), brightness: Brightness.dark, oura: false, page: (_) => DishesScreen(food: food));
+    await _page(t, name: 'dish9_list', size: const Size(400, 1100), brightness: Brightness.dark, oura: false, page: (_) => DishesScreen(food: food));
   });
   testWidgets('Φαγητά · αλλαγή φαγητού από το ημερολόγιο', (t) async {
     final food = dishStore(now);
@@ -649,7 +649,7 @@ void main() {
     final out = await food.logDish(pot, dishAmounts(pot, portion: 350), meal: Meal.lunch, qty: 350, now: now);
     await _page(
       t,
-      name: '79_dish_entry_edit',
+      name: 'dish10_entry_edit',
       size: const Size(400, 1300),
       brightness: Brightness.light,
       oura: false,

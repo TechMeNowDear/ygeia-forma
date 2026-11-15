@@ -21,6 +21,9 @@ String dishQtyText(DishKind k, double q) => switch (k) {
       _ => '${gramsText(q)} g',
     };
 
+/// «1.000» από 1.000 και πάνω (όπως οι θερμίδες), αλλιώς όπως παντού («250», «9,3»).
+String amountText(double v) => v >= 1000 && v == v.roundToDouble() ? thousands(v.round()) : gramsText(v);
+
 /// Τα σύνολα μιας λίστας υλικών (με τις τιμές της βάσης όπως είναι τώρα), ή null αν λείπει υλικό.
 Totals? dishTotals(FoodStore food, List<DishItem> amounts) {
   final p = food.previewDish(amounts);
@@ -31,14 +34,14 @@ Totals? dishTotals(FoodStore food, List<DishItem> amounts) {
 String dishSubtitle(FoodStore food, Dish d) {
   final missing = food.missingItems(d.items);
   if (missing.isNotEmpty) return 'Λείπει: ${missing.join(', ')}';
-  String kp(Totals t) => '${kcalText(t.kcal)} kcal${dotJoin}πρωτεΐνη ${gramsText(t.protein)} g';
+  String kp(Totals t) => '${kcalText(t.kcal)} kcal${dotJoin}πρωτεΐνη ${gramsText(t.protein)} g';
   switch (d.kind) {
     case DishKind.plate:
       final t = dishTotals(food, dishAmounts(d, plate: d.lastPlate));
       return t == null ? 'Πιάτο' : 'Πιάτο$dotJoin${kp(t)}';
     case DishKind.portions:
       final t = dishTotals(food, dishAmounts(d, servings: 1));
-      return t == null ? 'Ίσες μερίδες' : '1 μερίδα από ${d.servings}$dotJoin${kp(t)}';
+      return t == null ? 'Ίσες μερίδες' : '1 από ${d.servings} μερίδες$dotJoin${kp(t)}';
     case DishKind.pot:
       final b = d.batch;
       if (b == null) return 'Κατσαρόλα${dotJoin}ζυγίζεις τη μερίδα σου';
@@ -108,11 +111,11 @@ class DishTile extends StatelessWidget {
                 icon: Icon(Icons.more_vert_rounded, color: c.textSecondary),
               ),
             if (onQuick != null && !missing)
-              IconButton.filledTonal(
+              IconButton(
                 key: ValueKey('dish-quick-${dish.id}'),
                 tooltip: 'Γράψ’ το τώρα, όπως την τελευταία φορά',
                 onPressed: onQuick,
-                icon: const Icon(Icons.add_rounded),
+                icon: Icon(Icons.add_circle_rounded, color: c.food, size: 32),
               )
             else
               Icon(Icons.chevron_right_rounded, color: c.textTertiary),
@@ -134,7 +137,9 @@ class NutrientStrip extends StatelessWidget {
     final t = totals;
     String g(double v) => t == null ? '—' : '${gramsText(v)} g';
     final kcal = t == null ? '—' : kcalText(t.kcal);
-    if (veryLargeText(context) || MediaQuery.textScalerOf(context).scale(10) >= 12.5) {
+    // Στενό πλαίσιο (π.χ. κάρτα σε κινητό 360 dp) ή μεγάλα γράμματα: μία γραμμή το καθένα, ποτέ ετικέτες που ακουμπούν.
+    return LayoutBuilder(builder: (context, box) {
+    if (box.maxWidth < 320 || veryLargeText(context) || MediaQuery.textScalerOf(context).scale(10) >= 12.5) {
       return Container(
         key: const ValueKey('dish-nutrients-rows'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -178,6 +183,7 @@ class NutrientStrip extends StatelessWidget {
         stat('Λιπαρά', g(t?.fat ?? 0), fatColor(c)),
       ]),
     );
+    });
   }
 }
 
@@ -664,8 +670,8 @@ class _DishLogSheetState extends State<DishLogSheet> {
         Text('Πόσο ζυγίζει όλο το έτοιμο φαγητό;', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
         const SizedBox(height: 4),
         Text(
-          'Ζύγισέ το μόλις μαγειρευτεί, πριν σερβίρει κανείς: ακούμπησε την άδεια κατσαρόλα, μηδένισε τη ζυγαριά, '
-          'μετά ζύγισε την κατσαρόλα με το φαγητό.',
+          'Μόλις μαγειρευτεί, πριν σερβίρει κανείς, χωρίς το βάρος της κατσαρόλας: ζύγισε την άδεια κατσαρόλα πριν '
+          'μαγειρέψεις και αφαίρεσέ το.',
           style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary),
         ),
         const SizedBox(height: 10),
@@ -957,7 +963,7 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
         ),
         if (_showItems)
           for (final e in r ?? g)
-            InfoRow(e.food.name, '${gramsText(e.grams)} ${e.food.unit}'),
+            InfoRow(e.food.name, '${amountText(e.grams)} ${e.food.unit}'),
       ]);
     }
     body.addAll([
@@ -1397,7 +1403,7 @@ class _IngredientRow extends StatelessWidget {
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: f == null ? c.warn : c.text)),
               const SizedBox(height: 2),
               Text(
-                f == null ? 'Δεν υπάρχει πια: πάτα για αφαίρεση' : '${gramsText(item.amount)} ${f.unit}',
+                f == null ? 'Δεν υπάρχει πια: πάτα για αφαίρεση' : '${amountText(item.amount)} ${f.unit}',
                 style: TextStyle(fontSize: 13, color: f == null ? c.warn : c.textSecondary, fontFeatures: tabular),
               ),
             ]),
