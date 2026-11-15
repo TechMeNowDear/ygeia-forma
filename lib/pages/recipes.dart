@@ -915,6 +915,21 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Το πρόχειρο δεν έχει λίστα «Τι μου αρέσει».')));
       return;
     }
+    if (!widget.food.likes.isEmpty) {
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Αντικατάσταση της λίστας;'),
+          content: Text('Η λίστα σου θα γίνει αυτή που επικόλλησες: ${countText(r.likes.like.length, 'τρόφιμο', 'τρόφιμα')} '
+              'που σου αρέσουν και ${r.likes.dislike.length} που δε σου αρέσουν.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Αντικατάσταση')),
+          ],
+        ),
+      );
+      if (yes != true || !mounted) return;
+    }
     final ok = await widget.food.saveLikes(r.likes);
     if (!mounted || !ok) return;
     _note.text = r.likes.note;
