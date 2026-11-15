@@ -11,6 +11,7 @@ import 'dart:convert';
 
 import 'error_report.dart' show ErrorReporter;
 import 'food/dishes.dart' show Dish;
+import 'food/recipe.dart' show FoodLikes;
 import 'food/food_model.dart';
 import 'format.dart';
 import 'plan_file.dart';
@@ -33,6 +34,7 @@ String buildBackup({
   ({String plan, String? log})? sources,
   Map<String, dynamic>? training,
   List<Object?>? dishes,
+  Map<String, Object>? foodLikes,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -52,6 +54,7 @@ String buildBackup({
     if (training != null) 'training': training,
     // «Τα φαγητά μου» (15/11): υπάρχουν μόνο στο κινητό. Πρόσθετο κλειδί· οι παλιές εκδόσεις το αγνοούν.
     if (dishes != null) 'dishes': dishes,
+    if (foodLikes != null) 'foodLikes': foodLikes,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -59,7 +62,10 @@ String buildBackup({
 /// Ό,τι βρέθηκε σε ένα αρχείο αντιγράφου, ελεγμένο.
 class BackupContents {
   BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped,
-      {this.sources, this.training, this.errorsOff = false, this.dishes = const []});
+      {this.sources, this.training, this.errorsOff = false, this.dishes = const [], this.likes = const FoodLikes()});
+
+  /// «Τι μου αρέσει» (15/11).
+  final FoodLikes likes;
 
   /// «Τα φαγητά μου» (15/11), όσα διαβάζονται σωστά.
   final List<Dish> dishes;
@@ -235,6 +241,7 @@ BackupContents parseBackup(String text) {
     training: j['training'] is Map ? Map<String, dynamic>.from(j['training'] as Map) : null,
     errorsOff: j['errorsOff'] == true,
     dishes: dishes,
+    likes: FoodLikes.fromJson(j['foodLikes']),
   );
 }
 

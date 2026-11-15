@@ -29,6 +29,8 @@ import 'package:ygeia_forma/pages/me_page.dart';
 import 'package:ygeia_forma/food/dishes.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/pages/dishes.dart';
+import 'package:ygeia_forma/food/recipe.dart';
+import 'package:ygeia_forma/pages/recipes.dart';
 import 'package:ygeia_forma/goals.dart';
 import 'package:ygeia_forma/pages/goals_page.dart';
 import 'package:ygeia_forma/profile.dart';
@@ -668,6 +670,110 @@ void main() {
         await t.tap(find.byKey(const ValueKey('dish-entry-items')));
       },
     );
+  });
+  // Συνταγές (15/11, βήμα 2): επινοημένη συνταγή, όπως θα την έγραφε ο βοηθός.
+  const recipeJson = '''```json
+{"kind": "ygeia-recipe", "name": "Κοτόπουλο με λαχανικά στον ατμό", "type": "plate", "minutes": 30,
+ "items": [{"id": "C36017", "name": "Κοτόπουλο στήθος χωρίς πέτσα (ωμό)", "g": 180}, {"id": "C9102", "name": "Ρύζι καστανό", "g": 70},
+   {"id": "C20057", "name": "Μπρόκολο", "g": 200}, {"id": "C20009", "name": "Καρότο", "g": 120},
+   {"id": "C17270", "name": "Ελαιόλαδο", "g": 8}],
+ "steps": [
+   {"text": "Βάλε το ρύζι να βράσει σε 200 ml νερό με μια πρέζα αλάτι.", "device": "Κατσαρόλα μικρή", "heat": "χαμηλή φωτιά, σκεπασμένη", "min": 25},
+   {"text": "Κόψε το κοτόπουλο σε μπουκιές και βάλ' το στον κάτω όροφο του ατμομάγειρα.", "device": "Ατμομάγειρας", "min": 2},
+   {"text": "Βάλε μπρόκολο και καρότο στον πάνω όροφο και άνοιξε τον ατμομάγειρα.", "device": "Ατμομάγειρας", "min": 18},
+   {"text": "Σέρβιρε με το ελαιόλαδο, λεμόνι και ρίγανη."}
+ ],
+ "tips": ["Το κοτόπουλο είναι έτοιμο όταν δεν είναι ροζ μέσα (75 °C στο κέντρο)."],
+ "keeps": "Στο ψυγείο ως 3 μέρες",
+ "why": "Πολλή πρωτεΐνη, πολλά λαχανικά, λίγο λάδι και λίγα κορεσμένα."}
+```''';
+  Goals screenshotGoals() => Goals(
+        aim: GoalAim.lose,
+        rate: 0.005,
+        activity: 1.5,
+        doctor: true,
+        since: '2026-10-20',
+        kg: 90,
+        age: 40,
+        heightCm: 180,
+        male: true,
+        nutsG: 30,
+        branG: 40,
+        legumesWeek: 4,
+        fishWeek: 2,
+      );
+  testWidgets('Φαγητά · συνταγή από AI · αρχή', (t) async {
+    final food = dishStore(now);
+    await _page(
+      t,
+      name: 'dish11_recipe_start',
+      size: const Size(400, 1300),
+      brightness: Brightness.light,
+      oura: false,
+      page: (_) => FoodTheme(
+        child: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: TextButton(
+                onPressed: () => showModalBottomSheet<bool>(
+                  context: context,
+                  isScrollControlled: true,
+                  showDragHandle: true,
+                  builder: (_) => RecipeStartSheet(food: food, goals: screenshotGoals(), now: now),
+                ),
+                child: const Text('άνοιξε'),
+              ),
+            ),
+          ),
+        ),
+      ),
+      act: (t) async {
+        await t.tap(find.text('άνοιξε'));
+      },
+    );
+  });
+  testWidgets('Φαγητά · συνταγή από AI · επικόλληση', (t) async {
+    final food = dishStore(now);
+    await _page(
+      t,
+      name: 'dish12_recipe_preview',
+      size: const Size(400, 2600),
+      brightness: Brightness.light,
+      oura: false,
+      page: (_) => RecipePreviewScreen(food: food, text: recipeJson, goals: screenshotGoals()),
+    );
+  });
+  testWidgets('Φαγητά · μαγείρεμα βήμα-βήμα', (t) async {
+    final food = dishStore(now);
+    final r = parseRecipe(recipeJson).recipe!;
+    final d = withRecipe(
+        Dish(id: 'D-r', name: r.name, kind: r.kind, items: [for (final i in r.items) DishItem(i.id!, i.name, i.amount)], created: 0),
+        r.recipe);
+    await _page(
+      t,
+      name: 'dish13_cook',
+      size: const Size(400, 1900),
+      brightness: Brightness.dark,
+      oura: false,
+      page: (_) => CookScreen(dish: d, recipe: recipeOf(d)!, food: food),
+      // Χωρίς χρονόμετρο: τρέχει κάθε δευτερόλεπτο και το στιγμιότυπο περιμένει να ησυχάσει η οθόνη (δοκιμάζεται στο recipes_test).
+      act: (t) async {
+        await t.tap(find.byKey(const ValueKey('cook-step-0')));
+      },
+    );
+  });
+  testWidgets('Φαγητά · τι μου αρέσει', (t) async {
+    final food = FoodStore.preloaded(
+      foods: basicFoods(),
+      likes: const FoodLikes(
+        // Επινοημένες προτιμήσεις (ποτέ του χρήστη).
+        like: ['C26036', 'C10021', 'C13004', 'C20010', 'C20066', 'C11093'],
+        dislike: ['C40106', 'C20023', 'C26065'],
+        note: 'Γρήγορα φαγητά τις καθημερινές. Χωρίς πικάντικα.',
+      ),
+      now: now,
+    );
+    await _page(t, name: 'dish14_likes', size: const Size(400, 1300), brightness: Brightness.light, oura: false, page: (_) => FoodLikesScreen(food: food));
   });
   testWidgets('Διατροφή · αναζήτηση με μάρκα', (t) => _shot(
         t,

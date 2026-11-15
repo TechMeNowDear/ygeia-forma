@@ -13,6 +13,7 @@ import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
 import 'off.dart' show dryStapleRawId, normalizeBarcode;
+import 'recipe.dart' show FoodLikes;
 import 'replaced_foods.dart';
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
@@ -27,8 +28,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     List<Food> mine = const [],
     List<Dish> dishes = const [],
     DishIO? dishIO,
+    FoodLikes likes = const FoodLikes(),
     DateTime? now,
   }) : _offline = true {
+    _likes = likes;
     _basic = foods;
     _mine = mine;
     _mineRead = true;
@@ -513,6 +516,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Τα προϊόντα μου, το πιο πρόσφατο πρώτο.
   List<Food> get mine => _mine;
 
+  /// Η βάση τροφίμων (για τις οδηγίες των συνταγών).
+  List<Food> get basicFoods => _basic;
+
   /// `false` αν δεν διαγράφηκε.
   Future<bool> deleteMyFood(Food f) async {
     final before = _mine;
@@ -698,6 +704,27 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Τι να πει η οθόνη για το αρχείο των φαγητών (δεν διαβάστηκε, μπήκε στην άκρη, νεότερη έκδοση)· null αν όλα καλά.
   String? dishesNote;
 
+  /// «Τι μου αρέσει» (15/11, βήμα 2): στο ίδιο αρχείο με τα φαγητά (κλειδί «likes»).
+  FoodLikes _likes = const FoodLikes();
+  FoodLikes get likes => _likes;
+
+  /// Αλλαγή του «Τι μου αρέσει». `false` αν δεν γράφτηκε (τότε μένει όπως ήταν).
+  Future<bool> saveLikes(FoodLikes l) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final before = _likes;
+    _likes = l;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (identical(_likes, l)) _likes = before;
+    saveError = 'Δεν αποθηκεύτηκε: Τι μου αρέσει. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
   /// Τα φαγητά μου: όσα έγραψες πιο πρόσφατα πρώτα.
   List<Dish> get dishes => _dishes;
 
@@ -718,6 +745,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     if (r.state == 'missing') {
       _dishes = const [];
       _badDishRows = const [];
+      _likes = const FoodLikes();
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -744,6 +772,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       }
       _dishes = const [];
       _badDishRows = const [];
+      _likes = const FoodLikes();
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -763,13 +792,17 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     }
     _dishes = dishesInOrder(ok);
     _badDishRows = bad;
+    _likes = FoodLikes.fromJson((j as Map)['likes']);
     skippedRows += bad.length;
     _dishesRead = true;
     dishesNote = _dishesNewer ? dishesNewerText : null;
   }
 
-  String _dishesJson(List<Dish> list) =>
-      jsonEncode({'v': dishesFileVersion, 'dishes': [for (final d in list) d.toJson(), ..._badDishRows]});
+  String _dishesJson(List<Dish> list) => jsonEncode({
+        'v': dishesFileVersion,
+        'dishes': [for (final d in list) d.toJson(), ..._badDishRows],
+        if (!_likes.isEmpty) 'likes': _likes.toJson(),
+      });
 
   Future<bool> _writeDishes(List<Dish> after, String what) async {
     if (!_dishesRead || _dishesNewer) {
@@ -867,6 +900,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Για το αντίγραφο: όλα τα φαγητά όπως αποθηκεύονται (και όσα δεν διαβάστηκαν, όπως είναι). null αν το αρχείο δεν
   /// διαβάστηκε (τότε το αντίγραφο το λέει).
   List<Object?>? dishesForBackup() => _dishesRead ? [for (final d in _dishes) d.toJson(), ..._badDishRows] : null;
+
+  /// Για το αντίγραφο: «Τι μου αρέσει» (null αν το αρχείο δεν διαβάστηκε ή είναι άδειο).
+  Map<String, Object>? likesForBackup() => _dishesRead && !_likes.isEmpty ? _likes.toJson() : null;
+
+  /// Επαναφορά του «Τι μου αρέσει»: μόνο αν το κινητό δεν έχει (ό,τι έχεις ήδη μένει). `true` αν μπήκε.
+  Future<bool> importLikes(FoodLikes l) async {
+    if (l.isEmpty || !_dishesRead || !_likes.isEmpty) return false;
+    return saveLikes(l);
+  }
 
   /// Επαναφορά: μπαίνουν μόνο τα φαγητά που λείπουν (ίδιο id = υπάρχει ήδη και μένει όπως είναι). Απάντηση: πόσα μπήκαν
   /// και πόσα υπήρχαν ήδη, ή null αν δεν γράφτηκαν (το αρχείο δεν διαβάστηκε ή απέτυχε η εγγραφή).

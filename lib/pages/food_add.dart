@@ -20,6 +20,7 @@ import '../widgets.dart';
 import 'dishes.dart';
 import 'my_foods.dart';
 import 'nutrition.dart';
+import 'recipes.dart';
 
 // ---------------------------------------------------------------------------
 // Είσοδοι
@@ -84,11 +85,20 @@ typedef IngredientPick = ({Food food, double amount, bool remove});
 
 /// Νέο υλικό για το φαγητό [dishName]: η γνωστή αναζήτηση (Συχνά, Πρόσφατα, Δικά μου, Σάρωση, Από ετικέτα) και η
 /// ποσότητα. null αν έκλεισε χωρίς υλικό.
-Future<IngredientPick?> pickIngredient(BuildContext context, FoodStore food, {required String dishName}) =>
+Future<IngredientPick?> pickIngredient(BuildContext context, FoodStore food, {required String dishName, String? query}) =>
     Navigator.of(context).push<IngredientPick>(MaterialPageRoute<IngredientPick>(
       settings: const RouteSettings(name: 'Υλικό φαγητού'),
-      builder: (_) => AddFoodScreen(food: food, meal: Meal.lunch, day: food.day, ingredientOf: dishName),
+      builder: (_) => AddFoodScreen(food: food, meal: Meal.lunch, day: food.day, ingredientOf: dishName, query: query),
     ));
+
+/// Ένα τρόφιμο χωρίς ποσότητα (15/11, «Τι μου αρέσει»): η ίδια αναζήτηση, κλείνει με το τρόφιμο.
+Future<Food?> pickFood(BuildContext context, FoodStore food, {required String forWhat}) async {
+  final r = await Navigator.of(context).push<IngredientPick>(MaterialPageRoute<IngredientPick>(
+    settings: const RouteSettings(name: 'Επιλογή τροφίμου'),
+    builder: (_) => AddFoodScreen(food: food, meal: Meal.lunch, day: food.day, ingredientOf: forWhat, pickOnly: true),
+  ));
+  return r?.food;
+}
 
 /// Αλλαγή ποσότητας (ή μορφής: ωμό/βρασμένο) ενός υλικού, ή αφαίρεσή του.
 Future<IngredientPick?> editIngredient(BuildContext context, FoodStore food, Food item, double amount) async {
@@ -389,8 +399,22 @@ class MealPicker extends StatelessWidget {
 
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen(
-      {super.key, required this.food, required this.meal, required this.day, this.clock, this.scanOnOpen = false, this.ingredientOf});
+      {super.key,
+      required this.food,
+      required this.meal,
+      required this.day,
+      this.clock,
+      this.scanOnOpen = false,
+      this.ingredientOf,
+      this.pickOnly = false,
+      this.query});
   final FoodStore food;
+
+  /// Η αναζήτηση γραμμένη ήδη (υλικό συνταγής που δεν βρέθηκε: το όνομά του).
+  final String? query;
+
+  /// Μόνο το τρόφιμο, χωρίς ποσότητα (με [ingredientOf]: «Τι μου αρέσει»).
+  final bool pickOnly;
 
   /// Επιλογή υλικού για το φαγητό με αυτό το όνομα (15/11): χωρίς γεύμα και μέρα· η οθόνη κλείνει με το υλικό και την
   /// ποσότητά του ([IngredientPick]) αντί να γράψει κάτι στο ημερολόγιο.
@@ -410,7 +434,7 @@ class AddFoodScreen extends StatefulWidget {
 }
 
 class _AddFoodScreenState extends State<AddFoodScreen> {
-  final _query = TextEditingController();
+  late final _query = TextEditingController(text: widget.query ?? '');
   late Meal _meal = widget.meal;
   bool _busy = false;
   bool _moreRecent = false;
@@ -499,6 +523,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       return;
     }
     final ingredient = widget.ingredientOf != null;
+    if (ingredient && widget.pickOnly) {
+      Navigator.of(context).pop<IngredientPick>((food: f, amount: 0, remove: false));
+      return;
+    }
     final r = await showModalBottomSheet<_SheetResult>(
       context: context,
       routeSettings: RouteSettings(name: ingredient ? 'Ποσότητα υλικού' : 'Ποσότητα'),
@@ -603,6 +631,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     final d = await openDishEditor(context, widget.food);
     if (d != null && mounted) await _pickDish(d);
   }
+
+  Future<void> _recipe() => openRecipeStart(context, widget.food);
 
   Future<void> _allDishes() async {
     final d = await Navigator.of(context).push<Dish>(DishesScreen.route(widget.food, pick: true));
@@ -737,21 +767,27 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   ]),
                 ),
               )
-            else ...[
+            else
               dishRows(dishes.take(3).toList()),
-              Padding(
-                padding: const EdgeInsets.only(left: 12),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
+            // Νέο φαγητό με τα χέρια, ή συνταγή από AI (15/11, βήμα 2).
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Wrap(children: [
+                if (dishes.isNotEmpty)
+                  TextButton.icon(
                     key: const ValueKey('add-dish-new'),
                     onPressed: widget.food.dishesRead ? _newDish : null,
                     icon: const Icon(Icons.add_rounded, size: 20),
                     label: const Text('Νέο φαγητό'),
                   ),
+                TextButton.icon(
+                  key: const ValueKey('add-recipe'),
+                  onPressed: widget.food.dishesRead ? _recipe : null,
+                  icon: const Icon(Icons.auto_awesome_outlined, size: 19),
+                  label: const Text('Συνταγή από AI'),
                 ),
-              ),
-            ],
+              ]),
+            ),
           ]),
         );
     // Έλεγχος round1 (U3a-5): αν οι δύο ετικέτες δεν χωρούν ολόκληρες δίπλα δίπλα (μεγάλα γράμματα σε στενή οθόνη), τα
@@ -888,7 +924,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   Icon(Icons.soup_kitchen_outlined, size: 16, color: c.textSecondary),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text('Υλικό για «${widget.ingredientOf}»',
+                    child: Text(widget.pickOnly ? 'Για «${widget.ingredientOf}»' : 'Υλικό για «${widget.ingredientOf}»',
                         maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
                   ),
                 ]),
