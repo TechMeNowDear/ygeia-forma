@@ -26,7 +26,9 @@ import 'package:ygeia_forma/nav.dart';
 import 'package:ygeia_forma/pages/devices_page.dart';
 import 'package:ygeia_forma/pages/kitchen.dart';
 import 'package:ygeia_forma/pages/me_page.dart';
+import 'package:ygeia_forma/food/dishes.dart';
 import 'package:ygeia_forma/food/food_store.dart';
+import 'package:ygeia_forma/pages/dishes.dart';
 import 'package:ygeia_forma/goals.dart';
 import 'package:ygeia_forma/pages/goals_page.dart';
 import 'package:ygeia_forma/profile.dart';
@@ -503,6 +505,170 @@ void main() {
       });
     });
   }
+  // «Τα φαγητά μου» (15/11): φαγητά επινοημένα για τα στιγμιότυπα.
+  FoodStore dishStore(DateTime at) {
+    Food bf(String id) => basicFoods().firstWhere((x) => x.id == id);
+    DishItem di(String id, double g) => DishItem(id, bf(id).name, g);
+    final pot = Dish(
+      id: 'D-pot',
+      name: 'Φακές με σάλτσα',
+      kind: DishKind.pot,
+      items: [di('C20359', 500), di('C20034', 300), di('C20385', 400), di('C17270', 60), di('C11017', 8)],
+      batch: PotBatch(
+          at: DateTime(at.year, at.month, at.day - 1, 20).millisecondsSinceEpoch,
+          cooked: 2250,
+          items: [di('C20359', 500), di('C20034', 300), di('C20385', 400), di('C17270', 60), di('C11017', 8)]),
+      lastQty: 350,
+      created: 0,
+      used: DateTime(at.year, at.month, at.day - 1, 21).millisecondsSinceEpoch,
+      uses: 3,
+    );
+    final plate = Dish(
+      id: 'D-plate',
+      name: 'Φιλέτο με ρύζι και μπρόκολο',
+      kind: DishKind.plate,
+      items: [di('U171812', 180), di('C9102', 70), di('C20057', 200), di('C17270', 5)],
+      created: 0,
+      used: DateTime(at.year, at.month, at.day - 2, 14).millisecondsSinceEpoch,
+      uses: 5,
+    );
+    final burgers = Dish(
+      id: 'D-burgers',
+      name: 'Μπιφτέκια φούρνου',
+      kind: DishKind.portions,
+      items: [di('C6250', 1000), di('C20034', 100), di('C22000', 100)],
+      servings: 8,
+      lastQty: 2,
+      created: 0,
+      used: DateTime(at.year, at.month, at.day - 3, 20).millisecondsSinceEpoch,
+      uses: 2,
+    );
+    return FoodStore.preloaded(foods: basicFoods(), dishes: [pot, plate, burgers], mine: sampleMine(), now: at);
+  }
+
+  testWidgets('Φαγητά · «+ Φαγητό» με τα φαγητά μου', (t) async {
+    final food = dishStore(now);
+    await _shot(t, name: '70_add_food_dishes', size: phone, brightness: Brightness.light, tab: Cat.food, food: food, act: (t) async {
+      await t.tap(find.text('Φαγητό'));
+    });
+  });
+  testWidgets('Φαγητά · ημερολόγιο με φαγητό', (t) async {
+    final food = dishStore(now);
+    final pot = food.dishById('D-pot')!;
+    await food.logDish(pot, dishAmounts(pot, portion: 350), meal: Meal.lunch, qty: 350, now: now);
+    final plate = food.dishById('D-plate')!;
+    await food.logDish(plate, dishAmounts(plate), meal: Meal.dinner, qty: 455, on: DateTime(now.year, now.month, now.day), now: now);
+    await food.add(basicFoods().firstWhere((x) => x.id == 'C22000'), 50, Meal.lunch, now: now);
+    await _shot(t, name: '71_diary_dishes', size: phone, brightness: Brightness.light, tab: Cat.food, food: food);
+  });
+  for (final (name, kind, dark) in [
+    ('72_dish_log_pot', 'D-pot', false),
+    ('73_dish_log_plate', 'D-plate', false),
+    ('74_dish_log_portions', 'D-burgers', true),
+  ]) {
+    testWidgets('Φαγητά · καταγραφή · $name', (t) async {
+      final food = dishStore(now);
+      await _page(
+        t,
+        name: name,
+        size: const Size(400, 1300),
+        brightness: dark ? Brightness.dark : Brightness.light,
+        oura: false,
+        page: (_) => FoodTheme(
+          child: Scaffold(
+            body: Builder(
+              builder: (context) => Center(
+                child: TextButton(
+                  onPressed: () => openDishLogSheet(context, food, food.dishById(kind)!, meal: Meal.lunch, now: () => now),
+                  child: const Text('άνοιξε'),
+                ),
+              ),
+            ),
+          ),
+        ),
+        act: (t) async {
+          await t.tap(find.text('άνοιξε'));
+        },
+      );
+    });
+  }
+  testWidgets('Φαγητά · καταγραφή κατσαρόλας · νέο μαγείρεμα', (t) async {
+    final food = dishStore(now);
+    final pot = food.dishById('D-pot')!;
+    await _page(
+      t,
+      name: '75_dish_log_new_cooking',
+      size: const Size(400, 1400),
+      brightness: Brightness.light,
+      oura: false,
+      page: (_) => FoodTheme(
+        child: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: TextButton(
+                onPressed: () => openDishLogSheet(context, food, pot.copyWith(clearBatch: true, clearLastQty: true), meal: Meal.lunch, now: () => now),
+                child: const Text('άνοιξε'),
+              ),
+            ),
+          ),
+        ),
+      ),
+      act: (t) async {
+        await t.tap(find.text('άνοιξε'));
+        await t.pumpAndSettle();
+        await t.enterText(find.byKey(const ValueKey('dish-cooked')), '2250');
+        await t.enterText(find.byKey(const ValueKey('dish-portion')), '320');
+        await t.pumpAndSettle();
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+    );
+  });
+  for (final (name, id, size) in [
+    ('76_dish_edit_pot', 'D-pot', const Size(400, 1900)),
+    ('77_dish_edit_portions_360', 'D-burgers', const Size(360, 1900)),
+  ]) {
+    testWidgets('Φαγητά · αλλαγή φαγητού · $name', (t) async {
+      final food = dishStore(now);
+      await _page(
+        t,
+        name: name,
+        size: size,
+        brightness: Brightness.light,
+        oura: false,
+        page: (_) => DishEditScreen(food: food, dish: food.dishById(id)),
+      );
+    });
+  }
+  testWidgets('Φαγητά · όλα τα φαγητά μου', (t) async {
+    final food = dishStore(now);
+    await _page(t, name: '78_dishes_list', size: const Size(400, 1100), brightness: Brightness.dark, oura: false, page: (_) => DishesScreen(food: food));
+  });
+  testWidgets('Φαγητά · αλλαγή φαγητού από το ημερολόγιο', (t) async {
+    final food = dishStore(now);
+    final pot = food.dishById('D-pot')!;
+    final out = await food.logDish(pot, dishAmounts(pot, portion: 350), meal: Meal.lunch, qty: 350, now: now);
+    await _page(
+      t,
+      name: '79_dish_entry_edit',
+      size: const Size(400, 1300),
+      brightness: Brightness.light,
+      oura: false,
+      page: (_) => FoodTheme(
+        child: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: TextButton(onPressed: () => openDishEntry(context, food, out!), child: const Text('άνοιξε')),
+            ),
+          ),
+        ),
+      ),
+      act: (t) async {
+        await t.tap(find.text('άνοιξε'));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('dish-entry-items')));
+      },
+    );
+  });
   testWidgets('Διατροφή · αναζήτηση με μάρκα', (t) => _shot(
         t,
         name: '20_search_branded',

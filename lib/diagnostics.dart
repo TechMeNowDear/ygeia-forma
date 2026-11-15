@@ -364,6 +364,13 @@ Map<String, dynamic> diagnosticsFrom({
   // Τελικός έλεγχος (Συμβούλιο 3): γραμμές της βάσης που δεν διαβάστηκαν και παραλείφθηκαν στο άνοιγμα.
   check('food-rows', food.skippedRows == 0, food.skippedRows == 0 ? null : '${food.skippedRows} γραμμές δεν διαβάστηκαν');
   check('food-save', food.saveError == null, food.saveError);
+  // «Τα φαγητά μου» (15/11): το αρχείο τους διαβάστηκε, και κάθε φαγητό έχει μόνο υλικά που υπάρχουν.
+  check('dishes-read', food.dishesRead && food.dishesNote == null, food.dishesNote);
+  final brokenDishes = [
+    for (final d in food.dishes)
+      if (food.missingItems(d.items).isNotEmpty) '${d.name}: ${food.missingItems(d.items).join(', ')}',
+  ];
+  check('dishes-items', brokenDishes.isEmpty, brokenDishes.isEmpty ? null : brokenDishes.take(20).join('; '));
   check('training-read', !trainingReadError);
   check('samsung-read', d != null && d.failed.isEmpty, d == null ? 'καμία ανάγνωση' : (d.failed.isEmpty ? null : d.failed.join(',')));
 
@@ -450,6 +457,7 @@ Map<String, dynamic> diagnosticsFrom({
               for (final e in food.entriesFor(day)) e.toJson(),
           ],
       'myFoods': myFoods,
+      'dishes': food.dishesForBackup(),
       'training': training,
       'sources': sources == null ? null : {'plan': _tryJson(sources.plan), 'log': sources.log == null ? null : _tryJson(sources.log!)},
       'waist': [for (final w in store.waist) w.toJson()],

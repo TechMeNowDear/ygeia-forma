@@ -10,6 +10,7 @@ import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'devices_page.dart';
+import 'dishes.dart';
 import 'goals_page.dart';
 import 'sources_page.dart';
 import 'kitchen.dart';
@@ -319,9 +320,22 @@ class _MePageState extends State<MePage> {
     final c = Aigaio.of(context);
     final n = food.mine.length;
     final k = Kitchen.fromJson(widget.store.prefs.kitchen);
+    final dn = food.dishes.length;
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(children: [
+        // «Τα φαγητά μου» (15/11).
+        NavRow(
+          key: const ValueKey('mine-dishes'),
+          icon: Icons.restaurant_menu_rounded,
+          color: c.food,
+          title: 'Τα φαγητά μου',
+          text: dn == 0
+              ? 'Φαγητά από τα δικά σου υλικά, για να τα γράφεις με ένα πάτημα.'
+              : '${countText(dn, 'φαγητό', 'φαγητά')} ·\u00A0αλλαγή, διαγραφή',
+          line: true,
+          onTap: () => Navigator.of(context).push(DishesScreen.route(food)),
+        ),
         NavRow(
           key: const ValueKey('mine-products'),
           icon: Icons.inventory_2_outlined,

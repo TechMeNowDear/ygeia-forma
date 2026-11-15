@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_sources.dart';
 import '../data.dart';
@@ -10,6 +11,7 @@ import '../format.dart';
 import '../goals.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'dishes.dart';
 import 'food_add.dart';
 import 'nutrition_goals.dart';
 
@@ -508,6 +510,17 @@ class _MealCard extends StatelessWidget {
     ));
   }
 
+  /// Τα τρόφιμα του γεύματος γίνονται τα υλικά ενός νέου φαγητού (πιάτο, με τις ποσότητες που έφαγες). Η οθόνη του φαγητού
+  /// ανοίγει για όνομα και έλεγχο· στο ημερολόγιο δεν αλλάζει τίποτα.
+  Future<void> _saveAsDish(BuildContext context) async {
+    final items = [for (final e in entries) DishItem(e.food.id, e.food.name, roundAmount(e.grams))];
+    final d = await openDishEditor(context, food, items: items);
+    if (d == null || !context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('Αποθηκεύτηκε: ${d.name}. Θα το βρίσκεις πρώτο στο «+ Φαγητό».')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
@@ -533,7 +546,9 @@ class _MealCard extends StatelessWidget {
             ),
           ),
           if (entries.isNotEmpty) const SizedBox(height: 4),
-          for (final e in entries) _EntryRow(food: food, entry: e),
+          // «Τα φαγητά μου» (15/11): τα υλικά μιας καταγραφής φαγητού σε μία γραμμή, στη θέση του πρώτου τους.
+          for (final row in mealRows(entries))
+            if (row.length > 1 || row.first.dish != null) _DishRow(food: food, group: row) else _EntryRow(food: food, entry: row.first),
           // Αν δεν χωράνε δίπλα δίπλα, το «Όπως χθες» πάει στην από κάτω γραμμή.
           Wrap(
             children: [
@@ -542,6 +557,14 @@ class _MealCard extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: Text(entries.isEmpty ? 'Προσθήκη' : 'Κι άλλο'),
               ),
+              // «Τα φαγητά μου» (15/11): ό,τι έφαγες σε αυτό το γεύμα γίνεται φαγητό, για να το γράφεις με ένα πάτημα.
+              if (mealRows(entries).length > 1 && food.dishesRead)
+                TextButton.icon(
+                  key: ValueKey('save-dish-${meal.name}'),
+                  onPressed: () => _saveAsDish(context),
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 19),
+                  label: const Text('Κράτα το ως φαγητό'),
+                ),
               if (entries.isEmpty && previous.isNotEmpty)
                 TextButton.icon(
                   key: ValueKey('copy-${meal.name}'),
@@ -598,6 +621,82 @@ class _EntryRow extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               thousands(e.total(Nk.kcal).round()),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Οι γραμμές ενός γεύματος: κάθε απλό τρόφιμο μόνο του, και όλα τα υλικά μιας καταγραφής φαγητού (ίδιο «grp») μαζί,
+/// στη θέση του πρώτου τους. Οι [entries] με τη σειρά της ώρας.
+List<List<LogEntry>> mealRows(List<LogEntry> entries) {
+  final out = <List<LogEntry>>[];
+  final byGroup = <String, List<LogEntry>>{};
+  for (final e in entries) {
+    final g = e.dish?.grp;
+    if (g == null) {
+      out.add([e]);
+    } else if (byGroup[g] case final list?) {
+      list.add(e);
+    } else {
+      final list = [e];
+      byGroup[g] = list;
+      out.add(list);
+    }
+  }
+  return out;
+}
+
+/// Ένα φαγητό στο ημερολόγιο: όνομα, πόσο έφαγες, θερμίδες. Πάτημα = αλλαγή μερίδας, γεύματος ή διαγραφή.
+class _DishRow extends StatelessWidget {
+  const _DishRow({required this.food, required this.group});
+  final FoodStore food;
+  final List<LogEntry> group;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final tag = group.first.dish!;
+    final t = Totals(group);
+    final qty = tag.kind == DishKind.plate ? countText(group.length, 'υλικό', 'υλικά') : dishQtyText(tag.kind, tag.qty);
+    return InkWell(
+      key: ValueKey('dish-row-${tag.grp}'),
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => openDishEntry(context, food, group),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 9, 8, 9),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(dishIcon(tag.kind), size: 16, color: c.food),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        tag.name,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$qty ·\u00A0πρωτεΐνη ${gramsText(t.protein)} g',
+                    style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              thousands(t.shownKcal),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
             ),
           ],

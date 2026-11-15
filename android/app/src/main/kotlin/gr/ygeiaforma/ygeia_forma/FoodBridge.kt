@@ -48,6 +48,42 @@ class FoodBridge(
                 withContext(DbQueue.dispatcher) { store.logPut(id, day, json.toString()) }
                 JSONObject().put("ok", true)
             }
+            // «Τα φαγητά μου» (15/11): όλα τα υλικά ενός φαγητού σε ΜΙΑ συναλλαγή ([DayStore.logPutAll]): ή γράφονται όλα
+            // ή κανένα, ώστε ένα φαγητό να μη μένει ποτέ μισό. Ό,τι δεν είναι σωστό σταματά εδώ ([FoodRules.putAllRows]).
+            "logPutAll" -> respondDb(result) {
+                val rows = FoodRules.putAllRows(call.argument<String>("json") ?: "[]")
+                withContext(DbQueue.dispatcher) { store.logPutAll(rows) }
+                JSONObject().put("ok", true).put("entries", rows.size)
+            }
+            "logDeleteAll" -> respondDb(result) {
+                val ids = FoodRules.idList(call.argument<String>("json") ?: "[]")
+                withContext(DbQueue.dispatcher) {
+                    store.logDeleteAll(ids)
+                    for (id in ids) DayStore.noteRemoved(activity.applicationContext, 'e', id)
+                }
+                JSONObject().put("ok", true)
+            }
+            // «Τα φαγητά μου»: το αρχείο dishes.json (ατομική εγγραφή· μπαίνει στο κρυπτογραφημένο αντίγραφο). Όπως το
+            // training.json: αν δεν διαβάζεται, μπαίνει στην άκρη (μετονομασία, ποτέ σβήσιμο).
+            "dishesRead" -> respond(result) {
+                val f = java.io.File(activity.filesDir, OuraRules.DISHES_FILE)
+                withContext(Dispatchers.IO) {
+                    if (!f.exists()) JSONObject().put("ok", true).put("state", "missing")
+                    else JSONObject().put("ok", true).put("state", "ok").put("json", f.readText())
+                }
+            }
+            "dishesWrite" -> respond(result) {
+                val text = call.argument<String>("json") ?: ""
+                require(text.isNotEmpty()) { "Κενό αρχείο φαγητών" }
+                val ok = withContext(Dispatchers.IO) {
+                    OuraBridge.atomicWrite(java.io.File(activity.filesDir, OuraRules.DISHES_FILE), text.toByteArray(Charsets.UTF_8))
+                }
+                JSONObject().put("ok", ok)
+            }
+            "dishesBad" -> respond(result) {
+                val name = withContext(Dispatchers.IO) { TrainingRules.setAside(java.io.File(activity.filesDir, OuraRules.DISHES_FILE)) }
+                if (name == null) JSONObject().put("ok", false) else JSONObject().put("ok", true).put("name", name)
+            }
             "logDelete" -> respondDb(result) {
                 val id = call.argument<String>("id") ?: ""
                 withContext(DbQueue.dispatcher) {

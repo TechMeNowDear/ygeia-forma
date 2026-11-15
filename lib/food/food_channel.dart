@@ -43,6 +43,16 @@ class FoodChannel {
   }
 
   static Future<Map<String, dynamic>> logPut(String json) => _write('logPut', {'json': json});
+  /// «Τα φαγητά μου» (15/11): πολλές καταχωρίσεις (πίνακας JSON) σε ΜΙΑ συναλλαγή της βάσης, ή όλες ή καμία· ό,τι υπάρχει
+  /// ήδη με το ίδιο id αντικαθίσταται (όπως το [logPut]).
+  static Future<Map<String, dynamic>> logPutAll(String json) => _write('logPutAll', {'json': json});
+  /// Σβήνει πολλές καταχωρίσεις ([json]: πίνακας με τα id) σε μία συναλλαγή.
+  static Future<Map<String, dynamic>> logDeleteAll(String json) => _write('logDeleteAll', {'json': json});
+  /// Το αρχείο «dishes.json» («Τα φαγητά μου»): «state» = «ok» (με «json») ή «missing». Εγγραφή: ατομική (προσωρινό
+  /// αρχείο + μετονομασία). «Στην άκρη»: μετονομασία σε «dishes.json.bad», ποτέ σβήσιμο («name»: το νέο όνομα).
+  static Future<Map<String, dynamic>> dishesRead() => _call('dishesRead');
+  static Future<Map<String, dynamic>> dishesWrite(String json) => _write('dishesWrite', {'json': json});
+  static Future<Map<String, dynamic>> dishesBad() => _write('dishesBad', const {});
   static Future<Map<String, dynamic>> logDelete(String id) => _write('logDelete', {'id': id});
   static Future<Map<String, dynamic>> myFoods() => _call('myFoods');
   static Future<Map<String, dynamic>> myFoodPut(String json) => _write('myFoodPut', {'json': json});

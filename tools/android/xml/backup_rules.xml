@@ -10,6 +10,7 @@
     <include domain="file" path="sources_log.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="oura_nights.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="training.json" requireFlags="clientSideEncryption" />
+    <include domain="file" path="dishes.json" requireFlags="clientSideEncryption" />
     <include domain="file" path="hr/" requireFlags="clientSideEncryption" />
     <include domain="sharedpref" path="errors.xml" requireFlags="clientSideEncryption" />
 </full-backup-content>

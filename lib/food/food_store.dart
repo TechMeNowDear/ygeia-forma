@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import '../backup.dart' show dbRecoveryRows;
 import '../format.dart';
 import '../history.dart' show dateKey;
+import 'dishes.dart';
 import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
@@ -24,11 +25,16 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     required List<Food> foods,
     List<LogEntry> entries = const [],
     List<Food> mine = const [],
+    List<Dish> dishes = const [],
+    DishIO? dishIO,
     DateTime? now,
   }) : _offline = true {
     _basic = foods;
     _mine = mine;
     _mineRead = true;
+    _dishes = dishesInOrder(dishes);
+    _dishIO = dishIO ?? MemoryDishIO();
+    _dishesRead = dishIO == null;
     _rebuildIndex();
     for (final e in entries) {
       _entries[e.id] = e;
@@ -70,6 +76,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (!_mineRead) await _loadMine();
     if (!_logRead) await _loadEntries();
+    if (!_dishesRead) await loadDishes();
     _rebuildIndex();
     notifyListeners();
   }
@@ -122,6 +129,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     }
     await _loadMine();
     await _loadEntries();
+    await loadDishes();
     _rebuildIndex();
     ready = true;
     notifyListeners();
@@ -224,6 +232,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     if (cached != null) return cached;
     final c = <String, int>{};
     for (final e in _entries.values) {
+      // «Τα φαγητά μου» (15/11): τα υλικά ενός φαγητού δεν μετρούν ως «έφαγα αυτό το τρόφιμο» (Συχνά, Πρόσφατα,
+      // αναζήτηση, ποσότητα της τελευταίας φοράς). Αλλιώς 23,4 g φακές από μια μερίδα κατσαρόλας θα ήταν η «τελευταία
+      // ποσότητα» των φακών, και ένα υλικό που τρως μόνο μέσα σε φαγητό θα έβγαινε στα «Συχνά».
+      if (e.dish != null) continue;
       final id = _idNow(e.food.id);
       c[id] = (c[id] ?? 0) + 1;
     }
@@ -241,7 +253,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Πρόσφατα: τα τελευταία διαφορετικά τρόφιμα.
   List<Food> recent({int limit = 15}) {
-    final sorted = _entries.values.toList()..sort((a, b) => b.time.compareTo(a.time));
+    final sorted = _entries.values.where((e) => e.dish == null).toList()..sort((a, b) => b.time.compareTo(a.time));
     final seen = <String>{};
     final out = <Food>[];
     for (final e in sorted) {
@@ -257,6 +269,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final counts = _counts.entries.where((e) => e.value >= 2).toList()..sort((a, b) => b.value.compareTo(a.value));
     final latest = <String, LogEntry>{};
     for (final e in _entries.values) {
+      if (e.dish != null) continue;
       final id = _idNow(e.food.id);
       final p = latest[id];
       if (p == null || e.time.isAfter(p.time)) latest[id] = e;
@@ -274,7 +287,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final id = _idNow(foodId);
     LogEntry? last;
     for (final e in _entries.values) {
-      if (_idNow(e.food.id) == id && (last == null || e.time.isAfter(last.time))) last = e;
+      if (e.dish == null && _idNow(e.food.id) == id && (last == null || e.time.isAfter(last.time))) last = e;
     }
     return last?.grams;
   }
@@ -384,8 +397,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   // ---------- Αλλαγές ----------
 
+  /// Μοναδικό id. Ο μετρητής (15/11) εγγυάται διαφορετικά id για όσα φτιάχνονται στο ίδιο μικροδευτερόλεπτο (τα υλικά
+  /// ενός φαγητού, το «Όπως χθες»): πριν τα ξεχώριζε μόνο ένας τυχαίος αριθμός, και μια σύμπτωση θα έγραφε το ένα πάνω
+  /// στο άλλο.
+  static int _idCounter = 0;
   static String _newId() =>
-      '${DateTime.now().microsecondsSinceEpoch}-${math.Random().nextInt(1 << 20).toRadixString(36)}';
+      '${DateTime.now().microsecondsSinceEpoch}-${(_idCounter++).toRadixString(36)}${math.Random().nextInt(1 << 20).toRadixString(36)}';
 
   /// [now]: για δοκιμές (αλλιώς το ρολόι του κινητού).
   Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on, DateTime? now}) async {
@@ -408,7 +425,16 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Οι καταχωρίσεις ενός γεύματος που ξαναγράφονται με το «Όπως χθες»: χωρίς όσα δικά μου προϊόντα σβήστηκαν
   /// (π.χ. είχαν λάθος τιμές) και όσα τρόφιμα της βάσης δεν υπάρχουν πια (έλεγχος 9/11, Μ3).
-  List<LogEntry> copyable(DateTime from, Meal meal) => [for (final e in entriesFor(from, meal)) if (!_gone(e.food)) e];
+  /// «Τα φαγητά μου» (15/11): φαγητό με υλικό που δεν υπάρχει πια δεν ξαναγράφεται καθόλου (ούτε τα υπόλοιπα υλικά
+  /// του): ένα φαγητό χωρίς ένα υλικό του θα είχε άλλες θερμίδες χωρίς να φαίνεται.
+  List<LogEntry> copyable(DateTime from, Meal meal) {
+    final all = entriesFor(from, meal);
+    final broken = {
+      for (final e in all)
+        if (e.dish != null && _gone(e.food)) e.dish!.grp,
+    };
+    return [for (final e in all) if (!_gone(e.food) && !broken.contains(e.dish?.grp)) e];
+  }
 
   /// Πόσα από το γεύμα δεν ξαναγράφονται με το «Όπως χθες» (σβησμένα προϊόντα).
   int notCopyable(DateTime from, Meal meal) => entriesFor(from, meal).length - copyable(from, meal).length;
@@ -419,6 +445,8 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final source = copyable(from, meal);
     final d = dayOf(to);
     final base = entryTime(d, DateTime.now());
+    // Κάθε φαγητό του γεύματος γίνεται νέα καταγραφή του (νέο «grp»), με τα ίδια υλικά και ποσότητες.
+    final groups = <String, String>{};
     final out = <LogEntry>[
       for (var i = 0; i < source.length; i++)
         LogEntry(
@@ -429,6 +457,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
           grams: source[i].grams,
           // Ίδια σειρά με το αρχικό γεύμα.
           time: base.add(Duration(milliseconds: i)),
+          dish: source[i].dish?.withGrp(groups.putIfAbsent(source[i].dish!.grp, _newId)),
         ),
     ];
     final saved = <LogEntry>[];
@@ -587,6 +616,277 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   static String newFoodId() => 'M${_newId()}';
+
+  // ---------- Πολλές καταχωρίσεις μαζί (15/11, «Τα φαγητά μου») ----------
+
+  /// Γράφει όλες τις [list] σε ΜΙΑ συναλλαγή της βάσης: ή γράφονται όλες ή καμία (ένα φαγητό δεν μένει ποτέ μισό). Αν
+  /// δεν γραφτούν, η οθόνη δείχνει ό,τι υπήρχε πριν και το λέει.
+  Future<bool> _putAll(List<LogEntry> list) async {
+    if (list.isEmpty) return true;
+    final before = {for (final e in list) e.id: _entries[e.id]};
+    for (final e in list) {
+      _entries[e.id] = e;
+    }
+    notifyListeners();
+    if (_offline) return true;
+    final r = await FoodChannel.logPutAll(jsonEncode([for (final e in list) e.toJson()]));
+    if (r['ok'] == true) return true;
+    for (final e in list) {
+      if (identical(_entries[e.id], e)) {
+        final b = before[e.id];
+        if (b == null) {
+          _entries.remove(e.id);
+        } else {
+          _entries[e.id] = b;
+        }
+      }
+    }
+    saveError = 'Δεν αποθηκεύτηκε: ${list.first.dish?.name ?? list.first.food.name}. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// Σβήνει όλες τις [list] σε μία συναλλαγή. `false` αν δεν σβήστηκαν (τότε ξαναφαίνονται και βγαίνει μήνυμα).
+  Future<bool> _removeAll(List<LogEntry> list) async {
+    if (list.isEmpty) return true;
+    for (final e in list) {
+      _entries.remove(e.id);
+      _removedIds.add(e.id);
+    }
+    notifyListeners();
+    if (_offline) return true;
+    final r = await FoodChannel.logDeleteAll(jsonEncode([for (final e in list) e.id]));
+    if (r['ok'] == true) return true;
+    for (final e in list) {
+      _entries.putIfAbsent(e.id, () => e);
+    }
+    saveError = 'Δεν διαγράφηκε: ${list.first.dish?.name ?? list.first.food.name}. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// Όλα τα υλικά της ίδιας καταγραφής φαγητού με το [e] (με τη σειρά τους)· για απλό τρόφιμο, μόνο το [e].
+  List<LogEntry> groupOf(LogEntry e) {
+    final g = e.dish?.grp;
+    if (g == null) return [e];
+    return _entries.values.where((x) => x.dish?.grp == g).toList()..sort((a, b) => a.time.compareTo(b.time));
+  }
+
+  /// Αλλαγή μιας καταγραφής φαγητού (ποσότητες, γεύμα): όλα μαζί.
+  Future<bool> updateGroup(List<LogEntry> group) => _putAll(group);
+
+  /// Διαγραφή μιας καταγραφής φαγητού (όλα τα υλικά της), και η «Αναίρεση» της.
+  Future<bool> removeGroup(List<LogEntry> group) => _removeAll(group);
+  Future<bool> restoreGroup(List<LogEntry> group) => _putAll(group);
+
+  // ---------- «Τα φαγητά μου» (15/11) ----------
+
+  DishIO _dishIO = ChannelDishIO();
+  List<Dish> _dishes = const [];
+
+  /// Το αρχείο με τα φαγητά διαβάστηκε (ή δεν υπάρχει ακόμα). Αν όχι, δεν γράφεται τίποτα σε αυτό, για να μη χαθεί ό,τι
+  /// έχει.
+  bool _dishesRead = false;
+  bool get dishesRead => _dishesRead;
+
+  /// Το αρχείο γράφτηκε από νεότερη έκδοση της εφαρμογής: διαβάζεται, αλλά δεν ξαναγράφεται από αυτήν.
+  bool _dishesNewer = false;
+
+  /// Φαγητά του αρχείου που δεν διαβάστηκαν (χαλασμένα): κρατιούνται όπως είναι και ξαναγράφονται όπως ήταν.
+  List<Object?> _badDishRows = const [];
+
+  /// Τι να πει η οθόνη για το αρχείο των φαγητών (δεν διαβάστηκε, μπήκε στην άκρη, νεότερη έκδοση)· null αν όλα καλά.
+  String? dishesNote;
+
+  /// Τα φαγητά μου: όσα έγραψες πιο πρόσφατα πρώτα.
+  List<Dish> get dishes => _dishes;
+
+  Dish? dishById(String id) {
+    for (final d in _dishes) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  static const dishesFileVersion = 1;
+  static const dishesUnreadText = 'Δεν διαβάστηκαν «Τα φαγητά μου». Κλείσε και άνοιξε ξανά την εφαρμογή.';
+  static const dishesNewerText = '«Τα φαγητά μου» γράφτηκαν από νεότερη έκδοση της εφαρμογής. Ενημέρωσέ την για να τα αλλάξεις.';
+
+  /// Διαβάζει το αρχείο των φαγητών (στο άνοιγμα και στο «Ξαναδοκίμασε»).
+  Future<void> loadDishes() async {
+    final r = await _dishIO.read();
+    if (r.state == 'missing') {
+      _dishes = const [];
+      _badDishRows = const [];
+      _dishesRead = true;
+      dishesNote = null;
+      return;
+    }
+    if (r.state != 'ok' || r.json == null) {
+      _dishesRead = false;
+      dishesNote = dishesUnreadText;
+      return;
+    }
+    Object? j;
+    try {
+      j = jsonDecode(r.json!);
+    } catch (_) {
+      j = null;
+    }
+    final list = j is Map ? j['dishes'] : null;
+    if (list is! List) {
+      // Δεν διαβάζεται καθόλου: μπαίνει στην άκρη (μετονομασία, ποτέ σβήσιμο) και η λίστα ξεκινά άδεια.
+      final name = await _dishIO.setAside();
+      if (name == null) {
+        _dishesRead = false;
+        dishesNote = dishesUnreadText;
+        return;
+      }
+      _dishes = const [];
+      _badDishRows = const [];
+      _dishesRead = true;
+      dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
+      return;
+    }
+    final v = (j as Map)['v'];
+    _dishesNewer = v is num && v > dishesFileVersion;
+    final ok = <Dish>[];
+    final bad = <Object?>[];
+    final ids = <String>{};
+    for (final x in list) {
+      final d = Dish.fromJson(x);
+      if (d == null || !ids.add(d.id)) {
+        bad.add(x);
+      } else {
+        ok.add(d);
+      }
+    }
+    _dishes = dishesInOrder(ok);
+    _badDishRows = bad;
+    skippedRows += bad.length;
+    _dishesRead = true;
+    dishesNote = _dishesNewer ? dishesNewerText : null;
+  }
+
+  String _dishesJson(List<Dish> list) =>
+      jsonEncode({'v': dishesFileVersion, 'dishes': [for (final d in list) d.toJson(), ..._badDishRows]});
+
+  Future<bool> _writeDishes(List<Dish> after, String what) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = '${_dishesNewer ? dishesNewerText : dishesUnreadText} ($what)';
+      notifyListeners();
+      return false;
+    }
+    final before = _dishes;
+    _dishes = after;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(after))) return true;
+    if (identical(_dishes, after)) _dishes = before;
+    saveError = 'Δεν αποθηκεύτηκε: $what. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  static String newDishId() => 'D${_newId()}';
+
+  /// Νέο ή αλλαγμένο φαγητό (ίδιο id = αλλαγή).
+  Future<bool> saveDish(Dish d) =>
+      _writeDishes(dishesInOrder([d, for (final x in _dishes) if (x.id != d.id) x]), d.name);
+
+  /// Διαγραφή φαγητού. Ό,τι έχεις ήδη γράψει από αυτό μένει όπως είναι στο ημερολόγιο.
+  Future<bool> deleteDish(Dish d) => _writeDishes([for (final x in _dishes) if (x.id != d.id) x], d.name);
+
+  List<Dish> findDishes(String q) => searchDishes(_dishes, q);
+
+  /// Το τρόφιμο ενός υλικού όπως είναι τώρα (με το νέο id, αν άλλαξε σε νεότερη λίστα· με τις τιμές μετά από
+  /// «Διόρθωση» ενός δικού μου προϊόντος), ή null αν δεν υπάρχει πια (π.χ. σβησμένο προϊόν).
+  Food? itemFood(DishItem i) => byId(_idNow(i.id));
+
+  /// Τα υλικά (ονόματα) που δεν υπάρχουν πια: τότε το φαγητό δεν γράφεται ώσπου να διορθωθεί.
+  List<String> missingItems(Iterable<DishItem> items) => [for (final i in items) if (itemFood(i) == null) i.name];
+
+  /// Οι καταχωρίσεις που θα γράφονταν για αυτές τις ποσότητες (για τα σύνολα της οθόνης), ή null αν λείπει υλικό.
+  List<LogEntry>? previewDish(List<DishItem> amounts) {
+    final out = <LogEntry>[];
+    for (final i in amounts) {
+      final f = itemFood(i);
+      if (f == null) return null;
+      out.add(LogEntry(id: '', day: '', meal: Meal.snack, food: f, grams: i.amount, time: DateTime(2000)));
+    }
+    return out;
+  }
+
+  /// Γράφει μία καταγραφή του φαγητού [d] στο ημερολόγιο: κάθε υλικό των [amounts] ως καταχώριση, όλα μαζί ή κανένα.
+  /// [qty]: πόσο έφαγες (δες [DishTag.qty]). [plate]: οι ποσότητες ανά υλικό (πιάτο), [batch]: το μαγείρεμα (κατσαρόλα)·
+  /// το φαγητό θυμάται και τα δύο για την επόμενη φορά. null αν δεν γράφτηκε (λείπει υλικό ή απέτυχε η εγγραφή).
+  Future<List<LogEntry>?> logDish(
+    Dish d,
+    List<DishItem> amounts, {
+    required Meal meal,
+    required double qty,
+    List<double>? plate,
+    PotBatch? batch,
+    DateTime? on,
+    DateTime? now,
+  }) async {
+    if (amounts.isEmpty) return null;
+    final dd = dayOf(on ?? day);
+    final t = now ?? DateTime.now();
+    final base = entryTime(dd, t);
+    final pot = d.kind == DishKind.pot ? (batch ?? d.batch) : null;
+    final tag = DishTag(id: d.id, name: d.name, grp: _newId(), kind: d.kind, qty: qty, batch: pot?.at);
+    final out = <LogEntry>[];
+    for (var i = 0; i < amounts.length; i++) {
+      final f = itemFood(amounts[i]);
+      if (f == null) return null;
+      out.add(LogEntry(
+        id: _newId(),
+        day: dateKey(dd),
+        meal: meal,
+        food: f,
+        grams: amounts[i].amount,
+        time: base.add(Duration(milliseconds: i)),
+        dish: tag,
+      ));
+    }
+    if (!await _putAll(out)) return null;
+    // Η επόμενη φορά ξεκινά από αυτή. Αν αυτό δεν γραφτεί, το ημερολόγιο είναι ήδη σωστό· το λέει το μήνυμα.
+    final cur = dishById(d.id);
+    if (cur != null) {
+      await saveDish(cur.copyWith(
+        used: t.millisecondsSinceEpoch,
+        uses: cur.uses + 1,
+        lastPlate: cur.kind == DishKind.plate && plate != null && plate.length == cur.items.length ? plate : null,
+        lastQty: cur.kind == DishKind.plate ? null : qty,
+        batch: cur.kind == DishKind.pot ? pot : null,
+      ));
+    }
+    return out;
+  }
+
+  /// Για το αντίγραφο: όλα τα φαγητά όπως αποθηκεύονται (και όσα δεν διαβάστηκαν, όπως είναι). null αν το αρχείο δεν
+  /// διαβάστηκε (τότε το αντίγραφο το λέει).
+  List<Object?>? dishesForBackup() => _dishesRead ? [for (final d in _dishes) d.toJson(), ..._badDishRows] : null;
+
+  /// Επαναφορά: μπαίνουν μόνο τα φαγητά που λείπουν (ίδιο id = υπάρχει ήδη και μένει όπως είναι). Απάντηση: πόσα μπήκαν
+  /// και πόσα υπήρχαν ήδη, ή null αν δεν γράφτηκαν (το αρχείο δεν διαβάστηκε ή απέτυχε η εγγραφή).
+  Future<(int, int)?> importDishes(List<Dish> list) async {
+    if (!_dishesRead) await loadDishes();
+    if (!_dishesRead || _dishesNewer) return null;
+    final have = {for (final d in _dishes) d.id};
+    final add = <Dish>[];
+    var existing = 0;
+    for (final d in list) {
+      if (have.add(d.id)) {
+        add.add(d);
+      } else {
+        existing++;
+      }
+    }
+    if (add.isEmpty) return (0, existing);
+    final ok = await _writeDishes(dishesInOrder([..._dishes, ...add]), 'Τα φαγητά μου');
+    return ok ? (add.length, existing) : null;
+  }
 
   // ---------- Αντίγραφο ασφαλείας ----------
 
