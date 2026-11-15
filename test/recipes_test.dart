@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/food/dishes.dart';
-import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/food/kitchen.dart';
 import 'package:ygeia_forma/food/recipe.dart';
@@ -105,7 +104,7 @@ void main() {
     test('Μένει με το φαγητό (και στο αρχείο) και διαβάζεται ξανά', () {
       final r = parseRecipe(recipeText()).recipe!;
       final d = withRecipe(
-          Dish(id: 'D1', name: r.name, kind: r.kind, items: [DishItem(lentils, 'Φακές', 250)], created: 0), r.recipe);
+          Dish(id: 'D1', name: r.name, kind: r.kind, items: const [DishItem(lentils, 'Φακές', 250)], created: 0), r.recipe);
       final back = Dish.fromJson(jsonDecode(jsonEncode(d.toJson())))!;
       final rr = recipeOf(back)!;
       expect(rr.steps.map((s) => s.text), ['Ξέπλυνε τις φακές.', 'Βράσε τις φακές με 1,5 λίτρο νερό.']);
@@ -137,6 +136,10 @@ void main() {
       expect(list, contains('$lentils Φακές (ξερές)'));
       expect(list, isNot(contains('C20360 ')), reason: 'οι βρασμένες φακές είναι μαγειρεμένη μορφή');
       expect(list, isNot(contains('$celery ')), reason: 'δε μου αρέσει');
+      // Το παράδειγμα μέσα στις οδηγίες δεν διαβάζεται ως συνταγή: αν επικολληθούν οι οδηγίες, το λέμε.
+      final back = parseRecipe(text);
+      expect(back.ok, isFalse);
+      expect(back.errors.single, contains('οδηγίες'));
     });
   });
 
@@ -250,7 +253,7 @@ void main() {
     testWidgets('Μαγείρεμα: βήματα, τικ, χρονόμετρο', (t) async {
       final s = store();
       final r = parseRecipe(recipeText()).recipe!;
-      final d = withRecipe(Dish(id: 'D1', name: r.name, kind: r.kind, items: [DishItem(lentils, 'Φακές', 250)], created: 0), r.recipe);
+      final d = withRecipe(Dish(id: 'D1', name: r.name, kind: r.kind, items: const [DishItem(lentils, 'Φακές', 250)], created: 0), r.recipe);
       await _pump(t, CookScreen(dish: d, recipe: recipeOf(d)!, food: s));
       expect(find.textContaining('2. Βράσε τις φακές'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('cook-start-1')));

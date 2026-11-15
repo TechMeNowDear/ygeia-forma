@@ -18,6 +18,9 @@ import 'food_search.dart' show phonetic;
 import 'kitchen.dart';
 
 const recipeKind = 'ygeia-recipe';
+
+/// Η πρώτη γραμμή των οδηγιών: αν επικολληθούν οι ίδιες οι οδηγίες (αντί για την απάντηση), το λέμε.
+const recipePromptTitle = 'ΣΥΝΤΑΓΗ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»';
 const likesKind = 'ygeia-likes';
 
 /// Όρια μιας συνταγής που επικολλάται (ώστε ένα λάθος κείμενο να μη φτιάχνει παράλογα φαγητά).
@@ -222,6 +225,11 @@ RecipeParse parseRecipe(String text) {
     return const RecipeParse(null, ['Δεν βρέθηκε συνταγή στο κείμενο. Αντίγραψε ολόκληρη την απάντηση του βοηθού.']);
   }
   final j = jsonOfKind(text, recipeKind);
+  if (j == null && text.contains(recipePromptTitle)) {
+    return const RecipeParse(null, [
+      'Αυτές είναι οι οδηγίες που αντιγράφηκαν, όχι η απάντηση. Επικόλλησέ τες στο AI, και μετά αντίγραψε την απάντησή του.'
+    ]);
+  }
   if (j == null) {
     return const RecipeParse(null, [
       'Το κείμενο δεν είναι συνταγή της εφαρμογής, ή αντιγράφηκε μισό. Αντίγραψε ολόκληρη την απάντηση· αν ξαναβγεί, ζήτα '
@@ -357,7 +365,7 @@ String recipePrompt({
       if (kitchen.has(d.$1)) d.$2,
   ];
   final b = StringBuffer()
-    ..writeln('ΣΥΝΤΑΓΗ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»')
+    ..writeln(recipePromptTitle)
     ..writeln()
     ..writeln('Τι θέλω: ${wish.trim().isEmpty ? 'μια υγιεινή, απλή συνταγή για μεσημεριανό ή βραδινό' : wish.trim()}')
     ..writeln()
@@ -373,7 +381,8 @@ String recipePrompt({
         'ΜΗ γράψεις θερμίδες ή θρεπτικά: τα υπολογίζει η εφαρμογή από τη βάση της.')
     ..writeln('6. «type»: "plate" = ένα πιάτο για μένα· "portions" = ίσες μερίδες (π.χ. μπιφτέκια· γράψε "servings")· '
         '"pot" = κατσαρόλα ή ταψί από όπου τρώω όσο ζυγίσω (γράψε στο "servings" περίπου πόσες μερίδες βγάζει).')
-    ..writeln('7. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή (τα ελληνικά κείμενα στα ελληνικά):')
+    ..writeln('7. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή (τα ελληνικά κείμενα στα ελληνικά). Στη θέση του «…» '
+        'βάλε όλα τα υλικά και όλα τα βήματα:')
     ..writeln('```json')
     ..writeln('{')
     ..writeln('  "kind": "$recipeKind",')
@@ -383,11 +392,13 @@ String recipePrompt({
     ..writeln('  "minutes": 45,')
     ..writeln('  "items": [')
     ..writeln('    {"id": "C20359", "name": "Φακές (ξερές)", "g": 250},')
-    ..writeln('    {"id": "C17270", "name": "Ελαιόλαδο εξαιρετικά παρθένο", "g": 20}')
+    ..writeln('    {"id": "C17270", "name": "Ελαιόλαδο εξαιρετικά παρθένο", "g": 20},')
+    ..writeln('    …')
     ..writeln('  ],')
     ..writeln('  "steps": [')
     ..writeln('    {"text": "Ξέπλυνε τις φακές σε σουρωτήρι.", "device": "", "heat": "", "min": 2},')
-    ..writeln('    {"text": "Βράσε τις φακές με 1,5 λίτρο νερό.", "device": "Κατσαρόλα μεγάλη", "heat": "δυνατή, μετά χαμηλή", "min": 30}')
+    ..writeln('    {"text": "Βράσε τις φακές με 1,5 λίτρο νερό.", "device": "Κατσαρόλα μεγάλη", "heat": "δυνατή, μετά χαμηλή", "min": 30},')
+    ..writeln('    …')
     ..writeln('  ],')
     ..writeln('  "tips": ["…"],')
     ..writeln('  "keeps": "Στο ψυγείο ως 3 μέρες",')
@@ -398,7 +409,7 @@ String recipePrompt({
   if (targets != null) {
     b.writeln('ΟΙ ΣΤΟΧΟΙ ΜΟΥ ΑΝΑ ΜΕΡΑ: ${thousands(targets.kcal)} kcal · πρωτεΐνη ${targets.protein} g · κορεσμένα έως '
         '${targets.satMax} g · ίνες τουλάχιστον ${targets.fiber} g · αλάτι κάτω από ${targets.salt.toStringAsFixed(0)} g. '
-        'Τρώω 3 γεύματα τη μέρα.');
+        'Μία μερίδα για ένα γεύμα: περίπου το ένα τρίτο αυτών, εκτός αν γράφω αλλιώς στο «Τι θέλω».');
   }
   if (left != null && left.kcal > 0) {
     b.writeln('ΣΗΜΕΡΑ ΜΟΥ ΜΕΝΟΥΝ: ${thousands(left.kcal)} kcal και ${left.protein} g πρωτεΐνη. Αν η συνταγή είναι για σήμερα, η '

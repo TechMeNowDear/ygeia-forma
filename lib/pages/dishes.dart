@@ -741,7 +741,7 @@ class _DishLogSheetState extends State<DishLogSheet> {
           big: true,
           hint: 'ζύγισε το πιάτο σου',
           error: tooMuch
-              ? 'Η μερίδα είναι μεγαλύτερη από όλο το φαγητό (${thousands(batch!.cooked.round())} g).'
+              ? 'Η μερίδα είναι μεγαλύτερη από όλο το φαγητό (${thousands(batch.cooked.round())} g).'
               : (_qty.text.trim().isNotEmpty && g == null ? 'Γράψε τα γραμμάρια της μερίδας σου.' : null),
         ),
         onMinus: g == null ? null : () => set(g - 10),

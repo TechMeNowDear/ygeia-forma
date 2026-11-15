@@ -136,6 +136,7 @@ class _RecipeStartSheetState extends State<RecipeStartSheet> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   labelText: 'Τι θέλεις;',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
                   hintText: 'π.χ. κοτόπουλο με λαχανικά στον ατμό, για 2 μέρες, ως 30 λεπτά',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -147,8 +148,9 @@ class _RecipeStartSheetState extends State<RecipeStartSheet> {
                   contentPadding: EdgeInsets.zero,
                   value: _today,
                   onChanged: (v) => setState(() => _today = v),
-                  title: const Text('Για σήμερα: να χωράει σε ό,τι μένει'),
-                  subtitle: Text('Μένουν ${thousands(left.kcal < 0 ? 0 : left.kcal)} kcal, πρωτεΐνη ${left.protein < 0 ? 0 : left.protein} g'),
+                  title: const Text('Για σήμερα'),
+                  subtitle: Text('Να χωράει σε ό,τι μένει: ${thousands(left.kcal < 0 ? 0 : left.kcal)} kcal, '
+                      'πρωτεΐνη ${left.protein < 0 ? 0 : left.protein} g'),
                 ),
               ],
               InkWell(
@@ -423,7 +425,7 @@ class _RecipePreviewScreenState extends State<RecipePreviewScreen> {
           padding: const EdgeInsets.only(top: 8),
           child: Row(children: [
             Expanded(
-              child: Text(_kind == DishKind.portions ? 'Μερίδες που βγάζει' : 'Περίπου μερίδες (για το «μία μερίδα»)',
+              child: Text(_kind == DishKind.portions ? 'Μερίδες που βγάζει' : 'Περίπου πόσες μερίδες βγάζει',
                   style: TextStyle(fontSize: 14.5, color: c.text)),
             ),
             IconButton(
@@ -475,7 +477,10 @@ class _RecipePreviewScreenState extends State<RecipePreviewScreen> {
                 style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
           ],
           const SizedBox(height: 6),
-          Text('Οι τιμές από τη βάση τροφίμων· όσα υλικά δεν βρέθηκαν δεν μετρούν ακόμα.',
+          Text(
+              missing > 0
+                  ? 'Από τη βάση τροφίμων. Όσα υλικά δεν βρέθηκαν δεν μετρούν ακόμα.'
+                  : 'Από τη βάση τροφίμων, όχι από το AI.',
               style: TextStyle(fontSize: 12, color: c.textTertiary)),
         ]),
       ),
@@ -966,12 +971,13 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
         surfaceTintColor: Colors.transparent,
         title: const Text('Τι μου αρέσει'),
         actions: [
-          IconButton(
+          TextButton.icon(
             key: const ValueKey('likes-paste'),
-            tooltip: 'Επικόλληση λίστας',
             onPressed: widget.food.dishesRead ? _paste : null,
-            icon: const Icon(Icons.content_paste_rounded),
+            icon: const Icon(Icons.content_paste_rounded, size: 20),
+            label: const Text('Επικόλληση'),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Center(
