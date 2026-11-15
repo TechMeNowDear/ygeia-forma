@@ -57,6 +57,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     training: await _trainingForBackup(),
     // «Τα φαγητά μου» (15/11).
     dishes: food.dishesForBackup(),
+    foodLikes: food.likesForBackup(),
     // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
     errorsOff: !errors.enabled,
   );
@@ -549,6 +550,7 @@ class _DataGroupState extends State<_DataGroup> {
       final (e, f, failed, existing) = res;
       // «Τα φαγητά μου» (15/11): μπαίνουν όσα λείπουν· ό,τι υπάρχει ήδη μένει όπως είναι.
       final dishRes = b.dishes.isEmpty ? null : await widget.food!.importDishes(b.dishes);
+      final likesIn = await widget.food!.importLikes(b.likes);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
       final prefsNotes =
@@ -581,6 +583,7 @@ class _DataGroupState extends State<_DataGroup> {
         if (dishRes != null && dishRes.$1 > 0)
           countText(dishRes.$1, 'φαγητό μπήκε από το αντίγραφο.', 'φαγητά μπήκαν από το αντίγραφο.'),
         if (b.dishes.isNotEmpty && dishRes == null) 'Τα φαγητά του αντιγράφου δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
+        if (likesIn) 'Μπήκε και το «Τι μου αρέσει».',
         if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
     } finally {

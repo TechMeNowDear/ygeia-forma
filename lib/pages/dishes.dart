@@ -7,8 +7,10 @@ import '../food/food_store.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../food/recipe.dart';
 import 'food_add.dart';
 import 'nutrition.dart' show carbsColor, fatColor, proteinColor;
+import 'recipes.dart';
 
 // ---------------------------------------------------------------------------
 // «Τα φαγητά μου» (αίτημα χρήστη 15/11): φτιάχνεις ένα φαγητό από υλικά και το γράφεις με ένα πάτημα.
@@ -530,6 +532,17 @@ class _DishLogSheetState extends State<DishLogSheet> {
     final body = <Widget>[
       Text(d.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
       const SizedBox(height: 2),
+      if (recipeOf(d) case final r?)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('dish-log-recipe'),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+            onPressed: () => Navigator.of(context).push(CookScreen.route(d, r, widget.food)),
+            icon: const Icon(Icons.menu_book_rounded, size: 18),
+            label: Text('Η συνταγή: ${countText(r.steps.length, 'βήμα', 'βήματα')} ›'),
+          ),
+        ),
       InkWell(
         key: const ValueKey('dish-log-edit'),
         onTap: () => Navigator.pop(context, DishLogResult(amounts: const [], qty: 0, meal: _meal, edit: true)),
@@ -1228,6 +1241,16 @@ class _DishEditScreenState extends State<DishEditScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
+              if (widget.dish != null && recipeOf(widget.dish!) != null) ...[
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  key: const ValueKey('dish-cook'),
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: () => Navigator.of(context).push(CookScreen.route(widget.dish!, recipeOf(widget.dish!)!, widget.food)),
+                  icon: const Icon(Icons.menu_book_rounded),
+                  label: const Text('Μαγείρεψέ το: η συνταγή βήμα-βήμα'),
+                ),
+              ],
               const SizedBox(height: 18),
               SectionTitle(text: 'Υλικά', trailing: _items.isEmpty ? null : countText(_items.length, 'υλικό', 'υλικά')),
               const SizedBox(height: 6),
@@ -1530,6 +1553,16 @@ class _DishesScreenState extends State<DishesScreen> {
                   onPressed: widget.food.dishesRead ? _new : null,
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Νέο φαγητό'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('dishes-recipe'),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: widget.food.dishesRead ? () => openRecipeStart(context, widget.food) : null,
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: const Text('Συνταγή από AI'),
                 ),
               ),
               if (all.length > 6)

@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'devices_page.dart';
 import 'dishes.dart';
+import 'recipes.dart' show FoodLikesScreen;
 import 'goals_page.dart';
 import 'sources_page.dart';
 import 'kitchen.dart';
@@ -335,6 +336,18 @@ class _MePageState extends State<MePage> {
               : '${countText(dn, 'φαγητό', 'φαγητά')} ·\u00A0αλλαγή, διαγραφή',
           line: true,
           onTap: () => Navigator.of(context).push(DishesScreen.route(food)),
+        ),
+        // «Τι μου αρέσει» (15/11): για τις συνταγές από AI.
+        NavRow(
+          key: const ValueKey('mine-likes'),
+          icon: Icons.favorite_border_rounded,
+          color: c.food,
+          title: 'Τι μου αρέσει',
+          text: food.likes.isEmpty
+              ? 'Για τις συνταγές: τι σου αρέσει και τι όχι.'
+              : '${countText(food.likes.like.length, 'τρόφιμο', 'τρόφιμα')} ·\u00A0δε μου αρέσουν ${food.likes.dislike.length}',
+          line: true,
+          onTap: () => Navigator.of(context).push(FoodLikesScreen.route(food)),
         ),
         NavRow(
           key: const ValueKey('mine-products'),
