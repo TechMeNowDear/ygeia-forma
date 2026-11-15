@@ -904,7 +904,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   if (large && !ingredient) Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: Center(child: mealPicker)),
                   tools,
                   if (q.trim().isEmpty) ...[
-                    if (!ingredient) dishSection(),
+                    // Με φαγητά: πρώτα αυτά (όλο το γεύμα με ένα πάτημα). Χωρίς: η πρόταση «Φτιάξε ένα φαγητό» πάει στο
+                    // τέλος, ώστε να μην κατεβάζει τα Συχνά, τα Πρόσφατα και τα Δικά μου (έλεγχος premium, S3).
+                    if (!ingredient && dishes.isNotEmpty) dishSection(),
                     if (frequent.isNotEmpty) section('Συχνά', frequent),
                     if (recent.isNotEmpty) section('Πρόσφατα', recent),
                     if (!_moreRecent && allRecent.length > recent.length)
@@ -959,6 +961,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                     ),
+                    if (!ingredient && dishes.isEmpty) dishSection(),
                   ] else if (results.isEmpty && foundDishes.isEmpty)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),

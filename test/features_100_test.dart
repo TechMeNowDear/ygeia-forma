@@ -63,8 +63,8 @@ void main() {
 
     test('σημειώνεται μόνο όταν το αντίγραφο βγήκε ολόκληρο', () {
       final src = File('lib/pages/settings.dart').readAsStringSync();
-      // Round 1 (f8 · S9-8): «ολόκληρο» = προπονήσεις με παλμούς, ρυθμίσεις και πηγές ύπνου.
-      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut;'));
+      // Round 1 (f8 · S9-8): «ολόκληρο» = προπονήσεις με παλμούς, ρυθμίσεις και πηγές ύπνου· 15/11: και «Τα φαγητά μου».
+      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut;'));
       expect(src, contains('if (complete) store.markExported(now);'));
     });
   });
