@@ -4,11 +4,13 @@ import 'package:flutter/services.dart';
 import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
+import '../food/library.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../food/recipe.dart';
 import 'food_add.dart';
+import 'library.dart';
 import 'nutrition.dart' show carbsColor, fatColor, proteinColor;
 import 'recipes.dart';
 
@@ -541,6 +543,17 @@ class _DishLogSheetState extends State<DishLogSheet> {
             onPressed: () => Navigator.of(context).push(CookScreen.route(d, r, widget.food)),
             icon: const Icon(Icons.menu_book_rounded, size: 18),
             label: Text('Η συνταγή: ${countText(r.steps.length, 'βήμα', 'βήματα')} ›'),
+          ),
+        ),
+      if (planInfoOf(d)?.order case final o?)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('dish-log-order'),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+            onPressed: () => showOrderText(context, d.name, o),
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('Τι να ζητήσεις όταν το παραγγέλνεις ›'),
           ),
         ),
       InkWell(
@@ -1251,6 +1264,10 @@ class _DishEditScreenState extends State<DishEditScreen> {
                   label: const Text('Μαγείρεψέ το: η συνταγή βήμα-βήμα'),
                 ),
               ],
+              if (widget.dish != null && planInfoOf(widget.dish!) != null) ...[
+                const SizedBox(height: 12),
+                PlanInfoBox(name: widget.dish!.name, info: planInfoOf(widget.dish!)!),
+              ],
               const SizedBox(height: 18),
               SectionTitle(text: 'Υλικά', trailing: _items.isEmpty ? null : countText(_items.length, 'υλικό', 'υλικά')),
               const SizedBox(height: 6),
@@ -1565,6 +1582,16 @@ class _DishesScreenState extends State<DishesScreen> {
                   label: const Text('Συνταγή από AI'),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('dishes-library'),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: widget.food.dishesRead ? () => Navigator.of(context).push(LibraryScreen.route(widget.food)) : null,
+                  icon: const Icon(Icons.collections_bookmark_outlined),
+                  label: const Text('Βιβλιοθήκη: πολλά φαγητά μαζί'),
+                ),
+              ),
               if (all.length > 6)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -1603,6 +1630,58 @@ class _DishesScreenState extends State<DishesScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// «Τι να ζητήσεις»: οι οδηγίες της βιβλιοθήκης για φαγητό που παραγγέλνεις (ψήσιμο, λάδι, αλάτι, συνοδευτικά).
+Future<void> showOrderText(BuildContext context, String name, String text) => showDialog<void>(
+      context: context,
+      routeSettings: const RouteSettings(name: 'Τι να ζητήσεις'),
+      builder: (ctx) => AlertDialog(
+        title: Text(name),
+        content: SingleChildScrollView(child: Text(text, style: const TextStyle(fontSize: 15.5, height: 1.45))),
+        actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Εντάξει'))],
+      ),
+    );
+
+/// Τα στοιχεία του φαγητού για το εβδομαδιαίο πρόγραμμα (από τη βιβλιοθήκη): πότε ταιριάζει, γραφείο, ετικέτες, και «Τι να
+/// ζητήσεις» για την παραγγελία. Μόνο για ανάγνωση: τα αλλάζει μια νέα επικόλληση της βιβλιοθήκης.
+class PlanInfoBox extends StatelessWidget {
+  const PlanInfoBox({super.key, required this.name, required this.info});
+  final String name;
+  final PlanInfo info;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final parts = [
+      cookWayLabel(info.cook),
+      if (info.meals.isNotEmpty) info.meals.map(mealLabel).join(', '),
+      if (info.office) 'και για το γραφείο',
+    ];
+    return Container(
+      key: const ValueKey('dish-plan-info'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(color: c.tint(c.food), borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(info.key != null ? 'Από τη βιβλιοθήκη' : 'Για το πρόγραμμα',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.food)),
+        const SizedBox(height: 4),
+        Text(parts.join(dotJoin), style: TextStyle(fontSize: 14.5, height: 1.35, color: c.text)),
+        if (info.tags.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(info.tags.join(dotJoin), style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+        ],
+        if (info.order case final o?)
+          TextButton.icon(
+            key: const ValueKey('dish-plan-order'),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+            onPressed: () => showOrderText(context, name, o),
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('Τι να ζητήσεις όταν το παραγγέλνεις ›'),
+          ),
+      ]),
     );
   }
 }

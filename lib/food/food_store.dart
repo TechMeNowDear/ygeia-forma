@@ -826,6 +826,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<bool> saveDish(Dish d) =>
       _writeDishes(dishesInOrder([d, for (final x in _dishes) if (x.id != d.id) x]), d.name);
 
+  /// Πολλά νέα ή αλλαγμένα φαγητά μαζί (βιβλιοθήκη), σε μία εγγραφή: ή όλα ή κανένα.
+  Future<bool> saveDishes(List<Dish> changed) {
+    final ids = {for (final d in changed) d.id};
+    return _writeDishes(
+      dishesInOrder([...changed, for (final x in _dishes) if (!ids.contains(x.id)) x]),
+      changed.length == 1 ? changed.first.name : '${changed.length} φαγητά',
+    );
+  }
+
   /// Διαγραφή φαγητού. Ό,τι έχεις ήδη γράψει από αυτό μένει όπως είναι στο ημερολόγιο.
   Future<bool> deleteDish(Dish d) => _writeDishes([for (final x in _dishes) if (x.id != d.id) x], d.name);
 
