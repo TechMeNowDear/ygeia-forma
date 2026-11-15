@@ -247,3 +247,134 @@ String weekPrompt({
   }
   return b.toString();
 }
+
+// ---------------------------------------------------------------------------
+// Λίστα ψωνιών (από το πρόγραμμα)
+// ---------------------------------------------------------------------------
+
+/// Κατηγορίες που αγοράζονται τη μέρα που μαγειρεύονται (απόφαση χρήστη 15/11: ψάρι, κρέας, κοτόπουλο φρέσκα).
+const freshShopCats = {'Κρέας', 'Πουλερικά', 'Ψάρια', 'Θαλασσινά'};
+
+/// Φρέσκο: ωμό κρέας, πουλερικό, ψάρι ή θαλασσινό («(ωμό)», «(ωμή)»…). Κονσέρβες, καπνιστά, μαρινάτα και έτοιμα
+/// μένουν στα ψώνια της αρχής.
+bool isFreshBuy(Food f) => freshShopCats.contains(f.cat) && f.name.contains('(ωμ');
+
+/// Ένα τρόφιμο της λίστας: πόσο χρειάζεται (g ή ml, ωμό, όπως ζυγίζεται).
+class ShopLine {
+  const ShopLine(this.food, this.amount);
+  final Food food;
+  final double amount;
+}
+
+class ShoppingList {
+  const ShoppingList({this.main = const [], this.fresh = const {}, this.ordered = 0, this.unknown = const []});
+
+  /// Όλα τα υπόλοιπα, για τα ψώνια της αρχής (ταξινομημένα ανά κατηγορία και όνομα).
+  final List<ShopLine> main;
+
+  /// Τα φρέσκα (ψάρι, κρέας, κοτόπουλο), ανά μέρα του προγράμματος (θέση της μέρας).
+  final Map<int, List<ShopLine>> fresh;
+
+  /// Πόσα γεύματα είναι από παραγγελία (δεν αγοράζονται).
+  final int ordered;
+
+  /// Φαγητά που δεν μπήκαν στη λίστα (δεν υπάρχουν πια, λείπει υλικό, κατσαρόλα χωρίς μερίδες και θερμίδες).
+  final List<String> unknown;
+
+  bool get isEmpty => main.isEmpty && fresh.isEmpty;
+}
+
+/// Η λίστα ψωνιών για τις μέρες του προγράμματος από τη θέση [fromDay] και μετά, για τα γεύματα που δεν έχουν σημειωθεί.
+/// - Πιάτο και μερίδες: τα ωμά υλικά της μερίδας του προγράμματος.
+/// - Κατσαρόλα: όλη η συνταγή (για όλους), μία φορά για κάθε μαγείρεμα· το ίδιο φαγητό σε λιγότερες από [potQuickDays]
+///   μέρες είναι περισσεύματα. Αν υπάρχει ήδη πρόσφατο μαγείρεμα, η πρώτη φορά είναι περισσεύματα.
+/// - Παραγγελία: τίποτα.
+ShoppingList shoppingList(FoodStore food, WeekPlan w, {int fromDay = 0, DateTime? now}) {
+  final main = <String, double>{};
+  final fresh = <int, Map<String, double>>{};
+  final unknown = <String>[];
+  final cookedOn = <String, DateTime>{};
+  var ordered = 0;
+  for (var i = fromDay; i < w.days.length; i++) {
+    final day = w.dayAt(i);
+    for (final s in w.days[i]) {
+      if (s.state != SlotState.open) continue;
+      final d = food.dishById(s.dishId);
+      if (d == null) {
+        unknown.add('Φαγητό που δεν υπάρχει πια (${mealLabel(s.meal)}, μέρα ${i + 1})');
+        continue;
+      }
+      if (planInfoOf(d)?.cook == CookWay.out) {
+        ordered++;
+        continue;
+      }
+      List<DishItem>? items;
+      if (d.kind == DishKind.pot) {
+        final last = cookedOn[d.id] ??
+            (freshBatch(d, now ?? day) == null ? null : DateTime.fromMillisecondsSinceEpoch(d.batch!.at));
+        if (last != null && daysBetween(last, day) < potQuickDays) continue;
+        cookedOn[d.id] = day;
+        items = d.items;
+      } else {
+        items = plannedRaw(food, d, s.kcal);
+      }
+      if (items == null || food.missingItems(d.items).isNotEmpty) {
+        unknown.add(d.name);
+        continue;
+      }
+      for (final it in items) {
+        final f = food.itemFood(it);
+        if (f == null) continue;
+        final target = isFreshBuy(f) ? fresh.putIfAbsent(i, () => {}) : main;
+        target[f.id] = (target[f.id] ?? 0) + it.amount;
+      }
+    }
+  }
+  List<ShopLine> lines(Map<String, double> m) {
+    final out = [
+      for (final e in m.entries)
+        if (food.byId(e.key) case final f?) ShopLine(f, e.value),
+    ];
+    out.sort((a, b) {
+      final c = a.food.cat.compareTo(b.food.cat);
+      return c != 0 ? c : a.food.name.compareTo(b.food.name);
+    });
+    return out;
+  }
+
+  return ShoppingList(
+    main: lines(main),
+    fresh: {for (final e in fresh.entries) e.key: lines(e.value)},
+    ordered: ordered,
+    unknown: unknown,
+  );
+}
+
+/// Ποσότητα για τα ψώνια: προς τα πάνω, ανά 10 g (ανά 1 g κάτω από 10 g, π.χ. μπαχαρικά).
+double shopRound(double g) => g < 10 ? g.ceilToDouble() : (g / 10).ceil() * 10.0;
+
+/// Η λίστα ως κείμενο, για αντιγραφή (σημειώσεις, μήνυμα).
+String shoppingText(ShoppingList l, WeekPlan w) {
+  String line(ShopLine s) => '- ${s.food.name}: ${thousands(shopRound(s.amount).round())} ${s.food.unit}';
+  final b = StringBuffer()..writeln('Ψώνια για το πρόγραμμα ${dateKey(w.start)} – ${dateKey(w.end)}');
+  String? cat;
+  for (final s in l.main) {
+    if (s.food.cat != cat) {
+      cat = s.food.cat;
+      b
+        ..writeln()
+        ..writeln(cat.isEmpty ? 'Άλλα' : cat);
+    }
+    b.writeln(line(s));
+  }
+  final days = l.fresh.keys.toList()..sort();
+  for (final i in days) {
+    b
+      ..writeln()
+      ..writeln('Φρέσκα, τη μέρα που μαγειρεύεις (${dateKey(w.dayAt(i))})');
+    for (final s in l.fresh[i]!) {
+      b.writeln(line(s));
+    }
+  }
+  return b.toString();
+}

@@ -371,6 +371,16 @@ Map<String, dynamic> diagnosticsFrom({
       if (food.missingItems(d.items).isNotEmpty) '${d.name}: ${food.missingItems(d.items).join(', ')}',
   ];
   check('dishes-items', brokenDishes.isEmpty, brokenDishes.isEmpty ? null : brokenDishes.take(20).join('; '));
+  // Πρόγραμμα εβδομάδας (15/11): κάθε γεύμα δείχνει φαγητό που υπάρχει.
+  final plan = food.week;
+  final lostSlots = plan == null
+      ? const <String>[]
+      : [
+          for (var i = 0; i < plan.days.length; i++)
+            for (final s in plan.days[i])
+              if (food.dishById(s.dishId) == null) 'μέρα ${i + 1} ${s.meal.name}',
+        ];
+  check('week-dishes', lostSlots.isEmpty, lostSlots.isEmpty ? null : lostSlots.take(20).join('; '));
   check('training-read', !trainingReadError);
   check('samsung-read', d != null && d.failed.isEmpty, d == null ? 'καμία ανάγνωση' : (d.failed.isEmpty ? null : d.failed.join(',')));
 
@@ -458,6 +468,8 @@ Map<String, dynamic> diagnosticsFrom({
           ],
       'myFoods': myFoods,
       'dishes': food.dishesForBackup(),
+      // Πρόγραμμα εβδομάδας (15/11): οι θέσεις με το φαγητό, τις θερμίδες και τι σημειώθηκε.
+      'week': food.week?.toJson(),
       'training': training,
       'sources': sources == null ? null : {'plan': _tryJson(sources.plan), 'log': sources.log == null ? null : _tryJson(sources.log!)},
       'waist': [for (final w in store.waist) w.toJson()],

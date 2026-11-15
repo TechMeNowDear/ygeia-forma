@@ -453,6 +453,14 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
           ),
           TextButton(key: const ValueKey('week-delete'), onPressed: _delete, child: const Text('Σβήσιμο')),
         ]),
+        const SizedBox(height: 6),
+        FilledButton.tonalIcon(
+          key: const ValueKey('week-shopping'),
+          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+          onPressed: () => Navigator.of(context).push(ShoppingScreen.route(food)),
+          icon: const Icon(Icons.shopping_cart_outlined),
+          label: const Text('Λίστα ψωνιών'),
+        ),
         for (var i = 0; i < w.days.length; i++) ...[
           const SizedBox(height: 10),
           AppCard(
@@ -496,6 +504,128 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: body),
+        ),
+      ),
+    );
+  }
+}
+
+/// Η λίστα ψωνιών του προγράμματος: από σήμερα (ή την αρχή του προγράμματος) ως το τέλος, για ό,τι δεν έχει σημειωθεί.
+class ShoppingScreen extends StatefulWidget {
+  const ShoppingScreen({super.key, required this.food, this.clock});
+  final FoodStore food;
+  final DateTime Function()? clock;
+
+  static Route<void> route(FoodStore food) => MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'Λίστα ψωνιών'),
+        builder: (_) => ShoppingScreen(food: food),
+      );
+
+  @override
+  State<ShoppingScreen> createState() => _ShoppingScreenState();
+}
+
+class _ShoppingScreenState extends State<ShoppingScreen> {
+  /// Τι έχεις ήδη πάρει (μόνο όσο είναι ανοιχτή η οθόνη).
+  final _got = <String>{};
+
+  @override
+  Widget build(BuildContext context) => FoodTheme(child: ListenableBuilder(listenable: widget.food, builder: (c, _) => _build(c)));
+
+  Widget _build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final w = widget.food.week;
+    final now = (widget.clock ?? DateTime.now)();
+    final body = <Widget>[];
+    if (w == null) {
+      body.add(Text('Δεν υπάρχει πρόγραμμα.', style: TextStyle(fontSize: 15, color: c.textSecondary)));
+    } else {
+      final ti = w.indexOf(now);
+      final from = ti >= 0 ? ti : (dayOf(now).isAfter(w.end) ? w.days.length : 0);
+      final l = shoppingList(widget.food, w, fromDay: from, now: now);
+      Widget row(String key, ShopLine s) {
+        final got = _got.contains(key);
+        return CheckboxListTile(
+          key: ValueKey('shop-$key'),
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: got,
+          onChanged: (v) => setState(() => v == true ? _got.add(key) : _got.remove(key)),
+          title: Text(s.food.name,
+              style: TextStyle(fontSize: 15, color: got ? c.textTertiary : c.text, decoration: got ? TextDecoration.lineThrough : null)),
+          secondary: Text('${thousands(shopRound(s.amount).round())} ${s.food.unit}',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: got ? c.textTertiary : c.text)),
+        );
+      }
+
+      body.addAll([
+        Text(
+          'Από ${shortDayDate(w.dayAt(from.clamp(0, w.days.length - 1)))} ως ${shortDayDate(w.end)}, για τα γεύματα που δεν έχεις σημειώσει. '
+          'Ωμά, όπως τα ζυγίζεις. Η κατσαρόλα μετρά μία φορά για κάθε μαγείρεμα, για όλους.',
+          style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          key: const ValueKey('shop-copy'),
+          onPressed: l.isEmpty
+              ? null
+              : () async {
+                  await Clipboard.setData(ClipboardData(text: shoppingText(l, w)));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Η λίστα αντιγράφηκε.')));
+                  }
+                },
+          icon: const Icon(Icons.copy_rounded),
+          label: const Text('Αντιγραφή της λίστας'),
+        ),
+        if (l.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text('Δεν χρειάζεται να αγοράσεις κάτι για τα υπόλοιπα γεύματα.', style: TextStyle(fontSize: 15, color: c.textSecondary)),
+          ),
+      ]);
+      String? cat;
+      for (final s in l.main) {
+        if (s.food.cat != cat) {
+          cat = s.food.cat;
+          body.add(Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 2),
+            child: Text(cat.isEmpty ? 'Άλλα' : cat, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.food)),
+          ));
+        }
+        body.add(row('m-${s.food.id}', s));
+      }
+      for (final i in l.fresh.keys.toList()..sort()) {
+        body.add(Padding(
+          padding: const EdgeInsets.only(top: 18, bottom: 2),
+          child: Text('Φρέσκα, ${shortDayDate(w.dayAt(i))}: τη μέρα που μαγειρεύεις',
+              key: ValueKey('shop-fresh-$i'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.food)),
+        ));
+        for (final s in l.fresh[i]!) {
+          body.add(row('f$i-${s.food.id}', s));
+        }
+      }
+      if (l.ordered > 0) {
+        body.add(Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Text('${countText(l.ordered, 'γεύμα είναι', 'γεύματα είναι')} από παραγγελία: δεν αγοράζονται.',
+              style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+        ));
+      }
+      if (l.unknown.isNotEmpty) {
+        body.add(Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text('Δεν μπήκαν στη λίστα: ${l.unknown.join(', ')}.', style: TextStyle(fontSize: 13.5, height: 1.35, color: c.warn)),
+        ));
+      }
+    }
+    return Scaffold(
+      backgroundColor: c.background,
+      appBar: AppBar(backgroundColor: c.background, surfaceTintColor: Colors.transparent, title: const Text('Λίστα ψωνιών')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: body),
         ),
       ),

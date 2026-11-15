@@ -21,6 +21,8 @@ const onion = 'C20034';
 const oil = 'C17270';
 const rusks = 'C7340';
 const apple = 'C13039';
+const bream = 'C26088'; // Τσιπούρα υδατοκαλλιέργειας (ωμή)
+const tuna = 'C26039'; // Τόνος σε νερό (κονσέρβα)
 final now = DateTime(2026, 11, 16, 13);
 
 final _lib = <Map<String, Object?>>[
@@ -50,6 +52,30 @@ final _lib = <Map<String, Object?>>[
     'items': [
       {'id': rusks, 'name': 'Φρυγανιές ολικής', 'g': 30},
       {'id': apple, 'name': 'Μήλο', 'g': 150},
+    ],
+  },
+  {
+    'key': 'tsipoura',
+    'name': 'Τσιπούρα με τόνο',
+    'type': 'plate',
+    'meals': ['dinner'],
+    'tags': ['ψάρι'],
+    'items': [
+      {'id': bream, 'name': 'Τσιπούρα', 'g': 300},
+      {'id': tuna, 'name': 'Τόνος', 'g': 50},
+    ],
+    'steps': [
+      {'text': 'Ψήσε την τσιπούρα.', 'min': 20}
+    ],
+  },
+  {
+    'key': 'tsipoura-exo',
+    'name': 'Τσιπούρα από ψητοπωλείο',
+    'cook': 'out',
+    'type': 'plate',
+    'order': 'Ψητή, λάδι στο πλάι.',
+    'items': [
+      {'id': bream, 'name': 'Τσιπούρα', 'g': 300},
     ],
   },
   {
@@ -160,7 +186,7 @@ void main() {
       final io2 = MemoryDishIO(io.json);
       final s2 = FoodStore.preloaded(foods: basicFoods(), dishIO: io2, now: now);
       await s2.loadDishes();
-      expect(s2.dishes, hasLength(3));
+      expect(s2.dishes, hasLength(5));
       expect(s2.likes.like, [lentils]);
       expect(jsonEncode(s2.week!.toJson()), jsonEncode(s.week!.toJson()));
       expect(s2.week!.days[0][1].locked, isTrue);
@@ -245,6 +271,67 @@ void main() {
       expect(text, contains('μερίδα $kcal kcal'));
       expect(text, contains('fakes · Φακές κοκκινιστές · κατσαρόλα ~4 μερίδες'));
       expect(nextMonday(DateTime(2026, 11, 16, 23)), DateTime(2026, 11, 16));
+    });
+  });
+
+  group('Λίστα ψωνιών', () {
+    test('Κατσαρόλα μία φορά ανά μαγείρεμα· φρέσκο ψάρι τη μέρα του· κονσέρβα και παραγγελία όχι στα φρέσκα', () {
+      final s = store();
+      final w = parseWeek(
+        weekText(days: [
+          [
+            {'meal': 'lunch', 'key': 'fakes'},
+            {'meal': 'snack', 'key': 'frygania-milo'},
+            {'meal': 'dinner', 'key': 'tsipoura'},
+          ],
+          [
+            {'meal': 'lunch', 'key': 'fakes'},
+            {'meal': 'dinner', 'key': 'tsipoura-exo'},
+          ],
+          [
+            {'meal': 'lunch', 'key': 'mpiftekia'},
+          ],
+          [],
+          [
+            {'meal': 'lunch', 'key': 'fakes'},
+          ],
+        ]),
+        s.dishes,
+        now: 0,
+      ).plan!;
+      final l = shoppingList(s, w, now: now);
+      final main = {for (final x in l.main) x.food.id: x.amount};
+      // Φακές: 2 μαγειρέματα (μέρα 1 και μέρα 5) × 250 + μπιφτέκια 1 μερίδα (200 ÷ 4).
+      expect(main[lentils], 2 * 250 + 50);
+      expect(main[onion], 200);
+      expect(main[rusks], 30);
+      expect(main[tuna], 50, reason: 'κονσέρβα: στα ψώνια της αρχής');
+      expect(main.containsKey(bream), isFalse);
+      expect(l.fresh.keys, [0]);
+      expect(l.fresh[0]!.single.food.id, bream);
+      expect(l.fresh[0]!.single.amount, 300, reason: 'η τσιπούρα από ψητοπωλείο δεν αγοράζεται');
+      expect(l.ordered, 1);
+      final text = shoppingText(l, w);
+      expect(text, contains('Τσιπούρα υδατοκαλλιέργειας (ωμή): 300 g'));
+      expect(text, contains('Φακές (ξερές): 550 g'));
+      // Από τη 2η μέρα και μετά: η κατσαρόλα της 1ης είναι περισσεύματα, μένει μόνο το μαγείρεμα της 5ης.
+      final later = shoppingList(s, w, fromDay: 1, now: now);
+      expect({for (final x in later.main) x.food.id: x.amount}[lentils], 250 + 50);
+      expect(shopRound(3.2), 4);
+      expect(shopRound(201), 210);
+    });
+
+    test('Υπάρχει ήδη πρόσφατο μαγείρεμα: η πρώτη φορά είναι περισσεύματα· τα σημειωμένα γεύματα δεν μετρούν', () {
+      final dishes = library();
+      final pot = dishes.firstWhere((d) => d.kind == DishKind.pot);
+      final b = PotBatch(at: now.millisecondsSinceEpoch, cooked: 1500, items: pot.items);
+      final cooked = [for (final d in dishes) d.id == pot.id ? d.copyWith(batch: b) : d];
+      final s = store(dishes: cooked);
+      final w = parseWeek(weekText(), cooked, now: 0).plan!;
+      final l = shoppingList(s, w, now: now);
+      expect({for (final x in l.main) x.food.id: x.amount}.containsKey(onion), isFalse);
+      final ate = w.withSlot(0, 1, w.days[0][1].copyWith(state: SlotState.ate, grp: 'x'));
+      expect(shoppingList(s, ate, now: now).main.any((x) => x.food.id == rusks), isFalse);
     });
   });
 
