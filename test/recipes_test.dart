@@ -235,7 +235,7 @@ void main() {
         activity: 1.5,
         doctor: false,
         since: '2026-11-16',
-        kg: 82,
+        kg: 90,
         age: 40,
         heightCm: 180,
         male: true,

@@ -693,7 +693,7 @@ void main() {
         activity: 1.5,
         doctor: true,
         since: '2026-10-20',
-        kg: 82,
+        kg: 90,
         age: 40,
         heightCm: 180,
         male: true,
