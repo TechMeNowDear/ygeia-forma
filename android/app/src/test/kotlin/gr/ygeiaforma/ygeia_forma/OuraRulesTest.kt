@@ -50,7 +50,8 @@ class OuraRulesTest {
         assertEquals(OuraRules.PLAN_LOG_FILE, OuraBridge.PLAN_LOG_FILE)
         assertEquals(
             listOf(
-                "oura_nights.json", "sources.json", "sources_log.json", "training.json",
+                // 15/11: και το dishes.json («Τα φαγητά μου»).
+                "oura_nights.json", "sources.json", "sources_log.json", "training.json", "dishes.json",
                 "oura_tokens.bin", "oura_pending.bin", "oura_connecting.bin",
             ),
             OuraRules.OWN_FILES,

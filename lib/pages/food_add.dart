@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../data.dart' show HealthStore;
 import '../food/chol.dart' show branByName, isBran;
+import '../food/dishes.dart';
 import '../food/food_channel.dart';
 import '../food/food_model.dart';
 import '../food/food_search.dart' show FoodSearchResult, plain;
@@ -16,6 +17,7 @@ import '../format.dart';
 import '../goals.dart' show defaultBranG;
 import '../theme.dart';
 import '../widgets.dart';
+import 'dishes.dart';
 import 'my_foods.dart';
 import 'nutrition.dart';
 
@@ -75,6 +77,30 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
   } else {
     await food.update(e.copyWith(grams: r.grams, meal: r.meal, food: r.food.id == e.food.id ? null : r.food));
   }
+}
+
+/// Υλικό φαγητού (15/11): το τρόφιμο και η ποσότητα που διάλεξες ([remove]: «Αφαίρεση από το φαγητό»).
+typedef IngredientPick = ({Food food, double amount, bool remove});
+
+/// Νέο υλικό για το φαγητό [dishName]: η γνωστή αναζήτηση (Συχνά, Πρόσφατα, Δικά μου, Σάρωση, Από ετικέτα) και η
+/// ποσότητα. null αν έκλεισε χωρίς υλικό.
+Future<IngredientPick?> pickIngredient(BuildContext context, FoodStore food, {required String dishName}) =>
+    Navigator.of(context).push<IngredientPick>(MaterialPageRoute<IngredientPick>(
+      settings: const RouteSettings(name: 'Υλικό φαγητού'),
+      builder: (_) => AddFoodScreen(food: food, meal: Meal.lunch, day: food.day, ingredientOf: dishName),
+    ));
+
+/// Αλλαγή ποσότητας (ή μορφής: ωμό/βρασμένο) ενός υλικού, ή αφαίρεσή του.
+Future<IngredientPick?> editIngredient(BuildContext context, FoodStore food, Food item, double amount) async {
+  final r = await showModalBottomSheet<_SheetResult>(
+    context: context,
+    routeSettings: const RouteSettings(name: 'Ποσότητα υλικού'),
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => QuantitySheet(food: food, item: item, initialGrams: amount, meal: Meal.lunch, editing: true, ingredient: true),
+  );
+  return r == null ? null : (food: r.food, amount: r.grams, remove: r.delete);
 }
 
 /// Πόσο μένει ένα μήνυμα με «Αναίρεση» (round8, R8-U2-1). Από το Flutter 3.38 ένα SnackBar με κουμπί δεν κλείνει ποτέ
@@ -362,8 +388,13 @@ class MealPicker extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class AddFoodScreen extends StatefulWidget {
-  const AddFoodScreen({super.key, required this.food, required this.meal, required this.day, this.clock, this.scanOnOpen = false});
+  const AddFoodScreen(
+      {super.key, required this.food, required this.meal, required this.day, this.clock, this.scanOnOpen = false, this.ingredientOf});
   final FoodStore food;
+
+  /// Επιλογή υλικού για το φαγητό με αυτό το όνομα (15/11): χωρίς γεύμα και μέρα· η οθόνη κλείνει με το υλικό και την
+  /// ποσότητά του ([IngredientPick]) αντί να γράψει κάτι στο ημερολόγιο.
+  final String? ingredientOf;
 
   /// Ανοίγει αμέσως τον σαρωτή barcode (από το widget «Γρήγορο φαγητό», 13/11). Αν ο σαρωτής κλείσει χωρίς αποτέλεσμα,
   /// μένει η κανονική οθόνη αναζήτησης.
@@ -467,9 +498,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(productGoneText(picked.name))));
       return;
     }
+    final ingredient = widget.ingredientOf != null;
     final r = await showModalBottomSheet<_SheetResult>(
       context: context,
-      routeSettings: const RouteSettings(name: 'Ποσότητα'),
+      routeSettings: RouteSettings(name: ingredient ? 'Ποσότητα υλικού' : 'Ποσότητα'),
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
@@ -479,9 +511,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         initialGrams:
             widget.food.lastGrams(f.id) ?? startServing(f) ?? firstGrams(f, branG: HealthStore.shared?.goals?.branG),
         meal: _meal,
+        ingredient: ingredient,
       ),
     );
     if (r == null || !mounted) return;
+    if (ingredient) {
+      Navigator.of(context).pop<IngredientPick>((food: r.food, amount: r.grams, remove: false));
+      return;
+    }
     final day = await _targetDay();
     if (day == null || !mounted) return;
     final e = await widget.food.add(r.food, r.grams, r.meal, on: day, now: _now());
@@ -521,6 +558,57 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     if (f != null && mounted) await _pick(f);
   }
 
+  /// «Τα φαγητά μου» (15/11): γράφει το φαγητό [picked]. [quick]: το «+» της γραμμής, όπως την τελευταία φορά, χωρίς
+  /// οθόνη (αν γίνεται: [quickDishResult]). Η μέρα με τον ίδιο κανόνα με τα τρόφιμα ([_targetDay]).
+  Future<void> _pickDish(Dish picked, {bool quick = false}) async {
+    final food = widget.food;
+    final d = food.dishById(picked.id);
+    if (d == null) return;
+    final r = (quick ? quickDishResult(food, d, _meal, _now()) : null) ??
+        await openDishLogSheet(context, food, d, meal: _meal, now: _now);
+    if (r == null || !mounted) return;
+    if (r.edit) {
+      await openDishEditor(context, food, dish: d);
+      return;
+    }
+    final day = await _targetDay();
+    if (day == null || !mounted) return;
+    final out = await food.logDish(d, r.amounts, meal: r.meal, qty: r.qty, plate: r.plate, batch: r.batch, on: day, now: _now());
+    if (!mounted) return;
+    if (out == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Δεν αποθηκεύτηκε: ${d.name}. Δοκίμασε ξανά.')));
+      return;
+    }
+    final today = _today();
+    final where = sameDay(day, today) ? 'Προστέθηκε' : 'Προστέθηκε (${entryDayLabel(day, today)})';
+    final kcal = Totals(out).shownKcal;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('$where: ${d.name}, ${dishQtyText(d.kind, r.qty)} ·\u00A0${thousands(kcal)} kcal'),
+        persist: false,
+        duration: undoSnackBarDuration,
+        // Η «Αναίρεση» σβήνει όλα τα υλικά και φέρνει πίσω το φαγητό όπως ήταν (π.χ. χωρίς το νέο μαγείρεμα).
+        action: SnackBarAction(
+          label: 'Αναίρεση',
+          onPressed: () async {
+            if (await food.removeGroup(out) && food.dishById(d.id) != null) await food.saveDish(d);
+          },
+        ),
+      ));
+    setState(() => _meal = r.meal);
+  }
+
+  Future<void> _newDish() async {
+    final d = await openDishEditor(context, widget.food);
+    if (d != null && mounted) await _pickDish(d);
+  }
+
+  Future<void> _allDishes() async {
+    final d = await Navigator.of(context).push<Dish>(DishesScreen.route(widget.food, pick: true));
+    if (d != null && mounted) await _pickDish(d);
+  }
+
   // Round9 (R9-U2-4): η οθόνη ακολουθεί το ημερολόγιο και τα προϊόντα σου: μετά από «Διόρθωση» ή «Διαγραφή» από το ⋮, ή
   // «Αναίρεση», οι λίστες δείχνουν αμέσως ό,τι ισχύει (πριν έμεναν οι παλιές τιμές και το σβησμένο προϊόν).
   @override
@@ -530,6 +618,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   Widget _build(BuildContext context) {
     final c = Aigaio.of(context);
     final q = _query.text;
+    // Επιλογή υλικού για φαγητό (15/11): χωρίς γεύμα, μέρα και φαγητά.
+    final ingredient = widget.ingredientOf != null;
+    final dishes = ingredient ? const <Dish>[] : widget.food.dishes;
+    final foundDishes = ingredient || q.trim().isEmpty ? const <Dish>[] : widget.food.findDishes(q);
     final found = q.trim().isEmpty ? null : widget.food.find(q);
     final results = found?.foods ?? const <Food>[];
     // Έλεγχος 9/11 (Υ3): αν βρέθηκε μόνο χωρίς μια λέξη ή με διόρθωση, το λέμε (να μη μοιάζει ακριβής απάντηση).
@@ -589,6 +681,78 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 line: k < foods.length - 1,
               ),
           ],
+        );
+    // «Τα φαγητά μου» (15/11): πρώτα, γιατί ένα φαγητό είναι όλο το γεύμα με ένα πάτημα.
+    Widget dishRows(List<Dish> list) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var k = 0; k < list.length; k++)
+            DishTile(
+              food: widget.food,
+              dish: list[k],
+              line: k < list.length - 1,
+              onTap: () => _pickDish(list[k]),
+              onQuick: () => _pickDish(list[k], quick: true),
+            ),
+        ]);
+    Widget dishSection() => KeyedSubtree(
+          key: const ValueKey('add-dishes'),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            head(
+              'Τα φαγητά μου',
+              trailing: dishes.length > 3
+                  ? TextButton(
+                      key: const ValueKey('add-dishes-all'),
+                      onPressed: _allDishes,
+                      child: Text('Όλα (${dishes.length}) ›'),
+                    )
+                  : null,
+            ),
+            if (widget.food.dishesNote != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                child: Text(widget.food.dishesNote!, style: TextStyle(fontSize: 13.5, height: 1.35, color: c.warn)),
+              ),
+            if (dishes.isEmpty)
+              InkWell(
+                key: const ValueKey('add-dish-first'),
+                onTap: widget.food.dishesRead ? _newDish : null,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
+                  child: Row(children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(color: c.tint(c.food), borderRadius: BorderRadius.circular(10)),
+                      child: Icon(Icons.add_rounded, size: 22, color: c.food),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Φτιάξε ένα φαγητό από υλικά',
+                            style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.text)),
+                        const SizedBox(height: 2),
+                        Text('Μετά το γράφεις με ένα πάτημα. Για πιάτα, μερίδες και κατσαρόλες.',
+                            style: TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary)),
+                      ]),
+                    ),
+                  ]),
+                ),
+              )
+            else ...[
+              dishRows(dishes.take(3).toList()),
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const ValueKey('add-dish-new'),
+                    onPressed: widget.food.dishesRead ? _newDish : null,
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: const Text('Νέο φαγητό'),
+                  ),
+                ),
+              ),
+            ],
+          ]),
         );
     // Έλεγχος round1 (U3a-5): αν οι δύο ετικέτες δεν χωρούν ολόκληρες δίπλα δίπλα (μεγάλα γράμματα σε στενή οθόνη), τα
     // κουμπιά πάνε το ένα κάτω από το άλλο· πριν κόβονταν σε «Σάρω…» και «Από ε…». (U3a-18: ίδιο εικονίδιο για το
@@ -686,7 +850,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               textInputAction: TextInputAction.search,
               style: TextStyle(fontSize: 17, color: c.text),
               decoration: InputDecoration(
-                hintText: 'Ψάξε φαγητό ή μάρκα',
+                hintText: ingredient ? 'Ψάξε υλικό' : 'Ψάξε φαγητό ή μάρκα',
                 hintStyle: TextStyle(color: c.textTertiary, fontSize: 17),
                 border: InputBorder.none,
                 isDense: true,
@@ -703,7 +867,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             ),
           ),
         ),
-        bottom: large
+        bottom: large || ingredient
             ? null
             : PreferredSize(
                 // Round8 (R8-U2-6): 64 (πριν 60): τα γεύματα πατιούνται σε 48 dp, μέσα σε πλαίσιο 50 dp.
@@ -716,16 +880,33 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           constraints: const BoxConstraints(maxWidth: 720),
           // Η γραμμή «Μέρα: …» μένει πάντα στη θέση της, πάνω από τη λίστα που κυλά.
           child: Column(children: [
-            dayLine,
+            if (ingredient)
+              Padding(
+                key: const ValueKey('add-ingredient-for'),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Row(children: [
+                  Icon(Icons.soup_kitchen_outlined, size: 16, color: c.textSecondary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text('Υλικό για «${widget.ingredientOf}»',
+                        maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+                  ),
+                ]),
+              )
+            else
+              dayLine,
             Expanded(
               child: Stack(
             children: [
               ListView(
                 padding: const EdgeInsets.only(bottom: 40),
                 children: [
-                  if (large) Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: Center(child: mealPicker)),
+                  if (large && !ingredient) Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: Center(child: mealPicker)),
                   tools,
                   if (q.trim().isEmpty) ...[
+                    // Με φαγητά: πρώτα αυτά (όλο το γεύμα με ένα πάτημα). Χωρίς: η πρόταση «Φτιάξε ένα φαγητό» πάει στο
+                    // τέλος, ώστε να μην κατεβάζει τα Συχνά, τα Πρόσφατα και τα Δικά μου (έλεγχος premium, S3).
+                    if (!ingredient && dishes.isNotEmpty) dishSection(),
                     if (frequent.isNotEmpty) section('Συχνά', frequent),
                     if (recent.isNotEmpty) section('Πρόσφατα', recent),
                     if (!_moreRecent && allRecent.length > recent.length)
@@ -744,8 +925,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                         child: Text(
-                          'Γράψε τι έφαγες, με ή χωρίς τόνους, ακόμα και σε greeklish («fakes», «kotopoulo»). '
-                          'Για συσκευασμένα προϊόντα πάτα «Σάρωση».',
+                          ingredient
+                              ? 'Γράψε το υλικό, με ή χωρίς τόνους, ακόμα και σε greeklish («fakes», «kotopoulo»). '
+                                  'Βάλε τα γραμμάρια όπως τα ζυγίζεις, ωμά. Για συσκευασμένα προϊόντα πάτα «Σάρωση».'
+                              : 'Γράψε τι έφαγες, με ή χωρίς τόνους, ακόμα και σε greeklish («fakes», «kotopoulo»). '
+                                  'Για συσκευασμένα προϊόντα πάτα «Σάρωση».',
                           style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                         ),
                       ),
@@ -777,7 +961,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                     ),
-                  ] else if (results.isEmpty)
+                    if (!ingredient && dishes.isEmpty) dishSection(),
+                  ] else if (results.isEmpty && foundDishes.isEmpty)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                       child: Text(
@@ -789,6 +974,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       ),
                     )
                   else ...[
+                    if (foundDishes.isNotEmpty) ...[
+                      head('Τα φαγητά μου'),
+                      dishRows(foundDishes.take(5).toList()),
+                      if (results.isNotEmpty) head('Τρόφιμα'),
+                    ],
                     if (note != null && strong)
                       Container(
                         key: const ValueKey('search-warning'),
@@ -970,12 +1160,18 @@ class QuantitySheet extends StatefulWidget {
     required this.initialGrams,
     required this.meal,
     this.editing = false,
+    this.ingredient = false,
   });
   final FoodStore food;
   final Food item;
   final double initialGrams;
   final Meal meal;
   final bool editing;
+
+  /// Υλικό φαγητού (15/11, «Τα φαγητά μου»): χωρίς γεύμα, κουμπί «Βάλ’ το στο φαγητό» / «Αφαίρεση». Χωρίς τις ερωτήσεις
+  /// «Σωστή ποσότητα;» και «πριν ή μετά το μαγείρεμα;»: σε μια κατσαρόλα 500 g φακές ή 150 g λάδι είναι κανονικές
+  /// ποσότητες, και τα υλικά μπαίνουν ωμά. Τα σύνολα του φαγητού φαίνονται αμέσως στην οθόνη του φαγητού.
+  final bool ingredient;
 
   @override
   State<QuantitySheet> createState() => _QuantitySheetState();
@@ -1033,6 +1229,10 @@ class _QuantitySheetState extends State<QuantitySheet> {
   /// την ξερή, δεν ξαναρωτά «Σωστή ποσότητα;» (είδες ήδη τις θερμίδες). Round7 (R7-A2-3): ο έλεγχος λάθους ξέρει και την
   /// ποσότητα της τελευταίας φοράς.
   Future<void> _submit(double g) async {
+    if (widget.ingredient) {
+      Navigator.pop(context, _SheetResult(g, _meal, _item));
+      return;
+    }
     final unchanged = widget.editing && g == widget.initialGrams && _item.id == widget.item.id;
     var item = _item;
     var keptRaw = false;
@@ -1277,7 +1477,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 if (oilNote) ...[
                   SizedBox(height: _states.length > 1 ? 2 : 10),
                   Text(
-                    'Λάδι ή βούτυρο για το μαγείρεμα: γράψ’ το χωριστά.',
+                    widget.ingredient
+                        ? 'Λάδι ή βούτυρο για το μαγείρεμα: βάλ’ το κι αυτό ως υλικό.'
+                        : 'Λάδι ή βούτυρο για το μαγείρεμα: γράψ’ το χωριστά.',
                     key: const ValueKey('oil-note'),
                     style: TextStyle(fontSize: 12.5, color: c.textTertiary),
                   ),
@@ -1438,15 +1640,23 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
+                if (!widget.ingredient) ...[
+                  const SizedBox(height: 16),
+                  MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
+                ],
                 const SizedBox(height: 18),
                 FilledButton(
                   // Round 2 (R2-U1-12): και 20 dp δεξιά-αριστερά (πριν 0: με γράμματα 2× το κείμενο ακουμπούσε τις άκρες).
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20)),
                   onPressed: g == null ? null : () => _submit(g),
                   // Έλεγχος round1 (U3a-18): αν σπάσει σε δύο γραμμές (μεγάλα γράμματα), μένει στο κέντρο του κουμπιού.
-                  child: Text(widget.editing ? 'Αποθήκευση' : 'Προσθήκη στο ${mealLabel(_meal)}', textAlign: TextAlign.center),
+                  child: Text(
+                      widget.editing
+                          ? 'Αποθήκευση'
+                          : widget.ingredient
+                              ? 'Βάλ’ το στο φαγητό'
+                              : 'Προσθήκη στο ${mealLabel(_meal)}',
+                      textAlign: TextAlign.center),
                 ),
                 if (widget.editing) ...[
                   const SizedBox(height: 8),
@@ -1454,7 +1664,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     style: TextButton.styleFrom(foregroundColor: c.bad),
                     onPressed: () => Navigator.pop(context, _SheetResult(g ?? 0, _meal, _item, delete: true)),
                     icon: const Icon(Icons.delete_outline_rounded),
-                    label: const Text('Διαγραφή'),
+                    label: Text(widget.ingredient ? 'Αφαίρεση από το φαγητό' : 'Διαγραφή'),
                   ),
                 ],
               ],

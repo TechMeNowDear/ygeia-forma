@@ -10,6 +10,7 @@ library;
 import 'dart:convert';
 
 import 'error_report.dart' show ErrorReporter;
+import 'food/dishes.dart' show Dish;
 import 'food/food_model.dart';
 import 'format.dart';
 import 'plan_file.dart';
@@ -31,6 +32,7 @@ String buildBackup({
   required DateTime now,
   ({String plan, String? log})? sources,
   Map<String, dynamic>? training,
+  List<Object?>? dishes,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -48,6 +50,8 @@ String buildBackup({
     if (sources != null) 'sources': {'plan': sources.plan, if (sources.log != null) 'log': sources.log},
     // Προπονήσεις και προγράμματα (έλεγχος 8/11, TRN-17): υπάρχουν μόνο στο κινητό.
     if (training != null) 'training': training,
+    // «Τα φαγητά μου» (15/11): υπάρχουν μόνο στο κινητό. Πρόσθετο κλειδί· οι παλιές εκδόσεις το αγνοούν.
+    if (dishes != null) 'dishes': dishes,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -55,7 +59,10 @@ String buildBackup({
 /// Ό,τι βρέθηκε σε ένα αρχείο αντιγράφου, ελεγμένο.
 class BackupContents {
   BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped,
-      {this.sources, this.training, this.errorsOff = false});
+      {this.sources, this.training, this.errorsOff = false, this.dishes = const []});
+
+  /// «Τα φαγητά μου» (15/11), όσα διαβάζονται σωστά.
+  final List<Dish> dishes;
 
   /// Round 7 (R7-A11-4): στο κινητό του αντιγράφου οι «Αναφορές σφαλμάτων» ήταν κλειστές.
   final bool errorsOff;
@@ -200,6 +207,16 @@ BackupContents parseBackup(String text) {
       skipped++;
     }
   }
+  final dishes = <Dish>[];
+  final dishIds = <String>{};
+  for (final d in (j['dishes'] is List ? j['dishes'] as List : const [])) {
+    final dish = Dish.fromJson(d);
+    if (dish == null || !dishIds.add(dish.id)) {
+      skipped++;
+    } else {
+      dishes.add(dish);
+    }
+  }
   final prefs = j['prefs'] is Map
       ? {
           for (final e in (j['prefs'] as Map).entries)
@@ -217,6 +234,7 @@ BackupContents parseBackup(String text) {
     sources: plan == null ? null : (plan: plan, log: (src as Map)['log'] is String ? src['log'] as String : null),
     training: j['training'] is Map ? Map<String, dynamic>.from(j['training'] as Map) : null,
     errorsOff: j['errorsOff'] == true,
+    dishes: dishes,
   );
 }
 
@@ -287,6 +305,7 @@ const backupOffPhoneText = 'Μετά στείλ’ το και έξω από τ�
 
 String entriesText(int n) => countText(n, 'καταχώριση', 'καταχωρίσεις');
 String productsText(int n) => countText(n, 'προϊόν', 'προϊόντα');
+String dishesText(int n) => countText(n, 'φαγητό', 'φαγητά');
 
 /// «ygeia-antigrafo-2026-11-01.json.gz» (συμπιεσμένο· η επαναφορά δέχεται και τα παλιά .json).
 String backupFileName(DateTime now) =>

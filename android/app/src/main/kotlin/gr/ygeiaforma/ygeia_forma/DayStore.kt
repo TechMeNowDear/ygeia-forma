@@ -258,6 +258,41 @@ class DayStore private constructor(context: Context) :
         writableDatabase.delete("food_log", "id = ?", arrayOf(id))
     }
 
+    /**
+     * «Τα φαγητά μου» (15/11): πολλές καταχωρίσεις [rows] (id, μέρα, JSON) σε ΜΙΑ συναλλαγή. Ό,τι υπάρχει ήδη με το ίδιο id
+     * αντικαθίσταται (όπως το [logPut]). Αν κάτι αποτύχει στη μέση, δεν γράφεται τίποτα.
+     */
+    fun logPutAll(rows: List<Triple<String, String, String>>) {
+        val db = writableDatabase
+        val now = System.currentTimeMillis()
+        db.beginTransaction()
+        try {
+            for ((id, day, json) in rows) {
+                val v = ContentValues()
+                v.put("id", id)
+                v.put("day", day)
+                v.put("json", json)
+                v.put("updated", now)
+                db.insertWithOnConflict("food_log", null, v, SQLiteDatabase.CONFLICT_REPLACE)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Σβήνει πολλές καταχωρίσεις σε μία συναλλαγή (ή όλες ή καμία). */
+    fun logDeleteAll(ids: List<String>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for (id in ids) db.delete("food_log", "id = ?", arrayOf(id))
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     /** Καταχωρίσεις στο [from, to] (ημερομηνίες «2026-10-24»), παλιότερη πρώτη. */
     fun logRange(from: String, to: String): JSONArray {
         val out = JSONArray()

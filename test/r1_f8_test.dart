@@ -303,7 +303,7 @@ void main() {
     test('και οι προεπιλογές μετά από χαλασμένο αρχείο μετρούν ως «δεν μπήκαν»', () {
       final src = File('lib/pages/settings.dart').readAsStringSync();
       expect(src, contains('final prefsOut = !store.prefsLoaded || store.prefsFromDefaults;'));
-      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut;'));
+      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut;'));
     });
   });
 

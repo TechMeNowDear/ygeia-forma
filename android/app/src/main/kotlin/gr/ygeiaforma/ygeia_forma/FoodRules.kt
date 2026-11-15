@@ -147,6 +147,39 @@ object FoodRules {
         return RestoreRows(outLog, outFoods)
     }
 
+    /**
+     * «Τα φαγητά μου» (15/11): οι καταχωρίσεις μιας εγγραφής «όλα μαζί» (πίνακας JSON). Κάθε μία με id και μέρα, αλλιώς
+     * σφάλμα πριν γραφτεί οτιδήποτε. Το πολύ [MAX_PUT_ALL] (ένα φαγητό έχει ως 40 υλικά· ένα γεύμα «Όπως χθες» λίγα παραπάνω).
+     */
+    fun putAllRows(json: String): List<Triple<String, String, String>> {
+        val a = JSONArray(json)
+        require(a.length() in 1..MAX_PUT_ALL) { "Πολλές καταχωρίσεις: ${a.length()}" }
+        val out = ArrayList<Triple<String, String, String>>(a.length())
+        val seen = HashSet<String>()
+        for (i in 0 until a.length()) {
+            val o = a.optJSONObject(i)
+            val id = (o?.opt("id") as? String).orEmpty()
+            val day = (o?.opt("day") as? String).orEmpty()
+            require(o != null && id.isNotEmpty() && day.isNotEmpty()) { "Καταχώριση ${i + 1} χωρίς id ή day" }
+            require(seen.add(id)) { "Το ίδιο id δύο φορές: $id" }
+            out.add(Triple(id, day, o.toString()))
+        }
+        return out
+    }
+
+    /** Τα id μιας διαγραφής «όλα μαζί» (πίνακας JSON με κείμενα, όχι κενά). */
+    fun idList(json: String): List<String> {
+        val a = JSONArray(json)
+        require(a.length() in 1..MAX_PUT_ALL) { "Πολλές διαγραφές: ${a.length()}" }
+        return List(a.length()) { i ->
+            val id = a.opt(i) as? String
+            require(!id.isNullOrEmpty()) { "Διαγραφή ${i + 1} χωρίς id" }
+            id
+        }
+    }
+
+    const val MAX_PUT_ALL = 500
+
     private fun connection(message: String): JSONObject =
         JSONObject().put("ok", false).put("kind", "connection").put("message", message)
 }

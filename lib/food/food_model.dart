@@ -9,6 +9,7 @@ library;
 import 'dart:math' as math;
 
 import '../format.dart';
+import 'dishes.dart' show DishTag;
 
 /// Κλειδιά θρεπτικών (ίδια με τα αρχεία της βάσης).
 abstract final class Nk {
@@ -257,6 +258,7 @@ class LogEntry {
     required this.food,
     required this.grams,
     required this.time,
+    this.dish,
   });
 
   final String id;
@@ -270,10 +272,21 @@ class LogEntry {
   final double grams;
   final DateTime time;
 
+  /// Υλικό φαγητού (15/11, «Τα φαγητά μου»): ποιο φαγητό και ποια καταγραφή του. null = απλό τρόφιμο. Κλειδί «dish»·
+  /// προαιρετικό: οι παλιές εκδόσεις το αγνοούν (και ένα χαλασμένο σημάδι κάνει την καταχώριση απλό τρόφιμο, ποτέ δεν
+  /// τη χάνει).
+  final DishTag? dish;
+
   double total(String k) => food.n.amount(k) * grams / 100;
 
-  LogEntry copyWith({Meal? meal, double? grams, Food? food}) => LogEntry(
-      id: id, day: day, meal: meal ?? this.meal, food: food ?? this.food, grams: grams ?? this.grams, time: time);
+  LogEntry copyWith({Meal? meal, double? grams, Food? food, DishTag? dish}) => LogEntry(
+      id: id,
+      day: day,
+      meal: meal ?? this.meal,
+      food: food ?? this.food,
+      grams: grams ?? this.grams,
+      time: time,
+      dish: dish ?? this.dish);
 
   factory LogEntry.fromJson(Map<String, dynamic> j) => LogEntry(
         id: j['id'] as String,
@@ -282,6 +295,7 @@ class LogEntry {
         food: Food.fromJson(Map<String, dynamic>.from(j['food'] as Map)),
         grams: (j['grams'] as num).toDouble(),
         time: DateTime.fromMillisecondsSinceEpoch((j['time'] as num).toInt()),
+        dish: DishTag.fromJson(j['dish']),
       );
 
   Map<String, Object?> toJson() => {
@@ -291,6 +305,7 @@ class LogEntry {
         'food': food.toSnapshotJson(),
         'grams': grams,
         'time': time.millisecondsSinceEpoch,
+        if (dish != null) 'dish': dish!.toJson(),
       };
 }
 

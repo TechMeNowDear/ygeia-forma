@@ -55,9 +55,13 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     now: now,
     sources: sources,
     training: await _trainingForBackup(),
+    // «Τα φαγητά μου» (15/11).
+    dishes: food.dishesForBackup(),
     // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
     errorsOff: !errors.enabled,
   );
+  final dishesOut = !food.dishesRead;
+  final dishCount = food.dishesForBackup()?.length ?? 0;
   final trainingOut = TrainingStore.main.readError;
   final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
   // Έλεγχος 13/11 (S9-8): αν οι ρυθμίσεις δεν διαβάστηκαν (ή ισχύουν οι προεπιλογές, γιατί το αρχείο τους χάλασε), το
@@ -74,11 +78,13 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   final saved = r['name'] is String ? r['name'] as String : name;
   // Πλήρες μόνο αν μπήκαν οι προπονήσεις με τους παλμούς τους, οι ρυθμίσεις και οι πηγές ύπνου. Μόνο ένα πλήρες
   // αντίγραφο μετρά ως «τελευταίο αντίγραφο» (13/11).
-  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut;
+  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut;
   if (complete) store.markExported(now);
   return (
     ok: complete,
     text: 'Αποθηκεύτηκε στις Λήψεις: $saved ·\u00A0${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
+        '${dishCount > 0 ? ', ${dishesText(dishCount)}' : ''}'
+        '${dishesOut ? '. «Τα φαγητά μου» δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
         // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
         '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
         // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
@@ -517,7 +523,8 @@ class _DataGroupState extends State<_DataGroup> {
         builder: (context) => AlertDialog(
           title: const Text('Επαναφορά αντιγράφου'),
           content: Text(
-            'Αντίγραφο$when: ${entriesText(b.entries.length)} φαγητού, ${productsText(b.myFoods.length)}.\n\n'
+            'Αντίγραφο$when: ${entriesText(b.entries.length)} φαγητού, ${productsText(b.myFoods.length)}'
+            '${b.dishes.isEmpty ? '' : ', ${dishesText(b.dishes.length)}'}.\n\n'
             'Μπαίνουν μόνο όσα λείπουν από το κινητό. Όσα υπάρχουν ήδη μένουν όπως είναι, με όσες αλλαγές τους έκανες. '
             'Τίποτα δεν σβήνεται· καταχωρίσεις που έσβησες μετά το αντίγραφο ξαναμπαίνουν.'
             '${b.prefs.isEmpty ? '' : '\n\nΘα αντικατασταθούν οι ρυθμίσεις: «Η κουζίνα μου», οι κάρτες της Σήμερα και η εμφάνιση.'}'
@@ -540,6 +547,8 @@ class _DataGroupState extends State<_DataGroup> {
         return;
       }
       final (e, f, failed, existing) = res;
+      // «Τα φαγητά μου» (15/11): μπαίνουν όσα λείπουν· ό,τι υπάρχει ήδη μένει όπως είναι.
+      final dishRes = b.dishes.isEmpty ? null : await widget.food!.importDishes(b.dishes);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
       final prefsNotes =
@@ -569,6 +578,9 @@ class _DataGroupState extends State<_DataGroup> {
           countText(trainingIn, 'προπόνηση μπήκε από το αντίγραφο.', 'προπονήσεις μπήκαν από το αντίγραφο.'),
         if (trainingIn > 0 && !trainingWritten) 'Οι προπονήσεις του αντιγράφου δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (b.training != null && TrainingStore.main.mergeProblem != null) TrainingStore.main.mergeProblem!,
+        if (dishRes != null && dishRes.$1 > 0)
+          countText(dishRes.$1, 'φαγητό μπήκε από το αντίγραφο.', 'φαγητά μπήκαν από το αντίγραφο.'),
+        if (b.dishes.isNotEmpty && dishRes == null) 'Τα φαγητά του αντιγράφου δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
     } finally {

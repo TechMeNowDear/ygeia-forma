@@ -21,7 +21,10 @@ object OuraRules {
     val VAULT_NAMES = setOf("oura_tokens", "oura_pending", "oura_connecting")
 
     /** Τα αρχεία μας (στο filesDir ή στο noBackupFilesDir/oura). Το προσωρινό είναι «όνομα.<αριθμός>.tmp». */
-    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, TRAINING_FILE) + VAULT_NAMES.map { "$it.bin" }
+    /** «Τα φαγητά μου» (15/11): το αρχείο των φαγητών (FoodBridge), κι αυτό με ατομική εγγραφή. */
+    const val DISHES_FILE = "dishes.json"
+
+    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, TRAINING_FILE, DISHES_FILE) + VAULT_NAMES.map { "$it.bin" }
 
     /** Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback. */
     fun isCallback(scheme: String?, host: String?, port: Int, path: String?, userInfo: String?): Boolean {

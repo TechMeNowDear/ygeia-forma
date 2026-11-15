@@ -16,6 +16,8 @@ void main() {
     'file/sources_log.json',
     'file/oura_nights.json',
     'file/training.json',
+    // 15/11: «Τα φαγητά μου».
+    'file/dishes.json',
     // Έλεγχος 9/11 (V-A-02): οι παλμοί κάθε προπόνησης σε δικό τους αρχείο.
     'file/hr/',
     // Round 1 (f8 · S9-10 / S10-3): η επιλογή «Αναφορές σφαλμάτων» (ένας διακόπτης) ακολουθεί τα δεδομένα.
