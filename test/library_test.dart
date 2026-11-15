@@ -253,7 +253,9 @@ void main() {
       expect(raw, isNot(contains('$lentilsCooked ')));
       expect(cooked, contains('$lentilsCooked Φακές (βρασμένες)'));
       expect(cooked, isNot(contains('$lentils ')));
-      expect(text, isNot(contains('$celery Σέλινο')));
+      expect(text, contains('ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ: $celery'), reason: 'λέγεται στον βοηθό ως «δε μου αρέσει»');
+      expect(raw, isNot(contains('$celery ')), reason: 'όχι στη λίστα των τροφίμων');
+      expect(cooked, isNot(contains('$celery ')));
     });
   });
 

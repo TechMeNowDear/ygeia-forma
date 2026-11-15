@@ -5,12 +5,14 @@ import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
 import '../food/library.dart';
+import '../food/week_calc.dart' show freshBatch, potPortion;
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../food/recipe.dart';
 import 'food_add.dart';
 import 'library.dart';
+import 'week.dart' show WeekPlanScreen;
 import 'nutrition.dart' show carbsColor, fatColor, proteinColor;
 import 'recipes.dart';
 
@@ -371,22 +373,25 @@ DishLogResult? quickDishResult(FoodStore food, Dish d, Meal meal, DateTime now) 
   return DishLogResult(amounts: amounts, qty: qty, meal: meal, plate: plate);
 }
 
-Future<DishLogResult?> openDishLogSheet(BuildContext context, FoodStore food, Dish dish, {required Meal meal, DateTime Function()? now}) =>
+/// [targetKcal]: οι θερμίδες της μερίδας στο πρόγραμμα εβδομάδας (κατσαρόλα: «Η μερίδα σου: … g» από το έτοιμο φαγητό).
+Future<DishLogResult?> openDishLogSheet(BuildContext context, FoodStore food, Dish dish,
+        {required Meal meal, DateTime Function()? now, double? targetKcal}) =>
     showModalBottomSheet<DishLogResult>(
       context: context,
       routeSettings: const RouteSettings(name: 'Καταγραφή φαγητού'),
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => DishLogSheet(food: food, dish: dish, meal: meal, now: now),
+      builder: (_) => DishLogSheet(food: food, dish: dish, meal: meal, now: now, targetKcal: targetKcal),
     );
 
 class DishLogSheet extends StatefulWidget {
-  const DishLogSheet({super.key, required this.food, required this.dish, required this.meal, this.now});
+  const DishLogSheet({super.key, required this.food, required this.dish, required this.meal, this.now, this.targetKcal});
   final FoodStore food;
   final Dish dish;
   final Meal meal;
   final DateTime Function()? now;
+  final double? targetKcal;
 
   @override
   State<DishLogSheet> createState() => _DishLogSheetState();
@@ -420,6 +425,17 @@ class _DishLogSheetState extends State<DishLogSheet> {
   ];
 
   DateTime _now() => (widget.now ?? DateTime.now)();
+
+  @override
+  void initState() {
+    super.initState();
+    // Πρόγραμμα εβδομάδας: η μερίδα της θέσης από το πρόσφατο μαγείρεμα (αντί για την τελευταία φορά).
+    final b = freshBatch(d, _now());
+    if (widget.targetKcal != null && b != null) {
+      final g = potPortion(widget.food, d, b, widget.targetKcal);
+      if (g != null) _qty.text = gramsField(g);
+    }
+  }
 
   @override
   void dispose() {
@@ -742,9 +758,30 @@ class _DishLogSheetState extends State<DishLogSheet> {
     final g = fieldValue(_qty, max: maxCookedGrams);
     final tooMuch = g != null && batch != null && g > batch.cooked;
     void set(double v) => setState(() => _qty.text = gramsField(v.clamp(1, maxCookedGrams).toDouble()));
+    final sv = recipeOf(d)?.servings;
+    final want = batch == null ? null : potPortion(widget.food, d, batch, widget.targetKcal);
     out.addAll([
       const SizedBox(height: 14),
       Text('Η μερίδα μου', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
+      if (want != null && (widget.targetKcal != null || sv != null))
+        Container(
+          key: const ValueKey('dish-want'),
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+          decoration: BoxDecoration(color: c.tint(c.food), borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [
+            Expanded(
+              child: Text(
+                widget.targetKcal != null
+                    ? 'Η μερίδα σου για το πρόγραμμα (${kcalText(widget.targetKcal!)} kcal): ${thousands(want.round())} g'
+                    : 'Μία από ${countText(sv!, 'μερίδα', 'μερίδες')}: ${thousands(want.round())} g',
+                style: TextStyle(fontSize: 14.5, height: 1.35, fontWeight: FontWeight.w600, color: c.text),
+              ),
+            ),
+            if (g != want)
+              TextButton(key: const ValueKey('dish-want-set'), onPressed: () => set(want), child: const Text('Βάλ’ το')),
+          ]),
+        ),
       const SizedBox(height: 8),
       StepperRow(
         field: AmountField(
@@ -1590,6 +1627,16 @@ class _DishesScreenState extends State<DishesScreen> {
                   onPressed: widget.food.dishesRead ? () => Navigator.of(context).push(LibraryScreen.route(widget.food)) : null,
                   icon: const Icon(Icons.collections_bookmark_outlined),
                   label: const Text('Βιβλιοθήκη: πολλά φαγητά μαζί'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('dishes-week'),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: widget.food.dishesRead ? () => Navigator.of(context).push(WeekPlanScreen.route(widget.food)) : null,
+                  icon: const Icon(Icons.event_note_rounded),
+                  label: const Text('Πρόγραμμα εβδομάδας'),
                 ),
               ),
               if (all.length > 6)
