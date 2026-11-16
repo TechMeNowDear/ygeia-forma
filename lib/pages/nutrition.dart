@@ -14,6 +14,8 @@ import '../widgets.dart';
 import 'dishes.dart';
 import 'food_add.dart';
 import 'nutrition_goals.dart';
+import 'day_close.dart';
+import 'transfer.dart' show transferGroup;
 import 'week.dart' show PlanDayCard;
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
@@ -138,8 +140,10 @@ class NutritionPage extends StatelessWidget {
             summary,
             if (cta != null) cta,
             if (chol != null) chol,
+            if (sameDay(day, today)) YesterdayCard(food: food, today: today),
             PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             ...meals,
+            DayCard(food: food, day: day, entries: entries, today: sameDay(day, today)),
             _SourcesNote(color: c.textTertiary),
           ],
           left: [
@@ -154,6 +158,7 @@ class NutritionPage extends StatelessWidget {
               ),
             // UX U11: στο tablet/PC τα γεύματα αριστερά και η σύνοψη δεξιά. Το «+ Φαγητό» είναι κάτω δεξιά· η δεξιά στήλη
             // είναι κοντή, οπότε δεν κάθεται πάνω στις θερμίδες ενός φαγητού (πριν κάλυπτε το «375» του μεσημεριανού).
+            if (sameDay(day, today)) YesterdayCard(food: food, today: today),
             PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             ...meals,
           ],
@@ -161,6 +166,7 @@ class NutritionPage extends StatelessWidget {
             summary,
             if (cta != null) cta,
             if (chol != null) chol,
+            DayCard(food: food, day: day, entries: entries, today: sameDay(day, today)),
             _SourcesNote(color: c.textTertiary),
           ],
         );
@@ -542,10 +548,20 @@ class _MealCard extends StatelessWidget {
               color: c.food,
               trailing: entries.isEmpty
                   ? null
-                  : Text(
-                      '${thousands(t.shownKcal)} kcal',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
-                    ),
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(
+                        '${thousands(t.shownKcal)} kcal',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
+                      ),
+                      // Αντιγραφή ή μετακίνηση όλου του γεύματος (16/11).
+                      IconButton(
+                        key: ValueKey('meal-transfer-${meal.name}'),
+                        tooltip: 'Αντιγραφή ή μετακίνηση του γεύματος',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: food.loaded ? () => transferGroup(context, food, entries) : null,
+                        icon: Icon(Icons.drive_file_move_outline, size: 20, color: c.textSecondary),
+                      ),
+                    ]),
             ),
           ),
           if (entries.isNotEmpty) const SizedBox(height: 4),

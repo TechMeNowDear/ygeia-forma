@@ -21,6 +21,7 @@ import 'dishes.dart';
 import 'my_foods.dart';
 import 'nutrition.dart';
 import 'recipes.dart';
+import 'transfer.dart' show transferGroup;
 
 // ---------------------------------------------------------------------------
 // Είσοδοι
@@ -65,6 +66,10 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
     builder: (_) => QuantitySheet(food: food, item: e.food, initialGrams: e.grams, meal: e.meal, editing: true),
   );
   if (r == null) return;
+  if (r.transfer) {
+    if (context.mounted) await transferGroup(context, food, [e]);
+    return;
+  }
   if (r.delete) {
     if (!await food.remove(e)) return;
     messenger
@@ -1179,13 +1184,16 @@ class MineBadge extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SheetResult {
-  _SheetResult(this.grams, this.meal, this.food, {this.delete = false});
+  _SheetResult(this.grams, this.meal, this.food, {this.delete = false, this.transfer = false});
   final double grams;
   final Meal meal;
 
   /// Η μορφή που διάλεξε (ωμό/βρασμένο/ψητό…): μπορεί να διαφέρει από αυτή που άνοιξε.
   final Food food;
   final bool delete;
+
+  /// «Αντιγραφή ή μετακίνηση…» (16/11): η καταχώριση όπως ήταν, σε άλλη μέρα ή γεύμα.
+  final bool transfer;
 }
 
 class QuantitySheet extends StatefulWidget {
@@ -1695,6 +1703,15 @@ class _QuantitySheetState extends State<QuantitySheet> {
                       textAlign: TextAlign.center),
                 ),
                 if (widget.editing) ...[
+                  if (!widget.ingredient) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      key: const ValueKey('entry-transfer'),
+                      onPressed: () => Navigator.pop(context, _SheetResult(g ?? 0, _meal, _item, transfer: true)),
+                      icon: const Icon(Icons.drive_file_move_outline),
+                      label: const Text('Αντιγραφή ή μετακίνηση…'),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   TextButton.icon(
                     style: TextButton.styleFrom(foregroundColor: c.bad),

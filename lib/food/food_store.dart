@@ -473,6 +473,46 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return saved;
   }
 
+  /// Αντιγραφή ή μετακίνηση (16/11) καταχωρίσεων σε άλλη μέρα και γεύμα, σε μία συναλλαγή (ή όλα ή κανένα).
+  /// - Μετακίνηση: οι ίδιες καταχωρίσεις (ίδιο id, ίδιο τρόφιμο όπως γράφτηκε) με νέα μέρα, γεύμα και ώρα.
+  /// - Αντιγραφή: νέες καταχωρίσεις με τις τιμές της βάσης όπως είναι τώρα (όπως το «Όπως χθες»)· κάθε φαγητό γίνεται νέα
+  ///   καταγραφή του (νέο «grp»). Όσα σβήστηκαν από τη βάση δεν αντιγράφονται.
+  /// Επιστρέφει ό,τι γράφτηκε, ή null αν δεν γράφτηκε τίποτα.
+  Future<List<LogEntry>?> transferEntries(List<LogEntry> group, DateTime to, Meal meal, {required bool move, DateTime? now}) async {
+    if (group.isEmpty) return null;
+    final d = dayOf(to);
+    final base = entryTime(d, now ?? DateTime.now());
+    final sorted = [...group]..sort((a, b) => a.time.compareTo(b.time));
+    final List<LogEntry> out;
+    if (move) {
+      out = [
+        for (var i = 0; i < sorted.length; i++)
+          sorted[i].copyWith(day: dateKey(d), meal: meal, time: base.add(Duration(milliseconds: i))),
+      ];
+    } else {
+      final broken = {
+        for (final e in sorted)
+          if (e.dish != null && _gone(e.food)) e.dish!.grp,
+      };
+      final source = [for (final e in sorted) if (!_gone(e.food) && !broken.contains(e.dish?.grp)) e];
+      final groups = <String, String>{};
+      out = [
+        for (var i = 0; i < source.length; i++)
+          LogEntry(
+            id: _newId(),
+            day: dateKey(d),
+            meal: meal,
+            food: _current(source[i].food),
+            grams: source[i].grams,
+            time: base.add(Duration(milliseconds: i)),
+            dish: source[i].dish?.withGrp(groups.putIfAbsent(source[i].dish!.grp, _newId)),
+          ),
+      ];
+    }
+    if (out.isEmpty || !await _putAll(out)) return null;
+    return out;
+  }
+
   Future<void> update(LogEntry e) => _put(e);
 
   /// Αν η καταχώριση είναι αποθηκευμένη όπως είναι (όχι αν απέτυχε η αποθήκευσή της).
@@ -728,6 +768,62 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return false;
   }
 
+  /// «Τελείωσα για σήμερα» (16/11): ποιες μέρες έγραψες ολόκληρες ή όχι. Στο ίδιο αρχείο με τα φαγητά (κλειδί «days»:
+  /// «2026-11-16» → «done» / «part»). Μόνο οι [DayMark.part] βγαίνουν από τον εβδομαδιαίο έλεγχο θερμίδων· μέρα χωρίς σημάδι
+  /// μετρά όπως πριν (αλλιώς μια ξεχασμένη απάντηση θα έσβηνε δεδομένα). Κρατιούνται [dayMarksKeepDays] μέρες.
+  Map<String, DayMark> _days = const {};
+  DayMark? dayMark(DateTime d) => _days[dateKey(d)];
+
+  /// Οι μέρες με σημάδι (για το αντίγραφο).
+  Map<String, String> dayMarksForBackup() => {for (final e in _days.entries) e.key: e.value.name};
+
+  /// Σημάδι μέρας (null: σβήνει το σημάδι). `false` αν δεν γράφτηκε (τότε μένει όπως ήταν).
+  Future<bool> setDayMark(DateTime d, DayMark? m) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final before = _days;
+    final next = {
+      for (final e in _days.entries)
+        if (e.key != dateKey(d)) e.key: e.value,
+      if (m != null) dateKey(d): m,
+    };
+    final after = _days = _pruneDays(next);
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (identical(_days, after)) _days = before;
+    saveError = 'Δεν αποθηκεύτηκε το σημάδι της μέρας. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// Επαναφορά από αντίγραφο: μπαίνουν μόνο οι μέρες που δεν έχουν ήδη σημάδι. Πόσες μπήκαν (ή -1 αν δεν γράφτηκε).
+  Future<int> importDayMarks(Object? j) async {
+    if (j is! Map || !_dishesRead || _dishesNewer) return 0;
+    final add = <String, DayMark>{};
+    for (final e in j.entries) {
+      final m = dayMarkOf(e.value);
+      if (e.key is String && m != null && !_days.containsKey(e.key)) add[e.key as String] = m;
+    }
+    if (add.isEmpty) return 0;
+    final before = _days;
+    final after = _days = _pruneDays({..._days, ...add});
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return add.length;
+    if (identical(_days, after)) _days = before;
+    notifyListeners();
+    return -1;
+  }
+
+  Map<String, DayMark> _pruneDays(Map<String, DayMark> m) {
+    final keys = m.keys.toList()..sort();
+    if (keys.length <= dayMarksKeepDays) return m;
+    final keep = keys.sublist(keys.length - dayMarksKeepDays).toSet();
+    return {for (final e in m.entries) if (keep.contains(e.key)) e.key: e.value};
+  }
+
   /// Το πρόγραμμα εβδομάδας (15/11): στο ίδιο αρχείο με τα φαγητά (κλειδί «week»). null: δεν υπάρχει.
   WeekPlan? _week;
   WeekPlan? get week => _week;
@@ -771,6 +867,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _badDishRows = const [];
       _likes = const FoodLikes();
       _week = null;
+      _days = const {};
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -799,6 +896,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _badDishRows = const [];
       _likes = const FoodLikes();
       _week = null;
+      _days = const {};
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -820,6 +918,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _badDishRows = bad;
     _likes = FoodLikes.fromJson((j as Map)['likes']);
     _week = WeekPlan.fromJson(j['week']);
+    _days = {
+      if (j['days'] is Map)
+        for (final e in (j['days'] as Map).entries)
+          if (e.key is String && dayMarkOf(e.value) != null) e.key as String: dayMarkOf(e.value)!,
+    };
     skippedRows += bad.length;
     _dishesRead = true;
     dishesNote = _dishesNewer ? dishesNewerText : null;
@@ -830,6 +933,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         'dishes': [for (final d in list) d.toJson(), ..._badDishRows],
         if (!_likes.isEmpty) 'likes': _likes.toJson(),
         if (_week != null) 'week': _week!.toJson(),
+        if (_days.isNotEmpty) 'days': {for (final e in _days.entries) e.key: e.value.name},
       });
 
   Future<bool> _writeDishes(List<Dish> after, String what) async {

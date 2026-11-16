@@ -35,6 +35,7 @@ String buildBackup({
   Map<String, dynamic>? training,
   List<Object?>? dishes,
   Map<String, Object>? foodLikes,
+  Map<String, String>? foodDays,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -55,6 +56,8 @@ String buildBackup({
     // «Τα φαγητά μου» (15/11): υπάρχουν μόνο στο κινητό. Πρόσθετο κλειδί· οι παλιές εκδόσεις το αγνοούν.
     if (dishes != null) 'dishes': dishes,
     if (foodLikes != null) 'foodLikes': foodLikes,
+    // «Τελείωσα για σήμερα» (16/11): ποιες μέρες γράφτηκαν ολόκληρες. Πρόσθετο κλειδί.
+    if (foodDays != null && foodDays.isNotEmpty) 'foodDays': foodDays,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -62,10 +65,18 @@ String buildBackup({
 /// Ό,τι βρέθηκε σε ένα αρχείο αντιγράφου, ελεγμένο.
 class BackupContents {
   BackupContents(this.entries, this.myFoods, this.prefs, this.created, this.skipped,
-      {this.sources, this.training, this.errorsOff = false, this.dishes = const [], this.likes = const FoodLikes()});
+      {this.sources,
+      this.training,
+      this.errorsOff = false,
+      this.dishes = const [],
+      this.likes = const FoodLikes(),
+      this.dayMarks = const {}});
 
   /// «Τι μου αρέσει» (15/11).
   final FoodLikes likes;
+
+  /// «Τελείωσα για σήμερα» (16/11): «2026-11-16» → «done»/«part» (όπως ήταν στο αρχείο· τα ελέγχει το importDayMarks).
+  final Map<String, Object?> dayMarks;
 
   /// «Τα φαγητά μου» (15/11), όσα διαβάζονται σωστά.
   final List<Dish> dishes;
@@ -242,6 +253,7 @@ BackupContents parseBackup(String text) {
     errorsOff: j['errorsOff'] == true,
     dishes: dishes,
     likes: FoodLikes.fromJson(j['foodLikes']),
+    dayMarks: j['foodDays'] is Map ? Map<String, Object?>.from(j['foodDays'] as Map) : const {},
   );
 }
 

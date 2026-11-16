@@ -279,13 +279,13 @@ class LogEntry {
 
   double total(String k) => food.n.amount(k) * grams / 100;
 
-  LogEntry copyWith({Meal? meal, double? grams, Food? food, DishTag? dish}) => LogEntry(
-      id: id,
-      day: day,
+  LogEntry copyWith({Meal? meal, double? grams, Food? food, DishTag? dish, String? id, String? day, DateTime? time}) => LogEntry(
+      id: id ?? this.id,
+      day: day ?? this.day,
       meal: meal ?? this.meal,
       food: food ?? this.food,
       grams: grams ?? this.grams,
-      time: time,
+      time: time ?? this.time,
       dish: dish ?? this.dish);
 
   factory LogEntry.fromJson(Map<String, dynamic> j) => LogEntry(
@@ -457,4 +457,32 @@ String nValueText(NValue? v, {int digits = 1}) {
     return '<${dec(((v.value * f) - 1e-9).ceil() / f, digits)}';
   }
   return dec(v.value, digits);
+}
+
+/// «Τελείωσα για σήμερα» (16/11): η μέρα γράφτηκε ολόκληρη ([done]) ή λείπουν γεύματα ([part]). Μόνο οι [part] βγαίνουν
+/// από τον εβδομαδιαίο έλεγχο θερμίδων.
+enum DayMark { done, part }
+
+DayMark? dayMarkOf(Object? v) => switch (v) {
+      'done' => DayMark.done,
+      'part' => DayMark.part,
+      _ => null,
+    };
+
+/// Πόσες μέρες κρατιούνται τα σημάδια (πάνω από ό,τι κοιτάζει ο έλεγχος θερμίδων, 46 μέρες· δική μας επιλογή).
+const dayMarksKeepDays = 400;
+
+/// Φρούτα και λαχανικά (16/11): τουλάχιστον 400 g τη μέρα, χωρίς πατάτες, γλυκοπατάτες και άλλα αμυλούχα κόνδυλα
+/// (Παγκόσμιος Οργανισμός Υγείας, «Healthy diet», fact sheet). Μετρούν τα τρόφιμα των κατηγοριών «Φρούτα» και
+/// «Λαχανικά» της βάσης (και ως υλικά φαγητών)· όχι τα όσπρια, οι πατάτες, τα αποξηραμένα φρούτα και οι χυμοί (άλλες
+/// κατηγορίες). Δική μας επιλογή: τα αποξηραμένα δεν μετρούν, γιατί 30 g σταφίδες δεν είναι 30 g φρούτου.
+const fruitVegTargetG = 400.0;
+const fruitVegCats = {'Φρούτα', 'Λαχανικά'};
+
+double fruitVegGrams(Iterable<LogEntry> entries) {
+  var g = 0.0;
+  for (final e in entries) {
+    if (fruitVegCats.contains(e.food.cat)) g += e.grams;
+  }
+  return g;
 }

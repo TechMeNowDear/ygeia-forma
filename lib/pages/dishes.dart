@@ -12,6 +12,7 @@ import '../widgets.dart';
 import '../food/recipe.dart';
 import 'food_add.dart';
 import 'library.dart';
+import 'transfer.dart' show transferGroup;
 import 'week.dart' show WeekPlanScreen;
 import 'nutrition.dart' show carbsColor, fatColor, proteinColor;
 import 'recipes.dart';
@@ -873,7 +874,7 @@ class _WarnBox extends StatelessWidget {
 /// Το φαγητό [group] (όλα τα υλικά μιας καταγραφής) από το ημερολόγιο: αλλαγή μερίδας, γεύματος ή διαγραφή.
 Future<void> openDishEntry(BuildContext context, FoodStore food, List<LogEntry> group) async {
   final messenger = ScaffoldMessenger.of(context);
-  final r = await showModalBottomSheet<({List<LogEntry> entries, bool delete})>(
+  final r = await showModalBottomSheet<({List<LogEntry> entries, bool delete, bool transfer})>(
     context: context,
     routeSettings: const RouteSettings(name: 'Φαγητό στο ημερολόγιο'),
     isScrollControlled: true,
@@ -882,6 +883,10 @@ Future<void> openDishEntry(BuildContext context, FoodStore food, List<LogEntry> 
     builder: (_) => DishEntrySheet(food: food, group: group),
   );
   if (r == null) return;
+  if (r.transfer) {
+    if (context.mounted) await transferGroup(context, food, group);
+    return;
+  }
   final name = group.first.dish?.name ?? group.first.food.name;
   if (r.delete) {
     if (!await food.removeGroup(group)) return;
@@ -967,7 +972,7 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
       if (ok != true || !mounted) return;
     }
     if (!mounted) return;
-    Navigator.pop(context, (entries: r, delete: false));
+    Navigator.pop(context, (entries: r, delete: false, transfer: false));
   }
 
   @override
@@ -1043,9 +1048,15 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
       ),
       const SizedBox(height: 8),
       TextButton.icon(
+        key: const ValueKey('dish-entry-transfer'),
+        onPressed: () => Navigator.pop(context, (entries: g, delete: false, transfer: true)),
+        icon: const Icon(Icons.drive_file_move_outline),
+        label: const Text('Αντιγραφή ή μετακίνηση…'),
+      ),
+      TextButton.icon(
         key: const ValueKey('dish-entry-delete'),
         style: TextButton.styleFrom(foregroundColor: c.bad),
-        onPressed: () => Navigator.pop(context, (entries: g, delete: true)),
+        onPressed: () => Navigator.pop(context, (entries: g, delete: true, transfer: false)),
         icon: const Icon(Icons.delete_outline_rounded),
         label: const Text('Διαγραφή'),
       ),
