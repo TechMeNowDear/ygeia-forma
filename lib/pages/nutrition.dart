@@ -549,9 +549,17 @@ class _MealCard extends StatelessWidget {
               trailing: entries.isEmpty
                   ? null
                   : Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(
-                        '${thousands(t.shownKcal)} kcal',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
+                      // Με μεγάλα γράμματα (2×, 360 dp) οι θερμίδες μικραίνουν αντί να σπρώχνουν το κουμπί έξω.
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 110),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${thousands(t.shownKcal)} kcal',
+                            maxLines: 1,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
+                          ),
+                        ),
                       ),
                       // Αντιγραφή ή μετακίνηση όλου του γεύματος (16/11).
                       IconButton(
