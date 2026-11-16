@@ -14,6 +14,8 @@ import '../widgets.dart';
 import 'dishes.dart';
 import 'food_add.dart';
 import 'nutrition_goals.dart';
+import 'day_close.dart';
+import 'transfer.dart' show transferGroup;
 import 'week.dart' show PlanDayCard;
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
@@ -138,8 +140,10 @@ class NutritionPage extends StatelessWidget {
             summary,
             if (cta != null) cta,
             if (chol != null) chol,
+            if (sameDay(day, today)) YesterdayCard(food: food, today: today),
             PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             ...meals,
+            DayCard(food: food, day: day, entries: entries, today: sameDay(day, today)),
             _SourcesNote(color: c.textTertiary),
           ],
           left: [
@@ -154,6 +158,7 @@ class NutritionPage extends StatelessWidget {
               ),
             // UX U11: στο tablet/PC τα γεύματα αριστερά και η σύνοψη δεξιά. Το «+ Φαγητό» είναι κάτω δεξιά· η δεξιά στήλη
             // είναι κοντή, οπότε δεν κάθεται πάνω στις θερμίδες ενός φαγητού (πριν κάλυπτε το «375» του μεσημεριανού).
+            if (sameDay(day, today)) YesterdayCard(food: food, today: today),
             PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             ...meals,
           ],
@@ -161,6 +166,7 @@ class NutritionPage extends StatelessWidget {
             summary,
             if (cta != null) cta,
             if (chol != null) chol,
+            DayCard(food: food, day: day, entries: entries, today: sameDay(day, today)),
             _SourcesNote(color: c.textTertiary),
           ],
         );
@@ -542,10 +548,28 @@ class _MealCard extends StatelessWidget {
               color: c.food,
               trailing: entries.isEmpty
                   ? null
-                  : Text(
-                      '${thousands(t.shownKcal)} kcal',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
-                    ),
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      // Με μεγάλα γράμματα (2×, 360 dp) οι θερμίδες μικραίνουν αντί να σπρώχνουν το κουμπί έξω.
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 110),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${thousands(t.shownKcal)} kcal',
+                            maxLines: 1,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
+                          ),
+                        ),
+                      ),
+                      // Αντιγραφή ή μετακίνηση όλου του γεύματος (16/11).
+                      IconButton(
+                        key: ValueKey('meal-transfer-${meal.name}'),
+                        tooltip: 'Αντιγραφή ή μετακίνηση του γεύματος',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: food.loaded ? () => transferGroup(context, food, entries) : null,
+                        icon: Icon(Icons.drive_file_move_outline, size: 20, color: c.textSecondary),
+                      ),
+                    ]),
             ),
           ),
           if (entries.isNotEmpty) const SizedBox(height: 4),
@@ -615,7 +639,8 @@ class _EntryRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${gramsText(e.grams)} ${e.food.unit} ·\u00A0πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
+                    // «Εκτίμηση» (16/11): η ποσότητα δεν ζυγίστηκε.
+                    '${e.est ? 'περίπου ' : ''}${gramsText(e.grams)} ${e.food.unit} ·\u00A0πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -623,7 +648,8 @@ class _EntryRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              thousands(e.total(Nk.kcal).round()),
+              '${e.est ? '≈\u00A0' : ''}${thousands(e.total(Nk.kcal).round())}',
+              key: e.est ? ValueKey('est-${e.id}') : null,
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
             ),
           ],
@@ -664,6 +690,7 @@ class _DishRow extends StatelessWidget {
     final c = Aigaio.of(context);
     final tag = group.first.dish!;
     final t = Totals(group);
+    final est = group.any((e) => e.est);
     final qty = tag.kind == DishKind.plate ? countText(group.length, 'υλικό', 'υλικά') : dishQtyText(tag.kind, tag.qty);
     return InkWell(
       key: ValueKey('dish-row-${tag.grp}'),
@@ -691,7 +718,7 @@ class _DishRow extends StatelessWidget {
                   ]),
                   const SizedBox(height: 2),
                   Text(
-                    '$qty ·\u00A0πρωτεΐνη ${gramsText(t.protein)} g',
+                    '${est ? 'περίπου ' : ''}$qty ·\u00A0πρωτεΐνη ${gramsText(t.protein)} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -699,7 +726,7 @@ class _DishRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              thousands(t.shownKcal),
+              '${est ? '≈\u00A0' : ''}${thousands(t.shownKcal)}',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
             ),
           ],

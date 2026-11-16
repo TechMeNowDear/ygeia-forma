@@ -259,6 +259,7 @@ class LogEntry {
     required this.grams,
     required this.time,
     this.dish,
+    this.est = false,
   });
 
   final String id;
@@ -277,16 +278,24 @@ class LogEntry {
   /// τη χάνει).
   final DishTag? dish;
 
+  /// Εκτίμηση (16/11): η ποσότητα δεν ζυγίστηκε (τυπικό τεμάχιο, φαγητό έξω, «με το μάτι»). Κλειδί «est»· οι παλιές
+  /// εκδόσεις το αγνοούν. Οι θερμίδες μετρούν κανονικά· το ημερολόγιο δείχνει «≈» και ο εβδομαδιαίος έλεγχος λέει πόσο
+  /// από το σύνολο ήταν εκτίμηση.
+  final bool est;
+
   double total(String k) => food.n.amount(k) * grams / 100;
 
-  LogEntry copyWith({Meal? meal, double? grams, Food? food, DishTag? dish}) => LogEntry(
-      id: id,
-      day: day,
+  LogEntry copyWith(
+          {Meal? meal, double? grams, Food? food, DishTag? dish, String? id, String? day, DateTime? time, bool? est}) =>
+      LogEntry(
+      id: id ?? this.id,
+      day: day ?? this.day,
       meal: meal ?? this.meal,
       food: food ?? this.food,
       grams: grams ?? this.grams,
-      time: time,
-      dish: dish ?? this.dish);
+      time: time ?? this.time,
+      dish: dish ?? this.dish,
+      est: est ?? this.est);
 
   factory LogEntry.fromJson(Map<String, dynamic> j) => LogEntry(
         id: j['id'] as String,
@@ -296,6 +305,7 @@ class LogEntry {
         grams: (j['grams'] as num).toDouble(),
         time: DateTime.fromMillisecondsSinceEpoch((j['time'] as num).toInt()),
         dish: DishTag.fromJson(j['dish']),
+        est: j['est'] == true,
       );
 
   Map<String, Object?> toJson() => {
@@ -306,6 +316,7 @@ class LogEntry {
         'grams': grams,
         'time': time.millisecondsSinceEpoch,
         if (dish != null) 'dish': dish!.toJson(),
+        if (est) 'est': true,
       };
 }
 
@@ -323,6 +334,7 @@ class Totals {
       satFat += e.total(Nk.satFat);
       alcohol += e.total(Nk.alcohol);
       shownKcal += e.total(Nk.kcal).round();
+      if (e.est) estKcal += e.total(Nk.kcal);
       for (final k in const [Nk.fiber, Nk.sugars, Nk.salt, Nk.satFat]) {
         if (!e.food.n.has(k)) missing[k] = (missing[k] ?? 0) + 1;
       }
@@ -331,6 +343,9 @@ class Totals {
   }
   double kcal = 0, protein = 0, carbs = 0, fat = 0, fiber = 0, sugars = 0, salt = 0, satFat = 0, alcohol = 0;
   int count = 0;
+
+  /// Θερμίδες από καταχωρίσεις-εκτιμήσεις ([LogEntry.est]).
+  double estKcal = 0;
 
   /// Θερμίδες όπως φαίνονται: το άθροισμα των στρογγυλεμένων θερμίδων κάθε καταχώρισης, ώστε τα κομμάτια να
   /// αθροίζουν ακριβώς στο σύνολο που γράφει η οθόνη (έλεγχος 9/11, Χ4). Διαφέρει από το [kcal] το πολύ λίγες kcal.
@@ -457,4 +472,32 @@ String nValueText(NValue? v, {int digits = 1}) {
     return '<${dec(((v.value * f) - 1e-9).ceil() / f, digits)}';
   }
   return dec(v.value, digits);
+}
+
+/// «Τελείωσα για σήμερα» (16/11): η μέρα γράφτηκε ολόκληρη ([done]) ή λείπουν γεύματα ([part]). Μόνο οι [part] βγαίνουν
+/// από τον εβδομαδιαίο έλεγχο θερμίδων.
+enum DayMark { done, part }
+
+DayMark? dayMarkOf(Object? v) => switch (v) {
+      'done' => DayMark.done,
+      'part' => DayMark.part,
+      _ => null,
+    };
+
+/// Πόσες μέρες κρατιούνται τα σημάδια (πάνω από ό,τι κοιτάζει ο έλεγχος θερμίδων, 46 μέρες· δική μας επιλογή).
+const dayMarksKeepDays = 400;
+
+/// Φρούτα και λαχανικά (16/11): τουλάχιστον 400 g τη μέρα, χωρίς πατάτες, γλυκοπατάτες και άλλα αμυλούχα κόνδυλα
+/// (Παγκόσμιος Οργανισμός Υγείας, «Healthy diet», fact sheet). Μετρούν τα τρόφιμα των κατηγοριών «Φρούτα» και
+/// «Λαχανικά» της βάσης (και ως υλικά φαγητών)· όχι τα όσπρια, οι πατάτες, τα αποξηραμένα φρούτα και οι χυμοί (άλλες
+/// κατηγορίες). Δική μας επιλογή: τα αποξηραμένα δεν μετρούν, γιατί 30 g σταφίδες δεν είναι 30 g φρούτου.
+const fruitVegTargetG = 400.0;
+const fruitVegCats = {'Φρούτα', 'Λαχανικά'};
+
+double fruitVegGrams(Iterable<LogEntry> entries) {
+  var g = 0.0;
+  for (final e in entries) {
+    if (fruitVegCats.contains(e.food.cat)) g += e.grams;
+  }
+  return g;
 }

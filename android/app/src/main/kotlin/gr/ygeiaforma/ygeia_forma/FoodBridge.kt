@@ -180,6 +180,21 @@ class FoodBridge(
             "offLookup" -> respond(result) {
                 withContext(Dispatchers.IO) { offLookup(call.argument<String>("code") ?: "") }
             }
+            // Βραδινή υπενθύμιση (16/11): ένα ξυπνητήρι, που το αποφασίζει η εφαρμογή ([FoodReminder]).
+            "remindSet" -> {
+                val at = (call.argument<Number>("at") ?: 0).toLong()
+                val ok = at > System.currentTimeMillis() && FoodReminder.set(
+                    activity.applicationContext, at,
+                    call.argument<String>("title") ?: "Φαγητό σήμερα",
+                    call.argument<String>("text") ?: "",
+                )
+                result.success(JSONObject().put("ok", ok).put("canNotify", FoodReminder.canNotify(activity)).toString())
+            }
+            "remindCancel" -> {
+                FoodReminder.cancel(activity.applicationContext)
+                result.success(JSONObject().put("ok", true).toString())
+            }
+            "remindCanNotify" -> result.success(JSONObject().put("ok", true).put("canNotify", FoodReminder.canNotify(activity)).toString())
             else -> result.notImplemented()
         }
     }

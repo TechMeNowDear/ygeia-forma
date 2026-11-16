@@ -13,6 +13,7 @@ import '../../widgets.dart';
 import 'hr_widgets.dart';
 import 'session_page.dart';
 import 'training_common.dart';
+import 'prep_sheet.dart' show PrepButton;
 
 /// «Άσκηση σήμερα» στη Σήμερα (σχέδια 9/11, 1β): μία κάρτα, πολλές μορφές.
 /// - μέρα βαρών: όνομα, ασκήσεις, «Ξεκίνα την προπόνηση»·
@@ -232,6 +233,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
           style: _aux(c),
         ),
         RoutineButton(w),
+        PrepButton(t, w),
         if (_otherLine(c, now) case final o?) o,
         if (list.isNotEmpty) ...[
           const SizedBox(height: 12),

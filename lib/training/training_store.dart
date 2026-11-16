@@ -407,6 +407,7 @@ class TrainingStore extends ChangeNotifier {
 
   static const _knownTop = {
     'v', 'hrLimit', 'zone', 'programs', 'active', 'sessions', 'del', 'current', 'bad', 'hrz', 'hrsDone', 'drop', 'voice', 'stride',
+    'equip',
   };
 
   /// Ανάγνωση με ανοχή (έλεγχος 9/11, V-A-10): μία χαλασμένη προπόνηση ή πρόγραμμα πάει σε καραντίνα, όχι όλο το
@@ -424,6 +425,9 @@ class TrainingStore extends ChangeNotifier {
     zone = WalkZone.fromJson(j['zone']);
     if (j['zone'] != null && zone == null) _extra['zone'] = j['zone'];
     voice = j['voice'] != false;
+    // Ο εξοπλισμός (16/11): λαβές και δίσκοι. Μόνο το κύριο αρχείο αλλάζει αυτό που χρησιμοποιούν οι υπολογισμοί.
+    equipment = Equipment.fromJson(j['equip']);
+    if (identical(this, main)) equip = equipment;
     final st = j['stride'];
     stride = st is num && st >= 0.4 && st <= 1.2 ? st.toDouble() : null;
     quarantine
@@ -501,6 +505,7 @@ class TrainingStore extends ChangeNotifier {
         if (zone != null) 'zone': zone!.toJson(),
         if (!voice) 'voice': false,
         if (stride != null) 'stride': stride,
+        if (!equipment.isStandard) 'equip': equipment.toJson(),
         'programs': [for (final p in programs) p.toJson()],
         if (activeId != null) 'active': activeId,
         // Οι παλμοί κάθε τελειωμένης προπόνησης στο δικό της αρχείο, μόλις γραφτεί αυτό· ως τότε μέσα (καμία απώλεια).
@@ -728,6 +733,15 @@ class TrainingStore extends ChangeNotifier {
   void setZone(WalkZone? z) {
     if (z == zone) return;
     zone = z;
+    save();
+  }
+
+  /// Ο εξοπλισμός μου (16/11): λαβές και δίσκοι. Τα βάρη που προτείνονται βγαίνουν αμέσως από αυτόν.
+  Equipment equipment = Equipment.standard;
+
+  void setEquipment(Equipment e) {
+    equipment = e;
+    if (identical(this, main)) equip = e;
     save();
   }
 

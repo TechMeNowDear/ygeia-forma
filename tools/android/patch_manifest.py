@@ -94,6 +94,13 @@ SAY = (
     "            </intent-filter>\n"
     "        </service>"
 )
+# Βραδινή υπενθύμιση φαγητού (16/11, FoodReminder.kt): ένα ξυπνητήρι που βάζει η ίδια η εφαρμογή· δεν δέχεται τίποτα απ' έξω.
+REMIND = (
+    "\n        <!-- Υπενθύμιση φαγητού (16/11): μόνο το ξυπνητήρι της εφαρμογής. -->\n"
+    "        <receiver\n"
+    '            android:name=".FoodReminderReceiver"\n'
+    '            android:exported="false"/>'
+)
 TTS_QUERY = (
     "\n        <!-- Φωνή (14/11): το Android 11+ θέλει να δηλωθεί ότι ψάχνουμε μηχανή φωνής (TextToSpeech). -->\n"
     "        <intent>\n"
@@ -135,6 +142,9 @@ if ".OuraCallbackActivity" not in s:
 
 if ".WidgetConfigActivity" not in s:
     s = s.replace("</application>", WIDGETS.lstrip("\n") + "\n    </application>", 1)
+
+if ".FoodReminderReceiver" not in s:
+    s = s.replace("</application>", REMIND.lstrip("\n") + "\n    </application>", 1)
 
 if ".SayService" not in s:
     s = s.replace("</application>", SAY.lstrip("\n") + "\n    </application>", 1)
@@ -209,7 +219,7 @@ for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiafor
                'android:name=".WorkoutWidget"', 'android:name=".QuickFoodWidget"', "@xml/widget_workout",
                "@xml/widget_quickfood",
                "android.appwidget.action.APPWIDGET_CONFIGURE", "android.permission.VIBRATE",
-               "android.permission.POST_NOTIFICATIONS") + BACKUP:
+               "android.permission.POST_NOTIFICATIONS", 'android:name=".FoodReminderReceiver"') + BACKUP:
     if needle not in s:
         sys.exit("Λείπει μετά την αλλαγή: " + needle)
 if s.count('android:scheme="ygeiaforma"') != 1:

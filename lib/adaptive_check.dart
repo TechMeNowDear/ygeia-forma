@@ -6,7 +6,7 @@ library;
 import 'adaptive.dart';
 import 'body_trend.dart' show weighInDays;
 import 'data.dart' show BodyMeasurement;
-import 'food/food_model.dart' show Totals;
+import 'food/food_model.dart' show DayMark, Totals;
 import 'food/food_store.dart';
 import 'history.dart' show dateKey;
 import 'format.dart' show daysBetween;
@@ -52,10 +52,35 @@ List<(DateTime, double)> dailyWeights(Iterable<BodyMeasurement> body) => guarded
 Map<DateTime, double> dailyIntake(FoodStore food, DateTime from, DateTime to) {
   final out = <DateTime, double>{};
   for (var d = _day(from); !d.isAfter(_day(to)); d = DateTime(d.year, d.month, d.day + 1)) {
+    // «Τελείωσα για σήμερα» (16/11): μέρα που είπες ότι λείπουν γεύματα δεν μετρά (όπως μια μέρα χωρίς καταγραφή).
+    if (food.dayMark(d) == DayMark.part) continue;
     final entries = food.entriesFor(d);
     if (entries.isNotEmpty) out[d] = Totals(entries).kcal;
   }
   return out;
+}
+
+/// «Εκτίμηση» (16/11): τι μέρος των θερμίδων των ημερών που μετρούν ([dailyIntake]) γράφτηκε χωρίς ζύγιση (0–1).
+/// null χωρίς θερμίδες.
+double? estimatedShare(FoodStore food, DateTime from, DateTime to) {
+  var all = 0.0, est = 0.0;
+  for (var d = _day(from); !d.isAfter(_day(to)); d = DateTime(d.year, d.month, d.day + 1)) {
+    if (food.dayMark(d) == DayMark.part) continue;
+    final t = Totals(food.entriesFor(d));
+    all += t.kcal;
+    est += t.estKcal;
+  }
+  return all > 0 ? est / all : null;
+}
+
+/// Από πόσο και πάνω το λέει η κάρτα ελέγχου (λίγες εκτιμήσεις δεν αλλάζουν τίποτα).
+const estimatedShareNote = 0.15;
+
+/// «Το 32% των θερμίδων … ήταν εκτίμηση …» ή null κάτω από [estimatedShareNote].
+String? estimatedShareText(double? share) {
+  if (share == null || share < estimatedShareNote) return null;
+  return 'Το ${(share * 100).round()}% των θερμίδων αυτών των ημερών γράφτηκε χωρίς ζύγιση (εκτίμηση): ο έλεγχος είναι '
+      'λιγότερο ακριβής. Όσο πιο πολλά ζυγίζεις, τόσο πιο σωστός βγαίνει.';
 }
 
 /// Τι δείχνει η κάρτα.

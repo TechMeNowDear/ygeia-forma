@@ -27,7 +27,11 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
           if (c == null) return const SizedBox.shrink(key: ValueKey('today-checkin-none'));
           return Padding(
             padding: const EdgeInsets.only(bottom: PageFrame.gap),
-            child: CheckInCard(check: c, store: store, now: now),
+            child: CheckInCard(
+                check: c,
+                store: store,
+                now: now,
+                estShare: c.est == null ? null : estimatedShare(food, c.est!.from, c.est!.to)),
           );
         },
       );
@@ -158,8 +162,11 @@ String gatheringText(CheckIn k) {
 
 /// A1 (εβδομαδιαίος έλεγχος) και A3 (γρήγορη απώλεια).
 class CheckInCard extends StatelessWidget {
-  const CheckInCard({super.key, required this.check, required this.store, required this.now});
+  const CheckInCard({super.key, required this.check, required this.store, required this.now, this.estShare});
   final CheckIn check;
+
+  /// «Εκτίμηση» (16/11): τι μέρος των θερμίδων του παραθύρου δεν ζυγίστηκε ([estimatedShare]).
+  final double? estShare;
   final HealthStore store;
   final DateTime now;
 
@@ -257,6 +264,8 @@ class CheckInCard extends StatelessWidget {
     final notes = [
       if (k.kind != CheckKind.foreign && k.foreign.isNotEmpty) foreignWeighText(k.foreign),
       if (k.absurd.isNotEmpty) absurdDaysText(k.absurd),
+      if (k.est != null)
+        if (estimatedShareText(estShare) case final t?) t,
     ];
 
     final hasProposal = (k.kind == CheckKind.proposal || k.kind == CheckKind.fast) && p != null;

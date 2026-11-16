@@ -12,9 +12,11 @@ import 'dishes.dart';
 import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
+import 'library.dart' show CookWay, planInfoOf;
 import 'off.dart' show dryStapleRawId, normalizeBarcode;
 import 'recipe.dart' show FoodLikes;
 import 'replaced_foods.dart';
+import 'units.dart' show validMyUnit;
 import 'week.dart' show WeekPlan;
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
@@ -411,9 +413,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       '${DateTime.now().microsecondsSinceEpoch}-${(_idCounter++).toRadixString(36)}${math.Random().nextInt(1 << 20).toRadixString(36)}';
 
   /// [now]: για δοκιμές (αλλιώς το ρολόι του κινητού).
-  Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on, DateTime? now}) async {
+  Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on, DateTime? now, bool est = false}) async {
     final d = dayOf(on ?? day);
-    final e = LogEntry(id: _newId(), day: dateKey(d), meal: meal, food: food, grams: grams, time: entryTime(d, now ?? DateTime.now()));
+    final e = LogEntry(
+        id: _newId(), day: dateKey(d), meal: meal, food: food, grams: grams, time: entryTime(d, now ?? DateTime.now()), est: est);
     await _put(e);
     return e;
   }
@@ -464,6 +467,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
           // Ίδια σειρά με το αρχικό γεύμα.
           time: base.add(Duration(milliseconds: i)),
           dish: source[i].dish?.withGrp(groups.putIfAbsent(source[i].dish!.grp, _newId)),
+          est: source[i].est,
         ),
     ];
     final saved = <LogEntry>[];
@@ -471,6 +475,47 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       if (await _put(e)) saved.add(e);
     }
     return saved;
+  }
+
+  /// Αντιγραφή ή μετακίνηση (16/11) καταχωρίσεων σε άλλη μέρα και γεύμα, σε μία συναλλαγή (ή όλα ή κανένα).
+  /// - Μετακίνηση: οι ίδιες καταχωρίσεις (ίδιο id, ίδιο τρόφιμο όπως γράφτηκε) με νέα μέρα, γεύμα και ώρα.
+  /// - Αντιγραφή: νέες καταχωρίσεις με τις τιμές της βάσης όπως είναι τώρα (όπως το «Όπως χθες»)· κάθε φαγητό γίνεται νέα
+  ///   καταγραφή του (νέο «grp»). Όσα σβήστηκαν από τη βάση δεν αντιγράφονται.
+  /// Επιστρέφει ό,τι γράφτηκε, ή null αν δεν γράφτηκε τίποτα.
+  Future<List<LogEntry>?> transferEntries(List<LogEntry> group, DateTime to, Meal meal, {required bool move, DateTime? now}) async {
+    if (group.isEmpty) return null;
+    final d = dayOf(to);
+    final base = entryTime(d, now ?? DateTime.now());
+    final sorted = [...group]..sort((a, b) => a.time.compareTo(b.time));
+    final List<LogEntry> out;
+    if (move) {
+      out = [
+        for (var i = 0; i < sorted.length; i++)
+          sorted[i].copyWith(day: dateKey(d), meal: meal, time: base.add(Duration(milliseconds: i))),
+      ];
+    } else {
+      final broken = {
+        for (final e in sorted)
+          if (e.dish != null && _gone(e.food)) e.dish!.grp,
+      };
+      final source = [for (final e in sorted) if (!_gone(e.food) && !broken.contains(e.dish?.grp)) e];
+      final groups = <String, String>{};
+      out = [
+        for (var i = 0; i < source.length; i++)
+          LogEntry(
+            id: _newId(),
+            day: dateKey(d),
+            meal: meal,
+            food: _current(source[i].food),
+            grams: source[i].grams,
+            time: base.add(Duration(milliseconds: i)),
+            dish: source[i].dish?.withGrp(groups.putIfAbsent(source[i].dish!.grp, _newId)),
+            est: source[i].est,
+          ),
+      ];
+    }
+    if (out.isEmpty || !await _putAll(out)) return null;
+    return out;
   }
 
   Future<void> update(LogEntry e) => _put(e);
@@ -728,6 +773,133 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return false;
   }
 
+  /// «Τελείωσα για σήμερα» (16/11): ποιες μέρες έγραψες ολόκληρες ή όχι. Στο ίδιο αρχείο με τα φαγητά (κλειδί «days»:
+  /// «2026-11-16» → «done» / «part»). Μόνο οι [DayMark.part] βγαίνουν από τον εβδομαδιαίο έλεγχο θερμίδων· μέρα χωρίς σημάδι
+  /// μετρά όπως πριν (αλλιώς μια ξεχασμένη απάντηση θα έσβηνε δεδομένα). Κρατιούνται [dayMarksKeepDays] μέρες.
+  Map<String, DayMark> _days = const {};
+  DayMark? dayMark(DateTime d) => _days[dateKey(d)];
+
+  /// Οι μέρες με σημάδι (για το αντίγραφο).
+  Map<String, String> dayMarksForBackup() => {for (final e in _days.entries) e.key: e.value.name};
+
+  /// Σημάδι μέρας (null: σβήνει το σημάδι). `false` αν δεν γράφτηκε (τότε μένει όπως ήταν).
+  Future<bool> setDayMark(DateTime d, DayMark? m) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final before = _days;
+    final next = {
+      for (final e in _days.entries)
+        if (e.key != dateKey(d)) e.key: e.value,
+      if (m != null) dateKey(d): m,
+    };
+    final after = _days = _pruneDays(next);
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (identical(_days, after)) _days = before;
+    saveError = 'Δεν αποθηκεύτηκε το σημάδι της μέρας. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// Επαναφορά από αντίγραφο: μπαίνουν μόνο οι μέρες που δεν έχουν ήδη σημάδι. Πόσες μπήκαν (ή -1 αν δεν γράφτηκε).
+  Future<int> importDayMarks(Object? j) async {
+    if (j is! Map || !_dishesRead || _dishesNewer) return 0;
+    final add = <String, DayMark>{};
+    for (final e in j.entries) {
+      final m = dayMarkOf(e.value);
+      if (e.key is String && m != null && !_days.containsKey(e.key)) add[e.key as String] = m;
+    }
+    if (add.isEmpty) return 0;
+    final before = _days;
+    final after = _days = _pruneDays({..._days, ...add});
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return add.length;
+    if (identical(_days, after)) _days = before;
+    notifyListeners();
+    return -1;
+  }
+
+  /// Βραδινή υπενθύμιση (16/11): η ώρα της σε λεπτά από τα μεσάνυχτα, ή null αν είναι κλειστή. Στο ίδιο αρχείο
+  /// (κλειδί «remind»).
+  int? _remindAt;
+  int? get remindAt => _remindAt;
+
+  Future<bool> setRemindAt(int? minutes) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    if (minutes != null && (minutes < 0 || minutes >= 24 * 60)) return false;
+    final before = _remindAt;
+    _remindAt = minutes;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (_remindAt == minutes) _remindAt = before;
+    saveError = 'Δεν αποθηκεύτηκε η υπενθύμιση. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// «Ζύγισα ένα» (16/11): το δικό σου βάρος ανά τεμάχιο (g), ανά τρόφιμο. Στο ίδιο αρχείο (κλειδί «units»). Μια
+  /// καταχώριση με αυτό δεν είναι εκτίμηση: το ζύγισες.
+  Map<String, double> _units = const {};
+  double? myUnit(String foodId) => _units[foodId];
+
+  /// Για το αντίγραφο.
+  Map<String, double> unitsForBackup() => Map.of(_units);
+
+  /// Αποθηκεύει (ή σβήνει με null) το δικό σου βάρος ανά τεμάχιο. `false` αν δεν γράφτηκε.
+  Future<bool> setMyUnit(String foodId, double? grams) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final g = grams == null ? null : validMyUnit(grams);
+    if (grams != null && g == null) return false;
+    final before = _units;
+    final after = _units = {
+      for (final e in _units.entries)
+        if (e.key != foodId) e.key: e.value,
+      if (g != null) foodId: g,
+    };
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (identical(_units, after)) _units = before;
+    saveError = 'Δεν αποθηκεύτηκε το βάρος του τεμαχίου. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// Επαναφορά: μπαίνουν μόνο όσα τρόφιμα δεν έχουν ήδη δικό σου βάρος. Πόσα μπήκαν (ή -1 αν δεν γράφτηκε).
+  Future<int> importUnits(Object? j) async {
+    if (j is! Map || !_dishesRead || _dishesNewer) return 0;
+    final add = <String, double>{};
+    for (final e in j.entries) {
+      final g = validMyUnit(e.value);
+      if (e.key is String && g != null && !_units.containsKey(e.key)) add[e.key as String] = g;
+    }
+    if (add.isEmpty) return 0;
+    final before = _units;
+    final after = _units = {..._units, ...add};
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return add.length;
+    if (identical(_units, after)) _units = before;
+    notifyListeners();
+    return -1;
+  }
+
+  Map<String, DayMark> _pruneDays(Map<String, DayMark> m) {
+    final keys = m.keys.toList()..sort();
+    if (keys.length <= dayMarksKeepDays) return m;
+    final keep = keys.sublist(keys.length - dayMarksKeepDays).toSet();
+    return {for (final e in m.entries) if (keep.contains(e.key)) e.key: e.value};
+  }
+
   /// Το πρόγραμμα εβδομάδας (15/11): στο ίδιο αρχείο με τα φαγητά (κλειδί «week»). null: δεν υπάρχει.
   WeekPlan? _week;
   WeekPlan? get week => _week;
@@ -771,6 +943,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _badDishRows = const [];
       _likes = const FoodLikes();
       _week = null;
+      _days = const {};
+      _units = const {};
+      _remindAt = null;
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -799,6 +974,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _badDishRows = const [];
       _likes = const FoodLikes();
       _week = null;
+      _days = const {};
+      _units = const {};
+      _remindAt = null;
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -820,6 +998,18 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     _badDishRows = bad;
     _likes = FoodLikes.fromJson((j as Map)['likes']);
     _week = WeekPlan.fromJson(j['week']);
+    _days = {
+      if (j['days'] is Map)
+        for (final e in (j['days'] as Map).entries)
+          if (e.key is String && dayMarkOf(e.value) != null) e.key as String: dayMarkOf(e.value)!,
+    };
+    _units = {
+      if (j['units'] is Map)
+        for (final e in (j['units'] as Map).entries)
+          if (e.key is String && validMyUnit(e.value) != null) e.key as String: validMyUnit(e.value)!,
+    };
+    final ra = j['remind'];
+    _remindAt = ra is int && ra >= 0 && ra < 24 * 60 ? ra : null;
     skippedRows += bad.length;
     _dishesRead = true;
     dishesNote = _dishesNewer ? dishesNewerText : null;
@@ -830,6 +1020,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         'dishes': [for (final d in list) d.toJson(), ..._badDishRows],
         if (!_likes.isEmpty) 'likes': _likes.toJson(),
         if (_week != null) 'week': _week!.toJson(),
+        if (_days.isNotEmpty) 'days': {for (final e in _days.entries) e.key: e.value.name},
+        if (_units.isNotEmpty) 'units': _units,
+        if (_remindAt != null) 'remind': _remindAt,
       });
 
   Future<bool> _writeDishes(List<Dish> after, String what) async {
@@ -898,8 +1091,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     PotBatch? batch,
     DateTime? on,
     DateTime? now,
+    bool est = false,
   }) async {
     if (amounts.isEmpty) return null;
+    // «Εκτίμηση» (16/11): και πάντα για φαγητό της βιβλιοθήκης που παραγγέλνεις (δεν ζυγίζεται).
+    final isEst = est || planInfoOf(d)?.cook == CookWay.out;
     final dd = dayOf(on ?? day);
     final t = now ?? DateTime.now();
     final base = entryTime(dd, t);
@@ -917,6 +1113,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         grams: amounts[i].amount,
         time: base.add(Duration(milliseconds: i)),
         dish: tag,
+        est: isEst,
       ));
     }
     if (!await _putAll(out)) return null;

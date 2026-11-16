@@ -16,6 +16,7 @@ import '../../training/session.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
 import '../../widgets.dart';
+import 'prep_sheet.dart' show PrepButton, openEquipmentSheet;
 import 'program_editor.dart';
 import 'hr_widgets.dart';
 import 'program_paste.dart';
@@ -341,6 +342,8 @@ class _TrainingPageState extends State<TrainingPage> {
             Navigator.of(context).push(ProgramPastePage.route(t));
           case 'export':
             _export(context);
+          case 'equip':
+            openEquipmentSheet(context, t);
           default:
             if (v.startsWith('pick:')) setState(() => t.choose(v.substring(5), _now));
         }
@@ -352,6 +355,7 @@ class _TrainingPageState extends State<TrainingPage> {
         const PopupMenuItem(value: 'edit', key: ValueKey('train-edit'), child: Text('Αλλαγές στο πρόγραμμα')),
         const PopupMenuItem(value: 'paste', key: ValueKey('train-paste-new'), child: Text('Επικόλληση νέου')),
         const PopupMenuItem(value: 'export', key: ValueKey('train-export'), child: Text('Αντιγραφή για τον Claude')),
+        const PopupMenuItem(value: 'equip', key: ValueKey('train-equip'), child: Text('Ο εξοπλισμός μου')),
       ],
     );
   }
@@ -415,6 +419,8 @@ class _TrainingPageState extends State<TrainingPage> {
       children.add(RoutineButton(w));
       // round1, S7-11: η σημείωση του προγράμματος (κανόνες ασφάλειας) ένα πάτημα μακριά.
       children.add(ProgramNotesButton(p, workout: w));
+      // «Ετοίμασε πριν ξεκινήσεις» (16/11): όλοι οι αλτήρες της μέρας από πριν.
+      children.add(PrepButton(t, w));
       final shown = _allItems || w.items.length <= 6 ? w.items : w.items.take(5).toList();
       for (var n = 0; n < shown.length; n++) {
         final plan = shown[n];
