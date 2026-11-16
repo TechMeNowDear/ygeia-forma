@@ -36,7 +36,7 @@ class _VitalsPageState extends State<VitalsPage> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      routeSettings: RouteSettings(name: 'Νέα μέτρηση: ${_title(_kind)}'),
+      routeSettings: const RouteSettings(name: 'Νέα μέτρηση'),
       constraints: const BoxConstraints(maxWidth: 560),
       builder: (_) => VitalSheet(kind: _kind, now: _now()),
     );

@@ -15,6 +15,8 @@ import 'sample_food.dart';
 
 final now = DateTime(2026, 11, 16, 13); // Δευτέρα
 
+String nameOf(String id) => basicFoods().firstWhere((f) => f.id == id).name;
+
 Map<String, Object?> dish(String key, String type, List<(String, double)> items,
         {List<String> meals = const [], List<String> tags = const [], bool office = false, int? servings, String cook = 'home'}) =>
     {
@@ -26,7 +28,7 @@ Map<String, Object?> dish(String key, String type, List<(String, double)> items,
       'tags': tags,
       'office': office,
       'cook': cook,
-      'items': [for (final (id, g) in items) {'id': id, 'name': id, 'g': g}],
+      'items': [for (final (id, g) in items) {'id': id, 'name': nameOf(id), 'g': g}],
       if (cook == 'home')
         'steps': [
           {'text': 'Μαγείρεψέ το.', 'min': 20}
