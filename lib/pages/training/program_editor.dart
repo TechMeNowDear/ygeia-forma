@@ -412,7 +412,7 @@ Future<void> editItem(BuildContext context, PlanItem it) => showModalBottomSheet
               row('Σετ', Stepper2(value: '${it.sets}', onMinus: it.sets > 1 ? () => set(() => it.sets--) : null, onPlus: it.sets < 10 ? () => set(() => it.sets++) : null)),
               row('Επαναλήψεις από', Stepper2(value: '${it.lo}', onMinus: it.lo > 1 ? () => set(() => it.lo--) : null, onPlus: it.lo < it.hi ? () => set(() => it.lo++) : null)),
               row('έως', Stepper2(value: '${it.hi}', onMinus: it.hi > it.lo ? () => set(() => it.hi--) : null, onPlus: it.hi < 50 ? () => set(() => it.hi++) : null)),
-              row('Διάλειμμα', Stepper2(value: restText(it.rest), width: 72, onMinus: it.rest >= 15 ? () => set(() => it.rest -= 15) : null, onPlus: it.rest < 600 ? () => set(() => it.rest += 15) : null)),
+              row('Διάλειμμα (δευτερόλεπτα)', Stepper2(value: '${it.rest}', width: 64, onMinus: it.rest >= 15 ? () => set(() => it.rest -= 15) : null, onPlus: it.rest < 600 ? () => set(() => it.rest += 15) : null)),
               row('Άφησε (επαναλήψεις)', Stepper2(value: '${it.rir}', onMinus: it.rir > minRir ? () => set(() => it.rir--) : null, onPlus: it.rir < 4 ? () => set(() => it.rir++) : null)),
               if (hasLoad(k))
                 row(

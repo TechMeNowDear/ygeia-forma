@@ -13,6 +13,8 @@ import 'devices_page.dart';
 import 'dishes.dart';
 import 'recipes.dart' show FoodLikesScreen;
 import 'day_close.dart' show openReminderSheet, reminderRowText;
+import '../vitals.dart' show VitalsStore;
+import 'vitals_page.dart' show VitalsPage;
 import 'week.dart' show WeekPlanScreen;
 import 'goals_page.dart';
 import 'sources_page.dart';
@@ -281,6 +283,25 @@ class _MePageState extends State<MePage> {
                       const GroupLabel('Διατροφή'),
                       _nutrition(context, food),
                     ],
+                    // Πίεση, σάκχαρο, καρδιογραφήματα με το χέρι (16/11).
+                    const GroupLabel('Μετρήσεις με το χέρι'),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: ListenableBuilder(
+                        listenable: VitalsStore.main,
+                        builder: (context, _) {
+                          final n = VitalsStore.main.all.length;
+                          return NavRow(
+                            key: const ValueKey('me-vitals'),
+                            icon: Icons.monitor_heart_outlined,
+                            color: c.health,
+                            title: 'Πίεση, σάκχαρο, καρδιογράφημα',
+                            text: n == 0 ? 'Γράψε τις μετρήσεις σου' : (n == 1 ? '1 μέτρηση' : '$n μετρήσεις'),
+                            onTap: () => Navigator.of(context).push(VitalsPage.route(VitalsStore.main)),
+                          );
+                        },
+                      ),
+                    ),
                     // Έλεγχος premium (S6): όχι σταθερό κείμενο («Oura / Ρολόι / InBody») που θα έλεγε ψέματα χωρίς Oura·
                     // οι πηγές όπως ισχύουν τώρα είναι στη σελίδα «Πηγές».
                     const GroupLabel('Από πού έρχεται κάθε μέτρηση'),

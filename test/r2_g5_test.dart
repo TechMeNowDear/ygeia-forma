@@ -286,10 +286,10 @@ void main() {
       expect(paceDiffText(65), '1 λεπτό 5 δευτερόλεπτα');
       expect(paceDiffText(121), '2 λεπτά 1 δευτερόλεπτο');
       expect(walkHrrDef.label, 'Πτώση παλμών στο 1ο λεπτό');
-      expect(restText(90), '1:30');
-      expect(restText(45), '0:45');
-      expect(restText(120), '2:00');
-      expect(restText(600), '10:00');
+      expect(restText(90), '90\u00A0δευτερόλεπτα');
+      expect(restText(45), '45\u00A0δευτερόλεπτα');
+      expect(restText(120), '120\u00A0δευτερόλεπτα');
+      expect(restText(600), '600\u00A0δευτερόλεπτα');
     });
 
     testWidgets('Πρόοδος: κανένα «′/″», «1ο λεπτό», «15 λεπτά», ενεργός χρόνος σε ώρες/λεπτά', (t) async {
@@ -326,7 +326,7 @@ void main() {
       await _pump(t, WorkoutEditorPage(workout: Workout(id: 'a', name: 'Προπόνηση Α', items: [PlanItem(ex: 'db_curl', rest: 90)])),
           size: const Size(400, 900));
       // R7-U3-14 (f2): «άφησε», όπως στην προπόνηση (πριν «ρεζέρβα 2»).
-      expect(find.textContaining('3 × 8–12 ·\u00A0ξεκούραση 1:30 ·\u00A0άφησε 2'), findsOneWidget);
+      expect(find.textContaining('3 × 8–12 ·\u00A0ξεκούραση 90\u00A0δευτερόλεπτα ·\u00A0άφησε 2'), findsOneWidget);
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
     });
   });

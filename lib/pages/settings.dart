@@ -14,6 +14,7 @@ import '../ti_ftanei.dart';
 import '../training/training_store.dart';
 import '../training/wear_link.dart' show WearLink, ymd;
 import '../widgets.dart';
+import '../vitals.dart' show VitalsStore;
 import 'appearance.dart';
 import 'devices_page.dart';
 import 'diagnostics_sheet.dart';
@@ -60,6 +61,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     foodLikes: food.likesForBackup(),
     foodDays: food.dishesRead ? food.dayMarksForBackup() : null,
     foodUnits: food.dishesRead ? food.unitsForBackup() : null,
+    vitals: VitalsStore.main.read ? VitalsStore.main.forBackup() : null,
     // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
     errorsOff: !errors.enabled,
   );
@@ -556,6 +558,7 @@ class _DataGroupState extends State<_DataGroup> {
       // «Τελείωσα για σήμερα» (16/11): μόνο οι μέρες χωρίς σημάδι στο κινητό.
       await widget.food!.importDayMarks(b.dayMarks);
       await widget.food!.importUnits(b.units);
+      await VitalsStore.main.importItems(b.vitals);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
       final prefsNotes =

@@ -528,7 +528,7 @@ class _SessionPageState extends State<SessionPage> {
                 TextSpan(text: '${e.sets} σετ × ${e.lo == e.hi ? '${e.lo}' : '${e.lo}–${e.hi}'} ·\u00A0'),
                 TextSpan(text: 'άφησε\u00A0${e.rir}', style: const TextStyle(fontWeight: FontWeight.w700)),
                 // R7-U3-09: «ξεκούραση 2:00» ποτέ σε δύο γραμμές.
-                TextSpan(text: ' ·\u00A0ξεκούραση\u00A0${clock(e.rest)}'),
+                TextSpan(text: ' ·\u00A0ξεκούραση\u00A0${restText(e.rest)}'),
               ]),
               key: const ValueKey('sess-plan'),
               style: TextStyle(fontSize: 15, height: 1.4, color: c.text),

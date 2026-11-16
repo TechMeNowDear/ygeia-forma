@@ -117,9 +117,17 @@ class NutritionPage extends StatelessWidget {
         final chol = goals != null && goals.doctor && !beforeGoals(goals, day)
             ? CholCard(food: food, goals: goals, day: day, today: today)
             : null;
+        // Πρωτεΐνη ανά γεύμα (16/11): ο στόχος της μέρας μοιρασμένος στα γεύματα (τουλάχιστον 3: τόσα τρως).
+        final mealProtein = goals == null || beforeGoals(goals, day) ? null : proteinPerMeal(goals.protein, entries);
         final meals = [
           for (final m in Meal.values)
-            _MealCard(food: food, meal: m, entries: entries.where((e) => e.meal == m).toList(), day: day, today: today),
+            _MealCard(
+                food: food,
+                meal: m,
+                entries: entries.where((e) => e.meal == m).toList(),
+                day: day,
+                today: today,
+                proteinTarget: mealProtein),
         ];
 
         return PageFrame(
@@ -480,8 +488,12 @@ class FoodTodayCard extends StatelessWidget {
 }
 
 class _MealCard extends StatelessWidget {
-  const _MealCard({required this.food, required this.meal, required this.entries, required this.day, required this.today});
+  const _MealCard(
+      {required this.food, required this.meal, required this.entries, required this.day, required this.today, this.proteinTarget});
   final FoodStore food;
+
+  /// Πρωτεΐνη ανά γεύμα (16/11), g. null: χωρίς στόχους.
+  final double? proteinTarget;
   final Meal meal;
   final List<LogEntry> entries;
   final DateTime day;
@@ -545,6 +557,9 @@ class _MealCard extends StatelessWidget {
             child: CardHeader(
               icon: mealIcon(meal),
               title: mealLabel(meal),
+              subtitle: entries.isEmpty || proteinTarget == null
+                  ? null
+                  : 'πρωτεΐνη ${gramsText(t.protein)} / ${proteinTarget!.round()} g',
               color: c.food,
               trailing: entries.isEmpty
                   ? null
@@ -837,4 +852,11 @@ class FoodSourcesScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Πρωτεΐνη ανά γεύμα (16/11): ο στόχος της μέρας μοιρασμένος στα γεύματα της μέρας, τουλάχιστον 3 (τρία γεύματα την
+/// ημέρα). Με ένα γεύμα γραμμένο το πρωί δεν βγαίνει ολόκληρος ο στόχος της μέρας σε αυτό.
+double proteinPerMeal(int dayProtein, List<LogEntry> entries) {
+  final used = {for (final e in entries) e.meal}.length;
+  return dayProtein / (used < 3 ? 3 : used);
 }

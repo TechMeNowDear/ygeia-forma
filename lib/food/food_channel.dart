@@ -53,6 +53,11 @@ class FoodChannel {
   static Future<Map<String, dynamic>> dishesRead() => _call('dishesRead');
   static Future<Map<String, dynamic>> dishesWrite(String json) => _write('dishesWrite', {'json': json});
   static Future<Map<String, dynamic>> dishesBad() => _write('dishesBad', const {});
+
+  // Πίεση, σάκχαρο, καρδιογραφήματα (16/11): το vitals.json.
+  static Future<Map<String, dynamic>> vitalsRead() => _call('vitalsRead');
+  static Future<Map<String, dynamic>> vitalsWrite(String json) => _write('vitalsWrite', {'json': json});
+  static Future<Map<String, dynamic>> vitalsBad() => _write('vitalsBad', const {});
   static Future<Map<String, dynamic>> logDelete(String id) => _write('logDelete', {'id': id});
   static Future<Map<String, dynamic>> myFoods() => _call('myFoods');
   static Future<Map<String, dynamic>> myFoodPut(String json) => _write('myFoodPut', {'json': json});

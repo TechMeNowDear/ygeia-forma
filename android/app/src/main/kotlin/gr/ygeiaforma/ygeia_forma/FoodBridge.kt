@@ -80,6 +80,26 @@ class FoodBridge(
                 }
                 JSONObject().put("ok", ok)
             }
+            // Πίεση, σάκχαρο, καρδιογραφήματα (16/11): το vitals.json, με τον ίδιο τρόπο (ατομική εγγραφή, αντίγραφο).
+            "vitalsRead" -> respond(result) {
+                val f = java.io.File(activity.filesDir, OuraRules.VITALS_FILE)
+                withContext(Dispatchers.IO) {
+                    if (!f.exists()) JSONObject().put("ok", true).put("state", "missing")
+                    else JSONObject().put("ok", true).put("state", "ok").put("json", f.readText())
+                }
+            }
+            "vitalsWrite" -> respond(result) {
+                val text = call.argument<String>("json") ?: ""
+                require(text.isNotEmpty()) { "Κενό αρχείο μετρήσεων" }
+                val ok = withContext(Dispatchers.IO) {
+                    OuraBridge.atomicWrite(java.io.File(activity.filesDir, OuraRules.VITALS_FILE), text.toByteArray(Charsets.UTF_8))
+                }
+                JSONObject().put("ok", ok)
+            }
+            "vitalsBad" -> respond(result) {
+                val name = withContext(Dispatchers.IO) { TrainingRules.setAside(java.io.File(activity.filesDir, OuraRules.VITALS_FILE)) }
+                if (name == null) JSONObject().put("ok", false) else JSONObject().put("ok", true).put("name", name)
+            }
             "dishesBad" -> respond(result) {
                 val name = withContext(Dispatchers.IO) { TrainingRules.setAside(java.io.File(activity.filesDir, OuraRules.DISHES_FILE)) }
                 if (name == null) JSONObject().put("ok", false) else JSONObject().put("ok", true).put("name", name)
