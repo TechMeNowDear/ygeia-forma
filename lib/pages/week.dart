@@ -8,6 +8,7 @@ import '../food/food_store.dart';
 import '../food/library.dart';
 import '../food/recipe.dart' show recipeOf;
 import '../food/week.dart';
+import '../food/week_auto.dart';
 import '../food/week_calc.dart';
 import '../format.dart';
 import '../theme.dart';
@@ -390,6 +391,78 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
     ));
   }
 
+  /// Οι σημειώσεις του τελευταίου αυτόματου προγράμματος (ό,τι δεν βγήκε όπως ζητούν οι κανόνες).
+  List<String>? _autoNotes;
+  int _seed = 1;
+
+  /// «Φτιάξε πρόγραμμα» (16/11): με κανόνες, χωρίς AI. Ρωτά από πότε και ποια γεύματα.
+  Future<void> _auto() async {
+    final g = HealthStore.shared?.goals;
+    if (g == null) {
+      setState(() => _errors = ['Πρώτα βάλε στόχους διατροφής (Εγώ › Στόχοι διατροφής): από αυτούς βγαίνουν οι μερίδες.']);
+      return;
+    }
+    final choice = await showModalBottomSheet<({DateTime from, List<Meal> meals})>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      routeSettings: const RouteSettings(name: 'Φτιάξε πρόγραμμα'),
+      constraints: const BoxConstraints(maxWidth: 560),
+      builder: (_) => AutoWeekSheet(now: _now),
+    );
+    if (choice == null || !mounted) return;
+    await _generate(choice.from, choice.meals, keep: null);
+  }
+
+  /// «Ξαναφτιάξ' το»: ίδια αρχή και γεύματα, άλλη επιλογή φαγητών· οι κλειδωμένες θέσεις μένουν.
+  Future<void> _again(WeekPlan w) async {
+    final meals = {for (final d in w.days) for (final s in d) s.meal}.toList();
+    _seed++;
+    await _generate(w.start, meals, keep: w, ask: false);
+  }
+
+  Future<void> _generate(DateTime from, List<Meal> meals, {required WeekPlan? keep, bool ask = true}) async {
+    final food = widget.food;
+    final g = HealthStore.shared?.goals;
+    if (g == null) return;
+    final r = autoWeek(
+      food,
+      from: from,
+      meals: meals,
+      kcalTarget: g.kcal.toDouble(),
+      proteinTarget: g.protein.toDouble(),
+      legumesWeek: g.legumesWeek,
+      fishWeek: g.fishWeek,
+      seed: _seed,
+      keep: keep,
+      now: _now.millisecondsSinceEpoch,
+    );
+    final old = food.week;
+    if (ask && old != null) {
+      final yes = await showDialog<bool>(
+        context: context,
+        routeSettings: const RouteSettings(name: 'Νέο πρόγραμμα'),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Νέο πρόγραμμα;'),
+          content: Text('Το πρόγραμμα από ${shortDayDate(old.start)} γίνεται νέο, από ${shortDayDate(r.plan.start)}. '
+              'Ό,τι έχεις ήδη γράψει στο ημερολόγιο μένει όπως είναι.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Άκυρο')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι, το νέο')),
+          ],
+        ),
+      );
+      if (yes != true || !mounted) return;
+    }
+    final ok = await food.saveWeek(keepDone(r.plan, old));
+    if (!mounted) return;
+    setState(() {
+      _errors = ok ? null : [food.saveError ?? 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.'];
+      _autoNotes = ok ? r.notes : null;
+    });
+  }
+
   Future<void> _delete() async {
     final yes = await showDialog<bool>(
       context: context,
@@ -426,9 +499,28 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
         Text('Πρώτα βάλε φαγητά στη βιβλιοθήκη: «Τα φαγητά μου › Βιβλιοθήκη».',
             key: const ValueKey('week-no-library'), style: TextStyle(fontSize: 14.5, height: 1.4, color: c.warn))
       else ...[
+        // Αυτόματο πρόγραμμα (16/11): το πρώτο κουμπί. Οι οδηγίες για το AI μένουν ως δεύτερος τρόπος.
         FilledButton.icon(
-          key: const ValueKey('week-copy'),
+          key: const ValueKey('week-auto'),
           style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          onPressed: food.dishesRead ? _auto : null,
+          icon: const Icon(Icons.auto_awesome_motion_rounded),
+          label: const Text('Φτιάξε πρόγραμμα'),
+        ),
+        if (usableLibrary(food) < 20)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Η βιβλιοθήκη έχει ${usableLibrary(food)} φαγητά. Με λιγότερα από 20 το πρόγραμμα θα επαναλαμβάνεται και '
+              'κάποιοι κανόνες μπορεί να μη βγαίνουν.',
+              key: const ValueKey('week-auto-few'),
+              style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary),
+            ),
+          ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          key: const ValueKey('week-copy'),
+          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
           onPressed: _copy,
           icon: Icon(_copied ? Icons.check_rounded : Icons.copy_rounded),
           label: Text(_copied ? 'Αντιγράφηκαν: πήγαινε στο AI' : 'Αντιγραφή οδηγιών για νέο πρόγραμμα'),
@@ -446,6 +538,12 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
         const SizedBox(height: 14),
         for (final e in errs) Text(e, style: TextStyle(fontSize: 14.5, height: 1.4, color: c.warn)),
       ],
+      if (_autoNotes case final notes? when notes.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        Text('Τι δεν βγήκε όπως ζητούν οι κανόνες:',
+            key: const ValueKey('week-auto-notes'), style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.warn)),
+        for (final n in notes) Text('•\u00A0$n', style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
+      ],
       if (w != null) ...[
         const SizedBox(height: 22),
         Row(children: [
@@ -455,6 +553,16 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
           ),
           TextButton(key: const ValueKey('week-delete'), onPressed: _delete, child: const Text('Σβήσιμο')),
         ]),
+        if (w.source == 'auto')
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const ValueKey('week-auto-again'),
+              onPressed: () => _again(w),
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              label: const Text('Ξαναφτιάξ’ το (μένουν όσα κλείδωσες)'),
+            ),
+          ),
         const SizedBox(height: 6),
         FilledButton.tonalIcon(
           key: const ValueKey('week-shopping'),
@@ -631,6 +739,74 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: body),
         ),
       ),
+    );
+  }
+}
+
+/// «Φτιάξε πρόγραμμα»: από πότε και ποια γεύματα. Προεπιλογή: η επόμενη Δευτέρα (ή σήμερα, αν είναι Δευτέρα) και
+/// μεσημέρι, σνακ, βράδυ (απόφαση χρήστη 15/11: τρία γεύματα, χωρίς πρωινό).
+class AutoWeekSheet extends StatefulWidget {
+  const AutoWeekSheet({super.key, required this.now});
+  final DateTime now;
+
+  @override
+  State<AutoWeekSheet> createState() => _AutoWeekSheetState();
+}
+
+class _AutoWeekSheetState extends State<AutoWeekSheet> {
+  late final DateTime _today = DateTime(widget.now.year, widget.now.month, widget.now.day);
+  late DateTime _from = nextMonday(widget.now);
+  final _meals = <Meal>{Meal.lunch, Meal.snack, Meal.dinner};
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    final tomorrow = DateTime(_today.year, _today.month, _today.day + 1);
+    final monday = nextMonday(widget.now);
+    final starts = <(String, DateTime)>[
+      ('Σήμερα', _today),
+      ('Αύριο', tomorrow),
+      if (!sameDay(monday, _today) && !sameDay(monday, tomorrow)) ('Δευτέρα ${monday.day}/${monday.month}', monday),
+    ];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        Text('Φτιάξε πρόγραμμα', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
+        const SizedBox(height: 4),
+        Text('7 μέρες από τη βιβλιοθήκη σου, με τους στόχους σου. Μετά αλλάζεις ό,τι θέλεις με «Άλλαξέ το».',
+            style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+        const SizedBox(height: 14),
+        Text('Από', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 6, children: [
+          for (final (label, d) in starts)
+            ChoiceChip(
+              key: ValueKey('auto-from-${d.day}'),
+              label: Text(label),
+              selected: sameDay(_from, d),
+              onSelected: (_) => setState(() => _from = d),
+            ),
+        ]),
+        const SizedBox(height: 14),
+        Text('Γεύματα', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 6, children: [
+          for (final m in Meal.values)
+            FilterChip(
+              key: ValueKey('auto-meal-${m.name}'),
+              label: Text(mealLabel(m)),
+              selected: _meals.contains(m),
+              onSelected: (on) => setState(() => on ? _meals.add(m) : _meals.remove(m)),
+            ),
+        ]),
+        const SizedBox(height: 18),
+        FilledButton(
+          key: const ValueKey('auto-go'),
+          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20)),
+          onPressed: _meals.isEmpty ? null : () => Navigator.pop(context, (from: _from, meals: _meals.toList())),
+          child: const Text('Φτιάξ’ το'),
+        ),
+      ]),
     );
   }
 }
