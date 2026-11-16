@@ -28,6 +28,7 @@ Map<String, Object?> dish(String key, String type, List<(String, double)> items,
       'tags': tags,
       'office': office,
       'cook': cook,
+      if (cook == 'out') 'order': 'Ψητό, λάδι στο πλάι.',
       'items': [for (final (id, g) in items) {'id': id, 'name': nameOf(id), 'g': g}],
       if (cook == 'home')
         'steps': [
