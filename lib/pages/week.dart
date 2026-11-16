@@ -393,7 +393,8 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
 
   /// Οι σημειώσεις του τελευταίου αυτόματου προγράμματος (ό,τι δεν βγήκε όπως ζητούν οι κανόνες).
   List<String>? _autoNotes;
-  int _seed = 1;
+  // Κάθε «Φτιάξε»/«Ξαναφτιάξ’ το» δίνει άλλη εβδομάδα, και μετά από νέο άνοιγμα της οθόνης (έλεγχος 16/11).
+  int _seed = DateTime.now().millisecondsSinceEpoch % 100000;
 
   /// «Φτιάξε πρόγραμμα» (16/11): με κανόνες, χωρίς AI. Ρωτά από πότε και ποια γεύματα.
   Future<void> _auto() async {

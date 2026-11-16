@@ -307,6 +307,15 @@ double? stepDown(LoadKind k, double v, {bool allowZero = false}) {
 }
 
 /// Περίπου [ratio] του βάρους (π.χ. 0,9 μετά από διάλειμμα), στο πλησιέστερο διαθέσιμο από κάτω.
+/// Τα είδη που εξαρτώνται από τον εξοπλισμό μου (λαβές, δίσκοι): εδώ ένα φορτίο από παλιότερη καταγραφή μπορεί να μη
+/// «βγαίνει» πια (π.χ. 11,8 kg με λαβή 1,8 kg, όταν η λαβή γίνει 2,2 kg).
+bool onEquipment(LoadKind k) =>
+    k == LoadKind.bar || k == LoadKind.dbPair || k == LoadKind.db || k == LoadKind.horn || k == LoadKind.plate;
+
+/// Το φορτίο που βγαίνει με τον εξοπλισμό τώρα: το ίδιο αν βγαίνει, αλλιώς το αμέσως ελαφρύτερο (16/11, έλεγχος:
+/// μετά από αλλαγή λαβής ή δίσκων). Ποτέ βαρύτερο από αυτό που καταγράφηκε.
+double fitLoad(LoadKind k, double v) => onEquipment(k) ? snap(k, v) : v;
+
 double scaled(LoadKind k, double v, double ratio) {
   if (k == LoadKind.bandAssist) {
     // Περισσότερη βοήθεια: το επόμενο βαρύτερο λάστιχο.

@@ -857,6 +857,13 @@ class FoodSourcesScreen extends StatelessWidget {
 /// Πρωτεΐνη ανά γεύμα (16/11): ο στόχος της μέρας μοιρασμένος στα γεύματα της μέρας, τουλάχιστον 3 (τρία γεύματα την
 /// ημέρα). Με ένα γεύμα γραμμένο το πρωί δεν βγαίνει ολόκληρος ο στόχος της μέρας σε αυτό.
 double proteinPerMeal(int dayProtein, List<LogEntry> entries) {
-  final used = {for (final e in entries) e.meal}.length;
+  // Μετρούν τα γεύματα με τουλάχιστον 15% των θερμίδων της μέρας (έλεγχος 16/11: ένας καφές με γάλα στο «Πρωινό» δεν
+  // είναι 4ο γεύμα που κατεβάζει τον στόχο όλων από 43 σε 33 g).
+  final all = Totals(entries).kcal;
+  final byMeal = <Meal, double>{};
+  for (final e in entries) {
+    byMeal[e.meal] = (byMeal[e.meal] ?? 0) + e.total(Nk.kcal);
+  }
+  final used = all <= 0 ? 0 : byMeal.values.where((k) => k >= all * 0.15).length;
   return dayProtein / (used < 3 ? 3 : used);
 }

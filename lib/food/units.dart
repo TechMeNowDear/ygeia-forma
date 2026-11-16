@@ -70,6 +70,8 @@ String pieceText(PieceUnit u, PieceSize s, int count) {
   if (u.sizes.length == 1 || s.label.isEmpty) return '$count $noun';
   if (u.sizeAfter) return '$count $noun ${s.label}';
   var adj = s.label;
+  if (count != 1 && adj.endsWith('ή')) adj = '${adj.substring(0, adj.length - 1)}ές';
+  if (count != 1 && adj.endsWith('η')) adj = '${adj.substring(0, adj.length - 1)}ες';
   if (count != 1 && adj.endsWith('α')) adj = '${adj.substring(0, adj.length - 1)}ες';
   if (count != 1 && adj.endsWith('ο')) adj = '${adj.substring(0, adj.length - 1)}α';
   return '$count $adj $noun';

@@ -212,6 +212,10 @@ class _EquipmentSheetState extends State<EquipmentSheet> {
             decoration: InputDecoration(
               labelText: 'Βάρος μίας λαβής, με τα 2 αστεράκια της',
               suffixText: 'kg',
+              // 16/11 (έλεγχος): ένα βάρος για όλες. Με παλιές 1,8 και νέες 2,2 kg, ο αλτήρας στις παλιές βγαίνει 0,4 kg
+              // ελαφρύτερος από όσο γράφει: μικρή διαφορά, αλλά καλύτερα οι λαβές του ίδιου ζευγαριού να είναι ίδιες.
+              helperText: 'Αν δεν ζυγίζουν όλες το ίδιο: το βάρος των περισσότερων, και τα ζευγάρια από ίδιες λαβές.',
+              helperMaxLines: 3,
               errorText: kg == null ? 'Από 0,5 έως 5 kg' : null,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),

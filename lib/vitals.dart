@@ -138,6 +138,14 @@ String bpAverageText(({double sys, double dia, int n}) a) {
       '$homeBpSys/$homeBpDia (ESC 2024).';
 }
 
+/// Πολύ υψηλή μέτρηση (16/11): από 180/110 (ESC 2024: σοβαρή υπέρταση). Μία μέτρηση μόνη της δεν είναι διάγνωση, αλλά
+/// σε αυτά τα νούμερα λέγεται αμέσως τι να κάνεις.
+String? bpNote(Vital v) {
+  if (v.kind != VitalKind.bp || (v.sys! < 180 && v.dia! < 110)) return null;
+  return 'Πολύ υψηλή. Ξαναμέτρησε σε 5 λεπτά, ήρεμος. Αν μένει τόσο ψηλά, μίλα σήμερα με γιατρό· με πόνο στο στήθος, '
+      'δύσπνοια, αδυναμία ή θόλωμα στην όραση, 166 ή 112.';
+}
+
 /// Σημείωση για μία μέτρηση σακχάρου (μόνο ό,τι είναι καθαρό· όχι διάγνωση).
 String? glucoseNote(Vital v) {
   final g = v.glucose!;
@@ -162,9 +170,10 @@ class ChannelVitalsIO implements VitalsIO {
   Future<({String state, String? json})> read() async {
     final r = await FoodChannel.vitalsRead();
     if (r['ok'] != true) return (state: r['kind'] == 'not_android' ? 'missing' : 'error', json: null);
-    if (r['state'] == 'missing') return (state: 'missing', json: null);
     final j = r['json'];
-    return r['state'] == 'ok' && j is String ? (state: 'ok', json: j) : (state: 'error', json: null);
+    if (r['state'] == 'ok' && j is String) return (state: 'ok', json: j);
+    // Απάντηση χωρίς αρχείο (ή από παλιό κανάλι χωρίς «state»): δεν υπάρχει αρχείο ακόμα.
+    return (state: 'missing', json: null);
   }
 
   @override
@@ -202,7 +211,7 @@ class VitalsStore extends ChangeNotifier {
   final VitalsIO _io;
 
   static VitalsStore? _main;
-  static VitalsStore get main => _main ??= VitalsStore()..load();
+  static VitalsStore get main => _main ??= VitalsStore()..ensureLoaded();
 
   List<Vital> _all = const [];
   List<Object?> _bad = const [];
@@ -212,6 +221,16 @@ class VitalsStore extends ChangeNotifier {
   /// Όλες, νεότερη πρώτη.
   List<Vital> get all => _all;
   List<Vital> of(VitalKind k) => [for (final v in _all) if (v.kind == k) v];
+
+  Future<void>? _loading;
+
+  /// Περιμένει να διαβαστεί το αρχείο (16/11, έλεγχος: η εξαγωγή αντιγράφου και η επαναφορά δεν περίμεναν, και οι
+  /// μετρήσεις έλειπαν σιωπηλά). Αν η ανάγνωση απέτυχε, ξαναδοκιμάζει.
+  Future<void> ensureLoaded() async {
+    if (read) return;
+    await (_loading ??= load());
+    _loading = null;
+  }
 
   Future<void> load() async {
     final r = await _io.read();
@@ -266,13 +285,14 @@ class VitalsStore extends ChangeNotifier {
   Future<bool> _save(List<Vital> next) async {
     if (!read) return false;
     final before = _all;
-    _all = [...next]..sort((a, b) => b.at.compareTo(a.at));
+    final after = _all = [...next]..sort((a, b) => b.at.compareTo(a.at));
     notifyListeners();
-    if (await _io.write(_json(_all))) {
+    if (await _io.write(_json(after))) {
       error = null;
       return true;
     }
-    _all = before;
+    // Μόνο αν δεν άλλαξε κάτι άλλο στο μεταξύ (16/11, έλεγχος: αλλιώς σβηνόταν μια νεότερη αλλαγή που γράφτηκε).
+    if (identical(_all, after)) _all = before;
     error = 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.';
     notifyListeners();
     return false;
@@ -282,13 +302,16 @@ class VitalsStore extends ChangeNotifier {
   Future<bool> remove(Vital v) => _save([..._all.where((x) => x.id != v.id)]);
 
   /// Για την «Εξαγωγή αντιγράφου».
-  List<Map<String, Object>> forBackup() => [for (final v in _all) v.toJson()];
+  /// Και οι γραμμές που δεν διαβάστηκαν, όπως είναι (16/11, έλεγχος: αλλιώς χάνονταν μετά από «Διαγραφή όλων»).
+  List<Object?> forBackup() => [for (final v in _all) v.toJson(), ..._bad];
 
   /// Επαναφορά: μπαίνουν όσες λείπουν (ίδιο id = ίδια μέτρηση). Πόσες μπήκαν, ή -1 αν δεν γράφτηκε.
   Future<int> importItems(Object? j) async {
-    if (j is! List || !read) return 0;
+    if (j is! List || j.isEmpty) return 0;
+    await ensureLoaded();
+    if (!read) return -1;
     final have = {for (final v in _all) v.id};
-    final add = [for (final x in j) if (Vital.fromJson(x) case final v? when !have.contains(v.id)) v];
+    final add = [for (final x in j) if (Vital.fromJson(x) case final v? when have.add(v.id)) v];
     if (add.isEmpty) return 0;
     return await _save([..._all, ...add]) ? add.length : -1;
   }

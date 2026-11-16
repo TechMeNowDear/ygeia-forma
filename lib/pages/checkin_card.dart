@@ -31,7 +31,10 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
                 check: c,
                 store: store,
                 now: now,
-                estShare: c.est == null ? null : estimatedShare(food, c.est!.from, c.est!.to)),
+                estShare: c.est == null
+                    ? null
+                    : estimatedShare(food, c.est!.from, c.est!.to,
+                        minKcal: adaptFullDayShare * c.goals.kcal, maxKcal: absurdDayKcal(c.goals.calc.tdee))),
           );
         },
       );

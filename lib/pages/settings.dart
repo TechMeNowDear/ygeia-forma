@@ -45,6 +45,8 @@ Future<Map<String, dynamic>?> _trainingForBackup() async {
 Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   final raw = await food.exportRaw();
   if (raw == null) return (ok: false, text: 'Δεν διαβάστηκαν τα δεδομένα. Δοκίμασε ξανά.', uri: null);
+  // Πίεση, σάκχαρο, καρδιογραφήματα (16/11, έλεγχος): να έχουν διαβαστεί πριν μπουν στο αρχείο.
+  await VitalsStore.main.ensureLoaded();
   final now = DateTime.now();
   final name = backupFileName(now);
   final sources = await store.sourcesForBackup();
@@ -66,6 +68,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     errorsOff: !errors.enabled,
   );
   final dishesOut = !food.dishesRead;
+  final vitalsOut = !VitalsStore.main.read;
   final dishCount = food.dishesForBackup()?.length ?? 0;
   final trainingOut = TrainingStore.main.readError;
   final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
@@ -83,13 +86,14 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   final saved = r['name'] is String ? r['name'] as String : name;
   // Πλήρες μόνο αν μπήκαν οι προπονήσεις με τους παλμούς τους, οι ρυθμίσεις και οι πηγές ύπνου. Μόνο ένα πλήρες
   // αντίγραφο μετρά ως «τελευταίο αντίγραφο» (13/11).
-  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut;
+  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut;
   if (complete) store.markExported(now);
   return (
     ok: complete,
     text: 'Αποθηκεύτηκε στις Λήψεις: $saved ·\u00A0${entriesText(raw.$1.length)}, ${productsText(raw.$2.length)}'
         '${dishCount > 0 ? ', ${dishesText(dishCount)}' : ''}'
         '${dishesOut ? '. «Τα φαγητά μου» δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
+        '${vitalsOut ? '. Πίεση, σάκχαρο και καρδιογραφήματα δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
         // Έλεγχος 9/11 (V-A-10): να μη λείπουν σιωπηλά.
         '${trainingOut ? '. Οι προπονήσεις δεν μπήκαν: το αρχείο τους δεν διαβάζεται.' : ''}'
         // Έλεγχος του #91 (S5): προπονήσεις των οποίων οι παλμοί δεν διαβάστηκαν, να μη λείπουν σιωπηλά.
@@ -556,9 +560,9 @@ class _DataGroupState extends State<_DataGroup> {
       final dishRes = b.dishes.isEmpty ? null : await widget.food!.importDishes(b.dishes);
       final likesIn = await widget.food!.importLikes(b.likes);
       // «Τελείωσα για σήμερα» (16/11): μόνο οι μέρες χωρίς σημάδι στο κινητό.
-      await widget.food!.importDayMarks(b.dayMarks);
-      await widget.food!.importUnits(b.units);
-      await VitalsStore.main.importItems(b.vitals);
+      final marksIn = await widget.food!.importDayMarks(b.dayMarks);
+      final unitsIn = await widget.food!.importUnits(b.units);
+      final vitalsIn = await VitalsStore.main.importItems(b.vitals);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
       final prefsNotes =
@@ -592,6 +596,10 @@ class _DataGroupState extends State<_DataGroup> {
           countText(dishRes.$1, 'φαγητό μπήκε από το αντίγραφο.', 'φαγητά μπήκαν από το αντίγραφο.'),
         if (b.dishes.isNotEmpty && dishRes == null) 'Τα φαγητά του αντιγράφου δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (likesIn) 'Μπήκε και το «Τι μου αρέσει».',
+        // 16/11 (έλεγχος): να μη χάνονται σιωπηλά.
+        if (vitalsIn > 0) countText(vitalsIn, 'μέτρηση (πίεση, σάκχαρο, καρδιογράφημα) μπήκε.', 'μετρήσεις (πίεση, σάκχαρο, καρδιογράφημα) μπήκαν.'),
+        if (vitalsIn < 0) 'Οι μετρήσεις (πίεση, σάκχαρο, καρδιογράφημα) δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
+        if (marksIn < 0 || unitsIn < 0) 'Τα σημάδια «Τελείωσα για σήμερα» και τα βάρη «Ζύγισα ένα» δεν γράφτηκαν· δοκίμασε ξανά.',
         if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
     } finally {

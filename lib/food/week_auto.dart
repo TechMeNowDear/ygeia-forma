@@ -81,15 +81,11 @@ AutoWeek autoWeek(
     if (all == null || all.kcal <= 0) continue;
     final nat = naturalRaw(d);
     final n = nat == null ? null : itemsTotals(food, nat)?.kcal;
-    cands.add(_Cand(
-      d,
-      info,
-      n == null ? 150 : math.max(minSlotKcal, n * autoPortionMin),
-      // Κατσαρόλα και ίσες μερίδες: ως 2 μερίδες (βάζεις λίγο παραπάνω, 2 μπιφτέκια)· πιάτο ως 1,6 φορές.
-      n == null ? 1200 : math.min(maxSlotKcal, n * (d.kind == DishKind.plate ? autoPortionMax : 2.0)),
-      n,
-      all.protein / all.kcal,
-    ));
+    final lo = n == null ? 150.0 : math.max(minSlotKcal, n * autoPortionMin);
+    // Κατσαρόλα και ίσες μερίδες: ως 2 μερίδες (βάζεις λίγο παραπάνω, 2 μπιφτέκια)· πιάτο ως 1,6 φορές.
+    final hi = n == null ? 1200.0 : math.min(maxSlotKcal, n * (d.kind == DishKind.plate ? autoPortionMax : 2.0));
+    // Πολύ μικρό φαγητό (π.χ. καφές 14 kcal): πάντα lo ≤ hi (έλεγχος 16/11: αλλιώς το clamp έσκαγε).
+    cands.add(_Cand(d, info, lo, math.max(lo, hi), n, all.protein / all.kcal));
   }
   final ordered = [for (final m in Meal.values) if (meals.contains(m)) m];
   final shareSum = ordered.fold(0.0, (a, m) => a + mealShare[m]!);
@@ -106,13 +102,21 @@ AutoWeek autoWeek(
   for (var day = 0; day < days; day++) {
     final date = DateTime(start.year, start.month, start.day + day);
     final office = officeWeekdays.contains(date.weekday);
-    final kept = keepPlan != null && day < keepPlan.days.length ? keepPlan.days[day].where((s) => s.locked).toList() : const <PlanSlot>[];
+    // Μένουν όσα κλείδωσες και όσα έχουν ήδη γίνει («Το έφαγα», «Δεν το έφαγα»· έλεγχος 16/11: αλλιώς το «Ξαναφτιάξ’
+    // το» στη μέση της εβδομάδας άλλαζε γεύματα που είχες ήδη φάει).
+    final kept = keepPlan != null && day < keepPlan.days.length
+        ? keepPlan.days[day].where((s) => s.locked || s.state != SlotState.open).toList()
+        : const <PlanSlot>[];
     final chosen = <(Meal, _Cand?, PlanSlot?)>[];
     for (final m in ordered) {
       final k = kept.where((s) => s.meal == m).firstOrNull;
       if (k != null) {
-        chosen.add((m, cands.where((c) => c.dish.id == k.dishId).firstOrNull, k));
+        final c = cands.where((c) => c.dish.id == k.dishId).firstOrNull;
+        chosen.add((m, c, k));
         (used[k.dishId] ??= []).add(day);
+        // Και τα κρατημένα μετρούν στα όσπρια και στο ψάρι της εβδομάδας (έλεγχος 16/11).
+        if (c != null && c.legumes) legumes++;
+        if (c != null && c.fish) fish++;
         continue;
       }
       final officeLunch = office && m == Meal.lunch;
@@ -161,7 +165,9 @@ AutoWeek autoWeek(
         }
         continue;
       }
-      ok.sort((a, b) => score(b).compareTo(score(a)));
+      // Μία βαθμολογία ανά φαγητό (έλεγχος 16/11: πριν ο τυχαίος αριθμός άλλαζε σε κάθε σύγκριση της ταξινόμησης).
+      final scores = {for (final c in ok) c: score(c)};
+      ok.sort((a, b) => scores[b]!.compareTo(scores[a]!));
       final pick = ok.first;
       chosen.add((m, pick, null));
       (used[pick.dish.id] ??= []).add(day);
@@ -169,18 +175,42 @@ AutoWeek autoWeek(
       if (pick.fish) fish++;
     }
 
-    // Θερμίδες: από το μερίδιο κάθε γεύματος, μέσα στα όρια της μερίδας· ό,τι λείπει ή περισσεύει μοιράζεται.
+    // Θερμίδες: από το μερίδιο κάθε γεύματος, μέσα στα όρια της μερίδας· ό,τι λείπει ή περισσεύει μοιράζεται. Γεύμα που
+    // έμεινε κενό (π.χ. χωρίς φαγητό για γραφείο) κρατά το μερίδιό του: δεν φορτώνεται στα άλλα (έλεγχος 16/11).
+    final dayTarget = chosen.fold(0.0, (a, x) => a + target(x.$1));
     final kc = <double>[
       for (final (m, c, k) in chosen) k?.kcal ?? (c == null ? target(m) : target(m).clamp(c.lo, c.hi).toDouble()),
     ];
     for (var round = 0; round < 4; round++) {
-      final diff = kcalTarget - kc.fold(0.0, (a, b) => a + b);
-      if (diff.abs() <= kcalTarget * 0.01) break;
+      final diff = dayTarget - kc.fold(0.0, (a, b) => a + b);
+      if (diff.abs() <= dayTarget * 0.01) break;
       final room = <int>[
         for (var i = 0; i < chosen.length; i++)
           if (chosen[i].$3 == null && chosen[i].$2 != null && (diff > 0 ? kc[i] < chosen[i].$2!.hi : kc[i] > chosen[i].$2!.lo)) i,
       ];
       if (room.isEmpty) break;
+      for (final i in room) {
+        final c = chosen[i].$2!;
+        kc[i] = (kc[i] + diff / room.length).clamp(c.lo, c.hi).toDouble();
+      }
+    }
+    // Ίσες μερίδες: μόνο ολόκληρες ή μισές μερίδες σερβίρονται (όπως στο «Το έφαγα»)· η διαφορά πάει στα άλλα γεύματα
+    // (έλεγχος 16/11: πριν 750 kcal στο πρόγραμμα και 1,5 μερίδα = 900 kcal στο πιάτο).
+    final snapped = <int>{};
+    for (var i = 0; i < chosen.length; i++) {
+      final c = chosen[i].$2;
+      if (chosen[i].$3 != null || c == null || c.dish.kind != DishKind.portions || c.natural == null) continue;
+      final half = c.natural! / 2;
+      final halves = (kc[i] / half).round().clamp(1, (maxEatenServings * 2).round()).toInt();
+      kc[i] = halves * half;
+      snapped.add(i);
+    }
+    if (snapped.isNotEmpty) {
+      final diff = dayTarget - kc.fold(0.0, (a, b) => a + b);
+      final room = [
+        for (var i = 0; i < chosen.length; i++)
+          if (!snapped.contains(i) && chosen[i].$3 == null && chosen[i].$2 != null) i,
+      ];
       for (final i in room) {
         final c = chosen[i].$2!;
         kc[i] = (kc[i] + diff / room.length).clamp(c.lo, c.hi).toDouble();
@@ -196,18 +226,21 @@ AutoWeek autoWeek(
         if (c != null) dayProtein += (k.kcal ?? kc[i]) * c.proteinPerKcal;
         continue;
       }
-      final v = ((kc[i] / 10).round() * 10).toDouble().clamp(minSlotKcal, maxSlotKcal).toDouble();
+      final v = snapped.contains(i)
+          ? kc[i].roundToDouble()
+          : ((kc[i] / 10).round() * 10).toDouble().clamp(minSlotKcal, maxSlotKcal).toDouble();
       slots.add(PlanSlot(meal: m, dishId: c!.dish.id, kcal: v));
       dayKcal += v;
       dayProtein += v * c.proteinPerKcal;
     }
     out.add(slots);
-    if (slots.isNotEmpty && (dayKcal - kcalTarget).abs() > kcalTarget * autoDayTolerance) {
-      notes.add('${_dayName(date)}: ${dayKcal.round()} kcal (στόχος ${kcalTarget.round()}): οι μερίδες των φαγητών δεν '
+    if (slots.isNotEmpty && (dayKcal - dayTarget).abs() > dayTarget * autoDayTolerance) {
+      notes.add('${_dayName(date)}: ${dayKcal.round()} kcal (στόχος ${dayTarget.round()}): οι μερίδες των φαγητών δεν '
           'φτάνουν για ακριβώς τον στόχο.');
     }
-    if (slots.isNotEmpty && dayProtein < proteinTarget * 0.9) {
-      notes.add('${_dayName(date)}: πρωτεΐνη ${dayProtein.round()} g (στόχος ${proteinTarget.round()}).');
+    final dayProteinTarget = proteinTarget * dayTarget / kcalTarget;
+    if (slots.isNotEmpty && dayProtein < dayProteinTarget * 0.9) {
+      notes.add('${_dayName(date)}: πρωτεΐνη ${dayProtein.round()} g (στόχος ${dayProteinTarget.round()}).');
     }
   }
   if (noOffice.isNotEmpty) {

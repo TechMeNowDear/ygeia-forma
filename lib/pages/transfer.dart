@@ -34,11 +34,17 @@ Future<void> transferGroup(BuildContext context, FoodStore food, List<LogEntry> 
   if (choice == null) return;
   final before = [...group];
   final out = await food.transferEntries(group, choice.day, choice.meal, move: choice.move, now: now);
-  if (out == null) {
-    messenger.showSnackBar(SnackBar(content: Text(food.saveError ?? 'Δεν έγινε. Δοκίμασε ξανά.')));
+  if (out == null || out.isEmpty) {
+    // 16/11 (έλεγχος): καθαρό μήνυμα όταν δεν βγήκε τίποτα (π.χ. τρόφιμο που δεν υπάρχει πια), όχι ένα παλιό σφάλμα.
+    messenger.showSnackBar(SnackBar(
+        content: Text(out == null
+            ? (food.saveError ?? 'Δεν έγινε. Δοκίμασε ξανά.')
+            : 'Δεν αντιγράφηκε τίποτα: τα τρόφιμα αυτά δεν υπάρχουν πια στη βάση.')));
     return;
   }
-  final where = '${entryDayLabel(choice.day, dayOf(now))}$dotJoin${mealLabel(choice.meal)}';
+  final skipped = choice.move ? 0 : group.length - out.length;
+  final where = '${entryDayLabel(choice.day, dayOf(now))}$dotJoin${mealLabel(choice.meal)}'
+      '${skipped > 0 ? ' ($skipped δεν αντιγράφηκαν: τρόφιμα που δεν υπάρχουν πια)' : ''}';
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
@@ -47,7 +53,18 @@ Future<void> transferGroup(BuildContext context, FoodStore food, List<LogEntry> 
       duration: undoSnackBarDuration,
       action: SnackBarAction(
         label: 'Αναίρεση',
-        onPressed: () => choice.move ? food.restoreGroup(before) : food.removeGroup(out),
+        onPressed: () {
+          if (!choice.move) {
+            food.removeGroup(out);
+            return;
+          }
+          // 16/11 (έλεγχος): γυρίζουν πίσω μόνο όσα δεν άλλαξαν στο μεταξύ (αλλιώς χανόταν μια διόρθωση ή ξαναερχόταν
+          // κάτι που έσβησες μετά τη μετακίνηση).
+          final now2 = {for (final e in food.entriesFor(choice.day)) e.id: e};
+          final unchanged = {for (final e in out) if (identical(now2[e.id], e)) e.id};
+          final back = [for (final e in before) if (unchanged.contains(e.id)) e];
+          if (back.isNotEmpty) food.restoreGroup(back);
+        },
       ),
     ));
 }

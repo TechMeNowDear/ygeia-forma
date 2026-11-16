@@ -185,4 +185,39 @@ void main() {
     expect(auto.plan.days[1].map((x) => x.meal), isNot(contains(Meal.lunch)));
     expect(usableLibrary(s), lib.length);
   });
+
+  test('Έλεγχος 16/11: πολύ μικρό φαγητό (καφές) δεν σκάει· κενό μεσημεριανό δεν φορτώνεται στα άλλα γεύματα', () {
+    var n = 0;
+    final s0 = FoodStore.preloaded(foods: basicFoods(), now: now);
+    final r = planLibraryImport(
+      parseLibrary(jsonEncode({
+        'kind': libraryKind,
+        'dishes': [
+          for (final d in lib) {...d, 'office': false},
+          dish('ntomata', 'plate', [(tomato, 20)], meals: ['snack'], cook: 'none'),
+        ]
+      })),
+      existing: const [],
+      food: (id) => s0.itemFood(DishItem(id, id, 1)),
+      likes: const FoodLikes(),
+      now: 1,
+      newId: () => 'L${n++}',
+    );
+    expect(r.problems, isEmpty);
+    final s = FoodStore.preloaded(foods: basicFoods(), dishes: r.added, now: now);
+    final w = make(s).plan;
+    // Τρίτη: χωρίς μεσημεριανό· οι θερμίδες της μέρας χωρίς το μερίδιο του μεσημεριανού (40/95 της μέρας).
+    expect(w.days[1].map((x) => x.meal), isNot(contains(Meal.lunch)));
+    final kcal = plannedDay(s, w, 1).totals.kcal;
+    expect(kcal, lessThan(2100 * (1 - 0.40 / 0.95) * 1.06), reason: '$kcal');
+  });
+
+  test('Έλεγχος 16/11: «Ξαναφτιάξ’ το» κρατά ό,τι έχει ήδη φαγωθεί', () {
+    final s = store();
+    final first = make(s).plan;
+    final eaten = first.withSlot(0, 1, first.days[0][1].copyWith(state: SlotState.ate));
+    final again = make(s, seed: 11, keep: eaten).plan;
+    expect(again.days[0][1].dishId, first.days[0][1].dishId);
+    expect(again.days[0][1].state, SlotState.ate);
+  });
 }

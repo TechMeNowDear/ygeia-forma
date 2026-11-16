@@ -140,6 +140,7 @@ class _VitalsPageState extends State<VitalsPage> {
                                         if (list[i].note != null) list[i].note!,
                                       ].join(' · '),
                                       style: small),
+                                  if (bpNote(list[i]) case final n?) Text(n, style: small.copyWith(color: c.warn)),
                                   if (list[i].kind == VitalKind.glucose && glucoseNote(list[i]) != null)
                                     Text(glucoseNote(list[i])!, style: small.copyWith(color: list[i].glucose! < 70 ? c.warn : c.textSecondary)),
                                 ]),

@@ -200,7 +200,9 @@ Map<String, dynamic> diagnosticsFrom({
     final entries = food.entriesFor(day);
     if (entries.isEmpty) continue;
     final t = Totals(entries);
-    final ch = CholDay(entries);
+    // «Λείπουν γεύματα» (16/11, έλεγχος): όπως στον έλεγχο θερμίδων, η μέρα δεν μετρά.
+    final part = food.dayMark(day) == DayMark.part;
+    final ch = CholDay(entries, part: part);
     cholDays.add((day, ch));
     // Round10 (R10-B1-2 / R10-B7-3): ο στόχος και το όριο κορεσμένων της μέρας όπως τα γράφει η Διατροφή
     // (GoalsSummaryCard): σήμερα ο τωρινός στόχος, μέρα που πέρασε ο στόχος που ίσχυε τότε ([targetOn], R9-A1-2), μέρα πριν
@@ -241,8 +243,10 @@ Map<String, dynamic> diagnosticsFrom({
       // για μέρες πριν από τους στόχους, για την πρώτη εβδομάδα, για σήμερα και για μέρες με αδύνατα πολλές θερμίδες, ενώ
       // το «adaptive.readiness» (σωστά) δεν τις μετρούσε. Αν η μέρα πέφτει στο παράθυρο που κρίθηκε ή μετά από κενό
       // καταγραφής φαίνεται στο «adaptive».
+      if (part) 'dayMark': 'part',
       if (g != null)
-        'countsForAdaptive': day.isBefore(today) &&
+        'countsForAdaptive': !part &&
+            day.isBefore(today) &&
             (adaptFirst == null || !day.isBefore(adaptFirst)) &&
             t.kcal >= adaptFullDayShare * g.kcal &&
             t.kcal <= absurdDayKcal(g.calc.tdee),

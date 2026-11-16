@@ -35,14 +35,18 @@ const remindTitle = 'Φαγητό σήμερα';
   required DayMark? markToday,
 }) {
   final today = DateTime(now.year, now.month, now.day);
-  final todayAt = today.add(Duration(minutes: atMinutes));
+  // Ώρα τοίχου (όχι «μεσάνυχτα + λεπτά»): τις μέρες που αλλάζει η ώρα έρχεται και πάλι στις 21:30 (έλεγχος 16/11).
+  final todayAt = DateTime(now.year, now.month, now.day, atMinutes ~/ 60, atMinutes % 60);
   final low = target == null || target <= 0 ? kcalToday <= 0 : kcalToday < target * fullDayShare;
   if (now.isBefore(todayAt) && markToday == null && low) {
     return (at: todayAt, text: reminderText(kcalToday, target));
   }
   // Αύριο: αν ως τότε δεν ανοίξει η εφαρμογή, δεν θα έχει γραφτεί τίποτα.
   final tomorrow = DateTime(today.year, today.month, today.day + 1);
-  return (at: tomorrow.add(Duration(minutes: atMinutes)), text: reminderText(0, target));
+  return (
+    at: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, atMinutes ~/ 60, atMinutes % 60),
+    text: reminderText(0, target),
+  );
 }
 
 String reminderText(double kcal, double? target) {

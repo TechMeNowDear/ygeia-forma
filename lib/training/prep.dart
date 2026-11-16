@@ -72,32 +72,28 @@ Prep prepFor(List<PrepIn> items, Equipment e) {
 
   for (final MapEntry(key: w, value: (n, names)) in dbs.entries) {
     final perEnd = _r((w - e.handleKg) / 2);
-    var built = 0;
-    List<double>? plates;
-    for (var k = 0; k < n; k++) {
-      if (handlesLeft == 0 || perEnd < -1e-6) break;
-      final p = take(perEnd, 2);
-      if (p == null) break;
-      plates = p;
-      handlesLeft--;
-      built++;
-    }
-    if (built > 0) {
-      lines.add(PrepLine('$built ${built == 1 ? 'αλτήρας' : 'αλτήρες'} ${kgText(w)} kg',
-          plates!.isEmpty ? 'μόνο η λαβή' : 'σε κάθε άκρη ${join(plates)}', names));
-    }
-    if (built < n) {
+    // Όλοι οι αλτήρες ενός βάρους μαζί, με τους ίδιους δίσκους σε κάθε άκρη (16/11, έλεγχος: πριν μοιράζονταν ένας-ένας
+    // και η γραμμή έδειχνε μόνο τους δίσκους του τελευταίου). Ζευγάρι μισό δεν στήνεται.
+    final p = handlesLeft >= n && perEnd >= -1e-6 ? take(perEnd, 2 * n) : null;
+    final what = '$n ${n == 1 ? 'αλτήρας' : 'αλτήρες'} ${kgText(w)} kg';
+    if (p != null) {
+      handlesLeft -= n;
+      lines.add(PrepLine(what, p.isEmpty ? 'μόνο η λαβή' : 'σε κάθε άκρη ${join(p)}', names));
+    } else {
       short = true;
-      lines.add(PrepLine('${n - built} ${n - built == 1 ? 'αλτήρας' : 'αλτήρες'} ${kgText(w)} kg', null, names, later: true));
+      lines.add(PrepLine(what, null, names, later: true));
     }
   }
 
-  // Μπάρα και κέρατο: στο βάρος της πρώτης άσκησης που τα θέλει.
+  // Μπάρα και κέρατο: στο βάρος της πρώτης άσκησης που τα θέλει. Αν άλλες ασκήσεις τα θέλουν με άλλο βάρος, γράφεται
+  // δίπλα στο όνομά τους (16/11, έλεγχος: πριν φαινόταν σαν να είναι όλες στο ίδιο βάρος).
   for (final kind in const [LoadKind.bar, LoadKind.horn]) {
     final first = items.where((i) => i.kind == kind && i.load != null).toList();
     if (first.isEmpty) continue;
     final w = first.first.load!;
-    final names = [for (final i in first) i.name];
+    final names = [
+      for (final i in first) _r(i.load!) == _r(w) ? i.name : '${i.name} (μετά ${kgText(i.load!)} kg)',
+    ];
     final perSide = kind == LoadKind.bar ? _r((w - barKg) / 2) : w;
     final p = perSide < -1e-6 ? null : take(perSide, kind == LoadKind.bar ? 2 : 1);
     final what = kind == LoadKind.bar ? 'Μπάρα ${kgText(w)} kg' : 'Κέρατο ${kgText(w)} kg';
@@ -114,14 +110,36 @@ Prep prepFor(List<PrepIn> items, Equipment e) {
 
   // Ό,τι άλλο: kettlebell, λάστιχα, δίσκος στο στήθος (ένα ανά διαφορετικό στήσιμο).
   final other = <String, List<String>>{};
+  final plateLater = <String, List<String>>{};
   for (final i in items) {
     if (!{LoadKind.kb, LoadKind.band, LoadKind.bandPair, LoadKind.bandAssist, LoadKind.plate}.contains(i.kind)) continue;
     if (i.load == null || (i.load! <= 0 && i.kind != LoadKind.bandAssist)) continue;
+    // Δίσκος στο χέρι/στήθος: βγαίνει κι αυτός από τους δίσκους που περίσσεψαν (16/11, έλεγχος).
+    if (i.kind == LoadKind.plate) {
+      final need = platesPerSide(LoadKind.plate, i.load!) ?? const <double>[];
+      final count = <double, int>{};
+      for (final k in need) {
+        count[k] = (count[k] ?? 0) + 1;
+      }
+      if (count.entries.every((c) => (stock[c.key] ?? 0) >= c.value)) {
+        for (final c in count.entries) {
+          stock[c.key] = stock[c.key]! - c.value;
+        }
+      } else {
+        final t = setupText(i.kind, i.load);
+        plateLater[t] = [...?plateLater[t], i.name];
+        continue;
+      }
+    }
     final t = i.kind == LoadKind.bandPair ? 'λάστιχα: ${setupText(i.kind, i.load)}' : setupText(i.kind, i.load);
     other[t] = [...?other[t], i.name];
   }
   for (final MapEntry(key: t, value: names) in other.entries) {
     lines.add(PrepLine(t[0].toUpperCase() + t.substring(1), null, names));
+  }
+  for (final MapEntry(key: t, value: names) in plateLater.entries) {
+    short = true;
+    lines.add(PrepLine(t[0].toUpperCase() + t.substring(1), null, names, later: true));
   }
   return Prep(lines, handlesNeeded: handlesNeeded, short: short);
 }

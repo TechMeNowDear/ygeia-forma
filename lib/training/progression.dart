@@ -270,7 +270,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty) h];
 
   if (usable.isEmpty) {
-    final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : startLoad(item.ex, k)) : null;
+    final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : switch (startLoad(item.ex, k)) { final v? => fitLoad(k, v), _ => null }) : null;
     return Target(load: start, reps: _same(sets, lo), change: Change.first, reason: _firstReason(item, k, start, rirGoal));
   }
 
@@ -283,6 +283,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   var lastLoad = endLoad ?? planned ?? (hasLoad(k) ? (item.load ?? startLoad(item.ex, k)) : null);
   // Ανοίγματα με λάστιχο, από πριν το «ανά πλευρά» (π.χ. 20): στο πλησιέστερο που βγαίνει (ελάχιστο 30/πλευρά).
   if (k == LoadKind.bandPair && lastLoad != null) lastLoad = snap(k, lastLoad);
+  // 16/11 (έλεγχος): μετά από αλλαγή εξοπλισμού (λαβή, δίσκοι) το φορτίο της προηγούμενης φοράς μπορεί να μη βγαίνει
+  // πια: στο αμέσως ελαφρύτερο που βγαίνει. Με τον ίδιο εξοπλισμό δεν αλλάζει τίποτα.
+  if (lastLoad != null) lastLoad = fitLoad(k, lastLoad);
   // Ημερολογιακές μέρες σε UTC (έλεγχος 9/11, RT-17 / V-B-17): πάνω από την αλλαγή ώρας του Μαρτίου, 15 μέρες δεν
   // μετριούνται πια 14 (14 μέρες + 23 ώρες).
   final gap = daysBetween(lastDay, today);

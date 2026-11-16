@@ -80,4 +80,17 @@ void main() {
     expect(find.text('128/82 mmHg'), findsOneWidget);
     expect(find.byKey(const ValueKey('bp-average')), findsOneWidget);
   });
+
+  test('Έλεγχος 16/11: επαναφορά πριν διαβαστεί το αρχείο → το διαβάζει πρώτα· πολύ υψηλή πίεση λέει τι να κάνεις', () async {
+    final io = MemoryVitalsIO(jsonEncode({
+      'v': 1,
+      'items': [bp('a', 120, 80).toJson()]
+    }));
+    final s = VitalsStore(io: io);
+    expect(s.read, isFalse);
+    expect(await s.importItems([bp('b', 125, 82).toJson(), bp('b', 125, 82).toJson(), bp('a', 120, 80).toJson()]), 1);
+    expect(s.all.map((v) => v.id).toSet(), {'a', 'b'});
+    expect(bpNote(bp('x', 182, 95)), contains('166'));
+    expect(bpNote(bp('y', 150, 95)), isNull);
+  });
 }

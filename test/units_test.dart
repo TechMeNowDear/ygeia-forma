@@ -165,4 +165,11 @@ void main() {
     expect((got as dynamic).grams, 250);
     expect((got as dynamic).est, isFalse);
   });
+
+  test('Έλεγχος 16/11: πληθυντικός σε -ή/-η', () {
+    final b = pieceUnits['C13005']!;
+    expect(pieceText(b, b.sizes[0], 2), '2 μικρές μπανάνες');
+    final t = pieceUnits['C20385']!;
+    expect(pieceText(t, t.sizes[2], 2), '2 μεγάλες ντομάτες');
+  });
 }

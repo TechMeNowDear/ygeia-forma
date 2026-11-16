@@ -61,12 +61,15 @@ Map<DateTime, double> dailyIntake(FoodStore food, DateTime from, DateTime to) {
 }
 
 /// «Εκτίμηση» (16/11): τι μέρος των θερμίδων των ημερών που μετρούν ([dailyIntake]) γράφτηκε χωρίς ζύγιση (0–1).
-/// null χωρίς θερμίδες.
-double? estimatedShare(FoodStore food, DateTime from, DateTime to) {
+/// null χωρίς θερμίδες. [minKcal]/[maxKcal]: οι ίδιες μέρες με την εκτίμηση της κατανάλωσης (από το 60% του στόχου
+/// ως το [absurdDayKcal]· έλεγχος 16/11: πριν μετρούσαν και μέρες που η εκτίμηση δεν χρησιμοποιεί).
+double? estimatedShare(FoodStore food, DateTime from, DateTime to, {double? minKcal, double? maxKcal}) {
   var all = 0.0, est = 0.0;
   for (var d = _day(from); !d.isAfter(_day(to)); d = DateTime(d.year, d.month, d.day + 1)) {
     if (food.dayMark(d) == DayMark.part) continue;
     final t = Totals(food.entriesFor(d));
+    if (minKcal != null && t.kcal < minKcal) continue;
+    if (maxKcal != null && t.kcal > maxKcal) continue;
     all += t.kcal;
     est += t.estKcal;
   }

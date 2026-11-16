@@ -514,7 +514,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
           ),
       ];
     }
-    if (out.isEmpty || !await _putAll(out)) return null;
+    // Τίποτα να γραφτεί (π.χ. τρόφιμα που δεν υπάρχουν πια): κενή λίστα, όχι σφάλμα (έλεγχος 16/11).
+    if (out.isEmpty) return const [];
+    if (!await _putAll(out)) return null;
     return out;
   }
 
@@ -806,7 +808,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Επαναφορά από αντίγραφο: μπαίνουν μόνο οι μέρες που δεν έχουν ήδη σημάδι. Πόσες μπήκαν (ή -1 αν δεν γράφτηκε).
   Future<int> importDayMarks(Object? j) async {
-    if (j is! Map || !_dishesRead || _dishesNewer) return 0;
+    if (j is! Map || j.isEmpty) return 0;
+    if (!_dishesRead) await loadDishes();
+    if (!_dishesRead || _dishesNewer) return -1;
     final add = <String, DayMark>{};
     for (final e in j.entries) {
       final m = dayMarkOf(e.value);
@@ -877,7 +881,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Επαναφορά: μπαίνουν μόνο όσα τρόφιμα δεν έχουν ήδη δικό σου βάρος. Πόσα μπήκαν (ή -1 αν δεν γράφτηκε).
   Future<int> importUnits(Object? j) async {
-    if (j is! Map || !_dishesRead || _dishesNewer) return 0;
+    if (j is! Map || j.isEmpty) return 0;
+    if (!_dishesRead) await loadDishes();
+    if (!_dishesRead || _dishesNewer) return -1;
     final add = <String, double>{};
     for (final e in j.entries) {
       final g = validMyUnit(e.value);
@@ -946,6 +952,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _days = const {};
       _units = const {};
       _remindAt = null;
+      _dishExtra = const {};
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -977,6 +984,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _days = const {};
       _units = const {};
       _remindAt = null;
+      _dishExtra = const {};
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -1008,6 +1016,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         for (final e in (j['units'] as Map).entries)
           if (e.key is String && validMyUnit(e.value) != null) e.key as String: validMyUnit(e.value)!,
     };
+    // Κλειδιά που δεν ξέρει αυτή η έκδοση (από νεότερη, ή από παλιά εγκατάσταση μετά από νεότερη): μένουν όπως είναι
+    // (έλεγχος 16/11: αλλιώς η επόμενη εγγραφή τα έσβηνε).
+    _dishExtra = {
+      for (final e in j.entries)
+        if (e.key is String && !_dishKnownKeys.contains(e.key)) e.key as String: e.value,
+    };
     final ra = j['remind'];
     _remindAt = ra is int && ra >= 0 && ra < 24 * 60 ? ra : null;
     skippedRows += bad.length;
@@ -1015,7 +1029,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     dishesNote = _dishesNewer ? dishesNewerText : null;
   }
 
+  static const _dishKnownKeys = {'v', 'dishes', 'likes', 'week', 'days', 'units', 'remind'};
+  Map<String, Object?> _dishExtra = const {};
+
   String _dishesJson(List<Dish> list) => jsonEncode({
+        ..._dishExtra,
         'v': dishesFileVersion,
         'dishes': [for (final d in list) d.toJson(), ..._badDishRows],
         if (!_likes.isEmpty) 'likes': _likes.toJson(),
