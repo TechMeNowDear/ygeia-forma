@@ -40,7 +40,7 @@ void main() {
     equip = bought;
     expect(available(LoadKind.dbPair).first, 2.0);
     expect(available(LoadKind.dbPair), contains(22.0), reason: '2 + 2 × (5 + 5)');
-    expect(available(LoadKind.bar).last, 99);
+    expect(available(LoadKind.bar).last, 89, reason: '10 + 40 + 25 + 10 + 4 (όλοι οι δίσκοι)');
     expect(platesPerSide(LoadKind.dbPair, 12.0), [5]);
   });
 

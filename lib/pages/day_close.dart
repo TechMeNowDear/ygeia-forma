@@ -35,10 +35,18 @@ class DayCard extends StatelessWidget {
           Expanded(
             child: Text('Φρούτα και λαχανικά', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text)),
           ),
-          Text(
-            '${thousands(fv.round())} / ${thousands(fruitVegTargetG.round())} g',
-            key: const ValueKey('day-fruitveg'),
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: enough ? c.food : c.text, fontFeatures: tabular),
+          // Με μεγάλα γράμματα ο αριθμός μικραίνει αντί να βγαίνει έξω από την κάρτα.
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${thousands(fv.round())} / ${thousands(fruitVegTargetG.round())} g',
+                key: const ValueKey('day-fruitveg'),
+                maxLines: 1,
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: enough ? c.food : c.text, fontFeatures: tabular),
+              ),
+            ),
           ),
         ]),
         const SizedBox(height: 8),
