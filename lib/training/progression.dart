@@ -270,7 +270,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty) h];
 
   if (usable.isEmpty) {
-    final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : fitLoad(k, startLoad(item.ex, k))) : null;
+    final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : switch (startLoad(item.ex, k)) { final v? => fitLoad(k, v), _ => null }) : null;
     return Target(load: start, reps: _same(sets, lo), change: Change.first, reason: _firstReason(item, k, start, rirGoal));
   }
 

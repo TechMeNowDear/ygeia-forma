@@ -243,8 +243,8 @@ Map<String, dynamic> diagnosticsFrom({
       // για μέρες πριν από τους στόχους, για την πρώτη εβδομάδα, για σήμερα και για μέρες με αδύνατα πολλές θερμίδες, ενώ
       // το «adaptive.readiness» (σωστά) δεν τις μετρούσε. Αν η μέρα πέφτει στο παράθυρο που κρίθηκε ή μετά από κενό
       // καταγραφής φαίνεται στο «adaptive».
+      if (part) 'dayMark': 'part',
       if (g != null)
-        if (part) 'dayMark': 'part',
         'countsForAdaptive': !part &&
             day.isBefore(today) &&
             (adaptFirst == null || !day.isBefore(adaptFirst)) &&
