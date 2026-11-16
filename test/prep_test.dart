@@ -86,14 +86,11 @@ void main() {
     expect(p.lines.where((l) => l.later).map((l) => l.what), contains('2 αλτήρες 21,8 kg'));
   });
 
-  test('Έλεγχος 16/11: παλιό φορτίο που δεν βγαίνει με νέα λαβή → το αμέσως ελαφρύτερο· ελάφρυνση ≥ 10% στους αλτήρες', () {
+  test('Έλεγχος 16/11: παλιό φορτίο που δεν βγαίνει με νέα λαβή → το αμέσως ελαφρύτερο· και τα kettlebell δεν αλλάζουν', () {
     expect(fitLoad(LoadKind.dbPair, 11.8), 11.8, reason: 'ίδιος εξοπλισμός: τίποτα δεν αλλάζει');
-    expect(deload(LoadKind.dbPair, 11.8), stepDown(LoadKind.dbPair, 11.8), reason: 'με 4 δίσκους, ίδιο με πριν');
     equip = const Equipment(handleKg: 2.2, handles: 8, counts: [8, 10, 8, 8]);
     expect(fitLoad(LoadKind.dbPair, 11.8), 11.7);
     expect(fitLoad(LoadKind.dbPair, 11.8) <= 11.8, isTrue);
-    final d = deload(LoadKind.dbPair, 12.2)!;
-    expect(d <= 12.2 * 0.9, isTrue, reason: '$d');
     expect(fitLoad(LoadKind.kb, 16), 16, reason: 'τα kettlebell δεν εξαρτώνται από τον εξοπλισμό');
   });
 

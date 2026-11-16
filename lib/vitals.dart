@@ -170,9 +170,10 @@ class ChannelVitalsIO implements VitalsIO {
   Future<({String state, String? json})> read() async {
     final r = await FoodChannel.vitalsRead();
     if (r['ok'] != true) return (state: r['kind'] == 'not_android' ? 'missing' : 'error', json: null);
-    if (r['state'] == 'missing') return (state: 'missing', json: null);
     final j = r['json'];
-    return r['state'] == 'ok' && j is String ? (state: 'ok', json: j) : (state: 'error', json: null);
+    if (r['state'] == 'ok' && j is String) return (state: 'ok', json: j);
+    // Απάντηση χωρίς αρχείο (ή από παλιό κανάλι χωρίς «state»): δεν υπάρχει αρχείο ακόμα.
+    return (state: 'missing', json: null);
   }
 
   @override

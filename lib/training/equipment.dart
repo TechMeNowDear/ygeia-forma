@@ -316,16 +316,6 @@ bool onEquipment(LoadKind k) =>
 /// μετά από αλλαγή λαβής ή δίσκων). Ποτέ βαρύτερο από αυτό που καταγράφηκε.
 double fitLoad(LoadKind k, double v) => onEquipment(k) ? snap(k, v) : v;
 
-/// «Ένα σκαλί πιο ελαφριά» μετά από ενόχληση ή σετ ως την εξάντληση (16/11, έλεγχος): στους αλτήρες τουλάχιστον 10%
-/// κάτω. Με 4 δίσκους από κάθε βάρος το σκαλί ήταν ~13%· με τους νέους δίσκους τα σκαλιά πυκνώνουν (~4%) και ένα σκαλί
-/// δεν θα ήταν πια ελάφρυνση. Στα άλλα είδη μένει ένα σκαλί, όπως πριν.
-double? deload(LoadKind k, double v, {bool allowZero = false}) {
-  final one = stepDown(k, v, allowZero: allowZero);
-  if (one == null || (k != LoadKind.dbPair && k != LoadKind.db)) return one;
-  final ten = snap(k, v * 0.9);
-  return ten < one && ten < v ? ten : one;
-}
-
 double scaled(LoadKind k, double v, double ratio) {
   if (k == LoadKind.bandAssist) {
     // Περισσότερη βοήθεια: το επόμενο βαρύτερο λάστιχο.
