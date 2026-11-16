@@ -36,6 +36,7 @@ String buildBackup({
   List<Object?>? dishes,
   Map<String, Object>? foodLikes,
   Map<String, String>? foodDays,
+  Map<String, double>? foodUnits,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -58,6 +59,8 @@ String buildBackup({
     if (foodLikes != null) 'foodLikes': foodLikes,
     // «Τελείωσα για σήμερα» (16/11): ποιες μέρες γράφτηκαν ολόκληρες. Πρόσθετο κλειδί.
     if (foodDays != null && foodDays.isNotEmpty) 'foodDays': foodDays,
+    // «Ζύγισα ένα» (16/11): το δικό σου βάρος ανά τεμάχιο.
+    if (foodUnits != null && foodUnits.isNotEmpty) 'foodUnits': foodUnits,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -70,7 +73,11 @@ class BackupContents {
       this.errorsOff = false,
       this.dishes = const [],
       this.likes = const FoodLikes(),
-      this.dayMarks = const {}});
+      this.dayMarks = const {},
+      this.units = const {}});
+
+  /// «Ζύγισα ένα» (16/11): τρόφιμο → g ανά τεμάχιο (όπως ήταν στο αρχείο· τα ελέγχει το importUnits).
+  final Map<String, Object?> units;
 
   /// «Τι μου αρέσει» (15/11).
   final FoodLikes likes;
@@ -254,6 +261,7 @@ BackupContents parseBackup(String text) {
     dishes: dishes,
     likes: FoodLikes.fromJson(j['foodLikes']),
     dayMarks: j['foodDays'] is Map ? Map<String, Object?>.from(j['foodDays'] as Map) : const {},
+    units: j['foodUnits'] is Map ? Map<String, Object?>.from(j['foodUnits'] as Map) : const {},
   );
 }
 

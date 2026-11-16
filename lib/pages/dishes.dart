@@ -12,6 +12,7 @@ import '../widgets.dart';
 import '../food/recipe.dart';
 import 'food_add.dart';
 import 'library.dart';
+import 'estimate.dart';
 import 'transfer.dart' show transferGroup;
 import 'week.dart' show WeekPlanScreen;
 import 'nutrition.dart' show carbsColor, fatColor, proteinColor;
@@ -337,8 +338,12 @@ class QuickAmounts extends StatelessWidget {
 
 /// Τι διάλεξες στο φύλλο καταγραφής. [edit]: «Αλλαγή φαγητού» (π.χ. λείπει υλικό).
 class DishLogResult {
-  const DishLogResult({required this.amounts, required this.qty, required this.meal, this.plate, this.batch, this.edit = false});
+  const DishLogResult(
+      {required this.amounts, required this.qty, required this.meal, this.plate, this.batch, this.edit = false, this.est = false});
   final List<DishItem> amounts;
+
+  /// «Εκτίμηση (δεν ζυγίστηκε)» (16/11).
+  final bool est;
   final double qty;
   final Meal meal;
   final List<double>? plate;
@@ -401,6 +406,9 @@ class DishLogSheet extends StatefulWidget {
 class _DishLogSheetState extends State<DishLogSheet> {
   Dish get d => widget.dish;
   late Meal _meal = widget.meal;
+
+  // «Εκτίμηση» (16/11): ανοιχτό από την αρχή για φαγητό της βιβλιοθήκης που παραγγέλνεις («out»).
+  late bool _est = planInfoOf(widget.dish)?.cook == CookWay.out;
 
   // Πιάτο: μία ποσότητα για κάθε υλικό (ξεκινά από την τελευταία φορά).
   late final List<TextEditingController> _plate = [
@@ -521,7 +529,13 @@ class _DishLogSheetState extends State<DishLogSheet> {
     if (!mounted) return;
     Navigator.pop(
       context,
-      DishLogResult(amounts: amounts, qty: qty, meal: _meal, plate: d.kind == DishKind.plate ? _plateValues : null, batch: batch),
+      DishLogResult(
+          amounts: amounts,
+          qty: qty,
+          meal: _meal,
+          plate: d.kind == DishKind.plate ? _plateValues : null,
+          batch: batch,
+          est: _est),
     );
   }
 
@@ -608,7 +622,9 @@ class _DishLogSheetState extends State<DishLogSheet> {
       NutrientStrip(totals: totals),
       const SizedBox(height: 16),
       MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
-      const SizedBox(height: 18),
+      const SizedBox(height: 8),
+      EstimateSwitch(value: _est, onChanged: (v) => setState(() => _est = v)),
+      const SizedBox(height: 10),
       if (missing.isNotEmpty)
         FilledButton(
           style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20)),

@@ -21,6 +21,8 @@ import 'dishes.dart';
 import 'my_foods.dart';
 import 'nutrition.dart';
 import 'recipes.dart';
+import 'estimate.dart';
+import 'pieces.dart';
 import 'transfer.dart' show transferGroup;
 
 // ---------------------------------------------------------------------------
@@ -63,7 +65,8 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (_) => QuantitySheet(food: food, item: e.food, initialGrams: e.grams, meal: e.meal, editing: true),
+    builder: (_) => QuantitySheet(
+        food: food, item: e.food, initialGrams: e.grams, meal: e.meal, editing: true, initialEst: e.est),
   );
   if (r == null) return;
   if (r.transfer) {
@@ -81,7 +84,8 @@ Future<void> openEditEntry(BuildContext context, FoodStore food, LogEntry e) asy
         action: SnackBarAction(label: 'Αναίρεση', onPressed: () => food.restore(e)),
       ));
   } else {
-    await food.update(e.copyWith(grams: r.grams, meal: r.meal, food: r.food.id == e.food.id ? null : r.food));
+    await food.update(
+        e.copyWith(grams: r.grams, meal: r.meal, food: r.food.id == e.food.id ? null : r.food, est: r.est));
   }
 }
 
@@ -554,7 +558,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
     final day = await _targetDay();
     if (day == null || !mounted) return;
-    final e = await widget.food.add(r.food, r.grams, r.meal, on: day, now: _now());
+    final e = await widget.food.add(r.food, r.grams, r.meal, on: day, now: _now(), est: r.est);
     if (!mounted) return;
     if (!widget.food.isSaved(e)) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -606,7 +610,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
     final day = await _targetDay();
     if (day == null || !mounted) return;
-    final out = await food.logDish(d, r.amounts, meal: r.meal, qty: r.qty, plate: r.plate, batch: r.batch, on: day, now: _now());
+    final out = await food.logDish(d, r.amounts, meal: r.meal, qty: r.qty, plate: r.plate, batch: r.batch, on: day, now: _now(), est: r.est);
     if (!mounted) return;
     if (out == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Δεν αποθηκεύτηκε: ${d.name}. Δοκίμασε ξανά.')));
@@ -1184,7 +1188,10 @@ class MineBadge extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SheetResult {
-  _SheetResult(this.grams, this.meal, this.food, {this.delete = false, this.transfer = false});
+  _SheetResult(this.grams, this.meal, this.food, {this.delete = false, this.transfer = false, this.est = false});
+
+  /// «Εκτίμηση (δεν ζυγίστηκε)» (16/11).
+  final bool est;
   final double grams;
   final Meal meal;
 
@@ -1205,9 +1212,13 @@ class QuantitySheet extends StatefulWidget {
     required this.meal,
     this.editing = false,
     this.ingredient = false,
+    this.initialEst = false,
   });
   final FoodStore food;
   final Food item;
+
+  /// Η καταχώριση που αλλάζει ήταν εκτίμηση (16/11).
+  final bool initialEst;
   final double initialGrams;
   final Meal meal;
   final bool editing;
@@ -1225,6 +1236,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
   late final _grams = TextEditingController(text: gramsField(widget.initialGrams));
   late Meal _meal = widget.meal;
   late Food _item = widget.item;
+  late bool _est = widget.initialEst;
   late final List<(Food, String)> _states = widget.food.statesOf(widget.item);
 
   // Έλεγχος round1 (U3a-12): το πρώτο άγγιγμα στο πεδίο διαλέγει όλο τον αριθμό, ώστε ό,τι γράψεις να τον αντικαθιστά
@@ -1321,7 +1333,7 @@ class _QuantitySheetState extends State<QuantitySheet> {
       );
       if (ok != true || !mounted) return;
     }
-    Navigator.pop(context, _SheetResult(g, _meal, item));
+    Navigator.pop(context, _SheetResult(g, _meal, item, est: _est));
   }
 
   @override
@@ -1568,6 +1580,20 @@ class _QuantitySheetState extends State<QuantitySheet> {
                     ],
                   ),
                 ],
+                // Κομμάτια (16/11): «2 μεσαίες μπανάνες», και «Ζύγισα ένα» για το δικό σου βάρος. Όχι για ό,τι μετριέται σε
+                // ml, με το κουτάλι ή με την πρέζα.
+                if (!f.perMl && !isSpoonFood(f) && !_pinchPortion(f)) ...[
+                  const SizedBox(height: 8),
+                  PieceRow(
+                    key: ValueKey('pieces-${f.id}'),
+                    food: widget.food,
+                    item: f,
+                    onPick: (grams, est) => setState(() {
+                      _grams.text = gramsField(grams);
+                      if (!widget.ingredient) _est = est;
+                    }),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -1687,6 +1713,8 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 if (!widget.ingredient) ...[
                   const SizedBox(height: 16),
                   MealPicker(value: _meal, grid: large, onChanged: (m) => setState(() => _meal = m)),
+                  const SizedBox(height: 8),
+                  EstimateSwitch(value: _est, onChanged: (v) => setState(() => _est = v)),
                 ],
                 const SizedBox(height: 18),
                 FilledButton(

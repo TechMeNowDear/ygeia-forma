@@ -59,6 +59,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     dishes: food.dishesForBackup(),
     foodLikes: food.likesForBackup(),
     foodDays: food.dishesRead ? food.dayMarksForBackup() : null,
+    foodUnits: food.dishesRead ? food.unitsForBackup() : null,
     // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
     errorsOff: !errors.enabled,
   );
@@ -554,6 +555,7 @@ class _DataGroupState extends State<_DataGroup> {
       final likesIn = await widget.food!.importLikes(b.likes);
       // «Τελείωσα για σήμερα» (16/11): μόνο οι μέρες χωρίς σημάδι στο κινητό.
       await widget.food!.importDayMarks(b.dayMarks);
+      await widget.food!.importUnits(b.units);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
       final prefsNotes =

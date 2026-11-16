@@ -639,7 +639,8 @@ class _EntryRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${gramsText(e.grams)} ${e.food.unit} ·\u00A0πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
+                    // «Εκτίμηση» (16/11): η ποσότητα δεν ζυγίστηκε.
+                    '${e.est ? 'περίπου ' : ''}${gramsText(e.grams)} ${e.food.unit} ·\u00A0πρωτεΐνη ${gramsText(e.total(Nk.protein))} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -647,7 +648,8 @@ class _EntryRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              thousands(e.total(Nk.kcal).round()),
+              '${e.est ? '≈\u00A0' : ''}${thousands(e.total(Nk.kcal).round())}',
+              key: e.est ? ValueKey('est-${e.id}') : null,
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
             ),
           ],
@@ -688,6 +690,7 @@ class _DishRow extends StatelessWidget {
     final c = Aigaio.of(context);
     final tag = group.first.dish!;
     final t = Totals(group);
+    final est = group.any((e) => e.est);
     final qty = tag.kind == DishKind.plate ? countText(group.length, 'υλικό', 'υλικά') : dishQtyText(tag.kind, tag.qty);
     return InkWell(
       key: ValueKey('dish-row-${tag.grp}'),
@@ -715,7 +718,7 @@ class _DishRow extends StatelessWidget {
                   ]),
                   const SizedBox(height: 2),
                   Text(
-                    '$qty ·\u00A0πρωτεΐνη ${gramsText(t.protein)} g',
+                    '${est ? 'περίπου ' : ''}$qty ·\u00A0πρωτεΐνη ${gramsText(t.protein)} g',
                     style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: tabular),
                   ),
                 ],
@@ -723,7 +726,7 @@ class _DishRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              thousands(t.shownKcal),
+              '${est ? '≈\u00A0' : ''}${thousands(t.shownKcal)}',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text, fontFeatures: tabular),
             ),
           ],

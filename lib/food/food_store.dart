@@ -12,9 +12,11 @@ import 'dishes.dart';
 import 'food_channel.dart';
 import 'food_model.dart';
 import 'food_search.dart';
+import 'library.dart' show CookWay, planInfoOf;
 import 'off.dart' show dryStapleRawId, normalizeBarcode;
 import 'recipe.dart' show FoodLikes;
 import 'replaced_foods.dart';
+import 'units.dart' show validMyUnit;
 import 'week.dart' show WeekPlan;
 
 /// Η κατάσταση της Διατροφής: βάση τροφίμων, δικά μου τρόφιμα, ημερολόγιο.
@@ -411,9 +413,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       '${DateTime.now().microsecondsSinceEpoch}-${(_idCounter++).toRadixString(36)}${math.Random().nextInt(1 << 20).toRadixString(36)}';
 
   /// [now]: για δοκιμές (αλλιώς το ρολόι του κινητού).
-  Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on, DateTime? now}) async {
+  Future<LogEntry> add(Food food, double grams, Meal meal, {DateTime? on, DateTime? now, bool est = false}) async {
     final d = dayOf(on ?? day);
-    final e = LogEntry(id: _newId(), day: dateKey(d), meal: meal, food: food, grams: grams, time: entryTime(d, now ?? DateTime.now()));
+    final e = LogEntry(
+        id: _newId(), day: dateKey(d), meal: meal, food: food, grams: grams, time: entryTime(d, now ?? DateTime.now()), est: est);
     await _put(e);
     return e;
   }
@@ -464,6 +467,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
           // Ίδια σειρά με το αρχικό γεύμα.
           time: base.add(Duration(milliseconds: i)),
           dish: source[i].dish?.withGrp(groups.putIfAbsent(source[i].dish!.grp, _newId)),
+          est: source[i].est,
         ),
     ];
     final saved = <LogEntry>[];
@@ -506,6 +510,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
             grams: source[i].grams,
             time: base.add(Duration(milliseconds: i)),
             dish: source[i].dish?.withGrp(groups.putIfAbsent(source[i].dish!.grp, _newId)),
+            est: source[i].est,
           ),
       ];
     }
@@ -817,6 +822,55 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return -1;
   }
 
+  /// «Ζύγισα ένα» (16/11): το δικό σου βάρος ανά τεμάχιο (g), ανά τρόφιμο. Στο ίδιο αρχείο (κλειδί «units»). Μια
+  /// καταχώριση με αυτό δεν είναι εκτίμηση: το ζύγισες.
+  Map<String, double> _units = const {};
+  double? myUnit(String foodId) => _units[foodId];
+
+  /// Για το αντίγραφο.
+  Map<String, double> unitsForBackup() => Map.of(_units);
+
+  /// Αποθηκεύει (ή σβήνει με null) το δικό σου βάρος ανά τεμάχιο. `false` αν δεν γράφτηκε.
+  Future<bool> setMyUnit(String foodId, double? grams) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final g = grams == null ? null : validMyUnit(grams);
+    if (grams != null && g == null) return false;
+    final before = _units;
+    final after = _units = {
+      for (final e in _units.entries)
+        if (e.key != foodId) e.key: e.value,
+      if (g != null) foodId: g,
+    };
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (identical(_units, after)) _units = before;
+    saveError = 'Δεν αποθηκεύτηκε το βάρος του τεμαχίου. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
+  /// Επαναφορά: μπαίνουν μόνο όσα τρόφιμα δεν έχουν ήδη δικό σου βάρος. Πόσα μπήκαν (ή -1 αν δεν γράφτηκε).
+  Future<int> importUnits(Object? j) async {
+    if (j is! Map || !_dishesRead || _dishesNewer) return 0;
+    final add = <String, double>{};
+    for (final e in j.entries) {
+      final g = validMyUnit(e.value);
+      if (e.key is String && g != null && !_units.containsKey(e.key)) add[e.key as String] = g;
+    }
+    if (add.isEmpty) return 0;
+    final before = _units;
+    final after = _units = {..._units, ...add};
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return add.length;
+    if (identical(_units, after)) _units = before;
+    notifyListeners();
+    return -1;
+  }
+
   Map<String, DayMark> _pruneDays(Map<String, DayMark> m) {
     final keys = m.keys.toList()..sort();
     if (keys.length <= dayMarksKeepDays) return m;
@@ -868,6 +922,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _likes = const FoodLikes();
       _week = null;
       _days = const {};
+      _units = const {};
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -897,6 +952,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _likes = const FoodLikes();
       _week = null;
       _days = const {};
+      _units = const {};
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -923,6 +979,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         for (final e in (j['days'] as Map).entries)
           if (e.key is String && dayMarkOf(e.value) != null) e.key as String: dayMarkOf(e.value)!,
     };
+    _units = {
+      if (j['units'] is Map)
+        for (final e in (j['units'] as Map).entries)
+          if (e.key is String && validMyUnit(e.value) != null) e.key as String: validMyUnit(e.value)!,
+    };
     skippedRows += bad.length;
     _dishesRead = true;
     dishesNote = _dishesNewer ? dishesNewerText : null;
@@ -934,6 +995,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         if (!_likes.isEmpty) 'likes': _likes.toJson(),
         if (_week != null) 'week': _week!.toJson(),
         if (_days.isNotEmpty) 'days': {for (final e in _days.entries) e.key: e.value.name},
+        if (_units.isNotEmpty) 'units': _units,
       });
 
   Future<bool> _writeDishes(List<Dish> after, String what) async {
@@ -1002,8 +1064,11 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     PotBatch? batch,
     DateTime? on,
     DateTime? now,
+    bool est = false,
   }) async {
     if (amounts.isEmpty) return null;
+    // «Εκτίμηση» (16/11): και πάντα για φαγητό της βιβλιοθήκης που παραγγέλνεις (δεν ζυγίζεται).
+    final isEst = est || planInfoOf(d)?.cook == CookWay.out;
     final dd = dayOf(on ?? day);
     final t = now ?? DateTime.now();
     final base = entryTime(dd, t);
@@ -1021,6 +1086,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         grams: amounts[i].amount,
         time: base.add(Duration(milliseconds: i)),
         dish: tag,
+        est: isEst,
       ));
     }
     if (!await _putAll(out)) return null;

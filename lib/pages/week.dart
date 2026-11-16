@@ -65,7 +65,7 @@ class SlotActions {
         await openDishEditor(context, food, dish: d);
         return;
       }
-      out = await food.logDish(d, r.amounts, meal: r.meal, qty: r.qty, plate: r.plate, batch: r.batch, on: on, now: _now);
+      out = await food.logDish(d, r.amounts, meal: r.meal, qty: r.qty, plate: r.plate, batch: r.batch, on: on, now: _now, est: r.est);
     }
     if (out == null || out.isEmpty) {
       messenger.showSnackBar(SnackBar(content: Text(food.saveError ?? 'Δεν γράφτηκε: ${d.name}. Δοκίμασε ξανά.')));
