@@ -52,45 +52,11 @@ class _PieceRowState extends State<PieceRow> {
   }
 
   Future<void> _weighOne() async {
-    final ctl = TextEditingController(text: switch (widget.food.myUnit(widget.item.id)) { final g? => gramsField(g), _ => '' });
     final g = await showDialog<double>(
       context: context,
       routeSettings: const RouteSettings(name: 'Ζύγισα ένα'),
-      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-        final v = parseNumber(ctl.text);
-        final ok = validMyUnit(v) != null;
-        return AlertDialog(
-          title: const Text('Ζύγισα ένα'),
-          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Πόσο ζυγίζει ένα κομμάτι, όπως το τρως; Την επόμενη φορά διαλέγεις μόνο πόσα κομμάτια.',
-                style: TextStyle(fontSize: 14, height: 1.35, color: Aigaio.of(ctx).textSecondary)),
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('unit-weigh-field'),
-              controller: ctl,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-              onChanged: (_) => set(() {}),
-              decoration: InputDecoration(
-                suffixText: 'g',
-                errorText: ctl.text.isEmpty || ok ? null : 'Από 1 έως 2.000 g',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Άκυρο')),
-            FilledButton(
-              key: const ValueKey('unit-weigh-save'),
-              onPressed: ok ? () => Navigator.pop(ctx, validMyUnit(v)) : null,
-              child: const Text('Αποθήκευση'),
-            ),
-          ],
-        );
-      }),
+      builder: (_) => WeighOneDialog(initial: widget.food.myUnit(widget.item.id)),
     );
-    ctl.dispose();
     if (g == null || !mounted) return;
     if (!await widget.food.setMyUnit(widget.item.id, g) || !mounted) return;
     setState(() => _pick = 0);
@@ -182,5 +148,58 @@ class _PieceRowState extends State<PieceRow> {
         ),
       ),
     ]);
+  }
+}
+
+/// «Ζύγισα ένα»: πόσο ζυγίζει ένα κομμάτι. Το πεδίο ζει όσο ο διάλογος (και στο κλείσιμό του).
+class WeighOneDialog extends StatefulWidget {
+  const WeighOneDialog({super.key, this.initial});
+  final double? initial;
+
+  @override
+  State<WeighOneDialog> createState() => _WeighOneDialogState();
+}
+
+class _WeighOneDialogState extends State<WeighOneDialog> {
+  late final _ctl = TextEditingController(text: widget.initial == null ? '' : gramsField(widget.initial!));
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = validMyUnit(parseNumber(_ctl.text));
+    return AlertDialog(
+      title: const Text('Ζύγισα ένα'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Πόσο ζυγίζει ένα κομμάτι, όπως το τρως; Την επόμενη φορά διαλέγεις μόνο πόσα κομμάτια.',
+            style: TextStyle(fontSize: 14, height: 1.35, color: Aigaio.of(context).textSecondary)),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('unit-weigh-field'),
+          controller: _ctl,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            suffixText: 'g',
+            errorText: _ctl.text.isEmpty || v != null ? null : 'Από 1 έως 2.000 g',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Άκυρο')),
+        FilledButton(
+          key: const ValueKey('unit-weigh-save'),
+          onPressed: v == null ? null : () => Navigator.pop(context, v),
+          child: const Text('Αποθήκευση'),
+        ),
+      ],
+    );
   }
 }
