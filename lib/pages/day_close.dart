@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../food/food_model.dart';
 import '../food/food_store.dart';
+import '../food/reminder.dart' show remindDefaultMinutes;
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -58,11 +60,11 @@ class DayCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              FilledButton.tonalIcon(
+              // Χωρίς εικονίδιο: με μεγάλα γράμματα το κείμενο σπάει σε δύο γραμμές αντί να βγαίνει έξω.
+              FilledButton.tonal(
                 key: const ValueKey('day-done'),
                 onPressed: food.dishesRead ? () => food.setDayMark(day, DayMark.done) : null,
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: Text(today ? 'Τελείωσα για σήμερα' : 'Ναι, όλα'),
+                child: Text(today ? 'Τελείωσα για σήμερα' : 'Ναι, όλα', textAlign: TextAlign.center),
               ),
               OutlinedButton(
                 key: const ValueKey('day-part'),
@@ -137,5 +139,97 @@ class YesterdayCard extends StatelessWidget {
         ]),
       ]),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Βραδινή υπενθύμιση (16/11): ναι/όχι και ώρα. Η λογική είναι στο food/reminder.dart.
+// ---------------------------------------------------------------------------
+
+String hhmm(int minutes) => '${minutes ~/ 60}:${(minutes % 60).toString().padLeft(2, '0')}';
+
+/// Τι γράφει η γραμμή στο «Εγώ».
+String reminderRowText(int? at) => at == null
+    ? 'Κλειστή · μία το βράδυ, μόνο αν η μέρα έχει λίγο φαγητό'
+    : 'Στις ${hhmm(at)}, μόνο αν η μέρα έχει λίγο φαγητό';
+
+Future<void> openReminderSheet(BuildContext context, FoodStore food) => showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      routeSettings: const RouteSettings(name: 'Βραδινή υπενθύμιση'),
+      builder: (_) => ReminderSheet(food: food),
+    );
+
+class ReminderSheet extends StatelessWidget {
+  const ReminderSheet({super.key, required this.food});
+  final FoodStore food;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.of(context);
+    return ListenableBuilder(
+      listenable: food,
+      builder: (context, _) {
+        final at = food.remindAt;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+                Text('Βραδινή υπενθύμιση', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
+                const SizedBox(height: 6),
+                Text(
+                  'Μία ειδοποίηση, μόνο αν ως εκείνη την ώρα η μέρα έχει λιγότερο από το 60% του στόχου γραμμένο και δεν έχεις '
+                  'πατήσει «Τελείωσα για σήμερα». Τίποτα δεν τρέχει στο παρασκήνιο.',
+                  style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  key: const ValueKey('remind-switch'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Υπενθύμιση'),
+                  value: at != null,
+                  onChanged: !food.dishesRead
+                      ? null
+                      : (on) async {
+                          if (on) await askNotifyPermission();
+                          await food.setRemindAt(on ? remindDefaultMinutes : null);
+                        },
+                ),
+                if (at != null)
+                  ListTile(
+                    key: const ValueKey('remind-time'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Ώρα'),
+                    trailing: Text(hhmm(at), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.primary)),
+                    onTap: () async {
+                      final t = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(hour: at ~/ 60, minute: at % 60),
+                        builder: (ctx, child) => MediaQuery(
+                            data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true), child: child!),
+                      );
+                      if (t != null) await food.setRemindAt(t.hour * 60 + t.minute);
+                    },
+                  ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Η άδεια «Ειδοποιήσεις» (Android 13+), όπως στο διάλειμμα της προπόνησης.
+Future<void> askNotifyPermission() async {
+  try {
+    await const MethodChannel('ygeia/training').invokeMethod<Object?>('askNotify');
+  } on PlatformException {
+    // Χωρίς άδεια η υπενθύμιση απλώς δεν φαίνεται.
+  } on MissingPluginException {
+    // Δοκιμές / όχι Android.
   }
 }

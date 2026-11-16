@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data.dart';
 import 'error_report.dart';
 import 'food/food_store.dart';
+import 'food/reminder.dart' show FoodReminderLink;
 import 'home_widgets/widget_bridge.dart';
 import 'nav.dart';
 import 'pages/privacy_page.dart' show WipeStatus, WipeUnfinishedApp, WipedPage, markWipeSeen, readWipeStatus, registerLicenses, startsApp;
@@ -64,6 +65,8 @@ Future<void> main() async {
     store.start();
     food.start();
     WidgetPublisher(store, food, training: TrainingStore.main).start();
+    // Βραδινή υπενθύμιση φαγητού (16/11): ένα ξυπνητήρι, μόνο αν τη ζητήσεις στη Διατροφή › Ρυθμίσεις.
+    FoodReminderLink(food, target: () => store.goals?.kcal.toDouble()).start();
     // Ρολόι (8/11): μόλις φορτωθεί η προπόνηση, πρόγραμμα προς το ρολόι και ό,τι έγινε εκεί προς το κινητό.
     TrainingStore.main.load().then((_) => WearLink.main.start(TrainingStore.main));
   }

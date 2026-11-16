@@ -12,6 +12,7 @@ import '../widgets.dart';
 import 'devices_page.dart';
 import 'dishes.dart';
 import 'recipes.dart' show FoodLikesScreen;
+import 'day_close.dart' show openReminderSheet, reminderRowText;
 import 'week.dart' show WeekPlanScreen;
 import 'goals_page.dart';
 import 'sources_page.dart';
@@ -349,6 +350,16 @@ class _MePageState extends State<MePage> {
               : 'Από ${shortDayDate(food.week!.start)} ως ${shortDayDate(food.week!.end)}',
           line: true,
           onTap: () => Navigator.of(context).push(WeekPlanScreen.route(food)),
+        ),
+        // Βραδινή υπενθύμιση (16/11).
+        NavRow(
+          key: const ValueKey('mine-remind'),
+          icon: Icons.notifications_none_rounded,
+          color: c.food,
+          title: 'Βραδινή υπενθύμιση',
+          text: reminderRowText(food.remindAt),
+          line: true,
+          onTap: () => openReminderSheet(context, food),
         ),
         // «Τι μου αρέσει» (15/11): για τις συνταγές από AI.
         NavRow(

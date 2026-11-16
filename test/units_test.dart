@@ -89,7 +89,7 @@ void main() {
           name: 'Σουβλάκι $id',
           kind: DishKind.plate,
           items: const [DishItem('C13005', 'Μπανάνα', 100)],
-          created: now,
+          created: now.millisecondsSinceEpoch,
           extra: {
             'plan': {'key': id, 'cook': cook}
           },

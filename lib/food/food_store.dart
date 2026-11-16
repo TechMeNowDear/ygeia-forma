@@ -822,6 +822,28 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return -1;
   }
 
+  /// Βραδινή υπενθύμιση (16/11): η ώρα της σε λεπτά από τα μεσάνυχτα, ή null αν είναι κλειστή. Στο ίδιο αρχείο
+  /// (κλειδί «remind»).
+  int? _remindAt;
+  int? get remindAt => _remindAt;
+
+  Future<bool> setRemindAt(int? minutes) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    if (minutes != null && (minutes < 0 || minutes >= 24 * 60)) return false;
+    final before = _remindAt;
+    _remindAt = minutes;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return true;
+    if (_remindAt == minutes) _remindAt = before;
+    saveError = 'Δεν αποθηκεύτηκε η υπενθύμιση. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
+
   /// «Ζύγισα ένα» (16/11): το δικό σου βάρος ανά τεμάχιο (g), ανά τρόφιμο. Στο ίδιο αρχείο (κλειδί «units»). Μια
   /// καταχώριση με αυτό δεν είναι εκτίμηση: το ζύγισες.
   Map<String, double> _units = const {};
@@ -923,6 +945,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _week = null;
       _days = const {};
       _units = const {};
+      _remindAt = null;
       _dishesRead = true;
       dishesNote = null;
       return;
@@ -953,6 +976,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
       _week = null;
       _days = const {};
       _units = const {};
+      _remindAt = null;
       _dishesRead = true;
       dishesNote = 'Το αρχείο με «Τα φαγητά μου» δεν διαβαζόταν. Κρατήθηκε στην άκρη ($name) και η λίστα ξεκίνησε άδεια.';
       return;
@@ -984,6 +1008,8 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         for (final e in (j['units'] as Map).entries)
           if (e.key is String && validMyUnit(e.value) != null) e.key as String: validMyUnit(e.value)!,
     };
+    final ra = j['remind'];
+    _remindAt = ra is int && ra >= 0 && ra < 24 * 60 ? ra : null;
     skippedRows += bad.length;
     _dishesRead = true;
     dishesNote = _dishesNewer ? dishesNewerText : null;
@@ -996,6 +1022,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         if (_week != null) 'week': _week!.toJson(),
         if (_days.isNotEmpty) 'days': {for (final e in _days.entries) e.key: e.value.name},
         if (_units.isNotEmpty) 'units': _units,
+        if (_remindAt != null) 'remind': _remindAt,
       });
 
   Future<bool> _writeDishes(List<Dish> after, String what) async {
