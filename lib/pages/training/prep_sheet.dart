@@ -221,7 +221,7 @@ class _EquipmentSheetState extends State<EquipmentSheet> {
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textSecondary)),
           for (final p in plateKinds)
             _stepper('${kgText(p)} kg', _e.count(p), Equipment.maxPlates,
-                (v) => setState(() => _e = _e.copyWith(plates: {..._e.plates, p: v})), 'equip-plate-${kgText(p)}'),
+                (v) => setState(() => _e = _e.withPlate(p, v)), 'equip-plate-${kgText(p)}'),
           const SizedBox(height: 16),
           FilledButton(
             key: const ValueKey('equip-save'),

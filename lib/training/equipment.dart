@@ -83,20 +83,33 @@ const kettlebells = [4.0, 6.0, 8.0, 10.0, 12.0, 16.0];
 /// και δίσκοι ανά βάρος. Αλλάζει από την εφαρμογή (Άσκηση › Ο εξοπλισμός μου), χωρίς νέα έκδοση. Γράφεται στο
 /// training.json (κλειδί «equip»). Προεπιλογή: ό,τι υπήρχε ως τις 15/11 (2 λαβές 1,8 kg, 4 δίσκοι από κάθε βάρος).
 class Equipment {
-  const Equipment({this.handleKg = 1.8, this.handles = 2, this.plates = const {5.0: 4, 2.5: 4, 1.25: 4, 0.5: 4}});
+  const Equipment({this.handleKg = 1.8, this.handles = 2, this.counts = const [4, 4, 4, 4]});
   final double handleKg;
   final int handles;
-  final Map<double, int> plates;
+
+  /// Πόσοι δίσκοι από κάθε βάρος, με τη σειρά του [plateKinds] (5, 2,5, 1,25, 0,5 kg).
+  final List<int> counts;
 
   static const standard = Equipment();
   static const maxHandles = 20;
   static const maxPlates = 40;
 
-  int count(double plate) => plates[plate] ?? 0;
+  int count(double plate) {
+    final i = plateKinds.indexOf(plate);
+    return i < 0 || i >= counts.length ? 0 : counts[i];
+  }
+
   bool get isStandard => toJson().toString() == standard.toJson().toString();
 
-  Equipment copyWith({double? handleKg, int? handles, Map<double, int>? plates}) =>
-      Equipment(handleKg: handleKg ?? this.handleKg, handles: handles ?? this.handles, plates: plates ?? this.plates);
+  Equipment copyWith({double? handleKg, int? handles}) =>
+      Equipment(handleKg: handleKg ?? this.handleKg, handles: handles ?? this.handles, counts: counts);
+
+  /// Ίδιος εξοπλισμός με [n] δίσκους των [plate] kg.
+  Equipment withPlate(double plate, int n) => Equipment(
+        handleKg: handleKg,
+        handles: handles,
+        counts: [for (final p in plateKinds) p == plate ? n : count(p)],
+      );
 
   Map<String, Object> toJson() => {
         'handleKg': handleKg,
@@ -113,13 +126,13 @@ class Equipment {
     return Equipment(
       handleKg: h is num && h >= 0.5 && h <= 5 ? (h * 100).round() / 100 : standard.handleKg,
       handles: n is int && n >= 1 && n <= maxHandles ? n : standard.handles,
-      plates: {
+      counts: [
         for (final p in plateKinds)
-          p: switch (pl is Map ? pl[p.toString()] : null) {
+          switch (pl is Map ? pl[p.toString()] : null) {
             final int c when c >= 0 && c <= maxPlates => c,
             _ => standard.count(p),
           },
-      },
+      ],
     );
   }
 }

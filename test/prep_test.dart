@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/training/equipment.dart';
 import 'package:ygeia_forma/training/prep.dart';
 
-const bought = Equipment(handleKg: 2.0, handles: 8, plates: {5.0: 8, 2.5: 10, 1.25: 8, 0.5: 8});
+const bought = Equipment(handleKg: 2.0, handles: 8, counts: [8, 10, 8, 8]);
 
 void main() {
   tearDown(() => equip = Equipment.standard);
@@ -63,7 +63,7 @@ void main() {
   });
 
   test('Ετοίμασε: με τον νέο εξοπλισμό όλα μαζί, με τους δίσκους σωστά μοιρασμένους', () {
-    const e = Equipment(handleKg: 1.8, handles: 8, plates: {5.0: 8, 2.5: 10, 1.25: 8, 0.5: 8});
+    const e = Equipment(handleKg: 1.8, handles: 8, counts: [8, 10, 8, 8]);
     final p = prepFor(day, e);
     expect(p.short, isFalse);
     final byWhat = {for (final l in p.lines) l.what: l};
@@ -76,7 +76,7 @@ void main() {
   });
 
   test('Ετοίμασε: όταν τελειώνουν οι δίσκοι, το λέει (όχι λάθος στήσιμο)', () {
-    const e = Equipment(handleKg: 1.8, handles: 8, plates: {5.0: 4, 2.5: 4, 1.25: 4, 0.5: 4});
+    const e = Equipment(handleKg: 1.8, handles: 8, counts: [4, 4, 4, 4]);
     final p = prepFor([
       (name: 'Α', kind: LoadKind.dbPair, load: 11.8),
       (name: 'Β', kind: LoadKind.dbPair, load: 11.8 + 0.01),
