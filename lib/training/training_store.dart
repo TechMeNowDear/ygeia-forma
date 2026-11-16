@@ -1778,6 +1778,12 @@ class TrainingStore extends ChangeNotifier {
     activeId ??= other.activeId;
     // Round 14 (P8): φωνή κλειστή στο αντίγραφο → κλειστή και εδώ (δεν ξαναμιλά το ρολόι μετά από επαναφορά).
     if (!other.voice) voice = false;
+    // 16/11 (έλεγχος): ο εξοπλισμός του αντιγράφου, αν εδώ είναι ακόμα ο αρχικός (νέο κινητό, μετά από «Διαγραφή όλων»).
+    // Αλλιώς τα βάρη θα υπολογίζονταν σιωπηλά για 2 λαβές 1,8 kg και 4 δίσκους από κάθε βάρος.
+    if (equipment.isStandard && !other.equipment.isStandard) {
+      equipment = other.equipment;
+      if (identical(this, main)) equip = equipment;
+    }
     // Ό,τι σβήστηκε (εδώ ή στο αντίγραφο) μένει σβησμένο.
     deleted.addAll(other.deleted);
     sessions.removeWhere((x) => deleted.contains(x.id));

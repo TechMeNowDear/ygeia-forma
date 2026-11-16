@@ -371,7 +371,7 @@ const cholInfo = MetricInfo(
 );
 
 List<(DateTime, CholDay)> _daysOf(FoodStore food, DateTime from, DateTime toExclusive) => [
-      for (var d = from; d.isBefore(toExclusive); d = DateTime(d.year, d.month, d.day + 1)) (d, CholDay(food.entriesFor(d))),
+      for (var d = from; d.isBefore(toExclusive); d = DateTime(d.year, d.month, d.day + 1)) (d, CholDay(food.entriesFor(d), part: food.dayMark(d) == DayMark.part)),
     ];
 
 /// Κάρτα «Χοληστερίνη» στη Διατροφή (μόνο όταν ο γιατρός ζήτησε να πέσει η LDL): η μέρα που βλέπεις και η εβδομάδα της.

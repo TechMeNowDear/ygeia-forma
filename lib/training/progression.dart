@@ -270,7 +270,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty) h];
 
   if (usable.isEmpty) {
-    final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : startLoad(item.ex, k)) : null;
+    final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : fitLoad(k, startLoad(item.ex, k))) : null;
     return Target(load: start, reps: _same(sets, lo), change: Change.first, reason: _firstReason(item, k, start, rirGoal));
   }
 
@@ -283,6 +283,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   var lastLoad = endLoad ?? planned ?? (hasLoad(k) ? (item.load ?? startLoad(item.ex, k)) : null);
   // Ανοίγματα με λάστιχο, από πριν το «ανά πλευρά» (π.χ. 20): στο πλησιέστερο που βγαίνει (ελάχιστο 30/πλευρά).
   if (k == LoadKind.bandPair && lastLoad != null) lastLoad = snap(k, lastLoad);
+  // 16/11 (έλεγχος): μετά από αλλαγή εξοπλισμού (λαβή, δίσκοι) το φορτίο της προηγούμενης φοράς μπορεί να μη βγαίνει
+  // πια: στο αμέσως ελαφρύτερο που βγαίνει. Με τον ίδιο εξοπλισμό δεν αλλάζει τίποτα.
+  if (lastLoad != null) lastLoad = fitLoad(k, lastLoad);
   // Ημερολογιακές μέρες σε UTC (έλεγχος 9/11, RT-17 / V-B-17): πάνω από την αλλαγή ώρας του Μαρτίου, 15 μέρες δεν
   // μετριούνται πια 14 (14 μέρες + 23 ώρες).
   final gap = daysBetween(lastDay, today);
@@ -327,7 +330,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     final where = last.pain.map((p) => painNames[p] ?? p).join(', ');
     final again = usable.length > 1 && usable[1].$2.pain.isNotEmpty;
     final base = r.isEmpty ? _same(sets, math.max(1, math.min(lo, last.log.isEmpty ? lo : last.log.first.reps))) : asLast();
-    final down = lastLoad == null || !hasLoad(k) ? null : stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    final down = lastLoad == null || !hasLoad(k) ? null : deload(k, lastLoad, allowZero: k == LoadKind.plate);
     final String what;
     final List<int> reps;
     if (down != null) {
@@ -564,7 +567,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // (πριν: 9,3 kg × 8, 7, 6 με «0» → 9,3 kg × 8, 8, 8). Ρεζέρβα ≥ 2: η πίεση ανεβαίνει απότομα κοντά στην εξάντληση
   // (MacDougall κ.ά., J Appl Physiol 1985;58:785–90). Όπου δεν υπάρχει πιο ελαφρύ (ή άσκηση σώματος): ίδια, με την οδηγία.
   if (done.isNotEmpty && ra != null && ra < 2 && low < last.lo) {
-    final down = lastLoad != null && hasLoad(k) ? stepDown(k, lastLoad, allowZero: k == LoadKind.plate) : null;
+    final down = lastLoad != null && hasLoad(k) ? deload(k, lastLoad, allowZero: k == LoadKind.plate) : null;
     final said = ra == 0 ? 'Δεν άφησες καμία' : 'Άφησες $ra';
     // R10-B4-5: όσες ζητά το πρόγραμμα ([rirGoal]), όπως κρίνεται και η επόμενη φορά (όχι πάντα 2).
     final stop = 'σταμάτα το σετ όταν σου μένουν $rirGoal: η πίεση ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση.';
@@ -596,7 +599,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     streak++;
   }
   if (streak >= 2 && lastLoad != null && hasLoad(k)) {
-    final down = stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    final down = deload(k, lastLoad, allowZero: k == LoadKind.plate);
     if (down != null) {
       return Target(
         load: down,
@@ -628,7 +631,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
 double? calibrate(PlanItem item, double? load, int reps, int rirAnswer) {
   final k = item.kind;
   if (load == null || !hasLoad(k)) return null;
-  if (rirAnswer < 2) return stepDown(k, load, allowZero: k == LoadKind.plate);
+  if (rirAnswer < 2) return deload(k, load, allowZero: k == LoadKind.plate);
   if (rirAnswer < 4 || reps < item.lo || lightOnly.contains(item.ex)) return null;
   final up = stepUp(k, load);
   if (up == null) return null;

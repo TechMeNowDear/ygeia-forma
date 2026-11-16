@@ -187,4 +187,9 @@ void main() {
       expect(find.byKey(const ValueKey('yesterday-card')), findsNothing);
     });
   });
+
+  test('Έλεγχος 16/11: χυμός λεμονιού και πελτές ντομάτας δεν μετρούν στα 400 g', () {
+    LogEntry e(String id, double g) => LogEntry(id: id, day: '2026-11-18', meal: Meal.lunch, food: f(id), grams: g, time: now);
+    expect(fruitVegGrams([e('C2007', 30), e('C20068', 70), e('C20385', 100)]), 100);
+  });
 }

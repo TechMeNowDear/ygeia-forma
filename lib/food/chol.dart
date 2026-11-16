@@ -94,7 +94,11 @@ bool _cookedLegumes(Food f) =>
     (f.cholKind == CholKind.legumes && f.n.has(Nk.kcal) && f.n.amount(Nk.kcal) < legumesDryMinKcal);
 
 class CholDay {
-  CholDay(Iterable<LogEntry> entries) {
+  /// «Λείπουν γεύματα» (16/11, έλεγχος): η μέρα δεν μετρά στους μέσους όρους «πλήρων ημερών» (όπως στον έλεγχο
+  /// θερμίδων). Ό,τι φαγώθηκε (όσπρια, ψάρι) μετρά κανονικά στην εβδομάδα.
+  bool part = false;
+
+  CholDay(Iterable<LogEntry> entries, {this.part = false}) {
     for (final e in entries) {
       kcal += e.total(Nk.kcal);
       satFat += e.total(Nk.satFat);
@@ -127,7 +131,7 @@ class CholDay {
   bool get fish => fishG >= fishMinG - 1e-9;
 
   /// Αρκετή καταγραφή για μέσους όρους, με στόχο [goalKcal] θερμίδες τη μέρα.
-  bool fullFor(int goalKcal) => kcal >= fullDayKcalFor(goalKcal);
+  bool fullFor(int goalKcal) => !part && kcal >= fullDayKcalFor(goalKcal);
 
   /// Κορεσμένα ως % των θερμίδων (null χωρίς θερμίδες).
   double? get satPct => kcal <= 0 ? null : satFat * 9 / kcal * 100;

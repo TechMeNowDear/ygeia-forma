@@ -494,10 +494,14 @@ const dayMarksKeepDays = 400;
 const fruitVegTargetG = 400.0;
 const fruitVegCats = {'Φρούτα', 'Λαχανικά'};
 
+/// Μέσα στις δύο κατηγορίες, όσα δεν μετρούν γραμμάριο-γραμμάριο (έλεγχος 16/11): χυμός λεμονιού (χυμός), πελτές και
+/// πουρές ντομάτας (συμπυκνωμένα, 3–6 φορές).
+const fruitVegExclude = {'C2007', 'C20068', 'C20170'};
+
 double fruitVegGrams(Iterable<LogEntry> entries) {
   var g = 0.0;
   for (final e in entries) {
-    if (fruitVegCats.contains(e.food.cat)) g += e.grams;
+    if (fruitVegCats.contains(e.food.cat) && !fruitVegExclude.contains(e.food.id)) g += e.grams;
   }
   return g;
 }

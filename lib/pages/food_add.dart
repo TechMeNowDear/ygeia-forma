@@ -1733,12 +1733,20 @@ class _QuantitySheetState extends State<QuantitySheet> {
                 if (widget.editing) ...[
                   if (!widget.ingredient) ...[
                     const SizedBox(height: 8),
-                    TextButton.icon(
-                      key: const ValueKey('entry-transfer'),
-                      onPressed: () => Navigator.pop(context, _SheetResult(g ?? 0, _meal, _item, transfer: true)),
-                      icon: const Icon(Icons.drive_file_move_outline),
-                      label: const Text('Αντιγραφή ή μετακίνηση…'),
-                    ),
+                    // 16/11 (έλεγχος): με αλλαγές που δεν αποθηκεύτηκαν δεν γίνεται (θα χάνονταν σιωπηλά): πρώτα «Αποθήκευση».
+                    Builder(builder: (context) {
+                      final changed = g != widget.initialGrams ||
+                          _item.id != widget.item.id ||
+                          _est != widget.initialEst ||
+                          _meal != widget.meal;
+                      return TextButton.icon(
+                        key: const ValueKey('entry-transfer'),
+                        onPressed:
+                            changed ? null : () => Navigator.pop(context, _SheetResult(g ?? 0, _meal, _item, transfer: true)),
+                        icon: const Icon(Icons.drive_file_move_outline),
+                        label: Text(changed ? 'Αντιγραφή ή μετακίνηση: πρώτα αποθήκευσε' : 'Αντιγραφή ή μετακίνηση…'),
+                      );
+                    }),
                   ],
                   const SizedBox(height: 8),
                   TextButton.icon(

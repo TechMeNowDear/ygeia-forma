@@ -37,7 +37,7 @@ String buildBackup({
   Map<String, Object>? foodLikes,
   Map<String, String>? foodDays,
   Map<String, double>? foodUnits,
-  List<Map<String, Object>>? vitals,
+  List<Object?>? vitals,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.

@@ -85,4 +85,30 @@ void main() {
     expect(p.short, isTrue);
     expect(p.lines.where((l) => l.later).map((l) => l.what), contains('2 αλτήρες 21,8 kg'));
   });
+
+  test('Έλεγχος 16/11: παλιό φορτίο που δεν βγαίνει με νέα λαβή → το αμέσως ελαφρύτερο· ελάφρυνση ≥ 10% στους αλτήρες', () {
+    expect(fitLoad(LoadKind.dbPair, 11.8), 11.8, reason: 'ίδιος εξοπλισμός: τίποτα δεν αλλάζει');
+    expect(deload(LoadKind.dbPair, 11.8), stepDown(LoadKind.dbPair, 11.8), reason: 'με 4 δίσκους, ίδιο με πριν');
+    equip = const Equipment(handleKg: 2.2, handles: 8, counts: [8, 10, 8, 8]);
+    expect(fitLoad(LoadKind.dbPair, 11.8), 11.7);
+    expect(fitLoad(LoadKind.dbPair, 11.8) <= 11.8, isTrue);
+    final d = deload(LoadKind.dbPair, 12.2)!;
+    expect(d <= 12.2 * 0.9, isTrue, reason: '$d');
+    expect(fitLoad(LoadKind.kb, 16), 16, reason: 'τα kettlebell δεν εξαρτώνται από τον εξοπλισμό');
+  });
+
+  test('Έλεγχος 16/11: ζευγάρι με τους ίδιους δίσκους και στους δύο αλτήρες· αλλιώς ολόκληρο «μετά»', () {
+    const e = Equipment(handleKg: 1.8, handles: 8, counts: [8, 10, 8, 8]);
+    final p = prepFor([
+      (name: 'Κωπηλασία', kind: LoadKind.db, load: 11.8),
+      (name: 'Πιεστικό', kind: LoadKind.dbPair, load: 21.8),
+    ], e);
+    final byWhat = {for (final l in p.lines) l.what: l};
+    expect(byWhat['1 αλτήρας 11,8 kg']!.how, 'σε κάθε άκρη 5');
+    // Μένουν 6 × 5 kg: ζευγάρι 21,8 θέλει 10 ανά άκρη × 4 άκρες. Με 5 + 5 ανά άκρη χρειάζονται 8 × 5: δεν φτάνουν·
+    // με 5 + 2,5 + 2,5 χρειάζονται 4 × 5 και 8 × 2,5: φτάνουν.
+    final pair = byWhat['2 αλτήρες 21,8 kg']!;
+    expect(pair.later, isFalse);
+    expect(pair.how, 'σε κάθε άκρη 5 + 2,5 + 2,5');
+  });
 }

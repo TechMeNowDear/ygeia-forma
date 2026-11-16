@@ -1063,12 +1063,19 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
         child: const Text('Αποθήκευση'),
       ),
       const SizedBox(height: 8),
-      TextButton.icon(
-        key: const ValueKey('dish-entry-transfer'),
-        onPressed: () => Navigator.pop(context, (entries: g, delete: false, transfer: true)),
-        icon: const Icon(Icons.drive_file_move_outline),
-        label: const Text('Αντιγραφή ή μετακίνηση…'),
-      ),
+      // 16/11 (έλεγχος): με αλλαγές που δεν αποθηκεύτηκαν δεν γίνεται (θα χάνονταν σιωπηλά): πρώτα «Αποθήκευση».
+      Builder(builder: (context) {
+        final changed = r == null ||
+            _meal != g.first.meal ||
+            r.length != g.length ||
+            [for (var i = 0; i < r.length; i++) (r[i].grams - g[i].grams).abs() > 1e-9].any((x) => x);
+        return TextButton.icon(
+          key: const ValueKey('dish-entry-transfer'),
+          onPressed: changed ? null : () => Navigator.pop(context, (entries: g, delete: false, transfer: true)),
+          icon: const Icon(Icons.drive_file_move_outline),
+          label: Text(changed ? 'Αντιγραφή ή μετακίνηση: πρώτα αποθήκευσε' : 'Αντιγραφή ή μετακίνηση…'),
+        );
+      }),
       TextButton.icon(
         key: const ValueKey('dish-entry-delete'),
         style: TextButton.styleFrom(foregroundColor: c.bad),
