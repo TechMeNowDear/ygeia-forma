@@ -6,7 +6,8 @@
 /// 3. Όσπρια και ψάρι όσες φορές την εβδομάδα λένε οι στόχοι.
 /// 4. Κατσαρόλα: μαγειρεύεται μία φορά και τρώγεται μέσα σε 4 μέρες (ως 2 φορές), όχι δύο μέρες στη σειρά, εκτός αν η
 ///    δεύτερη είναι ταπεράκι για το γραφείο.
-/// 5. Το ίδιο φαγητό ως 2 φορές την εβδομάδα, ποτέ δύο φορές την ίδια μέρα ή δύο μέρες στη σειρά (εκτός από τον 4).
+/// 5. Το ίδιο φαγητό (μεσημέρι, βράδυ, πρωινό) ως 2 φορές την εβδομάδα, ποτέ δύο φορές την ίδια μέρα ή δύο μέρες στη
+///    σειρά (εκτός από τον 4). Τα σνακ επαναλαμβάνονται. Αν τα φαγητά δεν φτάνουν, ένα φαγητό ξαναμπαίνει και το λέει.
 /// 6. Θερμίδες κάθε μέρας ±5% από τον στόχο, με μερίδες 0,6–1,6 φορές τη μερίδα της συνταγής (όχι «τριπλή σαλάτα»· στην
 ///    κατσαρόλα και στις ίσες μερίδες ως 2).
 ///    Οι θερμίδες και η πρωτεΐνη βγαίνουν πάντα από τη βάση. Ό,τι δεν βγαίνει λέγεται ([AutoWeek.notes]).
@@ -100,6 +101,7 @@ AutoWeek autoWeek(
   final out = <List<PlanSlot>>[];
   final keepPlan = keep != null && keep.from == dateKey(start) ? keep : null;
   final noOffice = <String>{};
+  final repeated = <String>[];
 
   for (var day = 0; day < days; day++) {
     final date = DateTime(start.year, start.month, start.day + day);
@@ -127,10 +129,13 @@ AutoWeek autoWeek(
         return s + rnd.nextDouble() * 0.5;
       }
 
+      bool basic(_Cand c) =>
+          c.info.fits(m) && !(officeLunch && !c.info.office) && !chosen.any((x) => x.$2?.dish.id == c.dish.id);
+
       bool allowed(_Cand c) {
-        if (!c.info.fits(m)) return false;
-        if (officeLunch && !c.info.office) return false;
-        if (chosen.any((x) => x.$2?.dish.id == c.dish.id)) return false;
+        if (!basic(c)) return false;
+        // Σνακ: επαναλαμβάνονται (το ίδιο γιαούρτι κάθε μέρα είναι εντάξει)· η ποικιλία μετρά μόνο στη βαθμολογία.
+        if (m == Meal.snack) return true;
         final u = used[c.dish.id] ?? const [];
         if (u.length >= autoMaxRepeat) return false;
         if (u.isEmpty) return true;
@@ -142,7 +147,12 @@ AutoWeek autoWeek(
         return day - last >= 2;
       }
 
-      final ok = [for (final c in cands) if (allowed(c)) c];
+      var ok = [for (final c in cands) if (allowed(c)) c];
+      if (ok.isEmpty) {
+        // Λίγα φαγητά για τους κανόνες ποικιλίας: καλύτερα ένα φαγητό ξανά παρά άδειο γεύμα. Το λέει.
+        ok = [for (final c in cands) if (basic(c)) c];
+        if (ok.isNotEmpty) repeated.add('${_dayName(date)}, ${mealLabel(m).toLowerCase()}');
+      }
       if (ok.isEmpty) {
         if (officeLunch) {
           noOffice.add(m.name);
@@ -202,6 +212,9 @@ AutoWeek autoWeek(
   }
   if (noOffice.isNotEmpty) {
     notes.insert(0, 'Δεν υπάρχει (αρκετό) φαγητό «για γραφείο»: κάποια μεσημεριανά Τρίτη–Πέμπτη έμειναν κενά.');
+  }
+  if (repeated.isNotEmpty) {
+    notes.add('Επαναλαμβάνεται φαγητό πιο συχνά απ’ όσο λένε οι κανόνες (λίγα φαγητά στη βιβλιοθήκη): ${repeated.join(' · ')}.');
   }
   if (legumesWeek > 0 && legumes < legumesWeek) notes.add('Όσπρια $legumes φορές (στόχος $legumesWeek): λίγα στη βιβλιοθήκη.');
   if (fishWeek > 0 && fish < fishWeek) notes.add('Ψάρι $fish φορές (στόχος $fishWeek): λίγο στη βιβλιοθήκη.');

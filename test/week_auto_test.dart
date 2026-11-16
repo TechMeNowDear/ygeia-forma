@@ -120,6 +120,7 @@ void main() {
       }
       var legumes = 0, fish = 0;
       for (final MapEntry(key: id, value: d) in days.entries) {
+        if (planInfoOf(s.dishById(id)!)!.meals.contains(Meal.snack)) continue; // τα σνακ επαναλαμβάνονται
         expect(d.length, lessThanOrEqualTo(2), reason: '${keyOf(s, id)} seed $seed');
         if (d.length == 2) {
           final d2 = s.dishById(id)!;
