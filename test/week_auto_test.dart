@@ -95,7 +95,7 @@ void main() {
     expect(w.days, hasLength(7));
     for (var i = 0; i < 7; i++) {
       final day = w.days[i];
-      expect(day.map((x) => x.meal), [Meal.lunch, Meal.snack, Meal.dinner], reason: 'μέρα $i');
+      expect(day.map((x) => x.meal), [Meal.lunch, Meal.dinner, Meal.snack], reason: 'μέρα $i');
       final kcal = plannedDay(s, w, i).totals.kcal;
       expect((kcal - 2100).abs(), lessThanOrEqualTo(2100 * 0.05 + 5), reason: 'μέρα $i: $kcal');
       for (final slot in day) {
