@@ -24,7 +24,10 @@ object OuraRules {
     /** «Τα φαγητά μου» (15/11): το αρχείο των φαγητών (FoodBridge), κι αυτό με ατομική εγγραφή. */
     const val DISHES_FILE = "dishes.json"
 
-    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, TRAINING_FILE, DISHES_FILE) + VAULT_NAMES.map { "$it.bin" }
+    /** Πίεση, σάκχαρο, καρδιογραφήματα με το χέρι (16/11). */
+    const val VITALS_FILE = "vitals.json"
+
+    val OWN_FILES = listOf(NIGHTS_FILE, PLAN_FILE, PLAN_LOG_FILE, TRAINING_FILE, DISHES_FILE, VITALS_FILE) + VAULT_NAMES.map { "$it.bin" }
 
     /** Μόνο οι δύο ακριβείς μορφές: https://ygeia-forma.netlify.app/oura/callback ή ygeiaforma://oura-callback. */
     fun isCallback(scheme: String?, host: String?, port: Int, path: String?, userInfo: String?): Boolean {

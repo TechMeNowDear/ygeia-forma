@@ -10,6 +10,7 @@
   Έλεγχος 9/11 (V-A-02): και ο φάκελος hr/ (οι παλμοί κάθε προπόνησης, σε συμπαγή μορφή· ~2,5 MB τον χρόνο αντί για
   ~9,5 MB μέσα στο training.json).
   15/11: και το dishes.json («Τα φαγητά μου»: φαγητά από υλικά, λίγα KB).
+  16/11: και το vitals.json (πίεση, σάκχαρο, καρδιογραφήματα με το χέρι, λίγα KB).
   Το όνομα της αναφοράς για τον γιατρό ΔΕΝ είναι στο prefs.json: η Kotlin το κρατά στο noBackupFilesDir (συγχώνευση 4/11).
   Έλεγχος 13/11 (S9-10 / S10-3): και η επιλογή «Αναφορές σφαλμάτων» (shared_prefs/errors.xml, ένας διακόπτης, ErrorQueue.kt).
   Όποιος τις έκλεισε (αντίρρηση, ΓΚΠΔ άρθρο 21) τις έχει κλειστές και στο νέο κινητό ή μετά από επανεγκατάσταση· πριν
@@ -25,6 +26,7 @@
         <include domain="file" path="oura_nights.json" />
         <include domain="file" path="training.json" />
         <include domain="file" path="dishes.json" />
+        <include domain="file" path="vitals.json" />
         <include domain="file" path="hr/" />
         <include domain="sharedpref" path="errors.xml" />
     </cloud-backup>
@@ -37,6 +39,7 @@
         <include domain="file" path="oura_nights.json" />
         <include domain="file" path="training.json" />
         <include domain="file" path="dishes.json" />
+        <include domain="file" path="vitals.json" />
         <include domain="file" path="hr/" />
         <include domain="sharedpref" path="errors.xml" />
     </device-transfer>

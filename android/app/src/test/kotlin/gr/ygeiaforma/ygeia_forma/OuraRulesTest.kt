@@ -52,6 +52,8 @@ class OuraRulesTest {
             listOf(
                 // 15/11: και το dishes.json («Τα φαγητά μου»).
                 "oura_nights.json", "sources.json", "sources_log.json", "training.json", "dishes.json",
+                // 16/11: και το vitals.json (πίεση, σάκχαρο, καρδιογραφήματα).
+                "vitals.json",
                 "oura_tokens.bin", "oura_pending.bin", "oura_connecting.bin",
             ),
             OuraRules.OWN_FILES,

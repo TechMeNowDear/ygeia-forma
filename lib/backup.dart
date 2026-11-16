@@ -37,6 +37,7 @@ String buildBackup({
   Map<String, Object>? foodLikes,
   Map<String, String>? foodDays,
   Map<String, double>? foodUnits,
+  List<Map<String, Object>>? vitals,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -61,6 +62,8 @@ String buildBackup({
     if (foodDays != null && foodDays.isNotEmpty) 'foodDays': foodDays,
     // «Ζύγισα ένα» (16/11): το δικό σου βάρος ανά τεμάχιο.
     if (foodUnits != null && foodUnits.isNotEmpty) 'foodUnits': foodUnits,
+    // Πίεση, σάκχαρο, καρδιογραφήματα (16/11).
+    if (vitals != null && vitals.isNotEmpty) 'vitals': vitals,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -74,7 +77,11 @@ class BackupContents {
       this.dishes = const [],
       this.likes = const FoodLikes(),
       this.dayMarks = const {},
-      this.units = const {}});
+      this.units = const {},
+      this.vitals = const []});
+
+  /// Πίεση, σάκχαρο, καρδιογραφήματα (16/11), όπως ήταν στο αρχείο (τα ελέγχει το importItems).
+  final List<Object?> vitals;
 
   /// «Ζύγισα ένα» (16/11): τρόφιμο → g ανά τεμάχιο (όπως ήταν στο αρχείο· τα ελέγχει το importUnits).
   final Map<String, Object?> units;
@@ -262,6 +269,7 @@ BackupContents parseBackup(String text) {
     likes: FoodLikes.fromJson(j['foodLikes']),
     dayMarks: j['foodDays'] is Map ? Map<String, Object?>.from(j['foodDays'] as Map) : const {},
     units: j['foodUnits'] is Map ? Map<String, Object?>.from(j['foodUnits'] as Map) : const {},
+    vitals: j['vitals'] is List ? List<Object?>.from(j['vitals'] as List) : const [],
   );
 }
 
