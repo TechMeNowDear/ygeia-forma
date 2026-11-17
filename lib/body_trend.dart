@@ -17,10 +17,16 @@
 library;
 
 import 'data.dart';
-import 'format.dart' show dayOf, dec;
+import 'format.dart' show dayOf, daysBetween, dec;
 import 'weight_guard.dart';
 
 const bodyTrendGroup = 3;
+
+/// Έλεγχος 17/11 (Κ3-M3): οι «3 πριν» είναι οι 3 τελευταίες ζυγίσεις που απέχουν τουλάχιστον τόσες μέρες από την πρώτη
+/// των 3 τελευταίων. Πριν ήταν οι 3 αμέσως πριν: με ζύγιση κάθε μέρα σύγκριναν 3 μέρες με τις 3 προηγούμενες, όπου μια
+/// αληθινή αλλαγή δεν προλαβαίνει να φανεί, και η παρένθεση ήταν σχεδόν πάντα θόρυβος (προσομοίωση: 4,3% με αληθινή
+/// απώλεια, 3,8% χωρίς καμία). Το όριο θορύβου (μεσαίες τιμές από 3) μένει το ίδιο.
+const bodyTrendGapDays = 14;
 
 /// Round 1 (S4-3): η μικρότερη διαφορά της τάσης (μεσαία 3 τελευταίων − μεσαία 3 πριν) που γράφεται. Πηγή: McLester κ.ά.,
 /// J Clin Densitom 2020 (67 ενήλικες, InBody 230/720/770, δύο μετρήσεις με 24–72 ώρες διαφορά): τυπικό σφάλμα μέτρησης
@@ -78,7 +84,18 @@ List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatu
   final picked = <DateTime, ({BodyMeasurement pick, WeighStatus status, bool unsure})>{};
   for (var i = 0; i < judged.length; i++) {
     final weighed = [for (final b in byDay[judged[i]]!) if (_weighed(b)) b];
-    picked[judged[i]] = (pick: weighed[r[i].pick], status: r[i].status, unsure: r[i].unsure);
+    var pick = weighed[r[i].pick];
+    // Έλεγχος 17/11 (Κ3-L4): ζύγιση μόνο με βάρος πρώτη (07:00) και πλήρης ζύγιση μετά (07:02) που συμφωνεί: μετρά η πλήρης,
+    // αλλιώς η μέρα έμενε χωρίς λίπος και μύες (Σώμα «Λίπος —», ιστορικό και Τάσεις χωρίς τη μέρα).
+    if (pick.fatPct == null && !r[i].unsure) {
+      for (final b in weighed) {
+        if (b.fatPct != null && weightsAgree(b.weight!, pick.weight!)) {
+          pick = b;
+          break;
+        }
+      }
+    }
+    picked[judged[i]] = (pick: pick, status: r[i].status, unsure: r[i].unsure);
   }
   return [
     for (final d in days)
@@ -216,21 +233,27 @@ List<(DateTime, double)> bodyDaily(List<BodyMeasurement> body, double? Function(
 class BodyTrend {
   const BodyTrend({required this.now, required this.before, required this.from, required this.to});
 
-  /// Η μεσαία τιμή των 3 τελευταίων ζυγίσεων και των 3 πριν από αυτές.
+  /// Η μεσαία τιμή των 3 τελευταίων ζυγίσεων και των 3 τουλάχιστον [bodyTrendGapDays] μέρες παλιότερων.
   final double now, before;
 
-  /// Η πρώτη και η τελευταία μέρα των 3 παλιότερων ζυγίσεων (για το κείμενο «με τις 3 πριν»).
+  /// Η πρώτη και η τελευταία μέρα των 3 παλιότερων ζυγίσεων.
   final DateTime from, to;
 }
 
-/// null με λιγότερες από 6 μέρες ζύγισης που έχουν την τιμή.
+/// null με λιγότερες από 6 μέρες ζύγισης που έχουν την τιμή, ή χωρίς 3 ζυγίσεις τουλάχιστον [bodyTrendGapDays] μέρες
+/// πριν από τις 3 τελευταίες.
 BodyTrend? bodyTrend(List<BodyMeasurement> body, double? Function(BodyMeasurement) f) {
   final d = bodyDaily(body, f);
   const g = bodyTrendGroup;
   if (d.length < 2 * g) return null;
   double median(List<(DateTime, double)> v) => ([for (final e in v) e.$2]..sort())[g ~/ 2];
   final last = d.sublist(d.length - g);
-  final prev = d.sublist(d.length - 2 * g, d.length - g);
+  final older = [
+    for (final e in d.sublist(0, d.length - g))
+      if (daysBetween(e.$1, last.first.$1) >= bodyTrendGapDays) e,
+  ];
+  if (older.length < g) return null;
+  final prev = older.sublist(older.length - g);
   return BodyTrend(now: median(last), before: median(prev), from: prev.first.$1, to: prev.last.$1);
 }
 
@@ -257,9 +280,12 @@ String bodyTrendNote({required DateTime? previous, required int days, required S
   if (days >= 2 * bodyTrendGroup) {
     // Round 2 (g4 · R2-D-2): τα όρια γραμμένα με τους αριθμούς τους ([bodyFloorFatPct], [bodyFloorKg]), ώστε να ξέρεις
     // γιατί συνήθως δεν φαίνεται παρένθεση από εβδομάδα σε εβδομάδα.
-    return '${weight}Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν. Σε παρένθεση μόνο αλλαγή από '
-        '${dec(bodyFloorFatPct, 0)}\u00A0μονάδες στο λίπος ή ${dec(bodyFloorKg)}\u00A0kg και πάνω: μικρότερη χάνεται στη '
-        'διακύμανση της ζυγαριάς.';
+    // Έλεγχος 17/11 (Κ3-M3, επιστημονικός M1): σύγκριση με ζυγίσεις 2 εβδομάδων πίσω, και ότι και μεγάλη αλλαγή μπορεί να
+    // είναι νερό (Bhutani 2017: το μεγαλύτερο μέρος μιας αλλαγής 2 εβδομάδων είναι νερό, γλυκογόνο, έντερο).
+    return '${weight}Σε λίπος και μύες, οι 3 τελευταίες ζυγίσεις σε σύγκριση με 3 τουλάχιστον 2\u00A0εβδομάδες παλιότερες. '
+        'Σε παρένθεση μόνο αλλαγή από ${dec(bodyFloorFatPct, 0)}\u00A0μονάδες στο λίπος ή ${dec(bodyFloorKg)}\u00A0kg και '
+        'πάνω: μικρότερη χάνεται στη διακύμανση της ζυγαριάς. Και μεγαλύτερη μπορεί να είναι νερό, ειδικά την πρώτη '
+        'εβδομάδα δίαιτας.';
   }
   return '${weight}Η αλλαγή σε λίπος και μύες φαίνεται μετά από 6\u00A0μέρες ζύγισης (έχεις $days): μία ζύγιση μόνη της '
       'ανεβοκατεβαίνει με το νερό.';

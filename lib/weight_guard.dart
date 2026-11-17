@@ -134,6 +134,11 @@ const weightConfirmBigKg = 12.0;
 const weightConfirmBigShare = 0.15;
 const weightConfirmGap = 7;
 
+/// Έλεγχος 17/11 (Κ3-M2): πόσα kg τη μέρα, πάνω από το [weightGuardKg], «χωρά» μια αληθινή αλλαγή από την τελευταία
+/// ζύγιση με το παλιό βάρος (νερά αρρώστιας, πολύ γρήγορη απώλεια). Με αυτό, προσομοίωση: οι δικές σου ζυγίσεις μένουν
+/// όπως πριν (σε αναμονή/ξένες 4/0 έναντι 3/0 στις 15.740), ο επισκέπτης 4,5–8 kg μένει σε αναμονή.
+const weightReachKgPerDay = 0.35;
+
 /// Round 2 (R2-E-2): τι γίνεται με μια ζύγιση (κανόνας στην αρχή του αρχείου).
 enum WeighStatus {
   /// Μετρά παντού.
@@ -266,7 +271,8 @@ WeighStatus _weighStatus(List<(DateTime, double)> s, int i, double kg) {
   if (near.length < weightGuardMinNeighbours) return WeighStatus.counted;
   final (:ref, :other) = _reference(s, i, kg, near, vote: true);
   final diff = (kg - ref).abs();
-  if (diff <= math.max(weightGuardKg, weightGuardShare * ref)) return WeighStatus.counted;
+  final base = math.max(weightGuardKg, weightGuardShare * ref);
+  if (diff <= base) return WeighStatus.counted;
   double at(int j) => j == i ? kg : s[j].$2;
   // Το «κομμάτι» της: οι διπλανές ζυγίσεις που συμφωνούν μαζί της, η καθεμία ως [weightGuardDays] μέρες από την επόμενη.
   bool linked(int a, int b) => daysBetween(s[a].$1, s[b].$1) <= weightGuardDays && weightsAgree(at(a), at(b));
@@ -300,10 +306,15 @@ WeighStatus _weighStatus(List<(DateTime, double)> s, int i, double kg) {
     // Round 3 (k1 · R3-A-1): μετρά όταν το νέο βάρος φάνηκε σε [weightConfirmDays] μέρες σε [weightConfirmSpan] μέρες και
     // πάνω. Round 4 (m1 · R4-A-1): αλλαγή πάνω από [weightConfirmKg] kg / [weightConfirmShare] μόνο μετά από κενό
     // [weightConfirmGap] ημερών χωρίς ζύγιση (πριν: οποιοδήποτε μέγεθος, και −45 kg: το παιδί δύο Σαββατοκύριακα).
-    final gapBefore = first == 0 || daysBetween(s[first - 1].$1, s[first].$1) > weightConfirmGap;
+    final gapDays = first == 0 ? null : daysBetween(s[first - 1].$1, s[first].$1);
+    final gapBefore = gapDays == null || gapDays > weightConfirmGap;
+    // Έλεγχος 17/11 (Κ3-M2): και η αλλαγή να «χωρά» στις μέρες από την τελευταία ζύγιση με το παλιό βάρος (το πολύ
+    // [weightReachKgPerDay] kg τη μέρα πάνω από το [weightGuardKg]). Πριν, κάποιος 6 kg ελαφρύτερος την επόμενη μέρα από
+    // την τελευταία σου ζύγιση μετρούσε μετά από 3 μέρες (και η «γρήγορη απώλεια» πρότεινε +150 kcal).
+    final reachable = gapDays == null || diff <= base + weightReachKgPerDay * gapDays;
     return last - first + 1 >= weightConfirmDays &&
             daysBetween(s[first].$1, s[last].$1) >= weightConfirmSpan &&
-            (diff <= cap || gapBefore)
+            ((diff <= cap && reachable) || gapBefore)
         ? WeighStatus.counted
         : WeighStatus.pending;
   }
@@ -366,7 +377,7 @@ bool _mixed(List<double> kgs) {
 /// όποιος ζυγιζόταν πρώτος). Χωρίς καμία άλλη μέρα ζύγισης ως [weightGuardHorizon] μέρες: [unsure], η μέρα «σε αναμονή»
 /// (ζύγιση της μέρας η πρώτη· καμία δεν μετρά, καμία δεν είναι «ξένη») ως την επόμενη ζύγιση. Ζυγίσεις που συμφωνούν
 /// (π.χ. πρωί και βράδυ): η πρώτη που μετρά· αν καμία, μια «σε αναμονή» πριν από μια «ξένη», η πιο κοντινή στην αναφορά
-/// (round 3, R3-A-2). Η επιλογή ξανακρίνεται με τις επιλογές των άλλων ημερών (ως 3 φορές, ώσπου να μην αλλάζει)· η
+/// (round 3, R3-A-2). Η επιλογή ξανακρίνεται με τις επιλογές των άλλων ημερών (ως 10 φορές, ώσπου να μην αλλάζει)· η
 /// κατάσταση κάθε μέρας βγαίνει στο τέλος από τη σειρά των ζυγίσεων της μέρας ([weighStatusAt]), όπως στο ιστορικό.
 List<({int pick, WeighStatus status, bool unsure})> guardDays(List<(DateTime, List<double>)> days) {
   final n = days.length;
@@ -375,8 +386,14 @@ List<({int pick, WeighStatus status, bool unsure})> guardDays(List<(DateTime, Li
       (i == n - 1 || daysBetween(days[i].$1, days[i + 1].$1) > weightGuardHorizon);
   final mixed = [for (final d in days) _mixed(d.$2)];
   final unsure = [for (var i = 0; i < n; i++) mixed[i] && alone(i)];
-  var picks = List<int>.filled(n, 0);
-  for (var round = 0; round < 3; round++) {
+  // Έλεγχος 17/11 (Κ3-H1): μέρα με δύο ανθρώπους ξεκινά από τη ζύγιση που είναι πιο κοντά στη διάμεσο των ημερών με ΜΙΑ
+  // ζύγιση (±[weightGuardHorizon]). Πριν ξεκινούσε από την πρώτη της μέρας, και η αναφορά έβγαινε μόνο από τις επιλογές:
+  // όποιος ζυγιζόταν πρώτος κάθε μέρα «γινόταν εσύ» (30 μέρες με 65 kg πρώτα και τα δικά σου 80 kg μετά: μετρούσαν τα 65).
+  var picks = [
+    for (var i = 0; i < n; i++)
+      mixed[i] && !unsure[i] ? _closestToSolo(days, i, mixed) : 0,
+  ];
+  for (var round = 0; round < 10; round++) {
     final s = [for (var i = 0; i < n; i++) (days[i].$1, days[i].$2[picks[i]])];
     final next = [
       for (var i = 0; i < n; i++) days[i].$2.length < 2 || unsure[i] ? 0 : _pickDay(s, i, days[i].$2, mixed[i]),
@@ -393,6 +410,23 @@ List<({int pick, WeighStatus status, bool unsure})> guardDays(List<(DateTime, Li
     for (var i = 0; i < n; i++)
       (pick: picks[i], status: unsure[i] ? WeighStatus.pending : _weighStatus(s, i, s[i].$2), unsure: unsure[i]),
   ];
+}
+
+/// Κ3-H1: η θέση της ζύγισης της μέρας [i] που είναι πιο κοντά στη διάμεσο των ημερών με μία μόνο ζύγιση (ή ζυγίσεις
+/// που συμφωνούν) ως [weightGuardHorizon] μέρες γύρω της· 0 αν δεν υπάρχει καμία τέτοια μέρα.
+int _closestToSolo(List<(DateTime, List<double>)> days, int i, List<bool> mixed) {
+  final solo = [
+    for (var j = 0; j < days.length; j++)
+      if (!mixed[j] && (daysBetween(days[j].$1, days[i].$1)).abs() <= weightGuardHorizon) days[j].$2.first,
+  ];
+  final m = _median(solo);
+  if (m == null) return 0;
+  final kgs = days[i].$2;
+  var best = 0;
+  for (var k = 1; k < kgs.length; k++) {
+    if ((kgs[k] - m).abs() < (kgs[best] - m).abs()) best = k;
+  }
+  return best;
 }
 
 int _pickDay(List<(DateTime, double)> s, int i, List<double> kgs, bool mixed) {

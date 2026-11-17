@@ -407,7 +407,7 @@ void main() {
       final r = math.Random(seed);
       var shown = 0;
       for (var k = 0; k < n; k++) {
-        final body = [for (var d = 0; d < 6; d++) _m(DateTime(2026, 11, 2 + 2 * d, 8), 90, smm: 34 + sigma * _normal(r))];
+        final body = [for (final day in const [2, 4, 6, 20, 22, 24]) _m(DateTime(2026, 11, day, 8), 90, smm: 34 + sigma * _normal(r))];
         final tr = bodyTrend(body, (b) => b.smm)!;
         if (bodyDiffShown(shownDiff(tr.now, tr.before, 1), floor)) shown++;
       }

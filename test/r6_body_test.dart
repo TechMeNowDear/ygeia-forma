@@ -81,9 +81,8 @@ void main() {
     test('ο φύλακας: η 14/12 είναι «σε αναμονή»· η τάση λίπους (3 τελευταίες που μετρούν, 29,0, με τις 3 πριν, 27,0) = +2,0', () {
       final st = {for (final g in weighInDays(rows)) g.day: g.status};
       expect(st[DateTime(2026, 12, 14)], WeighStatus.pending);
-      final tr = bodyTrend(rows, (b) => b.fatPct)!;
-      expect(tr.now, 29.0);
-      expect(tr.before, 27.0);
+      // Έλεγχος 17/11 (Κ3-M3): οι «3 πριν» θέλουν 2 εβδομάδες απόσταση από τις 3 τελευταίες: εδώ καμία τάση.
+      expect(bodyTrend(rows, (b) => b.fatPct), isNull);
     });
 
     testWidgets('Δε 14/12: «Λίπος 25,0%» χωρίς «(+2,0)» (πριν: «25,0%  (+2,0)», αλλαγή που δεν περιέχει την τιμή)', (t) async {

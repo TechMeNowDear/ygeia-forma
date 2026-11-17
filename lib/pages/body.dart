@@ -8,6 +8,7 @@ import '../profile.dart';
 import '../reference.dart';
 import '../shown.dart';
 import '../theme.dart';
+import '../weight_guard.dart' show weightsAgree;
 import '../widgets.dart';
 import 'info_sheet.dart';
 import 'me_page.dart';
@@ -50,7 +51,14 @@ class BodyPage extends StatelessWidget {
             ? null
             : [
                 for (final b in body)
-                  if (b.weight != null && dayOf(b.time) == dayOf(last.time) && b.time.isAfter(last.time)) b,
+                  // Έλεγχος 17/11 (Κ3-L5): μόνο δική σου (όχι ξένη, και βάρος που συμφωνεί με της μέρας): πριν «Και 07:20:
+                  // 38,0 kg» με τη ζύγιση του παιδιού.
+                  if (b.weight != null &&
+                      dayOf(b.time) == dayOf(last.time) &&
+                      b.time.isAfter(last.time) &&
+                      !foreign.contains(b) &&
+                      (last.weight == null || weightsAgree(b.weight!, last.weight!)))
+                    b,
               ].lastOrNull;
         // Round 2 (g4 · R2-D-8): τα γραφήματα με μία ζύγιση ανά μέρα, την πρώτη που μετρά ([countedBody]), όπως η τάση, το
         // ιστορικό, οι Τάσεις και η σελίδα της μέτρησης (πριν: κάθε ζύγιση, και η βραδινή μετά την προπόνηση ζιγκ-ζαγκ).
