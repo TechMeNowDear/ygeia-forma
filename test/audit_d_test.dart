@@ -213,7 +213,7 @@ void main() {
 
       expect(t.widget<TextField>(find.byKey(const ValueKey('report-note'))).maxLength, 400);
       expect(t.widget<TextField>(find.byKey(const ValueKey('report-note'))).decoration!.hintText, contains('τεστ άπνοιας'));
-      expect(find.textContaining('μετρήσεις πίεσης'), findsWidgets);
+      expect(find.textContaining('πίεση, σάκχαρο και καρδιογραφήματα'), findsWidgets); // Κ6-H1 (17/11)
       expect(find.text('Μέρες'), findsOneWidget, reason: 'όχι «Μέρες με / μέτρηση» που έσπαγε');
       expect(find.textContaining('κατά προσέγγιση'), findsOneWidget);
       expect(find.textContaining('90,4% ± 3,1%'), findsOneWidget);

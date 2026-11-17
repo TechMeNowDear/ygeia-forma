@@ -29,15 +29,25 @@ void main() {
     final a = bpAverage(list, now)!;
     expect(a.n, 2);
     expect(bpAverageText(a), contains('135/83'));
-    expect(bpAverageText(a), contains('Πάνω από το όριο'));
+    // Έλεγχος 17/11 (Κ6-H2): με 2 μετρήσεις σε 2 μέρες κανένα συμπέρασμα.
+    expect(bpAverageText(a), contains('Λίγες μετρήσεις'));
+    expect(bpAverageText(a), isNot(contains('πάνω από το όριο')));
+    // 12 μετρήσεις σε 3 μέρες: τρία σκαλιά (ESC 2024).
+    List<Vital> many(int s, int d) => [for (var i = 0; i < 12; i++) bp('m$i', s, d, daysAgo: i % 3)];
+    expect(bpAverageText(bpAverage(many(138, 84), now)!), contains('πάνω από το όριο'));
+    expect(bpAverageText(bpAverage(many(130, 83), now)!), contains('«αυξημένη»'));
+    expect(bpAverageText(bpAverage(many(118, 68), now)!), contains('όχι αυξημένη'));
     expect(bpAverage([bp('c', 180, 110, daysAgo: 9)], now), isNull);
   });
 
   test('Σάκχαρο: σημείωση μόνο όπου είναι καθαρό', () {
     Vital g(double v, GlucoseWhen w) => Vital(id: 'g', kind: VitalKind.glucose, at: now, glucose: v, when: w);
-    expect(glucoseNote(g(92, GlucoseWhen.fasting)), contains('φυσιολογικό'));
-    expect(glucoseNote(g(110, GlucoseWhen.fasting)), contains('γιατρό'));
+    expect(glucoseNote(g(92, GlucoseWhen.fasting)), contains('εξέταση αίματος'));
+    expect(glucoseNote(g(110, GlucoseWhen.fasting)), contains('προδιαβήτη'));
+    expect(glucoseNote(g(130, GlucoseWhen.fasting)), contains('διαβήτη'));
     expect(glucoseNote(g(140, GlucoseWhen.after)), isNull);
+    expect(glucoseNote(g(210, GlucoseWhen.after)), contains('200 και πάνω'));
+    expect(glucoseNote(g(350, GlucoseWhen.random)), contains('Πολύ υψηλό'));
     expect(glucoseNote(g(60, GlucoseWhen.random)), contains('χαμηλό'));
   });
 
