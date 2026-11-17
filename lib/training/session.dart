@@ -120,7 +120,8 @@ class ExLog {
   /// [plannedSets] μετά από αλλαγή άσκησης). Ένα σετ παραπάνω με το «+ Σετ» μένει στο ιστορικό και στον όγκο, αλλά δεν
   /// κρίνεται. Ένας κανόνας για την πρόοδο της εφαρμογής (progression.dart) και για την «Πρόοδο» (progress.dart).
   List<SetLog> get judged {
-    final d = done;
+    // Έλεγχος 17/11 (Κ5-M4): ✓ με 0 επαναλήψεις δεν είναι σετ (πριν: 11, 11, 0 → «μένει ίδιο», δύο φορές → πιο ελαφριά).
+    final d = [for (final s in done) if (s.reps > 0) s];
     final p = plannedSets ?? 0;
     final n = sets > p ? sets : p;
     return n > 0 && d.length > n ? d.sublist(0, n) : d;

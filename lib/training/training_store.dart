@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../exercise/ex_data.dart';
+import '../format.dart' show daysBetween;
 import 'equipment.dart';
 import 'hr_file.dart';
 import 'progression.dart';
@@ -1079,6 +1080,20 @@ class TrainingStore extends ChangeNotifier {
     for (final e in s.items) {
       e.firstAnswer ??= watchFirstAnswer(e);
     }
+    // Έλεγχος 17/11 (Κ5-M2): ξεχασμένη προπόνηση ΜΟΝΟ στο ρολόι («Τέλος» ώρες μετά το τελευταίο ✓): τέλος στο τελευταίο ✓
+    // και παλμοί ως εκεί (+1′), όπως οι προπονήσεις του κινητού ([finish]). Πριν: 4 ώρες 10 λεπτά, και μέσος/υψηλότερος
+    // από 3 ώρες καθημερινότητας.
+    if (cardio == null && !partial && s.items.any((e) => e.done.isNotEmpty) && end.difference(s.lastTick) >= staleAfter) {
+      s.end = s.lastTick;
+      final cut = s.hrUpTo(s.lastTick);
+      if (cut.hr.length < s.hr.length) {
+        s.hr
+          ..clear()
+          ..addAll(cut.hr);
+        s.hrMax = cut.max;
+      }
+      if (s.hr.isNotEmpty) s.hrAvg = cut.avg;
+    }
     _watchHrInfo(s, j);
     if (cardio != null) {
       // Ρολόι παλιότερης έκδοσης έστελνε 0 όταν το Health Services δεν έδωσε χρόνο (έλεγχος γ2, W2-11): τότε από τις ώρες.
@@ -1506,7 +1521,19 @@ class TrainingStore extends ChangeNotifier {
     for (var k = 1; k < e.log.length; k++) {
       if (e.log[k].done) return false;
     }
-    return isFirstTime(e.ex);
+    return isFirstTime(e.ex) || stillCalibrating(e.ex);
+  }
+
+  /// Έλεγχος 17/11 (Κ5-H1, Κ5-M3): η ερώτηση του 1ου σετ ξαναγίνεται (α) όσο την τελευταία φορά η απάντηση ήταν «4+» με τις
+  /// επαναλήψεις του στόχου (το βάρος ίσως είναι ακόμα πολύ ελαφρύ), και (β) μετά από διακοπή πάνω από [recalibrateGapDays]
+  /// μέρες (σαν πρώτη φορά). Πριν γινόταν μόνο μία φορά σε όλη τη ζωή της άσκησης.
+  bool stillCalibrating(String ex) {
+    final h = historyOf(ex).where((x) => !x.$2.skipped && x.$2.done.isNotEmpty).firstOrNull;
+    if (h == null) return false;
+    if (daysBetween(h.$1, now) > recalibrateGapDays) return true;
+    final e = h.$2;
+    final first = e.log.isEmpty ? null : e.log.first;
+    return (e.firstAnswer ?? -1) >= 4 && first != null && first.done && first.reps >= e.lo && e.pain.isEmpty;
   }
 
   /// R8-U3-01: η απάντηση στο «Πρώτο σετ», από όποια συσκευή έρθει πρώτη: [rir] 0–4 (βαθμονόμηση, [calibrateAfterFirst]) ή
@@ -1514,7 +1541,8 @@ class TrainingStore extends ChangeNotifier {
   /// false). [load]: το νέο φορτίο των επόμενων σετ, ή null αν δεν άλλαξε.
   ({bool applied, double? load}) answerFirst(ExLog e, int rir) {
     if (!firstPending(e)) return (applied: false, load: null);
-    final a = rir < 0 ? -1 : rir.clamp(0, 4);
+    // Κ5-H1 (17/11): από το κινητό και 6/10/15 («5–7», «8–12», «13+»)· το ρολόι στέλνει ως 4.
+    final a = rir < 0 ? -1 : rir.clamp(0, 15);
     e.firstAnswer = a;
     final v = a < 0 ? null : calibrateAfterFirst(e, a);
     save();

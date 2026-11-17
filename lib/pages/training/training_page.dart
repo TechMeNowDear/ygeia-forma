@@ -926,8 +926,8 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               decoration: BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(12)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('Η δόνηση βοηθά, δεν εγγυάται: πρώτα μετράει πώς νιώθεις. Με πόνο στο στήθος, δύσπνοια ή ζάλη σταματάς, '
-                    'ό,τι κι αν δείχνει το ρολόι.',
+                Text('Η δόνηση βοηθά, δεν εγγυάται: πρώτα μετράει πώς νιώθεις. Με πόνο στο στήθος, δύσπνοια, ζάλη ή αίσθημα '
+                    'παλμών σταματάς, ό,τι κι αν δείχνει το ρολόι. Αν είναι έντονο ή δεν περνά: 166 ή 112.',
                     style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
                 const SizedBox(height: 6),
                 Text(hrLimitBetaBlockerText, key: const ValueKey('train-hr-beta'), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
