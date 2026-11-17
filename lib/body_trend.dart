@@ -318,3 +318,22 @@ const bodyNoPermissionText = 'Η άδεια «Σύσταση σώματος» τ
     'InBody δεν φτάνουν εδώ. Άνοιξέ την από τις «Άδειες Samsung Health».';
 const bodyNoPermissionShort = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή· άνοιξέ την από Ρυθμίσεις › '
     'Άδειες Samsung Health.';
+
+/// 17/11 (απόφαση χρήστη): μέσος όρος 7 ημερών για το γράφημα βάρους· για κάθε μέρα με τιμή, ο μέσος όρος των τιμών της
+/// ίδιας και των 6 προηγούμενων ημερών, μόνο με 3 τιμές και πάνω (με λιγότερες δεν «μαλακώνει» τα νερά). [pts]: μία τιμή τη
+/// μέρα, παλιότερη πρώτη. Turicchi 2020: το βάρος ανεβοκατεβαίνει ~0,35% μέσα στην εβδομάδα.
+List<(DateTime, double)> average7Days(List<(DateTime, double)> pts) {
+  final out = <(DateTime, double)>[];
+  var lo = 0;
+  var sum = 0.0;
+  for (var i = 0; i < pts.length; i++) {
+    sum += pts[i].$2;
+    while (daysBetween(dayOf(pts[lo].$1), dayOf(pts[i].$1)) > 6) {
+      sum -= pts[lo].$2;
+      lo++;
+    }
+    final n = i - lo + 1;
+    if (n >= 3) out.add((pts[i].$1, sum / n));
+  }
+  return out;
+}

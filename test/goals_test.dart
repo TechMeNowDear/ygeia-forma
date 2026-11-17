@@ -80,7 +80,7 @@ void main() {
       expect(g.delta, closeTo(-495, 1e-9));
       expect(g.kcal, 2250);
       expect(g.floored, isFalse);
-      expect(g.protein, 145); // 1,6 × 90 = 144 → στα 5
+      expect(g.protein, 160); // απώλεια: 1,8 × 90 = 162 → στα 5 (17/11)
       expect(g.fatLo, 63);
       expect(g.fatHi, 88);
       expect(g.satPct, 6);
@@ -347,7 +347,7 @@ void main() {
       await next();
       expect(find.byType(GoalsPage), findsOneWidget);
       final g = store.goals!;
-      expect((g.kcal, g.protein, g.doctor, g.kg, g.since, g.activity), (2520, 145, true, 90.0, '2026-11-12', 1.65));
+      expect((g.kcal, g.protein, g.doctor, g.kg, g.since, g.activity), (2520, 160, true, 90.0, '2026-11-12', 1.65));
       expect(find.byKey(const ValueKey('goals-bran')), findsOneWidget);
       expect(t.takeException(), isNull);
     });

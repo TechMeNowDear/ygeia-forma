@@ -4,7 +4,7 @@ import '../data.dart';
 import '../format.dart';
 import '../history.dart';
 import '../profile.dart';
-import '../body_trend.dart' show bodyFloorFatPct, bodyFloorKg;
+import '../body_trend.dart' show average7Days, bodyFloorFatPct, bodyFloorKg;
 import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
@@ -316,6 +316,8 @@ class _MetricPageState extends State<MetricPage> {
               if (pts.length >= 2) ...[
                 LineChart(
                   points: pts,
+                  // 17/11: στο βάρος και ο μέσος όρος 7 ημερών (έντονη γραμμή).
+                  average: s.metric == K.weight ? average7Days(pts) : const [],
                   color: color,
                   format: s.axis ?? s.show,
                   // Round 2 (R2-D-9): «365 μέρες» (και κάθε διάστημα που περνά την Πρωτοχρονιά) με το έτος στις άκρες.
