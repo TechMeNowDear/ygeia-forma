@@ -28,6 +28,9 @@ const bodyTrendGroup = 3;
 /// απώλεια, 3,8% χωρίς καμία). Το όριο θορύβου (μεσαίες τιμές από 3) μένει το ίδιο.
 const bodyTrendGapDays = 14;
 
+/// Κ3-L4: ζυγίσεις ως τόσα λεπτά μετά τη ζύγιση της μέρας θεωρούνται το ίδιο ζύγισμα (π.χ. ξανά για να πάρει και λίπος).
+const bodySameSessionMin = 30;
+
 /// Round 1 (S4-3): η μικρότερη διαφορά της τάσης (μεσαία 3 τελευταίων − μεσαία 3 πριν) που γράφεται. Πηγή: McLester κ.ά.,
 /// J Clin Densitom 2020 (67 ενήλικες, InBody 230/720/770, δύο μετρήσεις με 24–72 ώρες διαφορά): τυπικό σφάλμα μέτρησης
 /// 0,77–0,99 μονάδες στο % λίπους, 0,54–0,87 kg στη μάζα λίπους, 0,58–0,84 kg στην άλιπη μάζα. Σε προσομοίωση χωρίς
@@ -86,10 +89,14 @@ List<({DateTime day, List<BodyMeasurement> all, BodyMeasurement pick, WeighStatu
     final weighed = [for (final b in byDay[judged[i]]!) if (_weighed(b)) b];
     var pick = weighed[r[i].pick];
     // Έλεγχος 17/11 (Κ3-L4): ζύγιση μόνο με βάρος πρώτη (07:00) και πλήρης ζύγιση μετά (07:02) που συμφωνεί: μετρά η πλήρης,
-    // αλλιώς η μέρα έμενε χωρίς λίπος και μύες (Σώμα «Λίπος —», ιστορικό και Τάσεις χωρίς τη μέρα).
+    // αλλιώς η μέρα έμενε χωρίς λίπος και μύες (Σώμα «Λίπος —», ιστορικό και Τάσεις χωρίς τη μέρα). Μόνο ως
+    // [bodySameSessionMin] λεπτά μετά: μια βραδινή ζύγιση (μετά από φαγητό ή προπόνηση) δεν παίρνει τη θέση της πρωινής.
     if (pick.fatPct == null && !r[i].unsure) {
       for (final b in weighed) {
-        if (b.fatPct != null && weightsAgree(b.weight!, pick.weight!)) {
+        if (b.fatPct != null &&
+            !b.time.isBefore(pick.time) &&
+            b.time.difference(pick.time).inMinutes <= bodySameSessionMin &&
+            weightsAgree(b.weight!, pick.weight!)) {
           pick = b;
           break;
         }

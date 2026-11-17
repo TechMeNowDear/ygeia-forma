@@ -320,7 +320,7 @@ void main() {
       addTearDown(() => t.binding.setSurfaceSize(null));
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: BodyPage(store: s))));
       await t.pumpAndSettle();
-      expect(t.widget<Text>(find.byKey(const ValueKey('body-trend-note'))).data, contains('οι 3 τελευταίες ζυγίσεις σε σύγκριση με τις 3 πριν'));
+      expect(t.widget<Text>(find.byKey(const ValueKey('body-trend-note'))).data, contains('οι 3 τελευταίες ζυγίσεις σε σύγκριση με 3 τουλάχιστον'));
       String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
       // Δείγμα: λίπος 27,9 · 27,5 · 27,0 | 26,6 · 26,3 · 25,4 → μεσαίες 27,5 και 26,3 → −1,2 (από την προηγούμενη θα ήταν −0,9).
       // Round 1 (S4-3, f4): −1,2 είναι μέσα στη διακύμανση της ζυγαριάς (όριο 1,5 μονάδες) → χωρίς παρένθεση· «%» χωρίς
