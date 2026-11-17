@@ -927,6 +927,31 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     return false;
   }
 
+  /// Έλεγχος 17/11 (Κ2-M1): για το αντίγραφο. Πριν το πρόγραμμα εβδομάδας και η ώρα υπενθύμισης δεν έμπαιναν, και μετά
+  /// από «Διαγραφή όλων» και επαναφορά χάνονταν (μαζί με το «Το έφαγα»/«Παράλειψη» της εβδομάδας).
+  Map<String, dynamic>? weekForBackup() => _week?.toJson();
+
+  /// Επαναφορά: το πρόγραμμα και η ώρα μπαίνουν μόνο αν εδώ δεν υπάρχουν. Πόσα μπήκαν (0–2), ή -1 αν δεν γράφτηκαν.
+  Future<int> importWeekRemind(Object? week, Object? remind) async {
+    final w = week == null ? null : WeekPlan.fromJson(week);
+    final r = remind is int && remind >= 0 && remind < 24 * 60 ? remind : null;
+    if (w == null && r == null) return 0;
+    if (!_dishesRead) await loadDishes();
+    if (!_dishesRead || _dishesNewer) return -1;
+    final addWeek = w != null && _week == null;
+    final addRemind = r != null && _remindAt == null;
+    if (!addWeek && !addRemind) return 0;
+    final beforeWeek = _week, beforeRemind = _remindAt;
+    if (addWeek) _week = w;
+    if (addRemind) _remindAt = r;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(_dishes))) return (addWeek ? 1 : 0) + (addRemind ? 1 : 0);
+    _week = beforeWeek;
+    _remindAt = beforeRemind;
+    notifyListeners();
+    return -1;
+  }
+
   /// Τα φαγητά μου: όσα έγραψες πιο πρόσφατα πρώτα.
   List<Dish> get dishes => _dishes;
 

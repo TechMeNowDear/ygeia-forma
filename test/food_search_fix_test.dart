@@ -214,7 +214,7 @@ void main() {
   group('Νέα τρόφιμα (μόνο ακριβείς αντιστοιχίες CIQUAL 2025 / USDA FDC)', () {
     test('375 τρόφιμα· τα νέα υπάρχουν με την πηγή τους', () {
       // + πίτουρο βρώμης (12/11) + 5 του ελέγχου round1 (ρέγγα × 3, καστανό ρύζι parboiled × 2)
-      expect(basicFoods().length, 380);
+      expect(basicFoods().length, 385);
       const added = {
         'C26025': 'CIQUAL 2025', 'C26120': 'CIQUAL 2025', 'C26040': 'CIQUAL 2025', 'C6255': 'CIQUAL 2025',
         'C6257': 'CIQUAL 2025', 'C21800': 'CIQUAL 2025', 'C21801': 'CIQUAL 2025', 'C22505': 'CIQUAL 2025',

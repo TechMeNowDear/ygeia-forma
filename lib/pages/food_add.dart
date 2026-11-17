@@ -203,7 +203,8 @@ String rawOrCookedQuestion(double grams, List<(Food, String)> forms) {
 /// σε κάθε μορφή της βάσης (πριν «για στον ατμό», «για φούρνου», «για ψητός», «για βρασμένοι»). Round9 (R9-A2-3): δικό σου
 /// ξερό προϊόν (ζυμαρικό, ρύζι, όσπριο): οι τιμές του είναι για το ξερό, όπως γράφει η συσκευασία.
 String stateNote(Food f) {
-  if (f.rawId == null) {
+  // Έλεγχος 17/11: και τα «μόνο μαγειρεμένα» της βάσης (κεφτέδες, σουβλάκι…): πριν έγραφε «Βάρος πριν το μαγείρεμα».
+  if (!f.isCooked) {
     return f.isMine
         ? 'Οι τιμές είναι για το ξερό προϊόν, όπως στη συσκευασία: βάρος πριν το μαγείρεμα.'
         : 'Βάρος πριν το μαγείρεμα (το πιο ακριβές).';
@@ -1269,6 +1270,9 @@ class _QuantitySheetState extends State<QuantitySheet> {
   }
 
   double? get _value {
+    // Κ2-H1 (17/11): ανέγγιχτο πεδίο αλλαγής → η αποθηκευμένη ποσότητα (12,25 g φαίνεται «12,3» αλλά μένει 12,25).
+    final init = widget.initialGrams;
+    if (widget.editing && _grams.text.trim() == gramsField(init)) return init;
     final v = parseNumber(_grams.text);
     return (v == null || !(v > 0 && v <= maxEntryGrams)) ? null : v;
   }

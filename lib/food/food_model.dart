@@ -166,6 +166,10 @@ class Food {
 
   bool get isRawWithCooked => cooked.isNotEmpty;
 
+  /// Έλεγχος 17/11: μαγειρεμένο τρόφιμο της βάσης, με ή χωρίς ωμή μορφή ([rawId]). Χωρίς ωμή μορφή («μόνο μαγειρεμένο»,
+  /// π.χ. κεφτέδες, σουβλάκι): ζυγίζεται μετά το μαγείρεμα και δεν μπαίνει ως ωμό υλικό σε συνταγή.
+  bool get isCooked => rawId != null || cookedLabel != null;
+
   bool get isMine => source == 'Open Food Facts' || source == 'Ετικέτα';
 
   /// «ml» για υγρά με τιμές ανά 100 ml (η ποσότητα γράφεται τότε σε ml), αλλιώς «g».

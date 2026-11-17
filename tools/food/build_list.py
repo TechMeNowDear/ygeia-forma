@@ -28,6 +28,14 @@ def calc_kcal(n):
     # Στη CIQUAL οι υδατάνθρακες περιέχουν ήδη τις πολυόλες.
     return 4*p + 4*max(0.0, c - pol) + 9*f + 2*fib + 7*alc + 2.4*pol
 
+# Έλεγχος 17/11 (επιστημονικός, κατηγορία 2): εδώ το νάτριο της CIQUAL δεν στέκει με το δικό της αλάτι, που στηρίζεται
+# σε νεότερα ή περισσότερα δεδομένα. Ηλιόσποροι αλατισμένοι: νάτριο 2.000 mg (= 5 g αλάτι, το πάνω άκρο του εύρους
+# 0,25–5) έναντι αλατιού 2,63 g (USDA 169: 1,64 g)· γαύρος μαρινάτος: 7,68 έναντι 4,15 g (και τα δύο υπολογισμένα)·
+# γκρυγιέρ: νάτριο του 2004 (0,8 g) έναντι αλατιού 1,3 g (2015· USDA: 1,79 g).
+CIQUAL_SALT = {15045, 26700, 12114}
+# Ελέγχθηκαν και μένει το νάτριο × 2,5: μαϊντανός (νάτριο 51,5 mg· USDA 56 mg = 0,14 g αλάτι· το αλάτι 0,59 g της CIQUAL δεν στέκει).
+SODIUM_OK = {11014}
+
 foods, problems, seen = [], [], set()
 for line in open(listfile, encoding="utf-8"):
     if not line.strip() or line.startswith("#"): continue
@@ -52,6 +60,14 @@ for line in open(listfile, encoding="utf-8"):
         # Νάτριο «<x» mg → αλάτι «<x×2,5/1000» g. Η τιμή αλατιού της CIQUAL εκεί είναι μερικές φορές λάθος
         # (γκρέιπφρουτ, κόκκινο κρασί: «<2 g»· έλεγχος διατροφής M3, 4/11).
         n["salt"] = {"lt": round(sod["lt"] * 2.5 / 1000, 4)}
+    # Έλεγχος 17/11: όπου η CIQUAL δίνει δικό της αλάτι πολύ διαφορετικό από νάτριο × 2,5, το λέει για έλεγχο. Στα
+    # [CIQUAL_SALT] κρατιέται το αλάτι της CIQUAL (το νάτριο είναι από παλιά ή υπολογισμένη πηγή).
+    cs = s["n"].get("salt") if src == "C" else None
+    if isinstance(cs, (int, float)) and isinstance(n.get("salt"), (int, float)):
+        if code in CIQUAL_SALT:
+            n["salt"] = cs
+        elif code not in SODIUM_OK and abs(cs - n["salt"]) > 0.2 and abs(cs - n["salt"]) > 0.25 * max(cs, n["salt"]):
+            problems.append(f"ΑΛΑΤΙ (έλεγξε) {fid} {name}: CIQUAL {cs:g} g, νάτριο × 2,5 = {n['salt']:g} g")
     entry = {
         "id": fid,
         "name": name, "cat": cat, "aliases": aliases,
@@ -84,6 +100,12 @@ byid = {f["id"]: f for f in foods}
 for line in open(pairs_file, encoding="utf-8"):
     if not line.strip() or line.startswith("#"): continue
     raw, cooked, label = line.rstrip("\n").split("\t")[:3]
+    if raw == "-":
+        # Έλεγχος 17/11: μόνο μαγειρεμένο (καμία ωμή μορφή στη βάση): ζυγίζεται μετά το μαγείρεμα.
+        if cooked not in byid:
+            problems.append(f"ΜΟΝΟ ΜΑΓΕΙΡΕΜΕΝΟ ΧΩΡΙΣ ΤΡΟΦΙΜΟ {cooked}"); continue
+        byid[cooked]["cookedLabel"] = label
+        continue
     if raw not in byid or cooked not in byid:
         problems.append(f"ΖΕΥΓΑΡΙ ΧΩΡΙΣ ΤΡΟΦΙΜΟ {raw} → {cooked}"); continue
     byid[raw].setdefault("cooked", []).append({"id": cooked, "label": label})
