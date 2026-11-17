@@ -180,7 +180,7 @@ void main() {
       final text = not.textSpan!.toPlainText();
       expect(text, isNot(contains('δεν έχει πρόσβαση')), reason: 'η εφαρμογή ζητά τις άδειες· η φράση ήταν ψευδής');
       expect(text, contains('ΗΚΓ'));
-      expect(text, contains('πίεση'));
+      expect(text, contains('Πίεση, σάκχαρο')); // Κ6-H1 (17/11): γράφονται με το χέρι, δεν μπαίνουν ακόμα
       expect(text, contains('Samsung Health Monitor'));
       expect(text, contains('δεν σημαίνει ότι ήταν φυσιολογικά'));
       // Έλεγχος του #90 (M-1): η εξήγηση δεν διαβάζεται σαν «δεν άλλαξε».
