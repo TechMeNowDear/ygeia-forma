@@ -55,10 +55,18 @@ HrvTrend? hrvTrend(Map<String, Map<String, double>> history, SourcePlan plan, Da
   final base = [for (var i = 7; i < 7 + hrvBaseDays; i++) ln(i)].whereType<double>().toList();
   if (base.length < hrvBaseMin) return null;
   double mean(List<double> v) => v.fold<double>(0, (a, b) => a + b) / v.length;
-  final m = mean(base);
-  final sd = math.sqrt(base.fold<double>(0, (a, b) => a + (b - m) * (b - m)) / (base.length - 1));
+  // Έλεγχος 17/11 (Κ4-4): μία νύχτα με λάθος (π.χ. 180 ms από έκτακτες συστολές) δεν απλώνει το εύρος για 60 νύχτες:
+  // οι τιμές πέρα από διάμεσο ± 3 × MAD × 1,4826 κόβονται σε αυτό το όριο πριν από τον υπολογισμό (winsorize). Χωρίς
+  // τέτοιες νύχτες ο υπολογισμός είναι ίδιος με πριν.
+  final sorted = [...base]..sort();
+  double med(List<double> v) => v.length.isOdd ? v[v.length ~/ 2] : (v[v.length ~/ 2 - 1] + v[v.length ~/ 2]) / 2;
+  final md = med(sorted);
+  final mad = med([for (final x in sorted) (x - md).abs()]..sort()) * 1.4826;
+  final clipped = mad <= 0 ? base : [for (final x in base) x.clamp(md - 3 * mad, md + 3 * mad).toDouble()];
+  final mc = mean(clipped);
+  final sd = math.sqrt(clipped.fold<double>(0, (a, b) => a + (b - mc) * (b - mc)) / (clipped.length - 1));
   final w = mean(week);
-  final lo = m - hrvBandSd * sd, hi = m + hrvBandSd * sd;
+  final lo = mc - hrvBandSd * sd, hi = mc + hrvBandSd * sd;
   final weekMs = math.exp(w), lowMs = math.exp(lo), highMs = math.exp(hi);
   // Από τα νούμερα όπως φαίνονται ([hrvTrendText]: ακέραια ms).
   final shownWeek = weekMs.round(), shownLow = lowMs.round(), shownHigh = highMs.round();
