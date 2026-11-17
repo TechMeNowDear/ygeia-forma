@@ -269,28 +269,36 @@ void main() {
 
   // ------------------------------------------------------------------------------------------------ R2-A-3
   group('R2-A-3: γρήγορη απώλεια χωρίς φαγητό γραμμένο τις τελευταίες μέρες', () {
-    // Τρως 2.250 κάθε μέρα 23/11–10/1 (γραμμένα), χάνεις 0,5%/εβδ. Από 11/1 άρρωστος: τίποτα γραμμένο, ζυγίσεις 1 / 2 / 2,5 kg
+    // Τρως 2.250 κάθε μέρα 23/11–10/1 (γραμμένα), χάνεις 0,5%/εβδ. Από 11/1 άρρωστος: τίποτα γραμμένο, ζυγίσεις 1,5 / 3 / 3,75 kg
     // κάτω από την τάση. Ο εβδομαδιαίος έλεγχος της 11/1 έχει απαντηθεί.
+    // Έλεγχος 17/11 (Κ1-H1): με 1 / 2 / 2,5 kg (όπως πριν) η ειδοποίηση δεν βγαίνει πια: τρεις ζυγίσεις στη σειρά κάτω από
+    // την τάση είναι νερά που κρατούν μέρες, και το περιθώριο μεγαλώνει. Εδώ δοκιμάζεται το ημερολόγιο, άρα πιο μεγάλη πτώση.
     final g = checkinGoals().copyWith(checkIn: '2027-01-11');
     final today = DateTime(2027, 1, 15);
     final weights = _weights(DateTime(2026, 11, 16), today, 90, 0.005,
-        dip: {DateTime(2027, 1, 11): 1.0, DateTime(2027, 1, 13): 2.0, DateTime(2027, 1, 15): 2.5});
+        dip: {DateTime(2027, 1, 11): 1.5, DateTime(2027, 1, 13): 3.0, DateTime(2027, 1, 15): 3.75});
     Map<DateTime, double> diary(Set<int> alsoJan) => {
           for (var d = DateTime(2026, 11, 23); !d.isAfter(DateTime(2027, 1, 10)); d = DateTime(d.year, d.month, d.day + 1)) d: 2250,
           for (final day in alsoJan) DateTime(2027, 1, day): 2250,
         };
 
     testWidgets('3 από τις 7 τελευταίες μέρες γραμμένες: καμία πρόταση (πριν: +150 από τις μέρες πριν από την αρρώστια)', (t) async {
-      expect(weights.sublist(weights.length - 3).map((x) => x.$2), [85.5, 84.3, 83.7]);
+      expect(weights.sublist(weights.length - 3).map((x) => x.$2), [85.0, 83.3, 82.5]);
       final c = pendingCheckIn(goals: g, today: today, weights: weights, intake: _intakeOf(diary({})))!;
       expect((c.kind, c.proposal, c.fastIntake, c.fastTarget), (CheckKind.fast, null, null, null));
-      expect((c.fastIntakeDays, c.kgNow), (17, 83.7));
-      expect(c.fastSlope!, closeTo(-1.1807, 0.0005));
+      expect((c.fastIntakeDays, c.kgNow), (17, 82.5));
+      expect(c.fastSlope!, closeTo(-1.5489, 0.0005));
       await _card(t, c, DateTime(2027, 1, 15, 9));
       expect(find.textContaining('Τις τελευταίες μέρες δεν έχει γραφτεί αρκετό φαγητό για να φανεί πόσο τρως.', findRichText: true),
           findsOneWidget);
       expect(find.byKey(const ValueKey('checkin-apply')), findsNothing);
       expect(dismissCheckIn(c, today).kcal, 2250);
+    });
+
+    test('Κ1-H1: τα νερά μιας αρρώστιας (1 / 2 / 2,5 kg κάτω) δεν βγάζουν πια «χάνεις γρήγορα»', () {
+      final small = _weights(DateTime(2026, 11, 16), today, 90, 0.005,
+          dip: {DateTime(2027, 1, 11): 1.0, DateTime(2027, 1, 13): 2.0, DateTime(2027, 1, 15): 2.5});
+      expect(pendingCheckIn(goals: g, today: today, weights: small, intake: _intakeOf(diary({11, 12}))), isNull);
     });
 
     test('4 από τις 7: ακόμα όχι· 5 από τις 7: +150 όπως πριν', () {
