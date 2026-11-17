@@ -115,11 +115,11 @@ List<(DateTime, double)> _upTo(List<(DateTime, double)> w, DateTime today) => [
 void main() {
   // ------------------------------------------------------------------------------------------------ ο χρήστης, 16/11
   group('οι αριθμοί της αρχής (16/11) δεν αλλάζουν', () {
-    test('2.090 kcal με μέτρια κίνηση, 1.920 με λίγη· πρωτεΐνη 130 g· κορεσμένα έως 14 / 13 g', () {
+    test('2.090 kcal με μέτρια κίνηση, 1.920 με λίγη· πρωτεΐνη 145 g (1,8 g/kg από 17/11)· κορεσμένα έως 14 / 13 g', () {
       final m = computeGoals(male: true, age: 38, heightCm: 171, kg: 80, aim: GoalAim.lose, rate: 0.005, activity: 1.5, doctor: true);
-      expect((m.kcal, m.protein, m.satMax, m.floored), (2090, 130, 14, false));
+      expect((m.kcal, m.protein, m.satMax, m.floored), (2090, 145, 14, false));
       final l = computeGoals(male: true, age: 38, heightCm: 171, kg: 80, aim: GoalAim.lose, rate: 0.005, activity: 1.4, doctor: true);
-      expect((l.kcal, l.protein, l.satMax, l.floored), (1920, 130, 13, false));
+      expect((l.kcal, l.protein, l.satMax, l.floored), (1920, 145, 13, false));
       expect(_invGoals().kcal, 2090);
       expect(_invGoals(activity: 1.4).kcal, 1920);
     });
@@ -143,7 +143,7 @@ void main() {
     // Round 9 (R9-A1-3): ο οδηγός με τα επίπεδα της FAO/WHO/UNU 2004. «Μέτρια» 1,65: 1.683,75 × 1,65 = 2.778,19 − 440 →
     // 2.340 (πριν, με 1,5: 2.090)· «Λίγη» 1,53: 2.576,14 − 440 → 2.140 (πριν, με 1,4: 1.920). Οι αποθηκευμένοι στόχοι
     // ([_invGoals], 1,5) δεν αλλάζουν.
-    testWidgets('ο οδηγός στις 16/11: 2.340 kcal, 130 g, έως 15,6 g, πρώτη εκτίμηση «τη Δευτέρα 14 Δεκεμβρίου»', (t) async {
+    testWidgets('ο οδηγός στις 16/11: 2.340 kcal, 145 g, έως 15,6 g, πρώτη εκτίμηση «τη Δευτέρα 14 Δεκεμβρίου»', (t) async {
       final store = HealthStore()..setProfile(_inv);
       await _pump(t, GoalsWizard(store: store, now: DateTime(2026, 11, 16, 9)));
       await t.enterText(find.byKey(const ValueKey('wizard-kg')), '80');
@@ -157,7 +157,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       expect(find.text('2.340 kcal', findRichText: true), findsOneWidget);
-      expect(find.text('130 g'), findsOneWidget);
+      expect(find.text('145 g'), findsOneWidget);
       // Round 9 (R9-A3-2): το ακριβές όριο, 2.340 × 6% ÷ 9 = 15,6 → «έως 15,6 g».
       expect(find.text('έως 15,6 g ·\u00A06%'), findsOneWidget);
       expect(find.text('80,0 kg ·\u00A0μέτρια κίνηση'), findsOneWidget);
@@ -168,7 +168,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('wizard-next')));
       await t.pumpAndSettle();
       final g = store.goals!;
-      expect((g.kcal, g.protein, g.satMax, g.since, g.kcalAdapt, g.activity), (2340, 130, 16, '2026-11-16', null, 1.65));
+      expect((g.kcal, g.protein, g.satMax, g.since, g.kcalAdapt, g.activity), (2340, 145, 16, '2026-11-16', null, 1.65));
       expect(firstEstimateDay(g), DateTime(2026, 12, 14));
     });
 
@@ -1003,7 +1003,7 @@ void main() {
       expect(m(GoalAim.lose, 0.0025, 1.5).kcal, 2500);
       expect(m(GoalAim.lose, 0.0075, 1.5).kcal, 2000);
       expect(m(GoalAim.gain, 0.005, 1.5).kcal, 3240);
-      expect(m(GoalAim.lose, 0.005, 1.5).carbsEst, 249);
+      expect(m(GoalAim.lose, 0.005, 1.5).carbsEst, 234); // 17/11: πρωτεΐνη 160 g
       final edge = computeGoals(male: true, age: 70, heightCm: 160, kg: 41.5, aim: GoalAim.keep, rate: 0, activity: 1.4, doctor: false);
       expect((edge.kcal, edge.floored), (1500, false), reason: '1.498 → 1.500 στα 10: όχι «ανέβηκε στο όριο»');
       final under = computeGoals(male: true, age: 70, heightCm: 160, kg: 41, aim: GoalAim.keep, rate: 0, activity: 1.4, doctor: false);
