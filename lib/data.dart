@@ -2300,6 +2300,34 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   @override
   Future<bool> saveDaysNow(Set<String> keys) => _saveDays(keys);
 
+  /// Έλεγχος 17/11 (Κ7-3): το ιστορικό ημερών για το αντίγραφο, μόνο αν διαβάστηκε. Κρατά και ό,τι δεν ξαναδιαβάζεται από
+  /// τη Samsung (παλιές ζυγίσεις άλλων εφαρμογών, αρχειοθετημένες νύχτες «nw.*»).
+  Map<String, Map<String, double>>? historyForBackup() => _historyLoaded ? history : null;
+
+  /// Επαναφορά: μπαίνουν μόνο τιμές που λείπουν (ποτέ πάνω από ό,τι υπάρχει). Πόσες μέρες άλλαξαν, ή -1 αν δεν γράφτηκαν
+  /// ή αν το ιστορικό δεν έχει διαβαστεί.
+  Future<int> importHistory(Object? j) async {
+    if (j is! Map || j.isEmpty) return 0;
+    if (!_historyLoaded) return -1;
+    final changed = <String>{};
+    for (final e in j.entries) {
+      final day = e.key, vals = e.value;
+      if (day is! String || !isDayKey(day) || vals is! Map) continue;
+      final cur = history[day];
+      final add = <String, double>{
+        for (final v in vals.entries)
+          if (v.key is String && v.value is num && (v.value as num).isFinite && !(cur?.containsKey(v.key) ?? false))
+            v.key as String: (v.value as num).toDouble(),
+      };
+      if (add.isEmpty) continue;
+      history[day] = {...?cur, ...add};
+      changed.add(day);
+    }
+    if (changed.isEmpty) return 0;
+    notifyListeners();
+    return await _saveDays(changed) ? changed.length : -1;
+  }
+
   @override
   int? watchStepsBetween(DateTime from, DateTime to) {
     final d = _raw;

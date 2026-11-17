@@ -40,6 +40,7 @@ String buildBackup({
   List<Object?>? vitals,
   Map<String, dynamic>? foodWeek,
   int? foodRemind,
+  Map<String, Map<String, double>>? history,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -69,6 +70,8 @@ String buildBackup({
     // Έλεγχος 17/11 (Κ2-M1): πρόγραμμα εβδομάδας και ώρα βραδινής υπενθύμισης. Πρόσθετα κλειδιά.
     if (foodWeek != null) 'foodWeek': foodWeek,
     if (foodRemind != null) 'foodRemind': foodRemind,
+    // Έλεγχος 17/11 (Κ7-3): το ιστορικό ημερών (και ό,τι δεν ξαναδιαβάζεται από τη Samsung). Πρόσθετο κλειδί.
+    if (history != null && history.isNotEmpty) 'history': history,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -85,7 +88,11 @@ class BackupContents {
       this.units = const {},
       this.vitals = const [],
       this.week,
-      this.remind});
+      this.remind,
+      this.history});
+
+  /// Έλεγχος 17/11 (Κ7-3): το ιστορικό ημερών όπως ήταν στο αρχείο (το ελέγχει το importHistory).
+  final Object? history;
 
   /// Έλεγχος 17/11 (Κ2-M1): το πρόγραμμα εβδομάδας και η ώρα υπενθύμισης, όπως ήταν στο αρχείο (τα ελέγχει το
   /// importWeekRemind).
@@ -284,6 +291,7 @@ BackupContents parseBackup(String text) {
     vitals: j['vitals'] is List ? List<Object?>.from(j['vitals'] as List) : const [],
     week: j['foodWeek'],
     remind: j['foodRemind'],
+    history: j['history'],
   );
 }
 
