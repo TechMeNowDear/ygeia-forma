@@ -142,7 +142,12 @@ class _VitalsPageState extends State<VitalsPage> {
                                       style: small),
                                   if (bpNote(list[i]) case final n?) Text(n, style: small.copyWith(color: c.warn)),
                                   if (list[i].kind == VitalKind.glucose && glucoseNote(list[i]) != null)
-                                    Text(glucoseNote(list[i])!, style: small.copyWith(color: list[i].glucose! < 70 ? c.warn : c.textSecondary)),
+                                    Text(glucoseNote(list[i])!,
+                                        style: small.copyWith(
+                                            color: list[i].glucose! < 70 || list[i].glucose! >= 200 ? c.warn : c.textSecondary)),
+                                  if (list[i].kind == VitalKind.ecg && list[i].ecg != null)
+                                    Text(ecgNote(list[i].ecg!),
+                                        style: small.copyWith(color: list[i].ecg == EcgResult.afib ? c.warn : c.textSecondary)),
                                 ]),
                               ),
                             ),
@@ -179,7 +184,8 @@ class VitalSheet extends StatefulWidget {
 class _VitalSheetState extends State<VitalSheet> {
   final _a = TextEditingController(), _b = TextEditingController(), _p = TextEditingController(), _note = TextEditingController();
   late DateTime _at = widget.now;
-  GlucoseWhen _when = GlucoseWhen.fasting;
+  // Κ6-M5: χωρίς προεπιλογή (πριν «νηστεία»: ένα 150 μετά το φαγητό έπαιρνε τη σημείωση νηστείας).
+  GlucoseWhen? _when;
   EcgResult? _ecg;
 
   @override
@@ -205,21 +211,23 @@ class _VitalSheetState extends State<VitalSheet> {
         return (Vital(id: id, kind: VitalKind.bp, at: _at, sys: s, dia: d, pulse: p, note: note), null);
       case VitalKind.glucose:
         final g = double.tryParse(_a.text.trim().replaceAll(',', '.'));
-        if (g == null) return (null, null);
+        if (g == null || _when == null) return (null, null);
         final err = glucoseProblem(g);
         if (err != null) return (null, err);
-        return (Vital(id: id, kind: VitalKind.glucose, at: _at, glucose: g, when: _when, note: note), null);
+        // Κ6-L3: ακέραιο, ώστε τιμή και σημείωση να συμφωνούν (99,6 → 100).
+        return (Vital(id: id, kind: VitalKind.glucose, at: _at, glucose: g.roundToDouble(), when: _when, note: note), null);
       case VitalKind.ecg:
         if (_ecg == null) return (null, null);
         return (Vital(id: id, kind: VitalKind.ecg, at: _at, ecg: _ecg, note: note), null);
     }
   }
 
+  // Κ6-L5: πίεση και σφυγμοί μόνο ακέραιοι (πριν «120,5» απλώς έκλεινε σιωπηλά το κουμπί).
   Widget _field(TextEditingController c, String label, String key, {String? suffix}) => TextField(
         key: ValueKey(key),
         controller: c,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+        keyboardType: TextInputType.numberWithOptions(decimal: widget.kind == VitalKind.glucose),
+        inputFormatters: [FilteringTextInputFormatter.allow(widget.kind == VitalKind.glucose ? RegExp(r'[0-9.,]') : RegExp(r'[0-9]'))],
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           labelText: label,
@@ -270,7 +278,9 @@ class _VitalSheetState extends State<VitalSheet> {
             const SizedBox(height: 8),
             _field(_p, 'Σφυγμοί (αν τους δείχνει)', 'bp-pulse'),
             const SizedBox(height: 6),
-            Text('Καθιστός, μετά από 5 λεπτά ηρεμίας, το χέρι στο ύψος της καρδιάς. Καλύτερα 2 μετρήσεις και γράψε τη δεύτερη.',
+            // Κ6-M4 (ESC 2024 / ESH 2021): χωρίς τσιγάρο/καφέ/άσκηση πριν, και γράφονται και οι δύο μετρήσεις.
+            Text('Όχι τσιγάρο, καφές ή άσκηση 30 λεπτά πριν. Καθιστός, πλάτη ακουμπισμένη, πόδια στο πάτωμα, χέρι στο ύψος της '
+                'καρδιάς, 5 λεπτά ηρεμία, χωρίς κουβέντα. Δύο μετρήσεις με 1 λεπτό διαφορά· γράψε και τις δύο.',
                 style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
           ],
           if (widget.kind == VitalKind.glucose) ...[
