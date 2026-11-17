@@ -132,6 +132,7 @@ class CheckIn {
       this.weighs = 0,
       this.tooFast = false,
       this.heldDays,
+      this.quitDays,
       this.gap,
       this.absurd = const [],
       this.foreign = const [],
@@ -175,6 +176,10 @@ class CheckIn {
   /// Εβδομαδιαίος έλεγχος (S1-4): ο στόχος άλλαξε πριν από τόσες μέρες (λιγότερες από [adaptMinChangeDays]), γι' αυτό
   /// δεν προτείνεται νέα αλλαγή τώρα. null: δεν ισχύει.
   final int? heldDays;
+
+  /// Απόφαση χρήστη 17/11: πριν από πόσες μέρες έκοψες το κάπνισμα, όταν γι' αυτό ο στόχος δεν κατέβηκε
+  /// ([smokeQuitHoldDays]).
+  final int? quitDays;
 
   /// Το κενό καταγραφής φαγητού ([CheckKind.gap]· και στο [CheckKind.gathering], για τη μέρα της πρώτης εκτίμησης:
   /// R8-A1-4).
@@ -226,6 +231,19 @@ class CheckIn {
 
 /// Η πρώτη μέρα που βγαίνει κάρτα ελέγχου: 21 μέρες μετά την αρχή (ίδια μέρα της εβδομάδας). Εκείνη τη μέρα η κάρτα
 /// λέει ότι μαζεύει ακόμα δεδομένα ([CheckKind.gathering])· η πρώτη εκτίμηση βγαίνει στο [firstEstimateDay].
+/// Απόφαση χρήστη 17/11: για 10 εβδομάδες αφού κόψεις το κάπνισμα ο στόχος θερμίδων δεν κατεβαίνει. Τους πρώτους μήνες
+/// το βάρος ανεβαίνει συνήθως 2–3 kg (Aubin 2012, BMJ: +2,9 kg στους 3 μήνες, +4,7 στον χρόνο), κυρίως γιατί η νικοτίνη
+/// ανεβάζει την κατανάλωση και κόβει την όρεξη. Η εφαρμογή δεν το «πολεμά» με λιγότερο φαγητό: προτεραιότητα να μην
+/// ξαναρχίσεις. Επιλογή προσοχής: η ανασκόπηση Cochrane (Farley 2012) δεν βρήκε ότι η δίαιτα χαλά τη διακοπή.
+const smokeQuitHoldDays = 70;
+
+/// Πόσες μέρες πέρασαν από τη διακοπή, όταν είναι μέσα στις [smokeQuitHoldDays]· αλλιώς null.
+int? quitHoldDays(DateTime? quitDay, DateTime today) {
+  if (quitDay == null) return null;
+  final d = daysBetween(_day(quitDay), _day(today));
+  return d >= 0 && d < smokeQuitHoldDays ? d : null;
+}
+
 DateTime firstCheckDay(Goals g) {
   final s = DateTime.parse(g.since);
   return DateTime(s.year, s.month, s.day + adaptWindowDays);
@@ -340,6 +358,7 @@ CheckIn? pendingCheckIn({
   required Map<DateTime, double> Function(DateTime from, DateTime to) intake,
   List<(DateTime, double)> foreign = const [],
   bool weightsRead = true,
+  DateTime? quitDay,
 }) {
   final g = goals;
   if (g == null) return null;
@@ -402,7 +421,9 @@ CheckIn? pendingCheckIn({
         final changed = lastChangeDay(g);
         final sinceChange = changed == null ? null : daysBetween(changed, t);
         final held = sinceChange != null && sinceChange < adaptMinChangeDays && p.change != 0;
-        if ((tooFast && p.change < 0) || held) {
+        final quit = quitHoldDays(quitDay, t);
+        final quitHeld = quit != null && p.change < 0 && !tooFast && !held;
+        if ((tooFast && p.change < 0) || held || quitHeld) {
           p = AdaptProposal(current: p.current, target: p.current, est: e, fastLoss: false, floored: false);
         }
         // R2-A-1: οι στόχοι που ίσχυαν τις μέρες που μπήκαν στον μέσο όρο φαγητού (ίδιο φίλτρο με το estimateExpenditure).
@@ -422,6 +443,7 @@ CheckIn? pendingCheckIn({
             weighs: weighs,
             tooFast: tooFast,
             heldDays: held ? sinceChange : null,
+            quitDays: quitHeld ? quit : null,
             absurd: absurd,
             foreign: news,
             estTarget: estTarget,
@@ -438,7 +460,8 @@ CheckIn? pendingCheckIn({
         final lowP = lowEst == null || lowKg == null ? null : lowLogProposal(goals: g, est: lowEst, kgNow: lowKg, formulaTdee: formula);
         final lowChanged = lastChangeDay(g);
         final lowHeld = lowChanged != null && daysBetween(lowChanged, t) < adaptMinChangeDays;
-        if (lowP != null && !lowHeld) {
+        // 17/11: και όχι στις 10 εβδομάδες μετά τη διακοπή του καπνίσματος (πάντα προς τα κάτω).
+        if (lowP != null && !lowHeld && quitHoldDays(quitDay, t) == null) {
           return CheckIn(
               kind: CheckKind.proposal,
               goals: g,

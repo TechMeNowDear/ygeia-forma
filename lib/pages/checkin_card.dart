@@ -62,6 +62,7 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
       foreign: w.foreign,
       weightsRead: d.bodyOk && !bodyFailed,
       intake: (from, to) => dailyIntake(food, from, to),
+      quitDay: store.profile.quitDate,
     );
   }
 }
@@ -353,6 +354,15 @@ class CheckInCard extends StatelessWidget {
   }
 }
 
+/// 17/11: γιατί ο στόχος δεν κατεβαίνει μετά τη διακοπή του καπνίσματος ([smokeQuitHoldDays]).
+String quitText(int days) {
+  final ago = days <= 0 ? 'σήμερα' : (days == 1 ? 'χθες' : 'πριν από $days μέρες');
+  final left = (smokeQuitHoldDays - days + 6) ~/ 7;
+  return 'Έκοψες το κάπνισμα $ago: για 10 εβδομάδες από τότε ο στόχος δεν κατεβαίνει (μένουν ακόμα '
+      '${left == 1 ? '1 εβδομάδα' : '$left εβδομάδες'}). Λίγα κιλά τους πρώτους μήνες είναι συνηθισμένα· τώρα μετράει να μην '
+      'ξαναρχίσεις.';
+}
+
 /// Το τέλος του κειμένου όταν ο στόχος μένει ίδιος: γιατί μένει.
 String _sameText(CheckIn k) {
   final p = k.proposal, e = k.est;
@@ -373,6 +383,10 @@ String _sameText(CheckIn k) {
     }
     return '$fast Τρως κατά μέσο όρο ${thousands(eaten)}\u00A0kcal, ${thousands(under)} λιγότερες από τους στόχους σου αυτές τις '
         'εβδομάδες (κατά μέσο όρο ${thousands(target)}): φάε πιο κοντά στον στόχο.';
+  }
+  final quit = k.quitDays;
+  if (quit != null) {
+    return ' ${quitText(quit)}';
   }
   final held = k.heldDays;
   if (held != null) {
@@ -489,6 +503,8 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
             Text('Χάνεις πάνω από 1% του βάρους την εβδομάδα: ο στόχος δεν κατεβαίνει όσο χάνεις τόσο γρήγορα.', style: small)
           else if (k.heldDays != null)
             Text('Ο στόχος άλλαξε πριν από λίγες μέρες: δεν αλλάζει ξανά τόσο σύντομα.', style: small)
+          else if (k.quitDays != null)
+            Text(quitText(k.quitDays!), style: small)
           else if (p.withinNoise)
             Text(
                 'Η διαφορά από τον στόχο σου είναι μέσα στο φυσιολογικό εύρος των ζυγίσεων'

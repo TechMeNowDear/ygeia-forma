@@ -8,6 +8,7 @@ import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/goals.dart';
 import 'package:ygeia_forma/main.dart';
 import 'package:ygeia_forma/nav.dart';
+import 'package:ygeia_forma/pages/checkin_card.dart' show quitText;
 import 'package:ygeia_forma/pages/goals_page.dart';
 import 'package:ygeia_forma/profile.dart';
 import 'package:ygeia_forma/theme.dart';
@@ -21,7 +22,8 @@ final _day21 = DateTime(2026, 12, 7, 8, 20); // Δευτέρα, 21 μέρες μ
 final _check = DateTime(2026, 12, 14, 8, 20); // Δευτέρα, 28 μέρες μετά τις 16/11: η πρώτη μέρα με εκτίμηση
 const _me = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
 
-CheckIn? _pending(Goals g, DateTime today, {double eat = 2250, double tdee = 2600, Set<int> skip = const {}, int weighs = 99}) {
+CheckIn? _pending(Goals g, DateTime today,
+    {double eat = 2250, double tdee = 2600, Set<int> skip = const {}, int weighs = 99, DateTime? quitDay}) {
   final food = checkinFood(today, eat: eat, skip: skip);
   final w = simWeights(today, eat: eat, tdee: tdee);
   return pendingCheckIn(
@@ -29,6 +31,7 @@ CheckIn? _pending(Goals g, DateTime today, {double eat = 2250, double tdee = 260
     today: today,
     weights: dailyWeights(Dashboard.fromJson({...sampleDashboardJson(today), 'body': bodyJson(w.take(weighs).toList())}).body),
     intake: (a, b) => dailyIntake(food, a, b),
+    quitDay: quitDay,
   );
 }
 
@@ -89,6 +92,18 @@ void main() {
           reason: 'η πρώτη εβδομάδα (16–22/11) μένει έξω');
       expect(c.proposal!.withinNoise, isFalse, reason: 'οι ζυγίσεις εδώ πέφτουν σχεδόν πάνω στην ευθεία: μικρό περιθώριο');
       expect(c.est!.guardKcal, lessThan(40));
+    });
+
+    test('17/11: για 10 εβδομάδες μετά τη διακοπή του καπνίσματος ο στόχος δεν κατεβαίνει· μετά ξανά', () {
+      final c = _pending(checkinGoals(), _check, quitDay: DateTime(2026, 11, 23))!;
+      expect(c.kind, CheckKind.same);
+      expect(c.proposal!.target, 2250);
+      expect(c.quitDays, 21);
+      expect(quitText(21), contains('μένουν ακόμα 7 εβδομάδες'));
+      final old = _pending(checkinGoals(), _check, quitDay: DateTime(2026, 10, 5))!;
+      expect(old.kind, CheckKind.proposal, reason: '70 μέρες ακριβώς: τελείωσε');
+      expect(old.quitDays, isNull);
+      expect(quitHoldDays(DateTime(2026, 12, 15), _check), isNull, reason: 'μέρα στο μέλλον');
     });
 
     test('Α2: την 21η μέρα η κάρτα μαζεύει ακόμα δεδομένα· καμία εκτίμηση, καμία πρόταση· η πρώτη βγαίνει την 28η', () {
