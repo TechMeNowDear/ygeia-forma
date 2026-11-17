@@ -380,7 +380,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     return Target(
       load: lastLoad,
       reps: _same(sets, lo),
-      change: Change.back,
+      change: Change.hold,
       reason: 'Πέρασαν $gap μέρες από την τελευταία φορά: ξανά από $lo επαναλήψεις.',
     );
   }

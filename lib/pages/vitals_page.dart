@@ -144,7 +144,11 @@ class _VitalsPageState extends State<VitalsPage> {
                                   if (list[i].kind == VitalKind.glucose && glucoseNote(list[i]) != null)
                                     Text(glucoseNote(list[i])!,
                                         style: small.copyWith(
-                                            color: list[i].glucose! < 70 || list[i].glucose! >= 200 ? c.warn : c.textSecondary)),
+                                            color: list[i].glucose! < 70 ||
+                                                    list[i].glucose! >= 200 ||
+                                                    (list[i].when == GlucoseWhen.fasting && list[i].glucose! >= 126)
+                                                ? c.warn
+                                                : c.textSecondary)),
                                   if (list[i].kind == VitalKind.ecg && list[i].ecg != null)
                                     Text(ecgNote(list[i].ecg!),
                                         style: small.copyWith(color: list[i].ecg == EcgResult.afib ? c.warn : c.textSecondary)),

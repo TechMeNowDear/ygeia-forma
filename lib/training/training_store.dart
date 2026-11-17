@@ -1083,7 +1083,11 @@ class TrainingStore extends ChangeNotifier {
     // Έλεγχος 17/11 (Κ5-M2): ξεχασμένη προπόνηση ΜΟΝΟ στο ρολόι («Τέλος» ώρες μετά το τελευταίο ✓): τέλος στο τελευταίο ✓
     // και παλμοί ως εκεί (+1′), όπως οι προπονήσεις του κινητού ([finish]). Πριν: 4 ώρες 10 λεπτά, και μέσος/υψηλότερος
     // από 3 ώρες καθημερινότητας.
-    if (cardio == null && !partial && s.items.any((e) => e.done.isNotEmpty) && end.difference(s.lastTick) >= staleAfter) {
+    // Μόνο όταν κάποιο ✓ έχει ώρα (ρολόι παλιότερης έκδοσης χωρίς «at»: lastTick = αρχή, η προπόνηση θα γινόταν 0 λεπτά).
+    if (cardio == null &&
+        !partial &&
+        s.items.any((e) => e.done.any((x) => x.at != null)) &&
+        end.difference(s.lastTick) >= staleAfter) {
       s.end = s.lastTick;
       final cut = s.hrUpTo(s.lastTick);
       if (cut.hr.length < s.hr.length) {

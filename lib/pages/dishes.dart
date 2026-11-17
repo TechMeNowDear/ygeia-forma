@@ -967,13 +967,14 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
     }
     final q = keptFieldValue(_qty, tag.qty, max: tag.kind == DishKind.portions ? maxEatenServings : maxCookedGrams);
     if (q == null) return null;
+    // Ίδια ποσότητα: οι καταχωρίσεις μένουν ακριβώς όπως ήταν (καμία στρογγυλοποίηση· και πριν από τον έλεγχο της
+    // κατσαρόλας, ώστε μια αλλαγή μόνο του γεύματος να μην μπλοκάρεται).
+    if (q == tag.qty) return [for (final e in g) e.copyWith(meal: _meal)];
     // Κ2-L3: μερίδα κατσαρόλας ως το βάρος της κατσαρόλας (όπως στην πρώτη καταχώριση), όταν είναι ακόμα η ίδια.
     if (tag.kind == DishKind.pot) {
       final b = widget.food.dishById(tag.id)?.batch;
       if (b != null && b.at == tag.batch && q > b.cooked) return null;
     }
-    // Ίδια ποσότητα: οι καταχωρίσεις μένουν ακριβώς όπως ήταν (καμία στρογγυλοποίηση).
-    if (q == tag.qty) return [for (final e in g) e.copyWith(meal: _meal)];
     final f = q / tag.qty;
     return [
       for (final e in g)

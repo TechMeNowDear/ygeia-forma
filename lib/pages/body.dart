@@ -367,7 +367,11 @@ class _LatestCard extends StatelessWidget {
             Text(
               // Round 8 (A4 Β2 / U4 Β4): η ίδια μέρα με την ίδια μορφή στο χάπι και στη σημείωση («από 13/8», όπως η Σήμερα και
               // το widget)· πριν «από 13/8» στο χάπι και «από τις 13 Αυγ.» από κάτω.
-              bodyTrendNote(previous: p?.weight == null ? null : p!.time, days: bodyCompositionDays(body), date: _dayNum),
+              bodyTrendNote(
+                  previous: p?.weight == null ? null : p!.time,
+                  days: bodyCompositionDays(body),
+                  date: _dayNum,
+                  ready: bodyTrend(body, (b) => b.fatPct) != null || bodyTrend(body, (b) => b.smm) != null),
               key: const ValueKey('body-trend-note'),
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),

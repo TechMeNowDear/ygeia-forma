@@ -72,6 +72,8 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   );
   final dishesOut = !food.dishesRead;
   final vitalsOut = !VitalsStore.main.read;
+  // Έλεγχος 17/11 (Κ8-M2): το ιστορικό ημερών έχει και ό,τι δεν ξαναδιαβάζεται από τη Samsung.
+  final historyOut = !store.historyReady;
   final dishCount = food.dishesForBackup()?.length ?? 0;
   final trainingOut = TrainingStore.main.readError;
   final hrMissing = trainingOut ? 0 : TrainingStore.main.backupHrMissing;
@@ -89,7 +91,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   final saved = r['name'] is String ? r['name'] as String : name;
   // Πλήρες μόνο αν μπήκαν οι προπονήσεις με τους παλμούς τους, οι ρυθμίσεις και οι πηγές ύπνου. Μόνο ένα πλήρες
   // αντίγραφο μετρά ως «τελευταίο αντίγραφο» (13/11).
-  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut;
+  final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut && !historyOut;
   if (complete) store.markExported(now);
   return (
     ok: complete,
@@ -103,6 +105,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
         '${hrMissing > 0 ? '. ${countText(hrMissing, 'προπόνηση μπήκε χωρίς παλμούς', 'προπονήσεις μπήκαν χωρίς παλμούς')}: τα αρχεία τους δεν διαβάστηκαν.' : ''}'
         '${prefsOut ? '. Οι ρυθμίσεις (στοιχεία, στόχοι, μέση) δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
         '${sourcesOut ? '. Οι πηγές ύπνου δεν μπήκαν: δεν διαβάστηκαν.' : ''}'
+        '${historyOut ? '. Το ιστορικό ημερών δεν μπήκε: δεν διαβάστηκε.' : ''}'
         // Έλεγχος 13/11 (S9-3): το αρχείο μένει στις Λήψεις του ίδιου κινητού.
         '${complete ? '. Στείλ’ το και έξω από το κινητό (π.χ. στο Drive ή με email).' : ''}',
     uri: r['uri'] as String,
@@ -566,7 +569,7 @@ class _DataGroupState extends State<_DataGroup> {
       final marksIn = await widget.food!.importDayMarks(b.dayMarks);
       final unitsIn = await widget.food!.importUnits(b.units);
       final weekIn = await widget.food!.importWeekRemind(b.week, b.remind);
-      final histIn = await widget.store.importHistory(b.history);
+      final histIn = await widget.store.importHistory(b.history, version: b.historyVersion);
       final vitalsIn = await VitalsStore.main.importItems(b.vitals);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
@@ -606,6 +609,7 @@ class _DataGroupState extends State<_DataGroup> {
         if (vitalsIn < 0) 'Οι μετρήσεις (πίεση, σάκχαρο, καρδιογράφημα) δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (marksIn < 0 || unitsIn < 0) 'Τα σημάδια «Τελείωσα για σήμερα» και τα βάρη «Ζύγισα ένα» δεν γράφτηκαν· δοκίμασε ξανά.',
         if (weekIn < 0) 'Το πρόγραμμα εβδομάδας και η ώρα υπενθύμισης δεν γράφτηκαν· δοκίμασε ξανά.',
+        if (histIn > 0) countText(histIn, 'μέρα ιστορικού μπήκε από το αντίγραφο.', 'μέρες ιστορικού μπήκαν από το αντίγραφο.'),
         if (histIn < 0) 'Το ιστορικό ημερών του αντιγράφου δεν γράφτηκε· δοκίμασε ξανά.',
         if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
@@ -625,7 +629,9 @@ class _DataGroupState extends State<_DataGroup> {
           title: 'Εξαγωγή αντιγράφου',
           // Φαγητό, προϊόντα, προπονήσεις και ρυθμίσεις υπάρχουν μόνο σε αυτό το κινητό· η Samsung ξαναδιαβάζεται.
           // Το αρχείο δεν είναι κρυπτογραφημένο: το λέμε (Συμβούλιο 5, Δ6α· κείμενο εγκεκριμένο 13/11).
-          subtitle: 'Ένα αρχείο στις Λήψεις: φαγητό, προϊόντα, προπονήσεις, ρυθμίσεις. Δεν είναι κλειδωμένο: όποιος το ανοίξει, τα διαβάζει.'
+          // Έλεγχος 17/11 (Κ8-H1): από #132 και το ιστορικό υγείας, και από #124 πίεση/σάκχαρο/καρδιογραφήματα.
+          subtitle: 'Ένα αρχείο στις Λήψεις: φαγητό, προϊόντα, προπονήσεις, πίεση/σάκχαρο, ιστορικό υγείας (ύπνος, παλμοί, '
+              'ζυγίσεις), ρυθμίσεις. Δεν είναι κλειδωμένο: όποιος το ανοίξει, τα διαβάζει.'
               '\n${lastBackupText(widget.store.lastExport, DateTime.now())}',
           onTap: _busy ? null : _export,
         ),

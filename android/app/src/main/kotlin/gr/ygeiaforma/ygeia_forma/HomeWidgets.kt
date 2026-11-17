@@ -130,10 +130,14 @@ object HomeWidgets {
         val f = snapFile(ctx)
         // Μοναδικό προσωρινό όνομα: δύο εγγραφές δεν γράφουν ποτέ στο ίδιο αρχείο.
         val tmp = File(f.parentFile, "$SNAPSHOT.${System.nanoTime()}.tmp")
-        tmp.writeText(text)
-        if (!tmp.renameTo(f)) {
-            f.delete()
-            if (!tmp.renameTo(f)) tmp.delete()
+        try {
+            tmp.writeText(text)
+            if (!tmp.renameTo(f)) {
+                f.delete()
+                tmp.renameTo(f)
+            }
+        } finally {
+            if (tmp.exists()) tmp.delete()
         }
     }
 

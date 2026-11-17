@@ -2304,28 +2304,35 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// τη Samsung (παλιές ζυγίσεις άλλων εφαρμογών, αρχειοθετημένες νύχτες «nw.*»).
   Map<String, Map<String, double>>? historyForBackup() => _historyLoaded ? history : null;
 
-  /// Επαναφορά: μπαίνουν μόνο τιμές που λείπουν (ποτέ πάνω από ό,τι υπάρχει). Πόσες μέρες άλλαξαν, ή -1 αν δεν γράφτηκαν
-  /// ή αν το ιστορικό δεν έχει διαβαστεί.
-  Future<int> importHistory(Object? j) async {
+  /// Επαναφορά: μπαίνουν μόνο ΟΛΟΚΛΗΡΕΣ μέρες που λείπουν από το κινητό (Κ8-M3: όχι τιμή-τιμή, που μπορούσε να ανακατέψει
+  /// δύο ζυγίσεις μιας μέρας ή να φέρει πίσω τιμές που η εφαρμογή έβγαλε επίτηδες), και μόνο αν το αντίγραφο φτιάχτηκε με
+  /// τους ίδιους κανόνες ιστορικού ([version] = [historyRulesVersion]· αλλιώς τίποτα). Πόσες μέρες μπήκαν, ή -1 αν δεν
+  /// γράφτηκαν ή αν το ιστορικό δεν έχει διαβαστεί.
+  Future<int> importHistory(Object? j, {Object? version}) async {
     if (j is! Map || j.isEmpty) return 0;
+    if (version != historyRulesVersion) return 0;
     if (!_historyLoaded) return -1;
-    final changed = <String>{};
+    final added = <String, Map<String, double>>{};
     for (final e in j.entries) {
       final day = e.key, vals = e.value;
-      if (day is! String || !isDayKey(day) || vals is! Map) continue;
-      final cur = history[day];
-      final add = <String, double>{
+      if (day is! String || !isDayKey(day) || vals is! Map || history.containsKey(day)) continue;
+      final m = <String, double>{
         for (final v in vals.entries)
-          if (v.key is String && v.value is num && (v.value as num).isFinite && !(cur?.containsKey(v.key) ?? false))
-            v.key as String: (v.value as num).toDouble(),
+          if (v.key is String && v.value is num && (v.value as num).isFinite) v.key as String: (v.value as num).toDouble(),
       };
-      if (add.isEmpty) continue;
-      history[day] = {...?cur, ...add};
-      changed.add(day);
+      if (m.isNotEmpty) added[day] = m;
     }
-    if (changed.isEmpty) return 0;
+    if (added.isEmpty) return 0;
+    history.addAll(added);
     notifyListeners();
-    return await _saveDays(changed) ? changed.length : -1;
+    if (await _saveDays(added.keys.toSet())) return added.length;
+    // Όπως οι άλλες επαναφορές: ό,τι δεν γράφτηκε βγαίνει και από τη μνήμη.
+    for (final k in added.keys) {
+      history.remove(k);
+    }
+    _unsavedDays.removeAll(added.keys);
+    notifyListeners();
+    return -1;
   }
 
   @override

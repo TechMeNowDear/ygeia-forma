@@ -1,6 +1,7 @@
 /// Αντίγραφο ασφαλείας: ημερολόγιο φαγητού, «Τα προϊόντα μου» και ρυθμίσεις σε ένα αρχείο JSON.
 ///
-/// Αυτά υπάρχουν μόνο στο κινητό (τα δεδομένα της Samsung ξαναδιαβάζονται, γι' αυτό δεν μπαίνουν). Και το σχέδιο
+/// Αυτά υπάρχουν μόνο στο κινητό. Από 17/11 (#132) μπαίνει και το ιστορικό ημερών (ύπνος, παλμοί, ζυγίσεις, Oura): κρατά
+/// και ό,τι δεν ξαναδιαβάζεται από τη Samsung (παλιές ζυγίσεις άλλων εφαρμογών, αρχειοθετημένες νύχτες). Και το σχέδιο
 /// πηγών με το ημερολόγιό του (έλεγχος 4/11, A10): σε νέο κινητό, χωρίς αυτό, οι νύχτες του Oura θα γίνονταν σιωπηλά
 /// νύχτες του ρολογιού.
 /// Η επαναφορά **δεν σβήνει τίποτα** και **δεν αλλάζει ό,τι υπάρχει ήδη**: προσθέτει μόνο ό,τι λείπει· το σχέδιο πηγών
@@ -14,6 +15,7 @@ import 'food/dishes.dart' show Dish;
 import 'food/recipe.dart' show FoodLikes;
 import 'food/food_model.dart';
 import 'format.dart';
+import 'history.dart' show historyRulesVersion;
 import 'plan_file.dart';
 import 'waist.dart' show isDayKey;
 
@@ -72,6 +74,7 @@ String buildBackup({
     if (foodRemind != null) 'foodRemind': foodRemind,
     // Έλεγχος 17/11 (Κ7-3): το ιστορικό ημερών (και ό,τι δεν ξαναδιαβάζεται από τη Samsung). Πρόσθετο κλειδί.
     if (history != null && history.isNotEmpty) 'history': history,
+    if (history != null && history.isNotEmpty) 'historyV': historyRulesVersion,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -89,7 +92,11 @@ class BackupContents {
       this.vitals = const [],
       this.week,
       this.remind,
-      this.history});
+      this.history,
+      this.historyVersion});
+
+  /// Με ποιους κανόνες ιστορικού φτιάχτηκε το [history] (Κ8-M3).
+  final Object? historyVersion;
 
   /// Έλεγχος 17/11 (Κ7-3): το ιστορικό ημερών όπως ήταν στο αρχείο (το ελέγχει το importHistory).
   final Object? history;
@@ -292,6 +299,7 @@ BackupContents parseBackup(String text) {
     week: j['foodWeek'],
     remind: j['foodRemind'],
     history: j['history'],
+    historyVersion: j['historyV'],
   );
 }
 
