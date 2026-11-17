@@ -670,7 +670,7 @@ void main() {
     expect(metricInfos[K.weight]!.accuracy, contains('0,5–1 kg'));
     expect(metricInfos[K.fatPct]!.accuracy, contains('DXA'));
     expect(metricInfos[K.steps]!.accuracy, contains('στη μέση'));
-    expect(metricInfos[K.sleepMin]!.accuracy, contains('η συσκευή'));
+    expect(metricInfos[K.sleepMin]!.accuracy, contains('ρολόι (Galaxy Watch 5)')); // Κ4 (17/11): κάθε συσκευή χωριστά
     expect(metricInfos[K.energy]!.down, isNot(contains('ήπια μέρα')));
     expect(metricInfos[K.ringSpo2]!.down, contains('85%'));
     expect(File('lib/training/progression.dart').readAsStringSync(), isNot(contains('δεν ανεβαίνει απότομα')));
