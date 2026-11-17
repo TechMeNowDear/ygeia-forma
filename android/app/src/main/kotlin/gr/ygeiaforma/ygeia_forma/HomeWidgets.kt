@@ -123,13 +123,17 @@ object HomeWidgets {
         null
     }
 
-    private fun writeSnapshot(ctx: Context, text: String) {
+    /** Έλεγχος 17/11 (Κ7-4): ένα κλείδωμα για την εφαρμογή και την ανάγνωση στο παρασκήνιο (RefreshWorker). */
+    private val snapLock = Any()
+
+    private fun writeSnapshot(ctx: Context, text: String) = synchronized(snapLock) {
         val f = snapFile(ctx)
-        val tmp = File(f.parentFile, "$SNAPSHOT.tmp")
+        // Μοναδικό προσωρινό όνομα: δύο εγγραφές δεν γράφουν ποτέ στο ίδιο αρχείο.
+        val tmp = File(f.parentFile, "$SNAPSHOT.${System.nanoTime()}.tmp")
         tmp.writeText(text)
         if (!tmp.renameTo(f)) {
             f.delete()
-            tmp.renameTo(f)
+            if (!tmp.renameTo(f)) tmp.delete()
         }
     }
 
@@ -340,16 +344,22 @@ object HomeWidgets {
      */
     fun refreshMoveFromDashboard(ctx: Context, dashboard: JSONObject) {
         if (count(ctx) == 0) return
-        val snap = snapshot(ctx) ?: return
-        val kinds = snap.optJSONObject("kinds") ?: return
+        // Κ7-4: διάβασμα-αλλαγή-γράψιμο μέσα στο κλείδωμα, ώστε να μη σβήσει μια νεότερη εγγραφή της εφαρμογής.
+        val changed = synchronized(snapLock) { refreshMoveLocked(ctx, dashboard) }
+        if (changed) updateAll(ctx, only = "move")
+    }
+
+    private fun refreshMoveLocked(ctx: Context, dashboard: JSONObject): Boolean {
+        val snap = snapshot(ctx) ?: return false
+        val kinds = snap.optJSONObject("kinds") ?: return false
         val zone = ZoneId.systemDefault()
         // Round 7 (f8 · R7-A10-4): η μέρα της ΑΝΑΓΝΩΣΗΣ («readAt» = η αρχή της), όχι η μέρα που τελείωσε: μια εκτέλεση από
         // τις 23:59 ως μετά τα μεσάνυχτα γράφει τα σύνολα στη μέρα τους, και το widget δείχνει «—» τη νέα μέρα.
         val readDay = java.time.Instant.ofEpochMilli(dashboard.optLong("readAt", System.currentTimeMillis())).atZone(zone).toLocalDate()
-        val move = WidgetText.moveFromDashboard(kinds.optJSONObject("move"), dashboard, readDay, zone) ?: return
+        val move = WidgetText.moveFromDashboard(kinds.optJSONObject("move"), dashboard, readDay, zone) ?: return false
         kinds.put("move", move)
         writeSnapshot(ctx, snap.toString())
-        updateAll(ctx, only = "move")
+        return true
     }
 }
 
