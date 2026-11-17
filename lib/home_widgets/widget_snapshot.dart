@@ -134,7 +134,7 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   // Round 1 (U7-13): «7:16 ώρες» (η μονάδα ως λέξη· στο «συνήθως» χωρίς αυτήν, για να χωρά η γραμμή).
   add(K.sleepMin, 'Ύπνος', ' ώρες', (v) => '${v.round() ~/ 60}:${two(v.round() % 60)}', unitInUsual: false,
       cap: bed != null && wake != null ? '${clockFromSix(bed)}–${clockFromSix(wake)}' : shortDayDate(d0),
-      range: sleepWeek != null && sr != null ? '${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1)}' : null);
+      range: sleepWeek != null && sr != null ? '${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1.roundToDouble())}' : null);
   // Round 9 (R9-U1-4): το όνομα της πηγής της νύχτας, όπως η εφαρμογή: «Ετοιμότητα» του Oura, «Energy Score» της Samsung
   // (Σήμερα, Τάσεις, «Εκτός συνηθισμένου»)· πριν πάντα «Ετοιμότητα», και για το Energy Score του ρολογιού. Στη στενή στήλη
   // 1×3 το «Energy Score» (Inter Medium 9,5 sp: 60,8 dp· με «Μεγάλα» γράμματα 68,1) γίνεται «Energy» αν δεν χωρά.

@@ -646,6 +646,14 @@ class Dashboard {
     final grouped = groupSleepPieces<SleepRecord>(
       recs,
       (r) => (start: r.start, end: r.end, minutes: r.sleepMinutes),
+      // Έλεγχος 17/11 (Κ4-1): οι κανόνες ώρας (22:00–08:00, 20:00, 06:00, υπνάκος μετά τις 18:00) με την ώρα του τόπου όπου
+      // κοιμήθηκες, όπως ήδη στο Oura (S5-1). Πριν με τη ζώνη του κινητού: νύχτα της Αθήνας διαβασμένη στη Νέα Υόρκη
+      // γινόταν «νύχτα 260′ + υπνάκος 170′ την προηγούμενη μέρα». Χωρίς πλήρη επανανάγνωση: ως τώρα κανένα ταξίδι.
+      wall: (r) => (
+        start: wallClock(r.start.millisecondsSinceEpoch, r.off),
+        end: wallClock(r.end.millisecondsSinceEpoch, r.off),
+        minutes: r.sleepMinutes,
+      ),
       stepsBetween: (a, b) => gapSteps(a, b, stepsByMinute: stepsByMinute, stepsFrom: stepsFrom),
       napLockOf: (date) {
         final m = napLocks[dateKey(date)];
