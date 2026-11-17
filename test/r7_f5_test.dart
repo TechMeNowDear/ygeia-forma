@@ -382,7 +382,7 @@ void main() {
       final pills = [for (final p in t.widgetList<TrendPill>(find.byType(TrendPill))) if (p.text.contains(' kg από ')) p.text];
       expect(pills, ['−0,2 kg από 2/12'], reason: 'πριν «+1,2 kg από 2/12»');
       expect(_row(t, 'Βάρος'), '80,7 kg  (−0,2)');
-      expect(_row(t, 'Λίπος'), '29,0%  (+2,0)', reason: 'πριν «27,6%  (+2,0)»: τάση δίπλα σε τιμή που δεν μετρά');
+      expect(_row(t, 'Λίπος'), '29,0%', reason: 'Κ3-M3 (17/11): χωρίς τάση (οι 3 πριν θέλουν 2 εβδομάδες απόσταση)· πριν «29,0%  (+2,0)»');
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9', reason: 'πριν 25,3');
       expect(find.text('Μέσα στο εύρος ·\u00A0φυσιολογικός δείκτης για το ύψος σου: 60,0–80,9 kg'), findsOneWidget,
           reason: 'πριν «Πάνω από το εύρος»');
