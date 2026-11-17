@@ -139,9 +139,17 @@ class CheckIn {
       this.fastIntakeDays = 0,
       this.fastTarget,
       this.estTarget,
-      this.lowLog = false});
+      this.lowLog = false,
+      this.formula,
+      this.formulaKg});
   final CheckKind kind;
   final Goals goals;
+
+  /// Κ1-L6 (17/11): ο τύπος με τον οποίο κρίθηκε η εκτίμηση ([formulaNow]) και το βάρος του, όταν διαφέρει από του
+  /// οδηγού (null: ο τύπος του οδηγού). Η κάρτα γράφει αυτόν τον αριθμό.
+  final double? formula;
+  final double? formulaKg;
+  double get formulaTdee => formula ?? goals.calc.tdee;
   final AdaptStatus? status;
   final Expenditure? est;
   final AdaptProposal? proposal;
@@ -343,8 +351,11 @@ CheckIn? pendingCheckIn({
     for (final x in foreign)
       if (!x.$1.isBefore(recentFrom) && !x.$1.isAfter(t) && (seen == null || dateKey(x.$1).compareTo(seen) > 0)) x,
   ];
+  // Κ1-L6 (17/11): ο τύπος με το τωρινό βάρος, για όλους τους ελέγχους λογικής εδώ ([formulaNow]).
+  final fNow = formulaNow(g, weights);
+  final formula = fNow.tdee;
   // Μέρα με αδύνατα πολλές θερμίδες δεν μετρά πουθενά (S11-3).
-  final over = absurdDayKcal(g.calc.tdee);
+  final over = absurdDayKcal(formula);
   if (checkInDue(goals: g, today: t, lastCheckIn: g.checkIn)) {
     if (!weightsRead) return CheckIn(kind: CheckKind.unread, goals: g);
     final to = DateTime(t.year, t.month, t.day - 1);
@@ -365,7 +376,7 @@ CheckIn? pendingCheckIn({
       intake: eaten,
       weights: weights,
       today: t,
-      formulaTdee: g.calc.tdee,
+      formulaTdee: formula,
       goalKcal: g.kcal,
       since: since,
     );
@@ -413,7 +424,9 @@ CheckIn? pendingCheckIn({
             heldDays: held ? sinceChange : null,
             absurd: absurd,
             foreign: news,
-            estTarget: estTarget);
+            estTarget: estTarget,
+            formula: formula,
+            formulaKg: fNow.kg);
       case AdaptStatus.implausible:
         // Round 7 (R7-A1-1): εκτίμηση πολύ χαμηλή (λείπει φαγητό από το ημερολόγιο) και βάρος καθαρά πιο ψηλά από τον
         // ρυθμό σου: ο στόχος κατεβαίνει από τη ζυγαριά ([lowLogProposal]). Όχι λιγότερο από 4 μέρες μετά από αλλαγή (S1-4).
@@ -422,7 +435,7 @@ CheckIn? pendingCheckIn({
             ? const <(DateTime, double)>[]
             : [for (final w in weights) if (!w.$1.isBefore(lowEst.from) && !w.$1.isAfter(lowEst.to)) w];
         final lowKg = lowWeights.isEmpty ? null : lowWeights.last.$2;
-        final lowP = lowEst == null || lowKg == null ? null : lowLogProposal(goals: g, est: lowEst, kgNow: lowKg);
+        final lowP = lowEst == null || lowKg == null ? null : lowLogProposal(goals: g, est: lowEst, kgNow: lowKg, formulaTdee: formula);
         final lowChanged = lastChangeDay(g);
         final lowHeld = lowChanged != null && daysBetween(lowChanged, t) < adaptMinChangeDays;
         if (lowP != null && !lowHeld) {
@@ -437,7 +450,9 @@ CheckIn? pendingCheckIn({
               weighs: weighs,
               absurd: absurd,
               foreign: news,
-              lowLog: true);
+              lowLog: true,
+              formula: formula,
+              formulaKg: fNow.kg);
         }
         return CheckIn(
             kind: CheckKind.implausible,
@@ -447,7 +462,9 @@ CheckIn? pendingCheckIn({
             days: days,
             weighs: weighs,
             absurd: absurd,
-            foreign: news);
+            foreign: news,
+            formula: formula,
+            formulaKg: fNow.kg);
       case AdaptStatus.tooEarly:
         // Round 8 (R8-A1-4): και το κενό καταγραφής ως χθες. Μετά από κενό η πρώτη εκτίμηση δεν βγαίνει την επόμενη μέρα
         // ελέγχου αλλά 3 εβδομάδες αφού ξαναρχίσει η καταγραφή ([estimateDayAfterGap]): η κάρτα το γράφει.
@@ -457,7 +474,7 @@ CheckIn? pendingCheckIn({
             status: r.status,
             days: days,
             weighs: weighs,
-            gap: foodGap(intake: eaten, today: t, formulaTdee: g.calc.tdee, goalKcal: g.kcal, since: since),
+            gap: foodGap(intake: eaten, today: t, formulaTdee: formula, goalKcal: g.kcal, since: since),
             foreign: news);
       case AdaptStatus.gapOpen:
       case AdaptStatus.afterGap:
@@ -467,7 +484,7 @@ CheckIn? pendingCheckIn({
             status: r.status,
             days: days,
             weighs: weighs,
-            gap: foodGap(intake: eaten, today: t, formulaTdee: g.calc.tdee, goalKcal: g.kcal, since: since),
+            gap: foodGap(intake: eaten, today: t, formulaTdee: formula, goalKcal: g.kcal, since: since),
             absurd: absurd,
             foreign: news);
       case AdaptStatus.fewIntakeDays:
@@ -630,7 +647,7 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
   final to = DateTime(t.year, t.month, t.day - 1);
   final windowFrom = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1));
   var since = firstCounted.isAfter(windowFrom) ? firstCounted : windowFrom;
-  final formula = goals.calc.tdee;
+  final formula = formulaNow(goals, weights).tdee;
   // Το κενό ψάχνεται όσο πίσω και στον έλεγχο ([adaptScanDays]), χωρίς την πρώτη εβδομάδα.
   final scanFrom = DateTime(to.year, to.month, to.day - (adaptScanDays - 1));
   final wideFrom = scanFrom.isBefore(firstCounted) ? firstCounted : scanFrom;

@@ -109,7 +109,13 @@ class NutritionPage extends StatelessWidget {
         final goals = health?.goals;
         // Round8 (R8-A1-5): μέρα που πέρασε με τον στόχο που ίσχυε τότε ([day])· μέρα πριν από τους στόχους, το απλό σύνολο.
         final summary = goals != null && !beforeGoals(goals, day)
-            ? GoalsSummaryCard(totals: totals, goals: goals, today: sameDay(day, today), health: health!, day: day)
+            ? GoalsSummaryCard(
+                totals: totals,
+                goals: goals,
+                today: sameDay(day, today),
+                health: health!,
+                day: day,
+                part: food.dayMark(day) == DayMark.part)
             : _SummaryCard(totals: totals);
         final cta = goals == null && health != null ? GoalsCtaCard(health: health!) : null;
         // Round9 (R9-A3-4): ούτε η κάρτα «Χοληστερίνη» σε μέρα πριν από τους στόχους (το πλάνο δεν υπήρχε ακόμα), όπως το

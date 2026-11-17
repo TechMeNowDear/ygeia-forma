@@ -111,6 +111,8 @@ Map<String, dynamic> diagnosticsFrom({
   final g = store.goals;
   final weights = d == null ? <(DateTime, double)>[] : dailyWeights(d.body);
   Map<DateTime, double> intake(DateTime a, DateTime b) => dailyIntake(food, a, b);
+  // Κ1-L6 (17/11): ο τύπος με το τωρινό βάρος, όπως ο έλεγχος θερμίδων ([formulaNow]).
+  final fNow = g == null ? null : formulaNow(g, weights);
 
   // ---------------------------------------------------------------- data
   final samsung = d == null
@@ -214,7 +216,7 @@ Map<String, dynamic> diagnosticsFrom({
     // ([satVerdict], η ίδια συνάρτηση με την κάρτα). Πριν η αναφορά έδινε για ΚΑΘΕ μέρα το «satLimit» (γραμμάρια) σαν όριο
     // της οθόνης, και σε τέτοιες μέρες (2.000 kcal, 14,0 g: οθόνη 6,3% «πάνω από το 6%») έβγαινε η ανάποδη ετυμηγορία.
     // Το «satLimit» μένει μόνο για τις μέρες που η οθόνη κρίνει με γραμμάρια.
-    final sat = goalKcal == null || g == null ? null : satVerdict(t, g, today: day == today, day: day);
+    final sat = goalKcal == null || g == null ? null : satVerdict(t, g, today: day == today, day: day, part: part);
     days.add({
       'd': dateKey(day),
       'entries': entries.length,
@@ -249,7 +251,7 @@ Map<String, dynamic> diagnosticsFrom({
             day.isBefore(today) &&
             (adaptFirst == null || !day.isBefore(adaptFirst)) &&
             t.kcal >= adaptFullDayShare * g.kcal &&
-            t.kcal <= absurdDayKcal(g.calc.tdee),
+            t.kcal <= absurdDayKcal(fNow!.tdee),
     });
   }
 
@@ -265,7 +267,7 @@ Map<String, dynamic> diagnosticsFrom({
     // Η εκτίμηση ΤΩΡΑ (όποια μέρα κι αν είναι), για έλεγχο· στην εφαρμογή φαίνεται μόνο τη μέρα ελέγχου. Με τους ίδιους
     // κανόνες (Συμβούλιο 2, Α1–Α2): χωρίς την πρώτη εβδομάδα των στόχων, στο μεγαλύτερο παράθυρο που έχει αρκετά δεδομένα.
     final probe = estimateExpenditure(
-        intake: intake(wideFrom, to), weights: weights, today: today, formulaTdee: g.calc.tdee, goalKcal: g.kcal, since: since);
+        intake: intake(wideFrom, to), weights: weights, today: today, formulaTdee: fNow!.tdee, goalKcal: g.kcal, since: since);
     final fastWindow = fastLossWindow(goals: g, today: today);
     final fastWs = fastLossWeights(goals: g, weights: weights, today: today);
     final fastFit = weightFit(fastWs);
@@ -311,8 +313,10 @@ Map<String, dynamic> diagnosticsFrom({
             'seKcal': _r(probe.est!.seKcal, 1),
             'guardKcal': _r(probe.est!.guardKcal, 1),
           },
-        'formulaTdee': _r(g.calc.tdee, 1),
-        'plausibleBand': [_r(0.7 * g.calc.tdee, 0), _r(1.4 * g.calc.tdee, 0)],
+        'formulaTdee': _r(fNow!.tdee, 1),
+        if (fNow!.kg != null) 'formulaKg': fNow!.kg,
+        'wizardTdee': _r(g.calc.tdee, 1),
+        'plausibleBand': [_r(adaptLowShare * fNow!.tdee, 0), _r(adaptHighShare * fNow!.tdee, 0)],
       },
       // Η «γρήγορη απώλεια» όπως θα κρινόταν σήμερα (Συμβούλιο 2, Α3): παράθυρο, ζυγίσεις, κλίση και τυπικό σφάλμα.
       'fast': {

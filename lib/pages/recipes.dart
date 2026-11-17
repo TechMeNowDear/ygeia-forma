@@ -8,6 +8,7 @@ import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
 import '../food/kitchen.dart';
+import '../food/chol.dart' show satLimitShown;
 import '../food/recipe.dart';
 import '../format.dart';
 import '../goals.dart' show Goals;
@@ -24,7 +25,7 @@ import 'privacy_page.dart' show copySensitive;
 
 /// Οι στόχοι της μέρας για τις οδηγίες, ή null.
 RecipeTargets? targetsOf(Goals? g) =>
-    g == null ? null : (kcal: g.kcal, protein: g.protein, satMax: g.satMax, fiber: g.fiber, salt: g.salt);
+    g == null ? null : (kcal: g.kcal, protein: g.protein, satMax: satLimitShown(g.kcal, g.satPct).floor(), fiber: g.fiber, salt: g.salt);
 
 /// Το φύλλο «Συνταγή από AI»: τι θέλεις → «Αντιγραφή οδηγιών» → (στο AI) → «Επικόλληση συνταγής».
 Future<void> openRecipeStart(BuildContext context, FoodStore food) async {
