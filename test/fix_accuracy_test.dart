@@ -665,7 +665,8 @@ void main() {
     expect(breathRange.text, isNot(contains('υγιείς')));
     expect(metricInfos[K.breath]!.compare, contains('χρήστες Fitbit'));
     final snap = File('lib/home_widgets/widget_snapshot.dart').readAsStringSync();
-    expect(snap, contains(r"'${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1)}'"));
+    // Έλεγχος 17/11 (Κ4-2): η θέση κρίνεται από τον μέσο όρο όπως φαίνεται (στρογγυλεμένο λεπτό).
+    expect(snap, contains(r"'${countText(sleepWeek.$2, 'νύχτα', 'νύχτες')} ${sr.placeText(sleepWeek.$1.roundToDouble())}'"));
     expect(metricInfos[K.weight]!.accuracy, contains('0,5–1 kg'));
     expect(metricInfos[K.fatPct]!.accuracy, contains('DXA'));
     expect(metricInfos[K.steps]!.accuracy, contains('στη μέση'));
