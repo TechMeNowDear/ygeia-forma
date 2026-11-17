@@ -50,6 +50,8 @@ class BodyPage extends StatelessWidget {
             ? null
             : [
                 for (final b in body)
+                  // Έλεγχος 17/11 (Κ3-L5, απόφαση): και η ξένη φαίνεται εδώ, όπως αποφασίστηκε στο R7 (f5 · A4-1)· στον πίνακα
+                  // ζυγίσεων είναι σημειωμένη με «*».
                   if (b.weight != null && dayOf(b.time) == dayOf(last.time) && b.time.isAfter(last.time)) b,
               ].lastOrNull;
         // Round 2 (g4 · R2-D-8): τα γραφήματα με μία ζύγιση ανά μέρα, την πρώτη που μετρά ([countedBody]), όπως η τάση, το

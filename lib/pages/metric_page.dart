@@ -4,6 +4,7 @@ import '../data.dart';
 import '../format.dart';
 import '../history.dart';
 import '../profile.dart';
+import '../body_trend.dart' show bodyFloorFatPct, bodyFloorKg;
 import '../reference.dart';
 import '../shown.dart';
 import '../sources.dart';
@@ -252,11 +253,14 @@ class _MetricPageState extends State<MetricPage> {
         } else if (base?.usual != null) {
           final d = shownDiff(base!.value, base.usual!, s.digits);
           final unit = s.unitSuffix;
+          // Έλεγχος 17/11 (Κ3-L3): λίπος και μύες της ζυγαριάς: διαφορά μέσα στον θόρυβο μιας ζύγισης (McLester 2020) =
+          // «όπως συνήθως», όχι «+1,2 μονάδες».
+          final noise = switch (s.metric) { K.fatPct => bodyFloorFatPct, K.smm => bodyFloorKg, _ => 0.0 };
           usual = s.duration
               // Round 1 (U1b-04): «33 λεπτά λιγότερο από ό,τι συνήθως · συνήθως 7 ώρες 5 λεπτά» (πριν «−33 · …» χωρίς μονάδα).
               // Round 12 (R12-D2-5): «·» με τον κανόνα [dotJoin] και ο αριθμός με τη λέξη του ([unitsGlued]).
               ? unitsGlued('${sleepVsUsualText(d.round())} ·\u00A0συνήθως ${s.show(base.usual!)}')
-              : d == 0
+              : d == 0 || d.abs() < noise - 1e-9
                   // Round 8 (R8-U4-12): «Όπως συνήθως (59 bpm)», όπως ο Ύπνος του Oura (πριν «Όπως συνήθως · συνήθως 59 bpm»,
                   // το λάθος που η Καρδιά διόρθωσε στο R2-U1-10).
                   ? '$asUsualText (${s.show(base.usual!)}$unit)'

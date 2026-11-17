@@ -81,9 +81,8 @@ void main() {
     test('ο φύλακας: η 14/12 είναι «σε αναμονή»· η τάση λίπους (3 τελευταίες που μετρούν, 29,0, με τις 3 πριν, 27,0) = +2,0', () {
       final st = {for (final g in weighInDays(rows)) g.day: g.status};
       expect(st[DateTime(2026, 12, 14)], WeighStatus.pending);
-      final tr = bodyTrend(rows, (b) => b.fatPct)!;
-      expect(tr.now, 29.0);
-      expect(tr.before, 27.0);
+      // Έλεγχος 17/11 (Κ3-M3): οι «3 πριν» θέλουν 2 εβδομάδες απόσταση από τις 3 τελευταίες: εδώ καμία τάση.
+      expect(bodyTrend(rows, (b) => b.fatPct), isNull);
     });
 
     testWidgets('Δε 14/12: «Λίπος 25,0%» χωρίς «(+2,0)» (πριν: «25,0%  (+2,0)», αλλαγή που δεν περιέχει την τιμή)', (t) async {
@@ -92,10 +91,11 @@ void main() {
       expect(_row(t, 'Λίπος'), '25,0%');
     });
 
-    testWidgets('ζύγιση που μετρά (Πα 4/12): η τάση φαίνεται όπως πριν, «29,0%  (+2,0)»', (t) async {
+    // Έλεγχος 17/11 (Κ3-M3): οι «3 πριν» θέλουν 2 εβδομάδες απόσταση· εδώ δεν υπάρχουν, άρα καμία παρένθεση (πριν «(+2,0)»).
+    testWidgets('ζύγιση που μετρά (Πα 4/12): «29,0%» χωρίς τάση (λίγες εβδομάδες ζυγίσεων)', (t) async {
       final now = DateTime(2026, 12, 4, 8);
       await _pump(t, BodyPage(store: _store(now, _ownRows), now: now));
-      expect(_row(t, 'Λίπος'), '29,0%  (+2,0)');
+      expect(_row(t, 'Λίπος'), '29,0%');
     });
   });
 
@@ -119,7 +119,7 @@ void main() {
       await _pump(t, BodyPage(store: _store(now, rows), now: now));
       expect(_row(t, 'Βάρος'), '80,7 kg  (−0,2)');
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9'); // 80,7 / 1,8² = 24,907 (πριν: κανένας, από την 85,4)
-      expect(_row(t, 'Λίπος'), '29,0%  (+2,0)');
+      expect(_row(t, 'Λίπος'), '29,0%'); // Κ3-M3 (17/11): χωρίς τάση, όπως πιο πάνω
       // Round 8 (A4 Β2 / U4 Β4): η μέρα με την ίδια μορφή με το χάπι («από 2/12»)· πριν «από τις 2 Δεκ.».
       expect(_note(t), contains('σε παρένθεση η αλλαγή από τις 2/12.'));
       expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data,

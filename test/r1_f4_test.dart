@@ -236,9 +236,9 @@ void main() {
   group('S4-3 / S4-4: Σώμα, τάση λίπους και μυών', () {
     test('S4-4: μετρά η ΠΡΩΤΗ (πρωινή) ζύγιση της μέρας, όχι η βραδινή μετά την προπόνηση', () {
       final body = <BodyMeasurement>[
-        for (final (d, fat) in [(2, 26.0), (4, 26.1), (6, 26.0), (9, 26.1), (11, 26.0), (13, 26.1)])
+        for (final (d, fat) in [(2, 26.0), (4, 26.1), (6, 26.0), (20, 26.1), (22, 26.0), (24, 26.1)])
           _m(DateTime(2026, 11, d, 8), 90, fat: fat),
-        for (final (d, fat) in [(9, 24.6), (11, 24.8), (13, 24.7)]) _m(DateTime(2026, 11, d, 20), 90.5, fat: fat),
+        for (final (d, fat) in [(20, 24.6), (22, 24.8), (24, 24.7)]) _m(DateTime(2026, 11, d, 20), 90.5, fat: fat),
       ]..sort((a, b) => a.time.compareTo(b.time));
       final t = bodyTrend(body, (b) => b.fatPct)!;
       // πρωινές: 26,0 · 26,1 · 26,0 | 26,1 · 26,0 · 26,1 → μεσαίες 26,0 και 26,1.
@@ -260,11 +260,12 @@ void main() {
 
     testWidgets('S4-3 + S3-3: «(−2,1)» φαίνεται· η ημερομηνία σε σχέση με τώρα («Χθες»), όχι με την ανάγνωση', (t) async {
       final s = HealthStore()
-        ..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 11, 13, 20), [
-          for (final (d, fat) in [(2, 27.9), (4, 27.5), (6, 27.0), (9, 25.6), (11, 25.3), (13, 25.4)])
+        // Έλεγχος 17/11 (Κ3-M3): οι 3 πριν τουλάχιστον 2 εβδομάδες πριν από τις 3 τελευταίες.
+        ..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 11, 24, 20), [
+          for (final (d, fat) in [(2, 27.9), (4, 27.5), (6, 27.0), (20, 25.6), (22, 25.3), (24, 25.4)])
             (DateTime(2026, 11, d, 8), 90.0, fat),
         ]));
-      await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 14, 9)), size: const Size(400, 4000));
+      await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 25, 9)), size: const Size(400, 4000));
       String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
       // μεσαίες 27,5 και 25,4 → −2,1 (πάνω από το όριο 1,5)· «%» χωρίς κενό.
       expect(row('Λίπος'), '25,4%  (−2,1)');

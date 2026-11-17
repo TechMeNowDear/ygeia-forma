@@ -146,7 +146,9 @@ const trendMetrics = <MetricDef>[
   // Σώμα
   MetricDef(key: K.weight, label: 'Βάρος', section: TrendSection.body, minDiff: 0.5, unit: 'kg', digits: 1, sparse: true),
   MetricDef(key: K.fatPct, label: 'Λίπος', section: TrendSection.body, minDiff: 0.5, unit: '%', digits: 1, better: -1, sparse: true),
-  MetricDef(key: K.smm, label: 'Σκελετικοί μύες', section: TrendSection.body, minDiff: 0.3, unit: 'kg', digits: 1, better: 1, sparse: true),
+  // Έλεγχος 17/11 (Κ3, επιστημονικός M1): ουδέτερο χρώμα και αλλαγή από 1 kg. Η ζυγαριά BIA δεν ξεχωρίζει μύες από νερό
+  // και γλυκογόνο (Bhutani 2017· ESPEN, Kyle 2004)· +0,3 kg σε 30 μέρες με πράσινο διαβαζόταν «χτίζω μύες».
+  MetricDef(key: K.smm, label: 'Σκελετικοί μύες', section: TrendSection.body, minDiff: 1.0, unit: 'kg', digits: 1, sparse: true),
   MetricDef(key: K.skinTemp, label: 'Θερμοκρασία καρπού στον ύπνο', section: TrendSection.sleep, minDiff: 0.2, unit: '°C', digits: 1),
   // Κίνηση
   MetricDef(key: K.steps, label: 'Βήματα', section: TrendSection.move, minDiff: 500, better: 1, includeToday: false),
