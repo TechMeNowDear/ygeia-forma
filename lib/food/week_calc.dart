@@ -242,7 +242,10 @@ String weekPrompt({
       else if (t == null)
         'μερίδα: άγνωστη (βάλε "kcal")'
       else
-        'μερίδα ${n(t.kcal)} kcal, πρωτεΐνη ${n(t.protein)} g, κορεσμένα ${t.satFat.toStringAsFixed(1)} g, ίνες ${n(t.fiber)} g',
+        // Κ2-L4 (17/11): «≥» όταν σε κάποιο υλικό λείπει η τιμή, όπως στις οθόνες.
+        'μερίδα ${n(t.kcal)} kcal, πρωτεΐνη ${n(t.protein)} g, '
+            'κορεσμένα ${(t.missing[Nk.satFat] ?? 0) > 0 ? '≥ ' : ''}${t.satFat.toStringAsFixed(1)} g, '
+            'ίνες ${(t.missing[Nk.fiber] ?? 0) > 0 ? '≥ ' : ''}${n(t.fiber)} g',
     ].join(' · '));
   }
   return b.toString();

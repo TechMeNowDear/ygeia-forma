@@ -434,7 +434,7 @@ List<String> rawFoodLines(List<Food> foods, FoodLikes likes, {bool cooked = fals
   final cookedIds = {for (final f in foods) for (final c in f.cooked) c.$1};
   for (final f in foods) {
     if (likes.dislike.contains(f.id)) continue;
-    final isCooked = f.rawId != null || cookedIds.contains(f.id);
+    final isCooked = f.isCooked || cookedIds.contains(f.id);
     if (isCooked != cooked) continue;
     byCat.putIfAbsent(f.cat.isEmpty ? 'Άλλα' : f.cat, () => []).add(f);
   }

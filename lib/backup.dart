@@ -38,6 +38,8 @@ String buildBackup({
   Map<String, String>? foodDays,
   Map<String, double>? foodUnits,
   List<Object?>? vitals,
+  Map<String, dynamic>? foodWeek,
+  int? foodRemind,
   bool errorsOff = false,
 }) {
   // Χωρίς κενά: το αρχείο συμπιέζεται κιόλας (gzip, στο Android), ώστε να μένει μικρό για χρόνια.
@@ -64,6 +66,9 @@ String buildBackup({
     if (foodUnits != null && foodUnits.isNotEmpty) 'foodUnits': foodUnits,
     // Πίεση, σάκχαρο, καρδιογραφήματα (16/11).
     if (vitals != null && vitals.isNotEmpty) 'vitals': vitals,
+    // Έλεγχος 17/11 (Κ2-M1): πρόγραμμα εβδομάδας και ώρα βραδινής υπενθύμισης. Πρόσθετα κλειδιά.
+    if (foodWeek != null) 'foodWeek': foodWeek,
+    if (foodRemind != null) 'foodRemind': foodRemind,
     if (errorsOff) 'errorsOff': true,
   });
 }
@@ -78,7 +83,14 @@ class BackupContents {
       this.likes = const FoodLikes(),
       this.dayMarks = const {},
       this.units = const {},
-      this.vitals = const []});
+      this.vitals = const [],
+      this.week,
+      this.remind});
+
+  /// Έλεγχος 17/11 (Κ2-M1): το πρόγραμμα εβδομάδας και η ώρα υπενθύμισης, όπως ήταν στο αρχείο (τα ελέγχει το
+  /// importWeekRemind).
+  final Object? week;
+  final Object? remind;
 
   /// Πίεση, σάκχαρο, καρδιογραφήματα (16/11), όπως ήταν στο αρχείο (τα ελέγχει το importItems).
   final List<Object?> vitals;
@@ -270,6 +282,8 @@ BackupContents parseBackup(String text) {
     dayMarks: j['foodDays'] is Map ? Map<String, Object?>.from(j['foodDays'] as Map) : const {},
     units: j['foodUnits'] is Map ? Map<String, Object?>.from(j['foodUnits'] as Map) : const {},
     vitals: j['vitals'] is List ? List<Object?>.from(j['vitals'] as List) : const [],
+    week: j['foodWeek'],
+    remind: j['foodRemind'],
   );
 }
 

@@ -321,8 +321,10 @@ LibraryImport planLibraryImport(
         errors.add('Το id $id είναι «${f.name}», όχι «${i.name}».');
       } else if (likes.dislike.contains(f.id)) {
         errors.add('«${f.name}» είναι στα «Δε μου αρέσει».');
-      } else if (f.rawId != null && e.plan.cook != CookWay.out) {
-        errors.add('«${f.name}» είναι μαγειρεμένη μορφή: γράψε την ωμή (${f.rawId}), ζυγισμένη ωμή.');
+      } else if (f.isCooked && e.plan.cook != CookWay.out) {
+        errors.add(f.rawId != null
+            ? '«${f.name}» είναι μαγειρεμένη μορφή: γράψε την ωμή (${f.rawId}), ζυγισμένη ωμή.'
+            : '«${f.name}» υπάρχει στη βάση μόνο μαγειρεμένο: διάλεξε ωμό υλικό, ζυγισμένο ωμό.');
       } else {
         items.add(DishItem(f.id, f.name, i.amount));
       }

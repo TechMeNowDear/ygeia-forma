@@ -266,6 +266,12 @@ class _AmountFieldState extends State<AmountField> {
   }
 }
 
+/// Έλεγχος 17/11 (Κ2-H1): πεδίο που άνοιξε με [stored] και δεν άλλαξε κρατά την ΑΠΟΘΗΚΕΥΜΕΝΗ τιμή, όχι αυτήν που
+/// φαίνεται (ένα δεκαδικό). Πριν, 0,25 μερίδες ξανανοιγμένες γράφονταν «0,3» και μια αποθήκευση μόνο για αλλαγή γεύματος
+/// τις έκανε 0,3 (+20% θερμίδες)· «12,25 g» γίνονταν 12,3.
+double? keptFieldValue(TextEditingController t, double stored, {double max = maxEntryGrams}) =>
+    t.text.trim() == gramsField(stored) ? stored : fieldValue(t, max: max);
+
 /// Αριθμός πεδίου πάνω από 0 και ως [max], ή null.
 double? fieldValue(TextEditingController t, {double max = maxEntryGrams, bool zero = false}) {
   final v = parseNumber(t.text);
@@ -952,15 +958,22 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
     if (tag.kind == DishKind.plate) {
       final out = <LogEntry>[];
       for (var k = 0; k < g.length; k++) {
-        final v = fieldValue(_items[k]);
+        final v = keptFieldValue(_items[k], g[k].grams);
         if (v == null) return null;
-        out.add(g[k].copyWith(grams: roundAmount(v), meal: _meal));
+        out.add(g[k].copyWith(grams: v == g[k].grams ? v : roundAmount(v), meal: _meal));
       }
       final sum = out.fold(0.0, (a, e) => a + e.grams);
       return [for (final e in out) e.copyWith(dish: tag.withQty(roundAmount(sum)))];
     }
-    final q = fieldValue(_qty, max: tag.kind == DishKind.portions ? maxEatenServings : maxCookedGrams);
+    final q = keptFieldValue(_qty, tag.qty, max: tag.kind == DishKind.portions ? maxEatenServings : maxCookedGrams);
     if (q == null) return null;
+    // Κ2-L3: μερίδα κατσαρόλας ως το βάρος της κατσαρόλας (όπως στην πρώτη καταχώριση), όταν είναι ακόμα η ίδια.
+    if (tag.kind == DishKind.pot) {
+      final b = widget.food.dishById(tag.id)?.batch;
+      if (b != null && b.at == tag.batch && q > b.cooked) return null;
+    }
+    // Ίδια ποσότητα: οι καταχωρίσεις μένουν ακριβώς όπως ήταν (καμία στρογγυλοποίηση).
+    if (q == tag.qty) return [for (final e in g) e.copyWith(meal: _meal)];
     final f = q / tag.qty;
     return [
       for (final e in g)

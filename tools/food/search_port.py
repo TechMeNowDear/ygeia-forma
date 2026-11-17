@@ -334,7 +334,7 @@ class Index:
             mine = f.get('source') in ('Open Food Facts', 'Ετικέτα')
             if mine: score += 1.5
             if f.get('cooked'): score += 1.2
-            if cooked_first and f.get('rawId'): score += 2.5
+            if cooked_first and (f.get('rawId') or f.get('cookedLabel')): score += 2.5
             score -= len(f['name']) / 60
             # round1 (U3a-10): δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις (μέσος βαθμός λέξεων >= 7) μπαίνει πρώτο.
             # round2 (R2-A-4): όχι όταν μια λέξη-τρόφιμο της αναζήτησης («μέλι») είναι μόνο η αρχή άλλης λέξης του ονόματος

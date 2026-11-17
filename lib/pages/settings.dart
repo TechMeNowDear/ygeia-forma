@@ -64,6 +64,8 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     foodDays: food.dishesRead ? food.dayMarksForBackup() : null,
     foodUnits: food.dishesRead ? food.unitsForBackup() : null,
     vitals: VitalsStore.main.read ? VitalsStore.main.forBackup() : null,
+    foodWeek: food.dishesRead ? food.weekForBackup() : null,
+    foodRemind: food.dishesRead ? food.remindAt : null,
     // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
     errorsOff: !errors.enabled,
   );
@@ -562,6 +564,7 @@ class _DataGroupState extends State<_DataGroup> {
       // «Τελείωσα για σήμερα» (16/11): μόνο οι μέρες χωρίς σημάδι στο κινητό.
       final marksIn = await widget.food!.importDayMarks(b.dayMarks);
       final unitsIn = await widget.food!.importUnits(b.units);
+      final weekIn = await widget.food!.importWeekRemind(b.week, b.remind);
       final vitalsIn = await VitalsStore.main.importItems(b.vitals);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
@@ -600,6 +603,7 @@ class _DataGroupState extends State<_DataGroup> {
         if (vitalsIn > 0) countText(vitalsIn, 'μέτρηση (πίεση, σάκχαρο, καρδιογράφημα) μπήκε.', 'μετρήσεις (πίεση, σάκχαρο, καρδιογράφημα) μπήκαν.'),
         if (vitalsIn < 0) 'Οι μετρήσεις (πίεση, σάκχαρο, καρδιογράφημα) δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (marksIn < 0 || unitsIn < 0) 'Τα σημάδια «Τελείωσα για σήμερα» και τα βάρη «Ζύγισα ένα» δεν γράφτηκαν· δοκίμασε ξανά.',
+        if (weekIn < 0) 'Το πρόγραμμα εβδομάδας και η ώρα υπενθύμισης δεν γράφτηκαν· δοκίμασε ξανά.',
         if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
     } finally {

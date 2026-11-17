@@ -713,7 +713,7 @@ class FoodIndex {
       }
       if (f.isMine) score += 1.5; // τα δικά μου πρώτα (έγγραφο › Βάση τροφίμων)
       if (f.isRawWithCooked) score += rawFirstBonus; // ζυγίζω ωμά: η ωμή μορφή πριν από τη μαγειρεμένη
-      if (cookedFirst && f.rawId != null) score += 2.5;
+      if (cookedFirst && f.isCooked) score += 2.5;
       score -= f.name.length / 60; // τα πιο σύντομα ονόματα λίγο πιο πάνω
       // Έλεγχος round1 (U3a-10): ένα δικό μου προϊόν που ταιριάζει με ολόκληρες λέξεις του ονόματος ή της μάρκας του
       // ([_mineFirst]) μπαίνει ΠΡΩΤΟ, πάνω από τα γενικά τρόφιμα. Πριν, το +1,5 δεν έφτανε: στο «γιαούρτι» το δικό μου
