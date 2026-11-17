@@ -210,7 +210,8 @@ void main() {
       expect(_row(t, 'Βάρος'), '74,0 kg');
       expect(_row(t, 'Δείκτης μάζας σώματος'), isNull, reason: 'πριν: «22,8» (74,0 / 1,8²)');
       expect(_note(t), isNot(contains('σε παρένθεση η αλλαγή από')), reason: 'πριν: «… από τις 4 Δεκ.» χωρίς παρένθεση');
-      expect(_note(t), contains('Σε λίπος και μύες'));
+      // Κ8-M1 (17/11): χωρίς ζυγίσεις 2 εβδομάδες πίσω, η σημείωση λέει πότε θα φανεί η αλλαγή.
+      expect(_note(t), contains('λίπος και μύες'));
       expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text.contains(' kg από ')), isEmpty);
     });
 

@@ -282,8 +282,15 @@ BodyMeasurement? previousCounted(List<BodyMeasurement> counted, BodyMeasurement 
 /// Η γραμμή κάτω από τον τίτλο «Σύσταση σώματος». [previous]: η προηγούμενη ζύγιση (για το βάρος), αν υπάρχει.
 /// Round 8 (R8-U4-3): ο αριθμός μένει με τη μονάδα του όταν σπάει η γραμμή (αδιάσπαστο κενό, όπως [unitsGlued]): πριν
 /// «…από τις 13 ⏎ Αυγ.», «1,7 ⏎ kg».
-String bodyTrendNote({required DateTime? previous, required int days, required String Function(DateTime) date}) {
+/// Έλεγχος 17/11 (Κ8-M1): [ready] false = υπάρχουν 6 μέρες αλλά όχι ακόμα 3 ζυγίσεις 2 εβδομάδες πριν από τις 3 τελευταίες
+/// ([bodyTrend] null): λέγεται αυτό, όχι «σε σύγκριση με…» χωρίς καμία παρένθεση.
+String bodyTrendNote(
+    {required DateTime? previous, required int days, required String Function(DateTime) date, bool? ready}) {
   final weight = previous == null ? '' : 'Στο βάρος, σε παρένθεση η αλλαγή από τις ${date(previous).replaceAll(' ', '\u00A0')}. ';
+  if (days >= 2 * bodyTrendGroup && ready == false) {
+    return '${weight}Η αλλαγή σε λίπος και μύες φαίνεται όταν υπάρχουν 3 ζυγίσεις τουλάχιστον 2\u00A0εβδομάδες πριν από '
+        'τις 3 τελευταίες: μία ζύγιση μόνη της ανεβοκατεβαίνει με το νερό.';
+  }
   if (days >= 2 * bodyTrendGroup) {
     // Round 2 (g4 · R2-D-2): τα όρια γραμμένα με τους αριθμούς τους ([bodyFloorFatPct], [bodyFloorKg]), ώστε να ξέρεις
     // γιατί συνήθως δεν φαίνεται παρένθεση από εβδομάδα σε εβδομάδα.

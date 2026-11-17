@@ -275,7 +275,9 @@ void main() {
       _mockPrefs(const {'themeMode': 'dark'});
       final s = HealthStore()
         ..planFile = MemoryPlanFile()
-        ..debugSetPlan(SourcePlan.samsungOnly);
+        ..debugSetPlan(SourcePlan.samsungOnly)
+        // Έλεγχος 17/11 (Κ8-M2): και το ιστορικό ημερών διαβασμένο.
+        ..debugSetRecovery();
       await s.loadPrefs();
       expect(s.prefsLoaded, isTrue);
       final r = await exportBackupNow(s, FoodStore.preloaded(foods: const []));
@@ -303,7 +305,7 @@ void main() {
     test('και οι προεπιλογές μετά από χαλασμένο αρχείο μετρούν ως «δεν μπήκαν»', () {
       final src = File('lib/pages/settings.dart').readAsStringSync();
       expect(src, contains('final prefsOut = !store.prefsLoaded || store.prefsFromDefaults;'));
-      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut;'));
+      expect(src, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut && !historyOut;'));
     });
   });
 

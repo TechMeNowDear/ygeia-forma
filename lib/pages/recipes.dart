@@ -521,7 +521,9 @@ class _RecipePreviewScreenState extends State<RecipePreviewScreen> {
     return [
       row('Θερμίδες', '${kcalText(t.kcal)} από ${thousands(g.kcal)}${pct(t.kcal, g.kcal)}'),
       row('Πρωτεΐνη', '${gramsText(t.protein)} από ${g.protein} g${pct(t.protein, g.protein)}'),
-      row('Κορεσμένα', '${dec(t.satFat, 1)} από ${g.satMax} g${pct(t.satFat, g.satMax)}', warn: t.satFat > g.satMax / 2),
+      // Κ8-L1 (17/11): το ίδιο όριο με τη Διατροφή ([satLimitShown], ένα δεκαδικό).
+      row('Κορεσμένα', '${dec(t.satFat, 1)} από ${dec(satLimitShown(g.kcal, g.satPct), 1)} g'
+          '${pct(t.satFat, satLimitShown(g.kcal, g.satPct))}', warn: t.satFat > satLimitShown(g.kcal, g.satPct) / 2),
       row('Φυτικές ίνες', '${gramsText(t.fiber)} από ${g.fiber} g${pct(t.fiber, g.fiber)}'),
       row('Αλάτι', '${dec(t.salt, 1)} από ${dec(g.salt, 0)} g${pct(t.salt, g.salt)}', warn: t.salt > g.salt / 2),
     ];

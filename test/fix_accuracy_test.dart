@@ -216,7 +216,7 @@ void main() {
       expect(enabled(tester, 'wipe-confirm'), isFalse);
       // Round 1 (f8 · S9-8): πλήρες μόνο αν μπήκαν ΚΑΙ οι ρυθμίσεις και οι πηγές ύπνου.
       final settings = File('lib/pages/settings.dart').readAsStringSync();
-      expect(settings, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut;'));
+      expect(settings, contains('final complete = !trainingOut && hrMissing == 0 && !prefsOut && !sourcesOut && !dishesOut && !vitalsOut && !historyOut;'));
       expect(settings, contains('ok: complete,'));
     });
 
