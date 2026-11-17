@@ -346,7 +346,7 @@ CheckIn? pendingCheckIn({
   final t = _day(today);
   // Ξένες ζυγίσεις των 3 τελευταίων εβδομάδων που δεν έχουν φανεί ακόμα σε κάρτα.
   final seen = g.foreignSeen;
-  final recentFrom = DateTime(t.year, t.month, t.day - (adaptFastWindowDays - 1));
+  final recentFrom = DateTime(t.year, t.month, t.day - adaptFastWindowDays);
   final news = [
     for (final x in foreign)
       if (!x.$1.isBefore(recentFrom) && !x.$1.isAfter(t) && (seen == null || dateKey(x.$1).compareTo(seen) > 0)) x,

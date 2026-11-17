@@ -50,9 +50,9 @@ bool beforeGoals(Goals g, DateTime day) {
   final kcalGoal = today || day == null ? g.kcal : targetOn(g, day);
   final limitG = satLimitShown(kcalGoal, g.satPct);
   final overG = oneDecimal(oneDecimal(t.satFat) - limitG);
-  // Έλεγχος 17/11 (Κ1-L4): μέρα με «Λείπουν γεύματα» ([part]) κρίνεται με γραμμάρια, όπως στη «Χοληστερίνη» (CholDay)·
-  // και το 60% από τον στόχο που ίσχυε εκείνη τη μέρα (πριν από τον τωρινό).
-  final pctDay = !today && !part && t.kcal > 0 && t.kcal >= fullDayKcalFor(kcalGoal) ? t.satFat * 9 / t.kcal * 100 : null;
+  // Έλεγχος 17/11 (Κ1-L4): μέρα με «Λείπουν γεύματα» ([part]) κρίνεται με γραμμάρια, όπως στη «Χοληστερίνη» (CholDay.fullFor)·
+  // το 60% με τον τωρινό στόχο, όπως εκεί (R9-U2-1).
+  final pctDay = !today && !part && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
   final strict = satStrictPct(g.satPct);
   final over = pctDay != null
       ? (strict ? oneDecimal(pctDay) >= g.satPct : oneDecimal(pctDay) > g.satPct)

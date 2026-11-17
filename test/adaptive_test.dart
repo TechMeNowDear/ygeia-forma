@@ -268,9 +268,9 @@ void main() {
     expect(fastLossCheck(goals: _g(), weights: ws(86.0), today: day18), isNull);
     // Όταν η απώλεια είναι καθαρά πάνω από το όριο, η ειδοποίηση βγαίνει.
     expect(fastLossCheck(goals: _g(), weights: ws(85.8), today: day18)?.change, 150);
-    // Το παράθυρο: 21 μέρες μαζί με σήμερα, ποτέ μέσα στην πρώτη εβδομάδα.
+    // Το παράθυρο: 21 μέρες πίσω, ποτέ μέσα στην πρώτη εβδομάδα.
     expect(fastLossWindow(goals: _g(), today: day18), (DateTime(2026, 11, 23), day18));
-    expect(fastLossWindow(goals: _g(), today: DateTime(2026, 12, 28)), (DateTime(2026, 12, 8), DateTime(2026, 12, 28)));
+    expect(fastLossWindow(goals: _g(), today: DateTime(2026, 12, 28)), (DateTime(2026, 12, 7), DateTime(2026, 12, 28)));
   });
 
   test('μ1: «δεν κατεβαίνει κάτω από το όριο ασφαλείας» μόνο όταν ο νέος στόχος είναι στο όριο', () {
