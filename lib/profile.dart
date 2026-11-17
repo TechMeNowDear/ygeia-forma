@@ -10,7 +10,53 @@ class Profile {
     this.heightCm,
     this.weighDays = defaultWeighDays,
     this.waistDay = DateTime.friday,
+    this.smoke,
+    this.cigs,
+    this.smokeFrom,
+    this.quit,
   });
+
+  /// Κάπνισμα (απόφαση χρήστη 17/11): «no» δεν καπνίζω, «now» καπνίζω, «ex» το έκοψα· null αν δεν απαντήθηκε.
+  final String? smoke;
+
+  /// Τσιγάρα τη μέρα (όσο κάπνιζες, για το «το έκοψα»), 1–80.
+  final int? cigs;
+
+  /// Ηλικία που ξεκίνησες, 8–80.
+  final int? smokeFrom;
+
+  /// Μέρα που το έκοψες, «2026-11-23» (μόνο με «ex»).
+  final String? quit;
+
+  bool get smokes => smoke == 'now';
+
+  /// Η μέρα που το έκοψες, μόνο με «ex».
+  DateTime? get quitDate => smoke == 'ex' && quit != null ? DateTime.tryParse(quit!) : null;
+
+  /// Πακέτα-έτη: τσιγάρα τη μέρα ÷ 20 × χρόνια καπνίσματος (ως σήμερα, ή ως τη μέρα που το έκοψες). null αν λείπει κάτι.
+  double? packYears(DateTime today) {
+    if (smoke != 'now' && smoke != 'ex') return null;
+    final c = cigs, from = smokeFrom;
+    if (c == null || from == null) return null;
+    final end = smoke == 'ex' ? quitDate : today;
+    final age = end == null ? null : ageOn(end);
+    if (age == null || age < from) return null;
+    return c / 20 * (age - from);
+  }
+
+  /// Αλλάζει όλα τα πεδία του καπνίσματος μαζί (null = σβήνεται).
+  Profile withSmoking({String? smoke, int? cigs, int? smokeFrom, String? quit}) => Profile(
+        birthYear: birthYear,
+        birthMonth: birthMonth,
+        sex: sex,
+        heightCm: heightCm,
+        weighDays: weighDays,
+        waistDay: waistDay,
+        smoke: smoke,
+        cigs: smoke == 'no' ? null : cigs,
+        smokeFrom: smoke == 'no' ? null : smokeFrom,
+        quit: smoke == 'ex' ? quit : null,
+      );
 
   /// Έτος και μήνας γέννησης (αρκούν για την ηλικία· η μέρα δεν χρειάζεται).
   final int? birthYear;
@@ -50,6 +96,10 @@ class Profile {
         heightCm: heightCm ?? this.heightCm,
         weighDays: weighDays == null || weighDays.isEmpty ? this.weighDays : weighDays,
         waistDay: waistDay ?? this.waistDay,
+        smoke: smoke,
+        cigs: cigs,
+        smokeFrom: smokeFrom,
+        quit: quit,
       );
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +111,10 @@ class Profile {
         'wad': waistDay,
         // Για παλιότερη έκδοση της εφαρμογής (μία μέρα ζυγίσματος): η μέρα της μέσης.
         'wd': waistDay,
+        if (smoke != null) 'smk': smoke,
+        if (cigs != null) 'cig': cigs,
+        if (smokeFrom != null) 'smf': smokeFrom,
+        if (quit != null) 'quit': quit,
       };
 
   static Profile fromJson(Object? j) {
@@ -91,6 +145,13 @@ class Profile {
       heightCm: h != null && h >= 100 && h <= 250 ? h : null,
       weighDays: days,
       waistDay: day(wad) ? wad! : (day(wd) ? wd! : DateTime.friday),
+      smoke: const {'no', 'now', 'ex'}.contains(j['smk']) ? j['smk'] as String : null,
+      cigs: i(j['cig']) != null && i(j['cig'])! >= 1 && i(j['cig'])! <= 80 ? i(j['cig']) : null,
+      smokeFrom: i(j['smf']) != null && i(j['smf'])! >= 8 && i(j['smf'])! <= 80 ? i(j['smf']) : null,
+      quit: j['quit'] is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(j['quit'] as String) &&
+              DateTime.tryParse(j['quit'] as String) != null
+          ? j['quit'] as String
+          : null,
     );
   }
 }

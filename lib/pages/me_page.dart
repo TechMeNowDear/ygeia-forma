@@ -6,6 +6,8 @@ import '../data.dart';
 import '../food/food_store.dart';
 import '../food/kitchen.dart';
 import '../format.dart';
+import '../adaptive_check.dart' show quitHoldDays, smokeQuitHoldDays;
+import '../history.dart' show dateKey;
 import '../profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -206,6 +208,8 @@ class _MePageState extends State<MePage> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    _smoking(context, p, now, label, hint),
+                    const SizedBox(height: 12),
                     AppCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -340,6 +344,116 @@ class _MePageState extends State<MePage> {
   }
 
   /// «Τα προϊόντα μου» και «Η κουζίνα μου» (πριν: υπο-καρτέλα «Τα δικά μου» της Διατροφής).
+  /// Κάπνισμα (απόφαση χρήστη 17/11): για τον κίνδυνο της καρδιάς στις εξετάσεις και τον εβδομαδιαίο έλεγχο θερμίδων.
+  Widget _smoking(BuildContext context, Profile p, DateTime now, TextStyle label, TextStyle hint) {
+    final today = DateTime(now.year, now.month, now.day);
+    final s = p.smoke;
+    int? num(String v, int lo, int hi) {
+      final n = int.tryParse(v.trim());
+      return n != null && n >= lo && n <= hi ? n : null;
+    }
+
+    final pack = p.packYears(today);
+    final quit = p.quitDate;
+    final hold = quitHoldDays(quit, today);
+    return AppCard(
+      key: const ValueKey('me-smoking'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Κάπνισμα', style: label),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            key: const ValueKey('me-smoke'),
+            emptySelectionAllowed: true,
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 'no', label: Text('Όχι', style: TextStyle(fontFamily: 'Inter'))),
+              ButtonSegment(value: 'now', label: Text('Καπνίζω', style: TextStyle(fontFamily: 'Inter'))),
+              ButtonSegment(value: 'ex', label: Text('Το έκοψα', style: TextStyle(fontFamily: 'Inter'))),
+            ],
+            selected: {if (s != null) s},
+            onSelectionChanged: (v) {
+              if (v.isEmpty) return;
+              final n = v.first;
+              // «Το έκοψα»: η μέρα είναι σήμερα, εκτός αν είχε ήδη γραφτεί.
+              _save(p.withSmoking(
+                  smoke: n, cigs: p.cigs, smokeFrom: p.smokeFrom, quit: n == 'ex' ? (p.quit ?? dateKey(today)) : null));
+            },
+          ),
+          if (s == 'now' || s == 'ex') ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    key: const ValueKey('me-cigs'),
+                    initialValue: p.cigs?.toString() ?? '',
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(labelText: s == 'ex' ? 'Τσιγάρα τη μέρα (τότε)' : 'Τσιγάρα τη μέρα', border: _outline),
+                    onChanged: (v) {
+                      final n = num(v, 1, 80);
+                      if (n != null) _save(p.withSmoking(smoke: s, cigs: n, smokeFrom: p.smokeFrom, quit: p.quit));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    key: const ValueKey('me-smoke-from'),
+                    initialValue: p.smokeFrom?.toString() ?? '',
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Από ηλικία', border: _outline),
+                    onChanged: (v) {
+                      final n = num(v, 8, 80);
+                      if (n != null) _save(p.withSmoking(smoke: s, cigs: p.cigs, smokeFrom: n, quit: p.quit));
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (s == 'ex') ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const ValueKey('me-quit'),
+                icon: const Icon(Icons.event_rounded, size: 18),
+                label: Text('Το έκοψα στις ${quit == null ? '—' : dayMonthYear(quit)}'),
+                onPressed: () async {
+                  final d = await showDatePicker(
+                    context: context,
+                    initialDate: quit ?? today,
+                    firstDate: DateTime(1950),
+                    lastDate: today,
+                  );
+                  if (d == null || !mounted) return;
+                  _save(p.withSmoking(smoke: 'ex', cigs: p.cigs, smokeFrom: p.smokeFrom, quit: dateKey(d)));
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          if (pack != null)
+            Text('Πακέτα-έτη: ${dec(pack, pack < 10 ? 1 : 0)} (τσιγάρα τη μέρα ÷ 20 × χρόνια). Το ρωτά συχνά ο γιατρός.',
+                key: const ValueKey('me-pack-years'), style: hint),
+          if (s == 'now')
+            Text('Αν το κόψεις, πάτα «Το έκοψα»: η εφαρμογή κρατά τη μέρα.', style: hint)
+          else if (hold != null)
+            Text(
+                'Για ${smokeQuitHoldDays ~/ 7} εβδομάδες από τη μέρα που το έκοψες, ο εβδομαδιαίος έλεγχος δεν κατεβάζει τις '
+                'θερμίδες σου: λίγα κιλά στην αρχή είναι συνηθισμένα, και μετράει να μην ξαναρχίσεις.',
+                key: const ValueKey('me-quit-hold'),
+                style: hint)
+          else if (s == null)
+            Text('Χρειάζεται για τον κίνδυνο της καρδιάς στις εξετάσεις.', style: hint),
+        ],
+      ),
+    );
+  }
+
   Widget _nutrition(BuildContext context, FoodStore food) {
     final c = Aigaio.of(context);
     final n = food.mine.length;
