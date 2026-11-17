@@ -260,11 +260,12 @@ void main() {
 
     testWidgets('S4-3 + S3-3: «(−2,1)» φαίνεται· η ημερομηνία σε σχέση με τώρα («Χθες»), όχι με την ανάγνωση', (t) async {
       final s = HealthStore()
-        ..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 11, 13, 20), [
-          for (final (d, fat) in [(2, 27.9), (4, 27.5), (6, 27.0), (9, 25.6), (11, 25.3), (13, 25.4)])
+        // Έλεγχος 17/11 (Κ3-M3): οι 3 πριν τουλάχιστον 2 εβδομάδες πριν από τις 3 τελευταίες.
+        ..data = Dashboard.fromJson(_bodyJson(DateTime(2026, 11, 24, 20), [
+          for (final (d, fat) in [(2, 27.9), (4, 27.5), (6, 27.0), (20, 25.6), (22, 25.3), (24, 25.4)])
             (DateTime(2026, 11, d, 8), 90.0, fat),
         ]));
-      await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 14, 9)), size: const Size(400, 4000));
+      await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 25, 9)), size: const Size(400, 4000));
       String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
       // μεσαίες 27,5 και 25,4 → −2,1 (πάνω από το όριο 1,5)· «%» χωρίς κενό.
       expect(row('Λίπος'), '25,4%  (−2,1)');
