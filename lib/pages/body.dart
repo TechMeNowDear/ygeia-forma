@@ -124,6 +124,7 @@ class BodyPage extends StatelessWidget {
               [for (final b in daily) if (b.weight != null) (b.time, b.weight!)],
               c.body,
               clock,
+              average: true,
             ),
           _WaistCard(store: store),
           if (daily.where((b) => b.fatPct != null).length >= 2)
@@ -199,7 +200,10 @@ class BodyPage extends StatelessWidget {
     );
   }
 
-  Widget _chartCard(BuildContext context, String metric, String title, List<(DateTime, double)> points, Color color, DateTime clock) {
+  Widget _chartCard(BuildContext context, String metric, String title, List<(DateTime, double)> points, Color color, DateTime clock,
+      {bool average = false}) {
+    // 17/11: στο βάρος και ο μέσος όρος 7 ημερών (η έντονη γραμμή).
+    final avg = average ? average7Days(points) : const <(DateTime, double)>[];
     return AppCard(
       key: ValueKey('body-$metric'),
       // Round 1 (U1b-21): η σελίδα της μέτρησης με το ίδιο ρολόι (πριν: πάντα η ώρα του κινητού, και το στιγμιότυπο έδειχνε
@@ -215,7 +219,19 @@ class BodyPage extends StatelessWidget {
             trailing: Icon(Icons.chevron_right_rounded, color: Aigaio.of(context).textTertiary),
           ),
           const SizedBox(height: 12),
-          LineChart(points: points, color: color, format: (v) => dec(v), minRange: 3, dateLabel: yearAwareLabel(points)),
+          LineChart(
+              points: points,
+              color: color,
+              format: (v) => dec(v),
+              minRange: 3,
+              dateLabel: yearAwareLabel(points),
+              average: avg),
+          if (avg.length >= 2) ...[
+            const SizedBox(height: 6),
+            Text('Έντονη γραμμή: μέσος όρος 7 ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας.',
+                key: const ValueKey('body-weight-avg-note'),
+                style: TextStyle(color: Aigaio.of(context).textSecondary, fontSize: 12.5, height: 1.35)),
+          ],
         ],
       ),
     );
@@ -664,6 +680,9 @@ class _WaistCard extends StatelessWidget {
           ),
           if (p.male || p.female)
             Text('Εύρος αναφοράς: κάτω από ${dec(ref.ok, 0)} cm (ESC 2021)', style: small),
+          // 17/11: ο λόγος μέσης/ύψους (NICE), που οι νέες οδηγίες προτιμούν (και για το λίπος της κοιλιάς).
+          if (waistHeightText(last.cm, p.heightCm) case final wh?)
+            Text(wh, key: const ValueKey('body-waist-height'), style: small),
           if (list.length >= 2) ...[
             const SizedBox(height: 12),
             LineChart(

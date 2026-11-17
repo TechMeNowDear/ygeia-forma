@@ -1536,7 +1536,11 @@ class LineChart extends StatelessWidget {
     this.breaks = const [],
     this.tickSteps,
     this.semanticLabel,
+    this.average = const [],
   });
+
+  /// 17/11: δεύτερη, πιο έντονη γραμμή (π.χ. μέσος όρος 7 ημερών του βάρους)· οι τιμές της μέρας τότε πιο αχνές.
+  final List<(DateTime, double)> average;
 
   /// Τι λέει το TalkBack για το γράφημα (R7-U4-8)· χωρίς αυτό η περιγραφή του [lineChartSummary].
   final String? semanticLabel;
@@ -1598,6 +1602,7 @@ class LineChart extends StatelessWidget {
           to: to,
           breaks: breaks,
           tickSteps: tickSteps,
+          average: average,
           scale: chartTextScale(context),
         ),
       ),
@@ -1742,8 +1747,10 @@ class _LinePainter extends CustomPainter {
     this.breaks = const [],
     this.tickSteps,
     this.scale = 1,
+    this.average = const [],
   });
 
+  final List<(DateTime, double)> average;
   final List<(DateTime, String)> breaks;
   final DateTime? from;
   final DateTime? to;
@@ -1773,7 +1780,7 @@ class _LinePainter extends CustomPainter {
     if (w <= 0 || h <= 0) return;
 
     final refs = [if (reference != null) reference!.$1];
-    final all = <double>[...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs];
+    final all = <double>[...points.map((p) => p.$2), ...levels.map((l) => l.$3), ...refs, ...average.map((p) => p.$2)];
     // Άξονας σε στρογγυλές τιμές (U1b-09)· με ετικέτες ακέραιων (π.χ. παλμοί) ποτέ βήμα κάτω από 1, αλλιώς δύο γραμμές θα
     // έγραφαν την ίδια τιμή. Round 2 (R2-D-4): ο υπολογισμός στο [lineAxis] (σφιχτός άξονας για τις διάρκειες).
     final integer = format(0.5) == format(1) || format(0.5) == format(0);
@@ -1848,16 +1855,40 @@ class _LinePainter extends CustomPainter {
       }
       _textLeft(canvas, label, Offset(x + 3, top - 18 * scale), text, 10 * scale);
     }
+    final faint = average.length >= 2;
     canvas.drawPath(
       path,
       Paint()
-        ..color = levels.isEmpty ? color : color.withValues(alpha: 0.75)
+        ..color = faint ? color.withValues(alpha: 0.4) : (levels.isEmpty ? color : color.withValues(alpha: 0.75))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = points.length > 60 ? 1.5 : (levels.isEmpty ? 2.5 : 2)
+        ..strokeWidth = faint ? 1.5 : (points.length > 60 ? 1.5 : (levels.isEmpty ? 2.5 : 2))
         ..strokeJoin = StrokeJoin.round
         ..strokeCap = StrokeCap.round,
     );
-    final dot = Paint()..color = color;
+    if (faint) {
+      // Ο μέσος όρος: έντονη γραμμή, κομμένη στα ίδια κενά και αλλαγές πηγής με τις τιμές.
+      final avgPath = Path();
+      for (final seg in lineSegments(average, [for (final b in breaks) b.$1, ...longGaps(average)])) {
+        for (var i = 0; i < seg.length; i++) {
+          final o = at(seg[i]);
+          if (i == 0) {
+            avgPath.moveTo(o.dx, o.dy);
+          } else {
+            avgPath.lineTo(o.dx, o.dy);
+          }
+        }
+      }
+      canvas.drawPath(
+        avgPath,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..strokeJoin = StrokeJoin.round
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    final dot = Paint()..color = faint ? color.withValues(alpha: 0.55) : color;
     if (points.length <= 31) {
       for (final p in points) {
         canvas.drawCircle(at(p), 2.5, dot);
