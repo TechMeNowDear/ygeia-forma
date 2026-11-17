@@ -45,11 +45,14 @@ bool beforeGoals(Goals g, DateTime day) {
 /// - αλλιώς (σήμερα, ή λίγη καταγραφή): γραμμάρια, με όριο [limitG] (R9-A3-2) και [overG] = πόσα πάνω από αυτό (ένα
 ///   δεκαδικό, R7-A3-3).
 /// [over]: η μπάρα γράφει «πάνω από το όριο» ή «στο όριο» (προειδοποίηση), με τον κανόνα που ισχύει εκείνη τη μέρα.
-({double? pctDay, double limitG, double overG, bool over}) satVerdict(Totals t, Goals g, {required bool today, DateTime? day}) {
+({double? pctDay, double limitG, double overG, bool over}) satVerdict(Totals t, Goals g,
+    {required bool today, DateTime? day, bool part = false}) {
   final kcalGoal = today || day == null ? g.kcal : targetOn(g, day);
   final limitG = satLimitShown(kcalGoal, g.satPct);
   final overG = oneDecimal(oneDecimal(t.satFat) - limitG);
-  final pctDay = !today && t.kcal > 0 && t.kcal >= fullDayKcalFor(g.kcal) ? t.satFat * 9 / t.kcal * 100 : null;
+  // Έλεγχος 17/11 (Κ1-L4): μέρα με «Λείπουν γεύματα» ([part]) κρίνεται με γραμμάρια, όπως στη «Χοληστερίνη» (CholDay)·
+  // και το 60% από τον στόχο που ίσχυε εκείνη τη μέρα (πριν από τον τωρινό).
+  final pctDay = !today && !part && t.kcal > 0 && t.kcal >= fullDayKcalFor(kcalGoal) ? t.satFat * 9 / t.kcal * 100 : null;
   final strict = satStrictPct(g.satPct);
   final over = pctDay != null
       ? (strict ? oneDecimal(pctDay) >= g.satPct : oneDecimal(pctDay) > g.satPct)
@@ -60,7 +63,13 @@ bool beforeGoals(Goals g, DateTime day) {
 /// Σύνολο ημέρας με τους στόχους (αντικαθιστά τη «Σύνολο ημέρας» όταν υπάρχουν στόχοι).
 class GoalsSummaryCard extends StatelessWidget {
   const GoalsSummaryCard(
-      {super.key, required this.totals, required this.goals, required this.today, required this.health, this.day});
+      {super.key,
+      required this.totals,
+      required this.goals,
+      required this.today,
+      required this.health,
+      this.day,
+      this.part = false});
   final Totals totals;
   final Goals goals;
   final bool today;
@@ -68,6 +77,9 @@ class GoalsSummaryCard extends StatelessWidget {
 
   /// Η μέρα που φαίνεται (για μέρα που πέρασε: ο στόχος που ίσχυε εκείνη τη μέρα).
   final DateTime? day;
+
+  /// Η μέρα σημειώθηκε «Λείπουν γεύματα» ([satVerdict]).
+  final bool part;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +94,7 @@ class GoalsSummaryCard extends StatelessWidget {
     // στρογγυλευόταν στο γραμμάριο («έως 14 g») και 14,3 g σήμερα έβγαιναν «0,3 g πάνω από το όριο», ενώ είναι 5,96%.
     // Η απόφαση με τους αριθμούς όπως φαίνονται (ένα δεκαδικό, R7-A3-3). Round11 (R11-C1-2): η απόφαση στο [satVerdict],
     // την ίδια συνάρτηση που καλεί η «Αναφορά για έλεγχο».
-    final sat = satVerdict(t, g, today: today, day: day);
+    final sat = satVerdict(t, g, today: today, day: day, part: part);
     final satLimit = sat.limitG;
     final fatLo = (kcalGoal * 0.25 / 9).round(), fatHi = (kcalGoal * 0.35 / 9).round(); // όπως τα Goals.fatLo/fatHi
     final left = kcalLeft(t.shownKcal, kcalGoal, today: today);
@@ -357,8 +369,10 @@ const cholInfo = MetricInfo(
       '«Χοληστερίνη» μετρά ως»).',
   shows: 'Αν κάνεις όσα συμφώνησες: λιγότερα κορεσμένα λιπαρά, περισσότερες φυτικές ίνες, ξηροί καρποί και πίτουρο βρώμης '
       'κάθε μέρα, όσπρια και ψάρι μέσα στην εβδομάδα. Η εφαρμογή δεν προβλέπει τη νέα σου LDL· αυτό το λένε μόνο οι '
-      'εξετάσεις.',
-  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC) ·\u00A0φυτικές ίνες 30 g (Reynolds 2019) ·\u00A03 g β\u2011γλυκάνες βρώμης τη μέρα '
+      'εξετάσεις. Αν η διατροφή φτάνει ή χρειάζεται και φάρμακο, το κρίνει ο γιατρός σου.',
+  // Έλεγχος 17/11 (Κ1, επιστήμη): ESC/EAS 2019 (Mach 2020, πίνακας διατροφής): κορεσμένα < 7%, ίνες 25–40 g με 7–13 g διαλυτές.
+  compare: 'Κορεσμένα λιπαρά έως 6% των θερμίδων (AHA/ACC· ESC/EAS 2019: κάτω από 7%) ·\u00A0φυτικές ίνες 30 g (Reynolds 2019· '
+      'ESC/EAS 2019: 25–40 g, από αυτές 7–13 g διαλυτές, π.χ. βρώμη, όσπρια, φρούτα) ·\u00A03 g β\u2011γλυκάνες βρώμης τη μέρα '
       '(EFSA) ·\u00A0ξηροί καρποί περίπου 30 g (Del Gobbo 2015) ·\u00A0όσπρια ως φυτική πρωτεΐνη (διατροφή «portfolio», '
       'Chiavaroli 2018).',
   // Τελικός έλεγχος, Συμβούλιο 2 (Α4): ίδιος κανόνας «πλήρους μέρας» με τη διόρθωση θερμίδων, και το αλάτι που λείπει.

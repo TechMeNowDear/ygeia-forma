@@ -34,7 +34,7 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
                 estShare: c.est == null
                     ? null
                     : estimatedShare(food, c.est!.from, c.est!.to,
-                        minKcal: adaptFullDayShare * c.goals.kcal, maxKcal: absurdDayKcal(c.goals.calc.tdee))),
+                        minKcal: adaptFullDayShare * c.goals.kcal, maxKcal: absurdDayKcal(c.formulaTdee))),
           );
         },
       );
@@ -189,7 +189,11 @@ class CheckInCard extends StatelessWidget {
     final next = 'Ξανά ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday.';
     // Round 8 (R8-A1-3): εκτίμηση πολύ ΨΗΛΑ (πάνω από το [adaptHighShare] του τύπου). Γεύματα που δεν γράφτηκαν τη ρίχνουν
     // (μέσος όρος φαγητού − αλλαγή βάρους), δεν την ανεβάζουν· άρα εδώ φταίνε άλλα και η κάρτα τα λέει.
-    final high = k.kind == CheckKind.implausible && k.est != null && k.est!.tdee > adaptHighShare * g.calc.tdee;
+    final high = k.kind == CheckKind.implausible && k.est != null && k.est!.tdee > adaptHighShare * k.formulaTdee;
+    // Κ1-L6 (17/11): ο τύπος με το τωρινό βάρος, όταν απέχει από του οδηγού ([formulaNow]): το λέει, ώστε ο αριθμός να μη
+    // μοιάζει λάθος δίπλα στο «Πώς υπολογίστηκε» των Στόχων.
+    final fTdee = k.formulaTdee;
+    final fKg = k.formulaKg == null ? '' : ' με ${dec(k.formulaKg!)}\u00A0kg';
     // Έλεγχος 13/11 (S1-12): όχι «πιο γρήγορα από το ασφαλές». Το Helms 2014 λέει 0,5–1% την εβδομάδα «για να κρατιούνται
     // οι μύες», όχι ότι πιο γρήγορα είναι επικίνδυνο· ο τίτλος λέει μόνο αυτό που μετρήθηκε.
     final title = switch (k.kind) {
@@ -213,11 +217,11 @@ class CheckInCard extends StatelessWidget {
           // Συμβούλιο 2, Α1: «όχι Χ που υπολόγισε ο τύπος» μόνο όταν η διαφορά ξεπερνά το περιθώριο των ζυγίσεων.
           // U3b-27: ο τύπος με τον ίδιο αριθμό που γράφουν ο οδηγός και το «Πώς υπολογίστηκε» (2.745, όχι 2.750).
           TextSpan(
-              text: (k.est!.tdee - g.calc.tdee).abs() < 30
-                  ? ' τη μέρα, όσο υπολόγισε και ο τύπος.'
-                  : (k.est!.tdee - g.calc.tdee).abs() <= k.est!.guardKcal
-                      ? ' τη μέρα, κοντά στον τύπο (${thousands(g.calc.tdee)}).'
-                      : ' τη μέρα, όχι ${thousands(g.calc.tdee)} που υπολόγισε ο τύπος.'),
+              text: (k.est!.tdee - fTdee).abs() < 30
+                  ? ' τη μέρα, όσο υπολόγισε και ο τύπος$fKg.'
+                  : (k.est!.tdee - fTdee).abs() <= k.est!.guardKcal
+                      ? ' τη μέρα, κοντά στον τύπο$fKg (${thousands(fTdee)}).'
+                      : ' τη μέρα, όχι ${thousands(fTdee)} που υπολόγισε ο τύπος$fKg.'),
           if (k.kind == CheckKind.same) TextSpan(text: _sameText(k)),
         ])),
       // Συμβούλιο 2, Α2: την 21η μέρα δεν βγαίνει ακόμα εκτίμηση, γιατί η πρώτη εβδομάδα δεν μετρά.
@@ -243,11 +247,11 @@ class CheckInCard extends StatelessWidget {
           style: body),
       CheckKind.implausible => Text(
           high
-              ? 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ πιο ψηλά από τον τύπο '
-                  '(${thousands(g.calc.tdee)}). Συνήθως φταίνε ποσότητες γραμμένες μεγαλύτερες από όσο έφαγες (π.χ. '
+              ? 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ πιο ψηλά από τον τύπο'
+                  '$fKg (${thousands(fTdee)}). Συνήθως φταίνε ποσότητες γραμμένες μεγαλύτερες από όσο έφαγες (π.χ. '
                   'μαγειρεμένο φαγητό γραμμένο σαν ωμό, ή κάτι γραμμένο δύο φορές) ή νερά που έφυγαν γρήγορα (π.χ. σε '
                   'αρρώστια). Ο στόχος μένει ίδιος.'
-              : 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ μακριά από τον τύπο (${thousands(g.calc.tdee)}). '
+              : 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ μακριά από τον τύπο$fKg (${thousands(fTdee)}). '
                   'Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Ο στόχος μένει ίδιος.',
           style: body),
       CheckKind.fast => Text.rich(TextSpan(style: body, children: [
@@ -444,7 +448,7 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
       final kg = k.kgNow ?? g.kg;
       final delta = (kg * g.rate * kcalPerKg / 7).round();
       final wanted = k.wanted;
-      final formula = g.calc.tdee;
+      final formula = k.formulaTdee;
       final rawOff = e.tdee - formula;
       // Η διαφορά που γράφεται είναι η διαφορά των δύο αριθμών όπως φαίνονται (εκτίμηση στα 10, τύπος όπως στο «Πώς
       // υπολογίστηκε»): πριν «2.750» και «2.580» στην οθόνη και «έπεφτε 160 ψηλά» από κάτω (έλεγχος 13/11, U3b-5, U3b-27).
@@ -488,7 +492,7 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
           else if (p.withinNoise)
             Text(
                 'Η διαφορά από τον στόχο σου είναι μέσα στο φυσιολογικό εύρος των ζυγίσεων'
-                '${guard >= 10 ? ' (±${thousands(guard)}\u00A0kcal)' : ''}: δεν αξίζει αλλαγή. Με περισσότερες ζυγίσεις το εύρος μικραίνει.',
+                '${guard >= 10 ? ' (±${thousands(guard)}\u00A0kcal)' : ''}: δεν αξίζει αλλαγή. Το εύρος μικραίνει όσο μαζεύονται περισσότερες εβδομάδες.',
                 style: small)
           // Και όταν ο νέος στόχος δεν είναι ακόμα στο όριο αλλά τα δεδομένα θέλουν κάτω από αυτό (Συμβούλιο 2, μ1): εδώ
           // γράφεται το όριο, ποτέ «τα δεδομένα λένε» έναν αριθμό κάτω από το κάτω όριο. R7-A1-4: με τα λόγια της οδηγίας.
@@ -509,15 +513,15 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
             child: Text(
               // «Έπεφτε Χ χαμηλά» μόνο όταν η διαφορά από τον τύπο ξεπερνά και το περιθώριο των ζυγίσεων (Α1).
               rawOff.abs() < 100 || rawOff.abs() <= e.guardKcal
-                  ? 'Ο τύπος ήταν κοντά (${thousands(formula)}). Η διαφορά είναι μέσα στο λάθος μιας εκτίμησης.'
-                  : 'Ο τύπος έλεγε ${thousands(formula)}: έπεφτε ${thousands(off.abs())}\u00A0kcal '
+                  ? 'Ο τύπος${k.formulaKg == null ? '' : ' με ${dec(k.formulaKg!)}\u00A0kg'} ήταν κοντά (${thousands(formula)}). Η διαφορά είναι μέσα στο λάθος μιας εκτίμησης.'
+                  : 'Ο τύπος${k.formulaKg == null ? '' : ' με ${dec(k.formulaKg!)}\u00A0kg'} έλεγε ${thousands(formula)}: έπεφτε ${thousands(off.abs())}\u00A0kcal '
                       '${off > 0 ? 'χαμηλά' : 'ψηλά'}. Γι’ αυτό μετράνε τα δικά σου δεδομένα.',
               style: TextStyle(fontSize: 14, height: 1.45, color: c.text),
             ),
           ),
           const SizedBox(height: 12),
           Text(
-              'Όσο πιο πλήρης η καταγραφή φαγητού, τόσο πιο σωστή η εκτίμηση. Ισοζύγιο ενέργειας (Hall 2008). Καμία τιμή από AI: '
+              'Όσο πιο πλήρης η καταγραφή φαγητού, τόσο πιο σωστή η εκτίμηση. Ισοζύγιο ενέργειας (Hall 2008· το 7.700 kcal ανά κιλό είναι προσέγγιση). Καμία τιμή από AI: '
               'μόνο ό,τι έγραψες και ό,τι ζύγισε η ζυγαριά.',
               style: small),
         ]),

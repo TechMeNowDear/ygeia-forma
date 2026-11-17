@@ -292,6 +292,12 @@ class Goals {
   GoalCalc get calc => computeGoals(
       male: male, age: age, heightCm: heightCm, kg: kg, aim: aim, rate: rate, activity: activity, doctor: doctor);
 
+  /// Έλεγχος 17/11 (Κ1-L6): ο ίδιος τύπος (Mifflin × κίνηση) με άλλο βάρος· για τους ελέγχους λογικής της διόρθωσης
+  /// θερμίδων ([formulaNow]). Δεν αλλάζει κανέναν αποθηκευμένο στόχο.
+  double tdeeAt(double kg) => computeGoals(
+          male: male, age: age, heightCm: heightCm, kg: kg, aim: aim, rate: rate, activity: activity, doctor: doctor)
+      .tdee;
+
   /// Ο στόχος θερμίδων που ισχύει (ο δικός σου, αν τον άλλαξες).
   int get kcal => kcalSet ?? kcalAdapt ?? calc.kcal;
   int get protein => proteinSet ?? calc.protein;
@@ -511,7 +517,7 @@ class Goals {
       checkIn: ci is String && isDayKey(ci) ? ci : null,
       fastAt: fa is String && isDayKey(fa) ? fa : null,
       foreignSeen: fw is String && isDayKey(fw) ? fw : null,
-      log: rawLog is List ? rawLog.map(AdaptLog.fromJson).whereType<AdaptLog>().take(adaptLogMax).toList() : const [],
+      log: rawLog is List ? _lastN(rawLog.map(AdaptLog.fromJson).whereType<AdaptLog>().toList(), adaptLogMax) : const [],
       docTargets: DoctorTargets.fromJson(j),
       hist: hist.length > targetHistMax ? hist.sublist(hist.length - targetHistMax) : hist,
     );
@@ -669,3 +675,7 @@ String rateWord(GoalAim aim, double rate) {
   if (aim == GoalAim.lose) return const ['ήπια', 'μέτρια', 'γρήγορα'][i < 0 ? 1 : i];
   return const ['αργά', 'πιο γρήγορα'][i < 0 ? 0 : i];
 }
+
+/// Έλεγχος 17/11 (Κ1-L3): κρατά τα [n] ΤΕΛΕΥΤΑΙΑ (τα πιο πρόσφατα), όπως οι αλλαγές στη μνήμη και το ιστορικό στόχων.
+/// Πριν το φόρτωμα κρατούσε τα πρώτα: με ένα αντίγραφο από νεότερη έκδοση χάνονταν οι πιο πρόσφατοι έλεγχοι.
+List<T> _lastN<T>(List<T> xs, int n) => xs.length > n ? xs.sublist(xs.length - n) : xs;
