@@ -8,8 +8,9 @@
 /// - Η προηγούμενη φορά κρίνεται με τα σετ και το κάτω όριο ΕΚΕΙΝΗΣ της μέρας ([ExLog.sets], [ExLog.lo])· ο σημερινός
 ///   στόχος ταιριάζει μετά στα σημερινά σετ και εύρος (S6-1: η ίδια άσκηση σε δύο προπονήσεις με άλλα σετ).
 /// - Βάρος ανεβαίνει μόνο όταν οι επαναλήψεις δείχνουν ότι το επόμενο σκαλί βγαίνει στο κάτω όριο με την ίδια ρεζέρβα
-///   ([repsBeforeStep], S6-12). Οδηγία: αύξηση φορτίου 2–10% όταν βγαίνουν 1–2 επαναλήψεις πάνω από τον στόχο (ACSM,
-///   Progression models in resistance training, Med Sci Sports Exerc 2009;41:687–708). Όπου το σκαλί του εξοπλισμού είναι
+///   ([repsBeforeStep], S6-12). Οδηγία: αύξηση φορτίου 2–10% όταν βγαίνουν 1–2 επαναλήψεις πάνω από τον στόχο σε δύο
+///   συνεχόμενες προπονήσεις (ACSM, Progression models in resistance training, Med Sci Sports Exerc 2009;41:687–708). Εδώ
+///   αρκεί μία, με τη ρεζέρβα που ζητά το πρόγραμμα (Helms 2016, εναλλακτική με βάση τη ρεζέρβα· έλεγχος 17/11). Όπου το σκαλί του εξοπλισμού είναι
 ///   μεγαλύτερο από ~10%, πρώτα περισσότερες επαναλήψεις με το ίδιο (διπλή πρόοδος).
 /// - Ο στόχος ρυθμίζεται από τη ρεζέρβα που λες (Zourdos κ.ά., J Strength Cond Res 2016;30:267–75· Helms κ.ά.,
 ///   Strength Cond J 2016;38(4):42–9): λίγο κάτω από τον στόχο ΜΕ τη ρεζέρβα που ζητά το πρόγραμμα δεν είναι αποτυχία.
@@ -348,14 +349,18 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       reason: '${again ? 'Ενόχληση και τις δύο τελευταίες φορές' : 'Την τελευταία φορά είχες ενόχληση'} ($where, ${shortDayDate(lastDay)}): '
           '$what, και μικρότερο εύρος κίνησης, χωρίς πόνο. '
           '${again ? 'Καλύτερα άλλαξέ την με εναλλακτική: τρεις τελείες, πάνω δεξιά › «Αλλαγή άσκησης».' : 'Αν ξανασυμβεί, τρεις τελείες, πάνω δεξιά › «Αλλαγή άσκησης».'} '
-          'Αν ο πόνος μένει ως την επόμενη μέρα, ρώτα γιατρό ή φυσικοθεραπευτή.',
+          // Έλεγχος 17/11 (Κ5, επιστημονικός LOW-5): ο πόνος των μυών τις επόμενες μέρες είναι συνηθισμένος· γιατρός για άρθρωση.
+          'Πιάσιμο στους μυς τις επόμενες 1–2 μέρες είναι συνηθισμένο. Ρώτα γιατρό ή φυσικοθεραπευτή αν ο πόνος είναι στην '
+          'άρθρωση και κρατά πάνω από μία εβδομάδα, ή αμέσως με οξύ πόνο, πρήξιμο, μούδιασμα ή αδυναμία.',
     );
   }
 
   // Μετά από πάνω από 2 εβδομάδες: περίπου 10% πιο ελαφριά, ποτέ κάτω από το ελαφρύ ξεκίνημα της εφαρμογής
   // ([startLoad]), και ο λόγος λέει πόσο (R7-A6-1: πριν «λίγο πιο ελαφριά» και για 4,3 → 2,8 kg ή 20 → 10 lb).
+  // Έλεγχος 17/11 (Κ5-M3): πιο μεγάλη διακοπή, πιο ελαφριά αρχή (Bosquet 2013: η απώλεια δύναμης μεγαλώνει με τη διάρκεια):
+  // 15–28 μέρες −10% (όπως πριν), 29+ −20%. Μετά από [recalibrateGapDays] ξαναρωτά και το 1ο σετ (training_store).
   if (gap > 14 && lastLoad != null && hasLoad(k)) {
-    var v = scaled(k, lastLoad, 0.9);
+    var v = scaled(k, lastLoad, gap > 28 ? 0.8 : 0.9);
     final start = startLoad(item.ex, k);
     if (start != null && !_easier(k, lastLoad, start) && _easier(k, v, start)) v = start;
     final same = (v - lastLoad).abs() < 1e-6;
@@ -366,6 +371,17 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       reason: same
           ? 'Πέρασαν $gap μέρες από την τελευταία φορά: ${usesKg(k) ? 'ίδια κιλά' : 'ίδιο φορτίο'} (${_l(k, v)}, ήδη ελαφρύ), ξανά από $lo επαναλήψεις.'
           : 'Πέρασαν $gap μέρες από την τελευταία φορά: πιο ελαφριά για αρχή, ${_l(k, v)} αντί για ${_l(k, lastLoad)}, από $lo επαναλήψεις.',
+    );
+  }
+
+  // Έλεγχος 17/11 (Κ5, επιστημονικός M1): και στις ασκήσεις χωρίς φορτίο (κάμψεις, βυθίσεις), μετά από διακοπή ξανά από
+  // το κάτω όριο· πριν «+1 επανάληψη» ή και πιο δύσκολη παραλλαγή μετά από δύο μήνες.
+  if (gap > 14 && !hasLoad(k)) {
+    return Target(
+      load: lastLoad,
+      reps: _same(sets, lo),
+      change: Change.back,
+      reason: 'Πέρασαν $gap μέρες από την τελευταία φορά: ξανά από $lo επαναλήψεις.',
     );
   }
 
@@ -635,6 +651,21 @@ double? calibrate(PlanItem item, double? load, int reps, int rirAnswer) {
   if (rirAnswer < 4 || reps < item.lo || lightOnly.contains(item.ex)) return null;
   final up = stepUp(k, load);
   if (up == null) return null;
+  // Έλεγχος 17/11 (Κ5-H1): «5–7», «8–12», «13+» (6, 10, 15): από τον τύπο του Epley, το βάρος που βγάζει το κάτω όριο με
+  // τη ρεζέρβα του προγράμματος, το πολύ +[calibrateMaxJump] (μπάρα: και +[calibrateBarKg] kg), στο αμέσως ελαφρύτερο που
+  // βγαίνει με τον εξοπλισμό. Αν δεν φτάνει ούτε για ένα σκαλί, ο κανόνας του «4+» πιο κάτω.
+  if (rirAnswer > 4) {
+    final g = math.max(item.rir, 2);
+    final max1 = load * (1 + (reps + rirAnswer) / 30);
+    final want = max1 / (1 + (item.lo + g) / 30);
+    final cap = math.max(load * (1 + calibrateMaxJump), k == LoadKind.bar ? load + calibrateBarKg : 0.0);
+    final goal = math.min(want, cap);
+    var best = load;
+    for (var next = stepUp(k, best); next != null && next <= goal + 1e-6; next = stepUp(k, best)) {
+      best = next;
+    }
+    if (best > load + 1e-6) return best;
+  }
   if (labelIsLoad(item.ex, k)) {
     final g = math.max(item.rir, 2);
     final c = stepCeiling(item.ex, k, load, up, item.lo, item.hi, g);
@@ -642,6 +673,13 @@ double? calibrate(PlanItem item, double? load, int reps, int rirAnswer) {
   }
   return up;
 }
+
+/// Κ5-H1: το πολύ τόσο βαρύτερα σε μία βαθμονόμηση του 1ου σετ (+25%)· στη μπάρα και ως +[calibrateBarKg] kg.
+const calibrateMaxJump = 0.25;
+const calibrateBarKg = 5.0;
+
+/// Κ5-M3: μετά από τόσες μέρες χωρίς την άσκηση, η ερώτηση του 1ου σετ ξαναγίνεται (σαν πρώτη φορά).
+const recalibrateGapDays = 90;
 
 /// R8-A6-5: τι λέγεται μετά το 1ο σετ όταν η απάντηση είναι «4+» αλλά το βάρος ΔΕΝ αλλάζει ([calibrate] = null). Πριν δεν
 /// λεγόταν τίποτα, ενώ το φύλλο μόλις είχε πει «Από αυτό βρίσκεται το σωστό βάρος για τα επόμενα σετ»: στις 9 από τις 15

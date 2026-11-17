@@ -252,7 +252,18 @@ class _SessionPageState extends State<SessionPage> {
                       : allDone && routine.cooldown.isNotEmpty
                           ? _routineRow(context, routine, 'Αποθεραπεία ·\u00A0${countText(routine.cooldown.length, 'βήμα', 'βήματα')}')
                           : null;
-              final card = routineRow == null ? ex : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [routineRow, const SizedBox(height: 8), ex]);
+              // Έλεγχος 17/11 (Κ5, επιστημονικός HIGH-1, AHA 2023): σταθερή γραμμή ασφάλειας σε κάθε προπόνηση.
+              final safety = Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(sessionSafetyText,
+                    key: const ValueKey('session-safety'),
+                    style: TextStyle(fontSize: 12.5, height: 1.35, color: Aigaio.of(context).textSecondary)),
+              );
+              final card = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (routineRow != null) ...[routineRow, const SizedBox(height: 8)],
+                ex,
+                safety,
+              ]);
               final rest = _restEnd == null ? null : _restBar(context, s);
               final actions = _actions(context, s, e);
               if (wide) {
@@ -942,22 +953,25 @@ class _SessionPageState extends State<SessionPage> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: Material(
-                      color: pick == v ? c.exerciseSolid : c.card,
+                      color: (v == 4 ? pick >= 4 : pick == v) ? c.exerciseSolid : c.card,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(color: pick == v ? c.exerciseSolid : c.hairline, width: 1.5),
+                        side: BorderSide(color: (v == 4 ? pick >= 4 : pick == v) ? c.exerciseSolid : c.hairline, width: 1.5),
                       ),
                       child: InkWell(
                         key: ValueKey('rir-$v'),
                         customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        onTap: () => set(() => pick = v),
+                        onTap: () => set(() => pick = v == 4 && pick >= 4 ? pick : v),
                         child: SizedBox(
                           height: 54,
                           child: Center(
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(v == 4 ? '4+' : '$v',
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: pick == v ? c.onSolid : c.text)),
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: (v == 4 ? pick >= 4 : pick == v) ? c.onSolid : c.text)),
                             ),
                           ),
                         ),
@@ -966,6 +980,22 @@ class _SessionPageState extends State<SessionPage> {
                   ),
                 ),
             ]),
+            // Έλεγχος 17/11 (Κ5-H1): στο 1ο σετ, το «4+» ρωτά «πόσες περίπου;». Πριν το «4+» δεν ξεχώριζε το 5 από το 30, και
+            // με αυτόματο ξεκίνημα (ελαφρύ) το βάρος έμενε πολύ χαμηλό για εβδομάδες (προσομοίωση: μπάρα 18,5 αντί ~47 kg).
+            if (first && pick >= 4) ...[
+              const SizedBox(height: 14),
+              Text('Πόσες περίπου;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final (v, label) in const [(4, '4'), (6, '5–7'), (10, '8–12'), (15, '13+')])
+                  ChoiceChip(
+                    key: ValueKey('rir-more-$v'),
+                    label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    selected: pick == v,
+                    onSelected: (_) => set(() => pick = v),
+                  ),
+              ]),
+            ],
             if (!first && e != null) ...[
               const SizedBox(height: 18),
               // Σχέδια 9/11 (6γ): πόνος σε κεχριμπάρι, χωρίς ✓ και χωρίς πράσινο.
@@ -1849,3 +1879,8 @@ class _HeartLabel extends StatelessWidget {
         Flexible(child: Text(text, style: style, overflow: TextOverflow.ellipsis)),
       ]);
 }
+
+/// Έλεγχος 17/11 (Κ5, AHA 2023, Paluch κ.ά., Circulation 2024): ζάλη, δύσπνοια, πόνος στο στήθος και αίσθημα παλμών θέλουν
+/// άμεση εκτίμηση.
+const sessionSafetyText = 'Πόνος ή σφίξιμο στο στήθος, δύσπνοια, ζάλη ή αίσθημα παλμών: σταματάς αμέσως. Αν είναι '
+    'έντονο ή δεν περνά σε λίγα λεπτά: 166 ή 112.';
