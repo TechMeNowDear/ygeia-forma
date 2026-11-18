@@ -55,7 +55,8 @@ void main() {
     expect(sent.single, 'https://abcdefghij0123456789.supabase.co/functions/v1/ai-food');
     expect(find.textContaining('Ποτέ ζυγίσεις'), findsOneWidget);
 
-    await t.scrollUntilVisible(find.byKey(const ValueKey('ai-disconnect')), 200);
+    await t.ensureVisible(find.byKey(const ValueKey('ai-disconnect')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-disconnect')));
     await t.pumpAndSettle();
     await t.tap(find.text('Αποσύνδεση').last);
