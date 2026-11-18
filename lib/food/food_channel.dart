@@ -77,6 +77,9 @@ class FoodChannel {
   static Future<Map<String, dynamic>> saveBackup(String json, String name) =>
       _call('saveBackup', {'json': json, 'name': name});
   static Future<Map<String, dynamic>> shareBackup(String uri) => _call('shareBackup', {'uri': uri});
+
+  /// 18/11: πόσα bytes πάνε στο αντίγραφο Google ({'ok', 'bytes'}).
+  static Future<Map<String, dynamic>> cloudBackupSize() => _call('cloudBackupSize');
   static Future<Map<String, dynamic>> pickBackup() => _call('pickBackup');
   static Future<Map<String, dynamic>> offLookup(String code) => _call('offLookup', {'code': code});
 }

@@ -19,6 +19,7 @@ import 'oura_pages.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
 import 'sources_page.dart';
+import 'sleep_links_card.dart';
 
 /// Ο λόγος που η χθεσινή νύχτα είναι κενή (null = υπάρχει).
 EmptyNight? lastNightReason(HealthStore s, DateTime now) => s.ouraNightReason(dayOf(now), now);
@@ -104,6 +105,7 @@ class OuraSleepPage extends StatelessWidget {
 
     final heart = _OuraRestCard(store: store, day: last?.day ?? today, now: now);
     final breath = _BreathCard(store: store, day: last?.day ?? today, now: now);
+    final links = SleepLinksCard(store: store, now: this.now);
 
     // Χωρίς τελευταία νύχτα: ο δρόμος για τις 30 νύχτες μένει (έλεγχος premium, S2).
     final history = last != null
@@ -124,9 +126,10 @@ class OuraSleepPage extends StatelessWidget {
       subtitle: plan.nightSource(today) == Source.none ? 'Το Oura δεν είναι συνδεδεμένο' : 'Από το Oura Ring 5',
       onRefresh: () => store.refresh(),
       // Σχέδια 9/11 (2α): η σελίδα όπως ο πίνακας· οι φάσεις 7 νυχτών και η λίστα των νυχτών στο «Ύπνος 30 νυχτών ›».
-      single: [lastCard, if (history != null) history, heart, breath],
+      // 18/11: «Τι συνδέεται με τον ύπνο σου» στο τέλος.
+      single: [lastCard, if (history != null) history, heart, breath, links],
       left: [lastCard, if (history != null) history, heart],
-      right: [breath],
+      right: [breath, links],
     );
   }
 }
