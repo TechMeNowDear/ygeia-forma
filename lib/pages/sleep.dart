@@ -14,6 +14,7 @@ import '../widgets.dart';
 import 'info_sheet.dart';
 import 'oura_sleep.dart';
 import 'oxygen_widgets.dart';
+import 'sleep_links_card.dart';
 
 class SleepPage extends StatelessWidget {
   const SleepPage({super.key, required this.store, this.now});
@@ -133,6 +134,7 @@ class SleepPage extends StatelessWidget {
               ),
             ),
             _ConsistencyCard(nights: last14),
+            SleepLinksCard(store: store, now: now),
           ],
           right: [
             const SectionHeader('Νύχτα προς νύχτα ·\u00A014 νύχτες'),

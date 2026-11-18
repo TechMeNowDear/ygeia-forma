@@ -25,6 +25,43 @@ const backupVersion = 1;
 /// Οι ρυθμίσεις που μπαίνουν στο αντίγραφο (όχι η πρόοδος του ιστορικού, που είναι τεχνική).
 const backupPrefKeys = ['cards', 'kitchen', 'themeMode', 'dayTheme', 'nightTheme', 'me', 'goals', 'zone', 'waist'];
 
+/// 18/11: όλα τα ορίσματα του [buildBackup] μαζί, για την κωδικοποίηση σε άλλο isolate ([buildBackupFrom] με compute).
+typedef BackupArgs = ({
+  List<Map<String, dynamic>> foodLog,
+  List<Map<String, dynamic>> myFoods,
+  Map<String, dynamic> prefs,
+  DateTime now,
+  ({String plan, String? log})? sources,
+  Map<String, dynamic>? training,
+  List<Object?>? dishes,
+  Map<String, Object>? foodLikes,
+  Map<String, String>? foodDays,
+  Map<String, double>? foodUnits,
+  List<Object?>? vitals,
+  Map<String, dynamic>? foodWeek,
+  int? foodRemind,
+  Map<String, Map<String, double>>? history,
+  bool errorsOff,
+});
+
+String buildBackupFrom(BackupArgs a) => buildBackup(
+      foodLog: a.foodLog,
+      myFoods: a.myFoods,
+      prefs: a.prefs,
+      now: a.now,
+      sources: a.sources,
+      training: a.training,
+      dishes: a.dishes,
+      foodLikes: a.foodLikes,
+      foodDays: a.foodDays,
+      foodUnits: a.foodUnits,
+      vitals: a.vitals,
+      foodWeek: a.foodWeek,
+      foodRemind: a.foodRemind,
+      history: a.history,
+      errorsOff: a.errorsOff,
+    );
+
 /// [errorsOff]: Round 7 (R7-A11-4) ο χρήστης έχει κλειστές τις «Αναφορές σφαλμάτων» (αντίρρηση, ΓΚΠΔ άρθρο 21). Μπαίνει
 /// στο αρχείο (πρόσθετο κλειδί «errorsOff», μόνο όταν είναι κλειστές), ώστε η επαναφορά σε νέο κινητό να τις κρατά
 /// κλειστές, όπως ήδη το αντίγραφο της Google. Παλιά αντίγραφα χωρίς το κλειδί: ο διακόπτης δεν αλλάζει.

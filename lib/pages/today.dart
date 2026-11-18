@@ -31,6 +31,7 @@ import 'training/today_training_card.dart';
 import 'week_card.dart';
 import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
+import 'cloud_backup_size.dart';
 
 /// Round 3 (k1 · R3-A-1): κάτω από το «Βάρος» όταν η τελευταία ζύγιση είναι «σε αναμονή» (διαφέρει πολύ από τις
 /// προηγούμενες και δεν τη βεβαίωσαν ακόμα επόμενες: weight_guard.dart). Φαίνεται, αλλά δεν μπαίνει σε υπολογισμούς.
@@ -306,6 +307,7 @@ class TodayPage extends StatelessWidget {
               if (foodCard != null) foodCard,
               if (week != null) week,
               backupReminder,
+              const CloudBackupWarningCard(),
               footer,
             ],
             top: alerts,
@@ -327,6 +329,7 @@ class TodayPage extends StatelessWidget {
               ...section('Καρδιά', heart),
               if (foodCard != null) foodCard,
               backupReminder,
+              const CloudBackupWarningCard(),
             ],
             bottom: [if (week != null) week, footer],
           );

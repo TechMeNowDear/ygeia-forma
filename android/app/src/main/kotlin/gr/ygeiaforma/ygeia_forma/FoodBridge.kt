@@ -172,6 +172,11 @@ class FoodBridge(
                     JSONObject().put("ok", false).put("kind", kind)
                 }
             }
+            // 18/11: μέγεθος των αρχείων του αντιγράφου Google (όριο 25 MB).
+            "cloudBackupSize" -> respond(result) {
+                val b = withContext(Dispatchers.IO) { CloudBackupSize.bytes(activity.applicationContext) }
+                JSONObject().put("ok", b >= 0).put("bytes", b)
+            }
             "shareBackup" -> respondMain(result) {
                 BackupFiles.share(activity, android.net.Uri.parse(call.argument<String>("uri") ?: ""))
                 JSONObject().put("ok", true)

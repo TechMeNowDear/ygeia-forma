@@ -22,6 +22,7 @@ import 'sources_page.dart';
 import 'me_page.dart';
 import 'privacy_page.dart';
 import 'training/training_page.dart' show editDoctorLimit;
+import 'cloud_backup_size.dart';
 
 /// Το κείμενο στο τέλος των Ρυθμίσεων. Έλεγχος 13/11 (U4-8): έγραφε «διαβάζει δεδομένα μόνο όταν την ανοίγεις», ενώ από
 /// τις 2/11 η εφαρμογή διαβάζει το Samsung Health και κάθε 3 ώρες στο παρασκήνιο (RefreshWorker.kt· όχι 00:00–06:00).
@@ -51,10 +52,12 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
   final name = backupFileName(now);
   final sources = await store.sourcesForBackup();
   // Οι ρυθμίσεις μπαίνουν μόνο αν έχουν διαβαστεί (αλλιώς θα έμπαιναν οι αρχικές).
-  final json = buildBackup(
+  // 18/11: η κωδικοποίηση σε άλλο isolate (όπως ήδη η ανάγνωση στην επαναφορά), ώστε ένα αντίγραφο χρόνων να μην
+  // «κολλάει» την οθόνη. Οι τιμές μαζεύονται πρώτα εδώ· στο isolate περνούν μόνο απλοί χάρτες και λίστες.
+  final BackupArgs args = (
     foodLog: raw.$1,
     myFoods: raw.$2,
-    prefs: store.prefsLoaded ? store.prefsJson() : const {},
+    prefs: store.prefsLoaded ? store.prefsJson() : const <String, dynamic>{},
     now: now,
     sources: sources,
     training: await _trainingForBackup(),
@@ -70,6 +73,7 @@ Future<BackupExport> exportBackupNow(HealthStore store, FoodStore food) async {
     // Round 7 (R7-A11-4): η αντίρρηση στις αναφορές σφαλμάτων ταξιδεύει με το αντίγραφο.
     errorsOff: !errors.enabled,
   );
+  final json = await compute(buildBackupFrom, args);
   final dishesOut = !food.dishesRead;
   final vitalsOut = !VitalsStore.main.read;
   // Έλεγχος 17/11 (Κ8-M2): το ιστορικό ημερών έχει και ό,τι δεν ξαναδιαβάζεται από τη Samsung.
@@ -635,6 +639,8 @@ class _DataGroupState extends State<_DataGroup> {
               '\n${lastBackupText(widget.store.lastExport, DateTime.now())}',
           onTap: _busy ? null : _export,
         ),
+        // 18/11: πόσο πιάνει το αντίγραφο Google (όριο 25 MB).
+        const CloudBackupLine(),
         SettingsRow(
           key: const ValueKey('backup-import'),
           icon: Icons.upload_rounded,
