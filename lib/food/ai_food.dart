@@ -516,10 +516,11 @@ List<(int, String)> aiDayProblems(FoodStore food, WeekPlan w, List<Dish> extra, 
     }
     if (unknown || w.days[i].isEmpty) continue;
     final share = w.days[i].length / math.max(1, meals.length);
-    final kt = t.kcal * (share >= 1 ? 1 : share);
+    final f = share >= 1 ? 1.0 : share;
+    final kt = t.kcal * f;
     final label = _day(w.dayAt(i));
     if ((kcal - kt).abs() > kt * aiDayKcalTol) out.add((i, '$label: ${_n(kcal)} kcal (στόχος ${_n(kt)}).'));
-    if (protein < t.protein * (share >= 1 ? 1 : share) * aiDayProteinMin) {
+    if (protein < t.protein * f * aiDayProteinMin) {
       out.add((i, '$label: πρωτεΐνη ${_n(protein)} g (στόχος ${t.protein}): θέλει πιο πρωτεϊνούχα φαγητά.'));
     }
     if (sat > t.satMax) out.add((i, '$label: κορεσμένα ${sat.toStringAsFixed(1)} g (όριο ${t.satMax}): θέλει λιγότερα λιπαρά ζωικά.'));

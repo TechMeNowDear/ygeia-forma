@@ -15,6 +15,7 @@ import '../training/training_store.dart';
 import '../training/wear_link.dart' show WearLink, ymd;
 import '../widgets.dart';
 import '../vitals.dart' show VitalsStore;
+import 'ai_settings.dart';
 import 'appearance.dart';
 import 'devices_page.dart';
 import 'diagnostics_sheet.dart';
@@ -245,6 +246,14 @@ class SettingsPage extends StatelessWidget {
                           // Σχέδιο Settings + premium: η κουζίνα και τα προϊόντα μου είναι πια μέσα στα «Τα στοιχεία μου».
                           subtitle: 'Ηλικία, ύψος, ζυγίσεις, στόχοι ·\u00A0η κουζίνα μου ·\u00A0τα προϊόντα μου',
                           onTap: () => Navigator.of(context).push(MePage.route(store)),
+                        ),
+                        // 19/11: AI μόνο για το φαγητό (πρόγραμμα εβδομάδας, αλλαγή γεύματος).
+                        SettingsRow(
+                          key: const ValueKey('settings-ai'),
+                          icon: Icons.auto_awesome_outlined,
+                          title: 'AI για το φαγητό',
+                          subtitle: 'Σύνδεση με τη γέφυρα ·\u00A0τι στέλνεται',
+                          onTap: () => push('AI για το φαγητό', (_) => const AiSettingsPage()),
                         ),
                         SettingsRow(
                           key: const ValueKey('settings-today-cards'),
