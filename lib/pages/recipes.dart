@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data.dart' show HealthStore;
+import '../food/ai_food.dart' show stapleSuggestions;
 import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
@@ -880,6 +881,56 @@ class FoodLikesScreen extends StatefulWidget {
 }
 
 class _FoodLikesScreenState extends State<FoodLikesScreen> {
+  /// «Βασικά κουζίνας» (19/11): λάδι, αλάτι, μπαχαρικά, κρεμμύδι κ.λπ. Μπαίνουν σε συνταγή του AI μόνο αν τα τσεκάρεις.
+  Widget _staples(Aigaio c, FoodLikes l) {
+    final food = widget.food;
+    final suggested = [
+      for (final id in stapleSuggestions)
+        if (food.itemFood(DishItem(id, id, 1)) case final f?) f,
+    ];
+    final ids = {for (final f in suggested) f.id};
+    final others = [
+      for (final id in l.staple)
+        if (!ids.contains(id))
+          if (food.itemFood(DishItem(id, id, 1)) case final f?) f,
+    ];
+    return AppCard(
+      key: const ValueKey('likes-staples'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Τσέκαρε όσα έχεις πάντα στο σπίτι.', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final f in suggested)
+            FilterChip(
+              key: ValueKey('staple-${f.id}'),
+              label: Text(f.name),
+              selected: l.staple.contains(f.id) || l.like.contains(f.id),
+              onSelected: !food.dishesRead || l.dislike.contains(f.id) || l.like.contains(f.id)
+                  ? null
+                  : (on) => _put(f.id, on ? 'staple' : null),
+            ),
+          for (final f in others)
+            InputChip(
+              key: ValueKey('staple-${f.id}'),
+              label: Text(f.name),
+              onDeleted: () => _remove(f.id),
+              deleteButtonTooltipMessage: 'Αφαίρεση',
+            ),
+        ]),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('staples-add'),
+            onPressed: food.dishesRead ? () => _add('staple') : null,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Πρόσθεσε τρόφιμο'),
+          ),
+        ),
+      ]),
+    );
+  }
+
   late final _note = TextEditingController(text: widget.food.likes.note);
   Timer? _noteSave;
 
@@ -898,19 +949,26 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
     if (l.note != _note.text.trim()) widget.food.saveLikes(l.copyWith(note: _note.text.trim()));
   }
 
-  Future<void> _add(bool like) async {
-    final f = await pickFood(context, widget.food, forWhat: like ? 'Μου αρέσουν' : 'Δε μου αρέσουν');
+  /// [which]: «like», «dislike» ή «staple» (βασικά κουζίνας, 19/11). Ένα τρόφιμο είναι σε μία μόνο λίστα· το «δε μου
+  /// αρέσει» το βγάζει από τις άλλες δύο.
+  Future<void> _add(String which) async {
+    final f = await pickFood(context, widget.food,
+        forWhat: switch (which) { 'like' => 'Μου αρέσουν', 'staple' => 'Βασικά κουζίνας', _ => 'Δε μου αρέσουν' });
     if (f == null || !mounted) return;
-    final l = widget.food.likes;
-    final likeIds = [for (final x in l.like) if (x != f.id) x];
-    final dislikeIds = [for (final x in l.dislike) if (x != f.id) x];
-    await widget.food.saveLikes(like ? l.copyWith(like: [...likeIds, f.id], dislike: dislikeIds) : l.copyWith(like: likeIds, dislike: [...dislikeIds, f.id]));
+    await _put(f.id, which);
   }
 
-  Future<void> _remove(String id) async {
+  Future<void> _put(String id, String? which) async {
     final l = widget.food.likes;
-    await widget.food.saveLikes(l.copyWith(like: [for (final x in l.like) if (x != id) x], dislike: [for (final x in l.dislike) if (x != id) x]));
+    List<String> without(List<String> xs) => [for (final x in xs) if (x != id) x];
+    await widget.food.saveLikes(l.copyWith(
+      like: [...without(l.like), if (which == 'like') id],
+      dislike: [...without(l.dislike), if (which == 'dislike') id],
+      staple: [...without(l.staple), if (which == 'staple') id],
+    ));
   }
+
+  Future<void> _remove(String id) => _put(id, null);
 
   Future<void> _paste() async {
     final d = await Clipboard.getData(Clipboard.kTextPlain);
@@ -975,7 +1033,7 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               key: ValueKey(like ? 'likes-add' : 'dislikes-add'),
-              onPressed: widget.food.dishesRead ? () => _add(like) : null,
+              onPressed: widget.food.dishesRead ? () => _add(like ? 'like' : 'dislike') : null,
               icon: const Icon(Icons.add_rounded),
               label: const Text('Πρόσθεσε τρόφιμο'),
             ),
@@ -1006,12 +1064,17 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
             children: [
-              Text('Μπαίνουν στις οδηγίες για τις συνταγές από AI. Όσα δε σου αρέσουν δεν μπαίνουν ποτέ σε συνταγή.',
+              Text('Το AI φτιάχνει φαγητά ΜΟΝΟ από όσα σου αρέσουν και τα βασικά κουζίνας. Όσα δε σου αρέσουν δεν μπαίνουν '
+                  'ποτέ σε συνταγή.',
                   style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary)),
               const SizedBox(height: 16),
               SectionTitle(text: 'Μου αρέσουν', trailing: l.like.isEmpty ? null : '${l.like.length}'),
               const SizedBox(height: 6),
               chips(l.like, true),
+              const SizedBox(height: 16),
+              SectionTitle(text: 'Βασικά κουζίνας', trailing: l.staple.isEmpty ? null : '${l.staple.length}'),
+              const SizedBox(height: 6),
+              _staples(c, l),
               const SizedBox(height: 16),
               SectionTitle(text: 'Δε μου αρέσουν', trailing: l.dislike.isEmpty ? null : '${l.dislike.length}'),
               const SizedBox(height: 6),
