@@ -106,7 +106,10 @@ Future<({List<String> notes, List<String> errors})?> aiMakeWeek(
   final b = bridge ?? mainAiBridge;
   if (!await ensureAiReady(context, b) || !context.mounted) return null;
   final g = HealthStore.shared?.goals;
-  if (g == null) return (notes: const <String>[], errors: ['Πρώτα βάλε στόχους διατροφής (Εγώ › Στόχοι διατροφής).']);
+  final targets = targetsOf(g);
+  if (g == null || targets == null) {
+    return (notes: const <String>[], errors: ['Πρώτα βάλε στόχους διατροφής (Εγώ › Στόχοι διατροφής).']);
+  }
   final now = (clock ?? DateTime.now)();
   final text = ValueNotifier(aiStageText(AiStage.plan, 0, 1));
   final r = await runWithProgress(
@@ -116,7 +119,7 @@ Future<({List<String> notes, List<String> errors})?> aiMakeWeek(
       call: b.call,
       food: food,
       kitchen: Kitchen.fromJson(HealthStore.shared?.prefs.kitchen),
-      targets: targetsOf(g),
+      targets: targets,
       from: from,
       meals: meals,
       legumesWeek: g.legumesWeek,

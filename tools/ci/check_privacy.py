@@ -155,6 +155,8 @@ if '<device-transfer' in rules:
 # --- Κάθε υπηρεσία στο διαδίκτυο που καλεί ο κώδικας πρέπει να είναι γνωστή (και γραμμένη στην πολιτική) ---
 KNOWN_HOSTS = {
     'ouraring.com': 'Oura', 'netlify.app': 'Netlify', 'openfoodfacts.org': 'Open Food Facts', 'sentry.io': 'Sentry',
+    # 19/11: η γέφυρα του «AI για το φαγητό» (Edge Function «ai-food»· η εφαρμογή δεν καλεί ποτέ απευθείας την Anthropic).
+    'supabase.co': 'Supabase',
 }
 # Διευθύνσεις που υπάρχουν στον κώδικα αλλά η εφαρμογή ΔΕΝ τις καλεί (σύνδεσμοι πηγών που ανοίγει ο χρήστης, User-Agent).
 NOT_CONTACTED = {
