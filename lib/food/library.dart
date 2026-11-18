@@ -161,6 +161,16 @@ PlanInfo? planInfoOf(Dish d) => PlanInfo.fromJson(d.extra['plan']);
 /// Το φαγητό [d] με τα στοιχεία [p] (ή χωρίς, αν null).
 Dish withPlanInfo(Dish d, PlanInfo? p) => withExtra(d, 'plan', p?.toJson());
 
+/// 19/11: «Μου άρεσε» (1), «Δεν μου άρεσε» (-1) ή τίποτα (0), στο κλειδί «rate» του φαγητού ([Dish.extra]). Φαγητό με
+/// «Δεν μου άρεσε» δεν μπαίνει ποτέ σε πρόγραμμα (κανόνες ή AI)· το «Μου άρεσε» προτιμάται.
+int dishRating(Dish d) => switch (d.extra['rate']) {
+      1 => 1,
+      -1 => -1,
+      _ => 0,
+    };
+
+Dish withRating(Dish d, int r) => withExtra(d, 'rate', r == 1 || r == -1 ? r : null);
+
 /// Τα φαγητά της βιβλιοθήκης (όσα ήρθαν με επικόλληση και έχουν κλειδί).
 List<Dish> libraryDishes(Iterable<Dish> all) => [for (final d in all) if (planInfoOf(d)?.key != null) d];
 

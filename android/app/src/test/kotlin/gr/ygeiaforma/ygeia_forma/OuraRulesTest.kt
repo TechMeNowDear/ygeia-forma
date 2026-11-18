@@ -55,6 +55,8 @@ class OuraRulesTest {
                 // 16/11: και το vitals.json (πίεση, σάκχαρο, καρδιογραφήματα).
                 "vitals.json",
                 "oura_tokens.bin", "oura_pending.bin", "oura_connecting.bin",
+                // 19/11: η γέφυρα του AI (διεύθυνση και κλειδί), κρυπτογραφημένα όπως τα tokens.
+                "ai_url.bin", "ai_token.bin",
             ),
             OuraRules.OWN_FILES,
         )

@@ -55,6 +55,20 @@ class _Cand {
   bool get fish => info.hasTag('ψάρι') || info.hasTag('λιπαρό ψάρι');
 }
 
+/// Τα όρια της μερίδας ενός φαγητού σε θερμίδες (ίδια για τους κανόνες και το AI, 19/11): από 0,6 της μερίδας της
+/// συνταγής ως 1,6 (πιάτο) ή 2 (κατσαρόλα, ίσες μερίδες). null αν δεν βγαίνουν θερμίδες από τη βάση.
+({double lo, double hi, double? natural, double proteinPerKcal, double satPerKcal})? portionRange(FoodStore food, Dish d) {
+  final all = itemsTotals(food, d.items);
+  if (all == null || all.kcal <= 0) return null;
+  final nat = naturalRaw(d);
+  final n = nat == null ? null : itemsTotals(food, nat)?.kcal;
+  final lo = n == null ? 150.0 : math.max(minSlotKcal, n * autoPortionMin);
+  // Κατσαρόλα και ίσες μερίδες: ως 2 μερίδες (βάζεις λίγο παραπάνω, 2 μπιφτέκια)· πιάτο ως 1,6 φορές.
+  final hi = n == null ? 1200.0 : math.min(maxSlotKcal, n * (d.kind == DishKind.plate ? autoPortionMax : 2.0));
+  // Πολύ μικρό φαγητό (π.χ. καφές 14 kcal): πάντα lo ≤ hi (έλεγχος 16/11: αλλιώς το clamp έσκαγε).
+  return (lo: lo, hi: math.max(lo, hi), natural: n, proteinPerKcal: all.protein / all.kcal, satPerKcal: all.satFat / all.kcal);
+}
+
 /// Φτιάχνει πρόγραμμα [days] ημερών από τη [from]. [seed]: άλλο seed → άλλη (εξίσου σωστή) εβδομάδα.
 AutoWeek autoWeek(
   FoodStore food, {
@@ -68,24 +82,23 @@ AutoWeek autoWeek(
   int seed = 1,
   WeekPlan? keep,
   int? now,
+  List<Dish> extra = const [],
+  Map<(int, Meal), String> forced = const {},
 }) {
   final rnd = math.Random(seed);
   final notes = <String>[];
   final dislikes = food.likes.dislike.toSet();
   final cands = <_Cand>[];
-  for (final d in libraryDishes(food.dishes)) {
+  // 19/11 (AI): [extra] = φαγητά που δεν έχουν αποθηκευτεί ακόμα (μπαίνουν μόνο αν πεις «Ναι, το νέο»). [forced] = ποιο
+  // φαγητό σε ποια θέση (μέρα, γεύμα) διάλεξε το AI: οι μερίδες βγαίνουν από εδώ, όπως σε κάθε άλλο πρόγραμμα.
+  for (final d in libraryDishes([...food.dishes.where((x) => !extra.any((e) => e.id == x.id)), ...extra])) {
     final info = planInfoOf(d)!;
     if (food.missingItems(d.items).isNotEmpty) continue;
     if (d.items.any((i) => dislikes.contains(i.id))) continue;
-    final all = itemsTotals(food, d.items);
-    if (all == null || all.kcal <= 0) continue;
-    final nat = naturalRaw(d);
-    final n = nat == null ? null : itemsTotals(food, nat)?.kcal;
-    final lo = n == null ? 150.0 : math.max(minSlotKcal, n * autoPortionMin);
-    // Κατσαρόλα και ίσες μερίδες: ως 2 μερίδες (βάζεις λίγο παραπάνω, 2 μπιφτέκια)· πιάτο ως 1,6 φορές.
-    final hi = n == null ? 1200.0 : math.min(maxSlotKcal, n * (d.kind == DishKind.plate ? autoPortionMax : 2.0));
-    // Πολύ μικρό φαγητό (π.χ. καφές 14 kcal): πάντα lo ≤ hi (έλεγχος 16/11: αλλιώς το clamp έσκαγε).
-    cands.add(_Cand(d, info, lo, math.max(lo, hi), n, all.protein / all.kcal));
+    if (dishRating(d) < 0) continue; // «Δεν μου άρεσε»
+    final r = portionRange(food, d);
+    if (r == null) continue;
+    cands.add(_Cand(d, info, r.lo, r.hi, r.natural, r.proteinPerKcal));
   }
   final ordered = [for (final m in Meal.values) if (meals.contains(m)) m];
   final shareSum = ordered.fold(0.0, (a, m) => a + mealShare[m]!);
@@ -120,12 +133,28 @@ AutoWeek autoWeek(
         continue;
       }
       final officeLunch = office && m == Meal.lunch;
+      final f = forced[(day, m)];
+      if (f != null) {
+        final c = cands.where((c) => c.dish.id == f).firstOrNull;
+        if (c == null) {
+          notes.add('${_dayName(date)}: το φαγητό για ${mealLabel(m).toLowerCase()} δεν μπορεί να μπει (λείπει υλικό ή '
+              'δεν σου αρέσει).');
+          continue;
+        }
+        chosen.add((m, c, null));
+        (used[c.dish.id] ??= []).add(day);
+        if (c.legumes) legumes++;
+        if (c.fish) fish++;
+        continue;
+      }
+      if (forced.isNotEmpty) continue; // Με επιλογές του AI: μόνο ό,τι διάλεξε (καμία θέση δεν γεμίζει «κρυφά»).
       final daysLeft = days - day;
       double score(_Cand c) {
         final t = target(m);
         var s = -((t.clamp(c.lo, c.hi) - t).abs() / t) * 3;
         final u = used[c.dish.id] ?? const [];
         if (c.pot && u.isNotEmpty) s += 1.5; // περισσεύματα πρώτα (όχι πέταμα)
+        if (dishRating(c.dish) > 0) s += 0.8; // «Μου άρεσε»
         if (c.legumes && legumes < legumesWeek) s += 1.2 * (legumesWeek - legumes) / daysLeft + 0.6;
         if (c.fish && fish < fishWeek) s += 1.2 * (fishWeek - fish) / daysLeft + 0.6;
         s += c.proteinPerKcal * 8; // πρωτεΐνη ανά θερμίδα: προτίμηση στα πιο πρωτεϊνούχα
@@ -264,6 +293,6 @@ String _dayName(DateTime d) => '${_wd[d.weekday - 1]} ${d.day}/${d.month}';
 int usableLibrary(FoodStore food) {
   final dislikes = food.likes.dislike.toSet();
   return libraryDishes(food.dishes)
-      .where((d) => food.missingItems(d.items).isEmpty && !d.items.any((i) => dislikes.contains(i.id)))
+      .where((d) => food.missingItems(d.items).isEmpty && !d.items.any((i) => dislikes.contains(i.id)) && dishRating(d) >= 0)
       .length;
 }

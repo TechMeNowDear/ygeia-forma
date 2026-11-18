@@ -295,14 +295,23 @@ enum ItemMatch {
 /// Τα τρόφιμα που μου αρέσουν και δε μου αρέσουν (id της βάσης ή δικών μου), και ελεύθερες σημειώσεις (π.χ. «γρήγορα φαγητά
 /// τις καθημερινές»). Μπαίνουν στις οδηγίες για τον βοηθό· τα «δε μου αρέσει» ελέγχονται και στην επικόλληση.
 class FoodLikes {
-  const FoodLikes({this.like = const [], this.dislike = const [], this.note = ''});
+  const FoodLikes({this.like = const [], this.dislike = const [], this.note = '', this.staple = const []});
   final List<String> like;
   final List<String> dislike;
   final String note;
 
-  bool get isEmpty => like.isEmpty && dislike.isEmpty && note.trim().isEmpty;
+  /// 19/11 (AI φαγητού): «Βασικά κουζίνας» που εγκρίνεις μία φορά (λάδι, αλάτι, μπαχαρικά, κρεμμύδι…). Μαζί με τα
+  /// [like] είναι τα ΜΟΝΑ υλικά που επιτρέπονται στις συνταγές του AI ([aiAllowedIds]). Ποτέ ταυτόχρονα και στα [dislike].
+  final List<String> staple;
 
-  Map<String, Object> toJson() => {'like': like, 'dislike': dislike, if (note.trim().isNotEmpty) 'note': note.trim()};
+  bool get isEmpty => like.isEmpty && dislike.isEmpty && note.trim().isEmpty && staple.isEmpty;
+
+  Map<String, Object> toJson() => {
+        'like': like,
+        'dislike': dislike,
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+        if (staple.isNotEmpty) 'staple': staple,
+      };
 
   static FoodLikes fromJson(Object? j) {
     if (j is! Map) return const FoodLikes();
@@ -315,11 +324,12 @@ class FoodLikes {
       like: [for (final x in ids(j['like'])) if (!dislike.contains(x)) x],
       dislike: dislike,
       note: j['note'] is String ? _cut(j['note'] as String, 1000) : '',
+      staple: [for (final x in ids(j['staple'])) if (!dislike.contains(x)) x],
     );
   }
 
-  FoodLikes copyWith({List<String>? like, List<String>? dislike, String? note}) =>
-      FoodLikes(like: like ?? this.like, dislike: dislike ?? this.dislike, note: note ?? this.note);
+  FoodLikes copyWith({List<String>? like, List<String>? dislike, String? note, List<String>? staple}) => FoodLikes(
+      like: like ?? this.like, dislike: dislike ?? this.dislike, note: note ?? this.note, staple: staple ?? this.staple);
 }
 
 /// Επικόλληση προτιμήσεων («kind»: «ygeia-likes»): για να μπουν όλα μαζί την πρώτη φορά. Τα id που δεν υπάρχουν στη
