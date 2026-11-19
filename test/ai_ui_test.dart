@@ -34,24 +34,43 @@ void main() {
     // Χωρίς κλειδί και διεύθυνση: η δοκιμή δεν πατιέται.
     expect(t.widget<FilledButton>(find.byKey(const ValueKey('ai-test'))).onPressed, isNull);
 
+    await t.ensureVisible(find.byKey(const ValueKey('ai-make-token')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-make-token')));
     await t.pumpAndSettle();
     expect(b.token, hasLength(43));
-    expect(find.text(b.token!), findsOneWidget); // φαίνεται μόλις φτιαχτεί, για αντιγραφή
+    // Κρυμμένο μέχρι να το ζητήσεις (X-9): φαίνονται μόνο οι 4 πρώτοι και οι 4 τελευταίοι χαρακτήρες.
+    expect(find.text(b.token!), findsNothing);
+    await t.ensureVisible(find.byKey(const ValueKey('ai-show-token')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('ai-show-token')));
+    await t.pumpAndSettle();
+    expect(find.text(b.token!), findsOneWidget);
 
     await t.enterText(find.byKey(const ValueKey('ai-project-id')), 'λάθος');
+    await t.ensureVisible(find.byKey(const ValueKey('ai-save-id')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-save-id')));
     await t.pumpAndSettle();
     expect(b.url, isNull);
+    // Το μήνυμα λάθους (κάτω) καλύπτει το κουμπί: κλείνει πριν το επόμενο πάτημα.
+    ScaffoldMessenger.of(t.element(find.byType(Scaffold).first)).removeCurrentSnackBar();
+    await t.pumpAndSettle();
 
     await t.enterText(find.byKey(const ValueKey('ai-project-id')), 'abcdefghij0123456789');
+    await t.ensureVisible(find.byKey(const ValueKey('ai-save-id')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-save-id')));
     await t.pumpAndSettle();
     expect(b.ready, isTrue);
 
+    await t.ensureVisible(find.byKey(const ValueKey('ai-test')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-test')));
     await t.pumpAndSettle();
     expect(find.text('Η σύνδεση δουλεύει.'), findsOneWidget);
+    expect(b.okDay, isNotNull);
+    expect(find.textContaining('Συνδεδεμένο ✓'), findsOneWidget);
     expect(sent.single, 'https://abcdefghij0123456789.supabase.co/functions/v1/ai-food');
     expect(find.textContaining('Ποτέ ζυγίσεις'), findsOneWidget);
 
@@ -70,9 +89,13 @@ void main() {
     await b.setUrl('abcdefghij0123456789');
     await b.ensureToken();
     await pump(t, AiSettingsPage(bridge: b));
+    await t.ensureVisible(find.byKey(const ValueKey('ai-test')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-test')));
     await t.pumpAndSettle();
     expect(find.text(aiErrorText(AiFail.token)), findsOneWidget);
+    expect(b.okDay, isNull);
+    expect(find.textContaining('Συνδεδεμένο ✓'), findsNothing);
   });
 
   testWidgets('Τι μου αρέσει: τα βασικά κουζίνας τσεκάρονται, το «δε μου αρέσει» τα κλειδώνει', (t) async {
@@ -87,6 +110,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('staple-$oil')));
     await t.pumpAndSettle();
     expect(food.likes.staple, isEmpty);
+    // «Μου αρέσει» και «βασικό» είναι ανεξάρτητα: τα «Μου αρέσει» δεν άλλαξαν.
+    expect(food.likes.like, ['C36017']);
     // Το αλάτι είναι στα «δε μου αρέσει»: δεν τσεκάρεται.
     expect(t.widget<FilterChip>(find.byKey(const ValueKey('staple-$salt'))).onSelected, isNull);
   });

@@ -18,7 +18,7 @@ object OuraRules {
     const val TRAINING_FILE = "training.json"
 
     /** Τα κρυπτογραφημένα (Vault): αρχείο «όνομα.bin» στο noBackupFilesDir/oura. */
-    val VAULT_NAMES = setOf("oura_tokens", "oura_pending", "oura_connecting", "ai_url", "ai_token")
+    val VAULT_NAMES = setOf("oura_tokens", "oura_pending", "oura_connecting", "ai_url", "ai_token", "ai_ok")
 
     /** Τα αρχεία μας (στο filesDir ή στο noBackupFilesDir/oura). Το προσωρινό είναι «όνομα.<αριθμός>.tmp». */
     /** «Τα φαγητά μου» (15/11): το αρχείο των φαγητών (FoodBridge), κι αυτό με ατομική εγγραφή. */

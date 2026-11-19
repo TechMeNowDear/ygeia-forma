@@ -31,7 +31,10 @@ const mealShare = {Meal.breakfast: 0.25, Meal.lunch: 0.40, Meal.dinner: 0.35, Me
 const officeWeekdays = {DateTime.tuesday, DateTime.wednesday, DateTime.thursday};
 
 const autoMaxRepeat = 2;
-const autoPotDays = 4;
+/// Η κατσαρόλα ξαναμπαίνει το πολύ τόσες μέρες μετά την 1η φορά, μη συμπεριλαμβανομένης (έλεγχος 19/11, S-7: FSA,
+/// περισσεύματα ως 48 ώρες· πριν 4). Με ρύζι μόνο την επόμενη μέρα ([autoRiceDays]).
+const autoPotDays = 3;
+const autoRiceDays = 2;
 const autoDayTolerance = 0.05;
 const autoPortionMin = 0.6, autoPortionMax = 1.6;
 
@@ -44,7 +47,8 @@ class AutoWeek {
 }
 
 class _Cand {
-  _Cand(this.dish, this.info, this.lo, this.hi, this.natural, this.proteinPerKcal);
+  _Cand(this.dish, this.info, this.lo, this.hi, this.natural, this.proteinPerKcal, [this.rice = false]);
+  final bool rice;
   final Dish dish;
   final PlanInfo info;
   final double lo, hi;
@@ -84,13 +88,15 @@ AutoWeek autoWeek(
   int? now,
   List<Dish> extra = const [],
   Map<(int, Meal), String> forced = const {},
+  bool aiOnly = false,
 }) {
   final rnd = math.Random(seed);
   final notes = <String>[];
   final dislikes = food.likes.dislike.toSet();
   final cands = <_Cand>[];
   // 19/11 (AI): [extra] = φαγητά που δεν έχουν αποθηκευτεί ακόμα (μπαίνουν μόνο αν πεις «Ναι, το νέο»). [forced] = ποιο
-  // φαγητό σε ποια θέση (μέρα, γεύμα) διάλεξε το AI: οι μερίδες βγαίνουν από εδώ, όπως σε κάθε άλλο πρόγραμμα.
+  // φαγητό σε ποια θέση (μέρα, γεύμα) διάλεξε το AI: οι μερίδες βγαίνουν από εδώ, όπως σε κάθε άλλο πρόγραμμα. [aiOnly]:
+  // μόνο ό,τι διάλεξε το AI (καμία θέση δεν γεμίζει «κρυφά» με τους κανόνες, ακόμα κι αν δεν μπήκε κανένα, L-2).
   for (final d in libraryDishes([...food.dishes.where((x) => !extra.any((e) => e.id == x.id)), ...extra])) {
     final info = planInfoOf(d)!;
     if (food.missingItems(d.items).isNotEmpty) continue;
@@ -98,7 +104,7 @@ AutoWeek autoWeek(
     if (dishRating(d) < 0) continue; // «Δεν μου άρεσε»
     final r = portionRange(food, d);
     if (r == null) continue;
-    cands.add(_Cand(d, info, r.lo, r.hi, r.natural, r.proteinPerKcal));
+    cands.add(_Cand(d, info, r.lo, r.hi, r.natural, r.proteinPerKcal, d.items.any((i) => food.itemFood(i)?.name.startsWith('Ρύζι') ?? false)));
   }
   final ordered = [for (final m in Meal.values) if (meals.contains(m)) m];
   final shareSum = ordered.fold(0.0, (a, m) => a + mealShare[m]!);
@@ -141,13 +147,19 @@ AutoWeek autoWeek(
               'δεν σου αρέσει).');
           continue;
         }
+        // Δίχτυ ασφαλείας (I-3): ποτέ σε γεύμα που δεν του ταιριάζει ή μεσημέρι γραφείου χωρίς «για γραφείο».
+        if (!c.info.fits(m) || (officeLunch && !c.info.office)) {
+          notes.add('${_dayName(date)}: το «${c.dish.name}» δεν ταιριάζει στο ${mealLabel(m).toLowerCase()}'
+              '${officeLunch ? ' (γραφείο)' : ''}· η θέση έμεινε χωρίς φαγητό.');
+          continue;
+        }
         chosen.add((m, c, null));
         (used[c.dish.id] ??= []).add(day);
         if (c.legumes) legumes++;
         if (c.fish) fish++;
         continue;
       }
-      if (forced.isNotEmpty) continue; // Με επιλογές του AI: μόνο ό,τι διάλεξε (καμία θέση δεν γεμίζει «κρυφά»).
+      if (aiOnly || forced.isNotEmpty) continue; // Με επιλογές του AI: μόνο ό,τι διάλεξε (καμία θέση δεν γεμίζει «κρυφά»).
       final daysLeft = days - day;
       double score(_Cand c) {
         final t = target(m);
@@ -174,7 +186,7 @@ AutoWeek autoWeek(
         if (u.isEmpty) return true;
         final last = u.last;
         if (c.pot) {
-          if (day - u.first >= autoPotDays) return false;
+          if (day - u.first >= (c.rice ? autoRiceDays : autoPotDays)) return false;
           return day - last >= 2 || officeLunch;
         }
         return day - last >= 2;
@@ -208,7 +220,9 @@ AutoWeek autoWeek(
     // έμεινε κενό (π.χ. χωρίς φαγητό για γραφείο) κρατά το μερίδιό του: δεν φορτώνεται στα άλλα (έλεγχος 16/11).
     final dayTarget = chosen.fold(0.0, (a, x) => a + target(x.$1));
     final kc = <double>[
-      for (final (m, c, k) in chosen) k?.kcal ?? (c == null ? target(m) : target(m).clamp(c.lo, c.hi).toDouble()),
+      // Κρατημένη θέση χωρίς θερμίδες = η μερίδα της συνταγής (όπως τη μετρά το πρόγραμμα, L-12).
+      for (final (m, c, k) in chosen)
+        k != null ? (k.kcal ?? c?.natural ?? target(m)) : (c == null ? target(m) : target(m).clamp(c.lo, c.hi).toDouble()),
     ];
     for (var round = 0; round < 4; round++) {
       final diff = dayTarget - kc.fold(0.0, (a, b) => a + b);
@@ -228,7 +242,7 @@ AutoWeek autoWeek(
     final snapped = <int>{};
     for (var i = 0; i < chosen.length; i++) {
       final c = chosen[i].$2;
-      if (chosen[i].$3 != null || c == null || c.dish.kind != DishKind.portions || c.natural == null) continue;
+      if (chosen[i].$3 != null || c == null || c.dish.kind != DishKind.portions || c.natural == null || c.natural! <= 0) continue;
       final half = c.natural! / 2;
       final halves = (kc[i] / half).round().clamp(1, (maxEatenServings * 2).round()).toInt();
       kc[i] = halves * half;
@@ -278,10 +292,11 @@ AutoWeek autoWeek(
   if (repeated.isNotEmpty) {
     notes.add('Επαναλαμβάνεται φαγητό πιο συχνά απ’ όσο λένε οι κανόνες (λίγα φαγητά στη βιβλιοθήκη): ${repeated.join(' · ')}.');
   }
-  if (legumesWeek > 0 && legumes < legumesWeek) notes.add('Όσπρια $legumes φορές (στόχος $legumesWeek): λίγα στη βιβλιοθήκη.');
-  if (fishWeek > 0 && fish < fishWeek) notes.add('Ψάρι $fish φορές (στόχος $fishWeek): λίγο στη βιβλιοθήκη.');
+  // Με το AI τα όσπρια/ψάρι μετρά ο έλεγχος του AI από τα υλικά (aiCheckWeek)· εδώ μόνο για τους κανόνες.
+  if (!aiOnly && legumesWeek > 0 && legumes < legumesWeek) notes.add('Όσπρια $legumes φορές (στόχος $legumesWeek): λίγα στη βιβλιοθήκη.');
+  if (!aiOnly && fishWeek > 0 && fish < fishWeek) notes.add('Ψάρι $fish φορές (στόχος $fishWeek): λίγο στη βιβλιοθήκη.');
   return AutoWeek(
-    WeekPlan(from: dateKey(start), days: out, created: now ?? DateTime.now().millisecondsSinceEpoch, source: 'auto'),
+    WeekPlan(from: dateKey(start), days: out, created: now ?? DateTime.now().millisecondsSinceEpoch, source: 'auto', meals: ordered),
     notes,
   );
 }

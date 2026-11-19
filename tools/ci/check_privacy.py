@@ -156,7 +156,7 @@ if '<device-transfer' in rules:
 KNOWN_HOSTS = {
     'ouraring.com': 'Oura', 'netlify.app': 'Netlify', 'openfoodfacts.org': 'Open Food Facts', 'sentry.io': 'Sentry',
     # 19/11: η γέφυρα του «AI για το φαγητό» (Edge Function «ai-food»· η εφαρμογή δεν καλεί ποτέ απευθείας την Anthropic).
-    'supabase.co': 'Supabase',
+    'supabase.co': 'Supabase', 'anthropic.com': 'Anthropic',
 }
 # Διευθύνσεις που υπάρχουν στον κώδικα αλλά η εφαρμογή ΔΕΝ τις καλεί (σύνδεσμοι πηγών που ανοίγει ο χρήστης, User-Agent).
 NOT_CONTACTED = {
@@ -242,6 +242,31 @@ if len(_stamp) != 2 or _stamp[0] != _now or _stamp[1].strip() != _shown:
                   f'tools/ci/privacy_stamp.txt τη γραμμή: {_now} {_shown}')
 need('dpa.gr' in page, 'Λείπει η Αρχή Προστασίας Δεδομένων (δικαίωμα καταγγελίας)')
 need('Επικοινωνία' in greek, 'Λείπει η ενότητα «Επικοινωνία»')
+
+# --- AI για το φαγητό (19/11, έλεγχος X-8/I-16): η διεύθυνση της γέφυρας φτιάχνεται δυναμικά, άρα η αναζήτηση των
+# https://… δεν τη βλέπει. Ρητός έλεγχος: αν υπάρχει η γέφυρα, η πολιτική (ελληνικά και αγγλικά) τη γράφει, και η function
+# του Supabase καλεί μόνο γνωστές υπηρεσίες. Και κανένα δημόσιο κείμενο δεν λέει «ποτέ σε AI» για όλα τα δεδομένα.
+if os.path.exists(f'{ROOT}/lib/ai/ai_bridge.dart'):
+    bridge = read('lib/ai/ai_bridge.dart')
+    need('.supabase.co' in bridge, 'AI: η γέφυρα δεν πάει σε *.supabase.co (άλλαξε η διεύθυνση; γράψ\' την στην πολιτική)')
+    for w in ('AI για το φαγητό', 'Supabase', 'Anthropic', 'Ποτέ</strong> ζυγίσεις'):
+        need(w in greek, f'AI: η πολιτική (ελληνικά) πρέπει να γράφει «{w}»')
+    for w in ('AI for food', 'Supabase', 'Anthropic'):
+        need(w in english, f'AI: η πολιτική (αγγλικά) πρέπει να γράφει «{w}»')
+for dirpath, _, files in os.walk(f'{ROOT}/supabase/functions'):
+    for fn in files:
+        if not fn.endswith('.ts'):
+            continue
+        src = open(os.path.join(dirpath, fn), encoding='utf-8').read()
+        for host in set(re.findall(r'https://([a-z0-9.-]+\.[a-z]{2,})', src)):
+            known = [k for k in KNOWN_HOSTS if host == k or host.endswith('.' + k)]
+            if not known:
+                errors.append(f'Νέα υπηρεσία στη function {fn}: {host} — γράψ\' τη στην πολιτική και στη λίστα KNOWN_HOSTS')
+            else:
+                need(KNOWN_HOSTS[known[0]] in greek, f'{host}: η πολιτική πρέπει να αναφέρει {KNOWN_HOSTS[known[0]]}')
+_index = read('site/public/index.html')
+need(not re.search(r'never shares data with third parties or sends it to AI', _index),
+     'Η αρχική σελίδα λέει ακόμα ότι η εφαρμογή δεν στέλνει τίποτα σε AI (υπάρχει το «AI για το φαγητό»)')
 
 if errors:
     for e in errors:

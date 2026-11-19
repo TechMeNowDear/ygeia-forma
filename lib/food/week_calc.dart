@@ -146,12 +146,12 @@ SlotState slotStateNow(FoodStore food, WeekPlan w, int day, PlanSlot s) {
 }
 
 /// Σύνολα της μέρας του προγράμματος: όσα έχει το πρόγραμμα (χωρίς τα «Δεν το έφαγα»). [unknown]: θέσεις χωρίς νούμερο.
-({Totals totals, int unknown}) plannedDay(FoodStore food, WeekPlan w, int day) {
+({Totals totals, int unknown}) plannedDay(FoodStore food, WeekPlan w, int day, {List<Dish> extra = const []}) {
   final items = <DishItem>[];
   var unknown = 0;
   for (final s in w.days[day]) {
     if (s.state == SlotState.skip) continue;
-    final d = food.dishById(s.dishId);
+    final d = food.dishById(s.dishId) ?? extra.where((x) => x.id == s.dishId).firstOrNull;
     final raw = d == null ? null : plannedRaw(food, d, s.kcal);
     final p = raw == null ? null : food.previewDish(raw);
     if (p == null) {
@@ -237,7 +237,10 @@ String weekPrompt({
       p.meals.isEmpty ? 'όλα τα γεύματα' : p.meals.map((m) => m.name).join('/'),
       if (p.office) 'γραφείο',
       if (p.tags.isNotEmpty) p.tags.join(', '),
-      if (food.missingItems(d.items).isNotEmpty)
+      if (dishRating(d) > 0) 'ΜΟΥ ΑΡΕΣΕ',
+      if (dishRating(d) < 0)
+        'ΔΕΝ ΜΟΥ ΑΡΕΣΕ: μην το βάλεις'
+      else if (food.missingItems(d.items).isNotEmpty)
         'ΛΕΙΠΕΙ ΥΛΙΚΟ: μην το βάλεις'
       else if (t == null)
         'μερίδα: άγνωστη (βάλε "kcal")'

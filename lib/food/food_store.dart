@@ -1029,7 +1029,8 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     }
     _dishes = dishesInOrder(ok);
     _badDishRows = bad;
-    _likes = FoodLikes.fromJson((j as Map)['likes']);
+    // Τα id του «Τι μου αρέσει» όπως είναι σήμερα στη βάση (I-2): αλλιώς ένα αντικατεστημένο τρόφιμο χάνεται από το AI.
+    _likes = FoodLikes.fromJson((j as Map)['likes']).mapIds(_idNow);
     _week = WeekPlan.fromJson(j['week']);
     _days = {
       if (j['days'] is Map)
@@ -1089,6 +1090,27 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Νέο ή αλλαγμένο φαγητό (ίδιο id = αλλαγή).
   Future<bool> saveDish(Dish d) =>
       _writeDishes(dishesInOrder([d, for (final x in _dishes) if (x.id != d.id) x]), d.name);
+
+  /// Νέα φαγητά ΚΑΙ πρόγραμμα μαζί (AI, 19/11, I-13): είναι στο ίδιο αρχείο, άρα μία εγγραφή, ή όλα ή τίποτα.
+  Future<bool> saveDishesAndWeek(List<Dish> changed, WeekPlan w) async {
+    if (!_dishesRead || _dishesNewer) {
+      saveError = _dishesNewer ? dishesNewerText : dishesUnreadText;
+      notifyListeners();
+      return false;
+    }
+    final ids = {for (final d in changed) d.id};
+    final beforeD = _dishes, beforeW = _week;
+    final after = dishesInOrder([...changed, for (final x in _dishes) if (!ids.contains(x.id)) x]);
+    _dishes = after;
+    _week = w;
+    notifyListeners();
+    if (await _dishIO.write(_dishesJson(after))) return true;
+    if (identical(_dishes, after)) _dishes = beforeD;
+    if (identical(_week, w)) _week = beforeW;
+    saveError = 'Δεν αποθηκεύτηκε: Πρόγραμμα εβδομάδας. Δοκίμασε ξανά.';
+    notifyListeners();
+    return false;
+  }
 
   /// Πολλά νέα ή αλλαγμένα φαγητά μαζί (βιβλιοθήκη), σε μία εγγραφή: ή όλα ή κανένα.
   Future<bool> saveDishes(List<Dish> changed) {
@@ -1184,7 +1206,7 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Επαναφορά του «Τι μου αρέσει»: μόνο αν το κινητό δεν έχει (ό,τι έχεις ήδη μένει). `true` αν μπήκε.
   Future<bool> importLikes(FoodLikes l) async {
     if (l.isEmpty || !_dishesRead || !_likes.isEmpty) return false;
-    return saveLikes(l);
+    return saveLikes(l.mapIds(_idNow));
   }
 
   /// Επαναφορά: μπαίνουν μόνο τα φαγητά που λείπουν (ίδιο id = υπάρχει ήδη και μένει όπως είναι). Απάντηση: πόσα μπήκαν
@@ -1193,10 +1215,15 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     if (!_dishesRead) await loadDishes();
     if (!_dishesRead || _dishesNewer) return null;
     final have = {for (final d in _dishes) d.id};
+    // Ίδιο κλειδί βιβλιοθήκης με άλλο id = το ίδιο φαγητό (έλεγχος 19/11, I-7): δεν μπαίνει δεύτερο.
+    final keys = {for (final d in _dishes) if (planInfoOf(d)?.key case final k?) k};
     final add = <Dish>[];
     var existing = 0;
     for (final d in list) {
-      if (have.add(d.id)) {
+      final k = planInfoOf(d)?.key;
+      if (k != null && !keys.add(k)) {
+        existing++;
+      } else if (have.add(d.id)) {
         add.add(d);
       } else {
         existing++;
