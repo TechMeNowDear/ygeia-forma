@@ -34,16 +34,22 @@ void main() {
     // Χωρίς κλειδί και διεύθυνση: η δοκιμή δεν πατιέται.
     expect(t.widget<FilledButton>(find.byKey(const ValueKey('ai-test'))).onPressed, isNull);
 
+    await t.ensureVisible(find.byKey(const ValueKey('ai-make-token')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-make-token')));
     await t.pumpAndSettle();
     expect(b.token, hasLength(43));
     // Κρυμμένο μέχρι να το ζητήσεις (X-9): φαίνονται μόνο οι 4 πρώτοι και οι 4 τελευταίοι χαρακτήρες.
     expect(find.text(b.token!), findsNothing);
+    await t.ensureVisible(find.byKey(const ValueKey('ai-show-token')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-show-token')));
     await t.pumpAndSettle();
     expect(find.text(b.token!), findsOneWidget);
 
     await t.enterText(find.byKey(const ValueKey('ai-project-id')), 'λάθος');
+    await t.ensureVisible(find.byKey(const ValueKey('ai-save-id')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-save-id')));
     await t.pumpAndSettle();
     expect(b.url, isNull);
@@ -52,10 +58,14 @@ void main() {
     await t.pumpAndSettle();
 
     await t.enterText(find.byKey(const ValueKey('ai-project-id')), 'abcdefghij0123456789');
+    await t.ensureVisible(find.byKey(const ValueKey('ai-save-id')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-save-id')));
     await t.pumpAndSettle();
     expect(b.ready, isTrue);
 
+    await t.ensureVisible(find.byKey(const ValueKey('ai-test')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-test')));
     await t.pumpAndSettle();
     expect(find.text('Η σύνδεση δουλεύει.'), findsOneWidget);
@@ -79,6 +89,8 @@ void main() {
     await b.setUrl('abcdefghij0123456789');
     await b.ensureToken();
     await pump(t, AiSettingsPage(bridge: b));
+    await t.ensureVisible(find.byKey(const ValueKey('ai-test')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('ai-test')));
     await t.pumpAndSettle();
     expect(find.text(aiErrorText(AiFail.token)), findsOneWidget);
