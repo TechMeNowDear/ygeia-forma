@@ -89,8 +89,8 @@ class SlotActions {
           onPressed: () async {
             if (await food.removeGroup(out!)) {
               // Το φαγητό όπως ήταν, αλλά με τη βαθμολογία που ίσως δόθηκε στο μεταξύ (I-12).
-              final now = food.dishById(d.id);
-              if (now != null) await food.saveDish(withRating(d, dishRating(now)));
+              final cur = food.dishById(d.id);
+              if (cur != null) await food.saveDish(withRating(d, dishRating(cur)));
               final now = _slot;
               if (now != null && now.grp == grp) await _set(now.copyWith(state: SlotState.open, clearGrp: true));
             }
