@@ -58,6 +58,7 @@ Session _lat(int daysAgo, List<int> reps, {double load = 5.3, double? later, int
       id: 's$daysAgo',
       workout: 'A',
       name: 'Α',
+      programId: 'p1',
       start: _now.subtract(Duration(days: daysAgo, hours: 1)),
       end: _now.subtract(Duration(days: daysAgo)),
       source: source,

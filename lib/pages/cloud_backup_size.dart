@@ -38,9 +38,6 @@ String cloudBackupText(int bytes) {
   return 'Αντίγραφο Google: ${dec(mb, mb < 10 || mb >= 24.9 && mb < 25 ? 1 : 0)} MB από 25 MB';
 }
 
-/// Το όριο του Android Auto Backup.
-const cloudBackupLimitBytes = 25 * 1024 * 1024;
-
 const cloudBackupStoppedText = 'Πάνω από τα 25 MB το Android δεν ενημερώνει πια το αντίγραφο Google, χωρίς να σε '
     'ειδοποιήσει. Κάνε «Εξαγωγή αντιγράφου» τώρα, και πες το στον developer.';
 
