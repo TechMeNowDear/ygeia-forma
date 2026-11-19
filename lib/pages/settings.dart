@@ -508,6 +508,9 @@ class _DataGroupState extends State<_DataGroup> {
       final r = await exportBackupNow(widget.store, widget.food!);
       final uri = r.uri;
       _say(r.text, action: uri == null ? null : SnackBarAction(label: 'Αποστολή', onPressed: () => FoodChannel.shareBackup(uri)));
+    } catch (_) {
+      // Έλεγχος 19/11 (IS-3): όπως η κάρτα της Σήμερα· πριν το σφάλμα δεν έλεγε τίποτα.
+      _say('Δεν αποθηκεύτηκε το αντίγραφο. Δοκίμασε ξανά.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

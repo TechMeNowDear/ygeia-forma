@@ -363,6 +363,9 @@ class Goals {
     if (o == null) return this;
     final before = o.kcal, after = kcal;
     final day = '${today.year}-${two(today.month)}-${two(today.day)}';
+    // Έλεγχος 19/11 (W-5): οι παλιοί στόχοι αρχίζουν σήμερα ή αργότερα (π.χ. οδηγός και αμέσως «δικός μου αριθμός»):
+    // καμία μέρα δεν κρίθηκε με τον παλιό αριθμό, άρα καμία γραμμή· πριν, η μέρα της αρχής κρινόταν μετά με τον τύπο.
+    if (o.since.compareTo(day) >= 0) return copyWith(hist: o.hist);
     return copyWith(
         hist: before == after
             ? o.hist

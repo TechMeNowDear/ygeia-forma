@@ -258,7 +258,9 @@ Map<String, dynamic> diagnosticsFrom({
 
   Map<String, dynamic>? adaptive;
   if (g != null) {
-    final pending = pendingCheckIn(goals: g, today: today, weights: weights, intake: intake);
+    // Έλεγχος 19/11 (L-6): με τη μέρα διακοπής του καπνίσματος, όπως η κάρτα της Σήμερα.
+    final quitDay = store.profile.quitDate;
+    final pending = pendingCheckIn(goals: g, today: today, weights: weights, intake: intake, quitDay: quitDay);
     final ready = readiness(goals: g, today: today, weights: weights, intake: intake);
     final to = DateTime(today.year, today.month, today.day - 1);
     final windowFrom = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1));
@@ -295,6 +297,7 @@ Map<String, dynamic> diagnosticsFrom({
                   'fastLoss': pending.proposal!.fastLoss,
                 },
               'wanted': pending.wanted,
+              if (pending.quitDays != null) 'quitHoldDays': pending.quitDays,
               'kgNow': pending.kgNow,
               'fastSlopeKgWeek': pending.fastSlope == null ? null : _r(pending.fastSlope!, 3),
             },

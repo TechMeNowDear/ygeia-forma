@@ -32,9 +32,17 @@ class CloudBackupMeter {
 
 /// «3,2 MB από 25 MB»
 String cloudBackupText(int bytes) {
-  final mb = bytes / (1024 * 1024);
-  return 'Αντίγραφο Google: ${dec(mb, mb < 10 ? 1 : 0)} MB από 25 MB';
+  var mb = bytes / (1024 * 1024);
+  // Έλεγχος 19/11 (CB-3): κάτω από το όριο ποτέ «25 από 25» (στρογγύλεμα προς τα πάνω).
+  if (bytes < cloudBackupLimitBytes && mb >= 24.95) mb = 24.9;
+  return 'Αντίγραφο Google: ${dec(mb, mb < 10 || mb >= 24.9 && mb < 25 ? 1 : 0)} MB από 25 MB';
 }
+
+/// Το όριο του Android Auto Backup.
+const cloudBackupLimitBytes = 25 * 1024 * 1024;
+
+const cloudBackupStoppedText = 'Πάνω από τα 25 MB το Android δεν ενημερώνει πια το αντίγραφο Google, χωρίς να σε '
+    'ειδοποιήσει. Κάνε «Εξαγωγή αντιγράφου» τώρα, και πες το στον developer.';
 
 const cloudBackupWarnText = 'Πάνω από τα 25 MB το Android σταματά το αντίγραφο Google χωρίς να σε ειδοποιήσει. Χρειάζεται '
     'αλλαγή στην εφαρμογή πριν φτάσει εκεί· ως τότε κάνε «Εξαγωγή αντιγράφου» κάθε εβδομάδα.';
@@ -56,7 +64,7 @@ class CloudBackupLine extends StatelessWidget {
           key: const ValueKey('settings-cloud-size'),
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Text(
-            warn ? '${cloudBackupText(b)}. $cloudBackupWarnText' : cloudBackupText(b),
+            warn ? '${cloudBackupText(b)}. ${b >= cloudBackupLimitBytes ? cloudBackupStoppedText : cloudBackupWarnText}' : cloudBackupText(b),
             style: TextStyle(color: warn ? c.warn : c.textSecondary, fontSize: 13, height: 1.35),
           ),
         );
@@ -84,11 +92,15 @@ class CloudBackupWarningCard extends StatelessWidget with SelfSpaced {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                CardHeader(icon: Icons.cloud_off_rounded, title: 'Το αντίγραφο Google γεμίζει', color: c.warn),
+                CardHeader(
+                    icon: Icons.cloud_off_rounded,
+                    title: b >= cloudBackupLimitBytes ? 'Το αντίγραφο Google σταμάτησε' : 'Το αντίγραφο Google γεμίζει',
+                    color: c.warn),
                 const SizedBox(height: 8),
                 Text('${cloudBackupText(b)}.', style: TextStyle(color: c.text, fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text(cloudBackupWarnText, style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.35)),
+                Text(b >= cloudBackupLimitBytes ? cloudBackupStoppedText : cloudBackupWarnText,
+                    style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.35)),
               ],
             ),
           ),

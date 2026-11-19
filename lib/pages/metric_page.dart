@@ -164,6 +164,12 @@ final metricSpecs = <String, MetricSpec>{
 /// Round 3 (k1 · R3-C-2): αντίγραφο του ιστορικού όπου οι μέρες [from]–[to] με ζύγιση που δεν μετρά ([uncountedWeighIn]:
 /// ξένη ή σε αναμονή, ίδιος κανόνας με τις Τάσεις, την εβδομάδα και την αναφορά) δεν έχουν τιμές ζύγισης ([bodyKeys]).
 /// Το ιστορικό δεν αλλάζει.
+/// Ο μέσος όρος 7 ημερών του βάρους για τις μέρες [from]–[end], με τις τιμές των 6 προηγούμενων ημερών (L-5).
+List<(DateTime, double)> _avgFrom(Map<String, Map<String, double>> history, SourcePlan plan, DateTime from, DateTime end) {
+  final wide = planSeries(history, plan, K.weight, DateTime(from.year, from.month, from.day - 6), end).points;
+  return [for (final p in average7Days(wide)) if (!dayOf(p.$1).isBefore(from)) p];
+}
+
 Map<String, Map<String, double>> _countedWeighInsOnly(
     Map<String, Map<String, double>> history, SourcePlan plan, DateTime from, DateTime to) {
   final out = Map<String, Map<String, double>>.of(history);
@@ -317,7 +323,8 @@ class _MetricPageState extends State<MetricPage> {
                 LineChart(
                   points: pts,
                   // 17/11: στο βάρος και ο μέσος όρος 7 ημερών (έντονη γραμμή).
-                  average: s.metric == K.weight ? average7Days(pts) : const [],
+                  // Έλεγχος 19/11 (L-5): με τις 6 μέρες πριν από την περίοδο, ώστε να είναι ίδιος με του Σώματος από την 1η μέρα.
+                  average: s.metric == K.weight ? _avgFrom(history, store.plan, from, end) : const [],
                   color: color,
                   format: s.axis ?? s.show,
                   // Round 2 (R2-D-9): «365 μέρες» (και κάθε διάστημα που περνά την Πρωτοχρονιά) με το έτος στις άκρες.
@@ -338,6 +345,12 @@ class _MetricPageState extends State<MetricPage> {
                 if (s.axis != null) ...[
                   const SizedBox(height: 4),
                   Text('Άξονας: ώρες:λεπτά', style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
+                ],
+                // Έλεγχος 19/11 (L-15): η ίδια εξήγηση με το Σώμα.
+                if (s.metric == K.weight && _avgFrom(history, store.plan, from, end).length >= 2) ...[
+                  const SizedBox(height: 4),
+                  Text('Έντονη γραμμή: μέσος όρος 7 ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας.',
+                      key: const ValueKey('metric-avg-note'), style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
                 ],
                 if (wrist) ...[
                   const SizedBox(height: 4),

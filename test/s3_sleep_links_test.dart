@@ -31,6 +31,9 @@ final _bread = Food(id: 'T-bread', name: 'Ψωμί (δοκιμή)', cat: 'Ψωμ
   required double Function(int i, double gap, _Rng r) hr,
   bool markDone = true,
   bool lateLog = false,
+  bool writtenNextMorning = false,
+  bool fixedWake = false,
+  double Function(int i)? gapLevel,
 }) {
   final r = _Rng(7);
   final history = <String, Map<String, double>>{};
@@ -40,16 +43,24 @@ final _bread = Food(id: 'T-bread', name: 'Ψωμί (δοκιμή)', cat: 'Ψωμ
     final night = DateTime(_today.year, _today.month, _today.day - (nights - 1 - i));
     final prev = DateTime(night.year, night.month, night.day - 1);
     final bed = 300 + (r.next() * 60).round(); // 23:00–00:00 (λεπτά μετά τις 18:00)
-    final gap = gapH(i, r);
-    final bedAt = DateTime(prev.year, prev.month, prev.day, 18).add(Duration(minutes: bed));
+    // Σταθερό βραδινό (21:00 ± λίγο) και σταθερό ξύπνημα: το κενό και η διάρκεια βγαίνουν από την ώρα ύπνου (SL-1).
+    final gap = fixedWake ? (bed - 180 + r.next() * 20) / 60 : gapH(i, r) + (gapLevel?.call(i) ?? 0);
+    final bedAt = DateTime(prev.year, prev.month, prev.day, 18, bed);
     final ate = bedAt.subtract(Duration(minutes: (gap * 60).round()));
-    history[dateKey(night)] = {K.bedtime: bed.toDouble(), K.sleepHr: hr(i, gap, r), K.sleepMin: 400 + r.next() * 60};
+    final minutes = fixedWake ? 780 - bed - 20 + r.next() * 20 : 400 + r.next() * 60;
+    history[dateKey(night)] = {K.bedtime: bed.toDouble(), K.sleepHr: hr(i, gap, r), K.sleepMin: minutes};
     history[dateKey(prev)] = {...?history[dateKey(prev)], K.steps: 6000 + r.next() * 4000};
+    // SL-3: γραμμένα το επόμενο πρωί στις 09:10 → η εφαρμογή δίνει ώρα 09:10 της ίδιας μέρας ([FoodStore.entryTime])
+    // και id με την πραγματική ώρα εγγραφής.
+    final nextMorning = DateTime(night.year, night.month, night.day, 9, 10);
+    String id(String k) => writtenNextMorning ? '${nextMorning.microsecondsSinceEpoch}-$k$i' : '$k$i';
     food[dateKey(prev)] = [
-      LogEntry(id: 'l$i', day: dateKey(prev), meal: Meal.lunch, food: _bread, grams: 100,
+      LogEntry(id: id('l'), day: dateKey(prev), meal: Meal.lunch, food: _bread, grams: 100,
           time: DateTime(prev.year, prev.month, prev.day, 14)),
-      LogEntry(id: 'd$i', day: dateKey(prev), meal: Meal.dinner, food: _bread, grams: 100 + r.next() * 200,
-          time: lateLog ? bedAt.add(const Duration(hours: 9)) : ate),
+      LogEntry(id: id('d'), day: dateKey(prev), meal: Meal.dinner, food: _bread, grams: 100 + r.next() * 200,
+          time: writtenNextMorning
+              ? DateTime(prev.year, prev.month, prev.day, 9, 10)
+              : (lateLog ? bedAt.add(const Duration(hours: 9)) : ate)),
     ];
     if (markDone) done.add(dateKey(prev));
   }
@@ -109,6 +120,30 @@ void main() {
         lateLog: true, gapH: (i, r) => 0.5 + r.next() * 4, hr: (i, g, r) => 56 + (g < 2.5 ? 4 : 0) + r.next() * 2));
     expect(r.links.where((l) => l.cause == LinkCause.mealGap), isEmpty);
     expect(r.links.where((l) => l.cause == LinkCause.dinnerKcal), isNotEmpty);
+  });
+
+  test('Έλεγχος 19/11 (SL-1): σταθερό βραδινό και ξύπνημα, καμία επίδραση → το «κενό × διάρκεια» δεν βγαίνει· «ώρα ύπνου × διάρκεια» δεν ελέγχεται', () {
+    final r = _run(_data(84, fixedWake: true, gapH: (i, r) => 0, hr: (i, g, r) => 58 + r.next() * 4));
+    expect(r.found.where((l) => l.sleep == LinkSleep.sleepMin), isEmpty);
+    expect(r.links.where((l) => l.cause == LinkCause.bedtime && l.sleep == LinkSleep.sleepMin), isEmpty);
+  });
+
+  test('Έλεγχος 19/11 (SL-2): αλλαγή επιπέδου και στα δύο την ίδια μέρα (π.χ. αρχή δίαιτας), χωρίς σύνδεση νύχτα με νύχτα → τίποτα', () {
+    final r = _run(_data(84,
+        gapH: (i, r) => 1 + r.next() * 2,
+        gapLevel: (i) => i >= 56 ? 2 : 0,
+        hr: (i, g, r) => (i >= 56 ? 54 : 60) + r.next() * 3));
+    expect(r.found, isEmpty);
+  });
+
+  test('Έλεγχος 19/11 (SL-3): φαγητό γραμμένο το επόμενο πρωί → η ώρα δεν μετρά', () {
+    final r = _run(_data(84,
+        writtenNextMorning: true, gapH: (i, r) => 0.5 + r.next() * 4, hr: (i, g, r) => 56 + (g < 2.5 ? 4 : 0) + r.next() * 2));
+    expect(r.links.where((l) => l.cause == LinkCause.mealGap), isEmpty);
+    expect(r.links.where((l) => l.cause == LinkCause.dinnerKcal), isNotEmpty);
+    final e = LogEntry(id: '${DateTime(2026, 12, 2, 9, 10).microsecondsSinceEpoch}-ab', day: '2026-12-01', meal: Meal.dinner,
+        food: _bread, grams: 100, time: DateTime(2026, 12, 1, 9, 10));
+    expect(writtenAt(e), DateTime(2026, 12, 2, 9, 10));
   });
 
   testWidgets('κάρτα: «Μαζεύω νύχτες» χωρίς δεδομένα, και «Πώς το βρίσκω»', (t) async {

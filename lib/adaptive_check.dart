@@ -477,6 +477,9 @@ CheckIn? pendingCheckIn({
               formula: formula,
               formulaKg: fNow.kg);
         }
+        // Έλεγχος 19/11 (L-2): στις 10 εβδομάδες μετά τη διακοπή, εκτίμηση χαμηλή = συνήθως το βάρος που ανεβαίνει μετά
+        // τη διακοπή (μέση άνοδος ~0,25 kg την εβδομάδα τους πρώτους μήνες), όχι γεύματα που δεν γράφτηκαν: η κάρτα το λέει.
+        final quitLow = quitHoldDays(quitDay, t);
         return CheckIn(
             kind: CheckKind.implausible,
             goals: g,
@@ -486,6 +489,7 @@ CheckIn? pendingCheckIn({
             weighs: weighs,
             absurd: absurd,
             foreign: news,
+            quitDays: quitLow != null && r.est != null && r.est!.tdee < formula ? quitLow : null,
             formula: formula,
             formulaKg: fNow.kg);
       case AdaptStatus.tooEarly:

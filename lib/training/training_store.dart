@@ -1485,8 +1485,15 @@ class TrainingStore extends ChangeNotifier {
     final first = e.log.first;
     final v = calibrate(item, first.load, first.reps, rir);
     if (v != null) {
+      // Έλεγχος 19/11 (W-3): πιο δύσκολο φορτίο → επαναλήψεις στο κάτω όριο, όπως σε κάθε άνοδο (το calibrate υπολογίζει
+      // το φορτίο για το κάτω όριο· πριν έμεναν οι επαναλήψεις του στόχου, π.χ. 12 αντί για 8).
+      final f = first.load;
+      final harder = f != null && (e.kind == LoadKind.bandAssist ? v < f : v > f);
       for (var k = 1; k < e.log.length; k++) {
-        if (!e.log[k].done) e.log[k].load = v;
+        if (!e.log[k].done) {
+          e.log[k].load = v;
+          if (harder && e.log[k].reps > item.lo) e.log[k].reps = item.lo;
+        }
       }
       save();
     }
@@ -1531,13 +1538,42 @@ class TrainingStore extends ChangeNotifier {
   /// Έλεγχος 17/11 (Κ5-H1, Κ5-M3): η ερώτηση του 1ου σετ ξαναγίνεται (α) όσο την τελευταία φορά η απάντηση ήταν «4+» με τις
   /// επαναλήψεις του στόχου (το βάρος ίσως είναι ακόμα πολύ ελαφρύ), και (β) μετά από διακοπή πάνω από [recalibrateGapDays]
   /// μέρες (σαν πρώτη φορά). Πριν γινόταν μόνο μία φορά σε όλη τη ζωή της άσκησης.
+  ///
+  /// Έλεγχος 19/11 (W-2): και μόνο όταν ΟΛΗ η άσκηση ήταν ελαφριά: και το «Τελευταίο σετ» «4+», και κανένα σετ κάτω από το
+  /// κάτω όριο. Πριν, το 1ο σετ (πάντα το πιο ξεκούραστο) έβγαινε «4+», η εφαρμογή ανέβαζε σε φορτίο που την προηγούμενη
+  /// φορά δεν έβγαλε τις επαναλήψεις, και κάθε προπόνηση τελείωνε με ρεζέρβα 1 και «πιο ελαφρύ».
+  /// (W-5): και όσο η άσκηση έχει γίνει μόνο από το ρολόι χωρίς ερώτηση 1ου σετ (το ρολόι ρωτά μόνο σε προπόνηση του κινητού):
+  /// πριν η βαθμονόμηση χανόταν για πάντα και το βάρος έμενε στο ελαφρύ ξεκίνημα.
   bool stillCalibrating(String ex) {
     final h = historyOf(ex).where((x) => !x.$2.skipped && x.$2.done.isNotEmpty).firstOrNull;
     if (h == null) return false;
     if (daysBetween(h.$1, now) > recalibrateGapDays) return true;
     final e = h.$2;
+    if (e.pain.isNotEmpty) return false;
     final first = e.log.isEmpty ? null : e.log.first;
-    return (e.firstAnswer ?? -1) >= 4 && first != null && first.done && first.reps >= e.lo && e.pain.isEmpty;
+    final easy = (e.firstAnswer ?? -1) >= 4 &&
+        first != null &&
+        first.done &&
+        first.reps >= e.lo &&
+        (e.rirAnswer ?? -1) >= 4 &&
+        e.done.every((s) => s.reps >= e.lo);
+    return easy || _onlyWatchNeverAsked(ex);
+  }
+
+  /// Η άσκηση έχει γίνει μόνο σε προπονήσεις του ρολογιού, χωρίς ποτέ απάντηση στο 1ο σετ και χωρίς ενόχληση ([stillCalibrating]).
+  bool _onlyWatchNeverAsked(String ex) {
+    var any = false;
+    for (final s in sessions) {
+      if (!s.finished || s.stopped) continue;
+      for (final e in s.items) {
+        if (e.ex != ex) continue;
+        if (e.pain.isNotEmpty) return false;
+        if (e.skipped || e.done.isEmpty) continue;
+        if (e.firstAnswer != null || s.source != 'watch') return false;
+        any = true;
+      }
+    }
+    return any;
   }
 
   /// R8-U3-01: η απάντηση στο «Πρώτο σετ», από όποια συσκευή έρθει πρώτη: [rir] 0–4 (βαθμονόμηση, [calibrateAfterFirst]) ή

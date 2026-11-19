@@ -343,8 +343,52 @@ class _MePageState extends State<MePage> {
     );
   }
 
-  /// «Τα προϊόντα μου» και «Η κουζίνα μου» (πριν: υπο-καρτέλα «Τα δικά μου» της Διατροφής).
-  /// Κάπνισμα (απόφαση χρήστη 17/11): για τον κίνδυνο της καρδιάς στις εξετάσεις και τον εβδομαδιαίο έλεγχο θερμίδων.
+  /// Κάπνισμα (απόφαση χρήστη 17/11): πακέτα-έτη για τον γιατρό και η διακοπή για τον εβδομαδιαίο έλεγχο θερμίδων.
+  ///
+  /// Έλεγχος 19/11: «Το έκοψα» από «Καπνίζω» = σήμερα· από οπουδήποτε αλλού ρωτά «Πότε το έκοψες;» (L-1: πριν έβαζε σιωπηλά
+  /// σήμερα και ένας παλιός πρώην καπνιστής έχανε 10 εβδομάδες διόρθωσης). «Ποτέ» με γραμμένα στοιχεία ζητά επιβεβαίωση
+  /// (L-8). Κενό ή άκυρο πεδίο σβήνει την τιμή, με μήνυμα (L-7: πριν έμενε π.χ. «2» όταν έσβηνες το «20»).
+  Future<void> _setSmoke(BuildContext context, Profile p, String n, DateTime today) async {
+    if (n == p.smoke) return;
+    if (n == 'ex') {
+      if (p.smoke == 'now') {
+        _save(p.withSmoking(smoke: 'ex', cigs: p.cigs, smokeFrom: p.smokeFrom, quit: dateKey(today)));
+        return;
+      }
+      final d = await showDatePicker(
+        context: context,
+        helpText: 'Πότε το έκοψες;',
+        initialDate: today,
+        firstDate: DateTime(1950),
+        lastDate: today,
+        routeSettings: const RouteSettings(name: 'Πότε το έκοψες'),
+      );
+      if (d == null || !mounted) return;
+      final q = widget.store.profile;
+      _save(q.withSmoking(smoke: 'ex', cigs: q.cigs, smokeFrom: q.smokeFrom, quit: dateKey(d)));
+      return;
+    }
+    if (n == 'no' && (p.cigs != null || p.smokeFrom != null || p.quit != null)) {
+      final ok = await showDialog<bool>(
+        context: context,
+        routeSettings: const RouteSettings(name: 'Κάπνισμα ποτέ'),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Δεν κάπνισες ποτέ;'),
+          content: Text(p.smoke == 'ex'
+              ? 'Σβήνονται η μέρα που το έκοψες, τα τσιγάρα και η ηλικία. Αν απλώς δεν καπνίζεις πια, μείνε στο «Το έκοψα».'
+              : 'Σβήνονται τα τσιγάρα και η ηλικία.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Άκυρο')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι, ποτέ')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    final q = widget.store.profile;
+    _save(q.withSmoking(smoke: n, cigs: q.cigs, smokeFrom: q.smokeFrom, quit: null));
+  }
+
   Widget _smoking(BuildContext context, Profile p, DateTime now, TextStyle label, TextStyle hint) {
     final today = DateTime(now.year, now.month, now.day);
     final s = p.smoke;
@@ -368,17 +412,14 @@ class _MePageState extends State<MePage> {
             emptySelectionAllowed: true,
             showSelectedIcon: false,
             segments: const [
-              ButtonSegment(value: 'no', label: Text('Όχι', style: TextStyle(fontFamily: 'Inter'))),
+              ButtonSegment(value: 'no', label: Text('Ποτέ', style: TextStyle(fontFamily: 'Inter'))),
               ButtonSegment(value: 'now', label: Text('Καπνίζω', style: TextStyle(fontFamily: 'Inter'))),
               ButtonSegment(value: 'ex', label: Text('Το έκοψα', style: TextStyle(fontFamily: 'Inter'))),
             ],
             selected: {if (s != null) s},
             onSelectionChanged: (v) {
               if (v.isEmpty) return;
-              final n = v.first;
-              // «Το έκοψα»: η μέρα είναι σήμερα, εκτός αν είχε ήδη γραφτεί.
-              _save(p.withSmoking(
-                  smoke: n, cigs: p.cigs, smokeFrom: p.smokeFrom, quit: n == 'ex' ? (p.quit ?? dateKey(today)) : null));
+              _setSmoke(context, p, v.first, today);
             },
           ),
           if (s == 'now' || s == 'ex') ...[
@@ -392,9 +433,11 @@ class _MePageState extends State<MePage> {
                     initialValue: p.cigs?.toString() ?? '',
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(labelText: s == 'ex' ? 'Τσιγάρα τη μέρα (τότε)' : 'Τσιγάρα τη μέρα', border: _outline),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (v) => (v ?? '').trim().isEmpty || num(v!, 1, 80) != null ? null : 'Από 1 ως 80',
                     onChanged: (v) {
-                      final n = num(v, 1, 80);
-                      if (n != null) _save(p.withSmoking(smoke: s, cigs: n, smokeFrom: p.smokeFrom, quit: p.quit));
+                      final q = widget.store.profile;
+                      _save(q.withSmoking(smoke: s, cigs: num(v, 1, 80), smokeFrom: q.smokeFrom, quit: q.quit));
                     },
                   ),
                 ),
@@ -405,9 +448,11 @@ class _MePageState extends State<MePage> {
                     initialValue: p.smokeFrom?.toString() ?? '',
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Από ηλικία', border: _outline),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (v) => (v ?? '').trim().isEmpty || num(v!, 8, 80) != null ? null : 'Από 8 ως 80',
                     onChanged: (v) {
-                      final n = num(v, 8, 80);
-                      if (n != null) _save(p.withSmoking(smoke: s, cigs: p.cigs, smokeFrom: n, quit: p.quit));
+                      final q = widget.store.profile;
+                      _save(q.withSmoking(smoke: s, cigs: q.cigs, smokeFrom: num(v, 8, 80), quit: q.quit));
                     },
                   ),
                 ),
@@ -448,7 +493,7 @@ class _MePageState extends State<MePage> {
                 key: const ValueKey('me-quit-hold'),
                 style: hint)
           else if (s == null)
-            Text('Χρειάζεται για τον κίνδυνο της καρδιάς στις εξετάσεις.', style: hint),
+            Text('Για τον γιατρό (πακέτα-έτη) και, αν το κόψεις, για τον εβδομαδιαίο έλεγχο θερμίδων.', style: hint),
         ],
       ),
     );

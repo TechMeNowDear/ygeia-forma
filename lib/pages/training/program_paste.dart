@@ -54,6 +54,44 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
         _r = parseProgram(text, exIds());
       });
 
+  /// Έλεγχος 19/11 (W-7): η αρχή του προγράμματος φαίνεται πριν από την αποθήκευση. Χωρίς ημερομηνία ξεκινούσε σιωπηλά τη μέρα
+  /// της επικόλλησης (Κυριακή → η προπόνηση της Κυριακής ήδη στη Σήμερα)· με αρχή πάνω από 6 μέρες πίσω το περπάτημα
+  /// ξεκινούσε από «εβδομάδα 2».
+  List<Widget> _startRow(BuildContext context, Program p) {
+    final c = Aigaio.of(context);
+    final n = widget.training.now;
+    final today = DateTime(n.year, n.month, n.day);
+    final monday = today.weekday == DateTime.monday ? null : DateTime(today.year, today.month, today.day + (8 - today.weekday));
+    final f = p.from;
+    final old = f != null && daysBetween(f, today) > 6;
+    if (f != null && !old) return const [];
+    final small = TextStyle(fontSize: 13.5, height: 1.4, color: old ? c.warn : c.textSecondary);
+    return [
+      const SizedBox(height: 6),
+      Text(
+          old
+              ? 'Η αρχή είναι ${f!.day}/${f.month}, πριν από ${daysBetween(f, today)} μέρες: το πρόγραμμα θα συνεχίσει σαν να '
+                  'ξεκίνησε τότε (π.χ. το περπάτημα από την εβδομάδα ${daysBetween(f, today) ~/ 7 + 1}).'
+              : 'Χωρίς ημερομηνία αρχής: ξεκινά σήμερα, ${today.day}/${today.month}.',
+          key: const ValueKey('paste-start-note'),
+          style: small),
+      Wrap(spacing: 8, children: [
+        if (old)
+          TextButton(
+            key: const ValueKey('paste-start-today'),
+            onPressed: () => setState(() => p.from = today),
+            child: const Text('Από σήμερα'),
+          ),
+        if (monday != null)
+          TextButton(
+            key: const ValueKey('paste-start-monday'),
+            onPressed: () => setState(() => p.from = monday),
+            child: Text('Από Δευτέρα ${monday.day}/${monday.month}'),
+          ),
+      ]),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
@@ -84,6 +122,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
             '${p.author == 'claude' ? 'Από τον Claude' : 'Πρόγραμμα'}${p.from == null ? '' : ' ·\u00A0ισχύει από ${p.from!.day}/${p.from!.month}'}',
             style: TextStyle(fontSize: 13.5, color: c.textSecondary),
           ),
+          ..._startRow(context, p),
           if (p.note != null) ...[const SizedBox(height: 6), Text(p.note!, style: TextStyle(fontSize: 14.5, height: 1.4, color: c.text))],
           const SizedBox(height: 10),
           Row(children: [

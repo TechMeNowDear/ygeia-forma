@@ -11,6 +11,9 @@ void main() {
   test('κείμενο μεγέθους', () {
     expect(cloudBackupText(3355443), 'Αντίγραφο Google: 3,2 MB από 25 MB');
     expect(cloudBackupText(21 * 1024 * 1024), 'Αντίγραφο Google: 21 MB από 25 MB');
+    // Έλεγχος 19/11 (CB-3): κάτω από το όριο ποτέ «25 από 25».
+    expect(cloudBackupText(25 * 1024 * 1024 - 1000), 'Αντίγραφο Google: 24,9 MB από 25 MB');
+    expect(cloudBackupText(26 * 1024 * 1024), 'Αντίγραφο Google: 26 MB από 25 MB');
   });
 
   test('buildBackupFrom = buildBackup (ίδια ορίσματα, ίδιο αρχείο)', () {

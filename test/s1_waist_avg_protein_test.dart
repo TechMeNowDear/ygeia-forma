@@ -10,9 +10,13 @@ DateTime _d(int n) => DateTime(2026, 11, 1 + n, 7, 30);
 void main() {
   group('Μέση/ύψος (NICE)', () {
     test('όρια στα δύο δεκαδικά', () {
-      expect(waistHeightText(88, 180), 'Μέση/ύψος: 0,49 · υγιές (0,40–0,49) (NICE 2025)');
+      expect(waistHeightText(88, 180), 'Μέση/ύψος: 0,48 · υγιές (0,40–0,49) (NICE 2025)');
+      // Έλεγχος 19/11 (L-12): 0,497 δεν είναι «0,50 · αυξημένος».
+      expect(waistHeightText(88, 177), contains('0,49 · υγιές'));
+      expect(waistHeightText(88.5, 177), contains('0,50 · αυξημένος'));
       expect(waistHeightText(90, 180), 'Μέση/ύψος: 0,50 · αυξημένος κίνδυνος (0,50–0,59) (NICE 2025)');
-      expect(waistHeightText(107.9, 180), contains('0,60 · ακόμα πιο αυξημένος'));
+      expect(waistHeightText(107.9, 180), contains('0,59 · αυξημένος'));
+      expect(waistHeightText(108, 180), contains('0,60 · ακόμα πιο αυξημένος'));
       expect(waistHeightText(70, 180), contains('κάτω από το 0,40'));
       expect(waistHeightText(72, 180), contains('0,40 · υγιές'));
     });
@@ -35,6 +39,12 @@ void main() {
       final pts = [(_d(0), 90.0), (_d(1), 90.0), (_d(2), 90.0), (_d(10), 80.0), (_d(11), 80.0)];
       final a = average7Days(pts);
       expect(a.map((p) => p.$1), [_d(2)]); // στις 10 και 11 μόνο 1–2 τιμές
+    });
+    test('Έλεγχος 19/11 (L-4): Δε/Τε/Πα με μία Τετάρτη που λείπει → η γραμμή δεν κόβεται', () {
+      // Δε 30/11 = _d(0)· λείπει η Τε 9/12 (_d(9)).
+      final days = [0, 2, 4, 7, 11, 14, 16, 18];
+      final a = average7Days([for (final n in days) (_d(n), 82.0 - n / 10)]);
+      expect(a.map((p) => p.$1), [for (final n in [4, 7, 11, 14, 16, 18]) _d(n)]);
     });
     test('λίγες τιμές: κενή λίστα', () {
       expect(average7Days([(_d(0), 90.0), (_d(1), 89.0)]), isEmpty);

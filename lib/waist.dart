@@ -82,9 +82,11 @@ List<Map<String, dynamic>> mergeWaist(Object? device, Object? backup) {
 /// 17/11 (απόφαση χρήστη): λόγος μέσης/ύψους, NICE NG246 (2025): 0,40–0,49 υγιές, 0,50–0,59 αυξημένος κίνδυνος για την
 /// υγεία, 0,60 και πάνω ακόμα πιο αυξημένος· για ενήλικες με ΔΜΣ κάτω από 35, κάθε φύλου και καταγωγής. Η κρίση γίνεται
 /// με τον λόγο όπως φαίνεται (δύο δεκαδικά). null χωρίς ύψος.
+/// Έλεγχος 19/11 (L-12): αποκοπή, όχι στρογγύλεμα· πριν, 88 cm στα 177 (0,497) γράφονταν «0,50 · αυξημένος κίνδυνος».
+/// Ο αριθμός και η κρίση συμφωνούν πάντα, και κανένας λόγος κάτω από ένα όριο δεν κρίνεται πάνω από αυτό.
 String? waistHeightText(double waistCm, double? heightCm) {
   if (heightCm == null || heightCm < 100 || heightCm > 250) return null;
-  final r = (waistCm / heightCm * 100).round() / 100;
+  final r = (waistCm / heightCm * 100 + 1e-9).floor() / 100;
   final shown = r.toStringAsFixed(2).replaceAll('.', ',');
   final verdict = r < 0.40
       ? 'κάτω από το 0,40'

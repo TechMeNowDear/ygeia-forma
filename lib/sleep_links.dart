@@ -17,7 +17,17 @@
 ///   αλλάζει η εβδομάδα (δουλειά, Σαββατοκύριακο).
 ///
 /// Η ώρα του φαγητού είναι η ώρα που **γράφτηκε**: μετρά μόνο μέρα με «Τελείωσα για σήμερα» ([DayMark.done]) και όλες
-/// τις καταχωρίσεις γραμμένες από τα μεσάνυχτα της μέρας ως την ώρα του ύπνου. Οι θερμίδες βραδινού μόνο σε μέρα με
+/// τις καταχωρίσεις γραμμένες από τα μεσάνυχτα της μέρας ως την ώρα του ύπνου.
+///
+/// Έλεγχος 19/11 (sleep136):
+/// - SL-1: «ώρες από το τελευταίο φαγητό» και «διάρκεια ύπνου» βγαίνουν και τα δύο από την ώρα ύπνου (όσο πιο αργά
+///   ξαπλώνεις, τόσο μεγαλύτερο το κενό και τόσο λιγότερος ο ύπνος): «συνδέονταν» στο 100% των προσομοιώσεων χωρίς καμία
+///   επίδραση. Τώρα: μερική Spearman με σταθερή την ώρα ύπνου (ψεύτικα 1% στην προσομοίωση). Και το «ώρα ύπνου × διάρκεια»
+///   (αριθμητική, όχι εύρημα) δεν ελέγχεται.
+/// - SL-2: η συσχέτιση μετριέται στα ίδια υπόλοιπα με την αυτοσυσχέτιση (χωρίς τον μέσο όρο κάθε κομματιού 28 ημερών):
+///   μια αλλαγή επιπέδου (δίαιτα, γιορτές) έβγαζε ψεύτικη σύνδεση στο 14–69% των προσομοιώσεων· τώρα 1–2%.
+/// - SL-3: «γράφτηκε» = η πραγματική ώρα της εγγραφής (από το id της καταχώρισης), όχι η ώρα της μέρας της· πριν, ένα βραδινό
+///   γραμμένο το επόμενο πρωί έπαιρνε πρωινή ώρα της ίδιας μέρας και το «κενό» έβγαινε 6 ή 14 ώρες αντί για 2,5. Οι θερμίδες βραδινού μόνο σε μέρα με
 /// «Τελείωσα για σήμερα» (αλλιώς ένα βραδινό που δεν γράφτηκε θα μετρούσε 0).
 library;
 
@@ -142,10 +152,12 @@ SleepLinksResult sleepLinks({
       if (es.isNotEmpty) {
         cause[LinkCause.dinnerKcal] = Totals(es.where((e) => e.meal == Meal.dinner)).kcal;
         if (bed != null) {
-          final bedAt = DateTime(prev.year, prev.month, prev.day, 18).add(Duration(minutes: bed.round()));
+          // Ώρα τοίχου (SL-6): η αλλαγή ώρας δεν μετακινεί τον ύπνο μία ώρα.
+          final bedAt = DateTime(prev.year, prev.month, prev.day, 18, bed.round());
           final dayStart = DateTime(prev.year, prev.month, prev.day);
           // Όλες γραμμένες από τα μεσάνυχτα της μέρας ως τον ύπνο· αλλιώς η ώρα δεν λέει πότε έφαγες.
-          if (es.every((e) => !e.time.isBefore(dayStart) && e.time.isBefore(bedAt))) {
+          bool inDay(DateTime x) => !x.isBefore(dayStart) && x.isBefore(bedAt);
+          if (es.every((e) => inDay(e.time) && inDay(writtenAt(e)))) {
             final last = es.map((e) => e.time).reduce((a, b) => a.isAfter(b) ? a : b);
             cause[LinkCause.mealGap] = bedAt.difference(last).inMinutes / 60;
           }
@@ -159,9 +171,11 @@ SleepLinksResult sleepLinks({
   final tested = <SleepLink>[];
   for (final c in LinkCause.values) {
     for (final s in LinkSleep.values) {
+      // SL-1: η διάρκεια βγαίνει από την ώρα ύπνου· η σύγκριση τους είναι αριθμητική, όχι εύρημα.
+      if (c == LinkCause.bedtime && s == LinkSleep.sleepMin) continue;
       final pts = [
         for (final r in rows)
-          if (r.cause[c] != null && r.sleep[s] != null) (r.night, r.cause[c]!, r.sleep[s]!),
+          if (r.cause[c] != null && r.sleep[s] != null) (r.night, r.cause[c]!, r.sleep[s]!, r.cause[LinkCause.bedtime]),
       ];
       most = math.max(most, pts.length);
       if (pts.length < sleepLinkMinNights) continue;
@@ -199,14 +213,49 @@ SleepLinksResult sleepLinks({
   return SleepLinksResult(nights: most, links: out);
 }
 
-SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double)> pts) {
+/// Η πραγματική ώρα που γράφτηκε μια καταχώριση (SL-3): το id ξεκινά με τα μικροδευτερόλεπτα της εγγραφής
+/// ([FoodStore] `_newId`). Χωρίς τέτοιο id (π.χ. δοκιμές): η ώρα της.
+DateTime writtenAt(LogEntry e) {
+  final dash = e.id.indexOf('-');
+  final us = dash > 0 ? int.tryParse(e.id.substring(0, dash)) : null;
+  // Λογικά όρια (2020–2100): αλλιώς δεν είναι ώρα.
+  if (us == null || us < 1577836800000000 || us > 4102444800000000) return e.time;
+  return DateTime.fromMicrosecondsSinceEpoch(us);
+}
+
+/// Χωρίς τον μέσο όρο κάθε κομματιού 28 ημερών (SL-2): μια αλλαγή επιπέδου δεν μετρά ούτε ως «νύχτες που μοιάζουν» ούτε
+/// ως σύνδεση.
+List<double> _residuals(List<DateTime> days, List<double> v) {
+  final b = [for (final d in days) daysBetween(days.first, d) ~/ 28];
+  final sum = <int, double>{}, cnt = <int, int>{};
+  for (var i = 0; i < v.length; i++) {
+    sum[b[i]] = (sum[b[i]] ?? 0) + v[i];
+    cnt[b[i]] = (cnt[b[i]] ?? 0) + 1;
+  }
+  return [for (var i = 0; i < v.length; i++) v[i] - sum[b[i]]! / cnt[b[i]]!];
+}
+
+SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double, double?)> pts) {
+  final days = [for (final p in pts) p.$1];
   final xs = [for (final p in pts) p.$2];
   final ys = [for (final p in pts) p.$3];
   final split = _median(xs);
   final low = [for (final p in pts) if (p.$2 <= split) p.$3];
   final high = [for (final p in pts) if (p.$2 > split) p.$3];
   if (low.length < sleepLinkMinGroup || high.length < sleepLinkMinGroup) return null;
-  final rho = _pearson(_ranks(xs), _ranks(ys));
+  final rx = _ranks(_residuals(days, xs)), ry = _ranks(_residuals(days, ys));
+  var rho = _pearson(rx, ry);
+  // SL-1: το κενό ως το φαγητό βγαίνει από την ώρα ύπνου· με σταθερή την ώρα ύπνου (μερική συσχέτιση), ένας βαθμός
+  // ελευθερίας λιγότερο.
+  var lost = 2;
+  if (c == LinkCause.mealGap && pts.every((p) => p.$4 != null)) {
+    final rz = _ranks(_residuals(days, [for (final p in pts) p.$4!]));
+    final a = _pearson(rx, rz), b = _pearson(ry, rz);
+    final d = (1 - a * a) * (1 - b * b);
+    if (d <= 1e-9) return null;
+    rho = ((rho - a * b) / math.sqrt(d)).clamp(-1.0, 1.0);
+    lost = 3;
+  }
   final n = pts.length;
   // Αυτοσυσχέτιση κάθε σειράς, σε κομμάτια 28 ημερών (μια αλλαγή επιπέδου δεν μετρά ως «νύχτες που μοιάζουν»).
   double phiOf(List<(DateTime, double)> v) {
@@ -225,7 +274,7 @@ SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double)> pts)
   final fx = phiOf([for (final p in pts) (p.$1, p.$2)]);
   final fy = phiOf([for (final p in pts) (p.$1, p.$3)]);
   final nEff = n * (1 - fx * fy) / (1 + fx * fy);
-  final df = nEff - 2;
+  final df = nEff - lost;
   double p;
   if (rho.abs() >= 0.999999) {
     p = 0;
