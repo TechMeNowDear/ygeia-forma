@@ -33,12 +33,22 @@ class Profile {
   /// Η μέρα που το έκοψες, μόνο με «ex».
   DateTime? get quitDate => smoke == 'ex' && quit != null ? DateTime.tryParse(quit!) : null;
 
+  /// Έλεγχος 19/11 (L-10): μέρα «2026-02-30» δεν υπάρχει (το Dart τη γυρνά σε 2 Μαρτίου).
+  static bool _dayKey(String s) {
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(s)) return false;
+    final d = DateTime.tryParse(s);
+    return d != null &&
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}' == s;
+  }
+
   /// Πακέτα-έτη: τσιγάρα τη μέρα ÷ 20 × χρόνια καπνίσματος (ως σήμερα, ή ως τη μέρα που το έκοψες). null αν λείπει κάτι.
   double? packYears(DateTime today) {
     if (smoke != 'now' && smoke != 'ex') return null;
     final c = cigs, from = smokeFrom;
     if (c == null || from == null) return null;
-    final end = smoke == 'ex' ? quitDate : today;
+    // Μέρα διακοπής στο μέλλον (μόνο από πειραγμένο αρχείο· το ημερολόγιο δεν την επιτρέπει): ως σήμερα (L-10).
+    final q = quitDate;
+    final end = smoke == 'ex' ? (q != null && q.isAfter(today) ? today : q) : today;
     final age = end == null ? null : ageOn(end);
     if (age == null || age < from) return null;
     return c / 20 * (age - from);
@@ -117,6 +127,8 @@ class Profile {
         if (quit != null) 'quit': quit,
       };
 
+  static bool _smokesIn(Map j) => j['smk'] == 'now' || j['smk'] == 'ex';
+
   static Profile fromJson(Object? j) {
     if (j is! Map) return const Profile();
     // Τελικός έλεγχος (Συμβούλιο 3): 1e999 στο JSON γίνεται «άπειρο» και το toInt() πετά σφάλμα· «Τα στοιχεία μου»
@@ -146,12 +158,11 @@ class Profile {
       weighDays: days,
       waistDay: day(wad) ? wad! : (day(wd) ? wd! : DateTime.friday),
       smoke: const {'no', 'now', 'ex'}.contains(j['smk']) ? j['smk'] as String : null,
-      cigs: i(j['cig']) != null && i(j['cig'])! >= 1 && i(j['cig'])! <= 80 ? i(j['cig']) : null,
-      smokeFrom: i(j['smf']) != null && i(j['smf'])! >= 8 && i(j['smf'])! <= 80 ? i(j['smf']) : null,
-      quit: j['quit'] is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(j['quit'] as String) &&
-              DateTime.tryParse(j['quit'] as String) != null
-          ? j['quit'] as String
-          : null,
+      // Έλεγχος 19/11 (L-9): τσιγάρα/ηλικία μόνο με «now»/«ex», μέρα διακοπής μόνο με «ex» (όπως τα γράφει το withSmoking·
+      // αλλιώς μια παλιά μέρα διακοπής από ενωμένο αντίγραφο ξαναέβγαινε στο επόμενο «Το έκοψα»).
+      cigs: _smokesIn(j) && i(j['cig']) != null && i(j['cig'])! >= 1 && i(j['cig'])! <= 80 ? i(j['cig']) : null,
+      smokeFrom: _smokesIn(j) && i(j['smf']) != null && i(j['smf'])! >= 8 && i(j['smf'])! <= 80 ? i(j['smf']) : null,
+      quit: j['smk'] == 'ex' && j['quit'] is String && _dayKey(j['quit'] as String) ? j['quit'] as String : null,
     );
   }
 }

@@ -32,7 +32,9 @@ const goalsInfo = MetricInfo(
       'πραγματικά, και κάθε εβδομάδα η εφαρμογή ελέγχει τον στόχο. Προτείνει διόρθωση (το πολύ 150 kcal τη φορά) μόνο όταν '
       'η διαφορά ξεπερνά το φυσιολογικό εύρος των ζυγίσεων. Αλλάζει μόνο όταν πατήσεις «Εφάρμοσε».',
   // Έλεγχος 13/11 (S1-12): η EFSA δίνει εύρος 20–35% για τα λιπαρά· το κάτω όριο 25% είναι δική μας επιλογή μέσα σε αυτό.
-  compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018), 1,8 όταν χάνεις λίπος (ISSN 2017) ·\u00A0λιπαρά 25–35% των θερμίδων (μέσα στο εύρος 20–35% της EFSA) ·\u00A0κορεσμένα '
+  compare: 'Πρωτεΐνη 1,6 g ανά κιλό (Morton 2018), 1,8 όταν χάνεις λίπος (μέσα στο 1,4–2,0 της ISSN 2017)· με ΔΜΣ πάνω από 30, ανά κιλό '
+      'του βάρους στο ΔΜΣ 30. Αν έχεις πρόβλημα στα νεφρά (π.χ. eGFR κάτω από 60 ή λεύκωμα στα ούρα), ρώτα τον γιατρό πριν '
+      'από τόση πρωτεΐνη ·\u00A0λιπαρά 25–35% των θερμίδων (μέσα στο εύρος 20–35% της EFSA) ·\u00A0κορεσμένα '
       'λιπαρά έως 6% όταν ο γιατρός ζητά να πέσει η LDL (AHA/ACC· η ESC/EAS 2019 λέει κάτω από 7%), αλλιώς κάτω από 10% (Π.Ο.Υ. 2023) ·\u00A0φυτικές ίνες 30 g '
       '(Reynolds 2019) ·\u00A0αλάτι κάτω από 5 g (Π.Ο.Υ.).',
   // Έλεγχος 17/11 (Κ1, επιστήμη): το 7.700 kcal το κιλό είναι προσέγγιση (Hall 2008), όχι σταθερά· γράφεται έτσι.
@@ -63,6 +65,10 @@ class GoalsWizard extends StatefulWidget {
 }
 
 enum _Step { data, aim, rate, activity, doctor, summary }
+
+/// Έλεγχος 19/11 (W-1): από πότε μετρούν οι στόχοι. [keep]: συνεχίζει η αρχή των παλιών στόχων (ίδιος σκοπός)· [today]·
+/// [monday]: η επόμενη Δευτέρα (π.χ. ξεκινάς δίαιτα τη Δευτέρα 23/11).
+enum _Start { keep, today, monday }
 
 /// Βάρος όπως γράφεται: ως 3 ψηφία και, αν θέλεις, κόμμα ή τελεία με 1–2 δεκαδικά.
 final _kgPattern = RegExp(r'^\d{1,3}(?:[.,]\d{1,2})?$');
@@ -97,6 +103,12 @@ class _GoalsWizardState extends State<GoalsWizard> {
   late DoctorTargets _targets = _old?.docTargets ?? const DoctorTargets();
   final _kg = TextEditingController();
   int _i = 0;
+
+  /// Έλεγχος 19/11 (W-1): η αρχή που διάλεξες στη σύνοψη· null = η προεπιλογή ([_startNow]).
+  _Start? _start;
+
+  /// Έλεγχος 19/11 (W-2): κρατά τον δικό σου αριθμό θερμίδων/πρωτεΐνης· null = η προεπιλογή ([_keepOwnNow]).
+  bool? _keepOwn;
 
   DateTime get _now => widget.now ?? DateTime.now();
 
@@ -166,6 +178,50 @@ class _GoalsWizardState extends State<GoalsWizard> {
     return age >= 0 && age <= _freshEstimateDays ? te : null;
   }
 
+  DateTime get _today => DateTime(_now.year, _now.month, _now.day);
+
+  /// Η επόμενη Δευτέρα (null αν σήμερα είναι Δευτέρα).
+  DateTime? get _nextMonday {
+    final t = _today;
+    if (t.weekday == DateTime.monday) return null;
+    return DateTime(t.year, t.month, t.day + (8 - t.weekday));
+  }
+
+  /// Μπορεί να συνεχίσει η αρχή των παλιών στόχων: ίδιος σκοπός, και πρόσφατη εκτίμηση ή πρόσφατη αρχή (R7-A1-3).
+  bool get _canKeep {
+    final o = _old;
+    if (o == null || o.aim != _aim) return false;
+    final oldSince = DateTime.tryParse(o.since);
+    final recent = oldSince != null && daysBetween(oldSince, _now) <= _freshEstimateDays;
+    return _freshTdee != null || recent;
+  }
+
+  /// Οι παλιοί στόχοι έχουν ήδη μαζέψει κάτι που θα χανόταν με νέα αρχή: εκτίμηση, έλεγχο με εκτίμηση, ή μέρες φαγητού
+  /// που μετρούν (V-1). Μόνο τότε η προεπιλογή είναι «Συνεχίζω».
+  bool get _oldCollected {
+    final o = _old;
+    if (o == null) return false;
+    // Εκτίμηση, κάρτα ελέγχου ή βήμα «γρήγορης απώλειας» με αυτούς τους στόχους: έχουν ήδη ζυγίσεις και φαγητό.
+    if (_freshTdee != null || o.checkIn != null || o.fastAt != null || o.log.any((l) => l.day.compareTo(o.since) >= 0)) return true;
+    final f = FoodStore.shared;
+    if (f == null || !f.loaded) return false;
+    return readiness(goals: o, today: _now, weights: const [], intake: (a, b) => dailyIntake(f, a, b)).intakeDays > 0;
+  }
+
+  _Start get _startNow {
+    final s = _start;
+    if (s == _Start.keep && !_canKeep) return _Start.today;
+    if (s == _Start.monday && _nextMonday == null) return _Start.today;
+    if (s != null) return s;
+    // Έλεγχος 19/11 (V-1): μια δίαιτα που δεν έχει αρχίσει δεν παίρνει ποτέ σιωπηλά παλιά αρχή. Την Κυριακή: η Δευτέρα.
+    if (_canKeep && _oldCollected) return _Start.keep;
+    return _today.weekday == DateTime.sunday ? _Start.monday : _Start.today;
+  }
+
+  /// Ο δικός σου αριθμός μένει από προεπιλογή όταν ο σκοπός δεν άλλαξε (ένας αριθμός για «λιγότερο λίπος» δεν ταιριάζει
+  /// στο «ίδιο βάρος»).
+  bool get _keepOwnNow => _keepOwn ?? (_old?.aim == _aim);
+
   /// Οι στόχοι που θα αποθηκευτούν με όσα έχουν απαντηθεί ως τώρα (null όσο λείπει κάτι). Η σύνοψη δείχνει ακριβώς αυτούς.
   ///
   /// Έλεγχος 13/11 (S1-11). Πριν, το «Ξανά ο οδηγός» πετούσε σιωπηλά τον στόχο και την εκτίμηση από τα δεδομένα σου και
@@ -188,10 +244,12 @@ class _GoalsWizardState extends State<GoalsWizard> {
     final o = _old;
     final te = _freshTdee;
     // Οι παλιοί στόχοι, μόνο όταν ο έλεγχος συνεχίζει στις ίδιες μέρες: ίδιος σκοπός, και πρόσφατη εκτίμηση ή πρόσφατη
-    // αρχή (R7-A1-3).
-    final oldSince = o == null ? null : DateTime.tryParse(o.since);
-    final recent = oldSince != null && daysBetween(oldSince, _now) <= _freshEstimateDays;
-    final same = o != null && o.aim == _aim && (te != null || recent) ? o : null;
+    // αρχή (R7-A1-3)· και (έλεγχος 19/11, W-1) μόνο αν δεν διάλεξες νέα αρχή. Πριν, οι στόχοι της 11/11 κρατούσαν την
+    // αρχή τους και η 1η εβδομάδα της δίαιτας (νερά) μετρούσε: ψεύτικη «γρήγορη απώλεια» +150.
+    final start = _startNow;
+    final same = start == _Start.keep ? o : null;
+    final startDay = start == _Start.monday ? _nextMonday! : _today;
+    final own = _keepOwnNow;
     final kept = keptKcalAdapt(
         old: o, calc: calc, male: p.male, age: age, heightCm: h, oldActivity: o == null ? null : currentActivityLevel(o.activity));
     return Goals(
@@ -199,12 +257,15 @@ class _GoalsWizardState extends State<GoalsWizard> {
       rate: _rateValue,
       activity: activityLevels[_activity],
       doctor: _doctor == true,
-      since: same?.since ?? '${_now.year}-${two(_now.month)}-${two(_now.day)}',
+      since: same?.since ?? '${startDay.year}-${two(startDay.month)}-${two(startDay.day)}',
       kg: kg,
       age: age,
       heightCm: h,
       male: p.male,
-      // Ό,τι είχες αλλάξει στη χοληστερίνη μένει· οι θερμίδες/πρωτεΐνη ξαναϋπολογίζονται.
+      // Ό,τι είχες αλλάξει στη χοληστερίνη μένει. Ο δικός σου αριθμός θερμίδων/πρωτεΐνης μένει, εκτός αν πατήσεις «Πάρε τον
+      // υπολογισμό» (έλεγχος 19/11, W-2: πριν χανόταν σιωπηλά, π.χ. 2.090 → 2.410).
+      kcalSet: own ? o?.kcalSet : null,
+      proteinSet: own ? o?.proteinSet : null,
       nutsG: o?.nutsG ?? defaultNutsG,
       branG: o?.branG ?? defaultBranG,
       betaPer100: o?.betaPer100,
@@ -411,7 +472,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
         final kgNow = _weight, cm = p.heightCm;
         final bmi = kgNow == null || cm == null || cm <= 0 ? null : kgNow / ((cm / 100) * (cm / 100));
         return [
-          _q(context, 'Τι θέλεις πρώτα;', 'Αλλάζει μόνο τις θερμίδες. Η πρωτεΐνη μένει ίδια, τα κορεσμένα ίδιο ποσοστό.'),
+          _q(context, 'Τι θέλεις πρώτα;', 'Αλλάζει τις θερμίδες, και στο «Λιγότερο λίπος» λίγο περισσότερη πρωτεΐνη '
+              '(1,8 αντί για 1,6 g ανά κιλό), για να μείνουν οι μύες. Τα κορεσμένα μένουν ίδιο ποσοστό.'),
           _Opt(
             k: 'aim-lose',
             on: _aim == GoalAim.lose,
@@ -536,6 +598,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
             heightCm: d.heightCm,
             oldActivity: o == null ? null : currentActivityLevel(o.activity));
         final fromData = kept != null;
+        final ownKept = d.kcalSet != null;
         final floored = kept != null ? kept.floored : g.floored;
         final sinceDay = DateTime.parse(d.since);
         final weekday = weekdayNames[sinceDay.weekday - 1];
@@ -562,14 +625,19 @@ class _GoalsWizardState extends State<GoalsWizard> {
               BigValue(thousands(d.kcal), unit: 'kcal', size: 44),
               const SizedBox(height: 6),
               Text(
-                _aim == GoalAim.keep
-                    ? (fromData ? 'όσες καις κατά τον τύπο, περίπου ${thousands(g.tdee)}' : 'όσες καις, περίπου ${thousands(g.tdee)}')
-                    : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} ·\u00A0'
-                        '${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
+                // V-6: με δικό σου αριθμό, ο ρυθμός του οδηγού δεν αλλάζει τίποτα· γράφεται τι σημαίνει ο αριθμός σου.
+                ownKept
+                    ? 'ο δικός σου αριθμός ·\u00A0με τον τύπο (${thousands(g.tdee)}) περίπου '
+                        '${dec((g.tdee - d.kcal).abs() / kcalPerKg * 7, 2)} kg την εβδομάδα ${d.kcal < g.tdee ? 'λιγότερα' : 'περισσότερα'}'
+                    : _aim == GoalAim.keep
+                        ? (fromData ? 'όσες καις κατά τον τύπο, περίπου ${thousands(g.tdee)}' : 'όσες καις, περίπου ${thousands(g.tdee)}')
+                        : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} ·\u00A0'
+                            '${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
+                key: const ValueKey('wizard-kcal-line'),
                 style: small,
               ),
               // S1-11 / R8-A1-2: ο στόχος από τα δεδομένα σου μένει, και η οθόνη το λέει.
-              if (fromData)
+              if (fromData && !ownKept)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
@@ -584,6 +652,29 @@ class _GoalsWizardState extends State<GoalsWizard> {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text('Ο στόχος αλλάζει από ${thousands(o.kcal)} σε ${thousands(d.kcal)} kcal.',
                       key: const ValueKey('wizard-change'), style: small),
+                ),
+              // Έλεγχος 19/11 (W-2): ο δικός σου αριθμός μένει, και η οθόνη λέει τι θα έδινε ο υπολογισμός.
+              if (o != null && (o.kcalSet != null || o.proteinSet != null))
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                        _keepOwnNow
+                            ? 'Μένει ο δικός σου αριθμός'
+                                '${o.kcalSet != null ? ' ${thousands(o.kcalSet!)} kcal' : ''}'
+                                '${o.kcalSet != null && o.proteinSet != null ? ' και' : ''}'
+                                '${o.proteinSet != null ? ' ${o.proteinSet} g πρωτεΐνη' : ''}. Ο υπολογισμός λέει '
+                                '${thousands(kept?.kcal ?? g.kcal)} kcal και ${g.protein} g.'
+                            : 'Ο δικός σου αριθμός'
+                                '${o.kcalSet != null ? ' (${thousands(o.kcalSet!)} kcal)' : ''} δεν μένει: ισχύει ο υπολογισμός.',
+                        key: const ValueKey('wizard-own'),
+                        style: small),
+                    TextButton(
+                      key: const ValueKey('wizard-own-toggle'),
+                      onPressed: () => setState(() => _keepOwn = !_keepOwnNow),
+                      child: Text(_keepOwnNow ? 'Πάρε τον υπολογισμό' : 'Κράτα τον δικό μου αριθμό'),
+                    ),
+                  ]),
                 ),
               if (floored)
                 Padding(
@@ -603,6 +694,45 @@ class _GoalsWizardState extends State<GoalsWizard> {
               const Hairline(vertical: 12),
               // U3b-23: με τι υπολογίστηκαν, για να φανεί ένα λάθος βάρος πριν από την αποθήκευση.
               InfoRow('Υπολογίστηκαν με', '${dec(d.kg)} kg ·\u00A0${activityText(d.activity).toLowerCase()}'),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          // Έλεγχος 19/11 (W-1, W-4): από πότε μετρούν οι στόχοι. Η πρώτη εβδομάδα από την αρχή δεν μετρά (νερά), και ο
+          // έλεγχος γίνεται κάθε εβδομάδα την ίδια μέρα με την αρχή.
+          AppCard(
+            key: const ValueKey('wizard-start'),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Από πότε ξεκινάς;', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                if (_canKeep && o != null)
+                  ChoiceChip(
+                    key: const ValueKey('wizard-start-keep'),
+                    label: Text('Συνεχίζω (από ${_dm(o.since)})'),
+                    selected: _startNow == _Start.keep,
+                    onSelected: (_) => setState(() => _start = _Start.keep),
+                  ),
+                ChoiceChip(
+                  key: const ValueKey('wizard-start-today'),
+                  label: const Text('Σήμερα'),
+                  selected: _startNow == _Start.today,
+                  onSelected: (_) => setState(() => _start = _Start.today),
+                ),
+                if (_nextMonday != null)
+                  ChoiceChip(
+                    key: const ValueKey('wizard-start-monday'),
+                    label: Text('Δευτέρα ${_nextMonday!.day}/${_nextMonday!.month}'),
+                    selected: _startNow == _Start.monday,
+                    onSelected: (_) => setState(() => _start = _Start.monday),
+                  ),
+              ]),
+              const SizedBox(height: 6),
+              Text(
+                  _startNow == _Start.keep
+                      ? 'Ίδιες μέρες ελέγχου με πριν. Διάλεξε νέα αρχή αν τώρα ξεκινάς στ’ αλήθεια τη δίαιτα: η πρώτη '
+                          'εβδομάδα (νερά) δεν πρέπει να μετρήσει.'
+                      : 'Η πρώτη εβδομάδα από ${dayMonth(sinceDay)} δεν μετρά (φεύγουν νερά). Ο έλεγχος θα γίνεται κάθε $weekday.',
+                  style: small),
             ]),
           ),
           const SizedBox(height: 12),
@@ -1101,6 +1231,8 @@ class GoalsPage extends StatelessWidget {
     if (r != null) {
       final gap = r.gap;
       final restart = gap?.restart;
+      final since = DateTime.tryParse(g.since);
+      final countFrom = since == null ? null : DateTime(since.year, since.month, since.day + 7);
       // R7-A1-2: έλεγχος που έγινε (από την 28η μέρα) χωρίς να βγει εκτίμηση, π.χ. «κάτι λείπει»: η κάρτα το λέει, αντί να
       // δείχνει «όλα έτοιμα» και την επόμενη μέρα σαν σίγουρη.
       final ci = g.checkIn == null ? null : DateTime.tryParse(g.checkIn!);
@@ -1111,9 +1243,16 @@ class GoalsPage extends StatelessWidget {
           Text(nextLabel == 'Πρώτη εκτίμηση' ? 'Πριν από την πρώτη εκτίμηση' : 'Πριν από την επόμενη εκτίμηση', style: title),
           const SizedBox(height: 2),
           // R7-U2-18: «η πρώτη εβδομάδα δεν μετρά» μία φορά, στο κείμενο κάτω.
-          Text('Τι έχει μαζευτεί ως χθες:', style: small),
-          InfoRow('Μέρες με φαγητό', '${r.intakeDays} από $adaptMinIntakeDays'),
-          InfoRow('Ζυγίσεις', '${r.weighIns} από $adaptMinWeighIns'),
+          // Έλεγχος 19/11 (W-6): την πρώτη εβδομάδα «0 από 14» έμοιαζε με χαμένη καταγραφή· τώρα λέει από πότε μετρούν.
+          if (countFrom != null && !dayOf(today).isAfter(countFrom))
+            Text('Οι μέρες μετράνε από ${weekdayNames[countFrom.weekday - 1]} ${dayMonth(countFrom)}: η πρώτη εβδομάδα δεν '
+                'μετρά (φεύγουν νερά). Γράφε κανονικά από τώρα.',
+                key: const ValueKey('goals-adapt-first-week'), style: small)
+          else ...[
+            Text('Τι έχει μαζευτεί ως χθες:', style: small),
+            InfoRow('Μέρες με φαγητό', '${r.intakeDays} από $adaptMinIntakeDays'),
+            InfoRow('Ζυγίσεις', '${r.weighIns} από $adaptMinWeighIns'),
+          ],
           // R8-A1-6: αρκετές ζυγίσεις, αλλά μαζεμένες σε λίγες μέρες: ο έλεγχος θέλει και 2 εβδομάδες από την πρώτη ως την
           // τελευταία (όπως λέει και η κάρτα «λίγα δεδομένα»). Πριν, «8 από 6» έμοιαζε έτοιμο.
           if (r.weighIns >= adaptMinWeighIns && r.weighSpan < adaptMinSpanDays)

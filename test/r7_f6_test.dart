@@ -383,6 +383,12 @@ void main() {
       await t.pumpAndSettle();
       await _next(t); // → γιατρός (το «Ναι» είναι ήδη επιλεγμένο από τους παλιούς στόχους)
       await _next(t); // → σύνοψη
+      // Έλεγχος 19/11 (V-1): χωρίς δεδομένα η προεπιλογή είναι νέα αρχή· εδώ η δίαιτα συνεχίζει, άρα «Συνεχίζω».
+      if (find.byKey(const ValueKey('wizard-start-keep')).evaluate().isNotEmpty) {
+        await t.ensureVisible(find.byKey(const ValueKey('wizard-start-keep')));
+        await t.tap(find.byKey(const ValueKey('wizard-start-keep')));
+        await t.pumpAndSettle();
+      }
       return store;
     }
 

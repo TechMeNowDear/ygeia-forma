@@ -10,7 +10,12 @@ import 'package:ygeia_forma/theme.dart';
 void main() {
   test('κείμενο μεγέθους', () {
     expect(cloudBackupText(3355443), 'Αντίγραφο Google: 3,2 MB από 25 MB');
-    expect(cloudBackupText(21 * 1024 * 1024), 'Αντίγραφο Google: 21 MB από 25 MB');
+    expect(cloudBackupText(21 * 1024 * 1024), 'Αντίγραφο Google: 21,0 MB από 25 MB');
+    // Έλεγχος 19/11 (CB-3): κάτω από το όριο ποτέ «25 από 25».
+    expect(cloudBackupText(25 * 1024 * 1024 - 1000), 'Αντίγραφο Google: 24,9 MB από 25 MB');
+    expect(cloudBackupText((24.6 * 1024 * 1024).round()), 'Αντίγραφο Google: 24,6 MB από 25 MB');
+    expect(cloudBackupText(25 * 1024 * 1024 + 1000), 'Αντίγραφο Google: 25,1 MB από 25 MB');
+    expect(cloudBackupText(26 * 1024 * 1024), 'Αντίγραφο Google: 26,0 MB από 25 MB');
   });
 
   test('buildBackupFrom = buildBackup (ίδια ορίσματα, ίδιο αρχείο)', () {
@@ -58,7 +63,7 @@ void main() {
     await t.pumpWidget(app(const CloudBackupWarningCard(key: ValueKey('x'))));
     await t.pump();
     expect(find.byKey(const ValueKey('today-cloud-size')), findsOneWidget);
-    expect(find.text('Αντίγραφο Google: 22 MB από 25 MB.'), findsOneWidget);
+    expect(find.text('Αντίγραφο Google: 22,0 MB από 25 MB.'), findsOneWidget);
   });
 
   testWidgets('Ρυθμίσεις: γραμμή μεγέθους· χωρίς μέτρηση τίποτα', (t) async {

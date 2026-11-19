@@ -1187,8 +1187,22 @@ Map<String, dynamic> mergePrefsForRestore(Map<String, dynamic> mine, Map<String,
       if (backup['waist'] != null || mine['waist'] != null) 'waist': mergeWaist(mine['waist'], backup['waist']),
       if (mine['goals'] != null) 'goals': mine['goals'],
       if (mine['zone'] != null) 'zone': mergeZoneForRestore(mine['zone'], backup['zone']),
-      if (mine['me'] is Map) 'me': {if (backup['me'] is Map) ...(backup['me'] as Map), ...(mine['me'] as Map)},
+      if (mine['me'] is Map) 'me': mergeMeForRestore(mine['me'] as Map, backup['me']),
     };
+
+/// «Τα στοιχεία μου» μετά από επαναφορά: του κινητού, και όποιο πεδίο λείπει από το αντίγραφο. Το κάπνισμα όμως είναι
+/// ΜΙΑ απάντηση (έλεγχος 19/11, L-9): αν το κινητό έχει απαντήσει, όλα τα πεδία του (ναι/όχι, τσιγάρα, ηλικία, μέρα
+/// διακοπής) μένουν του κινητού· πριν ένα «Καπνίζω» του κινητού έπαιρνε τη μέρα διακοπής ενός παλιού αντιγράφου.
+Map<dynamic, dynamic> mergeMeForRestore(Map mine, Object? backup) {
+  const smoking = {'smk', 'cig', 'smf', 'quit'};
+  final b = backup is Map ? backup : const {};
+  final mineAnswered = mine['smk'] != null;
+  return {
+    for (final e in b.entries)
+      if (!(mineAnswered && smoking.contains(e.key))) e.key: e.value,
+    ...mine,
+  };
+}
 
 /// Round 1 (S9-11): η ζώνη περπατήματος μετά από επαναφορά, όταν το κινητό έχει ήδη δική του ([mine]). Όπως στα
 /// «στοιχεία μου»: ό,τι έχει το κινητό μένει, και οι ΜΕΤΡΗΣΕΙΣ που του λείπουν έρχονται από το αντίγραφο ([backup]): οι

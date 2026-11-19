@@ -22,6 +22,7 @@ import 'hr_widgets.dart';
 import 'program_paste.dart';
 import 'progress_page.dart';
 import 'session_page.dart';
+import 'today_training_card.dart' show TodayTrainingCard;
 import 'training_common.dart';
 import 'zone_widgets.dart';
 
@@ -412,6 +413,27 @@ class _TrainingPageState extends State<TrainingPage> {
       ]);
     } else {
       children.add(FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(w.name, maxLines: 1, style: title)));
+      // Έλεγχος 19/11 (W-8): η προπόνηση της μέρας έγινε. Πριν η κάρτα έλεγε ξανά «Ξεκίνα την προπόνηση», με τους στόχους της
+      // ΕΠΟΜΕΝΗΣ φοράς, ενώ η Σήμερα έλεγε «Έγινε».
+      final done = TodayTrainingCard.doneToday(t, _now);
+      if (done != null && !done.isCardio) {
+        children.add(InkWell(
+          key: const ValueKey('train-done-today'),
+          onTap: () => Navigator.of(context).push(SummaryPage.route(t, done)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(children: [
+              Icon(Icons.check_circle_rounded, size: 20, color: c.good),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text('Έγινε σήμερα ·\u00A0${countText(done.setsDone, 'σετ', 'σετ')}. Δες τη σύνοψη',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.text))),
+              Icon(Icons.chevron_right_rounded, color: c.textSecondary),
+            ]),
+          ),
+        ));
+        children.add(Text('Την επόμενη φορά:', key: const ValueKey('train-next-time'), style: aux));
+      }
       // Round 11 (R11-C2-2): όπως η γραμμή του περπατήματος και η κάρτα της Σήμερα: «·» με τον κανόνα [dotJoin] και ο
       // αριθμός με τη λέξη του (πριν, με μεγάλα γράμματα: «6 ασκήσεις · περίπου 55» / «λεπτά»).
       children.add(Text('${countText(w.items.length, 'άσκηση', 'ασκήσεις')}${dotJoin}περίπου ${w.minutes}\u00A0λεπτά', style: aux));
@@ -488,13 +510,21 @@ class _TrainingPageState extends State<TrainingPage> {
       }
       children.add(const SizedBox(height: 12));
       final can = t.current == null;
-      children.add(FilledButton(
-        key: const ValueKey('train-start'),
-        style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
-        onPressed: can ? () => _start(context, w) : null,
-        child: Text(t.current != null ? 'Υπάρχει προπόνηση σε εξέλιξη' : 'Ξεκίνα την προπόνηση',
-            textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-      ));
+      final startText = Text(
+          t.current != null ? 'Υπάρχει προπόνηση σε εξέλιξη' : (done != null && !done.isCardio ? 'Κάν’ την ξανά σήμερα' : 'Ξεκίνα την προπόνηση'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700));
+      children.add(done != null && !done.isCardio
+          ? OutlinedButton(
+              key: const ValueKey('train-start'),
+              style: OutlinedButton.styleFrom(foregroundColor: c.exercise, minimumSize: const Size.fromHeight(52)),
+              onPressed: can ? () => _start(context, w) : null,
+              child: startText)
+          : FilledButton(
+              key: const ValueKey('train-start'),
+              style: FilledButton.styleFrom(backgroundColor: c.exerciseSolid, foregroundColor: c.onSolid, minimumSize: const Size.fromHeight(52)),
+              onPressed: can ? () => _start(context, w) : null,
+              child: startText));
       children.add(const SizedBox(height: 12));
       children.add(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(Icons.directions_walk_rounded, size: 18, color: c.textSecondary),

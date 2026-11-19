@@ -17,7 +17,21 @@
 ///   αλλάζει η εβδομάδα (δουλειά, Σαββατοκύριακο).
 ///
 /// Η ώρα του φαγητού είναι η ώρα που **γράφτηκε**: μετρά μόνο μέρα με «Τελείωσα για σήμερα» ([DayMark.done]) και όλες
-/// τις καταχωρίσεις γραμμένες από τα μεσάνυχτα της μέρας ως την ώρα του ύπνου. Οι θερμίδες βραδινού μόνο σε μέρα με
+/// τις καταχωρίσεις γραμμένες από τα μεσάνυχτα της μέρας ως την ώρα του ύπνου.
+///
+/// Έλεγχος 19/11 (sleep136):
+/// - SL-1: «ώρες από το τελευταίο φαγητό» και «διάρκεια ύπνου» βγαίνουν και τα δύο από την ώρα ύπνου (όσο πιο αργά
+///   ξαπλώνεις, τόσο μεγαλύτερο το κενό και τόσο λιγότερος ο ύπνος): «συνδέονταν» στο 100% των προσομοιώσεων χωρίς καμία
+///   επίδραση. Τώρα: μερική Spearman με σταθερή την ώρα ύπνου (ψεύτικα 1% στην προσομοίωση). Και το «ώρα ύπνου × διάρκεια»
+///   (αριθμητική, όχι εύρημα) δεν ελέγχεται.
+/// - SL-2 / S-1: η συσχέτιση και η αυτοσυσχέτιση μετριούνται στα ίδια υπόλοιπα, χωρίς την πορεία των εβδομάδων (μέσος
+///   όρος ±7 νυχτών): μια αλλαγή επιπέδου (δίαιτα, γιορτές) έβγαζε ψεύτικη σύνδεση στο 14–69% των προσομοιώσεων· τώρα ~1%.
+/// - S-2: η κάρτα ξαναϋπολογίζεται κάθε μέρα, άρα μια τυχαία σύνδεση θα φαινόταν κάποια μέρα στον μισό χρήστη (6 μήνες).
+///   Τώρα φαίνεται μόνο αν βγαίνει ίδια και στα παράθυρα που τελείωναν πριν από 14 και 28 μέρες ([sleepLinksStable]):
+///   ~8% των χρηστών σε 6 μήνες, και μια πραγματική σύνδεση φαίνεται το ίδιο.
+/// - S-3: και διαφορά των δύο μισών τουλάχιστον 2 bpm / 3 ms / 15 λεπτά ([_minDiff]).
+/// - SL-3: «γράφτηκε» = η πραγματική ώρα της εγγραφής (από το id της καταχώρισης), όχι η ώρα της μέρας της· πριν, ένα βραδινό
+///   γραμμένο το επόμενο πρωί έπαιρνε πρωινή ώρα της ίδιας μέρας και το «κενό» έβγαινε 6 ή 14 ώρες αντί για 2,5. Οι θερμίδες βραδινού μόνο σε μέρα με
 /// «Τελείωσα για σήμερα» (αλλιώς ένα βραδινό που δεν γράφτηκε θα μετρούσε 0).
 library;
 
@@ -106,6 +120,41 @@ class SleepLinksResult {
 typedef _Night = ({DateTime night, Map<LinkCause, double> cause, Map<LinkSleep, double> sleep});
 
 /// [entries]: οι καταχωρίσεις φαγητού μιας μέρας· [mark]: το «Τελείωσα για σήμερα» μιας μέρας.
+/// Όπως [sleepLinks], με τον κανόνα της σταθερότητας (S-2): «συνδέεται» μόνο ό,τι βγαίνει σήμερα ΚΑΙ στα παράθυρα που
+/// τελείωναν πριν από 14 και πριν από 28 μέρες.
+SleepLinksResult sleepLinksStable({
+  required Map<String, Map<String, double>> history,
+  required SourcePlan plan,
+  required DateTime today,
+  required List<LogEntry> Function(DateTime day) entries,
+  required DayMark? Function(DateTime day) mark,
+}) {
+  SleepLinksResult at(int back) => sleepLinks(
+      history: history,
+      plan: plan,
+      today: DateTime(today.year, today.month, today.day - back),
+      entries: entries,
+      mark: mark);
+  final now = at(0);
+  if (now.found.isEmpty) return now;
+  final before = [at(14), at(28)];
+  bool stable(SleepLink l) =>
+      before.every((r) => r.found.any((x) => x.cause == l.cause && x.sleep == l.sleep && x.rho.sign == l.rho.sign));
+  return SleepLinksResult(nights: now.nights, links: [
+    for (final l in now.links)
+      SleepLink(
+          cause: l.cause,
+          sleep: l.sleep,
+          n: l.n,
+          rho: l.rho,
+          p: l.p,
+          split: l.split,
+          lowMean: l.lowMean,
+          highMean: l.highMean,
+          found: l.found && stable(l)),
+  ]);
+}
+
 SleepLinksResult sleepLinks({
   required Map<String, Map<String, double>> history,
   required SourcePlan plan,
@@ -142,10 +191,12 @@ SleepLinksResult sleepLinks({
       if (es.isNotEmpty) {
         cause[LinkCause.dinnerKcal] = Totals(es.where((e) => e.meal == Meal.dinner)).kcal;
         if (bed != null) {
-          final bedAt = DateTime(prev.year, prev.month, prev.day, 18).add(Duration(minutes: bed.round()));
+          // Ώρα τοίχου (SL-6): η αλλαγή ώρας δεν μετακινεί τον ύπνο μία ώρα.
+          final bedAt = DateTime(prev.year, prev.month, prev.day, 18, bed.round());
           final dayStart = DateTime(prev.year, prev.month, prev.day);
           // Όλες γραμμένες από τα μεσάνυχτα της μέρας ως τον ύπνο· αλλιώς η ώρα δεν λέει πότε έφαγες.
-          if (es.every((e) => !e.time.isBefore(dayStart) && e.time.isBefore(bedAt))) {
+          bool inDay(DateTime x) => !x.isBefore(dayStart) && x.isBefore(bedAt);
+          if (es.every((e) => inDay(e.time) && inDay(writtenAt(e)))) {
             final last = es.map((e) => e.time).reduce((a, b) => a.isAfter(b) ? a : b);
             cause[LinkCause.mealGap] = bedAt.difference(last).inMinutes / 60;
           }
@@ -159,9 +210,11 @@ SleepLinksResult sleepLinks({
   final tested = <SleepLink>[];
   for (final c in LinkCause.values) {
     for (final s in LinkSleep.values) {
+      // SL-1: η διάρκεια βγαίνει από την ώρα ύπνου· η σύγκριση τους είναι αριθμητική, όχι εύρημα.
+      if (c == LinkCause.bedtime && s == LinkSleep.sleepMin) continue;
       final pts = [
         for (final r in rows)
-          if (r.cause[c] != null && r.sleep[s] != null) (r.night, r.cause[c]!, r.sleep[s]!),
+          if (r.cause[c] != null && r.sleep[s] != null) (r.night, r.cause[c]!, r.sleep[s]!, r.cause[LinkCause.bedtime]),
       ];
       most = math.max(most, pts.length);
       if (pts.length < sleepLinkMinNights) continue;
@@ -193,39 +246,98 @@ SleepLinksResult sleepLinks({
         // Και η διαφορά των δύο μισών προς την ίδια μεριά με τη συσχέτιση.
         found: pass[i] &&
             tested[i].rho.abs() >= sleepLinkMinRho &&
-            (tested[i].highMean - tested[i].lowMean).sign == tested[i].rho.sign,
+            (tested[i].highMean - tested[i].lowMean).sign == tested[i].rho.sign &&
+            (tested[i].highMean - tested[i].lowMean).abs() >= _minDiff(tested[i].sleep),
       ),
   ];
   return SleepLinksResult(nights: most, links: out);
 }
 
-SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double)> pts) {
+/// Η πραγματική ώρα που γράφτηκε μια καταχώριση (SL-3): το id ξεκινά με τα μικροδευτερόλεπτα της εγγραφής
+/// ([FoodStore] `_newId`). Χωρίς τέτοιο id (π.χ. δοκιμές): η ώρα της.
+DateTime writtenAt(LogEntry e) {
+  final dash = e.id.indexOf('-');
+  final us = dash > 0 ? int.tryParse(e.id.substring(0, dash)) : null;
+  // Λογικά όρια (2020–2100): αλλιώς δεν είναι ώρα.
+  if (us == null || us < 1577836800000000 || us > 4102444800000000) return e.time;
+  return DateTime.fromMicrosecondsSinceEpoch(us);
+}
+
+/// Χωρίς την πορεία των εβδομάδων (SL-2, S-1): κάθε τιμή μείον τον μέσο όρο των τιμών της ίδιας σειράς σε ±7 νύχτες
+/// (όσες υπάρχουν). Μια αλλαγή που κράτησε εβδομάδες (δίαιτα, γιορτές, φυσική κατάσταση) δεν μετρά ούτε ως «νύχτες που
+/// μοιάζουν» ούτε ως σύνδεση· μένει η σύνδεση από νύχτα σε νύχτα.
+List<double> _residuals(List<DateTime> days, List<double> v) {
+  final out = <double>[];
+  var lo = 0, hi = 0;
+  var sum = 0.0;
+  for (var i = 0; i < v.length; i++) {
+    while (hi < v.length && daysBetween(days[i], days[hi]) <= 7) {
+      sum += v[hi];
+      hi++;
+    }
+    while (daysBetween(days[lo], days[i]) > 7) {
+      sum -= v[lo];
+      lo++;
+    }
+    out.add(v[i] - sum / (hi - lo));
+  }
+  return out;
+}
+
+/// Η μικρότερη διαφορά των δύο μισών που λέγεται «συνδέεται» (S-3): κάτω από αυτήν, οι δύο τιμές της κάρτας φαίνονται
+/// σχεδόν ίδιες και είναι μέσα στο λάθος της συσκευής.
+double _minDiff(LinkSleep s) => switch (s) {
+      LinkSleep.sleepHr => 2,
+      LinkSleep.hrv => 3,
+      LinkSleep.sleepMin => 15,
+    };
+
+SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double, double?)> pts) {
+  final days = [for (final p in pts) p.$1];
   final xs = [for (final p in pts) p.$2];
   final ys = [for (final p in pts) p.$3];
   final split = _median(xs);
-  final low = [for (final p in pts) if (p.$2 <= split) p.$3];
-  final high = [for (final p in pts) if (p.$2 > split) p.$3];
-  if (low.length < sleepLinkMinGroup || high.length < sleepLinkMinGroup) return null;
-  final rho = _pearson(_ranks(xs), _ranks(ys));
-  final n = pts.length;
-  // Αυτοσυσχέτιση κάθε σειράς, σε κομμάτια 28 ημερών (μια αλλαγή επιπέδου δεν μετρά ως «νύχτες που μοιάζουν»).
-  double phiOf(List<(DateTime, double)> v) {
-    final blocks = <List<(DateTime, double)>>[];
-    for (final e in v) {
-      final b = daysBetween(v.first.$1, e.$1) ~/ 28;
-      while (blocks.length <= b) {
-        blocks.add([]);
-      }
-      blocks[b].add(e);
+  final lowIdx = [for (var i = 0; i < pts.length; i++) if (pts[i].$2 <= split) i];
+  final highIdx = [for (var i = 0; i < pts.length; i++) if (pts[i].$2 > split) i];
+  if (lowIdx.length < sleepLinkMinGroup || highIdx.length < sleepLinkMinGroup) return null;
+  final ex = _residuals(days, xs), ey = _residuals(days, ys);
+  final rx = _ranks(ex), ry = _ranks(ey);
+  var rho = _pearson(rx, ry);
+  // Οι τιμές ύπνου των δύο μισών (V-8): ο μέσος όρος όλων συν το υπόλοιπο κάθε μισού, ώστε η διαφορά που φαίνεται να είναι
+  // αυτή που κρίθηκε (χωρίς την πορεία των εβδομάδων, και για το κενό χωρίς την ώρα ύπνου).
+  var adj = ey;
+  // SL-1: το κενό ως το φαγητό βγαίνει από την ώρα ύπνου· με σταθερή την ώρα ύπνου (μερική συσχέτιση), ένας βαθμός
+  // ελευθερίας λιγότερο.
+  var lost = 2;
+  if (c == LinkCause.mealGap && pts.every((p) => p.$4 != null)) {
+    final ez = _residuals(days, [for (final p in pts) p.$4!]);
+    final rz = _ranks(ez);
+    final a = _pearson(rx, rz), b = _pearson(ry, rz);
+    final d = (1 - a * a) * (1 - b * b);
+    if (d <= 1e-9) return null;
+    rho = ((rho - a * b) / math.sqrt(d)).clamp(-1.0, 1.0);
+    lost = 3;
+    // Ο ύπνος χωρίς ό,τι εξηγεί η ώρα ύπνου (γραμμική παλινδρόμηση στα υπόλοιπα).
+    var szz = 0.0, szy = 0.0;
+    for (var i = 0; i < ez.length; i++) {
+      szz += ez[i] * ez[i];
+      szy += ez[i] * ey[i];
     }
-    // Χωρίς εκτίμηση: συντηρητικά 0,5.
-    return dailyCorrelation(blocks) ?? 0.5;
+    final beta = szz > 0 ? szy / szz : 0.0;
+    adj = [for (var i = 0; i < ey.length; i++) ey[i] - beta * ez[i]];
   }
+  final meanY = ys.reduce((a, b) => a + b) / ys.length;
+  double half(List<int> idx) => meanY + idx.map((i) => adj[i]).reduce((a, b) => a + b) / idx.length;
+  final n = pts.length;
+  // Αυτοσυσχέτιση κάθε σειράς, στα ίδια υπόλοιπα με τη συσχέτιση (S-1). Χωρίς εκτίμηση: συντηρητικά 0,5.
+  double phiOf(List<double> r) => dailyCorrelation([
+        [for (var i = 0; i < n; i++) (days[i], r[i])]
+      ]) ?? 0.5;
 
-  final fx = phiOf([for (final p in pts) (p.$1, p.$2)]);
-  final fy = phiOf([for (final p in pts) (p.$1, p.$3)]);
+  final fx = phiOf(ex);
+  final fy = phiOf(ey);
   final nEff = n * (1 - fx * fy) / (1 + fx * fy);
-  final df = nEff - 2;
+  final df = nEff - lost;
   double p;
   if (rho.abs() >= 0.999999) {
     p = 0;
@@ -242,8 +354,8 @@ SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double)> pts)
     rho: rho,
     p: p,
     split: split,
-    lowMean: low.reduce((a, b) => a + b) / low.length,
-    highMean: high.reduce((a, b) => a + b) / high.length,
+    lowMean: half(lowIdx),
+    highMean: half(highIdx),
     found: false,
   );
 }

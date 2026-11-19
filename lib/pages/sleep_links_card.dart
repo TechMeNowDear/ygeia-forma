@@ -33,7 +33,7 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
 
   Widget _card(BuildContext context, FoodStore? food) {
     final c = Aigaio.of(context);
-    final r = sleepLinks(
+    final r = sleepLinksStable(
       history: widget.store.history,
       plan: widget.store.plan,
       today: widget.now ?? DateTime.now(),
@@ -42,6 +42,9 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
     );
     final small = TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35);
     final found = r.found;
+    final foodTested = r.links.any((l) => l.cause == LinkCause.mealGap || l.cause == LinkCause.dinnerKcal);
+    final hasHrv = r.links.any((l) => l.sleep == LinkSleep.hrv);
+    final pairs = r.links.length;
     return AppCard(
       key: const ValueKey('sleep-links'),
       child: Column(
@@ -75,6 +78,12 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
                 key: const ValueKey('sleep-links-none'), style: TextStyle(color: c.text, fontSize: 15, height: 1.35))
           else
             for (final l in found) _row(context, l),
+          // Έλεγχος 19/11 (SL-4): τα βήματα κρίνονται από τις πρώτες μέρες, το φαγητό θέλει δικές του νύχτες.
+          if (r.ready && !foodTested) ...[
+            const SizedBox(height: 6),
+            Text('Το φαγητό δεν ελέγχθηκε ακόμα: θέλει $sleepLinkMinNights νύχτες με «Τελείωσα για σήμερα» την προηγούμενη μέρα.',
+                key: const ValueKey('sleep-links-food-wait'), style: small),
+          ],
           const SizedBox(height: 10),
           Text('Για το φαγητό μετρούν μόνο οι μέρες με «Τελείωσα για σήμερα». Συνδέεται δεν σημαίνει ότι το ένα φέρνει '
               'το άλλο.', style: small),
@@ -89,10 +98,13 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
           if (_how)
             Text(
               'Κάθε νύχτα μπαίνει δίπλα στην προηγούμενη μέρα σου: ώρες από το τελευταίο φαγητό ως τον ύπνο, θερμίδες '
-              'βραδινού, βήματα και ώρα ύπνου. Απέναντι: παλμοί ύπνου, HRV και διάρκεια ύπνου. Κάθε ζευγάρι κρίνεται από '
-              '$sleepLinkMinNights νύχτες και πάνω. Επειδή είναι 12 ζευγάρια μαζί και οι διαδοχικές νύχτες μοιάζουν, ο '
-              'έλεγχος είναι αυστηρός: μια σύνδεση που φαίνεται εδώ είναι σταθερή, όχι τύχη μιας εβδομάδας. Η ώρα του '
-              'φαγητού είναι η ώρα που το έγραψες· γράψ\' το όταν το τρως για να βγαίνει σωστά.',
+              'βραδινού, βήματα και ώρα ύπνου. Απέναντι: παλμοί ύπνου${hasHrv ? ', HRV' : ''} και διάρκεια ύπνου. Κάθε ζευγάρι '
+              'κρίνεται από $sleepLinkMinNights νύχτες και πάνω. Επειδή '
+              '${pairs > 1 ? 'είναι $pairs ζευγάρια μαζί' : 'μετρά κάθε ζευγάρι'} και οι διαδοχικές νύχτες μοιάζουν, ο '
+              'έλεγχος είναι αυστηρός, και μια αλλαγή που κράτησε εβδομάδες (π.χ. γιορτές, νέα δίαιτα) δεν μετρά ως σύνδεση. '
+              'Μια σύνδεση φαίνεται εδώ μόνο αν βγαίνει ίδια για 4 εβδομάδες· και πάλι μπορεί σπάνια να είναι τύχη. '
+              'Το «ώρες από το φαγητό» κρίνεται με την ώρα ύπνου σταθερή. Η ώρα του φαγητού είναι η ώρα που το έγραψες· '
+              'γράψ\' το όταν το τρως για να βγαίνει σωστά.',
               key: const ValueKey('sleep-links-how-text'),
               style: small,
             ),

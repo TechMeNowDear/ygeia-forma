@@ -106,6 +106,15 @@ void main() {
       expect(quitHoldDays(DateTime(2026, 12, 15), _check), isNull, reason: 'μέρα στο μέλλον');
     });
 
+    test('Έλεγχος 19/11 (L-2): μετά τη διακοπή, βάρος που ανεβαίνει → «κάτι λείπει» με τη διακοπή, όχι «γεύματα που δεν γράφτηκαν»', () {
+      final c = _pending(checkinGoals(), _check, tdee: 1700, quitDay: DateTime(2026, 11, 23))!;
+      expect(c.kind, CheckKind.implausible);
+      expect(c.proposal, isNull, reason: 'καμία μείωση από τη ζυγαριά στις 10 εβδομάδες');
+      expect(c.quitDays, 21);
+      final n = _pending(checkinGoals(), _check, tdee: 1700)!;
+      expect(n.quitDays, isNull);
+    });
+
     test('Α2: την 21η μέρα η κάρτα μαζεύει ακόμα δεδομένα· καμία εκτίμηση, καμία πρόταση· η πρώτη βγαίνει την 28η', () {
       final c = _pending(checkinGoals(), _day21)!;
       expect((c.kind, c.status), (CheckKind.gathering, AdaptStatus.tooEarly));
