@@ -32,10 +32,12 @@ class CloudBackupMeter {
 
 /// «3,2 MB από 25 MB»
 String cloudBackupText(int bytes) {
-  var mb = bytes / (1024 * 1024);
-  // Έλεγχος 19/11 (CB-3): κάτω από το όριο ποτέ «25 από 25» (στρογγύλεμα προς τα πάνω).
-  if (bytes < cloudBackupLimitBytes && mb >= 24.95) mb = 24.9;
-  return 'Αντίγραφο Google: ${dec(mb, mb < 10 || mb >= 24.9 && mb < 25 ? 1 : 0)} MB από 25 MB';
+  final mb = bytes / (1024 * 1024);
+  if (bytes < cloudBackupWarnBytes) return 'Αντίγραφο Google: ${dec(mb, mb < 10 ? 1 : 0)} MB από 25 MB';
+  // Έλεγχος 19/11 (CB-3, V-5): κοντά στο όριο ένα δεκαδικό, ποτέ «25 από 25»: κάτω από το όριο προς τα κάτω, από το όριο
+  // και πάνω προς τα πάνω.
+  final v = bytes < cloudBackupLimitBytes ? (mb * 10).floor() / 10 : (mb * 10).ceil() / 10;
+  return 'Αντίγραφο Google: ${dec(v, 1)} MB από 25 MB';
 }
 
 const cloudBackupStoppedText = 'Πάνω από τα 25 MB το Android δεν ενημερώνει πια το αντίγραφο Google, χωρίς να σε '

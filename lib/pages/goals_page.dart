@@ -196,11 +196,25 @@ class _GoalsWizardState extends State<GoalsWizard> {
     return _freshTdee != null || recent;
   }
 
+  /// Οι παλιοί στόχοι έχουν ήδη μαζέψει κάτι που θα χανόταν με νέα αρχή: εκτίμηση, έλεγχο με εκτίμηση, ή μέρες φαγητού
+  /// που μετρούν (V-1). Μόνο τότε η προεπιλογή είναι «Συνεχίζω».
+  bool get _oldCollected {
+    final o = _old;
+    if (o == null) return false;
+    if (_freshTdee != null || o.log.any((l) => !l.fast && l.day.compareTo(o.since) >= 0)) return true;
+    final f = FoodStore.shared;
+    if (f == null || !f.loaded) return false;
+    return readiness(goals: o, today: _now, weights: const [], intake: (a, b) => dailyIntake(f, a, b)).intakeDays > 0;
+  }
+
   _Start get _startNow {
     final s = _start;
     if (s == _Start.keep && !_canKeep) return _Start.today;
     if (s == _Start.monday && _nextMonday == null) return _Start.today;
-    return s ?? (_canKeep ? _Start.keep : _Start.today);
+    if (s != null) return s;
+    // Έλεγχος 19/11 (V-1): μια δίαιτα που δεν έχει αρχίσει δεν παίρνει ποτέ σιωπηλά παλιά αρχή. Την Κυριακή: η Δευτέρα.
+    if (_canKeep && _oldCollected) return _Start.keep;
+    return _today.weekday == DateTime.sunday ? _Start.monday : _Start.today;
   }
 
   /// Ο δικός σου αριθμός μένει από προεπιλογή όταν ο σκοπός δεν άλλαξε (ένας αριθμός για «λιγότερο λίπος» δεν ταιριάζει
@@ -583,6 +597,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
             heightCm: d.heightCm,
             oldActivity: o == null ? null : currentActivityLevel(o.activity));
         final fromData = kept != null;
+        final ownKept = d.kcalSet != null;
         final floored = kept != null ? kept.floored : g.floored;
         final sinceDay = DateTime.parse(d.since);
         final weekday = weekdayNames[sinceDay.weekday - 1];
@@ -609,14 +624,19 @@ class _GoalsWizardState extends State<GoalsWizard> {
               BigValue(thousands(d.kcal), unit: 'kcal', size: 44),
               const SizedBox(height: 6),
               Text(
-                _aim == GoalAim.keep
-                    ? (fromData ? 'όσες καις κατά τον τύπο, περίπου ${thousands(g.tdee)}' : 'όσες καις, περίπου ${thousands(g.tdee)}')
-                    : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} ·\u00A0'
-                        '${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
+                // V-6: με δικό σου αριθμό, ο ρυθμός του οδηγού δεν αλλάζει τίποτα· γράφεται τι σημαίνει ο αριθμός σου.
+                ownKept
+                    ? 'ο δικός σου αριθμός ·\u00A0με τον τύπο (${thousands(g.tdee)}) περίπου '
+                        '${dec((g.tdee - d.kcal).abs() / kcalPerKg * 7, 2)} kg την εβδομάδα ${d.kcal < g.tdee ? 'λιγότερα' : 'περισσότερα'}'
+                    : _aim == GoalAim.keep
+                        ? (fromData ? 'όσες καις κατά τον τύπο, περίπου ${thousands(g.tdee)}' : 'όσες καις, περίπου ${thousands(g.tdee)}')
+                        : 'καις περίπου ${thousands(g.tdee)}${fromData ? ' κατά τον τύπο' : ''} ·\u00A0'
+                            '${_aim == GoalAim.lose ? '−' : '+'}$per για ${rateKgText(d.kg, _rateValue)}',
+                key: const ValueKey('wizard-kcal-line'),
                 style: small,
               ),
               // S1-11 / R8-A1-2: ο στόχος από τα δεδομένα σου μένει, και η οθόνη το λέει.
-              if (fromData)
+              if (fromData && !ownKept)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
@@ -1223,7 +1243,7 @@ class GoalsPage extends StatelessWidget {
           const SizedBox(height: 2),
           // R7-U2-18: «η πρώτη εβδομάδα δεν μετρά» μία φορά, στο κείμενο κάτω.
           // Έλεγχος 19/11 (W-6): την πρώτη εβδομάδα «0 από 14» έμοιαζε με χαμένη καταγραφή· τώρα λέει από πότε μετρούν.
-          if (countFrom != null && !today.isAfter(countFrom))
+          if (countFrom != null && !dayOf(today).isAfter(countFrom))
             Text('Οι μέρες μετράνε από ${weekdayNames[countFrom.weekday - 1]} ${dayMonth(countFrom)}: η πρώτη εβδομάδα δεν '
                 'μετρά (φεύγουν νερά). Γράφε κανονικά από τώρα.',
                 key: const ValueKey('goals-adapt-first-week'), style: small)

@@ -139,7 +139,7 @@ SleepLinksResult sleepLinksStable({
   if (now.found.isEmpty) return now;
   final before = [at(14), at(28)];
   bool stable(SleepLink l) =>
-      before.every((r) => r.found.any((x) => x.cause == l.cause && x.sleep == l.sleep));
+      before.every((r) => r.found.any((x) => x.cause == l.cause && x.sleep == l.sleep && x.rho.sign == l.rho.sign));
   return SleepLinksResult(nights: now.nights, links: [
     for (final l in now.links)
       SleepLink(
@@ -297,23 +297,37 @@ SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double, doubl
   final xs = [for (final p in pts) p.$2];
   final ys = [for (final p in pts) p.$3];
   final split = _median(xs);
-  final low = [for (final p in pts) if (p.$2 <= split) p.$3];
-  final high = [for (final p in pts) if (p.$2 > split) p.$3];
-  if (low.length < sleepLinkMinGroup || high.length < sleepLinkMinGroup) return null;
+  final lowIdx = [for (var i = 0; i < pts.length; i++) if (pts[i].$2 <= split) i];
+  final highIdx = [for (var i = 0; i < pts.length; i++) if (pts[i].$2 > split) i];
+  if (lowIdx.length < sleepLinkMinGroup || highIdx.length < sleepLinkMinGroup) return null;
   final ex = _residuals(days, xs), ey = _residuals(days, ys);
   final rx = _ranks(ex), ry = _ranks(ey);
   var rho = _pearson(rx, ry);
+  // Οι τιμές ύπνου των δύο μισών (V-8): ο μέσος όρος όλων συν το υπόλοιπο κάθε μισού, ώστε η διαφορά που φαίνεται να είναι
+  // αυτή που κρίθηκε (χωρίς την πορεία των εβδομάδων, και για το κενό χωρίς την ώρα ύπνου).
+  var adj = ey;
   // SL-1: το κενό ως το φαγητό βγαίνει από την ώρα ύπνου· με σταθερή την ώρα ύπνου (μερική συσχέτιση), ένας βαθμός
   // ελευθερίας λιγότερο.
   var lost = 2;
   if (c == LinkCause.mealGap && pts.every((p) => p.$4 != null)) {
-    final rz = _ranks(_residuals(days, [for (final p in pts) p.$4!]));
+    final ez = _residuals(days, [for (final p in pts) p.$4!]);
+    final rz = _ranks(ez);
     final a = _pearson(rx, rz), b = _pearson(ry, rz);
     final d = (1 - a * a) * (1 - b * b);
     if (d <= 1e-9) return null;
     rho = ((rho - a * b) / math.sqrt(d)).clamp(-1.0, 1.0);
     lost = 3;
+    // Ο ύπνος χωρίς ό,τι εξηγεί η ώρα ύπνου (γραμμική παλινδρόμηση στα υπόλοιπα).
+    var szz = 0.0, szy = 0.0;
+    for (var i = 0; i < ez.length; i++) {
+      szz += ez[i] * ez[i];
+      szy += ez[i] * ey[i];
+    }
+    final beta = szz > 0 ? szy / szz : 0.0;
+    adj = [for (var i = 0; i < ey.length; i++) ey[i] - beta * ez[i]];
   }
+  final meanY = ys.reduce((a, b) => a + b) / ys.length;
+  double half(List<int> idx) => meanY + idx.map((i) => adj[i]).reduce((a, b) => a + b) / idx.length;
   final n = pts.length;
   // Αυτοσυσχέτιση κάθε σειράς, στα ίδια υπόλοιπα με τη συσχέτιση (S-1). Χωρίς εκτίμηση: συντηρητικά 0,5.
   double phiOf(List<double> r) => dailyCorrelation([
@@ -340,8 +354,8 @@ SleepLink? _test(LinkCause c, LinkSleep s, List<(DateTime, double, double, doubl
     rho: rho,
     p: p,
     split: split,
-    lowMean: low.reduce((a, b) => a + b) / low.length,
-    highMean: high.reduce((a, b) => a + b) / high.length,
+    lowMean: half(lowIdx),
+    highMean: half(highIdx),
     found: false,
   );
 }

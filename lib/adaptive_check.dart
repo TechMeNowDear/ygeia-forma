@@ -490,7 +490,8 @@ CheckIn? pendingCheckIn({
             weighs: weighs,
             absurd: absurd,
             foreign: news,
-            quitDays: quitLow != null && r.est != null && r.est!.tdee < formula ? quitLow : null,
+            // V-4: μόνο όταν το βάρος ανεβαίνει· αλλιώς η χαμηλή εκτίμηση είναι συνήθως φαγητό που δεν γράφτηκε.
+            quitDays: quitLow != null && r.est != null && r.est!.tdee < formula && r.est!.slopeKgWeek > 0 ? quitLow : null,
             formula: formula,
             formulaKg: fNow.kg);
       case AdaptStatus.tooEarly:

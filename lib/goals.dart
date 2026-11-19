@@ -366,6 +366,14 @@ class Goals {
     // Έλεγχος 19/11 (W-5): οι παλιοί στόχοι αρχίζουν σήμερα ή αργότερα (π.χ. οδηγός και αμέσως «δικός μου αριθμός»):
     // καμία μέρα δεν κρίθηκε με τον παλιό αριθμό, άρα καμία γραμμή· πριν, η μέρα της αρχής κρινόταν μετά με τον τύπο.
     if (o.since.compareTo(day) >= 0) return copyWith(hist: o.hist);
+    // V-2: οι νέοι στόχοι αρχίζουν σήμερα (ή αργότερα): η σημερινή μέρα κρίνεται με τον νέο αριθμό, οι μέρες ως χθες με τον
+    // παλιό ([targetOn]: η μέρα της αλλαγής μετρά με τον παλιό).
+    if (before != after && since.compareTo(day) >= 0) {
+      final y = DateTime(today.year, today.month, today.day - 1);
+      return copyWith(
+          hist: addTargetChange(
+              o.hist, o.log, TargetChange(day: '${y.year}-${two(y.month)}-${two(y.day)}', before: before, after: after)));
+    }
     return copyWith(
         hist: before == after
             ? o.hist

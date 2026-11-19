@@ -127,15 +127,15 @@ void main() {
   });
 
   group('Οδηγός στόχων: αρχή και δικός σου αριθμός (W-1, W-2 του week-food)', () {
-    testWidgets('Δευτέρα 23/11 με στόχους της 11/11: προεπιλογή «Συνεχίζω», «Σήμερα» βάζει αρχή 23/11· ο 2.090 μένει', (t) async {
+    testWidgets('Δευτέρα 23/11 με στόχους της 11/11 χωρίς δεδομένα: προεπιλογή «Σήμερα» (V-1), αρχή 23/11· ο 2.090 μένει', (t) async {
       final store = HealthStore()..setProfile(_me)..setGoals(_old());
       await _wizard(t, store, DateTime(2026, 11, 23, 9));
       await _save(t);
       expect(find.byKey(const ValueKey('wizard-start-keep')), findsOneWidget);
+      expect(t.widget<ChoiceChip>(find.byKey(const ValueKey('wizard-start-today'))).selected, isTrue);
       expect(find.byKey(const ValueKey('wizard-start-monday')), findsNothing, reason: 'σήμερα είναι Δευτέρα');
       expect(find.textContaining('Μένει ο δικός σου αριθμός 2.090 kcal'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('wizard-start-today')));
-      await t.pumpAndSettle();
+      expect(find.textContaining('ο δικός σου αριθμός ·'), findsOneWidget, reason: 'V-6');
       await _save(t);
       final g = store.goals!;
       expect((g.since, g.kcal, g.kcalSet), ('2026-11-23', 2090, 2090));
@@ -146,8 +146,8 @@ void main() {
       final store = HealthStore()..setProfile(_me)..setGoals(_old());
       await _wizard(t, store, DateTime(2026, 11, 22, 20));
       await _save(t);
-      await t.tap(find.byKey(const ValueKey('wizard-start-monday')));
-      await t.pumpAndSettle();
+      // Την Κυριακή η προεπιλογή είναι η Δευτέρα.
+      expect(t.widget<ChoiceChip>(find.byKey(const ValueKey('wizard-start-monday'))).selected, isTrue);
       await t.ensureVisible(find.byKey(const ValueKey('wizard-own-toggle')));
       await t.tap(find.byKey(const ValueKey('wizard-own-toggle')));
       await t.pumpAndSettle();
@@ -170,6 +170,12 @@ void main() {
       await _save(t);
       expect(store.goals!.since, '2026-11-23');
     });
+  });
+
+  test('V-2: νέοι στόχοι από σήμερα με άλλο αριθμό: η αλλαγή γράφεται χθες (σήμερα κρίνεται με τον νέο)', () {
+    final o = _old(kcalSet: 2410);
+    final g = _old(kcalSet: 2200, since: '2026-11-23').recordChangeFrom(o, DateTime(2026, 11, 23, 9));
+    expect(g.hist.single.day, '2026-11-22');
   });
 
   test('W-5: δικός σου αριθμός την ίδια μέρα με την αρχή: καμία γραμμή στο ιστορικό', () {
