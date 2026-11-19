@@ -47,6 +47,9 @@ void main() {
     await t.tap(find.byKey(const ValueKey('ai-save-id')));
     await t.pumpAndSettle();
     expect(b.url, isNull);
+    // Το μήνυμα λάθους (κάτω) καλύπτει το κουμπί: κλείνει πριν το επόμενο πάτημα.
+    ScaffoldMessenger.of(t.element(find.byType(Scaffold).first)).removeCurrentSnackBar();
+    await t.pumpAndSettle();
 
     await t.enterText(find.byKey(const ValueKey('ai-project-id')), 'abcdefghij0123456789');
     await t.tap(find.byKey(const ValueKey('ai-save-id')));

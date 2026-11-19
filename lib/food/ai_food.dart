@@ -439,7 +439,10 @@ AiPlanParse parseAiPlan(
       continue;
     }
     if (allKeys.contains(key) || newKeys.containsKey(key)) {
-      errors.add('Νέο φαγητό «$name»: το key «$key» υπάρχει ήδη· διάλεξε άλλο.');
+      errors.add(allKeys.contains(key)
+          ? 'Νέο φαγητό «$name»: το key «$key» είναι ήδη φαγητό της ΒΙΒΛΙΟΘΗΚΗΣ. Αν εννοείς αυτό, βγάλ’ το από το "new" '
+              'και βάλ’ το μόνο στις μέρες· αλλιώς δώσε άλλο key.'
+          : 'Νέο φαγητό «$name»: το key «$key» γράφτηκε δύο φορές στο "new".');
       continue;
     }
     if (name.isEmpty) errors.add('Νέο φαγητό «$key»: λείπει το "name".');

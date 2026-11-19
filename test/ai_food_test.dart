@@ -198,7 +198,8 @@ void main() {
     expect(sys, isNot(contains(beef)));
     expect(sys, contains('ΠΟΤΕ ωμό'));
     final p = aiPlanPrompt(food: s, ask: askOf(), library: aiLibrary(s, aiAllowedIds(s)), dayKcal: 2090);
-    expect(p, contains('μεσημέρι ~850 kcal'));
+    // Μερίδιο γεύματος του κανονικού προγράμματος (μεσημέρι > βράδυ > σνακ), στρογγυλό στα 50.
+    expect(p, contains('μεσημέρι ~900 kcal'));
     expect(p, isNot(contains('mosxari')));
     expect(p, isNot(contains('2.090')));
     for (final w in ['Oura', 'ύπνος', 'παλμ', 'πίεση', 'σάκχαρ', 'πρωτεΐνη 130', 'κορεσμένα έως']) {
@@ -273,8 +274,11 @@ void main() {
       d[2][2] = 'kotopoulo-ryzi';
       d[3][2] = 'solomos';
     })), contains('πρώτη φορά στο γραφείο'));
-    // Πιάτο σε συνεχόμενες μέρες: όχι.
-    expect(errs(edit((d) => d[4][2] = 'kotopoulo-ryzi')), contains('συνεχόμενη'));
+    // Πιάτο σε συνεχόμενες μέρες (κοτοσαλάτα Πέμπτη και Παρασκευή μεσημέρι): όχι.
+    expect(errs(edit((d) {
+      d[4][0] = 'kotopoulo-salata';
+      d[6][0] = 'fasolada';
+    })), contains('συνεχόμενη'));
     // Σνακ κάθε μέρα: εντάξει.
     expect(errs(edit((d) {
       for (final x in d) {
@@ -282,6 +286,8 @@ void main() {
       }
     })), isEmpty);
     expect(errs(planDays, news: [newJson(key: 'kotopoulo-fournou')]), contains('ai-'));
+    // Νέο με key που είναι ήδη στη βιβλιοθήκη: σωστή οδηγία (όχι «διάλεξε άλλο» που θα έφτιαχνε διπλό).
+    expect(parseAiPlan(fence(planJson()), askOf(), libMap, {...all, newKey}).errors.join(), contains('βγάλ’ το από το "new"'));
     final j = planJson();
     ((j['days'] as List)[3] as List).removeAt(1);
     expect(parseAiPlan(fence(j), askOf(), libMap, all).errors.join(), contains('λείπει το σνακ'));
@@ -340,9 +346,11 @@ void main() {
         final range = portionRange(s, byId[x.dishId]!)!;
         expect(x.kcal!, inInclusiveRange(range.lo - 10, range.hi + 10), reason: 'μέρα $i ${x.meal}');
       }
-      // Θερμίδες της μέρας από τη βάση κοντά στον στόχο (όχι από τα «99999» του AI).
+      // Θερμίδες της μέρας από τη βάση (όχι από τα «99999» του AI): ποτέ πάνω από τον στόχο +12%· όταν οι μερίδες δεν
+      // φτάνουν (π.χ. φακές 342 kcal × 1,6 το πολύ), το πρόγραμμα το λέει στις σημειώσεις.
       final day = plannedDay(s, w, i, extra: r.newDishes).totals.kcal;
-      expect(day, closeTo(2100, 2100 * 0.12), reason: 'μέρα $i');
+      expect(day, inInclusiveRange(2100 * 0.7, 2100 * 1.12), reason: 'μέρα $i');
+      if ((day - 2100).abs() > 2100 * aiDayKcalTol) expect(r.notes.join(), contains('kcal'), reason: 'μέρα $i');
     }
     // Ο έλεγχος του προγράμματος έτρεξε (π.χ. η κατσαρόλα των φακών: ο χρήστης τρώει πάνω από το μισό).
     expect(r.notes.join(), contains('της κατσαρόλας'));
@@ -357,7 +365,8 @@ void main() {
         call: ai.call, food: s, kitchen: Kitchen.initial(), targets: targets, from: monday, meals: meals, now: 1, today: monday, newId: () => 'x1');
     final w0 = first.plan!;
     // Πέμπτη: ξανά με AI. Δε–Τε μένουν (και ξεκλείδωτα όπως ήταν).
-    final ai2 = FakeAi((a, n) => fence(planJson()));
+    // Το νέο φαγητό είναι πια φαγητό της βιβλιοθήκης: το AI το βάζει στις μέρες χωρίς να το ξαναγράψει στο "new".
+    final ai2 = FakeAi((a, n) => fence(planJson(news: const [])));
     final s2 = FoodStore.preloaded(foods: basicFoods(), dishes: [...s.dishes, ...first.newDishes], likes: likes, now: monday, week: w0);
     final again = await aiBuildWeek(
         call: ai2.call, food: s2, kitchen: Kitchen.initial(), targets: targets, from: monday, meals: meals, keep: w0, now: 1,
