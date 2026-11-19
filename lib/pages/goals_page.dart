@@ -201,7 +201,8 @@ class _GoalsWizardState extends State<GoalsWizard> {
   bool get _oldCollected {
     final o = _old;
     if (o == null) return false;
-    if (_freshTdee != null || o.log.any((l) => !l.fast && l.day.compareTo(o.since) >= 0)) return true;
+    // Εκτίμηση, κάρτα ελέγχου ή βήμα «γρήγορης απώλειας» με αυτούς τους στόχους: έχουν ήδη ζυγίσεις και φαγητό.
+    if (_freshTdee != null || o.checkIn != null || o.fastAt != null || o.log.any((l) => l.day.compareTo(o.since) >= 0)) return true;
     final f = FoodStore.shared;
     if (f == null || !f.loaded) return false;
     return readiness(goals: o, today: _now, weights: const [], intake: (a, b) => dailyIntake(f, a, b)).intakeDays > 0;
