@@ -330,6 +330,19 @@ class FoodLikes {
 
   FoodLikes copyWith({List<String>? like, List<String>? dislike, String? note, List<String>? staple}) => FoodLikes(
       like: like ?? this.like, dislike: dislike ?? this.dislike, note: note ?? this.note, staple: staple ?? this.staple);
+
+  /// Με τα id όπως είναι σήμερα στη βάση (αντικατεστημένα τρόφιμα, έλεγχος 19/11, I-2), χωρίς διπλά· ό,τι είναι στα «Δε
+  /// μου αρέσει» φεύγει από τα άλλα δύο.
+  FoodLikes mapIds(String Function(String id) now) {
+    List<String> m(List<String> xs) => [...{for (final x in xs) now(x)}];
+    final dis = m(dislike);
+    return FoodLikes(
+      like: [for (final x in m(like)) if (!dis.contains(x)) x],
+      dislike: dis,
+      note: note,
+      staple: [for (final x in m(staple)) if (!dis.contains(x)) x],
+    );
+  }
 }
 
 /// Επικόλληση προτιμήσεων («kind»: «ygeia-likes»): για να μπουν όλα μαζί την πρώτη φορά. Τα id που δεν υπάρχουν στη
@@ -338,9 +351,13 @@ class FoodLikes {
   final j = jsonOfKind(text, likesKind);
   if (j == null) return null;
   final l = FoodLikes.fromJson(j);
-  final unknown = [for (final id in [...l.like, ...l.dislike]) if (!exists(id)) id];
+  final unknown = [for (final id in [...l.like, ...l.dislike, ...l.staple]) if (!exists(id)) id];
   return (
-    likes: l.copyWith(like: [for (final x in l.like) if (exists(x)) x], dislike: [for (final x in l.dislike) if (exists(x)) x]),
+    likes: l.copyWith(
+      like: [for (final x in l.like) if (exists(x)) x],
+      dislike: [for (final x in l.dislike) if (exists(x)) x],
+      staple: [for (final x in l.staple) if (exists(x)) x],
+    ),
     unknown: unknown,
   );
 }

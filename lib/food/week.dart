@@ -100,15 +100,19 @@ class PlanSlot {
 
 /// Το πρόγραμμα: από τη μέρα [from] ([dateKey]), μία λίστα γευμάτων για κάθε μέρα.
 class WeekPlan {
-  const WeekPlan({required this.from, required this.days, required this.created, this.source = 'paste'});
+  const WeekPlan({required this.from, required this.days, required this.created, this.source = 'paste', this.meals});
   final String from;
 
   /// Τα γεύματα κάθε μέρας, με τη σειρά των ημερών από το [from].
   final List<List<PlanSlot>> days;
   final int created;
 
-  /// «paste» (επικόλληση) ή «auto» (το έφτιαξε η εφαρμογή).
+  /// «paste» (επικόλληση), «auto» (το έφτιαξε η εφαρμογή) ή «ai» (AI για το φαγητό).
   final String source;
+
+  /// Τα γεύματα που ζητήθηκαν (19/11, U-8): ώστε ένα γεύμα που έμεινε κενό να φαίνεται και να συμπληρώνεται, και το
+  /// «Ξαναφτιάξ’ το» να ξέρει ποια γεύματα θέλεις. null στα παλιά/επικολλημένα προγράμματα.
+  final List<Meal>? meals;
 
   DateTime get start => DateTime.parse(from);
   DateTime dayAt(int i) => DateTime(start.year, start.month, start.day + i);
@@ -132,6 +136,7 @@ class WeekPlan {
         from: from,
         created: created,
         source: source,
+        meals: meals,
         days: [
           for (var i = 0; i < days.length; i++)
             i == day ? [for (var k = 0; k < days[i].length; k++) k == index ? s : days[i][k]] : days[i],
@@ -142,6 +147,7 @@ class WeekPlan {
         'from': from,
         'created': created,
         'source': source,
+        if (meals != null) 'meals': [for (final m in meals!) m.name],
         'days': [
           for (final d in days) [for (final s in d) s.toJson()],
         ],
@@ -149,7 +155,7 @@ class WeekPlan {
 
   static WeekPlan? fromJson(Object? j) {
     if (j is! Map) return null;
-    final from = j['from'], days = j['days'], c = j['created'], src = j['source'];
+    final from = j['from'], days = j['days'], c = j['created'], src = j['source'], ms = j['meals'];
     if (from is! String || parseDayKey(from) == null || days is! List || days.isEmpty || days.length > maxPlanDays) return null;
     final out = <List<PlanSlot>>[];
     for (final d in days) {
@@ -164,8 +170,20 @@ class WeekPlan {
       days: out,
       created: c is num && c.isFinite ? c.toInt() : 0,
       source: src is String && src.isNotEmpty ? src : 'paste',
+      meals: ms is List ? [for (final m in Meal.values) if (ms.contains(m.name)) m] : null,
     );
   }
+
+  /// Με μία θέση ακόμα στη μέρα [day] (π.χ. γεύμα που είχε μείνει κενό).
+  WeekPlan withAdded(int day, PlanSlot s) => WeekPlan(
+        from: from,
+        created: created,
+        source: source,
+        meals: meals,
+        days: [
+          for (var i = 0; i < days.length; i++) i == day ? [...days[i], s] : days[i],
+        ],
+      );
 }
 
 /// «2026-11-16» → η μέρα, ή null αν δεν είναι σωστή ημερομηνία.
@@ -243,6 +261,8 @@ WeekParse parseWeek(String text, List<Dish> dishes, {required int now}) {
       final dish = key is String ? byKey[key] : null;
       if (meal == null) errors.add('$label: άγνωστο γεύμα «${s['meal']}» (breakfast, lunch, dinner, snack).');
       if (dish == null) errors.add('$label: δεν υπάρχει στη βιβλιοθήκη φαγητό με key «$key».');
+      // 19/11 (I-5): ό,τι σημείωσες «Δεν μου άρεσε» δεν μπαίνει ούτε με επικόλληση.
+      if (dish != null && dishRating(dish) < 0) errors.add('$label: το «${dish.name}» δεν σου άρεσε· άλλαξέ το.');
       if (k != null && (k is! num || !k.isFinite || k < minSlotKcal || k > maxSlotKcal)) {
         errors.add('$label: οι θερμίδες («kcal») πρέπει να είναι από ${minSlotKcal.round()} ως ${maxSlotKcal.round()}.');
       }
@@ -264,6 +284,7 @@ WeekPlan keepDone(WeekPlan next, WeekPlan? old) {
     from: next.from,
     created: next.created,
     source: next.source,
+    meals: next.meals,
     days: [
       for (var i = 0; i < next.days.length; i++)
         [

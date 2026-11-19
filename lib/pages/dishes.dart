@@ -40,6 +40,12 @@ Totals? dishTotals(FoodStore food, List<DishItem> amounts) {
 
 /// Η δεύτερη γραμμή ενός φαγητού στις λίστες: τι είναι και πόσες θερμίδες έχει «μία φορά».
 String dishSubtitle(FoodStore food, Dish d) {
+  // 19/11 (I-4): η βαθμολογία φαίνεται (το «Δεν μου άρεσε» βγάζει το φαγητό από τα προγράμματα).
+  final rate = switch (dishRating(d)) { 1 => 'Μου άρεσε$dotJoin', -1 => 'Δεν μου άρεσε$dotJoin', _ => '' };
+  return '$rate${_dishSubtitle(food, d)}';
+}
+
+String _dishSubtitle(FoodStore food, Dish d) {
   final missing = food.missingItems(d.items);
   if (missing.isNotEmpty) return 'Λείπει: ${missing.join(', ')}';
   String kp(Totals t) => '${kcalText(t.kcal)} kcal${dotJoin}πρωτεΐνη ${gramsText(t.protein)} g';
@@ -1565,6 +1571,21 @@ Future<void> dishActions(BuildContext context, FoodStore food, Dish d) async {
           subtitle: const Text('Όνομα, υλικά, ποσότητες, μερίδες'),
           onTap: () => Navigator.pop(ctx, 'edit'),
         ),
+        // 19/11 (I-4): «Μου άρεσε» / «Δεν μου άρεσε» αλλάζει και από εδώ (ξανά το ίδιο: σβήνει).
+        ListTile(
+          key: const ValueKey('dish-like'),
+          leading: Icon(dishRating(d) == 1 ? Icons.thumb_up_rounded : Icons.thumb_up_outlined),
+          title: Text(dishRating(d) == 1 ? 'Μου άρεσε ✓' : 'Μου άρεσε'),
+          subtitle: const Text('Μπαίνει πιο συχνά στα προγράμματα.'),
+          onTap: () => Navigator.pop(ctx, 'like'),
+        ),
+        ListTile(
+          key: const ValueKey('dish-dislike'),
+          leading: Icon(dishRating(d) == -1 ? Icons.thumb_down_rounded : Icons.thumb_down_outlined),
+          title: Text(dishRating(d) == -1 ? 'Δεν μου άρεσε ✓' : 'Δεν μου άρεσε'),
+          subtitle: const Text('Δεν μπαίνει σε προγράμματα.'),
+          onTap: () => Navigator.pop(ctx, 'dislike'),
+        ),
         ListTile(
           leading: Icon(Icons.delete_outline_rounded, color: c.bad),
           title: Text('Διαγραφή', style: TextStyle(color: c.bad)),
@@ -1575,7 +1596,10 @@ Future<void> dishActions(BuildContext context, FoodStore food, Dish d) async {
     ),
   );
   if (!context.mounted) return;
-  if (choice == 'edit') {
+  if (choice == 'like' || choice == 'dislike') {
+    final r = choice == 'like' ? 1 : -1;
+    await food.saveDish(withRating(d, dishRating(d) == r ? 0 : r));
+  } else if (choice == 'edit') {
     await openDishEditor(context, food, dish: d);
   } else if (choice == 'delete') {
     if (!await food.deleteDish(d) || !context.mounted) return;

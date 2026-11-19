@@ -503,8 +503,9 @@ class _MePageState extends State<MePage> {
           color: c.food,
           title: 'Τι μου αρέσει',
           text: food.likes.isEmpty
-              ? 'Για τις συνταγές: τι σου αρέσει και τι όχι.'
-              : '${countText(food.likes.like.length, 'τρόφιμο', 'τρόφιμα')} ·\u00A0δε μου αρέσουν ${food.likes.dislike.length}',
+              ? 'Για τις συνταγές και το AI: τι σου αρέσει, τι όχι, βασικά κουζίνας.'
+              : '${countText(food.likes.like.length, 'τρόφιμο', 'τρόφιμα')} ·\u00A0δε μου αρέσουν ${food.likes.dislike.length} ·\u00A0'
+                  'βασικά ${food.likes.staple.length}',
           line: true,
           onTap: () => Navigator.of(context).push(FoodLikesScreen.route(food)),
         ),

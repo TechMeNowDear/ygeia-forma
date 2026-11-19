@@ -170,7 +170,7 @@ class _RecipeStartSheetState extends State<RecipeStartSheet> {
                         likes.isEmpty
                             ? 'Τι μου αρέσει: δεν έχεις γράψει ακόμα'
                             : 'Τι μου αρέσει: ${countText(likes.like.length, 'τρόφιμο', 'τρόφιμα')}, '
-                                'δε μου αρέσουν ${likes.dislike.length}',
+                                'δε μου αρέσουν ${likes.dislike.length}, βασικά κουζίνας ${likes.staple.length}',
                         style: TextStyle(fontSize: 14.5, color: c.text),
                       ),
                     ),
@@ -885,10 +885,10 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
   Widget _staples(Aigaio c, FoodLikes l) {
     final food = widget.food;
     final suggested = [
-      for (final id in stapleSuggestions)
-        if (food.itemFood(DishItem(id, id, 1)) case final f?) f,
+      for (final (id, label) in stapleSuggestions)
+        if (food.itemFood(DishItem(id, id, 1)) case final f?) (f, label),
     ];
-    final ids = {for (final f in suggested) f.id};
+    final ids = {for (final (f, _) in suggested) f.id};
     final others = [
       for (final id in l.staple)
         if (!ids.contains(id))
@@ -897,23 +897,25 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
     return AppCard(
       key: const ValueKey('likes-staples'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Τσέκαρε όσα έχεις πάντα στο σπίτι.', style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
+        Text('Τσέκαρε όσα έχεις πάντα στο σπίτι (τουλάχιστον λάδι και αλάτι). Τα γκρίζα είναι στα «Δε μου αρέσουν».',
+            style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)),
         const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final f in suggested)
-            FilterChip(
-              key: ValueKey('staple-${f.id}'),
-              label: Text(f.name),
-              selected: l.staple.contains(f.id) || l.like.contains(f.id),
-              onSelected: !food.dishesRead || l.dislike.contains(f.id) || l.like.contains(f.id)
-                  ? null
-                  : (on) => _put(f.id, on ? 'staple' : null),
+          for (final (f, label) in suggested)
+            Tooltip(
+              message: l.dislike.contains(f.id) ? 'Είναι στα «Δε μου αρέσουν»' : f.name,
+              child: FilterChip(
+                key: ValueKey('staple-${f.id}'),
+                label: Text(label),
+                selected: l.staple.contains(f.id),
+                onSelected: !food.dishesRead || l.dislike.contains(f.id) ? null : (on) => _set(f.id, staple: on),
+              ),
             ),
           for (final f in others)
             InputChip(
               key: ValueKey('staple-${f.id}'),
               label: Text(f.name),
-              onDeleted: () => _remove(f.id),
+              onDeleted: () => _set(f.id, staple: false),
               deleteButtonTooltipMessage: 'Αφαίρεση',
             ),
         ]),
@@ -955,20 +957,31 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
     final f = await pickFood(context, widget.food,
         forWhat: switch (which) { 'like' => 'Μου αρέσουν', 'staple' => 'Βασικά κουζίνας', _ => 'Δε μου αρέσουν' });
     if (f == null || !mounted) return;
-    await _put(f.id, which);
+    await switch (which) {
+      'like' => _set(f.id, like: true),
+      'staple' => _set(f.id, staple: true),
+      _ => _set(f.id, dislike: true),
+    };
   }
 
-  Future<void> _put(String id, String? which) async {
+  /// «Μου αρέσει» και «βασικά κουζίνας» είναι ανεξάρτητα (U-17)· μόνο το «δε μου αρέσει» βγάζει από τα δύο, και το
+  /// «μου αρέσει»/«βασικό» βγάζει από το «δε μου αρέσει».
+  Future<void> _set(String id, {bool? like, bool? staple, bool? dislike}) {
     final l = widget.food.likes;
-    List<String> without(List<String> xs) => [for (final x in xs) if (x != id) x];
-    await widget.food.saveLikes(l.copyWith(
-      like: [...without(l.like), if (which == 'like') id],
-      dislike: [...without(l.dislike), if (which == 'dislike') id],
-      staple: [...without(l.staple), if (which == 'staple') id],
+    List<String> tog(List<String> xs, bool? on) => on == null ? xs : [for (final x in xs) if (x != id) x, if (on) id];
+    final dis = dislike == true;
+    return widget.food.saveLikes(l.copyWith(
+      like: tog(l.like, dis ? false : like),
+      staple: tog(l.staple, dis ? false : staple),
+      dislike: tog(l.dislike, dislike ?? ((like == true || staple == true) ? false : null)),
     ));
   }
 
-  Future<void> _remove(String id) => _put(id, null);
+  /// Αφαίρεση από τη λίστα του τσιπ (μου αρέσουν ή δε μου αρέσουν).
+  Future<void> _remove(String id) {
+    final l = widget.food.likes;
+    return l.dislike.contains(id) ? _set(id, dislike: false) : _set(id, like: false);
+  }
 
   Future<void> _paste() async {
     final d = await Clipboard.getData(Clipboard.kTextPlain);
@@ -984,7 +997,8 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Αντικατάσταση της λίστας;'),
           content: Text('Η λίστα σου θα γίνει αυτή που επικόλλησες: ${countText(r.likes.like.length, 'τρόφιμο', 'τρόφιμα')} '
-              'που σου αρέσουν και ${r.likes.dislike.length} που δε σου αρέσουν.'),
+              'που σου αρέσουν και ${r.likes.dislike.length} που δε σου αρέσουν. '
+              '${r.likes.staple.isEmpty ? 'Τα βασικά κουζίνας (${widget.food.likes.staple.length}) μένουν.' : 'Τα βασικά κουζίνας γίνονται ${r.likes.staple.length}.'}'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Άκυρο')),
             FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Αντικατάσταση')),
@@ -993,9 +1007,16 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
       );
       if (yes != true || !mounted) return;
     }
-    final ok = await widget.food.saveLikes(r.likes);
+    // Επικόλληση χωρίς «staple»/σημειώσεις (π.χ. από άλλον βοηθό): τα τωρινά μένουν (I-1/U-16).
+    final cur = widget.food.likes;
+    final pasted = r.likes;
+    final next = pasted.copyWith(
+      staple: (pasted.staple.isEmpty ? cur.staple : pasted.staple).where((id) => !pasted.dislike.contains(id)).toList(),
+      note: pasted.note.trim().isEmpty ? cur.note : pasted.note,
+    );
+    final ok = await widget.food.saveLikes(next);
     if (!mounted || !ok) return;
-    _note.text = r.likes.note;
+    _note.text = next.note;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Μπήκαν ${countText(r.likes.like.length, 'τρόφιμο', 'τρόφιμα')} που σου αρέσουν και '
           '${r.likes.dislike.length} που δε σου αρέσουν'
@@ -1064,8 +1085,8 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
             children: [
-              Text('Το AI φτιάχνει φαγητά ΜΟΝΟ από όσα σου αρέσουν και τα βασικά κουζίνας. Όσα δε σου αρέσουν δεν μπαίνουν '
-                  'ποτέ σε συνταγή.',
+              Text('Το «Φτιάξ’ το με AI» φτιάχνει φαγητά ΜΟΝΟ από όσα σου αρέσουν και τα βασικά κουζίνας. Στις οδηγίες για '
+                  'αντιγραφή, όσα σου αρέσουν προτιμώνται. Όσα δε σου αρέσουν δεν μπαίνουν ποτέ σε συνταγή.',
                   style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary)),
               const SizedBox(height: 16),
               SectionTitle(text: 'Μου αρέσουν', trailing: l.like.isEmpty ? null : '${l.like.length}'),
@@ -1095,7 +1116,9 @@ class _FoodLikesScreenState extends State<FoodLikesScreen> {
                   _noteSave = Timer(const Duration(milliseconds: 800), _saveNote);
                 },
                 decoration: InputDecoration(
-                  hintText: 'π.χ. πόσο χρόνο έχεις για μαγείρεμα, τι τρόπο μαγειρέματος προτιμάς, τι αποφεύγεις.',
+                  hintText: 'π.χ. πόσο χρόνο έχεις για μαγείρεμα, τι τρόπο μαγειρέματος και ποιες γεύσεις προτιμάς.',
+                  helperText: 'Πάνε και στο AI. Μη γράφεις στοιχεία υγείας (εξετάσεις, φάρμακα, παθήσεις).',
+                  helperMaxLines: 3,
                   hintStyle: TextStyle(color: c.textTertiary),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),

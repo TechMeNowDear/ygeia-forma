@@ -16,6 +16,7 @@ library;
 import 'dart:convert';
 
 import 'adaptive.dart';
+import 'ai/ai_bridge.dart' show AiBridge;
 import 'adaptive_check.dart';
 import 'data.dart';
 import 'error_report.dart';
@@ -478,6 +479,9 @@ Map<String, dynamic> diagnosticsFrom({
       'dishes': food.dishesForBackup(),
       // Πρόγραμμα εβδομάδας (15/11): οι θέσεις με το φαγητό, τις θερμίδες και τι σημειώθηκε.
       'week': food.week?.toJson(),
+      // 19/11 (I-15): «Τι μου αρέσει» (από αυτά φτιάχνει το AI) και αν είναι συνδεδεμένο το AI. Ποτέ διεύθυνση ή κλειδί.
+      'foodLikes': food.likesForBackup(),
+      'ai': {'connected': AiBridge.shared?.ready ?? false, 'tested': AiBridge.shared?.okDay},
       'training': training,
       'sources': sources == null ? null : {'plan': _tryJson(sources.plan), 'log': sources.log == null ? null : _tryJson(sources.log!)},
       'waist': [for (final w in store.waist) w.toJson()],
