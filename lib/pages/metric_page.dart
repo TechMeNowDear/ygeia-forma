@@ -349,7 +349,7 @@ class _MetricPageState extends State<MetricPage> {
                 // Έλεγχος 19/11 (L-15): η ίδια εξήγηση με το Σώμα.
                 if (s.metric == K.weight && _avgFrom(history, store.plan, from, end).length >= 2) ...[
                   const SizedBox(height: 4),
-                  Text('Έντονη γραμμή: μέσος όρος 7 ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας.',
+                  Text('Έντονη γραμμή: μέσος όρος των ζυγίσεων των 7 τελευταίων ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας, με λίγες μέρες καθυστέρηση.',
                       key: const ValueKey('metric-avg-note'), style: TextStyle(color: c.textTertiary, fontSize: 12.5)),
                 ],
                 if (wrist) ...[

@@ -422,7 +422,12 @@ class _MePageState extends State<MePage> {
               _setSmoke(context, p, v.first, today);
             },
           ),
+          // Έλεγχος 19/11 (S-7): IQOS και ηλεκτρονικό τσιγάρο συνεχίζουν τη νικοτίνη· οι 10 εβδομάδες αφορούν τη διακοπή της.
           if (s == 'now' || s == 'ex') ...[
+            const SizedBox(height: 8),
+            Text('«Το έκοψα» σημαίνει χωρίς τσιγάρο και χωρίς νικοτίνη. Αν πέρασες σε IQOS ή ηλεκτρονικό τσιγάρο, μείνε στο '
+                '«Καπνίζω» και πάτα «Το έκοψα» τη μέρα που θα κόψεις κι αυτό.',
+                key: const ValueKey('me-smoke-nicotine'), style: hint),
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,7 +437,8 @@ class _MePageState extends State<MePage> {
                     key: const ValueKey('me-cigs'),
                     initialValue: p.cigs?.toString() ?? '',
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: s == 'ex' ? 'Τσιγάρα τη μέρα (τότε)' : 'Τσιγάρα τη μέρα', border: _outline),
+                    decoration: InputDecoration(
+                        labelText: s == 'ex' ? 'Τσιγάρα τη μέρα (τότε)' : 'Τσιγάρα τη μέρα', helperText: 'κατά μέσο όρο', border: _outline),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (v) => (v ?? '').trim().isEmpty || num(v!, 1, 80) != null ? null : 'Από 1 ως 80',
                     onChanged: (v) {

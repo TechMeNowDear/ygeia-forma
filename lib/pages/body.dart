@@ -228,7 +228,7 @@ class BodyPage extends StatelessWidget {
               average: avg),
           if (avg.length >= 2) ...[
             const SizedBox(height: 6),
-            Text('Έντονη γραμμή: μέσος όρος 7 ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας.',
+            Text('Έντονη γραμμή: μέσος όρος των ζυγίσεων των 7 τελευταίων ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας, με λίγες μέρες καθυστέρηση.',
                 key: const ValueKey('body-weight-avg-note'),
                 style: TextStyle(color: Aigaio.of(context).textSecondary, fontSize: 12.5, height: 1.35)),
           ],

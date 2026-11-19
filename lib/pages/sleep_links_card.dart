@@ -33,7 +33,7 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
 
   Widget _card(BuildContext context, FoodStore? food) {
     final c = Aigaio.of(context);
-    final r = sleepLinks(
+    final r = sleepLinksStable(
       history: widget.store.history,
       plan: widget.store.plan,
       today: widget.now ?? DateTime.now(),
@@ -102,6 +102,7 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
               'κρίνεται από $sleepLinkMinNights νύχτες και πάνω. Επειδή '
               '${pairs > 1 ? 'είναι $pairs ζευγάρια μαζί' : 'μετρά κάθε ζευγάρι'} και οι διαδοχικές νύχτες μοιάζουν, ο '
               'έλεγχος είναι αυστηρός, και μια αλλαγή που κράτησε εβδομάδες (π.χ. γιορτές, νέα δίαιτα) δεν μετρά ως σύνδεση. '
+              'Μια σύνδεση φαίνεται εδώ μόνο αν βγαίνει ίδια για 4 εβδομάδες· και πάλι μπορεί σπάνια να είναι τύχη. '
               'Το «ώρες από το φαγητό» κρίνεται με την ώρα ύπνου σταθερή. Η ώρα του φαγητού είναι η ώρα που το έγραψες· '
               'γράψ\' το όταν το τρως για να βγαίνει σωστά.',
               key: const ValueKey('sleep-links-how-text'),
