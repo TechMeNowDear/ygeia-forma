@@ -727,7 +727,8 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
       ],
       if (_autoNotes case final notes? when notes.isNotEmpty) ...[
         const SizedBox(height: 14),
-        Text('Τι δεν βγήκε όπως ζητούν οι κανόνες:',
+        // K2-R-10: ο ίδιος τίτλος και για τις σημειώσεις υγείας ενός επικολλημένου προγράμματος (δεν έχει «κανόνες»).
+        Text('Να ξέρεις για αυτό το πρόγραμμα:',
             key: const ValueKey('week-auto-notes'), style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.warn)),
         for (final n in notes) Text('•\u00A0$n', style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
       ],

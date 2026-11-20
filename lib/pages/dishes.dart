@@ -808,7 +808,9 @@ class _DishLogSheetState extends State<DishLogSheet> {
               child: Text(
                 widget.targetKcal != null
                     ? 'Η μερίδα σου για το πρόγραμμα (${kcalText(widget.targetKcal!)} kcal): ${thousands(want.round())} g'
-                    : 'Μία από ${countText(sv!, 'μερίδα', 'μερίδες')}: ${thousands(want.round())} g',
+                    // K2-R-06: από το K2-C-11 είναι η μερίδα της ΣΥΝΤΑΓΗΣ από αυτό το μαγείρεμα· με διπλή δόση το «Μία από
+                    // 6 μερίδες» δεν ήταν αληθινό (η κατσαρόλα βγάζει 12).
+                    : 'Μία μερίδα της συνταγής: ${thousands(want.round())} g',
                 style: TextStyle(fontSize: 14.5, height: 1.35, fontWeight: FontWeight.w600, color: c.text),
               ),
             ),

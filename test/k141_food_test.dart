@@ -269,7 +269,7 @@ void main() {
       final cod = check(s, List.filled(6, 'bakaliaros')).where((p) => p.tag == 'mercury').toList();
       expect(cod, hasLength(1));
       expect(cod.single.user, contains('120 µg'));
-      expect(cod.single.user, contains('όριο EFSA 107'));
+      expect(cod.single.user, contains('όριο EFSA 106'), reason: 'K2-R-11: η τιμή προς τα πάνω, το όριο (106,86) προς τα κάτω');
       expect(cod.single.user, contains('μπακαλιάρος'));
       expect(check(s, List.filled(6, 'sardeles')).where((p) => p.tag == 'mercury'), isEmpty);
       expect(check(s, List.filled(5, 'bakaliaros')).where((p) => p.tag == 'mercury'), isEmpty, reason: '5 × 180 × 0,111 = 99,9');
@@ -388,5 +388,132 @@ void main() {
     expect(aiKeepsText(false), contains('2 μέρες'));
     expect(aiKeepsText(true), contains('την επόμενη μέρα'));
     expect((aiPotMaxGap, aiPotRiceGap), (2, 1));
+  });
+
+  // ---------------------------------------------------------------------------- ανεξάρτητος έλεγχος των διορθώσεων (K2-R)
+  group('ανεξάρτητος έλεγχος των διορθώσεων (K2-R)', () {
+    test('K2-R-01: δύο φαγητά στο ίδιο γεύμα δεν φουσκώνουν το όριο της μέρας (πριν: 20,3 g κορεσμένα αντί για 14,3)', () {
+      final s = _store();
+      final w = _week([
+        [
+          PlanSlot(meal: Meal.lunch, dishId: _byKey(s, 'feta-salata').id),
+          PlanSlot(meal: Meal.lunch, dishId: _byKey(s, 'kotopoulo-ryzi').id),
+          PlanSlot(meal: Meal.snack, dishId: _byKey(s, 'giaourti').id),
+          PlanSlot(meal: Meal.dinner, dishId: _byKey(s, 'solomos').id),
+        ],
+      ]);
+      final notes = weekHealthNotes(s, w, t: _targets, bodyKg: 82.2);
+      final sat = notes.where((n) => n.contains('κορεσμένα') && n.contains('όριο')).toList();
+      expect(sat, hasLength(1));
+      expect(sat.single, contains('(όριο 14,3)'));
+      expect(notes.join('\n'), isNot(contains('20,3')));
+      expect(notes.join('\n'), isNot(contains('όριο 7,1')), reason: 'και το αλάτι με το όριο της μέρας (5 g)');
+    });
+
+    test('K2-R-02: δικό σου προϊόν «ΞΙΦΙΑΣ» χωρίς τόνο στο γράμμα ή «Swordfish» παίρνει την τιμή του ξιφία', () {
+      Food own(String name) =>
+          Food(id: 'own-$name', name: name, cat: 'Ψάρια', source: 'Ετικέτα', n: Nutrients({Nk.kcal: const NValue(120)}));
+      expect(mercuryPpm(own('ΞΙΦΙΑΣ ΦΕΤΕΣ')), 0.995);
+      expect(mercuryPpm(own('Swordfish steak')), 0.995);
+      expect(mercuryPpm(own('Ξιφίας κατεψυγμένος')), 0.995);
+      expect(mercuryPpm(own('Τόνος σε νερό Χ')), 0.35, reason: 'άγνωστο είδος τόνου: η συντηρητική τιμή');
+      expect(mercuryPpm(own('Λαβράκι φιλέτο')), aiMercuryDefaultPpm);
+    });
+
+    test('K2-R-04: το φίλτρο αριθμών διατροφής πιάνει και «θρεπτικό πρώτα», και όχι ποσότητες υλικών', () {
+      const caught = [
+        'Μόνο 420 kcal και 4 g κορεσμένα.', 'Έχει 35 γραμμάρια πρωτεΐνης στη μερίδα.', 'Περίπου 500 θερμίδες.',
+        'Πρωτεΐνη 35 g, κορεσμένα 4 g.', 'Πολλή πρωτεΐνη (38 g) και λίγα κορεσμένα (3 g).', 'Κορεσμένα μόνο 3,5 g στη μερίδα.',
+        'Δίνει ίνες 12 g.', 'Με 40g πρωτεΐνης.', '35 γρ. πρωτεΐνη.', 'Αλάτι κάτω από 1 g.', 'Θερμίδες: 450.',
+        'Έχει το 30% της πρωτεΐνης της μέρας.', 'Χαμηλό σε θερμίδες (περίπου 450).', '12 g of protein', 'Protein 30 g, 450 calories',
+        '12 g λιπαρά στη μερίδα.', 'Λιπαρά 12 g.', 'Υδατάνθρακες 60 g.', 'Πρωτεΐνη: 35 g.', 'Πρωτεΐνη περίπου 35 g.',
+        'Υδατάνθρακες ως 60 g.', 'πρωτεΐνης = 30%', 'Θερμίδες περίπου 450.', 'Ίνες 12 g.', 'Φυτικές ίνες: 9 g.',
+      ];
+      const passes = [
+        'Ψήσε 20 λεπτά στους 200 °C.', 'Κράτα 100 g ρύζι για αύριο.', 'Πολλή πρωτεΐνη και ίνες, λίγα κορεσμένα.',
+        'Αν το θες πιο νόστιμο, πρόσθεσε 1 g αλάτι στο τέλος.', 'Μη βάλεις πάνω από 1 g αλάτι.',
+        'Στο τέλος 5 g ζάχαρη για την οξύτητα της ντομάτας.', 'Αντί για γιαούρτι, 150 g φυτικό επιδόρπιο σόγιας.',
+        'Βάλε 10 g λιπαρό τυρί λιγότερο.', 'Γίνεται και με 200 g λίπος… όχι: με 20 g ελαιόλαδο.', 'Κόψε 300 g ντομάτα σε κύβους.',
+        'Σέρβιρε με 30 g φέτα.', 'Καλή πηγή πρωτεΐνης. Βράσε 10 λεπτά.', 'Λίγα κορεσμένα· με 150 g γιαούρτι γίνεται πιο χορταστικό.',
+        'Πλούσιο σε ίνες: πρόσθεσε 2 κουταλιές βρώμη.', 'Τα λιπαρά ψάρια θέλουν 12 λεπτά στους 180 °C.',
+        'Η πρωτεΐνη έρχεται από 2 αυγά.', 'Πλούσιο σε πρωτεΐνη με 150 g κοτόπουλο.', 'Λίγες θερμίδες· ψήσε 20 λεπτά.',
+        'Λίγες θερμίδες, 20 λεπτά δουλειά.', 'Κλημεντίνες 150 g για επιδόρπιο.', 'Κράτα 2 μερίδες στο ψυγείο ως 2 μέρες.',
+      ];
+      for (final t in caught) {
+        expect(aiSentenceHasNutritionNumber(t), isTrue, reason: t);
+      }
+      for (final t in passes) {
+        expect(aiSentenceHasNutritionNumber(t), isFalse, reason: t);
+      }
+    });
+
+    test('K2-R-09: «από αυτά 1 ως 3 λιπαρά» με στόχο 3 ψάρια (πριν: «2 ως 4»)· χωρίς λιπαρό ψάρι το λέει, χωρίς διόρθωση', () {
+      final s = _store();
+      List<AiProblem> check(List<String> dinners, int fishWeek) {
+        final w = _week([
+          for (final key in dinners) [PlanSlot(meal: Meal.dinner, dishId: _byKey(s, key).id)],
+        ], meals: const [Meal.dinner]);
+        return aiCheckWeek(s, w, const [],
+            t: _targets, meals: const [Meal.dinner], checkDays: {for (var i = 0; i < dinners.length; i++) i}, fishWeek: fishWeek,
+            bodyKg: 82.2);
+      }
+
+      final none = check(['bakaliaros', 'bakaliaros', 'kotopoulo-ryzi'], 2).where((p) => p.user.contains('Κανένα λιπαρό ψάρι')).toList();
+      expect(none, hasLength(1));
+      expect((none.single.weight, none.single.ai), (0, ''), reason: 'μόνο ενημέρωση');
+      expect(check(['bakaliaros', 'solomos'], 2).where((p) => p.user.contains('Κανένα λιπαρό ψάρι')), isEmpty);
+      expect(check(['bakaliaros', 'bakaliaros'], 0).where((p) => p.user.contains('Κανένα λιπαρό ψάρι')), isEmpty,
+          reason: 'χωρίς στόχο ψαριού δεν λέει τίποτα');
+    });
+
+    test('K2-R-10: πρόγραμμα 14 ημερών: τα εβδομαδιαία όρια μετριούνται ανά εβδομάδα (πριν: 800 g λιπαρό «την εβδομάδα»)', () {
+      final s = _store();
+      // 2 × 200 g σολομό την εβδομάδα, 14 μέρες: 800 g συνολικά = 400 g την εβδομάδα (όριο 720).
+      final w = _week([
+        for (var i = 0; i < 14; i++)
+          [PlanSlot(meal: Meal.dinner, dishId: _byKey(s, i % 7 < 2 ? 'solomos' : 'kotopoulo-ryzi').id)],
+      ], meals: const [Meal.dinner]);
+      expect(weekHealthNotes(s, w, t: _targets, bodyKg: 82.2).where((n) => n.contains('Λιπαρό ψάρι')), isEmpty);
+      // 6 × 180 g μπακαλιάρο ΚΑΘΕ εβδομάδα για 14 μέρες: 119,9 µg την εβδομάδα, πάνω από το όριο και τις δύο.
+      final cod = _week([
+        for (var i = 0; i < 14; i++)
+          [PlanSlot(meal: Meal.dinner, dishId: _byKey(s, i % 7 < 6 ? 'bakaliaros' : 'kotopoulo-ryzi').id)],
+      ], meals: const [Meal.dinner]);
+      final hg = weekHealthNotes(s, cod, t: _targets, bodyKg: 82.2).where((n) => n.contains('Υδράργυρος')).toList();
+      expect(hg, hasLength(1));
+      expect(hg.single, contains('120 µg την εβδομάδα'));
+    });
+
+    test('K2-R-11: ένα όνομα ανά είδος, και «(εκτίμηση)» για είδος χωρίς τιμή στον πίνακα της FDA', () {
+      final s = _store();
+      // Τσιπούρα (προεπιλογή 0,10): 6 × 180 g = 108 µg, πάνω από το όριο 106,9.
+      final lib = [
+        _dish('tsipoura', 'plate', [('C26088', 180), (_rice, 80)]),
+      ];
+      var n = 0;
+      final r = planLibraryImport(
+        parseLibrary(jsonEncode({'kind': libraryKind, 'dishes': lib})),
+        existing: const [],
+        food: (id) => s.itemFood(DishItem(id, id, 1)),
+        likes: const FoodLikes(),
+        now: 1,
+        newId: () => 'T${n++}',
+      );
+      expect(r.problems, isEmpty);
+      final s2 = _store(dishes: [...s.dishes, ...r.added]);
+      final w = _week([
+        for (var i = 0; i < 6; i++) [PlanSlot(meal: Meal.dinner, dishId: _byKey(s2, 'tsipoura').id)],
+      ], meals: const [Meal.dinner]);
+      final hg = weekHealthNotes(s2, w, t: _targets, bodyKg: 82.2).where((x) => x.contains('Υδράργυρος')).toList();
+      expect(hg, hasLength(1));
+      expect(hg.single, contains('(εκτίμηση)'));
+      expect(hg.single, contains('108 µg'));
+      expect(hg.single, contains('όριο EFSA 106'));
+    });
+
+    test('K2-R-07: το «light» δεν είναι άλλο όνομα του γάλακτος 0% (στα ράφια «light» είναι συνήθως το 1,5%)', () {
+      expect(_food('C19051').aliases, isNot(contains('light')));
+      expect(_food('C19051').aliases, contains('άπαχο'));
+    });
   });
 }
