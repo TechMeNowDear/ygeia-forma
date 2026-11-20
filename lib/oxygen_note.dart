@@ -5,6 +5,11 @@
 /// σημαντικότερο:
 /// 1. Ελάχιστο < 80% σε τουλάχιστον 2 από τις 30 τελευταίες νύχτες → «…σπάνιο… πες το στον γιατρό σου».
 /// 2. Ελάχιστο < 85% σε τουλάχιστον 3 από τις νύχτες με μέτρηση της τελευταίας εβδομάδας → «…αξίζει να το πεις…».
+/// 2β (έλεγχος 20/11, K3-S-03). Ελάχιστο < 85% σε τουλάχιστον 4 νύχτες ΚΑΙ στις μισές τουλάχιστον από τις νύχτες με
+///    μέτρηση των 30 τελευταίων ημερών → το ίδιο μήνυμα, «των τελευταίων 30 ημερών». Για όποιον φορά το ρολόι στον
+///    ύπνο 1–2 νύχτες την εβδομάδα: οι «3 σε 7 μέρες» δεν συμπληρώνονταν ποτέ, ακόμα κι αν ΟΛΕΣ οι νύχτες με μέτρηση
+///    ήταν κάτω από 85% (προσομοίωση: 24 τέτοιες νύχτες σε 12 εβδομάδες, καμία σημείωση). Το «4 και οι μισές» είναι
+///    δική μας επιλογή.
 /// 3. Ελάχιστο < 80% την τελευταία νύχτα (μόνο αυτή) → ουδέτερο «από μία νύχτα δεν ξεχωρίζει· αν ξαναγίνει…».
 /// Πάντα: σημάδια κινδύνου και 166/112 (στην οθόνη, όχι εδώ).
 ///
@@ -14,7 +19,9 @@
 /// είναι τυχαίο λάθος (τα λάθη του καρπού όμως μπορεί να επαναλαμβάνονται: στάση, λουρί). Το Galaxy Watch4 συμφώνησε καλά με την πολυυπνογραφία
 /// (RMSE 2,3%) και πετάει μόνο του τα κακά σήματα (Jung et al., Sleep Health 2022;8:420)· δεν υπάρχει στοιχείο ότι
 /// μια τιμή < 80% είναι «συνήθως» λάθος. Το 85% (όχι 88%): με 88% περίπου 1 στους 5 υγιείς θα έβλεπε σημείωση κάθε
-/// εβδομάδα· με 85% περίπου 1 στους 500 (πρόχειρος υπολογισμός, κανονική κατανομή, ανεξάρτητες νύχτες). Για την
+/// εβδομάδα· με 85% περίπου 1 στους 500 (πρόχειρος υπολογισμός, κανονική κατανομή, ΑΝΕΞΑΡΤΗΤΕΣ νύχτες· έλεγχος 20/11,
+/// K3-S-13: η τυπική απόκλιση 3,1 είναι κυρίως ΑΝΑΜΕΣΑ σε ανθρώπους, άρα ρεαλιστικά σημείωση βλέπει το 3–4% των υγιών,
+/// όσοι έχουν σταθερά χαμηλότερο ελάχιστο· μην στηρίξεις νέα απόφαση στο «1 στους 500»). Για την
 /// επανάληψη ο λόγος είναι αυτός ο στατιστικός. (Το Oldenburg 2016, Eur Heart J 37:1695, δείχνει ότι ο χρόνος κάτω από
 /// 90% συνδέεται με θνησιμότητα σε καρδιακή ανεπάρκεια· δεν αφορά την επανάληψη· τρίτος κλινικός έλεγχος C7.)
 ///
@@ -38,6 +45,10 @@ const oxygenWindowNights = 7;
 /// Πολύ χαμηλή τιμή σε τουλάχιστον [oxygenVeryLowRepeatNights] από τις [oxygenLongWindowNights] τελευταίες νύχτες.
 const oxygenLongWindowNights = 30;
 const oxygenVeryLowRepeatNights = 2;
+
+/// Κανόνας 2β (έλεγχος 20/11, K3-S-03): κάτω από [oxygenLow] σε τουλάχιστον τόσες νύχτες ΚΑΙ στις μισές τουλάχιστον
+/// από τις νύχτες με μέτρηση των [oxygenLongWindowNights] τελευταίων ημερών.
+const oxygenMonthRepeatNights = 4;
 
 /// K2: ≥ 2 νύχτες < 80% στις 30 τελευταίες. Κλινικός έλεγχος 4 (C2): όχι «δύο σε έναν μήνα δύσκολα [λάθη]»· τα λάθη
 /// του καρπού δεν είναι ανεξάρτητα από νύχτα σε νύχτα (κείμενο όπως γράφτηκε στον έλεγχο).
@@ -68,6 +79,10 @@ String oxygenRepeatText(int n, int measured) => 'Το οξυγόνο έπεσε 
     'ροχαλίζεις, νυστάζεις τη μέρα, έχεις υψηλή πίεση ή αρρυθμία. Η αναφορά για γιατρό (Τάσεις › Για γιατρό) '
     'δείχνει τη χαμηλότερη τιμή κάθε νύχτας.';
 
+/// Κανόνας 2β: το ίδιο μήνυμα για τις νύχτες με μέτρηση του μήνα (όταν το ρολόι φοριέται στον ύπνο λίγες νύχτες).
+String oxygenRepeatMonthText(int n, int measured) => oxygenRepeatText(n, measured)
+    .replaceFirst('της τελευταίας εβδομάδας', 'των τελευταίων $oxygenLongWindowNights ημερών');
+
 const oxygenRedFlagText = 'Αν έχεις δύσπνοια, πόνο στο στήθος ή μπλε χείλη, μην περιμένεις: 166 ή 112.';
 
 /// Μία γραμμή πάνω από τις τιμές· το πλήρες κείμενο ([oxygenAboutText]) ανοίγει με «Τι σημαίνει» (έλεγχος UX U9:
@@ -92,6 +107,8 @@ const oxygenMinLabel = 'Οξυγόνο τη νύχτα, χαμηλότερη τ�
 /// οι τιμές κάτω από 70% αποκλείστηκαν από την ανάλυση· δεν σημαίνει ότι το ρολόι δεν τις δίνει).
 const oxygenRangeText = 'Η ακρίβεια του ρολογιού έχει ελεγχθεί μόνο για τιμές 70–100%· πιο χαμηλές τιμές είναι αβέβαιες.';
 
+/// Έλεγχος 20/11 (K3-S-12, οδηγίες Samsung Sleep Apnea 03/2025): το τεστ θέλει περίπου 4 ώρες ύπνου τη νύχτα, 2 νύχτες
+/// μέσα σε 10 μέρες· με λιγότερο ύπνο δεν βγάζει αποτέλεσμα.
 /// Κλινικός έλεγχος M3 (δεύτερος, 4/11): το τεστ άπνοιας του ρολογιού είναι μόνο διαλογή· ευαισθησία 82,7% (χάνει
 /// περίπου 1 στους 6 με μέτρια–σοβαρή άπνοια) και δεν προορίζεται για κολπική μαρμαρυγή, καρδιακή ανεπάρκεια ή
 /// χρόνια πνευμονοπάθεια (Samsung IFU Sleep Apnea EU v1.2, 2025· FDA DEN230041). Υψηλή πίεση και αρρυθμία είναι
@@ -102,7 +119,8 @@ const oxygenAboutText = 'Δεν είναι διάγνωση. Το ρολόι δ�
     'περίπου 1 στους 6, και δεν '
     'προορίζεται για όσους έχουν κολπική μαρμαρυγή, καρδιακή ανεπάρκεια ή πάθηση των πνευμόνων (ούτε με περιοδικές κινήσεις '
     'ποδιών στον ύπνο, τρόμο ή προσωρινό πρόβλημα αναπνοής, π.χ. ίωση ή αλλεργία)· αρνητικό αποτέλεσμα '
-    'δεν αποκλείει άπνοια. Ρώτα τον γιατρό σου για μελέτη ύπνου αν ροχαλίζεις δυνατά, σου έχουν πει ότι σταματάς να '
+    'δεν αποκλείει άπνοια. Το τεστ θέλει 2 νύχτες με περίπου 4 ώρες ύπνου η καθεμία· νύχτα με λιγότερο ύπνο δεν '
+    'μετρά, και «δεν βγήκε αποτέλεσμα» δεν σημαίνει «αρνητικό». Ρώτα τον γιατρό σου για μελέτη ύπνου αν ροχαλίζεις δυνατά, σου έχουν πει ότι σταματάς να '
     'αναπνέεις, ξυπνάς με πονοκέφαλο, νυστάζεις τη μέρα, ή έχεις υψηλή πίεση ή αρρυθμία. $oxygenNoNoteText '
     '$oxygenRangeText';
 
@@ -112,6 +130,8 @@ class OxygenGuidance {
     required this.lowNights,
     this.measuredNights = 0,
     this.veryLowNights30 = 0,
+    this.lowNights30 = 0,
+    this.measuredNights30 = 0,
     this.lastNight,
     this.today,
     this.veryLowList = const [],
@@ -132,6 +152,10 @@ class OxygenGuidance {
   /// Σε πόσες από τις 30 τελευταίες νύχτες η χαμηλότερη μέτρηση ήταν κάτω από 80%.
   final int veryLowNights30;
 
+  /// Κανόνας 2β: σε πόσες από τις νύχτες με μέτρηση των 30 τελευταίων ημερών ήταν κάτω από 85%, και πόσες είχαν μέτρηση.
+  final int lowNights30;
+  final int measuredNights30;
+
   /// Η νύχτα που η οθόνη δείχνει ως «τελευταία» και η σημερινή μέρα (για το «χθεσινή» ή την ημερομηνία).
   final DateTime? lastNight;
   final DateTime? today;
@@ -139,8 +163,11 @@ class OxygenGuidance {
   bool get veryLowRepeated => veryLowNights30 >= oxygenVeryLowRepeatNights;
   bool get repeated => lowNights >= oxygenRepeatNights;
 
+  /// Κανόνας 2β: τουλάχιστον [oxygenMonthRepeatNights] νύχτες κάτω από 85% και οι μισές τουλάχιστον από όσες είχαν μέτρηση.
+  bool get repeatedMonth => lowNights30 >= oxygenMonthRepeatNights && lowNights30 * 2 >= measuredNights30;
+
   /// Αν υπάρχει κάτι να πούμε πέρα από το σταθερό κείμενο.
-  bool get any => veryLowRepeated || repeated || veryLowLastNight;
+  bool get any => veryLowRepeated || repeated || repeatedMonth || veryLowLastNight;
 
   /// ΕΝΑ μήνυμα, το σημαντικότερο (K3: δύο μαζί αντέφασκαν). Χωρίς το σταθερό των σημαδιών κινδύνου.
   List<String> get messages => [
@@ -148,6 +175,8 @@ class OxygenGuidance {
           oxygenVeryLowRepeatText(veryLowNights30, veryLowList)
         else if (repeated)
           oxygenRepeatText(lowNights, measuredNights)
+        else if (repeatedMonth)
+          oxygenRepeatMonthText(lowNights30, measuredNights30)
         else if (veryLowLastNight)
           lastNight == null ? oxygenVeryLowText : oxygenVeryLowTextFor(lastNight!, today),
       ];
@@ -157,9 +186,11 @@ class OxygenGuidance {
       ? 'Κάτω από 80% σε $veryLowNights30 νύχτες (30 μέρες) ·\u00A0δες την Καρδιά'
       : repeated
           ? 'Κάτω από 85% σε $lowNights από $measuredNights νύχτες ·\u00A0δες την Καρδιά'
-          : veryLowLastNight
-              ? 'Πολύ χαμηλή τιμή μία νύχτα ·\u00A0δες την Καρδιά'
-              : null;
+          : repeatedMonth
+              ? 'Κάτω από 85% σε $lowNights30 από $measuredNights30 νύχτες (30 μέρες) ·\u00A0δες την Καρδιά'
+              : veryLowLastNight
+                  ? 'Πολύ χαμηλή τιμή μία νύχτα ·\u00A0δες την Καρδιά'
+                  : null;
 }
 
 /// [minByNight]: η χαμηλότερη μέτρηση κάθε νύχτας (ημερομηνία του πρωινού), ΜΟΝΟ νύχτες με μέτρηση.
@@ -172,11 +203,15 @@ OxygenGuidance oxygenGuidance(Map<DateTime, double> minByNight, DateTime lastNig
   var low = 0;
   var measured = 0;
   var veryLow30 = 0;
+  var low30 = 0;
+  var measured30 = 0;
   final veryLowList = <(DateTime, double)>[];
   double? lastValue;
   for (final e in minByNight.entries) {
     final d = DateTime(e.key.year, e.key.month, e.key.day);
     if (d.isBefore(from30) || d.isAfter(last) || !e.value.isFinite) continue;
+    measured30++;
+    if (e.value < oxygenLow) low30++;
     if (e.value < oxygenVeryLow) {
       veryLow30++;
       veryLowList.add((d, e.value));
@@ -191,6 +226,8 @@ OxygenGuidance oxygenGuidance(Map<DateTime, double> minByNight, DateTime lastNig
     lowNights: low,
     measuredNights: measured,
     veryLowNights30: veryLow30,
+    lowNights30: low30,
+    measuredNights30: measured30,
     veryLowList: veryLowList..sort((a, b) => a.$1.compareTo(b.$1)),
     lastNight: last,
     today: today == null ? null : dayOf(today),

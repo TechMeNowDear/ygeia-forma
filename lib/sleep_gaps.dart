@@ -159,6 +159,11 @@ class _PieceGroup<T> {
 /// Έλεγχος 4: ελάχιστος πραγματικός ύπνος για να γίνει νύχτα μια ομάδα χωρίς κανένα λεπτό στο [nightWindow] (1β).
 const fallbackMainMinutes = 60;
 
+/// Έλεγχος 20/11 (K3C-01), κανόνας 1γ: πόσες φορές περισσότερο πραγματικό ύπνο από την κύρια του παραθύρου πρέπει να
+/// έχει μια επόμενη ομάδα ΧΩΡΙΣ κανένα λεπτό στο 22:00–08:00 (αρχή 08:00–12:00) για να γίνει αυτή η κύρια. Δική μας
+/// επιλογή, όχι από μελέτη: με 2× ένας μεσημεριανός ύπνος μετά από μια κανονική σύντομη νύχτα μένει υπνάκος.
+const mainTakeoverRatio = 2.0;
+
 /// Το «παράθυρο νύχτας» της ημερομηνίας [date] (το πρωί): 22:00 της προηγούμενης μέρας ως 08:00 (τοπική ώρα).
 ({DateTime from, DateTime to}) nightWindow(DateTime date) =>
     (from: DateTime(date.year, date.month, date.day - 1, 22), to: DateTime(date.year, date.month, date.day, 8));
@@ -173,6 +178,13 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
 ///    ισοπαλία → η νωρίτερη. Ημερομηνία χωρίς καμία τέτοια ομάδα (1β, έλεγχος 4): κύρια η ομάδα με τον περισσότερο
 ///    πραγματικό ύπνο από όσες αρχίζουν ως τις 12:00 της μέρας, αν έχει ≥ [fallbackMainMinutes] λεπτά (μια ομάδα του
 ///    βραδιού χωρίς λεπτά στο παράθυρο τελειώνει πριν από τις 22:00: λαγοκοίμισμα, μένει υπνάκος).
+///    1γ (έλεγχος 20/11, K3C-01: ύπνος μετά τις 03:00): μια ΕΠΟΜΕΝΗ ομάδα της ίδιας ημερομηνίας με περισσότερο
+///    πραγματικό ύπνο παίρνει τη θέση της κύριας του παραθύρου. Ομάδα με λεπτά στο παράθυρο της ίδιας ημερομηνίας
+///    (αρχίζει πριν από τις 08:00): αρκεί περισσότερος ύπνος. Ομάδα χωρίς κανένα λεπτό στο παράθυρο, που αρχίζει τη
+///    μέρα αυτή πριν από τις 12:00: τουλάχιστον [fallbackMainMinutes] λεπτά ΚΑΙ [mainTakeoverRatio] φορές τον ύπνο της
+///    κύριας. Έτσι ένα λαγοκοίμισμα 22:15–23:45 δεν γίνεται «νύχτα» αντί για τον ύπνο 06:30–12:30, και στο 03:30–05:15
+///    + 06:50–09:30 κύρια είναι το μεγάλο κομμάτι (το μικρό ενώνεται με τον κανόνα 2). Ποτέ προς τα πίσω: ένας μεγάλος
+///    βραδινός ύπνος 18:00–22:30 δεν παίρνει τη θέση της νύχτας που ακολουθεί.
 /// 2. Ομάδες ΠΡΙΝ από την κύρια: μέρος της νύχτας αν αρχίζουν από τις 20:00 του προηγούμενου βραδιού και μετά ΚΑΙ το
 ///    κενό ως την (ήδη ενωμένη) νύχτα είναι ως [maxGap] (4 ώρες)· αλλιώς υπνάκος.
 /// 3. Ομάδες ΜΕΤΑ από την κύρια που αρχίζουν πριν από τις 06:00: μέρος της νύχτας αν το κενό είναι ως 4 ώρες· αλλιώς
@@ -216,6 +228,8 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
   // 1. Κύρια ομάδα ανά ημερομηνία: κάθε ομάδα «διεκδικεί» την ημερομηνία όπου έχει τα περισσότερα λεπτά στο παράθυρο.
   final mainOf = <DateTime, int>{};
   final mainMinutes = <DateTime, double>{};
+  // Η ημερομηνία που διεκδικεί κάθε ομάδα με τα λεπτά της στο παράθυρο (null: κανένα λεπτό σε κανένα παράθυρο).
+  final claim = List<DateTime?>.filled(groups.length, null);
   for (var i = 0; i < groups.length; i++) {
     final g = groups[i];
     DateTime? best;
@@ -230,6 +244,7 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
       }
     }
     if (best == null) continue;
+    claim[i] = best;
     final prev = mainMinutes[best];
     if (prev == null || bestMin > prev) {
       mainOf[best] = i;
@@ -240,8 +255,42 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
   // χωρίς κύρια ομάδα: κύρια γίνεται η ομάδα με τον περισσότερο πραγματικό ύπνο ανάμεσα σε όσες αρχίζουν ως τις 12:00
   // της μέρας (ισοπαλία → η νωρίτερη), μόνο αν έχει τουλάχιστον
   // [fallbackMainMinutes] λεπτά. Μετά οι ίδιοι κανόνες ένωσης. Η νύχτα ανήκει στη μέρα που ξυπνάς.
-  final mainSet = mainOf.values.toSet();
+  // 1γ. Έλεγχος 20/11 (K3C-01): μια ΕΠΟΜΕΝΗ ομάδα της ίδιας ημερομηνίας με περισσότερο πραγματικό ύπνο γίνεται κύρια
+  // (ισοπαλία → μένει η προηγούμενη). Τα σύνολα [fallback] κρατούν και αυτές τις κύριες: μια αποθηκευμένη απόφαση
+  // «υπνάκος» ως την αρχή τους είχε παρθεί με άλλη κύρια και δεν μετρά.
   final fallback = <int>{};
+  for (final date in mainOf.keys.toList()) {
+    final w = mainOf[date]!;
+    final wTotal = groups[w].totalMinutes;
+    final limit = DateTime(date.year, date.month, date.day + 2);
+    var best = w;
+    var bestTotal = wTotal;
+    for (var i = w + 1; i < groups.length; i++) {
+      final g = groups[i];
+      if (g.wallStart.isAfter(limit)) break;
+      final total = g.totalMinutes;
+      final c = claim[i];
+      final bool claims;
+      if (c != null) {
+        claims = c == date && total > wTotal;
+      } else {
+        final st = g.wallStart;
+        claims = st.hour < 12 &&
+            dayOf(st) == date &&
+            total >= fallbackMainMinutes &&
+            total >= mainTakeoverRatio * wTotal;
+      }
+      if (claims && total > bestTotal) {
+        best = i;
+        bestTotal = total;
+      }
+    }
+    if (best != w) {
+      mainOf[date] = best;
+      fallback.add(best);
+    }
+  }
+  final mainSet = mainOf.values.toSet();
   final fallbackOf = <DateTime, int>{};
   for (var i = 0; i < groups.length; i++) {
     if (mainSet.contains(i)) continue;
@@ -302,8 +351,8 @@ DateTime napDateOf(DateTime start) => start.hour >= 18 ? DateTime(start.year, st
           if (!joins) locks[m.key] ??= g.start;
         } else {
           var lock = napLockOf?.call(lockKey);
-          // Κύρια από το 1β: μια αποθηκευμένη απόφαση ως την αρχή της είχε παρθεί χωρίς κύρια ομάδα (κανόνες ως v3)·
-          // δεν μετρά (σαν να μην υπάρχει).
+          // Κύρια από το 1β ή το 1γ: μια αποθηκευμένη απόφαση ως την αρχή της είχε παρθεί χωρίς κύρια ομάδα (κανόνες
+          // ως v3) ή με άλλη κύρια (πριν από το 1γ)· δεν μετρά (σαν να μην υπάρχει).
           if (lock != null && fallback.contains(m.value) && !lock.isAfter(groups[m.value].start)) lock = null;
           joins = lock == null || g.start.isBefore(lock);
           if (!joins) locks[m.key] ??= lock;

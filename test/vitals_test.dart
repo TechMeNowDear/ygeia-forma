@@ -48,7 +48,9 @@ void main() {
     expect(glucoseNote(g(140, GlucoseWhen.after)), isNull);
     expect(glucoseNote(g(210, GlucoseWhen.after)), contains('200 και πάνω'));
     expect(glucoseNote(g(350, GlucoseWhen.random)), contains('Πολύ υψηλό'));
-    expect(glucoseNote(g(60, GlucoseWhen.random)), contains('χαμηλό'));
+    // Έλεγχος 20/11 (K3-S-06): 55–69 χωρίς φάρμακα δεν λέγεται «χαμηλό σάκχαρο»· κάτω από 55 ναι.
+    expect(glucoseNote(g(60, GlucoseWhen.random)), contains('Κάτω από 70'));
+    expect(glucoseNote(g(50, GlucoseWhen.random)), contains('χαμηλό'));
   });
 
   test('Αποθήκευση, διαγραφή, επαναφορά από αντίγραφο, χαλασμένο αρχείο στην άκρη', () async {
