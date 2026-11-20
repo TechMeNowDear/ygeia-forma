@@ -1,0 +1,1213 @@
+{
+ "LabChange": {
+  "censored": "comparable false · diff null · pct null · lessSure false",
+  "different tests": "comparable false · diff null · pct null · lessSure false",
+  "from zero": "comparable true · diff 1.2 · pct null · lessSure false",
+  "ldl 160 → 131": "comparable true · diff -29.0 · pct -18.125 · lessSure false",
+  "ldl mg/dL → mmol/L": "comparable true · diff -28.52199999999999 · pct -17.826249999999995 · lessSure false",
+  "other lab": "comparable true · diff -10.0 · pct -6.25 · lessSure true",
+  "other method": "comparable true · diff -10.0 · pct -6.25 · lessSure true",
+  "same lab, other case": "comparable true · diff -10.0 · pct -6.25 · lessSure false",
+  "unknown unit on one side": "comparable true · diff null · pct null · lessSure false",
+  "urine vs blood": "comparable false · diff null · pct null · lessSure false"
+ },
+ "LabResult": {
+  "<0.5 with lo 0.5": "flag -1 · base 0.5 [0.5, 5.0] · censored true · notBlood false · test crp",
+  "<0.6 with lo 0.5": "flag 0 · base 0.6 [0.5, 5.0] · censored true · notBlood false · test crp",
+  ">4.9 with hi 5": "flag 0 · base 4.9 [0.5, 5.0] · censored true · notBlood false · test crp",
+  ">5 with hi 5": "flag 1 · base 5.0 [0.5, 5.0] · censored true · notBlood false · test crp",
+  "fromJson": {
+   "bad day": null,
+   "full": {
+    "d": "2026-11-10",
+    "gt": true,
+    "hi": 130.0,
+    "lab": "Εργαστήριο Α",
+    "lo": 0.0,
+    "lt": true,
+    "m": "calc",
+    "n": "LDL",
+    "ref": "< 130",
+    "s": "Ορός",
+    "t": "ldl",
+    "u": "mg/dL",
+    "v": 160.0
+   },
+   "minimal": {
+    "d": "2026-11-10",
+    "n": "Κάτι",
+    "u": "",
+    "v": 5.5
+   },
+   "not a map": null,
+   "unknown test id": {
+    "d": "2026-11-10",
+    "n": "Κάτι",
+    "u": "x",
+    "v": 5.0
+   },
+   "value NaN": null,
+   "value as text": null
+  },
+  "glucose in mmol/l": "flag 1 · base 115.30239999999999 [70.26239999999999, 99.088] · censored false · notBlood false · test glu",
+  "hba1c in mmol/mol": "flag 0 · base 5.53676 [null, null] · censored false · notBlood false · test hba1c",
+  "hdl 31, only lower limit": "flag -1 · base 31.0 [40.0, null] · censored false · notBlood false · test hdl",
+  "isDay": {
+   "": false,
+   "2026-02-29": false,
+   "2026-1-1": false,
+   "2026-11-10": true,
+   "2026-11-10T08:00": false,
+   "2026-13-01": false,
+   "2028-02-29": true
+  },
+  "ldl 100.0 [100, 130]": "flag 0 · base 100.0 [100.0, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 100.1 [100, 130]": "flag 0 · base 100.1 [100.0, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 129.9 [100, 130]": "flag 0 · base 129.9 [100.0, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 130.0 [100, 130]": "flag 0 · base 130.0 [100.0, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 130.1 [100, 130]": "flag 1 · base 130.1 [100.0, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 160, only upper limit": "flag 1 · base 160.0 [null, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 99.9 [100, 130]": "flag -1 · base 99.9 [100.0, 130.0] · censored false · notBlood false · test ldl",
+  "ldl in mmol/L": "flag 1 · base 158.547 [0.0, 131.478] · censored false · notBlood false · test ldl",
+  "no limits": "flag 0 · base 160.0 [null, null] · censored false · notBlood false · test ldl",
+  "serum glucose": "flag 0 · base 95.0 [null, null] · censored false · notBlood false · test glu",
+  "unknown test": "flag 0 · base null [null, null] · censored false · notBlood false · test null",
+  "unknown unit": "flag 0 · base null [null, null] · censored false · notBlood false · test ldl",
+  "urine glucose": "flag 0 · base null [null, null] · censored false · notBlood true · test null"
+ },
+ "aliases not matching their own test": [],
+ "catalog": {
+  "cats": {
+   "blood": "Γενική αίματος",
+   "electrolytes": "Ηλεκτρολύτες",
+   "inflammation": "Φλεγμονή",
+   "iron": "Σίδηρος",
+   "kidney": "Νεφροί",
+   "lipids": "Λιπίδια",
+   "liver": "Ήπαρ",
+   "other": "Άλλες",
+   "sugar": "Σάκχαρο",
+   "thyroid": "Θυρεοειδής",
+   "vitamins": "Βιταμίνες"
+  },
+  "labById": 39,
+  "shortCodeLength": 3,
+  "tests": {
+   "alb": {
+    "aliases": [
+     "Λευκωματίνη",
+     "Αλβουμίνη",
+     "Albumin",
+     "ALB"
+    ],
+    "cat": "liver",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Λευκωματίνη",
+    "toBase": {
+     "G/DL": 10.0,
+     "g/dL": 10.0,
+     "g/l": 1.0,
+     "κάτι": null
+    },
+    "unit": "g/dL",
+    "units": {
+     "g/l": "×0.1 +0.0 · 1→0.1 · 100←1000.0"
+    }
+   },
+   "alp": {
+    "aliases": [
+     "Αλκαλική φωσφατάση",
+     "ALP",
+     "Alkaline phosphatase"
+    ],
+    "cat": "liver",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Αλκαλική φωσφατάση",
+    "toBase": {
+     "U/L": 10.0,
+     "iu/l": 10.0,
+     "κάτι": null
+    },
+    "unit": "U/L",
+    "units": {
+     "iu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "alt": {
+    "aliases": [
+     "SGPT",
+     "ALT",
+     "SGPT/ALT",
+     "ALT/SGPT",
+     "Αλανινική αμινοτρανσφεράση",
+     "Alanine aminotransferase"
+    ],
+    "cat": "liver",
+    "decimals": 0,
+    "loinc": null,
+    "name": "SGPT (ALT)",
+    "toBase": {
+     "U/L": 10.0,
+     "iu/l": 10.0,
+     "κάτι": null
+    },
+    "unit": "U/L",
+    "units": {
+     "iu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "apob": {
+    "aliases": [
+     "ApoB",
+     "Apo B",
+     "Apo-B",
+     "Apolipoprotein B",
+     "Απολιποπρωτεΐνη Β",
+     "Απολιποπρωτεΐνη B"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Απολιποπρωτεΐνη B",
+    "toBase": {
+     "MG/DL": 10.0,
+     "g/l": 1000.0,
+     "mg/dL": 10.0,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "g/l": "×100.0 +0.0 · 1→100.0 · 100←1.0"
+    }
+   },
+   "ast": {
+    "aliases": [
+     "SGOT",
+     "AST",
+     "SGOT/AST",
+     "AST/SGOT",
+     "Ασπαρτική αμινοτρανσφεράση",
+     "Aspartate aminotransferase"
+    ],
+    "cat": "liver",
+    "decimals": 0,
+    "loinc": null,
+    "name": "SGOT (AST)",
+    "toBase": {
+     "U/L": 10.0,
+     "iu/l": 10.0,
+     "κάτι": null
+    },
+    "unit": "U/L",
+    "units": {
+     "iu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "b12": {
+    "aliases": [
+     "B12",
+     "Βιταμίνη B12",
+     "Βιταμίνη Β12",
+     "Vitamin B12",
+     "Κοβαλαμίνη",
+     "Cobalamin"
+    ],
+    "cat": "vitamins",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Βιταμίνη B12",
+    "toBase": {
+     "PG/ML": 10.0,
+     "pg/mL": 10.0,
+     "pmol/l": 13.5538086,
+     "κάτι": null
+    },
+    "unit": "pg/mL",
+    "units": {
+     "pmol/l": "×1.3553808620222283 +0.0 · 1→1.3553808620222283 · 100←73.78"
+    }
+   },
+   "bili": {
+    "aliases": [
+     "Χολερυθρίνη",
+     "Χολερυθρίνη ολική",
+     "Ολική χολερυθρίνη",
+     "Bilirubin",
+     "Total bilirubin",
+     "TBIL"
+    ],
+    "cat": "liver",
+    "decimals": 2,
+    "loinc": null,
+    "name": "Χολερυθρίνη ολική",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "µmol/l": 0.584795322,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "µmol/l": "×0.05847953216374269 +0.0 · 1→0.05847953216374269 · 100←1710.0"
+    }
+   },
+   "ca": {
+    "aliases": [
+     "Ασβέστιο",
+     "Calcium",
+     "Ca",
+     "Ca ολικό"
+    ],
+    "cat": "electrolytes",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Ασβέστιο",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 40.08,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×4.008 +0.0 · 1→4.008 · 100←24.9500998003992"
+    }
+   },
+   "chol": {
+    "aliases": [
+     "Χοληστερίνη",
+     "Χοληστερίνη ολική",
+     "Ολική χοληστερόλη",
+     "Χοληστερόλη",
+     "Χοληστερόλη ολική",
+     "Cholesterol",
+     "Total cholesterol",
+     "Cholesterol total",
+     "CHOL",
+     "TC"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Ολική χοληστερίνη",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 386.7,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×38.67 +0.0 · 1→38.67 · 100←2.585983966899405"
+    }
+   },
+   "crea": {
+    "aliases": [
+     "Κρεατινίνη",
+     "Creatinine",
+     "CREA",
+     "CREAT",
+     "CR"
+    ],
+    "cat": "kidney",
+    "decimals": 2,
+    "loinc": null,
+    "name": "Κρεατινίνη",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "µmol/l": 0.113096584,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "µmol/l": "×0.011309658448314861 +0.0 · 1→0.011309658448314861 · 100←8842.0"
+    }
+   },
+   "crp": {
+    "aliases": [
+     "CRP",
+     "C-αντιδρώσα πρωτεΐνη",
+     "C αντιδρώσα πρωτεΐνη",
+     "C-reactive protein"
+    ],
+    "cat": "inflammation",
+    "decimals": 1,
+    "loinc": null,
+    "name": "CRP (C-αντιδρώσα πρωτεΐνη)",
+    "toBase": {
+     "MG/L": 10.0,
+     "mg/L": 10.0,
+     "mg/dl": 100.0,
+     "κάτι": null
+    },
+    "unit": "mg/L",
+    "units": {
+     "mg/dl": "×10.0 +0.0 · 1→10.0 · 100←10.0"
+    }
+   },
+   "egfr": {
+    "aliases": [
+     "eGFR",
+     "GFR",
+     "Ρυθμός σπειραματικής διήθησης",
+     "Σπειραματική διήθηση",
+     "eGFR CKD-EPI",
+     "Estimated GFR",
+     "Estimated GFR CKD-EPI",
+     "Estimated GFR 2021 CKD-EPI",
+     "Estimated GFR 2021 CKD-EPI Creatinine",
+     "eGFR 2021 CKD-EPI",
+     "eGFR CKD-EPI 2021",
+     "eGFR CKD-EPI Creatinine",
+     "Εκτιμώμενος ρυθμός σπειραματικής διήθησης",
+     "Εκτιμώμενη σπειραματική διήθηση"
+    ],
+    "cat": "kidney",
+    "decimals": 0,
+    "loinc": null,
+    "name": "eGFR (σπειραματική διήθηση)",
+    "toBase": {
+     "ML/MIN/1,73M²": 10.0,
+     "mL/min/1,73m²": 10.0,
+     "ml/min": 10.0,
+     "κάτι": null
+    },
+    "unit": "mL/min/1,73m²",
+    "units": {
+     "ml/min": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "ferritin": {
+    "aliases": [
+     "Φερριτίνη",
+     "Ferritin",
+     "FERR"
+    ],
+    "cat": "iron",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Φερριτίνη",
+    "toBase": {
+     "NG/ML": 10.0,
+     "ng/mL": 10.0,
+     "µg/l": 10.0,
+     "κάτι": null
+    },
+    "unit": "ng/mL",
+    "units": {
+     "µg/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "folate": {
+    "aliases": [
+     "Φυλλικό οξύ",
+     "Φυλλικό",
+     "Folate",
+     "Folic acid",
+     "Serum folate"
+    ],
+    "cat": "vitamins",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Φυλλικό οξύ",
+    "toBase": {
+     "NG/ML": 10.0,
+     "ng/mL": 10.0,
+     "nmol/l": 4.41306267,
+     "κάτι": null
+    },
+    "unit": "ng/mL",
+    "units": {
+     "nmol/l": "×0.44130626654898497 +0.0 · 1→0.44130626654898497 · 100←226.60000000000002"
+    }
+   },
+   "ft4": {
+    "aliases": [
+     "FT4",
+     "Free T4",
+     "Ελεύθερη θυροξίνη",
+     "Ελεύθερη T4"
+    ],
+    "cat": "thyroid",
+    "decimals": 2,
+    "loinc": null,
+    "name": "FT4 (ελεύθερη θυροξίνη)",
+    "toBase": {
+     "NG/DL": 10.0,
+     "ng/dL": 10.0,
+     "pmol/l": 0.777000777,
+     "κάτι": null
+    },
+    "unit": "ng/dL",
+    "units": {
+     "pmol/l": "×0.07770007770007771 +0.0 · 1→0.07770007770007771 · 100←1286.9999999999998"
+    }
+   },
+   "ggt": {
+    "aliases": [
+     "γ-GT",
+     "γGT",
+     "GGT",
+     "Gamma GT",
+     "γ-γλουταμυλοτρανσφεράση",
+     "Gamma-glutamyl transferase"
+    ],
+    "cat": "liver",
+    "decimals": 0,
+    "loinc": null,
+    "name": "γ-GT",
+    "toBase": {
+     "U/L": 10.0,
+     "iu/l": 10.0,
+     "κάτι": null
+    },
+    "unit": "U/L",
+    "units": {
+     "iu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "glu": {
+    "aliases": [
+     "Σάκχαρο",
+     "Γλυκόζη",
+     "Γλυκόζη νηστείας",
+     "Σάκχαρο νηστείας",
+     "Glucose",
+     "Fasting glucose",
+     "GLU",
+     "GLUC"
+    ],
+    "cat": "sugar",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Σάκχαρο (γλυκόζη)",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 180.16,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×18.016 +0.0 · 1→18.016 · 100←5.550621669626999"
+    }
+   },
+   "hba1c": {
+    "aliases": [
+     "HbA1c",
+     "Hb A1c",
+     "A1c",
+     "Γλυκοζυλιωμένη αιμοσφαιρίνη",
+     "Γλυκοζυλιωμένη",
+     "Glycated hemoglobin",
+     "Hemoglobin A1c"
+    ],
+    "cat": "sugar",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Γλυκοζυλιωμένη αιμοσφαιρίνη (HbA1c)",
+    "toBase": {
+     "%": 10.0,
+     "mmol/mol": 3.0668,
+     "κάτι": null
+    },
+    "unit": "%",
+    "units": {
+     "mmol/mol": "×0.09148 +2.152 · 1→2.24348 · 100←1069.610843900306"
+    }
+   },
+   "hct": {
+    "aliases": [
+     "Αιματοκρίτης",
+     "Hematocrit",
+     "Haematocrit",
+     "HCT",
+     "Ht"
+    ],
+    "cat": "blood",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Αιματοκρίτης",
+    "toBase": {
+     "%": 10.0,
+     "l/l": 1000.0,
+     "κάτι": null
+    },
+    "unit": "%",
+    "units": {
+     "l/l": "×100.0 +0.0 · 1→100.0 · 100←1.0"
+    }
+   },
+   "hdl": {
+    "aliases": [
+     "HDL",
+     "HDL-C",
+     "HDL χοληστερόλη",
+     "Χοληστερίνη HDL",
+     "Χοληστερόλη HDL",
+     "HDL cholesterol",
+     "Cholesterol HDL",
+     "High density lipoprotein",
+     "Λιποπρωτεΐνη υψηλής πυκνότητας",
+     "Χοληστερόλη υψηλής πυκνότητας λιποπρωτεϊνών"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "HDL χοληστερίνη",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 386.7,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×38.67 +0.0 · 1→38.67 · 100←2.585983966899405"
+    }
+   },
+   "hgb": {
+    "aliases": [
+     "Αιμοσφαιρίνη",
+     "Hemoglobin",
+     "Haemoglobin",
+     "HGB",
+     "Hb"
+    ],
+    "cat": "blood",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Αιμοσφαιρίνη",
+    "toBase": {
+     "G/DL": 10.0,
+     "g/dL": 10.0,
+     "g/l": 1.0,
+     "κάτι": null
+    },
+    "unit": "g/dL",
+    "units": {
+     "g/l": "×0.1 +0.0 · 1→0.1 · 100←1000.0"
+    }
+   },
+   "hscrp": {
+    "aliases": [
+     "hs-CRP",
+     "hsCRP",
+     "CRP υψηλής ευαισθησίας",
+     "High sensitivity CRP"
+    ],
+    "cat": "inflammation",
+    "decimals": 2,
+    "loinc": null,
+    "name": "hs-CRP",
+    "toBase": {
+     "MG/L": 10.0,
+     "mg/L": 10.0,
+     "mg/dl": 100.0,
+     "κάτι": null
+    },
+    "unit": "mg/L",
+    "units": {
+     "mg/dl": "×10.0 +0.0 · 1→10.0 · 100←10.0"
+    }
+   },
+   "insulin": {
+    "aliases": [
+     "Ινσουλίνη",
+     "Insulin",
+     "INS"
+    ],
+    "cat": "sugar",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Ινσουλίνη",
+    "toBase": {
+     "miu/l": 10.0,
+     "mu/l": 10.0,
+     "µIU/mL": 10.0,
+     "ΜIU/ML": 10.0,
+     "κάτι": null
+    },
+    "unit": "µIU/mL",
+    "units": {
+     "miu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "mu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "iron": {
+    "aliases": [
+     "Σίδηρος",
+     "Σίδηρος ορού",
+     "Iron",
+     "Serum iron",
+     "Fe"
+    ],
+    "cat": "iron",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Σίδηρος",
+    "toBase": {
+     "µg/dL": 10.0,
+     "µmol/l": 55.8347292,
+     "ΜG/DL": 10.0,
+     "κάτι": null
+    },
+    "unit": "µg/dL",
+    "units": {
+     "µmol/l": "×5.583472920156337 +0.0 · 1→5.583472920156337 · 100←17.91"
+    }
+   },
+   "k": {
+    "aliases": [
+     "Κάλιο",
+     "Potassium",
+     "K",
+     "K+"
+    ],
+    "cat": "electrolytes",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Κάλιο",
+    "toBase": {
+     "MMOL/L": 10.0,
+     "meq/l": 10.0,
+     "mmol/L": 10.0,
+     "κάτι": null
+    },
+    "unit": "mmol/L",
+    "units": {
+     "meq/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "ldl": {
+    "aliases": [
+     "LDL",
+     "LDL-C",
+     "LDL χοληστερόλη",
+     "Χοληστερίνη LDL",
+     "Χοληστερόλη LDL",
+     "LDL cholesterol",
+     "Cholesterol LDL",
+     "LDL υπολογιζόμενη",
+     "LDL (υπολογιζόμενη)",
+     "LDL calculated",
+     "LDL direct",
+     "LDL άμεση",
+     "Low density lipoprotein",
+     "Λιποπρωτεΐνη χαμηλής πυκνότητας",
+     "Χοληστερόλη χαμηλής πυκνότητας λιποπρωτεϊνών"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "LDL χοληστερίνη",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 386.7,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×38.67 +0.0 · 1→38.67 · 100←2.585983966899405"
+    }
+   },
+   "lpa": {
+    "aliases": [
+     "Lp(a)",
+     "Lpa",
+     "Lipoprotein(a)",
+     "Lipoprotein a",
+     "Λιποπρωτεΐνη α",
+     "Λιποπρωτεΐνη (a)"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Λιποπρωτεΐνη(a)",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {}
+   },
+   "mcv": {
+    "aliases": [
+     "MCV",
+     "Μέσος όγκος ερυθρών"
+    ],
+    "cat": "blood",
+    "decimals": 1,
+    "loinc": null,
+    "name": "MCV (μέσος όγκος ερυθρών)",
+    "toBase": {
+     "FL": 10.0,
+     "fL": 10.0,
+     "κάτι": null
+    },
+    "unit": "fL",
+    "units": {}
+   },
+   "na": {
+    "aliases": [
+     "Νάτριο",
+     "Sodium",
+     "Na",
+     "Na+"
+    ],
+    "cat": "electrolytes",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Νάτριο",
+    "toBase": {
+     "MMOL/L": 10.0,
+     "meq/l": 10.0,
+     "mmol/L": 10.0,
+     "κάτι": null
+    },
+    "unit": "mmol/L",
+    "units": {
+     "meq/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "nonhdl": {
+    "aliases": [
+     "Non-HDL",
+     "Non HDL",
+     "Non-HDL-C",
+     "Non-HDL cholesterol",
+     "Μη HDL χοληστερίνη"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Non-HDL χοληστερίνη",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 386.7,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×38.67 +0.0 · 1→38.67 · 100←2.585983966899405"
+    }
+   },
+   "plt": {
+    "aliases": [
+     "Αιμοπετάλια",
+     "PLT",
+     "Platelets",
+     "Thrombocytes"
+    ],
+    "cat": "blood",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Αιμοπετάλια",
+    "toBase": {
+     "/mm3": 0.01,
+     "/µl": 0.01,
+     "10^3/µl": 10.0,
+     "10^9/l": 10.0,
+     "k/µl": 10.0,
+     "×10³/µL": 10.0,
+     "×10³/ΜL": 10.0,
+     "κάτι": null
+    },
+    "unit": "×10³/µL",
+    "units": {
+     "/mm3": "×0.001 +0.0 · 1→0.001 · 100←100000.0",
+     "/µl": "×0.001 +0.0 · 1→0.001 · 100←100000.0",
+     "10^3/µl": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "10^9/l": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "k/µl": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "psa": {
+    "aliases": [
+     "PSA",
+     "Total PSA",
+     "PSA ολικό",
+     "Ολικό PSA",
+     "Προστατικό ειδικό αντιγόνο",
+     "Ειδικό προστατικό αντιγόνο"
+    ],
+    "cat": "other",
+    "decimals": 2,
+    "loinc": null,
+    "name": "PSA",
+    "toBase": {
+     "NG/ML": 10.0,
+     "ng/mL": 10.0,
+     "µg/l": 10.0,
+     "κάτι": null
+    },
+    "unit": "ng/mL",
+    "units": {
+     "µg/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "rbc": {
+    "aliases": [
+     "Ερυθρά αιμοσφαίρια",
+     "Ερυθρά",
+     "RBC",
+     "Red blood cells",
+     "Erythrocytes"
+    ],
+    "cat": "blood",
+    "decimals": 2,
+    "loinc": null,
+    "name": "Ερυθρά αιμοσφαίρια",
+    "toBase": {
+     "10^12/l": 10.0,
+     "10^6/µl": 10.0,
+     "m/µl": 10.0,
+     "×10⁶/µL": 10.0,
+     "×10⁶/ΜL": 10.0,
+     "κάτι": null
+    },
+    "unit": "×10⁶/µL",
+    "units": {
+     "10^12/l": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "10^6/µl": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "m/µl": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "tg": {
+    "aliases": [
+     "Τριγλυκερίδια",
+     "Triglycerides",
+     "TRIG",
+     "TG",
+     "TRG"
+    ],
+    "cat": "lipids",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Τριγλυκερίδια",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 885.7,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×88.57 +0.0 · 1→88.57 · 100←1.1290504685559446"
+    }
+   },
+   "tsh": {
+    "aliases": [
+     "TSH",
+     "Θυρεοειδοτρόπος ορμόνη",
+     "Θυρεοτρόπος ορμόνη",
+     "Θυρεοτροπίνη",
+     "Thyroid stimulating hormone"
+    ],
+    "cat": "thyroid",
+    "decimals": 2,
+    "loinc": null,
+    "name": "TSH",
+    "toBase": {
+     "miu/l": 10.0,
+     "mu/l": 10.0,
+     "µIU/mL": 10.0,
+     "ΜIU/ML": 10.0,
+     "κάτι": null
+    },
+    "unit": "µIU/mL",
+    "units": {
+     "miu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "mu/l": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   },
+   "urea": {
+    "aliases": [
+     "Ουρία",
+     "Urea",
+     "UREA"
+    ],
+    "cat": "kidney",
+    "decimals": 0,
+    "loinc": null,
+    "name": "Ουρία",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "mmol/l": 60.06,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "mmol/l": "×6.006 +0.0 · 1→6.006 · 100←16.65001665001665"
+    }
+   },
+   "uric": {
+    "aliases": [
+     "Ουρικό οξύ",
+     "Ουρικό",
+     "Uric acid",
+     "UA",
+     "URIC"
+    ],
+    "cat": "kidney",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Ουρικό οξύ",
+    "toBase": {
+     "MG/DL": 10.0,
+     "mg/dL": 10.0,
+     "µmol/l": 0.168123739,
+     "κάτι": null
+    },
+    "unit": "mg/dL",
+    "units": {
+     "µmol/l": "×0.016812373907195696 +0.0 · 1→0.016812373907195696 · 100←5948.0"
+    }
+   },
+   "vitd": {
+    "aliases": [
+     "Βιταμίνη D",
+     "25-OH βιταμίνη D",
+     "25(OH)D",
+     "25-OH Vitamin D",
+     "Vitamin D",
+     "Vit D",
+     "25-υδροξυβιταμίνη D"
+    ],
+    "cat": "vitamins",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Βιταμίνη D (25-OH)",
+    "toBase": {
+     "NG/ML": 10.0,
+     "ng/mL": 10.0,
+     "nmol/l": 4.00641026,
+     "κάτι": null
+    },
+    "unit": "ng/mL",
+    "units": {
+     "nmol/l": "×0.40064102564102566 +0.0 · 1→0.40064102564102566 · 100←249.6"
+    }
+   },
+   "wbc": {
+    "aliases": [
+     "Λευκά αιμοσφαίρια",
+     "Λευκά",
+     "WBC",
+     "White blood cells",
+     "Leukocytes"
+    ],
+    "cat": "blood",
+    "decimals": 1,
+    "loinc": null,
+    "name": "Λευκά αιμοσφαίρια",
+    "toBase": {
+     "/mm3": 0.01,
+     "/µl": 0.01,
+     "10^3/µl": 10.0,
+     "10^9/l": 10.0,
+     "k/µl": 10.0,
+     "×10³/µL": 10.0,
+     "×10³/ΜL": 10.0,
+     "κάτι": null
+    },
+    "unit": "×10³/µL",
+    "units": {
+     "/mm3": "×0.001 +0.0 · 1→0.001 · 100←100000.0",
+     "/µl": "×0.001 +0.0 · 1→0.001 · 100←100000.0",
+     "10^3/µl": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "10^9/l": "×1.0 +0.0 · 1→1.0 · 100←100.0",
+     "k/µl": "×1.0 +0.0 · 1→1.0 · 100←100.0"
+    }
+   }
+  }
+ },
+ "decimalMarkOf": {
+  "comma decimals": "comma",
+  "dot decimals": "dot",
+  "empty": null,
+  "grouped twice": "comma",
+  "leading zero": "comma",
+  "mixed": null,
+  "only ambiguous": null,
+  "thousands with decimals (el)": "comma",
+  "thousands with decimals (en)": "dot",
+  "whole numbers": null,
+  "with signs and junk": "comma"
+ },
+ "foldName | unitKey": {
+  "«%»": " | %",
+  "«MG / DL»": "mgdl | mg/dl",
+  "«Vitamin D3 25-OH»": "vitamind325oh | vitamind325-oh",
+  "«mL/min/1,73m²»": "mlmin173m | ml/min/1.73m²",
+  "«mg/dL»": "mgdl | mg/dl",
+  "«x10^3/µL»": "x103ml | 10^3/µl",
+  "«µmol/L»": "mmoll | µmol/l",
+  "«»": " | ",
+  "«×10³/μL»": "10ml | 10^3/µl",
+  "«ΓΛΥΚΟΖΗ (ορού)»": "γλykozhopoy | γλυκοζη(ορού)",
+  "«ΤSΗ»": "tsh | τsη",
+  "«Χοληστερόλη Ολική»": "xoλhσtepoλhoλikh | χοληστερόληολική",
+  "«γ-GT»": "γgt | γ-gt",
+  "«μmol/l»": "mmoll | µmol/l"
+ },
+ "matchTest": {
+  "learned name": "ldl",
+  "learned unknown id": null,
+  "«   »": "null | null | null | null",
+  "«25-OH D3»": "null | null | null | null",
+  "«ALP»": "alp | null | null | null",
+  "«ALT»": "alt | null | null | null",
+  "«AST (SGOT)»": "ast | ast | ast | ast",
+  "«ApoB»": "apob | apob | apob | apob",
+  "«B12»": "b12 | null | null | null",
+  "«CRP υψηλής ευαισθησίας»": "hscrp | hscrp | hscrp | hscrp",
+  "«CRP»": "crp | crp | null | null",
+  "«Ca»": "ca | ca | ca | null",
+  "«Cholesterol total»": "chol | chol | chol | chol",
+  "«Creatinine serum»": "crea | crea | crea | crea",
+  "«FT4»": "ft4 | null | null | null",
+  "«Fe»": "iron | null | null | null",
+  "«GGT»": "ggt | null | null | null",
+  "«Glu»": "glu | glu | glu | null",
+  "«HDL-χοληστερίνη»": "hdl | hdl | hdl | hdl",
+  "«HDL»": "hdl | hdl | hdl | null",
+  "«HGB»": "hgb | null | null | null",
+  "«HbA1c»": "hba1c | hba1c | hba1c | hba1c",
+  "«Ht»": "hct | null | null | hct",
+  "«K»": "k | null | k | null",
+  "«LDL χοληστερόλη (υπολογιζόμενη)»": "null | null | null | null",
+  "«LDL-C»": "ldl | ldl | ldl | ldl",
+  "«LDL/HDL»": "null | null | null | null",
+  "«LDL»": "ldl | ldl | ldl | null",
+  "«Lp(a)»": "lpa | lpa | null | null",
+  "«MCV»": "mcv | null | null | null",
+  "«Na»": "na | null | na | null",
+  "«Non-HDL»": "nonhdl | nonhdl | nonhdl | nonhdl",
+  "«PLT»": "plt | null | null | null",
+  "«PSA»": "psa | null | null | null",
+  "«RBC»": "rbc | null | null | null",
+  "«SGOT»": "ast | ast | ast | ast",
+  "«SGPT»": "alt | alt | alt | alt",
+  "«TRIGLYCERIDES»": "tg | tg | tg | tg",
+  "«TSH»": "tsh | null | null | null",
+  "«Vitamin D total»": "null | null | null | null",
+  "«WBC»": "wbc | null | null | null",
+  "«eGFR (CKD-EPI)»": "egfr | egfr | egfr | egfr",
+  "«eGFR»": "egfr | egfr | egfr | egfr",
+  "«hs-CRP»": "hscrp | hscrp | hscrp | hscrp",
+  "«»": "null | null | null | null",
+  "«Άγνωστη εξέταση»": "null | null | null | null",
+  "«Αιματοκρίτης»": "hct | hct | hct | hct",
+  "«Αιμοπετάλια»": "plt | plt | plt | plt",
+  "«Αιμοσφαιρίνη»": "hgb | hgb | hgb | hgb",
+  "«Ασβέστιο»": "ca | ca | ca | ca",
+  "«Βιταμίνη D»": "vitd | vitd | vitd | vitd",
+  "«Βιταμίνη Β12»": "b12 | b12 | b12 | b12",
+  "«Γλυκοζυλιωμένη»": "hba1c | hba1c | hba1c | hba1c",
+  "«Γλυκόζη ορού»": "glu | glu | glu | glu",
+  "«Γλυκόζη ούρων»": "null | null | null | null",
+  "«Γλυκόζη»": "glu | glu | glu | glu",
+  "«Ινσουλίνη»": "insulin | insulin | insulin | insulin",
+  "«Κάλιο»": "k | k | k | k",
+  "«Κρεατινίνη ορού»": "crea | crea | crea | crea",
+  "«Κρεατινίνη»": "crea | crea | crea | crea",
+  "«Λευκά»": "wbc | wbc | wbc | wbc",
+  "«Λευκωματίνη»": "alb | alb | alb | alb",
+  "«Νάτριο»": "na | na | na | na",
+  "«Ολική/HDL»": "null | null | null | null",
+  "«Ομοκυστεΐνη»": "null | null | null | null",
+  "«Ουρία»": "urea | urea | urea | urea",
+  "«Ουρικό οξύ»": "uric | uric | uric | uric",
+  "«Σάκχαρο αίματος»": "null | null | null | null",
+  "«Σίδηρος ορού (Fe)»": "iron | iron | iron | iron",
+  "«Σίδηρος»": "iron | iron | iron | iron",
+  "«Τ3»": "null | null | null | null",
+  "«Τριγλυκερίδια»": "tg | tg | tg | tg",
+  "«Φερριτίνη»": "ferritin | ferritin | ferritin | ferritin",
+  "«Φυλλικό οξύ»": "folate | folate | folate | folate",
+  "«Χ»": "null | null | null | null",
+  "«ΧΟΛΗΣΤΕΡΙΝΗ»": "chol | chol | chol | chol",
+  "«Χολερυθρίνη»": "bili | bili | bili | bili",
+  "«Χοληστερόλη ολική»": "chol | chol | chol | chol",
+  "«γ-GT»": "ggt | null | null | null"
+ },
+ "methodOf": {
+  "«LDL (υπολογιζόμενη)»": "calc",
+  "«LDL calculated»": "calc",
+  "«LDL direct»": "direct",
+  "«LDL άμεση μέτρηση»": "direct",
+  "«eGFR (CKD-EPI)»": null,
+  "«eGFR MDRD»": null,
+  "«Γλυκόζη»": null
+ },
+ "parseLabNumber (χωρίς ένδειξη | κόμμα | τελεία)": {
+  "« 5,5 »": "5.5 | 5.5 | null",
+  "«+5»": "null | null | null",
+  "«,5»": "null | null | null",
+  "«-5»": "null | null | null",
+  "«0,123»": "0.123 | 0.123 | null",
+  "«0.123»": "0.123 | null | 0.123",
+  "«01.234»": "1.234 | null | 1.234",
+  "«1,2,3»": "null | null | null",
+  "«1,234,567»": "1234567.0 | null | 1234567.0",
+  "«1,234.5»": "1234.5 | null | 1234.5",
+  "«1,234»": "null | 1.234 | 1234.0",
+  "«1.234,5»": "1234.5 | 1234.5 | null",
+  "«1.234.567»": "1234567.0 | 1234567.0 | null",
+  "«1.234»": "null | 1234.0 | 1.234",
+  "«12,345»": "null | 12.345 | 12345.0",
+  "«12,34»": "12.34 | 12.34 | null",
+  "«12.345»": "null | 12345.0 | 12.345",
+  "«1234,5»": "1234.5 | 1234.5 | null",
+  "«160»": "160.0 | 160.0 | 160.0",
+  "«1e5»": "null | null | null",
+  "«1 234»": "null | null | null",
+  "«5 mg»": "null | null | null",
+  "«5,5»": "5.5 | 5.5 | null",
+  "«5,»": "null | null | null",
+  "«5-7»": "null | null | null",
+  "«5.5»": "5.5 | null | 5.5",
+  "«< 0.5»": "<0.5 | null | <0.5",
+  "«<0,5»": "<0.5 | <0.5 | null",
+  "«=< 3»": "<3.0 | <3.0 | <3.0",
+  "«=>7»": ">7.0 | >7.0 | >7.0",
+  "«>1.234,5»": ">1234.5 | >1234.5 | null",
+  "«>= 1.000»": "null | >1000.0 | >1.0",
+  "«abc»": "null | null | null",
+  "«»": "null | null | null",
+  "«≤ 5»": "<5.0 | <5.0 | <5.0",
+  "«≥1,5»": ">1.5 | >1.5 | null",
+  "«１２»": "null | null | null"
+ },
+ "specimenKind": {
+  "": null,
+  "Urine": "urine",
+  "null": null,
+  "serum": "blood",
+  "Κόπρανα": "other",
+  "Ολικό αίμα": "blood",
+  "Ορός": "blood",
+  "Ούρα": "urine",
+  "Πλάσμα": "blood",
+  "Σίελος": "other",
+  "κάτι άλλο": "other",
+  "ούρα 24ώρου": "urine"
+ },
+ "splitNameCode": {
+  "«(HDL)»": null,
+  "«GLU - Γλυκόζη»": null,
+  "«»": null,
+  "«Γλυκόζη (GLU)»": "Γλυκόζη | GLU",
+  "«Γλυκόζη»": null,
+  "«Κάλιο K»": null,
+  "«Χοληστερόλη ολική [CHOL]»": "Χοληστερόλη ολική | CHOL"
+ }
+}
