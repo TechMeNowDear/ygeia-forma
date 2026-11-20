@@ -5,11 +5,12 @@
 /// - Ξεκούραση: Mifflin-St Jeor (Mifflin 1990, AJCN).
 /// - Κίνηση: επίπεδα σωματικής δραστηριότητας 1,53 / 1,65 / 1,76 (FAO/WHO/UNU 2004, κεφ. 5· [activityLevels]).
 /// - Ρυθμός: ποσοστό του βάρους την εβδομάδα × 7.700 kcal/kg ÷ 7 (Hall 2008: προσέγγιση· Helms 2014: 0,5–1% για να
-///   μένουν οι μύες· αύξηση 0,25–0,5%, Iraki 2019).
+///   μένουν οι μύες· αύξηση 0,25–0,5% για αρχάριους και μέσου επιπέδου, οι προχωρημένοι πιο αργά: Iraki 2019).
 /// - Κάτω όριο: 1.500 kcal άνδρες, 1.200 γυναίκες: το λιγότερο που προτείνουν οι οδηγίες (Jensen 2013, AHA/ACC/TOS).
 /// - Πρωτεΐνη 1,6 g/kg (Morton 2018, BJSM), 1,8 στην απώλεια λίπους (17/11· μέσα στο 1,4–2,0 της ISSN 2017, Jäger)· λίπος 25–35% (δική μας επιλογή μέσα στο εύρος 20–35% της EFSA 2010: έλεγχος
 ///   13/11, S1-12)· κορεσμένα έως 6% όταν ο γιατρός ζητά μείωση LDL (Eckel 2013, AHA/ACC: 5–6%), αλλιώς κάτω από 10%
-///   (ΠΟΥ)· φυτικές ίνες 30 g (Reynolds 2019)· αλάτι κάτω από 5 g (ΠΟΥ).
+///   (ΠΟΥ)· φυτικές ίνες 30 g (ESC 2021: 30–45 g τη μέρα· Reynolds 2019: το όφελος φαίνεται από 25–29 g και πάνω·
+///   έλεγχος 20/11, K1-S-08)· αλάτι κάτω από 5 g (ΠΟΥ).
 ///
 /// Οι στόχοι αποθηκεύονται ΜΕ τους αριθμούς τους (και τα στοιχεία από τα οποία βγήκαν), ώστε η οθόνη «Πώς
 /// υπολογίστηκε» να λέει ακριβώς τι ίσχυε και οι στόχοι να μην αλλάζουν σιωπηλά με κάθε ζύγιση.
@@ -158,6 +159,12 @@ List<String> missingForGoals({int? age, String? sex, double? heightCm, double? k
 int _round10(double v) => (v / 10).round() * 10;
 int _round5(double v) => (v / 5).round() * 5;
 
+/// Τα όρια λιπαρών (g) για [kcal] θερμίδες: 25% και 35% των θερμίδων ÷ 9. Έλεγχος 20/11 (K1-C-07): με ακέραια αριθμητική
+/// ως τη διαίρεση. Πριν (`kcal * 0.35 / 9`) οι ακριβείς ισοβαθμίες στρογγύλευαν άλλοτε πάνω και άλλοτε κάτω (2.610 kcal:
+/// 101 αντί για 102 g), στο 1% των στόχων.
+int fatLoFor(int kcal) => (kcal * 25 / 900).round();
+int fatHiFor(int kcal) => (kcal * 35 / 900).round();
+
 /// Ο υπολογισμός. [rate]: ποσοστό του βάρους την εβδομάδα (0 για «ίδιο βάρος»).
 GoalCalc computeGoals({
   required bool male,
@@ -194,8 +201,8 @@ GoalCalc computeGoals({
     kcal: kcal,
     floored: floored,
     protein: protein,
-    fatLo: (kcal * 0.25 / 9).round(),
-    fatHi: (kcal * 0.35 / 9).round(),
+    fatLo: fatLoFor(kcal),
+    fatHi: fatHiFor(kcal),
     satMax: (kcal * satPct / 100 / 9).round(),
     satPct: satPct,
     fiber: 30,
@@ -311,8 +318,8 @@ class Goals {
   int get protein => proteinSet ?? calc.protein;
 
   /// Τα όρια που εξαρτώνται από τις θερμίδες ακολουθούν τον στόχο που ισχύει.
-  int get fatLo => (kcal * 0.25 / 9).round();
-  int get fatHi => (kcal * 0.35 / 9).round();
+  int get fatLo => fatLoFor(kcal);
+  int get fatHi => fatHiFor(kcal);
   int get satMax => (kcal * calc.satPct / 100 / 9).round();
   int get satPct => calc.satPct;
   int get fiber => calc.fiber;
@@ -368,11 +375,26 @@ class Goals {
     if (o.since.compareTo(day) >= 0) return copyWith(hist: o.hist);
     // V-2: οι νέοι στόχοι αρχίζουν σήμερα (ή αργότερα): η σημερινή μέρα κρίνεται με τον νέο αριθμό, οι μέρες ως χθες με τον
     // παλιό ([targetOn]: η μέρα της αλλαγής μετρά με τον παλιό).
-    if (before != after && since.compareTo(day) >= 0) {
+    if (since.compareTo(day) >= 0) {
       final y = DateTime(today.year, today.month, today.day - 1);
-      return copyWith(
-          hist: addTargetChange(
-              o.hist, o.log, TargetChange(day: '${y.year}-${two(y.month)}-${two(y.day)}', before: before, after: after)));
+      final yKey = '${y.year}-${two(y.month)}-${two(y.day)}';
+      // Έλεγχος 20/11 (K1-C-06): αν σήμερα (ή χθες) έγινε ήδη άλλη αλλαγή (π.χ. «Εφάρμοσε» και μετά ο οδηγός), οι γραμμές
+      // της γίνονται ΜΙΑ με μέρα χθες: «πριν» = ο στόχος πριν από την πρώτη τους, «μετά» = ο νέος. Πριν, η γραμμή του
+      // οδηγού (χθες) έμπαινε ΜΕΤΑ τη σημερινή γραμμή: το ιστορικό έβγαινε εκτός σειράς και το [targetOn] έδινε για χθες
+      // και για σήμερα λάθος στόχο. Και όταν ο αριθμός δεν άλλαξε, η σημερινή γραμμή μετακινείται στο χθες, ώστε η
+      // σημερινή μέρα να κρίνεται με τον στόχο που ισχύει (V-2).
+      final base = o.hist.isNotEmpty
+          ? o.hist
+          : [
+              for (final l in o.log)
+                if (l.applied) TargetChange(day: l.day, before: l.before, after: l.after),
+            ];
+      final earlier = [for (final c in base) if (c.day.compareTo(yKey) < 0) c];
+      final late = [for (final c in base) if (c.day.compareTo(yKey) >= 0) c];
+      final from = late.isEmpty ? before : late.first.before;
+      if (late.isEmpty && before == after) return copyWith(hist: o.hist);
+      final merged = [...earlier, TargetChange(day: yKey, before: from, after: after)];
+      return copyWith(hist: merged.length > targetHistMax ? merged.sublist(merged.length - targetHistMax) : merged);
     }
     return copyWith(
         hist: before == after
@@ -561,6 +583,8 @@ class TargetChange {
     if (j is! Map) return null;
     final d = j['d'], k0 = j['k0'], k1 = j['k1'];
     if (d is! String || !isDayKey(d) || k0 is! num || k1 is! num) return null;
+    // Έλεγχος 20/11 (K1-C-08): ένα NaN περνά τις συγκρίσεις με < και > και το toInt() θα πετούσε σφάλμα.
+    if (!k0.isFinite || !k1.isFinite) return null;
     // Ευρύτερα όρια από το [AdaptLog]: και ο στόχος από τον τύπο ενός πολύ βαρύ ανθρώπου με πολλή κίνηση γράφεται.
     if (k0 < 500 || k0 > 20000 || k1 < 500 || k1 > 20000) return null;
     return TargetChange(day: d, before: k0.toInt(), after: k1.toInt());
@@ -650,6 +674,7 @@ class AdaptLog {
     if (j is! Map) return null;
     final d = j['d'], te = j['te'], k0 = j['k0'], k1 = j['k1'];
     if (d is! String || !isDayKey(d) || te is! num || k0 is! num || k1 is! num) return null;
+    if (!te.isFinite || !k0.isFinite || !k1.isFinite) return null; // K1-C-08
     if (te < 800 || te > 8000 || k0 < 1000 || k0 > 6000 || k1 < 1000 || k1 > 6000) return null;
     return AdaptLog(
         day: d,
@@ -665,6 +690,22 @@ class AdaptLog {
 /// «0,45 kg την εβδομάδα» για έναν ρυθμό και βάρος. Με δύο δεκαδικά (έλεγχος 13/11, S1-8 / U3b-1): με ένα, τα 0,45 kg
 /// γράφονταν «0,5 kg» δίπλα σε θερμίδες που βγαίνουν από 0,45, και οι τρεις ρυθμοί έμοιαζαν άνισοι (0,2 · 0,5 · 0,7).
 String rateKgText(double kg, double rate) => '${dec(kg * rate, 2)} kg την εβδομάδα';
+
+/// Έλεγχος 20/11 (K1-C-07): ο ρυθμός στη σελίδα «Στόχοι» με το ΤΩΡΙΝΟ βάρος, όταν απέχει από του οδηγού. Ο εβδομαδιαίος
+/// έλεγχος υπολογίζει τον ρυθμό με την τελευταία ζύγιση (0,5% του τωρινού βάρους)· η σελίδα έγραφε πάντα «0,41 kg την
+/// εβδομάδα» με το βάρος του οδηγού (82,2), ενώ στα 78 kg ο έλεγχος μετρά 0,39. Χωρίς [kgNow], ή όταν απέχει λιγότερο από
+/// [rateNowKgDrift] kg, το ίδιο κείμενο με πριν ([rateKgText]).
+const rateNowKgDrift = 1.0;
+
+/// Ανεξάρτητος έλεγχος K1 (K1R-11): το «τώρα περίπου Χ kg» του ρυθμού γράφεται μόνο με ζύγιση τόσο πρόσφατη.
+const rateNowMaxAgeDays = 14;
+
+String rateNowText(double kg, double rate, {double? kgNow}) {
+  if (kgNow == null || !kgNow.isFinite || kgNow < 30 || kgNow > 300 || (kgNow - kg).abs() < rateNowKgDrift) {
+    return rateKgText(kg, rate);
+  }
+  return '${ratePctText(rate)} του βάρους την εβδομάδα (τώρα περίπου ${dec(kgNow * rate, 2)}\u00A0kg)';
+}
 
 /// «0,5%»
 String ratePctText(double rate) {

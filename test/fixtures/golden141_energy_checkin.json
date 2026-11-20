@@ -1355,7 +1355,7 @@
     "readyGap": "2026-12-23..2026-12-27 restart=-"
    },
    "+42 2027-01-04": {
-    "afterGap": "2027-01-25",
+    "afterGap": "2027-02-01",
     "check": {
      "days": 14,
      "fastIntakeDays": 0,
@@ -1374,11 +1374,11 @@
     },
     "due": true,
     "next": "2027-01-04",
-    "ready": "5|2|2|2026-12-21",
+    "ready": "0|0|0|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+45 2027-01-07": {
-    "afterGap": "2027-01-25",
+    "afterGap": "2027-02-01",
     "check": {
      "days": 14,
      "fastIntakeDays": 0,
@@ -1397,18 +1397,18 @@
     },
     "due": true,
     "next": "2027-01-07",
-    "ready": "8|4|7|2026-12-21",
+    "ready": "1|1|0|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+45 2027-01-07 μετά τον έλεγχο": {
-    "afterGap": "2027-01-25",
+    "afterGap": "2027-02-01",
     "due": false,
     "next": "2027-01-11",
-    "ready": "8|4|7|2026-12-21",
+    "ready": "1|1|0|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+49 2027-01-11": {
-    "afterGap": "2027-01-25",
+    "afterGap": "2027-02-01",
     "check": {
      "days": 14,
      "fastIntakeDays": 0,
@@ -1427,11 +1427,11 @@
     },
     "due": true,
     "next": "2027-01-11",
-    "ready": "12|5|9|2026-12-21",
+    "ready": "5|2|2|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+56 2027-01-18": {
-    "afterGap": "2027-01-25",
+    "afterGap": "2027-02-01",
     "check": {
      "days": 19,
      "fastIntakeDays": 0,
@@ -1450,86 +1450,37 @@
     },
     "due": true,
     "next": "2027-01-18",
-    "ready": "19|8|16|2026-12-21",
+    "ready": "12|5|9|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+59 2027-01-21 μετά τον έλεγχο": {
-    "afterGap": "2027-01-25",
+    "afterGap": "2027-02-01",
     "due": false,
     "next": "2027-01-25",
-    "ready": "21|9|19|2026-12-21",
+    "ready": "15|7|14|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+63 2027-01-25": {
-    "afterGap": "2027-01-25",
-    "apply": {
-     "ci": "2027-01-25",
-     "ka": 2300,
-     "kcal": 2300,
-     "log": [
-      {
-       "ap": true,
-       "d": "2027-01-25",
-       "k0": 2300,
-       "k1": 2300,
-       "te": 2804.18598
-      }
-     ],
-     "te": 2804.18598
-    },
+    "afterGap": "2027-02-01",
     "check": {
      "days": 21,
-     "est": {
-      "from": "2027-01-04",
-      "guardKcal": 188.758502,
-      "intakeDays": 21,
-      "meanIntake": 2305.38095,
-      "seKcal": 94.3792509,
-      "slopeKgWeek": -0.453459119,
-      "tdee": 2804.18598,
-      "to": "2027-01-24",
-      "weighIns": 9,
-      "windowDays": 21
-     },
-     "estTarget": 2300.0,
      "fastIntakeDays": 0,
-     "formula": 2737.17,
-     "formulaKg": 85.9,
-     "formulaTdee": 2737.17,
-     "kgNow": 85.8,
-     "kind": "same",
+     "formulaTdee": 2799.9,
+     "gap": "2026-12-23..2026-12-29 restart=2026-12-30",
+     "kind": "gap",
      "lowLog": false,
-     "proposal": {
-      "change": 0,
-      "current": 2300,
-      "fastLoss": false,
-      "floored": false,
-      "same": true,
-      "target": 2300,
-      "withinNoise": true
-     },
-     "status": "ok",
+     "status": "afterGap",
      "tooFast": false,
-     "wanted": 2330,
      "wantsBelowFloor": false,
      "weighs": 9
     },
     "dismiss": {
      "ci": "2027-01-25",
-     "kcal": 2300,
-     "log": [
-      {
-       "d": "2027-01-25",
-       "k0": 2300,
-       "k1": 2300,
-       "te": 2804.18598
-      }
-     ],
-     "te": 2804.18598
+     "kcal": 2300
     },
     "due": true,
     "next": "2027-01-25",
-    "ready": "21|9|18|2026-12-21",
+    "ready": "19|8|16|2026-12-21",
     "readyGap": "2026-12-23..2026-12-29 restart=2026-12-30"
    },
    "+70 2027-02-01": {
@@ -1544,24 +1495,24 @@
        "d": "2027-02-01",
        "k0": 2300,
        "k1": 2300,
-       "te": 2843.48347
+       "te": 2890.72507
       }
      ],
-     "te": 2843.48347
+     "te": 2890.72507
     },
     "check": {
      "days": 21,
      "est": {
-      "from": "2027-01-04",
-      "guardKcal": 109.020951,
-      "intakeDays": 28,
-      "meanIntake": 2306.89286,
-      "seKcal": 54.5104754,
-      "slopeKgWeek": -0.487809648,
-      "tdee": 2843.48347,
+      "from": "2027-01-11",
+      "guardKcal": 143.648033,
+      "intakeDays": 21,
+      "meanIntake": 2316.85714,
+      "seKcal": 71.8240164,
+      "slopeKgWeek": -0.521698113,
+      "tdee": 2890.72507,
       "to": "2027-01-31",
-      "weighIns": 12,
-      "windowDays": 28
+      "weighIns": 9,
+      "windowDays": 21
      },
      "estTarget": 2300.0,
      "fastIntakeDays": 0,
@@ -1582,7 +1533,7 @@
      },
      "status": "ok",
      "tooFast": false,
-     "wanted": 2370,
+     "wanted": 2420,
      "wantsBelowFloor": false,
      "weighs": 9
     },
@@ -1594,10 +1545,10 @@
        "d": "2027-02-01",
        "k0": 2300,
        "k1": 2300,
-       "te": 2843.48347
+       "te": 2890.72507
       }
      ],
-     "te": 2843.48347
+     "te": 2890.72507
     },
     "due": true,
     "next": "2027-02-01",
@@ -1616,24 +1567,24 @@
        "d": "2027-02-15",
        "k0": 2300,
        "k1": 2300,
-       "te": 2791.13351
+       "te": 2795.25752
       }
      ],
-     "te": 2791.13351
+     "te": 2795.25752
     },
     "check": {
      "days": 21,
      "est": {
-      "from": "2027-01-04",
-      "guardKcal": 52.2833202,
-      "intakeDays": 42,
-      "meanIntake": 2298.80952,
-      "seKcal": 26.1416601,
-      "slopeKgWeek": -0.447567258,
-      "tdee": 2791.13351,
+      "from": "2027-01-11",
+      "guardKcal": 60.4318002,
+      "intakeDays": 35,
+      "meanIntake": 2303.17143,
+      "seKcal": 30.2159001,
+      "slopeKgWeek": -0.447350993,
+      "tdee": 2795.25752,
       "to": "2027-02-14",
-      "weighIns": 18,
-      "windowDays": 42
+      "weighIns": 15,
+      "windowDays": 35
      },
      "estTarget": 2300.0,
      "fastIntakeDays": 0,
@@ -1666,14 +1617,15 @@
        "d": "2027-02-15",
        "k0": 2300,
        "k1": 2300,
-       "te": 2791.13351
+       "te": 2795.25752
       }
      ],
-     "te": 2791.13351
+     "te": 2795.25752
     },
     "due": true,
     "next": "2027-02-15",
-    "ready": "21|9|18|2026-12-21"
+    "ready": "21|9|18|2026-12-21",
+    "readyGap": "2026-12-24..2026-12-29 restart=2026-12-30"
    }
   },
   "journey": [
@@ -1683,7 +1635,7 @@
    "2027-01-04 gap afterGap - όχι τώρα → 2300 kcal",
    "2027-01-11 gap afterGap - όχι τώρα → 2300 kcal",
    "2027-01-18 gap afterGap - όχι τώρα → 2300 kcal",
-   "2027-01-25 same ok 2300→2300 όχι τώρα → 2300 kcal",
+   "2027-01-25 gap afterGap - όχι τώρα → 2300 kcal",
    "2027-02-01 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2027-02-08 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2027-02-15 same ok 2300→2300 όχι τώρα → 2300 kcal",
@@ -1699,28 +1651,22 @@
       "te": 2838.26595
      },
      {
-      "d": "2027-01-25",
-      "k0": 2300,
-      "k1": 2300,
-      "te": 2804.18598
-     },
-     {
       "d": "2027-02-01",
       "k0": 2300,
       "k1": 2300,
-      "te": 2843.48347
+      "te": 2890.72507
      },
      {
       "d": "2027-02-08",
       "k0": 2300,
       "k1": 2300,
-      "te": 2815.60643
+      "te": 2832.96247
      },
      {
       "d": "2027-02-15",
       "k0": 2300,
       "k1": 2300,
-      "te": 2791.13351
+      "te": 2795.25752
      },
      {
       "d": "2027-02-22",
@@ -2343,6 +2289,7 @@
       "windowDays": 21
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.24 planned=-0.43",
      "fastIntakeDays": 0,
      "formula": 2718.81,
      "formulaKg": 84.7,
@@ -2425,6 +2372,7 @@
       "windowDays": 21
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.34 planned=-0.42",
      "fastIntakeDays": 0,
      "formula": 2720.34,
      "formulaKg": 84.8,
@@ -2537,6 +2485,7 @@
       "windowDays": 21
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.35 planned=-0.42",
      "fastIntakeDays": 0,
      "formula": 2709.63,
      "formulaKg": 84.1,
@@ -2649,6 +2598,7 @@
       "windowDays": 28
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.28 planned=-0.42",
      "fastIntakeDays": 0,
      "formula": 2698.92,
      "formulaKg": 83.4,
@@ -2731,6 +2681,7 @@
       "windowDays": 35
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.28 planned=-0.42",
      "fastIntakeDays": 0,
      "formula": 2680.56,
      "formulaKg": 82.2,
@@ -2813,6 +2764,7 @@
       "windowDays": 35
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.30 planned=-0.41",
      "fastIntakeDays": 0,
      "formula": 2677.5,
      "formulaKg": 82.0,
@@ -2925,6 +2877,7 @@
       "windowDays": 42
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.30 planned=-0.41",
      "fastIntakeDays": 0,
      "formula": 2666.79,
      "formulaKg": 81.3,
@@ -3007,6 +2960,7 @@
       "windowDays": 42
      },
      "estTarget": 2300.0,
+     "farBelow": "1700/2300 under=600 slope=-1.29 planned=-0.40",
      "fastIntakeDays": 0,
      "formula": 2640.78,
      "formulaKg": 79.6,
@@ -3119,6 +3073,7 @@
       "windowDays": 42
      },
      "estTarget": 2300.0,
+     "farBelow": "1710/2300 under=590 slope=-1.30 planned=-0.39",
      "fastIntakeDays": 0,
      "formula": 2630.07,
      "formulaKg": 78.9,
@@ -3201,6 +3156,7 @@
       "windowDays": 42
      },
      "estTarget": 2300.0,
+     "farBelow": "1700/2300 under=600 slope=-1.25 planned=-0.39",
      "fastIntakeDays": 0,
      "formula": 2605.59,
      "formulaKg": 77.3,
@@ -3283,6 +3239,7 @@
       "windowDays": 42
      },
      "estTarget": 2300.0,
+     "farBelow": "1700/2300 under=600 slope=-1.26 planned=-0.38",
      "fastIntakeDays": 0,
      "formula": 2562.75,
      "formulaKg": 74.5,
@@ -10886,25 +10843,18 @@
     "afterGap": "2027-01-25",
     "apply": {
      "ci": "2027-01-25",
-     "ka": 2390,
-     "kcal": 2390,
+     "ka": 2300,
+     "kcal": 2300,
      "log": [
       {
        "ap": true,
        "d": "2027-01-25",
        "k0": 2300,
-       "k1": 2390,
+       "k1": 2300,
        "te": 2867.01028
       }
      ],
-     "te": 2867.01028,
-     "th": [
-      {
-       "d": "2027-01-25",
-       "k0": 2300,
-       "k1": 2390
-      }
-     ]
+     "te": 2867.01028
     },
     "check": {
      "absurd": [
@@ -10929,15 +10879,16 @@
      "formulaKg": 85.8,
      "formulaTdee": 2735.64,
      "kgNow": 86.1,
-     "kind": "proposal",
+     "kind": "same",
      "lowLog": false,
      "proposal": {
-      "change": 90,
+      "change": 0,
       "current": 2300,
       "fastLoss": false,
       "floored": false,
-      "same": false,
-      "target": 2390,
+      "recentDiffers": true,
+      "same": true,
+      "target": 2300,
       "withinNoise": false
      },
      "status": "ok",
@@ -15230,7 +15181,7 @@
       "withinNoise": true
      },
      "status": "ok",
-     "tooFast": true,
+     "tooFast": false,
      "wanted": 2190,
      "wantsBelowFloor": false,
      "weighs": 9
@@ -15249,72 +15200,12 @@
      "te": 2669.78323
     },
     "due": true,
-    "fast": [
-     -1.11746988,
-     86.7
-    ],
     "next": "2027-01-07",
     "ready": "21|9|19|2026-12-21"
    },
    "+45 2027-01-07 μετά τον έλεγχο": {
     "afterGap": "2027-01-11",
-    "apply": {
-     "ci": "2027-01-04",
-     "fa": "2027-01-07",
-     "ka": 2450,
-     "kcal": 2450,
-     "log": [
-      {
-       "ap": true,
-       "d": "2027-01-07",
-       "f": true,
-       "k0": 2300,
-       "k1": 2450,
-       "te": 2800.0
-      }
-     ],
-     "th": [
-      {
-       "d": "2027-01-07",
-       "k0": 2300,
-       "k1": 2450
-      }
-     ]
-    },
-    "check": {
-     "days": 0,
-     "fastDays": 21,
-     "fastIntake": 2301.04762,
-     "fastIntakeDays": 21,
-     "fastSlope": -1.11746988,
-     "fastTarget": 2300.0,
-     "formulaTdee": 2799.9,
-     "kgNow": 86.7,
-     "kind": "fast",
-     "lowLog": false,
-     "proposal": {
-      "change": 150,
-      "current": 2300,
-      "fastLoss": true,
-      "floored": false,
-      "same": false,
-      "target": 2450,
-      "withinNoise": false
-     },
-     "tooFast": false,
-     "wantsBelowFloor": false,
-     "weighs": 0
-    },
-    "dismiss": {
-     "ci": "2027-01-04",
-     "fa": "2027-01-07",
-     "kcal": 2300
-    },
     "due": false,
-    "fast": [
-     -1.11746988,
-     86.7
-    ],
     "next": "2027-01-11",
     "ready": "21|9|19|2026-12-21"
    },
@@ -15367,7 +15258,7 @@
       "withinNoise": true
      },
      "status": "ok",
-     "tooFast": true,
+     "tooFast": false,
      "wanted": 2330,
      "wantsBelowFloor": false,
      "weighs": 9
@@ -15386,10 +15277,6 @@
      "te": 2797.35003
     },
     "due": true,
-    "fast": [
-     -1.08815907,
-     87.1
-    ],
     "next": "2027-01-11",
     "ready": "21|9|18|2026-12-21"
    },
@@ -15689,7 +15576,7 @@
    "2026-12-21 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2026-12-28 proposal ok 2300→2150 εφάρμοσε → 2150 kcal",
    "2027-01-04 same ok 2150→2150 όχι τώρα → 2150 kcal",
-   "2027-01-07 fast - 2150→2300 εφάρμοσε → 2300 kcal",
+   "2027-01-08 fast - 2150→2300 εφάρμοσε → 2300 kcal",
    "2027-01-11 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2027-01-18 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2027-01-25 same ok 2300→2300 όχι τώρα → 2300 kcal",
@@ -15699,7 +15586,7 @@
    "2027-02-22 same ok 2300→2300 όχι τώρα → 2300 kcal",
    {
     "ci": "2027-02-22",
-    "fa": "2027-01-07",
+    "fa": "2027-01-08",
     "ka": 2300,
     "kcal": 2300,
     "log": [
@@ -15724,7 +15611,7 @@
      },
      {
       "ap": true,
-      "d": "2027-01-07",
+      "d": "2027-01-08",
       "f": true,
       "k0": 2150,
       "k1": 2300,
@@ -15781,7 +15668,7 @@
       "k1": 2150
      },
      {
-      "d": "2027-01-07",
+      "d": "2027-01-08",
       "k0": 2150,
       "k1": 2300
      }
@@ -16739,11 +16626,11 @@
    "2027-02-01 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2027-02-08 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2027-02-15 same ok 2300→2300 όχι τώρα → 2300 kcal",
-   "2027-02-22 proposal ok 2300→2340 εφάρμοσε → 2340 kcal",
+   "2027-02-22 same ok 2300→2300 όχι τώρα → 2300 kcal",
    {
     "ci": "2027-02-22",
-    "ka": 2340,
-    "kcal": 2340,
+    "ka": 2300,
+    "kcal": 2300,
     "log": [
      {
       "ap": true,
@@ -16803,10 +16690,9 @@
       "te": 2791.5818
      },
      {
-      "ap": true,
       "d": "2027-02-22",
       "k0": 2300,
-      "k1": 2340,
+      "k1": 2300,
       "te": 2803.8759
      }
     ],
@@ -16826,11 +16712,6 @@
       "d": "2027-01-25",
       "k0": 2350,
       "k1": 2300
-     },
-     {
-      "d": "2027-02-22",
-      "k0": 2300,
-      "k1": 2340
      }
     ]
    }
@@ -17370,7 +17251,7 @@
    "2027-01-18 gap gapOpen - όχι τώρα → 2450 kcal",
    "2027-01-25 gap gapOpen - όχι τώρα → 2450 kcal",
    "2027-02-01 gap gapOpen - όχι τώρα → 2450 kcal",
-   "2027-02-08 fewData fewIntakeDays - όχι τώρα → 2450 kcal",
+   "2027-02-08 gap gapOpen - όχι τώρα → 2450 kcal",
    "2027-02-15 fewData fewIntakeDays - όχι τώρα → 2450 kcal",
    "2027-02-22 fewData fewIntakeDays - όχι τώρα → 2450 kcal",
    {
@@ -18319,11 +18200,10 @@
    "2026-12-14 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2026-12-21 same ok 2300→2300 όχι τώρα → 2300 kcal",
    "2026-12-28 same ok 2300→2300 όχι τώρα → 2300 kcal",
-   "2027-01-04 proposal ok 2300→2360 εφάρμοσε → 2360 kcal",
+   "2027-01-04 same ok 2300→2300 όχι τώρα → 2300 kcal",
    {
     "ci": "2027-01-04",
-    "ka": 2360,
-    "kcal": 2360,
+    "kcal": 2300,
     "log": [
      {
       "d": "2026-11-02",
@@ -18380,21 +18260,13 @@
       "te": 2792.16291
      },
      {
-      "ap": true,
       "d": "2027-01-04",
       "k0": 2300,
-      "k1": 2360,
+      "k1": 2300,
       "te": 2824.52574
      }
     ],
-    "te": 2824.52574,
-    "th": [
-     {
-      "d": "2027-01-04",
-      "k0": 2300,
-      "k1": 2360
-     }
-    ]
+    "te": 2824.52574
    }
   ]
  },

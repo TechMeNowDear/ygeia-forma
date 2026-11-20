@@ -222,7 +222,15 @@ void main() {
     final s = _sim(t, days: 49, noise: 0.3);
     final last21 = {for (final e in s.intake.entries) if (!e.key.isBefore(DateTime(2026, 12, 14))) e.key: e.value};
     final r = estimateExpenditure(intake: last21, weights: s.weights, today: t, formulaTdee: 2745, goalKcal: 2250, since: since);
-    expect((r.status, r.est!.windowDays, r.est!.intakeDays), (AdaptStatus.ok, 21, 21), reason: 'το παράθυρο ξεκινά μετά το κενό');
+    // Έλεγχος 20/11 (K1-C-02): και οι 7 πρώτες μέρες μετά το κενό δεν μετρούν (νερά της επιστροφής). Στις 4/1 έχουν
+    // μαζευτεί 14 μέρες που μετρούν (21/12–3/1): όχι ακόμα· στις 11/1 ακριβώς 21 (21/12–10/1).
+    expect((r.status, r.est), (AdaptStatus.afterGap, null), reason: 'πριν: εκτίμηση από 14/12, με την πρώτη εβδομάδα της επιστροφής');
+    final t2 = DateTime(2027, 1, 11);
+    final s2 = _sim(t2, days: 56, noise: 0.3);
+    final from14 = {for (final e in s2.intake.entries) if (!e.key.isBefore(DateTime(2026, 12, 14))) e.key: e.value};
+    final r2 = estimateExpenditure(intake: from14, weights: s2.weights, today: t2, formulaTdee: 2745, goalKcal: 2250, since: since);
+    expect((r2.status, r2.est!.windowDays, r2.est!.intakeDays, r2.est!.from), (AdaptStatus.ok, 21, 21, DateTime(2026, 12, 21)),
+        reason: 'το παράθυρο ξεκινά μία εβδομάδα μετά το κενό');
   });
 
   test('Α2: η πρώτη εβδομάδα των στόχων δεν μετρά στην εκτίμηση· πρώτη εκτίμηση την 28η μέρα', () {
@@ -250,7 +258,7 @@ void main() {
     expect(all.est!.tdee - skip.est!.tdee, greaterThan(200));
   });
 
-  test('Α3: μία ρηχή ζύγιση δεν φτάνει για «γρήγορη απώλεια»· θέλει περιθώριο ενός τυπικού σφάλματος', () {
+  test('Α3: μία ρηχή ζύγιση δεν φτάνει για «γρήγορη απώλεια»· θέλει περιθώριο δύο τυπικών σφαλμάτων (K1-C-01, 20/11)', () {
     // Μετά την πρώτη εβδομάδα: −0,7 kg/εβδ. (0,8% του βάρους), και η τελευταία ζύγιση 0,6 kg κάτω από την τάση (αφυδάτωση).
     List<(DateTime, double)> ws(double last) => [
           (DateTime(2026, 11, 23), 88.0),
@@ -266,8 +274,14 @@ void main() {
     expect((f.slope + f.se!) * 7, greaterThan(-0.01 * 86.3), reason: 'με το περιθώριο (−0,80) δεν το περνά');
     expect(fastLossCheck(goals: _g(), weights: ws(86.3), today: day18), isNull);
     expect(fastLossCheck(goals: _g(), weights: ws(86.0), today: day18), isNull);
-    // Όταν η απώλεια είναι καθαρά πάνω από το όριο, η ειδοποίηση βγαίνει.
-    expect(fastLossCheck(goals: _g(), weights: ws(85.8), today: day18)?.change, 150);
+    // Έλεγχος 20/11 (K1-C-01): ούτε ΜΙΑ ζύγιση 1,1 kg κάτω από την τάση φτάνει (η τάση των άλλων πέντε είναι 0,8%). Πριν,
+    // με περιθώριο ενός τυπικού σφάλματος, αυτή η γραμμή περίμενε «+150» και η κάρτα θα έγραφε «1,4% του βάρους».
+    expect(fastLossCheck(goals: _g(), weights: ws(85.8), today: day18), isNull);
+    // Όταν ΟΛΕΣ οι ζυγίσεις δείχνουν απώλεια καθαρά πάνω από το όριο (−1,2% την εβδομάδα), η ειδοποίηση βγαίνει.
+    final steep = [
+      for (final d in [0, 2, 4, 7, 9, 11]) (DateTime(2026, 11, 23 + d), 88.0 - 0.151 * d),
+    ];
+    expect(fastLossCheck(goals: _g(), weights: steep, today: day18)?.change, 150);
     // Το παράθυρο: 21 μέρες πίσω, ποτέ μέσα στην πρώτη εβδομάδα.
     expect(fastLossWindow(goals: _g(), today: day18), (DateTime(2026, 11, 23), day18));
     expect(fastLossWindow(goals: _g(), today: DateTime(2026, 12, 28)), (DateTime(2026, 12, 7), DateTime(2026, 12, 28)));

@@ -204,18 +204,19 @@ void main() {
     ({AdaptStatus status, Expenditure? est}) at(DateTime d) =>
         estimateExpenditure(intake: w.intake, weights: w.weights, today: d, formulaTdee: formula, goalKcal: 2090, since: since);
 
-    test('όσο το κενό κρατά και 3 εβδομάδες μετά: καμία εκτίμηση· μετά ξαναβγαίνει σωστή', () {
+    test('όσο το κενό κρατά και 4 εβδομάδες μετά (η πρώτη δεν μετρά): καμία εκτίμηση· μετά ξαναβγαίνει σωστή', () {
       expect(at(DateTime(2027, 1, 4)).status, AdaptStatus.gapOpen);
       expect(at(DateTime(2027, 1, 4)).est, isNull);
-      for (final d in [DateTime(2027, 1, 11), DateTime(2027, 1, 18), DateTime(2027, 1, 25)]) {
+      // Έλεγχος 20/11 (K1-C-02): η καταγραφή ξαναρχίζει 7/1· μετρούν οι μέρες από 14/1 (πριν: από 7/1, εκτίμηση 28/1).
+      for (final d in [DateTime(2027, 1, 11), DateTime(2027, 1, 18), DateTime(2027, 1, 25), DateTime(2027, 1, 28), DateTime(2027, 2, 1)]) {
         expect(at(d).status, AdaptStatus.afterGap, reason: '$d');
         expect(at(d).est, isNull, reason: '$d');
       }
-      final back = at(DateTime(2027, 1, 28));
-      expect((back.status, back.est!.windowDays, back.est!.from), (AdaptStatus.ok, 21, DateTime(2027, 1, 7)));
+      final back = at(DateTime(2027, 2, 4));
+      expect((back.status, back.est!.windowDays, back.est!.from), (AdaptStatus.ok, 21, DateTime(2027, 1, 14)));
       expect(back.est!.tdee, closeTo(2540, 1));
       final later = at(DateTime(2027, 2, 8));
-      expect((later.status, later.est!.windowDays, later.est!.from), (AdaptStatus.ok, 28, DateTime(2027, 1, 11)));
+      expect((later.status, later.est!.windowDays, later.est!.from), (AdaptStatus.ok, 21, DateTime(2027, 1, 18)));
       expect(later.est!.tdee, closeTo(2540, 1));
     });
 
@@ -844,7 +845,10 @@ void main() {
       expect(find.text('0,5% × 89,2 kg × 7.700 ÷ 7'), findsOneWidget);
       // U3b-5: η διαφορά των αριθμών όπως φαίνονται.
       final shown = (c.est!.tdee / 10).round() * 10;
-      expect(find.textContaining('Ο τύπος έλεγε 2.745: έπεφτε ${thousands(2745 - shown)}\u00A0kcal ψηλά'), findsOneWidget);
+      // Έλεγχος 20/11 (K1-S-01): όχι πια «ο τύπος έπεφτε … ψηλά. Γι’ αυτό μετράνε τα δικά σου δεδομένα».
+      expect(find.textContaining('Ο τύπος έλεγε 2.745, ${thousands(2745 - shown)}\u00A0kcal περισσότερες από την εκτίμηση'), findsOneWidget);
+      expect(find.textContaining('η εφαρμογή δεν τα ξεχωρίζει'), findsOneWidget);
+      expect(find.textContaining('Γι’ αυτό μετράνε τα δικά σου δεδομένα'), findsNothing);
     });
   });
 

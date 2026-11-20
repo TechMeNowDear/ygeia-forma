@@ -97,6 +97,13 @@ Map<DateTime, double> _ateTargets({double less = 0}) => {
       for (var d = 4; d <= 24; d++) DateTime(2026, 12, d): (d <= 11 ? 2250 : (d <= 18 ? 2400 : 2550)) - less,
     };
 
+/// Έλεγχος 20/11 (K1-C-02): και οι μέρες 23/11–3/12 γραμμένες (2.250). Χωρίς αυτές, οι μέρες πριν από τις 4/12 είναι
+/// «κενό καταγραφής», και η «γρήγορη απώλεια» δεν κρίνει πια τις 7 πρώτες μέρες μετά από κενό.
+Map<DateTime, double> _ateFromStart({double less = 0}) => {
+      for (var d = DateTime(2026, 11, 23); d.isBefore(DateTime(2026, 12, 4)); d = DateTime(d.year, d.month, d.day + 1)) d: 2250,
+      ..._ateTargets(less: less),
+    };
+
 Food _own(String id, String name, double kcal, {String? brand}) => Food(
       id: id,
       name: name,
@@ -132,7 +139,7 @@ void main() {
           goals: g,
           today: today,
           weights: _weights(DateTime(2026, 11, 16), today, 90, 0.013),
-          intake: _intakeOf(_ateTargets()))!;
+          intake: _intakeOf(_ateFromStart()))!;
       expect(c.kind, CheckKind.fast);
       expect((c.proposal!.current, c.proposal!.target), (2550, 2700));
       expect(c.fastIntake!, closeTo(2385.714, 0.001));
@@ -148,7 +155,7 @@ void main() {
           goals: g,
           today: today,
           weights: _weights(DateTime(2026, 11, 16), today, 90, 0.013),
-          intake: _intakeOf(_ateTargets(less: 300)))!;
+          intake: _intakeOf(_ateFromStart(less: 300)))!;
       expect((c.kind, c.proposal), (CheckKind.fast, null));
       expect(c.fastIntake!, closeTo(2085.714, 0.001));
       expect(c.fastTarget!, closeTo(2385.714, 0.001));
@@ -228,31 +235,35 @@ void main() {
     final since = DateTime(2026, 11, 16);
     final formula = _invGoals().calc.tdee;
 
-    test('1/3: παράθυρο 35 μερών από 25/1 με την αληθινή κατανάλωση (πριν: 42 μέρες από 18/1, 2.377)', () {
+    test('1/3: παράθυρο 28 μερών από 1/2 με την αληθινή κατανάλωση (πριν: 42 μέρες από 18/1, 2.377)', () {
+      // Έλεγχος 20/11 (K1-C-02): η καταγραφή ξαναρχίζει 21/1· μετρούν οι μέρες από 28/1 (πριν: από 21/1, παράθυρο 35 από 25/1).
       final t = DateTime(2027, 3, 1);
       final r = estimateExpenditure(
           intake: w.intake, weights: _upTo(w.weights, t), today: t, formulaTdee: formula, goalKcal: 2090, since: since);
-      expect((r.status, r.est!.windowDays, r.est!.from, r.est!.intakeDays), (AdaptStatus.ok, 35, DateTime(2027, 1, 25), 35));
+      expect((r.status, r.est!.windowDays, r.est!.from, r.est!.intakeDays), (AdaptStatus.ok, 28, DateTime(2027, 2, 1), 28));
       expect(r.est!.tdee, closeTo(2540, 1));
       final gap = foodGap(intake: w.intake, today: t, formulaTdee: formula, goalKcal: 2090, since: since)!;
       expect((gap.to, gap.restart), (DateTime(2027, 1, 20), DateTime(2027, 1, 21)));
-      // Τις προηγούμενες Δευτέρες, όπως πριν (το κενό χωρούσε ολόκληρο στις 42 μέρες).
-      for (final (day, window) in [(DateTime(2027, 2, 15), 21), (DateTime(2027, 2, 22), 28)]) {
-        final e = estimateExpenditure(
-            intake: w.intake, weights: _upTo(w.weights, day), today: day, formulaTdee: formula, goalKcal: 2090, since: since);
-        expect((e.status, e.est!.windowDays, e.est!.from), (AdaptStatus.ok, window, DateTime(2027, 1, 25)), reason: '$day');
-        expect(e.est!.tdee, closeTo(2540, 1));
-      }
+      expect(afterGapStart(gap.restart!), DateTime(2027, 1, 28));
+      // Τις προηγούμενες Δευτέρες: 15/2 δεν έχουν μαζευτεί ακόμα 21 μέρες που μετρούν (28/1–14/2 = 18)· 22/2 ναι.
+      final early = estimateExpenditure(
+          intake: w.intake, weights: _upTo(w.weights, DateTime(2027, 2, 15)), today: DateTime(2027, 2, 15), formulaTdee: formula, goalKcal: 2090, since: since);
+      expect((early.status, early.est), (AdaptStatus.afterGap, null));
+      final e = estimateExpenditure(
+          intake: w.intake, weights: _upTo(w.weights, DateTime(2027, 2, 22)), today: DateTime(2027, 2, 22), formulaTdee: formula, goalKcal: 2090, since: since);
+      expect((e.status, e.est!.windowDays, e.est!.from), (AdaptStatus.ok, 21, DateTime(2027, 2, 1)));
+      expect(e.est!.tdee, closeTo(2540, 1));
     });
 
     test('η κάρτα της Δευτέρας 1/3 διαβάζει και τις 4 μέρες πριν από το παράθυρο: σωστή εκτίμηση, όχι λάθος μείωση', () {
       final t = DateTime(2027, 3, 1);
       final c = pendingCheckIn(goals: _invGoals(), today: t, weights: _upTo(w.weights, t), intake: _intakeOf(w.intake))!;
-      expect((c.kind, c.est!.windowDays, c.est!.from), (CheckKind.proposal, 35, DateTime(2027, 1, 25)));
+      expect((c.kind, c.est!.windowDays, c.est!.from), (CheckKind.proposal, 28, DateTime(2027, 2, 1)));
+      expect(c.proposal!.recentDiffers, isFalse, reason: 'K1-C-02: και οι 21 τελευταίες μέρες ζητούν το ίδιο');
       expect(c.est!.tdee, closeTo(2540, 1));
       // 2.540 − 73,9 kg × 0,5% × 7.700 ÷ 7 ≈ 2.130: λίγο πάνω, γιατί έχει χάσει βάρος (πριν: 2.090 → «μένει», από 2.377).
       expect((c.proposal!.current, c.proposal!.target), (2090, 2130));
-      expect(adaptScanDays, 46);
+      expect(adaptScanDays, 53, reason: 'K1R-01: 42 + 5 − 1 + 7');
     });
 
     test('χωρίς κενό: ίδια παράθυρα με πριν κάθε Δευτέρα ως 1/3', () {
@@ -269,25 +280,37 @@ void main() {
 
   // ------------------------------------------------------------------------------------------------ R2-A-3
   group('R2-A-3: γρήγορη απώλεια χωρίς φαγητό γραμμένο τις τελευταίες μέρες', () {
-    // Τρως 2.250 κάθε μέρα 23/11–10/1 (γραμμένα), χάνεις 0,5%/εβδ. Από 11/1 άρρωστος: τίποτα γραμμένο, ζυγίσεις 1,5 / 3 / 3,75 kg
-    // κάτω από την τάση. Ο εβδομαδιαίος έλεγχος της 11/1 έχει απαντηθεί.
-    // Έλεγχος 17/11 (Κ1-H1): με 1 / 2 / 2,5 kg (όπως πριν) η ειδοποίηση δεν βγαίνει πια: τρεις ζυγίσεις στη σειρά κάτω από
-    // την τάση είναι νερά που κρατούν μέρες, και το περιθώριο μεγαλώνει. Εδώ δοκιμάζεται το ημερολόγιο, άρα πιο μεγάλη πτώση.
+    // Τρως 2.250 κάθε μέρα 23/11–10/1 (γραμμένα), χάνεις 0,5%/εβδ. ως 20/12 και 1,3%/εβδ. από 21/12 (αληθινά γρήγορα, σε
+    // κάθε ζύγιση). Από 11/1 τίποτα γραμμένο. Ο εβδομαδιαίος έλεγχος της 11/1 έχει απαντηθεί.
+    // Έλεγχος 17/11 (Κ1-H1) και 20/11 (K1-C-01, περιθώριο δύο τυπικών σφαλμάτων): τρεις ζυγίσεις στη σειρά κάτω από την τάση
+    // (ως και 1,5 / 3 / 3,75 kg) είναι νερά που κρατούν μέρες και ΔΕΝ βγάζουν πια ειδοποίηση. Εδώ δοκιμάζεται το ημερολόγιο,
+    // άρα η απώλεια είναι αληθινά γρήγορη σε όλες τις ζυγίσεις των 3 τελευταίων εβδομάδων.
     final g = checkinGoals().copyWith(checkIn: '2027-01-11');
     final today = DateTime(2027, 1, 15);
-    final weights = _weights(DateTime(2026, 11, 16), today, 90, 0.005,
-        dip: {DateTime(2027, 1, 11): 1.5, DateTime(2027, 1, 13): 3.0, DateTime(2027, 1, 15): 3.75});
+    final weights = () {
+      final out = <(DateTime, double)>[];
+      var kg = 90.0;
+      for (var d = DateTime(2026, 11, 16); !d.isAfter(today); d = DateTime(d.year, d.month, d.day + 1)) {
+        if (d.weekday == 1 || d.weekday == 3 || d.weekday == 5) out.add((d, (kg * 10).round() / 10));
+        kg -= (d.isBefore(DateTime(2026, 12, 21)) ? 0.005 : 0.013) * kg / 7;
+      }
+      return out;
+    }();
     Map<DateTime, double> diary(Set<int> alsoJan) => {
           for (var d = DateTime(2026, 11, 23); !d.isAfter(DateTime(2027, 1, 10)); d = DateTime(d.year, d.month, d.day + 1)) d: 2250,
           for (final day in alsoJan) DateTime(2027, 1, day): 2250,
         };
 
     testWidgets('3 από τις 7 τελευταίες μέρες γραμμένες: καμία πρόταση (πριν: +150 από τις μέρες πριν από την αρρώστια)', (t) async {
-      expect(weights.sublist(weights.length - 3).map((x) => x.$2), [85.0, 83.3, 82.5]);
+      expect(weights.sublist(weights.length - 3).map((x) => x.$2), [84.4, 84.1, 83.8]);
+      // Με τις ζυγίσεις της αρρώστιας (1,5 / 3 / 3,75 kg κάτω από την τάση του 0,5%) δεν βγαίνει πια καμία κάρτα (K1-C-01).
+      final sick = _weights(DateTime(2026, 11, 16), today, 90, 0.005,
+          dip: {DateTime(2027, 1, 11): 1.5, DateTime(2027, 1, 13): 3.0, DateTime(2027, 1, 15): 3.75});
+      expect(pendingCheckIn(goals: g, today: today, weights: sick, intake: _intakeOf(diary({}))), isNull);
       final c = pendingCheckIn(goals: g, today: today, weights: weights, intake: _intakeOf(diary({})))!;
       expect((c.kind, c.proposal, c.fastIntake, c.fastTarget), (CheckKind.fast, null, null, null));
-      expect((c.fastIntakeDays, c.kgNow), (17, 82.5));
-      expect(c.fastSlope!, closeTo(-1.5489, 0.0005));
+      expect((c.fastIntakeDays, c.kgNow), (17, 83.8));
+      expect(c.fastSlope!, closeTo(-1.0997, 0.0005));
       await _card(t, c, DateTime(2027, 1, 15, 9));
       expect(find.textContaining('Τις τελευταίες μέρες δεν έχει γραφτεί αρκετό φαγητό για να φανεί πόσο τρως.', findRichText: true),
           findsOneWidget);

@@ -31,10 +31,14 @@
 ///   ζυγίσεις είναι ανεξάρτητες. Με αληθινά νερά που κρατούν μέρες ανέβαινε στο 24–59%: γι' αυτό το σφάλμα διορθώνεται για
 ///   ζυγίσεις που μοιάζουν μεταξύ τους (έλεγχος 17/11, [weightFit]) και πέφτει περίπου στο 17%.
 /// - Γρήγορη απώλεια (Α3): από [adaptFastWindowDays] μέρες πριν ως και σήμερα, χωρίς την πρώτη εβδομάδα, η κλίση
-///   περνά το 1% του βάρους την εβδομάδα ακόμα και με περιθώριο ενός τυπικού σφάλματος: πρόταση +150 kcal αμέσως (κρατά
-///   τους μύες· Helms 2014, Garthe 2011). Για όποιον χάνει 0,75% την εβδομάδα, η πιθανότητα να δει ψεύτικη ειδοποίηση
-///   κάποια μέρα ως την 28η πέφτει από 64% σε 10%· για 0,5% από 22% σε 1%. Όποιος χάνει 1,5% τη βλέπει στο 99,9%
-///   (προσομοίωση με θόρυβο ζύγισης 0,4 kg, 4.000 επαναλήψεις).
+///   περνά το 1% του βάρους την εβδομάδα ακόμα και με περιθώριο [adaptFastGuardSe] τυπικών σφαλμάτων: πρόταση +150 kcal
+///   αμέσως (κρατά τους μύες· Helms 2014, Garthe 2011).
+///   Έλεγχος 20/11 (K1-C-01): το περιθώριο έγινε 2 τυπικά σφάλματα (πριν 1). Ο κανόνας κρίνεται ΚΑΘΕ μέρα, περίπου 70
+///   φορές σε 26 εβδομάδες· με 1 σφάλμα, όποιος έχανε σταθερά 0,5% έβλεπε ψεύτικη ειδοποίηση (και «+150») στο 4–42% των
+///   πορειών (ανάλογα με το πόσο κρατούν τα νερά), και όποιος έχανε 0,75% στο 79–92%· με 2 σφάλματα 1–16% και 21–34%.
+///   Η αληθινά γρήγορη απώλεια πιάνεται λίγες μέρες αργότερα (1,3% την εβδομάδα: ως τη μέρα 42 στο 86% αντί για 98%·
+///   1,6%: 99,5%, διάμεσος μέρα 22 αντί για 18)· ο εβδομαδιαίος έλεγχος τη βλέπει ούτως ή άλλως από τη μέρα 28
+///   (προσομοίωση σε Python, k1-calc: fast_standalone.py, fast_fix.py).
 /// - Μέρες: πάντα ημερολογιακές (DateTime(έτος, μήνας, μέρα − n)), ποτέ «μείον n × 24 ώρες»: στην αλλαγή ώρας μια μέρα
 ///   κρατά 23 ή 25 ώρες (Συμβούλιο 2, Σ2: ο απαντημένος έλεγχος ξαναέβγαινε την εβδομάδα μετά την αλλαγή του Οκτωβρίου).
 ///
@@ -55,6 +59,19 @@
 ///   ζυγίσεις της αρρώστιας) και η κάρτα πρότεινε −130 kcal χωρίς λόγο.
 /// - Η απόσταση των 4 ημερών μετρά μόνο μετά από απάντηση που ΑΛΛΑΞΕ τον στόχο (R2-A-5, [answerChangedTarget]). Ένα
 ///   «Εντάξει» αργά (π.χ. την Παρασκευή, στο «μαζεύω δεδομένα») δεν μεταθέτει πια την πρώτη εκτίμηση κατά μία εβδομάδα.
+///
+/// Βαθύς έλεγχος 20/11 (κατηγορία 1). Πρώτα με αριθμούς σε Python (k1-calc, k1-science), μετά εδώ:
+/// - Μετά από κενό καταγραφής, οι πρώτες [adaptSkipDays] μέρες της επιστροφής δεν μετρούν ([afterGapStart], K1-C-02): ίδια
+///   φυσιολογία με την πρώτη εβδομάδα των στόχων (νερά και γλυκογόνο των διακοπών φεύγουν σε λίγες μέρες). Πριν, η πρώτη
+///   εκτίμηση μετά από 10 μέρες γιορτών χωρίς καταγραφή έβγαινε 264–387 kcal ψηλά (με +1 ως +1,5 kg νερά) και πρότεινε
+///   «+150»· με τον κανόνα −3 kcal. Κόστος: η εκτίμηση βγαίνει μία εβδομάδα αργότερα. Το ίδιο όριο ισχύει για το παράθυρο
+///   της «γρήγορης απώλειας» ([fastNotBefore]).
+/// - Πρόταση από παράθυρο μεγαλύτερο των 21 ημερών μόνο όταν και οι 21 τελευταίες μέρες δείχνουν προς την ίδια
+///   κατεύθυνση ([recentAgrees], K1-C-02): ένα «φούσκωμα» νερών στην άκρη του μεγάλου παραθύρου (π.χ. γιορτές) μετακινεί
+///   την κλίση πολύ ενώ το περιθώριο των ζυγίσεων μένει μικρό. Ψεύτικο «+150» έξι εβδομάδες μετά τις γιορτές: από 51% σε
+///   27% των πορειών· όπου η αλλαγή χρειάζεται, ο τελικός στόχος και ο ρυθμός μένουν ίδιοι (διαφορά ≤ 6 kcal).
+/// - Με «λιγότερο λίπος» και δείκτη μάζας σώματος κάτω από [adaptMinBmi], ο στόχος δεν κατεβαίνει ([belowHealthyWeight],
+///   K1-S-05 / K1-C-04): κάτω από 18,5 καμία οδηγία δεν συστήνει απώλεια βάρους (Π.Ο.Υ.· NICE NG246).
 library;
 
 import 'dart:math' as math;
@@ -88,7 +105,11 @@ const adaptGapDays = 5;
 /// R2-A-2): το μεγαλύτερο παράθυρο και [adaptGapDays] − 1 μέρες πριν από αυτό. Έτσι πιάνεται και κενό που άρχισε πριν από
 /// το παράθυρο και φτάνει μέσα του. Όποιος καλεί το [estimateExpenditure] διαβάζει το φαγητό τόσες μέρες πίσω· αλλιώς οι
 /// μέρες που δεν διαβάστηκαν μοιάζουν με μέρες χωρίς φαγητό.
-const adaptScanDays = adaptMaxWindowDays + adaptGapDays - 1;
+/// Έλεγχος 20/11 (ανεξάρτητος έλεγχος K1, K1R-01): και [adaptSkipDays] μέρες ακόμα (53 αντί για 46). Με 46, ένα κενό που είχε
+/// τελειώσει 42–48 μέρες πριν από το «χθες» δεν φαινόταν πια, και το παράθυρο των 42 ημερών άρχιζε ΜΕΣΑ στην εβδομάδα της
+/// επιστροφής, που κατά το K1-C-02 δεν μετρά: έξι εβδομάδες μετά από γιορτές 24/12–2/1, ο έλεγχος της 15/2 έβγαζε την
+/// εκτίμηση +60 ως +180 kcal ψηλά (ψεύτικο «+150» στο 3–10% των πορειών· με 53 μέρες: 1–2%).
+const adaptScanDays = adaptMaxWindowDays + adaptGapDays - 1 + adaptSkipDays;
 
 /// Ελάχιστες μέρες ανάμεσα σε δύο αλλαγές του στόχου, και από ένα «Εφάρμοσε» ως την επόμενη μέρα ελέγχου (S1-4, R2-A-5).
 const adaptMinChangeDays = 4;
@@ -115,8 +136,42 @@ const adaptFastLossPct = 0.01;
 const adaptFastFromDay = 14;
 const adaptFastWindowDays = 21;
 
-/// Πόσα τυπικά σφάλματα περιθώριο αφήνει η «γρήγορη απώλεια» πριν ειδοποιήσει.
-const adaptFastGuardSe = 1.0;
+/// Πόσα τυπικά σφάλματα περιθώριο αφήνει η «γρήγορη απώλεια» πριν ειδοποιήσει. Έλεγχος 20/11 (K1-C-01): 2 (πριν 1),
+/// όσο και ο εβδομαδιαίος έλεγχος ([adaptGuardSe]): ο κανόνας κρίνεται κάθε μέρα, και με 1 σφάλμα μία ρηχή ζύγιση αρκούσε.
+const adaptFastGuardSe = 2.0;
+
+/// Έλεγχος 20/11 (K1-S-05 / K1-C-04): κάτω από αυτόν τον δείκτη μάζας σώματος (όριο «λιποβαρούς», Π.Ο.Υ.· NICE NG246) ο
+/// στόχος του «λιγότερο λίπος» δεν κατεβαίνει άλλο.
+const adaptMinBmi = 18.5;
+
+/// Το βάρος [kg] είναι κάτω από το φυσιολογικό για το ύψος των στόχων, και ο σκοπός είναι «λιγότερο λίπος».
+bool belowHealthyWeight(Goals g, double kg) {
+  if (g.aim != GoalAim.lose) return false;
+  final m = g.heightCm / 100;
+  return kg / (m * m) < adaptMinBmi;
+}
+
+/// Έλεγχος 20/11 (K1-S-01): εκτίμηση κάτω από αυτό το μέρος του τύπου (πάνω από ένα τυπικό σφάλμα των εξισώσεων συνολικής
+/// κατανάλωσης: 339 kcal τη μέρα για άνδρες, περίπου 13%· NASEM 2023, Dietary Reference Intakes for Energy, Table S-1)
+/// σημαίνει συχνότερα φαγητό που δεν γράφτηκε παρά χαμηλό μεταβολισμό: η υποκαταγραφή 12–25% είναι ο κανόνας σε μελέτες
+/// με διπλά σημασμένο νερό (Subar 2003, Am J Epidemiol 158:1· Burrows 2019, Front Endocrinol 10:850). Η κάρτα το λέει.
+const adaptLikelyUnderlogShare = 0.87;
+
+/// Η πρώτη μέρα που μετρά μετά από κενό καταγραφής που τελείωσε τη μέρα [restart] (K1-C-02): [adaptSkipDays] μέρες μετά.
+DateTime afterGapStart(DateTime restart) => DateTime(restart.year, restart.month, restart.day + adaptSkipDays);
+
+/// Από πότε μετρούν οι ζυγίσεις της «γρήγορης απώλειας» μετά από κενό καταγραφής ([afterGapStart])· null χωρίς κενό, ή
+/// όσο το κενό κρατά ακόμα (τότε η κάρτα δεν προτείνει τίποτα: δεν ξέρει πόσο τρως).
+///
+/// Το κόστος του κανόνα, γραμμένο (ανεξάρτητος έλεγχος K1, K1R-07): «κενό» είναι και οι μέρες από την αρχή των ημερών που
+/// μετρούν ως την πρώτη γραμμένη μέρα ([foodGap] με «since»). Όποιος ζυγίζεται από την αρχή αλλά αρχίζει να γράφει φαγητό
+/// δύο εβδομάδες αργότερα, και χάνει πράγματι 1,5% την εβδομάδα, βλέπει την κάρτα «χάνεις γρήγορα» τη μέρα 32 αντί για
+/// τη 18. Το δεχόμαστε: αλλιώς τα νερά μιας δίαιτας που αρχίζει μαζί με την καταγραφή θα έδιναν ψεύτικο «+150». Και με
+/// κενό 5 ημερών κάθε 4 εβδομάδες δεν βγαίνει ποτέ εκτίμηση (η κάρτα «κενό στο φαγητό» το λέει κάθε εβδομάδα).
+DateTime? fastNotBefore(FoodGap? gap) {
+  final restart = gap?.restart;
+  return restart == null ? null : afterGapStart(restart);
+}
 
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -229,12 +284,13 @@ enum AdaptStatus {
   /// Κενό καταγραφής που κρατά ως και χθες ([foodGap] χωρίς «restart»): καμία εκτίμηση.
   gapOpen,
 
-  /// Μετά από κενό καταγραφής δεν έχουν μαζευτεί ακόμα [adaptWindowDays] μέρες: καμία εκτίμηση.
+  /// Μετά από κενό καταγραφής δεν έχουν μαζευτεί ακόμα [adaptWindowDays] μέρες που μετρούν (από το [afterGapStart]: η
+  /// πρώτη εβδομάδα της επιστροφής δεν μετρά): καμία εκτίμηση.
   afterGap,
 }
 
-/// Κενό καταγραφής: από [from] ως και [to] καμία μέρα δεν μετρά. [restart]: η πρώτη μέρα που μετρά μετά το κενό (από
-/// εκεί και πέρα ξαναρχίζει η εκτίμηση)· null όταν το κενό κρατά ως και χθες.
+/// Κενό καταγραφής: από [from] ως και [to] καμία μέρα δεν μετρά. [restart]: η πρώτη γραμμένη μέρα μετά το κενό (η
+/// εκτίμηση ξαναρχίζει [adaptSkipDays] μέρες αργότερα: [afterGapStart])· null όταν το κενό κρατά ως και χθες.
 typedef FoodGap = ({DateTime from, DateTime to, DateTime? restart});
 
 /// Το τελευταίο κενό καταγραφής ως χθες: [adaptGapDays] ή περισσότερες συνεχόμενες μέρες χωρίς φαγητό που μετρά (κάτω
@@ -292,7 +348,8 @@ FoodGap? foodGap({
 /// Δοκιμάζει τα παράθυρα του [adaptWindows] από το μεγαλύτερο: επιστρέφει το πρώτο που έχει αρκετά δεδομένα και λογική
 /// εκτίμηση. Αν κανένα, την κατάσταση του μικρότερου (21 μέρες), ώστε η κάρτα να λέει τι λείπει «στις 3 τελευταίες
 /// εβδομάδες». [AdaptStatus.tooEarly]: δεν έχουν περάσει ακόμα 21 μέρες που μετρούν.
-/// Έλεγχος 13/11: κανένα παράθυρο δεν αρχίζει πριν από το τέλος του τελευταίου κενού καταγραφής ([foodGap])·
+/// Έλεγχος 13/11: κανένα παράθυρο δεν αρχίζει πριν από το τέλος του τελευταίου κενού καταγραφής ([foodGap])· από 20/11
+/// (K1-C-02) ούτε στις πρώτες [adaptSkipDays] μέρες μετά από αυτό ([afterGapStart]).
 /// [AdaptStatus.gapOpen] / [AdaptStatus.afterGap] όταν γι' αυτό δεν χωρά ακόμα παράθυρο 21 ημερών. Μέρες πάνω από το
 /// [absurdDayKcal] δεν μετρούν.
 ({AdaptStatus status, Expenditure? est}) estimateExpenditure({
@@ -317,7 +374,8 @@ FoodGap? foodGap({
   if (gap != null) {
     final restart = gap.restart;
     if (restart == null) return (status: AdaptStatus.gapOpen, est: null);
-    final after = daysBetween(restart, to) + 1;
+    // Έλεγχος 20/11 (K1-C-02): οι πρώτες μέρες της επιστροφής δεν μετρούν (νερά, όπως στην πρώτη εβδομάδα των στόχων).
+    final after = daysBetween(afterGapStart(restart), to) + 1;
     if (after < adaptWindowDays) return (status: AdaptStatus.afterGap, est: null);
     if (after < available) available = after;
   }
@@ -381,6 +439,8 @@ class AdaptProposal {
     required this.fastLoss,
     required this.floored,
     this.withinNoise = false,
+    this.recentDiffers = false,
+    this.underweight = false,
   });
   final int current;
 
@@ -394,6 +454,14 @@ class AdaptProposal {
 
   /// Τα δεδομένα έδειχναν αλλαγή, αλλά μικρότερη από το περιθώριο αβεβαιότητας των ζυγίσεων: ο στόχος έμεινε ίδιος (Α1).
   final bool withinNoise;
+
+  /// Έλεγχος 20/11 (K1-C-02): το μεγάλο παράθυρο ζητούσε αλλαγή, οι 21 τελευταίες μέρες όχι (ή προς την άλλη μεριά): ο
+  /// στόχος έμεινε ίδιος ([recentAgrees]).
+  final bool recentDiffers;
+
+  /// Έλεγχος 20/11 (K1-S-05 / K1-C-04): τα δεδομένα ζητούσαν μείωση, αλλά το βάρος είναι κάτω από το φυσιολογικό
+  /// ([belowHealthyWeight]): ο στόχος έμεινε ίδιος.
+  final bool underweight;
 
   int get change => target - current;
   bool get same => change == 0;
@@ -422,6 +490,9 @@ AdaptProposal proposeTarget({required Goals goals, required Expenditure est, req
   // ζυγίσεων (νερό, φαγητό). Τότε ο στόχος μένει ίδιος και η κάρτα το λέει.
   final withinNoise = change != 0 && (want - current).abs() <= est.guardKcal;
   if (withinNoise) change = 0;
+  // Έλεγχος 20/11 (K1-S-05 / K1-C-04): κάτω από το φυσιολογικό βάρος ο στόχος του «λιγότερο λίπος» δεν κατεβαίνει.
+  final underweight = change < 0 && belowHealthyWeight(goals, kgNow);
+  if (underweight) change = 0;
   var target = current + change;
   if (target < floor) target = floor;
   // «Δεν κατεβαίνει κάτω από το κάτω όριο» μόνο όταν ο νέος στόχος ΕΙΝΑΙ στο όριο (Συμβούλιο 2, μ1). Πριν το έλεγε και
@@ -433,7 +504,30 @@ AdaptProposal proposeTarget({required Goals goals, required Expenditure est, req
     fastLoss: false,
     floored: floored && target == floor,
     withinNoise: withinNoise,
+    underweight: underweight,
   );
+}
+
+/// Έλεγχος 20/11 (K1-C-02): η πρόταση [p] από παράθυρο μεγαλύτερο των [adaptWindowDays] ημερών στέκει μόνο όταν και η
+/// εκτίμηση των 21 τελευταίων ημερών ([recent]) ζητά αλλαγή προς την ίδια κατεύθυνση (τουλάχιστον [adaptMinStep] kcal,
+/// χωρίς το περιθώριο των ζυγίσεων: εδώ μετρά μόνο η κατεύθυνση). Αλλιώς ο στόχος μένει ίδιος ([AdaptProposal.recentDiffers])
+/// και ο επόμενος έλεγχος ξανακοιτά. [recent] null (λίγα δεδομένα στις 21 τελευταίες μέρες): η πρόταση μένει όπως είναι.
+AdaptProposal recentAgrees({required AdaptProposal p, required Goals goals, required Expenditure? recent, required double kgNow}) {
+  if (p.change == 0 || recent == null) return p;
+  final direction = proposeTarget(
+      goals: goals,
+      est: Expenditure(
+          tdee: recent.tdee,
+          meanIntake: recent.meanIntake,
+          slopeKgWeek: recent.slopeKgWeek,
+          intakeDays: recent.intakeDays,
+          weighIns: recent.weighIns,
+          from: recent.from,
+          to: recent.to,
+          windowDays: recent.windowDays),
+      kgNow: kgNow);
+  if (direction.change != 0 && (direction.change > 0) == (p.change > 0)) return p;
+  return AdaptProposal(current: p.current, target: p.current, est: p.est, fastLoss: false, floored: false, recentDiffers: true);
 }
 
 /// Ο ρυθμός που διάλεξες, σε kg την εβδομάδα για βάρος [kg]: αρνητικός για «λιγότερο λίπος», 0 για «ίδιο βάρος».
@@ -460,6 +554,8 @@ double plannedKgWeek(Goals goals, double kg) => switch (goals.aim) {
 /// καμία μένουν 8–12% των ελέγχων (το πολύ +0,1 μονάδα)· η αρχή (16/11, πρώτη εκτίμηση 14/12) ίδια.
 AdaptProposal? lowLogProposal({required Goals goals, required Expenditure est, required double kgNow, double? formulaTdee}) {
   if (est.tdee >= adaptLowShare * (formulaTdee ?? goals.calc.tdee)) return null;
+  // Έλεγχος 20/11 (K1-S-05 / K1-C-04): κάτω από το φυσιολογικό βάρος καμία μείωση.
+  if (belowHealthyWeight(goals, kgNow)) return null;
   final excess = (est.slopeKgWeek - plannedKgWeek(goals, kgNow)) * kcalPerKg / 7;
   if (excess <= est.guardKcal) return null;
   final current = goals.kcal;
@@ -476,7 +572,10 @@ AdaptProposal? lowLogProposal({required Goals goals, required Expenditure est, r
 
 /// Το παράθυρο της «γρήγορης απώλειας» σήμερα: από πότε ως και σήμερα. Οι [adaptFastWindowDays] τελευταίες μέρες, ΧΩΡΙΣ
 /// τις πρώτες [adaptSkipDays] μέρες των στόχων (νερά και γλυκογόνο). null αν η αρχή των στόχων δεν διαβάζεται.
-(DateTime, DateTime)? fastLossWindow({required Goals goals, required DateTime today}) {
+///
+/// Έλεγχος 20/11 (K1-C-02): [notBefore] = η πρώτη μέρα που μετρά μετά από κενό καταγραφής ([fastNotBefore])· οι μέρες πριν
+/// από αυτήν (τα νερά της επιστροφής) δεν κρίνονται.
+(DateTime, DateTime)? fastLossWindow({required Goals goals, required DateTime today, DateTime? notBefore}) {
   final since = DateTime.tryParse(goals.since);
   if (since == null) return null;
   final to = _day(today);
@@ -485,13 +584,15 @@ AdaptProposal? lowLogProposal({required Goals goals, required Expenditure est, r
   var from = DateTime(to.year, to.month, to.day - adaptFastWindowDays);
   final firstCounted = DateTime(since.year, since.month, since.day + adaptSkipDays);
   if (from.isBefore(firstCounted)) from = firstCounted;
+  if (notBefore != null && from.isBefore(_day(notBefore))) from = _day(notBefore);
   return (from, to);
 }
 
 /// Οι ζυγίσεις που κρίνουν τη «γρήγορη απώλεια» σήμερα ([fastLossWindow]), παλιότερη πρώτη. Ένα μέρος, για να κρίνει
 /// και να δείχνει η κάρτα ακριβώς τις ίδιες ζυγίσεις.
-List<(DateTime, double)> fastLossWeights({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
-  final window = fastLossWindow(goals: goals, today: today);
+List<(DateTime, double)> fastLossWeights(
+    {required Goals goals, required List<(DateTime, double)> weights, required DateTime today, DateTime? notBefore}) {
+  final window = fastLossWindow(goals: goals, today: today, notBefore: notBefore);
   if (window == null) return const [];
   final (from, to) = window;
   return [
@@ -501,23 +602,37 @@ List<(DateTime, double)> fastLossWeights({required Goals goals, required List<(D
 }
 
 /// Γρήγορη απώλεια, η μέτρηση: η κλίση των ζυγίσεων του [fastLossWindow] περνά το −1% του βάρους την εβδομάδα ακόμα και
-/// αν της προστεθεί ένα τυπικό σφάλμα (με ≥ 4 ζυγίσεις σε ≥ 10 μέρες). Μόνο σε «λιγότερο λίπος», από τη 14η μέρα των
-/// στόχων. Στην πράξη η νωρίτερη ειδοποίηση βγαίνει τη 17η–18η μέρα (10 μέρες ζυγίσεων μετά την πρώτη εβδομάδα).
+/// αν της προστεθούν [adaptFastGuardSe] τυπικά σφάλματα (με ≥ 4 ζυγίσεις σε ≥ 10 μέρες). Μόνο σε «λιγότερο λίπος», από τη
+/// 14η μέρα των στόχων. Στην πράξη η νωρίτερη ειδοποίηση βγαίνει τη 17η–18η μέρα (10 μέρες ζυγίσεων μετά την πρώτη εβδομάδα).
 /// Επιστρέφει την κλίση (kg την εβδομάδα, αρνητική) και το βάρος της τελευταίας ζύγισης· null όταν δεν ισχύει.
-({double slopeKgWeek, double kg})? fastLossSlope({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
+({double slopeKgWeek, double kg})? fastLossSlope(
+    {required Goals goals, required List<(DateTime, double)> weights, required DateTime today, DateTime? notBefore}) {
   if (goals.aim != GoalAim.lose) return null;
   final since = DateTime.tryParse(goals.since);
   if (since == null || daysBetween(since, today) < adaptFastFromDay) return null;
-  final ws = fastLossWeights(goals: goals, weights: weights, today: today);
+  final ws = fastLossWeights(goals: goals, weights: weights, today: today, notBefore: notBefore);
   if (ws.length < 4 || daysBetween(ws.first.$1, ws.last.$1) < 10) return null;
   final fit = weightFit(ws);
   if (fit == null) return null;
   final kg = ws.last.$2;
-  // Περιθώριο (Συμβούλιο 2, Α3): η ειδοποίηση βγαίνει μόνο όταν η κλίση είναι πέρα από το όριο κατά ένα τυπικό σφάλμα.
-  // Μια ρηχή ζύγιση (αφυδάτωση) δεν φτάνει πια για να τη βγάλει.
+  // Περιθώριο (Συμβούλιο 2, Α3· έλεγχος 20/11, K1-C-01: δύο τυπικά σφάλματα): η ειδοποίηση βγαίνει μόνο όταν η κλίση
+  // είναι πέρα από το όριο κατά [adaptFastGuardSe] τυπικά σφάλματα. Μια ρηχή ζύγιση (αφυδάτωση) δεν φτάνει για να τη βγάλει.
   final cautious = fit.slope + adaptFastGuardSe * (fit.se ?? 0.0);
   if (cautious * 7 >= -adaptFastLossPct * kg) return null;
   return (slopeKgWeek: fit.slope * 7, kg: kg);
+}
+
+/// Έλεγχος 20/11 (ανεξάρτητος έλεγχος K1): μπορεί να βγει «γρήγορη απώλεια» σήμερα, με ΟΠΟΙΟΔΗΠΟΤΕ όριο [fastNotBefore];
+/// Φθηνός ΑΝΑΓΚΑΙΟΣ όρος, μόνο από τις ζυγίσεις (χωρίς το ημερολόγιο): σκοπός «λιγότερο λίπος», μέρα των στόχων, και ≥ 4
+/// ζυγίσεις σε ≥ 10 μέρες στο πλήρες παράθυρο. Κάθε στενότερο παράθυρο (μετά από κενό) έχει λιγότερες ή ίσες ζυγίσεις και
+/// μέρες, άρα όταν εδώ βγαίνει «όχι» δεν βγαίνει ειδοποίηση με κανένα όριο. ΔΕΝ κοιτά την κλίση: η κλίση του πλήρους
+/// παραθύρου μπορεί να είναι ήπια (ζυγίσεις των διακοπών) ενώ του στενού είναι γρήγορη.
+bool fastLossPossible({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
+  if (goals.aim != GoalAim.lose) return false;
+  final since = DateTime.tryParse(goals.since);
+  if (since == null || daysBetween(since, today) < adaptFastFromDay) return false;
+  final ws = fastLossWeights(goals: goals, weights: weights, today: today);
+  return ws.length >= 4 && daysBetween(ws.first.$1, ws.last.$1) >= 10;
 }
 
 /// Πάνω από εδώ η «γρήγορη απώλεια» δεν ανεβάζει τον στόχο (έλεγχος 13/11, S1-2): όσα καις, από την τελευταία εκτίμηση
@@ -527,8 +642,9 @@ int fastLossCap(Goals goals) => _round10(goals.tdeeEst ?? goals.calc.tdee);
 
 /// Γρήγορη απώλεια, η πρόταση: +[adaptMaxStep] kcal, ποτέ πάνω από το [fastLossCap]. null όταν η [fastLossSlope] δεν
 /// ισχύει ή όταν ο στόχος είναι ήδη εκεί (μένουν λιγότερες από [adaptMinStep] kcal ως το όριο).
-AdaptProposal? fastLossCheck({required Goals goals, required List<(DateTime, double)> weights, required DateTime today}) {
-  if (fastLossSlope(goals: goals, weights: weights, today: today) == null) return null;
+AdaptProposal? fastLossCheck(
+    {required Goals goals, required List<(DateTime, double)> weights, required DateTime today, DateTime? notBefore}) {
+  if (fastLossSlope(goals: goals, weights: weights, today: today, notBefore: notBefore) == null) return null;
   final current = goals.kcal;
   final target = math.min(current + adaptMaxStep, fastLossCap(goals));
   if (target - current < adaptMinStep) return null;
