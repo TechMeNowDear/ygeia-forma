@@ -205,6 +205,9 @@ class MemoryTrainingIO implements TrainingIO, TrainingBadIO {
 /// Όνομα που μπορεί να γίνει αρχείο παλμών (ίδιος κανόνας με το HrFiles.kt).
 bool hrFileId(String id) => id.isNotEmpty && id.length <= 120 && RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(id) && id != '.' && id != '..';
 
+/// Η μεγαλύτερη απάντηση στο «Πρώτο σετ» («13+» → 15), από κινητό και ρολόι (Κ5-H1· αποφάσεις 20/11 για το ρολόι).
+const firstAnswerMax = 15;
+
 /// Όλη η προπόνηση: έγκριση γιατρού, προγράμματα (με εκδόσεις), προπονήσεις που έγιναν, η τρέχουσα.
 class TrainingStore extends ChangeNotifier {
   TrainingStore({TrainingIO? io, DateTime Function()? clock})
@@ -1244,13 +1247,14 @@ class TrainingStore extends ChangeNotifier {
   static bool _phoneSaw(SetLog ws) => ws.extra['c'] == 1 || ws.extra['c'] == true;
 
   /// R9-A8-3 (συμβόλαιο με το ρολόι, f3, CROSS.md): η απάντηση του ρολογιού στο «Πρώτο σετ» μέσα στο αποτέλεσμα («fr» στην
-  /// άσκηση: 0–4, −1 = «Δεν ξέρω»), αντίγραφο της εντολής «rir1» για όταν εκείνη χάθηκε (κινητό που δεν άκουγε). null αν
-  /// λείπει ή δεν είναι αριθμός. Ρολόι παλιότερης έκδοσης δεν το στέλνει: όπως πριν.
+  /// άσκηση: 0–15, −1 = «Δεν ξέρω»· αποφάσεις 20/11: και 6/10/15 από το «Πόσες περίπου;» του ρολογιού, όπως το κινητό),
+  /// αντίγραφο της εντολής «rir1» για όταν εκείνη χάθηκε (κινητό που δεν άκουγε). null αν λείπει ή δεν είναι αριθμός.
+  /// Ρολόι παλιότερης έκδοσης δεν το στέλνει: όπως πριν.
   static int? watchFirstAnswer(ExLog w) {
     final v = w.extra['fr'];
     if (v is! num || !v.isFinite) return null;
     final a = v.toInt();
-    return a < 0 ? -1 : (a > 4 ? 4 : a);
+    return a < 0 ? -1 : (a > firstAnswerMax ? firstAnswerMax : a);
   }
 
   /// Σετ που πατήθηκαν ✓ στο ρολόι αλλά δεν έφτασαν στο κινητό (π.χ. η εφαρμογή ήταν κλειστή): προστίθενται.
@@ -1582,7 +1586,7 @@ class TrainingStore extends ChangeNotifier {
   ({bool applied, double? load}) answerFirst(ExLog e, int rir) {
     if (!firstPending(e)) return (applied: false, load: null);
     // Κ5-H1 (17/11): από το κινητό και 6/10/15 («5–7», «8–12», «13+»)· το ρολόι στέλνει ως 4.
-    final a = rir < 0 ? -1 : rir.clamp(0, 15);
+    final a = rir < 0 ? -1 : rir.clamp(0, firstAnswerMax);
     e.firstAnswer = a;
     final v = a < 0 ? null : calibrateAfterFirst(e, a);
     save();

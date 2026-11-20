@@ -306,11 +306,13 @@ class R8F3Test {
         assertEquals("db_press", c.getString("ex"))
         assertEquals(3, c.getInt("v"))
         assertEquals(t0 + 60_000, c.getLong("at"))
-        // «Δεν ξέρω» = −1· χωρίς ώρα ✓: χωρίς «at» (το κινητό κρίνει με το «τώρα»)· ποτέ πάνω από 4.
+        // «Δεν ξέρω» = −1· χωρίς ώρα ✓: χωρίς «at» (το κινητό κρίνει με το «τώρα»)· ποτέ πάνω από 15 (αποφάσεις 20/11: «Πόσες
+        // περίπου;» και στο ρολόι, 4/6/10/15 όπως στο κινητό· πριν ως 4).
         val unknown = rir1Cmd(0, "db_row", 0L, -1)
         assertEquals(-1, unknown.getInt("v"))
         assertFalse(unknown.has("at"))
-        assertEquals(4, rir1Cmd(0, "db_row", 0L, 7).getInt("v"))
+        assertEquals(7, rir1Cmd(0, "db_row", 0L, 7).getInt("v"))
+        assertEquals(FIRST_MAX, rir1Cmd(0, "db_row", 0L, 40).getInt("v"))
         // Η ροή της οθόνης: η απάντηση κλείνει την ερώτηση και δίνει τη θέση της άσκησης.
         Repo.applyPhone(LiveSession.parsePhone(withFirst(phoneJson("sA", t0, set(10), set(10)))))
         runningPhone("sA")
