@@ -1,0 +1,1508 @@
+{
+ "ExLog": {
+  "fromJson minimal": {
+   "ex": "db_press",
+   "hi": 12,
+   "lo": 8,
+   "log": [
+    {
+     "q": 7,
+     "r": 0
+    }
+   ],
+   "rest": 90,
+   "rir": 2,
+   "sets": 3
+  },
+  "json round trip": {
+   "ex": "db_press",
+   "fa": 2,
+   "from": "db_fly",
+   "hi": 12,
+   "lo": 8,
+   "log": [
+    {
+     "d": 1,
+     "l": 9.3,
+     "r": 12,
+     "t": 1000
+    },
+    {
+     "l": 9.3,
+     "r": 11
+    }
+   ],
+   "pain": [
+    "elbow"
+   ],
+   "ps": 4,
+   "ra": 3,
+   "rest": 90,
+   "rir": 2,
+   "sets": 3,
+   "skip": 1,
+   "why": "δεν είχα",
+   "μελλοντικό": {
+    "x": 1
+   }
+  },
+  "unknownKeys": {
+   "b": 2
+  },
+  "άδεια": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "false|false|false|false",
+   "done": 0,
+   "doneText": "0 kg · ",
+   "endLoad": null,
+   "judged": "",
+   "kind": "dbPair",
+   "volume": 0.0,
+   "workLoad": null
+  },
+  "ένα παραπάνω που έγινε": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|true",
+   "done": 4,
+   "doneText": "9,3 kg × 12, 11, 10 · 6,8 kg × 12",
+   "endLoad": 9.3,
+   "judged": "9.30×12 9.30×11 9.30×10",
+   "kind": "dbPair",
+   "volume": 777.0,
+   "workLoad": 9.3
+  },
+  "ένα παραπάνω που δεν έγινε": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|false|true|false",
+   "done": 3,
+   "doneText": "9,3 kg · 12, 11, 10",
+   "endLoad": 9.3,
+   "judged": "9.30×12 9.30×11 9.30×10",
+   "kind": "dbPair",
+   "volume": 613.8,
+   "workLoad": 9.3
+  },
+  "ένα σετ από ένα": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|false",
+   "done": 1,
+   "doneText": "9,3 kg · 12",
+   "endLoad": 9.3,
+   "judged": "9.30×12",
+   "kind": "dbPair",
+   "volume": 223.2,
+   "workLoad": 9.3
+  },
+  "ανέβηκε στη μέση": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|true",
+   "done": 3,
+   "doneText": "9,3 kg × 12 · 11,8 kg × 9, 8",
+   "endLoad": 11.8,
+   "judged": "9.30×12 11.80×9 11.80×8",
+   "kind": "dbPair",
+   "volume": 624.4,
+   "workLoad": 11.8
+  },
+  "βοήθεια (λιγότερη = πιο βαρύ)": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|true",
+   "done": 3,
+   "doneText": "βοήθεια: κόκκινο (50 lb) × 6 · βοήθεια: πράσινο (30 lb) × 5 · βοήθεια: μαύρο (40 lb) × 5",
+   "endLoad": 40.0,
+   "judged": "50.00×6 30.00×5 40.00×5",
+   "kind": "bandAssist",
+   "volume": 0.0,
+   "workLoad": 30.0
+  },
+  "δίσκος": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|true",
+   "done": 3,
+   "doneText": "χωρίς δίσκο × 15 · δίσκος 5 kg × 12 · δίσκοι 5 + 2,5 kg × 10",
+   "endLoad": 7.5,
+   "judged": "0.00×15 5.00×12 7.50×10",
+   "kind": "plate",
+   "volume": 135.0,
+   "workLoad": 7.5
+  },
+  "δύο έγιναν, ένα όχι": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "false|false|false|false",
+   "done": 2,
+   "doneText": "9,3 kg · 12, 11",
+   "endLoad": 9.3,
+   "judged": "9.30×12 9.30×11",
+   "kind": "dbPair",
+   "volume": 427.8,
+   "workLoad": 9.3
+  },
+  "κωπηλατική ανά πλευρά": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "false|false|false|false",
+   "done": 2,
+   "doneText": "14,3 kg · 10, 10",
+   "endLoad": 14.3,
+   "judged": "14.30×10 14.30×10",
+   "kind": "db",
+   "volume": 572.0,
+   "workLoad": 14.3
+  },
+  "λάστιχο": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "false|false|false|true",
+   "done": 2,
+   "doneText": "πράσινο (30 lb) × 14 · μαύρο (40 lb) × 12",
+   "endLoad": 40.0,
+   "judged": "30.00×14 40.00×12",
+   "kind": "band",
+   "volume": 0.0,
+   "workLoad": 40.0
+  },
+  "μπάρα": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|true",
+   "done": 3,
+   "doneText": "20 kg × 10 · 22,5 kg × 8 · 0 kg × 8",
+   "endLoad": 22.5,
+   "judged": "20.00×10 22.50×8 -×8",
+   "kind": "bar",
+   "volume": 380.0,
+   "workLoad": 22.5
+  },
+  "προγραμματισμένα 4": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|false",
+   "done": 5,
+   "doneText": "9,3 kg · 12, 11, 10, 9, 8",
+   "endLoad": 9.3,
+   "judged": "9.30×12 9.30×11 9.30×10 9.30×9",
+   "kind": "dbPair",
+   "volume": 930.0,
+   "workLoad": 9.3
+  },
+  "σετ με 0 επαναλήψεις": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|false",
+   "done": 3,
+   "doneText": "9,3 kg · 12, 0, 10",
+   "endLoad": 9.3,
+   "judged": "9.30×12 9.30×10",
+   "kind": "dbPair",
+   "volume": 409.2,
+   "workLoad": 9.3
+  },
+  "σώμα": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "false|false|false|false",
+   "done": 2,
+   "doneText": "12, 11",
+   "endLoad": null,
+   "judged": "-×12 -×11",
+   "kind": "bodyweight",
+   "volume": 0.0,
+   "workLoad": null
+  },
+  "τρία σετ": {
+   "complete|rowsDone|canRemoveRow|mixedLoads": "true|true|false|false",
+   "done": 3,
+   "doneText": "9,3 kg · 12, 11, 10",
+   "endLoad": 9.3,
+   "judged": "9.30×12 9.30×11 9.30×10",
+   "kind": "dbPair",
+   "volume": 613.8,
+   "workLoad": 9.3
+  }
+ },
+ "Session": {
+  "fromJson minimal": {
+   "extra": {
+    "km": "x",
+    "zt": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "κάτι": 1
+   },
+   "limit": null,
+   "stopped": true,
+   "workout": "",
+   "zoneTimes": null
+  },
+  "inPause": [
+   false,
+   true,
+   true,
+   false
+  ],
+  "pairs": [
+   [
+    1,
+    2
+   ],
+   [
+    4,
+    5
+   ]
+  ],
+  "steadyFrom": {
+   "29 samples after 5′": null,
+   "30 samples after 5′": 111,
+   "empty": null,
+   "sample at 299 not counted": 100,
+   "samples inside a pause": 110,
+   "with a pause in the warm-up": 97
+  },
+  "strength": {
+   "duration": 3000000,
+   "free": true,
+   "hasHr": true,
+   "hrUpTo 10′": "133|102|121",
+   "hrUpTo before start": "0|104|null",
+   "hrUpTo end": "300|103|126",
+   "isCardio|isFree|finished": "false|false|true",
+   "json keys": [
+    "end",
+    "feel",
+    "hrAvg",
+    "hrMax",
+    "hrf",
+    "hrs",
+    "id",
+    "items",
+    "lim",
+    "name",
+    "prog",
+    "start",
+    "w"
+   ],
+   "json round trip": {
+    "end": 1795456200000,
+    "feel": 4,
+    "hr": "300 δείγματα",
+    "hrAvg": 104,
+    "hrMax": 126,
+    "hrs": 103,
+    "id": "s9",
+    "items": [
+     {
+      "ex": "db_press",
+      "hi": 12,
+      "lo": 8,
+      "log": [
+       {
+        "d": 1,
+        "l": 9.3,
+        "r": 12,
+        "t": 1795453320000
+       },
+       {
+        "d": 1,
+        "l": 9.3,
+        "r": 11,
+        "t": 1795453500000
+       },
+       {
+        "d": 1,
+        "l": 9.3,
+        "r": 10,
+        "t": 1795453680000
+       }
+      ],
+      "ra": 2,
+      "rest": 120,
+      "rir": 2,
+      "sets": 3
+     },
+     {
+      "ex": "db_row",
+      "hi": 12,
+      "lo": 8,
+      "log": [
+       {
+        "d": 1,
+        "l": 14.3,
+        "r": 10,
+        "t": 1795453980000
+       },
+       {
+        "l": 14.3,
+        "r": 10
+       }
+      ],
+      "rest": 90,
+      "rir": 2,
+      "sets": 2
+     },
+     {
+      "ex": "reverse_crunch",
+      "hi": 15,
+      "lo": 10,
+      "log": [
+       {
+        "d": 1,
+        "r": 12
+       }
+      ],
+      "rest": 60,
+      "rir": 2,
+      "sets": 2
+     }
+    ],
+    "lim": 140,
+    "name": "Προπόνηση A",
+    "prog": "p1",
+    "start": 1795453200000,
+    "w": "A"
+   },
+   "lastActivity": "2026-11-23T19:13:00.000",
+   "lastActivity resumed": "2026-11-23T20:06:40.000",
+   "lastTick": "2026-11-23T19:13:00.000",
+   "limitUsed": [
+    140,
+    null,
+    null
+   ],
+   "setsDone": 5,
+   "steadyHr": 103,
+   "volume": 899.8
+  },
+  "walk": {
+   "isCardio": true,
+   "json round trip": {
+    "cmin": 30,
+    "csec": 1800,
+    "end": 1795501860000,
+    "gps": true,
+    "hr": "180 δείγματα",
+    "hrAvg": 110,
+    "hrMax": 124,
+    "hrr1": 96,
+    "hrrE": 118,
+    "hrs": 111,
+    "id": "w9",
+    "items": [],
+    "km": [
+     [
+      780,
+      790
+     ],
+     [
+      1560,
+      1640
+     ]
+    ],
+    "m": 2300.0,
+    "name": "Περπάτημα",
+    "prog": "p1",
+    "pz": [
+     [
+      600,
+      660
+     ],
+     [
+      1200,
+      1205
+     ]
+    ],
+    "src": "watch",
+    "start": 1795500000000,
+    "steps": 3100,
+    "w": "walk",
+    "zt": [
+     300,
+     1200,
+     250
+    ]
+   },
+   "moderateMinutes": 24,
+   "steadyHr": 111
+  },
+  "watchLimit": [
+   null,
+   null,
+   0,
+   140,
+   140,
+   null
+  ]
+ },
+ "constants": {
+  "cardioMaxMinutes": 600,
+  "cardioMinMinutes": 1,
+  "cardioNames": {
+   "bike": "Ποδήλατο",
+   "brisk": "Γρήγορο περπάτημα",
+   "stairs": "Σκάλες",
+   "walk": "Περπάτημα"
+  },
+  "catchUpDays": 2,
+  "dayShort": {
+   "1": "Δε",
+   "2": "Τρ",
+   "3": "Τε",
+   "4": "Πε",
+   "5": "Πα",
+   "6": "Σα",
+   "7": "Κυ"
+  },
+  "freeWorkoutId": "_free",
+  "planMaxWeeks": 12,
+  "routineMaxChars": 160,
+  "routineMaxSteps": 10,
+  "steadyFromSec": 300,
+  "steadyMinSamples": 30,
+  "weekdayLong": {
+   "1": "Δευτέρα",
+   "2": "Τρίτη",
+   "3": "Τετάρτη",
+   "4": "Πέμπτη",
+   "5": "Παρασκευή",
+   "6": "Σάββατο",
+   "7": "Κυριακή"
+  }
+ },
+ "missedToCatchUp": {
+  "έγινε η Α την Παρασκευή 13/11": "11-12:- 11-13:- 11-14:- 11-15:- 11-16:- 11-17:B@11-16 11-18:B@11-16 11-19:- 11-20:- 11-21:- 11-22:- 11-23:- 11-24:B@11-23 11-25:B@11-23",
+  "έγινε η Β την Κυριακή αντί για την Α": "11-12:- 11-13:- 11-14:- 11-15:- 11-16:- 11-17:B@11-16 11-18:B@11-16 11-19:- 11-20:- 11-21:- 11-22:- 11-23:- 11-24:B@11-23 11-25:B@11-23",
+  "η Β της Δευτέρας έγινε την Τρίτη": "11-12:- 11-13:- 11-14:- 11-15:- 11-16:- 11-17:- 11-18:- 11-19:- 11-20:- 11-21:- 11-22:- 11-23:- 11-24:B@11-23 11-25:B@11-23",
+  "καμία προπόνηση": "11-12:- 11-13:- 11-14:- 11-15:- 11-16:- 11-17:B@11-16 11-18:B@11-16 11-19:- 11-20:- 11-21:- 11-22:- 11-23:- 11-24:B@11-23 11-25:B@11-23",
+  "μισή (όχι τελειωμένη) το Σάββατο": "11-12:- 11-13:- 11-14:- 11-15:- 11-16:- 11-17:B@11-16 11-18:B@11-16 11-19:- 11-20:- 11-21:- 11-22:- 11-23:- 11-24:B@11-23 11-25:B@11-23",
+  "περπάτημα κάθε μέρα": "11-12:- 11-13:- 11-14:- 11-15:- 11-16:- 11-17:B@11-16 11-18:B@11-16 11-19:- 11-20:- 11-21:- 11-22:- 11-23:- 11-24:B@11-23 11-25:B@11-23"
+ },
+ "parseProgram": {
+  "minimal (σωστό)": {
+   "ok": true,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "B",
+     "2": "walk",
+     "3": "walk",
+     "4": "walk",
+     "5": "A",
+     "6": "B",
+     "7": "A"
+    },
+    "from": "2026-11-23",
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "load": 9.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "load": 20.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   }
+  },
+  "sample (σωστό)": {
+   "ok": true,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "B",
+     "2": "walk",
+     "3": "walk",
+     "4": "walk",
+     "5": "A",
+     "6": "B",
+     "7": "A"
+    },
+    "from": "2026-11-13",
+    "id": "p-claude-1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα 1",
+    "note": "Έμφαση: στήθος, χέρια, κοιλιακοί. Πλάτη και πόδια για ισορροπία.",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "load": 9.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "db_row",
+        "load": 14.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "goblet",
+        "load": 12.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "incline_curl",
+        "load": 5.3,
+        "reps": [
+         10,
+         15
+        ],
+        "rest": 75,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "band_pushdown",
+        "load": 30.0,
+        "reps": [
+         12,
+         15
+        ],
+        "rest": 60,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "reverse_crunch",
+        "reps": [
+         10,
+         15
+        ],
+        "rest": 60,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "incline_press",
+        "load": 7.8,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "band_pulldown",
+        "load": 40.0,
+        "reps": [
+         10,
+         15
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "rdl",
+        "load": 20.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "hammer_curl",
+        "load": 6.8,
+        "reps": [
+         10,
+         15
+        ],
+        "rest": 75,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "lying_ext",
+        "load": 4.3,
+        "reps": [
+         10,
+         15
+        ],
+        "rest": 75,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "pushup_bench",
+        "next": "pushup_handles",
+        "reps": [
+         10,
+         15
+        ],
+        "rest": 60,
+        "rir": 2,
+        "sets": 2
+       },
+       {
+        "ex": "ab_wheel",
+        "reps": [
+         6,
+         10
+        ],
+        "rest": 60,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30,
+       "note": "χαλαρά, να μπορείς να μιλάς"
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   }
+  },
+  "άγνωστη άσκηση και παραλλαγή": {
+   "errors": [
+    "Άγνωστη άσκηση «bench_press» στη «Προπόνηση Α».",
+    "Άγνωστη παραλλαγή «kati»."
+   ],
+   "ok": false
+  },
+  "άλλο είδος": {
+   "errors": [
+    "Το κείμενο δεν είναι πρόγραμμα της εφαρμογής."
+   ],
+   "ok": false
+  },
+  "άφησε 5, 1 και 0 (μπάρα)": {
+   "errors": [
+    "Προπόνηση Α: το «άφησε» (πόσες επαναλήψεις να περισσεύουν) πρέπει να είναι από 2 ως 4."
+   ],
+   "ok": false,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "B",
+     "2": "walk",
+     "3": "walk",
+     "4": "walk",
+     "5": "A",
+     "6": "B",
+     "7": "A"
+    },
+    "from": "2026-11-23",
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 5,
+        "sets": 3
+       },
+       {
+        "ex": "db_curl",
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   },
+   "warnings": [
+    "Άφησε τουλάχιστον 2 (ως να πει άλλα ο γιατρός σου): στο «Κάμψεις δικεφάλων με αλτήρες» έγινε 2.",
+    "Μπάρα χωρίς βραχίονες ασφαλείας: στο «Romanian deadlift» το «άφησε» έγινε 2."
+   ]
+  },
+  "αερόβια 0 και 601 λεπτά": {
+   "errors": [
+    "Περπάτημα: τα λεπτά της αερόβιας πρέπει να είναι από 1 ως 600.",
+    "Πολύ: τα λεπτά της αερόβιας πρέπει να είναι από 1 ως 600."
+   ],
+   "ok": false
+  },
+  "αποθεραπεία με πολύ μεγάλο βήμα": {
+   "errors": [
+    "Περπάτημα: η αποθεραπεία θέλει ως 10 βήματα, ως 160 γράμματα το καθένα."
+   ],
+   "ok": false
+  },
+  "αρνητικό βάρος": {
+   "errors": [
+    "Προπόνηση Α: το βάρος στο «Πιεστικό με αλτήρες» δεν μπορεί να είναι αρνητικό."
+   ],
+   "ok": false
+  },
+  "βάρη που δεν βγαίνουν": {
+   "ok": true,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "B",
+     "2": "walk",
+     "3": "walk",
+     "4": "walk",
+     "5": "A",
+     "6": "B",
+     "7": "A"
+    },
+    "from": "2026-11-23",
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "load": 9.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "goblet",
+        "load": 8.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "band_pushdown",
+        "load": 30.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "band_fly",
+        "load": 30.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "assisted_pullup",
+        "load": 40.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "crunch",
+        "load": 3.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "leg_curl",
+        "load": 0.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       },
+       {
+        "ex": "reverse_crunch",
+        "load": 10.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "load": 21.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   },
+   "warnings": [
+    "10 kg δεν βγαίνει με τους δίσκους σου· στο «Πιεστικό με αλτήρες» μπήκε 9,3 kg.",
+    "Δεν υπάρχει kettlebell 9 kg· στο «Goblet squat» μπήκε 8 kg.",
+    "35 lb δεν βγαίνει με τα λάστιχά σου· στο «Pushdown με λάστιχο» μπήκε πράσινο (30 lb).",
+    "35 lb/πλευρά δεν βγαίνει με τα λάστιχά σου· στο «Ανοίγματα με λάστιχο» μπήκε 30 lb/πλευρά.",
+    "βοήθεια: 45 lb δεν βγαίνει με τα λάστιχά σου· στο «Έλξεις με λάστιχο (βοήθεια)» μπήκε βοήθεια: μαύρο (40 lb).",
+    "0,3 kg δεν βγαίνει με τους δίσκους σου· στο «Leg curl στον πάγκο» μπήκε 0 kg.",
+    "21,3 kg δεν βγαίνει με τους δίσκους σου· στο «Romanian deadlift» μπήκε 21 kg."
+   ]
+  },
+  "διάλειμμα −1 και 601": {
+   "errors": [
+    "Προπόνηση Α: το διάλειμμα πρέπει να είναι έως 10 λεπτά.",
+    "Προπόνηση Β: το διάλειμμα πρέπει να είναι έως 10 λεπτά."
+   ],
+   "ok": false
+  },
+  "δύο προπονήσεις ίδιο id": {
+   "errors": [
+    "Δύο προπονήσεις με το ίδιο όνομα «A».",
+    "Η Τρίτη δείχνει σε προπόνηση που δεν υπάρχει («walk»).",
+    "Η Τετάρτη δείχνει σε προπόνηση που δεν υπάρχει («walk»).",
+    "Η Πέμπτη δείχνει σε προπόνηση που δεν υπάρχει («walk»)."
+   ],
+   "ok": false
+  },
+  "επαναλήψεις ως ένας αριθμός": {
+   "ok": true,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "B",
+     "2": "walk",
+     "3": "walk",
+     "4": "walk",
+     "5": "A",
+     "6": "B",
+     "7": "A"
+    },
+    "from": "2026-11-23",
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "reps": [
+         10,
+         10
+        ],
+        "rest": 90,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "load": 20.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   }
+  },
+  "επαναλήψεις ως κείμενο": {
+   "errors": [
+    "Προπόνηση Α: οι επαναλήψεις στο «Πιεστικό με αλτήρες» γράφονται [από, ως], π.χ. [8, 12].",
+    "Προπόνηση Β: οι επαναλήψεις στο «Romanian deadlift» γράφονται [από, ως], π.χ. [8, 12]."
+   ],
+   "ok": false
+  },
+  "εύρος ανάποδα, πάνω από 50, μηδέν": {
+   "errors": [
+    "Προπόνηση Α: λάθος εύρος επαναλήψεων 12–8.",
+    "Προπόνηση Β: λάθος εύρος επαναλήψεων 0–51."
+   ],
+   "ok": false
+  },
+  "ζέσταμα 11 βήματα": {
+   "errors": [
+    "Περπάτημα: το ζέσταμα θέλει ως 10 βήματα, ως 160 γράμματα το καθένα."
+   ],
+   "ok": false
+  },
+  "κείμενο γύρω και δύο μπλοκ": {
+   "ok": true
+  },
+  "κείμενο χωρίς πρόγραμμα": {
+   "errors": [
+    "Δεν βρέθηκε πρόγραμμα στο κείμενο. Αντίγραψε ολόκληρο το κομμάτι που ξεκινά με «{»."
+   ],
+   "ok": false
+  },
+  "λάθος μορφή (workouts όχι λίστα)": {
+   "errors": [
+    "Το πρόγραμμα έχει λάθος μορφή. Ζήτα από τον Claude να το ξαναβγάλει."
+   ],
+   "ok": false
+  },
+  "λάθος μορφή (άσκηση χωρίς ex)": {
+   "errors": [
+    "Το πρόγραμμα έχει λάθος μορφή. Ζήτα από τον Claude να το ξαναβγάλει."
+   ],
+   "ok": false
+  },
+  "λίστα αντί για αντικείμενο": {
+   "errors": [
+    "Δεν έχει καμία προπόνηση."
+   ],
+   "ok": false
+  },
+  "μέρα σε προπόνηση που δεν υπάρχει": {
+   "errors": [
+    "Η Τρίτη δείχνει σε προπόνηση που δεν υπάρχει («Γ»)."
+   ],
+   "ok": false
+  },
+  "μέρες με αριθμούς και ελληνικά": {
+   "ok": true,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "A",
+     "3": "B",
+     "4": "walk",
+     "5": "A",
+     "7": "walk"
+    },
+    "from": "2026-11-23",
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "load": 9.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "load": 20.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   }
+  },
+  "μέρες που δεν διαβάζονται": {
+   "errors": [
+    "Δεν κατάλαβα τη μέρα «8». Γράψε mon, tue, wed, thu, fri, sat, sun ή 1–7.",
+    "Δεν κατάλαβα τη μέρα «someday». Γράψε mon, tue, wed, thu, fri, sat, sun ή 1–7.",
+    "Δεν κατάλαβα τη μέρα «0». Γράψε mon, tue, wed, thu, fri, sat, sun ή 1–7."
+   ],
+   "ok": false,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "A",
+     "2": "B"
+    },
+    "from": "2026-11-23",
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "load": 9.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "load": 20.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   }
+  },
+  "μισό": {
+   "errors": [
+    "Δεν βρέθηκε πρόγραμμα στο κείμενο. Αντίγραψε ολόκληρο το κομμάτι που ξεκινά με «{»."
+   ],
+   "ok": false
+  },
+  "μισό με αγκύλη στο τέλος": {
+   "errors": [
+    "Το πρόγραμμα αντιγράφηκε μισό ή αλλοιωμένο. Αντίγραψέ το ξανά ολόκληρο."
+   ],
+   "ok": false
+  },
+  "πλάνο 13 εβδομάδων": {
+   "errors": [
+    "Περπάτημα: το πλάνο θέλει ως 12 εβδομάδες, με 1 ως 600 λεπτά η καθεμία."
+   ],
+   "ok": false
+  },
+  "πλάνο με 0 λεπτά": {
+   "errors": [
+    "Περπάτημα: το πλάνο θέλει ως 12 εβδομάδες, με 1 ως 600 λεπτά η καθεμία."
+   ],
+   "ok": false
+  },
+  "πλάνο χωρίς ημερομηνία έναρξης": {
+   "errors": [
+    "Περπάτημα: το πλάνο ανά εβδομάδα θέλει ημερομηνία έναρξης του προγράμματος."
+   ],
+   "ok": false,
+   "program": {
+    "author": "claude",
+    "days": {
+     "1": "B",
+     "2": "walk",
+     "3": "walk",
+     "4": "walk",
+     "5": "A",
+     "6": "B",
+     "7": "A"
+    },
+    "id": "p1",
+    "kind": "ygeia-program",
+    "name": "Πρόγραμμα",
+    "v": 1,
+    "version": 1,
+    "workouts": [
+     {
+      "id": "A",
+      "items": [
+       {
+        "ex": "db_press",
+        "load": 9.3,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Α"
+     },
+     {
+      "id": "B",
+      "items": [
+       {
+        "ex": "rdl",
+        "load": 20.0,
+        "reps": [
+         8,
+         12
+        ],
+        "rest": 120,
+        "rir": 2,
+        "sets": 3
+       }
+      ],
+      "name": "Προπόνηση Β"
+     },
+     {
+      "cardio": {
+       "activity": "walk",
+       "minutes": 30,
+       "plan": [
+        20,
+        25,
+        30
+       ]
+      },
+      "id": "walk",
+      "name": "Περπάτημα"
+     }
+    ]
+   }
+  },
+  "προπόνηση χωρίς ασκήσεις": {
+   "errors": [
+    "Η «Άδεια» δεν έχει ασκήσεις.",
+    "Η Τρίτη δείχνει σε προπόνηση που δεν υπάρχει («walk»).",
+    "Η Τετάρτη δείχνει σε προπόνηση που δεν υπάρχει («walk»).",
+    "Η Πέμπτη δείχνει σε προπόνηση που δεν υπάρχει («walk»)."
+   ],
+   "ok": false
+  },
+  "σετ 0 και 11": {
+   "errors": [
+    "Προπόνηση Α: τα σετ πρέπει να είναι 1–10.",
+    "Προπόνηση Β: τα σετ πρέπει να είναι 1–10."
+   ],
+   "ok": false
+  },
+  "χωρίς id (μόνο λάθη/προειδοποιήσεις)": {
+   "ok": true
+  },
+  "χωρίς προπονήσεις": {
+   "errors": [
+    "Δεν έχει καμία προπόνηση."
+   ],
+   "ok": false
+  }
+ },
+ "program": {
+  "PlanItem.fromJson": {
+   "copy": {
+    "ex": "goblet",
+    "load": 12.0,
+    "next": "x",
+    "reps": [
+     8,
+     12
+    ],
+    "rest": 90,
+    "rir": 2,
+    "sets": 3
+   },
+   "defaults": {
+    "ex": "db_press",
+    "reps": [
+     8,
+     12
+    ],
+    "rest": 90,
+    "rir": 2,
+    "sets": 3
+   },
+   "kind": [
+    "kb",
+    "bodyweight"
+   ],
+   "reps list of 3": {
+    "ex": "db_press",
+    "reps": [
+     8,
+     12
+    ],
+    "rest": 90,
+    "rir": 2,
+    "sets": 3
+   },
+   "reps number": {
+    "ex": "db_press",
+    "load": 9.0,
+    "reps": [
+     10,
+     10
+    ],
+    "rest": 90,
+    "rir": 2,
+    "sets": 4
+   }
+  },
+  "Workout.minutes per-side": 21,
+  "cardio": {
+   "json": {
+    "activity": "brisk",
+    "minutes": 30,
+    "note": "χαλαρά",
+    "plan": [
+     20,
+     25,
+     30,
+     35
+    ]
+   },
+   "minutesInWeek": [
+    20,
+    20,
+    25,
+    35,
+    35,
+    35
+   ],
+   "name": "Γρήγορο περπάτημα",
+   "no plan": [
+    40,
+    null
+   ],
+   "planWeekText": [
+    null,
+    "εβδομάδα 1 από 4",
+    "εβδομάδα 4 από 4",
+    null
+   ],
+   "unknown name": "Αερόβια"
+  },
+  "cardioMinutesPlus/Minus": {
+   "1": "6|null",
+   "30": "35|25",
+   "5": "10|null",
+   "594": "599|589",
+   "595": "600|590",
+   "596": "600|591",
+   "599": "600|594",
+   "6": "11|1",
+   "600": "null|595",
+   "601": "null|596"
+  },
+  "copy equals": true,
+  "forDay": {
+   "2026-11-11": null,
+   "2026-11-12": null,
+   "2026-11-13": "A",
+   "2026-11-14": "B",
+   "2026-11-15": "A",
+   "2026-11-16": "B",
+   "2026-11-17": "walk",
+   "2026-11-18": "walk",
+   "2026-11-19": "walk",
+   "2026-11-20": "A",
+   "2026-11-21": "B",
+   "2026-11-22": "A",
+   "2026-11-23": "B",
+   "2026-11-24": "walk"
+  },
+  "from": "2026-11-13T00:00:00.000",
+  "minutes": {
+   "A": 53,
+   "B": 56,
+   "walk": 30
+  },
+  "notStarted": [
+   true,
+   false,
+   false
+  ],
+  "plan minutes by date": {
+   "2026-11-22": "null · null",
+   "2026-11-24": "20 · εβδομάδα 1 από 4",
+   "2026-12-01": "25 · εβδομάδα 2 από 4",
+   "2026-12-08": "30 · εβδομάδα 3 από 4",
+   "2026-12-15": "35 · εβδομάδα 4 από 4",
+   "2026-12-22": "35 · null",
+   "2027-06-01": "35 · null"
+  },
+  "weekOf": {
+   "2026-11-22": 0,
+   "2026-11-23": 0,
+   "2026-11-29": 0,
+   "2026-11-30": 1,
+   "2027-03-28": 17,
+   "2027-03-29": 18,
+   "2027-11-22": 52
+  },
+  "workout(null)": null
+ },
+ "programJsonIn": {
+  "bare with braces in strings": "}{",
+  "fence": "p1",
+  "none": null
+ }
+}

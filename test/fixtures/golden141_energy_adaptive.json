@@ -1,0 +1,1273 @@
+{
+ "absurdDayKcal": {
+  "1500.0": 6000.0,
+  "2399.0": 6000.0,
+  "2400.0": 6000.0,
+  "2401.0": 6002.5,
+  "2800.0": 7000.0,
+  "3500.0": 8750.0
+ },
+ "adaptNeeds": {
+  "14": "10|6|10",
+  "21": "14|6|14",
+  "22": "15|7|15",
+  "28": "19|8|19",
+  "30": "20|9|20",
+  "35": "24|10|24",
+  "42": "28|12|28",
+  "56": "38|16|38"
+ },
+ "checkInDue": {
+  "answerChangedTarget": [
+   true,
+   false,
+   false
+  ],
+  "answered 14/12": "000000000000000000000000000011111111111111111",
+  "answered 14/12, target changed": "000000000000000000000000000011111111111111111",
+  "answered 16/12": "000000000000000000000000000011111111111111111",
+  "answered 18/12, target changed that day": "000000000000000000000000000000000001111111111",
+  "bad lastCheckIn": "000000000000000000000111111111111111111111111",
+  "bad since": false,
+  "firstCheckDay/firstEstimateDay": {
+   "2026-10-05": "2026-10-26 2026-11-02",
+   "2026-10-19": "2026-11-09 2026-11-16",
+   "2026-11-23": "2026-12-14 2026-12-21",
+   "2026-12-10": "2026-12-31 2027-01-07",
+   "2027-03-08": "2027-03-29 2027-04-05",
+   "2028-02-08": "2028-02-29 2028-03-07"
+  },
+  "lastChangeDay": [
+   null,
+   "2026-12-14",
+   "2026-12-21"
+  ],
+  "nextCheckDay": {
+   "answered 14/12": "12-14 12-14 12-14 12-21 12-21 12-21 12-21 12-21 12-21 12-22 12-27 12-28 12-29 01-05",
+   "answered 14/12, target changed": "12-14 12-14 12-14 12-21 12-21 12-21 12-21 12-21 12-21 12-22 12-27 12-28 12-29 01-05",
+   "answered 18/12, target changed": "12-14 12-14 12-14 12-28 12-28 12-28 12-28 12-28 12-28 12-28 12-28 12-28 12-29 01-05",
+   "no answer yet": "12-14 12-14 12-14 12-14 12-15 12-17 12-18 12-20 12-21 12-22 12-27 12-28 12-29 01-05"
+  },
+  "no answer yet": "000000000000000000000111111111111111111111111",
+  "since Thursday": "0000000000000000000001111111111"
+ },
+ "constants": {
+  "adaptAbsurdKcal": 6000.0,
+  "adaptAbsurdTimes": 2.5,
+  "adaptFastFromDay": 14,
+  "adaptFastGuardSe": 1.0,
+  "adaptFastLossPct": 0.01,
+  "adaptFastMinIntakeDays": 4,
+  "adaptFastRecentDays": 7,
+  "adaptFastRecentMinDays": 5,
+  "adaptFastWindowDays": 21,
+  "adaptFullDayShare": 0.6,
+  "adaptGapDays": 5,
+  "adaptGuardSe": 2.0,
+  "adaptHighShare": 1.4,
+  "adaptLowShare": 0.7,
+  "adaptMaxStep": 150,
+  "adaptMaxWindowDays": 42,
+  "adaptMinChangeDays": 4,
+  "adaptMinIntakeDays": 14,
+  "adaptMinSpanDays": 14,
+  "adaptMinStep": 30,
+  "adaptMinWeighIns": 6,
+  "adaptScanDays": 46,
+  "adaptSkipDays": 7,
+  "adaptWindowDays": 21,
+  "adaptWindows": [
+   42,
+   35,
+   28,
+   21
+  ],
+  "estimatedShareNote": 0.15,
+  "formulaKgDrift": 2.0,
+  "smokeQuitHoldDays": 70
+ },
+ "dailyIntake": {
+  "2026-12-07": 2250.0,
+  "2026-12-08": 2250.0,
+  "2026-12-10": 2250.0,
+  "2026-12-11": 2250.0,
+  "2026-12-13": 2250.0,
+  "2026-12-14": 146.0
+ },
+ "estimateDayAfterGap": {
+  "no gap": "2027-01-04",
+  "open gap": null,
+  "restart 12/12": "2027-01-04",
+  "restart 14/12": "2027-01-04",
+  "restart 16/12": "2027-01-11"
+ },
+ "estimateExpenditure": {
+  "13 intake days": {
+   "status": "afterGap"
+  },
+  "14 intake days": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 8.03413209e-12,
+    "intakeDays": 14,
+    "meanIntake": 2300.0,
+    "seKcal": 4.01706604e-12,
+    "slopeKgWeek": -0.448,
+    "tdee": 2792.8,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "5 weigh-ins": {
+   "status": "fewWeighIns"
+  },
+  "6 weigh-ins, span 13": {
+   "status": "fewWeighIns"
+  },
+  "6 weigh-ins, span 14": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 1.81534136e-11,
+    "intakeDays": 21,
+    "meanIntake": 2300.0,
+    "seKcal": 9.07670681e-12,
+    "slopeKgWeek": -0.448,
+    "tdee": 2792.8,
+    "to": "2026-12-20",
+    "weighIns": 6,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "flat weight, eats 1959.0": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 1959.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 1959.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "implausible"
+  },
+  "flat weight, eats 1960.0": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 1960.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 1960.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "flat weight, eats 1961.0": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 1961.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 1961.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "flat weight, eats 3919.0": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 3919.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 3919.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "flat weight, eats 3920.0": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 3920.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 3920.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "implausible"
+  },
+  "flat weight, eats 3921.0": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 3921.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 3921.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "implausible"
+  },
+  "long history +28": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 127.267238,
+    "intakeDays": 21,
+    "meanIntake": 2300.0,
+    "seKcal": 63.6336192,
+    "slopeKgWeek": -0.442496855,
+    "tdee": 2786.74654,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "long history +35": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 83.1424077,
+    "intakeDays": 28,
+    "meanIntake": 2300.0,
+    "seKcal": 41.5712038,
+    "slopeKgWeek": -0.43841721,
+    "tdee": 2782.25893,
+    "to": "2026-12-27",
+    "weighIns": 12,
+    "windowDays": 28
+   },
+   "status": "ok"
+  },
+  "long history +42": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 57.618698,
+    "intakeDays": 35,
+    "meanIntake": 2300.0,
+    "seKcal": 28.809349,
+    "slopeKgWeek": -0.454258278,
+    "tdee": 2799.68411,
+    "to": "2027-01-03",
+    "weighIns": 15,
+    "windowDays": 35
+   },
+   "status": "ok"
+  },
+  "long history +49": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 41.8630587,
+    "intakeDays": 42,
+    "meanIntake": 2300.0,
+    "seKcal": 20.9315293,
+    "slopeKgWeek": -0.441121542,
+    "tdee": 2785.2337,
+    "to": "2027-01-10",
+    "weighIns": 18,
+    "windowDays": 42
+   },
+   "status": "ok"
+  },
+  "long history +56": {
+   "est": {
+    "from": "2026-12-07",
+    "guardKcal": 42.6683038,
+    "intakeDays": 42,
+    "meanIntake": 2300.0,
+    "seKcal": 21.3341519,
+    "slopeKgWeek": -0.454945239,
+    "tdee": 2800.43976,
+    "to": "2027-01-17",
+    "weighIns": 18,
+    "windowDays": 42
+   },
+   "status": "ok"
+  },
+  "no since": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 8.03413209e-12,
+    "intakeDays": 21,
+    "meanIntake": 2300.0,
+    "seKcal": 4.01706604e-12,
+    "slopeKgWeek": -0.448,
+    "tdee": 2792.8,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "same weight every day": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 0.0,
+    "intakeDays": 21,
+    "meanIntake": 2300.0,
+    "seKcal": 0.0,
+    "slopeKgWeek": 0.0,
+    "tdee": 2300.0,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "since 23/11, 20/12 (20 μέρες)": {
+   "status": "tooEarly"
+  },
+  "since 23/11, 21/12 (21 μέρες)": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 8.03413209e-12,
+    "intakeDays": 21,
+    "meanIntake": 2300.0,
+    "seKcal": 4.01706604e-12,
+    "slopeKgWeek": -0.448,
+    "tdee": 2792.8,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  },
+  "weights 29.9 / 300.1 ignored": {
+   "est": {
+    "from": "2026-11-30",
+    "guardKcal": 8.03413209e-12,
+    "intakeDays": 21,
+    "meanIntake": 2300.0,
+    "seKcal": 4.01706604e-12,
+    "slopeKgWeek": -0.448,
+    "tdee": 2792.8,
+    "to": "2026-12-20",
+    "weighIns": 9,
+    "windowDays": 21
+   },
+   "status": "ok"
+  }
+ },
+ "estimatedShare": {
+  "all": 0.0,
+  "max 1000": 0.0,
+  "min 1380": 0.0,
+  "no food": null
+ },
+ "estimatedShareText": {
+  "0.0": null,
+  "0.149": null,
+  "0.15": "Το 15% των θερμίδων αυτών των ημερών γράφτηκε χωρίς ζύγιση (εκτίμηση): ο έλεγχος είναι λιγότερο ακριβής. Όσο πιο πολλά ζυγίζεις, τόσο πιο σωστός βγαίνει.",
+  "0.151": "Το 15% των θερμίδων αυτών των ημερών γράφτηκε χωρίς ζύγιση (εκτίμηση): ο έλεγχος είναι λιγότερο ακριβής. Όσο πιο πολλά ζυγίζεις, τόσο πιο σωστός βγαίνει.",
+  "0.305": "Το 31% των θερμίδων αυτών των ημερών γράφτηκε χωρίς ζύγιση (εκτίμηση): ο έλεγχος είναι λιγότερο ακριβής. Όσο πιο πολλά ζυγίζεις, τόσο πιο σωστός βγαίνει.",
+  "0.315": "Το 32% των θερμίδων αυτών των ημερών γράφτηκε χωρίς ζύγιση (εκτίμηση): ο έλεγχος είναι λιγότερο ακριβής. Όσο πιο πολλά ζυγίζεις, τόσο πιο σωστός βγαίνει.",
+  "1.0": "Το 100% των θερμίδων αυτών των ημερών γράφτηκε χωρίς ζύγιση (εκτίμηση): ο έλεγχος είναι λιγότερο ακριβής. Όσο πιο πολλά ζυγίζεις, τόσο πιο σωστός βγαίνει.",
+  "null": null
+ },
+ "fastLoss": {
+  "0.6 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "0.6 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "0.6 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "0.6 kg/εβδ. +18": {
+   "n": 6,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "0.6 kg/εβδ. +21": {
+   "n": 7,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "0.6 kg/εβδ. +28": {
+   "n": 10,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "0.6 kg/εβδ. +35": {
+   "n": 10,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "0.85 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "0.85 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "0.85 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "0.85 kg/εβδ. +18": {
+   "n": 6,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "0.85 kg/εβδ. +21": {
+   "n": 7,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "0.85 kg/εβδ. +28": {
+   "n": 10,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "0.85 kg/εβδ. +35": {
+   "n": 10,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "0.9 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "0.9 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "0.9 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "0.9 kg/εβδ. +18": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 87.6857143,
+   "n": 6,
+   "slope": -0.915642458,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "0.9 kg/εβδ. +21": {
+   "n": 7,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "0.9 kg/εβδ. +28": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 86.45,
+   "n": 10,
+   "slope": -0.896246649,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "0.9 kg/εβδ. +35": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 85.55,
+   "n": 10,
+   "slope": -0.896246649,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "0.95 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "0.95 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "0.95 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "0.95 kg/εβδ. +18": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 87.5571429,
+   "n": 6,
+   "slope": -0.965642458,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "0.95 kg/εβδ. +21": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 87.2,
+   "n": 7,
+   "slope": -0.94240566,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "0.95 kg/εβδ. +28": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 86.25,
+   "n": 10,
+   "slope": -0.946246649,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "0.95 kg/εβδ. +35": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 85.3,
+   "n": 10,
+   "slope": -0.946246649,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "1.0 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "1.0 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "1.0 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "1.0 kg/εβδ. +18": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 87.4285714,
+   "n": 6,
+   "slope": -1.01564246,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "1.0 kg/εβδ. +21": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 87.05,
+   "n": 7,
+   "slope": -0.99240566,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "1.0 kg/εβδ. +28": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 86.05,
+   "n": 10,
+   "slope": -0.996246649,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "1.0 kg/εβδ. +35": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 85.05,
+   "n": 10,
+   "slope": -0.996246649,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "1.1 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "1.1 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "1.1 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "1.1 kg/εβδ. +18": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 87.1714286,
+   "n": 6,
+   "slope": -1.11564246,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "1.1 kg/εβδ. +21": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 86.75,
+   "n": 7,
+   "slope": -1.09240566,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "1.1 kg/εβδ. +28": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 85.65,
+   "n": 10,
+   "slope": -1.09624665,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "1.1 kg/εβδ. +35": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 84.55,
+   "n": 10,
+   "slope": -1.09624665,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "1.4 kg/εβδ. +13": {
+   "n": 3,
+   "window": "2026-11-30..2026-12-06"
+  },
+  "1.4 kg/εβδ. +14": {
+   "n": 4,
+   "window": "2026-11-30..2026-12-07"
+  },
+  "1.4 kg/εβδ. +17": {
+   "n": 5,
+   "window": "2026-11-30..2026-12-10"
+  },
+  "1.4 kg/εβδ. +18": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 86.4,
+   "n": 6,
+   "slope": -1.41564246,
+   "window": "2026-11-30..2026-12-11"
+  },
+  "1.4 kg/εβδ. +21": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 85.85,
+   "n": 7,
+   "slope": -1.39240566,
+   "window": "2026-11-30..2026-12-14"
+  },
+  "1.4 kg/εβδ. +28": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 84.45,
+   "n": 10,
+   "slope": -1.39624665,
+   "window": "2026-11-30..2026-12-21"
+  },
+  "1.4 kg/εβδ. +35": {
+   "check": {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": true,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   "kg": 83.05,
+   "n": 10,
+   "slope": -1.39624665,
+   "window": "2026-12-07..2026-12-28"
+  },
+  "3 ζυγίσεις": true,
+  "aim keep": true,
+  "cap tdeeEst 2320": null,
+  "cap tdeeEst 2334": {
+   "change": 30,
+   "current": 2300,
+   "fastLoss": true,
+   "floored": false,
+   "same": false,
+   "target": 2330,
+   "withinNoise": false
+  },
+  "cap tdeeEst 2390": {
+   "change": 90,
+   "current": 2300,
+   "fastLoss": true,
+   "floored": false,
+   "same": false,
+   "target": 2390,
+   "withinNoise": false
+  },
+  "fastLossCap": [
+   2800,
+   2650,
+   2660
+  ],
+  "εύρος 10 ημερών": false,
+  "εύρος 9 ημερών": true
+ },
+ "fastPeriodText": {
+  "14": "Τις 2 τελευταίες εβδομάδες",
+  "20": "Τις τελευταίες 20 μέρες",
+  "21": "Τις 3 τελευταίες εβδομάδες",
+  "7": "Τις τελευταίες 7 μέρες",
+  "null": "Τις τελευταίες μέρες"
+ },
+ "foodGap": {
+  "1379 kcal days": "2026-12-13..2026-12-17 restart=2026-12-18",
+  "1380 kcal days": null,
+  "4 missing": null,
+  "5 missing": "2026-12-13..2026-12-17 restart=2026-12-18",
+  "7000 kcal days": null,
+  "7001 kcal days": "2026-12-13..2026-12-17 restart=2026-12-18",
+  "across 25/10": "2026-10-23..2026-10-27 restart=2026-10-28",
+  "across 28/3": "2027-03-26..2027-03-30 restart=2027-03-31",
+  "empty": null,
+  "first week ignored": null,
+  "full": null,
+  "last 4 missing": null,
+  "last 5 missing": "2027-01-07..2027-01-11 restart=-",
+  "leading 5 after first week": "2026-11-30..2026-12-04 restart=2026-12-05",
+  "leading 5, no since": null,
+  "two gaps": "2026-12-23..2026-12-28 restart=2026-12-29"
+ },
+ "formulaNow": {
+  "29.9": {
+   "kg": null,
+   "tdee": 2799.9
+  },
+  "30.0": {
+   "kg": 30.0,
+   "tdee": 1881.9
+  },
+  "300.0": {
+   "kg": 300.0,
+   "tdee": 6012.9
+  },
+  "300.1": {
+   "kg": null,
+   "tdee": 2799.9
+  },
+  "87.99": {
+   "kg": 87.99,
+   "tdee": 2769.147
+  },
+  "88.0": {
+   "kg": 88.0,
+   "tdee": 2769.3
+  },
+  "88.01": {
+   "kg": null,
+   "tdee": 2799.9
+  },
+  "89.0": {
+   "kg": null,
+   "tdee": 2799.9
+  },
+  "90.0": {
+   "kg": null,
+   "tdee": 2799.9
+  },
+  "91.99": {
+   "kg": null,
+   "tdee": 2799.9
+  },
+  "92.0": {
+   "kg": 92.0,
+   "tdee": 2830.5
+  },
+  "92.01": {
+   "kg": 92.01,
+   "tdee": 2830.653
+  },
+  "empty": {
+   "kg": null,
+   "tdee": 2799.9
+  }
+ },
+ "guardedWeights": {
+  "dailyWeights": 12,
+  "foreign": [
+   "2026-12-08=41.50"
+  ],
+  "used": [
+   "2026-11-23=90.00",
+   "2026-11-25=89.80",
+   "2026-11-27=89.60",
+   "2026-11-30=89.40",
+   "2026-12-02=89.20",
+   "2026-12-04=89.00",
+   "2026-12-07=88.80",
+   "2026-12-09=88.60",
+   "2026-12-11=88.40",
+   "2026-12-14=88.20",
+   "2026-12-16=88.00",
+   "2026-12-18=87.80"
+  ]
+ },
+ "lowLogProposal": {
+  "1900.0|-0.3|0.0": "2300→2150",
+  "1900.0|-0.3|200.0": null,
+  "1900.0|-0.3|50.0": "2300→2150",
+  "1900.0|-0.42|0.0": "2300→2270",
+  "1900.0|-0.42|200.0": null,
+  "1900.0|-0.42|50.0": null,
+  "1900.0|-0.45|0.0": null,
+  "1900.0|-0.45|200.0": null,
+  "1900.0|-0.45|50.0": null,
+  "1900.0|-0.6|0.0": null,
+  "1900.0|-0.6|200.0": null,
+  "1900.0|-0.6|50.0": null,
+  "1900.0|0.0|0.0": "2300→2150",
+  "1900.0|0.0|200.0": "2300→2150",
+  "1900.0|0.0|50.0": "2300→2150",
+  "1900.0|0.3|0.0": "2300→2150",
+  "1900.0|0.3|200.0": "2300→2150",
+  "1900.0|0.3|50.0": "2300→2150",
+  "1959.0|-0.3|0.0": "2300→2150",
+  "1959.0|-0.3|200.0": null,
+  "1959.0|-0.3|50.0": "2300→2150",
+  "1959.0|-0.42|0.0": "2300→2270",
+  "1959.0|-0.42|200.0": null,
+  "1959.0|-0.42|50.0": null,
+  "1959.0|-0.45|0.0": null,
+  "1959.0|-0.45|200.0": null,
+  "1959.0|-0.45|50.0": null,
+  "1959.0|-0.6|0.0": null,
+  "1959.0|-0.6|200.0": null,
+  "1959.0|-0.6|50.0": null,
+  "1959.0|0.0|0.0": "2300→2150",
+  "1959.0|0.0|200.0": "2300→2150",
+  "1959.0|0.0|50.0": "2300→2150",
+  "1959.0|0.3|0.0": "2300→2150",
+  "1959.0|0.3|200.0": "2300→2150",
+  "1959.0|0.3|50.0": "2300→2150",
+  "1960.0|-0.3|0.0": null,
+  "1960.0|-0.3|200.0": null,
+  "1960.0|-0.3|50.0": null,
+  "1960.0|-0.42|0.0": null,
+  "1960.0|-0.42|200.0": null,
+  "1960.0|-0.42|50.0": null,
+  "1960.0|-0.45|0.0": null,
+  "1960.0|-0.45|200.0": null,
+  "1960.0|-0.45|50.0": null,
+  "1960.0|-0.6|0.0": null,
+  "1960.0|-0.6|200.0": null,
+  "1960.0|-0.6|50.0": null,
+  "1960.0|0.0|0.0": null,
+  "1960.0|0.0|200.0": null,
+  "1960.0|0.0|50.0": null,
+  "1960.0|0.3|0.0": null,
+  "1960.0|0.3|200.0": null,
+  "1960.0|0.3|50.0": null,
+  "1961.0|-0.3|0.0": null,
+  "1961.0|-0.3|200.0": null,
+  "1961.0|-0.3|50.0": null,
+  "1961.0|-0.42|0.0": null,
+  "1961.0|-0.42|200.0": null,
+  "1961.0|-0.42|50.0": null,
+  "1961.0|-0.45|0.0": null,
+  "1961.0|-0.45|200.0": null,
+  "1961.0|-0.45|50.0": null,
+  "1961.0|-0.6|0.0": null,
+  "1961.0|-0.6|200.0": null,
+  "1961.0|-0.6|50.0": null,
+  "1961.0|0.0|0.0": null,
+  "1961.0|0.0|200.0": null,
+  "1961.0|0.0|50.0": null,
+  "1961.0|0.3|0.0": null,
+  "1961.0|0.3|200.0": null,
+  "1961.0|0.3|50.0": null,
+  "female floor": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": true,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "formula 3000, est 2050": {
+   "change": -150,
+   "current": 2300,
+   "fastLoss": false,
+   "floored": false,
+   "same": false,
+   "target": 2150,
+   "withinNoise": false
+  }
+ },
+ "plannedKgWeek": {
+  "gain": 0.1875,
+  "keep": 0.0,
+  "lose": -0.45
+ },
+ "proposeTarget floor": {
+  "1500.0": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": true,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "1600.0": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": true,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "1680.0": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": true,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "1690.0": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": true,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "1700.0": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": true,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "1711.0": {
+   "change": -100,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": false,
+   "same": false,
+   "target": 1200,
+   "withinNoise": false
+  },
+  "1720.0": {
+   "change": -90,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": false,
+   "same": false,
+   "target": 1210,
+   "withinNoise": false
+  },
+  "1800.0": {
+   "change": 0,
+   "current": 1300,
+   "fastLoss": false,
+   "floored": false,
+   "same": true,
+   "target": 1300,
+   "withinNoise": false
+  },
+  "gain": {
+   "change": 150,
+   "current": 2780,
+   "fastLoss": false,
+   "floored": false,
+   "same": false,
+   "target": 2930,
+   "withinNoise": false
+  },
+  "keep": {
+   "change": 100,
+   "current": 2800,
+   "fastLoss": false,
+   "floored": false,
+   "same": false,
+   "target": 2900,
+   "withinNoise": false
+  },
+  "kgNow 80 vs 100": [
+   {
+    "change": 150,
+    "current": 2300,
+    "fastLoss": false,
+    "floored": false,
+    "same": false,
+    "target": 2450,
+    "withinNoise": false
+   },
+   {
+    "change": 50,
+    "current": 2300,
+    "fastLoss": false,
+    "floored": false,
+    "same": false,
+    "target": 2350,
+    "withinNoise": false
+   }
+  ]
+ },
+ "proposeTarget se=0|12|40|80": {
+  "2560": "2150 2150 2150 2150",
+  "2570": "2150 2150 2150 2150",
+  "2580": "2150 2150 2150 2150",
+  "2590": "2150 2150 2150 2150",
+  "2600": "2150 2150 2150 2150",
+  "2610": "2150 2150 2150 2150",
+  "2620": "2150 2150 2150 2150",
+  "2630": "2150 2150 2150 2300n",
+  "2640": "2150 2150 2150 2300n",
+  "2650": "2160 2160 2160 2300n",
+  "2660": "2170 2170 2170 2300n",
+  "2670": "2180 2180 2180 2300n",
+  "2680": "2190 2190 2190 2300n",
+  "2690": "2200 2200 2200 2300n",
+  "2700": "2210 2210 2210 2300n",
+  "2710": "2220 2220 2300n 2300n",
+  "2720": "2230 2230 2300n 2300n",
+  "2730": "2240 2240 2300n 2300n",
+  "2740": "2250 2250 2300n 2300n",
+  "2750": "2260 2260 2300n 2300n",
+  "2760": "2270 2270 2300n 2300n",
+  "2770": "2300 2300 2300 2300",
+  "2780": "2300 2300 2300 2300",
+  "2790": "2300 2300 2300 2300",
+  "2800": "2300 2300 2300 2300",
+  "2810": "2300 2300 2300 2300",
+  "2820": "2330 2330 2300n 2300n",
+  "2830": "2340 2340 2300n 2300n",
+  "2840": "2350 2350 2300n 2300n",
+  "2850": "2360 2360 2300n 2300n",
+  "2860": "2370 2370 2300n 2300n",
+  "2870": "2380 2380 2300n 2300n",
+  "2880": "2390 2390 2390 2300n",
+  "2890": "2400 2400 2400 2300n",
+  "2900": "2410 2410 2410 2300n",
+  "2910": "2420 2420 2420 2300n",
+  "2920": "2430 2430 2430 2300n",
+  "2930": "2440 2440 2440 2300n",
+  "2940": "2450 2450 2450 2300n",
+  "2950": "2450 2450 2450 2300n",
+  "2960": "2450 2450 2450 2450",
+  "2970": "2450 2450 2450 2450",
+  "2980": "2450 2450 2450 2450",
+  "2990": "2450 2450 2450 2450",
+  "3000": "2450 2450 2450 2450",
+  "3010": "2450 2450 2450 2450",
+  "3020": "2450 2450 2450 2450"
+ },
+ "quitHoldDays": {
+  "-1": null,
+  "0": 0,
+  "1": 1,
+  "69": 69,
+  "70": null,
+  "71": null,
+  "across 28/3": null,
+  "null": null
+ },
+ "roundTo": {
+  "-0.5|0": -1.0,
+  "-2.345|2": -2.35,
+  "0.5|0": 1.0,
+  "1.5|0": 2.0,
+  "2.345|2": 2.35,
+  "2.355|2": 2.36,
+  "82.25|1": 82.3,
+  "82.35|1": 82.4
+ },
+ "targetOn": {
+  "hist": [
+   2300,
+   2300,
+   2200,
+   2200,
+   2100
+  ],
+  "log": [
+   2300,
+   2300,
+   2200,
+   2200,
+   2100
+  ],
+  "mean empty": 2100.0,
+  "mean hist": 2220.0,
+  "none": [
+   2300,
+   2300,
+   2300,
+   2300,
+   2300
+  ]
+ },
+ "weightFit": {
+  "across 28/3 (hours)": {
+   "se": 8.95199702e-16,
+   "slope": -0.055,
+   "weightSlope": -0.055
+  },
+  "drift then flat": {
+   "se": 0.0262220567,
+   "slope": -0.0657730116,
+   "weightSlope": -0.0657730116
+  },
+  "empty": {
+   "se": null,
+   "slope": null,
+   "weightSlope": null
+  },
+  "flat": {
+   "se": 0.0,
+   "slope": 0.0,
+   "weightSlope": 0.0
+  },
+  "nine M/W/F wobble": {
+   "se": 0.0162081568,
+   "slope": -0.057081761,
+   "weightSlope": -0.057081761
+  },
+  "one": {
+   "se": null,
+   "slope": null,
+   "weightSlope": null
+  },
+  "three on a line": {
+   "se": 2.0301221e-15,
+   "slope": -0.07,
+   "weightSlope": -0.07
+  },
+  "two": {
+   "se": null,
+   "slope": -0.07,
+   "weightSlope": -0.07
+  },
+  "two same day": {
+   "se": null,
+   "slope": null,
+   "weightSlope": null
+  }
+ }
+}

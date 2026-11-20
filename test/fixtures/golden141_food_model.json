@@ -1,0 +1,2999 @@
+{
+ "CholDay": {
+  "empty": {
+   "branG": 0.0,
+   "count": 0,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 0.0,
+   "legumes": false,
+   "legumesDryG": 0.0,
+   "missing": "false|false|false",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": null
+  },
+  "fish 100": {
+   "branG": 0.0,
+   "count": 2,
+   "fiber": 0.0,
+   "fish": true,
+   "fishG": 100.0,
+   "fullFor": false,
+   "kcal": 151.8,
+   "legumes": false,
+   "legumesDryG": 0.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.066,
+   "satFat": 1.29,
+   "satPct": 7.64822134
+  },
+  "full at 1290 kcal": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": true,
+   "kcal": 1290.0,
+   "legumes": false,
+   "legumesDryG": 0.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": 0.0
+  },
+  "fullDayKcalFor": [
+   1290.0,
+   900.0
+  ],
+  "legumes by name 40": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 132.0,
+   "legumes": true,
+   "legumesDryG": 40.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": 0.0
+  },
+  "legumes canned 100": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 120.0,
+   "legumes": true,
+   "legumesDryG": 40.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": 0.0
+  },
+  "legumes cooked 100": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 7.9,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 116.0,
+   "legumes": true,
+   "legumesDryG": 40.0,
+   "missing": "false|false|false",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.01,
+   "satFat": 0.1,
+   "satPct": 0.775862069
+  },
+  "legumes cooked 99": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 7.821,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 114.84,
+   "legumes": false,
+   "legumesDryG": 39.6,
+   "missing": "false|false|false",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0099,
+   "satFat": 0.099,
+   "satPct": 0.775862069
+  },
+  "legumes dry 40": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 6.52,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 130.8,
+   "legumes": true,
+   "legumesDryG": 40.0,
+   "missing": "false|false|false",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.004,
+   "satFat": 0.096,
+   "satPct": 0.660550459
+  },
+  "legumes tagged 249.9 kcal ×100": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 249.9,
+   "legumes": true,
+   "legumesDryG": 40.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": 0.0
+  },
+  "legumes tagged 250 kcal ×40": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 100.0,
+   "legumes": true,
+   "legumesDryG": 40.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": 0.0
+  },
+  "mixed": {
+   "branG": 39.4,
+   "count": 6,
+   "fiber": 14.8835,
+   "fish": false,
+   "fishG": 99.9,
+   "fullFor": true,
+   "kcal": 1764.914,
+   "legumes": false,
+   "legumesDryG": 39.9,
+   "missing": "false|true|true",
+   "nutsG": 30.0,
+   "part": false,
+   "salt": 0.655184,
+   "satFat": 15.82065,
+   "satPct": 8.06758006
+  },
+  "not full at 1289 kcal": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 1289.0,
+   "legumes": false,
+   "legumesDryG": 0.0,
+   "missing": "true|true|true",
+   "nutsG": 0.0,
+   "part": false,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "satPct": 0.0
+  },
+  "part": {
+   "branG": 0.0,
+   "count": 1,
+   "fiber": 0.0,
+   "fish": false,
+   "fishG": 0.0,
+   "fullFor": false,
+   "kcal": 2200.0,
+   "legumes": false,
+   "legumesDryG": 0.0,
+   "missing": "false|false|false",
+   "nutsG": 0.0,
+   "part": true,
+   "salt": 2.14,
+   "satFat": 8.8,
+   "satPct": 3.6
+  }
+ },
+ "CholKind.parse": {
+  "5": null,
+  "bran": "bran",
+  "fish": "fish",
+  "legumes": "legumes",
+  "meat": null,
+  "none": "none",
+  "null": null,
+  "nuts": "nuts"
+ },
+ "CholWeek": {
+  "empty": {
+   "daysFiberUnknown": 0,
+   "daysSaltOk5": 0,
+   "daysSaltUnknown": 0,
+   "daysSatUnknown": 0,
+   "daysWithBran40": 0,
+   "daysWithNuts30": 0,
+   "fiberMean": null,
+   "fish": 0,
+   "fullDays": 0,
+   "legumes": 0,
+   "satPctMean": null
+  },
+  "goal 1500": {
+   "daysFiberUnknown": 3,
+   "daysSaltOk5": 1,
+   "daysSaltUnknown": 2,
+   "daysSatUnknown": 2,
+   "daysWithBran40": 1,
+   "daysWithNuts30": 2,
+   "fiberMean": 8.261,
+   "fish": 2,
+   "fullDays": 4,
+   "legumes": 2,
+   "satPctMean": 3.87321562
+  },
+  "goal 2150": {
+   "daysFiberUnknown": 3,
+   "daysSaltOk5": 1,
+   "daysSaltUnknown": 2,
+   "daysSatUnknown": 2,
+   "daysWithBran40": 1,
+   "daysWithNuts30": 2,
+   "fiberMean": 8.261,
+   "fish": 2,
+   "fullDays": 4,
+   "legumes": 2,
+   "satPctMean": 3.87321562
+  }
+ },
+ "Food.fromJson": {
+  "ck unknown": null,
+  "full": {
+   "isCooked": true,
+   "isMine": true,
+   "isRawWithCooked": true,
+   "json": {
+    "aliases": [
+     "α",
+     "5"
+    ],
+    "barcode": "5200000000017",
+    "brand": "Μάρκα",
+    "cat": "Όσπρια",
+    "ck": "legumes",
+    "cooked": [
+     {
+      "id": "X2",
+      "label": "Ψητό"
+     }
+    ],
+    "cookedLabel": "Βρασμένο",
+    "energyCalc": true,
+    "fv": true,
+    "id": "X1",
+    "n": {
+     "fat": {
+      "tr": true
+     },
+     "kcal": 120.0,
+     "protein": {
+      "lt": 0.5
+     }
+    },
+    "name": "Δοκιμαστικό",
+    "perMl": true,
+    "rawId": "X0",
+    "servingGrams": 170.0,
+    "servingLabel": "1 κεσές",
+    "source": "Open Food Facts",
+    "sourceCode": 12,
+    "sourceName": "Test",
+    "sp": false
+   },
+   "snapshotKeys": [
+    "barcode",
+    "brand",
+    "cat",
+    "ck",
+    "cookedLabel",
+    "energyCalc",
+    "fv",
+    "id",
+    "n",
+    "name",
+    "perMl",
+    "rawId",
+    "servingGrams",
+    "servingLabel",
+    "source",
+    "sourceCode",
+    "sp"
+   ],
+   "unit": "ml"
+  },
+  "minimal": {
+   "isCooked": false,
+   "isMine": false,
+   "isRawWithCooked": false,
+   "json": {
+    "aliases": [],
+    "cat": "",
+    "id": "X3",
+    "n": {},
+    "name": "Ελάχιστο",
+    "source": ""
+   },
+   "snapshotKeys": [
+    "cat",
+    "id",
+    "n",
+    "name",
+    "source"
+   ],
+   "unit": "g"
+  },
+  "serving 0": null,
+  "serving 5000.1": null,
+  "source CIQUAL": false,
+  "source Ετικέτα": true,
+  "sp true": true
+ },
+ "NValue": {
+  "int": {
+   "amount": 3.0,
+   "json": 3.0,
+   "text": "3,0",
+   "text2": "3,00"
+  },
+  "lessThan": {
+   "amount": 0.0,
+   "json": {
+    "lt": 0.5
+   },
+   "text": "<0,5",
+   "text2": "<0,50"
+  },
+  "lt text": null,
+  "nValueText <": {
+   "0.0125": "<0,1 | <0,02",
+   "0.04": "<0,1 | <0,04",
+   "0.05": "<0,1 | <0,05",
+   "0.1": "<0,1 | <0,10",
+   "0.11": "<0,2 | <0,11",
+   "0.5": "<0,5 | <0,50",
+   "5.0": "<5,0 | <5,00"
+  },
+  "nValueText null": "—",
+  "null": null,
+  "number": {
+   "amount": 12.5,
+   "json": 12.5,
+   "text": "12,5",
+   "text2": "12,50"
+  },
+  "text": null,
+  "traces": {
+   "amount": 0.0,
+   "json": {
+    "tr": true
+   },
+   "text": "ίχνη",
+   "text2": "ίχνη"
+  }
+ },
+ "Totals": {
+  "copyWith": {
+   "day": "2026-11-24",
+   "est": true,
+   "food": {
+    "cat": "Πουλερικά",
+    "id": "T1",
+    "n": {
+     "carbs": 0.0,
+     "fat": 1.5,
+     "fiber": 0.0,
+     "kcal": 110.0,
+     "protein": 23.4,
+     "salt": 0.107,
+     "satFat": 0.44,
+     "sugars": 0.0
+    },
+    "name": "Κοτόπουλο δοκιμής",
+    "source": "Δοκιμή"
+   },
+   "grams": 200.0,
+   "id": "z",
+   "meal": "dinner",
+   "time": 1795435200000
+  },
+  "day": {
+   "alcohol": 15.75,
+   "carbs": 27.54,
+   "count": 6,
+   "estKcal": 224.4,
+   "fat": 25.5495,
+   "fiber": 3.24,
+   "kcal": 740.415,
+   "missing": {
+    "fiber": 4,
+    "salt": 3,
+    "satFat": 3,
+    "sugars": 4
+   },
+   "protein": 43.392,
+   "salt": 1.1916,
+   "satFat": 2.388,
+   "shownKcal": 741,
+   "sugars": 0.0
+  },
+  "empty": {
+   "alcohol": 0.0,
+   "carbs": 0.0,
+   "count": 0,
+   "estKcal": 0.0,
+   "fat": 0.0,
+   "fiber": 0.0,
+   "kcal": 0.0,
+   "missing": {},
+   "protein": 0.0,
+   "salt": 0.0,
+   "satFat": 0.0,
+   "shownKcal": 0,
+   "sugars": 0.0
+  },
+  "entry totals": [
+   "Κοτόπουλο δοκιμής 180.0 g → 198.00 kcal, 42.12 πρωτ",
+   "Λάδι δοκιμής 10.5 g → 94.39 kcal, 0.00 πρωτ",
+   "Ελιές δοκιμής 33.3 g → 99.90 kcal, 0.00 πρωτ",
+   "Με ίχνη 120.0 g → 105.12 kcal, 1.27 πρωτ",
+   "Κρασί δοκιμής 150.0 g → 124.50 kcal, 0.00 πρωτ",
+   "Πυκνό 250 47.4 g → 118.50 kcal, 0.00 πρωτ"
+  ],
+  "json round trip": {
+   "day": "2026-11-23",
+   "est": true,
+   "food": {
+    "cat": "Άλλα",
+    "id": "T20",
+    "n": {
+     "carbs": 19.7,
+     "fat": {
+      "lt": 0.5
+     },
+     "fiber": 2.7,
+     "kcal": 87.6,
+     "protein": 1.06,
+     "salt": {
+      "lt": 0.0125
+     },
+     "satFat": {
+      "lt": 0.01
+     },
+     "sugars": {
+      "tr": true
+     }
+    },
+    "name": "Με ίχνη",
+    "source": ""
+   },
+   "grams": 120.0,
+   "id": "e-T20-120.0-14",
+   "meal": "lunch",
+   "time": 1795435200000
+  },
+  "unknown meal → snack": "snack"
+ },
+ "askRawOrCooked": {
+  "χωρίς μαγειρεμένη μορφή|149.0 g|φορές 0|ξερό δικό μου false": false,
+  "χωρίς μαγειρεμένη μορφή|149.0 g|φορές 0|ξερό δικό μου true": false,
+  "χωρίς μαγειρεμένη μορφή|149.0 g|φορές 1|ξερό δικό μου false": false,
+  "χωρίς μαγειρεμένη μορφή|149.0 g|φορές 1|ξερό δικό μου true": false,
+  "χωρίς μαγειρεμένη μορφή|150.0 g|φορές 0|ξερό δικό μου false": false,
+  "χωρίς μαγειρεμένη μορφή|150.0 g|φορές 0|ξερό δικό μου true": false,
+  "χωρίς μαγειρεμένη μορφή|150.0 g|φορές 1|ξερό δικό μου false": false,
+  "χωρίς μαγειρεμένη μορφή|150.0 g|φορές 1|ξερό δικό μου true": false,
+  "ωμό 299 kcal|149.0 g|φορές 0|ξερό δικό μου false": false,
+  "ωμό 299 kcal|149.0 g|φορές 0|ξερό δικό μου true": false,
+  "ωμό 299 kcal|149.0 g|φορές 1|ξερό δικό μου false": false,
+  "ωμό 299 kcal|149.0 g|φορές 1|ξερό δικό μου true": false,
+  "ωμό 299 kcal|150.0 g|φορές 0|ξερό δικό μου false": false,
+  "ωμό 299 kcal|150.0 g|φορές 0|ξερό δικό μου true": false,
+  "ωμό 299 kcal|150.0 g|φορές 1|ξερό δικό μου false": false,
+  "ωμό 299 kcal|150.0 g|φορές 1|ξερό δικό μου true": false,
+  "ωμό 350 kcal|149.0 g|φορές 0|ξερό δικό μου false": false,
+  "ωμό 350 kcal|149.0 g|φορές 0|ξερό δικό μου true": false,
+  "ωμό 350 kcal|149.0 g|φορές 1|ξερό δικό μου false": false,
+  "ωμό 350 kcal|149.0 g|φορές 1|ξερό δικό μου true": false,
+  "ωμό 350 kcal|150.0 g|φορές 0|ξερό δικό μου false": true,
+  "ωμό 350 kcal|150.0 g|φορές 0|ξερό δικό μου true": true,
+  "ωμό 350 kcal|150.0 g|φορές 1|ξερό δικό μου false": false,
+  "ωμό 350 kcal|150.0 g|φορές 1|ξερό δικό μου true": false
+ },
+ "chol kinds (bran|nuts|legumes|fish)": {
+  "B2 Πίτουρο Βρώμης Μάρκα": "true|false|false|false",
+  "B3 Ψωμί με πίτουρο βρώμης": "false|false|false|false",
+  "B4 Κάτι με σήμανση πίτουρο": "true|false|false|false",
+  "C15011 Σπόρος στους ξηρούς καρπούς": "false|false|false|false",
+  "C15025 Κουκουνάρι αλλού": "false|true|false|false",
+  "C9640 Πίτουρο βρώμης": "true|false|false|false",
+  "L1 Φακές δοκιμής (ξερές)": "false|false|true|false",
+  "L2 Φακές δοκιμής (βρασμένες)": "false|false|true|false",
+  "L3 Ρεβίθια κονσέρβα": "false|false|true|false",
+  "L4 Φακές ψιλές μάρκας": "false|false|true|false",
+  "L5 Σαλάτα με σήμανση όσπρια": "false|false|true|false",
+  "L6 Ξερό με σήμανση όσπρια": "false|false|true|false",
+  "N1 Καρύδια δοκιμής": "false|true|false|false",
+  "P1 Σολομός δοκιμής": "false|false|false|true",
+  "P2 Γαρίδες δοκιμής": "false|false|false|true",
+  "P3 Ψάρι με σήμανση «όχι»": "false|false|false|false"
+ },
+ "cholKindFromOffTags": {
+  "bran": "bran",
+  "bran + nuts": "bran",
+  "bran in biscuits": "none",
+  "bran in flours and cereals": "bran",
+  "breaded fish": "none",
+  "chestnuts": "none",
+  "edamame": "none",
+  "empty": null,
+  "fish": "fish",
+  "hummus": "none",
+  "name bran, breads": "none",
+  "name bran, flours": "bran",
+  "name bran, no tags list": null,
+  "name bran, other tag": null,
+  "not a list": null,
+  "nuts": "nuts",
+  "nuts + fish": "nuts",
+  "peanut butter": "none",
+  "pulses": "legumes",
+  "unknown": null
+ },
+ "constants": {
+  "branFoodId": "C9640",
+  "cholKinds": [
+   "nuts",
+   "legumes",
+   "fish",
+   "bran",
+   "none"
+  ],
+  "dayMarksKeepDays": 400,
+  "draftRequired": [
+   "kcal",
+   "protein",
+   "carbs",
+   "fat"
+  ],
+  "fishMinG": 100.0,
+  "fruitVegCats": [
+   "Λαχανικά",
+   "Φρούτα"
+  ],
+  "fruitVegExclude": [
+   "C20068",
+   "C2007",
+   "C20170"
+  ],
+  "fruitVegFormMaxKcal": 180.0,
+  "fruitVegTargetG": 400.0,
+  "legumesCookedFactor": 2.5,
+  "legumesDryMinG": 40.0,
+  "legumesDryMinKcal": 250.0,
+  "maxEntryGrams": 5000.0,
+  "myFoodsCategory": "Τα προϊόντα μου",
+  "myUnitMaxG": 2000.0,
+  "myUnitMinG": 1.0,
+  "rawCheckGrams": 150.0,
+  "rawCheckKcal": 300.0,
+  "spoonSpreadKcal": 500.0,
+  "typoDenseGrams": 300.0,
+  "typoDensePer100": 250.0,
+  "typoEntryBigGrams": 1000.0,
+  "typoEntryBigKcal": 500.0,
+  "typoEntryKcal": 2000.0,
+  "typoFatGrams": 100.0,
+  "typoFatPer100": 80.0,
+  "typoSaltGrams": 10.0,
+  "typoSaltPer100": 50.0,
+  "typoTimesLast": 5.0,
+  "typoTimesLastKcal": 400.0
+ },
+ "dayMarkOf": {
+  "done": "done",
+  "null": null,
+  "part": "part",
+  "x": null
+ },
+ "doubtfulValues": {
+  "empty": {},
+  "ok": {},
+  "sat > fat": {
+   "satFat": "Τα κορεσμένα είναι μέρος των λιπαρών: έλεγξέ τα"
+  },
+  "sugars > carbs": {
+   "sugars": "Τα σάκχαρα είναι μέρος των υδατανθράκων: έλεγξέ τα"
+  },
+  "total 105.1": {
+   "total": "Πρωτεΐνη, υδατάνθρακες, λιπαρά και αλάτι μαζί ξεπερνούν τα 100 g. Έλεγξε ξανά την ετικέτα."
+  }
+ },
+ "draftFromFood": {
+  "from label, sodium, spoonNo": {
+   "alcohol": 4.0,
+   "cholKind": "nuts",
+   "erythritol": 1.0,
+   "fromOff": false,
+   "fruitVeg": true,
+   "lessThan": [
+    "protein"
+   ],
+   "missing": [
+    "carbs",
+    "fat"
+   ],
+   "name": "Ετικέτα",
+   "perMl": true,
+   "polyols": 2.0,
+   "saltFromSodium": true,
+   "sodiumMg": 400.0,
+   "spoon": false,
+   "values": {
+    "kcal": 100.0,
+    "protein": 0.5,
+    "salt": 1.0
+   }
+  },
+  "round trip": {
+   "barcode": "1",
+   "brand": "Μάρκα Α",
+   "fromOff": true,
+   "fruitVeg": false,
+   "name": "Γιαούρτι στραγγιστό 2%",
+   "perMl": false,
+   "saltFromSodium": false,
+   "servingGrams": 170.0,
+   "servingLabel": "170 g",
+   "values": {
+    "carbs": 3.4,
+    "fat": 2.0,
+    "fiber": 0.0,
+    "kcal": 73.0,
+    "protein": 9.6,
+    "salt": 0.1,
+    "satFat": 1.3,
+    "sugars": 3.4
+   }
+  }
+ },
+ "draftFromOff": {
+  "alcohol field, polyols 12": {
+   "draft": {
+    "alcohol": 9.8625,
+    "barcode": "5200000000017",
+    "erythritol": 8.0,
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "polyols": 12.0,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-alcohol field, polyols 12",
+    "n": {
+     "alcohol": 9.8625,
+     "erythritol": 8.0,
+     "polyols": 12.0
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "alcohol, polyols": {
+   "draft": {
+    "alcohol": 3.945,
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Μπίρα",
+    "perMl": true,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 43.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-alcohol, polyols",
+    "n": {
+     "alcohol": 3.945,
+     "kcal": 43.0
+    },
+    "name": "Μπίρα",
+    "perMl": true,
+    "source": "Open Food Facts"
+   }
+  },
+  "canned lentils": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "legumes",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "legumes",
+    "id": "M-canned lentils",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "canned tuna": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "fish",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "fish",
+    "id": "M-canned tuna",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "fish fingers": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "none",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "none",
+    "id": "M-fish fingers",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "green beans": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "none",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "none",
+    "id": "M-green beans",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "kJ field energy-kj": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 100.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-kJ field energy-kj",
+    "n": {
+     "kcal": 100.0
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "kJ only": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "name": "Crackers",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "carbs": 60.0,
+     "fat": 18.0,
+     "kcal": 454.1,
+     "protein": 10.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-kJ only",
+    "n": {
+     "carbs": 60.0,
+     "fat": 18.0,
+     "kcal": 454.1,
+     "protein": 10.0
+    },
+    "name": "Crackers",
+    "source": "Open Food Facts"
+   }
+  },
+  "kcal": {
+   "draft": {
+    "barcode": "5200000000017",
+    "brand": "Μάρκα Α",
+    "fromOff": true,
+    "fruitVeg": false,
+    "name": "Γιαούρτι στραγγιστό 2%",
+    "perMl": false,
+    "saltFromSodium": false,
+    "servingGrams": 170.0,
+    "servingLabel": "170 g",
+    "values": {
+     "carbs": 3.4,
+     "fat": 2.0,
+     "fiber": 0.0,
+     "kcal": 73.0,
+     "protein": 9.6,
+     "salt": 0.1,
+     "satFat": 1.3,
+     "sugars": 3.4
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "brand": "Μάρκα Α",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-kcal",
+    "n": {
+     "carbs": 3.4,
+     "fat": 2.0,
+     "fiber": 0.0,
+     "kcal": 73.0,
+     "protein": 9.6,
+     "salt": 0.1,
+     "satFat": 1.3,
+     "sugars": 3.4
+    },
+    "name": "Γιαούρτι στραγγιστό 2%",
+    "servingGrams": 170.0,
+    "servingLabel": "170 g",
+    "source": "Open Food Facts"
+   }
+  },
+  "kcal 0 with kJ": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Μπάρα",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 400.1
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-kcal 0 with kJ",
+    "n": {
+     "kcal": 400.1
+    },
+    "name": "Μπάρα",
+    "source": "Open Food Facts"
+   }
+  },
+  "kcal 0, kJ 0": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "carbs": 0.0,
+     "fat": 0.0,
+     "kcal": 0.0,
+     "protein": 0.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-kcal 0, kJ 0",
+    "n": {
+     "carbs": 0.0,
+     "fat": 0.0,
+     "kcal": 0.0,
+     "protein": 0.0
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "margarine": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "spoon": true,
+    "values": {
+     "kcal": 350.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-margarine",
+    "n": {
+     "kcal": 350.0
+    },
+    "name": "",
+    "source": "Open Food Facts",
+    "sp": true
+   }
+  },
+  "modifiers": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "lessThan": [
+     "fat",
+     "satFat",
+     "sugars"
+    ],
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "fat": 0.5,
+     "fiber": 1.0,
+     "satFat": 0.1,
+     "sugars": 0.5
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-modifiers",
+    "n": {
+     "fat": {
+      "lt": 0.5
+     },
+     "fiber": 1.0,
+     "satFat": {
+      "lt": 0.1
+     },
+     "sugars": {
+      "lt": 0.5
+     }
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "negative and junk": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 250.5
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-negative and junk",
+    "n": {
+     "kcal": 250.5
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "no tags": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Κάτι",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-no tags",
+    "n": {},
+    "name": "Κάτι",
+    "source": "Open Food Facts"
+   }
+  },
+  "nut butter 600 kcal": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "none",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Φυστικοβούτυρο",
+    "perMl": false,
+    "saltFromSodium": false,
+    "spoon": true,
+    "values": {
+     "kcal": 600.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "none",
+    "id": "M-nut butter 600 kcal",
+    "n": {
+     "kcal": 600.0
+    },
+    "name": "Φυστικοβούτυρο",
+    "source": "Open Food Facts",
+    "sp": true
+   }
+  },
+  "nutriments not a map": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-nutriments not a map",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "nuts": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "nuts",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Αμύγδαλα",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 600.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "nuts",
+    "id": "M-nuts",
+    "n": {
+     "kcal": 600.0
+    },
+    "name": "Αμύγδαλα",
+    "source": "Open Food Facts"
+   }
+  },
+  "oat bran bar": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "none",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "none",
+    "id": "M-oat bran bar",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "oat bran by name in flours": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "bran",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Πίτουρο βρώμης",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "bran",
+    "id": "M-oat bran by name in flours",
+    "n": {},
+    "name": "Πίτουρο βρώμης",
+    "source": "Open Food Facts"
+   }
+  },
+  "oat bran in cereals": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "bran",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "bran",
+    "id": "M-oat bran in cereals",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "per 100 ml": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "Χυμός",
+    "perMl": true,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 45.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-per 100 ml",
+    "n": {
+     "kcal": 45.0
+    },
+    "name": "Χυμός",
+    "perMl": true,
+    "source": "Open Food Facts"
+   }
+  },
+  "quantity 1 l": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": true,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 824.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-quantity 1 l",
+    "n": {
+     "kcal": 824.0
+    },
+    "name": "",
+    "perMl": true,
+    "source": "Open Food Facts"
+   }
+  },
+  "quantity 500 g": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-quantity 500 g",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "salt 0, sodium 0.5": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": true,
+    "sodiumMg": 500.0,
+    "values": {
+     "salt": 1.25
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-salt 0, sodium 0.5",
+    "n": {
+     "salt": 1.25,
+     "sodium": 500.0
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "salt and sodium": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "salt": 1.2
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-salt and sodium",
+    "n": {
+     "salt": 1.2
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "serving 30 g (2 ml)": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "servingLabel": "30 g (2 ml)"
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-serving 30 g (2 ml)",
+    "n": {},
+    "name": "",
+    "servingLabel": "30 g (2 ml)",
+    "source": "Open Food Facts"
+   }
+  },
+  "serving 330 ml, no quantity": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": true,
+    "saltFromSodium": false,
+    "servingGrams": 330.0,
+    "servingLabel": "330 ml"
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-serving 330 ml, no quantity",
+    "n": {},
+    "name": "",
+    "perMl": true,
+    "servingGrams": 330.0,
+    "servingLabel": "330 ml",
+    "source": "Open Food Facts"
+   }
+  },
+  "serving too big": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-serving too big",
+    "n": {},
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "sodium only": {
+   "draft": {
+    "barcode": "5200000000017",
+    "fromOff": true,
+    "fruitVeg": false,
+    "lessThan": [
+     "salt"
+    ],
+    "missing": [
+     "kcal",
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": true,
+    "sodiumMg": 400.0,
+    "values": {
+     "salt": 1.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "id": "M-sodium only",
+    "n": {
+     "salt": {
+      "lt": 1.0
+     },
+     "sodium": 400.0
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  },
+  "spread 499 kcal": {
+   "draft": {
+    "barcode": "5200000000017",
+    "cholKind": "none",
+    "fromOff": true,
+    "fruitVeg": false,
+    "missing": [
+     "protein",
+     "carbs",
+     "fat"
+    ],
+    "name": "",
+    "perMl": false,
+    "saltFromSodium": false,
+    "values": {
+     "kcal": 499.0
+    }
+   },
+   "food": {
+    "aliases": [],
+    "barcode": "5200000000017",
+    "cat": "Τα προϊόντα μου",
+    "ck": "none",
+    "id": "M-spread 499 kcal",
+    "n": {
+     "kcal": 499.0
+    },
+    "name": "",
+    "source": "Open Food Facts"
+   }
+  }
+ },
+ "dryStapleRawId | legumesByName": {
+  "Lentil pasta": "C9810|false",
+  "Red lentils": "C20359|true",
+  "Spaghetti integrale": "C9870|false",
+  "Αλεύρι ρεβιθιού": "null|false",
+  "Γάλα ρυζιού": "null|false",
+  "Γίγαντες ελέφαντες": "U174252|true",
+  "Ζυμαρικά από φακές": "C9810|false",
+  "Ζυμαρικά από φακές, σήμανση όσπρια": "C20359|true",
+  "Κάτι άλλο": "null|false",
+  "Κινόα τρίχρωμη": "C9340|false",
+  "Κουκί": "null|true",
+  "Κουκιά ξερά": "null|true",
+  "Κους κους": "null|false",
+  "Κουσκούς": "C9681|false",
+  "Κράκερ ρυζιού": "null|false",
+  "Κριθαράκι μέτριο": "C9810-1|false",
+  "Μακαρόνια Νο 6": "C9810|false",
+  "Μακαρόνια ολικής άλεσης": "C9870|false",
+  "Μπάρα δημητριακών": "null|false",
+  "Νιφάδες βρώμης": "null|false",
+  "Πλιγούρι χοντρό": "C9690|false",
+  "Ρεβίθια χονδρά": "C20516|true",
+  "Ρεβύθια": "C20516|true",
+  "Ρύζι parboiled": "C9101|false",
+  "Ρύζι καστανό parboiled": "U168876|false",
+  "Ρύζι μπασμάτι": "C9119|false",
+  "Ρύζι νυχάκι": "C9100|false",
+  "Ρύζι ολικής": "C9102|false",
+  "Σούπα φακές": "null|false",
+  "Ταλιατέλες με αυγά": "C9821|false",
+  "Φάβα Σαντορίνης": "C20515|true",
+  "Φακές ψιλές": "C20359|true",
+  "Φακές ψιλές, 299 kcal": "null|false",
+  "Φακές ψιλές, 300 kcal": "C20359|true",
+  "Φακές ψιλές, ml": "null|false",
+  "Φακές ψιλές, βάση": "null|false",
+  "Φακή κόκκινη": "C20359|true",
+  "Φασόλια μέτρια": "C20501|true",
+  "Φασόλια μαυρομάτικα": "U173758|true",
+  "Χυλοπίτες με αυγά": "C9821|false"
+ },
+ "energyMismatch": {
+  "alcohol": null,
+  "alcohol missing": 14.0,
+  "erythritol": null,
+  "fiber": 210.0,
+  "kcal 0.0 (calc 0)": null,
+  "kcal 100.0 (calc 170)": 170.0,
+  "kcal 149.0 (calc 170)": null,
+  "kcal 150.0 (calc 170)": null,
+  "kcal 151.0 (calc 170)": null,
+  "kcal 170.0 (calc 170)": null,
+  "kcal 189.0 (calc 170)": null,
+  "kcal 190.0 (calc 170)": null,
+  "kcal 191.0 (calc 170)": null,
+  "kcal 20.0 (calc 0)": null,
+  "kcal 21.0 (calc 0)": 0.0,
+  "kcal 211.0 (calc 170)": 170.0,
+  "kcal 212.0 (calc 170)": 170.0,
+  "kcal 230.0 (calc 170)": 170.0,
+  "kcal 300.0 (calc 170)": 170.0,
+  "no kcal": null,
+  "polyols": null,
+  "polyols > carbs, erythritol > polyols": 110.0
+ },
+ "entryLooksLikeTypo": {
+  "Άλειμμα 499": {
+   "last=10.0": "0000111111111111",
+   "last=60.0": "0000000001111111",
+   "last=null": "0000000001111111",
+   "olives": false,
+   "spoon": false
+  },
+  "Άλειμμα 500": {
+   "last=10.0": "0000111111111111",
+   "last=60.0": "0000011111111111",
+   "last=null": "0000011111111111",
+   "olives": false,
+   "spoon": true
+  },
+  "Αλμυρό 49,9": {
+   "last=10.0": "0000000000000000",
+   "last=60.0": "0000000000000000",
+   "last=null": "0000000000000000",
+   "olives": false,
+   "spoon": false
+  },
+  "Αλμυρό 50": {
+   "last=10.0": "0001111111111111",
+   "last=60.0": "0001111111111111",
+   "last=null": "0001111111111111",
+   "olives": false,
+   "spoon": false
+  },
+  "Ελιές δοκιμής": {
+   "last=10.0": "0000001111111111",
+   "last=60.0": "0000000001111111",
+   "last=null": "0000000001111111",
+   "olives": true,
+   "spoon": false
+  },
+  "Κοτόπουλο δοκιμής": {
+   "last=10.0": "0000000000111111",
+   "last=60.0": "0000000000111111",
+   "last=null": "0000000000000111",
+   "olives": false,
+   "spoon": false
+  },
+  "Λάδι δοκιμής": {
+   "last=10.0": "0000111111111111",
+   "last=60.0": "0000011111111111",
+   "last=null": "0000011111111111",
+   "olives": false,
+   "spoon": true
+  },
+  "Λίπος 79,9": {
+   "last=10.0": "0000001111111111",
+   "last=60.0": "0000000001111111",
+   "last=null": "0000000000001111",
+   "olives": false,
+   "spoon": false
+  },
+  "Λίπος 80": {
+   "last=10.0": "0000011111111111",
+   "last=60.0": "0000011111111111",
+   "last=null": "0000011111111111",
+   "olives": false,
+   "spoon": true
+  },
+  "Νερό δοκιμής": {
+   "last=10.0": "0000000000000000",
+   "last=60.0": "0000000000000000",
+   "last=null": "0000000000000000",
+   "olives": false,
+   "spoon": false
+  },
+  "Πυκνό 249": {
+   "last=10.0": "0000001111111111",
+   "last=60.0": "0000000001111111",
+   "last=null": "0000000000001111",
+   "olives": false,
+   "spoon": false
+  },
+  "Πυκνό 250": {
+   "last=10.0": "0000001111111111",
+   "last=60.0": "0000000001111111",
+   "last=null": "0000000001111111",
+   "olives": false,
+   "spoon": false
+  },
+  "Ταχίνι δικό μου": {
+   "last=10.0": "0000011111111111",
+   "last=60.0": "0000011111111111",
+   "last=null": "0000011111111111",
+   "olives": false,
+   "spoon": true
+  }
+ },
+ "fruitVegGrams": 363.0,
+ "gramsText": {
+  "0.0": "0",
+  "0.04": "0",
+  "0.05": "0,1",
+  "0.5": "0,5",
+  "1.0": "1",
+  "10.0": "10",
+  "10.4": "10",
+  "10.5": "11",
+  "100.0": "100",
+  "1234.5": "1235",
+  "2.25": "2,3",
+  "9.94": "9,9",
+  "9.95": "9,9",
+  "99.4": "99",
+  "99.5": "100"
+ },
+ "impossibleValues": {
+  "all over": {
+   "carbs": "Πάνω από 100 g σε 100 g δεν γίνεται",
+   "fat": "Πάνω από 100 g σε 100 g δεν γίνεται",
+   "fiber": "Πάνω από 100 g σε 100 g δεν γίνεται",
+   "kcal": "Πάνω από 900 kcal ανά 100 g δεν γίνεται (μήπως είναι kJ;)",
+   "protein": "Πάνω από 100 g σε 100 g δεν γίνεται",
+   "salt": "Πάνω από 100 g δεν γίνεται. Αν η ετικέτα γράφει νάτριο (sodium) σε mg, διάλεξε «Νάτριο mg».",
+   "satFat": "Πάνω από 100 g σε 100 g δεν γίνεται",
+   "sugars": "Πάνω από 100 g σε 100 g δεν γίνεται"
+  },
+  "ok": {}
+ },
+ "isFruitVeg": {
+  "C20068 Λαχανικά": false,
+  "C2007 Φρούτα": false,
+  "C20170 Λαχανικά": false,
+  "F1 Φρούτα": true,
+  "F2 Λαχανικά": true,
+  "F3 Τα προϊόντα μου": true,
+  "F4 Γλυκά": false,
+  "F5 Αποξηραμένα φρούτα": false
+ },
+ "isLiquidQuantity": {
+  "": false,
+  "1 l": true,
+  "1 lb": false,
+  "1 lt": true,
+  "1 λίτρο": true,
+  "1 λτ": true,
+  "1,5 λίτρα": true,
+  "100 gr": false,
+  "1L": true,
+  "2 dl": true,
+  "2 litres": true,
+  "3 λεμόνια": false,
+  "33 cl": true,
+  "330ml": true,
+  "500 g": false,
+  "500 μλ": true,
+  "6 x 330 ml": true,
+  "ml": false,
+  "null": false
+ },
+ "kcalText": {
+  "0.0": "0",
+  "0.5": "1",
+  "1000.0": "1.000",
+  "12345.6": "12.346",
+  "999.4": "999",
+  "999.5": "1.000"
+ },
+ "kitchen": {
+  "cookwareKindLabel": [
+   "Κατσαρόλα",
+   "wok"
+  ],
+  "cookwareKinds": [
+   "panNonstick|Τηγάνι αντικολλητικό",
+   "panCastIron|Τηγάνι μαντεμένιο",
+   "panSteel|Τηγάνι ανοξείδωτο",
+   "pot|Κατσαρόλα",
+   "tray|Ταψί",
+   "glass|Γυάλινο πυρίμαχο",
+   "other|Άλλο σκεύος"
+  ],
+  "cookwareSizeLabel": {
+   "pot|Μεγάλο": "Μεγάλη",
+   "pot|Μεσαίο": "Μεσαία",
+   "pot|Μικρό": "Μικρή",
+   "pot|Τεράστιο": "Τεράστιο",
+   "tray|Μεγάλο": "Μεγάλο",
+   "tray|Μεσαίο": "Μεσαίο",
+   "tray|Μικρό": "Μικρό",
+   "tray|Τεράστιο": "Τεράστιο"
+  },
+  "cookwareSizes": [
+   "Μικρό",
+   "Μεσαίο",
+   "Μεγάλο"
+  ],
+  "devices": [
+   "oven|Φούρνος|με ταψιά",
+   "hob|Μάτια κουζίνας|για κατσαρόλες, τηγάνια, μπρίκι",
+   "steamer|Ατμομάγειρας|ρύζι, πατάτες, κοτόπουλο, λαχανικά, αυγά",
+   "gasGrill|Ψησταριά υγραερίου|π.χ. Weber",
+   "charcoalGrill|Ψησταριά κάρβουνου|",
+   "deepFryer|Φριτέζα λαδιού|πολλές θερμίδες· μόνο όταν το επιτρέπουν οι στόχοι",
+   "airFryer|Φριτέζα αέρος (air fryer)|",
+   "kettle|Βραστήρας|",
+   "briki|Μπρίκι|",
+   "scale|Ζυγαριά κουζίνας|για ζύγισμα ωμών και μαγειρεμένων",
+   "microwave|Φούρνος μικροκυμάτων|",
+   "blender|Μπλέντερ / πολυμίξερ|",
+   "toaster|Τοστιέρα / γκριλιέρα|",
+   "pressureCooker|Χύτρα ταχύτητας|"
+  ],
+  "fromJson null": {
+   "cookware": [
+    {
+     "brand": "Tefal",
+     "id": "c1",
+     "kind": "panNonstick",
+     "size": "Μικρό"
+    },
+    {
+     "brand": "Tefal",
+     "id": "c2",
+     "kind": "panNonstick",
+     "size": "Μεσαίο"
+    },
+    {
+     "brand": "Tefal",
+     "id": "c3",
+     "kind": "panNonstick",
+     "size": "Μεγάλο"
+    },
+    {
+     "id": "c4",
+     "kind": "panCastIron"
+    },
+    {
+     "id": "c5",
+     "kind": "panCastIron"
+    },
+    {
+     "id": "c6",
+     "kind": "pot",
+     "size": "Μικρό"
+    },
+    {
+     "id": "c8",
+     "kind": "pot",
+     "size": "Μεσαίο"
+    },
+    {
+     "id": "c9",
+     "kind": "pot",
+     "size": "Μεγάλο"
+    },
+    {
+     "id": "c7",
+     "kind": "tray"
+    },
+    {
+     "brand": "Pyrex",
+     "id": "c10",
+     "kind": "glass"
+    }
+   ],
+   "devices": [
+    "blender",
+    "briki",
+    "deepFryer",
+    "gasGrill",
+    "hob",
+    "kettle",
+    "oven",
+    "scale",
+    "steamer",
+    "toaster"
+   ],
+   "hob": "Κεραμικά",
+   "ovenFan": true,
+   "seed": 2,
+   "steamerTiers": 2
+  },
+  "has": [
+   true,
+   false
+  ],
+  "initial": {
+   "cookware": [
+    {
+     "brand": "Tefal",
+     "id": "c1",
+     "kind": "panNonstick",
+     "size": "Μικρό"
+    },
+    {
+     "brand": "Tefal",
+     "id": "c2",
+     "kind": "panNonstick",
+     "size": "Μεσαίο"
+    },
+    {
+     "brand": "Tefal",
+     "id": "c3",
+     "kind": "panNonstick",
+     "size": "Μεγάλο"
+    },
+    {
+     "id": "c4",
+     "kind": "panCastIron"
+    },
+    {
+     "id": "c5",
+     "kind": "panCastIron"
+    },
+    {
+     "id": "c6",
+     "kind": "pot",
+     "size": "Μικρό"
+    },
+    {
+     "id": "c8",
+     "kind": "pot",
+     "size": "Μεσαίο"
+    },
+    {
+     "id": "c9",
+     "kind": "pot",
+     "size": "Μεγάλο"
+    },
+    {
+     "id": "c7",
+     "kind": "tray"
+    },
+    {
+     "brand": "Pyrex",
+     "id": "c10",
+     "kind": "glass"
+    }
+   ],
+   "devices": [
+    "blender",
+    "briki",
+    "deepFryer",
+    "gasGrill",
+    "hob",
+    "kettle",
+    "oven",
+    "scale",
+    "steamer",
+    "toaster"
+   ],
+   "hob": "Κεραμικά",
+   "ovenFan": true,
+   "seed": 2,
+   "steamerTiers": 2
+  },
+  "initial labels": [
+   "Τηγάνι αντικολλητικό · μικρό · Tefal",
+   "Τηγάνι αντικολλητικό · μεσαίο · Tefal",
+   "Τηγάνι αντικολλητικό · μεγάλο · Tefal",
+   "Τηγάνι μαντεμένιο",
+   "Τηγάνι μαντεμένιο",
+   "Κατσαρόλα · μικρή",
+   "Κατσαρόλα · μεσαία",
+   "Κατσαρόλα · μεγάλη",
+   "Ταψί",
+   "Γυάλινο πυρίμαχο · Pyrex"
+  ],
+  "own": {
+   "airFryerLiters": 5.5,
+   "cookware": [
+    {
+     "brand": "Χ",
+     "id": "c1",
+     "kind": "tray",
+     "note": "βαθύ",
+     "size": "Μεγάλο"
+    },
+    {
+     "brand": "",
+     "id": "c2",
+     "kind": "pot",
+     "size": "Μεσαίο"
+    },
+    {
+     "id": "c3",
+     "kind": "wok"
+    }
+   ],
+   "devices": [
+    "7",
+    "hob",
+    "scale"
+   ],
+   "hob": "Γκαζιού",
+   "ovenFan": false,
+   "scaleMaxKg": 5.0,
+   "seed": 2,
+   "steamerTiers": 3
+  },
+  "own labels": [
+   "Ταψί · μεγάλο · Χ · βαθύ",
+   "Κατσαρόλα · μεσαία",
+   "wok"
+  ],
+  "seedVersion": 2,
+  "upgraded from seed 1": {
+   "cookware": [
+    {
+     "id": "c6",
+     "kind": "pot",
+     "size": "Μικρό"
+    },
+    {
+     "id": "c8",
+     "kind": "pot",
+     "size": "Μεσαίο"
+    },
+    {
+     "id": "c9",
+     "kind": "pot",
+     "size": "Μεγάλο"
+    },
+    {
+     "brand": "Pyrex",
+     "id": "c10",
+     "kind": "glass"
+    }
+   ],
+   "devices": [
+    "blender",
+    "oven",
+    "toaster"
+   ],
+   "hob": "Κεραμικά",
+   "ovenFan": true,
+   "seed": 2
+  }
+ },
+ "mealForTime (λεπτά 0, 29, 30, 59)": {
+  "00": "ddss",
+  "01": "ssss",
+  "02": "ssss",
+  "03": "ssss",
+  "04": "ssss",
+  "05": "bbbb",
+  "06": "bbbb",
+  "07": "bbbb",
+  "08": "bbbb",
+  "09": "bbbb",
+  "10": "bbbb",
+  "11": "ssss",
+  "12": "llll",
+  "13": "llll",
+  "14": "llll",
+  "15": "llll",
+  "16": "llll",
+  "17": "ssss",
+  "18": "ssss",
+  "19": "dddd",
+  "20": "dddd",
+  "21": "dddd",
+  "22": "dddd",
+  "23": "dddd"
+ },
+ "mealLabel": {
+  "breakfast": "Πρωινό",
+  "dinner": "Βράδυ",
+  "lunch": "Μεσημέρι",
+  "snack": "Σνακ"
+ },
+ "normalizeBarcode | scannedBarcode": {
+  "": "|null",
+  " 5200000000017 ": "5200000000017|5200000000017",
+  "05200000000017": "5200000000017|5200000000017",
+  "1234567": "1234567|null",
+  "12345678": "12345678|12345678",
+  "15200000000017": "15200000000017|null",
+  "52 0000-0000017": "5200000000017|null",
+  "520000000001": "0520000000001|0520000000001",
+  "5200000000017": "5200000000017|5200000000017",
+  "5200000000017x": "5200000000017|null",
+  "ABC": "|null",
+  "not text": null
+ },
+ "pieceUnits": {
+  "C11000": {
+   "texts": [
+    "3.0 g × 1 → 1 σκελίδα",
+    "3.0 g × 2 → 2 σκελίδες",
+    "3.0 g × 5 → 5 σκελίδες"
+   ],
+   "unit": "σκελίδα/σκελίδες sizeAfter=false middle=:3.0"
+  },
+  "C13000": {
+   "texts": [
+    "35.0 g × 1 → 1 βερίκοκο",
+    "35.0 g × 2 → 2 βερίκοκα",
+    "35.0 g × 5 → 5 βερίκοκα"
+   ],
+   "unit": "βερίκοκο/βερίκοκα sizeAfter=false middle=μεσαίο:35.0"
+  },
+  "C13005": {
+   "texts": [
+    "101.0 g × 1 → 1 μικρή μπανάνα",
+    "101.0 g × 2 → 2 μικρές μπανάνες",
+    "101.0 g × 5 → 5 μικρές μπανάνες",
+    "118.0 g × 1 → 1 μεσαία μπανάνα",
+    "118.0 g × 2 → 2 μεσαίες μπανάνες",
+    "118.0 g × 5 → 5 μεσαίες μπανάνες",
+    "136.0 g × 1 → 1 μεγάλη μπανάνα",
+    "136.0 g × 2 → 2 μεγάλες μπανάνες",
+    "136.0 g × 5 → 5 μεγάλες μπανάνες"
+   ],
+   "unit": "μπανάνα/μπανάνες sizeAfter=false middle=μεσαία:118.0"
+  },
+  "C13021": {
+   "texts": [
+    "69.0 g × 1 → 1 ακτινίδιο",
+    "69.0 g × 2 → 2 ακτινίδια",
+    "69.0 g × 5 → 5 ακτινίδια"
+   ],
+   "unit": "ακτινίδιο/ακτινίδια sizeAfter=false middle=μεσαίο:69.0"
+  },
+  "C13024": {
+   "texts": [
+    "76.0 g × 1 → 1 μικρό μανταρίνι",
+    "76.0 g × 2 → 2 μικρό μανταρίνια",
+    "76.0 g × 5 → 5 μικρό μανταρίνια",
+    "88.0 g × 1 → 1 μεσαίο μανταρίνι",
+    "88.0 g × 2 → 2 μεσαία μανταρίνια",
+    "88.0 g × 5 → 5 μεσαία μανταρίνια",
+    "120.0 g × 1 → 1 μεγάλο μανταρίνι",
+    "120.0 g × 2 → 2 μεγάλα μανταρίνια",
+    "120.0 g × 5 → 5 μεγάλα μανταρίνια"
+   ],
+   "unit": "μανταρίνι/μανταρίνια sizeAfter=false middle=μεσαίο:88.0"
+  },
+  "C13034": {
+   "texts": [
+    "96.0 g × 1 → 1 μικρό πορτοκάλι",
+    "96.0 g × 2 → 2 μικρό πορτοκάλια",
+    "96.0 g × 5 → 5 μικρό πορτοκάλια",
+    "131.0 g × 1 → 1 μεσαίο πορτοκάλι",
+    "131.0 g × 2 → 2 μεσαία πορτοκάλια",
+    "131.0 g × 5 → 5 μεσαία πορτοκάλια",
+    "184.0 g × 1 → 1 μεγάλο πορτοκάλι",
+    "184.0 g × 2 → 2 μεγάλα πορτοκάλια",
+    "184.0 g × 5 → 5 μεγάλα πορτοκάλια"
+   ],
+   "unit": "πορτοκάλι/πορτοκάλια sizeAfter=false middle=μεσαίο:131.0"
+  },
+  "C13037": {
+   "texts": [
+    "148.0 g × 1 → 1 μικρό αχλάδι",
+    "148.0 g × 2 → 2 μικρό αχλάδια",
+    "148.0 g × 5 → 5 μικρό αχλάδια",
+    "178.0 g × 1 → 1 μεσαίο αχλάδι",
+    "178.0 g × 2 → 2 μεσαία αχλάδια",
+    "178.0 g × 5 → 5 μεσαία αχλάδια",
+    "230.0 g × 1 → 1 μεγάλο αχλάδι",
+    "230.0 g × 2 → 2 μεγάλα αχλάδια",
+    "230.0 g × 5 → 5 μεγάλα αχλάδια"
+   ],
+   "unit": "αχλάδι/αχλάδια sizeAfter=false middle=μεσαίο:178.0"
+  },
+  "C13039": {
+   "texts": [
+    "149.0 g × 1 → 1 μικρό μήλο",
+    "149.0 g × 2 → 2 μικρό μήλα",
+    "149.0 g × 5 → 5 μικρό μήλα",
+    "182.0 g × 1 → 1 μεσαίο μήλο",
+    "182.0 g × 2 → 2 μεσαία μήλα",
+    "182.0 g × 5 → 5 μεσαία μήλα",
+    "223.0 g × 1 → 1 μεγάλο μήλο",
+    "223.0 g × 2 → 2 μεγάλα μήλα",
+    "223.0 g × 5 → 5 μεγάλα μήλα"
+   ],
+   "unit": "μήλο/μήλα sizeAfter=false middle=μεσαίο:182.0"
+  },
+  "C13043": {
+   "texts": [
+    "130.0 g × 1 → 1 μικρό ροδάκινο",
+    "130.0 g × 2 → 2 μικρό ροδάκινα",
+    "130.0 g × 5 → 5 μικρό ροδάκινα",
+    "150.0 g × 1 → 1 μεσαίο ροδάκινο",
+    "150.0 g × 2 → 2 μεσαία ροδάκινα",
+    "150.0 g × 5 → 5 μεσαία ροδάκινα",
+    "175.0 g × 1 → 1 μεγάλο ροδάκινο",
+    "175.0 g × 2 → 2 μεγάλα ροδάκινα",
+    "175.0 g × 5 → 5 μεγάλα ροδάκινα"
+   ],
+   "unit": "ροδάκινο/ροδάκινα sizeAfter=false middle=μεσαίο:150.0"
+  },
+  "C20009": {
+   "texts": [
+    "61.0 g × 1 → 1 καρότο",
+    "61.0 g × 2 → 2 καρότα",
+    "61.0 g × 5 → 5 καρότα"
+   ],
+   "unit": "καρότο/καρότα sizeAfter=false middle=μεσαίο:61.0"
+  },
+  "C20034": {
+   "texts": [
+    "70.0 g × 1 → 1 μικρό κρεμμύδι",
+    "70.0 g × 2 → 2 μικρό κρεμμύδια",
+    "70.0 g × 5 → 5 μικρό κρεμμύδια",
+    "110.0 g × 1 → 1 μεσαίο κρεμμύδι",
+    "110.0 g × 2 → 2 μεσαία κρεμμύδια",
+    "110.0 g × 5 → 5 μεσαία κρεμμύδια",
+    "150.0 g × 1 → 1 μεγάλο κρεμμύδι",
+    "150.0 g × 2 → 2 μεγάλα κρεμμύδια",
+    "150.0 g × 5 → 5 μεγάλα κρεμμύδια"
+   ],
+   "unit": "κρεμμύδι/κρεμμύδια sizeAfter=false middle=μεσαίο:110.0"
+  },
+  "C20385": {
+   "texts": [
+    "91.0 g × 1 → 1 μικρή ντομάτα",
+    "91.0 g × 2 → 2 μικρές ντομάτες",
+    "91.0 g × 5 → 5 μικρές ντομάτες",
+    "123.0 g × 1 → 1 μεσαία ντομάτα",
+    "123.0 g × 2 → 2 μεσαίες ντομάτες",
+    "123.0 g × 5 → 5 μεσαίες ντομάτες",
+    "182.0 g × 1 → 1 μεγάλη ντομάτα",
+    "182.0 g × 2 → 2 μεγάλες ντομάτες",
+    "182.0 g × 5 → 5 μεγάλες ντομάτες"
+   ],
+   "unit": "ντομάτα/ντομάτες sizeAfter=false middle=μεσαία:123.0"
+  },
+  "C22000": {
+   "texts": [
+    "51.0 g × 1 → 1 αυγό M",
+    "51.0 g × 2 → 2 αυγά M",
+    "51.0 g × 5 → 5 αυγά M",
+    "60.0 g × 1 → 1 αυγό L",
+    "60.0 g × 2 → 2 αυγά L",
+    "60.0 g × 5 → 5 αυγά L"
+   ],
+   "unit": "αυγό/αυγά sizeAfter=true middle=L:60.0"
+  },
+  "C22010": {
+   "texts": [
+    "51.0 g × 1 → 1 αυγό M",
+    "51.0 g × 2 → 2 αυγά M",
+    "51.0 g × 5 → 5 αυγά M",
+    "60.0 g × 1 → 1 αυγό L",
+    "60.0 g × 2 → 2 αυγά L",
+    "60.0 g × 5 → 5 αυγά L"
+   ],
+   "unit": "αυγό/αυγά sizeAfter=true middle=L:60.0"
+  },
+  "C22011": {
+   "texts": [
+    "51.0 g × 1 → 1 αυγό M",
+    "51.0 g × 2 → 2 αυγά M",
+    "51.0 g × 5 → 5 αυγά M",
+    "60.0 g × 1 → 1 αυγό L",
+    "60.0 g × 2 → 2 αυγά L",
+    "60.0 g × 5 → 5 αυγά L"
+   ],
+   "unit": "αυγό/αυγά sizeAfter=true middle=L:60.0"
+  },
+  "C22014": {
+   "texts": [
+    "51.0 g × 1 → 1 αυγό M",
+    "51.0 g × 2 → 2 αυγά M",
+    "51.0 g × 5 → 5 αυγά M",
+    "60.0 g × 1 → 1 αυγό L",
+    "60.0 g × 2 → 2 αυγά L",
+    "60.0 g × 5 → 5 αυγά L"
+   ],
+   "unit": "αυγό/αυγά sizeAfter=true middle=L:60.0"
+  }
+ },
+ "reachedGrams": {
+  "0.0|0": false,
+  "29.4|30": false,
+  "29.5|30": true,
+  "30.0|30": true,
+  "39.5|40": true,
+  "5.0|0": false
+ },
+ "saltShown": {
+  "0.049": 0.0,
+  "4.94": 4.9,
+  "4.95": 5.0,
+  "4.96": 5.0,
+  "5.04": 5.0,
+  "5.05": 5.0
+ },
+ "satLimit": {
+  "1500|6": "10.0 · έως 10 g · strict=false",
+  "1800|10": "20.0 · κάτω από 20 g · strict=true",
+  "2090|6": "13.9 · έως 13,9 g · strict=false",
+  "2150|10": "23.9 · κάτω από 23,9 g · strict=true",
+  "2150|6": "14.3 · έως 14,3 g · strict=false",
+  "2250|6": "15.0 · έως 15 g · strict=false",
+  "2700|10": "30.0 · κάτω από 30 g · strict=true",
+  "strict 9/10/11": [
+   false,
+   true,
+   true
+  ]
+ },
+ "spoonByName": {
+  "": false,
+  "  — ": false,
+  "Margarine": true,
+  "Mayonnaise": true,
+  "Tahini": true,
+  "Βούτυρο αγελαδινό": true,
+  "Μέλι": false,
+  "Μαγιονέζα light": true,
+  "Μαργαρίνη soft": true,
+  "Πραλίνα φουντουκιού": true,
+  "Ταχίνι ολικής": true,
+  "ΦΥΣΤΙΚΟΒΟΥΤΥΡΟ": true,
+  "Ψωμί με βούτυρο": false
+ },
+ "spoonFromOffTags": {
+  "butters upper": true,
+  "fats": true,
+  "not a list": null,
+  "other": null,
+  "spread 499.9": null,
+  "spread 500": true,
+  "spread no kcal": null
+ },
+ "store": {
+  "CholWeek 1200": {
+   "daysFiberUnknown": 0,
+   "daysSaltOk5": 6,
+   "daysSaltUnknown": 0,
+   "daysSatUnknown": 0,
+   "daysWithBran40": 0,
+   "daysWithNuts30": 0,
+   "fiberMean": 26.5416667,
+   "fish": 0,
+   "fullDays": 6,
+   "legumes": 3,
+   "satPctMean": 8.58116553
+  },
+  "CholWeek 2150": {
+   "daysFiberUnknown": 0,
+   "daysSaltOk5": 5,
+   "daysSaltUnknown": 0,
+   "daysSatUnknown": 0,
+   "daysWithBran40": 0,
+   "daysWithNuts30": 0,
+   "fiberMean": 24.972,
+   "fish": 0,
+   "fullDays": 5,
+   "legumes": 3,
+   "satPctMean": 8.35406114
+  },
+  "byBarcode": [
+   "Mdemo1",
+   "Mdemo1",
+   "Mdemo1",
+   null,
+   null
+  ],
+  "currentOf unknown": "ZZ",
+  "days": {
+   "2026-11-17": {
+    "chol": {
+     "branG": 0.0,
+     "count": 0,
+     "fiber": 0.0,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": false,
+     "kcal": 0.0,
+     "legumes": false,
+     "legumesDryG": 0.0,
+     "missing": "false|false|false",
+     "nutsG": 0.0,
+     "part": false,
+     "salt": 0.0,
+     "satFat": 0.0,
+     "satPct": null
+    },
+    "copyable lunch": "0/0",
+    "dayMark": null,
+    "fruitVegGrams": 0.0,
+    "hasEntries": false,
+    "perMeal": {
+     "breakfast": "0.0",
+     "dinner": "0.0",
+     "lunch": "0.0",
+     "snack": "0.0"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 0.0,
+     "count": 0,
+     "estKcal": 0.0,
+     "fat": 0.0,
+     "fiber": 0.0,
+     "kcal": 0.0,
+     "missing": {},
+     "protein": 0.0,
+     "salt": 0.0,
+     "satFat": 0.0,
+     "shownKcal": 0,
+     "sugars": 0.0
+    }
+   },
+   "2026-11-18": {
+    "chol": {
+     "branG": 0.0,
+     "count": 13,
+     "fiber": 15.76,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": true,
+     "kcal": 1454.794,
+     "legumes": false,
+     "legumesDryG": 0.0,
+     "missing": "false|false|false",
+     "nutsG": 20.0,
+     "part": false,
+     "salt": 1.46405,
+     "satFat": 11.5072,
+     "satPct": 7.11886356
+    },
+    "copyable lunch": "4/0",
+    "dayMark": null,
+    "fruitVegGrams": 320.0,
+    "hasEntries": true,
+    "perMeal": {
+     "breakfast": "375.6",
+     "dinner": "305.5",
+     "lunch": "668.6",
+     "snack": "105.1"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 118.133,
+     "count": 13,
+     "estKcal": 0.0,
+     "fat": 45.13,
+     "fiber": 15.76,
+     "kcal": 1454.794,
+     "missing": {},
+     "protein": 131.0285,
+     "salt": 1.46405,
+     "satFat": 11.5072,
+     "shownKcal": 1456,
+     "sugars": 49.869
+    }
+   },
+   "2026-11-19": {
+    "chol": {
+     "branG": 0.0,
+     "count": 13,
+     "fiber": 38.79,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": true,
+     "kcal": 1505.094,
+     "legumes": true,
+     "legumesDryG": 120.0,
+     "missing": "false|false|false",
+     "nutsG": 20.0,
+     "part": false,
+     "salt": 2.14705,
+     "satFat": 17.0692,
+     "satPct": 10.2068575
+    },
+    "copyable lunch": "4/0",
+    "dayMark": null,
+    "fruitVegGrams": 320.0,
+    "hasEntries": true,
+    "perMeal": {
+     "breakfast": "375.6",
+     "dinner": "305.5",
+     "lunch": "718.9",
+     "snack": "105.1"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 130.943,
+     "count": 13,
+     "estKcal": 0.0,
+     "fat": 51.505,
+     "fiber": 38.79,
+     "kcal": 1505.094,
+     "missing": {},
+     "protein": 108.9585,
+     "salt": 2.14705,
+     "satFat": 17.0692,
+     "shownKcal": 1506,
+     "sugars": 50.109
+    }
+   },
+   "2026-11-20": {
+    "chol": {
+     "branG": 0.0,
+     "count": 13,
+     "fiber": 15.76,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": true,
+     "kcal": 1454.794,
+     "legumes": false,
+     "legumesDryG": 0.0,
+     "missing": "false|false|false",
+     "nutsG": 20.0,
+     "part": false,
+     "salt": 1.46405,
+     "satFat": 11.5072,
+     "satPct": 7.11886356
+    },
+    "copyable lunch": "4/0",
+    "dayMark": null,
+    "fruitVegGrams": 320.0,
+    "hasEntries": true,
+    "perMeal": {
+     "breakfast": "375.6",
+     "dinner": "305.5",
+     "lunch": "668.6",
+     "snack": "105.1"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 118.133,
+     "count": 13,
+     "estKcal": 0.0,
+     "fat": 45.13,
+     "fiber": 15.76,
+     "kcal": 1454.794,
+     "missing": {},
+     "protein": 131.0285,
+     "salt": 1.46405,
+     "satFat": 11.5072,
+     "shownKcal": 1456,
+     "sugars": 49.869
+    }
+   },
+   "2026-11-21": {
+    "chol": {
+     "branG": 0.0,
+     "count": 13,
+     "fiber": 38.79,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": true,
+     "kcal": 1505.094,
+     "legumes": true,
+     "legumesDryG": 120.0,
+     "missing": "false|false|false",
+     "nutsG": 20.0,
+     "part": false,
+     "salt": 2.14705,
+     "satFat": 17.0692,
+     "satPct": 10.2068575
+    },
+    "copyable lunch": "4/0",
+    "dayMark": null,
+    "fruitVegGrams": 320.0,
+    "hasEntries": true,
+    "perMeal": {
+     "breakfast": "375.6",
+     "dinner": "305.5",
+     "lunch": "718.9",
+     "snack": "105.1"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 130.943,
+     "count": 13,
+     "estKcal": 0.0,
+     "fat": 51.505,
+     "fiber": 38.79,
+     "kcal": 1505.094,
+     "missing": {},
+     "protein": 108.9585,
+     "salt": 2.14705,
+     "satFat": 17.0692,
+     "shownKcal": 1506,
+     "sugars": 50.109
+    }
+   },
+   "2026-11-22": {
+    "chol": {
+     "branG": 0.0,
+     "count": 13,
+     "fiber": 15.76,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": true,
+     "kcal": 1454.794,
+     "legumes": false,
+     "legumesDryG": 0.0,
+     "missing": "false|false|false",
+     "nutsG": 20.0,
+     "part": false,
+     "salt": 1.46405,
+     "satFat": 11.5072,
+     "satPct": 7.11886356
+    },
+    "copyable lunch": "4/0",
+    "dayMark": null,
+    "fruitVegGrams": 320.0,
+    "hasEntries": true,
+    "perMeal": {
+     "breakfast": "375.6",
+     "dinner": "305.5",
+     "lunch": "668.6",
+     "snack": "105.1"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 118.133,
+     "count": 13,
+     "estKcal": 0.0,
+     "fat": 45.13,
+     "fiber": 15.76,
+     "kcal": 1454.794,
+     "missing": {},
+     "protein": 131.0285,
+     "salt": 1.46405,
+     "satFat": 11.5072,
+     "shownKcal": 1456,
+     "sugars": 49.869
+    }
+   },
+   "2026-11-23": {
+    "chol": {
+     "branG": 0.0,
+     "count": 11,
+     "fiber": 34.39,
+     "fish": false,
+     "fishG": 0.0,
+     "fullFor": false,
+     "kcal": 1199.594,
+     "legumes": true,
+     "legumesDryG": 120.0,
+     "missing": "false|false|false",
+     "nutsG": 20.0,
+     "part": false,
+     "salt": 1.85705,
+     "satFat": 12.9512,
+     "satPct": 9.71668748
+    },
+    "copyable lunch": "4/0",
+    "dayMark": null,
+    "fruitVegGrams": 120.0,
+    "hasEntries": true,
+    "perMeal": {
+     "breakfast": "375.6",
+     "dinner": "0.0",
+     "lunch": "718.9",
+     "snack": "105.1"
+    },
+    "totals": {
+     "alcohol": 0.0,
+     "carbs": 125.883,
+     "count": 11,
+     "estKcal": 0.0,
+     "fat": 40.325,
+     "fiber": 34.39,
+     "kcal": 1199.594,
+     "missing": {},
+     "protein": 67.5185,
+     "salt": 1.85705,
+     "satFat": 12.9512,
+     "shownKcal": 1200,
+     "sugars": 47.109
+    }
+   }
+  },
+  "entriesWithOldValues": 6,
+  "entriesWithOldValues same": 0,
+  "entryTime": {
+   "25/10 at 03:30": "2026-10-25T03:30:00.000",
+   "28/3 at 02:30 target": "2027-03-28T02:30:00.000",
+   "today 14:05": "2026-11-23T14:05:06.007",
+   "two days ago at 02:00": "2026-11-21T02:00:00.000",
+   "yesterday at 03:59": "2026-11-23T03:59:00.000",
+   "yesterday at 04:00": "2026-11-22T04:00:00.000"
+  },
+  "frequent": [
+   "C18071 Εσπρέσο (χωρίς ζάχαρη)",
+   "C19033 Γάλα ημιαποβουτυρωμένο 1,5%",
+   "C31016 Ζάχαρη λευκή",
+   "U170903 Γιαούρτι στραγγιστό χαμηλά λιπαρά (περίπου 2%)",
+   "C31008 Μέλι",
+   "C15005 Καρύδια",
+   "C7110 Ψωμί ολικής άλεσης",
+   "C17270 Ελαιόλαδο εξαιρετικά παρθένο"
+  ],
+  "groupOf": 1,
+  "lastGrams": {
+   "banana": 120.0,
+   "lentils": 300.0,
+   "unknown": null
+  },
+  "otherDayShown": [
+   "-",
+   "2026-11-23"
+  ],
+  "pickable known": "C13005",
+  "pickable unknown": null,
+  "recent": [
+   "C13005 Μπανάνα",
+   "C17270 Ελαιόλαδο εξαιρετικά παρθένο",
+   "C7110 Ψωμί ολικής άλεσης",
+   "C12066 Φέτα (πρόβειο και κατσικίσιο)",
+   "C20360 Φακές (βρασμένες)",
+   "C15005 Καρύδια",
+   "C31008 Μέλι",
+   "U170903 Γιαούρτι στραγγιστό χαμηλά λιπαρά (περίπου 2%)"
+  ],
+  "statesOf": {
+   "C13039": [],
+   "C20359": [
+    "C20359:Ξερές (πριν το βράσιμο)",
+    "C20360:Βρασμένες"
+   ],
+   "C20360": [
+    "C20359:Ξερές (πριν το βράσιμο)",
+    "C20360:Βρασμένες"
+   ],
+   "C22000": [
+    "C22000:Ωμό",
+    "C22010:Βραστό",
+    "C22505:Τηγανητό χωρίς λάδι"
+   ],
+   "C26036": [
+    "C26036:Ωμός",
+    "C26230:Ψητός",
+    "C26229:Σχάρα"
+   ],
+   "Mdemo1": []
+  },
+  "timesEaten": {
+   "banana": 6,
+   "lentils": 3,
+   "unknown": 0
+  }
+ },
+ "typo grams": [
+  9.0,
+  10.0,
+  19.9,
+  20.0,
+  99.0,
+  100.0,
+  222.0,
+  223.0,
+  299.0,
+  300.0,
+  454.0,
+  455.0,
+  999.0,
+  1000.0,
+  1818.0,
+  1819.0
+ ],
+ "validMyUnit": {
+  "0.99": null,
+  "1": 1.0,
+  "150.5": 150.5,
+  "2000": 2000.0,
+  "2000.1": null,
+  "NaN": null,
+  "null": null,
+  "x": null
+ },
+ "validServing": {
+  "-1": null,
+  "0": null,
+  "0.1": 0.1,
+  "170": 170.0,
+  "5000": 5000.0,
+  "5000.1": null,
+  "Infinity": null,
+  "NaN": null,
+  "null": null,
+  "x": null
+ },
+ "weekStart": {
+  "2026-10-25": "2026-10-19",
+  "2026-10-26": "2026-10-26",
+  "2026-11-23": "2026-11-23",
+  "2026-11-24": "2026-11-23",
+  "2026-11-25": "2026-11-23",
+  "2026-11-26": "2026-11-23",
+  "2026-11-27": "2026-11-23",
+  "2026-11-28": "2026-11-23",
+  "2026-11-29": "2026-11-23",
+  "2027-01-01": "2026-12-28",
+  "2027-03-28": "2027-03-22",
+  "2027-03-29": "2027-03-29",
+  "2028-02-29": "2028-02-28"
+ },
+ "weighHints": {
+  "C10001": "καθαρισμένο, χωρίς κόκαλο (πλαστικό), μάτια και εντόσθια",
+  "C10007": "μόνο την ψίχα, χωρίς κέλυφος και κεφάλι",
+  "C10013": "μόνο το μύδι, χωρίς το όστρακο",
+  "C10018": "καθαρισμένο, χωρίς μάτια, ράμφος και εντόσθια",
+  "C10021": "μόνο την ψίχα, χωρίς κέλυφος και κεφάλι",
+  "C10026": "μόνο το μύδι, χωρίς το όστρακο",
+  "C10079": "καθαρισμένο, χωρίς μάτια, ράμφος και εντόσθια",
+  "C13000": "χωρίς κουκούτσι",
+  "C13002": "χωρίς φλούδα και κοτσάνι",
+  "C13004": "χωρίς φλούδα και κουκούτσι",
+  "C13005": "χωρίς φλούδα",
+  "C13008": "χωρίς κουκούτσια και κοτσάνια",
+  "C13009": "χωρίς φλούδα",
+  "C13010": "χωρίς φλούδα και κουκούτσια",
+  "C13011": "χωρίς κουκούτσι",
+  "C13018": "μόνο τους σπόρους, χωρίς φλούδα",
+  "C13021": "χωρίς φλούδα",
+  "C13024": "χωρίς φλούδα",
+  "C13025": "χωρίς φλούδα και κουκούτσι",
+  "C13032": "χωρίς κουκούτσι",
+  "C13033": "χωρίς κουκούτσι",
+  "C13034": "χωρίς φλούδα",
+  "C13036": "μόνο την ψίχα, χωρίς φλούδα και σπόρια",
+  "C13037": "χωρίς κοτσάνι και κουκούτσια",
+  "C13039": "χωρίς κοτσάνι και κουκούτσια",
+  "C13040": "χωρίς φλούδα",
+  "C13042": "χωρίς κουκούτσι",
+  "C13043": "χωρίς κουκούτσι",
+  "C13066": "χωρίς κοτσάνι και κουκούτσια (η φλούδα μετρά)",
+  "C13100": "χωρίς κουκούτσι",
+  "C13131": "χωρίς κουκούτσι",
+  "C13395": "χωρίς κοτσάνια",
+  "C13397": "χωρίς φλούδα και κουκούτσια",
+  "C15000": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15001": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15002": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15004": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15005": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15009": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15011": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15041": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15044": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15045": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C15054": "μόνο την ψίχα, χωρίς τσόφλι",
+  "C20049": "μόνο τους σπόρους, χωρίς το κοτσάνι",
+  "C20052": "μόνο την καρδιά και τη μαλακή βάση των φύλλων",
+  "C21500": "μόνο το κρέας, χωρίς κόκαλα",
+  "C21501": "μόνο το κρέας, χωρίς κόκαλα",
+  "C21502": "μόνο το κρέας, χωρίς κόκαλο",
+  "C21503": "μόνο το κρέας, χωρίς κόκαλο",
+  "C21504": "μόνο το κρέας, χωρίς κόκαλο",
+  "C21800": "μόνο το κρέας, χωρίς κόκαλα",
+  "C21801": "μόνο το κρέας, χωρίς κόκαλα",
+  "C22000": "χωρίς τσόφλι",
+  "C22010": "χωρίς τσόφλι",
+  "C22011": "χωρίς τσόφλι",
+  "C22014": "χωρίς τσόφλι",
+  "C25998": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26011": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26014": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26019": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26023": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26024": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26025": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26036": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26043": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26044": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26051": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26065": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26079": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26080": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26082": "χωρίς πέτσα και κόκαλο",
+  "C26088": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26098": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26113": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26120": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26136": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα",
+  "C26205": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26206": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26229": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C26230": "μόνο το ψάρι, χωρίς κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C27030": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C27031": "μόνο το ψάρι, χωρίς κεφάλι και κόκαλα (και χωρίς την πέτσα, αν δεν την τρως)",
+  "C28001": "μόνο το κρέας, χωρίς κόκαλο",
+  "C28100": "μόνο το κρέας, χωρίς κόκαλο",
+  "C28101": "μόνο το κρέας, χωρίς κόκαλο",
+  "C28400": "μόνο το κρέας, χωρίς κόκαλα",
+  "C36002": "μόνο το κρέας και την πέτσα, χωρίς κόκαλο",
+  "C36004": "μόνο το κρέας και την πέτσα, χωρίς κόκαλο",
+  "C36005": "μόνο το κρέας και την πέτσα, χωρίς κόκαλα",
+  "C36006": "μόνο το κρέας, χωρίς κόκαλο",
+  "C36016": "μόνο το κρέας και την πέτσα, χωρίς κόκαλα",
+  "C36023": "μόνο το κρέας και την πέτσα, χωρίς κόκαλα",
+  "C36024": "μόνο το κρέας, χωρίς κόκαλο",
+  "C6511": "μόνο το κρέας, χωρίς κόκαλο",
+  "U169092": "μόνο την ψίχα, χωρίς φλούδα και σπόρια",
+  "U169415": "μόνο την ψίχα, χωρίς τσόφλι",
+  "U169911": "μόνο την ψίχα, χωρίς φλούδα και σπόρια",
+  "U170557": "μόνο την ψίχα, χωρίς τσόφλι",
+  "U172521": "μόνο το κρέας, χωρίς κόκαλα",
+  "U174372": "μόνο το κρέας, χωρίς κόκαλο",
+  "U174373": "μόνο το κρέας, χωρίς κόκαλο"
+ }
+}

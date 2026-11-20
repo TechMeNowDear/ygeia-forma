@@ -1,0 +1,3532 @@
+{
+ "Dish.fromJson": {
+  "bad item": null,
+  "bad kind": null,
+  "blank name": null,
+  "empty id": null,
+  "lastQty 20000.1": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "pot",
+   "name": "Φακές"
+  },
+  "no items": null,
+  "not a map": null,
+  "plate lastPlate 5000.1": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "plate",
+   "name": "Φακές"
+  },
+  "plate lastPlate wrong length": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "plate",
+   "name": "Φακές"
+  },
+  "plate with lastPlate": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "plate",
+   "lastPlate": [
+    120.0,
+    0.0
+   ],
+   "name": "Φακές"
+  },
+  "portions 0": null,
+  "portions 4": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "portions",
+   "lastQty": 1.5,
+   "name": "Φακές",
+   "serv": 4
+  },
+  "portions 50": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "portions",
+   "name": "Φακές",
+   "serv": 50
+  },
+  "portions 51": null,
+  "portions missing": null,
+  "pot": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "pot",
+   "name": "Φακές"
+  },
+  "pot with batch, lastQty, extras": {
+   "batch": {
+    "at": 1000,
+    "c": 2400.0,
+    "items": [
+     {
+      "g": 100.0,
+      "id": "C1",
+      "n": "Α"
+     },
+     {
+      "g": 50.0,
+      "id": "C2",
+      "n": "Β"
+     }
+    ]
+   },
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "pot",
+   "lastQty": 350.0,
+   "name": "Φακές",
+   "plan": {
+    "key": "fakes"
+   },
+   "rate": 1,
+   "used": 20,
+   "uses": 3
+  },
+  "uses -2": {
+   "created": 10,
+   "id": "D1",
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ],
+   "kind": "pot",
+   "name": "Φακές"
+  }
+ },
+ "DishItem.fromJson": {
+  "empty id": null,
+  "g 0": null,
+  "g 5000": {
+   "g": 5000.0,
+   "id": "C1",
+   "n": "C1"
+  },
+  "g 5000.1": null,
+  "g text": null,
+  "no name": {
+   "g": 1.0,
+   "id": "C1",
+   "n": "C1"
+  },
+  "not a map": null,
+  "ok": {
+   "g": 120.5,
+   "id": "C1",
+   "n": "Όνομα"
+  }
+ },
+ "DishTag.fromJson": {
+  "bad kind": null,
+  "blank name": {
+   "grp": "g1",
+   "id": "D1",
+   "k": "plate",
+   "n": "Φαγητό",
+   "q": 1.0
+  },
+  "no grp": null,
+  "not a map": null,
+  "ok": {
+   "b": 1000,
+   "grp": "g1",
+   "id": "D1",
+   "k": "pot",
+   "n": "Φακές",
+   "q": 350.0
+  },
+  "q 0": null,
+  "withQty/withGrp": {
+   "grp": "g2",
+   "id": "D1",
+   "k": "pot",
+   "n": "Φ",
+   "q": 250.0
+  }
+ },
+ "FoodLikes": {
+  "copyWith": {
+   "dislike": [
+    "B"
+   ],
+   "like": [
+    "A"
+   ],
+   "note": "ν"
+  },
+  "fromJson": {
+   "dislike": [
+    "C",
+    "D"
+   ],
+   "like": [
+    "A",
+    "B"
+   ],
+   "note": "σημείωση",
+   "staple": [
+    "E"
+   ]
+  },
+  "fromJson junk": {
+   "dislike": [],
+   "like": []
+  },
+  "isEmpty": [
+   true,
+   true,
+   false
+  ],
+  "mapIds": {
+   "dislike": [
+    "C"
+   ],
+   "like": [
+    "A"
+   ],
+   "staple": [
+    "D",
+    "A"
+   ]
+  },
+  "parseLikes": {
+   "likes": {
+    "dislike": [
+     "B"
+    ],
+    "like": [
+     "A"
+    ],
+    "staple": [
+     "S"
+    ]
+   },
+   "unknown": [
+    "ZZ",
+    "YY"
+   ]
+  },
+  "parseLikes other": true
+ },
+ "PlanSlot.fromJson": {
+  "bad meal": null,
+  "copyWith clear": {
+   "dish": "D2",
+   "lock": true,
+   "meal": "lunch"
+  },
+  "kcal 2500": {
+   "dish": "D1",
+   "kcal": 2500.0,
+   "meal": "lunch"
+  },
+  "kcal 2500.1": {
+   "dish": "D1",
+   "meal": "lunch"
+  },
+  "kcal 29.9": {
+   "dish": "D1",
+   "meal": "lunch"
+  },
+  "kcal 30": {
+   "dish": "D1",
+   "kcal": 30.0,
+   "meal": "lunch"
+  },
+  "no dish": null,
+  "not a map": null,
+  "ok": {
+   "dish": "D1",
+   "grp": "g1",
+   "kcal": 650.0,
+   "lock": true,
+   "meal": "lunch",
+   "st": "ate"
+  },
+  "unknown state": {
+   "dish": "D1",
+   "meal": "snack"
+  }
+ },
+ "PotBatch.fromJson": {
+  "41 items": null,
+  "at text": null,
+  "bad item": null,
+  "c 0": null,
+  "c 20000": {
+   "at": 1000,
+   "c": 20000.0,
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ]
+  },
+  "c 20000.1": null,
+  "no items": null,
+  "ok": {
+   "at": 1000,
+   "c": 2400.0,
+   "items": [
+    {
+     "g": 100.0,
+     "id": "C1",
+     "n": "Α"
+    },
+    {
+     "g": 50.0,
+     "id": "C2",
+     "n": "Β"
+    }
+   ]
+  }
+ },
+ "Recipe.fromJson": {
+  "empty map": null,
+  "not a map": null,
+  "only minutes": null,
+  "only tips": {
+   "steps": [],
+   "tips": [
+    "α"
+   ]
+  },
+  "recipeOf/withRecipe": {
+   "serv": 3,
+   "steps": [],
+   "tips": [
+    "α"
+   ]
+  },
+  "serv 50": {
+   "keeps": "ψυγείο",
+   "min": 1440,
+   "steps": []
+  },
+  "serv bounds": {
+   "keeps": "ψυγείο",
+   "steps": []
+  },
+  "withRecipe null": false
+ },
+ "WeekPlan days": {
+  "autumn": "10-19 10-20 10-21 10-22 10-23 10-24 10-25 10-26 10-27 10-28 10-29 10-30 10-31 11-01",
+  "autumn indexOf 25/10 01:30": 6,
+  "autumn indexOf 26/10": 7,
+  "slotsFor inside": 3,
+  "slotsFor outside": 0,
+  "spring": "03-22 03-23 03-24 03-25 03-26 03-27 03-28 03-29 03-30 03-31 04-01 04-02 04-03 04-04",
+  "spring end": "2027-04-04",
+  "spring indexOf 28/3 23:59": 6,
+  "spring indexOf 5/4": -1,
+  "withAdded": "lunch:kotopoulo-salata@900.0 | dinner:solomos@790.0 | snack:milo-giaourti@450.0 | breakfast:giaourti@300.0"
+ },
+ "WeekPlan.fromJson": {
+  "14 days": {
+   "created": 0,
+   "days": [
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    []
+   ],
+   "from": "2026-11-23",
+   "source": "paste"
+  },
+  "15 days": null,
+  "7 slots a day": {
+   "created": 0,
+   "days": [
+    [
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     },
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     },
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     },
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     },
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     },
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     }
+    ]
+   ],
+   "from": "2026-11-23",
+   "source": "paste"
+  },
+  "bad from": null,
+  "day not a list": null,
+  "defaults": {
+   "created": 0,
+   "days": [
+    []
+   ],
+   "from": "2026-11-23",
+   "source": "paste"
+  },
+  "no days": null,
+  "not a map": null,
+  "ok": {
+   "created": 5,
+   "days": [
+    [
+     {
+      "dish": "D1",
+      "meal": "lunch"
+     }
+    ],
+    []
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner"
+   ],
+   "source": "auto"
+  }
+ },
+ "autoWeek": {
+  "14 days from 22/3/2027": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:giaourti@450.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:revithia@720.0 | snack:milo-giaourti@480.0",
+    "lunch:revithia@720.0 | dinner:fakes@680.0 | snack:milo-giaourti@480.0",
+    "lunch:fakes@680.0 | dinner:kotopoulo-ryzi@980.0 | snack:milo-giaourti@480.0",
+    "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:solomos@790.0 | snack:milo-giaourti@450.0",
+    "lunch:tsipoura-exo@910.0 | dinner:mosxari@790.0 | snack:milo-giaourti@450.0",
+    "lunch:kotopoulo-ryzi@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+    "lunch:tonosalata@800.0 | dinner:solomos@850.0 | snack:giaourti@510.0",
+    "lunch:fasolada@650.0 | dinner:biftekia@439.0 | snack:giaourti@550.0",
+    "lunch:fasolada@650.0 | dinner:fakes@680.0 | snack:frygania@460.0",
+    "lunch:biftekia@439.0 | dinner:fakes@680.0 | snack:giaourti@550.0",
+    "lunch:fasolada@650.0 | dinner:revithia@720.0 | snack:milo-giaourti@480.0",
+    "lunch:revithia@720.0 | dinner:fakes@680.0 | snack:giaourti@550.0"
+   ],
+   "from": "2027-03-22",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τετάρτη 24/3: 1880 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τετάρτη 24/3: πρωτεΐνη 125 g (στόχος 150).",
+    "Τετάρτη 31/3: 1639 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Πέμπτη 1/4: 1790 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Πέμπτη 1/4: πρωτεΐνη 100 g (στόχος 150).",
+    "Παρασκευή 2/4: 1669 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Σάββατο 3/4: 1850 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Σάββατο 3/4: πρωτεΐνη 122 g (στόχος 150).",
+    "Κυριακή 4/4: 1950 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Κυριακή 4/4: πρωτεΐνη 124 g (στόχος 150).",
+    "Επαναλαμβάνεται φαγητό πιο συχνά απ’ όσο λένε οι κανόνες (λίγα φαγητά στη βιβλιοθήκη): Πέμπτη 1/4, βράδυ · Παρασκευή 2/4, βράδυ · Σάββατο 3/4, μεσημέρι · Σάββατο 3/4, βράδυ · Κυριακή 4/4, μεσημέρι · Κυριακή 4/4, βράδυ."
+   ],
+   "planned": [
+    "2150.0 kcal · πρωτ 232.0 · κορ 14.55 · ίνες 10.5 · άγνωστα 0",
+    "2100.0 kcal · πρωτ 169.8 · κορ 21.36 · ίνες 32.3 · άγνωστα 0",
+    "1880.0 kcal · πρωτ 125.0 · κορ 6.81 · ίνες 55.9 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 174.2 · κορ 7.69 · ίνες 37.0 · άγνωστα 0",
+    "2110.0 kcal · πρωτ 207.8 · κορ 9.50 · ίνες 19.3 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 187.8 · κορ 23.42 · ίνες 12.2 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 224.5 · κορ 9.04 · ίνες 9.9 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 218.2 · κορ 13.09 · ίνες 10.5 · άγνωστα 0",
+    "2160.0 kcal · πρωτ 178.0 · κορ 12.31 · ίνες 19.9 · άγνωστα 0",
+    "1639.0 kcal · πρωτ 149.2 · κορ 7.75 · ίνες 35.8 · άγνωστα 0",
+    "1790.0 kcal · πρωτ 100.0 · κορ 16.35 · ίνες 62.9 · άγνωστα 0",
+    "1669.0 kcal · πρωτ 151.7 · κορ 7.87 · ίνες 37.3 · άγνωστα 0",
+    "1850.0 kcal · πρωτ 122.4 · κορ 6.69 · ίνες 54.4 · άγνωστα 0",
+    "1950.0 kcal · πρωτ 123.9 · κορ 6.76 · ίνες 57.5 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "aiOnly, nothing forced": {
+   "days": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [],
+   "planned": [
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "dislikes chicken and feta": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+    "lunch:fakes@680.0 | dinner:revithia@720.0 | snack:giaourti@550.0",
+    "lunch:fakes@680.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:revithia@720.0 | dinner:tsipoura@940.0 | snack:milo-giaourti@480.0",
+    "lunch:tonosalata@800.0 | dinner:tsipoura-exo@870.0 | snack:milo-giaourti@480.0",
+    "lunch:biftekia@439.0 | dinner:solomos@1070.0 | snack:milo-giaourti@480.0",
+    "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:giaourti@510.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τρίτη 24/11: 1950 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τρίτη 24/11: πρωτεΐνη 124 g (στόχος 150).",
+    "Τετάρτη 25/11: 1990 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Σάββατο 28/11: 1989 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο."
+   ],
+   "planned": [
+    "2150.0 kcal · πρωτ 238.7 · κορ 14.73 · ίνες 10.0 · άγνωστα 0",
+    "1950.0 kcal · πρωτ 123.9 · κορ 6.76 · ίνες 57.5 · άγνωστα 0",
+    "1990.0 kcal · πρωτ 175.4 · κορ 6.41 · ίνες 36.8 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 196.0 · κορ 14.15 · ίνες 30.4 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 216.7 · κορ 11.89 · ίνες 18.8 · άγνωστα 0",
+    "1989.0 kcal · πρωτ 186.0 · κορ 12.53 · ίνες 9.8 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 203.2 · κορ 9.37 · ίνες 20.3 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "forced": {
+   "days": [
+    "lunch:fakes@680.0 | dinner:solomos@1010.0",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τρίτη 24/11: το «Φαγητό solomos» δεν ταιριάζει στο μεσημέρι (γραφείο)· η θέση έμεινε χωρίς φαγητό.",
+    "Τρίτη 24/11: το φαγητό για σνακ δεν μπορεί να μπει (λείπει υλικό ή δεν σου αρέσει).",
+    "Τετάρτη 25/11: το «Φαγητό kotopoulo-ryzi» δεν ταιριάζει στο μεσημέρι (γραφείο)· η θέση έμεινε χωρίς φαγητό.",
+    "Όσπρια 1 φορές (στόχος 4): λίγα στη βιβλιοθήκη.",
+    "Ψάρι 1 φορές (στόχος 2): λίγο στη βιβλιοθήκη."
+   ],
+   "planned": [
+    "1690.0 kcal · πρωτ 113.3 · κορ 9.23 · ίνες 29.7 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0",
+    "0.0 kcal · πρωτ 0.0 · κορ 0.00 · ίνες 0.0 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "four meals 2800": {
+   "days": [
+    "lunch:tsipoura-exo@930.0 | dinner:tsipoura@820.0 | snack:giaourti@470.0",
+    "lunch:fakes@680.0 | dinner:revithia@720.0 | snack:milo-giaourti@480.0",
+    "lunch:revithia@720.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:fakes@680.0 | snack:milo-giaourti@480.0",
+    "lunch:fasolada@650.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-ryzi@930.0 | dinner:tsipoura-exo@820.0 | snack:milo-giaourti@470.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:solomos@830.0 | snack:milo-giaourti@480.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "breakfast",
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Δευτέρα 23/11: δεν βρέθηκε φαγητό για πρωινό.",
+    "Τρίτη 24/11: δεν βρέθηκε φαγητό για πρωινό.",
+    "Τρίτη 24/11: 1880 kcal (στόχος 2217): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τετάρτη 25/11: δεν βρέθηκε φαγητό για πρωινό.",
+    "Τετάρτη 25/11: 1850 kcal (στόχος 2217): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Πέμπτη 26/11: δεν βρέθηκε φαγητό για πρωινό.",
+    "Πέμπτη 26/11: 2060 kcal (στόχος 2217): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Παρασκευή 27/11: δεν βρέθηκε φαγητό για πρωινό.",
+    "Παρασκευή 27/11: 1960 kcal (στόχος 2217): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Σάββατο 28/11: δεν βρέθηκε φαγητό για πρωινό.",
+    "Κυριακή 29/11: δεν βρέθηκε φαγητό για πρωινό."
+   ],
+   "planned": [
+    "2220.1 kcal · πρωτ 239.5 · κορ 15.02 · ίνες 10.9 · άγνωστα 0",
+    "1880.0 kcal · πρωτ 125.0 · κορ 6.81 · ίνες 55.9 · άγνωστα 0",
+    "1850.0 kcal · πρωτ 122.4 · κορ 6.69 · ίνες 54.4 · άγνωστα 0",
+    "2060.0 kcal · πρωτ 177.3 · κορ 20.75 · ίνες 39.0 · άγνωστα 0",
+    "1960.0 kcal · πρωτ 172.9 · κορ 6.29 · ίνες 35.3 · άγνωστα 0",
+    "2220.0 kcal · πρωτ 215.4 · κορ 9.76 · ίνες 10.2 · άγνωστα 0",
+    "2210.0 kcal · πρωτ 193.7 · κορ 23.76 · ίνες 12.7 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "from Thursday 22/10/2026, 5 days": {
+   "days": [
+    "lunch:revithia@720.0 | dinner:tsipoura@940.0 | snack:milo-giaourti@480.0",
+    "lunch:tsipoura-exo@960.0 | dinner:fakes@680.0 | snack:giaourti@510.0",
+    "lunch:revithia@720.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:fakes@680.0 | snack:milo-giaourti@480.0",
+    "lunch:tsipoura-exo@1010.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0"
+   ],
+   "from": "2026-10-22",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Σάββατο 24/10: 1850 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Σάββατο 24/10: πρωτεΐνη 122 g (στόχος 150)."
+   ],
+   "planned": [
+    "2140.0 kcal · πρωτ 196.0 · κορ 14.15 · ίνες 30.4 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 189.6 · κορ 9.20 · ίνες 37.4 · άγνωστα 0",
+    "1850.0 kcal · πρωτ 122.4 · κορ 6.69 · ίνες 54.4 · άγνωστα 0",
+    "2060.0 kcal · πρωτ 177.3 · κορ 20.75 · ίνες 39.0 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 196.9 · κορ 9.50 · ίνες 35.0 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "keep from another week": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+    "lunch:fakes@680.0 | dinner:revithia@720.0 | snack:giaourti@550.0",
+    "lunch:fakes@680.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:revithia@720.0 | snack:frygania@460.0",
+    "lunch:fasolada@650.0 | dinner:kotopoulo-ryzi@1000.0 | snack:milo-giaourti@480.0",
+    "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:tsipoura-exo@910.0 | dinner:kotopoulo-salata@790.0 | snack:giaourti@450.0"
+   ],
+   "from": "2026-11-30",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τρίτη 1/12: 1950 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τρίτη 1/12: πρωτεΐνη 124 g (στόχος 150).",
+    "Τετάρτη 2/12: 1810 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τετάρτη 2/12: πρωτεΐνη 130 g (στόχος 150)."
+   ],
+   "planned": [
+    "2150.0 kcal · πρωτ 238.7 · κορ 14.73 · ίνες 10.0 · άγνωστα 0",
+    "1950.0 kcal · πρωτ 123.9 · κορ 6.76 · ίνες 57.5 · άγνωστα 0",
+    "1810.0 kcal · πρωτ 129.9 · κορ 6.09 · ίνες 61.1 · άγνωστα 0",
+    "2079.9 kcal · πρωτ 139.9 · κορ 31.62 · ίνες 34.1 · άγνωστα 0",
+    "2130.0 kcal · πρωτ 173.3 · κορ 7.65 · ίνες 35.5 · άγνωστα 0",
+    "2110.0 kcal · πρωτ 207.8 · κορ 9.50 · ίνες 19.3 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 213.3 · κορ 21.24 · ίνες 12.3 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "keep locked/ate/skip, seed 2": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 lock | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+    "lunch:fakes@680.0 | dinner:revithia@720.0 ate grp=g1 | snack:giaourti@550.0",
+    "lunch:revithia@720.0 skip | dinner:kotopoulo-ryzi@950.0 | snack:milo-giaourti@480.0",
+    "lunch:fakes@680.0 | dinner:solomos@1000.0 | snack:frygania@460.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:tsipoura-exo@790.0 | snack:milo-giaourti@450.0",
+    "lunch:kotopoulo-ryzi@910.0 | dinner:mosxari@790.0 | snack:milo-giaourti@450.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τρίτη 24/11: 1950 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τρίτη 24/11: πρωτεΐνη 124 g (στόχος 150).",
+    "Πέμπτη 26/11: πρωτεΐνη 131 g (στόχος 150)."
+   ],
+   "planned": [
+    "2150.0 kcal · πρωτ 238.7 · κορ 14.73 · ίνες 10.0 · άγνωστα 0",
+    "1950.0 kcal · πρωτ 123.9 · κορ 6.76 · ίνες 57.5 · άγνωστα 0",
+    "1430.0 kcal · πρωτ 129.5 · κορ 5.05 · ίνες 9.1 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 130.9 · κορ 20.61 · ίνες 38.4 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 217.6 · κορ 22.81 · ίνες 12.1 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 204.0 · κορ 7.40 · ίνες 10.4 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 227.3 · κορ 26.45 · ίνες 12.7 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "no legumes or fish asked": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:giaourti@450.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:mosxari@790.0 | snack:milo-giaourti@450.0",
+    "lunch:tonosalata@800.0 | dinner:kotopoulo-ryzi@870.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:solomos@790.0 | snack:milo-giaourti@450.0",
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+    "lunch:kotopoulo-ryzi@910.0 | dinner:mosxari@790.0 | snack:giaourti@450.0",
+    "lunch:tonosalata@800.0 | dinner:solomos@870.0 | snack:milo-giaourti@480.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [],
+   "planned": [
+    "2150.0 kcal · πρωτ 232.0 · κορ 14.55 · ίνες 10.5 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 213.2 · κορ 20.75 · ίνες 12.6 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 197.1 · κορ 10.33 · ίνες 19.2 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 187.8 · κορ 23.42 · ίνες 12.2 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 238.7 · κορ 14.73 · ίνες 10.0 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 197.4 · κορ 7.22 · ίνες 10.9 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 183.9 · κορ 12.57 · ίνες 18.9 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "seed 1": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:giaourti@450.0",
+    "lunch:fakes@680.0 | dinner:revithia@720.0 | snack:milo-giaourti@480.0",
+    "lunch:revithia@720.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:fakes@680.0 | snack:milo-giaourti@480.0",
+    "lunch:fasolada@650.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-ryzi@910.0 | dinner:tsipoura-exo@790.0 | snack:milo-giaourti@450.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:solomos@790.0 | snack:milo-giaourti@450.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τρίτη 24/11: 1880 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τρίτη 24/11: πρωτεΐνη 125 g (στόχος 150).",
+    "Τετάρτη 25/11: 1850 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τετάρτη 25/11: πρωτεΐνη 122 g (στόχος 150).",
+    "Παρασκευή 27/11: 1960 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο."
+   ],
+   "planned": [
+    "2150.0 kcal · πρωτ 232.0 · κορ 14.55 · ίνες 10.5 · άγνωστα 0",
+    "1880.0 kcal · πρωτ 125.0 · κορ 6.81 · ίνες 55.9 · άγνωστα 0",
+    "1850.0 kcal · πρωτ 122.4 · κορ 6.69 · ίνες 54.4 · άγνωστα 0",
+    "2060.0 kcal · πρωτ 177.3 · κορ 20.75 · ίνες 39.0 · άγνωστα 0",
+    "1960.0 kcal · πρωτ 172.9 · κορ 6.29 · ίνες 35.3 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 208.4 · κορ 9.45 · ίνες 9.9 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 187.8 · κορ 23.42 · ίνες 12.2 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "seed 2": {
+   "days": [
+    "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+    "lunch:fakes@680.0 | dinner:revithia@720.0 | snack:giaourti@550.0",
+    "lunch:fakes@680.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:revithia@720.0 | snack:frygania@460.0",
+    "lunch:fasolada@650.0 | dinner:kotopoulo-ryzi@1000.0 | snack:milo-giaourti@480.0",
+    "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:tsipoura-exo@910.0 | dinner:kotopoulo-salata@790.0 | snack:giaourti@450.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τρίτη 24/11: 1950 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τρίτη 24/11: πρωτεΐνη 124 g (στόχος 150).",
+    "Τετάρτη 25/11: 1810 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο.",
+    "Τετάρτη 25/11: πρωτεΐνη 130 g (στόχος 150)."
+   ],
+   "planned": [
+    "2150.0 kcal · πρωτ 238.7 · κορ 14.73 · ίνες 10.0 · άγνωστα 0",
+    "1950.0 kcal · πρωτ 123.9 · κορ 6.76 · ίνες 57.5 · άγνωστα 0",
+    "1810.0 kcal · πρωτ 129.9 · κορ 6.09 · ίνες 61.1 · άγνωστα 0",
+    "2079.9 kcal · πρωτ 139.9 · κορ 31.62 · ίνες 34.1 · άγνωστα 0",
+    "2130.0 kcal · πρωτ 173.3 · κορ 7.65 · ίνες 35.5 · άγνωστα 0",
+    "2110.0 kcal · πρωτ 207.8 · κορ 9.50 · ίνες 19.3 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 213.3 · κορ 21.24 · ίνες 12.3 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "seed 3": {
+   "days": [
+    "lunch:tsipoura-exo@940.0 | dinner:revithia@720.0 | snack:milo-giaourti@480.0",
+    "lunch:revithia@720.0 | dinner:tsipoura@880.0 | snack:giaourti@540.0",
+    "lunch:fakes@680.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+    "lunch:fakes@680.0 | dinner:kotopoulo-salata@900.0 | snack:giaourti@550.0",
+    "lunch:tsipoura-exo@910.0 | dinner:kotopoulo-ryzi@790.0 | snack:milo-giaourti@450.0",
+    "lunch:kotopoulo-salata@900.0 | dinner:solomos@790.0 | snack:milo-giaourti@450.0",
+    "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "notes": [
+    "Τετάρτη 25/11: 1990 kcal (στόχος 2150): οι μερίδες των φαγητών δεν φτάνουν για ακριβώς τον στόχο."
+   ],
+   "planned": [
+    "2140.0 kcal · πρωτ 184.4 · κορ 9.82 · ίνες 29.6 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 186.9 · κορ 13.45 · ίνες 31.7 · άγνωστα 0",
+    "1990.0 kcal · πρωτ 175.4 · κορ 6.41 · ίνες 36.8 · άγνωστα 0",
+    "2130.0 kcal · πρωτ 176.3 · κορ 20.70 · ίνες 40.7 · άγνωστα 0",
+    "2150.0 kcal · πρωτ 211.1 · κορ 9.67 · ίνες 9.8 · άγνωστα 0",
+    "2140.0 kcal · πρωτ 187.8 · κορ 23.42 · ίνες 12.2 · άγνωστα 0",
+    "2110.0 kcal · πρωτ 207.8 · κορ 9.50 · ίνες 19.3 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "snack only 400": {
+   "days": [
+    "snack:milo-giaourti@400.0",
+    "snack:giaourti@400.0",
+    "snack:milo-giaourti@400.0",
+    "snack:milo-giaourti@400.0",
+    "snack:milo-giaourti@400.0",
+    "snack:giaourti@400.0",
+    "snack:milo-giaourti@400.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "snack"
+   ],
+   "notes": [],
+   "planned": [
+    "400.0 kcal · πρωτ 40.2 · κορ 0.99 · ίνες 5.8 · άγνωστα 0",
+    "400.0 kcal · πρωτ 34.3 · κορ 0.83 · ίνες 6.3 · άγνωστα 0",
+    "400.0 kcal · πρωτ 40.2 · κορ 0.99 · ίνες 5.8 · άγνωστα 0",
+    "400.0 kcal · πρωτ 40.2 · κορ 0.99 · ίνες 5.8 · άγνωστα 0",
+    "400.0 kcal · πρωτ 40.2 · κορ 0.99 · ίνες 5.8 · άγνωστα 0",
+    "400.0 kcal · πρωτ 34.3 · κορ 0.83 · ίνες 6.3 · άγνωστα 0",
+    "400.0 kcal · πρωτ 40.2 · κορ 0.99 · ίνες 5.8 · άγνωστα 0"
+   ],
+   "source": "auto"
+  },
+  "two meals 1500, fish 6": {
+   "days": [
+    "lunch:tsipoura-exo@800.0 | dinner:tsipoura@700.0",
+    "lunch:revithia@720.0 | dinner:solomos@780.0",
+    "lunch:revithia@720.0 | dinner:tsipoura-exo@780.0",
+    "lunch:fakes@680.0 | dinner:tsipoura@820.0",
+    "lunch:kotopoulo-salata@850.0 | dinner:fasolada@650.0",
+    "lunch:fakes@680.0 | dinner:solomos@820.0",
+    "lunch:fasolada@650.0 | dinner:mosxari@830.0"
+   ],
+   "from": "2026-11-23",
+   "meals": [
+    "lunch",
+    "dinner"
+   ],
+   "notes": [
+    "Τρίτη 24/11: πρωτεΐνη 90 g (στόχος 110)."
+   ],
+   "planned": [
+    "1500.0 kcal · πρωτ 170.8 · κορ 12.03 · ίνες 3.1 · άγνωστα 0",
+    "1499.9 kcal · πρωτ 89.6 · κορ 8.30 · ίνες 22.5 · άγνωστα 0",
+    "1499.9 kcal · πρωτ 118.9 · κορ 7.69 · ίνες 22.4 · άγνωστα 0",
+    "1500.0 kcal · πρωτ 140.9 · κορ 11.10 · ίνες 29.9 · άγνωστα 0",
+    "1500.0 kcal · πρωτ 121.8 · κορ 18.50 · ίνες 30.3 · άγνωστα 0",
+    "1500.0 kcal · πρωτ 99.9 · κορ 7.96 · ίνες 29.3 · άγνωστα 0",
+    "1480.0 kcal · πρωτ 124.7 · κορ 5.11 · ίνες 28.3 · άγνωστα 0"
+   ],
+   "source": "auto"
+  }
+ },
+ "constants": {
+  "autoDayTolerance": 0.05,
+  "autoMaxRepeat": 2,
+  "autoPortionMax": 1.6,
+  "autoPortionMin": 0.6,
+  "autoPotDays": 3,
+  "autoRiceDays": 2,
+  "cookedTooLightShare": 0.4,
+  "freshShopCats": [
+   "Θαλασσινά",
+   "Κρέας",
+   "Πουλερικά",
+   "Ψάρια"
+  ],
+  "kinds": [
+   "ygeia-week",
+   "ygeia-library",
+   "ygeia-recipe",
+   "ygeia-likes"
+  ],
+  "maxCookedGrams": 20000.0,
+  "maxDishItems": 40,
+  "maxDishNameLength": 80,
+  "maxDishServings": 50,
+  "maxEatenServings": 20.0,
+  "maxLibraryDishes": 300,
+  "maxLibraryKeyLength": 60,
+  "maxOrderTextLength": 800,
+  "maxPlanDays": 14,
+  "maxPlanTags": 12,
+  "maxRecipeMinutes": 1440,
+  "maxRecipeSteps": 30,
+  "maxRecipeTextLength": 600,
+  "maxSlotKcal": 2500.0,
+  "maxSlotsPerDay": 6,
+  "maxTagLength": 30,
+  "mealShare": {
+   "breakfast": 0.25,
+   "dinner": 0.35,
+   "lunch": 0.4,
+   "snack": 0.2
+  },
+  "minSlotKcal": 30.0,
+  "noGoalsText": "Πρώτα βάλε στόχους διατροφής (Ρυθμίσεις › Τα στοιχεία μου › Στόχοι διατροφής): από αυτούς βγαίνουν οι μερίδες.",
+  "officeWeekdays": [
+   2,
+   3,
+   4
+  ],
+  "potQuickDays": 4,
+  "standardTags": [
+   "όσπρια",
+   "ψάρι",
+   "λιπαρό ψάρι",
+   "θαλασσινά",
+   "κόκκινο κρέας",
+   "κοτόπουλο",
+   "αυγά",
+   "γαλακτοκομικά",
+   "λαχανικά",
+   "φρούτα",
+   "ζυμαρικά",
+   "ρύζι"
+  ]
+ },
+ "cookedAgo": {
+  "-1": "σήμερα",
+  "0": "σήμερα",
+  "1": "χθες",
+  "2": "πριν από 2 μέρες",
+  "30": "πριν από 30 μέρες",
+  "4": "πριν από 4 μέρες",
+  "across 25/10": "πριν από 2 μέρες",
+  "across 28/3": "πριν από 2 μέρες"
+ },
+ "cookedLooksWrong": {
+  "0.0|0.0": false,
+  "0.0|10.0": false,
+  "1000.0|399.9": true,
+  "1000.0|400.0": false,
+  "1000.0|400.1": false,
+  "500.0|3000.0": false
+ },
+ "copyWith": {
+  "clear": {
+   "created": 3,
+   "id": "K",
+   "items": [
+    {
+     "g": 400.0,
+     "id": "C20359",
+     "n": "Φακές"
+    },
+    {
+     "g": 100.0,
+     "id": "C20034",
+     "n": "Κρεμμύδι"
+    },
+    {
+     "g": 30.0,
+     "id": "C17270",
+     "n": "Λάδι"
+    }
+   ],
+   "kind": "pot",
+   "name": "Φακές",
+   "uses": 1
+  },
+  "dishRating junk": 0,
+  "plate": {
+   "created": 1,
+   "id": "P",
+   "items": [
+    {
+     "g": 200.0,
+     "id": "C36017",
+     "n": "Κοτόπουλο"
+    },
+    {
+     "g": 90.0,
+     "id": "C9100",
+     "n": "Ρύζι"
+    },
+    {
+     "g": 10.0,
+     "id": "C17270",
+     "n": "Λάδι"
+    }
+   ],
+   "kind": "plate",
+   "lastPlate": [
+    1.0,
+    2.0,
+    3.0
+   ],
+   "name": "Νέο",
+   "used": 5,
+   "uses": 2
+  },
+  "withExtra add/remove": {
+   "created": 1,
+   "id": "P",
+   "items": [
+    {
+     "g": 200.0,
+     "id": "C36017",
+     "n": "Κοτόπουλο"
+    },
+    {
+     "g": 90.0,
+     "id": "C9100",
+     "n": "Ρύζι"
+    },
+    {
+     "g": 10.0,
+     "id": "C17270",
+     "n": "Λάδι"
+    }
+   ],
+   "kind": "plate",
+   "name": "Πιάτο"
+  },
+  "withRating": [
+   1,
+   -1,
+   0,
+   0
+  ]
+ },
+ "dishAmounts": {
+  "itemsSum": 300.0,
+  "plate default": "C36017=200.00 C9100=90.00 C17270=10.00",
+  "plate given": "C36017=180.00 C17270=12.35",
+  "plate long list": "C36017=1.00 C9100=2.00 C17270=3.00",
+  "plate short list": "C36017=150.00",
+  "portions 0": "",
+  "portions 0.001": "C6206=0.13 C20034=0.03 C22000=0.01",
+  "portions 1.5": "C6206=187.50 C20034=37.50 C22000=18.75",
+  "portions default": "C6206=125.00 C20034=25.00 C22000=12.50",
+  "pot 0 g": "",
+  "pot 350 g": "C20359=72.92 C20034=21.88 C17270=5.83",
+  "pot no portion": "",
+  "pot other batch": "C20359=62.50",
+  "pot without batch": ""
+ },
+ "dishLooksLikeTypo": [
+  false,
+  true
+ ],
+ "dishes": {
+  "biftekia": {
+   "all items": "878.8 kcal · πρωτ 125.0 · υδατ 8.3 · λιπ 38.0 · κορ 8.46 · ίνες 1.7 · σάκχ 4.8 · αλάτι 0.93 · λείπουν {}",
+   "dishGroup": "κρέας",
+   "json": {
+    "created": 1,
+    "id": "L9",
+    "items": [
+     {
+      "g": 500.0,
+      "id": "C6206",
+      "n": "Μοσχάρι κιλότο (ωμό)"
+     },
+     {
+      "g": 100.0,
+      "id": "C20034",
+      "n": "Κρεμμύδι ξερό (ωμό)"
+     },
+     {
+      "g": 50.0,
+      "id": "C22000",
+      "n": "Αυγό (ωμό)"
+     },
+     {
+      "g": 20.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     }
+    ],
+    "kind": "portions",
+    "name": "Φαγητό biftekia",
+    "plan": {
+     "cook": "home",
+     "key": "biftekia",
+     "meals": [
+      "lunch",
+      "dinner"
+     ],
+     "tags": [
+      "κόκκινο κρέας"
+     ]
+    },
+    "recipe": {
+     "serv": 4,
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    },
+    "serv": 4
+   },
+   "natural totals": "219.7 kcal · πρωτ 31.3 · υδατ 2.1 · λιπ 9.5 · κορ 2.12 · ίνες 0.4 · σάκχ 1.2 · αλάτι 0.23 · λείπουν {}",
+   "naturalRaw": "C6206=125.00 C20034=25.00 C22000=12.50 C17270=5.00",
+   "plan": {
+    "cook": "home",
+    "key": "biftekia",
+    "meals": [
+     "lunch",
+     "dinner"
+    ],
+    "tags": [
+     "κόκκινο κρέας"
+    ]
+   },
+   "plannedRaw 100.0": "C6206=56.90 C20034=11.38 C22000=5.69 C17270=2.28",
+   "plannedRaw 3000.0": "C6206=1706.87 C20034=341.37 C22000=170.69 C17270=68.27",
+   "plannedRaw 400.0": "C6206=227.58 C20034=45.52 C22000=22.76 C17270=9.10",
+   "plannedRaw 650.0": "C6206=369.82 C20034=73.96 C22000=36.98 C17270=14.79",
+   "plannedRaw null": "C6206=125.00 C20034=25.00 C22000=12.50 C17270=5.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 14.2 · υδατ 0.9 · λιπ 4.3 · κορ 0.96 · ίνες 0.2 · σάκχ 0.5 · αλάτι 0.11 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 426.9 · υδατ 28.3 · λιπ 129.8 · κορ 28.88 · ίνες 5.8 · σάκχ 16.5 · αλάτι 3.17 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 56.9 · υδατ 3.8 · λιπ 17.3 · κορ 3.85 · ίνες 0.8 · σάκχ 2.2 · αλάτι 0.42 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 92.5 · υδατ 6.1 · λιπ 28.1 · κορ 6.26 · ίνες 1.3 · σάκχ 3.6 · αλάτι 0.69 · λείπουν {}",
+   "plannedTotals null": "219.7 kcal · πρωτ 31.3 · υδατ 2.1 · λιπ 9.5 · κορ 2.12 · ίνες 0.4 · σάκχ 1.2 · αλάτι 0.23 · λείπουν {}",
+   "portionRange": "131.82..439.40 natural 219.70 · πρωτ/kcal 0.14230 · κορ/kcal 0.00963",
+   "recipe": {
+    "serv": 4,
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 0.50 · C6206=62.50 C20034=12.50 C22000=6.25 C17270=2.50",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 2.00 · C6206=250.00 C20034=50.00 C22000=25.00 C17270=10.00",
+   "slotLog 650.0": "qty 3.00 · C6206=375.00 C20034=75.00 C22000=37.50 C17270=15.00",
+   "slotLog null": "qty 1.00 · C6206=125.00 C20034=25.00 C22000=12.50 C17270=5.00"
+  },
+  "fakes": {
+   "all items": "2053.1 kcal · πρωτ 127.3 · υδατ 231.9 · λιπ 49.9 · κορ 7.58 · ίνες 84.0 · σάκχ 12.7 · αλάτι 0.15 · λείπουν {}",
+   "dishGroup": "όσπρια",
+   "json": {
+    "created": 1,
+    "id": "L0",
+    "items": [
+     {
+      "g": 500.0,
+      "id": "C20359",
+      "n": "Φακές (ξερές)"
+     },
+     {
+      "g": 150.0,
+      "id": "C20034",
+      "n": "Κρεμμύδι ξερό (ωμό)"
+     },
+     {
+      "g": 40.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     }
+    ],
+    "kind": "pot",
+    "name": "Φαγητό fakes",
+    "plan": {
+     "cook": "home",
+     "key": "fakes",
+     "meals": [
+      "lunch",
+      "dinner"
+     ],
+     "office": true,
+     "tags": [
+      "όσπρια"
+     ]
+    },
+    "recipe": {
+     "serv": 6,
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "342.2 kcal · πρωτ 21.2 · υδατ 38.6 · λιπ 8.3 · κορ 1.26 · ίνες 14.0 · σάκχ 2.1 · αλάτι 0.02 · λείπουν {}",
+   "naturalRaw": "C20359=83.33 C20034=25.00 C17270=6.67",
+   "plan": {
+    "cook": "home",
+    "key": "fakes",
+    "meals": [
+     "lunch",
+     "dinner"
+    ],
+    "office": true,
+    "tags": [
+     "όσπρια"
+    ]
+   },
+   "plannedRaw 100.0": "C20359=24.35 C20034=7.31 C17270=1.95",
+   "plannedRaw 3000.0": "C20359=730.60 C20034=219.18 C17270=58.45",
+   "plannedRaw 400.0": "C20359=97.41 C20034=29.22 C17270=7.79",
+   "plannedRaw 650.0": "C20359=158.30 C20034=47.49 C17270=12.66",
+   "plannedRaw null": "C20359=83.33 C20034=25.00 C17270=6.67",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 6.2 · υδατ 11.3 · λιπ 2.4 · κορ 0.37 · ίνες 4.1 · σάκχ 0.6 · αλάτι 0.01 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 185.9 · υδατ 338.8 · λιπ 72.9 · κορ 11.08 · ίνες 122.8 · σάκχ 18.6 · αλάτι 0.21 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 24.8 · υδατ 45.2 · λιπ 9.7 · κορ 1.48 · ίνες 16.4 · σάκχ 2.5 · αλάτι 0.03 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 40.3 · υδατ 73.4 · λιπ 15.8 · κορ 2.40 · ίνες 26.6 · σάκχ 4.0 · αλάτι 0.05 · λείπουν {}",
+   "plannedTotals null": "342.2 kcal · πρωτ 21.2 · υδατ 38.6 · λιπ 8.3 · κορ 1.26 · ίνες 14.0 · σάκχ 2.1 · αλάτι 0.02 · λείπουν {}",
+   "portionRange": "205.32..684.40 natural 342.20 · πρωτ/kcal 0.06198 · κορ/kcal 0.00369",
+   "potPortion 100.0": 115.0,
+   "potPortion 3000.0": 2400.0,
+   "potPortion 400.0": 470.0,
+   "potPortion 650.0": 760.0,
+   "potPortion null": 400.0,
+   "recipe": {
+    "serv": 6,
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 115.00 · C20359=23.96 C20034=7.19 C17270=1.92",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 470.00 · C20359=97.92 C20034=29.38 C17270=7.83",
+   "slotLog 650.0": "qty 760.00 · C20359=158.33 C20034=47.50 C17270=12.67",
+   "slotLog null": "qty 400.00 · C20359=83.33 C20034=25.00 C17270=6.67"
+  },
+  "fasolada": {
+   "all items": "1952.2 kcal · πρωτ 118.9 · υδατ 230.6 · λιπ 44.2 · κορ 7.18 · ίνες 79.1 · σάκχ 9.7 · αλάτι 0.20 · λείπουν {sugars: 1}",
+   "dishGroup": "όσπρια",
+   "json": {
+    "created": 1,
+    "id": "L2",
+    "items": [
+     {
+      "g": 500.0,
+      "id": "C20501",
+      "n": "Φασόλια μέτρια λευκά (ξερά)"
+     },
+     {
+      "g": 300.0,
+      "id": "C20385",
+      "n": "Ντομάτα (ωμή)"
+     },
+     {
+      "g": 40.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     }
+    ],
+    "kind": "pot",
+    "name": "Φαγητό fasolada",
+    "plan": {
+     "cook": "home",
+     "key": "fasolada",
+     "meals": [
+      "lunch",
+      "dinner"
+     ],
+     "office": true,
+     "tags": [
+      "όσπρια"
+     ]
+    },
+    "recipe": {
+     "serv": 6,
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "325.4 kcal · πρωτ 19.8 · υδατ 38.4 · λιπ 7.4 · κορ 1.20 · ίνες 13.2 · σάκχ 1.6 · αλάτι 0.03 · λείπουν {sugars: 1}",
+   "naturalRaw": "C20501=83.33 C20385=50.00 C17270=6.67",
+   "plan": {
+    "cook": "home",
+    "key": "fasolada",
+    "meals": [
+     "lunch",
+     "dinner"
+    ],
+    "office": true,
+    "tags": [
+     "όσπρια"
+    ]
+   },
+   "plannedRaw 100.0": "C20501=25.61 C20385=15.37 C17270=2.05",
+   "plannedRaw 3000.0": "C20501=768.36 C20385=461.02 C17270=61.47",
+   "plannedRaw 400.0": "C20501=102.45 C20385=61.47 C17270=8.20",
+   "plannedRaw 650.0": "C20501=166.48 C20385=99.89 C17270=13.32",
+   "plannedRaw null": "C20501=83.33 C20385=50.00 C17270=6.67",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 6.1 · υδατ 11.8 · λιπ 2.3 · κορ 0.37 · ίνες 4.0 · σάκχ 0.5 · αλάτι 0.01 · λείπουν {sugars: 1}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 182.7 · υδατ 354.3 · λιπ 67.9 · κορ 11.03 · ίνες 121.5 · σάκχ 14.8 · αλάτι 0.31 · λείπουν {sugars: 1}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 24.4 · υδατ 47.2 · λιπ 9.1 · κορ 1.47 · ίνες 16.2 · σάκχ 2.0 · αλάτι 0.04 · λείπουν {sugars: 1}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 39.6 · υδατ 76.8 · λιπ 14.7 · κορ 2.39 · ίνες 26.3 · σάκχ 3.2 · αλάτι 0.07 · λείπουν {sugars: 1}",
+   "plannedTotals null": "325.4 kcal · πρωτ 19.8 · υδατ 38.4 · λιπ 7.4 · κορ 1.20 · ίνες 13.2 · σάκχ 1.6 · αλάτι 0.03 · λείπουν {sugars: 1}",
+   "portionRange": "195.23..650.77 natural 325.39 · πρωτ/kcal 0.06091 · κορ/kcal 0.00368",
+   "potPortion 100.0": 125.0,
+   "potPortion 3000.0": 2400.0,
+   "potPortion 400.0": 490.0,
+   "potPortion 650.0": 800.0,
+   "potPortion null": 400.0,
+   "recipe": {
+    "serv": 6,
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 125.00 · C20501=26.04 C20385=15.63 C17270=2.08",
+   "slotLog 3000.0": "qty 2400.00 · C20501=500.00 C20385=300.00 C17270=40.00",
+   "slotLog 400.0": "qty 490.00 · C20501=102.08 C20385=61.25 C17270=8.17",
+   "slotLog 650.0": "qty 800.00 · C20501=166.67 C20385=100.00 C17270=13.33",
+   "slotLog null": "qty 400.00 · C20501=83.33 C20385=50.00 C17270=6.67"
+  },
+  "frygania": {
+   "all items": "288.4 kcal · πρωτ 11.5 · υδατ 30.3 · λιπ 12.1 · κορ 7.18 · ίνες 5.5 · σάκχ 5.2 · αλάτι 1.40 · λείπουν {}",
+   "dishGroup": "γαλακτοκομικά",
+   "json": {
+    "created": 1,
+    "id": "L11",
+    "items": [
+     {
+      "g": 40.0,
+      "id": "C7340",
+      "n": "Φρυγανιές ολικής άλεσης"
+     },
+     {
+      "g": 40.0,
+      "id": "C12066",
+      "n": "Φέτα (πρόβειο και κατσικίσιο)"
+     },
+     {
+      "g": 100.0,
+      "id": "C20385",
+      "n": "Ντομάτα (ωμή)"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό frygania",
+    "plan": {
+     "cook": "none",
+     "key": "frygania",
+     "meals": [
+      "snack"
+     ]
+    }
+   },
+   "natural totals": "288.4 kcal · πρωτ 11.5 · υδατ 30.3 · λιπ 12.1 · κορ 7.18 · ίνες 5.5 · σάκχ 5.2 · αλάτι 1.40 · λείπουν {}",
+   "naturalRaw": "C7340=40.00 C12066=40.00 C20385=100.00",
+   "plan": {
+    "cook": "none",
+    "key": "frygania",
+    "meals": [
+     "snack"
+    ]
+   },
+   "plannedRaw 100.0": "C7340=13.87 C12066=13.87 C20385=34.67",
+   "plannedRaw 3000.0": "C7340=416.09 C12066=416.09 C20385=1040.22",
+   "plannedRaw 400.0": "C7340=55.48 C12066=55.48 C20385=138.70",
+   "plannedRaw 650.0": "C7340=90.15 C12066=90.15 C20385=225.38",
+   "plannedRaw null": "C7340=40.00 C12066=40.00 C20385=100.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 4.0 · υδατ 10.5 · λιπ 4.2 · κορ 2.49 · ίνες 1.9 · σάκχ 1.8 · αλάτι 0.49 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 119.4 · υδατ 314.9 · λιπ 125.7 · κορ 74.65 · ίνες 57.2 · σάκχ 54.1 · αλάτι 14.56 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 15.9 · υδατ 42.0 · λιπ 16.8 · κορ 9.95 · ίνες 7.6 · σάκχ 7.2 · αλάτι 1.94 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 25.9 · υδατ 68.2 · λιπ 27.2 · κορ 16.17 · ίνες 12.4 · σάκχ 11.7 · αλάτι 3.16 · λείπουν {}",
+   "plannedTotals null": "288.4 kcal · πρωτ 11.5 · υδατ 30.3 · λιπ 12.1 · κορ 7.18 · ίνες 5.5 · σάκχ 5.2 · αλάτι 1.40 · λείπουν {}",
+   "portionRange": "173.04..461.44 natural 288.40 · πρωτ/kcal 0.03981 · κορ/kcal 0.02488",
+   "recipe": null,
+   "slotLog 100.0": "qty 63.00 · C7340=14.00 C12066=14.00 C20385=35.00 · plate 14.0/14.0/35.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 249.00 · C7340=55.00 C12066=55.00 C20385=139.00 · plate 55.0/55.0/139.0",
+   "slotLog 650.0": "qty 405.00 · C7340=90.00 C12066=90.00 C20385=225.00 · plate 90.0/90.0/225.0",
+   "slotLog null": "qty 180.00 · C7340=40.00 C12066=40.00 C20385=100.00 · plate 40.0/40.0/100.0"
+  },
+  "giaourti": {
+   "all items": "345.2 kcal · πρωτ 29.6 · υδατ 46.2 · λιπ 3.1 · κορ 0.71 · ίνες 5.4 · σάκχ 25.5 · αλάτι 0.60 · λείπουν {}",
+   "dishGroup": "γαλακτοκομικά",
+   "json": {
+    "created": 1,
+    "id": "L10",
+    "items": [
+     {
+      "g": 250.0,
+      "id": "U170894",
+      "n": "Γιαούρτι στραγγιστό 0%"
+     },
+     {
+      "g": 150.0,
+      "id": "C13039",
+      "n": "Μήλο (με φλούδα)"
+     },
+     {
+      "g": 30.0,
+      "id": "C7340",
+      "n": "Φρυγανιές ολικής άλεσης"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό giaourti",
+    "plan": {
+     "cook": "none",
+     "key": "giaourti",
+     "meals": [
+      "snack"
+     ]
+    }
+   },
+   "natural totals": "345.2 kcal · πρωτ 29.6 · υδατ 46.2 · λιπ 3.1 · κορ 0.71 · ίνες 5.4 · σάκχ 25.5 · αλάτι 0.60 · λείπουν {}",
+   "naturalRaw": "U170894=250.00 C13039=150.00 C7340=30.00",
+   "plan": {
+    "cook": "none",
+    "key": "giaourti",
+    "meals": [
+     "snack"
+    ]
+   },
+   "plannedRaw 100.0": "U170894=72.42 C13039=43.45 C7340=8.69",
+   "plannedRaw 3000.0": "U170894=2172.65 C13039=1303.59 C7340=260.72",
+   "plannedRaw 400.0": "U170894=289.69 C13039=173.81 C7340=34.76",
+   "plannedRaw 650.0": "U170894=470.74 C13039=282.44 C7340=56.49",
+   "plannedRaw null": "U170894=250.00 C13039=150.00 C7340=30.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 8.6 · υδατ 13.4 · λιπ 0.9 · κορ 0.21 · ίνες 1.6 · σάκχ 7.4 · αλάτι 0.17 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 257.0 · υδατ 401.5 · λιπ 27.1 · κορ 6.19 · ίνες 46.9 · σάκχ 221.5 · αλάτι 5.21 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 34.3 · υδατ 53.5 · λιπ 3.6 · κορ 0.83 · ίνες 6.3 · σάκχ 29.5 · αλάτι 0.70 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 55.7 · υδατ 87.0 · λιπ 5.9 · κορ 1.34 · ίνες 10.2 · σάκχ 48.0 · αλάτι 1.13 · λείπουν {}",
+   "plannedTotals null": "345.2 kcal · πρωτ 29.6 · υδατ 46.2 · λιπ 3.1 · κορ 0.71 · ίνες 5.4 · σάκχ 25.5 · αλάτι 0.60 · λείπουν {}",
+   "portionRange": "207.12..552.32 natural 345.20 · πρωτ/kcal 0.08566 · κορ/kcal 0.00206",
+   "recipe": null,
+   "slotLog 100.0": "qty 123.50 · U170894=72.00 C13039=43.00 C7340=8.50 · plate 72.0/43.0/8.5",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 499.00 · U170894=290.00 C13039=174.00 C7340=35.00 · plate 290.0/174.0/35.0",
+   "slotLog 650.0": "qty 809.00 · U170894=471.00 C13039=282.00 C7340=56.00 · plate 471.0/282.0/56.0",
+   "slotLog null": "qty 430.00 · U170894=250.00 C13039=150.00 C7340=30.00 · plate 250.0/150.0/30.0"
+  },
+  "kotopoulo-ryzi": {
+   "all items": "624.9 kcal · πρωτ 53.5 · υδατ 69.8 · λιπ 13.7 · κορ 2.54 · ίνες 1.4 · σάκχ 0.1 · αλάτι 0.22 · λείπουν {}",
+   "dishGroup": "πουλερικά",
+   "json": {
+    "created": 1,
+    "id": "L3",
+    "items": [
+     {
+      "g": 200.0,
+      "id": "C36017",
+      "n": "Κοτόπουλο στήθος χωρίς πέτσα (ωμό)"
+     },
+     {
+      "g": 90.0,
+      "id": "C9100",
+      "n": "Ρύζι λευκό (ωμό)"
+     },
+     {
+      "g": 10.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό kotopoulo-ryzi",
+    "plan": {
+     "cook": "home",
+     "key": "kotopoulo-ryzi",
+     "meals": [
+      "lunch",
+      "dinner"
+     ]
+    },
+    "recipe": {
+     "min": 25,
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "624.9 kcal · πρωτ 53.5 · υδατ 69.8 · λιπ 13.7 · κορ 2.54 · ίνες 1.4 · σάκχ 0.1 · αλάτι 0.22 · λείπουν {}",
+   "naturalRaw": "C36017=200.00 C9100=90.00 C17270=10.00",
+   "plan": {
+    "cook": "home",
+    "key": "kotopoulo-ryzi",
+    "meals": [
+     "lunch",
+     "dinner"
+    ]
+   },
+   "plannedRaw 100.0": "C36017=32.01 C9100=14.40 C17270=1.60",
+   "plannedRaw 3000.0": "C36017=960.15 C9100=432.07 C17270=48.01",
+   "plannedRaw 400.0": "C36017=128.02 C9100=57.61 C17270=6.40",
+   "plannedRaw 650.0": "C36017=208.03 C9100=93.61 C17270=10.40",
+   "plannedRaw null": "C36017=200.00 C9100=90.00 C17270=10.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 8.6 · υδατ 11.2 · λιπ 2.2 · κορ 0.41 · ίνες 0.2 · σάκχ 0.0 · αλάτι 0.04 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 256.7 · υδατ 334.9 · λιπ 65.8 · κορ 12.21 · ίνες 6.6 · σάκχ 0.5 · αλάτι 1.05 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 34.2 · υδατ 44.6 · λιπ 8.8 · κορ 1.63 · ίνες 0.9 · σάκχ 0.1 · αλάτι 0.14 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 55.6 · υδατ 72.5 · λιπ 14.2 · κορ 2.65 · ίνες 1.4 · σάκχ 0.1 · αλάτι 0.23 · λείπουν {}",
+   "plannedTotals null": "624.9 kcal · πρωτ 53.5 · υδατ 69.8 · λιπ 13.7 · κορ 2.54 · ίνες 1.4 · σάκχ 0.1 · αλάτι 0.22 · λείπουν {}",
+   "portionRange": "374.94..999.84 natural 624.90 · πρωτ/kcal 0.08556 · κορ/kcal 0.00407",
+   "recipe": {
+    "min": 25,
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 47.50 · C36017=32.00 C9100=14.00 C17270=1.50 · plate 32.0/14.0/1.5",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 192.50 · C36017=128.00 C9100=58.00 C17270=6.50 · plate 128.0/58.0/6.5",
+   "slotLog 650.0": "qty 312.00 · C36017=208.00 C9100=94.00 C17270=10.00 · plate 208.0/94.0/10.0",
+   "slotLog null": "qty 300.00 · C36017=200.00 C9100=90.00 C17270=10.00 · plate 200.0/90.0/10.0"
+  },
+  "kotopoulo-salata": {
+   "all items": "561.4 kcal · πρωτ 54.3 · υδατ 9.4 · λιπ 32.7 · κορ 10.64 · ίνες 2.6 · σάκχ 8.1 · αλάτι 1.12 · λείπουν {}",
+   "dishGroup": "πουλερικά",
+   "json": {
+    "created": 1,
+    "id": "L4",
+    "items": [
+     {
+      "g": 200.0,
+      "id": "C36017",
+      "n": "Κοτόπουλο στήθος χωρίς πέτσα (ωμό)"
+     },
+     {
+      "g": 250.0,
+      "id": "C20385",
+      "n": "Ντομάτα (ωμή)"
+     },
+     {
+      "g": 20.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     },
+     {
+      "g": 40.0,
+      "id": "C12066",
+      "n": "Φέτα (πρόβειο και κατσικίσιο)"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό kotopoulo-salata",
+    "plan": {
+     "cook": "home",
+     "key": "kotopoulo-salata",
+     "meals": [
+      "lunch",
+      "dinner"
+     ],
+     "office": true
+    },
+    "recipe": {
+     "min": 10,
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "561.4 kcal · πρωτ 54.3 · υδατ 9.4 · λιπ 32.7 · κορ 10.64 · ίνες 2.6 · σάκχ 8.1 · αλάτι 1.12 · λείπουν {}",
+   "naturalRaw": "C36017=200.00 C20385=250.00 C17270=20.00 C12066=40.00",
+   "plan": {
+    "cook": "home",
+    "key": "kotopoulo-salata",
+    "meals": [
+     "lunch",
+     "dinner"
+    ],
+    "office": true
+   },
+   "plannedRaw 100.0": "C36017=35.63 C20385=44.53 C17270=3.56 C12066=7.13",
+   "plannedRaw 3000.0": "C36017=1068.76 C20385=1335.95 C17270=106.88 C12066=213.75",
+   "plannedRaw 400.0": "C36017=142.50 C20385=178.13 C17270=14.25 C12066=28.50",
+   "plannedRaw 650.0": "C36017=231.56 C20385=289.45 C17270=23.16 C12066=46.31",
+   "plannedRaw null": "C36017=200.00 C20385=250.00 C17270=20.00 C12066=40.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 9.7 · υδατ 1.7 · λιπ 5.8 · κορ 1.90 · ίνες 0.5 · σάκχ 1.4 · αλάτι 0.20 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 290.0 · υδατ 50.3 · λιπ 174.7 · κορ 56.86 · ίνες 14.1 · σάκχ 43.0 · αλάτι 6.00 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 38.7 · υδατ 6.7 · λιπ 23.3 · κορ 7.58 · ίνες 1.9 · σάκχ 5.7 · αλάτι 0.80 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 62.8 · υδατ 10.9 · λιπ 37.9 · κορ 12.32 · ίνες 3.0 · σάκχ 9.3 · αλάτι 1.30 · λείπουν {}",
+   "plannedTotals null": "561.4 kcal · πρωτ 54.3 · υδατ 9.4 · λιπ 32.7 · κορ 10.64 · ίνες 2.6 · σάκχ 8.1 · αλάτι 1.12 · λείπουν {}",
+   "portionRange": "336.84..898.24 natural 561.40 · πρωτ/kcal 0.09667 · κορ/kcal 0.01895",
+   "recipe": {
+    "min": 10,
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 91.50 · C36017=36.00 C20385=45.00 C17270=3.50 C12066=7.00 · plate 36.0/45.0/3.5/7.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 364.00 · C36017=143.00 C20385=178.00 C17270=14.00 C12066=29.00 · plate 143.0/178.0/14.0/29.0",
+   "slotLog 650.0": "qty 590.00 · C36017=232.00 C20385=289.00 C17270=23.00 C12066=46.00 · plate 232.0/289.0/23.0/46.0",
+   "slotLog null": "qty 510.00 · C36017=200.00 C20385=250.00 C17270=20.00 C12066=40.00 · plate 200.0/250.0/20.0/40.0"
+  },
+  "milo-giaourti": {
+   "all items": "303.1 kcal · πρωτ 30.4 · υδατ 35.4 · λιπ 3.3 · κορ 0.75 · ίνες 4.4 · σάκχ 10.1 · αλάτι 0.72 · λείπουν {}",
+   "dishGroup": "γαλακτοκομικά",
+   "json": {
+    "created": 1,
+    "id": "L12",
+    "items": [
+     {
+      "g": 250.0,
+      "id": "U170894",
+      "n": "Γιαούρτι στραγγιστό 0%"
+     },
+     {
+      "g": 40.0,
+      "id": "C7340",
+      "n": "Φρυγανιές ολικής άλεσης"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό milo-giaourti",
+    "plan": {
+     "cook": "none",
+     "key": "milo-giaourti",
+     "meals": [
+      "snack"
+     ]
+    }
+   },
+   "natural totals": "303.1 kcal · πρωτ 30.4 · υδατ 35.4 · λιπ 3.3 · κορ 0.75 · ίνες 4.4 · σάκχ 10.1 · αλάτι 0.72 · λείπουν {}",
+   "naturalRaw": "U170894=250.00 C7340=40.00",
+   "plan": {
+    "cook": "none",
+    "key": "milo-giaourti",
+    "meals": [
+     "snack"
+    ]
+   },
+   "plannedRaw 100.0": "U170894=82.48 C7340=13.20",
+   "plannedRaw 3000.0": "U170894=2474.43 C7340=395.91",
+   "plannedRaw 400.0": "U170894=329.92 C7340=52.79",
+   "plannedRaw 650.0": "U170894=536.13 C7340=85.78",
+   "plannedRaw null": "U170894=250.00 C7340=40.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 10.0 · υδατ 11.7 · λιπ 1.1 · κορ 0.25 · ίνες 1.5 · σάκχ 3.3 · αλάτι 0.24 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 301.2 · υδατ 350.4 · λιπ 33.0 · κορ 7.41 · ίνες 43.6 · σάκχ 99.8 · αλάτι 7.10 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 40.2 · υδατ 46.7 · λιπ 4.4 · κορ 0.99 · ίνες 5.8 · σάκχ 13.3 · αλάτι 0.95 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 65.3 · υδατ 75.9 · λιπ 7.2 · κορ 1.61 · ίνες 9.4 · σάκχ 21.6 · αλάτι 1.54 · λείπουν {}",
+   "plannedTotals null": "303.1 kcal · πρωτ 30.4 · υδατ 35.4 · λιπ 3.3 · κορ 0.75 · ίνες 4.4 · σάκχ 10.1 · αλάτι 0.72 · λείπουν {}",
+   "portionRange": "181.86..484.96 natural 303.10 · πρωτ/kcal 0.10041 · κορ/kcal 0.00247",
+   "recipe": null,
+   "slotLog 100.0": "qty 95.00 · U170894=82.00 C7340=13.00 · plate 82.0/13.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 383.00 · U170894=330.00 C7340=53.00 · plate 330.0/53.0",
+   "slotLog 650.0": "qty 622.00 · U170894=536.00 C7340=86.00 · plate 536.0/86.0",
+   "slotLog null": "qty 290.00 · U170894=250.00 C7340=40.00 · plate 250.0/40.0"
+  },
+  "mosxari": {
+   "all items": "516.0 kcal · πρωτ 52.9 · υδατ 62.8 · λιπ 5.6 · κορ 1.69 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.27 · λείπουν {}",
+   "dishGroup": "κρέας",
+   "json": {
+    "created": 1,
+    "id": "L8",
+    "items": [
+     {
+      "g": 200.0,
+      "id": "C6206",
+      "n": "Μοσχάρι κιλότο (ωμό)"
+     },
+     {
+      "g": 80.0,
+      "id": "C9100",
+      "n": "Ρύζι λευκό (ωμό)"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό mosxari",
+    "plan": {
+     "cook": "home",
+     "key": "mosxari",
+     "meals": [
+      "dinner"
+     ],
+     "tags": [
+      "κόκκινο κρέας"
+     ]
+    },
+    "recipe": {
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "516.0 kcal · πρωτ 52.9 · υδατ 62.8 · λιπ 5.6 · κορ 1.69 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.27 · λείπουν {}",
+   "naturalRaw": "C6206=200.00 C9100=80.00",
+   "plan": {
+    "cook": "home",
+    "key": "mosxari",
+    "meals": [
+     "dinner"
+    ],
+    "tags": [
+     "κόκκινο κρέας"
+    ]
+   },
+   "plannedRaw 100.0": "C6206=38.76 C9100=15.50",
+   "plannedRaw 3000.0": "C6206=1162.79 C9100=465.12",
+   "plannedRaw 400.0": "C6206=155.04 C9100=62.02",
+   "plannedRaw 650.0": "C6206=251.94 C9100=100.78",
+   "plannedRaw null": "C6206=200.00 C9100=80.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 10.3 · υδατ 12.2 · λιπ 1.1 · κορ 0.33 · ίνες 0.2 · σάκχ 0.0 · αλάτι 0.05 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 307.6 · υδατ 365.1 · λιπ 32.7 · κορ 9.81 · ίνες 7.1 · σάκχ 0.6 · αλάτι 1.60 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 41.0 · υδατ 48.7 · λιπ 4.4 · κορ 1.31 · ίνες 0.9 · σάκχ 0.1 · αλάτι 0.21 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 66.6 · υδατ 79.1 · λιπ 7.1 · κορ 2.13 · ίνες 1.5 · σάκχ 0.1 · αλάτι 0.35 · λείπουν {}",
+   "plannedTotals null": "516.0 kcal · πρωτ 52.9 · υδατ 62.8 · λιπ 5.6 · κορ 1.69 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.27 · λείπουν {}",
+   "portionRange": "309.60..825.60 natural 516.00 · πρωτ/kcal 0.10253 · κορ/kcal 0.00327",
+   "recipe": {
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 55.00 · C6206=39.00 C9100=16.00 · plate 39.0/16.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 217.00 · C6206=155.00 C9100=62.00 · plate 155.0/62.0",
+   "slotLog 650.0": "qty 353.00 · C6206=252.00 C9100=101.00 · plate 252.0/101.0",
+   "slotLog null": "qty 280.00 · C6206=200.00 C9100=80.00 · plate 200.0/80.0"
+  },
+  "revithia": {
+   "all items": "2168.1 kcal · πρωτ 104.3 · υδατ 246.9 · λιπ 71.1 · κορ 9.38 · ίνες 63.5 · σάκχ 18.7 · αλάτι 0.45 · λείπουν {}",
+   "dishGroup": "όσπρια",
+   "json": {
+    "created": 1,
+    "id": "L1",
+    "items": [
+     {
+      "g": 500.0,
+      "id": "C20516",
+      "n": "Ρεβίθια (ξερά)"
+     },
+     {
+      "g": 150.0,
+      "id": "C20034",
+      "n": "Κρεμμύδι ξερό (ωμό)"
+     },
+     {
+      "g": 40.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     }
+    ],
+    "kind": "pot",
+    "name": "Φαγητό revithia",
+    "plan": {
+     "cook": "home",
+     "key": "revithia",
+     "meals": [
+      "lunch",
+      "dinner"
+     ],
+     "office": true,
+     "tags": [
+      "όσπρια"
+     ]
+    },
+    "recipe": {
+     "serv": 6,
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "361.4 kcal · πρωτ 17.4 · υδατ 41.1 · λιπ 11.9 · κορ 1.56 · ίνες 10.6 · σάκχ 3.1 · αλάτι 0.07 · λείπουν {}",
+   "naturalRaw": "C20516=83.33 C20034=25.00 C17270=6.67",
+   "plan": {
+    "cook": "home",
+    "key": "revithia",
+    "meals": [
+     "lunch",
+     "dinner"
+    ],
+    "office": true,
+    "tags": [
+     "όσπρια"
+    ]
+   },
+   "plannedRaw 100.0": "C20516=23.06 C20034=6.92 C17270=1.84",
+   "plannedRaw 3000.0": "C20516=691.85 C20034=207.56 C17270=55.35",
+   "plannedRaw 400.0": "C20516=92.25 C20034=27.67 C17270=7.38",
+   "plannedRaw 650.0": "C20516=149.90 C20034=44.97 C17270=11.99",
+   "plannedRaw null": "C20516=83.33 C20034=25.00 C17270=6.67",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 4.8 · υδατ 11.4 · λιπ 3.3 · κορ 0.43 · ίνες 2.9 · σάκχ 0.9 · αλάτι 0.02 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 144.3 · υδατ 341.6 · λιπ 98.4 · κορ 12.98 · ίνες 87.9 · σάκχ 25.9 · αλάτι 0.62 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 19.2 · υδατ 45.5 · λιπ 13.1 · κορ 1.73 · ίνες 11.7 · σάκχ 3.4 · αλάτι 0.08 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 31.3 · υδατ 74.0 · λιπ 21.3 · κορ 2.81 · ίνες 19.1 · σάκχ 5.6 · αλάτι 0.13 · λείπουν {}",
+   "plannedTotals null": "361.4 kcal · πρωτ 17.4 · υδατ 41.1 · λιπ 11.9 · κορ 1.56 · ίνες 10.6 · σάκχ 3.1 · αλάτι 0.07 · λείπουν {}",
+   "portionRange": "216.82..722.74 natural 361.37 · πρωτ/kcal 0.04808 · κορ/kcal 0.00433",
+   "potPortion 100.0": 110.0,
+   "potPortion 3000.0": 2400.0,
+   "potPortion 400.0": 445.0,
+   "potPortion 650.0": 720.0,
+   "potPortion null": 400.0,
+   "recipe": {
+    "serv": 6,
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 110.00 · C20516=22.92 C20034=6.87 C17270=1.83",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 445.00 · C20516=92.71 C20034=27.81 C17270=7.42",
+   "slotLog 650.0": "qty 720.00 · C20516=150.00 C20034=45.00 C17270=12.00",
+   "slotLog null": "qty 400.00 · C20516=83.33 C20034=25.00 C17270=6.67"
+  },
+  "solomos": {
+   "all items": "666.0 kcal · πρωτ 46.9 · υδατ 62.0 · λιπ 25.4 · κορ 4.43 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.23 · λείπουν {}",
+   "dishGroup": "ψάρι",
+   "json": {
+    "created": 1,
+    "id": "L5",
+    "items": [
+     {
+      "g": 200.0,
+      "id": "C26036",
+      "n": "Σολομός υδατοκαλλιέργειας (ωμός)"
+     },
+     {
+      "g": 80.0,
+      "id": "C9100",
+      "n": "Ρύζι λευκό (ωμό)"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό solomos",
+    "plan": {
+     "cook": "home",
+     "key": "solomos",
+     "meals": [
+      "dinner"
+     ],
+     "tags": [
+      "λιπαρό ψάρι"
+     ]
+    },
+    "recipe": {
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "666.0 kcal · πρωτ 46.9 · υδατ 62.0 · λιπ 25.4 · κορ 4.43 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.23 · λείπουν {}",
+   "naturalRaw": "C26036=200.00 C9100=80.00",
+   "plan": {
+    "cook": "home",
+    "key": "solomos",
+    "meals": [
+     "dinner"
+    ],
+    "tags": [
+     "λιπαρό ψάρι"
+    ]
+   },
+   "plannedRaw 100.0": "C26036=30.03 C9100=12.01",
+   "plannedRaw 3000.0": "C26036=900.90 C9100=360.36",
+   "plannedRaw 400.0": "C26036=120.12 C9100=48.05",
+   "plannedRaw 650.0": "C26036=195.20 C9100=78.08",
+   "plannedRaw null": "C26036=200.00 C9100=80.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 7.0 · υδατ 9.3 · λιπ 3.8 · κορ 0.66 · ίνες 0.2 · σάκχ 0.0 · αλάτι 0.03 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 211.3 · υδατ 279.3 · λιπ 114.6 · κορ 19.95 · ίνες 5.5 · σάκχ 0.4 · αλάτι 1.05 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 28.2 · υδατ 37.2 · λιπ 15.3 · κορ 2.66 · ίνες 0.7 · σάκχ 0.1 · αλάτι 0.14 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 45.8 · υδατ 60.5 · λιπ 24.8 · κορ 4.32 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.23 · λείπουν {}",
+   "plannedTotals null": "666.0 kcal · πρωτ 46.9 · υδατ 62.0 · λιπ 25.4 · κορ 4.43 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.23 · λείπουν {}",
+   "portionRange": "399.60..1065.60 natural 666.00 · πρωτ/kcal 0.07043 · κορ/kcal 0.00665",
+   "recipe": {
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 42.00 · C26036=30.00 C9100=12.00 · plate 30.0/12.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 168.00 · C26036=120.00 C9100=48.00 · plate 120.0/48.0",
+   "slotLog 650.0": "qty 273.00 · C26036=195.00 C9100=78.00 · plate 195.0/78.0",
+   "slotLog null": "qty 280.00 · C26036=200.00 C9100=80.00 · plate 200.0/80.0"
+  },
+  "tonosalata": {
+   "all items": "498.4 kcal · πρωτ 46.4 · υδατ 33.8 · λιπ 18.3 · κορ 3.49 · ίνες 6.4 · σάκχ 8.4 · αλάτι 1.43 · λείπουν {}",
+   "dishGroup": "ψάρι",
+   "json": {
+    "created": 1,
+    "id": "L13",
+    "items": [
+     {
+      "g": 150.0,
+      "id": "C26039",
+      "n": "Τόνος σε νερό (κονσέρβα, στραγγισμένος)"
+     },
+     {
+      "g": 200.0,
+      "id": "C20385",
+      "n": "Ντομάτα (ωμή)"
+     },
+     {
+      "g": 10.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     },
+     {
+      "g": 40.0,
+      "id": "C7340",
+      "n": "Φρυγανιές ολικής άλεσης"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό tonosalata",
+    "plan": {
+     "cook": "none",
+     "key": "tonosalata",
+     "meals": [
+      "lunch"
+     ],
+     "office": true
+    }
+   },
+   "natural totals": "498.4 kcal · πρωτ 46.4 · υδατ 33.8 · λιπ 18.3 · κορ 3.49 · ίνες 6.4 · σάκχ 8.4 · αλάτι 1.43 · λείπουν {}",
+   "naturalRaw": "C26039=150.00 C20385=200.00 C17270=10.00 C7340=40.00",
+   "plan": {
+    "cook": "none",
+    "key": "tonosalata",
+    "meals": [
+     "lunch"
+    ],
+    "office": true
+   },
+   "plannedRaw 100.0": "C26039=30.10 C20385=40.13 C17270=2.01 C7340=8.03",
+   "plannedRaw 3000.0": "C26039=902.89 C20385=1203.85 C17270=60.19 C7340=240.77",
+   "plannedRaw 400.0": "C26039=120.39 C20385=160.51 C17270=8.03 C7340=32.10",
+   "plannedRaw 650.0": "C26039=195.63 C20385=260.83 C17270=13.04 C7340=52.17",
+   "plannedRaw null": "C26039=150.00 C20385=200.00 C17270=10.00 C7340=40.00",
+   "plannedTotals 100.0": "100.1 kcal · πρωτ 9.3 · υδατ 6.8 · λιπ 3.7 · κορ 0.70 · ίνες 1.3 · σάκχ 1.7 · αλάτι 0.29 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 279.2 · υδατ 203.3 · λιπ 109.9 · κορ 21.01 · ίνες 38.8 · σάκχ 50.7 · αλάτι 8.62 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 37.2 · υδατ 27.1 · λιπ 14.7 · κορ 2.80 · ίνες 5.2 · σάκχ 6.8 · αλάτι 1.15 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 60.5 · υδατ 44.1 · λιπ 23.8 · κορ 4.55 · ίνες 8.4 · σάκχ 11.0 · αλάτι 1.87 · λείπουν {}",
+   "plannedTotals null": "498.4 kcal · πρωτ 46.4 · υδατ 33.8 · λιπ 18.3 · κορ 3.49 · ίνες 6.4 · σάκχ 8.4 · αλάτι 1.43 · λείπουν {}",
+   "portionRange": "299.04..797.44 natural 498.40 · πρωτ/kcal 0.09307 · κορ/kcal 0.00700",
+   "recipe": null,
+   "slotLog 100.0": "qty 80.00 · C26039=30.00 C20385=40.00 C17270=2.00 C7340=8.00 · plate 30.0/40.0/2.0/8.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 321.00 · C26039=120.00 C20385=161.00 C17270=8.00 C7340=32.00 · plate 120.0/161.0/8.0/32.0",
+   "slotLog 650.0": "qty 522.00 · C26039=196.00 C20385=261.00 C17270=13.00 C7340=52.00 · plate 196.0/261.0/13.0/52.0",
+   "slotLog null": "qty 400.00 · C26039=150.00 C20385=200.00 C17270=10.00 C7340=40.00 · plate 150.0/200.0/10.0/40.0"
+  },
+  "tsipoura": {
+   "all items": "615.1 kcal · πρωτ 74.1 · υδατ 5.5 · λιπ 32.8 · κορ 6.45 · ίνες 1.5 · σάκχ 4.8 · αλάτι 0.45 · λείπουν {}",
+   "dishGroup": "ψάρι",
+   "json": {
+    "created": 1,
+    "id": "L6",
+    "items": [
+     {
+      "g": 350.0,
+      "id": "C26088",
+      "n": "Τσιπούρα υδατοκαλλιέργειας (ωμή)"
+     },
+     {
+      "g": 150.0,
+      "id": "C20385",
+      "n": "Ντομάτα (ωμή)"
+     },
+     {
+      "g": 15.0,
+      "id": "C17270",
+      "n": "Ελαιόλαδο εξαιρετικά παρθένο"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό tsipoura",
+    "plan": {
+     "cook": "home",
+     "key": "tsipoura",
+     "meals": [
+      "dinner"
+     ],
+     "tags": [
+      "ψάρι"
+     ]
+    },
+    "recipe": {
+     "steps": [
+      {
+       "min": 20,
+       "text": "Μαγείρεψέ το."
+      }
+     ]
+    }
+   },
+   "natural totals": "615.1 kcal · πρωτ 74.1 · υδατ 5.5 · λιπ 32.8 · κορ 6.45 · ίνες 1.5 · σάκχ 4.8 · αλάτι 0.45 · λείπουν {}",
+   "naturalRaw": "C26088=350.00 C20385=150.00 C17270=15.00",
+   "plan": {
+    "cook": "home",
+    "key": "tsipoura",
+    "meals": [
+     "dinner"
+    ],
+    "tags": [
+     "ψάρι"
+    ]
+   },
+   "plannedRaw 100.0": "C26088=56.90 C20385=24.38 C17270=2.44",
+   "plannedRaw 3000.0": "C26088=1706.90 C20385=731.53 C17270=73.15",
+   "plannedRaw 400.0": "C26088=227.59 C20385=97.54 C17270=9.75",
+   "plannedRaw 650.0": "C26088=369.83 C20385=158.50 C17270=15.85",
+   "plannedRaw null": "C26088=350.00 C20385=150.00 C17270=15.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 12.0 · υδατ 0.9 · λιπ 5.3 · κορ 1.05 · ίνες 0.2 · σάκχ 0.8 · αλάτι 0.07 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 361.3 · υδατ 27.0 · λιπ 160.1 · κορ 31.43 · ίνες 7.5 · σάκχ 23.6 · αλάτι 2.20 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 48.2 · υδατ 3.6 · λιπ 21.3 · κορ 4.19 · ίνες 1.0 · σάκχ 3.1 · αλάτι 0.29 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 78.3 · υδατ 5.8 · λιπ 34.7 · κορ 6.81 · ίνες 1.6 · σάκχ 5.1 · αλάτι 0.48 · λείπουν {}",
+   "plannedTotals null": "615.1 kcal · πρωτ 74.1 · υδατ 5.5 · λιπ 32.8 · κορ 6.45 · ίνες 1.5 · σάκχ 4.8 · αλάτι 0.45 · λείπουν {}",
+   "portionRange": "369.09..984.24 natural 615.15 · πρωτ/kcal 0.12044 · κορ/kcal 0.01048",
+   "recipe": {
+    "steps": [
+     {
+      "min": 20,
+      "text": "Μαγείρεψέ το."
+     }
+    ]
+   },
+   "slotLog 100.0": "qty 83.50 · C26088=57.00 C20385=24.00 C17270=2.50 · plate 57.0/24.0/2.5",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 336.00 · C26088=228.00 C20385=98.00 C17270=10.00 · plate 228.0/98.0/10.0",
+   "slotLog 650.0": "qty 544.00 · C26088=370.00 C20385=158.00 C17270=16.00 · plate 370.0/158.0/16.0",
+   "slotLog null": "qty 515.00 · C26088=350.00 C20385=150.00 C17270=15.00 · plate 350.0/150.0/15.0"
+  },
+  "tsipoura-exo": {
+   "all items": "731.5 kcal · πρωτ 79.1 · υδατ 62.0 · λιπ 18.5 · κορ 4.29 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.46 · λείπουν {}",
+   "dishGroup": "ψάρι",
+   "json": {
+    "created": 1,
+    "id": "L7",
+    "items": [
+     {
+      "g": 350.0,
+      "id": "C26088",
+      "n": "Τσιπούρα υδατοκαλλιέργειας (ωμή)"
+     },
+     {
+      "g": 80.0,
+      "id": "C9100",
+      "n": "Ρύζι λευκό (ωμό)"
+     }
+    ],
+    "kind": "plate",
+    "name": "Φαγητό tsipoura-exo",
+    "plan": {
+     "cook": "out",
+     "key": "tsipoura-exo",
+     "meals": [
+      "lunch",
+      "dinner"
+     ],
+     "order": "Ψητό, λάδι στο πλάι.",
+     "tags": [
+      "ψάρι"
+     ]
+    }
+   },
+   "natural totals": "731.5 kcal · πρωτ 79.1 · υδατ 62.0 · λιπ 18.5 · κορ 4.29 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.46 · λείπουν {}",
+   "naturalRaw": "C26088=350.00 C9100=80.00",
+   "plan": {
+    "cook": "out",
+    "key": "tsipoura-exo",
+    "meals": [
+     "lunch",
+     "dinner"
+    ],
+    "order": "Ψητό, λάδι στο πλάι.",
+    "tags": [
+     "ψάρι"
+    ]
+   },
+   "plannedRaw 100.0": "C26088=47.85 C9100=10.94",
+   "plannedRaw 3000.0": "C26088=1435.41 C9100=328.09",
+   "plannedRaw 400.0": "C26088=191.39 C9100=43.75",
+   "plannedRaw 650.0": "C26088=311.00 C9100=71.09",
+   "plannedRaw null": "C26088=350.00 C9100=80.00",
+   "plannedTotals 100.0": "100.0 kcal · πρωτ 10.8 · υδατ 8.5 · λιπ 2.5 · κορ 0.59 · ίνες 0.2 · σάκχ 0.0 · αλάτι 0.06 · λείπουν {}",
+   "plannedTotals 3000.0": "3000.0 kcal · πρωτ 324.2 · υδατ 254.3 · λιπ 75.8 · κορ 17.61 · ίνες 5.0 · σάκχ 0.4 · αλάτι 1.87 · λείπουν {}",
+   "plannedTotals 400.0": "400.0 kcal · πρωτ 43.2 · υδατ 33.9 · λιπ 10.1 · κορ 2.35 · ίνες 0.7 · σάκχ 0.1 · αλάτι 0.25 · λείπουν {}",
+   "plannedTotals 650.0": "650.0 kcal · πρωτ 70.2 · υδατ 55.1 · λιπ 16.4 · κορ 3.81 · ίνες 1.1 · σάκχ 0.1 · αλάτι 0.41 · λείπουν {}",
+   "plannedTotals null": "731.5 kcal · πρωτ 79.1 · υδατ 62.0 · λιπ 18.5 · κορ 4.29 · ίνες 1.2 · σάκχ 0.1 · αλάτι 0.46 · λείπουν {}",
+   "portionRange": "438.90..1170.40 natural 731.50 · πρωτ/kcal 0.10807 · κορ/kcal 0.00587",
+   "recipe": null,
+   "slotLog 100.0": "qty 59.00 · C26088=48.00 C9100=11.00 · plate 48.0/11.0",
+   "slotLog 3000.0": null,
+   "slotLog 400.0": "qty 235.00 · C26088=191.00 C9100=44.00 · plate 191.0/44.0",
+   "slotLog 650.0": "qty 382.00 · C26088=311.00 C9100=71.00 · plate 311.0/71.0",
+   "slotLog null": "qty 430.00 · C26088=350.00 C9100=80.00 · plate 350.0/80.0"
+  }
+ },
+ "dishesInOrder": [
+  "S Μπιφτέκια",
+  "P Άλφα",
+  "K Βήτα",
+  "K Φακές",
+  "P Πιάτο"
+ ],
+ "freshBatch": {
+  "+0": true,
+  "+1": true,
+  "+3": true,
+  "+4": false,
+  "+5": false,
+  "no batch": false,
+  "old batch → no slotLog": true,
+  "plate": false,
+  "potPortion bigger than pot": 300.0
+ },
+ "isFreshBuy": {
+  "C20359 Φακές (ξερές)": false,
+  "C20385 Ντομάτα (ωμή)": false,
+  "C22000 Αυγό (ωμό)": false,
+  "C26036 Σολομός υδατοκαλλιέργειας (ωμός)": true,
+  "C26039 Τόνος σε νερό (κονσέρβα, στραγγισμένος)": false,
+  "C36017 Κοτόπουλο στήθος χωρίς πέτσα (ωμό)": true,
+  "C6206 Μοσχάρι κιλότο (ωμό)": true,
+  "C6207 Μοσχάρι κιλότο (ψητό)": false
+ },
+ "itemNameMatches": {
+  "lentils|Φακές (ξερές)": false,
+  "|Φακές (ξερές)": true,
+  "Ελαιόλαδο|Ελαιόλαδο εξαιρετικά παρθένο": true,
+  "Κοτόπουλο|Φακές (ξερές)": false,
+  "Φακές|Φακές (ξερές)": true,
+  "λάδι|Ελαιόλαδο εξαιρετικά παρθένο": false,
+  "ρύζι άσπρο|Ρύζι λευκό (ωμό)": true,
+  "στήθος κοτόπουλου|Κοτόπουλο στήθος χωρίς πέτσα (ωμό)": true,
+  "το|Φακές (ξερές)": true,
+  "φακη|Φακές (ξερές)": true
+ },
+ "jsonOfKind": {
+  "bare with braces in strings": {
+   "kind": "k",
+   "t": "} \" {"
+  },
+  "broken": null,
+  "fence without json word": {
+   "a": 2,
+   "kind": "k"
+  },
+  "fenced": {
+   "a": 1,
+   "kind": "k"
+  },
+  "list": {
+   "kind": "k"
+  },
+  "nested first": {
+   "kind": "k"
+  },
+  "second fence": {
+   "a": 3,
+   "kind": "k"
+  }
+ },
+ "keepDone": {
+  "no old": [
+   "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+   "lunch:fakes@680.0 | dinner:revithia@720.0 | snack:giaourti@550.0",
+   "lunch:fakes@680.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+   "lunch:kotopoulo-salata@900.0 | dinner:revithia@720.0 | snack:frygania@460.0",
+   "lunch:fasolada@650.0 | dinner:kotopoulo-ryzi@1000.0 | snack:milo-giaourti@480.0",
+   "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+   "lunch:tsipoura-exo@910.0 | dinner:kotopoulo-salata@790.0 | snack:giaourti@450.0"
+  ],
+  "other plan": [
+   "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:milo-giaourti@450.0",
+   "lunch:fakes@680.0 | dinner:revithia@720.0 ate grp=g1 | snack:giaourti@550.0",
+   "lunch:fakes@680.0 | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+   "lunch:kotopoulo-salata@900.0 | dinner:revithia@720.0 | snack:frygania@460.0",
+   "lunch:fasolada@650.0 | dinner:kotopoulo-ryzi@1000.0 | snack:milo-giaourti@480.0",
+   "lunch:tonosalata@800.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+   "lunch:tsipoura-exo@910.0 | dinner:kotopoulo-salata@790.0 | snack:giaourti@450.0"
+  ],
+  "same plan with states": [
+   "lunch:tsipoura-exo@910.0 | dinner:tsipoura@790.0 | snack:giaourti@450.0",
+   "lunch:fakes@680.0 | dinner:revithia@720.0 ate grp=g1 | snack:milo-giaourti@480.0",
+   "lunch:revithia@720.0 skip | dinner:fasolada@650.0 | snack:milo-giaourti@480.0",
+   "lunch:kotopoulo-salata@900.0 | dinner:fakes@680.0 | snack:milo-giaourti@480.0",
+   "lunch:fasolada@650.0 | dinner:mosxari@830.0 | snack:milo-giaourti@480.0",
+   "lunch:kotopoulo-ryzi@910.0 | dinner:tsipoura-exo@790.0 | snack:milo-giaourti@450.0",
+   "lunch:kotopoulo-salata@900.0 | dinner:solomos@790.0 | snack:milo-giaourti@450.0"
+  ]
+ },
+ "labels": {
+  "cookWay": {
+   "home": "Μαγείρεμα στο σπίτι",
+   "none": "Χωρίς μαγείρεμα",
+   "out": "Από παραγγελία"
+  },
+  "cookWayOf": [
+   "home",
+   "none",
+   "out",
+   null,
+   null
+  ],
+  "dishKind": {
+   "plate": "Πιάτο",
+   "portions": "Ίσες μερίδες",
+   "pot": "Κατσαρόλα"
+  },
+  "dishKindOf": [
+   "plate",
+   "portions",
+   "pot",
+   null,
+   null
+  ],
+  "mealOfName": [
+   "breakfast",
+   "lunch",
+   "dinner",
+   "snack",
+   null,
+   null
+  ]
+ },
+ "library import": {
+  "added": 14,
+  "libraryDishes": 14,
+  "problems": [],
+  "unchanged": 0,
+  "updated": 0,
+  "usableLibrary": 14
+ },
+ "libraryPrompt": {
+  "small list": [
+   "ΒΙΒΛΙΟΘΗΚΗ ΦΑΓΗΤΩΝ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»",
+   "",
+   "Γράψε φαγητά για τη βιβλιοθήκη της εφαρμογής μου, από την οποία φτιάχνεται το εβδομαδιαίο μου πρόγραμμα. Ποια φαγητά, θα σου τα πω στη συζήτησή μας.",
+   "",
+   "Κανόνες:",
+   "1. Μόνο τρόφιμα από τις λίστες «ΤΡΟΦΙΜΑ» πιο κάτω, με το id ΚΑΙ το όνομά τους ακριβώς όπως είναι. Αν κάτι λείπει, διάλεξε το πιο κοντινό ή άφησέ το έξω. Νερό δεν γράφεται ως υλικό.",
+   "2. Ποσότητες σε γραμμάρια (ml για όσα η λίστα γράφει «ml»), ΩΜΑ, όπως ζυγίζονται πριν το μαγείρεμα. Λάδι, αλάτι και μπαχαρικά είναι υλικά σε γραμμάρια· στα βήματα γράψε και την ποσότητα με κουτάλι (π.χ. «½ κουταλάκι αλάτι, περίπου 3 g»).",
+   "3. Ποτέ τρόφιμα από τα «ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ». ΜΗ γράψεις θερμίδες ή θρεπτικά: τα μετρά η εφαρμογή από τη βάση.",
+   {
+    "hash": "2884a85b",
+    "head": "4. «cook»: \"home\" = μαγειρεύεται στο σπίτι (θέλει \"steps\": συσκευή, φωτιά, λεπτά, πότε μπαίνει κάθε υλικό)· \"none\" = χωρ",
+    "len": 399,
+    "tail": " υλικά είναι εκτίμηση του πιάτου που έρχεται, και εδώ επιτρέπονται και οι μαγειρεμένες μορφές της λίστας «ΜΑΓΕΙΡΕΜΕΝΑ»)."
+   },
+   "5. «type»: \"plate\" = ένα πιάτο μόνο για μένα· \"portions\" = ίσες μερίδες (γράψε \"servings\")· \"pot\" = κατσαρόλα ή ταψί για όλους, από όπου τρώω όσο ζυγίσω (γράψε στο \"servings\" περίπου πόσες μερίδες βγάζει).",
+   {
+    "hash": "cc911bdc",
+    "head": "6. «meals»: σε ποια γεύματα ταιριάζει (\"lunch\" μεσημέρι, \"dinner\" βράδυ, \"snack\" σνακ, \"breakfast\" πρωινό). «office»: tr",
+    "len": 372,
+    "tail": ": όσπρια, ψάρι, λιπαρό ψάρι, θαλασσινά, κόκκινο κρέας, κοτόπουλο, αυγά, γαλακτοκομικά, λαχανικά, φρούτα, ζυμαρικά, ρύζι."
+   },
+   "7. «key»: σταθερό κλειδί κάθε φαγητού, μόνο λατινικά μικρά, αριθμοί, «-» (π.χ. \"fakes-kokkinistes\"). Για να αλλάξεις ένα φαγητό που υπάρχει, κράτα το ίδιο key.",
+   "8. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή (τα κείμενα στα ελληνικά). Στη θέση του «…» βάλε όλα τα φαγητά, τα υλικά και τα βήματα:",
+   "```json",
+   "{",
+   "  \"kind\": \"ygeia-library\",",
+   "  \"dishes\": [",
+   "    {",
+   "      \"key\": \"fakes-kokkinistes\",",
+   "      \"name\": \"Φακές κοκκινιστές\",",
+   "      \"cook\": \"home\", \"type\": \"pot\", \"servings\": 4, \"minutes\": 45,",
+   "      \"meals\": [\"lunch\", \"dinner\"], \"office\": true, \"tags\": [\"όσπρια\"],",
+   "      \"items\": [{\"id\": \"C20359\", \"name\": \"Φακές (ξερές)\", \"g\": 250}, …],",
+   "      \"steps\": [{\"text\": \"…\", \"device\": \"Κατσαρόλα μεγάλη\", \"heat\": \"μέτρια\", \"min\": 30}, …],",
+   "      \"tips\": [\"…\"], \"keeps\": \"Στο ψυγείο ως 3 μέρες\", \"why\": \"…\"",
+   "    },",
+   "    {\"key\": \"tsipoura-psitopoleio\", \"name\": \"Τσιπούρα από ψητοπωλείο\", \"cook\": \"out\", \"type\": \"plate\", \"meals\": [\"dinner\"], \"tags\": [\"ψάρι\"], \"order\": \"…\", \"items\": […]},",
+   "    …",
+   "  ]",
+   "}",
+   "```",
+   "",
+   "ΟΙ ΣΤΟΧΟΙ ΜΟΥ ΑΝΑ ΜΕΡΑ: 2.150 kcal · πρωτεΐνη 150 g · κορεσμένα έως 14 g · ίνες τουλάχιστον 30 g · αλάτι κάτω από 5 g.",
+   {
+    "hash": "ea1a00dd",
+    "head": "ΚΟΥΖΙΝΑ: Φούρνος, Μάτια κουζίνας, Ατμομάγειρας, Ψησταριά υγραερίου, Φριτέζα λαδιού, Βραστήρας, Μπρίκι, Ζυγαριά κουζίνας,",
+    "len": 415,
+    "tail": "μαντεμένιο, Τηγάνι μαντεμένιο, Κατσαρόλα · μικρή, Κατσαρόλα · μεσαία, Κατσαρόλα · μεγάλη, Ταψί, Γυάλινο πυρίμαχο · Pyrex"
+   },
+   "ΜΟΥ ΑΡΕΣΟΥΝ: C20359 Φακές (ξερές)",
+   "ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ: C12066 Φέτα (πρόβειο και κατσικίσιο)",
+   "ΣΗΜΕΙΩΣΕΙΣ: Όχι πικάντικα.",
+   "",
+   "ΥΠΑΡΧΟΥΝ ΗΔΗ ΣΤΗ ΒΙΒΛΙΟΘΗΚΗ (key: όνομα): biftekia: Φαγητό biftekia; fakes: Φαγητό fakes; fasolada: Φαγητό fasolada",
+   "",
+   "ΤΡΟΦΙΜΑ (id όνομα), ωμά, ανά κατηγορία:",
+   "Όσπρια: C20359 Φακές (ξερές)",
+   "Πουλερικά: C36017 Κοτόπουλο στήθος χωρίς πέτσα (ωμό)",
+   "Λιπαρά: C17270 Ελαιόλαδο εξαιρετικά παρθένο",
+   "Φρούτα: C13039 Μήλο (με φλούδα)",
+   "",
+   "ΜΑΓΕΙΡΕΜΕΝΑ (id όνομα), ΜΟΝΟ για \"cook\": \"out\":",
+   "Κρέας: C6207 Μοσχάρι κιλότο (ψητό)",
+   ""
+  ],
+  "whole database": {
+   "hash": "61430525",
+   "head": "ΒΙΒΛΙΟΘΗΚΗ ΦΑΓΗΤΩΝ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»\n\nΓράψε φαγητά για τη βιβλιοθήκη της εφαρμογής μου, από την οποία φτι",
+   "len": 15551,
+   "tail": "τά: C25586 Σουβλάκι κοτόπουλο (ψημένο); C25585 Σουβλάκι μοσχαρίσιο (ψημένο); C25163 Κεφτέδες μοσχαρίσιοι (μαγειρεμένοι)\n"
+  }
+ },
+ "nextMonday": {
+  "2026-10-25": "2026-10-26",
+  "2026-11-22": "2026-11-23",
+  "2026-11-23": "2026-11-23",
+  "2026-11-24": "2026-11-30",
+  "2026-11-25": "2026-11-30",
+  "2026-11-26": "2026-11-30",
+  "2026-11-27": "2026-11-30",
+  "2026-11-28": "2026-11-30",
+  "2026-11-29": "2026-11-30",
+  "2026-12-31": "2027-01-04",
+  "2027-03-28": "2027-03-29"
+ },
+ "parseDayKey": {
+  "2026-02-29": "-",
+  "2026-1-01": "-",
+  "2026-10-25": "2026-10-25",
+  "2026-11-23": "2026-11-23",
+  "2026-11-23 ": "-",
+  "2026-11-31": "-",
+  "2026-13-01": "-",
+  "2027-03-28": "2027-03-28",
+  "2028-02-29": "2028-02-29"
+ },
+ "parseLibrary": {
+  "301 dishes": {
+   "errors": [
+    "Πολλά φαγητά (301): το πολύ 300 σε μία επικόλληση."
+   ]
+  },
+  "instructions": {
+   "errors": [
+    "Αυτές είναι οι οδηγίες που αντιγράφηκαν, όχι η απάντηση. Επικόλλησέ τες στο AI, και μετά αντίγραψε την απάντησή του."
+   ]
+  },
+  "mixed": {
+   "entries": [
+    "nea-fakes · Φαγητό nea-fakes · {key: nea-fakes, meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή true · ",
+    " · Φαγητό 2 · {cook: home} · συνταγή false · Δεν διαβάζεται.",
+    "nea-fakes · Φαγητό nea-fakes · {meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Το «key» «nea-fakes» υπάρχει δύο φορές.",
+    " · Φαγητό nea-fakes · {meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Λείπει το «key».",
+    "Κεφαλαία · Φαγητό nea-fakes · {meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Το «key» θέλει μόνο λατινικά μικρά, αριθμούς, «-» και «_» (ως 60 χαρακτήρες).",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa · Φαγητό nea-fakes · {meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Το «key» θέλει μόνο λατινικά μικρά, αριθμούς, «-» και «_» (ως 60 χαρακτήρες).",
+    "k2 · Φαγητό nea-fakes · {meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Το «cook» πρέπει να είναι \"home\", \"none\" ή \"out\".",
+    "k3 · Φαγητό nea-fakes · {meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Άγνωστο γεύμα «brunch» (breakfast, lunch, dinner, snack).",
+    "k4 · Φαγητό nea-fakes · {key: k4, meals: [lunch], tags: [όσπρια, 5], cook: out} · συνταγή false · Φαγητό παραγγελίας χωρίς «order» (τι να ζητήσω).",
+    "k5 · Φαγητό nea-fakes · {key: k5, meals: [lunch], tags: [όσπρια, 5], cook: out, order: Ψητό} · συνταγή true · ",
+    "k6 · Φαγητό nea-fakes · {key: k6, meals: [lunch], tags: [όσπρια, 5], cook: none} · συνταγή true · ",
+    "k7 · Φαγητό nea-fakes · {key: k7, meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Η συνταγή δεν έχει βήματα.",
+    "k8 · Φαγητό 13 · {key: k8, meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Η συνταγή δεν έχει όνομα.",
+    "k9 · Φαγητό nea-fakes · {key: k9, meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Λείπει πόσες μερίδες βγάζει («servings», 1–50).",
+    "k10 · Φαγητό nea-fakes · {key: k10, meals: [lunch], tags: [όσπρια, 5], cook: home} · συνταγή false · Η συνταγή δεν έχει υλικά."
+   ]
+  },
+  "no dishes": {
+   "errors": [
+    "Η βιβλιοθήκη δεν έχει φαγητά («dishes»)."
+   ]
+  },
+  "no json": {
+   "errors": [
+    "Δεν βρέθηκαν φαγητά στο κείμενο. Αντίγραψε ολόκληρη την απάντηση του βοηθού."
+   ]
+  },
+  "other json": {
+   "errors": [
+    "Το κείμενο δεν είναι βιβλιοθήκη της εφαρμογής, ή αντιγράφηκε μισό. Αντίγραψε ολόκληρη την απάντηση· αν ξαναβγεί, ζήτα από τον βοηθό να τη γράψει ξανά στη μορφή των οδηγιών."
+   ]
+  }
+ },
+ "parseRecipe": {
+  "41 items": {
+   "errors": [
+    "Πολλά υλικά (41): το πολύ 40."
+   ],
+   "ok": false
+  },
+  "bad items": {
+   "errors": [
+    "Το υλικό 1 δεν διαβάζεται.",
+    "«C1»: η ποσότητα πρέπει να είναι γραμμάρια από 0 ως 5.000.",
+    "«C1»: η ποσότητα πρέπει να είναι γραμμάρια από 0 ως 5.000.",
+    "«Χωρίς ποσό»: η ποσότητα πρέπει να είναι γραμμάρια από 0 ως 5.000.",
+    "Το υλικό 5 δεν έχει όνομα."
+   ],
+   "ok": false
+  },
+  "instructions": {
+   "errors": [
+    "Αυτές είναι οι οδηγίες που αντιγράφηκαν, όχι η απάντηση. Επικόλλησέ τες στο AI, και μετά αντίγραψε την απάντησή του."
+   ],
+   "ok": false
+  },
+  "long texts": [
+   80,
+   600,
+   30,
+   600
+  ],
+  "min instead of minutes, 1441": {
+   "ok": true,
+   "recipe": {
+    "items": [
+     "C20359|Φακές (ξερές)|250.00",
+     "C17270|C17270|20.00",
+     "null|Καρότο|100.00"
+    ],
+    "kind": "pot",
+    "name": "Φακές με καρότο",
+    "recipe": {
+     "keeps": "Στο ψυγείο ως 3 μέρες",
+     "serv": 4,
+     "steps": [
+      {
+       "min": 2,
+       "text": "Ξέπλυνε."
+      },
+      {
+       "device": "Κατσαρόλα μεγάλη",
+       "heat": "δυνατή",
+       "min": 30,
+       "text": "Βράσε."
+      },
+      {
+       "text": "Σέρβιρε."
+      }
+     ],
+     "tips": [
+      "Με λεμόνι."
+     ],
+     "why": "Πολλές ίνες."
+    },
+    "servings": 4
+   }
+  },
+  "no items": {
+   "errors": [
+    "Η συνταγή δεν έχει υλικά."
+   ],
+   "ok": false
+  },
+  "no json": {
+   "errors": [
+    "Δεν βρέθηκε συνταγή στο κείμενο. Αντίγραψε ολόκληρη την απάντηση του βοηθού."
+   ],
+   "ok": false
+  },
+  "no name": {
+   "errors": [
+    "Η συνταγή δεν έχει όνομα."
+   ],
+   "ok": false
+  },
+  "no steps": {
+   "errors": [
+    "Η συνταγή δεν έχει βήματα."
+   ],
+   "ok": false
+  },
+  "ok": {
+   "ok": true,
+   "recipe": {
+    "items": [
+     "C20359|Φακές (ξερές)|250.00",
+     "C17270|C17270|20.00",
+     "null|Καρότο|100.00"
+    ],
+    "kind": "pot",
+    "name": "Φακές με καρότο",
+    "recipe": {
+     "keeps": "Στο ψυγείο ως 3 μέρες",
+     "min": 45,
+     "serv": 4,
+     "steps": [
+      {
+       "min": 2,
+       "text": "Ξέπλυνε."
+      },
+      {
+       "device": "Κατσαρόλα μεγάλη",
+       "heat": "δυνατή",
+       "min": 30,
+       "text": "Βράσε."
+      },
+      {
+       "text": "Σέρβιρε."
+      }
+     ],
+     "tips": [
+      "Με λεμόνι."
+     ],
+     "why": "Πολλές ίνες."
+    },
+    "servings": 4
+   }
+  },
+  "other json": {
+   "errors": [
+    "Το κείμενο δεν είναι συνταγή της εφαρμογής, ή αντιγράφηκε μισό. Αντίγραψε ολόκληρη την απάντηση· αν ξαναβγεί, ζήτα από τον βοηθό να τη γράψει ξανά στη μορφή των οδηγιών."
+   ],
+   "ok": false
+  },
+  "plain braces, no fence": {
+   "ok": true,
+   "recipe": {
+    "items": [
+     "C20359|Φακές (ξερές)|250.00",
+     "C17270|C17270|20.00",
+     "null|Καρότο|100.00"
+    ],
+    "kind": "pot",
+    "name": "Φακές με καρότο",
+    "recipe": {
+     "keeps": "Στο ψυγείο ως 3 μέρες",
+     "min": 45,
+     "serv": 4,
+     "steps": [
+      {
+       "min": 2,
+       "text": "Ξέπλυνε."
+      },
+      {
+       "device": "Κατσαρόλα μεγάλη",
+       "heat": "δυνατή",
+       "min": 30,
+       "text": "Βράσε."
+      },
+      {
+       "text": "Σέρβιρε."
+      }
+     ],
+     "tips": [
+      "Με λεμόνι."
+     ],
+     "why": "Πολλές ίνες."
+    },
+    "servings": 4
+   }
+  },
+  "plate ignores servings": {
+   "ok": true,
+   "recipe": {
+    "items": [
+     "C20359|Φακές (ξερές)|250.00",
+     "C17270|C17270|20.00",
+     "null|Καρότο|100.00"
+    ],
+    "kind": "plate",
+    "name": "Φακές με καρότο",
+    "recipe": {
+     "keeps": "Στο ψυγείο ως 3 μέρες",
+     "min": 45,
+     "serv": 4,
+     "steps": [
+      {
+       "min": 2,
+       "text": "Ξέπλυνε."
+      },
+      {
+       "device": "Κατσαρόλα μεγάλη",
+       "heat": "δυνατή",
+       "min": 30,
+       "text": "Βράσε."
+      },
+      {
+       "text": "Σέρβιρε."
+      }
+     ],
+     "tips": [
+      "Με λεμόνι."
+     ],
+     "why": "Πολλές ίνες."
+    },
+    "servings": 1
+   }
+  },
+  "portions without servings": {
+   "errors": [
+    "Λείπει πόσες μερίδες βγάζει («servings», 1–50)."
+   ],
+   "ok": false
+  },
+  "unknown type → pot": {
+   "ok": true,
+   "recipe": {
+    "items": [
+     "C20359|Φακές (ξερές)|250.00",
+     "C17270|C17270|20.00",
+     "null|Καρότο|100.00"
+    ],
+    "kind": "pot",
+    "name": "Φακές με καρότο",
+    "recipe": {
+     "keeps": "Στο ψυγείο ως 3 μέρες",
+     "min": 45,
+     "steps": [
+      {
+       "min": 2,
+       "text": "Ξέπλυνε."
+      },
+      {
+       "device": "Κατσαρόλα μεγάλη",
+       "heat": "δυνατή",
+       "min": 30,
+       "text": "Βράσε."
+      },
+      {
+       "text": "Σέρβιρε."
+      }
+     ],
+     "tips": [
+      "Με λεμόνι."
+     ],
+     "why": "Πολλές ίνες."
+    },
+    "servings": 1
+   }
+  }
+ },
+ "parseWeek": {
+  "15 days": {
+   "errors": [
+    "Πολλές μέρες (15): το πολύ 14."
+   ]
+  },
+  "bad from, no days": {
+   "errors": [
+    "Λείπει η πρώτη μέρα («from», π.χ. \"2026-11-16\").",
+    "Το πρόγραμμα δεν έχει μέρες («days»)."
+   ]
+  },
+  "days not a list": {
+   "errors": [
+    "Το πρόγραμμα δεν έχει μέρες («days»)."
+   ]
+  },
+  "disliked dish": [
+   "Μέρα 1: το «Φαγητό solomos» δεν σου άρεσε· άλλαξέ το."
+  ],
+  "errors in slots": {
+   "errors": [
+    "Μέρα 1: δεν διαβάζεται.",
+    "Μέρα 2: πολλά γεύματα (7), το πολύ 6.",
+    "Μέρα 2: ένα γεύμα δεν διαβάζεται.",
+    "Μέρα 2: άγνωστο γεύμα «brunch» (breakfast, lunch, dinner, snack).",
+    "Μέρα 2: δεν υπάρχει στη βιβλιοθήκη φαγητό με key «unknown».",
+    "Μέρα 2: δεν υπάρχει στη βιβλιοθήκη φαγητό με key «5».",
+    "Μέρα 2: οι θερμίδες («kcal») πρέπει να είναι από 30 ως 2500.",
+    "Μέρα 2: οι θερμίδες («kcal») πρέπει να είναι από 30 ως 2500.",
+    "Μέρα 3: πολλά γεύματα (7), το πολύ 6."
+   ]
+  },
+  "half": {
+   "errors": [
+    "Το κείμενο δεν είναι πρόγραμμα της εφαρμογής, ή αντιγράφηκε μισό. Αντίγραψε ολόκληρη την απάντηση· αν ξαναβγεί, ζήτα από τον βοηθό να το γράψει ξανά στη μορφή των οδηγιών."
+   ]
+  },
+  "kcal 30 and 2500": {
+   "created": 7,
+   "plan": [
+    "lunch:fakes@30.0 | dinner:solomos@2500.0"
+   ],
+   "source": "paste"
+  },
+  "no from": {
+   "errors": [
+    "Λείπει η πρώτη μέρα («from», π.χ. \"2026-11-16\")."
+   ]
+  },
+  "no json": {
+   "errors": [
+    "Δεν βρέθηκε πρόγραμμα στο κείμενο. Αντίγραψε ολόκληρη την απάντηση του βοηθού."
+   ]
+  },
+  "ok": {
+   "created": 7,
+   "plan": [
+    "lunch:fakes@650.0 | snack:giaourti@- | dinner:solomos@700.5",
+    "lunch:fakes@-",
+    ""
+   ],
+   "source": "paste"
+  },
+  "other json": {
+   "errors": [
+    "Το κείμενο δεν είναι πρόγραμμα της εφαρμογής, ή αντιγράφηκε μισό. Αντίγραψε ολόκληρη την απάντηση· αν ξαναβγεί, ζήτα από τον βοηθό να το γράψει ξανά στη μορφή των οδηγιών."
+   ]
+  },
+  "the instructions themselves": {
+   "errors": [
+    "Αυτές είναι οι οδηγίες που αντιγράφηκαν, όχι η απάντηση. Επικόλλησέ τες στο AI, και μετά αντίγραψε την απάντησή του."
+   ]
+  }
+ },
+ "planLibraryImport": {
+  "changed amounts": "added N0 · updated L0,L5 · unchanged 0 · ",
+  "cooked form allowed for order": "added N0 · updated  · unchanged 0 · ",
+  "problems": "added  · updated  · unchanged 0 · p1: «Χωρίς id»: λείπει το id. | «Άγνωστο»: δεν υπάρχει τρόφιμο με id ZZ1. | Το id C20359 είναι «Φακές (ξερές)», όχι «Κοτόπουλο». | «Μοσχάρι κιλότο (ψητό)» είναι μαγειρεμένη μορφή: γράψε την ωμή (C6206), ζυγισμένη ωμή. | «Φέτα (πρόβειο και κατσικίσιο)» είναι στα «Δε μου αρέσει».",
+  "problems text": [
+   "Η εφαρμογή «Υγεία & Φόρμα» δεν πέρασε αυτά τα φαγητά της βιβλιοθήκης. Διόρθωσέ τα και στείλε ξανά ΜΟΝΟ αυτά, στην ίδια μορφή (\"kind\": \"ygeia-library\"), με τα ίδια \"key\":",
+   "",
+   "- Φαγητό nea-fakes (key: p1):",
+   "  · «Χωρίς id»: λείπει το id.",
+   "  · «Άγνωστο»: δεν υπάρχει τρόφιμο με id ZZ1.",
+   "  · Το id C20359 είναι «Φακές (ξερές)», όχι «Κοτόπουλο».",
+   "  · «Μοσχάρι κιλότο (ψητό)» είναι μαγειρεμένη μορφή: γράψε την ωμή (C6206), ζυγισμένη ωμή.",
+   "  · «Φέτα (πρόβειο και κατσικίσιο)» είναι στα «Δε μου αρέσει».",
+   ""
+  ],
+  "same again": "added  · updated  · unchanged 14 · "
+ },
+ "portionRound": {
+  "0.0": 5.0,
+  "12.4": 10.0,
+  "12.5": 15.0,
+  "2.4": 5.0,
+  "2.5": 5.0,
+  "247.4": 245.0,
+  "247.5": 250.0,
+  "250.0": 250.0,
+  "7.4": 5.0,
+  "7.5": 10.0
+ },
+ "rawFoodLines": {
+  "cooked": [
+   "Κρέας: C6207 Μοσχάρι κιλότο (ψητό)"
+  ],
+  "raw": [
+   "Όσπρια: C20359 Φακές (ξερές)",
+   "Πουλερικά: C36017 Κοτόπουλο στήθος χωρίς πέτσα (ωμό)",
+   "Λιπαρά: C17270 Ελαιόλαδο εξαιρετικά παρθένο",
+   "Φρούτα: C13039 Μήλο (με φλούδα)"
+  ],
+  "with tail": [
+   "Ροφήματα: R1 Χυμός δοκιμής (ml) <ml>",
+   "Δημητριακά: R2 Ρύζι δοκιμής (ωμό) <g>",
+   "Άλλα: R4 Χωρίς κατηγορία <g>"
+  ]
+ },
+ "recipePrompt": {
+  "bare": [
+   "ΣΥΝΤΑΓΗ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»",
+   "",
+   "Τι θέλω: μια υγιεινή, απλή συνταγή για μεσημεριανό ή βραδινό",
+   "",
+   "Κανόνες:",
+   "1. Μόνο τρόφιμα από τη λίστα «ΤΡΟΦΙΜΑ» πιο κάτω, με το id τους ακριβώς όπως είναι. Αν κάτι λείπει, διάλεξε το πιο κοντινό της λίστας ή άφησέ το έξω. Νερό και ζωμός από νερό δεν γράφονται ως υλικά.",
+   "2. Ποσότητες σε γραμμάρια (ml για όσα η λίστα γράφει «ml»), όπως ζυγίζονται ΩΜΑ, πριν το μαγείρεμα: ξερά όσπρια, ωμό ρύζι και ζυμαρικά, ωμό κρέας. Το λάδι μαγειρέματος είναι υλικό, μετρημένο σε γραμμάρια.",
+   "3. Ποτέ τρόφιμα από τα «ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ». Προτίμησε όσα «ΜΟΥ ΑΡΕΣΟΥΝ».",
+   "4. Μόνο με τις συσκευές της «ΚΟΥΖΙΝΑΣ». Σε κάθε βήμα: συσκευή, φωτιά ή θερμοκρασία, και λεπτά. Ακριβείς οδηγίες, σαν για κάποιον που μαθαίνει να μαγειρεύει.",
+   "5. Υγιεινή συνταγή για τους στόχους μου: λίγα κορεσμένα, λίγο αλάτι, πολλές ίνες, αρκετή πρωτεΐνη, πολλά λαχανικά. ΜΗ γράψεις θερμίδες ή θρεπτικά: τα υπολογίζει η εφαρμογή από τη βάση της.",
+   "6. «type»: \"plate\" = ένα πιάτο για μένα· \"portions\" = ίσες μερίδες (π.χ. μπιφτέκια· γράψε \"servings\")· \"pot\" = κατσαρόλα ή ταψί από όπου τρώω όσο ζυγίσω (γράψε στο \"servings\" περίπου πόσες μερίδες βγάζει).",
+   "7. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή (τα ελληνικά κείμενα στα ελληνικά). Στη θέση του «…» βάλε όλα τα υλικά και όλα τα βήματα:",
+   "```json",
+   "{",
+   "  \"kind\": \"ygeia-recipe\",",
+   "  \"name\": \"Φακές με καρότο και σέλινο\",",
+   "  \"type\": \"pot\",",
+   "  \"servings\": 4,",
+   "  \"minutes\": 45,",
+   "  \"items\": [",
+   "    {\"id\": \"C20359\", \"name\": \"Φακές (ξερές)\", \"g\": 250},",
+   "    {\"id\": \"C17270\", \"name\": \"Ελαιόλαδο εξαιρετικά παρθένο\", \"g\": 20},",
+   "    …",
+   "  ],",
+   "  \"steps\": [",
+   "    {\"text\": \"Ξέπλυνε τις φακές σε σουρωτήρι.\", \"device\": \"\", \"heat\": \"\", \"min\": 2},",
+   "    {\"text\": \"Βράσε τις φακές με 1,5 λίτρο νερό.\", \"device\": \"Κατσαρόλα μεγάλη\", \"heat\": \"δυνατή, μετά χαμηλή\", \"min\": 30},",
+   "    …",
+   "  ],",
+   "  \"tips\": [\"…\"],",
+   "  \"keeps\": \"Στο ψυγείο ως 3 μέρες\",",
+   "  \"why\": \"Μία-δύο προτάσεις: γιατί ταιριάζει στους στόχους μου.\"",
+   "}",
+   "```",
+   "",
+   "",
+   "ΚΟΥΖΙΝΑ: μάτια κουζίνας, φούρνος, κατσαρόλες, τηγάνια",
+   "",
+   "ΜΟΥ ΑΡΕΣΟΥΝ: —",
+   "ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ: —",
+   "",
+   "ΤΡΟΦΙΜΑ (id όνομα), ανά κατηγορία:",
+   ""
+  ],
+  "full": [
+   "ΣΥΝΤΑΓΗ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»",
+   "",
+   "Τι θέλω: κάτι με φακές",
+   "",
+   "Κανόνες:",
+   "1. Μόνο τρόφιμα από τη λίστα «ΤΡΟΦΙΜΑ» πιο κάτω, με το id τους ακριβώς όπως είναι. Αν κάτι λείπει, διάλεξε το πιο κοντινό της λίστας ή άφησέ το έξω. Νερό και ζωμός από νερό δεν γράφονται ως υλικά.",
+   "2. Ποσότητες σε γραμμάρια (ml για όσα η λίστα γράφει «ml»), όπως ζυγίζονται ΩΜΑ, πριν το μαγείρεμα: ξερά όσπρια, ωμό ρύζι και ζυμαρικά, ωμό κρέας. Το λάδι μαγειρέματος είναι υλικό, μετρημένο σε γραμμάρια.",
+   "3. Ποτέ τρόφιμα από τα «ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ». Προτίμησε όσα «ΜΟΥ ΑΡΕΣΟΥΝ».",
+   "4. Μόνο με τις συσκευές της «ΚΟΥΖΙΝΑΣ». Σε κάθε βήμα: συσκευή, φωτιά ή θερμοκρασία, και λεπτά. Ακριβείς οδηγίες, σαν για κάποιον που μαθαίνει να μαγειρεύει.",
+   "5. Υγιεινή συνταγή για τους στόχους μου: λίγα κορεσμένα, λίγο αλάτι, πολλές ίνες, αρκετή πρωτεΐνη, πολλά λαχανικά. ΜΗ γράψεις θερμίδες ή θρεπτικά: τα υπολογίζει η εφαρμογή από τη βάση της.",
+   "6. «type»: \"plate\" = ένα πιάτο για μένα· \"portions\" = ίσες μερίδες (π.χ. μπιφτέκια· γράψε \"servings\")· \"pot\" = κατσαρόλα ή ταψί από όπου τρώω όσο ζυγίσω (γράψε στο \"servings\" περίπου πόσες μερίδες βγάζει).",
+   "7. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή (τα ελληνικά κείμενα στα ελληνικά). Στη θέση του «…» βάλε όλα τα υλικά και όλα τα βήματα:",
+   "```json",
+   "{",
+   "  \"kind\": \"ygeia-recipe\",",
+   "  \"name\": \"Φακές με καρότο και σέλινο\",",
+   "  \"type\": \"pot\",",
+   "  \"servings\": 4,",
+   "  \"minutes\": 45,",
+   "  \"items\": [",
+   "    {\"id\": \"C20359\", \"name\": \"Φακές (ξερές)\", \"g\": 250},",
+   "    {\"id\": \"C17270\", \"name\": \"Ελαιόλαδο εξαιρετικά παρθένο\", \"g\": 20},",
+   "    …",
+   "  ],",
+   "  \"steps\": [",
+   "    {\"text\": \"Ξέπλυνε τις φακές σε σουρωτήρι.\", \"device\": \"\", \"heat\": \"\", \"min\": 2},",
+   "    {\"text\": \"Βράσε τις φακές με 1,5 λίτρο νερό.\", \"device\": \"Κατσαρόλα μεγάλη\", \"heat\": \"δυνατή, μετά χαμηλή\", \"min\": 30},",
+   "    …",
+   "  ],",
+   "  \"tips\": [\"…\"],",
+   "  \"keeps\": \"Στο ψυγείο ως 3 μέρες\",",
+   "  \"why\": \"Μία-δύο προτάσεις: γιατί ταιριάζει στους στόχους μου.\"",
+   "}",
+   "```",
+   "",
+   "ΟΙ ΣΤΟΧΟΙ ΜΟΥ ΑΝΑ ΜΕΡΑ: 2.150 kcal · πρωτεΐνη 150 g · κορεσμένα έως 14 g · ίνες τουλάχιστον 30 g · αλάτι κάτω από 5 g. Μία μερίδα για ένα γεύμα: περίπου το ένα τρίτο αυτών, εκτός αν γράφω αλλιώς στο «Τι θέλω».",
+   "ΣΗΜΕΡΑ ΜΟΥ ΜΕΝΟΥΝ: 1.234 kcal και 56 g πρωτεΐνη. Αν η συνταγή είναι για σήμερα, η μερίδα μου να χωράει εδώ.",
+   "",
+   "ΚΟΥΖΙΝΑ: Φούρνος, Μάτια κουζίνας. Σκεύη: Κατσαρόλα · μεγάλη",
+   "",
+   "ΜΟΥ ΑΡΕΣΟΥΝ: C20359 Φακές (ξερές)",
+   "ΔΕ ΜΟΥ ΑΡΕΣΟΥΝ: C12066 Φέτα (πρόβειο και κατσικίσιο)",
+   "ΣΗΜΕΙΩΣΕΙΣ: Όχι πικάντικα.",
+   "",
+   "ΤΡΟΦΙΜΑ (id όνομα), ανά κατηγορία:",
+   "Όσπρια: C20359 Φακές (ξερές)",
+   "Πουλερικά: C36017 Κοτόπουλο στήθος χωρίς πέτσα (ωμό)",
+   "Λιπαρά: C17270 Ελαιόλαδο εξαιρετικά παρθένο",
+   "Φρούτα: C13039 Μήλο (με φλούδα)",
+   ""
+  ]
+ },
+ "roundAmount": {
+  "0.004": 0.0,
+  "0.005": 0.01,
+  "0.0051": 0.01,
+  "0.015": 0.02,
+  "1.005": 1.0,
+  "2.675": 2.68,
+  "4999.999": 5000.0,
+  "83.333333": 83.33
+ },
+ "sameWords": {
+  "fakes|Φακές": true,
+  "|Φακές": false,
+  "α|α β": false,
+  "ξερές φακές κόκκινες|Φακές (ξερές)": false,
+  "φακές|Φακές (ξερές)": true,
+  "φακες ξερες|Φακές (ξερές)": true
+ },
+ "searchDishes": {
+  "": [],
+  "  ": [],
+  "by uses": [],
+  "fakes": [
+   "fakes"
+  ],
+  "giaourti milo": [
+   "milo-giaourti"
+  ],
+  "kotopoulo": [
+   "kotopoulo-ryzi",
+   "kotopoulo-salata"
+  ],
+  "ryzi": [
+   "kotopoulo-ryzi"
+  ],
+  "uses order": [
+   "S:4",
+   "K:1",
+   "P:0"
+  ],
+  "Φαγητό": [
+   "biftekia",
+   "fakes",
+   "fasolada",
+   "frygania",
+   "giaourti",
+   "kotopoulo-ryzi",
+   "kotopoulo-salata",
+   "milo-giaourti",
+   "mosxari",
+   "revithia",
+   "solomos",
+   "tonosalata",
+   "tsipoura",
+   "tsipoura-exo"
+  ],
+  "κοτο": [
+   "kotopoulo-ryzi",
+   "kotopoulo-salata"
+  ],
+  "ξξξ": [],
+  "σολ": [
+   "solomos"
+  ],
+  "φαγητο ρυζι": [
+   "kotopoulo-ryzi"
+  ],
+  "φακες": [
+   "fakes"
+  ]
+ },
+ "shopRound": {
+  "0.0": 0.0,
+  "0.2": 1.0,
+  "1.0": 1.0,
+  "10.0": 10.0,
+  "10.01": 20.0,
+  "100.0": 100.0,
+  "100.01": 110.0,
+  "9.01": 10.0,
+  "9.99": 10.0,
+  "95.0": 100.0
+ },
+ "shoppingList": {
+  "auto week from day 3": {
+   "fresh": {
+    "3": [
+     "Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 320.63"
+    ],
+    "4": [
+     "Μοσχάρι κιλότο (ωμό): 321.71"
+    ],
+    "5": [
+     "Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 291.25"
+    ],
+    "6": [
+     "Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 320.63",
+     "Σολομός υδατοκαλλιέργειας (ωμός): 237.24"
+    ]
+   },
+   "isEmpty": false,
+   "main": [
+    "Όσπρια · Φακές (ξερές): 500.00",
+    "Όσπρια · Φασόλια μέτρια λευκά (ξερά): 500.00",
+    "Γαλακτοκομικά · Γιαούρτι στραγγιστό 0%: 1534.14",
+    "Δημητριακά · Ρύζι λευκό (ωμό): 354.63",
+    "Λαχανικά · Κρεμμύδι ξερό (ωμό): 150.00",
+    "Λαχανικά · Ντομάτα (ωμή): 1101.56",
+    "Λιπαρά · Ελαιόλαδο εξαιρετικά παρθένο: 158.68",
+    "Τυριά · Φέτα (πρόβειο και κατσικίσιο): 128.26",
+    "Ψωμί · Φρυγανιές ολικής άλεσης: 245.48"
+   ],
+   "ordered": 1,
+   "text": [
+    "Ψώνια για το πρόγραμμα 2026-11-23 – 2026-11-29",
+    "",
+    "Όσπρια",
+    "- Φακές (ξερές): 500 g",
+    "- Φασόλια μέτρια λευκά (ξερά): 500 g",
+    "",
+    "Γαλακτοκομικά",
+    "- Γιαούρτι στραγγιστό 0%: 1.540 g",
+    "",
+    "Δημητριακά",
+    "- Ρύζι λευκό (ωμό): 360 g",
+    "",
+    "Λαχανικά",
+    "- Κρεμμύδι ξερό (ωμό): 150 g",
+    "- Ντομάτα (ωμή): 1.110 g",
+    "",
+    "Λιπαρά",
+    "- Ελαιόλαδο εξαιρετικά παρθένο: 160 g",
+    "",
+    "Τυριά",
+    "- Φέτα (πρόβειο και κατσικίσιο): 130 g",
+    "",
+    "Ψωμί",
+    "- Φρυγανιές ολικής άλεσης: 250 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-26)",
+    "- Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 330 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-27)",
+    "- Μοσχάρι κιλότο (ωμό): 330 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-28)",
+    "- Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 300 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-29)",
+    "- Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 330 g",
+    "- Σολομός υδατοκαλλιέργειας (ωμός): 240 g",
+    ""
+   ],
+   "unknown": []
+  },
+  "auto week seed 1": {
+   "fresh": {
+    "0": [
+     "Τσιπούρα υδατοκαλλιέργειας (ωμή): 449.48"
+    ],
+    "3": [
+     "Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 320.63"
+    ],
+    "4": [
+     "Μοσχάρι κιλότο (ωμό): 321.71"
+    ],
+    "5": [
+     "Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 291.25"
+    ],
+    "6": [
+     "Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 320.63",
+     "Σολομός υδατοκαλλιέργειας (ωμός): 237.24"
+    ]
+   },
+   "isEmpty": false,
+   "main": [
+    "Όσπρια · Ρεβίθια (ξερά): 500.00",
+    "Όσπρια · Φακές (ξερές): 500.00",
+    "Όσπρια · Φασόλια μέτρια λευκά (ξερά): 500.00",
+    "Γαλακτοκομικά · Γιαούρτι στραγγιστό 0%: 2651.86",
+    "Δημητριακά · Ρύζι λευκό (ωμό): 354.63",
+    "Λαχανικά · Κρεμμύδι ξερό (ωμό): 300.00",
+    "Λαχανικά · Ντομάτα (ωμή): 1294.20",
+    "Λιπαρά · Ελαιόλαδο εξαιρετικά παρθένο: 217.94",
+    "Τυριά · Φέτα (πρόβειο και κατσικίσιο): 128.26",
+    "Φρούτα · Μήλο (με φλούδα): 195.54",
+    "Ψωμί · Φρυγανιές ολικής άλεσης: 411.29"
+   ],
+   "ordered": 2,
+   "text": [
+    "Ψώνια για το πρόγραμμα 2026-11-23 – 2026-11-29",
+    "",
+    "Όσπρια",
+    "- Ρεβίθια (ξερά): 500 g",
+    "- Φακές (ξερές): 500 g",
+    "- Φασόλια μέτρια λευκά (ξερά): 500 g",
+    "",
+    "Γαλακτοκομικά",
+    "- Γιαούρτι στραγγιστό 0%: 2.660 g",
+    "",
+    "Δημητριακά",
+    "- Ρύζι λευκό (ωμό): 360 g",
+    "",
+    "Λαχανικά",
+    "- Κρεμμύδι ξερό (ωμό): 300 g",
+    "- Ντομάτα (ωμή): 1.300 g",
+    "",
+    "Λιπαρά",
+    "- Ελαιόλαδο εξαιρετικά παρθένο: 220 g",
+    "",
+    "Τυριά",
+    "- Φέτα (πρόβειο και κατσικίσιο): 130 g",
+    "",
+    "Φρούτα",
+    "- Μήλο (με φλούδα): 200 g",
+    "",
+    "Ψωμί",
+    "- Φρυγανιές ολικής άλεσης: 420 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-23)",
+    "- Τσιπούρα υδατοκαλλιέργειας (ωμή): 450 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-26)",
+    "- Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 330 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-27)",
+    "- Μοσχάρι κιλότο (ωμό): 330 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-28)",
+    "- Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 300 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-29)",
+    "- Κοτόπουλο στήθος χωρίς πέτσα (ωμό): 330 g",
+    "- Σολομός υδατοκαλλιέργειας (ωμός): 240 g",
+    ""
+   ],
+   "unknown": []
+  },
+  "empty": {
+   "fresh": {},
+   "isEmpty": true,
+   "main": [],
+   "ordered": 0,
+   "text": [
+    "Ψώνια για το πρόγραμμα 2026-11-23 – 2026-11-23",
+    ""
+   ],
+   "unknown": []
+  },
+  "pot cooked yesterday": {
+   "fresh": {
+    "2": [
+     "Μοσχάρι κιλότο (ωμό): 284.48"
+    ],
+    "4": [
+     "Σολομός υδατοκαλλιέργειας (ωμός): 200.00"
+    ]
+   },
+   "isEmpty": false,
+   "main": [
+    "Όσπρια · Φακές (ξερές): 500.00",
+    "Αυγά · Αυγό (ωμό): 28.45",
+    "Δημητριακά · Ρύζι λευκό (ωμό): 80.00",
+    "Λαχανικά · Κρεμμύδι ξερό (ωμό): 206.90",
+    "Λιπαρά · Ελαιόλαδο εξαιρετικά παρθένο: 51.38"
+   ],
+   "ordered": 1,
+   "text": [
+    "Ψώνια για το πρόγραμμα 2026-11-23 – 2026-11-27",
+    "",
+    "Όσπρια",
+    "- Φακές (ξερές): 500 g",
+    "",
+    "Αυγά",
+    "- Αυγό (ωμό): 30 g",
+    "",
+    "Δημητριακά",
+    "- Ρύζι λευκό (ωμό): 80 g",
+    "",
+    "Λαχανικά",
+    "- Κρεμμύδι ξερό (ωμό): 210 g",
+    "",
+    "Λιπαρά",
+    "- Ελαιόλαδο εξαιρετικά παρθένο: 60 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-25)",
+    "- Μοσχάρι κιλότο (ωμό): 290 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-27)",
+    "- Σολομός υδατοκαλλιέργειας (ωμός): 200 g",
+    ""
+   ],
+   "unknown": [
+    "Φαγητό που δεν υπάρχει πια (Βράδυ, μέρα 2)"
+   ]
+  },
+  "pot, order, missing, ate": {
+   "fresh": {
+    "2": [
+     "Μοσχάρι κιλότο (ωμό): 284.48"
+    ],
+    "4": [
+     "Σολομός υδατοκαλλιέργειας (ωμός): 200.00"
+    ]
+   },
+   "isEmpty": false,
+   "main": [
+    "Όσπρια · Φακές (ξερές): 1000.00",
+    "Αυγά · Αυγό (ωμό): 28.45",
+    "Δημητριακά · Ρύζι λευκό (ωμό): 80.00",
+    "Λαχανικά · Κρεμμύδι ξερό (ωμό): 356.90",
+    "Λιπαρά · Ελαιόλαδο εξαιρετικά παρθένο: 91.38"
+   ],
+   "ordered": 1,
+   "text": [
+    "Ψώνια για το πρόγραμμα 2026-11-23 – 2026-11-27",
+    "",
+    "Όσπρια",
+    "- Φακές (ξερές): 1.000 g",
+    "",
+    "Αυγά",
+    "- Αυγό (ωμό): 30 g",
+    "",
+    "Δημητριακά",
+    "- Ρύζι λευκό (ωμό): 80 g",
+    "",
+    "Λαχανικά",
+    "- Κρεμμύδι ξερό (ωμό): 360 g",
+    "",
+    "Λιπαρά",
+    "- Ελαιόλαδο εξαιρετικά παρθένο: 100 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-25)",
+    "- Μοσχάρι κιλότο (ωμό): 290 g",
+    "",
+    "Φρέσκα, τη μέρα που μαγειρεύεις (2026-11-27)",
+    "- Σολομός υδατοκαλλιέργειας (ωμός): 200 g",
+    ""
+   ],
+   "unknown": [
+    "Φαγητό που δεν υπάρχει πια (Βράδυ, μέρα 2)"
+   ]
+  }
+ },
+ "slotStateNow": {
+  "ate, entry deleted": "open",
+  "ate, entry exists": "ate",
+  "ate, entry on another day": "open",
+  "ate, no grp": "open",
+  "open": "open",
+  "other": "other",
+  "skip": "skip"
+ },
+ "tags": {
+  "PlanInfo.fromJson": {
+   "13 tags": {
+    "cook": "home",
+    "tags": [
+     "ετικέτα 0",
+     "ετικέτα 1",
+     "ετικέτα 2",
+     "ετικέτα 3",
+     "ετικέτα 4",
+     "ετικέτα 5",
+     "ετικέτα 6",
+     "ετικέτα 7",
+     "ετικέτα 8",
+     "ετικέτα 9",
+     "ετικέτα 10",
+     "ετικέτα 11"
+    ]
+   },
+   "bad key": {
+    "cook": "home"
+   },
+   "full": {
+    "cook": "none",
+    "key": "fakes",
+    "meals": [
+     "dinner",
+     "lunch"
+    ],
+    "office": true,
+    "order": "ζήτα ψητό",
+    "tags": [
+     "όσπρια"
+    ]
+   },
+   "long key": {
+    "cook": "home"
+   },
+   "long order": {
+    "cook": "out",
+    "order": "μήκος 800"
+   },
+   "not a map": null
+  },
+  "hasTag/fits": [
+   true,
+   false,
+   true,
+   false,
+   true
+  ],
+  "normTag": [
+   "λιπαρό ψάρι",
+   ""
+  ],
+  "sameTag": [
+   true,
+   true,
+   false
+  ]
+ },
+ "weekPrompt": {
+  "bare": {
+   "hash": "77f6071e",
+   "head": "ΠΡΟΓΡΑΜΜΑ ΕΒΔΟΜΑΔΑΣ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»\n\nΦτιάξε το πρόγραμμα φαγητού μου από τη 2027-03-29 (7 μέρες), ΜΟΝΟ ",
+   "len": 3234,
+   "tail": " tsipoura-exo · πιάτο, από παραγγελία · lunch/dinner · ψάρι · μερίδα 732 kcal, πρωτεΐνη 79 g, κορεσμένα 4.3 g, ίνες 1 g\n"
+  },
+  "disliked and missing": [
+   "ΠΡΟΓΡΑΜΜΑ ΕΒΔΟΜΑΔΑΣ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»",
+   "",
+   "Φτιάξε το πρόγραμμα φαγητού μου από τη 2026-11-23 (7 μέρες), ΜΟΝΟ με φαγητά της «ΒΙΒΛΙΟΘΗΚΗΣ» πιο κάτω. Πόσα γεύματα τη μέρα και τι άλλο ισχύει, θα σου τα πω στη συζήτησή μας.",
+   "",
+   "Κανόνες:",
+   {
+    "hash": "e6e00a4b",
+    "head": "1. Κάθε γεύμα: \"meal\" (\"lunch\" μεσημέρι, \"dinner\" βράδυ, \"snack\" σνακ, \"breakfast\" πρωινό), \"key\" ενός φαγητού της βιβλι",
+    "len": 323,
+    "tail": "ς \"kcal\", μετρά η μερίδα της συνταγής. Η εφαρμογή βγάζει τα γραμμάρια από τη βάση· ΜΗ γράψεις γραμμάρια ή άλλα θρεπτικά."
+   },
+   "2. Οι θερμίδες κάθε μέρας κοντά στον στόχο, και κατά μέσο όρο της εβδομάδας πάνω του· πρωτεΐνη μοιρασμένη στα γεύματα· κορεσμένα κάτω από το όριο· αρκετές ίνες.",
+   "3. Φαγητό κατσαρόλας (\"pot\"): μαγειρεύεται μία φορά και τρώγεται ως 3 μέρες (ίδιο key σε συνεχόμενα γεύματα).",
+   "4. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή. Στη θέση του «…» βάλε όλα τα γεύματα και όλες τις μέρες:",
+   "```json",
+   "{",
+   "  \"kind\": \"ygeia-week\",",
+   "  \"from\": \"2026-11-23\",",
+   "  \"days\": [",
+   "    [{\"meal\": \"lunch\", \"key\": \"fakes-kokkinistes\", \"kcal\": 650}, {\"meal\": \"snack\", \"key\": \"…\"}, …],",
+   "    …",
+   "  ]",
+   "}",
+   "```",
+   "",
+   "ΤΗΝ ΕΒΔΟΜΑΔΑ: ψάρι 2 φορές.",
+   "",
+   "ΒΙΒΛΙΟΘΗΚΗ (key · όνομα · είδος · γεύματα · γραφείο · ετικέτες · η μερίδα της συνταγής από τη βάση):",
+   "biftekia · Φαγητό biftekia · 4 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · κόκκινο κρέας · μερίδα 220 kcal, πρωτεΐνη 31 g, κορεσμένα 2.1 g, ίνες 0 g",
+   "fakes · Φαγητό fakes · κατσαρόλα ~6 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · όσπρια · μερίδα 342 kcal, πρωτεΐνη 21 g, κορεσμένα 1.3 g, ίνες 14 g",
+   "fasolada · Φαγητό fasolada · κατσαρόλα ~6 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · όσπρια · μερίδα 325 kcal, πρωτεΐνη 20 g, κορεσμένα 1.2 g, ίνες 13 g",
+   "frygania · Φαγητό frygania · πιάτο, χωρίς μαγείρεμα · snack · ΛΕΙΠΕΙ ΥΛΙΚΟ: μην το βάλεις",
+   "giaourti · Φαγητό giaourti · πιάτο, χωρίς μαγείρεμα · snack · μερίδα 345 kcal, πρωτεΐνη 30 g, κορεσμένα 0.7 g, ίνες 5 g",
+   "kotopoulo-ryzi · Φαγητό kotopoulo-ryzi · πιάτο, μαγείρεμα στο σπίτι · lunch/dinner · μερίδα 625 kcal, πρωτεΐνη 53 g, κορεσμένα 2.5 g, ίνες 1 g",
+   "kotopoulo-salata · Φαγητό kotopoulo-salata · πιάτο, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · μερίδα 561 kcal, πρωτεΐνη 54 g, κορεσμένα 10.6 g, ίνες 3 g",
+   "milo-giaourti · Φαγητό milo-giaourti · πιάτο, χωρίς μαγείρεμα · snack · μερίδα 303 kcal, πρωτεΐνη 30 g, κορεσμένα 0.7 g, ίνες 4 g",
+   "mosxari · Φαγητό mosxari · πιάτο, μαγείρεμα στο σπίτι · dinner · κόκκινο κρέας · ΜΟΥ ΑΡΕΣΕ · μερίδα 516 kcal, πρωτεΐνη 53 g, κορεσμένα 1.7 g, ίνες 1 g",
+   "revithia · Φαγητό revithia · κατσαρόλα ~6 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · όσπρια · μερίδα 361 kcal, πρωτεΐνη 17 g, κορεσμένα 1.6 g, ίνες 11 g",
+   "solomos · Φαγητό solomos · πιάτο, μαγείρεμα στο σπίτι · dinner · λιπαρό ψάρι · ΔΕΝ ΜΟΥ ΑΡΕΣΕ: μην το βάλεις",
+   "tonosalata · Φαγητό tonosalata · πιάτο, χωρίς μαγείρεμα · lunch · γραφείο · μερίδα 498 kcal, πρωτεΐνη 46 g, κορεσμένα 3.5 g, ίνες 6 g",
+   "tsipoura · Φαγητό tsipoura · πιάτο, μαγείρεμα στο σπίτι · dinner · ψάρι · μερίδα 615 kcal, πρωτεΐνη 74 g, κορεσμένα 6.4 g, ίνες 2 g",
+   "tsipoura-exo · Φαγητό tsipoura-exo · πιάτο, από παραγγελία · lunch/dinner · ψάρι · μερίδα 732 kcal, πρωτεΐνη 79 g, κορεσμένα 4.3 g, ίνες 1 g",
+   ""
+  ],
+  "with targets": [
+   "ΠΡΟΓΡΑΜΜΑ ΕΒΔΟΜΑΔΑΣ ΓΙΑ ΤΗΝ ΕΦΑΡΜΟΓΗ «ΥΓΕΙΑ & ΦΟΡΜΑ»",
+   "",
+   "Φτιάξε το πρόγραμμα φαγητού μου από τη 2026-11-23 (7 μέρες), ΜΟΝΟ με φαγητά της «ΒΙΒΛΙΟΘΗΚΗΣ» πιο κάτω. Πόσα γεύματα τη μέρα και τι άλλο ισχύει, θα σου τα πω στη συζήτησή μας.",
+   "",
+   "Κανόνες:",
+   {
+    "hash": "e6e00a4b",
+    "head": "1. Κάθε γεύμα: \"meal\" (\"lunch\" μεσημέρι, \"dinner\" βράδυ, \"snack\" σνακ, \"breakfast\" πρωινό), \"key\" ενός φαγητού της βιβλι",
+    "len": 323,
+    "tail": "ς \"kcal\", μετρά η μερίδα της συνταγής. Η εφαρμογή βγάζει τα γραμμάρια από τη βάση· ΜΗ γράψεις γραμμάρια ή άλλα θρεπτικά."
+   },
+   "2. Οι θερμίδες κάθε μέρας κοντά στον στόχο, και κατά μέσο όρο της εβδομάδας πάνω του· πρωτεΐνη μοιρασμένη στα γεύματα· κορεσμένα κάτω από το όριο· αρκετές ίνες.",
+   "3. Φαγητό κατσαρόλας (\"pot\"): μαγειρεύεται μία φορά και τρώγεται ως 3 μέρες (ίδιο key σε συνεχόμενα γεύματα).",
+   "4. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή. Στη θέση του «…» βάλε όλα τα γεύματα και όλες τις μέρες:",
+   "```json",
+   "{",
+   "  \"kind\": \"ygeia-week\",",
+   "  \"from\": \"2026-11-23\",",
+   "  \"days\": [",
+   "    [{\"meal\": \"lunch\", \"key\": \"fakes-kokkinistes\", \"kcal\": 650}, {\"meal\": \"snack\", \"key\": \"…\"}, …],",
+   "    …",
+   "  ]",
+   "}",
+   "```",
+   "",
+   "ΟΙ ΣΤΟΧΟΙ ΜΟΥ ΑΝΑ ΜΕΡΑ: 2.150 kcal · πρωτεΐνη 150 g · κορεσμένα έως 14 g · ίνες τουλάχιστον 30 g · αλάτι κάτω από 5 g.",
+   "ΤΗΝ ΕΒΔΟΜΑΔΑ: όσπρια 4 φορές · ψάρι 2 φορές.",
+   "",
+   "ΒΙΒΛΙΟΘΗΚΗ (key · όνομα · είδος · γεύματα · γραφείο · ετικέτες · η μερίδα της συνταγής από τη βάση):",
+   "biftekia · Φαγητό biftekia · 4 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · κόκκινο κρέας · μερίδα 220 kcal, πρωτεΐνη 31 g, κορεσμένα 2.1 g, ίνες 0 g",
+   "fakes · Φαγητό fakes · κατσαρόλα ~6 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · όσπρια · μερίδα 342 kcal, πρωτεΐνη 21 g, κορεσμένα 1.3 g, ίνες 14 g",
+   "fasolada · Φαγητό fasolada · κατσαρόλα ~6 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · όσπρια · μερίδα 325 kcal, πρωτεΐνη 20 g, κορεσμένα 1.2 g, ίνες 13 g",
+   "frygania · Φαγητό frygania · πιάτο, χωρίς μαγείρεμα · snack · μερίδα 288 kcal, πρωτεΐνη 11 g, κορεσμένα 7.2 g, ίνες 6 g",
+   "giaourti · Φαγητό giaourti · πιάτο, χωρίς μαγείρεμα · snack · μερίδα 345 kcal, πρωτεΐνη 30 g, κορεσμένα 0.7 g, ίνες 5 g",
+   "kotopoulo-ryzi · Φαγητό kotopoulo-ryzi · πιάτο, μαγείρεμα στο σπίτι · lunch/dinner · μερίδα 625 kcal, πρωτεΐνη 53 g, κορεσμένα 2.5 g, ίνες 1 g",
+   "kotopoulo-salata · Φαγητό kotopoulo-salata · πιάτο, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · μερίδα 561 kcal, πρωτεΐνη 54 g, κορεσμένα 10.6 g, ίνες 3 g",
+   "milo-giaourti · Φαγητό milo-giaourti · πιάτο, χωρίς μαγείρεμα · snack · μερίδα 303 kcal, πρωτεΐνη 30 g, κορεσμένα 0.7 g, ίνες 4 g",
+   "mosxari · Φαγητό mosxari · πιάτο, μαγείρεμα στο σπίτι · dinner · κόκκινο κρέας · μερίδα 516 kcal, πρωτεΐνη 53 g, κορεσμένα 1.7 g, ίνες 1 g",
+   "revithia · Φαγητό revithia · κατσαρόλα ~6 μερίδες, μαγείρεμα στο σπίτι · lunch/dinner · γραφείο · όσπρια · μερίδα 361 kcal, πρωτεΐνη 17 g, κορεσμένα 1.6 g, ίνες 11 g",
+   "solomos · Φαγητό solomos · πιάτο, μαγείρεμα στο σπίτι · dinner · λιπαρό ψάρι · μερίδα 666 kcal, πρωτεΐνη 47 g, κορεσμένα 4.4 g, ίνες 1 g",
+   "tonosalata · Φαγητό tonosalata · πιάτο, χωρίς μαγείρεμα · lunch · γραφείο · μερίδα 498 kcal, πρωτεΐνη 46 g, κορεσμένα 3.5 g, ίνες 6 g",
+   "tsipoura · Φαγητό tsipoura · πιάτο, μαγείρεμα στο σπίτι · dinner · ψάρι · μερίδα 615 kcal, πρωτεΐνη 74 g, κορεσμένα 6.4 g, ίνες 2 g",
+   "tsipoura-exo · Φαγητό tsipoura-exo · πιάτο, από παραγγελία · lunch/dinner · ψάρι · μερίδα 732 kcal, πρωτεΐνη 79 g, κορεσμένα 4.3 g, ίνες 1 g",
+   ""
+  ]
+ },
+ "weighRound": {
+  "0.0": 0.5,
+  "0.1": 0.5,
+  "0.24": 0.5,
+  "0.25": 0.5,
+  "0.74": 0.5,
+  "0.75": 1.0,
+  "10.0": 10.0,
+  "10.49": 10.0,
+  "10.5": 11.0,
+  "11.5": 12.0,
+  "123.5": 124.0,
+  "3.2": 3.0,
+  "3.25": 3.5,
+  "9.74": 9.5,
+  "9.75": 10.0,
+  "9.99": 10.0
+ }
+}

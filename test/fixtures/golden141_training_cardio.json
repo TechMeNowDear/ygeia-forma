@@ -1,0 +1,1318 @@
+{
+ "WalkZone.fromJson": {
+  "defaults": {
+   "down": false,
+   "hi": 125,
+   "lo": 100,
+   "up": true
+  },
+  "equality": [
+   true,
+   false
+  ],
+  "hi 221": null,
+  "lo 49": null,
+  "lo = hi": null,
+  "not a map": null,
+  "ok": {
+   "down": true,
+   "hi": 125,
+   "lo": 100,
+   "up": false
+  },
+  "text": null
+ },
+ "ZoneSettings.fromJson": {
+  "bounds high": {
+   "json": {
+    "down": false,
+    "up": true
+   },
+   "manual": false
+  },
+  "bounds low": {
+   "json": {
+    "down": false,
+    "up": true
+   },
+   "manual": false
+  },
+  "bounds ok high": {
+   "json": {
+    "down": false,
+    "hi": 220,
+    "lo": 219,
+    "max": 230,
+    "rest": 120,
+    "up": true
+   },
+   "manual": true
+  },
+  "bounds ok low": {
+   "json": {
+    "down": false,
+    "hi": 51,
+    "lo": 50,
+    "max": 100,
+    "rest": 30,
+    "up": true
+   },
+   "manual": true
+  },
+  "copyWith clear": {
+   "down": true,
+   "up": true
+  },
+  "copyWith set": {
+   "down": false,
+   "hi": 120,
+   "lo": 95,
+   "max": 170,
+   "rest": 60,
+   "talk": [
+    [
+     "a",
+     "b"
+    ]
+   ],
+   "up": false
+  },
+  "empty": {
+   "json": {
+    "down": false,
+    "up": true
+   },
+   "manual": false
+  },
+  "full": {
+   "json": {
+    "down": true,
+    "hi": 125,
+    "lo": 100,
+    "max": 172,
+    "rest": 58,
+    "talk": [
+     [
+      "2026-11-24",
+      "ok"
+     ]
+    ],
+    "up": false
+   },
+   "manual": true
+  },
+  "lo >= hi": {
+   "json": {
+    "down": false,
+    "up": true
+   },
+   "manual": false
+  },
+  "not a map": {
+   "json": {
+    "down": false,
+    "up": true
+   },
+   "manual": false
+  }
+ },
+ "computeZone": {
+  "δικοί του παλμοί ηρεμίας 58": "105–127 · ηρεμίας 58 · μέγιστοι 175 · maxMeasured false · restMeasured true · manual false",
+  "ηλικία 25 · ηρεμίας 120.0": "148–162 · ηρεμίας 120 · μέγιστοι 191 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 25 · ηρεμίας 29.9": "122–145 · ηρεμίας null · μέγιστοι 191 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 25 · ηρεμίας 30.0": "94–125 · ηρεμίας 30 · μέγιστοι 191 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 25 · ηρεμίας 54.6": "109–135 · ηρεμίας 55 · μέγιστοι 191 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 25 · ηρεμίας 70.0": "118–141 · ηρεμίας 70 · μέγιστοι 191 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 25 · ηρεμίας null": "122–145 · ηρεμίας null · μέγιστοι 191 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 120.0": "142–152 · ηρεμίας 120 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 154.0 (όριο)": "162–166 · ηρεμίας 154 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 154.4 (όριο)": "162–166 · ηρεμίας 154 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 154.5 (όριο)": "163–167 · ηρεμίας 155 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 155.0 (όριο)": "112–133 · ηρεμίας null · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 156.0 (όριο)": "112–133 · ηρεμίας null · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 29.9": "112–133 · ηρεμίας null · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 30.0": "88–116 · ηρεμίας 30 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 54.6": "103–126 · ηρεμίας 55 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας 70.0": "112–132 · ηρεμίας 70 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 47 · ηρεμίας null": "112–133 · ηρεμίας null · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 70 · ηρεμίας 120.0": "136–143 · ηρεμίας 120 · μέγιστοι 159 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 70 · ηρεμίας 29.9": "102–121 · ηρεμίας null · μέγιστοι 159 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 70 · ηρεμίας 30.0": "82–106 · ηρεμίας 30 · μέγιστοι 159 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 70 · ηρεμίας 54.6": "97–116 · ηρεμίας 55 · μέγιστοι 159 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 70 · ηρεμίας 70.0": "106–123 · ηρεμίας 70 · μέγιστοι 159 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία 70 · ηρεμίας null": "102–121 · ηρεμίας null · μέγιστοι 159 · maxMeasured false · restMeasured false · manual false",
+  "ηλικία null · ηρεμίας 120.0": null,
+  "ηλικία null · ηρεμίας 29.9": null,
+  "ηλικία null · ηρεμίας 30.0": null,
+  "ηλικία null · ηρεμίας 54.6": null,
+  "ηλικία null · ηρεμίας 70.0": null,
+  "ηλικία null · ηρεμίας null": null,
+  "μετρημένοι μέγιστοι 153": "97–115 · ηρεμίας 60 · μέγιστοι 153 · maxMeasured true · restMeasured false · manual false",
+  "μετρημένοι μέγιστοι, χωρίς ηλικία": "108–131 · ηρεμίας 60 · μέγιστοι 180 · maxMeasured true · restMeasured false · manual false",
+  "μόνο κάτω όριο (όχι χειροκίνητη)": "112–133 · ηρεμίας null · μέγιστοι 175 · maxMeasured false · restMeasured false · manual false",
+  "χειροκίνητη 100–125": "100–125 · ηρεμίας 60 · μέγιστοι 175 · maxMeasured false · restMeasured false · manual true",
+  "χειροκίνητη, χωρίς ηλικία": "100–125 · ηρεμίας null · μέγιστοι 0 · maxMeasured false · restMeasured false · manual true"
+ },
+ "constants": {
+  "defaultRepSec": 4.5,
+  "maxSetSec": 120.0,
+  "minRest": 15,
+  "minSamples": 3,
+  "minSetSec": 20.0,
+  "paceTolerance": 0.02,
+  "perSideExercises": [
+   "band_er",
+   "db_row",
+   "pallof",
+   "split_squat"
+  ],
+  "repsTolerance": 1,
+  "restWindow": 10,
+  "setWindow": 30,
+  "sideSwitchSec": 5.0,
+  "talkAskWalks": 3,
+  "walkMinSec": 900,
+  "walkNeeded": 4,
+  "zoneBackSec": 10,
+  "zoneGapSec": 60,
+  "zoneHiMaxPct": 0.76,
+  "zoneHiPct": 0.59,
+  "zoneHoldSec": 5,
+  "zoneLoMaxPct": 0.64,
+  "zoneLoPct": 0.4,
+  "zoneRepeatSec": 120,
+  "zoneRestMax": 120,
+  "zoneRestMin": 30,
+  "zoneWarmupSec": 300
+ },
+ "hrQuality": {
+  "": null,
+  "null": null,
+  "only bad": "Μετρήσεις ρολογιού: 999 με καλή επαφή · 1 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).",
+  "only low": "Μετρήσεις ρολογιού: 1.500 με καλή επαφή · 20 χαμηλής ακρίβειας.",
+  "q=0/0/0": null,
+  "q=0/0/5": "0|0|5|5 · Μετρήσεις ρολογιού: 0 με καλή επαφή · 5 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).",
+  "q=1/2": null,
+  "q=1/2/3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": null,
+  "q=1/2/3/4": null,
+  "q=100/0/0": "100|0|0|100 · Μετρήσεις ρολογιού: 100, όλες με καλή επαφή.",
+  "q=1234/56/7": "1234|56|7|1297 · Μετρήσεις ρολογιού: 1.234 με καλή επαφή · 56 χαμηλής ακρίβειας · 7 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).",
+  "q=1234567890/1/1": null,
+  "v=3 q=10/2/1 x": "10|2|1|13 · Μετρήσεις ρολογιού: 10 με καλή επαφή · 2 χαμηλής ακρίβειας · 1 χωρίς επαφή ή αναξιόπιστες (δεν μέτρησαν).",
+  "xq=1/2/3": null
+ },
+ "kmText": {
+  "0.0": "0,00",
+  "1004.9": "1,00",
+  "1005.0": "1,00",
+  "12345.6": "12,35",
+  "4.9": "0,00",
+  "5.0": "0,01",
+  "999.0": "1,00"
+ },
+ "liveMeters": {
+  "empty": null,
+  "gps": "1200.0",
+  "gps as text": "2000.0 ≈",
+  "no gps": "800.0 ≈"
+ },
+ "meanIn/restIn": {
+  "empty": null,
+  "meanIn 0–30": 120,
+  "meanIn 30–60": 100,
+  "meanIn 597–700 (3 δείγματα)": 95,
+  "meanIn 599–700 (1 δείγμα)": null,
+  "meanIn half seconds": 120,
+  "restIn 14 s": null,
+  "restIn 15 s": 91,
+  "restIn 90 s": 121
+ },
+ "pickMeters": {
+  "false|0.0|0.0": null,
+  "false|0.0|10.0": "10.0 ≈",
+  "false|0.0|9.9": null,
+  "false|10.0|0.0": "10.0 ≈",
+  "false|1919.0|2400.0": "1919.0 ≈",
+  "false|1920.0|2400.0": "1920.0 ≈",
+  "false|1921.0|2400.0": "1921.0 ≈",
+  "false|2300.0|2400.0": "2300.0 ≈",
+  "false|2300.0|9.0": "2300.0 ≈",
+  "false|9.0|2400.0": "2400.0 ≈",
+  "false|9.9|0.0": null,
+  "null|0.0|0.0": null,
+  "null|0.0|10.0": "10.0 ≈",
+  "null|0.0|9.9": null,
+  "null|10.0|0.0": "10.0",
+  "null|1919.0|2400.0": "2400.0 ≈",
+  "null|1920.0|2400.0": "1920.0",
+  "null|1921.0|2400.0": "1921.0",
+  "null|2300.0|2400.0": "2300.0",
+  "null|2300.0|9.0": "2300.0",
+  "null|9.0|2400.0": "2400.0 ≈",
+  "null|9.9|0.0": null,
+  "true|0.0|0.0": null,
+  "true|0.0|10.0": "10.0 ≈",
+  "true|0.0|9.9": null,
+  "true|10.0|0.0": "10.0",
+  "true|1919.0|2400.0": "2400.0 ≈",
+  "true|1920.0|2400.0": "1920.0",
+  "true|1921.0|2400.0": "1921.0",
+  "true|2300.0|2400.0": "2300.0",
+  "true|2300.0|9.0": "2300.0",
+  "true|9.0|2400.0": "2400.0 ≈",
+  "true|9.9|0.0": null
+ },
+ "progressWindows": {
+  "month 2026-10-26": "2026-08-28..2026-09-26 | 2026-09-27..2026-10-26",
+  "month 2026-12-20": "2026-10-22..2026-11-20 | 2026-11-21..2026-12-20",
+  "month 2027-03-30": "2027-01-30..2027-02-28 | 2027-03-01..2027-03-30",
+  "month 2028-03-01": "2028-01-02..2028-01-31 | 2028-02-01..2028-03-01",
+  "quarter 2026-10-26": "2026-04-30..2026-07-28 | 2026-07-29..2026-10-26",
+  "quarter 2026-12-20": "2026-06-24..2026-09-21 | 2026-09-22..2026-12-20",
+  "quarter 2027-03-30": "2026-10-02..2026-12-30 | 2026-12-31..2027-03-30",
+  "quarter 2028-03-01": "2027-09-04..2027-12-02 | 2027-12-03..2028-03-01",
+  "year 2026-10-26": "2026-08-28..2026-09-26 | 2026-09-27..2026-10-26",
+  "year 2026-12-20": "2026-10-22..2026-11-20 | 2026-11-21..2026-12-20",
+  "year 2027-03-30": "2027-01-30..2027-02-28 | 2027-03-01..2027-03-30",
+  "year 2028-03-01": "2028-01-02..2028-01-31 | 2028-02-01..2028-03-01"
+ },
+ "sessionSetHr": {
+  "default": "101: 100/121 101/122 102/93 ## 102: 104/null 99/null - -",
+  "no hr": 0,
+  "own seconds only for db_row": "101: 100/121 101/122 102/123 ## 102: 104/null 99/null - -",
+  "slow reps (8 s)": "101: 100/91 101/92 102/null ## 102: 104/null 99/null - -"
+ },
+ "setSeconds": {
+  "0": "20.0|20.0|20.0|45.0|20.0",
+  "1": "20.0|20.0|20.0|45.0|20.0",
+  "12": "54.0|30.0|54.0|113.0|36.0",
+  "26": "117.0|65.0|117.0|239.0|78.0",
+  "27": "120.0|67.5|120.0|245.0|81.0",
+  "4": "20.0|20.0|20.0|45.0|20.0",
+  "5": "22.5|20.0|22.5|50.0|20.0",
+  "50": "120.0|120.0|120.0|245.0|120.0",
+  "8": "36.0|20.0|36.0|77.0|24.0"
+ },
+ "strengthProgress": {
+  "month": "hammer_curl(dbPair) 12-14→12-18 10,10,10→12,11,11 Δεπαν 4 Δφορτίο 0.0 στοΕύρος true up ## db_press(dbPair) 11-10→12-14 10,10,9→8,8,8 Δεπαν -5 Δφορτίο 2.5 στοΕύρος true up ## db_row(db) 11-10→12-14 10,10,10→10,9,9 Δεπαν -2 Δφορτίο 2.5 στοΕύρος true up ## goblet(kb) 11-10→12-14 12,12,12→15,15,14 Δεπαν 8 Δφορτίο -2.0 στοΕύρος true mixed ## reverse_crunch(bodyweight) 11-10→12-14 10,10,9→9,9,8 Δεπαν -3 Δφορτίο 0.0 στοΕύρος true down ## assisted_pullup(bandAssist) 11-10→12-14 6,6,5→5,5,4 Δεπαν -3 Δφορτίο 20.0 στοΕύρος false mixed ## rdl(bar) 11-10→12-14 12,12,12→6,5,5 Δεπαν -20 Δφορτίο 5.0 στοΕύρος false mixed ## band_pushdown(band) 11-10→12-14 12,12,12→12,12,13 Δεπαν 1 Δφορτίο 0.0 στοΕύρος true same",
+  "quarter": "hammer_curl(dbPair) 12-14→12-18 10,10,10→12,11,11 Δεπαν 4 Δφορτίο 0.0 στοΕύρος true up ## db_press(dbPair) 11-10→12-14 10,10,9→8,8,8 Δεπαν -5 Δφορτίο 2.5 στοΕύρος true up ## db_row(db) 11-10→12-14 10,10,10→10,9,9 Δεπαν -2 Δφορτίο 2.5 στοΕύρος true up ## goblet(kb) 11-10→12-14 12,12,12→15,15,14 Δεπαν 8 Δφορτίο -2.0 στοΕύρος true mixed ## reverse_crunch(bodyweight) 11-10→12-14 10,10,9→9,9,8 Δεπαν -3 Δφορτίο 0.0 στοΕύρος true down ## assisted_pullup(bandAssist) 11-10→12-14 6,6,5→5,5,4 Δεπαν -3 Δφορτίο 20.0 στοΕύρος false mixed ## rdl(bar) 11-10→12-14 12,12,12→6,5,5 Δεπαν -20 Δφορτίο 5.0 στοΕύρος false mixed ## band_pushdown(band) 11-10→12-14 12,12,12→12,12,13 Δεπαν 1 Δφορτίο 0.0 στοΕύρος true same",
+  "year": "hammer_curl(dbPair) 12-14→12-18 10,10,10→12,11,11 Δεπαν 4 Δφορτίο 0.0 στοΕύρος true up ## db_press(dbPair) 11-10→12-14 10,10,9→8,8,8 Δεπαν -5 Δφορτίο 2.5 στοΕύρος true up ## db_row(db) 11-10→12-14 10,10,10→10,9,9 Δεπαν -2 Δφορτίο 2.5 στοΕύρος true up ## goblet(kb) 11-10→12-14 12,12,12→15,15,14 Δεπαν 8 Δφορτίο -2.0 στοΕύρος true mixed ## reverse_crunch(bodyweight) 11-10→12-14 10,10,9→9,9,8 Δεπαν -3 Δφορτίο 0.0 στοΕύρος true down ## assisted_pullup(bandAssist) 11-10→12-14 6,6,5→5,5,4 Δεπαν -3 Δφορτίο 20.0 στοΕύρος false mixed ## rdl(bar) 11-10→12-14 12,12,12→6,5,5 Δεπαν -20 Δφορτίο 5.0 στοΕύρος false mixed ## band_pushdown(band) 11-10→12-14 12,12,12→12,12,13 Δεπαν 1 Δφορτίο 0.0 στοΕύρος true same",
+  "δέκα μέρες αργότερα": "hammer_curl(dbPair) 12-14→12-18 10,10,10→12,11,11 Δεπαν 4 Δφορτίο 0.0 στοΕύρος true up ## db_press(dbPair) 11-30→12-14 12,12,11→8,8,8 Δεπαν -11 Δφορτίο 2.5 στοΕύρος true up ## db_row(db) 11-30→12-14 8,8,7→10,9,9 Δεπαν 5 Δφορτίο 0.0 στοΕύρος true up ## goblet(kb) 11-30→12-14 12,12,12→15,15,14 Δεπαν 8 Δφορτίο 0.0 στοΕύρος true up ## reverse_crunch(bodyweight) 11-30→12-14 12,12,12→9,9,8 Δεπαν -10 Δφορτίο 0.0 στοΕύρος true down ## assisted_pullup(bandAssist) 11-30→12-14 6,5,5→5,5,4 Δεπαν -2 Δφορτίο 10.0 στοΕύρος false mixed ## rdl(bar) 11-30→12-14 9,8,8→6,5,5 Δεπαν -9 Δφορτίο 2.5 στοΕύρος false mixed ## band_pushdown(band) 11-30→12-14 12,11,12→12,12,13 Δεπαν 2 Δφορτίο 0.0 στοΕύρος true up",
+  "κενό": ""
+ },
+ "strideFor": {
+  "from walks": 0.768025078,
+  "no walks · 119.0 · f": null,
+  "no walks · 119.0 · m": null,
+  "no walks · 119.0 · null": null,
+  "no walks · 120.0 · f": 0.4956,
+  "no walks · 120.0 · m": 0.498,
+  "no walks · 120.0 · null": 0.498,
+  "no walks · 177.0 · f": 0.73101,
+  "no walks · 177.0 · m": 0.73455,
+  "no walks · 177.0 · null": 0.73455,
+  "no walks · 230.0 · f": 0.9499,
+  "no walks · 230.0 · m": 0.9545,
+  "no walks · 230.0 · null": 0.9545,
+  "no walks · 231.0 · f": null,
+  "no walks · 231.0 · m": null,
+  "no walks · 231.0 · null": null,
+  "no walks · null · f": null,
+  "no walks · null · m": null,
+  "no walks · null · null": null,
+  "only the first five": 0.740740741
+ },
+ "talkShift": {
+  "": 0,
+  "no": -5,
+  "ok": 0,
+  "sing": 5
+ },
+ "tanakaMax": "195 195 194 193 193 192 191 191 190 189 188 188 187 186 186 185 184 184 183 182 181 181 180 179 179 178 177 177 176 175 174 174 173 172 172 171 170 170 169 168 167 167 166 165 165 164 163 163 162 161 160 160 159 158 158 157 156 156 155 154 153 153 152 151 151 150 149 149 148 147 146 146 145",
+ "walkHistory": {
+  "2026-10-28": {
+   "pw.hr": 119.0,
+   "pw.pace": 782.608696
+  },
+  "2026-11-02": {
+   "pw.hr": 119.0,
+   "pw.pace": 782.608696
+  },
+  "2026-11-07": {
+   "pw.hr": 119.0,
+   "pw.pace": 782.608696
+  },
+  "2026-11-12": {
+   "pw.hr": 119.0,
+   "pw.pace": 782.608696
+  },
+  "2026-11-17": {
+   "pw.hr": 119.0,
+   "pw.pace": 782.608696
+  },
+  "2026-11-30": {
+   "pw.hr": 114.0,
+   "pw.pace": 782.608696
+  },
+  "2026-12-06": {
+   "pw.hr": 114.0,
+   "pw.pace": 782.608696
+  },
+  "2026-12-12": {
+   "pw.hr": 114.0,
+   "pw.pace": 782.608696
+  },
+  "2026-12-18": {
+   "pw.hr": 118.0,
+   "pw.pace": 782.608696
+  }
+ },
+ "walkHrPoints": [
+  "2026-11-30=114.0",
+  "2026-12-06=114.0",
+  "2026-12-12=114.0",
+  "2026-12-18=114.0",
+  "2026-12-18=122.0"
+ ],
+ "walkProgress": {
+  "ίδια · month": {
+   "count": "6|6|10800",
+   "hr": {
+    "changed": false,
+    "current": 113.5,
+    "key": "pw.hr",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 113.5,
+    "status": "stable"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 782.608696,
+    "status": "stable"
+   },
+   "paceRel": "same"
+  },
+  "ίδια · quarter": {
+   "count": "12|0|21600",
+   "hr": {
+    "changed": false,
+    "current": 113.5,
+    "key": "pw.hr",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "δύο την ίδια μέρα και ένα που δεν μετρά · month": {
+   "count": "5|5|9000",
+   "hr": {
+    "changed": false,
+    "current": 114.0,
+    "key": "pw.hr",
+    "nCurrent": 4,
+    "nPrevious": 5,
+    "previous": 119.0,
+    "status": "stable"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 4,
+    "nPrevious": 5,
+    "previous": 782.608696,
+    "status": "stable"
+   },
+   "paceRel": "same"
+  },
+  "δύο την ίδια μέρα και ένα που δεν μετρά · quarter": {
+   "count": "10|0|18000",
+   "hr": {
+    "changed": false,
+    "current": 119.0,
+    "key": "pw.hr",
+    "nCurrent": 9,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 9,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "καθόλου · month": {
+   "count": "0|0|0",
+   "hr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": null,
+    "key": "pw.pace",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "καθόλου · quarter": {
+   "count": "0|0|0",
+   "hr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": null,
+    "key": "pw.pace",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "παλμοί κάτω, ίδιος ρυθμός · month": {
+   "count": "6|6|10800",
+   "hr": {
+    "changed": true,
+    "current": 113.5,
+    "key": "pw.hr",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 121.5,
+    "status": "down"
+   },
+   "hrGoodness": 1,
+   "hrr": {
+    "changed": true,
+    "current": 24.5,
+    "key": "pw.hrr",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 16.5,
+    "status": "up"
+   },
+   "hrrEnd": {
+    "changed": true,
+    "current": 116.0,
+    "key": "pw.hrrEnd",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 124.0,
+    "status": "down"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 782.608696,
+    "status": "stable"
+   },
+   "paceRel": "same"
+  },
+  "παλμοί κάτω, ίδιος ρυθμός · quarter": {
+   "count": "12|0|21600",
+   "hr": {
+    "changed": false,
+    "current": 117.0,
+    "key": "pw.hr",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": 20.0,
+    "key": "pw.hrr",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": 120.0,
+    "key": "pw.hrrEnd",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "παλμοί κάτω, πιο αργά · month": {
+   "count": "6|6|10800",
+   "hr": {
+    "changed": true,
+    "current": 113.5,
+    "key": "pw.hr",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 121.5,
+    "status": "down"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": true,
+    "current": 818.181818,
+    "key": "pw.pace",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 720.0,
+    "status": "up"
+   },
+   "paceRel": "slower"
+  },
+  "παλμοί κάτω, πιο αργά · quarter": {
+   "count": "12|0|21600",
+   "hr": {
+    "changed": false,
+    "current": 117.0,
+    "key": "pw.hr",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 769.090909,
+    "key": "pw.pace",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "παλμοί πάνω, πιο γρήγορα · month": {
+   "count": "6|6|10800",
+   "hr": {
+    "changed": true,
+    "current": 120.5,
+    "key": "pw.hr",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 111.5,
+    "status": "up"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": true,
+    "current": 720.0,
+    "key": "pw.pace",
+    "nCurrent": 6,
+    "nPrevious": 6,
+    "previous": 818.181818,
+    "status": "down"
+   },
+   "paceRel": "faster"
+  },
+  "παλμοί πάνω, πιο γρήγορα · quarter": {
+   "count": "12|0|21600",
+   "hr": {
+    "changed": false,
+    "current": 115.5,
+    "key": "pw.hr",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 769.090909,
+    "key": "pw.pace",
+    "nCurrent": 12,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "τέσσερα τώρα, κανένα πριν · month": {
+   "count": "4|0|7200",
+   "hr": {
+    "changed": false,
+    "current": 113.0,
+    "key": "pw.hr",
+    "nCurrent": 4,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 4,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "τέσσερα τώρα, κανένα πριν · quarter": {
+   "count": "4|0|7200",
+   "hr": {
+    "changed": false,
+    "current": 113.0,
+    "key": "pw.hr",
+    "nCurrent": 4,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 4,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "τρία περπατήματα τώρα · month": {
+   "count": "3|0|5400",
+   "hr": {
+    "changed": false,
+    "current": 113.0,
+    "key": "pw.hr",
+    "nCurrent": 3,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 3,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "τρία περπατήματα τώρα · quarter": {
+   "count": "3|0|5400",
+   "hr": {
+    "changed": false,
+    "current": 113.0,
+    "key": "pw.hr",
+    "nCurrent": 3,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": true,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 3,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "paceRel": "unknown"
+  },
+  "τρίμηνο · month": {
+   "count": "4|5|7200",
+   "hr": {
+    "changed": false,
+    "current": 114.0,
+    "key": "pw.hr",
+    "nCurrent": 4,
+    "nPrevious": 5,
+    "previous": 115.0,
+    "status": "stable"
+   },
+   "hrGoodness": 0,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 4,
+    "nPrevious": 5,
+    "previous": 782.608696,
+    "status": "stable"
+   },
+   "paceRel": "same"
+  },
+  "τρίμηνο · quarter": {
+   "count": "12|12|21600",
+   "hr": {
+    "changed": true,
+    "current": 114.5,
+    "key": "pw.hr",
+    "nCurrent": 12,
+    "nPrevious": 12,
+    "previous": 122.5,
+    "status": "down"
+   },
+   "hrGoodness": 1,
+   "hrr": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrr",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "hrrEnd": {
+    "changed": false,
+    "current": null,
+    "key": "pw.hrrEnd",
+    "nCurrent": 0,
+    "nPrevious": 0,
+    "previous": null,
+    "status": "insufficient"
+   },
+   "insufficient": false,
+   "pace": {
+    "changed": false,
+    "current": 782.608696,
+    "key": "pw.pace",
+    "nCurrent": 12,
+    "nPrevious": 12,
+    "previous": 782.608696,
+    "status": "stable"
+   },
+   "paceRel": "same"
+  }
+ },
+ "walks": {
+  "14′59″": {
+   "activeHr": 90,
+   "cadence": 207,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "kmValue": "1,10",
+   "pace": 817,
+   "pausedSec": 0,
+   "shown": "1100.0",
+   "walkHr": 111
+  },
+  "15′ 499 m": {
+   "activeHr": 90,
+   "cadence": 207,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "kmValue": "0,50",
+   "pace": 1804,
+   "pausedSec": 0,
+   "shown": "499.0",
+   "walkHr": 111
+  },
+  "15′ 500 m": {
+   "activeHr": 90,
+   "cadence": 207,
+   "countsAsWalk": true,
+   "fromSteps": false,
+   "kmValue": "0,50",
+   "pace": 1800,
+   "pausedSec": 0,
+   "shown": "500.0",
+   "walkHr": 111
+  },
+  "gps 2,04 km (υπόλοιπο 40 m)": {
+   "activeHr": 180,
+   "cadence": 103,
+   "countsAsWalk": true,
+   "fromSteps": false,
+   "kmValue": "2,04",
+   "pace": 882,
+   "pausedSec": 0,
+   "shown": "2040.0",
+   "splits": [
+    "1: 880″ ♥108",
+    "2: 880″ ♥111"
+   ],
+   "walkHr": 111
+  },
+  "gps 2,05 km (υπόλοιπο 50 m)": {
+   "activeHr": 180,
+   "cadence": 103,
+   "countsAsWalk": true,
+   "fromSteps": false,
+   "kmValue": "2,05",
+   "pace": 878,
+   "pausedSec": 0,
+   "shown": "2050.0",
+   "splits": [
+    "1: 880″ ♥108",
+    "2: 880″ ♥111",
+    "0,05: 40″ ♥111 (μέρος)"
+   ],
+   "walkHr": 111
+  },
+  "gps 2,3 km σε 30′": {
+   "activeHr": 174,
+   "cadence": 103,
+   "countsAsWalk": true,
+   "fromSteps": false,
+   "kmValue": "2,30",
+   "pace": 783,
+   "pausedSec": 60,
+   "shown": "2300.0",
+   "splits": [
+    "1: 780″ ♥107",
+    "2: 780″ ♥110",
+    "0,30: 240″ ♥111 (μέρος)"
+   ],
+   "walkHr": 111
+  },
+  "gps αλλά η εκτίμηση νικά": {
+   "activeHr": 180,
+   "cadence": 103,
+   "countsAsWalk": false,
+   "fromSteps": true,
+   "kmValue": "≈ 2,40",
+   "pace": 750,
+   "pausedSec": 0,
+   "shown": "2400.0 ≈",
+   "walkHr": 111
+  },
+  "μισό (όχι τελειωμένο)": {
+   "activeHr": 180,
+   "cadence": 103,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "kmValue": "2,30",
+   "pace": 783,
+   "pausedSec": 0,
+   "shown": "2300.0",
+   "splits": [
+    "1: 780″ ♥107"
+   ],
+   "walkHr": 111
+  },
+  "ποδήλατο": {
+   "activeHr": 180,
+   "cadence": 0,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "kmValue": "9,00",
+   "pace": 200,
+   "pausedSec": 0,
+   "shown": "9000.0",
+   "walkHr": 111
+  },
+  "σταμάτησε": {
+   "activeHr": 180,
+   "cadence": 103,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "kmValue": "2,30",
+   "pace": 783,
+   "pausedSec": 0,
+   "shown": "2300.0",
+   "walkHr": 111
+  },
+  "σύντομο 59″": {
+   "activeHr": 6,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "kmValue": "0,08",
+   "pausedSec": 0,
+   "shown": "80.0"
+  },
+  "χωρίς gps, από βήματα": {
+   "activeHr": 180,
+   "cadence": 103,
+   "countsAsWalk": false,
+   "fromSteps": true,
+   "kmValue": "≈ 2,25",
+   "pace": 800,
+   "pausedSec": 0,
+   "shown": "2250.0 ≈",
+   "walkHr": 111
+  },
+  "χωρίς απόσταση": {
+   "activeHr": 180,
+   "countsAsWalk": false,
+   "fromSteps": false,
+   "pausedSec": 0,
+   "walkHr": 111
+  },
+  "χωρίς δείγματα παλμών": {
+   "activeHr": 0,
+   "cadence": 103,
+   "countsAsWalk": true,
+   "fromSteps": false,
+   "kmValue": "2,30",
+   "pace": 783,
+   "pausedSec": 0,
+   "shown": "2300.0"
+  }
+ },
+ "weekMovement": {
+  "Δευτέρα 23/11": "25|2|1",
+  "Δευτέρα 30/11": "15|0|0",
+  "Κυριακή 28/3/2027": "35|0|0",
+  "Κυριακή 29/11": "25|2|1"
+ },
+ "zoneTimes (below|in|above|measured)": {
+  "edges 99/100/125/126": "1|2|1|4",
+  "empty": "0|0|0|0",
+  "gap of 60 s counts 15": "0|16|0|16",
+  "gap of 60 s, maxGap 30": "0|31|0|31",
+  "last sample with endSec": "0|10|15|25",
+  "ramp 90→139": "120|320|151|591",
+  "ramp, end at 300": "120|180|0|300",
+  "ramp, end at 305": "120|185|0|305",
+  "ramp, pause 100–200": "100|240|151|491",
+  "zero bpm ignored": "0|10|0|10"
+ }
+}
