@@ -413,10 +413,24 @@ CheckIn? pendingCheckIn({
         final inWindow = [for (final w in weights) if (!w.$1.isBefore(e.from) && !w.$1.isAfter(e.to)) w];
         final kg = inWindow.last.$2;
         var p = proposeTarget(goals: g, est: e, kgNow: kg);
+        // Έλεγχος 20/11 (K1-C-02): πρόταση από παράθυρο μεγαλύτερο των 21 ημερών μόνο όταν και οι 21 τελευταίες μέρες
+        // δείχνουν προς την ίδια κατεύθυνση ([recentAgrees]). Η εκτίμηση των 21 ημερών βγαίνει από τον ίδιο υπολογισμό, με
+        // «αρχή» τέτοια που να χωρά ακριβώς το μικρότερο παράθυρο.
+        if (p.change != 0 && e.windowDays > adaptWindowDays) {
+          final recentSince = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1) - adaptSkipDays);
+          final recent = estimateExpenditure(
+              intake: eaten, weights: weights, today: t, formulaTdee: formula, goalKcal: g.kcal, since: recentSince).est;
+          p = recentAgrees(
+              p: p, goals: g, recent: recent != null && recent.windowDays == adaptWindowDays ? recent : null, kgNow: kg);
+        }
         // S1-3: όσο χάνεις πάνω από 1% την εβδομάδα (στο παράθυρο της εκτίμησης ή στις τελευταίες μέρες), ο στόχος δεν
         // κατεβαίνει. Πριν, η κάρτα της Δευτέρας τον κατέβαζε 150 και η «γρήγορη απώλεια» της Παρασκευής τον ανέβαζε 150.
+        // Έλεγχος 20/11 (K1-C-02): οι τελευταίες μέρες χωρίς την πρώτη εβδομάδα μετά από κενό καταγραφής ([fastNotBefore]).
+        final fastFrom =
+            fastNotBefore(foodGap(intake: eaten, today: t, formulaTdee: formula, goalKcal: g.kcal, since: since));
         final losingFast = g.aim == GoalAim.lose &&
-            (e.slopeKgWeek < -adaptFastLossPct * kg || fastLossSlope(goals: g, weights: weights, today: t) != null);
+            (e.slopeKgWeek < -adaptFastLossPct * kg ||
+                fastLossSlope(goals: g, weights: weights, today: t, notBefore: fastFrom) != null);
         final tooFast = losingFast && p.change <= 0;
         // S1-4: όχι δεύτερη αλλαγή λιγότερο από 4 μέρες μετά την προηγούμενη (π.χ. «γρήγορη απώλεια» την Παρασκευή).
         final changed = lastChangeDay(g);
@@ -533,12 +547,23 @@ CheckIn? pendingCheckIn({
   if (lastChange != null && daysBetween(lastChange, t) < adaptMinChangeDays) return onlyForeign;
   // Οι ίδιες ζυγίσεις που κρίνουν την ειδοποίηση (χωρίς την πρώτη εβδομάδα· Συμβούλιο 2, Σ1): ό,τι γράφει η κάρτα
   // («−1,16 kg την εβδομάδα») είναι ακριβώς ο αριθμός που συγκρίθηκε με το 1%.
-  final f = fastLossSlope(goals: g, weights: weights, today: t);
-  final window = fastLossWindow(goals: g, today: t);
+  // Πρώτα μόνο με τις ζυγίσεις (φθηνό)· το φαγητό διαβάζεται μόνο αν υπάρχει λόγος.
+  if (fastLossSlope(goals: g, weights: weights, today: t) == null) return onlyForeign;
+  final yesterday = DateTime(t.year, t.month, t.day - 1);
+  // Έλεγχος 20/11 (K1-C-02): μετά από κενό καταγραφής οι πρώτες μέρες της επιστροφής δεν κρίνονται ([fastNotBefore]): τα
+  // νερά των διακοπών φεύγουν σε λίγες μέρες και έμοιαζαν με «γρήγορη απώλεια» (ψεύτικο «+150» στο 32–46% των πορειών).
+  final scanFrom = DateTime(yesterday.year, yesterday.month, yesterday.day - (adaptScanDays - 1));
+  final fastFrom = fastNotBefore(foodGap(
+      intake: intake(scanFrom, yesterday),
+      today: t,
+      formulaTdee: formula,
+      goalKcal: g.kcal,
+      since: DateTime.tryParse(g.since)));
+  final f = fastLossSlope(goals: g, weights: weights, today: t, notBefore: fastFrom);
+  final window = fastLossWindow(goals: g, today: t, notBefore: fastFrom);
   if (f == null || window == null) return onlyForeign;
   // S1-2: πόσο γράφτηκε στο ημερολόγιο τις ίδιες μέρες (ως χθες· η σημερινή μέρα δεν έχει τελειώσει). Όλες οι μέρες με
   // καταχώριση, όχι μόνο όσες περνούν το 60%: εδώ ψάχνουμε ακριβώς το «τρως πολύ λίγο».
-  final yesterday = DateTime(t.year, t.month, t.day - 1);
   final diary = yesterday.isBefore(window.$1) ? const <DateTime, double>{} : intake(window.$1, yesterday);
   final loggedDays = [
     for (final e in diary.entries)
@@ -556,7 +581,7 @@ CheckIn? pendingCheckIn({
   if (known && mean != null && mean >= target - adaptMaxStep) {
     // Τρως περίπου όσο ο στόχος και χάνεις γρήγορα: πρόταση +150, ως όσα καις. Αν ο στόχος είναι ήδη εκεί, καμία κάρτα·
     // ο εβδομαδιαίος έλεγχος τον διορθώνει από τα δεδομένα.
-    proposal = fastLossCheck(goals: g, weights: weights, today: t);
+    proposal = fastLossCheck(goals: g, weights: weights, today: t, notBefore: fastFrom);
     if (proposal == null) return onlyForeign;
   }
   return CheckIn(
@@ -570,6 +595,28 @@ CheckIn? pendingCheckIn({
       fastIntakeDays: logged.length,
       fastTarget: known ? target : null,
       foreign: news);
+}
+
+/// Έλεγχος 20/11 (K1-S-02): πόσο πιο γρήγορα από τον ρυθμό σου πρέπει να χάνεις για να το πει η κάρτα.
+const farBelowRate = 1.5;
+
+/// Έλεγχος 20/11 (K1-S-02): εβδομαδιαίος έλεγχος με εκτίμηση, «λιγότερο λίπος», και το ημερολόγιο δείχνει ότι τρως πάνω
+/// από [adaptMaxStep] kcal κάτω από τους στόχους που ίσχυαν ([CheckIn.estTarget]) ΕΝΩ χάνεις πάνω από [farBelowRate] φορές
+/// τον ρυθμό που διάλεξες. Πριν, η κάρτα το έλεγε μόνο πάνω από 1% την εβδομάδα (S1-3)· ανάμεσα στο 0,5% και στο 1% έγραφε
+/// σκέτο «ο στόχος σου ταιριάζει» σε όποιον έτρωγε 300–450 kcal λιγότερες και έχανε σχεδόν διπλάσια. Ο ρυθμός είναι επιλογή
+/// του χρήστη για να κρατιούνται οι μύες (Helms 2014· Garthe 2011). null όταν δεν ισχύει.
+/// [eaten], [target], [under]: στρογγυλεμένα στα 10, όπως γράφονται· [slopeKgWeek], [plannedKgWeek]: αρνητικά.
+({int eaten, int target, int under, double slopeKgWeek, double plannedKgWeek})? eatingFarBelow(CheckIn k) {
+  final e = k.est, kg = k.kgNow, targetMean = k.estTarget;
+  final g = k.goals;
+  if (e == null || kg == null || targetMean == null || k.lowLog || g.aim != GoalAim.lose) return null;
+  final eaten = (e.meanIntake / 10).round() * 10;
+  final target = (targetMean / 10).round() * 10;
+  final under = target - eaten;
+  if (under <= adaptMaxStep) return null;
+  final planned = plannedKgWeek(g, kg);
+  if (planned >= 0 || e.slopeKgWeek >= farBelowRate * planned) return null;
+  return (eaten: eaten, target: target, under: under, slopeKgWeek: e.slopeKgWeek, plannedKgWeek: planned);
 }
 
 /// Οι ξένες ζυγίσεις που έγραψε η κάρτα θεωρούνται «ειδωμένες» μόλις απαντηθεί (δεν ξαναγράφονται).
@@ -685,8 +732,9 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
       : foodGap(intake: intake(wideFrom, to), today: t, formulaTdee: formula, goalKcal: goals.kcal, since: start);
   if (gap != null) {
     final restart = gap.restart;
-    // Κενό που κρατά ως χθες: τίποτα δεν μετρά ακόμα για την επόμενη εκτίμηση.
-    final from = restart ?? DateTime(t.year, t.month, t.day);
+    // Κενό που κρατά ως χθες: τίποτα δεν μετρά ακόμα για την επόμενη εκτίμηση. Έλεγχος 20/11 (K1-C-02): μετά το κενό οι
+    // μέρες μετρούν από [afterGapStart] (η πρώτη εβδομάδα της επιστροφής δεν μετρά), όπως στον έλεγχο.
+    final from = restart == null ? DateTime(t.year, t.month, t.day) : afterGapStart(restart);
     if (from.isAfter(since)) since = from;
   }
   final full = adaptFullDayShare * goals.kcal;
@@ -706,15 +754,18 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
 }
 
 /// Round 7 (R7-A1-2): η μέρα ελέγχου που μπορεί να βγάλει εκτίμηση, μετά από κενό καταγραφής φαγητού. Ο έλεγχος θέλει
-/// [adaptWindowDays] μέρες από τη μέρα που ξαναρχίζει η καταγραφή ως χθες ([estimateExpenditure]: «afterGap»), άρα η
-/// πρώτη μέρα ελέγχου (ίδια μέρα της εβδομάδας με την αρχή) από [FoodGap.restart] + 21 μέρες. Χωρίς κενό, ή αν η [next]
+/// [adaptWindowDays] μέρες που μετρούν ως χθες ([estimateExpenditure]: «afterGap»), και από 20/11 (K1-C-02) οι πρώτες
+/// [adaptSkipDays] μέρες της επιστροφής δεν μετρούν: άρα η πρώτη μέρα ελέγχου (ίδια μέρα της εβδομάδας με την αρχή) από
+/// [FoodGap.restart] + 7 + 21 μέρες. Χωρίς κενό, ή αν η [next]
 /// είναι ήδη αργότερα: η [next]. null: το κενό κρατά ως χθες (η εκτίμηση περιμένει να ξαναρχίσει η καταγραφή).
 /// Πριν, η σελίδα «Στόχοι» έγραφε «Πρώτη εκτίμηση: Δευτέρα 21 Δεκεμβρίου» ενώ η Σήμερα έλεγε σωστά 4 Ιανουαρίου.
 DateTime? estimateDayAfterGap(Goals g, DateTime next, FoodGap? gap) {
   if (gap == null) return next;
   final restart = gap.restart;
   if (restart == null) return null;
-  var d = DateTime(restart.year, restart.month, restart.day + adaptWindowDays);
+  // Έλεγχος 20/11 (K1-C-02): και η πρώτη εβδομάδα της επιστροφής δεν μετρά ([afterGapStart]).
+  final counted = afterGapStart(restart);
+  var d = DateTime(counted.year, counted.month, counted.day + adaptWindowDays);
   if (!d.isAfter(next)) return next;
   final weekday = DateTime.parse(g.since).weekday;
   while (d.weekday != weekday) {
