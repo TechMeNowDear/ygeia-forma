@@ -438,7 +438,7 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
   Future<void> _auto() async {
     final g = HealthStore.shared?.goals;
     if (g == null) {
-      setState(() => _errors = ['Πρώτα βάλε στόχους διατροφής (Εγώ › Στόχοι διατροφής): από αυτούς βγαίνουν οι μερίδες.']);
+      setState(() => _errors = [noGoalsText]);
       return;
     }
     final choice = await showModalBottomSheet<({DateTime from, List<Meal> meals})>(
@@ -478,7 +478,7 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
       meals = again.meals ?? [for (final m in Meal.values) if (again.days.any((d) => d.any((s) => s.meal == m))) m];
     } else {
       if (HealthStore.shared?.goals == null) {
-        setState(() => _errors = ['Πρώτα βάλε στόχους διατροφής (Εγώ › Στόχοι διατροφής): από αυτούς βγαίνουν οι μερίδες.']);
+        setState(() => _errors = [noGoalsText]);
         return;
       }
       final choice = await showModalBottomSheet<({DateTime from, List<Meal> meals})>(

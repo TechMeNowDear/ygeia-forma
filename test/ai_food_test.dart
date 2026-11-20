@@ -191,7 +191,7 @@ void main() {
     expect({for (final d in aiLibrary(s3, aiAllowedIds(s3))) planInfoOf(d)!.key}, isNot(contains('solomos')));
   });
 
-  test('Οι οδηγίες: μόνο επιτρεπόμενα τρόφιμα· στόχοι μόνο ως θερμίδες ανά γεύμα (όχι πρωτεΐνη/κορεσμένα, X-3)', () {
+  test('Οι οδηγίες: μόνο επιτρεπόμενα τρόφιμα· χωρίς όρια, μόνο θερμίδες ανά γεύμα· ποτέ δεδομένα υγείας', () {
     final s = store();
     final sys = aiSystem(s, aiAllowedIds(s), Kitchen.initial());
     expect(sys, contains(chicken));
@@ -202,8 +202,30 @@ void main() {
     expect(p, contains('μεσημέρι ~900 kcal'));
     expect(p, isNot(contains('mosxari')));
     expect(p, isNot(contains('2.090')));
-    for (final w in ['Oura', 'ύπνος', 'παλμ', 'πίεση', 'σάκχαρ', 'πρωτεΐνη 130', 'κορεσμένα έως']) {
+    for (final w in ['Oura', 'ύπνος', 'παλμ', 'πίεση', 'σάκχαρ', 'πρωτεΐνη 130', 'κορεσμένα λιπαρά έως']) {
       expect('$sys$p'.contains(w), isFalse, reason: w);
+    }
+  });
+
+  test('Αποφάσεις 20/11: το AI μαθαίνει τα όρια της μέρας και τα κορεσμένα/αλάτι των υλικών· ποτέ δεδομένα υγείας', () {
+    final s = store();
+    const limits = (kcal: 2150, protein: 150, satMax: 14.3, fiber: 30, salt: 5.0);
+    final sys = aiSystem(s, aiAllowedIds(s), Kitchen.initial(), limits: limits);
+    expect(sys, contains('Κορεσμένα λιπαρά έως 14,3 g τη μέρα'));
+    expect(sys, contains('Αλάτι κάτω από 5,0 g τη μέρα'));
+    expect(sys, contains('Φυτικές ίνες τουλάχιστον 30 g'));
+    expect(sys, contains('Πρωτεΐνη περίπου 150 g'));
+    // Το ελαιόλαδο (~14 g κορεσμένα/100 g) και η φέτα (αλάτι) με τους αριθμούς της βάσης.
+    final f = {for (final x in basicFoods()) x.id: x};
+    expect(aiNutTail(f[oil]!), contains('κορ.'));
+    expect(aiNutTail(f[feta]!), contains('αλάτι'));
+    expect(aiNutTail(f[apple]!), isEmpty);
+    final oilLine = sys.split('\n').firstWhere((l) => l.contains('$oil '));
+    expect(oilLine, contains(aiNutTail(f[oil]!)));
+    // Η μέρα σε θερμίδες δεν γράφεται· ποτέ ύπνος, παλμοί, πίεση, σάκχαρο, Oura.
+    expect(sys, isNot(contains('2.150')));
+    for (final w in ['Oura', 'ύπνος', 'παλμ', 'πίεση', 'σάκχαρ']) {
+      expect(sys.contains(w), isFalse, reason: w);
     }
   });
 

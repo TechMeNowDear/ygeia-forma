@@ -1987,6 +1987,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   /// Round9 (R9-A2-2): μετριέται με το κουτάλι, ή null όσο δεν το διάλεξες (τότε από το όνομα, [spoonByName]).
   late bool? _spoon = widget.draft.spoon;
 
+  /// Αποφάσεις 20/11: μετρά στα φρούτα και λαχανικά της μέρας (π.χ. κατεψυγμένο μπρόκολο, έτοιμη σαλάτα).
+  late bool _fruitVeg = widget.draft.fruitVeg;
+
   static String _field(double v) => dec(v, 4).replaceAll(RegExp(r',?0+$'), '');
 
   // Round7 (R7-U2 Β-1): με τη σειρά της διατροφικής δήλωσης της ΕΕ (Κανονισμός 1169/2011, Παράρτημα XV), όπως είναι
@@ -2080,6 +2083,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
       // Round10 (R10-B1-1): «Όχι» αποθηκεύεται μόνο όταν το διάλεξες (ή το είχε ήδη το προϊόν)· όσο δεν το άγγιξες, «Ναι» από
       // το όνομα, αλλιώς τίποτα, όπως πριν.
       spoon: _spoon ?? (spoonByName(_name.text) ? true : null),
+      fruitVeg: _fruitVeg,
     );
     Navigator.pop(context, foodFromDraft(d, widget.existingId ?? FoodStore.newFoodId()));
   }
@@ -2334,6 +2338,17 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   key: const ValueKey('spoon-kind'),
                 ),
               ],
+              // Αποφάσεις 20/11: σκαναρισμένο ή δικό σου προϊόν μετρά στα 400 g φρούτων και λαχανικών μόνο αν το πεις
+              // (χωρίς πατάτες, χυμούς, αποξηραμένα, όπως η βάση).
+              const SizedBox(height: 14),
+              choices<bool>(
+                'Μετρά στα φρούτα και λαχανικά της μέρας (π.χ. κατεψυγμένο μπρόκολο, έτοιμη σαλάτα· όχι πατάτες, χυμοί, '
+                'αποξηραμένα);',
+                const [(false, 'Όχι'), (true, 'Ναι')],
+                _fruitVeg,
+                (v) => setState(() => _fruitVeg = v),
+                key: const ValueKey('fruit-veg-kind'),
+              ),
               const SizedBox(height: 14),
               KeyedSubtree(
                 key: _servingKey,

@@ -524,7 +524,8 @@ class LiveSession(
     }
 
     /**
-     * Έλεγχος 14/11, round 9 (R9-A12-2): ένα πάτημα στην οθόνη της ρεζέρβας ([rir] 0–4, −1 = «Δεν ξέρω»), όπως το κρίνει η
+     * Έλεγχος 14/11, round 9 (R9-A12-2): ένα πάτημα στην οθόνη της ρεζέρβας ([rir] 0–4, στο «Πρώτο σετ» και 6/10/15 από το
+     * «Πόσες περίπου;», −1 = «Δεν ξέρω»), όπως το κρίνει η
      * οθόνη ([WatchActivity.answer]). Πρώτα η ερώτηση «Πρώτο σετ», αν είναι ανοιχτή ([firstIdx] ≥ 0): την ΚΛΕΙΝΕΙ
      * ([answerFirst]) και, σε προπόνηση του κινητού που τη ζητά ακόμα, δίνει την εντολή «rir1» και κρατά την απάντηση
      * ([firstAns], R9-A8-3). Η ρεζέρβα της άσκησης δεν αλλάζει. Αλλιώς: η ρεζέρβα της άσκησης ([answer]).
@@ -534,7 +535,8 @@ class LiveSession(
             val fi = answerFirst()
             val item = items.getOrNull(fi)
             if (!phone || item == null) return AnswerResult(true, null, null, fi)
-            val v = rir.coerceIn(-1, 4)
+            // Αποφάσεις 20/11: και 6/10/15 από το «Πόσες περίπου;» (WatchView.drawRirMore), όπως το κινητό (0–15).
+            val v = rir.coerceIn(-1, FIRST_MAX)
             firstAns[item.ex] = v
             return AnswerResult(true, rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, v), null, fi)
         }
@@ -2147,3 +2149,6 @@ fun walkLines(shown: Pair<Double, Boolean>, steps: Long, sec: Long): Pair<String
 
 /** «2.840» (τελεία στις χιλιάδες, όπως στο κινητό). */
 fun thousandsEl(n: Long): String = "%,d".format(java.util.Locale.ROOT, n).replace(',', '.')
+
+/** Αποφάσεις 20/11: η μεγαλύτερη απάντηση στο «Πρώτο σετ» («13+» → 15), όπως δέχεται το κινητό (`answerFirst`: 0–15). */
+const val FIRST_MAX = 15

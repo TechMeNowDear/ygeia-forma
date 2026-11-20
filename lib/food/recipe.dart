@@ -456,7 +456,8 @@ String recipePrompt({
 /// Τα τρόφιμα για τις οδηγίες, μία γραμμή ανά κατηγορία («Κατηγορία: id όνομα; …»). Μόνο ωμές μορφές: οι συνταγές
 /// ζυγίζονται ωμές. Έξω οι μαγειρεμένες μορφές ωμών τροφίμων (π.χ. «Φακές (βρασμένες)», που η βάση τις συνδέει με τις
 /// ξερές) και όσα δε μου αρέσουν. [cooked]: αντί για τις ωμές, ΜΟΝΟ οι μαγειρεμένες μορφές (για φαγητά από παραγγελία).
-List<String> rawFoodLines(List<Food> foods, FoodLikes likes, {bool cooked = false}) {
+/// [tail]: κάτι μετά το όνομα (π.χ. για το AI τα κορεσμένα και το αλάτι ανά 100 g, έλεγχος 20/11).
+List<String> rawFoodLines(List<Food> foods, FoodLikes likes, {bool cooked = false, String Function(Food f)? tail}) {
   final byCat = <String, List<Food>>{};
   final cookedIds = {for (final f in foods) for (final c in f.cooked) c.$1};
   for (final f in foods) {
@@ -466,7 +467,8 @@ List<String> rawFoodLines(List<Food> foods, FoodLikes likes, {bool cooked = fals
     byCat.putIfAbsent(f.cat.isEmpty ? 'Άλλα' : f.cat, () => []).add(f);
   }
   return [
-    for (final e in byCat.entries) '${e.key}: ${[for (final f in e.value) '${f.id} ${f.name}${f.perMl ? ' (ml)' : ''}'].join('; ')}',
+    for (final e in byCat.entries)
+      '${e.key}: ${[for (final f in e.value) '${f.id} ${f.name}${f.perMl ? ' (ml)' : ''}${tail?.call(f) ?? ''}'].join('; ')}',
   ];
 }
 

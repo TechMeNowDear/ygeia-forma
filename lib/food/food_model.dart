@@ -120,7 +120,12 @@ class Food {
     this.cholKind,
     this.spoon = false,
     this.spoonNo = false,
+    this.fruitVeg = false,
   });
+
+  /// Αποφάσεις 20/11: δικό μου προϊόν που μετρά στα φρούτα και λαχανικά της μέρας ([fruitVegGrams]), π.χ. κατεψυγμένο
+  /// μπρόκολο ή έτοιμη σαλάτα. Κλειδί «fv» (νέο, προαιρετικό). Τα τρόφιμα της βάσης μετρούν από την κατηγορία τους.
+  final bool fruitVeg;
 
   /// Δικό μου προϊόν: τι μετρά στην κάρτα «Χοληστερίνη» ([CholKind]) ή null (δεν ορίστηκε).
   final String? cholKind;
@@ -196,6 +201,7 @@ class Food {
         cholKind: CholKind.parse(j['ck']),
         spoon: j['sp'] == true,
         spoonNo: j['sp'] == false,
+        fruitVeg: j['fv'] == true,
         cooked: [
           for (final c in (j['cooked'] as List?) ?? const [])
             if (c is Map) ((c['id'] as String), (c['label'] as String)),
@@ -222,6 +228,7 @@ class Food {
         if (perMl) 'perMl': true,
         if (cholKind != null) 'ck': cholKind,
         if (spoon || spoonNo) 'sp': spoon,
+        if (fruitVeg) 'fv': true,
         'n': n.toJson(),
       };
 
@@ -502,10 +509,14 @@ const fruitVegCats = {'Φρούτα', 'Λαχανικά'};
 /// πουρές ντομάτας (συμπυκνωμένα, 3–6 φορές).
 const fruitVegExclude = {'C2007', 'C20068', 'C20170'};
 
+/// Μετρά στα φρούτα και λαχανικά: κατηγορία της βάσης ([fruitVegCats], εκτός [fruitVegExclude]) ή δικό μου προϊόν με
+/// τον διακόπτη της φόρμας ([Food.fruitVeg], αποφάσεις 20/11).
+bool isFruitVeg(Food f) => f.fruitVeg || (fruitVegCats.contains(f.cat) && !fruitVegExclude.contains(f.id));
+
 double fruitVegGrams(Iterable<LogEntry> entries) {
   var g = 0.0;
   for (final e in entries) {
-    if (fruitVegCats.contains(e.food.cat) && !fruitVegExclude.contains(e.food.id)) g += e.grams;
+    if (isFruitVeg(e.food)) g += e.grams;
   }
   return g;
 }

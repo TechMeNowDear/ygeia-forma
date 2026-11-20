@@ -214,7 +214,7 @@ Future<AiOutcome?> aiMakeWeek(
   final b = bridge ?? mainAiBridge;
   if (!await ensureAiReady(context, b) || !context.mounted) return null;
   final g = HealthStore.shared?.goals;
-  if (g == null) return (notes: const <String>[], errors: ['Πρώτα βάλε στόχους διατροφής (Εγώ › Στόχοι διατροφής).']);
+  if (g == null) return (notes: const <String>[], errors: [noGoalsText]);
   final now = (clock ?? DateTime.now)();
   final text = ValueNotifier(aiStageText(AiStage.plan, 0, 1, 1));
   ({AiWeekResult? value, bool capped, bool crashed}) run;
