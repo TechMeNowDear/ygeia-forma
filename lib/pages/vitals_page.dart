@@ -147,9 +147,10 @@ class _VitalsPageState extends State<VitalsPage> {
                                   if (list[i].kind == VitalKind.glucose && glucoseNote(list[i]) != null)
                                     Text(glucoseNote(list[i])!,
                                         style: small.copyWith(
+                                            // K3-review R13: το χρώμα κρίνεται στην τιμή όπως φαίνεται (όπως το κείμενο).
                                             color: list[i].glucose!.round() < glucoseVeryLow ||
-                                                    list[i].glucose! >= 200 ||
-                                                    (list[i].when == GlucoseWhen.fasting && list[i].glucose! >= 126)
+                                                    list[i].glucose!.round() >= 200 ||
+                                                    (list[i].when == GlucoseWhen.fasting && list[i].glucose!.round() >= 126)
                                                 ? c.warn
                                                 : c.textSecondary)),
                                   if (list[i].kind == VitalKind.ecg && list[i].ecg != null)

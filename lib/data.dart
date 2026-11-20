@@ -2425,6 +2425,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// του (90 μέρες με την κανονική ανάγνωση, πιο πίσω ανά 90 μέρες), μία φορά για κάθε αλλαγή κανόνων.
   Future<void> _upgradeOura() async {
     if (!_prefsLoaded || planState != PlanState.ok || prefs.ouraRules >= ouraRulesVersion) return;
+    // K3-review R7: αν το ιστορικό δεν διαβάστηκε σε αυτή την εκκίνηση, δεν ξέρουμε αν υπάρχουν παλιές τιμές του Oura.
+    // Η έκδοση ΔΕΝ γράφεται (πριν γραφόταν, και η επανανάγνωση δεν ξαναζητιόταν ποτέ)· ξαναδοκιμάζει στην επόμενη εκκίνηση.
+    if (_plan.hasOura && !_historyLoaded) return;
     // Μόνο αν υπάρχουν αποθηκευμένα ποσοστά φάσεων του Oura (αλλιώς δεν υπάρχει τίποτα με τον παλιό ορισμό). Η Oura
     // δίνει φάσεις σε κάθε νύχτα, οπότε έτσι ξαναδιαβάζονται και οι νύχτες σε κομμάτια (κοινός κανόνας, 4/11).
     final old = ouraKeys[K.deepPct]!;

@@ -1,6 +1,7 @@
 // Βαθύς έλεγχος 20/11/2026, κατηγορία 3 (καρδιά, ύπνος, πίεση, σάκχαρο, οξυγόνο, τάσεις): οι διορθώσεις K3-S-01…13 και
-// K3C-01…08. Μόνο επινοημένες τιμές και σταθερές ημερομηνίες. Οι αριθμοί βγήκαν από τις αναφορές k3-science / k3-calc και
-// από τη μεταφορά του κανόνα της νύχτας σε Python (audit-141/main-k3/takeover.py).
+// K3C-01…08, και όσα βρήκε ο ανεξάρτητος ελεγκτής (K3-review R1–R13). Μόνο επινοημένες τιμές και σταθερές ημερομηνίες.
+// Οι αναμενόμενες τιμές του κανόνα της νύχτας επαληθεύτηκαν με δύο ανεξάρτητες μεταφορές σε Python (του ειδικού k3-calc
+// για τον παλιό κανόνα και του ανεξάρτητου ελεγκτή για τον νέο: audit-141/k3-review/r_nights.py, t07_variant.py).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart' show NightOxygen, ouraRulesVersion;
@@ -86,6 +87,55 @@ void main() {
       expect((mainTakeoverRatio, mainTakeoverMinMinutes), (2.0, 180));
     });
 
+    test('K3-review R2: όταν η «νύχτα» είναι λαγοκοίμισμα κάτω από 60 λεπτά, αρκεί ύπνος 60 λεπτών και 2 φορές (όπως το 1β)', () {
+      // Λαγοκοίμισμα 18 λεπτών + ύπνος 08:30–11:15 (150): χωρίς το λαγοκοίμισμα ο ίδιος ύπνος ΕΙΝΑΙ νύχτα (1β).
+      expect(_grouped([_p(23, 23, 10, 23, 23, 30, 18), _p(24, 8, 30, 24, 11, 15, 150)]), '24: 150 | υπνάκοι 24: 18');
+      expect(_grouped([_p(24, 8, 30, 24, 11, 15, 150)]), '24: 150');
+      // 42 λεπτά στις 04:36 και 175 στις 09:06: νύχτα και τα δύο (το πρώτο απέχει κάτω από 4 ώρες).
+      expect(_grouped([_p(24, 4, 36, 24, 5, 20, 42), _p(24, 9, 6, 24, 12, 28, 175)]), '24: 42+175');
+      // Το σκαλοπάτι που ΜΕΝΕΙ (ερώτηση στον χρήστη, Α9): νύχτα 80 λεπτών και 165 λεπτά από τις 08:05 → νύχτα + υπνάκος·
+      // το ίδιο από τις 07:55 (5 λεπτά μέσα στο 22:00–08:00, σκέλος α) → μία νύχτα.
+      expect(_grouped([_p(24, 4, 30, 24, 6, 0, 80), _p(24, 8, 5, 24, 11, 0, 165)]), '24: 80 | υπνάκοι 24: 165');
+      expect(_grouped([_p(24, 4, 30, 24, 6, 0, 80), _p(24, 7, 55, 24, 10, 50, 165)]), '24: 80+165');
+    });
+
+    test('K3-review R1: η σύγκριση γίνεται με ΟΛΗ τη νύχτα (όλα τα κομμάτια της), όχι με ένα κομμάτι', () {
+      int walk(DateTime a, DateTime b) => 1500;
+      // F1: η νύχτα 03:30–06:00 κομμένη σε 70 + 68 λεπτά (κενό 4 λεπτά) και ύπνος 09:00–12:30 (200): 200 < 2 × 138.
+      expect(_grouped([_p(24, 3, 30, 24, 4, 43, 70), _p(24, 4, 47, 24, 6, 0, 68), _p(24, 9, 0, 24, 12, 30, 200)]),
+          '24: 70+68 | υπνάκοι 24: 200');
+      // F3: συμβατική νύχτα 375 λεπτών σε 3 κομμάτια και ύπνος 11:00–15:30 (265): η νύχτα ΔΕΝ γίνεται υπνάκος.
+      expect(
+          _grouped([_p(23, 23, 30, 24, 1, 40, 120), _p(24, 1, 50, 24, 4, 0, 125), _p(24, 4, 5, 24, 6, 20, 130), _p(24, 11, 0, 24, 15, 30, 265)]),
+          '24: 120+125+130 | υπνάκοι 24: 265');
+      // F4: νύχτα 290 λεπτών σε 3 κομμάτια, ξύπνιος 3 ώρες 45 λεπτά με βήματα, 07:45–09:45 (115): υπνάκος.
+      expect(
+          _grouped([_p(23, 22, 30, 24, 0, 15, 100), _p(24, 0, 30, 24, 2, 0, 85), _p(24, 2, 10, 24, 4, 0, 105), _p(24, 7, 45, 24, 9, 45, 115)],
+              stepsBetween: walk),
+          '24: 100+85+105 | υπνάκοι 24: 115');
+      // F5: νύχτα 340 λεπτών σε 3 κομμάτια, σηκώθηκε 90 λεπτά με 1.500 βήματα, 07:30–10:00 (145): υπνάκος, με βήματα ΚΑΙ με
+      // το αποθηκευμένο κλείδωμα όταν τα βήματα δεν υπάρχουν πια (ο κανόνας 4 και το κλείδωμα ισχύουν όπως πριν).
+      final f5 = [_p(23, 23, 30, 24, 1, 30, 115), _p(24, 1, 45, 24, 3, 15, 85), _p(24, 3, 30, 24, 6, 0, 140), _p(24, 7, 30, 24, 10, 0, 145)];
+      expect(_grouped(f5, stepsBetween: walk), '24: 115+85+140 | υπνάκοι 24: 145');
+      expect(_grouped(f5, napLockOf: (_) => DateTime(2026, 11, 24, 7, 30)), '24: 115+85+140 | υπνάκοι 24: 145');
+      // F6: 03:30–05:15 (94) + 05:40–07:30 (100) και ύπνος 11:40–15:10 (200): 200 < 2 × 194.
+      expect(_grouped([_p(24, 3, 30, 24, 5, 15, 94), _p(24, 5, 40, 24, 7, 30, 100), _p(24, 11, 40, 24, 15, 10, 200)]),
+          '24: 94+100 | υπνάκοι 24: 200');
+      // F7: το σενάριο του K3C-01 (94 + 144) και τρίτος ύπνος 10:30–14:00 (200) μετά από 1 ώρα με βήματα: η νύχτα είναι
+      // 238 λεπτά, ο τρίτος ύπνος υπνάκος (πρώτα γίνεται κύρια το 144, η νύχτα ξαναχτίζεται, και 200 < 2 × 238).
+      expect(_grouped([_p(24, 3, 30, 24, 5, 15, 94), _p(24, 6, 50, 24, 9, 30, 144), _p(24, 10, 30, 24, 14, 0, 200)], stepsBetween: walk),
+          '24: 94+144 | υπνάκοι 24: 200');
+    });
+
+    test('αλλαγή ώρας 25/10/2026 (25 ώρες): 03:30–05:15 και 06:50–09:30 μένουν μία νύχτα', () {
+      SleepSpan o(int h1, int m1, int h2, int m2, int minutes) =>
+          (start: DateTime(2026, 10, 25, h1, m1), end: DateTime(2026, 10, 25, h2, m2), minutes: minutes);
+      final g = groupSleepPieces<SleepSpan>([o(3, 30, 5, 15, 94), o(6, 50, 9, 30, 144)], (x) => x);
+      expect(g.nights.single.parts.map((x) => x.minutes), [94, 144]);
+      expect(g.nights.single.date, DateTime(2026, 10, 25));
+      expect(g.naps, isEmpty);
+    });
+
     test('ίδια λεπτά ύπνου: μένει η κύρια του παραθύρου· οι πρωινοί υπνάκοι με βήματα μένουν υπνάκοι', () {
       expect(_grouped([_p(24, 3, 30, 24, 5, 30, 110), _p(24, 7, 10, 24, 9, 30, 110)]), '24: 110 | υπνάκοι 24: 110');
       int steps(DateTime a, DateTime b) => 300;
@@ -140,6 +190,13 @@ void main() {
       expect(_avgText(165, 102), contains('πολύ πάνω από το όριο των 135/85'));
       expect(_avgText(159, 99), isNot(contains('λίγες μέρες')));
       expect(_avgText(159, 99), contains('πάνω από το όριο'));
+      // K3-review R5: μέσος όρος από 180/110 → «σήμερα», όπως λέει η σημείωση κάθε τέτοιας μέτρησης.
+      expect(_avgText(182, 112), contains('Μίλα σήμερα με γιατρό'));
+      expect(_avgText(182, 112), contains('166 ή 112'));
+      expect(_avgText(180, 90), contains('Μίλα σήμερα με γιατρό'));
+      expect(_avgText(170, 110), contains('Μίλα σήμερα με γιατρό'));
+      expect(_avgText(179, 109), contains('μέσα σε λίγες μέρες'));
+      expect(_avgText(179, 109), isNot(contains('σήμερα')));
     });
 
     test('K3-S-11: η γραμμή της αναφοράς για τον γιατρό έχει αριθμούς και όρια, όχι προτροπές προς τον ασθενή', () {
@@ -152,11 +209,19 @@ void main() {
       }
       expect(bpAverageReportText(many), contains('128/82 (14 μετρήσεις σε 5 μέρες). Όρια για μετρήσεις στο σπίτι (ESC 2024)'));
       expect(bpAverageReportText(few), contains('Λίγες μετρήσεις για συμπέρασμα'));
+      final high = bpAverage([for (var i = 0; i < 14; i++) _bp(165, 102, daysAgo: i % 5, id: 'h$i')], _now)!;
+      expect(bpAverageReportText(high), isNot(contains('λίγες μέρες')));
     });
 
     test('K3-S-02: σφυγμοί πάνω από 100 ή κάτω από 40 στο πιεσόμετρο παίρνουν σημείωση· 40–100 και χωρίς σφυγμούς όχι', () {
       expect(pulseNote(_bp(126, 84, pulse: 101)), contains('Σφυγμοί πάνω από 100 σε ηρεμία'));
       expect(pulseNote(_bp(126, 84, pulse: 130)), contains('166 ή 112'));
+      // K3-review R4: πάνω από 120 που μένει και μετά την ηρεμία → γιατρός την ίδια μέρα (όπως το κείμενο του ΗΚΓ).
+      expect(pulseNote(_bp(126, 84, pulse: 135)), contains('μίλα με γιατρό την ίδια μέρα'));
+      expect(pulseNote(_bp(126, 84, pulse: 121)), contains('πάνω από 120'));
+      expect(pulseNote(_bp(126, 84, pulse: 120)), isNot(contains('την ίδια μέρα')));
+      expect(pulseNote(_bp(126, 84, pulse: 110)), isNot(contains('την ίδια μέρα')));
+      expect(pulseNote(_bp(126, 84, pulse: 39)), contains('δεν είναι το συνηθισμένο σου'));
       expect(pulseNote(_bp(126, 84, pulse: 39)), contains('Πολύ αργοί σφυγμοί'));
       expect(pulseNote(_bp(126, 84, pulse: 100)), isNull);
       expect(pulseNote(_bp(126, 84, pulse: 40)), isNull);
@@ -194,11 +259,17 @@ void main() {
     expect(glucoseNote(_glu(54)), contains('Κάτω από 55 mg/dL: χαμηλό σάκχαρο'));
     expect(glucoseNote(_glu(50)), contains('166 ή 112'));
     expect(glucoseNote(_glu(70, GlucoseWhen.after)), isNull);
+    expect(glucoseNote(_glu(69.5, GlucoseWhen.after)), isNull, reason: 'κρίνεται όπως φαίνεται (70)');
+    // K3-review R6: όποιος παίρνει ινσουλίνη ή χάπια που ρίχνουν το σάκχαρο δεν περιμένει συμπτώματα.
+    expect(glucoseNote(_glu(62)), contains('ινσουλίνη ή χάπια που ρίχνουν το σάκχαρο: 15 g ζάχαρη τώρα'));
     expect((glucoseLow, glucoseVeryLow), (70, 55));
   });
 
   test('K3-S-07: «Ασαφές» δεν σημαίνει «εντάξει»· η μαρμαρυγή παίρνει χρόνο', () {
     expect(ecgNote(EcgResult.inconclusive), contains('δεν σημαίνει «εντάξει»'));
+    // K3-review R3: χωρίς αριθμούς που αλλάζουν με την έκδοση της εφαρμογής ECG του ρολογιού (100–120 ή 150).
+    expect(ecgNote(EcgResult.inconclusive), contains('πολύ αργοί (κάτω από 50) ή πολύ γρήγοροι'));
+    expect(ecgNote(EcgResult.inconclusive), isNot(contains('100–120')));
     expect(ecgNote(EcgResult.inconclusive), contains('παλμούς πάνω από 120 σε ηρεμία, μίλα με γιατρό την ίδια μέρα'));
     expect(ecgNote(EcgResult.afib), contains('μέσα σε λίγες μέρες'));
     expect(ecgNote(EcgResult.afib), contains('166 ή 112'));
@@ -226,6 +297,14 @@ void main() {
       expect((less.repeatedMonth, less.any), (false, false));
       final healthy = oxygenGuidance(nights({for (var i = 0; i < 30; i++) i: (i == 2 || i == 10 || i == 18 || i == 26) ? 84.0 : 92.0}), last);
       expect((healthy.lowNights30, healthy.measuredNights30, healthy.repeatedMonth, healthy.any), (4, 30, false, false));
+      // K3-review: 4 από 9 όχι, 4 από 7 ναι· και όταν η «τελευταία νύχτα» δεν έχει μέτρηση (νύχτες −8, −15, −22, −29).
+      final of9 = oxygenGuidance(nights({1: 83, 8: 83, 15: 83, 22: 83, 2: 92, 9: 92, 16: 92, 23: 92, 27: 92}), last);
+      expect((of9.lowNights30, of9.measuredNights30, of9.repeatedMonth), (4, 9, false));
+      final of7 = oxygenGuidance(nights({1: 83, 8: 83, 15: 83, 22: 83, 9: 92, 16: 92, 23: 92}), last);
+      expect((of7.lowNights30, of7.measuredNights30, of7.repeatedMonth), (4, 7, true));
+      final noLast = oxygenGuidance(nights({8: 83, 15: 83, 22: 83, 29: 83}), last);
+      expect((noLast.repeatedMonth, noLast.veryLowLastNight), (true, false));
+      expect(oxygenGuidance(nights({8: 84.99, 15: 84.99, 22: 84.99, 29: 85.0}), last).repeatedMonth, isFalse, reason: '85,0 δεν μετρά');
     });
 
     test('η σειρά των μηνυμάτων: κάτω από 80% σε 2 νύχτες, μετά η εβδομάδα, μετά ο μήνας', () {
@@ -238,7 +317,7 @@ void main() {
 
     test('το ⓘ λέει τον νέο κανόνα, ότι χωρίς το ρολόι στον ύπνο δεν βγαίνει σημείωση, και κάτι για τον μέσο όρο', () {
       final down = metricInfos[K.ringSpo2]!.down!;
-      expect(down, contains('4+ νύχτες του μήνα'));
+      expect(down, contains('στις μισές και πάνω από τις νύχτες του μήνα που φόρεσες το ρολόι, αν είναι τουλάχιστον 4'));
       expect(down, contains('Χωρίς το ρολόι στον ύπνο'));
       expect(down, contains('κάτω από 92%'));
       expect(oxygenAboutText, contains('περίπου 4 ώρες ύπνου'), reason: 'K3-S-12');
@@ -257,6 +336,9 @@ void main() {
     expect(watchLowText(low), 'Λίγη κάλυψη: το ρολόι μέτρησε το 49% του ύπνου');
     const NightOxygen ok = (avg: 94, min: 88, below90: null, cov: 0.5);
     expect(watchLowText(ok), 'Μέτρησε το 50% του ύπνου');
+    // K3-review R12: 0,29 × 100 = 28,999999999999996 → «29%», όχι «28%».
+    const NightOxygen c29 = (avg: 94, min: 88, below90: null, cov: 0.29);
+    expect(watchLowText(c29), 'Λίγη κάλυψη: το ρολόι μέτρησε το 29% του ύπνου');
   });
 
   test('K3-S-10: η «Βαθμολογία ύπνου» έχει ουδέτερο χρώμα στις Τάσεις· η διάρκεια μένει «περισσότερο = καλύτερα»', () {

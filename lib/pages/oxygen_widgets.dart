@@ -51,9 +51,8 @@ String watchLowText(NightOxygen? ox) {
   if (ox == null) return 'Χωρίς μετρήσεις του ρολογιού μέσα στον ύπνο';
   final pct = ox.cov == null ? null : (ox.cov! * 100).round();
   // Έλεγχος 20/11 (K3C-08): εδώ το ποσοστό προς τα κάτω· κάλυψη 49,6% έγραφε «Λίγη κάλυψη… το 50%», ενώ το 50% φαίνεται.
-  if (!spo2MinShown(ox.cov)) {
-    return 'Λίγη κάλυψη: το ρολόι μέτρησε το ${ox.cov == null ? pct : (ox.cov! * 100).floor()}% του ύπνου';
-  }
+  // (K3-review R12: + 1e-9, γιατί 0,29 × 100 = 28,999999999999996.)
+  if (!spo2MinShown(ox.cov)) return 'Λίγη κάλυψη: το ρολόι μέτρησε το ${(ox.cov! * 100 + 1e-9).floor()}% του ύπνου';
   final below = ox.below90 == null ? '' : ' ·\u00A0κάτω από 90%: ${unitsGlued(hoursMinutes(ox.below90!.round()))} (ενδεικτικό)';
   return '${pct == null ? '' : 'Μέτρησε το $pct% του ύπνου'}$below';
 }
