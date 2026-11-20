@@ -156,8 +156,24 @@ List<String> aiFoodLines(FoodStore food, Set<String> allowed) {
     for (final f in [...food.mine, ...food.basicFoods])
       if (allowed.contains(f.id)) f,
   ];
-  return rawFoodLines(foods, food.likes);
+  return rawFoodLines(foods, food.likes, tail: aiNutTail);
 }
+
+/// Αποφάσεις 20/11 (ο χρήστης: «θέλω να έχει πρόσβαση και να μαθαίνει ό,τι θέλει»): δίπλα σε κάθε υλικό τα κορεσμένα
+/// και το αλάτι ανά 100 g (ή 100 ml) από τη βάση, όταν μετράνε (κορεσμένα από [aiTailSat] g, αλάτι από [aiTailSalt] g),
+/// ώστε το AI να διαλέγει υλικά που χωράνε στα όρια. Οι αριθμοί του προγράμματος μετριούνται πάντα από την εφαρμογή.
+String aiNutTail(Food f) {
+  final sat = f.n.has(Nk.satFat) ? f.n.amount(Nk.satFat) : null;
+  final salt = f.n.has(Nk.salt) ? f.n.amount(Nk.salt) : null;
+  final parts = [
+    if (sat != null && sat >= aiTailSat) 'κορ. ${_g1(sat)}',
+    if (salt != null && salt >= aiTailSalt) 'αλάτι ${_g1(salt)}',
+  ];
+  return parts.isEmpty ? '' : ' [${parts.join(' · ')}]';
+}
+
+const aiTailSat = 1.0;
+const aiTailSalt = 0.25;
 
 // ---------------------------------------------------------------------------
 // Ασφάλεια και λογική μιας συνταγής
@@ -298,7 +314,10 @@ Map<Meal, int> aiMealKcal(int dayKcal, List<Meal> meals) {
 }
 
 /// Το σταθερό κομμάτι κάθε ερώτησης (κρατιέται στην cache του API, ώστε οι συνταγές να έρχονται γρηγορότερα).
-String aiSystem(FoodStore food, Set<String> allowed, Kitchen kitchen) {
+///
+/// [limits] (αποφάσεις 20/11): τα όρια της μέρας του χρήστη (κορεσμένα, αλάτι, ίνες, πρωτεΐνη), ώστε το AI να τα σέβεται
+/// από την αρχή. Ποτέ δεδομένα υγείας (ύπνος, παλμοί, πίεση, σάκχαρο, Oura): μόνο οι στόχοι διατροφής.
+String aiSystem(FoodStore food, Set<String> allowed, Kitchen kitchen, {AiTargets? limits}) {
   final devices = [
     for (final d in kitchenDevices)
       if (kitchen.has(d.$1)) '${d.$2} (${d.$3})',
@@ -328,7 +347,22 @@ String aiSystem(FoodStore food, Set<String> allowed, Kitchen kitchen) {
     ..writeln('- Ψωμί, ζυμαρικά και ρύζι ολικής όπου υπάρχουν στη λίστα· ζάχαρη ή μέλι ως 10 g· κρασί μόνο στο μαγείρεμα.')
     ..writeln('- Ψάρι: κυρίως σαρδέλα, γαύρος, σκουμπρί, σολομός, τσιπούρα, λαβράκι, μπακαλιάρος. Ξιφίας το πολύ μία φορά '
         'τον μήνα· τόνος λευκός (albacore) το πολύ μία φορά την εβδομάδα.')
-    ..writeln()
+    ..writeln();
+  if (limits != null) {
+    b
+      ..writeln('ΤΑ ΟΡΙΑ ΤΗΣ ΜΕΡΑΣ ΜΟΥ (τα μετρά η εφαρμογή από τη βάση· διάλεξε υλικά και ποσότητες ώστε να χωράνε):')
+      ..writeln('- Κορεσμένα λιπαρά έως ${_g1(limits.satMax)} g τη μέρα, όλα τα γεύματα μαζί (ένα κύριο γεύμα περίπου έως '
+          '${_g1(limits.satMax / 3)} g). Μετρούν και τα κορεσμένα του ελαιόλαδου, του λιπαρού ψαριού, του τυριού και του '
+          'γιαουρτιού: προτίμησε άπαχα γαλακτοκομικά και λίγο λάδι.')
+      ..writeln('- Αλάτι κάτω από ${_g1(limits.salt)} g τη μέρα, ΜΑΖΙ με το αλάτι που έχουν ήδη τα τρόφιμα (τυρί, cottage, '
+          'ψωμί, κονσέρβες, παστά, καπνιστά, μαρινάτα).')
+      ..writeln('- Φυτικές ίνες τουλάχιστον ${limits.fiber} g τη μέρα (όσπρια, λαχανικά, φρούτα, ολικής άλεσης, πίτουρο).')
+      ..writeln('- Πρωτεΐνη περίπου ${limits.protein} g τη μέρα, μοιρασμένη στα κύρια γεύματα.')
+      ..writeln('- Στη λίστα υλικών, «[κορ. … · αλάτι …]» = γραμμάρια κορεσμένων και αλατιού ανά 100 g (ή 100 ml), από τη '
+          'βάση. Όπου δεν γράφει, είναι λίγα.')
+      ..writeln();
+  }
+  b
     ..writeln('ΚΟΥΖΙΝΑ: ${devices.isEmpty ? 'μάτια κουζίνας, φούρνος, κατσαρόλες, τηγάνια' : devices.join(', ')}'
         '${kitchen.cookware.isEmpty ? '' : '. Σκεύη: ${kitchen.cookware.map((c) => c.size == null ? c.kind : '${c.kind} ${c.size}').join(', ')}'}');
   if (food.likes.note.trim().isNotEmpty) b.writeln('ΣΗΜΕΙΩΣΕΙΣ ΤΟΥ ΧΡΗΣΤΗ: ${food.likes.note.trim()}');
@@ -586,8 +620,9 @@ String aiPlanPrompt({
     ..writeln('- Τρίτη, Τετάρτη, Πέμπτη μεσημέρι είμαι στο γραφείο (ψυγείο και μικροκύματα): μόνο φαγητό με "office": true. '
         'Κατσαρόλα στο γραφείο μόνο ως περίσσευμα (μαγειρεμένη το βράδυ της προηγούμενης μέρας)· αλλιώς κάτι χωρίς μαγείρεμα.')
     ..writeln('- Καθημερινές ως 30 λεπτά μαγείρεμα, Σαββατοκύριακο ως 60.')
-    ..writeln('- Κατσαρόλα ("pot") για όλο το σπίτι (2–3 άτομα) και ένα ταπεράκι: μαγειρεύεται μία φορά και ξαναμπαίνει το '
-        'πολύ μία φορά, ως 2 μέρες μετά (με ρύζι: μόνο την επόμενη μέρα), με το ίδιο key. Τα άλλα φαγητά (όχι σνακ) το πολύ 2 '
+    ..writeln('- Κατσαρόλα ("pot") για όλο το σπίτι: 2–3 άτομα σε ένα γεύμα, ΣΥΝ τις δύο δικές μου μερίδες (είναι '
+        'μεγάλες) και ένα ταπεράκι· στο "idea" γράψε για πόσες μερίδες ενήλικα, τουλάχιστον 6. Μαγειρεύεται μία φορά '
+        'και ξαναμπαίνει το πολύ μία φορά, ως 2 μέρες μετά (με ρύζι: μόνο την επόμενη μέρα), με το ίδιο key. Τα άλλα φαγητά (όχι σνακ) το πολύ 2 '
         'φορές την εβδομάδα και όχι σε ίδια ή συνεχόμενη μέρα. Τα σνακ μπορούν να επαναλαμβάνονται.')
     ..writeln('- Ψώνια τη Δευτέρα: το φρέσκο ψάρι νωρίς στην εβδομάδα, τα υπόλοιπα κατεψυγμένα ή κονσέρβα.')
     ..writeln('- Την εβδομάδα: ${[
@@ -625,7 +660,7 @@ String aiPlanPrompt({
     ..writeln('  "new": [')
     ..writeln('    {"key": "${aiKeyPrefix}kotopoulo-lemonato", "name": "Κοτόπουλο λεμονάτο με πατάτες και κολοκυθάκια", '
         '"type": "pot", "cook": "home", "minutes": 50, "meals": ["lunch", "dinner"], "office": true, "tags": ["κοτόπουλο"], '
-        '"idea": "μπούτι χωρίς πέτσα, πατάτες, κολοκυθάκια, λεμόνι, ελαιόλαδο, ρίγανη· για 5 μερίδες"}')
+        '"idea": "μπούτι χωρίς πέτσα, πατάτες, κολοκυθάκια, λεμόνι, ελαιόλαδο, ρίγανη· για 6 μερίδες"}')
     ..writeln('  ],')
     ..writeln('  "days": [')
     ..writeln('    [{"meal": "lunch", "key": "…"}, {"meal": "dinner", "key": "${aiKeyPrefix}kotopoulo-lemonato"}],')
@@ -662,12 +697,13 @@ String aiRecipePrompt(AiNewDish n) {
 
 String _recipeFormat(String key, String name) => [
       'Κράτα ΙΔΙΑ τα "key", "name", "type", "cook", "meals", "office", "tags". "type": "plate" = ένα πιάτο για μένα· '
-          '"portions" = ίσες μερίδες (γράψε "servings")· "pot" = κατσαρόλα για όλο το σπίτι (2–3 άτομα) και ένα ταπεράκι '
-          '(γράψε στο "servings" πόσες μερίδες ενήλικα βγάζει, τουλάχιστον 3). Με "cook": "home" θέλει "steps" (συσκευή, '
+          '"portions" = ίσες μερίδες (γράψε "servings")· "pot" = κατσαρόλα για όλο το σπίτι: 2–3 άτομα σε ένα γεύμα, ΣΥΝ τις '
+          'δύο δικές μου μερίδες (είναι μεγάλες) και ένα ταπεράκι. Γράψε στο "servings" πόσες μερίδες ενήλικα βγάζει, '
+          'τουλάχιστον 6, και ποσότητες για όλες (μία μερίδα ενήλικα ≈ ένα κανονικό πιάτο). Με "cook": "home" θέλει "steps" (συσκευή, '
           'φωτιά, λεπτά, πότε μπαίνει κάθε υλικό, αλάτι με κουτάλι). Μην γράψεις "keeps": τη διατήρηση τη γράφει η εφαρμογή.',
       'Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή:',
       '```json',
-      '{"kind": "$libraryKind", "dishes": [{"key": "$key", "name": "$name", "type": "pot", "cook": "home", "servings": 5, '
+      '{"kind": "$libraryKind", "dishes": [{"key": "$key", "name": "$name", "type": "pot", "cook": "home", "servings": 6, '
           '"minutes": 40, "meals": ["lunch"], "office": true, "tags": ["…"], '
           '"items": [{"id": "C…", "name": "…", "g": 250}, …], '
           '"steps": [{"text": "…", "device": "…", "heat": "μέτρια", "min": 10}, …], '
@@ -945,7 +981,7 @@ List<AiProblem> aiCheckWeek(
         weight: 0.5,
       ));
     }
-    final fv = parts.where((e) => (e.food.cat == 'Λαχανικά' || e.food.cat == 'Φρούτα') && e.grams >= 10).fold(0.0, (a, e) => a + e.grams);
+    final fv = parts.where((e) => isFruitVeg(e.food) && e.grams >= 10).fold(0.0, (a, e) => a + e.grams);
     if (fv < aiFruitVegDayG * f) {
       out.add(AiProblem(
         day: i,
@@ -1153,7 +1189,7 @@ Future<AiWeekResult> aiBuildWeek({
       if (food.dishById(e.value) case final d?)
         if (planInfoOf(d)?.key case final k?) e.key: k,
   };
-  final system = aiSystem(food, allowed, kitchen);
+  final system = aiSystem(food, allowed, kitchen, limits: targets);
   final checkDays = <int>{
     for (var i = 0; i < 7; i++)
       if (!DateTime(start.year, start.month, start.day + i).isBefore(todayD) && meals.any((m) => !kept.containsKey((i, m)))) i,

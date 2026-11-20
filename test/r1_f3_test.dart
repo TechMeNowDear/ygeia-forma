@@ -592,7 +592,9 @@ void main() {
       expect(s.prefsSaveError, isTrue);
       expect(notified, greaterThanOrEqualTo(2), reason: 'η οθόνη μαθαίνει και την αλλαγή και την αποτυχία');
       expect(s.waist.single.day, '2026-11-20', reason: 'στη μνήμη υπάρχει');
-      expect(a.load.contains('2026-11-20'), isFalse, reason: 'στο κινητό όχι');
+      // 20/11: όχι με την ημερομηνία ως κείμενο (η μέρα της δοκιμής είναι η πραγματική· στις 20/11/2026 το αρχείο είχε
+      // ήδη αυτή την ημερομηνία από άλλα πεδία).
+      expect((jsonDecode(a.load) as Map)['waist'], isNull, reason: 'στο κινητό όχι');
       // «Δοκίμασε ξανά» με τον χώρο ακόμα γεμάτο.
       expect(await s.retrySavePrefs(), isFalse);
       expect(s.prefsSaveError, isTrue);

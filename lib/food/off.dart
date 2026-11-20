@@ -25,6 +25,7 @@ class FoodDraft {
     Set<String>? lessThan,
     this.cholKind,
     this.spoon,
+    this.fruitVeg = false,
   })  : values = values ?? {},
         lessThan = lessThan ?? {};
 
@@ -32,6 +33,9 @@ class FoodDraft {
   /// ([spoonFromOffTags]), από το ίδιο το προϊόν όταν διορθώνεται· null = δεν ξέρουμε (η φόρμα προτείνει από το όνομα).
   /// Round10 (R10-B1-1): false = διάλεξες «Όχι» ([Food.spoonNo]), και μένει «Όχι» σε κάθε «Διόρθωση».
   final bool? spoon;
+
+  /// Αποφάσεις 20/11: μετρά στα φρούτα και λαχανικά της μέρας ([Food.fruitVeg]).
+  final bool fruitVeg;
 
   /// Τι μετρά το προϊόν στην κάρτα «Χοληστερίνη» ([CholKind]) ή null. Από τις κατηγορίες του Open Food Facts όταν
   /// σαρώνεται ([cholKindFromOffTags]), από το ίδιο το προϊόν όταν διορθώνεται· το αλλάζεις στη φόρμα.
@@ -488,6 +492,7 @@ FoodDraft draftFromFood(Food f) => FoodDraft(
       // Round10 (R10-B1-1): το «Όχι» που διάλεξες μένει «Όχι» ([Food.spoonNo]· πριν η «Διόρθωση» ξαναπρότεινε «Ναι» από το
       // όνομα, και η αποθήκευση το έγραφε σιωπηλά).
       spoon: f.spoon ? true : (f.spoonNo ? false : null),
+      fruitVeg: f.fruitVeg,
     );
 
 const _formKeys = {Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fat, Nk.satFat, Nk.fiber, Nk.salt};
@@ -508,6 +513,7 @@ Food foodFromDraft(FoodDraft d, String id) => Food(
       cholKind: d.cholKind,
       spoon: d.spoon ?? false,
       spoonNo: d.spoon == false,
+      fruitVeg: d.fruitVeg,
       n: Nutrients({
         for (final e in d.values.entries) e.key: NValue(e.value, lessThan: d.lessThan.contains(e.key)),
         if (d.alcohol != null) Nk.alcohol: NValue(d.alcohol!),

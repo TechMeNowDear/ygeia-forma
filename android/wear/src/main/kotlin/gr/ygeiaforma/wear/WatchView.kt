@@ -342,6 +342,8 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
             if (Repo.screen == Repo.Screen.SET && isBriefNotice(inNote)) hits.add(Hit(noteHit(), inNote, null))
             else hits.add(Hit(noteHit(), inNote) { noticeOpen = true; invalidate() })
         }
+        // Αποφάσεις 20/11: το «Πόσες περίπου;» ζει μόνο όσο φαίνεται η ερώτηση.
+        if (Repo.screen != Repo.Screen.RIR) rirMore = false
         when (Repo.screen) {
             Repo.Screen.HOME -> drawHome(c)
             Repo.Screen.SET -> drawSet(c, now)
@@ -1004,7 +1006,17 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     }
 
     // ------------------------------------------------------------------ ρεζέρβα
+    /**
+     * Αποφάσεις 20/11: στο «Πρώτο σετ», μετά το «4+», δεύτερη ερώτηση «Πόσες περίπου;» (4 / 5–7 / 8–12 / 13+ → 4, 6, 10, 15),
+     * όπως στο κινητό (Κ5-H1): η βαθμονόμηση ανεβάζει το βάρος πιο γρήγορα στο σωστό. Μόνο στη μνήμη της οθόνης· σβήνει με
+     * την απάντηση ή όταν φύγει η οθόνη.
+     */
+    private var rirMore = false
+
     private fun drawRir(c: Canvas) {
+        val firstQ = Repo.session?.firstPending == true
+        if (!firstQ) rirMore = false
+        if (rirMore) return drawRirMore(c)
         // Έλεγχος 13/11, round 7 (R7-U3-04): «Δεν ξέρω» όπως στο κινητό (καμία απάντηση: δεν ανεβαίνει τίποτα), κάτω-κάτω.
         // Για να χωρέσουν τρεις σειρές πατημάτων ≥ 40u: η ερώτηση 11u πιο ψηλά, το «με καλή τεχνική» κάτω από αυτήν (πριν
         // στη θέση του «Δεν ξέρω») και τα κουμπιά 28u ψηλά (πριν 30u).
@@ -1025,8 +1037,35 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         // Έλεγχος 13/11 (U7-08β): οι περιοχές πατήματος των σειρών δεν πέφτουν η μία πάνω στην άλλη: 80–120u, 120–160u και
         // 160–200u («Δεν ξέρω»), και δεξιά-αριστερά ακριβώς διπλανές (40–80, 80–120, 120–160u).
         pillAt(c, labels[3], 80f, 140f, 34f, 28f, card, Color.WHITE, 14f * fs, descs[3]) { actions.answer(3) }
-        pillAt(c, labels[4], 120f, 140f, 34f, 28f, card, Color.WHITE, 14f * fs, descs[4]) { actions.answer(4) }
+        pillAt(c, labels[4], 120f, 140f, 34f, 28f, card, Color.WHITE, 14f * fs, descs[4]) {
+            if (first) {
+                rirMore = true
+                invalidate()
+            } else {
+                actions.answer(4)
+            }
+        }
         pill(c, RIR_UNKNOWN, 174f, 84f, 24f, button3, soft, ess(10f), padTop = 2f, padBottom = 14f) { actions.answer(-1) }
+    }
+
+    /** «Πόσες περίπου;» (αποφάσεις 20/11): ίδιες θέσεις και μεγέθη με τα κουμπιά της ρεζέρβας, δύο σειρές των δύο. */
+    private fun drawRirMore(c: Canvas) {
+        val y1 = 43f
+        t(c, FIRST_MORE_LINE1, y1, Color.WHITE, 12f * fs, true)
+        t(c, FIRST_MORE_LINE2, y1 + 15f * fs, Color.WHITE, 12f * fs, true)
+        sayAdd(FIRST_MORE_SAY)
+        for ((k, o) in FIRST_MORE.withIndex()) {
+            val x = if (k % 2 == 0) 80f else 120f
+            val y = if (k < 2) 100f else 140f
+            pillAt(c, o.first, x, y, 34f, 28f, card, Color.WHITE, 13f * fs, o.third) {
+                rirMore = false
+                actions.answer(o.second)
+            }
+        }
+        pill(c, "Πίσω", 174f, 84f, 24f, button3, soft, ess(10f), padTop = 2f, padBottom = 14f) {
+            rirMore = false
+            invalidate()
+        }
     }
 
     // ------------------------------------------------------------------ Γ. διάλειμμα
@@ -1577,6 +1616,17 @@ internal const val UNSAVED_TEXT = "Μάλλον γέμισε ο χώρος το�
 internal const val FIRST_SET_LINE1 = "Πρώτο σετ:"
 internal const val FIRST_SET_LINE2 = "πόσες ακόμα;"
 internal const val FIRST_SET_SAY = "Πρώτο σετ: πόσες επαναλήψεις ακόμα θα έβγαζες με καλή τεχνική;"
+
+/** Αποφάσεις 20/11: μετά το «4+» του «Πρώτο σετ», όπως στο κινητό (κείμενο, τιμή που στέλνεται, για το TalkBack). */
+internal const val FIRST_MORE_LINE1 = "Πρώτο σετ:"
+internal const val FIRST_MORE_LINE2 = "πόσες περίπου;"
+internal const val FIRST_MORE_SAY = "Πρώτο σετ: πόσες επαναλήψεις ακόμα, περίπου;"
+internal val FIRST_MORE = listOf(
+    Triple("4", 4, "Τέσσερις"),
+    Triple("5–7", 6, "Πέντε ως επτά"),
+    Triple("8–12", 10, "Οκτώ ως δώδεκα"),
+    Triple("13+", 15, "Δεκατρείς ή περισσότερες"),
+)
 
 /** Η προπόνηση κλείνει ακόμα, αντί για την αρχική (R8-A8-1). Κείμενα προς έγκριση. */
 internal const val CLOSING_TITLE = "Αποθηκεύεται"

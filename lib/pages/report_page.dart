@@ -15,6 +15,7 @@ import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../trends.dart';
+import '../vitals.dart';
 import '../widgets.dart';
 
 /// Η στήλη «Διαφορά» της σελίδας 1. Έλεγχος 9/11 (V-B-01): με πολύ λίγες ανεξάρτητες μέρες (π.χ. αραιές ζυγίσεις)
@@ -35,8 +36,23 @@ String reportTrendText(TrendResult? t, MetricDef? def) {
 // Έλεγχος 17/11 (Κ6-H1): από 16/11 η πίεση, το σάκχαρο και τα καρδιογραφήματα γράφονται εδώ με το χέρι· δεν μπαίνουν
 // ακόμα στην αναφορά (ιδέα στο έγγραφο, θέλει συμφωνία). Πριν: «η πίεση είναι στο Samsung Health Monitor».
 const reportNotIncludedText = 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας: είναι στο Samsung Health Monitor. '
-    'Πίεση, σάκχαρο και καρδιογραφήματα που γράφω με το χέρι δεν μπαίνουν ακόμα εδώ· τα δείχνω από την οθόνη «Πίεση, '
-    'σάκχαρο, καρδιογράφημα». Η απουσία τους εδώ δεν σημαίνει ότι ήταν φυσιολογικά.';
+    'Πίεση, σάκχαρο και καρδιογραφήματα που γράφω με το χέρι: καμία μέτρηση σε αυτό το διάστημα. Η απουσία τους εδώ δεν '
+    'σημαίνει ότι ήταν φυσιολογικά.';
+
+/// Αποφάσεις 20/11: με μετρήσεις πίεσης/σακχάρου/καρδιογραφήματος στο διάστημα, μπαίνουν στη σελίδα 4.
+const reportVitalsIncludedText = 'ΗΚΓ, ειδοποιήσεις ακανόνιστου ρυθμού και τεστ άπνοιας: είναι στο Samsung Health '
+    'Monitor. Πίεση, σάκχαρο και καρδιογραφήματα που γράφω με το χέρι: στη σελίδα 4. Η απουσία των υπολοίπων εδώ δεν '
+    'σημαίνει ότι ήταν φυσιολογικά.';
+
+/// Όσες μετρήσεις χωρούν στη σελίδα 4 (οι νεότερες· γράφεται πόσες είναι όλες).
+const reportBpRows = 30, reportGlucoseRows = 20, reportEcgRows = 10;
+
+/// Οι μετρήσεις του διαστήματος της αναφοράς, νεότερη πρώτη.
+List<Vital> reportVitals(Iterable<Vital> all, DateTime from, DateTime to) {
+  final a = DateTime(from.year, from.month, from.day);
+  final b = DateTime(to.year, to.month, to.day + 1);
+  return [for (final v in all) if (!v.at.isBefore(a) && v.at.isBefore(b)) v]..sort((x, y) => y.at.compareTo(x.at));
+}
 
 /// R7-U4-3: το μήνυμα μετά την αποθήκευση με το όνομα που πήρε ΠΡΑΓΜΑΤΙ το αρχείο ([saved], από το σύστημα: δεύτερο PDF
 /// την ίδια μέρα γίνεται «… (1).pdf»)· αν λείπει (παλιά απάντηση), το όνομα που ζητήθηκε ([asked]).
@@ -51,8 +67,11 @@ String pdfSaveFailText(Map<String, dynamic>? r) => r?['kind'] == 'full'
 
 /// Αναφορά για γιατρό: προεπισκόπηση των σελίδων A4 και αποθήκευση ως PDF στις Λήψεις.
 class ReportPage extends StatefulWidget {
-  const ReportPage({super.key, required this.store, this.now, this.note = '', this.end});
+  const ReportPage({super.key, required this.store, this.now, this.note = '', this.end, this.vitals});
   final HealthStore store;
+
+  /// Πίεση, σάκχαρο, καρδιογράφημα (αποφάσεις 20/11)· χωρίς: του κινητού ([VitalsStore.main]).
+  final VitalsStore? vitals;
   final DateTime? now;
 
   /// Η τελευταία μέρα του διαστήματος (από τις Τάσεις: η ίδια μέρα με αυτές, έλεγχος υπολογισμών C12).
@@ -66,7 +85,19 @@ class ReportPage extends StatefulWidget {
 }
 
 class _ReportPageState extends State<ReportPage> {
-  final _keys = [for (var i = 0; i < _pageCount; i++) GlobalKey()];
+  final _keys = [for (var i = 0; i < _maxPages; i++) GlobalKey()];
+  late final VitalsStore _vitalsStore = widget.vitals ?? VitalsStore.main;
+
+  @override
+  void initState() {
+    super.initState();
+    // Οι μετρήσεις μπορεί να μην έχουν διαβαστεί ακόμα: όταν διαβαστούν, μπαίνει η σελίδα 4.
+    if (!_vitalsStore.read) {
+      _vitalsStore.ensureLoaded().then((_) {
+        if (mounted) setState(() => _uri = null);
+      });
+    }
+  }
   bool _saving = false;
   String? _uri;
 
@@ -115,7 +146,7 @@ class _ReportPageState extends State<ReportPage> {
     try {
       await WidgetsBinding.instance.endOfFrame;
       final pages = <Uint8List>[];
-      for (final k in _keys) {
+      for (final k in _keys.take(_pageTotal)) {
         final boundary = k.currentContext!.findRenderObject()! as RenderRepaintBoundary;
         // 595 στιγμές × 3 ≈ 250 dpi: καθαρό στην εκτύπωση, λογικό μέγεθος αρχείου.
         final image = await boundary.toImage(pixelRatio: 3);
@@ -146,14 +177,19 @@ class _ReportPageState extends State<ReportPage> {
     }
   }
 
+  List<Vital> get _periodVitals => reportVitals(_vitalsStore.all, _data.from, _data.to);
+  int get _pageTotal => _periodVitals.isEmpty ? 3 : 4;
+
   @override
   Widget build(BuildContext context) {
     final c = Aigaio.of(context);
     final name = _name.trim();
+    final vitals = _periodVitals;
     final pages = [
-      _PageOne(data: _data, note: _note.trim(), name: name),
+      _PageOne(data: _data, note: _note.trim(), name: name, vitals: vitals.isNotEmpty),
       _PageTwo(data: _data, name: name),
       _PageThree(data: _data, name: name, stale: widget.store.prefs.staleMonths),
+      if (vitals.isNotEmpty) _PageVitals(data: _data, name: name, vitals: vitals),
     ];
 
     return Scaffold(
@@ -175,13 +211,14 @@ class _ReportPageState extends State<ReportPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Οι τελευταίοι 3 μήνες σε τρεις σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
+                      'Οι τελευταίοι 3 μήνες σε ${pages.length == 4 ? 'τέσσερις' : 'τρεις'} σελίδες A4, για να τις δείξεις ή να τις στείλεις στον γιατρό σου. '
                       // Round 1 (U1b-08): με το Oura και «δαχτυλίδι», όπως το υποσέλιδο των σελίδων.
                       '${widget.store.analysisPlan.hasOura ? 'Μετρήσεις από ρολόι, δαχτυλίδι και ζυγαριά' : 'Μετρήσεις από ρολόι και ζυγαριά'}, '
                       'με σύγκριση με τους προηγούμενους μήνες. Χωρίς διάγνωση. '
                       // Κλινικός έλεγχος H2 και M6 (4/11).
-                      'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού ή τεστ άπνοιας (τα δείχνεις από το Samsung Health Monitor), ούτε '
-                      'πίεση, σάκχαρο και καρδιογραφήματα που γράφεις με το χέρι (τα δείχνεις από την οθόνη τους).',
+                      'Δεν περιέχει ΗΚΓ, ειδοποιήσεις ρυθμού ή τεστ άπνοιας (τα δείχνεις από το Samsung Health Monitor). '
+                      'Μετρήσεις για πίεση, σάκχαρο και καρδιογραφήματα που γράφεις με το χέρι: '
+                      '${pages.length == 4 ? 'στη σελίδα 4.' : 'μπαίνουν σε δική τους σελίδα, όταν υπάρχουν στο διάστημα.'}',
                       style: TextStyle(color: c.textSecondary, fontSize: 14.5, height: 1.4),
                     ),
                     const SizedBox(height: 12),
@@ -242,7 +279,7 @@ class _ReportPageState extends State<ReportPage> {
                             child: FittedBox(
                               child: RepaintBoundary(
                                 key: _keys[i],
-                                child: _Paper(child: pages[i]),
+                                child: _ReportTotal(total: pages.length, child: _Paper(child: pages[i])),
                               ),
                             ),
                           ),
@@ -335,7 +372,19 @@ const reportNoteMax = 400;
 const reportNameMax = 60;
 
 /// Σελίδες: 1 σύνοψη και ορισμοί, 2 γραφήματα, 3 οξυγόνο και ζυγίσεις (από 4/11, για να χωρούν οι εξηγήσεις).
-const _pageCount = 3;
+/// Ως 4 σελίδες: η 4η (πίεση, σάκχαρο, καρδιογράφημα) μόνο με μετρήσεις στο διάστημα (αποφάσεις 20/11).
+const _maxPages = 4;
+
+/// Πόσες σελίδες έχει η αναφορά (για το «σελίδα 2 από 3/4» του υποσέλιδου).
+class _ReportTotal extends InheritedWidget {
+  const _ReportTotal({required this.total, required super.child});
+  final int total;
+
+  static int of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_ReportTotal>()?.total ?? 3;
+
+  @override
+  bool updateShouldNotify(_ReportTotal old) => old.total != total;
+}
 
 class _Paper extends StatelessWidget {
   const _Paper({required this.child});
@@ -387,6 +436,7 @@ class _Header extends StatelessWidget {
                     switch (page) {
                       1 => 'Αναφορά υγείας',
                       2 => 'Αναφορά υγείας ·\u00A0γραφήματα',
+                      4 => 'Αναφορά υγείας ·\u00A0πίεση, σάκχαρο, καρδιογράφημα',
                       _ => 'Αναφορά υγείας ·\u00A0οξυγόνο και ζυγίσεις',
                     },
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.text, letterSpacing: -0.3),
@@ -439,7 +489,7 @@ class _Footer extends StatelessWidget {
           ),
         ),
         Text(
-          'Δημιουργήθηκε ${t.day}/${t.month}/${t.year} ·\u00A0σελίδα $page από $_pageCount',
+          'Δημιουργήθηκε ${t.day}/${t.month}/${t.year} ·\u00A0σελίδα $page από ${_ReportTotal.of(context)}',
           style: TextStyle(fontSize: 8, color: c.textTertiary),
         ),
       ],
@@ -465,9 +515,12 @@ class _Title extends StatelessWidget {
 // --- Σελίδα 1: πίνακας ---
 
 class _PageOne extends StatelessWidget {
-  const _PageOne({required this.data, this.note = '', this.name = ''});
+  const _PageOne({required this.data, this.note = '', this.name = '', this.vitals = false});
   final ReportData data;
   final String note;
+
+  /// Υπάρχει σελίδα 4 (πίεση, σάκχαρο, καρδιογράφημα).
+  final bool vitals;
   final String name;
 
   @override
@@ -561,7 +614,7 @@ class _PageOne extends StatelessWidget {
             // Δεύτερος κλινικός έλεγχος M6: και η πίεση (από τις πρώτες ερωτήσεις κάθε γιατρού για την καρδιά).
             // Έλεγχος 9/11 (V-B-02): όχι «δεν έχει πρόσβαση» (η εφαρμογή ζητά τις άδειες)· ό,τι κι αν γίνει με τις
             // άδειες, η πρόταση μένει σωστή.
-            const TextSpan(text: reportNotIncludedText),
+            TextSpan(text: vitals ? reportVitalsIncludedText : reportNotIncludedText),
           ]),
           style: TextStyle(fontSize: 9, color: c.text, height: 1.35),
         ),
@@ -1156,4 +1209,111 @@ String lowestDiffText(ReportStat s) {
     return s.periods.any((p) => p.oldRules) ? 'Ενημερώνεται το ιστορικό' : 'Αλλαγή ορισμού';
   }
   return 'Δεν συγκρίνεται (σελίδα 3)';
+}
+
+// --- Σελίδα 4: πίεση, σάκχαρο, καρδιογράφημα (αποφάσεις 20/11) ---
+
+/// Ό,τι γράφει ο χρήστης με το χέρι στην οθόνη «Πίεση, σάκχαρο, καρδιογράφημα», μέσα στο διάστημα της αναφοράς. Μόνο
+/// όταν υπάρχουν μετρήσεις. Χωρίς διάγνωση: για την πίεση ο μέσος όρος των 7 τελευταίων ημερών με τους ίδιους κανόνες
+/// με την οθόνη (ESC 2024, αρκετές μετρήσεις), για το σάκχαρο η περίσταση της κάθε μέτρησης.
+class _PageVitals extends StatelessWidget {
+  const _PageVitals({required this.data, required this.vitals, this.name = ''});
+  final ReportData data;
+  final List<Vital> vitals;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Aigaio.light;
+    final d = data;
+    final header = TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: c.textSecondary);
+    final cell = TextStyle(fontSize: 9.5, color: c.text, fontFeatures: tabular);
+    final small = TextStyle(fontSize: 8.8, color: c.textSecondary, height: 1.4);
+    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4), child: w);
+    String when(DateTime t) => '${t.day}/${t.month}/${t.year} ${hm(t)}';
+    final bp = [for (final v in vitals) if (v.kind == VitalKind.bp) v];
+    final glu = [for (final v in vitals) if (v.kind == VitalKind.glucose) v];
+    final ecg = [for (final v in vitals) if (v.kind == VitalKind.ecg) v];
+    final end = DateTime(d.to.year, d.to.month, d.to.day, 23, 59, 59);
+    final avg = bpAverage(bp, end);
+    String shown(int n, int all) => 'Οι $n πιο πρόσφατες από $all.';
+
+    Widget table(List<String> heads, List<List<String>> rows, Map<int, TableColumnWidth> widths) => Table(
+          columnWidths: widths,
+          border: TableBorder(horizontalInside: BorderSide(color: c.hairline, width: 0.6)),
+          children: [
+            TableRow(children: [for (final h in heads) pad(Text(h, style: header))]),
+            for (final r in rows) TableRow(children: [for (final x in r) pad(Text(x, style: cell))]),
+          ],
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Header(data: d, page: 4, name: name),
+        Expanded(
+          child: ReportFit(
+            key: const ValueKey('report-page4-body'),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(
+                'Μετρήσεις του σπιτιού που γράφω ο ίδιος με το χέρι (πιεσόμετρο, μετρητής σακχάρου, καρδιογράφημα του '
+                'ρολογιού). Δεν είναι ιατρικές μετρήσεις και δεν κάνουν διάγνωση.',
+                style: small,
+              ),
+              if (bp.isNotEmpty) ...[
+                _Title('Πίεση (${bp.length == 1 ? '1 μέτρηση' : '${bp.length} μετρήσεις'})'),
+                if (avg != null) Text(bpAverageText(avg), key: const ValueKey('report-bp-average'), style: cell),
+                if (avg == null) Text('Καμία μέτρηση τις 7 τελευταίες μέρες του διαστήματος.', style: cell),
+                const SizedBox(height: 4),
+                table(
+                  const ['Ημερομηνία', 'Πίεση (mmHg)', 'Σφυγμοί', 'Σημείωση'],
+                  [
+                    for (final v in bp.take(reportBpRows))
+                      [when(v.at), '${v.sys}/${v.dia}', v.pulse == null ? '—' : '${v.pulse}', v.note ?? ''],
+                  ],
+                  const {0: FixedColumnWidth(110), 1: FixedColumnWidth(80), 2: FixedColumnWidth(60), 3: FlexColumnWidth()},
+                ),
+                if (bp.length > reportBpRows) Text(shown(reportBpRows, bp.length), style: small),
+              ],
+              if (glu.isNotEmpty) ...[
+                _Title('Σάκχαρο (${glu.length == 1 ? '1 μέτρηση' : '${glu.length} μετρήσεις'})'),
+                table(
+                  const ['Ημερομηνία', 'mg/dL', 'Πότε', 'Σημείωση'],
+                  [
+                    for (final v in glu.take(reportGlucoseRows))
+                      [when(v.at), '${v.glucose!.round()}', glucoseWhenText(v.when!), v.note ?? ''],
+                  ],
+                  const {0: FixedColumnWidth(110), 1: FixedColumnWidth(60), 2: FixedColumnWidth(140), 3: FlexColumnWidth()},
+                ),
+                if (glu.length > reportGlucoseRows) Text(shown(reportGlucoseRows, glu.length), style: small),
+                Text(
+                  'Ο μετρητής του σπιτιού έχει απόκλιση (ISO 15197: ως ±15 mg/dL κάτω από 100). Η διάγνωση γίνεται με εξέταση '
+                  'αίματος (γλυκόζη νηστείας, HbA1c).',
+                  style: small,
+                ),
+              ],
+              if (ecg.isNotEmpty) ...[
+                _Title('Καρδιογράφημα ρολογιού (${ecg.length == 1 ? '1 καταγραφή' : '${ecg.length} καταγραφές'})'),
+                table(
+                  const ['Ημερομηνία', 'Αποτέλεσμα', 'Σημείωση'],
+                  [
+                    for (final v in ecg.take(reportEcgRows)) [when(v.at), ecgText(v.ecg!), v.note ?? ''],
+                  ],
+                  const {0: FixedColumnWidth(110), 1: FixedColumnWidth(150), 2: FlexColumnWidth()},
+                ),
+                if (ecg.length > reportEcgRows) Text(shown(reportEcgRows, ecg.length), style: small),
+                Text(
+                  'Το αποτέλεσμα όπως το έγραψα από το Samsung Health Monitor· το PDF της καταγραφής το δείχνω από εκεί. Ο '
+                  'φλεβοκομβικός ρυθμός τη στιγμή της μέτρησης δεν αποκλείει έμφραγμα ή άλλη καρδιοπάθεια.',
+                  style: small,
+                ),
+              ],
+            ]),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _Footer(data: d, page: 4),
+      ],
+    );
+  }
 }

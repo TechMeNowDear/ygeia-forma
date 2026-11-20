@@ -12,6 +12,7 @@ import '../../training/progress.dart';
 import '../../trends.dart' show TrendPeriod;
 import '../../training/program.dart';
 import '../../training/progression.dart' show Change;
+import '../../training/catch_up.dart';
 import '../../training/session.dart';
 import '../../training/training_store.dart';
 import '../../training/wear_link.dart';
@@ -145,6 +146,10 @@ class _TrainingPageState extends State<TrainingPage> {
       final picked = chosen == null ? null : p.workout(chosen);
       final w = chosen == null ? p.forDay(today) : (picked == null ? null : p.at(picked, today));
       cards.add(_todayCard(context, p, w, today, chosen: chosen != null));
+      // Αποφάσεις 20/11: χαμένη προπόνηση με βάρη, μόνο όταν χωρά σήμερα (catch_up.dart). Ρωτά· δεν αλλάζει τίποτα μόνη της.
+      if (chosen == null && cur == null) {
+        if (missedToCatchUp(p, t.sessions, today) case final m?) cards.add(_catchUpCard(context, m.workout, m.missed));
+      }
       final strengthDone = [for (final x in t.sessions.reversed) if (x.finished && !x.isCardio) x];
       final lastStrength = strengthDone.isEmpty ? null : strengthDone.first;
       if (lastStrength != null) cards.add(_lastCard(context, lastStrength));
@@ -191,6 +196,21 @@ class _TrainingPageState extends State<TrainingPage> {
   }
 
   // ---------------------------------------------------------------- κάρτες
+  Widget _catchUpCard(BuildContext context, Workout w, DateTime missed) {
+    final c = Aigaio.of(context);
+    final when = DateTime(_now.year, _now.month, _now.day - 1) == missed ? 'Χθες' : 'Προχθές';
+    return EmptyCard(
+      key: const ValueKey('train-catch-up'),
+      icon: Icons.event_repeat_rounded,
+      color: c.exercise,
+      title: '$when δεν έγινε «${w.name}»',
+      text: 'Χωράει σήμερα: δεν έκανες βάρη χθες και δεν έχεις αύριο, άρα οι μύες ξεκουράζονται τουλάχιστον μία μέρα πριν '
+          'και μετά. Αν δεν θες, απλώς συνέχισε το πρόγραμμα· μία χαμένη δεν χαλάει την εβδομάδα.',
+      buttonText: 'Κάν’ την σήμερα',
+      onPressed: () => setState(() => t.choose(w.id, _now)),
+    );
+  }
+
   Widget _resumeCard(BuildContext context, Session s) {
     final c = Aigaio.of(context);
     return AppCard(

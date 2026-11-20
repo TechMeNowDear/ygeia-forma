@@ -183,7 +183,7 @@ fun tickCmd(i: Int, k: Int, at: Long, ex: String, reps: Int?, late: Boolean = fa
  * βάζει ο αποστολέας, όπως σε κάθε εντολή. Κινητό παλιότερης έκδοσης: άγνωστη εντολή, δεν κάνει τίποτα.
  */
 fun rir1Cmd(i: Int, ex: String, at: Long, v: Int): JSONObject =
-    JSONObject().put("op", "rir1").put("i", i).put("s", 0).put("ex", ex).put("v", v.coerceIn(-1, 4)).also { if (at > 0) it.put("at", at) }
+    JSONObject().put("op", "rir1").put("i", i).put("s", 0).put("ex", ex).put("v", v.coerceIn(-1, FIRST_MAX)).also { if (at > 0) it.put("at", at) }
 
 /**
  * Τα όρια χρόνου του «Τέλος» (τελικός έλεγχος, Συμβούλιο 4, W-1/W-2). Κάθε κλήση προς το Health Services και προς το
@@ -524,7 +524,8 @@ class LiveSession(
     }
 
     /**
-     * Έλεγχος 14/11, round 9 (R9-A12-2): ένα πάτημα στην οθόνη της ρεζέρβας ([rir] 0–4, −1 = «Δεν ξέρω»), όπως το κρίνει η
+     * Έλεγχος 14/11, round 9 (R9-A12-2): ένα πάτημα στην οθόνη της ρεζέρβας ([rir] 0–4, στο «Πρώτο σετ» και 6/10/15 από το
+     * «Πόσες περίπου;», −1 = «Δεν ξέρω»), όπως το κρίνει η
      * οθόνη ([WatchActivity.answer]). Πρώτα η ερώτηση «Πρώτο σετ», αν είναι ανοιχτή ([firstIdx] ≥ 0): την ΚΛΕΙΝΕΙ
      * ([answerFirst]) και, σε προπόνηση του κινητού που τη ζητά ακόμα, δίνει την εντολή «rir1» και κρατά την απάντηση
      * ([firstAns], R9-A8-3). Η ρεζέρβα της άσκησης δεν αλλάζει. Αλλιώς: η ρεζέρβα της άσκησης ([answer]).
@@ -534,7 +535,8 @@ class LiveSession(
             val fi = answerFirst()
             val item = items.getOrNull(fi)
             if (!phone || item == null) return AnswerResult(true, null, null, fi)
-            val v = rir.coerceIn(-1, 4)
+            // Αποφάσεις 20/11: και 6/10/15 από το «Πόσες περίπου;» (WatchView.drawRirMore), όπως το κινητό (0–15).
+            val v = rir.coerceIn(-1, FIRST_MAX)
             firstAns[item.ex] = v
             return AnswerResult(true, rir1Cmd(fi, item.ex, item.sets.getOrNull(0)?.at ?: 0L, v), null, fi)
         }
@@ -802,11 +804,12 @@ class LiveSession(
                     res = o.optLong("res", 0),
                 ).also { p ->
                     o.optJSONArray("fa")?.let { a -> for (k in 0 until a.length()) a.optString(k, "").takeIf { it.isNotEmpty() }?.let { p.firstAsked.add(it) } }
-                    // R9-A8-3: στιγμιότυπο χωρίς «fr» (έκδοση ως #107): καμία απάντηση. Μόνο τιμές −1…4.
+                    // R9-A8-3: στιγμιότυπο χωρίς «fr» (έκδοση ως #107): καμία απάντηση. Μόνο τιμές −1…15 (αποφάσεις 20/11:
+                    // και 6/10/15 από το «Πόσες περίπου;»).
                     o.optJSONObject("fr")?.let { m ->
                         for (ex in m.keys().asSequence()) {
                             val v = m.optInt(ex, Int.MIN_VALUE)
-                            if (ex.isNotEmpty() && v in -1..4) p.firstAns[ex] = v
+                            if (ex.isNotEmpty() && v in -1..FIRST_MAX) p.firstAns[ex] = v
                         }
                     }
                 }
@@ -2147,3 +2150,6 @@ fun walkLines(shown: Pair<Double, Boolean>, steps: Long, sec: Long): Pair<String
 
 /** «2.840» (τελεία στις χιλιάδες, όπως στο κινητό). */
 fun thousandsEl(n: Long): String = "%,d".format(java.util.Locale.ROOT, n).replace(',', '.')
+
+/** Αποφάσεις 20/11: η μεγαλύτερη απάντηση στο «Πρώτο σετ» («13+» → 15), όπως δέχεται το κινητό (`answerFirst`: 0–15). */
+const val FIRST_MAX = 15

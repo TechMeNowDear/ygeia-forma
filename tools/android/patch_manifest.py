@@ -101,6 +101,19 @@ REMIND = (
     '            android:name=".FoodReminderReceiver"\n'
     '            android:exported="false"/>'
 )
+# Αποφάσεις 20/11: μετά από επανεκκίνηση (ή ενημέρωση) η υπενθύμιση ξαναμπαίνει μία φορά (FoodReminderBootReceiver).
+# Μηνύματα μόνο του συστήματος· τίποτα δεν τρέχει συνεχώς.
+BOOT = (
+    "\n        <!-- Υπενθύμιση φαγητού μετά από επανεκκίνηση ή ενημέρωση (20/11). -->\n"
+    "        <receiver\n"
+    '            android:name=".FoodReminderBootReceiver"\n'
+    '            android:exported="false">\n'
+    "            <intent-filter>\n"
+    '                <action android:name="android.intent.action.BOOT_COMPLETED"/>\n'
+    '                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>\n'
+    "            </intent-filter>\n"
+    "        </receiver>"
+)
 TTS_QUERY = (
     "\n        <!-- Φωνή (14/11): το Android 11+ θέλει να δηλωθεί ότι ψάχνουμε μηχανή φωνής (TextToSpeech). -->\n"
     "        <intent>\n"
@@ -131,7 +144,8 @@ if "flutter_deeplinking_enabled" not in s[main_at:s.index("</activity>", main_at
     s = s.replace(before_main, before_main + DEEPLINK, 1)
 
 # Προπόνηση (8/11): δόνηση στο τέλος του διαλείμματος και ειδοποίηση με αντίστροφη μέτρηση.
-for perm in ("android.permission.VIBRATE", "android.permission.POST_NOTIFICATIONS"):
+for perm in ("android.permission.VIBRATE", "android.permission.POST_NOTIFICATIONS",
+             "android.permission.RECEIVE_BOOT_COMPLETED"):
     if f'android:name="{perm}"' not in s:
         s = s.replace("<application", f'<uses-permission android:name="{perm}"/>\n    <application', 1)
 
@@ -143,8 +157,11 @@ if ".OuraCallbackActivity" not in s:
 if ".WidgetConfigActivity" not in s:
     s = s.replace("</application>", WIDGETS.lstrip("\n") + "\n    </application>", 1)
 
-if ".FoodReminderReceiver" not in s:
+if ".FoodReminderReceiver\"" not in s:
     s = s.replace("</application>", REMIND.lstrip("\n") + "\n    </application>", 1)
+
+if ".FoodReminderBootReceiver" not in s:
+    s = s.replace("</application>", BOOT.lstrip("\n") + "\n    </application>", 1)
 
 if ".SayService" not in s:
     s = s.replace("</application>", SAY.lstrip("\n") + "\n    </application>", 1)
@@ -219,7 +236,9 @@ for needle in ('android:name=".OuraCallbackActivity"', 'android:scheme="ygeiafor
                'android:name=".WorkoutWidget"', 'android:name=".QuickFoodWidget"', "@xml/widget_workout",
                "@xml/widget_quickfood",
                "android.appwidget.action.APPWIDGET_CONFIGURE", "android.permission.VIBRATE",
-               "android.permission.POST_NOTIFICATIONS", 'android:name=".FoodReminderReceiver"') + BACKUP:
+               "android.permission.POST_NOTIFICATIONS", 'android:name=".FoodReminderReceiver"',
+               "android.permission.RECEIVE_BOOT_COMPLETED", 'android:name=".FoodReminderBootReceiver"',
+               "android.intent.action.BOOT_COMPLETED") + BACKUP:
     if needle not in s:
         sys.exit("Λείπει μετά την αλλαγή: " + needle)
 if s.count('android:scheme="ygeiaforma"') != 1:

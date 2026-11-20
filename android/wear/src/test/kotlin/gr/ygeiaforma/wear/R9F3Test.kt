@@ -244,8 +244,8 @@ class R9F3Test {
         assertTrue(Repo.phone!!.firstAns.isEmpty())
         assertTrue(Repo.pendingFirst.isEmpty())
         assertFalse(Results.build(t0 + 600_000, partialAt = t0 + 70_000)!!.second.getJSONArray("items").getJSONObject(0).has("fr"))
-        // Τιμές εκτός −1…4 στο στιγμιότυπο αγνοούνται· το −1 («Δεν ξέρω») κρατιέται.
-        val pp = LiveSession.phoneWatchState(seen()).put("fr", JSONObject().put("db_press", 7).put("db_row", -1))
+        // Τιμές εκτός −1…15 στο στιγμιότυπο αγνοούνται· το −1 («Δεν ξέρω») κρατιέται (αποφάσεις 20/11: ως 15, πριν ως 4).
+        val pp = LiveSession.phoneWatchState(seen()).put("fr", JSONObject().put("db_press", 40).put("db_row", -1))
         val back = LiveSession.phoneFromWatchState(pp)!!
         assertNull(back.firstAns["db_press"])
         assertEquals(-1, back.firstAns["db_row"])

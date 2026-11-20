@@ -641,7 +641,8 @@ void main() {
     test('τιμές: −3 → −1 («Δεν ξέρω»), 7 → 4, όχι αριθμός → τίποτα· προπόνηση μόνο στο ρολόι: «fr» → «fa»', () {
       ExLog w(Object? fr) => ExLog.fromJson({'ex': 'db_press', 'sets': 3, 'lo': 8, 'hi': 12, 'log': const [], 'fr': fr});
       expect(TrainingStore.watchFirstAnswer(w(-3)), -1);
-      expect(TrainingStore.watchFirstAnswer(w(7)), 4);
+      expect(TrainingStore.watchFirstAnswer(w(7)), 7); // αποφάσεις 20/11: «Πόσες περίπου;» και στο ρολόι
+      expect(TrainingStore.watchFirstAnswer(w(40)), 15);
       expect(TrainingStore.watchFirstAnswer(w(2)), 2);
       expect(TrainingStore.watchFirstAnswer(w('x')), isNull);
       final t = sampleTraining(t0, history: false);
