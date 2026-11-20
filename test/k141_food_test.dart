@@ -12,6 +12,7 @@ import 'package:ygeia_forma/food/library.dart';
 import 'package:ygeia_forma/food/off.dart';
 import 'package:ygeia_forma/food/recipe.dart';
 import 'package:ygeia_forma/food/week.dart';
+import 'package:ygeia_forma/food/week_auto.dart' show portionRange;
 import 'package:ygeia_forma/food/week_calc.dart';
 import 'package:ygeia_forma/history.dart' show dateKey;
 
