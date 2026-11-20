@@ -2339,7 +2339,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 ),
               ],
               // Αποφάσεις 20/11: σκαναρισμένο ή δικό σου προϊόν μετρά στα 400 g φρούτων και λαχανικών μόνο αν το πεις
-              // (χωρίς πατάτες, χυμούς, αποξηραμένα, όπως η βάση).
+              // (χωρίς πατάτες, χυμούς, αποξηραμένα, όπως η βάση). Μόνο όταν μοιάζει με φρούτο/λαχανικό (ως
+              // [fruitVegFormMaxKcal] kcal, ή αν είναι ήδη «Ναι»), για να μη μακραίνει η φόρμα σε πατατάκια και μπισκότα.
+              if (_fruitVeg || (values[Nk.kcal] ?? double.infinity) <= fruitVegFormMaxKcal) ...[
               const SizedBox(height: 14),
               choices<bool>(
                 'Μετρά στα φρούτα και λαχανικά της μέρας (π.χ. κατεψυγμένο μπρόκολο, έτοιμη σαλάτα· όχι πατάτες, χυμοί, '
@@ -2349,6 +2351,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 (v) => setState(() => _fruitVeg = v),
                 key: const ValueKey('fruit-veg-kind'),
               ),
+              ],
               const SizedBox(height: 14),
               KeyedSubtree(
                 key: _servingKey,

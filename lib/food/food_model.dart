@@ -511,6 +511,10 @@ const fruitVegExclude = {'C2007', 'C20068', 'C20170'};
 
 /// Μετρά στα φρούτα και λαχανικά: κατηγορία της βάσης ([fruitVegCats], εκτός [fruitVegExclude]) ή δικό μου προϊόν με
 /// τον διακόπτη της φόρμας ([Food.fruitVeg], αποφάσεις 20/11).
+/// Η φόρμα προϊόντος ρωτά «Μετρά στα φρούτα και λαχανικά;» μόνο ως τόσες kcal/100 g (φρέσκα και κατεψυγμένα φρούτα και
+/// λαχανικά είναι κάτω από ~100· το αβοκάντο ~160). Δική μας επιλογή, για να μη μακραίνει η φόρμα άσκοπα.
+const fruitVegFormMaxKcal = 180.0;
+
 bool isFruitVeg(Food f) => f.fruitVeg || (fruitVegCats.contains(f.cat) && !fruitVegExclude.contains(f.id));
 
 double fruitVegGrams(Iterable<LogEntry> entries) {
