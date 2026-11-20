@@ -102,8 +102,11 @@ Goals _raisedTwice() => checkinGoals(kcalAdapt: 2550)
         addLog: const AdaptLog(day: '2026-12-11', tdee: 2750, before: 2250, after: 2400, applied: true, fast: true))
     .copyWith(addLog: const AdaptLog(day: '2026-12-18', tdee: 2750, before: 2400, after: 2550, applied: true, fast: true));
 
-/// Τρως τον στόχο που ίσχυε κάθε μέρα μείον [less], 4–24/12 (μέσος όρος των στόχων: 2.385,71).
+/// Τρως τον στόχο που ίσχυε κάθε μέρα μείον [less], 4–24/12 (μέσος όρος των στόχων: 2.385,71). Έλεγχος 20/11 (K1-C-02):
+/// και οι μέρες 23/11–3/12 γραμμένες (2.250)· χωρίς αυτές οι μέρες πριν από τις 4/12 είναι «κενό καταγραφής», και η
+/// «γρήγορη απώλεια» δεν κρίνει πια τις 7 πρώτες μέρες μετά από κενό.
 Map<DateTime, double> _ateTargets({double less = 0}) => {
+      for (var d = DateTime(2026, 11, 23); d.isBefore(DateTime(2026, 12, 4)); d = DateTime(d.year, d.month, d.day + 1)) d: 2250,
       for (var d = 4; d <= 24; d++) DateTime(2026, 12, d): (d <= 11 ? 2250 : (d <= 18 ? 2400 : 2550)) - less,
     };
 
@@ -301,28 +304,30 @@ void main() {
     final weights = _mwf(DateTime(2027, 1, 10), -0.42);
     List<(DateTime, double)> upTo(DateTime d) => [for (final w in weights) if (!w.$1.isAfter(d)) w];
 
-    test('Δευτέρα 7/12: «μαζεύω δεδομένα» με το κενό· η εκτίμηση βγαίνει 28/12, όπως στον έλεγχο (14/12, 21/12 κενό)', () {
+    test('Δευτέρα 7/12: «μαζεύω δεδομένα» με το κενό· η εκτίμηση βγαίνει 4/1, όπως στον έλεγχο (14/12, 21/12, 28/12 κενό)', () {
+      // Έλεγχος 20/11 (K1-C-02): η καταγραφή ξαναρχίζει 5/12· μετρούν οι μέρες από 12/12 (πριν: από 5/12, εκτίμηση 28/12).
       final g = checkinGoals();
       final mon = DateTime(2026, 12, 7);
       final c = pendingCheckIn(goals: g, today: mon, weights: upTo(mon), intake: _intakeOf(food))!;
       expect((c.kind, c.status), (CheckKind.gathering, AdaptStatus.tooEarly));
       expect((c.gap!.from, c.gap!.to, c.gap!.restart), (DateTime(2026, 11, 30), DateTime(2026, 12, 4), DateTime(2026, 12, 5)));
-      expect(estimateDayAfterGap(g, firstEstimateDay(g), c.gap), DateTime(2026, 12, 28));
+      expect(estimateDayAfterGap(g, firstEstimateDay(g), c.gap), DateTime(2027, 1, 4));
       expect(
           gatheringText(c),
           'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά, και η εκτίμηση θα έβγαινε πιο ψηλή από την αληθινή. Από 30 Νοε '
-          'ως 4 Δεκ δεν γράφτηκε φαγητό που να μετρά, άρα η εκτίμηση θέλει 3 εβδομάδες από 5 Δεκ: η πρώτη βγαίνει τη Δευτέρα '
-          '28 Δεκεμβρίου. Ο στόχος μένει ίδιος.');
+          'ως 4 Δεκ δεν γράφτηκε φαγητό που να μετρά, άρα η εκτίμηση θέλει 3 εβδομάδες από 12 Δεκ (η πρώτη εβδομάδα μετά το '
+          'κενό δεν μετρά): η πρώτη βγαίνει τη Δευτέρα 4 Ιανουαρίου. Ο στόχος μένει ίδιος.');
       for (final (day, status) in [
         (DateTime(2026, 12, 14), AdaptStatus.afterGap),
         (DateTime(2026, 12, 21), AdaptStatus.afterGap),
-        (DateTime(2026, 12, 28), AdaptStatus.ok),
+        (DateTime(2026, 12, 28), AdaptStatus.afterGap),
+        (DateTime(2027, 1, 4), AdaptStatus.ok),
       ]) {
         expect(pendingCheckIn(goals: g, today: day, weights: upTo(day), intake: _intakeOf(food))!.status, status, reason: '$day');
       }
     });
 
-    test('χωρίς κενό: «την επόμενη Δευτέρα» όπως πριν· με κενό που κρατά: «3 εβδομάδες αφού ξαναρχίσει»', () {
+    test('χωρίς κενό: «την επόμενη Δευτέρα» όπως πριν· με κενό που κρατά: «4 εβδομάδες αφού ξαναρχίσει»', () {
       final g = checkinGoals();
       final mon = DateTime(2026, 12, 7);
       final full = pendingCheckIn(goals: g, today: mon, weights: upTo(mon), intake: _intakeOf(_daily(_start, mon, 2250)))!;
@@ -337,24 +342,26 @@ void main() {
       expect(
           gatheringText(open),
           'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά, και η εκτίμηση θα έβγαινε πιο ψηλή από την αληθινή. Από 30 Νοε '
-          'δεν έχει γραφτεί φαγητό που να μετρά: η πρώτη εκτίμηση βγαίνει 3 εβδομάδες αφού ξαναρχίσει η καταγραφή. Ο στόχος '
-          'μένει ίδιος.');
+          'δεν έχει γραφτεί φαγητό που να μετρά: η πρώτη εκτίμηση βγαίνει 4 εβδομάδες αφού ξαναρχίσει η καταγραφή (η πρώτη από '
+          'αυτές δεν μετρά). Ο στόχος μένει ίδιος.');
     });
 
-    testWidgets('η κάρτα της Σήμερα στις 7/12 γράφει 28 Δεκεμβρίου, όχι «την επόμενη Δευτέρα»', (t) async {
+    testWidgets('η κάρτα της Σήμερα στις 7/12 γράφει 4 Ιανουαρίου, όχι «την επόμενη Δευτέρα»', (t) async {
       final mon = DateTime(2026, 12, 7);
       final c = pendingCheckIn(goals: checkinGoals(), today: mon, weights: upTo(mon), intake: _intakeOf(food))!;
       await _pump(t, Scaffold(body: SingleChildScrollView(child: CheckInCard(check: c, store: HealthStore(), now: DateTime(2026, 12, 7, 9)))));
       expect(find.text('Έλεγχος θερμίδων: μαζεύω δεδομένα'), findsOneWidget);
-      expect(find.textContaining('τη Δευτέρα 28 Δεκεμβρίου'), findsOneWidget);
+      expect(find.textContaining('τη Δευτέρα 4 Ιανουαρίου'), findsOneWidget);
       expect(find.textContaining('την επόμενη Δευτέρα'), findsNothing);
     });
 
-    testWidgets('ξανά ο οδηγός στις 8/12 (κενό 30/11–4/12): η σύνοψη λέει 28 Δεκεμβρίου, όχι 14', (t) async {
+    testWidgets('ξανά ο οδηγός στις 8/12 (κενό 30/11–4/12): η σύνοψη λέει 4 Ιανουαρίου, όχι 14 Δεκεμβρίου', (t) async {
       FoodStore.shared = checkinFood(DateTime(2026, 12, 8), days: 22, skip: {4, 5, 6, 7, 8});
       addTearDown(() => FoodStore.shared = null);
       final store = await _rerun(t, checkinGoals(), DateTime(2026, 12, 8, 9));
-      expect(find.textContaining('τη Δευτέρα 28 Δεκεμβρίου θα φανεί πόσες θερμίδες καις πραγματικά'), findsOneWidget);
+      // Έλεγχος 20/11: K1-C-02 (μία εβδομάδα αργότερα) και K1-S-01 (όχι «πραγματικά»: η εκτίμηση εξαρτάται από όσα γράφονται).
+      expect(find.textContaining('τη Δευτέρα 4 Ιανουαρίου θα φανεί περίπου πόσες θερμίδες καις, με βάση όσα γράφεις'), findsOneWidget);
+      expect(find.textContaining('καις πραγματικά'), findsNothing);
       expect(find.textContaining('(η πρώτη εβδομάδα και το κενό στο φαγητό δεν μετράνε)'), findsOneWidget);
       expect(find.textContaining('14 Δεκεμβρίου'), findsNothing);
       await _next(t);

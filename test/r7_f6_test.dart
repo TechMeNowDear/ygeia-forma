@@ -282,24 +282,27 @@ void main() {
       return s;
     }
 
-    test('readiness: μετρούν οι μέρες από 12/12· η εκτίμηση βγαίνει 4/1, όπως στον έλεγχο της Σήμερα', () {
+    test('readiness: μετρούν οι μέρες από 19/12 (μία εβδομάδα μετά το κενό)· η εκτίμηση βγαίνει 11/1, όπως στον έλεγχο της Σήμερα', () {
+      // Έλεγχος 20/11 (K1-C-02): η καταγραφή ξαναρχίζει 12/12· οι 7 πρώτες μέρες της επιστροφής δεν μετρούν (πριν: από 12/12, 4/1).
       final food = checkinFood(at, days: 29, skip: {4, 5, 6, 7, 8}); // καμία καταγραφή 7–11/12
       final g = checkinGoals().copyWith(checkIn: '2026-12-14');
       final w = dailyWeights(Dashboard.fromJson({...sampleDashboardJson(at), 'body': bodyJson(simWeights(at))}).body);
       final r = readiness(goals: g, today: at, weights: w, intake: (a, b) => dailyIntake(food, a, b));
-      expect((r.intakeDays, r.weighIns, r.first), (3, 1, DateTime(2026, 12, 14)));
+      expect((r.intakeDays, r.weighIns, r.first), (0, 0, DateTime(2026, 12, 14)));
       expect((r.gap!.from, r.gap!.to, r.gap!.restart), (DateTime(2026, 12, 7), DateTime(2026, 12, 11), DateTime(2026, 12, 12)));
+      expect(afterGapStart(r.gap!.restart!), DateTime(2026, 12, 19));
       expect(nextCheckDay(g, at), DateTime(2026, 12, 21));
-      expect(estimateDayAfterGap(g, DateTime(2026, 12, 21), r.gap), DateTime(2027, 1, 4));
-      expect(estimateDayAfterGap(g, DateTime(2027, 1, 11), r.gap), DateTime(2027, 1, 11), reason: 'ήδη αργότερα');
+      expect(estimateDayAfterGap(g, DateTime(2026, 12, 21), r.gap), DateTime(2027, 1, 11));
+      expect(estimateDayAfterGap(g, DateTime(2027, 1, 18), r.gap), DateTime(2027, 1, 18), reason: 'ήδη αργότερα');
       expect(estimateDayAfterGap(g, DateTime(2026, 12, 21), null), DateTime(2026, 12, 21));
       expect(estimateDayAfterGap(g, DateTime(2026, 12, 21), (from: DateTime(2026, 12, 9), to: DateTime(2026, 12, 14), restart: null)),
           isNull);
-      // Ο έλεγχος της Σήμερα με τα ίδια δεδομένα (και φαγητό κάθε μέρα μετά): 21/12 και 28/12 «afterGap», 4/1 εκτίμηση.
+      // Ο έλεγχος της Σήμερα με τα ίδια δεδομένα (και φαγητό κάθε μέρα μετά): 21/12, 28/12 και 4/1 «afterGap», 11/1 εκτίμηση.
       for (final (day, status) in [
         (DateTime(2026, 12, 21), AdaptStatus.afterGap),
         (DateTime(2026, 12, 28), AdaptStatus.afterGap),
-        (DateTime(2027, 1, 4), AdaptStatus.ok),
+        (DateTime(2027, 1, 4), AdaptStatus.afterGap),
+        (DateTime(2027, 1, 11), AdaptStatus.ok),
       ]) {
         final eaten = {
           for (final e in _daily(_start, DateTime(day.year, day.month, day.day - 1), 2250).entries)
@@ -308,21 +311,22 @@ void main() {
         final ws = [for (final (d, kg) in simWeights(day, days: daysBetween(_start, day))) (DateTime(d.year, d.month, d.day), kg)];
         final r2 = estimateExpenditure(intake: eaten, weights: ws, today: day, formulaTdee: g.calc.tdee, goalKcal: g.kcal, since: _start);
         expect(r2.status, status, reason: '$day');
-        if (status == AdaptStatus.ok) expect((r2.est!.from, r2.est!.windowDays), (DateTime(2026, 12, 14), 21));
+        if (status == AdaptStatus.ok) expect((r2.est!.from, r2.est!.windowDays), (DateTime(2026, 12, 21), 21));
       }
     });
 
-    testWidgets('κενό 7–11/12: «Πρώτη εκτίμηση: Δευτέρα 4 Ιανουαρίου», μέρες «3 από 14», το κενό γραμμένο', (t) async {
+    testWidgets('κενό 7–11/12: «Πρώτη εκτίμηση: Δευτέρα 11 Ιανουαρίου», μέρες «0 από 14», το κενό γραμμένο', (t) async {
       FoodStore.shared = checkinFood(at, days: 29, skip: {4, 5, 6, 7, 8});
       addTearDown(() => FoodStore.shared = null);
       await _pump(t, GoalsPage(store: store(checkinGoals().copyWith(checkIn: '2026-12-14')), now: at));
-      expect(find.text('Πρώτη εκτίμηση: Δευτέρα 4 Ιανουαρίου'), findsOneWidget, reason: 'πριν: Δευτέρα 21 Δεκεμβρίου');
-      expect(find.text('3 από 14'), findsOneWidget);
-      expect(find.text('1 από 6'), findsOneWidget);
-      expect(find.text('σε 20 μέρες'), findsOneWidget);
+      // Έλεγχος 20/11 (K1-C-02): μία εβδομάδα αργότερα (πριν: 4 Ιανουαρίου, «3 από 14», «1 από 6», από 12 Δεκ).
+      expect(find.text('Πρώτη εκτίμηση: Δευτέρα 11 Ιανουαρίου'), findsOneWidget, reason: 'πριν: Δευτέρα 21 Δεκεμβρίου');
+      expect(find.text('0 από 14'), findsOneWidget);
+      expect(find.text('0 από 6'), findsOneWidget);
+      expect(find.text('σε 27 μέρες'), findsOneWidget);
       expect(
-          find.text('Από 7 Δεκ ως 11 Δεκ δεν γράφτηκε φαγητό που να μετρά: μετράνε οι μέρες από 12 Δεκ και μετά, και η '
-              'εκτίμηση θέλει 3 εβδομάδες.'),
+          find.text('Από 7 Δεκ ως 11 Δεκ δεν γράφτηκε φαγητό που να μετρά: μετράνε οι μέρες από 19 Δεκ και μετά (μία εβδομάδα '
+              'μετά το κενό), και η εκτίμηση θέλει 3 εβδομάδες.'),
           findsOneWidget);
       expect(find.byKey(const ValueKey('goals-adapt-missed')), findsNothing);
       // R7-U2-18: η φράση «η πρώτη εβδομάδα δεν μετρά» μία φορά.
@@ -331,17 +335,17 @@ void main() {
       expect(find.textContaining('Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά.'), findsOneWidget);
     });
 
-    testWidgets('κενό που κρατά ως χθες: «3 εβδομάδες αφού ξαναρχίσει η καταγραφή», τίποτα δεν μετρά ακόμα', (t) async {
+    testWidgets('κενό που κρατά ως χθες: «4 εβδομάδες αφού ξαναρχίσει η καταγραφή», τίποτα δεν μετρά ακόμα', (t) async {
       FoodStore.shared = checkinFood(at, days: 29, skip: {1, 2, 3, 4, 5, 6}); // καμία καταγραφή 9–14/12
       addTearDown(() => FoodStore.shared = null);
       await _pump(t, GoalsPage(store: store(checkinGoals().copyWith(checkIn: '2026-12-14')), now: at));
-      expect(find.text('Πρώτη εκτίμηση: 3 εβδομάδες αφού ξαναρχίσει η καταγραφή φαγητού'), findsOneWidget);
+      expect(find.text('Πρώτη εκτίμηση: 4 εβδομάδες αφού ξαναρχίσει η καταγραφή φαγητού'), findsOneWidget);
       expect(find.text('0 από 14'), findsOneWidget);
       expect(find.text('0 από 6'), findsOneWidget);
       expect(find.text('μετά το κενό'), findsOneWidget);
       expect(
-          find.text('Από 9 Δεκ δεν έχει γραφτεί φαγητό που να μετρά. Η εκτίμηση ξαναρχίζει από τη μέρα που θα ξαναγράψεις '
-              'φαγητό και θέλει 3 εβδομάδες.'),
+          find.text('Από 9 Δεκ δεν έχει γραφτεί φαγητό που να μετρά. Η εκτίμηση ξαναρχίζει μία εβδομάδα αφού ξαναγράψεις '
+              'φαγητό και θέλει άλλες 3.'),
           findsOneWidget);
     });
 
@@ -582,7 +586,7 @@ void main() {
           .kind, CheckKind.fast);
     });
 
-    test('A12-3: τουλάχιστον 4 ζυγίσεις· περιθώριο ενός τυπικού σφάλματος· «λιγότερες από 30» ως το όριο', () {
+    test('A12-3: τουλάχιστον 4 ζυγίσεις· περιθώριο δύο τυπικών σφαλμάτων (πριν: ενός)· «λιγότερες από 30» ως το όριο', () {
       final day = DateTime(2026, 12, 4);
       final three = [
         (DateTime(2026, 11, 23), 88.0),
@@ -602,9 +606,24 @@ void main() {
       final f = weightFit(a3(85.9))!;
       expect(f.slope * 7, closeTo(-1.1302, 1e-4));
       expect(f.se! * 7, closeTo(0.2604, 1e-4));
-      expect((f.slope + f.se!) * 7, lessThan(-0.01 * 85.9), reason: '−0,870 < −0,859');
-      expect((f.slope + 1.1 * f.se!) * 7, greaterThan(-0.01 * 85.9), reason: 'με 1,1 σφάλματα δεν θα έβγαινε');
-      expect(fastLossCheck(goals: checkinGoals(), weights: a3(85.9), today: day)?.change, 150);
+      expect((f.slope + f.se!) * 7, lessThan(-0.01 * 85.9), reason: '−0,870 < −0,859: με ένα σφάλμα έβγαινε');
+      // Έλεγχος 20/11 (K1-C-01): μία απότομη τελευταία ζύγιση δεν φτάνει πια· το περιθώριο είναι δύο τυπικά σφάλματα.
+      expect(adaptFastGuardSe, 2.0);
+      expect((f.slope + 2 * f.se!) * 7, greaterThan(-0.01 * 85.9), reason: '−0,609 > −0,859');
+      expect(fastLossCheck(goals: checkinGoals(), weights: a3(85.9), today: day), isNull, reason: 'πριν: +150');
+      // Απώλεια γρήγορη σε κάθε ζύγιση (−1,2 kg την εβδομάδα, μικρή διασπορά): βγαίνει και με δύο σφάλματα.
+      final steady = [
+        (DateTime(2026, 11, 23), 88.0),
+        (DateTime(2026, 11, 25), 87.7),
+        (DateTime(2026, 11, 27), 87.3),
+        (DateTime(2026, 11, 30), 86.8),
+        (DateTime(2026, 12, 2), 86.5),
+        (DateTime(2026, 12, 4), 86.1),
+      ];
+      final fs = weightFit(steady)!;
+      expect(fs.slope * 7, closeTo(-1.2045, 1e-4));
+      expect((fs.slope + 2 * fs.se!) * 7, lessThan(-0.01 * 86.1), reason: '−1,161 < −0,861');
+      expect(fastLossCheck(goals: checkinGoals(), weights: steady, today: day)?.change, 150);
       final line = [for (final d in [0, 2, 4, 7, 9, 11]) (DateTime(2026, 11, 23 + d), 88.0 - 0.9 * d / 7)];
       final p = fastLossCheck(goals: checkinGoals(kcalAdapt: 2720), weights: line, today: day)!;
       expect((p.current, p.target, p.change), (2720, 2750, 30), reason: 'μένουν ακριβώς 30: όχι «λιγότερες από 30»');

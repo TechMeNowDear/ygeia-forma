@@ -473,6 +473,9 @@ Map<String, Object?>? _propJson(AdaptProposal? p) => p == null
         'withinNoise': p.withinNoise,
         'change': p.change,
         'same': p.same,
+        // Έλεγχος 20/11 (K1-C-02, K1-S-05): γράφονται μόνο όταν ισχύουν, ώστε τα παλιά στιγμιότυπα να μην αλλάζουν.
+        if (p.recentDiffers) 'recentDiffers': true,
+        if (p.underweight) 'underweight': true,
       };
 
 String? _gapText(FoodGap? g) => g == null ? null : '${g141Day(g.from)}..${g141Day(g.to)} restart=${_dayOrNull(g.restart) ?? '-'}';
@@ -505,7 +508,14 @@ Map<String, Object?>? _checkJson(CheckIn? c) {
     'formulaTdee': c.formulaTdee,
     'wanted': c.wanted,
     'wantsBelowFloor': c.wantsBelowFloor,
+    // Έλεγχος 20/11 (K1-S-02): «τρως πολύ κάτω από τον στόχο» (null όταν δεν ισχύει).
+    'farBelow': _farBelow(c),
   });
+}
+
+String? _farBelow(CheckIn c) {
+  final b = eatingFarBelow(c);
+  return b == null ? null : '${b.eaten}/${b.target} under=${b.under} slope=${_f2(b.slopeKgWeek)} planned=${_f2(b.plannedKgWeek)}';
 }
 
 /// Ό,τι αλλάζει στους στόχους μετά από «εφάρμοσε» / «όχι τώρα».

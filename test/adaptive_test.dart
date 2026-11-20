@@ -222,7 +222,15 @@ void main() {
     final s = _sim(t, days: 49, noise: 0.3);
     final last21 = {for (final e in s.intake.entries) if (!e.key.isBefore(DateTime(2026, 12, 14))) e.key: e.value};
     final r = estimateExpenditure(intake: last21, weights: s.weights, today: t, formulaTdee: 2745, goalKcal: 2250, since: since);
-    expect((r.status, r.est!.windowDays, r.est!.intakeDays), (AdaptStatus.ok, 21, 21), reason: 'το παράθυρο ξεκινά μετά το κενό');
+    // Έλεγχος 20/11 (K1-C-02): και οι 7 πρώτες μέρες μετά το κενό δεν μετρούν (νερά της επιστροφής). Στις 4/1 έχουν
+    // μαζευτεί 14 μέρες που μετρούν (21/12–3/1): όχι ακόμα· στις 11/1 ακριβώς 21 (21/12–10/1).
+    expect((r.status, r.est), (AdaptStatus.afterGap, null), reason: 'πριν: εκτίμηση από 14/12, με την πρώτη εβδομάδα της επιστροφής');
+    final t2 = DateTime(2027, 1, 11);
+    final s2 = _sim(t2, days: 56, noise: 0.3);
+    final from14 = {for (final e in s2.intake.entries) if (!e.key.isBefore(DateTime(2026, 12, 14))) e.key: e.value};
+    final r2 = estimateExpenditure(intake: from14, weights: s2.weights, today: t2, formulaTdee: 2745, goalKcal: 2250, since: since);
+    expect((r2.status, r2.est!.windowDays, r2.est!.intakeDays, r2.est!.from), (AdaptStatus.ok, 21, 21, DateTime(2026, 12, 21)),
+        reason: 'το παράθυρο ξεκινά μία εβδομάδα μετά το κενό');
   });
 
   test('Α2: η πρώτη εβδομάδα των στόχων δεν μετρά στην εκτίμηση· πρώτη εκτίμηση την 28η μέρα', () {
