@@ -1,10 +1,13 @@
 // Βαθύς έλεγχος 20/11/2026, κατηγορία 1 (θερμίδες, στόχοι, βάρος): δοκιμές για τις διορθώσεις K1-C-01…08 και K1-S-01…08.
-// Μόνο επινοημένα δεδομένα (δημόσιο repo). Οι αναμενόμενες τιμές επαληθεύτηκαν πρώτα σε ανεξάρτητη μεταφορά σε Python.
+// Μόνο επινοημένα δεδομένα (δημόσιο repo). Οι αναμενόμενες τιμές των K1-C-01, K1-C-02, K1-S-05 επαληθεύτηκαν πρώτα στη
+// μεταφορά του developer σε Python, και ΟΛΕΣ (και των K1-C-06/07/08, K1-S-02) ξανά από τον ανεξάρτητο ελεγκτή (22 από 22).
+// Παλιά κεφαλίδα: οι αναμενόμενες τιμές επαληθεύτηκαν πρώτα σε ανεξάρτητη μεταφορά σε Python.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/adaptive.dart';
 import 'package:ygeia_forma/adaptive_check.dart';
 import 'package:ygeia_forma/data.dart';
+import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/goals.dart';
 import 'package:ygeia_forma/history.dart' show K;
 import 'package:ygeia_forma/pages/checkin_card.dart';
@@ -12,6 +15,8 @@ import 'package:ygeia_forma/pages/goals_page.dart';
 import 'package:ygeia_forma/profile.dart';
 import 'package:ygeia_forma/reference.dart';
 import 'package:ygeia_forma/theme.dart';
+
+import 'sample_checkin.dart' show checkinFood;
 
 /// Επινοημένοι στόχοι: άνδρας 40 ετών, 180 cm, 90 kg, −0,5% την εβδομάδα (τύπος 2.745 → στόχος 2.250).
 Goals _g({String since = '2026-11-16', int? kcalSet, GoalAim aim = GoalAim.lose}) => Goals(
@@ -400,13 +405,175 @@ void main() {
       expect(firstCheckDay(store.goals!).weekday, DateTime.monday);
     });
 
-    testWidgets('Πέμπτη 26/11, μέσα στην πρώτη εβδομάδα: προεπιλογή «Συνεχίζω», η αρχή μένει 23/11', (t) async {
+    testWidgets('Πέμπτη 26/11, μέσα στην πρώτη εβδομάδα, με φαγητό γραμμένο από τη Δευτέρα: «Συνεχίζω», η αρχή μένει 23/11', (t) async {
+      FoodStore.shared = checkinFood(DateTime(2026, 11, 26), days: 3); // φαγητό 23–25/11
+      addTearDown(() => FoodStore.shared = null);
       final store = HealthStore()..setProfile(_me)..setGoals(monday());
       await _wizard(t, store, DateTime(2026, 11, 26, 18));
       await _save(t);
       expect(t.widget<ChoiceChip>(find.byKey(const ValueKey('wizard-start-keep'))).selected, isTrue);
+      expect(find.text('Συνεχίζω (από 23/11)'), findsOneWidget);
       await _save(t);
       expect(store.goals!.since, '2026-11-23', reason: 'πριν: 26/11, δεύτερη «πρώτη εβδομάδα»');
+    });
+
+    testWidgets('K1R-09: Πέμπτη 26/11 ΧΩΡΙΣ φαγητό γραμμένο: η δίαιτα δεν έχει αρχίσει, προεπιλογή «Σήμερα» (κανόνας V-1)', (t) async {
+      final store = HealthStore()..setProfile(_me)..setGoals(monday());
+      await _wizard(t, store, DateTime(2026, 11, 26, 18));
+      await _save(t);
+      expect(t.widget<ChoiceChip>(find.byKey(const ValueKey('wizard-start-today'))).selected, isTrue);
+      expect(t.widget<ChoiceChip>(find.byKey(const ValueKey('wizard-start-keep'))).selected, isFalse);
+    });
+
+    testWidgets('K1R-09: αρχή στο μέλλον: το κουμπί γράφει «Όπως το όρισα (από 23/11)»', (t) async {
+      final store = HealthStore()..setProfile(_me)..setGoals(monday());
+      await _wizard(t, store, DateTime(2026, 11, 21, 18));
+      await _save(t);
+      expect(find.text('Όπως το όρισα (από 23/11)'), findsOneWidget);
+      expect(find.textContaining('Συνεχίζω (από'), findsNothing);
+    });
+  });
+
+  // ------------------------------------------------------------------------------------- ανεξάρτητος έλεγχος K1 (K1R)
+  group('ανεξάρτητος έλεγχος των διορθώσεων (K1R)', () {
+    Map<DateTime, double> Function(DateTime, DateTime) reader(Map<DateTime, double> m) =>
+        (a, b) => {for (final e in m.entries) if (!e.key.isBefore(a) && !e.key.isAfter(b)) e.key: e.value};
+
+    test('K1R-01: έξι εβδομάδες μετά από κενό, το παράθυρο ΔΕΝ ξαναμπαίνει στην εβδομάδα της επιστροφής', () {
+      // Στόχοι 23/11· γιορτές 24/12–2/1 χωρίς φαγητό και ζυγίσεις· επιστροφή 3/1 με +1 kg νερά που φεύγουν ως τις 8/1.
+      final g = _g(since: '2026-11-23');
+      final tdee = g.calc.tdee;
+      final intake = <DateTime, double>{};
+      final weights = <(DateTime, double)>[];
+      var kg = 90.0;
+      for (var d = DateTime(2026, 11, 23); !d.isAfter(DateTime(2027, 2, 28)); d = DateTime(d.year, d.month, d.day + 1)) {
+        final off = !d.isBefore(DateTime(2026, 12, 24)) && !d.isAfter(DateTime(2027, 1, 2));
+        final water = d.year == 2027 && d.month == 1 && d.day >= 3 && d.day <= 8 ? (8 - d.day) / 5.0 : 0.0;
+        if (!off) {
+          intake[d] = g.kcal.toDouble();
+          if (d.weekday == 1 || d.weekday == 3 || d.weekday == 5) weights.add((d, kg + water));
+        }
+        kg += ((off ? g.kcal + 600 : g.kcal) - tdee) / kcalPerKg;
+      }
+      expect(adaptScanDays, 53, reason: '42 + 5 − 1 + 7 (πριν: 46)');
+      for (final (day, window) in [(DateTime(2027, 2, 1), 21), (DateTime(2027, 2, 8), 28), (DateTime(2027, 2, 15), 35), (DateTime(2027, 2, 22), 42)]) {
+        final r = estimateExpenditure(
+            intake: intake,
+            weights: [for (final w in weights) if (!w.$1.isAfter(day)) w],
+            today: day,
+            formulaTdee: tdee,
+            goalKcal: g.kcal,
+            since: DateTime(2026, 11, 23));
+        expect((r.status, r.est!.from, r.est!.windowDays), (AdaptStatus.ok, DateTime(2027, 1, 11), window),
+            reason: '$day (πριν, στις 15/2: 42 μέρες από 4/1, μέσα στα νερά της επιστροφής)');
+        expect(r.est!.tdee, closeTo(tdee, 1));
+      }
+      final gap = foodGap(intake: intake, today: DateTime(2027, 2, 15), formulaTdee: tdee, goalKcal: g.kcal, since: DateTime(2026, 11, 23))!;
+      expect((gap.from, gap.to, gap.restart), (DateTime(2026, 12, 24), DateTime(2027, 1, 2), DateTime(2027, 1, 3)));
+    });
+
+    test('K1R-05: ζυγίσεις πριν από το όριο του κενού δεν κρύβουν την κάρτα «χάνεις γρήγορα»', () {
+      // Κενό 15–21/1· −0,5% την εβδομάδα ως 28/1 και −1,6% από 29/1. Ο εβδομαδιαίος έλεγχος της 8/2 έχει απαντηθεί.
+      final g = _g().copyWith(checkIn: '2027-02-08');
+      final intake = <DateTime, double>{};
+      final weights = <(DateTime, double)>[];
+      var kg = 90.0;
+      for (var d = DateTime(2026, 11, 16); !d.isAfter(DateTime(2027, 2, 12)); d = DateTime(d.year, d.month, d.day + 1)) {
+        if (d.isBefore(DateTime(2027, 1, 15)) || d.isAfter(DateTime(2027, 1, 21))) intake[d] = g.kcal.toDouble();
+        if (d.weekday == 1 || d.weekday == 3 || d.weekday == 5) weights.add((d, (kg * 10).round() / 10));
+        kg -= (d.isBefore(DateTime(2027, 1, 29)) ? 0.005 : 0.016) * kg / 7;
+      }
+      final today = DateTime(2027, 2, 9);
+      final ws = [for (final w in weights) if (!w.$1.isAfter(today)) w];
+      expect(fastLossSlope(goals: g, weights: ws, today: today), isNull,
+          reason: 'το πλήρες παράθυρο (με τις ζυγίσεις πριν από τις 29/1) δεν είναι «γρήγορο»');
+      expect(fastLossPossible(goals: g, weights: ws, today: today), isTrue);
+      final c = pendingCheckIn(goals: g, today: today, weights: ws, intake: reader(intake))!;
+      expect((c.kind, c.proposal!.current, c.proposal!.target, c.fastDays, c.kgNow), (CheckKind.fast, 2250, 2400, 11, 83.4),
+          reason: 'πριν από τη διόρθωση: καμία κάρτα ως τις 11/2');
+      expect(c.fastSlope!, closeTo(-1.4, 0.001));
+      // Αναγκαίος όρος: σκοπός, μέρα των στόχων, ≥ 4 ζυγίσεις σε ≥ 10 μέρες.
+      expect(fastLossPossible(goals: _g(aim: GoalAim.keep), weights: ws, today: today), isFalse);
+      expect(fastLossPossible(goals: g, weights: ws.sublist(ws.length - 3), today: today), isFalse);
+      expect(fastLossPossible(goals: _g(since: '2027-02-01'), weights: ws, today: today), isFalse);
+    });
+
+    CheckIn same({bool tooFast = false, bool recentDiffers = false, bool underweight = false}) {
+      final e = _est(2600, windowDays: 42);
+      return CheckIn(
+          kind: CheckKind.same,
+          goals: _g(kcalSet: 2250),
+          status: AdaptStatus.ok,
+          est: e,
+          proposal: AdaptProposal(
+              current: 2250, target: 2250, est: e, fastLoss: false, floored: false, recentDiffers: recentDiffers, underweight: underweight),
+          kgNow: 80,
+          tooFast: tooFast,
+          estTarget: 2250);
+    }
+
+    Future<void> card(WidgetTester t, CheckIn c) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(400, 2600);
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(
+          theme: buildTheme(Brightness.light),
+          home: Scaffold(
+              body: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16), child: CheckInCard(check: c, store: HealthStore(), now: DateTime(2027, 2, 1, 9))))));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('K1R-02: κάτω από ΔΜΣ 18,5 η κάρτα γράφει αυτόν τον λόγο, και όταν χάνεις πάνω από 1%', (t) async {
+      await card(t, same(tooFast: true, underweight: true));
+      expect(find.textContaining('κάτω από το φυσιολογικό για το ύψος σου', findRichText: true), findsOneWidget);
+      expect(find.textContaining('πάνω από 1% του βάρους', findRichText: true), findsNothing);
+    });
+
+    testWidgets('K1R-02: «οι 3 τελευταίες εβδομάδες όχι» γράφεται με το νέο κείμενο', (t) async {
+      await card(t, same(recentDiffers: true));
+      expect(
+          find.textContaining('Όλο το διάστημα δείχνει ότι ο στόχος θέλει αλλαγή, οι 3 τελευταίες εβδομάδες όμως όχι',
+              findRichText: true),
+          findsOneWidget);
+      expect(find.textContaining('πάνω από 1% του βάρους', findRichText: true), findsNothing);
+    });
+
+    testWidgets('όπως πριν: χάνεις πάνω από 1% χωρίς άλλο λόγο → το κείμενο του 1%', (t) async {
+      await card(t, same(tooFast: true));
+      expect(find.textContaining('Χάνεις όμως πάνω από 1% του βάρους την εβδομάδα', findRichText: true), findsOneWidget);
+    });
+
+    test('K1R-03: τα όρια λιπαρών βγαίνουν από μία συνάρτηση (2.610 kcal: 73–102 g παντού)', () {
+      expect((fatLoFor(2610), fatHiFor(2610)), (73, 102));
+      expect((fatLoFor(2790), fatHiFor(2790)), (78, 109));
+      final g = _g(kcalSet: 2610);
+      expect((g.fatLo, g.fatHi), (73, 102));
+    });
+
+    test('K1R-11: «φάε πιο κοντά στον στόχο» δεν γράφεται μαζί με «λείπει φαγητό από το ημερολόγιο»', () {
+      CheckIn k(double tdee) {
+        final e = _est(tdee, meanIntake: 1700, slopeKgWeek: -0.7, seKcal: 50);
+        return CheckIn(
+            kind: CheckKind.same,
+            goals: _g(kcalSet: 2250),
+            est: e,
+            proposal: AdaptProposal(current: 2250, target: 2250, est: e, fastLoss: false, floored: false),
+            kgNow: 80,
+            estTarget: 2250);
+      }
+
+      expect(likelyUnderlogged(k(2300)), isTrue);
+      expect(eatingFarBelow(k(2300)), isNotNull);
+      expect(farBelowText(k(2300)), isNull, reason: 'δύο αντίθετες συμβουλές στην ίδια κάρτα');
+      expect(likelyUnderlogged(k(2600)), isFalse);
+      expect(farBelowText(k(2600)), isNotNull);
+    });
+
+    test('K1R-11: «τώρα περίπου Χ kg» μόνο με πρόσφατη ζύγιση', () {
+      expect(rateNowMaxAgeDays, 14);
+      expect(rateNowText(82.2, 0.005, kgNow: 78.0), contains('τώρα περίπου 0,39'));
+      expect(rateNowText(82.2, 0.005), isNot(contains('τώρα')));
     });
   });
 }

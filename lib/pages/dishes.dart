@@ -485,12 +485,8 @@ class _DishLogSheetState extends State<DishLogSheet> {
 
   List<double>? get _plateValues {
     final out = <double>[];
-    for (var k = 0; k < _plate.length; k++) {
-      // Έλεγχος 20/11 (K2-C-09): πεδίο που δεν το άγγιξες κρατά την αποθηκευμένη ποσότητα (12,25 g, όχι το «12,3» που
-      // δείχνει το πεδίο), όπως στην αλλαγή καταχώρισης (Κ2-H1).
-      final stored = k < d.items.length ? (d.lastPlate?[k] ?? d.items[k].amount) : null;
-      final t = _plate[k];
-      final v = stored != null && t.text.trim() == gramsField(stored) ? stored : fieldValue(t, zero: true);
+    for (final t in _plate) {
+      final v = fieldValue(t, zero: true);
       if (v == null) return null;
       out.add(v);
     }
@@ -506,14 +502,13 @@ class _DishLogSheetState extends State<DishLogSheet> {
         final a = dishAmounts(d, plate: p);
         return a.isEmpty ? null : (a, itemsSum(a));
       case DishKind.portions:
-        // Έλεγχος 20/11 (K2-C-09): τελευταία φορά 0,25 μερίδες → το πεδίο ανοίγει «0,3»· ανέγγιχτο γράφει 0,25, όχι 0,3 (+20%).
-        final s = keptFieldValue(_qty, d.lastQty ?? 1, max: maxEatenServings);
+        final s = fieldValue(_qty, max: maxEatenServings);
         if (s == null) return null;
         final a = dishAmounts(d, servings: s);
         return a.isEmpty ? null : (a, s);
       case DishKind.pot:
         final b = _batch;
-        final g = d.lastQty == null ? fieldValue(_qty, max: maxCookedGrams) : keptFieldValue(_qty, d.lastQty!, max: maxCookedGrams);
+        final g = fieldValue(_qty, max: maxCookedGrams);
         if (b == null || g == null || g > b.cooked) return null;
         final a = dishAmounts(d, portion: g, batch: b);
         return a.isEmpty ? null : (a, g);
@@ -1173,12 +1168,8 @@ class _DishEditScreenState extends State<DishEditScreen> {
     final r = await pickIngredient(context, widget.food, dishName: name);
     if (r == null || !mounted) return;
     if (_items.length >= maxDishItems) return;
-    setState(() => _items = [..._items, DishItem(r.food.id, r.food.name, _itemAmount(r.amount))]);
+    setState(() => _items = [..._items, DishItem(r.food.id, r.food.name, roundAmount(r.amount))]);
   }
-
-  /// Έλεγχος 20/11 (K2-C-06): η ποσότητα υλικού όπως αποθηκεύεται, ποτέ 0 (ποσότητα «0,004» στρογγύλευε στο 0, και στο
-  /// επόμενο άνοιγμα όλο το φαγητό δεν διαβαζόταν).
-  double _itemAmount(double v) => roundAmount(v) > 0 ? roundAmount(v) : 0.01;
 
   Future<void> _editItem(int k) async {
     final i = _items[k];
@@ -1206,7 +1197,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
       if (r.remove) {
         next.removeAt(k);
       } else {
-        next[k] = DishItem(r.food.id, r.food.name, _itemAmount(r.amount));
+        next[k] = DishItem(r.food.id, r.food.name, roundAmount(r.amount));
       }
       _items = next;
     });

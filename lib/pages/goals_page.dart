@@ -38,7 +38,7 @@ const goalsInfo = MetricInfo(
       'λιπαρά έως 6% όταν ο γιατρός ζητά να πέσει η LDL (AHA/ACC· η ESC/EAS 2019 λέει κάτω από 7%), αλλιώς κάτω από 10% (Π.Ο.Υ. 2023) ·\u00A0φυτικές ίνες 30 g '
       '(ESC 2021: 30–45 g· Reynolds 2019: το όφελος φαίνεται από 25–29 g και πάνω) ·\u00A0αλάτι κάτω από 5 g (Π.Ο.Υ.).',
   // Έλεγχος 17/11 (Κ1, επιστήμη): το 7.700 kcal το κιλό είναι προσέγγιση (Hall 2008), όχι σταθερά· γράφεται έτσι.
-  accuracy: 'Οι τύποι για τις θερμίδες πέφτουν συχνά 10–15% έξω σε έναν άνθρωπο. Γι’ αυτό η εφαρμογή τους διορθώνει με τα '
+  accuracy: 'Οι τύποι για τις θερμίδες πέφτουν συχνά 10–15% έξω σε έναν άνθρωπο, μερικές φορές και 20–25%. Γι’ αυτό η εφαρμογή τους διορθώνει με τα '
       'δικά σου δεδομένα. Το «7.700 kcal ανά κιλό» είναι προσέγγιση: στην αρχή φεύγουν και νερά, γι’ αυτό η πρώτη εβδομάδα '
       'δεν μετρά. Ό,τι πει ο γιατρός σου υπερισχύει.',
   cite: 'Mifflin 1990 ·\u00A0FAO/WHO/UNU 2004 ·\u00A0Hall 2008 ·\u00A0Helms 2014 ·\u00A0Jensen 2013 (AHA/ACC/TOS) ·\u00A0Morton 2018 ·\u00A0Jäger 2017 (ISSN) ·\u00A0EFSA 2010 ·\u00A0'
@@ -215,10 +215,25 @@ class _GoalsWizardState extends State<GoalsWizard> {
   /// [adaptSkipDays] μέρες πριν). Τότε «Ξανά ο οδηγός» κρατά από προεπιλογή την αρχή που διάλεξες: πριν, με στόχους που
   /// αρχίζουν τη Δευτέρα 23/11, ο οδηγός το Σάββατο 21/11 έβαζε από προεπιλογή αρχή το Σάββατο (και έλεγχο κάθε Σάββατο),
   /// και την Πέμπτη 26/11 ξανάρχιζε την πρώτη εβδομάδα. Η σύνοψη δείχνει πάντα και τις άλλες επιλογές.
+  ///
+  /// Ανεξάρτητος έλεγχος K1 (K1R-09): μέσα στην πρώτη εβδομάδα μόνο όταν η δίαιτα άρχισε πράγματι (υπάρχει φαγητό γραμμένο
+  /// από την αρχή και μετά). Στόχοι που ορίστηκαν πριν από λίγες μέρες χωρίς να γραφτεί τίποτα δεν έχουν αρχίσει: εκεί
+  /// ισχύει ο κανόνας V-1 (καμία παλιά αρχή σιωπηλά). Αρχή σήμερα ή στο μέλλον: μένει πάντα.
   bool get _oldStartsNow {
     final o = _old;
     final s = o == null ? null : DateTime.tryParse(o.since);
-    return s != null && daysBetween(s, _today) <= adaptSkipDays;
+    if (s == null) return false;
+    final ago = daysBetween(s, _today);
+    if (ago <= 0) return true;
+    if (ago > adaptSkipDays) return false;
+    final f = FoodStore.shared;
+    return f != null && f.loaded && dailyIntake(f, s, _today).isNotEmpty;
+  }
+
+  /// Η αρχή των παλιών στόχων είναι στο μέλλον (K1R-09: τότε το κουμπί γράφει «Όπως το όρισα», όχι «Συνεχίζω»).
+  bool get _oldStartsLater {
+    final s = _old == null ? null : DateTime.tryParse(_old!.since);
+    return s != null && daysBetween(s, _today) < 0;
   }
 
   _Start get _startNow {
@@ -628,7 +643,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
         final checked = d.log.any((l) => !l.fast && l.day.compareTo(d.since) >= 0);
         final continues = !sameDay(sinceDay, _now) && checked;
         final firstEst = firstEstimateDay(d);
-        // R8-A1-4: μετά από κενό στο φαγητό η εκτίμηση θέλει 3 εβδομάδες αφού ξαναρχίσει η καταγραφή, όπως στη Σήμερα και
+        // R8-A1-4: μετά από κενό στο φαγητό η εκτίμηση θέλει 4 εβδομάδες αφού ξαναρχίσει η καταγραφή (η πρώτη δεν μετρά: K1-C-02), όπως στη Σήμερα και
         // στη σελίδα «Στόχοι» ([estimateDayAfterGap]). Πριν, η σύνοψη έγραφε τη μέρα χωρίς το κενό (14/12 αντί για 28/12).
         final foodStore = FoodStore.shared;
         final gap = !continues && foodStore != null && foodStore.loaded
@@ -729,7 +744,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
                 if (_canKeep && o != null)
                   ChoiceChip(
                     key: const ValueKey('wizard-start-keep'),
-                    label: Text('Συνεχίζω (από ${_dm(o.since)})'),
+                    label: Text('${_oldStartsLater ? 'Όπως το όρισα' : 'Συνεχίζω'} (από ${_dm(o.since)})'),
                     selected: _startNow == _Start.keep,
                     onSelected: (_) => setState(() => _start = _Start.keep),
                   ),
@@ -973,12 +988,13 @@ class GoalsPage extends StatelessWidget {
         final due = nextCheckDay(g, today);
         final firstEstimate = firstEstimateDay(g);
         // Round 7 (R7-A1-2): πριν από την εκτίμηση, με τους ίδιους κανόνες με τον έλεγχο της Σήμερα: μετά από κενό
-        // καταγραφής φαγητού η εκτίμηση θέλει 3 εβδομάδες από τη μέρα που ξαναρχίζει η καταγραφή ([estimateDayAfterGap]).
+        // καταγραφής φαγητού η εκτίμηση θέλει 3 εβδομάδες από το [afterGapStart] (μία εβδομάδα μετά την επιστροφή· [estimateDayAfterGap]).
         final foodStore = FoodStore.shared;
         final data = store.data;
         // Οι ζυγίσεις που μετρούν, μία φορά: για το «τι έχει μαζευτεί» και για τον ρυθμό με το τωρινό βάρος (K1-C-07).
         final counted = data == null ? const <(DateTime, double)>[] : dailyWeights(data.body);
-        final kgNow = counted.isEmpty ? null : counted.last.$2;
+        // K1R-11: «τώρα περίπου Χ kg» μόνο με ζύγιση των τελευταίων [rateNowMaxAgeDays] ημερών (μια παλιά ζύγιση δεν είναι «τώρα»).
+        final kgNow = counted.isEmpty || daysBetween(counted.last.$1, today) > rateNowMaxAgeDays ? null : counted.last.$2;
         final ready = !estimated && foodStore != null && foodStore.loaded && data != null
             ? readiness(goals: g, today: today, weights: counted, intake: (a, b) => dailyIntake(foodStore, a, b))
             : null;

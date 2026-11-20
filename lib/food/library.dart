@@ -467,7 +467,7 @@ String libraryPrompt({
     ..writeln('      "meals": ["lunch", "dinner"], "office": true, "tags": ["όσπρια"],')
     ..writeln('      "items": [{"id": "C20359", "name": "Φακές (ξερές)", "g": 250}, …],')
     ..writeln('      "steps": [{"text": "…", "device": "Κατσαρόλα μεγάλη", "heat": "μέτρια", "min": 30}, …],')
-    ..writeln('      "tips": ["…"], "keeps": "Στο ψυγείο ως 2 μέρες (με ρύζι: ως την επόμενη μέρα)", "why": "…"')
+    ..writeln('      "tips": ["…"], "keeps": "Στο ψυγείο ως 3 μέρες", "why": "…"')
     ..writeln('    },')
     ..writeln('    {"key": "tsipoura-psitopoleio", "name": "Τσιπούρα από ψητοπωλείο", "cook": "out", "type": "plate", '
         '"meals": ["dinner"], "tags": ["ψάρι"], "order": "…", "items": […]},')

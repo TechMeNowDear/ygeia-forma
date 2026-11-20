@@ -26,8 +26,7 @@ class DayCard extends StatelessWidget {
     final c = Aigaio.of(context);
     final fv = fruitVegGrams(entries);
     final mark = food.dayMark(day);
-    // Έλεγχος 20/11 (K2-C-17): με τον αριθμό όπως φαίνεται (399,6 g γράφονται «400 / 400 g», άρα «έφτασες»).
-    final enough = fv.roundToDouble() >= fruitVegTargetG;
+    final enough = fv >= fruitVegTargetG;
     final share = (fv / fruitVegTargetG).clamp(0.0, 1.0);
     return AppCard(
       key: const ValueKey('day-card'),
@@ -57,7 +56,7 @@ class DayCard extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          enough ? 'Έφτασες τα 400 g της ημέρας.' : 'Τουλάχιστον 400 g τη μέρα, χωρίς πατάτες (ΠΟΥ/FAO 2003).',
+          enough ? 'Έφτασες τα 400 g της ημέρας.' : 'Τουλάχιστον 400 g τη μέρα, χωρίς πατάτες (ΠΟΥ).',
           style: TextStyle(fontSize: 13, color: c.textSecondary),
         ),
         if (entries.isNotEmpty) ...[

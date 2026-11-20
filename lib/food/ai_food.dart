@@ -12,8 +12,7 @@
 /// - Το πρόγραμμα ελέγχεται ξανά από τη βάση ([aiCheckWeek]): κάθε μέρα (θερμίδες, πρωτεΐνη, κορεσμένα, αλάτι, ίνες, φρούτα
 ///   και λαχανικά, ζάχαρη) και η εβδομάδα (όσπρια, ψάρι, κόκκινο κρέας, αλλαντικά, υδράργυρος, κατσαρόλες, χρόνος).
 /// - Τίποτα δεν γράφεται πριν πεις «Ναι»: οι συναρτήσεις εδώ ΜΟΝΟ ετοιμάζουν (πρόγραμμα, νέα φαγητά, αλλαγή γεύματος).
-/// - (Ως 19/11· από τις αποφάσεις 20/11 πηγαίνουν και τα όρια της μέρας: κορεσμένα, αλάτι, ίνες, πρωτεΐνη· δες [aiSystem].)
-///   Στο AI δεν πήγαιναν αριθμοί στόχων που προδίδουν υγεία ή βάρος (κορεσμένα, πρωτεΐνη σε γραμμάρια): μόνο θερμίδες
+/// - Στο AI δεν πηγαίνουν αριθμοί στόχων που προδίδουν υγεία ή βάρος (κορεσμένα, πρωτεΐνη σε γραμμάρια): μόνο θερμίδες
 ///   ανά γεύμα σε στρογγυλά νούμερα και λόγια («πολλή πρωτεΐνη»)· τα προβλήματα πάνε ως ποσοστά (έλεγχος 19/11, X-3).
 /// - Σε κάθε κλήση: λίγη δουλειά (σχέδιο ή ΜΙΑ συνταγή), ώστε να χωράει στα 150″ του Supabase.
 library;
@@ -23,7 +22,7 @@ import 'dart:math' as math;
 
 import '../ai/ai_bridge.dart';
 import '../history.dart' show dateKey;
-import 'chol.dart' show isLegumes, isFish, cookedLegumes, legumesDryMinG, legumesCookedFactor, fishMinG;
+import 'chol.dart' show isLegumes, isFish, legumesDryMinG, legumesCookedFactor, fishMinG;
 import 'dishes.dart';
 import 'food_model.dart';
 import 'food_store.dart';
@@ -88,65 +87,10 @@ const aiPotMaxGap = 2;
 const aiPotRiceGap = 1;
 const aiPotUserShare = 0.5;
 
-/// Υδράργυρος (EFSA 2012: ανεκτή εβδομαδιαία πρόσληψη μεθυλυδραργύρου 1,3 µg/kg βάρους)· μέσες τιμές FDA «Mercury Levels in
-/// Commercial Fish and Shellfish (1990–2012)» σε mg/kg (= µg/g).
-///
-/// Έλεγχος 20/11 (K2-S-01): τιμή για ΚΑΘΕ ψάρι και θαλασσινό της βάσης. Πριν μετρούσαν μόνο ξιφίας και τόνος, και κάθε άλλο
-/// ψάρι έμπαινε με 0: μια εβδομάδα με μπακαλιάρο (0,111, όσο σχεδόν ο τόνος σε νερό), μερλούσα ή λαβράκι έφτανε το
-/// 96–150% του ορίου και ο έλεγχος έγραφε 0 µg. Λαβράκι: «Bass, saltwater» της FDA (το λαβράκι ιχθυοτροφείου έχει συνήθως
-/// λιγότερο: συντηρητικό). Σκουμπρί: η μεγαλύτερη από τις δύο τιμές (chub 0,088· Atlantic 0,05). Μύδια: δεν υπάρχουν στον
-/// πίνακα· η μεγαλύτερη τιμή διθύρων (στρείδι 0,012· αχιβάδα 0,009· χτένι 0,003). Ό,τι δεν έχει τιμή στον πίνακα (τσιπούρα,
-/// σαυρίδι, χταπόδι, δικό σου προϊόν ψαριού) παίρνει το [aiMercuryDefaultPpm].
+/// Υδράργυρος (EFSA 2012: ανεκτή εβδομαδιαία πρόσληψη μεθυλυδραργύρου 1,3 µg/kg βάρους)· μέσες τιμές FDA 1990–2012 σε
+/// mg/kg (= µg/g). Τα άλλα ψάρια της βάσης είναι πολύ χαμηλότερα (σολομός 0,02, σαρδέλα 0,01).
 const aiMercuryTwiPerKg = 1.3;
-const aiMercuryPpm = {
-  'C26082': 0.995, // ξιφίας
-  'C26179': 0.35, // τόνος λευκός (albacore), κονσέρβα
-  'C26039': 0.126, // τόνος σε νερό (κονσέρβα, «light»)
-  'C26205': 0.167, 'C26206': 0.167, 'C27030': 0.167, // λαβράκι
-  'C26043': 0.111, 'C26023': 0.111, 'C26025': 0.111, 'C26024': 0.111, 'C26098': 0.111, // μπακαλιάρος (cod)
-  'C26051': 0.088, 'C26019': 0.088, // σκουμπρί
-  'C26044': 0.079, 'C26120': 0.079, // μερλούσα (hake)
-  'C26011': 0.078, 'C26014': 0.078, 'C25998': 0.078, // ρέγγα
-  'C10001': 0.024, 'C10084': 0.024, // καλαμάρι
-  'C26036': 0.022, 'C26230': 0.022, 'C26229': 0.022, 'C26037': 0.022, // σολομός
-  'C26079': 0.016, 'C26700': 0.016, 'C26694': 0.016, // γαύρος, αντζούγιες
-  'C26065': 0.013, 'C26136': 0.013, 'C26040': 0.013, // σαρδέλα
-  'C10026': 0.012, 'C10013': 0.012, // μύδια
-  'C10021': 0.009, 'C10007': 0.009, // γαρίδες
-};
-
-/// Έλεγχος 20/11 (K2-S-01): ψάρι ή θαλασσινό χωρίς τιμή στον πίνακα της FDA. Συντηρητική προεπιλογή, περίπου όσο ο
-/// μπακαλιάρος: η τσιπούρα έχει μετρηθεί 0,05 (ιχθυοτροφείου) ως 0,09 mg/kg (άγρια) (Environ Sci Pollut Res 2021,
-/// doi:10.1007/s11356-021-13366-y).
-const aiMercuryDefaultPpm = 0.10;
-
-/// Υδράργυρος του τροφίμου σε µg ανά g: ο πίνακας, αλλιώς η προεπιλογή για ψάρια και θαλασσινά ([isFish]), αλλιώς 0.
-/// Δικό σου προϊόν με «ξιφία» ή «τόνο» στο όνομα: ξιφίας, ή τόνος λευκός (το είδος της κονσέρβας δεν είναι γνωστό).
-double mercuryPpm(Food f) {
-  final known = aiMercuryPpm[f.id];
-  if (known != null) return known;
-  if (!isFish(f)) return 0;
-  final n = f.name.toLowerCase();
-  if (n.contains('ξιφί')) return aiMercuryPpm['C26082']!;
-  if (n.contains('τόνο') || n.contains('τονο') || n.contains('tuna') || n.contains('thon') || n.contains('tonno')) {
-    return aiMercuryPpm['C26179']!;
-  }
-  return aiMercuryDefaultPpm;
-}
-
-/// Έλεγχος 20/11 (K2-S-03): λιπαρά ψάρια (σολομός, σαρδέλα, σκουμπρί, ρέγγα, γαύρος, σαυρίδι) και το όριό τους. Το NHS
-/// (σελίδα «Fish and shellfish», αναθ. 26/6/2026) δίνει για άνδρες ως 4 μερίδες λιπαρού ψαριού την εβδομάδα (μερίδα
-/// περίπου 140 g μαγειρεμένο), λόγω ρύπων που μαζεύονται στο λίπος του ψαριού. 4 × 140 g μαγειρεμένο ÷ 0,78 ≈ 720 g ωμό.
-/// Ο στόχος «ψάρι Χ φορές» μένει όπως είναι· αλλάζει μόνο πόσα από αυτά μπορούν να είναι λιπαρά.
-const aiOilyFishIds = {
-  'C26036', 'C26230', 'C26229', 'C26037', // σολομός
-  'C26065', 'C26136', 'C26040', // σαρδέλα
-  'C26051', 'C26019', // σκουμπρί
-  'C26011', 'C26014', 'C25998', // ρέγγα
-  'C26079', 'C26700', 'C26694', // γαύρος, αντζούγιες
-  'C26113', // σαυρίδι
-};
-const aiOilyFishWeekG = 720.0;
+const aiMercuryPpm = {'C26082': 0.995, 'C26179': 0.35, 'C26039': 0.126};
 
 /// Βασικά κουζίνας που προτείνονται (id της βάσης, σύντομο όνομα). Μπαίνουν ΜΟΝΟ αν τα εγκρίνεις.
 const stapleSuggestions = [
@@ -240,21 +184,15 @@ final _rawMark = RegExp(r'[(\s,]ωμ[όήάέοηίςύ]*[),\s]');
 /// Θέλει μαγείρεμα για να φαγωθεί με ασφάλεια (έλεγχος 19/11, S-1): ωμό κρέας, πουλερικό, ψάρι, θαλασσινό, αυγό, αλλαντικό
 /// (μπέικον), ξερά όσπρια, ωμά δημητριακά/ζυμαρικά/πατάτες, αλεύρι, ωμά φασολάκια. Κονσέρβες, καπνιστά, μαρινάτα, βρασμένα
 /// δεν πιάνονται (δεν έχουν «ωμ» ούτε μαγειρεμένες μορφές).
-/// Έλεγχος 20/11 (K2-S-07): και τα ωμά κατεψυγμένα λαχανικά (αρακάς· EFSA 2020, Listeria: «cooked properly after
-/// defrosting»), η ωμή ζύμη (φύλλο κρούστας) και το λουκάνικο (χωρίς «ωμό» στο όνομα της πηγής).
-const _alwaysCookIds = {'C30780'};
-
 bool aiNeedsCooking(Food f) {
   if (f.isCooked) return false;
-  if (_alwaysCookIds.contains(f.id)) return true;
   final n = ' ${f.name.toLowerCase()} ';
   final raw = f.isRawWithCooked || _rawMark.hasMatch(n);
   return switch (f.cat) {
     'Κρέας' || 'Πουλερικά' || 'Ψάρια' || 'Θαλασσινά' || 'Αυγά' || 'Αλλαντικά' => raw,
     'Όσπρια' => raw || n.contains('ξερ'),
     'Δημητριακά' || 'Ζυμαρικά' || 'Πατάτες' => raw || n.contains('ξηρ') || n.contains('αλεύρι'),
-    'Λαχανικά' => raw && (n.contains('φασολάκια') || n.contains('κατεψυγμ')),
-    'Ψωμί' => raw,
+    'Λαχανικά' => raw && n.contains('φασολάκια'),
     _ => false,
   };
 }
@@ -398,22 +336,17 @@ String aiSystem(FoodStore food, Set<String> allowed, Kitchen kitchen, {AiTargets
     ..writeln('ΑΣΦΑΛΕΙΑ ΤΡΟΦΙΜΩΝ:')
     ..writeln('- ΠΟΤΕ ωμό ή μισοψημένο κρέας, πουλερικό, ψάρι, θαλασσινό ή αυγό. Φαγητό «χωρίς μαγείρεμα» μόνο με έτοιμα '
         'για φάγωμα (γιαούρτι, τυρί, κονσέρβα, ψωμί, ωμά λαχανικά, φρούτα, ξηροί καρποί).')
-    ..writeln('- Κοτόπουλο, κιμάς, χοιρινό, ψάρι: ψημένα ως το κέντρο (75 °C, ή χωρίς ροζ και με διάφανα ζουμιά).')
-    ..writeln('- Ξερά φασόλια, γίγαντες, ρεβίθια: μούλιασμα, πέταμα του νερού, και σε φρέσκο νερό δυνατό βράσιμο τουλάχιστον '
-        '10 λεπτά πριν το σιγανό· ποτέ μισοβρασμένα. Φακές και φάβα δεν θέλουν μούλιασμα.')
+    ..writeln('- Ξερά όσπρια: μούλιασμα και δυνατό βράσιμο τουλάχιστον 10 λεπτά πριν το σιγανό.')
     ..writeln('- Περισσεύματα: κρύωμα μέσα σε 1–2 ώρες, ψυγείο, φαγητό ως 2 μέρες (με ρύζι: ως την επόμενη μέρα), ένα '
         'ξαναζέσταμα ως να αχνίζει παντού.')
     ..writeln()
     ..writeln('ΥΓΙΕΙΝΗ ΣΥΝΤΑΓΗ (ανά μερίδα):')
     ..writeln('- Κύριο γεύμα με λαχανικά τουλάχιστον 150 g και καλή πηγή πρωτεΐνης.')
     ..writeln('- Λάδι 10–15 g (λαδερά ως 20 g), μόνο όσο τρώγεται· όχι βαθύ τηγάνισμα.')
-    ..writeln('- Πρόσθετο αλάτι ως 1 g (νοστιμιά με λεμόνι, ξύδι, σκόρδο, μυρωδικά, μπαχαρικά)· τυρί ως '
-        '${limits == null ? '30 g' : '20 g και πάντα μέσα στο όριο κορεσμένων του γεύματος (με λάδι στο ίδιο πιάτο: λιγότερο ή άπαχο τυρί)'}· '
-        'όχι αλλαντικά.')
+    ..writeln('- Πρόσθετο αλάτι ως 1 g (νοστιμιά με λεμόνι, ξύδι, σκόρδο, μυρωδικά, μπαχαρικά)· τυρί ως 30 g· όχι αλλαντικά.')
     ..writeln('- Ψωμί, ζυμαρικά και ρύζι ολικής όπου υπάρχουν στη λίστα· ζάχαρη ή μέλι ως 10 g· κρασί μόνο στο μαγείρεμα.')
-    ..writeln('- Ψάρι: κυρίως σαρδέλα, γαύρος, σκουμπρί, σολομός, τσιπούρα, λαβράκι, μπακαλιάρος, γαρίδες, καλαμάρι, με '
-        'εναλλαγή ειδών. Λιπαρό ψάρι (σολομός, σαρδέλα, σκουμπρί, ρέγγα, γαύρος) ως 4 φορές την εβδομάδα. Ξιφίας το πολύ μία '
-        'φορά τον μήνα· τόνος λευκός (albacore) το πολύ μία φορά την εβδομάδα.')
+    ..writeln('- Ψάρι: κυρίως σαρδέλα, γαύρος, σκουμπρί, σολομός, τσιπούρα, λαβράκι, μπακαλιάρος. Ξιφίας το πολύ μία φορά '
+        'τον μήνα· τόνος λευκός (albacore) το πολύ μία φορά την εβδομάδα.')
     ..writeln();
   if (limits != null) {
     b
@@ -460,11 +393,7 @@ class AiNewDish {
   CookWay get cook => cookWayOf(json['cook'] ?? 'home') ?? CookWay.home;
   bool get office => json['office'] == true;
   List<Meal> get meals => [for (final m in (json['meals'] is List ? json['meals'] as List : const [])) if (mealOfName(m) case final mm?) mm];
-  // Έλεγχος 20/11 (K2-C-08): «minutes»: 1e999 γίνεται Infinity και το round() πετούσε εξαίρεση (χανόταν όλη η προσπάθεια).
-  int? get minutes {
-    final m = json['minutes'];
-    return m is num && m.isFinite && m > 0 && m <= maxRecipeMinutes ? m.round() : null;
-  }
+  int? get minutes => json['minutes'] is num ? (json['minutes'] as num).round() : null;
 }
 
 class AiPlan {
@@ -699,7 +628,7 @@ String aiPlanPrompt({
     ..writeln('- Την εβδομάδα: ${[
       if (legumes > 0) 'όσπρια τουλάχιστον $legumes μέρες (τουλάχιστον 40 g ξερά ή 100 g βρασμένα στη μερίδα)',
       if (fish > 0)
-        'ψάρι τουλάχιστον $fish μέρες (τουλάχιστον 100 g ωμό στη μερίδα${fish >= 2 ? ', από αυτά ${math.min(2, fish)} ως 4 λιπαρά, το πολύ ${_n(aiOilyFishWeekG)} g ωμό λιπαρό ψάρι την εβδομάδα' : ', κατά προτίμηση λιπαρό'})',
+        'ψάρι τουλάχιστον $fish μέρες (τουλάχιστον 100 g ωμό στη μερίδα${fish >= 2 ? ', από αυτά τουλάχιστον ${math.min(2, fish)} λιπαρά' : ', κατά προτίμηση λιπαρό'})',
       'κόκκινο κρέας το πολύ 1',
       'αλλαντικά το πολύ 1',
       'κοτόπουλο ως 5',
@@ -787,17 +716,6 @@ String aiKeepsText(bool rice) => 'Κρύωσέ το μέσα σε 1–2 ώρες
     '${rice ? 'την επόμενη μέρα (έχει ρύζι)' : '2 μέρες'}. Ζέστανέ το μία φορά, ως να αχνίζει παντού· ανακάτεψε στη μέση '
     'του μικροκυμάτων.';
 
-/// Έλεγχος 20/11 (K2-S-10): αριθμός διατροφής («420 kcal», «30 g πρωτεΐνη», «4 g κορεσμένα») μέσα στο ελεύθερο κείμενο
-/// του AI («why», «tips»). Το κείμενο αυτό φαίνεται όπως ήρθε, δίπλα στους αριθμούς της βάσης, και μπορεί να διαφωνεί μαζί
-/// τους: ο κανόνας «οι αριθμοί διατροφής ποτέ από το AI» ισχύει και εκεί. Τα βήματα δεν ελέγχονται (έχουν γραμμάρια υλικών).
-final _nutritionNumber = RegExp(r'\d[\d.,]*\s*(kcal|θερμίδ|χιλιοθερμ)|'
-    r'\d[\d.,]*\s*(g|γρ|γραμμάρι\S*)\.?\s+(πρωτε[ΐϊι]ν|κορεσμ|λιπαρ|λίπο|υδατ|φυτικ|ίνες|ινών|αλάτι|αλατιού|ζάχαρ|σάκχαρ)');
-
-bool aiTextHasNutritionNumbers(Recipe? r) {
-  if (r == null) return false;
-  return [if (r.why != null) r.why!, ...r.tips].any((t) => _nutritionNumber.hasMatch(t.toLowerCase()));
-}
-
 /// Ένα φαγητό από την απάντηση (μορφή βιβλιοθήκης, ΕΝΑ φαγητό), ελεγμένο με τη βάση, τα επιτρεπόμενα υλικά, την ασφάλεια
 /// ([aiDishProblems]) και, για φαγητό του σχεδίου, με ό,τι δηλώθηκε στο σχέδιο ([want]: είδος, μαγείρεμα, γραφείο,
 /// γεύματα). Επιστρέφει το φαγητό ή τα προβλήματα (για το AI).
@@ -852,10 +770,6 @@ bool aiTextHasNutritionNumbers(Recipe? r) {
   if (bad.isNotEmpty) errors.add('Υλικά εκτός λίστας «ΕΠΙΤΡΕΠΟΜΕΝΑ ΥΛΙΚΑ»: ${bad.join(', ')}. Βγάλ’ τα ή άλλαξε φαγητό.');
   if (errors.isEmpty) errors.addAll(aiDishProblems(food, d));
   if (errors.isEmpty && portionRange(food, d) == null) errors.add('Δεν βγαίνουν θερμίδες από τα υλικά.');
-  if (errors.isEmpty && aiTextHasNutritionNumbers(recipeOf(d))) {
-    errors.add('Στα "why" και "tips" μη γράφεις θερμίδες ή γραμμάρια θρεπτικών: τα μετρά η εφαρμογή από τη βάση της. Βγάλε '
-        'τους αριθμούς.');
-  }
   if (errors.isNotEmpty) return (dish: null, errors: errors);
   // Η διατήρηση από την εφαρμογή, όχι από το AI· και σημάδι «από AI».
   final r = recipeOf(d);
@@ -942,11 +856,7 @@ typedef AiTargets = ({int kcal, int protein, double satMax, int fiber, double sa
 
 /// Ένα πρόβλημα του προγράμματος: [user] για την οθόνη (με αριθμούς), [ai] για τη διόρθωση (χωρίς αριθμούς στόχων).
 class AiProblem {
-  const AiProblem({this.day, required this.user, required this.ai, this.weight = 1, this.tag});
-
-  /// Έλεγχος 20/11 (K2-C-10): τι είδους πρόβλημα υγείας είναι («sat», «salt», «mercury», «oily»)· null για τα υπόλοιπα.
-  /// Με αυτό το [weekHealthNotes] δείχνει τα ίδια και στο πρόγραμμα που φτιάχνεται με κανόνες ή επικολλάται.
-  final String? tag;
+  const AiProblem({this.day, required this.user, required this.ai, this.weight = 1});
 
   /// Η μέρα (θέση στο πρόγραμμα) ή null για όλη την εβδομάδα.
   final int? day;
@@ -956,17 +866,6 @@ class AiProblem {
 }
 
 double _pct(double a, double b) => b <= 0 ? 0 : ((a - b).abs() / b * 100);
-
-/// Έλεγχος 20/11 (K2-C-10): οι σημειώσεις υγείας για πρόγραμμα που ΔΕΝ πέρασε από το AI («Φτιάξε πρόγραμμα» με κανόνες,
-/// επικόλληση): κορεσμένα και αλάτι κάθε μέρας απέναντι στα όριά σου, υδράργυρος και λιπαρό ψάρι της εβδομάδας. Ο ίδιος
-/// έλεγχος με του AI ([aiCheckWeek]), από τη βάση. Πριν, αυτά τα προγράμματα έλεγχαν μόνο θερμίδες, πρωτεΐνη, όσπρια και
-/// ψάρι, και το όριο κορεσμένων του γιατρού δεν φαινόταν πουθενά πριν φας.
-List<String> weekHealthNotes(FoodStore food, WeekPlan w, {required AiTargets t, double? bodyKg}) {
-  final meals = w.meals ?? [for (final m in Meal.values) if (w.days.any((d) => d.any((s) => s.meal == m))) m];
-  if (meals.isEmpty) return const [];
-  final ps = aiCheckWeek(food, w, const [], t: t, meals: meals, checkDays: {for (var i = 0; i < w.days.length; i++) i}, bodyKg: bodyKg);
-  return [for (final p in ps) if (p.tag != null) p.user];
-}
 
 /// Ελέγχει το πρόγραμμα από τη βάση. [extra]: τα νέα φαγητά (δεν έχουν αποθηκευτεί). [checkDays]: ποιες μέρες ελέγχονται
 /// (όσες μπορεί να αλλάξει το AI: από σήμερα, με θέσεις που δεν κρατήθηκαν). [bodyKg]: για τον υδράργυρο (μένει στο κινητό).
@@ -986,9 +885,7 @@ List<AiProblem> aiCheckWeek(
   final shareAll = ordered.fold(0.0, (a, m) => a + mealShare[m]!);
   final out = <AiProblem>[];
   var legumeDays = 0, fishDays = 0, redMeat = 0, processed = 0;
-  var mercury = 0.0, oilyFish = 0.0;
-  final mercuryBy = <String, double>{};
-  var fruitVegShort = 0;
+  var mercury = 0.0;
   final weekKcal = <double>[];
   for (var i = 0; i < w.days.length; i++) {
     final label = _day(w.dayAt(i));
@@ -1010,16 +907,11 @@ List<AiProblem> aiCheckWeek(
       var meat = 0.0, proc = 0.0;
       for (final e in p) {
         final f = e.food;
-        if (isLegumes(f)) legumeG += cookedLegumes(f) ? e.grams / legumesCookedFactor : e.grams; // K2-C-05
+        if (isLegumes(f)) legumeG += f.isCooked ? e.grams / legumesCookedFactor : e.grams;
         if (isFish(f)) fishG += e.grams;
         if (f.cat == 'Κρέας') meat += e.grams;
         if (f.cat == 'Αλλαντικά') proc += e.grams;
-        final hg = e.grams * mercuryPpm(f); // K2-S-01: κάθε ψάρι και θαλασσινό, όχι μόνο ξιφίας και τόνος
-        if (hg > 0) {
-          mercury += hg;
-          mercuryBy[f.name] = (mercuryBy[f.name] ?? 0) + hg;
-        }
-        if (aiOilyFishIds.contains(f.id)) oilyFish += e.grams;
+        mercury += e.grams * (aiMercuryPpm[f.id] ?? 0);
       }
       if (meat >= 80) redMeat++;
       if (proc >= 20) processed++;
@@ -1067,7 +959,6 @@ List<AiProblem> aiCheckWeek(
         day: i,
         user: '$label: κορεσμένα ${_g1(tot.satFat)} g (όριο ${_g1(t.satMax * f)}): κυρίως $src.',
         ai: '$label: κορεσμένα ${_n(_pct(tot.satFat, t.satMax * f))}% πάνω από το όριο· κυρίως $src.',
-        tag: 'sat',
       ));
     } else if ((tot.missing[Nk.satFat] ?? 0) > 0) {
       out.add(AiProblem(day: i, user: '$label: κάποια τρόφιμα δεν έχουν κορεσμένα στη βάση (το σύνολο είναι «τουλάχιστον»).', ai: '', weight: 0));
@@ -1080,7 +971,6 @@ List<AiProblem> aiCheckWeek(
         user: '$label: αλάτι ${(tot.missing[Nk.salt] ?? 0) > 0 ? '≥ ' : ''}${_g1(tot.salt)} g (όριο ${_g1(saltMax)}): κυρίως $src.',
         ai: '$label: αλάτι ${_n(_pct(tot.salt, saltMax))}% πάνω από το όριο· κυρίως $src.',
         weight: 0.7,
-        tag: 'salt',
       ));
     }
     if (tot.fiber < t.fiber * f * aiDayFiberMin) {
@@ -1099,8 +989,6 @@ List<AiProblem> aiCheckWeek(
         ai: '$label: λίγα φρούτα και λαχανικά (${_n(fv)} g)· θέλει τουλάχιστον ${_n(aiFruitVegDayG * f)} g.',
         weight: 0.5,
       ));
-    } else if (fv < fruitVegTargetG * f) {
-      fruitVegShort++; // K2-S-08: περνά τον έλεγχο (από 300 g), αλλά κάτω από τον στόχο της μέρας (400 g, ΠΟΥ)
     }
     final sugar = parts.where((e) => e.food.cat == 'Γλυκά').fold(0.0, (a, e) => a + e.total(Nk.sugars));
     if (sugar > kt * aiFreeSugarPct / 4) {
@@ -1134,38 +1022,11 @@ List<AiProblem> aiCheckWeek(
     out.add(AiProblem(user: 'Αλλαντικά $processed φορές (το πολύ 1).', ai: 'Αλλαντικά $processed φορές: το πολύ 1.', weight: 0.7));
   }
   if (bodyKg != null && bodyKg > 0 && mercury > aiMercuryTwiPerKg * bodyKg) {
-    // K2-S-01: οι μεγαλύτερες πηγές με το όνομά τους (πριν: πάντα «ξιφίας ή τόνος λευκός»).
-    final top = mercuryBy.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    final names = [for (final e in top.take(2)) _shortName(e.key)].join(', ');
     out.add(AiProblem(
-      user: 'Υδράργυρος από ψάρια ${_n(mercury)} µg την εβδομάδα (όριο EFSA ${_n(aiMercuryTwiPerKg * bodyKg)}): κυρίως '
-          '$names.',
-      ai: 'Πολύς υδράργυρος από ψάρια την εβδομάδα, κυρίως από: $names. Λιγότερες φορές ή μικρότερη μερίδα από αυτά· στη '
-          'θέση τους σαρδέλα, γαύρος, σολομός, γαρίδες ή καλαμάρι. Ξιφίας το πολύ μία φορά τον μήνα, τόνος λευκός το '
-          'πολύ μία φορά την εβδομάδα.',
+      user: 'Υδράργυρος από ψάρια ${_n(mercury)} µg την εβδομάδα (όριο EFSA ${_n(aiMercuryTwiPerKg * bodyKg)}): λιγότερος '
+          'ξιφίας ή τόνος λευκός.',
+      ai: 'Πολύς ξιφίας ή τόνος (υδράργυρος): ξιφίας το πολύ μία φορά τον μήνα, τόνος λευκός το πολύ μία φορά την εβδομάδα.',
       weight: 1.5,
-      tag: 'mercury',
-    ));
-  }
-  if (fruitVegShort > 0) {
-    // K2-S-08: μόνο ενημέρωση (βάρος 0): η κάρτα της μέρας ζητά 400 g, ο έλεγχος του προγράμματος περνά από τα 300.
-    out.add(AiProblem(
-      user: 'Φρούτα και λαχανικά: ${fruitVegShort == 1 ? '1 μέρα' : '$fruitVegShort μέρες'} με ${_n(aiFruitVegDayG)}–'
-          '${_n(fruitVegTargetG)} g, κάτω από τον στόχο της μέρας (${_n(fruitVegTargetG)} g). Ένα φρούτο ή μια σαλάτα ακόμα '
-          'τον καλύπτει.',
-      ai: '',
-      weight: 0,
-    ));
-  }
-  if (oilyFish > aiOilyFishWeekG + 1e-9) {
-    // K2-S-03: άνω όριο για το λιπαρό ψάρι (NHS: άνδρες ως 4 μερίδες την εβδομάδα).
-    out.add(AiProblem(
-      user: 'Λιπαρό ψάρι ${_n(oilyFish)} g την εβδομάδα (ως ${_n(aiOilyFishWeekG)} g ωμό, περίπου 4 μερίδες· NHS).',
-      ai: 'Λιπαρό ψάρι (σολομός, σαρδέλα, σκουμπρί, ρέγγα, γαύρος) ${_n(oilyFish)} g την εβδομάδα: το πολύ '
-          '${_n(aiOilyFishWeekG)} g ωμό (4 μερίδες). Βάλε άπαχο ψάρι ή θαλασσινά (τσιπούρα, γαρίδες, καλαμάρι) στη θέση '
-          'μερικών, ή μικρότερη μερίδα.',
-      weight: 0.7,
-      tag: 'oily',
     ));
   }
   if (weekKcal.length >= 3) {
@@ -1671,7 +1532,7 @@ List<String> swapWarnings(FoodStore food, Dish oldDish, PlanSlot oldSlot, Dish n
   final ta = Totals(a), tb = Totals(b);
   double g(List<LogEntry> p, bool Function(Food f) w, {bool legumes = false}) => p
       .where((e) => w(e.food))
-      .fold(0.0, (s, e) => s + (legumes && cookedLegumes(e.food) ? e.grams / legumesCookedFactor : e.grams));
+      .fold(0.0, (s, e) => s + (legumes && e.food.isCooked ? e.grams / legumesCookedFactor : e.grams));
   final out = <String>[];
   if (ta.fiber - tb.fiber > 3 && tb.fiber < ta.fiber * 0.6) out.add('Ίνες ${_n(ta.fiber)} → ${_n(tb.fiber)} g.');
   if (tb.salt - ta.salt >= 1) out.add('Αλάτι ${_g1(ta.salt)} → ${_g1(tb.salt)} g.');
@@ -1680,7 +1541,7 @@ List<String> swapWarnings(FoodStore food, Dish oldDish, PlanSlot oldSlot, Dish n
   }
   if (g(a, isFish) >= fishMinG && g(b, isFish) < fishMinG) out.add('Χάνεται ένα ψάρι της εβδομάδας.');
   if (g(a, (f) => f.cat == 'Κρέας') < 80 && g(b, (f) => f.cat == 'Κρέας') >= 80) out.add('Μπαίνει κόκκινο κρέας.');
-  if (b.any((e) => mercuryPpm(e.food) >= 0.3) && !a.any((e) => mercuryPpm(e.food) >= 0.3)) {
+  if (b.any((e) => (aiMercuryPpm[e.food.id] ?? 0) >= 0.3) && !a.any((e) => (aiMercuryPpm[e.food.id] ?? 0) >= 0.3)) {
     out.add('Ψάρι με περισσότερο υδράργυρο (ξιφίας/τόνος λευκός): όχι συχνά.');
   }
   return out;
@@ -1699,7 +1560,6 @@ Future<AiSwapResult> aiSwapSlot({
   required int now,
   required String Function() newId,
   void Function(int attempt)? onAttempt,
-  AiTargets? limits,
 }) async {
   final s = w.days[day][index];
   final cur = food.dishById(s.dishId);
@@ -1752,8 +1612,7 @@ Future<AiSwapResult> aiSwapSlot({
     prompt.writeln('Γράψε ΝΕΟ φαγητό (στη βιβλιοθήκη δεν υπάρχει κάτι που ταιριάζει· key που ξεκινά με «$aiKeyPrefix»):');
   }
   prompt.writeln(_recipeFormat('${aiKeyPrefix}neo-fagito', 'Όνομα'));
-  // Έλεγχος 20/11 (K2-S-09): και εδώ τα όρια της μέρας (όπως στο πρόγραμμα της εβδομάδας)· πριν το AI δεν τα μάθαινε.
-  final system = aiSystem(food, allowed, kitchen, limits: limits);
+  final system = aiSystem(food, allowed, kitchen);
   final readyByKey = {for (final d in ready) planInfoOf(d)!.key!: d};
   final (res, errs, fail) = await aiAskUntilValid<AiSwapResult>(
     call,
@@ -1807,37 +1666,6 @@ typedef Rebalance = ({
   double proteinAfter,
 });
 
-/// Έλεγχος 20/11 (K2-C-01): πόσο από τις θερμίδες των ανοιχτών θέσεων ενός προηγούμενου γεύματος πρέπει να υπάρχει στο
-/// ημερολόγιο (εκτός προγράμματος) για να θεωρηθεί ότι το γεύμα φαγώθηκε ήδη.
-const rebalanceEatenShare = 0.5;
-
-/// Έλεγχος 20/11 (K2-C-01): τα γεύματα της μέρας [day] ΠΡΙΝ από το [before] που γράφτηκαν στο ημερολόγιο χωρίς το
-/// πρόγραμμα («+ Φαγητό», «Κι άλλο», «Όπως χθες»): όλες οι θέσεις τους είναι ακόμα ανοιχτές, και το ημερολόγιο έχει σε
-/// αυτό το γεύμα τουλάχιστον το [rebalanceEatenShare] των θερμίδων τους. Οι θέσεις αυτές ΔΕΝ είναι «θα φαγωθεί ακόμα»:
-/// οι θερμίδες τους είναι ήδη στο «έφαγες ως τώρα». Πριν μετριόνταν δύο φορές και το «Έφαγα κάτι άλλο» έκοβε το βραδινό
-/// στο ελάχιστο χωρίς λόγο (840 → 440 kcal· η μέρα έκλεινε 600 kcal κάτω από τον στόχο). Γεύμα με θέση που σημειώθηκε από
-/// το πρόγραμμα («Το έφαγα», «Έφαγα κάτι άλλο», «Δεν το έφαγα») μένει όπως πριν: εκεί οι καταχωρίσεις ανήκουν στη θέση.
-Set<Meal> mealsEatenOutsidePlan(FoodStore food, WeekPlan w, int day, {required Meal before}) {
-  final open = <Meal, double>{};
-  final touched = <Meal>{};
-  for (final s in w.days[day]) {
-    if (slotStateNow(food, w, day, s) != SlotState.open) {
-      touched.add(s.meal);
-      continue;
-    }
-    final t = plannedTotals(food, food.dishById(s.dishId), s);
-    if (t != null) open[s.meal] = (open[s.meal] ?? 0) + t.kcal;
-  }
-  final logged = <Meal, double>{};
-  for (final e in food.entriesFor(w.dayAt(day))) {
-    logged[e.meal] = (logged[e.meal] ?? 0) + Totals([e]).kcal;
-  }
-  return {
-    for (final m in open.keys)
-      if (_mealOrder(m) < _mealOrder(before) && !touched.contains(m) && open[m]! > 0 && (logged[m] ?? 0) >= rebalanceEatenShare * open[m]!) m,
-  };
-}
-
 /// Ξαναμοιράζει τις θερμίδες των ανοιχτών γευμάτων της μέρας [day] που έρχονται ΜΕΤΑ το [after] (όχι κλειδωμένα), ώστε
 /// [eaten] (ό,τι γράφτηκε ήδη στο ημερολόγιο τη μέρα) + τα υπόλοιπα ≈ [target]. Κάθε μερίδα μέσα στα όριά της (0,6–1,6).
 /// Όταν μικραίνουν, πρώτα το φαγητό με τη λιγότερη πρωτεΐνη ανά θερμίδα· όταν μεγαλώνουν, πρώτα το πιο πρωτεϊνούχο
@@ -1855,7 +1683,6 @@ Rebalance? rebalanceDay(
   final byId = {for (final d in food.dishes) d.id: d};
   final adjust = <int>[];
   var fixedKcal = 0.0, fixedProtein = 0.0;
-  final eatenOutside = mealsEatenOutsidePlan(food, w, day, before: after);
   for (var k = 0; k < w.days[day].length; k++) {
     final s = w.days[day][k];
     if (slotStateNow(food, w, day, s) != SlotState.open) continue;
@@ -1864,8 +1691,6 @@ Rebalance? rebalanceDay(
     if (d == null || t == null) continue;
     if (!s.locked && _mealOrder(s.meal) > _mealOrder(after) && portionRange(food, d) != null) {
       adjust.add(k);
-    } else if (eatenOutside.contains(s.meal)) {
-      continue; // K2-C-01: γράφτηκε με «+ Φαγητό»· είναι ήδη μέσα στο [eaten]
     } else {
       fixedKcal += t.kcal;
       fixedProtein += t.protein;

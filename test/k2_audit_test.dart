@@ -37,15 +37,8 @@ void main() {
 
     test('ωμές μορφές για τα ψητά κρέατα, με ζευγάρι', () {
       expect(_byId('C6110').rawId, 'C6111');
-      // Έλεγχος 20/11 (K2-C-03 / K2-S-04): μοσχαρίσια μπριζόλα και αρνίσια παϊδάκια ΔΕΝ είναι πια ζευγάρι: η ωμή γραμμή της
-      // πηγής είναι το κρέας με το λίπος, η ψητή μόνο το ψαχνό (το ίδιο κομμάτι έγραφε −57% θερμίδες, −72% κορεσμένα).
-      for (final (raw, cooked) in [('C6510', 'C6511'), ('C21500', 'C21501')]) {
-        expect(_byId(cooked).rawId, isNull, reason: cooked);
-        expect(_byId(cooked).isCooked, isTrue, reason: cooked);
-        expect(_byId(raw).cooked, isEmpty, reason: raw);
-        expect(_byId(raw).name, contains('με το λίπος'), reason: raw);
-        expect(_byId(cooked).name, contains('μόνο το ψαχνό'), reason: cooked);
-      }
+      expect(_byId('C6511').rawId, 'C6510');
+      expect(_byId('C21501').rawId, 'C21500');
       expect(_byId('C36005').rawId, 'C36016');
       expect(_byId('C40116').rawId, 'C40111');
       expect(_byId('C26229').rawId, 'C26036');

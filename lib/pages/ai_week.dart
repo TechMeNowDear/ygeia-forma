@@ -576,7 +576,6 @@ Future<void> aiSwapFlow(BuildContext context, FoodStore food, int day, int index
         missingId: why.$2,
         now: (clock ?? DateTime.now)().millisecondsSinceEpoch,
         newId: FoodStore.newDishId,
-        limits: HealthStore.shared?.goals == null ? null : aiTargetsOf(HealthStore.shared!.goals!),
         onAttempt: (a) {
           if (a > 1 && !_isDisposed(text)) {
             text.value = 'Το AI ψάχνει ανάλογο φαγητό…\nΔιορθώνει την απάντησή του (προσπάθεια $a από ${aiMaxRetries + 1}).';

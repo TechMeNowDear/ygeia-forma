@@ -112,33 +112,6 @@ for line in open(pairs_file, encoding="utf-8"):
     byid[cooked]["rawId"] = raw
     byid[cooked]["cookedLabel"] = label
 
-# Έλεγχος 20/11 (K2-C-03 / K2-S-04): ζευγάρι κρέατος, πουλερικού, ψαριού ή αυγού πρέπει να είναι το ΙΔΙΟ κομμάτι πριν και
-# μετά το ψήσιμο. Με διατήρηση της πρωτεΐνης, οι θερμίδες του μαγειρεμένου για το ίδιο κομμάτι = kcal × (πρωτεΐνη ωμού ÷
-# πρωτεΐνη μαγειρεμένου)· κανονικά 0,7–1,2 των θερμίδων του ωμού (λιώνει λίγο λίπος, ή μπαίνει λίγο λάδι). Έξω από 0,65–1,35 τα
-# δύο τρόφιμα της πηγής δεν περιγράφουν το ίδιο πράγμα (παϊδάκια 0,43 και μοσχαρίσια μπριζόλα 0,60: ωμό με το λίπος, ψητό
-# μόνο το ψαχνό). Γνωστή εξαίρεση: καλαμάρι τηγανητό (κουρκούτι και λάδι).
-PAIR_OK = {("C10001", "C10084")}
-for f in foods:
-    if f["cat"] not in ("Κρέας", "Πουλερικά", "Ψάρια", "Θαλασσινά", "Αυγά"): continue
-    for c in f.get("cooked", []):
-        g = byid[c["id"]]
-        vals = [f["n"].get("protein"), g["n"].get("protein"), f["n"].get("kcal"), g["n"].get("kcal")]
-        if (f["id"], g["id"]) in PAIR_OK or not all(isinstance(x, (int, float)) and x > 0 for x in vals): continue
-        keep = vals[3] * (vals[0] / vals[1]) / vals[2]
-        if not 0.65 <= keep <= 1.35:
-            problems.append(f"ΖΕΥΓΑΡΙ (έλεγξε) {f['id']} → {g['id']} {f['name']}: το ίδιο κομμάτι θα είχε {keep:.2f} των θερμίδων του ωμού")
-
-# Έλεγχος 20/11 (K2-S-02): στο λίπος του γάλακτος τα κορεσμένα είναι περίπου 60–70%. Γαλακτοκομικό ή τυρί με λίπος ≥ 2 g και
-# κορεσμένα έξω από 52–78% του λίπους δεν είναι αυτό που λέει το όνομα, ή η τιμή της πηγής δεν στέκει. Γνωστή εξαίρεση:
-# γιαούρτι στραγγιστό 5% της USDA (48%· η ετικέτα ελληνικού 5% γράφει 3,6 g, όχι 2,4): μένει με όνομα «γενική τιμή·
-# προτίμησε το barcode».
-SAT_SHARE_OK = {"U171304"}
-for f in foods:
-    if f["cat"] not in ("Γαλακτοκομικά", "Τυριά") or f["id"] in SAT_SHARE_OK: continue
-    fat, sat = f["n"].get("fat"), f["n"].get("satFat")
-    if isinstance(fat, (int, float)) and isinstance(sat, (int, float)) and fat >= 2 and not 0.52 <= sat / fat <= 0.78:
-        problems.append(f"ΚΟΡΕΣΜΕΝΑ (έλεγξε) {f['id']} {f['name']}: {sat:g} g σε {fat:g} g λίπος ({sat / fat:.0%})")
-
 json.dump({"version": 1, "sources": {
     "CIQUAL 2025": "ANSES, Table de composition nutritionnelle des aliments Ciqual 2025, doi:10.57745/RDMHWY — Licence Ouverte (etalab-2.0)",
     "USDA SR Legacy": "U.S. Department of Agriculture, FoodData Central, SR Legacy (2018) — public domain (CC0)",

@@ -418,8 +418,11 @@ CheckIn? pendingCheckIn({
         // «αρχή» τέτοια που να χωρά ακριβώς το μικρότερο παράθυρο.
         if (p.change != 0 && e.windowDays > adaptWindowDays) {
           final recentSince = DateTime(to.year, to.month, to.day - (adaptWindowDays - 1) - adaptSkipDays);
-          final recent = estimateExpenditure(
-              intake: eaten, weights: weights, today: t, formulaTdee: formula, goalKcal: g.kcal, since: recentSince).est;
+          // Ανεξάρτητος έλεγχος K1 (K1R-13): μόνο εκτίμηση 21 ημερών που βγήκε «ok». Μια εκτίμηση εκτός λογικής (70–140% του
+          // τύπου, π.χ. νερά που έφυγαν γρήγορα) δεν «επιβεβαιώνει» τίποτα: τότε η πρόταση του μεγάλου παραθύρου μένει.
+          final rr = estimateExpenditure(
+              intake: eaten, weights: weights, today: t, formulaTdee: formula, goalKcal: g.kcal, since: recentSince);
+          final recent = rr.status == AdaptStatus.ok ? rr.est : null;
           p = recentAgrees(
               p: p, goals: g, recent: recent != null && recent.windowDays == adaptWindowDays ? recent : null, kgNow: kg);
         }
@@ -431,7 +434,9 @@ CheckIn? pendingCheckIn({
         final losingFast = g.aim == GoalAim.lose &&
             (e.slopeKgWeek < -adaptFastLossPct * kg ||
                 fastLossSlope(goals: g, weights: weights, today: t, notBefore: fastFrom) != null);
-        final tooFast = losingFast && p.change <= 0;
+        // Ανεξάρτητος έλεγχος K1 (K1R-02): όχι όταν ο στόχος έμεινε επειδή οι 3 τελευταίες εβδομάδες δεν συμφώνησαν (τότε
+        // κανείς δεν ζήτησε μείωση, και η κάρτα πρέπει να γράψει αυτόν τον λόγο, όχι «χάνεις πάνω από 1%»).
+        final tooFast = losingFast && p.change <= 0 && !p.recentDiffers;
         // S1-4: όχι δεύτερη αλλαγή λιγότερο από 4 μέρες μετά την προηγούμενη (π.χ. «γρήγορη απώλεια» την Παρασκευή).
         final changed = lastChangeDay(g);
         final sinceChange = changed == null ? null : daysBetween(changed, t);
@@ -547,8 +552,10 @@ CheckIn? pendingCheckIn({
   if (lastChange != null && daysBetween(lastChange, t) < adaptMinChangeDays) return onlyForeign;
   // Οι ίδιες ζυγίσεις που κρίνουν την ειδοποίηση (χωρίς την πρώτη εβδομάδα· Συμβούλιο 2, Σ1): ό,τι γράφει η κάρτα
   // («−1,16 kg την εβδομάδα») είναι ακριβώς ο αριθμός που συγκρίθηκε με το 1%.
-  // Πρώτα μόνο με τις ζυγίσεις (φθηνό)· το φαγητό διαβάζεται μόνο αν υπάρχει λόγος.
-  if (fastLossSlope(goals: g, weights: weights, today: t) == null) return onlyForeign;
+  // Πρώτα μόνο με τις ζυγίσεις (φθηνό)· το φαγητό διαβάζεται μόνο αν υπάρχει λόγος. Ο όρος είναι αναγκαίος για κάθε όριο
+  // [fastNotBefore] ([fastLossPossible]): δεν κοιτά την κλίση του πλήρους παραθύρου, που μετά από κενό δεν είναι αυτή που
+  // κρίνεται (ανεξάρτητος έλεγχος K1: με την κλίση εδώ χανόταν η κάρτα όταν οι ζυγίσεις των διακοπών ήταν επίπεδες).
+  if (!fastLossPossible(goals: g, weights: weights, today: t)) return onlyForeign;
   final yesterday = DateTime(t.year, t.month, t.day - 1);
   // Έλεγχος 20/11 (K1-C-02): μετά από κενό καταγραφής οι πρώτες μέρες της επιστροφής δεν κρίνονται ([fastNotBefore]): τα
   // νερά των διακοπών φεύγουν σε λίγες μέρες και έμοιαζαν με «γρήγορη απώλεια» (ψεύτικο «+150» στο 32–46% των πορειών).

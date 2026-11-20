@@ -48,25 +48,10 @@ List<DishItem>? naturalRaw(Dish d) {
   }
 }
 
-/// Πόσες μερίδες φαγητού «ίσων μερίδων» αντιστοιχούν σε [kcal] θερμίδες, όταν η μία μερίδα έχει [oneKcal]: η
-/// πλησιέστερη μισή μερίδα, από μισή ως [maxEatenServings]. Ο ίδιος κανόνας για το πρόγραμμα ([plannedRaw]) και για το
-/// «Το έφαγα» ([slotLog]).
-double servingsFor(double kcal, double oneKcal) => math.min(maxEatenServings, math.max(0.5, (kcal / oneKcal * 2).round() / 2));
-
 /// Τα ωμά υλικά που αντιστοιχούν στη θέση (για τα σύνολα του προγράμματος, πριν φας). null αν δεν βγαίνει (λείπει υλικό,
 /// κατσαρόλα χωρίς μερίδες και χωρίς θερμίδες).
-///
-/// Έλεγχος 20/11 (K2-C-02): στα φαγητά «ίσων μερίδων» το πρόγραμμα δείχνει πια ό,τι θα γράψει το «Το έφαγα»: την
-/// πλησιέστερη μισή μερίδα ([servingsFor]). Πριν κλιμάκωνε τα υλικά ακριβώς στις θερμίδες της θέσης, και όταν αυτές δεν
-/// ήταν πολλαπλάσιο μισής μερίδας («Άλλαξέ το», «Διάλεξε φαγητό», επικόλληση) η γραμμή έγραφε «699 kcal» ενώ γράφονταν
-/// 560 (παστίτσιο, 1 μερίδα): διαφορά ως ±220 kcal ανάμεσα στο πρόγραμμα της μέρας και στο ημερολόγιο.
 List<DishItem>? plannedRaw(FoodStore food, Dish d, double? kcal) {
   if (kcal == null) return naturalRaw(d);
-  if (d.kind == DishKind.portions) {
-    final one = itemsTotals(food, dishAmounts(d, servings: 1));
-    if (one == null || one.kcal <= 0) return null;
-    return dishAmounts(d, servings: servingsFor(kcal, one.kcal));
-  }
   final all = d.items;
   final t = itemsTotals(food, all);
   if (t == null || t.kcal <= 0) return null;
@@ -85,18 +70,10 @@ Totals? plannedTotals(FoodStore food, Dish? d, PlanSlot s) {
 }
 
 /// Η μερίδα σου από το μαγείρεμα [b] (g του έτοιμου φαγητού), ή null αν δεν βγαίνει.
-///
-/// Έλεγχος 20/11 (K2-C-11): θέση χωρίς θερμίδες (επικολλημένο πρόγραμμα) σημαίνει «μία μερίδα της συνταγής»: τόσα γραμμάρια
-/// από ΑΥΤΟ το μαγείρεμα, όσα έχουν τις θερμίδες της μερίδας της συνταγής ([naturalRaw]), που δείχνει και η γραμμή του
-/// προγράμματος. Πριν έπαιρνε «έτοιμο ÷ μερίδες», και με διπλή δόση στην κατσαρόλα η γραμμή έγραφε 399 kcal ενώ γράφονταν 796.
 double? potPortion(FoodStore food, Dish d, PotBatch b, double? kcal) {
   if (kcal == null) {
     final sv = recipeOf(d)?.servings;
-    if (sv == null) return null;
-    final natural = naturalRaw(d);
-    final one = natural == null ? null : itemsTotals(food, natural);
-    if (one == null || one.kcal <= 0) return math.min(b.cooked, portionRound(b.cooked / sv));
-    kcal = one.kcal;
+    return sv == null ? null : math.min(b.cooked, portionRound(b.cooked / sv));
   }
   final t = itemsTotals(food, b.items);
   if (t == null || t.kcal <= 0) return null;
@@ -141,7 +118,7 @@ SlotLog? slotLog(FoodStore food, Dish d, PlanSlot s, DateTime now) {
       if (s.kcal != null) {
         final t = itemsTotals(food, dishAmounts(d, servings: 1));
         if (t == null || t.kcal <= 0) return null;
-        sv = servingsFor(s.kcal!, t.kcal);
+        sv = math.min(maxEatenServings, math.max(0.5, (s.kcal! / t.kcal * 2).round() / 2));
       }
       qty = sv;
       amounts = dishAmounts(d, servings: sv);
@@ -218,9 +195,7 @@ String weekPrompt({
         'της συνταγής. Η εφαρμογή βγάζει τα γραμμάρια από τη βάση· ΜΗ γράψεις γραμμάρια ή άλλα θρεπτικά.')
     ..writeln('2. Οι θερμίδες κάθε μέρας κοντά στον στόχο, και κατά μέσο όρο της εβδομάδας πάνω του· πρωτεΐνη μοιρασμένη στα '
         'γεύματα· κορεσμένα κάτω από το όριο· αρκετές ίνες.')
-    // Έλεγχος 20/11 (K2-S-06): ίδιο πρότυπο με το AI της εφαρμογής (FSA: περισσεύματα ως 48 ώρες, ρύζι ως την επόμενη μέρα).
-    ..writeln('3. Φαγητό κατσαρόλας ("pot"): μαγειρεύεται μία φορά και τρώγεται ως 2 μέρες μετά (με ρύζι μόνο την επόμενη '
-        'μέρα), με το ίδιο key.')
+    ..writeln('3. Φαγητό κατσαρόλας ("pot"): μαγειρεύεται μία φορά και τρώγεται ως 3 μέρες (ίδιο key σε συνεχόμενα γεύματα).')
     ..writeln('4. Απάντησε με ΕΝΑ μπλοκ JSON σε αυτή ακριβώς τη μορφή. Στη θέση του «…» βάλε όλα τα γεύματα και όλες τις μέρες:')
     ..writeln('```json')
     ..writeln('{')

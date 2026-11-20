@@ -263,10 +263,8 @@ List<PastedItem> parsePastedItems(List rawItems, List<String> errors) {
     final g = x['g'] ?? x['grams'];
     final n = x['name'] is String ? (x['name'] as String).trim() : '';
     final id = x['id'] is String && (x['id'] as String).trim().isNotEmpty ? (x['id'] as String).trim() : null;
-    // Έλεγχος 20/11 (K2-C-06): και ποσότητα που στρογγυλεύει στο 0 (κάτω από 0,005 g) απορρίπτεται. Πριν γινόταν δεκτή,
-    // αποθηκευόταν ως 0 g, και στο επόμενο άνοιγμα ΟΛΟ το φαγητό δεν διαβαζόταν («Το φαγητό δεν υπάρχει πια»).
-    if (g is! num || !g.isFinite || g <= 0 || g > maxEntryGrams || roundAmount(g.toDouble()) <= 0) {
-      errors.add('«${n.isEmpty ? (id ?? 'υλικό ${k + 1}') : n}»: η ποσότητα πρέπει να είναι γραμμάρια από 0,01 ως ${thousands(maxEntryGrams)}.');
+    if (g is! num || !g.isFinite || g <= 0 || g > maxEntryGrams) {
+      errors.add('«${n.isEmpty ? (id ?? 'υλικό ${k + 1}') : n}»: η ποσότητα πρέπει να είναι γραμμάρια από 0 ως ${thousands(maxEntryGrams)}.');
       continue;
     }
     if (id == null && n.isEmpty) {
@@ -424,7 +422,7 @@ String recipePrompt({
     ..writeln('    …')
     ..writeln('  ],')
     ..writeln('  "tips": ["…"],')
-    ..writeln('  "keeps": "Στο ψυγείο ως 2 μέρες (με ρύζι: ως την επόμενη μέρα)",')
+    ..writeln('  "keeps": "Στο ψυγείο ως 3 μέρες",')
     ..writeln('  "why": "Μία-δύο προτάσεις: γιατί ταιριάζει στους στόχους μου."')
     ..writeln('}')
     ..writeln('```')

@@ -697,6 +697,9 @@ String rateKgText(double kg, double rate) => '${dec(kg * rate, 2)} kg την ε�
 /// [rateNowKgDrift] kg, το ίδιο κείμενο με πριν ([rateKgText]).
 const rateNowKgDrift = 1.0;
 
+/// Ανεξάρτητος έλεγχος K1 (K1R-11): το «τώρα περίπου Χ kg» του ρυθμού γράφεται μόνο με ζύγιση τόσο πρόσφατη.
+const rateNowMaxAgeDays = 14;
+
 String rateNowText(double kg, double rate, {double? kgNow}) {
   if (kgNow == null || !kgNow.isFinite || kgNow < 30 || kgNow > 300 || (kgNow - kg).abs() < rateNowKgDrift) {
     return rateKgText(kg, rate);

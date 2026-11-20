@@ -96,7 +96,9 @@ class GoalsSummaryCard extends StatelessWidget {
     // την ίδια συνάρτηση που καλεί η «Αναφορά για έλεγχο».
     final sat = satVerdict(t, g, today: today, day: day, part: part);
     final satLimit = sat.limitG;
-    final fatLo = (kcalGoal * 0.25 / 9).round(), fatHi = (kcalGoal * 0.35 / 9).round(); // όπως τα Goals.fatLo/fatHi
+    // Έλεγχος 20/11 (K1-C-07, ανεξάρτητος έλεγχος): ο ΙΔΙΟΣ τύπος με τα Goals.fatLo/fatHi ([fatLoFor], [fatHiFor]). Πριν,
+    // το αντίγραφο εδώ έδινε στις 2.610 kcal «101 g» ενώ οι «Στόχοι» έγραφαν 102.
+    final fatLo = fatLoFor(kcalGoal), fatHi = fatHiFor(kcalGoal);
     final left = kcalLeft(t.shownKcal, kcalGoal, today: today);
     String atLeast(String key, String text) => (t.missing[key] ?? 0) > 0 ? '≥ $text' : text;
     final protLeft = g.protein - t.protein;

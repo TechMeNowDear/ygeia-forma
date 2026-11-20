@@ -126,7 +126,7 @@ Map<String, dynamic> diagnosticsFrom({
           'bodyOk': d.bodyOk,
           // Round 8 (R8-A11-3): οι ζυγίσεις των τελευταίων [diagnosticsDays] ημερών, όπως όλα τα άλλα της Samsung και της
           // Oura (και όπως λέει η πολιτική απορρήτου)· πριν έμπαινε ένας ολόκληρος χρόνος. Κάθε υπολογισμός της αναφοράς
-          // κοιτά ως 46 μέρες πίσω ([adaptScanDays]).
+          // κοιτά ως 53 μέρες πίσω ([adaptScanDays]), μέσα στις [diagnosticsDays].
           'body': [
             for (final b in d.body)
               if (!b.time.isBefore(from))
@@ -271,8 +271,12 @@ Map<String, dynamic> diagnosticsFrom({
     // κανόνες (Συμβούλιο 2, Α1–Α2): χωρίς την πρώτη εβδομάδα των στόχων, στο μεγαλύτερο παράθυρο που έχει αρκετά δεδομένα.
     final probe = estimateExpenditure(
         intake: intake(wideFrom, to), weights: weights, today: today, formulaTdee: fNow!.tdee, goalKcal: g.kcal, since: since);
-    final fastWindow = fastLossWindow(goals: g, today: today);
-    final fastWs = fastLossWeights(goals: g, weights: weights, today: today);
+    // Έλεγχος 20/11 (K1-C-02, ανεξάρτητος έλεγχος): το ίδιο όριο μετά από κενό καταγραφής που κρίνει και η κάρτα
+    // ([fastNotBefore])· πριν η αναφορά έδειχνε το παράθυρο χωρίς αυτό.
+    final fastFrom = fastNotBefore(
+        foodGap(intake: intake(wideFrom, to), today: today, formulaTdee: fNow!.tdee, goalKcal: g.kcal, since: since));
+    final fastWindow = fastLossWindow(goals: g, today: today, notBefore: fastFrom);
+    final fastWs = fastLossWeights(goals: g, weights: weights, today: today, notBefore: fastFrom);
     final fastFit = weightFit(fastWs);
     final w14 = [for (final w in weights) if (!w.$1.isBefore(DateTime(today.year, today.month, today.day - 14))) w];
     final w21 = [for (final w in weights) if (!w.$1.isBefore(windowFrom) && !w.$1.isAfter(to)) w];
@@ -295,6 +299,9 @@ Map<String, dynamic> diagnosticsFrom({
                   'change': pending.proposal!.change,
                   'floored': pending.proposal!.floored,
                   'fastLoss': pending.proposal!.fastLoss,
+                  // Έλεγχος 20/11 (K1-C-02, K1-S-05): γράφονται μόνο όταν ισχύουν.
+                  if (pending.proposal!.recentDiffers) 'recentDiffers': true,
+                  if (pending.proposal!.underweight) 'underweight': true,
                 },
               'wanted': pending.wanted,
               if (pending.quitDays != null) 'quitHoldDays': pending.quitDays,

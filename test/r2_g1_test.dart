@@ -263,7 +263,7 @@ void main() {
       expect(c.est!.tdee, closeTo(2540, 1));
       // 2.540 − 73,9 kg × 0,5% × 7.700 ÷ 7 ≈ 2.130: λίγο πάνω, γιατί έχει χάσει βάρος (πριν: 2.090 → «μένει», από 2.377).
       expect((c.proposal!.current, c.proposal!.target), (2090, 2130));
-      expect(adaptScanDays, 46);
+      expect(adaptScanDays, 53, reason: 'K1R-01: 42 + 5 − 1 + 7');
     });
 
     test('χωρίς κενό: ίδια παράθυρα με πριν κάθε Δευτέρα ως 1/3', () {
