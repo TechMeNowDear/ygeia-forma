@@ -35,8 +35,8 @@ const fishMinG = 100.0;
 const legumesDryMinKcal = 250.0;
 
 /// Σπόροι που είναι (ή ήταν ως το #100) στην κατηγορία «Ξηροί καρποί» της βάσης: ηλιόσποροι (και το παλιό τους id),
-/// κολοκυθόσποροι. Δεν μετρούν ως ξηροί καρποί: η μείωση της LDL έχει δειχθεί για καρπούς δέντρων και αράπικα φιστίκια
-/// (Del Gobbo 2015, Am J Clin Nutr· Jenkins 2011, JAMA: «tree nuts and peanuts»), όχι για σπόρους. Με το id, ώστε να ισχύει και για παλιές
+/// κολοκυθόσποροι. Δεν μετρούν ως ξηροί καρποί: η μείωση της LDL έχει δειχθεί για καρπούς δέντρων (Del Gobbo 2015, Am J
+/// Clin Nutr: μόνο καρποί δέντρων) και για αράπικα φιστίκια (Jenkins 2011, JAMA: «tree nuts and peanuts»), όχι για σπόρους. Με το id, ώστε να ισχύει και για παλιές
 /// καταχωρίσεις που κρατούν την παλιά κατηγορία.
 const _seedIds = {'C15011', 'C15045', 'U170557', 'U169415', 'U170562'};
 
@@ -87,8 +87,12 @@ bool isFish(Food f) => f.cholKind != null ? f.cholKind == CholKind.fish : f.cat 
 
 /// Μαγειρεμένα όσπρια (βρασμένα, κονσέρβα): ζυγίζουν περίπου 2,5 φορές τα ξερά. Δικό σου προϊόν οσπρίων: και όταν οι
 /// θερμίδες του δείχνουν μαγειρεμένο ([legumesDryMinKcal]), ό,τι όνομα κι αν του έδωσες.
-bool _cookedLegumes(Food f) =>
-    f.rawId != null ||
+///
+/// Έλεγχος 20/11 (K2-C-05): δημόσιο, και με τον ίδιο κανόνα στον έλεγχο του προγράμματος ([aiCheckWeek], [swapWarnings]).
+/// Πριν εκεί μετρούσε μόνο το [Food.isCooked], και τα «Ρεβίθια κονσέρβα» (χωρίς ωμή μορφή στη βάση) έμπαιναν σαν ξερά:
+/// 60 g κονσέρβας (24 g ξερά) έδιναν «μέρα οσπρίων» στο πρόγραμμα, ενώ η κάρτα «Χοληστερίνη» σωστά δεν τη μετρούσε.
+bool cookedLegumes(Food f) =>
+    f.isCooked ||
     _plain(f.name).contains('κονσερβα') ||
     _plain(f.name).contains('βρασμεν') ||
     (f.cholKind == CholKind.legumes && f.n.has(Nk.kcal) && f.n.amount(Nk.kcal) < legumesDryMinKcal);
@@ -114,7 +118,7 @@ class CholDay {
       } else if (isNuts(f)) {
         nutsG += e.grams;
       } else if (isLegumes(f)) {
-        legumesDryG += _cookedLegumes(f) ? e.grams / legumesCookedFactor : e.grams;
+        legumesDryG += cookedLegumes(f) ? e.grams / legumesCookedFactor : e.grams;
       } else if (isFish(f)) {
         fishG += e.grams;
       }

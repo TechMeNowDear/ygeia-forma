@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data.dart' show HealthStore;
+import '../food/ai_food.dart' show weekHealthNotes;
 import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
@@ -49,9 +50,23 @@ class SlotActions {
     return food.saveWeek(w.withSlot(day, index, s));
   }
 
+  /// Έλεγχος 20/11 (K2-C-14): θέσεις («μέρα/θέση») με «Το έφαγα» σε εξέλιξη. Η θέση γίνεται «ate» μόνο αφού τελειώσουν η
+  /// εγγραφή στο ημερολόγιο και η αποθήκευση του προγράμματος· δεύτερο πάτημα στο μεταξύ έγραφε το φαγητό δύο φορές.
+  static final _ateBusy = <String>{};
+
   /// «Το έφαγα»: με ένα πάτημα όταν η μερίδα βγαίνει (πιάτο, μερίδες, κατσαρόλα ζυγισμένη)· αλλιώς ανοίγει το φαγητό με
   /// τη μερίδα του προγράμματος.
   Future<void> ate() async {
+    final key = '$day/$index';
+    if (!_ateBusy.add(key)) return;
+    try {
+      await _ate();
+    } finally {
+      _ateBusy.remove(key);
+    }
+  }
+
+  Future<void> _ate() async {
     final s = _slot, w = food.week;
     if (s == null || w == null) return;
     final d = food.dishById(s.dishId);
@@ -424,6 +439,8 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
     }
     final ok = await food.saveWeek(keepDone(p.plan!, old));
     if (!mounted) return;
+    // Έλεγχος 20/11 (K2-C-10): και το επικολλημένο πρόγραμμα ελέγχεται (κορεσμένα, αλάτι, υδράργυρος, λιπαρό ψάρι).
+    setState(() => _autoNotes = ok ? _healthNotes() : null);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok ? 'Το πρόγραμμα αποθηκεύτηκε.' : (food.saveError ?? 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.')),
     ));
@@ -578,8 +595,15 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
     if (!mounted) return;
     setState(() {
       _errors = ok ? null : [food.saveError ?? 'Δεν αποθηκεύτηκε. Δοκίμασε ξανά.'];
-      _autoNotes = ok ? r.notes : null;
+      // Έλεγχος 20/11 (K2-C-10): και κορεσμένα, αλάτι, υδράργυρος, λιπαρό ψάρι, όπως στο πρόγραμμα του AI.
+      _autoNotes = ok ? [...r.notes, ..._healthNotes()] : null;
     });
+  }
+
+  /// Έλεγχος 20/11 (K2-C-10): οι σημειώσεις υγείας του αποθηκευμένου προγράμματος ([weekHealthNotes])· κενό χωρίς στόχους.
+  List<String> _healthNotes() {
+    final g = HealthStore.shared?.goals, w = widget.food.week;
+    return g == null || w == null ? const [] : weekHealthNotes(widget.food, w, t: aiTargetsOf(g), bodyKg: g.kg);
   }
 
   /// Γεύμα που έμεινε κενό (U-8): διαλέγεις φαγητό, με τη μερίδα του γεύματος από τους στόχους.
@@ -703,7 +727,8 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
       ],
       if (_autoNotes case final notes? when notes.isNotEmpty) ...[
         const SizedBox(height: 14),
-        Text('Τι δεν βγήκε όπως ζητούν οι κανόνες:',
+        // K2-R-10: ο ίδιος τίτλος και για τις σημειώσεις υγείας ενός επικολλημένου προγράμματος (δεν έχει «κανόνες»).
+        Text('Να ξέρεις για αυτό το πρόγραμμα:',
             key: const ValueKey('week-auto-notes'), style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.warn)),
         for (final n in notes) Text('•\u00A0$n', style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
       ],

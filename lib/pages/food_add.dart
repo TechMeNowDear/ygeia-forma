@@ -2144,6 +2144,9 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
         alcohol: widget.draft.alcohol ?? 0, polyols: widget.draft.polyols ?? 0, erythritol: widget.draft.erythritol ?? 0);
     final impossible = impossibleValues(values);
     final doubtful = doubtfulValues(values);
+    // Έλεγχος 20/11 (K2-R-05): με «Νάτριο mg» (ή g) ήδη επιλεγμένο, η προειδοποίηση «διάλεξε Νάτριο mg» δεν έχει νόημα
+    // και έκρυβε τη γραμμή «Αποθηκεύεται ως αλάτι … g».
+    if (_saltMode != SaltInput.salt) doubtful.remove(Nk.salt);
     final per = _perMl ? '100 ml' : '100 g';
     final showChol = widget.cholChoice ?? (HealthStore.shared?.goals?.doctor ?? false);
 
