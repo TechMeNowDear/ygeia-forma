@@ -205,7 +205,10 @@ class _GoalsWizardState extends State<GoalsWizard> {
     if (_freshTdee != null || o.checkIn != null || o.fastAt != null || o.log.any((l) => l.day.compareTo(o.since) >= 0)) return true;
     final f = FoodStore.shared;
     if (f == null || !f.loaded) return false;
-    return readiness(goals: o, today: _now, weights: const [], intake: (a, b) => dailyIntake(f, a, b)).intakeDays > 0;
+    // Έλεγχος 20/11 (K1-C-02): μετά από κενό οι μέρες που μετρούν αρχίζουν μία εβδομάδα μετά την επιστροφή ([afterGapStart]),
+    // αλλά φαγητό γραμμένο μετά το κενό είναι ήδη «κάτι που θα χανόταν»: η προεπιλογή μένει «Συνεχίζω», όπως πριν.
+    final r = readiness(goals: o, today: _now, weights: const [], intake: (a, b) => dailyIntake(f, a, b));
+    return r.intakeDays > 0 || r.gap?.restart != null;
   }
 
   /// Έλεγχος 20/11 (K1-C-03): η αρχή των παλιών στόχων είναι στο μέλλον, σήμερα, ή μέσα στην πρώτη της εβδομάδα (ως
