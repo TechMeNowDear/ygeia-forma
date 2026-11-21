@@ -472,6 +472,49 @@ void main() {
       expect((gap.from, gap.to, gap.restart), (DateTime(2026, 12, 24), DateTime(2027, 1, 2), DateTime(2027, 1, 3)));
     });
 
+    test('K1R-02 (τελικός έλεγχος): από άκρη σε άκρη, «οι 3 τελευταίες εβδομάδες δεν συμφωνούν» δεν γράφεται «χάνεις πάνω από 1%»',
+        () {
+      // Οι δοκιμές της κάρτας τη φτιάχνουν με το χέρι· καμία δεν περνούσε από τη γραμμή του ελέγχου
+      // (`tooFast = losingFast && p.change <= 0 && !p.recentDiffers`): αν έφευγε το τελευταίο μέρος, τίποτα δεν κοκκίνιζε.
+      // Εδώ ο έλεγχος τρέχει ολόκληρος. Ψάχνουμε σε ένα πλέγμα ένα σενάριο όπου το μεγάλο παράθυρο χάνει πάνω από 1% την
+      // εβδομάδα (γρήγορα στην αρχή) ΚΑΙ ο στόχος έμεινε επειδή οι 3 τελευταίες εβδομάδες (αργές) δεν συμφώνησαν.
+      final g = _g(since: '2026-10-26');
+      final today = DateTime(2026, 12, 14); // Δευτέρα, 49η μέρα των στόχων: μέρα ελέγχου
+      CheckIn? hit;
+      var found = '';
+      var tried = 0;
+      for (final turn in [DateTime(2026, 11, 23), DateTime(2026, 11, 16), DateTime(2026, 11, 30)]) {
+        for (final early in [0.012, 0.014, 0.016, 0.018, 0.02, 0.022, 0.025, 0.028, 0.032]) {
+          for (final late in [0.0, 0.001, 0.002, 0.003, 0.004, 0.005]) {
+            for (final daily in [false, true]) {
+              if (hit != null) continue;
+              tried++;
+              final intake = <DateTime, double>{};
+              final weights = <(DateTime, double)>[];
+              var kg = 90.0;
+              for (var d = DateTime(2026, 10, 26); d.isBefore(today); d = DateTime(d.year, d.month, d.day + 1)) {
+                intake[d] = g.kcal.toDouble();
+                if (daily || d.weekday == 1 || d.weekday == 3 || d.weekday == 5) weights.add((d, (kg * 10).round() / 10));
+                kg -= (d.isBefore(turn) ? early : late) * kg / 7;
+              }
+              final c = pendingCheckIn(goals: g, today: today, weights: weights, intake: reader(intake));
+              final p = c?.proposal;
+              final e = c?.est;
+              final now = c?.kgNow;
+              if (c == null || p == null || e == null || now == null) continue;
+              if (p.recentDiffers && e.slopeKgWeek < -adaptFastLossPct * now) {
+                hit = c;
+                found = 'αλλαγή ρυθμού ${turn.day}/${turn.month}, πριν $early, μετά $late, ζύγιση κάθε μέρα: $daily';
+              }
+            }
+          }
+        }
+      }
+      expect(hit, isNotNull, reason: 'κανένα από τα $tried σενάρια δεν έφτασε στον κλάδο· άλλαξε ο κανόνας;');
+      expect((hit!.tooFast, hit.proposal!.change, hit.kind), (false, 0, CheckKind.same),
+          reason: '$found: πριν από το K1R-02 η κάρτα έγραφε «χάνεις πάνω από 1%» αντί για «οι 3 τελευταίες εβδομάδες»');
+    });
+
     test('K1R-05: ζυγίσεις πριν από το όριο του κενού δεν κρύβουν την κάρτα «χάνεις γρήγορα»', () {
       // Κενό 15–21/1· −0,5% την εβδομάδα ως 28/1 και −1,6% από 29/1. Ο εβδομαδιαίος έλεγχος της 8/2 έχει απαντηθεί.
       final g = _g().copyWith(checkIn: '2027-02-08');

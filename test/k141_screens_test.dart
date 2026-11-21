@@ -7,6 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/history.dart' show K;
 import 'package:ygeia_forma/oura/oura_model.dart' show pieceMinutesShown;
+import 'package:ygeia_forma/oxygen_note.dart' show oxygenAboutShort;
+import 'package:ygeia_forma/pages/oxygen_widgets.dart' show watchLowText;
 import 'package:ygeia_forma/pages/info_sheet.dart';
 import 'package:ygeia_forma/pages/vitals_page.dart';
 import 'package:ygeia_forma/reference.dart';
@@ -14,6 +16,15 @@ import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/vitals.dart';
 
 void main() {
+
+  test('K7A-04 (τελικός έλεγχος): χωρίς το ρολόι στον ύπνο η κάρτα λέει ότι η νύχτα δεν μετρά στη σημείωση', () {
+    // Η φράση δεν είχε δοκιμή: ένα μελλοντικό «κόψιμο κειμένων» θα την έκανε ξανά «Χωρίς μετρήσεις του ρολογιού στον ύπνο».
+    expect(watchLowText(null), contains('Χωρίς μετρήσεις του ρολογιού στον ύπνο'));
+    expect(watchLowText(null), contains('δεν μετρά στη σημείωση'));
+    // Και το σταθερό κείμενο της κάρτας δεν μιλά μόνο για το ρολόι (ο μέσος όρος που φαίνεται είναι του δαχτυλιδιού).
+    expect(oxygenAboutShort, contains('Καμία από αυτές τις μετρήσεις δεν είναι από ιατρικό οξύμετρο'));
+    expect(oxygenAboutShort, isNot(contains('Το ρολόι δεν είναι ιατρικό οξύμετρο')));
+  });
   // ------------------------------------------------------------------------------------------------------- K7A-03
   test('K7A-03: στο ⓘ τα μακριά «Πάνω / Κάτω» πάνε το ένα κάτω από το άλλο (πριν: πάντα δύο στενές στήλες)', () {
     final oxygen = metricInfos[K.ringSpo2]!;
