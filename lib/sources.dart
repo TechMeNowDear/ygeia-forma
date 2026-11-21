@@ -127,7 +127,8 @@ const sourceRows = <SourceRow>[
     group: SourceGroup.night,
     metrics: [K.sleepHr, K.lowHr, K.hrv, K.breath],
     watchNote: 'Μόνο παλμοί· η Samsung δεν δίνει HRV',
-    ouraNote: 'Μόνο Oura· μέσοι όροι όλης της νύχτας',
+    // Έλεγχος 20/11 (K5M-04): σε νύχτα με δύο κομμάτια οι τιμές είναι της κύριας περιόδου, όχι όλης της νύχτας.
+    ouraNote: 'Μόνο Oura· της κύριας περιόδου ύπνου',
   ),
   SourceRow(
     title: 'Θερμοκρασία δέρματος',

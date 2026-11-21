@@ -68,9 +68,11 @@ class _MePageState extends State<MePage> {
     super.dispose();
   }
 
-  /// Ύψος από την τελευταία ζύγιση (βάρος και δείκτης της InBody), ως πρόταση.
+  /// Ύψος από την τελευταία ζύγιση (το ύψος της εγγραφής· αλλιώς από βάρος και δείκτη μάζας σώματος), ως πρόταση.
   double? _scaleHeight() {
     final b = widget.store.data?.latestBody;
+    // Έλεγχος 20/11 (K5A-05): πρώτα το ύψος της ίδιας της εγγραφής, αν υπάρχει.
+    if (b?.heightCm != null) return (b!.heightCm! * 2).round() / 2;
     if (b?.weight == null || b?.bmi == null || b!.bmi! <= 0) return null;
     final cm = math.sqrt(b.weight! / b.bmi!) * 100;
     return (cm * 2).round() / 2;

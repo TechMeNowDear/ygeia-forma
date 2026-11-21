@@ -432,6 +432,9 @@ class DashboardReader(
             putFloat(o, "smm", p.getValue(DataType.BodyCompositionType.SKELETAL_MUSCLE_MASS))
             putFloat(o, "ffm", p.getValue(DataType.BodyCompositionType.FAT_FREE_MASS))
             putFloat(o, "bmi", p.getValue(DataType.BodyCompositionType.BODY_MASS_INDEX))
+            // Έλεγχος 20/11 (K5A-05 / K5M-01): το ύψος της ίδιας της εγγραφής (cm). Ο ΔΜΣ, κατά την τεκμηρίωση της Samsung,
+            // υπολογίζεται από τη Samsung Health: από αυτόν δεν βγαίνει με βεβαιότητα «το ύψος της InBody».
+            putFloat(o, "height", p.getValue(DataType.BodyCompositionType.HEIGHT))
             putFloat(o, "water", p.getValue(DataType.BodyCompositionType.TOTAL_BODY_WATER))
             val bmr: Int? = p.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE)
             if (bmr != null) o.put("bmr", bmr)
@@ -547,7 +550,11 @@ class DashboardReader(
                 .setLocalTimeFilter(LocalTimeFilter.of(from, to))
                 .setOrdering(Ordering.ASC)
                 .setPageSize(1)
-            when (DataRules.filterOutcome(0, s.readData(probe.build()).dataList.size, recent)) {
+            // K5A-01: όσο ο ύπνος έρχεται από το δαχτυλίδι ([sleepUntil] ορισμένο), το ρολόι δεν φοριέται τη νύχτα: για
+            // οξυγόνο και θερμοκρασία δέρματος «καμία εγγραφή ρολογιού» είναι το κανονικό, όχι σφάλμα. K5-R-02: μόνο όταν
+            // όλο το διάστημα είναι μετά την τελευταία νύχτα με το ρολόι.
+            val watchExpected = DataRules.watchExpected(kind, sleepUntil, from.toLocalDate())
+            when (DataRules.filterOutcome(0, s.readData(probe.build()).dataList.size, recent, watchExpected)) {
                 DataRules.FilterOutcome.ERROR -> throw IllegalStateException(DataRules.WATCH_FILTER_EMPTY)
                 DataRules.FilterOutcome.NON_WATCH -> nonWatch.add(kind)
                 DataRules.FilterOutcome.OK -> {}

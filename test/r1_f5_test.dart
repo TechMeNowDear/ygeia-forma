@@ -423,8 +423,10 @@ void main() {
       expect(r(d, error: 'rateLimited', synced: DateTime(2026, 11, 14, 7)), EmptyNight.notRead);
       expect(r(d, error: 'proxyNotConfigured', synced: DateTime(2026, 11, 14, 7)), EmptyNight.notRead);
       expect(r(d, synced: DateTime(2026, 11, 14, 7)), EmptyNight.noRing, reason: 'χωρίς σφάλμα: όπως πριν');
+      // Έλεγχος 20/11 (K5A-04, K5-R-06): ξαναδιαβάζονται 7 μέρες (πριν 3)· η 7/11 είναι η μέρα −7, η πρώτη έξω. Το
+      // όριο από τις δύο πλευρές δοκιμάζεται στο k141_devices_test.dart.
       expect(r(DateTime(2026, 11, 7), error: 'network', synced: DateTime(2026, 11, 8, 9)), EmptyNight.noRing,
-          reason: 'παλιά νύχτα, έξω από τις 3 μέρες που ξαναδιαβάζονται');
+          reason: 'παλιά νύχτα, μόλις έξω από τις 7 μέρες που ξαναδιαβάζονται');
     });
 
     test('Κάρτα κατάστασης: μόνο όταν λείπει η νύχτα ή > 24 ώρες χωρίς επιτυχία', () {
