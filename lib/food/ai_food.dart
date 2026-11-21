@@ -115,6 +115,39 @@ const aiMercuryPpm = {
   'C10021': 0.009, 'C10007': 0.009, // γαρίδες
 };
 
+/// Τελικός έλεγχος 21/11 (K2-R-03): παστές, καπνιστές και μορφές κονσέρβας που η βάση δεν τις δένει με ωμή μορφή
+/// ([Food.rawId]): το είδος τους, για το [fishRawFactor]. Ο τόνος κονσέρβας ΔΕΝ είναι εδώ: η τιμή της FDA είναι ήδη για
+/// την κονσέρβα.
+const aiFishRawOf = {
+  'C26024': 'C26043', 'C26098': 'C26043', // μπακαλιάρος παστός (βρασμένος, ξερός) → ωμός
+  'C26037': 'C26036', // σολομός καπνιστός
+  'C25998': 'C26011', // ρέγγα καπνιστή
+  'C26700': 'C26079', 'C26694': 'C26079', // γαύρος μαρινάτος, αντζούγιες
+  'C26040': 'C26065', // σαρδέλα κονσέρβα
+};
+
+/// Τελικός έλεγχος 21/11 (K2-R-03): πόσα γραμμάρια ΩΜΟΥ ψαριού αντιστοιχούν σε 1 g της μαγειρεμένης ή παστής μορφής [f].
+/// Οι τιμές υδραργύρου της FDA είναι ανά g ψαριού όπως πουλιέται, και το όριο του λιπαρού ψαριού είναι σε g ωμού· το
+/// μαγείρεμα και το πάστωμα βγάζουν νερό, όχι υδράργυρο ούτε πρωτεΐνη, άρα 1 g ψητού είναι περισσότερο από 1 g ωμού. Ο
+/// λόγος είναι η πρωτεΐνη της μορφής προς την πρωτεΐνη της ωμής (τιμές της βάσης, ανά 100 g): μπακαλιάρος φούρνου 1,23,
+/// σολομός σχάρας 1,24, χταπόδι μαγειρεμένο 2,31, παστός ξερός μπακαλιάρος 2,63. Πριν μετρούσαν σαν ωμά: ο υδράργυρος
+/// έβγαινε 4% ως 57% χαμηλότερα σε φαγητά παραγγελίας και σε δικά σου φαγητά με ψημένο ψάρι (τα φαγητά του AI μπαίνουν με
+/// ωμές μορφές: εκεί ήταν σωστό). Ωμό, ό,τι δεν είναι ψάρι, ή μορφή χωρίς γνωστή ωμή (π.χ. δικό σου προϊόν): 1. Ποτέ
+/// κάτω από 1, και ως [aiFishRawFactorMax] (λάθος τιμή πρωτεΐνης δεν δίνει παράλογο αριθμό).
+double fishRawFactor(Food f, Food? Function(String id) byId) {
+  if (!isFish(f)) return 1;
+  final rawId = f.rawId ?? aiFishRawOf[f.id];
+  if (rawId == null) return 1;
+  final raw = byId(rawId);
+  if (raw == null || !f.n.has(Nk.protein) || !raw.n.has(Nk.protein)) return 1;
+  final cooked = f.n.amount(Nk.protein), fresh = raw.n.amount(Nk.protein);
+  if (!(cooked > 0) || !(fresh > 0)) return 1;
+  final k = cooked / fresh;
+  return k < 1 ? 1 : (k > aiFishRawFactorMax ? aiFishRawFactorMax : k);
+}
+
+const aiFishRawFactorMax = 3.0;
+
 /// Έλεγχος 20/11 (K2-S-01): ψάρι ή θαλασσινό χωρίς τιμή στον πίνακα της FDA. Συντηρητική προεπιλογή, περίπου όσο ο
 /// μπακαλιάρος: η τσιπούρα έχει μετρηθεί 0,05 (ιχθυοτροφείου) ως 0,09 mg/kg (άγρια) (Environ Sci Pollut Res 2021,
 /// doi:10.1007/s11356-021-13366-y).
@@ -1044,7 +1077,9 @@ List<AiProblem> aiCheckWeek(
         if (isFish(f)) fishG += e.grams;
         if (f.cat == 'Κρέας') meat += e.grams;
         if (f.cat == 'Αλλαντικά') proc += e.grams;
-        final hg = e.grams * mercuryPpm(f); // K2-S-01: κάθε ψάρι και θαλασσινό, όχι μόνο ξιφίας και τόνος
+        // K2-R-03: μαγειρεμένη ή παστή μορφή ψαριού σε γραμμάρια ωμού ([fishRawFactor]).
+        final rawG = e.grams * fishRawFactor(f, food.byId);
+        final hg = rawG * mercuryPpm(f); // K2-S-01: κάθε ψάρι και θαλασσινό, όχι μόνο ξιφίας και τόνος
         if (hg > 0) {
           mercury += hg;
           // K2-R-11: ένα όνομα ανά είδος («μπακαλιάρος», όχι «μπακαλιάρος, μπακαλιάρος» για ωμό και ψητό)· είδος χωρίς
@@ -1052,7 +1087,7 @@ List<AiProblem> aiCheckWeek(
           final name = '${_shortName(f.name)}${aiMercuryPpm.containsKey(f.id) ? '' : ' (εκτίμηση)'}';
           mercuryBy[name] = (mercuryBy[name] ?? 0) + hg;
         }
-        if (aiOilyFishIds.contains(f.id)) oilyFish += e.grams;
+        if (aiOilyFishIds.contains(f.id)) oilyFish += rawG;
       }
       if (meat >= 80) redMeat++;
       if (proc >= 20) processed++;

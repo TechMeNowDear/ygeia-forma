@@ -299,6 +299,67 @@ void main() {
       expect(check(s, List.filled(5, 'bakaliaros')).where((p) => p.tag == 'mercury'), isEmpty, reason: '5 × 180 × 0,111 = 99,9');
     });
 
+    test('K2-R-03 (τελικός έλεγχος): κάθε μαγειρεμένη ή παστή μορφή ψαριού μετριέται σε γραμμάρια ωμού', () {
+      final by = {for (final f in basicFoods()) f.id: f};
+      double k(String id) => fishRawFactor(by[id]!, (x) => by[x]);
+      double p(String id) => by[id]!.n.amount(Nk.protein);
+      // Ωμό, κονσέρβα τόνου (η τιμή της FDA είναι ήδη για την κονσέρβα) και ό,τι δεν είναι ψάρι: 1.
+      expect([k(_cod), k(_salmon), k('C26039'), k('C26179'), k(_feta), k(_chicken)], everyElement(1.0));
+      // Ο λόγος της πρωτεΐνης (μορφή ÷ ωμό, τιμές της βάσης).
+      for (final (form, raw, about) in [
+        ('C26023', 'C26043', 1.23), // μπακαλιάρος φούρνου
+        ('C26025', 'C26043', 1.35), // μπακαλιάρος ατμού
+        ('C26229', 'C26036', 1.24), // σολομός σχάρας
+        ('C27031', 'C26088', 1.13), // τσιπούρα φούρνου
+        ('C26136', 'C26065', 1.29), // σαρδέλα ψητή
+        ('C10079', 'C10018', 2.31), // χταπόδι μαγειρεμένο
+        ('C10013', 'C10026', 1.61), // μύδια βραστά
+        // Παστά, καπνιστά, κονσέρβα σαρδέλας: η βάση δεν τα δένει με ωμή μορφή· το είδος από το [aiFishRawOf].
+        ('C26098', 'C26043', 2.63), // μπακαλιάρος παστός, ξερός
+        ('C26024', 'C26043', 1.44), // μπακαλιάρος παστός, ξαλμυρισμένος και βρασμένος
+        ('C26040', 'C26065', 1.19), // σαρδέλα κονσέρβα
+      ]) {
+        expect(k(form), closeTo(p(form) / p(raw), 1e-9), reason: form);
+        expect(k(form), closeTo(about, 0.01), reason: form);
+      }
+      for (final f in basicFoods()) {
+        if (f.cat == 'Ψάρια' || f.cat == 'Θαλασσινά') expect(k(f.id), inInclusiveRange(1.0, aiFishRawFactorMax), reason: f.name);
+      }
+      expect(aiFishRawOf.entries.every((e) => by.containsKey(e.key) && by.containsKey(e.value) && by[e.key]!.rawId == null), isTrue);
+    });
+
+    test('K2-R-03 (τελικός έλεγχος): 5 × 180 g ψητός μπακαλιάρος περνούν το όριο· 4 × 180 g σολομός σχάρας είναι 896 g ωμό', () {
+      // Πριν: σαν ωμά. Ψητός μπακαλιάρος από ψητοπωλείο 5 × 180 × 0,111 = 99,9 µg (κάτω από 106,6: καμία σημείωση)·
+      // σολομός σχάρας 720 g (ακριβώς στο όριο: καμία σημείωση).
+      var n = 0;
+      final s0 = FoodStore.preloaded(foods: basicFoods(), now: _monday);
+      final r = planLibraryImport(
+        parseLibrary(jsonEncode({
+          'kind': libraryKind,
+          // Φαγητά παραγγελίας: μόνο εκεί η βιβλιοθήκη δέχεται μαγειρεμένες μορφές (στα δικά σου ζητά την ωμή).
+          'dishes': [
+            {..._dish('bakaliaros-psitos', 'plate', [('C26023', 180), (_tomato, 200)], cook: 'out'), 'order': 'Μπακαλιάρος ψητός'},
+            {..._dish('solomos-sxaras', 'plate', [('C26229', 180), (_tomato, 200)], cook: 'out'), 'order': 'Σολομός σχάρας'},
+          ],
+        })),
+        existing: const [],
+        food: (id) => s0.itemFood(DishItem(id, id, 1)),
+        likes: const FoodLikes(),
+        now: 1,
+        newId: () => 'R${n++}',
+      );
+      expect(r.problems, isEmpty, reason: r.problems.map((p) => p.errors).join());
+      final s = FoodStore.preloaded(foods: basicFoods(), dishes: r.added, now: _monday);
+      // 5 × 180 g × (22,3 ÷ 18,1) × 0,111 = 123,1 µg· όριο 1,3 × 82 = 106,6.
+      final cod = check(s, List.filled(5, 'bakaliaros-psitos')).where((p) => p.tag == 'mercury').toList();
+      expect(cod, hasLength(1));
+      expect(cod.single.user, contains('124 µg'));
+      // 4 × 180 g × (25,5 ÷ 20,5) = 895,6 g ωμό: πάνω από τα 720.
+      final oily = check(s, List.filled(4, 'solomos-sxaras')).where((p) => p.tag == 'oily').toList();
+      expect(oily, hasLength(1));
+      expect(oily.single.user, contains('896 g'));
+    });
+
     test('K2-S-03: λιπαρό ψάρι πάνω από 720 g ωμό την εβδομάδα → σημείωση (NHS: ως 4 μερίδες)', () {
       final s = _store();
       final six = check(s, List.filled(6, 'solomos')).where((p) => p.tag == 'oily').toList();

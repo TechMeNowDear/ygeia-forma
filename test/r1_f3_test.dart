@@ -106,6 +106,11 @@ class _Phone {
   /// false: η εγγραφή ημερών ιστορικού αποτυγχάνει (π.χ. γεμάτος χώρος) και τίποτα δεν γράφεται.
   bool saveDaysOk = true;
 
+  /// Τι απαντά το «requestPermissions» (null: «ok»). Κάτι που δεν είναι κείμενο κάνει την κλήση να σκάσει με σφάλμα τύπου,
+  /// που κανένα catch του καναλιού δεν πιάνει (K6C-04).
+  Object? permissionsReply;
+  var dashboardCalls = 0;
+
   int count(String method) => calls.where((c) => c == method).length;
 
   void install() {
@@ -142,7 +147,10 @@ class _Phone {
             };
           }
           return '{"ok":true}';
+        case 'requestPermissions':
+          return permissionsReply ?? '{"ok":true}';
         case 'dashboard':
+          dashboardCalls++;
           return jsonEncode(sampleDashboardJson(now));
         case 'cachedDashboard':
           return '{}';
@@ -883,6 +891,32 @@ void main() {
         final s = await boot(a);
         expect(s.loading, isFalse);
         expect(s.data, isNotNull);
+        s.dispose();
+      });
+
+      test('K6C-04 (τελικός έλεγχος): εξαίρεση στη μέση της ανανέωσης δεν αφήνει το «Διαβάζω…» για πάντα', () async {
+        // Η δικλείδα try/finally του refresh() δεν είχε δοκιμή. Χωρίς αυτήν, κάθε εξαίρεση στη μέση άφηνε το loading true και
+        // κάθε επόμενη ανανέωση γύριζε αμέσως, ώσπου να κλείσει η εφαρμογή (παλιά δεδομένα χωρίς ένδειξη).
+        final a = _Phone(now)..load = okPrefs();
+        final s = await boot(a);
+        expect(s.loading, isFalse);
+        final reads = a.dashboardCalls;
+        a.permissionsReply = 42;
+        Object? thrown;
+        try {
+          await s.refresh(askPermissions: true);
+        } catch (e) {
+          thrown = e;
+        }
+        expect(thrown, isNotNull, reason: 'η δοκιμή πρέπει να περνά από εξαίρεση, αλλιώς δεν ελέγχει το finally');
+        expect(s.loading, isFalse, reason: 'το «Διαβάζω…» κλείνει');
+        expect(a.dashboardCalls, reads, reason: 'αυτή η ανανέωση δεν έφτασε στην ανάγνωση');
+        // Η επόμενη ανανέωση τρέχει κανονικά (πριν: γύριζε αμέσως, επειδή το loading είχε μείνει true).
+        a.permissionsReply = null;
+        await s.refresh();
+        await settle(s);
+        expect(a.dashboardCalls, reads + 1);
+        expect(s.loading, isFalse);
         s.dispose();
       });
 
