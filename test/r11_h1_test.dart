@@ -570,9 +570,10 @@ void main() {
         expect(run(after(), '00:40 +${n + 6}: All tests passed!\n', github: false).code, 0);
       });
 
-      test('κατώτατο ≈ 3% κάτω από το #109 (2.203 έτρεξαν)', () {
-        expect(floor, greaterThanOrEqualTo(2135));
-        expect(floor, lessThan(2203));
+      // Έλεγχος 21/11 (#148): πριν «≈ 3% κάτω από το #109 (2.203)»: 2135, ενώ έτρεχαν ήδη 2.725 (≈ 590 μπορούσαν να χαθούν).
+      test('κατώτατο ≈ 3% κάτω από όσες έτρεξαν στον έλεγχο 21/11 (2.725)', () {
+        expect(floor, greaterThanOrEqualTo(2640));
+        expect(floor, lessThan(2725));
       });
     });
   }

@@ -496,12 +496,83 @@ void main() {
       final rows = ((sum['data'] as Map)['history'] as Map).values.cast<Map>().toList();
       expect(rows.any((row) => row.keys.any((k) => '$k'.startsWith('o.'))), isFalse);
       expect(rows.any((row) => row.containsKey(K.steps)), isTrue, reason: 'τα βήματα (Samsung) μένουν');
+      // Και οι τιμές του ρολογιού που μετριούνται πάνω στις ώρες ύπνου του Oura (εδώ κάθε μέρα έχει τιμές του δαχτυλιδιού).
+      final fullRows = ((full['data'] as Map)['history'] as Map).values.cast<Map>().toList();
+      expect(fullRows.any((row) => row.keys.any(definitionMetrics.contains)), isTrue, reason: 'το πλήρες αρχείο τις έχει');
+      expect(rows.any((row) => row.keys.any(definitionMetrics.contains)), isFalse);
+      final moveShown = (((sum['shown'] as Map)['kinds'] as Map)['move'] as Map)['m'] as Map;
+      expect(moveShown.containsKey('dayHr'), isFalse);
       expect(((sum['shown'] as Map)['kinds'] as Map).keys, containsAll(['move', 'food', 'body']));
       // Και λέει ΤΙ έμεινε έξω (ονόματα πεδίων, όχι τιμές).
       final omitted = (sum['omitted'] as List).join(' | ');
       for (final what in ['data.history: ', 'o.hrv', 'calc.hrv', 'calc.zone: restHrUsed, zone', 'shown.kinds.sleep']) {
         expect(omitted, contains(what));
       }
+    });
+
+    test('σύνοψη: και οι τιμές του ρολογιού που μετριούνται πάνω στις ώρες ύπνου του Oura μένουν έξω, μόνο τις μέρες με δαχτυλίδι',
+        () {
+      // Πριν (πρώτη μορφή της σύνοψης): οξυγόνο νύχτας και παλμοί μέρας/ηρεμίας/περπατήματος έμεναν μέσα· η τιμή είναι του
+      // ρολογιού, αλλά το ποιες ώρες μετρούν το ορίζει ο ύπνος του Oura.
+      final full = <String, dynamic>{
+        'app': 'ygeia-forma',
+        'kind': 'diagnostics',
+        'window': {'days': 60, 'from': '2026-10-16', 'to': '2026-12-14'},
+        'ouraIn': ['data.history: o.*', 'shown.kinds.move.m.dayHr'],
+        'checks': <Object>[],
+        'errors': <Object>[],
+        'calc': {
+          'zone': {
+            'restHrUsed': 58.0,
+            'restSrc': 'watch',
+            'age': 44,
+            'zone': {'lo': 106, 'hi': 124},
+          },
+        },
+        'shown': {
+          'kinds': {
+            'move': {
+              'src': 'Samsung · 08:20',
+              'm': {
+                'steps': {'v': '5.120'},
+                'dayHr': {'v': '75'},
+              },
+            },
+          },
+        },
+        'data': {
+          'history': {
+            '2026-12-12': {
+              K.steps: 8000.0,
+              K.restHr: 60.0,
+              K.dayHr: 75.0,
+              K.walkHr: 98.0,
+              K.spo2Avg: 95.0,
+              K.spo2Min: 90.0,
+              K.spo2Low: 2.0,
+              K.spo2Cov: 0.9,
+            },
+            '2026-12-13': {K.steps: 9000.0, K.restHr: 61.0, K.dayHr: 76.0, K.spo2Avg: 96.0, K.spo2Cov: 0.8, 'o.sleepMin': 400.0},
+          },
+        },
+      };
+      final sum = diagnosticsSummary(full);
+      final rows = (sum['data'] as Map)['history'] as Map;
+      // Μέρα χωρίς δαχτυλίδι: όλα του ρολογιού μένουν (τις ώρες τις ορίζει ο ύπνος του ρολογιού).
+      expect((rows['2026-12-12'] as Map).keys.toSet(),
+          {K.steps, K.restHr, K.dayHr, K.walkHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov});
+      // Μέρα με δαχτυλίδι: μένει μόνο ό,τι δεν εξαρτάται από τις ώρες ύπνου του.
+      expect((rows['2026-12-13'] as Map).keys.toSet(), {K.steps});
+      final zone = (sum['calc'] as Map)['zone'] as Map;
+      expect((zone.containsKey('restHrUsed'), zone.containsKey('zone'), zone['age']), (false, false, 44));
+      final m = (((sum['shown'] as Map)['kinds'] as Map)['move'] as Map)['m'] as Map;
+      expect(m.keys.toSet(), {'steps'});
+      final omitted = (sum['omitted'] as List).join(' | ');
+      for (final what in ['restHr', 'dayHr', 'spo2Avg', 'spo2Cov', 'o.sleepMin', 'calc.zone: restHrUsed, zone', 'shown.kinds.move.m.dayHr']) {
+        expect(omitted, contains(what));
+      }
+      // Το πλήρες αρχείο δεν αλλάζει.
+      expect(((full['data'] as Map)['history'] as Map)['2026-12-13'], containsPair(K.restHr, 61.0));
     });
 
     testWidgets('οθόνη: δεύτερο κουμπί «Σύνοψη για τον Claude» → αρχείο «…-synopsi.json», απλό JSON, χωρίς Oura', (t) async {

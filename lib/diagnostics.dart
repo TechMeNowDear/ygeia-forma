@@ -30,6 +30,7 @@ import 'format.dart' show daysBetween;
 import 'goals.dart';
 import 'history.dart' show K, dateKey;
 import 'home_widgets/widget_snapshot.dart' show buildWidgetSnapshot;
+import 'home_widgets/widget_style.dart' show WKind;
 import 'hrv_trend.dart';
 import 'pages/nutrition_goals.dart' show beforeGoals, satVerdict;
 import 'sources.dart' show Source, definitionMetrics;
@@ -561,9 +562,12 @@ Map<String, dynamic> diagnosticsFrom({
     final sunday = shownSunday ?? DateTime(today.year, today.month, today.day - today.weekday);
     final w = buildWeekReview(store.history, sunday, now, plan: weekPlan);
     // Αν η μέτρηση ήρθε από το δαχτυλίδι κάποια μέρα των δύο περιόδων (μόνο σημάδι· η σύνοψη αφήνει έξω τη γραμμή).
+    // Και οι τιμές του ρολογιού που μετριούνται πάνω στις ώρες ύπνου του Oura ([definitionMetrics]) τις μέρες με νύχτα Oura.
     bool ouraIn(String metric, DateTime a, DateTime b) {
+      final byDefinition = definitionMetrics.contains(metric);
       for (var x = _day(a); !x.isAfter(b); x = DateTime(x.year, x.month, x.day + 1)) {
         if (weekPlan.sourceFor(metric, x) == Source.oura) return true;
+        if (byDefinition && (weekPlan.nightSource(x) == Source.oura || _hasOura(store.history[dateKey(x)]))) return true;
       }
       return false;
     }
@@ -614,6 +618,14 @@ Map<String, dynamic> diagnosticsFrom({
     if (nightPlan.value(store.history, K.sleepMin, x) != null) sleepDay = x;
   }
   final sleepFromOura = sleepDay != null && nightPlan.nightSource(sleepDay) == Source.oura;
+  // Οι «Παλμοί χθες» του widget «Κίνηση» είναι του ρολογιού, αλλά μετριούνται έξω από τις ώρες ύπνου του Oura όταν η
+  // χθεσινή νύχτα είναι του δαχτυλιδιού.
+  final yesterday = DateTime(today.year, today.month, today.day - 1);
+  final moveShown = (shown['kinds'] as Map)[WKind.move];
+  final dayHrByOura = moveShown is Map &&
+      moveShown['m'] is Map &&
+      (moveShown['m'] as Map).containsKey('dayHr') &&
+      (nightPlan.nightSource(yesterday) == Source.oura || _hasOura(store.history[dateKey(yesterday)]));
   final ouraParts = <String>[
     if (store.history.values.any((row) => row.keys.any((k) => k.startsWith(_ouraPrefix)))) 'data.history: o.*',
     if (hrvCalc != null) 'calc.hrv',
@@ -621,6 +633,7 @@ Map<String, dynamic> diagnosticsFrom({
     if (weekCalc != null && (weekCalc['items'] as List).any((x) => (x as Map)['oura'] == true)) 'calc.week.items',
     if (weekCalc != null && weekCalc['bestNightOura'] == true) 'calc.week: bestNight, bestNightScore',
     if (sleepFromOura) 'shown.kinds.sleep',
+    if (dayHrByOura) 'shown.kinds.move.m.dayHr',
   ];
 
   // ---------------------------------------------------------------- checks
@@ -865,6 +878,9 @@ Map<String, dynamic> diagnosticsRules() => {
 /// Το πρόθεμα των τιμών του Oura στο ιστορικό («o.sleepMin», «o.hrv» …· sources.dart `ouraKeys`).
 const _ouraPrefix = 'o.';
 
+/// Η μέρα του ιστορικού έχει τιμή του Oura.
+bool _hasOura(Map<String, double>? row) => row != null && row.keys.any((k) => k.startsWith(_ouraPrefix));
+
 /// Τα θρεπτικά που μετρά η εφαρμογή· μόνο αυτά κρατά το λεπτό αντίγραφο τροφίμου της σύνοψης.
 const diagnosticsThinNutrients = [
   Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fiber, Nk.fat, Nk.satFat, Nk.salt, Nk.sodium, Nk.alcohol, Nk.polyols,
@@ -982,6 +998,35 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
               : e.value,
       };
       omitted.add('shown.kinds.sleep');
+    }
+  }
+
+  // ---- Oura: οι «Παλμοί χθες» της «Κίνησης» όταν η χθεσινή νύχτα είναι του δαχτυλιδιού (σημάδι της αναφοράς).
+  if (shown is Map && full['ouraIn'] is List && (full['ouraIn'] as List).contains('shown.kinds.move.m.dayHr')) {
+    final kinds = shown['kinds'];
+    final move = kinds is Map ? kinds[WKind.move] : null;
+    final m = move is Map ? move['m'] : null;
+    if (kinds is Map && move is Map && m is Map) {
+      shown = {
+        for (final e in shown.entries)
+          '${e.key}': e.key == 'kinds'
+              ? {
+                  for (final k in kinds.entries)
+                    '${k.key}': k.key == WKind.move
+                        ? {
+                            for (final x in move.entries)
+                              '${x.key}': x.key == 'm'
+                                  ? {
+                                      for (final y in m.entries)
+                                        if (y.key != 'dayHr') '${y.key}': y.value,
+                                    }
+                                  : x.value,
+                          }
+                        : k.value,
+                }
+              : e.value,
+      };
+      omitted.add('shown.kinds.move.m.dayHr');
     }
   }
 

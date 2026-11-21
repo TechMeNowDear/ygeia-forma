@@ -705,6 +705,7 @@ String? checkInWhy(CheckIn c) {
 
 int? _logInt(double? v) => v == null || !v.isFinite ? null : v.round();
 double? _logDec(double? v) => v == null || !v.isFinite ? null : (v * 1000).round() / 1000;
+double? _logDec2(double? v) => v == null || !v.isFinite ? null : (v * 100).round() / 100;
 
 /// Έλεγχος 21/11 (K8-02): η γραμμή του ιστορικού ελέγχων με τα δεδομένα που έκριναν την κάρτα [c] (παράθυρο, μέσος όρος
 /// φαγητού, κλίση, τυπικό σφάλμα, πλήθη, βάρος, είδος, λόγος), ώστε ο έλεγχος να ξαναελέγχεται αργότερα. Τα πέντε πρώτα
@@ -734,7 +735,8 @@ AdaptLog _logLine(CheckIn c,
       se: e == null ? null : _logInt(e.seKcal),
       intakeDays: e?.intakeDays ?? (c.kind == CheckKind.fast ? c.fastIntakeDays : null),
       weighIns: e?.weighIns,
-      kg: c.kgNow,
+      // Δύο δεκαδικά: το βάρος της κάρτας είναι μέσος όρος (π.χ. 96,92142857142856), και η γραμμή μένει στις ρυθμίσεις.
+      kg: _logDec2(c.kgNow),
       kind: c.kind.name,
       why: checkInWhy(c));
 }
