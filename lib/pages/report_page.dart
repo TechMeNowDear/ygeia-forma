@@ -1262,7 +1262,8 @@ class _PageVitals extends StatelessWidget {
               ),
               if (bp.isNotEmpty) ...[
                 _Title('Πίεση (${bp.length == 1 ? '1 μέτρηση' : '${bp.length} μετρήσεις'})'),
-                if (avg != null) Text(bpAverageText(avg), key: const ValueKey('report-bp-average'), style: cell),
+                // Έλεγχος 20/11 (K3-S-11): στον γιατρό οι αριθμοί και τα όρια, όχι οι προτροπές προς τον ασθενή.
+                if (avg != null) Text(bpAverageReportText(avg), key: const ValueKey('report-bp-average'), style: cell),
                 if (avg == null) Text('Καμία μέτρηση τις 7 τελευταίες μέρες του διαστήματος.', style: cell),
                 const SizedBox(height: 4),
                 table(

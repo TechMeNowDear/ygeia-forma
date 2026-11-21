@@ -135,7 +135,10 @@ const trendMetrics = <MetricDef>[
   MetricDef(key: K.dayHr, label: 'Παλμοί ξύπνιος', section: TrendSection.heart, minDiff: 2, unit: 'bpm', includeToday: false),
   // Ύπνος
   MetricDef(key: K.sleepMin, label: 'Διάρκεια ύπνου', section: TrendSection.sleep, minDiff: 15, better: 1, kind: ValueKind.duration),
-  MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, better: 1, partial: true),
+  // Έλεγχος 20/11 (K3-S-10): ουδέτερο χρώμα, όπως το Energy Score, ο βαθύς ύπνος και ο REM. Ιδιόκτητη εκτίμηση χωρίς
+  // ανεξάρτητη επικύρωση, φτιαγμένη από τα ίδια στάδια· πέφτει με αντικαταθλιπτικό ή με μια ενημέρωση του αλγορίθμου,
+  // ενώ διάρκεια και παλμοί ύπνου μένουν ίδια. Η διάρκεια μένει «περισσότερο = καλύτερα».
+  MetricDef(key: K.sleepScore, label: 'Βαθμολογία ύπνου', section: TrendSection.sleep, minDiff: 3, partial: true),
   // Βαθύς ύπνος και ξύπνιος: ουδέτερο χρώμα (κλινικός έλεγχος M3, 4/11). Οι συσκευές χάνουν τα μισά ξυπνήματα και
   // υπερεκτιμούν τον βαθύ ύπνο· μια ενημέρωση λογισμικού θα έβγαζε ψεύτικη «βελτίωση».
   MetricDef(key: K.deepPct, label: 'Βαθύς ύπνος', section: TrendSection.sleep, minDiff: 2, unit: '%'),

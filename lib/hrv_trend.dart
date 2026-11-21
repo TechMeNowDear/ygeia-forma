@@ -80,12 +80,14 @@ HrvTrend? hrvTrend(Map<String, Map<String, double>> history, SourcePlan plan, Da
   );
 }
 
-/// «7 νύχτες: 42 ms, μέσα στο συνηθισμένο σου εύρος (36–47)». Μόνο περιγραφή.
+/// «7 νύχτες: 42 ms, μέσα στο συνηθισμένο σου εύρος (36–47)» (ή «5 από 7 νύχτες: …»). Μόνο περιγραφή.
 String hrvTrendText(HrvTrend t) {
   final where = switch (t.band) {
     HrvBand.below => 'κάτω από το συνηθισμένο σου εύρος',
     HrvBand.within => 'μέσα στο συνηθισμένο σου εύρος',
     HrvBand.above => 'πάνω από το συνηθισμένο σου εύρος',
   };
-  return '7 νύχτες: ${t.weekMs.round()} ms, $where (${t.lowMs.round()}–${t.highMs.round()})';
+  // Έλεγχος 20/11 (K3C-07): ο μέσος όρος βγαίνει και από 5 ή 6 νύχτες ([hrvWeekMin])· τότε το λέει («5 από 7 νύχτες»).
+  final nights = t.weekNights >= 7 ? '7 νύχτες' : '${t.weekNights} από 7 νύχτες';
+  return '$nights: ${t.weekMs.round()} ms, $where (${t.lowMs.round()}–${t.highMs.round()})';
 }

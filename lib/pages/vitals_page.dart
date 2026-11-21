@@ -141,12 +141,16 @@ class _VitalsPageState extends State<VitalsPage> {
                                       ].join(' · '),
                                       style: small),
                                   if (bpNote(list[i]) case final n?) Text(n, style: small.copyWith(color: c.warn)),
+                                  // Έλεγχος 20/11 (K3-S-02): και οι σφυγμοί κρίνονται (πριν: «σφυγμοί 112» χωρίς λέξη).
+                                  if (pulseNote(list[i]) case final n?)
+                                    Text(n, key: ValueKey('vital-pulse-note-${list[i].id}'), style: small.copyWith(color: c.warn)),
                                   if (list[i].kind == VitalKind.glucose && glucoseNote(list[i]) != null)
                                     Text(glucoseNote(list[i])!,
                                         style: small.copyWith(
-                                            color: list[i].glucose! < 70 ||
-                                                    list[i].glucose! >= 200 ||
-                                                    (list[i].when == GlucoseWhen.fasting && list[i].glucose! >= 126)
+                                            // K3-review R13: το χρώμα κρίνεται στην τιμή όπως φαίνεται (όπως το κείμενο).
+                                            color: list[i].glucose!.round() < glucoseVeryLow ||
+                                                    list[i].glucose!.round() >= 200 ||
+                                                    (list[i].when == GlucoseWhen.fasting && list[i].glucose!.round() >= 126)
                                                 ? c.warn
                                                 : c.textSecondary)),
                                   if (list[i].kind == VitalKind.ecg && list[i].ecg != null)
@@ -283,7 +287,10 @@ class _VitalSheetState extends State<VitalSheet> {
             _field(_p, 'Σφυγμοί (αν τους δείχνει)', 'bp-pulse'),
             const SizedBox(height: 6),
             // Κ6-M4 (ESC 2024 / ESH 2021): χωρίς τσιγάρο/καφέ/άσκηση πριν, και γράφονται και οι δύο μετρήσεις.
-            Text('Όχι τσιγάρο, καφές ή άσκηση 30 λεπτά πριν. Καθιστός, πλάτη ακουμπισμένη, πόδια στο πάτωμα, χέρι στο ύψος της '
+            // Έλεγχος 20/11 (K3-S-01): και ΜΕ ΤΙ μετράς. Η ESH 2023 και η ESC (δήλωση 25/2/2026) δεν δέχονται μετρήσεις χωρίς
+            // περιχειρίδα για αποφάσεις· το ρολόι γράφει λιγότερο όταν η πίεση είναι ψηλή (Falter 2022).
+            Text('Με πιεσόμετρο μπράτσου (όχι καρπού και όχι το ρολόι: η πίεση του ρολογιού δεν κάνει για συμπέρασμα). '
+                'Όχι τσιγάρο, καφές ή άσκηση 30 λεπτά πριν. Καθιστός, πλάτη ακουμπισμένη, πόδια στο πάτωμα, χέρι στο ύψος της '
                 'καρδιάς, 5 λεπτά ηρεμία, χωρίς κουβέντα. Δύο μετρήσεις με 1 λεπτό διαφορά· γράψε και τις δύο.',
                 style: TextStyle(fontSize: 13, height: 1.35, color: c.textSecondary)),
           ],

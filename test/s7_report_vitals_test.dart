@@ -50,7 +50,7 @@ void main() {
     expect(not.textSpan!.toPlainText(), contains('καμία μέτρηση σε αυτό το διάστημα'));
   });
 
-  testWidgets('με πίεση και σάκχαρο: σελίδα 4, μέσος όρος με τους κανόνες της οθόνης', (t) async {
+  testWidgets('με πίεση και σάκχαρο: σελίδα 4, μέσος όρος με τα όρια του σπιτιού', (t) async {
     final items = [
       for (var i = 0; i < 14; i++) _bp('bp$i', DateTime(2026, 11, 20 - i ~/ 2, i.isEven ? 8 : 21), 126, 78),
       {'id': 'g1', 'k': 'glucose', 'at': DateTime(2026, 11, 18, 8).millisecondsSinceEpoch, 'glu': 104, 'when': 'fasting'},
@@ -62,7 +62,11 @@ void main() {
     expect(find.textContaining('σελίδα 1 από 4'), findsOneWidget);
     expect(find.textContaining('σε τέσσερις σελίδες'), findsOneWidget);
     expect(find.text('Πίεση (14 μετρήσεις)'), findsOneWidget);
-    expect(find.textContaining('«αυξημένη» κατά ESC 2024'), findsOneWidget);
+    // Έλεγχος 20/11 (K3-S-11): στον γιατρό οι αριθμοί και τα όρια, όχι ο χαρακτηρισμός και οι προτροπές της οθόνης.
+    final avg = t.widget<Text>(find.byKey(const ValueKey('report-bp-average'))).data!;
+    expect(avg, 'Μέσος όρος 7 ημερών: 126/78 (14 μετρήσεις σε 7 μέρες). Όρια για μετρήσεις στο σπίτι (ESC 2024): «αυξημένη» από '
+        '120/70, υπέρταση από 135/85.');
+    expect(avg, isNot(contains('γιατρό σου')));
     expect(find.text('104'), findsOneWidget);
     expect(find.text(ecgText(EcgResult.sinus)), findsOneWidget);
     final not = t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('report-not-included')), matching: find.byType(Text)));

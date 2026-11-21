@@ -74,7 +74,10 @@ class _SleepLinksCardState extends State<SleepLinksCard> {
             const SizedBox(height: 8),
             Text('Το πρώτο αποτέλεσμα θέλει περίπου 4 εβδομάδες με ύπνο από τη συσκευή σου.', style: small),
           ] else if (found.isEmpty)
-            Text('Δεν φαίνεται ακόμα καμία σύνδεση. Με περισσότερες νύχτες ο έλεγχος γίνεται πιο ευαίσθητος.',
+            // Έλεγχος 20/11 (K3C-03): όχι «με περισσότερες νύχτες…» (μετά τις 12 εβδομάδες δεν γίνεται πιο ευαίσθητος),
+            // και άδεια κάρτα δεν σημαίνει «δεν επηρεάζει».
+            Text('Δεν φαίνεται καμία μεγάλη και σταθερή σύνδεση. Ο έλεγχος είναι αυστηρός επίτηδες: μια μικρή σύνδεση '
+                'δεν φαίνεται, και αυτό δεν σημαίνει ότι δεν υπάρχει.',
                 key: const ValueKey('sleep-links-none'), style: TextStyle(color: c.text, fontSize: 15, height: 1.35))
           else
             for (final l in found) _row(context, l),

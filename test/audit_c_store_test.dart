@@ -26,6 +26,9 @@ class Android {
 
   /// Η απάντηση της κανονικής ανάγνωσης (null = το δείγμα).
   String? dashboard;
+
+  /// K3-review R7 (20/11): η ανάγνωση του ιστορικού αποτυγχάνει (π.χ. κλειδωμένη βάση στην εκκίνηση).
+  bool daysFail = false;
   int? corrupt;
   final rangeCalls = <String>[];
 
@@ -40,6 +43,7 @@ class Android {
           prefs = jsonDecode(args['json'] as String) as Map<String, dynamic>;
           return '{"ok":true}';
         case 'loadDays':
+          if (daysFail) return '{"ok":false,"kind":"other"}';
           return jsonEncode({
             'ok': true,
             'days': [for (final e in days.entries) {'date': e.key, 'data': e.value}],
@@ -280,6 +284,24 @@ void main() {
     s = await boot(a, plan: plan);
     expect(a.prefs['ouraSyncedTo'], dateKey(today));
     expect(a.prefs.containsKey('ouraRefetchTo'), isFalse);
+    s.dispose();
+  });
+
+  test('K3-review R7 (20/11): αν το ιστορικό δεν διαβαστεί στην εκκίνηση, η επανανάγνωση του Oura δεν σημειώνεται ως «έγινε»', () async {
+    final plan = SourcePlan.samsungOnly.withEra(Source.oura, add(today, -120));
+    final a = Android(now)
+      ..prefs = {'historyVersion': historyRulesVersion, 'ouraRules': 1, 'ouraSyncedTo': dateKey(add(today, -1))}
+      ..daysFail = true;
+    a.days[dateKey(add(today, -100))] = {'o.deepPct': 18.0, 'o.sleepMin': 420};
+    var s = await boot(a, plan: plan);
+    expect(a.prefs['ouraRules'], 1, reason: 'πριν γραφόταν η νέα έκδοση και οι παλιές νύχτες του Oura δεν ξαναδιαβάζονταν ποτέ');
+    s.dispose();
+    // Επόμενη εκκίνηση, το ιστορικό διαβάζεται: τώρα ζητιέται η επανανάγνωση (από κανόνες 1 σε $ouraRulesVersion).
+    a.daysFail = false;
+    s = await boot(a, plan: plan);
+    expect(a.prefs['ouraRules'], ouraRulesVersion);
+    expect(a.prefs.containsKey('ouraSyncedTo'), isFalse);
+    expect(a.prefs['ouraRefetchTo'], dateKey(add(today, -91)));
     s.dispose();
   });
 

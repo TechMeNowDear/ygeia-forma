@@ -236,7 +236,7 @@ class TodayPage extends StatelessWidget {
                   ? null
                   : oxygenGuidance(
                       d.spo2MinByNight(d.lastNight!.date, history: store.history), d.lastNight!.date, today: now));
-          final oxAuto = !prefs.show('spo2') && oxGuidance != null && (oxGuidance.veryLowRepeated || oxGuidance.repeated);
+          final oxAuto = !prefs.show('spo2') && oxGuidance != null && (oxGuidance.veryLowRepeated || oxGuidance.repeated || oxGuidance.repeatedMonth);
           Widget oxCard() => ouraNight
               ? _watchSpo2Card(context, d, now, store.ouraWindows, oxGuidance!, () => open(Cat.health, HealthTab.heart),
                   auto: oxAuto)
