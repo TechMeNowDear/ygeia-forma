@@ -314,9 +314,10 @@ void main() {
       final text = shoppingText(l, w);
       expect(text, contains('Τσιπούρα υδατοκαλλιέργειας (ωμή): 300 g'));
       expect(text, contains('Φακές (ξερές): 550 g'));
-      // Από τη 2η μέρα και μετά: η κατσαρόλα της 1ης είναι περισσεύματα, μένει μόνο το μαγείρεμα της 5ης.
+      // Από τη 2η μέρα και μετά, χωρίς ζυγισμένο μαγείρεμα: οι φακές της 2ης μέρας είναι μαγείρεμα, και της 5ης (3 μέρες
+      // μετά) επίσης. Απόφαση 21/11 (Α2): τα περισσεύματα κρατούν ως 2 μέρες· πριν (ως 3) η 5η μέρα ήταν «περίσσευμα».
       final later = shoppingList(s, w, fromDay: 1, now: now);
-      expect({for (final x in later.main) x.food.id: x.amount}[lentils], 250 + 50);
+      expect({for (final x in later.main) x.food.id: x.amount}[lentils], 2 * 250 + 50);
       expect(shopRound(3.2), 4);
       expect(shopRound(201), 210);
     });

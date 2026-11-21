@@ -189,7 +189,8 @@ void main() {
           estTarget: 2140,
           lowLog: true,
           formula: 2600,
-          formulaKg: 83.5);
+          formulaKg: 83.5,
+          waistDrop: 1.2);
       final j = checkInJson(full, estShare: 0.3217);
       for (final f in fields) {
         expect(keys.containsKey(f), isTrue, reason: 'νέο πεδίο «$f» του CheckIn: βάλ\' το στο checkInJson και εδώ');

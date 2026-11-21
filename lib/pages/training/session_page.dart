@@ -1111,11 +1111,8 @@ class _SessionPageState extends State<SessionPage> {
               const SizedBox(height: 10),
               Text('Σημειώνεται στη σύνοψη της προπόνησης.', style: TextStyle(fontSize: 13.5, color: c.warn)),
             ],
-            // Έλεγχος 21/11 (K7B-13): το μόνο κουμπί με τη λέξη «πόνος» μιλούσε μόνο για αρθρώσεις· η γραμμή για στήθος,
-            // δύσπνοια και 166/112 είναι κάτω από την κάρτα, εκτός οθόνης στο κλειστό Fold. Το ίδιο κείμενο και εδώ.
-            const SizedBox(height: 14),
-            Text(sessionSafetyText,
-                key: const ValueKey('pain-safety'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text)),
+            // Απόφαση χρήστη 21/11: η γραμμή για πόνο στο στήθος, δύσπνοια και 166/112 (K7B-13, #147) ΔΕΝ μπαίνει σε αυτό το
+            // φύλλο· μένει μόνο κάτω από την κάρτα της άσκησης ([sessionSafetyText]), όπως πριν από την #147.
             const SizedBox(height: 16),
             FilledButton(
               key: const ValueKey('pain-ok'),

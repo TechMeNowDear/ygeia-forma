@@ -782,6 +782,9 @@ class TrainingStore extends ChangeNotifier {
       ..author = author
       ..version = prev.isEmpty ? 1 : prev.last.version + 1
       ..savedAt = now;
+    // Α15 (21/11): ποια φορτία άλλαξαν σε σχέση με το πρόγραμμα που ίσχυε ως τώρα· μόνο αυτά μπορούν να ξεκινήσουν μια
+    // άσκηση πιο ελαφριά από την τελευταία φορά ([nextTarget]).
+    stampLoadTimes(copy, program, now);
     copy.from ??= DateTime(now.year, now.month, now.day);
     programs.add(copy);
     activeId = copy.id;

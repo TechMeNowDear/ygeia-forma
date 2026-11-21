@@ -216,8 +216,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sess-pain')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
-      // Έλεγχος 21/11 (K7B-13): το φύλλο γράφει και τι κάνεις με πόνο στο στήθος ή δύσπνοια (πριν: μόνο αρθρώσεις).
-      expect(tester.widget<Text>(find.byKey(const ValueKey('pain-safety'))).data, sessionSafetyText);
+      // Απόφαση χρήστη 21/11: η γραμμή για πόνο στο στήθος και 166 δεν μπαίνει στο φύλλο «Πόνεσε κάπου;» (#147: είχε μπει).
+      expect(find.byKey(const ValueKey('pain-safety')), findsNothing);
+      expect(find.descendant(of: find.byType(BottomSheet), matching: find.text(sessionSafetyText)), findsNothing);
       await tester.tap(find.byKey(const ValueKey('pain-shoulderR')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('pain-ok')));

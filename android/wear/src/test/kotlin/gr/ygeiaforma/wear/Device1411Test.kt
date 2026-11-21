@@ -164,8 +164,15 @@ class Device1411Test {
         // Η υπηρεσία: «Εκτός εύρους» με τη δόνηση, «Πάλι στη ζώνη» μόνο φωνή.
         val svc = source("ExerciseService.kt")
         assertTrue(svc.contains("speak(Say.BACK)"))
-        assertTrue(svc.contains("speak(Say.OFF_RANGE)"))
-        assertEquals("Εκτός εύρους" to "Off range", Say.OFF_RANGE)
+        // Απόφαση χρήστη 21/11 (Α25): η φωνή λέει προς τα πού (πριν «Εκτός εύρους» και για τα δύο).
+        assertTrue(svc.contains("speak(if (b == ZoneAlarm.Buzz.UP) Say.ABOVE_ZONE else Say.BELOW_ZONE)"))
+        assertFalse(svc.contains("OFF_RANGE"))
+        assertEquals("Πάνω από τη ζώνη" to "Above your zone", Say.ABOVE_ZONE)
+        assertEquals("Κάτω από τη ζώνη" to "Below your zone", Say.BELOW_ZONE)
+        assertEquals(Say.ABOVE_ZONE, Say.zone(ZoneAlarm.Buzz.UP))
+        assertEquals(Say.BELOW_ZONE, Say.zone(ZoneAlarm.Buzz.DOWN))
+        assertEquals(Say.BACK, Say.zone(ZoneAlarm.Buzz.BACK))
+        assertEquals(null, Say.zone(ZoneAlarm.Buzz.NONE))
     }
 
     // ------------------------------------------------------------------ φωνή

@@ -1193,7 +1193,8 @@ class ExerciseService : Service() {
             speak(Say.BACK)
             return
         }
-        speak(Say.OFF_RANGE)
+        // Α25 (21/11): «Πάνω από τη ζώνη» ή «Κάτω από τη ζώνη» (πριν «Εκτός εύρους» και για τα δύο).
+        speak(if (b == ZoneAlarm.Buzz.UP) Say.ABOVE_ZONE else Say.BELOW_ZONE)
         // Δόνηση ειδοποίησης (απόφαση του χρήστη): σε Σίγαση / Εξοικονόμηση ενέργειας το ρολόι την κόβει· τότε η οθόνη
         // γράφει «χωρίς δόνηση» ([checkZoneMute], S8-02). Η κλήση γίνεται έτσι κι αλλιώς.
         vibrate(if (b == ZoneAlarm.Buzz.UP) longArrayOf(0, 110, 120, 110) else longArrayOf(0, 260), alarm = false)

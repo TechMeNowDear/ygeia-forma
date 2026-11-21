@@ -2071,8 +2071,19 @@ object Say {
     val START = "Ξεκινάμε" to "Let's go"
     val PAUSE = "Παύση" to "Paused"
     val RESUME = "Συνέχεια" to "Resuming"
-    val OFF_RANGE = "Εκτός εύρους" to "Off range"
+    // Απόφαση χρήστη 21/11 (Α25): η φωνή λέει ΠΡΟΣ ΤΑ ΠΟΥ βγήκες από τη ζώνη, για να ξέρεις τι να κάνεις χωρίς να κοιτάξεις
+    // το ρολόι. Πριν «Εκτός εύρους» και για πάνω και για κάτω (απόφαση 14/11).
+    val ABOVE_ZONE = "Πάνω από τη ζώνη" to "Above your zone"
+    val BELOW_ZONE = "Κάτω από τη ζώνη" to "Below your zone"
     val BACK = "Πάλι στη ζώνη" to "Back in range"
+
+    /** Τι λέει η φωνή για ένα σήμα της ζώνης· null: τίποτα. */
+    fun zone(b: ZoneAlarm.Buzz): Pair<String, String>? = when (b) {
+        ZoneAlarm.Buzz.UP -> ABOVE_ZONE
+        ZoneAlarm.Buzz.DOWN -> BELOW_ZONE
+        ZoneAlarm.Buzz.BACK -> BACK
+        ZoneAlarm.Buzz.NONE -> null
+    }
     val END_RECOVER = "Τέλος. Κάθισε για ένα λεπτό" to "Done. Sit down for one minute"
     val END = "Τέλος" to "Done"
     val NEXT_SET = "Επόμενο σετ" to "Next set"
