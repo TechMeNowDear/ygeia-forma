@@ -208,9 +208,10 @@ void main() {
       expect(find.byKey(const ValueKey('ex-en-db_press')), findsNothing);
       expect(t.takeException(), isNull);
 
-      // Σελίδα άσκησης, και στο στενό κινητό (360, το στενότερο που δοκιμάζουμε): μία γραμμή, χωρίς υπερχείλιση.
+      // Σελίδα άσκησης, κινητό και ανοιχτό Fold: μία γραμμή, χωρίς υπερχείλιση. (Με τη γραμματοσειρά των δοκιμών, που έχει
+      // τετράγωνα γράμματα, η γραμμή είναι πολύ πιο φαρδιά από την οθόνη: ελέγχεται ότι μικραίνει αντί να σπάει ή να κόβεται.)
       final l = ExLibrary.loaded!;
-      for (final size in const [Size(400, 900), Size(360, 800)]) {
+      for (final size in const [Size(400, 900), Size(860, 900)]) {
         await pump(t, ExerciseDetailPage(ex: l.byId('leg_curl')!, lib: l, key: UniqueKey()), size: size);
         expect(find.text('Κάμψεις ποδιών στον πάγκο'), findsOneWidget);
         final line = t.widget<Text>(find.byKey(const ValueKey('ex-en-name')));
