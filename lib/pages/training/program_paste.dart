@@ -157,6 +157,23 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
           ]),
         ]),
       ));
+      // Έλεγχος 20/11 (K4C-15): το «load» του προγράμματος είναι μόνο ΑΡΧΙΚΟ βάρος· για άσκηση που έχεις ήδη κάνει, ο
+      // στόχος βγαίνει από την τελευταία φορά ([nextTarget]). Πριν η επικόλληση έδειχνε τα κιλά του προγράμματος σαν να
+      // ισχύουν: νέο πρόγραμμα με 6,8 kg (π.χ. πιο ελαφριά εβδομάδα) → η οθόνη «6,8 kg», η προπόνηση 9,3 kg. Τώρα δείχνει
+      // αυτό που θα γίνει («συνεχίζεις από 9,3 kg») και το λέει μία φορά από κάτω.
+      var continues = false;
+      String loadText(PlanItem i) {
+        if (!hasLoad(i.kind) || i.load == null) return '';
+        if (!widget.training.isFirstTime(i.ex)) {
+          final v = widget.training.targetFor(i).load;
+          if (v != null) {
+            continues = true;
+            return ' ·\u00A0συνεχίζεις από ${loadLabel(i.kind, v)}';
+          }
+        }
+        return ' ·\u00A0${loadLabel(i.kind, i.load)}';
+      }
+
       for (final w in p.workouts) {
         body.add(AppCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -195,7 +212,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
                     Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text)),
                     Text(
-                      '${repsRange(i)} ·\u00A0ξεκούραση ${clock(i.rest)}${hasLoad(i.kind) && i.load != null ? ' ·\u00A0${loadLabel(i.kind, i.load)}' : ''}',
+                      '${repsRange(i)} ·\u00A0ξεκούραση ${clock(i.rest)}${loadText(i)}',
                       style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                     ),
                   ]),
@@ -203,6 +220,10 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
               ),
           ]),
         ));
+      }
+      if (continues) {
+        body.add(Text('Τα κιλά του προγράμματος ισχύουν μόνο για ασκήσεις που δεν έχεις κάνει ακόμα. Στις άλλες συνεχίζεις από τα δικά σου.',
+            key: const ValueKey('paste-continues'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)));
       }
       if (r.warnings.isNotEmpty) {
         body.add(Text(r.warnings.join('\n'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)));

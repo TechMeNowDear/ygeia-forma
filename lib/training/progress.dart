@@ -10,9 +10,11 @@
 /// - Πτώση παλμών στο 1′: ουδέτερη, ποτέ «καλύτερα/χειρότερα» (έλεγχος 9/11, V-B-08): εξαρτάται κυρίως από την ένταση
 ///   (πιο γρήγορο βάδισμα = μεγαλύτερη πτώση), άρα δεν δείχνει από μόνη της φυσική κατάσταση. Δίπλα οι παλμοί στο τέλος.
 /// - Δύναμη: μόνο γεγονότα (κιλά × επαναλήψεις τότε → τώρα), χωρίς υπολογισμένο «μέγιστο» (1RM).
+/// - Δύναμη, έλεγχος 20/11 (K4-S-03): «πτώση» ΜΟΝΟ όταν η διαφορά ξεπερνά τον θόρυβο (μία επανάληψη ανά σετ) και ΔΕΝ την
+///   έκανε η ίδια η εφαρμογή (πιο ελαφριά μετά από διακοπή ή ενόχληση: ουδέτερο, με τον λόγο).
 library;
 
-import '../format.dart' show dayOf;
+import '../format.dart' show dayOf, daysBetween;
 import '../history.dart' show dateKey;
 import '../trends.dart';
 import 'equipment.dart';
@@ -149,15 +151,47 @@ WalkProgress walkProgress(Iterable<Session> sessions, DateTime today, TrendPerio
 
 enum StrengthChange { up, down, mixed, same }
 
-/// Μία επανάληψη πάνω-κάτω στο σύνολο των σετ δεν λέγεται αλλαγή.
+/// Μία επανάληψη πάνω-κάτω ΑΝΑ ΣΕΤ δεν λέγεται αλλαγή, όταν το φορτίο είναι το ίδιο. Συγκρίνεται το ΣΥΝΟΛΟ των κοινών
+/// σετ με (1 × κοινά σετ): με 3 σετ, ως ±3 στο σύνολο (και 12, 12, 12 → 12, 12, 9 είναι «ίδιο»). Με ΑΛΛΟ φορτίο μένει η
+/// παλιά ανοχή, 1 στο σύνολο (K4-R-04): «περισσότερο βάρος με σετ κάτω από το εύρος» μένει «ούτε καλύτερα ούτε χειρότερα».
+///
+/// Έλεγχος 20/11 (K4-S-03): πριν ήταν μία επανάληψη στο ΣΥΝΟΛΟ των σετ. Η ίδια δύναμη με ±1 επανάληψη τυχαία ανά σετ
+/// έβγαζε «άλλαξε» στο 39% των συγκρίσεων (προσομοίωση)· 12, 12, 11 → 12, 11, 10 μετά από κακό ύπνο έβγαινε κόκκινη «πτώση»,
+/// όπως και το 11, 11, 11 → 10, 10, 10 όταν ο χρήστης έκανε αυτό που του είπε ο στόχος («σταμάτα όταν σου μένουν 2»). Μόνο
+/// η εκτίμηση της ρεζέρβας πέφτει έξω περίπου 1 επανάληψη ανά σετ (Halperin κ.ά., Sports Med 2022;52:377–390).
 const repsTolerance = 1;
 
+/// Πάνω από τόσες μέρες χωρίς την άσκηση η εφαρμογή ξεκινά πιο ελαφριά (ίδιο όριο με το [nextTarget]).
+const easedGapDays = 14;
+
+/// Γιατί η εφαρμογή έβαλε πιο ελαφρύ φορτίο ανάμεσα στις δύο φορές που συγκρίνονται.
+enum Eased { pause, pain }
+
+String easedText(Eased e) => switch (e) { Eased.pause => 'μετά από διακοπή', Eased.pain => 'μετά από ενόχληση' };
+
 class ExProgress {
-  ExProgress({required this.ex, required this.kind, required this.beforeDay, required this.before, required this.nowDay, required this.now});
+  ExProgress({required this.ex, required this.kind, required this.beforeDay, required this.before, required this.nowDay, required this.now, this.eased});
   final String ex;
   final LoadKind kind;
   final DateTime beforeDay, nowDay;
   final ExLog before, now;
+
+  /// K4-S-03: ανάμεσα στις δύο φορές υπήρξε διακοπή πάνω από [easedGapDays] μέρες ή ενόχληση: τότε το πιο ελαφρύ φορτίο
+  /// είναι κανόνας της εφαρμογής ([nextTarget]: «πιο ελαφριά για αρχή», «μετά από ενόχληση»), όχι «πτώση». null = τίποτα.
+  final Eased? eased;
+
+  /// Το φορτίο έπεσε και ο λόγος είναι της εφαρμογής: ουδέτερο, με τον λόγο ([easedText]).
+  bool get easedDown => eased != null && loadDiff < -1e-6;
+
+  /// K4-R-05: ίδιο φορτίο (ή άσκηση σώματος) με λιγότερες επαναλήψεις, και ο λόγος είναι της εφαρμογής: μετά από διακοπή ο
+  /// στόχος είναι «ξανά από το κάτω όριο», και μετά από ενόχληση χωρίς ελαφρύτερο φορτίο «2 επαναλήψεις λιγότερες».
+  /// Πριν: κάμψεις 15, 15, 15 → 20 μέρες διακοπή → 10, 10, 10 (ό,τι είπε ο στόχος) = κόκκινη «πτώση −15».
+  bool get easedReps => eased != null && loadDiff.abs() < 1e-6 && repsDiff < -_sameLoadTolerance;
+
+  int get _sameLoadTolerance => repsTolerance * (commonSets < 1 ? 1 : commonSets);
+
+  /// Τα κοινά σετ των δύο φορών.
+  int get commonSets => repsBefore.length < repsNow.length ? repsBefore.length : repsNow.length;
 
   // R9-A6-2: τα σετ που κρίνονται ([ExLog.judged]), όπως η πρόοδος της εφαρμογής: όχι ένα σετ παραπάνω («+ Σετ»).
   List<int> get repsBefore => [for (final s in before.judged) s.reps];
@@ -195,17 +229,21 @@ class ExProgress {
     return true;
   }
 
-  /// ±[repsTolerance] επανάληψη στο σύνολο των σετ = ίδιο: τόσο αλλάζει από μέρα σε μέρα χωρίς πραγματική αλλαγή.
+  /// ±[repsTolerance] επανάληψη ανά κοινό σετ = ίδιο: μικρές διαφορές από μέρα σε μέρα είναι θόρυβος (K4-S-03).
   /// Περισσότερο βάρος με τις επαναλήψεις ακόμα μέσα στο εύρος (π.χ. 12, 12, 12 → 9, 9, 8 με κάτω όριο 8) είναι
   /// πρόοδος: έτσι ακριβώς ανεβαίνει το βάρος στο πρόγραμμα (έλεγχος 9/11, V-B-12). «Μικτό» μόνο όταν κάποιο σετ
   /// έπεσε κάτω από το εύρος.
   StrengthChange get change {
     final l = loadDiff, r = repsDiff;
     const eps = 1e-6;
+    // K4-R-04: με άλλο φορτίο, η παλιά ανοχή (1 στο σύνολο)· η ανοχή ανά σετ μόνο με ίδιο φορτίο.
     if (l > eps) return r >= -repsTolerance || repsInRange ? StrengthChange.up : StrengthChange.mixed;
-    if (l < -eps) return r > repsTolerance ? StrengthChange.mixed : StrengthChange.down;
-    if (r > repsTolerance) return StrengthChange.up;
-    if (r < -repsTolerance) return StrengthChange.down;
+    // K4-S-03: πιο ελαφριά επειδή το έβαλε η εφαρμογή (διακοπή, ενόχληση): ούτε καλύτερα ούτε χειρότερα.
+    if (l < -eps) return r > repsTolerance || eased != null ? StrengthChange.mixed : StrengthChange.down;
+    final tol = _sameLoadTolerance;
+    if (r > tol) return StrengthChange.up;
+    // K4-R-05: λιγότερες επαναλήψεις επειδή το ζήτησε ο στόχος (διακοπή, ενόχληση): ουδέτερο.
+    if (r < -tol) return eased != null ? StrengthChange.mixed : StrengthChange.down;
     return StrengthChange.same;
   }
 }
@@ -215,11 +253,14 @@ class ExProgress {
 List<ExProgress> strengthProgress(Iterable<Session> sessions, DateTime today, TrendPeriod period) {
   final w = progressWindows(today, period);
   final logs = <String, List<(DateTime, ExLog)>>{};
+  // K4-S-03: οι μέρες με ενόχληση ανά άσκηση (και χωρίς κανένα σετ: και τότε η επόμενη φορά βγαίνει πιο ελαφριά).
+  final painDays = <String, List<DateTime>>{};
   final ordered = sessions.where((s) => s.finished && !s.stopped && !s.isCardio).toList()..sort((a, b) => a.start.compareTo(b.start));
   for (final s in ordered) {
     final d = dayOf(s.start);
     if (d.isBefore(w.prevFrom) || d.isAfter(w.end)) continue;
     for (final e in s.items) {
+      if (e.pain.isNotEmpty) (painDays[e.ex] ??= []).add(d);
       if (e.skipped || e.done.isEmpty) continue;
       (logs[e.ex] ??= []).add((d, e));
     }
@@ -239,7 +280,35 @@ List<ExProgress> strengthProgress(Iterable<Session> sessions, DateTime today, Tr
       continue;
     }
     final last = now.last;
-    out.add(ExProgress(ex: entry.key, kind: last.$2.kind, beforeDay: before.$1, before: before.$2, nowDay: last.$1, now: last.$2));
+    // K4-S-03: ενόχληση ή διακοπή ανάμεσα στις δύο φορές (μαζί με τις ίδιες).
+    // (K4-R-06, ανεξάρτητος έλεγχος): μια παλιά διακοπή ή ενόχληση «ξεπληρώνεται» μόλις μια ενδιάμεση φορά ξαναφτάσει το
+    // φορτίο του «πριν» (ή τις επαναλήψεις του, χωρίς φορτίο)· μετρούν μόνο όσες έγιναν μετά. Πριν, στο Τρίμηνο και στο
+    // Έτος, μία διακοπή τον Ιανουάριο έκανε «ουδέτερη» και μια πραγματική πτώση του Νοεμβρίου.
+    final pains = painDays[entry.key] ?? const <DateTime>[];
+    final i0 = list.indexOf(before), i1 = list.lastIndexOf(last);
+    final baseLoad = before.$2.endLoad;
+    int repsOf(ExLog e) => e.judged.fold(0, (a, x) => a + x.reps);
+    final baseReps = repsOf(before.$2);
+    final assist = last.$2.kind == LoadKind.bandAssist;
+    Eased? eased = pains.contains(before.$1) ? Eased.pain : null;
+    for (var i = i0 + 1; i <= i1 && i0 >= 0; i++) {
+      final a = list[i - 1].$1, b = list[i].$1;
+      if (eased == null && daysBetween(a, b) > easedGapDays) eased = Eased.pause;
+      // Ενόχληση σε προπόνηση χωρίς κανένα σετ, ανάμεσα στις δύο.
+      if (pains.any((d) => d.isAfter(a) && d.isBefore(b))) eased = Eased.pain;
+      if (i < i1) {
+        final e = list[i].$2;
+        final v = e.endLoad;
+        final repaid = baseLoad != null && v != null
+            ? (assist ? v <= baseLoad + 1e-6 : v >= baseLoad - 1e-6)
+            : (baseLoad == null && v == null && repsOf(e) >= baseReps);
+        if (repaid) eased = null;
+      }
+      // Ενόχληση στην ίδια τη φορά: μετρά για τις επόμενες (και, στην πιο πρόσφατη, για την ίδια).
+      if (pains.contains(b)) eased = Eased.pain;
+    }
+    out.add(ExProgress(
+        ex: entry.key, kind: last.$2.kind, beforeDay: before.$1, before: before.$2, nowDay: last.$1, now: last.$2, eased: eased));
   }
   out.sort((a, b) => b.nowDay.compareTo(a.nowDay));
   return out;

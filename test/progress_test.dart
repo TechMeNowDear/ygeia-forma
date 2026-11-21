@@ -160,10 +160,23 @@ void main() {
       expect(strengthPill(r['db_press']!).$1, '2 kg');
     });
 
-    test('ίδιο βάρος, λιγότερες επαναλήψεις: πτώση (φαίνεται)', () {
-      expect(r['hammer_curl']!.change, StrengthChange.down);
+    // Έλεγχος 20/11 (K4-S-03, K4-R-05): οι δύο φορές απέχουν 37 μέρες. Μετά από διακοπή πάνω από 14 μέρες ο στόχος της
+    // εφαρμογής είναι «πιο ελαφριά, ξανά από το κάτω όριο»: λιγότερες επαναλήψεις τότε δεν γράφονται κόκκινη «πτώση».
+    test('ίδιο βάρος, λιγότερες επαναλήψεις μετά από διακοπή 37 ημερών: ουδέτερο, με τον λόγο (πριν «πτώση»)', () {
       expect(r['hammer_curl']!.repsDiff, -6);
-      expect(strengthPill(r['hammer_curl']!), ('6 επαναλήψεις', TrendKind.bad, false));
+      expect(r['hammer_curl']!.eased, Eased.pause);
+      expect(r['hammer_curl']!.change, StrengthChange.mixed);
+      expect(strengthPill(r['hammer_curl']!), ('λιγότερες επαναλήψεις μετά από διακοπή', TrendKind.neutral, null));
+    });
+
+    test('ίδιο βάρος, λιγότερες επαναλήψεις ΧΩΡΙΣ διακοπή: πτώση (φαίνεται)', () {
+      final p = strengthProgress([
+        lift(10, [ex('hammer_curl', 6.8, [12, 11, 11])]),
+        lift(3, [ex('hammer_curl', 6.8, [10, 9, 9])]),
+      ], now, TrendPeriod.month).single;
+      expect(p.change, StrengthChange.down);
+      expect(p.repsDiff, -6);
+      expect(strengthPill(p), ('6 επαναλήψεις', TrendKind.bad, false));
     });
 
     // Έλεγχος 9/11 (V-B-12): πριν «μικτό». 12 → 14 kg με 9, 9, 8 (κάτω όριο 8) είναι η κανονική πρόοδος του προγράμματος.

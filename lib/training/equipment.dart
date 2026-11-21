@@ -243,8 +243,18 @@ Map<int, List<String>> bandCombos() {
 }
 
 /// Το πλησιέστερο διαθέσιμο βάρος (ίσο ή μικρότερο), για να μη ζητηθεί κάτι που δεν βγαίνει.
+///
+/// Έλεγχος 20/11 (K4C-05): στο λάστιχο βοήθειας «μικρότερο» σημαίνει πιο ΔΥΣΚΟΛΟ. Εκεί το ασφαλές είναι η ίση ή η αμέσως
+/// ΠΕΡΙΣΣΟΤΕΡΗ βοήθεια (45 → 50, πριν 40), και το 0 («χωρίς λάστιχο») είναι κανονική τιμή (πριν γινόταν «κίτρινο, 10 lb»).
 double snap(LoadKind k, double v) {
   final a = available(k);
+  if (k == LoadKind.bandAssist) {
+    if (v <= 1e-6) return 0;
+    for (final x in a) {
+      if (x >= v - 1e-6) return x;
+    }
+    return a.last;
+  }
   var best = a.first;
   for (final x in a) {
     if (x <= v + 1e-6) best = x;
@@ -304,6 +314,28 @@ double? stepDown(LoadKind k, double v, {bool allowZero = false}) {
   }
   if (best == 0 && !allowZero && k != LoadKind.plate && k != LoadKind.horn) return null;
   return best;
+}
+
+/// Έλεγχος 20/11 (K4C-02): «πιο ελαφριά» μετά από ενόχληση, ή όταν δεν βγήκαν οι επαναλήψεις ως την εξάντληση. Πριν ήταν
+/// πάντα «το αμέσως μικρότερο που βγαίνει» ([stepDown]): με 4 δίσκους από κάθε βάρος η μπάρα έχει φορτία ανά 0,5 kg και
+/// το κέρατο ανά 0,25 kg, άρα 30 → 29,5 kg (−1,7%) και 10 → 9,75 kg, ενώ στους αλτήρες το ίδιο «σκαλί» είναι −10% ως −16%.
+/// Τώρα, στα κιλά: αν το ένα σκαλί είναι κάτω από −5% ([lighterMinDrop]), το μεγαλύτερο διαθέσιμο ως το [lighterRatio] του
+/// βάρους (30 → 27 kg, 10 → 9 kg)· ποτέ κάτω από το [lighterFloor] (αραιά βάρη: τότε μένει το ένα σκαλί). Στην πράξη −10%
+/// ως −15%· με τον τύπο του Epley, για να γίνουν οι 5 επαναλήψεις ως την εξάντληση 8 με ρεζέρβα 2 θέλει −12,5% (K4-R-12).
+/// Όπου το ένα σκαλί είναι ήδη −5% ή περισσότερο (σχεδόν όλα τα ζευγάρια αλτήρων με τον αρχικό εξοπλισμό, kettlebell) και
+/// στα λάστιχα: ίδιο αποτέλεσμα με πριν. Αλλάζουν, πάντα προς περισσότερη μείωση: μπάρα, κέρατο, δίσκος, ο μονός αλτήρας
+/// σε 10 από τα 28 φορτία του (π.χ. 16,8 → 14,3 kg, πριν 16,3) και το ζευγάρι στα 20,3 kg (→ 17,8, πριν 19,3).
+/// null = δεν υπάρχει ελαφρύτερο.
+const lighterRatio = 0.9;
+const lighterMinDrop = 0.05;
+const lighterFloor = 0.8;
+
+double? lighterStep(LoadKind k, double v, {bool allowZero = false}) {
+  final one = stepDown(k, v, allowZero: allowZero);
+  if (one == null || !usesKg(k) || v <= 0) return one;
+  if (one <= v * (1 - lighterMinDrop) + 1e-6) return one;
+  final s = snap(k, v * lighterRatio);
+  return s < one - 1e-6 && s >= v * lighterFloor - 1e-6 ? s : one;
 }
 
 /// Περίπου [ratio] του βάρους (π.χ. 0,9 μετά από διάλειμμα), στο πλησιέστερο διαθέσιμο από κάτω.
@@ -464,7 +496,8 @@ String? plateChange(LoadKind from, double? fromKg, LoadKind to, double? toKg) {
   for (final p in a) {
     if (!add.remove(p)) remove.add(p);
   }
-  final where = to == LoadKind.bar ? 'από κάθε πλευρά' : (to == LoadKind.horn ? '' : 'σε κάθε άκρη');
+  // K4C-12: ο δίσκος που κρατάς στο στήθος δεν έχει «άκρες».
+  final where = to == LoadKind.bar ? 'από κάθε πλευρά' : (to == LoadKind.horn || to == LoadKind.plate ? '' : 'σε κάθε άκρη');
   final parts = <String>[
     if (remove.isNotEmpty) 'βγάλε ${remove.map(kgText).join(' + ')}',
     if (add.isNotEmpty) 'βάλε ${add.map(kgText).join(' + ')}',

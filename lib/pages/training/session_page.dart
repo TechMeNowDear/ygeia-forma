@@ -252,6 +252,16 @@ class _SessionPageState extends State<SessionPage> {
                       : allDone && routine.cooldown.isNotEmpty
                           ? _routineRow(context, routine, 'Αποθεραπεία ·\u00A0${countText(routine.cooldown.length, 'βήμα', 'βήματα')}')
                           : null;
+              // Έλεγχος 20/11 (K4-S-10): πρόγραμμα χωρίς βήματα ζεστάματος (του επεξεργαστή, «Ελεύθερη άσκηση»): μία σταθερή
+              // γραμμή πριν από το 1ο σετ. Πριν δεν υπήρχε καμία υπενθύμιση και το 1ο σετ γινόταν κρύο με το φορτίο εργασίας.
+              final warmHint = routineRow == null && s.setsDone == 0
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(sessionWarmupText,
+                          key: const ValueKey('session-warmup-hint'),
+                          style: TextStyle(fontSize: 13, height: 1.35, color: Aigaio.of(context).textSecondary)),
+                    )
+                  : null;
               // Έλεγχος 17/11 (Κ5, επιστημονικός HIGH-1, AHA 2023): σταθερή γραμμή ασφάλειας σε κάθε προπόνηση.
               final safety = Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -261,6 +271,7 @@ class _SessionPageState extends State<SessionPage> {
               );
               final card = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (routineRow != null) ...[routineRow, const SizedBox(height: 8)],
+                if (warmHint != null) warmHint,
                 ex,
                 safety,
               ]);
@@ -505,7 +516,8 @@ class _SessionPageState extends State<SessionPage> {
       }
     }
     // Η τελευταία φορά με σετ (όχι μια «παράλειψη»). R7-A6-11: κάθε σετ με το φορτίο του, όταν άλλαξε μέσα στην άσκηση.
-    final hist = [for (final h in t.historyOf(e.ex)) if (!h.$2.skipped && h.$2.done.isNotEmpty) h];
+    // K4-R-08: σετ που κρίνονται ([ExLog.judged]), όπως ο στόχος (όχι ✓ με 0 επαναλήψεις: «Τελευταία φορά: 4,3 kg · 0»).
+    final hist = [for (final h in t.historyOf(e.ex)) if (!h.$2.skipped && h.$2.judged.isNotEmpty) h];
     String? lastTime;
     if (hist.isNotEmpty) {
       final (d, l) = hist.first;
@@ -831,7 +843,12 @@ class _SessionPageState extends State<SessionPage> {
     if (!r.applied || rir < 0) return;
     final v = r.load;
     // R8-A6-5: και όταν το «4+» δεν αλλάζει το βάρος (μεγάλο σκαλί), να λέγεται γιατί· πριν: τίποτα.
-    final text = v != null ? 'Τα επόμενα σετ: ${loadLabel(e.kind, v)}.' : t.firstSetNote(e, rir);
+    // Έλεγχος 20/11 (K4-S-07): όταν τα επόμενα σετ γίνονται βαρύτερα, η ρεζέρβα μετράει περισσότερο από τον αριθμό.
+    final f = e.log.isEmpty ? null : e.log.first.load;
+    final harder = v != null && f != null && (e.kind == LoadKind.bandAssist ? v < f : v > f);
+    final text = v != null
+        ? 'Τα επόμενα σετ: ${loadLabel(e.kind, v)}.${harder ? ' ${calibrateUpNote(e.rir < 2 ? 2 : e.rir)}' : ''}'
+        : t.firstSetNote(e, rir);
     if (text != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
@@ -1567,7 +1584,8 @@ class _SummaryPageState extends State<SummaryPage> {
       final item = itemFor(e);
       // Μία γραμμή ανά άσκηση της επόμενης φοράς (η άσκηση που άλλαξε και η εναλλακτική της δίνουν την ίδια).
       if (!shownNext.add(item.ex)) continue;
-      final own = [for (final x in s.items) if (x.ex == item.ex) (s.start, x)];
+      // Έλεγχος 20/11 (K4-R-07): ίδια σειρά με το ιστορικό (πρώτη η καταγραφή με ενόχληση, K4C-13).
+      final own = [for (final x in TrainingStore.sameExercise(s, item.ex)) (s.start, x)];
       final history = widget.live ? [...own, ...t.historyOf(item.ex)] : t.historyOf(item.ex);
       // R9-A6-8: σε σύνοψη παλιότερης προπόνησης, αν η άσκηση έγινε και αργότερα, ο στόχος «Την επόμενη φορά» βγαίνει
       // από εκείνες τις μεταγενέστερες φορές και δεν αντιστοιχεί σε αυτή τη σύνοψη: δεν δείχνεται (ο σημερινός στόχος
@@ -1883,5 +1901,18 @@ class _HeartLabel extends StatelessWidget {
 /// Έλεγχος 17/11 (Κ5, AHA 2023, Paluch κ.ά., Circulation 2024): ζάλη, δύσπνοια, πόνος στο στήθος και αίσθημα παλμών θέλουν
 /// άμεση εκτίμηση.
 // Κ8-M5: ίδια διατύπωση με τις άλλες κάρτες («μην περιμένεις»).
-const sessionSafetyText = 'Πόνος ή σφίξιμο στο στήθος, δύσπνοια, ζάλη ή αίσθημα παλμών: σταματάς αμέσως. Αν ο πόνος στο '
-    'στήθος ή η δύσπνοια δεν περνούν με την ξεκούραση, μην περιμένεις: 166 ή 112.';
+//
+// Έλεγχος 20/11 (K4-S-01): (α) και όταν το σύμπτωμα ΠΕΡΑΣΕΙ: γιατρός πριν από την επόμενη προπόνηση. Πόνος στο στήθος στην
+// προσπάθεια που περνά με την ξεκούραση είναι η κλασική περιγραφή της στηθάγχης· η θέση της AHA για τα βάρη λέει «σταματάς,
+// ζητάς ιατρική εκτίμηση και δεν ξαναρχίζεις πριν σε δει γιατρός» (Paluch κ.ά., Circulation 2024;149:e217–e231). Πριν το
+// κείμενο άφηνε να εννοηθεί ότι, αν περάσει, τελείωσε. (β) Τάση λιποθυμίας (υπήρχε στις άλλες κάρτες, όχι εδώ). (γ) Πόνος
+// εκτός στήθους: πλάτη, χέρι, σαγόνι (AHA, «Warning Signs of a Heart Attack»)· ο ξαφνικός δυνατός πόνος στην πλάτη δεν
+// πρέπει να περάσει ως «πιάσιμο». (δ) Χρόνος: «λίγα λεπτά» ή «ξαναέρχεται», όχι «δεν περνά με την ξεκούραση».
+// Τα ίδια συμπτώματα και η ίδια συνέχεια στο φύλλο «Όριο παλμών από τον γιατρό» (training_page.dart).
+/// K4-S-10: όταν το πρόγραμμα δεν έχει δικά του βήματα ζεστάματος.
+const sessionWarmupText = 'Πρώτα 5 λεπτά ζέσταμα: περπάτημα και ένα ελαφρύ σετ της πρώτης άσκησης.';
+
+const trainingSymptoms = 'στο στήθος (ή στην πλάτη, στο χέρι, στο σαγόνι), δύσπνοια, ζάλη, τάση λιποθυμίας ή αίσθημα παλμών';
+const trainingSymptomsNext = 'Αν δεν περάσει σε λίγα λεπτά, αν ξαναέρθει, ή αν ο πόνος είναι ξαφνικός και δυνατός: 166 ή 112, '
+    'χωρίς αναμονή. Αν περάσει, μίλα με τον γιατρό σου πριν από την επόμενη προπόνηση.';
+const sessionSafetyText = 'Πόνος ή σφίξιμο $trainingSymptoms: σταματάς αμέσως. $trainingSymptomsNext';
