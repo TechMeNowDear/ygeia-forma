@@ -898,6 +898,26 @@ void main() {
       });
     });
 
+    test('δείγμα αρχείων για τον ελεγκτή Python: build/golden141/export_full.json και export_summary.json', () async {
+      // Το CI βγάζει τον φάκελο build/golden141 στο log· ο ελεγκτής (εκτός repo) ξαναϋπολογίζει ΑΝΕΞΑΡΤΗΤΑ ό,τι γράφει το
+      // «calc» από τα ακατέργαστα «data» αυτών των δύο αρχείων, όπως θα κάνει με το αρχείο του κινητού. Επινοημένα δεδομένα.
+      final v = VitalsStore(io: MemoryVitalsIO());
+      await v.load();
+      for (var i = 0; i < 6; i++) {
+        await v.add(Vital(id: 'x$i', kind: VitalKind.bp, at: DateTime(2026, 12, 11 + i ~/ 2, 7, i), sys: 120 + 4 * (i % 2), dia: 80 + i % 2));
+      }
+      final full = diagnosticsFrom(store: _store(), food: _food(_at), now: _at, vitals: v, note: 'δείγμα', training: {
+        'v': 1,
+        'sessions': [
+          {'id': 'w1', 'start': DateTime(2026, 12, 12, 18).millisecondsSinceEpoch, 'items': <Object>[], 'hrAvg': 104},
+        ],
+      });
+      final dir = Directory('build/golden141')..createSync(recursive: true);
+      File('${dir.path}/export_full.json').writeAsStringSync(diagnosticsEncode(full));
+      File('${dir.path}/export_summary.json').writeAsStringSync(diagnosticsEncode(diagnosticsSummary(full)));
+      expect((full['kind'], full['v']), ('diagnostics', 2));
+    });
+
     test('K8-R-13 / K8-R-24: το αρχείο βγαίνει και με μη πεπερασμένο αριθμό, και γράφει ό,τι έγραφε το σκέτο jsonEncode', () {
       // Πριν: ένα NaN οπουδήποτε = «Δεν φτιάχτηκε η αναφορά».
       expect(diagnosticsEncode({'x': double.nan, 'y': double.infinity, 'z': 1.5}), '{"x":null,"y":null,"z":1.5}');
