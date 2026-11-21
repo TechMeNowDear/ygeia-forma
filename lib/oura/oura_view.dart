@@ -353,3 +353,7 @@ String sleepVsAdvice({required int asleepMin, required int? inBedMin, required i
 
 /// Κλειδιά του ιστορικού που διαβάζει η σελίδα (για να φαίνεται ρητά ότι είναι μόνο του Oura).
 const ouraScreenMetrics = [K.hrv, K.sleepHr, K.lowHr, K.breath, K.skinTemp, K.energy, K.sleepScore];
+
+/// Α17 (απόφαση χρήστη 21/11): η σημείωση της νύχτας με χαμηλή μπαταρία δαχτυλιδιού ([OuraNight.lowBattery]), στον Ύπνο
+/// και στη Σήμερα.
+const ouraLowBatteryText = 'Η μπαταρία του δαχτυλιδιού έπεσε: η νύχτα μάλλον μετρήθηκε μισή και δεν μετρά στους μέσους όρους.';

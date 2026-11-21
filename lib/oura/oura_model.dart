@@ -88,7 +88,13 @@ class OuraSleep {
     this.readinessTemp,
     this.offsetMin,
     this.endOffsetMin,
+    this.lowBattery = false,
   });
+
+  /// Απόφαση χρήστη 21/11 (Α17): η Oura σημείωσε ότι η μπαταρία του δαχτυλιδιού έπεσε στη διάρκεια αυτής της περιόδου
+  /// («low_battery_alert»). Τότε η περίοδος μάλλον μετρήθηκε μισή: η νύχτα φαίνεται με σημείωση και δεν μπαίνει στους
+  /// μέσους όρους ([ouraRow]).
+  final bool lowBattery;
 
   /// Round 1 (S5-1): η ζώνη ώρας της ίδιας της εγγραφής, σε λεπτά ανατολικά του UTC (π.χ. «+02:00» → 120), όπως τη
   /// δίνει η Oura στο bedtime_start ([offsetMin]) και στο bedtime_end ([endOffsetMin]· διαφέρουν μόνο τη νύχτα της
@@ -193,6 +199,7 @@ class OuraSleep {
       phases: _str(j['sleep_phase_5_min']) ?? _str(j['app_sleep_phase_5_min']),
       readinessTemp: j['readiness'] is Map ? _dbl((j['readiness'] as Map)['temperature_deviation']) : null,
       // Από την Oura: η ζώνη μέσα στην ίδια την ώρα. Από το δικό μας αρχείο (ώρες σε UTC): τα «tz» / «tz_end».
+      lowBattery: j['low_battery_alert'] == true,
       offsetMin: _offsetOk(j['tz']) ?? _isoOffset(j['bedtime_start']),
       endOffsetMin: _offsetOk(j['tz_end']) ?? _isoOffset(j['bedtime_end']),
     );
@@ -222,6 +229,8 @@ class OuraSleep {
         // Round 1 (S5-1), πρόσθετα κλειδιά: παλιός κώδικας τα αγνοεί· παλιό αρχείο χωρίς αυτά = ώρα κινητού.
         if (offsetMin != null) 'tz': offsetMin,
         if (endOffsetMin != null && endOffsetMin != offsetMin) 'tz_end': endOffsetMin,
+        // Α17 (21/11): μόνο όταν ισχύει· παλιό αρχείο χωρίς αυτό = η μπαταρία ήταν εντάξει.
+        if (lowBattery) 'low_battery_alert': true,
       };
 
   /// Οι φάσεις ως κομμάτια χρόνου (για το υπνόγραμμα, «εκτίμηση της Oura»).
@@ -266,6 +275,11 @@ class OuraDaily {
 
   /// Μέσος όρος οξυγόνου της νύχτας (%), από το daily_spo2 (spo2_percentage.average). Μόνο με την άδεια spo2.
   double? spo2Avg;
+
+  /// Απόφαση χρήστη 21/11 (Α16): ο «δείκτης διαταραχών αναπνοής» της Oura (daily_spo2 · breathing_disturbance_index:
+  /// ακέραιος 0–100, «από τις πτώσεις του οξυγόνου», κατά την τεκμηρίωση του Oura API). Εκτίμηση της Oura, όχι τεστ
+  /// άπνοιας: φαίνεται μόνο στον Ύπνο, χωρίς δική μας ερμηνεία ή όρια, και δεν μπαίνει στο ιστορικό ή στις Τάσεις.
+  int? breathingIndex;
 }
 
 /// Μία μέρα του Oura: η νύχτα, οι υπνάκοι και οι ημερήσιες τιμές.
@@ -310,6 +324,9 @@ class OuraNight {
     return [m, ...pieces]..sort((a, b) => a.start.compareTo(b.start));
   }
 
+  /// Α17 (21/11): η μπαταρία του δαχτυλιδιού έπεσε σε κάποιο κομμάτι της νύχτας ([OuraSleep.lowBattery]).
+  bool get lowBattery => counted.any((x) => x.lowBattery);
+
   /// Ο ύπνος της νύχτας σε λεπτά: το άθροισμα των περιόδων που μετρούν ([counted]), χωρίς τα κενά. Null αν η κύρια
   /// δεν έχει διάρκεια ύπνου.
   int? get nightMinutes {
@@ -336,6 +353,9 @@ class OuraNight {
   /// Από το daily_readiness· αν λείπει, από την ίδια νύχτα (ίδια πηγή, ίδια τιμή της Oura).
   double? get tempDeviation => daily?.tempDeviation ?? main?.readinessTemp;
   double? get spo2Avg => daily?.spo2Avg;
+
+  /// Α16 (21/11): [OuraDaily.breathingIndex].
+  int? get breathingIndex => daily?.breathingIndex;
 
   int get napMinutes => naps.fold(0, (s, n) => s + (n.totalMinutes ?? 0));
   bool get hasAny => main != null || naps.isNotEmpty || others.isNotEmpty || pieces.isNotEmpty || daily != null;
@@ -366,6 +386,7 @@ class OuraNight {
         if (daily?.readiness != null) 'readiness': daily!.readiness,
         if (daily?.tempDeviation != null) 'temp': daily!.tempDeviation,
         if (daily?.spo2Avg != null) 'spo2': daily!.spo2Avg,
+        if (daily?.breathingIndex != null) 'bdi': daily!.breathingIndex,
         if (napLock != null) 'napLock': napLock!.millisecondsSinceEpoch ~/ 60000,
       };
 
@@ -379,7 +400,7 @@ class OuraNight {
               if (x is Map) OuraSleep.fromJson(Map<String, dynamic>.from(x)),
         ].whereType<OuraSleep>().toList();
     final main = j['main'] is Map ? OuraSleep.fromJson(Map<String, dynamic>.from(j['main'] as Map)) : null;
-    final hasDaily = j['score'] != null || j['readiness'] != null || j['temp'] != null || j['spo2'] != null;
+    final hasDaily = j['score'] != null || j['readiness'] != null || j['temp'] != null || j['spo2'] != null || j['bdi'] != null;
     return OuraNight(
       day: day,
       main: main,
@@ -392,7 +413,8 @@ class OuraNight {
             ..sleepScore = _int(j['score'])
             ..readiness = _int(j['readiness'])
             ..tempDeviation = _dbl(j['temp'])
-            ..spo2Avg = _dbl(j['spo2']))
+            ..spo2Avg = _dbl(j['spo2'])
+            ..breathingIndex = _bdi(j['bdi']))
           : null,
     );
   }
@@ -502,9 +524,12 @@ Map<String, OuraDaily> mergeDailies(List<Map<String, dynamic>> dailySleep, List<
     final v = p is Map ? _dbl(p['average']) : null;
     // Μόνο λογικές τιμές (όπως spo2Range του ρολογιού)· 0 ή κενό = δεν μετρήθηκε.
     if (v != null && v >= 50 && v <= 100) at(d).spo2Avg = v;
+    // Α16 (21/11): ο δείκτης διαταραχών αναπνοής, μόνο μέσα στο 0–100 της τεκμηρίωσης.
+    if (_bdi(j['breathing_disturbance_index']) case final b?) at(d).breathingIndex = b;
   }
   // Μέρα χωρίς καμία τιμή: δεν μένει άδεια εγγραφή.
-  out.removeWhere((_, v) => v.sleepScore == null && v.readiness == null && v.tempDeviation == null && v.spo2Avg == null);
+  out.removeWhere((_, v) =>
+      v.sleepScore == null && v.readiness == null && v.tempDeviation == null && v.spo2Avg == null && v.breathingIndex == null);
   return out;
 }
 
@@ -519,7 +544,11 @@ Map<String, double> ouraRow(OuraNight n) {
   }
 
   final m = n.main;
-  if (m != null) {
+  // Α17 (απόφαση χρήστη 21/11): νύχτα με χαμηλή μπαταρία δαχτυλιδιού δεν μπαίνει στους μέσους όρους (μάλλον μετρήθηκε
+  // μισή): καμία τιμή της νύχτας στο ιστορικό. Η νύχτα φαίνεται στον Ύπνο, με σημείωση. Οι υπνάκοι και οι ημερήσιες
+  // τιμές της Oura (ετοιμότητα, θερμοκρασία) μένουν.
+  final low = n.lowBattery;
+  if (m != null && !low) {
     // Νύχτα σε κομμάτια ([OuraNight.counted]): διάρκεια, φάσεις και ξύπνιος από όλα τα κομμάτια που μετρούν, ώρα
     // ύπνου από το πρώτο, ξύπνημα από το τελευταίο (δεύτερος γύρος ελέγχου, U12). Παλμοί, HRV, αναπνοές: της κύριας
     // περιόδου (μέσοι όροι της Oura ανά περίοδο· δεν ανακατεύονται).
@@ -552,11 +581,11 @@ Map<String, double> ouraRow(OuraNight n) {
   if (napped.isNotEmpty) put(K.napMin, napped.fold<int>(0, (a, b) => a + b) / 60);
   if (m != null && n.napLock != null) put(K.napLock, n.napLock!.millisecondsSinceEpoch ~/ 60000);
   // Βαθμολογία ύπνου μόνο για μέρα με κύρια νύχτα (όχι για μέρα με μόνο υπνάκο: η κάρτα λέει «Μόνο υπνάκος»).
-  if (m != null) put(K.sleepScore, _within(n.sleepScore, 0, 100));
+  if (m != null && !low) put(K.sleepScore, _within(n.sleepScore, 0, 100));
   put(K.energy, _within(n.readiness, 0, 100));
   put(K.skinTemp, _within(n.tempDeviation, -5, 5));
   // Οξυγόνο: μόνο για μέρα με κύρια νύχτα (όπως η βαθμολογία ύπνου).
-  if (m != null) put(K.ringSpo2, n.spo2Avg);
+  if (m != null && !low) put(K.ringSpo2, n.spo2Avg);
   return out;
 }
 
@@ -708,3 +737,6 @@ List<int?> pieceMinutesShown(List<int?> totalSeconds, int? night) {
   if ((fixed - mins[big]!).abs() > (mins.length + 1) ~/ 2 || fixed < 0) return mins;
   return [for (var i = 0; i < mins.length; i++) i == big ? fixed : mins[i]];
 }
+
+/// Α16 (21/11): ο δείκτης διαταραχών αναπνοής της Oura, μόνο ακέραιος μέσα στο 0–100 (αλλιώς null).
+int? _bdi(Object? v) => v is int && v >= 0 && v <= 100 ? v : (v is num && v == v.roundToDouble() && v >= 0 && v <= 100 ? v.toInt() : null);

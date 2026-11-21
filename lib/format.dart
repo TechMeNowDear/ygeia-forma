@@ -55,6 +55,14 @@ String two(int n) => n.toString().padLeft(2, '0');
 /// «08:40»
 String hm(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
 
+/// Απόφαση χρήστη 21/11 (Α9): οι ώρες των κομματιών μιας νύχτας σε κομμάτια, κάτω από τη συνολική διάρκεια:
+/// «03:30–07:00 και 08:40–10:00». Μόνο για 2 ή 3 κομμάτια (πιο πολλά: ο αριθμός τους φτάνει)· αλλιώς null.
+String? piecesTimesText(List<(DateTime, DateTime)> pieces) {
+  if (pieces.length < 2 || pieces.length > 3) return null;
+  final t = [for (final (a, b) in pieces) '${hm(a)}–${hm(b)}'];
+  return t.length == 2 ? '${t[0]} και ${t[1]}' : '${t[0]}, ${t[1]} και ${t[2]}';
+}
+
 String _hours(int h) => h == 1 ? '1 ώρα' : '$h ώρες';
 String _minutes(int m) => m == 1 ? '1 λεπτό' : '$m λεπτά';
 
