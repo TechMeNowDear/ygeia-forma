@@ -17,6 +17,52 @@ ExLibrary _lib() => ExLibrary.fromJson(jsonDecode(File('assets/exercises/exercis
 void main() {
   final lib = _lib();
 
+  // Α24 (απόφαση χρήστη 21/11): ελληνικό όνομα σε κάθε άσκηση· το αγγλικό, όπου υπάρχει, μικρό από κάτω.
+  test('Α24: κανένα όνομα άσκησης με αγγλική λέξη· 13 ασκήσεις έχουν και σύντομο αγγλικό όνομα', () {
+    for (final e in lib.list) {
+      expect(RegExp(r'[A-Za-z]').hasMatch(e.name), isFalse, reason: '${e.id}: «${e.name}»');
+      // Το ρολόι δείχνει το ελληνικό όνομα· κανένα νέο όνομα πιο μακρύ από το μακρύτερο παλιό (31 χαρακτήρες).
+      expect(e.name.length, lessThanOrEqualTo(31), reason: e.id);
+      if (e.enName case final en?) {
+        expect(RegExp(r'^[A-Z][A-Za-z ]+$').hasMatch(en), isTrue, reason: '${e.id}: «$en»');
+        // Η αναζήτηση βρίσκει την άσκηση και με το αγγλικό της όνομα (λέξεις αναζήτησης).
+        for (final w in en.toLowerCase().split(' ')) {
+          expect('${e.en} ${e.id}'.contains(w), isTrue, reason: '${e.id}: η αναζήτηση δεν έχει «$w»');
+        }
+      }
+    }
+    expect({for (final e in lib.list) if (e.enName != null) e.id: e.enName}, {
+      'dips': 'Dips',
+      'hammer_curl': 'Hammer curl',
+      'band_pushdown': 'Band pushdown',
+      'crunch': 'Crunch',
+      'reverse_crunch': 'Reverse crunch',
+      'pallof': 'Pallof press',
+      'face_pull': 'Face pull',
+      'goblet': 'Goblet squat',
+      'rdl': 'Romanian deadlift',
+      'split_squat': 'Split squat',
+      'leg_curl': 'Leg curl',
+      'leg_ext': 'Leg extension',
+      'hip_thrust': 'Hip thrust',
+    });
+    expect(lib.byId('goblet')!.name, 'Κάθισμα με βάρος στο στήθος');
+    expect(lib.byId('rdl')!.name, 'Ρουμανική άρση θανάτου');
+    // Ανεξάρτητος έλεγχος 21/11 (Α24-1): κανένα κείμενο της βιβλιοθήκης δεν λέει πια άσκηση με το παλιό αγγλικό όνομα.
+    for (final e in lib.list) {
+      final texts = [e.feel, ...e.setup, ...e.steps, ...e.mistakes, ...e.tips, for (final c in e.cues) c.text].join(' ').toLowerCase();
+      for (final old in ['crunch', 'pushdown', 'deadlift', 'goblet', 'squat', 'leg curl', 'leg extension', 'hip thrust', 'face pull', 'pallof', 'hammer']) {
+        expect(texts.contains(old), isFalse, reason: '${e.id}: «$old»');
+      }
+    }
+    // Τα ονόματα μένουν μοναδικά.
+    expect({for (final e in lib.list) e.name}.length, lib.list.length);
+    // Η γραμμή των λιστών επιλογής: με αγγλικό όνομα μπροστά, αλλιώς μόνο ο εξοπλισμός (όπως πριν).
+    expect(exEquipLine(lib.byId('goblet')), 'Goblet squat ·\u00A0Kettlebell');
+    expect(exEquipLine(lib.byId('db_press')), lib.byId('db_press')!.equip);
+    expect(exEquipLine(null), '');
+  });
+
   test('όλες οι ασκήσεις έχουν πλήρη κείμενα και σωστά δεδομένα κίνησης', () {
     expect(lib.list.length, greaterThanOrEqualTo(29));
     final ids = <String>{};
@@ -150,6 +196,44 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('ex-row-db_curl')), findsOneWidget);
       expect(find.byKey(const ValueKey('ex-row-db_press')), findsNothing);
+    });
+
+    testWidgets('Α24: βιβλιοθήκη και σελίδα άσκησης δείχνουν το αγγλικό όνομα κάτω από το ελληνικό, όπου υπάρχει', (t) async {
+      await pump(t, const ExerciseLibraryPage());
+      await t.enterText(find.byKey(const ValueKey('ex-search')), 'goblet');
+      await t.pumpAndSettle();
+      final row = find.byKey(const ValueKey('ex-row-goblet'));
+      expect(row, findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text('Κάθισμα με βάρος στο στήθος')), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('ex-en-goblet'))).data, 'Goblet squat');
+      // Το αγγλικό κάτω από το ελληνικό, όχι δίπλα.
+      expect(t.getTopLeft(find.byKey(const ValueKey('ex-en-goblet'))).dy,
+          greaterThan(t.getTopLeft(find.descendant(of: row, matching: find.text('Κάθισμα με βάρος στο στήθος'))).dy));
+      // Ανεξάρτητος έλεγχος 21/11 (Α24-2): η αναζήτηση βρίσκει το αγγλικό όνομα ακριβώς όπως γράφεται στην οθόνη.
+      await t.enterText(find.byKey(const ValueKey('ex-search')), 'band pushdown');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ex-row-band_pushdown')), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('ex-search')), '');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ex-row-db_press')), findsOneWidget);
+      expect(find.byKey(const ValueKey('ex-en-db_press')), findsNothing);
+      expect(t.takeException(), isNull);
+
+      // Σελίδα άσκησης, κινητό και ανοιχτό Fold: μία γραμμή, χωρίς υπερχείλιση. (Με τη γραμματοσειρά των δοκιμών, που έχει
+      // τετράγωνα γράμματα, η γραμμή είναι πολύ πιο φαρδιά από την οθόνη: ελέγχεται ότι μικραίνει αντί να σπάει ή να κόβεται.)
+      final l = ExLibrary.loaded!;
+      for (final size in const [Size(400, 900), Size(860, 900)]) {
+        await pump(t, ExerciseDetailPage(ex: l.byId('leg_curl')!, lib: l, key: UniqueKey()), size: size);
+        expect(find.text('Κάμψεις ποδιών στον πάγκο'), findsOneWidget);
+        final line = t.widget<Text>(find.byKey(const ValueKey('ex-en-name')));
+        expect(line.data, 'Leg curl ·\u00A0Πόδια ·\u00A0${l.byId('leg_curl')!.equip}');
+        expect(t.getSize(find.byKey(const ValueKey('ex-en-name'))).height, lessThan(22), reason: '$size: μία γραμμή');
+        expect(t.takeException(), isNull, reason: '$size');
+      }
+      // Άσκηση χωρίς αγγλικό όνομα: η γραμμή όπως πριν.
+      await pump(t, ExerciseDetailPage(ex: l.byId('db_press')!, lib: l, key: UniqueKey()));
+      expect(find.byKey(const ValueKey('ex-en-name')), findsNothing);
+      expect(find.text('${l.byId('db_press')!.groupName} ·\u00A0${l.byId('db_press')!.equip}'), findsOneWidget);
     });
 
     testWidgets('σελίδα άσκησης: κίνηση, σημεία προσοχής, όψη, εναλλακτικές', (t) async {

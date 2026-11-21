@@ -21,6 +21,7 @@ class PlanItem {
     this.load,
     this.next,
     this.note,
+    this.loadAt,
   });
 
   /// Το id της άσκησης στη βιβλιοθήκη.
@@ -36,13 +37,19 @@ class PlanItem {
   /// Αρχικό φορτίο (kg ή lb για λάστιχα). null = να το βρει η εφαρμογή (πρώτη φορά, ξεκίνα ελαφριά).
   double? load;
 
+  /// Απόφαση χρήστη 21/11 (Α15): πότε γράφτηκε ΑΥΤΟ το [load] (ms), όταν ένα νέο πρόγραμμα (ή μια αλλαγή σου) έβαλε στην
+  /// άσκηση άλλο φορτίο από αυτό που είχε το προηγούμενο πρόγραμμα ([stampLoadTimes]). null: το φορτίο είναι ίδιο από
+  /// πάντα (ή από πριν υπάρξει αυτό το πεδίο). Το βάζει μόνο η αποθήκευση· ό,τι γράφει ένα επικολλημένο κείμενο αγνοείται.
+  int? loadAt;
+
   /// Πιο δύσκολη παραλλαγή, όταν φτάσει στο ανώτατο (π.χ. κάμψεις πάγκου → κάμψεις με λαβές).
   String? next;
   String? note;
 
   LoadKind get kind => loadKindOf(ex);
 
-  PlanItem copy() => PlanItem(ex: ex, sets: sets, lo: lo, hi: hi, rir: rir, rest: rest, load: load, next: next, note: note);
+  PlanItem copy() =>
+      PlanItem(ex: ex, sets: sets, lo: lo, hi: hi, rir: rir, rest: rest, load: load, next: next, note: note, loadAt: loadAt);
 
   Map<String, dynamic> toJson() => {
         'ex': ex,
@@ -51,6 +58,7 @@ class PlanItem {
         'rir': rir,
         'rest': rest,
         if (load != null) 'load': load,
+        if (load != null && loadAt != null) 'loadAt': loadAt,
         if (next != null) 'next': next,
         if (note != null && note!.isNotEmpty) 'note': note,
       };
@@ -74,8 +82,55 @@ class PlanItem {
       load: (j['load'] as num?)?.toDouble(),
       next: j['next'] as String?,
       note: j['note'] as String?,
+      loadAt: j['loadAt'] is num && (j['loadAt'] as num).isFinite ? (j['loadAt'] as num).toInt() : null,
     );
   }
+}
+
+/// Απόφαση χρήστη 21/11 (Α15): σημειώνει στο πρόγραμμα [next] ποια φορτία είναι ΝΕΑ σε σχέση με το πρόγραμμα [old] που
+/// ίσχυε ως τώρα ([PlanItem.loadAt] = [at]). Φορτίο ίδιο με του παλιού προγράμματος για την ίδια άσκηση κρατά τη σημείωση
+/// που είχε (συνήθως καμία): έτσι μια αλλαγή σε μέρες ή σετ, ή ένα νέο πρόγραμμα που αντιγράφει τα παλιά αρχικά κιλά, δεν
+/// «ξαναγράφει» φορτία. Χωρίς παλιό πρόγραμμα (το πρώτο σου) δεν σημειώνεται τίποτα: τα φορτία του είναι αρχικά, και όσα
+/// έκανες ήδη σε ελεύθερες προπονήσεις μένουν η αφετηρία. Ό,τι [PlanItem.loadAt] φέρνει το ίδιο το [next] (π.χ. από
+/// επικολλημένο κείμενο) αγνοείται.
+///
+/// «Ίδιο» κρίνεται με τον ΤΩΡΙΝΟ εξοπλισμό και στα δύο ([_sameLoad]): το [next] έρχεται ήδη στρογγυλεμένο σε ό,τι βγαίνει
+/// σήμερα, ενώ το [old] γράφτηκε με τον εξοπλισμό της μέρας του (ανεξάρτητος έλεγχος 21/11, Α15-1: μετά από αλλαγή λαβής,
+/// η επικόλληση του ίδιου κειμένου «έβλεπε» νέο φορτίο σε κάθε άσκηση και τις γύριζε στα αρχικά κιλά).
+///
+/// [stampNew] = false: ο επεξεργαστής προγράμματος. Εκεί το πεδίο λέγεται «Αρχικό βάρος» και αφορά μόνο την πρώτη φορά
+/// μιας άσκησης (όπως πάντα): φορτίο που άλλαξε εκεί ΔΕΝ σημειώνεται, άρα δεν κατεβάζει ποτέ μια άσκηση που ήδη κάνεις
+/// (Α15-3). Η σημείωση ενός φορτίου που δεν άλλαξε μένει.
+void stampLoadTimes(Program next, Program? old, DateTime at, {bool stampNew = true}) {
+  final before = <String, List<PlanItem>>{};
+  if (old != null) {
+    for (final w in old.workouts) {
+      for (final i in w.items) {
+        (before[i.ex] ??= []).add(i);
+      }
+    }
+  }
+  for (final w in next.workouts) {
+    for (final i in w.items) {
+      final load = i.load;
+      if (load == null || old == null) {
+        i.loadAt = null;
+        continue;
+      }
+      PlanItem? same;
+      for (final o in before[i.ex] ?? const <PlanItem>[]) {
+        if (o.load != null && _sameLoad(i.kind, o.load!, load)) same = o;
+      }
+      i.loadAt = same != null ? same.loadAt : (stampNew ? at.millisecondsSinceEpoch : null);
+    }
+  }
+}
+
+/// Δύο φορτία της ίδιας άσκησης είναι «το ίδιο» όταν με τον τωρινό εξοπλισμό βγαίνουν στο ίδιο βάρος.
+bool _sameLoad(LoadKind k, double a, double b) {
+  if ((a - b).abs() < 1e-6) return true;
+  if (!hasLoad(k) || !a.isFinite || !b.isFinite || a < 0 || b < 0) return false;
+  return (snap(k, a) - snap(k, b)).abs() < 1e-6;
 }
 
 /// Αερόβια (περπάτημα κ.λπ.).

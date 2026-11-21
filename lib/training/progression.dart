@@ -298,6 +298,50 @@ String _firstReason(PlanItem item, LoadKind k, double? start, int rirGoal) {
 /// [history]: οι προηγούμενες φορές της ίδιας άσκησης, νεότερη πρώτη, με την ημερομηνία τους.
 /// [caution]: άσκηση με προσοχή στη βιβλιοθήκη (ώμοι, μέση): χωρίς απάντηση για ρεζέρβα δεν ανεβαίνει τίποτα.
 Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today, {bool caution = false}) {
+  final t = _targetFromHistory(item, history, today, caution: caution);
+  return _lighterByPlan(item, history, t) ?? t;
+}
+
+/// Οι φορές της άσκησης που μετρούν για τον επόμενο στόχο (R7-A6-2, K4C-06).
+List<(DateTime, ExLog)> _usableHistory(List<(DateTime, ExLog)> history) =>
+    [for (final h in history) if ((!h.$2.skipped && h.$2.judged.isNotEmpty) || h.$2.pain.isNotEmpty) h];
+
+/// Απόφαση χρήστη 21/11 (Α15· K4C-15): όταν ένα ΝΕΟ πρόγραμμα γράφει για την άσκηση πιο ελαφρύ φορτίο από αυτό που θα
+/// έβγαινε από την τελευταία φορά (πιο ελαφριά εβδομάδα, επιστροφή μετά από αρρώστια, σύσταση γιατρού), ισχύει του
+/// προγράμματος. «Νέο»: το φορτίο γράφτηκε ΜΕΤΑ την τελευταία φορά της άσκησης ([PlanItem.loadAt], που το βάζει η
+/// αποθήκευση μόνο σε φορτίο διαφορετικό από του προηγούμενου προγράμματος). Μόλις γίνει μία φορά με το νέο φορτίο, η
+/// πρόοδος συνεχίζει από εκεί όπως πάντα. Ψηλότερο φορτίο προγράμματος δεν ισχύει ποτέ μόνο του. null: δεν αλλάζει τίποτα.
+Target? _lighterByPlan(PlanItem item, List<(DateTime, ExLog)> history, Target t) {
+  final k = item.kind;
+  final at = item.loadAt, planned = item.load, now = t.load;
+  if (at == null || planned == null || now == null || !hasLoad(k) || t.change == Change.first) return null;
+  final usable = _usableHistory(history);
+  if (usable.isEmpty || !usable.first.$1.isBefore(DateTime.fromMillisecondsSinceEpoch(at))) return null;
+  final plan = fitLoad(k, snap(k, planned));
+  if (!_easier(k, plan, now)) return null;
+  // Ανεξάρτητος έλεγχος 21/11 (Α15-2): «πιο ελαφριά» σημαίνει και από ό,τι ΕΚΑΝΕΣ την τελευταία φορά, όχι μόνο από τον
+  // επόμενο στόχο. Πρόγραμμα που γράφει τα κιλά της τελευταίας φοράς (π.χ. 9,3 kg, ενώ ήταν έτοιμη η άνοδος σε 10,3 kg)
+  // δεν ζητά τίποτα πιο ελαφρύ: η πρόοδος συνεχίζει.
+  final last = usable.first.$2;
+  final lastLoad = _endLoad(last) ?? (last.log.isNotEmpty ? last.log.first.load : null);
+  if (lastLoad != null && !_easier(k, plan, lastLoad)) return null;
+  // Μετά από ενόχληση: ο στόχος και το κείμενό του μένουν (μικρότερο εύρος, πότε γιατρός), με το ελαφρύτερο φορτίο.
+  if (t.change == Change.pain) {
+    return Target(
+        load: plan,
+        reps: t.reps,
+        change: t.change,
+        reason: '${t.reason} Το νέο σου πρόγραμμα γράφει ακόμα πιο ελαφριά (${_l(k, plan)}): ισχύει αυτό.',
+        variant: t.variant);
+  }
+  return Target(
+      load: plan,
+      reps: _same(item.sets, item.lo),
+      change: Change.back,
+      reason: 'Το νέο σου πρόγραμμα γράφει πιο ελαφριά: ${_l(k, plan)} αντί για ${_l(k, now)}, από ${item.lo} επαναλήψεις.');
+}
+
+Target _targetFromHistory(PlanItem item, List<(DateTime, ExLog)> history, DateTime today, {bool caution = false}) {
   final k = item.kind;
   final sets = item.sets, lo = item.lo, hi = item.hi;
   // Τουλάχιστον 2 ρεζέρβα σε όλες τις ασκήσεις, ως να πει άλλα ο γιατρός: η πίεση ανεβαίνει απότομα
@@ -306,7 +350,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // R7-A6-2: και μια φορά με ενόχληση χωρίς κανένα σετ (σταμάτησες στο 1ο σετ, ή «Παράλειψη» μετά τον πόνο): μετρά.
   // Έλεγχος 20/11 (K4C-06): «σετ» είναι όσα κρίνονται ([ExLog.judged])· ένα ✓ με 0 επαναλήψεις δεν είναι φορά της άσκησης
   // (πριν: έσβηνε για πάντα την «πρώτη φορά» και την ερώτηση του 1ου σετ).
-  final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.judged.isNotEmpty) || h.$2.pain.isNotEmpty) h];
+  final usable = _usableHistory(history);
 
   if (usable.isEmpty) {
     final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : switch (startLoad(item.ex, k)) { final v? => fitLoad(k, v), _ => null }) : null;

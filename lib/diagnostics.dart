@@ -174,6 +174,7 @@ Map<String, dynamic> checkInJson(CheckIn c, {double? estShare, bool oldWeights =
       },
     'wanted': c.wanted,
     if (c.quitDays != null) 'quitHoldDays': c.quitDays,
+    if (c.waistDrop != null) 'waistDropCm': c.waistDrop,
     'kgNow': oldWeights ? null : c.kgNow,
     'fastSlopeKgWeek': _n(c.fastSlope, 3),
     // ---- Έλεγχος 21/11 (K8-01): τα υπόλοιπα πεδία της κάρτας.
@@ -985,6 +986,9 @@ Map<String, dynamic> diagnosticsRules() => {
         'likelyUnderlogShare': adaptLikelyUnderlogShare,
         'farBelowRate': farBelowRate,
         'quitHoldDays': smokeQuitHoldDays,
+        'waistHoldMinCm': waistHoldMinCm,
+        'waistHoldMinDays': waistHoldMinDays,
+        'waistHoldEdgeDays': waistHoldEdgeDays,
         'estShareNote': estimatedShareNote,
         'kcalPerKg': kcalPerKg,
         'floorMale': kcalFloorMale,

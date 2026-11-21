@@ -87,7 +87,8 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
       );
       return;
     }
-    widget.training.saveProgram(_p, author: 'user');
+    // Α15-3 (21/11): το «Αρχικό βάρος» εδώ δεν κατεβάζει ποτέ άσκηση που ήδη κάνεις (μόνο η επικόλληση προγράμματος).
+    widget.training.saveProgram(_p, author: 'user', newLoads: false);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -454,7 +455,7 @@ Future<String?> pickExercise(BuildContext context) => showModalBottomSheet<Strin
           final c = Aigaio.of(ctx);
           final list = [
             for (final e in ExLibrary.loaded?.list ?? const <Ex>[])
-              if (q.isEmpty || plain('${e.name} ${e.en} ${e.groupName} ${e.equip}').contains(plain(q))) e,
+              if (q.isEmpty || plain('${e.name} ${e.enName ?? ''} ${e.en} ${e.groupName} ${e.equip}').contains(plain(q))) e,
           ];
           return SizedBox(
             height: MediaQuery.of(ctx).size.height * 0.8,
@@ -482,9 +483,9 @@ Future<String?> pickExercise(BuildContext context) => showModalBottomSheet<Strin
                           title: Text(e.name),
                           // R7-A6-9: η προειδοποίηση των ασκήσεων «με προσοχή», όπως στο «Πρόσθεσε άσκηση» (ex_picker.dart).
                           subtitle: e.caution == null
-                              ? Text(e.equip)
+                              ? Text(exEquipLine(e))
                               : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text(e.equip),
+                                  Text(exEquipLine(e)),
                                   Row(children: [
                                     Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
                                     const SizedBox(width: 4),

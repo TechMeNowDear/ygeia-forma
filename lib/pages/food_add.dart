@@ -1283,7 +1283,21 @@ class _QuantitySheetState extends State<QuantitySheet> {
   /// «πριν ή μετά το μαγείρεμα;» με τις θερμίδες της κάθε μορφής· η απάντηση αλλάζει τη μορφή που γράφεται. Αν κράτησες
   /// την ξερή, δεν ξαναρωτά «Σωστή ποσότητα;» (είδες ήδη τις θερμίδες). Round7 (R7-A2-3): ο έλεγχος λάθους ξέρει και την
   /// ποσότητα της τελευταίας φοράς.
+  /// Μία υποβολή τη φορά: το «✓» του πληκτρολογίου και το κουμπί κάνουν το ίδιο (Α23), και δύο γρήγορα πατήματα δεν
+  /// κλείνουν δύο οθόνες.
+  bool _submitting = false;
+
   Future<void> _submit(double g) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await _doSubmit(g);
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _doSubmit(double g) async {
     if (widget.ingredient) {
       Navigator.pop(context, _SheetResult(g, _meal, _item));
       return;
@@ -1611,6 +1625,14 @@ class _QuantitySheetState extends State<QuantitySheet> {
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                         textAlign: TextAlign.center,
                         onChanged: (_) => setState(() {}),
+                        // Απόφαση χρήστη 21/11 (Α23· K7B-07): το «✓» του πληκτρολογίου κάνει ό,τι και το κουμπί από κάτω
+                        // («Προσθήκη στο …», «Αποθήκευση», «Βάλ’ το στο φαγητό»), με τους ίδιους ελέγχους. Πριν μόνο έκλεινε
+                        // το πληκτρολόγιο: ένα πάτημα παραπάνω σε κάθε καταχώριση. Με άκυρη ποσότητα δεν κάνει τίποτα.
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) {
+                          final v = _value;
+                          if (v != null) _submit(v);
+                        },
                         style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: c.text, fontFeatures: tabular),
                         decoration: InputDecoration(
                           suffixText: unit,

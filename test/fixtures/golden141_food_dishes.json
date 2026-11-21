@@ -1033,7 +1033,8 @@
    3,
    4
   ],
-  "potQuickDays": 4,
+  "potQuickDays": 3,
+  "potRiceQuickDays": 2,
   "standardTags": [
    "όσπρια",
    "ψάρι",
@@ -2257,7 +2258,8 @@
  "freshBatch": {
   "+0": true,
   "+1": true,
-  "+3": true,
+  "+2": true,
+  "+3": false,
   "+4": false,
   "+5": false,
   "no batch": false,

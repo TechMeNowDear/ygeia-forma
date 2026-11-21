@@ -29,7 +29,7 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
 
   bool _matches(Ex e, String q) {
     if (q.isEmpty) return true;
-    final hay = [e.name, e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
+    final hay = [e.name, e.enName ?? '', e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
     final p = plain(q.trim());
     if (plain(hay).contains(p)) return true;
     return phonetic(hay).contains(phonetic(q.trim()));
@@ -190,6 +190,9 @@ class _Row extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(ex.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, height: 1.25)),
+                  // Α24 (απόφαση χρήστη 21/11): το αγγλικό όνομα μικρό, κάτω από το ελληνικό.
+                  if (ex.enName case final en?)
+                    Text(en, key: ValueKey('ex-en-${ex.id}'), style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.3)),
                   const SizedBox(height: 2),
                   Text(
                     '${ex.equip} ·\u00A0${ex.primary.map((m) => m.name.toLowerCase()).join(', ')}',

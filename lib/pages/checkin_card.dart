@@ -245,7 +245,8 @@ class CheckInCard extends StatelessWidget {
                       '(${thousands(fTdee)}). Μετά τη διακοπή του καπνίσματος το βάρος συχνά ανεβαίνει λίγο και αυτό κατεβάζει '
                       'την εκτίμηση· δεν σημαίνει ότι γράφεις λάθος. ${quitText(k.quitDays!)}'
                   : 'Με όσα γράφτηκαν βγαίνει ότι καις ${_kcal(k.est!.tdee)}\u00A0kcal, πολύ μακριά από τον τύπο$fKg (${thousands(fTdee)}). '
-                      'Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Ο στόχος μένει ίδιος.',
+                      'Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. '
+                      '${k.waistDrop != null ? waistHeldText(k.waistDrop!) : 'Ο στόχος μένει ίδιος.'}',
           style: body),
       CheckKind.fast => Text.rich(TextSpan(style: body, children: [
           TextSpan(text: '${fastPeriodText(k.fastDays)}: '),
@@ -384,18 +385,22 @@ String _sameText(CheckIn k) {
     return '$fast Τρως κατά μέσο όρο ${thousands(eaten)}\u00A0kcal, ${thousands(under)} λιγότερες από τους στόχους σου αυτές τις '
         'εβδομάδες (κατά μέσο όρο ${thousands(target)}): φάε πιο κοντά στον στόχο.';
   }
+  // Έλεγχος 20/11 (K1-S-02): τρως πολύ κάτω από τον στόχο και χάνεις πολύ πιο γρήγορα από τον ρυθμό σου. Ανεξάρτητος
+  // έλεγχος 21/11 (Α8-5): γράφεται ΚΑΙ όταν ο στόχος κρατήθηκε (μέση, κάπνισμα, πρόσφατη αλλαγή)· πριν, η κάρτα πρότασης
+  // το έλεγε και η κάρτα «ίδιος στόχος» για τον ίδιο άνθρωπο όχι.
+  final below = farBelowText(k) ?? '';
   final quit = k.quitDays;
   if (quit != null) {
-    return ' ${quitText(quit)}';
+    return ' ${quitText(quit)}$below';
   }
+  final waist = k.waistDrop;
+  if (waist != null) return ' ${waistHeldText(waist)}$below';
   final held = k.heldDays;
   if (held != null) {
     // S1-4: όχι δεύτερη αλλαγή μέσα σε λίγες μέρες.
     final ago = held <= 0 ? 'σήμερα' : (held == 1 ? 'χθες' : 'πριν από $held μέρες');
-    return ' Ο στόχος άλλαξε $ago: δεν αλλάζει ξανά τόσο σύντομα. Ο επόμενος έλεγχος συνεχίζει.';
+    return ' Ο στόχος άλλαξε $ago: δεν αλλάζει ξανά τόσο σύντομα. Ο επόμενος έλεγχος συνεχίζει.$below';
   }
-  // Έλεγχος 20/11 (K1-S-02): τρως πολύ κάτω από τον στόχο και χάνεις πολύ πιο γρήγορα από τον ρυθμό σου.
-  final below = farBelowText(k) ?? '';
   // Έλεγχος 20/11 (K1-C-02): το μεγάλο διάστημα ζητούσε αλλαγή, οι 3 τελευταίες εβδομάδες όχι.
   if (p != null && p.recentDiffers) {
     return ' Όλο το διάστημα δείχνει ότι ο στόχος θέλει αλλαγή, οι 3 τελευταίες εβδομάδες όμως όχι: ο στόχος μένει ίδιος '
@@ -452,6 +457,10 @@ String? newMuscleNote(CheckIn k, DateTime now) {
   return 'Αν άρχισες πρόσφατα βάρη, νέοι μύες και το νερό τους μπορεί να κρύβουν μέρος της απώλειας λίπους στη ζυγαριά, και η '
       'εκτίμηση βγαίνει τότε λίγο χαμηλά. Αν η μέση σου πέφτει, το «Όχι τώρα» είναι λογικό.';
 }
+
+/// Απόφαση χρήστη 21/11 (Α8): γιατί ο στόχος δεν κατέβηκε ενώ η εκτίμηση το ζητούσε ([CheckIn.waistDrop], σε cm).
+String waistHeldText(double cm) =>
+    'Η μέση σου έπεσε ${dec(cm)}\u00A0cm σε αυτό το διάστημα: χάνεις λίπος. Ο στόχος δεν κατεβαίνει.';
 
 /// Γρήγορη απώλεια χωρίς πρόταση (S1-2): τι δείχνει το ημερολόγιο φαγητού.
 /// Γύρος 2: «τις τελευταίες μέρες», γιατί τώρα μετρούν κυρίως αυτές (R2-A-3)· και όταν ο στόχος άλλαξε μέσα στις μέρες
@@ -566,6 +575,8 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
             Text('Ο στόχος άλλαξε πριν από λίγες μέρες: δεν αλλάζει ξανά τόσο σύντομα.', style: small)
           else if (k.quitDays != null)
             Text(quitText(k.quitDays!), style: small)
+          else if (k.waistDrop != null)
+            Text(waistHeldText(k.waistDrop!), style: small)
           else if (p.underweight)
             Text('Το βάρος σου είναι κάτω από το φυσιολογικό για το ύψος σου (δείκτης μάζας σώματος κάτω από 18,5): ο στόχος δεν '
                 'κατεβαίνει άλλο.', style: small)

@@ -22,7 +22,7 @@ Future<String?> pickExercise(BuildContext context, {Set<String> already = const 
 bool exMatches(Ex e, String q) {
   final t = q.trim();
   if (t.isEmpty) return true;
-  final hay = [e.name, e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
+  final hay = [e.name, e.enName ?? '', e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
   if (plain(hay).contains(plain(t))) return true;
   return phonetic(hay).contains(phonetic(t));
 }
@@ -65,7 +65,7 @@ class _PickerState extends State<_Picker> {
           minVerticalPadding: 6,
           title: Text(e.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: c.text)),
           subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(e.equip, style: TextStyle(fontSize: 13, color: c.textSecondary)),
+            Text(exEquipLine(e), style: TextStyle(fontSize: 13, color: c.textSecondary)),
             if (e.caution != null)
               Row(children: [
                 Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),

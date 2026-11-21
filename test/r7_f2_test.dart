@@ -216,8 +216,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sess-pain')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
-      // Έλεγχος 21/11 (K7B-13): το φύλλο γράφει και τι κάνεις με πόνο στο στήθος ή δύσπνοια (πριν: μόνο αρθρώσεις).
-      expect(tester.widget<Text>(find.byKey(const ValueKey('pain-safety'))).data, sessionSafetyText);
+      // Απόφαση χρήστη 21/11: η γραμμή για πόνο στο στήθος και 166 δεν μπαίνει στο φύλλο «Πόνεσε κάπου;» (#147: είχε μπει).
+      expect(find.byKey(const ValueKey('pain-safety')), findsNothing);
+      expect(find.descendant(of: find.byType(BottomSheet), matching: find.text(sessionSafetyText)), findsNothing);
       await tester.tap(find.byKey(const ValueKey('pain-shoulderR')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('pain-ok')));
@@ -448,6 +449,32 @@ void main() {
     expect(done('db_curl', 2.8, [12, 12]).doneText(), '2,8 kg ·\u00A012, 12');
     final p = ExProgress(ex: 'db_curl', kind: LoadKind.dbPair, beforeDay: ago(10), before: done('db_curl', 2.8, [12, 12]), nowDay: ago(3), now: mixed);
     expect(p.loadDiff, 0, reason: 'τελείωσε με 2,8 kg και τις δύο φορές (με το μεγαλύτερο θα έβγαινε +1,5)');
+  });
+
+  // ---------------------------------------------------------------- Α24 (απόφαση χρήστη 21/11)
+  testWidgets('Α24: στην προπόνηση το ελληνικό όνομα και από κάτω, μικρό, το αγγλικό· χωρίς αγγλικό όνομα, καμία γραμμή', (tester) async {
+    await tester.runAsync(() => ExLibrary.load(inline: true));
+    final at = DateTime(2026, 11, 23, 18);
+    final t = TrainingStore(io: MemoryTrainingIO(), clock: () => at)..ready = true;
+    t.saveProgram(parseProgram(_v2, ids).program!, author: 'claude');
+    t.start(t.program!.workout('LB')!);
+    await _pump(tester, SessionPage(training: t));
+    expect(find.text('Κάθισμα με βάρος στο στήθος'), findsWidgets);
+    final en = find.byKey(const ValueKey('ex-en-name'));
+    expect(tester.widget<Text>(en).data, 'Goblet squat');
+    expect(find.text('Goblet squat'), findsOneWidget, reason: 'το παλιό αγγλικό όνομα μόνο στη μικρή γραμμή');
+    // Ο μεγάλος τίτλος της άσκησης (22), όχι η γραμμή της στη λίστα.
+    final title = find.byWidgetPredicate((w) => w is Text && w.data == 'Κάθισμα με βάρος στο στήθος' && w.style?.fontSize == 22);
+    expect(title, findsOneWidget);
+    expect(tester.getTopLeft(en).dy, greaterThanOrEqualTo(tester.getBottomLeft(title).dy - 1));
+    expect(tester.takeException(), isNull);
+
+    // Άσκηση χωρίς αγγλικό όνομα (Πιεστικό με αλτήρες): καμία δεύτερη γραμμή.
+    final t2 = sampleTraining(DateTime(2026, 11, 13, 17, 30));
+    final s2 = t2.start(t2.program!.workout('A')!);
+    expect(lib.byId(s2.items.first.ex)!.enName, isNull, reason: 'το δείγμα ξεκινά με άσκηση χωρίς αγγλικό όνομα');
+    await _pump(tester, SessionPage(training: t2, key: UniqueKey()));
+    expect(find.byKey(const ValueKey('ex-en-name')), findsNothing);
   });
 
   // ---------------------------------------------------------------- R7-A6-4

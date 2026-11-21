@@ -314,9 +314,10 @@ void main() {
       final text = shoppingText(l, w);
       expect(text, contains('Τσιπούρα υδατοκαλλιέργειας (ωμή): 300 g'));
       expect(text, contains('Φακές (ξερές): 550 g'));
-      // Από τη 2η μέρα και μετά: η κατσαρόλα της 1ης είναι περισσεύματα, μένει μόνο το μαγείρεμα της 5ης.
+      // Από τη 2η μέρα και μετά, χωρίς ζυγισμένο μαγείρεμα: οι φακές της 2ης μέρας είναι μαγείρεμα, και της 5ης (3 μέρες
+      // μετά) επίσης. Απόφαση 21/11 (Α2): τα περισσεύματα κρατούν ως 2 μέρες· πριν (ως 3) η 5η μέρα ήταν «περίσσευμα».
       final later = shoppingList(s, w, fromDay: 1, now: now);
-      expect({for (final x in later.main) x.food.id: x.amount}[lentils], 250 + 50);
+      expect({for (final x in later.main) x.food.id: x.amount}[lentils], 2 * 250 + 50);
       expect(shopRound(3.2), 4);
       expect(shopRound(201), 210);
     });
@@ -377,6 +378,20 @@ void main() {
       await t.pumpAndSettle();
       expect(slotStateNow(s, s.week!, 0, s.week!.days[0][1]), SlotState.open);
       expect(find.byKey(const ValueKey('slot-ate-0-1')), findsOneWidget);
+    });
+
+    // Ανεξάρτητος έλεγχος 21/11 (Α2-2).
+    testWidgets('Κατσαρόλα που πέρασε τις μέρες της: η θέση το λέει («Μαγειρεύτηκε πριν από 4 μέρες…»), όχι «Μαγείρεψε και ζύγισε»', (t) async {
+      final dishes = library();
+      final pot = dishes.firstWhere((d) => d.kind == DishKind.pot);
+      final b = PotBatch(at: DateTime(now.year, now.month, now.day - 4, 20).millisecondsSinceEpoch, cooked: 1500, items: pot.items);
+      final cooked = [for (final d in dishes) d.id == pot.id ? d.copyWith(batch: b) : d];
+      final s = store(dishes: cooked, week: parseWeek(weekText(), cooked, now: 0).plan);
+      await pump(t, FoodTheme(child: PlanDayCard(food: s, day: now, clock: () => now)));
+      expect(potOldHint(4), 'Μαγειρεύτηκε πριν από 4 μέρες: πάτα για να δεις τη μερίδα ή να το μαγειρέψεις ξανά');
+      expect(find.text(potOldHint(4)), findsOneWidget);
+      expect(find.textContaining('Μαγείρεψε και ζύγισε όλο το έτοιμο φαγητό'), findsNothing);
+      expect(find.textContaining('Η μερίδα σου:'), findsNothing);
     });
 
     testWidgets('Κατσαρόλα στο πρόγραμμα: μετά το ζύγισμα, «Η μερίδα σου: … g»', (t) async {

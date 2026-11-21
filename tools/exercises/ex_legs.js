@@ -27,7 +27,7 @@ const barOnLegs = x => J => {
 };
 
 const rdl = {
-  id: 'rdl', name: 'Romanian deadlift', en: 'romanian deadlift rdl', group: 'legs', equip: 'Μπάρα', yaw: 90,
+  id: 'rdl', name: 'Ρουμανική άρση θανάτου', enName: 'Romanian deadlift', en: 'romanian deadlift rdl', group: 'legs', equip: 'Μπάρα', yaw: 90,
   tempo: [[0, 1, 2.6, 'Κάτω, εισπνοή'], [1, 1, 0.4, 'Κάτω'], [1, 0, 1.4, 'Πάνω, εκπνοή'], [0, 0, 0.8, 'Πάνω']],
   primary: [['hamstrings'], ['glutes']], secondary: [['lowback'], ['forearm'], ['adductors']],
   frame(S, p) {
@@ -47,7 +47,7 @@ const rdl = {
 };
 
 const goblet = {
-  id: 'goblet', name: 'Goblet squat', en: 'goblet squat kettlebell squat', group: 'legs', equip: 'Kettlebell', yaw: 90,
+  id: 'goblet', name: 'Κάθισμα με βάρος στο στήθος', enName: 'Goblet squat', en: 'goblet squat kettlebell squat', group: 'legs', equip: 'Kettlebell', yaw: 90,
   tempo: [[0, 1, 2.4, 'Κάτω, εισπνοή'], [1, 1, 0.5, 'Κάτω'], [1, 0, 1.5, 'Πάνω, εκπνοή'], [0, 0, 0.8, 'Πάνω']],
   primary: [['quads'], ['glutes']], secondary: [['adductors'], ['abs'], ['upperback']],
   frame(S, p) {
@@ -79,7 +79,7 @@ const { feetBeside, ARM: ARM2 } = require('./poses');
 const solve = E.solve;
 
 const splitSquat = {
-  id: 'split_squat', name: 'Split squat με αλτήρες', en: 'split squat lunge dumbbells', group: 'legs', equip: 'Αλτήρες', yaw: -90, yaw2: -25,
+  id: 'split_squat', name: 'Στατικές προβολές με αλτήρες', enName: 'Split squat', en: 'split squat lunge dumbbells', group: 'legs', equip: 'Αλτήρες', yaw: -90, yaw2: -25,
   tempo: [[0, 1, 2.2, 'Κάτω, εισπνοή'], [1, 1, 0.3, 'Κάτω'], [1, 0, 1.4, 'Πάνω, εκπνοή'], [0, 0, 0.7, 'Πάνω']],
   frame(S, p) {
     const fF = E.footFlat(0.11, 0.42, 4);
@@ -106,7 +106,7 @@ const splitSquat = {
 };
 
 const legCurl = {
-  id: 'leg_curl', name: 'Leg curl στον πάγκο', en: 'lying leg curl hamstring curl machine', group: 'legs', equip: 'Πάγκος, μονάδα ποδιών', yaw: 90, yaw2: 150, elev2: 20,
+  id: 'leg_curl', name: 'Κάμψεις ποδιών στον πάγκο', enName: 'Leg curl', en: 'lying leg curl hamstring curl machine', group: 'legs', equip: 'Πάγκος, μονάδα ποδιών', yaw: 90, yaw2: 150, elev2: 20,
   tempo: [[0, 1, 1.2, 'Λύγισε'], [1, 1, 0.5, 'Σφίξε'], [1, 0, 2.4, 'Κάτω, εισπνοή'], [0, 0, 0.4, 'Κάτω']],
   frame(S, p) {
     S.bench();
@@ -129,7 +129,7 @@ const legCurl = {
 };
 
 const legExt = {
-  id: 'leg_ext', name: 'Leg extension', en: 'leg extension quad machine', group: 'legs', equip: 'Πάγκος, μονάδα ποδιών', yaw: 90, yaw2: 30,
+  id: 'leg_ext', name: 'Εκτάσεις ποδιών', enName: 'Leg extension', en: 'leg extension quad machine', group: 'legs', equip: 'Πάγκος, μονάδα ποδιών', yaw: 90, yaw2: 30,
   tempo: [[0, 1, 1.2, 'Τέντωσε'], [1, 1, 0.6, 'Σφίξε'], [1, 0, 2.4, 'Κάτω, εισπνοή'], [0, 0, 0.4, 'Κάτω']],
   frame(S, p) {
     S.bench({ back: 80, seat: 0, seatLen: 0.4 });
@@ -157,7 +157,7 @@ const legExt = {
 };
 
 const hipThrust = {
-  id: 'hip_thrust', name: 'Hip thrust στον πάγκο', en: 'hip thrust glute bridge bench', group: 'legs', equip: 'Πάγκος, αλτήρας', yaw: 90, yaw2: 30, elev2: 18,
+  id: 'hip_thrust', name: 'Ανύψωση λεκάνης στον πάγκο', enName: 'Hip thrust', en: 'hip thrust glute bridge bench', group: 'legs', equip: 'Πάγκος, αλτήρας', yaw: 90, yaw2: 30, elev2: 18,
   tempo: [[0, 1, 1.2, 'Πάνω'], [1, 1, 1.0, 'Σφίξε'], [1, 0, 2.0, 'Κάτω, εισπνοή'], [0, 0, 0.4, 'Κάτω']],
   frame(S, p) {
     S.bench({ rot: 90, at: [0.27, 0, -0.62], unit: false });
@@ -316,7 +316,7 @@ Object.assign(legCurl, {
   tips: [
     BREATH,
     'Σε μηχάνημα δεν σε πλακώνει το βάρος, αλλά κράτα κι εδώ 2 επαναλήψεις ρεζέρβα: η αποτυχία ανεβάζει απότομα την πίεση.',
-    'Συμπληρώνει το Romanian deadlift: εκεί οι οπίσθιοι δουλεύουν από το ισχίο, εδώ από το γόνατο.',
+    'Συμπληρώνει τη ρουμανική άρση θανάτου: εκεί οι οπίσθιοι δουλεύουν από το ισχίο, εδώ από το γόνατο.',
   ],
   alt: ['rdl'],
 });

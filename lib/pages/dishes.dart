@@ -5,7 +5,7 @@ import '../food/dishes.dart';
 import '../food/food_model.dart';
 import '../food/food_store.dart';
 import '../food/library.dart';
-import '../food/week_calc.dart' show freshBatch, potPortion;
+import '../food/week_calc.dart' show freshBatch, itemsHaveRice, potBatchOld, potPortion;
 import '../format.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -363,8 +363,12 @@ class DishLogResult {
   final bool edit;
 }
 
+/// Γιατί η κάρτα ενός παλιού μαγειρέματος είναι σε χρώμα προσοχής (Α2, 21/11: FSA 48 ώρες· ρύζι ως την επόμενη μέρα).
+String potOldNote(bool rice) =>
+    rice ? 'Φαγητό με ρύζι κρατά στο ψυγείο ως την επόμενη μέρα.' : 'Τα περισσεύματα κρατούν στο ψυγείο ως 2 μέρες.';
+
 /// Το «ένα πάτημα»: η καταγραφή όπως την τελευταία φορά, ή null όταν χρειάζεται η οθόνη (λείπει υλικό, κατσαρόλα που
-/// δεν έχει ζυγιστεί ή μαγειρεύτηκε πριν από [potQuickDays] μέρες και πάνω, καταγραφή που μοιάζει με λάθος).
+/// δεν έχει ζυγιστεί ή είναι πιο παλιά από όσο κρατούν τα περισσεύματα ([potBatchOld]), καταγραφή που μοιάζει με λάθος).
 DishLogResult? quickDishResult(FoodStore food, Dish d, Meal meal, DateTime now) {
   if (food.missingItems(d.items).isNotEmpty) return null;
   List<DishItem> amounts;
@@ -381,7 +385,7 @@ DishLogResult? quickDishResult(FoodStore food, Dish d, Meal meal, DateTime now) 
     case DishKind.pot:
       final b = d.batch, g = d.lastQty;
       if (b == null || g == null || g > b.cooked) return null;
-      if (daysBetween(DateTime.fromMillisecondsSinceEpoch(b.at), now) >= potQuickDays) return null;
+      if (potBatchOld(food, b, now)) return null;
       qty = g;
       amounts = dishAmounts(d, portion: g);
   }
@@ -451,7 +455,7 @@ class _DishLogSheetState extends State<DishLogSheet> {
   void initState() {
     super.initState();
     // Πρόγραμμα εβδομάδας: η μερίδα της θέσης από το πρόσφατο μαγείρεμα (αντί για την τελευταία φορά).
-    final b = freshBatch(d, _now());
+    final b = freshBatch(widget.food, d, _now());
     if (widget.targetKcal != null && b != null) {
       final g = potPortion(widget.food, d, b, widget.targetKcal);
       if (g != null) _qty.text = gramsField(g);
@@ -721,7 +725,7 @@ class _DishLogSheetState extends State<DishLogSheet> {
     final out = <Widget>[];
     if (!_cooking && b != null) {
       final at = DateTime.fromMillisecondsSinceEpoch(b.at);
-      final old = daysBetween(at, now) >= potQuickDays;
+      final old = potBatchOld(widget.food, b, now);
       out.add(Container(
         key: const ValueKey('dish-batch'),
         padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
@@ -729,7 +733,8 @@ class _DishLogSheetState extends State<DishLogSheet> {
         child: Row(children: [
           Expanded(
             child: Text(
-              'Μαγειρεύτηκε ${cookedAgo(at, now)}${dotJoin}όλο το φαγητό ${thousands(b.cooked.round())} g',
+              'Μαγειρεύτηκε ${cookedAgo(at, now)}${dotJoin}όλο το φαγητό ${thousands(b.cooked.round())} g'
+              '${old ? '\n${potOldNote(itemsHaveRice(widget.food, b.items))}' : ''}',
               style: TextStyle(fontSize: 14, height: 1.35, color: old ? c.warn : c.text, fontWeight: old ? FontWeight.w600 : null),
             ),
           ),

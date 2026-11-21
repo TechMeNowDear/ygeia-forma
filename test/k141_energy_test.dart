@@ -15,6 +15,7 @@ import 'package:ygeia_forma/pages/goals_page.dart';
 import 'package:ygeia_forma/profile.dart';
 import 'package:ygeia_forma/reference.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/waist.dart' show WaistEntry;
 
 import 'sample_checkin.dart' show checkinFood;
 
@@ -515,6 +516,86 @@ void main() {
           reason: '$found: πριν από το K1R-02 η κάρτα έγραφε «χάνεις πάνω από 1%» αντί για «οι 3 τελευταίες εβδομάδες»');
     });
 
+    test('Α8 (απόφαση 21/11): waistDropIn: δύο μετρήσεις που απέχουν 14+ μέρες, η τελευταία πρόσφατη, πτώση 1+ cm', () {
+      final from = DateTime(2026, 11, 23), to = DateTime(2026, 12, 13);
+      WaistEntry w(String day, double cm) => WaistEntry(day, [cm - 0.1, cm + 0.1]);
+      double? drop(List<WaistEntry> x) => waistDropIn(x, from, to);
+      expect(drop([w('2026-11-20', 98.0), w('2026-12-11', 96.8)]), 1.2);
+      expect(drop([w('2026-11-20', 98.0), w('2026-11-27', 99.5), w('2026-12-11', 97.0)]), 1.0, reason: 'πρώτη και τελευταία');
+      expect(drop([w('2026-11-20', 98.0), w('2026-12-11', 97.1)]), isNull, reason: '0,9 cm: κάτω από το όριο');
+      expect(drop([w('2026-11-20', 98.0), w('2026-12-11', 99.0)]), isNull, reason: 'η μέση ανέβηκε');
+      expect(drop([w('2026-12-01', 98.0), w('2026-12-11', 96.0)]), isNull, reason: '10 μέρες: πολύ κοντά');
+      expect(drop([w('2026-11-20', 98.0), w('2026-12-05', 96.0)]), isNull, reason: 'η τελευταία είναι 8 μέρες πριν από το τέλος');
+      expect(drop([w('2026-11-15', 98.0), w('2026-12-11', 96.0)]), isNull, reason: 'η πρώτη είναι 8 μέρες πριν από την αρχή');
+      expect(drop([w('2026-11-16', 98.0), w('2026-12-06', 96.0)]), 2.0, reason: 'ακριβώς στα άκρα');
+      expect(drop([w('2026-11-20', 98.0), w('2026-12-14', 96.0)]), isNull, reason: 'μέτρηση μετά το τέλος δεν μετρά');
+      expect(drop([w('2026-12-11', 96.0)]), isNull);
+      expect(drop(const []), isNull);
+      expect(drop([const WaistEntry('χαλασμένη', [98]), w('2026-11-20', 98.0), w('2026-12-11', 96.8)]), 1.2);
+      expect((waistHoldMinCm, waistHoldMinDays, waistHoldEdgeDays), (1.0, 14, 7));
+    });
+
+    test('Α8 (απόφαση 21/11): από άκρη σε άκρη: η εκτίμηση ζητά μείωση, η μέση έπεσε 1,2 cm → ο στόχος μένει', () {
+      // Φαγητό στον στόχο, βάρος σχεδόν σταθερό: η εκτίμηση βγαίνει χαμηλά και ο έλεγχος προτείνει −150.
+      final g = _g(since: '2026-10-26');
+      final today = DateTime(2026, 12, 14);
+      final intake = <DateTime, double>{};
+      final weights = <(DateTime, double)>[];
+      var kg = 90.0;
+      for (var d = DateTime(2026, 10, 26); d.isBefore(today); d = DateTime(d.year, d.month, d.day + 1)) {
+        intake[d] = g.kcal.toDouble();
+        weights.add((d, (kg * 10).round() / 10));
+        kg -= 0.001 * kg / 7;
+      }
+      CheckIn check(List<WaistEntry> waist) =>
+          pendingCheckIn(goals: g, today: today, weights: weights, intake: reader(intake), waist: waist)!;
+      final plain = check(const []);
+      expect((plain.kind, plain.proposal!.change < 0, plain.waistDrop), (CheckKind.proposal, true, null),
+          reason: 'το σενάριο πρέπει να ζητά μείωση χωρίς μετρήσεις μέσης: ${plain.kind} ${plain.proposal?.change}');
+      final fell = check(const [WaistEntry('2026-11-20', [98.0, 98.2]), WaistEntry('2026-12-11', [96.8, 97.0])]);
+      expect((fell.kind, fell.proposal!.change, fell.proposal!.target, fell.waistDrop), (CheckKind.same, 0, g.kcal, 1.2));
+      expect(checkInWhy(fell), 'waist');
+      expect(waistHeldText(fell.waistDrop!),
+          'Η μέση σου έπεσε 1,2\u00A0cm σε αυτό το διάστημα: χάνεις λίπος. Ο στόχος δεν κατεβαίνει.');
+      expect(fell.est!.tdee, plain.est!.tdee, reason: 'η εκτίμηση δεν αλλάζει· αλλάζει μόνο το αν κατεβαίνει ο στόχος');
+      // Μικρή πτώση, ή μέση που δεν έπεσε: η πρόταση μένει όπως πριν.
+      final small = check(const [WaistEntry('2026-11-20', [98.0, 98.0]), WaistEntry('2026-12-11', [97.4, 97.4])]);
+      expect((small.kind, small.proposal!.change, small.waistDrop), (CheckKind.proposal, plain.proposal!.change, null));
+      // Το «Εντάξει» γράφει τον λόγο στο ιστορικό ελέγχων.
+      expect(dismissCheckIn(fell, today).log.last.toJson()['wh'], 'waist');
+      // Ανεξάρτητος έλεγχος 21/11 (Α8-3): μετρήσεις ανά δύο εβδομάδες, η δεύτερη το πρωί του ελέγχου → μετρά.
+      final sameDay = check(const [WaistEntry('2026-11-30', [98.0, 98.0]), WaistEntry('2026-12-14', [96.0, 96.0])]);
+      expect((sameDay.kind, sameDay.waistDrop), (CheckKind.same, 2.0), reason: 'πριν: η σημερινή μέτρηση δεν μετρούσε');
+      // Μέτρηση «αύριο» (λάθος ημερομηνία) δεν μετρά.
+      final future = check(const [WaistEntry('2026-11-30', [98.0, 98.0]), WaistEntry('2026-12-15', [96.0, 96.0])]);
+      expect(future.waistDrop, isNull);
+    });
+
+    // Ανεξάρτητος έλεγχος 21/11 (Α8-1).
+    test('Α8-1: και η μείωση «από τη ζυγαριά» (λίγη καταγραφή) δεν γίνεται όταν η μέση έπεσε', () {
+      // Γραμμένα 1.500 kcal τη μέρα με σταθερό βάρος: η εκτίμηση βγαίνει πολύ κάτω από τον τύπο και ο στόχος θα κατέβαινε
+      // από τη ζυγαριά.
+      final g = _g(since: '2026-10-26');
+      final today = DateTime(2026, 12, 14);
+      final intake = <DateTime, double>{};
+      final weights = <(DateTime, double)>[];
+      for (var d = DateTime(2026, 10, 26); d.isBefore(today); d = DateTime(d.year, d.month, d.day + 1)) {
+        intake[d] = 1500;
+        weights.add((d, 90.0));
+      }
+      CheckIn check(List<WaistEntry> waist) =>
+          pendingCheckIn(goals: g, today: today, weights: weights, intake: reader(intake), waist: waist)!;
+      final plain = check(const []);
+      expect((plain.kind, plain.lowLog, plain.proposal!.change < 0), (CheckKind.proposal, true, true),
+          reason: 'το σενάριο πρέπει να δίνει μείωση από τη ζυγαριά: ${plain.kind} ${plain.status} ${plain.proposal?.change}');
+      final fell = check(const [WaistEntry('2026-11-20', [98.0, 98.2]), WaistEntry('2026-12-11', [96.8, 97.0])]);
+      expect((fell.kind, fell.proposal, fell.lowLog, fell.waistDrop), (CheckKind.implausible, null, false, 1.2));
+      expect(checkInWhy(fell), 'waist');
+      // Μέση που δεν έπεσε αρκετά: η μείωση από τη ζυγαριά μένει όπως πριν.
+      final small = check(const [WaistEntry('2026-11-20', [98.0, 98.0]), WaistEntry('2026-12-11', [97.4, 97.4])]);
+      expect((small.kind, small.lowLog, small.proposal!.change, small.waistDrop), (CheckKind.proposal, true, plain.proposal!.change, null));
+    });
+
     test('K1R-05: ζυγίσεις πριν από το όριο του κενού δεν κρύβουν την κάρτα «χάνεις γρήγορα»', () {
       // Κενό 15–21/1· −0,5% την εβδομάδα ως 28/1 και −1,6% από 29/1. Ο εβδομαδιαίος έλεγχος της 8/2 έχει απαντηθεί.
       final g = _g().copyWith(checkIn: '2027-02-08');
@@ -571,6 +652,48 @@ void main() {
       await card(t, same(tooFast: true, underweight: true));
       expect(find.textContaining('κάτω από το φυσιολογικό για το ύψος σου', findRichText: true), findsOneWidget);
       expect(find.textContaining('πάνω από 1% του βάρους', findRichText: true), findsNothing);
+    });
+
+    // Ανεξάρτητος έλεγχος 21/11 (Α8-5).
+    testWidgets('Α8-5: όταν η μέση, το κάπνισμα ή μια πρόσφατη αλλαγή κρατά τον στόχο, το «τρως πολύ κάτω από τον στόχο» δεν χάνεται', (t) async {
+      final e = _est(2600, meanIntake: 1800, slopeKgWeek: -0.73);
+      CheckIn held({double? waistDrop, int? quitDays, int? heldDays}) => CheckIn(
+          kind: CheckKind.same,
+          goals: _g(kcalSet: 2250),
+          status: AdaptStatus.ok,
+          est: e,
+          proposal: AdaptProposal(current: 2250, target: 2250, est: e, fastLoss: false, floored: false),
+          kgNow: 80,
+          estTarget: 2250,
+          waistDrop: waistDrop,
+          quitDays: quitDays,
+          heldDays: heldDays);
+      expect(farBelowText(held(waistDrop: 2.0)), isNotNull, reason: 'το σενάριο πρέπει να έχει την προειδοποίηση');
+      await card(t, held(waistDrop: 2.0));
+      expect(
+          find.textContaining(
+              'Η μέση σου έπεσε 2,0\u00A0cm σε αυτό το διάστημα: χάνεις λίπος. Ο στόχος δεν κατεβαίνει. Τρως όμως κατά μέσο όρο 1.800\u00A0kcal',
+              findRichText: true),
+          findsOneWidget);
+      expect(find.textContaining('ακόμα κι αν η ζυγαριά δείχνει λιγότερο', findRichText: true), findsNothing);
+      await card(t, held(quitDays: 20));
+      expect(find.textContaining('Τρως όμως κατά μέσο όρο 1.800\u00A0kcal', findRichText: true), findsOneWidget);
+      await card(t, held(heldDays: 2));
+      expect(find.textContaining('δεν αλλάζει ξανά τόσο σύντομα. Ο επόμενος έλεγχος συνεχίζει. Τρως όμως κατά μέσο όρο 1.800\u00A0kcal', findRichText: true),
+          findsOneWidget);
+    });
+
+    testWidgets('Α8-1: η κάρτα «κάτι λείπει» γράφει τη μέση όταν αυτή κράτησε τη μείωση από τη ζυγαριά', (t) async {
+      final e = _est(1500, meanIntake: 1500, slopeKgWeek: 0);
+      CheckIn low(double? waistDrop) =>
+          CheckIn(kind: CheckKind.implausible, goals: _g(kcalSet: 2250), status: AdaptStatus.implausible, est: e, kgNow: 80, waistDrop: waistDrop);
+      await card(t, low(1.2));
+      expect(
+          find.textContaining('Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Η μέση σου έπεσε 1,2\u00A0cm σε αυτό το διάστημα: χάνεις λίπος. Ο στόχος δεν κατεβαίνει.',
+              findRichText: true),
+          findsOneWidget);
+      await card(t, low(null));
+      expect(find.textContaining('Συνήθως φταίνε γεύματα ή σνακ που δεν γράφτηκαν. Ο στόχος μένει ίδιος.', findRichText: true), findsOneWidget);
     });
 
     testWidgets('K1R-02: «οι 3 τελευταίες εβδομάδες όχι» γράφεται με το νέο κείμενο', (t) async {

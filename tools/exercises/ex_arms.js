@@ -56,7 +56,7 @@ const curl = {
 };
 
 const hammer = {
-  id: 'hammer_curl', name: 'Κάμψεις σφυριά (hammer)', en: 'hammer curl neutral grip', group: 'arms', equip: 'Αλτήρες', yaw: 35, yaw2: 90,
+  id: 'hammer_curl', name: 'Κάμψεις σφυριά', enName: 'Hammer curl', en: 'hammer curl neutral grip', group: 'arms', equip: 'Αλτήρες', yaw: 35, yaw2: 90,
   tempo: curlTempo,
   primary: ['brachio'], secondary: ['biceps', ['forearm', 'κράτημα']],
   feel: 'Στο πλάι του μπράτσου προς τα έξω και στον πήχη, κοντά στον αγκώνα.',
@@ -191,7 +191,7 @@ const overheadExt = {
   ],
   tips: [
     'Σε έρευνα 12 εβδομάδων, η έκταση πάνω από το κεφάλι έδωσε περίπου 40% μεγαλύτερη αύξηση του τρικέφαλου από την ίδια κίνηση με τα χέρια κάτω (Maeo 2023). Πιθανός λόγος: ο μακρύς τρικέφαλος δουλεύει τεντωμένος· δεν είναι βέβαιο.',
-    'Αν σε έχουν ενοχλήσει οι ώμοι: πρώτα η έκταση ξαπλωτός και το pushdown. Αυτή μπαίνει αργότερα, ελαφριά, μόνο χωρίς πόνο.',
+    'Αν σε έχουν ενοχλήσει οι ώμοι: πρώτα η έκταση ξαπλωτός και οι πιέσεις τρικεφάλων με λάστιχο. Αυτή μπαίνει αργότερα, ελαφριά, μόνο χωρίς πόνο.',
     BREATH,
   ],
   alt: ['lying_ext', 'band_pushdown'],
@@ -217,7 +217,7 @@ const overheadExt = {
 };
 
 const pushdown = {
-  id: 'band_pushdown', name: 'Pushdown με λάστιχο', en: 'band triceps pushdown pressdown', group: 'arms', equip: 'Λάστιχο, μονόζυγο', yaw: 90, yaw2: 30,
+  id: 'band_pushdown', name: 'Πιέσεις τρικεφάλων με λάστιχο', enName: 'Band pushdown', en: 'band triceps pushdown pressdown', group: 'arms', equip: 'Λάστιχο, μονόζυγο', yaw: 90, yaw2: 30,
   tempo: [[0, 1, 1.1, 'Κάτω, εκπνοή'], [1, 1, 0.5, 'Σφίξε'], [1, 0, 2.0, 'Πάνω αργά, εισπνοή'], [0, 0, 0.4, 'Πάνω']],
   primary: ['triceps'], secondary: [],
   feel: 'Πίσω στο μπράτσο, κυρίως στο κάτω σημείο με τα χέρια τεντωμένα.',

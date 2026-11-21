@@ -83,10 +83,15 @@ const exGroups = <String, String>{
   'legs': 'Πόδια',
 };
 
+/// Η γραμμή κάτω από το όνομα στις λίστες επιλογής: «Goblet squat · Kettlebell» όπου υπάρχει αγγλικό όνομα, αλλιώς μόνο ο
+/// εξοπλισμός (όπως πριν). Α24, απόφαση χρήστη 21/11.
+String exEquipLine(Ex? e) => e == null ? '' : (e.enName == null ? e.equip : '${e.enName} ·\u00A0${e.equip}');
+
 class Ex {
   Ex({
     required this.id,
     required this.name,
+    this.enName,
     required this.en,
     required this.group,
     required this.equip,
@@ -110,6 +115,10 @@ class Ex {
 
   final String id, name, en, group, equip, feel;
   final String? caution;
+
+  /// Α24 (απόφαση χρήστη 21/11): το σύντομο αγγλικό όνομα, μόνο στις ασκήσεις που οι περισσότεροι τις ξέρουν με αυτό
+  /// («Goblet squat»). Το [name] είναι πάντα ελληνικό· το [en] είναι λέξεις αναζήτησης, όχι όνομα.
+  final String? enName;
   final double yaw, elev, yaw2, elev2;
   final List<ExPhase> tempo;
   final List<ExMuscle> primary, secondary;
@@ -153,6 +162,7 @@ class Ex {
     return Ex(
       id: j['id'] as String,
       name: j['name'] as String,
+      enName: j['enName'] as String?,
       en: j['en'] as String? ?? '',
       group: j['group'] as String,
       equip: j['equip'] as String,

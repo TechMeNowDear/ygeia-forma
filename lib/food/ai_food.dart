@@ -405,8 +405,7 @@ String aiDishLine(FoodStore food, Dish d) {
   ].join(' · ');
 }
 
-bool _hasRice(FoodStore food, Dish d) =>
-    d.items.any((i) => food.itemFood(i)?.name.startsWith('Ρύζι') ?? false);
+bool _hasRice(FoodStore food, Dish d) => itemsHaveRice(food, d.items);
 
 /// Οι μερίδες ανά γεύμα σε στρογγυλά νούμερα (μόνο αυτό το νούμερο των στόχων πάει στο AI).
 Map<Meal, int> aiMealKcal(int dayKcal, List<Meal> meals) {
@@ -1904,13 +1903,17 @@ typedef Rebalance = ({
 /// ημερολόγιο (εκτός προγράμματος) για να θεωρηθεί ότι το γεύμα φαγώθηκε ήδη.
 const rebalanceEatenShare = 0.5;
 
-/// Έλεγχος 20/11 (K2-C-01): τα γεύματα της μέρας [day] ΠΡΙΝ από το [before] που γράφτηκαν στο ημερολόγιο χωρίς το
+/// Έλεγχος 20/11 (K2-C-01): τα γεύματα της μέρας [day], εκτός από το [changed], που γράφτηκαν στο ημερολόγιο χωρίς το
 /// πρόγραμμα («+ Φαγητό», «Κι άλλο», «Όπως χθες»): όλες οι θέσεις τους είναι ακόμα ανοιχτές, και το ημερολόγιο έχει σε
 /// αυτό το γεύμα τουλάχιστον το [rebalanceEatenShare] των θερμίδων τους. Οι θέσεις αυτές ΔΕΝ είναι «θα φαγωθεί ακόμα»:
 /// οι θερμίδες τους είναι ήδη στο «έφαγες ως τώρα». Πριν μετριόνταν δύο φορές και το «Έφαγα κάτι άλλο» έκοβε το βραδινό
 /// στο ελάχιστο χωρίς λόγο (840 → 440 kcal· η μέρα έκλεινε 600 kcal κάτω από τον στόχο). Γεύμα με θέση που σημειώθηκε από
 /// το πρόγραμμα («Το έφαγα», «Έφαγα κάτι άλλο», «Δεν το έφαγα») μένει όπως πριν: εκεί οι καταχωρίσεις ανήκουν στη θέση.
-Set<Meal> mealsEatenOutsidePlan(FoodStore food, WeekPlan w, int day, {required Meal before}) {
+///
+/// Απόφαση χρήστη 21/11 (Α31· K7-R-15): ΟΛΑ τα άλλα γεύματα της μέρας, όχι μόνο τα προηγούμενα. Πριν: σνακ που φαγώθηκε το
+/// πρωί και γράφτηκε με «+ Φαγητό», και μετά «Έφαγα κάτι άλλο» στο μεσημεριανό: η θέση του σνακ ήταν «επόμενο γεύμα», οι
+/// θερμίδες του μετρούσαν δεύτερη φορά και η εφαρμογή άλλαζε τη μερίδα ενός σνακ που είχε ήδη φαγωθεί.
+Set<Meal> mealsEatenOutsidePlan(FoodStore food, WeekPlan w, int day, {required Meal changed}) {
   final open = <Meal, double>{};
   final touched = <Meal>{};
   for (final s in w.days[day]) {
@@ -1927,7 +1930,7 @@ Set<Meal> mealsEatenOutsidePlan(FoodStore food, WeekPlan w, int day, {required M
   }
   return {
     for (final m in open.keys)
-      if (_mealOrder(m) < _mealOrder(before) && !touched.contains(m) && open[m]! > 0 && (logged[m] ?? 0) >= rebalanceEatenShare * open[m]!) m,
+      if (m != changed && !touched.contains(m) && open[m]! > 0 && (logged[m] ?? 0) >= rebalanceEatenShare * open[m]!) m,
   };
 }
 
@@ -1949,17 +1952,19 @@ Rebalance? rebalanceDay(
   final adjust = <int>[];
   final assumed = <(Meal, String, double)>[];
   var fixedKcal = 0.0, fixedProtein = 0.0;
-  final eatenOutside = mealsEatenOutsidePlan(food, w, day, before: after);
+  final eatenOutside = mealsEatenOutsidePlan(food, w, day, changed: after);
   for (var k = 0; k < w.days[day].length; k++) {
     final s = w.days[day][k];
     if (slotStateNow(food, w, day, s) != SlotState.open) continue;
     final d = byId[s.dishId];
     final t = d == null ? null : plannedTotals(food, d, s);
     if (d == null || t == null) continue;
-    if (!s.locked && _mealOrder(s.meal) > _mealOrder(after) && portionRange(food, d) != null) {
+    if (eatenOutside.contains(s.meal)) {
+      // K2-C-01, Α31: γράφτηκε με «+ Φαγητό»· είναι ήδη μέσα στο [eaten]. Ούτε «θα φαγωθεί ακόμα», ούτε αλλάζει η μερίδα του
+      // (και όταν είναι επόμενο γεύμα: έχει ήδη φαγωθεί).
+      continue;
+    } else if (!s.locked && _mealOrder(s.meal) > _mealOrder(after) && portionRange(food, d) != null) {
       adjust.add(k);
-    } else if (eatenOutside.contains(s.meal)) {
-      continue; // K2-C-01: γράφτηκε με «+ Φαγητό»· είναι ήδη μέσα στο [eaten]
     } else {
       fixedKcal += t.kcal;
       fixedProtein += t.protein;

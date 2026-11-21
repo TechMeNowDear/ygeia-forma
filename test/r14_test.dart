@@ -111,7 +111,7 @@ void main() {
       expect(zoneGapSec, 60);
       expect(zoneBackSec, 10);
       expect(zoneHighText, contains('το πολύ μία φορά το λεπτό'));
-      expect(zoneLowText, contains('«Εκτός εύρους»'));
+      expect(zoneLowText, contains('«Κάτω από τη ζώνη»'));
       expect(zoneVoiceText, contains('«Πάλι στη ζώνη» όταν ξαναμπείς για 10 δευτερόλεπτα'));
       expect(zoneVoiceText, contains('«Φωνή στην άσκηση»'));
       // Πιο σύντομο, και το «ρολόι» μία φορά.

@@ -11,6 +11,7 @@ import 'food/food_store.dart';
 import 'history.dart' show dateKey;
 import 'format.dart' show daysBetween;
 import 'goals.dart';
+import 'waist.dart' show WaistEntry;
 import 'weight_guard.dart';
 
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -134,6 +135,7 @@ class CheckIn {
       this.tooFast = false,
       this.heldDays,
       this.quitDays,
+      this.waistDrop,
       this.gap,
       this.absurd = const [],
       this.foreign = const [],
@@ -185,6 +187,10 @@ class CheckIn {
   /// Απόφαση χρήστη 17/11: πριν από πόσες μέρες έκοψες το κάπνισμα, όταν γι' αυτό ο στόχος δεν κατέβηκε
   /// ([smokeQuitHoldDays]).
   final int? quitDays;
+
+  /// Απόφαση χρήστη 21/11 (Α8): πόσα cm έπεσε η μέση στο διάστημα του ελέγχου, όταν γι' αυτό ο στόχος δεν κατεβαίνει
+  /// ([waistDropIn]). null: δεν ισχύει.
+  final double? waistDrop;
 
   /// Το κενό καταγραφής φαγητού ([CheckKind.gap]· και στο [CheckKind.gathering], για τη μέρα της πρώτης εκτίμησης:
   /// R8-A1-4).
@@ -242,6 +248,47 @@ class CheckIn {
 /// ξαναρχίσεις. Επιλογή προσοχής (έλεγχος 19/11, S-9): Hartmann-Boyce 2021 (Cochrane): γενικές οδηγίες για το βάρος χωρίς
 /// εξατομικευμένη υποστήριξη μπορεί να μειώνουν τις διακοπές (χαμηλή βεβαιότητα).
 const smokeQuitHoldDays = 70;
+
+/// Απόφαση χρήστη 21/11 (Α8· K1-S-03, Χ-8): ο έλεγχος δεν κατεβάζει τον στόχο όταν η μέση έπεσε τουλάχιστον τόσο (cm) στο
+/// ίδιο διάστημα που έκρινε. Η εκτίμηση υποθέτει ότι ό,τι αλλάζει στη ζυγαριά είναι λίπος· όταν μπαίνει άλιπη μάζα (νέα
+/// βάρη) ή κρατιούνται νερά, η ζυγαριά δείχνει λιγότερη απώλεια από την αληθινή και η εκτίμηση βγαίνει χαμηλά (Hall 2008,
+/// Int J Obes 32:573· προσομοίωση k1-science: 160–250 kcal). Η μέση που πέφτει λέει ότι το λίπος φεύγει. Το όριο είναι
+/// γνώμη ειδικού, όχι οδηγία: 1 cm είναι περίπου το σφάλμα μιας μέτρησης με μεζούρα, γι' αυτό κάθε άκρο είναι ο μέσος όρος
+/// των 2–3 μετρήσεων της μέρας ([WaistEntry.cm]) και οι δύο μέρες απέχουν τουλάχιστον [waistHoldMinDays].
+const waistHoldMinCm = 1.0;
+
+/// Οι δύο μετρήσεις της μέσης απέχουν τουλάχιστον τόσες μέρες.
+const waistHoldMinDays = 14;
+
+/// Η πρώτη μέτρηση το πολύ τόσες μέρες πριν από την αρχή του διαστήματος, και η τελευταία μέσα στις τόσες τελευταίες μέρες
+/// του (μια παλιά μέτρηση δεν λέει τι γίνεται τώρα).
+const waistHoldEdgeDays = 7;
+
+/// Πόσα cm έπεσε η μέση μέσα στο διάστημα [from]–[to] του ελέγχου, ή null όταν δεν φτάνουν οι μετρήσεις ή η πτώση είναι
+/// κάτω από [waistHoldMinCm]. Πρώτη μέτρηση: η παλιότερη από [waistHoldEdgeDays] μέρες πριν από το [from] και μετά.
+/// Τελευταία: η πιο πρόσφατη ως το [to], μέσα στις [waistHoldEdgeDays] τελευταίες μέρες. Ο έλεγχος δίνει για [to] τη ΜΕΡΑ
+/// ΤΟΥ ΕΛΕΓΧΟΥ (όχι το τέλος της εκτίμησης, που είναι η προηγούμενη): η μέτρηση του ίδιου πρωινού μετρά (ανεξάρτητος
+/// έλεγχος 21/11, Α8-3: με μετρήσεις ανά δύο εβδομάδες, η σημερινή δεν μετρούσε και η προηγούμενη ήταν πια «παλιά»).
+double? waistDropIn(List<WaistEntry> waist, DateTime from, DateTime to) {
+  final a = _day(from), b = _day(to);
+  final first = DateTime(a.year, a.month, a.day - waistHoldEdgeDays);
+  final lastFrom = DateTime(b.year, b.month, b.day - waistHoldEdgeDays);
+  final inside = <(DateTime, double)>[];
+  for (final w in waist) {
+    final d = DateTime.tryParse(w.day);
+    if (d == null || w.values.isEmpty) continue;
+    final day = _day(d);
+    final cm = w.cm;
+    if (day.isBefore(first) || day.isAfter(b) || !cm.isFinite || cm <= 0) continue;
+    inside.add((day, cm));
+  }
+  if (inside.length < 2) return null;
+  inside.sort((x, y) => x.$1.compareTo(y.$1));
+  final start = inside.first, end = inside.last;
+  if (end.$1.isBefore(lastFrom) || daysBetween(start.$1, end.$1) < waistHoldMinDays) return null;
+  final drop = start.$2 - end.$2;
+  return drop >= waistHoldMinCm - 1e-9 ? (drop * 10).round() / 10 : null;
+}
 
 /// Πόσες μέρες πέρασαν από τη διακοπή, όταν είναι μέσα στις [smokeQuitHoldDays]· αλλιώς null.
 int? quitHoldDays(DateTime? quitDay, DateTime today) {
@@ -365,6 +412,7 @@ CheckIn? pendingCheckIn({
   List<(DateTime, double)> foreign = const [],
   bool weightsRead = true,
   DateTime? quitDay,
+  List<WaistEntry> waist = const [],
 }) {
   final g = goals;
   if (g == null) return null;
@@ -448,7 +496,11 @@ CheckIn? pendingCheckIn({
         final held = sinceChange != null && sinceChange < adaptMinChangeDays && p.change != 0;
         final quit = quitHoldDays(quitDay, t);
         final quitHeld = quit != null && p.change < 0 && !tooFast && !held;
-        if ((tooFast && p.change < 0) || held || quitHeld) {
+        // Απόφαση χρήστη 21/11 (Α8): όχι μείωση όταν η μέση έπεσε στο ίδιο διάστημα ([waistDropIn]). Μόνο για μείωση που
+        // θα γινόταν τώρα: οι άλλοι λόγοι (γρήγορη απώλεια, πρόσφατη αλλαγή, διακοπή καπνίσματος) γράφονται πρώτοι.
+        final waistFell = g.aim == GoalAim.lose ? waistDropIn(waist, e.from, t) : null;
+        final waistHeld = waistFell != null && p.change < 0 && !tooFast && !held && !quitHeld;
+        if ((tooFast && p.change < 0) || held || quitHeld || waistHeld) {
           p = AdaptProposal(current: p.current, target: p.current, est: e, fastLoss: false, floored: false);
         }
         // R2-A-1: οι στόχοι που ίσχυαν τις μέρες που μπήκαν στον μέσο όρο φαγητού (ίδιο φίλτρο με το estimateExpenditure).
@@ -469,6 +521,7 @@ CheckIn? pendingCheckIn({
             tooFast: tooFast,
             heldDays: held ? sinceChange : null,
             quitDays: quitHeld ? quit : null,
+            waistDrop: waistHeld ? waistFell : null,
             absurd: absurd,
             foreign: news,
             estTarget: estTarget,
@@ -485,8 +538,11 @@ CheckIn? pendingCheckIn({
         final lowP = lowEst == null || lowKg == null ? null : lowLogProposal(goals: g, est: lowEst, kgNow: lowKg, formulaTdee: formula);
         final lowChanged = lastChangeDay(g);
         final lowHeld = lowChanged != null && daysBetween(lowChanged, t) < adaptMinChangeDays;
+        // Ανεξάρτητος έλεγχος 21/11 (Α8-1): και αυτή η μείωση (πάντα προς τα κάτω) δεν γίνεται όταν η μέση έπεσε στο ίδιο
+        // διάστημα· είναι ακριβώς η περίπτωση του κανόνα (η ζυγαριά δείχνει λιγότερη απώλεια από την αληθινή).
+        final lowWaist = lowEst != null && g.aim == GoalAim.lose ? waistDropIn(waist, lowEst.from, t) : null;
         // 17/11: και όχι στις 10 εβδομάδες μετά τη διακοπή του καπνίσματος (πάντα προς τα κάτω).
-        if (lowP != null && !lowHeld && quitHoldDays(quitDay, t) == null) {
+        if (lowP != null && !lowHeld && quitHoldDays(quitDay, t) == null && lowWaist == null) {
           return CheckIn(
               kind: CheckKind.proposal,
               goals: g,
@@ -516,6 +572,8 @@ CheckIn? pendingCheckIn({
             foreign: news,
             // V-4: μόνο όταν το βάρος ανεβαίνει· αλλιώς η χαμηλή εκτίμηση είναι συνήθως φαγητό που δεν γράφτηκε.
             quitDays: quitLow != null && r.est != null && r.est!.tdee < formula && r.est!.slopeKgWeek > 0 ? quitLow : null,
+            // Μόνο όταν η μέση είναι ο λόγος που δεν έγινε η μείωση «από τη ζυγαριά».
+            waistDrop: lowP != null && !lowHeld && quitLow == null ? lowWaist : null,
             formula: formula,
             formulaKg: fNow.kg);
       case AdaptStatus.tooEarly:
@@ -644,6 +702,7 @@ CheckIn? pendingCheckIn({
       weightsRead: d.bodyOk && !bodyFailed,
       intake: (from, to) => dailyIntake(food, from, to),
       quitDay: store.profile.quitDate,
+      waist: store.waist,
     ),
     why: 'none',
   );
@@ -700,6 +759,7 @@ String? checkInWhy(CheckIn c) {
   if (c.tooFast) return 'tooFast';
   if (c.heldDays != null) return 'held';
   if (c.quitDays != null) return 'quit';
+  if (c.waistDrop != null) return 'waist';
   final p = c.proposal;
   if (p == null) return null;
   if (p.recentDiffers) return 'recent';

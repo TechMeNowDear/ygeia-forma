@@ -234,7 +234,7 @@ void main() {
   group('6. ζώνη και φωνή', () {
     test('5 δευτερόλεπτα· διακόπτης φωνής στις Ρυθμίσεις', () {
       expect(zoneHoldSec, 5);
-      expect(voiceSettingText, contains('«Εκτός εύρους»'));
+      expect(voiceSettingText, contains('«Πάνω από τη ζώνη», «Κάτω από τη ζώνη»'));
       final settings = File('lib/pages/settings.dart').readAsStringSync();
       expect(settings, contains("key: const ValueKey('settings-voice-switch')"));
     });

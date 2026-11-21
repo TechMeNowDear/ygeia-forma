@@ -5,6 +5,7 @@ import '../../format.dart';
 import '../../theme.dart';
 import '../../training/equipment.dart';
 import '../../training/program.dart';
+import '../../training/progression.dart' show Change;
 import '../../training/training_store.dart';
 import '../../widgets.dart';
 import 'training_common.dart';
@@ -161,12 +162,26 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
       // στόχος βγαίνει από την τελευταία φορά ([nextTarget]). Πριν η επικόλληση έδειχνε τα κιλά του προγράμματος σαν να
       // ισχύουν: νέο πρόγραμμα με 6,8 kg (π.χ. πιο ελαφριά εβδομάδα) → η οθόνη «6,8 kg», η προπόνηση 9,3 kg. Τώρα δείχνει
       // αυτό που θα γίνει («συνεχίζεις από 9,3 kg») και το λέει μία φορά από κάτω.
-      var continues = false;
-      String loadText(PlanItem i) {
+      // Απόφαση χρήστη 21/11 (Α15): φορτίο του νέου προγράμματος που είναι πιο ελαφρύ από την τελευταία φορά ΙΣΧΥΕΙ (όταν
+      // διαφέρει από του τωρινού προγράμματος). Η προεπισκόπηση το κρίνει όπως θα το κρίνει η αποθήκευση: σε αντίγραφο με
+      // τις ίδιες σημειώσεις ([stampLoadTimes])· το πρόγραμμα που θα αποθηκευτεί δεν αγγίζεται εδώ.
+      final stamped = p.copy();
+      stampLoadTimes(stamped, widget.training.program, widget.training.now);
+      final asSaved = {
+        for (final w in stamped.workouts)
+          for (final i in w.items) '${w.id}|${i.ex}': i,
+      };
+      var continues = false, lighter = false;
+      String loadText(Workout w, PlanItem i) {
         if (!hasLoad(i.kind) || i.load == null) return '';
         if (!widget.training.isFirstTime(i.ex)) {
-          final v = widget.training.targetFor(i).load;
+          final t = widget.training.targetFor(asSaved['${w.id}|${i.ex}'] ?? i);
+          final v = t.load;
           if (v != null) {
+            if (t.change == Change.back && (v - fitLoad(i.kind, snap(i.kind, i.load!))).abs() < 1e-6) {
+              lighter = true;
+              return ' ·\u00A0${loadLabel(i.kind, v)} (πιο ελαφριά από την τελευταία φορά)';
+            }
             continues = true;
             return ' ·\u00A0συνεχίζεις από ${loadLabel(i.kind, v)}';
           }
@@ -212,7 +227,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
                     Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text)),
                     Text(
-                      '${repsRange(i)} ·\u00A0διάλειμμα ${clock(i.rest)}${loadText(i)}',
+                      '${repsRange(i)} ·\u00A0διάλειμμα ${clock(i.rest)}${loadText(w, i)}',
                       style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                     ),
                   ]),
@@ -222,8 +237,13 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
         ));
       }
       if (continues) {
-        body.add(Text('Τα κιλά του προγράμματος ισχύουν μόνο για ασκήσεις που δεν έχεις κάνει ακόμα. Στις άλλες συνεχίζεις από τα δικά σου.',
+        body.add(Text(
+            'Στις ασκήσεις που έχεις ήδη κάνει συνεχίζεις από τα δικά σου κιλά. Τα κιλά του προγράμματος ισχύουν μόνο όπου '
+            'είναι πιο ελαφριά, ή για ασκήσεις που δεν έχεις κάνει ακόμα.',
             key: const ValueKey('paste-continues'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)));
+      } else if (lighter) {
+        body.add(Text('Όπου το πρόγραμμα γράφει πιο ελαφριά κιλά από την τελευταία φορά, ισχύουν του προγράμματος.',
+            key: const ValueKey('paste-lighter'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)));
       }
       if (r.warnings.isNotEmpty) {
         body.add(Text(r.warnings.join('\n'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.textSecondary)));

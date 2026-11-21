@@ -9,6 +9,7 @@ import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/food/dishes.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/food_store.dart';
+import 'package:ygeia_forma/food/week_calc.dart' show freshBatch, isRiceName, itemsHaveRice, potBatchOld, potKeepDays;
 import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart' show dateKey;
 import 'package:ygeia_forma/pages/dishes.dart';
@@ -398,16 +399,50 @@ void main() {
       expect(searchDishes(all, 'ψάρι'), isEmpty);
     });
 
-    test('Κατσαρόλα: από το ίδιο μαγείρεμα ως 3 μέρες μετά· από την 4η, ή χωρίς ζυγισμένο φαγητό, ανοίγει η οθόνη', () {
+    test('Κατσαρόλα: από το ίδιο μαγείρεμα ως 2 μέρες μετά· από την 3η, ή χωρίς ζυγισμένο φαγητό, ανοίγει η οθόνη', () {
       final d0 = lentilPot();
       final s = store();
       expect(quickDishResult(s, d0, Meal.lunch, _now), isNull, reason: 'δεν έχει ζυγιστεί ποτέ');
-      final fresh = lentilPot(batch: batchOf(d0, 2250, DateTime(2026, 11, 13, 20)), lastQty: 350);
+      final fresh = lentilPot(batch: batchOf(d0, 2250, DateTime(2026, 11, 14, 20)), lastQty: 350);
       final r = quickDishResult(s, fresh, Meal.lunch, _now)!;
       expect(r.qty, 350);
       expect(r.amounts.first.amount, 77.78);
-      final old = lentilPot(batch: batchOf(d0, 2250, DateTime(2026, 11, 12, 20)), lastQty: 350);
+      final old = lentilPot(batch: batchOf(d0, 2250, DateTime(2026, 11, 13, 20)), lastQty: 350);
       expect(quickDishResult(s, old, Meal.lunch, _now), isNull);
+    });
+
+    test('Α2 (απόφαση 21/11): ένα πάτημα ως 2 μέρες μετά το μαγείρεμα· με ρύζι ως την επόμενη μέρα', () {
+      // Πριν: ως 3 μέρες μετά, και για φαγητό με ρύζι· το πρόγραμμα του AI δεν βάζει ποτέ περίσσευμα τόσο αργά (FSA: 48 ώρες).
+      final s = store();
+      final d0 = lentilPot();
+      bool quick(Dish d) => quickDishResult(s, d, Meal.lunch, _now) != null;
+      Dish cooked(int daysAgo) =>
+          lentilPot(batch: batchOf(d0, 2250, DateTime(_now.year, _now.month, _now.day - daysAgo, 20)), lastQty: 350);
+      expect([for (final n in [0, 1, 2, 3, 4]) quick(cooked(n))], [true, true, true, false, false]);
+      expect((potQuickDays, potRiceQuickDays), (3, 2));
+      // Το ίδιο όριο και για τη θέση του προγράμματος («Το έφαγα») και για την κάρτα του μαγειρέματος.
+      expect([for (final n in [0, 2, 3]) freshBatch(s, cooked(n), _now) != null], [true, true, false]);
+      expect([for (final n in [2, 3]) potBatchOld(s, cooked(n).batch!, _now)], [false, true]);
+      // Με ρύζι στο μαγείρεμα: τη μέρα του μαγειρέματος και την επόμενη.
+      final rice = basicFoods().firstWhere((x) => x.name.startsWith('Ρύζι'));
+      PotBatch riceBatch(int daysAgo) {
+        final b = cooked(daysAgo).batch!;
+        return PotBatch(items: [...b.items, DishItem(rice.id, rice.name, 300)], cooked: b.cooked, at: b.at);
+      }
+
+      expect(itemsHaveRice(s, riceBatch(0).items), isTrue);
+      expect(itemsHaveRice(s, d0.items), isFalse);
+      // Ανεξάρτητος έλεγχος 21/11 (Α2-4): «ρύζι» ως λέξη οπουδήποτε στο όνομα (και σε δικό σου προϊόν), όχι «ρυζιού».
+      expect([for (final n in ['Ρύζι basmati, ωμό', 'Basmati ρύζι', 'ΡΥΖΙ ΚΑΣΤΑΝΟ', 'Κοτόπουλο με ρύζι (έτοιμο)']) isRiceName(n)],
+          [true, true, true, true]);
+      expect([for (final n in ['Γάλα ρυζιού', 'Ρυζόγαλο', 'Ρυζογκοφρέτες', 'Φακές', null]) isRiceName(n)],
+          [false, false, false, false, false]);
+      expect(basicFoods().where((x) => isRiceName(x.name)).length, basicFoods().where((x) => x.name.startsWith('Ρύζι')).length,
+          reason: 'στη βάση τίποτα δεν αλλάζει: τα ίδια τρόφιμα με πριν');
+      expect([for (final n in [0, 1, 2]) potBatchOld(s, riceBatch(n), _now)], [false, false, true]);
+      expect((potKeepDays(s, riceBatch(0).items), potKeepDays(s, d0.items)), (2, 3));
+      expect(potOldNote(true), 'Φαγητό με ρύζι κρατά στο ψυγείο ως την επόμενη μέρα.');
+      expect(potOldNote(false), 'Τα περισσεύματα κρατούν στο ψυγείο ως 2 μέρες.');
     });
 
     test('Πιάτο: όπως την τελευταία φορά· μερίδες: όσες την τελευταία φορά (αλλιώς 1)', () {
