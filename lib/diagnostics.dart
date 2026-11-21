@@ -1200,7 +1200,7 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
     final kinds = shown['kinds'];
     final move = kinds is Map ? kinds[WKind.move] : null;
     final m = move is Map ? move['m'] : null;
-    if (kinds is Map && move is Map && m is Map) {
+    if (kinds is Map && move is Map && m is Map && m.containsKey('dayHr')) {
       shown = {
         for (final e in shown.entries)
           '${e.key}': e.key == 'kinds'
