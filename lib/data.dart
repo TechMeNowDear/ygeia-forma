@@ -1082,8 +1082,9 @@ class Prefs {
   /// ύπνου: φαίνονται στις Τάσεις («δεν ξαναϋπολογίστηκαν»), ποτέ σιωπηλά.
   final List<String> staleMonths;
 
-  /// Έλεγχος 21/11 (K8-06): οι [failedLogMax] τελευταίες αναγνώσεις της Samsung που δεν έδωσαν κάποιο είδος δεδομένων:
-  /// [ώρα σε ms, «body,heart»]. Μόνο ώρα και ονόματα ειδών, ποτέ τιμές. Πριν φαινόταν μόνο η ΤΕΛΕΥΤΑΙΑ ανάγνωση: μια
+  /// Έλεγχος 21/11 (K8-06): οι [failedLogMax] τελευταίες διαφορετικές αποτυχίες ανάγνωσης της Samsung (κάποιο είδος
+  /// δεδομένων δεν ήρθε): [ώρα σε ms, «body,heart»], και όταν η ίδια ξανάγινε [πρώτη ώρα, είδη, πόσες φορές, τελευταία ώρα]
+  /// ([noteFailedRead]). Μόνο ώρα και ονόματα ειδών, ποτέ τιμές. Πριν φαινόταν μόνο η ΤΕΛΕΥΤΑΙΑ ανάγνωση: μια
   /// αποτυχία της προηγούμενης μέρας δεν άφηνε ίχνος στην «Αναφορά για έλεγχο». Προαιρετικό κλειδί («failedLog»): παλιό
   /// αρχείο ρυθμίσεων χωρίς αυτό διαβάζεται όπως πριν, και άδειο δεν γράφεται.
   final List<List<Object>> failedLog;
@@ -1197,17 +1198,50 @@ class Prefs {
 /// Έλεγχος 21/11 (K8-06): πόσες αποτυχημένες αναγνώσεις της Samsung κρατά το [Prefs.failedLog] (περίπου 40 bytes η καθεμία).
 const failedLogMax = 20;
 
-/// Πόσο απέχουν δύο ίδιες αποτυχίες για να γραφτούν και οι δύο (μία ώρα).
+/// Πόσο απέχουν δύο ίδιες αποτυχίες για να μετρηθεί και η δεύτερη (μία ώρα).
 const failedLogRepeatMs = 60 * 60 * 1000;
 
-/// Το «failedLog» όπως διαβάζεται από το αρχείο: μόνο γραμμές [ακέραια ώρα ms, κείμενο ως 80 χαρακτήρες]· ό,τι άλλο
-/// αγνοείται (χαλασμένο ή άγνωστο σχήμα δεν χαλά τις ρυθμίσεις).
-List<List<Object>> failedLogFromJson(Object? j) => [
-      if (j is List)
-        for (final x in j)
-          if (x is List && x.length == 2 && x[0] is num && (x[0] as num).isFinite && x[1] is String && (x[1] as String).length <= 80)
-            <Object>[(x[0] as num).toInt(), x[1] as String],
-    ];
+/// Το «failedLog» όπως διαβάζεται από το αρχείο: γραμμές [ακέραια ώρα ms, κείμενο ως 80 χαρακτήρες] ή, όταν η ίδια
+/// αποτυχία ξανάγινε, [πρώτη ώρα ms, κείμενο, πόσες φορές, τελευταία ώρα ms]· ό,τι άλλο αγνοείται (χαλασμένο ή άγνωστο
+/// σχήμα δεν χαλά τις ρυθμίσεις).
+List<List<Object>> failedLogFromJson(Object? j) {
+  bool ms(Object? v) => v is num && v.isFinite;
+  return [
+    if (j is List)
+      for (final x in j)
+        if (x is List && (x.length == 2 || x.length == 4) && ms(x[0]) && x[1] is String && (x[1] as String).length <= 80)
+          if (x.length == 2)
+            <Object>[(x[0] as num).toInt(), x[1] as String]
+          else if (ms(x[2]) && ms(x[3]))
+            <Object>[(x[0] as num).toInt(), x[1] as String, (x[2] as num).toInt(), (x[3] as num).toInt()],
+  ];
+}
+
+/// Γράφει στο [log] μια αποτυχημένη ανάγνωση [what] τη στιγμή [at] (ms). `true` αν το [log] άλλαξε (τότε γράφονται οι
+/// ρυθμίσεις).
+///
+/// K8-R-08 (ανεξάρτητος έλεγχος): μία γραμμή για ΚΑΘΕ διαφορετική αποτυχία, όχι μία για κάθε φορά. Όταν η ίδια ξαναγίνει,
+/// η γραμμή της γίνεται [πρώτη ώρα, είδη, πόσες φορές, τελευταία ώρα] και πηγαίνει στο τέλος· μέσα σε [failedLogRepeatMs]
+/// από την τελευταία φορά δεν αλλάζει τίποτα (καμία εγγραφή στον δίσκο). Πριν: νέα γραμμή κάθε ώρα· ένα είδος που αποτυγχάνει
+/// ΠΑΝΤΑ (π.χ. κλειστή άδεια) γέμιζε τις [failedLogMax] θέσεις με την ίδια γραμμή και έσβηνε τη σπάνια αποτυχία της
+/// προηγούμενης εβδομάδας, και δύο αποτυχίες που εναλλάσσονται έγραφαν σε κάθε ανανέωση.
+bool noteFailedRead(List<List<Object>> log, String what, int at) {
+  final i = log.lastIndexWhere((x) => x.length >= 2 && x[1] == what);
+  if (i < 0) {
+    log.add(<Object>[at, what]);
+    if (log.length > failedLogMax) log.removeRange(0, log.length - failedLogMax);
+    return true;
+  }
+  final old = log[i];
+  final first = old[0] is int ? old[0] as int : at;
+  final times = old.length >= 4 && old[2] is int ? old[2] as int : 1;
+  final last = old.length >= 4 && old[3] is int ? old[3] as int : first;
+  if (at - last < failedLogRepeatMs) return false;
+  log
+    ..removeAt(i)
+    ..add(<Object>[first, what, times + 1, at]);
+  return true;
+}
 
 /// Οι ρυθμίσεις μετά από επαναφορά αντιγράφου ([HealthStore.restorePrefs]): του κινητού ([mine]) με όσα φέρνει το
 /// αντίγραφο ([backup], ήδη μόνο τα κλειδιά του backupPrefKeys). Κουζίνα, κάρτες και εμφάνιση: του αντιγράφου. Μέση: του
@@ -2303,14 +2337,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       what = 'read:$kind';
     }
     if (what.length > 80) what = what.substring(0, 80);
-    final at = DateTime.now().millisecondsSinceEpoch;
-    // Η ίδια αποτυχία μέσα σε μία ώρα δεν ξαναγράφεται: ένα είδος που αποτυγχάνει σε κάθε ανανέωση δεν γεμίζει το ιστορικό
-    // με την ίδια γραμμή, ούτε γράφει τις ρυθμίσεις σε κάθε άνοιγμα.
-    final last = prefs.failedLog.isEmpty ? null : prefs.failedLog.last;
-    if (last != null && last[1] == what && last[0] is int && at - (last[0] as int) < failedLogRepeatMs) return;
-    prefs.failedLog.add(<Object>[at, what]);
-    if (prefs.failedLog.length > failedLogMax) prefs.failedLog.removeRange(0, prefs.failedLog.length - failedLogMax);
-    await _savePrefs();
+    if (noteFailedRead(prefs.failedLog, what, DateTime.now().millisecondsSinceEpoch)) await _savePrefs();
   }
 
   /// Η βάση βρέθηκε χαλασμένη (ώρα, ms) και κρατήθηκε αντίγραφο (A7): κάρτα στη Σήμερα ώσπου να την κλείσει ο χρήστης.

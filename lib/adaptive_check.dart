@@ -128,6 +128,7 @@ class CheckIn {
       this.kgNow,
       this.fastSlope,
       this.fastDays,
+      this.fastFrom,
       this.days = 0,
       this.weighs = 0,
       this.tooFast = false,
@@ -164,6 +165,10 @@ class CheckIn {
   /// Για τη γρήγορη απώλεια: πόσες μέρες πίσω φτάνει το παράθυρο που κρίθηκε (το πολύ 21· λιγότερες όσο η πρώτη
   /// εβδομάδα των στόχων το κόβει). Η κάρτα γράφει ακριβώς αυτό ([fastPeriodText]).
   final int? fastDays;
+
+  /// Για τη γρήγορη απώλεια: η πρώτη μέρα του παραθύρου που κρίθηκε (η τελευταία είναι [fastDays] μέρες μετά). Για τη
+  /// γραμμή του ιστορικού ελέγχων ([AdaptLog.from], K8-R-06)· η κάρτα δεν τη γράφει.
+  final DateTime? fastFrom;
 
   /// Στις 3 τελευταίες εβδομάδες (χωρίς την πρώτη εβδομάδα των στόχων): μέρες φαγητού που μετρούν (≥ 60% του στόχου)
   /// και ζυγίσεις. Για την κάρτα «λίγα δεδομένα».
@@ -598,6 +603,7 @@ CheckIn? pendingCheckIn({
       kgNow: f.kg,
       fastSlope: f.slopeKgWeek,
       fastDays: daysBetween(window.$1, window.$2),
+      fastFrom: window.$1,
       fastIntake: known ? mean : null,
       fastIntakeDays: logged.length,
       fastTarget: known ? target : null,
@@ -720,6 +726,11 @@ AdaptLog _logLine(CheckIn c,
     bool fast = false,
     bool lowLog = false}) {
   final e = c.est;
+  // K8-R-06 (ανεξάρτητος έλεγχος): στη «γρήγορη απώλεια» δεν υπάρχει εκτίμηση, αλλά το παράθυρο που κρίθηκε υπάρχει
+  // ([CheckIn.fastFrom] και [CheckIn.fastDays] μέρες μετά): γράφεται, αλλιώς αυτός ο έλεγχος δεν ξαναελέγχεται.
+  final ff = e == null ? c.fastFrom : null;
+  final fd = c.fastDays;
+  final ft = ff == null || fd == null ? null : DateTime(ff.year, ff.month, ff.day + fd);
   return AdaptLog(
       day: day,
       tdee: tdee,
@@ -728,8 +739,8 @@ AdaptLog _logLine(CheckIn c,
       applied: applied,
       fast: fast,
       lowLog: lowLog,
-      from: e == null ? null : dateKey(e.from),
-      to: e == null ? null : dateKey(e.to),
+      from: e != null ? dateKey(e.from) : (ff == null ? null : dateKey(ff)),
+      to: e != null ? dateKey(e.to) : (ft == null ? null : dateKey(ft)),
       meanIntake: _logInt(e?.meanIntake ?? c.fastIntake),
       slope: _logDec(e?.slopeKgWeek ?? c.fastSlope),
       se: e == null ? null : _logInt(e.seKcal),

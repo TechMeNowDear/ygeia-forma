@@ -79,6 +79,41 @@ Map<String, dynamic> _withoutSecrets(Map<String, dynamic> m) => {
         if (!_secretKey(e.key)) e.key: e.value,
     };
 
+/// K8-R-07 (ανεξάρτητος έλεγχος): το ιστορικό ελέγχων κρατά πια και το βάρος κάθε ελέγχου («kg») για ως [adaptLogMax]
+/// ελέγχους (περίπου 6 μήνες). Η αναφορά λέει «από Samsung και Oura τις τελευταίες 60 μέρες» (R8-A11-3: οι ζυγίσεις
+/// κόπηκαν εκεί ακριβώς γι' αυτό): σε γραμμές πριν από την πρώτη μέρα της αναφοράς [fromKey] το βάρος δεν γράφεται.
+Map<String, dynamic> _goalsForReport(Map<String, dynamic> goals, String fromKey) {
+  final log = goals['log'];
+  if (log is! List) return goals;
+  return {
+    ...goals,
+    'log': [
+      for (final x in log)
+        if (x is Map && x['d'] is String && (x['d'] as String).compareTo(fromKey) < 0)
+          {
+            for (final e in x.entries)
+              if (e.key != 'kg') '${e.key}': e.value,
+          }
+        else
+          x,
+    ],
+  };
+}
+
+Map<String, dynamic> _prefsForReport(Map<String, dynamic> prefs, String fromKey) {
+  final goals = prefs['goals'];
+  if (goals is! Map) return prefs;
+  return {...prefs, 'goals': _goalsForReport(Map<String, dynamic>.from(goals), fromKey)};
+}
+
+/// K8-R-13 (ανεξάρτητος έλεγχος): το `jsonEncode` πετά σφάλμα σε NaN/άπειρο, και τότε δεν βγαίνει ΚΑΘΟΛΟΥ αναφορά, ακριβώς
+/// όταν χρειάζεται (μια καταχώριση με άπειρα γραμμάρια είναι αυτό που ψάχνουν οι έλεγχοι «food-grams»/«food-values»). Με
+/// αυτό ως `toEncodable` ο μη πεπερασμένος αριθμός γράφεται null και ό,τι άλλο δεν γράφεται σε JSON γίνεται κείμενο.
+Object? diagnosticsEncodable(Object? o) => o is num ? null : '$o';
+
+/// Η αναφορά (ή η σύνοψη) ως κείμενο JSON, χωρίς να σπάει σε μη πεπερασμένο αριθμό.
+String diagnosticsEncode(Object? report) => jsonEncode(report, toEncodable: diagnosticsEncodable);
+
 /// Έλεγχος 21/11 (K8-14): ΤΑ ΟΝΟΜΑΤΑ (ποτέ οι τιμές) των ρυθμίσεων που δεν μπήκαν στην αναφορά. Πριν το φίλτρο τις
 /// πετούσε αθόρυβα: ένα μελλοντικό κλειδί με «key» στο όνομα θα χανόταν χωρίς ίχνος.
 List<String> _droppedKeys(Map<String, dynamic> m) => [
@@ -103,7 +138,10 @@ Map<String, dynamic> _estJson(Expenditure e) => {
 /// αλλαγή πριν από λίγες μέρες, κάπνισμα, οι 3 τελευταίες εβδομάδες), ούτε το κενό καταγραφής, οι μέρες με αδύνατα πολλές
 /// θερμίδες, οι ξένες ζυγίσεις και το «Χ% εκτίμηση». [estShare]: [checkInEstShare]. Κάθε κλειδί γράφεται πάντα (null όταν
 /// δεν ισχύει), εκτός από τα παλιά «proposal», «quitHoldDays» και «formulaKg» που γράφονται μόνο όταν υπάρχουν, όπως πριν.
-Map<String, dynamic> checkInJson(CheckIn c, {double? estShare}) {
+///
+/// [oldWeights] (K8-R-12): η τελευταία ζύγιση είναι παλιότερη από τις μέρες της αναφοράς· τότε το βάρος της κάρτας και
+/// το βάρος του τύπου δεν γράφονται (η αναφορά έχει από τη Samsung μόνο τις τελευταίες [diagnosticsDays] μέρες).
+Map<String, dynamic> checkInJson(CheckIn c, {double? estShare, bool oldWeights = false}) {
   final p = c.proposal;
   final e = c.est;
   final gap = c.gap;
@@ -126,12 +164,12 @@ Map<String, dynamic> checkInJson(CheckIn c, {double? estShare}) {
       },
     'wanted': c.wanted,
     if (c.quitDays != null) 'quitHoldDays': c.quitDays,
-    'kgNow': c.kgNow,
+    'kgNow': oldWeights ? null : c.kgNow,
     'fastSlopeKgWeek': _n(c.fastSlope, 3),
     // ---- Έλεγχος 21/11 (K8-01): τα υπόλοιπα πεδία της κάρτας.
     'goalKcal': c.goals.kcal,
     'formulaTdee': _n(c.formulaTdee, 1),
-    if (c.formulaKg != null) 'formulaKg': c.formulaKg,
+    if (c.formulaKg != null && !oldWeights) 'formulaKg': c.formulaKg,
     'tooFast': c.tooFast,
     'heldDays': c.heldDays,
     'lowLog': c.lowLog,
@@ -144,6 +182,7 @@ Map<String, dynamic> checkInJson(CheckIn c, {double? estShare}) {
       for (final (day, kg) in c.foreign) [dateKey(day), kg],
     ],
     'fastDays': c.fastDays,
+    'fastFrom': c.fastFrom == null ? null : dateKey(c.fastFrom!),
     'fastIntake': _n(c.fastIntake, 1),
     'fastIntakeDays': c.fastIntakeDays,
     'fastTarget': _n(c.fastTarget, 1),
@@ -225,6 +264,8 @@ Map<String, dynamic> diagnosticsFrom({
   final d = store.data;
   final g = store.goals;
   final weights = d == null ? <(DateTime, double)>[] : dailyWeights(d.body);
+  // K8-R-12: η τελευταία ζύγιση είναι πριν από τις μέρες της αναφοράς· τότε η τιμή της δεν γράφεται πουθενά.
+  final weightsOld = weights.isNotEmpty && weights.last.$1.isBefore(from);
   Map<DateTime, double> intake(DateTime a, DateTime b) => dailyIntake(food, a, b);
   // Κ1-L6 (17/11): ο τύπος με το τωρινό βάρος, όπως ο έλεγχος θερμίδων ([formulaNow]).
   final fNow = g == null ? null : formulaNow(g, weights);
@@ -292,7 +333,7 @@ Map<String, dynamic> diagnosticsFrom({
   if (g != null) {
     final c = g.calc;
     goalsCalc = {
-      'stored': g.toJson(),
+      'stored': _goalsForReport(g.toJson(), dateKey(from)),
       'formula': {
         'bmr': _r(c.bmr, 1),
         'tdee': _r(c.tdee, 1),
@@ -417,7 +458,7 @@ Map<String, dynamic> diagnosticsFrom({
       'due': checkInDue(goals: g, today: today, lastCheckIn: g.checkIn),
       'cardShown': pending != null,
       'cardWhyNot': shownCard.why,
-      'pending': pending == null ? null : checkInJson(pending, estShare: checkInEstShare(pending, food)),
+      'pending': pending == null ? null : checkInJson(pending, estShare: checkInEstShare(pending, food), oldWeights: weightsOld),
       'readiness': {'intakeDays': ready.intakeDays, 'weighIns': ready.weighIns, 'first': dateKey(ready.first)},
       'firstEstimate': dateKey(firstEstimateDay(g)),
       'probe': {
@@ -425,7 +466,7 @@ Map<String, dynamic> diagnosticsFrom({
         'status': probe.status.name,
         if (probe.est != null) 'est': _estJson(probe.est!),
         'formulaTdee': _r(fNow!.tdee, 1),
-        if (fNow!.kg != null) 'formulaKg': fNow!.kg,
+        if (fNow!.kg != null && !weightsOld) 'formulaKg': fNow!.kg,
         'wizardTdee': _r(g.calc.tdee, 1),
         'plausibleBand': [_r(adaptLowShare * fNow!.tdee, 0), _r(adaptHighShare * fNow!.tdee, 0)],
       },
@@ -468,7 +509,22 @@ Map<String, dynamic> diagnosticsFrom({
   final z = store.zoneOn(now);
   // Έλεγχος 21/11 (K8-08): από ποια πηγή είναι οι παλμοί ύπνου που δίνουν τους «παλμούς ηρεμίας» της ζώνης (μόνο το όνομα
   // της πηγής: «watch», «oura», «none»)· η σύνοψη αφήνει έξω τη ζώνη όταν βγαίνει από το δαχτυλίδι.
-  final restSrc = store.analysisPlan.sourceFor(K.sleepHr, today).name;
+  // K8-R-11 (ανεξάρτητος έλεγχος): η πηγή της τελευταίας νύχτας που ΜΠΗΚΕ στον υπολογισμό (οι 28 τελευταίες μέρες, όχι
+  // πάνω από αλλαγή πηγής, όπως το `restHrForZone`). Πριν: η πηγή της σημερινής μέρας· μετά από αποσύνδεση έγραφε «none»
+  // ενώ οι παλμοί ηρεμίας έβγαιναν ακόμα από τις νύχτες του Oura.
+  String restSource() {
+    final p = store.analysisPlan;
+    final changes = p.changeDates(K.sleepHr);
+    final first = changes.isEmpty ? null : changes.last;
+    for (var i = 0; i < 28; i++) {
+      final x = DateTime(today.year, today.month, today.day - i);
+      if (first != null && x.isBefore(first)) break;
+      if (p.value(store.history, K.sleepHr, x) != null) return p.sourceFor(K.sleepHr, x).name;
+    }
+    return p.sourceFor(K.sleepHr, today).name;
+  }
+
+  final restSrc = restSource();
   final zone = {
     'settings': store.zoneSettings.toJson(),
     'restHrUsed': store.restHrForZone(now),
@@ -488,6 +544,36 @@ Map<String, dynamic> diagnosticsFrom({
   final shownWeigh = d == null || d.body.isEmpty ? null : (guardBody(d.body).shown.lastOrNull ?? d.body.last);
   if (shownWeigh != null && shownWeigh.time.isBefore(from)) {
     (shown['kinds'] as Map)['body'] = <String, dynamic>{'outsideWindow': true};
+  } else if (d != null && d.body.isNotEmpty) {
+    // K8-R-12 (ανεξάρτητος έλεγχος): το γράφημα του widget είναι οι 7 τελευταίες ζυγίσεις που μετρούν, ΟΣΟ παλιές κι αν
+    // είναι, και η διαφορά («−0,4 kg») είναι από την προηγούμενη. Με αραιές ζυγίσεις έμπαιναν τιμές μηνών, ενώ η αναφορά
+    // λέει «τις τελευταίες 60 μέρες»: οι θέσεις του γραφήματος πριν από την πρώτη μέρα της αναφοράς γράφονται null, και αν
+    // η προηγούμενη ζύγιση είναι έξω από αυτές τις μέρες δεν γράφεται ούτε η διαφορά (μόνο ότι υπάρχει).
+    final counted = guardBody(d.body).counted;
+    final recent = counted.length > 7 ? counted.sublist(counted.length - 7) : counted;
+    final body = (shown['kinds'] as Map)['body'];
+    final m = body is Map ? body['m'] : null;
+    if (counted.length >= 2 && counted[counted.length - 2].time.isBefore(from)) {
+      (shown['kinds'] as Map)['body'] = <String, dynamic>{'outsideWindow': true};
+    } else if (body is Map && m is Map && recent.any((x) => x.time.isBefore(from))) {
+      final old = [for (final x in recent) x.time.isBefore(from)];
+      final pad = 7 - recent.length;
+      Object? masked(Object? box) {
+        final series = box is Map ? box['s'] : null;
+        if (box is! Map || series is! List) return box;
+        return <String, dynamic>{
+          for (final e in box.entries) '${e.key}': e.value,
+          's': [
+            for (var i = 0; i < series.length; i++) i - pad >= 0 && i - pad < old.length && old[i - pad] ? null : series[i],
+          ],
+        };
+      }
+
+      (shown['kinds'] as Map)['body'] = <String, dynamic>{
+        for (final e in body.entries)
+          '${e.key}': e.key == 'm' ? <String, dynamic>{for (final x in m.entries) '${x.key}': masked(x.value)} : e.value,
+      };
+    }
   }
 
   Map<String, dynamic>? bodyCalc;
@@ -549,6 +635,10 @@ Map<String, dynamic> diagnosticsFrom({
         'band': t.band.name,
         'weekNights': t.weekNights,
         'baseNights': t.baseNights,
+        // K8-R-12: το εύρος βγαίνει από τις [hrvBaseDays] νύχτες ΠΡΙΝ από τις 7 τελευταίες, δηλαδή ως 67 μέρες πίσω, ενώ το
+        // «data.history» έχει 60: όποιος το ξαναϋπολογίσει από το αρχείο πρέπει να ξέρει ότι οι πρώτες μέρες του λείπουν.
+        'baseFrom': dateKey(DateTime(hrvDay.year, hrvDay.month, hrvDay.day - (7 + hrvBaseDays - 1))),
+        'baseTo': dateKey(DateTime(hrvDay.year, hrvDay.month, hrvDay.day - 7)),
       };
     }
   }
@@ -569,13 +659,17 @@ Map<String, dynamic> diagnosticsFrom({
         if (weekPlan.sourceFor(metric, x) == Source.oura) return true;
         if (byDefinition && (weekPlan.nightSource(x) == Source.oura || _hasOura(store.history[dateKey(x)]))) return true;
       }
+      // K8-R-02: οι παλμοί μέρας της τελευταίας μέρας εξαιρούν και τον ύπνο που αρχίζει το βράδυ της (η νύχτα της επομένης).
+      final next = DateTime(b.year, b.month, b.day + 1);
+      if (byDefinition && (weekPlan.nightSource(next) == Source.oura || _hasOura(store.history[dateKey(next)]))) return true;
       return false;
     }
 
     weekCalc = {
       'monday': dateKey(w.monday),
       'sunday': dateKey(w.sunday),
-      'shownNow': shownSunday != null,
+      // K8-R-14: η Σήμερα δείχνει την κάρτα μόνο αν είναι ανοιχτή στις ρυθμίσεις ΚΑΙ υπάρχει τουλάχιστον μία τιμή.
+      'shownNow': shownSunday != null && store.prefs.show('week') && w.items.any((t) => t.current != null),
       'items': [
         for (final t in w.items)
           {
@@ -617,7 +711,12 @@ Map<String, dynamic> diagnosticsFrom({
     final x = DateTime(today.year, today.month, today.day - i);
     if (nightPlan.value(store.history, K.sleepMin, x) != null) sleepDay = x;
   }
-  final sleepFromOura = sleepDay != null && nightPlan.nightSource(sleepDay) == Source.oura;
+  // K8-R-01 (ανεξάρτητος έλεγχος): το widget γράφει για κάθε κουτάκι και γράφημα 7 νυχτών (και «Ν νύχτες μέσα στο εύρος»),
+  // με κάθε νύχτα από τη ΔΙΚΗ της πηγή. Μετά από επιστροφή στο ρολόι, οι προηγούμενες νύχτες του γραφήματος είναι ακόμα του
+  // Oura: ο «Ύπνος» σημαδεύεται όταν ΟΠΟΙΑΔΗΠΟΤΕ από τις 7 νύχτες είναι του δαχτυλιδιού, όχι μόνο η τελευταία.
+  final sleepFromOura = sleepDay != null &&
+      [for (var i = 0; i < 7; i++) DateTime(sleepDay.year, sleepDay.month, sleepDay.day - i)]
+          .any((x) => nightPlan.nightSource(x) == Source.oura || _hasOura(store.history[dateKey(x)]));
   // Οι «Παλμοί χθες» του widget «Κίνηση» είναι του ρολογιού, αλλά μετριούνται έξω από τις ώρες ύπνου του Oura όταν η
   // χθεσινή νύχτα είναι του δαχτυλιδιού.
   final yesterday = DateTime(today.year, today.month, today.day - 1);
@@ -625,7 +724,12 @@ Map<String, dynamic> diagnosticsFrom({
   final dayHrByOura = moveShown is Map &&
       moveShown['m'] is Map &&
       (moveShown['m'] as Map).containsKey('dayHr') &&
-      (nightPlan.nightSource(yesterday) == Source.oura || _hasOura(store.history[dateKey(yesterday)]));
+      // K8-R-02: οι παλμοί της χθεσινής μέρας εξαιρούν τον ύπνο δύο νυχτών: της χθεσινής και αυτής που άρχισε χθες βράδυ
+      // (η σημερινή νύχτα).
+      (nightPlan.nightSource(yesterday) == Source.oura ||
+          _hasOura(store.history[dateKey(yesterday)]) ||
+          nightPlan.nightSource(today) == Source.oura ||
+          _hasOura(store.history[dateKey(today)]));
   final ouraParts = <String>[
     if (store.history.values.any((row) => row.keys.any((k) => k.startsWith(_ouraPrefix)))) 'data.history: o.*',
     if (hrvCalc != null) 'calc.hrv',
@@ -730,8 +834,16 @@ Map<String, dynamic> diagnosticsFrom({
   if (g != null) {
     check('goals-floor', g.kcal >= (g.male ? kcalFloorMale : kcalFloorFemale), '${g.kcal}');
     final latest = weights.isEmpty ? null : weights.last.$2;
-    check('goals-weight-fresh', latest == null || (latest - g.kg).abs() < 3,
-        latest == null ? 'καμία ζύγιση' : 'στόχοι με ${g.kg} kg, τελευταία ζύγιση $latest kg');
+    // K8-R-12: ζύγιση παλιότερη από τις μέρες της αναφοράς δεν γράφεται με την τιμή της (ο έλεγχος γίνεται όπως πριν).
+    final latestOld = weightsOld;
+    check(
+        'goals-weight-fresh',
+        latest == null || (latest - g.kg).abs() < 3,
+        latest == null
+            ? 'καμία ζύγιση'
+            : latestOld
+                ? 'στόχοι με ${g.kg} kg, η τελευταία ζύγιση είναι πριν από τις μέρες της αναφοράς'
+                : 'στόχοι με ${g.kg} kg, τελευταία ζύγιση $latest kg');
   }
 
   // Έλεγχος 21/11 (K8-08): η σειρά των κλειδιών: στοιχεία αρχείου → «checks» → «errors» → «calc» → «shown» → «data», και
@@ -788,7 +900,7 @@ Map<String, dynamic> diagnosticsFrom({
     'shown': shown,
     'data': {
       'foodLogSource': foodLog == null ? 'memory-${diagnosticsDays}d' : 'file',
-      'prefs': store.prefsReady ? _withoutSecrets(store.prefsJson()) : null,
+      'prefs': store.prefsReady ? _prefsForReport(_withoutSecrets(store.prefsJson()), dateKey(from)) : null,
       'prefsDropped': store.prefsReady ? _droppedKeys(store.prefsJson()) : const <String>[],
       'profile': {
         'birthYear': store.profile.birthYear,
@@ -881,6 +993,34 @@ const _ouraPrefix = 'o.';
 /// Η μέρα του ιστορικού έχει τιμή του Oura.
 bool _hasOura(Map<String, double>? row) => row != null && row.keys.any((k) => k.startsWith(_ouraPrefix));
 
+/// Το ίδιο για γραμμή που διαβάστηκε από την αναφορά (άγνωστος τύπος).
+bool _rowHasOura(Object? row) => row is Map && row.keys.any((k) => '$k'.startsWith(_ouraPrefix));
+
+/// Το κλειδί της επόμενης μέρας («2026-12-13» → «2026-12-14»)· κενό αν το κλειδί δεν είναι μέρα.
+String _nextDayKey(String key) {
+  final d = DateTime.tryParse(key);
+  return d == null ? '' : dateKey(DateTime(d.year, d.month, d.day + 1));
+}
+
+/// Οι τιμές του ρολογιού που εξαιρούν και τον ύπνο που ΑΡΧΙΖΕΙ το βράδυ της μέρας (history.dart `_heartWithPlan`).
+const _dayHeartByOuraNight = {K.dayHr, K.restHr, K.walkHr};
+
+/// Το ιστορικό της αναφοράς [full] έχει τιμή του Oura σε κάποια από τις [back] + 1 τελευταίες μέρες της («window.to» και
+/// [back] μέρες πίσω). Χωρίς «window»: αν έχει οπουδήποτε.
+bool _recentOura(Map<String, dynamic> full, int back) {
+  final data = full['data'];
+  final history = data is Map ? data['history'] : null;
+  if (history is! Map) return false;
+  final window = full['window'];
+  final to = window is Map && window['to'] is String ? DateTime.tryParse(window['to'] as String) : null;
+  if (to == null) return history.values.any(_rowHasOura);
+  final first = dateKey(DateTime(to.year, to.month, to.day - back));
+  return history.entries.any((e) => '${e.key}'.compareTo(first) >= 0 && _rowHasOura(e.value));
+}
+
+/// Ψηφία σε κείμενο σφάλματος → «#»: το μήνυμα μένει χρήσιμο, χωρίς καμία τιμή.
+String _maskDigits(String s) => s.replaceAll(RegExp(r'[0-9]+'), '#');
+
 /// Τα θρεπτικά που μετρά η εφαρμογή· μόνο αυτά κρατά το λεπτό αντίγραφο τροφίμου της σύνοψης.
 const diagnosticsThinNutrients = [
   Nk.kcal, Nk.protein, Nk.carbs, Nk.sugars, Nk.fiber, Nk.fat, Nk.satFat, Nk.salt, Nk.sodium, Nk.alcohol, Nk.polyols,
@@ -923,13 +1063,19 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
         out['${e.key}'] = row;
         continue;
       }
-      final hadOura = row.keys.any((k) => '$k'.startsWith(_ouraPrefix));
+      final hadOura = _rowHasOura(row);
+      // K8-R-02 (ανεξάρτητος έλεγχος): οι παλμοί μέρας, ηρεμίας και περπατήματος της μέρας εξαιρούν τον ύπνο ΔΥΟ νυχτών:
+      // αυτής που τελείωσε το πρωί της και αυτής που άρχισε το βράδυ της (γράφεται στην επόμενη μέρα). Η παραμονή της
+      // πρώτης νύχτας του Oura δεν έχει κανένα «o.*», αλλά οι παλμοί της ορίζονται από τις ώρες ύπνου του.
+      final byNext = _rowHasOura(history[_nextDayKey('${e.key}')]);
       final kept = <String, dynamic>{};
       for (final v in row.entries) {
         final k = '${v.key}';
         // Και οι τιμές του ρολογιού που μετριούνται πάνω στις ώρες ύπνου του Oura ([definitionMetrics]: οξυγόνο της νύχτας,
         // παλμοί μέρας, ηρεμίας, περπατήματος): η τιμή είναι του ρολογιού, αλλά το ποιες ώρες μετρούν το ορίζει το δαχτυλίδι.
-        if (k.startsWith(_ouraPrefix) || (hadOura && (k == K.spo2Cov || definitionMetrics.contains(k)))) {
+        if (k.startsWith(_ouraPrefix) ||
+            (hadOura && (k == K.spo2Cov || definitionMetrics.contains(k))) ||
+            (byNext && _dayHeartByOuraNight.contains(k))) {
           ouraKeys.add(k);
         } else {
           kept[k] = v.value;
@@ -946,13 +1092,40 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
   if (calc['hrv'] != null) omitted.add('calc.hrv');
   calc.remove('hrv');
   final zone = calc['zone'];
+  // Η αναφορά έχει οτιδήποτε του δαχτυλιδιού: τότε μένει έξω και ό,τι βγαίνει από τους παλμούς ηρεμίας (ζώνη περπατήματος).
+  final ouraUsed = ouraKeys.isNotEmpty ||
+      (full['ouraIn'] is List && (full['ouraIn'] as List).isNotEmpty) ||
+      (zone is Map && zone['restSrc'] == Source.oura.name);
   // Και όταν οι παλμοί ηρεμίας είναι του ρολογιού αλλά μετρήθηκαν έξω από ώρες ύπνου του Oura (ιστορικό με τιμές Oura).
-  if (zone is Map && (zone['restSrc'] == Source.oura.name || ouraKeys.isNotEmpty)) {
+  if (zone is Map && ouraUsed) {
+    // K8-R-04 (ανεξάρτητος έλεγχος): και η ζώνη «που όρισες εσύ» («settings.lo/hi»): το τεστ ομιλίας την προτείνει ως τη
+    // ζώνη του υπολογισμού ± 5, δηλαδή βγαίνει κι αυτή από τους παλμούς ύπνου.
+    final settings = zone['settings'];
     calc['zone'] = {
       for (final e in zone.entries)
-        if (e.key != 'restHrUsed' && e.key != 'zone') '${e.key}': e.value,
+        if (e.key != 'restHrUsed' && e.key != 'zone')
+          '${e.key}': e.key == 'settings' && settings is Map
+              ? {
+                  for (final x in settings.entries)
+                    if (x.key != 'lo' && x.key != 'hi') '${x.key}': x.value,
+                }
+              : e.value,
     };
-    omitted.add('calc.zone: restHrUsed, zone');
+    omitted.add('calc.zone: restHrUsed, zone, settings.lo, settings.hi');
+    final prefs = data['prefs'];
+    final prefsZone = prefs is Map ? prefs['zone'] : null;
+    if (prefs is Map && prefsZone is Map) {
+      data['prefs'] = {
+        for (final e in prefs.entries)
+          '${e.key}': e.key == 'zone'
+              ? {
+                  for (final x in prefsZone.entries)
+                    if (x.key != 'lo' && x.key != 'hi') '${x.key}': x.value,
+                }
+              : e.value,
+      };
+      omitted.add('data.prefs.zone: lo, hi');
+    }
   }
   final week = calc['week'];
   if (week is Map) {
@@ -987,7 +1160,9 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
     final sleep = kinds is Map ? kinds['sleep'] : null;
     final marked = full['ouraIn'] is List && (full['ouraIn'] as List).contains('shown.kinds.sleep');
     final src = sleep is Map ? sleep['src'] : null;
-    if (kinds is Map && sleep != null && (marked || (src is String && src.startsWith('Oura')))) {
+    // K8-R-01: δεύτερη ασφάλεια, ανεξάρτητη από το σημάδι: τιμή του Oura σε οποιαδήποτε από τις 8 τελευταίες μέρες της
+    // αναφοράς (το γράφημα 7 νυχτών του widget) βγάζει όλο τον «Ύπνο».
+    if (kinds is Map && sleep != null && (marked || (src is String && src.startsWith('Oura')) || _recentOura(full, 7))) {
       shown = {
         for (final e in shown.entries)
           '${e.key}': e.key == 'kinds'
@@ -1002,7 +1177,8 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
   }
 
   // ---- Oura: οι «Παλμοί χθες» της «Κίνησης» όταν η χθεσινή νύχτα είναι του δαχτυλιδιού (σημάδι της αναφοράς).
-  if (shown is Map && full['ouraIn'] is List && (full['ouraIn'] as List).contains('shown.kinds.move.m.dayHr')) {
+  if (shown is Map &&
+      ((full['ouraIn'] is List && (full['ouraIn'] as List).contains('shown.kinds.move.m.dayHr')) || _recentOura(full, 1))) {
     final kinds = shown['kinds'];
     final move = kinds is Map ? kinds[WKind.move] : null;
     final m = move is Map ? move['m'] : null;
@@ -1060,7 +1236,7 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
           },
         };
         final id = '${f['id']}';
-        final sig = '$id|${jsonEncode(thin)}';
+        final sig = '$id|${diagnosticsEncode(thin)}';
         key = foodKeys[sig];
         if (key == null) {
           // Το ίδιο τρόφιμο με άλλες τιμές (π.χ. διορθώθηκε το προϊόν): δεύτερο κλειδί, «id#2».
@@ -1089,16 +1265,33 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
   // ---- Προπονήσεις: χωρίς παλμούς, μόνο των ημερών της αναφοράς.
   // Oura: τα όρια της ζώνης περπατήματος (της εφαρμογής και κάθε προπόνησης) βγαίνουν από τους παλμούς ηρεμίας· όταν η
   // αναφορά έχει οτιδήποτε του δαχτυλιδιού, μένουν κι αυτά έξω (δεν ξέρουμε από ποια πηγή ήταν τη μέρα της προπόνησης).
-  final ouraUsed = ouraKeys.isNotEmpty ||
-      (full['ouraIn'] is List && (full['ouraIn'] as List).isNotEmpty) ||
-      (zone is Map && zone['restSrc'] == Source.oura.name);
   final training = data['training'];
   if (training is Map) {
     final t = <String, dynamic>{
       for (final e in training.entries)
         if (e.key != 'hrz' && !(ouraUsed && e.key == 'zone')) '${e.key}': e.value,
     };
-    if (ouraUsed) omitted.add('data.training: zone, sessions[].zlo, sessions[].zhi');
+    if (ouraUsed) omitted.add('data.training: zone, sessions[].zlo, sessions[].zhi, sessions[].zt');
+    // K8-R-03 (ανεξάρτητος έλεγχος): μια προπόνηση χωρίς τους παλμούς της και, όταν η αναφορά έχει οτιδήποτε του
+    // δαχτυλιδιού, χωρίς τα όρια της ζώνης και τον χρόνο κάτω/μέσα/πάνω από αυτήν («zt»: κρίνεται με τα ίδια όρια).
+    Map<String, dynamic> thin(Map s) => {
+          for (final e in s.entries)
+            if (e.key != 'hr' && !(ouraUsed && (e.key == 'zlo' || e.key == 'zhi' || e.key == 'zt'))) '${e.key}': e.value,
+        };
+    // Η προπόνηση σε εξέλιξη («current») κρατά όρια ζώνης και ΟΛΟΥΣ τους παλμούς: το ίδιο φίλτρο. Οι προπονήσεις που δεν
+    // διαβάστηκαν («bad») και όσες σβήστηκαν πρόσφατα («drop») είναι ωμά αντικείμενα με ό,τι είχαν μέσα: μόνο το πλήθος.
+    final current = t['current'];
+    if (current is Map) {
+      t['current'] = thin(current);
+      omitted.add('data.training.current: hr${ouraUsed ? ', zlo, zhi, zt' : ''}');
+    }
+    for (final k in const ['bad', 'drop']) {
+      final raw = t[k];
+      if (raw is List) {
+        t[k] = raw.length;
+        omitted.add('data.training.$k: ${raw.length} (μόνο το πλήθος)');
+      }
+    }
     final fromMs = DateTime.tryParse(fromKey)?.millisecondsSinceEpoch;
     final sessions = t['sessions'];
     if (sessions is List) {
@@ -1114,10 +1307,7 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
           old++;
           continue;
         }
-        kept.add({
-          for (final e in s.entries)
-            if (e.key != 'hr' && !(ouraUsed && (e.key == 'zlo' || e.key == 'zhi'))) '${e.key}': e.value,
-        });
+        kept.add(thin(s));
       }
       t['sessions'] = kept;
       if (old > 0) {
@@ -1140,16 +1330,23 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
     var cut = 0;
     errorsOut = [
       for (final x in errorsOut)
-        if (x is Map && jsonEncode(x).toLowerCase().contains('oura'))
+        if (x is Map && diagnosticsEncode(x).toLowerCase().contains('oura'))
           {
             for (final e in x.entries)
               if (e.key != 'message') '${e.key}': e.value,
             'messageOmitted': ++cut > 0,
           }
+        else if (x is Map)
+          // K8-R-05 (ανεξάρτητος έλεγχος): σφάλμα σε οθόνη που ζωγραφίζει τιμές του Oura μπορεί να κουβαλά αριθμό στο μήνυμα
+          // χωρίς τη λέξη «oura» πουθενά: στη σύνοψη κάθε μήνυμα γράφεται με «#» στη θέση των ψηφίων.
+          {
+            for (final e in x.entries) '${e.key}': e.key == 'message' && e.value is String ? _maskDigits(e.value as String) : e.value,
+          }
         else
           x,
     ];
     if (cut > 0) omitted.add('errors[].message: $cut');
+    omitted.add('errors[].message: τα ψηφία ως #');
   }
 
   const heavy = {'calc', 'shown', 'data', 'ouraIn', 'errors'};
@@ -1162,8 +1359,10 @@ Map<String, dynamic> diagnosticsSummary(Map<String, dynamic> full) {
         if (e.key == 'kind') ...{
           'oura': 'omitted',
           'omitted': omitted,
-          'about': 'Σύνοψη της «Αναφοράς για έλεγχο»: χωρίς τα δεδομένα του Oura, χωρίς το πλήρες ημερολόγιο φαγητού και '
-              'χωρίς τους παλμούς των προπονήσεων. Το πλήρες αρχείο (.json.gz) τα έχει.',
+          'about': 'Σύνοψη της «Αναφοράς για έλεγχο»: χωρίς τα δεδομένα του Oura και χωρίς ό,τι μετρά το ρολόι πάνω στις ώρες '
+              'ύπνου του (οξυγόνο νύχτας, παλμοί μέρας, ηρεμίας και περπατήματος, ζώνη περπατήματος), χωρίς το πλήρες '
+              'ημερολόγιο φαγητού και χωρίς τους παλμούς των προπονήσεων. Το «omitted» λέει τι έμεινε έξω· το πλήρες αρχείο '
+              '(.json.gz) τα έχει.',
         },
       },
     'calc': calc,

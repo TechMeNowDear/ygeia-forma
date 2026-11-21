@@ -96,11 +96,14 @@ class ErrorReporter {
   final Map<String, DateTime> _recent = {};
   final List<Map<String, Object?>> _early = [];
 
-  /// Τα τελευταία σφάλματα, για την «Αναφορά για έλεγχο» (μπαίνουν και με κλειστή την αποστολή· δεν φεύγουν από το κινητό
-  /// αν δεν τα στείλει ο ίδιος ο χρήστης).
-  /// Έλεγχος 21/11 (K8-06): γράφονται και σε ένα μικρό αρχείο ([recentFile], ως [recentMax] γραμμές) και διαβάζονται στο
-  /// επόμενο άνοιγμα, σημειωμένα «run: previous». Πριν ζούσαν ΜΟΝΟ στη μνήμη: ό,τι πήγε στραβά χθες το βράδυ είχε χαθεί
-  /// όταν έβγαινε η αναφορά το επόμενο πρωί.
+  /// Τα τελευταία σφάλματα, για την «Αναφορά για έλεγχο» (στη μνήμη μπαίνουν και με κλειστή την αποστολή· δεν φεύγουν από
+  /// το κινητό αν δεν τα στείλει ο ίδιος ο χρήστης).
+  /// Έλεγχος 21/11 (K8-06): με ΑΝΟΙΧΤΕΣ τις «Αναφορές σφαλμάτων» γράφονται και σε ένα μικρό αρχείο ([recentFile], ως
+  /// [recentMax] γραμμές) και διαβάζονται στο επόμενο άνοιγμα, σημειωμένα «run: previous». Πριν ζούσαν ΜΟΝΟ στη μνήμη: ό,τι
+  /// πήγε στραβά χθες το βράδυ είχε χαθεί όταν έβγαινε η αναφορά το επόμενο πρωί.
+  /// K8-R-10 (ανεξάρτητος έλεγχος): με ΚΛΕΙΣΤΕΣ τις αναφορές δεν γράφεται ούτε διαβάζεται αρχείο, και το κλείσιμο το σβήνει
+  /// ([_clearQueue]· το ίδιο κάνει η πλευρά Android, ErrorQueue.kt): η πολιτική απορρήτου λέει «κλειστές, όσες περίμεναν στο
+  /// κινητό σβήνονται», και ένα αρχείο σφαλμάτων που μένει θα την έκανε ψέμα.
   final List<Map<String, Object?>> recentErrors = [];
   static const recentMax = 30;
 
@@ -108,15 +111,22 @@ class ErrorReporter {
   /// τελειώνει σε «.json»: ό,τι τελειώνει σε «.json» εκεί είναι γεγονός προς αποστολή (το στέλνει και το σβήνει η ουρά,
   /// από εδώ και από την πλευρά Android)· αυτό δεν στέλνεται ποτέ (όπως το «.count»).
   static const recentFile = '.recent';
-  bool _recentRead = false;
+  Future<void>? _recentReading;
   Future<void> _recentWrites = Future.value();
   final Map<String, DateTime> _recentSaved = {};
 
-  /// Διαβάζει μία φορά τα σφάλματα της προηγούμενης εκτέλεσης και τα βάζει ΠΡΙΝ από τα τωρινά, με «run: previous».
-  Future<void> _readRecent() async {
+  /// Διαβάζει ΜΙΑ φορά τα σφάλματα της προηγούμενης εκτέλεσης και τα βάζει ΠΡΙΝ από τα τωρινά, με «run: previous».
+  /// K8-R-09 (ανεξάρτητος έλεγχος): η ανάγνωση είναι ένα Future που το περιμένουν ΟΛΟΙ. Πριν ένα bool γινόταν true πριν
+  /// τελειώσει η ανάγνωση: σφάλμα που αναφερόταν εκείνα τα ms έγραφε το αρχείο μόνο με τον εαυτό του και τα σφάλματα της
+  /// προηγούμενης εκτέλεσης χάνονταν από τον δίσκο (ή διαβάζονταν διπλά). Χωρίς φάκελο ή με κλειστές αναφορές: τίποτα.
+  Future<void> _readRecent() {
+    if (dir == null || !enabled) return Future.value();
+    return _recentReading ??= _doReadRecent();
+  }
+
+  Future<void> _doReadRecent() async {
     final d = dir;
-    if (_recentRead || d == null) return;
-    _recentRead = true;
+    if (d == null) return;
     try {
       final f = File('${d.path}/$recentFile');
       if (!await f.exists()) return;
@@ -133,18 +143,33 @@ class ErrorReporter {
     }
   }
 
-  /// Γράφει τα [recentErrors] στο αρχείο (μία εγγραφή τη φορά, με τη σειρά). Χωρίς φάκελο: τίποτα.
+  /// Γράφει τα [recentErrors] στο αρχείο (μία εγγραφή τη φορά, με τη σειρά· κάθε εγγραφή γράφει ό,τι υπάρχει ΤΗ ΣΤΙΓΜΗ που
+  /// έρχεται η σειρά της, και πάντα μετά την ανάγνωση της προηγούμενης εκτέλεσης). Χωρίς φάκελο ή με κλειστές αναφορές:
+  /// τίποτα.
   Future<void> _writeRecent() {
     final d = dir;
-    if (d == null) return Future.value();
-    final text = jsonEncode(recentErrors);
+    if (d == null || !enabled) return Future.value();
     return _recentWrites = _recentWrites.then((_) async {
       try {
+        await _readRecent();
+        if (!enabled) return;
         if (!await d.exists()) await d.create(recursive: true);
-        await File('${d.path}/$recentFile').writeAsString(text, flush: true);
+        await File('${d.path}/$recentFile').writeAsString(jsonEncode(recentErrors), flush: true);
       } catch (_) {
         // Η αναφορά σφαλμάτων δεν πρέπει ποτέ να χαλάσει την εφαρμογή.
       }
+    });
+  }
+
+  /// Σβήνει το αρχείο των τελευταίων σφαλμάτων (κλείσιμο των «Αναφορών σφαλμάτων»): μετά από ό,τι εγγραφή είναι στη σειρά.
+  Future<void> _deleteRecent() {
+    final d = dir;
+    if (d == null) return Future.value();
+    return _recentWrites = _recentWrites.then((_) async {
+      try {
+        final f = File('${d.path}/$recentFile');
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
     });
   }
 
@@ -192,7 +217,7 @@ class ErrorReporter {
   Future<void> report(Object error, StackTrace? stack, {bool handled = true, Map<String, Object?> extra = const {}}) async {
     try {
       if (isNoise(error)) return;
-      recentErrors.add({
+      final entry = <String, Object?>{
         'at': _clock().toIso8601String(),
         // K8-13: και σε ms (η ώρα χωρίς ζώνη δεν ξεχωρίζει την επαναλαμβανόμενη ώρα της αλλαγής ώρας).
         'atMs': _clock().millisecondsSinceEpoch,
@@ -204,13 +229,14 @@ class ErrorReporter {
           for (final f in parseDartStack(stack?.toString() ?? '').reversed.take(8))
             '${f['function'] ?? ''} ${f['filename'] ?? ''}:${f['lineno'] ?? ''}',
         ],
-      });
+      };
+      recentErrors.add(entry);
       if (recentErrors.length > recentMax) recentErrors.removeAt(0);
-      // K8-06: και στο αρχείο, ώστε να επιζήσει από το κλείσιμο της εφαρμογής (και με κλειστή την αποστολή: μένει στο κινητό).
+      // K8-06: και στο αρχείο (με ανοιχτές τις αναφορές), ώστε να επιζήσει από το κλείσιμο της εφαρμογής.
       // Το ίδιο σφάλμα γράφεται στο αρχείο το πολύ μία φορά στο [dedupeWindow]: ένα σφάλμα που επαναλαμβάνεται σε κάθε
-      // καρέ δεν γράφει στον δίσκο σε κάθε καρέ (μπαταρία).
-      if (!_recentRead) await _readRecent();
-      final savedSig = '${recentErrors.last['type']}:${recentErrors.last['message']}';
+      // καρέ δεν γράφει στον δίσκο σε κάθε καρέ (μπαταρία). Η υπογραφή από τη δική του γραμμή (K8-R-09: πριν από την
+      // τελευταία της λίστας, που μετά από αναμονή μπορεί να είναι άλλου σφάλματος).
+      final savedSig = '${entry['type']}:${entry['message']}';
       final savedNow = _clock();
       final savedLast = _recentSaved[savedSig];
       if (savedLast == null || savedNow.difference(savedLast) >= dedupeWindow) {
@@ -325,6 +351,8 @@ class ErrorReporter {
     for (final f in await _queued()) {
       await _delete(f);
     }
+    // K8-R-10: και το αρχείο των τελευταίων σφαλμάτων (με κλειστές τις αναφορές δεν μένει αρχείο σφαλμάτων στο κινητό).
+    await _deleteRecent();
   }
 
   /// Ο διακόπτης «Αναφορές σφαλμάτων». Κλείσιμο: σβήνονται αμέσως όσα περίμεναν. Η επιλογή γράφεται πρώτα, ώστε μια

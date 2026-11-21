@@ -141,6 +141,7 @@ void main() {
         'kgNow': 'kgNow',
         'fastSlope': 'fastSlopeKgWeek',
         'fastDays': 'fastDays',
+        'fastFrom': 'fastFrom',
         'days': 'days',
         'weighs': 'weighs',
         'tooFast': 'tooFast',
@@ -161,7 +162,7 @@ void main() {
       final from = src.indexOf('const CheckIn(');
       final ctor = src.substring(from, src.indexOf('});', from));
       final fields = [for (final m in RegExp(r'this\.(\w+)').allMatches(ctor)) m.group(1)!];
-      expect(fields.length, greaterThanOrEqualTo(23));
+      expect(fields.length, greaterThanOrEqualTo(24));
       final g = _goals();
       final base = _proposal(g);
       final full = CheckIn(
@@ -219,6 +220,43 @@ void main() {
       expect(jsonEncode(Goals.fromJson(applied.toJson())!.log.last.toJson()), jsonEncode(line));
       final no = dismissCheckIn(_proposal(g, tooFast: true), _at).log.last.toJson();
       expect((no.containsKey('ap'), no['kd'], no['wh'], no['wf']), (false, 'proposal', 'tooFast', '2026-11-22'));
+    });
+
+    test('K8-R-06: και η «γρήγορη απώλεια» (χωρίς εκτίμηση) κρατά το παράθυρο που κρίθηκε', () {
+      // Πριν: wf/wt null· αυτός ο έλεγχος δεν μπορούσε να ξαναελεγχθεί.
+      final g = _goals();
+      final fast = CheckIn(
+          kind: CheckKind.fast,
+          goals: g,
+          proposal: AdaptProposal(current: g.kcal, target: g.kcal + 150, est: null, fastLoss: true, floored: false),
+          kgNow: 82.4,
+          fastSlope: -1.104,
+          fastDays: 21,
+          fastFrom: DateTime(2026, 11, 24),
+          fastIntake: 2140.6,
+          fastIntakeDays: 18,
+          fastTarget: 2160);
+      final line = applyCheckIn(fast, DateTime(2026, 12, 15, 8)).log.last.toJson();
+      expect((line['d'], line['f'], line['k0'], line['k1'], line['ap']), ('2026-12-15', true, g.kcal, g.kcal + 150, true));
+      expect((line['wf'], line['wt'], line['mi'], line['sl'], line['nd'], line['kg'], line['kd']),
+          ('2026-11-24', '2026-12-15', 2141, -1.104, 18, 82.4, 'fast'));
+      expect((line.containsKey('se'), line.containsKey('nw')), (false, false), reason: 'δεν υπάρχει εκτίμηση');
+      expect(checkInJson(fast)['fastFrom'], '2026-11-24');
+    });
+
+    test('K8-R-07: έλεγχος παλιότερος από τις 60 μέρες της αναφοράς: η γραμμή του μένει, το βάρος της όχι', () {
+      // Πριν: «kg» ως 26 ελέγχους πίσω (περίπου 6 μήνες), ενώ η αναφορά λέει «τις τελευταίες 60 μέρες».
+      AdaptLog line(String day, double kg) =>
+          AdaptLog(day: day, tdee: 2500, before: 2160, after: 2160, applied: true, kg: kg, kind: 'same', meanIntake: 2160);
+      final g = _goals().copyWith(addLog: line('2026-09-07', 86.537)).copyWith(addLog: line('2026-12-07', 83.4));
+      final r = diagnosticsFrom(store: _store(goals: g), food: _food(_at), now: _at);
+      final stored = (((r['calc'] as Map)['goals'] as Map)['stored'] as Map)['log'] as List;
+      expect([for (final x in stored) (x as Map)['d']], ['2026-09-07', '2026-12-07']);
+      expect([for (final x in stored) (x as Map)['kg']], [null, 83.4]);
+      expect((stored.first as Map)['mi'], 2160, reason: 'μόνο το βάρος βγαίνει');
+      final inPrefs = jsonEncode((r['data'] as Map)['prefs']);
+      expect(inPrefs, isNot(contains('86.537')));
+      expect(jsonEncode(r), isNot(contains('86.537')));
     });
 
     test('παλιό αρχείο: γραμμή χωρίς τα νέα κλειδιά διαβάζεται και γράφεται ίδια· άκυρες τιμές αγνοούνται', () {
@@ -296,10 +334,12 @@ void main() {
     tearDown(() => dir.deleteSync(recursive: true));
 
     test('σφάλμα → νέα εκτέλεση με τον ίδιο φάκελο: στην αναφορά με «run: previous» (πριν: errors [])', () async {
-      final first = ErrorReporter(dir: dir, post: (_) async => 200)..sending.value = false;
+      final first = ErrorReporter(dir: dir, post: (_) async => 200);
       await first.report(StateError('δοκιμή αποθήκευσης'), StackTrace.current);
       expect(File('${dir.path}/${ErrorReporter.recentFile}').existsSync(), isTrue);
+      await first.flush();
       expect(await first.pending(), 0, reason: 'το αρχείο των τελευταίων σφαλμάτων δεν είναι γεγονός της ουράς');
+      expect(File('${dir.path}/${ErrorReporter.recentFile}').existsSync(), isTrue, reason: 'η αποστολή δεν το σβήνει');
 
       final sent = <String>[];
       final next = ErrorReporter(post: (b) async {
@@ -318,6 +358,60 @@ void main() {
       expect((errors.first as Map)['run'], 'previous');
       expect((errors.first as Map)['message'], contains('δοκιμή αποθήκευσης'));
       expect((errors.last as Map)['atMs'], isA<int>());
+    });
+
+    test('K8-R-09: σφάλμα την ώρα που διαβάζεται το αρχείο της προηγούμενης εκτέλεσης: τίποτα δεν χάνεται', () async {
+      // Πριν: το σφάλμα έγραφε το αρχείο μόνο με τον εαυτό του και τα σφάλματα της προηγούμενης εκτέλεσης χάνονταν.
+      final first = ErrorReporter(dir: dir, post: (_) async => 200);
+      await first.report(StateError('χθες'), StackTrace.current);
+      final next = ErrorReporter(post: (_) async => 200);
+      final a = next.configure(dir: dir, release: 'ygeia-forma@0.1.0', device: const {});
+      final b = next.report(StateError('σήμερα'), StackTrace.current);
+      await Future.wait([a, b]);
+      expect([for (final e in next.recentErrors) e['run']], ['previous', null]);
+      final saved = jsonDecode(File('${dir.path}/${ErrorReporter.recentFile}').readAsStringSync()) as List;
+      expect([for (final e in saved) '${(e as Map)['message']}'.contains('χθες')], [true, false]);
+    });
+
+    test('K8-R-10: με κλειστές τις «Αναφορές σφαλμάτων» δεν μένει αρχείο σφαλμάτων στο κινητό', () async {
+      // Η πολιτική απορρήτου: «Κλειστές, δεν στέλνεται τίποτα και όσες περίμεναν στο κινητό σβήνονται».
+      final r = ErrorReporter(dir: dir, post: (_) async => 200);
+      await r.report(StateError('ένα'), StackTrace.current);
+      final f = File('${dir.path}/${ErrorReporter.recentFile}');
+      expect(f.existsSync(), isTrue);
+      expect(await r.setEnabled(false), isTrue);
+      expect(f.existsSync(), isFalse, reason: 'το κλείσιμο το σβήνει');
+      await r.report(StateError('δύο'), StackTrace.current);
+      expect(f.existsSync(), isFalse, reason: 'κλειστές: δεν γράφεται');
+      expect(r.recentErrors.length, 2, reason: 'στη μνήμη μένουν, για την αναφορά αυτής της εκτέλεσης');
+      final next = ErrorReporter(post: (_) async => 200);
+      await next.configure(dir: dir, release: 'ygeia-forma@0.1.0', device: const {}, enabled: false);
+      expect(next.recentErrors, isEmpty);
+    });
+
+    test('K8-R-08: μία γραμμή για κάθε διαφορετική αποτυχία, με πλήθος· η μόνιμη αποτυχία δεν σβήνει τη σπάνια', () {
+      // Πριν: νέα γραμμή κάθε ώρα· 20 ανοίγματα με κλειστή άδεια «Ύπνος» έσβηναν τη σπάνια αποτυχία της προηγούμενης εβδομάδας.
+      const h = failedLogRepeatMs;
+      final log = <List<Object>>[];
+      expect(noteFailedRead(log, 'heart', 1000), isTrue);
+      expect(noteFailedRead(log, 'sleep', 2000), isTrue);
+      expect(noteFailedRead(log, 'sleep', 2000 + h - 1), isFalse, reason: 'μέσα στην ώρα: καμία εγγραφή');
+      for (var i = 1; i <= 30; i++) {
+        expect(noteFailedRead(log, 'sleep', 2000 + i * h), isTrue);
+      }
+      expect(log, [
+        [1000, 'heart'],
+        [2000, 'sleep', 31, 2000 + 30 * h],
+      ]);
+      // Δύο αποτυχίες που εναλλάσσονται μέσα στην ώρα: καμία εγγραφή (πριν: εγγραφή σε κάθε ανανέωση).
+      expect(noteFailedRead(log, 'heart', 1010), isFalse);
+      expect(noteFailedRead(log, 'sleep', 2000 + 30 * h + 10), isFalse);
+      expect(failedLogFromJson(jsonDecode(jsonEncode(log))), log, reason: 'ξαναδιαβάζεται ίδιο από τις ρυθμίσεις');
+      final many = <List<Object>>[];
+      for (var i = 0; i < 25; i++) {
+        noteFailedRead(many, 'k$i', i);
+      }
+      expect((many.length, many.first[1], many.last[1]), (failedLogMax, 'k5', 'k24'));
     });
 
     test('οι αποτυχημένες αναγνώσεις της Samsung στις ρυθμίσεις: προαιρετικό κλειδί, ως 20, μόνο ώρα και είδη', () {
@@ -573,6 +667,245 @@ void main() {
       }
       // Το πλήρες αρχείο δεν αλλάζει.
       expect(((full['data'] as Map)['history'] as Map)['2026-12-13'], containsPair(K.restHr, 61.0));
+    });
+
+    test('σύνοψη, ανεξάρτητος έλεγχος (K8-R-01…05): γράφημα 7 νυχτών, παραμονή νύχτας Oura, προπόνηση σε εξέλιξη, ζώνη που όρισες, ψηφία σφαλμάτων',
+        () {
+      // Πριν: (1) ο «Ύπνος» έμενε όταν η ΤΕΛΕΥΤΑΙΑ νύχτα ήταν του ρολογιού, με γράφημα 7 νυχτών που είχε νύχτες του Oura·
+      // (2) οι παλμοί της παραμονής μιας νύχτας Oura έμεναν· (3) «current», «bad», «drop», «zt» των προπονήσεων έμεναν·
+      // (4) η ζώνη «που όρισες» (ζώνη του υπολογισμού ± 5) έμενε· (5) τα μηνύματα σφαλμάτων έμεναν με τους αριθμούς τους.
+      final inWindow = DateTime(2026, 12, 12, 18).millisecondsSinceEpoch;
+      final full = <String, dynamic>{
+        'app': 'ygeia-forma',
+        'kind': 'diagnostics',
+        'window': {'days': 60, 'from': '2026-10-16', 'to': '2026-12-14'},
+        // Κανένα σημάδι για τον «Ύπνο»: η δεύτερη ασφάλεια της σύνοψης πρέπει να φτάνει μόνη της.
+        'ouraIn': ['data.history: o.*'],
+        'checks': <Object>[],
+        'errors': [
+          {'type': 'StateError', 'message': 'Bad state: τιμή 61 στη θέση 3', 'screen': 'sleep'},
+        ],
+        'calc': {
+          'zone': {
+            'settings': {'lo': 117, 'hi': 136, 'max': 170, 'up': true, 'down': false},
+            'restHrUsed': 58.0,
+            'restSrc': 'watch',
+            'age': 44,
+          },
+        },
+        'shown': {
+          'kinds': {
+            'sleep': {
+              'src': 'ρολόι · 07:10',
+              'm': {
+                'sleepMin': {
+                  'v': '7:05',
+                  's': [401.0, 402.0, 403.0, 404.0, 405.0, 420.0, 425.0],
+                },
+              },
+            },
+            'move': {
+              'm': {
+                'steps': {'v': '5.120'},
+                'dayHr': {'v': '75'},
+              },
+            },
+          },
+        },
+        'data': {
+          'prefs': {
+            'layout': 1,
+            'zone': {'lo': 117, 'hi': 136, 'up': true, 'down': false},
+          },
+          'history': {
+            // Παραμονή της νύχτας του Oura: κανένα «o.*», αλλά οι παλμοί της εξαιρούν τον ύπνο που άρχισε το βράδυ της.
+            '2026-12-07': {K.steps: 7000.0, K.restHr: 60.0, K.dayHr: 75.0, K.walkHr: 98.0, K.spo2Avg: 95.0},
+            '2026-12-08': {K.steps: 8000.0, 'o.sleepMin': 401.0},
+            '2026-12-10': {K.steps: 9000.0, K.restHr: 61.0, K.dayHr: 76.0},
+          },
+          'training': {
+            'v': 1,
+            'current': {
+              'id': 'c',
+              'start': inWindow,
+              'hr': [
+                [0, 101],
+                [5, 104],
+              ],
+              'zlo': 106,
+              'zhi': 124,
+              'zt': [10, 200, 30],
+              'hrAvg': 103,
+            },
+            'bad': [
+              {'in': 'sessions', 'j': {'zlo': 106}},
+              {'in': 'sessions', 'j': {'zhi': 124}},
+            ],
+            'drop': [
+              {'id': 'd', 'zlo': 106, 'hr': <Object>[]},
+            ],
+            'sessions': [
+              {'id': 'w', 'start': inWindow, 'zlo': 106, 'zhi': 124, 'zt': [10, 200, 30], 'hrAvg': 101, 'hr': <Object>[]},
+            ],
+          },
+        },
+      };
+      final sum = diagnosticsSummary(full);
+      final omitted = (sum['omitted'] as List).join(' | ');
+      // (1) Ο «Ύπνος» βγαίνει ολόκληρος: τιμή του Oura μέσα στις 8 τελευταίες μέρες (8/12, αναφορά 14/12).
+      final kinds = (sum['shown'] as Map)['kinds'] as Map;
+      expect(kinds.containsKey('sleep'), isFalse);
+      expect(omitted, contains('shown.kinds.sleep'));
+      // Οι «Παλμοί χθες» μένουν: ούτε χθες ούτε σήμερα έχει νύχτα του Oura.
+      expect(((kinds['move'] as Map)['m'] as Map).keys.toSet(), {'steps', 'dayHr'});
+      // (2) Παραμονή: οι τρεις παλμοί έξω, το οξυγόνο (της νύχτας που τελείωσε το πρωί της) και τα βήματα μένουν.
+      final rows = (sum['data'] as Map)['history'] as Map;
+      expect((rows['2026-12-07'] as Map).keys.toSet(), {K.steps, K.spo2Avg});
+      expect((rows['2026-12-08'] as Map).keys.toSet(), {K.steps});
+      expect((rows['2026-12-10'] as Map).keys.toSet(), {K.steps, K.restHr, K.dayHr}, reason: 'μέρα μακριά από νύχτα Oura');
+      // (3) Προπονήσεις.
+      final training = (sum['data'] as Map)['training'] as Map;
+      expect((training['current'] as Map).keys.toSet(), {'id', 'start', 'hrAvg'});
+      expect((training['bad'], training['drop']), (2, 1));
+      expect(((training['sessions'] as List).single as Map).keys.toSet(), {'id', 'start', 'hrAvg'});
+      // (4) Ζώνη που όρισες: τα όρια έξω, οι υπόλοιπες ρυθμίσεις μένουν.
+      final zone = (sum['calc'] as Map)['zone'] as Map;
+      expect((zone['settings'] as Map).keys.toSet(), {'max', 'up', 'down'});
+      final prefs = (sum['data'] as Map)['prefs'] as Map;
+      expect(((prefs['zone'] as Map).keys.toSet(), prefs['layout']), ({'up', 'down'}, 1));
+      // (5) Σφάλματα: το μήνυμα μένει, χωρίς ψηφία.
+      expect(((sum['errors'] as List).single as Map)['message'], 'Bad state: τιμή # στη θέση #');
+      final text = jsonEncode(sum);
+      for (final leak in ['401', '117', '136', '106', '124', '"zt"', '"zlo"', '"zhi"', '"hr"']) {
+        expect(text, isNot(contains(leak)), reason: leak);
+      }
+      // Το πλήρες αρχείο δεν αλλάζει.
+      expect((((full['data'] as Map)['training'] as Map)['current'] as Map).containsKey('hr'), isTrue);
+      expect(((full['data'] as Map)['prefs'] as Map)['zone'], containsPair('lo', 117));
+    });
+
+    // K8-R-17 (ανεξάρτητος έλεγχος): η δοκιμή «χαρακτηριστική τιμή 61.3777» έπιανε μόνο ωμές τιμές σε ΕΝΑ σχέδιο πηγών (Oura
+    // κάθε μέρα): ούτε στρογγυλεμένα παράγωγα, ούτε νύχτα ρολογιού μετά από Oura, ούτε παραμονή σύνδεσης, ούτε αποσύνδεση.
+    // Διαφορική δοκιμή: δύο χρήστες ίδιοι σε όλα, που διαφέρουν ΜΟΝΟ σε ό,τι έρχεται από το δαχτυλίδι («o.*») ή ορίζεται από
+    // τις ώρες ύπνου του (οξυγόνο νύχτας του ρολογιού· παλμοί μέρας, ηρεμίας, περπατήματος της ίδιας μέρας και της
+    // παραμονής· ζώνη περπατήματος των προπονήσεων). Η σύνοψη πρέπει να βγαίνει ΙΔΙΑ, χαρακτήρα προς χαρακτήρα.
+    group('K8-R-17: διαφορική δοκιμή: ό,τι αλλάζει μόνο από το Oura δεν αλλάζει τη σύνοψη', () {
+      final today = DateTime(_at.year, _at.month, _at.day);
+      Map<String, dynamic> training(int lo) => {
+            'v': 1,
+            'zone': {'lo': lo, 'hi': lo + 18},
+            'current': {
+              'id': 'c',
+              'start': DateTime(2026, 12, 14, 7, 30).millisecondsSinceEpoch,
+              'items': <Object>[],
+              'zlo': lo,
+              'zhi': lo + 18,
+              'zt': [lo, 300, 20],
+              'hr': [
+                [0, lo + 3],
+              ],
+            },
+            'sessions': [
+              {
+                'id': 'w1',
+                'start': DateTime(2026, 12, 12, 18).millisecondsSinceEpoch,
+                'items': <Object>[],
+                'zlo': lo,
+                'zhi': lo + 18,
+                'zt': [lo, 900, 60],
+                'hrAvg': 104,
+              },
+            ],
+          };
+
+      /// Η πλήρης αναφορά και η σύνοψη ενός χρήστη με σχέδιο πηγών [eras]: κάθε τιμή του δαχτυλιδιού = [oura], και οι τιμές
+      /// του ρολογιού που ορίζονται από τις ώρες ύπνου του μετακινημένες κατά [shift].
+      (String, String) reports(List<SourceEra> eras, double oura, double shift, {int? zoneLo}) {
+        final plan = SourcePlan(eras);
+        final s = _store()..debugSetPlan(plan);
+        final history = {for (final e in s.history.entries) e.key: {...e.value}};
+        for (var i = 0; i < 75; i++) {
+          final day = DateTime(today.year, today.month, today.day - i);
+          final next = DateTime(day.year, day.month, day.day + 1);
+          final row = history.putIfAbsent(dateKey(day), () => <String, double>{});
+          final ring = plan.nightSource(day) == Source.oura;
+          if (ring) {
+            for (final k in ouraKeySet) {
+              row[k] = oura;
+            }
+            for (final k in [K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov]) {
+              row[k] = (row[k] ?? 90.0) + shift;
+            }
+          }
+          // Οι παλμοί της μέρας εξαιρούν τον ύπνο που τελείωσε το πρωί της ΚΑΙ αυτόν που άρχισε το βράδυ της.
+          if (ring || (!next.isAfter(today) && plan.nightSource(next) == Source.oura)) {
+            for (final k in [K.dayHr, K.restHr, K.walkHr]) {
+              row[k] = (row[k] ?? 70.0) + shift;
+            }
+          }
+        }
+        s.history = history;
+        final full = diagnosticsFrom(
+            store: s, food: _food(_at), now: _at, training: zoneLo == null ? null : training(zoneLo));
+        return (jsonEncode(full), jsonEncode(diagnosticsSummary(full)));
+      }
+
+      /// Πού διαφέρουν δύο κείμενα (για το μήνυμα της αποτυχίας).
+      String firstDiff(String a, String b) {
+        var i = 0;
+        while (i < a.length && i < b.length && a.codeUnitAt(i) == b.codeUnitAt(i)) {
+          i++;
+        }
+        if (i == a.length && i == b.length) return 'ίδια';
+        final from = i < 200 ? 0 : i - 200;
+        String cut(String x) => x.substring(from, i + 80 > x.length ? x.length : i + 80);
+        return 'θέση $i:\nΑ: ${cut(a)}\nΒ: ${cut(b)}';
+      }
+
+      final plans = <String, List<SourceEra>>{
+        'μόνο Oura': [SourceEra(Source.oura, DateTime(2026, 9, 1))],
+        'Oura, και πριν από 2 μέρες ξανά ρολόι': [
+          SourceEra(Source.oura, DateTime(2026, 9, 1)),
+          SourceEra(Source.watch, DateTime(2026, 12, 13)),
+        ],
+        'Oura, και πριν από 10 μέρες ξανά ρολόι': [
+          SourceEra(Source.oura, DateTime(2026, 9, 1)),
+          SourceEra(Source.watch, DateTime(2026, 12, 4)),
+        ],
+        'ρολόι, και από σήμερα Oura (η χθεσινή μέρα είναι παραμονή)': [SourceEra(Source.oura, DateTime(2026, 12, 14))],
+        'Oura, και πριν από 5 μέρες αποσύνδεση': [
+          SourceEra(Source.oura, DateTime(2026, 9, 1)),
+          SourceEra(Source.none, DateTime(2026, 12, 10)),
+        ],
+      };
+      for (final e in plans.entries) {
+        test(e.key, () {
+          final a = reports(e.value, 61.3777, 0);
+          final b = reports(e.value, 47.9191, 3.25);
+          expect(a.$1 == b.$1, isFalse, reason: 'οι δύο χρήστες διαφέρουν στο πλήρες αρχείο (αλλιώς η δοκιμή δεν λέει τίποτα)');
+          expect(a.$1, contains('61.3777'));
+          expect(a.$2 == b.$2, isTrue, reason: firstDiff(a.$2, b.$2));
+        });
+      }
+
+      test('μόνο Oura, με προπόνηση σε εξέλιξη και άλλη ζώνη περπατήματος (βγαίνει από τους παλμούς ύπνου)', () {
+        final a = reports(plans['μόνο Oura']!, 61.3777, 0, zoneLo: 106);
+        final b = reports(plans['μόνο Oura']!, 47.9191, 3.25, zoneLo: 101);
+        expect(a.$1 == b.$1, isFalse);
+        expect(a.$2 == b.$2, isTrue, reason: firstDiff(a.$2, b.$2));
+        expect(a.$2, contains('"hrAvg":104'), reason: 'ό,τι μέτρησε το ρολόι στην προπόνηση μένει');
+      });
+    });
+
+    test('K8-R-18 / K8-R-12: ζυγίσεις μόνο πριν από τις 60 μέρες της αναφοράς: «outsideWindow», καμία τιμή τους', () {
+      // Πριν: η αντικατάσταση δεν δοκιμαζόταν πουθενά.
+      final old = [(DateTime(2026, 9, 1, 8), 86.211), (DateTime(2026, 9, 3, 8), 85.837)];
+      final r = diagnosticsFrom(store: _store(weights: old), food: _food(_at), now: _at);
+      expect(((r['calc'] as Map)['body'] as Map)['last'], {'outsideWindow': true});
+      expect(((r['shown'] as Map)['kinds'] as Map)['body'], {'outsideWindow': true});
+      final text = jsonEncode(r);
+      expect(text, isNot(contains('86.211')));
+      expect(text, isNot(contains('85.837')));
     });
 
     testWidgets('οθόνη: δεύτερο κουμπί «Σύνοψη για τον Claude» → αρχείο «…-synopsi.json», απλό JSON, χωρίς Oura', (t) async {
