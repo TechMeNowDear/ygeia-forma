@@ -74,7 +74,8 @@ Map _widgetBody(HealthStore s, DateTime now) =>
 
 String? _row(WidgetTester t, String label) {
   for (final r in t.widgetList<InfoRow>(find.byType(InfoRow))) {
-    if (r.label == label) return r.value;
+    // Α27 (21/11): η αλλαγή σε δική της στήλη ([InfoRow.change]): εδώ γράφεται όπως πριν, «τιμή  (αλλαγή)».
+    if (r.label == label) return r.change == null ? r.value : '${r.value}  (${r.change})';
   }
   return null;
 }
@@ -209,7 +210,7 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('body-pending-latest'))).data, pendingLatestText);
       expect(_row(t, 'Βάρος'), '74,0 kg');
       expect(_row(t, 'Δείκτης μάζας σώματος'), isNull, reason: 'πριν: «22,8» (74,0 / 1,8²)');
-      expect(_note(t), isNot(contains('σε παρένθεση η αλλαγή από')), reason: 'πριν: «… από τις 4 Δεκ.» χωρίς παρένθεση');
+      expect(_note(t), isNot(contains('«Αλλαγή» από')), reason: 'πριν: «… από τις 4 Δεκ.» χωρίς παρένθεση');
       // Κ8-M1 (17/11): χωρίς ζυγίσεις 2 εβδομάδες πίσω, η σημείωση λέει πότε θα φανεί η αλλαγή.
       expect(_note(t), contains('λίπος και μύες'));
       expect(t.widgetList<TrendPill>(find.byType(TrendPill)).where((p) => p.text.contains(' kg από ')), isEmpty);
@@ -221,7 +222,7 @@ void main() {
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9'); // 80,7 / 1,8² = 24,907
       expect(_row(t, 'Βάρος'), '80,7 kg  (−0,2)');
       // Round 8 (A4 Β2 / U4 Β4): ίδια μορφή μέρας με το χάπι («2/12»· πριν «2 Δεκ.»).
-      expect(_note(t), contains('Στο βάρος, σε παρένθεση η αλλαγή από τις 2/12.'));
+      expect(_note(t), contains('Στο βάρος, «Αλλαγή» από τις 2/12.'));
     });
   });
 
@@ -256,7 +257,7 @@ void main() {
       expect(pills, ['−0,8 kg από 18/12']);
       expect(_row(t, 'Βάρος'), '78,9 kg  (−0,8)', reason: 'πριν: «78,9 kg  (−15,8)»');
       // Round 8 (A4 Β2 / U4 Β4): ίδια μορφή μέρας με το χάπι («18/12»· πριν «18 Δεκ.»).
-      expect(_note(t), contains('σε παρένθεση η αλλαγή από τις 18/12.'));
+      expect(_note(t), contains('«Αλλαγή» από τις 18/12.'));
       await _pump(t, TodayPage(store: s, food: sampleFoodStore(now), open: (_, [__]) {}, openSettings: () {}, now: now));
       final card = t.widgetList<StatCard>(find.byType(StatCard)).firstWhere((c) => c.icon == Icons.monitor_weight_rounded);
       expect((card.trend! as TrendPill).text, '−0,8 kg από 18/12');
@@ -268,7 +269,7 @@ void main() {
       expect(find.byKey(const ValueKey('body-pending-latest')), findsOneWidget);
       expect(_row(t, 'Βάρος'), '94,7 kg');
       expect(_row(t, 'Δείκτης μάζας σώματος'), isNull);
-      expect(_note(t), isNot(contains('σε παρένθεση η αλλαγή από')));
+      expect(_note(t), isNot(contains('«Αλλαγή» από')));
     });
   });
 

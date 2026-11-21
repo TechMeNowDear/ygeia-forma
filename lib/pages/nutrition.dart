@@ -16,7 +16,7 @@ import 'food_add.dart';
 import 'nutrition_goals.dart';
 import 'day_close.dart';
 import 'transfer.dart' show transferGroup;
-import 'week.dart' show PlanDayCard;
+import 'week.dart' show PlanDayCard, planHasOpenSlot;
 
 /// Χρώματα μακροθρεπτικών (ίδια παντού).
 Color proteinColor(Aigaio c) => c.sleep;
@@ -125,8 +125,10 @@ class NutritionPage extends StatelessWidget {
             : null;
         // Πρωτεΐνη ανά γεύμα (16/11): ο στόχος της μέρας μοιρασμένος στα γεύματα (τουλάχιστον 3: τόσα τρως).
         final mealProtein = goals == null || beforeGoals(goals, day) ? null : proteinPerMeal(goals.protein, entries);
+        final planFirst = sameDay(day, today) && planHasOpenSlot(food, day);
+        // Α22 (21/11): Πρωινό, Μεσημέρι, Σνακ, Βράδυ ([mealsShown]).
         final meals = [
-          for (final m in Meal.values)
+          for (final m in mealsShown)
             _MealCard(
                 food: food,
                 meal: m,
@@ -142,6 +144,9 @@ class NutritionPage extends StatelessWidget {
           action: switcher,
           onRefresh: () async {},
           single: [
+            // Απόφαση χρήστη 21/11 (Α21): όσο μένει γεύμα του προγράμματος να σημειωθεί σήμερα, το «Πρόγραμμα» πρώτο (στο
+            // κινητό και στο κλειστό Fold ήταν μία οθόνη πιο κάτω· πάνω φαινόταν μόνο το «+ Φαγητό», που σε βάζει να ψάχνεις).
+            if (planFirst) PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
             if (food.error != null) _ErrorCard(food: food),
             if (food.saveError != null)
               EmptyCard(
@@ -154,8 +159,11 @@ class NutritionPage extends StatelessWidget {
             summary,
             if (cta != null) cta,
             if (chol != null) chol,
-            if (sameDay(day, today)) YesterdayCard(food: food, today: today),
-            PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
+            if (planFirst && sameDay(day, today)) YesterdayCard(food: food, today: today),
+            if (!planFirst) ...[
+              if (sameDay(day, today)) YesterdayCard(food: food, today: today),
+              PlanDayCard(food: food, day: day, clock: now == null ? null : () => now!),
+            ],
             ...meals,
             DayCard(food: food, day: day, entries: entries, today: sameDay(day, today)),
             _SourcesNote(color: c.textTertiary),
@@ -553,6 +561,55 @@ class _MealCard extends StatelessWidget {
     final c = Aigaio.of(context);
     final t = Totals(entries);
     final previous = entries.isEmpty ? food.copyable(prevDay, meal) : const <LogEntry>[];
+    final copyButton = previous.isEmpty
+        ? null
+        : TextButton.icon(
+            key: ValueKey('copy-${meal.name}'),
+            onPressed: food.loaded ? () => _copyFromPrevious(context, prevDay) : null,
+            icon: const Icon(Icons.content_copy_rounded, size: 18),
+            // Με τις τωρινές τιμές, όπως θα γραφτούν (όχι με τα παλιά αντίγραφα).
+            label: Text(
+                'Όπως $_fromLabel ·\u00A0${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
+          );
+    // Απόφαση χρήστη 21/11 (Α22): γεύμα χωρίς τίποτα σε μία γραμμή (όνομα και «Προσθήκη»)· το «Όπως χθες», αν υπάρχει,
+    // από κάτω. Πριν: μια ολόκληρη κάρτα για κάθε άδειο γεύμα (π.χ. το «Πρωινό» που δεν τρως, πρώτο κάθε μέρα).
+    if (entries.isEmpty) {
+      return AppCard(
+        key: ValueKey('meal-empty-${meal.name}'),
+        padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Wrap: με μεγάλα γράμματα σε στενή οθόνη το «Προσθήκη» πάει στη δεύτερη γραμμή αντί να ξεχειλίζει.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconBadge(mealIcon(meal), c.food, size: 30),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        mealLabel(meal),
+                        style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: food.loaded ? () => openAddFood(context, food, meal: meal, day: day) : null,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text('Προσθήκη'),
+                ),
+              ],
+            ),
+            if (copyButton != null) Align(alignment: Alignment.centerLeft, child: copyButton),
+          ],
+        ),
+      );
+    }
     return AppCard(
       padding: const EdgeInsets.fromLTRB(18, 16, 10, 6),
       child: Column(
@@ -612,15 +669,6 @@ class _MealCard extends StatelessWidget {
                   onPressed: () => _saveAsDish(context),
                   icon: const Icon(Icons.bookmark_add_outlined, size: 19),
                   label: const Text('Κράτα το ως φαγητό'),
-                ),
-              if (entries.isEmpty && previous.isNotEmpty)
-                TextButton.icon(
-                  key: ValueKey('copy-${meal.name}'),
-                  onPressed: food.loaded ? () => _copyFromPrevious(context, prevDay) : null,
-                  icon: const Icon(Icons.content_copy_rounded, size: 18),
-                  // Με τις τωρινές τιμές, όπως θα γραφτούν (όχι με τα παλιά αντίγραφα).
-                  label: Text(
-                      'Όπως $_fromLabel ·\u00A0${thousands(Totals([for (final e in previous) e.copyWith(food: food.currentOf(e.food))]).shownKcal)} kcal'),
                 ),
             ],
           ),

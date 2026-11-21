@@ -125,7 +125,8 @@ Widget _today(HealthStore s, DateTime now, {FoodStore? food}) => TodayPage(
 
 String? _row(WidgetTester t, String label) {
   for (final r in t.widgetList<InfoRow>(find.byType(InfoRow))) {
-    if (r.label == label) return r.value;
+    // Α27 (21/11): η αλλαγή σε δική της στήλη ([InfoRow.change]): εδώ γράφεται όπως πριν, «τιμή  (αλλαγή)».
+    if (r.label == label) return r.change == null ? r.value : '${r.value}  (${r.change})';
   }
   return null;
 }
@@ -204,7 +205,7 @@ void main() {
       await _pump(t, BodyPage(store: _store(now, rows()), now: now));
       expect(_row(t, 'Βάρος'), '82,2 kg  (0)');
       expect(_pills(t), contains('0 kg από 18/11'));
-      expect(find.textContaining('σε παρένθεση η αλλαγή από τις 18/11'), findsOneWidget);
+      expect(find.textContaining('«Αλλαγή» από τις 18/11'), findsOneWidget);
     });
 
     testWidgets('Σήμερα: το ίδιο χάπι', (t) async {

@@ -4,7 +4,6 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.view.View
 import android.widget.RemoteViews
-import java.time.LocalDate
 
 /**
  * Δύο μικρά widgets αρχικής οθόνης (13/11): «Προπόνηση σήμερα» και «Γρήγορο φαγητό».
@@ -22,7 +21,7 @@ object QuickWidgets {
     fun views(ctx: Context, id: Int, kind: String): RemoteViews =
         if (kind == WORKOUT) {
             RemoteViews(ctx.packageName, R.layout.quick_workout_widget).apply {
-                val (title, sub) = QuickWidgetRules.workoutLines(HomeWidgets.snapshot(ctx)?.optJSONObject("workout"), LocalDate.now())
+                val (title, sub) = QuickWidgetRules.workoutLines(HomeWidgets.snapshot(ctx)?.optJSONObject("workout"), QuickWidgetRules.trainingToday())
                 setTextViewText(R.id.qw_title, title)
                 setTextViewText(R.id.qw_sub, sub)
                 // Round 1 (U7-17 α): σε χαμηλό widget (ή με μεγάλα γράμματα) η σταθερή επικεφαλίδα «ΠΡΟΠΟΝΗΣΗ ΣΗΜΕΡΑ» φεύγει,

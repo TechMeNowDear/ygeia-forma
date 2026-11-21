@@ -177,7 +177,7 @@ void main() {
       await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 13, 21)), size: const Size(400, 4000));
       expect(find.byKey(const ValueKey('body-foreign-latest')), findsNothing);
       expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data, contains('09:00: 30,0 kg'));
-      expect(t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος').value, '90,0 kg  (0)'); // R9-A4-3: και το 0
+      expect(t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος').change, '0'); // R9-A4-3: και το 0
       expect(find.byKey(const ValueKey('body-weighings-foreign')), findsOneWidget);
       // R9-A4-3: η ζύγιση της μέρας (90,0) μετρά και είναι ίδια με την προηγούμενη → «0 kg από …»· καμία διαφορά από την
       // ξένη 30,0 (θα ήταν «−60 kg»).
@@ -266,7 +266,11 @@ void main() {
             (DateTime(2026, 11, d, 8), 90.0, fat),
         ]));
       await _pump(t, BodyPage(store: s, now: DateTime(2026, 11, 25, 9)), size: const Size(400, 4000));
-      String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
+      String row(String label) {
+        // Α27 (21/11): η αλλαγή σε δική της στήλη: εδώ γράφεται όπως πριν, «τιμή  (αλλαγή)».
+        final r = t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label);
+        return r.change == null ? r.value : '${r.value}  (${r.change})';
+      }
       // μεσαίες 27,5 και 25,4 → −2,1 (πάνω από το όριο 1,5)· «%» χωρίς κενό.
       expect(row('Λίπος'), '25,4%  (−2,1)');
       expect(row('Σκελετικοί μύες'), '34,0 kg');
@@ -473,7 +477,13 @@ void main() {
       await t.tap(find.byKey(const ValueKey('info-${K.breath}')));
       await t.pumpAndSettle();
       expect(find.text('Εύρος αναφοράς'), findsOneWidget);
+      // Α26 (21/11): η σύγκριση κάτω από «Περισσότερα».
+      expect(find.text('Με τι το συγκρίνεις'), findsNothing);
+      await t.ensureVisible(find.byKey(const ValueKey('info-more')));
+      await t.tap(find.byKey(const ValueKey('info-more')));
+      await t.pumpAndSettle();
       expect(find.text('Με τι το συγκρίνεις'), findsOneWidget);
+      expect(find.text('Πόσο ακριβές είναι'), findsOneWidget);
       expect(find.textContaining('ενδεικτική'), findsOneWidget);
     });
 
@@ -517,7 +527,11 @@ void main() {
           dateKey(day): {K.sleepHr: 62.0},
         };
       await _pump(t, MetricPage(store: three, spec: metricSpecs[K.sleepHr]!, now: DateTime(2026, 11, 13, 10)));
-      String row(String label) => t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label).value;
+      String row(String label) {
+        // Α27 (21/11): η αλλαγή σε δική της στήλη: εδώ γράφεται όπως πριν, «τιμή  (αλλαγή)».
+        final r = t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == label);
+        return r.change == null ? r.value : '${r.value}  (${r.change})';
+      }
       expect(row('Μέσος όρος'), '60 bpm');
       expect(row('Χαμηλότερη ·\u00A0υψηλότερη'), '58 ·\u00A062 bpm');
       final one = HealthStore()..history = {dateKey(day): {K.sleepHr: 62.0}};

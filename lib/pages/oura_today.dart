@@ -328,7 +328,8 @@ class OuraSleepTodayCard extends StatelessWidget {
       // τουλάχιστον 7), μόνο από νύχτες του Oura του ίδιου κομματιού πηγής (έλεγχος υπολογισμών C7, D9).
       final minutes = night!.nightMinutes;
       final base = ouraBaseline(store.history, store.plan, K.sleepMin, today)?.usual;
-      final diff = base == null || minutes == null ? null : minutes - base.round();
+      // Α17 (21/11): νύχτα με χαμηλή μπαταρία: καμία σύγκριση με το «συνήθως» (μάλλον μετρήθηκε μισή).
+      final diff = base == null || minutes == null || night.lowBattery ? null : minutes - base.round();
       final parts = night.counted;
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -396,6 +397,12 @@ class OuraSleepTodayCard extends StatelessWidget {
               ].join(' ·\u00A0'),
               style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w500),
             ),
+          ],
+          if (night.lowBattery) ...[
+            const SizedBox(height: 6),
+            Text(ouraLowBatteryText,
+                key: const ValueKey('oura-today-low-battery'),
+                style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w600)),
           ],
           if (night.naps.isNotEmpty) ...[
             const SizedBox(height: 6),

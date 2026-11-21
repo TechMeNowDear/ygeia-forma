@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import '../exercise/ex_data.dart';
 import '../exercise/ex_names.dart';
+import 'training_day.dart';
 import 'equipment.dart';
 import 'program.dart';
 import 'session.dart';
@@ -50,7 +51,8 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     // 14/11: φωνή στην άσκηση και μήκος βήματος (απόσταση χωρίς GPS). Νέα πεδία: το παλιό ρολόι τα αγνοεί.
     'voice': t.voice,
     if (t.stride != null) 'stride': t.stride,
-    if (p?.forDay(now) != null) 'today': p!.forDay(now)!.id,
+    // Α13 (21/11): η μέρα της προπόνησης αλλάζει στις 04:00 ([trainingDay])· το ρολόι κάνει το ίδιο (trainingDate).
+    if (p?.forDay(trainingDay(now)) != null) 'today': p!.forDay(trainingDay(now))!.id,
     // Οι μέρες, για να βρίσκει το ρολόι μόνο του τη σημερινή (και αν το κινητό δεν άνοιξε σήμερα).
     if (p != null) 'days': {for (final e in p.days.entries) '${e.key}': e.value},
     'day': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
@@ -60,7 +62,7 @@ Map<String, dynamic> watchPlan(TrainingStore t, DateTime now, String Function(St
     if (p?.from != null) 'from': ymd(p!.from!),
     'workouts': [
       // 13/11: στην αερόβια με πλάνο ανά εβδομάδα, τα λεπτά της εβδομάδας που τρέχει (Program.at).
-      for (final w in [for (final x in p?.workouts ?? const <Workout>[]) p!.at(x, now)])
+      for (final w in [for (final x in p?.workouts ?? const <Workout>[]) p!.at(x, trainingDay(now))])
         {
           'id': w.id,
           'name': w.name,

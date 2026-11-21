@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../exercise/ex_data.dart';
 import '../../exercise/ex_names.dart';
 import '../../format.dart';
+import '../../training/training_day.dart';
 import '../../training/walk_stats.dart' show kmValue, liveMeters, kmText;
 import '../../theme.dart';
 import '../../training/program.dart';
@@ -31,7 +32,8 @@ class TodayTrainingCard extends StatefulWidget {
     if (!t.ready) return false;
     if (liveWalk() != null || t.current != null) return true;
     if (doneToday(t, now) != null) return true;
-    return chosenWorkout(t, now) != null || t.program?.forDay(now) != null;
+    // Α13 (21/11): η μέρα της προπόνησης αλλάζει στις 04:00 ([trainingDay]).
+    return chosenWorkout(t, now) != null || t.program?.forDay(trainingDay(now)) != null;
   }
 
   /// R9-U3-06: η προπόνηση που διάλεξες για σήμερα από τις τρεις τελείες της «Άσκησης» ([TrainingStore.chosenOn]), με
@@ -40,7 +42,7 @@ class TodayTrainingCard extends StatefulWidget {
     final p = t.program;
     final id = t.chosenOn(now);
     final w = p == null || id == null ? null : p.workout(id);
-    return w == null ? null : p!.at(w, now);
+    return w == null ? null : p!.at(w, trainingDay(now));
   }
 
   /// Περπάτημα που τρέχει τώρα στο ρολόι (ήρθε μήνυμα τα τελευταία 30″), όπως στην Άσκηση.
@@ -58,19 +60,19 @@ class TodayTrainingCard extends StatefulWidget {
   /// R10-B4-3: «της μέρας» είναι και αυτή που διάλεξες για σήμερα ([chosenWorkout]): ένα περπάτημα που διάλεξες σε μέρα
   /// βαρών και έγινε στο ρολόι (που δεν καθαρίζει την επιλογή) είναι η σημερινή «έγινε», όχι «Έγινε σήμερα και».
   static Session? doneToday(TrainingStore t, DateTime now) {
-    final w = chosenWorkout(t, now) ?? t.program?.forDay(now);
+    final w = chosenWorkout(t, now) ?? t.program?.forDay(trainingDay(now));
     for (final s in t.sessions.reversed) {
-      if (s.finished && sameDay(s.start, now) && (w == null || w.isCardio == s.isCardio)) return s;
+      if (s.finished && sameTrainingDay(s.start, now) && (w == null || w.isCardio == s.isCardio)) return s;
     }
     return null;
   }
 
   /// Ό,τι άλλο τελείωσε σήμερα, έξω από την προπόνηση της μέρας (για τη γραμμή «Έγινε σήμερα και: …»).
   static Session? otherToday(TrainingStore t, DateTime now) {
-    final w = chosenWorkout(t, now) ?? t.program?.forDay(now);
+    final w = chosenWorkout(t, now) ?? t.program?.forDay(trainingDay(now));
     if (w == null) return null;
     for (final s in t.sessions.reversed) {
-      if (s.finished && sameDay(s.start, now) && w.isCardio != s.isCardio) return s;
+      if (s.finished && sameTrainingDay(s.start, now) && w.isCardio != s.isCardio) return s;
     }
     return null;
   }
@@ -120,7 +122,7 @@ class _TodayTrainingCardState extends State<TodayTrainingCard> {
     if (done != null) return _done(context, done, limit);
     final p = t.program;
     final chosen = cur == null ? TodayTrainingCard.chosenWorkout(t, now) : null;
-    final w = cur != null ? (p?.workout(cur.workout)) : (chosen ?? p?.forDay(now));
+    final w = cur != null ? (p?.workout(cur.workout)) : (chosen ?? p?.forDay(trainingDay(now)));
     // R9-U3-06: όπως η «Άσκηση» (R8-U3-05): να φαίνεται ότι η σημερινή είναι επιλογή σου.
     final chosenLine = chosen == null ? null : Text('Τη διάλεξες εσύ για σήμερα.', key: const ValueKey('today-train-chosen'), style: _aux(c));
 

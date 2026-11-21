@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../training/training_day.dart';
 import '../data.dart';
 import '../food/food_store.dart';
 import '../training/training_store.dart';
@@ -62,7 +63,7 @@ class WidgetPublisher with WidgetsBindingObserver {
     final t = training;
     if (t == null || !t.ready) return;
     final now = _clock();
-    final text = jsonEncode(workoutSnapshot(t, DateTime(now.year, now.month, now.day)));
+    final text = jsonEncode(workoutSnapshot(t, trainingDay(now)));
     if (text == _lastWorkout) return;
     _lastWorkout = text;
     _schedule();

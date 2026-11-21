@@ -813,6 +813,14 @@ class _BreathCard extends StatelessWidget {
                 : 'Χωρίς νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες',
             Source.watch,
           ),
+          // Α16 (απόφαση χρήστη 21/11): ο δείκτης διαταραχών αναπνοής της Oura, ως εκτίμηση της Oura (χωρίς δική μας ερμηνεία).
+          if (_breathingIndexOn(store, day) case final bdi?) ...[
+            const Hairline(vertical: 2),
+            KeyedSubtree(
+              key: const ValueKey('sleep-bdi'),
+              child: row(gluedValue('$ouraBdiLabel $bdi'), ouraBdiNote, Source.oura),
+            ),
+          ],
           const SizedBox(height: 6),
           // Κλινικός έλεγχος C1/M3 (4/11): το τεστ άπνοιας του ρολογιού είναι διαλογή· το πλήρες κείμενο με «Τι σημαίνει».
           const OxygenAbout(),
@@ -864,6 +872,17 @@ class _NightLine extends StatelessWidget {
                               '${night!.counted.length > 1 ? ' ·\u00A0${night!.counted.length} κομμάτια' : ''}',
                       style: TextStyle(color: c.textSecondary, fontSize: 13.5, fontFeatures: tabular),
                     ),
+                    // Α17 (21/11): η μπαταρία του δαχτυλιδιού έπεσε (η Oura το σημειώνει): η νύχτα μάλλον μετρήθηκε μισή.
+                    if (m != null && night!.lowBattery)
+                      Text(ouraLowBatteryText,
+                          key: const ValueKey('oura-low-battery'),
+                          style: TextStyle(color: c.warn, fontSize: 13, fontWeight: FontWeight.w600)),
+                    // Α9 (21/11): σε νύχτα σε 2–3 κομμάτια, οι ώρες τους (η διάρκεια πάνω είναι πάντα το σύνολο).
+                    if (m != null)
+                      if (piecesTimesText([for (final x in night!.counted) (x.wallOnset ?? x.wallStart, x.wallEnd)]) case final pt?)
+                        Text(pt,
+                            key: const ValueKey('oura-pieces'),
+                            style: TextStyle(color: c.textSecondary, fontSize: 13, fontFeatures: tabular)),
                   ],
                 ),
               ),
@@ -903,3 +922,15 @@ String ouraStatusLine(OuraStatus s) => switch (s) {
       OuraStatus.disconnected => 'Το Oura δεν είναι συνδεδεμένο',
       _ => '',
     };
+
+/// Α16 (21/11): ο δείκτης διαταραχών αναπνοής της Oura για τη νύχτα [day] (μόνο νύχτα που μετρά από το Oura).
+int? _breathingIndexOn(HealthStore store, DateTime day) {
+  for (final n in store.ouraNights) {
+    if (sameDay(n.day, day) && n.main != null) return n.breathingIndex;
+  }
+  return null;
+}
+
+/// Α16 (21/11): η ετικέτα και η εξήγηση του δείκτη διαταραχών αναπνοής της Oura.
+const ouraBdiLabel = 'Διαταραχές αναπνοής';
+const ouraBdiNote = 'Δείκτης 0–100 της Oura από τις πτώσεις του οξυγόνου. Εκτίμηση του δαχτυλιδιού, όχι τεστ άπνοιας.';

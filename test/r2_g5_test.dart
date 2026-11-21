@@ -135,10 +135,8 @@ void main() {
         final icon = t.widget<Icon>(find.descendant(of: waist, matching: find.byIcon(Icons.straighten_rounded)));
         expect(icon.color, theme.body, reason: 'το εικονίδιο κρατά το χρώμα του Σώματος');
         expect(Aigaio.contrast(icon.color!, bg), greaterThanOrEqualTo(3.0), reason: theme.id);
-        // Ίδια κάρτα: «Πώς ζυγίζομαι σωστά» (πριν «Αυγή» 4,45:1 στο κύριο χρώμα).
-        final how = find.widgetWithText(TextButton, 'Πώς ζυγίζομαι σωστά');
-        expect(how, findsOneWidget, reason: theme.id);
-        expect(Aigaio.contrast(_ink(t, how, 'Πώς ζυγίζομαι σωστά'), bg), greaterThanOrEqualTo(4.5), reason: '${theme.id}/${theme.dark}');
+        // Απόφαση χρήστη 21/11 (Α30): το «Πώς ζυγίζομαι σωστά» έφυγε (οι οδηγίες μένουν στο ⓘ του βάρους).
+        expect(find.text('Πώς ζυγίζομαι σωστά'), findsNothing, reason: theme.id);
       }
     });
   });

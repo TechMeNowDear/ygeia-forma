@@ -299,13 +299,17 @@ class R7F3Test {
                  {"id":"C","name":"Περπάτημα ζώνης 2","minutes":40,"cardio":{"activity":"walk","name":"Περπάτημα ζώνης 2","minutes":40}}]}""",
         )!!
         val athens = ZoneId.of("Europe/Athens")
-        // Κυριακή 22/11/2026 23:45 → το περπάτημα της Κυριακής· Δευτέρα 00:30 → καμία αερόβια (βάρη).
+        // Κυριακή 22/11/2026 23:45 → το περπάτημα της Κυριακής. Δευτέρα 00:30 → ακόμα της Κυριακής (Α13, απόφαση χρήστη
+        // 21/11: η μέρα της προπόνησης αλλάζει στις 04:00)· Δευτέρα 04:30 → καμία αερόβια (βάρη).
         val sun = ZonedDateTime.of(2026, 11, 22, 23, 45, 0, 0, athens).toInstant().toEpochMilli()
         val mon = ZonedDateTime.of(2026, 11, 23, 0, 30, 0, 0, athens).toInstant().toEpochMilli()
+        val mon4 = ZonedDateTime.of(2026, 11, 23, 4, 30, 0, 0, athens).toInstant().toEpochMilli()
         assertEquals("C", plan.walkOn(sun, athens)!!.id)
-        assertNull(plan.walkOn(mon, athens))
+        assertEquals("C", plan.walkOn(mon, athens)!!.id)
+        assertNull(plan.walkOn(mon4, athens))
         assertEquals(LocalDate.of(2026, 11, 22), plan.dayOf(sun, athens))
-        assertEquals(LocalDate.of(2026, 11, 23), plan.dayOf(mon, athens))
+        assertEquals(LocalDate.of(2026, 11, 22), plan.dayOf(mon, athens))
+        assertEquals(LocalDate.of(2026, 11, 23), plan.dayOf(mon4, athens))
         // Το αποτέλεσμα: αρχή Κυριακή 12:00 UTC (Κυριακή σε κάθε ζώνη από −11 ως +11), γράφεται 24 ώρες μετά.
         Repo.plan = plan
         Repo.running = "walk"

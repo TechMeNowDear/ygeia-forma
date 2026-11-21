@@ -108,16 +108,17 @@ void main() {
       }
     });
 
-    test('Πρωινός υπνάκος 09:30–10:30 μετά από ξύπνημα 07:00: υπνάκος, η νύχτα τελειώνει 07:00', () {
+    // Απόφαση χρήστη 21/11 (Α9α): κενό ως 4 ώρες το πρωί χωρίς βήματα (εδώ άγνωστα) → η ίδια νύχτα (πριν: υπνάκος).
+    test('Πρωινός ύπνος 09:30–10:30 μετά από ξύπνημα 07:00, χωρίς βήματα: η ίδια νύχτα, τελειώνει 10:30', () {
       final d = Dashboard.fromJson({
         'readAt': ms(t(3, 13, 0)),
         'sleep': [rec(t(2, 23, 30), t(3, 7, 0)), rec(t(3, 9, 30), t(3, 10, 30))],
       });
       final n = d.nights.single;
-      expect(n.end, t(3, 7, 0));
-      expect(n.minutes, 450);
-      expect(n.napMinutes, 60);
-      expect(summarizeDay(d, DateTime(2026, 11, 3))[K.napMin], 60);
+      expect(n.end, t(3, 10, 30));
+      expect(n.minutes, 510);
+      expect(n.napMinutes, 0);
+      expect(summarizeDay(d, DateTime(2026, 11, 3)).containsKey(K.napMin), isFalse);
       // Μισή ώρα μετά το ξύπνημα (06:30 → 07:00–08:00): ίδια νύχτα.
       final soon = Dashboard.fromJson({
         'readAt': ms(t(3, 13, 0)),
@@ -176,13 +177,14 @@ void main() {
       expect(summarizeDay(d, DateTime(2026, 11, 3))[K.napMin], 60);
     });
 
-    test('Ξύπνημα 07:00, υπνάκος 10:00–11:00 (κενό 3 ώρες) → υπνάκος, ακόμα και χωρίς βήματα', () {
+    // Απόφαση χρήστη 21/11 (Α9α): κενό 3 ώρες, 0 βήματα → η ίδια νύχτα (πριν: υπνάκος, ακόμα και χωρίς βήματα).
+    test('Ξύπνημα 07:00, ύπνος 10:00–11:00 (κενό 3 ώρες) χωρίς βήματα → η ίδια νύχτα', () {
       final d = Dashboard.fromJson(morning(
         [rec(t(2, 23, 0), t(3, 7, 0)), rec(t(3, 10, 0), t(3, 11, 0))],
         stepsFrom: DateTime(2026, 10, 27),
       ));
-      expect(d.nights.single.minutes, 480);
-      expect(d.nights.single.napMinutes, 60);
+      expect(d.nights.single.minutes, 540);
+      expect(d.nights.single.napMinutes, 0);
     });
 
     test('Υπνάκος μέρας χωρίς νύχτα του ρολογιού: αποθηκεύεται (δεν χάνεται)', () {

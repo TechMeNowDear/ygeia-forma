@@ -7,6 +7,7 @@ import '../../exercise/ex_data.dart';
 import '../../format.dart';
 import '../../theme.dart';
 import '../../data.dart' show HealthStore;
+import '../../training/training_day.dart';
 import '../../training/equipment.dart';
 import '../../training/progression.dart';
 import '../../training/program.dart';
@@ -1625,7 +1626,7 @@ class _SummaryPageState extends State<SummaryPage> {
 
     // round1, S6-9 (f6a): προπόνηση που έκλεισε σήμερα από το ρολόι (ή περπάτημα): το «Πώς ένιωσες;» απαντιέται και εδώ, και
     // γράφεται αμέσως (t.setFeel). Παλιότερες: μόνο για ανάγνωση.
-    final feelToday = !widget.live && t.sessions.any((x) => x.id == s.id) && sameDay(s.end ?? s.start, t.now);
+    final feelToday = !widget.live && t.sessions.any((x) => x.id == s.id) && sameTrainingDay(s.end ?? s.start, t.now);
     final feel = AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('Πώς ένιωσες;', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text)),

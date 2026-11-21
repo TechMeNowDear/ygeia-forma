@@ -710,7 +710,7 @@ class R8F3ViewTest {
         v.chosen = "B"
         draw(v)
         assertTrue(buttons(v).toString(), buttons(v).first().first.startsWith("Προπόνηση Β, "))
-        v.chosenDay = LocalDate.now().minusDays(1)
+        v.chosenDay = trainingToday().minusDays(1)
         draw(v)
         assertTrue(buttons(v).toString(), buttons(v).first().first.startsWith("Προπόνηση Α, "))
         // Μέρα περπατήματος: χθεσινή επιλογή → η αρχική του περπατήματος.
@@ -719,7 +719,7 @@ class R8F3ViewTest {
         w.chosen = "A"
         draw(w)
         assertTrue(buttons(w).toString(), buttons(w).first().first.startsWith("Προπόνηση Α, "))
-        w.chosenDay = LocalDate.now().minusDays(1)
+        w.chosenDay = trainingToday().minusDays(1)
         draw(w)
         assertTrue(buttons(w).toString(), buttons(w).first().first.startsWith("Περπάτημα, 30 λεπτά"))
         // Χωρίς επιλογή: καμία μέρα.

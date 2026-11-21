@@ -151,8 +151,10 @@ void main() {
 
   test('Δεύτερο κομμάτι μετά τις 10:00 με «καθαρό» κενό: μέρος της νύχτας, όχι υπνάκος', () {
     final d = Dashboard.fromJson(night(secondStart: DateTime(2026, 10, 26, 5, 0).add(const Duration(hours: 5, minutes: 30))));
-    // κενό 03:55 → 10:30 = 6,5 ώρες: πάνω από το όριο των 4 ωρών, άρα υπνάκος όπως πριν
-    expect(d.nights.single.napMinutes, 141);
+    // κενό 03:55 → 10:30 = 6,5 ώρες: πάνω από το όριο των 4 ωρών, δεν ενώνονται. Από την #151 (Α9β, «πάντα ο μεγαλύτερος»)
+    // νύχτα είναι ο ύπνος των 141 λεπτών και υπνάκος το πρώτο κομμάτι (63).
+    expect(d.nights.single.minutes, 141);
+    expect(d.nights.single.napMinutes, 63);
     // Κυριακή 25/10: 05:55–09:50 και 10:53–… με κενό 63 λεπτών χωρίς βήματα (ο χρήστης ΔΕΝ ξύπνησε· η Samsung χώρισε
     // τη νύχτα). Κανόνας C1: πρωινό κομμάτι με κενό ως 90 λεπτά και χωρίς βήματα (ως 30) = η ίδια νύχτα.
     final sunday = Dashboard.fromJson(night(
@@ -168,7 +170,9 @@ void main() {
 
   test('Υπνάκος με βήματα πριν: μένει υπνάκος', () {
     final d = Dashboard.fromJson(night(secondStart: DateTime(2026, 10, 26, 10, 53), gapSteps: 300));
-    expect(d.nights.single.napMinutes, 141);
+    // Από την #151 (Α9β): νύχτα ο μεγαλύτερος ύπνος (141)· το πρώτο κομμάτι (63) μένει χωριστά, ως υπνάκος.
+    expect(d.nights.single.minutes, 141);
+    expect(d.nights.single.napMinutes, 63);
     expect(d.nights.single.estimatedMinutes, 0);
   });
 

@@ -24,6 +24,15 @@ object QuickWidgetRules {
     fun workoutHeadFits(maxHeightDp: Int, fontScale: Float): Boolean = maxHeightDp <= 0 || maxHeightDp >= 86f * fontScale
 
     /** (τίτλος, δεύτερη γραμμή). */
+    /**
+     * Α13 (απόφαση χρήστη 21/11): η μέρα της προπόνησης αλλάζει στις 04:00, όπως στην εφαρμογή (training_day.dart): στις
+     * 00:30 του Σαββάτου το widget δείχνει ακόμα την προπόνηση της Παρασκευής. Τα μεσάνυχτα ακριβώς είναι ημερομηνία.
+     */
+    fun trainingDate(t: java.time.LocalDateTime): LocalDate =
+        if (t.hour < 4 && t.toLocalTime() != java.time.LocalTime.MIDNIGHT) t.toLocalDate().minusDays(1) else t.toLocalDate()
+
+    fun trainingToday(): LocalDate = trainingDate(java.time.LocalDateTime.now())
+
     fun workoutLines(w: JSONObject?, today: LocalDate): Pair<String, String> {
         if (w == null) return "Προπόνηση" to "Άνοιξε την εφαρμογή"
         if (w.optString("done", "") == today.toString()) {

@@ -6,6 +6,7 @@ import '../../format.dart';
 import '../../theme.dart';
 import '../privacy_page.dart' show copySensitive;
 import '../../data.dart' show HealthStore;
+import '../../training/training_day.dart';
 import '../../training/equipment.dart';
 import '../../training/walk_stats.dart' show kmValue, liveMeters, kmText;
 import '../../training/progress.dart';
@@ -89,7 +90,8 @@ class _TrainingPageState extends State<TrainingPage> {
   Widget _page(BuildContext context) {
     final c = Aigaio.of(context);
     final p = t.program;
-    final today = _now;
+    // Α13 (21/11): η μέρα της προπόνησης αλλάζει στις 04:00 ([trainingDay]).
+    final today = trainingDay(_now);
     final cards = <Widget>[];
     final side = <Widget>[];
 
@@ -198,13 +200,15 @@ class _TrainingPageState extends State<TrainingPage> {
   // ---------------------------------------------------------------- κάρτες
   Widget _catchUpCard(BuildContext context, Workout w, DateTime missed) {
     final c = Aigaio.of(context);
-    final when = DateTime(_now.year, _now.month, _now.day - 1) == missed ? 'Χθες' : 'Προχθές';
+    final td = trainingDay(_now);
+    final when = DateTime(td.year, td.month, td.day - 1) == missed ? 'Χθες' : 'Προχθές';
     return EmptyCard(
       key: const ValueKey('train-catch-up'),
       icon: Icons.event_repeat_rounded,
       color: c.exercise,
       title: '$when δεν έγινε «${w.name}»',
-      text: 'Χωράει σήμερα: δεν έκανες βάρη χθες και δεν έχεις αύριο. Αν δεν θες, συνέχισε το πρόγραμμα· μία χαμένη δεν χαλάει την εβδομάδα.',
+      // Α14 (απόφαση χρήστη 21/11): 48 ώρες στους ίδιους μύες· ο χρήστης θα την κάνει απόγευμα ή βράδυ.
+      text: catchUpText,
       buttonText: 'Κάν’ την σήμερα',
       onPressed: () => setState(() => t.choose(w.id, _now)),
     );
@@ -581,7 +585,7 @@ class _TrainingPageState extends State<TrainingPage> {
               final day = DateTime(monday.year, monday.month, monday.day + d - 1);
               // R9-A6-6: πριν από την έναρξη του προγράμματος καμία προπόνηση του, όπως η κάρτα «Σήμερα» ([Program.forDay]).
               final w = p.notStarted(day) ? null : p.workout(p.days[d]);
-              final ds = [for (final s in week) if (s.finished && sameDay(s.start, day)) s];
+              final ds = [for (final s in week) if (s.finished && sameDay(trainingDay(s.start), day)) s];
               // round1, S6-13: «✓» μόνο όταν έγινε αυτό που έλεγε η μέρα (βάρη σε μέρα βαρών, περπάτημα σε μέρα
               // περπατήματος)· ένα πρωινό περπάτημα δεν «κλείνει» τη μέρα των βαρών. Ό,τι άλλο έγινε: μικρή τελεία.
               // Ό,τι έγινε πράγματι (μπορεί να είναι άλλη προπόνηση βαρών από το πρόγραμμα) δείχνεται με το όνομά της.
@@ -1053,3 +1057,7 @@ String recentWorkoutLine(Session s) {
   return '${countText(s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')} ·\u00A0${s.setsDone}\u00A0σετ'
       '${s.volume > 0 ? ' ·\u00A0${thousands(s.volume.round())}\u00A0kg' : ''}$hr';
 }
+
+/// Α14 (21/11): το κείμενο της κάρτας «χαμένη προπόνηση».
+const catchUpText = 'Χωράει σήμερα, απόγευμα ή βράδυ: οι ίδιοι μύες δεν δούλεψαν χθες και δεν έχουν αύριο. Αν δεν θες, '
+    'συνέχισε το πρόγραμμα· μία χαμένη δεν χαλάει την εβδομάδα.';

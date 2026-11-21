@@ -10,6 +10,7 @@ import 'equipment.dart';
 import 'hr_file.dart';
 import 'progression.dart';
 import 'program.dart';
+import 'training_day.dart';
 import 'session.dart';
 import 'walk_stats.dart' show shownMeters;
 import 'zone.dart';
@@ -853,11 +854,16 @@ class TrainingStore extends ChangeNotifier {
     return lib == null ? cautionIds.contains(ex) : lib.byId(ex)?.caution != null;
   }
 
-  /// Οι προπονήσεις της εβδομάδας (Δευτέρα–Κυριακή) της μέρας [day].
+  /// Οι προπονήσεις της εβδομάδας (Δευτέρα–Κυριακή) της μέρας [day]. Α13 (21/11): κάθε προπόνηση μετρά στη μέρα
+  /// προπόνησης όπου ξεκίνησε ([trainingDay]): στις 00:30 της Δευτέρας, στην εβδομάδα που τελειώνει.
   List<Session> weekOf(DateTime day) {
-    final monday = DateTime(day.year, day.month, day.day - (day.weekday - 1));
+    final d = trainingDay(day);
+    final monday = DateTime(d.year, d.month, d.day - (d.weekday - 1));
     final next = DateTime(monday.year, monday.month, monday.day + 7);
-    return [for (final s in sessions) if (!s.start.isBefore(monday) && s.start.isBefore(next)) s];
+    return [
+      for (final s in sessions)
+        if (!trainingDay(s.start).isBefore(monday) && trainingDay(s.start).isBefore(next)) s,
+    ];
   }
 
   // ---------------------------------------------------------------- προπόνηση σε εξέλιξη
@@ -1377,16 +1383,17 @@ class TrainingStore extends ChangeNotifier {
   (String, DateTime)? _chosen;
 
   /// Η προπόνηση που διάλεξες για τη μέρα [day] (id), αν η επιλογή είναι εκείνης της μέρας.
+  /// Α13 (21/11): μέρα προπόνησης ([trainingDay]): η επιλογή των 23:00 ισχύει και στις 00:30.
   String? chosenOn(DateTime day) {
     final ch = _chosen;
     if (ch == null) return null;
-    final d = ch.$2;
-    return d.year == day.year && d.month == day.month && d.day == day.day ? ch.$1 : null;
+    final d = ch.$2, x = trainingDay(day);
+    return d.year == x.year && d.month == x.month && d.day == x.day ? ch.$1 : null;
   }
 
   /// Διαλέγει ([id]) ή καθαρίζει (null) την προπόνηση της μέρας [day]· μόνο στη μνήμη.
   void choose(String? id, DateTime day) {
-    _chosen = id == null ? null : (id, day);
+    _chosen = id == null ? null : (id, trainingDay(day));
     notifyListeners();
   }
 

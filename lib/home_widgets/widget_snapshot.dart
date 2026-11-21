@@ -1,3 +1,4 @@
+import '../training/training_day.dart';
 import '../body_trend.dart' show bodyNotPermitted, guardBody;
 import '../data.dart';
 import '../food/food_model.dart';
@@ -35,7 +36,8 @@ Map<String, dynamic> buildWidgetSnapshot(HealthStore store, FoodStore food, Date
       WKind.body: _body(store, today),
     },
     // 13/11: το widget «Προπόνηση σήμερα» (QuickWidgetRules.kt). Νέο κλειδί· τα υπόλοιπα widgets δεν το διαβάζουν.
-    if (training != null && training.ready) 'workout': workoutSnapshot(training, today),
+    // Α13 (21/11): η μέρα της προπόνησης αλλάζει στις 04:00 ([trainingDay]).
+    if (training != null && training.ready) 'workout': workoutSnapshot(training, trainingDay(now)),
   };
 }
 

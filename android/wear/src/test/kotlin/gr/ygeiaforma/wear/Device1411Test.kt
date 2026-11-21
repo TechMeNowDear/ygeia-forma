@@ -260,4 +260,30 @@ class Device1411Test {
         assertFalse(o2.getJSONObject("cardio").has("mest"))
         Repo.resetExercise()
     }
+
+    /** Α13 (απόφαση χρήστη 21/11): η μέρα της προπόνησης αλλάζει στις 04:00, όπως στο κινητό (training_day.dart). */
+    @Test
+    fun trainingDayChangesAtFour() {
+        val sat = java.time.LocalDate.of(2026, 11, 21)
+        assertEquals(sat.minusDays(1), trainingDate(sat.atTime(0, 30)))
+        assertEquals(sat.minusDays(1), trainingDate(sat.atTime(3, 59, 59)))
+        assertEquals(sat, trainingDate(sat.atTime(4, 0)))
+        assertEquals(sat, trainingDate(sat.atStartOfDay()))
+        assertEquals(4, TRAINING_DAY_START_HOUR)
+        // Η μέρα μιας άσκησης που ξεκίνησε στις 00:30 του Σαββάτου (για τα λεπτά του περπατήματος): Παρασκευή.
+        val zone = java.time.ZoneOffset.UTC
+        val p = Plan.parse("""{"v":1,"days":{"5":"walkF","6":"walkS"},"workouts":[
+            {"id":"walkF","name":"Περπάτημα Παρασκευής","minutes":30,"cardio":{"activity":"walk","name":"Περπάτημα","minutes":30}},
+            {"id":"walkS","name":"Περπάτημα Σαββάτου","minutes":40,"cardio":{"activity":"walk","name":"Περπάτημα","minutes":40}}]}""")!!
+        val at0030 = sat.atTime(0, 30).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(sat.minusDays(1), p.dayOf(at0030, zone))
+        assertEquals("walkF", p.walkOn(at0030, zone)!!.id)
+        val at1000 = sat.atTime(10, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals("walkS", p.walkOn(at1000, zone)!!.id)
+        // Και ο πηγαίος κώδικας: «σήμερα» του ρολογιού από τη μέρα προπόνησης, όχι από το ημερολόγιο.
+        val view = java.io.File("src/main/kotlin/gr/ygeiaforma/wear/WatchView.kt").readText()
+        assertFalse(view.contains("java.time.LocalDate.now()"))
+        val proto = java.io.File("src/main/kotlin/gr/ygeiaforma/wear/Protocol.kt").readText()
+        assertTrue(proto.contains("val todayWorkout: WorkoutT? get() = forDay(trainingToday())"))
+    }
 }

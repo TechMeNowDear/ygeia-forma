@@ -323,6 +323,9 @@ class _LastNightCard extends StatelessWidget {
             const SizedBox(height: 6),
           ],
           if (n.parts.length > 1) InfoRow('Η Samsung τη χώρισε σε', '${n.parts.length} κομμάτια', dot: c.textTertiary),
+          // Α9 (21/11): οι ώρες των κομματιών (η διάρκεια πάνω είναι πάντα το σύνολο).
+          if (piecesTimesText([for (final p in n.parts) (p.start, p.end)]) case final pt?)
+            InfoRow('Τα κομμάτια', pt, key: const ValueKey('sleep-pieces'), dot: c.textTertiary),
           if (n.parts.length > 1 && n.parts.any((p) => p.score != null))
             InfoRow(
               'Βαθμολογία Samsung ανά κομμάτι',

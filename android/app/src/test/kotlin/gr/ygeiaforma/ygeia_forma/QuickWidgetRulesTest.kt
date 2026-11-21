@@ -36,6 +36,22 @@ class QuickWidgetRulesTest {
         assertEquals("Ξεκούραση σήμερα" to "Αύριο: Περπάτημα", QuickWidgetRules.workoutLines(w, mon.plusDays(1)))
     }
 
+    /** Α13 (απόφαση χρήστη 21/11): η μέρα της προπόνησης αλλάζει στις 04:00, όπως στην εφαρμογή. */
+    @Test
+    fun trainingDayChangesAtFour() {
+        val sat = java.time.LocalDate.of(2026, 11, 21)
+        assertEquals(sat.minusDays(1), QuickWidgetRules.trainingDate(sat.atTime(0, 30)))
+        assertEquals(sat.minusDays(1), QuickWidgetRules.trainingDate(sat.atTime(3, 59)))
+        assertEquals(sat, QuickWidgetRules.trainingDate(sat.atTime(4, 0)))
+        assertEquals(sat, QuickWidgetRules.trainingDate(sat.atTime(23, 59)))
+        // Ακριβώς μεσάνυχτα: ημερομηνία, μένει ίδια (όπως το trainingDay του κινητού).
+        assertEquals(sat, QuickWidgetRules.trainingDate(sat.atStartOfDay()))
+        // Στις 00:30 της Τρίτης το widget δείχνει ακόμα το «έγινε» της Δευτέρας.
+        val w = week(1, 3, 5).put("done", "2026-11-16").put("doneText", "Προπόνηση Α · 52′")
+        val tue0030 = QuickWidgetRules.trainingDate(java.time.LocalDate.of(2026, 11, 17).atTime(0, 30))
+        assertEquals("Έγινε σήμερα" to "Προπόνηση Α · 52′", QuickWidgetRules.workoutLines(w, tue0030))
+    }
+
     @Test
     fun withoutProgramOrSnapshot() {
         assertEquals("Προπόνηση" to "Άνοιξε την εφαρμογή", QuickWidgetRules.workoutLines(null, mon))

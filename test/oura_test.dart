@@ -198,12 +198,16 @@ void main() {
       expect(m.deep, isNull);
       expect(m.lowestHr, isNull);
       expect(m.onset, isNull);
+      // Η νύχτα του δείγματος έχει «low_battery_alert: true»: από την #151 (Α17) δεν μπαίνει στους μέσους όρους.
+      expect(n.lowBattery, isTrue);
       final row = ouraRow(n);
-      expect(row[ouraKeys[K.sleepMin]], 360);
+      expect(row.containsKey(ouraKeys[K.sleepMin]), isFalse);
+      expect(row.values.every((v) => v != 0), isTrue, reason: 'ποτέ 0 στη θέση μιας τιμής που λείπει');
       for (final k in [K.deepPct, K.remPct, K.awakeMin, K.sleepHr, K.lowHr, K.hrv, K.breath, K.bedtime, K.sleepScore, K.energy, K.skinTemp]) {
         expect(row.containsKey(ouraKeys[k]), isFalse, reason: k);
       }
-      expect(row[ouraKeys[K.wake]], isNotNull);
+      // Και το ξύπνημα: με άδεια μπαταρία η ώρα του τέλους δεν είναι σίγουρη.
+      expect(row.containsKey(ouraKeys[K.wake]), isFalse);
     });
 
     test('late_nap και χαλασμένη εγγραφή: ο υπνάκος χωριστά, η χαλασμένη παραλείπεται και μετριέται', () {
@@ -387,12 +391,17 @@ void main() {
       expect(soon.counted.length, 2, reason: 'κενό 60′, χωρίς βήματα: ίδια νύχτα');
       expect(soon.naps, isEmpty);
       expect(soon.nightMinutes, 445 + 55);
+      // Απόφαση χρήστη 21/11 (Α9α): κενό ως 4 ώρες το πρωί, χωρίς βήματα → η ίδια νύχτα (πριν: πρωινός υπνάκος).
       final late = only([rec('long_sleep', at(2, 23, 30), at(3, 7, 0)), rec('sleep', at(3, 9, 30), at(3, 10, 30))]);
-      expect(late.counted.length, 1, reason: 'κενό 2 ώρες 30 λεπτά: πρωινός υπνάκος');
-      expect(late.napMinutes, 55);
-      expect(ouraRow(late)[ouraKeys[K.napMin]], 55);
+      expect(late.counted.length, 2, reason: 'κενό 2 ώρες 30 λεπτά το πρωί, χωρίς βήματα: ίδια νύχτα');
+      expect(late.napMinutes, 0);
+      // Πάνω από 4 ώρες: πρωινός υπνάκος, όπως πριν.
+      final later = only([rec('long_sleep', at(2, 23, 30), at(3, 7, 0)), rec('sleep', at(3, 11, 30), at(3, 12, 10))]);
+      expect(later.counted.length, 1, reason: 'κενό 4 ώρες 30 λεπτά: υπνάκος');
+      expect(later.napMinutes, 35);
+      expect(ouraRow(later)[ouraKeys[K.napMin]], 35);
       // Έλεγχος 3, E1 (σκόπιμα): πριν από την κύρια, υπνάκος μόνο ό,τι αρχίζει πριν από τις 20:00· από τις 20:00 με
-      // κενό ως 4 ώρες είναι μέρος της νύχτας.
+      // κενό ως 2 ώρες (απόφαση χρήστη 21/11, Α10· πριν 4 ώρες) είναι μέρος της νύχτας.
       final evening = only([rec('late_nap', at(2, 19, 30), at(2, 20, 30)), rec('long_sleep', at(2, 23, 30), at(3, 7, 0))]);
       expect(evening.counted.single.type, 'long_sleep');
       expect(evening.naps.single.type, 'late_nap');
@@ -972,7 +981,8 @@ void main() {
       expect(h['2026-10-23'], {K.sleepMin: 400, K.steps: 5000}, reason: 'νύχτα του ρολογιού: το Oura δεν γράφεται');
       // Δύο long_sleep με κενό 2 ώρες 5 λεπτά: μία νύχτα (κοινός κανόνας με το ρολόι, συγχώνευση 4/11).
       expect(h['2026-10-24']!['o.sleepMin'], 475);
-      expect(h['2026-10-26']!['o.sleepMin'], 360);
+      // Α17 (21/11): η νύχτα της 26/10 έχει χαμηλή μπαταρία: καμία τιμή της (και η παλιά «999» σβήνει).
+      expect(h['2026-10-26']!.containsKey('o.sleepMin'), isFalse);
       expect(h['2026-10-26']!.containsKey('o.hrv'), isFalse, reason: 'δεν ήρθε πια → φεύγει');
       expect(h['2026-10-26']![K.steps], 6000);
       expect(changed, containsAll(['2026-10-24', '2026-10-25', '2026-10-26']));

@@ -29,7 +29,6 @@ import 'unusual_card.dart';
 import 'waist_sheet.dart';
 import 'training/today_training_card.dart';
 import 'week_card.dart';
-import 'info_sheet.dart';
 import 'oxygen_widgets.dart';
 import 'cloud_backup_size.dart';
 
@@ -1046,16 +1045,8 @@ class _WeighCard extends StatelessWidget {
                 label: const Text('Γράψε τη μέση'),
               ),
             ),
-          if (weighDay && !weighed)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                // Round 2 (R2-D-3): ίδιο φόντο· το κύριο χρώμα της «Αυγής» έβγαινε 4,45:1. Χρώμα κειμένου σε όλα τα θέματα.
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40), foregroundColor: c.text),
-                onPressed: () => showMetricInfo(context, metricInfos[K.weight]!),
-                child: const Text('Πώς ζυγίζομαι σωστά'),
-              ),
-            ),
+          // Απόφαση χρήστη 21/11 (Α30): χωρίς το κουμπί «Πώς ζυγίζομαι σωστά». Άνοιγε το φύλλο του βάρους, όπου η απάντηση
+          // ήταν στο τέλος· οι οδηγίες ζύγισης μένουν στο ⓘ του βάρους (Σώμα).
         ],
       ),
     );

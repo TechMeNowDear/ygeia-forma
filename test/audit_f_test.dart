@@ -114,7 +114,8 @@ void main() {
 
       await _pump(t, BodyPage(store: _sample(edit: edit)), size: const Size(400, 3000));
       final row = t.widgetList<InfoRow>(find.byType(InfoRow)).firstWhere((r) => r.label == 'Βάρος');
-      expect(row.value, endsWith('(−1,2)'));
+      // Α27 (21/11): η αλλαγή σε δική της στήλη.
+      expect(row.change, '−1,2');
     });
 
     testWidgets('F3: Σήμερα, θερμοκρασία καρπού = διαφορά των νούμερων όπως φαίνονται (ίδια με το «Εκτός συνηθισμένου»)',
