@@ -9,7 +9,7 @@ import 'package:ygeia_forma/backup.dart';
 import 'package:ygeia_forma/food/dishes.dart';
 import 'package:ygeia_forma/food/food_model.dart';
 import 'package:ygeia_forma/food/food_store.dart';
-import 'package:ygeia_forma/food/week_calc.dart' show freshBatch, itemsHaveRice, potBatchOld, potKeepDays;
+import 'package:ygeia_forma/food/week_calc.dart' show freshBatch, isRiceName, itemsHaveRice, potBatchOld, potKeepDays;
 import 'package:ygeia_forma/format.dart';
 import 'package:ygeia_forma/history.dart' show dateKey;
 import 'package:ygeia_forma/pages/dishes.dart';
@@ -432,6 +432,13 @@ void main() {
 
       expect(itemsHaveRice(s, riceBatch(0).items), isTrue);
       expect(itemsHaveRice(s, d0.items), isFalse);
+      // Ανεξάρτητος έλεγχος 21/11 (Α2-4): «ρύζι» ως λέξη οπουδήποτε στο όνομα (και σε δικό σου προϊόν), όχι «ρυζιού».
+      expect([for (final n in ['Ρύζι basmati, ωμό', 'Basmati ρύζι', 'ΡΥΖΙ ΚΑΣΤΑΝΟ', 'Κοτόπουλο με ρύζι (έτοιμο)']) isRiceName(n)],
+          [true, true, true, true]);
+      expect([for (final n in ['Γάλα ρυζιού', 'Ρυζόγαλο', 'Ρυζογκοφρέτες', 'Φακές', null]) isRiceName(n)],
+          [false, false, false, false, false]);
+      expect(basicFoods().where((x) => isRiceName(x.name)).length, basicFoods().where((x) => x.name.startsWith('Ρύζι')).length,
+          reason: 'στη βάση τίποτα δεν αλλάζει: τα ίδια τρόφιμα με πριν');
       expect([for (final n in [0, 1, 2]) potBatchOld(s, riceBatch(n), _now)], [false, false, true]);
       expect((potKeepDays(s, riceBatch(0).items), potKeepDays(s, d0.items)), (2, 3));
       expect(potOldNote(true), 'Φαγητό με ρύζι κρατά στο ψυγείο ως την επόμενη μέρα.');

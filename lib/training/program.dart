@@ -90,9 +90,16 @@ class PlanItem {
 /// Απόφαση χρήστη 21/11 (Α15): σημειώνει στο πρόγραμμα [next] ποια φορτία είναι ΝΕΑ σε σχέση με το πρόγραμμα [old] που
 /// ίσχυε ως τώρα ([PlanItem.loadAt] = [at]). Φορτίο ίδιο με του παλιού προγράμματος για την ίδια άσκηση κρατά τη σημείωση
 /// που είχε (συνήθως καμία): έτσι μια αλλαγή σε μέρες ή σετ, ή ένα νέο πρόγραμμα που αντιγράφει τα παλιά αρχικά κιλά, δεν
-/// «ξαναγράφει» φορτία. Χωρίς παλιό πρόγραμμα δεν σημειώνεται τίποτα (όλα είναι αρχικά φορτία). Ό,τι [loadAt] έφερε το
-/// ίδιο το [next] (π.χ. από επικολλημένο κείμενο) αγνοείται.
-void stampLoadTimes(Program next, Program? old, DateTime at) {
+/// «ξαναγράφει» φορτία. Ό,τι [PlanItem.loadAt] φέρνει το ίδιο το [next] (π.χ. από επικολλημένο κείμενο) αγνοείται.
+///
+/// «Ίδιο» κρίνεται με τον ΤΩΡΙΝΟ εξοπλισμό και στα δύο ([_sameLoad]): το [next] έρχεται ήδη στρογγυλεμένο σε ό,τι βγαίνει
+/// σήμερα, ενώ το [old] γράφτηκε με τον εξοπλισμό της μέρας του (ανεξάρτητος έλεγχος 21/11, Α15-1: μετά από αλλαγή λαβής,
+/// η επικόλληση του ίδιου κειμένου «έβλεπε» νέο φορτίο σε κάθε άσκηση και τις γύριζε στα αρχικά κιλά).
+///
+/// [stampNew] = false: ο επεξεργαστής προγράμματος. Εκεί το πεδίο λέγεται «Αρχικό βάρος» και αφορά μόνο την πρώτη φορά
+/// μιας άσκησης (όπως πάντα): φορτίο που άλλαξε εκεί ΔΕΝ σημειώνεται, άρα δεν κατεβάζει ποτέ μια άσκηση που ήδη κάνεις
+/// (Α15-3). Η σημείωση ενός φορτίου που δεν άλλαξε μένει.
+void stampLoadTimes(Program next, Program? old, DateTime at, {bool stampNew = true}) {
   final before = <String, List<PlanItem>>{};
   if (old != null) {
     for (final w in old.workouts) {
@@ -104,17 +111,24 @@ void stampLoadTimes(Program next, Program? old, DateTime at) {
   for (final w in next.workouts) {
     for (final i in w.items) {
       final load = i.load;
-      if (load == null || old == null) {
+      if (load == null) {
         i.loadAt = null;
         continue;
       }
       PlanItem? same;
       for (final o in before[i.ex] ?? const <PlanItem>[]) {
-        if (o.load != null && (o.load! - load).abs() < 1e-6) same = o;
+        if (o.load != null && _sameLoad(i.kind, o.load!, load)) same = o;
       }
-      i.loadAt = same != null ? same.loadAt : at.millisecondsSinceEpoch;
+      i.loadAt = same != null ? same.loadAt : (stampNew ? at.millisecondsSinceEpoch : null);
     }
   }
+}
+
+/// Δύο φορτία της ίδιας άσκησης είναι «το ίδιο» όταν με τον τωρινό εξοπλισμό βγαίνουν στο ίδιο βάρος.
+bool _sameLoad(LoadKind k, double a, double b) {
+  if ((a - b).abs() < 1e-6) return true;
+  if (!hasLoad(k) || !a.isFinite || !b.isFinite || a < 0 || b < 0) return false;
+  return (snap(k, a) - snap(k, b)).abs() < 1e-6;
 }
 
 /// Αερόβια (περπάτημα κ.λπ.).

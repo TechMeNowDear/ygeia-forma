@@ -488,8 +488,9 @@ void main() {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(400, 2400);
     addTearDown(tester.view.reset);
-    // Νέο πρόγραμμα με πιο ελαφρύ «load» (6,8 kg) για άσκηση που έχει ήδη γίνει με 9,3 kg, και για μία που δεν έχει γίνει ποτέ.
-    final text = _prog(items: '${_ex('db_press', extra: ',"load":6.8')},${_ex('db_row', extra: ',"load":6.8')}');
+    // Νέο πρόγραμμα με «load» 6,8 kg για μια άσκηση που δεν έχει γίνει ποτέ, και με ΠΕΡΙΣΣΟΤΕΡΑ κιλά (11,8 kg) για άσκηση που
+    // έχει ήδη γίνει με 9,3 kg: τα περισσότερα δεν ισχύουν μόνα τους. (Πιο ελαφριά από την τελευταία φορά: ομάδα «Α15».)
+    final text = _prog(items: '${_ex('db_press', extra: ',"load":11.8')},${_ex('db_row', extra: ',"load":6.8')}');
     await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: ProgramPastePage(training: t, initial: text)));
     await tester.pump();
     expect(find.textContaining('συνεχίζεις από 9,3 kg'), findsOneWidget);
@@ -545,21 +546,30 @@ void main() {
     test('stampLoadTimes: σημειώνεται μόνο φορτίο διαφορετικό από του προγράμματος που ίσχυε', () {
       final at = DateTime(2026, 12, 31, 20);
       final old = prog('${_ex('db_press', extra: ',"load":9.3')},${_ex('db_row', extra: ',"load":6.8')}');
-      // Χωρίς παλιό πρόγραμμα: τίποτα (και ό,τι «loadAt» έφερε το κείμενο αγνοείται).
+      // Ό,τι «loadAt» έφερε το κείμενο αγνοείται. Χωρίς παλιό πρόγραμμα κάθε φορτίο είναι νέο (Α15-5γ)· από τον
+      // επεξεργαστή (stampNew: false) δεν σημειώνεται ποτέ νέο φορτίο (Α15-3).
       final first = prog(_ex('db_press', extra: ',"load":9.3,"loadAt":123'));
       expect(pressOf(first).loadAt, 123, reason: 'το κείμενο το διαβάζει…');
       stampLoadTimes(first, null, at);
-      expect(pressOf(first).loadAt, isNull, reason: '…αλλά η αποθήκευση το αγνοεί');
+      expect(pressOf(first).loadAt, ms(at), reason: '…αλλά η αποθήκευση βάζει τη δική της ώρα');
+      stampLoadTimes(first, null, at, stampNew: false);
+      expect(pressOf(first).loadAt, isNull);
       // Ίδιο φορτίο με πριν: καμία σημείωση. Άλλο φορτίο, ή νέα άσκηση με φορτίο: σημειώνεται.
       final next = prog('${_ex('db_press', extra: ',"load":9.3,"loadAt":123')},${_ex('db_row', extra: ',"load":4.3')},'
           '${_ex('goblet', extra: ',"load":11.8')},${_ex('db_curl')}');
       stampLoadTimes(next, old, at);
       final byEx = {for (final i in next.workout('A')!.items) i.ex: i.loadAt};
       expect(byEx, {'db_press': null, 'db_row': ms(at), 'goblet': ms(at), 'db_curl': null});
-      // Τρίτο πρόγραμμα με τα ίδια φορτία: οι σημειώσεις μένουν όπως ήταν (δεν γίνονται «τώρα»).
-      final third = prog('${_ex('db_press', extra: ',"load":9.3')},${_ex('db_row', extra: ',"load":4.3')}');
-      stampLoadTimes(third, next, at.add(const Duration(days: 7)));
-      expect({for (final i in third.workout('A')!.items) i.ex: i.loadAt}, {'db_press': null, 'db_row': ms(at)});
+      // Τρίτο πρόγραμμα με τα ίδια φορτία: οι σημειώσεις μένουν όπως ήταν (δεν γίνονται «τώρα»), και από τον επεξεργαστή.
+      for (final stampNew in [true, false]) {
+        final third = prog('${_ex('db_press', extra: ',"load":9.3')},${_ex('db_row', extra: ',"load":4.3')}');
+        stampLoadTimes(third, next, at.add(const Duration(days: 7)), stampNew: stampNew);
+        expect({for (final i in third.workout('A')!.items) i.ex: i.loadAt}, {'db_press': null, 'db_row': ms(at)}, reason: '$stampNew');
+      }
+      // Από τον επεξεργαστή, φορτίο που άλλαξε: καμία σημείωση (το «Αρχικό βάρος» αφορά μόνο την πρώτη φορά).
+      final byHand = prog('${_ex('db_press', extra: ',"load":1.8')},${_ex('db_row', extra: ',"load":4.3')}');
+      stampLoadTimes(byHand, next, at.add(const Duration(days: 7)), stampNew: false);
+      expect({for (final i in byHand.workout('A')!.items) i.ex: i.loadAt}, {'db_press': null, 'db_row': ms(at)});
       // Γράφεται και διαβάζεται από το αρχείο.
       final back = Program.fromJson(jsonDecode(jsonEncode(next.toJson())) as Map<String, dynamic>);
       expect({for (final i in back.workout('A')!.items) i.ex: i.loadAt}, byEx);
@@ -568,8 +578,10 @@ void main() {
 
     test('αποθήκευση: μια αλλαγή αλλού (π.χ. σετ) ΔΕΝ ξαναγράφει φορτία· νέο πιο ελαφρύ φορτίο ισχύει στην επόμενη προπόνηση', () {
       final t = _store([_lift(3, [_log('db_press', 9.3, [11, 10, 10], rir: 2)])]);
-      // Το πρόγραμμα με το παλιό αρχικό φορτίο (4,3 kg), ενώ η άσκηση έχει φτάσει τα 9,3 kg.
-      final v1 = t.saveProgram(prog(_ex('db_press', extra: ',"load":4.3')));
+      // Το πρόγραμμα με το παλιό αρχικό φορτίο (4,3 kg), ενώ η άσκηση έχει φτάσει τα 9,3 kg. Αποθηκευμένο χωρίς σημείωση,
+      // όπως κάθε πρόγραμμα από πριν την #150.
+      final v1 = t.saveProgram(prog(_ex('db_press', extra: ',"load":4.3')), newLoads: false);
+      expect(pressOf(v1).loadAt, isNull);
       expect(t.targetFor(pressOf(v1)).load, 9.3);
       // Αλλάζεις τα σετ και αποθηκεύεις ξανά: το φορτίο του προγράμματος είναι το ίδιο → τα 9,3 kg μένουν.
       final edited = v1.copy();
@@ -587,10 +599,87 @@ void main() {
       expect(t.targetFor(pressOf(v4)).load, 9.3);
     });
 
+    // Ανεξάρτητος έλεγχος 21/11, Α15-2.
+    test('πρόγραμμα που γράφει τα κιλά της ΤΕΛΕΥΤΑΙΑΣ φοράς δεν ακυρώνει την άνοδο που ήταν έτοιμη', () {
+      // 9,3 kg × 12, 12, 12 με «άφησα 2»: η επόμενη φορά ανεβαίνει.
+      final top = [(lastDay, _log('db_press', 9.3, [12, 12, 12], rir: 2))];
+      final plain = nextTarget(_item('db_press', load: 9.3), top, _now);
+      expect(plain.load, greaterThan(9.3), reason: 'η άνοδος είναι έτοιμη');
+      // Νέο πρόγραμμα γράφει 9,3 kg (όσα έκανες): δεν είναι «πιο ελαφριά». Ο στόχος μένει αυτός της προόδου.
+      final same = nextTarget(_item('db_press', load: 9.3)..loadAt = ms(_now), top, _now);
+      expect((same.load, same.change, same.reason), (plain.load, plain.change, plain.reason));
+      expect(same.reps, plain.reps);
+      // Πιο ελαφριά από ό,τι έκανες (6,8 kg): ισχύει.
+      final lighter = nextTarget(_item('db_press', load: 6.8)..loadAt = ms(_now), top, _now);
+      expect((lighter.load, lighter.change), (6.8, Change.back));
+      // Από άκρη σε άκρη: αποθήκευση προγράμματος με 9,3 kg ενώ το παλιό έγραφε 4,3 kg.
+      final t = _store([_lift(3, [_log('db_press', 9.3, [12, 12, 12], rir: 2)])]);
+      t.saveProgram(prog(_ex('db_press', extra: ',"load":4.3')));
+      final v2 = t.saveProgram(prog(_ex('db_press', extra: ',"load":9.3')), author: 'claude');
+      expect(pressOf(v2).loadAt, ms(_now), reason: 'το φορτίο είναι νέο σε σχέση με το παλιό πρόγραμμα…');
+      final target = t.targetFor(pressOf(v2));
+      expect(target.load, plain.load, reason: '…αλλά δεν είναι πιο ελαφρύ από ό,τι έγινε: η άνοδος μένει');
+      expect(target.change, isNot(Change.back));
+    });
+
+    // Ανεξάρτητος έλεγχος 21/11, Α15-1.
+    test('αλλαγή εξοπλισμού και επικόλληση του ΙΔΙΟΥ προγράμματος: οι ασκήσεις δεν γυρίζουν στα αρχικά κιλά', () {
+      final t = _store([_lift(3, [_log('db_press', 9.3, [11, 10, 10], rir: 2)])]);
+      final text = _prog(items: _ex('db_press', extra: ',"load":4.3'));
+      // Το πρόγραμμα που ισχύει: 4,3 kg αρχικό, χωρίς σημείωση (η άσκηση έχει πια φτάσει τα 9,3 kg).
+      final v1 = t.saveProgram(parseProgram(text, known).program!, author: 'claude', newLoads: false);
+      expect(pressOf(v1).load, 4.3);
+      expect(t.targetFor(pressOf(v1)).reason, isNot(contains('Το νέο σου πρόγραμμα')));
+      // Άλλη λαβή: το 4,3 kg δεν βγαίνει πια ακριβώς και η επικόλληση το στρογγυλεύει αλλού.
+      equip = const Equipment(handleKg: 2.2);
+      final again = parseProgram(text, known).program!;
+      expect(pressOf(again).load, isNot(4.3), reason: 'η δοκιμή θέλει φορτίο που στρογγυλεύεται αλλιώς με τη νέα λαβή');
+      final v2 = t.saveProgram(again, author: 'claude');
+      expect(pressOf(v2).loadAt, isNull, reason: 'ίδιο κείμενο → ίδιο φορτίο με τον τωρινό εξοπλισμό → δεν είναι «νέο»');
+      final after = t.targetFor(pressOf(v2));
+      expect(after.reason, isNot(contains('Το νέο σου πρόγραμμα')), reason: 'πριν: «…γράφει πιο ελαφριά» σε κάθε άσκηση');
+      expect(after.load, greaterThan(pressOf(v2).load!));
+      // Πραγματικά άλλο φορτίο στο κείμενο (6,8 → άλλο βάρος και με τη νέα λαβή): σημειώνεται, όπως πρέπει.
+      final other = t.saveProgram(parseProgram(_prog(items: _ex('db_press', extra: ',"load":6.8')), known).program!, author: 'claude');
+      expect(pressOf(other).loadAt, ms(_now));
+    });
+
+    // Ανεξάρτητος έλεγχος 21/11, Α15-3.
+    test('ο επεξεργαστής προγράμματος (newLoads: false) δεν κατεβάζει ποτέ άσκηση που ήδη κάνεις', () {
+      final t = _store([_lift(3, [_log('db_press', 9.3, [11, 10, 10], rir: 2)])]);
+      final v1 = t.saveProgram(prog(_ex('db_press')));
+      // Ένα πάτημα στο «+» του «Αρχικό βάρος» από «αυτόματα» βάζει το ελαφρύτερο που βγαίνει.
+      final edited = v1.copy();
+      pressOf(edited).load = 1.8;
+      final v2 = t.saveProgram(edited, newLoads: false);
+      expect(pressOf(v2).loadAt, isNull);
+      expect(t.targetFor(pressOf(v2)).load, 9.3, reason: 'πριν από τη διόρθωση: 1,8 kg στην επόμενη προπόνηση');
+      // Εκκρεμές πιο ελαφρύ φορτίο από επικόλληση μένει, όταν ο επεξεργαστής αλλάζει κάτι άλλο (π.χ. σετ).
+      final v3 = t.saveProgram(prog(_ex('db_press', extra: ',"load":6.8')), author: 'claude');
+      final edited3 = v3.copy();
+      pressOf(edited3).sets = 4;
+      final v4 = t.saveProgram(edited3, newLoads: false);
+      expect(pressOf(v4).loadAt, pressOf(v3).loadAt);
+      expect(t.targetFor(pressOf(v4)).load, 6.8);
+    });
+
+    // Ανεξάρτητος έλεγχος 21/11, Α15-6.
+    test('η σύνοψη για τον Claude: το πρόγραμμα χωρίς «loadAt», και μία γραμμή για το τι σημαίνει το «load»', () {
+      final t = _store([_lift(3, [_log('db_press', 9.3, [11, 10, 10], rir: 2)])]);
+      t.saveProgram(prog(_ex('db_press', extra: ',"load":4.3')));
+      final v2 = t.saveProgram(prog(_ex('db_press', extra: ',"load":6.8')), author: 'claude');
+      expect(pressOf(v2).loadAt, isNotNull);
+      final text = t.exportForClaude();
+      expect(text, isNot(contains('loadAt')));
+      expect(text, contains('"load":6.8'));
+      expect(text, contains('Κιλά στο πρόγραμμα ("load"): ισχύουν σε άσκηση που δεν έχει γίνει ακόμα, ή όταν είναι πιο ελαφριά από την τελευταία φορά'));
+      expect(pressOf(t.program!).loadAt, pressOf(v2).loadAt, reason: 'η σύνοψη δεν αλλάζει το αποθηκευμένο πρόγραμμα');
+    });
+
     testWidgets('η επικόλληση το δείχνει πριν αποθηκεύσεις: «6,8 kg (πιο ελαφριά από την τελευταία φορά)»', (tester) async {
       await tester.runAsync(() => ExLibrary.load(inline: true));
       final t = _store([_lift(3, [_log('db_press', 9.3, [11, 10, 10], rir: 2)])]);
-      t.saveProgram(prog(_ex('db_press', extra: ',"load":9.3')));
+      t.saveProgram(prog(_ex('db_press', extra: ',"load":9.3')), newLoads: false);
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(400, 2400);
       addTearDown(tester.view.reset);

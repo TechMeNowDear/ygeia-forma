@@ -249,7 +249,6 @@ class CheckIn {
 /// εξατομικευμένη υποστήριξη μπορεί να μειώνουν τις διακοπές (χαμηλή βεβαιότητα).
 const smokeQuitHoldDays = 70;
 
-/// Πόσες μέρες πέρασαν από τη διακοπή, όταν είναι μέσα στις [smokeQuitHoldDays]· αλλιώς null.
 /// Απόφαση χρήστη 21/11 (Α8· K1-S-03, Χ-8): ο έλεγχος δεν κατεβάζει τον στόχο όταν η μέση έπεσε τουλάχιστον τόσο (cm) στο
 /// ίδιο διάστημα που έκρινε. Η εκτίμηση υποθέτει ότι ό,τι αλλάζει στη ζυγαριά είναι λίπος· όταν μπαίνει άλιπη μάζα (νέα
 /// βάρη) ή κρατιούνται νερά, η ζυγαριά δείχνει λιγότερη απώλεια από την αληθινή και η εκτίμηση βγαίνει χαμηλά (Hall 2008,
@@ -267,7 +266,9 @@ const waistHoldEdgeDays = 7;
 
 /// Πόσα cm έπεσε η μέση μέσα στο διάστημα [from]–[to] του ελέγχου, ή null όταν δεν φτάνουν οι μετρήσεις ή η πτώση είναι
 /// κάτω από [waistHoldMinCm]. Πρώτη μέτρηση: η παλιότερη από [waistHoldEdgeDays] μέρες πριν από το [from] και μετά.
-/// Τελευταία: η πιο πρόσφατη ως το [to], μέσα στις [waistHoldEdgeDays] τελευταίες μέρες.
+/// Τελευταία: η πιο πρόσφατη ως το [to], μέσα στις [waistHoldEdgeDays] τελευταίες μέρες. Ο έλεγχος δίνει για [to] τη ΜΕΡΑ
+/// ΤΟΥ ΕΛΕΓΧΟΥ (όχι το τέλος της εκτίμησης, που είναι η προηγούμενη): η μέτρηση του ίδιου πρωινού μετρά (ανεξάρτητος
+/// έλεγχος 21/11, Α8-3: με μετρήσεις ανά δύο εβδομάδες, η σημερινή δεν μετρούσε και η προηγούμενη ήταν πια «παλιά»).
 double? waistDropIn(List<WaistEntry> waist, DateTime from, DateTime to) {
   final a = _day(from), b = _day(to);
   final first = DateTime(a.year, a.month, a.day - waistHoldEdgeDays);
@@ -289,6 +290,7 @@ double? waistDropIn(List<WaistEntry> waist, DateTime from, DateTime to) {
   return drop >= waistHoldMinCm - 1e-9 ? (drop * 10).round() / 10 : null;
 }
 
+/// Πόσες μέρες πέρασαν από τη διακοπή, όταν είναι μέσα στις [smokeQuitHoldDays]· αλλιώς null.
 int? quitHoldDays(DateTime? quitDay, DateTime today) {
   if (quitDay == null) return null;
   final d = daysBetween(_day(quitDay), _day(today));
@@ -496,7 +498,7 @@ CheckIn? pendingCheckIn({
         final quitHeld = quit != null && p.change < 0 && !tooFast && !held;
         // Απόφαση χρήστη 21/11 (Α8): όχι μείωση όταν η μέση έπεσε στο ίδιο διάστημα ([waistDropIn]). Μόνο για μείωση που
         // θα γινόταν τώρα: οι άλλοι λόγοι (γρήγορη απώλεια, πρόσφατη αλλαγή, διακοπή καπνίσματος) γράφονται πρώτοι.
-        final waistFell = g.aim == GoalAim.lose ? waistDropIn(waist, e.from, e.to) : null;
+        final waistFell = g.aim == GoalAim.lose ? waistDropIn(waist, e.from, t) : null;
         final waistHeld = waistFell != null && p.change < 0 && !tooFast && !held && !quitHeld;
         if ((tooFast && p.change < 0) || held || quitHeld || waistHeld) {
           p = AdaptProposal(current: p.current, target: p.current, est: e, fastLoss: false, floored: false);
@@ -536,8 +538,11 @@ CheckIn? pendingCheckIn({
         final lowP = lowEst == null || lowKg == null ? null : lowLogProposal(goals: g, est: lowEst, kgNow: lowKg, formulaTdee: formula);
         final lowChanged = lastChangeDay(g);
         final lowHeld = lowChanged != null && daysBetween(lowChanged, t) < adaptMinChangeDays;
+        // Ανεξάρτητος έλεγχος 21/11 (Α8-1): και αυτή η μείωση (πάντα προς τα κάτω) δεν γίνεται όταν η μέση έπεσε στο ίδιο
+        // διάστημα· είναι ακριβώς η περίπτωση του κανόνα (η ζυγαριά δείχνει λιγότερη απώλεια από την αληθινή).
+        final lowWaist = lowEst != null && g.aim == GoalAim.lose ? waistDropIn(waist, lowEst.from, t) : null;
         // 17/11: και όχι στις 10 εβδομάδες μετά τη διακοπή του καπνίσματος (πάντα προς τα κάτω).
-        if (lowP != null && !lowHeld && quitHoldDays(quitDay, t) == null) {
+        if (lowP != null && !lowHeld && quitHoldDays(quitDay, t) == null && lowWaist == null) {
           return CheckIn(
               kind: CheckKind.proposal,
               goals: g,
@@ -567,6 +572,8 @@ CheckIn? pendingCheckIn({
             foreign: news,
             // V-4: μόνο όταν το βάρος ανεβαίνει· αλλιώς η χαμηλή εκτίμηση είναι συνήθως φαγητό που δεν γράφτηκε.
             quitDays: quitLow != null && r.est != null && r.est!.tdee < formula && r.est!.slopeKgWeek > 0 ? quitLow : null,
+            // Μόνο όταν η μέση είναι ο λόγος που δεν έγινε η μείωση «από τη ζυγαριά».
+            waistDrop: lowP != null && !lowHeld && quitLow == null ? lowWaist : null,
             formula: formula,
             formulaKg: fNow.kg);
       case AdaptStatus.tooEarly:

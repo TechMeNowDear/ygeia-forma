@@ -206,9 +206,14 @@ class SlotRow extends StatelessWidget {
       } else if (d.kind == DishKind.pot) {
         final b = freshBatch(food, d, now);
         final g = b == null ? null : potPortion(food, d, b, s.kcal);
+        // Ανεξάρτητος έλεγχος 21/11 (Α2-2): κατσαρόλα που πέρασε τις μέρες της δεν είναι «δεν έχεις μαγειρέψει»· η
+        // γραμμή λέει τον πραγματικό λόγο, και το πάτημα ανοίγει την οθόνη με τη μερίδα από εκείνο το μαγείρεμα.
+        final old = d.batch;
         hint = g != null
             ? 'Η μερίδα σου: ${thousands(g.round())} g'
-            : 'Μαγείρεψε και ζύγισε όλο το έτοιμο φαγητό· μετά βγαίνει η μερίδα σου';
+            : old != null && potBatchOld(food, old, now)
+                ? potOldHint(daysBetween(DateTime.fromMillisecondsSinceEpoch(old.at), now))
+                : 'Μαγείρεψε και ζύγισε όλο το έτοιμο φαγητό· μετά βγαίνει η μερίδα σου';
       } else if (d.kind == DishKind.plate && s.kcal != null) {
         final l = slotLog(food, d, s, now);
         if (l?.plate case final p?) {
@@ -1054,3 +1059,7 @@ class _AutoWeekSheetState extends State<AutoWeekSheet> {
 /// K6S-07: το «Το έφαγα» έγραψε το φαγητό στο ημερολόγιο, αλλά η θέση του προγράμματος δεν αποθηκεύτηκε.
 String weekSlotNotSavedText(String dish) =>
     'Το «$dish» γράφτηκε στο ημερολόγιο, αλλά το πρόγραμμα δεν ενημερώθηκε. Μην πατήσεις ξανά «Το έφαγα»: θα γραφτεί δύο φορές.';
+
+/// Α2-2 (21/11): η γραμμή της θέσης όταν το φαγητό της κατσαρόλας μαγειρεύτηκε πριν από [days] μέρες και δεν γράφεται
+/// πια με ένα πάτημα ([potBatchOld]).
+String potOldHint(int days) => 'Μαγειρεύτηκε πριν από $days μέρες: πάτα για να δεις τη μερίδα ή να το μαγειρέψεις ξανά';

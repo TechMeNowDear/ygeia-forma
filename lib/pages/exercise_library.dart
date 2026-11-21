@@ -29,7 +29,7 @@ class _ExerciseLibraryPageState extends State<ExerciseLibraryPage> {
 
   bool _matches(Ex e, String q) {
     if (q.isEmpty) return true;
-    final hay = [e.name, e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
+    final hay = [e.name, e.enName ?? '', e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
     final p = plain(q.trim());
     if (plain(hay).contains(p)) return true;
     return phonetic(hay).contains(phonetic(q.trim()));

@@ -380,6 +380,20 @@ void main() {
       expect(find.byKey(const ValueKey('slot-ate-0-1')), findsOneWidget);
     });
 
+    // Ανεξάρτητος έλεγχος 21/11 (Α2-2).
+    testWidgets('Κατσαρόλα που πέρασε τις μέρες της: η θέση το λέει («Μαγειρεύτηκε πριν από 4 μέρες…»), όχι «Μαγείρεψε και ζύγισε»', (t) async {
+      final dishes = library();
+      final pot = dishes.firstWhere((d) => d.kind == DishKind.pot);
+      final b = PotBatch(at: DateTime(now.year, now.month, now.day - 4, 20).millisecondsSinceEpoch, cooked: 1500, items: pot.items);
+      final cooked = [for (final d in dishes) d.id == pot.id ? d.copyWith(batch: b) : d];
+      final s = store(dishes: cooked, week: parseWeek(weekText(), cooked, now: 0).plan);
+      await pump(t, FoodTheme(child: PlanDayCard(food: s, day: now, clock: () => now)));
+      expect(potOldHint(4), 'Μαγειρεύτηκε πριν από 4 μέρες: πάτα για να δεις τη μερίδα ή να το μαγειρέψεις ξανά');
+      expect(find.text(potOldHint(4)), findsOneWidget);
+      expect(find.textContaining('Μαγείρεψε και ζύγισε όλο το έτοιμο φαγητό'), findsNothing);
+      expect(find.textContaining('Η μερίδα σου:'), findsNothing);
+    });
+
     testWidgets('Κατσαρόλα στο πρόγραμμα: μετά το ζύγισμα, «Η μερίδα σου: … g»', (t) async {
       final dishes = library();
       final pot = dishes.firstWhere((d) => d.kind == DishKind.pot);

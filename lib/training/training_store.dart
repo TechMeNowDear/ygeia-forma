@@ -776,15 +776,16 @@ class TrainingStore extends ChangeNotifier {
   }
 
   /// Αποθηκεύει ως νέα έκδοση (ίδιο id → έκδοση +1) και το κάνει ενεργό.
-  Program saveProgram(Program p, {String author = 'user'}) {
+  Program saveProgram(Program p, {String author = 'user', bool newLoads = true}) {
     final prev = [for (final x in programs) if (x.id == p.id) x];
     final copy = p.copy()
       ..author = author
       ..version = prev.isEmpty ? 1 : prev.last.version + 1
       ..savedAt = now;
     // Α15 (21/11): ποια φορτία άλλαξαν σε σχέση με το πρόγραμμα που ίσχυε ως τώρα· μόνο αυτά μπορούν να ξεκινήσουν μια
-    // άσκηση πιο ελαφριά από την τελευταία φορά ([nextTarget]).
-    stampLoadTimes(copy, program, now);
+    // άσκηση πιο ελαφριά από την τελευταία φορά ([nextTarget]). [newLoads] = false από τον επεξεργαστή προγράμματος: το
+    // «Αρχικό βάρος» εκεί αφορά μόνο την πρώτη φορά μιας άσκησης (ανεξάρτητος έλεγχος 21/11, Α15-3).
+    stampLoadTimes(copy, program, now, stampNew: newLoads);
     copy.from ??= DateTime(now.year, now.month, now.day);
     programs.add(copy);
     activeId = copy.id;
@@ -1901,7 +1902,18 @@ class TrainingStore extends ChangeNotifier {
     if (p != null) {
       b.writeln();
       b.writeln('Το τρέχον πρόγραμμα (για αλλαγές):');
-      b.writeln(jsonEncode(p.toJson()));
+      // Α15 (21/11): χωρίς το εσωτερικό «loadAt» (πότε γράφτηκε ένα φορτίο· η επικόλληση το αγνοεί έτσι κι αλλιώς).
+      final plain = p.copy();
+      for (final w in plain.workouts) {
+        for (final i in w.items) {
+          i.loadAt = null;
+        }
+      }
+      b.writeln(jsonEncode(plain.toJson()));
+      // Για όποιον γράψει το επόμενο πρόγραμμα: τι σημαίνει το «load» από την #150 και μετά.
+      b.writeln('Κιλά στο πρόγραμμα ("load"): ισχύουν σε άσκηση που δεν έχει γίνει ακόμα, ή όταν είναι πιο ελαφριά από την '
+          'τελευταία φορά (τότε η άσκηση ξεκινά από εκεί, στο κάτω όριο των επαναλήψεων). Ίδια ή περισσότερα κιλά δεν '
+          'αλλάζουν τίποτα: η εφαρμογή συνεχίζει από την πρόοδο.');
     }
     return b.toString();
   }

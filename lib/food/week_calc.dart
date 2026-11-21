@@ -104,8 +104,14 @@ double? potPortion(FoodStore food, Dish d, PotBatch b, double? kcal) {
 }
 
 /// Τα υλικά έχουν ρύζι (τρόφιμο της βάσης που το όνομά του αρχίζει με «Ρύζι»): το περίσσευμα μόνο ως την επόμενη μέρα.
-bool itemsHaveRice(FoodStore food, Iterable<DishItem> items) =>
-    items.any((i) => food.itemFood(i)?.name.startsWith('Ρύζι') ?? false);
+bool itemsHaveRice(FoodStore food, Iterable<DishItem> items) => items.any((i) => isRiceName(food.itemFood(i)?.name));
+
+/// Το όνομα ενός τροφίμου λέει «ρύζι» ως λέξη (αρχή ή μέση, πεζά ή κεφαλαία): «Ρύζι basmati», «Basmati ρύζι», «ΡΥΖΙ».
+/// Όχι «ρυζιού» (γάλα ρυζιού), «ρυζόγαλο», «ρυζογκοφρέτες». Ανεξάρτητος έλεγχος 21/11 (Α2-4): πριν μόνο όνομα που ΑΡΧΙΖΕ
+/// με «Ρύζι» (όλα τα ρύζια της βάσης)· ένα δικό σου προϊόν «Basmati ρύζι» έπαιρνε 3 μέρες αντί για 2.
+bool isRiceName(String? name) => name != null && _riceWord.hasMatch(name.toLowerCase());
+
+final _riceWord = RegExp(r'(^|[^a-zα-ωάέήίόύώϊϋΐΰ])ρ[υύ]ζι($|[^a-zα-ωάέήίόύώϊϋΐΰ])');
 
 /// Πόσες μέρες μετρά ένα μαγείρεμα με αυτά τα [items]: [potQuickDays], ή [potRiceQuickDays] αν έχει ρύζι (Α2, 21/11).
 int potKeepDays(FoodStore food, Iterable<DishItem> items) => itemsHaveRice(food, items) ? potRiceQuickDays : potQuickDays;

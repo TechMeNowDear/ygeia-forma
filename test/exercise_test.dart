@@ -48,6 +48,13 @@ void main() {
     });
     expect(lib.byId('goblet')!.name, 'Κάθισμα με βάρος στο στήθος');
     expect(lib.byId('rdl')!.name, 'Ρουμανική άρση θανάτου');
+    // Ανεξάρτητος έλεγχος 21/11 (Α24-1): κανένα κείμενο της βιβλιοθήκης δεν λέει πια άσκηση με το παλιό αγγλικό όνομα.
+    for (final e in lib.list) {
+      final texts = [e.feel, ...e.setup, ...e.steps, ...e.mistakes, ...e.tips, for (final c in e.cues) c.text].join(' ').toLowerCase();
+      for (final old in ['crunch', 'pushdown', 'deadlift', 'goblet', 'squat', 'leg curl', 'leg extension', 'hip thrust', 'face pull', 'pallof', 'hammer']) {
+        expect(texts.contains(old), isFalse, reason: '${e.id}: «$old»');
+      }
+    }
     // Τα ονόματα μένουν μοναδικά.
     expect({for (final e in lib.list) e.name}.length, lib.list.length);
     // Η γραμμή των λιστών επιλογής: με αγγλικό όνομα μπροστά, αλλιώς μόνο ο εξοπλισμός (όπως πριν).
@@ -202,6 +209,10 @@ void main() {
       // Το αγγλικό κάτω από το ελληνικό, όχι δίπλα.
       expect(t.getTopLeft(find.byKey(const ValueKey('ex-en-goblet'))).dy,
           greaterThan(t.getTopLeft(find.descendant(of: row, matching: find.text('Κάθισμα με βάρος στο στήθος'))).dy));
+      // Ανεξάρτητος έλεγχος 21/11 (Α24-2): η αναζήτηση βρίσκει το αγγλικό όνομα ακριβώς όπως γράφεται στην οθόνη.
+      await t.enterText(find.byKey(const ValueKey('ex-search')), 'band pushdown');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ex-row-band_pushdown')), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('ex-search')), '');
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('ex-row-db_press')), findsOneWidget);

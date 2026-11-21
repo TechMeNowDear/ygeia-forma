@@ -22,7 +22,7 @@ Future<String?> pickExercise(BuildContext context, {Set<String> already = const 
 bool exMatches(Ex e, String q) {
   final t = q.trim();
   if (t.isEmpty) return true;
-  final hay = [e.name, e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
+  final hay = [e.name, e.enName ?? '', e.en, e.equip, e.groupName, for (final m in [...e.primary, ...e.secondary]) m.name].join(' ');
   if (plain(hay).contains(plain(t))) return true;
   return phonetic(hay).contains(phonetic(t));
 }
