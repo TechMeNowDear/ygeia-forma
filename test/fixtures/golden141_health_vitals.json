@@ -1050,7 +1050,7 @@
  "sleepRange": {
   "age 17": null,
   "age 18": {
-   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι· οι συσκευές μετρούν συνήθως μισή με μία ώρα λιγότερο (Lauderdale κ.ά., Epidemiology 2008)",
+   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι (Lauderdale κ.ά., Epidemiology 2008)",
    "high": null,
    "low": 420.0,
    "nearBelow": 30.0,
@@ -1065,7 +1065,7 @@
    "text": "τουλάχιστον 7 ώρες για ενήλικες"
   },
   "age 44": {
-   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι· οι συσκευές μετρούν συνήθως μισή με μία ώρα λιγότερο (Lauderdale κ.ά., Epidemiology 2008)",
+   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι (Lauderdale κ.ά., Epidemiology 2008)",
    "high": null,
    "low": 420.0,
    "nearBelow": 30.0,
@@ -1080,7 +1080,7 @@
    "text": "τουλάχιστον 7 ώρες για ενήλικες"
   },
   "age 60": {
-   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι· οι συσκευές μετρούν συνήθως μισή με μία ώρα λιγότερο (Lauderdale κ.ά., Epidemiology 2008)",
+   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι (Lauderdale κ.ά., Epidemiology 2008)",
    "high": null,
    "low": 420.0,
    "nearBelow": 30.0,
@@ -1096,7 +1096,7 @@
   },
   "age 61": null,
   "age null": {
-   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι· οι συσκευές μετρούν συνήθως μισή με μία ώρα λιγότερο (Lauderdale κ.ά., Epidemiology 2008)",
+   "cite": "AASM και Sleep Research Society (Watson κ.ά., Sleep 2015), ενήλικες 18–60 ετών. Η σύσταση βγήκε από ώρες ύπνου που δήλωναν οι ίδιοι οι άνθρωποι (Lauderdale κ.ά., Epidemiology 2008)",
    "high": null,
    "low": 420.0,
    "nearBelow": 30.0,

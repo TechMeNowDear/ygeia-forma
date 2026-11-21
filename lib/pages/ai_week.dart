@@ -768,6 +768,10 @@ class _SwapReasonSheetState extends State<_SwapReasonSheet> {
 
 /// Μετά το «Έφαγα κάτι άλλο» (μόνο για σήμερα, μόνο αν γράφτηκε κάτι): προτείνει τις νέες μερίδες των γευμάτων που
 /// έρχονται μετά το [after] στη μέρα (κανόνες, χωρίς AI).
+///
+/// Έλεγχος 21/11 (K7B-02, K2-R-08): ο διάλογος λέει ποια ανοιχτά γεύματα μέτρησε ως «θα φαγωθούν ακόμα»
+/// ([rebalanceAssumedText]). Πριν έγραφε μόνο «η μέρα θα κλείσει στις …»· με μεσημεριανό γραμμένο αλλιώς, το βραδινό
+/// μίκραινε και ο χρήστης έτρωγε εκατοντάδες θερμίδες λιγότερο χωρίς να το ξέρει.
 Future<void> offerRebalance(BuildContext context, FoodStore food, int day, {required Meal after, DateTime Function()? clock}) async {
   final w = food.week;
   final g = HealthStore.shared?.goals;
@@ -786,6 +790,7 @@ Future<void> offerRebalance(BuildContext context, FoodStore food, int day, {requ
       title: const Text('Να προσαρμοστούν τα επόμενα γεύματα;'),
       content: Text(
         'Ως τώρα σήμερα: ${thousands(t.shownKcal)} από ${thousands(g.kcal)} kcal.\n\n'
+        '${rebalanceAssumedText(r.assumed)}'
         '${[for (final (m, n, a, b) in r.changes) '${mealLabel(m)}$dotJoin$n: ${thousands(a)} → ${thousands(b)} kcal'].join('\n')}\n\n'
         'Η μέρα θα κλείσει στις ${thousands(r.dayKcal)} kcal (στόχος ${thousands(g.kcal)}), πρωτεΐνη '
         '${r.proteinBefore.round()} → ${r.proteinAfter.round()} g (στόχος ${g.protein}).'
@@ -876,4 +881,16 @@ class AiReadyCard extends StatelessWidget {
       },
     );
   }
+}
+
+
+/// Η παράγραφος του «Να προσαρμοστούν τα επόμενα γεύματα;» για τα ανοιχτά γεύματα που μπήκαν στο σύνολο της μέρας.
+/// Κενό όταν δεν υπάρχει κανένα. «Σημείωσέ το στο Πρόγραμμα» και όχι «πάτα Το έφαγα»: όποιος το έχει ήδη γράψει με
+/// «+ Φαγητό» θέλει «Έφαγα κάτι άλλο», αλλιώς το γράφει δεύτερη φορά.
+String rebalanceAssumedText(List<(Meal, String, double)> assumed) {
+  if (assumed.isEmpty) return '';
+  final list = [for (final (m, n, k) in assumed) '${mealLabel(m)}$dotJoin$n (${thousands(k)} kcal)'].join(', ');
+  final one = assumed.length == 1;
+  return 'Στο σύνολο μετρά και ό,τι δεν έχεις σημειώσει ακόμα: $list. '
+      'Αν ${one ? 'το' : 'τα'} έφαγες ήδη, πάτα «Όχι» και σημείωσέ ${one ? 'το' : 'τα'} πρώτα στο «Πρόγραμμα».\n\n';
 }

@@ -15,6 +15,7 @@ import 'package:ygeia_forma/food/week.dart';
 import 'package:ygeia_forma/food/week_auto.dart' show portionRange;
 import 'package:ygeia_forma/food/week_calc.dart';
 import 'package:ygeia_forma/history.dart' show dateKey;
+import 'package:ygeia_forma/pages/ai_week.dart' show rebalanceAssumedText;
 
 import 'sample_food.dart';
 
@@ -126,6 +127,7 @@ void main() {
       expect(after, greaterThan(before), reason: 'μένουν θερμίδες για το βράδυ: η μερίδα μεγαλώνει, δεν μικραίνει');
       // Η μέρα = ό,τι γράφτηκε + το νέο βραδινό, χωρίς το μεσημεριανό δεύτερη φορά.
       expect(r.dayKcal, closeTo(t.kcal + after, 1.0));
+      expect(r.assumed, isEmpty, reason: 'το μεσημεριανό γράφτηκε ήδη: τίποτα δεν μετριέται ως «θα φαγωθεί ακόμα»');
       final range = portionRange(s, _byKey(s, 'solomos'))!;
       expect(after, inInclusiveRange(range.lo - 10, range.hi + 10));
     });
@@ -144,6 +146,27 @@ void main() {
       final r = rebalanceDay(s, w, 0, eaten: t.kcal, eatenProtein: t.protein, target: 2150, after: Meal.snack, now: _monday);
       expect(r, isNotNull);
       expect(r!.dayKcal, closeTo(t.kcal + r.changes.single.$4, 1.0));
+      expect(r.assumed, isEmpty);
+    });
+
+    test('K7B-02 (K2-R-08): ο διάλογος λέει ποιο ανοιχτό γεύμα μέτρησε ως «θα φαγωθεί ακόμα» (πριν: μόνο το σύνολο)', () {
+      // Μόνο ένας καφές με γάλα στο μεσημέρι: η θέση του μεσημεριανού μένει ανοιχτή και μπαίνει στο σύνολο της μέρας.
+      final s = _store(entries: [_entry(_yogurt, 50, Meal.lunch), ...snackEntries]);
+      final w = plan(s);
+      final t = Totals(s.entriesFor(_monday));
+      final r = rebalanceDay(s, w, 0, eaten: t.kcal, eatenProtein: t.protein, target: 2150, after: Meal.snack, now: _monday)!;
+      expect(r.assumed, hasLength(1));
+      final (meal, name, kcal) = r.assumed.single;
+      expect((meal, name), (Meal.lunch, _byKey(s, 'kotopoulo-ryzi').name));
+      expect(kcal, closeTo(700, 30));
+      // Το σύνολο που γράφει ο διάλογος περιέχει αυτό το γεύμα: ακριβώς αυτό λέει η νέα παράγραφος.
+      expect(r.dayKcal, closeTo(t.kcal + kcal + r.changes.single.$4, 1.0));
+      final text = rebalanceAssumedText(r.assumed);
+      expect(text, startsWith('Στο σύνολο μετρά και ό,τι δεν έχεις σημειώσει ακόμα: Μεσημέρι'));
+      expect(text, contains(' kcal). Αν το έφαγες ήδη, πάτα «Όχι» και σημείωσέ το πρώτα στο «Πρόγραμμα».'));
+      expect(rebalanceAssumedText(const []), '');
+      expect(rebalanceAssumedText(const [(Meal.lunch, 'Φακές', 860.0), (Meal.snack, 'Γιαούρτι', 450.0)]),
+          contains('(450 kcal). Αν τα έφαγες ήδη, πάτα «Όχι» και σημείωσέ τα πρώτα'));
     });
   });
 

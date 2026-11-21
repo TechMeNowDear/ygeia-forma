@@ -2063,6 +2063,7 @@ Map<String, Object?> _aiGolden() {
       'dayKcal': r.dayKcal,
       'proteinBefore': r.proteinBefore,
       'proteinAfter': r.proteinAfter,
+      'assumed': [for (final a in r.assumed) '${a.$1.name} ${a.$2}: ${_n1(a.$3)}'],
     };
   });
 

@@ -341,6 +341,7 @@ class _OuraNightCard extends StatelessWidget {
     // Νύχτα σε κομμάτια (ως 4 ώρες κενό): μετρούν όλα μαζί, το κενό όχι (δεύτερος γύρος ελέγχου, U12).
     final parts = night.counted;
     final minutes = night.nightMinutes;
+    final pieceShown = pieceMinutesShown([for (final x in parts) x.total], minutes);
     Widget clock(String label, String v, {String? note}) => Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,8 +501,9 @@ class _OuraNightCard extends StatelessWidget {
           ],
           if (parts.length > 1) ...[
             const Hairline(vertical: 12),
-            for (final x in parts)
-              InfoRow('Κομμάτι ${hm(x.wallStart)}–${hm(x.wallEnd)}', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+            // K7A-15: τα λεπτά των κομματιών αθροίζουν στον μεγάλο αριθμό της κάρτας ([pieceMinutesShown]).
+            for (final (i, x) in parts.indexed)
+              InfoRow('Κομμάτι ${hm(x.wallStart)}–${hm(x.wallEnd)}', pieceShown[i] == null ? '—' : hoursMinutes(pieceShown[i]!)),
             // Round 1 (U2a-19): χωρίς κουκκίδα, στοιχισμένο με τις γραμμές «Κομμάτι» (με την κουκκίδα έσπαγε σε δύο γραμμές).
             InfoRow(
               'Κενό ανάμεσα (δεν μετρά)',

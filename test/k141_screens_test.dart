@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/history.dart' show K;
+import 'package:ygeia_forma/oura/oura_model.dart' show pieceMinutesShown;
 import 'package:ygeia_forma/pages/info_sheet.dart';
 import 'package:ygeia_forma/pages/vitals_page.dart';
 import 'package:ygeia_forma/reference.dart';
@@ -76,6 +77,21 @@ void main() {
     await t.tap(find.byKey(const ValueKey('tab-Σάκχαρο')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('vital-add')), findsOneWidget);
+  });
+
+  // ------------------------------------------------------------------------------------------------------- K7A-15
+  test('K7A-15: τα κομμάτια της νύχτας αθροίζουν στον μεγάλο αριθμό (πριν: 1 λεπτό διαφορά από το στρογγύλεμα)', () {
+    // 5.429 s + 8.669 s = 14.098 s → νύχτα 235 λεπτά. Πριν: «1 ώρα 30» + «2 ώρες 24» = 234 κάτω από «3 ώρες 55».
+    expect(pieceMinutesShown([5429, 8669], 235), [90, 145]);
+    expect(pieceMinutesShown([8669, 5429], 235), [145, 90], reason: 'το μεγαλύτερο κομμάτι παίρνει τη διαφορά, όπου κι αν είναι');
+    // Όταν ήδη συμφωνούν, τίποτα δεν αλλάζει.
+    expect(pieceMinutesShown([5400, 9000], 240), [90, 150]);
+    expect(pieceMinutesShown([3630, 3630, 3630], 182), [60, 61, 61], reason: '3 × 60,5 λεπτά = 181,5 → 182· όχι 61 + 61 + 61 = 183');
+    // Κομμάτι χωρίς διάρκεια, νύχτα χωρίς διάρκεια, ή διαφορά που δεν είναι στρογγύλεμα: όπως είναι.
+    expect(pieceMinutesShown([5429, null], 235), [90, null]);
+    expect(pieceMinutesShown([5429, 8669], null), [90, 144]);
+    expect(pieceMinutesShown([5429, 8669], 300), [90, 144]);
+    expect(pieceMinutesShown(const [], 0), isEmpty);
   });
 
   // ------------------------------------------------------------------------------------------------------- K7B
