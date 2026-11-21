@@ -324,7 +324,7 @@ class Plan(
      * Τα λεπτά της αερόβιας [c] τη μέρα [day] ([planMinutes]): της εβδομάδας του προγράμματος που τρέχει ΣΗΜΕΡΑ, και αν το
      * κινητό δεν άνοιξε μέσα σε αυτήν. Η μέρα έναρξης μέσα στο «cardio», αν υπάρχει, αλλιώς του προγράμματος.
      */
-    fun cardioMinutes(c: CardioT, day: java.time.LocalDate = java.time.LocalDate.now()): Int =
+    fun cardioMinutes(c: CardioT, day: java.time.LocalDate = trainingToday()): Int =
         planMinutes(c.minutes, c.plan, c.from ?: from, day)
 
     /** Η προπόνηση μιας μέρας (για να είναι σωστή και αν το κινητό δεν άνοιξε σήμερα). */
@@ -337,7 +337,8 @@ class Plan(
      */
     fun forDay(day: java.time.LocalDate): WorkoutT? = if (from != null && day < from) null else forWeekday(day.dayOfWeek.value)
 
-    val todayWorkout: WorkoutT? get() = forDay(java.time.LocalDate.now())
+    /** Α13 (21/11): η μέρα της προπόνησης αλλάζει στις 04:00, όπως στο κινητό ([trainingToday]). */
+    val todayWorkout: WorkoutT? get() = forDay(trainingToday())
 
     /**
      * Το περπάτημα (αερόβια) του προγράμματος τη μέρα που ξεκίνησε μια άσκηση στις [startedAt] (ms), ή null (έλεγχος 13/11,
@@ -348,9 +349,9 @@ class Plan(
         return w?.takeIf { it.isCardio }
     }
 
-    /** Η μέρα (ημερολογίου) της στιγμής [at] (ms)· χωρίς ώρα ([at] ≤ 0): σήμερα. */
+    /** Η μέρα προπόνησης της στιγμής [at] (ms)· χωρίς ώρα ([at] ≤ 0): σήμερα. Α13 (21/11): αλλάζει στις 04:00 ([trainingDate]). */
     fun dayOf(at: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): java.time.LocalDate =
-        if (at > 0) java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate() else java.time.LocalDate.now(zone)
+        if (at > 0) trainingDate(java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDateTime()) else trainingToday(zone)
 
     companion object {
         fun parse(text: String): Plan? = try {
@@ -1941,6 +1942,19 @@ fun joinAllowedWhileRunning(running: String?, kind: String, fromPhone: Boolean, 
  * Έλεγχος 14/11, round 8 (R8-U3-06): πριν έμενε όσο ζούσε η εφαρμογή, και τις επόμενες μέρες το πρώτο κουμπί ήταν η χθεσινή
  * επιλογή (σε μέρα περπατήματος χανόταν και η αρχική του περπατήματος).
  */
+/** Α13 (απόφαση χρήστη 21/11): η ώρα που αλλάζει η μέρα της προπόνησης, όπως στο κινητό (training_day.dart). */
+const val TRAINING_DAY_START_HOUR = 4
+
+/** Η μέρα της προπόνησης της στιγμής [t]: 00:00–03:59 ανήκει στην προηγούμενη μέρα (όπως το trainingDay του κινητού). */
+fun trainingDate(t: java.time.LocalDateTime): java.time.LocalDate {
+    val midnight = t.toLocalTime() == java.time.LocalTime.MIDNIGHT
+    return if (t.hour < TRAINING_DAY_START_HOUR && !midnight) t.toLocalDate().minusDays(1) else t.toLocalDate()
+}
+
+/** Η σημερινή μέρα προπόνησης ([trainingDate]). */
+fun trainingToday(zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): java.time.LocalDate =
+    trainingDate(java.time.LocalDateTime.now(zone))
+
 fun chosenToday(chosen: String?, chosenDay: java.time.LocalDate?, today: java.time.LocalDate): String? =
     if (chosen != null && chosenDay == today) chosen else null
 

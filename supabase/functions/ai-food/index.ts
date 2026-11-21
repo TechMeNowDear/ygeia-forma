@@ -9,6 +9,9 @@
 // - Δεν γράφει ποτέ στα logs το περιεχόμενο (ερωτήσεις, απαντήσεις, κλειδιά): μόνο το είδος του σφάλματος.
 // - Για όριο δαπάνης: κλειδί API σε ξεχωριστό Workspace του Claude Console, με όριο δαπάνης στο Workspace.
 // Ανάπτυξη: supabase functions deploy ai-food --no-verify-jwt (ο έλεγχος γίνεται με το APP_TOKEN).
+// Α19 (απόφαση χρήστη 21/11): το μοντέλο που καλείται διαβάζεται από τα Secrets (AI_MODEL_PLAN, AI_MODEL_RECIPE), με
+// προεπιλογή τα σημερινά. Όταν η Anthropic αποσύρει ένα μοντέλο, αλλάζει ένα Secret στο Supabase, χωρίς νέα έκδοση της
+// εφαρμογής. Η εφαρμογή στέλνει πάντα το ίδιο όνομα: εδώ είναι μόνο ο «ρόλος» (πρόγραμμα ή συνταγή).
 
 const MAX_BODY = 200_000; // bytes
 const MAX_SYSTEM = 100_000; // χαρακτήρες
@@ -19,10 +22,21 @@ const TIMEOUT_MS = 125_000; // το Supabase κόβει στα 150″· περι
 // Τα μοντέλα και πόσο σκέφτονται (τεκμηρίωση effort, 19/11/2026):
 // - Opus 5.5: η σκέψη είναι πάντα ανοιχτή· «low» για να χωράει στον χρόνο και στο όριο.
 // - Sonnet 5.5: χωρίς σκέψη πριν την απάντηση («between_tools»), effort «medium».
-const MODELS: Record<string, Record<string, unknown>> = {
-  "claude-opus-5-5": { output_config: { effort: "low" } },
-  "claude-sonnet-5-5": { thinking: { type: "between_tools" }, output_config: { effort: "medium" } },
+const MODELS: Record<string, { secret: string; config: Record<string, unknown> }> = {
+  "claude-opus-5-5": { secret: "AI_MODEL_PLAN", config: { output_config: { effort: "low" } } },
+  "claude-sonnet-5-5": { secret: "AI_MODEL_RECIPE", config: { thinking: { type: "between_tools" }, output_config: { effort: "medium" } } },
 };
+
+// Το μοντέλο που καλείται για τον ρόλο [role]: το Secret, αν μοιάζει με όνομα μοντέλου του Claude, αλλιώς ο ίδιος ο ρόλος.
+// Λάθος τιμή στο Secret δεν σταματά το AI: γυρίζει στο σημερινό και το log το λέει (χωρίς την τιμή).
+const MODEL_NAME = /^claude-[a-z0-9][a-z0-9.-]{0,62}$/;
+function realModel(role: string): string {
+  const v = (Deno.env.get(MODELS[role].secret) ?? "").trim();
+  if (v.length === 0) return role;
+  if (MODEL_NAME.test(v)) return v;
+  console.log(`ai-food: setup-model ${MODELS[role].secret}`);
+  return role;
+}
 
 const enc = new TextEncoder();
 
@@ -53,7 +67,7 @@ function readAsk(j: unknown): { model: string; max: number; system: string; mess
   if (typeof j !== "object" || j === null) return null;
   const o = j as Record<string, unknown>;
   const model = o.model, max = o.max_tokens, system = o.system, messages = o.messages;
-  if (typeof model !== "string" || !(model in MODELS)) return null;
+  if (typeof model !== "string" || !Object.hasOwn(MODELS, model)) return null;
   if (typeof max !== "number" || !Number.isInteger(max) || max < 1 || max > MAX_TOKENS) return null;
   if (typeof system !== "string" || system.trim().length === 0 || system.length > MAX_SYSTEM) return null;
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) return null;
@@ -127,9 +141,9 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: ask.model,
+        model: realModel(ask.model),
         max_tokens: ask.max,
-        ...MODELS[ask.model],
+        ...MODELS[ask.model].config,
         // Το σταθερό κομμάτι (λίστα τροφίμων) μένει στην cache του API για λίγα λεπτά: γρηγορότερες οι επόμενες συνταγές.
         system: [{ type: "text", text: ask.system, cache_control: { type: "ephemeral" } }],
         messages: ask.messages,

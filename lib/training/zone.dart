@@ -11,6 +11,7 @@ library;
 import 'dart:math' as math;
 
 import 'session.dart';
+import 'training_day.dart';
 
 const zoneLoPct = 0.40;
 const zoneHiPct = 0.59;
@@ -210,12 +211,15 @@ class WalkZone {
 /// Η εβδομάδα (Δευτέρα–Κυριακή) της [now]: λεπτά μέτριας άσκησης από τα περπατήματα (στη ζώνη ή πιο πάνω), μέρες με
 /// βάρη, και περπατήματα που δεν μετρούν (χωρίς παλμούς ή ζώνη).
 ({int moderateMin, int strengthDays, int unmeasuredWalks}) weekMovement(Iterable<Session> sessions, DateTime now) {
-  final from = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+  // Α13 (21/11): μέρες προπόνησης ([trainingDay]): ένα περπάτημα στις 00:30 της Δευτέρας μετρά στην εβδομάδα που τελειώνει.
+  final today = trainingDay(now);
+  final from = DateTime(today.year, today.month, today.day - (today.weekday - 1));
   final to = DateTime(from.year, from.month, from.day + 7);
   var sec = 0, unmeasured = 0;
   final strength = <String>{};
   for (final s in sessions) {
-    if (!s.finished || s.start.isBefore(from) || !s.start.isBefore(to)) continue;
+    final day = trainingDay(s.start);
+    if (!s.finished || day.isBefore(from) || !day.isBefore(to)) continue;
     if (s.isCardio) {
       if (s.activity != null && s.activity != 'walk') continue;
       final z = s.zoneTimes;
@@ -225,7 +229,7 @@ class WalkZone {
         sec += z[1] + z[2];
       }
     } else if (!s.stopped && s.setsDone > 0) {
-      strength.add('${s.start.year}-${s.start.month}-${s.start.day}');
+      strength.add('${day.year}-${day.month}-${day.day}');
     }
   }
   return (moderateMin: (sec / 60).round(), strengthDays: strength.length, unmeasuredWalks: unmeasured);

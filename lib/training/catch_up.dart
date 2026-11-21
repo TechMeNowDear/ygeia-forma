@@ -13,17 +13,20 @@ library;
 
 import 'program.dart';
 import 'session.dart';
+import 'training_day.dart';
 
 /// Ως πόσες μέρες πίσω ψάχνει χαμένη προπόνηση.
 const catchUpDays = 2;
 
-DateTime _day(DateTime t) => DateTime(t.year, t.month, t.day);
+// Α13 (21/11): μέρες προπόνησης ([trainingDay]): η μέρα αλλάζει στις 04:00. Μια προπόνηση στις 00:30 του Σαββάτου είναι
+// της Παρασκευής.
+DateTime _day(DateTime t) => trainingDay(t);
 
 bool _strengthOn(Iterable<Session> sessions, DateTime day) {
   // Έλεγχος 20/11 (K6C-05): η επόμενη ΗΜΕΡΟΛΟΓΙΑΚΗ μέρα, όχι «+24 ώρες»: στις αλλαγές ώρας η μέρα έχει 25 ή 23 ώρες, και
   // μια προπόνηση στις 23:30 της Κυριακής 31/10/2027 δεν μετρούσε ως Κυριακής («χαμένη προπόνηση» που είχε γίνει).
   final a = _day(day), b = DateTime(a.year, a.month, a.day + 1);
-  return sessions.any((s) => s.finished && !s.isCardio && !s.start.isBefore(a) && s.start.isBefore(b));
+  return sessions.any((s) => s.finished && !s.isCardio && !_day(s.start).isBefore(a) && _day(s.start).isBefore(b));
 }
 
 bool _plannedStrength(Program p, DateTime day) {
@@ -45,7 +48,7 @@ bool _plannedStrength(Program p, DateTime day) {
     final w = p.forDay(d);
     if (w == null || w.isCardio) continue;
     // Έγινε εκείνη τη μέρα ή μετά (π.χ. την έκανες ήδη την επόμενη): τίποτα χαμένο.
-    final done = sessions.any((s) => s.finished && !s.isCardio && s.workout == w.id && !s.start.isBefore(d));
+    final done = sessions.any((s) => s.finished && !s.isCardio && s.workout == w.id && !_day(s.start).isBefore(d));
     if (done) return null;
     // Έγινε άλλη προπόνηση με βάρη στη θέση της (την ίδια μέρα): δεν χάθηκε.
     if (_strengthOn(sessions, d)) return null;

@@ -69,7 +69,8 @@ void main() {
     // Χωρίς καμία προπόνηση την Κυριακή: η χαμένη προτείνεται κανονικά.
     final m = missedToCatchUp(p, const [], tuesday);
     expect((m?.workout.id, m?.missed), ('P2', DateTime(2027, 10, 31)));
-    // Και μια προπόνηση στις 00:30 της Κυριακής (η μέρα αρχίζει κανονικά στα μεσάνυχτα).
+    // Μια προπόνηση στις 00:30 της Κυριακής: από την #151 (Α13, απόφαση χρήστη 21/11) η μέρα της προπόνησης αλλάζει στις
+    // 04:00, άρα είναι του Σαββάτου. Η Π2 της Κυριακής δεν έγινε: προτείνεται κανονικά.
     final early = Session(
       id: 's2',
       workout: 'K2',
@@ -78,7 +79,18 @@ void main() {
       start: DateTime(2027, 10, 31, 0, 30),
       end: DateTime(2027, 10, 31, 1, 20),
     );
-    expect(missedToCatchUp(p, [early], tuesday), isNull);
+    final e = missedToCatchUp(p, [early], tuesday);
+    expect((e?.workout.id, e?.missed), ('P2', DateTime(2027, 10, 31)));
+    // Και στις 04:30 της Κυριακής: της Κυριακής, όπως πριν.
+    final sunday = Session(
+      id: 's3',
+      workout: 'K2',
+      name: 'K2',
+      programId: 'p1',
+      start: DateTime(2027, 10, 31, 4, 30),
+      end: DateTime(2027, 10, 31, 5, 20),
+    );
+    expect(missedToCatchUp(p, [sunday], tuesday), isNull);
   });
 
   // ------------------------------------------------------------------------------------------------------- K6C-06

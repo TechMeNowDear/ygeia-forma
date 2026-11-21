@@ -172,7 +172,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
     var chosen: String? = null
         set(v) {
             field = v
-            chosenDay = if (v == null) null else java.time.LocalDate.now()
+            chosenDay = if (v == null) null else trainingToday()
         }
 
     /** Η μέρα που διαλέχτηκε το [chosen] (αλλάζει μόνο με αυτό· εδώ και στις δοκιμές). */
@@ -782,7 +782,7 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
         val strength = plan?.workouts?.filter { !it.isCardio && it.items.isNotEmpty() }.orEmpty()
         val today = plan?.todayWorkout
         // R8-U3-06: η επιλογή του τρίτου κουμπιού μόνο τη μέρα που έγινε.
-        val pick = chosenToday(chosen, chosenDay, java.time.LocalDate.now())
+        val pick = chosenToday(chosen, chosenDay, trainingToday())
         val shown = plan?.workout(pick) ?: today?.takeIf { !it.isCardio } ?: strength.firstOrNull()
         // Η κεφαλίδα «Σήμερα · όριο …» γράφεται (round 9, R9-U3-01: τότε η μέρα ξεκούρασης δεν ξαναγράφει «ΣΗΜΕΡΑ» από κάτω).
         val header = !upd && (plan != null || Repo.knownLimit != null)
