@@ -212,6 +212,7 @@ class FoodBridge(
                     activity.applicationContext, at,
                     call.argument<String>("title") ?: "Φαγητό σήμερα",
                     call.argument<String>("text") ?: "",
+                    call.argument<String>("next"),
                 )
                 result.success(JSONObject().put("ok", ok).put("canNotify", FoodReminder.canNotify(activity)).toString())
             }

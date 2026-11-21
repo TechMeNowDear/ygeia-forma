@@ -106,7 +106,14 @@ class FoodReminderLink with WidgetsBindingObserver {
     final key = '${r.at.millisecondsSinceEpoch}|${r.text}|${dateKey(now)}';
     if (key == _last) return;
     _last = key;
-    await _invoke('remindSet', {'at': r.at.millisecondsSinceEpoch, 'title': remindTitle, 'text': r.text});
+    // Έλεγχος 20/11 (K6C-02): «next» = το κείμενο της επόμενης μέρας, αν η εφαρμογή δεν ανοίξει ως τότε (τότε δεν θα
+    // έχει γραφτεί τίποτα): το Android ξαναβάζει μόνο του την υπενθύμιση όταν χτυπήσει (FoodReminder.kt).
+    await _invoke('remindSet', {
+      'at': r.at.millisecondsSinceEpoch,
+      'title': remindTitle,
+      'text': r.text,
+      'next': reminderText(0, target()),
+    });
   }
 
   static Future<Map<String, dynamic>> _invoke(String m, [Map<String, Object>? args]) async {

@@ -209,12 +209,12 @@ void main() {
 
   test('Αποφάσεις 20/11: το AI μαθαίνει τα όρια της μέρας και τα κορεσμένα/αλάτι των υλικών· ποτέ δεδομένα υγείας', () {
     final s = store();
-    const limits = (kcal: 2150, protein: 150, satMax: 14.3, fiber: 30, salt: 5.0);
+    const limits = (kcal: 2300, protein: 140, satMax: 15.3, fiber: 30, salt: 5.0);
     final sys = aiSystem(s, aiAllowedIds(s), Kitchen.initial(), limits: limits);
-    expect(sys, contains('Κορεσμένα λιπαρά έως 14,3 g τη μέρα'));
+    expect(sys, contains('Κορεσμένα λιπαρά έως 15,3 g τη μέρα'));
     expect(sys, contains('Αλάτι κάτω από 5,0 g τη μέρα'));
     expect(sys, contains('Φυτικές ίνες τουλάχιστον 30 g'));
-    expect(sys, contains('Πρωτεΐνη περίπου 150 g'));
+    expect(sys, contains('Πρωτεΐνη περίπου 140 g'));
     // Το ελαιόλαδο (~14 g κορεσμένα/100 g) και η φέτα (αλάτι) με τους αριθμούς της βάσης.
     final f = {for (final x in basicFoods()) x.id: x};
     expect(aiNutTail(f[oil]!), contains('κορ.'));
@@ -223,7 +223,7 @@ void main() {
     final oilLine = sys.split('\n').firstWhere((l) => l.contains('$oil '));
     expect(oilLine, contains(aiNutTail(f[oil]!)));
     // Η μέρα σε θερμίδες δεν γράφεται· ποτέ ύπνος, παλμοί, πίεση, σάκχαρο, Oura.
-    expect(sys, isNot(contains('2.150')));
+    expect(sys, isNot(contains('2.300')));
     for (final w in ['Oura', 'ύπνος', 'παλμ', 'πίεση', 'σάκχαρ']) {
       expect(sys.contains(w), isFalse, reason: w);
     }

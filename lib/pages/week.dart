@@ -91,7 +91,14 @@ class SlotActions {
       return;
     }
     final grp = out.first.dish?.grp;
-    await _set(s.copyWith(state: SlotState.ate, grp: grp));
+    // Έλεγχος 20/11 (K6S-07): το φαγητό γράφτηκε στο ημερολόγιο· αν το πρόγραμμα δεν γραφτεί (π.χ. γεμάτος χώρος), η θέση
+    // φαίνεται ακόμα ανοιχτή και ένα δεύτερο «Το έφαγα» θα το έγραφε δύο φορές. Πριν, το μήνυμα έλεγε απλώς «Γράφτηκε».
+    if (!await _set(s.copyWith(state: SlotState.ate, grp: grp))) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(weekSlotNotSavedText(d.name))));
+      return;
+    }
     final kcal = Totals(out).shownKcal;
     messenger
       ..hideCurrentSnackBar()
@@ -1043,3 +1050,7 @@ class _AutoWeekSheetState extends State<AutoWeekSheet> {
     );
   }
 }
+
+/// K6S-07: το «Το έφαγα» έγραψε το φαγητό στο ημερολόγιο, αλλά η θέση του προγράμματος δεν αποθηκεύτηκε.
+String weekSlotNotSavedText(String dish) =>
+    'Το «$dish» γράφτηκε στο ημερολόγιο, αλλά το πρόγραμμα δεν ενημερώθηκε. Μην πατήσεις ξανά «Το έφαγα»: θα γραφτεί δύο φορές.';

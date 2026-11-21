@@ -15,6 +15,7 @@ import 'package:ygeia_forma/oura/oura_api.dart';
 import 'package:ygeia_forma/oura/oura_store.dart';
 import 'package:ygeia_forma/pages/checkin_card.dart';
 import 'package:ygeia_forma/pages/prefs_notice.dart';
+import 'package:ygeia_forma/pages/settings.dart' show historyRestoreSummary;
 import 'package:ygeia_forma/plan_file.dart';
 import 'package:ygeia_forma/sources.dart';
 import 'package:ygeia_forma/theme.dart';
@@ -102,6 +103,9 @@ class _Phone {
   final days = <String, Map<String, double>>{};
   var saveDaysCalls = 0;
 
+  /// false: η εγγραφή ημερών ιστορικού αποτυγχάνει (π.χ. γεμάτος χώρος) και τίποτα δεν γράφεται.
+  bool saveDaysOk = true;
+
   int count(String method) => calls.where((c) => c == method).length;
 
   void install() {
@@ -130,6 +134,7 @@ class _Phone {
           });
         case 'saveDays':
           saveDaysCalls++;
+          if (!saveDaysOk) return '{"ok":false,"kind":"write"}';
           for (final row in jsonDecode(args['json'] as String) as List) {
             final r = row as Map;
             days[r['date'] as String] = {
@@ -748,6 +753,188 @@ void main() {
         expect(await s.restoreSources((plan: file(backup, 1000), log: null)), isTrue);
         expect(a.saved.last['ouraSyncedTo'], dateKey(_add(today, -1)));
         expect(a.saved.last.containsKey('ouraRefetchTo'), isFalse);
+        s.dispose();
+      });
+
+      // ------------------------------------------------------------------------------ Έλεγχος 20/11, κατηγορία 6
+      test('K6S-01: πρώτα οι πηγές, μετά το ιστορικό: οι «Παλμοί ξύπνιος» των ημερών του αντιγράφου μένουν', () async {
+        final backup = SourcePlan([SourceEra(Source.oura, _add(today, -200))]);
+        // Μέρα έξω από τις 30 της κανονικής ανάγνωσης και χωρίς ζύγιση στο δείγμα.
+        final day = dateKey(_add(today, -160));
+        final hist = {
+          day: {ouraKeys[K.sleepMin]!: 300.0, K.dayHr: 80.0, K.restHr: 62.0, K.steps: 7000.0},
+        };
+        final a = _Phone(now)..load = okPrefs();
+        final s = await boot(a);
+        // Η σειρά της οθόνης (settings.dart): πηγές, μετά ιστορικό.
+        expect(await s.restoreSources((plan: file(backup, 1000), log: null)), isTrue);
+        final r = await s.importHistoryWhy(hist, version: historyRulesVersion);
+        expect((r.added, r.existing, r.problem), (1, 0, HistoryImportProblem.none));
+        expect(s.history[day], hist[day]);
+        expect(a.days[day], hist[day], reason: 'γραμμένη και στο κινητό');
+        s.dispose();
+        // Η παλιά σειρά (ιστορικό, μετά πηγές): ο κανόνας C11 έσβηνε τους παλμούς μέρας από τη μέρα που μόλις είχε μπει.
+        final b = _Phone(now)..load = okPrefs();
+        final s2 = await boot(b);
+        expect(await s2.importHistory(hist, version: historyRulesVersion), 1);
+        expect(await s2.restoreSources((plan: file(backup, 1000), log: null)), isTrue);
+        expect(s2.history[day]!.containsKey(K.dayHr), isFalse, reason: 'γι\' αυτό η οθόνη βάζει πρώτα τις πηγές');
+        s2.dispose();
+        // Και η ίδια η οθόνη: η γραμμή των πηγών πριν από τη γραμμή του ιστορικού.
+        final src = File('lib/pages/settings.dart').readAsStringSync();
+        final iSources = src.indexOf('await widget.store.restoreSourcesWhy(');
+        final iHistory = src.indexOf('await widget.store.importHistoryWhy(');
+        expect(iSources, greaterThan(0));
+        expect(iHistory, greaterThan(iSources), reason: 'settings.dart: το ιστορικό μετά τις πηγές');
+      });
+
+      test('K6S-02: μέρα που το κινητό έχει μόνο από ζύγιση παίρνει τις υπόλοιπες τιμές της από το αντίγραφο', () async {
+        final a = _Phone(now)..load = okPrefs();
+        final s = await boot(a);
+        // Όπως σε νέο κινητό: η ανάγνωση της Samsung έγραψε κάθε μέρα με ζύγιση, όσο παλιά κι αν είναι, μόνο με τη ζύγιση.
+        final bodyOnly = [
+          for (final e in s.history.entries)
+            if (e.value.isNotEmpty && e.value.keys.every(bodyRowKeys.contains) && parseDateKey(e.key).isBefore(_add(today, -40)))
+              e.key,
+        ]..sort();
+        expect(bodyOnly, isNotEmpty, reason: 'το δείγμα έχει ζυγίσεις παλιότερες από 30 μέρες');
+        final weighDay = bodyOnly.last;
+        final mine = Map.of(s.history[weighDay]!);
+        final fullDay = dateKey(_add(today, -3));
+        final full = Map.of(s.history[fullDay]!);
+        expect(full.keys.any((k) => !bodyRowKeys.contains(k)), isTrue);
+        final missing = dateKey(_add(today, -160));
+        final r = await s.importHistoryWhy({
+          weighDay: {K.weight: 99.5, K.smm: 36.0, K.inbody: 1, K.steps: 7000, K.dayHr: 80, ouraKeys[K.sleepMin]!: 300},
+          fullDay: {K.steps: 1, K.dayHr: 77},
+          missing: {K.steps: 5000},
+        }, version: historyRulesVersion);
+        expect((r.added, r.existing, r.problem), (2, 1, HistoryImportProblem.none));
+        // Οι τιμές ζύγισης ΟΛΕΣ του κινητού (ποτέ δύο ζυγίσεις ανακατεμένες)· οι υπόλοιπες από το αντίγραφο.
+        expect(s.history[weighDay], {...mine, K.steps: 7000.0, K.dayHr: 80.0, ouraKeys[K.sleepMin]!: 300.0});
+        expect(s.history[weighDay]![K.weight], mine[K.weight]);
+        expect(s.history[fullDay], full, reason: 'μέρα με άλλες τιμές στο κινητό: μένει όπως είναι');
+        expect(s.history[missing], {K.steps: 5000.0});
+        expect(a.days[weighDay]![K.dayHr], 80.0, reason: 'γραμμένη και στο κινητό');
+        s.dispose();
+        // Η καθαρή συνάρτηση: μέρα με και άλλες τιμές, ή αντίγραφο που έχει μόνο ζύγιση → τίποτα.
+        expect(historyDayOverBodyOnly({K.weight: 81.9, K.steps: 10}, {K.dayHr: 80}), isNull);
+        expect(historyDayOverBodyOnly({K.weight: 81.9}, {K.weight: 83.0, K.fatPct: 25}), isNull);
+        expect(historyDayOverBodyOnly({K.weight: 81.9, K.inbody: 1}, {K.weight: 83.0, K.fatPct: 25, K.dayHr: 80}),
+            {K.dayHr: 80.0, K.weight: 81.9, K.inbody: 1.0});
+      });
+
+      test('K6S-02 / K6S-05: η σύνοψη λέει και όσα ΔΕΝ μπήκαν (πριν: σιωπή)', () async {
+        final a = _Phone(now)..load = okPrefs();
+        final s = await boot(a);
+        final day = dateKey(_add(today, -160));
+        final old = await s.importHistoryWhy({day: {K.steps: 5000}}, version: historyRulesVersion - 1);
+        expect((old.added, old.problem), (0, HistoryImportProblem.otherRules));
+        expect(s.history.containsKey(day), isFalse);
+        expect(await s.importHistory({day: {K.steps: 5000}}, version: historyRulesVersion - 1), 0, reason: 'όπως πριν');
+        final newer = await s.importHistoryWhy({day: {K.steps: 5000}}, version: historyRulesVersion + 1);
+        expect(newer.problem, HistoryImportProblem.otherRules);
+        s.dispose();
+        expect(historyRestoreSummary((added: 17, existing: 43, problem: HistoryImportProblem.none)), [
+          '17 μέρες ιστορικού μπήκαν από το αντίγραφο.',
+          '43 μέρες ιστορικού υπήρχαν ήδη στο κινητό και έμειναν όπως είναι.',
+        ]);
+        expect(historyRestoreSummary((added: 0, existing: 0, problem: HistoryImportProblem.otherRules)).single,
+            contains('είναι από άλλη έκδοση κανόνων και δεν μπήκε'));
+        expect(historyRestoreSummary((added: 0, existing: 0, problem: HistoryImportProblem.writeFailed)).single,
+            'Το ιστορικό ημερών του αντιγράφου δεν γράφτηκε· δοκίμασε ξανά.');
+        expect(historyRestoreSummary((added: 0, existing: 0, problem: HistoryImportProblem.none)), isEmpty);
+      });
+
+      test('K6S-02: όσο κρατά η «Επαναφορά από αντίγραφο» μετά από «Διαγραφή όλων», καμία αυτόματη ανάγνωση', () async {
+        final a = _Phone(now)..load = okPrefs();
+        final s = app(a)..holdAutoRefresh = true;
+        await s.loadPrefs();
+        await s.start();
+        await settle(s);
+        expect(s.data, isNull, reason: 'η ανάγνωση της Samsung περιμένει');
+        expect(a.saveDaysCalls, 0, reason: 'τίποτα στο ιστορικό πριν από την επαναφορά');
+        final day = dateKey(_add(today, -3));
+        final r = await s.importHistoryWhy({day: {K.steps: 5000, K.dayHr: 80}}, version: historyRulesVersion);
+        expect((r.added, r.existing), (1, 0), reason: 'άδειο κινητό: και οι πρόσφατες μέρες μπαίνουν ολόκληρες');
+        // Η ρητή ανανέωση του χρήστη (τράβηγμα προς τα κάτω) δεν κρατιέται· το τέλος της επαναφοράς διαβάζει.
+        s.releaseAutoRefresh();
+        await settle(s);
+        expect(s.holdAutoRefresh, isFalse);
+        expect(s.data, isNotNull);
+        s.dispose();
+      });
+
+      test('K6C-04: κλειδιά-ημερομηνίες που δεν είναι ημερομηνίες = «δεν υπάρχει», και η ανανέωση τελειώνει πάντα', () async {
+        final p = Prefs.fromJson({
+          'ouraSyncedTo': 'x',
+          'recentTo': '2026-13-99',
+          'gapFrom': '2026-11-20',
+          'gapTo': 20261120,
+          'backfillFrom': '',
+          'ouraRefetchTo': '2026-11-31',
+          'emptyFrom': '2026-02-28',
+          'emptyChecked': '2026-02-30',
+        });
+        expect([p.ouraSyncedTo, p.recentTo, p.gapFrom, p.gapTo, p.backfillFrom, p.ouraRefetchTo, p.emptyFrom, p.emptyChecked],
+            [null, null, '2026-11-20', null, null, null, '2026-02-28', null]);
+        // Με χαλασμένη ημερομηνία στο αρχείο ρυθμίσεων η εφαρμογή ανοίγει και διαβάζει κανονικά (πριν: «Διαβάζω…» για πάντα).
+        final a = _Phone(now)..load = jsonEncode({'historyVersion': historyRulesVersion, 'ouraSyncedTo': 'x', 'recentTo': 'y'});
+        final s = await boot(a);
+        expect(s.loading, isFalse);
+        expect(s.data, isNotNull);
+        s.dispose();
+      });
+
+      test('K6-R-08: αποτυχία εγγραφής στην επαναφορά δεν ξεχνά μέρα ζύγισης που περίμενε ήδη να γραφτεί', () async {
+        final a = _Phone(now)..load = okPrefs();
+        final s = await boot(a);
+        final bodyOnly = [
+          for (final e in s.history.entries)
+            if (e.value.isNotEmpty && e.value.keys.every(bodyRowKeys.contains) && parseDateKey(e.key).isBefore(_add(today, -40)))
+              e.key,
+        ]..sort();
+        final weighDay = bodyOnly.last;
+        final mine = Map.of(s.history[weighDay]!);
+        // Πρώτη αποτυχία: η μέρα της ζύγισης περιμένει να γραφτεί.
+        a.saveDaysOk = false;
+        expect(await s.saveDaysNow({weighDay}), isFalse);
+        // Δεύτερη αποτυχία, στην επαναφορά: η μνήμη γυρίζει όπως ήταν…
+        final r = await s.importHistoryWhy({weighDay: {K.steps: 7000, K.dayHr: 80}}, version: historyRulesVersion);
+        expect((r.added, r.problem), (0, HistoryImportProblem.writeFailed));
+        expect(s.history[weighDay], mine);
+        // …και η μέρα περιμένει ακόμα: η επόμενη εγγραφή που πετυχαίνει τη γράφει (πριν: έβγαινε από τη λίστα αναμονής).
+        a.days.remove(weighDay);
+        a.saveDaysOk = true;
+        expect(await s.saveDaysNow(const {}), isTrue);
+        expect(a.days[weighDay], mine);
+        // Μέρα που ΔΕΝ περίμενε πριν από την αποτυχημένη επαναφορά δεν μένει στη λίστα: μνήμη και δίσκος είναι ίδια.
+        final missing = dateKey(_add(today, -160));
+        a.saveDaysOk = false;
+        final r2 = await s.importHistoryWhy({missing: {K.steps: 5000}}, version: historyRulesVersion);
+        expect(r2.problem, HistoryImportProblem.writeFailed);
+        expect(s.history.containsKey(missing), isFalse);
+        a.saveDaysOk = true;
+        final calls = a.saveDaysCalls;
+        expect(await s.saveDaysNow(const {}), isTrue);
+        expect(a.saveDaysCalls, calls, reason: 'τίποτα δεν περιμένει');
+        s.dispose();
+      });
+
+      test('K6S-02: άδεια μέρα του κινητού παίρνει μόνο όσα ΔΕΝ είναι ζύγιση· η ρητή ανανέωση διαβάζει και με κράτημα', () async {
+        // Η ζύγιση εκείνης της μέρας είχε σβηστεί επίτηδες στο κινητό: το αντίγραφο δεν τη φέρνει πίσω.
+        expect(historyDayOverBodyOnly(const {}, {K.weight: 83.0, K.fatPct: 25, K.steps: 7000}), {K.steps: 7000.0});
+        expect(historyDayOverBodyOnly(const {}, {K.weight: 83.0}), isNull);
+        final a = _Phone(now)..load = okPrefs();
+        final s = app(a)..holdAutoRefresh = true;
+        await s.loadPrefs();
+        await s.start();
+        await settle(s);
+        expect(s.data, isNull, reason: 'η αυτόματη ανάγνωση περιμένει');
+        await s.refresh();
+        await settle(s);
+        expect(s.data, isNotNull, reason: 'το τράβηγμα προς τα κάτω του χρήστη δεν κρατιέται');
+        expect(s.holdAutoRefresh, isTrue, reason: 'το κράτημα λύνεται μόνο όταν κλείσουν οι Ρυθμίσεις');
         s.dispose();
       });
     });

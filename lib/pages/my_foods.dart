@@ -330,13 +330,19 @@ Future<Food?> editMyFood(BuildContext context, FoodStore food, Food f, {String? 
     if (yes == true) {
       final n = await food.applyFoodToEntries(edited, old);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Διορθώθηκαν ${countText(n, 'καταχώριση', 'καταχωρίσεις')}.')));
+        // Έλεγχος 21/11 (K6-R-09): γράφονται ή όλες ή καμία (K6S-06)· «καμία» έλεγε «Διορθώθηκαν 0 καταχωρίσεις».
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(n == 0 ? entriesNotFixedText(edited.name) : 'Διορθώθηκαν ${countText(n, 'καταχώριση', 'καταχωρίσεις')}.')));
       }
     }
   }
   return edited;
 }
+
+/// Οι παλιές καταχωρίσεις ενός προϊόντος δεν πήραν τα νέα στοιχεία (το προϊόν το ίδιο αποθηκεύτηκε). Όταν το
+/// ξανανοίξεις και πατήσεις αποθήκευση, η ερώτηση «Και στις μέρες που το έγραψες;» βγαίνει ξανά.
+String entriesNotFixedText(String name) =>
+    'Οι καταχωρίσεις με το «$name» δεν διορθώθηκαν. Άνοιξε ξανά το προϊόν και αποθήκευσέ το για να δοκιμάσεις πάλι.';
 
 Future<void> _deleteMyFood(BuildContext context, FoodStore food, Food f) async {
   if (!await food.deleteMyFood(f) || !context.mounted) return;

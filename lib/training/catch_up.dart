@@ -20,7 +20,9 @@ const catchUpDays = 2;
 DateTime _day(DateTime t) => DateTime(t.year, t.month, t.day);
 
 bool _strengthOn(Iterable<Session> sessions, DateTime day) {
-  final a = _day(day), b = a.add(const Duration(days: 1));
+  // Έλεγχος 20/11 (K6C-05): η επόμενη ΗΜΕΡΟΛΟΓΙΑΚΗ μέρα, όχι «+24 ώρες»: στις αλλαγές ώρας η μέρα έχει 25 ή 23 ώρες, και
+  // μια προπόνηση στις 23:30 της Κυριακής 31/10/2027 δεν μετρούσε ως Κυριακής («χαμένη προπόνηση» που είχε γίνει).
+  final a = _day(day), b = DateTime(a.year, a.month, a.day + 1);
   return sessions.any((s) => s.finished && !s.isCardio && !s.start.isBefore(a) && s.start.isBefore(b));
 }
 

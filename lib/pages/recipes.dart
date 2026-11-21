@@ -682,10 +682,13 @@ class RecipeSteps extends StatelessWidget {
 /// Μαγείρεμα βήμα-βήμα: μεγάλα γράμματα, τικ σε ό,τι έγινε, χρονόμετρο ανά βήμα (μόνο όσο είναι ανοιχτή η οθόνη, που
 /// μένει αναμμένη). Τίποτα στο παρασκήνιο.
 class CookScreen extends StatefulWidget {
-  const CookScreen({super.key, required this.dish, required this.recipe, required this.food});
+  const CookScreen({super.key, required this.dish, required this.recipe, required this.food, this.now});
   final Dish dish;
   final Recipe recipe;
   final FoodStore food;
+
+  /// Η ώρα (για τις δοκιμές)· κανονικά το ρολόι του κινητού.
+  final DateTime Function()? now;
 
   static Route<void> route(Dish d, Recipe r, FoodStore food) => MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'Μαγείρεμα'),
@@ -702,6 +705,8 @@ class _CookScreenState extends State<CookScreen> {
   int? _timerStep;
   int _left = 0;
   Timer? _timer;
+
+  DateTime _now() => (widget.now ?? DateTime.now)();
 
   @override
   void initState() {
@@ -726,6 +731,10 @@ class _CookScreenState extends State<CookScreen> {
     final m = widget.recipe.steps[k].minutes;
     if (m == null) return;
     _timer?.cancel();
+    // Έλεγχος 20/11 (K6C-03): το τέλος του χρονομέτρου ως ΩΡΑ. Πριν μετρούσε χτύπους του [Timer] («−1 κάθε δευτερόλεπτο»):
+    // όσο η εφαρμογή ήταν πίσω (π.χ. απαντούσες σε μήνυμα), το Android την πάγωνε και ο χρόνος δεν κυλούσε· ένα βήμα 12
+    // λεπτών με 5 λεπτά σε άλλη εφαρμογή χτυπούσε στα 17. Τώρα ο πρώτος χτύπος μετά την επιστροφή δείχνει τη σωστή ώρα.
+    final end = _now().add(Duration(minutes: m));
     setState(() {
       _timerStep = k;
       _left = m * 60;
@@ -735,7 +744,8 @@ class _CookScreenState extends State<CookScreen> {
         t.cancel();
         return;
       }
-      setState(() => _left--);
+      final ms = end.difference(_now()).inMilliseconds;
+      setState(() => _left = ms <= 0 ? 0 : (ms / 1000).ceil());
       if (_left <= 0) {
         t.cancel();
         HapticFeedback.heavyImpact();

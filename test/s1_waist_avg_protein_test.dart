@@ -12,8 +12,8 @@ void main() {
     test('όρια στα δύο δεκαδικά', () {
       expect(waistHeightText(88, 180), 'Μέση/ύψος: 0,48 · υγιές (0,40–0,49) (NICE 2025)');
       // Έλεγχος 19/11 (L-12): 0,497 δεν είναι «0,50 · αυξημένος».
-      expect(waistHeightText(88, 177), contains('0,49 · υγιές'));
-      expect(waistHeightText(88.5, 177), contains('0,50 · αυξημένος'));
+      expect(waistHeightText(89.5, 180), contains('0,49 · υγιές'));
+      expect(waistHeightText(90, 180), contains('0,50 · αυξημένος'));
       expect(waistHeightText(90, 180), 'Μέση/ύψος: 0,50 · αυξημένος κίνδυνος (0,50–0,59) (NICE 2025)');
       expect(waistHeightText(107.9, 180), contains('0,59 · αυξημένος'));
       expect(waistHeightText(108, 180), contains('0,60 · ακόμα πιο αυξημένος'));

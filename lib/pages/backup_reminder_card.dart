@@ -15,6 +15,7 @@ import '../food/food_channel.dart';
 import '../food/food_store.dart';
 import '../theme.dart';
 import '../training/training_store.dart';
+import '../vitals.dart' show VitalsStore;
 import '../widgets.dart';
 import 'settings.dart' show BackupExport, exportBackupNow;
 
@@ -28,11 +29,15 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
     required this.now,
     this.export,
     this.share,
+    this.vitals,
   });
   final HealthStore store;
   final FoodStore food;
   final TrainingStore training;
   final DateTime now;
+
+  /// Πίεση, σάκχαρο, καρδιογράφημα· χωρίς: του κινητού ([VitalsStore.main]). Άλλο δίνουν μόνο οι δοκιμές.
+  final VitalsStore? vitals;
 
   /// Μόνο για δοκιμές (αλλιώς η κανονική εξαγωγή και το φύλλο κοινοποίησης του Android).
   final Future<BackupExport> Function()? export;
@@ -40,17 +45,24 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
 
   /// Υπάρχει κάτι που έγραψε ο χρήστης και ζει μόνο σε αυτό το κινητό: καταχώριση φαγητού, δικό του προϊόν,
   /// προπόνηση που έγινε ή μέτρηση μέσης. (Ό,τι έρχεται από Samsung Health και Oura ξαναδιαβάζεται.)
-  static bool hasOwnData(HealthStore store, FoodStore food, TrainingStore training) =>
+  /// Έλεγχος 20/11 (K6S-11): και «Τα φαγητά μου» και οι μετρήσεις πίεσης, σακχάρου, καρδιογραφήματος: όποιος έγραφε μόνο
+  /// πίεση δεν έβλεπε ποτέ την κάρτα.
+  static bool hasOwnData(HealthStore store, FoodStore food, TrainingStore training, [VitalsStore? vitals]) =>
+      _ownDataBesidesVitals(store, food, training) || (vitals ?? VitalsStore.main).all.isNotEmpty;
+
+  /// Ό,τι το [hasOwnData] χωρίς τις μετρήσεις: εκείνες ζουν σε δικό τους αρχείο και διαβάζονται μόνο όταν χρειαστούν.
+  static bool _ownDataBesidesVitals(HealthStore store, FoodStore food, TrainingStore training) =>
       (food.loaded && (food.mine.isNotEmpty || food.recent(limit: 1).isNotEmpty)) ||
+      (food.dishesRead && food.dishes.isNotEmpty) ||
       (training.ready && !training.readError && training.sessions.isNotEmpty) ||
       store.waist.isNotEmpty;
 
   /// Μόνο με διαβασμένες ρυθμίσεις: πριν από αυτό δεν ξέρουμε πότε βγήκε το τελευταίο αντίγραφο.
-  static bool shows(HealthStore store, FoodStore food, TrainingStore training, DateTime now) =>
+  static bool shows(HealthStore store, FoodStore food, TrainingStore training, DateTime now, [VitalsStore? vitals]) =>
       store.prefsLoaded &&
       backupReminderDue(
         last: store.lastExport,
-        hasData: hasOwnData(store, food, training),
+        hasData: hasOwnData(store, food, training, vitals),
         now: now,
         snoozedUntil: store.backupSnoozedUntil,
       );
@@ -59,13 +71,20 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: Listenable.merge([food, training]),
         builder: (context, _) {
-          if (!shows(store, food, training, now)) return const SizedBox.shrink(key: ValueKey('today-backup-none'));
-          return Padding(
-            padding: const EdgeInsets.only(bottom: PageFrame.gap),
-            child: BackupReminderCard(store: store, food: food, now: now, export: export, share: share),
-          );
+          if (!store.prefsLoaded || _ownDataBesidesVitals(store, food, training)) return _slot();
+          // Έλεγχος 21/11 (K6-R-07): μόνο οι μετρήσεις μπορούν να δείξουν την κάρτα, και διαβάζονται λίγο ΜΕΤΑ το πρώτο
+          // χτίσιμο: η κάρτα τις ακούει. Πριν, όποιος είχε μόνο μετρήσεις πίεσης την έβλεπε μόνο αν άλλαζε κάτι άλλο.
+          return ListenableBuilder(listenable: vitals ?? VitalsStore.main, builder: (context, _) => _slot());
         },
       );
+
+  Widget _slot() {
+    if (!shows(store, food, training, now, vitals)) return const SizedBox.shrink(key: ValueKey('today-backup-none'));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PageFrame.gap),
+      child: BackupReminderCard(store: store, food: food, now: now, export: export, share: share),
+    );
+  }
 }
 
 /// Η κάρτα: πόσο παλιό είναι το τελευταίο αντίγραφο, «Εξαγωγή τώρα» (και αμέσως το φύλλο κοινοποίησης, για να φύγει το

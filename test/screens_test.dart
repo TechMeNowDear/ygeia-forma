@@ -2162,8 +2162,8 @@ void main() {
       ));
 
   // ---------------------------------------------------------------- 12/11: στόχοι, χοληστερίνη, μέση, ζώνη
-  // Φανταστικός χρήστης (δημόσιο repo, R7-A11-1): άνδρας 47 ετών (γεννημένος 3/1979), 172 cm, 90 kg.
-  const me = Profile(birthYear: 1979, birthMonth: 3, sex: 'm', heightCm: 172);
+  // Φανταστικός χρήστης (δημόσιο repo, R7-A11-1· K6-R-02: και η ηλικία φανταστική): άνδρας 44 ετών (6/1982), 172 cm, 90 kg.
+  const me = Profile(birthYear: 1982, birthMonth: 6, sex: 'm', heightCm: 172);
   // Ο φανταστικός άνθρωπος των [checkinGoals] (άνδρας 40 ετών, 180 cm), για τα στιγμιότυπα του ελέγχου θερμίδων.
   const checkinMe = Profile(birthYear: 1985, birthMonth: 12, sex: 'm', heightCm: 180);
   Goals goals() => Goals(
@@ -2173,7 +2173,7 @@ void main() {
         doctor: true,
         since: '2026-11-09',
         kg: 90,
-        age: 47,
+        age: 44,
         heightCm: 172,
         male: true,
         nutsG: 30,

@@ -791,21 +791,21 @@ Map<String, Object?> _cardioGolden() {
   // Ζώνη παλμών.
   out['tanakaMax'] = [for (var age = 18; age <= 90; age++) tanakaMax(age)].join(' ');
   final zones = <String, Object?>{};
-  for (final age in <int?>[null, 25, 47, 70]) {
+  for (final age in <int?>[null, 25, 44, 70]) {
     for (final rest in <double?>[null, 29.9, 30, 54.6, 70, 120]) {
       zones['ηλικία $age · ηρεμίας $rest'] = _zone(computeZone(age: age, restHr: rest, s: const ZoneSettings()));
     }
   }
-  // 47 ετών: μέγιστοι 175 → παλμοί ηρεμίας 154 και 155 (όριο «μέγιστοι − 20»).
-  for (final rest in [154.0, 154.4, 154.5, 155.0, 156.0]) {
-    zones['ηλικία 47 · ηρεμίας $rest (όριο)'] = _zone(computeZone(age: 47, restHr: rest, s: const ZoneSettings()));
+  // 44 ετών: μέγιστοι 177 → παλμοί ηρεμίας 156 και 157 (όριο «μέγιστοι − 20»).
+  for (final rest in [156.0, 156.4, 156.5, 157.0, 158.0]) {
+    zones['ηλικία 44 · ηρεμίας $rest (όριο)'] = _zone(computeZone(age: 44, restHr: rest, s: const ZoneSettings()));
   }
-  zones['μετρημένοι μέγιστοι 153'] = _zone(computeZone(age: 47, restHr: 60, s: const ZoneSettings(maxHr: 153)));
+  zones['μετρημένοι μέγιστοι 158'] = _zone(computeZone(age: 44, restHr: 60, s: const ZoneSettings(maxHr: 158)));
   zones['μετρημένοι μέγιστοι, χωρίς ηλικία'] = _zone(computeZone(restHr: 60, s: const ZoneSettings(maxHr: 180)));
-  zones['δικοί του παλμοί ηρεμίας 58'] = _zone(computeZone(age: 47, restHr: 70, s: const ZoneSettings(restHr: 58)));
-  zones['χειροκίνητη 100–125'] = _zone(computeZone(age: 47, restHr: 60.4, s: const ZoneSettings(lo: 100, hi: 125)));
+  zones['δικοί του παλμοί ηρεμίας 58'] = _zone(computeZone(age: 44, restHr: 70, s: const ZoneSettings(restHr: 58)));
+  zones['χειροκίνητη 100–125'] = _zone(computeZone(age: 44, restHr: 60.4, s: const ZoneSettings(lo: 100, hi: 125)));
   zones['χειροκίνητη, χωρίς ηλικία'] = _zone(computeZone(s: const ZoneSettings(lo: 100, hi: 125)));
-  zones['μόνο κάτω όριο (όχι χειροκίνητη)'] = _zone(computeZone(age: 47, s: const ZoneSettings(lo: 100)));
+  zones['μόνο κάτω όριο (όχι χειροκίνητη)'] = _zone(computeZone(age: 44, s: const ZoneSettings(lo: 100)));
   out['computeZone'] = zones;
   out['ZoneSettings.fromJson'] = <String, Object?>{
     for (final e in <String, Object?>{
@@ -991,7 +991,7 @@ Map<String, Object?> _cardioGolden() {
   out['strideFor'] = <String, Object?>{
     'from walks': strideFor(strideSessions),
     'only the first five': strideFor(strideSessions.sublist(0, 5)),
-    for (final h in <double?>[null, 119, 120, 177, 230, 231])
+    for (final h in <double?>[null, 119, 120, 180, 230, 231])
       for (final sex in <String?>['m', 'f', null]) 'no walks · $h · $sex': strideFor(const [], heightCm: h, sex: sex),
   };
 
