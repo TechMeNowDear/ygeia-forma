@@ -204,7 +204,7 @@ class SlotRow extends StatelessWidget {
       if (food.missingItems(d.items).isNotEmpty) {
         hint = 'Λείπει υλικό: άλλαξε το φαγητό';
       } else if (d.kind == DishKind.pot) {
-        final b = freshBatch(d, now);
+        final b = freshBatch(food, d, now);
         final g = b == null ? null : potPortion(food, d, b, s.kcal);
         hint = g != null
             ? 'Η μερίδα σου: ${thousands(g.round())} g'

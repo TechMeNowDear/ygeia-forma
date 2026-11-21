@@ -947,6 +947,7 @@ Map<String, Object?> _dishesGolden() {
     'maxEatenServings': maxEatenServings,
     'cookedTooLightShare': cookedTooLightShare,
     'potQuickDays': potQuickDays,
+    'potRiceQuickDays': potRiceQuickDays,
     'maxPlanDays': maxPlanDays,
     'maxSlotsPerDay': maxSlotsPerDay,
     'minSlotKcal': minSlotKcal,
@@ -1155,9 +1156,9 @@ Map<String, Object?> _dishesGolden() {
   final fakes = _k(s, 'fakes');
   final cooked = fakes.copyWith(batch: PotBatch(at: batchAt.millisecondsSinceEpoch, cooked: 2400, items: fakes.items));
   out['freshBatch'] = <String, Object?>{
-    for (final o in [0, 1, 3, 4, 5]) '+$o': freshBatch(cooked, DateTime(2026, 11, 22 + o, 9)) != null,
-    'no batch': freshBatch(fakes, _monday) != null,
-    'plate': freshBatch(_k(s, 'solomos'), _monday) != null,
+    for (final o in [0, 1, 2, 3, 4, 5]) '+$o': freshBatch(s, cooked, DateTime(2026, 11, 22 + o, 9)) != null,
+    'no batch': freshBatch(s, fakes, _monday) != null,
+    'plate': freshBatch(s, _k(s, 'solomos'), _monday) != null,
     'old batch → no slotLog': slotLog(s, cooked, PlanSlot(meal: Meal.lunch, dishId: fakes.id), DateTime(2026, 11, 26, 13)) == null,
     'potPortion bigger than pot': potPortion(s, cooked, PotBatch(at: 1, cooked: 300, items: fakes.items), 3000),
   };

@@ -101,18 +101,48 @@ void main() {
           ],
         ]);
 
-    test('mealsEatenOutsidePlan: μόνο προηγούμενο γεύμα, με ανοιχτές θέσεις και αρκετό φαγητό στο ημερολόγιο', () {
+    test('mealsEatenOutsidePlan: άλλο γεύμα της μέρας, με ανοιχτές θέσεις και αρκετό φαγητό στο ημερολόγιο', () {
       final s = _store(entries: [...lunchEntries, ...snackEntries]);
       final w = plan(s);
-      expect(mealsEatenOutsidePlan(s, w, 0, before: Meal.snack), {Meal.lunch});
-      expect(mealsEatenOutsidePlan(s, w, 0, before: Meal.lunch), isEmpty, reason: 'το ίδιο το γεύμα δεν είναι «προηγούμενο»');
+      expect(mealsEatenOutsidePlan(s, w, 0, changed: Meal.snack), {Meal.lunch});
+      expect(mealsEatenOutsidePlan(s, w, 0, changed: Meal.lunch), isEmpty, reason: 'το ίδιο το γεύμα που άλλαξε δεν μετρά');
       // Μόνο ένας καφές με γάλα στο μεσημέρι (κάτω από το μισό της θέσης): η θέση μένει «θα φαγωθεί ακόμα».
       final coffee = _store(entries: [_entry(_yogurt, 50, Meal.lunch), ...snackEntries]);
-      expect(mealsEatenOutsidePlan(coffee, plan(coffee), 0, before: Meal.snack), isEmpty);
+      expect(mealsEatenOutsidePlan(coffee, plan(coffee), 0, changed: Meal.snack), isEmpty);
       // Χωρίς τίποτα στο μεσημέρι: όπως πριν.
       final none = _store(entries: snackEntries);
-      expect(mealsEatenOutsidePlan(none, plan(none), 0, before: Meal.snack), isEmpty);
+      expect(mealsEatenOutsidePlan(none, plan(none), 0, changed: Meal.snack), isEmpty);
       expect(rebalanceEatenShare, 0.5);
+    });
+
+    test('Α31 (απόφαση 21/11): σνακ που φαγώθηκε ΠΡΙΝ από το μεσημεριανό και γράφτηκε με «+ Φαγητό» δεν μετρά δεύτερη φορά', () {
+      // Το σνακ γράφτηκε το πρωί με «+ Φαγητό» (η θέση του μένει ανοιχτή), και μετά «Έφαγα κάτι άλλο» στο μεσημεριανό.
+      // Πριν: ο κανόνας κοίταζε μόνο τα ΠΡΟΗΓΟΥΜΕΝΑ γεύματα· το σνακ, ως «επόμενο», λογαριαζόταν ξανά και άλλαζε η μερίδα του.
+      final s = _store(entries: [...lunchEntries, ...snackEntries]);
+      final w = _week([
+        [
+          PlanSlot(meal: Meal.lunch, dishId: _byKey(s, 'kotopoulo-ryzi').id, kcal: 700, state: SlotState.other),
+          PlanSlot(meal: Meal.snack, dishId: _byKey(s, 'giaourti').id, kcal: 300),
+          PlanSlot(meal: Meal.dinner, dishId: _byKey(s, 'solomos').id, kcal: 700),
+        ],
+      ]);
+      expect(mealsEatenOutsidePlan(s, w, 0, changed: Meal.lunch), {Meal.snack});
+      final t = Totals(s.entriesFor(_monday));
+      final r = rebalanceDay(s, w, 0, eaten: t.kcal, eatenProtein: t.protein, target: 2140, after: Meal.lunch, now: _monday);
+      expect(r, isNotNull);
+      // Αλλάζει μόνο το βραδινό· το σνακ που φαγώθηκε ήδη δεν αγγίζεται.
+      expect([for (final c in r!.changes) c.$1], [Meal.dinner]);
+      final (_, _, before, after) = r.changes.single;
+      expect(after, greaterThan(before), reason: 'μένουν θερμίδες για το βράδυ: η μερίδα μεγαλώνει');
+      // Η μέρα = ό,τι γράφτηκε + το νέο βραδινό, χωρίς το σνακ δεύτερη φορά.
+      expect(r.dayKcal, closeTo(t.kcal + after, 1.0));
+      expect(r.assumed, isEmpty);
+      // Σνακ που ΔΕΝ έχει γραφτεί: όπως πριν, μοιράζεται κανονικά με το βραδινό.
+      final open = _store(entries: lunchEntries);
+      final t2 = Totals(open.entriesFor(_monday));
+      final r2 = rebalanceDay(open, w, 0, eaten: t2.kcal, eatenProtein: t2.protein, target: 2140, after: Meal.lunch, now: _monday);
+      expect(r2, isNotNull);
+      expect({for (final c in r2!.changes) c.$1}, {Meal.snack, Meal.dinner});
     });
 
     test('rebalanceDay: η μέρα κλείνει κοντά στον στόχο (πριν: το βραδινό κοβόταν στο ελάχιστο)', () {
@@ -141,7 +171,7 @@ void main() {
       ];
       final s = _store(entries: [...tagged, ...snackEntries]);
       final w = plan(s, lunch: SlotState.ate, lunchGrp: grp);
-      expect(mealsEatenOutsidePlan(s, w, 0, before: Meal.snack), isEmpty);
+      expect(mealsEatenOutsidePlan(s, w, 0, changed: Meal.snack), isEmpty);
       final t = Totals(s.entriesFor(_monday));
       final r = rebalanceDay(s, w, 0, eaten: t.kcal, eatenProtein: t.protein, target: 2150, after: Meal.snack, now: _monday);
       expect(r, isNotNull);

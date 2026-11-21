@@ -506,6 +506,39 @@ void main() {
       expect(find.text('Σωστή ποσότητα;'), findsNothing);
       expect(store.entriesFor(_today).single.food.id, 'C20359');
     });
+    testWidgets('Α23 (απόφαση 21/11): το «✓» του πληκτρολογίου γράφει το φαγητό, με τους ίδιους ελέγχους', (t) async {
+      // Πριν: το «✓» μόνο έκλεινε το πληκτρολόγιο και ήθελε δεύτερο πάτημα στο «Προσθήκη στο …».
+      Future<FoodStore> typeAndDone(String grams) async {
+        final store = FoodStore.preloaded(foods: basicFoods(), now: _now);
+        await _pump(t, AddFoodScreen(food: store, meal: Meal.lunch, day: _today));
+        await t.enterText(find.byType(TextField), 'φακές');
+        await t.pumpAndSettle();
+        await t.tap(find.text('Φακές (ξερές)').first);
+        await t.pumpAndSettle();
+        await t.enterText(find.descendant(of: find.byType(QuantitySheet), matching: find.byType(TextField)), grams);
+        await t.pumpAndSettle();
+        await t.testTextInput.receiveAction(TextInputAction.done);
+        await t.pumpAndSettle();
+        return store;
+      }
+
+      final small = await typeAndDone('80');
+      expect(find.byType(QuantitySheet), findsNothing, reason: 'το φύλλο έκλεισε');
+      final e = small.entriesFor(_today).single;
+      expect((e.food.id, e.grams, e.meal), ('C20359', 80.0, Meal.lunch));
+      // Ίδιοι έλεγχοι με το κουμπί: 300 g ξερές φακές → η ερώτηση «πριν ή μετά το μαγείρεμα;», και τίποτα δεν γράφεται ακόμα.
+      final big = await typeAndDone('300');
+      expect(find.text('Ζύγισες πριν ή μετά το μαγείρεμα;'), findsOneWidget);
+      expect(big.entriesFor(_today), isEmpty);
+      await t.tap(find.widgetWithText(TextButton, 'Βρασμένες'));
+      await t.pumpAndSettle();
+      expect(big.entriesFor(_today).single.food.id, 'C20360');
+      // Άκυρη ποσότητα: το «✓» δεν γράφει τίποτα και το φύλλο μένει.
+      final none = await typeAndDone('0');
+      expect(none.entriesFor(_today), isEmpty);
+      expect(find.byType(QuantitySheet), findsOneWidget);
+    });
+
     testWidgets('80 g ξερές: καμία ερώτηση', (t) async {
       final store = await addLentils(t, '80');
       expect(find.text('Ζύγισες πριν ή μετά το μαγείρεμα;'), findsNothing);

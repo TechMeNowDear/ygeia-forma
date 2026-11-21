@@ -103,11 +103,23 @@ double? potPortion(FoodStore food, Dish d, PotBatch b, double? kcal) {
   return math.min(b.cooked, portionRound(kcal * b.cooked / t.kcal));
 }
 
-/// Το μαγείρεμα της κατσαρόλας που μετρά για το πρόγραμμα: ζυγισμένο, των τελευταίων [potQuickDays] ημερών.
-PotBatch? freshBatch(Dish d, DateTime now) {
+/// Τα υλικά έχουν ρύζι (τρόφιμο της βάσης που το όνομά του αρχίζει με «Ρύζι»): το περίσσευμα μόνο ως την επόμενη μέρα.
+bool itemsHaveRice(FoodStore food, Iterable<DishItem> items) =>
+    items.any((i) => food.itemFood(i)?.name.startsWith('Ρύζι') ?? false);
+
+/// Πόσες μέρες μετρά ένα μαγείρεμα με αυτά τα [items]: [potQuickDays], ή [potRiceQuickDays] αν έχει ρύζι (Α2, 21/11).
+int potKeepDays(FoodStore food, Iterable<DishItem> items) => itemsHaveRice(food, items) ? potRiceQuickDays : potQuickDays;
+
+/// Το μαγείρεμα [b] είναι πιο παλιό από όσο κρατούν τα περισσεύματα (τα υλικά του ίδιου του μαγειρέματος κρίνουν το ρύζι).
+bool potBatchOld(FoodStore food, PotBatch b, DateTime now) =>
+    daysBetween(DateTime.fromMillisecondsSinceEpoch(b.at), now) >= potKeepDays(food, b.items);
+
+/// Το μαγείρεμα της κατσαρόλας που μετρά για το πρόγραμμα: ζυγισμένο, και όχι πιο παλιό από όσο κρατούν τα περισσεύματα
+/// ([potKeepDays]: ως 2 μέρες μετά, με ρύζι ως την επόμενη).
+PotBatch? freshBatch(FoodStore food, Dish d, DateTime now) {
   final b = d.batch;
   if (d.kind != DishKind.pot || b == null) return null;
-  return daysBetween(DateTime.fromMillisecondsSinceEpoch(b.at), now) < potQuickDays ? b : null;
+  return potBatchOld(food, b, now) ? null : b;
 }
 
 /// Τι γράφεται με «Το έφαγα».
@@ -146,7 +158,7 @@ SlotLog? slotLog(FoodStore food, Dish d, PlanSlot s, DateTime now) {
       qty = sv;
       amounts = dishAmounts(d, servings: sv);
     case DishKind.pot:
-      final b = freshBatch(d, now);
+      final b = freshBatch(food, d, now);
       if (b == null) return null;
       final g = potPortion(food, d, b, s.kcal);
       if (g == null) return null;
@@ -342,8 +354,8 @@ ShoppingList shoppingList(FoodStore food, WeekPlan w, {int fromDay = 0, DateTime
       List<DishItem>? items;
       if (d.kind == DishKind.pot) {
         final last = cookedOn[d.id] ??
-            (freshBatch(d, now ?? day) == null ? null : DateTime.fromMillisecondsSinceEpoch(d.batch!.at));
-        if (last != null && daysBetween(last, day) < potQuickDays) continue;
+            (freshBatch(food, d, now ?? day) == null ? null : DateTime.fromMillisecondsSinceEpoch(d.batch!.at));
+        if (last != null && daysBetween(last, day) < potKeepDays(food, d.items)) continue;
         cookedOn[d.id] = day;
         items = d.items;
       } else {

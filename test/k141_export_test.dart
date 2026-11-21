@@ -147,6 +147,7 @@ void main() {
         'tooFast': 'tooFast',
         'heldDays': 'heldDays',
         'quitDays': 'quitHoldDays',
+        'waistDrop': 'waistDropCm',
         'gap': 'gap',
         'absurd': 'absurd',
         'foreign': 'foreign',
@@ -162,7 +163,7 @@ void main() {
       final from = src.indexOf('const CheckIn(');
       final ctor = src.substring(from, src.indexOf('});', from));
       final fields = [for (final m in RegExp(r'this\.(\w+)').allMatches(ctor)) m.group(1)!];
-      expect(fields.length, greaterThanOrEqualTo(24));
+      expect(fields.length, greaterThanOrEqualTo(25));
       final g = _goals();
       final base = _proposal(g);
       final full = CheckIn(

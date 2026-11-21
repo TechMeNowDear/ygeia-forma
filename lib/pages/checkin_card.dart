@@ -388,6 +388,8 @@ String _sameText(CheckIn k) {
   if (quit != null) {
     return ' ${quitText(quit)}';
   }
+  final waist = k.waistDrop;
+  if (waist != null) return ' ${waistHeldText(waist)}';
   final held = k.heldDays;
   if (held != null) {
     // S1-4: όχι δεύτερη αλλαγή μέσα σε λίγες μέρες.
@@ -452,6 +454,11 @@ String? newMuscleNote(CheckIn k, DateTime now) {
   return 'Αν άρχισες πρόσφατα βάρη, νέοι μύες και το νερό τους μπορεί να κρύβουν μέρος της απώλειας λίπους στη ζυγαριά, και η '
       'εκτίμηση βγαίνει τότε λίγο χαμηλά. Αν η μέση σου πέφτει, το «Όχι τώρα» είναι λογικό.';
 }
+
+/// Απόφαση χρήστη 21/11 (Α8): γιατί ο στόχος δεν κατέβηκε ενώ η εκτίμηση το ζητούσε ([CheckIn.waistDrop], σε cm).
+String waistHeldText(double cm) =>
+    'Η μέση σου έπεσε ${dec(cm)}\u00A0cm σε αυτό το διάστημα: χάνεις λίπος, ακόμα κι αν η ζυγαριά δείχνει λιγότερο. Ο στόχος '
+    'δεν κατεβαίνει.';
 
 /// Γρήγορη απώλεια χωρίς πρόταση (S1-2): τι δείχνει το ημερολόγιο φαγητού.
 /// Γύρος 2: «τις τελευταίες μέρες», γιατί τώρα μετρούν κυρίως αυτές (R2-A-3)· και όταν ο στόχος άλλαξε μέσα στις μέρες
@@ -566,6 +573,8 @@ Future<void> showHowAdapted(BuildContext context, CheckIn k) {
             Text('Ο στόχος άλλαξε πριν από λίγες μέρες: δεν αλλάζει ξανά τόσο σύντομα.', style: small)
           else if (k.quitDays != null)
             Text(quitText(k.quitDays!), style: small)
+          else if (k.waistDrop != null)
+            Text(waistHeldText(k.waistDrop!), style: small)
           else if (p.underweight)
             Text('Το βάρος σου είναι κάτω από το φυσιολογικό για το ύψος σου (δείκτης μάζας σώματος κάτω από 18,5): ο στόχος δεν '
                 'κατεβαίνει άλλο.', style: small)
