@@ -413,13 +413,13 @@ void main() {
     test('ο δείκτης κόβεται στο 0,1 (ποτέ «25,0» για 24,97)· τα άκρα του βάρους = οι τιμές που κρίνονται «μέσα»', () {
       expect(bmiText(bmiOf(80.9, 180)!), '24,9'); // 24,969
       expect(bmiText(bmiOf(81.0, 180)!), '25,0');
-      expect(bmiText(bmiOf(78.3, 177)!), '24,9'); // 24,993
+      expect(bmiText(bmiOf(76.5, 175)!), '24,9'); // 24,980
       expect(bmiText(bmiOf(80.676, 180)!), '24,9'); // ακριβώς 24,9
       expect(bmiText(bmiOf(59.9, 180)!), '18,4'); // 18,488: «κάτω από το εύρος»
       final (lo180, hi180) = healthyWeight(180)!;
       expect(healthyWeightText(lo180, hi180), '60,0–80,9'); // 59,94–81,0
-      final (lo177, hi177) = healthyWeight(177)!;
-      expect(healthyWeightText(lo177, hi177), '58,0–78,3'); // 57,96–78,32
+      final (lo175, hi175) = healthyWeight(175)!;
+      expect(healthyWeightText(lo175, hi175), '56,7–76,5'); // 56,66–76,56
       final (lo170, hi170) = healthyWeight(170)!;
       expect(healthyWeightText(lo170, hi170), '53,5–72,2'); // 53,465–72,25
       expect(metricSpecs[K.weight]!.range!(const Profile(heightCm: 180), DateTime(2026, 12, 2))!.text,

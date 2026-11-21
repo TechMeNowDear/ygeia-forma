@@ -608,7 +608,7 @@ class _GoalsWizardState extends State<GoalsWizard> {
                 icon: Icons.flag_rounded,
                 color: c.food,
                 title: _targets.isEmpty ? 'Σου έγραψε αριθμούς-στόχους;' : 'Στόχοι του γιατρού',
-                text: _targets.isEmpty ? 'Π.χ. LDL < 115. Προαιρετικά.' : _targets.text,
+                text: _targets.isEmpty ? 'Π.χ. LDL < 100. Προαιρετικά.' : _targets.text,
                 onTap: () async {
                   final t = await askDoctorTargets(context, _targets);
                   if (t != null) setState(() => _targets = t);

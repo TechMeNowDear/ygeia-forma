@@ -82,7 +82,7 @@ LogEntry _entry(String id, double g, Meal m, {DateTime? day, DishTag? dish}) {
   return LogEntry(id: 'e${_entryId++}', day: dateKey(d), meal: m, food: _food(id), grams: g, time: DateTime(d.year, d.month, d.day, 14), dish: dish);
 }
 
-const AiTargets _targets = (kcal: 2150, protein: 150, satMax: 14.3, fiber: 30, salt: 5.0);
+const AiTargets _targets = (kcal: 2150, protein: 140, satMax: 14.3, fiber: 30, salt: 5.0);
 
 void main() {
   // ---------------------------------------------------------------------------------------------------------- K2-C-01

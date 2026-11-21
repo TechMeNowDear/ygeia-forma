@@ -1171,7 +1171,7 @@ Map<String, Object?> _dishesGolden() {
 
   // Αυτόματο πρόγραμμα (σταθερό seed) και ό,τι βγαίνει από αυτό.
   const lsd = [Meal.lunch, Meal.snack, Meal.dinner];
-  AutoWeek make(FoodStore st, {int seed = 1, List<Meal> meals = lsd, double kcal = 2150, double protein = 150, int legumes = 4, int fish = 2, int days = 7, DateTime? from, WeekPlan? keep, Map<(int, Meal), String> forced = const {}, bool aiOnly = false}) =>
+  AutoWeek make(FoodStore st, {int seed = 1, List<Meal> meals = lsd, double kcal = 2150, double protein = 140, int legumes = 4, int fish = 2, int days = 7, DateTime? from, WeekPlan? keep, Map<(int, Meal), String> forced = const {}, bool aiOnly = false}) =>
       autoWeek(st,
           from: from ?? _monday,
           meals: meals,
@@ -1265,7 +1265,7 @@ Map<String, Object?> _dishesGolden() {
     'empty': shop(s, const WeekPlan(from: '2026-11-23', days: [[]], created: 1)),
   };
   out['weekPrompt'] = <String, Object?>{
-    'with targets': g141Lines(weekPrompt(food: s, from: _monday, targets: (kcal: 2150, protein: 150, satMax: 14, fiber: 30, salt: 5.0), legumesWeek: 4, fishWeek: 2)),
+    'with targets': g141Lines(weekPrompt(food: s, from: _monday, targets: (kcal: 2150, protein: 140, satMax: 14, fiber: 30, salt: 5.0), legumesWeek: 4, fishWeek: 2)),
     'bare': g141Text(weekPrompt(food: s, from: DateTime(2027, 3, 29))),
     'disliked and missing': g141Lines(weekPrompt(
         food: _store(
@@ -1525,7 +1525,7 @@ Map<String, Object?> _dishesGolden() {
         foods: small,
         likes: const FoodLikes(like: [_lentils, 'ZZ'], dislike: [_feta], note: ' Όχι πικάντικα. '),
         kitchen: Kitchen.initial(),
-        targets: (kcal: 2150, protein: 150, satMax: 14, fiber: 30, salt: 5.0),
+        targets: (kcal: 2150, protein: 140, satMax: 14, fiber: 30, salt: 5.0),
         existing: s.dishes.take(3).toList())),
     'whole database': g141Text(libraryPrompt(foods: basicFoods(), likes: const FoodLikes(), kitchen: Kitchen())),
   };
@@ -1647,7 +1647,7 @@ Map<String, Object?> _dishesGolden() {
         foods: small,
         likes: const FoodLikes(like: [_lentils], dislike: [_feta], note: 'Όχι πικάντικα.'),
         kitchen: Kitchen(devices: {'hob', 'oven'}, cookware: [Cookware(id: 'c1', kind: 'pot', size: 'Μεγάλο')]),
-        targets: (kcal: 2150, protein: 150, satMax: 14, fiber: 30, salt: 5.0),
+        targets: (kcal: 2150, protein: 140, satMax: 14, fiber: 30, salt: 5.0),
         left: (kcal: 1234, protein: 56))),
     'bare': g141Lines(recipePrompt(wish: ' ', foods: const [], likes: const FoodLikes(), kitchen: Kitchen(), left: (kcal: 0, protein: 10))),
   };
@@ -1732,7 +1732,7 @@ Map<String, Object?> _aiGolden() {
   final allowed = aiAllowedIds(s);
   final aiLib = aiLibrary(s, allowed);
   const meals = [Meal.lunch, Meal.snack, Meal.dinner];
-  const AiTargets targets = (kcal: 2150, protein: 150, satMax: 14.3, fiber: 30, salt: 5.0);
+  const AiTargets targets = (kcal: 2150, protein: 140, satMax: 14.3, fiber: 30, salt: 5.0);
   out['constants'] = <String, Object?>{
     'kinds': [aiWeekKind, aiSwapKind, aiKeyPrefix],
     'aiMaxNewDishes': aiMaxNewDishes,
@@ -1980,7 +1980,7 @@ Map<String, Object?> _aiGolden() {
   };
 
   // Έλεγχος εβδομάδας (όρια μέρας, όσπρια/ψάρι, κατσαρόλα, λεπτά) πάνω σε προγράμματα με σταθερό seed.
-  WeekPlan auto({int seed = 1, double kcal = 2150, double protein = 150}) =>
+  WeekPlan auto({int seed = 1, double kcal = 2150, double protein = 140}) =>
       autoWeek(s, from: _monday, meals: meals, kcalTarget: kcal, proteinTarget: protein, legumesWeek: 4, fishWeek: 2, seed: seed, now: 1).plan;
   Object? problems(WeekPlan w, {AiTargets t = targets, Set<int>? checkDays, int legumes = 4, int fish = 2, double? bodyKg, List<Meal> ms = meals}) => g141Safe(() {
         final ps =

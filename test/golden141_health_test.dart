@@ -242,7 +242,7 @@ Map<String, Object?> _vitalsGolden() {
   Profile who(String? sex, int? age) => Profile(birthYear: age == null ? null : 2026 - age, birthMonth: 1, sex: sex, heightCm: 180);
   final refDay = DateTime(2026, 11, 23);
   out['sleepRange'] = <String, Object?>{
-    for (final age in <int?>[null, 17, 18, 47, 60, 61]) 'age $age': _range(sleepRange(who('m', age), refDay), [389.9, 390, 419.9, 420, 480, 600]),
+    for (final age in <int?>[null, 17, 18, 44, 60, 61]) 'age $age': _range(sleepRange(who('m', age), refDay), [389.9, 390, 419.9, 420, 480, 600]),
   };
   out['fatRange'] = <String, Object?>{
     for (final sex in <String?>['m', 'f', null])
@@ -697,38 +697,38 @@ Map<String, Object?> _labsGolden() {
   };
 
   // Ένα αποτέλεσμα: σημαία εκτός ορίων, μετατροπή μονάδας, δείγμα, αλλαγή από την προηγούμενη φορά.
-  LabResult res(String name, double v, String unit, {String? id, double? lo, double? hi, bool below = false, bool above = false, String? specimen, String? lab, String? method, String day = '2026-11-10'}) =>
+  LabResult res(String name, double v, String unit, {String? id, double? lo, double? hi, bool below = false, bool above = false, String? specimen, String? lab, String? method, String day = '2030-03-05'}) =>
       LabResult(day: day, rawName: name, value: v, unit: unit, testId: id, refLo: lo, refHi: hi, below: below, above: above, specimen: specimen, lab: lab, method: method);
   String view(LabResult r) => 'flag ${r.flag} · base ${r.base} [${r.baseLo}, ${r.baseHi}] · censored ${r.censored} · notBlood ${r.notBlood} · test ${r.test?.id}';
   out['LabResult'] = <String, Object?>{
     for (final v in [129.9, 130.0, 130.1, 99.9, 100.0, 100.1]) 'ldl $v [100, 130]': view(res('LDL', v, 'mg/dL', id: 'ldl', lo: 100, hi: 130)),
-    'ldl 160, only upper limit': view(res('LDL', 160, 'mg/dL', id: 'ldl', hi: 130)),
-    'hdl 31, only lower limit': view(res('HDL', 31, 'mg/dL', id: 'hdl', lo: 40)),
-    'no limits': view(res('LDL', 160, 'mg/dL', id: 'ldl')),
+    'ldl 150, only upper limit': view(res('LDL', 150, 'mg/dL', id: 'ldl', hi: 130)),
+    'hdl 35, only lower limit': view(res('HDL', 35, 'mg/dL', id: 'hdl', lo: 40)),
+    'no limits': view(res('LDL', 150, 'mg/dL', id: 'ldl')),
     '<0.5 with lo 0.5': view(res('CRP', 0.5, 'mg/L', id: 'crp', lo: 0.5, hi: 5, below: true)),
     '<0.6 with lo 0.5': view(res('CRP', 0.6, 'mg/L', id: 'crp', lo: 0.5, hi: 5, below: true)),
     '>5 with hi 5': view(res('CRP', 5, 'mg/L', id: 'crp', lo: 0.5, hi: 5, above: true)),
     '>4.9 with hi 5': view(res('CRP', 4.9, 'mg/L', id: 'crp', lo: 0.5, hi: 5, above: true)),
-    'ldl in mmol/L': view(res('LDL', 4.1, 'mmol/L', id: 'ldl', lo: 0, hi: 3.4)),
-    'glucose in mmol/l': view(res('Γλυκόζη', 6.4, 'mmol/l', id: 'glu', lo: 3.9, hi: 5.5)),
-    'hba1c in mmol/mol': view(res('HbA1c', 37, 'mmol/mol', id: 'hba1c')),
-    'unknown unit': view(res('LDL', 160, 'mg', id: 'ldl')),
+    'ldl in mmol/L': view(res('LDL', 3.9, 'mmol/L', id: 'ldl', lo: 0, hi: 3.4)),
+    'glucose in mmol/l': view(res('Γλυκόζη', 6.0, 'mmol/l', id: 'glu', lo: 3.9, hi: 5.5)),
+    'hba1c in mmol/mol': view(res('HbA1c', 40, 'mmol/mol', id: 'hba1c')),
+    'unknown unit': view(res('LDL', 150, 'mg', id: 'ldl')),
     'unknown test': view(res('Κάτι', 5, 'mg/dL')),
     'urine glucose': view(res('Γλυκόζη', 5, 'mg/dL', id: 'glu', specimen: 'Ούρα')),
     'serum glucose': view(res('Γλυκόζη', 95, 'mg/dL', id: 'glu', specimen: 'Ορός')),
     'fromJson': <String, Object?>{
       for (final e in <String, Object?>{
-        'full': {'d': '2026-11-10', 'n': 'LDL', 'v': 160, 'u': 'mg/dL', 't': 'ldl', 'lab': 'Εργαστήριο Α', 'lo': 0, 'hi': 130, 'ref': '< 130', 'm': 'calc', 'lt': true, 'gt': true, 's': 'Ορός'},
-        'minimal': {'d': '2026-11-10', 'n': 'Κάτι', 'v': 5.5, 'u': ''},
-        'unknown test id': {'d': '2026-11-10', 'n': 'Κάτι', 'v': 5, 'u': 'x', 't': 'zzz', 's': '  '},
-        'bad day': {'d': '2026-02-30', 'n': 'LDL', 'v': 160, 'u': 'mg/dL'},
-        'value as text': {'d': '2026-11-10', 'n': 'LDL', 'v': '160', 'u': 'mg/dL'},
-        'value NaN': {'d': '2026-11-10', 'n': 'LDL', 'v': double.nan, 'u': 'mg/dL'},
+        'full': {'d': '2030-03-05', 'n': 'LDL', 'v': 150, 'u': 'mg/dL', 't': 'ldl', 'lab': 'Εργαστήριο Α', 'lo': 0, 'hi': 130, 'ref': '< 130', 'm': 'calc', 'lt': true, 'gt': true, 's': 'Ορός'},
+        'minimal': {'d': '2030-03-05', 'n': 'Κάτι', 'v': 5.7, 'u': ''},
+        'unknown test id': {'d': '2030-03-05', 'n': 'Κάτι', 'v': 5, 'u': 'x', 't': 'zzz', 's': '  '},
+        'bad day': {'d': '2026-02-30', 'n': 'LDL', 'v': 150, 'u': 'mg/dL'},
+        'value as text': {'d': '2030-03-05', 'n': 'LDL', 'v': '150', 'u': 'mg/dL'},
+        'value NaN': {'d': '2030-03-05', 'n': 'LDL', 'v': double.nan, 'u': 'mg/dL'},
         'not a map': 5,
       }.entries)
         e.key: LabResult.fromJson(e.value)?.toJson(),
     },
-    'isDay': <String, Object?>{for (final s in ['2026-11-10', '2026-02-29', '2028-02-29', '2026-13-01', '2026-1-1', '2026-11-10T08:00', '']) s: isDay(s)},
+    'isDay': <String, Object?>{for (final s in ['2030-03-05', '2026-02-29', '2028-02-29', '2026-13-01', '2026-1-1', '2030-03-05T08:00', '']) s: isDay(s)},
   };
   String change(LabResult a, LabResult b) {
     final c = LabChange(a, b);
@@ -736,15 +736,15 @@ Map<String, Object?> _labsGolden() {
   }
 
   out['LabChange'] = <String, Object?>{
-    'ldl 160 → 131': change(res('LDL', 160, 'mg/dL', id: 'ldl'), res('LDL', 131, 'mg/dL', id: 'ldl')),
-    'ldl mg/dL → mmol/L': change(res('LDL', 160, 'mg/dL', id: 'ldl'), res('LDL', 3.4, 'mmol/L', id: 'ldl')),
-    'different tests': change(res('LDL', 160, 'mg/dL', id: 'ldl'), res('HDL', 31, 'mg/dL', id: 'hdl')),
+    'ldl 150 → 131': change(res('LDL', 150, 'mg/dL', id: 'ldl'), res('LDL', 131, 'mg/dL', id: 'ldl')),
+    'ldl mg/dL → mmol/L': change(res('LDL', 150, 'mg/dL', id: 'ldl'), res('LDL', 3.4, 'mmol/L', id: 'ldl')),
+    'different tests': change(res('LDL', 150, 'mg/dL', id: 'ldl'), res('HDL', 35, 'mg/dL', id: 'hdl')),
     'censored': change(res('CRP', 0.5, 'mg/L', id: 'crp', below: true), res('CRP', 1.2, 'mg/L', id: 'crp')),
     'from zero': change(res('CRP', 0, 'mg/L', id: 'crp'), res('CRP', 1.2, 'mg/L', id: 'crp')),
-    'other lab': change(res('LDL', 160, 'mg/dL', id: 'ldl', lab: 'Α '), res('LDL', 150, 'mg/dL', id: 'ldl', lab: 'β')),
-    'same lab, other case': change(res('LDL', 160, 'mg/dL', id: 'ldl', lab: ' ΑΒ'), res('LDL', 150, 'mg/dL', id: 'ldl', lab: 'αβ ')),
-    'other method': change(res('LDL', 160, 'mg/dL', id: 'ldl', method: 'calc'), res('LDL', 150, 'mg/dL', id: 'ldl', method: 'direct')),
-    'unknown unit on one side': change(res('LDL', 160, 'mg/dL', id: 'ldl'), res('LDL', 150, 'κάτι', id: 'ldl')),
+    'other lab': change(res('LDL', 150, 'mg/dL', id: 'ldl', lab: 'Α '), res('LDL', 140, 'mg/dL', id: 'ldl', lab: 'β')),
+    'same lab, other case': change(res('LDL', 150, 'mg/dL', id: 'ldl', lab: ' ΑΒ'), res('LDL', 140, 'mg/dL', id: 'ldl', lab: 'αβ ')),
+    'other method': change(res('LDL', 150, 'mg/dL', id: 'ldl', method: 'calc'), res('LDL', 140, 'mg/dL', id: 'ldl', method: 'direct')),
+    'unknown unit on one side': change(res('LDL', 150, 'mg/dL', id: 'ldl'), res('LDL', 140, 'κάτι', id: 'ldl')),
     'urine vs blood': change(res('Γλυκόζη', 95, 'mg/dL', id: 'glu'), res('Γλυκόζη', 5, 'mg/dL', id: 'glu', specimen: 'Ούρα')),
   };
   return out;

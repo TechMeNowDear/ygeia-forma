@@ -107,7 +107,7 @@ Map<String, Object?> _goalsView(Goals g) => <String, Object?>{
 Map<String, Object?> _goalsGrid() {
   final out = <String, Object?>{};
   for (final male in [true, false]) {
-    for (final age in [25, 47, 70]) {
+    for (final age in [25, 44, 70]) {
       for (final h in [160.0, 180.0, 195.0]) {
         for (final kg in [55.0, 84.0, 110.0, 140.0]) {
           for (final pal in activityLevels) {
@@ -208,7 +208,7 @@ Map<String, Object?> _goalsGolden() {
     'kcalSet+Adapt': _goalsView(_base(kcalSet: 1800, kcalAdapt: 2150)),
     'proteinSet': _goalsView(_base(proteinSet: 120)),
     'noDoctor': _goalsView(_base(doctor: false, kcalSet: 2000)),
-    'female': _goalsView(_base(male: false, kg: 62, heightCm: 163, age: 47, rate: 0.0075)),
+    'female': _goalsView(_base(male: false, kg: 62, heightCm: 163, age: 44, rate: 0.0075)),
     'gain': _goalsView(_base(aim: GoalAim.gain, rate: 0.0025, kg: 70)),
     'keep': _goalsView(_base(aim: GoalAim.keep, rate: 0)),
     'tinyKcal': _goalsView(_base(kcalSet: 1500, proteinSet: 300)),
@@ -620,7 +620,7 @@ List<_Scn> _scenarios() {
     _Scn('12 ζυγίσεις αδιάβαστες', g, steady, read: false),
     _Scn('13 αλλαγή ώρας 28/3', _base(since: '2027-03-01'), _world(seed: 23, from: DateTime(2027, 3, 1))),
     _Scn('14 ίδιο βάρος', _base(aim: GoalAim.keep, rate: 0), _world(seed: 24, from: start, eat: (i, d) => 2800.0, tdee: 2650)),
-    _Scn('15 γυναίκα στο κατώτατο', _base(male: false, kg: 62, heightCm: 160, age: 47, rate: 0.0075),
+    _Scn('15 γυναίκα στο κατώτατο', _base(male: false, kg: 62, heightCm: 160, age: 44, rate: 0.0075),
         _world(seed: 25, from: start, kg0: 62, eat: (i, d) => 1250.0, tdee: 1650)),
     _Scn('16 ζυγαριά με θόρυβο', g, _world(seed: 26, from: start, scaleNoise: 1.5)),
     _Scn('17 ζύγιση κάθε μέρα', g, _world(seed: 27, from: start, weighs: (i, d) => true)),
@@ -831,7 +831,7 @@ Map<String, Object?> _adaptiveGolden() {
     propose['$t'] = cells.join(' ');
   }
   out['proposeTarget se=0|12|40|80'] = propose;
-  final fem = _base(male: false, kg: 62, heightCm: 160, age: 47, rate: 0.0075, kcalSet: 1300);
+  final fem = _base(male: false, kg: 62, heightCm: 160, age: 44, rate: 0.0075, kcalSet: 1300);
   out['proposeTarget floor'] = <String, Object?>{
     for (final t in [1500.0, 1600.0, 1680.0, 1690.0, 1700.0, 1711.0, 1720.0, 1800.0])
       '$t': _propJson(proposeTarget(goals: fem, est: _est(t), kgNow: 62)),
@@ -1437,7 +1437,7 @@ Map<String, Object?> _bodyGolden() {
     },
     'copyWith': pv(me
         .withSmoking(smoke: 'ex', cigs: 15, smokeFrom: 19, quit: '2026-11-23')
-        .copyWith(birthYear: 1979, birthMonth: 3, sex: 'f', heightCm: 165, weighDays: {2, 6}, waistDay: 7)),
+        .copyWith(birthYear: 1982, birthMonth: 6, sex: 'f', heightCm: 165, weighDays: {2, 6}, waistDay: 7)),
     'copyWith empty weighDays': pv(me.copyWith(weighDays: <int>{})),
     'fromJson': <String, Object?>{
       for (final e in <String, Object?>{

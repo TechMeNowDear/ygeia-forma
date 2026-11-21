@@ -620,9 +620,11 @@ void main() {
     test('Βάση: οι κλήσεις του ιστορικού και του φαγητού ξεκινούν κατευθείαν στη σειρά της (χωρίς Dispatchers.Default)', () {
       const dir = 'android/app/src/main/kotlin/gr/ygeiaforma/ygeia_forma';
       final bridge = File('$dir/SamsungHealthBridge.kt').readAsStringSync();
-      for (final m in ['saveDays', 'loadDays', 'clearDays', 'dbStatus', 'dbStatusSeen']) {
+      for (final m in ['saveDays', 'loadDays', 'dbStatus', 'dbStatusSeen']) {
         expect(bridge, contains('"$m" -> respondDb(result)'), reason: m);
       }
+      // Έλεγχος 20/11 (K6C, ιδέα 1): το «clearDays» (σβήσιμο όλου του ιστορικού, που δεν το καλούσε κανείς) βγήκε.
+      expect(bridge, isNot(contains('"clearDays" ->')));
       final food = File('$dir/FoodBridge.kt').readAsStringSync();
       for (final m in ['logRange', 'logPut', 'logDelete', 'myFoods', 'myFoodPut', 'myFoodDelete']) {
         expect(food, contains('"$m" -> respondDb(result)'), reason: m);
