@@ -5,7 +5,7 @@ library;
 
 import 'adaptive.dart';
 import 'body_trend.dart' show weighInDays;
-import 'data.dart' show BodyMeasurement;
+import 'data.dart' show BodyMeasurement, HealthStore;
 import 'food/food_model.dart' show DayMark, Totals;
 import 'food/food_store.dart';
 import 'history.dart' show dateKey;
@@ -128,6 +128,7 @@ class CheckIn {
       this.kgNow,
       this.fastSlope,
       this.fastDays,
+      this.fastFrom,
       this.days = 0,
       this.weighs = 0,
       this.tooFast = false,
@@ -164,6 +165,10 @@ class CheckIn {
   /// Για τη γρήγορη απώλεια: πόσες μέρες πίσω φτάνει το παράθυρο που κρίθηκε (το πολύ 21· λιγότερες όσο η πρώτη
   /// εβδομάδα των στόχων το κόβει). Η κάρτα γράφει ακριβώς αυτό ([fastPeriodText]).
   final int? fastDays;
+
+  /// Για τη γρήγορη απώλεια: η πρώτη μέρα του παραθύρου που κρίθηκε (η τελευταία είναι [fastDays] μέρες μετά). Για τη
+  /// γραμμή του ιστορικού ελέγχων ([AdaptLog.from], K8-R-06)· η κάρτα δεν τη γράφει.
+  final DateTime? fastFrom;
 
   /// Στις 3 τελευταίες εβδομάδες (χωρίς την πρώτη εβδομάδα των στόχων): μέρες φαγητού που μετρούν (≥ 60% του στόχου)
   /// και ζυγίσεις. Για την κάρτα «λίγα δεδομένα».
@@ -598,10 +603,58 @@ CheckIn? pendingCheckIn({
       kgNow: f.kg,
       fastSlope: f.slopeKgWeek,
       fastDays: daysBetween(window.$1, window.$2),
+      fastFrom: window.$1,
       fastIntake: known ? mean : null,
       fastIntakeDays: logged.length,
       fastTarget: known ? target : null,
       foreign: news);
+}
+
+/// Έλεγχος 21/11 (K8-01): η κάρτα ελέγχου ΟΠΩΣ τη δείχνει η «Σήμερα», από ΜΙΑ συνάρτηση για την κάρτα
+/// (`CheckInSlot.pendingFor`) και για την «Αναφορά για έλεγχο». Πριν η αναφορά καλούσε μόνη της το [pendingCheckIn] με
+/// λιγότερα ορίσματα (χωρίς ξένες ζυγίσεις και χωρίς το «οι ζυγίσεις δεν διαβάστηκαν») και χωρίς τους τρεις όρους της
+/// οθόνης: με σφάλμα στις ζυγίσεις έγραφε «λίγα δεδομένα, 0 ζυγίσεις» ενώ η κάρτα έλεγε «δεν διαβάστηκαν».
+/// [why]: γιατί δεν υπολογίστηκε κάρτα: «noGoals», «noData» (καμία ανάγνωση), «foodNotLoaded» (το ημερολόγιο φαγητού δεν
+/// έχει φορτωθεί), «background» (φαίνεται ακόμα το αντίγραφο του παρασκηνίου), «bodyNoPermission» (οι ζυγίσεις δεν
+/// διαβάστηκαν και δεν υπάρχει σφάλμα: δεν δόθηκε άδεια). «none»: υπολογίστηκε· τότε [check] null = τίποτα δεν εκκρεμεί.
+({CheckIn? check, String why}) checkInShown(HealthStore store, FoodStore food, DateTime now) {
+  final g = store.goals;
+  final d = store.data;
+  if (g == null) return (check: null, why: 'noGoals');
+  if (d == null) return (check: null, why: 'noData');
+  if (!food.loaded) return (check: null, why: 'foodNotLoaded');
+  // Round 1 (f3 · S1-10): όσο φαίνεται το αντίγραφο του παρασκηνίου ([Dashboard.background]: όχι πλήρης ανάγνωση·
+  // από παλιότερη έκδοση, ζυγίσεις μόνο 30 ημερών) η κάρτα περιμένει την πλήρη ανάγνωση της εφαρμογής. Πριν, στο
+  // άνοιγμα έβγαινε από μέρος των ζυγίσεων και μπορούσε να δείξει άλλη πρόταση από αυτήν λίγα δευτερόλεπτα μετά.
+  if (d.background) return (check: null, why: 'background');
+  // Round 1 (f1 · S11-2): ζύγιση που δεν μπορεί να είναι δική σου δεν μπαίνει στον έλεγχο· η κάρτα τη γράφει.
+  // Round 1 (f1 · S11-8): αν οι ζυγίσεις δεν διαβάστηκαν τώρα, η κάρτα δεν γράφει «έγιναν 0 ζυγίσεις» και το
+  // «Εντάξει» δεν ξοδεύει τον έλεγχο της εβδομάδας: τη μέρα ελέγχου λέει ότι δεν διαβάστηκαν, χωρίς κουμπί.
+  // Χωρίς ζυγίσεις στην ανάγνωση και χωρίς σφάλμα (δεν δόθηκε άδεια): καμία κάρτα· ο έλεγχος μένει ανοιχτός ως να
+  // διαβαστούν (πριν: «έγιναν 0 ζυγίσεις» και το «Εντάξει» ξόδευε τον έλεγχο).
+  final bodyFailed = d.failed.contains('body');
+  if (!d.bodyOk && !bodyFailed) return (check: null, why: 'bodyNoPermission');
+  final w = guardedWeights(d.body);
+  return (
+    check: pendingCheckIn(
+      goals: g,
+      today: now,
+      weights: w.used,
+      foreign: w.foreign,
+      weightsRead: d.bodyOk && !bodyFailed,
+      intake: (from, to) => dailyIntake(food, from, to),
+      quitDay: store.profile.quitDate,
+    ),
+    why: 'none',
+  );
+}
+
+/// Έλεγχος 21/11 (K8-01): το «Χ% των θερμίδων ήταν εκτίμηση» της κάρτας ([estimatedShare] με τις μέρες της εκτίμησης), από
+/// την ίδια συνάρτηση για την κάρτα και για την αναφορά. null χωρίς εκτίμηση.
+double? checkInEstShare(CheckIn c, FoodStore food) {
+  final e = c.est;
+  if (e == null) return null;
+  return estimatedShare(food, e.from, e.to, minKcal: adaptFullDayShare * c.goals.kcal, maxKcal: absurdDayKcal(c.formulaTdee));
 }
 
 /// Έλεγχος 20/11 (K1-S-02): πόσο πιο γρήγορα από τον ρυθμό σου πρέπει να χάνεις για να το πει η κάρτα.
@@ -642,6 +695,63 @@ Goals _markForeignSeen(CheckIn c, Goals g) {
 /// Round 9 (R9-A1-2): και στο ιστορικό του στόχου ([Goals.recordChangeFrom]), όπως κάθε άλλη αλλαγή.
 Goals applyCheckIn(CheckIn c, DateTime today) => _applied(c, today).recordChangeFrom(c.goals, today);
 
+/// Έλεγχος 21/11 (K8-02): γιατί ο στόχος έμεινε ίδιος ή κόπηκε, όπως το λέει η κάρτα· null: τίποτα από αυτά.
+String? checkInWhy(CheckIn c) {
+  if (c.tooFast) return 'tooFast';
+  if (c.heldDays != null) return 'held';
+  if (c.quitDays != null) return 'quit';
+  final p = c.proposal;
+  if (p == null) return null;
+  if (p.recentDiffers) return 'recent';
+  if (p.underweight) return 'underweight';
+  if (p.withinNoise) return 'noise';
+  if (p.floored) return 'floor';
+  return null;
+}
+
+int? _logInt(double? v) => v == null || !v.isFinite ? null : v.round();
+double? _logDec(double? v) => v == null || !v.isFinite ? null : (v * 1000).round() / 1000;
+double? _logDec2(double? v) => v == null || !v.isFinite ? null : (v * 100).round() / 100;
+
+/// Έλεγχος 21/11 (K8-02): η γραμμή του ιστορικού ελέγχων με τα δεδομένα που έκριναν την κάρτα [c] (παράθυρο, μέσος όρος
+/// φαγητού, κλίση, τυπικό σφάλμα, πλήθη, βάρος, είδος, λόγος), ώστε ο έλεγχος να ξαναελέγχεται αργότερα. Τα πέντε πρώτα
+/// πεδία (μέρα, εκτίμηση, πριν, μετά, εφαρμόστηκε) και τα «fast»/«lowLog» γράφονται ακριβώς όπως πριν. Στη «γρήγορη
+/// απώλεια» (χωρίς εκτίμηση) η κλίση και ο μέσος όρος είναι των ημερών που κρίθηκαν ([CheckIn.fastSlope], [CheckIn.fastIntake]).
+AdaptLog _logLine(CheckIn c,
+    {required String day,
+    required double tdee,
+    required int before,
+    required int after,
+    required bool applied,
+    bool fast = false,
+    bool lowLog = false}) {
+  final e = c.est;
+  // K8-R-06 (ανεξάρτητος έλεγχος): στη «γρήγορη απώλεια» δεν υπάρχει εκτίμηση, αλλά το παράθυρο που κρίθηκε υπάρχει
+  // ([CheckIn.fastFrom] και [CheckIn.fastDays] μέρες μετά): γράφεται, αλλιώς αυτός ο έλεγχος δεν ξαναελέγχεται.
+  final ff = e == null ? c.fastFrom : null;
+  final fd = c.fastDays;
+  final ft = ff == null || fd == null ? null : DateTime(ff.year, ff.month, ff.day + fd);
+  return AdaptLog(
+      day: day,
+      tdee: tdee,
+      before: before,
+      after: after,
+      applied: applied,
+      fast: fast,
+      lowLog: lowLog,
+      from: e != null ? dateKey(e.from) : (ff == null ? null : dateKey(ff)),
+      to: e != null ? dateKey(e.to) : (ft == null ? null : dateKey(ft)),
+      meanIntake: _logInt(e?.meanIntake ?? c.fastIntake),
+      slope: _logDec(e?.slopeKgWeek ?? c.fastSlope),
+      se: e == null ? null : _logInt(e.seKcal),
+      intakeDays: e?.intakeDays ?? (c.kind == CheckKind.fast ? c.fastIntakeDays : null),
+      weighIns: e?.weighIns,
+      // Δύο δεκαδικά: το βάρος της κάρτας είναι μέσος όρος (π.χ. 96,92142857142856), και η γραμμή μένει στις ρυθμίσεις.
+      kg: _logDec2(c.kgNow),
+      kind: c.kind.name,
+      why: checkInWhy(c));
+}
+
 Goals _applied(CheckIn c, DateTime today) {
   final day = dateKey(today);
   final p = c.proposal!;
@@ -652,7 +762,7 @@ Goals _applied(CheckIn c, DateTime today) {
           kcalAdapt: p.target,
           fastAt: day,
           clearKcal: true,
-          addLog: AdaptLog(
+          addLog: _logLine(c,
               day: day, tdee: fastLossCap(c.goals).toDouble(), before: p.current, after: p.target, applied: true, fast: true),
         ));
   }
@@ -665,7 +775,7 @@ Goals _applied(CheckIn c, DateTime today) {
           kcalAdapt: p.target,
           checkIn: day,
           clearKcal: true,
-          addLog: AdaptLog(
+          addLog: _logLine(c,
               day: day, tdee: fastLossCap(c.goals).toDouble(), before: p.current, after: p.target, applied: true, lowLog: true),
         ));
   }
@@ -676,7 +786,7 @@ Goals _applied(CheckIn c, DateTime today) {
         tdeeEst: c.est!.tdee,
         checkIn: day,
         clearKcal: true,
-        addLog: AdaptLog(day: day, tdee: c.est!.tdee, before: p.current, after: p.target, applied: true),
+        addLog: _logLine(c, day: day, tdee: c.est!.tdee, before: p.current, after: p.target, applied: true),
       ));
 }
 
@@ -695,7 +805,7 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
         c,
         c.goals.copyWith(
           checkIn: day,
-          addLog: AdaptLog(
+          addLog: _logLine(c,
               day: day, tdee: fastLossCap(c.goals).toDouble(), before: p.current, after: p.current, applied: false, lowLog: true),
         ));
   }
@@ -705,7 +815,7 @@ Goals dismissCheckIn(CheckIn c, DateTime today) {
       c.goals.copyWith(
         tdeeEst: e.tdee,
         checkIn: day,
-        addLog: AdaptLog(day: day, tdee: e.tdee, before: p.current, after: p.current, applied: false),
+        addLog: _logLine(c, day: day, tdee: e.tdee, before: p.current, after: p.current, applied: false),
       ));
 }
 

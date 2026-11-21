@@ -204,9 +204,14 @@ void main() {
       expect((g.kcal, g.kcalAdapt, g.kcalSet, g.tdeeEst, g.checkIn), (2150, 2150, null, null, '2026-12-14'));
       final l = g.log.single;
       expect((l.day, l.tdee, l.before, l.after, l.applied, l.fast, l.lowLog), ('2026-12-14', 2760.0, 2300, 2150, true, false, true));
-      expect(g.toJson()['log'], [
+      // Έλεγχος 21/11 (K8-02): η γραμμή κρατά και με τι κρίθηκε ο έλεγχος (νέα προαιρετικά κλειδιά)· τα παλιά όπως πριν.
+      final line = Map<String, dynamic>.from((g.toJson()['log'] as List).single as Map);
+      final extra = {for (final k in const ['wf', 'wt', 'mi', 'sl', 'se', 'nd', 'nw', 'kg', 'kd']) k: line.remove(k)};
+      expect([line], [
         {'d': '2026-12-14', 'te': 2760.0, 'k0': 2300, 'k1': 2150, 'ap': true, 'lo': true},
       ]);
+      expect(extra,
+          {'wf': '2026-11-23', 'wt': '2026-12-13', 'mi': 2230, 'sl': 0.3, 'se': 73, 'nd': 21, 'nw': 9, 'kg': 96.92, 'kd': 'proposal'});
       final back = Goals.fromJson(g.toJson())!;
       expect(back.log.single.lowLog, isTrue);
       expect(back.toJson(), g.toJson());

@@ -136,7 +136,9 @@ void main() {
     await r.report(StateError('στην εκκίνηση'), null);
     await r.configure(dir: dir, release: 'ygeia-forma@0.1.5', device: const {'model': 'm', 'android': '16'});
     expect(await r.pending(), 1);
-    final e = jsonDecode(dir.listSync().whereType<File>().single.readAsStringSync()) as Map;
+    // Έλεγχος 21/11 (K8-06): στον φάκελο υπάρχει πια και το αρχείο των τελευταίων σφαλμάτων («.recent», δεν στέλνεται)·
+    // το γεγονός της ουράς είναι το μοναδικό «.json».
+    final e = jsonDecode(dir.listSync().whereType<File>().where((f) => f.path.endsWith('.json')).single.readAsStringSync()) as Map;
     expect(e['release'], 'ygeia-forma@0.1.5');
   });
 

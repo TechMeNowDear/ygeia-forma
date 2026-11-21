@@ -974,10 +974,12 @@ class Prefs {
       this.lastExport,
       this.backupSnooze,
       Map<String, int>? monthFails,
-      List<String>? staleMonths})
+      List<String>? staleMonths,
+      List<List<Object>>? failedLog})
       : plan = plan ?? SourcePlan.samsungOnly,
         monthFails = monthFails ?? {},
-        staleMonths = staleMonths ?? [];
+        staleMonths = staleMonths ?? [],
+        failedLog = failedLog ?? [];
 
   factory Prefs.fromJson(Map<String, dynamic> j) {
     // Round 1 (f3 · S3-2): αριθμητικό πεδίο λάθος είδους (π.χ. «"layout": "x"») παίρνει μόνο αυτό την προεπιλογή του·
@@ -1039,6 +1041,7 @@ class Prefs {
         if (j['staleMonths'] is List)
           for (final m in j['staleMonths'] as List) if (m is String) m,
       ],
+      failedLog: failedLogFromJson(j['failedLog']),
     );
   }
 
@@ -1078,6 +1081,13 @@ class Prefs {
   /// Κομμάτια («2026-10-01» = οι 30 μέρες ως εκείνη τη μέρα) που απέτυχαν 3 φορές και κράτησαν τις παλιές τιμές
   /// ύπνου: φαίνονται στις Τάσεις («δεν ξαναϋπολογίστηκαν»), ποτέ σιωπηλά.
   final List<String> staleMonths;
+
+  /// Έλεγχος 21/11 (K8-06): οι [failedLogMax] τελευταίες διαφορετικές αποτυχίες ανάγνωσης της Samsung (κάποιο είδος
+  /// δεδομένων δεν ήρθε): [ώρα σε ms, «body,heart»], και όταν η ίδια ξανάγινε [πρώτη ώρα, είδη, πόσες φορές, τελευταία ώρα]
+  /// ([noteFailedRead]). Μόνο ώρα και ονόματα ειδών, ποτέ τιμές. Πριν φαινόταν μόνο η ΤΕΛΕΥΤΑΙΑ ανάγνωση: μια
+  /// αποτυχία της προηγούμενης μέρας δεν άφηνε ίχνος στην «Αναφορά για έλεγχο». Προαιρετικό κλειδί («failedLog»): παλιό
+  /// αρχείο ρυθμίσεων χωρίς αυτό διαβάζεται όπως πριν, και άδειο δεν γράφεται.
+  final List<List<Object>> failedLog;
 
   /// Για ποια χαλασμένη βάση (ώρα, ms) ξεκίνησε ήδη η ξαναδιάβαση του ιστορικού (A7): μία φορά για κάθε βλάβη.
   int? dbReset;
@@ -1181,7 +1191,56 @@ class Prefs {
         if (backupSnooze != null) 'backupSnooze': backupSnooze,
         if (monthFails.isNotEmpty) 'monthFails': monthFails,
         if (staleMonths.isNotEmpty) 'staleMonths': staleMonths,
+        if (failedLog.isNotEmpty) 'failedLog': failedLog,
       });
+}
+
+/// Έλεγχος 21/11 (K8-06): πόσες αποτυχημένες αναγνώσεις της Samsung κρατά το [Prefs.failedLog] (περίπου 40 bytes η καθεμία).
+const failedLogMax = 20;
+
+/// Πόσο απέχουν δύο ίδιες αποτυχίες για να μετρηθεί και η δεύτερη (μία ώρα).
+const failedLogRepeatMs = 60 * 60 * 1000;
+
+/// Το «failedLog» όπως διαβάζεται από το αρχείο: γραμμές [ακέραια ώρα ms, κείμενο ως 80 χαρακτήρες] ή, όταν η ίδια
+/// αποτυχία ξανάγινε, [πρώτη ώρα ms, κείμενο, πόσες φορές, τελευταία ώρα ms]· ό,τι άλλο αγνοείται (χαλασμένο ή άγνωστο
+/// σχήμα δεν χαλά τις ρυθμίσεις).
+List<List<Object>> failedLogFromJson(Object? j) {
+  bool ms(Object? v) => v is num && v.isFinite;
+  return [
+    if (j is List)
+      for (final x in j)
+        if (x is List && (x.length == 2 || x.length == 4) && ms(x[0]) && x[1] is String && (x[1] as String).length <= 80)
+          if (x.length == 2)
+            <Object>[(x[0] as num).toInt(), x[1] as String]
+          else if (ms(x[2]) && ms(x[3]))
+            <Object>[(x[0] as num).toInt(), x[1] as String, (x[2] as num).toInt(), (x[3] as num).toInt()],
+  ];
+}
+
+/// Γράφει στο [log] μια αποτυχημένη ανάγνωση [what] τη στιγμή [at] (ms). `true` αν το [log] άλλαξε (τότε γράφονται οι
+/// ρυθμίσεις).
+///
+/// K8-R-08 (ανεξάρτητος έλεγχος): μία γραμμή για ΚΑΘΕ διαφορετική αποτυχία, όχι μία για κάθε φορά. Όταν η ίδια ξαναγίνει,
+/// η γραμμή της γίνεται [πρώτη ώρα, είδη, πόσες φορές, τελευταία ώρα] και πηγαίνει στο τέλος· μέσα σε [failedLogRepeatMs]
+/// από την τελευταία φορά δεν αλλάζει τίποτα (καμία εγγραφή στον δίσκο). Πριν: νέα γραμμή κάθε ώρα· ένα είδος που αποτυγχάνει
+/// ΠΑΝΤΑ (π.χ. κλειστή άδεια) γέμιζε τις [failedLogMax] θέσεις με την ίδια γραμμή και έσβηνε τη σπάνια αποτυχία της
+/// προηγούμενης εβδομάδας, και δύο αποτυχίες που εναλλάσσονται έγραφαν σε κάθε ανανέωση.
+bool noteFailedRead(List<List<Object>> log, String what, int at) {
+  final i = log.lastIndexWhere((x) => x.length >= 2 && x[1] == what);
+  if (i < 0) {
+    log.add(<Object>[at, what]);
+    if (log.length > failedLogMax) log.removeRange(0, log.length - failedLogMax);
+    return true;
+  }
+  final old = log[i];
+  final first = old[0] is int ? old[0] as int : at;
+  final times = old.length >= 4 && old[2] is int ? old[2] as int : 1;
+  final last = old.length >= 4 && old[3] is int ? old[3] as int : first;
+  if (at - last < failedLogRepeatMs) return false;
+  log
+    ..removeAt(i)
+    ..add(<Object>[first, what, times + 1, at]);
+  return true;
 }
 
 /// Οι ρυθμίσεις μετά από επαναφορά αντιγράφου ([HealthStore.restorePrefs]): του κινητού ([mine]) με όσα φέρνει το
@@ -2233,6 +2292,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     notifyListeners();
 
     if (!_prefsLoaded) await loadPrefs(timeout: const Duration(seconds: 10));
+    // Έλεγχος 21/11 (K8-06): ανάγνωση που δεν έδωσε κάποιο είδος (ή καθόλου) αφήνει ίχνος στις ρυθμίσεις, για την «Αναφορά
+    // για έλεγχο». Μόνο όταν υπάρχει αποτυχία: καμία επιπλέον εγγραφή στις κανονικές αναγνώσεις.
+    await _noteFailedRead(ok ? p.data?.failed : null, ok ? null : p.status);
 
     final d = _raw;
     if (ok && d != null && d.hasAnyPermission) {
@@ -2258,6 +2320,24 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       // Η Samsung δεν απάντησε: το Oura διαβάζεται κανονικά (ανεξάρτητη πηγή).
       await syncOura();
     }
+  }
+
+  /// Έλεγχος 21/11 (K8-06): γράφει στο [Prefs.failedLog] μια ανάγνωση της Samsung με αποτυχία: τα είδη που δεν ήρθαν
+  /// ([failed]), ή, όταν δεν ήρθε τίποτα, «read:είδος σφάλματος» από το [status] (μόνο ο σύντομος κωδικός, ποτέ το μήνυμα).
+  /// Χωρίς πλευρά Android (δοκιμές) ή χωρίς διαβασμένες ρυθμίσεις: τίποτα.
+  Future<void> _noteFailedRead(Set<String>? failed, Map<String, dynamic>? status) async {
+    if (!_prefsLoaded) return;
+    String? what;
+    if (failed != null) {
+      if (failed.isEmpty) return;
+      what = (failed.toList()..sort()).join(',');
+    } else {
+      final kind = status?['kind'];
+      if (kind is! String || kind == 'not_android' || !RegExp(r'^[a-z_]{1,24}$').hasMatch(kind)) return;
+      what = 'read:$kind';
+    }
+    if (what.length > 80) what = what.substring(0, 80);
+    if (noteFailedRead(prefs.failedLog, what, DateTime.now().millisecondsSinceEpoch)) await _savePrefs();
   }
 
   /// Η βάση βρέθηκε χαλασμένη (ώρα, ms) και κρατήθηκε αντίγραφο (A7): κάρτα στη Σήμερα ώσπου να την κλείσει ο χρήστης.
@@ -2386,6 +2466,13 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// Μέρες που άλλαξαν στη μνήμη αλλά δεν γράφτηκαν ακόμα στο κινητό (απέτυχε η αποθήκευση):
   /// μπαίνουν σε κάθε επόμενη αποθήκευση μέχρι να γραφτούν, ώστε να μη μείνουν κενά.
   final Set<String> _unsavedDays = {};
+
+  /// Έλεγχος 21/11 (K8-07): μόνο για ανάγνωση, για την «Αναφορά για έλεγχο»: οι μέρες του ιστορικού που είναι στη μνήμη
+  /// αλλά δεν γράφτηκαν ακόμα στο κινητό. Αντίγραφο: όποιος το πάρει δεν αλλάζει τίποτα εδώ.
+  Set<String> get unsavedDays => Set.unmodifiable(_unsavedDays);
+
+  /// Έλεγχος 21/11 (K8-07): η τελευταία εγγραφή των ρυθμίσεων απέτυχε στο κινητό (μόνο για ανάγνωση, για την αναφορά).
+  bool get prefsWriteFailed => _prefsWriteFailed;
 
   @override
   bool get historyReady => _historyLoaded;
@@ -3024,6 +3111,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       ..monthFails.addAll(prefs.monthFails)
       ..staleMonths.clear()
       ..staleMonths.addAll(prefs.staleMonths)
+      ..failedLog.clear()
+      ..failedLog.addAll(prefs.failedLog)
       // Οι πηγές και η σύνδεση Oura ανήκουν σε αυτό το κινητό, όχι στο αντίγραφο.
       ..plan = _plan
       ..ouraSynced = prefs.ouraSynced

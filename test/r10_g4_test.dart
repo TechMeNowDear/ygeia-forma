@@ -68,10 +68,14 @@ void main() {
 
       test('λιγότερες από όσες δηλώνουν τα αρχεία (skip, ομάδα που δεν έτρεξε) → κόκκινο, και πάνω από το κατώτατο', () {
         final gate = _gate(wf);
-        // 2.500 δηλωμένες: «test(» και «testWidgets(» στην αρχή της γραμμής (και με εσοχή)· όχι σχόλιο, group, testX ή
+        // Έλεγχος 21/11 (#148): τα πλήθη της δοκιμής βγαίνουν από το κατώτατο της πύλης (κατώτατο + 100)· πριν ήταν
+        // γραμμένα «2.500» και η δοκιμή κοκκίνιζε μόλις το κατώτατο ανέβαινε πάνω από εκεί.
+        final floor = int.parse(RegExp(r'if \[ "\$\{n:-0\}" -lt (\d+) \]; then').firstMatch(gate)!.group(1)!);
+        final n = floor + 100;
+        // n δηλωμένες: «test(» και «testWidgets(» στην αρχή της γραμμής (και με εσοχή)· όχι σχόλιο, group, testX ή
         // «test» μέσα σε έκφραση.
         final body = StringBuffer('void main() {\n');
-        for (var i = 0; i < 2498; i++) {
+        for (var i = 0; i < n - 2; i++) {
           body.writeln("  test('t$i', () {});");
         }
         body
@@ -83,18 +87,18 @@ void main() {
           ..writeln('  expect(test, isNotNull);')
           ..writeln('}');
         final files = [body.toString()];
-        final same = _run(gate, dir, '2500 tests passed.\n', files);
+        final same = _run(gate, dir, '$n tests passed.\n', files);
         expect(same.code, 0, reason: same.out);
-        expect(same.out, contains('στον κώδικα: 2500'));
-        final less = _run(gate, dir, '2499 tests passed, 1 skipped.\n', files);
+        expect(same.out, contains('στον κώδικα: $n'));
+        final less = _run(gate, dir, '${n - 1} tests passed, 1 skipped.\n', files);
         expect(less.code, isNot(0));
-        expect(less.out, contains('δηλώνουν 2500'));
+        expect(less.out, contains('δηλώνουν $n'));
         // Μετρούν όλα τα αρχεία της λίστας του «flutter test».
         final two = [...files, "  testWidgets('z', (t) async {});\n"];
-        expect(_run(gate, dir, '2500 tests passed.\n', two).code, isNot(0));
-        expect(_run(gate, dir, '2501 tests passed.\n', two).code, 0);
+        expect(_run(gate, dir, '$n tests passed.\n', two).code, isNot(0));
+        expect(_run(gate, dir, '${n + 1} tests passed.\n', two).code, 0);
         // Ένας βρόχος δίνει περισσότερες από όσες δηλώνονται: πράσινο.
-        expect(_run(gate, dir, '2600 tests passed.\n', files).code, 0);
+        expect(_run(gate, dir, '${n + 100} tests passed.\n', files).code, 0);
       });
 
       test('Kotlin: κατώτατα από το #108 (117 κινητό, 197 ρολόι), μαζί με το «όχι λιγότεροι από τα @Test»', () {
