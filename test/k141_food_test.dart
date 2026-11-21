@@ -329,16 +329,17 @@ void main() {
     });
 
     test('K2-R-03 (τελικός έλεγχος): 5 × 180 g ψητός μπακαλιάρος περνούν το όριο· 4 × 180 g σολομός σχάρας είναι 896 g ωμό', () {
-      // Πριν: σαν ωμά. Ψητός μπακαλιάρος 5 × 180 × 0,111 = 99,9 µg (κάτω από 106,6: καμία σημείωση)· σολομός σχάρας 720 g
-      // (ακριβώς στο όριο: καμία σημείωση).
+      // Πριν: σαν ωμά. Ψητός μπακαλιάρος από ψητοπωλείο 5 × 180 × 0,111 = 99,9 µg (κάτω από 106,6: καμία σημείωση)·
+      // σολομός σχάρας 720 g (ακριβώς στο όριο: καμία σημείωση).
       var n = 0;
       final s0 = FoodStore.preloaded(foods: basicFoods(), now: _monday);
       final r = planLibraryImport(
         parseLibrary(jsonEncode({
           'kind': libraryKind,
+          // Φαγητά παραγγελίας: μόνο εκεί η βιβλιοθήκη δέχεται μαγειρεμένες μορφές (στα δικά σου ζητά την ωμή).
           'dishes': [
-            _dish('bakaliaros-psitos', 'plate', [('C26023', 180), (_tomato, 200)], cook: 'none'),
-            _dish('solomos-sxaras', 'plate', [('C26229', 180), (_tomato, 200)], cook: 'none'),
+            {..._dish('bakaliaros-psitos', 'plate', [('C26023', 180), (_tomato, 200)], cook: 'out'), 'order': 'Μπακαλιάρος ψητός'},
+            {..._dish('solomos-sxaras', 'plate', [('C26229', 180), (_tomato, 200)], cook: 'out'), 'order': 'Σολομός σχάρας'},
           ],
         })),
         existing: const [],
