@@ -451,4 +451,44 @@ void main() {
       expect(s.week, isNull);
     });
   });
+
+  // Έλεγχος 21/11 (Α29): οι μέρες σε δύο στήλες όταν χωρούν (ανοιχτό Fold ~750 dp, tablet), μία στο κινητό· ποτέ ξεχείλισμα.
+  group('Α29: δύο στήλες στο ανοιχτό Fold', () {
+    Future<void> pump(WidgetTester t, FoodStore s, Size size, double scale) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = size;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(
+        theme: buildTheme(Brightness.light),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+        home: WeekPlanScreen(food: s, clock: () => now),
+      ));
+      await t.pumpAndSettle();
+    }
+
+    for (final (size, scale, two) in [
+      (const Size(412, 4000), 1.0, false),
+      (const Size(360, 6000), 2.0, false),
+      (const Size(750, 3000), 1.0, true),
+      (const Size(750, 5000), 2.0, true),
+      (const Size(832, 3000), 1.3, true),
+      (const Size(1280, 3000), 1.0, true),
+    ]) {
+      testWidgets('${size.width.round()} dp, ${scale}×: ${two ? 'δύο στήλες' : 'μία στήλη'}, τίποτα δεν ξεχειλίζει', (t) async {
+        final s = store(dishes: library());
+        await pump(t, s, size, scale);
+        final st = t.state(find.byType(WeekPlanScreen)) as dynamic;
+        await st.read(weekText());
+        await t.pumpAndSettle();
+        expect(s.week, isNotNull);
+        expect(find.byKey(const ValueKey('week-day-0')), findsOneWidget);
+        expect(find.byKey(const ValueKey('week-two-columns')), two ? findsOneWidget : findsNothing);
+        final e = t.takeException();
+        expect(e, isNull, reason: e is FlutterError ? e.toStringDeep() : '$e');
+      });
+    }
+  });
 }

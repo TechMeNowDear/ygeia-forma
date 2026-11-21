@@ -865,19 +865,24 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
 /// Fold, tablet, PC). Στο κινητό και στο κλειστό Fold μία στήλη, όπως πριν.
 const weekTwoColumnsWidth = 840.0;
 
-/// Α29 (21/11): οι κάρτες των ημερών σε μία στήλη, ή σε δύο όταν η οθόνη είναι φαρδιά ([weekTwoColumnsWidth]).
+/// Έλεγχος 21/11 (μετά την #151): οι δύο στήλες αποφασίζονται από το πλάτος που παίρνει πράγματι η λίστα: κάθε στήλη
+/// τουλάχιστον 328 dp, όσο οι κάρτες σε κινητό 360 dp. Πριν: από 840 dp οθόνης, που δεν το φτάνει το ανοιχτό Fold
+/// (περίπου 750–830 dp), άρα οι δύο στήλες δεν εμφανίζονταν ποτέ εκεί.
+const weekTwoColumnsMinWidth = 2 * 328.0 + 12;
+
+/// Α29 (21/11): οι κάρτες των ημερών σε μία στήλη, ή σε δύο όταν χωρούν ([weekTwoColumnsMinWidth]).
 class _WeekDays extends StatelessWidget {
   const _WeekDays({required this.cards});
   final List<Widget> cards;
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.sizeOf(context).width < weekTwoColumnsWidth) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 10), cards[i]],
-      ]);
-    }
     return LayoutBuilder(builder: (context, box) {
+      if (box.maxWidth < weekTwoColumnsMinWidth) {
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 10), cards[i]],
+        ]);
+      }
       const gap = 12.0;
       final col = (box.maxWidth - gap) / 2;
       return Wrap(

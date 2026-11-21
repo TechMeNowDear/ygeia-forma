@@ -33,6 +33,20 @@ object QuickWidgetRules {
 
     fun trainingToday(): LocalDate = trainingDate(java.time.LocalDateTime.now())
 
+    /**
+     * Έλεγχος 21/11 (μετά την #151): πότε ξαναζωγραφίζονται μόνα τους τα widgets. Στα μεσάνυχτα αλλάζει η μέρα των
+     * μετρήσεων (χθεσινά βήματα, φαγητό = «—») και στις 04:00 η μέρα της προπόνησης ([trainingDate]). Χωρίς το δεύτερο, το
+     * «Προπόνηση σήμερα» έδειχνε όλο το πρωί την προπόνηση της προηγούμενης μέρας, ώσπου να ανοίξεις την εφαρμογή. Ένα
+     * λεπτό μετά από την αλλαγή, όπως πριν.
+     */
+    fun nextRedraw(now: java.time.LocalDateTime): java.time.LocalDateTime {
+        val four = now.toLocalDate().atTime(TRAINING_DAY_START_HOUR, 0)
+        val next = if (now.isBefore(four)) four else now.toLocalDate().plusDays(1).atStartOfDay()
+        return next.plusMinutes(1)
+    }
+
+    private const val TRAINING_DAY_START_HOUR = 4
+
     fun workoutLines(w: JSONObject?, today: LocalDate): Pair<String, String> {
         if (w == null) return "Προπόνηση" to "Άνοιξε την εφαρμογή"
         if (w.optString("done", "") == today.toString()) {

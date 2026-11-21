@@ -411,6 +411,11 @@ class MealPicker extends StatelessWidget {
 /// Fold, tablet, PC). Ίδιο όριο με την εβδομάδα του προγράμματος.
 const foodTwoColumnsWidth = 840.0;
 
+/// Έλεγχος 21/11 (μετά την #151): οι δύο στήλες αποφασίζονται από το πλάτος που παίρνει πράγματι η λίστα: κάθε στήλη
+/// τουλάχιστον 340 dp, όσο ένα κινητό. Πριν: από 840 dp οθόνης, που δεν το φτάνει το ανοιχτό Fold (περίπου 750–830 dp),
+/// άρα οι δύο στήλες δεν εμφανίζονταν ποτέ εκεί.
+const foodTwoColumnsMinWidth = 2 * 340.0 + 16;
+
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen(
       {super.key,
@@ -711,28 +716,34 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         );
     // Απόφαση χρήστη 21/11 (Α29): στο ανοιχτό Fold, στο tablet και στο PC τα τρόφιμα σε δύο στήλες (πριν: μία, τεντωμένη).
     final wide = MediaQuery.sizeOf(context).width >= foodTwoColumnsWidth;
-    Widget tiles(List<Widget> items) => !wide
-        ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: items)
-        : LayoutBuilder(builder: (context, box) {
-            const gap = 16.0;
-            final col = (box.maxWidth - gap) / 2;
-            return Wrap(spacing: gap, children: [for (final t in items) SizedBox(width: col, child: t)]);
-          });
+    // [two]: δύο στήλες ([foodTwoColumnsMinWidth]), για τη γραμμή κάτω από κάθε τρόφιμο.
+    Widget tiles(List<Widget> Function(bool two) items) => LayoutBuilder(builder: (context, box) {
+          final two = box.maxWidth >= foodTwoColumnsMinWidth;
+          final list = items(two);
+          if (!two) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: list);
+          const gap = 16.0;
+          final col = (box.maxWidth - gap) / 2;
+          return Wrap(
+            key: const ValueKey('food-two-columns'),
+            spacing: gap,
+            children: [for (final t in list) SizedBox(width: col, child: t)],
+          );
+        });
     Widget section(String title, List<Food> foods, {Widget? trailing, bool more = false}) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             head(title, trailing: trailing),
-            tiles([
-              for (var k = 0; k < foods.length; k++)
-                _FoodTile(
-                  food: foods[k],
-                  store: widget.food,
-                  onTap: () => _pick(foods[k]),
-                  onMore: more ? () => myFoodActions(context, widget.food, foods[k]) : null,
-                  badge: !more,
-                  line: wide ? k < foods.length - 2 : k < foods.length - 1,
-                ),
-            ]),
+            tiles((two) => [
+                  for (var k = 0; k < foods.length; k++)
+                    _FoodTile(
+                      food: foods[k],
+                      store: widget.food,
+                      onTap: () => _pick(foods[k]),
+                      onMore: more ? () => myFoodActions(context, widget.food, foods[k]) : null,
+                      badge: !more,
+                      line: two ? k < foods.length - 2 : k < foods.length - 1,
+                    ),
+                ]),
           ],
         );
     // «Τα φαγητά μου» (15/11): πρώτα, γιατί ένα φαγητό είναι όλο το γεύμα με ένα πάτημα.
@@ -1066,15 +1077,15 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                           ],
                         ),
                       ),
-                    tiles([
-                      for (var k = 0; k < results.length; k++)
-                        _FoodTile(
-                          food: results[k],
-                          store: widget.food,
-                          onTap: () => _pick(results[k]),
-                          line: wide ? k < results.length - 2 : k < results.length - 1,
-                        ),
-                    ]),
+                    tiles((two) => [
+                          for (var k = 0; k < results.length; k++)
+                            _FoodTile(
+                              food: results[k],
+                              store: widget.food,
+                              onTap: () => _pick(results[k]),
+                              line: two ? k < results.length - 2 : k < results.length - 1,
+                            ),
+                        ]),
                   ],
                 ],
               ),
