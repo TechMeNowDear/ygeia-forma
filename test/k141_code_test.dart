@@ -177,10 +177,13 @@ void main() {
     })));
     await t.pumpWidget(MaterialApp(
       theme: buildTheme(Brightness.light),
+      // Στήλη, όχι λίστα: μέσα σε λίστα ο «finder» δεν βλέπει παιδί με ύψος 0 (το «τίποτα» της κάρτας).
       home: Scaffold(
-        body: ListView(children: [
-          BackupReminderSlot(store: store, food: food, training: training, now: now, vitals: vitals),
-        ]),
+        body: SingleChildScrollView(
+          child: Column(children: [
+            BackupReminderSlot(store: store, food: food, training: training, now: now, vitals: vitals),
+          ]),
+        ),
       ),
     ));
     expect(find.byKey(const ValueKey('today-backup-none')), findsOneWidget);

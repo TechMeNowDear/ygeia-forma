@@ -48,11 +48,14 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
   /// Έλεγχος 20/11 (K6S-11): και «Τα φαγητά μου» και οι μετρήσεις πίεσης, σακχάρου, καρδιογραφήματος: όποιος έγραφε μόνο
   /// πίεση δεν έβλεπε ποτέ την κάρτα.
   static bool hasOwnData(HealthStore store, FoodStore food, TrainingStore training, [VitalsStore? vitals]) =>
+      _ownDataBesidesVitals(store, food, training) || (vitals ?? VitalsStore.main).all.isNotEmpty;
+
+  /// Ό,τι το [hasOwnData] χωρίς τις μετρήσεις: εκείνες ζουν σε δικό τους αρχείο και διαβάζονται μόνο όταν χρειαστούν.
+  static bool _ownDataBesidesVitals(HealthStore store, FoodStore food, TrainingStore training) =>
       (food.loaded && (food.mine.isNotEmpty || food.recent(limit: 1).isNotEmpty)) ||
       (food.dishesRead && food.dishes.isNotEmpty) ||
       (training.ready && !training.readError && training.sessions.isNotEmpty) ||
-      store.waist.isNotEmpty ||
-      (vitals ?? VitalsStore.main).all.isNotEmpty;
+      store.waist.isNotEmpty;
 
   /// Μόνο με διαβασμένες ρυθμίσεις: πριν από αυτό δεν ξέρουμε πότε βγήκε το τελευταίο αντίγραφο.
   static bool shows(HealthStore store, FoodStore food, TrainingStore training, DateTime now, [VitalsStore? vitals]) =>
@@ -65,20 +68,22 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
       );
 
   @override
-  Widget build(BuildContext context) {
-    // Έλεγχος 21/11 (K6-R-07): οι μετρήσεις διαβάζονται λίγο ΜΕΤΑ το πρώτο χτίσιμο· χωρίς αυτό, όποιος είχε μόνο
-    // μετρήσεις πίεσης έβλεπε την κάρτα μόνο αν τύχαινε να αλλάξει κάτι άλλο.
-    final v = vitals ?? VitalsStore.main;
-    return ListenableBuilder(
-        listenable: Listenable.merge([food, training, v]),
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Listenable.merge([food, training]),
         builder: (context, _) {
-          if (!shows(store, food, training, now, v)) return const SizedBox.shrink(key: ValueKey('today-backup-none'));
-          return Padding(
-            padding: const EdgeInsets.only(bottom: PageFrame.gap),
-            child: BackupReminderCard(store: store, food: food, now: now, export: export, share: share),
-          );
+          if (!store.prefsLoaded || _ownDataBesidesVitals(store, food, training)) return _slot();
+          // Έλεγχος 21/11 (K6-R-07): μόνο οι μετρήσεις μπορούν να δείξουν την κάρτα, και διαβάζονται λίγο ΜΕΤΑ το πρώτο
+          // χτίσιμο: η κάρτα τις ακούει. Πριν, όποιος είχε μόνο μετρήσεις πίεσης την έβλεπε μόνο αν άλλαζε κάτι άλλο.
+          return ListenableBuilder(listenable: vitals ?? VitalsStore.main, builder: (context, _) => _slot());
         },
       );
+
+  Widget _slot() {
+    if (!shows(store, food, training, now, vitals)) return const SizedBox.shrink(key: ValueKey('today-backup-none'));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: PageFrame.gap),
+      child: BackupReminderCard(store: store, food: food, now: now, export: export, share: share),
+    );
   }
 }
 
