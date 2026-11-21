@@ -246,7 +246,7 @@ void main() {
       ], meals: const [Meal.dinner]);
       return aiCheckWeek(s, w, const [],
           t: _targets, meals: const [Meal.dinner], checkDays: {for (var i = 0; i < dinners.length; i++) i}, fishWeek: fishWeek,
-          legumesWeek: legumesWeek, bodyKg: 82.2);
+          legumesWeek: legumesWeek, bodyKg: 82.0);
     }
 
     test('K2-S-01: κάθε ψάρι και θαλασσινό της βάσης έχει τιμή· τα άλλα τρόφιμα 0', () {
@@ -263,13 +263,13 @@ void main() {
       expect(mercuryPpm(_food('C26088')), aiMercuryDefaultPpm, reason: 'τσιπούρα: δεν υπάρχει στον πίνακα της FDA');
     });
 
-    test('K2-S-01: 6 × 180 g μπακαλιάρος με 82,2 kg → πάνω από το όριο EFSA (πριν: 0 µg)· 6 × 180 g σαρδέλα → εντάξει', () {
+    test('K2-S-01: 6 × 180 g μπακαλιάρος με 82 kg → πάνω από το όριο EFSA (πριν: 0 µg)· 6 × 180 g σαρδέλα → εντάξει', () {
       final s = _store();
-      // 6 × 180 × 0,111 = 119,9 µg· όριο 1,3 × 82,2 = 106,9.
+      // 6 × 180 × 0,111 = 119,9 µg· όριο 1,3 × 82 = 106,6.
       final cod = check(s, List.filled(6, 'bakaliaros')).where((p) => p.tag == 'mercury').toList();
       expect(cod, hasLength(1));
       expect(cod.single.user, contains('120 µg'));
-      expect(cod.single.user, contains('όριο EFSA 106'), reason: 'K2-R-11: η τιμή προς τα πάνω, το όριο (106,86) προς τα κάτω');
+      expect(cod.single.user, contains('όριο EFSA 106'), reason: 'K2-R-11: η τιμή προς τα πάνω, το όριο (106,6) προς τα κάτω');
       expect(cod.single.user, contains('μπακαλιάρος'));
       expect(check(s, List.filled(6, 'sardeles')).where((p) => p.tag == 'mercury'), isEmpty);
       expect(check(s, List.filled(5, 'bakaliaros')).where((p) => p.tag == 'mercury'), isEmpty, reason: '5 × 180 × 0,111 = 99,9');
@@ -305,14 +305,14 @@ void main() {
       final fatty = _week([
         [PlanSlot(meal: Meal.lunch, dishId: _byKey(s, 'feta-salata').id)],
       ]);
-      final notes = weekHealthNotes(s, fatty, t: _targets, bodyKg: 82.2);
+      final notes = weekHealthNotes(s, fatty, t: _targets, bodyKg: 82.0);
       expect(notes.where((n) => n.contains('κορεσμένα')), hasLength(1));
       expect(notes.where((n) => n.contains('αλάτι')), hasLength(1));
       expect(notes.join(), isNot(contains('kcal')), reason: 'θερμίδες και πρωτεΐνη τα λέει ήδη το αυτόματο πρόγραμμα');
       final lean = _week([
         [PlanSlot(meal: Meal.lunch, dishId: _byKey(s, 'kotopoulo-ryzi').id)],
       ]);
-      expect(weekHealthNotes(s, lean, t: _targets, bodyKg: 82.2), isEmpty);
+      expect(weekHealthNotes(s, lean, t: _targets, bodyKg: 82.0), isEmpty);
       expect(weekHealthNotes(s, _week(const [[], []], meals: const []), t: _targets), isEmpty);
     });
 
@@ -402,7 +402,7 @@ void main() {
           PlanSlot(meal: Meal.dinner, dishId: _byKey(s, 'solomos').id),
         ],
       ]);
-      final notes = weekHealthNotes(s, w, t: _targets, bodyKg: 82.2);
+      final notes = weekHealthNotes(s, w, t: _targets, bodyKg: 82.0);
       final sat = notes.where((n) => n.contains('κορεσμένα') && n.contains('όριο')).toList();
       expect(sat, hasLength(1));
       expect(sat.single, contains('(όριο 14,3)'));
@@ -455,7 +455,7 @@ void main() {
         ], meals: const [Meal.dinner]);
         return aiCheckWeek(s, w, const [],
             t: _targets, meals: const [Meal.dinner], checkDays: {for (var i = 0; i < dinners.length; i++) i}, fishWeek: fishWeek,
-            bodyKg: 82.2);
+            bodyKg: 82.0);
       }
 
       final none = check(['bakaliaros', 'bakaliaros', 'kotopoulo-ryzi'], 2).where((p) => p.user.contains('Κανένα λιπαρό ψάρι')).toList();
@@ -473,20 +473,20 @@ void main() {
         for (var i = 0; i < 14; i++)
           [PlanSlot(meal: Meal.dinner, dishId: _byKey(s, i % 7 < 2 ? 'solomos' : 'kotopoulo-ryzi').id)],
       ], meals: const [Meal.dinner]);
-      expect(weekHealthNotes(s, w, t: _targets, bodyKg: 82.2).where((n) => n.contains('Λιπαρό ψάρι')), isEmpty);
+      expect(weekHealthNotes(s, w, t: _targets, bodyKg: 82.0).where((n) => n.contains('Λιπαρό ψάρι')), isEmpty);
       // 6 × 180 g μπακαλιάρο ΚΑΘΕ εβδομάδα για 14 μέρες: 119,9 µg την εβδομάδα, πάνω από το όριο και τις δύο.
       final cod = _week([
         for (var i = 0; i < 14; i++)
           [PlanSlot(meal: Meal.dinner, dishId: _byKey(s, i % 7 < 6 ? 'bakaliaros' : 'kotopoulo-ryzi').id)],
       ], meals: const [Meal.dinner]);
-      final hg = weekHealthNotes(s, cod, t: _targets, bodyKg: 82.2).where((n) => n.contains('Υδράργυρος')).toList();
+      final hg = weekHealthNotes(s, cod, t: _targets, bodyKg: 82.0).where((n) => n.contains('Υδράργυρος')).toList();
       expect(hg, hasLength(1));
       expect(hg.single, contains('120 µg την εβδομάδα'));
     });
 
     test('K2-R-11: ένα όνομα ανά είδος, και «(εκτίμηση)» για είδος χωρίς τιμή στον πίνακα της FDA', () {
       final s = _store();
-      // Τσιπούρα (προεπιλογή 0,10): 6 × 180 g = 108 µg, πάνω από το όριο 106,9.
+      // Τσιπούρα (προεπιλογή 0,10): 6 × 180 g = 108 µg, πάνω από το όριο 106,6.
       final lib = [
         _dish('tsipoura', 'plate', [('C26088', 180), (_rice, 80)]),
       ];
@@ -504,7 +504,7 @@ void main() {
       final w = _week([
         for (var i = 0; i < 6; i++) [PlanSlot(meal: Meal.dinner, dishId: _byKey(s2, 'tsipoura').id)],
       ], meals: const [Meal.dinner]);
-      final hg = weekHealthNotes(s2, w, t: _targets, bodyKg: 82.2).where((x) => x.contains('Υδράργυρος')).toList();
+      final hg = weekHealthNotes(s2, w, t: _targets, bodyKg: 82.0).where((x) => x.contains('Υδράργυρος')).toList();
       expect(hg, hasLength(1));
       expect(hg.single, contains('(εκτίμηση)'));
       expect(hg.single, contains('108 µg'));

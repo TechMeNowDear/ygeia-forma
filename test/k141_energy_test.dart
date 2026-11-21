@@ -364,10 +364,10 @@ void main() {
     });
 
     test('ο ρυθμός στη σελίδα «Στόχοι» με το τωρινό βάρος, όταν απέχει από του οδηγού', () {
-      expect(rateNowText(82.2, 0.005), '0,41 kg την εβδομάδα');
-      expect(rateNowText(82.2, 0.005, kgNow: 81.5), '0,41 kg την εβδομάδα', reason: 'κάτω από 1 kg διαφορά');
-      expect(rateNowText(82.2, 0.005, kgNow: 78), '0,5% του βάρους την εβδομάδα (τώρα περίπου 0,39 kg)');
-      expect(rateNowText(82.2, 0.005, kgNow: double.nan), '0,41 kg την εβδομάδα');
+      expect(rateNowText(84.0, 0.005), '0,42 kg την εβδομάδα');
+      expect(rateNowText(84.0, 0.005, kgNow: 83.3), '0,42 kg την εβδομάδα', reason: 'κάτω από 1 kg διαφορά');
+      expect(rateNowText(84.0, 0.005, kgNow: 78), '0,5% του βάρους την εβδομάδα (τώρα περίπου 0,39 kg)');
+      expect(rateNowText(84.0, 0.005, kgNow: double.nan), '0,42 kg την εβδομάδα');
     });
   });
 
@@ -572,8 +572,8 @@ void main() {
 
     test('K1R-11: «τώρα περίπου Χ kg» μόνο με πρόσφατη ζύγιση', () {
       expect(rateNowMaxAgeDays, 14);
-      expect(rateNowText(82.2, 0.005, kgNow: 78.0), contains('τώρα περίπου 0,39'));
-      expect(rateNowText(82.2, 0.005), isNot(contains('τώρα')));
+      expect(rateNowText(84.0, 0.005, kgNow: 78.0), contains('τώρα περίπου 0,39'));
+      expect(rateNowText(84.0, 0.005), isNot(contains('τώρα')));
     });
   });
 }

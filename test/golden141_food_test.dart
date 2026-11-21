@@ -2010,7 +2010,7 @@ Map<String, Object?> _aiGolden() {
     'auto seed 1, only days 0-2': problems(w1, checkDays: {0, 1, 2}),
     'auto seed 1, strict targets': problems(w1, t: (kcal: 2150, protein: 190, satMax: 8.0, fiber: 45, salt: 2.0)),
     'auto seed 1 for 1500 kcal checked at 2150': problems(auto(kcal: 1500, protein: 110)),
-    'hand-made heavy week': problems(heavy, bodyKg: 82.2),
+    'hand-made heavy week': problems(heavy, bodyKg: 82.0),
     'hand-made heavy week, 60 kg, no weekly rules': problems(heavy, bodyKg: 60, legumes: 0, fish: 0),
     'empty week': problems(weekOf([for (var i = 0; i < 7; i++) const <PlanSlot>[]])),
   };

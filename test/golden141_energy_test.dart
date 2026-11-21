@@ -108,8 +108,8 @@ Map<String, Object?> _goalsGrid() {
   final out = <String, Object?>{};
   for (final male in [true, false]) {
     for (final age in [25, 47, 70]) {
-      for (final h in [160.0, 177.0, 195.0]) {
-        for (final kg in [55.0, 82.2, 110.0, 140.0]) {
+      for (final h in [160.0, 180.0, 195.0]) {
+        for (final kg in [55.0, 84.0, 110.0, 140.0]) {
           for (final pal in activityLevels) {
             for (final (aim, rate) in _aims()) {
               final a = _calcJson(computeGoals(
@@ -170,7 +170,7 @@ Map<String, Object?> _goalsGolden() {
     for (final pal in [1.2, ...legacyActivityLevels, 2.5]) {
       for (final (aim, rate) in _aims()) {
         legacy['${male ? 'm' : 'f'}|$pal|${aim.name}|$rate'] = _calcJson(
-            computeGoals(male: male, age: 47, heightCm: 177, kg: 82.2, aim: aim, rate: rate, activity: pal, doctor: true));
+            computeGoals(male: male, age: 44, heightCm: 180, kg: 84.0, aim: aim, rate: rate, activity: pal, doctor: true));
       }
     }
   }
@@ -188,14 +188,14 @@ Map<String, Object?> _goalsGolden() {
   }
   out['floorScan'] = floor;
 
-  // Πρωτεΐνη γύρω από ΔΜΣ 30 (177 cm → 93,99 kg): στην απώλεια μετρά το βάρος του ΔΜΣ 30, αλλού το πραγματικό.
+  // Πρωτεΐνη γύρω από ΔΜΣ 30 (180 cm → 97,2 kg): στην απώλεια μετρά το βάρος του ΔΜΣ 30, αλλού το πραγματικό.
   final prot = <String, Object?>{};
   for (var i = 0; i <= 32; i++) {
-    final kg = 90 + i * 0.25;
+    final kg = 93 + i * 0.25;
     final lose =
-        computeGoals(male: true, age: 47, heightCm: 177, kg: kg, aim: GoalAim.lose, rate: 0.005, activity: 1.53, doctor: true);
+        computeGoals(male: true, age: 44, heightCm: 180, kg: kg, aim: GoalAim.lose, rate: 0.005, activity: 1.53, doctor: true);
     final keep =
-        computeGoals(male: true, age: 47, heightCm: 177, kg: kg, aim: GoalAim.keep, rate: 0, activity: 1.53, doctor: true);
+        computeGoals(male: true, age: 44, heightCm: 180, kg: kg, aim: GoalAim.keep, rate: 0, activity: 1.53, doctor: true);
     prot['$kg'] = '${lose.protein}|${keep.protein}';
   }
   out['proteinScan'] = prot;
@@ -213,7 +213,7 @@ Map<String, Object?> _goalsGolden() {
     'keep': _goalsView(_base(aim: GoalAim.keep, rate: 0)),
     'tinyKcal': _goalsView(_base(kcalSet: 1500, proteinSet: 300)),
     'tdeeAt': <String, Object?>{
-      for (final kg in [60.0, 82.2, 88.0, 90.0, 92.0, 120.0]) '$kg': _base().tdeeAt(kg),
+      for (final kg in [60.0, 84.0, 88.0, 90.0, 92.0, 120.0]) '$kg': _base().tdeeAt(kg),
     },
   };
 
@@ -295,7 +295,7 @@ Map<String, Object?> _goalsGolden() {
     fastAt: '2026-12-10',
     foreignSeen: '2026-12-01',
     log: oneLog,
-    docTargets: const DoctorTargets(ldlMax: 115, hdlMin: 50, tgMax: 150),
+    docTargets: const DoctorTargets(ldlMax: 100, hdlMin: 40, tgMax: 150),
     hist: const [TargetChange(day: '2026-12-14', before: 2300, after: 2200)],
   ).copyWith(betaPer100: 5.5).toJson();
   Object? view(Map<String, dynamic> patch) {
@@ -409,7 +409,7 @@ Map<String, Object?> _goalsGolden() {
 
   out['doctorTargets'] = <String, Object?>{
     'empty': <String, Object?>{'isEmpty': const DoctorTargets().isEmpty, 'text': const DoctorTargets().text},
-    'all': const DoctorTargets(ldlMax: 115, hdlMin: 50, tgMax: 150).text,
+    'all': const DoctorTargets(ldlMax: 100, hdlMin: 40, tgMax: 150).text,
     'ldl': const DoctorTargets(ldlMax: 100).text,
     'hdl+tg': const DoctorTargets(hdlMin: 45, tgMax: 150).text,
     'notEmpty': const DoctorTargets(tgMax: 150).isEmpty,
@@ -418,7 +418,7 @@ Map<String, Object?> _goalsGolden() {
   final pals = [1.2, 1.4, 1.5, 1.53, 1.589, 1.59, 1.6, 1.65, 1.7, 1.704, 1.705, 1.71, 1.76, 2.0];
   out['texts'] = <String, Object?>{
     'rateKgText': <String, Object?>{
-      for (final kg in [55.0, 82.2, 110.0])
+      for (final kg in [55.0, 84.0, 110.0])
         for (final r in [...loseRates, ...gainRates]) '$kg|$r': rateKgText(kg, r),
     },
     'ratePctText': <String, Object?>{
@@ -1202,7 +1202,7 @@ Map<String, Object?> _bodyGolden() {
   status['two weigh-ins'] = _statuses([(DateTime(2026, 11, 23), 82.0), (DateTime(2026, 11, 25), 60.0)]);
   status['three neighbours'] = _statuses([
     (DateTime(2026, 11, 23), 82.0),
-    (DateTime(2026, 11, 25), 82.2),
+    (DateTime(2026, 11, 25), 82.3),
     (DateTime(2026, 11, 27), 81.9),
     (DateTime(2026, 11, 30), 60.0),
   ]);
@@ -1332,7 +1332,7 @@ Map<String, Object?> _bodyGolden() {
   };
 
   // Μέση.
-  final heights = <double?>[null, 99.0, 100.0, 177.0, 250.0, 251.0];
+  final heights = <double?>[null, 99.0, 100.0, 180.0, 250.0, 251.0];
   out['waist'] = <String, Object?>{
     'cm': <String, Object?>{
       for (final v in const [
@@ -1391,8 +1391,8 @@ Map<String, Object?> _bodyGolden() {
     },
     'waistHeightText': <String, Object?>{
       for (final h in heights)
-        for (final w in [70.7, 70.8, 88.4, 88.5, 88.6, 106.1, 106.2, 106.3, 50.0, 200.0])
-          if (h == 177.0 || w == 88.5) '$w|$h': waistHeightText(w, h),
+        for (final w in [71.9, 72.0, 89.9, 90.0, 90.1, 107.9, 108.0, 108.1, 50.0, 200.0])
+          if (h == 180.0 || w == 90.0) '$w|$h': waistHeightText(w, h),
       for (final w in [63.9, 64.0, 79.9, 80.0, 95.9, 96.0]) '$w|160.0': waistHeightText(w, 160),
     },
   };

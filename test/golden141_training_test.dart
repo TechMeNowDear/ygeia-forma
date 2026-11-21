@@ -800,7 +800,7 @@ Map<String, Object?> _cardioGolden() {
   for (final rest in [154.0, 154.4, 154.5, 155.0, 156.0]) {
     zones['ηλικία 47 · ηρεμίας $rest (όριο)'] = _zone(computeZone(age: 47, restHr: rest, s: const ZoneSettings()));
   }
-  zones['μετρημένοι μέγιστοι 153'] = _zone(computeZone(age: 47, restHr: 60, s: const ZoneSettings(maxHr: 153)));
+  zones['μετρημένοι μέγιστοι 158'] = _zone(computeZone(age: 47, restHr: 60, s: const ZoneSettings(maxHr: 158)));
   zones['μετρημένοι μέγιστοι, χωρίς ηλικία'] = _zone(computeZone(restHr: 60, s: const ZoneSettings(maxHr: 180)));
   zones['δικοί του παλμοί ηρεμίας 58'] = _zone(computeZone(age: 47, restHr: 70, s: const ZoneSettings(restHr: 58)));
   zones['χειροκίνητη 100–125'] = _zone(computeZone(age: 47, restHr: 60.4, s: const ZoneSettings(lo: 100, hi: 125)));
@@ -991,7 +991,7 @@ Map<String, Object?> _cardioGolden() {
   out['strideFor'] = <String, Object?>{
     'from walks': strideFor(strideSessions),
     'only the first five': strideFor(strideSessions.sublist(0, 5)),
-    for (final h in <double?>[null, 119, 120, 177, 230, 231])
+    for (final h in <double?>[null, 119, 120, 180, 230, 231])
       for (final sex in <String?>['m', 'f', null]) 'no walks · $h · $sex': strideFor(const [], heightCm: h, sex: sex),
   };
 

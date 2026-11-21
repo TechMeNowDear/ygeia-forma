@@ -28,37 +28,37 @@ void main() {
       final d = Dashboard.fromJson({
         'readAt': _ms(DateTime(2026, 11, 23, 12)),
         'body': [
-          _w(DateTime(2026, 11, 21), 82.4, bmi: 26.3, height: 170),
-          _w(DateTime(2026, 11, 22), 82.2, bmi: 26.24),
-          _w(DateTime(2026, 11, 23), 82.0, bmi: 26.2, height: 17),
+          _w(DateTime(2026, 11, 21), 84.2, bmi: 29.1, height: 170),
+          _w(DateTime(2026, 11, 22), 84.0, bmi: 25.93),
+          _w(DateTime(2026, 11, 23), 83.8, bmi: 25.9, height: 17),
           // K5-R-04: ύψος σε μέτρα ή 0 (αν η Samsung το γράφει αλλιώς) = δεν υπάρχει· τότε μετρά ο δείκτης.
-          _w(DateTime(2026, 11, 24), 82.0, bmi: 26.2, height: 1.77),
-          _w(DateTime(2026, 11, 25), 82.0, bmi: 26.2, height: 0),
+          _w(DateTime(2026, 11, 24), 83.8, bmi: 25.9, height: 1.8),
+          _w(DateTime(2026, 11, 25), 83.8, bmi: 25.9, height: 0),
         ],
       });
       expect([for (final b in d.body) b.heightCm], [170.0, null, null, null, null]);
     });
 
-    test('ύψος εγγραφής 170, δείκτης 26,24 (= 177 cm), στοιχεία μου 177: μήνυμα με «170» (πριν: κανένα μήνυμα)', () {
-      final note = scaleHeightNote(recordCm: 170, weight: 82.2, bmi: 26.24, profileCm: 177);
-      expect(note, startsWith('Η ζύγιση γράφτηκε με ύψος 170 cm, τα στοιχεία σου 177 cm.'));
+    test('ύψος εγγραφής 170, δείκτης 25,93 (= 180 cm), στοιχεία μου 180: μήνυμα με «170» (πριν: κανένα μήνυμα)', () {
+      final note = scaleHeightNote(recordCm: 170, weight: 84.0, bmi: 25.93, profileCm: 180);
+      expect(note, startsWith('Η ζύγιση γράφτηκε με ύψος 170 cm, τα στοιχεία σου 180 cm.'));
       // K5-R-04: δεν ξέρουμε ακόμα ποιος γράφει το ύψος της εγγραφής: το μήνυμα στέλνει και στις δύο εφαρμογές.
       expect(note, endsWith('έλεγξε το ύψος στην InBody και στη Samsung Health: από το ύψος της InBody βγαίνουν λίπος και μύες.'));
     });
 
-    test('ύψος εγγραφής ίσο με τα στοιχεία μου, δείκτης από άλλο ύψος: κανένα μήνυμα (πριν: «Η εφαρμογή InBody έχει ύψος 175»)', () {
-      // Προφίλ Samsung Health 175 cm → δείκτης 26,84· η InBody και η εφαρμογή έχουν 177.
-      expect(scaleHeightNote(recordCm: 177, weight: 82.2, bmi: 26.84, profileCm: 177), isNull);
+    test('ύψος εγγραφής ίσο με τα στοιχεία μου, δείκτης από άλλο ύψος: κανένα μήνυμα (πριν: «Η εφαρμογή InBody έχει ύψος 178»)', () {
+      // Προφίλ Samsung Health 178 cm → δείκτης 26,51· η InBody και η εφαρμογή έχουν 180.
+      expect(scaleHeightNote(recordCm: 180, weight: 84.0, bmi: 26.51, profileCm: 180), isNull);
     });
 
     test('χωρίς ύψος στην εγγραφή: από τον δείκτη, και δεν το αποδίδει μόνο στην InBody', () {
-      final note = scaleHeightNote(weight: 82.2, bmi: 26.84, profileCm: 177);
-      expect(note, startsWith('Η Samsung Health ή η InBody έχει ύψος 175 cm'));
+      final note = scaleHeightNote(weight: 84.0, bmi: 26.51, profileCm: 180);
+      expect(note, startsWith('Η Samsung Health ή η InBody έχει ύψος 178 cm'));
       expect(note, isNot(contains('Η εφαρμογή InBody έχει')));
       expect(note, endsWith('έλεγξε το ύψος στην InBody και στη Samsung Health: από το ύψος της InBody βγαίνουν λίπος και μύες.'));
-      expect(scaleHeightNote(weight: 82.2, bmi: 26.24, profileCm: 177), isNull, reason: 'διαφορά κάτω από 1 cm');
-      expect(scaleHeightNote(weight: 82.2, bmi: 26.84), isNull, reason: 'χωρίς ύψος στα στοιχεία μου');
-      expect(scaleHeightNote(profileCm: 177), isNull);
+      expect(scaleHeightNote(weight: 84.0, bmi: 25.93, profileCm: 180), isNull, reason: 'διαφορά κάτω από 1 cm');
+      expect(scaleHeightNote(weight: 84.0, bmi: 26.51), isNull, reason: 'χωρίς ύψος στα στοιχεία μου');
+      expect(scaleHeightNote(profileCm: 180), isNull);
     });
 
     test('scaleHeightCm: πρώτα η εγγραφή, μετά ο δείκτης', () {

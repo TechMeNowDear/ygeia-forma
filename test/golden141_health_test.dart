@@ -239,7 +239,7 @@ Map<String, Object?> _vitalsGolden() {
   };
 
   // Εύρη αναφοράς: όλα τα όρια και τα κείμενα, για φύλο × ηλικία.
-  Profile who(String? sex, int? age) => Profile(birthYear: age == null ? null : 2026 - age, birthMonth: 1, sex: sex, heightCm: 177);
+  Profile who(String? sex, int? age) => Profile(birthYear: age == null ? null : 2026 - age, birthMonth: 1, sex: sex, heightCm: 180);
   final refDay = DateTime(2026, 11, 23);
   out['sleepRange'] = <String, Object?>{
     for (final age in <int?>[null, 17, 18, 47, 60, 61]) 'age $age': _range(sleepRange(who('m', age), refDay), [389.9, 390, 419.9, 420, 480, 600]),
@@ -256,22 +256,22 @@ Map<String, Object?> _vitalsGolden() {
   out['bmiRange'] = _range(bmiRange, [18.49, 18.5, 24.99, 25, 30]);
   out['bmi'] = <String, Object?>{
     'healthyWeight': <String, Object?>{
-      for (final h in <double?>[null, 150, 163, 177, 177.5, 195])
+      for (final h in <double?>[null, 150, 163, 180, 180.5, 195])
         '$h': () {
           final w = healthyWeight(h);
           return w == null ? null : '${w.$1}|${w.$2} · ${healthyWeightText(w.$1, w.$2)}';
         }(),
     },
-    'healthyWeightText edges': [healthyWeightText(58.0, 78.3), healthyWeightText(57.96, 78.31), healthyWeightText(58.04, 78.39)],
+    'healthyWeightText edges': [healthyWeightText(59.9, 81.0), healthyWeightText(59.94, 80.96), healthyWeightText(59.96, 81.04)],
     'bmiOf': <String, Object?>{
-      for (final (w, h) in <(double?, double?)>[(82.2, 177), (78.3, 177), (78.4, 177), (58.0, 177), (57.9, 177), (null, 177), (82.2, null)])
+      for (final (w, h) in <(double?, double?)>[(84.0, 180), (80.9, 180), (81.1, 180), (60.0, 180), (59.9, 180), (null, 180), (84.0, null)])
         '$w|$h': () {
           final b = bmiOf(w, h);
           return b == null ? null : '$b · ${bmiText(b)} · ${bmiShown(b)} · ${bmiRange.placeText(b)}';
         }(),
     },
-    'bmiShown': <String, Object?>{for (final b in [18.49, 18.5, 24.94, 24.95, 24.99, 24.999999999, 25.0, 26.24, 29.96]) '$b': '${bmiShown(b)} · ${bmiText(b)}'},
-    'inBodyHeight': [inBodyHeight(82.2, 26.2), inBodyHeight(82.2, 0), inBodyHeight(null, 26.2), inBodyHeight(82.2, null)],
+    'bmiShown': <String, Object?>{for (final b in [18.49, 18.5, 24.94, 24.95, 24.99, 24.999999999, 25.0, 25.93, 29.96]) '$b': '${bmiShown(b)} · ${bmiText(b)}'},
+    'inBodyHeight': [inBodyHeight(84.0, 25.9), inBodyHeight(84.0, 0), inBodyHeight(null, 25.9), inBodyHeight(84.0, null)],
   };
   final rows = <String, Map<String, double>>{
     for (var i = 0; i < 40; i++) dateKey(back(i)): {'o.hrv': 38.0 + (i * 7) % 9, K.sleepHr: 58.0 + (i * 5) % 6},
@@ -682,10 +682,10 @@ Map<String, Object?> _labsGolden() {
   out['decimalMarkOf'] = <String, Object?>{
     for (final e in <String, List<String>>{
       'empty': [],
-      'whole numbers': ['160', '31', '208'],
-      'comma decimals': ['5,5', '160', '1,02'],
-      'dot decimals': ['5.5', '160'],
-      'mixed': ['5,5', '1.02'],
+      'whole numbers': ['150', '40', '200'],
+      'comma decimals': ['5,7', '150', '1,02'],
+      'dot decimals': ['5.7', '150'],
+      'mixed': ['5,7', '1.02'],
       'only ambiguous': ['1,234', '2.345'],
       'thousands with decimals (el)': ['1.234,5', '160'],
       'thousands with decimals (en)': ['1,234.5'],
