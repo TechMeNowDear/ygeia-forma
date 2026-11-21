@@ -148,7 +148,7 @@ String _onDay(DateTime d) => '${const ['τη', 'την', 'την', 'την', 'τ
 String gatheringText(CheckIn k) {
   final g = k.goals;
   final weekday = weekdayNames[DateTime.parse(g.since).weekday - 1];
-  const skip = 'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά, και η εκτίμηση θα έβγαινε πιο ψηλή από την αληθινή.';
+  const skip = 'Η πρώτη εβδομάδα δεν μετρά: τότε φεύγουν κυρίως νερά.';
   final gap = k.gap;
   if (gap == null) {
     return '$skip Η πρώτη εκτίμηση βγαίνει ${weekday == 'Σάββατο' ? 'το επόμενο' : 'την επόμενη'} $weekday, με 3 εβδομάδες '
@@ -258,8 +258,7 @@ class CheckInCard extends StatelessWidget {
                   'συμφωνούν μεταξύ τους, όχι μαζί τους. Αν δεν είναι δικές σου, δεν χρειάζεται να κάνεις τίποτα.',
           style: body),
       CheckKind.unread => Text(
-          'Η Samsung Health δεν έδωσε τώρα τις ζυγίσεις σου, άρα ο έλεγχος δεν μπορεί να γίνει. Τράβηξε τη Σήμερα προς τα '
-          'κάτω για νέα ανάγνωση: η κάρτα θα βγει μόλις διαβαστούν. Ο στόχος μένει ίδιος.',
+          'Η Samsung Health δεν έδωσε τώρα τις ζυγίσεις σου. Τράβηξε προς τα κάτω: ο έλεγχος γίνεται μόλις διαβαστούν. Ο στόχος μένει ίδιος.',
           style: body),
       CheckKind.implausible => Text(
           high

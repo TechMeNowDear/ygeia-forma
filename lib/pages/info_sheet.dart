@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../history.dart' show K;
 import '../reference.dart';
 import '../theme.dart';
+import '../widgets.dart' show veryLargeText;
 import 'devices_page.dart';
 
 /// Το «i» δίπλα σε μια μέτρηση (απόφαση 7/11): η εξήγηση δεν φαίνεται στη σελίδα· ανοίγει σε φύλλο από κάτω.
@@ -66,6 +67,13 @@ String deviceOf(String metric) => switch (metric) {
       _ => 'oura',
     };
 
+/// Ως πόσους χαρακτήρες χωρά ένα «Πάνω» ή «Κάτω» σε μισό πλάτος χωρίς να γίνει στήλη-λωρίδα (περίπου 5 γραμμές στα 360 dp).
+const infoPillSideMax = 90;
+
+/// K7A-03: τα «Πάνω / Κάτω» του ⓘ δίπλα δίπλα μόνο όταν και τα δύο είναι σύντομα και τα γράμματα όχι πολύ μεγάλα.
+bool infoPillsSideBySide(String? up, String? down, {required bool veryLarge}) =>
+    !veryLarge && (up?.length ?? 0) <= infoPillSideMax && (down?.length ?? 0) <= infoPillSideMax;
+
 Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? range, String? device}) {
   return showModalBottomSheet<void>(
     context: context,
@@ -82,18 +90,16 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [Text(title, style: head), const SizedBox(height: 4), Text(text, style: body)],
           );
-      Widget pill(String title, String text, Color color) => Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: c.tint(color), borderRadius: BorderRadius.circular(16)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: c.text)),
-                  const SizedBox(height: 3),
-                  Text(text, style: TextStyle(fontSize: 13, height: 1.4, color: c.text)),
-                ],
-              ),
+      Widget pill(String title, String text, Color color) => Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: c.tint(color), borderRadius: BorderRadius.circular(16)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: c.text)),
+                const SizedBox(height: 3),
+                Text(text, style: TextStyle(fontSize: 13, height: 1.4, color: c.text)),
+              ],
             ),
           );
       return ConstrainedBox(
@@ -113,16 +119,31 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
                 const SizedBox(height: 14),
                 Text('Πώς το διαβάζεις', style: head),
                 const SizedBox(height: 6),
-                IntrinsicHeight(
-                  child: Row(
+                // Έλεγχος 21/11 (K7A-03): δίπλα δίπλα μόνο οι σύντομες ετικέτες. Τα μακριά «Πάνω / Κάτω» (και όλα με πολύ
+                // μεγάλα γράμματα) το ένα κάτω από το άλλο, σε όλο το πλάτος: το «Κάτω» του οξυγόνου (κείμενο ασφαλείας)
+                // έπιανε 34 γραμμές σε στήλη 130 dp· τώρα 14.
+                if (infoPillsSideBySide(info.up, info.down, veryLarge: veryLargeText(context)))
+                  IntrinsicHeight(
+                    key: const ValueKey('info-pills-row'),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (info.up != null) Expanded(child: pill('Πάνω', info.up!, c.energy)),
+                        if (info.up != null && info.down != null) const SizedBox(width: 8),
+                        if (info.down != null) Expanded(child: pill('Κάτω', info.down!, c.move)),
+                      ],
+                    ),
+                  )
+                else
+                  Column(
+                    key: const ValueKey('info-pills-column'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (info.up != null) pill('Πάνω', info.up!, c.energy),
-                      if (info.up != null && info.down != null) const SizedBox(width: 8),
+                      if (info.up != null && info.down != null) const SizedBox(height: 8),
                       if (info.down != null) pill('Κάτω', info.down!, c.move),
                     ],
                   ),
-                ),
               ],
               // Round 1 (S4-7): και τα δύο όταν υπάρχουν (πριν, με εύρος δεν φαινόταν ποτέ το «Με τι το συγκρίνεις», π.χ. η
               // σημείωση των αναπνοών ότι το εύρος μετρήθηκε στον βαθύ ύπνο και η σύγκριση είναι ενδεικτική).

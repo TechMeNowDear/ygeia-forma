@@ -117,7 +117,7 @@ class ExercisePage extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   // UX U8: η γραμμή είναι το «συνήθως» (μεσαία τιμή), όχι μέσος όρος.
-                  '14 ημέρες ·\u00A0η διακεκομμένη γραμμή είναι το «συνήθως» σου (η μεσαία τιμή των 14 προηγούμενων ημερών)',
+                  '14 μέρες ·\u00A0διακεκομμένη γραμμή: το «συνήθως» σου (μεσαία τιμή των 14 προηγούμενων)',
                   style: TextStyle(color: c.textSecondary, fontSize: 12.5),
                 ),
               ],
@@ -167,7 +167,7 @@ class ExercisePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CardHeader(icon: Icons.stairs_rounded, title: 'Όροφοι, 14 ημέρες', color: c.energy),
+              CardHeader(icon: Icons.stairs_rounded, title: 'Όροφοι, 14 μέρες', color: c.energy),
               const SizedBox(height: 12),
               BarChart(
                 height: 110,

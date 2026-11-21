@@ -1852,12 +1852,17 @@ WeekPlan applySwap(WeekPlan w, int day, int index, Dish d, double kcal) {
 // ---------------------------------------------------------------------------
 
 /// Αποτέλεσμα: το νέο πρόγραμμα, οι αλλαγές (γεύμα, φαγητό, πριν, μετά), και πώς κλείνει η μέρα (θερμίδες, πρωτεΐνη).
+///
+/// Έλεγχος 21/11 (K7B-02, K2-R-08): [assumed] = οι ανοιχτές θέσεις γευμάτων ως και το γεύμα που μόλις άλλαξε, που μπήκαν
+/// στο σύνολο της μέρας ως «θα φαγωθούν ακόμα» (γεύμα, φαγητό, θερμίδες). Ο διάλογος το λέει: αν ένα τέτοιο γεύμα
+/// έχει ήδη φαγωθεί και γραφτεί αλλιώς, το «η μέρα θα κλείσει στις …» το μετρά δύο φορές και τα επόμενα μικραίνουν λάθος.
 typedef Rebalance = ({
   WeekPlan plan,
   List<(Meal, String, double, double)> changes,
   double dayKcal,
   double proteinBefore,
   double proteinAfter,
+  List<(Meal, String, double)> assumed,
 });
 
 /// Έλεγχος 20/11 (K2-C-01): πόσο από τις θερμίδες των ανοιχτών θέσεων ενός προηγούμενου γεύματος πρέπει να υπάρχει στο
@@ -1907,6 +1912,7 @@ Rebalance? rebalanceDay(
 }) {
   final byId = {for (final d in food.dishes) d.id: d};
   final adjust = <int>[];
+  final assumed = <(Meal, String, double)>[];
   var fixedKcal = 0.0, fixedProtein = 0.0;
   final eatenOutside = mealsEatenOutsidePlan(food, w, day, before: after);
   for (var k = 0; k < w.days[day].length; k++) {
@@ -1922,6 +1928,7 @@ Rebalance? rebalanceDay(
     } else {
       fixedKcal += t.kcal;
       fixedProtein += t.protein;
+      if (_mealOrder(s.meal) <= _mealOrder(after)) assumed.add((s.meal, d.name, t.kcal));
     }
   }
   if (adjust.isEmpty) return null;
@@ -1971,5 +1978,6 @@ Rebalance? rebalanceDay(
     dayKcal: eaten + fixedKcal + newSum,
     proteinBefore: eatenProtein + fixedProtein + oldProtein,
     proteinAfter: eatenProtein + fixedProtein + newProtein,
+    assumed: assumed,
   );
 }

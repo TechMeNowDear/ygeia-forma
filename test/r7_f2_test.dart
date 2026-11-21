@@ -95,10 +95,10 @@ void main() {
       expect(m.reps, [15, 15]);
     });
 
-    test('χωρίς να έχει γίνει ποτέ το βαρύτερο: στο ανώτατο λέει «πες μου» και ότι υπάρχει το «+»', () {
+    test('χωρίς να έχει γίνει ποτέ το βαρύτερο: στο ανώτατο λέει «ζήτα από τον Claude» και ότι υπάρχει το «+»', () {
       final t = nextTarget(it('db_curl'), [(ago(3), done('db_curl', 2.8, [20, 20], ra: 4))], now);
       expect(t.change, Change.max);
-      expect(t.reason, contains('πες μου'));
+      expect(t.reason, contains('ζήτα από τον Claude'));
       expect(t.reason, contains('«+»'));
     });
 
@@ -119,10 +119,10 @@ void main() {
       expect(t.change, Change.first);
       expect(t.reason, contains('πράσινο (30 lb)'));
       expect(t.reason, contains('ως τις 20'));
-      expect(t.reason, contains('πες μου'));
+      expect(t.reason, contains('ζήτα από τον Claude'));
       final m = nextTarget(it('band_pushdown'), [(ago(3), done('band_pushdown', 20, [12, 12], ra: 3))], now);
       expect(m.change, Change.more);
-      expect(m.reason, contains('πες μου'));
+      expect(m.reason, contains('ζήτα από τον Claude'));
       // στο face pull η βιβλιοθήκη θέλει πάντα ελαφρύ λάστιχο: χωρίς «ανέβασε εσύ με το +»
       final f = nextTarget(it('face_pull', lo: 12), [(ago(3), done('face_pull', 10, [20, 20], ra: 3, lo: 12))], now);
       expect(f.change, Change.max);
@@ -216,6 +216,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sess-pain')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
+      // Έλεγχος 21/11 (K7B-13): το φύλλο γράφει και τι κάνεις με πόνο στο στήθος ή δύσπνοια (πριν: μόνο αρθρώσεις).
+      expect(tester.widget<Text>(find.byKey(const ValueKey('pain-safety'))).data, sessionSafetyText);
       await tester.tap(find.byKey(const ValueKey('pain-shoulderR')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('pain-ok')));
@@ -521,7 +523,7 @@ void main() {
 
   // ---------------------------------------------------------------- R7-U3 / U1-9
   group('R7-U3 / R7-U1-9: κείμενα και διάταξη', () {
-    testWidgets('U3-09 «ξεκούραση 2:00» αδιάσπαστο· Β-Α2 «Πάμε» στο διάλειμμα', (tester) async {
+    testWidgets('U3-09 «διάλειμμα 2:00» αδιάσπαστο· Β-Α2 «Πάμε» στο διάλειμμα', (tester) async {
       final at = DateTime(2026, 11, 13, 17, 30);
       await tester.runAsync(() => ExLibrary.load(inline: true));
       final store = sampleTraining(at);
@@ -529,7 +531,7 @@ void main() {
       store.restEnd = at.add(const Duration(seconds: 90));
       await _pump(tester, SessionPage(training: store));
       final plan = tester.widget<Text>(find.byKey(const ValueKey('sess-plan'))).textSpan!.toPlainText();
-      expect(plan, contains('ξεκούραση '));
+      expect(plan, contains('διάλειμμα '));
       expect(find.descendant(of: find.byKey(const ValueKey('rest-stop')), matching: find.text('Πάμε')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.pump();

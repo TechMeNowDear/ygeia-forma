@@ -1676,6 +1676,9 @@
  "rebalanceDay": {
   "after dinner": null,
   "after snack": {
+   "assumed": [
+    "snack Φαγητό milo-giaourti: 450.0"
+   ],
    "changes": [
     "dinner Φαγητό tsipoura: 790.0 → 600.0"
    ],
@@ -1686,6 +1689,7 @@
   },
   "all locked": null,
   "ate 1100 at lunch": {
+   "assumed": [],
    "changes": [
     "snack Φαγητό milo-giaourti: 450.0 → 260.0"
    ],
@@ -1695,6 +1699,7 @@
    "proteinBefore": 180.328441
   },
   "ate 2500": {
+   "assumed": [],
    "changes": [
     "dinner Φαγητό tsipoura: 790.0 → 370.0",
     "snack Φαγητό milo-giaourti: 450.0 → 190.0"
@@ -1705,6 +1710,7 @@
    "proteinBefore": 220.328441
   },
   "ate 300 at lunch": {
+   "assumed": [],
    "changes": [
     "dinner Φαγητό tsipoura: 790.0 → 980.0",
     "snack Φαγητό milo-giaourti: 450.0 → 480.0"
@@ -1715,6 +1721,7 @@
    "proteinBefore": 170.328441
   },
   "ate 860 at lunch (as planned)": {
+   "assumed": [],
    "changes": [
     "dinner Φαγητό tsipoura: 790.0 → 840.0"
    ],
@@ -1724,6 +1731,7 @@
    "proteinBefore": 200.328441
   },
   "target 1500": {
+   "assumed": [],
    "changes": [
     "dinner Φαγητό tsipoura: 790.0 → 370.0",
     "snack Φαγητό milo-giaourti: 450.0 → 190.0"

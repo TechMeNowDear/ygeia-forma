@@ -653,13 +653,14 @@ Future<void> aiSwapFlow(BuildContext context, FoodStore food, int day, int index
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(
           '${r.isNew ? 'Νέο φαγητό· μπαίνει και στη βιβλιοθήκη σου.\n\n' : ''}'
+          // Έλεγχος 21/11 (K7B-03): δεκαδικά με κόμμα, όπως παντού (πριν «4.2 g»).
           'Αντί για «${cur.name}».\n'
           'Θερμίδες: ${thousands(oldT.shownKcal)} → ${thousands(newT.shownKcal)} kcal\n'
           'Πρωτεΐνη: ${oldT.protein.round()} → ${newT.protein.round()} g\n'
-          'Κορεσμένα: ${oldT.satFat.toStringAsFixed(1)} → ${newT.satFat.toStringAsFixed(1)} g\n'
-          'Αλάτι: ${oldT.salt.toStringAsFixed(1)} → ${newT.salt.toStringAsFixed(1)} g'
+          'Κορεσμένα: ${dec(oldT.satFat)} → ${dec(newT.satFat)} g\n'
+          'Αλάτι: ${dec(oldT.salt)} → ${dec(newT.salt)} g'
           '${g == null ? '' : '\n\nΗ μέρα μετά: ${thousands(dayKcal)} / ${thousands(g.kcal)} kcal, πρωτεΐνη ${dayProtein.round()} / '
-              '${g.protein} g, κορεσμένα ${daySat.toStringAsFixed(1)} / ${satLimitShown(g.kcal, g.satPct).toStringAsFixed(1)} g.'}'
+              '${g.protein} g, κορεσμένα ${dec(daySat)} / ${dec(satLimitShown(g.kcal, g.satPct))} g.'}'
           '\n\nΑπό τη βάση της εφαρμογής.',
           key: const ValueKey('ai-swap-summary'),
         ),
@@ -767,6 +768,10 @@ class _SwapReasonSheetState extends State<_SwapReasonSheet> {
 
 /// Μετά το «Έφαγα κάτι άλλο» (μόνο για σήμερα, μόνο αν γράφτηκε κάτι): προτείνει τις νέες μερίδες των γευμάτων που
 /// έρχονται μετά το [after] στη μέρα (κανόνες, χωρίς AI).
+///
+/// Έλεγχος 21/11 (K7B-02, K2-R-08): ο διάλογος λέει ποια ανοιχτά γεύματα μέτρησε ως «θα φαγωθούν ακόμα»
+/// ([rebalanceAssumedText]). Πριν έγραφε μόνο «η μέρα θα κλείσει στις …»· με μεσημεριανό γραμμένο αλλιώς, το βραδινό
+/// μίκραινε και ο χρήστης έτρωγε εκατοντάδες θερμίδες λιγότερο χωρίς να το ξέρει.
 Future<void> offerRebalance(BuildContext context, FoodStore food, int day, {required Meal after, DateTime Function()? clock}) async {
   final w = food.week;
   final g = HealthStore.shared?.goals;
@@ -785,6 +790,7 @@ Future<void> offerRebalance(BuildContext context, FoodStore food, int day, {requ
       title: const Text('Να προσαρμοστούν τα επόμενα γεύματα;'),
       content: Text(
         'Ως τώρα σήμερα: ${thousands(t.shownKcal)} από ${thousands(g.kcal)} kcal.\n\n'
+        '${rebalanceAssumedText(r.assumed)}'
         '${[for (final (m, n, a, b) in r.changes) '${mealLabel(m)}$dotJoin$n: ${thousands(a)} → ${thousands(b)} kcal'].join('\n')}\n\n'
         'Η μέρα θα κλείσει στις ${thousands(r.dayKcal)} kcal (στόχος ${thousands(g.kcal)}), πρωτεΐνη '
         '${r.proteinBefore.round()} → ${r.proteinAfter.round()} g (στόχος ${g.protein}).'
@@ -822,7 +828,7 @@ Future<void> rateDish(BuildContext context, FoodStore food, Dish d, int r) async
         : next == 1
             ? 'Σημειώθηκε: σου άρεσε. Θα μπαίνει πιο συχνά.'
             : next == -1
-                ? 'Σημειώθηκε: δεν σου άρεσε. Από το επόμενο πρόγραμμα δεν θα προτείνεται (αλλάζει από τη βιβλιοθήκη).'
+                ? 'Δεν σου άρεσε: από το επόμενο πρόγραμμα δεν θα προτείνεται. Αλλάζει από τη βιβλιοθήκη.'
                 : 'Η βαθμολογία σβήστηκε.'),
   ));
 }
@@ -875,4 +881,19 @@ class AiReadyCard extends StatelessWidget {
       },
     );
   }
+}
+
+
+/// Η παράγραφος του «Να προσαρμοστούν τα επόμενα γεύματα;» για τα ανοιχτά γεύματα που μπήκαν στο σύνολο της μέρας.
+/// Κενό όταν δεν υπάρχει κανένα. «Σημείωσέ το στο Πρόγραμμα» και όχι «πάτα Το έφαγα»: όποιος το έχει ήδη γράψει με
+/// «+ Φαγητό» θέλει «Έφαγα κάτι άλλο», αλλιώς το γράφει δεύτερη φορά· όποιος δεν θα το φάει θέλει «Δεν το έφαγα».
+String rebalanceAssumedText(List<(Meal, String, double)> assumed) {
+  if (assumed.isEmpty) return '';
+  final list = [for (final (m, n, k) in assumed) '${mealLabel(m)}$dotJoin$n (${thousands(k)} kcal)'].join(', ');
+  final one = assumed.length == 1;
+  // K7-R-02/03 (ανεξάρτητος έλεγχος): «λογαριάζω ότι θα φας» (όχι «στο σύνολο», που διαβαζόταν ως το «ως τώρα»)· και οι
+  // δύο περιπτώσεις (το έφαγες ήδη, ή δεν θα το φας)· χωρίς «πρώτα»: η ερώτηση δεν ξαναβγαίνει μετά το «Όχι».
+  final it = one ? 'το' : 'τα';
+  return 'Λογαριάζω ότι θα φας ακόμα: $list. '
+      'Αν $it έφαγες ήδη ή δεν θα $it φας, πάτα «Όχι» και σημείωσέ $it στο «Πρόγραμμα». Οι μερίδες τότε μένουν όπως είναι.\n\n';
 }

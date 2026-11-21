@@ -212,7 +212,7 @@ class _ProgramPastePageState extends State<ProgramPastePage> {
                   child: Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 2, children: [
                     Text(exName(i.ex), style: TextStyle(fontSize: 15, color: c.text)),
                     Text(
-                      '${repsRange(i)} ·\u00A0ξεκούραση ${clock(i.rest)}${loadText(i)}',
+                      '${repsRange(i)} ·\u00A0διάλειμμα ${clock(i.rest)}${loadText(i)}',
                       style: TextStyle(fontSize: 13.5, color: c.textSecondary),
                     ),
                   ]),

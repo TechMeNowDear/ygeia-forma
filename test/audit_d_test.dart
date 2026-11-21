@@ -213,7 +213,7 @@ void main() {
 
       expect(t.widget<TextField>(find.byKey(const ValueKey('report-note'))).maxLength, 400);
       expect(t.widget<TextField>(find.byKey(const ValueKey('report-note'))).decoration!.hintText, contains('τεστ άπνοιας'));
-      expect(find.textContaining('πίεση, σάκχαρο και καρδιογραφήματα'), findsWidgets); // Κ6-H1 (17/11)
+      expect(find.textContaining('Πίεση, σάκχαρο και καρδιογραφήματα'), findsWidgets); // Κ6-H1 (17/11)
       expect(find.text('Μέρες'), findsOneWidget, reason: 'όχι «Μέρες με / μέτρηση» που έσπαγε');
       expect(find.textContaining('κατά προσέγγιση'), findsOneWidget);
       expect(find.textContaining('90,4% ± 3,1%'), findsOneWidget);
@@ -526,7 +526,7 @@ void main() {
           child: Column(children: [OuraStatusCard(store: s, now: clock), OuraSleepTodayCard(store: s, now: clock, onTap: () {})]),
         ),
       );
-      expect(find.textContaining('τελευταίο συγχρονισμό, Τετ 11/11 10:08'), findsOneWidget);
+      expect(find.textContaining('Τελευταίος συγχρονισμός: Τετ 11/11 10:08'), findsOneWidget);
       // Round 1 (U2a-11): ημερομηνία και διάρκεια με αδιάσπαστα κενά (δεν σπάνε σε δύο γραμμές) και κόμμα ανάμεσα.
       expect(find.text('Τελευταία νύχτα που ήρθε: Τετ\u00A011/11, 7\u00A0ώρες\u00A016\u00A0λεπτά'), findsOneWidget);
       expect(find.text('Η Oura δεν δίνει νέα δεδομένα'), findsOneWidget);

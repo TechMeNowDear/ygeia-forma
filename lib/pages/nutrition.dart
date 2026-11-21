@@ -771,8 +771,7 @@ class _SourcesNote extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Text(
           // Round9 (R9-U2 ΒΕΛΤΙΩΣΗ-Α): ο σύνδεσμος σε μία γραμμή (πριν έμενε «άδειες ›» μόνο του στα 400 dp).
-          'Τιμές από CIQUAL 2025 (ANSES), USDA FoodData Central, Open Food Facts και ό,τι πέρασες από ετικέτες. '
-          'Πηγές\u00A0και\u00A0άδειες\u00A0›',
+          'Τιμές: CIQUAL, USDA, Open Food Facts και οι ετικέτες σου. Πηγές\u00A0και\u00A0άδειες\u00A0›',
           style: TextStyle(fontSize: 12, height: 1.4, color: color),
         ),
       ),

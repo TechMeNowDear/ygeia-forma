@@ -45,7 +45,7 @@ class SleepPage extends StatelessWidget {
                   icon: Icons.bedtime_rounded,
                   color: c.sleep,
                   title: 'Ο ύπνος δεν διαβάστηκε τώρα',
-                  text: 'Η Samsung δεν τον έδωσε αυτή τη φορά. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.',
+                  text: 'Η Samsung δεν τον έδωσε τώρα. Τράβηξε προς τα κάτω.',
                 )
               else
                 EmptyCard(

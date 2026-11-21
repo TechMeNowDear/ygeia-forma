@@ -213,7 +213,7 @@ void main() {
       expect(notComparedText([stable, _result(K.weight, TrendStatus.stable, effective: 2.0)]), someInconclusiveText);
       final one = notComparedText([stable, _result(K.sleepMin, TrendStatus.insufficient), _result(K.steps, TrendStatus.insufficient)])!;
       expect(one,
-          'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει «Λίγα δεδομένα», δεν φαίνεται αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.');
+          'Δεν φαίνεται καθαρή αλλαγή. Όπου γράφει «Λίγα δεδομένα», δεν φαίνεται αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.');
       final many = notComparedText([
         _result(K.weight, TrendStatus.stable, effective: 2.0),
         _result(K.sleepMin, TrendStatus.insufficient),
@@ -224,7 +224,7 @@ void main() {
       ])!;
       expect(
           many,
-          'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει «Λίγες ζυγίσεις για συμπέρασμα», «Λίγα δεδομένα», «Αλλαγή πηγής», '
+          'Δεν φαίνεται καθαρή αλλαγή. Όπου γράφει «Λίγες ζυγίσεις για συμπέρασμα», «Λίγα δεδομένα», «Αλλαγή πηγής», '
           '«Αλλαγή ορισμού» ή «Ενημερώνεται το ιστορικό», δεν φαίνεται αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.');
       for (final s in [one, many]) {
         expect(s, isNot(contains('μέσα στις συνηθισμένες')));
@@ -238,7 +238,7 @@ void main() {
       expect(find.textContaining('μέσα στις συνηθισμένες'), findsNothing);
       expect(
           find.text(
-              'Καμία διαφορά δεν πέρασε τα όρια ελέγχου. Όπου γράφει «Λίγα δεδομένα», δεν φαίνεται αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.'),
+              'Δεν φαίνεται καθαρή αλλαγή. Όπου γράφει «Λίγα δεδομένα», δεν φαίνεται αν άλλαξε κάτι. Αυτό δεν είναι ιατρικός έλεγχος.'),
           findsOneWidget);
     });
   });
@@ -319,14 +319,14 @@ void main() {
       expect(find.textContaining('15 δευτερόλεπτα ανά km'), findsOneWidget);
     });
 
-    testWidgets('επεξεργαστής: «30 λεπτά» στο αερόβιο, «ξεκούραση 1:30» στις ασκήσεις', (t) async {
+    testWidgets('επεξεργαστής: «30 λεπτά» στο αερόβιο, «διάλειμμα 1:30» στις ασκήσεις', (t) async {
       await _pump(t, WorkoutEditorPage(workout: Workout(id: 'c', name: 'Περπάτημα', cardio: Cardio(minutes: 30))), size: const Size(400, 900));
       expect(find.text('30 λεπτά'), findsOneWidget);
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
       await _pump(t, WorkoutEditorPage(workout: Workout(id: 'a', name: 'Προπόνηση Α', items: [PlanItem(ex: 'db_curl', rest: 90)])),
           size: const Size(400, 900));
       // R7-U3-14 (f2): «άφησε», όπως στην προπόνηση (πριν «ρεζέρβα 2»).
-      expect(find.textContaining('3 × 8–12 ·\u00A0ξεκούραση 90\u00A0δευτερόλεπτα ·\u00A0άφησε 2'), findsOneWidget);
+      expect(find.textContaining('3 × 8–12 ·\u00A0διάλειμμα 90\u00A0δευτερόλεπτα ·\u00A0άφησε 2'), findsOneWidget);
       expect(find.textContaining(RegExp('[′″]')), findsNothing);
     });
   });

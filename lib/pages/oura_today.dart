@@ -58,7 +58,7 @@ class OuraStatusCard extends StatelessWidget {
     final last = store.lastOuraNight;
     // Σφάλμα με παλιά δεδομένα στην οθόνη: λέμε ως πότε είναι (έλεγχος UX U5· ποτέ «χθες βράδυ» για παλιά νύχτα).
     final synced = store.ouraLastSync;
-    final syncedText = synced == null ? '' : ' Ό,τι βλέπεις ήρθε ως τον τελευταίο συγχρονισμό, ${shortDayDate(synced)} ${hm(synced)}.';
+    final syncedText = synced == null ? '' : ' Τελευταίος συγχρονισμός: ${shortDayDate(synced)} ${hm(synced)}.';
     final VoidCallback openManage = () {
       Navigator.of(context).push(OuraManagePage.route(store, now: now));
     };
@@ -74,15 +74,14 @@ class OuraStatusCard extends StatelessWidget {
     const readNowLabel = 'Ενημέρωση τώρα';
     // Round 1 (U2a-03): χωρίς νύχτα από το δαχτυλίδι το οξυγόνο της νύχτας ΔΕΝ φαίνεται (το ρολόι το μετρά μόνο μέσα
     // στις ώρες ύπνου του δαχτυλιδιού)· πριν, η κάρτα έγραφε «το οξυγόνο από το ρολόι φαίνεται κανονικά».
-    const emptyNight = ' νύχτα μένει κενή στον Ύπνο και στις Τάσεις, και το οξυγόνο της νύχτας μένει κενό, γιατί χωρίς '
-        'νύχτα από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες.';
+    const emptyNight = ' νύχτα μένει κενή, μαζί και το οξυγόνο της.';
     // Round 1 (U2a-04): και η μία νύχτα που λείπει λέει τι να κάνεις (συνήθως απλώς δεν συγχρόνισε η εφαρμογή Oura).
-    const ifWorn = ' Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά γύρνα εδώ.';
+    const ifWorn = ' Αν φορούσες το δαχτυλίδι, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά γύρνα εδώ.';
     final nap = napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true);
     final (title, text, color, button, action) = switch (s) {
       OuraStatus.waiting => (
           'Περιμένει το Oura',
-          'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ.',
+          'Η νύχτα δεν ήρθε ακόμα. Αν ξύπνησες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και γύρνα εδώ.',
           c.sleep,
           readNowLabel,
           readNow,

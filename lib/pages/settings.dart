@@ -359,8 +359,8 @@ class SettingsPage extends StatelessWidget {
                               key: const ValueKey('settings-hrlimit'),
                               icon: Icons.favorite_border_rounded,
                               color: c.textSecondary,
-                              title: 'Όριο παλμών από γιατρό',
-                              subtitle: hr == null ? 'Κανένα ·\u00A0μόνο αν σου έδωσε γιατρός' : '$hr bpm ·\u00A0δόνηση στο ρολόι σε κάθε άσκηση',
+                              title: 'Όριο παλμών από τον γιατρό',
+                              subtitle: hr == null ? 'Κανένα ·\u00A0μόνο αν σου έδωσε γιατρός' : '$hr bpm ·\u00A0δόνηση στο ρολόι όσο μετρά άσκηση',
                               onTap: () async {
                                 await TrainingStore.main.load();
                                 if (context.mounted) await editDoctorLimit(context, TrainingStore.main);

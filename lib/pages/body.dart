@@ -79,7 +79,7 @@ class BodyPage extends StatelessWidget {
               icon: Icons.monitor_weight_rounded,
               color: c.body,
               title: 'Οι ζυγίσεις δεν διαβάστηκαν τώρα',
-              text: 'Η Samsung δεν τις έδωσε αυτή τη φορά. Τράβηξε την οθόνη προς τα κάτω για να ξαναδοκιμάσεις.',
+              text: 'Η Samsung δεν τις έδωσε τώρα. Τράβηξε προς τα κάτω.',
             )
           // Round 8 (R8-A4-3): η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή (κανένα «body» στην ανάγνωση,
           // κανένα σφάλμα): πριν «Δεν υπάρχει ζύγιση · Ζυγίσου στην InBody», ενώ η ζύγιση δεν μπορούσε να φτάσει.
@@ -228,7 +228,7 @@ class BodyPage extends StatelessWidget {
               average: avg),
           if (avg.length >= 2) ...[
             const SizedBox(height: 6),
-            Text('Έντονη γραμμή: μέσος όρος των ζυγίσεων των 7 τελευταίων ημερών. Δείχνει την πορεία πέρα από τα νερά της κάθε μέρας, με λίγες μέρες καθυστέρηση.',
+            Text('Έντονη γραμμή: μέσος όρος 7 ημερών. Δείχνει την πορεία χωρίς τα νερά της κάθε μέρας, με λίγες μέρες καθυστέρηση.',
                 key: const ValueKey('body-weight-avg-note'),
                 style: TextStyle(color: Aigaio.of(context).textSecondary, fontSize: 12.5, height: 1.35)),
           ],

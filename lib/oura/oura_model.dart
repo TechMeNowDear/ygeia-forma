@@ -686,3 +686,25 @@ List<OuraNight> mergeOuraNights(
   final out = [for (final n in byDay.values) if (!n.day.isBefore(oldest)) n]..sort((a, b) => a.day.compareTo(b.day));
   return out;
 }
+
+/// Έλεγχος 21/11 (K7A-15, K3C-09): τα λεπτά κάθε κομματιού της νύχτας όπως γράφονται, ώστε να αθροίζουν ακριβώς στον
+/// μεγάλο αριθμό της νύχτας ([night]): το μεγαλύτερο κομμάτι παίρνει ό,τι μένει. Με στρογγύλεμα ανά κομμάτι, 5.429 και
+/// 8.669 δευτερόλεπτα έδιναν «1 ώρα 30 λεπτά» και «2 ώρες 24 λεπτά» κάτω από «3 ώρες 55 λεπτά». Μόνο εμφάνιση: κανένας
+/// υπολογισμός και καμία αποθηκευμένη τιμή δεν αλλάζει.
+List<int?> pieceMinutesShown(List<int?> totalSeconds, int? night) {
+  final mins = [for (final s in totalSeconds) s == null ? null : (s / 60).round()];
+  if (night == null || mins.isEmpty || totalSeconds.any((s) => s == null)) return mins;
+  var big = 0;
+  for (var i = 1; i < totalSeconds.length; i++) {
+    if (totalSeconds[i]! > totalSeconds[big]!) big = i;
+  }
+  var rest = 0;
+  for (var i = 0; i < mins.length; i++) {
+    if (i != big) rest += mins[i]!;
+  }
+  final fixed = night - rest;
+  // Μόνο η διαφορά του στρογγυλέματος (το πολύ μισό λεπτό ανά κομμάτι: 1 λεπτό με 2–3 κομμάτια, 2 με 4–5)· αλλιώς κάτι
+  // άλλο δεν συμφωνεί και μένουν όπως είναι (K7-R-12).
+  if ((fixed - mins[big]!).abs() > (mins.length + 1) ~/ 2 || fixed < 0) return mins;
+  return [for (var i = 0; i < mins.length; i++) i == big ? fixed : mins[i]];
+}

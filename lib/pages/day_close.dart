@@ -125,7 +125,7 @@ class YesterdayCard extends StatelessWidget {
         Text('Χθες έγραψες όλα όσα έφαγες;', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: c.text)),
         const SizedBox(height: 4),
         Text(
-          'Αν λείπουν γεύματα, η χθεσινή μέρα δεν μετρά στον εβδομαδιαίο έλεγχο θερμίδων. Έτσι ο στόχος δεν αλλάζει χωρίς λόγο.',
+          'Αν λείπουν γεύματα, η χθεσινή μέρα δεν μετρά στον εβδομαδιαίο έλεγχο θερμίδων.',
           style: TextStyle(fontSize: 13.5, height: 1.35, color: c.textSecondary),
         ),
         const SizedBox(height: 10),
@@ -190,8 +190,7 @@ class ReminderSheet extends StatelessWidget {
                 Text('Βραδινή υπενθύμιση', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.text)),
                 const SizedBox(height: 6),
                 Text(
-                  'Μία ειδοποίηση, μόνο αν ως εκείνη την ώρα η μέρα έχει λιγότερο από το 60% του στόχου γραμμένο και δεν έχεις '
-                  'πατήσει «Τελείωσα για σήμερα». Τίποτα δεν τρέχει στο παρασκήνιο.',
+                  'Μία ειδοποίηση, μόνο αν ως εκείνη την ώρα έχεις γράψει λιγότερο από το 60% του στόχου και δεν έχεις πατήσει «Τελείωσα για σήμερα».',
                   style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
                 ),
                 const SizedBox(height: 8),

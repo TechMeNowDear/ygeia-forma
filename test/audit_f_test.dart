@@ -290,7 +290,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('F5: κείμενα άπνοιας και οξυγόνου', () {
     test('Οι δύο φράσεις για το τεστ άπνοιας φαίνονται χωρίς πάτημα· «αποφρακτική (όχι την κεντρική)» στο πλήρες', () {
-      expect(oxygenAboutShort, contains('Ένα αρνητικό τεστ άπνοιας του ρολογιού δεν την αποκλείει'));
+      expect(oxygenAboutShort, contains('Αρνητικό τεστ άπνοιας του ρολογιού δεν αποκλείει την άπνοια'));
       expect(oxygenAboutShort, contains('κεντρική άπνοια'));
       expect(oxygenAboutText, contains('αποφρακτική άπνοια (όχι την κεντρική)'));
       expect(oxygenRepeatText(3, 5), contains('Ένα αρνητικό τεστ άπνοιας του ρολογιού δεν το αποκλείει'));
@@ -343,7 +343,7 @@ void main() {
 
     testWidgets('Το κλειστό κείμενο δείχνει τις φράσεις για την άπνοια', (t) async {
       await _pump(t, const SingleChildScrollView(child: OxygenAbout()));
-      expect(find.textContaining('δεν την αποκλείει'), findsOneWidget);
+      expect(find.textContaining('δεν αποκλείει την άπνοια'), findsOneWidget);
     });
   });
 
@@ -514,14 +514,14 @@ void main() {
       expect(find.textContaining('Ενεργός χρόνος ·'), findsNothing);
     });
 
-    testWidgets('U2: Τάσεις χωρίς αρκετές μέρες: «δεν υπάρχουν αρκετές μετρήσεις», όχι «καμία διαφορά»', (t) async {
+    testWidgets('U2: Τάσεις χωρίς αρκετές μέρες: «δεν υπάρχουν αρκετές μετρήσεις», όχι «δεν φαίνεται καθαρή αλλαγή»', (t) async {
       final s = _sample();
       s.history = {
         for (var i = 0; i < 5; i++) dateKey(_add(dayOf(_now), -i)): {K.sleepHr: 60.0, K.steps: 5000.0},
       };
       await _pump(t, TrendsPage(store: s, now: _now), size: const Size(400, 4000));
       expect(find.text(noComparisonText(TrendPeriod.month)), findsOneWidget);
-      expect(find.textContaining('Καμία διαφορά δεν πέρασε'), findsNothing);
+      expect(find.textContaining('Δεν φαίνεται καθαρή αλλαγή'), findsNothing);
     });
 
     testWidgets('U5: ίδιο όνομα «Από ετικέτα» για την ίδια ενέργεια', (t) async {

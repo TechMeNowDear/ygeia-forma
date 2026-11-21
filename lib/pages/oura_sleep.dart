@@ -268,10 +268,8 @@ class _EmptyNightCard extends StatelessWidget {
     // Round 1 (U2a-03 / U2a-04 / U2a-13): κάθε κείμενο λέει τι ισχύει και τι να κάνεις· χωρίς νύχτα από το δαχτυλίδι
     // το οξυγόνο της νύχτας ΔΕΝ φαίνεται (πριν: «οξυγόνο από το ρολόι φαίνεται κανονικά»).
     final text = switch (reason) {
-      EmptyNight.waiting => 'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ.',
-      EmptyNight.noRing => 'Η νύχτα μένει κενή στον Ύπνο και στις Τάσεις, και το οξυγόνο της νύχτας μένει κενό, γιατί χωρίς νύχτα '
-          'από το δαχτυλίδι δεν ξέρουμε πότε κοιμήθηκες. Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά '
-          'γύρνα εδώ.',
+      EmptyNight.waiting => 'Η νύχτα δεν ήρθε ακόμα. Αν ξύπνησες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και γύρνα εδώ.',
+      EmptyNight.noRing => 'Η νύχτα μένει κενή, μαζί και το οξυγόνο της. Αν φορούσες το δαχτυλίδι, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά γύρνα εδώ.',
       EmptyNight.reconnect => 'Το Oura χρειάζεται νέα σύνδεση: πάτα «Σύνδεση ξανά». Δεν χάνεται τίποτα· οι νύχτες έρχονται μετά.',
       EmptyNight.subscription => 'Η Oura δεν δίνει τον ύπνο: η συνδρομή Oura δεν είναι ενεργή ή λείπει η άδεια για τον ύπνο. '
           'Έλεγξε τη συνδρομή στην εφαρμογή Oura και μετά άνοιξε τις «Ρυθμίσεις Oura».',
@@ -343,6 +341,7 @@ class _OuraNightCard extends StatelessWidget {
     // Νύχτα σε κομμάτια (ως 4 ώρες κενό): μετρούν όλα μαζί, το κενό όχι (δεύτερος γύρος ελέγχου, U12).
     final parts = night.counted;
     final minutes = night.nightMinutes;
+    final pieceShown = pieceMinutesShown([for (final x in parts) x.total], minutes);
     Widget clock(String label, String v, {String? note}) => Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,8 +501,9 @@ class _OuraNightCard extends StatelessWidget {
           ],
           if (parts.length > 1) ...[
             const Hairline(vertical: 12),
-            for (final x in parts)
-              InfoRow('Κομμάτι ${hm(x.wallStart)}–${hm(x.wallEnd)}', x.totalMinutes == null ? '—' : hoursMinutes(x.totalMinutes!)),
+            // K7A-15: τα λεπτά των κομματιών αθροίζουν στον μεγάλο αριθμό της κάρτας ([pieceMinutesShown]).
+            for (final (i, x) in parts.indexed)
+              InfoRow('Κομμάτι ${hm(x.wallStart)}–${hm(x.wallEnd)}', pieceShown[i] == null ? '—' : hoursMinutes(pieceShown[i]!)),
             // Round 1 (U2a-19): χωρίς κουκκίδα, στοιχισμένο με τις γραμμές «Κομμάτι» (με την κουκκίδα έσπαγε σε δύο γραμμές).
             InfoRow(
               'Κενό ανάμεσα (δεν μετρά)',
