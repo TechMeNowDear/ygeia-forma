@@ -244,6 +244,7 @@ class BodyMeasurement {
     this.smm,
     this.ffm,
     this.bmi,
+    this.heightCm,
     this.water,
     this.bmr,
     this.app = '',
@@ -259,6 +260,10 @@ class BodyMeasurement {
   final double? smm;
   final double? ffm;
   final double? bmi;
+
+  /// Έλεγχος 20/11 (K5A-05 / K5M-01): το ύψος που γράφει η ίδια η εγγραφή της ζύγισης (cm), αν το γράφει. Νέο πεδίο
+  /// («height»)· από παλιότερη έκδοση του Kotlin λείπει (null).
+  final double? heightCm;
   final double? water;
   final int? bmr;
 
@@ -551,6 +556,7 @@ class Dashboard {
             smm: within(d(e['smm']), 5, 100),
             ffm: within(d(e['ffm']), 10, 200),
             bmi: within(d(e['bmi']), 8, 80),
+            heightCm: within(d(e['height']), 100, 250),
             water: within(d(e['water']), 5, 120),
             // Τελικός έλεγχος (Συμβούλιο 1, μ2): και ο βασικός μεταβολισμός μόνο μέσα σε λογικά όρια (ίδιος κανόνας με
             // τα υπόλοιπα της ζύγισης)· «0 kcal» ή σφάλμα δεν είναι μέτρηση. 500–5.000 kcal καλύπτει κάθε ενήλικα.
@@ -1566,10 +1572,20 @@ Set<String> applyRecentRead(
     final from = DateTime(today.year - 10, today.month, today.day + 1);
     final copy = {for (final e in history.entries) e.key: e.value};
     final gone = removeMissingBody(copy, days, from: from);
-    if (gone.isNotEmpty && gone.length <= 3) changed.addAll(removeMissingBody(history, days, from: from));
+    // Έλεγχος 20/11 (K5A-06): ως 3 μαζί, ή ως το 10% των ημερών με ζύγιση που δίνει ΤΩΡΑ η Samsung. Πριν, 4 ή περισσότερες
+    // ζυγίσεις που έσβηνες μαζί (π.χ. ενός επισκέπτη) έμεναν για πάντα στις Τάσεις και στην αναφορά για τον γιατρό. Η
+    // προφύλαξη μένει: μισή απάντηση της Samsung (λίγες μέρες) δεν σβήνει τίποτα, και ό,τι σβηστεί κατά λάθος ξαναμπαίνει
+    // στην επόμενη ανάγνωση που το περιέχει ([mergeBody]).
+    if (gone.isNotEmpty && bodyRemovalAllowed(gone.length, days.length)) {
+      changed.addAll(removeMissingBody(history, days, from: from));
+    }
   }
   return changed;
 }
+
+/// K5A-06: πόσες ζυγίσεις που λείπουν από τη Samsung επιτρέπεται να σβηστούν μαζί από το ιστορικό: ως 3, ή ως το 10% των
+/// ημερών με ζύγιση που έδωσε η Samsung σε αυτή την ανάγνωση ([present]).
+bool bodyRemovalAllowed(int gone, int present) => gone <= 3 || gone * 10 <= present;
 
 /// Round 7 (R7-A9-3): τι έγινε με τις πηγές ύπνου ενός αντιγράφου ([HealthStore.restoreSourcesWhy]).
 /// [restored]: μπήκαν· [phoneNewer]: το κινητό έχει νεότερες (ή ήδη ό,τι έχει το αντίγραφο)· [same]: ίδιες με του
@@ -2502,7 +2518,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       // τη μέρα −7. Αν υπήρχε ήδη ανολοκλήρωτο κενό, κρατάμε την παλιότερη αρχή και ξεκινάμε από πάνω.
       if (last != null && last.isBefore(addDays(today, -(_recentDays - 1)))) {
         final prev = prefs.gapFrom != null ? parseDateKey(prefs.gapFrom!) : null;
-        prefs.gapFrom = dateKey(prev != null && prev.isBefore(last) ? prev : last);
+        // Έλεγχος 20/11 (K5A-03): το κενό αρχίζει [gapLeadDays] μέρες ΠΡΙΝ από την τελευταία γραμμένη μέρα. Το ρολόι
+        // συγχρονίζει βήματα και 1–3 μέρες αργότερα, και μια ανάγνωση με σφάλμα σε ένα είδος προχωρά το [Prefs.recentTo]:
+        // πριν, μετά από περίπου 4 εβδομάδες κλειστή εφαρμογή, εκείνες οι μέρες έμεναν για πάντα με μισά βήματα.
+        final from = addDays(last, -gapLeadDays);
+        prefs.gapFrom = dateKey(prev != null && prev.isBefore(from) ? prev : from);
         prefs.gapTo = null;
       }
       if (prefs.recentTo != dateKey(today)) {
@@ -2512,6 +2532,9 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
     }
     notifyListeners();
   }
+
+  /// K5A-03: πόσες μέρες πριν από την τελευταία γραμμένη μέρα ξαναδιαβάζονται, όταν η εφαρμογή έμεινε κλειστή πάνω από 6.
+  static const gapLeadDays = 3;
 
   /// Αποτυχίες της συμπλήρωσης σε αυτή τη χρήση της εφαρμογής (η ανάγνωση δεν έγινε καθόλου). Μετά από 3, δεν
   /// ξαναδιαβάζουμε σε κάθε ανανέωση (μπαταρία). Οι αποτυχίες ανά μήνα είναι αποθηκευμένες ([Prefs.monthFails]).

@@ -109,6 +109,16 @@ class DataRulesTest {
     }
 
     @Test
+    fun watchFilterEmptyIsNormalForNightKindsWhileSleepComesFromTheRing() {
+        // Έλεγχος 20/11 (K5A-01): οξυγόνο / θερμοκρασία δέρματος με τον ύπνο από το δαχτυλίδι: «χωρίς ρολόι εδώ», όχι σφάλμα.
+        assertEquals(DataRules.FilterOutcome.NON_WATCH, DataRules.filterOutcome(0, 4, recent = true, watchExpected = false))
+        assertEquals(DataRules.FilterOutcome.ERROR, DataRules.filterOutcome(0, 4, recent = true, watchExpected = true))
+        assertEquals(DataRules.FilterOutcome.OK, DataRules.filterOutcome(0, 0, recent = true, watchExpected = false))
+        assertEquals(DataRules.FilterOutcome.OK, DataRules.filterOutcome(3, 4, recent = true, watchExpected = false))
+        assertEquals(setOf("spo2", "skinTemp"), DataRules.NIGHT_ONLY_KINDS)
+    }
+
+    @Test
     fun nightsFileErrorIsNotMissing() {
         // Έλεγχος 3, E4: σφάλμα ανάγνωσης ≠ «δεν υπάρχει».
         assertEquals("{\"state\":\"missing\"}", DataRules.nightsState(false) { error("δεν καλείται") })

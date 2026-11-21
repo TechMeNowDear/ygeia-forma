@@ -152,7 +152,10 @@ Map<String, dynamic> _sleep(HealthStore store, DateTime today) {
   // Θερμοκρασία: το Oura δίνει απόκλιση (+0,3°), το ρολόι απόλυτη τιμή καρπού (33,6 °C), που δεν δείχνεται ποτέ ως
   // «+33,6°» (έλεγχος 8/11, DATA-04). Από το ρολόι: μόνο η απόκλιση από τα συνηθισμένα, αν υπάρχουν.
   if (src == Source.oura) {
-    add(K.skinTemp, 'Θερμοκρασία', '°', (v) => signedDec(v), digits: 1);
+    // Έλεγχος 20/11 (K5M-03): η τιμή του Oura είναι ΗΔΗ απόκλιση από το συνηθισμένο· χωρίς δεύτερο «συνήθως» και βέλος
+    // (πριν «+0,3° · συνήθως −0,1°»), όπως στη σελίδα της μέτρησης (R7-A5-1).
+    final t = plan.value(h, K.skinTemp, d0);
+    if (t != null) out[K.skinTemp] = _entry('Θερμοκρασία', signedDec(t), '°', spark: series(K.skinTemp));
   } else {
     final v = plan.value(h, K.skinTemp, d0);
     final b = personalBaseline(h, plan, K.skinTemp, d0);

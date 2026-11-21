@@ -64,7 +64,8 @@ const wMetrics = <String, List<WMetric>>{
     WMetric('fatPct', 'Λίπος'),
     WMetric('smm', 'Σκελετικοί μύες'),
     WMetric('ffm', 'Άλιπη μάζα'),
-    WMetric('bmr', 'Μεταβολισμός ηρεμίας'),
+    // K5M-05: «βασικός» (BMR), όπως στο Σώμα· ο «μεταβολισμός ηρεμίας» (RMR) είναι άλλη έννοια.
+    WMetric('bmr', 'Βασικός μεταβολισμός'),
     WMetric('bmi', 'Δείκτης μάζας σώματος'),
     WMetric('water', 'Νερό σώματος'),
   ],

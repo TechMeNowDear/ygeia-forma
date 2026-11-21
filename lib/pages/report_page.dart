@@ -541,7 +541,8 @@ class _PageOne extends StatelessWidget {
     // Ορισμοί και μονάδες σε κάθε γραμμή (κλινικός έλεγχος H3/H4, 4/11).
     final rows = <(String, String, String Function(double), MetricDef?)>[
       ('Παλμοί στον ύπνο, μέσος όρος νύχτας (bpm)', K.sleepHr, num0, _def(K.sleepHr)),
-      if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο (bpm)', K.lowHr, num0, _def(K.lowHr)),
+      // Έλεγχος 20/11 (K5M-02): το χαμηλότερο ΔΕΙΓΜΑ 30 δευτερολέπτων (Oura API), όχι μέσος όρος: να μη διαβαστεί ως βραδυκαρδία.
+      if (withOura) ('Χαμηλότεροι παλμοί στον ύπνο, χαμηλότερο δείγμα 30″ (bpm)', K.lowHr, num0, _def(K.lowHr)),
       if (withOura) ('HRV νύχτας, RMSSD, μέσος όρος (ms)', K.hrv, num0, _def(K.hrv)),
       if (withOura) ('Αναπνοές στον ύπνο (ανά λεπτό)', K.breath, (v) => dec(v), _def(K.breath)),
       // Round 1 (U1b-08): η συσκευή γράφεται μία φορά, από την ετικέτα της γραμμής (« · Ρολόι», « · Oura»)· πριν

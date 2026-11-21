@@ -216,12 +216,21 @@ object DataRules {
      * δεδομένα ρολογιού: εκεί είναι σφάλμα (το ιστορικό μένει). Σε κομμάτι συμπλήρωσης/επανανάγνωσης ένα άδειο
      * αποτέλεσμα με φίλτρο σημαίνει «δεν υπάρχουν δεδομένα ρολογιού εδώ» (π.χ. πριν από το ρολόι, από κινητό ή
      * βραχιόλι): δεκτό, χωρίς ξαναδοκιμές, σημειωμένο ως [FilterOutcome.NON_WATCH].
+     *
+     * Έλεγχος 20/11 (K5A-01): [watchExpected] = false για τα είδη της νύχτας (οξυγόνο, θερμοκρασία δέρματος) όσο ο ύπνος
+     * έρχεται από το δαχτυλίδι: το ρολόι τα μετρά μόνο στον ύπνο, άρα «καμία εγγραφή ρολογιού» είναι τότε το κανονικό, όχι
+     * «το ρολόι δεν αναγνωρίστηκε». Πριν, αν η Samsung Health είχε οξυγόνο άλλης συσκευής, η κανονική ανάγνωση γύριζε
+     * σφάλμα ΚΑΘΕ φορά (από τη μέρα που η τελευταία νύχτα με το ρολόι έβγαινε από τις 30 μέρες): η ανάγνωση στο
+     * παρασκήνιο δεν έγραφε ποτέ, και το «Τι φτάνει» έδειχνε μόνιμο σφάλμα.
      */
-    fun filterOutcome(filtered: Int, unfiltered: Int, recent: Boolean): FilterOutcome = when {
+    fun filterOutcome(filtered: Int, unfiltered: Int, recent: Boolean, watchExpected: Boolean = true): FilterOutcome = when {
         !watchFilterEmpty(filtered, unfiltered) -> FilterOutcome.OK
-        recent -> FilterOutcome.ERROR
+        recent && watchExpected -> FilterOutcome.ERROR
         else -> FilterOutcome.NON_WATCH
     }
+
+    /** K5A-01: τα είδη που το ρολόι μετρά μόνο στον ύπνο (ονόματα του JSON). */
+    val NIGHT_ONLY_KINDS = setOf("spo2", "skinTemp")
 
     /** Το μήνυμα του σφάλματος [watchFilterEmpty] (η Flutter το αναγνωρίζει με αυτό το κλειδί). */
     const val WATCH_FILTER_EMPTY = "watch_filter_empty"

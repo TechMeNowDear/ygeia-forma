@@ -402,14 +402,12 @@ class _LatestCard extends StatelessWidget {
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση)', '${thousands(last.bmr!)} kcal'),
           // Round 7 (A4-2): κομμένος στο 0,1 ([bmiText]): ποτέ «25,0» δίπλα σε «μέσα στο εύρος».
           if (bmi != null) InfoRow('Δείκτης μάζας σώματος', bmiText(bmi)),
-          if (inBodyHeight(last.weight, last.bmi) case final h? when profile.heightCm != null && (h - profile.heightCm!).abs() >= 1)
+          // Έλεγχος 20/11 (K5A-05 / K5M-01): από το ύψος της ίδιας της εγγραφής όταν υπάρχει· αλλιώς από τον δείκτη, με
+          // διατύπωση που δεν αποδίδει στην InBody ό,τι μπορεί να είναι του προφίλ της Samsung Health.
+          if (scaleHeightNote(recordCm: last.heightCm, weight: last.weight, bmi: last.bmi, profileCm: profile.heightCm) case final note?)
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 6),
-              child: Text(
-                'Η εφαρμογή InBody έχει ύψος ${h.round()} cm, τα στοιχεία σου ${profile.heightCm!.round()} cm. Εδώ μετρά το δικό σου· '
-                'διόρθωσέ το και στην InBody, για να βγάζει σωστά λίπος και μύες.',
-                style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
-              ),
+              child: Text(note, key: const ValueKey('body-height-note'), style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35)),
             ),
           if (last.water != null) InfoRow('Νερό σώματος', '${dec(last.water!)} L'),
           // 7/11: εύρη αναφοράς με πηγή (λίπος ανά ηλικία και φύλο, υγιές βάρος για το ύψος). Η εξήγηση στο «i».

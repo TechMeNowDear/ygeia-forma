@@ -22,7 +22,7 @@ const fieldLabels = <String, String>{
   'bodyfatmass': 'Μάζα λίπους (kg)',
   'skeletalmuscle': 'Σκελετικοί μύες (%)',
   'skeletalmusclemass': 'Σκελετικοί μύες (kg)',
-  'musclemass': 'Μυϊκή μάζα',
+  'musclemass': 'Μυϊκή μάζα (%)',
   'basalmetabolicrate': 'Βασικός μεταβολισμός (kcal)',
   'fatfree': 'Άλιπη μάζα (%)',
   'fatfreemass': 'Άλιπη μάζα (kg)',

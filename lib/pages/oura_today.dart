@@ -618,7 +618,8 @@ class OuraRestCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Μέσοι όροι όλης της νύχτας, σε σύγκριση με τις 14 τελευταίες νύχτες σου.',
+            // K5M-04: σε νύχτα με δύο κομμάτια οι τιμές είναι του μεγάλου κομματιού.
+            'Τιμές της κύριας περιόδου ύπνου, σε σύγκριση με τις 14 τελευταίες νύχτες σου.',
             style: TextStyle(color: c.textSecondary, fontSize: 12.5),
           ),
         ],
