@@ -6,6 +6,7 @@ import '../format.dart';
 import '../theme.dart';
 import '../vitals.dart';
 import '../widgets.dart';
+import 'category.dart' show SegmentTabs;
 
 class VitalsPage extends StatefulWidget {
   const VitalsPage({super.key, required this.store, this.now});
@@ -68,7 +69,8 @@ class _VitalsPageState extends State<VitalsPage> {
         key: const ValueKey('vital-add'),
         onPressed: widget.store.read ? _add : null,
         icon: const Icon(Icons.add_rounded),
-        label: Text('Νέα: ${_title(_kind).toLowerCase()}'),
+        // Έλεγχος 21/11 (K7A-02): η καρτέλα λέει ήδη ποια μέτρηση (πριν «Νέα: καρδιογράφημα»).
+        label: const Text('Νέα μέτρηση'),
       ),
       body: ListenableBuilder(
         listenable: widget.store,
@@ -83,14 +85,14 @@ class _VitalsPageState extends State<VitalsPage> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 680),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    SegmentedButton<VitalKind>(
+                    // Έλεγχος 21/11 (K7A-02): οι ίδιες καρτέλες με «Ύπνος · Καρδιά · Σώμα · Τάσεις»: μετρούν τις λέξεις
+                    // και κυλούν αν δεν χωρούν. Πριν, τρία ίσα τμήματα: στο κλειστό Fold το «Καρδιογράφημα» κοβόταν.
+                    SegmentTabs(
                       key: const ValueKey('vital-kind'),
-                      showSelectedIcon: false,
-                      segments: [
-                        for (final k in VitalKind.values) ButtonSegment(value: k, label: Text(_title(k), maxLines: 1)),
-                      ],
-                      selected: {_kind},
-                      onSelectionChanged: (s) => setState(() => _kind = s.first),
+                      tabs: [for (final k in VitalKind.values) _title(k)],
+                      selected: VitalKind.values.indexOf(_kind),
+                      solid: c.healthSolid,
+                      onTap: (i) => setState(() => _kind = VitalKind.values[i]),
                     ),
                     const SizedBox(height: 12),
                     if (widget.store.error != null)

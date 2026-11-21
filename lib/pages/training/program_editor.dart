@@ -267,7 +267,7 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
   String _line(PlanItem i) {
     // Round 2 (R2-D-5): «ξεκούραση 1:30», όπως στην προπόνηση και στην επικόλληση (πριν «1′30″»).
     // R7-U3-14: «άφησε 3», η ίδια λέξη με την προπόνηση και την Άσκηση (πριν «ρεζέρβα 3» μόνο εδώ).
-    final parts = [repsRange(i), 'ξεκούραση ${restText(i.rest)}', 'άφησε ${i.rir}'];
+    final parts = [repsRange(i), 'διάλειμμα ${restText(i.rest)}', 'άφησε ${i.rir}'];
     if (hasLoad(i.kind)) parts.add(i.load == null ? 'βάρος: αυτόματα' : loadLabel(i.kind, i.load));
     return parts.join(' ·\u00A0');
   }

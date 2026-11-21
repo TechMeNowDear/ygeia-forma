@@ -678,9 +678,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             : found.ignored.isEmpty
                 ? null
                 : strong
-                    ? 'Δεν έχουμε «${q.trim()}». Τα παρακάτω είναι για «$kept»: άλλο τρόφιμο, με άλλες θερμίδες. Αν είναι '
-                        'συσκευασμένο, πάτα «Σάρωση» ή «Από ετικέτα» (πιο πάνω)· αν είναι σπιτικό, γράψε '
-                        'χωριστά και τα υπόλοιπα υλικά.'
+                    ? 'Δεν έχουμε «${q.trim()}». Τα παρακάτω είναι για «$kept»: άλλο τρόφιμο, με άλλες θερμίδες. Συσκευασμένο: «Σάρωση» ή «Από ετικέτα», πιο πάνω. Σπιτικό: γράψε χωριστά και τα υπόλοιπα υλικά.'
                     : kept.isEmpty
                         ? 'Δεν βρέθηκε με όλες τις λέξεις. Αποτελέσματα χωρίς ${found.ignored.map((w) => '«$w»').join(', ')}.'
                         : 'Δεν βρέθηκε «${q.trim()}». Αποτελέσματα για «$kept».';
@@ -972,10 +970,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                         child: Text(
                           ingredient
-                              ? 'Γράψε το υλικό, με ή χωρίς τόνους, ακόμα και σε greeklish («fakes», «kotopoulo»). '
-                                  'Βάλε τα γραμμάρια όπως τα ζυγίζεις, ωμά. Για συσκευασμένα προϊόντα πάτα «Σάρωση».'
-                              : 'Γράψε τι έφαγες, με ή χωρίς τόνους, ακόμα και σε greeklish («fakes», «kotopoulo»). '
-                                  'Για συσκευασμένα προϊόντα πάτα «Σάρωση».',
+                              ? 'Γράψε το υλικό, και χωρίς τόνους ή με λατινικά («fakes»). Τα γραμμάρια ωμά, όπως τα ζυγίζεις. Συσκευασμένο; Πάτα «Σάρωση».'
+                              : 'Γράψε τι έφαγες, και χωρίς τόνους ή με λατινικά («fakes»). Συσκευασμένο; Πάτα «Σάρωση».',
                           style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                         ),
                       ),
@@ -1003,7 +999,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                       child: Text(
-                        'Νέο δικό σου προϊόν: «Σάρωση» ή «Από ετικέτα». Τα δικά σου βγαίνουν και όταν ψάχνεις.',
+                        'Νέο προϊόν: «Σάρωση» ή «Από ετικέτα».',
                         style: TextStyle(color: c.textSecondary, fontSize: 13.5, height: 1.4),
                       ),
                     ),
@@ -1014,8 +1010,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       child: Text(
                         // Έλεγχος round1 (U3a-18): με τα ονόματα των δύο κουμπιών, όπως και η κάρτα «άλλο τρόφιμο».
                         // Round7 (R7-U2-14): χωρίς το κενό που αφήνει το πληκτρολόγιο μετά από πρόταση λέξης («σαλάτα »).
-                        'Δεν βρέθηκε «${q.trim()}» στη βάση. Αν είναι συσκευασμένο, πάτα «Σάρωση» ή «Από ετικέτα». '
-                        'Αν δεν έχει ετικέτα (π.χ. σπιτικό φαγητό), πρόσθεσε ένα-ένα τα υλικά του.',
+                        'Δεν βρέθηκε «${q.trim()}». Συσκευασμένο: «Σάρωση» ή «Από ετικέτα». Σπιτικό: γράψε τα υλικά του ένα-ένα.',
                         style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.45),
                       ),
                     )
@@ -1562,8 +1557,8 @@ class _QuantitySheetState extends State<QuantitySheet> {
                   Text(
                     // Έλεγχος 9/11 (Μ2): οι τιμές μένουν όπως στην ετικέτα (ανά 100 ml) και η ποσότητα γράφεται σε ml.
                     (f.n[Nk.fat]?.value ?? 0) >= 90
-                        ? 'Οι τιμές είναι ανά 100 ml, όπως στην ετικέτα: γράψε ml. Αν το ζυγίζεις, 10 g λάδι είναι περίπου 11 ml.'
-                        : 'Οι τιμές είναι ανά 100 ml, όπως στην ετικέτα: γράψε ml.',
+                        ? 'Γράψε ml, όπως στην ετικέτα. Αν το ζυγίζεις: 10 g λάδι είναι περίπου 11 ml.'
+                        : 'Γράψε ml, όπως στην ετικέτα.',
                     key: const ValueKey('ml-note'),
                     style: TextStyle(fontSize: 12.5, height: 1.35, color: c.textTertiary),
                   ),
@@ -2299,9 +2294,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: c.warnBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.warnLine)),
                   child: Text(
-                    'Οι θερμίδες δεν ταιριάζουν με τα υπόλοιπα: από πρωτεΐνες, υδατάνθρακες και λιπαρά βγαίνουν '
-                    'περίπου ${kcalText(mismatch)} kcal. Έλεγξε ξανά την ετικέτα (μήπως είναι ανά μερίδα ή σε kJ;). '
-                    'Αλκοόλ και γλυκαντικές πολυόλες δίνουν θερμίδες που δεν φαίνονται εδώ.',
+                    'Οι θερμίδες δεν ταιριάζουν: από πρωτεΐνη, υδατάνθρακες και λιπαρά βγαίνουν περίπου ${kcalText(mismatch)} kcal. Μήπως η ετικέτα είναι ανά μερίδα ή σε kJ; Αλκοόλ και πολυόλες δίνουν θερμίδες που δεν φαίνονται εδώ.',
                     style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text),
                   ),
                 ),
@@ -2430,7 +2423,7 @@ Future<Food?> scanToFood(
       persist: false,
       content: Text(kind == 'unavailable'
           ? 'Ο σαρωτής κατεβαίνει από το Google Play. Δοκίμασε ξανά σε λίγο, με σύνδεση στο ίντερνετ.'
-          : 'Δεν άνοιξε ο σαρωτής. Μέχρι να το διορθώσω, πέρασε το προϊόν χειροκίνητα.'),
+          : 'Δεν άνοιξε ο σαρωτής. Πέρασε το προϊόν με «Από ετικέτα».'),
       action: detail.isEmpty
           ? null
           : SnackBarAction(

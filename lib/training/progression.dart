@@ -257,7 +257,7 @@ const _noSelfStep = <String>{'band_er', 'face_pull'};
 /// ανεβαίνουν μόνο οι επαναλήψεις, και μετά η αλλαγή είναι δική σου απόφαση.
 String _bigStepNote(PlanItem item, LoadKind k, double up, int ceiling) =>
     ' Το επόμενο σκαλί, ${_l(k, up)}, είναι πολύ μεγάλο για να μπει μόνο του: εδώ ανεβαίνουν οι επαναλήψεις, ως τις $ceiling. '
-    'Μετά πες μου να το κάνουμε πιο δύσκολο${_noSelfStep.contains(item.ex) ? '' : ', ή ανέβασε εσύ με το «+» όταν νιώθεις έτοιμος'}.';
+    'Μετά ζήτα από τον Claude να το κάνει πιο δύσκολο${_noSelfStep.contains(item.ex) ? '' : ', ή ανέβασε εσύ με το «+» όταν νιώθεις έτοιμος'}.';
 
 const _hint = ' Αν είναι πολύ ελαφρύ (θα έβγαζες άνετα τις τριπλάσιες), ανέβασε ένα σκαλί με το «+».';
 
@@ -471,7 +471,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
         load: null,
         reps: _same(sets, hi),
         change: Change.max,
-        reason: 'Στο ανώτατο: κράτα $sets × $hi με πιο αργό κατέβασμα (3 δευτερόλεπτα). Πες μου να το κάνουμε πιο δύσκολο.',
+        reason: 'Στο ανώτατο: κράτα $sets × $hi με πιο αργό κατέβασμα (3 δευτερόλεπτα). Ζήτα από τον Claude πιο δύσκολη παραλλαγή.',
       );
     }
     if (up == null) {
@@ -479,7 +479,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
         load: lastLoad,
         reps: _same(sets, hi),
         change: Change.max,
-        reason: 'Είσαι στο μεγαλύτερο ${_l(k, lastLoad)} που βγαίνει με τον εξοπλισμό. Πες μου να το αλλάξουμε.',
+        reason: 'Είσαι στο μεγαλύτερο ${_l(k, lastLoad)} που βγαίνει με τον εξοπλισμό. Ζήτα από τον Claude να αλλάξει την άσκηση.',
       );
     }
     if (!auto) {
@@ -492,7 +492,7 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
             ? 'Έφτασες στις $ceiling και άφησες όσες ζητά το πρόγραμμα. Σε αυτή την άσκηση μένουμε σε ελαφρύ λάστιχο: κράτα τις $ceiling με πιο αργή κίνηση '
                 '(3 δευτερόλεπτα στην επιστροφή).'
             : 'Έφτασες στις $ceiling και άφησες όσες ζητά το πρόγραμμα. Το επόμενο σκαλί, ${_l(k, up)}, είναι πολύ μεγάλο για να ανέβεις μονομιάς: κράτα τις '
-                '$ceiling με πιο αργή κίνηση (3 δευτερόλεπτα στην επιστροφή) και πες μου να το κάνουμε πιο δύσκολο'
+                '$ceiling με πιο αργή κίνηση (3 δευτερόλεπτα στην επιστροφή) και ζήτα από τον Claude να το κάνει πιο δύσκολο'
                 '${_noSelfStep.contains(item.ex) ? '' : ', ή ανέβασε εσύ με το «+» όταν νιώθεις έτοιμος'}.',
       );
     }

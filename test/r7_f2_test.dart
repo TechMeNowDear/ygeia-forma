@@ -216,6 +216,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sess-pain')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
+      // Έλεγχος 21/11 (K7B-13): το φύλλο γράφει και τι κάνεις με πόνο στο στήθος ή δύσπνοια (πριν: μόνο αρθρώσεις).
+      expect(tester.widget<Text>(find.byKey(const ValueKey('pain-safety'))).data, sessionSafetyText);
       await tester.tap(find.byKey(const ValueKey('pain-shoulderR')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('pain-ok')));

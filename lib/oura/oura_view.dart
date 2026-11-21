@@ -305,7 +305,7 @@ String gluedValue(String s) => s.replaceFirst(RegExp(r' (?=\S+$)'), '\u00A0');
 /// [watchTonight]: μετά την αποσύνδεση διάλεξε ρητά «από απόψε το ρολόι».
 String lastNightNote(EmptyNight r, {String nap = '', bool watchTonight = false}) => switch (r) {
       EmptyNight.waiting =>
-        'Η χθεσινή νύχτα δεν έχει φτάσει ακόμα. Άνοιξε την εφαρμογή Oura για να συγχρονίσει, και μετά γύρνα εδώ.',
+        'Η νύχτα δεν ήρθε ακόμα. Αν ξύπνησες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και γύρνα εδώ.',
       EmptyNight.noRing =>
         'Χθες βράδυ δεν ήρθε ύπνος από το δαχτυλίδι. Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει.',
       EmptyNight.reconnect => 'Η χθεσινή νύχτα δεν διαβάστηκε: το Oura χρειάζεται νέα σύνδεση.',

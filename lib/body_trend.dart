@@ -316,8 +316,7 @@ bool bodyNotPermitted(Dashboard? d) => d != null && d.hasAnyPermission && !d.bod
 const bodyNoPermissionTitle = 'Δεν έχει δοθεί άδεια για τις ζυγίσεις';
 const bodyNoPermissionText = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή, γι\' αυτό οι ζυγίσεις της '
     'InBody δεν φτάνουν εδώ. Άνοιξέ την από τις «Άδειες Samsung Health».';
-const bodyNoPermissionShort = 'Η άδεια «Σύσταση σώματος» της Samsung Health είναι κλειστή· άνοιξέ την από Ρυθμίσεις › '
-    'Άδειες Samsung Health.';
+const bodyNoPermissionShort = 'Κλειστή η άδεια «Σύσταση σώματος»: άνοιξέ την από Ρυθμίσεις › Άδειες Samsung Health.';
 
 /// 17/11 (απόφαση χρήστη): μέσος όρος 7 ημερών για το γράφημα βάρους· για κάθε μέρα με τιμή, ο μέσος όρος των τιμών της
 /// ίδιας και των 6 προηγούμενων ημερών, με 3 τιμές και πάνω, ή 2 τιμές με 3+ μέρες απόσταση (με λιγότερες δεν «μαλακώνει» τα νερά). [pts]: μία τιμή τη

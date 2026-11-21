@@ -551,7 +551,7 @@ class _SessionPageState extends State<SessionPage> {
                 TextSpan(text: '${e.sets} σετ × ${e.lo == e.hi ? '${e.lo}' : '${e.lo}–${e.hi}'} ·\u00A0'),
                 TextSpan(text: 'άφησε\u00A0${e.rir}', style: const TextStyle(fontWeight: FontWeight.w700)),
                 // R7-U3-09: «ξεκούραση 2:00» ποτέ σε δύο γραμμές.
-                TextSpan(text: ' ·\u00A0ξεκούραση\u00A0${restText(e.rest)}'),
+                TextSpan(text: ' ·\u00A0διάλειμμα\u00A0${restText(e.rest)}'),
               ]),
               key: const ValueKey('sess-plan'),
               style: TextStyle(fontSize: 15, height: 1.4, color: c.text),
@@ -1111,6 +1111,11 @@ class _SessionPageState extends State<SessionPage> {
               const SizedBox(height: 10),
               Text('Σημειώνεται στη σύνοψη της προπόνησης.', style: TextStyle(fontSize: 13.5, color: c.warn)),
             ],
+            // Έλεγχος 21/11 (K7B-13): το μόνο κουμπί με τη λέξη «πόνος» μιλούσε μόνο για αρθρώσεις· η γραμμή για στήθος,
+            // δύσπνοια και 166/112 είναι κάτω από την κάρτα, εκτός οθόνης στο κλειστό Fold. Το ίδιο κείμενο και εδώ.
+            const SizedBox(height: 14),
+            Text(sessionSafetyText,
+                key: const ValueKey('pain-safety'), style: TextStyle(fontSize: 13.5, height: 1.4, color: c.text)),
             const SizedBox(height: 16),
             FilledButton(
               key: const ValueKey('pain-ok'),
@@ -1274,8 +1279,7 @@ class _SessionPageState extends State<SessionPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text('Διάλεξε την πρώτη άσκηση', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.text)),
                   const SizedBox(height: 6),
-                  Text('Μετά από κάθε άσκηση προσθέτεις την επόμενη. Τα κιλά βγαίνουν από τις προηγούμενες φορές της ίδιας άσκησης· '
-                      'σε άσκηση που κάνεις πρώτη φορά, μετά το 1ο σετ σε ρωτάει πώς πήγε, για να βρεθεί το σωστό βάρος.',
+                  Text('Μετά από κάθε άσκηση προσθέτεις την επόμενη. Τα κιλά βγαίνουν από τις προηγούμενες φορές· την πρώτη φορά σε ρωτάει μετά το 1ο σετ πώς πήγε.',
                       style: TextStyle(fontSize: 14.5, height: 1.45, color: c.textSecondary)),
                   const SizedBox(height: 14),
                   FilledButton.icon(

@@ -539,7 +539,7 @@ class _DishLogSheetState extends State<DishLogSheet> {
     if (t != null && dishLooksLikeTypo(t.kcal)) {
       final ok = await _ask(
         'Σωστή ποσότητα;',
-        '${dishQtyText(d.kind, qty)} «${d.name}» = ${kcalText(t.kcal)} kcal σε μία καταγραφή. Είναι σωστό;',
+        '${dishQtyText(d.kind, qty)} «${d.name}» = ${kcalText(t.kcal)} kcal σε μία καταχώριση. Είναι σωστό;',
       );
       if (ok != true || !mounted) return;
     }
@@ -1005,7 +1005,7 @@ class _DishEntrySheetState extends State<DishEntrySheet> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Σωστή ποσότητα;'),
-          content: Text('«${tag.name}» = ${kcalText(kcal)} kcal σε μία καταγραφή. Είναι σωστό;'),
+          content: Text('«${tag.name}» = ${kcalText(kcal)} kcal σε μία καταχώριση. Είναι σωστό;'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Όχι, θα το διορθώσω')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι, σωστό')),
@@ -1675,7 +1675,7 @@ class _DishesScreenState extends State<DishesScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   widget.pick
-                      ? 'Πάτα ένα φαγητό για να το γράψεις, ή το «+» για να γραφτεί αμέσως όπως την τελευταία φορά.'
+                      ? 'Πάτημα: το γράφεις. «+»: γράφεται αμέσως, όπως την τελευταία φορά.'
                       : 'Φαγητά από τα δικά σου υλικά. Τα γράφεις από το «+ Φαγητό» με ένα πάτημα.',
                   style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary),
                 ),

@@ -653,13 +653,14 @@ Future<void> aiSwapFlow(BuildContext context, FoodStore food, int day, int index
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(
           '${r.isNew ? 'Νέο φαγητό· μπαίνει και στη βιβλιοθήκη σου.\n\n' : ''}'
+          // Έλεγχος 21/11 (K7B-03): δεκαδικά με κόμμα, όπως παντού (πριν «4.2 g»).
           'Αντί για «${cur.name}».\n'
           'Θερμίδες: ${thousands(oldT.shownKcal)} → ${thousands(newT.shownKcal)} kcal\n'
           'Πρωτεΐνη: ${oldT.protein.round()} → ${newT.protein.round()} g\n'
-          'Κορεσμένα: ${oldT.satFat.toStringAsFixed(1)} → ${newT.satFat.toStringAsFixed(1)} g\n'
-          'Αλάτι: ${oldT.salt.toStringAsFixed(1)} → ${newT.salt.toStringAsFixed(1)} g'
+          'Κορεσμένα: ${dec(oldT.satFat)} → ${dec(newT.satFat)} g\n'
+          'Αλάτι: ${dec(oldT.salt)} → ${dec(newT.salt)} g'
           '${g == null ? '' : '\n\nΗ μέρα μετά: ${thousands(dayKcal)} / ${thousands(g.kcal)} kcal, πρωτεΐνη ${dayProtein.round()} / '
-              '${g.protein} g, κορεσμένα ${daySat.toStringAsFixed(1)} / ${satLimitShown(g.kcal, g.satPct).toStringAsFixed(1)} g.'}'
+              '${g.protein} g, κορεσμένα ${dec(daySat)} / ${dec(satLimitShown(g.kcal, g.satPct))} g.'}'
           '\n\nΑπό τη βάση της εφαρμογής.',
           key: const ValueKey('ai-swap-summary'),
         ),
@@ -822,7 +823,7 @@ Future<void> rateDish(BuildContext context, FoodStore food, Dish d, int r) async
         : next == 1
             ? 'Σημειώθηκε: σου άρεσε. Θα μπαίνει πιο συχνά.'
             : next == -1
-                ? 'Σημειώθηκε: δεν σου άρεσε. Από το επόμενο πρόγραμμα δεν θα προτείνεται (αλλάζει από τη βιβλιοθήκη).'
+                ? 'Δεν σου άρεσε: δεν θα ξαναμπεί σε πρόγραμμα. Αλλάζει από τη βιβλιοθήκη.'
                 : 'Η βαθμολογία σβήστηκε.'),
   ));
 }
