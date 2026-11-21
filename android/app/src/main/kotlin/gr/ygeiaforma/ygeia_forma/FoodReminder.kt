@@ -23,7 +23,8 @@ import androidx.core.content.ContextCompat
  *
  * Επανεκκίνηση (αποφάσεις 20/11): το Android σβήνει τα ξυπνητήρια όταν κλείνει το κινητό. Γι' αυτό η ώρα και το κείμενο
  * κρατιούνται σε ένα μικρό αρχείο ρυθμίσεων, και ο [FoodReminderBootReceiver] τα ξαναβάζει μία φορά μετά την εκκίνηση
- * (ή μετά από ενημέρωση της εφαρμογής). Τίποτα δεν τρέχει συνεχώς· αν η ώρα πέρασε όσο ήταν κλειστό, δεν χτυπά αργά.
+ * (ή μετά από ενημέρωση της εφαρμογής). Τίποτα δεν τρέχει συνεχώς· αν η ώρα πέρασε όσο ήταν κλειστό, δεν χτυπά αργά:
+ * μπαίνει η επόμενη, ίδια ώρα (K6-R-06).
  */
 object FoodReminder {
     const val CHANNEL = "food_reminder"
@@ -86,17 +87,26 @@ object FoodReminder {
         prefs(ctx).edit().clear().apply()
     }
 
-    /** Μετά την εκκίνηση: ξαναβάζει την υπενθύμιση, μόνο αν η ώρα της δεν πέρασε ([FoodReminderBootReceiver]). */
+    /** Η ώρα της υπενθύμισης που κρατά το αρχείο (0: καμία, ή το αρχείο σβήστηκε με τη «Διαγραφή όλων»). */
+    internal fun savedAt(ctx: Context): Long = prefs(ctx).getLong(P_AT, 0L)
+
+    /**
+     * Μετά την εκκίνηση ([FoodReminderBootReceiver]): ξαναβάζει την υπενθύμιση αν η ώρα της δεν πέρασε. Αν πέρασε όσο το
+     * κινητό ήταν κλειστό, δεν χτυπά αργά: μπαίνει η επόμενη, ίδια ώρα, με το κείμενο της επόμενης μέρας
+     * ([FoodReminderRules.afterBoot], K6-R-06).
+     */
     internal fun restore(ctx: Context, now: Long = System.currentTimeMillis()) {
         val p = prefs(ctx)
         val at = p.getLong(P_AT, 0L)
         val title = p.getString(P_TITLE, null)
         val text = p.getString(P_TEXT, null)
-        if (!FoodReminderRules.restoreAt(at, now) || title == null || text == null) {
+        val next = p.getString(P_NEXT, null)
+        val plan = FoodReminderRules.afterBoot(at, now, next != null, java.time.ZoneId.systemDefault())
+        if (plan == null || title == null || text == null) {
             forget(ctx)
             return
         }
-        arm(ctx, at, title, text, p.getString(P_NEXT, null))
+        if (plan.second && next != null) set(ctx, plan.first, title, next, next) else arm(ctx, plan.first, title, text, next)
     }
 
     fun canNotify(ctx: Context): Boolean =
@@ -159,6 +169,26 @@ object FoodReminderRules {
         }
         return 0L
     }
+
+    /**
+     * Έλεγχος 21/11 (K6-R-06): τι γίνεται με την αποθηκευμένη υπενθύμιση μετά την εκκίνηση. (ώρα, false) = η ίδια, δεν
+     * πέρασε· (ώρα, true) = πέρασε όσο το κινητό ήταν κλειστό και υπάρχει κείμενο επόμενης μέρας: η επόμενη ίδια ώρα
+     * τοίχου μετά το [now], με εκείνο το κείμενο· null = καμία (χωρίς ώρα, χαλασμένο αρχείο, ή χωρίς κείμενο επόμενης).
+     * Πριν, ώρα που πέρασε σήμαινε «καμία υπενθύμιση ώσπου να ανοίξει η εφαρμογή».
+     */
+    fun afterBoot(at: Long, now: Long, hasNext: Boolean, zone: java.time.ZoneId): Pair<Long, Boolean>? {
+        if (restoreAt(at, now)) return at to false
+        if (at <= 0L || at > now || !hasNext) return null
+        val next = nextDay(at, now, zone)
+        return if (next > 0L) next to true else null
+    }
+
+    /**
+     * Έλεγχος 21/11 (K6-R-05): όταν χτυπήσει, η επόμενη μπαίνει μόνο αν το αρχείο κρατά ακόμα ΑΥΤΗ την υπενθύμιση.
+     * Μετά από «Διαγραφή όλων» το αρχείο έχει σβηστεί ([savedAt] 0): δείχνει (αν πρόλαβε) και σταματά εκεί.
+     */
+    fun rearm(savedAt: Long, intentAt: Long, nextText: String?): Boolean =
+        savedAt > 0L && savedAt == intentAt && nextText != null
 }
 
 /**
@@ -172,13 +202,15 @@ class FoodReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val (title, text) = FoodReminder.extras(intent) ?: return
         val app = context.applicationContext
+        val at = intent.getLongExtra(FoodReminder.EXTRA_AT, 0L)
+        val nextText = intent.getStringExtra(FoodReminder.EXTRA_NEXT)
+        // K6-R-05: πρώτα τι κρατά το αρχείο, μετά το σβήσιμό του.
+        val again = FoodReminderRules.rearm(FoodReminder.savedAt(app), at, nextText)
         FoodReminder.forget(app)
         FoodReminder.show(app, title, text)
-        val next = FoodReminderRules.nextDay(
-            intent.getLongExtra(FoodReminder.EXTRA_AT, 0L), System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
-        )
-        val nextText = intent.getStringExtra(FoodReminder.EXTRA_NEXT)
-        if (next > 0L && nextText != null) FoodReminder.set(app, next, title, nextText, nextText)
+        if (!again || nextText == null) return
+        val next = FoodReminderRules.nextDay(at, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+        if (next > 0L) FoodReminder.set(app, next, title, nextText, nextText)
     }
 }
 

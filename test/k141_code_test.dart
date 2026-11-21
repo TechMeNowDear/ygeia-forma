@@ -2,18 +2,24 @@
 // που δεν έχουν δοκιμή αλλού (η επαναφορά από αντίγραφο και η ανανέωση είναι στο r1_f3_test.dart, το χρονόμετρο
 // μαγειρέματος στο recipes_test.dart). Επινοημένα δεδομένα. Κάθε δοκιμή γράφει τι έβγαινε ΠΡΙΝ.
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ygeia_forma/data.dart';
 import 'package:ygeia_forma/food/dishes.dart';
 import 'package:ygeia_forma/food/food_store.dart';
 import 'package:ygeia_forma/home_widgets/widget_bridge.dart';
 import 'package:ygeia_forma/pages/backup_reminder_card.dart';
+import 'package:ygeia_forma/pages/my_foods.dart' show entriesNotFixedText;
 import 'package:ygeia_forma/pages/week.dart' show weekSlotNotSavedText;
+import 'package:ygeia_forma/theme.dart';
 import 'package:ygeia_forma/training/catch_up.dart';
 import 'package:ygeia_forma/training/program.dart';
 import 'package:ygeia_forma/training/session.dart';
 import 'package:ygeia_forma/training/training_store.dart';
+import 'package:ygeia_forma/vitals.dart';
 
 import 'sample_data.dart';
 import 'sample_food.dart';
@@ -122,6 +128,11 @@ void main() {
     expect(await s2.importUnits({'C13742': 1200.0, 'C13026': 950.0}), 1, reason: 'το πεπόνι κανταλούπ έχει ήδη δικό σου βάρος');
     expect(s2.myUnit('U169911'), 1200);
     expect(s2.myUnit('U169092'), 900);
+    // Παλιό ΚΑΙ νέο id στο ίδιο αρχείο: ένα βάρος, αυτό που γράφτηκε τελευταίο (πιο κάτω στο αρχείο).
+    j['units'] = {'C13026': 900.0, 'U169092': 910.0};
+    final s3 = FoodStore.preloaded(foods: basicFoods(), dishIO: MemoryDishIO(jsonEncode(j)), now: now);
+    await s3.loadDishes();
+    expect(s3.myUnit('U169092'), 910);
   });
 
   // ------------------------------------------------------------------------------------------------------- K6S-11
@@ -138,6 +149,57 @@ void main() {
             id: 'D1', name: 'Φακές', kind: DishKind.plate, items: const [DishItem('C20359', 'Φακές', 80)], created: 1)),
         isTrue);
     expect(BackupReminderSlot.hasOwnData(HealthStore(), withDish, training), isTrue);
+  });
+
+  // ------------------------------------------------------------------------------------------------------- K6-R-07
+  testWidgets('K6-R-07: με μόνο μία μέτρηση πίεσης η κάρτα αντιγράφου φαίνεται μόλις διαβαστούν οι μετρήσεις', (t) async {
+    final now = DateTime(2026, 11, 23, 9);
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const samsung = MethodChannel('ygeia/samsung');
+    messenger.setMockMethodCallHandler(samsung, (call) async {
+      if (call.method == 'loadPrefs') return jsonEncode({'lastExport': DateTime(2026, 11, 14, 8).millisecondsSinceEpoch});
+      return '{"ok":true}';
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(samsung, null));
+    final store = HealthStore();
+    await t.runAsync(() => store.loadPrefs());
+    expect(store.prefsLoaded, isTrue);
+    final food = FoodStore.preloaded(foods: basicFoods(), dishIO: MemoryDishIO(), now: now);
+    await t.runAsync(() => food.loadDishes());
+    final training = TrainingStore(io: MemoryTrainingIO(), clock: () => now)..ready = true;
+    // Το αρχείο των μετρήσεων δεν έχει διαβαστεί ακόμα όταν χτίζεται η «Σήμερα» (όπως στο κινητό).
+    final vitals = VitalsStore(
+        io: MemoryVitalsIO(jsonEncode({
+      'v': 1,
+      'items': [
+        {'id': 'b1', 'k': 'bp', 'at': DateTime(2026, 11, 22, 8).millisecondsSinceEpoch, 'sys': 120, 'dia': 80, 'pulse': 70},
+      ],
+    })));
+    await t.pumpWidget(MaterialApp(
+      theme: buildTheme(Brightness.light),
+      home: Scaffold(
+        body: ListView(children: [
+          BackupReminderSlot(store: store, food: food, training: training, now: now, vitals: vitals),
+        ]),
+      ),
+    ));
+    expect(find.byKey(const ValueKey('today-backup-none')), findsOneWidget);
+    await t.runAsync(() => vitals.ensureLoaded());
+    expect(vitals.all, hasLength(1));
+    // Καμία άλλη αλλαγή (φαγητό, προπόνηση): πριν, η κάρτα δεν ξαναχτιζόταν.
+    await t.pump();
+    expect(find.byKey(const ValueKey('today-backup')), findsOneWidget);
+    expect(BackupReminderSlot.hasOwnData(HealthStore(), food, training, vitals), isTrue);
+    expect(BackupReminderSlot.hasOwnData(HealthStore(), food, training, VitalsStore(io: MemoryVitalsIO())), isFalse);
+  });
+
+  // ------------------------------------------------------------------------------------------------------- K6-R-09
+  test('K6-R-09: «Διόρθωση προϊόντος» που δεν γράφτηκε στις παλιές καταχωρίσεις το λέει (πριν: «Διορθώθηκαν 0»)', () {
+    final t = entriesNotFixedText('Κράκερ');
+    expect(t, contains('«Κράκερ» δεν διορθώθηκαν'));
+    expect(t, contains('Άνοιξε ξανά το προϊόν'));
+    final src = File('lib/pages/my_foods.dart').readAsStringSync();
+    expect(src, contains('n == 0 ? entriesNotFixedText(edited.name)'));
   });
 
   // ------------------------------------------------------------------------------------------------------- K6S-07

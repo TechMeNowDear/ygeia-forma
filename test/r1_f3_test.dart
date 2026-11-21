@@ -103,6 +103,9 @@ class _Phone {
   final days = <String, Map<String, double>>{};
   var saveDaysCalls = 0;
 
+  /// false: η εγγραφή ημερών ιστορικού αποτυγχάνει (π.χ. γεμάτος χώρος) και τίποτα δεν γράφεται.
+  bool saveDaysOk = true;
+
   int count(String method) => calls.where((c) => c == method).length;
 
   void install() {
@@ -131,6 +134,7 @@ class _Phone {
           });
         case 'saveDays':
           saveDaysCalls++;
+          if (!saveDaysOk) return '{"ok":false,"kind":"write"}';
           for (final row in jsonDecode(args['json'] as String) as List) {
             final r = row as Map;
             days[r['date'] as String] = {
@@ -870,14 +874,67 @@ void main() {
           'backfillFrom': '',
           'ouraRefetchTo': '2026-11-31',
           'emptyFrom': '2026-02-28',
+          'emptyChecked': '2026-02-30',
         });
-        expect([p.ouraSyncedTo, p.recentTo, p.gapFrom, p.gapTo, p.backfillFrom, p.ouraRefetchTo, p.emptyFrom],
-            [null, null, '2026-11-20', null, null, null, '2026-02-28']);
+        expect([p.ouraSyncedTo, p.recentTo, p.gapFrom, p.gapTo, p.backfillFrom, p.ouraRefetchTo, p.emptyFrom, p.emptyChecked],
+            [null, null, '2026-11-20', null, null, null, '2026-02-28', null]);
         // Με χαλασμένη ημερομηνία στο αρχείο ρυθμίσεων η εφαρμογή ανοίγει και διαβάζει κανονικά (πριν: «Διαβάζω…» για πάντα).
         final a = _Phone(now)..load = jsonEncode({'historyVersion': historyRulesVersion, 'ouraSyncedTo': 'x', 'recentTo': 'y'});
         final s = await boot(a);
         expect(s.loading, isFalse);
         expect(s.data, isNotNull);
+        s.dispose();
+      });
+
+      test('K6-R-08: αποτυχία εγγραφής στην επαναφορά δεν ξεχνά μέρα ζύγισης που περίμενε ήδη να γραφτεί', () async {
+        final a = _Phone(now)..load = okPrefs();
+        final s = await boot(a);
+        final bodyOnly = [
+          for (final e in s.history.entries)
+            if (e.value.isNotEmpty && e.value.keys.every(bodyRowKeys.contains) && parseDateKey(e.key).isBefore(_add(today, -40)))
+              e.key,
+        ]..sort();
+        final weighDay = bodyOnly.last;
+        final mine = Map.of(s.history[weighDay]!);
+        // Πρώτη αποτυχία: η μέρα της ζύγισης περιμένει να γραφτεί.
+        a.saveDaysOk = false;
+        expect(await s.saveDaysNow({weighDay}), isFalse);
+        // Δεύτερη αποτυχία, στην επαναφορά: η μνήμη γυρίζει όπως ήταν…
+        final r = await s.importHistoryWhy({weighDay: {K.steps: 7000, K.dayHr: 80}}, version: historyRulesVersion);
+        expect((r.added, r.problem), (0, HistoryImportProblem.writeFailed));
+        expect(s.history[weighDay], mine);
+        // …και η μέρα περιμένει ακόμα: η επόμενη εγγραφή που πετυχαίνει τη γράφει (πριν: έβγαινε από τη λίστα αναμονής).
+        a.days.remove(weighDay);
+        a.saveDaysOk = true;
+        expect(await s.saveDaysNow(const {}), isTrue);
+        expect(a.days[weighDay], mine);
+        // Μέρα που ΔΕΝ περίμενε πριν από την αποτυχημένη επαναφορά δεν μένει στη λίστα: μνήμη και δίσκος είναι ίδια.
+        final missing = dateKey(_add(today, -160));
+        a.saveDaysOk = false;
+        final r2 = await s.importHistoryWhy({missing: {K.steps: 5000}}, version: historyRulesVersion);
+        expect(r2.problem, HistoryImportProblem.writeFailed);
+        expect(s.history.containsKey(missing), isFalse);
+        a.saveDaysOk = true;
+        final calls = a.saveDaysCalls;
+        expect(await s.saveDaysNow(const {}), isTrue);
+        expect(a.saveDaysCalls, calls, reason: 'τίποτα δεν περιμένει');
+        s.dispose();
+      });
+
+      test('K6S-02: άδεια μέρα του κινητού παίρνει μόνο όσα ΔΕΝ είναι ζύγιση· η ρητή ανανέωση διαβάζει και με κράτημα', () async {
+        // Η ζύγιση εκείνης της μέρας είχε σβηστεί επίτηδες στο κινητό: το αντίγραφο δεν τη φέρνει πίσω.
+        expect(historyDayOverBodyOnly(const {}, {K.weight: 83.0, K.fatPct: 25, K.steps: 7000}), {K.steps: 7000.0});
+        expect(historyDayOverBodyOnly(const {}, {K.weight: 83.0}), isNull);
+        final a = _Phone(now)..load = okPrefs();
+        final s = app(a)..holdAutoRefresh = true;
+        await s.loadPrefs();
+        await s.start();
+        await settle(s);
+        expect(s.data, isNull, reason: 'η αυτόματη ανάγνωση περιμένει');
+        await s.refresh();
+        await settle(s);
+        expect(s.data, isNotNull, reason: 'το τράβηγμα προς τα κάτω του χρήστη δεν κρατιέται');
+        expect(s.holdAutoRefresh, isTrue, reason: 'το κράτημα λύνεται μόνο όταν κλείσουν οι Ρυθμίσεις');
         s.dispose();
       });
     });

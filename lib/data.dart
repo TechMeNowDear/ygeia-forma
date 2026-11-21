@@ -2446,6 +2446,8 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
       added[day] = merged;
     }
     if (added.isEmpty) return (added: 0, existing: existing, problem: HistoryImportProblem.none);
+    // K6-R-08: μέρες που περίμεναν ΗΔΗ να γραφτούν (προηγούμενη αποτυχημένη εγγραφή) συνεχίζουν να περιμένουν.
+    final waiting = {..._unsavedDays};
     history.addAll(added);
     notifyListeners();
     if (await _saveDays(added.keys.toSet())) {
@@ -2460,7 +2462,7 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
         history[k] = old;
       }
     }
-    _unsavedDays.removeAll(added.keys);
+    _unsavedDays.removeAll(added.keys.where((k) => !waiting.contains(k)));
     notifyListeners();
     return (added: 0, existing: existing, problem: HistoryImportProblem.writeFailed);
   }

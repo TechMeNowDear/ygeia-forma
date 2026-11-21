@@ -3,11 +3,11 @@
   "censored": "comparable false · diff null · pct null · lessSure false",
   "different tests": "comparable false · diff null · pct null · lessSure false",
   "from zero": "comparable true · diff 1.2 · pct null · lessSure false",
-  "ldl 160 → 131": "comparable true · diff -29.0 · pct -18.125 · lessSure false",
-  "ldl mg/dL → mmol/L": "comparable true · diff -28.52199999999999 · pct -17.826249999999995 · lessSure false",
-  "other lab": "comparable true · diff -10.0 · pct -6.25 · lessSure true",
-  "other method": "comparable true · diff -10.0 · pct -6.25 · lessSure true",
-  "same lab, other case": "comparable true · diff -10.0 · pct -6.25 · lessSure false",
+  "ldl 150 → 131": "comparable true · diff -19.0 · pct -12.666666666666668 · lessSure false",
+  "ldl mg/dL → mmol/L": "comparable true · diff -18.52199999999999 · pct -12.347999999999994 · lessSure false",
+  "other lab": "comparable true · diff -10.0 · pct -6.666666666666667 · lessSure true",
+  "other method": "comparable true · diff -10.0 · pct -6.666666666666667 · lessSure true",
+  "same lab, other case": "comparable true · diff -10.0 · pct -6.666666666666667 · lessSure false",
   "unknown unit on one side": "comparable true · diff null · pct null · lessSure false",
   "urine vs blood": "comparable false · diff null · pct null · lessSure false"
  },
@@ -19,7 +19,7 @@
   "fromJson": {
    "bad day": null,
    "full": {
-    "d": "2026-11-10",
+    "d": "2030-03-05",
     "gt": true,
     "hi": 130.0,
     "lab": "Εργαστήριο Α",
@@ -31,17 +31,17 @@
     "s": "Ορός",
     "t": "ldl",
     "u": "mg/dL",
-    "v": 160.0
+    "v": 150.0
    },
    "minimal": {
-    "d": "2026-11-10",
+    "d": "2030-03-05",
     "n": "Κάτι",
     "u": "",
-    "v": 5.5
+    "v": 5.7
    },
    "not a map": null,
    "unknown test id": {
-    "d": "2026-11-10",
+    "d": "2030-03-05",
     "n": "Κάτι",
     "u": "x",
     "v": 5.0
@@ -49,27 +49,27 @@
    "value NaN": null,
    "value as text": null
   },
-  "glucose in mmol/l": "flag 1 · base 115.30239999999999 [70.26239999999999, 99.088] · censored false · notBlood false · test glu",
-  "hba1c in mmol/mol": "flag 0 · base 5.53676 [null, null] · censored false · notBlood false · test hba1c",
-  "hdl 31, only lower limit": "flag -1 · base 31.0 [40.0, null] · censored false · notBlood false · test hdl",
+  "glucose in mmol/l": "flag 1 · base 108.09599999999999 [70.26239999999999, 99.088] · censored false · notBlood false · test glu",
+  "hba1c in mmol/mol": "flag 0 · base 5.8112 [null, null] · censored false · notBlood false · test hba1c",
+  "hdl 35, only lower limit": "flag -1 · base 35.0 [40.0, null] · censored false · notBlood false · test hdl",
   "isDay": {
    "": false,
    "2026-02-29": false,
    "2026-1-1": false,
-   "2026-11-10": true,
-   "2026-11-10T08:00": false,
    "2026-13-01": false,
-   "2028-02-29": true
+   "2028-02-29": true,
+   "2030-03-05": true,
+   "2030-03-05T08:00": false
   },
   "ldl 100.0 [100, 130]": "flag 0 · base 100.0 [100.0, 130.0] · censored false · notBlood false · test ldl",
   "ldl 100.1 [100, 130]": "flag 0 · base 100.1 [100.0, 130.0] · censored false · notBlood false · test ldl",
   "ldl 129.9 [100, 130]": "flag 0 · base 129.9 [100.0, 130.0] · censored false · notBlood false · test ldl",
   "ldl 130.0 [100, 130]": "flag 0 · base 130.0 [100.0, 130.0] · censored false · notBlood false · test ldl",
   "ldl 130.1 [100, 130]": "flag 1 · base 130.1 [100.0, 130.0] · censored false · notBlood false · test ldl",
-  "ldl 160, only upper limit": "flag 1 · base 160.0 [null, 130.0] · censored false · notBlood false · test ldl",
+  "ldl 150, only upper limit": "flag 1 · base 150.0 [null, 130.0] · censored false · notBlood false · test ldl",
   "ldl 99.9 [100, 130]": "flag -1 · base 99.9 [100.0, 130.0] · censored false · notBlood false · test ldl",
-  "ldl in mmol/L": "flag 1 · base 158.547 [0.0, 131.478] · censored false · notBlood false · test ldl",
-  "no limits": "flag 0 · base 160.0 [null, null] · censored false · notBlood false · test ldl",
+  "ldl in mmol/L": "flag 1 · base 150.81300000000002 [0.0, 131.478] · censored false · notBlood false · test ldl",
+  "no limits": "flag 0 · base 150.0 [null, null] · censored false · notBlood false · test ldl",
   "serum glucose": "flag 0 · base 95.0 [null, null] · censored false · notBlood false · test glu",
   "unknown test": "flag 0 · base null [null, null] · censored false · notBlood false · test null",
   "unknown unit": "flag 0 · base null [null, null] · censored false · notBlood false · test ldl",

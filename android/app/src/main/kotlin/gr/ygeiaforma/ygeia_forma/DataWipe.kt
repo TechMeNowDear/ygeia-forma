@@ -206,6 +206,12 @@ class DataWipe(private val activity: Activity, private val scope: CoroutineScope
          * αρχεία του WorkManager, «lib» και «code_cache» (κώδικας, όχι δεδομένα). Επιστρέφει πόσα δεν σβήστηκαν.
          */
         fun wipeLocal(ctx: Context): Int {
+            // Έλεγχος 21/11 (K6-R-05): το ξυπνητήρι της υπενθύμισης φαγητού ζει στο Android, όχι στα αρχεία· χωρίς αυτό
+            // χτυπούσε και μετά τη «Διαγραφή όλων» (και, από το K6C-02, ξανάμπαινε μόνο του κάθε βράδυ).
+            try {
+                FoodReminder.cancel(ctx.applicationContext)
+            } catch (_: Throwable) {
+            }
             var failed = 0
             fun del(f: File) {
                 if (f.exists() && !f.deleteRecursively()) failed++

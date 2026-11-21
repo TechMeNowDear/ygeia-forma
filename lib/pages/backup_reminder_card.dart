@@ -29,11 +29,15 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
     required this.now,
     this.export,
     this.share,
+    this.vitals,
   });
   final HealthStore store;
   final FoodStore food;
   final TrainingStore training;
   final DateTime now;
+
+  /// Πίεση, σάκχαρο, καρδιογράφημα· χωρίς: του κινητού ([VitalsStore.main]). Άλλο δίνουν μόνο οι δοκιμές.
+  final VitalsStore? vitals;
 
   /// Μόνο για δοκιμές (αλλιώς η κανονική εξαγωγή και το φύλλο κοινοποίησης του Android).
   final Future<BackupExport> Function()? export;
@@ -43,34 +47,39 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
   /// προπόνηση που έγινε ή μέτρηση μέσης. (Ό,τι έρχεται από Samsung Health και Oura ξαναδιαβάζεται.)
   /// Έλεγχος 20/11 (K6S-11): και «Τα φαγητά μου» και οι μετρήσεις πίεσης, σακχάρου, καρδιογραφήματος: όποιος έγραφε μόνο
   /// πίεση δεν έβλεπε ποτέ την κάρτα.
-  static bool hasOwnData(HealthStore store, FoodStore food, TrainingStore training) =>
+  static bool hasOwnData(HealthStore store, FoodStore food, TrainingStore training, [VitalsStore? vitals]) =>
       (food.loaded && (food.mine.isNotEmpty || food.recent(limit: 1).isNotEmpty)) ||
       (food.dishesRead && food.dishes.isNotEmpty) ||
       (training.ready && !training.readError && training.sessions.isNotEmpty) ||
       store.waist.isNotEmpty ||
-      VitalsStore.main.all.isNotEmpty;
+      (vitals ?? VitalsStore.main).all.isNotEmpty;
 
   /// Μόνο με διαβασμένες ρυθμίσεις: πριν από αυτό δεν ξέρουμε πότε βγήκε το τελευταίο αντίγραφο.
-  static bool shows(HealthStore store, FoodStore food, TrainingStore training, DateTime now) =>
+  static bool shows(HealthStore store, FoodStore food, TrainingStore training, DateTime now, [VitalsStore? vitals]) =>
       store.prefsLoaded &&
       backupReminderDue(
         last: store.lastExport,
-        hasData: hasOwnData(store, food, training),
+        hasData: hasOwnData(store, food, training, vitals),
         now: now,
         snoozedUntil: store.backupSnoozedUntil,
       );
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: Listenable.merge([food, training]),
+  Widget build(BuildContext context) {
+    // Έλεγχος 21/11 (K6-R-07): οι μετρήσεις διαβάζονται λίγο ΜΕΤΑ το πρώτο χτίσιμο· χωρίς αυτό, όποιος είχε μόνο
+    // μετρήσεις πίεσης έβλεπε την κάρτα μόνο αν τύχαινε να αλλάξει κάτι άλλο.
+    final v = vitals ?? VitalsStore.main;
+    return ListenableBuilder(
+        listenable: Listenable.merge([food, training, v]),
         builder: (context, _) {
-          if (!shows(store, food, training, now)) return const SizedBox.shrink(key: ValueKey('today-backup-none'));
+          if (!shows(store, food, training, now, v)) return const SizedBox.shrink(key: ValueKey('today-backup-none'));
           return Padding(
             padding: const EdgeInsets.only(bottom: PageFrame.gap),
             child: BackupReminderCard(store: store, food: food, now: now, export: export, share: share),
           );
         },
       );
+  }
 }
 
 /// Η κάρτα: πόσο παλιό είναι το τελευταίο αντίγραφο, «Εξαγωγή τώρα» (και αμέσως το φύλλο κοινοποίησης, για να φύγει το
