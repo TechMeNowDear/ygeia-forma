@@ -221,7 +221,7 @@ object HomeWidgets {
 
     fun ensureMidnight(ctx: Context) = scheduleMidnight(ctx)
 
-    /** Ένα ξυπνητήρι στα μεσάνυχτα, μόνο όσο υπάρχουν widgets (ανακριβές, χωρίς άδεια, χωρίς να ξυπνά τη συσκευή). */
+    /** Ένα ξυπνητήρι στα μεσάνυχτα (και στις 04:00), μόνο όσο υπάρχουν widgets (ανακριβές, χωρίς άδεια, χωρίς να ξυπνά τη συσκευή). */
     private fun scheduleMidnight(ctx: Context) {
         try {
             val am = ctx.getSystemService(AlarmManager::class.java) ?: return
@@ -234,7 +234,8 @@ object HomeWidgets {
                 return
             }
             val zone = ZoneId.systemDefault()
-            val next = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() + 60_000
+            // Και στις 04:00, για το «Προπόνηση σήμερα» (Α13· [QuickWidgetRules.nextRedraw]).
+            val next = QuickWidgetRules.nextRedraw(java.time.LocalDateTime.now(zone)).atZone(zone).toInstant().toEpochMilli()
             am.set(AlarmManager.RTC, next, pi)
         } catch (e: Throwable) {
             ErrorQueue.report(e, "widget")

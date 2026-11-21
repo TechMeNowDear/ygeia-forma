@@ -717,4 +717,25 @@ void main() {
     expect(store.loaded, isTrue);
     expect(store.followsClock, isFalse);
   });
+
+  // Έλεγχος 21/11 (Α29): τα τρόφιμα σε δύο στήλες όταν χωρούν (ανοιχτό Fold ~750 dp, tablet), μία στο κινητό.
+  group('Α29: δύο στήλες στην αναζήτηση τροφίμων', () {
+    for (final (size, scale, two) in [
+      (const Size(412, 2400), 1.0, false),
+      (const Size(360, 2400), 2.0, false),
+      (const Size(750, 2400), 1.0, true),
+      (const Size(750, 2400), 2.0, true),
+      (const Size(1280, 2400), 1.0, true),
+    ]) {
+      testWidgets('${size.width.round()} dp, ${scale}×: ${two ? 'δύο στήλες' : 'μία στήλη'}, τίποτα δεν ξεχειλίζει', (t) async {
+        final s = FoodStore.preloaded(foods: basicFoods(), now: DateTime(2026, 11, 9, 13));
+        await _pump(t, AddFoodScreen(food: s, meal: Meal.lunch, day: DateTime(2026, 11, 9)), size: size, textScale: scale);
+        await t.enterText(find.byType(TextField), 'ντομάτα');
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('food-two-columns')), two ? findsWidgets : findsNothing);
+        final e = t.takeException();
+        expect(e, isNull, reason: e is FlutterError ? e.toStringDeep() : '$e');
+      });
+    }
+  });
 }

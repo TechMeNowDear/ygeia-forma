@@ -16,6 +16,7 @@ import '../sources.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../unusual.dart';
+import '../training/training_day.dart' show trainingDay, trainingDayStartHour;
 import '../training/training_store.dart';
 import '../training/wear_link.dart';
 import '../training/zone.dart' show weekMovement;
@@ -1071,7 +1072,9 @@ class _TrainingSlot extends StatelessWidget with SelfSpaced {
 
 /// Round 8 (R8-U1-5): ξαναχτίζει τη «Σήμερα» όταν αλλάζει η μέρα: ένα χρονόμετρο ως 1″ μετά τα επόμενα μεσάνυχτα (όσο
 /// η εφαρμογή είναι μπροστά· ακυρώνεται στο παρασκήνιο) και ένας έλεγχος σε κάθε επιστροφή στην εφαρμογή. Τίποτα
-/// συνεχές: μία αφύπνιση τη μέρα το πολύ. [enabled]: όχι στα στιγμιότυπα (σταθερή ώρα).
+/// συνεχές: δύο αφυπνίσεις τη μέρα το πολύ. [enabled]: όχι στα στιγμιότυπα (σταθερή ώρα).
+/// Έλεγχος 21/11 (μετά την #151): και στις 04:00, που αλλάζει η μέρα της προπόνησης ([trainingDay], Α13)· αλλιώς η κάρτα
+/// «Άσκηση σήμερα» έμενε στη χθεσινή προπόνηση όταν η εφαρμογή ήταν ανοιχτή από τα μεσάνυχτα.
 class _DayClock extends StatefulWidget {
   const _DayClock({required this.clock, required this.enabled, required this.builder});
   final DateTime Function() clock;
@@ -1084,12 +1087,14 @@ class _DayClock extends StatefulWidget {
 
 class _DayClockState extends State<_DayClock> with WidgetsBindingObserver {
   Timer? _timer;
-  late DateTime _day;
+  late (DateTime, DateTime) _day;
+
+  (DateTime, DateTime) _dayOf(DateTime now) => (dayOf(now), trainingDay(now));
 
   @override
   void initState() {
     super.initState();
-    _day = dayOf(widget.clock());
+    _day = _dayOf(widget.clock());
     if (widget.enabled) {
       WidgetsBinding.instance.addObserver(this);
       _arm();
@@ -1099,14 +1104,15 @@ class _DayClockState extends State<_DayClock> with WidgetsBindingObserver {
   void _arm() {
     _timer?.cancel();
     final now = widget.clock();
-    final next = DateTime(now.year, now.month, now.day + 1);
+    final four = DateTime(now.year, now.month, now.day, trainingDayStartHour);
+    final next = now.isBefore(four) ? four : DateTime(now.year, now.month, now.day + 1);
     _timer = Timer(next.difference(now) + const Duration(seconds: 1), _check);
   }
 
   /// Αν άλλαξε η μέρα, νέο χτίσιμο (με το νέο «τώρα»)· και νέο χρονόμετρο για τα επόμενα μεσάνυχτα.
   void _check() {
     if (!mounted) return;
-    final day = dayOf(widget.clock());
+    final day = _dayOf(widget.clock());
     if (day != _day) setState(() => _day = day);
     _arm();
   }

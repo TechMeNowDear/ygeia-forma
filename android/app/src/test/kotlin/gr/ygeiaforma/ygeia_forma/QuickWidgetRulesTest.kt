@@ -36,6 +36,16 @@ class QuickWidgetRulesTest {
         assertEquals("Ξεκούραση σήμερα" to "Αύριο: Περπάτημα", QuickWidgetRules.workoutLines(w, mon.plusDays(1)))
     }
 
+    /** Έλεγχος 21/11: τα widgets ξαναζωγραφίζονται στα μεσάνυχτα ΚΑΙ στις 04:00 (αλλιώς το «Προπόνηση σήμερα» έμενε στη χθεσινή). */
+    @Test
+    fun redrawAtMidnightAndAtFour() {
+        val d = LocalDate.of(2026, 11, 21)
+        assertEquals(d.atTime(4, 1), QuickWidgetRules.nextRedraw(d.atTime(0, 1, 5)))
+        assertEquals(d.atTime(4, 1), QuickWidgetRules.nextRedraw(d.atTime(3, 59)))
+        assertEquals(d.plusDays(1).atTime(0, 1), QuickWidgetRules.nextRedraw(d.atTime(4, 1, 10)))
+        assertEquals(d.plusDays(1).atTime(0, 1), QuickWidgetRules.nextRedraw(d.atTime(23, 59)))
+    }
+
     /** Α13 (απόφαση χρήστη 21/11): η μέρα της προπόνησης αλλάζει στις 04:00, όπως στην εφαρμογή. */
     @Test
     fun trainingDayChangesAtFour() {
