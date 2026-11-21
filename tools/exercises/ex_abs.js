@@ -6,7 +6,7 @@ const { supine, ARM } = require('./poses');
 const BREATH = 'Εκπνοή όταν σφίγγεις την κοιλιά, εισπνοή όταν επιστρέφεις. Μην κρατάς καθόλου την ανάσα.';
 
 const crunch = {
-  id: 'crunch', name: 'Crunch (κοιλιακοί στο πάτωμα)', en: 'crunch abs sit up', group: 'abs', equip: 'Πατάκι', yaw: 90, yaw2: 35, elev2: 20,
+  id: 'crunch', name: 'Κοιλιακοί στο πάτωμα', enName: 'Crunch', en: 'crunch abs sit up', group: 'abs', equip: 'Πατάκι', yaw: 90, yaw2: 35, elev2: 20,
   tempo: [[0, 1, 1.2, 'Πάνω'], [1, 1, 1.0, 'Σφίξε'], [1, 0, 2.0, 'Κάτω, εισπνοή'], [0, 0, 0.6, 'Κάτω']],
   primary: ['abs'], secondary: ['obliques'],
   feel: 'Στην κοιλιά, κυρίως πάνω από τον αφαλό. Όχι στον σβέρκο.',
@@ -49,7 +49,7 @@ const crunch = {
 };
 
 const reverseCrunch = {
-  id: 'reverse_crunch', name: 'Ανάποδο crunch στον πάγκο', en: 'reverse crunch lower abs bench', group: 'abs', equip: 'Πάγκος', yaw: 90, yaw2: 30, elev2: 20,
+  id: 'reverse_crunch', name: 'Ανάποδοι κοιλιακοί στον πάγκο', enName: 'Reverse crunch', en: 'reverse crunch lower abs bench', group: 'abs', equip: 'Πάγκος', yaw: 90, yaw2: 30, elev2: 20,
   tempo: [[0, 1, 1.4, 'Λεκάνη πάνω'], [1, 1, 0.6, 'Σφίξε'], [1, 0, 2.2, 'Κάτω, εισπνοή'], [0, 0, 0.6, 'Κάτω']],
   primary: ['abs'], secondary: ['obliques'],
   feel: 'Στο κάτω μέρος της κοιλιάς, κάτω από τον αφαλό.',
@@ -150,7 +150,7 @@ const abWheel = {
 };
 
 const pallof = {
-  id: 'pallof', name: 'Pallof press', en: 'pallof press anti rotation core band', group: 'abs', equip: 'Λάστιχο, βάση καθισμάτων', yaw: -40, elev: 20, yaw2: 90,
+  id: 'pallof', name: 'Πίεση κορμού με λάστιχο', enName: 'Pallof press', en: 'pallof press anti rotation core band', group: 'abs', equip: 'Λάστιχο, βάση καθισμάτων', yaw: -40, elev: 20, yaw2: 90,
   tempo: [[0, 1, 1.2, 'Σπρώξε, εκπνοή'], [1, 1, 2.0, 'Κράτα, ανάσαινε'], [1, 0, 1.2, 'Πίσω, εισπνοή'], [0, 0, 0.6, 'Έτοιμος']],
   primary: ['obliques'], secondary: ['abs', 'glutes'],
   feel: 'Στο πλάι της κοιλιάς, από τη μεριά του λάστιχου. Το σώμα «θέλει» να στρίψει και εσύ δεν το αφήνεις.',

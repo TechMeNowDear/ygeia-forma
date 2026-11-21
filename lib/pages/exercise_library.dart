@@ -190,6 +190,9 @@ class _Row extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(ex.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text, height: 1.25)),
+                  // Α24 (απόφαση χρήστη 21/11): το αγγλικό όνομα μικρό, κάτω από το ελληνικό.
+                  if (ex.enName case final en?)
+                    Text(en, key: ValueKey('ex-en-${ex.id}'), style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.3)),
                   const SizedBox(height: 2),
                   Text(
                     '${ex.equip} ·\u00A0${ex.primary.map((m) => m.name.toLowerCase()).join(', ')}',

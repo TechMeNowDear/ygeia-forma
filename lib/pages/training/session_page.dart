@@ -526,13 +526,15 @@ class _SessionPageState extends State<SessionPage> {
     }
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // Σχέδια 9/11 (6β): «3 σετ × 12–15 · άφησε 2 · ξεκούραση 1:30». (Το αγγλικό δεν μπαίνει: η βιβλιοθήκη έχει
-        // μόνο λέξεις αναζήτησης, όχι σύντομο όνομα.)
+        // Σχέδια 9/11 (6β): «3 σετ × 12–15 · άφησε 2 · ξεκούραση 1:30». Α24 (απόφαση χρήστη 21/11): το ελληνικό όνομα και
+        // από κάτω, μικρό, το αγγλικό, στις ασκήσεις που έχουν σύντομο αγγλικό όνομα στη βιβλιοθήκη.
         // round1, U5-09: «Πώς γίνεται» στο ύψος του τίτλου (πριν 10 dp πιο χαμηλά στο ανοιχτό Fold).
         Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(exName(e.ex), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, color: c.text)),
+              if (exEnName(e.ex) case final en?)
+                Text(en, key: const ValueKey('ex-en-name'), style: TextStyle(fontSize: 13.5, height: 1.3, color: c.textSecondary)),
             ]),
           ),
           if (ex != null && lib != null)
@@ -1329,9 +1331,9 @@ class _SessionPageState extends State<SessionPage> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(exName(id)),
                   subtitle: lib.byId(id)?.caution == null
-                      ? Text(lib.byId(id)?.equip ?? '')
+                      ? Text(exEquipLine(lib.byId(id)))
                       : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(lib.byId(id)?.equip ?? ''),
+                          Text(exEquipLine(lib.byId(id))),
                           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
                             const SizedBox(width: 4),

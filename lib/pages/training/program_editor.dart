@@ -482,9 +482,9 @@ Future<String?> pickExercise(BuildContext context) => showModalBottomSheet<Strin
                           title: Text(e.name),
                           // R7-A6-9: η προειδοποίηση των ασκήσεων «με προσοχή», όπως στο «Πρόσθεσε άσκηση» (ex_picker.dart).
                           subtitle: e.caution == null
-                              ? Text(e.equip)
+                              ? Text(exEquipLine(e))
                               : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text(e.equip),
+                                  Text(exEquipLine(e)),
                                   Row(children: [
                                     Icon(Icons.warning_amber_rounded, size: 15, color: c.warn),
                                     const SizedBox(width: 4),

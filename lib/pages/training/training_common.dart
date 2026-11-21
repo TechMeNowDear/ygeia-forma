@@ -17,6 +17,9 @@ import '../../widgets.dart' show AppCard, IconBadge;
 /// προπόνηση που ξεκινούσε από τη Σήμερα έδειχνε «db_press» αντί για το όνομα). Το σκέτο id μόνο για άγνωστη άσκηση.
 String exName(String id) => ExLibrary.loaded?.byId(id)?.name ?? exNamesById[id] ?? id;
 
+/// Α24 (απόφαση χρήστη 21/11): το σύντομο αγγλικό όνομα («Goblet squat»), όπου υπάρχει· null στις υπόλοιπες ασκήσεις.
+String? exEnName(String id) => ExLibrary.loaded?.byId(id)?.enName ?? exEnNamesById[id];
+
 Map<String, String> exNames() => {for (final e in ExLibrary.loaded?.list ?? const <Ex>[]) e.id: e.name};
 
 Set<String> exIds() => {for (final e in ExLibrary.loaded?.list ?? const <Ex>[]) e.id};

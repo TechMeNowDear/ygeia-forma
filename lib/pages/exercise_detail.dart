@@ -217,7 +217,16 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('${ex.groupName} ·\u00A0${ex.equip}', style: TextStyle(fontSize: 14, color: c.textSecondary)),
+              // Α24 (απόφαση χρήστη 21/11): μπροστά το αγγλικό όνομα, όπου υπάρχει. Τότε η γραμμή είναι πιο μακριά: μικραίνει
+              // για να χωρά σε μία γραμμή (όπως ο τίτλος), δεν κόβεται. Χωρίς αγγλικό όνομα: ακριβώς όπως πριν.
+              child: ex.enName == null
+                  ? Text('${ex.groupName} ·\u00A0${ex.equip}', style: TextStyle(fontSize: 14, color: c.textSecondary))
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text('${ex.enName} ·\u00A0${ex.groupName} ·\u00A0${ex.equip}',
+                          key: const ValueKey('ex-en-name'), maxLines: 1, softWrap: false, style: TextStyle(fontSize: 14, color: c.textSecondary)),
+                    ),
             ),
           ),
         ),

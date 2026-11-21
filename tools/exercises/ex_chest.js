@@ -258,7 +258,7 @@ const bandFly = {
 };
 
 const dips = {
-  id: 'dips', name: 'Βυθίσεις (dips)', en: 'dips parallel bar chest triceps', group: 'chest', equip: 'Βάσεις βυθίσεων', yaw: 90, yaw2: 20,
+  id: 'dips', name: 'Βυθίσεις', enName: 'Dips', en: 'dips parallel bar chest triceps', group: 'chest', equip: 'Βάσεις βυθίσεων', yaw: 90, yaw2: 20,
   caution: 'Σταδιακά και μόνο χωρίς πόνο. Δεν μπαίνει από την πρώτη εβδομάδα (ώμοι).',
   tempo: [[0, 1, 2.2, 'Κάτω, εισπνοή'], [1, 1, 0.2, 'Κάτω'], [1, 0, 1.2, 'Πάνω, εκπνοή'], [0, 0, 0.8, 'Πάνω']],
   primary: ['chest', 'triceps'], secondary: ['frontdelt'],

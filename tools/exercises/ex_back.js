@@ -179,7 +179,7 @@ const assisted = {
 };
 
 const facePull = {
-  id: 'face_pull', name: 'Face pull με λάστιχο', en: 'face pull band rear delt rotator cuff', group: 'back', equip: 'Λάστιχο, μονόζυγο', yaw: 120, elev: 14, yaw2: 90,
+  id: 'face_pull', name: 'Έλξη στο πρόσωπο με λάστιχο', enName: 'Face pull', en: 'face pull band rear delt rotator cuff', group: 'back', equip: 'Λάστιχο, μονόζυγο', yaw: 120, elev: 14, yaw2: 90,
   tempo: [[0, 1, 1.2, 'Τράβα, εκπνοή'], [1, 1, 1.0, 'Κράτα'], [1, 0, 2.0, 'Μπροστά αργά, εισπνοή'], [0, 0, 0.5, 'Μπροστά']],
   primary: ['reardelt', 'rotcuff'], secondary: ['upperback'],
   feel: 'Πίσω στους ώμους και ανάμεσα στις ωμοπλάτες. Ελαφριά άσκηση· δεν πρέπει να πονά μπροστά στον ώμο.',

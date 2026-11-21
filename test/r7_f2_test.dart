@@ -451,6 +451,32 @@ void main() {
     expect(p.loadDiff, 0, reason: 'τελείωσε με 2,8 kg και τις δύο φορές (με το μεγαλύτερο θα έβγαινε +1,5)');
   });
 
+  // ---------------------------------------------------------------- Α24 (απόφαση χρήστη 21/11)
+  testWidgets('Α24: στην προπόνηση το ελληνικό όνομα και από κάτω, μικρό, το αγγλικό· χωρίς αγγλικό όνομα, καμία γραμμή', (tester) async {
+    await tester.runAsync(() => ExLibrary.load(inline: true));
+    final at = DateTime(2026, 11, 23, 18);
+    final t = TrainingStore(io: MemoryTrainingIO(), clock: () => at)..ready = true;
+    t.saveProgram(parseProgram(_v2, ids).program!, author: 'claude');
+    t.start(t.program!.workout('LB')!);
+    await _pump(tester, SessionPage(training: t));
+    expect(find.text('Κάθισμα με βάρος στο στήθος'), findsWidgets);
+    final en = find.byKey(const ValueKey('ex-en-name'));
+    expect(tester.widget<Text>(en).data, 'Goblet squat');
+    expect(find.text('Goblet squat'), findsOneWidget, reason: 'το παλιό αγγλικό όνομα μόνο στη μικρή γραμμή');
+    // Ο μεγάλος τίτλος της άσκησης (22), όχι η γραμμή της στη λίστα.
+    final title = find.byWidgetPredicate((w) => w is Text && w.data == 'Κάθισμα με βάρος στο στήθος' && w.style?.fontSize == 22);
+    expect(title, findsOneWidget);
+    expect(tester.getTopLeft(en).dy, greaterThanOrEqualTo(tester.getBottomLeft(title).dy - 1));
+    expect(tester.takeException(), isNull);
+
+    // Άσκηση χωρίς αγγλικό όνομα (Πιεστικό με αλτήρες): καμία δεύτερη γραμμή.
+    final t2 = sampleTraining(DateTime(2026, 11, 13, 17, 30));
+    final s2 = t2.start(t2.program!.workout('A')!);
+    expect(lib.byId(s2.items.first.ex)!.enName, isNull, reason: 'το δείγμα ξεκινά με άσκηση χωρίς αγγλικό όνομα');
+    await _pump(tester, SessionPage(training: t2, key: UniqueKey()));
+    expect(find.byKey(const ValueKey('ex-en-name')), findsNothing);
+  });
+
   // ---------------------------------------------------------------- R7-A6-4
   testWidgets('R7-A6-4: «Την επόμενη φορά» = ο στόχος της επόμενης προπόνησης (εύρος του προγράμματος, όχι της μέρας)', (tester) async {
     await tester.runAsync(() => ExLibrary.load(inline: true));

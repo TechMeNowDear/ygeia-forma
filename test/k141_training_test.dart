@@ -509,7 +509,8 @@ void main() {
       final plain = nextTarget(_item('db_press', load: 6.8), hist, _now);
       expect(plain.load, 9.3, reason: 'χωρίς σημείωση (παλιό πρόγραμμα): όπως πριν, από την τελευταία φορά');
       final lighter = nextTarget(_item('db_press', load: 6.8)..loadAt = ms(_now), hist, _now);
-      expect((lighter.load, lighter.change, lighter.reps), (6.8, Change.back, [8, 8, 8]));
+      expect((lighter.load, lighter.change), (6.8, Change.back));
+      expect(lighter.reps, [8, 8, 8]);
       expect(lighter.reason, startsWith('Το νέο σου πρόγραμμα γράφει πιο ελαφριά: 6,8 kg αντί για 9,3 kg'));
       // Φορτίο που γράφτηκε ΠΡΙΝ από την τελευταία φορά (το έχεις ήδη περάσει): όπως πριν.
       final old = nextTarget(_item('db_press', load: 6.8)..loadAt = ms(_ago(10)), hist, _now);
@@ -535,7 +536,8 @@ void main() {
       expect(plain.change, Change.pain);
       expect(plain.load, greaterThan(4.3));
       final t = nextTarget(_item('db_press', load: 4.3)..loadAt = ms(_now), pain, _now);
-      expect((t.load, t.change, t.reps), (4.3, Change.pain, plain.reps));
+      expect((t.load, t.change), (4.3, Change.pain));
+      expect(t.reps, plain.reps);
       expect(t.reason, startsWith(plain.reason));
       expect(t.reason, endsWith('Το νέο σου πρόγραμμα γράφει ακόμα πιο ελαφριά (4,3 kg): ισχύει αυτό.'));
     });

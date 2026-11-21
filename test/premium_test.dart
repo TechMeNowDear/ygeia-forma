@@ -481,8 +481,11 @@ void main() {
       final lib = await ExLibrary.load(inline: true);
       for (final e in lib.list) {
         expect(exNamesById[e.id], e.name, reason: e.id);
+        // Α24 (21/11): και το σύντομο αγγλικό όνομα, όπου υπάρχει.
+        expect(exEnNamesById[e.id], e.enName, reason: e.id);
       }
       expect(exNamesById.length, lib.list.length);
+      expect(exEnNamesById.length, lib.list.where((e) => e.enName != null).length);
     });
 
     testWidgets('S3: τα «Δικά μου» φαίνονται στην πρώτη οθόνη του «+ Φαγητό»· «Περισσότερα πρόσφατα» ανοίγει τη λίστα', (t) async {
