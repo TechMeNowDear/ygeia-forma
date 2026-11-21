@@ -590,9 +590,11 @@ Map<String, double> ouraRow(OuraNight n) {
 }
 
 /// Γραμμές ιστορικού για όλες τις μέρες.
+/// Α17 (21/11): και η μέρα μιας νύχτας με χαμηλή μπαταρία, ακόμα κι αν δεν έχει καμία τιμή: έτσι η συγχώνευση σβήνει
+/// ό,τι είχε γραφτεί από μια παλιότερη ανάγνωση της ίδιας νύχτας (μια μέρα που λείπει από εδώ δεν αγγίζεται).
 Map<String, Map<String, double>> ouraRows(List<OuraNight> nights) => {
       for (final n in nights)
-        if (ouraRow(n).isNotEmpty) dateKey(n.day): ouraRow(n),
+        if (ouraRow(n).isNotEmpty || (n.main != null && n.lowBattery)) dateKey(n.day): ouraRow(n),
     };
 
 /// Τα χρονικά παράθυρα ύπνου του Oura (για να μη μετρούν ως «μέρα» οι παλμοί του ρολογιού).

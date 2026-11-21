@@ -243,6 +243,10 @@ class Food {
 
 enum Meal { breakfast, lunch, dinner, snack }
 
+/// Απόφαση χρήστη 21/11 (Α22): η σειρά των γευμάτων στη Διατροφή, όπως τρως: Πρωινό, Μεσημέρι, Σνακ, Βράδυ. Η σειρά
+/// του [Meal] (και ό,τι αποθηκεύεται ή στέλνεται στο AI) δεν αλλάζει.
+const mealsShown = [Meal.breakfast, Meal.lunch, Meal.snack, Meal.dinner];
+
 /// Σύντομα ονόματα, ίδιου μεγέθους στο κουμπί επιλογής (UX U7: το «Μεσημεριανό» μίκραινε για να χωρέσει στα 400 dp).
 String mealLabel(Meal m) => switch (m) {
       Meal.breakfast => 'Πρωινό',

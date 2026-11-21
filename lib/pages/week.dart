@@ -331,6 +331,15 @@ class SlotRow extends StatelessWidget {
 }
 
 /// Η κάρτα «Πρόγραμμα» στο ημερολόγιο, για τη μέρα που φαίνεται (μόνο αν το πρόγραμμα την έχει).
+/// Απόφαση χρήστη 21/11 (Α21): η μέρα [day] έχει στο πρόγραμμα γεύμα που δεν σημειώθηκε ακόμα ([SlotState.open]).
+/// Όσο ισχύει, η Διατροφή βάζει την κάρτα «Πρόγραμμα» πρώτη.
+bool planHasOpenSlot(FoodStore food, DateTime day) {
+  final w = food.week;
+  final i = w?.indexOf(day) ?? -1;
+  if (w == null || i < 0) return false;
+  return w.days[i].any((s) => slotStateNow(food, w, i, s) == SlotState.open);
+}
+
 class PlanDayCard extends StatelessWidget {
   const PlanDayCard({super.key, required this.food, required this.day, this.clock});
   final FoodStore food;
@@ -658,6 +667,58 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
     final lib = libraryDishes(food.dishes);
     final goals = HealthStore.shared?.goals;
     final today = dayOf(_now);
+    // Α29 (21/11): μία μέρα του προγράμματος (κάρτα)· σε μία ή δύο στήλες από το [_WeekDays].
+    Widget dayCard(WeekPlan w, int i) => AppCard(
+            key: ValueKey('week-day-$i'),
+            padding: const EdgeInsets.fromLTRB(16, 12, 4, 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Builder(builder: (context) {
+                final p = plannedDay(food, w, i);
+                final isToday = sameDay(w.dayAt(i), today);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                    Expanded(
+                      child: Text(isToday ? 'Σήμερα$dotJoin${shortDayDate(w.dayAt(i))}' : shortDayDate(w.dayAt(i)),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isToday ? c.food : c.text)),
+                    ),
+                    Text(
+                      '${thousands(p.totals.shownKcal)}${p.unknown > 0 ? '+' : ''}'
+                      '${goals == null ? '' : ' / ${thousands(goals.kcal)}'} kcal',
+                      key: ValueKey('week-day-kcal-$i'),
+                      style: TextStyle(fontSize: 13.5, color: c.textSecondary),
+                    ),
+                  ]),
+                );
+              }),
+              if (w.days[i].isEmpty && (w.meals?.isEmpty ?? true))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Χωρίς γεύματα.', style: TextStyle(fontSize: 14, color: c.textTertiary)),
+                ),
+              for (var k = 0; k < w.days[i].length; k++)
+                SlotRow(food: food, plan: w, day: i, index: k, lock: true, clock: widget.clock),
+              // Γεύμα που έμεινε κενό (π.χ. συνταγή του AI που δεν πέρασε): διαλέγεις φαγητό (U-8).
+              for (final m in w.meals ?? const <Meal>[])
+                if (!w.days[i].any((s) => s.meal == m))
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
+                    child: Row(children: [
+                      Icon(mealIcon(m), size: 24, color: c.textTertiary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text('${mealLabel(m)}${dotJoin}χωρίς φαγητό',
+                            style: TextStyle(fontSize: 15, height: 1.3, color: c.textSecondary)),
+                      ),
+                      TextButton(
+                        key: ValueKey('week-fill-$i-${m.name}'),
+                        onPressed: food.dishesRead ? () => _fillEmpty(i, m) : null,
+                        child: const Text('Διάλεξε φαγητό'),
+                      ),
+                    ]),
+                  ),
+            ]),
+          );
     final body = <Widget>[
       Text(
         'Τι θα φας κάθε μέρα. Στο ημερολόγιο μπαίνει μόνο ό,τι πατήσεις «Το έφαγα».',
@@ -781,60 +842,9 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
           icon: const Icon(Icons.shopping_cart_outlined),
           label: const Text('Λίστα ψωνιών'),
         ),
-        for (var i = 0; i < w.days.length; i++) ...[
-          const SizedBox(height: 10),
-          AppCard(
-            key: ValueKey('week-day-$i'),
-            padding: const EdgeInsets.fromLTRB(16, 12, 4, 8),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Builder(builder: (context) {
-                final p = plannedDay(food, w, i);
-                final isToday = sameDay(w.dayAt(i), today);
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                    Expanded(
-                      child: Text(isToday ? 'Σήμερα$dotJoin${shortDayDate(w.dayAt(i))}' : shortDayDate(w.dayAt(i)),
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isToday ? c.food : c.text)),
-                    ),
-                    Text(
-                      '${thousands(p.totals.shownKcal)}${p.unknown > 0 ? '+' : ''}'
-                      '${goals == null ? '' : ' / ${thousands(goals.kcal)}'} kcal',
-                      key: ValueKey('week-day-kcal-$i'),
-                      style: TextStyle(fontSize: 13.5, color: c.textSecondary),
-                    ),
-                  ]),
-                );
-              }),
-              if (w.days[i].isEmpty && (w.meals?.isEmpty ?? true))
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text('Χωρίς γεύματα.', style: TextStyle(fontSize: 14, color: c.textTertiary)),
-                ),
-              for (var k = 0; k < w.days[i].length; k++)
-                SlotRow(food: food, plan: w, day: i, index: k, lock: true, clock: widget.clock),
-              // Γεύμα που έμεινε κενό (π.χ. συνταγή του AI που δεν πέρασε): διαλέγεις φαγητό (U-8).
-              for (final m in w.meals ?? const <Meal>[])
-                if (!w.days[i].any((s) => s.meal == m))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
-                    child: Row(children: [
-                      Icon(mealIcon(m), size: 24, color: c.textTertiary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text('${mealLabel(m)}${dotJoin}χωρίς φαγητό',
-                            style: TextStyle(fontSize: 15, height: 1.3, color: c.textSecondary)),
-                      ),
-                      TextButton(
-                        key: ValueKey('week-fill-$i-${m.name}'),
-                        onPressed: food.dishesRead ? () => _fillEmpty(i, m) : null,
-                        child: const Text('Διάλεξε φαγητό'),
-                      ),
-                    ]),
-                  ),
-            ]),
-          ),
-        ],
+        // Απόφαση χρήστη 21/11 (Α29): στο ανοιχτό Fold, στο tablet και στο PC οι μέρες σε δύο στήλες (πριν: μία, τεντωμένη).
+        const SizedBox(height: 10),
+        _WeekDays(cards: [for (var i = 0; i < w.days.length; i++) dayCard(w, i)]),
       ],
     ];
     return Scaffold(
@@ -842,11 +852,41 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
       appBar: AppBar(backgroundColor: c.background, surfaceTintColor: Colors.transparent, title: const Text('Πρόγραμμα εβδομάδας')),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
+          // Α29 (21/11): πιο φαρδιά όταν οι μέρες πάνε σε δύο στήλες ([_WeekDays]).
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width >= weekTwoColumnsWidth ? 1180 : 720),
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: body),
         ),
       ),
     );
+  }
+}
+
+/// Α29 (απόφαση χρήστη 21/11): από τόσο πλάτος οθόνης (dp) και πάνω, οι μέρες της εβδομάδας σε δύο στήλες (ανοιχτό
+/// Fold, tablet, PC). Στο κινητό και στο κλειστό Fold μία στήλη, όπως πριν.
+const weekTwoColumnsWidth = 840.0;
+
+/// Α29 (21/11): οι κάρτες των ημερών σε μία στήλη, ή σε δύο όταν η οθόνη είναι φαρδιά ([weekTwoColumnsWidth]).
+class _WeekDays extends StatelessWidget {
+  const _WeekDays({required this.cards});
+  final List<Widget> cards;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < weekTwoColumnsWidth) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 10), cards[i]],
+      ]);
+    }
+    return LayoutBuilder(builder: (context, box) {
+      const gap = 12.0;
+      final col = (box.maxWidth - gap) / 2;
+      return Wrap(
+        key: const ValueKey('week-two-columns'),
+        spacing: gap,
+        runSpacing: 10,
+        children: [for (final c in cards) SizedBox(width: col, child: c)],
+      );
+    });
   }
 }
 

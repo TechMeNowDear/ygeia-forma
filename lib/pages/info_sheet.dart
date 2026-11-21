@@ -102,7 +102,10 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
               ],
             ),
           );
-      return ConstrainedBox(
+      // Απόφαση χρήστη 21/11 (Α26): πάνω μόνο ό,τι χρειάζεσαι για να διαβάσεις τον αριθμό (τι είναι, τι δείχνει, πώς το
+      // διαβάζεις, το εύρος)· η σύγκριση, η ακρίβεια, οι πηγές και οι συσκευές κάτω από «Περισσότερα».
+      var more = false;
+      return StatefulBuilder(builder: (context, setSheet) => ConstrainedBox(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
@@ -151,17 +154,31 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
                 const SizedBox(height: 14),
                 block('Εύρος αναφοράς', '${_cap(range.text)}. Πηγή: ${range.cite}.'),
               ],
-              if (info.compare != null) ...[
+              if (!more) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const ValueKey('info-more'),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    onPressed: () => setSheet(() => more = true),
+                    child: const Text('Περισσότερα: ακρίβεια και πηγές ›'),
+                  ),
+                ),
+              ],
+              if (more && info.compare != null) ...[
                 const SizedBox(height: 14),
                 block('Με τι το συγκρίνεις', info.compare!),
               ],
-              const SizedBox(height: 14),
-              block('Πόσο ακριβές είναι', info.accuracy),
-              if (info.cite != null) ...[
+              if (more) ...[
+                const SizedBox(height: 14),
+                block('Πόσο ακριβές είναι', info.accuracy),
+              ],
+              if (more && info.cite != null) ...[
                 const SizedBox(height: 10),
                 Text(info.cite!, style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4)),
               ],
-              if (device != null) ...[
+              if (more && device != null) ...[
                 const SizedBox(height: 8),
                 // Σχέδια 9/11 (4α): οι εξηγήσεις όλων των συσκευών σε μία σελίδα, στο σωστό σημείο.
                 Align(
@@ -187,7 +204,7 @@ Future<void> showMetricInfo(BuildContext context, MetricInfo info, {RefRange? ra
             ],
           ),
         ),
-      );
+      ));
     },
   );
 }

@@ -101,7 +101,8 @@ StatCard _weightCard(WidgetTester t) =>
 
 String? _row(WidgetTester t, String label) {
   for (final r in t.widgetList<InfoRow>(find.byType(InfoRow))) {
-    if (r.label == label) return r.value;
+    // Α27 (21/11): η αλλαγή σε δική της στήλη ([InfoRow.change]): εδώ γράφεται όπως πριν, «τιμή  (αλλαγή)».
+    if (r.label == label) return r.change == null ? r.value : '${r.value}  (${r.change})';
   }
   return null;
 }

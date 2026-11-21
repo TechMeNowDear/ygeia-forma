@@ -342,7 +342,7 @@ void main() {
       final pills = [for (final p in t.widgetList<TrendPill>(find.byType(TrendPill))) if (p.text.contains(' kg από ')) p.text];
       expect(pills, ['−0,2 kg από 2/12']);
       final note = t.widget<Text>(find.byKey(const ValueKey('body-trend-note'))).data!;
-      expect(note, contains('σε παρένθεση η αλλαγή από τις 2/12.'), reason: 'πριν «από τις 2 Δεκ.» κάτω από το «από 2/12»');
+      expect(note, contains('«Αλλαγή» από τις 2/12.'), reason: 'πριν «από τις 2 Δεκ.» κάτω από το «από 2/12»');
     });
 
     test('U4-3: ο αριθμός μένει με τη μονάδα/τον μήνα του (αδιάσπαστο κενό)', () {

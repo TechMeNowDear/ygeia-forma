@@ -1,5 +1,6 @@
 // Α13 (απόφαση χρήστη 21/11): η μέρα της προπόνησης αλλάζει στις 04:00, όπως του φαγητού. Επινοημένα δεδομένα.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ygeia_forma/exercise/ex_data.dart';
 import 'package:ygeia_forma/home_widgets/widget_snapshot.dart';
 import 'package:ygeia_forma/pages/training/today_training_card.dart';
 import 'package:ygeia_forma/training/catch_up.dart';
@@ -146,5 +147,45 @@ void main() {
     final t = _store(() => DateTime(2026, 11, 29, 20), sessions);
     expect([for (final s in t.weekOf(DateTime(2026, 11, 29))) s.id], containsAll(['w1', 's1']));
     expect([for (final s in t.weekOf(DateTime(2026, 11, 30))) s.id], ['w2']);
+  });
+
+  // Α14 (απόφαση χρήστη 21/11): χαμένη προπόνηση, 48 ώρες στους ΙΔΙΟΥΣ μύες.
+  group('Α14: πρόταση μέρας για χαμένη προπόνηση', () {
+    // Π1, Π2 = πάνω (πιεστικό: στήθος), Κ1, Κ2 = κάτω (κάθισμα: πόδια).
+    Program split() => Program.fromJson({
+          'id': 'p1',
+          'name': 'Δοκιμή',
+          'from': '2026-11-16',
+          'days': {'fri': 'P1', 'sat': 'K2', 'sun': 'P2', 'mon': 'K1', 'tue': 'walk', 'wed': 'walk', 'thu': 'walk'},
+          'workouts': [
+            for (final (id, ex) in [('P1', 'db_press'), ('K2', 'goblet'), ('P2', 'db_press'), ('K1', 'goblet')])
+              {
+                'id': id,
+                'name': 'Προπόνηση $id',
+                'items': [
+                  {'ex': ex, 'sets': 2, 'reps': [8, 12]}
+                ],
+              },
+            {'id': 'walk', 'name': 'Περπάτημα', 'cardio': {'activity': 'walk', 'minutes': 30}},
+          ],
+        });
+
+    test('η «Πάνω» της Κυριακής χωρά την Τρίτη, μετά από «Κάτω» τη Δευτέρα', () async {
+      await ExLibrary.load(inline: true);
+      final p = split();
+      final tue = DateTime(2026, 11, 24, 18);
+      final mon = _lift('m', 'K1', DateTime(2026, 11, 23, 19));
+      final m = missedToCatchUp(p, [mon], tue);
+      expect((m?.workout.id, m?.missed), ('P2', DateTime(2026, 11, 22)));
+      // Αν χθες έγινε «Πάνω» (ίδιοι μύες): όχι.
+      final monUpper = _lift('m', 'P1', DateTime(2026, 11, 23, 19));
+      expect(missedToCatchUp(p, [monUpper], tue), isNull);
+      // Ελεύθερη προπόνηση χθες (άγνωστοι μύες): όχι, όπως πριν.
+      final free = _lift('f', 'free', DateTime(2026, 11, 23, 19));
+      expect(missedToCatchUp(p, [free], tue), isNull);
+      // Πέμπτη: οι δύο προηγούμενες μέρες είναι περπάτημα (η Κυριακή απέχει πάνω από [catchUpDays]): τίποτα.
+      expect(missedToCatchUp(p, [mon], DateTime(2026, 11, 26, 18)), isNull);
+      expect(catchUpDays, 2);
+    });
   });
 }

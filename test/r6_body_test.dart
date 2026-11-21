@@ -50,7 +50,8 @@ Future<void> _pump(WidgetTester t, Widget w) async {
 
 String? _row(WidgetTester t, String label) {
   for (final r in t.widgetList<InfoRow>(find.byType(InfoRow))) {
-    if (r.label == label) return r.value;
+    // Α27 (21/11): η αλλαγή σε δική της στήλη ([InfoRow.change]): εδώ γράφεται όπως πριν, «τιμή  (αλλαγή)».
+    if (r.label == label) return r.change == null ? r.value : '${r.value}  (${r.change})';
   }
   return null;
 }
@@ -121,7 +122,7 @@ void main() {
       expect(_row(t, 'Δείκτης μάζας σώματος'), '24,9'); // 80,7 / 1,8² = 24,907 (πριν: κανένας, από την 85,4)
       expect(_row(t, 'Λίπος'), '29,0%'); // Κ3-M3 (17/11): χωρίς τάση, όπως πιο πάνω
       // Round 8 (A4 Β2 / U4 Β4): η μέρα με την ίδια μορφή με το χάπι («από 2/12»)· πριν «από τις 2 Δεκ.».
-      expect(_note(t), contains('σε παρένθεση η αλλαγή από τις 2/12.'));
+      expect(_note(t), contains('«Αλλαγή» από τις 2/12.'));
       expect(t.widget<Text>(find.byKey(const ValueKey('body-later-weighin'))).data,
           'Και 19:30: 85,4 kg· μετρά μία ζύγιση τη μέρα, η πρώτη.');
       expect(find.byKey(const ValueKey('body-weighings-foreign')), findsOneWidget);

@@ -295,31 +295,36 @@ class _LatestCard extends StatelessWidget {
     // Round 1 (U1a-7): «25,4%» χωρίς κενό, όπως παντού στην εφαρμογή· «82,2 kg» με κενό.
     String withUnit(double value, String unit, [int digits = 1]) => unit == '%' ? '${dec(value, digits)}%' : '${dec(value, digits)} $unit';
 
-    String withDiff(double? value, double? before, String unit, {int digits = 1, bool lowerIsBetter = true}) {
-      if (value == null) return '—';
+    // Απόφαση χρήστη 21/11 (Α27): η τιμή («Τώρα») και η αλλαγή σε δική της στήλη («Αλλαγή»), αντί για «τιμή  (αλλαγή)» σε παρένθεση.
+    (String, String?) withDiff(double? value, double? before, String unit, {int digits = 1, bool lowerIsBetter = true}) {
+      if (value == null) return ('—', null);
       final base = withUnit(value, unit, digits);
       // Round 4 (m1 · R4-A-4): ούτε από ζύγιση «σε αναμονή» (πριν: «(−42,6)» για το παιδί του Σαββάτου).
-      if (before == null || foreign || pending) return base;
+      if (before == null || foreign || pending) return (base, null);
       // Η διαφορά των νούμερων όπως φαίνονται (τρίτος έλεγχος F3): 82,2 και 83,4 → «−1,2».
       // Round 9 (R9-A4-3): και το 0 («82,2 kg  (0)»), όπως η Σήμερα («0 kg από 18/11») και το widget: η σημείωση από πάνω
       // λέει «σε παρένθεση η αλλαγή από τις …», και πριν, με ίδιο βάρος, δεν φαινόταν καμία.
       final diff = shownDiff(value, before, digits);
-      return '$base  (${signedDec(diff, digits)})';
+      return (base, signedDec(diff, digits));
     }
 
     // Η τιμή της τελευταίας ζύγισης· σε παρένθεση η διαφορά των δύο μεσαίων τιμών (3 τελευταίες, 3 πριν), όπως φαίνονται,
     // ΜΟΝΟ όταν ξεπερνά τη διακύμανση της ζυγαριάς [floor] (round 1, S4-3: πριν γραφόταν κάθε διαφορά, π.χ. «(+0,2)» μύες).
-    String trendDiff(double? value, double? Function(BodyMeasurement) f, String unit, double floor) {
-      if (value == null) return '—';
+    (String, String?) trendDiff(double? value, double? Function(BodyMeasurement) f, String unit, double floor) {
+      if (value == null) return ('—', null);
       final base = withUnit(value, unit);
       // Round 6 (R6-1): ούτε τάση δίπλα σε ζύγιση που δεν μετρά· η τάση (3 τελευταίες που μετρούν) δεν την περιέχει και θα
       // διαβαζόταν σαν αλλαγή της τιμής που φαίνεται (π.χ. «Λίπος 25,0%  (+2,0)» μετά από αρρώστια).
-      if (foreign || pending) return base;
+      if (foreign || pending) return (base, null);
       final t = bodyTrend(body, f);
-      if (t == null) return base;
+      if (t == null) return (base, null);
       final diff = shownDiff(t.now, t.before, 1);
-      return bodyDiffShown(diff, floor) ? '$base  (${signedDec(diff)})' : base;
+      return (base, bodyDiffShown(diff, floor) ? signedDec(diff) : null);
     }
+
+    // Α27 (21/11): ο πίνακας «Τώρα | Αλλαγή» ([InfoRow.columns]).
+    final headStyle = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: .4, color: c.textSecondary);
+    Widget compRow(String label, (String, String?) v) => InfoRow(label, v.$1, change: v.$2, columns: true);
 
     return AppCard(
       child: Column(
@@ -391,12 +396,17 @@ class _LatestCard extends StatelessWidget {
               key: const ValueKey('body-trend-note'),
               style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
             ),
-          const SizedBox(height: 4),
-          InfoRow('Βάρος', withDiff(last.weight, p?.weight, 'kg')),
-          InfoRow('Λίπος', trendDiff(last.fatPct, (b) => b.fatPct, '%', bodyFloorFatPct)),
-          InfoRow('Μάζα λίπους', trendDiff(last.fatKg, (b) => b.fatKg, 'kg', bodyFloorKg)),
-          InfoRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg', bodyFloorKg)),
-          InfoRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg', bodyFloorKg)),
+          const SizedBox(height: 8),
+          Row(key: const ValueKey('body-columns'), children: [
+            const Expanded(flex: 5, child: SizedBox()),
+            Expanded(flex: 3, child: Text(upperGr('Τώρα'), textAlign: TextAlign.right, style: headStyle)),
+            Expanded(flex: 2, child: Text(upperGr('Αλλαγή'), textAlign: TextAlign.right, style: headStyle)),
+          ]),
+          compRow('Βάρος', withDiff(last.weight, p?.weight, 'kg')),
+          compRow('Λίπος', trendDiff(last.fatPct, (b) => b.fatPct, '%', bodyFloorFatPct)),
+          compRow('Μάζα λίπους', trendDiff(last.fatKg, (b) => b.fatKg, 'kg', bodyFloorKg)),
+          compRow('Σκελετικοί μύες', trendDiff(last.smm, (b) => b.smm, 'kg', bodyFloorKg)),
+          compRow('Άλιπη μάζα', trendDiff(last.leanMass, (b) => b.leanMass, 'kg', bodyFloorKg)),
           // Round 8 (R8-A4-2): χωρίς το «±10%», που δεν είχε πηγή και δεν ισχύει για κάθε άνθρωπο (Frankenfield κ.ά., J Am
           // Diet Assoc 2005: ακόμα και η καλύτερη εξίσωση βγαίνει μέσα στο ±10% μόνο στους περισσότερους, όχι σε όλους).
           if (last.bmr != null) InfoRow('Βασικός μεταβολισμός (εκτίμηση)', '${thousands(last.bmr!)} kcal'),

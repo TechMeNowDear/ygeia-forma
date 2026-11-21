@@ -407,6 +407,10 @@ class MealPicker extends StatelessWidget {
 // Αναζήτηση και προσθήκη
 // ---------------------------------------------------------------------------
 
+/// Α29 (απόφαση χρήστη 21/11): από τόσο πλάτος οθόνης (dp) και πάνω, τα τρόφιμα της αναζήτησης σε δύο στήλες (ανοιχτό
+/// Fold, tablet, PC). Ίδιο όριο με την εβδομάδα του προγράμματος.
+const foodTwoColumnsWidth = 840.0;
+
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen(
       {super.key,
@@ -705,19 +709,30 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             if (trailing != null) trailing,
           ]),
         );
+    // Απόφαση χρήστη 21/11 (Α29): στο ανοιχτό Fold, στο tablet και στο PC τα τρόφιμα σε δύο στήλες (πριν: μία, τεντωμένη).
+    final wide = MediaQuery.sizeOf(context).width >= foodTwoColumnsWidth;
+    Widget tiles(List<Widget> items) => !wide
+        ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: items)
+        : LayoutBuilder(builder: (context, box) {
+            const gap = 16.0;
+            final col = (box.maxWidth - gap) / 2;
+            return Wrap(spacing: gap, children: [for (final t in items) SizedBox(width: col, child: t)]);
+          });
     Widget section(String title, List<Food> foods, {Widget? trailing, bool more = false}) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             head(title, trailing: trailing),
-            for (var k = 0; k < foods.length; k++)
-              _FoodTile(
-                food: foods[k],
-                store: widget.food,
-                onTap: () => _pick(foods[k]),
-                onMore: more ? () => myFoodActions(context, widget.food, foods[k]) : null,
-                badge: !more,
-                line: k < foods.length - 1,
-              ),
+            tiles([
+              for (var k = 0; k < foods.length; k++)
+                _FoodTile(
+                  food: foods[k],
+                  store: widget.food,
+                  onTap: () => _pick(foods[k]),
+                  onMore: more ? () => myFoodActions(context, widget.food, foods[k]) : null,
+                  badge: !more,
+                  line: wide ? k < foods.length - 2 : k < foods.length - 1,
+                ),
+            ]),
           ],
         );
     // «Τα φαγητά μου» (15/11): πρώτα, γιατί ένα φαγητό είναι όλο το γεύμα με ένα πάτημα.
@@ -921,7 +936,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
+          // Α29 (21/11): πιο φαρδιά όταν τα τρόφιμα πάνε σε δύο στήλες.
+          constraints: BoxConstraints(maxWidth: wide ? 1180 : 720),
           // Η γραμμή «Μέρα: …» μένει πάντα στη θέση της, πάνω από τη λίστα που κυλά.
           child: Column(children: [
             if (ingredient)
@@ -1050,13 +1066,15 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                           ],
                         ),
                       ),
-                    for (var k = 0; k < results.length; k++)
-                      _FoodTile(
-                        food: results[k],
-                        store: widget.food,
-                        onTap: () => _pick(results[k]),
-                        line: k < results.length - 1,
-                      ),
+                    tiles([
+                      for (var k = 0; k < results.length; k++)
+                        _FoodTile(
+                          food: results[k],
+                          store: widget.food,
+                          onTap: () => _pick(results[k]),
+                          line: wide ? k < results.length - 2 : k < results.length - 1,
+                        ),
+                    ]),
                   ],
                 ],
               ),

@@ -207,7 +207,8 @@ class _TrainingPageState extends State<TrainingPage> {
       icon: Icons.event_repeat_rounded,
       color: c.exercise,
       title: '$when δεν έγινε «${w.name}»',
-      text: 'Χωράει σήμερα: δεν έκανες βάρη χθες και δεν έχεις αύριο. Αν δεν θες, συνέχισε το πρόγραμμα· μία χαμένη δεν χαλάει την εβδομάδα.',
+      // Α14 (απόφαση χρήστη 21/11): 48 ώρες στους ίδιους μύες· ο χρήστης θα την κάνει απόγευμα ή βράδυ.
+      text: catchUpText,
       buttonText: 'Κάν’ την σήμερα',
       onPressed: () => setState(() => t.choose(w.id, _now)),
     );
@@ -1056,3 +1057,7 @@ String recentWorkoutLine(Session s) {
   return '${countText(s.duration.inMinutes, 'λεπτό', 'λεπτά').replaceAll(' ', '\u00A0')} ·\u00A0${s.setsDone}\u00A0σετ'
       '${s.volume > 0 ? ' ·\u00A0${thousands(s.volume.round())}\u00A0kg' : ''}$hr';
 }
+
+/// Α14 (21/11): το κείμενο της κάρτας «χαμένη προπόνηση».
+const catchUpText = 'Χωράει σήμερα, απόγευμα ή βράδυ: οι ίδιοι μύες δεν δούλεψαν χθες και δεν έχουν αύριο. Αν δεν θες, '
+    'συνέχισε το πρόγραμμα· μία χαμένη δεν χαλάει την εβδομάδα.';

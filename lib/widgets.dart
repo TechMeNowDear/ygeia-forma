@@ -670,9 +670,14 @@ class StatCard extends StatelessWidget {
 
 /// Γραμμή «όνομα ........ τιμή».
 class InfoRow extends StatelessWidget {
-  const InfoRow(this.label, this.value, {super.key, this.valueColor, this.dot, this.dotBorder});
+  const InfoRow(this.label, this.value, {super.key, this.valueColor, this.dot, this.dotBorder, this.change, this.columns = false});
   final String label;
   final String value;
+
+  /// Απόφαση χρήστη 21/11 (Α27): γραμμή πίνακα «Τώρα | Αλλαγή» ([columns]): η τιμή και, σε δική της στήλη, η αλλαγή
+  /// ([change], σε γκρι, χωρίς κρίση). Οι στήλες με αναλογίες, ώστε να μένουν στοιχισμένες και με μεγάλα γράμματα.
+  final String? change;
+  final bool columns;
   final Color? valueColor;
   final Color? dot;
 
@@ -688,6 +693,19 @@ class InfoRow extends StatelessWidget {
       fontWeight: FontWeight.w600,
       fontFeatures: tabular,
     );
+    if (columns) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(flex: 5, child: Text(label, style: TextStyle(color: c.textSecondary, fontSize: 15))),
+          Expanded(flex: 3, child: Text(value, textAlign: TextAlign.right, style: valueStyle)),
+          Expanded(
+            flex: 2,
+            child: Text(change ?? '', textAlign: TextAlign.right, style: TextStyle(color: c.textSecondary, fontSize: 15, fontFeatures: tabular)),
+          ),
+        ]),
+      );
+    }
     final valueText = Text(value, style: valueStyle);
     final dotW = dot == null
         ? null

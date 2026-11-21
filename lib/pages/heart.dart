@@ -10,11 +10,13 @@ import '../shown.dart';
 import '../sources.dart';
 import '../theme.dart';
 import '../unusual.dart';
+import '../vitals.dart' show VitalsStore;
 import '../widgets.dart';
 import 'info_sheet.dart';
 import 'metric_page.dart';
 import 'oxygen_widgets.dart';
 import 'source_widgets.dart';
+import 'vitals_page.dart' show VitalsPage;
 
 class HeartPage extends StatelessWidget {
   const HeartPage({super.key, required this.store, this.now, this.onOpenSleep});
@@ -184,6 +186,32 @@ class HeartPage extends StatelessWidget {
                 ],
               ),
             ),
+            // Απόφαση χρήστη 21/11 (Α28): τα σημάδια κινδύνου αμέσως μετά τους παλμούς ύπνου (πριν: το τελευταίο πράγμα της
+            // σελίδας). Κλινικός έλεγχος M6 (4/11): όποιος έχει συμπτώματα ανοίγει πρώτα την Καρδιά.
+            Padding(
+              key: const ValueKey('heart-red-flags'),
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+              child: Text(heartRhythmNote, style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4)),
+            ),
+            // Απόφαση χρήστη 21/11 (Α20): πίεση, σάκχαρο και καρδιογράφημα με δύο πατήματα (πριν: Σήμερα › Ρυθμίσεις › Τα
+            // στοιχεία μου › κάτω χαμηλά). Η ίδια γραμμή με τις Ρυθμίσεις.
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: ListenableBuilder(
+                listenable: VitalsStore.main,
+                builder: (context, _) {
+                  final n = VitalsStore.main.all.length;
+                  return NavRow(
+                    key: const ValueKey('heart-vitals'),
+                    icon: Icons.monitor_heart_outlined,
+                    color: c.heart,
+                    title: 'Πίεση, σάκχαρο, καρδιογράφημα',
+                    text: n == 0 ? 'Γράψε τις μετρήσεις σου' : (n == 1 ? '1 μέτρηση' : '$n μετρήσεις'),
+                    onTap: () => Navigator.of(context).push(VitalsPage.route(VitalsStore.main)),
+                  );
+                },
+              ),
+            ),
             _AwakeHeartCard(store: store, day: day),
             // Στο tablet/PC κάτω από τους παλμούς ύπνου, για να μη μένει η αριστερή στήλη με μία κάρτα (UX U10).
             AppCard(
@@ -267,12 +295,6 @@ class HeartPage extends StatelessWidget {
                     Text('Δεν υπάρχουν μετρήσεις σήμερα.', style: TextStyle(color: c.textSecondary)),
                 ],
               ),
-            ),
-            // Κλινικός έλεγχος M6 (4/11): όποιος έχει συμπτώματα ανοίγει πρώτα την Καρδιά.
-            Padding(
-              key: const ValueKey('heart-red-flags'),
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Text(heartRhythmNote, style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4)),
             ),
           ],
         );

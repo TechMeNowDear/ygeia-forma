@@ -373,6 +373,10 @@ void main() {
       await _pump(t, const Scaffold(body: Center(child: InfoButton(K.weight))), size: const Size(400, 900));
       await t.tap(find.byKey(const ValueKey('info-${K.weight}')));
       await t.pumpAndSettle();
+      // Α26 (21/11): οι συσκευές κάτω από «Περισσότερα».
+      await t.ensureVisible(find.byKey(const ValueKey('info-more')));
+      await t.tap(find.byKey(const ValueKey('info-more')));
+      await t.pumpAndSettle();
       await t.ensureVisible(find.byKey(const ValueKey('info-devices')));
       await t.tap(find.byKey(const ValueKey('info-devices')));
       await t.pumpAndSettle();
