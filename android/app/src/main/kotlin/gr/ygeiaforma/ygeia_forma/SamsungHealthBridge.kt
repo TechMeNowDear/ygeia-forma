@@ -74,10 +74,8 @@ class SamsungHealthBridge(
                 val rows = withContext(DbQueue.dispatcher) { dayStore.loadAll() }
                 JSONObject().put("ok", true).put("days", rows)
             }
-            "clearDays" -> respondDb(result) {
-                withContext(DbQueue.dispatcher) { dayStore.clear() }
-                JSONObject().put("ok", true)
-            }
+            // Έλεγχος 20/11 (K6C, ιδέα 1): το «clearDays» (σβήσιμο ΟΛΟΥ του ιστορικού ημερών) βγήκε. Δεν το καλούσε κανείς από
+            // τη Flutter, και μια μέθοδος που σβήνει τα πάντα δεν πρέπει να περιμένει ένα λάθος όνομα.
             // Η βάση βρέθηκε χαλασμένη και κρατήθηκε αντίγραφο (A7): {"ok", "corrupt": ώρα σε ms ή null, "seen": αν η
             // κάρτα της έκλεισε, "partial": αν η επαναφορά δεν διάβασε όλα}. Round 8 (R8-A9-2, f4): το σημάδι της βλάβης
             // μένει και μετά το «Εντάξει». Round 9 (R9-A12-2, f4): η απάντηση από καθαρή συνάρτηση ([DbSalvage.status]).

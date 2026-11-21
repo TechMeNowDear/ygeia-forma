@@ -31,32 +31,45 @@ object FoodReminder {
     private const val REQ = 7321
     private const val EXTRA_TITLE = "title"
     private const val EXTRA_TEXT = "text"
+    internal const val EXTRA_AT = "at"
+    internal const val EXTRA_NEXT = "next"
     private const val PREFS = "food_reminder"
     private const val P_AT = "at"
     private const val P_TITLE = "title"
     private const val P_TEXT = "text"
+    private const val P_NEXT = "next"
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private fun pending(ctx: Context, title: String?, text: String?, create: Boolean): PendingIntent? {
+    private fun pending(
+        ctx: Context, title: String?, text: String?, create: Boolean, at: Long = 0L, next: String? = null,
+    ): PendingIntent? {
         val i = Intent(ctx, FoodReminderReceiver::class.java)
         if (title != null) i.putExtra(EXTRA_TITLE, title)
         if (text != null) i.putExtra(EXTRA_TEXT, text)
+        // K6C-02: η ώρα του ξυπνητηριού και το κείμενο της επόμενης μέρας, για να ξαναμπεί μόνο του όταν χτυπήσει.
+        if (at > 0L) i.putExtra(EXTRA_AT, at)
+        if (next != null) i.putExtra(EXTRA_NEXT, next)
         val flags = PendingIntent.FLAG_IMMUTABLE or
             (if (create) PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_NO_CREATE)
         return PendingIntent.getBroadcast(ctx, REQ, i, flags)
     }
 
-    /** Βάζει (ή αλλάζει) το ξυπνητήρι στις [atMillis]. */
-    fun set(ctx: Context, atMillis: Long, title: String, text: String): Boolean {
-        if (!arm(ctx, atMillis, title, text)) return false
-        prefs(ctx).edit().putLong(P_AT, atMillis).putString(P_TITLE, title).putString(P_TEXT, text).apply()
+    /**
+     * Βάζει (ή αλλάζει) το ξυπνητήρι στις [atMillis]. [next]: το κείμενο της υπενθύμισης της ΕΠΟΜΕΝΗΣ μέρας, αν η
+     * εφαρμογή δεν ανοίξει ως τότε (K6C-02, [FoodReminderReceiver]).
+     */
+    fun set(ctx: Context, atMillis: Long, title: String, text: String, next: String? = null): Boolean {
+        if (!arm(ctx, atMillis, title, text, next)) return false
+        prefs(ctx).edit().putLong(P_AT, atMillis).putString(P_TITLE, title).putString(P_TEXT, text)
+            .apply { if (next != null) putString(P_NEXT, next) else remove(P_NEXT) }
+            .apply()
         return true
     }
 
-    private fun arm(ctx: Context, atMillis: Long, title: String, text: String): Boolean {
+    private fun arm(ctx: Context, atMillis: Long, title: String, text: String, next: String? = null): Boolean {
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return false
-        val pi = pending(ctx, title, text, true) ?: return false
+        val pi = pending(ctx, title, text, true, atMillis, next) ?: return false
         am.setWindow(AlarmManager.RTC_WAKEUP, atMillis, 10 * 60 * 1000L, pi)
         return true
     }
@@ -83,7 +96,7 @@ object FoodReminder {
             forget(ctx)
             return
         }
-        arm(ctx, at, title, text)
+        arm(ctx, at, title, text, p.getString(P_NEXT, null))
     }
 
     fun canNotify(ctx: Context): Boolean =
@@ -130,15 +143,42 @@ object FoodReminderRules {
 
     /** Μόνο τα μηνύματα του συστήματος για εκκίνηση και ενημέρωση της εφαρμογής. */
     val actions = setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED)
+
+    /**
+     * Έλεγχος 20/11 (K6C-02): η ίδια ώρα ΤΟΙΧΟΥ την επόμενη μέρα μετά το [at] που είναι μετά το [now] (σε αλλαγή ώρας
+     * 23 ή 25 ώρες αργότερα, όχι 24). 0 αν το [at] δεν είναι ώρα.
+     */
+    fun nextDay(at: Long, now: Long, zone: java.time.ZoneId): Long {
+        if (at <= 0L) return 0L
+        var t = java.time.Instant.ofEpochMilli(at).atZone(zone)
+        // Το πολύ λίγες επαναλήψεις: το ξυπνητήρι χτυπά μέσα σε 10 λεπτά από την ώρα του.
+        repeat(400) {
+            t = t.plusDays(1)
+            val ms = t.toInstant().toEpochMilli()
+            if (ms > now) return ms
+        }
+        return 0L
+    }
 }
 
-/** Δείχνει την υπενθύμιση και τελειώνει (λίγα ms). */
+/**
+ * Δείχνει την υπενθύμιση και τελειώνει (λίγα ms).
+ *
+ * Έλεγχος 20/11 (K6C-02): και βάζει την υπενθύμιση της επόμενης μέρας, ίδια ώρα. Πριν, μετά το πρώτο χτύπημα δεν υπήρχε
+ * επόμενο ώσπου να ξανανοίξει η εφαρμογή: ακριβώς τις μέρες που την ξεχνάς δεν ερχόταν καμία υπενθύμιση. Αν η εφαρμογή
+ * ανοίξει στο μεταξύ, η Flutter ξαναϋπολογίζει ώρα και κείμενο (ή τη σβήνει) όπως πάντα.
+ */
 class FoodReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val (title, text) = FoodReminder.extras(intent) ?: return
         val app = context.applicationContext
         FoodReminder.forget(app)
         FoodReminder.show(app, title, text)
+        val next = FoodReminderRules.nextDay(
+            intent.getLongExtra(FoodReminder.EXTRA_AT, 0L), System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+        )
+        val nextText = intent.getStringExtra(FoodReminder.EXTRA_NEXT)
+        if (next > 0L && nextText != null) FoodReminder.set(app, next, title, nextText, nextText)
     }
 }
 

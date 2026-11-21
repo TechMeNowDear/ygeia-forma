@@ -83,8 +83,11 @@ class WidgetPublisher with WidgetsBindingObserver {
       // τα widgets. Το «at» μένει στο στιγμιότυπο (ίδια μορφή).
       final key = jsonEncode({...snap}..remove('at'));
       if (key == _last) return;
-      await widgetChannel.invokeMethod('update', jsonEncode(snap));
-      _last = key;
+      // Έλεγχος 20/11 (K6C-06): «ίδιο με το τελευταίο» μόνο αν το τελευταίο ΓΡΑΦΤΗΚΕ (η Kotlin απαντά false όταν η εγγραφή
+      // απέτυχε, π.χ. γεμάτος χώρος). Πριν, μετά από αποτυχία τα widgets έμεναν με τις παλιές τιμές ώσπου να αλλάξουν
+      // ξανά τα δεδομένα. Απάντηση null (παλιά πλευρά Android, δοκιμές) μετρά ως γραμμένο, όπως πριν.
+      final ok = await widgetChannel.invokeMethod<Object?>('update', jsonEncode(snap));
+      if (ok != false) _last = key;
     } on MissingPluginException {
       // Τεστ ή πλατφόρμα χωρίς widgets.
     } catch (e, st) {

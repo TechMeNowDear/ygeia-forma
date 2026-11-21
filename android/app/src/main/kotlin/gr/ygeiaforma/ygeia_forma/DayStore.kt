@@ -370,10 +370,6 @@ class DayStore private constructor(context: Context) :
         }
         return out
     }
-
-    fun clear() {
-        writableDatabase.delete("days", null, null)
-    }
 }
 
 /**

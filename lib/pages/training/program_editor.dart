@@ -126,6 +126,8 @@ class _ProgramEditorPageState extends State<ProgramEditorPage> {
         AppCard(
           onTap: () async {
             await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WorkoutEditorPage(workout: w)));
+            // K6C-08: η οθόνη μπορεί να έχει κλείσει στο μεταξύ (πάτημα σε widget της αρχικής οθόνης κλείνει όλες τις σελίδες).
+            if (!mounted) return;
             setState(() {});
           },
           child: Row(children: [
@@ -363,6 +365,7 @@ class _WorkoutEditorPageState extends State<WorkoutEditorPage> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
                   onTap: () async {
                     await editItem(context, it);
+                    if (!mounted) return;
                     setState(() {});
                   },
                   child: Row(children: [

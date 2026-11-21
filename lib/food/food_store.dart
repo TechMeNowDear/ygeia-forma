@@ -470,11 +470,10 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
           est: source[i].est,
         ),
     ];
-    final saved = <LogEntry>[];
-    for (final e in out) {
-      if (await _put(e)) saved.add(e);
-    }
-    return saved;
+    // Έλεγχος 20/11 (K6S-06): όλες μαζί, σε μία συναλλαγή (ή όλες ή καμία), όπως το [transferEntries]. Πριν γράφονταν
+    // μία-μία: αν η εφαρμογή έκλεινε στη μέση, έμενε μισό γεύμα (και φαγητό με μισά υλικά), και ένα δεύτερο «Όπως χθες»
+    // έγραφε διπλά τα πρώτα.
+    return await _putAll(out) ? out : const [];
   }
 
   /// Αντιγραφή ή μετακίνηση (16/11) καταχωρίσεων σε άλλη μέρα και γεύμα, σε μία συναλλαγή (ή όλα ή κανένα).
@@ -887,7 +886,9 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
     final add = <String, double>{};
     for (final e in j.entries) {
       final g = validMyUnit(e.value);
-      if (e.key is String && g != null && !_units.containsKey(e.key)) add[e.key as String] = g;
+      if (e.key is! String || g == null) continue;
+      final id = _idNow(e.key as String);
+      if (!_units.containsKey(id)) add[id] = g;
     }
     if (add.isEmpty) return 0;
     final before = _units;
@@ -1037,10 +1038,12 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
         for (final e in (j['days'] as Map).entries)
           if (e.key is String && dayMarkOf(e.value) != null) e.key as String: dayMarkOf(e.value)!,
     };
+    // Έλεγχος 20/11 (K6S-12): με το id του τροφίμου όπως είναι σήμερα στη βάση ([_idNow]), όπως το «Τι μου αρέσει»:
+    // αλλιώς, όταν μια νέα λίστα τροφίμων αντικαταστήσει ένα τρόφιμο που έχεις ζυγίσει, το «δικό σου» βάρος χανόταν.
     _units = {
       if (j['units'] is Map)
         for (final e in (j['units'] as Map).entries)
-          if (e.key is String && validMyUnit(e.value) != null) e.key as String: validMyUnit(e.value)!,
+          if (e.key is String && validMyUnit(e.value) != null) _idNow(e.key as String): validMyUnit(e.value)!,
     };
     // Κλειδιά που δεν ξέρει αυτή η έκδοση (από νεότερη, ή από παλιά εγκατάσταση μετά από νεότερη): μένουν όπως είναι
     // (έλεγχος 16/11: αλλιώς η επόμενη εγγραφή τα έσβηνε).
@@ -1420,10 +1423,8 @@ class FoodStore extends ChangeNotifier with WidgetsBindingObserver {
   /// Διόρθωση προϊόντος: οι καταχωρίσεις του παίρνουν τις νέες τιμές (ίδια γραμμάρια).
   /// Επιστρέφει πόσες γράφτηκαν.
   Future<int> applyFoodToEntries(Food f, List<LogEntry> entries) async {
-    var n = 0;
-    for (final e in entries) {
-      if (await _put(e.copyWith(food: f))) n++;
-    }
-    return n;
+    // Έλεγχος 20/11 (K6S-06): όλες μαζί (ή όλες ή καμία)· πριν μία-μία.
+    final next = [for (final e in entries) e.copyWith(food: f)];
+    return await _putAll(next) ? next.length : 0;
   }
 }

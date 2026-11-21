@@ -254,12 +254,19 @@ void main() {
       final s = store();
       final r = parseRecipe(recipeText()).recipe!;
       final d = withRecipe(Dish(id: 'D1', name: r.name, kind: r.kind, items: const [DishItem(lentils, 'Φακές', 250)], created: 0), r.recipe);
-      await _pump(t, CookScreen(dish: d, recipe: recipeOf(d)!, food: s));
+      var now = DateTime(2026, 11, 21, 12);
+      await _pump(t, CookScreen(dish: d, recipe: recipeOf(d)!, food: s, now: () => now));
       expect(find.textContaining('2. Βράσε τις φακές'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('cook-start-1')));
+      now = now.add(const Duration(seconds: 1));
       await t.pump(const Duration(seconds: 1));
       expect(find.byKey(const ValueKey('cook-timer')), findsOneWidget);
-      expect(find.textContaining('Βήμα 2: 29:5'), findsOneWidget);
+      expect(find.textContaining('Βήμα 2: 29:59'), findsOneWidget);
+      // Έλεγχος 20/11 (K6C-03): 5 λεπτά σε άλλη εφαρμογή (το Android παγώνει τα χρονόμετρα: κανένας χτύπος στο μεταξύ). Ο
+      // επόμενος χτύπος δείχνει την ΩΡΑ που πέρασε. Πριν: «29:58», δηλαδή το φαγητό έβραζε 5 λεπτά παραπάνω.
+      now = now.add(const Duration(minutes: 5));
+      await t.pump(const Duration(seconds: 1));
+      expect(find.textContaining('Βήμα 2: 24:59'), findsOneWidget);
       await t.tap(find.text('Στοπ'));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('cook-timer')), findsNothing);

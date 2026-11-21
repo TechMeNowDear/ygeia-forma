@@ -585,7 +585,6 @@ class _DataGroupState extends State<_DataGroup> {
       final marksIn = await widget.food!.importDayMarks(b.dayMarks);
       final unitsIn = await widget.food!.importUnits(b.units);
       final weekIn = await widget.food!.importWeekRemind(b.week, b.remind);
-      final histIn = await widget.store.importHistory(b.history, version: b.historyVersion);
       final vitalsIn = await VitalsStore.main.importItems(b.vitals);
       // Round 1 (f3 · S9-11): τι από τους στόχους και τη ζώνη του αντιγράφου ΔΕΝ μπήκε ή συμπληρώθηκε (πριν: σιωπηλά).
       final prefsWereLoaded = widget.store.prefsLoaded;
@@ -593,6 +592,10 @@ class _DataGroupState extends State<_DataGroup> {
           b.prefs.isEmpty || !prefsWereLoaded ? const <String>[] : restoreNotes(widget.store.prefsJson(), b.prefs);
       final prefsOk = b.prefs.isEmpty || await widget.store.restorePrefs(b.prefs);
       final sources = b.sources == null ? null : await widget.store.restoreSourcesWhy(b.sources!);
+      // Έλεγχος 20/11 (K6S-01): το ιστορικό ημερών ΜΕΤΑ τις πηγές ύπνου. Πριν έμπαινε πρώτο, και η επαναφορά των πηγών
+      // (κανόνας C11: «η νύχτα άλλαξε πηγή → οι παλμοί μέρας ξαναϋπολογίζονται») έσβηνε τους «Παλμούς ξύπνιος» από τις
+      // μέρες του Oura που μόλις είχαν μπει από το αντίγραφο· για νύχτες παλιότερες από 45 μέρες δεν ξαναβγαίνουν.
+      final hist = await widget.store.importHistoryWhy(b.history, version: b.historyVersion);
       var trainingIn = 0;
       var trainingWritten = true;
       if (b.training != null) {
@@ -625,8 +628,7 @@ class _DataGroupState extends State<_DataGroup> {
         if (vitalsIn < 0) 'Οι μετρήσεις (πίεση, σάκχαρο, καρδιογράφημα) δεν γράφτηκαν στο κινητό· δοκίμασε ξανά.',
         if (marksIn < 0 || unitsIn < 0) 'Τα σημάδια «Τελείωσα για σήμερα» και τα βάρη «Ζύγισα ένα» δεν γράφτηκαν· δοκίμασε ξανά.',
         if (weekIn < 0) 'Το πρόγραμμα εβδομάδας και η ώρα υπενθύμισης δεν γράφτηκαν· δοκίμασε ξανά.',
-        if (histIn > 0) countText(histIn, 'μέρα ιστορικού μπήκε από το αντίγραφο.', 'μέρες ιστορικού μπήκαν από το αντίγραφο.'),
-        if (histIn < 0) 'Το ιστορικό ημερών του αντιγράφου δεν γράφτηκε· δοκίμασε ξανά.',
+        ...historyRestoreSummary(hist),
         if (errorsClosed) restoreErrorsClosedText,
       ].join(' '));
     } finally {
@@ -673,3 +675,18 @@ class _DataGroupState extends State<_DataGroup> {
     ]);
   }
 }
+
+
+/// Έλεγχος 20/11 (K6S-02, K6S-05): οι γραμμές της σύνοψης της επαναφοράς για το ιστορικό ημερών. Πριν: μόνο «Ν μέρες
+/// μπήκαν»· οι μέρες που παραλείφθηκαν επειδή υπήρχαν, και ένα αντίγραφο με άλλους κανόνες ιστορικού, δεν λέγονταν.
+List<String> historyRestoreSummary(({int added, int existing, HistoryImportProblem problem}) h) => [
+      if (h.added > 0) countText(h.added, 'μέρα ιστορικού μπήκε από το αντίγραφο.', 'μέρες ιστορικού μπήκαν από το αντίγραφο.'),
+      if (h.existing > 0)
+        countText(h.existing, 'μέρα ιστορικού υπήρχε ήδη στο κινητό και έμεινε όπως είναι.',
+            'μέρες ιστορικού υπήρχαν ήδη στο κινητό και έμειναν όπως είναι.'),
+      if (h.problem == HistoryImportProblem.otherRules)
+        'Το ιστορικό ημερών του αντιγράφου είναι από άλλη έκδοση κανόνων και δεν μπήκε· ξαναδιαβάζεται από το Samsung Health '
+            'και το Oura.',
+      if (h.problem == HistoryImportProblem.notReady || h.problem == HistoryImportProblem.writeFailed)
+        'Το ιστορικό ημερών του αντιγράφου δεν γράφτηκε· δοκίμασε ξανά.',
+    ];

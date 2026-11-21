@@ -984,6 +984,10 @@ class Prefs {
     // στόχοι, στοιχεία, ζώνη και μέση διαβάζονται κανονικά. Πριν, πεταγόταν σφάλμα για όλο το αρχείο: χαρακτηριζόταν
     // «χαλασμένο», ενώ η Kotlin (που το διαβάζει κανονικά ως αντικείμενο) δεν το έβαζε ποτέ στην άκρη.
     int? number(Object? v) => v is num && v.isFinite ? v.toInt() : null;
+    // Έλεγχος 20/11 (K6C-04): τα κλειδιά-ημερομηνίες («2026-11-23») μόνο αν είναι όντως ημερομηνίες· αλλιώς «δεν υπάρχει».
+    // Πριν, ένα κείμενο που δεν είναι ημερομηνία (χαλασμένο αρχείο, μελλοντικό λάθος) περνούσε, και το `parseDateKey`
+    // πετούσε σφάλμα σε κάθε ανανέωση: η εφαρμογή έμενε στο «Διαβάζω…» σε κάθε άνοιγμα.
+    String? day(Object? v) => v is String && isDayKey(v) ? v : null;
     final saved = j['cards'] is Map ? j['cards'] as Map : const {};
     final layout = number(j['layout']) ?? 1;
     // Κάρτες που η νέα διάταξη βγάζει από την αρχική: μία φορά στην προεπιλογή τους.
@@ -995,7 +999,7 @@ class Prefs {
               ? c.defaultOn
               : saved[c.key] as bool,
       },
-      backfillFrom: j['backfillFrom'] is String ? j['backfillFrom'] as String : null,
+      backfillFrom: day(j['backfillFrom']),
       kitchen: j['kitchen'] is Map ? Map<String, dynamic>.from(j['kitchen'] as Map) : null,
       reportName: j['reportName'] is String ? j['reportName'] as String : null,
       reportNameKnown: true,
@@ -1003,14 +1007,14 @@ class Prefs {
       dayTheme: j['dayTheme'] is String ? j['dayTheme'] as String : 'aigaio',
       nightTheme: j['nightTheme'] is String ? j['nightTheme'] as String : 'aigaio',
       historyVersion: number(j['historyVersion']) ?? 1,
-      recentTo: j['recentTo'] is String ? j['recentTo'] as String : null,
-      gapFrom: j['gapFrom'] is String ? j['gapFrom'] as String : null,
-      gapTo: j['gapTo'] is String ? j['gapTo'] as String : null,
-      emptyFrom: j['emptyFrom'] is String ? j['emptyFrom'] as String : null,
-      emptyChecked: j['emptyChecked'] is String ? j['emptyChecked'] as String : null,
+      recentTo: day(j['recentTo']),
+      gapFrom: day(j['gapFrom']),
+      gapTo: day(j['gapTo']),
+      emptyFrom: day(j['emptyFrom']),
+      emptyChecked: day(j['emptyChecked']),
       plan: SourcePlan.fromJson(j['sources']),
       ouraSynced: number(j['ouraSynced']),
-      ouraSyncedTo: j['ouraSyncedTo'] is String ? j['ouraSyncedTo'] as String : null,
+      ouraSyncedTo: day(j['ouraSyncedTo']),
       ouraTried: number(j['ouraTried']),
       ouraBackoff: number(j['ouraBackoff']),
       planAt: number(j['sourcesAt']),
@@ -1018,7 +1022,7 @@ class Prefs {
       ouraConnected: number(j['ouraConnected']),
       dbReset: number(j['dbReset']),
       rereadVersion: number(j['rereadVersion']),
-      ouraRefetchTo: j['ouraRefetchTo'] is String ? j['ouraRefetchTo'] as String : null,
+      ouraRefetchTo: day(j['ouraRefetchTo']),
       ouraRules: number(j['ouraRules']) ?? 0,
       me: j['me'] is Map ? Map<String, dynamic>.from(j['me'] as Map) : null,
       goals: j['goals'] is Map ? Map<String, dynamic>.from(j['goals'] as Map) : null,
@@ -1593,6 +1597,24 @@ Set<String> applyRecentRead(
 /// ημερών με ζύγιση της ζυγαριάς που έδωσε η Samsung σε αυτή την ανάγνωση ([present]· K5-R-01: χωρίς τις άλλες εφαρμογές).
 bool bodyRemovalAllowed(int gone, int present) => gone <= 3 || gone * 10 <= present;
 
+/// K6S-02 / K6S-05: γιατί το ιστορικό ημερών ενός αντιγράφου δεν μπήκε ([HealthStore.importHistoryWhy]).
+/// [otherRules]: το αντίγραφο φτιάχτηκε με άλλους κανόνες ιστορικού· [notReady]: το ιστορικό του κινητού δεν έχει
+/// διαβαστεί· [writeFailed]: δεν γράφτηκε στο κινητό.
+enum HistoryImportProblem { none, otherRules, notReady, writeFailed }
+
+/// K6S-02: η μέρα του αντιγράφου ([backup]) πάνω σε μέρα του κινητού που έχει ΜΟΝΟ τιμές ζύγισης ([mine]): όλες οι τιμές
+/// του αντιγράφου εκτός από τις τιμές ζύγισης, και οι τιμές ζύγισης του κινητού όπως είναι. null = η μέρα του κινητού
+/// έχει και άλλες τιμές (μένει όπως είναι), ή το αντίγραφο δεν προσθέτει τίποτα.
+Map<String, double>? historyDayOverBodyOnly(Map<String, double> mine, Map<String, double> backup) {
+  if (mine.keys.any((k) => !bodyRowKeys.contains(k))) return null;
+  final extra = {
+    for (final v in backup.entries)
+      if (!bodyRowKeys.contains(v.key)) v.key: v.value,
+  };
+  if (extra.isEmpty) return null;
+  return {...extra, ...mine};
+}
+
 /// Round 7 (R7-A9-3): τι έγινε με τις πηγές ύπνου ενός αντιγράφου ([HealthStore.restoreSourcesWhy]).
 /// [restored]: μπήκαν· [phoneNewer]: το κινητό έχει νεότερες (ή ήδη ό,τι έχει το αντίγραφο)· [same]: ίδιες με του
 /// αντιγράφου· [notReady]: οι ρυθμίσεις ή οι πηγές του κινητού δεν διαβάζονται ακόμα· [writeFailed]: δεν γράφτηκαν στο
@@ -2128,11 +2150,45 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// των αυτόματων αναγνώσεων (δες `syncOura(force:)` στο oura_store.dart).
   Future<void> refresh({bool askPermissions = false, bool auto = false}) async {
     if (loading) return;
+    // K6S-02: όσο κρατά η «Επαναφορά από αντίγραφο» μετά από «Διαγραφή όλων», καμία αυτόματη ανάγνωση.
+    if (auto && holdAutoRefresh) return;
     loading = true;
+    final run = ++_refreshRun;
     notifyListeners();
+    try {
+      await _refresh(askPermissions: askPermissions, auto: auto);
+    } finally {
+      // Έλεγχος 20/11 (K6C-04): ό,τι κι αν γίνει στη μέση (εξαίρεση πριν από το τέλος της ανάγνωσης), η ανανέωση δεν
+      // μένει στο «Διαβάζω…». Πριν, το [loading] έμενε true και κάθε επόμενη ανανέωση γύριζε αμέσως, ώσπου να κλείσει η
+      // εφαρμογή. Μόνο η ΔΙΚΗ μας ανάγνωση: αν στο μεταξύ ξεκίνησε άλλη (η δική μας είχε ήδη τελειώσει το διάβασμα και
+      // έγραφε το ιστορικό), το «Διαβάζω…» είναι εκείνης.
+      if (loading && _refreshRun == run) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
 
+  int _refreshRun = 0;
+
+  /// K6S-02: true όσο ο χρήστης είναι στην «Επαναφορά από αντίγραφο» αμέσως μετά από «Διαγραφή όλων» (main.dart). Οι
+  /// αυτόματες αναγνώσεις (άνοιγμα, επιστροφή στην εφαρμογή από την επιλογή αρχείου) περιμένουν, ώστε το ιστορικό του
+  /// αντιγράφου να μπει σε άδειο κινητό: αλλιώς η ανάγνωση της Samsung προλάβαινε να γράψει τις 30 τελευταίες μέρες και
+  /// κάθε μέρα με ζύγιση, και η επαναφορά τις παρέλειπε («μόνο μέρες που λείπουν»).
+  bool holdAutoRefresh = false;
+
+  /// Τέλος του [holdAutoRefresh]: η ανάγνωση που περίμενε γίνεται τώρα.
+  void releaseAutoRefresh() {
+    if (!holdAutoRefresh) return;
+    holdAutoRefresh = false;
+    refresh(auto: true);
+  }
+
+  Future<void> _refresh({required bool askPermissions, required bool auto}) async {
     if (askPermissions) {
-      final r = await SamsungHealth.requestPermissions();
+      // K6C-04: χωρίς απάντηση σε 5 λεπτά (π.χ. κόλλησε η οθόνη αδειών της Samsung) δεν περιμένουμε για πάντα.
+      final r = await SamsungHealth.requestPermissions().timeout(const Duration(minutes: 5),
+          onTimeout: () => {'ok': false, 'kind': 'other', 'message': 'Δεν απάντησε η Samsung Health. Δοκίμασε ξανά.'});
       if (r['ok'] != true) {
         error = r;
         loading = false;
@@ -2349,30 +2405,64 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// τους ίδιους κανόνες ιστορικού ([version] = [historyRulesVersion]· αλλιώς τίποτα). Πόσες μέρες μπήκαν, ή -1 αν δεν
   /// γράφτηκαν ή αν το ιστορικό δεν έχει διαβαστεί.
   Future<int> importHistory(Object? j, {Object? version}) async {
-    if (j is! Map || j.isEmpty) return 0;
-    if (version != historyRulesVersion) return 0;
-    if (!_historyLoaded) return -1;
+    final r = await importHistoryWhy(j, version: version);
+    return r.problem == HistoryImportProblem.notReady || r.problem == HistoryImportProblem.writeFailed ? -1 : r.added;
+  }
+
+  /// Έλεγχος 20/11 (K6S-02, K6S-05): ό,τι το [importHistory], με όσα χρειάζεται η σύνοψη της επαναφοράς: πόσες μέρες
+  /// μπήκαν ([added]), πόσες υπήρχαν ήδη και έμειναν όπως είναι ([existing]), και γιατί δεν μπήκε τίποτα ([problem]).
+  /// Πριν, η σύνοψη έλεγε μόνο πόσες μπήκαν· αντίγραφο με άλλους κανόνες ιστορικού δεν έφερνε τίποτα, σιωπηλά.
+  ///
+  /// K6S-02: μέρα που το κινητό έχει ΜΟΝΟ από ζύγιση ([bodyRowKeys]) μετρά ως μέρα που λείπει. Η ανάγνωση της Samsung
+  /// γράφει κάθε μέρα με ζύγιση, όσο παλιά κι αν είναι ([mergeBody])· πριν, σε νέο κινητό που άνοιξε την εφαρμογή πριν από
+  /// την επαναφορά, καμία Δευτέρα, Τετάρτη, Παρασκευή του αντιγράφου δεν έμπαινε, και οι «Παλμοί ξύπνιος» τους (που για
+  /// νύχτες του Oura παλιότερες από 45 μέρες δεν ξαναϋπολογίζονται) χάνονταν. Η μέρα μπαίνει ολόκληρη από το αντίγραφο,
+  /// και οι τιμές ζύγισης μένουν ΟΛΕΣ του κινητού (ποτέ δύο ζυγίσεις ανακατεμένες: ο κανόνας του Κ8-M3 ισχύει).
+  Future<({int added, int existing, HistoryImportProblem problem})> importHistoryWhy(Object? j, {Object? version}) async {
+    if (j is! Map || j.isEmpty) return (added: 0, existing: 0, problem: HistoryImportProblem.none);
+    if (version != historyRulesVersion) return (added: 0, existing: 0, problem: HistoryImportProblem.otherRules);
+    if (!_historyLoaded) return (added: 0, existing: 0, problem: HistoryImportProblem.notReady);
     final added = <String, Map<String, double>>{};
+    final before = <String, Map<String, double>>{};
+    var existing = 0;
     for (final e in j.entries) {
       final day = e.key, vals = e.value;
-      if (day is! String || !isDayKey(day) || vals is! Map || history.containsKey(day)) continue;
+      if (day is! String || !isDayKey(day) || vals is! Map) continue;
       final m = <String, double>{
         for (final v in vals.entries)
           if (v.key is String && v.value is num && (v.value as num).isFinite) v.key as String: (v.value as num).toDouble(),
       };
-      if (m.isNotEmpty) added[day] = m;
+      final mine = history[day];
+      if (mine == null) {
+        if (m.isNotEmpty) added[day] = m;
+        continue;
+      }
+      final merged = historyDayOverBodyOnly(mine, m);
+      if (merged == null) {
+        if (m.isNotEmpty) existing++;
+        continue;
+      }
+      before[day] = mine;
+      added[day] = merged;
     }
-    if (added.isEmpty) return 0;
+    if (added.isEmpty) return (added: 0, existing: existing, problem: HistoryImportProblem.none);
     history.addAll(added);
     notifyListeners();
-    if (await _saveDays(added.keys.toSet())) return added.length;
-    // Όπως οι άλλες επαναφορές: ό,τι δεν γράφτηκε βγαίνει και από τη μνήμη.
+    if (await _saveDays(added.keys.toSet())) {
+      return (added: added.length, existing: existing, problem: HistoryImportProblem.none);
+    }
+    // Όπως οι άλλες επαναφορές: ό,τι δεν γράφτηκε βγαίνει και από τη μνήμη (οι μέρες ζύγισης γυρίζουν όπως ήταν).
     for (final k in added.keys) {
-      history.remove(k);
+      final old = before[k];
+      if (old == null) {
+        history.remove(k);
+      } else {
+        history[k] = old;
+      }
     }
     _unsavedDays.removeAll(added.keys);
     notifyListeners();
-    return -1;
+    return (added: 0, existing: existing, problem: HistoryImportProblem.writeFailed);
   }
 
   @override
@@ -2835,8 +2925,11 @@ class HealthStore extends ChangeNotifier with WidgetsBindingObserver, OuraStore 
   /// πρώτα «Σύνδεση με Oura», μετά «Επαναφορά από αντίγραφο»): το παρελθόν από το αντίγραφο, το παρόν του κινητού
   /// ([planWithPast]). Πριν, το σχέδιο του αντιγράφου απορριπτόταν και οι παλιές νύχτες του Oura γίνονταν νύχτες ρολογιού.
   /// Round 1 (S9-2): όταν το σχέδιο που μπήκε έχει Oura, το Oura ξαναδιαβάζεται από την αρχή του (90 μέρες με την
-  /// κανονική ανάγνωση και πιο πίσω ανά 90, [OuraStore.ouraOlderRange]), όπως μετά από καινούργια βάση (C9): το
-  /// ημερήσιο ιστορικό δεν είναι στο αντίγραφο, και πριν οι νύχτες του Oura παλιότερες από 90 μέρες δεν ξαναζητούνταν ποτέ.
+  /// κανονική ανάγνωση και πιο πίσω ανά 90, [OuraStore.ouraOlderRange]), όπως μετά από καινούργια βάση (C9): πριν, οι
+  /// νύχτες του Oura παλιότερες από 90 μέρες δεν ξαναζητούνταν ποτέ.
+  /// Έλεγχος 20/11 (K6S-01): από το #132 το ημερήσιο ιστορικό ΕΙΝΑΙ στο αντίγραφο. Η επαναφορά (settings.dart) βάζει
+  /// πρώτα τις πηγές και ΜΕΤΑ το ιστορικό: ο κανόνας C11 πιο κάτω κρίνει μόνο τις μέρες που είχε υπολογίσει το ίδιο το
+  /// κινητό με το παλιό του σχέδιο, ποτέ τις μέρες του αντιγράφου (που είναι ήδη υπολογισμένες με το σχέδιο του αντιγράφου).
   Future<bool> restoreSources(({String plan, String? log}) s) async =>
       await restoreSourcesWhy(s) == SourcesRestore.restored;
 

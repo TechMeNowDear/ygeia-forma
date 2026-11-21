@@ -103,13 +103,27 @@ class _YgeiaFormaAppState extends State<YgeiaFormaApp> {
 
   void _leaveWiped({bool restore = false}) {
     markWipeSeen();
+    // Έλεγχος 20/11 (K6S-02): «Επαναφορά από αντίγραφο»: καμία αυτόματη ανάγνωση της Samsung ώσπου να κλείσουν οι
+    // Ρυθμίσεις. Πριν, η ανάγνωση ξεκινούσε αμέσως και, ως να διαλέξεις αρχείο, είχε ήδη γράψει στο ιστορικό τις 30
+    // τελευταίες μέρες και κάθε μέρα με ζύγιση· η επαναφορά («μόνο μέρες που λείπουν») τις παρέλειπε.
+    if (restore) widget.store.holdAutoRefresh = true;
     // Μία φορά: η οθόνη «Όλα διαγράφηκαν» δεν ξαναφαίνεται μετά από αυτό (το _wiped γίνεται null).
     if (_wiped != null) widget.onLeaveWiped?.call();
     setState(() => _wiped = null);
     if (!restore) return;
     // «Επαναφορά από αντίγραφο»: οι Ρυθμίσεις, όπου είναι η επαναφορά (ΤΑ ΔΕΔΟΜΕΝΑ ΜΟΥ).
-    WidgetsBinding.instance.addPostFrameCallback((_) => _nav.currentState?.push(MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'Ρυθμίσεις'), builder: (_) => SettingsPage(store: widget.store, food: widget.food))));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final nav = _nav.currentState;
+      if (nav == null) {
+        widget.store.releaseAutoRefresh();
+        return;
+      }
+      nav
+          .push(MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'Ρυθμίσεις'),
+              builder: (_) => SettingsPage(store: widget.store, food: widget.food)))
+          .whenComplete(widget.store.releaseAutoRefresh);
+    });
   }
 
   @override

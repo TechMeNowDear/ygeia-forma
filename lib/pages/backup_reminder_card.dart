@@ -15,6 +15,7 @@ import '../food/food_channel.dart';
 import '../food/food_store.dart';
 import '../theme.dart';
 import '../training/training_store.dart';
+import '../vitals.dart' show VitalsStore;
 import '../widgets.dart';
 import 'settings.dart' show BackupExport, exportBackupNow;
 
@@ -40,10 +41,14 @@ class BackupReminderSlot extends StatelessWidget with SelfSpaced {
 
   /// Υπάρχει κάτι που έγραψε ο χρήστης και ζει μόνο σε αυτό το κινητό: καταχώριση φαγητού, δικό του προϊόν,
   /// προπόνηση που έγινε ή μέτρηση μέσης. (Ό,τι έρχεται από Samsung Health και Oura ξαναδιαβάζεται.)
+  /// Έλεγχος 20/11 (K6S-11): και «Τα φαγητά μου» και οι μετρήσεις πίεσης, σακχάρου, καρδιογραφήματος: όποιος έγραφε μόνο
+  /// πίεση δεν έβλεπε ποτέ την κάρτα.
   static bool hasOwnData(HealthStore store, FoodStore food, TrainingStore training) =>
       (food.loaded && (food.mine.isNotEmpty || food.recent(limit: 1).isNotEmpty)) ||
+      (food.dishesRead && food.dishes.isNotEmpty) ||
       (training.ready && !training.readError && training.sessions.isNotEmpty) ||
-      store.waist.isNotEmpty;
+      store.waist.isNotEmpty ||
+      VitalsStore.main.all.isNotEmpty;
 
   /// Μόνο με διαβασμένες ρυθμίσεις: πριν από αυτό δεν ξέρουμε πότε βγήκε το τελευταίο αντίγραφο.
   static bool shows(HealthStore store, FoodStore food, TrainingStore training, DateTime now) =>
