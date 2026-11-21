@@ -636,7 +636,7 @@ void main() {
     testWidgets('R8-A6-6: η οδηγία χωρίς «⋮» (δεν υπάρχει στη γραμματοσειρά)', (t) async {
       await _pump(t, MyFoodsScreen(food: sampleFoodStore(_now), pick: true));
       expect(find.textContaining('⋮'), findsNothing);
-      expect(find.textContaining('τρεις τελείες'), findsOneWidget);
+      expect(find.textContaining('Τρεις τελείες'), findsOneWidget);
     });
   });
 

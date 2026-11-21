@@ -666,7 +666,7 @@ void main() {
       await _pump(t, AddFoodScreen(food: sampleFoodStore(_now), meal: Meal.snack, day: _today));
       await t.enterText(find.byType(TextField), 'σαλάτα ');
       await t.pumpAndSettle();
-      expect(find.textContaining('Δεν βρέθηκε «σαλάτα» στη βάση.'), findsOneWidget);
+      expect(find.textContaining('Δεν βρέθηκε «σαλάτα».'), findsOneWidget);
     });
     testWidgets('U2-15: «τι τη ρίχνει» δεν σπάει (αδιάσπαστα κενά)', (t) async {
       await _pump(

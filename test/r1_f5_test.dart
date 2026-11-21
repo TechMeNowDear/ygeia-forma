@@ -642,7 +642,7 @@ void main() {
       expect(s.ouraStatus, OuraStatus.missing);
       await _pump(t, SingleChildScrollView(child: OuraStatusCard(store: s, now: _at15)));
       expect(find.textContaining('φαίνεται κανονικά'), findsNothing);
-      expect(find.textContaining('το οξυγόνο της νύχτας μένει κενό'), findsOneWidget);
+      expect(find.textContaining('μαζί και το οξυγόνο της'), findsOneWidget);
       expect(find.textContaining('Αν το φορούσες, άνοιξε την εφαρμογή Oura'), findsOneWidget);
       expect(find.text('Ενημέρωση τώρα'), findsOneWidget);
     });
@@ -795,7 +795,7 @@ void main() {
       expect(s.ouraStatus, OuraStatus.waiting);
       await _pumpPage(t, OuraManagePage(store: s, now: clock));
       expect(find.textContaining('δεν χρειάζεται να κάνεις τίποτα'), findsNothing);
-      expect(find.textContaining('Η χθεσινή νύχτα δεν έχει φτάσει ακόμα'), findsOneWidget);
+      expect(find.textContaining('Η νύχτα δεν ήρθε ακόμα'), findsOneWidget);
     });
 
     for (final (name, plan, clock, expected) in [
