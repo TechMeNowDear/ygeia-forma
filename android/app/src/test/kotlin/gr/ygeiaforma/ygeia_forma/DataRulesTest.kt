@@ -119,6 +119,27 @@ class DataRulesTest {
     }
 
     @Test
+    fun watchExpectedOnlyRelaxesNightKindsOnceTheLastWatchNightLeftTheRange() {
+        // K5-R-02: ύπνος και παλμοί πάντα «περιμένουμε ρολόι»· τα είδη της νύχτας όχι ΜΟΝΟ όταν όλο το διάστημα είναι μετά
+        // την τελευταία νύχτα με το ρολόι.
+        val until = LocalDate.of(2026, 12, 1)
+        for (kind in listOf("sleep", "heart", "steps", "")) {
+            assertTrue(DataRules.watchExpected(kind, null, until))
+            assertTrue(DataRules.watchExpected(kind, until, until.plusDays(40)))
+        }
+        for (kind in DataRules.NIGHT_ONLY_KINDS) {
+            // Ο ύπνος έρχεται από το ρολόι (κανένα όριο): όπως πάντα.
+            assertTrue(DataRules.watchExpected(kind, null, until))
+            // Η ανάγνωση των 30 ημερών περιέχει ακόμα νύχτες με το ρολόι: σφάλμα, το ιστορικό μένει.
+            assertTrue(DataRules.watchExpected(kind, until, until.minusDays(29)))
+            assertTrue(DataRules.watchExpected(kind, until, until))
+            // Η τελευταία νύχτα με το ρολόι βγήκε από το διάστημα: «καμία εγγραφή ρολογιού» είναι το κανονικό.
+            assertFalse(DataRules.watchExpected(kind, until, until.plusDays(1)))
+            assertFalse(DataRules.watchExpected(kind, until, until.plusDays(300)))
+        }
+    }
+
+    @Test
     fun nightsFileErrorIsNotMissing() {
         // Έλεγχος 3, E4: σφάλμα ανάγνωσης ≠ «δεν υπάρχει».
         assertEquals("{\"state\":\"missing\"}", DataRules.nightsState(false) { error("δεν καλείται") })

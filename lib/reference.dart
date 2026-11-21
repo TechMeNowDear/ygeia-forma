@@ -151,10 +151,12 @@ String? scaleHeightNote({double? recordCm, double? weight, double? bmi, double? 
   final h = scaleHeightCm(recordCm: recordCm, weight: weight, bmi: bmi);
   if (h == null || profileCm == null || (h.cm - profileCm).abs() < 1) return null;
   final mine = 'τα στοιχεία σου ${profileCm.round()} cm. Εδώ μετρά το δικό σου·';
+  // K5-R-04: ίδια κατάληξη και στα δύο. Δεν ξέρουμε ακόμα αν το ύψος της εγγραφής το γράφει η InBody ή το γεμίζει η
+  // Samsung Health από το δικό της προφίλ (όπως τον δείκτη): το μήνυμα δεν στέλνει τον χρήστη μόνο στη μία.
+  const check = 'έλεγξε το ύψος στην InBody και στη Samsung Health: από το ύψος της InBody βγαίνουν λίπος και μύες.';
   return h.fromRecord
-      ? 'Η ζύγιση γράφτηκε με ύψος ${h.cm.round()} cm, $mine έλεγξε το ύψος στην εφαρμογή InBody: από αυτό βγάζει λίπος και μύες.'
-      : 'Η Samsung Health ή η InBody έχει ύψος ${h.cm.round()} cm, $mine έλεγξε το ύψος και στις δύο: από το ύψος της InBody '
-          'βγαίνουν λίπος και μύες.';
+      ? 'Η ζύγιση γράφτηκε με ύψος ${h.cm.round()} cm, $mine $check'
+      : 'Η Samsung Health ή η InBody έχει ύψος ${h.cm.round()} cm, $mine $check';
 }
 
 /// Δείκτης μάζας σώματος από βάρος και ύψος.
@@ -358,7 +360,8 @@ final metricInfos = <String, MetricInfo>{
     // ανεβαίνουν σιγά σιγά (Mayo: ταχυκαρδία > 100· ESC/ESH 2018: > 80 παράγοντας κινδύνου· Quer 2020).
     compare: 'Σύγκρινέ τους μόνο με τον εαυτό σου. Σε 92.457 ενήλικες, ηλικία, φύλο και βάρος εξηγούσαν λιγότερο από το '
         '10% των διαφορών ανάμεσα στους ανθρώπους. $restHrException',
-    // Έλεγχος 20/11 (K5M-02): γιατί οι αριθμοί διαφέρουν λίγο από την εφαρμογή Oura (σημείωση του ίδιου του API της Oura).
+    // Έλεγχος 20/11 (K5M-02): γιατί οι αριθμοί διαφέρουν λίγο από την εφαρμογή Oura (σημείωση του ίδιου του API της Oura,
+    // στα average_heart_rate και lowest_heart_rate: https://cloud.ouraring.com/v2/static/json/openapi-1.35.json).
     accuracy: 'Δαχτυλίδι: σε μικρή μελέτη (13 υγιείς ενήλικες), οι παλμοί ηρεμίας της νύχτας απείχαν κατά μέσο όρο περίπου 2% '
         'από το ΗΚΓ (Oura Gen3 και Gen4· για το Ring 5 δεν υπάρχει μελέτη). Οι αριθμοί μπορεί να διαφέρουν λίγο από την '
         'εφαρμογή Oura: εκείνη τους βγάζει από τιμές 5 λεπτών, εδώ έρχονται από δείγματα 30 δευτερολέπτων, γι’ αυτό ο '

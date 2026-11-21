@@ -526,7 +526,7 @@ extension on OuraSleepTodayCard {
   }
 }
 
-/// «Καρδιά και θερμοκρασία στον ύπνο»: HRV, παλμοί, θερμοκρασία (μέσοι όροι όλης της νύχτας), και ετοιμότητα.
+/// «Καρδιά και θερμοκρασία στον ύπνο»: HRV, παλμοί, θερμοκρασία (τιμές της κύριας περιόδου ύπνου), και ετοιμότητα.
 /// Όλα από το Oura, σε σύγκριση με τις 14 τελευταίες νύχτες σου από το Oura.
 class OuraRestCard extends StatelessWidget {
   const OuraRestCard({super.key, required this.store, required this.now, required this.onTap});
