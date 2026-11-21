@@ -9,7 +9,8 @@
 ///   στόχος ταιριάζει μετά στα σημερινά σετ και εύρος (S6-1: η ίδια άσκηση σε δύο προπονήσεις με άλλα σετ).
 /// - Βάρος ανεβαίνει μόνο όταν οι επαναλήψεις δείχνουν ότι το επόμενο σκαλί βγαίνει στο κάτω όριο με την ίδια ρεζέρβα
 ///   ([repsBeforeStep], S6-12). Οδηγία: αύξηση φορτίου 2–10% όταν βγαίνουν 1–2 επαναλήψεις πάνω από τον στόχο σε δύο
-///   συνεχόμενες προπονήσεις (ACSM, Progression models in resistance training, Med Sci Sports Exerc 2009;41:687–708). Εδώ
+///   συνεχόμενες προπονήσεις (ACSM, Progression models in resistance training, Med Sci Sports Exerc 2009;41:687–708· η νέα
+///   θέση του ACSM, Currier κ.ά., MSSE 2026;58:851–872, δεν δίνει κανόνα ποσοστού: έλεγχος 20/11, K4-S-05). Εδώ
 ///   αρκεί μία, με τη ρεζέρβα που ζητά το πρόγραμμα (Helms 2016, εναλλακτική με βάση τη ρεζέρβα· έλεγχος 17/11). Όπου το σκαλί του εξοπλισμού είναι
 ///   μεγαλύτερο από ~10%, πρώτα περισσότερες επαναλήψεις με το ίδιο (διπλή πρόοδος).
 /// - Ο στόχος ρυθμίζεται από τη ρεζέρβα που λες (Zourdos κ.ά., J Strength Cond Res 2016;30:267–75· Helms κ.ά.,
@@ -105,7 +106,8 @@ const maxExtraReps = 10;
 const plateauExtraReps = 5;
 
 /// Ως τόσες επαναλήψεις κάτω από το κάτω όριο, με τη ρεζέρβα που ζητά το πρόγραμμα, δεν είναι αποτυχία: τόσο πέφτει
-/// έξω η εκτίμηση της ρεζέρβας (Halperin κ.ά. 2021, όπως στον έλεγχο S7-15: περίπου 1 επανάληψη κατά μέσο όρο).
+/// έξω η εκτίμηση της ρεζέρβας (Halperin κ.ά., Sports Med 2022;52:377–390, όπως στον έλεγχο S7-15: περίπου 1 επανάληψη κατά
+/// μέσο όρο).
 const closeReps = 2;
 
 double? startLoad(String ex, LoadKind k) => startOverride[ex] ?? defaultStart(k);
@@ -118,6 +120,9 @@ bool labelIsLoad(String ex, LoadKind k) =>
 /// Πόσες επαναλήψεις χρειάζονται με το τωρινό φορτίο ώστε με [ratio] φορές βαρύτερο να βγαίνουν [lo] με την ίδια
 /// ρεζέρβα [rirGoal]. Από τη σχέση του Epley (μέγιστο ≈ φορτίο × (1 + επαναλήψεις ως την εξάντληση ÷ 30)):
 /// ratio × (30 + lo + ρεζέρβα) − 30 − ρεζέρβα. Παράδειγμα: 8–12, ρεζέρβα 3, αλτήρες 4,3 → 5,3 kg (+23%) → 18.
+/// Έλεγχος 20/11 (K4-S-07): εκτίμηση. Πάνω από 10 επαναλήψεις οι γραμμικοί τύποι δεν έχουν ελεγχθεί (Reynolds κ.ά., J
+/// Strength Cond Res 2006;20:584–92)· με άλλους τύπους το βαρύτερο βγάζει λιγότερες από το κάτω όριο. Γι’ αυτό ο λόγος
+/// κάθε ανόδου λέει ότι η ρεζέρβα μετράει περισσότερο από τον αριθμό ([_reserveFirst]).
 int repsBeforeStep(double ratio, int lo, int rirGoal) => (ratio * (30 + lo + rirGoal) - 30 - rirGoal - 1e-6).ceil();
 
 /// Σε πόσες επαναλήψεις ([reps]) ανεβαίνει το βάρος από [load] σε [up], και αν ανεβαίνει αυτόματα ([step]).
@@ -162,6 +167,37 @@ int _lowAt(ExLog e, double? load) {
 
 /// [a] είναι ευκολότερο φορτίο από το [b] (στο λάστιχο βοήθειας: περισσότερη βοήθεια).
 bool _easier(LoadKind k, double a, double b) => k == LoadKind.bandAssist ? a > b : a < b;
+
+/// Έλεγχος 20/11 (K4-S-07): σε κάθε άνοδο φορτίου. Ο στόχος γράφει αριθμό (π.χ. 8) και «άφησε 2»· όταν δεν βγαίνουν και τα
+/// δύο, υπερισχύει η ρεζέρβα (κοντά στην εξάντληση η πίεση ανεβαίνει απότομα, και εκεί κρατά κανείς την ανάσα).
+// K4-R-12: με τη λέξη της οθόνης («άφησε»), όχι «ρεζέρβα».
+String _reserveFirst(int rirGoal) => ' Αν δεν βγαίνουν αφήνοντας $rirGoal, σταμάτα νωρίτερα: το «άφησε» μετράει περισσότερο από τον αριθμό.';
+
+/// Το ίδιο, για το μήνυμα μετά το 1ο σετ όταν τα επόμενα σετ γίνονται βαρύτερα ([calibrate]).
+String calibrateUpNote(int rirGoal) => _reserveFirst(rirGoal).trim();
+
+/// K4C-02: «ένα σκαλί πιο ελαφριά» μόνο όταν είναι όντως ένα σκαλί· αλλιώς «πιο ελαφριά» (π.χ. μπάρα 30 → 27 kg).
+String _lighterWord(double down, double? one) => one != null && (down - one).abs() < 1e-6 ? 'ένα σκαλί πιο ελαφριά' : 'πιο ελαφριά';
+
+/// Πόσο από το βάρος μένει μετά από διακοπή [gap] ημερών: 15–28 μέρες 0,9· 29–90 0,8· και (έλεγχος 20/11, K4-S-08)
+/// 91–180 0,7· πάνω από 180 0,6. Οι αριθμοί δεν είναι της βιβλιογραφίας: συντηρητική επιλογή. Η απώλεια δύναμης
+/// μεγαλώνει με τη διάρκεια και είναι μεγαλύτερη σε όσους δεν ήταν αθλητές (Bosquet κ.ά., Scand J Med Sci Sports
+/// 2013;23:e140–9)· 3 εβδομάδες δεν χάλασαν τίποτα (Ogasawara κ.ά., Eur J Appl Physiol 2013;113:975–985). Πριν, και
+/// μετά από 8 μήνες έμενε το 0,8 (14,3 kg → 10,3 kg × 8, ενώ η πρώτη φορά είχε ξεκινήσει από 4,3–6,8 kg).
+double breakRatio(int gap) => gap > 180 ? 0.6 : (gap > recalibrateGapDays ? 0.7 : (gap > 28 ? 0.8 : 0.9));
+
+/// Το φορτίο μετά από διακοπή: [breakRatio] του [lastLoad], ποτέ κάτω από το ελαφρύ ξεκίνημα της εφαρμογής.
+/// K4C-03: το ξεκίνημα περνά από το [fitLoad] (πριν, με άλλη λαβή ή λιγότερους δίσκους, έβγαινε στόχος 4,3 kg που δεν
+/// φτιάχνεται)· ποτέ βαρύτερο από το [lastLoad].
+double _afterBreak(PlanItem item, LoadKind k, double lastLoad, int gap) {
+  var v = scaled(k, lastLoad, breakRatio(gap));
+  // K4-R-09: στο λάστιχο βοήθειας το [scaled] δίνει πάντα ΕΝΑ λάστιχο περισσότερη βοήθεια, όση κι αν είναι η διακοπή·
+  // μετά από πάνω από [recalibrateGapDays] μέρες, δύο.
+  if (k == LoadKind.bandAssist && gap > recalibrateGapDays) v = stepDown(k, v) ?? v;
+  final start = switch (startLoad(item.ex, k)) { final s? => fitLoad(k, s), _ => null };
+  if (start != null && !_easier(k, lastLoad, start) && _easier(k, v, start)) v = start;
+  return v;
+}
 
 /// R9-U3-08: η ερώτηση «Τελευταίο σετ: πόσες ακόμα;» γίνεται μετά την ΤΕΛΕΥΤΑΙΑ γραμμή (όπως στο ρολόι), που μπορεί να
 /// είναι σετ παραπάνω («+ Σετ»)· κρίνονται όμως τα σετ του προγράμματος ([_judged]). Σετ παραπάνω με ίδιο ή βαρύτερο
@@ -268,7 +304,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // όσο πλησιάζεις την αποτυχία (MacDougall 1985· έλεγχος #2). Το πρόγραμμα μπορεί να ζητά περισσότερη.
   final rirGoal = math.max(item.rir, 2);
   // R7-A6-2: και μια φορά με ενόχληση χωρίς κανένα σετ (σταμάτησες στο 1ο σετ, ή «Παράλειψη» μετά τον πόνο): μετρά.
-  final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty) h];
+  // Έλεγχος 20/11 (K4C-06): «σετ» είναι όσα κρίνονται ([ExLog.judged])· ένα ✓ με 0 επαναλήψεις δεν είναι φορά της άσκησης
+  // (πριν: έσβηνε για πάντα την «πρώτη φορά» και την ερώτηση του 1ου σετ).
+  final usable = [for (final h in history) if ((!h.$2.skipped && h.$2.judged.isNotEmpty) || h.$2.pain.isNotEmpty) h];
 
   if (usable.isEmpty) {
     final start = hasLoad(k) ? (item.load != null ? snap(k, item.load!) : switch (startLoad(item.ex, k)) { final v? => fitLoad(k, v), _ => null }) : null;
@@ -331,12 +369,20 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     final where = last.pain.map((p) => painNames[p] ?? p).join(', ');
     final again = usable.length > 1 && usable[1].$2.pain.isNotEmpty;
     final base = r.isEmpty ? _same(sets, math.max(1, math.min(lo, last.log.isEmpty ? lo : last.log.first.reps))) : asLast();
-    final down = lastLoad == null || !hasLoad(k) ? null : stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    // Έλεγχος 20/11 (K4C-02): πραγματικά πιο ελαφριά και στη μπάρα ([lighterStep]). Και μετά από διακοπή πάνω από 2
+    // εβδομάδες, το ελαφρύτερο από τα δύο (ενόχληση, διακοπή): πριν, ενόχληση και ένας μήνας χωρίς την άσκηση έδιναν
+    // λιγότερη μείωση από τον μήνα μόνο του.
+    final one = lastLoad == null || !hasLoad(k) ? null : stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    var down = lastLoad == null || !hasLoad(k) ? null : lighterStep(k, lastLoad, allowZero: k == LoadKind.plate);
+    if (down != null && lastLoad != null && gap > 14) {
+      final b = _afterBreak(item, k, lastLoad, gap);
+      if (_easier(k, b, down)) down = b;
+    }
     final String what;
     final List<int> reps;
     if (down != null) {
       reps = base;
-      what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : 'ένα σκαλί πιο ελαφριά, ${_l(k, down)}';
+      what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : '${_lighterWord(down, one)}, ${_l(k, down)}';
     } else {
       reps = [for (final x in base) math.max(1, x - 2)];
       what = hasLoad(k) ? '${usesKg(k) ? 'ίδια κιλά' : 'ίδιο φορτίο'} με 2 επαναλήψεις λιγότερες' : '2 επαναλήψεις λιγότερες';
@@ -359,10 +405,9 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // ([startLoad]), και ο λόγος λέει πόσο (R7-A6-1: πριν «λίγο πιο ελαφριά» και για 4,3 → 2,8 kg ή 20 → 10 lb).
   // Έλεγχος 17/11 (Κ5-M3): πιο μεγάλη διακοπή, πιο ελαφριά αρχή (Bosquet 2013: η απώλεια δύναμης μεγαλώνει με τη διάρκεια):
   // 15–28 μέρες −10% (όπως πριν), 29+ −20%. Μετά από [recalibrateGapDays] ξαναρωτά και το 1ο σετ (training_store).
+  // Έλεγχος 20/11 (K4-S-08): και μετά από μήνες ([breakRatio]).
   if (gap > 14 && lastLoad != null && hasLoad(k)) {
-    var v = scaled(k, lastLoad, gap > 28 ? 0.8 : 0.9);
-    final start = startLoad(item.ex, k);
-    if (start != null && !_easier(k, lastLoad, start) && _easier(k, v, start)) v = start;
+    final v = _afterBreak(item, k, lastLoad, gap);
     final same = (v - lastLoad).abs() < 1e-6;
     return Target(
       load: v,
@@ -456,8 +501,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
       reps: _same(sets, lo),
       change: Change.up,
       reason: k == LoadKind.bandAssist
-          ? 'Όλα τα σετ στις $ceiling και άφησες όσες ζητά το πρόγραμμα: λιγότερη βοήθεια, ${_l(k, up)}, ξανά από $lo.'
-          : 'Όλα τα σετ στις $ceiling και άφησες όσες ζητά το πρόγραμμα: ανέβα σε ${_l(k, up)}, ξανά από $lo.',
+          ? 'Όλα τα σετ στις $ceiling και άφησες όσες ζητά το πρόγραμμα: λιγότερη βοήθεια, ${_l(k, up)}, ξανά από $lo.${_reserveFirst(rirGoal)}'
+          : 'Όλα τα σετ στις $ceiling και άφησες όσες ζητά το πρόγραμμα: ανέβα σε ${_l(k, up)}, ξανά από $lo.${_reserveFirst(rirGoal)}',
     );
   }
 
@@ -514,7 +559,28 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     }
     // S7-22: «4+» σημαίνει «τουλάχιστον 4»· αν ήταν πολύ περισσότερες, το ξέρεις μόνο εσύ. Όχι αν το βαρύτερο
     // δοκιμάστηκε ήδη και γύρισες πίσω.
-    final tried = usable.any((h) => _endLoad(h.$2) == up);
+    // Έλεγχος 20/11 (K4C-07): «δοκιμάστηκε και γύρισες πίσω» μόνο όταν το βαρύτερο ΔΕΝ βγήκε (κάτω από το εύρος, ρεζέρβα
+    // 0–1 ή ενόχληση). Πριν μετρούσε και όταν σε γύρισε πίσω η ίδια η εφαρμογή μετά από διακοπή: η συμβουλή «ανέβασε εσύ
+    // με το +» δεν έβγαινε ποτέ, και 30 μέρες διακοπή στη μπάρα ήθελαν ως 15 εβδομάδες για τα ίδια κιλά.
+    // (K4-R-02): μια φορά με ενόχληση μετρά και ΧΩΡΙΣ κανένα σετ (τότε το φορτίο του στόχου εκείνης της μέρας), και με φορτίο
+    // ίσο ή βαρύτερο από το επόμενο σκαλί. Πριν, μετά από ενόχληση χωρίς σετ στα 9,3 kg και μία άνετη φορά στα 7,8 kg, ο
+    // στόχος έγραφε «ανέβασε ένα σκαλί με το +»: πίσω στο φορτίο του πόνου.
+    // (K4-R-11): όχι μόνο ακριβώς στο επόμενο σκαλί. Στη μπάρα το σκαλί προσπερνά φορτία (από 29,5 πάει στα 31): μια
+    // αποτυχημένη φορά στα 30 kg μετρά για το 31. Άρα: ενόχληση σε ΟΠΟΙΟΔΗΠΟΤΕ βαρύτερο φορτίο, ή φορά που δεν βγήκε σε
+    // φορτίο ανάμεσα στο τωρινό (όχι το ίδιο) και στο επόμενο σκαλί (μαζί).
+    final cur = lastLoad;
+    final tried = usable.any((h) {
+      final e = h.$2;
+      if (up == null || cur == null) return false;
+      final raw = _endLoad(e) ?? (e.pain.isNotEmpty && e.log.isNotEmpty ? e.log.first.load : null);
+      if (raw == null) return false;
+      final at = fitLoad(k, raw);
+      if (!_easier(k, cur, at)) return false;
+      if (e.pain.isNotEmpty) return true;
+      if (_easier(k, up, at)) return false;
+      final r = _rirOf(e);
+      return _lowAt(e, raw) < e.lo || (r != null && r < 2);
+    });
     if (ra == 4 && rirGoal < 4 && !strict && _hintFits(item, k, lastLoad, up, rirGoal) && !tried) {
       b.write(_hint);
     } else if (ra == 4 &&
@@ -583,12 +649,13 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
   // (πριν: 9,3 kg × 8, 7, 6 με «0» → 9,3 kg × 8, 8, 8). Ρεζέρβα ≥ 2: η πίεση ανεβαίνει απότομα κοντά στην εξάντληση
   // (MacDougall κ.ά., J Appl Physiol 1985;58:785–90). Όπου δεν υπάρχει πιο ελαφρύ (ή άσκηση σώματος): ίδια, με την οδηγία.
   if (done.isNotEmpty && ra != null && ra < 2 && low < last.lo) {
-    final down = lastLoad != null && hasLoad(k) ? stepDown(k, lastLoad, allowZero: k == LoadKind.plate) : null;
+    final one = lastLoad != null && hasLoad(k) ? stepDown(k, lastLoad, allowZero: k == LoadKind.plate) : null;
+    final down = lastLoad != null && hasLoad(k) ? lighterStep(k, lastLoad, allowZero: k == LoadKind.plate) : null;
     final said = ra == 0 ? 'Δεν άφησες καμία' : 'Άφησες $ra';
     // R10-B4-5: όσες ζητά το πρόγραμμα ([rirGoal]), όπως κρίνεται και η επόμενη φορά (όχι πάντα 2).
     final stop = 'σταμάτα το σετ όταν σου μένουν $rirGoal: η πίεση ανεβαίνει λιγότερο απ’ ό,τι όταν φτάνεις στην εξάντληση.';
     if (down != null) {
-      final what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : 'ένα σκαλί πιο ελαφριά, ${_l(k, down)}';
+      final what = k == LoadKind.bandAssist ? 'περισσότερη βοήθεια, ${_l(k, down)}' : '${_lighterWord(down, one)}, ${_l(k, down)}';
       return Target(
         load: down,
         reps: _same(sets, lo),
@@ -615,13 +682,14 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
     streak++;
   }
   if (streak >= 2 && lastLoad != null && hasLoad(k)) {
-    final down = stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    final one = stepDown(k, lastLoad, allowZero: k == LoadKind.plate);
+    final down = lighterStep(k, lastLoad, allowZero: k == LoadKind.plate);
     if (down != null) {
       return Target(
         load: down,
         reps: _same(sets, lo),
         change: Change.down,
-        reason: 'Δύο φορές κάτω από ${last.lo} επαναλήψεις: ένα σκαλί πιο ελαφριά, ${_l(k, down)}.',
+        reason: 'Δύο φορές κάτω από ${last.lo} επαναλήψεις: ${_lighterWord(down, one)}, ${_l(k, down)}.',
       );
     }
   }
@@ -647,7 +715,8 @@ Target nextTarget(PlanItem item, List<(DateTime, ExLog)> history, DateTime today
 double? calibrate(PlanItem item, double? load, int reps, int rirAnswer) {
   final k = item.kind;
   if (load == null || !hasLoad(k)) return null;
-  if (rirAnswer < 2) return stepDown(k, load, allowZero: k == LoadKind.plate);
+  // Έλεγχος 20/11 (K4C-02): πραγματικά πιο ελαφριά και στη μπάρα (πριν −0,5 kg).
+  if (rirAnswer < 2) return lighterStep(k, load, allowZero: k == LoadKind.plate);
   if (rirAnswer < 4 || reps < item.lo || lightOnly.contains(item.ex)) return null;
   final up = stepUp(k, load);
   if (up == null) return null;

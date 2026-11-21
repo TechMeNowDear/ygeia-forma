@@ -271,7 +271,8 @@ Widget? _progress(BuildContext context, Ex ex) {
   final all = t.historyOf(ex.id);
   // R8-A6-1 / R8-U3-08: μόνο οι φορές με σετ, όπως η «Τελευταία φορά» της προπόνησης (session_page). Πριν, μια
   // «Παράλειψη» ή ένα «Τελείωσες νωρίτερα» γραφόταν «0 kg» και η γραμμή του γραφήματος βουτούσε στο μηδέν.
-  final hist = [for (final h in all.reversed) if (!h.$2.skipped && h.$2.done.isNotEmpty) h];
+  // Έλεγχος 20/11 (K4-R-08): σετ που κρίνονται ([ExLog.judged]), όχι ✓ με 0 επαναλήψεις.
+  final hist = [for (final h in all.reversed) if (!h.$2.skipped && h.$2.judged.isNotEmpty) h];
   // Η ενόχληση της πιο πρόσφατης φοράς μετρά και χωρίς σετ (σταμάτησες από πόνο).
   final lastPain = all.isNotEmpty && all.first.$2.pain.isNotEmpty;
   if (hist.isEmpty && !lastPain) return null;

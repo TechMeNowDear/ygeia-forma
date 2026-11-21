@@ -765,7 +765,7 @@ class R1F7ViewTest {
         Repo.zoneAlarm.start(WalkZone(108, 131), Repo.startedEl)
         for (scale in listOf(1f, 1.3f)) {
             RuntimeEnvironment.setFontScale(scale)
-            for ((bpm, word) in listOf(118 to "στη ζώνη 108–131", 136 to "πάνω · κόψε λίγο", 98 to "κάτω από τη ζώνη")) {
+            for ((bpm, word) in listOf(118 to "στη ζώνη 108–131", 136 to "πάνω από τη ζώνη", 98 to "κάτω από τη ζώνη")) {
                 Repo.bpm = bpm
                 val v = newView()
                 val bmp = draw(v, if (scale == 1f && bpm == 136) "R1_W7n_walk_zone_above" else null)
@@ -966,14 +966,14 @@ class R1F7ViewTest {
         val v = newView()
         v.clockEl = { t }
         draw(v)
-        assertFalse(labels(v).first(), labels(v).first().contains("πάνω · κόψε λίγο"))
+        assertFalse(labels(v).first(), labels(v).first().contains("πάνω από τη ζώνη"))
         assertTrue(labels(v).toString(), text in labels(v))
         t += 7_900
         draw(v)
         assertTrue(labels(v).toString(), text in labels(v))
         t += 200
         draw(v)
-        assertTrue(labels(v).first(), labels(v).first().contains("πάνω · κόψε λίγο"))
+        assertTrue(labels(v).first(), labels(v).first().contains("πάνω από τη ζώνη"))
         assertFalse(labels(v).toString(), text in labels(v))
         assertNull(Repo.notice)
     }

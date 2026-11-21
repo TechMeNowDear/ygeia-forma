@@ -130,7 +130,15 @@ void main() {
       final x = ExProgress(ex: 'db_press', kind: LoadKind.dbPair, beforeDay: ago(7), before: before, nowDay: ago(0), now: after);
       expect(x.loadDiff, 0);
       expect(x.repsDiff, 3);
-      expect(x.change, StrengthChange.up);
+      // Έλεγχος 20/11 (K4-S-03): +1 επανάληψη σε κάθε σετ είναι μέσα στον θόρυβο (ανοχή 1 ανά σετ): «Ίδιο», όχι «πάνω».
+      // Το σημαντικό εδώ (R9-A6-2) μένει: κρίνονται τα 3 σετ του προγράμματος και το φορτίο 9,3 kg, όχι το «+ Σετ».
+      expect(x.change, StrengthChange.same);
+      // Με ένα «+ Σετ» ΜΕΣΑ στην κρίση θα έβγαινε πτώση φορτίου (7,8 kg)· δεν βγαίνει.
+      final more = ExProgress(
+          ex: 'db_press', kind: LoadKind.dbPair, beforeDay: ago(7), before: before, nowDay: ago(0),
+          now: mixed('db_press', [(9.3, 12), (9.3, 12), (9.3, 12), (7.8, 12)], planned: 3, ra: 3));
+      expect(more.repsDiff, 6);
+      expect(more.change, StrengthChange.up);
     });
 
     test('η επόμενη φορά: 9,3 kg × 12, 12, 12 (+1, ίδιο βάρος)', () {
@@ -337,9 +345,10 @@ void main() {
       expect(tg.reason, contains('σταμάτα το σετ όταν σου μένουν 3'));
     });
 
-    test('μπάρα (RDL) 15 kg × 8, 7, 7 με «1» → 14,5 kg', () {
+    // Έλεγχος 20/11 (K4C-02): πριν 14,5 kg (−0,5 kg, −3%)· τώρα περίπου −10%, όπως στους αλτήρες.
+    test('μπάρα (RDL) 15 kg × 8, 7, 7 με «1» → 13,5 kg (πριν 14,5 kg)', () {
       final tg = nextTarget(it('rdl', sets: 3, lo: 8, hi: 12), [(ago(3), done('rdl', 15, [8, 7, 7], ra: 1, lo: 8, hi: 12))], now);
-      expect((tg.change, tg.load), (Change.down, 14.5));
+      expect((tg.change, tg.load), (Change.down, 13.5));
       expect(tg.reps, [8, 8, 8]);
       expect(tg.reason, contains('Άφησες 1'));
     });

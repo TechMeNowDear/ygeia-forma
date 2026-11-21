@@ -213,6 +213,11 @@ class Program {
   /// μέρα με άγνωστο όνομα γινόταν σιωπηλά «ξεκούραση». Δεν αποθηκεύονται.
   List<String> badDays = const [];
 
+  /// Έλεγχος 20/11 (K4C-14): μέρες που γράφτηκαν δύο φορές με ΑΛΛΗ προπόνηση (π.χ. «mon» και «1», «Δευτέρα» και «δευ»).
+  /// Πριν κέρδιζε σιωπηλά η τελευταία και η άλλη προπόνηση εξαφανιζόταν από την εβδομάδα. Μόνο στην επικόλληση: η
+  /// αποθηκευμένη μορφή γράφει κάθε μέρα μία φορά.
+  List<int> clashDays = const [];
+
   Workout? workout(String? id) {
     for (final w in workouts) {
       if (w.id == id) return w;
@@ -271,6 +276,7 @@ class Program {
   factory Program.fromJson(Map<String, dynamic> j) {
     final days = <int, String>{};
     final bad = <String>[];
+    final clash = <int>[];
     final d = j['days'];
     if (d is Map) {
       d.forEach((k, v) {
@@ -278,6 +284,7 @@ class Program {
         if (n == null || n < 1 || n > 7) {
           bad.add('$k');
         } else if (v is String && v.isNotEmpty) {
+          if (days.containsKey(n) && days[n] != v && !clash.contains(n)) clash.add(n);
           days[n] = v;
         }
       });
@@ -292,7 +299,9 @@ class Program {
       author: j['author'] as String? ?? 'user',
       version: (j['version'] as num?)?.toInt() ?? 1,
       savedAt: j['savedAt'] is num ? DateTime.fromMillisecondsSinceEpoch((j['savedAt'] as num).toInt()) : null,
-    )..badDays = bad;
+    )
+      ..badDays = bad
+      ..clashDays = clash;
   }
 }
 
@@ -450,6 +459,12 @@ List<String> validate(Program p, Set<String> known) {
   for (final w in p.workouts) {
     if (!ids.add(w.id)) e.add('Δύο προπονήσεις με το ίδιο όνομα «${w.id}».');
     if (!w.isCardio && w.items.isEmpty) e.add('Η «${w.name}» δεν έχει ασκήσεις.');
+    // Έλεγχος 20/11 (K4C-14, K4C-13): η ίδια άσκηση δύο φορές στην ίδια προπόνηση. Η πρόοδος κρατά ΜΙΑ «τελευταία φορά» ανά
+    // άσκηση· με δύο καταγραφές την ίδια μέρα ο επόμενος στόχος έβγαινε από όποια ήταν πιο πάνω στη λίστα.
+    final seen = <String>{};
+    for (final i in w.items) {
+      if (!seen.add(i.ex) && known.contains(i.ex)) e.add('Η «${w.name}» έχει δύο φορές το «${_exName(i.ex)}». Γράψ’ το μία φορά, με περισσότερα σετ.');
+    }
     // Πριν δεν ελέγχονταν καθόλου: −5 ή 100.000 λεπτά περνούσαν ως την κάρτα της Σήμερα και το ρολόι.
     if (w.cardio != null && (w.cardio!.minutes < cardioMinMinutes || w.cardio!.minutes > cardioMaxMinutes)) {
       e.add('${w.name}: τα λεπτά της αερόβιας πρέπει να είναι από $cardioMinMinutes ως $cardioMaxMinutes.');
@@ -478,11 +493,26 @@ List<String> validate(Program p, Set<String> known) {
       if (load != null && !load.isFinite) e.add('${w.name}: το βάρος στο «${_exName(i.ex)}» δεν είναι σωστός αριθμός.');
       // R7-A6-10: αρνητικό βάρος δεν «στρογγυλεύεται» σε κάτι που βγαίνει· είναι λάθος.
       if (load != null && load.isFinite && load < 0) e.add('${w.name}: το βάρος στο «${_exName(i.ex)}» δεν μπορεί να είναι αρνητικό.');
+      // Έλεγχος 20/11 (K4C-14): βάρος πάνω από το μεγαλύτερο που βγαίνει με τον εξοπλισμό είναι λάθος (συνήθως «93» αντί
+      // για «9.3»). Πριν γινόταν σιωπηλά το ΜΕΓΑΛΥΤΕΡΟ διαθέσιμο (αλτήρας 20,3 kg, μπάρα 47 kg) με μια γκρι σημείωση, και
+      // αυτό ήταν ο στόχος του 1ου σετ. Βάρος ανάμεσα σε δύο διαθέσιμα στρογγυλεύεται όπως πριν ([_warnings]).
+      if (load != null && load.isFinite && load >= 0 && hasLoad(i.kind) && known.contains(i.ex)) {
+        final all = available(i.kind);
+        final top = all.isEmpty ? null : all.reduce((a, b) => a > b ? a : b);
+        if (top != null && load > top + 1e-6) {
+          e.add('${w.name}: το βάρος στο «${_exName(i.ex)}» (${loadLabel(i.kind, load)}) είναι πάνω από το μεγαλύτερο που βγαίνει με '
+              'τον εξοπλισμό σου (${loadLabel(i.kind, top)}). Διόρθωσέ το.');
+        }
+      }
     }
   }
   p.days.forEach((d, id) {
     if (p.workout(id) == null) e.add('Η ${weekdayLong[d]} δείχνει σε προπόνηση που δεν υπάρχει («$id»).');
   });
+  // K4C-14: η ίδια μέρα δύο φορές με άλλη προπόνηση.
+  for (final d in p.clashDays) {
+    e.add('Η ${weekdayLong[d]} γράφτηκε δύο φορές, με άλλη προπόνηση κάθε φορά. Κράτα τη μία.');
+  }
   // round1, S6-6: μέρα με άγνωστο όνομα δεν γίνεται σιωπηλά «ξεκούραση».
   for (final k in p.badDays) {
     e.add('Δεν κατάλαβα τη μέρα «$k». Γράψε mon, tue, wed, thu, fri, sat, sun ή 1–7.');

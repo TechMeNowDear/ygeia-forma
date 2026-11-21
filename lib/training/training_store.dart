@@ -791,16 +791,50 @@ class TrainingStore extends ChangeNotifier {
 
   // ---------------------------------------------------------------- ιστορικό
   /// Οι προηγούμενες φορές μιας άσκησης, νεότερη πρώτη.
+  ///
+  /// Έλεγχος 20/11 (K4C-13): η ίδια άσκηση μπορεί να γραφτεί δύο φορές σε μία προπόνηση («Αλλαγή άσκησης» και πίσω στην
+  /// αρχική, ή αλλαγή σε άσκηση που υπάρχει ήδη πιο κάτω). Τότε πρώτη η καταγραφή με ενόχληση (ο κανόνας «μετά από ενόχληση
+  /// ποτέ ίδιο ή περισσότερο» δεν κρύβεται πίσω από μια δεύτερη καταγραφή), αλλιώς αυτή με το πιο πρόσφατο ✓. Πριν: όποια
+  /// ήταν πιο πάνω στη λίστα (πιεστικό με ενόχληση → αλλαγή → πίσω, 12, 12, 12 → «ανέβα σε 10,3 kg»).
   List<(DateTime, ExLog)> historyOf(String ex) {
     final out = <(DateTime, ExLog)>[];
     for (final s in sessions.reversed) {
       if (!s.finished || s.stopped) continue;
-      for (final e in s.items) {
-        if (e.ex == ex) out.add((s.start, e));
+      for (final e in sameExercise(s, ex)) {
+        out.add((s.start, e));
       }
     }
     return out;
   }
+
+  /// K4C-13: οι καταγραφές της [ex] μέσα στην προπόνηση [s], με τη σειρά που «μετρούν»: πρώτη αυτή με ενόχληση, αλλιώς αυτή
+  /// με το πιο πρόσφατο ✓, αλλιώς η σειρά της λίστας. [skip]: μια καταγραφή που δεν μετρά (η άσκηση που φεύγει στο [swap]).
+  static List<ExLog> sameExercise(Session s, String ex, {ExLog? skip}) {
+    final same = <(int, ExLog)>[];
+    for (var i = 0; i < s.items.length; i++) {
+      if (s.items[i].ex == ex && !identical(s.items[i], skip)) same.add((i, s.items[i]));
+    }
+    if (same.length > 1) {
+      int lastTick(ExLog e) {
+        var t = -1;
+        for (final x in e.log) {
+          if (x.done && (x.at ?? 0) > t) t = x.at ?? 0;
+        }
+        return t;
+      }
+
+      same.sort((a, b) {
+        final pa = a.$2.pain.isNotEmpty ? 0 : 1, pb = b.$2.pain.isNotEmpty ? 0 : 1;
+        if (pa != pb) return pa - pb;
+        final c = lastTick(b.$2).compareTo(lastTick(a.$2));
+        return c != 0 ? c : a.$1.compareTo(b.$1);
+      });
+    }
+    return [for (final x in same) x.$2];
+  }
+
+  /// Έλεγχος 20/11 (K4-R-01): στη ΣΗΜΕΡΙΝΗ προπόνηση έχει γραφτεί ενόχληση σε αυτή την άσκηση (σε όποια καταγραφή της).
+  bool painToday(String ex) => current?.items.any((x) => x.ex == ex && x.pain.isNotEmpty) ?? false;
 
   Target targetFor(PlanItem item) => nextTarget(item, historyOf(item.ex), now, caution: isCaution(item.ex));
 
@@ -823,8 +857,9 @@ class TrainingStore extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------- προπόνηση σε εξέλιξη
-  ExLog _logFor(PlanItem item) {
-    final t = targetFor(item);
+  /// [today]: καταγραφές της ίδιας άσκησης από την προπόνηση που τρέχει (μόνο στο [swap], K4-R-01), πριν από το ιστορικό.
+  ExLog _logFor(PlanItem item, {List<(DateTime, ExLog)> today = const []}) {
+    final t = today.isEmpty ? targetFor(item) : nextTarget(item, [...today, ...historyOf(item.ex)], now, caution: isCaution(item.ex));
     return ExLog(
       ex: item.ex,
       sets: item.sets,
@@ -1429,7 +1464,11 @@ class TrainingStore extends ChangeNotifier {
   /// στόχος έλεγε «πρώτη φορά, θα σε ρωτήσει πώς πήγε» και η ερώτηση δεν ερχόταν ποτέ.
   /// R7-A6-2: και μια φορά με ενόχληση (ίσως χωρίς κανένα σετ) μετρά: μετά από πόνο δεν ρωτάμε για «βαθμονόμηση» προς τα
   /// πάνω, ο στόχος βγαίνει από τον κανόνα της ενόχλησης.
-  bool isFirstTime(String ex) => !historyOf(ex).any((h) => (!h.$2.skipped && h.$2.done.isNotEmpty) || h.$2.pain.isNotEmpty);
+  /// Έλεγχος 20/11 (K4C-06): «σετ» = όσα κρίνονται ([ExLog.judged])· ένα ✓ με 0 επαναλήψεις δεν είναι φορά της άσκησης.
+  bool isFirstTime(String ex) => !historyOf(ex).any(_counts);
+
+  /// Η καταγραφή «μετρά» για τον στόχο: ίδιος κανόνας με το [nextTarget] (σετ που κρίνονται, ή ενόχληση χωρίς κανένα σετ).
+  static bool _counts((DateTime, ExLog) h) => (!h.$2.skipped && h.$2.judged.isNotEmpty) || h.$2.pain.isNotEmpty;
 
   /// ✓ σε ένα σετ. [at]: η ώρα του ✓ στο ρολόι (ms), αν ήρθε από εκεί· κρατιέται μόνο αν είναι μέσα στην προπόνηση
   /// (από την αρχή της ως τώρα + 1′, για μικρές διαφορές ρολογιού), αλλιώς η ώρα του κινητού (9/11).
@@ -1487,7 +1526,21 @@ class TrainingStore extends ChangeNotifier {
     if (e.log.isEmpty) return null;
     final item = _calibrationItem(e);
     final first = e.log.first;
-    final v = calibrate(item, first.load, first.reps, rir);
+    var v = calibrate(item, first.load, first.reps, rir);
+    // Έλεγχος 20/11 (K4-R-01): με ενόχληση γραμμένη ΣΗΜΕΡΑ σε αυτή την άσκηση, τα επόμενα σετ δεν γίνονται ποτέ βαρύτερα
+    // (το φύλλο «Πόνεσε κάπου;» γράφει ήδη «Αν πονάς, σταμάτα την άσκηση»). Πιο ελαφριά (απάντηση 0–1): όπως πριν.
+    if (v != null && _harder(e, v) && painToday(e.ex)) v = null;
+    // Έλεγχος 20/11 (K4-R-10): «0–1» στο 1ο σετ με το ΕΛΑΦΡΥΤΕΡΟ φορτίο που υπάρχει (σκέτη μπάρα, λαβή, κίτρινο λάστιχο):
+    // πιο ελαφρύ δεν βγαίνει, άρα τα σετ που μένουν με 2 επαναλήψεις λιγότερες. Πριν δεν άλλαζε τίποτα και δεν λεγόταν
+    // τίποτα: τα επόμενα σετ ζητούσαν τις ίδιες επαναλήψεις με φορτίο που μόλις έφτασε ως την εξάντληση.
+    if (v == null && noLighterAfterFirst(e, rir)) {
+      for (var k = 1; k < e.log.length; k++) {
+        if (e.log[k].done) continue;
+        final r = e.log[k].reps - 2;
+        e.log[k].reps = r < 1 ? 1 : r;
+      }
+      save();
+    }
     if (v != null) {
       // Έλεγχος 19/11 (W-3): πιο δύσκολο φορτίο → επαναλήψεις στο κάτω όριο, όπως σε κάθε άνοδο (το calibrate υπολογίζει
       // το φορτίο για το κάτω όριο· πριν έμεναν οι επαναλήψεις του στόχου, π.χ. 12 αντί για 8).
@@ -1517,8 +1570,29 @@ class TrainingStore extends ChangeNotifier {
   String? firstSetNote(ExLog e, int rir) {
     if (e.log.isEmpty) return null;
     final first = e.log.first;
+    // K4-R-01: το βάρος θα ανέβαινε, αλλά σήμερα έγραψες ενόχληση σε αυτή την άσκηση.
+    final v = calibrate(_calibrationItem(e), first.load, first.reps, rir);
+    if (v != null && _harder(e, v) && painToday(e.ex)) return firstSetPainNote;
+    if (v == null && noLighterAfterFirst(e, rir)) return firstSetNoLighterNote;
     return calibrateNote(_calibrationItem(e), first.load, first.reps, rir);
   }
+
+  /// K4-R-10: απάντηση «0–1» στο 1ο σετ και δεν υπάρχει πιο ελαφρύ φορτίο ([calibrate] = null).
+  bool noLighterAfterFirst(ExLog e, int rir) {
+    if (rir < 0 || rir >= 2 || e.log.isEmpty) return false;
+    final first = e.log.first;
+    return first.load != null && hasLoad(e.kind) && calibrate(_calibrationItem(e), first.load, first.reps, rir) == null;
+  }
+
+  static const firstSetNoLighterNote = 'Δεν υπάρχει πιο ελαφρύ: στα επόμενα σετ 2 επαναλήψεις λιγότερες, και σταμάτα όταν σου μένουν 2.';
+
+  /// Το [v] είναι πιο δύσκολο από το φορτίο του 1ου σετ της [e] (στο λάστιχο βοήθειας: λιγότερη βοήθεια).
+  static bool _harder(ExLog e, double v) {
+    final f = e.log.isEmpty ? null : e.log.first.load;
+    return f != null && (e.kind == LoadKind.bandAssist ? v < f - 1e-6 : v > f + 1e-6);
+  }
+
+  static const firstSetPainNote = 'Έγραψες ενόχληση σε αυτή την άσκηση: τα επόμενα σετ δεν γίνονται βαρύτερα.';
 
   /// R8-U3-01: το 1ο σετ μιας άσκησης «πρώτης φοράς» έγινε ✓ στο ρολόι (όχι στο κινητό, όπου ρωτά αμέσως): η οθόνη της
   /// προπόνησης, αν είναι ανοιχτή, κάνει την ίδια ερώτηση «Πρώτο σετ: πόσες ακόμα θα έβγαζες;». Μόνο στη μνήμη.
@@ -1548,8 +1622,16 @@ class TrainingStore extends ChangeNotifier {
   /// φορά δεν έβγαλε τις επαναλήψεις, και κάθε προπόνηση τελείωνε με ρεζέρβα 1 και «πιο ελαφρύ».
   /// (W-5): και όσο η άσκηση έχει γίνει μόνο από το ρολόι χωρίς ερώτηση 1ου σετ (το ρολόι ρωτά μόνο σε προπόνηση του κινητού):
   /// πριν η βαθμονόμηση χανόταν για πάντα και το βάρος έμενε στο ελαφρύ ξεκίνημα.
+  ///
+  /// Έλεγχος 20/11 (K4C-01, κρίσιμο): μετά από ενόχληση ΠΟΤΕ, όποτε κι αν γράφτηκε. Πριν κοιτούσε την ενόχληση μόνο στην πιο
+  /// πρόσφατη φορά ΜΕ σετ· αν ο πόνος γράφτηκε σε προπόνηση χωρίς κανένα σετ της άσκησης («Παράλειψη» μετά τον πόνο, ή κανένα
+  /// ✓) και η προηγούμενη φορά ήταν «όλα άνετα», ο στόχος έβγαινε «ένα σκαλί πιο ελαφριά» και, με απάντηση «4+» στο 1ο σετ,
+  /// τα επόμενα σετ γύριζαν στο φορτίο του πόνου ή πιο πάνω (π.χ. 7,8 kg → 9,3 kg· μπάρα 29,5 → 34,5 kg).
   bool stillCalibrating(String ex) {
-    final h = historyOf(ex).where((x) => !x.$2.skipped && x.$2.done.isNotEmpty).firstOrNull;
+    final hist = historyOf(ex);
+    final latest = hist.where(_counts).firstOrNull;
+    if (latest != null && latest.$2.pain.isNotEmpty) return false;
+    final h = hist.where((x) => !x.$2.skipped && x.$2.judged.isNotEmpty).firstOrNull;
     if (h == null) return false;
     if (daysBetween(h.$1, now) > recalibrateGapDays) return true;
     final e = h.$2;
@@ -1572,7 +1654,7 @@ class TrainingStore extends ChangeNotifier {
       for (final e in s.items) {
         if (e.ex != ex) continue;
         if (e.pain.isNotEmpty) return false;
-        if (e.skipped || e.done.isEmpty) continue;
+        if (e.skipped || e.judged.isEmpty) continue;
         if (e.firstAnswer != null || s.source != 'watch') return false;
         any = true;
       }
@@ -1612,7 +1694,18 @@ class TrainingStore extends ChangeNotifier {
     final base = itemOf(e);
     // Το εύρος του προγράμματος, όχι το (ίσως χαμηλωμένο για σήμερα) κάτω όριο της άσκησης που φεύγει ([loFor]).
     final item = PlanItem(ex: ex, sets: e.sets, lo: base?.lo ?? e.lo, hi: e.hi, rir: e.rir, rest: e.rest, load: base?.ex == ex ? base?.load : null);
-    final n = _logFor(item)..swappedFrom = e.swappedFrom ?? e.ex;
+    // Έλεγχος 20/11 (K4-R-01): αν η άσκηση που ξαναμπαίνει έχει ήδη καταγραφή ΣΗΜΕΡΑ (π.χ. ενόχληση → «Αλλαγή άσκησης» →
+    // πίσω στην αρχική), ο στόχος της βγαίνει και από αυτήν: ισχύει ο κανόνας της ενόχλησης. Πριν έβγαινε μόνο από τις
+    // προπονήσεις που είχαν τελειώσει: ίδιος στόχος με πριν από τον πόνο (9,3 kg × 11), και με «8–12» στο 1ο σετ 10,3 kg.
+    // (K4-R-03, ανεξάρτητος έλεγχος): ΜΟΝΟ όταν κάποια σημερινή καταγραφή της έχει ενόχληση. Χωρίς ενόχληση η άσκηση
+    // ξαναμπαίνει με τον στόχο της μέρας, όπως πριν· αλλιώς 9,3 kg × 12, 12, 12 → αλλαγή → πίσω έδινε τον στόχο της
+    // ΕΠΟΜΕΝΗΣ φοράς (10,3 kg) μέσα στην ίδια προπόνηση.
+    final sameToday = [
+      for (final x in sameExercise(cur, ex, skip: e))
+        if ((!x.skipped && x.judged.isNotEmpty) || x.pain.isNotEmpty) (cur.start, x),
+    ];
+    final today = sameToday.any((x) => x.$2.pain.isNotEmpty) ? sameToday : const <(DateTime, ExLog)>[];
+    final n = _logFor(item, today: today)..swappedFrom = e.swappedFrom ?? e.ex;
     cur.items[idx] = n;
     // R7-A8-4: ό,τι έγινε ήδη (σετ με ✓, ενόχληση) δεν χάνεται. Η άσκηση που φεύγει μένει στην προπόνηση με μόνο τα σετ
     // που έγιναν, ΣΤΟ ΤΕΛΟΣ (οι θέσεις των άλλων ασκήσεων δεν αλλάζουν: τα ✓ του ρολογιού πάνε με τη θέση), και κρατά τα

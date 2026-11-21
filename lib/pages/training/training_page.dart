@@ -976,9 +976,9 @@ class _HrLimitSheetState extends State<_HrLimitSheet> {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               decoration: BoxDecoration(color: c.tint(c.exercise), borderRadius: BorderRadius.circular(12)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('Η δόνηση βοηθά, δεν εγγυάται: πρώτα μετράει πώς νιώθεις. Με πόνο στο στήθος, δύσπνοια, ζάλη ή αίσθημα '
-                    'παλμών σταματάς, ό,τι κι αν δείχνει το ρολόι. Αν ο πόνος στο στήθος ή η δύσπνοια δεν περνούν με την ξεκούραση, μην '
-                    'περιμένεις: 166 ή 112.',
+                // Έλεγχος 20/11 (K4-S-01): ίδια συμπτώματα και ίδια συνέχεια με τη γραμμή της προπόνησης ([sessionSafetyText]).
+                Text('Η δόνηση βοηθά, δεν εγγυάται: πρώτα μετράει πώς νιώθεις. Με πόνο ή σφίξιμο $trainingSymptoms σταματάς, '
+                    'ό,τι κι αν δείχνει το ρολόι. $trainingSymptomsNext',
                     style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
                 const SizedBox(height: 6),
                 Text(hrLimitBetaBlockerText, key: const ValueKey('train-hr-beta'), style: TextStyle(fontSize: 14, height: 1.4, color: c.text)),
