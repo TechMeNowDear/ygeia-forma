@@ -546,14 +546,12 @@ void main() {
     test('stampLoadTimes: σημειώνεται μόνο φορτίο διαφορετικό από του προγράμματος που ίσχυε', () {
       final at = DateTime(2026, 12, 31, 20);
       final old = prog('${_ex('db_press', extra: ',"load":9.3')},${_ex('db_row', extra: ',"load":6.8')}');
-      // Ό,τι «loadAt» έφερε το κείμενο αγνοείται. Χωρίς παλιό πρόγραμμα κάθε φορτίο είναι νέο (Α15-5γ)· από τον
-      // επεξεργαστή (stampNew: false) δεν σημειώνεται ποτέ νέο φορτίο (Α15-3).
+      // Ό,τι «loadAt» έφερε το κείμενο αγνοείται. Χωρίς παλιό πρόγραμμα (το πρώτο σου) τίποτα δεν σημειώνεται: τα φορτία
+      // του είναι αρχικά, όπως πριν από την #150.
       final first = prog(_ex('db_press', extra: ',"load":9.3,"loadAt":123'));
       expect(pressOf(first).loadAt, 123, reason: 'το κείμενο το διαβάζει…');
       stampLoadTimes(first, null, at);
-      expect(pressOf(first).loadAt, ms(at), reason: '…αλλά η αποθήκευση βάζει τη δική της ώρα');
-      stampLoadTimes(first, null, at, stampNew: false);
-      expect(pressOf(first).loadAt, isNull);
+      expect(pressOf(first).loadAt, isNull, reason: '…αλλά η αποθήκευση το αγνοεί');
       // Ίδιο φορτίο με πριν: καμία σημείωση. Άλλο φορτίο, ή νέα άσκηση με φορτίο: σημειώνεται.
       final next = prog('${_ex('db_press', extra: ',"load":9.3,"loadAt":123')},${_ex('db_row', extra: ',"load":4.3')},'
           '${_ex('goblet', extra: ',"load":11.8')},${_ex('db_curl')}');
