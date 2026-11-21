@@ -636,7 +636,7 @@ void main() {
         },
         'data': {
           'history': {
-            '2026-12-12': {
+            '2026-12-10': {
               K.steps: 8000.0,
               K.restHr: 60.0,
               K.dayHr: 75.0,
@@ -652,8 +652,8 @@ void main() {
       };
       final sum = diagnosticsSummary(full);
       final rows = (sum['data'] as Map)['history'] as Map;
-      // Μέρα χωρίς δαχτυλίδι: όλα του ρολογιού μένουν (τις ώρες τις ορίζει ο ύπνος του ρολογιού).
-      expect((rows['2026-12-12'] as Map).keys.toSet(),
+      // Μέρα χωρίς δαχτυλίδι, και όχι παραμονή νύχτας του: όλα του ρολογιού μένουν (τις ώρες τις ορίζει ο ύπνος του ρολογιού).
+      expect((rows['2026-12-10'] as Map).keys.toSet(),
           {K.steps, K.restHr, K.dayHr, K.walkHr, K.spo2Avg, K.spo2Min, K.spo2Low, K.spo2Cov});
       // Μέρα με δαχτυλίδι: μένει μόνο ό,τι δεν εξαρτάται από τις ώρες ύπνου του.
       expect((rows['2026-12-13'] as Map).keys.toSet(), {K.steps});
@@ -772,7 +772,8 @@ void main() {
       final zone = (sum['calc'] as Map)['zone'] as Map;
       expect((zone['settings'] as Map).keys.toSet(), {'max', 'up', 'down'});
       final prefs = (sum['data'] as Map)['prefs'] as Map;
-      expect(((prefs['zone'] as Map).keys.toSet(), prefs['layout']), ({'up', 'down'}, 1));
+      expect((prefs['zone'] as Map).keys.toSet(), {'up', 'down'});
+      expect(prefs['layout'], 1);
       // (5) Σφάλματα: το μήνυμα μένει, χωρίς ψηφία.
       expect(((sum['errors'] as List).single as Map)['message'], 'Bad state: τιμή # στη θέση #');
       final text = jsonEncode(sum);
@@ -895,6 +896,17 @@ void main() {
         expect(a.$2 == b.$2, isTrue, reason: firstDiff(a.$2, b.$2));
         expect(a.$2, contains('"hrAvg":104'), reason: 'ό,τι μέτρησε το ρολόι στην προπόνηση μένει');
       });
+    });
+
+    test('K8-R-13 / K8-R-24: το αρχείο βγαίνει και με μη πεπερασμένο αριθμό, και γράφει ό,τι έγραφε το σκέτο jsonEncode', () {
+      // Πριν: ένα NaN οπουδήποτε = «Δεν φτιάχτηκε η αναφορά».
+      expect(diagnosticsEncode({'x': double.nan, 'y': double.infinity, 'z': 1.5}), '{"x":null,"y":null,"z":1.5}');
+      // Αντικείμενο με toJson() γράφεται με το toJson() του, όπως στο σκέτο jsonEncode (όχι «Instance of …»).
+      final g = _goals();
+      expect(diagnosticsEncode({'g': g}), jsonEncode({'g': g.toJson()}));
+      final r = diagnosticsFrom(store: _store(), food: _food(_at), now: _at);
+      expect(jsonDecode(diagnosticsEncode(r)), jsonDecode(jsonEncode(r)));
+      expect(jsonDecode(diagnosticsEncode(diagnosticsSummary(r))), jsonDecode(jsonEncode(diagnosticsSummary(r))));
     });
 
     test('K8-R-18 / K8-R-12: ζυγίσεις μόνο πριν από τις 60 μέρες της αναφοράς: «outsideWindow», καμία τιμή τους', () {

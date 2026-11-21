@@ -109,7 +109,17 @@ Map<String, dynamic> _prefsForReport(Map<String, dynamic> prefs, String fromKey)
 /// K8-R-13 (ανεξάρτητος έλεγχος): το `jsonEncode` πετά σφάλμα σε NaN/άπειρο, και τότε δεν βγαίνει ΚΑΘΟΛΟΥ αναφορά, ακριβώς
 /// όταν χρειάζεται (μια καταχώριση με άπειρα γραμμάρια είναι αυτό που ψάχνουν οι έλεγχοι «food-grams»/«food-values»). Με
 /// αυτό ως `toEncodable` ο μη πεπερασμένος αριθμός γράφεται null και ό,τι άλλο δεν γράφεται σε JSON γίνεται κείμενο.
-Object? diagnosticsEncodable(Object? o) => o is num ? null : '$o';
+///
+/// K8-R-24: με δικό μας `toEncodable` το `jsonEncode` δεν καλεί πια μόνο του το `toJson()` ενός αντικειμένου· το καλούμε
+/// εδώ πρώτα, αλλιώς ένα αντικείμενο με `toJson()` θα γραφόταν σιωπηλά «Instance of …».
+Object? diagnosticsEncodable(Object? o) {
+  if (o is num) return null;
+  try {
+    return (o as dynamic).toJson();
+  } catch (_) {
+    return '$o';
+  }
+}
 
 /// Η αναφορά (ή η σύνοψη) ως κείμενο JSON, χωρίς να σπάει σε μη πεπερασμένο αριθμό.
 String diagnosticsEncode(Object? report) => jsonEncode(report, toEncodable: diagnosticsEncodable);
@@ -544,34 +554,42 @@ Map<String, dynamic> diagnosticsFrom({
   final shownWeigh = d == null || d.body.isEmpty ? null : (guardBody(d.body).shown.lastOrNull ?? d.body.last);
   if (shownWeigh != null && shownWeigh.time.isBefore(from)) {
     (shown['kinds'] as Map)['body'] = <String, dynamic>{'outsideWindow': true};
-  } else if (d != null && d.body.isNotEmpty) {
+  } else if (d != null && shownWeigh != null) {
     // K8-R-12 (ανεξάρτητος έλεγχος): το γράφημα του widget είναι οι 7 τελευταίες ζυγίσεις που μετρούν, ΟΣΟ παλιές κι αν
     // είναι, και η διαφορά («−0,4 kg») είναι από την προηγούμενη. Με αραιές ζυγίσεις έμπαιναν τιμές μηνών, ενώ η αναφορά
     // λέει «τις τελευταίες 60 μέρες»: οι θέσεις του γραφήματος πριν από την πρώτη μέρα της αναφοράς γράφονται null, και αν
-    // η προηγούμενη ζύγιση είναι έξω από αυτές τις μέρες δεν γράφεται ούτε η διαφορά (μόνο ότι υπάρχει).
-    final counted = guardBody(d.body).counted;
+    // η προηγούμενη ζύγιση (αυτή με την οποία συγκρίνει το widget) είναι έξω από αυτές τις μέρες, το «Βάρος» γράφεται
+    // χωρίς τη διαφορά του (η λεζάντα, η σύντομη λεζάντα και το πρόσημο).
+    final guard = guardBody(d.body);
+    final counted = guard.counted;
     final recent = counted.length > 7 ? counted.sublist(counted.length - 7) : counted;
+    final waiting = guard.shown.isEmpty || guard.pending.contains(shownWeigh);
+    final at = counted.indexWhere((x) => identical(x, shownWeigh));
+    final prevOld = !waiting && at >= 1 && counted[at - 1].time.isBefore(from);
     final body = (shown['kinds'] as Map)['body'];
     final m = body is Map ? body['m'] : null;
-    if (counted.length >= 2 && counted[counted.length - 2].time.isBefore(from)) {
-      (shown['kinds'] as Map)['body'] = <String, dynamic>{'outsideWindow': true};
-    } else if (body is Map && m is Map && recent.any((x) => x.time.isBefore(from))) {
+    if (body is Map && m is Map && (prevOld || recent.any((x) => x.time.isBefore(from)))) {
       final old = [for (final x in recent) x.time.isBefore(from)];
       final pad = 7 - recent.length;
-      Object? masked(Object? box) {
-        final series = box is Map ? box['s'] : null;
-        if (box is! Map || series is! List) return box;
+      Object? masked(Object? key, Object? box) {
+        if (box is! Map) return box;
+        final series = box['s'];
+        final noDiff = prevOld && key == 'weight';
         return <String, dynamic>{
-          for (final e in box.entries) '${e.key}': e.value,
-          's': [
-            for (var i = 0; i < series.length; i++) i - pad >= 0 && i - pad < old.length && old[i - pad] ? null : series[i],
-          ],
+          for (final e in box.entries)
+            if (!(noDiff && (e.key == 'cap' || e.key == 'capShort' || e.key == 'd')))
+              '${e.key}': e.key == 's' && series is List
+                  ? [
+                      for (var i = 0; i < series.length; i++)
+                        i - pad >= 0 && i - pad < old.length && old[i - pad] ? null : series[i],
+                    ]
+                  : e.value,
         };
       }
 
       (shown['kinds'] as Map)['body'] = <String, dynamic>{
         for (final e in body.entries)
-          '${e.key}': e.key == 'm' ? <String, dynamic>{for (final x in m.entries) '${x.key}': masked(x.value)} : e.value,
+          '${e.key}': e.key == 'm' ? <String, dynamic>{for (final x in m.entries) '${x.key}': masked(x.key, x.value)} : e.value,
       };
     }
   }
