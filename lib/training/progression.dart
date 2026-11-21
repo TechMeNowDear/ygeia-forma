@@ -322,7 +322,8 @@ Target? _lighterByPlan(PlanItem item, List<(DateTime, ExLog)> history, Target t)
   // Ανεξάρτητος έλεγχος 21/11 (Α15-2): «πιο ελαφριά» σημαίνει και από ό,τι ΕΚΑΝΕΣ την τελευταία φορά, όχι μόνο από τον
   // επόμενο στόχο. Πρόγραμμα που γράφει τα κιλά της τελευταίας φοράς (π.χ. 9,3 kg, ενώ ήταν έτοιμη η άνοδος σε 10,3 kg)
   // δεν ζητά τίποτα πιο ελαφρύ: η πρόοδος συνεχίζει.
-  final lastLoad = usable.first.$2.load;
+  final last = usable.first.$2;
+  final lastLoad = _endLoad(last) ?? (last.log.isNotEmpty ? last.log.first.load : null);
   if (lastLoad != null && !_easier(k, plan, lastLoad)) return null;
   // Μετά από ενόχληση: ο στόχος και το κείμενό του μένουν (μικρότερο εύρος, πότε γιατρός), με το ελαφρύτερο φορτίο.
   if (t.change == Change.pain) {
