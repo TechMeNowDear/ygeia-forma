@@ -92,6 +92,12 @@ void main() {
     expect(pieceMinutesShown([5429, 8669], null), [90, 144]);
     expect(pieceMinutesShown([5429, 8669], 300), [90, 144]);
     expect(pieceMinutesShown(const [], 0), isEmpty);
+    // Διαφορά 2 λεπτών με 2 κομμάτια δεν είναι στρογγύλεμα (K7-R-12): όπως είναι.
+    expect(pieceMinutesShown([5429, 8669], 237), [90, 144]);
+    // Η κάρτα της νύχτας γράφει πράγματι αυτά τα λεπτά (K7-R-13).
+    final card = File('lib/pages/oura_sleep.dart').readAsStringSync();
+    expect(card, contains('final pieceShown = pieceMinutesShown([for (final x in parts) x.total], minutes);'));
+    expect(card, contains(r"pieceShown[i] == null ? '—' : hoursMinutes(pieceShown[i]!)"));
   });
 
   // ------------------------------------------------------------------------------------------------------- K7B
@@ -99,6 +105,8 @@ void main() {
     final src = File('lib/pages/ai_week.dart').readAsStringSync();
     expect(src, isNot(contains('toStringAsFixed')));
     expect(src, contains(r"'Κορεσμένα: ${dec(oldT.satFat)} → ${dec(newT.satFat)} g\n'"));
+    // Ο διάλογος «Να προσαρμοστούν τα επόμενα γεύματα;» γράφει πράγματι την παράγραφο του K7B-02 (K7-R-13).
+    expect(src, contains(r"'${rebalanceAssumedText(r.assumed)}'"));
   });
 
   test('K7B-16: «διάλειμμα» ανάμεσα στα σετ· «Ξεκούραση» μόνο για τη μέρα χωρίς προπόνηση', () {

@@ -802,7 +802,7 @@ class R8F3ViewTest {
             assertTrue(keys.toString(), keys.any { Regex("^0:4[5-7]$").matches(it) })
             assertFalse(keys.toString(), keys.any { it.contains("″") })
             assertTrue(v.clipped.toString(), v.clipped.isEmpty())
-            assertTrue(labels(v).toString(), "Παράλειψη της μέτρησης" in labels(v))
+            assertTrue(labels(v).toString(), "Παράλειψη της αποκατάστασης" in labels(v))
         }
     }
 

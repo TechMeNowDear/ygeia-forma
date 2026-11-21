@@ -1675,7 +1675,7 @@ class _DishesScreenState extends State<DishesScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   widget.pick
-                      ? 'Πάτημα: το γράφεις. «+»: γράφεται αμέσως, όπως την τελευταία φορά.'
+                      ? 'Πάτα ένα φαγητό για να το γράψεις. «+»: γράφεται αμέσως, όπως την τελευταία φορά.'
                       : 'Φαγητά από τα δικά σου υλικά. Τα γράφεις από το «+ Φαγητό» με ένα πάτημα.',
                   style: TextStyle(fontSize: 14.5, height: 1.4, color: c.textSecondary),
                 ),

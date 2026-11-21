@@ -162,11 +162,12 @@ void main() {
       // Το σύνολο που γράφει ο διάλογος περιέχει αυτό το γεύμα: ακριβώς αυτό λέει η νέα παράγραφος.
       expect(r.dayKcal, closeTo(t.kcal + kcal + r.changes.single.$4, 1.0));
       final text = rebalanceAssumedText(r.assumed);
-      expect(text, startsWith('Στο σύνολο μετρά και ό,τι δεν έχεις σημειώσει ακόμα: Μεσημέρι'));
-      expect(text, contains(' kcal). Αν το έφαγες ήδη, πάτα «Όχι» και σημείωσέ το πρώτα στο «Πρόγραμμα».'));
+      expect(text, startsWith('Λογαριάζω ότι θα φας ακόμα: Μεσημέρι'));
+      expect(text, contains(' kcal). Αν το έφαγες ήδη ή δεν θα το φας, πάτα «Όχι» και σημείωσέ το στο «Πρόγραμμα». Οι μερίδες τότε μένουν όπως είναι.'));
+      expect(text, isNot(contains('πρώτα')), reason: 'η ερώτηση δεν ξαναβγαίνει μετά το «Όχι»: καμία υπόσχεση');
       expect(rebalanceAssumedText(const []), '');
       expect(rebalanceAssumedText(const [(Meal.lunch, 'Φακές', 860.0), (Meal.snack, 'Γιαούρτι', 450.0)]),
-          contains('(450 kcal). Αν τα έφαγες ήδη, πάτα «Όχι» και σημείωσέ τα πρώτα'));
+          contains('(450 kcal). Αν τα έφαγες ήδη ή δεν θα τα φας, πάτα «Όχι» και σημείωσέ τα στο «Πρόγραμμα».'));
     });
   });
 

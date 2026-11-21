@@ -703,7 +703,8 @@ List<int?> pieceMinutesShown(List<int?> totalSeconds, int? night) {
     if (i != big) rest += mins[i]!;
   }
   final fixed = night - rest;
-  // Μόνο η διαφορά του στρογγυλέματος (το πολύ μισό λεπτό ανά κομμάτι)· αλλιώς κάτι άλλο δεν συμφωνεί: όπως είναι.
-  if ((fixed - mins[big]!).abs() > mins.length || fixed < 0) return mins;
+  // Μόνο η διαφορά του στρογγυλέματος (το πολύ μισό λεπτό ανά κομμάτι: 1 λεπτό με 2–3 κομμάτια, 2 με 4–5)· αλλιώς κάτι
+  // άλλο δεν συμφωνεί και μένουν όπως είναι (K7-R-12).
+  if ((fixed - mins[big]!).abs() > (mins.length + 1) ~/ 2 || fixed < 0) return mins;
   return [for (var i = 0; i < mins.length; i++) i == big ? fixed : mins[i]];
 }

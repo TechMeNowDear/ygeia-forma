@@ -1417,15 +1417,15 @@ class WatchView(context: Context, private val actions: Actions) : View(context) 
      * οι παλμοί. «Παράλειψη»: τέλος αμέσως, χωρίς μέτρηση.
      */
     private fun drawRecover(c: Canvas, now: Long) {
-        small(c, "ΠΤΩΣΗ ΠΑΛΜΩΝ", 42f, green, ess(10f), 120f)
+        small(c, "ΑΠΟΚΑΤΑΣΤΑΣΗ", 42f, green, ess(10f), 120f)
         t(c, "Κάθισε", 64f, Color.WHITE, 15f * fs, true)
         small(c, "χέρι ακίνητο, μη μιλάς", 64f + 16f * fs, Color.WHITE, ess(10.5f), 150f)
         val left = ((Repo.recoveryUntil - now + 999) / 1000).coerceAtLeast(0)
         // Round 8 (R8-U3 Β2): ίδια μορφή με την αντίστροφη μέτρηση του διαλείμματος («0:47», [clock]), όχι «47″».
         t(c, clock(left), 114f, Color.WHITE, 26f, true)
-        sayAdd("Πτώση παλμών. Κάθισε, χέρι ακίνητο, μη μιλάς. ${secondsLeftText(left)}")
+        sayAdd("Αποκατάσταση. Κάθισε, χέρι ακίνητο, μη μιλάς. ${secondsLeftText(left)}")
         heart(c, 134f, now, 11f)
-        pill(c, "Παράλειψη", 168f, 92f, 30f, card, Color.WHITE, 11f * fs, desc = "Παράλειψη της μέτρησης") { actions.finishWorkout() }
+        pill(c, "Παράλειψη", 168f, 92f, 30f, card, Color.WHITE, 11f * fs, desc = "Παράλειψη της αποκατάστασης") { actions.finishWorkout() }
     }
 
     // ------------------------------------------------------------------ τέλος

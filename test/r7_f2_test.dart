@@ -95,7 +95,7 @@ void main() {
       expect(m.reps, [15, 15]);
     });
 
-    test('χωρίς να έχει γίνει ποτέ το βαρύτερο: στο ανώτατο λέει «πες μου» και ότι υπάρχει το «+»', () {
+    test('χωρίς να έχει γίνει ποτέ το βαρύτερο: στο ανώτατο λέει «ζήτα από τον Claude» και ότι υπάρχει το «+»', () {
       final t = nextTarget(it('db_curl'), [(ago(3), done('db_curl', 2.8, [20, 20], ra: 4))], now);
       expect(t.change, Change.max);
       expect(t.reason, contains('ζήτα από τον Claude'));

@@ -76,7 +76,7 @@ class OuraStatusCard extends StatelessWidget {
     // στις ώρες ύπνου του δαχτυλιδιού)· πριν, η κάρτα έγραφε «το οξυγόνο από το ρολόι φαίνεται κανονικά».
     const emptyNight = ' νύχτα μένει κενή, μαζί και το οξυγόνο της.';
     // Round 1 (U2a-04): και η μία νύχτα που λείπει λέει τι να κάνεις (συνήθως απλώς δεν συγχρόνισε η εφαρμογή Oura).
-    const ifWorn = ' Αν το φορούσες, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά γύρνα εδώ.';
+    const ifWorn = ' Αν φορούσες το δαχτυλίδι, άνοιξε την εφαρμογή Oura για να συγχρονίσει και μετά γύρνα εδώ.';
     final nap = napTimes(store.ouraNightFor(dayOf(now)), nightOnly: true);
     final (title, text, color, button, action) = switch (s) {
       OuraStatus.waiting => (

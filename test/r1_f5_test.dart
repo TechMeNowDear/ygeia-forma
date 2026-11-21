@@ -643,7 +643,7 @@ void main() {
       await _pump(t, SingleChildScrollView(child: OuraStatusCard(store: s, now: _at15)));
       expect(find.textContaining('φαίνεται κανονικά'), findsNothing);
       expect(find.textContaining('μαζί και το οξυγόνο της'), findsOneWidget);
-      expect(find.textContaining('Αν το φορούσες, άνοιξε την εφαρμογή Oura'), findsOneWidget);
+      expect(find.textContaining('Αν φορούσες το δαχτυλίδι, άνοιξε την εφαρμογή Oura'), findsOneWidget);
       expect(find.text('Ενημέρωση τώρα'), findsOneWidget);
     });
 
