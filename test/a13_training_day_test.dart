@@ -68,6 +68,7 @@ TrainingStore _store(DateTime Function() clock, List<Session> sessions) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('trainingDay: 00:00–03:59 ανήκει στην προηγούμενη μέρα· τα μεσάνυχτα ακριβώς είναι ημερομηνία', () {
     expect(trainingDayStartHour, 4);
     expect(trainingDay(DateTime(2026, 11, 21, 0, 30)), DateTime(2026, 11, 20));

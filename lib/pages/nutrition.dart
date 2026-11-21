@@ -580,15 +580,30 @@ class _MealCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CardHeader(
-              icon: mealIcon(meal),
-              title: mealLabel(meal),
-              color: c.food,
-              trailing: TextButton.icon(
-                onPressed: food.loaded ? () => openAddFood(context, food, meal: meal, day: day) : null,
-                icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text('Προσθήκη'),
-              ),
+            // Wrap: με μεγάλα γράμματα σε στενή οθόνη το «Προσθήκη» πάει στη δεύτερη γραμμή αντί να ξεχειλίζει.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconBadge(mealIcon(meal), c.food, size: 30),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        mealLabel(meal),
+                        style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w600, color: c.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: food.loaded ? () => openAddFood(context, food, meal: meal, day: day) : null,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text('Προσθήκη'),
+                ),
+              ],
             ),
             if (copyButton != null) Align(alignment: Alignment.centerLeft, child: copyButton),
           ],

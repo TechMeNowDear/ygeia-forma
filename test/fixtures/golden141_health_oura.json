@@ -259,6 +259,7 @@
       "bedtime_start": "2026-10-25T22:05:00.000Z",
       "day": "2026-10-26",
       "id": "s-1026",
+      "low_battery_alert": true,
       "time_in_bed": 24300,
       "total_sleep_duration": 21600,
       "type": "long_sleep",
@@ -270,10 +271,6 @@
     "napTimes": "",
     "napTimes nightOnly": "",
     "nightMinutes": 360,
-    "row": {
-     "o.sleepMin": 360.0,
-     "o.wake": 770.0
-    },
     "score|readiness|temp|spo2": "null|null|null|null",
     "shortNight|onlyNap|hasAny": "false|false|true"
    },
@@ -349,10 +346,7 @@
     "o.sleepScore": 85.0,
     "o.wake": 850.0
    },
-   "2026-10-26": {
-    "o.sleepMin": 360.0,
-    "o.wake": 770.0
-   },
+   "2026-10-26": {},
    "2026-10-27": {
     "o.napMin": 25.0
    }

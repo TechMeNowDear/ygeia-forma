@@ -206,7 +206,8 @@ void main() {
       for (final k in [K.deepPct, K.remPct, K.awakeMin, K.sleepHr, K.lowHr, K.hrv, K.breath, K.bedtime, K.sleepScore, K.energy, K.skinTemp]) {
         expect(row.containsKey(ouraKeys[k]), isFalse, reason: k);
       }
-      expect(row[ouraKeys[K.wake]], isNotNull);
+      // Και το ξύπνημα: με άδεια μπαταρία η ώρα του τέλους δεν είναι σίγουρη.
+      expect(row.containsKey(ouraKeys[K.wake]), isFalse);
     });
 
     test('late_nap και χαλασμένη εγγραφή: ο υπνάκος χωριστά, η χαλασμένη παραλείπεται και μετριέται', () {
