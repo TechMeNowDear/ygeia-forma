@@ -96,10 +96,57 @@ class ErrorReporter {
   final Map<String, DateTime> _recent = {};
   final List<Map<String, Object?>> _early = [];
 
-  /// Τα τελευταία σφάλματα αυτής της εκτέλεσης, ΜΟΝΟ στη μνήμη, για την «Αναφορά για έλεγχο» (μπαίνουν και με κλειστή
-  /// την αποστολή· δεν φεύγουν από το κινητό αν δεν τα στείλει ο ίδιος ο χρήστης).
+  /// Τα τελευταία σφάλματα, για την «Αναφορά για έλεγχο» (μπαίνουν και με κλειστή την αποστολή· δεν φεύγουν από το κινητό
+  /// αν δεν τα στείλει ο ίδιος ο χρήστης).
+  /// Έλεγχος 21/11 (K8-06): γράφονται και σε ένα μικρό αρχείο ([recentFile], ως [recentMax] γραμμές) και διαβάζονται στο
+  /// επόμενο άνοιγμα, σημειωμένα «run: previous». Πριν ζούσαν ΜΟΝΟ στη μνήμη: ό,τι πήγε στραβά χθες το βράδυ είχε χαθεί
+  /// όταν έβγαινε η αναφορά το επόμενο πρωί.
   final List<Map<String, Object?>> recentErrors = [];
   static const recentMax = 30;
+
+  /// Το αρχείο των τελευταίων σφαλμάτων, μέσα στον φάκελο της ουράς (δεν μπαίνει σε κανένα αντίγραφο). Το όνομα ΔΕΝ
+  /// τελειώνει σε «.json»: ό,τι τελειώνει σε «.json» εκεί είναι γεγονός προς αποστολή (το στέλνει και το σβήνει η ουρά,
+  /// από εδώ και από την πλευρά Android)· αυτό δεν στέλνεται ποτέ (όπως το «.count»).
+  static const recentFile = '.recent';
+  bool _recentRead = false;
+  Future<void> _recentWrites = Future.value();
+  final Map<String, DateTime> _recentSaved = {};
+
+  /// Διαβάζει μία φορά τα σφάλματα της προηγούμενης εκτέλεσης και τα βάζει ΠΡΙΝ από τα τωρινά, με «run: previous».
+  Future<void> _readRecent() async {
+    final d = dir;
+    if (_recentRead || d == null) return;
+    _recentRead = true;
+    try {
+      final f = File('${d.path}/$recentFile');
+      if (!await f.exists()) return;
+      final j = jsonDecode(await f.readAsString());
+      if (j is! List) return;
+      final old = <Map<String, Object?>>[
+        for (final x in j)
+          if (x is Map) {for (final e in x.entries) '${e.key}': e.value, 'run': 'previous'},
+      ];
+      recentErrors.insertAll(0, old);
+      if (recentErrors.length > recentMax) recentErrors.removeRange(0, recentErrors.length - recentMax);
+    } catch (_) {
+      // Χαλασμένο αρχείο: σαν να μην υπήρχε.
+    }
+  }
+
+  /// Γράφει τα [recentErrors] στο αρχείο (μία εγγραφή τη φορά, με τη σειρά). Χωρίς φάκελο: τίποτα.
+  Future<void> _writeRecent() {
+    final d = dir;
+    if (d == null) return Future.value();
+    final text = jsonEncode(recentErrors);
+    return _recentWrites = _recentWrites.then((_) async {
+      try {
+        if (!await d.exists()) await d.create(recursive: true);
+        await File('${d.path}/$recentFile').writeAsString(text, flush: true);
+      } catch (_) {
+        // Η αναφορά σφαλμάτων δεν πρέπει ποτέ να χαλάσει την εφαρμογή.
+      }
+    });
+  }
 
   /// Φάκελος, έκδοση και συσκευή, όταν έρθουν από την πλευρά Android.
   /// Ό,τι σφάλμα έγινε ως τότε μπαίνει τώρα στην ουρά.
@@ -108,6 +155,10 @@ class ErrorReporter {
     this.release = release;
     this.device = device;
     sending.value = enabled;
+    // K8-06: τα σφάλματα της προηγούμενης εκτέλεσης· και ό,τι έγινε ως τώρα σε αυτήν γράφεται (αν έγινε κάτι).
+    final hadNow = recentErrors.isNotEmpty;
+    await _readRecent();
+    if (hadNow) await _writeRecent();
     final early = List.of(_early);
     _early.clear();
     if (!enabled) {
@@ -143,6 +194,8 @@ class ErrorReporter {
       if (isNoise(error)) return;
       recentErrors.add({
         'at': _clock().toIso8601String(),
+        // K8-13: και σε ms (η ώρα χωρίς ζώνη δεν ξεχωρίζει την επαναλαμβανόμενη ώρα της αλλαγής ώρας).
+        'atMs': _clock().millisecondsSinceEpoch,
         'type': (error is FlutterErrorDetails ? error.exception : error).runtimeType.toString(),
         'message': _message(error),
         'screen': screen,
@@ -153,6 +206,17 @@ class ErrorReporter {
         ],
       });
       if (recentErrors.length > recentMax) recentErrors.removeAt(0);
+      // K8-06: και στο αρχείο, ώστε να επιζήσει από το κλείσιμο της εφαρμογής (και με κλειστή την αποστολή: μένει στο κινητό).
+      // Το ίδιο σφάλμα γράφεται στο αρχείο το πολύ μία φορά στο [dedupeWindow]: ένα σφάλμα που επαναλαμβάνεται σε κάθε
+      // καρέ δεν γράφει στον δίσκο σε κάθε καρέ (μπαταρία).
+      if (!_recentRead) await _readRecent();
+      final savedSig = '${recentErrors.last['type']}:${recentErrors.last['message']}';
+      final savedNow = _clock();
+      final savedLast = _recentSaved[savedSig];
+      if (savedLast == null || savedNow.difference(savedLast) >= dedupeWindow) {
+        _recentSaved[savedSig] = savedNow;
+        await _writeRecent();
+      }
       if (!enabled) return;
       final sig = '${error.runtimeType}:${_firstLine(error.toString())}';
       final now = _clock();

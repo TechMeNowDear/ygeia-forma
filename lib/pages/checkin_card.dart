@@ -31,40 +31,14 @@ class CheckInSlot extends StatelessWidget with SelfSpaced {
                 check: c,
                 store: store,
                 now: now,
-                estShare: c.est == null
-                    ? null
-                    : estimatedShare(food, c.est!.from, c.est!.to,
-                        minKcal: adaptFullDayShare * c.goals.kcal, maxKcal: absurdDayKcal(c.formulaTdee))),
+                estShare: checkInEstShare(c, food)),
           );
         },
       );
 
-  static CheckIn? pendingFor(HealthStore store, FoodStore food, DateTime now) {
-    final g = store.goals;
-    final d = store.data;
-    if (g == null || d == null || !food.loaded) return null;
-    // Round 1 (f3 · S1-10): όσο φαίνεται το αντίγραφο του παρασκηνίου ([Dashboard.background]: όχι πλήρης ανάγνωση·
-    // από παλιότερη έκδοση, ζυγίσεις μόνο 30 ημερών) η κάρτα περιμένει την πλήρη ανάγνωση της εφαρμογής. Πριν, στο
-    // άνοιγμα έβγαινε από μέρος των ζυγίσεων και μπορούσε να δείξει άλλη πρόταση από αυτήν λίγα δευτερόλεπτα μετά.
-    if (d.background) return null;
-    // Round 1 (f1 · S11-2): ζύγιση που δεν μπορεί να είναι δική σου δεν μπαίνει στον έλεγχο· η κάρτα τη γράφει.
-    // Round 1 (f1 · S11-8): αν οι ζυγίσεις δεν διαβάστηκαν τώρα, η κάρτα δεν γράφει «έγιναν 0 ζυγίσεις» και το
-    // «Εντάξει» δεν ξοδεύει τον έλεγχο της εβδομάδας: τη μέρα ελέγχου λέει ότι δεν διαβάστηκαν, χωρίς κουμπί.
-    // Χωρίς ζυγίσεις στην ανάγνωση και χωρίς σφάλμα (δεν δόθηκε άδεια): καμία κάρτα· ο έλεγχος μένει ανοιχτός ως να
-    // διαβαστούν (πριν: «έγιναν 0 ζυγίσεις» και το «Εντάξει» ξόδευε τον έλεγχο).
-    final bodyFailed = d.failed.contains('body');
-    if (!d.bodyOk && !bodyFailed) return null;
-    final w = guardedWeights(d.body);
-    return pendingCheckIn(
-      goals: g,
-      today: now,
-      weights: w.used,
-      foreign: w.foreign,
-      weightsRead: d.bodyOk && !bodyFailed,
-      intake: (from, to) => dailyIntake(food, from, to),
-      quitDay: store.profile.quitDate,
-    );
-  }
+  /// Έλεγχος 21/11 (K8-01): οι όροι και η κλήση ζουν στο [checkInShown] (adaptive_check.dart), ώστε η «Αναφορά για
+  /// έλεγχο» να γράφει ακριβώς την κάρτα της οθόνης. Καμία αλλαγή συμπεριφοράς εδώ.
+  static CheckIn? pendingFor(HealthStore store, FoodStore food, DateTime now) => checkInShown(store, food, now).check;
 }
 
 String _kcal(num v) => thousands((v / 10).round() * 10);

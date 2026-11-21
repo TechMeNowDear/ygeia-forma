@@ -10,19 +10,27 @@ import '../food/food_store.dart';
 import '../theme.dart';
 import '../training/training_device.dart';
 import '../training/training_store.dart';
+import '../vitals.dart' show VitalsStore;
 
 /// «Αναφορά για έλεγχο» (αίτημα χρήστη 12/11): σημείωση + ένα αρχείο στις Λήψεις, και κοινοποίηση. Τίποτα δεν φεύγει
 /// μόνο του από το κινητό.
 ///
 /// Round 7 (R7-A11-2): τα κείμενα λένε την αλήθεια για το αρχείο: έχει ΟΛΑ τα δεδομένα (και του Oura), μένει στις Λήψεις
 /// χωρίς κλείδωμα, και όποιος το λάβει (π.χ. μια υπηρεσία AI) τα βλέπει. Το ίδιο λέει η πολιτική απορρήτου.
+///
+/// Έλεγχος 21/11 (K8-03 / K8-17): το αρχείο έχει πια και πίεση, σάκχαρο, καρδιογραφήματα (πριν έλειπαν, ενώ το κείμενο
+/// έλεγε «όλα τα δεδομένα υγείας σου»), και το κείμενο λέει ότι από Samsung και Oura μπαίνουν οι τελευταίες 60 μέρες.
 const diagnosticsIntroText = 'Ένα αρχείο με ό,τι έχεις γράψει και ό,τι διάβασε και υπολόγισε η εφαρμογή: φαγητό, '
-    'ζυγίσεις, μέση, ύπνο και παλμούς (και του Oura), βήματα, στόχους, διόρθωση θερμίδων, ζώνη, προπονήσεις, και '
-    'αυτόματους ελέγχους για λάθη. Στείλ’ το σε όποιον θα το ελέγξει, π.χ. στη συζήτηση με τον Claude.';
+    'ζυγίσεις, μέση, πίεση και σάκχαρο, ύπνο και παλμούς (και του Oura), βήματα, στόχους, διόρθωση θερμίδων, ζώνη, '
+    'προπονήσεις, και αυτόματους ελέγχους για λάθη. Στείλ’ το σε όποιον θα το ελέγξει.';
 
-const diagnosticsPrivacyText = 'Έχει όλα τα δεδομένα υγείας σου και μένει στις Λήψεις χωρίς κλείδωμα: όποιος το ανοίξει, '
-    'τα διαβάζει. Η εφαρμογή δεν το στέλνει πουθενά μόνη της· αν το στείλεις σε μια υπηρεσία AI (π.χ. τον Claude), '
-    'εκείνη βλέπει όλα όσα έχει, και τα δεδομένα του Oura. Δεν έχει κωδικούς ή κλειδιά σύνδεσης.';
+const diagnosticsPrivacyText = 'Έχει όλα τα δεδομένα υγείας σου (από Samsung και Oura τις τελευταίες 60 μέρες) και μένει '
+    'στις Λήψεις χωρίς κλείδωμα: όποιος το ανοίξει, τα διαβάζει. Η εφαρμογή δεν το στέλνει πουθενά μόνη της· αν το '
+    'στείλεις σε μια υπηρεσία AI (π.χ. τον Claude), εκείνη βλέπει όλα όσα έχει, και τα δεδομένα του Oura. Δεν έχει '
+    'κωδικούς ή κλειδιά σύνδεσης.';
+
+/// Έλεγχος 21/11 (K8-08): η γραμμή κάτω από το κουμπί «Σύνοψη για τον Claude».
+const diagnosticsSummaryText = 'Μικρό αρχείο, χωρίς τα δεδομένα του Oura. Αυτό δίνεις στον Claude.';
 
 Future<void> openDiagnostics(BuildContext context, HealthStore store, FoodStore food) => showModalBottomSheet<void>(
       context: context,
@@ -35,9 +43,12 @@ Future<void> openDiagnostics(BuildContext context, HealthStore store, FoodStore 
     );
 
 class DiagnosticsSheet extends StatefulWidget {
-  const DiagnosticsSheet({super.key, required this.store, required this.food, this.save});
+  const DiagnosticsSheet({super.key, required this.store, required this.food, this.save, this.vitals});
   final HealthStore store;
   final FoodStore food;
+
+  /// Πίεση, σάκχαρο, καρδιογράφημα (K8-03)· χωρίς: του κινητού ([VitalsStore.main]). Άλλο δίνουν μόνο οι δοκιμές.
+  final VitalsStore? vitals;
 
   /// Για τις δοκιμές: αντί για το Android (αποθήκευση στις Λήψεις).
   final Future<Map<String, dynamic>> Function(String json, String name)? save;
@@ -58,7 +69,9 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
     super.dispose();
   }
 
-  Future<void> _make() async {
+  /// [summary]: η «Σύνοψη για τον Claude» (K8-08): το ίδιο αρχείο, μικρό, ασυμπίεστο και χωρίς τα δεδομένα του Oura
+  /// ([diagnosticsSummary]). Χωρίς αυτό: η πλήρης αναφορά, όπως πριν.
+  Future<void> _make({bool summary = false}) async {
     final mq = MediaQuery.of(context);
     final c = Aigaio.of(context);
     setState(() {
@@ -75,6 +88,7 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
         now: now,
         note: _note.text.trim(),
         reporter: errors,
+        vitals: widget.vitals,
         rest: await TrainingDevice.restStats(),
         screen: {
           'w': mq.size.width.round(),
@@ -84,8 +98,8 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
           'dark': c.dark,
         },
       );
-      final name = diagnosticsFileName(now);
-      final r = await (widget.save ?? FoodChannel.saveBackup)(jsonEncode(report), name);
+      final name = summary ? diagnosticsSummaryFileName(now) : diagnosticsFileName(now);
+      final r = await (widget.save ?? FoodChannel.saveBackup)(jsonEncode(summary ? diagnosticsSummary(report) : report), name);
       if (!mounted) return;
       if (r['ok'] == true && r['uri'] is String) {
         final checks = report['checks'] as List;
@@ -93,6 +107,7 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
         setState(() {
           _uri = r['uri'] as String;
           _result = 'Αποθηκεύτηκε στις Λήψεις: ${r['name'] ?? name}. '
+              '${summary ? 'Δεν έχει τα δεδομένα του Oura. ' : ''}'
               '${bad == 0 ? 'Οι αυτόματοι έλεγχοι δεν βρήκαν τίποτα.' : 'Οι αυτόματοι έλεγχοι βρήκαν $bad θέματα· θα φανούν στον έλεγχο.'}';
         });
         if (widget.save == null) await FoodChannel.shareBackup(_uri!);
@@ -143,6 +158,17 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
           icon: const Icon(Icons.ios_share_rounded, size: 20),
           label: Text(_busy ? 'Φτιάχνεται…' : 'Φτιάξε και στείλε'),
         ),
+        // Έλεγχος 21/11 (K8-08): δεύτερο κουμπί, για το αρχείο που δίνεται σε AI: μικρό, απλό κείμενο, χωρίς το Oura.
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          key: const ValueKey('diag-summary'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          onPressed: _busy ? null : () => _make(summary: true),
+          icon: const Icon(Icons.description_outlined, size: 20),
+          label: const Text('Σύνοψη για τον Claude'),
+        ),
+        const SizedBox(height: 6),
+        Text(diagnosticsSummaryText, key: const ValueKey('diag-summary-note'), style: small),
         if (_result != null) ...[
           const SizedBox(height: 12),
           Text(_result!, key: const ValueKey('diag-result'), style: body),

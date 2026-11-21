@@ -659,6 +659,16 @@ class AdaptLog {
     required this.applied,
     this.fast = false,
     this.lowLog = false,
+    this.from,
+    this.to,
+    this.meanIntake,
+    this.slope,
+    this.se,
+    this.intakeDays,
+    this.weighIns,
+    this.kg,
+    this.kind,
+    this.why,
   });
   final String day;
   final double tdee;
@@ -667,8 +677,43 @@ class AdaptLog {
   final bool fast;
   final bool lowLog;
 
-  Map<String, dynamic> toJson() =>
-      {'d': day, 'te': tdee, 'k0': before, 'k1': after, if (applied) 'ap': true, if (fast) 'f': true, if (lowLog) 'lo': true};
+  /// Έλεγχος 21/11 (K8-02): ΜΕ ΤΙ κρίθηκε ο έλεγχος, για να ξαναελέγχεται αργότερα από την «Αναφορά για έλεγχο». Πριν από
+  /// τον έλεγχο έμενε μόνο «μέρα, εκτίμηση, πριν, μετά»: αν στο μεταξύ διορθωνόταν μια καταχώριση ή βεβαιωνόταν μια
+  /// ζύγιση, ο επανυπολογισμός έβγαζε άλλον αριθμό και δεν φαινόταν αν έφταιγε η εφαρμογή ή τα δεδομένα που άλλαξαν.
+  /// Όλα προαιρετικά: γραμμή από παλιό αρχείο (χωρίς αυτά) διαβάζεται ίδια, και κλειδί χωρίς τιμή δεν γράφεται. Καμία
+  /// οθόνη και κανένας υπολογισμός δεν τα διαβάζει.
+  /// [from]/[to]: το παράθυρο («wf», «wt»). [meanIntake]: μέσος όρος φαγητού, kcal («mi»). [slope]: kg την εβδομάδα
+  /// («sl»). [se]: τυπικό σφάλμα, kcal («se»). [intakeDays]/[weighIns]: μέρες φαγητού και ζυγίσεις που μέτρησαν («nd»,
+  /// «nw»). [kg]: το βάρος του ρυθμού («kg»). [kind]: το είδος της κάρτας («kd»). [why]: γιατί ο στόχος έμεινε ή κόπηκε
+  /// («wh»: noise, tooFast, held, quit, recent, floor, underweight).
+  final String? from, to;
+  final int? meanIntake;
+  final double? slope;
+  final int? se;
+  final int? intakeDays, weighIns;
+  final double? kg;
+  final String? kind;
+  final String? why;
+
+  Map<String, dynamic> toJson() => {
+        'd': day,
+        'te': tdee,
+        'k0': before,
+        'k1': after,
+        if (applied) 'ap': true,
+        if (fast) 'f': true,
+        if (lowLog) 'lo': true,
+        if (from != null) 'wf': from,
+        if (to != null) 'wt': to,
+        if (meanIntake != null) 'mi': meanIntake,
+        if (slope != null) 'sl': slope,
+        if (se != null) 'se': se,
+        if (intakeDays != null) 'nd': intakeDays,
+        if (weighIns != null) 'nw': weighIns,
+        if (kg != null) 'kg': kg,
+        if (kind != null) 'kd': kind,
+        if (why != null) 'wh': why,
+      };
 
   static AdaptLog? fromJson(Object? j) {
     if (j is! Map) return null;
@@ -683,8 +728,24 @@ class AdaptLog {
         after: k1.toInt(),
         applied: j['ap'] == true,
         fast: j['f'] == true,
-        lowLog: j['lo'] == true);
+        lowLog: j['lo'] == true,
+        // K8-02: προαιρετικά· ό,τι λείπει ή δεν έχει το σωστό είδος μένει null (η γραμμή δεν απορρίπτεται ποτέ γι' αυτά).
+        from: _logDay(j['wf']),
+        to: _logDay(j['wt']),
+        meanIntake: _logInt(j['mi']),
+        slope: _logNum(j['sl']),
+        se: _logInt(j['se']),
+        intakeDays: _logInt(j['nd']),
+        weighIns: _logInt(j['nw']),
+        kg: _logNum(j['kg']),
+        kind: _logWord(j['kd']),
+        why: _logWord(j['wh']));
   }
+
+  static String? _logDay(Object? v) => v is String && isDayKey(v) ? v : null;
+  static int? _logInt(Object? v) => v is num && v.isFinite ? v.toInt() : null;
+  static double? _logNum(Object? v) => v is num && v.isFinite ? v.toDouble() : null;
+  static String? _logWord(Object? v) => v is String && v.isNotEmpty && v.length <= 24 ? v : null;
 }
 
 /// «0,45 kg την εβδομάδα» για έναν ρυθμό και βάρος. Με δύο δεκαδικά (έλεγχος 13/11, S1-8 / U3b-1): με ένα, τα 0,45 kg

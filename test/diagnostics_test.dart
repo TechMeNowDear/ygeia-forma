@@ -12,6 +12,7 @@ import 'package:ygeia_forma/history.dart';
 import 'package:ygeia_forma/pages/diagnostics_sheet.dart';
 import 'package:ygeia_forma/profile.dart';
 import 'package:ygeia_forma/theme.dart';
+import 'package:ygeia_forma/vitals.dart' show MemoryVitalsIO, VitalsStore;
 
 import 'sample_checkin.dart';
 import 'sample_data.dart';
@@ -101,6 +102,8 @@ void main() {
         body: DiagnosticsSheet(
           store: _store(),
           food: checkinFood(_at),
+          // Έλεγχος 21/11 (K8-03): η αναφορά διαβάζει πια και πίεση/σάκχαρο· στη δοκιμή δικό της, άδειο αρχείο μετρήσεων.
+          vitals: VitalsStore(io: MemoryVitalsIO()),
           save: (json, n) async {
             saved = json;
             name = n;
