@@ -566,9 +566,12 @@ void main() {
     });
 
     test('πιο ελαφρύ φορτίο χωρίς διακοπή και χωρίς ενόχληση: «πτώση» (μένει)', () {
-      final p = one([_lift(10, [_log('db_press', 9.3, [8, 7, 6])]), _lift(3, [_log('db_press', 7.8, [8, 8, 8])])], 'db_press');
+      final p = one([_lift(10, [_log('db_press', 9.3, [8, 8, 8])]), _lift(3, [_log('db_press', 7.8, [8, 8, 8])])], 'db_press');
       expect(p.eased, isNull);
       expect(p.change, StrengthChange.down);
+      // Πιο ελαφρύ με περισσότερες επαναλήψεις: «βάρος ↓, επαναλήψεις ↑», όπως πριν (η ανοχή με άλλο φορτίο δεν άλλαξε).
+      final more = one([_lift(10, [_log('db_press', 9.3, [8, 7, 6])]), _lift(3, [_log('db_press', 7.8, [8, 8, 8])])], 'db_press');
+      expect(more.change, StrengthChange.mixed);
     });
 
     // K4-R-04: με ΑΛΛΟ φορτίο μένει η παλιά ανοχή (1 στο σύνολο)· αλλιώς αντιφάσκει με το ⓘ της ίδιας οθόνης.
